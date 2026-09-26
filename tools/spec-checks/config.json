@@ -1,0 +1,13 @@
+{
+  "testFileGlobs": [
+    "systems/*/{apps,packages}/**/*.{test,spec}.{ts,tsx}",
+    "systems/*/{apps,packages}/**/test/**/*.ts",
+    "systems/*/e2e/**/*.ts",
+    "systems/*/infra/**/*.tftest.hcl",
+    "systems/*/infra/**/*_test.rego",
+    "systems/*/infra/{tools,test}/**/*.test.ts",
+    "tools/**/*.test.ts"
+  ],
+  "testFileExcludes": ["**/node_modules/**"],
+  "prefixTable": "docs/specs/README.md"
+}
