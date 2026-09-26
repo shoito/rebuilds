@@ -115,14 +115,14 @@ outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at
 | 層 | 選定 | AI エージェント視点での理由 |
 | --- | --- | --- |
 | 言語 | TypeScript（フロント・バック共通） | 型を API 契約として共有でき、エージェントが境界をまたいでも整合を保ちやすい |
-| API | Hono＋Zod | スキーマから型と OpenAPI を生成できる。仕様と実装のずれを機械的に検出できる |
+| API | Hono RPC＋Zod | API の型をクライアントが直接参照し、生成を挟まずに契約を共有できる。入出力の変更が型検査の失敗として即座に見える（ADR-0008） |
 | Gateway | Node.js＋`ws` | 同じ言語・同じイベント型を使える |
 | DB | PostgreSQL 17＋Drizzle | SQL に近く、生成されるクエリが読みやすい。マイグレーションをレビューしやすい |
 | Web | React＋TanStack Query＋Vite | 学習データが多く、エージェントの出力品質が安定する |
 | テスト | Vitest、fast-check、Testcontainers、Playwright | 実 DB・実ブラウザで検証でき、モックで誤魔化せない |
 | ローカル環境 | Docker Compose（Postgres、Redis、MinIO） | エージェントが 1 コマンドで起動・破棄できる |
 
-詳細は [ADR-0007](decisions/0007-typescript-stack.md)。
+詳細は [ADR-0007](decisions/0007-typescript-stack.md)、API の契約の持ち方は [ADR-0008](decisions/0008-hono-rpc-for-api-contract.md)。
 
 ## 6. 主な決定
 
@@ -135,6 +135,7 @@ outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at
 | [0005](decisions/0005-single-authorization-check.md) | 権限判定を 1 つの関数に集約する |
 | [0006](decisions/0006-message-body-ast.md) | 本文は独自の軽量 AST（JSON） |
 | [0007](decisions/0007-typescript-stack.md) | TypeScript で統一した技術スタック |
+| [0008](decisions/0008-hono-rpc-for-api-contract.md) | API の契約を Hono RPC の型で共有する。WebSocket イベントは Zod スキーマで検証する |
 
 ## 7. リスクと未解決事項
 

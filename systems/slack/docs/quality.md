@@ -43,7 +43,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 単体 | ドメインロジック（権限判定、AST 変換、未読計算） | Vitest | 保存時、PR |
 | 表駆動 | `DT-...`：`spec.md` の決定表を直接読み込み、各行を 1 ケースにする | Vitest | PR |
 | 性質ベース | `PROP-...`：順序、冪等性、権限、XSS | fast-check | PR |
-| 契約 | API とイベントが契約（Zod / OpenAPI）に一致する | 契約から生成したテスト | PR |
+| 契約 | HTTP：Hono RPC のクライアント型のスナップショットに差分がない。WebSocket：送受信するイベントが Zod スキーマに一致する | tsc、Vitest | PR |
 | 結合 | API ＋ 実 DB ＋ Redis | Testcontainers | PR |
 | 障害注入 | Redis 停止、Gateway 再起動、遅延・重複 | Toxiproxy | PR（短縮版）、夜間（完全版） |
 | E2E | 複数ブラウザでの会話シナリオ | Playwright（ブラウザ 2〜3 個を同時に使う） | PR（主要シナリオ）、夜間（全件） |

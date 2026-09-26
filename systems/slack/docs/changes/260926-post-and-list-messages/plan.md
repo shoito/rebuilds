@@ -9,12 +9,14 @@
 最初の変更なので、モノレポの骨格も作る。パスは `systems/slack/` からの相対パス。
 
 - `package.json`、`pnpm-workspace.yaml`、`tsconfig.base.json`、`compose.yaml`（新規）
-- `packages/contract/src/messages.ts`（新規）：Zod スキーマ、OpenAPI 生成
+- `packages/contract/src/messages.ts`（新規）：投稿・履歴取得の入出力の Zod スキーマ
+- `packages/api-client/src/index.ts`（新規）：`hcWithType`。コンパイル結果の `.d.ts` を API の表面のスナップショットとしてコミットする（ADR-0008）
 - `packages/db/src/schema.ts`、`packages/db/migrations/0001_init.sql`（新規）
 - `packages/db/seed.ts`（新規）
 - `apps/api/src/domain/authorization.ts`（新規）：`canReadChannel` / `canPostToChannel`
 - `apps/api/src/domain/post-message.ts`、`apps/api/src/domain/list-messages.ts`（新規）
-- `apps/api/src/routes/messages.ts`（新規）
+- `apps/api/src/app.ts`（新規）：ルートをまとめ、`AppType` を export する
+- `apps/api/src/routes/messages.ts`（新規）：メソッドチェーンで定義し、`c.json()` にステータスコードを明示する
 - `apps/api/test/messages.test.ts`（新規）：シナリオの結合テスト
 - `apps/api/test/messages.property.test.ts`（新規）：PROP-MSG-001, 002
 - `apps/api/test/messages.decision-table.test.ts`（新規）：DT-MSG-001
@@ -25,7 +27,7 @@
 ## Order of work
 
 - [ ] 1. モノレポの骨格、`compose.yaml`（Postgres）、CI（型検査・lint・テスト）
-- [ ] 2. 契約：投稿・履歴取得のスキーマ（REQ-MSG-001, 004, 006）→ **人間がレビューして確定**
+- [ ] 2. 契約：投稿・履歴取得のスキーマと、空のハンドラーを持つルート、`packages/api-client` とそのスナップショット（REQ-MSG-001, 004, 006）→ **人間がレビューして確定**
 - [ ] 3. DB スキーマとマイグレーション：`workspaces`、`users`、`channels`、`channel_members`、`messages`
 - [ ] 4. 権限判定関数（REQ-MSG-003, 005）
 - [ ] 5. 投稿：採番、冪等性、本文検証（REQ-MSG-001, 002, 003, 006）
@@ -54,3 +56,4 @@
 | 再送を任意に含んでも冪等 | PROP-MSG-002 | 性質ベーステスト |
 | 権限・本文・再送の組み合わせと優先順位 | DT-MSG-001 | 表駆動テスト（`spec.md` から読み込み、4 行 = 4 ケース） |
 | すべての ID（REQ・PROP・DT）がテストから参照されている | — | `scripts/check-req-ids.ts` が CI で通る |
+| 契約が確定したものから変わっていない | ADR-0008 | クライアント型のスナップショットの差分検査が CI で通る |

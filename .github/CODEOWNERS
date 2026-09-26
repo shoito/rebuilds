@@ -21,3 +21,7 @@
 
 # Ops
 /systems/*/docs/runbooks/           @shoito
+
+# API contract (Dev tech lead) — see systems/slack/docs/decisions/0008
+/systems/*/packages/contract/       @shoito
+/systems/*/packages/api-client/     @shoito
