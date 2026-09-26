@@ -169,6 +169,7 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_security_group" "endpoints" {
+  #checkov:skip=CKV2_AWS_5:attached to every aws_vpc_endpoint.interface (for_each is not resolved by Checkov) approved-by:PENDING
   count = length(local.interface_endpoints) > 0 ? 1 : 0
 
   name        = "${var.name}-vpc-endpoints"

@@ -12,3 +12,8 @@ output "oidc_provider_arn" {
   description = "ARN of the GitHub Actions OIDC provider."
   value       = aws_iam_openid_connect_provider.github.arn
 }
+
+output "apply_boundary_arn" {
+  description = "ARN of the tf-apply permissions boundary; roles created by tf-apply must carry it."
+  value       = aws_iam_policy.apply_boundary.arn
+}

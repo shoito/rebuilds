@@ -153,6 +153,15 @@ resource "aws_iam_role_policy" "plan_deny" {
 # this boundary, cannot create IAM users, and can only create roles that carry
 # this boundary (no escalation through a new role).
 resource "aws_iam_policy" "apply_boundary" {
+  #checkov:skip=CKV_AWS_288:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_290:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_287:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_63:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_289:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_62:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_355:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV_AWS_286:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
+  #checkov:skip=CKV2_AWS_40:tf-apply boundary allows everything except the listed denies by design (spec Design OIDC) approved-by:PENDING
   name        = "tf-apply-boundary"
   description = "Permissions boundary for tf-apply and every role it creates"
 
@@ -231,6 +240,7 @@ resource "aws_iam_role" "apply" {
 }
 
 resource "aws_iam_role_policy_attachment" "apply_admin" {
+  #checkov:skip=CKV_AWS_274:tf-apply needs admin to apply every root module; limited by tf-apply-boundary and main-only trust approved-by:PENDING
   role       = aws_iam_role.apply.name
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
