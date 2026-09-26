@@ -389,8 +389,9 @@ plan に、状態を持つ型のリソースの削除または置き換えが含
 | 1 | Ops | すべて | `ViewOnly`、`BreakGlass` |
 | 2 | Dev | dev | `ViewOnly`、`DevPowerUser`（IAM・Organizations・アカウントの設定を除く） |
 | 3 | Dev | staging、shared | `ViewOnly` |
-| 4 | Dev | management、security、log-archive、prod | なし |
-| 5 | その他 | - | なし |
+| 4 | Dev | prod | 常設の許可はなし。障害の調査のときだけ、Ops の承認で `ViewOnly` を 4 時間だけ一時的に割り当てる（IAM Identity Center の割り当てを、期限つきで作って消す。割り当てと削除は監査ログに残る） |
+| 5 | Dev | management、security、log-archive | なし |
+| 6 | その他 | - | なし |
 
 ### DT-INFRA-003: 状態の置き場所
 
@@ -580,9 +581,9 @@ OIDC のロールと状態のバケットができるまでは、CI から apply
 ## Open questions
 
 - **ルートモジュールを持つアカウントの範囲**：状態のバケットを、東京は 7 つのアカウントすべて、大阪は prod だけに置く案にした。staging にも大阪のバケットを置き、DR の手順を staging で練習するか（Ops）。
-- **大阪の待機時の NAT とエンドポイント**：作らない案にした（コストを抑える）。切り替えの RTO（4 時間）に、`network` の apply（NAT の作成に数分）を足しても収まるかと、runbook の手順の追加（Ops）。
+- （決定）大阪の待機時は、NAT とインターフェイス型エンドポイントを作らない。切り替え時に `network` を apply する（数分で、RTO 4 時間に収まる）。手順は disaster-recovery.md の 5 に追加済み（Ops、2026-09-26）。
 - **dev の NAT を 1 つにする**ことを認めるか（Ops、Dev）。
 - **ドリフトの通知先**：「Ops のキュー」を GitHub の Issue とした。オンコールの道具（ADR-0021 で未決定）が決まったら移すか（Ops）。
 - **IAM の制御プレーンは us-east-1 にある。** 東京の障害は IAM の変更に影響しないが、us-east-1 の障害の間は、ロールの信頼ポリシーを変えられない。災害復旧の手順は、既存のロールの引き受け（STS は大阪のリージョンのエンドポイントを使う）だけで完結させる。これで足りるか（Ops）。
 - **Identity Center の ID ソース**：当面は Identity Center のディレクトリ。外部の IdP に移すか（Ops）。
-- **Dev の prod への読み取り**：DT-INFRA-002 では Dev に prod の許可を与えていない。障害の調査で Dev に `ViewOnly` を与えるか（Ops、Dev）。
+- （決定）Dev に prod の常設の許可は与えない。障害の調査のときだけ、Ops の承認で `ViewOnly` を 4 時間だけ割り当てる。DT-INFRA-002 の 4 行目（Ops、2026-09-26）。

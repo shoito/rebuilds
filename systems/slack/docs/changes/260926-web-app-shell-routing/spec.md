@@ -396,7 +396,7 @@ API の呼び出しが失敗した場合、システムは DT-WEB-003 に従っ�
 | --- | --- | --- | --- |
 | 1 | `ja` または `en`（E2 以降。E1 には設定がない） | - | 設定の言語 |
 | 2 | なし | 先頭から見て、主言語の部分（`ja-JP` なら `ja`）が `ja` か `en` に最初に一致するもの | その言語 |
-| 3 | なし | どれも一致しない、または取得できない | `en`（Open questions） |
+| 3 | なし | どれも一致しない、または取得できない | `ja` |
 
 ## Correctness Properties
 
@@ -503,7 +503,7 @@ API の呼び出しが失敗した場合、システムは DT-WEB-003 に従っ�
 - **API の不足（PM・Dev）**：`GET /api/me/workspaces`、`GET /api/workspaces/{ws}/channels`、開発用のサインイン・サインアウトの API がどの変更にもない。E1 のどの Story で作るか（260926-post-and-list-messages に足すか、新しい Story を起こすか）。
 - **パスの接頭辞（Dev）**：260926-post-and-list-messages は `/workspaces/{ws}/...`、identity-and-access.md は `/api/workspaces/{ws}/...` と書いている。`packages/api-client` がどちらを基準にするかを揃える必要がある。
 - **開発用トークンの渡し方（Dev）**：推奨は、開発用の API が HttpOnly の Cookie を発行する方式（E2 と同じ経路になり、Web がトークンを持たない）。代わりに、ローカルの開発サーバーのプロキシがヘッダーを付ける方式もある（UI は不要だが、staging では Web を使えない）。
-- **既定の言語（PM）**：DT-WEB-005 の 3 行目を `en` にしたが、主な利用者が日本語なら `ja` が妥当かもしれない。
+- （決定）既定の言語は `ja` にする。DT-WEB-005 の 3 行目（PM、2026-09-26）。
 - **リリースの識別子のヘッダー名（Dev・Ops）**：仮に `X-Client-Release` とする。API のログ・トレースに載せるのは `telemetry-package` の範囲。
 - **骨格の release フラグ（PM・Ops）**：フラグはワークスペース単位で評価するため、ワークスペースを選ぶ前の骨格そのものは release フラグで隠せない。E1 では本番の利用者がいない前提で、骨格にはフラグを置かない。本番の CloudFront で Web をいつから配るかを決める必要がある（未検証）。
 - **「最後に開いた」の記憶のキー（Dev）**：アカウントを表す値（`account_id` そのものか、その派生値か）を `GET /api/me/workspaces` の応答に含めるか。

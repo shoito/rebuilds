@@ -79,7 +79,7 @@
 | SCP が拒否・許可する | REQ-INFRA-002 | dev での実際の API 呼び出し（許可されないリージョン、大阪、`StopLogging`）の結合テスト。DT-INFRA-001 は、SCP の JSON を IAM Policy Simulator（`SimulateCustomPolicy`）で評価する表駆動テスト（各行 1 ケース） |
 | SCP の判定の表 | DT-INFRA-001 | 同上 |
 | IAM ユーザーが 0 件、許可セットの割り当て | REQ-INFRA-003 | apply 後の検証（全アカウントの `ListUsers`、Identity Center の割り当ての一覧） |
-| グループとアカウントの組み合わせ | DT-INFRA-002 | Identity Center の割り当ての一覧を `spec.md` の表と比べる表駆動テスト |
+| グループとアカウントの組み合わせ | DT-INFRA-002 | Identity Center の割り当ての一覧を `spec.md` の表と比べる表駆動テスト。4 行目は、一時的な割り当てが 4 時間で消えることを、staging の練習用のグループで確かめる |
 | break-glass の通知 | REQ-INFRA-004 | staging で `BreakGlass` にサインインし、5 分以内に SNS の通知（テスト用の SQS の購読）が届く手動の受け入れ試験を 1 回。EventBridge のルールのパターンは単体テスト |
 | 証跡が記録され、消せない | REQ-INFRA-005 | apply 後の検証（Object Lock の設定）。dev の操作が log-archive に届く結合テスト |
 | 状態のバケットの設定 | REQ-INFRA-006 | `state-bucket` の `terraform test`。apply 後の検証（全バケット）。前のバージョンからの復元は dev で 1 回試す |

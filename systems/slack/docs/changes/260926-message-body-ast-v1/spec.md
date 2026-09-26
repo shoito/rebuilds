@@ -151,6 +151,11 @@ status: draft
 - When `"<@M1> さん、<#C1> を見てください\n*急ぎ*"` を変換する
 - Then 結果は、段落 2 つ。1 つ目は `mention(M1)`、`text("さん、")`、`channel_link(C1)`、`text(" を見てください")`、2 つ目は `text("*急ぎ*")`（太字にしない）
 
+#### Scenario: URL の自動認識
+
+- When `"資料は https://example.com/a. です"` を変換する
+- Then 結果は `text("資料は ")`、`link(url="https://example.com/a")`、`text(". です")` の段落 1 つ
+
 #### Scenario: ブロードキャストの形は文字列のまま
 
 - When `"<!channel> お知らせ"` を変換する
@@ -242,11 +247,12 @@ status: draft
 | 1 | `\n` | 今の段落を閉じ、新しい段落を始める |
 | 2 | `<@` ＋ 小文字の正規形の UUID ＋ `>` | `mention { member_id }` |
 | 3 | `<#` ＋ 小文字の正規形の UUID ＋ `>` | `channel_link { channel_id }` |
-| 4 | それ以外の 1 文字（`<!here>` など、2・3 に当たらない `<` を含む） | 直前の `text` に足す（なければ `text` を始める。`marks` なし） |
+| 4 | `http://` か `https://` で始まり、空白・`<`・`>` の直前まで続く文字列。ただし末尾の `.`・`,`・`)`・`!`・`?`・`:`・`;` を除く。`isSafeUrl` が真のものだけ | `link { url }`（`text` を持たない） |
+| 5 | それ以外の 1 文字（`<!here>` など、2・3 に当たらない `<` を含む） | 直前の `text` に足す（なければ `text` を始める。`marks` なし） |
 
 - 入力が空なら、子のない段落 1 つを作る。空の `text` は作らない。
 - 大文字を含む UUID は 2・3 に当たらず、文字列のまま残る（REQ-MSG-013、PROP-MSG-003 のため）。
-- リンクの自動認識（URL を `link` にする）はしない（Open questions）。
+- URL の自動認識（4 行目）は、本家 Slack と同じく行う。`text` を持たない `link` は `toPlainText` で `url` に戻る（DT-MSG-003 の 7 行目）ので、PROP-MSG-003 の往復は保たれる。
 
 ## Correctness Properties
 
@@ -327,9 +333,9 @@ type Inline =
 
 ## Open questions
 
-- REQ-MSG-006 の「文字」をコードポイントで数えることを、PM が承認するか。書記素（見た目の 1 文字）で数える案もあるが、結果が Unicode の版と実装に依存する。
+- （決定）REQ-MSG-006 の「文字」は、`toPlainText` の結果のコードポイントで数える。書記素で数える案は、結果が Unicode の版と実装に依存するため採らない（PM、2026-09-26）。
 - 400 の応答に `reason` を足す契約の変更を、[260926-post-and-list-messages](../260926-post-and-list-messages/spec.md) に含めるか、この変更に含めるか（Dev）。
-- MCP と公開 API のプレーンテキストで、URL を自動で `link` にするか。しないと、エージェントの投稿の URL にプレビューが付かない。するなら DT-MSG-004 に行を足し、PROP-MSG-003 の往復を保つ規則（`link` の `text` を持たせない）を決める（PM）。
+- （決定）プレーンテキストの URL は、自動で `link` にする。DT-MSG-004 の 4 行目（PM、2026-09-26。本家 Slack に合わせる）。
 - `emoji` の名前を、固定した絵文字の一覧で検証するか。一覧は E3 の `reactions` で `packages/contract` に置く予定なので、それまでは形だけを検証する（Dev）。
 - 双方向の制御文字（U+202E など）による表示の偽装を、スキーマで拒否するか、描画で無害にするか（Dev、QA）。
 - `MessageBody` を `packages/ui` に置くと、この変更で `packages/ui` の骨格も作ることになる。`web-app-shell-routing` と骨格の作成がぶつからないよう、先に着手した側が作る（Dev）。

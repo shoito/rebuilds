@@ -151,7 +151,7 @@ status: draft
 ## Open questions
 
 - 各領域の設計（[architecture/](../../architecture/README.md)）を受けて、次を確かめる。
-  - REQ-MSG-006 の「文字」の数え方。仮に、`toPlainText` の結果のコードポイント数とする（[messaging.md](../../architecture/messaging.md)）。
+  - （決定）REQ-MSG-006 の「文字」は、`toPlainText` の結果のコードポイント数で数える（PM、2026-09-26。[messaging.md](../../architecture/messaging.md)）。
   - スレッドの返信もチャンネルの `seq` を消費する（messaging.md）。REQ-MSG-004 の履歴からスレッドの返信を除く変更は、E3 で MODIFIED として書く。
   - 指定した `seq` の周辺を取る `around_seq` は、E3 の `jump-to-message` で追加する（[client.md](../../architecture/client.md)）。
 
