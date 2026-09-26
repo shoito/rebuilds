@@ -1,0 +1,24 @@
+{
+  "name": "@slack/infra-tools",
+  "private": true,
+  "type": "module",
+  "description": "CI helpers and tests for systems/slack/infra (DT-INFRA-003, DT-INFRA-006, DT-INFRA-007, DT-INFRA-008). Outside the Turborepo workspace.",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:state-location": "node src/check-state-location.ts",
+    "check:dr-independence": "node src/check-dr-independence.ts",
+    "check:module-tests": "node src/check-module-tests.ts",
+    "check:suppressions": "node src/check-suppressions.ts",
+    "check:all": "node src/check-state-location.ts && node src/check-dr-independence.ts && node src/check-module-tests.ts && node src/check-suppressions.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "fast-check": "^4.10.2",
+    "typescript": "^7.0.2",
+    "vitest": "~5.0.1"
+  }
+}
