@@ -39,7 +39,7 @@ export function checkAll(liveDir: string, accounts: AccountsFile): string[] {
 
 if (import.meta.main) {
   const liveDir = resolve(process.argv[2] ?? join(INFRA_DIR, "live"));
-  const accounts = loadAccounts(process.argv[3] ?? join(INFRA_DIR, "accounts.json"));
+  const accounts = loadAccounts(process.argv[3] ?? join(INFRA_DIR, "accounts.tfvars.json"));
   const errors = checkAll(liveDir, accounts);
   for (const e of errors) console.error(`::error::${e}`);
   if (errors.length > 0) process.exit(1);

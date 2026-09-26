@@ -11,7 +11,7 @@ if (import.meta.main) {
   }
   const ctx = rootContext(root);
   if (!ctx.accountId) {
-    console.error(`::error::account id of "${ctx.account}" is not set in infra/accounts.json (bootstrap not finished)`);
+    console.error(`::error::account id of "${ctx.account}" is not set in infra/accounts.tfvars.json (bootstrap not finished)`);
     process.exit(1);
   }
   console.log(JSON.stringify(ctx));

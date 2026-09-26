@@ -50,7 +50,7 @@ describe("DT-INFRA-003: state location", () => {
 describe("REQ-INFRA-007: backend must match DT-INFRA-003", () => {
   const accounts: AccountsFile = {
     organization_id: "o-example",
-    accounts: { management: "111111111111", security: null, "log-archive": null, shared: null, dev: "222222222222", staging: null, prod: "333333333333" },
+    account_ids: { management: "111111111111", security: null, "log-archive": null, shared: null, dev: "222222222222", staging: null, prod: "333333333333" },
   };
   const liveDir = join(INFRA_DIR, "policy/test/fixtures/live-wrong-location");
 

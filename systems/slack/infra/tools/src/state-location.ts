@@ -42,15 +42,15 @@ export function isDisasterRecoveryRoot(root: string): boolean {
 
 export interface AccountsFile {
   organization_id: string | null;
-  accounts: Record<Account, string | null>;
+  account_ids: Record<Account, string | null>;
 }
 
-export function loadAccounts(path: string = join(INFRA_DIR, "accounts.json")): AccountsFile {
+export function loadAccounts(path: string = join(INFRA_DIR, "accounts.tfvars.json")): AccountsFile {
   return JSON.parse(readFileSync(path, "utf8")) as AccountsFile;
 }
 
 export function stateBucketName(account: Account, region: string, accounts: AccountsFile): string {
-  const id = accounts.accounts[account] ?? `<${account} account id>`;
+  const id = accounts.account_ids[account] ?? `<${account} account id>`;
   return `slack-tfstate-${id}-${region}`;
 }
 
@@ -79,7 +79,7 @@ export interface RootContext {
 export function rootContext(root: string, accounts: AccountsFile = loadAccounts()): RootContext {
   const loc = stateLocation(root);
   if (!loc.ok) throw new Error(loc.reason);
-  const id = accounts.accounts[loc.account];
+  const id = accounts.account_ids[loc.account];
   return {
     root,
     account: loc.account,
