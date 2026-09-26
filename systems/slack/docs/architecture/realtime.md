@@ -67,7 +67,7 @@ Client                         API                     Gateway                 V
 
 | 層 | 制約 | 対応 |
 | --- | --- | --- |
-| CloudFront | WebSocket は HTTP/1.1 のみ。`Sec-WebSocket-*` ヘッダーをオリジンへ転送する必要がある。アイドル切断は 10 分で変更できないとされる（公式文書では **未検証**、AWS re:Post の回答） | 25 秒ごとの心拍で、どの層でもアイドルにならないようにする |
+| CloudFront | WebSocket は HTTP/1.1 のみ。`Sec-WebSocket-*` ヘッダーをオリジンへ転送する必要がある。オリジンからクライアントへ 10 分間 1 バイトも流れないと、アイドルとみなして切る（[CloudFront のクォータ](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-websockets)）。数えるのはオリジン → クライアントの向きだけ | 25 秒ごとの心拍で、どの層でもアイドルにならないようにする |
 | ALB | アイドルタイムアウトは 1〜4,000 秒（既定 60 秒）。HTTP/2 の PING ではリセットされない | 120 秒に設定する。Gateway の HTTP サーバーの keep-alive タイムアウトは、ALB より長く（130 秒）する（ALB の推奨） |
 | Gateway | — | 25 秒ごとに WebSocket の ping フレームを送る。60 秒間なにも受信しなければ切る |
 | クライアント | ブラウザの JS は ping フレームを観測できない | 25 秒ごとにアプリの `ping` を送り、10 秒以内に `pong` がなければ切って再接続する |
@@ -94,7 +94,8 @@ Client                         API                     Gateway                 V
 ECS は、タスクを止めるときに ALB からの登録解除を先に行い、登録解除の遅延（deregistration delay）が過ぎてから SIGTERM を送る。ALB は遅延が過ぎた時点で残った接続を強制的に切る。Fargate の停止猶予（`stopTimeout`）は最大 120 秒である。
 
 - 登録解除の遅延を 180 秒にする。その間、新しい接続は来ない。
-- Gateway は、自分が登録解除されたこと（ECS のタスクメタデータの `DesiredStatus` が `STOPPED` になること。**未検証**）を 5 秒ごとに確かめ、気づいたら接続を 150 秒かけて少しずつ `4000 reconnect` で切る（1 秒あたり「接続数 ÷ 150」本）。
+- Gateway は、自分が登録解除されたこと（ECS のタスクメタデータの `DesiredStatus` が `STOPPED` になること）を 5 秒ごとに確かめ、気づいたら接続を 150 秒かけて少しずつ `4000 reconnect` で切る（1 秒あたり「接続数 ÷ 150」本）。
+  - この検知の方法は **未検証**。タスクメタデータ v4 は `DesiredStatus` を返し（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint-v4-fargate-response.html)）、登録解除はタスクが `DEACTIVATING` の間に行われる（[タスクのライフサイクル](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-lifecycle-explanation.html)）。しかし、`DEACTIVATING` の間にメタデータの `DesiredStatus` が `STOPPED` になっているとは書かれていない。着手前に staging の PoC で確かめる。使えなければ、ELB の `DescribeTargetHealth` でターゲットの状態が `draining` になったことを見る方式に替える（タスクロールに読み取りの権限が要る）。
 - 検知できなかった場合も、ALB が遅延の終わりに切り、クライアントのジッター付きの再接続（8 節）で吸収する。
 - ローリングデプロイは 1 回に全タスクの 10〜20% ずつ入れ替える。同時に再接続してくる数の上限を、この割合で決める。
 - デプロイの方式全体は [infrastructure.md](infrastructure.md) にある。
@@ -255,7 +256,7 @@ Gateway ノード
 
 - Relay は outbox を 25ms ごとにポーリングし、`ORDER BY id LIMIT 500` で読み、配信し、配信できた行を消す（カーソルで追いかけず、消す方式）。`BIGSERIAL` の採番順とコミット順は一致しないので、カーソル方式では遅れてコミットされた行を飛ばしうるため。
 - 同じチャンネルの行は、`last_seq` の行ロックによりコミットの順が `seq` の順になる。消す方式なら、`seq` 6 の行が見えるのは 5 の行が見えた後になる。
-- NOTIFY による起床は使わない。通知を伴うトランザクションのコミットが直列化されるため（影響の大きさは **未検証**）。
+- NOTIFY による起床は使わない。通知を伴うトランザクションのコミットが直列化されるため（影響の大きさは **未検証**。PostgreSQL の文書に記述がなく、実装に依存する。NOTIFY を使わないので確かめない）。
 - Relay は writer から読む。reader は遅れるため。
 
 ### 11.2 複数の Relay
@@ -297,7 +298,8 @@ Gateway ノード
 - Valkey をクラスタモードにし、`SPUBLISH` / `SSUBSCRIBE` を使う。通常の PUBLISH はクラスタの全ノードへ伝わり、シャードを増やしても配信の負荷が減らない。sharded pub/sub は、チャンネル名のスロットを持つシャードの中だけで伝わる（ElastiCache は Valkey と Redis OSS 7 以降で対応）。
 - チャンネル名は `ws:{w}:ch:{c}` のまま、ハッシュタグを使わない。チャンネルごとに別のスロットに散る。
 - Gateway は、各シャードへの購読用の接続を持つ。スロットの移動（リシャーディング）で購読が外れたら、張り直して `resync` を送る。
-- 使うクライアントライブラリが `SSUBSCRIBE` とスロットの移動に対応していることを、S2 に入る前に確かめる（**未検証**）。
+- ElastiCache は、クラスタモードで sharded pub/sub に対応する（Valkey、Redis OSS 7 以降。[AWS のドキュメント](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/WorkingWithRedis.html)）。
+- 使うクライアントライブラリが `SSUBSCRIBE` とスロットの移動に対応していることを、S2 に入る前に確かめる（**未検証**。ライブラリをまだ選んでいない。S2 の前に、リシャーディング中の購読の張り直しを staging で試す）。
 - 大規模チャンネルの経路（5.3 節）を有効にする。Gateway を EC2 の起動タイプへ移すかは、負荷試験で判断する（ADR-0011）。
 
 ### S3（100 万接続）：セル

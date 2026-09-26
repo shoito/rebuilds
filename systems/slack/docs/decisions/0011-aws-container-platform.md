@@ -59,4 +59,5 @@ date: 2026-09-26
 - 着手前に、次の 2 点を確かめる。
   - Aurora PostgreSQL が、PostgreSQL 18（`uuidv7()`）と pg_bigm に対応しているか。
   - どちらかが未対応なら、UUIDv7 はアプリで生成し、検索は RDS for PostgreSQL か OpenSearch で代替する。その場合は、この ADR と ADR-0004・0009 を更新する。
+  - 2026-09 に確認済み：どちらも対応している。Aurora PostgreSQL は 2026-06 から 18.3 以降で PostgreSQL 18 に対応し、すべての商用リージョンで使える（[AWS の発表](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-aurora-postgresql-major-version-18/)）。`uuidv7()` は PostgreSQL 18 の組み込み関数である（[PostgreSQL の文書](https://www.postgresql.org/docs/18/functions-uuid.html)）。pg_bigm は Aurora PostgreSQL 18 の拡張機能の一覧にある（[拡張機能の一覧](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)）。代替は不要で、ADR-0004・0009 は変えない。
 - 全リソースを IaC で定義し、コンソールからの手作業での変更を禁止する（AWS Config で逸脱を検知する）。

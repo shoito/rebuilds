@@ -62,7 +62,7 @@ b. 日付の版をヘッダーで選ぶ（Stripe 型）
   - サービスが 1 つ増える（デプロイ、監視、容量の対象）。
   - 本家の SDK やサンプルを流用できず、開発者は新しい API を学ぶ必要がある。
   - `RateLimit` のヘッダーと `Idempotency-Key` は IETF の草案で、書式が変わりうる。変わったら、公開 API の変更として告知する。
-  - Better Auth の oauth-provider での、ワークスペースへの結び付け（`consentReferenceId`）とアクセストークンの項目の加え方は未検証で、合わなければ自前の実装を足す。
+  - Better Auth の oauth-provider での、ワークスペースへの結び付け（`consentReferenceId`）とアクセストークンの項目の加え方（`customAccessTokenClaims`）は、どちらも非同期の関数で、organization プラグインなしで実現できることを 2026-09-26 に文書と型定義で確かめた（[public-api.md](../architecture/public-api.md) の 4.1 節）。E9（MCP）と E12 の結合テストで実際の動きを確かめる。
 
 ## Confirmation
 

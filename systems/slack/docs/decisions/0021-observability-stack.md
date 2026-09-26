@@ -30,7 +30,7 @@ SLO（[runbooks/README.md](../runbooks/README.md)）の計測、障害の調査�
 - **トレースは X-Ray に送る。** CloudWatch は OTLP を直接受け取れ、X-Ray は OpenTelemetry を主な計装の方式にしている。ECS・SQS・ALB とのつながりを追加の運用なしに見られる。
 - **ログは CloudWatch Logs に置く。** 各環境のアカウントの中にとどまり、本番のデータを外に出さない。Logs Insights で調べられ、データ保護ポリシーで個人情報をマスクできる。
 - **Grafana で横断して見る。** AMP、CloudWatch、X-Ray をデータソースにし、SLO のダッシュボードを 1 か所に置く。Grafana は shared のアカウントに置き、各環境のロールを引き受けて読む。
-- 1 は運用が最も少ないが、テナントのラベルとバーンレートの計算で費用と表現力が足りない。CloudWatch が OTLP のメトリクスを受け取り PromQL で問い合わせられる機能（2026 年に一般提供と報じられている）は **未検証**。確かめられたら、AMP を CloudWatch に寄せられるかを再評価する。
+- 1 は運用が最も少ないが、テナントのラベルとバーンレートの計算で費用と表現力が足りない。CloudWatch は、2026-06 から OTLP のメトリクスの受け取りと PromQL での問い合わせを一般提供している（東京を含む。料金は取り込み量の GB 単位。[AWS の発表](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-cloudwatch-otel-metrics/)）。AMP を CloudWatch に寄せられるかを、テナントのラベルの費用とバーンレートの計算で再評価する（S2 の前）。
 - 3 は機能が最も豊かだが、本番のログとトレースを社外に出すことになり、テナントのデータの扱いを説明する負担が増える。費用もホスト数・ログ量に比例して読みにくい。
 
 ### 構成

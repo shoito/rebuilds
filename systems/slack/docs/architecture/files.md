@@ -21,7 +21,7 @@
 
 - 両方のバケットで、パブリックアクセスをすべて遮断する。読み出しは CloudFront（OAC）と file Worker にだけ許す。
 - `derived` バケットのキーも `ws/{workspace_id}/files/{file_id}/thumb_{幅}.webp` の形にする。
-- 暗号化の方式（SSE-S3 か SSE-KMS か）は [security.md](security.md) で決める。SSE-KMS にする場合、GuardDuty が使う IAM ロールに鍵の復号の権限が要る（未検証：必要な権限の詳細）。
+- 暗号化の方式（SSE-S3 か SSE-KMS か）は [security.md](security.md) で決める。SSE-KMS にする場合、GuardDuty が使う IAM ロールに、その鍵の `kms:GenerateDataKey` と `kms:Decrypt` を、`kms:ViaService` を S3 に限る条件付きで与える（[AWS のドキュメント](https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-s3-iam-policy-prerequisite.html)）。
 
 ## 3. 状態
 
@@ -44,7 +44,7 @@ pending_upload ──complete──▶ scanning ──NO_THREATS_FOUND──▶ 
    - `files` に `pending_upload` で INSERT し、容量を予約する。
    - 署名付きの PUT の URL を返す。有効期限は 15 分。
 2. **PUT**：クライアントが S3 へ直接 PUT する。
-   - URL の署名に、`Content-Length`（申告した大きさ）と `Content-Type` を含める。違う値では署名が合わず拒否される（未検証：S3 が署名した `Content-Length` を強制するか。強制しなくても、3 の検査で止める）。
+   - URL の署名に、`Content-Length`（申告した大きさ）と `Content-Type` を含める。署名に含めたヘッダーが実際のリクエストと違えば、S3 は `SignatureDoesNotMatch` で拒否する（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html#PresignedUrlFAQ)）。ただし、署名付き PUT で `Content-Length` を強制できると明示した公式の記述はない（未検証。POST の `content-length-range` のような大きさの条件は PUT にない）。着手前に、申告と違う大きさの PUT が拒否されるかを PoC で確かめる。強制されなくても、3 の検査で止める。
    - S3 の CORS は、アプリのオリジンからの PUT だけを許す。
 3. **完了**：`POST /workspaces/{ws}/files/{id}/complete`
    - API が `HeadObject` で、オブジェクトがあり、大きさが申告と一致することを確かめる。違えばオブジェクトを消し、400 を返す。
@@ -65,7 +65,7 @@ GuardDuty Malware Protection for S3 を使う（2026-09 に AWS のドキュメ�
 - タグ付けは、バケットの保護を有効にするときに設定する。後から有効にしても、それ以前のオブジェクトには付かない。
 - 結果の通知は at-least-once で、同じオブジェクトの結果が重複して届きうる。
 - 上限：オブジェクトの大きさ 100 GB、アーカイブの展開 100,000 ファイル・入れ子 100 段、保護できるバケットは 1 アカウント・1 リージョンあたり 25。
-- 料金は、スキャンしたデータ量とオブジェクト数に応じてかかる。タグ付けにも S3 の料金がかかる（未検証：単価）。
+- 料金は、スキャンしたデータ量とオブジェクト数に応じてかかる（us-east-1 で 1 GB あたり 0.09 ドル、1,000 オブジェクトあたり 0.215 ドル。毎月 1 GB・1,000 件の無料枠）。ほかに、タグ付け、GuardDuty が呼ぶ S3 の API、EventBridge のイベントの料金が別にかかり、無料枠に含まれない（[GuardDuty の料金](https://aws.amazon.com/guardduty/pricing/)、[AWS のドキュメント](https://docs.aws.amazon.com/guardduty/latest/ug/pricing-malware-protection-for-s3-guardduty.html)）。東京の単価は未検証（料金ページのリージョン別の表を取得できなかった）。着手前に料金ページで確かめる。
 
 ### 5.1 隔離
 
@@ -121,7 +121,7 @@ EventBridge のルールで、スキャン結果を SQS `file-events` に送る�
 - ファイル専用のドメインにし、アプリの Cookie が送られないようにする。HTML や SVG が万一開かれても、アプリのオリジンで動かない。
 - **署名付き URL は発行後に取り消せない。** 権限を失った人が、有効期限の間だけ URL を使える。期限を短くして抑える。署名付き Cookie は、同じドメインのすべてのファイルに効くため使わない。
 - CloudFront のキャッシュのキーから署名のパラメーターを除き、利用者をまたいでキャッシュを共有する。署名はエッジで確かめてからキャッシュを返す。ファイルを消したら、そのパスを無効化する。
-- 署名の鍵は Secrets Manager に置き、CloudFront の信頼された鍵グループで検証する。鍵の種類（RSA か ECDSA か）は未検証。
+- 署名の鍵は Secrets Manager に置き、CloudFront の信頼された鍵グループで検証する。鍵は RSA 2048 か ECDSA 256 のどちらも使える（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-trusted-signers.html)）。どちらにするかは実装で決める。
 
 ## 7. 容量と上限
 

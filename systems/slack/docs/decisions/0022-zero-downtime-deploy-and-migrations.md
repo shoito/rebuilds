@@ -20,7 +20,7 @@ runbooks の 3 節で「ロールバックはデプロイではなくフラグ�
 デプロイの方式：
 
 1. ECS のローリング更新（全サービス）
-2. ECS のネイティブな blue/green（2025 年 7 月から ECS が単独で提供。カナリアと線形も選べる）（全サービス）
+2. ECS のネイティブな blue/green（2025 年 7 月から ECS が単独で提供。2025 年 10 月にカナリアと線形が加わった。[AWS の発表（blue/green）](https://aws.amazon.com/about-aws/whats-new/2025/07/amazon-ecs-built-in-blue-green-deployments/)、[AWS の発表（カナリア・線形）](https://aws.amazon.com/about-aws/whats-new/2025/10/amazon-ecs-built-in-linear-canary-deployments/)）（全サービス）
 3. サービスごとに選ぶ：状態を持たないサービスは blue/green、Gateway はローリング＋穏やかな接続の移し替え
 
 スキーマの変更：
@@ -43,7 +43,7 @@ B. expand / contract：互換性を保つ追加（expand）と、古いものの
 **Gateway の接続の移し替え**（詳細は [realtime.md](../architecture/realtime.md) の 3.5 節）：
 
 1. ECS がタスクをターゲットグループから外し、新しい接続を送らなくなる。登録解除の遅延は 180 秒にする。ECS は、この遅延が過ぎてから SIGTERM を送る。
-2. Gateway は、自分が登録解除されたことに気づいたら、接続を 150 秒かけて少しずつ `4000 reconnect` で切る。気づく方法（ECS のタスクメタデータ）は **未検証**。
+2. Gateway は、自分が登録解除されたことに気づいたら、接続を 150 秒かけて少しずつ `4000 reconnect` で切る。気づく方法（ECS のタスクメタデータ）は **未検証**（公式の記述なし。着手前に PoC で確かめる。代わりの方法は [realtime.md](../architecture/realtime.md) の 3.5 節）。
 3. クライアントは、ジッターを入れて再接続し、`seq` による差分取得で追いつく。データは失われない（[ADR-0002](0002-db-as-source-of-truth-with-outbox.md)）。
 4. 残った接続は、遅延の終わりに ALB が切る。SIGTERM の後は、Fargate の `stopTimeout` の上限（120 秒）の中で終了する。
 
@@ -82,7 +82,7 @@ CI で、次のどれかに当たるマイグレーションを失敗させる�
 
 
 - 新しい振る舞いは、すべてフラグの裏に置く（runbooks の 3 節）。デプロイ（コードを置くこと）とリリース（機能を有効にすること）を分ける。
-- フラグは AWS AppConfig の機能フラグで持つ。`workspace_id` を単位に、社内 → 5% → 25% → 100% と広げる。割合での振り分けを `workspace_id` で安定させられるか（同じワークスペースが常に同じ側になるか）は **未検証**。できなければ、アプリで `workspace_id` のハッシュから判定する。
+- フラグは AWS AppConfig の機能フラグで持つ。`workspace_id` を単位に、社内 → 5% → 25% → 100% と広げる。割合での振り分けは、AppConfig の複数バリアントのフラグの `split` 演算子で行う。`split` は渡した値（`workspace_id`）の一貫したハッシュで振り分け、`seed` を固定すればフラグや設定をまたいでも同じ値は同じ側になる（[AWS のドキュメント](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-creating-multi-variant-feature-flags-rules-operators.html)）。例：`(split pct::5 by::$workspaceId seed::"<フラグ名>")`。割合を 5% から 25% に上げたときに、先の 5% が 25% に含まれ続けることは、文書の例（同じハッシュの 20% と 25%）から読み取れるが明示はない。staging で確かめる。
 - フラグの変更は、AppConfig のデプロイ戦略（段階的な反映とアラームでの自動ロールバック）で行い、変更の履歴を残す。
 - 100% にして 2 週間たったフラグは、コードから消す。残っているフラグの数を毎月見る。
 

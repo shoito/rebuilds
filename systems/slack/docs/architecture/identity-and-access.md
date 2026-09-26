@@ -106,7 +106,7 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 
 | 属性 | 値 | 理由 |
 | --- | --- | --- |
-| 名前 | `__Host-session`（使えなければ `__Secure-session`） | `__Host-` は `Secure`・`Path=/`・`Domain` なしを強制し、サブドメインからの上書きを防ぐ。Better Auth で `__Host-` の名前が使えるかは 未検証 |
+| 名前 | `__Secure-session`（`advanced.cookies.session_token.name` に `session` を指定する） | Better Auth は `Secure` のとき、Cookie の名前の前に必ず `__Secure-` を付ける（指定した名前にも付く）ため、`__Host-` の名前にはできない（[`cookies/index.ts` の `createCookieGetter`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/cookies/index.ts)、[Cookies の文書](https://www.better-auth.com/docs/concepts/cookies)）。`__Host-` の代わりに、`Domain` を付けない（`crossSubDomainCookies` を使わない）・`Path=/` にすることで同じ属性にそろえる。`__Secure-` ではサブドメインからの上書きを防げないので、`app.<domain>` の兄弟のサブドメインに、他者が内容を置けるホストを作らない |
 | `HttpOnly` | あり | スクリプトから読めないようにする |
 | `Secure` | あり | |
 | `SameSite` | `Lax` | 他サイトからの状態変更の要求に Cookie を付けない。OAuth・SAML のコールバック（トップレベルの遷移）は通す |
@@ -121,8 +121,11 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 | ワークスペースごとの最大有効期間 | 既定なし。管理者が 1 時間〜90 日で設定できる | 6 節の表で、`sessions.created_at`（または最後にそのワークスペースの SSO で認証した時刻）と比べる |
 | 重要な操作の再認証 | 直近 10 分以内の認証を要求する | Better Auth の `freshAge`。対象はアカウントの削除、MFA の変更、パスキーの削除、セッションの一覧と取り消し |
 
-- **セッションの ID はログイン、MFA の完了、権限の昇格（SSO での再認証）のたびに作り直す**（セッション固定攻撃を防ぐ）。Better Auth がログインの都度セッションを新しく作ることは確認した。MFA 完了時に作り直すかは 未検証 で、E2 の実装で確かめる。
-- セッションの正本は Aurora の `sessions` に置く。Valkey（ElastiCache）には、Better Auth の Cookie キャッシュ（`cookieCache`、最大 60 秒）だけを使う。Valkey は失われてもよい（[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)）ので、セッションの正本を置かない。Better Auth は `secondaryStorage` を設定するとセッションをそちらに置くため、`secondaryStorage` にはセッションを置かない設定にする（設定の可否は 未検証。できなければ `secondaryStorage` を使わない）。
+- **セッションの ID はログイン、MFA の完了、権限の昇格（SSO での再認証）のたびに作り直す**（セッション固定攻撃を防ぐ）。Better Auth がログインの都度セッションを新しく作ることは確認した。MFA も、2 要素目の検証（TOTP・OTP・バックアップコード）に通ったときに新しいセッションを作って Cookie に入れ、パスワードの段階のセッションは捨てる。TOTP の登録の完了時も、セッションを作り直して旧いものを消す（[2FA の文書](https://www.better-auth.com/docs/plugins/2fa)、[`verify-two-factor.ts`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/plugins/two-factor/verify-two-factor.ts)、2026-09-26 に確認）。ただし 2FA の要求は既定でメールとパスワードなどの資格情報によるサインインだけにかかり、OTP・ソーシャル・パスキーのサインインにはかからない（同じ文書）。
+- セッションの正本は Aurora の `sessions` に置く。Valkey（ElastiCache）には、Better Auth の Cookie キャッシュ（`cookieCache`、最大 60 秒）だけを使う。Valkey は失われてもよい（[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)）ので、セッションの正本を置かない。Better Auth は `secondaryStorage` を設定するとセッションをそちらに置く。`secondaryStorage` を使いながらセッションを Valkey に置かない設定はない。`session.storeSessionInDatabase: true` にすると DB にも書き、読み取りは Valkey を先に見て、なければ DB から読む（[Session Management の文書](https://www.better-auth.com/docs/concepts/session-management)、[`internal-adapter.ts` の `findSession`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/db/internal-adapter.ts)、2026-09-26 に確認）。そこで次のようにする。
+  - `secondaryStorage`（Valkey）を使うなら、必ず `storeSessionInDatabase: true` にする。`preserveSessionInDatabase` は使わない（有効にすると DB からの読み直しをしなくなり、Valkey を失うと全員がログアウトされる）。
+  - Valkey の値が先に読まれるので、セッションの取り消しと変更は Better Auth の API（`revokeSession` など）だけで行い、`sessions` の行を直接書き換えない（Valkey の写しが残るため）。
+  - この制約を持ちたくなければ、`secondaryStorage` を使わない（レート制限と検証の値も DB に置く）。E2 で、どちらにするかを負荷の見込みで決める。
 
 ### 3.3 端末の一覧と取り消し
 
@@ -381,7 +384,7 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
   3. 本文を持つ要求は `Content-Type: application/json` だけを受ける（単純なフォームの送信で届かないようにする）
 - `GET` で状態を変えない。
 - `Authorization: Bearer` の要求は、ブラウザが自動で付ける資格情報を使わないので、オリジンの検査をしない。
-- OAuth と OIDC のフローでは、`state` と PKCE を使う。SAML では `InResponseTo` を検査し、IdP 起点のログインは受け付けない（`allowIdpInitiated: false`）。複数の API タスクの間で AuthnRequest の記録を共有する方法は 未検証 で、E2 で確かめる。
+- OAuth と OIDC のフローでは、`state` と PKCE を使う。SAML では `InResponseTo` を検査し、IdP 起点のログインは受け付けない（`allowIdpInitiated: false`）。AuthnRequest の記録は Better Auth の検証の値（verification）として、`secondaryStorage` があればそこ、なければ DB の検証のテーブルに置かれるので、複数の API タスクの間で共有される（[`@better-auth/sso` の `types.ts`](https://github.com/better-auth/better-auth/blob/main/packages/sso/src/types.ts) の `enableInResponseToValidation` の説明、[`response-validation.ts`](https://github.com/better-auth/better-auth/blob/main/packages/sso/src/saml/response-validation.ts)、2026-09-26 に確認）。Valkey に置く場合、Valkey を失うとログインの途中の SAML の応答が拒否されるが、やり直せばよい。
 
 ## 11. レート制限とロックアウト
 

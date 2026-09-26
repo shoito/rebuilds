@@ -47,7 +47,7 @@ ADR-0022 では、フラグを AWS AppConfig で持ち、ワークスペース�
 ### 割り当ての単位
 
 - **割り当ての単位はワークスペースにする。** 同じワークスペースのメンバーは、同じ機能を見る。会話の相手どうしで見える機能が違うと、混乱を生むため。
-- 割合で広げるときは、`hash(flag_name + workspace_id) mod 100` をアプリで計算して判定する。AppConfig の割合での振り分けが、同じワークスペースを常に同じ側に置くかは未検証なので、頼らない。
+- 割合で広げるときは、`hash(flag_name + workspace_id) mod 100` をアプリで計算して判定する。AppConfig の多変量フラグの `split` も、渡した値の一貫したハッシュで振り分ける（`seed` を渡せばフラグをまたいでもそろう。[AppConfig の文書](https://docs.aws.amazon.com/appconfig/latest/userguide/appconfig-creating-multi-variant-feature-flags-rules.html)、2026-09-26 に確認）が、判定を API・Gateway・Worker で同じ関数にそろえるため、アプリで計算する。
 - 社内のワークスペースと、個別に指定したワークスペースの許可リストを持てるようにする。
 
 ### 評価する場所

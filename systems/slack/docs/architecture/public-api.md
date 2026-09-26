@@ -129,8 +129,8 @@ Better Auth の oauth-provider プラグインについて、2026-09-26 に文�
 | 機密クライアント（`client_secret_basic` / `client_secret_post` / `private_key_jwt`） | 対応。管理者が登録するクライアントを作れる。DCR は無効のままにする |
 | `client_secret` の入れ替え | 対応（`/oauth2/client/rotate-secret`）。**旧い秘密は即座に無効になる**。重なりの期間を持てないので、アプリの側の切り替えと同時に行う必要がある（[apps.md](apps.md) の 14.3 節） |
 | リフレッシュトークンの入れ替え | 対応。更新のたびに新しいリフレッシュトークンを出す。`refreshTokenReuseInterval` で、再試行のための短い猶予を設定できる |
-| ワークスペースへの結び付け | `postLogin`（ログイン後・同意前の選択の画面）と `consentReferenceId` で、同意に参照 ID を結び付けられる。文書の例は organization プラグインの `activeOrganizationId` を使う。本システムは organization プラグインを使わないので、選んだワークスペースをどこに持ち、`consentReferenceId` に渡すかは **未検証**（mcp.md と同じ課題） |
-| アクセストークンに `workspace_id`・`member_id` を載せる | `customAccessTokenClaims` が `referenceId` を受け取る。`member_id` の解決をここで行えるか（DB を引いてよいか）は **未検証** |
+| ワークスペースへの結び付け | `postLogin`（ログイン後・同意前の選択の画面）と `consentReferenceId` で、同意に参照 ID を結び付けられる。文書の例は organization プラグインの `activeOrganizationId` を使うが、`consentReferenceId` は `{ user, session, scopes }` を受け取って参照 ID を返す非同期の関数で、organization プラグインには依らない（[`types/index.ts`](https://github.com/better-auth/better-auth/blob/main/packages/oauth-provider/src/types/index.ts)、2026-09-26 に確認）。本システムは、postLogin の画面で選んだワークスペースを、セッション ID をキーにした短命の行（10 分）に置き、`consentReferenceId` でそれを引いて `workspace_id` を返す。選ばれていなければ例外を投げる（mcp.md も同じ） |
+| アクセストークンに `workspace_id`・`member_id` を載せる | `customAccessTokenClaims` が `referenceId` を受け取り、戻り値は `Awaitable`（非同期でよい）なので、ここで DB を引いて `member_id` を解決できる。メンバーでなくなっていれば例外を投げて発行を止められる（[oauth-provider の文書](https://www.better-auth.com/docs/plugins/oauth-provider)、型定義、2026-09-26 に確認） |
 | 取り消しとイントロスペクション | RFC 7009 の取り消し、RFC 7662 のイントロスペクションに対応。JWT のアクセストークンは取り消せず、リフレッシュトークンは取り消せる |
 | `resource` ごとのスコープの上限とアクセストークンの期間 | `resources` の設定で指定できる |
 
@@ -183,7 +183,7 @@ RFC 9457（Problem Details）の形で返す。`Content-Type: application/proble
 
 ### 5.3 冪等性
 
-- `POST` の書き込みは、`Idempotency-Key` ヘッダー（任意の文字列、最大 255 文字）を受け付ける。ヘッダーの名前と意味は IETF の draft-ietf-httpapi-idempotency-key-header に合わせる（最新の版と状態は **未検証**）。
+- `POST` の書き込みは、`Idempotency-Key` ヘッダー（任意の文字列、最大 255 文字）を受け付ける。ヘッダーの名前と意味は IETF の draft-ietf-httpapi-idempotency-key-header に合わせる。最新は -07（2025-10-15）で、RFC にならないまま失効している（[IETF Datatracker](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)、2026-09-26 に確認）。-07 の書式で固定し、後に RFC になって違いが出たら、公開 API の変更として扱う。
 - メッセージの投稿では、キーを `client_msg_id` に変換して使う（キーから UUIDv5 を作る）。既存の一意制約（`messages` の `(workspace_id, channel_id, member_id, client_msg_id)`）がそのまま効き、同じ投稿を 2 回作らない（REQ-MSG-002 と同じ性質）。
 - それ以外の `POST` は、テナントテーブル `api_idempotency_keys (workspace_id, principal_id, key, request_hash, status, response_status, response_body, created_at, PRIMARY KEY (workspace_id, principal_id, key))` で扱う。`principal_id` はボットならインストール、ユーザーのトークンならメンバー。24 時間で消す。
 
@@ -208,7 +208,7 @@ RFC 9457（Problem Details）の形で返す。`Content-Type: application/proble
 ## 6. 契約と OpenAPI
 
 - ルートは `@hono/zod-openapi` の `OpenAPIHono` と `createRoute` で定義する。ADR-0008 が「外部公開 API が必要になったときに移る」とした形である。スキーマは `packages/contract/public/v1` の Zod スキーマ（`.openapi()` でメタデータを付ける）を使う。
-- OpenAPI の文書（3.1）を生成し、`packages/contract/public/v1/openapi.json` としてコミットする。CI で再生成し、差分があるのに契約の変更の承認がなければ失敗させる（ADR-0008 の Confirmation と同じ考え方）。3.1 での出力（`doc31` 相当）と、Events API の `webhooks` の節を `@hono/zod-openapi` で出せるかは **未検証**。出せなければ、Events API のスキーマだけ別に生成して合わせる。
+- OpenAPI の文書（3.1）を生成し、`packages/contract/public/v1/openapi.json` としてコミットする。CI で再生成し、差分があるのに契約の変更の承認がなければ失敗させる（ADR-0008 の Confirmation と同じ考え方）。`@hono/zod-openapi` は `getOpenAPI31Document`（エンドポイントなら `doc31`）で 3.1 の文書を出せる（[README](https://github.com/honojs/middleware/blob/main/packages/zod-openapi/README.md)）。Events API は `app.openAPIRegistry.registerWebhook`（`@asteasolutions/zod-to-openapi` の `OpenAPIRegistry`。[README](https://github.com/asteasolutions/zod-to-openapi#defining-routes--webhooks)）で登録すれば、3.1 の生成器が `webhooks` の節に出す（2026-09-26 にソースで確認）。
 - 互換性を壊す変更の検知に、OpenAPI の差分の検査の道具（例：oasdiff）を CI に入れる。フィールドの削除・型の変更・必須化・列挙値の削除・ステータスの削除を、`/v1` の中では失敗させる。
 - 公開用のスキーマは、内部のスキーマを直接 import しない。内部の項目（`body_format`、`content_seq` など）が、うっかり公開の契約に入らないようにするため。lint で `packages/contract/public` から内部のスキーマへの import を禁止する。
 - `public-api` のハンドラーも、`c.json()` にステータスを明示する規則を守る（AGENTS.md）。

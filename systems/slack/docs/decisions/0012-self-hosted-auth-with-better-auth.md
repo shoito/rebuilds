@@ -44,7 +44,7 @@ date: 2026-09-26
 | セッション | DB に保存。`expiresIn`・`updateAge` によるアイドルタイムアウト、`freshAge`、`listSessions`・`revokeSession`・`revokeOtherSessions`、短命の Cookie キャッシュ | 対応。**絶対タイムアウトはない**ので自前で検査する |
 | CSRF | `Origin` の検査と `trustedOrigins`、Cookie の属性の設定 | 対応 |
 | レート制限 | パスごとの規則。保存先に secondary storage（Valkey）を使える | 対応 |
-| SSO | `@better-auth/sso`：OIDC と SAML 2.0、メールのドメインによる IdP の選択、ドメインの確認、`provisionUser` フック、SAML の `InResponseTo` 検査と IdP 起点の拒否、SAML の Single Logout（1.5） | 対応。複数タスクの間での `InResponseTo` の記録の共有は 未検証 |
+| SSO | `@better-auth/sso`：OIDC と SAML 2.0、メールのドメインによる IdP の選択、ドメインの確認、`provisionUser` フック、SAML の `InResponseTo` 検査と IdP 起点の拒否、SAML の Single Logout（1.5） | 対応。`InResponseTo` の記録は検証の値として `secondaryStorage` か DB に置かれ、複数タスクの間で共有される（[`types.ts`](https://github.com/better-auth/better-auth/blob/main/packages/sso/src/types.ts)、2026-09-26 に確認） |
 | SCIM | `@better-auth/scim`：Users の作成・更新・削除、プロバイダーと組織に紐付いたトークン | 対応。ただし組織に紐付かないトークンの `DELETE` はグローバルなユーザーを削除しうる |
 | 組織 | `organization` プラグイン | 対応（本システムでは使わない） |
 | アカウントの削除 | `deleteUser`（確認メール、`beforeDelete`） | 対応（ユーザーの行を消すため、本システムでは使わない） |
@@ -84,7 +84,7 @@ date: 2026-09-26
   - 認証の脆弱性への対応（ライブラリの更新、勧告の監視）を自分たちで持つ。SAML は特に攻撃面が大きく、E2 の完了前に外部のペネトレーションテストを受ける。
   - Better Auth のスキーマと設定の変更に、ライブラリの更新のたびに追従する必要がある。モデル名を変えているため（`user` → `accounts`、`account` → `auth_identities`）、マイグレーションの生成結果をレビューする。
   - organization・SCIM・API キー・`deleteUser` のプラグインを使わないぶん、同等の機能を自前で書く。
-  - 絶対タイムアウト、ワークスペースごとのセッションの方針、MFA 完了時のセッションの作り直し（未検証）は、Better Auth の外で補う。
+  - 絶対タイムアウトとワークスペースごとのセッションの方針は、Better Auth の外で補う。MFA 完了時のセッションの作り直しは Better Auth が行う（2026-09-26 に確認。[identity-and-access.md](../architecture/identity-and-access.md) の 3.2 節）。
 
 ## Confirmation
 
@@ -92,8 +92,8 @@ date: 2026-09-26
 - `/api/auth/*` のうち Better Auth に渡すパスの許可リストを、テストで固定する。許可リストにないパス（例：`/api/auth/sso/register`）が 404 になることを確かめる。
 - lint：`apps/api/src/auth/` の外から、Better Auth の `auth.api` と認証のテーブルを import しない。Web から `better-auth/client` を直接 import しない。
 - `package.json` で `better-auth` と `@better-auth/*` のバージョンが完全に固定されていることを CI で検査する。
-- E2 の着手時に、次の 未検証 の項目を確かめ、この ADR の後継か identity-and-access.md に結果を書く。
-  - `secondaryStorage` を設定したときに、セッションを DB に置いたままにできるか
-  - Cookie の名前に `__Host-` の接頭辞を使えるか
-  - MFA の完了時にセッションが作り直されるか
-  - 複数の ECS タスクの間で、SAML の `InResponseTo` の記録を共有できるか
+- 次の項目は、2026-09-26 に Better Auth の文書とソースで確かめ、結果を identity-and-access.md に書いた。E2 の結合テストで実際の動きを確かめる。
+  - `secondaryStorage` を設定したときに、セッションを DB に置いたままにできるか：`storeSessionInDatabase: true` で DB にも書けるが、Valkey にも置かれ、先に読まれる（3.2 節）
+  - Cookie の名前に `__Host-` の接頭辞を使えるか：使えない。`__Secure-` が必ず付く（3.1 節）
+  - MFA の完了時にセッションが作り直されるか：作り直される（3.2 節）
+  - 複数の ECS タスクの間で、SAML の `InResponseTo` の記録を共有できるか：できる（10 節）

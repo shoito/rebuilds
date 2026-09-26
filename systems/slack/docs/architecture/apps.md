@@ -161,8 +161,8 @@ privacy_policy_url: https://deploy.example.com/privacy
 
 - **ボットのスコープは、マニフェストから決める。** OAuth の `scope` パラメーターには、ユーザーのスコープだけを載せる。ボットのスコープをリクエストの度に変えられると、同意の画面と実際の権限がずれる余地が増えるため。
 - **ボットのトークンは本システムが発行する**（`slk_bot_...`、[identity-and-access.md](identity-and-access.md) の 9 節）。Better Auth の発行するトークンはアカウント（人）に結び付くもので、アカウントを持たないボットに合わないため。ボットのトークンの平文は、5 で作って短時間（10 分）だけ暗号化して置き、7 の応答で 1 回だけ渡して消す。
-  - 7 の応答に項目を加える方法は、Better Auth の `customTokenResponseFields` を候補にする（トークンの作成の前に呼ばれ、例外を投げれば何も発行されないと文書にある）。ここで一時的な値を読み出して消してよいか（副作用を置いてよいか）は **未検証**。だめなら、`/oauth/v1/token` を本システムのハンドラーで包み、Better Auth の応答に項目を足す。
-- 5 の選択したワークスペースを `consentReferenceId` に渡す方法は **未検証**（Better Auth の文書の例は organization プラグインの `activeOrganizationId` を使う。[public-api.md](public-api.md) の 4.1 節）。
+  - 7 の応答に項目を加える方法は、Better Auth の `customTokenResponseFields` を候補にする（トークンの作成の前に呼ばれ、例外を投げれば何も発行されないと文書にある）。このコールバックは非同期でよく（`Awaitable`）、認可コードの交換では同意の `referenceId` を含む検証の値を受け取る（[oauth-provider の文書](https://www.better-auth.com/docs/plugins/oauth-provider)、2026-09-26 に確認）。ただし、ここで一時的な値を読み出して消してよいか（呼ばれた後にトークンの作成が失敗したら、値だけが消える）は、文書に書かれておらず **未検証**。E12 の着手前に PoC で、失敗の経路（コードの二重使用、DB の失敗）での動きを確かめる。消してよいと言えなければ、`/oauth/v1/token` を本システムのハンドラーで包み、Better Auth の応答が成功したときだけ項目を足して値を消す。
+- 5 の選択したワークスペースは、セッション ID をキーにした短命の行に置き、`consentReferenceId`（`{ user, session, scopes }` を受け取る非同期の関数。organization プラグインには依らない）で引いて返す（[public-api.md](public-api.md) の 4.1 節、2026-09-26 に確認）。
 - **再インストール**（同じワークスペースに既にあるアプリ）は、同じインストールとボットのメンバーを使い続け、ボットのトークンを新しく発行する。旧いトークンは 5.3 節の重なりの期間の後に失効させる。
 - ユーザーのスコープだけの追加の認可（既にインストールされたアプリに、別のメンバーが自分のトークンを与える）も同じ流れで、5 ではインストールを作らず `app_user_authorizations` だけを作る。
 
@@ -185,7 +185,7 @@ privacy_policy_url: https://deploy.example.com/privacy
 
 - `POST /v1/auth/token/rotate`（ボットのトークンで呼ぶ）で、新しいボットのトークンを発行する。旧いトークンは 24 時間の後に失効する。開発者コンソールからも実行できる。
 - 漏洩が疑われるときは、開発者または管理者が即時に失効させる（重なりなし）。
-- トークンの接頭辞（`slk_bot_`）を、GitHub などのシークレットスキャンに登録し、公開のリポジトリで見つかったら自動で失効させることを目指す。登録の手続きと条件は **未検証**。
+- トークンの接頭辞（`slk_bot_`）を、GitHub などのシークレットスキャンに登録し、公開のリポジトリで見つかったら自動で失効させることを目指す。登録は GitHub の secret scanning partner program で行う。`secret-scanning@github.com` に申し込み、秘密の種類ごとの名前と正規表現（一意な接頭辞、高いエントロピー、チェックサムが推奨）を渡し、検出を受ける公開の HTTP エンドポイントを用意する。エンドポイントは `Github-Public-Key-Identifier`・`Github-Public-Key-Signature` の署名（ECDSA P-256、SHA-256）を検証し、見つかったトークンを失効させて持ち主に知らせる。公開のリポジトリと公開の npm パッケージが既定で走査される（[GitHub Docs](https://docs.github.com/en/code-security/secret-scanning/secret-scanning-partnership-program/secret-scanning-partner-program)、2026-09-26 に確認）。このため、トークンの形式にチェックサムを含めることを検討する。
 
 ## 6. スコープと管理者の統制
 
@@ -362,7 +362,7 @@ app-delivery-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎ�
 
 ## 8. 署名とリプレイの防止
 
-Events API、インタラクティブ機能、スラッシュコマンド、URL の確認の、アプリへ送るすべての要求に署名する。形式は Standard Webhooks の仕様に合わせる。検証の実装が多くの言語に既にあるため。仕様の細部（ヘッダーの名前、秘密の表し方）は着手時に確かめる（**未検証**）。
+Events API、インタラクティブ機能、スラッシュコマンド、URL の確認の、アプリへ送るすべての要求に署名する。形式は Standard Webhooks の仕様に合わせる。検証の実装が多くの言語に既にあるため。ヘッダーは `webhook-id`・`webhook-timestamp`・`webhook-signature`、署名は `v1,` に続けて `{id}.{timestamp}.{本文}` の HMAC-SHA256 の base64、入れ替え中は複数の署名を空白で区切る。秘密は `whsec_` に続く base64 で、24〜64 バイトとする（[Standard Webhooks の仕様](https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md)、2026-09-26 に確認）。時刻の許容幅は仕様では定めていないので、本システムは 5 分とする。
 
 | ヘッダー | 値 |
 | --- | --- |

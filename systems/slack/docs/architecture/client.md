@@ -139,12 +139,13 @@ SharedWorker が使えないとき（古い Chrome for Android、Android の Web
 | --- | --- | --- | --- | --- | --- |
 | SharedWorker | 5 | 29 | 16 以上 | 148 以上（caniuse は 152 と表示） | MDN browser-compat-data、caniuse |
 | Web Locks | 69 | 96 | 15.4 | Chrome に準じる | MDN browser-compat-data |
-| BroadcastChannel | 対応 | 対応 | 15.4 | 対応 | 未検証（版は MDN で要確認） |
+| BroadcastChannel | 54 | 38 | 15.4 | Chrome に準じる | [MDN browser-compat-data](https://github.com/mdn/browser-compat-data/blob/main/api/BroadcastChannel.json) |
+
+- module 形式の SharedWorker（`type: 'module'`）：SharedWorker のコンストラクターの `type` オプションは Safari 15 から対応しており、SharedWorker が戻った Safari 16 以降では module 形式で動く（[MDN browser-compat-data の `SharedWorker`](https://github.com/mdn/browser-compat-data/blob/main/api/SharedWorker.json) の `options_type_parameter`、2026-09-26 に確認）。classic 形式への出力は要らない。
 
 未検証の事項：
 
-- iOS の PWA がバックグラウンドにある間、SharedWorker と WebSocket がどれだけ生き続けるか。すぐ止まる前提で、フォアグラウンドに戻ったら全チャンネルを差分取得する設計にしておく。
-- module 形式の SharedWorker（`type: 'module'`）が Safari 16〜17 で動くか。動かなければ、Vite の設定で classic 形式に出力する。
+- iOS の PWA がバックグラウンドにある間、SharedWorker と WebSocket がどれだけ生き続けるか。WebKit・Apple の公式の文書に定めがなく、確かめられなかった。すぐ止まる前提で、フォアグラウンドに戻ったら全チャンネルを差分取得する設計にしておく。E4 の着手前に、実機（iPhone のホーム画面に追加した PWA）で、バックグラウンドに移ってから接続が切れるまでの時間を PoC で測る。
 
 ### 3.5 チャンネルごとの同期の状態
 
@@ -211,8 +212,7 @@ IndexedDB に、次の単位で保存する。データベースはアカウン�
 Safari の保存の扱い：
 
 - Safari 17 以降は、オリジンあたりディスクの最大 60% まで使え、上限を超えるとユーザーの操作が古いオリジンから消される（WebKit の storage policy）。
-- Safari の追跡防止により、ホーム画面に追加していないサイトは、Safari を使った 7 日間に操作がないとスクリプトから書いたデータが消える（WebKit のブログ、2020 年）。キャッシュが消えても最新ページの取り直しで動くようにする。未送信のメッセージが消えうることは、送信失敗と同じ扱いにはできないので、ドキュメントで注意する。
-- 7 日間の扱いが 2026 年時点でも同じかは未検証。
+- Safari の追跡防止（ITP）により、ユーザーの操作のない 7 日間の後に、スクリプトから書いたデータ（IndexedDB、LocalStorage、Service Worker の登録とキャッシュなど）が消える。ホーム画面に追加した Web アプリのオリジンは対象外（[WebKit の Tracking Prevention の文書](https://webkit.org/tracking-prevention/)、2026-09-26 に確認）。キャッシュが消えても最新ページの取り直しで動くようにする。未送信のメッセージが消えうることは、送信失敗と同じ扱いにはできないので、ドキュメントで注意する。
 
 ## 4. メッセージの一覧
 
@@ -300,7 +300,7 @@ Safari の保存の扱い：
 | 本文の描画 | AST を React の要素に変換して描く。`dangerouslySetInnerHTML`・`innerHTML`・`eval` を使わない（lint で禁止） |
 | リンク | `http:` / `https:` / `mailto:` 以外のスキームは描画しない。外部リンクには `rel="noopener noreferrer"` を付ける |
 | CSP | `default-src 'self'`、`script-src 'self'`（インラインなし）、`style-src 'self'`、`worker-src 'self'`、`connect-src 'self'`（API と WebSocket が同一オリジンの前提）、`img-src 'self' blob:` とファイル配信のドメイン、`frame-ancestors 'none'`。利用状況の計測を有効にしたワークスペースでだけ、GA の送信先を `script-src`・`connect-src`・`img-src` に加える（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)）、`object-src 'none'`、`base-uri 'none'`。CloudFront の応答ヘッダーで付ける |
-| Trusted Types | `require-trusted-types-for 'script'` を付ける。対応していないブラウザでは無視される。対応状況は未検証 |
+| Trusted Types | `require-trusted-types-for 'script'` を付ける。対応していないブラウザでは無視される。対応は Chrome 83、Firefox 148、Safari 26 から（[MDN browser-compat-data](https://github.com/mdn/browser-compat-data/blob/main/http/headers/Content-Security-Policy.json)、2026-09-26 に確認）。これより古い版では効かないので、本文の描画の方針（上の行）を主な防御とする |
 | 認証情報 | セッションは HttpOnly・Secure・SameSite の Cookie に置く。トークンを `localStorage`・IndexedDB・URL に置かない。WebSocket は、API から受け取った短命の 1 回限りのチケットで認証し、Gateway が `Origin` を検査する。Gateway は DB に触れないため、Cookie のセッションを直接は検証しない（[identity-and-access.md](identity-and-access.md)、[realtime.md](realtime.md)） |
 | 利用状況の計測 | `packages/analytics` の型付きのイベントだけを GA に送る。本文・名前・ID を送らない。ワークスペースで無効なら gtag.js を読み込まない（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)） |
 | ログアウト | 全タブに伝えて画面を閉じ、そのアカウントの IndexedDB を消し、Web Push の購読を解除し、SharedWorker の接続を閉じる |

@@ -36,7 +36,7 @@ AWS Organizations で、用途ごとにアカウントを分ける。本番の�
 | isolated | Aurora、ElastiCache | なし |
 
 - **入口は CloudFront → ALB だけ。** ALB のセキュリティグループは、CloudFront のマネージドプレフィックスリストからの接続だけを許可する。CloudFront には AWS WAF を付ける。
-- **CloudFront は WebSocket を扱える**（HTTP/1.1 のみ）。オリジンリクエストポリシーで `Sec-WebSocket-*` のヘッダーを転送する。CloudFront 経由の WebSocket のアイドル切断時間は **未検証**。Gateway は 25 秒ごとに心拍を送り、アイドル切断が起きないようにする。ALB のアイドルタイムアウトは心拍より十分長くする（例：120 秒）。
+- **CloudFront は WebSocket を扱える**（HTTP/1.1 のみ）。オリジンリクエストポリシーで `Sec-WebSocket-*` のヘッダーを転送する（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-working-with.websockets.html)）。CloudFront は、オリジンからクライアントへ 10 分間 1 バイトも流れない WebSocket をアイドルとみなして切る（[CloudFront のクォータ](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html#limits-websockets)）。数えるのはオリジン → クライアントの向きだけなので、心拍はサーバー（Gateway）から送る。Gateway は 25 秒ごとに心拍を送り、アイドル切断が起きないようにする。ALB のアイドルタイムアウトは心拍より十分長くする（例：120 秒）。
 - **VPC エンドポイント**を使い、AWS のサービスへの通信を NAT に出さない：S3（ゲートウェイ型）、ECR、SQS、Secrets Manager、KMS、CloudWatch Logs、STS、X-Ray、AppConfig。
 - **外向きの通信を制限する。** private サブネットからの外向きの通信は、AWS Network Firewall のドメインの許可リスト（Web Push の送信先、外部の IdP など）に限る。DNS は Route 53 Resolver DNS Firewall でも絞る。
 - **リンクのプレビューの取得器（unfurler）は隔離する。** 任意の URL を取りに行くため、SSRF の踏み台になりうる（ADR-0016、[messaging.md](messaging.md)、[security.md](security.md)）。
@@ -67,7 +67,7 @@ S1（同時接続 5 万、最大ワークスペース 5,000 人）の本番の�
 | リソース | 構成 | 見積もりの根拠 |
 | --- | --- | --- |
 | Aurora PostgreSQL | writer `db.r8g.2xlarge` × 1、reader 同型 × 1（別の AZ）。I/O-Optimized | 投稿は全体で数百件/秒のピークを想定。reader はフェイルオーバー先を兼ねる |
-| RDS Proxy | 使わない（S1） | 接続数は api のプールで足りる見込み。タスクが増えて接続数が問題になったら入れる |
+| RDS Proxy | 使わない | テナントのコンテキストの設定（`SET LOCAL` / `set_config`）で接続が固定され、多重化が効かない（[capacity.md](capacity.md) の 2.2 節） |
 | ElastiCache（Valkey） | `cache.r7g.large`、1 シャード、プライマリ 1＋レプリカ 2（3 AZ）、クラスタモード無効 | Pub/Sub のメッセージ量は小さい。ネットワーク帯域で決まる |
 | gateway | 2 vCPU / 4 GB × 9 タスク | 1 タスク 1 万接続を上限とみなし、目標 60% と AZ 障害時の余裕を含める |
 | api | 1 vCPU / 2 GB × 6 タスク | |
@@ -107,7 +107,8 @@ staging は同じ構成を最小の台数（Aurora は writer のみ、各サー
 
 - **S1 でも Aurora Global Database を使う。** バックアップの復元だけでは、コピーの頻度（1 時間ごとが下限）のため RPO 15 分を守れない。Aurora PostgreSQL は、Global Database 以外にリージョンをまたぐリードレプリカを持てない。
 - Global Database のリージョン間の複製の遅延は、通常 1 秒未満である。計画外のフェイルオーバーでは、その時点の遅延ぶんだけデータを失う。計画的な切り替え（switchover）なら RPO 0。
-- headless の二次クラスタは、インスタンスの料金がかからず、ストレージの料金だけになる。作成は CLI・API から行う（コンソールでは作れない）。大阪での Global Database と headless 構成の提供状況は **未検証**。着手前に確かめる。
+- headless の二次クラスタは、インスタンスの料金がかからず、ストレージの料金だけになる。作成は CLI・API から行う（コンソールでは作れない）。切り替えの前に、二次クラスタへインスタンスを足す必要がある（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-attach.console.headless.html)）。
+- 大阪（ap-northeast-3）と東京は、Aurora PostgreSQL 18.3 以降の Global Database に対応している（2026-09 に確認。[対応リージョンとバージョン](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.Aurora_Fea_Regions_DB-eng.Feature.GlobalDatabase.html)）。headless 構成にリージョンの制限は書かれていない。
 - 大阪に常に置くもの：Aurora の二次クラスタ、ECR のイメージ（レプリケーション）、S3 のレプリカ、Secrets Manager のレプリカ、KMS のマルチリージョンキー、VPC とサブネット（空のまま）。ECS・ALB・Valkey・SQS は、切り替え時に Terraform で作る（状態ファイルは大阪のバケットにある。ADR-0020）。
 - Valkey と SQS の中身は大阪へ複製しない。切り替え後、Relay が未配信の outbox から配信を再開する。実行中だったジョブは失われうるので、検索インデックスは差分の再構築で補い、通知の一部の欠落は許容する。
 - 手順は [runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md)。
@@ -212,7 +213,7 @@ S3（同時接続 100 万）では、スタック一式を「セル」として�
 
 - **Global のサービスが、workspace → cell の対応表を持つ。** ログイン後に、クライアントは自分が属するワークスペースと、それぞれのセルのエンドポイント（例：`c01.api.example.com`）を受け取る。
 - API と Gateway の URL は、セルのホスト名を直接使う。パスの `workspace_id` と、セルが持つワークスペースが一致しなければ、セルは 421 を返し、クライアントは Global から対応表を取り直す（ワークスペースの移動中への備え）。
-- エッジ（CloudFront Functions と KeyValueStore）で、パスの `workspace_id` からオリジンを選ぶ方式も併用できる。CloudFront Functions でオリジンを切り替えられるかは **未検証**。
+- エッジ（CloudFront Functions と KeyValueStore）で、パスの `workspace_id` からオリジンを選ぶ方式も併用できる。CloudFront Functions は、ビューワーリクエストでオリジンを切り替えられる（`selectRequestOriginById()`・`updateRequestOrigin()`。[AWS のドキュメント](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)）。
 - 対応表は Global の DB を正本とし、各セルにはキャッシュとして配る。Global が止まっても、ログイン済みのクライアントはセルと直接話し続けられる。
 
 ### 10.2 セルの外に置くもの
@@ -237,7 +238,7 @@ S3（同時接続 100 万）では、スタック一式を「セル」として�
 すべてのテナントデータが `workspace_id` を持つので（[ADR-0009](../decisions/0009-pooled-tenancy-with-rls.md)）、ワークスペース単位で切り出せる。`seq` と ID はそのまま移すので、クライアントの状態は移動後も使える。
 
 1. 移動先のセルに、そのワークスペースの行をまとめてコピーする（`workspace_id` で絞ったスナップショット）。
-2. 変更を追いかけて反映する（PostgreSQL の論理レプリケーションの行フィルタを使う想定。方式は **未検証**）。
+2. 変更を追いかけて反映する（PostgreSQL の論理レプリケーションの行フィルタを使う想定）。行フィルタは PostgreSQL 15 から使え、初期コピーにも効く。ただし UPDATE と DELETE を流すなら、フィルタの列（`workspace_id`）がレプリカ識別子に含まれている必要がある（[PostgreSQL の文書](https://www.postgresql.org/docs/18/logical-replication-row-filter.html)）。テナントのテーブルは主キーに `workspace_id` を含む複合キーなので（[ADR-0009](../decisions/0009-pooled-tenancy-with-rls.md)）、主キーをレプリカ識別子にすれば満たせる。セル間の実際の手順は **未検証**（公式の手順はない）。S3 に入る前に staging で試す。
 3. 書き込みを短時間止める（ワークスペースを読み取り専用にする。目標は 1 分以内）。outbox を移動元で出し切り、両方のセルで件数と各チャンネルの `last_seq` を突合する。
 4. 対応表を切り替える。移動元の Gateway はそのワークスペースの接続を切り、クライアントは新しいセルへ再接続して差分取得で追いつく。
 5. 検索インデックスは移動先で作り直す。ファイルは S3 のキーが `ws/{workspace_id}/` で始まるので、プレフィックス単位でコピーする。

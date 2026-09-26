@@ -29,7 +29,7 @@ ADR-0011（Worker は ECS Fargate で動かす）の例外として、外部の 
 4 を採用し、アプリの検査を重ねる。
 
 - **ネットワークで隔離する。** VPC に接続しない Lambda は、VPC 内の資源に届かない。検査に漏れがあっても、DB や Valkey には到達できない。
-- **盗まれる権限を持たせない。** 実行ロールには、ログの書き込み以外の権限を与えない。ECS のタスクのような認証情報のエンドポイントがない（Lambda の認証情報は環境変数で渡る。未検証：取得器のコードから到達できる HTTP の経路がないこと）。
+- **盗まれる権限を持たせない。** 実行ロールには、ログの書き込み以外の権限を与えない。ECS のタスクのような認証情報のエンドポイントがない。Lambda の認証情報は環境変数（`AWS_ACCESS_KEY_ID` など）で渡る（[AWS のドキュメント](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html#configuration-envvars-runtime)）。実行環境の中には、ランタイム API（`AWS_LAMBDA_RUNTIME_API`）とメタデータのエンドポイント（`169.254.100.1:9001` など）の HTTP の経路がある。メタデータのエンドポイントは AZ の ID だけを返し、環境変数のトークンがないと 401 を返す（[AWS のドキュメント](https://docs.aws.amazon.com/lambda/latest/dg/configuration-metadata-endpoint.html)）。どちらも認証情報を返さず、ループバックとリンクローカルはアプリの検査でも拒否する。
 - **呼び出しを 1 方向にする。** VPC 内の unfurl Worker（ECS）が Lambda を同期で呼び、結果を受け取って DB と S3 に書く。Lambda はキューにも DB にも触れない。
 - **解析も隔離の中で行う。** HTML からは、タイトル・説明・サイト名だけを取り出し、長さを切り詰めて返す。画像は Lambda の中で WebP に再エンコードしてから返す。
 - 1 は投稿 API を外部サイトの遅延に巻き込む（NFR-003）。2 は、検査の漏れがそのまま内部への到達になる。3 は 4 と同じ隔離を得られるが、VPC と NAT を別に持つ費用と運用がかかる。5 は、秘密を含みうる URL を第三者に渡す。

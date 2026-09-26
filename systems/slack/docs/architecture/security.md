@@ -66,7 +66,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 | 種類 | 脅威 | 対策 |
 | --- | --- | --- |
-| S | セッションの窃取・固定 | `__Host-` 接頭辞の Cookie（`HttpOnly`、`Secure`、`SameSite=Lax`）、ログイン時のセッション ID の再発行 |
+| S | セッションの窃取・固定 | `__Secure-` 接頭辞の Cookie（`HttpOnly`、`Secure`、`SameSite=Lax`、`Path=/`、`Domain` なし。Better Auth では `__Host-` を使えない。[identity-and-access.md](identity-and-access.md) の 3.1 節）、ログイン時と MFA の完了時のセッション ID の再発行 |
 | T | 悪意ある本文・ファイル名・表示名による XSS | 本文は AST から React の要素として描画（ADR-0006）、`dangerouslySetInnerHTML` を lint で禁止、厳格な CSP（5 節） |
 | I | 共有端末に残るデータ、外部画像を使ったデータの持ち出し | ログアウト時にキャッシュと IndexedDB を消す。CSP の `img-src` で外部画像を直接読まない（プレビューの画像は自ドメイン経由） |
 | E | CSRF、クリックジャッキング、WebSocket の乗っ取り（CSWSH） | 5 節 |
@@ -285,7 +285,7 @@ roadmap の「後回しにしたもの」を作るときの前提を先に決め
 - **本文は命令ではなくデータとして扱う。** 間接的なプロンプトインジェクション（メッセージやファイルに紛れた命令）を前提に設計する。
   - LLM の出力も AST として描画する。外部画像の自動読み込みやリンクの自動取得をしない（持ち出しの経路を断つ）。
   - LLM によるツール呼び出しは、依頼したメンバーの権限の範囲に限る。書き込み（投稿、招待、設定変更）は、メンバーの確認を経てから行う。
-- **LLM の提供者**：顧客データを学習に使わない契約を前提にする。処理する地域（東京リージョンで使えるモデル）は 未検証。
+- **LLM の提供者**：顧客データを学習に使わない契約を前提にする。Amazon Bedrock では、モデルの提供者は Bedrock のログにも、顧客のプロンプトと出力にも触れられない（[Bedrock の Data protection](https://docs.aws.amazon.com/bedrock/latest/userguide/data-protection.html)）。東京リージョンでの提供は、モデルごとに「リージョン内」「地理（日本など）のクロスリージョン推論」「Global のクロスリージョン推論」の別があり、モデルの詳細ページの Regional availability の表に載る（[Regional availability](https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html)、[推論プロファイル](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html)、2026-09-26 に確認）。Global は全商用リージョンに送られうるので使わない。処理を日本に留めるには、リージョン内か、日本の地理のプロファイル（東京と大阪の間だけで振り分ける。[Geographic cross-Region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/geographic-cross-region-inference.html)）があるモデルを選ぶ。使うモデルは、AI 機能の着手時にこの表で決める。
 - AI 機能の評価に、プロンプトインジェクションと越権のケースを含める。
 
 ### 7.2 ボット・AI エージェントのメンバー
@@ -327,7 +327,7 @@ ADR-0010 により、ボット・AI エージェントは `account_id` が NULL 
 - 秘密情報（DB の認証情報、セッションの署名鍵、SES・外部サービスの鍵）は Secrets Manager に置く。リポジトリ・環境変数ファイル・CI の変数に置かない。
 - ECS のタスクロールで、サービスごとに読める秘密情報を限定する。
 - DB の認証情報は自動でローテーションする。アプリはローテーションに追従できるよう、接続の確立時に秘密情報を取り直す。
-- 署名鍵は、新旧の鍵を同時に受け付ける期間を設けて入れ替える。
+- 署名鍵は、新旧の鍵を同時に受け付ける期間を設けて入れ替える。ただし Better Auth のセッションの Cookie の署名は 1 つの鍵でしか検証できないので、定期には入れ替えず、漏洩の疑いがあるときに全員の再ログインを受け入れて入れ替える（ADR-0017 の注）。
 - 漏洩の疑いがあれば、即座にローテーションする（runbook の `key-rotation`、E7 で作成）。
 
 ## 10. セキュリティの試験
@@ -405,5 +405,5 @@ ADR-0010 により、ボット・AI エージェントは `account_id` が NULL 
 - プライベートチャンネル・DM でのリンクのプレビューを既定で有効にするか（PM）。
 - ワークスペースの全データ（プライベート・DM を含む）のエクスポートを、どのプランで、メンバーへのどんな通知のもとで許すか（PM、ADR-0019）。
 - SOC 2 の監査をいつ受けるか（PM、Ops）。
-- 東京リージョンで使える LLM の提供形態（未検証）。
+- AI 機能で使うモデル（Bedrock の東京リージョンで、処理を日本に留められるもの。7.1 節）。
 - バグバウンティを始める時期。

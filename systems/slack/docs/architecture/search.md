@@ -102,7 +102,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS: search-index ─▶ search ind
 
 ### 4.1 RLS の下では pg_bigm のインデックスが使われない
 
-PostgreSQL は、RLS のあるテーブルでは、leakproof でない演算子を含む条件にインデックスを使わない。`LIKE`（`~~`）は leakproof ではない。したがって、RLS を有効にした表に `LIKE` で検索すると、pg_bigm の GIN インデックスは使われず、ワークスペースの全行を走査する（[PostgreSQL のメーリングリスト](https://www.postgresql.org/message-id/14241.1565725716%40sss.pgh.pa.us)）。演算子を leakproof にするには superuser が必要で、Aurora では行えない見込み（未検証）。
+PostgreSQL は、RLS のあるテーブルでは、leakproof でない演算子を含む条件にインデックスを使わない。`LIKE`（`~~`）は leakproof ではない。したがって、RLS を有効にした表に `LIKE` で検索すると、pg_bigm の GIN インデックスは使われず、ワークスペースの全行を走査する（[PostgreSQL のメーリングリスト](https://www.postgresql.org/message-id/14241.1565725716%40sss.pgh.pa.us)）。演算子を leakproof にできるのは superuser だけで（[PostgreSQL の文書](https://www.postgresql.org/docs/18/sql-createfunction.html)）、Aurora では superuser を使えない（`rds_superuser` は superuser ではない。[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Appendix.PostgreSQL.CommonDBATasks.Roles.rds_superuser.html)）。したがって Aurora では行えない。
 
 そこで、検索用のテーブルだけを次の形にする。
 
@@ -132,7 +132,7 @@ CREATE INDEX ON search.message_docs (workspace_id, member_id, created_at DESC);
 ```
 
 - `messages` とは別のテーブルにする。本文は AST（JSON）なので、テキスト化した列が要る。更新を indexer に任せ、S2 と同じ経路（2.3 節）にする。
-- ハッシュ分割で、GIN の転置リストに載る他テナントの行を減らす。`current_setting` は stable なので、実行時の分割の刈り込みが効く（未検証：Aurora の実行計画で確かめる）。
+- ハッシュ分割で、GIN の転置リストに載る他テナントの行を減らす。`current_setting` は stable なので、実行時の分割の刈り込みが効く見込み（未検証：PostgreSQL の文書は、実行時の刈り込みの例に PREPARE の引数・副問い合わせ・入れ子ループの引数を挙げるが、stable な関数には触れていない。[PostgreSQL の文書](https://www.postgresql.org/docs/18/ddl-partitioning.html#DDL-PARTITION-PRUNING)。着手前に Aurora の `EXPLAIN` で「Subplans Removed」を確かめる）。
 - 検索の条件で絞り込みが強いとき（`in:`、`from:`、日付）は B-tree、語が珍しいときは GIN が選ばれる想定。
 
 ### 4.3 クエリ
@@ -197,9 +197,9 @@ LIMIT :limit + 1;                              -- 1 件多く取り、次のペ�
 | `text` | Sudachi（形態素解析） | **関連度のスコア**。`should` にだけ使う |
 
 - 一致の判定を N-gram にするのは、S1 から移ったときに「前は見つかったものが見つからない」を起こさないため。形態素解析だけでは、未知語や語の途中での検索を取りこぼす。
-- 形態素解析には Sudachi を使う。表記の揺れの正規化（例：「附属」と「付属」）を持ち、辞書の更新が続いている。Amazon OpenSearch Service は、Sudachi と Kuromoji を任意のプラグインとして提供している（[AWS の発表、2023-10](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/)）。対応する OpenSearch のバージョンと、プラグインが版の更新を妨げないかは未検証。
+- 形態素解析には Sudachi を使う。表記の揺れの正規化（例：「附属」と「付属」）を持ち、辞書の更新が続いている。Amazon OpenSearch Service は、Sudachi を任意のプラグインとして OpenSearch 1.3 以降で提供し、Kuromoji はすべてのドメインに入っている（[AWS の発表、2023-10](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/)、[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。任意のプラグインのパッケージは OpenSearch の版ごとにあり、関連付けと解除には blue/green のデプロイが走る。Sudachi の辞書を差し替えても、次の blue/green のデプロイまで反映されない（[パッケージの管理](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/custom-packages.html)）。プラグインを関連付けたまま版を上げられるかは未検証（公式の記述なし）。S2 の前に staging のドメインで版の更新を試す。
 - 正規化（NFKC・小文字化）は、アナライザーではなくアプリの `normalizeForSearch` で行う。S1 と同じ関数を使い、結果を揃える。
-- 1 文字の N-gram を含めると、インデックスが大きくなる。増え方は未検証なので、バックフィルの前に代表的なワークスペースで測る。
+- 1 文字の N-gram を含めると、インデックスが大きくなる。増え方はデータに依存し、公式の目安はない（未検証）。バックフィルの前に代表的なワークスペースで測る。
 - 関連度順のスコアは、Sudachi のフィールドの BM25 に、投稿時刻の減衰（ガウス、30 日）を掛ける。
 
 ### 5.3 文書単位の権限の条件

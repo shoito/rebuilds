@@ -49,9 +49,9 @@
 | migrator、運用 | — | — | 20 |
 | **合計** | | | **約 580** |
 
-- 規則：**オートスケールの上限まで増えたときの合計を、`max_connections` の 50% 以下に保つ。** Aurora の `max_connections` の既定値はメモリから決まり、`db.r8g.2xlarge` で数千になる（正確な値は未検証）。
+- 規則：**オートスケールの上限まで増えたときの合計を、`max_connections` の 50% 以下に保つ。** Aurora の `max_connections` の既定値は `LEAST({DBInstanceClassMemory/9531392}, 5000)` で、`db.r8g.2xlarge`（メモリ 64 GiB）では上限の 5,000 になる（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Managing.html#AuroraPostgreSQL.Managing.MaxConnections)）。
 - Gateway は DB に接続しない（[realtime.md](realtime.md)）。
-- S1 では RDS Proxy を使わない。テナントのコンテキストの設定（`SET LOCAL` または `set_config(..., true)`）で、RDS Proxy の接続の固定（pinning）が起きるかは未検証。S2 で api のタスクが増え、接続数が上の規則を超えそうになったら、固定が起きないことを確かめてから入れる。
+- RDS Proxy は使わない。AWS のドキュメントでは、PostgreSQL で `SET` と `set_config` を使うと接続が固定（pinning）される。`SET LOCAL` を除く記述はない（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy-pinning.html#rds-proxy-pinning.postgres)）。テナントのコンテキストの設定（`SET LOCAL` または `set_config(..., true)`）は毎トランザクションで行うので、ほぼすべての接続が固定され、多重化が効かない。S2 で接続数が上の規則を超えそうになったら、まず読み取りを reader に分け、タスクあたりのプールを小さくする。それでも足りなければ、接続の集約の方式を改めて比べる。
 
 ### 2.3 Gateway
 
@@ -141,7 +141,7 @@
 
 | 設定 | 値 | 理由 |
 | --- | --- | --- |
-| `ulimit nofile` | 65,536（タスク定義で明示） | 1 万接続＋Valkey などの接続。Fargate の既定値に頼らない（既定値は未検証） |
+| `ulimit nofile` | 65,536（タスク定義で明示） | 1 万接続＋Valkey などの接続。Fargate の既定値もソフト・ハードとも 65,535 だが（[ECS の API リファレンス](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Ulimit.html)）、既定値に頼らず明示する |
 | `ws` の `perMessageDeflate` | 無効 | 圧縮は CPU とメモリを接続ごとに使う。イベントは小さい |
 | `ws` の `maxPayload` | 64 KB | クライアントからの大きなフレームを拒否する |
 | 送信バッファの上限 | 1 MB（`bufferedAmount`） | 超えたら遅い受信者として `4003` で切る（[realtime.md](realtime.md) の 7 節） |
@@ -159,14 +159,14 @@
 | ターゲットグループ（api） | ヘルスチェック | 10 秒ごと、2 回続けて失敗で外す |
 | WAF | IP ごとのレート制限 | 5 分に 2,000 リクエスト（ログインなど認証の経路は、より厳しく） |
 
-大規模な告知などで、平常の数倍の接続が一度に来ることがわかっているときは、ALB の容量の予約（LCU の予約）を事前に使う（未検証。着手前に確かめる）。
+大規模な告知などで、平常の数倍の接続が一度に来ることがわかっているときは、ALB の容量の予約（LCU の予約）を事前に使う。予約は 100 LCU 以上で、通常は数分、長いと数時間で反映される。減らせるのは 1 日 2 回まで（[AWS のドキュメント](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/capacity-unit-reservation.html)）。告知の前日までに予約する。
 
 ### 3.6 ElastiCache（Valkey）
 
 | パラメーター | 値 | 理由 |
 | --- | --- | --- |
 | `maxmemory-policy` | `volatile-ttl` | 在席などの TTL 付きのキーから消す。TTL のないキー（レート制限の設定など）は消さない |
-| `client-output-buffer-limit`（pubsub） | ハード 256 MB、ソフト 64 MB・60 秒 | 既定値（32 MB / 8 MB）では、配信の急増で Gateway の購読が切られうる。切られても差分取得で回復するが、頻発させない |
+| `client-output-buffer-limit`（pubsub） | ハード 256 MB、ソフト 64 MB・60 秒 | ElastiCache では `client-output-buffer-limit-pubsub-*` の 3 つのパラメーターで変えられる（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ParameterGroups.Engine.html)）。既定値（32 MB / 8 MB・60 秒）では、配信の急増で Gateway の購読が切られうる。切られても差分取得で回復するが、頻発させない |
 | `timeout` | 0 | Gateway の購読の接続を、アイドルで切らない |
 | `tcp-keepalive` | 60 | 死んだ接続を検知する |
 
