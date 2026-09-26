@@ -1,0 +1,37 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.16.1",
+  "resource_changes": [
+    {
+      "address": "module.state.aws_s3_bucket.state",
+      "mode": "managed",
+      "type": "aws_s3_bucket",
+      "name": "state",
+      "provider_name": "registry.terraform.io/hashicorp/aws",
+      "change": {
+        "actions": [
+          "delete",
+          "create"
+        ],
+        "before": {
+          "bucket": "slack-tfstate-123456789012-ap-northeast-1"
+        },
+        "after": {
+          "bucket": "slack-tfstate-123456789012-ap-northeast-1"
+        },
+        "after_unknown": {
+          "id": true,
+          "output": true
+        },
+        "before_sensitive": {},
+        "after_sensitive": {},
+        "replace_paths": [
+          [
+            "triggers_replace"
+          ]
+        ]
+      },
+      "action_reason": "replace_because_cannot_update"
+    }
+  ]
+}

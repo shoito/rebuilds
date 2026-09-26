@@ -1,0 +1,18 @@
+{
+  "stateful_types": [
+    "aws_s3_bucket",
+    "aws_kms_key",
+    "aws_kms_replica_key",
+    "aws_organizations_account",
+    "aws_organizations_organization",
+    "aws_cloudtrail",
+    "aws_rds_cluster",
+    "aws_rds_global_cluster",
+    "aws_db_instance",
+    "aws_backup_vault",
+    "aws_secretsmanager_secret",
+    "aws_cloudwatch_log_group",
+    "aws_ecr_repository",
+    "aws_elasticache_replication_group"
+  ]
+}

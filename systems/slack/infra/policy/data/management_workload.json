@@ -1,0 +1,7 @@
+{
+  "management_workload": {
+    "types": ["aws_vpc", "aws_s3_bucket", "aws_db_instance"],
+    "type_prefixes": ["aws_ecs_", "aws_rds_"],
+    "allowed_bucket_prefixes": ["slack-tfstate-", "slack-cloudtrail-"]
+  }
+}

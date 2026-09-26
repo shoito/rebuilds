@@ -1,0 +1,6 @@
+{
+  "exception_approvers": {
+    "ops": ["@shoito"],
+    "dev_tech_lead": ["@shoito"]
+  }
+}
