@@ -13,7 +13,9 @@
 - `packages/api-client/src/index.ts`（新規）：`hcWithType`。コンパイル結果の `.d.ts` を API の表面のスナップショットとしてコミットする（ADR-0008）
 - `packages/db/src/schema.ts`、`packages/db/migrations/0001_init.sql`（新規）
 - `packages/db/seed.ts`（新規）
+- `apps/api/src/middleware/tenant.ts`（新規）：メンバーの解決と、テナントのコンテキストの設定
 - `apps/api/src/domain/authorization.ts`（新規）：`canReadChannel` / `canPostToChannel`
+- `scripts/lint-migrations.ts`（新規）：テナントテーブルの `workspace_id`・RLS の検査
 - `apps/api/src/domain/post-message.ts`、`apps/api/src/domain/list-messages.ts`（新規）
 - `apps/api/src/app.ts`（新規）：ルートをまとめ、`AppType` を export する
 - `apps/api/src/routes/messages.ts`（新規）：メソッドチェーンで定義し、`c.json()` にステータスコードを明示する
@@ -28,7 +30,9 @@
 
 - [ ] 1. モノレポの骨格、`compose.yaml`（Postgres）、CI（型検査・lint・テスト）
 - [ ] 2. 契約：投稿・履歴取得のスキーマと、空のハンドラーを持つルート、`packages/api-client` とそのスナップショット（REQ-MSG-001, 004, 006）→ **人間がレビューして確定**
-- [ ] 3. DB スキーマとマイグレーション：`workspaces`、`users`、`channels`、`channel_members`、`messages`
+- [ ] 3. DB スキーマとマイグレーション：`accounts`、`workspaces`、`members`、`channels`、`channel_members`、`messages`。`workspace_id`・複合キー・UUIDv7・RLS・DB ロール（`migrator` / `app`）を含む（ADR-0009, 0010）
+- [ ] 3a. 認証ミドルウェア：`account_id` とパスの `workspace_id` からメンバーを解決し、`SET LOCAL` でテナントのコンテキストを設定する
+- [ ] 3b. マイグレーションの lint：テナントテーブルに `workspace_id` と RLS があることを検査する
 - [ ] 4. 権限判定関数（REQ-MSG-003, 005）
 - [ ] 5. 投稿：採番、冪等性、本文検証（REQ-MSG-001, 002, 003, 006）
 - [ ] 6. 履歴取得：ページング（REQ-MSG-004, 005）
@@ -41,6 +45,7 @@
 
 - **並行投稿時の採番**：`UPDATE ... RETURNING` とメッセージの INSERT が同じトランザクションにないと、欠番や重複が起きる。PROP-MSG-001 で検出する。
 - **冪等性と一意制約の競合**：同じ `client_msg_id` の同時リクエストで一意制約違反が起き、500 になりうる。違反を捕まえて既存行を返す必要がある。このとき、採番したトランザクションは必ずロールバックする（`seq` を消費しない）。
+- **RLS とコネクションプール**：`SET LOCAL` をトランザクションの外で実行すると効かない。全クエリがミドルウェアの開始したトランザクションの中で走ることを、結合テストで確かめる。
 - **最初の変更で骨格まで作るため、差分が大きくなる。** 1 と 2 は別 PR に分けてよい。
 
 ## Proof
@@ -49,7 +54,8 @@
 | --- | --- | --- |
 | 投稿で `seq` が 1 ずつ増える | REQ-MSG-001 | 結合テスト（Testcontainers） |
 | 再送で重複しない | REQ-MSG-002 | 結合テスト。同時再送のケースを含む |
-| 非メンバーは投稿・取得できず、`seq` も消費されない | REQ-MSG-003, 005 | 結合テスト |
+| 非メンバー・別ワークスペースからは投稿・取得できず、`seq` も消費されない | REQ-MSG-003, 005 | 結合テスト |
+| RLS がテナントを分離する | ADR-0009 | `app` ロールで、コンテキストなし・別テナントのコンテキストでは行が読めず書けないことの結合テスト。マイグレーションの lint が CI で通る |
 | ページングが正しい | REQ-MSG-004 | 結合テスト（境界：0 件、ちょうど `limit` 件、`limit` + 1 件） |
 | 本文の検証 | REQ-MSG-006 | 単体テスト、結合テスト |
 | 並行投稿でも `seq` が欠番・重複しない | PROP-MSG-001 | 性質ベーステスト（fast-check、並行度 1〜50） |

@@ -12,7 +12,7 @@
    │  │         │  API server  │ ───────────────────────────────▶ │ PostgreSQL │
    │  │         └──────────────┘                                   └─────┬──────┘
    │  │                                                                  │ outbox
-   │  │         ┌──────────────┐   subscribe ch:{id}  ┌───────────┐     ▼
+   │  │         ┌──────────────┐   subscribe ws:..:ch ┌───────────┐     ▼
    │  └─────────┤   Gateway    │ ◀─────────────────── │   Redis   │ ◀── Relay
    │            │ (WS 常時接続)│                       │  Pub/Sub  │     │
    │            └──────────────┘                       └───────────┘     │
@@ -38,57 +38,92 @@
 
 ## 2. データモデル
 
+テナントの分離は [ADR-0009](decisions/0009-pooled-tenancy-with-rls.md)、アカウントとメンバーの関係は [ADR-0010](decisions/0010-accounts-and-workspace-members.md) に従う。ID はすべて UUIDv7。
+
 ```sql
+-- テナントの外（RLS なし）
+accounts        (id, email, auth_provider, created_at)          -- 認証のためだけ
 workspaces      (id, name, created_at)
-users           (id, email, name, created_at)
-memberships     (workspace_id, user_id, role)                 -- owner / admin / member / guest
 
-channels        (id, workspace_id, kind, name, is_private,    -- kind: channel / dm / group_dm
-                 last_seq, created_at)
-channel_members (channel_id, user_id, last_read_seq, notify_level, joined_at)
+-- テナントの中（すべて workspace_id を持ち、RLS を有効にする）
+members         (workspace_id, id, account_id NULL,              -- NULL はボット / エージェント
+                 display_name, real_name, avatar_key,
+                 role,                                           -- owner / admin / member / guest
+                 deactivated_at, created_at,
+                 PRIMARY KEY (workspace_id, id),
+                 UNIQUE (workspace_id, account_id))
 
-messages        (id, channel_id, seq, user_id,
-                 thread_root_id NULL,                         -- スレッド返信なら親メッセージ
+channels        (workspace_id, id, kind, name, is_private,       -- kind: channel / dm / group_dm
+                 last_seq, created_at,
+                 PRIMARY KEY (workspace_id, id))
+channel_members (workspace_id, channel_id, member_id,
+                 last_read_seq, notify_level, joined_at,
+                 PRIMARY KEY (workspace_id, channel_id, member_id))
+
+messages        (workspace_id, id, channel_id, seq, member_id,
+                 thread_root_id NULL,                            -- スレッド返信なら親メッセージ
                  body, body_format,
-                 client_msg_id,                               -- 冪等キー
-                 reply_count, last_reply_at,                  -- スレッド親に非正規化
+                 client_msg_id,                                  -- 冪等キー
+                 reply_count, last_reply_at,                     -- スレッド親に非正規化
                  edited_at, deleted_at, created_at,
-                 UNIQUE (channel_id, seq),
-                 UNIQUE (channel_id, user_id, client_msg_id))
+                 PRIMARY KEY (workspace_id, id),
+                 UNIQUE (workspace_id, channel_id, seq),
+                 UNIQUE (workspace_id, channel_id, member_id, client_msg_id))
 
-reactions       (message_id, user_id, emoji, created_at, PRIMARY KEY (message_id, user_id, emoji))
-mentions        (message_id, user_id, channel_id, created_at) -- メンション一覧・バッジ用
-files           (id, workspace_id, uploader_id, storage_key, mime, size, created_at)
-message_files   (message_id, file_id)
+reactions       (workspace_id, message_id, member_id, emoji, created_at,
+                 PRIMARY KEY (workspace_id, message_id, member_id, emoji))
+mentions        (workspace_id, message_id, member_id, channel_id, created_at)
+files           (workspace_id, id, uploader_member_id,
+                 storage_key,                                    -- ws/{workspace_id}/files/{id}
+                 mime, size, created_at,
+                 PRIMARY KEY (workspace_id, id))
+message_files   (workspace_id, message_id, file_id)
 
-outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at)
+outbox          (id BIGSERIAL, workspace_id, channel_id, event_type, payload JSONB, created_at)
 ```
 
+- **外部キーはすべて `workspace_id` を含む複合キーにする**（例：`messages (workspace_id, channel_id)` → `channels (workspace_id, id)`）。別テナントの行を参照するデータは、DB が拒否する。
+- **テナントの中のデータは `member_id` を参照し、`account_id` を参照しない**（ADR-0010）。
+- **インデックスは `workspace_id` を先頭に置く。** RLS のポリシーがクエリの条件に加わるため。
 - **`seq`（チャンネル内の連番）が設計の中心**（[ADR-0001](decisions/0001-per-channel-sequence.md)）。表示順、欠損検知、既読位置、差分取得のすべてを `seq` で表す。
 - `channels.last_seq` を `UPDATE ... SET last_seq = last_seq + 1 RETURNING last_seq` で採番し、メッセージの INSERT と同じトランザクションで行う。チャンネル単位の行ロックになるが、1 チャンネルへの投稿頻度は低いので問題にならない。
 - 編集・削除・リアクションも、`seq` を消費するイベントとして outbox に積む。メッセージ本体の `seq` は変わらない。
-- 全テーブルが `workspace_id` を直接または間接に持ち、将来はワークスペース単位でシャードできるようにする。
+
+### 2.1 テナントのコンテキスト
+
+```
+Request ─▶ 認証ミドルウェア
+            1. セッションから account_id を得る
+            2. パスの workspace_id と account_id から member を解決する（なければ 404）
+            3. BEGIN; SET LOCAL app.workspace_id = …; SET LOCAL app.member_id = …
+         ─▶ ハンドラー（以降のクエリはすべて RLS の下で実行される）
+         ─▶ COMMIT（SET LOCAL の値はここで消える）
+```
+
+- API のパスは `/workspaces/{workspace_id}/...` の形にし、テナントを明示する。
+- DB ロールは `migrator`（所有者）、`app`（RLS の対象）、`relay`（`outbox` のみ）に分ける。`app` は `BYPASSRLS` を持たない。
+- Worker は、ジョブが持つ `workspace_id` でコンテキストを設定してから処理する。
 
 ## 3. 主要フロー
 
 ### 3.1 投稿
 
 1. クライアントが `client_msg_id`（UUID）を生成し、画面に「送信中」で仮表示する。
-2. `POST /channels/{id}/messages` を送る。
-3. API は 1 トランザクションで次を行う。
-   - メンバーであることを確認する
+2. `POST /workspaces/{ws}/channels/{id}/messages` を送る。
+3. 認証ミドルウェアがメンバーを解決し、テナントのコンテキストを設定したトランザクションを開始する（2.1 節）。API はその中で次を行う。
+   - チャンネルのメンバーであることを確認する
    - `last_seq` を採番する
    - `messages` に INSERT する（`client_msg_id` の一意制約に当たったら、既存の行を返す）
    - `mentions` と `outbox` に INSERT する
 4. コミット後、`seq` 付きのメッセージを返す。クライアントは仮表示を確定させる。
-5. Relay が outbox を読み、Redis の `ch:{channel_id}` に publish する。
+5. Relay が outbox を読み、Redis の `ws:{workspace_id}:ch:{channel_id}` に publish する。
 6. 購読中の Gateway が、接続中のメンバーへ WebSocket で push する。
 
 ### 3.2 再接続と差分取得
 
 1. クライアントはチャンネルごとに「最後に受け取った `seq`」を保持する。
 2. WebSocket で受け取ったイベントの `seq` が `last + 1` でなければ、欠損とみなす。
-3. 再接続時・欠損検知時は `GET /channels/{id}/events?after_seq=N` で差分を取得し、`seq` 順に適用する。
+3. 再接続時・欠損検知時は `GET /workspaces/{ws}/channels/{id}/events?after_seq=N` で差分を取得し、`seq` 順に適用する。
 4. 差分が多すぎる場合（例：1,000 件超）は差分を諦め、最新ページを取り直す。
 
 これにより、**Redis や Gateway の配信を「ベストエフォート」にしても正しさが保たれる**。
@@ -96,8 +131,8 @@ outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at
 ### 3.3 既読と未読数
 
 - 未読数は `channels.last_seq - channel_members.last_read_seq` を基本とする。自分の投稿やスレッド返信など、本来は数えないものが含まれても近似として許容する（正確な数よりもバッジの有無が重要なため）。
-- 既読更新は `POST /channels/{id}/read {seq}` で行い、`GREATEST(last_read_seq, :seq)` で後退しないようにする。
-- 既読イベントは、同じユーザーの他端末にだけ配信する。
+- 既読更新は `POST /workspaces/{ws}/channels/{id}/read {seq}` で行い、`GREATEST(last_read_seq, :seq)` で後退しないようにする。
+- 既読イベントは、同じメンバーの他端末にだけ配信する。
 
 ## 4. 非機能要件
 
@@ -117,7 +152,7 @@ outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at
 | 言語 | TypeScript（フロント・バック共通） | 型を API 契約として共有でき、エージェントが境界をまたいでも整合を保ちやすい |
 | API | Hono RPC＋Zod | API の型をクライアントが直接参照し、生成を挟まずに契約を共有できる。入出力の変更が型検査の失敗として即座に見える（ADR-0008） |
 | Gateway | Node.js＋`ws` | 同じ言語・同じイベント型を使える |
-| DB | PostgreSQL 17＋Drizzle | SQL に近く、生成されるクエリが読みやすい。マイグレーションをレビューしやすい |
+| DB | PostgreSQL 18＋Drizzle | SQL に近く、生成されるクエリが読みやすい。マイグレーションをレビューしやすい。18 は `uuidv7()` を標準で持つ（ADR-0009） |
 | Web | React＋TanStack Query＋Vite | 学習データが多く、エージェントの出力品質が安定する |
 | テスト | Vitest、fast-check、Testcontainers、Playwright | 実 DB・実ブラウザで検証でき、モックで誤魔化せない |
 | ローカル環境 | Docker Compose（Postgres、Redis、MinIO） | エージェントが 1 コマンドで起動・破棄できる |
@@ -136,10 +171,14 @@ outbox          (id BIGSERIAL, channel_id, event_type, payload JSONB, created_at
 | [0006](decisions/0006-message-body-ast.md) | 本文は独自の軽量 AST（JSON） |
 | [0007](decisions/0007-typescript-stack.md) | TypeScript で統一した技術スタック |
 | [0008](decisions/0008-hono-rpc-for-api-contract.md) | API の契約を Hono RPC の型で共有する。WebSocket イベントは Zod スキーマで検証する |
+| [0009](decisions/0009-pooled-tenancy-with-rls.md) | テナントは共有スキーマで持ち、RLS で分離を強制する。ID は UUIDv7 |
+| [0010](decisions/0010-accounts-and-workspace-members.md) | グローバルなアカウントと、ワークスペースごとのメンバーを分ける |
 
 ## 7. リスクと未解決事項
 
 - **巨大チャンネル（数千人）のファンアウト**：1 投稿あたり数千件の push になる。Gateway 側で購読をチャンネル単位にまとめ、Redis からの受信を Gateway 1 台につき 1 回にする設計で足りるかは、負荷試験で確認する。
 - **`last_seq` 採番のホットスポット**：全社アナウンスのように書き込みが集中するチャンネルでは、行ロックの待ちが発生しうる。書き込み頻度は低いため問題になりにくいと見込むが、計測する。
+- **RLS の性能と設定漏れ**：ポリシーの条件が全クエリに加わる。`workspace_id` を先頭にしたインデックスで足りるかを、負荷試験で確認する。コンテキストの設定漏れは 0 件になる（安全側に倒れる）が、「データが消えた」ように見える不具合として現れるため、検知しにくい。
+- **テナント間の負荷の偏り**：大きなワークスペース 1 つが共有 DB と Gateway を占有しうる。テナント単位の上限とレート制限（runbooks）で抑え、足りなければ ADR-0009 の「将来の拡張」へ移る。
 - **未読数の正確さ**：近似で許容したが、「未読 3 件と出ているのに見当たらない」はユーザーの不信を招く。
 - **データ保持と削除**：保持期間ポリシーやリーガルホールドは MVP に含めていないが、企業利用では早い段階で要求される。

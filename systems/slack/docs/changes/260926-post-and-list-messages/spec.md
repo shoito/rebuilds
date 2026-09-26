@@ -31,7 +31,7 @@ status: draft
 
 ### REQ-MSG-002: 再送による重複の防止
 
-同じユーザーが同じチャンネルに同じ `client_msg_id` で投稿した場合、システムは新しいメッセージを作らず、既存のメッセージを返さなければならない。
+同じメンバーが同じチャンネルに同じ `client_msg_id` で投稿した場合、システムは新しいメッセージを作らず、既存のメッセージを返さなければならない。
 
 #### Scenario: 同じ client_msg_id での再送
 
@@ -39,7 +39,7 @@ status: draft
 - When A が C に `client_msg_id` = X で再び投稿する
 - Then 200 が返り、`seq` 5 の既存メッセージが返る。C のメッセージ数は増えず、`seq` も消費されない
 
-#### Scenario: 別ユーザーが同じ client_msg_id を使う
+#### Scenario: 別のメンバーが同じ client_msg_id を使う
 
 - Given A が C に `client_msg_id` = X で投稿済み
 - When B が C に `client_msg_id` = X で投稿する
@@ -47,13 +47,19 @@ status: draft
 
 ### REQ-MSG-003: メンバー以外の投稿の拒否
 
-チャンネルのメンバーでないユーザーが投稿した場合、システムは 404 を返し、何も保存せず、`seq` も消費してはならない。
+チャンネルのメンバーでない者が投稿した場合、システムは 404 を返し、何も保存せず、`seq` も消費してはならない。
 
 #### Scenario: 非メンバーの投稿
 
 - Given A がメンバーでないチャンネル C（最新の `seq` は 7）
 - When A が C に投稿する
 - Then 404 が返り、C のメッセージ数は変わらず、次にメンバーが投稿したときの `seq` は 8 である
+
+#### Scenario: 別のワークスペースのチャンネルへの投稿
+
+- Given ワークスペース W1 のメンバー A と、ワークスペース W2 のチャンネル C
+- When A が、パスのワークスペースを W1 にして、C の ID に投稿する
+- Then 404 が返り、W1・W2 のどちらにも何も保存されない
 
 ### REQ-MSG-004: 履歴の取得
 
@@ -78,13 +84,19 @@ status: draft
 
 ### REQ-MSG-005: メンバー以外の履歴取得の拒否
 
-チャンネルのメンバーでないユーザーが履歴を要求した場合、システムは 404 を返さなければならない。
+チャンネルのメンバーでない者が履歴を要求した場合、システムは 404 を返さなければならない。
 
 #### Scenario: 非メンバーの履歴取得
 
 - Given A がメンバーでないチャンネル C
 - When A が C の履歴を要求する
 - Then 404 が返り、レスポンスに C の存在を示す情報（名前など）は含まれない
+
+#### Scenario: 別のワークスペースのチャンネルの履歴
+
+- Given ワークスペース W1 のメンバー A と、ワークスペース W2 のチャンネル C
+- When A が、パスのワークスペースを W1 にして、C の ID の履歴を要求する
+- Then 404 が返る
 
 ### REQ-MSG-006: 本文の検証
 
@@ -104,9 +116,9 @@ status: draft
 
 ### DT-MSG-001: 投稿の結果
 
-上から順に評価し、最初に一致した行を採用する。権限の判定を最初に行うのは、非メンバーに本文の検証結果を返すと、チャンネルの存在が漏れるため。
+上から順に評価し、最初に一致した行を採用する。別のワークスペースのチャンネルは、「チャンネルのメンバー」が「いいえ」として扱われる（RLS により存在自体が見えない）。権限の判定を最初に行うのは、非メンバーに本文の検証結果を返すと、チャンネルの存在が漏れるため。
 
-| # | メンバー | 本文が有効 | 同じ（ユーザー, `client_msg_id`）の既存メッセージ | → ステータス | → 返すもの | → `seq` の消費 |
+| # | チャンネルのメンバー | 本文が有効 | 同じ（メンバー, `client_msg_id`）の既存メッセージ | → ステータス | → 返すもの | → `seq` の消費 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | いいえ | - | - | 404 | エラー | しない |
 | 2 | はい | いいえ | - | 400 | エラー | しない |
@@ -121,17 +133,18 @@ status: draft
 
 ### PROP-MSG-002: 冪等性
 
-任意の投稿リクエストの列（同じ `client_msg_id` の再送を任意の回数含む）に対して、保存されるメッセージ数は、異なる（ユーザー, `client_msg_id`）の組の数と等しい。
+任意の投稿リクエストの列（同じ `client_msg_id` の再送を任意の回数含む）に対して、保存されるメッセージ数は、異なる（メンバー, `client_msg_id`）の組の数と等しい。
 
 ## Design
 
 - データモデルと採番方法は [architecture.md](../../architecture.md) の 2 節、[ADR-0001](../../decisions/0001-per-channel-sequence.md) に従う。
 - 本文は [ADR-0006](../../decisions/0006-message-body-ast.md) の AST で受け付ける。この変更ではテキストノードだけを扱う。
-- 認証は E2 まで簡易方式（開発用トークンから `user_id` を得る）とする。
+- テナントの分離は [ADR-0009](../../decisions/0009-pooled-tenancy-with-rls.md) に従い、最初のマイグレーションから `workspace_id`・複合キー・RLS を入れる。後から入れるとマイグレーションが重いため。
+- 認証は E2 まで簡易方式（開発用トークンから `account_id` を得て、パスの `workspace_id` からメンバーを解決する）とする（[ADR-0010](../../decisions/0010-accounts-and-workspace-members.md)）。
 - 非メンバーに 403 ではなく 404 を返すのは、プライベートチャンネルの存在を漏らさないため（[ADR-0005](../../decisions/0005-single-authorization-check.md)）。
 - API：
-  - `POST /channels/{channel_id}/messages` `{ client_msg_id, body }` → 201（新規） / 200（再送）
-  - `GET /channels/{channel_id}/messages?before_seq&limit` → `{ messages, has_more }`
+  - `POST /workspaces/{workspace_id}/channels/{channel_id}/messages` `{ client_msg_id, body }` → 201（新規） / 200（再送）
+  - `GET /workspaces/{workspace_id}/channels/{channel_id}/messages?before_seq&limit` → `{ messages, has_more }`
 
 ## Open questions
 
