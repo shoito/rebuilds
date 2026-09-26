@@ -68,4 +68,4 @@ Git のリポジトリのホスティングと、その上の共同作業を作�
 
 ## Open questions
 
-- 公開リポジトリの大量の clone（CI や AI の学習の収集）への帯域とコストの対策を、どこまで行うか。
+- ~~公開リポジトリの大量の clone（CI や AI の学習の収集）への帯域とコストの対策を、どこまで行うか。~~ → 2026-09-26 に既定案で決めた：人気の公開リポジトリの bundle-uri と CDN、リポジトリごと・IP ごとの clone のレート制限。利用者ごとの帯域の課金は MVP に含めない（[architecture/README.md](architecture/README.md) の 6 節）。
