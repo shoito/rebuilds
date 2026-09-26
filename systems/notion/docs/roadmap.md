@@ -44,8 +44,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `feature-flags-appconfig` | ワークスペース単位のフラグ、群れで広げるフラグ（[delivery.md](architecture/delivery.md) の 5 節） |
 | `shard-router` | `packages/shard-router`、`global.shard_map`、`search_path` とテナントのコンテキスト、フェンス（[ADR-0027](decisions/0027-shard-router.md)） |
 | `migration-rollout-shard-groups` | migrator、`schema_migrations` と `global.migration_ledger`、群れ G0〜G3、デプロイの関門（[ADR-0031](decisions/0031-migration-rollout-by-shard-groups.md)） |
-| `block-table-and-invariants` | `block` の表と RLS、`packages/ops` の `applyOperation` と T1〜T8 の検査（[block-model.md](architecture/block-model.md) の 2・5・11 節） |
-| `transactions-and-page-seq` | `POST /transactions`、`page_seq`・`page_ops`・`device_cursors`、`outbox`（[ADR-0005](decisions/0005-transactions-as-unit-of-change.md)、[collaboration.md](architecture/collaboration.md) の 4・7 節） |
+| `block-table-and-invariants` | `blocks` の表と RLS、`packages/ops` の `applyOperation` と T1〜T8 の検査（[block-model.md](architecture/block-model.md) の 2・5・11 節） |
+| `transactions-and-page-seq` | `POST /transactions`、`page_seqs`・`page_ops`・`device_cursors`、`outbox`（[ADR-0005](decisions/0005-transactions-as-unit-of-change.md)、[collaboration.md](architecture/collaboration.md) の 4・7 節） |
 | `rich-text-spans` | `packages/rich-text` のスパンの正規化と `plain_text`（[ADR-0006](decisions/0006-rich-text-as-normalized-spans.md)、[block-model.md](architecture/block-model.md) の 4 節） |
 | `dev-session-and-workspaces` | 開発用のサインインとワークスペースの作成（ID はサーバーで作る。E2 で本番のログインに置き換える） |
 | `web-app-shell-routing` | アプリの骨格、ルート `/{workspace_slug}/{page_id}`（[editor.md](architecture/editor.md) の 2 節） |
@@ -63,7 +63,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `groups` | グループとメンバー（同じ文書の 2.4 節） |
 | `page-acls-and-can` | `page_acls`・`page_acl_entries`、置き換えの継承、`can()` と素朴な実装（[ADR-0018](decisions/0018-permission-levels-and-inheritance.md)） |
 | `authorization-decision-tables` | 4.5・4.6・3.3 節の決定表を `DT-PRM-*` として定め、表駆動テスト（[quality.md](quality.md) の 2.2.3 節） |
-| `acl-version-cache` | `workspace_acl_version`、キャッシュ、`acl.changed` の outbox（[ADR-0019](decisions/0019-workspace-acl-version-cache.md)） |
+| `acl-version-cache` | `workspace_acl_versions`、キャッシュ、`acl.changed` の outbox（[ADR-0019](decisions/0019-workspace-acl-version-cache.md)） |
 | `share-dialog` | 共有の画面、「親と異なる」印、「子孫にも加える」（既定の決定は [permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 11 節） |
 | `general-access-and-links` | 一般アクセス（ワークスペース・リンク）と期限、`hide_from_search`（同じ文書の 7 節） |
 | `page-move-permissions` | 実効の権限が変わる移動に `full_access` を求める（同じ文書の 4.2 節） |
@@ -100,7 +100,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `relay-shard-leases` | 物理クラスタごとの Relay の群れと、論理シャードごとのリース（[collaboration.md](architecture/collaboration.md) の 7.3 節） |
 | `sync-gateway-subscriptions` | ページ単位の購読、`can()` での判定、`page.revoked`、閲覧者が多いページの `page.head`（同じ文書の 7.2 節） |
 | `page-ops-catch-up` | `seq` の飛びの検知と `GET /pages/{id}/ops`、スナップショットの取り直し（同じ文書の 8 節） |
-| `text-crdt-package` | `packages/text-crdt` の Fugue＋Peritext、`block_text_state`、展開（[ADR-0010](decisions/0010-text-crdt-with-server-ordered-structure.md)） |
+| `text-crdt-package` | `packages/text-crdt` の Fugue＋Peritext、`block_text_states`、展開（[ADR-0010](decisions/0010-text-crdt-with-server-ordered-structure.md)） |
 | `text-split-join-slices` | text slice と `text_slices` の索引（[collaboration.md](architecture/collaboration.md) の 5.3 節） |
 | `structural-conflict-rules` | 構造とプロパティの規則、兄弟のアンカー、`sync_conflicts`（[ADR-0011](decisions/0011-structural-and-property-conflict-rules.md)、[ADR-0012](decisions/0012-child-order-by-sibling-anchors.md)） |
 | `presence-and-cursors` | ページの在席とカーソル（[collaboration.md](architecture/collaboration.md) の 9 節） |
@@ -110,32 +110,32 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `sync-heads` | `POST /sync/heads` での鮮度の照合と、読めなくなったページの消去（同じ文書の 11.3 節） |
 | `offline-merge-and-conflicts-ui` | 長時間のオフラインの統合、送れなかった変更、衝突の見せ方、同期の状態の表示（同じ文書の 10・11 節） |
 | `desktop-electron-shell` | Electron の設定、ディープリンク、通知（[ADR-0009](decisions/0009-electron-desktop-shell.md)、[editor.md](architecture/editor.md) の 11 節） |
-| `desktop-auto-update` | 自前の更新の情報の API、段階的な配布、署名の検証（[delivery.md](architecture/delivery.md) の 6.2 節。`autoUpdater` で足りるかを確かめる） |
+| `desktop-auto-update` | 自前の更新の情報の API、段階的な配布、署名の検証（[delivery.md](architecture/delivery.md) の 6.2 節。`electron-updater` の `generic` の提供元で作る） |
 
 ### E5 データベース
 
 | Story | 内容 |
 | --- | --- |
-| `data-source-and-schema` | `database` ブロック、`data_source`、プロパティの種類、行（`parent_type = data_source`）（[databases.md](architecture/databases.md) の 2 節） |
-| `db-query-index` | `dbx_row`・`dbx_value`、押し下げと評価器、キーセットと `query_id`（[ADR-0014](decisions/0014-database-query-index.md)） |
+| `data-source-and-schema` | `database` ブロック、`data_sources`、プロパティの種類、行（`parent_type = data_source`）（[databases.md](architecture/databases.md) の 2 節） |
+| `db-query-index` | `dbx_rows`・`dbx_values`、押し下げと評価器、キーセットと `query_id`（[ADR-0014](decisions/0014-database-query-index.md)） |
 | `view-table` | 表のビュー、最初の 50 行とスクロール（[databases.md](architecture/databases.md) の 3.2・4 節） |
 | `filters-sorts-groups` | フィルタ（3 段）・並べ替え・グループとサブグループ、「自分だけ」（同じ文書の 4 節） |
 | `view-board-list-gallery` | ボード・リスト・ギャラリー |
 | `view-calendar-timeline` | カレンダー・タイムライン（期間での問い合わせ） |
-| `relations` | `relation_edge`、両方向、上限 10,000（[ADR-0016](decisions/0016-relation-edges-as-single-source.md)） |
+| `relations` | `relation_edges`、両方向、上限 10,000（[ADR-0016](decisions/0016-relation-edges-as-single-source.md)） |
 | `rollups` | ロールアップと Worker での計算し直し（[databases.md](architecture/databases.md) の 7 節） |
 | `formula-evaluator` | 構文解析と評価器、依存の検査、実体化（[ADR-0015](decisions/0015-formula-evaluation-model.md)） |
 | `row-acl-readable-rollups` | 行に固有の ACL、早い経路と遅い経路（[ADR-0017](decisions/0017-rollups-over-readable-rows-only.md)） |
 | `linked-views` | リンクドビュー（[databases.md](architecture/databases.md) の 3.3 節） |
 | `property-type-change` | 種類の変更と、数式の定義の変更の全行の計算し直しのジョブ（同じ文書の 2.1・8.3 節） |
-| `db-index-consistency-check` | `properties` と `dbx_value` の整合の検査のジョブ（同じ文書の 3.1 節） |
+| `db-index-consistency-check` | `properties` と `dbx_values` の整合の検査のジョブ（同じ文書の 3.1 節） |
 
 ### E6 検索・コメント・通知
 
 | Story | 内容 |
 | --- | --- |
 | `search-opensearch-domain` | OpenSearch のドメイン、Sudachi、別名 `pages`（[search.md](architecture/search.md) の 4・9 節） |
-| `search-indexer` | `search-index` のキュー、5 秒の窓、外部バージョン（同じ文書の 8 節） |
+| `search-indexer` | `search-index` のキュー、5 秒の窓、外部バージョン、runbook の `search-indexing.md`（同じ文書の 8 節） |
 | `search-access-keys` | `accessKeysFor`、`search-acl` のキュー、1 時間ごとの突き合わせ（同じ文書の 5 節、[ADR-0023](decisions/0023-search-engine-and-permission-filtering.md)） |
 | `search-query-and-hydration` | `buildSearchRequest`、読み直し、抜粋、絞り込みと並べ替え（[search.md](architecture/search.md) の 5.4・6 節） |
 | `quick-search` | クイック検索とオフラインのタイトルの検索（同じ文書の 7 節） |
@@ -144,7 +144,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `mentions-and-backlinks` | メンションの記録、バックリンク、読めない人への通知をしない（同じ文書の 3 節） |
 | `reminders` | リマインダーのスケジューラー（同じ文書の 4 節） |
 | `notification-planner-and-inbox` | 通知の計画、3 か所の判定、受信箱（同じ文書の 5 節） |
-| `email-and-push-notifications` | メール（SES）と Web・デスクトップの push（同じ文書の 5.4・5.5 節） |
+| `email-and-push-notifications` | メール（SES）と Web・デスクトップの push、runbook の `notification-delivery.md`（同じ文書の 5.4・5.5 節） |
 | `page-subscriptions-and-updates` | 購読の水準、ページの更新の欄（同じ文書の 5.1・6 節） |
 
 ### E7 API・連携・MCP
@@ -158,7 +158,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `comments-users-search-api` | コメント・利用者・タイトルの検索の API |
 | `file-uploads-api` | ファイルのアップロードの API |
 | `api-rate-limits` | 連携・ワークスペース・エンドポイントの上限（同じ文書の 5 節） |
-| `webhooks` | 購読と確認、イベント、まとめ、配送、`webhook-egress` の Lambda（同じ文書の 6 節、[ADR-0025](decisions/0025-webhook-delivery.md)） |
+| `webhooks` | 購読と確認、イベント、まとめ、配送、`webhook-egress` の Lambda、runbook の `webhook-delivery.md`（同じ文書の 6 節、[ADR-0025](decisions/0025-webhook-delivery.md)） |
 | `mcp-server-read` | リモートの MCP サーバーの読み取りのツール、OAuth 2.1、監査（同じ文書の 8 節、[ADR-0026](decisions/0026-remote-mcp-server.md)） |
 | `mcp-write-tools` | 書き込みのツール（既定で無効。[quality.md](quality.md) の 3 節の eval の後） |
 | `import-markdown-csv-html` | Markdown（ZIP）・CSV・HTML・テキストのインポート（[api-and-integrations.md](architecture/api-and-integrations.md) の 7.1 節） |
@@ -188,7 +188,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `reshard-automation` | `reshard` のワークフロー、パブリケーション、切り替えと戻し、runbook の `resharding.md`（[ADR-0028](decisions/0028-zero-downtime-resharding.md)） |
-| `reshard-shadow-reads` | 影の読み取りと不一致の分類（[quality.md](quality.md) の 2.2.4 節） |
+| `reshard-shadow-reads` | 影の読み取りと不一致の分類、不一致のアラート（[quality.md](quality.md) の 2.2.4 節） |
 | `reshard-drill-staging` | staging での物理 1 → 2 の訓練 |
 | `global-cluster-split` | `global` を独立したクラスタへ（[infrastructure.md](architecture/infrastructure.md) の 3.1 節） |
 | `api-pools-per-cluster` | クラスタごとの小さなプール、または接続の集約（[capacity.md](architecture/capacity.md) の 2.3 節） |
@@ -232,7 +232,7 @@ MVP の後に検討する。着手するときに `intent.md` から起票する
 - **ビュー**：チャート、フォーム、マップ、ダッシュボード。データベースのプロパティへのコメント。
 - **ブロックの種類**：列、表、ブックマーク、目次、数式のブロック、パンくず、ボタン、`heading_4`（[block-model.md](architecture/block-model.md) の 3 節）。
 - **エディタ**：ブロックの間にまたがる部分的なテキストの選択。
-- **クライアント**：モバイルのネイティブアプリ（PWA で代替）、デスクトップの Linux 版、デスクトップのネイティブの SQLite とローカルの保存の暗号化。
+- **クライアント**：モバイルのネイティブアプリ（PWA で代替）、デスクトップの Linux 版、デスクトップのネイティブの SQLite とローカルの保存の暗号化（S2 の候補。S1 の計測で決める。[ADR-0032](decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。
 - **API**：個人のアクセストークン、Webhook の署名の秘密の入れ替え。
 - **通知**：ダイジェストのメール、Slack・Microsoft Teams への通知、端末をまたぐ閲覧の履歴での検索の加点。
 - **権限**：データベースの `can_create` の水準と行単位の権限、リンクでの閲覧者へのコメント・編集の許可。

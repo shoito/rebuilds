@@ -181,6 +181,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | 運用者 | サポートのためのアクセス、濫用による公開の停止、ワークスペースの停止 |
 
 - 記録しないもの：ブロックの編集と閲覧（量が多く、ページの履歴が編集の記録になる）。
+- 表 `audit_events`：主キー `(workspace_id, id)`。列は `occurred_at`、`actor_member_id`、`actor_kind`（`human` / `bot` / `mcp` / `operator`）、`action`、`target_type`、`target_id`、`ip`、`user_agent`、`details`（ID だけ。本文を含めない）、`prev_hash`、`hash`。索引は `(workspace_id, occurred_at)`、`(workspace_id, target_id)`。時間でパーティションを切り、365 日を過ぎたパーティションを `DROP` する。
 - 本家の監査ログは Enterprise の機能で、365 日保持し、CSV で出力でき、SIEM へ Webhook で送れる（[Audit log](https://www.notion.com/help/audit-log)）。本システムは記録を全プランで MVP から行い、DB に 365 日置く。閲覧の画面・CSV・SIEM は Enterprise の機能として E10 で作る。アーカイブ（Object Lock の S3）は 2 年保持する（Slack の ADR-0033 に合わせた既定案）。ワークスペースの削除の後にアーカイブを残す期間は、法務の確認待ち（[intent.md](../intent.md)）。
 
 ## 7. データのライフサイクル
@@ -192,7 +193,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | ゴミ箱のページ | 30 日（本家と同じ。Enterprise は所有者が変えられる） | 30 日で「完全に削除」の状態へ移す |
 | 完全に削除したページ（`purged_at`） | 30 日は運用者が所有者の依頼で戻せる | 期限の後に Worker が部分木・ファイル・スナップショット・索引を物理削除する（[block-model.md](block-model.md) の 9 節） |
 | ページの履歴（版） | プランで 7 日（Free）・30 日（Plus）・90 日（Business）・無期限（Enterprise）。MVP は 30 日（block-model.md の 8 節） | 期限を過ぎた版を毎日消す。期限は消す時点のプランで決める |
-| 検索の索引 | 元のデータに従う | ゴミ箱に入れたら `in_trash` にして通常の検索から外す。ゴミ箱の中の検索は `can_edit` 以上の人だけ（[search.md](search.md) の 6.1 節）。物理削除で文書を tombstone にし、7 日後に消す |
+| 検索の索引 | 元のデータに従う | ゴミ箱に入れたら、文書を残したまま `in_trash: true` にし、通常の検索から外す。ゴミ箱の中のページは、ゴミ箱の画面の検索からだけ出し、`can_edit` 以上の人だけが見る（[search.md](search.md) の 1・6.1 節、ADR-0022 の注記）。物理削除で文書を tombstone にし、7 日後に消す |
 | ファイル | 属するブロックに従う | ブロックの物理削除で S3 のオブジェクトを消す |
 | 公開サイトの CDN のキャッシュ | 最大 60 秒 | 取り下げで無効化 |
 | 監査ログ | DB に 365 日、アーカイブ 2 年 | 6 節 |
@@ -201,9 +202,10 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | バックアップ | 35 日 | 期限で消える。削除の最終的な期限になる |
 
 - 本家の保持の値：ゴミ箱の 30 日、完全に削除した後の 30 日、履歴のプランごとの日数（[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、[Pricing](https://www.notion.com/pricing)）。
-- **ワークスペースの削除**：所有者が再認証して依頼し、30 日の猶予の後に `workspace_id` 単位で消す（Slack の ADR-0019 と同じ）。本家の猶予期間は未検証。
+- **ワークスペースの削除**：所有者が再認証して依頼し、30 日の猶予の後に `workspace_id` 単位で消す（Slack の ADR-0019 と同じ）。本家は、ワークスペースの削除をすぐ確定させ、利用者向けの猶予を持たない。サポートが過去 30 日のバックアップから戻せる（[Delete a workspace](https://www.notion.com/help/delete-a-workspace)、[Workspace settings](https://www.notion.com/help/workspace-settings)、2026-09-27 に確認）。30 日の猶予は、本家より手厚い本システムの決定である。
 - **アカウントの削除**：アカウントの個人情報を消し、各ワークスペースのメンバーを「削除されたユーザー」として匿名化する。共有したページはワークスペースのデータとして残る。プライベートの領域のページ（本人しか読めないもの）は、ゴミ箱に入れて通常の削除の段階に流す。所有者に引き継ぐ経路は持たない（所有者もページの権限を迂回しないため。11 節）。
 - **削除の完了**：ページはゴミ箱から最長 30＋30＋35＝95 日で、バックアップを含めて消える。
+- 表 `deletion_jobs`：主キー `(workspace_id, id)`。列は `kind`（`page_purge`：物理削除 / `workspace_delete`：ワークスペースの削除 / `history_expire`：履歴の期限切れ）、`target_id`、`state`（`scheduled` / `running` / `done` / `failed`）、`scheduled_at`、`attempts`、`last_error`、`completed_at`。索引は `(workspace_id, state, scheduled_at)`。
 - 手順は runbook の `data-deletion`（E8）に書く。
 
 ## 8. 濫用対策
@@ -221,6 +223,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | レート制限 | ワークスペースの作成、招待、公開の操作。値は Slack の ADR-0029 を先例に決める |
 | 招待のスパム | ゲストの招待のメールに、送り主のワークスペースとメールアドレスを示す。1 日あたりの招待の上限 |
 
+- 表 `abuse_reports`：主キー `(workspace_id, id)`。列は `site_id`（`published_sites`）、`page_id`、`source`（`user_report` / `auto_scan`）、`reporter_email`（任意）、`reason`、`score`、`state`（`open` / `reviewing` / `actioned` / `dismissed`）、`reviewed_by`（運用者）、`created_at`、`resolved_at`。索引は `(workspace_id, state, created_at)`。運用者の確認の列は、運用の道具が各シャードのこの索引を引いてまとめる。
 - 手順は runbook の `abuse-takedown`（E8）に書く。
 
 ## 9. AI エージェントと連携
@@ -249,11 +252,11 @@ Slack の security.md の 10 節（SAST、シークレットスキャン、依�
 
 | 問い | 決定 |
 | --- | --- |
-| アカウントの削除で、プライベートの領域のページをどうするか | ゴミ箱に入れて通常の削除の段階に流す。所有者への引き継ぎは持たない（7 節）。本家の振る舞いは未検証。契約・個人情報の扱いに関わる点は法務の確認待ち |
+| アカウントの削除で、プライベートの領域のページをどうするか | ゴミ箱に入れて通常の削除の段階に流す。所有者への引き継ぎは持たない（7 節）。本家は、自分だけのワークスペースを消し、共有のワークスペースから外す。外れた後は本人もプライベートのページに入れず、Enterprise の所有者は 30 日以内なら別の利用者へ移せる（[Delete your account](https://www.notion.com/help/delete-your-account)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。引き継ぎを持たない点は本家との差異。契約・個人情報の扱いに関わる点は法務の確認待ち |
 | 完全に削除したページを 30 日戻す経路 | 運用者への依頼だけ（所有者の画面は作らない。ADR-0022）。手順は runbook の `data-deletion`（E8） |
 | 監査ログのアーカイブの保持期間 | 2 年（6 節） |
-| デスクトップアプリのローカルの保存の暗号化 | MVP は Web と同じ実装で、独自の暗号化はしない。ネイティブの SQLite に移すとき（MVP の後）に OS の資格情報の保管庫の鍵で暗号化する |
+| デスクトップアプリのローカルの保存の暗号化 | S1 は Web と同じ実装で、独自の暗号化はしない。ネイティブの SQLite に移すとき（S2 の候補。[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）に OS の資格情報の保管庫の鍵で暗号化する |
 
 持ち越し：
 
-- 公開サイトのフィッシングの自動の検査の、誤検知の許容度（PM、Ops）。E8 の `abuse-takedown` の運用で、保留の件数と誤検知の率を見て決める。
+- 公開サイトのフィッシングの自動の検査の、誤検知の許容度（PM、Ops）。E8 の `abuse-reporting-and-takedown` の運用で、保留の件数と誤検知の率を見て決める。

@@ -16,7 +16,7 @@
 | 編集中の接続 | 同時接続の 20%（2,000） | 残りは閲覧、または開いたまま |
 | 編集中の接続が送るトランザクション | 0.5 件/秒 | クライアントは打鍵を 100ms ごとにまとめて送る（[collaboration.md](collaboration.md) の 4 節）。入力の合間を含めた平均 |
 | 1 トランザクションの操作 | 平均 3 | 文字の編集、ブロックの属性、並びの変更 |
-| 1 トランザクションで書く行 | 平均 5 | 操作のログ 1、ブロック 1.5、ページの `seq`（`page_seq`）1、outbox 1、その他 0.5（[block-model.md](block-model.md)、[collaboration.md](collaboration.md) の 7 節） |
+| 1 トランザクションで書く行 | 平均 5 | 操作のログ 1、ブロック 1.5、ページの `seq`（`page_seqs`）1、outbox 1、その他 0.5（[block-model.md](block-model.md)、[collaboration.md](collaboration.md) の 7 節） |
 | ページを開く | 接続あたり 2 分に 1 回 | |
 | 1 回のページの読み込みでサーバーから読むブロック | 平均 300 | 1,000 ブロックのページ（NFR-002）もある。ローカルにあれば差分だけ |
 | 同じページを開いている人 | 平均 3、最大 1,000 | 大多数は 1〜2 人。最大は全社の告知ページ |
@@ -106,7 +106,7 @@ S2 と S3 は、S1 の前提の比率を保ったまま、規模だけを伸ば�
 | import-export | 1 件/秒 | 数分 | 2 |
 | backfill（マイグレーション） | 物理クラスタの負荷で制御 | — | 1 |
 
-キューの名前は [search.md](search.md) の 8 節、[comments-and-notifications.md](comments-and-notifications.md) の 5 節、[api-and-integrations.md](api-and-integrations.md) の 6 節に合わせた。
+キューの名前は [search.md](search.md) の 8 節、[comments-and-notifications.md](comments-and-notifications.md) の 5 節、[api-and-integrations.md](api-and-integrations.md) の 6.4・12 節、[infrastructure.md](infrastructure.md) の 5 節に合わせた。
 
 ## 3. パラメーター
 
@@ -127,7 +127,7 @@ Slack の [capacity.md](../../../slack/docs/architecture/capacity.md) の 3 節�
 
 | テーブル | 設定 | 理由 |
 | --- | --- | --- |
-| `page_seq`（ページの `seq` を持つ行） | `fillfactor = 70`、`autovacuum_vacuum_scale_factor = 0.01` | トランザクションごとに更新する。HOT 更新にする |
+| `page_seqs`（ページの `seq` を持つ行） | `fillfactor = 70`、`autovacuum_vacuum_scale_factor = 0.01` | トランザクションごとに更新する。HOT 更新にする |
 | ブロック | `fillfactor = 80` | 本家の更新の比率は upsert の 90%（[data lake](https://www.notion.com/blog/building-and-scaling-notions-data-lake)） |
 | 操作のログ、outbox | 時間でパーティションを切り、古いものを `DROP` する | 大量の挿入と削除を VACUUM に任せない |
 
@@ -170,7 +170,7 @@ Slack の Gateway の設定（`ulimit nofile`、`maxPayload`、送信バッフ�
 | 公開 API | 1 連携 1 分に 180 回（Business 以上は 600 回）。ワークスペースの合計は負荷試験で決める | 429 | [api-and-integrations.md](api-and-integrations.md) の 5 節 |
 | 1 ワークスペースの同時接続 | 1 万（S1 の全体の同時接続と同じ） | 超えた接続は、在席の配信を間引く | [collaboration.md](collaboration.md) |
 
-上限を一時的に変えるのは、ワークスペース単位の上書きで行い、監査ログに残す（Slack の runbooks の 2 節と同じ）。
+上限を一時的に変えるのは、ワークスペース単位の上書きで行い、監査ログに残す（Slack の runbooks の 2 節と同じ）。上書きは表 `rate_limit_overrides` に持つ。主キー `(workspace_id, id)`、列は `target`（`workspace` / `integration`）、`integration_id`、`limit_name`、`value`、`reason`、`created_by`（運用者）、`expires_at`。索引は `(workspace_id, expires_at)`。期限を過ぎた行は効かない。
 
 ## 4. シャードあたりの容量
 

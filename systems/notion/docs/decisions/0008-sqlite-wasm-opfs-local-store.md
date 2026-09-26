@@ -33,6 +33,8 @@ Slack の題材は IndexedDB を選んだ（Slack の ADR-0024）。Slack はチ
 - OPFS の同期アクセス（`createSyncAccessHandle`）は専用ワーカーでしか使えない。このため、SQLite を SharedWorker に置けない。Web Locks でロックを取ったタブの専用ワーカーが開き、SharedWorker が他のタブの要求をそこへ回す。ロックを持つタブが閉じたら、次のタブが開き直す。
 - OPFS が使えない環境（プライベートブラウズなど）では、メモリだけで動き、オフラインの機能を無効にする。IndexedDB の実装を別に持たない。
 
+> 2026-09-27 の注記：Consequences の「Safari の 7 日の削除が OPFS にも及ぶかは未検証」は解消した。Safari 17 の保存の方針は File System（OPFS）も対象にし、操作のない期間による追い出しを含む（[Updates to Storage Policy](https://webkit.org/blog/14403/updates-to-storage-policy/)、2026-09-27 に確認）。OPFS も消えるものとして扱う（対策は変えない）。プライベートブラウズでの OPFS の可否はブラウザごとに違い、[editor.md](../architecture/editor.md) の 10 節にまとめた。SQLite 3.50 以降は `pauseVfs()`・`unpauseVfs()` で `opfs-sahpool` の接続を他のタブへ譲れるが、譲る相手を決める調停はアプリで要るので、選択肢 4 を採らない理由は変わらない（[sqlite.org の persistence の文書](https://sqlite.org/wasm/doc/trunk/persistence.md)、2026-09-27 に確認）。表の名前は複数形に揃えた（[data-model.md](../architecture/data-model.md) の冒頭の規約）。Confirmation の `record` は `records` と読む。`offline_page`・`offline_action` は本家の名前で、本システムの表は `offline_pages`・`offline_actions`。
+
 ## Consequences
 
 - 良くなること：

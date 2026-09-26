@@ -29,6 +29,8 @@ date: 2026-09-26
 - 3 は、関連する行が多いとき（1 つの変更で数万行が影響する）に、書き込みが遅くなり、失敗する。
 - 4 は、実行環境の隔離（脱出、資源の枯渇）を守る範囲が広く、クライアントとの意味の一致も難しい。
 
+> 2026-09-27 の注記：Context の「本家は参照の深さを 15 層に限る」の値は正しいが、出典が違う。層の記述があるのは [Fix common formula errors](https://www.notion.com/help/common-formula-errors) で、数式が他の数式・ロールアップを参照するたびに 1 層増える（2026-09-27 に確認）。表の名前は複数形に揃えた（[data-model.md](../architecture/data-model.md) の冒頭の規約）。`dbx_value` は `dbx_values` と読む。
+
 ## Consequences
 
 - 良くなること：

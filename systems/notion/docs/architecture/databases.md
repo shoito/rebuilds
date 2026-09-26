@@ -36,13 +36,13 @@ linked_database ブロック（別のページ）── view → 他のデータ
 | レコード | 持つもの | 本家の対応 |
 | --- | --- | --- |
 | `database` ブロック | タイトル、アイコン、カバー、データソースの ID の並び、ビューの ID の並び、インラインかどうか | database |
-| `data_source` | `workspace_id`、親（database ブロック）、名前、スキーマ（`properties`：プロパティ ID → 名前・種類・設定）、削除したプロパティ、行の数、行に固有の ACL を持つ行の数。ブロックではなく別の表（`data_source`）に持つ | data source（内部名 collection。未検証） |
+| `data_sources` | `workspace_id`、親（database ブロック）、名前、スキーマ（`properties`：プロパティ ID → 名前・種類・設定）、削除したプロパティ、行の数、行に固有の ACL を持つ行の数。ブロックではなく別の表（`data_sources`）に持つ | data source（本家の内部の表は `collection`。[Herding elephants](https://www.notion.com/blog/sharding-postgres-at-notion)、2026-09-27 に確認。データソースと 1 対 1 かは未検証） |
 | 行（`page` ブロック） | `parent_type = data_source`、`parent_id` がデータソースの ID。`properties` にプロパティ ID をキーとして値を持つ。本文は普通のブロックの木 | page |
-| `view` | 親の database（またはリンクドビューのブロック）、対象の `data_source_id`、種類、設定（4 節） | view |
-| `relation_edge` | リレーションの辺（6 節） | （未検証） |
+| `views` | 親の database（またはリンクドビューのブロック）、対象の `data_source_id`、種類、設定（4 節） | view |
+| `relation_edges` | リレーションの辺（6 節） | （未検証） |
 | 索引の表 | 問い合わせ用の写し（3 節） | （未検証） |
 
-- `data_source` と `view` は、ブロックと同じ操作・トランザクション・配信の仕組みに乗る（[ADR-0005](../decisions/0005-transactions-as-unit-of-change.md)）。レコードの種類が違うだけで、`seq`・履歴・権限の判定は共通。
+- `data_sources` と `views` の行は、ブロックと同じ操作・トランザクション・配信の仕組みに乗る（[ADR-0005](../decisions/0005-transactions-as-unit-of-change.md)）。レコードの種類が違うだけで、`seq`・履歴・権限の判定は共通。
 - 権限の判定は、行 → `data_source` → `database` ブロック → 親のページ、と祖先をたどる（[ADR-0004](../decisions/0004-inherited-page-permissions.md)）。
 - **行は `data_source` の `content` に並べない。** 行は数十万になり、並びは各ビューの並べ替えで決まるため。行の集合は索引の表で列挙する。ブロックの木の不変条件（[ADR-0002](../decisions/0002-everything-is-a-block.md)）は、行については「親の `data_source` がちょうど 1 つ」と読み替える（[ADR-0014](../decisions/0014-database-query-index.md)）。
 - 手動の並び（ボードでのドラッグなど）は、ビューごとの並びのキー（分数の索引）として索引の表に持つ。
@@ -61,7 +61,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 | people | ○ | 利用者の ID の配列 | 参照 ID（複数行） |
 | checkbox、url、email、phone_number | ○ | スカラー | 真偽・平文 |
 | files | ○ | ファイルの参照の配列 | なし（空かどうかだけ） |
-| relation | ○ | 持たない。`relation_edge` が正本（6 節） | 参照 ID（複数行） |
+| relation | ○ | 持たない。`relation_edges` が正本（6 節） | 参照 ID（複数行） |
 | rollup、formula | ○ | 持たない。計算の結果を索引に書く（7・8 節） | 結果の型の列 |
 | created_time、created_by、last_edited_time、last_edited_by | ○ | ブロックの属性から導く | 時刻・参照 ID |
 | unique_id | ○ | 接頭辞とデータソースごとの連番。採番はデータソースの行ロックで行う | 数値 |
@@ -79,12 +79,12 @@ linked_database ブロック（別のページ）── view → 他のデータ
 
 | 表 | キー | 列 |
 | --- | --- | --- |
-| `dbx_row` | (`workspace_id`, `data_source_id`, `row_id`) | 作成・更新の時刻と人、ゴミ箱かどうか、行に固有の ACL を持つか、`version` |
-| `dbx_value` | (`workspace_id`, `data_source_id`, `property_id`, `row_id`, `ord`) | `v_text`、`v_num`、`v_ts`、`v_ts_end`、`v_bool`、`v_ref`。型ごとに 1 列だけ使う。複数の値（multi_select・people・relation）は `ord` で複数行 |
+| `dbx_rows` | (`workspace_id`, `data_source_id`, `row_id`) | 作成・更新の時刻と人、ゴミ箱かどうか、行に固有の ACL を持つか、`version` |
+| `dbx_values` | (`workspace_id`, `data_source_id`, `property_id`, `row_id`, `ord`) | `v_text`、`v_num`、`v_ts`、`v_ts_end`、`v_bool`、`v_ref`。型ごとに 1 列だけ使う。複数の値（multi_select・people・relation）は `ord` で複数行 |
 
 - 索引は、`(workspace_id, data_source_id, property_id, v_num, row_id)` のように型ごとに持つ。`v_text` には照合順序つきの B-tree と、「含む」のための `pg_trgm` の GIN を置く（title と rich_text だけ）。
 - 全表が `workspace_id` と RLS を持つ（[ADR-0003](../decisions/0003-workspace-sharding.md)）。
-- 正本は行の `properties` と `relation_edge`。索引は写しで、整合の検査のジョブが定期的に突き合わせ、ずれたら作り直す。
+- 正本は行の `properties` と `relation_edges`。索引は写しで、整合の検査のジョブが定期的に突き合わせ、ずれたら作り直す。
 
 ### 3.2 実行
 
@@ -127,7 +127,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 ## 5. 書き込みの流れ
 
 1. クライアントが、行のプロパティの変更をトランザクションで送る（ADR-0005）。
-2. API は、権限・スキーマ（型・選択肢の存在・上限）を検証し、ブロックの表と索引の表（`dbx_row`・`dbx_value`）、同じ行の中の数式の結果を、1 つの DB のトランザクションで書く。
+2. API は、権限・スキーマ（型・選択肢の存在・上限）を検証し、ブロックの表と索引の表（`dbx_rows`・`dbx_values`）、同じ行の中の数式の結果を、1 つの DB のトランザクションで書く。
 3. outbox から、行を開いている人と、そのデータソースのビューを購読している人へ配信する。
 4. 行をまたぐ依存（ロールアップ、リレーションをたどる数式）は、Worker が計算し直して索引に書く（7 節）。
 
@@ -137,7 +137,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 ## 6. リレーション（ADR-0016）
 
 - 本家は、片方向と両方向（`single_property`・`dual_property`）、自分自身へのリレーション、関連できるページを「1 ページ」か「制限なし」に絞る設定を持つ（[Relations & rollups](https://www.notion.com/help/relations-and-rollups)、[Property object](https://developers.notion.com/reference/property-object)）。
-- **正本は辺の表。** `relation_edge`（`workspace_id`、`from_property_id`、`from_row_id`、`to_row_id`、`from_pos`、`to_pos`）。両方向のリレーションは、1 本の辺を両側のプロパティから見る。A 側の値は `from_row_id = A` の辺、B 側の値は `to_row_id = B` の辺で、同じ辺から導くので、片側だけが変わる状態が起きない。
+- **正本は辺の表。** `relation_edges`（`workspace_id`、`from_property_id`、`from_row_id`、`to_row_id`、`from_pos`、`to_pos`）。両方向のリレーションは、1 本の辺を両側のプロパティから見る。A 側の値は `from_row_id = A` の辺、B 側の値は `to_row_id = B` の辺で、同じ辺から導くので、片側だけが変わる状態が起きない。
 - 辺の追加・削除は 1 つの操作で、両側の行の購読者に配信し、両側の行の `last_edited_time` を進める（本家の細部は未検証）。
 - **ワークスペースをまたぐリレーションは作れない。** 対象のデータソースは同じワークスペースに限る（ADR-0003）。本家も同じと見られるが、文書で明示されていない（未検証）。
 - 「1 ページ」の制限は、辺の追加のときに同じトランザクションで検査する。
@@ -151,7 +151,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 - 関数は本家の一覧に合わせる（count、count_values、empty、not_empty、unique、show_unique、percent_*、sum、average、median、min、max、range、earliest_date、latest_date、date_range、checked、unchecked、percent_checked、percent_unchecked、count_per_group、percent_per_group、show_original。[Property object](https://developers.notion.com/reference/property-object)）。
 - ロールアップのロールアップは作れない（本家と同じ。[Relations & rollups](https://www.notion.com/help/relations-and-rollups)）。数式を通した参照は、8 節の深さの上限で抑える。
 - 計算と実体化：
-  - 関連する行の値・辺・関連する行のゴミ箱の状態が変わったら、outbox のイベントから Worker が影響する行を求め、ロールアップを計算し直して `dbx_value` に書く。
+  - 関連する行の値・辺・関連する行のゴミ箱の状態が変わったら、outbox のイベントから Worker が影響する行を求め、ロールアップを計算し直して `dbx_values` に書く。
   - 影響する行は辺の表の逆引きで求める。1 つの変更で計算し直す行が多いとき（10,000 行を超えるなど）は、バッチに分けて順に処理する。
   - 計算し直すまでの間、ビューには古い値を出す。目標は、変更からロールアップの反映まで p99 5 秒（S1）。
   - クライアントは、関連する行を読み込み済みなら、同じ評価器で楽観的に計算して先に出す。
@@ -166,8 +166,8 @@ linked_database ブロック（別のページ）── view → 他のデータ
 - 型：テキスト、数値、真偽、日付、人、ページ、リスト。
 - `prop("名前")`、`let`・`lets`、リストの関数（`map`・`filter`・`find`・`findIndex`・`some`・`every` など）と `current`。
 - リレーションをたどる参照：`prop("Tasks").map(current.prop("Status"))`。
-- 深さ：数式が他の数式・ロールアップを参照するたびに 1 層とし、15 層まで（本家と同じ。[Optimize database performance](https://www.notion.com/help/optimize-database-load-times-and-performance)）。
-- 関数の一覧と各関数の細かな意味（日付の計算の丸め、空の値の扱い）は、本家の関数の文書に合わせて仕様で決める。コメントや複数行の書き方の可否は未検証。
+- 深さ：数式が他の数式・ロールアップを参照するたびに 1 層とし、15 層まで（本家と同じ。[Fix common formula errors](https://www.notion.com/help/common-formula-errors)、2026-09-27 に確認）。
+- 関数の一覧と各関数の細かな意味（日付の計算の丸め、空の値の扱い）は、本家の関数の文書に合わせて仕様で決める。コメント（`/* */`）は本家で書ける（[upvote formula のガイド](https://www.notion.com/help/guides/create-and-use-an-upvote-formula-for-team-decisions)、2026-09-27 に確認）。複数行の書き方の可否は未検証。
 
 ### 8.2 解析と実行
 
@@ -180,8 +180,8 @@ linked_database ブロック（別のページ）── view → 他のデータ
 
 | 数式の種類 | 評価 | 結果の置き場 |
 | --- | --- | --- |
-| 同じ行のプロパティだけを参照 | 書き込みのトランザクションの中で、サーバーが評価 | `dbx_value`（押し下げできる） |
-| リレーションをたどる、ロールアップを参照 | Worker が非同期に評価（7 節と同じ仕組み） | `dbx_value` |
+| 同じ行のプロパティだけを参照 | 書き込みのトランザクションの中で、サーバーが評価 | `dbx_values`（押し下げできる） |
+| リレーションをたどる、ロールアップを参照 | Worker が非同期に評価（7 節と同じ仕組み） | `dbx_values` |
 | `now()` など時刻に依存（揮発） | 実体化しない。問い合わせのときに評価器で評価 | なし |
 
 - クライアントは、同じ評価器で楽観的に表示し、サーバーの値が届いたら置き換える。
@@ -209,16 +209,16 @@ linked_database ブロック（別のページ）── view → 他のデータ
 
 | 項目 | 値 | 根拠 |
 | --- | --- | --- |
-| 行 | 1 データソースあたり 250,000 | 本家はデータベースあたり 25 万（[Optimize database performance](https://www.notion.com/help/optimize-database-load-times-and-performance)）。複数のデータソースのときに、データベースあたりかデータソースあたりかは未検証 |
+| 行 | 1 データソースあたり 250,000 | 本家はデータベースあたり 25 万（[Optimize database performance](https://www.notion.com/help/optimize-database-load-times-and-performance)、2026-09-27 に確認）。複数のデータソースのときに、データベースあたりかデータソースあたりかは未検証 |
 | プロパティ | 1 データソースあたり 500 | 本家と同じ（[Database properties](https://www.notion.com/help/database-properties)） |
 | 行のプロパティの値の合計 | 2.5MB（files・数式・ロールアップ・本文を除く） | 本家と同じ |
-| スキーマの大きさ | 1.5MB | 本家と同じ |
+| スキーマの大きさ | 1.5MB | ヘルプの値と同じ。本家の API の文書は、プロパティ 500 個かスキーマ 50KB を推奨の上限とし、大きすぎるスキーマの更新を止める（[Data source](https://developers.notion.com/reference/data-source)、2026-09-27 に確認）。API での上限は E7 の Story で決める |
 | データソース | 1 データベースあたり 20 | 本設計の値（本家は未検証） |
 | ビュー | 1 データベースあたり 200 | 本設計の値（本家は未検証） |
 | フィルタの入れ子 | 3 段 | 本家と同じ |
 | サブグループ | 1 段 | 本家と同じ |
 | リレーションの辺 | 1 行・1 プロパティあたり 10,000 | 6 節 |
-| 数式の深さ | 15 層 | 本家と同じ |
+| 数式の深さ | 15 層 | 本家と同じ（[Fix common formula errors](https://www.notion.com/help/common-formula-errors)、2026-09-27 に確認） |
 | multi_select の選択肢（API の 1 リクエスト） | 100 | 本家と同じ（[Request limits](https://developers.notion.com/reference/request-limits)） |
 | API の問い合わせの結果 | 1 回の問い合わせで 10,000 件までページ送り | 本家と同じ（[Query a data source](https://developers.notion.com/reference/query-a-data-source)） |
 
@@ -247,7 +247,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 ## 14. リスクと未解決事項
 
 - 行を `data_source` の `content` に並べない扱いは、ADR-0002 の不変条件の読み替え。[block-model.md](block-model.md) の 2・5 節（`parent_type = data_source`、T1・T3）に反映した。性質ベーステストで、行がどの `content` にも現れず、親の `data_source` がちょうど 1 つであることを確かめる（[quality.md](../quality.md)）。
-- 索引の表の書き込みの増幅（1 行の変更で、プロパティの数だけ `dbx_value` を書く可能性）。変わったプロパティだけを書くことで抑えるが、インポートの大量の書き込みでの負荷は [capacity.md](capacity.md) で見る。
+- 索引の表の書き込みの増幅（1 行の変更で、プロパティの数だけ `dbx_values` を書く可能性）。変わったプロパティだけを書くことで抑えるが、インポートの大量の書き込みでの負荷は [capacity.md](capacity.md) で見る。
 - 遅い経路のロールアップ（行に固有の ACL が多いデータソース）で、ビューが遅くなる。
 - 揮発する数式でのフィルタ・並べ替えの性能。
 - 複数のデータソースを持つデータベースの、上限の数え方（本家が未検証）。

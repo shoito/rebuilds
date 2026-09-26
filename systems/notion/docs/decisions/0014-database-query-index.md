@@ -28,6 +28,8 @@ date: 2026-09-26
 - 3 は、写しの遅れで、書いた直後のビューに行が出ない。権限の判定も写しの側に二重に持つことになる。S3 で、再構築できる写しとして検討する。
 - 4 は、10 万行を超えるデータベースで読み込みが重い。本家も 2022 年に全体の読み込みをやめた（[Notion 2.16](https://www.notion.com/releases/2022-04-14)）。
 
+> 2026-09-27 の注記：表の名前を複数形に揃えた（[data-model.md](../architecture/data-model.md) の冒頭の規約）。この ADR の `dbx_row`・`dbx_value` は `dbx_rows`・`dbx_values` と読む。`data_source` はレコードの種類の名前で、表は `data_sources`。
+
 ## Consequences
 
 - 良くなること：

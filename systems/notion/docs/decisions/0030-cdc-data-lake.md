@@ -29,13 +29,13 @@ S2 に向けた計画。S1 の運用で得た数字で見直し、S2 への移�
 
 段階で分ける。
 
-- **S1：2 を使う。** 1 日 1 回、Aurora のクラスタのデータを S3 にエクスポートする。エクスポートは、クラスタのクローンから Parquet で書き出すので、稼働中のクラスタの性能に影響しない（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/export-cluster-data.html)）。鮮度は 1 日で足りる。
+- **S1：2 を使う。** 1 日 1 回、Aurora のクラスタのデータを S3 にエクスポートする。エクスポートは、クラスタのクローンから Parquet で書き出すので、稼働中のクラスタの性能に影響しない（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/export-cluster-data.html)、2026-09-27 に確認）。鮮度は 1 日で足りる。
 - **S2：1 を採用する（提案）。** 物理クラスタが増え、ブロックが 1,000 億になると、毎日の全体のエクスポートは費用と時間で合わなくなる見込みである。
   - 物理クラスタごとに 1 つのコネクター。スキーマ `shard000`〜`shard479` の同じテーブルを、1 つのトピックにまとめる（本家と同じ）。
   - 初期の状態は、2 のエクスポートで作る。
   - 表の形式は Hudi か Iceberg。S2 の前に、更新の多いブロックの表で両方を比べて決める（未決定）。
   - 鮮度の目標は、ブロックの表で 2 時間以内、その他で 15 分以内。
-- 3 は、運用が最も少ない。ただし 480 のスキーマと更新の多い表を、目標の費用で扱えるかは **未検証**。S2 の前の比較に含める。
+- 3 は、運用が最も少ない。送り先は Redshift か SageMaker のレイクハウスで、スキーマは正規表現のフィルタでまとめて指定できる（1 つの統合に 99 パターンまで）。全テーブルに主キーが要り、DDL で表の再同期が起き、Global Database のフェイルオーバーで統合が止まる（作り直す）。1 つの元のクラスタに統合は 5 つまで（[Aurora zero-ETL integrations](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/zero-etl.html)、[データのフィルタ](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/zero-etl.filtering.html)、2026-09-27 に確認）。Redshift のテーブルの数の上限（ra3.4xlarge 以上と Serverless で 20 万。[Quotas and limits](https://docs.aws.amazon.com/redshift/latest/mgmt/amazon-redshift-limits.html)）に、480 スキーマ × テーブルの数が収まるか、更新の多い表を目標の費用で扱えるかは **未検証**。S2 の前の比較に含める。
 - 4 は、S1 の小さな調べものにだけ使い、定常の分析には使わない。
 
 ### 守ること
@@ -54,7 +54,7 @@ S2 に向けた計画。S1 の運用で得た数字で見直し、S2 への移�
 - 引き受けるコスト：
   - MSK、Kafka Connect、Spark の運用が加わる。小さなチームには重い。3 で足りるなら、3 を選び直す。
   - CDC のスロットが止まると、WAL がたまり、本番の DB に影響する。スロットの遅延を監視し、閾値を超えたらスロットを捨てて、エクスポートからやり直す。
-  - 再シャーディングとリージョンの切り替えのたびに、コネクターとスロットを作り直す。
+  - 再シャーディングとリージョンの切り替え、writer のフェイルオーバーのたびに、コネクターとスロットを作り直す。Aurora ではスロットがフェイルオーバーで保たれない（[ADR-0028](0028-zero-downtime-resharding.md) の注記）。Aurora では読み取りのレプリカからの論理デコードができないので、CDC は writer から読む。
 
 ## Confirmation
 

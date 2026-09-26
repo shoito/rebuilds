@@ -4,12 +4,12 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0018](../decisions/0018-permission-levels-and-inheritance.md) | 権限の水準を本家に合わせ、ACL は設定したページに置き換えとして持つ（追加も制限も、そのページで継承を切る） |
-| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限の版（`acl_version`）をキーにキャッシュする |
-| [0020](../decisions/0020-published-pages-isolation.md) | 公開ページは別の登録可能ドメインで配り、既定で検索エンジンに載せない |
+| [0018](../decisions/0018-permission-levels-and-inheritance.md) | 権限の水準を本家に合わせ、ACL は設定したページで継承を置き換える |
+| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限の版（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションで版を上げる |
+| [0020](../decisions/0020-published-pages-isolation.md) | 公開ページは別の登録可能ドメインで、専用の描画サービスから配り、既定で検索エンジンに載せない |
 | [0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバーを分け、ゲスト・連携もメンバーの行にし、チームスペースを最上位の暗黙の ACL にする |
-| [0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱・ページの履歴・ワークスペースの削除の保持期間 |
-| [0024](../decisions/0024-integration-access-model.md) | 連携は明示的に共有されたページだけを読む（[api-and-integrations.md](api-and-integrations.md)） |
+| [0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱は 30 日、完全に削除した後も 30 日戻せ、ページの履歴はプランの日数で消す。バックアップの期限を削除の最終的な期限にする |
+| [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付の版に寄せ、連携は明示的に共有されたページだけを読む |
 
 この文書の決定表は設計の草案である。ID（`DT-...`）は、E2 の各変更の `spec.md` に移すときに振る。
 
@@ -71,11 +71,11 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | ロールを変える | ○ | member ⇄ guest だけ（未検証） | — | — | — |
 | ゲストの追加の申請を承認する（Enterprise） | ○ | — | — | — | — |
 | チームスペースを作る | ○ | ○ | 設定で許可されていれば | — | — |
-| グループを作る・編集する（Business 以上） | ○ | ○（未検証） | — | — | — |
+| グループを作る・編集する（Business 以上） | ○ | ○ | — | — | — |
 | 内部の連携を作る | ○ | — | — | — | — |
 | ワークスペースを削除する | ○ | — | — | — | — |
 
-- **所有者も、ページの権限を迂回しない。** 他のメンバーのプライベートのページやゴミ箱のページは、所有者でも読めない（本家の振る舞いは未検証）。Enterprise の管理者向けの内容の検索は、監査ログに残す別の経路として E10 で扱う。
+- **所有者も、ページの権限を迂回しない。** 他のメンバーのプライベートのページやゴミ箱のページは、所有者でも読めない。本家とは違う。本家は、所有者がプライベートのページを含むデータにアクセスしうると明記し、Enterprise では離脱から 30 日以内の利用者のプライベートのページを、所有者が別の利用者へ移せる（[Data your workspace owner can access](https://www.notion.com/help/data-accessible-by-your-workspace-owner)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。本システムは、通常の画面では所有者にも読ませない（差異。2026-09-26 の決定）。離脱した人のページを移す機能は E10 で検討する。Enterprise の管理者向けの内容の検索は、監査ログに残す別の経路として E10 で扱う。
 - 最後の所有者は、降格・無効化できない（409）。
 
 ### 2.3 ゲストの上限
@@ -113,7 +113,7 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | 非公開（private） | 追加された人以外には存在も見えない | Business・Enterprise |
 
 - チームスペースのロールは `owner` と `member`。所有者は既定で配下のすべてのページにフルアクセスを持ち、設定（招待できる人、サイドバーを編集できる人）を変えられる（同じ文書）。
-- **ゲストはチームスペースに入れない。** ゲストは「ワークスペース全体への権限を持てない」ので、ページ単位で共有する（本家でゲストがチームスペースに入れないことは未検証）。
+- **ゲストはチームスペースに入れない。** ゲストは「ワークスペース全体への権限を持てない」ので、ページ単位で共有する（本家のゲストはページ単位で招待され、ワークスペース全体の権限やグループを持てない。チームスペースのページへもページ単位で共有され、Enterprise ではチームスペースごとにゲストへの共有を禁止できる。[Who's who](https://www.notion.com/help/whos-who-in-a-workspace)、[Intro to teamspaces](https://www.notion.com/help/intro-to-teamspaces)、2026-09-27 に確認。「入れない」と明示した一文はない）。
 
 ### 3.2 最上位の暗黙の ACL
 
@@ -142,7 +142,7 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | 5 | 非公開 | 非参加のメンバー | 404 | 招待されたとき | ページ単位の共有だけ | — | — |
 | 6 | - | チームスペースのメンバー | ○ | - | 暗黙の ACL | 設定（「全員」か「所有者だけ」）に従う | — |
 | 7 | - | チームスペースの所有者 | ○ | - | `full_access` | ○ | ○ |
-| 8 | 非公開 | ワークスペースの所有者（非参加） | 管理画面でだけ（未検証） | — | ページ単位の共有だけ | — | 所有者の割り当てだけ |
+| 8 | 非公開 | ワークスペースの所有者（非参加） | 管理画面でだけ（本家は、所有者が設定の画面ですべてのチームスペースを管理でき、Enterprise では任意のチームスペースに参加し自分を所有者にできる。[Manage teamspaces](https://www.notion.com/help/manage-teamspaces)、2026-09-27 に確認。本システムは参加・所有者の割り当てを通してだけ中身を見る） | — | ページ単位の共有だけ | — | 所有者の割り当てだけ |
 
 ## 4. ページの権限
 
@@ -192,7 +192,7 @@ ACL は、設定をしたページにだけ持つ（ADR-0004、[block-model.md](
 | `page_acls` | `workspace_id`、`page_id`、`version`、作成・更新の人と日時。行があれば、そのページは ACL を持つ（中身が空でもよい） |
 | `page_acl_entries` | `workspace_id`、`page_id`、`principal`、`level`、`expires_at`、`granted_by` |
 | `page_general_access` | `page_id`、`scope`（`workspace` / `public`）、`level`、`hide_from_search`、`expires_at` |
-| `workspace_acl_version` | `workspace_id`、`acl_version`。権限に影響する変更のたびに増える番号（5 節）。[search.md](search.md) の「ワークスペースの権限の版」と同じもの。権限の変更と同じトランザクションで上げるので、`global` ではなくシャードに置く（[data-model.md](data-model.md)） |
+| `workspace_acl_versions` | `workspace_id`、`acl_version`。権限に影響する変更のたびに増える番号（5 節）。[search.md](search.md) の「ワークスペースの権限の版」と同じもの。権限の変更と同じトランザクションで上げるので、`global` ではなくシャードに置く（[data-model.md](data-model.md)） |
 
 `principal` は、[search.md](search.md) の主体のキーと同じ形にする。
 
@@ -372,8 +372,8 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 - `page_general_access` も ACL の一部で、ACL を持たない子孫に継承する。
 - ページの URL はページの ID（UUIDv7）を含む。リンクの共有は URL を知っていることを前提にするので、UUIDv7 のランダムな部分（74 ビット）と、公開の配信のレート制限で推測を防ぐ。
 - **ログインしていない閲覧者には、アプリのオリジンで内容を見せない。** `public` のページへのログインしていない要求は、公開サイトのオリジン（8 節）へ送る。アプリのオリジンで、誰でも作れる内容を匿名に見せない（フィッシングの対策。本家と体験が違いうる。未検証）。
-- `public` の水準は、S1 では `can_view` だけにする（決定。[README.md](README.md) の「決定」）。本家のリンクでの閲覧者に、コメント・編集を許す選択があるかは未検証。
-- 期限を付けられるプランは未検証。
+- `public` の水準は、S1 では `can_view` だけにする（決定。[README.md](README.md) の「決定」）。本家は、リンクの閲覧者に編集・コメント・閲覧のいずれかを許せる。コメントと編集にはログインが要る（[Share your Notion pages](https://www.notion.com/help/share-your-work)、2026-09-27 に確認）。S1 で `can_view` だけにするのは本家との差異である。
+- 本家は、有料のプランでリンクに期限（Link expires）を付けられる（[リリースノート 2022-10-12](https://www.notion.com/releases/2022-10-12)、2026-09-27 に確認）。
 
 ## 8. Web への公開（公開サイト）
 
@@ -438,7 +438,7 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 | `teamspaces` | `type`（`default` / `open` / `closed` / `private`）、`member_access_level`、`workspace_access_level`、招待・サイドバーの設定、アーカイブ日時 |
 | `teamspace_members` | `teamspace_id`、`member_id`、`role`（`owner` / `member`） |
 | `page_acls`、`page_acl_entries`、`page_general_access` | 4.3 節 |
-| `workspace_acl_version` | 5 節 |
+| `workspace_acl_versions` | 5 節 |
 | `workspace_security_policies` | 公開・ゲスト・エクスポート・連携の禁止、ゲストの追加の申請（Enterprise） |
 | `guest_requests` | ゲストの追加の申請（Enterprise） |
 | `published_sites` | 8 節 |

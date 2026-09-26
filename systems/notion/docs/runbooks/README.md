@@ -61,26 +61,26 @@ observability.md の 2 節の SLI に、NFR から導いた SLO を付けたも�
 
 ## 4. アラートと手順
 
-「作成済み」以外の手順は、表の Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。アラートの閾値は [observability.md](../architecture/observability.md) の 5 節。
+「作成済み」以外の手順は、表の Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。アラートの閾値は [observability.md](../architecture/observability.md) の 5 節。アラートの設定そのものは E8 の `slo-dashboards-and-alerts` で作る。「状態」の列は、手順を作る Story を示す。
 
 | アラート | 重さ | 手順 | 状態 |
 | --- | --- | --- | --- |
 | 編集の反映の遅延・トランザクションの成功率の速いバーンレート、合成監視の 2 回連続の失敗 | 呼び出し | [incident-response.md](incident-response.md) | 作成済み |
-| 権限の監査の不一致が 1 件以上 | 呼び出し（SEV1） | [incident-response.md](incident-response.md)、`security-incident.md` | 作成済み／`security-incident.md` は E8 で作成 |
+| 権限の監査の不一致が 1 件以上 | 呼び出し（SEV1） | [incident-response.md](incident-response.md)、`security-incident.md` | 作成済み／`security-incident.md` は E8 の `security-incident-runbook` で作成 |
 | 同期の滞留（outbox の最古の行、クライアントの未確定の最古） | 呼び出し | [incident-response.md](incident-response.md) の「同期の滞留」 | 作成済み |
 | 物理クラスタの writer の CPU、1 シャード・1 ワークスペース・1 ページの占有 | チケット（CPU 80% で呼び出し） | [incident-response.md](incident-response.md) の「重いシャード」 | 作成済み |
 | デプロイ中の自動ロールバック、デプロイ後の悪化、マイグレーションの台帳の失敗・停滞 | 通知・チケット | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み |
 | AZ・リージョンの障害、`AuroraGlobalDBRPOLag` が 5 分を超える | 呼び出し | [disaster-recovery.md](disaster-recovery.md) | 作成済み |
-| 検索への反映の遅延の遅いバーンレート、indexer の DLQ、`search-acl` の遅れ | チケット | `search-indexing.md`（再索引、別名の切り替えを含む） | E6 で作成 |
-| メールのバウンス率、push の失敗の急増、受信箱の計画の遅れ | チケット | `notification-delivery.md` | E6 で作成 |
-| Webhook の配送の失敗の急増、egress での拒否の急増、停止した購読の急増 | チケット | `webhook-delivery.md` | E7 で作成 |
-| `age(datfrozenxid)` が 10 億を超える、デッドタプルの増加、`pg_stat_statements` の上限 | 呼び出し | `db-maintenance.md`（VACUUM、周回の回避、480 スキーマの統計） | E8 で作成 |
-| 物理削除の遅れ（期限を過ぎて残る行）、削除のジョブの失敗、完全に削除したページの復元の依頼 | チケット | `data-deletion.md`（ADR-0022 の 3 段、ワークスペースの削除、運用者による復元） | E8 で作成 |
-| 公開サイトの通報、自動の検査での保留、フィッシングの報告 | チケット | `abuse-takedown.md`（`publishing_suspended`、CDN の無効化、所有者への通知） | E8 で作成 |
-| セキュリティインシデント（漏洩の疑い、依存の勧告、鍵の漏洩） | 呼び出し | `security-incident.md`（証拠の保全、個人情報保護委員会への報告の判断を含む） | E8 で作成 |
-| 論理レプリケーションのスロットの WAL が 100 GB を超える（再シャーディング） | 呼び出し | `resharding.md`（ADR-0028 の段 0〜6、中止と戻し） | E9 で作成 |
-| 影の読み取りの、遅延で説明できない不一致が 1 件以上 | チケット（再シャーディングを止める） | `resharding.md` | E9 で作成 |
-| CDC のスロットの WAL が 100 GB を超える、取り込みの遅れ | 呼び出し | `data-lake.md`（スロットを捨ててエクスポートからやり直す） | E9 で作成（S2 の CDC） |
+| 検索への反映の遅延の遅いバーンレート、indexer の DLQ、`search-acl` の遅れ | チケット | `search-indexing.md`（再索引、別名の切り替えを含む） | E6 の `search-indexer` で作成 |
+| メールのバウンス率、push の失敗の急増、受信箱の計画の遅れ | チケット | `notification-delivery.md` | E6 の `email-and-push-notifications` で作成 |
+| Webhook の配送の失敗の急増、egress での拒否の急増、停止した購読の急増 | チケット | `webhook-delivery.md` | E7 の `webhooks` で作成 |
+| `age(datfrozenxid)` が 10 億を超える、デッドタプルの増加、`pg_stat_statements` の上限 | 呼び出し | `db-maintenance.md`（VACUUM、周回の回避、480 スキーマの統計） | E8 の `db-maintenance` で作成 |
+| 物理削除の遅れ（期限を過ぎて残る行）、削除のジョブの失敗、完全に削除したページの復元の依頼 | チケット | `data-deletion.md`（ADR-0022 の 3 段、ワークスペースの削除、運用者による復元） | E8 の `data-deletion-worker` で作成 |
+| 公開サイトの通報、自動の検査での保留、フィッシングの報告 | チケット | `abuse-takedown.md`（`publishing_suspended`、CDN の無効化、所有者への通知） | E8 の `abuse-reporting-and-takedown` で作成 |
+| セキュリティインシデント（漏洩の疑い、依存の勧告、鍵の漏洩） | 呼び出し | `security-incident.md`（証拠の保全、個人情報保護委員会への報告の判断を含む） | E8 の `security-incident-runbook` で作成 |
+| 論理レプリケーションのスロットの WAL が 100 GB を超える（再シャーディング） | 呼び出し | `resharding.md`（ADR-0028 の段 0〜6、中止と戻し） | E9 の `reshard-automation` で作成 |
+| 影の読み取りの、遅延で説明できない不一致が 1 件以上 | チケット（再シャーディングを止める） | `resharding.md` | E9 の `reshard-shadow-reads` で作成 |
+| CDC のスロットの WAL が 100 GB を超える、取り込みの遅れ | 呼び出し | `data-lake.md`（スロットを捨ててエクスポートからやり直す） | E9 の `cdc-data-lake` で作成（S2 の CDC） |
 
 ## 5. 定期作業と訓練
 

@@ -38,6 +38,10 @@ intent.md の「守るべき振る舞い」に、ページを削除しても決�
 - リーガルホールドは MVP に含めない。作るときは、Slack の ADR-0019 と同じく、ホールドが削除に優先する。
 - 1 は、誤操作を戻せず、intent.md の約束を満たせない。2 は「消した」と言えない。
 
+> 2026-09-27 の注記：Decision の「ゴミ箱へ入れたページは、検索の索引・通知・公開サイトから外す」のうち、検索の索引の扱いを次のとおり明確にする。ゴミ箱のページは索引から消さず、`in_trash: true` で残す。通常の検索には出さず、ゴミ箱の画面の検索からだけ出す。見られるのは `can_edit` 以上の人だけ（[search.md](../architecture/search.md) の 1・6.1 節、[security.md](../architecture/security.md) の 7 節）。索引の文書を消すのは物理削除のとき（tombstone、7 日後に削除）。Confirmation の「検索から消え」は「通常の検索から消え」と読む。
+
+> 2026-09-27 の注記：本家の値を確かめた（[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、[Pricing](https://www.notion.com/pricing)、2026-09-27 に確認）。ゴミ箱 30 日、完全に削除した後の 30 日、履歴の Free 7 日・Plus 30 日・Business 90 日は一致する。Enterprise の履歴は、ヘルプでは任意の日数、料金の表では無制限。ワークスペースの削除は、本家では利用者向けの猶予がなくすぐ確定し、サポートが過去 30 日のバックアップから戻せる（[Delete a workspace](https://www.notion.com/help/delete-a-workspace)、2026-09-27 に確認）。本 ADR の 30 日の猶予は、本家より手厚い本システムの決定として残す（「本家の猶予は未検証」は解消）。
+
 ## Consequences
 
 - 良くなること：

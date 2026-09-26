@@ -7,9 +7,10 @@
 | ADR | 決定 |
 | --- | --- |
 | [0010](../decisions/0010-text-crdt-with-server-ordered-structure.md) | テキストはブロックごとの CRDT（Fugue＋Peritext）で統合し、構造とプロパティはサーバーの順序で決める |
-| [0011](../decisions/0011-structural-and-property-conflict-rules.md) | 構造とプロパティの衝突の規則（削除・移動・循環・プロパティ） |
+| [0011](../decisions/0011-structural-and-property-conflict-rules.md) | 構造とプロパティの衝突は、サーバーの順序と決まった規則で解き、負けた変更を記録して本人に見せる |
 | [0012](../decisions/0012-child-order-by-sibling-anchors.md) | 子の並びは前後の兄弟をアンカーにした操作で表し、分数インデックスは使わない |
-| [0013](../decisions/0013-offline-availability-policy.md) | オフラインで使えるページの決め方と、端末の保存 |
+| [0013](../decisions/0013-offline-availability-policy.md) | オフラインで使うページを理由ごとに記録して決め、Web とデスクトップで SQLite に保存する |
+| [0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 のデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補にする |
 
 配信の仕組み（Gateway、Valkey、背圧、再接続の殺到）は、Slack の [realtime.md](../../../slack/docs/architecture/realtime.md) をそのまま使う。Relay の担当の分け方は、論理シャードがあるため Slack と違う（7.3 節）。この文書には、Notion で違うところだけを書く。
 
@@ -30,7 +31,7 @@
 | テキストの統合 | 2025 年 7 月から、RGA に Peritext の書式の操作を足した CRDT。ブロックの分割・結合に「text slice / text instance」を使う。以前は同じブロックへの同時の編集が LWW で失われた（[How Notion handles concurrent editing with CRDTs](https://www.notion.com/blog/how-notion-handles-concurrent-editing-with-crdts)） | Fugue＋Peritext の CRDT。分割・結合は本家の text slice に倣う（ADR-0010） |
 | テキスト以外 | 選択などのプロパティは合わさらず、片方だけが残る（[ヘルプ：オフラインで使う](https://www.notion.com/help/use-pages-offline)） | 単一値は LWW。複数値（複数選択・人・リレーション）は追加・削除で合わせる。負けた値は衝突の記録に残す（ADR-0011） |
 | オフライン | デスクトップとモバイルのアプリだけ。明示したページ、有料プランでは最近のページとお気に入り。データベースは最初のビューの先頭 50 行。子ページは含めない。`offline_page` と、理由を持つ `offline_action` の表で管理する（[How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)、ヘルプ） | Web（PWA）も含める。理由の表の考え方は同じ（ADR-0013） |
-| 在席・カーソル | 公開情報なし（**未検証**） | Gateway の一時的なイベント（9 節） |
+| 在席・カーソル | 実装の公開情報はない。CRDT の記事は、在席の表示の改善を今後の課題に挙げている（[How Notion handles concurrent editing with CRDTs](https://www.notion.com/blog/how-notion-handles-concurrent-editing-with-crdts)、2026-09-27 に確認） | Gateway の一時的なイベント（9 節） |
 
 ## 3. 方式の比較（要約）
 
@@ -63,7 +64,7 @@
 
 ### 5.1 列
 
-- 各ブロックのテキストは、Fugue の列 CRDT で持つ（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)）。本家の RGA ではなく Fugue にするのは、2 人が同じ位置へ長く書いたときに、互いの文が文字単位で交ざらない性質（maximal non-interleaving）を持つためである。オフラインの長い編集ほど効く。
+- 各ブロックのテキストは、Fugue の列 CRDT で持つ（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)）。本家の RGA ではなく Fugue にするのは、2 人が同じ位置へ前向きに（左から右へ）長く書いたときに、互いの文が文字単位で交ざらないためである。RGA は、後ろ向きの挿入が重なると交ざりうる。交ざりを最小にする性質（maximal non-interleaving）が証明されているのは変種の FugueMax で、Fugue は実装が簡単な代わりに、後ろ向きの挿入で交ざる文字が少し多くなりうる（同じ論文、2026-09-27 に確認）。通常の入力は前向きなので、Fugue で足りるとする。オフラインの長い編集ほど効く。
 - 文字の ID は `(replica_id, counter)`。`replica_id` は端末とセッションごとに振る。連続して入力した文字は 1 つの run にまとめて保存する。
 - 削除は墓標（tombstone）にする。中身の文字列は消し、ID の範囲だけを run で残す。墓標は消さない。何か月も前の版を基にした操作でも、アンカーの ID が必ず見つかるようにするため。
 - メンション（人・ページ・日付）とインラインの数式は、属性を持つ 1 文字として扱う。
@@ -86,7 +87,7 @@ Peritext は段落をまたぐ構造を扱わない（論文の範囲外）。�
 ### 5.4 実装
 
 - TypeScript で自前の実装を `packages/text-crdt` に持ち、クライアントとサーバーで同じものを使う。理由は ADR-0010。
-- サーバーは、ブロックごとの CRDT の状態（`block_text_state`）と、読み取り用に展開したリッチテキスト（ブロックの `properties`）を同じトランザクションで書く。検索・API・エクスポートは展開した方を読む。
+- サーバーは、ブロックごとの CRDT の状態（`block_text_states`）と、読み取り用に展開したリッチテキスト（ブロックの `properties`）を同じトランザクションで書く。検索・API・エクスポートは展開した方を読む。
 
 ## 6. 構造とプロパティの衝突
 
@@ -206,8 +207,8 @@ Client ──(WebSocket or POST /transactions)──▶ API
 
 ### 11.2 保存
 
-- Web とデスクトップの両方で、WASM の SQLite を OPFS に置く（[ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md)）。本家と同じく、書き込みは Web Locks で選んだ 1 つのタブの専用ワーカーだけが行う（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）。WebSocket と同期のエンジンは SharedWorker に置く（Slack の [ADR-0024](../../../slack/docs/decisions/0024-client-data-layer-and-offline.md)）。デスクトップ（Electron）も MVP は同じ実装を使い、ネイティブの SQLite へ移すのは MVP の後に検討する（[editor.md](editor.md) の 11 節、[ADR-0009](../decisions/0009-electron-desktop-shell.md)）。
-- 端末の表：`record`（ブロックなどのレコード、`version`、ページの確定した `seq`）、`text_state`（ブロックのテキストの CRDT の状態）、`transaction_queue`（未確定。FIFO）、`offline_page`、`offline_action`（理由）、`failed_changes`（10.1 節）、`meta`。名前と形の正は [editor.md](editor.md) の 10 節。データベースはアカウントごとに分け、キーに `workspace_id` を含める。
+- Web とデスクトップの両方で、WASM の SQLite を OPFS に置く（[ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md)）。本家と同じく、書き込みは Web Locks で選んだ 1 つのタブの専用ワーカーだけが行う（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）。WebSocket と同期のエンジンは SharedWorker に置く（Slack の [ADR-0024](../../../slack/docs/decisions/0024-client-data-layer-and-offline.md)）。デスクトップ（Electron）も S1 は同じ実装を使い、ネイティブの SQLite は S2 の候補として計測で決める（[editor.md](editor.md) の 11 節、[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。
+- 端末の表：`records`（ブロックなどのレコード、`version`、ページの確定した `seq`）、`text_states`（ブロックのテキストの CRDT の状態）、`transaction_queue`（未確定。FIFO）、`offline_pages`、`offline_actions`（理由）、`failed_changes`（10.1 節）、`meta`。名前と形の正は [editor.md](editor.md) の 10 節。データベースはアカウントごとに分け、キーに `workspace_id` を含める。
 - `navigator.storage.persist()` を求める。Safari はホーム画面に追加していないサイトのデータを 7 日で消しうる（Slack の ADR-0024 の注記）。未送信があるのにデータが消えうる環境では、画面に警告を出す。
 - OPFS が使えないブラウザでは、オフラインを無効にし、その旨を出す。
 

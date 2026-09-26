@@ -41,6 +41,10 @@ B. **SQLite。Web は WASM＋OPFS、デスクトップはネイティブ**
 - SQLite にする理由：データベースのビューの絞り込み・並べ替えを、オフラインでも SQL で行える。本家が Web とアプリの両方で同じ形を使っている。書き込みは Web Locks で選んだ 1 つのタブの専用ワーカーだけが行う（OPFS の同期アクセスは専用ワーカーでしか使えないため）。OPFS が使えないブラウザでは、オフラインを無効にする。
 - 鮮度は、オフライン用のページを購読せず、10 分ごとと再接続時に `(page_id, seq)` をまとめて照合して保つ。
 
+> 2026-09-27 の注記：保存の選択肢 B の「デスクトップはネイティブ」は、[ADR-0032](0032-desktop-uses-wasm-sqlite-in-s1.md) で置き換えた。S1 はデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補として計測で決める。この ADR のほかの決定は変わらない。
+
+> 2026-09-27 の注記：Consequences の「OPFS の対応状況と WASM の SQLite の容量の上限は未検証」のうち、文書で分かる部分を確かめた。OPFS は Safari 15.2 から使え、同期アクセスのメソッドが同期になったのは Safari 16.4 である（[WebKit Features in Safari 16.4](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/)、2026-09-27 に確認）。WASM の SQLite に別の上限はなく、オリジンの割り当てで決まる。Chrome は全ディスクの 60%、Firefox は通常 10% と 10 GiB の小さい方、Safari 17 以上は 60%（WebView は 15%）である（[Storage quotas and eviction criteria](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria)、2026-09-27 に確認）。上限の 1GB はどのブラウザでも割り当ての内側に入る見込み。プライベートブラウズと追い出しの実際の挙動は、引き続き E4 の前の `opfs-poc` で確かめる。
+
 ## Consequences
 
 - 良くなること：

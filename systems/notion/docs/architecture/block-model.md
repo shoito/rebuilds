@@ -6,7 +6,7 @@
 
 | 決定 | この文書への影響 |
 | --- | --- |
-| [ADR-0002](../decisions/0002-everything-is-a-block.md) | ページもデータベースの行も、1 つの `block` の表に持つ |
+| [ADR-0002](../decisions/0002-everything-is-a-block.md) | ページもデータベースの行も、1 つの `blocks` の表に持つ |
 | [ADR-0003](../decisions/0003-workspace-sharding.md) | すべての行に `workspace_id` を持ち、1 つのトランザクションは 1 つのワークスペースで閉じる |
 | [ADR-0004](../decisions/0004-inherited-page-permissions.md) | 中身を返す経路は、必ず `can(actor, action, block)` を通す |
 | [ADR-0005](../decisions/0005-transactions-as-unit-of-change.md) | 変更は操作のトランザクションで送る。ページごとに `seq` を振り、操作のログに書く |
@@ -22,7 +22,7 @@
 - 論理シャードは Postgres のスキーマで表し（`schema001.block` など）、`space_id`（ワークスペース）で割り当てる。`block` から外部キーでたどれる表（`collection`、`space`、`discussion`、`comment`）を同じシャードに置く。`block` の行は `id` と `space_id` の複合キーを持つ（[Herding elephants](https://www.notion.com/blog/sharding-postgres-at-notion)）。
 - 公開 API のブロックは、`id`、`parent`、`type`、`created_time`、`created_by`、`last_edited_time`、`last_edited_by`、`has_children`、`in_trash`（旧 `archived`）を持つ（[Block object](https://developers.notion.com/reference/block)）。
 
-このシステムも同じ形にする。違いは ID を UUIDv7 にすること（ADR-0002）と、表示の設定を `format` に分けること（2 節）である。本家の内部の表に `format` や `alive` の列があるかは、公式の文書では確かめられなかった（未検証）。
+このシステムも同じ形にする。違いは ID を UUIDv7 にすること（ADR-0002）と、表示の設定を `format` に分けること（2 節）である。本家の内部の表に `format` や `alive` の列があるかは、公式の文書では確かめられなかった（未検証。2026-09-27 にも、本家の記事が挙げる列は `id`・`type`・`properties`・`content`・`parent` だけだった。[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)）。
 
 ## 2. ブロックの形
 
@@ -152,7 +152,7 @@
 | T7 | 同期ブロックの参照は子を持たず、自分の元の部分木の中にない。同期ブロックの中に同期ブロックを置かない（7 節） |
 | T8 | ゴミ箱の根（`trashed_at` あり）と削除済み（`alive` が偽）のブロックは、どの `content` にも現れない。`parent_id` は復元先として残す |
 
-- **データベースの行**：行は `data_source` の `content` に並べない（[ADR-0014](../decisions/0014-database-query-index.md)）。行は数十万になり、並びはビューごとに決まるため。行の集合は索引の表（`dbx_row`）で列挙する。ADR-0002 の「親の `content` にだけ現れる」は、行については「親の `data_source` がちょうど 1 つで、どの `content` にも現れない」と読み替える。行の本文（行のページの子）は、通常のブロックと同じく T1〜T8 に従う。
+- **データベースの行**：行は `data_source` の `content` に並べない（[ADR-0014](../decisions/0014-database-query-index.md)）。行は数十万になり、並びはビューごとに決まるため。行の集合は索引の表（`dbx_rows`）で列挙する。ADR-0002 の「親の `content` にだけ現れる」は、行については「親の `data_source` がちょうど 1 つで、どの `content` にも現れない」と読み替える。行の本文（行のページの子）は、通常のブロックと同じく T1〜T8 に従う。
 - T1〜T3 は ADR-0002 の性質そのものである。T1 は `content`（下向き）と `parent_id`（上向き）の二重の持ち方が食い違わないことを保証する。本家も、描画には `content`、権限には `parent` を使う（1 節）。
 - **移動**は「元の親の `content` から除く」「新しい親の `content` に入れる」「`parent_id` を変える」を 1 つのトランザクションで行う。ページをまたぐ移動では、動かした部分木の中の、次のページの境界までの `page_id` を書き換える。
 - 循環の検査（T3）は、新しい親の祖先の鎖に、動かすブロックが含まれないことで判定する。祖先の鎖は権限の判定と共有する（[permissions-and-sharing.md](permissions-and-sharing.md)）。
@@ -188,8 +188,8 @@
 | 操作のログ（`page_ops`） | トランザクション（ページごとの `seq`） | 30 日（[collaboration.md](collaboration.md) の 8・12 節） | 再接続時の差分の取得、細かい単位の取り消し、スナップショットの作成、ページの更新の欄 |
 | スナップショット | ページ | ワークスペースの設定（MVP の既定は 30 日） | 履歴の一覧、比較、復元 |
 
-- **スナップショットの作成**：ページの編集が止まって 10 分たったとき、または編集が続いても 1 時間ごとに、Worker が作る（間隔は既定案。本家の間隔は未検証）。中身は、そのページの部分木のうち、子ページの境界までのブロックの値（子ページは参照だけ）と、そのときの `seq` と、その間に編集したメンバーの一覧である。
-- **置き場所**：スナップショットの本体は、gzip した JSON を S3 に置く（`workspaces/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz`）。Aurora には `page_snapshot` の行（`workspace_id`、`page_id`、`seq`、`created_at`、`editors`、`s3_key`、`size`）だけを持つ。
+- **スナップショットの作成**：ページの編集が止まって 10 分たったとき、または編集が続いても 1 時間ごとに、Worker が作る（間隔は既定案。本家は、編集中は 10 分ごとと、最後の編集の 2 分後に版を記録する。[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、2026-09-27 に確認。本システムは本家より粗く、ストレージを抑える側に倒した）。中身は、そのページの部分木のうち、子ページの境界までのブロックの値（子ページは参照だけ）と、そのときの `seq` と、その間に編集したメンバーの一覧である。
+- **置き場所**：スナップショットの本体は、gzip した JSON を S3 に置く（`workspaces/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz`）。Aurora には `page_snapshots` の行（`workspace_id`、`page_id`、`seq`、`created_at`、`editors`、`s3_key`、`size`）だけを持つ。
 - **表示**：スナップショットの本文を描画する前に、現在のページの `can(actor, read, page)` を判定する。同期ブロックの参照は、現在の元の中身ではなく、「同期ブロック」の枠だけを出す。
 - **復元**：過去の版に「巻き戻す」のではなく、現在の値からスナップショットの値へ変える操作を作り、新しいトランザクションとして送る。削除済みのブロックは `alive` を真に戻す（ID が同じまま戻る）。復元にはページの編集の権限が要る。復元そのものも履歴に残り、取り消せる。
 - **期限切れ**：保持期間を過ぎたスナップショットは、日次の Worker が S3 と Aurora から消す。操作のログは、30 日を過ぎたパーティションを消す（スナップショットに含まれていることを確かめてから）。
@@ -213,7 +213,7 @@
 
 ## 10. 大きさと数の上限
 
-本家の公開 API は、1 回の要求の大きさを制限している。リッチテキストの 1 つの `content` は 2,000 文字、リッチテキストの配列は 100 要素、式は 1,000 文字、URL は 2,000 文字、1 回の要求のブロックは 1,000、本体は 500KB まで（[Request limits](https://developers.notion.com/reference/request-limits)）。これは要求の上限で、エディタで作れるブロックの大きさの上限ではない。本家のエディタの上限は公開されていない（未検証）。
+本家の公開 API は、1 回の要求の大きさを制限している。リッチテキストの 1 つの `content` は 2,000 文字、リッチテキストの配列は 100 要素、式は 1,000 文字、URL は 2,000 文字、1 回の要求のブロックは 1,000、本体は 500KB まで（[Request limits](https://developers.notion.com/reference/request-limits)、2026-09-27 に確認）。これは要求の上限で、エディタで作れるブロックの大きさの上限ではない。本家のエディタの上限は公開されていない（未検証）。
 
 このシステムの上限（既定案。[capacity.md](capacity.md) で負荷のモデルと合わせて確かめる）：
 
@@ -235,7 +235,7 @@
 ADR-0003 に従い、論理シャードを Postgres のスキーマで表す（本家と同じ。1 節）。S1 は 1 つのクラスタに `shard000`〜`shard479` の 480 スキーマを置く。
 
 ```sql
-CREATE TABLE shard042.block (
+CREATE TABLE shard042.blocks (
   workspace_id uuid        NOT NULL,
   id           uuid        NOT NULL,
   type         text        NOT NULL,
@@ -257,17 +257,17 @@ CREATE TABLE shard042.block (
   version      bigint      NOT NULL DEFAULT 1,
   PRIMARY KEY (workspace_id, id)
 );
-CREATE INDEX ON shard042.block (workspace_id, parent_id);
-CREATE INDEX ON shard042.block (workspace_id, page_id);
-CREATE INDEX ON shard042.block (workspace_id, synced_from) WHERE synced_from IS NOT NULL;
-CREATE INDEX ON shard042.block (workspace_id, trashed_at) WHERE trashed_at IS NOT NULL;
+CREATE INDEX ON shard042.blocks (workspace_id, parent_id);
+CREATE INDEX ON shard042.blocks (workspace_id, page_id);
+CREATE INDEX ON shard042.blocks (workspace_id, synced_from) WHERE synced_from IS NOT NULL;
+CREATE INDEX ON shard042.blocks (workspace_id, trashed_at) WHERE trashed_at IS NOT NULL;
 ```
 
 - RLS と `FORCE ROW LEVEL SECURITY` は、Slack の ADR-0009 と同じ形で全スキーマの表に付ける（ADR-0003）。
 - `content` の要素の参照の整合（T1・T2）は、外部キーでは表せないので、トランザクションの検証で保証する（5 節）。
 - ページの読み込みは `(workspace_id, page_id)` の索引で、ページの中のブロックを 1 回で取る。子ページの境界の先は取らない。
 - 書き込みの大半は更新なので、`fillfactor` を下げて HOT 更新を効かせる（値は [capacity.md](capacity.md) で決める）。`properties` の索引は張らない。データベースの問い合わせは別の索引で行う（ADR-0002、[databases.md](databases.md)）。
-- 同じシャードに置く表：`page_snapshot`、ACL、データベースの定義、コメント、操作のログ、ファイルの記録。どれも `workspace_id` を先頭に持つ。一覧は [data-model.md](data-model.md) にある。
+- 同じシャードに置く表：`page_snapshots`、ACL、データベースの定義、コメント、操作のログ、ファイルの記録。どれも `workspace_id` を先頭に持つ。一覧は [data-model.md](data-model.md) にある。
 
 ## 12. クライアントのレコードキャッシュ
 

@@ -43,6 +43,8 @@ Slack の設計は、同じ目標に対し、東京を主、大阪を災害復�
 | S2 | パイロットライト。各物理クラスタの二次は headless。`global` の二次だけ reader を 1 台置く | 同上。物理クラスタの数だけ二次がある |
 | S3 | ウォームスタンバイか、複数のリージョンでの常時稼働（未決定） | [infrastructure.md](../architecture/infrastructure.md) の 11 節 |
 
+> 2026-09-27 の注記：Global Database の RPO（通常は秒の単位、計画的な切り替えは RPO 0）、切り替えの前に副のリージョンにインスタンスを足す要件、RTO が分の単位であることは、出典のとおりであることを確かめた（[Aurora Global Database の災害復旧](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)、2026-09-27 に確認）。リージョンの切り替えの後は、論理レプリケーションのスロットに加え、zero-ETL の統合を使っていれば止まるので作り直す（[Aurora zero-ETL integrations](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/zero-etl.html)、2026-09-27 に確認。[ADR-0030](0030-cdc-data-lake.md)）。
+
 ## Consequences
 
 - 良くなること：

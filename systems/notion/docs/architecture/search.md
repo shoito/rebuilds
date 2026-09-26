@@ -14,7 +14,7 @@
 | プロパティの値（選択のタグなど） | 検索しない（本家と同じ）。データベースの中の絞り込みで扱う（[databases.md](databases.md)） |
 | メンション（人・ページ）、コメント、ディスカッション | 検索しない（本家と同じ） |
 | 添付ファイルの中身、埋め込み先の中身 | 検索しない。ファイル名は本文として扱う |
-| ゴミ箱のページ | 既定では出さない。「ゴミ箱」の絞り込みで出す |
+| ゴミ箱のページ | 索引には `in_trash: true` で残す。通常の検索には出さず、ゴミ箱の画面の検索からだけ出す（[ADR-0022](../decisions/0022-trash-history-and-deletion-retention.md) の 2026-09-27 の注記） |
 
 - 検索できるのは、検索した人がその時点で読めるページだけ（ADR-0004）。ゲストは、共有されたページとその子孫だけ。
 - 同期ブロックの本文は、元のブロックがあるページの文書にだけ入れる。参照しているページでは検索にかからない。元のページの権限で判定するため、参照先の権限で本文が見えることを防ぐ（[block-model.md](block-model.md)）。
@@ -63,7 +63,7 @@ Slack の S2 の設計（Slack の search.md の 5.2 節）をそのまま使う
 | `title`、`body` | Sudachi（形態素解析、表記の揺れの正規化） | **関連度のスコア**。`should` にだけ使う |
 | `title.prefix` | edge N-gram（1〜20 文字） | クイック検索の前方一致（7 節） |
 
-- Amazon OpenSearch Service は Sudachi を任意のプラグインとして提供する（[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。辞書の差し替えは blue/green のデプロイで反映される。
+- Amazon OpenSearch Service は Sudachi を任意のプラグインとして提供する（[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)、2026-09-27 に確認）。プラグインのパッケージは OpenSearch の版ごとに関連付け、辞書はバイナリの形だけを受け付ける。辞書の差し替えは blue/green のデプロイで反映される。すぐに反映したいときは、新しいパッケージで索引を作り直し、別名を切り替える。
 - 英語などの空白で区切る言語も、同じ N-gram の判定で扱う。語幹の処理（英語の複数形など）は S1 では行わない。
 - ひらがなとカタカナは同一視しない（Slack と同じ判断）。
 - 1 文字の N-gram による索引の増え方は、代表的なワークスペースで測る（未検証）。
@@ -151,7 +151,7 @@ Slack の S2 の設計（Slack の search.md の 5.2 節）をそのまま使う
 | チームスペース | `teamspace_id` |
 | ページの中 | `ancestor_ids` にそのページを含む |
 | 日付 | `last_edited_at` または `created_at` の範囲。検索した人のタイムゾーンで解釈する |
-| ゴミ箱 | `in_trash: true`。ゴミ箱のページは `can_edit` 以上の人にだけ見えるので、読み直し（5.2 節）で落ちる件数がある |
+| ゴミ箱 | `in_trash: true`。ゴミ箱の画面の検索だけが付ける。通常の検索は常に `in_trash: false` で絞る。ゴミ箱のページは `can_edit` 以上の人にだけ見えるので、読み直し（5.2 節）で落ちる件数がある |
 
 ### 6.2 並べ替え
 
@@ -199,7 +199,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 - indexer はイベントを「きっかけ」として扱い、ページの現在の状態を DB（reader）から読んで文書を作る。テナントのコンテキストを設定してから読む。
 - 同じページの編集は、5 秒の窓でまとめる（入力中の連続した変更で、同じ文書を何度も作らない）。
 - 書き込みは `index_version` を外部バージョンにし、古い版で新しい版を上書きしない（本家と同じ）。
-- ページの完全な削除は tombstone（本文を空にし `deleted`）で書き、7 日後に消す。ゴミ箱への移動は `in_trash` の更新。
+- ページの完全な削除は tombstone（本文を空にし `deleted`）で書き、7 日後に消す。ゴミ箱への移動と復元は `in_trash` の更新で、文書は消さない。
 - 失敗は SQS の再試行、5 回で DLQ とアラート。
 
 | 区間 | 目安 |
@@ -217,9 +217,9 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 
 ### 9.1 S1
 
-- Amazon OpenSearch Service の 1 ドメイン。VPC の中、3 AZ、専用のマスターノード 3、データノードは負荷試験で決める。IAM で認証し、書き込みは indexer、読み出しは API のロールだけに許す。
-- 索引は別名 `pages` の裏に置く（`pages-v1`）。ルーティングは `workspace_id`。`index.routing_partition_size` で大きいワークスペースの偏りを抑える（値は負荷試験で決める）。
-- 見積もり（S1）：ページ 5,000 万（ブロック 10 億 ÷ 平均 20）、平均の文書 5 KB、N-gram を含めて索引は元の 5 倍（未検証）とすると、主シャードで約 1.2 TB、レプリカ 1 で約 2.5 TB。値は [capacity.md](capacity.md) で管理する。
+- Amazon OpenSearch Service の 1 ドメイン。VPC の中、Multi-AZ with Standby（3 AZ、専用のマスターノード 3、データノードは 3 の倍数、レプリカ 2）。AWS が本番に勧める形である（[Multi-AZ with Standby](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html)、2026-09-27 に確認）。データノードの数は負荷試験で決める。IAM で認証し、書き込みは indexer、読み出しは API のロールだけに許す。
+- 索引は別名 `pages` の裏に置く（`pages-v1`）。ルーティングは `workspace_id`。`index.routing_partition_size` で大きいワークスペースの偏りを抑える（値は負荷試験で決める）。この設定は索引の作成時に決める静的な設定で、1 より大きく主シャードの数より小さい（[Index settings](https://docs.opensearch.org/latest/install-and-configure/configuring-opensearch/index-settings/)、2026-09-27 に確認）。変えるときは、別名の裏で索引を作り直す。
+- 見積もり（S1）：ページ 5,000 万（ブロック 10 億 ÷ 平均 20）、平均の文書 5 KB、N-gram を含めて索引は元の 5 倍（未検証）とすると、主シャードで約 1.2 TB、レプリカ 2 を含めて約 3.7 TB。主シャードは 1 つ 10〜30 GiB を目安にし、約 40〜120 にする（[Operational best practices](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html)、2026-09-27 に確認）。値は [capacity.md](capacity.md) で管理する。
 
 ### 9.2 S2
 
@@ -235,6 +235,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 
 ## 10. データの削除
 
+- ページのゴミ箱への移動：文書は消さず、`in_trash: true` にする（1 節）。ゴミ箱の画面の検索からだけ出る。
 - ページの完全な削除：tombstone にし、7 日後に消す。
 - ワークスペースの削除：`routing` を付けた `delete_by_query`。削除の手順の一部として行う（[security.md](security.md)）。
 - 利用者の削除：`access_keys` の `user:` は残っても、主体のキーに現れないので一致しない。定期の再計算（5.3 節）で消える。
@@ -251,6 +252,6 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 
 2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
 
-- ワークスペースの中の「リンクを知っている人」の共有（`hide_from_search`）のページは、開いたことのないメンバーの検索に出さない（キーにしない）。本家の挙動は未検証。
+- ワークスペースの中の「リンクを知っている人」の共有（`hide_from_search`）のページは、開いたことのないメンバーの検索に出さない（キーにしない）。本家と同じ（「Hide in search」。[Sharing & permissions](https://www.notion.com/help/sharing-and-permissions)、2026-09-27 に確認）。
 - 本文は 1 MB で切る。切ったページの数を指標にし、多ければ上限を見直す（E6）。
 - 最近開いたページの加点は、クライアントから渡す。サーバー側の閲覧の履歴は持たない（端末をまたぐ加点は MVP の後）。

@@ -29,6 +29,8 @@ Tauri は OS の WebView を使う。Windows は WebView2（Chromium）、macOS 
 - 2 は、配布物とメモリが小さい利点がある。上の理由で、エディタの品質の試験の幅が広がることを重く見た。
 - 3 は、ディープリンク、OS の通知の細かい制御、自動更新、メニューの統合が弱い。PWA はモバイルの代わりとして Web で提供する。
 
+> 2026-09-27 の注記：Context の「本家のデスクトップが Electron であることは未検証」は解消した。Electron の公式サイトが採用例に本家を挙げている（[Electron の公式サイト](https://www.electronjs.org/)、[10 years of Electron](https://www.electronjs.org/blog/10-years-of-electron)、2026-09-27 に確認）。デスクトップのローカルの保存は、[ADR-0032](0032-desktop-uses-wasm-sqlite-in-s1.md) で S1 は WASM の SQLite、ネイティブの SQLite は S2 の候補とした。
+
 ## Consequences
 
 - 良くなること：

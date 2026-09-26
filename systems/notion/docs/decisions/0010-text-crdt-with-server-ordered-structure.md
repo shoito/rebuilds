@@ -41,6 +41,8 @@ ADR-0005 は、変更をトランザクションで送り、サーバーがペ�
   - Loro は Fugue と Peritext 相当の書式を持ち（[Loro の rich text](https://loro.dev/blog/loro-richtext)）、最も近い選択肢である。自前の実装が性質ベーステストで収束を示せないときの代替として残す。
 - 墓標は消さない。中身の文字列は消し、ID の範囲だけを run で残す。何か月も前の版を基にした操作でも、アンカーが必ず見つかる。
 
+> 2026-09-27 の注記：Decision の「Fugue はこれを最小にする性質を持つ」は正確でない。交ざりを最小にする性質（maximal non-interleaving）が証明されているのは変種の FugueMax で、Fugue が保証するのは前向き（左から右へ）の連続した入力が交ざらないことである（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)、2026-09-27 に確認）。通常の入力は前向きなので、Fugue を採る決定は変えない。Confirmation の「互いの文が交ざらない」は、前向きの連続した挿入についての性質と読む。本家の CRDT（RGA＋Peritext の書式、text slice / text instance、2025 年 7 月の導入）と Peritext・Loro の記述は、出典のとおりであることを確かめた（2026-09-27）。
+
 ## Consequences
 
 - 良くなること：

@@ -113,12 +113,12 @@ Slack の [ADR-0026](../../../slack/docs/decisions/0026-feature-flags.md) を引
 | 配布の元 | 更新の情報（最新の版、差分の場所、署名）を、自分たちの API（`/desktop/updates`）から返す。ファイルは S3＋CloudFront |
 | 段階的な配布 | 更新の情報の API が、`hash(install_id) mod 100` で割合を決めて返す。1% → 10% → 50% → 100%。各段で 24 時間、クラッシュ率と RUM の指標を見る |
 | 止める | 更新の情報の API で、配布を止める。配った版に問題があれば、1 つ前の版より新しい番号で、中身を戻した版を出す（前へ進めて戻す） |
-| 署名の検証 | クライアントは、更新の署名を検証してから当てる。署名の鍵の公開部分はアプリに埋め込む |
+| 署名の検証 | クライアントは、更新の OS のコード署名と、更新の情報の sha512 を検証してから当てる（macOS は Squirrel.Mac が Developer ID の署名を、Windows は `electron-updater` が Authenticode の署名を `publisherName` と照合する） |
 | 最小のバージョン | サーバーが対応する最小のバージョンを API で返す。下回ったら、編集を止めて更新を求める（閲覧とローカルの保存は残す） |
 | 互換の期間 | デスクトップは最長 90 日前の版まで互換を保つ（初期値）。更新を止めている利用者のため |
 | 更新の当て方 | アプリの再起動時に当てる。未確定のトランザクションを送り終えるか、ローカルの保存に残っていることを確かめてから再起動する |
 
-Electron の更新の仕組みで、上の条件（自前の更新の情報の API、段階的な配布、署名の検証）をどう満たすか（組み込みの `autoUpdater` か、別のライブラリか）は **未検証**。E4 のデスクトップの配布の Story で確かめる。
+更新の仕組みには electron-builder の `electron-updater` を使う（macOS は dmg＋zip、Windows は NSIS）。`generic` の提供元を `/desktop/updates` に向け、API が要求のヘッダーの `install_id` で割合を決めて `latest.yml` を返す（`stagingPercentage` は使わず、割合はサーバーで決める）。組み込みの `autoUpdater` は、`setFeedURL` で自前の URL を使えるが、Linux に対応せず、Windows での署名の検証と段階的な配布の記述がない（[Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)、[electron-builder Auto Update](https://www.electron.build/v26/docs/features/auto-update/)、2026-09-27 に確認）。
 
 ## 7. 480 シャードのマイグレーションの安全
 

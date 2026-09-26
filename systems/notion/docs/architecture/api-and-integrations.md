@@ -46,6 +46,7 @@ Aurora（RLS、論理シャード）
 | 公開の連携 | OAuth 2.0。複数のワークスペースに入れる。認可のときにページを選ぶ | OAuth 2.1（認可コード、PKCE、機密クライアント）。アクセストークン 1 時間、リフレッシュトークン 90 日（使うたびに入れ替える） | E7 の後半 |
 | 個人のアクセストークン | 利用者の権限で動く静的なトークン（2026-05 に追加。期限 7 日〜1 年） | MVP では持たない。AI エージェントは MCP（8 節）を使う | 後 |
 
+- トークンの `{id}` は、`workspace_id` とトークンの ID から作る。API はトークンの形から `workspace_id` を得て論理シャードへ振り分け、`api_tokens` の行を主キーで引き、ハッシュを定数時間で比べる（12 節）。`global` にトークンの索引を持たない。
 - トークンは DB にハッシュで持つ（Slack と同じ）。接頭辞は他のサービスと重ならないことを確かめ、シークレットスキャンのパートナープログラムに登録する（リポジトリ共通の ADR-0006）。
 - 内部の連携を作れるのは、ワークスペースの所有者だけ（本家と同じ）。管理者は、公開の連携の導入を許可制にできる。
 
@@ -113,7 +114,7 @@ Aurora（RLS、論理シャード）
 - 検索は本家と同じく**タイトルだけ**を対象にする（[Search](https://developers.notion.com/reference/post-search)）。連携の検索は、`bot:{integration_id}` を主体のキーにして同じ索引を使う（[search.md](search.md)）。全文検索は MCP の `search` で提供する（8 節）。
 - 本家と同じ JSON の約束に合わせる：`object` の属性、`snake_case`、ISO 8601、空文字列を使わず `null`。ID は UUIDv7（ADR-0002）。本家の ID は UUIDv4 で、形は同じ。
 - 書き込みは、1 リクエストを 1 トランザクション（ADR-0005）にする。1 つのリクエストの中の変更は、全部が反映されるか、何も反映されないか。
-- 冪等性：`POST` は `Idempotency-Key` ヘッダーを受け付け、24 時間同じ応答を返す。本家に同じ仕組みがあるかは未検証。
+- 冪等性：`POST` は `Idempotency-Key` ヘッダーを受け付け、24 時間同じ応答を返す。本家には冪等性のキーがなく、書き込みの 503 は `additional_data.retry_guidance` を見て再試行を判断させる（[Request limits](https://developers.notion.com/reference/request-limits)、2026-09-27 に確認）。`Idempotency-Key` は本システムの独自の拡張である。
 
 ### 4.3 ページングと上限
 
@@ -126,7 +127,7 @@ Aurora（RLS、論理シャード）
 | リッチテキストの 1 要素・URL | 2,000 文字 | 同じ |
 | メール・電話番号 | 200 文字 | 同じ |
 | リレーション・人・複数選択 | 100 | 同じ |
-| 子の追加の入れ子 | 2 段まで | 本家の記述は未検証 |
+| 子の追加の入れ子 | 2 段まで | 同じ（[Append block children](https://developers.notion.com/reference/patch-block-children)、2026-09-27 に確認） |
 
 ## 5. レート制限
 
@@ -164,7 +165,7 @@ Aurora（RLS、論理シャード）
 - **本文は送らない。** 封筒は `id`、`timestamp`、`workspace_id`、`subscription_id`、`integration_id`、`type`、`authors`、`entity`（ID と種類）、`data`（親、更新したブロック・プロパティの ID）、`attempt_number`（本家と同じ）。受け手は API で最新の内容を取りに来る。そのため、配送の時点の権限で API が判定する。
 - **権限**：イベントの対象を、その連携が配送の時点で読めるときだけ送る。コメントのイベントは、コメントの読み取りの能力を要する（本家と同じ）。
 - **まとめ**：ページ単位で 30 秒の窓でまとめる（本家は「通常 1 分未満」）。ロックとコメントは数秒以内に送る。
-- 本家の `accessible_by` の属性は、中身の意味を確かめられなかったため、持たない（未検証）。
+- 本家の `accessible_by` は、連携の bot と、その連携に接続した利用者のうち、対象にアクセスできる者の一覧で、公開の連携にだけ付く（[Event types & delivery](https://developers.notion.com/reference/webhooks-events-delivery)、2026-09-27 に確認）。受け手が API で権限を確かめれば足りるので、本システムは持たない。
 
 ### 6.3 配送
 
@@ -181,7 +182,7 @@ Aurora（RLS、論理シャード）
 
 開発者が指定した任意の URL へ送るので、SSRF の踏み台になりうる。Slack の app-egress（Slack の apps.md の 13 節）と同じ形にする。
 
-- 配送の Worker は、署名した本文を、VPC に接続しない Lambda（`webhook-egress`）に渡す。Lambda の権限はログの書き込みだけ。署名の秘密は Lambda に渡さない。
+- 配送の Worker は、SQS の `webhook-delivery` のキューから配送を受け取り、署名した本文を、VPC に接続しない Lambda（`webhook-egress`）に渡す。Lambda の権限はログの書き込みだけ。署名の秘密は Lambda に渡さない。
 - 名前解決の後の IP を検査し、プライベート・リンクローカル・ループバック・メタデータのアドレスを拒否する。リダイレクトは追わない。
 - 送信元の IP の一覧を公開する（受け手の許可リストのため）。
 - 連携ごとの同時実行の上限で、遅い受け手が他の配送を待たせないようにする。
@@ -291,6 +292,26 @@ Aurora（RLS、論理シャード）
 2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
 
 - 個人のアクセストークンは MVP に入れない。AI エージェントは MCP（8 節）か内部の連携を使う（[roadmap.md](../roadmap.md) の「後回しにしたもの」）。
-- 公開の連携のリフレッシュトークンは 90 日で、使うたびに入れ替える（3.1 節）。本家の値は未検証。
+- 公開の連携のリフレッシュトークンは 90 日で、使うたびに入れ替える（3.1 節）。本家も更新のたびに新しいリフレッシュトークンを返す（[Authorization](https://developers.notion.com/guides/get-started/authorization)、2026-09-27 に確認）。本家の有効期間は公開されていない（未検証）。90 日は本システムの値である。
 - ビューの API と `view.*` の Webhook は、E5 のビューの形が固まった後に、E7 の後半の Story として入れる。
 - Webhook の署名の秘密は、本家と同じく `verification_token` を使う。別に入れ替える仕組みは MVP に入れない。
+
+## 12. 表
+
+連携・API・MCP・ジョブの表の最小の定義。列の型・制約の細部は、E7 の各 Story の `spec.md` で決める。どの表も論理シャード（`shardNNN`）に置き、`workspace_id` を持ち、主キーは `(workspace_id, id)`、索引は `workspace_id` を先頭にし、RLS を付ける（[data-model.md](data-model.md) の 1 節）。公開の連携の定義だけは `global.public_integrations` にある。
+
+| 表 | 主な列 | 索引・一意 |
+| --- | --- | --- |
+| `integrations` | `id`、`name`、`bot_member_id`（`members` の `kind = bot` の行）、`capabilities`（3.3 節）、`created_by`、`created_at`、`disabled_at` | 一意 `(workspace_id, bot_member_id)` |
+| `integration_installations` | `id`、`public_integration_id`（`global.public_integrations` の ID。外部キーは張らない）、`bot_member_id`、`capabilities`、`installed_by`、`installed_at`、`revoked_at` | 一意 `(workspace_id, public_integration_id)`（`revoked_at IS NULL` のもの） |
+| `api_tokens` | `id`、`kind`（`internal` / `oauth_access` / `oauth_refresh`）、`integration_id` か `installation_id`、`bot_member_id`、`secret_hash`（SHA-256）、`expires_at`、`last_used_at`、`revoked_at`、`replaced_by`（リフレッシュトークンの入れ替え） | `(workspace_id, integration_id)`、`(workspace_id, installation_id)` |
+| `webhook_subscriptions` | `id`、`integration_id` か `installation_id`、`url`、`event_types`、`verification_token`（署名に使うので、ハッシュではなく KMS で暗号化して持つ）、`status`（`pending` / `active` / `suspended`）、`failing_since`、`created_at` | `(workspace_id, status)`、`(workspace_id, integration_id)` |
+| `webhook_deliveries` | `id`（イベントの `id`）、`subscription_id`、`event_type`、`entity_id`、`envelope`（本文を含まない封筒。6.2 節）、`attempt_number`、`next_attempt_at`、`status`（`pending` / `delivered` / `failed`）、`last_status_code`、`created_at`。時間でパーティションを切る | `(workspace_id, subscription_id, created_at)`、`(workspace_id, status, next_attempt_at)` |
+| `idempotency_keys` | `bot_member_id`、`key`、`request_hash`、`response_status`、`response_body`、`created_at`、`expires_at`（24 時間） | 主キー `(workspace_id, bot_member_id, key)`、`(workspace_id, expires_at)` |
+| `mcp_grants` | `id`、`kind`（`member`：利用者の同意 / `workspace`：管理者の許可）、`member_id`（`member` のとき）、`client_id`（CIMD の URL）、`scopes`、`granted_by`、`granted_at`、`revoked_at` | 一意 `(workspace_id, member_id, client_id)`（`kind = member` で `revoked_at IS NULL` のもの）、`(workspace_id, client_id)` |
+| `import_jobs` | `id`、`requested_by`、`format`、`parent_page_id`、`upload_s3_key`、`status`（`queued` / `running` / `succeeded` / `failed`）、`progress`、`error`、`created_at`、`finished_at` | `(workspace_id, requested_by, created_at)` |
+| `export_jobs` | `id`、`requested_by`、`scope`（`page` / `workspace`）、`root_page_id`、`format`、`include_comments`、`status`（同上）、`result_s3_key`、`expires_at`（7 日）、`error`、`created_at`、`finished_at` | `(workspace_id, requested_by, created_at)`、`(workspace_id, status)` |
+
+- MCP のアクセストークンとリフレッシュトークンは、Slack の ADR-0028 と同じく、`global` の認可サーバーが発行して持つ。`api_tokens` には入れない。シャードの `mcp_grants` は、同意と管理者の許可だけを持ち、MCP サーバーは呼び出しのたびにこれを確かめる。
+- ジョブの実行は SQS の `import-export` のキューで渡す（[capacity.md](capacity.md) の 2.6 節）。表は状態と再実行のために持ち、Worker が表を走査して拾わない。
+

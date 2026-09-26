@@ -13,6 +13,7 @@ Web クライアントとデスクトップアプリ、エディタの設計。�
 | [ADR-0007](../decisions/0007-block-editor-with-per-block-prosemirror.md) | ブロックの層は自前で作り、ブロックの中のテキストの編集に ProseMirror を使う |
 | [ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md) | ローカルの保存は SQLite（WASM）と OPFS |
 | [ADR-0009](../decisions/0009-electron-desktop-shell.md) | デスクトップアプリは Electron で包む |
+| [ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 はデスクトップも Web と同じ WASM の SQLite（OPFS）。ネイティブの SQLite は S2 の候補 |
 | Slack の [client.md](../../../slack/docs/architecture/client.md) | 対応ブラウザ、ルーター、デザインシステム、CSP、i18n、a11y の方針を引き継ぐ。違うところだけをこの文書に書く |
 
 ## 1. 対応環境
@@ -92,7 +93,7 @@ packages/ui/          # デザインシステム（Slack と同じ作り）
 - **ブロックの層は自前**：ページの木の描画、ブロックの選択、並べ替え、インデント、種類の変更、仮想化は、ブロックの木（RecordStore）を直接扱う React のコンポーネントで作る。
 - **テキストの編集は ProseMirror**：テキストを持つブロック 1 つにつき、ProseMirror の `EditorView` を 1 つ置く。スキーマはスパンの形に合わせた最小のもの（段落 1 つ、テキスト、装飾、メンションと数式のインラインの atom）にする。
 - **変換**：ProseMirror の文書とスパンの配列は、`packages/rich-text` の純関数で相互に変換する。ProseMirror の `Step` を、ブロックのテキストへの操作（位置は UTF-16）に変えて送る。
-- 本家のエディタは、ブロックごとに `contenteditable` の要素を持つ自前の実装だと言われるが、公式の文書で確かめられなかった（未検証）。ブロックごとに編集の領域を分ける形は、本家に寄せたものである。
+- 本家のエディタは、ブロックごとに `contenteditable` の要素を持つ自前の実装だと言われるが、公式の文書で確かめられなかった（未検証。2026-09-27 にも、本家の公式の文書には「テキストのエディタを作り直した」という更新の記録しか見つからなかった）。ブロックごとに編集の領域を分ける形は、本家に寄せたものである。
 
 ### 3.1 テキストの選択とブロックの選択
 
@@ -104,7 +105,7 @@ packages/ui/          # デザインシステム（Slack と同じ作り）
 | ブロックの選択中に `↑/↓`、`Shift+↑/↓` | 選ぶブロックを動かす・広げる |
 | ブロックの選択中に `Delete`、`Cmd/Ctrl+C/X/D`、`Tab`、`Cmd/Ctrl+/` | 削除、コピー、切り取り、複製、インデント、種類の変更 |
 
-- 複数のブロックにまたがる部分的なテキストの選択は、MVP では作らない。ブロックの選択に切り替える。本家が複数ブロックにまたがる部分的な選択をどこまで扱うかは未検証。
+- 複数のブロックにまたがる部分的なテキストの選択は、MVP では作らない。ブロックの選択に切り替える。本家は、デスクトップ（Firefox を除く）とモバイルで、ブロックをまたぐ部分的な選択を扱う（[Writing & editing basics](https://www.notion.com/help/writing-and-editing-basics)、2026-09-27 に確認）。MVP で作らないのは本家との差異である。
 - ブロックの間のカーソルの移動（`↑` で上のブロックの同じ横位置へ）は、controller が ProseMirror の `coordsAtPos` と `posAtCoords` を使って行う。
 
 ### 3.2 構造を変えるキー操作
@@ -128,7 +129,7 @@ NFR-002（1,000 ブロックのページを、キャッシュなしで p75 1.5 �
 ### 4.1 読み込み
 
 - ページを開いたら、まず RecordCache（SQLite）から読んで描く。同時に API の読み込みを始め、版の新しいものだけを差し替える。本家は、遅い端末では SQLite と API の速い方を使う（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）。これに倣う。
-- API は、ページの中のブロックを文書の順（深さ優先）に区切って返す。最初の区切りは、画面の最初の表示に要る 100 ブロック程度にし、残りを続けて取る。本家の `loadPageChunk` にあたる（名前は [3perf の分析](https://3perf.com/blog/notion/)による。未検証）。
+- API は、ページの中のブロックを文書の順（深さ優先）に区切って返す。最初の区切りは、画面の最初の表示に要る 100 ブロック程度にし、残りを続けて取る。本家の `loadPageChunk` にあたる（[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)、2026-09-27 に確認）。
 - 描画は、最初の区切りが届いた時点で始める。読み込み中の後ろの部分は、高さの見積もりの分だけ場所を取っておく。
 
 ### 4.2 描画の段
@@ -183,7 +184,7 @@ NFR-002（1,000 ブロックのページを、キャッシュなしで p75 1.5 �
 | `*文字*` | 斜体 |
 | `` `文字` `` | コード |
 | `~文字~` | 取り消し線 |
-| `$$式$$` | インラインの数式（本家にあるかは未検証） |
+| `$$式$$` | インラインの数式（本家と同じ。[Math equations](https://www.notion.com/help/math-equations)、2026-09-27 に確認） |
 
 - 変換は、変換の直後の `Backspace` で打った文字に戻せる（取り消しの 1 段）。
 - IME の変換中は判定しない。変換を確定した文字は判定の対象にする（全角の `＃` や `＊` は対象外）。
@@ -230,7 +231,7 @@ HTML の無害化の方針：
 | --- | --- | --- |
 | `@`（全角の `＠` も） | 人、ページ、日付 | 人は最近の相手を先に出し `GET .../members?query=`。ページは検索の API（権限で絞った結果、[search.md](search.md)）。日付は入力の解釈 |
 | `[[` | ページへのリンク、子ページの作成 | 検索の API |
-| `+` | 子ページの作成、ページへのリンク | 同上（本家の振る舞いは未検証） |
+| `+` | 子ページの作成、ページへのリンク | 同上（本家と同じ。[Keyboard shortcuts](https://www.notion.com/help/keyboard-shortcuts)、2026-09-27 に確認） |
 
 - 日付は、「今日」「明日」「来週の金曜」「2026/10/1」と、英語の同じ表現を解釈する。解釈の結果は、アカウントのタイムゾーンで `date` のメンションにする。
 - 候補の一覧は WAI-ARIA の combobox で作る。確定した候補は文字列でなく、スパンのメンション（ID）として入れる（ADR-0006）。
@@ -247,25 +248,30 @@ HTML の無害化の方針：
 
 | 表 | キー | 中身 |
 | --- | --- | --- |
-| `record` | `(table, workspace_id, id)` | 値、`version`、最後に使った時刻 |
+| `records` | `(table, workspace_id, id)` | 値、`version`、最後に使った時刻 |
 | `transaction_queue` | `transaction_id` | 未確定のトランザクション、作った時刻、試行の回数、状態 |
-| `offline_page` | `(workspace_id, page_id)` | オフラインで使えるページ、最後に取得した時刻 |
-| `offline_action` | `(workspace_id, page_id, reason)` | オフラインに置く理由（本人の指定、お気に入り、親からの継承、最近開いた） |
-| `text_state` | `(workspace_id, block_id)` | ブロックのテキストの CRDT の状態（[collaboration.md](collaboration.md) の 5 節） |
+| `offline_pages` | `(workspace_id, page_id)` | オフラインで使えるページ、最後に取得した時刻 |
+| `offline_actions` | `(workspace_id, page_id, reason)` | オフラインに置く理由（本人の指定、お気に入り、親からの継承、最近開いた） |
+| `text_states` | `(workspace_id, block_id)` | ブロックのテキストの CRDT の状態（[collaboration.md](collaboration.md) の 5 節） |
 | `failed_changes` | `(workspace_id, id)` | 送れなかった変更（本人が入力したテキストと作ったブロック。30 日。[collaboration.md](collaboration.md) の 10.1 節） |
 | `meta` | 固定 | スキーマの版、総量 |
 
-- `offline_page` と `offline_action` は、本家の形に合わせた。理由を複数持ち、最後の理由がなくなったときだけページを外す（[How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)）。オフラインのページの更新の取り方は [collaboration.md](collaboration.md) で決める。
-- `record` は、オフラインのページの部分木と `transaction_queue` が参照するレコードを除いて、LRU で追い出す。総量は 500MB を目安にする（既定案）。
+- `offline_pages` と `offline_actions` は、本家の `offline_page`・`offline_action` の形に合わせた。理由を複数持ち、最後の理由がなくなったときだけページを外す（[How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)）。オフラインのページの更新の取り方は [collaboration.md](collaboration.md) で決める。
+- `records` は、オフラインのページの部分木と `transaction_queue` が参照するレコードを除いて、LRU で追い出す。総量は 500MB を目安にする（既定案）。
 - データベースのファイルはアカウントごとに分ける。ログアウトしたら、そのアカウントのファイルを消す。
-- OPFS が使えない、または開けない（プライベートブラウズなど）ときは、メモリだけで動く。オフラインの機能は使えないと画面に出す。IndexedDB の実装を別に持たない。プライベートブラウズでの OPFS の可否はブラウザごとに未検証で、E4 の着手前に確かめる。
-- Safari は、ホーム画面に追加していないサイトのスクリプトが書いたデータを、操作のない 7 日の後に消す（[WebKit の Tracking Prevention](https://webkit.org/tracking-prevention/)）。OPFS も対象と考え（未検証）、消えても API から取り直して動くようにする。未確定のトランザクションが消えうることは、オフラインの設定の画面で知らせる。
+- OPFS が使えない、または開けない（プライベートブラウズなど）ときは、メモリだけで動く。オフラインの機能は使えないと画面に出す。IndexedDB の実装を別に持たない。
+- プライベートブラウズでの OPFS は、ブラウザごとに違う（2026-09-27 に確認）。
+  - Chrome のシークレットでは開けるが、メモリの上にあり、セッションの終わりに消える（[Chromium の FileSystem の README](https://chromium.googlesource.com/chromium/src/+/main/storage/browser/file_system/README.md)）。オフラインの機能は動くが、ウィンドウを閉じると未確定のトランザクションも消える。これは受け入れ、未確定のトランザクションがあるときは閉じる前に警告する。
+  - Firefox のプライベートウィンドウでは `getDirectory()` が `SecurityError` になる（[MDN の getDirectory](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/getDirectory)、[Bug 1975760](https://bugzilla.mozilla.org/show_bug.cgi?id=1975760)。対応は進行中）。
+  - Safari のプライベートブラウズでは使えない（[The File System Access API with Origin Private File System](https://webkit.org/blog/12257/the-file-system-access-api-with-origin-private-file-system/)、2022 年の記事。より新しい公式の記述は見つからなかった）。
+  - 実際の挙動は E4 の前の `opfs-poc` で各ブラウザの現行版で確かめる。
+- Safari は、ホーム画面に追加していないサイトのスクリプトが書いたデータを、操作のない 7 日の後に消す（[WebKit の Tracking Prevention](https://webkit.org/tracking-prevention/)）。Safari 17 の保存の方針は、File System（OPFS）も対象にし、操作のない期間による追い出しを含む（[Updates to Storage Policy](https://webkit.org/blog/14403/updates-to-storage-policy/)、2026-09-27 に確認）。OPFS も消えるものとして扱い、消えても API から取り直して動くようにする。未確定のトランザクションが消えうることは、オフラインの設定の画面で知らせる。
 
 ## 11. デスクトップアプリ
 
-[ADR-0009](../decisions/0009-electron-desktop-shell.md) で Electron を選んだ。本家のデスクトップアプリも Electron で Web のアプリを包んでいる（公式の文書は見つからず、[3perf の分析](https://3perf.com/blog/notion/)などによる。未検証）。
+[ADR-0009](../decisions/0009-electron-desktop-shell.md) で Electron を選んだ。本家のデスクトップアプリも Electron で作られている（[Electron の公式サイト](https://www.electronjs.org/)の採用例、[10 years of Electron](https://www.electronjs.org/blog/10-years-of-electron)、2026-09-27 に確認）。
 
-- レンダラーは Web のクライアントと同じ成果物を、アプリのオリジンから読み込む。ローカルの保存も Web と同じ SQLite（WASM、OPFS）を使う。本家のデスクトップは、親のプロセス 1 つがネイティブの SQLite に書く（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）が、MVP は実装を 1 つにすることを優先する。
+- レンダラーは Web のクライアントと同じ成果物を、アプリのオリジンから読み込む。ローカルの保存も Web と同じ SQLite（WASM、OPFS）を使う。本家のデスクトップは、親のプロセス 1 つがネイティブの SQLite に書く（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）が、S1 は実装を 1 つにすることを優先する（[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。
 - セキュリティの設定：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`、`webSecurity: true`。アプリのオリジン以外へのナビゲーションは止め、外部のリンクは既定のブラウザで開く。`preload` が `contextBridge` で出す API は、通知、バッジ、ディープリンク、自動更新、ウィンドウの操作だけにする。
 - ディープリンク（`<brand>://`）で、ブラウザのリンクからアプリのページを開く。スキームの名前は、リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) に従って後で決める。
 - 自動更新は、署名と公証（macOS）をした配布物を、段階的に出す（[delivery.md](delivery.md)）。Electron の新しいメジャーには、出てから 8 週以内に上げる。
@@ -335,7 +341,7 @@ Slack の client.md の 8 節（CSP、Trusted Types、Cookie のセッション�
 2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
 
 - ブロックの間にまたがる部分的なテキストの選択は、MVP に入れない（3.1 節。[roadmap.md](../roadmap.md) の「後回しにしたもの」）。
-- デスクトップのローカルの保存は、MVP は Web と同じ WASM の SQLite（OPFS）にする。本家と同じネイティブの SQLite に移すかは、MVP の後に計測で決める（11 節）。
+- デスクトップのローカルの保存は、S1 は Web と同じ WASM の SQLite（OPFS）にする。本家と同じネイティブの SQLite は S2 の候補にし、計測で決める（11 節、[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。
 - 埋め込みは、許可した提供元（oEmbed の一覧）だけを直接埋め込み、それ以外はリンクのカードにする。一覧の中身は E3 の `embed-block` の Story で決める（[security.md](security.md) の 3.5 節）。
 
 持ち越し：

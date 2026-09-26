@@ -88,13 +88,13 @@ Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md
 | 配信のバス（ElastiCache Valkey） | `cache.r7g.large`、プライマリ 1＋レプリカ 2（3 AZ） | ページごとのチャンネルと在席。Slack と同じ。S2 でクラスタモードと sharded pub/sub |
 | SQS | キューごとに標準キュー＋DLQ | [comments-and-notifications.md](comments-and-notifications.md)、[search.md](search.md)、[api-and-integrations.md](api-and-integrations.md) |
 | 検索のクラスタ | Amazon OpenSearch Service の 1 ドメイン（[search.md](search.md) の 9 節、[ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md)） | 正本は Aurora。索引は再構築できる |
-| データベースの問い合わせ用の索引 | シャードのスキーマの中の `dbx_row`・`dbx_value`（[ADR-0014](../decisions/0014-database-query-index.md)） | 変更と同じ DB のトランザクションで更新する。物理の分割にも一緒に乗る |
+| データベースの問い合わせ用の索引 | シャードのスキーマの中の `dbx_rows`・`dbx_values`（[ADR-0014](../decisions/0014-database-query-index.md)） | 変更と同じ DB のトランザクションで更新する。物理の分割にも一緒に乗る |
 
 ## 5. ファイル
 
 - 利用者が上げたファイル（画像、添付、エクスポートの成果物）は S3 に置く。キーは `ws/{workspace_id}/...` で始める。ワークスペースの削除と、S3 でのリージョンの移動を、プレフィックスの単位で行うため。
 - 配信は CloudFront の署名付き URL。アプリと別のドメインから配る（[security.md](security.md)）。
-- アップロードは、署名付き URL でクライアントから S3 へ直接行う。スキャンとサムネイルは Worker（Slack の [ADR-0015](../../../slack/docs/decisions/0015-file-upload-scan-and-delivery.md) を先例にする）。
+- アップロードは、署名付き URL でクライアントから S3 へ直接行う。スキャンとサムネイルは、SQS の `file-events` のキューから Worker が処理する（Slack の [ADR-0015](../../../slack/docs/decisions/0015-file-upload-scan-and-delivery.md) を先例にする）。
 - 東京 → 大阪のレプリケーション（Replication Time Control 付き）。バージョニングを有効にし、削除から 30 日で古いバージョンを消す。ゴミ箱の保持期間（[block-model.md](block-model.md)）より長くする。
 
 ## 6. Sync Gateway の群れ
@@ -186,7 +186,7 @@ S3（利用者 1 億、同時接続 1,000 万）では、東京だけでなく�
 - **リージョンごとに持つもの：** API・Sync Gateway・Relay・Worker、Aurora の物理クラスタ、Valkey、検索、ファイルの S3、データレイク。
 - **リージョンの外（global）に置くもの：** アカウントと認証、ワークスペースの一覧と所在、課金。Global は各リージョンにキャッシュし、止まってもログイン済みのクライアントが使い続けられるようにする（Slack の [ADR-0023](../../../slack/docs/decisions/0023-cell-based-architecture.md) と同じ課題）。
 - **振り分け：** クライアントはログイン後に、ワークスペースごとのリージョンのエンドポイントを受け取る。リージョンは、自分が持たないワークスペースへのリクエストに 421 を返し、クライアントは所在を取り直す。
-- **ワークスペースをリージョン間で移す：** `workspace_id` で絞った論理レプリケーション（行フィルタ）でコピーし、短時間の書き込みの停止で切り替える。Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md) の 10.4 節と同じ手順。リージョン間の実際の手順は **未検証**。
+- **ワークスペースをリージョン間で移す：** `workspace_id` で絞った論理レプリケーション（行フィルタ）でコピーし、短時間の書き込みの停止で切り替える。行フィルタは PostgreSQL 15 以降の `FOR TABLE ... WHERE (workspace_id = ...)` で、テーブルを列挙して付ける（`FOR TABLES IN SCHEMA` には付けられない）。UPDATE・DELETE を流すには、フィルタの列がレプリカ識別子に含まれる必要があり、全テーブルの主キーに `workspace_id` を含めるので満たす（[CREATE PUBLICATION](https://www.postgresql.org/docs/18/sql-createpublication.html)、2026-09-27 に確認）。Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md) の 10.4 節と同じ手順。リージョン間の実際の手順は **未検証**。
 - 決定は、S3 に入る前に ADR にする（未起票）。
 
 ## 12. 段階を上げる判断の基準
@@ -208,6 +208,7 @@ S3（利用者 1 億、同時接続 1,000 万）では、東京だけでなく�
 | 項目 | 月額（USD、概算） |
 | --- | --- |
 | Aurora（r8g.4xlarge × 3、ストレージ約 2 TB、I/O-Optimized、Global Database の複製） | 6,000 |
+| OpenSearch（Multi-AZ with Standby、データノード 6、専用マスター 3、EBS 約 4 TB。[search.md](search.md) の 9.1 節。単価は未検証） | 4,500 |
 | ECS Fargate | 1,200 |
 | ElastiCache | 600 |
 | CloudFront、ALB、データ転送 | 1,000 |
@@ -216,4 +217,4 @@ S3（利用者 1 億、同時接続 1,000 万）では、東京だけでなく�
 | セキュリティのサービス | 600 |
 | バックアップ、S3、大阪の待機、分析用のエクスポート | 800 |
 | その他 | 300 |
-| **本番の合計** | **約 12,700** |
+| **本番の合計** | **約 17,200** |
