@@ -10,6 +10,15 @@
 
 ## 1. 成果物の全体像
 
+成果物は、設計の記録（rebuilds）と、題材ごとの開発リポジトリに分けて置く（[ADR-0005](decisions/0005-design-record-repository.md)）。
+
+| リポジトリ | 置くもの |
+| --- | --- |
+| rebuilds の `systems/<name>/` | `AGENTS.md`（設計の規則）、`docs/` の `intent.md`・`architecture/`・`quality.md`・`roadmap.md`・`runbooks/`・`decisions/` |
+| 題材の開発リポジトリ | 実装のコード、`specs/`、`changes/`、CI、IaC、`AGENTS.md`（実装の規則） |
+
+下の図は、両方を合わせた論理的な構成である。`specs/` と `changes/` と実装のコードは、開発リポジトリの側にある。
+
 ```
 systems/<name>/
 ├── AGENTS.md                  # この題材に固有のエージェント向けルール（CLAUDE.md は symlink）
@@ -28,7 +37,7 @@ systems/<name>/
 │       │   ├── plan.md        # Files / Order of work / Risks / Proof
 │       │   └── quality.md     # 任意：リスクの高い変更のテスト設計
 │       └── archive/           # 完了した変更
-└── <実装コード>
+└── <実装コード>              # 開発リポジトリの側
 ```
 
 リポジトリ全体に関わる決定は、ルートの `docs/decisions/` に置く。

@@ -9,6 +9,7 @@
 | [0002](0002-trunk-based-development.md) | トランクベース開発を採る | accepted |
 | [0003](0003-github-projects-for-planning.md) | 計画と進み具合は GitHub Projects で持ち、仕様の正本はリポジトリに置く | accepted |
 | [0004](0004-agent-prs-via-github-app.md) | エージェントの PR は GitHub App から作り、人が承認する | accepted |
+| [0005](0005-design-record-repository.md) | rebuilds を設計の記録に限定し、実装は題材ごとの開発リポジトリで行う | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。E1 の `ci-pipeline` で、CI が生成と差分の検査を行うようにする（手で編集する一覧は衝突しやすいため。[process.md](../process.md) の「衝突の防止」）。

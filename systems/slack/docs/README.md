@@ -1,6 +1,6 @@
 # Slack の設計ドキュメント
 
-入口。何を作るかは intent、どう作るかは architecture、何をもって正しいとするかは quality と specs・changes、どう運用するかは runbooks にある。
+入口。このリポジトリには設計の文書だけを置き、実装は Slack の開発リポジトリで行う（[ADR-0005](../../../docs/decisions/0005-design-record-repository.md)）。何を作るかは intent、どう作るかは architecture、何をもって正しいとするかは quality と specs・changes、どう運用するかは runbooks にある。
 
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
@@ -10,8 +10,8 @@
 | [quality.md](quality.md) | 品質戦略（シフトレフト、AI 自体の品質、本番での品質検証）、テスト計画 | QA |
 | [runbooks/](runbooks/README.md) | SLO、テナント単位の上限、リリース、アラートと手順、訓練 | Ops |
 | [roadmap.md](roadmap.md) | Epic と Story | PM |
-| [specs/](specs/README.md) | 実装済みの振る舞いの正本 | Dev（反映のみ） |
-| [changes/](changes/README.md) | 進行中の変更 | 変更ごと |
+| [specs/](specs/README.md) | 実装済みの振る舞いの正本。**開発リポジトリへ移す予定** | Dev（反映のみ） |
+| [changes/](changes/README.md) | 進行中の変更。**開発リポジトリへ移す予定** | 変更ごと |
 
 ## 読む順序
 

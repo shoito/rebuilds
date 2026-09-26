@@ -1,5 +1,7 @@
 # Changes: Slack
 
+> **開発リポジトリへ移す予定。** [ADR-0005](../../../../docs/decisions/0005-design-record-repository.md) により、`specs/` と `changes/` は Slack の開発リポジトリに置く。開発リポジトリを作るまで、初期のバックログとしてここに置いている。
+
 進行中の変更（Story 単位）。1 つの変更が 1 つのフォルダ `YYMMDD-<slug>/` を持つ。成果物と規模ごとの要否は [process.md](../../../../docs/process.md) の「規模に応じた経路」にある。
 
 | ファイル | 内容 | 要否 |

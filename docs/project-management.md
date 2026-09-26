@@ -1,6 +1,6 @@
 # プロジェクト管理（GitHub Projects）
 
-[process.md](process.md) の段と成果物を、GitHub の Issue・Projects・Actions でどう回すか。方針は [ADR-0003](decisions/0003-github-projects-for-planning.md) にある。
+[process.md](process.md) の段と成果物を、GitHub の Issue・Projects・Actions でどう回すか。主に、題材ごとの開発リポジトリに適用する（[ADR-0005](decisions/0005-design-record-repository.md)）。方針は [ADR-0003](decisions/0003-github-projects-for-planning.md) にある。
 
 ## 1. 正本の分担
 

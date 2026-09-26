@@ -34,6 +34,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
+| `dev-repo-bootstrap` | Slack の開発リポジトリを Organization の下に作り、`changes/`・`specs/`・開発向けの `AGENTS.md` を移す。rebuilds の設計へのリンクを置く（ADR-0005）。E1 の他の Story の前に行う |
 | `terraform-foundation` | AWS の Organizations、アカウント、VPC、Terraform の状態のバケット、GitHub Actions の OIDC（ADR-0020） |
 | `github-project-setup` | ラベル・Issue Forms・Projects の項目とビュー・同期のワークフロー（[project-management.md](../../../docs/project-management.md)） |
 | `agent-skills-foundation` | `spec-authoring`・`spec-review`（QA 役の Subagent）・`pmo-triage` と、Skill の eval（`github-project-setup` と `ci-pipeline` の後） |

@@ -1,5 +1,7 @@
 # Specs
 
+> **開発リポジトリへ移す予定。** [ADR-0005](../../../../docs/decisions/0005-design-record-repository.md) により、`specs/` と `changes/` は Slack の開発リポジトリに置く。開発リポジトリを作るまで、初期のバックログとしてここに置いている。
+
 実装済みの振る舞いの正本。capability（機能領域）ごとに `<capability>/spec.md` を置く。
 
 - ここは直接編集しない。変更は `changes/YYMMDD-<slug>/spec.md` に差分として書き、変更の最後の PR（アーカイブ）で反映する。
