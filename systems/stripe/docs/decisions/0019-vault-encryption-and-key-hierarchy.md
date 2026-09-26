@@ -67,3 +67,5 @@ PCI DSS は、保存した PAN を読めない形にし（要件 3.5.1）、鍵�
 - 結合テスト：オーソリの後に、CVC が ElastiCache に残っていない。TTL を過ぎた CVC が取り出せない。
 - AWS Config：`cde-*` の鍵の自動ローテーションが有効で、削除の予約がない。
 - 鍵のローテーションと `ReEncrypt` の手順を、ステージングで年 1 回実行する（runbook の `key-rotation`）。
+
+> 2026-09-27 の注記：AWS Encryption SDK for JavaScript は、データキーのキャッシュ（caching CMM。Node.js では `NodeCachingMaterialsManager`）を持つ。Node.js では `plaintextLength` を渡さないとキャッシュされない。Node.js 版は 4.1 以降で Hierarchical keyring（ブランチキーを DynamoDB に置く）も使える（[データキーのキャッシュ](https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/implement-caching.html)、[Hierarchical keyring](https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/use-hierarchical-keyring.html)。2026-09-27 に確認）。SDK の対応状況の「未検証」はこれで解消した。自前で書く必要はなく、実装の `plan.md` では caching CMM と Hierarchical keyring のどちらを使うかを決める。

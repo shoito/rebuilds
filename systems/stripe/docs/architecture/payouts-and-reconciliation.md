@@ -17,7 +17,7 @@
 | レポート | 残高サマリー（期首・活動・入金・期末）と、入金照合（自動入金ごとに含まれた取引を `reporting_category` でまとめる）。日ごとのデータは翌日 12:00 までに揃う | [Balance report](https://docs.stripe.com/reports/balance)、[Payout reconciliation report](https://docs.stripe.com/reports/payout-reconciliation) |
 | 即時入金 | デビットカード・一部の銀行口座へ即時に送る | [Payout object](https://docs.stripe.com/api/payouts/object) の `method` |
 
-- **即時入金（`method = instant`）は範囲外** とする。日本では本家も提供していない想定だが **未検証**。モアタイムシステムで即時の振込自体は可能なので、後の Epic で検討する。
+- **即時入金（`method = instant`）は範囲外** とする。日本では本家も提供していない（[Instant Payouts](https://docs.stripe.com/payouts/instant-payouts) の対象国に日本がない。2026-09-27 に確認）。モアタイムシステム（2018-10-09 稼働）で 24 時間 365 日の振込自体は可能だが、接続の時間帯は金融機関ごとに違う（[全銀ネット](https://www.zengin-net.jp/zengin_system/)、2026-09-27 に確認）。後の Epic で検討する。
 
 ## 2. 入金のスケジュール
 
@@ -35,7 +35,7 @@ payout_settings (account_id, currency,
 
 - 既定は本家の日本に揃えて `manual`。週次・月次を選べる。日次は提供しない（本家の日本と同じ）。
 - 支払日が休業日なら、翌営業日にずらす。営業日は [ledger.md](ledger.md) の `business_calendars` を使う。
-- **最低入金額** は 1 円（本家の日本）。ただし振込の実費（銀行の振込手数料）を誰が負うかで、実質の下限は変わる。**未検証**：本家の日本の入金手数料の有無と金額。決まるまで、入金手数料は 0 円とし、自社の費用に計上する。
+- **最低入金額** は 1 円（本家の日本。[Payouts](https://docs.stripe.com/payouts)、2026-09-27 に確認）。ただし振込の実費（銀行の振込手数料）を誰が負うかで、実質の下限は変わる。**未検証**：本家の日本の入金手数料の有無と金額（2026-09-27 に確認した範囲では、文書にも [料金](https://stripe.com/jp/pricing) にも記載がない）。決まるまで、入金手数料は 0 円とし、自社の費用に計上する。
 - 入金先の口座は、金融機関コード・支店コード・預金種目（普通・当座）・口座番号・口座名義（カナ）で持つ。名義は全銀の使用文字（半角カナ・英数・一部の記号）に正規化して保存する。
 
 ## 3. 入金の作成
@@ -76,7 +76,7 @@ payout_settings (account_id, currency,
 
 - 採用は、**銀行の API を主、全銀フォーマットのファイルを予備** にする（[ADR-0018](../decisions/0018-payout-execution-via-banking-partner.md)）。どの銀行と契約するかは未決。
 - **未検証**：API での 1 回あたりの件数の上限、当日扱いの締めの時刻、振込手数料、依頼の重複を防ぐ識別子（依頼側の番号を持てるか）、口座名義の事前の確認（名義照会）の可否。銀行を選ぶときに、各行の仕様書で確かめる。
-- **未検証**：全銀フォーマットのデータレコードのうち、自社の入金の ID を載せられる項目（顧客コード・EDI 情報）の桁数。
+- 自社の入金の ID は、総合振込のデータレコードの「顧客コード 1・2」（数字 10 桁ずつ）か、識別表示を `Y` にした「EDI 情報」（英数カナ 20 文字）に載せる（[三井住友銀行の仕様](https://www.smbc.co.jp/hojin/eb/firm/manual/resources/pdf/sougoufurikomi_kyuyofurikomi.pdf)、2026-09-27 に確認。全銀協の原本は未取得）。EDI 情報を使い、入金の ID を 20 文字以内の形にする。受取側の銀行が EDI 情報を明細に載せるかは行ごとに確かめる。
 
 ### 4.2 流れ
 
@@ -108,7 +108,7 @@ payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 AP
 - 失敗した入金には `failure_balance_transaction` を設定し、`payout.failed` を出す（本家と同じ）。
 - 自動入金が失敗したら、含めた BT は次の自動入金に含め直す。本家のレポートの `retried_payout_id` に当たる関係を `payouts.retried_by_payout_id` に持つ。
 - `account_closed`・`no_account`・`invalid_account_number`・`incorrect_account_holder_name`・`incorrect_account_type` の失敗では、その口座を使えない状態にし、自動入金を止め、加盟店に口座の更新を求める。
-- 銀行の理由（全銀の不能の理由など）と `failure_code` の対応表は、銀行ごとに持つ。**未検証**：各行の理由のコードの一覧。
+- 銀行の理由（全銀の不能の理由など）と `failure_code` の対応表は、銀行ごとに持つ。**未検証**：各行の理由のコードの一覧（振込の不能の理由コードの公開された一覧は見つからなかった。2026-09-27）。
 
 ## 5. 照合
 
@@ -130,7 +130,7 @@ payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 AP
 
 - 精算ファイルは、決済代行ごとの形式（CSV、固定長）を取り込み、共通の形の `settlement_lines (id, connector, settlement_batch_id, connector_ref, line_type, gross, fee, net, currency, transaction_date, value_date, raw)` に変える。元のファイルは S3 に保存し（改ざん検知のためハッシュも持つ）、同じファイルの 2 回目の取り込みは無視する。
 - 決済代行の精算のサイクル（例：月 2 回締め・月 2 回払い、月末締め翌月末払い）は決済代行ごとに違う。**未検証**：最初の決済代行のサイクル、ファイルの形式、届く手段（SFTP か API か）。
-- 銀行の明細は、銀行の API（入出金明細の照会）で 1 日に数回取り込む。API がない銀行は、全銀協規定形式の入出金取引明細のファイルを使う。**未検証**：各行の明細に載る項目（振込依頼人名の桁数、EDI 情報の有無）。
+- 銀行の明細は、銀行の API（入出金明細の照会）で 1 日に数回取り込む。API がない銀行は、全銀協規定形式の入出金取引明細のファイルを使う。全銀協規定形式の明細（200 バイト）には、振込依頼人コード（10 桁）・振込依頼人名（48 文字）・EDI 情報（20 文字）の項目がある（一例：[関西みらい銀行の仕様](https://www.kansaimiraibank.co.jp/hojin/b_direct/recordformat/pdf/meisai.pdf)、2026-09-27 に確認）。**未検証**：各行が実際にどの項目を埋めるか。
 - 顧客の銀行振込（振込専用口座への入金）の取り込みと割り当ては、同じ明細の取り込みを使う（[payment-methods.md](payment-methods.md)）。
 
 ### 5.3 照合の処理

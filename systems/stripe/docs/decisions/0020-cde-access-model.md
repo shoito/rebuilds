@@ -51,3 +51,5 @@ ADR-0005 で、CDE へは人もエージェントも常設の権限を持たな�
 - 期限を過ぎた割り当てが残っていたら、アラートにする。
 - JIT の利用ごとに、申請・承認・セッションの記録がそろっていることを、月次で突き合わせる。
 - 承認者の名簿に、エージェントのロールや共有のアカウントがないことを CI（IaC の検査）で確かめる。
+
+> 2026-09-27 の注記：AWS TEAM は aws-samples のオープンソースで、AWS のマネージドサービスではない。申請と承認の後に IAM Identity Center の権限セットを期限つきで割り当て、期限で外す（[TEAM](https://github.com/aws-samples/iam-identity-center-team)）。IAM Identity Center には一時的な昇格のネイティブの機能がなく、公式の文書は検証済みのパートナー製品を案内している（[Temporary elevated access](https://docs.aws.amazon.com/singlesignon/latest/userguide/temporary-elevated-access.html)）。TEAM を選ぶなら、自社で運用するソフトとして、パッチの適用（2025 年の CVE-2025-1969 は 1.2.2 以降で修正）と PCI DSS の範囲を E10 の PoC で決める。いずれも 2026-09-27 に確認。仕組みの選定は未決のまま。

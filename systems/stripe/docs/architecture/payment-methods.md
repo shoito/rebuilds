@@ -42,7 +42,7 @@ MVP は 3 つ。本家の `type` の値をそのまま使う（[PaymentIntent ob
 | `checks` | `cvc_check`・`address_postal_code_check` | 最初のオーソリの結果 |
 | `three_d_secure_usage.supported` | `true` | BIN の表・3DS Server |
 
-- `fingerprint` は加盟店ごとに別の値にする。加盟店をまたいで同じカードを突き合わせられないようにする。本家の `fingerprint` が加盟店をまたいで同じ値かは未検証（本家の 2 つのテストアカウントで同じテストカードの値を比べる）。
+- `fingerprint` は加盟店ごとに別の値にする。加盟店をまたいで同じカードを突き合わせられないようにする。本家の `fingerprint` もアカウントごとに一意である（[重複したカードの検出](https://support.stripe.com/questions/how-can-i-detect-duplicate-cards-or-bank-accounts)、2026-09-27 に確認。Connect のプラットフォームが作ったものは例外で、範囲外）。
 - BIN の表（ブランド・国・種別）は、コネクタかカードブランドの提供する表を CDE で定期的に取り込む。取得元は最初のコネクタとの契約で決める。
 - カード番号・CVC・トラックデータは本体に一切置かない。CVC は Vault にも保存しない（オーソリの 1 回に使って捨てる）。
 
@@ -217,7 +217,8 @@ Payments（本体）
 5. 顧客が店頭で払うと、収納代行から入金の通知（速報）が届く。受信箱（[ADR-0014](../decisions/0014-connector-inbox.md)）を経て、PaymentIntent を `succeeded` にし、非同期の入金の仕訳を書く（[payments.md](payments.md) の 9 節）。
 6. 期限を過ぎても入金がなければ、猶予（`konbini.expiry_grace`、既定 1 時間）の後に `requires_payment_method` に戻し、`payment_intent.payment_failed` を出す。期限前に発行された払込票はレジで期限後も払えることがあるため、猶予を置く（本家も同じ理由で猶予を置き、失効の通知を期限の約 1 時間後に出す）。
 
-- 速報と確報：収納代行は一般に、店頭での支払いの直後の「速報」と、後日の「確報」を送る。速報で `succeeded` にし、確報と精算ファイルで照合する。速報の後に確報が来ない（速報の取り消し）場合は、照合の不一致として手作業で扱う。収納代行ごとの速報・確報の有無と取り消しの扱いは未検証（最初の収納代行の仕様書で確かめる）。
+- 速報と確報：収納代行は一般に「速報」と、後日の「確報」を送る。速報の時期は代行ごとに違い、支払いの直後とは限らない（例：入金の 90〜150 分後、または収納日の翌営業日。確報は翌営業日から 3〜10 営業日。[地銀ネットワークサービス](https://www.chigin-cns.co.jp/services/conveni_web/summary.php)、[電算システム](https://www.dsk-ec.jp/products/convenience/)、2026-09-27 に確認）。速報で `succeeded` にし、確報と精算ファイルで照合する。
+- 店頭での取り消しは、確報が来ないことではなく「速報取消データ」という別のデータで届く（同上）。受け取ったら受信箱（ADR-0014）で扱い、`succeeded` の後なので自動では戻さず、照合の不一致として手作業で扱う（加盟店への通知を含む）。最初の収納代行の仕様書で、データの形と時期を確かめる。
 - 取り消し：期限前の `requires_action` は取り消せる。収納代行に `cancel_voucher` を送り、受理されてから `canceled` にする。顧客が店頭で支払い中などで拒否されたら、400 を返す（本家も同じ）。
 - 期限切れの後の入金（猶予も過ぎた後）：PaymentIntent は既に `requires_payment_method` なので、成功にしない。入金を「宙に浮いたお金」として受け、自動で顧客に返金する（口座情報の入力を依頼する）。SEV3 として数える。
 - 支払い番号の発行が一時的に使えない（収納代行の障害）ときは、本家と同じ `payment_method_not_available` を返す。
@@ -247,9 +248,9 @@ Payments（本体）
 1. 提携する銀行から入金の明細（API か全銀の形式のファイル）が届く。受信箱に記録する（[ADR-0014](../decisions/0014-connector-inbox.md)）。
 2. 口座番号から Customer を特定し、現金残高の受け入れの仕訳を書く。`cash_balance_transactions` に `funded` を追記する（振込人の名義・銀行・支店を含む）。
 3. **自動の充当**（Customer の `reconciliation_mode = automatic`、既定）：その Customer の、銀行振込で `requires_action` の PaymentIntent に現金残高を充てる。
-   - 残高と `amount_remaining` が一致する PaymentIntent があれば、それに充てる。
-   - なければ、古いものから順に充てる。1 つを満たせない額は、その PaymentIntent に一部だけ充てる。
-   - 充当の順序の規則は本システムの選択（本家の規則は文書に詳しくない。未検証）。
+   - 本家の JPY の規則に合わせる（[現金残高の消し込み](https://docs.stripe.com/payments/customer-balance/reconciliation)、2026-09-27 に確認）。請求書（Billing）は範囲外なので、PaymentIntent の部分だけを使う。
+   - まず、金額の合計が残高にちょうど一致する 1〜5 件の PaymentIntent の組を探す。候補が複数あれば、件数の少ない組、PaymentIntent の古い組の順で選ぶ。
+   - 見つからなければ、確定の古い順に充てる。1 つを満たせない額は、その PaymentIntent に一部だけ充てる。
 4. 満たされた PaymentIntent は `succeeded`、一部だけのものは `requires_action` のまま `amount_remaining` を減らし、`payment_intent.partially_funded` を出す。
 5. 充てても残った額は、Customer の現金残高に残る。次の PaymentIntent の confirm で自動的に使う。
 6. **手動の充当**（`reconciliation_mode = manual`）：加盟店が `apply_customer_balance` で充てる。
@@ -266,7 +267,7 @@ Payments（本体）
 | 振込手数料が差し引かれて足りない | 足りない場合と同じ。顧客に差額の振込を求めるかは加盟店が決める |
 | どの PaymentIntent にも充たらないまま長く残る | 本家は 75 日で顧客の口座への返金を試み、90 日で口座情報が得られなければ加盟店の残高に移す。本システムの扱いは法務の確認の後に決める（顧客のお金を加盟店に移してよいかが、資金決済法上の位置づけに依存する） |
 
-- PaymentIntent の期限：本家の文書に、銀行振込の PaymentIntent が自動で失効する記述はない（未検証）。MVP では自動で失効させず、加盟店が取り消す。取り消しても、現金残高に入ったお金はそのまま残る。
+- PaymentIntent の期限：本家の文書は「着金するまで `requires_action` のまま」とし、自動で失効する記述はない（2026-09-27 に確認）。MVP では自動で失効させず、加盟店が取り消す。取り消しても、現金残高に入ったお金はそのまま残る。
 
 ### 6.4 返金
 

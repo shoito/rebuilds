@@ -57,7 +57,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | （なし） | 作成 | `payment_method` あり、`confirm` なし | `requires_confirmation` | なし |
 | （なし）・`requires_payment_method`・`requires_confirmation` | confirm | 決済手段と金額の検証に通り、不正検知が拒否しない | 試行（Charge）を作り、4 節の流れへ | なし |
 | 同上 | confirm | 不正検知のルールが拒否 | `requires_payment_method`（`last_payment_error.decline_code = fraudulent` だが、顧客には `generic_decline` を見せる） | なし |
-| 試行中 | 3DS が必要（チャレンジ） | カード | `requires_action`（`next_action.type = use_stripe_sdk` か `redirect_to_url`） | なし |
+| 試行中 | 3DS が必要（チャレンジ） | カード | `requires_action`（`next_action.type = use_<brand>_sdk` か `redirect_to_url`） | なし |
 | 試行中 | コンビニ・銀行振込の確定 | 支払い番号・振込先の発行に成功 | `requires_action`（`konbini_display_details` / `display_bank_transfer_instructions`） | なし |
 | `requires_action`（3DS） | 3DS 成功・frictionless | | オーソリへ進む（試行中） | なし |
 | `requires_action`（3DS） | 3DS 失敗・放棄 | | `requires_payment_method` | なし |
@@ -78,7 +78,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | `succeeded`・`canceled` | 何でも | | 変わらない（終端） | — |
 
 - `processing` のカードの PaymentIntent は取り消せない。本家も、`processing` の取り消しは一部の口座振替に限る（[Cancel a PaymentIntent](https://docs.stripe.com/api/payment_intents/cancel)）。
-- 取り消しの理由は本家と同じ値を持つ。加盟店が指定できるのは `duplicate`・`fraudulent`・`requested_by_customer`・`abandoned`、システムが付けるのは `automatic`・`expired` など（[PaymentIntent object](https://docs.stripe.com/api/payment_intents/object)）。オーソリの期限切れで付く値が `automatic` であることは未検証。本家のテスト環境でオーソリを失効させて確かめる。
+- 取り消しの理由は本家と同じ値を持つ。加盟店が指定できるのは `duplicate`・`fraudulent`・`requested_by_customer`・`abandoned`、システムが付けるのは `automatic`・`expired` など（[PaymentIntent object](https://docs.stripe.com/api/payment_intents/object)）。本家がシステムで付ける値は `failed_invoice`・`void_invoice`・`automatic`・`expired` と列挙されているが、どの事象でどの値になるかは文書にない（2026-09-27 に確認）。オーソリの期限切れで付く値が `automatic` であることは**未検証**。本家のテスト環境でオーソリを失効させて確かめる。
 - `confirmation_method = manual`（`next_action` の後にサーバーで再び確定させる方式）は、S2 で足す。MVP は `automatic` だけ。
 
 ### 3.2 不変条件
@@ -139,7 +139,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | Mastercard・American Express・Discover | 7 日 | 7 日 |
 | 日本の加盟店の JPY 取引（Visa・Mastercard・JCB・Diners Club・Discover） | 最長 30 日 | 最長 30 日 |
 
-- 日本の 30 日は、接続するアクワイアラがそれを許すかに依存する（未検証。最初のコネクタとの契約で確かめる）。許さなければ、コネクタの能力の値を使う。
+- 日本の 30 日は本家の文書と一致する（[支払い方法を保留する](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method)、2026-09-27 に確認）。ただし、接続するアクワイアラがそれを許すかに依存する（未検証。最初のコネクタとの契約で確かめる）。許さなければ、コネクタの能力の値を使う。
 - `capture_before` を過ぎた `requires_capture` は、定期ジョブが `canceled` にし、コネクタに取り消しを送る。本家もオーソリの失効で `canceled` にする。
 - 本家の `automatic_delayed`（期限前の自動キャプチャ、プレビュー）は作らない。
 
@@ -164,7 +164,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | 加盟店起点の取引（MIT、`off_session = true`）で、事前に SetupIntent か `setup_future_usage` で認証済み | 要求しない。免除としてオーソリする |
 | MIT で、発行会社が認証を要求した | `requires_payment_method`（`authentication_required`）で返す。加盟店は顧客を呼び戻して on-session で確定し直す |
 
-- ガイドラインの版と、3DS を求める範囲の条文は未検証。法務の確認と合わせて、日本クレジット協会の公表資料で確かめる。
+- 現行のガイドラインは [クレジットカード・セキュリティガイドライン【6.1 版】](https://www.j-credit.or.jp/security/pdf/Creditcardsecurityguidelines_6.1_published.pdf)（2026 年 3 月。[資料の一覧](https://www.j-credit.or.jp/security/document/index.html)にこれより新しい版はない。2026-09-27 に確認）。3DS は「5-2-2-2 不正利用対策 ① EC 加盟店の指針対策」にあり、EC 加盟店は EMV 3-D セキュアを導入し、原則として決済の都度に認証する。ただし、他の対策に応じて、カード番号の登録時だけの認証や、加盟店のリスクの判断による認証も認められ、導入しなくてよい取引は附属文書 14 で定める。「2025 年 3 月末までに原則すべての EC 加盟店に導入」という期限は 5.0 版の記述で、6.1 版では常設の指針対策である。本システムへの法的な当てはめは法務の確認（[intent.md](../intent.md)）。
 - 加盟店が API で 3DS を無効にすることはできない（本家と同じ）。
 
 ### 6.2 流れ
@@ -172,7 +172,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 1. Connector Gateway が、コネクタの 3DS Server に認証の開始を要求する（カード番号を使うので CDE の中で行う）。
 2. 応答が frictionless（チャレンジ不要）なら、そのままオーソリへ進む。
 3. チャレンジが要るなら、`requires_action` にし、`next_action` を返す。
-   - `use_stripe_sdk`：Elements・Checkout が iframe（モーダル）でチャレンジを表示する。ブラウザーの情報の収集（3DS Method）も Elements が行う。
+   - `use_<brand>_sdk`（本家の `use_stripe_sdk` に当たる。名前はリポジトリ共通の ADR-0006 に従う）：Elements・Checkout が iframe（モーダル）でチャレンジを表示する。ブラウザーの情報の収集（3DS Method）も Elements が行う。
    - `redirect_to_url`：加盟店が `return_url` を渡したとき。顧客をカード発行会社の画面へ移し、`return_url` に `payment_intent` と `payment_intent_client_secret` を付けて戻す。
 4. 認証の結果は、コネクタからの通知（[ADR-0014](../decisions/0014-connector-inbox.md)）か、ブラウザーの戻りを合図にした照会で受け取る。どちらが先でも、同じ試行に 1 回だけ反映する。
 5. 結果が認証成功（または `attempt_acknowledged` のように、ネットワークの規則上オーソリを続けてよい結果）ならオーソリへ進む。失敗なら `requires_payment_method` にする。
@@ -341,7 +341,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | --- | --- | --- |
 | カード（JPY） | 50 円 | 99,999,999 円（日本の JCB・Diners Club・Discover は 8 桁が上限。他ブランドもそろえる） |
 | コンビニ | 120 円 | 300,000 円 |
-| 銀行振込 | 50 円 | 99,999,999 円（未検証。本家の文書に銀行振込の上限の明記がない。コネクタの制限と合わせて確かめる） |
+| 銀行振込 | 50 円 | 99,999,999 円（本家は、カード以外の決済手段の上限を一般に 8 桁としている。[対応通貨](https://docs.stripe.com/currencies)、2026-09-27 に確認。銀行振込に固有の上限は明記がないので、提携銀行の制限と合わせて確かめる） |
 
 - 金額は JSON の数値で出し、`Number.MAX_SAFE_INTEGER` 以内であることを検証する（ADR-0001）。
 - 手数料・一部返金・一部キャプチャの計算は `packages/money` だけで行う。

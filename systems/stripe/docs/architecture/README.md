@@ -108,7 +108,6 @@
 | [0003](../decisions/0003-double-entry-ledger.md) | お金の正本は、追記のみの複式簿記の台帳 |
 | [0004](../decisions/0004-idempotency.md) | すべての書き込みを冪等にする |
 | [0005](../decisions/0005-pci-scope-segmentation.md) | カード情報は CDE（別の AWS アカウント）に閉じ込め、本体はトークンだけを扱う |
-
 | [0006](../decisions/0006-api-shape.md) | 公開 API は本家 v1 のリソースの形に寄せ、本文は JSON。見出しは `<Brand>-` にする |
 | [0007](../decisions/0007-date-based-api-versions.md) | API の版は日付で持ち、アカウントに固定し、変更モジュールで古い版の形を保つ |
 | [0008](../decisions/0008-api-keys-and-dashboard-access.md) | API キーは本家と同じ 3 種類（接頭辞は `<brand>_`）。ダッシュボードは Better Auth と必須の MFA |
@@ -177,5 +176,5 @@ PM の方針（本家 Stripe に寄せる、既定案）により、次のとお
 | QSA の選定、PrivateLink・指紋の扱い、附属書 A1 | E10 の QSA の事前相談 |
 | JIT の仕組み（AWS TEAM など） | E10 の PoC（ADR-0020） |
 | 検索 API の索引、読み取りの割当を止めるか | E11 の PoC と計測 |
-| Aurora DSQL のマルチリージョン（ADR-0031 の比較の対象） | S2 の運用の後に再評価する |
+| Aurora DSQL のマルチリージョン（ADR-0031 の比較の対象） | トリガー・RLS を持たないことを 2026-09-27 に確認し、候補から外した。DSQL がこれらを持ったときに再評価する |
 | 本家の振る舞いで未確認のもの（手数料の丸め、`cancellation_reason`、アクセスポリシーの `code`、Webhook の自動の無効化の条件など） | 各文書の「持ち越し」に書いた Epic の Story で、本家のサンドボックスを観察して揃える |

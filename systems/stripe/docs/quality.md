@@ -96,7 +96,12 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 日本の決済手段（[payment-methods.md](architecture/payment-methods.md)、ADR-0013） | 表駆動：コンビニの期限（JST の 23:59:59）と本家のテスト用の値。性質：任意の着金と PaymentIntent の列で「着金の合計 ＝ 充てた額 ＋ 現金残高 ＋ 返金した額」 |
 | 審査（[merchant-onboarding.md](architecture/merchant-onboarding.md)、ADR-0022） | 表駆動：`requirements` と照合の結果の組み合わせ → capability・`charges_enabled`・`payouts_enabled`。審査が済まない加盟店の本番のキーでの決済が拒否され、テストのキーでは成功する |
 | 保持と削除（ADR-0024） | 性質：消去のジョブの後に期限を過ぎたカード番号が Vault に残らない。Customer の削除の後に個人情報と Vault の行が残らない。期限後の取引の個人情報の除去で台帳の残高が変わらない |
-| リリース（ADR-0032） | お金の区分 A の変更の影の実行の合格基準（2.5 節） |
+| Dispute（[disputes.md](architecture/disputes.md)） | 表駆動：状態の遷移（照会・チャージバック・`won`・`lost`・期限切れ）。性質：任意の Dispute と返金の列で、引き落とし・戻し・手数料の仕訳の合計が 0 で、返金とあわせて決済額を超えて戻さない。結合：本家のテスト用の証拠の値（`winning_evidence` など）で本家と同じ結果になる |
+| Checkout と Elements（[checkout.md](architecture/checkout.md)、ADR-0027） | E2E：iframe の外（加盟店のページの `window`）から PAN に届かない。埋め込み先の制限（`frame-ancestors`）。改ざんの検知が目録にないスクリプトで鳴る。axe で違反 0（WCAG 2.2 AA） |
+| ダッシュボード（[dashboard.md](architecture/dashboard.md)、ADR-0028） | 結合：ダッシュボードの操作が公開 API と同じ検証・冪等・監査を通る。E2E：環境の切り替えで他方のデータが出ない。権限のないロールでボタンが出ず、API も 403 |
+| 復旧と容量（[infrastructure.md](architecture/infrastructure.md)、[capacity.md](architecture/capacity.md)、ADR-0030） | 負荷：k6 でモデルの 1 倍・2 倍と、コネクタの遅延のもとでの隔壁。DR の訓練：RTO・RPO と、失った範囲のコネクタへの照会での全件回復、台帳の整合と照合の不一致が 0 |
+| 観測（[observability.md](architecture/observability.md)） | すべてのアラートが runbook の URL を持つ（CI）。SLI の定義を変えるときは QA と合意する（[runbooks/README.md](runbooks/README.md) の 1 節） |
+| リリース（[delivery.md](architecture/delivery.md)、ADR-0032） | お金の区分 A の変更の影の実行の合格基準（2.5 節） |
 
 ### 2.3 エージェントの確認ループ
 

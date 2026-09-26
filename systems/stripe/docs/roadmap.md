@@ -34,6 +34,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E1 Walking skeleton
 
+設計：[api.md](architecture/api.md)、[data-model.md](architecture/data-model.md)、[ledger.md](architecture/ledger.md)、[card-vault.md](architecture/card-vault.md)、[infrastructure.md](architecture/infrastructure.md)、[delivery.md](architecture/delivery.md)
+
 | Story | 内容 |
 | --- | --- |
 | `dev-repo-bootstrap` | Stripe の開発リポジトリを作り、`changes/`・`specs/`・開発向けの `AGENTS.md`、`cde/` の区分とルールセットを置く（リポジトリ共通の ADR-0005、ADR-0033） |
@@ -59,6 +61,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E2 アカウントと権限（審査を含む）
 
+設計：[auth-and-keys.md](architecture/auth-and-keys.md)、[merchant-onboarding.md](architecture/merchant-onboarding.md)、[security.md](architecture/security.md) の 6 節
+
 | Story | 内容 |
 | --- | --- |
 | `dashboard-auth-mfa` | Better Auth（OTP・Google・パスキー・TOTP）、MFA の必須、セッション（[auth-and-keys.md](architecture/auth-and-keys.md) の 3 節） |
@@ -78,6 +82,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E3 決済
 
+設計：[payments.md](architecture/payments.md)、[payment-methods.md](architecture/payment-methods.md)、[fraud.md](architecture/fraud.md)
+
 | Story | 内容 |
 | --- | --- |
 | `connector-selection` | 最初のカードのコネクタの選定と仕様の確認（照会、3DS、30 日のオーソリ、重複の扱い、精算） |
@@ -95,6 +101,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `dr-idempotent-connector-refs` | 参照番号を PaymentIntent の ID と冪等キーから決める（ADR-0030） |
 
 ### E4 お金
+
+設計：[ledger.md](architecture/ledger.md)、[payouts-and-reconciliation.md](architecture/payouts-and-reconciliation.md)
 
 | Story | 内容 |
 | --- | --- |
@@ -117,6 +125,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E5 Event と Webhook
 
+設計：[events-and-webhooks.md](architecture/events-and-webhooks.md)
+
 | Story | 内容 |
 | --- | --- |
 | `webhook-endpoints` | エンドポイントの API、上限、URL の検査 |
@@ -129,6 +139,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `webhook-delivery-logs-and-resend` | 配信ログと手動の再送 |
 
 ### E6 Checkout と Elements
+
+設計：[checkout.md](architecture/checkout.md)、[card-vault.md](architecture/card-vault.md)
 
 | Story | 内容 |
 | --- | --- |
@@ -145,6 +157,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E7 ダッシュボード
 
+設計：[dashboard.md](architecture/dashboard.md)
+
 | Story | 内容 |
 | --- | --- |
 | `dashboard-shell` | SPA の骨格、ルート、環境の切り替え、ブートストラップ（ADR-0028） |
@@ -160,6 +174,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E8 日本の決済手段
 
+設計：[payment-methods.md](architecture/payment-methods.md) の 5・6 節、[checkout.md](architecture/checkout.md) の 7 節
+
 | Story | 内容 |
 | --- | --- |
 | `konbini-provider-selection` | コンビニ収納代行の選定と仕様の確認 |
@@ -170,6 +186,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `jp-payment-capabilities` | `konbini_payments`・`jp_bank_transfer_payments` の capability |
 
 ### E9 不正検知と Dispute
+
+設計：[fraud.md](architecture/fraud.md)、[disputes.md](architecture/disputes.md)、[merchant-onboarding.md](architecture/merchant-onboarding.md) の 6・7 節
 
 | Story | 内容 |
 | --- | --- |
@@ -184,6 +202,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `merchant-risk-monitoring` | Dispute の率などの継続的な監視とリザーブの判断 |
 
 ### E10 本番運用（PCI・SLO・DR）
+
+設計：[capacity.md](architecture/capacity.md)、[observability.md](architecture/observability.md)、[security.md](architecture/security.md)、[infrastructure.md](architecture/infrastructure.md)、[runbooks/README.md](runbooks/README.md)
 
 | Story | 内容 |
 | --- | --- |
@@ -204,6 +224,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ### E11 S2 への拡張
 
+設計：[infrastructure.md](architecture/infrastructure.md) の 8 節、[ledger.md](architecture/ledger.md) の 9・10 節、[events-and-webhooks.md](architecture/events-and-webhooks.md) の 11 節
+
 | Story | 内容 |
 | --- | --- |
 | `ledger-sharding` | `account_id` のハッシュでの台帳と状態のテーブルの分割（ADR-0016） |
@@ -219,6 +241,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `confirmation-method-manual` | `confirmation_method = manual`、`advice_code` |
 
 ### E12 S3 への拡張
+
+設計：[infrastructure.md](architecture/infrastructure.md)、[ADR-0031](decisions/0031-active-active-cells.md)
 
 | Story | 内容 |
 | --- | --- |

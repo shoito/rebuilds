@@ -371,7 +371,7 @@ idempotency_keys（test・live の各クラスタ。テナントテーブル、R
 - MVP（E1）では、アカウントの作成時にサンドボックスを 1 つ自動で作る。ダッシュボードではこれを「テスト環境」と呼ぶ（[dashboard.md](dashboard.md) の 4 節）。追加のサンドボックス（最大 5 つ）と、利用者ごとの入れる範囲の設定は E11。
 - オブジェクトの `livemode` は、live のクラスタでは `true`、test のクラスタでは `false`。
 - 模擬のアクワイアラのテスト用のカード番号と、3D セキュア・拒否・Dispute の再現の方法は、本家のテスト用の番号に合わせる（[payment-methods.md](payment-methods.md)、E1 の `mock-acquirer`）。
-- サンドボックスで作ったキーで本番のオブジェクトを指すと 404（`resource_missing`）。本番のキーで、テスト用のカード番号を使うと、本家と同じく `card_declined` 相当のエラーにする（コードの名前は E3 で本家の値を確かめて決める。未検証）。
+- サンドボックスで作ったキーで本番のオブジェクトを指すと 404（`resource_missing`）。本番のキーで、テスト用のカード番号を使うと、本家と同じく 402、`code: card_declined`、`decline_code: testmode_decline` にする（[Decline codes](https://docs.stripe.com/declines/codes)、2026-09-27 に確認）。
 
 ## 12. 観測
 

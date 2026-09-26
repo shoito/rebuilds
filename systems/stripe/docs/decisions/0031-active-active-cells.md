@@ -36,7 +36,13 @@ Slack は S3 でセル構成を提案している（Slack の ADR-0023）。決�
 - **セルの外（Global）**：API キー → アカウント → セルの対応表、ダッシュボードのログインとセッション、審査の状態。両方のリージョンで読めるようにする。セルは自分が持たないアカウントの要求に 421 を返し、ルーターは対応表を取り直す。
 - **大口の加盟店**には専用のセルを割り当てる。
 - **デプロイはセルを順に進める**：社内の加盟店のセル → 小さなセル → 残り。お金の区分 A の変更（[ADR-0032](0032-release-safety-for-money-moving-code.md)）は、1 つのセルで影の実行と照合を 1 日以上通してから、次のセルへ進める。
-- 1 は、1 つの加盟店を両方のリージョンで書ける点で勝る。ただし、台帳が頼る PostgreSQL の機能（遅延制約のトリガー、RLS）との互換と、ソウルの witness に置かれるデータの扱いが **未検証** である。台帳の正しさを DB の新しい一貫性のモデルに預けるのは、S2 の運用の実績の後に再評価する。
+- 1 は、1 つの加盟店を両方のリージョンで書ける点で勝る。ただし、台帳が頼る PostgreSQL の機能を Aurora DSQL は持たない（[サポートする SQL の機能](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-sql-features.html)、[移行ガイド](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-migration-guide.html)、[耐障害性](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/disaster-recovery-resiliency.html)。2026-09-27 に確認）。
+  - トリガーがない（遅延制約のトリガーで仕訳の釣り合いを検査できない）。`CREATE POLICY`・RLS がない。関数は `LANGUAGE SQL` だけで、PL/pgSQL がない。手動のパーティションがない。
+  - 分離レベルは Repeatable Read に固定の楽観的な並行制御で、競合はコミット時の `40001` になる。大口の加盟店の残高のスロット（ADR-0016）のような書き込みの集中で、失敗が増える。1 トランザクションで変えられる行は 3,000 まで。
+  - PostgreSQL 16 相当で、本体の Aurora PostgreSQL 18 と版が違う。
+  - witness のリージョン（東京・大阪の組ならソウルを選べる）には、暗号化したトランザクションのログだけが置かれ、利用者はアクセスできない。国外にデータを置くことの扱いは法務の確認が要る。
+  - したがって 1 は、台帳の正しさの保証（ADR-0003）と RLS によるテナントの分離（ADR-0002）を、DB からアプリへ移す大きな設計の変更になる。S3 の候補から外し、DSQL がトリガーと RLS を持ったときに再評価する。
+- この ADR は proposed のまま。DSQL を外した判断を含め、Dev（テックリード）の承認待ちである（2026-09-27）。
 - 3 は、影響範囲と可用性の目標を解決しない。
 
 ## Consequences

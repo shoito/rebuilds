@@ -81,11 +81,11 @@ Slack と同じく、3 AZ にまたがる VPC を 1 つ持つ。
 | 向き | 方式 | 運ぶもの |
 | --- | --- | --- |
 | 本体 → CDE | AWS PrivateLink＋相互 TLS。CDE が NLB のエンドポイントサービスを公開し、prod の VPC エンドポイントから呼ぶ。許可するプリンシパルは prod のアカウントだけ | vault-core（Vault Core）の `bind_card_input`・`get_card`・`delete_card` と、connector-gateway の `authorize`・`capture`・`refund`・`void`・`inquire`・`authenticate_*`。渡すのは `pm_`、`account_id`、金額、参照番号。紐づけのときだけ、ブラウザが vault-ingest から受け取った使い捨ての `card_input` を渡す。応答にカード番号を含めない |
-| CDE → 本体 | cde-live の VPC エンドポイント経由で、prod の SQS キュー（`connector-results`）へ送る。キューのリソースポリシーで cde-live のロールだけを許可する | コネクタの結果と、カード番号を除いたアクワイアラの通知（[ADR-0014](../decisions/0014-connector-inbox.md)）。カード番号は含まない |
+| CDE → 本体 | cde-live（テスト環境は cde-test）の VPC エンドポイント経由で、prod の SQS キュー（`connector-results`）へ送る。キューのリソースポリシーで cde-live・cde-test のロールだけを許可する（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md)） | コネクタの結果と、カード番号を除いたアクワイアラの通知（[ADR-0014](../decisions/0014-connector-inbox.md)）。カード番号は含まない |
 
-- **境界を越える識別子は `pm_` だけ**（紐づけの 1 回だけ `card_input` も通る）。Vault の内部の `card_ref` は CDE の外に出さない（[card-vault.md](card-vault.md) の 3.1 節）。
+- **境界を越える識別子は `pm_` だけ**（唯一の例外は、紐づけの 1 回だけ通る使い捨ての `card_input`。カード会員データを含まない。[card-vault.md](card-vault.md) の 2 節、ADR-0029 の注記）。Vault の内部の `card_ref` は CDE の外に出さない（[card-vault.md](card-vault.md) の 3.1 節）。
 - CDE → 本体の向きに HTTP の呼び出しを作らない。CDE が本体の障害に引きずられず、本体の中に入る経路もできない。PaymentMethod の作成も、ブラウザ → 本体 → CDE の向きで行う（[card-vault.md](card-vault.md) の 3.1 節）。
-- AWS PrivateLink は、AWS の PCI DSS の対象サービスの一覧に名前がない（2026-09-26 に確認。[AWS Services in Scope](https://aws.amazon.com/compliance/services-in-scope/PCI/)）。通すのはトークンだけで、カード番号は通さないので、統制の上は問題にならない見込みである。ただし境界の装置として評価される可能性がある。**未検証**：QSA の事前相談で扱いを確かめる（E10）。
+- AWS PrivateLink は、AWS の PCI DSS の対象サービスの一覧に独立した項目としては名前がない。一覧には Amazon VPC が載っているが、PrivateLink が VPC の範囲に含まれると明記した公式の文書は見つからなかった（2026-09-27 に確認。[AWS Services in Scope](https://aws.amazon.com/compliance/services-in-scope/PCI/)、[Amazon VPC のコンプライアンス](https://docs.aws.amazon.com/vpc/latest/userguide/VPC-compliance.html)）。通すのはトークンだけで、カード番号は通さないので、統制の上は問題にならない見込みである。ただし境界の装置として評価される可能性がある。**未検証**：QSA の事前相談で扱いを確かめる（E10）。
 - 呼び出しは、相互 TLS と、呼び出し元のサービスごとの短命な署名付きトークンで認証する。詳細は [card-vault.md](card-vault.md)。
 
 ### 2.4 アクワイアラ・決済代行・銀行への接続
@@ -328,5 +328,5 @@ S3（確定 50,000 件/秒、加盟店 100 万、NFR-001 の 99.995%）では、
 - **CDE もセルごとに持つ。** カード番号をセルの外で共有しない。1 つの顧客のカードが複数のセルに保存されうるが、トークンはセルごとでよい（加盟店をまたいでカードを共有しない）。
 - **リージョンの障害**では、止まったリージョンを主とするセルだけを、相手のリージョンへ切り替える（5.3・5.4 節の手順を、セル単位で行う）。もう一方のリージョンのセルは影響を受けない。切り替えを受けるため、各リージョンは相手のセルの負荷を引き受ける余裕（平常時の使用率 50% 以下）を持つ。
 - **デプロイはセルを順に進める**（[delivery.md](delivery.md) の 5 節）。社内の加盟店のセル → 小さなセル → 残り。
-- 複数リージョンに同時に書ける DB（Aurora DSQL のマルチリージョン。東京・大阪・ソウルの組で提供されている。[AWS の発表](https://aws.amazon.com/about-aws/whats-new/2026/07/amazon-aurora-dsql-adds-multi-region-clusters-four-more-regions/)）は、1 つのセルを両方のリージョンで書けるようにする候補として比べた。台帳が頼る PostgreSQL の機能（遅延制約のトリガー、RLS）との互換と、ソウルに置く witness のデータの扱いが**未検証**のため、S2 の運用の後に再評価する（ADR-0031）。
+- 複数リージョンに同時に書ける DB（Aurora DSQL のマルチリージョン。東京・大阪を書けるリージョン、ソウルを witness にする組を作れる。[耐障害性](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/disaster-recovery-resiliency.html)）は、1 つのセルを両方のリージョンで書けるようにする候補として比べた。DSQL はトリガー・RLS・PL/pgSQL・手動のパーティションを持たず、分離レベルは楽観的な Repeatable Read に固定である（[サポートする SQL の機能](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-sql-features.html)、2026-09-27 に確認）。台帳の制約（ADR-0003）と RLS（ADR-0002）が成り立たないので、候補から外す。DSQL がこれらを持ったときに再評価する（ADR-0031）。
 - 加盟店をセル間で移す手順は、Slack の infrastructure.md の 10.4 節（`account_id` で絞ったコピー、論理レプリケーションの行フィルタ、短い書き込みの停止、対応表の切り替え）に倣う。決済では、移動中に結果不明の試行が残っていないこと、台帳の残高が移動の前後で一致することを、切り替えの条件に加える。

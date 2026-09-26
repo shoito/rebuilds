@@ -65,3 +65,7 @@ B. **本体 → CDE は PrivateLink、CDE → 本体は SQS の 2 本だけ**
 - IAM Access Analyzer：CDE のアカウントのロール・KMS の鍵・PrivateLink のエンドポイントサービス・`connector-results` のキューを、許可したプリンシパル以外が使えないこと。
 - SCP の検査：本体の OU のロールが CDE の OU のロールを引き受けられないこと（四半期ごとに、試行が拒否されることを確かめる）。
 - 年次：本体（prod）が PCI DSS の範囲外であることの確認（データの流れの図の更新と、カード番号の走査の結果）を、QSA の評価に含める。
+
+> 2026-09-27 の注記：AWS の PCI DSS の対象サービスの一覧を再確認した。PrivateLink は独立した項目としてはなく、Amazon VPC は載っている。PrivateLink が VPC の範囲に含まれると明記した公式の文書は見つからなかった（[AWS Services in Scope](https://aws.amazon.com/compliance/services-in-scope/PCI/)）。QSA の事前相談では、「VPC の一部として扱えるか」を質問に加える。QSA の扱いは未検証のまま。
+
+> 2026-09-27 の注記（境界を越える値の唯一の例外）：本体と CDE の間を越える識別子は `pm_` だけとし、唯一の例外を `card_input` とする。PAN・有効期限・CVC は、ブラウザの iframe から CDE の vault-ingest へ直接送られ、本体を通らない。`card_input` は PAN から導かない 128 bit のランダムな値で、カード会員データを含まない。使い捨てで 30 分で失効し、PaymentMethod の紐づけ（本体 → CDE の PrivateLink で 1 回）にだけ使う（[card-vault.md](../architecture/card-vault.md) の 2・3.1 節）。これ以外の値を境界に通すときは、新しい ADR を起票する。

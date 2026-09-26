@@ -14,7 +14,7 @@
 | 売上処理のタイミング | 日本は初回 7 暦日、既定 4 営業日（[Payouts](https://docs.stripe.com/payouts)） | 加盟店ごとの設定。既定値は本家に揃える |
 | リザーブ | 固定（指定日に解放）とローリング（決済から N 日後に解放）。返金・Dispute が起きたら、対応するリザーブを解放して充てる（[Reserves FAQ](https://support.stripe.com/questions/reserves-frequently-asked-questions)） | 加盟店のリザーブの口座（4.4 節） |
 | マイナス残高 | 以後の売上で相殺し、足りなければ加盟店の銀行口座から引き落とす（[Payouts](https://docs.stripe.com/payouts)）。返金は利用可能な残高から引き、足りなければカードは保留・他は失敗にする（[支払いの返金とキャンセル](https://docs.stripe.com/refunds)） | 利用可能の口座はマイナスを許す（Dispute で起こりうる。4.5 節）。返金は残高を確かめる（[payments.md](payments.md) の 10.2 節） |
-| `reporting_category` | 会計向けの分類。`charge` / `payment` → `charge`、`refund` / `payment_refund` → `refund`、`payout_cancel` / `payout_failure` → `payout_reversal`、`stripe_fee` → `fee`、`reserved_funds` → `risk_reserved_funds` など（[Reporting categories](https://docs.stripe.com/reports/reporting-categories)） | 仕訳の種類から決まる対応表（6 節） |
+| `reporting_category` | 会計向けの分類。`charge` / `payment` → `charge`、`refund` / `payment_refund` → `refund`、`payout_cancel` / `payout_failure` → `payout_reversal`、`stripe_fee` → `fee`（本システムでは `<brand>_fee`）、`reserved_funds` → `risk_reserved_funds` など（[Reporting categories](https://docs.stripe.com/reports/reporting-categories)） | 仕訳の種類から決まる対応表（6 節） |
 
 ## 2. 勘定体系
 
@@ -209,10 +209,10 @@ BalanceTransaction は、加盟店に見せるための **仕訳の射影** で�
 ```sql
 balance_transactions (id,                    -- txn_...
                       account_id, currency,
-                      type,                  -- charge, payment, refund, payment_refund, refund_failure, adjustment, payout, payout_failure, payout_cancel, reserve_hold, reserve_release, stripe_fee, stripe_fx_fee
+                      type,                  -- charge, payment, refund, payment_refund, refund_failure, adjustment, payout, payout_failure, payout_cancel, reserve_hold, reserve_release, <brand>_fee, <brand>_fx_fee
                       reporting_category,
                       amount, fee, net,      -- net = amount - fee
-                      fee_details,           -- jsonb：[{type: stripe_fee, amount, currency, description}]
+                      fee_details,           -- jsonb：[{type: <brand>_fee, amount, currency, description}]
                       exchange_rate,         -- numeric。換算がなければ NULL
                       source_type, source_id,
                       entry_id,              -- 元の仕訳
@@ -226,7 +226,7 @@ balance_transactions (id,                    -- txn_...
 - 仕訳と同じトランザクションで作る。`status`・`availability_entry_id`・`payout_id` 以外の列は変えない。
 - `type` は本家の列挙のうち、MVP の機能に当たるものだけを使う（[BalanceTransaction object](https://docs.stripe.com/api/balance_transactions/object)）。カードは `charge`・`refund`、コンビニ払い・銀行振込は `payment`・`payment_refund` に分ける（本家と同じ）。Dispute は `adjustment` にし、`reporting_category` で `dispute` / `dispute_reversal` を区別する。
 - `reporting_category` は、仕訳の種類からの固定の対応表で決める（[Reporting categories](https://docs.stripe.com/reports/reporting-categories)）。表は `packages/ledger` に置き、表駆動テストで確かめる。
-- `fee_details[].type` は本家の `stripe_fee`・`tax` などを使う。
+- `fee_details[].type` は本家の `stripe_fee`・`tax` などに当たる値を使う。本家の名前を含む値は `<brand>_fee`・`<brand>_fx_fee` にする（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - API：`GET /v1/balance_transactions`（`payout`、`type`、`source`、`created`、`currency` で絞り込み）と `GET /v1/balance_transactions/{id}`。`payout` での絞り込みは自動入金だけに効く（本家と同じ。[Payout reconciliation](https://docs.stripe.com/payouts/reconciliation)）。
 
 ## 7. 手数料
@@ -240,7 +240,7 @@ balance_transactions (id,                    -- txn_...
   - `fee = max(rate_part + fixed_amount, min_amount)`。手数料が金額を超えるときは金額で頭打ちにする。
   - 本家の丸めの規則は未確認。E4 の `fee-schedules` の Story で、本家のテスト環境で端数の出る金額を決済し、BT の `fee` を比べて揃える（持ち越し）。
 - 適用した料金表の版を仕訳の `metadata` に残す。料金表を変えても、過去の手数料は変わらない。
-- 手数料は、決済の確定の仕訳の中で `merchant_pending` から差し引く（2.3 節）。別の BT（`stripe_fee`）にはしない。月額の料金など、決済に結び付かない手数料だけを `stripe_fee` の BT にする。
+- 手数料は、決済の確定の仕訳の中で `merchant_pending` から差し引く（2.3 節）。別の BT（`<brand>_fee`）にはしない。月額の料金など、決済に結び付かない手数料だけを `<brand>_fee` の BT にする。
 
 ### 7.2 性質
 
@@ -275,7 +275,7 @@ balance_transactions (id,                    -- txn_...
 - 日本の加盟店の売上処理・入金の通貨は JPY だけにする。本家も日本では JPY の入金だけを受け付ける（[Payouts](https://docs.stripe.com/payouts)）。
 - **MVP で受け付ける取引の通貨は JPY だけ**（[payments.md](payments.md)）。両替は起きず、`fx_*` の口座は使わない。以下は S2 で JPY 以外の取引の通貨を足すときの設計である。以下の **未検証** の項目は、E11 の `multi-currency` の Story で確かめる。
 - JPY 以外（USD など）の決済は、確定の時点で、JPY に換算して加盟店の残高に計上する。BT の `amount` は換算後の JPY、`exchange_rate` に使ったレートを入れる（本家と同じ。[BalanceTransaction object](https://docs.stripe.com/api/balance_transactions/object)）。
-- レートは外部のレートの提供元から取り、換算の手数料（2%、[Stripe 料金](https://stripe.com/jp/pricing)）を上乗せした値を `fx_quotes (id, from_currency, to_currency, mid_rate, applied_rate, source, fetched_at)` に保存する。仕訳は `fx_quote_id` を持つ。
+- レートは外部のレートの提供元から取り、`fx_quotes (id, from_currency, to_currency, mid_rate, applied_rate, source, fetched_at)` に保存する。換算の手数料（2%、[Stripe 料金](https://stripe.com/jp/pricing)）はレートに上乗せせず、BT の `fee` に含める（下記）。仕訳は `fx_quote_id` を持つ。
 - 通貨をまたぐ仕訳は、`fx_position` で通貨ごとに釣り合わせる。100 USD、レート 150、手数料 3.6% の例：
 
 | 通貨 | 口座 | 金額 |
@@ -284,12 +284,13 @@ balance_transactions (id,                    -- txn_...
 | USD | `fx_position:usd` | −10,000 |
 | JPY | `fx_position:jpy` | +15,000 |
 | JPY | `fx_revenue` | −300（2%） |
-| JPY | `fee_revenue` | −529（14,700 × 3.6% を四捨五入） |
-| JPY | `merchant_pending` | −14,171 |
+| JPY | `fee_revenue` | −540（15,000 × 3.6%） |
+| JPY | `merchant_pending` | −14,160 |
 
-- この例の BT は、`amount` 14,700（手数料を上乗せしたレート 147 で換算）、`exchange_rate` 147、`fee` 529、`net` 14,171 とする。換算の手数料を `fee_details` に出さずにレートに含める扱いは、本家に寄せた想定で **未検証**。
+- この例の BT は、`amount` 15,000（レート 150 で換算）、`exchange_rate` 150、`fee` 840（処理の手数料 540 と換算の手数料 300）、`net` 14,160 とする。`fee_details` には 2 つを別の行で出す。
+  - 2026-09-27 の訂正：以前は換算の手数料をレートに含める想定だった。本家は、決済の換算の手数料を既定で処理の手数料（BT の `fee`）にまとめ、設定で `fee_details` の別の行に分けられる。レートに含めるのは、残高の換算と Adaptive Pricing の場合である（[通貨の換算](https://support.stripe.com/questions/currency-conversion)、[NetSuite の複数通貨](https://docs.stripe.com/use-stripe-apps/netsuite/multiple-currencies)、2026-09-27 に確認）。根拠が連携の文書で間接的なので、E11 の `multi-currency` で本家のテスト環境の BT を見て確かめる。
 - 決済代行が JPY で精算すれば、その時点の USD の未収金と JPY の着金の差は `fx_gain_loss` に計上する。USD のまま精算されるなら、自社の両替の時点で同じく計上する。**未検証**：最初の決済代行の精算の通貨。
-- 返金の換算は、返金の時点のレートを使う方針にする。**未検証**：本家の規則（元の決済のレートか、返金時のレートか）を確かめて揃える。
+- 返金の換算は、返金の時点のレートを使う（本家と同じ。返金の換算に換算の手数料はかからず、元の決済の換算の手数料は返らない。Adaptive Pricing は元のレート。[価格の現地通貨化](https://docs.stripe.com/payments/currencies/localize-prices)、2026-09-27 に確認）。
 - 手数料の計算の基準（換算前の外貨か、換算後の JPY か）も **未検証**。上の例は換算後の JPY を基準にした。
 
 ## 11. 関連

@@ -71,7 +71,7 @@
 | コネクタの応答時間 | `connector.call` の時間（コネクタ別） | connector-gateway のヒストグラム | SLO にしない。平常との差で見る |
 | 結果不明の残り | 結果不明のままの試行の件数と、最古の経過時間 | workers の照会のキュー | 最古が 15 分以内 |
 | コネクタの通知の反映 | 受信箱（`connector_inbox`）に記録してから、遷移関数で反映するまでの時間。未反映・保留の行の最古の経過時間 | workers の `connector_inbox_apply_latency_seconds` | p95 5 秒以内。保留が 24 時間を超えたら 1 件でもアラート（[ADR-0014](../decisions/0014-connector-inbox.md)） |
-| Webhook の配信の遅れ（NFR-006） | Event の作成から、最初の配信の試行が終わるまでの時間 | webhook-sender の `webhook_first_attempt_latency_seconds` | p95 10 秒以内 |
+| Webhook の配信の遅れ（NFR-006） | Event をコミットしてから、最初の配信の試行を egress が送り始めるまでの時間（加盟店の応答時間を含めない。[events-and-webhooks.md](events-and-webhooks.md) の 2 節） | webhook-sender の `webhook_first_attempt_latency_seconds` | p95 10 秒以内 |
 | 照合の不一致（NFR-005） | 精算ファイル・銀行の明細と、台帳の突き合わせで合わない明細の件数（経過営業日ごと） | 照合のジョブのメトリクス `recon_breaks{source, age_bucket}` | T+2 営業日で 0 件 |
 | 台帳の整合 | 日次の再計算の残高と集計の残高の差（口座の数） | 台帳の検査のジョブ | 0（1 件でも SEV2。[ADR-0003](../decisions/0003-double-entry-ledger.md)） |
 | DR の複製の遅延 | `AuroraGlobalDBRPOLag`（live・Vault） | CloudWatch | 10 秒以内（[infrastructure.md](infrastructure.md) の 5.3 節） |
@@ -153,7 +153,7 @@ PCI DSS は、カード番号を平文で残す場所を厳しく限る。本体
 
 - 13 か月にするのは、12 か月の境目で監査の証跡が欠けないため。
 - 「すぐに使える」は、Logs Insights か Athena で、その場で問い合わせられることとする。Glacier などの取り出しに時間がかかる層に置くのは、120 日を過ぎてからにする。
-- **要件 10.5.1 の文言は、PCI SSC の原本の PDF を取得できず、二次資料（[KirkpatrickPrice](https://explore.kirkpatrickprice.com/videos/pci-v4-0-10-5-1-retain-audit-log-history-for-at-least-12-months)、[PCI DSS GUIDE](https://pcidssguide.com/what-are-the-pci-dss-log-retention-requirements/)）で確かめた（2026-09-26）。** 要件の番号（3.3.1、3.4.1、10.2.x、10.4.x、10.6、10.7.2 など）も同じ。**未検証**：E10 で、PCI SSC の文書ライブラリから v4.0.1 の原本を取得して照らし合わせる。
+- **要件 10.5.1 の文言と、要件の番号（3.3.1、3.4.1、10.2.x、10.4.x、10.6、10.7.2 など）は、PCI DSS v4.0.1 の原文で確かめた**（PCI SSC の文書庫からは取得できず、第三者が掲載した公式の PDF の写しで照合。2026-09-27。[card-vault.md](card-vault.md) の 10 節）。QSA との打ち合わせで、正式に取得した原本で改めて確かめる。
 
 ### 4.5 アクセス
 
@@ -202,6 +202,8 @@ Slack と同じマルチウィンドウのバーンレートを使う。NFR-001 
 | 鍵の削除の予約・無効化・キーポリシーの変更、ローテーションの失敗 | CloudTrail・AWS Config | 呼び出し | `key-rotation.md`（E10） |
 | CDE の期限を過ぎた権限の割り当て | JIT の割り当てが期限（4 時間）を過ぎても残る | 呼び出し | `cde-access.md`（E10） |
 | 不正の急増、カードテスティングの兆候 | [fraud.md](fraud.md) の 9 節 | 呼び出し | `fraud-spike.md`（E9） |
+| 決済ページの改ざんの検知 | 1 時間ごとの合成監視で、読み込まれたスクリプトのハッシュかセキュリティのヘッダーが目録と違う（[checkout.md](checkout.md) の 4.3 節、要件 11.6.1） | 呼び出し（SEV1） | `payment-page-tamper.md`（E6） |
+| Dispute の証拠を送れない | 提出を受けた証拠が、アクワイアラへ送れないまま `submission_buffer` の期間に入った（[disputes.md](disputes.md) の 6.2 節） | 呼び出し（SEV2） | `dispute-submission.md`（E9） |
 | API キーの漏洩の通知 | シークレットスキャンのパートナーからの通知 | 呼び出し（営業時間外も） | `api-key-leak.md`（E10） |
 | 決済の経路の 429 | 決済の経路での 429 の率が 0.1% を超える（[rate-limiting.md](rate-limiting.md) の 7 節） | チケット | `rate-limit-override.md`（E10） |
 | 重要なセキュリティの仕組みの失敗 | 4.3 節 | 呼び出し | `security-incident.md`（E10） |

@@ -13,7 +13,7 @@
 - MVP は**ルールと外部の不正検知サービスの連携**で行う。機械学習のモデルは作らない（intent.md の Non-goals）。
 - 本家の Radar に寄せる。ルールの書き方（`{action} if {条件}`）、4 つの動作（3DS の要求・許可・ブロック・レビュー）、リスト、レビューのキュー、ルールの試験と段階的な適用を同じ考え方にする（[Radar のルール](https://docs.stripe.com/radar/rules)、2026-09-26 に確認）。
 - **決済の API の可用性（NFR-001）を不正検知の障害で落とさない。** Fraud の部品が落ちたら、決済は既定のルールだけで続け、後でレビューに回す（4.4 節）。
-- 日本のクレジットカード・セキュリティガイドラインは、EC 加盟店に EMV 3-D セキュアの導入と、不正ログイン対策を求めている（6.0 版で追加、2026 年 3 月の 6.1 版でも指針対策は変わらない。[日本クレジット協会の改訂の資料](https://www.j-credit.or.jp/security/pdf/Creditcardsecurityguidelines_6.1_revisionpoint.pdf)）。3DS の既定の判断（5 節）は、これを前提にする。
+- 日本のクレジットカード・セキュリティガイドラインは、EC 加盟店に EMV 3-D セキュアの導入と、不正ログイン対策を求めている（6.0 版で指針対策に追加。現行は 2026 年 3 月の 6.1 版で、「5-2-2-2 ① EC 加盟店の指針対策」にある。[クレジットカード・セキュリティガイドライン【6.1 版】](https://www.j-credit.or.jp/security/pdf/Creditcardsecurityguidelines_6.1_published.pdf)、2026-09-27 に確認。条文の要点は [payments.md](payments.md) の 6.1 節）。3DS の既定の判断（5 節）は、これを前提にする。
 
 ## 2. 全体の流れ
 
@@ -152,7 +152,11 @@ reviews           (account_id, id, payment_intent_id, opened_reason, rule_id,
 | 顧客がいない決済（off-session、MIT） | 要求しない。最初の保存（CIT）で認証しておく |
 
 - 3DS の実行の流れ（`requires_action`、3DS Server への要求）は [payments.md](payments.md) の 6 節と ADR-0012。Fraud が決めるのは「要求するか」だけ。
-- 本家の日本での既定の振る舞い（`automatic` のときに日本発行のカードで常に要求するか）は未検証。検証の予定：日本のテスト環境で確かめ、Stripe の日本向けの文書と照合する。
+- 本家の日本での既定の振る舞い（[日本の 3D セキュア必須化の例外](https://docs.stripe.com/payments/3d-secure/japan-exemptions)、2026-09-27 に確認）は、本システムの決定（ADR-0012）と次の点で違う。
+  - 本家は、発行国を問わず、日本の加盟店のすべてのカードに適用する。
+  - 本家は、カードごとに少なくとも 1 回（保存時か最初の使用時）認証し、認証済みで保存したカードの以後の CIT には強制しない（リスクの判断で求めることはある）。加盟店のログインの対策がセキュリティのチェックリストの 2 つ以上を満たさないときは、毎回求める。
+  - 本家は、2025-04-01 より前に保存したカード、デビット・プリペイド、Apple Pay・Google Pay、MOTO には求めない。
+  - 本システムは ADR-0012 のとおり「日本で発行されたカードの CIT では常に要求」のままにする。本家に揃えるかは PM の判断で、揃えるなら新しい ADR で扱う（ADR-0012 の 2026-09-27 の注記）。
 - 3DS の結果（`is_3d_secure`、`is_3d_secure_authenticated`、`has_liability_shift`）を属性に入れ、段 2 で評価する。本家は、3DS を行わなかった決済をブロックするルールで、ウォレットと off-session を除外する例を示している。既定のルールもこれに倣う。
 - 3DS の認証に失敗したら、オーソリへ進まず、PaymentIntent を `requires_payment_method` に戻す（[payments.md](payments.md)）。
 - 3DS の要求を出しても、発行会社が行うとは限らない（本家の説明と同じ）。結果の種類ごとの扱いは [payments.md](payments.md) に書く。

@@ -82,12 +82,36 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | Webhook の配信の遅れ・滞留 | `webhook-delivery-backlog.md` | E5 で作成 |
 | エンドポイントの一斉の無効化 | `endpoint-mass-disable.md`（キルスイッチと再予定） | E5 で作成 |
 | 不正の急増、カードテスティングの兆候 | `fraud-spike.md`（プラットフォームのルールの一時的な強化、WAF の Challenge） | E9 で作成 |
+| 決済ページの改ざんの検知（SEV1） | `payment-page-tamper.md`（目録にないスクリプトの配信の停止、前の版への戻し、影響の範囲の調査） | E6 で作成 |
+| Dispute の証拠を送れないまま期限が近い | `dispute-submission.md`（コネクタの管理画面からの手動の提出、加盟店への連絡） | E9 で作成 |
 | PAN の形の検出、カード番号の漏洩の疑い | `card-data-exposure.md`（報告の要否は法務：[intent.md](../intent.md) の L4） | E10 で作成 |
 | 鍵の削除の予約・無効化・ポリシーの変更、ローテーションの失敗、漏洩の疑い | `key-rotation.md`（`ReEncrypt`、HMAC 鍵の入れ替え） | E10 で作成 |
 | CDE の期限を過ぎた権限、深夜の CDE への入場 | `cde-access.md`（JIT の申請・承認・当番） | E10 で作成 |
 | API キーの漏洩の通知（シークレットスキャン） | `api-key-leak.md`（本番は 24 時間でローテーション、サンドボックスは即時失効） | E10 で作成 |
 | 決済の経路の 429、特定の加盟店の上限の変更 | `rate-limit-override.md` | E10 で作成 |
 | 重要なセキュリティの仕組みの失敗、セキュリティインシデント | `security-incident.md` | E10 で作成 |
+
+### 4.1 領域との対応
+
+各領域の文書に対して、運用で見る指標と手順の置き場所。
+
+| 領域 | アラート・手順 |
+| --- | --- |
+| [api.md](../architecture/api.md)、[rate-limiting.md](../architecture/rate-limiting.md) | SLO の速いバーンレート、5xx の急増、決済の経路の 429（`rate-limit-override.md`） |
+| [auth-and-keys.md](../architecture/auth-and-keys.md) | API キーの漏洩（`api-key-leak.md`）、MFA の回復（`mfa-recovery.md`） |
+| [payments.md](../architecture/payments.md)、[payment-methods.md](../architecture/payment-methods.md) | 技術的な成功率・承認率（`connector-outage.md`）、結果不明の滞留（`unknown-outcome-backlog.md`） |
+| [disputes.md](../architecture/disputes.md) | 証拠を送れないまま期限が近い（`dispute-submission.md`） |
+| [ledger.md](../architecture/ledger.md) | 台帳の整合（`balance-drift.md`）、仮勘定（`suspense-balance.md`） |
+| [payouts-and-reconciliation.md](../architecture/payouts-and-reconciliation.md) | 照合の不一致（`reconciliation-break.md`）、入金の失敗・遅れ（`payout-failure.md`・`payout-in-transit-delay.md`） |
+| [card-vault.md](../architecture/card-vault.md)、[security.md](../architecture/security.md) | PAN の形の検出（`card-data-exposure.md`）、鍵（`key-rotation.md`）、CDE のアクセス（`cde-access.md`）、KMS のスロットリング、セキュリティの仕組みの失敗（`security-incident.md`） |
+| [fraud.md](../architecture/fraud.md)、[merchant-onboarding.md](../architecture/merchant-onboarding.md) | 不正の急増（`fraud-spike.md`）。加盟店の継続的な監視は審査の担当の業務で、アラートにしない（merchant-onboarding.md の 6 節） |
+| [events-and-webhooks.md](../architecture/events-and-webhooks.md) | 配信の遅れ（`webhook-delivery-backlog.md`）、一斉の無効化（`endpoint-mass-disable.md`）、outbox の遅れ（`relay-backlog.md`） |
+| [checkout.md](../architecture/checkout.md) | 決済ページの改ざんの検知（`payment-page-tamper.md`）、合成監視（Checkout の表示と支払い） |
+| [dashboard.md](../architecture/dashboard.md) | 専用のアラートは置かない。公開 API の SLO と合成監視で見る（ダッシュボードは公開 API を呼ぶ。ADR-0028） |
+| [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | AZ・リージョンの障害と複製の遅延（[disaster-recovery.md](disaster-recovery.md)）、キャパシティの見直し（5 節） |
+| [delivery.md](../architecture/delivery.md) | デプロイとお金の不変条件のガード（[deploy-and-rollback.md](deploy-and-rollback.md)） |
+| [observability.md](../architecture/observability.md) | アラートの条件の正本の実装側（5.2 節） |
+| [data-model.md](../architecture/data-model.md) | 索引のみ。運用の対象は各領域の文書で扱う |
 
 ## 5. 定期作業と訓練
 

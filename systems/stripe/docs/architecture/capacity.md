@@ -194,7 +194,7 @@
 | NAT ゲートウェイの Elastic IP の数 | 既定は 1 つの NAT に 2 個まで（[AWS のドキュメント](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateway-basics.html)）。送信元 IP を接続先に登録するので、数を最初に決める |
 | Network Firewall | エンドポイントあたりの処理量と、ルールの数 |
 | ALB | ターゲットグループあたりのターゲット数、LCU |
-| AWS Payment Cryptography（使う場合） | 1 秒あたりの暗号操作の上限（**未検証**。使うと決めたら確かめる） |
+| AWS Payment Cryptography（使う場合） | 既定の上限は、対称鍵のデータ面の操作が合計で 1 秒 500 回、非対称鍵が 1 秒 20 回（アカウント・リージョンごと。引き上げを申請できる。[エンドポイントとクォータ](https://docs.aws.amazon.com/general/latest/gr/payment-cryptography.html)、2026-09-27 に確認）。S1 のオーソリ 500 件/秒を通すと既定の上限ちょうどになるので、使うと決めたら着手前に引き上げを申請する |
 | SQS | 標準キューの流量はほぼ無制限。FIFO は使わない |
 | アクワイアラ | 契約上の毎秒の件数と同時接続数（2.5 節） |
 

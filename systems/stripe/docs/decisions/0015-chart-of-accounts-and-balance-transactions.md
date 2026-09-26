@@ -61,3 +61,5 @@ C. BT を持たず、読むたびに仕訳から組み立てる
 - 性質ベーステスト：任意の決済・返金・Dispute・移動・入金の列の後で、加盟店・通貨ごとの BT の `net` の合計が、`merchant_*` の口座の残高（符号反転）と一致する。任意の金額と料金表で `fee + net = amount`、`0 ≤ fee ≤ amount`。
 - 表駆動テスト：仕訳の種類 → BT の `type`・`reporting_category` の対応表。
 - 日次のジョブ：`available_on` を 1 営業日以上過ぎた `pending` の BT が 0 件。
+
+> 2026-09-27 の注記：BT の `type` と `fee_details[].type` の値のうち本家の名前を含む `stripe_fee`・`stripe_fx_fee` は、リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) に従い、本システムでは `<brand>_fee`・`<brand>_fx_fee` とする（[ledger.md](../architecture/ledger.md) の 6 節）。決定の中身は変えない。

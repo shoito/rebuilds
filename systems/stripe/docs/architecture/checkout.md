@@ -111,7 +111,7 @@ success_url へ戻す ／ 加盟店のサーバーには checkout.session.comple
 - 加盟店が次の条件を満たせば、SAQ A の対象になる設計にする。本家の Checkout と Elements も、カード入力をすべて Stripe のドメインの iframe に置くことで SAQ A の対象にしている（[PCI DSS 準拠ガイド](https://stripe.com/guides/pci-compliance)）。
   - ホスト型・埋め込み型の決済ページ、または Payment Element を使う。
   - loader を `https://js.<domain>` から直接読み込む。バンドルしたり、自分で配信したりしない（本家も同じ。[Including Stripe.js](https://docs.stripe.com/js/including)）。npm のパッケージは、`js.<domain>` から読み込むための薄い包みだけにする（本家の `@stripe/stripe-js` と同じ）。
-- PCI SSC は 2025 年 1 月の SAQ A の改訂で、6.4.3 と 11.6.1 を SAQ A から外し、代わりに「加盟店のサイトが、電子商取引のシステムに影響しうるスクリプトの攻撃を受けにくいことを確認する」という適格の条件を加えた（2025-03-31 から適用。[PCI SSC のブログ](https://blog.pcisecuritystandards.org/important-updates-announced-for-merchants-validating-to-self-assessment-questionnaire-a)）。埋め込み型・Payment Element を使う加盟店には、この条件を満たすための案内（自分のページの CSP、第三者のスクリプトの管理）を文書にする。ホスト型へリダイレクトする加盟店は、この点の負担が最も小さいことも示す。
+- PCI SSC は 2025 年 1 月の SAQ A の改訂で、6.4.3・11.6.1・12.3.1 を SAQ A から外し、代わりに「加盟店のサイトが、電子商取引のシステムに影響しうるスクリプトの攻撃を受けにくいことを確認する」という適格の条件を加えた（2025-03-31 に旧版が廃止。[PCI SSC のブログ](https://blog.pcisecuritystandards.org/important-updates-announced-for-merchants-validating-to-self-assessment-questionnaire-a)、2026-09-27 に確認）。埋め込み型・Payment Element を使う加盟店には、この条件を満たすための案内（自分のページの CSP、第三者のスクリプトの管理）を文書にする。ホスト型へリダイレクトする加盟店は、この点の負担が最も小さいことも示す。
 - 加盟店に年次の PCI の自己評価を求める画面（ダッシュボードの「コンプライアンス」）は、[dashboard.md](dashboard.md) と [merchant-onboarding.md](merchant-onboarding.md) で扱う。本家もダッシュボードで書類の要件を示している（[セキュリティガイド](https://docs.stripe.com/security/guide)）。
 - 本システム自身は、PCI DSS v4.0.1 のサービスプロバイダー レベル 1 の要件を満たす設計にする（NFR-010）。
 
@@ -217,6 +217,8 @@ success_url へ戻す ／ 加盟店のサーバーには checkout.session.comple
 - 決済ページの静的なファイルは CloudFront から配り、API が落ちているときは「いまは支払えません」を出す（支払ったかどうか不明の状態を作らない）。確定の要求は冪等キーを付けて送り、応答を受け取れなかったときは PaymentIntent を取り直してから次の手を決める（[ADR-0004](../decisions/0004-idempotency.md)）。
 
 ## 14. 未検証の事項と確かめ方
+
+2026-09-27 に本家の文書（[セキュリティガイド](https://docs.stripe.com/security/guide)、[PCI DSS 準拠ガイド](https://stripe.com/guides/pci-compliance)）を再確認したが、次の事項は記述がなく、観察でしか確かめられない。
 
 | 事項 | 確かめ方 |
 | --- | --- |

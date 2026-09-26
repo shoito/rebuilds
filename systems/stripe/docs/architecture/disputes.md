@@ -21,7 +21,7 @@
 | Early Fraud Warning | `issfr_` | カード発行会社が不正の疑いを報告した記録。Charge に属する |
 
 - ID の接頭辞は本家の文書の例（`du_`）に合わせる。
-- テーブル：`disputes`（`account_id`、`livemode`、`charge_id`、`payment_intent_id`、`amount`、`currency`、`reason`、`status`、`network_reason_code`、`evidence`（JSONB）、`evidence_due_by`、`submission_count`、`is_charge_refundable`、`connector_case_id`、`created_at`、`closed_at`）、`dispute_files`、`early_fraud_warnings`。
+- テーブル：`disputes`（`account_id`、`charge_id`、`payment_intent_id`、`amount`、`currency`、`reason`、`status`、`network_reason_code`、`evidence`（JSONB）、`evidence_due_by`、`submission_count`、`is_charge_refundable`、`connector_case_id`、`created_at`、`closed_at`）、`dispute_files`、`early_fraud_warnings`、`files`（File。`purpose`、S3 のキー、大きさ、種類）。テストと本番はクラスタで分かれるので `livemode` の列は持たない（[data-model.md](data-model.md) の 1 節）。
 - 本家の `reason` の値を使う：`fraudulent`、`duplicate`、`product_not_received`、`product_unacceptable`、`subscription_canceled`、`credit_not_processed`、`unrecognized`、`general` など。カードブランドの理由コード（例：Visa 10.4）は `network_reason_code` に持ち、写し先の表はコネクタごとに持つ。
 
 ## 3. 状態

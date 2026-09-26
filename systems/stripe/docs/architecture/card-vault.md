@@ -65,7 +65,10 @@
   | 本体 → CDE | PrivateLink（CDE の NLB のエンドポイントサービス）＋mTLS（AWS Private CA の証明書）。許可するのは prod のアカウントだけ | vault-core の `bind_card_input`・`get_card`・`delete_card`、connector-gateway の `authorize` / `capture` / `refund` / `void` / `inquire` / `authenticate_*`。渡すのは `pm_`、`account_id`、金額、参照番号（紐づけのときだけ使い捨ての `card_input`）。応答は表示用の情報と結果だけで、カード番号を含めない |
   | CDE → 本体 | prod の SQS キュー `connector-results`（キューのポリシーで cde-live・cde-test のロールだけを許す） | コネクタの結果と、カード番号を除いたアクワイアラの通知（[ADR-0014](../decisions/0014-connector-inbox.md)）。CDE から本体へ HTTP で呼ぶ経路は作らない |
 
-- **境界を越える識別子は `pm_` だけ**（紐づけの 1 回だけ `card_input` も通る）。Vault の内部の `card_ref` は CDE の外に出さない。
+- **境界を越える識別子は `pm_` だけ。唯一の例外が `card_input`** で、PaymentMethod の紐づけ（3.1 節の手順 8）の 1 回だけ本体を通る。Vault の内部の `card_ref` は CDE の外に出さない。
+  - 例外を認める根拠（2026-09-27 に確かめた）：PAN・有効期限・CVC は、ブラウザの iframe から CDE の vault-ingest へ直接送られ、本体を通らない。本体が受け取るのは `card_input`（`ci_` ＋ 128 bit のランダムな値。PAN から導かない）だけで、カード会員データを含まず、PAN を復元する手がかりにもならない。使い捨てで、30 分で失効し、同じ公開キーからの紐づけにしか使えない。
+  - 紐づけの応答で本体が受け取るのは、表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と加盟店向けの指紋だけ。BIN と下 4 桁と指紋を本体に置く扱いは、QSA に確認する（4 節）。
+  - これ以外の値を境界に通すときは、ADR を起票する（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) の 2026-09-27 の注記）。
 - **Checkout のページ（本体）と、Elements を埋め込む加盟店のページは CDE ではない。** ただし Checkout のページは、改ざんされるとカード欄を偽装できるため、CDE のセキュリティに影響する系（connected-to / security-impacting）として扱い、スクリプトの管理（要件 6.4.3）と改ざんの検知（要件 11.6.1）の対象に含める。
 - CDE のデプロイの経路（CI/CD のロール、Terraform の状態、ECR）も CDE と同じ統制に置く（[ADR-0033](../decisions/0033-cde-pipeline-and-change-control.md)、[security.md](security.md) の 8 節）。
 - 大阪リージョン（DR）にも同じ構成を置く。Vault DB は Aurora Global Database、鍵は KMS のマルチリージョンキーにする（ADR-0019）。
@@ -148,9 +151,9 @@ Payments（本体）──▶ Connector Gateway.authorize(account_id, pm_, amoun
 - DEK は 1 時間ごと、または 100 万件ごとに新しくし、以後は復号だけに使う。GCM の nonce は 96 bit のランダムで、1 つの DEK での件数を上限で抑える。
 - KMS の HSM は FIPS 140-3 Security Level 3 の認定を受けており、平文の鍵を誰も取り出せない（[AWS のブログ](https://aws.amazon.com/blogs/security/aws-kms-now-fips-140-2-level-3-what-does-this-mean-for-you/)）。
 - 指紋：本家の `fingerprint` は、同じカード番号かを見分ける値（[Card object](https://docs.stripe.com/api/cards/object)）。本システムでは次の 2 つを出す。
-  - 加盟店向け：`HMAC(cde-fp, account_id ‖ PAN)` を切り詰めた値。加盟店をまたいで同じカードを突き合わせられない。本家の指紋も加盟店ごとに異なるとされる（未検証。検証の予定：テスト環境の 2 つのアカウントで同じテスト用の番号の指紋を比べる）。
+  - 加盟店向け：`HMAC(cde-fp, account_id ‖ PAN)` を切り詰めた値。加盟店をまたいで同じカードを突き合わせられない。本家の指紋もアカウントごとに一意である（[重複したカードの検出](https://support.stripe.com/questions/how-can-i-detect-duplicate-cards-or-bank-accounts)、2026-09-27 に確認）。
   - 内部向け（Fraud のリストと速度の集計）：`HMAC(cde-fp, PAN)`。加盟店に出さない。
-- 本体に置くのは、ブランド、BIN（先頭 6 桁）、下 4 桁、有効期限、funding、発行国、指紋。切り詰めた PAN と鍵つきハッシュが同じ場所にあっても、鍵が CDE の外にないので突き合わせられない。**この扱いが要件 3.4・3.5.1.1 を満たすかは QSA に確認する**（未検証）。
+- 本体に置くのは、ブランド、BIN（先頭 6 桁）、下 4 桁、有効期限、funding、発行国、指紋。切り詰めた PAN と鍵つきハッシュが同じ場所にあっても、鍵が CDE の外にないので突き合わせられない。**この扱いが要件 3.5.1（同じ PAN の切り詰めた値とハッシュが同じ環境にあるときの追加の統制）と 3.5.1.1（鍵つきの暗号学的ハッシュ）を満たすかは QSA に確認する**（QSA の見解は未検証）。2026-09-27 の訂正：以前は「3.4・3.5.1.1」と書いていたが、3.4 は PAN の表示とコピーの制限で、この話題の要件は 3.5.1 である（PCI DSS v4.0.1 の原文（PCI SSC の文書庫からは取得できず、第三者が掲載した公式の PDF の写し [PCI-DSS-v4_0_1.pdf](https://www.middlebury.edu/sites/default/files/2025-01/PCI-DSS-v4_0_1.pdf) で照合。2026-09-27））。
 
 ### データモデル（CDE）
 
@@ -218,21 +221,22 @@ vault_deks  (dek_id PK, wrapped_dek, cmk_arn, created_at, retired_at)
 S2 以降で扱う。ネットワークトークンは、ブランドのトークンサービス（Visa Token Service、Mastercard MDES など）が PAN の代わりに発行するトークンで、カードの再発行に追従し、取引ごとの暗号文（cryptogram）を使う（[Stripe の解説](https://stripe.com/guides/understanding-benefits-of-network-tokens)）。
 
 - 発行と暗号文の取得は Connector Gateway から、アクワイアラまたはトークンリクエスタの機能を通して行う。
-- ネットワークトークンも Vault DB に `card_ref` に紐づけて、PAN と同じ鍵の階層で保管する（トークンの扱いはブランドの規則に従う。未検証）。
+- ネットワークトークンも Vault DB に `card_ref` に紐づけて、PAN と同じ鍵の階層で保管する。これは本システムの選択で、トークンリクエスタがトークンをどう保管すべきかを定めた公開の規則は見つからなかった（未検証）。ブランドの規則で確かめられたのは、Visa の暗号文（TAVV・DTVV）はオーソリの後に保存してはならず、1 回限りであること（[Visa のトークンの要件](https://usa.visa.com/content/dam/VCOM/global/support-legal/documents/avoid-authorization-declines-by-following-the-requirements-for-token.pdf)、2026-09-27 に確認）。暗号文は保存しない。
 - PAN は、ネットワークトークンが使えないときのために残す。
 - カードの情報の更新（Card Account Updater）も同じ時期に検討する。
 
 ## 9. ログとマスキング
 
 - **構造化ログのフィールドは許可リストにする。** CDE のサービスは、許可したフィールドだけを出すロガーを使い、要求の本文をそのままログに出さない。
-- CloudWatch Logs のデータ保護ポリシーで、カード番号・セキュリティコードの形をマスクし、検出をメトリクスにする（検出が 1 件でもあればアラート）。マネージドなデータ識別子の対象は着手時に確かめる（未検証）。
+- CloudWatch Logs のデータ保護ポリシーで、カード番号・セキュリティコードの形をマスクし、検出をメトリクスにする（検出が 1 件でもあればアラート）。マネージドなデータ識別子は `CreditCardNumber`・`CreditCardExpiration`・`CreditCardSecurityCode` を使う（[金融のデータ識別子](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/protect-sensitive-log-data-types-financial.html)、2026-09-27 に確認）。
+  - この 3 つは、近くに「card」「cvv」などのキーワードがあることを検出の条件にしている。キーワードのない生の PAN は検出されないことがあり、テスト用のカード番号も報告されない。**この仕組みを唯一の防御にしない。** 許可リストのロガー（上）と、正規表現と Luhn による独自のデータ識別子を併せて使う。
 - 本体では、ADR-0005 の Confirmation のとおり、ログ・DB・メッセージに PAN の形（Luhn を満たす 13〜19 桁）が出ないことを CI と本番の走査で確かめる。S3 は Macie で走査する。
 - 画面に出すカード番号は、BIN と下 4 桁までにする（要件 3.4.1）。本体の画面は下 4 桁だけを出す。
 - CDE のログ・CloudTrail・VPC フローログは、log-archive アカウントへ送る（ADR-0023）。
 
 ## 10. PCI DSS の要件との対応（概要）
 
-要件番号は PCI DSS v4.0.1 の原文で確定させる（未検証：原文は PCI SSC の文書庫から利用条件に同意して取得する。QSA との最初の打ち合わせまでに照合する）。AWS の責任範囲（物理、ハイパーバイザー）は、AWS Artifact の AOC と責任分担の表で引き継ぐ。
+要件番号は PCI DSS v4.0.1 の原文（PCI SSC の文書庫からは取得できず、第三者が掲載した公式の PDF の写し [PCI-DSS-v4_0_1.pdf](https://www.middlebury.edu/sites/default/files/2025-01/PCI-DSS-v4_0_1.pdf) で照合。2026-09-27）と照合した。この文書・[security.md](security.md)・[observability.md](observability.md) の番号（1.3.1・1.3.2、3.2.1、3.3.1・3.3.1.2・3.3.2、3.4.1、3.5.1・3.5.1.1、3.6・3.7、6.2.3、6.3.3、6.4.3、6.5.1、7.2.4、8.4.2、10.2.1・10.2.2、10.4.1・10.4.1.1、10.5.1、10.6、10.7.2、11.3.1・11.3.2、11.4.1〜11.4.3、11.4.6、11.6.1、12.5.2・12.5.2.1、12.8、12.9、12.10・12.10.2）は、表題と内容が合っている。QSA との最初の打ち合わせで、PCI SSC から正式に取得した原本で改めて確かめる。AWS の責任範囲（物理、ハイパーバイザー）は、AWS Artifact の AOC と責任分担の表で引き継ぐ。
 
 | 要件 | 内容 | 本システムでの対応 |
 | --- | --- | --- |
@@ -250,7 +254,7 @@ S2 以降で扱う。ネットワークトークンは、ブランドのトー�
 | 12 | 方針と体制 | スコープの確認、TPSP の管理（3DS Server、アクワイアラ）、インシデント対応、加盟店への責任分担の提示（12.9） |
 
 - サービスプロバイダーとして、加盟店に AOC と責任分担の表を出す（要件 12.9）。本家も、統合の方法に応じた自己評価の書式（SAQ）の案内を提供している（[Stripe のセキュリティ](https://docs.stripe.com/security)）。
-- 附属書 A1（マルチテナントのサービスプロバイダー）が当てはまるかは QSA に確認する（未検証）。
+- 附属書 A1（Additional PCI DSS Requirements for Multi-Tenant Service Providers。A1.1 顧客の環境の分離、A1.2 顧客ごとのログとインシデント対応）が当てはまるかは QSA に確認する（番号と表題は原文で確認。当てはまるかは QSA の判断で未検証）。
 
 ## 11. Epic との対応
 
