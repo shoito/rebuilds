@@ -1,0 +1,35 @@
+# REQ-DLV-014: compare the `main` ruleset on GitHub with .github/rulesets/main.json
+# every day and open (or comment on) an issue when they differ.
+#
+# bypass_actors are only returned to tokens with admin read access. Without the
+# RULESET_READ_TOKEN secret (e.g. a GitHub App token with Administration: read),
+# the drift issue reports them as "not returned by the API".
+name: Ruleset drift
+
+on:
+  schedule:
+    - cron: "0 0 * * *" # 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Compare the ruleset
+        env:
+          GITHUB_TOKEN: ${{ secrets.RULESET_READ_TOKEN || github.token }}
+        run: node tools/spec-checks/src/cli.ts ruleset-drift

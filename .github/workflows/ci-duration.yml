@@ -1,0 +1,32 @@
+# REQ-DLV-012: weekly p90 of the PR CI duration (until ci-gate completes).
+# Opens (or comments on) the `ci-slow` issue when the p90 exceeds 15 minutes.
+name: CI duration
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Monday 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Measure the last 7 days
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/spec-checks/src/cli.ts ci-duration

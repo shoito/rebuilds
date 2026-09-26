@@ -1,0 +1,251 @@
+# PR and merge queue CI (systems/slack/docs/changes/260926-ci-pipeline).
+# `ci-gate` is the only required check (REQ-DLV-004). To add a check, add a job,
+# let tools/spec-checks/src/changes.ts target it, and add it to `ci-gate.needs`.
+#
+# The `infra` job (uses: ./.github/workflows/infra-pr.yml) is added by
+# 260926-terraform-foundation together with infra-pr.yml: a reusable workflow
+# that does not exist would make this whole file invalid. Until then
+# changes.ts does not target infra.
+name: CI
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per PR; a new push cancels the previous run (REQ-DLV-012).
+  # Merge queue refs are unique, so queue runs never cancel each other.
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Comparison base: PR base commit, or the merge queue base commit (REQ-DLV-003).
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+  TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+  TURBO_TELEMETRY_DISABLED: "1"
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      targets: ${{ steps.plan.outputs.targets }}
+      slack-scope: ${{ steps.plan.outputs.slack-scope }}
+      hooks-scope: ${{ steps.plan.outputs.hooks-scope }}
+      required-hooks: ${{ steps.plan.outputs.required-hooks }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - id: plan
+        name: Decide the jobs to run (DT-DLV-001)
+        run: node tools/spec-checks/src/cli.ts changes --base "$BASE_SHA"
+
+  slack-static:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"slack-static"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          project: systems/slack
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: systems/slack/.turbo/cache
+          key: turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-
+      - name: Type check, lint, format
+        working-directory: systems/slack
+        env:
+          SCOPE: ${{ needs.changes.outputs.slack-scope }}
+        run: |
+          if [ "$SCOPE" = affected ]; then set -- --affected; fi
+          pnpm exec turbo run typecheck lint format:check "$@"
+
+  slack-test:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"slack-test"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          project: systems/slack
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: systems/slack/.turbo/cache
+          key: turbo-${{ github.job }}-${{ github.sha }}
+          restore-keys: turbo-${{ github.job }}-
+      - name: Unit, property and table-driven tests
+        working-directory: systems/slack
+        env:
+          SCOPE: ${{ needs.changes.outputs.slack-scope }}
+        run: |
+          if [ "$SCOPE" = affected ]; then set -- --affected; fi
+          pnpm exec turbo run test "$@"
+
+  slack-integration:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"slack-integration"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          project: systems/slack
+      - name: Integration tests (Testcontainers on the runner's Docker)
+        working-directory: systems/slack
+        env:
+          SCOPE: ${{ needs.changes.outputs.slack-scope }}
+        run: |
+          if [ "$SCOPE" = affected ]; then set -- --affected; fi
+          pnpm exec turbo run test:integration "$@"
+
+  slack-hooks:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"slack-hooks"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Required hook tasks are defined (REQ-DLV-011)
+        env:
+          REQUIRED: ${{ needs.changes.outputs.required-hooks }}
+        run: node tools/spec-checks/src/cli.ts hooks --required "$REQUIRED"
+      - uses: ./.github/actions/setup
+        with:
+          project: systems/slack
+      - name: Migration lint, contract check, flag tests
+        working-directory: systems/slack
+        env:
+          SCOPE: ${{ needs.changes.outputs.hooks-scope }}
+        run: |
+          if [ "$SCOPE" = affected ]; then set -- --affected; fi
+          pnpm exec turbo run lint:migrations check:contract test:flags "$@"
+
+  workflow-lint:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"workflow-lint"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          project: tools/spec-checks
+      - name: Install actionlint (checksum verified)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tgz" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/actionlint.tgz" -C "$RUNNER_TEMP/bin" actionlint
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Workflow safety and ruleset checks (REQ-DLV-013)
+        run: node tools/spec-checks/src/cli.ts workflow-lint
+
+  tools-test:
+    needs: changes
+    if: contains(needs.changes.outputs.targets, '"tools-test"')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          project: tools/spec-checks
+      - name: Type check
+        working-directory: tools/spec-checks
+        run: pnpm typecheck
+      - name: Tests
+        working-directory: tools/spec-checks
+        run: pnpm test
+
+  spec-checks:
+    # Runs for every PR and merge group (REQ-DLV-006..010, REQ-DLV-002).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Traceability, collisions, archive lock, ADR index
+        run: node tools/spec-checks/src/cli.ts check --base "$BASE_SHA" --warnings-file "$RUNNER_TEMP/warnings.md"
+      - name: PR title
+        if: success() || failure()
+        env:
+          # For merge groups the title is read again from the PR via the API.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/spec-checks/src/cli.ts title
+      - name: Comment warnings on the PR (DT-DLV-003 #6)
+        if: (success() || failure()) && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -s "$RUNNER_TEMP/warnings.md" ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/warnings.md" --edit-last \
+              || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/warnings.md"
+          fi
+
+  ci-gate:
+    needs: [changes, slack-static, slack-test, slack-integration, slack-hooks, workflow-lint, tools-test, spec-checks]
+    # !cancelled() rather than always(): a run cancelled by a newer push must not
+    # report a result, and it is excluded from the duration measurement (REQ-DLV-012).
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools/spec-checks
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Judge (DT-DLV-002)
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/spec-checks/src/cli.ts gate
