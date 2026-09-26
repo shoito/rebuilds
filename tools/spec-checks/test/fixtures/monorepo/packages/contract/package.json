@@ -1,0 +1,5 @@
+{
+  "name": "@slack/contract",
+  "private": true,
+  "scripts": { "typecheck": "true", "lint": "true", "test": "true" }
+}

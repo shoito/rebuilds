@@ -58,6 +58,14 @@ describe("REQ-DLV-008: ID and ADR number collisions", () => {
     expect(checkConflicts(specsFromFiles(files)).map((f) => f.message)).toEqual([expect.stringContaining("DT-DLV-004 #2")]);
   });
 
+  it("REQ-DLV-005: two PRs adding the same ID pass alone but fail once combined in the merge queue", () => {
+    const a = spec("systems/slack/docs/changes/260101-a/spec.md", "---\ncapability: messaging\nstatus: draft\n---\n## ADDED Requirements\n\n### REQ~MSG~007: a\n");
+    const b = spec("systems/slack/docs/changes/260101-b/spec.md", "---\ncapability: messaging\nstatus: draft\n---\n## ADDED Requirements\n\n### REQ~MSG~007: b\n");
+    expect(checkConflicts(specsFromFiles(new Map([a])))).toEqual([]);
+    expect(checkConflicts(specsFromFiles(new Map([b])))).toEqual([]);
+    expect(checkConflicts(specsFromFiles(new Map([a, b])))[0]!.message).toContain("DT-DLV-004 #2");
+  });
+
   it("REQ-DLV-008: an ID prefix that does not match the capability fails", () => {
     const files = new Map([
       spec("systems/slack/docs/changes/260101-x/spec.md", "---\ncapability: channels\nstatus: draft\n---\n## ADDED Requirements\n\n### REQ~DLV~020: a\n"),

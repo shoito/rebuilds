@@ -1,0 +1,5 @@
+{
+  "name": "@slack/db",
+  "private": true,
+  "scripts": { "typecheck": "true", "lint": "true", "test": "true" }
+}

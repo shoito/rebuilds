@@ -1,0 +1,6 @@
+{
+  "name": "@slack/api",
+  "private": true,
+  "scripts": { "typecheck": "true", "lint": "true", "test": "true" },
+  "dependencies": { "@slack/contract": "workspace:*", "@slack/db": "workspace:*" }
+}
