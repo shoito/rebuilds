@@ -69,4 +69,27 @@ Web ブラウザは、利用者が最も長く使うソフトウェアの 1 つ�
 
 ## Open questions
 
-- 互換性の目標を、どの指標で測るか（Web Platform Tests の合格率、主要サイトの動作）。
+- ~~互換性の目標を、どの指標で測るか~~：NFR-007（対象とした領域の Web Platform Tests の合格率 90% 以上、主要サイト 1,000 件で致命的な崩れ 0 件）で測る。対象の領域と数え方は [quality.md](quality.md) の 2.4 節。
+- 既定案で決めた事項と、計測・PoC・契約で決める持ち越しは、[architecture/README.md](architecture/README.md) の 6 節にある。
+
+### 法務・事業の確認待ち
+
+設計はどの結論にも対応できる形にしてあるが、結論は出していない。**下の表の「承認を止める spec」は、確認が済むまで PM・QA が承認しない。** 設計と、確認に依らない Story は進めてよい。
+
+| # | 問い | 関係する設計 | 承認を止める spec |
+| --- | --- | --- | --- |
+| L1 | DRM：Widevine を使うか。使うなら提供元へのライセンスの申請（外部の手続き）と、その条件（サンドボックス・署名・配布の要件） | [rendering.md](architecture/rendering.md) の 15・17 節 | DRM の Story（S1 に含めない。[roadmap.md](roadmap.md) の「後回しにしたもの」） |
+| L2 | ソースの公開：公開するか、時期、自作のコードのライセンス。部品（MPL-2.0 の Stylo、BSD の DevTools のフロントエンドなど）のライセンスの表示と、配布物への同梱の方法 | [architecture/README.md](architecture/README.md) の「決定」、[build-and-test.md](architecture/build-and-test.md) の 5 節 | ソースの公開と OSS-Fuzz への参加の Story。配布物のライセンスの表示の Story（E9） |
+| L3 | 本家の名前との関係：拡張機能の `chrome.*` の名前空間（ADR-0025）、本家と同じ名前の企業のポリシー（`ExtensionSettings` など）、拡張機能 ID の形式を本家と同じにすることが、商標・誤認の問題にならないか | [ADR-0025](decisions/0025-extension-platform-mv3.md)、[browser-ui.md](architecture/browser-ui.md) の 5 節、[extensions.md](architecture/extensions.md) の 6 節 | E7 の名前空間の Story、E6 の企業のポリシーの Story |
+| L4 | 本家の CRLSet・HSTS の事前読み込み・ルートストアの一覧を取り込んで再配布してよいか（利用条件） | [networking.md](architecture/networking.md) の 6 節、[ADR-0015](decisions/0015-tls-and-certificate-verification.md) | E4 の本家の CRLSet を使う Story（既定案の CCADB から作る Story は止めない） |
+| L5 | Pwned Passwords のデータを自前の CDN に写して配ってよいか | [safe-browsing-and-permissions.md](architecture/safe-browsing-and-permissions.md) の 6.4 節 | E8 の自前の写しの Story（既定案の範囲 API は止めない） |
+| L6 | 利用者のデータの送信：テレメトリ・クラッシュの同意の画面と公開する範囲、Safe Browsing のリアルタイムの照会、検索の候補の送信が、個人情報保護法・電気通信事業法の外部送信規律・GDPR の求めを満たすか | [ADR-0005](decisions/0005-privacy-first-services.md)、[ADR-0032](decisions/0032-crash-and-telemetry-privacy.md)、[browser-ui.md](architecture/browser-ui.md) の 3.3 節 | E9 の同意とテレメトリの Story、E5 のリアルタイムの照会の Story、E6 の検索の候補の Story |
+| L7 | 拡張機能のストアの開発者の規約、方針の条項、措置と異議の手続き | [extensions.md](architecture/extensions.md) の 7 節、[ADR-0026](decisions/0026-extension-store-review.md) | E7 のストアの公開の Story |
+| L8 | 脆弱性の報告の窓口とバグ報奨金の規約（研究者の保護、支払い） | [sandbox-and-security.md](architecture/sandbox-and-security.md) の 7 節 | E10 のバグ報奨金の Story |
+| L9 | 主要サイトの通信を記録して試験に使うこと（著作権、各サイトの利用規約） | [build-and-test.md](architecture/build-and-test.md) の 3 節 | E2 の主要サイトの記録の Story |
+| L10 | 検索エンジンの選択の画面（各国の規制）と、検索エンジンと商業の契約を持たない前提 | [browser-ui.md](architecture/browser-ui.md) の 3.2 節 | E6 の検索エンジンの選択の Story |
+
+### 事業の判断（法務以外）
+
+- OHTTP の中継の事業者との契約（E5 の着手前）、商用の脅威のフィードの選定と費用（E5）、Google との契約を Safe Browsing の出所に足すか（S2 の後。ADR-0021）。
+- バグ報奨金の金額と運営の基盤（E10）。
