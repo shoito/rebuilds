@@ -96,6 +96,8 @@ API（操作＋audit_events を同じトランザクションで INSERT）
 
 ### 保持
 
+> S3 のアーカイブの期間は、[ADR-0033](0033-slack-aligned-platform-and-plan-decisions.md) で 2 年に改めた。管理者が見られる監査ログは Enterprise だけにする。
+
 | 場所 | 期間 | 期限後 |
 | --- | --- | --- |
 | DB の `audit_events` | 1 年 | 削除の Worker が消す（専用のロールで行い、その実行自体を `platform_audit_events` に残す） |

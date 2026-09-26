@@ -141,6 +141,7 @@
 | [0030](../decisions/0030-versioned-public-api.md) | 版付きの公開 API を、内部 API と分けて提供する（MVP の後） |
 | [0031](../decisions/0031-app-platform.md) | アプリのプラットフォーム（インストール、ボット、イベントの配信、インタラクティブ） |
 | [0032](../decisions/0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ |
+| [0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 

@@ -36,6 +36,8 @@ date: 2026-09-26
 
 ### 初期値（仮置き）
 
+> プランの区分と値は、[ADR-0033](0033-slack-aligned-platform-and-plan-decisions.md) で本家 Slack に寄せて確定した（4 区分、レート制限はプランで変えない）。下の表は起票時の仮置きとして残す。
+
 | 名前 | Free | Pro | Enterprise |
 | --- | --- | --- | --- |
 | `limit.members.max` | 50 | 5,000 | 5,000（S2 以降は 20,000） |

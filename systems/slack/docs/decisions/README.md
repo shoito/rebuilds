@@ -36,5 +36,6 @@ Slack の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0030](0030-versioned-public-api.md) | 版を持つ公開 API を、内部の API と別の面として提供する | accepted |
 | [0031](0031-app-platform.md) | アプリの基盤を、インストール単位のボット、署名付きの HTTPS の配送、宣言的な UI で作る | accepted |
 | [0032](0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ | accepted |
+| [0033](0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める | accepted |
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。E1 の `ci-pipeline` で、CI が生成と差分の検査を行うようにする（手で編集する一覧は衝突しやすいため。[process.md](../../../../docs/process.md) の「衝突の防止」）。
