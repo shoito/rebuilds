@@ -173,7 +173,7 @@ Rust で作るこのブラウザでは、2 を「C/C++ の部品」と「`unsafe
 
 - **上流の部品（V8 など）の修正**：上流の修正が公開された時点から、差分の解析で悪用が始まりうる（パッチの空白）。上流の Critical・High の修正は、上流の公開から 3 日以内に Stable の修正の版の配信を始め（内部の目標）、そこから NFR-006 で届ける。上流の修正の公開の予定を事前に知る手段（上流の配布者の事前通知の枠組みに入れるか）は、未解決の問い（E10）。
 - 修正は、開発ブランチでは中身のわからない件名でコミットし、リリースのブランチへの取り込みと同時に公開する。
-- 報告の詳細は、修正を全利用者へ届けた後に公開する。公開までの期間は本家の運用（修正の後、一定の週数で公開）に寄せる。本家の具体的な週数は未検証。
+- 報告の詳細は、修正を全利用者へ届けた後に公開する。公開までの期間は本家に揃え、修正が入って約 30 日の後に公開する。受け付けなかった報告（WontFix・Invalid）は 14 週の後に公開する（[Security FAQ](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/security/faq.md)、[security-labels.md](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/security/security-labels.md)、2026-09-27 に確認）。修正を全利用者へ届け終えていなければ、公開を延ばす。
 - CVE の採番のために、CNA になるかは未解決の問い。
 - 手順は [runbooks/emergency-security-release.md](../runbooks/emergency-security-release.md)（0-day と上流の部品の緊急の修正を含む）。
 
@@ -228,7 +228,7 @@ UI の部品の設計は [browser-ui.md](browser-ui.md) にある。
 - 上流の部品（V8 など）の修正の公開を事前に知る手段。NFR-006 の起点は Stable への配信の開始と決めた（[README.md](README.md) の「決定」）。上流の公開から配信の開始までは、3 日の内部の目標で追う。
 - CNA になるか。バグ報奨金の金額と運営。
 - ソースを公開するか（OSS-Fuzz への参加、外部の研究者の参加に影響する）。
-- 未検証：Windows で Network サービス・GPU を LPAC で動かせる範囲、CET と V8 の JIT の両立、Linux の配布版ごとのユーザー名前空間の制限、整数のあふれの検査の性能への影響、本家が報告を公開するまでの週数。E5 の Story の中で、実機と公式の資料で確かめる。
+- 未検証：Windows で Network サービス・GPU を LPAC で動かせる範囲、CET と V8 の JIT の両立、Linux の配布版ごとのユーザー名前空間の制限、整数のあふれの検査の性能への影響。どれも実機での計測が要り、公式の資料だけでは決まらない（2026-09-27 の検証の対象外）。E5 の Story の中で確かめる。本家が報告を公開するまでの期間（約 30 日）は、2026-09-27 に確かめた（7 節）。
 
 ## References
 

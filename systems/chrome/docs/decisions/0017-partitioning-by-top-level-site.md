@@ -42,6 +42,8 @@ date: 2026-09-26
 
 ## Consequences
 
+> 2026-09-27 の注記：HTTP キャッシュのキーを改める。本家が既定にしたのは、Chrome 135 の「クロスサイトから始まったトップレベルのナビゲーションの区別」だけである（[http_cache.cc](https://source.chromium.org/chromium/chromium/src/+/main:net/http/http_cache.cc) の `cn_` の接頭辞、2026-09-27 に確認）。フレームのサイトをクロスサイトのビットに替える案は実験だけで、`NetworkIsolationKey` は今も（トップレベルのサイト、フレームのサイト）を持つ（[network_isolation_key.h](https://source.chromium.org/chromium/chromium/src/+/main:net/base/network_isolation_key.h)）。したがって、上の「既定になった版は未検証」は解消した。下の表の HTTP キャッシュの行は、「（トップレベルのサイト、フレームのサイト）＋クロスサイトから始まったナビゲーションの区別＋URL」と読む（クロスサイトのビットは入れない）。[networking.md](../architecture/networking.md) の 5.2 節を改めた。
+
 - 良くなること：
   - キャッシュ・接続・保存領域による、サイトをまたいだ追跡と情報の漏洩を防げる。
   - 本家と同じ分割なので、Web Platform Tests と本家の振る舞いで試験できる。

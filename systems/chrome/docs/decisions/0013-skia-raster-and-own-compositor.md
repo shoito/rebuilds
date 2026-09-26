@@ -37,6 +37,8 @@ date: 2026-09-26
 
 ## Consequences
 
+> 2026-09-27 の注記：`skia-safe`（0.153.3、2026-09-04）は `graphite` の機能を持つが、Rust のバインディングは Metal と Vulkan だけで、Dawn はない。ANGLE の専用の機能と、Fontations のバックエンド（`SkTypeface_Fontations`）もない（[rust-skia](https://github.com/rust-skia/rust-skia) の skia-safe の Cargo.toml と build の設定、2026-09-27 に確認）。このため、Windows で Graphite を使うなら Vulkan、Ganesh なら Direct3D か GL（ANGLE の EGL を自前で渡す）になる。文字の輪郭は Skrifa で取り出し、パスとして Skia に渡す（[rendering.md](../architecture/rendering.md) の 8.2・11 節）。ANGLE と組み合わせる手間は、引き続き E1 で確かめる。
+
 - 良くなること：
   - ページの raster、Canvas 2D、表示の合成の描画、文字の描画を、1 つの部品（Skia）で賄う。本家と同じ描画の結果（アンチエイリアス、文字）に近づく。
   - 本家の RenderingNG と段・スレッドの形が揃い、性能の問題の切り分けに本家の知見を使える。

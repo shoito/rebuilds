@@ -36,6 +36,8 @@ DOM と JavaScript の間には循環が普通にある（ノード → イベ�
 
 ## Consequences
 
+> 2026-09-27 の注記：rusty_v8（v152 系）は `v8::cppgc`（Heap、Visitor、GarbageCollected、Member）と `Object::wrap`・`unwrap`、名前と添字の interceptor を公開している。既定のビルドでは、V8 のサンドボックスもポインタの圧縮も無効である。ポインタの圧縮は Cargo の機能 `v8_enable_pointer_compression` で有効にでき、事前にビルドした版もある。サンドボックスは実験的な機能で、ソースからのビルドが要る（[denoland/rusty_v8](https://github.com/denoland/rusty_v8) の Cargo.toml・build.rs・README、2026-09-27 に確認）。アクセス検査のコールバックと、ラッパーの削除可能性の API は公開していない。このため、cross-origin の `WindowProxy` にはアクセス検査の API を上流へ足す作業が要る。ラッパーはノードと同じ寿命にする（[javascript-and-web-apis.md](../architecture/javascript-and-web-apis.md) の 1.3・4.2 節）。cppgc の DOM の速度は、引き続き E1 で測る。
+
 - 良くなること：
   - JavaScript と DOM の循環を、V8 の GC が 1 回で回収する。Blink で実績のある方式。
   - V8 の並行マーキング・背景の掃除（sweep）を DOM にも使える。

@@ -49,6 +49,8 @@ TLS は 1、検証は 1 を採用する。周辺の部品も合わせて決め�
 
 ## Consequences
 
+> 2026-09-27 の注記：本家は CRLSet の利用の許諾を出していない（2017-12-01 の chromium-discuss で「We are not offering a license for the CRLSets at this time」、形式も予告なく変えるとした。[chromium-discuss](https://groups.google.com/a/chromium.org/g/chromium-discuss/c/wfnqnXmePsA)、2026-09-27 に確認）。公開の利用条件もない。したがって既定の案（CCADB の CRL から自前で作る）を使い、再配布は法務の確認（[intent.md](../intent.md) の L4）で許諾が得られた場合に限る。CCADB の `AllCertificateRecordsCSVFormatV5` には、全体の CRL と分割した CRL の URL の列がある。データは CDLA-Permissive-2.0 で、再配布には CCADB の帰属の表示が要る（[CCADB のリソース](https://www.ccadb.org/resources)、[利用条件](https://www.ccadb.org/rootstores/usage)、2026-09-27 に確認）。本家のルートストアへの移行は、Windows・macOS が Chrome 105 から段階的に始めて 108 で既定、Linux・ChromeOS が 114 である（[Chrome Root Store FAQ](https://chromium.googlesource.com/chromium/src/+/main/net/data/ssl/chrome_root_store/faq.md)）。
+
 - 良くなること：
   - TLS から HTTP までの主な解析が Rust になり、メモリ安全性の欠陥を減らせる。
   - 3 OS で同じ検証の振る舞い（CT、ルートの制約、エラー）になり、本家と比べて試験できる。

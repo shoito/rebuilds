@@ -26,6 +26,8 @@ date: 2026-09-26
 | 自作する（設計の中心） | 複数プロセスの構成と IPC、サイトの隔離、ナビゲーションと履歴、ネットワークのスタックの組み立て（キャッシュ、Cookie、プライバシーの制限）、保存領域、DOM とイベント、レイアウト、UI、拡張機能の API、更新・同期のクライアント |
 | 部品を使う（候補。領域の文書で確定する） | JavaScript：V8。スタイル：Stylo（Servo）。描画：WebRender か Skia。文字：HarfBuzz と FreeType・各 OS のフォント。国際化：ICU4X。TLS：rustls か BoringSSL。HTTP/3：quinn などの QUIC の実装。画像・動画：各形式の復号器と OS の機能 |
 
+> 2026-09-27 の注記：上の表の「候補」は、後の ADR と領域の文書で確定した。JavaScript は V8 を rusty_v8 で組み込む（[ADR-0010](0010-v8-embedding-and-dom-gc.md)）。スタイルは Stylo（[ADR-0011](0011-stylo-style-engine.md)）。描画は WebRender でなく Skia で、合成は自作（[ADR-0013](0013-skia-raster-and-own-compositor.md)）。TLS は BoringSSL でなく rustls（暗号は `aws-lc-rs`）、HTTP/3 は `quinn` と `h3`（[ADR-0015](0015-tls-and-certificate-verification.md)）。文字は HarfBuzz と FreeType でなく、HarfRust と Skrifa（[rendering.md](../architecture/rendering.md) の 11 節、[ADR-0024](0024-ui-toolkit.md) の注記）。表は決めた時点の記録として残す。
+
 - 部品は、バージョンを固定し、脆弱性の修正に追従する責任を持つ（[update-and-release.md](../architecture/update-and-release.md)）。
 - 2 は、プロセスの構成・隔離・ナビゲーションといった設計の中心を、既存のコードに委ねることになる。
 - 3 は、JavaScript エンジンの性能と互換性に、何年もかかる。

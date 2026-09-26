@@ -79,10 +79,12 @@ NFR-010 を受けた SLI と、その計測の場所。値の正本は [runbooks
 | 成果物の配信 | CloudFront の成果物の要求のうち、5xx 以外の割合 | 99.95% |
 | Safe Browsing のリスト | リストの要求のうち、5xx 以外の割合。加えて、最新の版の生成から配信まで 10 分以内の割合 | 99.95% |
 | Safe Browsing の照会 | 1 秒以内に 5xx 以外を返した割合 | 99.95% |
+| Safe Browsing の判定（端から端） | テスト用の URL をリストに載せてから、合成の端末で判定されるまで | 30 分以内（NFR-009） |
 | 同期 | 同期の要求のうち、5xx 以外の割合 | 99.9% |
 | 同期の反映 | 反映の遅延が 10 秒以内の割合（NFR-008） | 95% |
 | アカウント | ログイン・トークンの更新のうち、5xx 以外の割合 | 99.9% |
 | 拡張機能のストア | 更新の確認とパッケージの取得のうち、5xx 以外の割合 | 99.9% |
+| 拡張機能の停止の一覧の反映 | 一覧への追加から、合成の端末で無効になるまで | 30 分以内（ADR-0026） |
 | クラッシュ・テレメトリの受け取り | 受け取りの要求のうち、5xx 以外の割合 | 99.5% |
 
 端末の品質の指標（NFR-001・005・006）は、SLO ではなく、リリースの判定の基準と自動の停止の条件として使う（[update-and-release.md](update-and-release.md) の 4.3 節）。判定の基準の値は QA が [quality.md](../quality.md) で決める。
@@ -94,7 +96,7 @@ Slack の 5.2 節のマルチウィンドウのバーンレートを、4 節の 
 | アラート | 条件 | 重さ | 手順 |
 | --- | --- | --- | --- |
 | 配信の自動の停止 | rollout-guard が段階を凍結した | 呼び出し（営業時間外は Stable のみ） | [bad-release-rollback.md](../runbooks/bad-release-rollback.md) |
-| 新しい版のクラッシュの急増 | 新しい版の Browser のクラッシュ率が、前の版の 1.5 倍（標本が足りる場合） | 呼び出し | 同上 |
+| 新しい版のクラッシュの急増 | 新しい版の Browser のクラッシュ率が、前の版の 1.5 倍を超え、かつ 1,000 セッションあたり 0.5 を超える（標本が足りる場合。[update-and-release.md](update-and-release.md) の 4.3 節） | 呼び出し | 同上 |
 | 更新の失敗率 | 結果のイベントの失敗が 5% を超える（版ごと） | 呼び出し | 同上 |
 | 緊急の修正の普及の遅れ | `urgency=critical` の版の普及が、24 時間で 60% に届かない | チケット（release owner） | [emergency-security-release.md](../runbooks/emergency-security-release.md) |
 | Safe Browsing のリストの遅れ | 最新のリストの生成から 20 分たっても CDN に出ていない（NFR-009） | 呼び出し | [service-incident-response.md](../runbooks/service-incident-response.md) |

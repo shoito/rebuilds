@@ -36,6 +36,8 @@ date: 2026-09-26
 
 ## Consequences
 
+> 2026-09-27 の注記：EC2 Mac には物理のスマートカードを挿せないので、下の「スマートカードを署名専用の機械に挿す運用」は成り立たない。macOS の署名は [ADR-0034](0034-macos-signing-with-rcodesign-and-cloudhsm.md) で決め直した（Linux の署名専用の実行環境で rcodesign を使い、Developer ID の鍵を CloudHSM に置く。公証は App Store Connect の API キーで行う）。release-signing に EC2 Mac は置かない。下の「CloudHSM と EC2 Mac の固定の費用」は、CloudHSM の固定の費用と読む。E9 の PoC で確かめ終えるまで、macOS の Stable は出さない。
+
 - 良くなること：
   - サービスが止まっても、端末は配信済みのものと静的な配信で動き続ける。
   - 鍵と診断のデータへの経路が、アカウントの境界で絞られる。

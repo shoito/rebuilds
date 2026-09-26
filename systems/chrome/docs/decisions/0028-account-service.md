@@ -44,6 +44,8 @@ date: 2026-09-26
 
 ## Confirmation
 
+> 2026-09-27 の注記：Better Auth の「OAuth 2.1 Provider」のプラグイン（`@better-auth/oauth-provider`）は、公開クライアント（`token_endpoint_auth_method: "none"`）、既定で必須の PKCE、RFC 8252 の形の独自のスキームのリダイレクト URI を受け付ける（[OAuth 2.1 Provider](https://www.better-auth.com/docs/plugins/oauth-provider)、2026-09-27 に確認）。文書の上では条件を満たす。E8 の初めの試作は、動作の確認として残す。Linux の Chrome は、スマートフォンでの認証（hybrid）に対応している。BLE は BlueZ を使う（[Passkeys の対応環境](https://developers.google.com/identity/passkeys/supported-environments)、2026-09-27 に確認）。BlueZ に起因する不安定さの報告があるので、Linux の hybrid の品質は E8 で実機で確かめる。
+
 - 結合テストで、パスキー・メールの OTP・TOTP・ブラウザのサインイン（PKCE を含む）・リフレッシュトークンの回転と失効・端末の削除を通す。
 - リフレッシュトークンの再利用（回転前のトークンの使用）で、その端末のトークンがすべて失効することをテストで確かめる。
 - リダイレクト URI への遷移が Renderer に渡らないことを、侵害された Renderer を模したテストで確かめる。

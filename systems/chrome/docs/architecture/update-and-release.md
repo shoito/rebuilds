@@ -190,8 +190,8 @@ ADR-0004 の段階（1% → 10% → 50% → 100%）で配る。区画が段階�
 | OS | 方式 | 鍵の保管 |
 | --- | --- | --- |
 | Windows | Authenticode。すべての実行ファイル・DLL・インストーラーに署名し、タイムスタンプを付ける | release-signing アカウントの CloudHSM。SignTool から KSP 経由で使う（[CloudHSM と SignTool](https://docs.aws.amazon.com/cloudhsm/latest/userguide/third-signtool-toplevel.html)） |
-| macOS | Developer ID で署名し、Hardened Runtime を有効にし、セキュアなタイムスタンプを付ける。`notarytool` で公証し、チケットをステープルする（[Apple のドキュメント](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)） | 署名専用の EC2 Mac の上の、ハードウェアの鍵。方式は未検証（CloudHSM から `codesign` を使えるかは確かめていない。EC2 Mac には物理のスマートカードを挿せないので、方式は E9 の PoC で選び直す。決まるまで macOS の Stable は出さない） |
-| Linux | apt・dnf のリポジトリのメタデータとパッケージに GPG で署名する | CloudHSM を PKCS#11 で使う想定。GnuPG から使う方式は未検証 |
+| macOS | Developer ID で署名し、Hardened Runtime を有効にし、セキュアなタイムスタンプを付ける。公証し、チケットをステープルする（[Apple のドキュメント](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)）。署名・公証・ステープルは、release-signing の Linux の署名専用の実行環境で rcodesign が行う。公証には App Store Connect の Team の API キー（Developer の役割。release-signing の Secrets Manager）を使う。署名の後、ci の EC2 Mac で `codesign --verify`・`spctl`・`stapler validate` を流す（[ADR-0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)） | release-signing アカウントの CloudHSM（PKCS#11）。rcodesign の PKCS#11 は未リリースの機能なので、E9 の `macos-signing-poc` で公証と Gatekeeper の検査を通ることを確かめる。決まるまで macOS の Stable は出さない |
+| Linux | apt・dnf のリポジトリのメタデータとパッケージに GPG（OpenPGP）で署名する | release-signing アカウントの CloudHSM を PKCS#11 で使う。CloudHSM と GnuPG をつなぐ AWS の文書はなく、方式は未検証（2026-09-27）。候補は、GnuPG の scdaemon を置き換える第三者の `gnupg-pkcs11-scd`（RSA だけ）と、PKCS#11 の鍵で OpenPGP の署名を作る `sq-pkcs11`（初期の段階）。E9 の `linux-packages` で選ぶ |
 
 - **コード署名の鍵は、ハードウェアの中で作り、外に出さない。** CA/Browser Forum の要件で、2023-06-01 から、コード署名の証明書の鍵は FIPS 140-2 レベル 2 以上の機器で作って保管することが求められる（[CA/Browser Forum の Code Signing Baseline Requirements](https://cabforum.org/working-groups/code-signing/requirements/)）。
 - **SmartScreen の評判は時間をかけて貯まる。** EV の証明書でも、最初のダウンロードの警告は消えない。評判は、ファイルのハッシュと、署名の発行者の両方で貯まる（[Microsoft のドキュメント](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation)）。したがって、署名の主体を変えない。証明書の更新は、同じ発行者の名前で、期限の 60 日前に行う。Canary から先に新しい証明書に切り替える。
@@ -221,7 +221,7 @@ NFR-006：重大な脆弱性の修正を、Stable への配信の開始から 48
 
 ## 7. 差分の更新
 
-- **Zucchini** で、実行ファイルの差分を作る。Zucchini は、実行ファイルの中の参照（ジャンプ先など）を解析して、生のバイトの差分より小さな差分を作る（[Zucchini の README](https://chromium.googlesource.com/chromium/src/+/HEAD/components/zucchini/README.md)）。本家が以前使った Courgette との関係と、どちらが今の本家の既定かは未検証。新しく作るので、Zucchini だけを使う。
+- **Zucchini** で、実行ファイルの差分を作る。Zucchini は、実行ファイルの中の参照（ジャンプ先など）を解析して、生のバイトの差分より小さな差分を作る（[Zucchini の README](https://chromium.googlesource.com/chromium/src/+/HEAD/components/zucchini/README.md)）。本家の部品の更新（update_client）が持つ差分の形式は Puffin（`puffpatch`）と Zucchini だけで、Courgette はソースから消えた（[components/update_client/patcher.h](https://source.chromium.org/chromium/chromium/src/+/main:components/update_client/patcher.h)、2026-09-27 に確認）。この設計も Zucchini と Puffin を使う。
 - 圧縮されたファイル（リソースのパック）は **Puffin** で差分にする。プロトコル 4 のパイプラインは、どちらの操作も持つ（[Omaha プロトコル 4](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/updater/protocol_4.md)）。
 - 差分は、リリースの工程で、各チャンネルの直近の 3 つの版から作る。それより古い版の端末と、差分の適用に失敗した端末には、全体を返す（応答のパイプラインに、差分と全体の両方の URL を並べる）。
 - 差分の大きさは初期見積もり（全体の約 10%。[capacity.md](capacity.md)）。Canary の実績で決め直す。
@@ -252,7 +252,7 @@ Crashpad ─POST（gzip）─▶ CloudFront ─▶ crash-ingest（ECS）
 リリースの工程 ─ dump_syms でシンボルを作り、S3 のシンボルの置き場へ
 ```
 
-- **シンボル化**は、rust-minidump の `minidump-stackwalk` を使う。Breakpad の `.sym` 形式のシンボルを読める。Mozilla のクラッシュの収集（Socorro）で本番に使われている（[rust-minidump](https://github.com/rust-minidump/rust-minidump)）。PDB・DWARF・Mach-O から `.sym` を作る道具（Mozilla の `dump_syms`）の対応範囲は未検証。
+- **シンボル化**は、rust-minidump の `minidump-stackwalk` を使う。Breakpad の `.sym` 形式のシンボルを読める。Mozilla のクラッシュの収集（Socorro）で本番に使われている（[rust-minidump](https://github.com/rust-minidump/rust-minidump)）。Mozilla の `dump_syms`（v2.3 系）は、PDB と ELF の DWARF から `.sym` を作る。Mach-O は README に書かれていないが、ソースに対応がある（`src/mac.rs`）（[mozilla/dump_syms](https://github.com/mozilla/dump_syms)、2026-09-27 に確認）。Socorro は rust-minidump の上の stackwalker を使っている（[mozilla-services/socorro](https://github.com/mozilla-services/socorro)）。macOS の `.sym` は、E9 の `crash-ingest-symbolicator` で実際に作って確かめる。
 - シンボルは、Canary を含むすべての成果物について、リリースの工程で作って置く。シンボルのない版のクラッシュは、ビルドの工程の失敗として扱う。
 - **シグネチャ**：復元したスタックの上位のフレーム（部品の中の共通の関数を飛ばす）を正規化したもの。シグネチャごと・版ごと・チャンネルごとに件数を数え、[observability.md](observability.md) の指標にする。
 - 新しいシグネチャが、ある版で上位 20 件に入ったら、開発リポジトリに Issue を起票する。Issue にはスタックとシグネチャだけを書き、minidump は添付しない。

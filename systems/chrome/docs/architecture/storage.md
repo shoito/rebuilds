@@ -21,7 +21,7 @@ Storage サービス（1 つ。S2 までに別プロセス・サンドボック�
 ```
 
 - **Renderer は StorageKey を指定しない。** Browser が、そのフレームのオリジンとトップレベルのサイトから StorageKey を決め、そのキーに結び付けたハンドル（IPC の接続）だけを Renderer に渡す。Renderer が侵害されても、別のキーの保存領域を開けない（[ADR-0003](../decisions/0003-multi-process-site-isolation.md)）。
-- Storage サービスは、最初は Browser プロセスの中で動かし、S2 までに別のプロセスへ分ける（[process-model.md](process-model.md) の 5 節）。最初から IPC の境界（ハンドルと StorageKey）を別プロセスと同じ形にしておき、分けるときに呼び出しの経路を変えずに済むようにする。分ける理由は、解析の多い処理（IndexedDB のキーの比較、SQLite）を Browser から外すため。本家がどちらで動かしているかは 未検証（確認方法：Chromium の `components/services/storage/` の起動の経路を読む）。
+- Storage サービスは、最初は Browser プロセスの中で動かし、S2 までに別のプロセスへ分ける（[process-model.md](process-model.md) の 5 節）。最初から IPC の境界（ハンドルと StorageKey）を別プロセスと同じ形にしておき、分けるときに呼び出しの経路を変えずに済むようにする。分ける理由は、解析の多い処理（IndexedDB のキーの比較、SQLite）を Browser から外すため。本家のデスクトップは別のプロセスで動かしている（Android だけが Browser の中。[storage_partition_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/storage_partition_impl.cc) の `GetStorageServiceRemote()`、2026-09-27 に確認）。
 
 ## 2. プロファイルのディスク上の配置
 
@@ -62,7 +62,7 @@ Storage サービス（1 つ。S2 までに別プロセス・サンドボック�
 | 分割する API | localStorage、sessionStorage、IndexedDB、Cache Storage、Service Worker、Storage Buckets、BroadcastChannel、SharedWorker、Web Locks、Blob URL |
 | バケット | StorageKey ごとに `default` のバケットを 1 つ持つ。Storage Buckets API で名前付きのバケットを足せる（MVP の後。データのモデルだけ最初から持つ） |
 
-- 本家の、分割を一時的に解く deprecation trial（`DisableThirdPartyStoragePartitioning`）には対応しない。代わりに、Storage Access API で許可された埋め込みには、分割されない保存領域へのハンドルを渡す（本家の「Storage Access API の保存領域への拡張」に相当。仕様の状態は 未検証）。
+- 本家の、分割を一時的に解く deprecation trial（`DisableThirdPartyStoragePartitioning`）には対応しない。代わりに、Storage Access API で許可された埋め込みには、分割されない保存領域へのハンドルを渡す（本家の「Storage Access API の保存領域への拡張」に相当。仕様は Privacy CG の草案で、本家は Chrome 125 で出荷した。`requestStorageAccess({ localStorage: true, indexedDB: true, ... })` の形で求める。[saa-non-cookie-storage](https://privacycg.github.io/saa-non-cookie-storage/)、[New in Chrome 125](https://developer.chrome.com/blog/new-in-chrome-125)、2026-09-27 に確認）。
 
 ## 4. 割り当てと追い出し
 
@@ -78,20 +78,20 @@ Storage サービス（1 つ。S2 までに別プロセス・サンドボック�
 | 「終了時に Cookie とサイトデータを消去」を設定したサイト | 300 MB（本家と同じ） |
 
 - 数える対象：IndexedDB、Cache Storage、Service Worker のスクリプト、localStorage。HTTP キャッシュは数えない。
-- `navigator.storage.estimate()` は、実際の使用量を丸めて返す（ディスクの空きを正確に見せない。フィンガープリントの対策）。不透明な応答（`no-cors`）の Cache Storage への保存は、本体の大きさでなく、水増しした値で数える（本家と同じ考え方。水増しの値は 未検証。確認方法：Chromium の `padding_key` の実装を読む）。
+- `navigator.storage.estimate()` は、実際の使用量を丸めて返す（ディスクの空きを正確に見せない。フィンガープリントの対策）。不透明な応答（`no-cors`）の Cache Storage への保存は、本体の大きさでなく、水増しした値で数える（本家と同じ形にする。本家の水増しは、ブラウザの起動ごとに作る乱数の鍵で、URL・応答の時刻・サイト・メソッド・付随データの大きさの HMAC-SHA256 を取り、約 14.1 MiB（14,431 KiB）で割った余り。不透明な応答とリダイレクトに付ける。[padding_key.cc](https://source.chromium.org/chromium/chromium/src/+/main:storage/common/quota/padding_key.cc)、2026-09-27 に確認）。
 - 使用量は、書き込みのたびに `buckets.db` の値を増減する。起動時に全体を数え直さない。数え直しは、破損からの回復と定期の検査のときだけ行う。
 
 ### 4.2 追い出し
 
 - **ディスクの空きが閾値を下回ったら、最後に使われた時刻が古いバケットから、バケット単位で全部を消す。** 本家も「最も長く使われていないオリジンから、そのデータをすべて」消す（同上）。
 - 追い出さないもの：`navigator.storage.persist()` で永続を許されたバケット、今開いているページが使っているバケット。
-- 永続の許可は、ブックマーク済み・インストール済みのアプリ・通知の許可があるサイトに、確認なしで与えるか、確認を出すかを決める（本家は確認を出さずに条件で決める。条件の詳細は 未検証）。
+- 永続の許可は、確認を出さず、条件で与える（[README.md](README.md) の「決定」。本家も確認を出さない。トップレベルのオリジンだけが対象で、Cookie がセッション限りか遮断なら与えない。インストール済みのアプリか、利用の多さ・永続の許可・ブックマーク・ホーム画面・通知の許可から選ぶ「重要なサイト」の上位 10 件なら与える。[persistent_storage_permission_context.cc](https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/storage/persistent_storage_permission_context.cc)、2026-09-27 に確認）。
 - 閾値は、ディスクの全容量の 10% か 数 GB の小さい方から始め、計測で決める。
 
 ## 5. localStorage
 
 - StorageKey ごとに 1 つ。バケットの `local_storage.db`（SQLite、1 つの表のキーと値）に保存する。
-- 上限は StorageKey あたり 10 MiB（キーと値の文字数を UTF-16 で数える）。本家の値は 未検証（確認方法：Chromium の `dom_storage` の定数を読む）。
+- 上限は StorageKey あたり 10 MiB（キーと値の文字数を UTF-16 で数える）。本家と同じ値（`kPerStorageAreaQuota = 10 MiB`。1 文字を 2 バイトとして、キーと値を数える。Browser の側は 100 KiB の超過を許す。[storage_area.mojom](https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/public/mojom/dom_storage/storage_area.mojom)、[storage_area_map.cc](https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/modules/storage/storage_area_map.cc)、2026-09-27 に確認）。
 - **Renderer に全体の写しを持たせる。** localStorage は同期の API なので、ページを開いたときに Storage サービスから全件を Renderer に渡し、以後の読み取りは Renderer の中で済ませる。書き込みは非同期に Storage サービスへ送り、同じ StorageKey の他の Renderer に `storage` イベントとして配る（本家も Renderer に写しを持つ）。
 - ディスクへの書き込みは、まとめて遅延させる（数秒）。Browser が落ちても、直前の数秒分を失うことを許す（仕様上も保証はない）。
 
@@ -118,7 +118,7 @@ parsed → installing → installed(waiting) → activating → activated → re
 ```
 
 - Service Worker は、専用の Renderer で動かす。どのプロセスで動かすかは、StorageKey のサイトで決める（サイトの隔離。[process-model.md](process-model.md)）。
-- **イベントがなければ、30 秒で止める。1 つのイベントの処理が 5 分を超えたら止める。** 本家と同じ値（未検証。確認方法：Chromium の `ServiceWorkerVersion` の定数を読む）。止めても登録は残り、次のイベントで起動する。
+- **イベントがなければ、30 秒で止める。1 つのイベントの処理が 5 分を超えたら止める。** 本家と同じ値（`kServiceWorkerDefaultIdleDelayInSeconds = 30`、`kRequestTimeout = base::Minutes(5)`。[service_worker.mojom](https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/public/mojom/service_worker/service_worker.mojom)、[service_worker_version.h](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/service_worker/service_worker_version.h)、2026-09-27 に確認）。止めても登録は残り、次のイベントで起動する。
 - 起動の遅さを隠すため、ナビゲーションの横取りでは、Service Worker の起動と並行して、`navigationPreload` が有効ならネットワークへのリクエストも始める。
 
 ### 7.3 fetch の横取り

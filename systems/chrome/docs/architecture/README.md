@@ -63,7 +63,7 @@
 | --- | --- | --- | --- |
 | NFR-001 | 起動の時間（ウォームの起動、最初の画面まで） | p75 1 秒以内 | 基準の端末で |
 | NFR-002 | ページの表示 | 主要サイトの Core Web Vitals（LCP・INP・CLS）が、同じ端末の本家 Chrome の 1.2 倍以内 | |
-| NFR-003 | JavaScript・描画の性能 | Speedometer 3 のスコアが、同じ端末の本家 Chrome の 80% 以上 | |
+| NFR-003 | JavaScript・描画の性能 | Speedometer 3.1 のスコアが、同じ端末の本家 Chrome の 80% 以上 | |
 | NFR-004 | メモリ | タブ 20 枚の標準の作業で、本家 Chrome の 1.2 倍以内 | |
 | NFR-005 | 安定性 | Stable のクラッシュ率（Browser プロセス）が 1,000 セッションあたり 0.5 件未満 | |
 | NFR-006 | 修正の配信 | 重大な脆弱性の修正を、Stable への配信の開始から 48 時間以内に Stable の 90% の利用者へ届ける | 起点と終点の定義は [update-and-release.md](update-and-release.md) の 6 節。公表から配信の開始までは内部の目標で別に追う |
@@ -118,6 +118,7 @@
 | [0031](../decisions/0031-ci-tiers-wpt-and-release-branches.md) | CI は presubmit・CQ・継続の 3 段。WPT は期待値で回帰を止め、リリースのブランチは cherry-pick だけ（リポジトリ共通の ADR-0002 の例外） |
 | [0032](../decisions/0032-crash-and-telemetry-privacy.md) | クラッシュとテレメトリは同意した人だけが送り、利用者の ID を持たせない |
 | [0033](../decisions/0033-service-infrastructure-and-dr.md) | 配信を静的にして CDN で守り、署名の鍵と診断のデータを専用のアカウントに分ける |
+| [0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md) | macOS の署名は、Linux の署名専用の実行環境で rcodesign を使い、鍵を CloudHSM に置く |
 
 リポジトリ共通の決定（開発プロセス、トランクベース開発の [ADR-0002](../../../../docs/decisions/0002-trunk-based-development.md)、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。この題材は、そのうち 2 つに例外を持つ（下の「決定」）。
 
@@ -156,26 +157,26 @@ PM の方針（追加の質問なしに既定案で進める。本家の Chromiu
 - **漏洩の確認**は、Pwned Passwords の範囲 API を OHTTP の中継で使う。自前の写しは、配布の条件の確認（法務）の後に検討する。
 - **ネットワークの既定**：プロキシの自動検出（WPAD）は OS の設定に従い、ブラウザが独自に有効にしない。`Sec-GPC` は既定で送らない（設定で送れる）。どちらも本家と同じ。
 - **永続の保存の許可**は、確認を出さず、条件（ブックマーク済み、インストール済みのアプリ、通知の許可、利用の多さ）で与える（本家と同じ）。
-- **ログインの互換**：サードパーティ Cookie の一時的な許可は、本家の 3PCD のヒューリスティクス（ポップアップ・リダイレクトの後の期限付きの許可）の形に揃える。値は E4 で本家のソースで確かめる。
+- **ログインの互換**：サードパーティ Cookie の一時的な許可は、本家の 3PCD のヒューリスティクス（ポップアップ・リダイレクトの後の期限付きの許可）の形に揃える。値はポップアップの後 30 日、リダイレクトの後 15 分（2026-09-27 に確認。[networking.md](networking.md) の 8.1 節）。
 - **WebGL の後に Web Audio**（MVP の後、E2 の Story）。
 - **ソースの公開**：本家（Chromium）と同じく公開する前提で設計を進める。ライセンスと公開の時期は法務・事業の確認待ち。OSS-Fuzz への参加は、公開の後に ClusterFuzz と比べる。
 - **CVE**：E10 で CNA の登録を申請する（本家も自ら採番する）。それまでは MITRE に採番を依頼する。
-- **本家の値で未検証のもの**（`beforeunload` の打ち切り、応答のない Renderer の 15 秒、履歴の 50 件、bfcache の 6 ページ、接続の 6・256、Happy Eyeballs の 300 ms、Service Worker の 30 秒・5 分、localStorage の 10 MiB、一時の抑止の 3 回・7 日、使っていないサイトの 60 日、HTTPS-First の 15 日、GPU の切り替えの回数など）は、書いた値を初期値として実装し、各領域の Epic の Story で本家のソースを読んで揃える。
+- **本家の値**：2026-09-27 に本家のソースで確かめ、各文書に出典を書いた。`beforeunload` の打ち切り（500 ms）、応答のない Renderer（15 秒）、履歴（50 件）、bfcache（6 ページ・10 分）、接続（6・256）、Happy Eyeballs（300 ms）、Service Worker（30 秒・5 分）、localStorage（10 MiB）、一時の抑止（3 回・7 日）、使っていないサイト（60 日）、HTTPS-First（15 日）、GPU の切り替え（5 分ごとに 1 回を許し、3 回で 1 段下げる）、CT のログの一覧の古さ（70 日）、DNR の全体の枠（300,000）。どれも本家と同じ値にした。確かめられなかったもの（`pushState` の大きさの上限など）は、書いた値を初期値として実装し、各領域の Epic の Story で揃える。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節（[observability.md](observability.md) の 4 節の提案をそのまま採った）。性能の予算・WPT の対象・リリースの合否は [quality.md](../quality.md)。段階的な配信の自動の停止の閾値は [update-and-release.md](update-and-release.md) の 4.3 節。負荷の前提は [capacity.md](capacity.md)。
 
 持ち越し（計測・PoC・契約で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| rusty_v8 のサンドボックス・ポインタの圧縮、cppgc の DOM の速度、weedle2 の構文、Stylo の `servo` で足りないプロパティ、`skia-safe` の Graphite と ANGLE、HarfRust の速度、Rust の画像の復号器の互換、DevTools のフロントエンド | E1 の PoC（[rendering.md](rendering.md) の 17 節、[javascript-and-web-apis.md](javascript-and-web-apis.md) の 7 節） |
-| Taffy の Grid の合格率、WPT の結果の wpt.fyi への掲載 | E2 |
-| プロセスの上限の式、IPC・RenderDocument の費用、V8 の `Intl` と ICU4X、OS の合成器への委譲、Linux の PSI の閾値 | E3 の計測 |
-| `h3` の成熟度（足りなければ `quiche`）、IndexedDB の性能、3PCD のヒューリスティクスの値 | E4 |
+| rusty_v8 のサンドボックス・ポインタの圧縮（既定で無効と確認。ソースからビルドする）とアクセス検査の API の追加、cppgc の DOM の速度、weedle2 のフォークか自作か（`ObservableArray` がないと確認）、Stylo の `servo` で足りないプロパティ、`skia-safe` の Graphite と ANGLE、HarfRust の速度とメトリクス、Rust の画像の復号器の互換、DevTools のフロントエンド | E1 の PoC（[rendering.md](rendering.md) の 17 節、[javascript-and-web-apis.md](javascript-and-web-apis.md) の 7 節） |
+| Taffy の Grid の合格率、WPT の結果の wpt.fyi への掲載（手続きは確認済み：送り手の登録とブラウザの名前の追加） | E2 |
+| プロセスの上限の式、IPC・RenderDocument の費用、V8 の `Intl` と ICU4X の二重持ちのメモリ、OS の合成器への委譲、Linux の PSI の閾値 | E3 の計測 |
+| `h3` の成熟度（足りなければ `quiche`）、IndexedDB の性能 | E4 |
 | Linux のユーザー名前空間の制限、LPAC・CET の範囲、商用の脅威のフィード、OHTTP の中継の事業者（契約） | E5 の着手前に選ぶ・確かめる |
-| winit の IME、IA2 の要否、AccessKit の性能 | E6 の初め |
-| 上位の拡張機能のマニフェストの集計、DNR の全体の枠 | E7 の初め |
-| Argon2id の引数、OAuth 2.1 Provider の第一者のクライアント、本家の同期の衝突の既定、Linux の hybrid | E8 の初め |
-| macOS の署名の鍵の置き場（EC2 Mac にスマートカードは挿せないため、方式を選び直す） | E9 の PoC。決まるまで macOS の Stable は出さない |
+| winit の IME、IA2 の要否（AccessKit は IA2 を持たないと確認）、AccessKit の性能 | E6 の初め |
+| 上位の拡張機能のマニフェストの集計 | E7 の初め |
+| Argon2id の引数、OAuth 2.1 Provider の第一者のクライアントの動作（文書では対応を確認）、Linux の hybrid の品質 | E8 の初め |
+| macOS の署名：[ADR-0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)（rcodesign と CloudHSM、公証は App Store Connect の API キー）で決めた。rcodesign の PKCS#11 は未リリースの機能なので、公証と Gatekeeper の検査を通ることを確かめる。Linux の GPG の署名を CloudHSM でどう行うか | E9 の PoC（`macos-signing-poc`、`linux-packages`）。確かめ終えるまで macOS の Stable は出さない |
 | 上流の部品の事前通知の枠組み、バグ報奨金の金額と運営、CNA | E10 |
-| 2 週の周期、Origin-Agent-Cluster のプロセスの分離、Storage サービスの別プロセス化、同期のメタデータのパディング、パスキーの PRF での鍵の保護、社内の Canary の広いダンプ | S2 の前 |
+| 2 週の周期、Origin-Agent-Cluster のプロセスの分離（本家は既定で分けないと確認）、Storage サービスの別プロセス化、同期のメタデータのパディング、パスキーの PRF での鍵の保護、社内の Canary の広いダンプ | S2 の前 |
 | Google との契約（Web Risk など）を出所に足すか | S2 の運用の後（ADR-0021） |

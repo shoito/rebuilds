@@ -80,7 +80,7 @@ Browser（UI・frame の木）          Network サービス             Rendere
 
 - 前の文書の `beforeunload` は、行き先へのリクエストの前に、前の文書のプロセスへ問う。Browser が始めたナビゲーションで、`beforeunload` の処理器がない文書には問わない（Renderer が、処理器の有無を事前に Browser へ知らせる）。
 - 確認の画面は Browser が出す。利用者の操作がない文書の `beforeunload` の確認は出さない（仕様が許す範囲の本家の挙動）。
-- 前の文書の応答がない場合、一定時間で打ち切って進める。時間は **未検証**（本家の既定を確かめる）。
+- 前の文書の応答がない場合、500 ms で打ち切って進める。本家と同じ値（`kUnloadTimeout = base::Milliseconds(500)`。beforeunload と unload の両方に使う。[render_frame_host_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/renderer_host/render_frame_host_impl.cc)、2026-09-27 に確認）。
 - `unload` は、コミットの後、前の文書のプロセスで実行する（別のプロセスなら、並行して行う）。`unload` は bfcache を妨げるので、将来は本家の段階的な廃止に合わせて、使えないようにしていく（6.3）。
 
 ### 3.4 リダイレクト
@@ -201,8 +201,8 @@ Renderer は、文書を作ったら完了を知らせる。Browser は、完了
 
 - タブごとに、履歴の項目の列と、今の位置を持つ。各項目は、その時点の frame の木に沿った、frame ごとの項目（URL、オリジン、文書の状態、POST の本文の識別子）を持つ。
 - iframe の中のナビゲーションも、項目を増やす（仕様の joint session history）。戻るは、どの frame を動かすかを項目の差から決める。
-- 項目の数の上限は 50（本家と同じ既定。**未検証**。`NavigationController` の上限を確かめる）。超えたら古いものから捨てる。
-- `history.pushState` の状態（シリアライズした値）は、Renderer から受け取る不透明なバイト列として保存し、同じオリジンの文書にだけ戻す。大きさの上限を設ける（仕様の上限は実装に任される。本家の値は **未検証**）。
+- 項目の数の上限は 50（本家と同じ。`kMaxSessionHistoryEntries = 50`。[session_history_constants.h](https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/public/common/history/session_history_constants.h)、2026-09-27 に確認）。超えたら古いものから捨てる。
+- `history.pushState` の状態（シリアライズした値）は、Renderer から受け取る不透明なバイト列として保存し、同じオリジンの文書にだけ戻す。大きさの上限を設ける（仕様の上限は実装に任される。本家の値は **未検証**。本家のソースで見つけられなかったため、E2 の `history-and-navigation-api` で探す）。
 
 ### 6.2 履歴の移動
 
@@ -218,7 +218,7 @@ Renderer は、文書を作ったら完了を知らせる。Browser は、完了
 - **入れる**：最上位のクロスドキュメントのナビゲーションで離れるとき、ページ（frame の木のすべての文書）が条件を満たせば、`pagehide`（`persisted: true`）を送り、凍結する。タイマー・Promise の実行・ネットワークの読み込みを止める。
 - **入れない条件**（MVP）：`unload` の処理器、`window.opener` を持つ・持たれる、進行中の `fetch`・XHR、開いた IndexedDB の接続で他のタブをふさいでいるもの、WebRTC、`Cache-Control: no-store` の文書、ダウンロードや権限のダイアログの表示中。条件の一覧は 1 か所で持ち、理由のコードを付ける。
 - **追い出す**：凍結中に JavaScript を実行しなければならない事態（別のタブからの `BroadcastChannel` のメッセージの配送など）が起きたら、実行せずに追い出す。凍結中のページが動いたように見えることを防ぐ。
-- **保持の上限**：タブあたり 6 ページ、1 ページあたり 10 分（本家の既定。10 分は [Chrome のドキュメント](https://developer.chrome.com/docs/web-platform/bfcache-ccns)で確認。6 ページは `cache_size` の既定として見たが **未検証**）。メモリの圧迫で減らす（[process-model.md](process-model.md) の 3.5）。
+- **保持の上限**：タブあたり 6 ページ、1 ページあたり 10 分（本家の既定。`kBackForwardCacheSize` の `cache_size` の既定が 6、`kDefaultTimeToLiveInBackForwardCacheInSeconds = 600`。[back_forward_cache_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/back_forward_cache/back_forward_cache_impl.cc)、2026-09-27 に確認。本家はメモリの圧迫で中程度なら前面 3・背面 1、重大なら 0 に減らす。`Cache-Control: no-store` のページは 3 分）。メモリの圧迫で減らす（[process-model.md](process-model.md) の 3.5）。
 - **プロセス**：凍結したページのプロセスは、プロセスの鍵を保ったまま残す。上限の計算では、凍結中のページだけのプロセスを優先して止める候補にする。
 - **復元**：戻るで該当のページがあれば、ネットワークに行かず、凍結を解いて `pageshow`（`persisted: true`）を送る。文書の実体は保存していたものを使うので、コミットの検査（5.3）は要らないが、プロセスが生きていること・鍵が変わっていないことは確かめる。
 - **理由の公開**：復元できなかった理由を、`notRestoredReasons`（Navigation Timing）で返す。自分たちの理由のコードを、仕様の名前に対応づける。

@@ -28,7 +28,7 @@ Renderer ──(URLLoaderFactory だけ)──▶ URLLoader（リクエスト 1 
 ```
 
 - **Network サービスは、デスクトップでは独立したプロセスで動かす。** 本家もデスクトップでは専用の Utility プロセスで動かす（同 README）。落ちたら Browser が起動し直し、発行済みの URLLoaderFactory は切れるので、利用する側が張り直す。
-- **Network サービスのプロセスも、サンドボックスに入れる。** ネットワークの入出力とプロファイルのネットワーク用ディレクトリ（[storage.md](storage.md) の 2 節の `Network/`）だけを許す。本家がどの OS でどこまで閉じているかは 未検証（確認方法：Chromium の `sandbox/policy` の network の定義を読む）。方針は [sandbox-and-security.md](sandbox-and-security.md) に合わせる。
+- **Network サービスのプロセスも、サンドボックスに入れる。** ネットワークの入出力とプロファイルのネットワーク用ディレクトリ（[storage.md](storage.md) の 2 節の `Network/`）だけを許す。本家がどの OS でどこまで閉じているかは 未検証（2026-09-27 の検証では調べていない。E5 の `sandbox-windows` などで、Chromium の `sandbox/policy` の network の定義を読む）。方針は [sandbox-and-security.md](sandbox-and-security.md) に合わせる。
 - **NetworkService と NetworkContext の IPC は、Browser だけが持つ。** Renderer には渡さない（本家と同じ）。
 - **Renderer は、Browser が発行した URLLoaderFactory だけを持つ。** Browser はファクトリを作るときに、信頼するパラメータを焼き込む。Renderer がリクエストに書いた値では上書きできない（[ADR-0003](../decisions/0003-multi-process-site-isolation.md)）。
 
@@ -79,7 +79,7 @@ URLLoader
 | 項目 | 値 | 本家との関係 |
 | --- | --- | --- |
 | プールのキー | 宛先（スキーム・ホスト・ポート）、プロキシの連鎖、プライバシーのモード（Cookie を送るか）、NetworkAnonymizationKey（5.1 節）、安全な DNS の方針 | 本家の `ClientSocketPool::GroupId` と同じ考え方 |
-| HTTP/1.1 の同時接続 | 宛先ごとに 6、プール全体で 256 | 本家の既定と同じ（値は 未検証。確認方法：`net/socket/client_socket_pool_manager.cc` を読む） |
+| HTTP/1.1 の同時接続 | 宛先ごとに 6、プール全体で 256 | 本家の既定と同じ（宛先ごとに 6、WebSocket は 255。256 はプールごとの soft limit。[client_socket_pool_manager.cc](https://source.chromium.org/chromium/chromium/src/+/main:net/socket/client_socket_pool_manager.cc)、2026-09-27 に確認） |
 | HTTP/2・HTTP/3 のセッション | 宛先ごとに 1 本を共有する。証明書が別名を覆い、IP が一致すれば、別のホストでも共有する（connection coalescing） | 同じ |
 | 待機中の接続の破棄 | 使われない接続は数分で閉じる。ネットワークの変化（Wi-Fi の切り替え）で全接続を捨てる | 同じ |
 
@@ -94,7 +94,7 @@ URLLoader
 ### 4.4 Happy Eyeballs
 
 - DNS は A と AAAA（と HTTPS レコード）を並行して引く。
-- IPv6 を先に試し、300 ms で応答がなければ IPv4 を並行して始める（[RFC 8305](https://www.rfc-editor.org/rfc/rfc8305) の考え方）。本家の待ち時間の値は 未検証（確認方法：`net/socket/transport_connect_job.cc` を読む）。
+- IPv6 を先に試し、300 ms で応答がなければ IPv4 を並行して始める（[RFC 8305](https://www.rfc-editor.org/rfc/rfc8305) の考え方）。本家も 300 ms（`kIPv6FallbackTime`。[tcp_connect_job.h](https://source.chromium.org/chromium/chromium/src/+/main:net/socket/tcp_connect_job.h)、2026-09-27 に確認。RTT で変える機能は既定で無効）。
 
 ## 5. 分割（Network State Partitioning）
 
@@ -104,12 +104,12 @@ URLLoader
 
 - キーは **NetworkAnonymizationKey（トップレベルのサイト＋フレームがクロスサイトかのビット）**。本家の Network State Partitioning と同じ（[Intent to Ship](https://groups.google.com/a/chromium.org/g/blink-dev/c/Oj9cS6p40Ws)）。
 - 分割するもの：接続（H1・H2・H3・WebSocket）、DNS のキャッシュ、ALPN・HTTP/2 の対応の記録、TLS・QUIC のセッションの再開の情報、Reporting・NEL の設定と送信。
-- 分割しないもの：HSTS（セキュリティを弱めるため。代わりに、サードパーティの文脈からの HSTS の設定を無視するかは 未検証。確認方法：本家の `TransportSecurityState` の挙動を読む）。
+- 分割しないもの：HSTS（セキュリティを弱めるため）。本家と同じく、サードパーティの文脈の応答からの HSTS の設定も受け付ける。本家が捨てるのは、証明書の誤りがある応答、IP アドレスのホスト、localhost だけである（[url_request_http_job.cc](https://source.chromium.org/chromium/chromium/src/+/main:net/url_request/url_request_http_job.cc) の `ProcessStrictTransportSecurityHeader()`、2026-09-27 に確認）。
 
 ### 5.2 HTTP キャッシュ
 
 - キーは **NetworkIsolationKey（トップレベルのサイト、フレームのサイト）＋URL**。本家は Chrome 86 で分割した（[Gaining security and privacy by partitioning the cache](https://developer.chrome.com/blog/http-cache-partitioning)）。
-- 本家はその後、キーにクロスサイトのビットと、クロスサイトから始まったトップレベルのナビゲーションの区別を加える実験・出荷をしている（[is-cross-site bit](https://groups.google.com/a/chromium.org/g/blink-dev/c/cG65eYPYf9w)、[top-level navigations](https://groups.google.com/a/chromium.org/g/blink-dev/c/ZpyP6jjCUJE)）。どの版で既定になったかは 未検証。この設計では、2 つとも最初から入れる（後から入れるとキャッシュの形式が変わるため）。
+- 本家は Chrome 135 で、クロスサイトから始まったトップレベルのナビゲーションの区別をキーに加えた（[top-level navigations](https://groups.google.com/a/chromium.org/g/blink-dev/c/ZpyP6jjCUJE)。[http_cache.cc](https://source.chromium.org/chromium/chromium/src/+/main:net/http/http_cache.cc) の `cn_` の接頭辞、2026-09-27 に確認）。フレームのサイトをクロスサイトのビットに替える案（[is-cross-site bit](https://groups.google.com/a/chromium.org/g/blink-dev/c/cG65eYPYf9w)）は実験だけで、既定にはなっていない（[network_isolation_key.h](https://source.chromium.org/chromium/chromium/src/+/main:net/base/network_isolation_key.h)、2026-09-27 に確認）。この設計は本家に揃え、（トップレベルのサイト、フレームのサイト）＋クロスサイトから始まったナビゲーションの区別＋URL を、最初から使う（後から入れるとキャッシュの形式が変わるため）。
 
 ### 5.3 HTTP キャッシュの実装
 
@@ -140,7 +140,7 @@ URLLoader
 ### 6.3 検証と CT・失効
 
 - 検証器は自作する（パスの構築、ルートストアの制約、名前の制約、有効期間）。証明書の解析と署名の検証は `rustls-webpki` と `aws-lc-rs` を使う。本家も OS の検証器をやめ、自前の検証器を Windows・macOS で Chrome 108、Linux で Chrome 114 から既定にした（同 FAQ）。
-- **CT（Certificate Transparency）を強制する。** 公開のルートにつながる証明書は、本家の CT のポリシー（異なる運営者のログからの SCT）を満たさなければ拒否する。ログの一覧は部品の更新で配る。ログの一覧が古くなったら（10 週など）、本家と同じく CT の強制を止める（値は 未検証。確認方法：Chromium の CT のポリシーの文書を読む）。
+- **CT（Certificate Transparency）を強制する。** 公開のルートにつながる証明書は、本家の CT のポリシー（異なる運営者のログからの SCT）を満たさなければ拒否する。ログの一覧は部品の更新で配る。ログの一覧が古くなったら（70 日＝10 週）、本家と同じく CT の強制を止める（[Chrome CT Policy](https://googlechrome.github.io/CertificateTransparency/ct_policy.html)、[chrome_ct_policy_enforcer.cc](https://source.chromium.org/chromium/chromium/src/+/main:components/certificate_transparency/chrome_ct_policy_enforcer.cc) の `IsLogDataTimely()`、2026-09-27 に確認）。
 - **失効は、オンラインで確かめない。** OCSP・CRL を取りに行かない（利用者の閲覧先を CA に知らせないため、遅くなるため）。本家の CRLSet と同じく、優先度の高い失効（CA の侵害、鍵の漏洩）を集めたリストを部品の更新で配る。本家の CRLSet は「失効した CA の証明書と、鍵の漏洩などで失効したサーバーの証明書」を対象にする（同 FAQ）。
   - 取り込み元は、本家の CRLSet の再配布か、CCADB の CRL から自前で作るかを決めていない（未解決事項）。CRLite の型（全件を圧縮したフィルタ）は、証明書の有効期間の短縮（CA/B Forum の SC-081：2029 年に 47 日）が進めば要らなくなるため、MVP では作らない。
 - 検証の結果は、証明書・ホスト名・分割のキーごとに短時間キャッシュする。
@@ -178,8 +178,8 @@ URLLoader
 | サードパーティ、利用者・企業のポリシーで例外 | 送る |
 
 - **CHIPS**：分割のキーはトップレベルのサイト（とクロスサイトの祖先のビット）。`Secure` を必須にする。本家は Chrome 114 から対応し、分割ごとに 180 個・埋め込まれたサイトごとに 10 KB を上限にする（[CHIPS](https://privacysandbox.google.com/3pcd/chips)）。同じ上限にする。
-- **Storage Access API**：`document.requestStorageAccess()` で、利用者の操作の後に、埋め込まれたサイトが自分の分割されない Cookie を使える。許可は 30 日で切れる（値は Firefox・Safari の実装を見て決める。未検証）。
-- **ログインの互換性**：OAuth のポップアップなど、よく壊れる流れには、Firefox と同じ種類の一時的な許可（ポップアップで操作した後の、期限付きの許可）を入れる。規則の詳細は Firefox の実装を読んで決める（未検証）。互換性を主要サイトの自動検査で追う（[build-and-test.md](build-and-test.md)）。
+- **Storage Access API**：`document.requestStorageAccess()` で、利用者の操作の後に、埋め込まれたサイトが自分の分割されない Cookie を使える。許可は、操作のない 30 日で切れる（本家・Safari と同じ。Firefox は 30 暦日。[MDN の Storage Access API](https://developer.mozilla.org/en-US/docs/Web/API/Storage_Access_API)、2026-09-27 に確認）。
+- **ログインの互換性**：OAuth のポップアップなど、よく壊れる流れには、本家の 3PCD のヒューリスティクスと同じ一時的な許可を入れる。ポップアップで操作した後は 30 日、リダイレクトの後は 15 分（[Heuristics based exceptions](https://privacysandbox.google.com/cookies/temporary-exceptions/heuristics-based-exceptions)、2026-09-27 に確認）。本家も Firefox も、将来は外す一時的な措置としている。互換性を主要サイトの自動検査で追う（[build-and-test.md](build-and-test.md)）。
 
 ### 8.2 SameSite と属性
 
@@ -191,7 +191,7 @@ URLLoader
 ### 8.3 保存と保護
 
 - Cookie は、プロファイルの `Network/Cookies`（SQLite）に保存し、NetworkContext がメモリに全件を持つ。書き込みはまとめて遅延させる。
-- Cookie の値は、OS の鍵（Keychain、DPAPI、Secret Service）で包んだ鍵で暗号化する。Windows では、本家の App-Bound Encryption（Chrome 127）と同じく、ブラウザの実行ファイルに結び付けた鍵を使い、同じ利用者の権限で動く他のプログラムから読みにくくする（本家の詳細は 未検証。確認方法：Chromium の `os_crypt` と App-Bound Encryption の文書を読む）。
+- Cookie の値は、OS の鍵（Keychain、DPAPI、Secret Service）で包んだ鍵で暗号化する。Windows では、本家の App-Bound Encryption（Chrome 127）と同じく、ブラウザの実行ファイルに結び付けた鍵を使い、同じ利用者の権限で動く他のプログラムから読みにくくする（本家は Chrome 127 から Windows の Cookie に入れ、ポリシー `ApplicationBoundEncryptionEnabled` で止められる。[Improving the security of Chrome cookies on Windows](https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html)、2026-09-27 に確認。同じ保護を自前で作る方法は 未検証で、E5 で確かめる）。
 - Renderer は `document.cookie` を読むとき、Network サービスに問い合わせる。Network サービスは、ファクトリに焼き込んだオリジンと分割のキーの範囲の Cookie だけを返す（ADR-0003）。
 
 ## 9. プロキシ
@@ -220,7 +220,7 @@ URLLoader
 
 | 項目 | 方針 |
 | --- | --- |
-| Referrer | 既定のポリシーを `strict-origin-when-cross-origin` にする（本家は Chrome 85 から）。クロスサイトでは `no-referrer-when-downgrade` などの緩いポリシーを指定されても、オリジンまでに切り詰めるかは 未検証（確認方法：本家と Firefox の挙動を WPT で比べる） |
+| Referrer | 既定のポリシーを `strict-origin-when-cross-origin` にする（本家は Chrome 85 から）。緩いポリシー（`no-referrer-when-downgrade` など）を明示されたら、クロスサイトでもそれに従う（本家と同じ。切り詰める案は取りやめた。[Cap page-scoped referrer policies](https://chromestatus.com/feature/5123843565813760)、2026-09-27 に確認）。長さは 4,096 文字まで |
 | User-Agent | 本家の User-Agent の削減と同じく、OS の版・端末の型を固定の値にする。ブランドは自前の名前にする |
 | Client Hints | 低エントロピーのもの（`Sec-CH-UA`、`Sec-CH-UA-Mobile`、`Sec-CH-UA-Platform`）だけを既定で送る。高エントロピーのもの（詳細な版、端末の型）は `Accept-CH` で要求された場合も、MVP では送らない。互換性の問題が出たら、ファーストパーティに限って送る |
 | `Sec-Fetch-*` | 送る（Fetch Metadata。サーバー側の防御に使われる） |
@@ -241,4 +241,4 @@ URLLoader
 - **サードパーティ Cookie の遮断による互換性**：SSO・埋め込みの決済・コメント欄で壊れる。Storage Access API、一時的な許可、例外の UI で補う。壊れたサイトの報告の経路を UI に置く。
 - **`h3` の成熟度**：`h3` クレートは本番での実績が `hyper`・`quinn` より少ない。E4 で負荷と相互接続の試験を行い、足りなければ `quiche`（Cloudflare）に替える。
 - **失効のリストの取り込み元**：本家の CRLSet を再配布してよいか（利用条件）、CCADB から自前で作るか。
-- **PAC と WPAD の安全**：WPAD はネットワークの攻撃者にプロキシを差し込まれる経路になる。既定で有効にするかは、本家の既定を確かめて決める（未検証）。
+- **PAC と WPAD の安全**：WPAD はネットワークの攻撃者にプロキシを差し込まれる経路になる。本家は OS のプロキシの設定に従い、OS で WPAD が有効なときだけ使う（[net/docs/proxy.md](https://chromium.googlesource.com/chromium/src/+/HEAD/net/docs/proxy.md)、2026-09-27 に確認）。この設計も同じにし、ブラウザが独自に有効にしない（[README.md](README.md) の「決定」）。

@@ -20,7 +20,8 @@ Renderer に JavaScript エンジン（V8）を組み込み、Web API を JavaSc
 - ビルドは、配布されている静的ライブラリを使わず、`V8_FROM_SOURCE=1` で自分たちのビルドの設定（GN の引数）から作る。理由は 2 つ。
   - V8 のセキュリティの設定（V8 のサンドボックス、ポインタの圧縮、Control-flow integrity）を自分たちで決めるため。
   - V8 の脆弱性の修正を、rusty_v8 の版を待たずに当てられるようにするため（[update-and-release.md](update-and-release.md)）。
-- **未検証**：rusty_v8 の既定のビルドで、V8 のサンドボックスとポインタの圧縮が有効か。自分たちの GN の引数で有効にしたとき、rusty_v8 と cppgc のバインディングが動くか。確かめ方：E1 で、両方を有効にしたビルドを 3 OS で作り、rusty_v8 のテストと自分たちの DOM のテストを通す。
+- rusty_v8 の既定のビルドでは、V8 のサンドボックスもポインタの圧縮も無効である。ポインタの圧縮は Cargo の機能 `v8_enable_pointer_compression` で有効にでき、事前にビルドした版もある。サンドボックス（`v8_enable_sandbox`）は実験的で、ソースからのビルド（`V8_FROM_SOURCE=1`）が要る（[denoland/rusty_v8](https://github.com/denoland/rusty_v8) の Cargo.toml・build.rs・README、2026-09-27 に確認）。この設計は、両方を有効にして rusty_v8 をソースからビルドする（[ADR-0030](../decisions/0030-build-system.md) の事前にビルドした成果物として固定する）。
+- **未検証**：両方を有効にしたとき、rusty_v8 と cppgc のバインディングが動くか。確かめ方：E1 で、両方を有効にしたビルドを 3 OS で作り、rusty_v8 のテストと自分たちの DOM のテストを通す。
 - `deno_core`（Deno のランタイム）は使わない。モジュールの読み込み・イベントループ・op の仕組みが Deno の実行環境に合わせてあり、ブラウザのイベントループ（HTML の仕様）や、1 つの Isolate に複数のコンテキストを持つ形と合わない。cppgc のラッパーや高速な呼び出しの使い方は、deno_core の実装を参考にする。
 
 ### 1.2 Isolate とコンテキスト
@@ -40,7 +41,7 @@ V8 の Isolate は「自分のヒープを持つ VM」、コンテキストは�
 
 - DOM のノードは cppgc のヒープに置き、JavaScript のラッパーとは `Object::wrap` で結ぶ。V8 の GC がラッパーとノードを 1 つのヒープとして辿るので、JavaScript → ノード → イベントのリスナー → JavaScript の循環も回収できる（[ADR-0010](../decisions/0010-v8-embedding-and-dom-gc.md)、[rendering.md](rendering.md) の 3 節）。
 - ラッパーは遅延して作る。JavaScript がそのノードに初めて触れたときに作り、以後は同じラッパーを返す（`[SameObject]` と同一性）。
-- ラッパーを GC に回収させてよいか（ノードは生きているが、ラッパーに独自のプロパティがない）は、V8 の「ラッパーの削除可能性」の仕組みに任せる。**未検証**：rusty_v8 がこの設定を公開しているか。公開していなければ、ラッパーはノードと同じ寿命にする（メモリは増えるが、正しさは保てる）。
+- ラッパーを GC に回収させてよいか（ノードは生きているが、ラッパーに独自のプロパティがない）は、V8 の「ラッパーの削除可能性」の仕組みに任せる。rusty_v8 はこの仕組み（EmbedderRootsHandler など）を公開していない（[denoland/rusty_v8](https://github.com/denoland/rusty_v8)、2026-09-27 に確認）。MVP では、ラッパーはノードと同じ寿命にする（メモリは増えるが、正しさは保てる）。メモリが NFR-004 を超えたら、上流に追加を送る。
 
 ### 1.4 マイクロタスク
 
@@ -89,7 +90,7 @@ V8 の Isolate は「自分のヒープを持つ VM」、コンテキストは�
 ### 3.2 型の変換
 
 - Web IDL の変換の規則（`long` の範囲の丸め、`[EnforceRange]`、`[Clamp]`、`DOMString` と `USVString`、辞書、`sequence<T>`、union、`Promise<T>`、コールバック、`any`）は、生成するコードで仕様どおりに行う（[Web IDL Standard](https://webidl.spec.whatwg.org/)）。
-- 辞書のメンバーは辞書順に読む、getter の副作用の順序など、観測できる順序も仕様に合わせる。WPT の `WebIDL/` と各 API の `idlharness` のテストで確かめる。
+- 辞書のメンバーは辞書順に読む、getter の副作用の順序など、観測できる順序も仕様に合わせる。WPT の `webidl/` と各 API の `idlharness` のテストで確かめる。
 - 文字列は、V8 の文字列から Rust の文字列への変換を避けられる場所（属性の値の比較など）では、V8 の文字列のまま扱う。
 
 ### 3.3 拡張属性
@@ -110,7 +111,7 @@ V8 の Isolate は「自分のヒープを持つ VM」、コンテキストは�
 
 ### 3.4 呼び出しの速さ
 
-- Speedometer 3（NFR-003）は、DOM の呼び出しの多いベンチマーク。呼び出しの費用を小さくする。
+- Speedometer 3.1（NFR-003）は、DOM の呼び出しの多いベンチマーク。呼び出しの費用を小さくする。
   - 属性の getter はアクセサとして置き、引数の変換を省ける場合は省く。
   - よく呼ばれる単純なメソッド（`getAttribute`、`appendChild` など）は、V8 の高速な API の呼び出し（fast API calls）の対象にする。rusty_v8 と deno_core は、この仕組みを Rust から使っている。
 - 生成したコードは、ベンチマークで遅い箇所が見つかったら、生成器の側で直す。生成したファイルを手で編集しない。
@@ -125,7 +126,7 @@ V8 の Isolate は「自分のヒープを持つ VM」、コンテキストは�
 ### 4.2 コンテキストをまたぐアクセス
 
 - 別のフレームの `WindowProxy` と `Location` に触れたときは、HTML の「cross-origin のオブジェクト」の規則に従う。cross-origin なら、許されたプロパティ（`postMessage`、`location` の書き込み、`close` など）だけを見せる。
-  - V8 のアクセス検査のコールバック（`ObjectTemplate` の access check）で実装する。**未検証**：rusty_v8 がアクセス検査のコールバックと、cross-origin 用の interceptor を公開しているか。確かめ方：E1 で `WindowProxy` の最小の実装を作る。公開していなければ、rusty_v8 に追加を送る。
+  - V8 のアクセス検査のコールバック（`ObjectTemplate` の access check）で実装する。rusty_v8 は、名前と添字の interceptor（`set_named_property_handler`・`set_indexed_property_handler`）を公開しているが、アクセス検査のコールバックは公開していない（[denoland/rusty_v8](https://github.com/denoland/rusty_v8)、2026-09-27 に確認）。E1 の `WindowProxy` の最小の実装の前に、rusty_v8 に追加を送る。取り込まれるまでは、自分たちの固定した版にパッチとして持つ（[build-and-test.md](build-and-test.md) の 1 節の、レシピの隣のパッチ）。
 - それ以外の DOM のオブジェクトは、同じ origin のフレームの間でしか受け渡されない前提にし、バインディングの入口で「呼び出したコンテキストの origin」と「オブジェクトが属する文書の origin」を比べる。合わなければ `SecurityError` を投げる。
 - `document.domain` の書き込みは、既定で効かない（origin-keyed のエージェントのまとまりを既定にする）。`Origin-Agent-Cluster: ?0` で明示的に外した文書だけ許す（本家と同じ。[process-model.md](process-model.md) の 3.4 節）。互換性の影響は、主要サイトの検査で確かめる。
 - isolated world（拡張機能）は、main world の JavaScript のオブジェクトを見られない。DOM は共有する。
@@ -164,7 +165,7 @@ intent の「HTML・CSS・JavaScript（V8）の主要な Web プラットフォ�
 | 認証 | WebAuthn（パスキー、セキュリティキー、OS の認証器、条件付きの UI） | [safe-browsing-and-permissions.md](safe-browsing-and-permissions.md) の 7 節 |
 | 履歴 | History API、Navigation API | [navigation-and-loading.md](navigation-and-loading.md) |
 
-- `Intl` は V8 に組み込みの ICU（C++）を使う。レイアウトの ICU4X（[rendering.md](rendering.md) の 11 節）とは別。ICU のデータを 2 つ持つことになるが、V8 の `Intl` を ICU4X に替える方法は V8 の側にない（**未検証**：V8 の ICU4X への移行の状況。E3 のメモリの調査で確かめる）。
+- `Intl` は V8 に組み込みの ICU（C++）を使う。レイアウトの ICU4X（[rendering.md](rendering.md) の 11 節）とは別。ICU のデータを 2 つ持つことになるが、V8 の `Intl` を ICU4X に替える方法は V8 の側にない。V8 は Temporal のために temporal_rs（ICU4X を使う）に依存するが、`Intl` 本体を ICU4X へ移す計画は、V8 のソースにも v8.dev にも見当たらない（[V8 の BUILD.gn](https://chromium.googlesource.com/v8/v8/+/refs/heads/main/BUILD.gn)、2026-09-27 に確認）。ICU4C と ICU4X の二重持ちは前提にし、そのメモリを E3 で測る。
 
 ### 5.1 MVP に含めない
 
@@ -185,7 +186,7 @@ intent の「HTML・CSS・JavaScript（V8）の主要な Web プラットフォ�
 ### 6.1 方針
 
 - 開発者ツールは Chrome DevTools Protocol（CDP）で話す（[CDP](https://chromedevtools.github.io/devtools-protocol/)）。自動化の道具（Puppeteer、Playwright）と同じプロトコルなので、E2E のテストにも使える（[build-and-test.md](build-and-test.md)）。
-- 画面（フロントエンド）は、Chrome DevTools のフロントエンド（chrome-devtools-frontend、BSD-3-Clause）を改変せずに、ブラウザの内部のページとして同梱する。**未検証**：フロントエンドが、下の部分集合だけのバックエンドで破綻しないか（未実装のメソッドへの応答の扱い）。確かめ方：E1 の終わりに、要素の検査・コンソールを部分集合で動かす。
+- 画面（フロントエンド）は、Chrome DevTools のフロントエンド（chrome-devtools-frontend、BSD-3-Clause。[ChromeDevTools/devtools-frontend](https://github.com/ChromeDevTools/devtools-frontend)、2026-09-27 に確認）を改変せずに、ブラウザの内部のページとして同梱する。**未検証**：フロントエンドが、下の部分集合だけのバックエンドで破綻しないか（未実装のメソッドへの応答の扱い）。確かめ方：E1 の終わりに、要素の検査・コンソールを部分集合で動かす。
 
 ### 6.2 MVP のドメイン
 
@@ -200,17 +201,17 @@ intent の「HTML・CSS・JavaScript（V8）の主要な Web プラットフォ�
 | Input、Emulation（画面の大きさ） | Browser | 自動化のテスト用 |
 
 - CDP の接続は Browser プロセスが受け、対象（Target）ごとに、担当するプロセスへ中継する。Renderer は、自分のサイトの対象へのメッセージしか受けない。
-- 外からの接続（`--remote-debugging-port`・`--remote-debugging-pipe`）は既定で無効。有効にするときは、既定のプロファイルでは許さない（本家が 2025 年に採った制限と同じ考え方。**未検証**：本家の現在の制限の正確な条件。E1 で確かめて合わせる）。
+- 外からの接続（`--remote-debugging-port`・`--remote-debugging-pipe`）は既定で無効。有効にするときは、既定のプロファイルでは許さない（本家は Chrome 136 から、既定のユーザーデータのディレクトリではこれらのスイッチを受け付けず、既定でない `--user-data-dir` と組み合わせたときだけ受け付ける。[Changes to remote debugging switches](https://developer.chrome.com/blog/remote-debugging-port)、2026-09-27 に確認。この設計も同じ条件にする）。
 
 ## 7. 未解決事項と未検証の項目
 
 | 項目 | 状態 | 確かめ方・決め方 |
 | --- | --- | --- |
-| V8 のサンドボックス・ポインタの圧縮を有効にした rusty_v8 のビルド | 未検証 | 1.1 節。E1 |
-| rusty_v8 の、ラッパーの削除可能性・アクセス検査のコールバックの公開 | 未検証 | 1.3 節・4.2 節。E1。なければ上流に追加を送る |
-| weedle2 が、現在の Web IDL の構文（async iterable、`ObservableArray` など）を解析できるか | 未検証 | E1 で `@webref/idl` の全体を解析し、失敗する定義を数える。足りなければ weedle2 に追加を送るか、解析器を自作する（ADR-0014） |
+| V8 のサンドボックス・ポインタの圧縮を有効にした rusty_v8 のビルド | 未検証（既定で無効と確認。ソースからビルドする） | 1.1 節。E1 |
+| rusty_v8 の、ラッパーの削除可能性・アクセス検査のコールバックの公開 | どちらも公開していないと確認（2026-09-27） | 1.3 節・4.2 節。アクセス検査は E1 で上流に追加を送る。ラッパーはノードと同じ寿命にする |
+| weedle2 が、現在の Web IDL の構文を解析できるか | async iterable は解析できる。`ObservableArray` はできず、2024-01 の 5.0.0 から更新がない（2026-09-27 に確認） | E1 で `@webref/idl` の全体を解析し、失敗する定義を数え、weedle2 のフォークか解析器の自作かを決める（ADR-0014 の注記） |
 | DevTools のフロントエンドと部分集合のバックエンド | 未検証 | 6.1 節 |
-| V8 の `Intl` と ICU4X の二重持ち | 未検証 | 5 節。E3 |
+| V8 の `Intl` と ICU4X の二重持ち | 二重持ちを前提にする（V8 に移行の計画なし。2026-09-27 に確認） | 5 節。メモリを E3 で測る |
 | WebGL・Web Audio の順序と時期 | 未決定 | E2 の計画で PM と決める |
 
 ## 参考

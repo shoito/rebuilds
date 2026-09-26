@@ -82,7 +82,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `crypto-wasm-intl` | Web Crypto、WebAssembly、`Intl`、`TextEncoder` |
 | `cross-origin-windowproxy` | cross-origin の `WindowProxy`・`Location`、`document.domain` の既定（[javascript-and-web-apis.md](architecture/javascript-and-web-apis.md) の 4.2 節） |
 | `top-sites-harness` | 主要サイト 1,000 件の選定、記録と再生、崩れの分類（法務の確認待ち：L9） |
-| `wpt-fyi-submission` | wpt.fyi への結果の掲載の手続き（未検証） |
+| `wpt-fyi-submission` | wpt.fyi への結果の掲載（送り手の登録を Issue で頼み、ブラウザの名前を `shared/browsers.go` に足す。[build-and-test.md](architecture/build-and-test.md) の 4.3 節） |
 | `webgl` | ANGLE を GPU プロセスに載せ、WebGL・WebGL 2 を足す（MVP の後。[javascript-and-web-apis.md](architecture/javascript-and-web-apis.md) の 5.1 節） |
 | `web-audio` | Web Audio（MVP の後。WebGL の次） |
 
@@ -130,13 +130,13 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `sandbox-linux` | 名前空間と seccomp-bpf、ユーザー名前空間を使えない配布版への対応（同 4.4 節） |
 | `sandbox-escape-tests` | 3 OS・プロセスの種類ごとの脱出のテスト（[quality.md](quality.md) の 2.5 節） |
 | `exploit-mitigations` | CFG、CET、V8 のサンドボックス、整数のあふれの検査の性能（[sandbox-and-security.md](architecture/sandbox-and-security.md) の 6 節） |
-| `bad-message-telemetry` | 不正なメッセージの理由のコードの指標と、急増のアラート |
-| `safe-browsing-list-service` | フィードの取り込み、保護の一覧、人の確認、リストの版と差分、署名、S3・CloudFront（[safe-browsing-and-permissions.md](architecture/safe-browsing-and-permissions.md) の 3 節。フィードの契約が前提） |
+| `bad-message-telemetry` | 不正なメッセージの理由のコードの指標と、急増のアラート、runbook の `bad-message-spike.md`（[runbooks/README.md](runbooks/README.md) の 4 節） |
+| `safe-browsing-list-service` | フィードの取り込み、保護の一覧、人の確認、リストの版と差分、署名、S3・CloudFront、runbook の `safe-browsing-false-positive.md`・`safe-browsing-feed-outage.md`（[safe-browsing-and-permissions.md](architecture/safe-browsing-and-permissions.md) の 3 節、[runbooks/README.md](runbooks/README.md) の 4 節。フィードの契約が前提） |
 | `safe-browsing-client` | 正規化と照合、手元のリスト（15 分）、完全なハッシュの照会、警告の画面（同 2 節） |
 | `safe-browsing-realtime-ohttp` | リアルタイムの照会と OHTTP の中継（中継の契約が前提。L6） |
 | `download-protection` | ファイルの種類の危険度、URL の連鎖、ハッシュの照会、アーカイブの検査、OS の印（同 4 節） |
 | `permissions-model` | 権限の単位と状態、確認の吹き出し、一時の抑止、静かな確認、自動の失効（[ADR-0022](decisions/0022-permission-model.md)） |
-| `https-first` | HTTPS-First の既定、警告の画面、混在コンテンツの格上げ（同 8 節） |
+| `https-first` | HTTPS-First の既定、警告の画面、混在コンテンツの格上げ（[safe-browsing-and-permissions.md](architecture/safe-browsing-and-permissions.md) の 8 節） |
 | `security-ui` | オリジンの表示、警告の画面、死線、全画面（[sandbox-and-security.md](architecture/sandbox-and-security.md) の 9 節） |
 
 ### E6 ブラウザの UI
@@ -167,28 +167,28 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `extension-permissions` | API・ホストの権限、実行時のサイトへのアクセスの制御、`activeTab`（同 4 節） |
 | `dnr-engine` | DNR の検証・索引・照合、上限、予算（同 5 節） |
 | `extension-apis-mvp` | MVP の API（`tabs`・`storage`・`scripting` など）と、`browser.*`・`chrome.*` の名前空間（[ADR-0025](decisions/0025-extension-platform-mv3.md)。`chrome.*` は L3） |
-| `package-format-and-ids` | CRX3 と同じ構造の独自の形式、拡張機能 ID、署名の検証（同 6 節） |
+| `package-format-and-ids` | CRX3 と同じ構造の独自の形式、拡張機能 ID、署名の検証（[extensions.md](architecture/extensions.md) の 6 節） |
 | `store-developer-dashboard` | 開発者のアカウント、2 段階認証、提出（同 7 節） |
 | `store-automated-review` | 形式・遠隔のコード・難読化・マルウェア・動的解析・差分の検査、リスクの点数（同 7.1 節） |
 | `store-human-review` | 人の審査、判定の記録、措置、異議（同 7.2・7.3 節。規約は L7） |
 | `store-update-delivery` | 拡張機能の更新の確認と段階的な配布（同 7.4 節） |
-| `extension-blocklist` | 停止の一覧の管理と配信、端末での措置（同 9 節） |
-| `extension-enterprise-policy` | `ExtensionSettings` と同じ意味のポリシー、強制インストール、`webRequestBlocking` の例外（同 5.3・8 節） |
+| `extension-blocklist` | 停止の一覧の管理と配信、端末での措置（同 9 節）、runbook の `extension-takedown.md`（[runbooks/README.md](runbooks/README.md) の 4 節） |
+| `extension-enterprise-policy` | `ExtensionSettings` と同じ意味のポリシー、強制インストール、`webRequestBlocking` の例外（[extensions.md](architecture/extensions.md) の 5.3・8 節） |
 
 ### E8 同期とアカウント
 
 | Story | 内容 |
 | --- | --- |
-| `account-service` | Better Auth、パスキー・メールの OTP・TOTP、アカウントのページ（[ADR-0028](decisions/0028-account-service.md)。OAuth 2.1 Provider の第一者のクライアントの試作を最初に行う） |
+| `account-service` | Better Auth、パスキー・メールの OTP・TOTP、アカウントのページ、ログインの失敗の急増のアラートと runbook の `auth-anomalies.md`（[runbooks/README.md](runbooks/README.md) の 4 節。[ADR-0028](decisions/0028-account-service.md)。OAuth 2.1 Provider の第一者のクライアントの試作を最初に行う） |
 | `browser-signin` | OAuth 2.1 と PKCE、`<brand>://oauth-callback` の横取り、トークンの保存と回転（[sync-and-accounts.md](architecture/sync-and-accounts.md) の 2.2 節） |
 | `sync-protocol-core` | `GetUpdates`・`Commit`、版の番号、衝突、削除の印、通知の WebSocket（同 5 節） |
 | `sync-e2ee-keys` | SRK と鍵の導出、HPKE、回復用のコード、パスフレーズ、Argon2id の引数の計測（同 4 節、[ADR-0027](decisions/0027-sync-protocol-and-e2ee.md)） |
-| `device-add-and-rotation` | 既存の端末での承認と確認の数字、端末の削除と鍵の回転（同 4.2・4.3・7 節） |
+| `device-add-and-rotation` | 既存の端末での承認と確認の数字、端末の削除と鍵の回転、runbook の `sync-key-issues.md`（[runbooks/README.md](runbooks/README.md) の 4 節。[sync-and-accounts.md](architecture/sync-and-accounts.md) の 4.2・4.3・7 節） |
 | `sync-data-types` | データ型ごとの橋と衝突の規則（ブックマーク、パスワード、設定、履歴、タブ、リーディングリスト、拡張機能、検索エンジン、自動入力）と初回の合わせ込み（同 3・5.3 節） |
 | `password-manager-store` | パスワードの保存と入力、データ鍵と OS の鍵の保管、再認証（[ADR-0023](decisions/0023-password-manager-encryption.md)） |
 | `password-leak-check` | Pwned Passwords の範囲 API と OHTTP（自前の写しは L5） |
 | `webauthn-passkeys` | WebAuthn、RP ID の検査、セキュリティキーと OS の認証器、条件付きの UI（[safe-browsing-and-permissions.md](architecture/safe-browsing-and-permissions.md) の 7 節） |
-| `sync-plaintext-scanner` | 同期の DB の平文の走査（ADR-0005 の Confirmation） |
+| `sync-plaintext-scanner` | 同期の DB の平文の走査（ADR-0005 の Confirmation）、runbook の `sync-data-exposure.md`（[runbooks/README.md](runbooks/README.md) の 4 節） |
 | `sync-crypto-review` | 外部の暗号のレビュー（E8 の完了の前） |
 | `passkey-provider` | 自前のパスキーの提供者と E2EE の同期（MVP の後） |
 
@@ -197,21 +197,21 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `release-signing-account` | release-signing アカウント、KMS のリリースの鍵（マルチリージョン）、CloudHSM、署名専用の実行環境（[infrastructure.md](architecture/infrastructure.md) の 1・6 節） |
-| `macos-signing-poc` | macOS の署名の鍵の置き場を選び直す PoC（EC2 Mac にスマートカードは挿せない。[update-and-release.md](architecture/update-and-release.md) の 5.2 節）。決まるまで macOS の Stable は出さない |
+| `macos-signing-poc` | rcodesign と CloudHSM での署名、CSR、App Store Connect の API キーでの公証とステープル、EC2 Mac での検証、大阪での同じ手順（[ADR-0034](decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)、[update-and-release.md](architecture/update-and-release.md) の 5.2 節）。確かめ終えるまで macOS の Stable は出さない |
 | `update-server-omaha4` | プロトコル 4 互換の update-server、CUP の署名、配信の区画（[ADR-0029](decisions/0029-updater-protocol-and-staged-rollout.md)） |
-| `updater-windows` | サービスとタスクスケジューラ、権限の昇格、自己更新（同 3 節） |
+| `updater-windows` | サービスとタスクスケジューラ、権限の昇格、自己更新（[update-and-release.md](architecture/update-and-release.md) の 3 節） |
 | `updater-macos` | LaunchDaemon・LaunchAgent、特権のヘルパー |
-| `linux-packages` | apt・dnf のリポジトリと GPG の署名、版の古さの表示 |
+| `linux-packages` | apt・dnf のリポジトリと GPG の署名（CloudHSM から使う方式の選定：`gnupg-pkcs11-scd` か `sq-pkcs11`）、版の古さの表示（[update-and-release.md](architecture/update-and-release.md) の 5.2 節） |
 | `differential-updates` | Zucchini・Puffin の差分、全体への戻し（同 7 節） |
 | `rollout-guard` | 段階的な配信、自動の停止、リリースのダッシュボード（同 4.3 節、[observability.md](architecture/observability.md) の 3.3 節） |
-| `fallback-manifest` | 予備のマニフェストと予備の CloudFront（同 4.4 節） |
+| `fallback-manifest` | 予備のマニフェストと予備の CloudFront（[update-and-release.md](architecture/update-and-release.md) の 4.4 節） |
 | `restart-prompts` | 再起動の促し方と `urgency=critical`（同 3.3 節） |
-| `component-delivery` | 部品のリスト（ルートストア、CT のログ、失効のリスト、HSTS の事前読み込み、Public Suffix List、DoH の提供者、検索エンジンの一覧）の配信 |
+| `component-delivery` | 部品のリスト（ルートストア、CT のログ、失効のリスト、HSTS の事前読み込み、Public Suffix List、DoH の提供者、検索エンジンの一覧）の配信、配信の遅れのアラートと runbook の `component-list-staleness.md`（[runbooks/README.md](runbooks/README.md) の 4 節） |
 | `consent-first-run` | 初回の起動での同意の画面と、公開する範囲（L6） |
-| `crashpad-integration` | Crashpad の登録、注釈の許可リスト、同意のないときの 7 日の保持（同 9.1 節） |
-| `crash-ingest-symbolicator` | crash-ingest、symbolicator、シグネチャ、Issue の起票、シンボルの欠落のアラート（同 9.2 節） |
-| `telemetry-registry-and-ingest` | 指標の登録簿、telemetry-ingest、Parquet と AMP（同 10 節、[observability.md](architecture/observability.md) の 3 節） |
-| `field-trials-seed` | seed の署名と配信、端末の中の割り当て、止める手段（同 12 節） |
+| `crashpad-integration` | Crashpad の登録、注釈の許可リスト、同意のないときの 7 日の保持（[update-and-release.md](architecture/update-and-release.md) の 9.1 節） |
+| `crash-ingest-symbolicator` | crash-ingest、symbolicator、シグネチャ、Issue の起票、シンボルの欠落のアラート（同 9.2 節）、runbook の `symbolication-gap.md`（[runbooks/README.md](runbooks/README.md) の 4 節） |
+| `telemetry-registry-and-ingest` | 指標の登録簿、telemetry-ingest、Parquet と AMP（[update-and-release.md](architecture/update-and-release.md) の 10 節、[observability.md](architecture/observability.md) の 3 節） |
+| `field-trials-seed` | seed の署名と配信、端末の中の割り当て、止める手段（[update-and-release.md](architecture/update-and-release.md) の 12 節） |
 | `license-notices` | 配布物の部品のライセンスの表示（L2） |
 
 ### E10 本番運用

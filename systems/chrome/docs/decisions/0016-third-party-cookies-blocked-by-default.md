@@ -35,6 +35,8 @@ date: 2026-09-26
 
 ## Consequences
 
+> 2026-09-27 の注記：ログインの流れの一時的な許可は、Firefox の規則でなく、本家の 3PCD のヒューリスティクスに揃える（[architecture/README.md](../architecture/README.md) の「決定」）。本家の値は、ポップアップで操作した後は 30 日、リダイレクトの後は 15 分（[Heuristics based exceptions](https://privacysandbox.google.com/cookies/temporary-exceptions/heuristics-based-exceptions)、2026-09-27 に確認）。Firefox も同じ種類の規則（ポップアップ・リダイレクト、30 日）を持つ（[MDN の Storage Access Policy](https://developer.mozilla.org/en-US/docs/Web/Privacy/Guides/Storage_access_policy)）。下の「Firefox の実装を読んで決める（未検証）」は解消した。
+
 - 良くなること：
   - 既定の状態で、サードパーティ Cookie による追跡を防げる。
   - シークレットと通常のモードで、Cookie の規則が同じになり、試験と説明が簡単になる。

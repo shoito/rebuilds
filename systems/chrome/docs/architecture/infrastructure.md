@@ -12,7 +12,7 @@ Slack の構成（management、security、log-archive、shared、dev、staging�
 | --- | --- | --- |
 | management、security、log-archive、shared | Slack と同じ | Organizations、SCP、IAM Identity Center、監査の記録、ECR、Route 53、Grafana |
 | ci | Infrastructure | CI の実行環境（EC2、EC2 Mac の Dedicated Host）、sccache の S3、部品の成果物の S3、ビルドの成果物（署名の前） |
-| release-signing | Security | リリースの署名の KMS の鍵、フィールドトライアルと Safe Browsing のリストの署名の鍵、Authenticode・GPG の鍵の CloudHSM、署名専用の実行環境（EC2 Mac を含む） |
+| release-signing | Security | リリースの署名の KMS の鍵、フィールドトライアルと Safe Browsing のリストの署名の鍵、Authenticode・Developer ID・GPG の鍵の CloudHSM、公証の API キー（Secrets Manager）、署名専用の実行環境（Linux・Windows の EC2。EC2 Mac は置かない。[ADR-0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)） |
 | dev、staging | Workloads/NonProd | Slack と同じ |
 | prod-core | Workloads/Prod | 更新の配信、Safe Browsing、アカウント、同期、拡張機能のストア、フィールドトライアルの設定の配信 |
 | prod-diagnostics | Workloads/Prod | クラッシュの収集とシンボル化、テレメトリの取り込みと分析 |
@@ -103,6 +103,7 @@ PR・merge queue ─▶ ci アカウントの実行環境（Linux・Windows は 
                      │ リリースの工程だけが起動できる
                      ▼
                release-signing：再現性の確認 → OS の署名・公証 → リリースの署名（KMS）
+                     │ macOS の成果物は、ci の EC2 Mac で codesign・spctl・stapler の検証
                      │
                      ▼
                prod-core の S3（成果物）＋ Aurora（リリースの登録）─▶ 段階的な配信
@@ -115,13 +116,13 @@ PR・merge queue ─▶ ci アカウントの実行環境（Linux・Windows は 
   | Linux x64 の大きなインスタンス（64 vCPU 級） | presubmit、CQ、WPT、ファズ | オートスケール 4〜40 |
   | Windows x64（32 vCPU 級） | CQ、継続 | 2〜16 |
   | GPU のインスタンス（Linux・Windows） | 画面の比較、WebGL・WebGPU | 2〜6 |
-  | EC2 Mac（Apple silicon） | macOS のビルドとテスト、性能 | 常時 6 ホスト |
+  | EC2 Mac（Apple silicon） | macOS のビルドとテスト、性能、署名の後の検証 | 常時 6 ホスト |
   | bare metal（Linux・Windows） | 性能の測定 | 各 2 |
-  | EC2 Mac（release-signing） | macOS の署名と公証 | 常時 2 ホスト |
+  | Linux・Windows の EC2（release-signing） | OS の署名（Windows は SignTool、macOS は rcodesign）と公証 | 必要なときに起動 |
 
 - EC2 Mac は Dedicated Host の上でだけ動き、最低 24 時間の確保が要り、オンデマンドのみ（[AWS のドキュメント](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html)）。台数を固定で持ち、Savings Plans で費用を抑える。
 - GitHub Actions からの AWS への認証は OIDC（Slack と同じ）。release-signing のロールは、`release/*` のブランチと `main` の Canary のワークフローの、`environment:release` の主体だけが引き受けられる。
-- Windows の署名は、CloudHSM の鍵を SignTool から KSP 経由で使う（[CloudHSM と SignTool](https://docs.aws.amazon.com/cloudhsm/latest/userguide/third-signtool-toplevel.html)）。macOS の署名の鍵の置き場は未検証（[update-and-release.md](update-and-release.md) の 5.2 節）。
+- Windows の署名は、CloudHSM の鍵を SignTool から KSP 経由で使う（[CloudHSM と SignTool](https://docs.aws.amazon.com/cloudhsm/latest/userguide/third-signtool-toplevel.html)）。macOS の署名は、Linux の実行環境で rcodesign が CloudHSM の鍵を PKCS#11 で使う。公証も rcodesign で行う（[ADR-0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)、[update-and-release.md](update-and-release.md) の 5.2 節）。rcodesign の PKCS#11 は未リリースの機能で、E9 の PoC で確かめる。Linux のパッケージの GPG の署名で CloudHSM を使う方式は未検証（同 5.2 節）。
 - サービスのデプロイは Slack の delivery.md と同じ（イメージを 1 回ビルドし、dev → staging → prod へ昇格。prod は Ops の承認）。
 
 ## 7. 環境とデータ
@@ -149,10 +150,10 @@ PR・merge queue ─▶ ci アカウントの実行環境（Linux・Windows は 
 | 可観測性（ログ、メトリクス、トレース、Grafana） | 1,000 |
 | セキュリティのサービス（WAF、GuardDuty など） | 500 |
 | **本番（同期を除く）の合計** | **約 3,600** |
-| CloudHSM（2 台、release-signing） | 約 2,500（未検証） |
+| CloudHSM（2 台、release-signing） | 約 2,650（東京 1.81 ドル/時 × 730 時間 × 2。[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/CloudHSM/current/ap-northeast-1/index.json)、2026-09-27 に確認） |
 | CI（Linux・Windows・GPU のオートスケール） | 約 15,000 |
-| CI（EC2 Mac 8 ホスト、性能の bare metal） | 約 8,000 |
-| **CI と署名の合計** | **約 25,000** |
+| CI（EC2 Mac 6 ホスト、性能の bare metal） | 約 6,800 |
+| **CI と署名の合計** | **約 24,500** |
 
 - S1 では、費用の大半がサービスではなく CI にかかる。CQ の中身と、継続の段の頻度で調整する（[build-and-test.md](build-and-test.md) の 4 節）。
 - S3 では、CloudFront の転送（月 5 PB 程度）が最大の費用になる。CloudFront の料金の割引の契約を、S2 のうちに検討する。

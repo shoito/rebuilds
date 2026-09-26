@@ -42,7 +42,7 @@ Slack の設計（[identity-and-access.md](../../../slack/docs/architecture/iden
 | パスワード | × | 保存しない |
 | Google などのソーシャルログイン | × | Google のサービスとの統合は Non-goals（[intent.md](../intent.md)） |
 
-- パスキーでのログインには、ブラウザ自身の WebAuthn の実装が要る。Windows は Windows Hello、macOS は AuthenticationServices のパスキー、Linux はセキュリティキーを使う。スマートフォンでの認証（hybrid）は MVP の後で、それまではメールの OTP で補う（[safe-browsing-and-permissions.md](safe-browsing-and-permissions.md) の 7 節。Linux の hybrid の実装の範囲は **未検証**。E8 の初めに確かめる）。WebAuthn の実装は [safe-browsing-and-permissions.md](safe-browsing-and-permissions.md) の権限と合わせて扱う。
+- パスキーでのログインには、ブラウザ自身の WebAuthn の実装が要る。Windows は Windows Hello、macOS は AuthenticationServices のパスキー、Linux はセキュリティキーを使う。スマートフォンでの認証（hybrid）は MVP の後で、それまではメールの OTP で補う（[safe-browsing-and-permissions.md](safe-browsing-and-permissions.md) の 7 節。Linux の本家は hybrid に対応し、BLE は BlueZ を使う。[Passkeys の対応環境](https://developers.google.com/identity/passkeys/supported-environments)、2026-09-27 に確認。BlueZ に起因する不安定さの報告があるので、品質は E8 の初めに実機で確かめる）。WebAuthn の実装は [safe-browsing-and-permissions.md](safe-browsing-and-permissions.md) の権限と合わせて扱う。
 - 応答は、アカウントが存在するかどうかで変えない（メールアドレスの列挙を防ぐ）。
 
 ### 2.2 ブラウザのサインイン
@@ -130,7 +130,7 @@ SRK を包んだもの（サービスに置く。サービスは開けない）
 | 回復用のコード | 128 bit の乱数を、区切り付きの 26 文字（Crockford の Base32）で表示する。鍵は Argon2id（m=64 MiB、t=3、p=1）で作る |
 | パスフレーズ（任意） | 12 文字以上。鍵は Argon2id（m=256 MiB、t=3、p=1）。塩は無作為 |
 
-- 本家の利用者のパスフレーズの鍵の導出は、M70 から scrypt（N=2^13、r=8、p=11、無作為の塩）で、それ以前は PBKDF2-HMAC-SHA1 の 1,003 回（固定の塩）だった（[nigori_specifics.proto](https://chromium.googlesource.com/chromium/src/+/HEAD/components/sync/protocol/nigori_specifics.proto)）。本システムは、メモリを多く使う Argon2id（RFC 9106）を選ぶ。引数は、基準の端末で 1 秒以内に終わる値を E8 で測って確定する（**未検証**）。
+- 本家の利用者のパスフレーズの鍵の導出は、M70 から scrypt（N=2^13、r=8、p=11、無作為の塩）で、それ以前は PBKDF2-HMAC-SHA1 の 1,003 回（固定の塩）だった（[nigori_specifics.proto](https://chromium.googlesource.com/chromium/src/+/HEAD/components/sync/protocol/nigori_specifics.proto)）。本システムは、メモリを多く使う Argon2id（RFC 9106）を選ぶ。引数は、RFC 9106 の 4 節の 2 つ目の推奨（t=3、p=4、m=64 MiB）を出発点にし、基準の端末で 1 秒以内に終わる値を E8 で測って確定する（[RFC 9106](https://www.rfc-editor.org/rfc/rfc9106.html#section-4)、2026-09-27 に確認。値は **未検証**）。
 - 暗号の実装は、監査済みのライブラリ（RustCrypto の各クレート、HPKE は `hpke` クレートなど）を使い、自分たちで暗号の基本の部品を書かない（[ADR-0002](../decisions/0002-engine-build-vs-reuse.md)）。
 
 ### 4.2 端末を足す
@@ -188,7 +188,7 @@ SRK を包んだもの（サービスに置く。サービスは開けない）
 4. B は復号して、データ型の規則（3 節）で合わせ、元の版 8 として Commit し直す。
 5. 合わせた結果が A の版と同じなら、B は何も送らない。
 
-- 本家の既定の衝突の解決（橋が上書きしなければ、サーバーの側を採る）は、ソースで確かめていない（**未検証**。E8 で本家の `ClientTagBasedDataTypeProcessor` を確かめ、差があれば記録する）。
+- 本家の既定の衝突の解決は、橋が上書きしなければサーバーの側を採る。ただし、サーバーの側が削除なら手元の側を採る（`DataTypeSyncBridge::ResolveConflict`。[data_type_sync_bridge.cc](https://source.chromium.org/chromium/chromium/src/+/main:components/sync/model/data_type_sync_bridge.cc)、2026-09-27 に確認）。3 節の規則がないデータ型は、この既定に揃える。
 
 ### 5.3 初回の合わせ込み
 
@@ -254,5 +254,5 @@ SRK を包んだもの（サービスに置く。サービスは開けない）
 - **鍵の喪失**：回復用のコードを控えない利用者は、端末を失うとデータを失う。初回の設定で控えたことを確かめ、定期的に再確認を促す。
 - **メタデータ**：データ型・大きさ・時刻から、閲覧の量の傾向が見える。パディング（大きさの丸め）を S2 で検討する。
 - **時計のずれ**：「新しい方」の判定が端末の時計に依存する。
-- **パスキーでの鍵の保護**：WebAuthn の PRF 拡張で SRK を包めば、パスキーだけで新しい端末を足せる。対応する認証器・OS の範囲が **未検証** のため、MVP に含めず、S2 の前に検討する。
+- **パスキーでの鍵の保護**：WebAuthn の PRF 拡張で SRK を包めば、パスキーだけで新しい端末を足せる。対応する認証器・OS の範囲が **未検証** のため（2026-09-27 の検証でも、Windows Hello などの各 OS の対応を公式の文書で確かめられなかった）、MVP に含めず、S2 の前に検討する。
 - **本家からの移行**：本家の同期のデータは読めない（Google の鍵）。本家からの取り込みは、エクスポートしたファイル（ブックマークの HTML、パスワードの CSV）から行う。

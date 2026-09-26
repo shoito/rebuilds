@@ -16,7 +16,7 @@
 | MVP の後 | `debugger`、`nativeMessaging`、`tabGroups`、`userScripts`、`declarativeContent`、`proxy`、`privacy`、`topSites`、`search` など |
 | 提供しない | Google のサービスに結びつく API（`gcm`、`identity.getAuthToken` など）、`enterprise.*` のうち本家の管理基盤に依存するもの |
 
-- API の実装の優先度は、ストアの拡張機能が使う API の頻度で決める。本家の Web Store の上位の拡張機能 500 件のマニフェストを集計し、E7 の最初の計画に使う（未検証：集計はまだ行っていない）。
+- API の実装の優先度は、ストアの拡張機能が使う API の頻度で決める。本家の Web Store の上位の拡張機能 500 件のマニフェストを集計し、E7 の最初の計画に使う（まだ集計していない。E7 の `extension-api-survey` で行う）。
 - 本家の既知の仕様との違い（未対応の API、引数の差）は、`<brand>://extensions` と開発者向けの文書に一覧で公開する。
 
 ## 2. プロセスの構成と隔離
@@ -80,7 +80,7 @@ MV3 で、拡張機能がネットワークの要求を遮断・書き換える�
 | 項目 | 値 |
 | --- | --- |
 | 静的な規則の保証（拡張機能ごと） | 30,000 |
-| 静的な規則の全体の枠 | 保証を超える分は、全拡張機能で共有の枠から割り当てる（本家の API の文書には全体の枠の数値がない。以前の文書の値 300,000 を初期値にし、本家の実装の値を E7 で確かめる：**未検証**） |
+| 静的な規則の全体の枠 | 保証を超える分は、全拡張機能で共有の枠から割り当てる（本家の API の文書には全体の枠の数値がない。本家の実装の値は、プロファイルあたり 300,000（`kMaxStaticRulesPerProfile`。[constants.h](https://source.chromium.org/chromium/chromium/src/+/main:extensions/browser/api/declarative_net_request/constants.h)、2026-09-27 に確認）で、同じ値にする） |
 | 静的な規則セットの数 / 同時に有効な数 | 100 / 50 |
 | 動的な規則 / うち安全でない規則（遮断・転送・スキームの変更） | 30,000 / 5,000 |
 | セッションの規則 / うち安全でない規則 | 5,000 / 5,000 |

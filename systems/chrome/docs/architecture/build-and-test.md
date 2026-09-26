@@ -129,7 +129,7 @@ PR ─▶ presubmit（20 分）─▶ レビュー ─▶ merge queue（CQ。45 
   - 期待値より良くなったら、ボットが期待値を更新する PR を出す（自動でマージしてよいのは「良くなった」ものだけ）。
   - 期待値を悪い方へ変える PR は、QA の承認を必須にする（テストの緩和で通したことにしない。ルートの AGENTS.md）。
 - **合格率の計測**：NFR-007 の「対象とした領域」を `tests/wpt/scope.toml` に列挙し、領域ごとの合格率を継続の段で出す。対象の領域の選び方は QA が [quality.md](../quality.md) で決める。
-- **外部への公開**：結果を wpt.fyi に載せ、他のブラウザと比べられるようにしたい。新しいブラウザの結果を wpt.fyi に受け付けてもらう手続きは未検証。載せられない間は、同じ形式の結果を自分たちのダッシュボードで出す。
+- **外部への公開**：結果を wpt.fyi に載せ、他のブラウザと比べられるようにしたい。手続きは 2 つある。結果の送り手（test runner）として登録を Issue で頼み、HTTP の Basic 認証で `/api/results/upload` に送る。ブラウザの名前を wpt.fyi の `shared/browsers.go` の許可の一覧に PR で足す（Servo・Ladybird などが入っている）（[wpt.fyi の API](https://github.com/web-platform-tests/wpt.fyi/blob/main/api/README.md)、2026-09-27 に確認）。WPT の実行は、wptrunner の `browsers/` に自分たちのブラウザの定義を足して行う（[wptrunner](https://github.com/web-platform-tests/wpt/tree/master/tools/wptrunner)）。載せられない間は、同じ形式の結果を自分たちのダッシュボードで出す。
 - 自分たちで書いた Web の互換性のテストは、できるだけ WPT の形で書き、上流へ出す。
 
 ### 4.4 性能の測定
@@ -158,7 +158,7 @@ PR ─▶ presubmit（20 分）─▶ レビュー ─▶ merge queue（CQ。45 
 - **基盤**：
   - PR：ClusterFuzzLite の変更のファズで、変更のあったターゲットを数分かける。ClusterFuzzLite は GitHub Actions で動き、Rust に対応し、変更のファズ・長時間のファズ・カバレッジを持つ（[ClusterFuzzLite](https://google.github.io/clusterfuzzlite/)）。
   - 継続：同じく ClusterFuzzLite の長時間のファズを、CI の実行環境で毎日回す。コーパスは S3 に置く。
-  - S2 で、クラッシュの重複の除去・原因のコミットの二分探索・Issue の自動の起票と閉鎖を持つ ClusterFuzz（[ClusterFuzz](https://google.github.io/clusterfuzz/)）を検討する。ClusterFuzz の本番の構成が Google Cloud を前提にするかは未検証。ソースを公開するなら OSS-Fuzz への参加も比べる。
+  - S2 で、クラッシュの重複の除去・原因のコミットの二分探索・Issue の自動の起票と閉鎖を持つ ClusterFuzz（[ClusterFuzz](https://google.github.io/clusterfuzz/)）を検討する。ClusterFuzz の本番の構成は Google Cloud（App Engine、Datastore、Cloud Storage、Firebase の認証）を前提にする。bot だけは他で動かせる（[Production setup](https://google.github.io/clusterfuzz/production-setup/clusterfuzz/)、2026-09-27 に確認）。AWS の上に置くなら、GCP のプロジェクトを別に持つことになる。ClusterFuzzLite は GitHub Actions で動き、GCP は要らない。ソースを公開するなら OSS-Fuzz への参加も比べる。
 - ファズで見つけたクラッシュは、セキュリティの Issue（非公開）として起票し、再現する入力を回帰テストのコーパスに足す。
 
 ## 6. プラットフォームの組み合わせ

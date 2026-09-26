@@ -128,7 +128,7 @@ Node（GarbageCollected）
 
 ### 4.4 Stylo の範囲の確かめ
 
-- **未検証**：`servo` の機能で組んだ Stylo が、`gecko` の機能に比べて、どの CSS のプロパティを持たないか。確かめ方：Stylo のプロパティの定義（`engines=` の指定）から、`servo` で有効なプロパティの一覧を機械的に出し、NFR-007 の対象にする WPT の CSS の領域と突き合わせる。足りないプロパティは、Stylo の上流（servo/stylo）に追加を送り、フォークを持たない。E1 の中で行う。
+- **未検証**：`servo` の機能で組んだ Stylo が、`gecko` の機能に比べて、どの CSS のプロパティを持たないか。確かめ方：Stylo のプロパティの定義（`style/properties/longhands.toml` などの TOML。一方のエンジンだけのものは `engine = "gecko"`、Servo で未実装のものは `servo_pref`。[servo/stylo](https://github.com/servo/stylo)、2026-09-27 に確認）から、`servo` で有効なプロパティの一覧を機械的に出し、NFR-007 の対象にする WPT の CSS の領域と突き合わせる。足りないプロパティは、Stylo の上流（servo/stylo）に追加を送り、フォークを持たない。E1 の中で行う。
 
 ## 5. レイアウト
 
@@ -233,8 +233,9 @@ DOM ＋ ComputedValues
 | すべて | Skia の CPU の raster | GPU が使えない・ブロックリストのドライバのとき |
 
 - Windows と Linux の Graphite への移行は、本家の展開を見て判断する（E3 以降）。
-- GPU のドライバのブロックリストを持ち、既知の不具合があるドライバでは CPU の raster に落とす。GPU プロセスが繰り返しクラッシュしたら、CPU の raster に落として再起動する。
-- **未検証**：`skia-safe` の Graphite のバインディングが、本番で使える範囲（Metal の `Recorder`・`Context`、画像のアップロード）を持つか。`skia-safe` を ANGLE と組み合わせたビルド（EGL の文脈を Skia に渡す）の手間。確かめ方：E1 の中で、3 OS で「表示リスト → タイル → 画面」の最小の経路を組む。
+- GPU のドライバのブロックリストを持ち、既知の不具合があるドライバでは CPU の raster に落とす。GPU プロセスが繰り返しクラッシュしたら、描画の方式を 1 段ずつ下げ、最後は CPU の raster にして再起動する（回数は [process-model.md](process-model.md) の 6.1 節の表）。
+- `skia-safe`（0.153.3）の Graphite のバインディングは Metal と Vulkan を持ち、Dawn は持たない。ANGLE の専用の機能はない（[rust-skia](https://github.com/rust-skia/rust-skia)、2026-09-27 に確認）。Windows は、ANGLE の EGL の文脈を自分たちで作って Ganesh の GL に渡す。
+- **未検証**：Graphite の Metal のバインディングが、本番で使える範囲（`Recorder`・`Context`、画像のアップロード）を持つか。`skia-safe` と ANGLE を組み合わせたビルドの手間。確かめ方：E1 の中で、3 OS で「表示リスト → タイル → 画面」の最小の経路を組む。
 
 ### 8.3 raster の分担
 
@@ -278,12 +279,14 @@ DOM ＋ ComputedValues
 - インラインのレイアウトは「テキストの走り（同じフォント・同じ方向・同じスクリプト）→ シェーピング → 改行の候補 → 行の組み立て」の順。シェーピングの結果は、文字列とフォントの組でキャッシュする。
 - Web フォントは、取得した後、Utility プロセスではなく Renderer の中で Skrifa で検証してから使う（Rust で解析するので、別プロセスに分けない）。OTS（OpenType Sanitizer）に当たる検査は、Skrifa の解析の失敗として扱う。
 - `font-display` の既定の待ち時間（block 3 秒）は仕様どおり。
-- **未検証**：HarfRust のシェーピングの速度が、HarfBuzz（C++）と比べてどの程度か。確かめ方：E1 で、日本語・アラビア語・デーヴァナーガリーの長文でベンチマークし、1.5 倍を超えて遅ければ HarfBuzz（C++、MIT）に替える。切り替えられるよう、シェーピングは 1 つの trait の裏に置く。
-- **未検証**：`skia-safe` から Skia の Fontations のバックエンド（`SkTypeface_Fontations`）を使えるか。使えなければ、Skrifa で輪郭を取り出し、パスとして Skia に渡す。
+- HarfRust（0.13.3、2026-08-25）は HarfBuzz v14.3.1 に揃え、README では「よく使うフォントで HarfBuzz より 25% 未満の遅さ」とする。フォントの大きさを持たず（UnitsPerEm で返す）、不正なフォントはエラーにし、Graphite に対応しない（[harfbuzz/harfrust](https://github.com/harfbuzz/harfrust)、2026-09-27 に確認）。本家は試したが、設定したメトリクスの関数を呼ばない点が障害になった（[harfbuzz#5994](https://github.com/harfbuzz/harfbuzz/issues/5994)）。シェーピングの結果を大きさで拡大・縮小する処理と、不正なフォントを代わりのフォントに落とす処理は、自分たちの側で持つ。
+- **未検証**：HarfRust の速度とメトリクスの扱いが、この設計で足りるか。確かめ方：E1 で、日本語・アラビア語・デーヴァナーガリーの長文でベンチマークし、1.5 倍を超えて遅ければ HarfBuzz（C++、MIT）に替える。切り替えられるよう、シェーピングは 1 つの trait の裏に置く。
+- `skia-safe` は Skia の Fontations のバックエンド（`SkTypeface_Fontations`）を公開していない（2026-09-27 に確認）。Skrifa で輪郭を取り出し、パスとして Skia に渡す。グリフのキャッシュは自分たちで持つ。
 
 ## 12. 画像
 
 - 画像の復号は、形式ごとの Rust の復号器を優先する（`png`、`zune-jpeg`、`image-webp`、`gif`）。AVIF は `dav1d`（C、BSD）を使う。画像は信頼できない入力なので、C の復号器は Utility プロセスで動かす（[sandbox-and-security.md](sandbox-and-security.md)）。
+  - `zune-jpeg`（0.5 系）と `image-webp`（0.2.4。復号は lossy・lossless・アルファ・アニメーションに対応し、速度は libwebp の 70〜100%）は、`image` クレートの既定の復号器で、保守されている（[zune-image](https://github.com/etemesi254/zune-image)、[image-webp](https://github.com/image-rs/image-webp)、2026-09-27 に確認）。
   - **未検証**：`zune-jpeg` と `image-webp` の、本家（libjpeg-turbo、libwebp）に対する互換性（壊れたファイルの扱い、色空間）と速度。確かめ方：E1 で本家のテスト画像の集まりと WPT の画像のテストで比べる。
 - 復号は遅延させる。表示リストは画像の ID だけを持ち、raster の時に、必要な大きさで復号する（大きな画像を縮小して復号する）。
 - 復号済みの画像はキャッシュに置き、上限を超えたら、見えていないものから捨てる。
@@ -316,7 +319,7 @@ DOM ＋ ComputedValues
 
 ## 16. 性能の予算
 
-NFR-002（Core Web Vitals が本家の 1.2 倍以内）、NFR-003（Speedometer 3 が本家の 80% 以上）、NFR-004（タブ 20 枚でメモリが本家の 1.2 倍以内）を、描画の段ごとの予算に分ける。値は基準の端末（[build-and-test.md](build-and-test.md)）での目安で、E3 の計測で見直す。
+NFR-002（Core Web Vitals が本家の 1.2 倍以内）、NFR-003（Speedometer 3.1 が本家の 80% 以上）、NFR-004（タブ 20 枚でメモリが本家の 1.2 倍以内）を、描画の段ごとの予算に分ける。値は基準の端末（[build-and-test.md](build-and-test.md)）での目安で、E3 の計測で見直す。
 
 | 項目 | 予算 | 関係する NFR |
 | --- | --- | --- |
@@ -330,16 +333,16 @@ NFR-002（Core Web Vitals が本家の 1.2 倍以内）、NFR-003（Speedometer 
 | 復号済みの画像のキャッシュ | Renderer ごとに上限。見えていないものから捨てる | NFR-004 |
 
 - 予算を越えたかどうかは、Renderer のトレース（段ごとの時間）で CI と実機で測る（[observability.md](observability.md)）。
-- ベンチマーク：Speedometer 3（NFR-003）、MotionMark 1.3（raster と合成）、主要サイトの読み込みでの LCP・CLS・INP の比較。
+- ベンチマーク：Speedometer 3.1（NFR-003）、MotionMark 1.3.1（raster と合成）、主要サイトの読み込みでの LCP・CLS・INP の比較。
 
 ## 17. 未解決事項と未検証の項目
 
 | 項目 | 状態 | 確かめ方・決め方 |
 | --- | --- | --- |
-| `servo` の機能の Stylo が持たない CSS のプロパティ | 未検証 | 4.4 節。E1 で一覧を出し、WPT の対象と突き合わせる |
+| `servo` の機能の Stylo が持たない CSS のプロパティ | 未検証（定義の形は確認済み） | 4.4 節。E1 で一覧を出し、WPT の対象と突き合わせる |
 | Rust の `v8::cppgc` で DOM を作ったときの速度とメモリ | 未検証 | E1 で、ノードの作成・挿入・削除のマイクロベンチマークを本家と比べる（[ADR-0010](../decisions/0010-v8-embedding-and-dom-gc.md)） |
 | `skia-safe` の Graphite と ANGLE との組み合わせ | 未検証 | 8.2 節。E1 で 3 OS の最小の経路を組む |
-| HarfRust の速度、`skia-safe` での Fontations のバックエンド | 未検証 | 11 節 |
+| HarfRust の速度とメトリクスの扱い | 未検証（Fontations のバックエンドは無いと確認し、Skrifa の輪郭をパスで渡す形に決めた） | 11 節 |
 | Rust の画像の復号器の互換性 | 未検証 | 12 節 |
 | Taffy のグリッドの、仕様への適合の範囲 | 未検証 | WPT の `css/css-grid` を E2 で流し、合格率が 90% に届かなければ、グリッドも自作に替える（ADR-0012） |
 | 動画の復号の部品と DRM（Widevine を使うか） | 復号の部品は未決定。DRM は S1 に含めない | 復号の部品は動画の領域の文書で決める。Widevine はライセンスの申請が要り、法務・事業の確認待ち（[intent.md](../intent.md)、[roadmap.md](../roadmap.md) の「後回しにしたもの」） |

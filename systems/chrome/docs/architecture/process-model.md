@@ -76,7 +76,7 @@
 ```
 
 - **上限は「目安」で、安全のために超える。** 上限を超えた状態で、同じ鍵のプロセスが無いサイトへ行くときは、新しいプロセスを起動する。本家も、上限を超えたら同じサイトのプロセスを無作為に再利用し、違うサイトは混ぜない（[Process Model](https://chromium.googlesource.com/chromium/src/+/main/docs/process_model_and_site_isolation.md)）。
-- **上限は、端末のメモリから計算する。** 本家は「利用できるメモリに応じた soft limit」とだけ公開している。式は自分たちで決める：`上限 = clamp(物理メモリ ÷ Renderer の想定の大きさ（初期値 80MB） ÷ 2, 20, 200)`。数値は **未検証**。E3 で NFR-004（タブ 20 枚でメモリが本家の 1.2 倍以内）を測って決め直す。
+- **上限は、端末のメモリから計算する。** 本家は「利用できるメモリに応じた soft limit」とだけ公開している。式は自分たちで決める：`上限 = clamp(物理メモリ ÷ Renderer の想定の大きさ（初期値 80MB） ÷ 2, 20, 200)`。本家の式は `(物理メモリの MiB ÷ 2) ÷ 85 MB`（64 ビット）で、下限 3、上限 82（[render_process_host_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/renderer_host/render_process_host_impl.cc) の `GetMaxRendererProcessCount()`、2026-09-27 に確認）。本家の上限は、サイトの隔離では超えてよい soft limit である。この設計の式の数値は **未検証**（本家の値に揃えるかを含む）。E3 で NFR-004（タブ 20 枚でメモリが本家の 1.2 倍以内）を測って決め直す。
 - **再利用の選び方**：同じ鍵のプロセスのうち、フォアグラウンドのタブを持たず、メモリが少ないものを選ぶ。本家の「無作為」より、偏りを避けやすい。
 - 再利用しても、プロセスの鍵が同じなので、侵害されたときの被害は同じサイトに閉じる。
 
@@ -90,7 +90,7 @@
 ### 3.4 オリジン単位の隔離
 
 - `Origin-Agent-Cluster` は、本家では既定で有効になり（`document.domain` の変更は、明示的に外さない限り効かない）、エージェントクラスタはオリジン単位になる。これは同じプロセスの中の論理的な分離で、プロセスはサイト単位のまま。MVP も同じにする。
-- `Origin-Agent-Cluster: ?1` を明示したオリジンに、プロセスを分ける（オリジン単位の鍵にする）のは S2 で入れる。本家がいまこの条件でプロセスまで分けているかは **未検証**。本家の `process_model_and_site_isolation.md` の該当節と `content/browser` の実装を読んでから決める。
+- `Origin-Agent-Cluster: ?1` を明示したオリジンに、プロセスを分ける（オリジン単位の鍵にする）のは S2 で入れる。本家は、`Origin-Agent-Cluster: ?1` をオリジン単位のプロセスを使って「よい」という合図として扱い、保証はしない。既定でオリジン単位のプロセスにする機能（`kOriginKeyedProcessesByDefault`）は既定で無効（[process_model_and_site_isolation.md](https://source.chromium.org/chromium/chromium/src/+/main:docs/process_model_and_site_isolation.md)、[content_features.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/public/common/content_features.cc)、2026-09-27 に確認）。この設計も S2 まではプロセスを分けず、S2 の前に費用を測って決める。
 
 ### 3.5 メモリの圧迫への対応
 
@@ -165,7 +165,7 @@
 | Linux | zygote から fork する。zygote は起動時に共通のライブラリを読み、名前空間と seccomp-bpf の準備をしておく | Unix ドメインソケット、memfd | zygote は、動いている間にブラウザが更新されても、子の版がずれないことも保つ（[Linux Zygote](https://chromium.googlesource.com/chromium/src/+/main/docs/linux/zygote.md)） |
 
 - サンドボックスの中身は [sandbox-and-security.md](sandbox-and-security.md) で決める。この文書は、プロセスの種類ごとに「どのサンドボックスの型を使うか」の対応だけを持つ。
-- Storage サービスを Browser の中で始めるのは、本家のデスクトップが今どちらで動かしているかが **未検証** のため。本家の `components/services/storage` の起動の経路を確かめて、S2 までに分けるかを決める。
+- 本家のデスクトップは Storage サービスを別のプロセスで動かす（Android だけが Browser の中。[storage_partition_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/storage_partition_impl.cc) の `GetStorageServiceRemote()`、2026-09-27 に確認）。この設計は、IPC の境界を同じ形にしたうえで Browser の中で始め、S2 までに別のプロセスへ分ける（[storage.md](storage.md) の 1 節）。
 
 ## 6. クラッシュと回復
 
@@ -176,7 +176,7 @@
 | Renderer（最上位の frame を持つ） | そのプロセスのタブが「このページは表示できません」の画面（本家の sad tab）になる。他のタブは影響なし | 再読み込みで、新しいプロセスと新しい frame の実体で開き直す。履歴は残る |
 | Renderer（iframe だけを持つ） | その iframe の領域が、落ちたことを示す表示（sad frame）になる。親のページは動き続ける | 親の再読み込み、または iframe の再ナビゲーションで開き直す |
 | バックグラウンドのタブの Renderer | 表示なし。タブを開いたときに sad tab を出す | 同上 |
-| GPU | 一瞬画面が止まる | 作り直し、全プロセスの合成の接続を張り直す。短い間に何度も落ちるなら、ソフトウェアの描画に切り替える（回数と時間は **未検証**。本家の GPU のデータの管理の既定を確かめる） |
+| GPU | 一瞬画面が止まる | 作り直し、全プロセスの合成の接続を張り直す。短い間に何度も落ちるなら、ソフトウェアの描画に切り替える（本家と同じく、落ちた回数を 5 分ごとに 1 回ずつ許し、数えた回数が 3 回に達したら、次の描画の方式へ 1 段下げる。GPU のモードが変わったら数え直す。[gpu_process_host.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/gpu/gpu_process_host.cc)、[fallback.md](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/gpu/fallback.md)、2026-09-27 に確認） |
 | Network サービス | 読み込み中の要求が失敗する | 作り直し、各 Renderer の `URLLoaderFactory` を張り直す。Cookie・キャッシュはディスクから読み直す |
 | Utility | その機能（画像の復号など）が失敗する | 次の要求で作り直す |
 | Browser | ブラウザが終わる | 次の起動で、セッションの復元を提案する（[navigation-and-loading.md](navigation-and-loading.md) の 6.4） |
@@ -193,7 +193,7 @@
 
 ### 6.3 応答しない Renderer
 
-- 入力イベントへの応答が一定時間（本家は 15 秒前後。**未検証**）ないとき、「ページが応答しません」を表示し、待つか終了させるかを選ばせる。
+- 入力イベントへの応答が一定時間（本家はデスクトップで 15 秒。`kHungRendererDelay`。[input_constants.h](https://source.chromium.org/chromium/chromium/src/+/main:components/input/input_constants.h)、2026-09-27 に確認）ないとき、「ページが応答しません」を表示し、待つか終了させるかを選ばせる。
 - 同じプロセスの他のタブにも、同じ表示が出る（プロセスを共有しているため）。
 
 ## 7. OOPIF の描画と入力

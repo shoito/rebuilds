@@ -19,6 +19,8 @@ date: 2026-09-26
 
 ## Decision
 
+> 2026-09-27 の注記：本家の保持の上限は、タブあたり 6 ページ（`kBackForwardCacheSize` の `cache_size` の既定）、10 分（`kDefaultTimeToLiveInBackForwardCacheInSeconds = 600`）である（[back_forward_cache_impl.cc](https://source.chromium.org/chromium/chromium/src/+/main:content/browser/back_forward_cache/back_forward_cache_impl.cc)、2026-09-27 に確認）。下の「6 ページは未検証」は解消した。
+
 1 を採用する。詳細は [navigation-and-loading.md](../architecture/navigation-and-loading.md) の 6.3。
 
 - 最上位のクロスドキュメントのナビゲーションで離れるとき、条件を満たすページの frame の木を丸ごと凍結する（`pagehide` の `persisted: true`、タイマー・Promise・読み込みの停止）。

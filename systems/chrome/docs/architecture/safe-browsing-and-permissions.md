@@ -141,7 +141,7 @@ ADR-0022 で決める。
 ### 5.2 確認の画面
 
 - アドレスバーに結び付けた吹き出しで出す（ページが描けない領域。[sandbox-and-security.md](sandbox-and-security.md) の 9 節）。
-- **一時の抑止（embargo）**：同じオリジンの確認を利用者が続けて閉じたら、一定の期間、自動でブロックする。回数と期間は本家に寄せる（具体的な値は未検証。初期値は 3 回・7 日）。
+- **一時の抑止（embargo）**：同じオリジンの確認を利用者が続けて閉じたら、一定の期間、自動でブロックする。回数と期間は本家と同じ 3 回・7 日（`kDefaultDismissalsBeforeBlock = 3`、`kDefaultEmbargoDays = 7`。無視は 4 回。静かな確認では閉じる 1 回・無視 2 回。[permission_decision_auto_blocker.cc](https://source.chromium.org/chromium/chromium/src/+/main:components/permissions/permission_decision_auto_blocker.cc)、2026-09-27 に確認）。
 - **静かな確認**：通知の確認は、次のときに、吹き出しではなくアドレスバーの小さな表示にする。
   - 利用者が「静かな確認」を選んだ。
   - 利用者が通知の確認を何度も拒否している（端末の中の判断）。
@@ -150,7 +150,7 @@ ADR-0022 で決める。
 
 ### 5.3 自動の失効
 
-- **使っていないサイト**：一定の期間（初期値 60 日。本家の値は未検証）訪れていないサイトの許可を外し、安全の確認の画面で知らせる。利用者は戻せる。
+- **使っていないサイト**：60 日（本家と同じ。`kUnusedSitePermissionsRevocationThreshold = base::Days(60)`。[unused_site_permissions_manager.cc](https://source.chromium.org/chromium/chromium/src/+/main:chrome/browser/ui/safety_hub/unused_site_permissions_manager.cc)、2026-09-27 に確認）訪れていないサイトの許可を外し、安全の確認の画面で知らせる。利用者は戻せる。
 - **通知の多いサイト**：関わりの少ないサイトが大量の通知を送るとき、通知の許可を外す。関わりの度合いは端末の中で計算する。
 - **悪用するサイト**：悪用する通知のリストに入ったサイトの通知の許可を外す。
 - 企業のポリシーで許可を固定した権限は、自動では外さない。
@@ -166,7 +166,7 @@ ADR-0023 で決める。
 
 | OS | データ鍵の保護 |
 | --- | --- |
-| Windows | DPAPI。加えて、ブラウザの実行ファイルに結び付ける保護（本家の app-bound encryption の形）を検討する（未検証） |
+| Windows | DPAPI。加えて、ブラウザの実行ファイルに結び付ける保護（本家の app-bound encryption の形）を検討する（本家は Chrome 127 から。[Improving the security of Chrome cookies on Windows](https://security.googleblog.com/2024/07/improving-security-of-chrome-cookies-on.html)。自前で作れるかは未検証で、E5 で確かめる） |
 | macOS | キーチェーン（ブラウザのアプリに限った項目） |
 | Linux | Secret Service（libsecret）か KWallet。どちらも使えない環境では、平文に近い保護しかないことを設定の画面で示す |
 
@@ -188,7 +188,7 @@ ADR-0023 で決める。
 
 - 保存したパスワードが、公開された漏洩のデータに含まれているかを、**k-匿名性**で確かめる（ADR-0023）。
 - 方式：パスワードの SHA-1 の先頭 5 文字（16 進）だけを送り、その範囲に入るハッシュの後半の一覧（詰め物を加えて件数を隠したもの）を受け取り、端末で比べる。Have I Been Pwned の Pwned Passwords の範囲 API と同じ形。
-- 照会先：Pwned Passwords のデータを自前の CDN に写して配るか、範囲 API を直接使う。自前で写せるかは、データの配布の条件の確認次第（未検証）。範囲 API は、利用の許諾・帰属の表示が不要で、商用の利用も認められている。
+- 照会先：Pwned Passwords のデータを自前の CDN に写して配るか、範囲 API を直接使う。全体のデータは公式の PwnedPasswordsDownloader で取れるが、取ったデータの利用と再配布の条件は書かれていない。利用規約は、同等のサービスを作ることを禁じる一般の条項を持つ（[Terms of Use](https://haveibeenpwned.com/TermsOfUse)）。自前の写しは法務の確認（[intent.md](../intent.md) の L5）の後に限る。範囲 API は、API キーが要らず、「ライセンスと帰属の要件はない」とされる。`Add-Padding: true` で応答の件数を揃えられる（[HIBP API v3](https://haveibeenpwned.com/API/v3)、2026-09-27 に確認）。商用の利用を明示的に認める文言はない。
 - 照会は OHTTP の中継を通し、IP アドレスと接頭辞を結び付けられないようにする。
 - 確認する時点：パスワードを保存・使用したとき（既定で有効。送るのは接頭辞だけ）と、パスワードの確認の画面を開いたとき。
 - 本家の Password Checkup は、ユーザー名とパスワードの組を、ハッシュの接頭辞と秘匿集合演算で照会する。ユーザー名との組で確かめる方式は、漏洩のデータの入手と秘匿集合演算の実装が要るため、MVP の後に検討する。
@@ -201,7 +201,7 @@ ADR-0023 で決める。
 | 認証器 | MVP | 方法 |
 | --- | --- | --- |
 | セキュリティ キー（USB・NFC） | あり | CTAP2。デバイスへのアクセスは Browser プロセス |
-| OS のプラットフォームの認証器 | あり | Windows は Windows Hello の WebAuthn の API、macOS は OS のパスキーの API（ブラウザ向けの entitlement が要る。未検証）。Linux は OS の仕組みがないため、自前の提供者だけ |
+| OS のプラットフォームの認証器 | あり | Windows は Windows Hello の WebAuthn の API、macOS は OS のパスキーの API（ブラウザ向けの entitlement `com.apple.developer.web-browser.public-key-credential` が要る。macOS 13.3 以降。Account Holder が申請し、Apple が既定のブラウザの基準で審査して与える。[Apple のドキュメント](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.web-browser.public-key-credential)、2026-09-27 に確認）。Linux は OS の仕組みがないため、自前の提供者だけ |
 | 自前のパスキーの提供者（パスワードマネージャに保存し、E2EE で同期） | MVP の後（E8） | 秘密鍵は端末の外では暗号文だけにする。本家の Google Password Manager と同じ考え方 |
 | 他の端末（スマートフォン）による認証（hybrid） | MVP の後 | |
 
@@ -212,7 +212,7 @@ ADR-0023 で決める。
 - **既定で有効にする。** 本家は 2026 年 10 月の Chrome 154 で「常に安全な接続を使用する」を既定にした。これに合わせる。
 - ナビゲーションは、HTTP の URL でも、まず HTTPS で試す。HTTPS で失敗したら、公開のサイトについては警告の画面を出し、利用者の確認の後に HTTP で開く。
 - 次のものは警告しない：`localhost`、プライベートの IP アドレス、単一のラベルのホスト名、`.local` など、組織の中のもの。企業のポリシーで対象外のホストを指定できる。
-- 利用者が HTTP で進んだサイトは、一定の期間、警告を出さない（初期値 15 日。本家の値は未検証）。
+- 利用者が HTTP で進んだサイトは、一定の期間、警告を出さない（15 日。本家と同じ。`kHTTPSFirstModeBypassExpirationInSeconds = 1296000`。[stateful_ssl_host_state_delegate.cc](https://source.chromium.org/chromium/chromium/src/+/main:components/security_interstitials/content/stateful_ssl_host_state_delegate.cc)、2026-09-27 に確認）。
 - 混在コンテンツ：サブリソースは HTTPS に自動で格上げし、できなければブロックする。
 - HSTS と HSTS のプリロードの一覧は [networking.md](networking.md) にある。
 
@@ -233,7 +233,8 @@ ADR-0023 で決める。
 - OHTTP の中継を、どの事業者に運用してもらうか（中継とサービスが結託しないことの担保）。
 - 商用の脅威のフィードの選定と費用。Google との契約（Web Risk、Safe Browsing の商用の枠組み）を後で結ぶか（ADR-0021）。
 - Pwned Passwords のデータを自前で写して配ってよいか（配布の条件）。
-- 未検証：一時の抑止の回数と期間、使っていないサイトの許可を外すまでの日数、HTTPS-First で警告を出さない期間の本家の値。macOS のパスキーの API をブラウザが使うための entitlement の条件。Windows の app-bound encryption に相当する保護を自前で作れるか。E5・E8 の Story で公式の資料と実機で確かめる。
+- 2026-09-27 に確かめたもの：一時の抑止の回数と期間（3 回・7 日）、使っていないサイトの許可を外すまでの日数（60 日）、HTTPS-First で警告を出さない期間（15 日）、macOS のパスキーの entitlement の条件。どれも本家の値と同じにした。
+- 未検証：Windows の app-bound encryption に相当する保護を自前で作れるか。E5 の Story で実機で確かめる。
 
 ## References
 

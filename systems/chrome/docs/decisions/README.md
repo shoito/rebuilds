@@ -38,6 +38,7 @@ Chrome の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0031](0031-ci-tiers-wpt-and-release-branches.md) | CI を presubmit・CQ・継続の 3 段にし、WPT は期待値で回帰を止め、リリースのブランチは cherry-pick だけにする | accepted |
 | [0032](0032-crash-and-telemetry-privacy.md) | クラッシュとテレメトリは同意した人だけが送り、利用者の ID を持たせない | accepted |
 | [0033](0033-service-infrastructure-and-dr.md) | サービスは配信を静的にして CDN で守り、署名の鍵と診断のデータを専用のアカウントに分ける | accepted |
+| [0034](0034-macos-signing-with-rcodesign-and-cloudhsm.md) | macOS の署名は、Linux の署名専用の実行環境で rcodesign を使い、鍵を CloudHSM に置く | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

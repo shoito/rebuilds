@@ -33,6 +33,8 @@ CSS の解析、カスケード、セレクタの照合、計算値、無効化�
 
 ## Consequences
 
+> 2026-09-27 の注記：Stylo は crates.io の `stylo`（0.21.0、2026-09-08）として出ている。プロパティの定義は、`.mako.rs` の `engines="gecko servo"` から TOML（`style/properties/longhands.toml` など）に移った。一方のエンジンだけのプロパティには `engine = "gecko"` を書き、Servo で未実装のものは `servo_pref` で止める（[servo/stylo](https://github.com/servo/stylo)、2026-09-27 に確認）。「`servo` で有効なプロパティは `gecko` より少ない」は正しい。一覧は、この TOML から出す。
+
 - 良くなること：
   - Firefox で本番の実績がある、並列で速いスタイルの計算を得る。
   - CSS の新しい機能が、Firefox の実装とともに上流から入る。

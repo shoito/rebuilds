@@ -72,8 +72,9 @@ Ops が持つ運用の文書。品質の判定基準とリリースの受け入�
 | リリースの署名の鍵 | release-signing の KMS（マルチリージョンキー。大阪に複製） | 定期には交換しない。予備の鍵の公開鍵をアップデータに埋め込み、漏洩の疑いで切り替える。切り替えを年 1 回 staging で訓練する |
 | フィールドトライアル・Safe Browsing のリストの署名の鍵 | 同上（別の鍵） | 同上 |
 | Authenticode の鍵 | release-signing の CloudHSM（大阪へバックアップ） | 証明書の期限の 60 日前に、同じ発行者の名前で更新する。Canary から先に切り替える |
-| macOS の Developer ID の鍵 | 未定（E9 の PoC） | 証明書の期限の 60 日前 |
-| Linux のリポジトリの GPG の鍵 | release-signing の CloudHSM（PKCS#11。未検証） | 鍵の期限の延長を年 1 回 |
+| macOS の Developer ID の鍵 | release-signing の CloudHSM（PKCS#11。rcodesign から使う。[ADR-0034](../decisions/0034-macos-signing-with-rcodesign-and-cloudhsm.md)。E9 の PoC で確かめる） | 証明書の期限の 60 日前。新しい鍵を CloudHSM の中で作り、CSR から証明書を作る |
+| App Store Connect の API キー（公証） | release-signing の Secrets Manager（Team のキー、Developer の役割） | 1 年ごとに作り直す |
+| Linux のリポジトリの GPG の鍵 | release-signing の CloudHSM（PKCS#11。GnuPG・Sequoia からの使い方は未検証。[update-and-release.md](../architecture/update-and-release.md) の 5.2 節） | 鍵の期限の延長を年 1 回 |
 
 ## 4. アラートと手順
 
@@ -102,7 +103,7 @@ Ops が持つ運用の文書。品質の判定基準とリリースの受け入�
 
 | 作業 | 頻度 | 手順 |
 | --- | --- | --- |
-| 大阪での署名の訓練：大阪の KMS の複製と、大阪に復元した CloudHSM で Canary の 1 版を署名し、合成の端末で 3 つの署名を検証する | 半年ごと | `signing-key-rotation.md`（E10）。それまでは [emergency-security-release.md](emergency-security-release.md) の「署名の工程が使えないとき」 |
+| 大阪での署名の訓練：大阪の KMS の複製と、大阪に復元した CloudHSM で Canary の 1 版を署名し（macOS の署名と公証を含む）、合成の端末で 3 つの署名を検証する | 半年ごと | `signing-key-rotation.md`（E10）。それまでは [emergency-security-release.md](emergency-security-release.md) の「署名の工程が使えないとき」 |
 | 大阪での全体の訓練：東京を使わずに「静的な配信」「更新の確認」「署名の工程」を動かす | 年 1 回 | `disaster-recovery.md`（E10）、ADR-0033 の Confirmation |
 | 鍵の交換：CUP の鍵の交換 | 90 日ごと | `signing-key-rotation.md`（E10） |
 | 鍵の交換の訓練：予備のリリースの鍵・seed と Safe Browsing のリストの予備の鍵への切り替え（staging） | 年 1 回 | 同上 |

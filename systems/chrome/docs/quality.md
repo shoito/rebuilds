@@ -96,7 +96,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | プロセスと IPC（[process-model.md](architecture/process-model.md)、ADR-0006・0007） | 性質：任意のナビゲーション・タブの操作の列の後、どのプロセスにも異なる鍵の文書が同居しない。プロセスの数を上限の数倍にしても保たれる。生成した全インターフェースの復号器のファズ。不正なメッセージで送り元のプロセスが終了し、理由のコードが残る。IPC のメソッドの引数のオリジンを lint で検出 |
 | ナビゲーション（[navigation-and-loading.md](architecture/navigation-and-loading.md)、ADR-0008・0009） | 侵害された Renderer：別のオリジンでのコミットの完了、`pushState` での別のオリジン、内部のページへの要求がプロセスの終了になる。表駆動：応答の検査の順（4.1 節）、ダウンロードの判定（4.5 節）。性質：凍結中のページで JavaScript のタスクが 1 つも実行されない。WPT：`html/browsers/`、`html/cross-origin-opener-policy/`、`content-security-policy/frame-ancestors/`、`x-frame-options/` |
 | 描画（[rendering.md](architecture/rendering.md)、ADR-0010〜0013） | 性質：ランダムな DOM の変更の後、インクリメンタルなレイアウトと全体の再計算のフラグメントの木が一致する。GC のストレステスト（割り当てごとの GC）で DOM のテストと WPT の `dom/`。表示リストのデシリアライザのファズ。reftest を GPU と CPU の raster の両方で。Renderer が Skia と GPU のドライバをリンクしていないことの検査 |
-| JavaScript と Web API（[javascript-and-web-apis.md](architecture/javascript-and-web-apis.md)、ADR-0014） | WPT の `WebIDL/` と各 API の `idlharness`。生成したファイルが生成器の出力と一致する。cross-origin の `WindowProxy`・`Location` のアクセスの表駆動 |
+| JavaScript と Web API（[javascript-and-web-apis.md](architecture/javascript-and-web-apis.md)、ADR-0014） | WPT の `webidl/` と各 API の `idlharness`。生成したファイルが生成器の出力と一致する。cross-origin の `WindowProxy`・`Location` のアクセスの表駆動 |
 | ネットワーク（[networking.md](architecture/networking.md)、ADR-0015〜0017） | 本家の検証器の試験のデータ（証明書の連鎖と期待する結果）の表駆動。表駆動：分割のキーの組み合わせ、サードパーティ Cookie の送出。TLS の相互接続の試験。QUIC の失敗から TCP への戻しの障害注入。WPT：`fetch/`、`cookies/`、`storage-access-api/`、ORB。ルートストアの差分を本家と毎日比べる |
 | 保存（[storage.md](architecture/storage.md)、ADR-0018） | 障害の注入：書き込みの途中でのプロセスの停止、ディスク満杯、ファイルの破損で、破損が 1 つのデータベースに閉じ、満杯で既存のデータを失わない。形式の互換の往復（新しい版で書いた後、1 つ前のマイルストーンで読める）。侵害された Renderer：別の StorageKey を開けない。WPT：`IndexedDB/`、`webstorage/`、`service-workers/`。IndexedDB のベンチマーク（E4 の合否） |
 | サンドボックス（[sandbox-and-security.md](architecture/sandbox-and-security.md)、ADR-0019・0020） | 2.5 節。Stable のビルドにサンドボックスを外す経路がないことをリリースの前に検査。Browser プロセスに入るクレートの依存に C/C++ の解析器がないこと |
@@ -106,7 +106,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | ブラウザの UI（[browser-ui.md](architecture/browser-ui.md)、ADR-0024） | Browser プロセスが V8 の Isolate を作らない。内部ページの許可リストにない要求が拒まれる。UI の性能の予算（2.7 節）。axe で違反 0。IME の変換中の表示と確定のテスト（日本語） |
 | 拡張機能（[extensions.md](architecture/extensions.md)、ADR-0025・0026） | 表駆動：DNR の上限と評価の順序（本家の文書の値）。拡張機能のページで外部のスクリプトと `eval` が CSP で拒まれる。本家の上位の拡張機能 100 件の代表的な操作の自動試験。既知の悪い拡張機能の標本が高リスクと判定される。停止の一覧への追加から端末での無効化まで 30 分以内 |
 | 同期とアカウント（[sync-and-accounts.md](architecture/sync-and-accounts.md)、ADR-0027・0028） | 性質：任意の順序で届いた変更が、すべての端末で同じ結果に収束する（データ型ごと）。確認の数字が公開鍵のすり替えで一致しなくなる。鍵の回転の後、外した端末が新しいデータを読めない。リフレッシュトークンの再利用でその端末のトークンがすべて失効する。リダイレクト URI への遷移が Renderer に渡らない |
-| 更新と配信（[update-and-release.md](architecture/update-and-release.md)、ADR-0029） | CUP の署名・リリースの署名・差分のハッシュの合わないものをアップデータが拒否する。update-server を止めて予備のマニフェストから 100% の版を取る。表駆動：自動の停止の条件（4.3 節）。差分の適用の失敗から全体への戻し |
+| 更新と配信（[update-and-release.md](architecture/update-and-release.md)、ADR-0029） | CUP の署名・リリースの署名・差分のハッシュの合わないものをアップデータが拒否する。update-server を止めて予備のマニフェストから 100% の版を取る。表駆動：自動の停止の条件（4.3 節）。差分の適用の失敗から全体への戻し。macOS の成果物が `codesign --verify`・`spctl`・`stapler validate` を通る（ADR-0034） |
 | ビルドとリリース（ADR-0030・0031） | 再現性の検査。build.rs がネットワークに出たら失敗。cherry-pick の PR に元の `main` のコミットの参照がある |
 | クラッシュとテレメトリ（ADR-0032） | 注釈に許可リストにない鍵・URL の形の値が入らない。同意がない状態で送信が 0 件。登録簿にない指標・期限切れの指標のコードで CI が失敗する |
 | サービスの基盤（ADR-0033） | SCP と IAM Access Analyzer の検査。大阪での訓練（[runbooks/README.md](runbooks/README.md) の 5 節） |
@@ -127,7 +127,7 @@ Claude は PR を出す前に、次を自分で実行し、すべて通ること
 
 ### 2.4 Web Platform Tests の対象と期待値
 
-NFR-007 の「対象とした領域」を、ここで決める。開発リポジトリの `tests/wpt/scope.toml` はこの表の写しで、変えるときはこの表と同じ PR で変え、QA が承認する。ディレクトリの名前は、固定した WPT の版で確かめる。
+NFR-007 の「対象とした領域」を、ここで決める。開発リポジトリの `tests/wpt/scope.toml` はこの表の写しで、変えるときはこの表と同じ PR で変え、QA が承認する。ディレクトリの名前は、固定した WPT の版で確かめる（下の表の名前は、2026-09-27 に [WPT のリポジトリ](https://github.com/web-platform-tests/wpt)の `master` で確かめた）。
 
 | 分野 | 対象の WPT のディレクトリ（MVP） |
 | --- | --- |
@@ -135,13 +135,13 @@ NFR-007 の「対象とした領域」を、ここで決める。開発リポジ
 | HTML | `html/syntax/`、`html/semantics/`（`media-elements` は基本の再生だけ）、`html/dom/`、`html/webappapis/`、`html/canvas/` |
 | ナビゲーションと履歴 | `html/browsers/`、`html/cross-origin-opener-policy/`、`html/cross-origin-embedder-policy/`、`navigation-api/` |
 | CSS | `css/CSS2/`、`css/css-cascade/`、`css/selectors/`、`css/css-values/`、`css/css-display/`、`css/css-flexbox/`、`css/css-grid/`、`css/css-tables/`、`css/css-position/`、`css/css-writing-modes/`、`css/css-text/`、`css/css-fonts/`、`css/css-backgrounds/`、`css/css-transforms/`、`css/css-animations/`、`css/css-transitions/`、`css/css-contain/`、`css/css-conditional/`、`css/cssom/`、`css/cssom-view/` |
-| Web IDL と API | `WebIDL/`、`fetch/`、`xhr/`、`websockets/`、`url/`、`encoding/`、`streams/`、`FileAPI/`、`webmessaging/`、`workers/`、`WebCryptoAPI/`、`wasm/`、`uievents/`、`pointerevents/`、`intersection-observer/`、`resize-observer/`、`performance-timeline/`、`largest-contentful-paint/`、`layout-instability/`、`event-timing/` |
+| Web IDL と API | `webidl/`、`fetch/`、`xhr/`、`websockets/`、`url/`、`encoding/`、`streams/`、`FileAPI/`、`webmessaging/`、`workers/`、`WebCryptoAPI/`、`wasm/`、`uievents/`、`pointerevents/`、`intersection-observer/`、`resize-observer/`、`performance-timeline/`、`largest-contentful-paint/`、`layout-instability/`、`event-timing/` |
 | 保存 | `webstorage/`、`IndexedDB/`、`service-workers/`、`storage/` |
 | 権限の要る API | `permissions/`、`notifications/`、`clipboard-apis/`、`fullscreen/`、`webauthn/` |
 | セキュリティとプライバシー | `content-security-policy/`、`x-frame-options/`、`mixed-content/`、`referrer-policy/`、`cookies/`、`storage-access-api/`、`fetch/metadata/`、`upgrade-insecure-requests/` |
 | グラフィックス | `svg/`（描画と基本の DOM） |
 
-対象の外（MVP）：`webgl/`、`webgpu/`、`webrtc/`、`webaudio/`、`webxr/`、`webusb/`・`web-bluetooth/` などのデバイスの API、`payment-request/`、`webtransport/`、`speech-api/`、`push-api/`、Privacy Sandbox の API、`css/css-multicol/`、印刷。MVP の後に足すものは、足す Epic で表に加える。
+対象の外（MVP）：`webgl/`、`webgpu/`、`webrtc/`、`webaudio/`、`webxr/`、`webusb/`・`bluetooth/` などのデバイスの API、`payment-request/`、`webtransport/`、`speech-api/`、`push-api/`、Privacy Sandbox の API、`css/css-multicol/`、印刷。MVP の後に足すものは、足す Epic で表に加える。
 
 **数え方**：領域（表の 1 つのディレクトリ）ごとに、テストの合格の割合を出す。サブテストを持つテストは、合格したサブテストの割合で数える（wpt.fyi の数え方に合わせる）。基準は 3 OS それぞれで、最も低い OS の値で判定する。
 
@@ -349,7 +349,7 @@ Epic の定義は [roadmap.md](roadmap.md)。
 | --- | --- | --- |
 | E1 Walking skeleton | IPC の生成と検査、サイトごとのプロセス、侵害された Renderer の模擬の枠組み、CI の 3 段、WPT とファズの配線 | 3 OS で「アドレスバー → ナビゲーション → 別のサイトの別プロセスでの表示」が通る。実装済みの IPC について、2.5 節の表の該当する行が拒否・終了・理由のコードになる。ADR-0007 の性質テストが通る。WPT が CQ と継続で動き、期待値の初版がある。IPC の復号器と HTML の解析器のファズが PR と継続で動く。再現性の検査が通る。E1 の PoC（[architecture/README.md](architecture/README.md) の「持ち越し」）の結果が記録されている |
 | E2 Web プラットフォームの互換 | WPT の対象の全領域、主要サイトの検査、Stylo と Taffy の範囲 | 2.4 節の各領域で 80% 以上（3 OS の最低値）。主要サイト 1,000 件の記録と、崩れの原因の分類がある。Taffy の Grid が `css/css-grid/` で 90% に届くか、自作に替える判断が記録されている |
-| E3 性能 | 本家との比較の台本、合成、bfcache の有効化 | 2.7 節の台本が継続の段で動く。NFR-001〜004 を本家と比べて満たすか、満たさない項目に計画と PM の承認がある。bfcache を有効にしても WPT の `back-forward-cache/` と凍結の性質テストが通る |
+| E3 性能 | 本家との比較の台本、合成、bfcache の有効化 | 2.7 節の台本が継続の段で動く。NFR-001〜004 を本家と比べて満たすか、満たさない項目に計画と PM の承認がある。bfcache を有効にしても WPT の `html/browsers/browsing-the-web/back-forward-cache/` と凍結の性質テストが通る |
 | E4 ネットワークと保存 | 検証器、分割と Cookie、HTTP/3、IndexedDB | 本家の検証器の試験のデータが全件通る。分割のキーとサードパーティ Cookie の決定表の全行が通る。HTTP/3 の相互接続の試験が主要な CDN で通る。IndexedDB のベンチマークが本家の Stable の 1.5 倍以内、実サイトの操作で 1.2 倍以内。保存の障害注入で破損が 1 つのデータベースに閉じる |
 | E5 安全（サンドボックス、Safe Browsing、権限） | サンドボックスの脱出、侵害された Renderer、NFR-009 | 2.5 節のテストが 3 OS・全プロセスの種類で合格。Safe Browsing の差分の性質と正規化の表駆動が通る。合成の端末で NFR-009 の 30 分以内を 7 日続けて満たす。権限の決定表の全行が通る |
 | E6 ブラウザの UI | UI の性能、アクセシビリティ、日本語の入力 | 2.7 節の UI の予算を CI で満たす。支援技術での主要な操作の確認が合格（IA2 の要否の判断が記録されている）。axe の違反 0 件。IME のテストが 3 OS で通る。Browser プロセスに V8 の Isolate がない |

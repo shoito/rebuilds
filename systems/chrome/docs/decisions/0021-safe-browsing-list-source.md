@@ -18,6 +18,8 @@ Safe Browsing には、危険な URL のリスト（フィッシング、マル�
 
 ## Options
 
+> 2026-09-27 の注記：Safe Browsing API は非商用に限られ、商用は Web Risk を使うよう案内されている（[Safe Browsing](https://developers.google.com/safe-browsing)、[Usage limits](https://developers.google.com/safe-browsing/v4/usage-limits)）。Web Risk は、返した情報を再配布してはならないとしている（[Web Risk の概要](https://cloud.google.com/web-risk/docs/overview)）。消費者向けのブラウザでの利用を認めるか禁じるかの条項は、公開の文書に見つからなかった（2026-09-27 に確認）。上の「未検証」は、公開の文書では確かめられないまま残る。使うなら Google との個別の契約が前提になる（S2 の運用の後の判断。[architecture/README.md](../architecture/README.md) の「持ち越し」）。
+
 1. **自前の脅威のリストのサービスを作り、商用のフィードと利用者の報告で作る。Google の API は MVP で使わない**
 2. **Web Risk を契約し、端末から直接照会させる**
 3. **Google と個別の契約を結び、本家と同じリストを使う**

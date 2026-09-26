@@ -38,6 +38,8 @@ Web API は数百のインターフェイスと数千のメンバーを持つ。
 
 ## Consequences
 
+> 2026-09-27 の注記：weedle2 の最新は 5.0.0（2024-01-24）で、その後は更新されていない。`async iterable<T>`・`async iterable<K, V>` は解析できるが、`ObservableArray` は解析できない（[mozilla/uniffi-rs](https://github.com/mozilla/uniffi-rs) の weedle2、2026-09-27 に確認）。`ObservableArray` は `adoptedStyleSheets` などで使われるので、そのままでは足りない。上流の保守も止まっているため、E1 で weedle2 をフォークして足りない構文を加えるか、解析器を自作する（生成器の中の閉じた部分なので、替えやすい）。どちらにするかは、E1 で `@webref/idl` の全体を解析し、失敗する定義を数えて決める。
+
 - 良くなること：
   - 型の変換と例外が、すべての API で仕様どおりに揃う。変換の誤りは生成器の 1 か所で直る。
   - 仕様の IDL の変更が、`@webref/idl` の更新の PR として見える。
@@ -48,6 +50,8 @@ Web API は数百のインターフェイスと数千のメンバーを持つ。
   - 性能は生成器の出来に依存する。Speedometer 3（NFR-003）の遅い箇所は、生成器の側で直す。
 
 ## Confirmation
+
+> 2026-09-27 の注記：WPT のディレクトリの名前は `webidl/`（小文字）である（[web-platform-tests/wpt](https://github.com/web-platform-tests/wpt/tree/master/webidl)、2026-09-27 に確認）。下の `WebIDL/` は `webidl/` と読む。
 
 - 生成したファイルが、生成器の出力と一致することを CI で検査する（手での編集を検出する）。
 - WPT の `WebIDL/` と、各 API の `idlharness` のテストを CI で流す。

@@ -23,7 +23,7 @@
 1. セキュリティの担当が、重大度・悪用の有無・影響する版とチャンネル・公表の予定を記録する。Issue は非公開にする。
 2. 修正が `main` に入っているか。部品の修正なら、部品の成果物が作り直されているか（[build-and-test.md](../architecture/build-and-test.md) の 4.5 節）。
 3. 影響するリリースのブランチ（Stable、Beta。企業の固定の版があればそれも）を決める。
-4. 署名の工程が使えるか（release-signing の KMS・CloudHSM・署名専用の EC2 Mac の状態）。
+4. 署名の工程が使えるか（release-signing の KMS・CloudHSM・署名専用の実行環境の状態。macOS の公証は Apple の公証のサービスの状態も）。
 
 ## 対処
 

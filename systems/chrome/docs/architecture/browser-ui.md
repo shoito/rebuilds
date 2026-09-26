@@ -39,7 +39,7 @@
 | macOS 13 以降 | AppKit（`NSWindow`）、Core Animation | `NSTextInputClient` | メニューバーはネイティブ。フルスクリーン・Spaces に対応する |
 | Linux | Wayland を先に、X11 も対応 | Wayland の `text-input-v3`、X11 は XIM / IBus | クライアント側の枠（CSD）。`xdg-desktop-portal` でファイル選択 |
 
-- この層は OS ごとに書く。汎用のウィンドウのライブラリ（winit など）は、日本語の IME の変換中の表示・候補の窓の位置を細かく制御しにくいため、使わない（未検証：E6 の初めに、winit の IME の対応を確かめてから確定する）。
+- この層は OS ごとに書く。汎用のウィンドウのライブラリ（winit など）は、日本語の IME の変換中の表示・候補の窓の位置を細かく制御しにくいため、使わない。winit も IME のイベント（変換中の文字列、確定）と候補の窓の位置の指定（`set_ime_cursor_area`）を持つが、次の版でこの API を `request_ime_update` に置き換えつつある（[winit](https://github.com/rust-windowing/winit)、2026-09-27 に確認）。API が落ち着いていないことも、使わない理由に加える。E6 の初めに、3 OS の IME で自前の層と比べて確定する。
 
 ## 2. ウィンドウとタブ
 
@@ -160,7 +160,7 @@ Profile ─┬─ Window ─┬─ TabStrip ─┬─ Tab（WebContents 1 つ）
 
 - 枠の UI と Web のコンテンツは、1 つのアクセシビリティの木として OS に見せる。Web のコンテンツの木は Renderer が作り、Browser プロセスへ送り、そこで枠の UI の木とつなぐ（本家と同じ構成）。
 - OS への橋は AccessKit（Rust。UIA・NSAccessibility・AT-SPI の橋を持ち、一部は Chromium のコードに由来する。[AccessKit](https://github.com/AccessKit/accesskit)）を使う（ADR-0024）。
-- **Windows の MSAA・IAccessible2 は MVP で提供しない。** 本家は UIA を Chrome 126 から段階的に有効にしつつ、MSAA・IA2 も支え続けている（[Introducing UIA support on Windows](https://developer.chrome.com/blog/windows-uia-support)）。NVDA・JAWS の Web の閲覧は IA2 に依存してきたため、UIA だけで十分に使えるかは **未検証** である。E6 の初めに、NVDA・JAWS・ナレーターで主要な操作（タブの移動、アドレスバー、見出しとリンクの一覧、フォームの入力）を試し、足りなければ IA2 の橋を S2 の前に足す。
+- **Windows の MSAA・IAccessible2 は MVP で提供しない。** 本家は UIA を Chrome 126 から段階的に有効にしつつ、MSAA・IA2 も支え続けている（[Introducing UIA support on Windows](https://developer.chrome.com/blog/windows-uia-support)）。NVDA・JAWS の Web の閲覧は IA2 に依存してきたため、UIA だけで十分に使えるかは **未検証** である（実機の支援技術での確認が要る）。AccessKit は IA2 を実装していない（[ADR-0024](../decisions/0024-ui-toolkit.md) の注記）ので、IA2 が要れば橋は自前で書く。E6 の初めに、NVDA・JAWS・ナレーターで主要な操作（タブの移動、アドレスバー、見出しとリンクの一覧、フォームの入力）を試し、足りなければ IA2 の橋を S2 の前に足す。
 - 企業のポリシーで UIA の提供を止められるようにする（本家の `UiAutomationProviderEnabled` と同じ目的）。
 
 ### 8.2 UI の規則

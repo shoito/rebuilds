@@ -35,6 +35,10 @@ date: 2026-09-26
 - 3 を採らない理由：タブのドラッグでのウィンドウの切り離し、タイトルバーへの描き込み、日本語の IME の細かな制御、GPU の合成器との統合、ブラウザの規模の性能の予算を、外部のツールキットの設計に合わせることになる。ブラウザの UI での本番の実績も無い。ウィジェットの設計の参考にはする。
 - 4 を採らない理由：最も権限の高い Browser プロセスで JavaScript を動かすことになり、攻撃面が大きい（別のプロセスに出すと、キー入力のたびに IPC を往復する）。起動と枠の UI が、成熟に時間のかかるエンジン（[ADR-0002](0002-engine-build-vs-reuse.md) の自作の部分）の正しさと速さに左右され、E1 の walking skeleton が遅れる。
 
+> 2026-09-27 の注記：上の「文字の部品（HarfBuzz など）」は、[rendering.md](../architecture/rendering.md) の 11 節の HarfRust（シェーピング）と Skrifa（フォントの解析・輪郭）と読む。HarfRust は HarfBuzz の組織が保守する Rust の移植で、最新は 0.13.3（2026-08-25）。HarfBuzz v14.3.1 に揃え、README では「よく使うフォントで HarfBuzz より 25% 未満の遅さ」としている（[harfbuzz/harfrust](https://github.com/harfbuzz/harfrust)、[crates.io](https://crates.io/crates/harfrust)）。制約は 3 つある。フォントの大きさを持たない（UnitsPerEm で返す）。不正なフォントは代わりのシェーパーで処理せず、エラーにする。Graphite に対応しない。本家は HarfRust を試したが、設定したフォントの関数（メトリクス）を呼ばない点が障害になった（[harfbuzz#5994](https://github.com/harfbuzz/harfbuzz/issues/5994)、2026-05 に閉じた）。本家が出荷したことは確かめられなかった。採用は変えず、E1 の PoC で速度とメトリクスの呼び出しを確かめる。合わなければ HarfBuzz（C++）に替える（rendering.md の 11 節）。
+>
+> 2026-09-27 の注記：AccessKit（0.25.1、2026-09-25）の出力先は、UIA、NSAccessibility、AT-SPI、Android、iOS である。IAccessible2 の実装はない（[AccessKit](https://github.com/AccessKit/accesskit)）。README では、リッチテキストとハイパーテキストに未対応としている。このため、下の「IA2 を出さない」リスクは、AccessKit の上では避けられない。IA2 が要ると E6 で分かったら、IA2 の橋を自前で書く。
+
 ## Consequences
 
 - 良くなること：
