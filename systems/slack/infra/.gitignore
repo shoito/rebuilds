@@ -1,0 +1,9 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+backend_override.tf
+# Lock files are committed for root modules (live/) only.
+modules/**/.terraform.lock.hcl
+node_modules/

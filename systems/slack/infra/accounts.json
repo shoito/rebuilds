@@ -1,0 +1,13 @@
+{
+  "_comment": "Account IDs are filled in by Ops after the bootstrap apply of live/global/organization (see infra/README.md). null means not created yet.",
+  "organization_id": null,
+  "accounts": {
+    "management": null,
+    "security": null,
+    "log-archive": null,
+    "shared": null,
+    "dev": null,
+    "staging": null,
+    "prod": null
+  }
+}
