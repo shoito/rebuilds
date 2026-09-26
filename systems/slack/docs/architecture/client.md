@@ -304,7 +304,7 @@ Safari の保存の扱い：
 | 認証情報 | セッションは HttpOnly・Secure・SameSite の Cookie に置く。トークンを `localStorage`・IndexedDB・URL に置かない。WebSocket は、API から受け取った短命の 1 回限りのチケットで認証し、Gateway が `Origin` を検査する。Gateway は DB に触れないため、Cookie のセッションを直接は検証しない（[identity-and-access.md](identity-and-access.md)、[realtime.md](realtime.md)） |
 | 利用状況の計測 | `packages/analytics` の型付きのイベントだけを GA に送る。本文・名前・ID を送らない。ワークスペースで無効なら gtag.js を読み込まない（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)） |
 | ログアウト | 全タブに伝えて画面を閉じ、そのアカウントの IndexedDB を消し、Web Push の購読を解除し、SharedWorker の接続を閉じる |
-| 共有端末 | オフラインのキャッシュには、プライベートチャンネルの本文も含まれる。「この端末に保存しない」設定を設けるかは未解決事項 |
+| 共有端末 | オフラインのキャッシュには、プライベートチャンネルの本文も含まれる。「この端末に保存しない」設定は設けず、ログアウト時の IndexedDB の消去と、セッションの最大有効期間で抑える（13 節の決定） |
 | 依存関係 | lockfile を固定し、CI で既知の脆弱性を検査する（[security.md](security.md)） |
 
 ## 9. 国際化（ja / en）
@@ -366,7 +366,7 @@ E2E の主なシナリオ：
 
 Playwright の WebKit は Safari そのものではない。SharedWorker のバックグラウンドでの寿命・Web Push・ホーム画面の PWA は、実機での手動確認とする。
 
-## 13. 未解決事項
+## 13. 未解決の問い
 
 - 対応ブラウザの下限（Safari 17 でよいか）。
 - 共有端末向けに「この端末に保存しない」設定を設けるか。

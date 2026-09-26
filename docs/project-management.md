@@ -18,12 +18,12 @@
 
 ## 2. 前提：アカウントの種類
 
-- **実際の開発では、リポジトリと Project を GitHub の Organization に置く。** 今の `shoito/rebuilds` は個人のリポジトリだが、この文書は Organization を前提に書く。
+- **題材ごとの開発リポジトリと Project は、GitHub の Organization の下に作る**（[ADR-0005](decisions/0005-design-record-repository.md)）。設計の記録の `shoito/rebuilds` は個人のリポジトリのまま置き、Organization へは移さない。この文書は、Organization に作る開発リポジトリを前提に書く。
 - Organization を前提にする理由は 2 つある。
   - GitHub App は、個人アカウントの Projects を操作できない。fine-grained PAT も、個人アカウントの Projects に対応していない。個人アカウントのまま自動化するには、権限の広い classic PAT が要る（[community #156512](https://github.com/orgs/community/discussions/156512)）。
   - Issue types は、Organization でしか使えない。
 - Issue の種類は Issue types で、親子は Sub-issues で表す。Projects では、組み込みの Type・Parent issue・Sub-issues progress の項目を使う。
-- Organization へ移すまでの間は、Projects の自動化を動かさない（設定の実装は、移した後に行う）。
+- Organization の下に開発リポジトリを作るまでは、Projects の自動化を動かさない（設定の実装は、開発リポジトリを作った後に行う）。
 
 ## 3. Issue の種類
 

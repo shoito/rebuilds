@@ -471,7 +471,7 @@ changes ─┬─▶ slack-static ─┐
 | 規則 | 値 |
 | --- | --- |
 | 対象 | `main`（既定のブランチ） |
-| バイパス | リポジトリの管理者のロールだけ（PR を通したマージに限る）。バイパスでマージした PR は REQ-DLV-015 で検出する（[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)） |
+| バイパス | リポジトリの管理者のロールだけ（PR を通したマージに限る）。バイパスでマージした PR は REQ-DLV-015 で検出する（リポジトリ共通の [ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)） |
 | 削除の制限、force push の禁止 | 有効 |
 | PR の必須 | 有効。承認 1 件、`CODEOWNERS` の承認必須、push の後の承認の取り消し、会話の解決必須 |
 | 許可するマージの方法 | squash のみ |
@@ -499,11 +499,11 @@ ruleset の merge queue の規則の各項目の名前と値の範囲は **未�
 
 ## Open questions
 
-- **1 人のリポジトリでの承認**：[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md) で決めた。エージェントの PR は GitHub App から作り、`@shoito` が承認する。人が自分で作った PR は、管理者のバイパスでマージし、REQ-DLV-015 で検出して事後に確認する。
+- **1 人のリポジトリでの承認**：リポジトリ共通の [ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md) で決めた。エージェントの PR は GitHub App から作り、`@shoito` が承認する。人が自分で作った PR は、管理者のバイパスでマージし、REQ-DLV-015 で検出して事後に確認する。
 - **`spec.md` の二重承認の CI**：process.md の 2 節は「承認者のロールを確かめる CI」を求めているが、ロールとアカウントの対応の置き場所がない。この変更の範囲外にした。いつ、どの Story で入れるか（PM、QA）。
 - **検査の道具をどこに置くか**：`tools/spec-checks/` をリポジトリのルートに置き、正本は Slack の `delivery` の capability に置いた。題材が増えたら、正本をリポジトリ共通に移すか（Dev）。
 - **in-progress の変更の未参照を警告にとどめる**（DT-DLV-003 #6）。複数の PR に分けて実装する間に失敗させないためだが、`done` に変える PR で初めて失敗が出る。`plan.md` の Order of work の完了（チェックボックス）と突き合わせて、完了したタスクの ID だけを必須にするか（QA）。
-- **ブランチ名**（`<system>/<YYMMDD-slug>`、ADR-0002）を検査するか。今は要件にしていない（Dev）。
+- **ブランチ名**（`<system>/<YYMMDD-slug>`、リポジトリ共通の [ADR-0002](../../../../../docs/decisions/0002-trunk-based-development.md)）を検査するか。今は要件にしていない（Dev）。
 
 ## 決定（2026-09-26、PM・QA、既定案）
 

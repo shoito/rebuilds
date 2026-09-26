@@ -284,18 +284,18 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 
 - 開発者は、無料の **開発用のワークスペース**（`workspaces.kind = 'developer'`）を作れる。本番と同じ環境の中の、通常のワークスペースである。専用のサンドボックスの環境（別の URL）は持たない。環境を分けると、本番との挙動の差が問題の源になるため。
 - 開発用のワークスペースの制限（メンバー数、保存容量、保持期間）は、開発用の区分の entitlement（[ADR-0032](../decisions/0032-plans-and-entitlements.md) の `limit.*`）で持つ。値は 15 節の決定のとおり、本家の開発用のサンドボックスに合わせる。
-- 開発用のワークスペースでは、審査の前の配布型のアプリ（[apps.md](apps.md) の 4 節）をインストールできる。通常のワークスペースではできない。
+- 配布型のアプリは、審査を受けていなくても、開発用のワークスペースと通常のワークスペースの両方にインストールできる（[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) の 4）。未審査のアプリには、読み取りの厳しい上限と「未審査」の表示がつく（[apps.md](apps.md) の 4 節）。
 - レート制限の tier は、本番と同じにする。開発中に上限に当たる経験を、本番の前にしてもらうため。
 - テストデータは、開発用のワークスペースを作るときに選べるひな形（ダミーのメンバー 7 人、チャンネル、スレッド、リアクション）で入れる。ダミーのメンバーはボットと同じく `account_id IS NULL` で、ログインできず、上限の人数に数えない。作るための公開の API は持たない（15 節の決定）。
 
 ## 12. プランとエンタイトルメント
 
-プランの仕組みは枠組みだけで、値は仮である。課金は範囲外。ワークスペースの entitlement（[ADR-0032](../decisions/0032-plans-and-entitlements.md)。`limit.*` と `feature.*`）で持つ。
+プランの値は [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) の表のとおり。課金は範囲外。ワークスペースの entitlement（[ADR-0032](../decisions/0032-plans-and-entitlements.md)。`limit.*` と `feature.*`）で持つ。**レート制限はプランで変えない**（ADR-0033）。
 
 | entitlement | 内容 | 値 |
 | --- | --- | --- |
-| `limit.api.*` | 各 tier の値（[rate-limiting.md](rate-limiting.md)） | ADR-0032 の表 |
-| `limit.apps.installed` | インストールできるアプリの数 | ADR-0032 の表 |
+| `limit.api.*` | 各 tier の値 | 全プランで同じ（[rate-limiting.md](rate-limiting.md) の 4 節）。変えるのは、ワークスペース単位の上書き（ADR-0032）だけ |
+| `limit.apps.installed` | インストールできるアプリの数 | ADR-0033 の表 |
 | `feature.api_user_tokens` | ユーザーのトークンを使うアプリを許すか | 全プランで有効。ユーザーの機微なスコープ（`messages:read` など）は、ワークスペースの方針にかかわらず管理者の承認を要する（[apps.md](apps.md) の 6.1 節） |
 | `feature.apps_admin_policy` | 管理者の承認・許可リストの設定（[apps.md](apps.md) の 6.3 節） | 全プランで有効。本家もアプリの承認を全プランで提供する（[Manage app approval for your workspace](https://slack.com/help/articles/222386767-Manage-app-approval-for-your-workspace)）。既定の方針は 6.3 節のとおり |
 

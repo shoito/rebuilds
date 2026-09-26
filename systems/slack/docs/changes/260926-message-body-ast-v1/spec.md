@@ -1,6 +1,7 @@
 ---
 capability: messaging
 change: 260926-message-body-ast-v1
+issue:
 epic: E1
 status: approved
 ---

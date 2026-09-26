@@ -7,7 +7,7 @@ Gateway、購読、ファンアウト、在席・入力中、再接続と差分�
 - **正しさは DB とクライアントの差分取得が持つ。** Relay・Valkey・Gateway はイベントを落としてよい。落としたことは、クライアントが `seq` の飛びで検知して取り戻す。
 - **Gateway は状態を「作らない」。** Gateway が持つのは接続と購読の表だけで、どれも再接続で作り直せる。Gateway は DB に書き込まない。
 - **1 つの接続は 1 つのワークスペースに属する。** テナントの境界を接続の単位にそろえる。
-- **Redis のチャンネル名は必ず `ws:{workspace_id}:` で始める**（ADR-0009）。この文書の `{...}` はプレースホルダーで、実際の名前に波かっこは含めない（Valkey のハッシュタグとして解釈され、1 ワークスペースの全チャンネルが同じスロットに寄るため）。
+- **Valkey のチャンネル名は必ず `ws:{workspace_id}:` で始める**（ADR-0009）。この文書の `{...}` はプレースホルダーで、実際の名前に波かっこは含めない（Valkey のハッシュタグとして解釈され、1 ワークスペースの全チャンネルが同じスロットに寄るため）。
 
 ## 2. 全体の流れ
 
@@ -131,7 +131,7 @@ WebSocket で送受信するものは、すべて `packages/contract` の Zod �
 
 | 種類 | 例 | `seq` | 永続化 | 取りこぼしたとき |
 | --- | --- | --- | --- | --- |
-| チャンネル | `message.created/edited/deleted`、`reaction.added/removed`、`pin.added/removed`、`file.updated`、`channel.member_joined/left`、`channel.updated`（一覧は [messaging.md](messaging.md) の「イベント」） | あり | `channel_events` に残る | `after_seq` の差分取得で取り戻す |
+| チャンネル | `message.created/edited/deleted`、`reaction.added/removed`、`pin.added/removed`、`file.updated`、`channel.created/renamed/archived/updated`、`channel.member_joined/left`（一覧は [messaging.md](messaging.md) の「イベント」） | あり | `channel_events` に残る | `after_seq` の差分取得で取り戻す |
 | メンバー | `read.updated`、`thread_subscription.updated`、`channel.joined/left`（自分）、`prefs.updated`、`session.revoked` | なし | 状態は各テーブルが正本 | 再接続時と、タブが前面に戻ったときに、状態を API で取り直す |
 | 一時的 | `typing`、`presence.changed` | なし | しない | 取り戻さない |
 | 制御 | `hello`、`ready`、`ping`/`pong`、`resync`、`focus`、`activity` | なし | しない | — |
@@ -148,7 +148,7 @@ WebSocket で送受信するものは、すべて `packages/contract` の Zod �
   - 差分取得は `seq > N ORDER BY seq LIMIT 1000` の範囲読みになる。
   - 保持は 30 日とし、月ごとのパーティションを落とす。それより古い位置から追いつくクライアントは、差分が 1,000 件を超えたときと同じく最新ページを取り直す（6 節）。
   - 読む側で ADR-0005 の判定を通す。`payload` は、そのチャンネルを読める人に見せてよい内容だけを持つ。
-  - [data-model.md](data-model.md) への反映が必要（前提）。
+  - [data-model.md](data-model.md) に反映済み。
 
 ## 5. 購読モデル
 
@@ -200,7 +200,7 @@ Gateway ノード
 3. 再接続時・欠損検知時は `GET /workspaces/{ws}/channels/{id}/events?after_seq=N` で差分を取得し、`seq` 順に適用する。
 4. 差分が多すぎる場合（例：1,000 件超）は差分を諦め、最新ページを取り直す。
 
-これにより、**Redis や Gateway の配信を「ベストエフォート」にしても正しさが保たれる**。
+これにより、**Valkey や Gateway の配信を「ベストエフォート」にしても正しさが保たれる**。
 
 ### 取得の順序と絞り込み
 
@@ -221,14 +221,14 @@ Gateway ノード
 - 遅い受信者のためにイベントを溜め込まない。溜めるほど Gateway のメモリが減り、ほかの接続を巻き込むため。欠けた分は差分取得で取り戻せる。
 - **Valkey の側の背圧**：Gateway の受信が遅れると、Valkey は `client-output-buffer-limit pubsub` を超えた購読の接続を切る。Gateway は購読を張り直し、影響したチャンネルを購読している全接続に `resync` を送る。
 - **ノードの過負荷**：イベントループの遅延が 200ms を超えたら、新しい接続を `4029` で断る。ALB のヘルスチェックには生存だけを返し、過負荷を理由に不健全にしない（不健全にすると接続が他のノードへ一斉に移り、連鎖する）。
-- クライアントからの送信は、1 接続あたり 1 秒に 20 フレーム、1 フレーム 16 KB までとし、超えたら `4008` で切る。
+- クライアントからの送信は、1 接続あたり 1 秒に 10 フレーム（ping を除く）、1 フレーム 16 KB までとし、超えたら `4008` で切る（[rate-limiting.md](rate-limiting.md) の 4.1 節が正）。
 
 ## 8. 再接続の殺到への備え
 
 デプロイ、AZ の障害、Valkey のフェイルオーバーで、多数のクライアントが同時に再接続してくる。
 
 - **クライアントのバックオフ**：初回は 0〜3 秒のランダムな待ち。その後は「full jitter」の指数バックオフ（基数 1 秒、上限 30 秒）。`4000`・`4029` で `retry_after_ms` が指定されたら、その範囲に広げる。ネットワークの復帰（`online` イベント）を検知したときも、ランダムな待ちを入れる。
-- **受け付けの制限**：Gateway は 1 ノードあたり 1 秒に 500 接続までを受け付け、超えたら `4029` を返す。チケットの発行 API にもワークスペース単位・全体の上限を置く。
+- **受け付けの制限**：Gateway は 1 タスクあたり 1 秒に 200 接続までを受け付け、超えたら `4029` を返す。チケットの発行 API にもワークスペース単位・全体の上限を置く。
 - **`hello` の負荷**：チャンネル一覧と heads の取得が、再接続のたびに DB に当たる。reader から読み、同時に実行する数をノードごとに制限する。
 - **差分取得の負荷**：6 節の優先順位と同時数の制限に加え、API はメンバー単位のレート制限を持ち、超えたら 429 と `Retry-After` を返す。
 
@@ -284,7 +284,7 @@ Gateway ノード
 - 同じメンバーの接続は、それぞれ独立に購読し、同じチャンネルのイベントを受け取る。
 - 既読の更新（`read.updated`）はメンバーのストリームに流し、同じメンバーの他の端末に届ける（[read-state-and-notifications.md](read-state-and-notifications.md)）。
 - 在席は端末をまたいで集約する（9 節）。通知の抑制は、どの端末が操作中かで決める。
-- 1 メンバーあたりの同時接続は 10 本までとし、超えたら古い接続から `4000` で切る。
+- 1 メンバーあたりの同時接続は、ワークスペースごとに 10 本までとし、超えたら古い接続から `4000` で切る。ワークスペースをまたいだ 1 アカウントの合計は 20 本まで（[rate-limiting.md](rate-limiting.md) の 4.1 節）。
 
 ## 13. 規模の段階ごとの構成
 

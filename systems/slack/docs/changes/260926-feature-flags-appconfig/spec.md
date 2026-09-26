@@ -1,6 +1,7 @@
 ---
 capability: flags
 change: 260926-feature-flags-appconfig
+issue:
 epic: E1
 status: approved
 ---

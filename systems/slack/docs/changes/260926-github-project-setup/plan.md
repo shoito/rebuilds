@@ -8,7 +8,7 @@
 
 | 変更・作業 | 関係 |
 | --- | --- |
-| リポジトリを Organization へ移す | **先に必要。** 人が行う（ADR-0003） |
+| Organization の下に Slack の開発リポジトリを作る | **先に必要。** 人が行う（リポジトリ共通の [ADR-0003](../../../../../docs/decisions/0003-github-projects-for-planning.md)、[ADR-0005](../../../../../docs/decisions/0005-design-record-repository.md)） |
 | [ci-pipeline](../260926-ci-pipeline/plan.md) | 先に必要。`change-link` は `ci-gate` の必須のチェックに加える |
 | [agent-skills-foundation](../260926-agent-skills-foundation/plan.md) | この変更の後。App と Project を使う |
 

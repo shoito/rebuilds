@@ -42,6 +42,8 @@
   - `test/`：各モジュールのテスト、`test/fixtures/`、`test/arbitraries/`（quality.md の 2 節）
 - `systems/slack/package.json`、`systems/slack/pnpm-workspace.yaml`、`systems/slack/turbo.json`（新規）：ワークスペースとタスク（`typecheck`、`lint`、`format:check`、`test`、`test:integration`、`test:flags`、`lint:migrations`、`check:contract`）の定義だけ。パッケージは作らない
 - `systems/slack/docs/decisions/README.md`、`docs/decisions/README.md`：一覧の表を `adr-index` の印で囲み、生成し直す
+
+> 注記（2026-09-26）：ADR は rebuilds に残る（リポジトリ共通の [ADR-0005](../../../../../docs/decisions/0005-design-record-repository.md)）。ADR の一覧の生成し直し（REQ-DLV-010、5 の作業）は、開発リポジトリの CI ではなく、rebuilds 自身の CI（これから用意する）に適用する。`adr-index.ts` は、そちらで使う。
 - `systems/slack/AGENTS.md`：Commands の「要件 ID の追跡検査」「型検査・lint」の行を埋める
 - GitHub の設定（コードではない。`tools/spec-checks/README.md` に手順）：ruleset の適用、merge queue の有効化、リポジトリの「squash のコミットメッセージの既定を PR のタイトルにする」
 

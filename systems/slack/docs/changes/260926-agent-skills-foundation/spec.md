@@ -83,7 +83,7 @@ Priority・Iteration・Target date は変えてはならない。
 - 7 日を超えたブランチ
 - 期限切れのフラグ
 - `needs:*` の一覧
-- `review:post-merge` の一覧（ADR-0004）
+- `review:post-merge` の一覧（リポジトリ共通の [ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)）
 - DORA の 4 指標
 
 数値は Actions が集計したものだけを使い、エージェントが推測した数値を載せてはならない。

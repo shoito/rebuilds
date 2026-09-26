@@ -69,6 +69,6 @@
 
 ## 事後
 
-- 調査結果を `changes/` の新しい `intent.md` として起票する（Maintain 段）。
+- 調査結果を Intent の Issue として起票する（Maintain 段。[project-management.md](../../../../docs/project-management.md)）。
 - この手順で足りなかったことを、ここに反映する。
 - デプロイの失敗の原因が CI で防げたなら、CI の検査（マイグレーションの lint、E2E）を足す提案を Dev と QA に出す。

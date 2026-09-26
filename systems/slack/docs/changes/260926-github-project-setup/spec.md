@@ -12,13 +12,13 @@ status: approved
 
 [project-management.md](../../../../../docs/project-management.md) の運用を動かすための設定と自動化を作る。対象は次のとおり。
 
-- エージェント用の GitHub App（[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)）
+- エージェント用の GitHub App（リポジトリ共通の [ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)）
 - Issue types、ラベル、Issue Forms
 - Project の項目とビュー
 - 同期のワークフロー（`project-fields-sync`・`change-link`・`stage-sync`）
 - 既存の変更フォルダへの Issue の割り当て
 
-リポジトリと Project は Organization に置く前提である（[ADR-0003](../../../../../docs/decisions/0003-github-projects-for-planning.md)）。
+Slack の開発リポジトリと Project は、Organization の下に作る前提である（リポジトリ共通の [ADR-0003](../../../../../docs/decisions/0003-github-projects-for-planning.md)、[ADR-0005](../../../../../docs/decisions/0005-design-record-repository.md)）。rebuilds は Organization へ移さない。
 
 範囲の外：
 
@@ -191,4 +191,4 @@ status: approved
 
 - 1 人の間は、Organization のチーム `pm`・`dev`・`qa`・`ops` のすべてに `@shoito` だけを入れ、`CODEOWNERS` はチームで書く。
 - GitHub App の秘密鍵は 90 日ごとに入れ替える（ADR-0017 の署名鍵に合わせる）。
-- この変更の実装は、リポジトリを Organization へ移すまで着手しない。
+- この変更の実装は、Organization の下に Slack の開発リポジトリを作るまで着手しない（rebuilds は Organization へ移さない。リポジトリ共通の [ADR-0005](../../../../../docs/decisions/0005-design-record-repository.md)）。

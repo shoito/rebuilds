@@ -1,6 +1,7 @@
 ---
 capability: observability
 change: 260926-telemetry-package
+issue:
 epic: E1
 status: approved
 ---

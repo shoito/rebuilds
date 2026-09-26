@@ -80,6 +80,6 @@
   - 責任追及をしない（blameless）。人ではなく、仕組みの穴を探す。
   - 書くこと：時系列、影響（時間、ワークスペース数、消費したエラーバジェット）、検知までの時間、原因、うまくいったこと、足りなかったこと、再発防止の対策。
   - 振り返りの記録は Ops が持ち、再発防止の対策には担当者と期限を付ける。
-- **再発防止を intent にする。** Claude が調査結果をもとに、`changes/` の新しい `intent.md` を起票する（Maintain 段）。PM が受理したものは、通常の Plan → Design の流れに乗る。
+- **再発防止を intent にする。** Claude が調査結果をもとに、Intent の Issue を起票する（Maintain 段。[project-management.md](../../../../docs/project-management.md)）。PM が受理したものは、`intent.md` か Epic・Story になり、通常の Plan → Design の流れに乗る。
 - テナント境界・データ喪失に関わるものは、QA にも共有し、[quality.md](../quality.md) のリスクと対策を見直す。
 - この手順と、関係した個別の runbook で足りなかったことを反映する。アラートが鳴らなかった・遅かったなら、アラートを直す。

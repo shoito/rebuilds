@@ -92,7 +92,7 @@
 
 ## 事後
 
-- 調査結果を `changes/` の新しい `intent.md` として起票する（Maintain 段）。
+- 調査結果を Intent の Issue として起票する（Maintain 段。[project-management.md](../../../../docs/project-management.md)）。
 - この手順で足りなかったことを、ここに反映する。
 - 訓練と実際の切り替えで計測した RTO・RPO を記録し、目標を満たさなければ intent を起票する。
 

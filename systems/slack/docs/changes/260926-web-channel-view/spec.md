@@ -1,6 +1,7 @@
 ---
 capability: web-client
 change: 260926-web-channel-view
+issue:
 epic: E1
 status: approved
 ---

@@ -10,7 +10,7 @@ status: approved
 
 ## 概要
 
-E1 の Web クライアントのサイドバーに必要な、参加しているチャンネルの一覧を返す。チャンネルの作成・参加・退出と、権限の決定表は、E2 の `authorization-decision-tables` で扱う。E1 では、seed で作ったチャンネルとメンバーシップだけを使う。
+E1 の Web クライアントのサイドバーに必要な、参加しているチャンネルの一覧を返す。チャンネルの作成・参加・退出・アーカイブは E2 の `channel-lifecycle`、権限の決定表は E2 の `authorization-decision-tables` で扱う。E1 では、seed で作ったチャンネルとメンバーシップだけを使う。
 
 ## ADDED Requirements
 

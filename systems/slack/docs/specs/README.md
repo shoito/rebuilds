@@ -1,6 +1,6 @@
 # Specs
 
-> **開発リポジトリへ移す予定。** [ADR-0005](../../../../docs/decisions/0005-design-record-repository.md) により、`specs/` と `changes/` は Slack の開発リポジトリに置く。開発リポジトリを作るまで、初期のバックログとしてここに置いている。
+> **開発リポジトリへ移す予定。** リポジトリ共通の [ADR-0005](../../../../docs/decisions/0005-design-record-repository.md) により、`specs/` と `changes/` は Slack の開発リポジトリに置く。開発リポジトリを作るまで、初期のバックログとしてここに置いている。
 
 実装済みの振る舞いの正本。capability（機能領域）ごとに `<capability>/spec.md` を置く。
 
@@ -22,3 +22,10 @@
 | observability | `OBS` | 計装、ログ、テナントのラベル |
 | flags | `FLAG` | フィーチャーフラグの定義と評価 |
 | agent-tooling | `AGT` | エージェントの Skills・Subagent・eval |
+| identity | `AUTH` | 認証、セッション、SSO、トークン（[identity-and-access.md](../architecture/identity-and-access.md)） |
+| notifications | `NOTIF` | 通知の計画と配送、通知の設定（[read-state-and-notifications.md](../architecture/read-state-and-notifications.md)） |
+| mcp | `MCP` | リモート MCP サーバー（[mcp.md](../architecture/mcp.md)） |
+| public-api | `API` | 版付きの公開 API（[public-api.md](../architecture/public-api.md)） |
+| apps | `APP` | アプリの基盤（[apps.md](../architecture/apps.md)） |
+| plans | `PLAN` | プランと entitlement（ADR-0032、0033） |
+| rate-limiting | `RL` | レート制限の共通の仕組み（[rate-limiting.md](../architecture/rate-limiting.md)） |

@@ -1,6 +1,7 @@
 ---
 capability: web-client
 change: 260926-web-app-shell-routing
+issue:
 epic: E1
 status: approved
 ---
@@ -500,8 +501,6 @@ API の呼び出しが失敗した場合、システムは DT-WEB-003 に従っ�
 
 ## Open questions
 
-- **API の不足（PM・Dev）**：`GET /api/me/workspaces`、`GET /api/workspaces/{ws}/channels`、開発用のサインイン・サインアウトの API がどの変更にもない。E1 のどの Story で作るか（260926-post-and-list-messages に足すか、新しい Story を起こすか）。
-- **パスの接頭辞（Dev）**：260926-post-and-list-messages は `/workspaces/{ws}/...`、identity-and-access.md は `/api/workspaces/{ws}/...` と書いている。`packages/api-client` がどちらを基準にするかを揃える必要がある。
 - **開発用トークンの渡し方（Dev）**：推奨は、開発用の API が HttpOnly の Cookie を発行する方式（E2 と同じ経路になり、Web がトークンを持たない）。代わりに、ローカルの開発サーバーのプロキシがヘッダーを付ける方式もある（UI は不要だが、staging では Web を使えない）。
 - （決定）既定の言語は `ja` にする。DT-WEB-005 の 3 行目（PM、2026-09-26）。
 - **リリースの識別子のヘッダー名（Dev・Ops）**：仮に `X-Client-Release` とする。API のログ・トレースに載せるのは `telemetry-package` の範囲。
@@ -512,7 +511,7 @@ API の呼び出しが失敗した場合、システムは DT-WEB-003 に従っ�
 
 上の Open questions は、次のとおり決めた。
 
-- 不足していた API は、`dev-session-and-workspaces` と `channel-list` で作る。
+- 不足していた API（`GET /api/me/workspaces`、`GET /api/workspaces/{ws}/channels`、開発用のサインイン・サインアウト）は、`dev-session-and-workspaces` と `channel-list` で作る。
 - 内部 API のパスの接頭辞は `/api` にする（`packages/api-client` もこれを基準にする）。
 - 開発用の認証は、開発用の API が HttpOnly の Cookie を発行する方式にする（`dev-session-and-workspaces`）。
 - リリースの識別子のヘッダー名は `X-Client-Release` にする。

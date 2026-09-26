@@ -35,8 +35,9 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `dev-repo-bootstrap` | Slack の開発リポジトリを Organization の下に作り、`changes/`・`specs/`・開発向けの `AGENTS.md` を移す。rebuilds の設計へのリンクを置く（ADR-0005）。E1 の他の Story の前に行う |
+| `dev-repo-bootstrap` | Slack の開発リポジトリを Organization の下に作り、`changes/`・`specs/`・開発向けの `AGENTS.md` を移す。rebuilds の設計へのリンクを置く（リポジトリ共通の [ADR-0005](../../../docs/decisions/0005-design-record-repository.md)）。E1 の他の Story の前に行う |
 | `terraform-foundation` | AWS の Organizations、アカウント、VPC、Terraform の状態のバケット、GitHub Actions の OIDC（ADR-0020） |
+| `app-infra-baseline` | ワークロードの基盤：ECS・ALB・Aurora・Valkey・SQS・CloudFront（`terraform-foundation` で後回しにしたもの。ADR-0011、0020） |
 | `github-project-setup` | ラベル・Issue Forms・Projects の項目とビュー・同期のワークフロー（[project-management.md](../../../docs/project-management.md)） |
 | `agent-skills-foundation` | `spec-authoring`・`spec-review`（QA 役の Subagent）・`pmo-triage` と、Skill の eval（`github-project-setup` と `ci-pipeline` の後） |
 | `ci-pipeline` | PR の CI、merge queue、ID の追跡の検査、マイグレーションの lint（[delivery.md](architecture/delivery.md)） |
@@ -57,7 +58,13 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `sessions-and-device-list` | セッションの管理と端末の一覧、取り消し |
 | `member-resolution-middleware` | アカウントからメンバーを解決し、`SET LOCAL` でテナントのコンテキストを設定する |
 | `rls-migration-lint` | テナントテーブルの RLS の検査と、`search` スキーマの例外（ADR-0009、0027） |
+| `workspace-create` | ワークスペースの作成と、最初の owner |
 | `authorization-decision-tables` | 権限の決定表（`DT-CHN-*`）と判定関数 |
+| `channel-lifecycle` | チャンネルの作成・参加・退出・アーカイブ・メンバーの追加（`channel.*` のイベント。[messaging.md](architecture/messaging.md)） |
+| `dm-and-group-dm` | DM とグループ DM |
+| `member-admin` | ロールの変更とメンバーの無効化 |
+| `rate-limit-framework` | 共通のレート制限の仕組み（GCRA、応答、Valkey の障害時の振る舞い。ADR-0029、[rate-limiting.md](architecture/rate-limiting.md)） |
+| `audit-log-core` | 監査ログの記録（ADR-0018。E2 の管理操作から記録する） |
 | `email-invitations` | メールでの招待 |
 | `mfa-totp-and-passkeys` | TOTP とパスキー |
 | `bot-member-api-tokens` | ボット・エージェントのメンバーと、スコープ付きのトークン |
@@ -135,6 +142,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- |
 | `security-headers-csp` | CSP と各種ヘッダー |
 | `waf-baseline` | WAF の基本設定 |
+| `security-baseline-guardduty` | GuardDuty・Security Hub・AWS Config の有効化と委任（`terraform-foundation` で後回しにしたもの） |
+| `egress-firewall` | AWS Network Firewall と Route 53 Resolver DNS Firewall による外向き通信の許可リスト |
 | `supply-chain-ci` | SBOM、来歴、Actions の SHA の固定 |
 | `security-scanning` | SAST、依存の検査、DAST |
 | `blue-green-deploy-pipeline` | api の blue/green、Gateway のローリング、prod の承認 |
@@ -158,7 +167,6 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `workspace-sso-saml` | ワークスペースの SSO（SAML） |
 | `domain-verification-and-join` | ドメインの確認と参加 |
 | `sso-enforcement-policy` | SSO の強制 |
-| `audit-log-core` | 監査ログの記録 |
 | `audit-log-archive` | アーカイブへの送出と改ざんの検知 |
 | `audit-log-admin-view` | 管理者向けの閲覧 |
 | `retention-policies` | 保持ポリシー |

@@ -2,6 +2,7 @@
 
 - Change: 260926-post-and-list-messages
 - Spec: [spec.md](spec.md)
+- Quality: [quality.md](quality.md)
 - Status: approved
 
 ## 依存

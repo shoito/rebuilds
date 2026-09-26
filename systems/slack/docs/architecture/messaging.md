@@ -12,7 +12,7 @@
    - `messages` に INSERT する（`client_msg_id` の一意制約に当たったら、既存の行を返す）
    - `mentions` と `outbox` に INSERT する
 4. コミット後、`seq` 付きのメッセージを返す。クライアントは仮表示を確定させる。
-5. Relay が outbox を読み、Redis の `ws:{workspace_id}:ch:{channel_id}` に publish する。
+5. Relay が outbox を読み、Valkey の `ws:{workspace_id}:ch:{channel_id}` に publish する。
 6. 購読中の Gateway が、接続中のメンバーへ WebSocket で push する。
 
 ## 共通の規則
@@ -243,7 +243,7 @@ type Inline =
 | 1 チャンネルのピン留め | 100 | 409 |
 | スレッドの深さ | 1 段 | 404（返信への返信） |
 
-投稿のレートの上限は [runbooks/README.md](../runbooks/README.md) の 2 節にある。
+投稿のレートの上限は [rate-limiting.md](rate-limiting.md) の 4.2 節にある。
 
 ## リンクのプレビュー
 
@@ -271,7 +271,7 @@ message_unfurls (workspace_id, message_id, url_hash, position, hidden,
 
 ## ピン留め
 
-実装が安いので、E3 の任意の Story として扱う。ブックマーク（チャンネル上部のリンク）と、個人の「保存済み」は範囲外。
+実装が安いので、E3 の任意の Story として扱う。
 
 ```sql
 pins (workspace_id, channel_id, message_id, pinned_by_member_id, created_at,
@@ -284,7 +284,7 @@ pins (workspace_id, channel_id, message_id, pinned_by_member_id, created_at,
 
 ## イベント
 
-outbox に積むイベントの一覧。Relay が Redis（リアルタイム配信）と、Worker ごとの SQS キューに流す。
+outbox に積むイベントの一覧。Relay が Valkey の Pub/Sub（リアルタイム配信）と、Worker ごとの SQS キューに流す。
 
 | イベント | `seq` | 主な中身 | リアルタイム | 検索 | 通知 | unfurl | ファイル |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -295,11 +295,17 @@ outbox に積むイベントの一覧。Relay が Redis（リアルタイム配�
 | `reaction.added` / `reaction.removed` | 消費する | `message_id`、`emoji`、`member_id` | ○ | | | | |
 | `pin.added` / `pin.removed` | 消費する | `message_id`、`member_id` | ○ | | | | |
 | `file.updated` | 消費する | `file_id`、`message_id`、状態、サムネイルの有無（[files.md](files.md)） | ○ | | | | |
+| `channel.created` | 消費する | `channel_id`、名前、種類、作成者 | ○ | | | | |
+| `channel.renamed` | 消費する | `channel_id`、新しい名前 | ○ | | | | |
+| `channel.archived` | 消費する | `channel_id`、`archived_by` | ○ | | | | |
+| `channel.updated` | 消費する | `channel_id`、変わった属性（トピック、説明など） | ○ | | | | |
+| `channel.member_joined` / `channel.member_left` | 消費する | `channel_id`、`member_id` | ○ | | ○（`member_left` だけ。未送信の通知の取り消し） | | |
 | `thread_subscription.updated` | 消費しない | `root_message_id`、`subscribed`、`last_read_seq` | ○（本人の端末だけ） | | | | |
 
 - **Worker は、イベントを「きっかけ」として扱い、中身は DB から読み直す。** SQS（標準キュー）は順序を保証せず、重複もある。DB の現在の状態を読めば、順序が入れ替わっても最終状態が正しくなる。
 - `content_seq` は、本文を最後に変えたイベント（作成・編集・削除）の `seq`。検索インデックスの書き込みで、古い内容が新しい内容を上書きしないための版番号に使う（[search.md](search.md)）。
 - Worker の冪等キーは `(workspace_id, channel_id, seq)`。
+- `channel.*` のイベントは、アプリへのイベント（[apps.md](apps.md) の 6.2 節）の元にもなる。自分の参加・退出は、別にメンバーのストリームの `channel.joined` / `channel.left` で知らせる（[realtime.md](realtime.md) の 5 節）。
 - 差分取得（`GET .../events?after_seq=N`）は、outbox ではなく、イベントを保存するテーブルから読む。テーブルの形は [realtime.md](realtime.md) で決める。
 
 ## データモデルへの追加

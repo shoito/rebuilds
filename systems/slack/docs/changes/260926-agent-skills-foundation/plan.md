@@ -9,7 +9,7 @@
 | 変更 | 関係 |
 | --- | --- |
 | [ci-pipeline](../260926-ci-pipeline/plan.md) | 先に必要。`tools/spec-checks/` と、CI の呼び出し口 |
-| [github-project-setup](../260926-github-project-setup/plan.md) | 先に必要。GitHub App、ラベル、Projects、同期のワークフロー（ADR-0003、0004） |
+| [github-project-setup](../260926-github-project-setup/plan.md) | 先に必要。GitHub App、ラベル、Projects、同期のワークフロー（リポジトリ共通の [ADR-0003](../../../../../docs/decisions/0003-github-projects-for-planning.md)、[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)） |
 
 ## Files that change
 

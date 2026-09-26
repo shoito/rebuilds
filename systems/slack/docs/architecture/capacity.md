@@ -46,8 +46,10 @@
 | api | 15 | 30 | 450 |
 | workers | 5 | 20 | 100 |
 | relay | 3 | 2 | 6 |
+| mcp（E9） | 5 | 10 | 50 |
+| public-api（E12） | 10 | 10 | 100 |
 | migrator、運用 | — | — | 20 |
-| **合計** | | | **約 580** |
+| **合計** | | | **約 730** |
 
 - 規則：**オートスケールの上限まで増えたときの合計を、`max_connections` の 50% 以下に保つ。** Aurora の `max_connections` の既定値は `LEAST({DBInstanceClassMemory/9531392}, 5000)` で、`db.r8g.2xlarge`（メモリ 64 GiB）では上限の 5,000 になる（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Managing.html#AuroraPostgreSQL.Managing.MaxConnections)）。
 - Gateway は DB に接続しない（[realtime.md](realtime.md)）。
@@ -85,11 +87,13 @@
 | キュー | ピークの流量 | Worker の処理時間 p99 | タスク数 |
 | --- | --- | --- | --- |
 | search-index | 450 件/秒 | 50 ms | 2 |
-| notify-plan | 300 件/秒 | 30 ms | 2 |
-| notify-fanout・push | 1,000 件/秒 | 200 ms（外部の push サービス） | 4 |
-| thumbnail | 20 件/秒 | 2 秒 | 2 |
+| notify-events | 300 件/秒 | 30 ms | 2 |
+| notify-fanout・notify-push | 1,000 件/秒 | 200 ms（外部の push サービス） | 4 |
+| file-events（スキャン結果・サムネイル） | 20 件/秒 | 2 秒 | 2 |
 | unfurl | 30 件/秒 | 3 秒（外部のサイト） | Lambda（ADR-0016） |
 | app-events・app-delivery（E12） | 約 150 件/秒（設計値 500 件/秒） | 外部のアプリの応答に依存 | 振り分けは ECS、送信は Lambda（[apps.md](apps.md)） |
+
+平常時の Worker は計 10 タスク（E12 の app-event-router・app-delivery を除く）。キュー名は [read-state-and-notifications.md](read-state-and-notifications.md) と [files.md](files.md) に合わせる。
 
 標準キューのスループットは上限を気にしなくてよい（SQS の標準キューはほぼ無制限）。
 
@@ -133,8 +137,8 @@
 | 設定 | 値 | 理由 |
 | --- | --- | --- |
 | `--max-old-space-size` | タスクのメモリの 75% | コンテナの上限の前に、Node.js の GC を働かせる |
-| `server.keepAliveTimeout` | 65 秒 | ALB のアイドルタイムアウト（api は 60 秒）より長くする。短いと、ALB が切れた接続を使って 502 を返す |
-| `server.headersTimeout` | 66 秒 | `keepAliveTimeout` より長くする |
+| `server.keepAliveTimeout` | api・mcp・public-api は 65 秒、gateway は 130 秒 | ALB のアイドルタイムアウト（api は 60 秒、gateway は 120 秒。3.5 節）より長くする。短いと、ALB が切れた接続を使って 502 を返す |
+| `server.headersTimeout` | api・mcp・public-api は 66 秒、gateway は 131 秒 | `keepAliveTimeout` より長くする |
 | 終了の処理 | SIGTERM で新しい受け付けを止め、処理中のリクエストを終えてから終わる | デプロイ中のエラーを 0 にする（ADR-0022） |
 
 ### 3.4 Gateway
@@ -143,7 +147,7 @@
 | --- | --- | --- |
 | `ulimit nofile` | 65,536（タスク定義で明示） | 1 万接続＋Valkey などの接続。Fargate の既定値もソフト・ハードとも 65,535 だが（[ECS の API リファレンス](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_Ulimit.html)）、既定値に頼らず明示する |
 | `ws` の `perMessageDeflate` | 無効 | 圧縮は CPU とメモリを接続ごとに使う。イベントは小さい |
-| `ws` の `maxPayload` | 64 KB | クライアントからの大きなフレームを拒否する |
+| `ws` の `maxPayload` | 16 KB | クライアントからの大きなフレームを拒否する（[rate-limiting.md](rate-limiting.md) の 4.1 節） |
 | 送信バッファの上限 | 1 MB（`bufferedAmount`） | 超えたら遅い受信者として `4003` で切る（[realtime.md](realtime.md) の 7 節） |
 | ping | 25 秒ごと。60 秒間なにも受信しなければ切る | ALB のアイドルタイムアウト（120 秒）より十分短く |
 | 毎秒の受け付け数 | 1 タスク 200 | 再接続の殺到を平らにする |
@@ -186,7 +190,15 @@
 | api | CPU 50%、ターゲットあたりのリクエスト数 | 3 / 30 | 60 秒 / 300 秒 |
 | gateway | タスクあたりの接続数 6,000 | 3 / 24 | 60 秒 / 900 秒（縮めるときは 1 回 1 タスクまで） |
 | relay | 固定（アクティブ 1、待機 1） | 2 / 2 | — |
-| workers | キューの最古のメッセージの経過時間（目標 5 秒）とメッセージ数 | 各 1 / 各 10 | 60 秒 / 300 秒 |
+| mcp（E9） | CPU 50% | 2 / 10 | 60 秒 / 300 秒 |
+| public-api（E12） | CPU 50%、ターゲットあたりのリクエスト数 | 2 / 10 | 60 秒 / 300 秒 |
+| workers（search-index） | キューの最古のメッセージの経過時間（目標 5 秒）とメッセージ数 | 2 / 4 | 60 秒 / 300 秒 |
+| workers（notify-events） | 同上 | 2 / 3 | 同上 |
+| workers（notify-fanout・notify-push） | 同上 | 4 / 7 | 同上 |
+| workers（file-events） | 同上 | 2 / 3 | 同上 |
+| workers（app-event-router・app-delivery、E12） | 同上 | 各 1 / 合計 3 | 同上 |
+
+- Worker の最大は、全サービスの合計で 20 タスクにする（2.2 節の接続数の規則）。キューごとの最大を足したものが 20 を超えないようにする。
 
 ### 3.9 クォータ（着手前に引き上げを申請する）
 

@@ -12,4 +12,4 @@
 | [0005](0005-design-record-repository.md) | rebuilds を設計の記録に限定し、実装は題材ごとの開発リポジトリで行う | accepted |
 <!-- adr-index:end -->
 
-この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。E1 の `ci-pipeline` で、CI が生成と差分の検査を行うようにする（手で編集する一覧は衝突しやすいため。[process.md](../process.md) の「衝突の防止」）。
+この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。生成と差分の検査は、rebuilds の CI（これから用意する）で行う。開発リポジトリの `ci-pipeline` の対象ではない（手で編集する一覧は衝突しやすいため。[process.md](../process.md) の「衝突の防止」）。

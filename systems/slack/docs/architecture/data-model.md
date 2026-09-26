@@ -73,7 +73,7 @@ Request ─▶ 認証ミドルウェア
 
 | 領域 | テーブル・列 | 定義の場所 |
 | --- | --- | --- |
-| 認証 | Better Auth が持つテーブル（`accounts` を Better Auth の user として使う、`sessions`、`verifications`、`passkeys`、`two_factors`、`sso_providers`） | [identity-and-access.md](identity-and-access.md)、[ADR-0012](../decisions/0012-self-hosted-auth-with-better-auth.md) |
+| 認証 | Better Auth が持つテーブル（`accounts` を Better Auth の user として使う、`auth_identities`（Better Auth の `account` を改名したもの）、`sessions`、`verifications`、`passkeys`、`two_factors`、`sso_providers`） | [identity-and-access.md](identity-and-access.md)、[ADR-0012](../decisions/0012-self-hosted-auth-with-better-auth.md) |
 | 認証 | `invitations`、`api_tokens`、`workspace_domains`、`workspace_auth_policies`、`workspace_sso_connections` | [identity-and-access.md](identity-and-access.md) |
 | 認証 | `members.role` を `owner / admin / member / guest_multi / guest_single` にする | [identity-and-access.md](identity-and-access.md) |
 | 会話 | `messages` に `also_send_to_channel`、`broadcast_mention`、`reply_member_ids`、`content_seq`、`last_reply_seq`。`mentions` に `seq` | [messaging.md](messaging.md)、[read-state-and-notifications.md](read-state-and-notifications.md) |
@@ -86,7 +86,7 @@ Request ─▶ 認証ミドルウェア
 | プラン | `plans`、`workspace_entitlements` | [ADR-0032](../decisions/0032-plans-and-entitlements.md) |
 | 会話の周辺 | `user_groups`・`user_group_members`、`scheduled_messages`、`custom_emoji`、`saved_items`、`channel_bookmarks` | [messaging.md](messaging.md) |
 | プロフィール・リマインダー | `members` のプロフィールの列、`member_statuses`、`reminders` | [identity-and-access.md](identity-and-access.md)、[read-state-and-notifications.md](read-state-and-notifications.md) |
-| 監査 | `audit_events`（追記のみ） | [ADR-0018](../decisions/0018-audit-log.md) |
+| 監査 | `audit_events`（追記のみ）、`platform_audit_events`（テナントの外。ワークスペースに属さない記録） | [ADR-0018](../decisions/0018-audit-log.md) |
 | 保持と削除 | 保持ポリシー、リーガルホールド、エクスポート、削除の予定 | [ADR-0019](../decisions/0019-data-retention-and-deletion.md)、[security.md](security.md) の 14 節 |
 
 - テナントの中のテーブルは、どれも ADR-0009 の規則（`workspace_id`、複合キー、`FORCE ROW LEVEL SECURITY`）に従う。例外は `search` スキーマだけ（ADR-0027）。

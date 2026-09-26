@@ -12,17 +12,19 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | クライアントの欠損検知率（`seq` の飛びを検知して差分を取りに行った割合） | 1% 未満 | 急増したら配信系の障害を疑う | ○ |
 | 未読数の不一致率（クライアントとサーバーの突合） | 0.1% 未満 | 超えたら QA に共有する | ○ |
 
+SLO の窓は 30 日（月次）とする。エラーバジェットとバーンレートは、この窓で計算する（[observability.md](../architecture/observability.md) の 5 節）。
+
 「品質の判定に使う」に○がある指標は、QA が品質の判定基準に使う。定義を変えるときは QA と合意する。
 
 ## 2. テナント単位の上限と負荷
 
-特定のワークスペースが共有の資源を占有しないよう、テナント単位で上限を設ける（ADR-0009）。**上限の値の正は [rate-limiting.md](../architecture/rate-limiting.md) の 4 節と、プランごとの値（[ADR-0032](../decisions/0032-plans-and-entitlements.md)）にある。** 下の表は、運用でよく見るものの抜粋である。上限を一時的に厳しくする・緩める操作は、ワークスペース単位の上書き（ADR-0032）で行い、監査ログに残す。
+特定のワークスペースが共有の資源を占有しないよう、テナント単位で上限を設ける（ADR-0009）。**上限の値の正は [rate-limiting.md](../architecture/rate-limiting.md) の 4 節にある。レート制限はプランで変えない（[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md)）。** 下の表は、運用でよく見るものの抜粋である。上限を一時的に厳しくする・緩める操作は、ワークスペース単位の上書き（ADR-0032）で行い、監査ログに残す。
 
 | 対象 | 上限（MVP） | 超えたとき |
 | --- | --- | --- |
-| メンバー数 | 5,000 | 招待を拒否する |
+| メンバー数 | 5,000（S1 の規模による技術的な上限。プランでは変えない。ADR-0033） | 招待を拒否する |
 | 投稿のレート | 1 メンバーあたり 1 秒に 1 件、1 ワークスペースあたり 1 秒に 200 件 | 429 を返す |
-| ストレージ | プランごとに定める | アップロードを拒否する |
+| ストレージ | プランごとに定める（容量。ADR-0033 の表） | アップロードを拒否する |
 | MCP の呼び出し | 1 トークン 1 分に 60 回（読み取り）・10 回（書き込み）、1 ワークスペース 1 秒に 50 回 | JSON-RPC のエラーで `retry_after` を返す（[mcp.md](../architecture/mcp.md)） |
 | 通知の push | 1 ワークスペース 1 秒に 200 件 | 遅らせる（[read-state-and-notifications.md](../architecture/read-state-and-notifications.md)） |
 | 検索 | 1 メンバー 1 分に 30 回 | 429 を返す（[search.md](../architecture/search.md)） |
@@ -44,6 +46,9 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | アラート | 手順 | 状態 |
 | --- | --- | --- |
 | SLO の速いバーンレート、合成監視の連続失敗 | [incident-response.md](incident-response.md) | 作成済み |
+| クライアントの欠損検知率の急増（1 節） | [incident-response.md](incident-response.md) | 作成済み |
+| 未読数の不一致率が 0.1% を超えた（1 節） | [incident-response.md](incident-response.md) | 作成済み |
+| 権限の監査の不一致（テナント境界・チャンネルの権限。[quality.md](../quality.md) の 4 節） | [incident-response.md](incident-response.md) | 作成済み |
 | デプロイ中の自動ロールバック、デプロイ後の悪化 | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み |
 | AZ・リージョンの障害 | [disaster-recovery.md](disaster-recovery.md) | 作成済み |
 | outbox の最古の行の経過時間、`outbox_dead` の増加、未処理件数の増加 | `relay-backlog.md`（Relay のリースの交代を含む） | E4 で作成 |
@@ -62,7 +67,8 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | アプリへの配信の失敗の急増、配信先の無効化、配信の遅れ | `app-event-delivery.md` | E12 で作成 |
 | アプリの濫用（スパム、過剰な読み取り） | `app-abuse.md`（インストールの停止を含む） | E12 で作成 |
 | 特定のワークスペース・アプリの 429 の急増、上限の一時的な変更 | `tenant-throttling.md`（[rate-limiting.md](../architecture/rate-limiting.md) の 5 節） | E7 で作成 |
-| 系列数が AMP の上限の 80%、Terraform のドリフトの検出 | `observability-and-drift.md` | E7 で作成 |
+| Terraform のドリフトの検出（`drift:` / `drift-error:` の Issue） | `terraform-drift.md`（break-glass の後始末を含む） | E1 で作成（terraform-foundation） |
+| 系列数が AMP の上限の 80% | `observability-limits.md` | E7 で作成 |
 
 ## 5. 定期作業と訓練
 

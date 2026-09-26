@@ -86,7 +86,7 @@ prod は、`tf-plan` のロール（読み取り）で V1〜V8 を実行する�
 
 | 指標 | 許容できる範囲 | 備考 |
 | --- | --- | --- |
-| ドリフトの検知で開いている Issue（`drift: <root>`） | 週次の確認で 0 件（ADR-0020 の Confirmation） | 計測とアラートは Ops の `observability-and-drift.md`（E7）。それまでは Issue の一覧で見る |
+| ドリフトの検知で開いている Issue（`drift: <root>`） | 週次の確認で 0 件（ADR-0020 の Confirmation） | 対応の手順は Ops の `terraform-drift.md`（E1。この変更の完了までに作る）。それまでは Issue の一覧で見る |
 | `drift-error: <root>` の Issue | 3 日続けて出ない | ロックの競合か、ロールの権限の不足を疑う |
 | break-glass の利用 | 月 0〜2 回。利用ごとに 24 時間以内に理由が記録されている | 手の変更は 24 時間以内にコードへ反映する（ADR-0020） |
 | ポリシーの例外 | 期限切れのまま残るものが 0 件 | |
