@@ -3,6 +3,7 @@
 - 変更フォルダ: `systems/<name>/docs/changes/YYMMDD-<slug>/`
 - 規模: 軽微 / 小 / 標準 / 大
 - フィーチャーフラグ: なし / `<種類>.<名前>`（削除のタスクを plan.md に書いた）
+- PR のタイトル（squash のコミットメッセージになる）: `<type>(<scope>): <subject>` を英語で。scope は `systems/` の下の名前か `repo`（例：`feat(slack): add message posting API`）
 
 ## 承認（docs/process.md「ロールと持ち主」）
 

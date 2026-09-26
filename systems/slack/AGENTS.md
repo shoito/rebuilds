@@ -13,14 +13,14 @@ Slack の再構築。リポジトリ共通のルールはルートの [AGENTS.md
 
 ## Commands
 
-まだ実装がない。[260926-post-and-list-messages](docs/changes/260926-post-and-list-messages/plan.md) の完了時に、次を埋める。
+リポジトリのルートで実行する。環境の起動とテストの行は、[260926-post-and-list-messages](docs/changes/260926-post-and-list-messages/plan.md) の完了時に埋める。
 
 | 目的 | コマンド | 正常な出力 |
 | --- | --- | --- |
 | 環境の起動 | | |
-| 型検査・lint | | |
+| 型検査・lint | `pnpm --dir systems/slack install && pnpm --dir systems/slack typecheck && pnpm --dir systems/slack lint` | Turborepo の `Tasks: N successful, N total`（失敗 0） |
 | テスト | | |
-| 要件 ID の追跡検査 | | |
+| 要件 ID の追跡検査 | `pnpm --dir tools/spec-checks install && pnpm --dir tools/spec-checks check` | `0 error(s), ...`（ID の追跡・重複・アーカイブ・ADR の一覧。詳細は [tools/spec-checks/README.md](../../tools/spec-checks/README.md)） |
 
 ## この題材に固有の規則
 
