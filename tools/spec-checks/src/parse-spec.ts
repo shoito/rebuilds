@@ -80,12 +80,11 @@ function findHeadings(lines: string[]): Heading[] {
 }
 
 /** Lines after `headings[k]` up to the next heading with level <= maxLevel. */
-function sliceBlock(lines: string[], headings: Heading[], k: number, maxLevel: number, end = lines.length): string {
+function sliceBlock(lines: string[], headings: Heading[], k: number, maxLevel: number): string {
   const start = headings[k]!.index + 1;
-  let stop = end;
+  let stop = lines.length;
   for (let j = k + 1; j < headings.length; j++) {
     const h = headings[j]!;
-    if (h.index >= end) break;
     if (h.level <= maxLevel) {
       stop = h.index;
       break;
@@ -124,12 +123,19 @@ export function parseSpec(path: string, text: string, kind: "canonical" | "chang
     }
     const entry: IdEntry = { id: m[1]!, section, line: h.index + 1, body: sliceBlock(lines, headings, k, 3) };
     if (section === "MODIFIED" || section === "REMOVED") {
+      // Before / After are copies of whole requirement blocks and contain their own
+      // "#### Scenario" headings, so Before runs up to "#### After" and After to the block end.
       const blockEnd = headings.slice(k + 1).find((x) => x.level <= 3)?.index ?? lines.length;
-      for (let j = k + 1; j < headings.length && headings[j]!.index < blockEnd; j++) {
-        const sub = headings[j]!;
-        if (sub.level !== 4) continue;
-        if (sub.text === "Before") entry.before = sliceBlock(lines, headings, j, 4, blockEnd);
-        if (sub.text === "After") entry.after = sliceBlock(lines, headings, j, 4, blockEnd);
+      const inBlock = headings.filter((x) => x.index > h.index && x.index < blockEnd && x.level === 4);
+      const beforeAt = inBlock.find((x) => x.text === "Before")?.index;
+      const afterAt = inBlock.find((x) => x.text === "After")?.index;
+      if (beforeAt !== undefined) {
+        const stop = afterAt !== undefined && afterAt > beforeAt ? afterAt : blockEnd;
+        entry.before = lines.slice(beforeAt + 1, stop).join("\n");
+      }
+      if (afterAt !== undefined) {
+        const stop = beforeAt !== undefined && beforeAt > afterAt ? beforeAt : blockEnd;
+        entry.after = lines.slice(afterAt + 1, stop).join("\n");
       }
       if (entry.before === undefined) {
         errors.push({ path, line: entry.line, message: `${entry.id} in ${section} has no "#### Before" section` });

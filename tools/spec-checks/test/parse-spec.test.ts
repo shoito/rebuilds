@@ -34,6 +34,8 @@ Body.
 
 Old text.
 
+#### Scenario: old
+
 #### After
 
 New text.
@@ -81,9 +83,9 @@ describe("parse-spec", () => {
     expect(spec.entries[0]!.body).toContain(ids("### REQ~MSG~009"));
   });
 
-  it("REQ-DLV-009: extracts Before and After of MODIFIED and REMOVED", () => {
+  it("REQ-DLV-009: extracts Before and After of MODIFIED and REMOVED, including their scenarios", () => {
     const [, modified, removed] = parseSpec("x/spec.md", DELTA, "change").entries;
-    expect(normalize(modified!.before!)).toBe("\nOld text.");
+    expect(normalize(modified!.before!)).toBe("\nOld text.\n\n#### Scenario: old");
     expect(normalize(modified!.after!)).toBe("\nNew text.");
     expect(normalize(removed!.before!)).toBe("\nRemoved text.");
   });
