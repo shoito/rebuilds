@@ -28,6 +28,16 @@ MODIFIED には変更後の全文を書く。REMOVED には ID と理由だけ�
 
 ## REMOVED Requirements
 
+## Decision Tables
+
+### DT-<CAP>-001: <規則名>
+
+上から順に評価し、最初に一致した行を採用する。
+
+| # | <条件 1> | <条件 2> | → <結果 1> | → <結果 2> |
+| --- | --- | --- | --- | --- |
+| 1 | | - | | |
+
 ## Correctness Properties
 
 ### PROP-<CAP>-001: <性質名>

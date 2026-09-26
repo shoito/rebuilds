@@ -17,6 +17,8 @@
 - `apps/api/src/routes/messages.ts`（新規）
 - `apps/api/test/messages.test.ts`（新規）：シナリオの結合テスト
 - `apps/api/test/messages.property.test.ts`（新規）：PROP-MSG-001, 002
+- `apps/api/test/messages.decision-table.test.ts`（新規）：DT-MSG-001
+- `scripts/lib/decision-table.ts`（新規）：`spec.md` から決定表を読み込む
 - `scripts/check-req-ids.ts`（新規）：要件 ID の追跡検査
 - `AGENTS.md`：Commands を追記
 
@@ -29,8 +31,9 @@
 - [ ] 5. 投稿：採番、冪等性、本文検証（REQ-MSG-001, 002, 003, 006）
 - [ ] 6. 履歴取得：ページング（REQ-MSG-004, 005）
 - [ ] 7. 性質ベーステスト（PROP-MSG-001, 002）
-- [ ] 8. 要件 ID の追跡検査を CI に組み込む
-- [ ] 9. `AGENTS.md` の Commands を更新する
+- [ ] 8. 決定表の読み込みと表駆動テスト（DT-MSG-001）
+- [ ] 9. ID の追跡検査を CI に組み込む
+- [ ] 10. `AGENTS.md` の Commands を更新する
 
 ## Risks
 
@@ -49,4 +52,5 @@
 | 本文の検証 | REQ-MSG-006 | 単体テスト、結合テスト |
 | 並行投稿でも `seq` が欠番・重複しない | PROP-MSG-001 | 性質ベーステスト（fast-check、並行度 1〜50） |
 | 再送を任意に含んでも冪等 | PROP-MSG-002 | 性質ベーステスト |
-| すべての要件 ID がテストから参照されている | — | `scripts/check-req-ids.ts` が CI で通る |
+| 権限・本文・再送の組み合わせと優先順位 | DT-MSG-001 | 表駆動テスト（`spec.md` から読み込み、4 行 = 4 ケース） |
+| すべての ID（REQ・PROP・DT）がテストから参照されている | — | `scripts/check-req-ids.ts` が CI で通る |

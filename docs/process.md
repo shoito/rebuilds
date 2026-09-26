@@ -45,6 +45,7 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | `.kiro/specs/<feature>/requirements.md` | `changes/NNNN-<slug>/spec.md` の Requirements | EARS と Given/When/Then は同じ。要件 ID を `REQ-<CAP>-NNN` 形式にし、差分（ADDED / MODIFIED / REMOVED）で書く |
 | `.kiro/specs/<feature>/design.md` | `spec.md` の Design ＋ `docs/architecture.md` ＋ ADR | 変更に固有の設計だけを spec に書く。横断的な設計は architecture.md、選択の理由は ADR に分ける |
 | design.md の Correctness Properties | `spec.md` の Correctness Properties（`PROP-*`） | 同じ考え方。性質ベーステストで検証する |
+| （なし） | `spec.md` の Decision Tables（`DT-*`） | 条件の組み合わせで結果が決まる規則を表で書き、表駆動テストで検証する |
 | `.kiro/specs/<feature>/tasks.md` | `plan.md` | Order of work が tasks.md にあたる。加えて Files that change、Risks、Proof を持つ |
 | tasks.md の `_Requirements: 1.2_` | Order of work と Proof の要件 ID | 要件 ID をテスト名にも含め、CI で追跡を検査する |
 | `bugfix.md` | 規模「小」の `plan.md` | Proof に回帰テストを書く。Kiro の「Unchanged Behavior」（直さないこと）の考え方は Risks に書く |
@@ -94,6 +95,7 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | --- | --- | --- |
 | 要件 | `REQ-<CAP>-NNN` | `REQ-MSG-001` |
 | 正しさの性質 | `PROP-<CAP>-NNN` | `PROP-MSG-001` |
+| 決定表 | `DT-<CAP>-NNN` | `DT-MSG-001` |
 | 非機能要件 | `NFR-NNN` | `NFR-003` |
 | ADR | `ADR-NNNN` | `ADR-0002` |
 
@@ -117,16 +119,34 @@ ID は一度振ったら再利用しない。削除した要件の ID は欠番�
 
 > PROP-MSG-001：任意の投稿・切断・再送の列に対して、全クライアントが最終的に見るメッセージ列は、DB 上の `seq` 順の列と一致する。
 
+### 決定表
+
+複数の条件の組み合わせで結果が決まる規則（権限、状態遷移、料金計算など）は、シナリオを並べる代わりに決定表で書く。表にすると、条件の組み合わせの漏れと、条件どうしの優先順位（例：「非メンバー」かつ「本文が不正」のときにどちらのエラーを返すか）が明らかになる。
+
+- 条件の列と結果の列を分け、どちらでもよい条件は `-` と書く。
+- 行はすべての組み合わせを覆うようにする。上から順に評価し、最初に一致した行を採用する。
+- テストは決定表を `spec.md` から直接読み込む、表駆動テストにする。表をテストコードに書き写すと、仕様とテストがずれるため。
+
+### 使い分け
+
+| 書き方 | 向いているもの | テスト |
+| --- | --- | --- |
+| シナリオ（Given / When / Then） | 代表的な具体例、ユーザーから見た流れ | 例示テスト |
+| 決定表 | 条件の組み合わせで結果が決まる規則 | 表駆動テスト（各行が 1 ケース） |
+| 正しさの性質 | どんな入力・順序・並行度でも成り立つべき不変条件 | 性質ベーステスト |
+
+3 つとも「何が正しいか」を定める仕様なので、`spec.md` に書き、アーカイブ時に正本へ反映する。ジェネレーターの設計、試行回数、障害の注入方法といった「どう確かめるか」は、`plan.md` の Proof か、変更単位の `quality.md` に書く。
+
 ## 6. 追跡
 
 - `plan.md` のタスクと Proof には、対応する要件 ID を書く。
-- テストの名前（`describe` / `it`）には要件 ID を含める。
+- テストの名前（`describe` / `it`）には要件・性質・決定表の ID を含める。決定表のテストでは、行番号も含める（例：`DT-MSG-001 #3`）。
 
   ```ts
   it("REQ-MSG-002: same client_msg_id returns the existing message", ...)
   ```
 
-- CI で、`specs/` と進行中の `changes/` にあるすべての要件 ID がどこかのテストから参照されていることを検査する。
+- CI で、`specs/` と進行中の `changes/` にあるすべての ID（`REQ-*`・`PROP-*`・`DT-*`）がどこかのテストから参照されていることを検査する。
 
 ## 7. 決定の記録（ADR）
 
@@ -135,7 +155,8 @@ ID は一度振ったら再利用しない。削除した要件の ID は欠番�
   - 複数の選択肢を比べて選んだもの
   - エージェントが別の選択をしがちなもの
 - 形式は `docs/templates/adr.md`（MADR を簡略化したもの）に従う。
-- ADR は書き換えない。方針を変えるときは新しい ADR を書き、古いほうの状態を `superseded by ADR-NNNN` にする。
+- `proposed` の間は、同じ ADR を書き換えて最新化してよい。
+- `accepted` になった ADR は書き換えない。方針を変えるときは新しい ADR を書き、古いほうの状態を `superseded by ADR-NNNN` にする。
 
 ## 8. 品質
 
@@ -158,7 +179,7 @@ ID は一度振ったら再利用しない。削除した要件の ID は欠番�
 
 中身は [templates/change-quality.md](templates/change-quality.md) に従う。
 
-- テスト設計の詳細（組み合わせ表、障害注入のシナリオ、負荷のモデル）
+- テスト設計の詳細（性質ベーステストのジェネレーター、障害注入のシナリオ、負荷のモデル）。決定表そのものは仕様なので `spec.md` に書く
 - テスト環境とテストデータ
 - 合否の判定基準
 - シフトライト（リリース後に何を見るか、どうなったら戻すか）
