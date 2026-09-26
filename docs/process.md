@@ -31,6 +31,27 @@ systems/<name>/
 
 リポジトリ全体に関わる決定は、ルートの `docs/decisions/` に置く。
 
+### Kiro との対応
+
+Kiro の Spec-Driven Development に慣れている人向けの対応表。
+
+| Kiro | このリポジトリ | 違い |
+| --- | --- | --- |
+| （なし） | `intent.md` | Kiro には spec の手前で「なぜ作るか」を合意する層がない。Anthropic Playbook の Plan 段にあたる |
+| `.kiro/steering/product.md` | `docs/intent.md`（題材レベル） | 製品の目的・ユーザー・スコープ |
+| `.kiro/steering/tech.md` | `docs/architecture.md` の技術スタック、`docs/decisions/` | 技術選定の理由は ADR として残す |
+| `.kiro/steering/structure.md` | `AGENTS.md` | ディレクトリの責務、コマンド、禁止事項 |
+| `.kiro/specs/<feature>/requirements.md` | `changes/NNNN-<slug>/spec.md` の Requirements | EARS と Given/When/Then は同じ。要件 ID を `REQ-<CAP>-NNN` 形式にし、差分（ADDED / MODIFIED / REMOVED）で書く |
+| `.kiro/specs/<feature>/design.md` | `spec.md` の Design ＋ `docs/architecture.md` ＋ ADR | 変更に固有の設計だけを spec に書く。横断的な設計は architecture.md、選択の理由は ADR に分ける |
+| design.md の Correctness Properties | `spec.md` の Correctness Properties（`PROP-*`） | 同じ考え方。性質ベーステストで検証する |
+| `.kiro/specs/<feature>/tasks.md` | `plan.md` | Order of work が tasks.md にあたる。加えて Files that change、Risks、Proof を持つ |
+| tasks.md の `_Requirements: 1.2_` | Order of work と Proof の要件 ID | 要件 ID をテスト名にも含め、CI で追跡を検査する |
+| `bugfix.md` | 規模「小」の `plan.md` | Proof に回帰テストを書く。Kiro の「Unchanged Behavior」（直さないこと）の考え方は Risks に書く |
+| `.kiro/specs/<feature>/` 一式（機能ごとに残り続ける） | `specs/<capability>/spec.md`（正本）＋ `changes/archive/` | Kiro は機能ごとの spec がそのまま残る。ここでは完了した差分を capability ごとの正本へ反映し、変更フォルダは履歴として archive に移す |
+| （なし） | `quality.md` | QA が持つ品質戦略。Kiro には対応するものがない |
+
+要するに、**spec.md は requirements.md ＋ design.md（のうち、その変更に固有の部分）**、**plan.md は tasks.md に Files・Risks・Proof を足したもの** にあたる。
+
 ## 2. 段と成果物
 
 | 段 | 成果物 | 作り手 | 承認者 | 完了条件 |
