@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "globalDependencies": ["tsconfig.base.json"],
+  "tasks": {
+    "typecheck": {},
+    "lint": {},
+    "format:check": {},
+    "test": {},
+    "test:integration": { "cache": false },
+    "test:flags": { "cache": false },
+    "lint:migrations": {},
+    "check:contract": {}
+  }
+}

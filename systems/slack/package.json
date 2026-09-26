@@ -1,0 +1,21 @@
+{
+  "name": "slack",
+  "private": true,
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "format:check": "turbo run format:check",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "test:flags": "turbo run test:flags",
+    "lint:migrations": "turbo run lint:migrations",
+    "check:contract": "turbo run check:contract"
+  },
+  "devDependencies": {
+    "turbo": "2.11.4"
+  }
+}
