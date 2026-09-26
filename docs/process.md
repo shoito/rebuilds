@@ -8,6 +8,73 @@
 - OpenSpec の「正本 spec」と「変更ごとの差分」の分離
 - MADR 形式の ADR
 
+## 流れの全体図
+
+### 段の流れ
+
+各段は、次の段が読める成果物をコミットする。矢印のラベルは、次の段へ進むための承認である。詳しくは「段と成果物」（3 節）にある。
+
+```mermaid
+flowchart TD
+    plan["<b>Plan</b><br/>Intent の Issue → intent.md"]
+    design["<b>Design</b><br/>spec.md（差分）<br/>必要なら ADR・quality.md"]
+    build["<b>Build</b><br/>plan.md → コード・テスト"]
+    test["<b>Test</b><br/>確認ループ・CI・eval"]
+    deploy["<b>Deploy</b><br/>デプロイ → フラグで段階的にリリース"]
+    maintain["<b>Maintain</b><br/>監視・SLO・インシデント"]
+    archive[("アーカイブ<br/>差分を specs/ の正本へ")]
+
+    plan -->|"PM が受理"| design
+    design -->|"PM・QA が承認"| build
+    build -->|"Dev がレビューしてマージ"| test
+    test -->|"QA が受け入れ"| deploy
+    deploy -->|"Ops が本番を承認・PM がリリースを判断"| maintain
+    deploy -.->|"最後の PR"| archive
+    maintain -->|"指標の逸脱・インシデントを<br/>新しい Intent として起票"| plan
+```
+
+- エージェントは各段の草案と実装を担うが、矢印の承認はしない（「ロールと持ち主」）。
+- すべての変更がすべての段の成果物を持つわけではない。重さは「規模に応じた経路」（4 節）で決める。
+
+### 成果物の置き場所
+
+設計の記録（rebuilds）と、題材ごとの開発リポジトリ、GitHub Projects の関係（[ADR-0005](decisions/0005-design-record-repository.md)、[project-management.md](project-management.md)）。
+
+```mermaid
+flowchart LR
+    subgraph rebuilds["rebuilds（設計の記録）"]
+        direction TB
+        intent["intent.md"]
+        arch["architecture/・decisions/（ADR）"]
+        quality["quality.md・runbooks/"]
+        roadmap["roadmap.md<br/>Epic と Story の計画"]
+    end
+
+    subgraph projects["GitHub Projects"]
+        direction TB
+        epic["Epic の Issue"]
+        story["Story の Issue<br/>（Stage は Actions が同期）"]
+        epic --> story
+    end
+
+    subgraph dev["題材の開発リポジトリ"]
+        direction TB
+        change["changes/YYMMDD-slug/<br/>spec.md（差分）・plan.md"]
+        code["コード・テスト・CI"]
+        specs[("specs/<br/>実装済みの正本")]
+        archived["changes/archive/"]
+        change --> code
+        change -->|"アーカイブ"| specs
+        change -->|"アーカイブ"| archived
+    end
+
+    intent -->|"Epic に分解"| roadmap
+    roadmap -->|"Story を起票"| story
+    story <-->|"frontmatter の issue"| change
+    arch -.->|"参照"| change
+    quality -.->|"テスト設計・リリース基準"| change
+```
+
 ## 1. 成果物の全体像
 
 成果物は、設計の記録（rebuilds）と、題材ごとの開発リポジトリに分けて置く（[ADR-0005](decisions/0005-design-record-repository.md)）。
