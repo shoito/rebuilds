@@ -18,6 +18,8 @@
   - テストとして書けない・判定できない → QA
   - 本番の制約との食い違い → Ops
 - エージェントは草案を作り、実装するが、承認はしない。承認はロールの持ち主（人間）が行う。
+- ブランチは `<system>/<YYMMDD-slug>` で切り、変更ごとに worktree を分ける。`main` へ直接 push しない。コミットは Conventional Commits の形で英語で書く（[ADR-0002](docs/decisions/0002-trunk-based-development.md)）。
+- 未完成の振る舞いは、release フラグの裏に置いてからマージする。
 - 要件 ID・ADR 番号を採番したら、既存の `specs/`・`changes/`・`decisions/` と重複していないか確かめる。
 - テストの削除・skip・期待値の緩和で、テストを通したことにしない。
 - テスト名には、対応する要件 ID（`REQ-...` / `PROP-...`）を含める。

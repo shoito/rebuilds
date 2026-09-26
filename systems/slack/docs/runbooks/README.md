@@ -22,6 +22,9 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | メンバー数 | 5,000 | 招待を拒否する |
 | 投稿のレート | 1 メンバーあたり 1 秒に 1 件、1 ワークスペースあたり 1 秒に 200 件 | 429 を返す |
 | ストレージ | プランごとに定める | アップロードを拒否する |
+| MCP の呼び出し | 1 トークン 1 分に 60 回（読み取り）・10 回（書き込み）、1 ワークスペース 1 秒に 50 回 | JSON-RPC のエラーで `retry_after` を返す（[mcp.md](../architecture/mcp.md)） |
+| 通知の push | 1 ワークスペース 1 秒に 200 件 | 遅らせる（[read-state-and-notifications.md](../architecture/read-state-and-notifications.md)） |
+| 検索 | 1 メンバー 1 分に 30 回 | 429 を返す（[search.md](../architecture/search.md)） |
 
 - API・DB・Gateway の主要な指標には `workspace_id` のラベルを付け、上位のテナントを見られるようにする。カーディナリティを抑えるため、上位 N 件以外は「その他」にまとめる。
 - 1 つのテナントが全体の負荷の一定割合（例：DB 時間の 30%）を超え続けたら、アラートを出す。
@@ -35,14 +38,35 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-| アラート | 手順 |
-| --- | --- |
+「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。
 
-個別の手順は、E7（負荷と運用）で実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。
+| アラート | 手順 | 状態 |
+| --- | --- | --- |
+| SLO の速いバーンレート、合成監視の連続失敗 | [incident-response.md](incident-response.md) | 作成済み |
+| デプロイ中の自動ロールバック、デプロイ後の悪化 | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み |
+| AZ・リージョンの障害 | [disaster-recovery.md](disaster-recovery.md) | 作成済み |
+| outbox の最古の行の経過時間、`outbox_dead` の増加、未処理件数の増加 | `relay-backlog.md`（Relay のリースの交代を含む） | E4 で作成 |
+| SQS の DLQ に 1 件以上、キューの最古のメッセージの経過時間 | `dlq-reprocess.md` | E4 で作成 |
+| 切断コード 4003・4029 の急増 | `gateway-overload.md` | E4 で作成 |
+| Web Push の 404/410 の急増、SES のバウンス率 | `notification-delivery.md`（VAPID の鍵の交換を含む） | E5 で作成 |
+| `search_index_lag` の p99 が 10 秒超、indexer の DLQ | `search-indexing.md` | E6 で作成 |
+| ファイルが `scanning` のまま 15 分超、`blocked` の発生 | `file-scanning.md` | E6 で作成 |
+| ログインの失敗の急増、OTP の到達率の低下 | `auth-anomalies.md` | E2 で作成 |
+| MFA を失った利用者からの回復の依頼 | `mfa-recovery.md`（本人確認の手順） | E2 で作成 |
+| SSO の障害、IdP の証明書の更新 | `sso-troubleshooting.md` | E8 で作成 |
+| Better Auth などの依存のセキュリティ勧告、セキュリティインシデント | `security-incident.md`（個人情報保護委員会への報告を含む） | E7 で作成 |
+| 鍵・秘密情報のローテーションの失敗 | `key-rotation.md` | E7 で作成 |
+| 削除の処理の遅れ・失敗、リーガルホールドの設定 | `data-deletion.md` | E8 で作成 |
+| MCP の呼び出しの急増、書き込みの異常 | `mcp-abuse.md`（クライアントの遮断を含む） | E9 で作成 |
+| 系列数が AMP の上限の 80%、Terraform のドリフトの検出 | `observability-and-drift.md` | E7 で作成 |
 
 ## 5. 定期作業と訓練
 
 | 作業 | 頻度 | 手順 |
 | --- | --- | --- |
-| カオス試験（Redis・Gateway・Relay を順に停止） | 月 1 回、ステージング | E7 で作成 |
-| バックアップからの復元訓練 | 四半期に 1 回 | E7 で作成 |
+| カオス試験（Valkey・Gateway・Relay を順に停止） | 月 1 回、ステージング | E7 で作成 |
+| バックアップからの復元訓練（削除の再適用を含む） | 四半期に 1 回 | [disaster-recovery.md](disaster-recovery.md) |
+| 大阪への切り替え訓練（東京の Terraform の状態ファイルを使わずに行う） | 年 1 回 | [disaster-recovery.md](disaster-recovery.md) |
+| Gateway のデプロイ中の k6 試験 | リリース前 | [deploy-and-rollback.md](deploy-and-rollback.md) |
+| キャパシティの見直し | 月次 | [capacity.md](../architecture/capacity.md) の 5 節 |
+| 外部のペンテスト | 年 1 回と、大きな機能の前 | [security.md](../architecture/security.md) の 10 節 |

@@ -66,3 +66,24 @@ Request ─▶ 認証ミドルウェア
 - DB ロールは `migrator`（所有者）、`app`（RLS の対象）、`relay`（`outbox` のみ）に分ける。`app` は `BYPASSRLS` を持たない。
 - Worker は、ジョブが持つ `workspace_id` でコンテキストを設定してから処理する。
 
+
+## 領域ごとの追加
+
+上のモデルは中核のテーブルだけを示す。各領域の設計で、次のテーブルと列を追加した。定義は、それぞれの文書を正とする。実装の変更（`changes/`）でマイグレーションを書くときに、ここと各文書を合わせて更新する。
+
+| 領域 | テーブル・列 | 定義の場所 |
+| --- | --- | --- |
+| 認証 | Better Auth が持つテーブル（`accounts` を Better Auth の user として使う、`sessions`、`verifications`、`passkeys`、`two_factors`、`sso_providers`） | [identity-and-access.md](identity-and-access.md)、[ADR-0012](../decisions/0012-self-hosted-auth-with-better-auth.md) |
+| 認証 | `invitations`、`api_tokens`、`workspace_domains`、`workspace_auth_policies`、`workspace_sso_connections` | [identity-and-access.md](identity-and-access.md) |
+| 認証 | `members.role` を `owner / admin / member / guest_multi / guest_single` にする | [identity-and-access.md](identity-and-access.md) |
+| 会話 | `messages` に `also_send_to_channel`、`broadcast_mention`、`reply_member_ids`、`content_seq`、`last_reply_seq`。`mentions` に `seq` | [messaging.md](messaging.md)、[read-state-and-notifications.md](read-state-and-notifications.md) |
+| 会話 | `thread_subscriptions`、`link_previews`、`message_unfurls`、`pins` | [messaging.md](messaging.md) |
+| リアルタイム | `channel_events`（差分取得の元。`seq` を消費するイベントを保持する）、`outbox_dead`、`outbox` の時間でのパーティション、`outbox.trace_context` | [realtime.md](realtime.md)、[observability.md](observability.md) |
+| 通知 | `member_notification_prefs`、`push_subscriptions`、`notification_log`、`notification_pending_emails` | [read-state-and-notifications.md](read-state-and-notifications.md) |
+| 検索 | `search.message_docs`（RLS の例外。関数を経由してだけ読み書きする） | [search.md](search.md)、[ADR-0027](../decisions/0027-search-table-rls-exception.md) |
+| ファイル | `files` のスキャンの状態、`message_files` に `UNIQUE (workspace_id, file_id)` | [files.md](files.md)、[ADR-0015](../decisions/0015-file-upload-scan-and-delivery.md) |
+| 監査 | `audit_events`（追記のみ） | [ADR-0018](../decisions/0018-audit-log.md) |
+| 保持と削除 | 保持ポリシー、リーガルホールド、エクスポート、削除の予定 | [ADR-0019](../decisions/0019-data-retention-and-deletion.md)、[security.md](security.md) の 14 節 |
+
+- テナントの中のテーブルは、どれも ADR-0009 の規則（`workspace_id`、複合キー、`FORCE ROW LEVEL SECURITY`）に従う。例外は `search` スキーマだけ（ADR-0027）。
+- 更新の多いテーブルの設定（`fillfactor`、VACUUM）は [capacity.md](capacity.md) の 3.1 節にある。

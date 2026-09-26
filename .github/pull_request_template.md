@@ -2,6 +2,7 @@
 
 - 変更フォルダ: `systems/<name>/docs/changes/YYMMDD-<slug>/`
 - 規模: 軽微 / 小 / 標準 / 大
+- フィーチャーフラグ: なし / `<種類>.<名前>`（削除のタスクを plan.md に書いた）
 
 ## 承認（docs/process.md「ロールと持ち主」）
 

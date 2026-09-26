@@ -12,9 +12,12 @@
 | [search.md](search.md) | 全文検索、インデックス、権限の適用 |
 | [files.md](files.md) | ファイルのアップロード、スキャン、サムネイル、配信 |
 | [client.md](client.md) | Web クライアント |
+| [mcp.md](mcp.md) | AI エージェント向けのリモート MCP サーバー |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
 | [infrastructure.md](infrastructure.md) | AWS の構成、環境、IaC、冗長化、バックアップと災害復旧、デプロイ、コスト |
 | [observability.md](observability.md) | ログ、メトリクス、トレース |
+| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーターの設定、キャパシティの運用 |
+| [delivery.md](delivery.md) | ブランチ、CI、デプロイ、リリース、フィーチャーフラグ |
 
 ## 1. 全体構成
 
@@ -58,7 +61,7 @@
 
 | 段階 | 同時接続 | 最大ワークスペースの人数 | 構成 |
 | --- | --- | --- | --- |
-| S1（MVP） | 5 万 | 5,000 | 1 リージョン（東京）・3 AZ。DB は writer 1 台＋reader 1 台。Redis は 1 シャード。検索は PostgreSQL |
+| S1（MVP） | 5 万 | 5,000 | 1 リージョン（東京）・3 AZ。DB は writer 1 台＋reader 1 台。Valkey は 1 シャード。検索は PostgreSQL。災害復旧は、大阪にインスタンスなしの Aurora Global Database の二次クラスタを置く |
 | S2 | 25 万 | 20,000 | DB の reader を増やす。Redis をクラスタにし、sharded pub/sub を使う。検索を OpenSearch へ移す（ADR-0004）。巨大チャンネル向けのファンアウト経路を分ける |
 | S3 | 100 万 | 100,000 | セル構成：1 つのセルがスタック一式を持ち、ワークスペースをセルに割り当てる。大口のワークスペースには専用のセルを割り当てる。災害復旧用に大阪リージョンを使う |
 
@@ -88,7 +91,14 @@
 | DB | PostgreSQL 18＋Drizzle | SQL に近く、生成されるクエリが読みやすい。マイグレーションをレビューしやすい。18 は `uuidv7()` を標準で持つ（ADR-0009） |
 | Web | React＋TanStack Query＋Vite | 学習データが多く、エージェントの出力品質が安定する |
 | テスト | Vitest、fast-check、Testcontainers、Playwright | 実 DB・実ブラウザで検証でき、モックで誤魔化せない |
-| ローカル環境 | Docker Compose（Postgres、Redis、MinIO） | エージェントが 1 コマンドで起動・破棄できる |
+| ローカル環境 | Docker Compose（Postgres、Valkey、MinIO） | エージェントが 1 コマンドで起動・破棄できる |
+| 認証 | Better Auth（自前でホスト） | TypeScript で、Hono・Drizzle と組み合わせられる。MCP の認可にも使える（ADR-0012、0028） |
+| 実行基盤 | AWS（ECS Fargate、Aurora、ElastiCache、SQS、S3、CloudFront） | ADR-0011 |
+| IaC | Terraform | 変更を plan で読んでから承認できる（ADR-0020） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Grafana | ADR-0021 |
+| フィーチャーフラグ | AWS AppConfig | ADR-0026 |
+| 利用状況の分析 | Google Analytics 4（許可リストのイベントだけ） | ADR-0025 |
+| AI エージェントとの接続 | リモート MCP サーバー（MCP 2026-07-28、公式 TypeScript SDK v2） | ADR-0028 |
 
 詳細は [ADR-0007](../decisions/0007-typescript-stack.md)、API の契約の持ち方は [ADR-0008](../decisions/0008-hono-rpc-for-api-contract.md)。
 
@@ -107,6 +117,25 @@
 | [0009](../decisions/0009-pooled-tenancy-with-rls.md) | テナントは共有スキーマで持ち、RLS で分離を強制する。ID は UUIDv7 |
 | [0010](../decisions/0010-accounts-and-workspace-members.md) | グローバルなアカウントと、ワークスペースごとのメンバーを分ける |
 | [0011](../decisions/0011-aws-container-platform.md) | AWS 上で、ECS Fargate とマネージドサービスを使って動かす |
+| [0012](../decisions/0012-self-hosted-auth-with-better-auth.md) | 認証は Better Auth で自前でホストし、ワークスペースとメンバーは自前のモデルで持つ |
+| [0013](../decisions/0013-gateway-scaling-and-presence.md) | Gateway を水平に増やし、購読をノードごとに集約する。在席は TTL と必要な分だけの購読 |
+| [0014](../decisions/0014-sqs-worker-queues-and-notification-delivery.md) | Relay と Worker の間に SQS。通知は冪等な多段の処理 |
+| [0015](../decisions/0015-file-upload-scan-and-delivery.md) | ファイルは署名付き PUT、GuardDuty でスキャン、短命な署名付き URL で配る |
+| [0016](../decisions/0016-isolated-link-unfurling.md) | リンクのプレビューは、VPC の外で権限を持たない取得器（Lambda）で行う。ADR-0011 の例外 |
+| [0017](../decisions/0017-encryption-and-key-management.md) | TLS、KMS のカスタマー管理キー、Secrets Manager の自動ローテーション |
+| [0018](../decisions/0018-audit-log.md) | 監査ログは同じトランザクションで DB に書き、改ざんできないアーカイブへ送る |
+| [0019](../decisions/0019-data-retention-and-deletion.md) | 保持ポリシーとリーガルホールド。論理削除から非同期の物理削除へ |
+| [0020](../decisions/0020-infrastructure-as-code-with-terraform.md) | インフラを Terraform で定義する |
+| [0021](../decisions/0021-observability-stack.md) | OpenTelemetry で計装し、AMP・X-Ray・CloudWatch Logs に送る |
+| [0022](../decisions/0022-zero-downtime-deploy-and-migrations.md) | 無停止のデプロイと、expand / contract のスキーマ変更 |
+| [0023](../decisions/0023-cell-based-architecture.md) | S3 でセル構成に移る（proposed） |
+| [0024](../decisions/0024-client-data-layer-and-offline.md) | クライアントは Timeline ストア＋TanStack Query、SharedWorker、IndexedDB |
+| [0025](../decisions/0025-product-analytics-with-ga4.md) | 利用状況の分析に GA4 を使う。送る内容と読み込む条件を絞る |
+| [0026](../decisions/0026-feature-flags.md) | フィーチャーフラグの種類と運用 |
+| [0027](../decisions/0027-search-table-rls-exception.md) | 検索用のテーブルだけ RLS を外し、関数を経由してしか読めないようにする |
+| [0028](../decisions/0028-remote-mcp-server.md) | AI エージェント向けに、リモートの MCP サーバーを提供する |
+
+リポジトリ共通の決定（開発プロセス、ブランチモデル）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
 ## 6. リスクと未解決事項
 
@@ -116,3 +145,9 @@
 - **テナント間の負荷の偏り**：大きなワークスペース 1 つが共有 DB と Gateway を占有しうる。テナント単位の上限とレート制限（runbooks）で抑え、足りなければ ADR-0009 の「将来の拡張」へ移る。
 - **未読数の正確さ**：近似で許容したが、「未読 3 件と出ているのに見当たらない」はユーザーの不信を招く。
 - **データ保持と削除**：保持期間ポリシーやリーガルホールドは MVP に含めていないが、企業利用では早い段階で要求される。
+- **マネージドサービスの対応状況**：Aurora が PostgreSQL 18（`uuidv7()`）と pg_bigm に対応しているか。大阪リージョンで Aurora Global Database のインスタンスなしの二次クラスタが使えるか。どちらも着手前に確かめる（ADR-0011、[infrastructure.md](infrastructure.md)）。
+- **検索の RLS の例外**：`search` スキーマだけは、テナントの分離を関数の実装に頼る（ADR-0027）。関数の変更のレビューと、性質ベーステストで守る。
+- **認証の基盤への依存**：Better Auth の脆弱性（例：SSO プラグインの CVE-2026-53515、1.6.11 で修正）の影響を直接受ける。使うエンドポイントを許可リストで絞り、勧告を監視する（ADR-0012）。
+- **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS の版に依存する。対応の下限（Safari 17 案）を PM が確定する（[client.md](client.md)）。
+- **第三者のスクリプト**：GA4 を読み込むワークスペースでは、CSP が広がる（ADR-0025）。
+- **AI エージェントの書き込み**：MCP の書き込みは、プロンプトインジェクションで誤用されうる。既定で無効にし、レート制限と監査で抑える（ADR-0028）。

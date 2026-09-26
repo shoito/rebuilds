@@ -129,6 +129,13 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 
 規模にかかわらず、「変更単位の quality.md を作る条件」に当たる変更には `quality.md` を加える。
 
+## 4.1 ブランチと PR
+
+- トランクベース開発を採る（[ADR-0002](decisions/0002-trunk-based-development.md)）。`main` だけを長く保ち、作業のブランチは 2 日以内を目安にマージする。
+- ブランチ名は `<system>/<YYMMDD-slug>` にし、変更フォルダと対応させる。エージェントは、変更ごとに git worktree とブランチを 1 つずつ持つ。
+- PR は squash でマージし、merge queue を通す。コミットメッセージは Conventional Commits に従う。
+- 題材ごとの CI・デプロイ・リリースの流れは、各題材の `docs/architecture/`（Slack は `delivery.md`）に書く。
+
 ## 5. 粒度
 
 - **Epic** は `roadmap.md` の 1 行。Epic ごとにフォルダは作らない。
