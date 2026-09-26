@@ -4,6 +4,15 @@
 - Spec: [spec.md](spec.md)
 - Status: draft
 
+## 依存
+
+| 変更 | 関係 |
+| --- | --- |
+| [ci-pipeline](../260926-ci-pipeline/plan.md) | **先に必要。** CI、ID の追跡の検査、マイグレーションの lint・契約のスナップショットの呼び出し口はそちらで作る。この変更は `lint:migrations`・`check:contract` のタスクを定義するだけ |
+| [message-body-ast-v1](../260926-message-body-ast-v1/plan.md) | **先に必要。** `validateBody` と AST のスキーマ |
+| [telemetry-package](../260926-telemetry-package/plan.md) | 先にあれば使う。認証ミドルウェアから `runWithTenant()` を呼ぶ |
+| [dev-session-and-workspaces](../260926-dev-session-and-workspaces/plan.md)、[channel-list](../260926-channel-list/plan.md) | この変更の DB スキーマと認証ミドルウェアの上に作る |
+
 ## Files that change
 
 最初の変更なので、モノレポの骨格も作る。パスは `systems/slack/` からの相対パス。
@@ -23,23 +32,21 @@
 - `apps/api/test/messages.property.test.ts`（新規）：PROP-MSG-001, 002
 - `apps/api/test/messages.decision-table.test.ts`（新規）：DT-MSG-001
 - `scripts/lib/decision-table.ts`（新規）：`spec.md` から決定表を読み込む
-- `scripts/check-req-ids.ts`（新規）：要件 ID の追跡検査
 - `AGENTS.md`：Commands を追記
 
 ## Order of work
 
-- [ ] 1. モノレポの骨格、`compose.yaml`（Postgres）、CI（型検査・lint・テスト）
+- [ ] 1. モノレポの骨格、`compose.yaml`（Postgres）。CI は ci-pipeline のものを使う
 - [ ] 2. 契約：投稿・履歴取得のスキーマと、空のハンドラーを持つルート、`packages/api-client` とそのスナップショット（REQ-MSG-001, 004, 006）→ **人間がレビューして確定**
 - [ ] 3. DB スキーマとマイグレーション：`accounts`、`workspaces`、`members`、`channels`、`channel_members`、`messages`。`workspace_id`・複合キー・UUIDv7・RLS・DB ロール（`migrator` / `app`）を含む（ADR-0009, 0010）
-- [ ] 3a. 認証ミドルウェア：`account_id` とパスの `workspace_id` からメンバーを解決し、`SET LOCAL` でテナントのコンテキストを設定する
+- [ ] 3a. 認証ミドルウェア：`account_id` とパスの `workspace_id` からメンバーを解決し、`SET LOCAL` でテナントのコンテキストを設定する。`runWithTenant()`（telemetry-package）を呼び、ログとトレースに反映する
 - [ ] 3b. マイグレーションの lint：テナントテーブルに `workspace_id` と RLS があることを検査する
 - [ ] 4. 権限判定関数（REQ-MSG-003, 005）
-- [ ] 5. 投稿：採番、冪等性、本文検証（REQ-MSG-001, 002, 003, 006）
+- [ ] 5. 投稿：採番、冪等性、`validateBody` による本文の検証と `reason`（REQ-MSG-001, 002, 003, 006）
 - [ ] 6. 履歴取得：ページング（REQ-MSG-004, 005）
 - [ ] 7. 性質ベーステスト（PROP-MSG-001, 002）
 - [ ] 8. 決定表の読み込みと表駆動テスト（DT-MSG-001）
-- [ ] 9. ID の追跡検査を CI に組み込む
-- [ ] 10. `AGENTS.md` の Commands を更新する
+- [ ] 9. `AGENTS.md` の Commands を更新する
 
 ## Risks
 
@@ -61,5 +68,5 @@
 | 並行投稿でも `seq` が欠番・重複しない | PROP-MSG-001 | 性質ベーステスト（fast-check、並行度 1〜50） |
 | 再送を任意に含んでも冪等 | PROP-MSG-002 | 性質ベーステスト |
 | 権限・本文・再送の組み合わせと優先順位 | DT-MSG-001 | 表駆動テスト（`spec.md` から読み込み、4 行 = 4 ケース） |
-| すべての ID（REQ・PROP・DT）がテストから参照されている | — | `scripts/check-req-ids.ts` が CI で通る |
+| すべての ID（REQ・PROP・DT）がテストから参照されている | — | ci-pipeline の追跡の検査が CI で通る |
 | 契約が確定したものから変わっていない | ADR-0008 | クライアント型のスナップショットの差分検査が CI で通る |

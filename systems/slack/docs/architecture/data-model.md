@@ -62,7 +62,7 @@ Request ─▶ 認証ミドルウェア
          ─▶ COMMIT（SET LOCAL の値はここで消える）
 ```
 
-- API のパスは `/workspaces/{workspace_id}/...` の形にし、テナントを明示する。
+- API のパスは `/workspaces/{workspace_id}/...` の形にし、テナントを明示する。内部 API は `/api` を接頭辞に持つ（Web と同じオリジンで SPA のルートと分けるため。例：`/api/workspaces/{ws}/channels`）。設計文書では、接頭辞を省いて書くことがある。
 - DB ロールは `migrator`（所有者）、`app`（RLS の対象）、`relay`（`outbox` のみ）に分ける。`app` は `BYPASSRLS` を持たない。
 - Worker は、ジョブが持つ `workspace_id` でコンテキストを設定してから処理する。
 

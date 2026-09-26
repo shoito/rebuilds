@@ -1,6 +1,7 @@
 ---
 capability: messaging
 change: 260926-post-and-list-messages
+issue:
 epic: E1
 status: draft
 ---
@@ -100,12 +101,12 @@ status: draft
 
 ### REQ-MSG-006: 本文の検証
 
-本文が空、または 40,000 文字を超える場合、システムは 400 を返し、何も保存してはならない。
+本文が AST v1 の検証（[message-body-ast-v1](../260926-message-body-ast-v1/spec.md) の `validateBody`、DT-MSG-002）に通らない場合、システムは 400 と、外れた理由の `reason` を返し、何も保存してはならない。空の本文と、40,000 文字を超える本文も、この検証で弾く。
 
 #### Scenario: 空の本文
 
 - When メンバーが空の本文（空白のみを含む）で投稿する
-- Then 400 が返る
+- Then 400（`reason`=`empty`）が返る
 
 #### Scenario: 上限ちょうど
 
@@ -138,13 +139,14 @@ status: draft
 ## Design
 
 - データモデルと採番方法は [data-model.md](../../architecture/data-model.md)、[ADR-0001](../../decisions/0001-per-channel-sequence.md) に従う。
-- 本文は [ADR-0006](../../decisions/0006-message-body-ast.md) の AST で受け付ける。この変更ではテキストノードだけを扱う。
+- 本文は [ADR-0006](../../decisions/0006-message-body-ast.md) の AST v1 で受け付け、[message-body-ast-v1](../260926-message-body-ast-v1/spec.md) の `validateBody` で検証する。
 - テナントの分離は [ADR-0009](../../decisions/0009-pooled-tenancy-with-rls.md) に従い、最初のマイグレーションから `workspace_id`・複合キー・RLS を入れる。後から入れるとマイグレーションが重いため。
 - 認証は E2 まで簡易方式（開発用トークンから `account_id` を得て、パスの `workspace_id` からメンバーを解決する）とする（[ADR-0010](../../decisions/0010-accounts-and-workspace-members.md)）。
 - 非メンバーに 403 ではなく 404 を返すのは、プライベートチャンネルの存在を漏らさないため（[ADR-0005](../../decisions/0005-single-authorization-check.md)）。
-- API：
-  - `POST /workspaces/{workspace_id}/channels/{channel_id}/messages` `{ client_msg_id, body }` → 201（新規） / 200（再送）
-  - `GET /workspaces/{workspace_id}/channels/{channel_id}/messages?before_seq&limit` → `{ messages, has_more }`
+- API：内部 API のパスは `/api` を接頭辞にする（Web と同じオリジンで、SPA のルートと分けるため）。以下では接頭辞を含めて書く。
+  - `POST /api/workspaces/{workspace_id}/channels/{channel_id}/messages` `{ client_msg_id, body }` → 201（新規） / 200（再送）
+  - `GET /api/workspaces/{workspace_id}/channels/{channel_id}/messages?before_seq&limit` → `{ messages, has_more }`
+  - メッセージの応答の形：`{ id, channel_id, seq, member_id, client_msg_id, body, created_at, edited_at }`。`client_msg_id` は投稿者本人への応答にだけ含め、他のメンバーには `null` にする（送信の照合にだけ使う）。
 
 ## Open questions
 

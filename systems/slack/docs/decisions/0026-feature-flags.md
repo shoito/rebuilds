@@ -39,6 +39,8 @@ ADR-0022 では、フラグを AWS AppConfig で持ち、ワークスペース�
 | migration | データの移行や二重書き込みを切り替える | 移行の完了で削除 | `migration.search_read_opensearch` |
 | entitlement | プランや契約で使える機能を分ける | 常設。ただし、プランの仕組みができたら DB へ移す | `entitlement.sso` |
 
+> entitlement の種別は、[ADR-0032](0032-plans-and-entitlements.md) と [ADR-0033](0033-slack-aligned-platform-and-plan-decisions.md) の DB の entitlement に置き換えたため、使わない。
+
 - 名前は `<種類>.<名前>` にする。種類ごとに、既定値と期限の規則を変える。
 - 実験（A/B テスト）には使わない。必要になったら、別の ADR で決める。
 

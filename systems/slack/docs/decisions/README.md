@@ -2,6 +2,7 @@
 
 Slack の再構築に関する決定。リポジトリ共通の決定は [docs/decisions/](../../../../docs/decisions/README.md) にある。領域ごとの設計と、各 ADR の位置づけは [architecture/](../architecture/README.md) を見る。
 
+<!-- adr-index:start -->
 | ADR | 決定 | 状態 |
 | --- | --- | --- |
 | [0001](0001-per-channel-sequence.md) | メッセージの順序付けにチャンネル内連番 `seq` を使う | accepted |
@@ -37,5 +38,6 @@ Slack の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0031](0031-app-platform.md) | アプリの基盤を、インストール単位のボット、署名付きの HTTPS の配送、宣言的な UI で作る | accepted |
 | [0032](0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ | accepted |
 | [0033](0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める | accepted |
+<!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。E1 の `ci-pipeline` で、CI が生成と差分の検査を行うようにする（手で編集する一覧は衝突しやすいため。[process.md](../../../../docs/process.md) の「衝突の防止」）。

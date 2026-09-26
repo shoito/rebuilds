@@ -136,6 +136,8 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 - PR は squash でマージし、merge queue を通す。コミットメッセージは Conventional Commits に従う。
 - 題材ごとの CI・デプロイ・リリースの流れは、各題材の `docs/architecture/`（Slack は `delivery.md`）に書く。
 
+Issue・Projects・Actions での回し方（正本の分担、ラベル、項目、自動化）は [project-management.md](project-management.md) にある。
+
 ## 5. 粒度
 
 - **Epic** は `roadmap.md` の 1 行。Epic ごとにフォルダは作らない。

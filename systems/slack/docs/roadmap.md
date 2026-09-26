@@ -35,10 +35,13 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `terraform-foundation` | AWS の Organizations、アカウント、VPC、Terraform の状態のバケット、GitHub Actions の OIDC（ADR-0020） |
+| `github-project-setup` | ラベル・Issue Forms・Projects の項目とビュー・同期のワークフロー（[project-management.md](../../../docs/project-management.md)） |
 | `ci-pipeline` | PR の CI、merge queue、ID の追跡の検査、マイグレーションの lint（[delivery.md](architecture/delivery.md)） |
 | `telemetry-package` | 計装の共通部品 `packages/telemetry`（ADR-0021） |
 | `feature-flags-appconfig` | `packages/flags` と AppConfig。トランクベース開発の前提なので最初に作る（ADR-0026） |
 | `post-and-list-messages` | 投稿と履歴取得、RLS を含む最初のマイグレーション（起票済み：[260926-post-and-list-messages](changes/260926-post-and-list-messages/)） |
+| `dev-session-and-workspaces` | 開発用のサインインと、自分のワークスペースの一覧（E2 で本番のログインに置き換える） |
+| `channel-list` | 参加しているチャンネルの一覧 |
 | `message-body-ast-v1` | 本文の AST の Zod スキーマと `toPlainText`（ADR-0006） |
 | `web-app-shell-routing` | アプリの骨格、ルーター、ワークスペースの切り替え |
 | `web-channel-view` | チャンネルの仮想化された一覧 |

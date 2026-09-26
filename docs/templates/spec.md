@@ -2,6 +2,7 @@
 capability: <capability>
 # 以下は差分（changes/YYMMDD-<slug>/spec.md）のときのみ
 change: <YYMMDD-slug>
+issue: <Story の Issue の番号。まだなければ空>
 epic: <E1>
 status: draft | approved | in-progress | done
 ---

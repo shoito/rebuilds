@@ -14,3 +14,8 @@
 | read-state | `READ` | 既読位置、未読数、通知 |
 | search | `SRCH` | 全文検索 |
 | files | `FILE` | ファイル添付 |
+| web-client | `WEB` | Web クライアントの骨格、画面の振る舞い |
+| infrastructure | `INFRA` | AWS のアカウント、ネットワーク、Terraform の基盤 |
+| delivery | `DLV` | CI、ブランチの保護、追跡と衝突の検査 |
+| observability | `OBS` | 計装、ログ、テナントのラベル |
+| flags | `FLAG` | フィーチャーフラグの定義と評価 |
