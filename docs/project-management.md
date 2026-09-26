@@ -62,6 +62,7 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 | `risk:` | `high` | 変更単位の `quality.md` が要る（process.md の条件） |
 | `agent:` | `ready`、`working`、`blocked` | エージェントに任せてよい / 作業中 / 人間の判断待ち（8 節） |
 | `source:` | `incident`、`alert`、`security` | Maintain 段で自動で起票されたもの |
+| `review:` | `post-merge` | 管理者のバイパスでマージされ、事後の確認を待っている PR（[ADR-0004](decisions/0004-agent-prs-via-github-app.md)） |
 
 優先度・規模・状態はラベルにせず、Projects の項目で持つ。ラベルと項目の二重管理を避けるため。
 
@@ -142,6 +143,7 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 | 判断が要るとき | 作業を止め、`agent:blocked` と `needs:<ロール>` を付け、Issue に問いを書く | 自分で仕様を書き換えて進める |
 | Maintain | 監視やインシデントから、Intent の Issue を起票する | 優先度を決める |
 
+- エージェントは GitHub App のトークンで push し、PR を作る。App はレビューの承認とマージができない（[ADR-0004](decisions/0004-agent-prs-via-github-app.md)）。
 - `agent:ready` を付けてよいのは、PM か Dev だけにする（ラベルを付けた人を Actions で確かめる）。
 - エージェントが作った PR には `agent` の印（PR の作成者か、ラベル）が付き、DORA の指標とは別に「差し戻しなしでマージされた割合」を集計する（delivery.md の 7 節）。
 

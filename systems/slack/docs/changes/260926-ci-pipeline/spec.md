@@ -306,6 +306,23 @@ PR が merge queue に入ったとき、システムは、最新の `main`（と
 - When 翌日の比較が走る
 - Then 違いの項目を含む Issue が作られる
 
+
+### REQ-DLV-015: バイパスでマージした PR の検出
+
+必須の承認を満たさずに、管理者のバイパスで `main` へマージされた PR があったとき、システムはその PR に `review:post-merge` のラベルを付け、週次のレポートの「事後の確認待ち」に載せなければならない。
+
+#### Scenario: 管理者が自分の PR をバイパスでマージした
+
+- Given `@shoito` が作った PR で、承認が 0 件
+- When 管理者のバイパスで merge queue を通してマージする
+- Then マージの後 10 分以内に、PR に `review:post-merge` が付く
+
+#### Scenario: App が作った PR を人が承認してマージした
+
+- Given GitHub App が作った PR を、`@shoito` が承認した
+- When マージする
+- Then `review:post-merge` は付かない
+
 ## Decision Tables
 
 ### DT-DLV-001: 変更されたパスと実行する検査
@@ -454,7 +471,7 @@ changes ─┬─▶ slack-static ─┐
 | 規則 | 値 |
 | --- | --- |
 | 対象 | `main`（既定のブランチ） |
-| バイパス | なし |
+| バイパス | リポジトリの管理者のロールだけ（PR を通したマージに限る）。バイパスでマージした PR は REQ-DLV-015 で検出する（[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)） |
 | 削除の制限、force push の禁止 | 有効 |
 | PR の必須 | 有効。承認 1 件、`CODEOWNERS` の承認必須、push の後の承認の取り消し、会話の解決必須 |
 | 許可するマージの方法 | squash のみ |
@@ -482,7 +499,7 @@ ruleset の merge queue の規則の各項目の名前と値の範囲は **未�
 
 ## Open questions
 
-- **1 人のリポジトリでの承認**：REQ-DLV-001 は `CODEOWNERS` の承認を必須にする。GitHub では PR の作成者が自分の PR を承認できないため、今の `CODEOWNERS`（全パスが `@shoito`）では、`@shoito` が作った PR をマージできない。案：エージェントの PR は GitHub App（ボットのアカウント）で作り、`@shoito` が承認する。人が自分で作る PR の扱い（別の人を立てる、または「AI レビュー＋作成者の承認」を process.md の例外として、その場合だけバイパスを許す）を決める必要がある（Dev、PM）。
+- **1 人のリポジトリでの承認**：[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md) で決めた。エージェントの PR は GitHub App から作り、`@shoito` が承認する。人が自分で作った PR は、管理者のバイパスでマージし、REQ-DLV-015 で検出して事後に確認する。
 - **`spec.md` の二重承認の CI**：process.md の 2 節は「承認者のロールを確かめる CI」を求めているが、ロールとアカウントの対応の置き場所がない。この変更の範囲外にした。いつ、どの Story で入れるか（PM、QA）。
 - **検査の道具をどこに置くか**：`tools/spec-checks/` をリポジトリのルートに置き、正本は Slack の `delivery` の capability に置いた。題材が増えたら、正本をリポジトリ共通に移すか（Dev）。
 - **in-progress の変更の未参照を警告にとどめる**（DT-DLV-003 #6）。複数の PR に分けて実装する間に失敗させないためだが、`done` に変える PR で初めて失敗が出る。`plan.md` の Order of work の完了（チェックボックス）と突き合わせて、完了したタスクの ID だけを必須にするか（QA）。

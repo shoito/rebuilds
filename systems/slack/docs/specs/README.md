@@ -19,3 +19,4 @@
 | delivery | `DLV` | CI、ブランチの保護、追跡と衝突の検査 |
 | observability | `OBS` | 計装、ログ、テナントのラベル |
 | flags | `FLAG` | フィーチャーフラグの定義と評価 |
+| agent-tooling | `AGT` | エージェントの Skills・Subagent・eval |

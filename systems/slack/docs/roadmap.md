@@ -36,6 +36,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- |
 | `terraform-foundation` | AWS の Organizations、アカウント、VPC、Terraform の状態のバケット、GitHub Actions の OIDC（ADR-0020） |
 | `github-project-setup` | ラベル・Issue Forms・Projects の項目とビュー・同期のワークフロー（[project-management.md](../../../docs/project-management.md)） |
+| `agent-skills-foundation` | `spec-authoring`・`spec-review`（QA 役の Subagent）・`pmo-triage` と、Skill の eval（`github-project-setup` と `ci-pipeline` の後） |
 | `ci-pipeline` | PR の CI、merge queue、ID の追跡の検査、マイグレーションの lint（[delivery.md](architecture/delivery.md)） |
 | `telemetry-package` | 計装の共通部品 `packages/telemetry`（ADR-0021） |
 | `feature-flags-appconfig` | `packages/flags` と AppConfig。トランクベース開発の前提なので最初に作る（ADR-0026） |
