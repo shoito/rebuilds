@@ -33,6 +33,16 @@ systems/<name>/
 
 リポジトリ全体に関わる決定は、ルートの `docs/decisions/` に置く。
 
+### 正本と差分の考え方（OpenSpec の解釈）
+
+`specs/` と `changes/` の分け方は、[OpenSpec](https://github.com/Fission-AI/OpenSpec) に倣っている。OpenSpec は、`specs/` を「システムが今どう振る舞うか」を表す正本とし、`changes/` に差分（ADDED / MODIFIED / REMOVED）を置き、アーカイブで差分を正本へ取り込む（[docs/concepts.md](https://github.com/Fission-AI/OpenSpec/blob/main/docs/concepts.md)）。
+
+ただし、OpenSpec の説明は既存のシステムの改修（brownfield）を中心にしており、ゼロから作る（greenfield）ときに `specs/` をどう始めるかは明記していない。このリポジトリでは、次のように解釈する。
+
+- **`specs/` には、実装してアーカイブした振る舞いだけを置く。** 承認済みでも、実装前の要件は `changes/` に置いたままにする。したがって、題材の立ち上げの時期には `specs/` はほぼ空で、要件の多くは `changes/` にある。
+- こう解釈するのは、実装されていない約束を正本に混ぜないためと、並行する変更の衝突を、正本の本文との照合（「衝突の防止」の楽観ロック）で確実に検出するためである。
+- 目標とする全体像は、`architecture/` と `roadmap.md` で示す。
+
 ### Kiro との対応
 
 Kiro の Spec-Driven Development に慣れている人向けの対応表。
