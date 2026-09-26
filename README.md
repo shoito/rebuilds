@@ -28,7 +28,7 @@
     ├── AGENTS.md              # 題材固有のルール
     ├── docs/
     │   ├── intent.md          # なぜ・何を作るか
-    │   ├── architecture.md    # 横断的な設計
+    │   ├── architecture/      # 全体像と領域ごとの設計
     │   ├── quality.md         # 品質戦略（QA）
     │   ├── roadmap.md         # Epic（PM）
     │   ├── runbooks/          # SLO、リリース、障害対応（Ops）
@@ -41,5 +41,5 @@
 ## 新しい題材の始め方
 
 1. `systems/<name>/docs/` に、テンプレートから `intent.md` を作る。
-2. `architecture.md`、`quality.md`、`roadmap.md`、`runbooks/README.md` を書き、主要な決定を ADR にする。
+2. `architecture/README.md`、`quality.md`、`roadmap.md`、`runbooks/README.md` を書き、主要な決定を ADR にする。
 3. 最初の Epic の最初の変更を `changes/YYMMDD-<slug>/` に作り、`spec.md` と `plan.md` を書く。

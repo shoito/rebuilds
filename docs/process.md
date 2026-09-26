@@ -15,7 +15,7 @@ systems/<name>/
 ├── AGENTS.md                  # この題材に固有のエージェント向けルール（CLAUDE.md は symlink）
 ├── docs/
 │   ├── intent.md              # 製品レベルの Plan：なぜ作るか、本質、スコープ、制約
-│   ├── architecture.md        # 横断的な設計：構成、データモデル、主要フロー、技術スタック
+│   ├── architecture/          # 設計：README.md に全体像・規模・非機能要件・技術スタック、領域ごとに 1 ファイル
 │   ├── quality.md             # 品質戦略：シフトレフト、本番での品質検証、テスト計画
 │   ├── roadmap.md             # Epic の一覧と順序
 │   ├── runbooks/              # 運用：SLO、アラート、リリースとロールバック、障害対応手順
@@ -41,10 +41,10 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | --- | --- | --- |
 | （なし） | `intent.md` | Kiro には spec の手前で「なぜ作るか」を合意する層がない。Anthropic Playbook の Plan 段にあたる |
 | `.kiro/steering/product.md` | `docs/intent.md`（題材レベル） | 製品の目的・ユーザー・スコープ |
-| `.kiro/steering/tech.md` | `docs/architecture.md` の技術スタック、`docs/decisions/` | 技術選定の理由は ADR として残す |
+| `.kiro/steering/tech.md` | `docs/architecture/README.md` の技術スタック、`docs/decisions/` | 技術選定の理由は ADR として残す |
 | `.kiro/steering/structure.md` | `AGENTS.md` | ディレクトリの責務、コマンド、禁止事項 |
 | `.kiro/specs/<feature>/requirements.md` | `changes/YYMMDD-<slug>/spec.md` の Requirements | EARS と Given/When/Then は同じ。要件 ID を `REQ-<CAP>-NNN` 形式にし、差分（ADDED / MODIFIED / REMOVED）で書く |
-| `.kiro/specs/<feature>/design.md` | `spec.md` の Design ＋ `docs/architecture.md` ＋ ADR | 変更に固有の設計だけを spec に書く。横断的な設計は architecture.md、選択の理由は ADR に分ける |
+| `.kiro/specs/<feature>/design.md` | `spec.md` の Design ＋ `docs/architecture/` ＋ ADR | 変更に固有の設計だけを spec に書く。横断的な設計や領域の設計は architecture/、選択の理由は ADR に分ける |
 | design.md の Correctness Properties | `spec.md` の Correctness Properties（`PROP-*`） | 同じ考え方。性質ベーステストで検証する |
 | （なし） | `spec.md` の Decision Tables（`DT-*`） | 条件の組み合わせで結果が決まる規則を表で書き、表駆動テストで検証する |
 | `.kiro/specs/<feature>/tasks.md` | `plan.md` | Order of work が tasks.md にあたる。加えて Files that change、Risks、Proof を持つ |
@@ -77,7 +77,7 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | パス | 持ち主 | 備考 |
 | --- | --- | --- |
 | `docs/intent.md`、`docs/roadmap.md`、`changes/*/intent.md` | PM | |
-| `docs/architecture.md`、`docs/decisions/`、`changes/*/plan.md` | Dev | |
+| `docs/architecture/`、`docs/decisions/`、`changes/*/plan.md` | Dev | |
 | `docs/quality.md`、`changes/*/quality.md` | QA | |
 | `docs/runbooks/` | Ops | |
 | `changes/*/spec.md` | **PM と QA の両方** | Design 節に大きな変更があれば Dev も |
@@ -287,7 +287,7 @@ QA が品質の指標を新しく必要とするときは、`runbooks/README.md`
 | 成果物 | テンプレート |
 | --- | --- |
 | `intent.md` | [templates/intent.md](templates/intent.md) |
-| `architecture.md` | [templates/architecture.md](templates/architecture.md) |
+| `architecture/README.md` | [templates/architecture.md](templates/architecture.md)。領域ごとのファイルは、題材に合わせて自由に分ける |
 | `quality.md`（題材） | [templates/quality.md](templates/quality.md) |
 | `quality.md`（変更） | [templates/change-quality.md](templates/change-quality.md) |
 | `roadmap.md` | [templates/roadmap.md](templates/roadmap.md) |

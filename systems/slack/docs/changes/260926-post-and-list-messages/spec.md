@@ -137,7 +137,7 @@ status: draft
 
 ## Design
 
-- データモデルと採番方法は [architecture.md](../../architecture.md) の 2 節、[ADR-0001](../../decisions/0001-per-channel-sequence.md) に従う。
+- データモデルと採番方法は [data-model.md](../../architecture/data-model.md)、[ADR-0001](../../decisions/0001-per-channel-sequence.md) に従う。
 - 本文は [ADR-0006](../../decisions/0006-message-body-ast.md) の AST で受け付ける。この変更ではテキストノードだけを扱う。
 - テナントの分離は [ADR-0009](../../decisions/0009-pooled-tenancy-with-rls.md) に従い、最初のマイグレーションから `workspace_id`・複合キー・RLS を入れる。後から入れるとマイグレーションが重いため。
 - 認証は E2 まで簡易方式（開発用トークンから `account_id` を得て、パスの `workspace_id` からメンバーを解決する）とする（[ADR-0010](../../decisions/0010-accounts-and-workspace-members.md)）。

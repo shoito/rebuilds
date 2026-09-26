@@ -6,7 +6,7 @@
 
 1. [docs/process.md](docs/process.md) — 開発プロセスと成果物の定義
 2. 作業する題材の `systems/<name>/AGENTS.md`
-3. その題材の `docs/intent.md`、`docs/architecture.md`、`docs/decisions/`
+3. その題材の `docs/intent.md`、`docs/architecture/README.md`、`docs/decisions/`
 
 ## 守ること
 

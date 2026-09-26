@@ -5,7 +5,7 @@ Slack の再構築。リポジトリ共通のルールはルートの [AGENTS.md
 ## 最初に読むもの
 
 - [docs/intent.md](docs/intent.md) — 何を、なぜ作るか
-- [docs/architecture.md](docs/architecture.md) — 構成、データモデル、主要フロー
+- [docs/architecture/](docs/architecture/README.md) — 全体像、規模の段階、非機能要件。領域ごとの設計は同じディレクトリの各ファイル
 - [docs/decisions/](docs/decisions/) — ADR。特に 0001（`seq`）、0002（DB が正本）、0005（権限判定の集約）
 - [docs/quality.md](docs/quality.md) — 品質戦略と、PR 前に回す確認ループ
 - [docs/runbooks/](docs/runbooks/README.md) — SLO、リリースとロールバック

@@ -69,6 +69,6 @@ MODIFIED と REMOVED には、正本から写した「変更前」の本文を�
 
 ## Design
 
-この変更に固有の設計。横断的なものは architecture.md や ADR に書き、ここからリンクする。
+この変更に固有の設計。横断的なものは architecture/ や ADR に書き、ここからリンクする。
 
 ## Open questions
