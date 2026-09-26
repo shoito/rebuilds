@@ -66,4 +66,17 @@
 
 ## Open questions
 
-- 共同編集の方式（操作の変換か、CRDT か）の選択による、オフラインの長時間の編集の扱い（[collaboration.md](architecture/collaboration.md) で決める）。
+- 共同編集の方式（操作の変換か、CRDT か）の選択による、オフラインの長時間の編集の扱い → 解決済み。テキストはブロックごとの CRDT、構造とプロパティはサーバーの順序で決める（[ADR-0010](decisions/0010-text-crdt-with-server-ordered-structure.md)、[ADR-0011](decisions/0011-structural-and-property-conflict-rules.md)）。
+- 設計の段階で残った問いは、本家に寄せる既定案で決めた（[architecture/README.md](architecture/README.md) の「決定（2026-09-26、既定案）」）。
+
+## 法務の確認待ち
+
+結論が出るまで、該当する Story の spec を承認しない。
+
+| # | 問い | 関わる Epic・文書 |
+| --- | --- | --- |
+| L1 | 削除からバックアップを含めて消えるまで最長 95 日かかることを、利用規約・データ処理の契約にどう書くか。ワークスペースの削除の後に監査ログのアーカイブ（2 年）を残してよいか | E8、[ADR-0022](decisions/0022-trash-history-and-deletion-retention.md)、[security.md](architecture/security.md) の 6・7 節 |
+| L2 | アカウントの削除で、本人のプライベートの領域のページを消す（所有者に引き継がない）既定案が、雇用主であるワークスペースの所有者との契約・個人情報の扱いに合うか | E8、[security.md](architecture/security.md) の 7 節 |
+| L3 | 公開サイトの通報と取り下げ（`publishing_suspended`）の手続き、権利侵害の申し立てへの対応、所有者への通知の内容 | E8、[security.md](architecture/security.md) の 8 節 |
+| L4 | 権限の分離の破れ（NFR-010）や漏洩が起きたときの、個人情報保護委員会と本人への報告の要否と期限 | E8、runbook の `security-incident.md` |
+| L5 | 管理者の内容の検索（Enterprise）を、どの条件で、誰の同意のもとで許すか | E10、[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節 |
