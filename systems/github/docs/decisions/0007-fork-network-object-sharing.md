@@ -21,6 +21,8 @@ fork は、元のリポジトリとほとんど同じ objects を持つ。人気
 
 ## Decision
 
+> 2026-09-26 の注記：「`upload-pack` は、そのリポジトリの ref から到達できる objects だけを返す設定にする」は、プロトコル v0・v1 にしか効かない。v2 の `fetch` は、広告していない `want` も object store（alternates の先の `network.git` を含む）にあれば返し、Git の本体の設定では制限できない（[gitprotocol-v2](https://git-scm.com/docs/gitprotocol-v2)、[upload-pack.c](https://github.com/git/git/blob/master/upload-pack.c)）。本家も、ネットワークのどのリポジトリに push したコミットも上流を含む他のリポジトリから到達できうると文書にしている（[About permissions and visibility of forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-permissions-and-visibility-of-forks)）。そこで、公開のネットワークでは Git の経路も Web・API と同じく仕様として受け入れる。非公開のネットワークで Git の経路を制限するなら、`gitd` が v2 の `want` を到達可能性で検査する処理を自前で持つ。採るかは Web・API と一緒に E3 の `fork-network-reachability-check` で決め、この ADR を改める ADR を起票する（[git-storage.md](../architecture/git-storage.md) の 7.2 節）。下の Confirmation の 2 つ目も、この注記に従って読む。
+
 1 を採用する。
 
 - ネットワークの全てのリポジトリの objects を、保守で `network.git` に集める。`network.git` は各リポジトリの ref を `refs/networks/<repo_id>/*` に写して持ち、到達可能性の根にする。

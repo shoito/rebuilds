@@ -51,7 +51,7 @@ MVP は E1〜E9。
 | `authz-minimal` | `can(actor, contents:read|write, repo)` の最小（持ち主と公開の種類）。Go からの `authz.Check` |
 | `web-repo-browse-minimal` | SSR のリポジトリの最上位・ファイルの表示（ADR-0035） |
 | `synthetic-canary-minimal` | clone・push の合成監視 |
-| `fork-network-want-poc` | プロトコル v2 の広告していない `want` の PoC（[quality.md](quality.md) の LEAK-GIT-02） |
+| `fork-network-want-poc` | プロトコル v2 の広告していない `want` の振る舞いの固定と、`gitd` での到達可能性の検査の費用の PoC（[quality.md](quality.md) の LEAK-GIT-02） |
 | `frontend-drain-poc` | NLB の登録解除と、EC2 起動タイプの停止猶予 15 分の PoC |
 
 ### E2 アカウントと権限
@@ -89,7 +89,7 @@ MVP は E1〜E9。
 | `git-maintenance-scheduler` | 幾何級数の repack、cruft、multi-pack index、commit-graph |
 | `fork-network` | `network.git` と alternates、fork の作成、ネットワークへの移動（ADR-0007） |
 | `network-split-on-visibility-change` | 公開の種類の変更でのネットワークの分割 |
-| `fork-network-reachability-check` | 非公開のネットワークでの SHA の参照の到達可能性の検査の費用を測り、ADR を起票する |
+| `fork-network-reachability-check` | 非公開のネットワークでの SHA の参照（Git の v2 の `want`、Web・API）の到達可能性の検査の費用を測り、ADR を起票する |
 | `push-checks` | push の検査（大きさ、fsck、予約した名前空間、LFS の pointer）と時間の予算 |
 | `git-backup-osaka` | 大阪の S3 への増分・完全のバンドル（ADR-0032） |
 | `daily-restore-check` | 毎日の 1,000 リポジトリの復元の確認 |
@@ -170,7 +170,7 @@ MVP は E1〜E9。
 | `graphql-foundation` | GraphQL のスキーマ、節点ごとの `can`、費用の計算 |
 | `rest-resources-v1` | 初版の資源（3.4 節） |
 | `rate-limits` | 主・副の制限と応答（11 節） |
-| `github-apps` | App の登録、インストール、JWT、インストールのトークン（ADR-0020） |
+| `apps-core` | App の登録、インストール、JWT、インストールのトークン（ADR-0020） |
 | `app-manifest-flow` | マニフェストでの App の作成 |
 | `app-user-tokens` | ユーザーのトークンとリフレッシュ |
 | `oauth-apps` | OAuth アプリ、デバイスのフロー |

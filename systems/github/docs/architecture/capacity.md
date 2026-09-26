@@ -64,7 +64,7 @@
 ### 2.3 Git フロントエンドと帯域
 
 - 外向きの帯域のピーク 12 Gbps は、ストレージ → フロントエンド → クライアントと 2 回流れる（ADR-0004）。フロントエンドは、同じ AZ の複製を優先して AZ 間の転送を抑える。
-- フロントエンドの 1 タスク（2 vCPU）で、SSH の暗号を含めて 1 Gbps を上限とみなす（**未検証**）。12 Gbps ÷ 使用率 2/3 ＝ 18 タスク。
+- フロントエンドの 1 タスク（2 vCPU）で、SSH の暗号を含めて 1 Gbps を上限とみなす（**未検証**。実装とインスタンスに依存し、文書では確かめられない。E3 の `git-load-tests` で測る）。12 Gbps ÷ 使用率 2/3 ＝ 18 タスク。
 - 同時接続：clone は平均 30 秒、fetch は平均 1 秒とすると、ピークの同時接続は約 2,500。1 タスク 500 を上限とし、接続数でもスケールさせる。
 - ストレージのノードの帯域（`i8g.4xlarge` は基準 9.375 Gbps・最大 25 Gbps。[AWS の仕様](https://docs.aws.amazon.com/ec2/latest/instancetypes/so.html)）は、平常時には余る。修復（2.8 節）と clone の集中が重なるときに効く。
 
@@ -117,7 +117,7 @@
 
 **リージョンの喪失（大阪での復元）。**
 
-- バックアップのバンドルからの復元は、`index-pack` の CPU で律速する。1 vCPU あたり 30 MB/秒（**未検証**）とすると、42 台 × 16 vCPU で約 20 GB/秒だが、S3 からの取得、リポジトリごとの手続き、3 つの複製の作成を含めると、その 1/10 程度と見る。
+- バックアップのバンドルからの復元は、`index-pack` の CPU で律速する。1 vCPU あたり 30 MB/秒（**未検証**。リポジトリの形に依存し、文書では確かめられない。E9 の大阪への復元の訓練で測る）とすると、42 台 × 16 vCPU で約 20 GB/秒だが、S3 からの取得、リポジトリごとの手続き、3 つの複製の作成を含めると、その 1/10 程度と見る。
 - 直近 7 日に使われたリポジトリ（約 6 TB）を 1 つの複製で戻すのに約 1〜2 時間、全体（30 TB）を 3 つの複製にそろえるのに 12〜24 時間と見込む。これが S1 の RTO の範囲の根拠である（[infrastructure.md](infrastructure.md) の 5.2 節、ADR-0032）。
 - 訓練（[runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md)）で計測し、ここを置き換える。
 
@@ -132,7 +132,7 @@
 | 平常のホスト | 14〜18（平均の同時実行 560〜720 ジョブ） |
 | 待機中の microVM | ジョブの開始のピーク（5 件/秒）× 起動の時間 の 2 倍を常に用意する |
 
-- ジョブの開始 p95 60 秒（NFR-007）は、待機中の microVM があれば数秒で満たせる。効くのは、ホストの追加の遅さ（ベアメタルの起動は数分かかる。**未検証**）である。待機のホストを 20% 持ち、キューの伸びで先回りして増やす。
+- ジョブの開始 p95 60 秒（NFR-007）は、待機中の microVM があれば数秒で満たせる。効くのは、ホストの追加の遅さである。AWS は「RunInstances から起動の開始まで通常 10 分未満」とだけ書き、metal に固有の起動の時間は公開していない（[Amazon EC2 FAQs](https://aws.amazon.com/ec2/faqs/)、2026-09-26 に確認）。数分〜10 分とみなし、E8 の `firecracker-host-poc` で測る（**未検証**）。待機のホストを 20% 持ち、キューの伸びで先回りして増やす。
 - 実行環境の型が [actions.md](actions.md) で変われば、ここを置き換える。
 - 以前の見積もり（1 ホスト約 90）は SMT を有効にした 192 vCPU を前提にしていた。ADR-0023 で SMT を無効にするので、約 40 に直した（2026-09-26）。台数が 2 倍強になり、Actions の費用は本番の最大の項目になる（[infrastructure.md](infrastructure.md) の 9 節）。
 
@@ -157,7 +157,7 @@
 | `pack.windowMemory` | 256 MB | 大きなリポジトリの repack でメモリを使い切らない |
 | `core.bigFileThreshold` | 50 MB（既定より小さくする） | 大きなファイルを差分の圧縮から外し、メモリを抑える。LFS を勧める |
 
-- 設定の名前と意味は [git-config](https://git-scm.com/docs/git-config) による。`core.fsync` の値の組み合わせと、その書き込みの性能への影響は **未検証**（E3 で計測する）。
+- 設定の名前と意味は [git-config](https://git-scm.com/docs/git-config) による。`core.fsync` の値（`objects` は `loose-object` と `pack`、`committed` は `objects` と `reference` の集まり。`-` で除く）と `core.fsyncMethod`（`fsync`・`writeout-only`・`batch`。`batch` は今は loose objects にだけ効く）の意味は、2026-09-26 に確かめた。書き込みの性能への影響は、文書では確かめられないので **未検証** とし、E3 の `git-load-tests` で計測する。
 - 保守は `git repack --geometric` と multi-pack-index を基本にし、全体の repack を避ける。詳細は [git-storage.md](git-storage.md)。
 
 ### 3.2 ストレージのサービス
@@ -177,7 +177,7 @@
 | --- | --- |
 | 1 タスクの同時接続の上限 | 500 |
 | SSH の keepalive | 60 秒 |
-| 停止の猶予（`stopTimeout`） | 900 秒（[infrastructure.md](infrastructure.md) の 3 節。上限は未検証） |
+| 停止の猶予（`stopTimeout`） | 900 秒（[infrastructure.md](infrastructure.md) の 3 節。EC2 起動タイプでは文書上の上限がない。[git-protocols.md](git-protocols.md) の 9 節、2026-09-26 に確認） |
 | NLB・ALB の登録解除の遅延 | 900 秒 |
 | ALB のアイドルタイムアウト（Git の HTTPS） | 600 秒（[git-protocols.md](git-protocols.md) の 9 節） |
 | ルーティングのキャッシュ | TTL 5 秒（[git-storage.md](git-storage.md) の 4.3 節。遅れた複製はチェックサムの照合で弾く。ノードの喪失は、ストレージの制御から即時に通知して消す） |

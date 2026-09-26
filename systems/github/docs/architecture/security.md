@@ -179,9 +179,9 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 ## 5. 認証の強さ
 
 - **2FA の必須化**：本家は 2023 年 3 月から、GitHub.com でコードに貢献する利用者に 2FA を求めている。対象は、リリースの作成、Action・App の公開、Organization の owner・Enterprise の管理者などで、45 日の登録期間と 7 日の猶予の後、有効にしないとアクセスを止める（[About mandatory two-factor authentication](https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/about-mandatory-two-factor-authentication)）。
-  - 本システムでは、S1 の開始時から **全利用者に 2FA を必須**にする。既存の利用者がいないので、段階的な移行は要らない。方式は TOTP、パスキー・セキュリティキー。SMS は提供しない。
-  - Organization は、メンバーに 2FA を必須にできる（本家と同じ）。
-- **高い影響の操作は再認証を求める**（3.3 節）。
+  - 本システムも本家の条件に寄せ、Organization の owner、リポジトリの admin、App・OAuth アプリの持ち主、リリースの作成者に、45 日の登録期間と 7 日の猶予で 2FA を求める（[ADR-0019](../decisions/0019-authentication-and-token-model.md)、[identity-and-permissions.md](identity-and-permissions.md) の 3.1 節）。方式は TOTP、パスキー・セキュリティキー。SMS は提供しない。
+  - Organization は、メンバーに 2FA を必須にできる（本家と同じ。外れる対象は identity-and-permissions.md の 3.1 節）。
+- **高い影響の操作は再認証を求める**（sudo モード。[identity-and-permissions.md](identity-and-permissions.md) の 3.1 節）。
 - パスワードの漏洩の検査（既知の漏洩したパスワードの拒否）を登録と変更の時に行う。
 
 ## 6. 濫用・スパム・マルウェアの配布への対策
@@ -201,7 +201,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 状態 | 対象 | 見え方 |
 | --- | --- | --- |
 | `disabled`（濫用） | リポジトリ | 持ち主にも読めない。API・Git は拒否する |
-| `disabled`（法的な理由） | リポジトリ | HTTP 451 を返す（本家の挙動との一致は未検証） |
+| `disabled`（法的な理由） | リポジトリ | HTTP 451 を返す（本家が 451 を返すという公式の記述は見つからない。2026-09-26 に docs.github.com の DMCA と政府の削除の方針を確認。**未検証**。451 は RFC 7725 の意味に合うので本システムの判断とする） |
 | `hidden` | アカウント | 他人からはプロフィール・内容が見えない。本人は操作できる |
 | `suspended` | アカウント | ログインと、すべてのトークン・SSH の鍵の利用を止める |
 
@@ -241,7 +241,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | Actions のシークレット、Webhook の秘密、OAuth のクライアントの秘密、TOTP の種、SSH のホスト鍵 | 上に加えて、アプリ層のエンベロープ暗号化 | CMK `app-secrets` で包んだデータキー |
 | トークン・パスワード | 暗号化ではなくハッシュ（トークンは SHA-256、パスワードは Argon2id） | — |
 
-- 本家も、GitHub.com のソースコードを暗号化されたディスクに保存している（[Git data encryption at rest](https://github.blog/changelog/2019-05-22-git-data-encryption-at-rest/)、2019 年）。鍵の管理の詳細は公開されていない（未検証）。
+- 本家も、GitHub.com のソースコードを暗号化されたディスクに保存している（[Git data encryption at rest](https://github.blog/changelog/2019-05-22-git-data-encryption-at-rest/)、2019 年）。鍵の管理の詳細は公開されていない（2026-09-26 に docs.github.com と GitHub のブログを確認。**未検証**。本家に寄せる対象ではなく、ADR-0028 の判断とする）。
 - 転送中はすべて TLS 1.2 以上。内部の RPC（Git ストレージ）は mTLS。
 - 顧客の鍵（BYOK・EKM）は MVP に含めない。移行の道筋を ADR-0028 に書く。
 
@@ -305,7 +305,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 個人情報保護法（日本） | アカウントの情報は自ら取得する。非公開のリポジトリの中身は利用者の管理下のデータとして扱う | データは日本国内（東京、災害復旧は大阪）に置く。漏えい等の報告（速報は概ね 3〜5 日、確報は 30 日、不正の目的によるものは 60 日）を手順に組み込む |
 | GDPR | Organization のデータは処理者、アカウントの情報は管理者 | DPA、データ主体の権利への対応。本家のプライバシーステートメントは、アカウントが有効な間と、契約・法令・紛争の解決に必要な間だけ保持するとし、日数を示していない（[GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)） |
 | SOC 2 | — | Type I を企業向けの機能の提供までに、その後 Type II。本家は SOC 2・ISO の報告を Trust Center で示す（[github.com/security](https://github.com/security)） |
-| 輸出管理・制裁 | — | 本家は米国の貿易管理に従う。日本の外為法での扱いを法務が確かめる（未検証、15 節） |
+| 輸出管理・制裁 | — | 本家は米国の EAR・OFAC・ITAR に従う（[GitHub and trade controls](https://docs.github.com/en/site-policy/other-site-policies/github-and-trade-controls)、2026-09-26 に確認）。日本の外為法での扱いは **法務の確認待ち**（15 節） |
 | DMCA・日本の発信者情報開示 | — | 6 節 |
 
 ## 14. データのライフサイクル
@@ -331,11 +331,15 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 - Git のバックアップ（[infrastructure.md](infrastructure.md) の 5 節）は「最新の完全な復元点を常に残す」が、消去したリポジトリはこの例外から外し、消去から 35 日で復元点ごと消す（ADR-0030）。
 - 手順は runbook の `repository-restore`・`data-deletion` に書く。
 
-## 15. 決定（2026-09-26、既定案）
+## 15. 未解決の問い
+
+設計の中で出た問いと、その決定。
+
+### 決定（2026-09-26、既定案）
 
 PM の方針（本家に寄せる、既定案）で次のとおり決めた。法務の確認が要るものは、E9 の一般公開の前に確認を受ける（`legal-review-before-launch`）。
 
-- **DMCA の通知の公開**：本家に合わせ、個人情報を編集したうえで公開のリポジトリで公開する。法務の確認を要する。
+- **DMCA の通知の公開**：本家に合わせ、個人情報を編集したうえで公開のリポジトリで公開する。**法務の確認待ち**。
 - **日本の発信者情報開示と、外為法・制裁への対応**：手順を E9 の `legal-takedown-and-disclosure` で作る。中身は法務が決める。
 - **通知のメールのドメインの制限**：本家と同じく企業向けの機能とし、MVP に含めない（E10）。
 - **内部のアクセスログの保持**：90 日のままにする。本家の 2022 年の事件（発覚まで約 1 週間）にも足りる。
@@ -344,5 +348,5 @@ PM の方針（本家に寄せる、既定案）で次のとおり決めた。�
 
 ### 未検証の事項
 
-- 本家が DMCA で無効にしたリポジトリに HTTP 451 を返すか。
-- 本家の保存時の暗号化の鍵の管理の方式（2019 年の Changelog 以上の公開の情報を見つけられなかった）。
+- 本家が DMCA で無効にしたリポジトリに HTTP 451 を返すか（2026-09-26 に公式の記述を探したが見つからない。一般公開の前に、公開のリポジトリで観測できる無効化の事例で確かめる）。
+- 本家の保存時の暗号化の鍵の管理の方式（2019 年の Changelog 以上の公開の情報はない。2026-09-26 に確認。本家に寄せる対象ではない）。

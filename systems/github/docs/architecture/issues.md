@@ -17,8 +17,8 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 
 | 属性 | 中身 | 規則 |
 | --- | --- | --- |
-| タイトル | 1 行 | 必須。最大 256 文字（本家の上限は未検証） |
-| 本文・コメント | Markdown | 最大 65,536 文字（本家のエラーの文言に倣う。公式の文書では未検証）。描画は隔離した環境で行う（[web.md](web.md)） |
+| タイトル | 1 行 | 必須。最大 256 文字（本家は上限を公開していない。2026-09-26 に確認。**未検証**。本システムの値） |
+| 本文・コメント | Markdown | 最大 65,536 文字（本家のエラーの文言に倣う。本家の文書にあるのは、メールの返信で作るコメントの上限 65,530 文字だけ。[Configuring notifications](https://docs.github.com/en/subscriptions-and-notifications/get-started/configuring-notifications)、2026-09-26 に確認。**未検証**）。描画は隔離した環境で行う（[web.md](web.md)） |
 | 状態 | `open` / `closed` | 閉じる理由 `state_reason`：`completed`、`not_planned`、`duplicate`。開き直すと `reopened`（[REST API の Issues](https://docs.github.com/en/rest/issues/issues)） |
 | 担当者 | ユーザー | 最大 10 人（[担当者の文書](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/assigning-issues-and-pull-requests-to-other-github-users)） |
 | ラベル | リポジトリのラベル | 3 節 |
@@ -32,7 +32,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 ## 3. ラベル
 
 - ラベルはリポジトリの単位で持つ：`labels (repo_id, id, name, color, description)`。名前はリポジトリの中で、大文字・小文字を区別せずに一意にする。
-- 新しいリポジトリには、既定のラベルを作る。本家の既定は `bug`、`documentation`、`duplicate`、`enhancement`、`good first issue`、`help wanted`、`invalid`、`question`、`wontfix` の 9 つ（本家の画面での確認に基づく。文書の一覧は未検証）。Organization は、新しいリポジトリの既定のラベルを差し替えられる。
+- 新しいリポジトリには、既定のラベルを作る。本家の既定は `accessibility`、`bug`、`documentation`、`duplicate`、`enhancement`、`good first issue`、`help wanted`、`invalid`、`question`、`wontfix` の 10 個で、本システムも同じにする（[Managing labels](https://docs.github.com/en/issues/using-labels-and-milestones-to-track-work/managing-labels)、2026-09-26 に確認。以前の案は `accessibility` を欠いていた）。Organization は、新しいリポジトリの既定のラベルを差し替えられる。
 - ラベルの削除は、付いている Issue から外す。タイムラインの過去の `labeled` イベントは、ラベルの名前と色の写しを持つので表示が壊れない。
 
 ## 4. マイルストーン
@@ -45,7 +45,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 ### 5.1 Issue の種類
 
 - Organization の単位で定義する：`issue_types (org_id, id, name, description, color, enabled)`。本家は 1 つの Organization に最大 25 種類、既定は `task`・`bug`・`feature`（[Issue の種類の管理](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/managing-issue-types-in-an-organization)）。
-- 個人の持つリポジトリには種類がない（本家の文書に明記はなく、未検証。Organization の設定の中にしかないことからの推定）。
+- 個人の持つリポジトリには種類がない。本家の種類は Organization で定め、リポジトリは Organization から引き継ぐ（[Issue types の REST API](https://docs.github.com/en/rest/repos/issue-types)、2026-09-26 に確認。個人のリポジトリに種類がないことの明記はないが、定める場所が Organization にしかない）。
 - 種類の管理は Organization の owner。種類を無効にしても、付いている Issue からは外さず、新たに付けられなくする。
 
 ### 5.2 sub-issue
@@ -53,7 +53,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 - `sub_issues (parent_issue_id, child_issue_id, position)`。子は親を 1 つだけ持つ。
 - 本家の上限：1 つの親に子は 100 件、入れ子は 8 段まで。別のリポジトリの Issue も子にできる（[sub-issue の文書](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues)）。
 - 追加の時に、循環（自分の祖先を子にする）を拒否する。祖先をたどるのは 8 段までなので、再帰の問い合わせで確かめられる。
-- **権限**：親のリポジトリと子のリポジトリの両方で triage 以上を要る（本家の要件は未検証。両側の表示が変わるので、両側で編集の権限を求める）。
+- **権限**：親のリポジトリと子のリポジトリの両方で triage 以上を要る（本家の文書に要件の記述がない。2026-09-26 に確認。**未検証**。両側の表示が変わるので、両側で編集の権限を求める。E5 の spec の決定表で確定する）。
 - **表示**：親の画面の子の一覧、子の画面の親の表示は、見る人が読めるリポジトリのものだけを出す。非公開のリポジトリの子の件数も、進み具合の分母に含めない（見る人ごとに数える）。これを怠ると、非公開の Issue の存在が漏れる。
 - 進み具合（閉じた子 / 子の全体）は、見る人が全部の子を読める場合に限り、非正規化した値を使う。そうでなければ、その場で数える。
 
@@ -70,7 +70,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 | コミットの SHA（短縮を含む）、`owner/repo@sha` | コミット |
 | `@user`、`@org/team` | メンション（[notifications.md](notifications.md)） |
 
-- 本文・コメントの保存の後、Worker が参照を抜き出し、`issue_references (source_kind, source_id, source_repo_id, target_issue_id, created_at)` に書き、参照された側のタイムラインに `cross-referenced` のイベントを積む。本文の編集で参照が増えたときも積む。消えても、イベントは消さない（本家と同じと思われるが未検証）。
+- 本文・コメントの保存の後、Worker が参照を抜き出し、`issue_references (source_kind, source_id, source_repo_id, target_issue_id, created_at)` に書き、参照された側のタイムラインに `cross-referenced` のイベントを積む。本文の編集で参照が増えたときも積む。消えても、イベントは消さない（本家の文書に記述がない。**未検証**。E5 で本家を観測して合わせる）。
 - `redirect.github.com` を使った参照は逆リンクを作らない、という本家の抜け道に相当するものは MVP では作らない。
 - **閉じるキーワード**（`closes #10` など）による自動クローズは、Pull Request のマージの時に行う。詳細は [pull-requests.md](pull-requests.md)。
 
@@ -127,15 +127,15 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 ## 10. ピン留め
 
 - 1 つのリポジトリに最大 3 件（[ピン留めの文書](https://docs.github.com/en/issues/tracking-your-work-with-issues/administering-issues/pinning-an-issue-to-your-repository)）。
-- 必要な権限は write 以上とする（本家の文書・ロールの表に行がなく未検証だが、2026-09-26 に既定案として決めた）。
+- 必要な権限は write 以上とする（本家の文書・ロールの表に行がない（2026-09-26 に確認。**未検証**）。2026-09-26 に既定案として決めた）。
 - `pinned_issues (repo_id, issue_id, position)`。4 件目は 422 で拒否する。
 
 ## 11. テンプレートとフォーム
 
-- 置き場所は、デフォルトブランチの `.<brand>/ISSUE_TEMPLATE/` の `*.md`（テンプレート）と `*.yml`（フォーム）、設定は `.<brand>/ISSUE_TEMPLATE/config.yml`（`blank_issues_enabled`、`contact_links`）。リポジトリになければ、Organization の `.<brand>` リポジトリのものを使う（本家の既定のコミュニティ健全性ファイルの仕組み。細部は未検証）。
+- 置き場所は、デフォルトブランチの `.<brand>/ISSUE_TEMPLATE/` の `*.md`（テンプレート）と `*.yml`（フォーム）、設定は `.<brand>/ISSUE_TEMPLATE/config.yml`（`blank_issues_enabled`、`contact_links`）。リポジトリに有効なテンプレートか設定が 1 つもなければ、Organization の公開の `.<brand>` リポジトリのものを使う。1 つでもあれば、Organization のものは使わない（本家の既定のコミュニティ健全性ファイルと同じ。[Creating a default community health file](https://docs.github.com/en/communities/setting-up-your-project-for-healthy-contributions/creating-a-default-community-health-file)、2026-09-26 に確認）。
 - 読み出しは Git のストレージの RPC で行い、デフォルトブランチのコミットの SHA をキーにキャッシュする（[ADR-0005](../decisions/0005-git-as-source-of-truth.md)。Git が正本）。
 - フォームの要素は `markdown`、`input`、`textarea`、`dropdown`、`checkboxes`。必須の検証はサーバーでも行い、送信時に Markdown の本文に変換して保存する（保存するのは変換後の本文だけ）。
-- テンプレートに書いたラベル・担当者・種類は、作成者に triage の権限がなくても付ける（リポジトリの持ち主の設定とみなす。本家の振る舞いは未検証）。存在しないラベル・担当できない人は黙って捨てる。
+- テンプレートに書いたラベル・担当者・種類は、作成者に triage の権限がなくても付ける（リポジトリの持ち主の設定とみなす。本家の文書に記述がない。**未検証**）。存在しないラベル・担当できない人は黙って捨てる（本家も、存在しないラベルは付けない。[Syntax for issue forms](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms)、2026-09-26 に確認）。
 - YAML の解析は、大きさ（例：64 KiB）と要素の数に上限を置く。不正なら、そのテンプレートを一覧に出さず、リポジトリの admin に画面で警告する。
 
 ## 12. 権限の規則
@@ -151,7 +151,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 | ラベル・マイルストーンの作成・編集・削除 | write 以上 |
 | ロック | write 以上（8 節） |
 | 移動 | write 以上（両方のリポジトリ。9 節） |
-| ピン留め | write 以上（本家の表に行がなく未検証。10 節） |
+| ピン留め | write 以上（本家の表に行がない。**未検証**。10 節） |
 | 他人のコメントの編集・削除・非表示 | write 以上 |
 | Issue の削除 | admin |
 
@@ -162,7 +162,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 ## 13. 濫用の対策
 
 - 作成の上限は、本家の二次レート制限（内容を作る要求は 1 分に 80 件、1 時間に 500 件まで。[REST API のレート制限](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)）に合わせ、Web と API で共有する。値の管理は [api-and-webhooks.md](api-and-webhooks.md)。
-- 1 つの Issue のコメントは、上限（例：2,500 件）を超えたら新しいコメントを拒否する（本設計の値。本家の上限は未検証）。
+- 1 つの Issue のコメントは、上限（例：2,500 件）を超えたら新しいコメントを拒否する（本設計の値。本家は上限を公開していない。2026-09-26 に確認。**未検証**）。
 - 本文のメンションは、1 つの本文で通知の対象にする人数を 50 人までにする（[notifications.md](notifications.md) の 3 節）。
 
 ## 14. イベントの発行
@@ -186,10 +186,15 @@ outbox から SQS への受け渡しは、[notifications.md](notifications.md) �
 - 移動：ラベル・マイルストーンの対応、リダイレクト、公開 → 非公開の拒否。
 - テンプレート：不正な YAML、大きすぎるフォーム、存在しないラベル。
 
-## 16. 決定（2026-09-26、既定案）
+## 16. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - ピン留めは write 以上、sub-issue の追加・削除は親と子の両方のリポジトリで triage 以上（5.2、10 節）。本家の文書で確かめられないので、E5 の spec の決定表で確定し、本家の振る舞いを観測できたら合わせる。
 - Issue のフィールド（本家の Issue fields や Projects のカスタムフィールド）は、MVP の後の候補（Projects と一緒に扱う。[roadmap.md](../roadmap.md) の「後回しにしたもの」）。
+- **既定のラベル**（2026-09-26 の本家の確認による改訂）：本家と同じ 10 個（`accessibility` を加えた）にする（3 節）。
 
 持ち越し：
 

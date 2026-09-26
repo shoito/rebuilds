@@ -56,7 +56,7 @@ PR は「head の ref の変更を、base の ref に取り込む提案」であ
 
 - `merged` は終端。`closed` は `reopen` できる。ただし head の ref が消えていたり、base に既に取り込まれていたりすると `reopen` できない。
 - **下書き（draft）はマージできない。** CODEOWNERS へのレビューの依頼も、下書きの間は出さない（[About code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners)）。
-- **base に head が既に含まれたら、`merged` にする。** 利用者が手元でマージして base に push した場合、push の Event の処理で「`head_sha` が base の新しい tip から到達できる」ことを検出し、その push をマージとして記録する。本家も同様に扱う（未検証：検出の条件の詳細）。
+- **base に head が既に含まれたら、`merged` にする。** 利用者が手元でマージして base に push した場合、push の Event の処理で「`head_sha` が base の新しい tip から到達できる」ことを検出し、その push をマージとして記録する。本家も、手元で作ったマージのコミットを保護されたブランチに push したとき、GitHub が作るマージと中身が一致すれば受け付けると書いており、手元のマージを PR のマージとして扱う前提がある（[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、2026-09-26 に確認）。検出の条件そのものは文書にない（**未検証**。E4 で本家を観測して合わせる）。
 
 ## 2. push の後の更新（ADR-0005）
 
@@ -121,7 +121,7 @@ head または base の ref が動くと、ストレージが順序付きの Eve
 | `false` | 衝突あり。衝突したファイルの一覧を持つ |
 
 - 計算は、push の Event（2 節）と、PR の画面・API の読み取りの両方から積む。同じキーの計算は、1 つにまとめる（キーごとの排他）。
-- 1 回の計算の上限は 10 秒。超えたら `mergeable: false`、理由「計算できない」とし、画面では手元でのマージを案内する。本家の上限は未検証。
+- 1 回の計算の上限は 10 秒。超えたら `mergeable: false`、理由「計算できない」とし、画面では手元でのマージを案内する。本家は上限を公開していない（2026-09-26 に docs.github.com を確認。**未検証**。本システムの値とする）。
 - base が頻繁に動くリポジトリ（モノレポ）では、base の push ごとに全 open の PR を計算し直すと重い。次のように抑える。
   - 画面か API で見られた PR、自動マージが有効な PR、merge queue に入っている PR を優先する。
   - それ以外は、最後の計算から一定時間（例：5 分）経つまで積まない。見られたときに計算する。
@@ -181,7 +181,7 @@ head または base の ref が動くと、ストレージが順序付きの Eve
 - head が動いたら、各スレッドの位置を新しい `head_sha` の差分へ付け直す。付け直しは、旧と新の差分の hunk を比べ、コメントの行を含む hunk が変わっていなければ、新しい行番号へ移す。
 - 変わっていれば、そのスレッドを outdated にし、元の `commit_id` の差分で表示する。削除はしない。
 - 付け直しは PR の Worker が非同期に行う。画面は付け直しの前でも、元の `commit_id` で正しく表示できる。
-- 付け直しの規則の本家との一致は未検証。
+- 付け直しの規則は、本家が公開していない（2026-09-26 に確認。**未検証**）。本システムの規則とし、E4 で本家の画面を観測して差があれば合わせる。
 
 ### 4.4 提案（suggested changes）
 
@@ -196,10 +196,10 @@ head または base の ref が動くと、ストレージが順序付きの Eve
 | きっかけ | 対象 | 条件 |
 | --- | --- | --- |
 | 手動 | 1 件の `APPROVED`・`CHANGES_REQUESTED` | base の管理者か maintain の権限。理由の記入を必須にする |
-| 古い承認の取り消し | その PR の全 `APPROVED` | ruleset の「新しいコミットで古い承認を取り消す」が有効で、差分が変わった |
+| 古い承認の取り消し | その PR の全 `APPROVED` | ruleset の「新しいコミットで古い承認を取り消す」が有効で、差分が変わったか、merge base が変わった |
 
 - 本家は、新しい push、「ブランチの更新」、関係する PR が base に入ったことなどで差分が変わると、承認を古いものとして取り消す（[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)）。
-- ここでは、承認の時点の三点の差分の指紋（ファイルごとの blob の組のハッシュ）を承認に持たせ、head か base が動いたら指紋を計算し直し、違えば取り消す。base の変更だけで差分の中身が変わらない（merge base が動くだけで PR の変更が同じ）なら取り消さない。本家の判定と完全に一致するかは未検証。
+- ここでは、承認の時点の三点の差分の指紋（ファイルごとの blob の組のハッシュ）を承認に持たせ、head か base が動いたら指紋を計算し直し、違えば取り消す。加えて、merge base が変わったら、差分の中身が同じでも取り消す。本家は「merge base が承認の後に新しい変更を持ち込んだら古いものとして取り消し、merge base が変わったら再び承認されるまでマージできない」としている（[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、2026-09-26 に確認）。以前の案（merge base が動くだけで差分が同じなら取り消さない）は、本家と違い、base から入った変更を承認なしに通しうるので改めた。
 - 取り消しは、タイムラインと監査ログに残し、`pull_request_review.dismissed` の Event を出す。
 
 ## 5. CODEOWNERS と ruleset（ADR-0011）
@@ -290,7 +290,7 @@ evaluate(repo, ref, operation, actor, context) -> { allowed, violations[], bypas
 - 検証の結果は、コミットの SHA と鍵の状態の版でキャッシュする。
 - サーバーが作るコミット（merge、squash、提案の適用、Web での編集）は、プラットフォームの鍵で署名する。本家も Web で作るコミットを署名し、squash の最後のコミットも署名する（[About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)、[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)）。
 - **rebase で作り直したコミットは署名しない。** 本家は、rebase のマージのコミットは利用者の鍵を持たないので署名できないとしている（同上）。本家に合わせ、署名の必須が掛かった base では rebase の方式を選べなくする。
-- squash でも、PR の中に署名のないコミットがあると拒否される場合があると本家は述べている（同上）。ここでは、squash と merge は「base に新たに入るコミット」だけを検証の対象にする。merge の方式では head のコミットも base に入るので、それらの署名も要る。squash では、プラットフォームが署名した 1 つのコミットだけが入るので、PR の中のコミットの署名は問わない。本家との差は未検証。
+- squash でも、PR の中に署名のないコミットがあると拒否される場合があると本家は述べている（同上）。本家は、テストのマージが持ち込む全てのコミット（head のコミットを含む）を検証し、署名のない head のコミットは、最後の squash のコミットを GitHub が署名する場合でも squash を妨げうるとしている（[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、2026-09-26 に確認）。ここでは、squash と merge は「base に新たに入るコミット」だけを検証の対象にする。merge の方式では head のコミットも base に入るので、それらの署名も要る。squash では、プラットフォームが署名した 1 つのコミットだけが入るので、PR の中のコミットの署名は問わない（**本家との違い**。base の履歴に入るコミットの署名を守るという規則の目的は満たし、外部の貢献者の署名のないコミットを squash で取り込めるようにする）。
 
 ## 6. マージ
 
@@ -327,7 +327,7 @@ API ──(1) can(actor, write, base_repo)
 
 ### 6.3 衝突の解決
 
-- Web での衝突の解決（衝突したファイルを編集してコミットする）は、MVP では単純な衝突（テキストのファイル、rename を含まない）に限る。解決のコミットは head に作る（base を head にマージするコミット）。本家と同じ（未検証：本家の制限の詳細）。
+- Web での衝突の解決（衝突したファイルを編集してコミットする）は、MVP では単純な衝突（テキストのファイル、rename を含まない）に限る。解決のコミットは head に作る（base を head にマージするコミット）。head が保護されていれば、新しいブランチを作らせる。本家も、Web で解決できるのは単純な行の競合だけで、解決は base 全体を head にマージし、head が保護されていれば新しいブランチを作る（[Resolving a merge conflict on GitHub](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/addressing-merge-conflicts/resolving-a-merge-conflict-on-github)、2026-09-26 に確認）。
 - それ以外は、手元での解決を案内する。
 
 ## 7. 「ブランチの更新」
@@ -380,7 +380,7 @@ API ──(1) can(actor, write, base_repo)
 - 次のときは予約を取り消す（本家と同じ。[Automatically merging a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/automatically-merging-a-pull-request)）。
   - 書き込み権限のない人が head に push した。
   - base のブランチが変わった。
-- 予約した人が権限を失ったときも取り消す（本家の挙動は未検証）。
+- 予約した人が権限を失ったときも取り消す（本家の文書に記述がない。2026-09-26 に確認。**未検証**。予約した人としてマージするので、権限のない人のマージを避けるための本システムの規則）。
 - 条件を満たしたかの判定は、チェックの結果、レビュー、push の Event を受けた PR の Worker が行う。判定のたびに 6.2 節の手順を通すので、事前判定が古くても誤ってマージしない。
 
 ## 10. 下書き
@@ -395,7 +395,7 @@ Worker は outbox に次の Event を書き、通知・Webhook・Actions・検�
 
 | Event | action |
 | --- | --- |
-| `pull_request` | `opened`、`edited`、`closed`（`merged` を含む）、`reopened`、`synchronize`、`converted_to_draft`、`ready_for_review`、`review_requested`、`review_request_removed`、`assigned`、`labeled`、`auto_merge_enabled`、`auto_merge_disabled`、`enqueued`、`dequeued` |
+| `pull_request` | `opened`、`edited`、`closed`（`merged` を含む）、`reopened`、`synchronize`、`converted_to_draft`、`ready_for_review`、`review_requested`、`review_request_removed`、`assigned`、`unassigned`、`labeled`、`unlabeled`、`auto_merge_enabled`、`auto_merge_disabled`、`enqueued`、`dequeued` |
 | `pull_request_review` | `submitted`、`edited`、`dismissed` |
 | `pull_request_review_comment` | `created`、`edited`、`deleted` |
 | `pull_request_review_thread` | `resolved`、`unresolved` |
@@ -403,7 +403,7 @@ Worker は outbox に次の Event を書き、通知・Webhook・Actions・検�
 
 - Event は PR ごとに順序を持つ（`pr_event_seq`）。受け手はこれで重複と順序を扱える。
 - Event の配信先は、配信の時点で権限を判定し直す（ADR-0002）。
-- 本家の action の一覧との完全な一致は未検証。MVP で出すものは上の表に限る。
+- 本家の `pull_request` の action は、上に加えて `milestoned`・`demilestoned`・`locked`・`unlocked`・`stacked` を持つ（[Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)、2026-09-26 に確認）。MVP で出すものは上の表に限り、残りは E7 の Webhook の拡充で足す。
 
 ## 12. 性能（NFR-004）
 
@@ -440,11 +440,17 @@ Worker は outbox に次の Event を書き、通知・Webhook・Actions・検�
 | `auto_merge_requests` | 自動マージの予約 |
 | `pull_request_events` | PR ごとの Event の順序 |
 
-## 14. 決定（2026-09-26、既定案）
+## 14. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - **差分の共有のキャッシュ**：ファイルの一覧と行数は Valkey（TTL 付き、追い出しだけ）、ファイルごとの差分の本文は S3（`(network_id, merge_base_sha, head_sha, opts, path)` のキー、ライフサイクルで 30 日）に置く（[capacity.md](capacity.md) の 2.5 節と同じ）。
 - **`evaluate` の状態**：MVP では全ての持ち主に開放する。MVP にプランの仕組みがないため。プランを入れるときに、本家に合わせて企業向けに限るかを見直す。
 - **旧来のブランチの保護の API**（`/branches/{branch}/protection`）：提供しない。呼ばれたら `501` と ruleset の文書の URL を返す（ADR-0011 の一本化、ADR-0021 の未実装の扱い）。
+- **古い承認の取り消し**（2026-09-26 の本家の確認による改訂）：差分の指紋が変わったときに加え、merge base が変わったときも取り消す（4.5 節）。本家に合わせ、base から入った変更を承認なしに通さない。
+- **署名の必須と squash**：squash では PR の中のコミットの署名を問わない（5.5 節）。本家は署名のない head のコミットで squash を妨げうるが、base に入るのは署名したコミットだけなので、本家との違いとして受け入れる。
 
 持ち越し：
 

@@ -183,7 +183,7 @@ created ──▶ waiting（環境の保護） ──▶ queued ──▶ assign
   - 必須のレビュアー：最大 6 人またはチーム。1 人の承認で進む。レビュアーはリポジトリの読み取りの権限が要る。
   - 待ち時間：1〜43,200 分（30 日）。待ち時間は課金の分に数えない。
   - デプロイできるブランチ・タグ：`<BRAND>_REF` をパターンで照合する。
-  - 独自の規則：GitHub App に相当する仕組みで外部に判断を問う（[api-and-webhooks.md](api-and-webhooks.md)）。
+  - 独自の規則：App（本家の GitHub App に相当）で外部に判断を問う（[api-and-webhooks.md](api-and-webhooks.md)）。
 - 環境のシークレットは、規則を満たした後のジョブの取得時にだけ渡す（7 節）。
 - 本家では、Free・Pro・Team の非公開のリポジトリで一部の規則が使えない。プランによる機能の制限も本家に合わせる。
 
@@ -210,7 +210,7 @@ Broker ── TLS ──▶ ランナー（ジョブのメッセージの中）
 
 - ジョブのメッセージに入れるのは、そのジョブのワークフローが `secrets.<name>` で参照するものだけにする（参照の一覧は、実行計画を作るときに抜き出す）。
 - 平文を DB・キュー・ログに書かない。Broker はメッセージを送った後にメモリから捨てる。
-- Log service がマスクの二重の確認（9.2 節）に使うために、そのジョブのシークレットの値の「ハッシュ（固定長の部分文字列の HMAC）」だけを、ジョブの間 Valkey に置く（未検証の設計。PoC で誤検出と漏れの率を測る）。
+- Log service がマスクの二重の確認（9.2 節）に使うために、そのジョブのシークレットの値の「ハッシュ（固定長の部分文字列の HMAC）」だけを、ジョブの間 Valkey に置く（**未検証** の設計。本家は方式を公開していないので、E8 の `log-mask-double-check` の PoC で誤検出と漏れの率を測る）。
 
 ### 6.3 渡してよいかの表
 
@@ -223,8 +223,8 @@ Broker ── TLS ──▶ ランナー（ジョブのメッセージの中）
 | Dependabot に相当するもの | MVP の外 | — | — | — |
 
 - 本家の記述：「<BRAND>_TOKEN を除き、fork のリポジトリから起動したワークフローのランナーには、シークレットは渡されない。<BRAND>_TOKEN は fork からの PR では読み取りだけ」（[Events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)）。
-- fork からの `pull_request` で OIDC のトークンを出さないのは、読み取りだけのトークンでは `id-token: write` を付与できないという本家の仕組みからの推論である。本家の明記は確認できていない（**未検証**）。
-- fork の PR の承認の方針は、本家の 3 つの選択肢（GitHub を使い始めたばかりの初めての貢献者 / 初めての貢献者 / 外部のコラボレーター全員）をリポジトリ・Organization の設定に持つ。既定は本家に合わせ、中間（初めての貢献者）にする（本家の既定値は **未検証**）。
+- fork からの `pull_request` で OIDC のトークンを出さないのは、本家の仕組みからの推論である。本家は、fork の PR では `permissions` で書き込みの権限を通常は付与できない（「Send write tokens to workflows from pull requests」の設定を有効にしたときを除く）とし（[Workflow syntax の `permissions`](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax)、2026-09-26 に確認）、OIDC は `id-token: write` を要する。「fork の PR では OIDC を出さない」とだけ書いた文は見つからない（**未検証**。推論の前提は確かめた。本システムは、書き込みのトークンを fork の PR に送る設定を持たないので、常に出さない）。
+- fork の PR の承認の方針は、本家の 3 つの選択肢（GitHub を使い始めたばかりの初めての貢献者 / 初めての貢献者 / 外部のコラボレーター全員）をリポジトリ・Organization の設定に持つ。既定は本家に合わせ、中間（初めての貢献者）にする（本家の既定も同じ。[Managing GitHub Actions settings for a repository](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository)、2026-09-26 に確認）。
 
 ### 6.4 `pull_request_target` と、秘密を持つ実行でのコードの取り込み
 
@@ -261,7 +261,7 @@ Broker ── TLS ──▶ ランナー（ジョブのメッセージの中）
 - `sub` の形も本家と同じ：`repo:<owner>/<repo>:environment:<name>`、`repo:<owner>/<repo>:pull_request`、`repo:<owner>/<repo>:ref:refs/heads/<branch>`。Organization・リポジトリの単位で、`sub` に含める claim を変えられる（`include_claim_keys`）。
 - **名前の再利用への対策**：リポジトリの名前は、削除・改名のあとに別の人が取れる。クラウドの信頼の条件を名前だけで書くと、別人のリポジトリが通る。`repository_id`・`repository_owner_id` を `sub` に含める設定を、Organization の既定で有効にできるようにし、ドキュメントで推奨する。
 - 署名の鍵は KMS の非対称鍵（RSA、`RS256`）。秘密鍵は KMS の外に出ない。鍵は 90 日ごとに入れ替え、JWKS には新旧の 2 つを並べる。
-- 有効期限は 5 分（本家の値は **未検証**）。発行の記録（`jti`、claim）を監査ログに残す。
+- 有効期限は 5 分（本家は値を明記していないが、文書の例のトークンの `exp − iat` は 300 秒。[OpenID Connect](https://docs.github.com/en/actions/concepts/security/openid-connect)、2026-09-26 に確認）。発行の記録（`jti`、claim）を監査ログに残す。
 
 ## 8. ランナーの実行基盤（ホスト）
 
@@ -281,7 +281,7 @@ EC2 metal（例：m7i.metal-48xl。SMT を無効）── actions-runners-prod �
 
 - **1 ジョブ 1 microVM。** VM は、ジョブを実行したら壊し、ディスクの書き込み層も消す。VM・ディスク・ネットワークのデバイスを、別のジョブに再利用しない。
 - **ゲストは Linux だけ。** Firecracker は Linux の KVM の上で Linux のゲストを動かす（[Firecracker](https://github.com/firecracker-microvm/firecracker)）。Windows・macOS のランナーは MVP の外にする。
-- 標準のランナーの大きさは、容量の計画では 2 vCPU・8 GiB・ディスク 14 GB とする（[capacity.md](capacity.md) の 2.9 節）。本家は公開リポジトリと非公開のリポジトリで大きさを変えている（公開 4 vCPU・16 GB、非公開 2 vCPU・7 GB と理解しているが **未検証**。[GitHub-hosted runners](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners) で着手前に確かめる）。
+- 標準のランナーの大きさは、容量の計画では 2 vCPU・8 GiB・ディスク 14 GB とする（[capacity.md](capacity.md) の 2.9 節）。本家は公開リポジトリと非公開のリポジトリで大きさを変えている（Linux・Windows で、公開は 4 CPU・16 GB・SSD 14 GB、非公開は 2 CPU・8 GB・SSD 14 GB。[GitHub-hosted runners reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)、2026-09-26 に確認）。本システムの標準は、非公開の大きさと同じになる。
 - イメージは本家の `ubuntu-latest` に近い中身（言語のランタイム、Docker、主要な道具）を持つ。ルートのディスクは読み取りだけのベースのイメージと、VM ごとの書き込み層に分け、起動を速くする。
 - ジョブの中の Docker（コンテナのアクションや `services`）は、VM の中の Docker で動かす。ジョブは VM の中で root になれる（本家と同じく、パスワードなしの `sudo`）。隔離の境界は VM であり、VM の中の権限は問わない。
 
@@ -310,7 +310,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 
 ### 8.4 待機中の VM（ウォームプール）と起動
 
-- Firecracker は、API の呼び出しから `/sbin/init` の開始まで 125 ms 以下、VMM のメモリのオーバーヘッド 5 MiB 以下を仕様としている（[SPECIFICATION.md](https://github.com/firecracker-microvm/firecracker/blob/main/SPECIFICATION.md)）。ただし、ランナーのエージェントとツールの初期化を含む実際の起動の時間は、イメージの大きさに依存する（**未検証**。PoC で測る）。
+- Firecracker は、API の呼び出しから `/sbin/init` の開始まで 125 ms 以下、VMM のメモリのオーバーヘッド 5 MiB 以下を仕様としている（[SPECIFICATION.md](https://github.com/firecracker-microvm/firecracker/blob/main/SPECIFICATION.md)）。ただし、ランナーのエージェントとツールの初期化を含む実際の起動の時間は、イメージの大きさに依存する（**未検証**。イメージに依存し、文書では確かめられない。E8 の `firecracker-host-poc` で測る）。
 - ラベルごとに、起動済みで long poll 中の VM を一定数持つ。数は、直近の配り出しの速さから決める（初期値は、直近 5 分のジョブの開始の数の 1.5 倍）。
 - 待機中の VM はシークレットを持たない。ジョブのメッセージを受け取って、初めてジョブの資格情報を持つ。
 - **スナップショットからの復元（起動の高速化）は S1 で使わない。** 1 つのスナップショットから複数の VM を作ると、乱数の状態などが複製される（[random-for-clones.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/snapshotting/random-for-clones.md)）。S2 で、起動の時間が NFR-007 を満たさないときに、再検討する。
@@ -318,10 +318,10 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 ### 8.5 容量
 
 - S1 のピークの同時実行は 1,800 ジョブ（[capacity.md](capacity.md) の 2.9 節）。
-- **1 ホストあたり約 40 VM とする。** 8.2 節で SMT を無効にすると、m7i.metal-48xl の物理コアは 96 になり、2 vCPU の VM を物理コア 2 つに割り当てると最大 48、ホストの予備を引いて約 40 になる。ピークのホストは 1,800 ÷ 40 ＝ 45 台＋待機 9 台（20%）＝ 54 台になる（概算。**未検証**。E8 の負荷試験で決める）。[capacity.md](capacity.md) の 2.9 節と [infrastructure.md](infrastructure.md) の 4・9 節の台数・費用は、この前提にそろえた（2026-09-26）。
+- **1 ホストあたり約 40 VM とする。** 8.2 節で SMT を無効にすると、m7i.metal-48xl の物理コアは 96 になり、2 vCPU の VM を物理コア 2 つに割り当てると最大 48、ホストの予備を引いて約 40 になる。ピークのホストは 1,800 ÷ 40 ＝ 45 台＋待機 9 台（20%）＝ 54 台になる（概算。`m7i.metal-48xl` が物理 96 コア・192 vCPU・768 GiB であることは [AWS の仕様](https://docs.aws.amazon.com/ec2/latest/instancetypes/gp.html) で確かめた（2026-09-26）。1 台に載る VM の数は **未検証** で、E8 の負荷試験で決める）。[capacity.md](capacity.md) の 2.9 節と [infrastructure.md](infrastructure.md) の 4・9 節の台数・費用は、この前提にそろえた（2026-09-26）。
 - vCPU を物理コアではなくハイパースレッドの単位で割り当てる（SMT を有効にする）案は、サイドチャネルの危険と引き換えになる。採らない（ADR-0023）。
-- 増やすときは、Auto Scaling グループで metal のホストを足す。metal の起動には分の単位の時間がかかる（**未検証**）ので、待機中の VM の余裕と、ホストの余裕の 2 段で吸収する。
-- 需要が読めない分は、S2 で、入れ子の仮想化に対応した仮想のインスタンス（C8i・M8i・R8i。2026-02 から対応。[AWS の告知](https://aws.amazon.com/about-aws/whats-new/2026/02/amazon-ec2-nested-virtualization-on-virtual)）を、あふれた分の受け皿として評価する。性能と隔離の性質は **未検証**。
+- 増やすときは、Auto Scaling グループで metal のホストを足す。metal の起動には分の単位の時間がかかる（AWS は起動の開始まで「通常 10 分未満」とだけ書く。[Amazon EC2 FAQs](https://aws.amazon.com/ec2/faqs/)。metal の値は **未検証** で、E8 で測る）ので、待機中の VM の余裕と、ホストの余裕の 2 段で吸収する。
+- 需要が読めない分は、S2 で、入れ子の仮想化に対応した仮想のインスタンス（2026-02 に C8i・M8i・R8i から始まり、2026-06 の時点で M7i・C7i・R7i・X8i・I7i なども対応。[AWS の告知](https://aws.amazon.com/about-aws/whats-new/2026/02/amazon-ec2-nested-virtualization-on-virtual)、[対応するインスタンス](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html)、2026-09-26 に確認）を、あふれた分の受け皿として評価する。Firecracker は入れ子の仮想化を検証済みの基盤に挙げていない（[README](https://github.com/firecracker-microvm/firecracker/blob/main/README.md)）ので、性能と隔離の性質は **未検証** とし、S2 の前に PoC で確かめる。
 
 ## 9. ランナーのプロトコル
 
@@ -342,12 +342,12 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 - **接続は、ランナーからの外向きの HTTPS だけにする。** 本家のセルフホストのランナーと同じく、50 秒の long poll でジョブを待つ（本家の記述：[Communicating with self-hosted runners（GHES 3.16）](https://docs.github.com/en/enterprise-server@3.16/actions/hosting-your-own-runners/managing-self-hosted-runners/communicating-with-self-hosted-runners)）。ホストされたランナーも同じプロトコルを使い、経路を 1 つにする。
 - Broker は長時間の接続を多数持つので Go で作り、状態を持たない（long poll の相手は DB と Valkey で探す）。水平に増やせる。
 - ジョブのメッセージの中身：ステップ（解決済みのアクションの SHA と、取得のための署名付き URL）、式の評価に要る文脈、シークレット、`<BRAND>_TOKEN`、ジョブトークン、キャッシュ・成果物の範囲、タイムアウト。
-- 取り消し（`cancel-in-progress`、利用者の取り消し）は、心拍の応答で伝える。ランナーはすぐに止め始め、猶予（初期値 5 分）を過ぎたらホストされたランナーでは VM ごと壊す（本家の取り消しの猶予は **未検証**）。
+- 取り消し（`cancel-in-progress`、利用者の取り消し）は、心拍の応答で伝える。ランナーはすぐに止め始め、猶予（5 分）を過ぎたらホストされたランナーでは VM ごと壊す。本家も、ランナーは SIGINT を送って 7.5 秒、SIGTERM を送って 2.5 秒待ってからプロセスを止め、5 分の取り消しの期限を過ぎたらサーバーが強制的に終える（[Workflow cancellation](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-cancellation)、2026-09-26 に確認）。ランナーの側の手順は本家に合わせる。
 
 ### 9.2 ランナーのエージェント
 
 - **本家の [actions/runner](https://github.com/actions/runner)（MIT ライセンス）を fork して使うことを第一候補にする。** アクションの実行（JavaScript・Docker・composite）、式、ログのマスクの互換性を、自前で作り直すより確実に得られる。
-- サーバーとのプロトコルは、上の自前の API に合わせて fork の側を書き換える。本家のサーバー側のプロトコルは公開の仕様がない（**未検証**）ので、互換にすることは目標にしない。
+- サーバーとのプロトコルは、上の自前の API に合わせて fork の側を書き換える。本家のサーバー側のプロトコルは公開の仕様がない（docs.github.com に記述がない。互換を目標にしないので確かめない）ので、互換にすることは目標にしない。
 - ランナーの側で、シークレットの値（と、登録された派生の値。`::add-mask::`）を、ログに出す前に `***` に置き換える。
 
 ### 9.3 マスクの二重の確認
@@ -366,7 +366,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
   - **ライブ表示**：Valkey のジョブごとのストリーム（`XADD`、直近 10,000 行、TTL 1 時間）。ブラウザは SSE で購読する。購読の前に `can(actor, read, repo)` を通す。
   - **確定**：ステップごとに 1 MB ごとのブロックにまとめ、S3 に置く。ジョブの完了時に、ステップごとの 1 つのオブジェクトに結合する。
 - S3 のキー：`logs/{repo_id}/{run_id}/{job_id}/{attempt}/{step}.log.zst`。
-- 1 ジョブのログの上限を置く（本家の値は **未検証**。初期値 64 MB、超えたら切り詰めて注記する）。
+- 1 ジョブのログの上限を置く（初期値 64 MB、超えたら切り詰めて注記する）。本家はジョブのログの上限を公開していない（[Actions limits](https://docs.github.com/en/actions/reference/limits) に記載がない。2026-09-26 に確認。**未検証**）ので、本システムの値とし、E8 の実測で見直す。
 - 保持は、成果物と同じ設定（10.3 節）に従う。
 
 ### 10.2 キャッシュ
@@ -399,14 +399,14 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 - 登録は、短命の登録のトークン（1 時間）か、JIT の構成（1 回だけ使える、特定のジョブに限らない単発のランナーの構成）で行う。API の形は本家に合わせる（[Self-hosted runners reference](https://docs.github.com/en/actions/reference/runners/self-hosted-runners)）。
 - 登録の単位はリポジトリ・Organization。Organization ではランナーのグループを持ち、使えるリポジトリ・ワークフローを制限する。
 - **エフェメラル（1 ジョブで登録を外す）を推奨する。** 本家も、自動で増減させるなら永続のランナーではなくエフェメラルを推奨している（同ページ）。
-- **公開リポジトリでのセルフホストのランナーは既定で使えなくする。** 本家は「公開リポジトリではほぼ使うべきでない」としている（[Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)）。ランナーのグループの設定で明示的に許したときだけ使える（本家のグループの既定値は **未検証**）。
+- **公開リポジトリでのセルフホストのランナーは既定で使えなくする。** 本家は「公開リポジトリではほぼ使うべきでない」としている（[Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)）。ランナーのグループの設定で明示的に許したときだけ使える（本家のグループも、既定では非公開のリポジトリだけが使える。[Managing access to self-hosted runners](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/manage-access)、2026-09-26 に確認）。
 - 14 日接続のない永続のランナー、1 日接続のないエフェメラルのランナーは、登録を消す（本家と同じ）。登録の速さの上限は、リポジトリ・Organization あたり 5 分に 1,500 台。
 - セルフホストのランナーのジョブにも、シークレットと `<BRAND>_TOKEN` は同じ規則で渡す。ランナーの機械の中のことは、利用者の責任とする。
 - 自動で増減させる仕組み（本家の Actions Runner Controller に相当）は MVP の外。`workflow_job` の Webhook と JIT の構成の API で、利用者が作れるようにする。
 
 ## 12. アクションの解決と固定
 
-- `uses: owner/repo@ref`（と `owner/repo/path@ref`）は、ジョブを配る直前に Scheduler が、そのリポジトリの ref を SHA に解決する。解決した SHA をジョブの記録（`job_action_resolutions`）に残し、再実行でも同じ SHA を使う（**本家が再実行で SHA を固定するかは未検証**。再現性のためにこちらでは固定する）。
+- `uses: owner/repo@ref`（と `owner/repo/path@ref`）は、ジョブを配る直前に Scheduler が、そのリポジトリの ref を SHA に解決する。解決した SHA をジョブの記録（`job_action_resolutions`）に残し、再実行でも同じ SHA を使う（本家の再実行は、同じ `GITHUB_SHA`・`GITHUB_REF` を使う（[Re-running workflows and jobs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)、2026-09-26 に確認）が、`uses:` のアクションの ref を解決し直すかは書かれていない（**未検証**）。再現性のためにこちらでは固定する）。
 - 取得は、SHA ごとのアーカイブを S3 にキャッシュし（`actions/{repo_id}/{sha}.tar.gz`）、ランナーには署名付き URL で渡す。非公開のリポジトリのアクションは、呼ぶ側のリポジトリに読む権限があるとき（`can()` と、アクセスの設定）だけ解決する。
 - ポリシー（本家に合わせる。[2025-08 の変更](https://github.blog/changelog/2025-08-15-github-actions-policy-now-supports-blocking-and-sha-pinning-actions/)）：
   - 使えるアクション：すべて / 持ち主のものだけ / 許可の一覧。遮断の一覧も持てる。
@@ -434,7 +434,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 ## 14. 課金の分の記録
 
 - 非公開のリポジトリのホストされたランナーの利用を、ジョブごとに分の単位で記録し、持ち主に課金する（本家と同じく、実行した人ではなく持ち主に付ける）。
-- 分の数え方：ジョブの開始から完了まで。1 分未満の切り上げの方法は本家に合わせる（ジョブごとに分へ切り上げると理解しているが **未検証**）。環境の待ち時間は数えない。
+- 分の数え方：ジョブの開始から完了まで。1 分未満は、本家と同じくジョブごとに分へ切り上げる（[Actions runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing)、2026-09-26 に確認）。環境の待ち時間は数えない。
 - 成果物とキャッシュの保存量は、1 時間ごとの GB で積算する（本家の方式。キャッシュは成果物と別の枠で、リポジトリあたり 10 GB）。
 - 記録は `actions_usage`（追記だけ）に持ち、月の集計は別のバッチで行う。課金の仕組みそのものは MVP の外の Epic と接続する。
 
@@ -500,12 +500,16 @@ actions_usage (owner_id, repo_id, job_id, runner_sku, billable_ms, recorded_at)
 
 トレースは、イベントの受け取り → 実行の作成 → キュー → 割り当て → 完了 → チェックの更新 を 1 つのトレースにつなぐ（[observability.md](observability.md)）。
 
-## 18. 決定（2026-09-26、既定案）
+## 18. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - **ランナーのエージェントは actions/runner（MIT）を fork して使う**（9.2 節の第一候補）。本家の追従は、アクションの実行・式・マスクの部分に限って四半期ごとに取り込む。サーバーとのプロトコルは自前にする。fork でも、環境変数・パスの名前は ADR-0006 で置き換える。
-- **標準のランナーの大きさ**は、S1 では公開・非公開とも 2 vCPU・8 GiB にする（本家は公開リポジトリに大きなものを与えていると理解しているが、容量の計画を単純にするため。本家との違い）。
+- **標準のランナーの大きさ**は、S1 では公開・非公開とも 2 vCPU・8 GiB にする（本家は公開リポジトリに 4 CPU・16 GB を与えている（8 節、2026-09-26 に確認）が、容量の計画を単純にするため。本家との違い）。
 - **課金**：非公開のリポジトリの分の記録（14 節）だけを MVP で持ち、プランと無料の枠は MVP の後の課金の Epic で決める。公開リポジトリのホストされたランナーは無料にする（本家と同じ）。
-- 検証していない本家の値（OIDC のトークンの有効期限、分の切り上げ、取り消しの猶予、ランナーのグループの公開リポジトリの既定、fork の PR の承認の既定、1 ジョブのログの上限、再実行でのアクションの SHA の固定）は、本文の初期値で作り、E8 の着手前に本家の文書で確かめて、違えば合わせる。
+- 本家の値の確認（2026-09-26）：分の切り上げ、取り消しの猶予、ランナーのグループの公開リポジトリの既定、fork の PR の承認の既定は本家の文書で確かめ、本文の値と一致した。OIDC のトークンの有効期限は文書の例（5 分）と一致した。1 ジョブのログの上限と、再実行でのアクションの SHA の固定は、本家が公開していないので本システムの値のまま作る。
 
 持ち越し（計測・PoC で決めるもの）：
 

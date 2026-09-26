@@ -38,7 +38,7 @@
 | ファイルの大きさ | 350 KiB を超えるものは除く |
 | 行の長さ | 1,024 文字を超える行は切り詰める。4,096 バイトを超える行を 2 行以上持つファイルは除く |
 | 種類 | 空のファイル、バイナリ、UTF-8 でないファイル、vendored と生成されたコードは除く |
-| fork | 親より star の多い fork だけ索引する（旧コード検索の規則。[Searching in forks](https://docs.github.com/en/enterprise-server@3.5/search-github/searching-on-github/searching-in-forks)。新しいコード検索での扱いは未検証） |
+| fork | 親より star の多い fork だけ索引する（旧コード検索の規則。[Searching in forks](https://docs.github.com/en/enterprise-server@3.5/search-github/searching-on-github/searching-in-forks)。新しいコード検索の文書は「一定の条件を満たす fork は含めうる」とだけ書き、条件を公開していない。[Searching in forks](https://docs.github.com/en/search-github/searching-on-github/searching-in-forks)、2026-09-26 に確認。**未検証**） |
 | アーカイブされたリポジトリ | 索引する（`is:archived` で絞れる） |
 
 - vendored と生成の判定は、Linguist に相当する規則（go-enry）と、`.gitattributes` の `linguist-vendored`・`linguist-generated` で行う。言語の判定も同じ。
@@ -74,7 +74,7 @@ push（デフォルトブランチ）─▶ Git ストレージ ─▶ outbox（
 - 作業は `lease_until` で 1 台だけが取る。`target_commit` が作り終えた `indexed_commit` と違えば、作り直す。古いイベントが来ても、Git の現在の ref を読んで作るので、後退しない。
 - 作り方：
   - 小さなリポジトリ（索引する内容が 100 MiB 未満）は、毎回すべてを作り直す。
-  - 大きなリポジトリは、前の `indexed_commit` との差分から変わったファイルだけを作り直す（Zoekt の差分のシャードの機能を使う想定。機能の成熟度は未検証。使えなければ、大きなリポジトリも全体を作り直し、5 分の目標を例外として扱う）。
+  - 大きなリポジトリは、前の `indexed_commit` との差分から変わったファイルだけを作り直す（Zoekt の差分の索引（`zoekt-git-index -delta`。変わったファイルを古いシャードで墓石にする）を使う。機能があることは [cmd/zoekt-git-index](https://github.com/sourcegraph/zoekt/blob/main/cmd/zoekt-git-index/main.go) で 2026-09-26 に確かめたが、専用の文書がなく、成熟度は **未検証**。E6 の `code-search-zoekt-poc` で確かめる。使えなければ、大きなリポジトリも全体を作り直し、5 分の目標を例外として扱う）。
 - 同じ blob の内容を、リポジトリをまたいで 1 回にする最適化（本家の blob の単位のシャード）は、S2 で検討する。
 - 失敗したジョブは SQS の再試行に任せ、5 回でデッドレターキューへ送る。
 
@@ -109,7 +109,7 @@ push（デフォルトブランチ）─▶ Git ストレージ ─▶ outbox（
 - 検索文字列は 1,000 文字まで。結果は 100 件（5 ページ）まで（本家の文書と同じ）。
 - 正規表現は、Zoekt の方式（リテラルを抜き出して trigram で候補を絞り、候補にだけ正規表現をかける）で評価する。リテラルを抜き出せない正規表現（`/.*/` など）は、`repo:` か `org:` で範囲を絞らない限り 422 で拒否する。
 - `enterprise:`、`license:` は MVP では持たない。
-- コード検索は、ログインを要する（本家の REST API はコード検索に認証を要する。[REST API の検索](https://docs.github.com/en/rest/search/search)。Web での要否は未検証だが、同じにする）。
+- コード検索は、ログインを要する（本家の REST API はコード検索に認証を要する。[REST API の検索](https://docs.github.com/en/rest/search/search)。Web でも、公開のリポジトリを含めてコード検索にはログインが要る。[About GitHub code search](https://docs.github.com/en/search-github/github-code-search/about-github-code-search)、2026-09-26 に確認）。
 
 ### 3.6 クエリの実行
 
@@ -126,7 +126,7 @@ push（デフォルトブランチ）─▶ Git ストレージ ─▶ outbox（
 | 項目 | 値 | 根拠 |
 | --- | --- | --- |
 | 索引するリポジトリ | 100 万（fork の多くを除く） | README の規模の段階 |
-| 1 リポジトリの索引する内容 | 平均 2 MB | 仮定。未検証。S1 の前に実データの分布で測る |
+| 1 リポジトリの索引する内容 | 平均 2 MB | 仮定（**未検証**。文書では確かめられない。E6 の前に実データの分布で測る） |
 | 内容の合計 | 約 2 TB | |
 | 索引の大きさ | 約 7 TB（内容の約 3.5 倍） | Zoekt の設計文書（[design.md](https://github.com/sourcegraph/zoekt/blob/main/doc/design.md)）の「コーパスの約 3 倍、実際のシャードは約 3.5 倍」 |
 | 2 つの複製 | 約 14 TB | |
@@ -156,7 +156,7 @@ readable(u) = { 公開のリポジトリ }
 - `E(u)`・`O(u)`・`R(u)` は、`accessPredicate(u)` が返す条件そのもの。チームで入れるリポジトリは `R(u)` に展開する。持ち主の単位（`O(u)`）にまとめることで、大きな Organization の全リポジトリを ID で列挙しなくて済む。`internal` は E10 で有効になる（それまで `E(u)` は空）。
 - トークン（個人用アクセストークン、App）の場合は、トークンのスコープ・対象のリポジトリで、さらに積（AND）を取る（[identity-and-permissions.md](identity-and-permissions.md)）。
 - ログインしていない人は、公開のリポジトリだけ（コード検索はログインを要する）。
-- **Zoekt**：各シャードに、リポジトリの属性（`repo_id`、`owner_id`、`visibility`、`enterprise_id`）を持たせる。router は上の条件を Zoekt のクエリの木（リポジトリの属性と、リポジトリの ID の集合の条件）に変換する。Zoekt のリポジトリの ID の集合の条件（ビットマップ）の詳細は未検証。使えなければ、`R(u)` をリポジトリ名の集合の条件に置き換える。
+- **Zoekt**：各シャードに、リポジトリの属性（`repo_id`、`owner_id`、`visibility`、`enterprise_id`）を持たせる。router は上の条件を Zoekt のクエリの木（リポジトリの属性と、リポジトリの ID の集合の条件）に変換する。Zoekt は、リポジトリの ID の集合の条件（`query.RepoIDs`。roaring のビットマップ）を持つ（[query/query.go](https://github.com/sourcegraph/zoekt/blob/main/query/query.go)、2026-09-26 に確認）。大きな集合での性能は E6 の `code-search-zoekt-poc` で測る（**未検証**）。使えなければ、`R(u)` をリポジトリ名の集合の条件に置き換える。
 - **OpenSearch**：文書に `repo_id`、`owner_id`、`visibility`、`enterprise_id` を持たせ、`bool.filter` の `should`（いずれか）で表す。`R(u)` の `terms` は既定の上限 65,536 件の内側に収める。超える人（個別に 6 万件以上のリポジトリを読める人）は、`org:` か `repo:` で範囲を絞るよう 422 を返す（本設計の制限）。
 
 ### 4.3 除外の表（権限の属性の変更）
@@ -216,7 +216,7 @@ readable(u) = { 公開のリポジトリ }
 | `language`、`license`、`stars`、`forks`、`size`、`archived`、`is_fork`、`is_template` | 属性 |
 | `created_at`、`pushed_at` | 日時 |
 
-- 解析：英語の語幹化（`english`）のフィールドを関連度に、ICU の分割と CJK の bigram のフィールドを一致の判定に使う。日本語の Issue も部分的に当たるようにする（Slack の Sudachi の方式は、MVP では採らない。検索の品質の指摘が続いたら見直す）。AWS の OpenSearch Service での ICU の利用可否は未検証。
+- 解析：英語の語幹化（`english`）のフィールドを関連度に、ICU の分割と CJK の bigram のフィールドを一致の判定に使う。日本語の Issue も部分的に当たるようにする（Slack の Sudachi の方式は、MVP では採らない。検索の品質の指摘が続いたら見直す）。Amazon OpenSearch Service は ICU Analysis のプラグインを全てのドメインに含む（[Supported plugins](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)、2026-09-26 に確認）。
 
 ### 5.3 索引の更新（NFR-005：Issue・Pull Request は 10 秒以内）
 
@@ -238,7 +238,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 
 | 構文 | 意味 |
 | --- | --- |
-| `is:issue` / `is:pr`、`type:` | 種類（`type:` は Issue の種類にも使う。本家での区別は未検証） |
+| `is:issue` / `is:pr`、`type:` | 種類（本家も `type:` を両方に使う。`type:pr`・`type:issue` は種類、`type:"Bug"` は Issue の種類。[Searching issues and pull requests](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)、[Filtering and searching issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/filtering-and-searching-issues-and-pull-requests)、2026-09-26 に確認） |
 | `is:open` / `is:closed` / `is:merged` / `is:unmerged`、`is:draft`、`is:locked` | 状態 |
 | `reason:completed` / `reason:"not planned"` | 閉じた理由 |
 | `author:`、`assignee:`、`mentions:`、`commenter:`、`involves:`、`reviewed-by:`、`review-requested:` | 人 |
@@ -247,7 +247,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 | `repo:`、`org:`、`user:`、`language:` | 範囲 |
 | `created:`、`updated:`、`closed:`、`merged:`（`>`、`<`、`..`） | 日時 |
 | `review:none` / `required` / `approved` / `changes_requested` | レビューの状態 |
-| `parent-issue:`、`has:sub-issues`（本家の構文の名前は未検証） | sub-issue |
+| `parent-issue:`（本家の Projects の絞り込みにある。[Filtering projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/customizing-views-in-your-project/filtering-projects)、2026-09-26 に確認）、`has:sub-issues`（本家の構文の名前は文書にない。**未検証**） | sub-issue |
 | `-修飾子` | 除外 |
 | `AND` / `OR`、`( )` | 論理演算（本家は Issue の画面で入れ子を許す） |
 
@@ -257,7 +257,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 ### 5.5 ページングと上限
 
 - 1 ページ 30 件（最大 100 件）。結果は 1,000 件まで（本家の REST API と同じ。[REST API の検索](https://docs.github.com/en/rest/search/search)）。深いページは `search_after` で行う。
-- 合計の件数は 1,000 件まで正確に数え、それを超えたら「1,000 件以上」とする（本家の表示の細部は未検証）。
+- 合計の件数は 1,000 件まで正確に数え、それを超えたら「1,000 件以上」とする（本家の API も 1 回の検索で 1,000 件までしか返さない。[REST API の検索](https://docs.github.com/en/rest/search/search)、2026-09-26 に確認。Web の件数の表示の細部は文書にない。**未検証**）。
 - 1 回の検索は 3 秒で打ち切り、`incomplete_results: true` を付けて返す。
 
 ## 6. レート制限
@@ -270,7 +270,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 | API のその他の検索（認証あり） | 1 分に 30 回 |
 | API の検索（認証なし） | 1 分に 10 回（コード検索は不可） |
 | API の検索文字列 | 修飾子を除き 256 文字まで、`AND` / `OR` / `NOT` は 5 個まで |
-| Web のコード検索 | 1 分に 60 回（本設計の値。本家の値は未検証） |
+| Web のコード検索 | 1 分に 60 回（本設計の値。本家は Web のコード検索の頻度の上限を公開していない。2026-09-26 に確認。**未検証**） |
 | Web のその他の検索 | 1 分に 60 回（本設計の値） |
 
 - 計数は API のレート制限の仕組み（[api-and-webhooks.md](api-and-webhooks.md)）で行う。
@@ -290,7 +290,11 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 - 索引の対象の規則（3.1 節）：350 KiB、長い行、バイナリ、UTF-8 以外、vendored。
 - 構文：3.5 節と 5.4 節の各行。リテラルのない正規表現の拒否。
 
-## 9. 決定（2026-09-26、既定案）
+## 9. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - fork の索引の規則は、3.1 節の「親より star の多い fork だけ」で始める。本家の新しいコード検索での扱いを観測できたら合わせる。
 - 利用者・コミットの検索は、MVP の後の候補にする。持つときは OpenSearch に置く（Zoekt は使わない）。

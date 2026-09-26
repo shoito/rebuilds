@@ -29,6 +29,8 @@ AWS の仕様で確かめたこと：
 
 ## Decision
 
+> 2026-09-26 の注記：東京のオンデマンドの料金（Linux）は、`i8g.4xlarge`（16 vCPU・128 GiB・NVMe 3,750 GB）が 1.6128 ドル/時、`m8g.4xlarge`（16 vCPU・64 GiB）が 0.92752 ドル/時、gp3 が 0.096 ドル/GB・月（[On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)、[EBS pricing](https://aws.amazon.com/ebs/pricing/)）。月 730 時間で、`i8g.4xlarge` は約 1,177 ドル、`m8g.4xlarge` と gp3 3,750 GB は約 677 ＋ 360 ＝ 1,037 ドルで、差は約 14%（しかも `m8g` はメモリが半分で、gp3 の既定の 3,000 IOPS・125 MB/秒は NVMe に遠く及ばず、IOPS と帯域の追加で差はさらに縮む）。「費用はおおむね同じ」は確かめられた。下の「東京の料金での比較は未検証」は解消した。
+
 1 を採用する。
 
 - **耐久性は、ディスクではなく複製で持つ。** ADR-0003 の 3 つの複製（異なる AZ）と、大阪の S3 へのバックアップ（[ADR-0032](0032-disaster-recovery-strategy.md)）があれば、1 台の NVMe の喪失はデータの喪失にならない。EBS を使っても、AZ の障害には複製が要ることは変わらない。EBS の耐久性に払う費用は、3 つの複製と二重になる。

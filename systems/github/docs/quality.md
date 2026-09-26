@@ -80,9 +80,9 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | --- | --- |
 | 権限（[identity-and-permissions.md](architecture/identity-and-permissions.md)） | 5.3（ロール × 操作）・5.4（資格情報の上限）・5.5（代表の組み合わせ）・6 節（fork）の決定表の表駆動テスト。性質：`accessPredicate` = `can`、`filterActorsCanRead(actors, a, R)` = `{x | can(x, a, R)}`、`canMany` = 個別の `can`、許可 ⊆ ロール ∩ 資格情報の上限、読めなければ常に 404、剥奪の後に世代の更新を経て許可が返らない。取り消したトークンが 30 秒以内に拒否される |
 | Git ストレージ（[git-storage.md](architecture/git-storage.md)、ADR-0003・0006） | **push の手順の 1〜4 の各時点**で複製のノード・coordinator を止めても、成功を返した push が失われず、修復後に 3 つのチェックサムが DB と一致する。同じリポジトリの並行な push で、`version` の順・outbox の順・ref の最終の状態が一致する。修復の途中でさらに 1 台を失っても、読み取りが続き push は失敗を返す。**複製のチェックサムの性質**：任意の ref の更新の列で、差分で計算したチェックサム ＝ ref の一覧から計算し直した値 |
-| fork のネットワーク（ADR-0007） | 非公開のネットワークで、読めないリポジトリの経路から他のリポジトリの objects が読めない。公開の種類の変更の後、公開のネットワークに非公開のリポジトリだけから到達できる objects がない。任意の fork・削除・復元の列で、残るリポジトリから到達できる objects が消えない。**プロトコル v2 の `fetch` で、広告していないハッシュ（fork の ref にしかないコミット）を元のリポジトリの経路から `want` したときの振る舞い**（2.2.2 節の LEAK-GIT-02。**未検証**） |
+| fork のネットワーク（ADR-0007） | 非公開のネットワークで、読めないリポジトリの経路から他のリポジトリの objects が読めない。公開の種類の変更の後、公開のネットワークに非公開のリポジトリだけから到達できる objects がない。任意の fork・削除・復元の列で、残るリポジトリから到達できる objects が消えない。**プロトコル v2 の `fetch` で、広告していないハッシュ（fork の ref にしかないコミット）を元のリポジトリの経路から `want` したときの振る舞い**（2.2.2 節の LEAK-GIT-02。v2 は検査しないことを 2026-09-26 に確認。非公開のネットワークの扱いは E3 で確定） |
 | Git のプロトコル（[git-protocols.md](architecture/git-protocols.md)） | Git のクライアントの互換のマトリクス。HTTPS でアカウントのパスワードを拒否する。policy のサービスが落ちたら保護の対象の ref への push を拒否する。LFS：別のネットワークの oid で `upload` の省略が起きない、S3 にない oid の pointer を含む push を拒否する。パックのキャッシュを権限のない要求が読めない。bundle-uri の clone が通常の clone と同じ ref・objects になる |
-| Pull Request（[pull-requests.md](architecture/pull-requests.md)、ADR-0010） | **`MergeTree` の結果（tree の ID と衝突の有無）が、手元の `git merge` の結果と一致する**（無作為のリポジトリの組での性質ベーステスト）。マージの比較交換で二重のマージが起きない。古い承認の取り消しの指紋。CODEOWNERS の「後の一致が優先」と base のブランチの CODEOWNERS を使うこと |
+| Pull Request（[pull-requests.md](architecture/pull-requests.md)、ADR-0010） | **`MergeTree` の結果（tree の ID と衝突の有無）が、手元の `git merge` の結果と一致する**（無作為のリポジトリの組での性質ベーステスト）。マージの比較交換で二重のマージが起きない。古い承認の取り消しの指紋と、merge base の変更での取り消し。CODEOWNERS の「後の一致が優先」と base のブランチの CODEOWNERS を使うこと |
 | ruleset・merge queue（ADR-0011・0012） | **ruleset の決定表**：ruleset の組み合わせ（複数・Organization とリポジトリ・`active` と `evaluate`）× 主体（バイパスの有無・モード）× 操作（作成・更新・force push・削除・3 つの方式のマージ・キューへの追加）の許否が、push と API の両方で同じ。性質：`active` の規則を満たさない更新がバイパスの記録なしに Git に入らない。base が指す SHA は、必須のチェックが通った SHA かバイパスの push に限られる。ruleset の読み取りを失敗させると拒否（fail closed） |
 | Web（[web.md](architecture/web.md)、ADR-0013・0035） | **XSS の性質**：生成した悪意ある Markdown・HTML（イベントの属性、`javascript:`、`<svg>`、DOM clobbering、変異 XSS）の描画結果に実行可能な要素と属性がない。悪意ある SVG・HTML・ノートブックを各経路で開いても、アプリのオリジンで JavaScript が動かず Cookie が読めない。CSP と利用者の内容のドメインのヘッダーの検査。JavaScript なしで公開リポジトリが読める。ストリームを始める前に権限の判定が済んでいる。axe で違反 0。訳の抜けの検査（英語・日本語） |
 | Issue（[issues.md](architecture/issues.md)、ADR-0017） | 番号の性質（並行な作成で重複と失敗による欠番がない）。12 節の権限の決定表。非公開のリポジトリからの `cross-referenced`、非公開の sub-issue、移動の元が、読めない人のタイムライン・件数・進み具合に出ない |
@@ -101,7 +101,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | ID | 経路 | 確かめること | 状態 |
 | --- | --- | --- | --- |
 | LEAK-GIT-01 | Git の `upload-pack`（v0・v1・v2） | `u` の clone・fetch・`ls-refs` が 404。存在を漏らさない | 設計済み |
-| LEAK-GIT-02 | Git の v2 の `fetch` の広告していない `want` | `F` の ref にしかないコミットの SHA を、`P` の経路から `want` しても objects が返らない（`uploadpack.allowAnySHA1InWant` の無効、alternates の先の ref を広告しない） | **未検証**（下の PoC） |
+| LEAK-GIT-02 | Git の v2 の `fetch` の広告していない `want` | 公開のネットワーク：`F` の ref にしかないコミットが `P` の経路から `want` で返ることを、本家と同じ仕様として固定する。非公開のネットワーク：E3 の決定に従う（検査すると決めたら、objects が返らない）。どちらも、alternates の先の ref を広告しない | E3 で確定（v2 の振る舞いは 2026-09-26 に確認。下の PoC） |
 | LEAK-GIT-03 | パックのキャッシュ・bundle | 非公開のリポジトリのキャッシュを、別のリポジトリ・権限のない要求が読めない。非公開には bundle-uri を出さない | 設計済み |
 | LEAK-GIT-04 | LFS | 別のネットワークの oid で、読み取りも `upload` の省略も起きない | 設計済み |
 | LEAK-WEB-01 | Web・生のファイル・添付 | `u` にはすべて 404。署名付き URL は他のパス・リポジトリに使えず、5 分で切れる | 設計済み |
@@ -120,8 +120,9 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 2. `P` の経路で、プロトコル v2 の `fetch` の要求を手で組み立て、`want c` を送る。`shallow`・`deepen`・`filter`・`want-ref` との組み合わせ、`not our ref` の後に別の複製で再試行する経路（[git-protocols.md](architecture/git-protocols.md) の 4 節）も試す。
 3. v0・v1（`upload-pack` の従来の交渉）でも同じことを試す。
 4. Git の本体の対象の版（ストレージで使う版と、その前後の minor）ごとに結果を記録する。
-5. 期待：objects が返らない。返る版・組み合わせがあれば、`gitd` の側で `want` を ref からの到達可能性で検査する処理を足す（費用を測る）。
-6. 結果で LEAK-GIT-02 を「設計済み」にし、PR の CI の漏洩テストと、Git の互換のマトリクスに入れる。本家の振る舞いも、公開のリポジトリで観測して記録する。
+5. 期待（2026-09-26 に Git の文書と `upload-pack.c` で確認）：v0・v1 は `not our ref` で拒否し、v2 は objects を返す。版ごとの結果を記録する。
+6. `gitd` の側で v2 の `want` を ref からの到達可能性で検査する処理を試作し、費用（CPU・遅延、ref の多いリポジトリ）を測る。結果を E3 の `fork-network-reachability-check` に渡す。
+7. E3 の決定で LEAK-GIT-02 を「設計済み」にし、PR の CI の漏洩テストと、Git の互換のマトリクスに入れる。本家の振る舞いも、公開のリポジトリで観測して記録する。
 
 ### 2.3 エージェントの確認ループ
 

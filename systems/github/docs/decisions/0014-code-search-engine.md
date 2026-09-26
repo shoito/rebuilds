@@ -31,6 +31,8 @@ B. PostgreSQL の全文検索で始め、規模に応じて OpenSearch へ移る
 
 ## Decision
 
+> 2026-09-26 の注記：Zoekt は、差分の索引（`zoekt-git-index` の `-delta`。変わったファイルを古いシャードで墓石にする）と、リポジトリの ID の集合の条件（`query.RepoIDs`。roaring のビットマップ）を持つ（[cmd/zoekt-git-index/main.go](https://github.com/sourcegraph/zoekt/blob/main/cmd/zoekt-git-index/main.go)、[query/query.go](https://github.com/sourcegraph/zoekt/blob/main/query/query.go)）。機能があることは確かめた。専用の文書はなく、本設計の規模で耐えるかは、引き続き E6 の `code-search-zoekt-poc` で確かめる。
+
 コード検索は 1、Issue・Pull Request・リポジトリの検索は A を採用する。詳細は [search.md](../architecture/search.md) にある。
 
 ### コード検索：Zoekt

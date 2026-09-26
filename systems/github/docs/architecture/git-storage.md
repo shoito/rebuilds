@@ -208,8 +208,11 @@ objects がネットワークで共有されるので、次のことが起きる
 
 - **公開と非公開をネットワークで混ぜない。** 非公開のリポジトリの fork は非公開で、同じネットワークにある。公開のリポジトリを非公開にしたら、公開の fork は別のネットワークに分ける。非公開を公開にしたら、非公開の fork は別のネットワークに分ける（本家の About forks と同じ）。分けるときは、新しいネットワークに `network.git` を作り、必要な objects をコピーする。コピーが終わるまで、公開の種類の変更を完了にしない。
 - **非公開のネットワークの中の読み取りは、リポジトリごとに判定する。** 同じネットワークでも、あるリポジトリに読み取りの権限がなければ、そのリポジトリの経路からは何も返さない（ADR-0002）。
-- **`upload-pack` は、そのリポジトリの ref から到達できる objects だけを返す設定にする**（`uploadpack.allowAnySHA1InWant` を無効にする。[git-config](https://git-scm.com/docs/git-config)）。alternates の先の `network.git` の ref は、そのリポジトリの ref として広告しない。
-  - プロトコル v2 の `fetch` で、広告していないハッシュの `want` をどこまで検査するかは **未検証**。E1 で、fork の ref にしかないコミットを元のリポジトリの経路から `want` するテストを作り、Git の版ごとの振る舞いを確かめる。本家は Web でこの種のコミットを表示するので、Git の経路で返すかどうかは本家の振る舞いも合わせて確かめる。
+- **`upload-pack` の `want` の検査は、プロトコルの版で違う（2026-09-26 に確認）。** v0・v1 の交渉では、`uploadpack.allowTipSHA1InWant`・`allowReachableSHA1InWant`・`allowAnySHA1InWant` の設定に従って、広告していない `want` を検査する（既定はいずれも無効。[git-config](https://git-scm.com/docs/git-config#Documentation/git-config.txt-uploadpackallowAnySHA1InWant)）。一方、**v2 の `fetch` は、`want` を広告した objects に限らない**（[gitprotocol-v2](https://git-scm.com/docs/gitprotocol-v2) の「Wants can be anything and are not limited to advertised objects」）。Git の本体の `upload-pack.c` の v2 の処理は、objects が object store（alternates の先を含む）にあるかだけを見る（[upload-pack.c](https://github.com/git/git/blob/master/upload-pack.c)）。したがって、**`network.git` を共有する限り、v2 では、ネットワークのどのリポジトリの経路からも、ネットワークの全ての objects を SHA で取得できる。**
+  - 本家も「ネットワークのどのリポジトリに push したコミットも、上流を含むネットワークの他のリポジトリから到達できうる」と文書にしている（[About permissions and visibility of forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-permissions-and-visibility-of-forks)、2026-09-26 に確認）。
+  - **公開のネットワーク**：本家と同じく仕様として受け入れる。Web・API の SHA の参照（LEAK-WEB-02）と同じ扱いにする。
+  - **非公開のネットワーク**：Web・API と同じく、既定の方向は「検査する」（[identity-and-permissions.md](identity-and-permissions.md) の 14 節）。検査するときは、`gitd` が v2 の `want` を、要求したリポジトリの ref からの到達可能性で検査する（v0 の `allowReachableSHA1InWant` の無効に相当する処理を、v2 に自前で足す。Git の本体の設定だけでは実現できない）。E1 の `fork-network-want-poc` で v0・v1・v2 の実際の振る舞いを結合テストに固定し、検査の費用を測る。E3 の `fork-network-reachability-check` で Web・API と合わせて決め、ADR-0007 を改める ADR を起票する。一般公開（E9）までに決着させる。
+  - alternates の先の `network.git` の ref（`refs/networks/*`）は、そのリポジトリの ref として広告しない（v2 の `ls-refs` はリポジトリ自身の ref だけを返す）。
 - 秘密情報を push してしまった場合の完全な消去は、本家と同じく運用の手順で行う（11.3 節）。
 
 ### 7.3 大きなネットワーク
@@ -239,7 +242,7 @@ objects がネットワークで共有されるので、次のことが起きる
 ### 8.2 reftable
 
 - Git 2.45 から、ref を少数の表のファイルに持つ reftable の形式を選べる（[Highlights from Git 2.45](https://github.blog/open-source/git/highlights-from-git-2-45/)）。ref が非常に多いリポジトリ（`network.git` は、全ての fork の ref を持つ）で、読み書きが速くなる見込みがある。
-- S1 は既定の files の形式で始める。reftable は、`network.git` と ref の多いリポジトリで E3 に PoC を行い、`update-ref --stdin` のトランザクション、チェックサムの計算、修復の手順がそのまま動くか、性能がどれだけ変わるかを確かめてから決める（**未検証**）。本家がどちらを使っているかは、公開情報では確かめられていない。
+- S1 は既定の files の形式で始める。reftable は、`network.git` と ref の多いリポジトリで E3 に PoC を行い、`update-ref --stdin` のトランザクション、チェックサムの計算、修復の手順がそのまま動くか、性能がどれだけ変わるかを確かめてから決める（**未検証**。この設計の使い方での動作と性能は PoC でしか確かめられない）。Git は 3.0 で reftable を既定にする計画である（[BreakingChanges](https://git-scm.com/docs/BreakingChanges)、2026-09-26 に確認。2.56 の時点で未リリース）。3.0 に上げる前に、この PoC で決着させる。本家がどちらを使っているかは、公開情報では確かめられない。
 
 ## 9. バックアップ
 
@@ -354,7 +357,7 @@ objects がネットワークで共有されるので、次のことが起きる
 | 事項 | 確かめ方 | 時期 |
 | --- | --- | --- |
 | `i8g.4xlarge` での clone・push・repack の性能 | 代表的なリポジトリの負荷試験（[capacity.md](capacity.md)） | E1 |
-| v2 の `fetch` で、広告していないハッシュの `want` の検査（fork の objects の漏れ） | 結合テスト。Git の版ごとに確かめる | E1 |
+| ~~v2 の `fetch` で、広告していないハッシュの `want` の検査~~ | 2026-09-26 に確認：v2 は広告していない `want` も、object store（alternates を含む）にあれば返す（7.2 節）。非公開のネットワークでの検査の費用は E1 の PoC で測る | E1・E3 |
 | reftable の採用 | `network.git` と ref の多いリポジトリで PoC | E3 |
-| 本家のバックアップと、reftable の利用 | 公開情報では確かめられない。本家に寄せず、この設計の判断として扱う | — |
+| 本家のバックアップと、reftable の利用 | 公開情報では確かめられない（2026-09-26 に docs.github.com と GitHub のブログを確認）。本家に寄せず、この設計の判断として扱う | — |
 | cruft の猶予の 2 週間、修復の同時数の上限 | 負荷試験と運用の実績で見直す | E3・E9 |

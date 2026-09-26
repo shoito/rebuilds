@@ -70,22 +70,22 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | SLO の速いバーンレート、合成監視の連続失敗、合意なしの成功、権限の合成監視の失敗 | [incident-response.md](incident-response.md) | 作成済み |
 | デプロイ中の自動ロールバック、ストレージの列車の自動停止、デプロイ後の悪化 | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み |
 | AZ・リージョンの障害、複製が 1 つ以下のリポジトリ、DB の論理的な破損 | [disaster-recovery.md](disaster-recovery.md) | 作成済み |
-| 修復の待ちの最古が 2 時間超、複製の不足、ストレージのノードの喪失・退役の予定 | `replica-repair.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E3 で作成 |
-| 1 つのリポジトリの負荷の偏り、上限への到達 | `hot-repository.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E3 で作成 |
-| バックアップの遅れ p99 が 12 分超、復元の確認の不一致 | `backup-lag.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E3 で作成 |
-| 削除したリポジトリの復元の依頼、fork のネットワークに属するリポジトリの復元（運用者の作業） | `repository-restore.md`（削除の再適用を含む） | E3 で作成 |
-| SSH のホスト鍵・コミットの署名鍵の漏洩・入れ替え | `host-key-rotation.md` | E3 で作成（四半期に staging で演習） |
-| マージの失敗が続く、キューが進まない、グループの作り直しの多発 | `merge-queue-stuck.md` | E4 で作成 |
-| メールのバウンス率 2%・苦情率 0.05% 超、SES の送信の停止 | `email-bounce.md` | E5 で作成 |
-| `search_index_lag` の p99 10 秒超、`code_index_lag` の p95 5 分超、`search_exclusions` の 15 分超の残り | `index-lag.md` | E6 で作成 |
-| トークンの漏洩（1 件・大量・App の秘密鍵）、一斉の失効 | `token-leak.md`（4-eyes の承認を含む） | E7 で作成 |
-| Webhook の配信の滞留、宛先ごとの失敗の急増、egress の拒否の急増 | `webhook-backlog.md` | E7 で作成 |
-| 副の制限の急増、特定の主体の過剰な利用 | `api-abuse.md` | E7 で作成 |
-| 待機中の VM が 0、キューの時間の悪化、metal のホストの在庫の不足 | `runner-capacity.md` | E8 で作成 |
-| 採掘の検知、持ち主の Actions の一時停止、誤検知の申し立て | `crypto-mining.md` | E8 で作成 |
-| OIDC の署名の鍵の入れ替え（90 日）、JWKS の取得の失敗 | `oidc-key-rotation.md` | E8 で作成 |
-| セキュリティインシデント（権限の漏洩、隔離の破れ、依存の脆弱性の緊急の修正）。個人情報保護委員会への報告を含む | `security-incident.md` | E9 で作成 |
-| 削除の処理の遅れ・失敗、リーガルホールド、秘密情報の完全な消去の依頼 | `data-deletion.md`（[git-storage.md](../architecture/git-storage.md) の 11.3 節の消去を含む） | E9 で作成 |
+| 修復の待ちの最古が 2 時間超、複製の不足、ストレージのノードの喪失・退役の予定 | `replica-repair.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E3 の `replica-repair` で作成 |
+| 1 つのリポジトリの負荷の偏り、上限への到達 | `hot-repository.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E9 の `hot-repository-detection` で作成（E3 で暫定） |
+| バックアップの遅れ p99 が 12 分超、復元の確認の不一致 | `backup-lag.md`（現在は [incident-response.md](incident-response.md) の該当の節） | E3 の `git-backup-osaka` で作成 |
+| 削除したリポジトリの復元の依頼、fork のネットワークに属するリポジトリの復元（運用者の作業） | `repository-restore.md`（削除の再適用を含む） | E3 の `repository-delete-and-restore` で作成 |
+| SSH のホスト鍵・コミットの署名鍵の漏洩・入れ替え | `host-key-rotation.md` | E1 の `git-frontend-https-ssh` で作成（四半期に staging で演習） |
+| マージの失敗が続く、キューが進まない、グループの作り直しの多発 | `merge-queue-stuck.md` | E4 の `merge-queue` で作成 |
+| メールのバウンス率 2%・苦情率 0.05% 超、SES の送信の停止 | `email-bounce.md` | E5 の `email-bounce-handling` で作成 |
+| `search_index_lag` の p99 10 秒超、`code_index_lag` の p95 5 分超、`search_exclusions` の 15 分超の残り | `index-lag.md` | E6 の `search-exclusions` で作成 |
+| トークンの漏洩（1 件・大量・App の秘密鍵）、一斉の失効 | `token-leak.md`（4-eyes の承認を含む） | E7 の `token-leak-revocation` で作成 |
+| Webhook の配信の滞留、宛先ごとの失敗の急増、egress の拒否の急増 | `webhook-backlog.md` | E7 の `webhook-retries-and-redelivery` で作成 |
+| 副の制限の急増、特定の主体の過剰な利用 | `api-abuse.md` | E7 の `rate-limits` で作成 |
+| 待機中の VM が 0、キューの時間の悪化、metal のホストの在庫の不足 | `runner-capacity.md` | E8 の `runner-fleet-manager` で作成 |
+| 採掘の検知、持ち主の Actions の一時停止、誤検知の申し立て | `crypto-mining.md` | E8 の `actions-abuse-detection` で作成 |
+| OIDC の署名の鍵の入れ替え（90 日）、JWKS の取得の失敗 | `oidc-key-rotation.md` | E8 の `oidc-issuer` で作成 |
+| セキュリティインシデント（権限の漏洩、隔離の破れ、依存の脆弱性の緊急の修正）。個人情報保護委員会への報告を含む | `security-incident.md` | E9 の `runbooks-completion` で作成 |
+| 削除の処理の遅れ・失敗、リーガルホールド、秘密情報の完全な消去の依頼 | `data-deletion.md`（[git-storage.md](../architecture/git-storage.md) の 11.3 節の消去を含む） | E9 の `data-deletion-jobs` で作成 |
 
 ## 5. 定期作業と訓練
 
@@ -98,7 +98,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | AZ の分断 | 四半期（staging） | 同上 |
 | 大阪への切り替え | 四半期（staging）、年 1 回（prod のバックアップの 20% を大阪へ復元） | 同上 |
 | 削除したリポジトリの復元（削除の再適用を含む） | 四半期 | `repository-restore.md`（E3） |
-| SSH のホスト鍵の入れ替えの演習 | 四半期（staging） | `host-key-rotation.md`（E3） |
+| SSH のホスト鍵の入れ替えの演習 | 四半期（staging） | `host-key-rotation.md`（E1） |
 | Actions の隔離の演習（VM からの脱出、内部への到達） | 四半期、実行環境の変更時 | [security.md](../architecture/security.md) の 11 節 |
 | 外部の CI からの緊急のデプロイの経路の確認 | 四半期 | [delivery.md](../architecture/delivery.md) の 6.2 節 |
 | キャパシティの見直し（充填率 55% でノードの追加を始める） | 月次 | [capacity.md](../architecture/capacity.md) の 5 節 |

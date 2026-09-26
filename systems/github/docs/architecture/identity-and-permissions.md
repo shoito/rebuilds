@@ -32,11 +32,11 @@ REST・GraphQL ─ Bearer トークン ─────────┴─▶ 主�
 | --- | --- | --- |
 | ユーザー | ○ | 人間。ログインを持つ。個人のリポジトリを持てる |
 | Organization | ○ | 共有のアカウント。ログインできない。メンバー・チーム・リポジトリを持つ |
-| Bot（App の bot） | ○ | GitHub App ごとに 1 つ。`<app-slug>[bot]` の名前で、コメントやコミットの作者として表示される。ログインできない |
+| Bot（App の bot） | ○ | App ごとに 1 つ。`<app-slug>[bot]` の名前で、コメントやコミットの作者として表示される。ログインできない |
 | Enterprise | E10（S2） | 複数の Organization を束ねる。`internal` のリポジトリ、SAML SSO の一括の強制、SCIM の土台 |
 
 - ユーザーと Organization は **同じ名前空間** を共有する（`/{owner}/{repo}` の `owner` がどちらでもよいため）。名前は大文字小文字を区別せずに一意にする。
-- 名前の変更は許す。変更前の名前からのリポジトリの URL は、転送（リダイレクト）で当面つなぐ。旧い名前を他人が取ったら、転送は止まる。転送の期間と条件は本家でも公開の資料で確かめられなかった（**未検証**）ので、E2 で決める。
+- 名前の変更は許す。変更前の名前からのリポジトリの URL は、転送（リダイレクト）で当面つなぐ。転送に期限はなく、旧い名前を他のアカウントが取って同じ名前のリポジトリを作ったら止まる（本家と同じ。[Username changes](https://docs.github.com/en/account-and-profile/concepts/username-changes)、2026-09-26 に確認）。細部は 14 節の決定。
 - メールアドレスは、ユーザーに複数を持たせ、確認済みのものだけをコミットの作者の照合に使う。主のメールアドレスは Better Auth の `user.email`、それ以外は自前の `user_emails` に置く。
 - 「コミット用の非公開のメールアドレス」（`<id>+<login>@users.noreply.<domain>`）を持たせる（本家と同じ考え方）。
 
@@ -64,15 +64,15 @@ Slack の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-be
 | パスキー | ○ | パスキーだけでログインでき、そのときは 2FA を満たしたとみなす |
 | 2FA：TOTP | ○ | Better Auth の `twoFactor` |
 | 2FA：セキュリティキー（WebAuthn） | ○ | パスキーと同じ仕組み |
-| 2FA：リカバリーコード | ○ | 16 個、1 回限り（本家の個数は **未検証**） |
+| 2FA：リカバリーコード | ○ | 16 個、1 回限り（本家は 1 回限りのコードのファイルとだけ書き、個数を公開していない。**未検証**。本システムの値とする） |
 | 2FA：SMS | × | 本家は提供するが、SIM スワップに弱く、費用もかかる（本家も「security risks」と書いている）。**本家との違い** |
 | ソーシャルログイン | × | MVP では持たない |
 
 - **2FA の必須化は、本家の条件に寄せる。** 本家は、コードを貢献する利用者のうち、次に当たる人に 2FA を求め、45 日の登録期間と 7 日の猶予の後にロックする（[About mandatory 2FA](https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/about-mandatory-two-factor-authentication)、2026-09-26 に確認）。
   - App や Action を公開する、リリースを作る、Organization の owner、パッケージを公開したリポジトリの admin など
-  - 本システムでは次のどれかに当たったら求める：Organization の owner、リポジトリの admin、GitHub App・OAuth アプリの持ち主、リリースの作成者。期間は本家と同じ 45 日＋7 日。
-  - Organization は「メンバーに 2FA を必須にする」を設定できる。設定すると、2FA のないメンバーと外部のコラボレーターは Organization から外れる（本家と同じ振る舞い。外れる対象の詳細は **未検証**）。
-- **重要な操作は再認証を求める（sudo モード）。** 対象はトークンの作成、SSH の鍵の追加、2FA の変更、メールアドレスの変更、リポジトリの削除・移管・公開の種類の変更、Organization の削除。Better Auth の `freshAge` で実現する。本家の sudo モードの有効時間（2 時間とされる）は **未検証** なので、S1 は 2 時間を初期値にする。
+  - 本システムでは次のどれかに当たったら求める：Organization の owner、リポジトリの admin、App・OAuth アプリの持ち主、リリースの作成者。期間は本家と同じ 45 日＋7 日。
+  - Organization は「メンバーに 2FA を必須にする」を設定できる。本家と同じく、設定すると、2FA のない外部のコラボレーター（bot の外部のコラボレーターを含む）は Organization のリポジトリから外れ、非公開のリポジトリの fork も失う（3 か月以内なら復帰できる）。2FA のないメンバーと支払いの管理者は外さず、席も保つが、2FA を有効にするまで Organization の資源に入れない。後から 2FA を無効にした外部のコラボレーターは自動で外す（[Requiring two-factor authentication in your organization](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-two-factor-authentication-for-your-organization/requiring-two-factor-authentication-in-your-organization)、2026-09-26 に確認。以前の案の「メンバーも外す」を改めた）。
+- **重要な操作は再認証を求める（sudo モード）。** 対象はトークンの作成、SSH の鍵の追加、2FA の変更、メールアドレスの変更、リポジトリの削除・移管・公開の種類の変更、Organization の削除。Better Auth の `freshAge` で実現する。有効時間は本家と同じ 2 時間で、重要な操作のたびに延びる（[Sudo mode](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/sudo-mode)、2026-09-26 に確認）。本家の対象（一覧は例示）には、Webhook の作成・編集・再配信、Organization の招待・メンバー・2FA の強制、ruleset、リカバリーコードの表示も含まれるので、本システムの対象にも加える。
 - セッションの Cookie、有効期間、端末の一覧と取り消しは、Slack の identity-and-access.md の 3 節と同じ方式にする（正本は Aurora、`__Secure-` の Cookie、`SameSite=Lax`、アイドル 14 日・絶対 90 日）。
 - 2FA の要素をすべて失ったときの回復は、サポートの本人確認とする（runbook）。自動の回復経路は作らない。
 
@@ -144,7 +144,7 @@ Slack の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-be
 | 7 | 公開の種類 `internal` | read | Enterprise のメンバー（E10） |
 | 8 | 非公開の fork の上流のチーム | 上流でのチームのロール | 6 節 |
 
-- 基本の権限が外部のコラボレーターに効かないこと、既定が `read` であることは本家のとおり（[Setting base permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/setting-base-permissions-for-an-organization)、2026-09-26 に確認）。選べる値の一覧（`none`・`read`・`write`・`admin`）は、本家のページの本文では確認できなかった（**未検証**）。
+- 基本の権限が外部のコラボレーターに効かないこと、既定が `read` であることは本家のとおり（[Setting base permissions](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/setting-base-permissions-for-an-organization)、2026-09-26 に確認）。選べる値（`read`・`write`・`admin`・`none`）は本家の REST API の `default_repository_permission` の値と同じ（[Organizations の REST API](https://docs.github.com/en/rest/orgs/orgs)、2026-09-26 に確認）。
 - 子チームが親チームのロールを引き継ぐこと、秘密のチーム（secret）は入れ子にできないことは本家のとおり（[About teams](https://docs.github.com/en/organizations/organizing-members-into-teams/about-teams)、2026-09-26 に確認）。
 - 実効のロールの計算は、`team_closure`（祖先と子孫の組）を使った 1 回の SQL で行う。入れ子の深さに上限を置く（初期値 10）。
 
@@ -275,7 +275,7 @@ accessPredicate(actor): RepoPredicate                       // 検索・一覧�
 | 22 | ログイン済み | public | `acme` がこの利用者をブロック | コメント | 403 |
 | 23 | Organization の SSO が必須で、PAT が SSO の未承認 | private | 利用者は `write` | `contents:read` | 403（E10） |
 
-- 行 19：本家の App は、インストールのリポジトリに対して `metadata:read` を必ず持つ（**未検証**。本家の権限の一覧では metadata を読み取り専用の権限として持つことだけを確かめた）。本システムでは、インストールの範囲のリポジトリの存在と基本の情報は常に読めることにする。
+- 行 19：本家の文書は「App は既定では権限を持たない」とし、metadata を読み取り専用の権限として挙げるだけで、自動で与えるとは書いていない（[Choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)、2026-09-26 に確認。**未検証**。E7 の着手前に本家で App を登録して観測する）。本システムでは、インストールの範囲のリポジトリの存在と基本の情報は常に読めることにする。
 
 ## 6. fork
 
@@ -291,9 +291,9 @@ accessPredicate(actor): RepoPredicate                       // 検索・一覧�
 | 「メンテナーによる編集を許可」 | 上流で write 以上の人が、PR の head のブランチ（fork 側）に push できる。**ユーザーが持つ fork だけ**（Organization の fork では不可） | fork の出典と同じ |
 
 - **fork のネットワークの中で、公開と非公開を混ぜない。** 上の 2 つの切り離しの規則で、ネットワークの公開の種類は常に 1 つになる。ネットワークはオブジェクトを共有する（[git-storage.md](git-storage.md)）ので、混ぜると非公開のオブジェクトが公開の側から SHA で引けてしまう。
-- **SHA での直接の参照（`/commit/<sha>`、API の `GET /repos/{o}/{r}/commits/{sha}`、Git の `want <sha>`）** は、[ADR-0007](../decisions/0007-fork-network-object-sharing.md) に従う：`upload-pack` はそのリポジトリの ref から到達できるオブジェクトだけを返す。Web・API では、本家と同じく、同じネットワークの他の fork のコミットが SHA で見えうることを仕様として受け入れ、「このリポジトリのブランチに属さないコミット」と表示する。
+- **SHA での直接の参照（`/commit/<sha>`、API の `GET /repos/{o}/{r}/commits/{sha}`、Git の `want <sha>`）** は、[ADR-0007](../decisions/0007-fork-network-object-sharing.md) に従う：Git のプロトコル v2 の `fetch` は、広告していない `want` もネットワークの object store にあれば返す（2026-09-26 に確認。[git-storage.md](git-storage.md) の 7.2 節）。Git・Web・API のいずれでも、本家と同じく、同じネットワークの他の fork のコミットが SHA で見えうることを仕様として受け入れ、「このリポジトリのブランチに属さないコミット」と表示する。
   - `can()` の判定は、要求の URL のリポジトリに対して行う。ネットワークの他のリポジトリへの権限は見ない。
-  - 残る危険：非公開のネットワークで、上流を読めるが、ある非公開の fork を読めない人（例：上流の外部のコラボレーター。非公開の fork は上流の **チーム** の権限だけを引き継ぐ）が、その fork のコミットを SHA で見うる。本家の振る舞いは **未検証**。非公開のネットワークに限って Web・API でも到達可能性を検査するかを、14 節の未解決の問いとして E3 で決める。
+  - 残る危険：非公開のネットワークで、上流を読めるが、ある非公開の fork を読めない人（例：上流の外部のコラボレーター。非公開の fork は上流の **チーム** の権限だけを引き継ぐ）が、その fork のコミットを SHA で見うる（Git の v2 の経路を含む）。本家の文書は「ネットワークのどのリポジトリの Git のデータも、同じネットワークのどのリポジトリからも取得されうる」とだけ書き、この場合を個別には述べていない（**未検証**。本家の非公開のネットワークは観測の手段がない）。非公開のネットワークに限って Git・Web・API で到達可能性を検査するかを、14 節の未解決の問いとして E3 で決める。
 - 「メンテナーによる編集」は、`can()` の特別な規則として持つ：`contents:write` on fork の branch B ⇔ B を head とする開いた PR があり、`maintainer_can_modify` が真で、主体が base に write 以上。
 
 ## 7. bot と App の主体
@@ -393,7 +393,11 @@ App と OAuth アプリのテーブルは [api-and-webhooks.md](api-and-webhooks
 | S2（E10） | Enterprise、`internal`、SAML SSO、SCIM、IP の許可リスト。実効のロールの計算を、Organization の大きさ（数万人・数万のリポジトリ）に合わせて、事前計算の表（`effective_repo_roles`）に置き換えるかを測って決める |
 | S3（E11） | アカウントと資格情報は、リージョンの外のアイデンティティ面に置き、各リージョンへ読み取りの複製を置く。取り消しは全リージョンへ知らせる |
 
-## 14. 決定（2026-09-26、既定案）
+## 14. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 PM の方針（本家に寄せる、既定案）で次のとおり決めた。一覧は [README.md](README.md) の 6 節にもある。
 
@@ -401,9 +405,11 @@ PM の方針（本家に寄せる、既定案）で次のとおり決めた。�
 - **クラシックの PAT の期限の必須**：[ADR-0019](../decisions/0019-authentication-and-token-model.md) のとおり、本家との違い（最長 366 日）を受け入れる。
 - **カスタムのリポジトリのロール**：MVP の後（E10 の後）の候補にする。本家でも企業向けの機能である。
 - **会話のロックの最小のロール**：write（5.3 節）。
+- **Organization の 2FA の必須化で外す対象**（2026-09-26 の本家の確認による改訂）：外部のコラボレーターだけを外し、メンバーと支払いの管理者は外さずに Organization の資源への立ち入りを止める（3.1 節）。
+- **sudo モードの対象**（同）：本家の例示に合わせ、Webhook の作成・編集・再配信、Organization の招待・メンバー・2FA の強制、ruleset、リカバリーコードの表示を加える（3.1 節）。
 
 持ち越し（計測で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 非公開のネットワークで、Web・API の SHA の参照にも到達可能性の検査をかけるか（6 節） | 既定の方向は「非公開のネットワークでは検査する」。E3 の `fork-network-reachability-check` で検査の費用を測り、ADR-0007 の Web の扱いを改める ADR を起票する |
+| 非公開のネットワークで、Git の v2 の `want` と Web・API の SHA の参照に到達可能性の検査をかけるか（6 節） | 既定の方向は「非公開のネットワークでは検査する」。E3 の `fork-network-reachability-check` で検査の費用を測り、ADR-0007 の Web の扱いを改める ADR を起票する |

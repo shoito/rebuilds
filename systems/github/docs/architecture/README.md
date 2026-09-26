@@ -12,7 +12,7 @@
 | [notifications.md](notifications.md) | 通知の購読、配信、メール |
 | [search.md](search.md) | コード検索と、リポジトリ・Issue・Pull Request の検索 |
 | [identity-and-permissions.md](identity-and-permissions.md) | ユーザー、Organization、チーム、ロール、SSH の鍵、トークン、SSO |
-| [api-and-webhooks.md](api-and-webhooks.md) | REST・GraphQL、Webhook、OAuth のアプリと GitHub App、レート制限 |
+| [api-and-webhooks.md](api-and-webhooks.md) | REST・GraphQL、Webhook、OAuth のアプリと App（本家の GitHub App に相当）、レート制限 |
 | [actions.md](actions.md) | CI：ワークフロー、ジョブのスケジューリング、実行環境の隔離、シークレット、ログ、成果物、キャッシュ |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
 | [data-model.md](data-model.md) | 中核のテーブルと、領域ごとのテーブルの索引 |
@@ -129,14 +129,14 @@ git（HTTPS・SSH）──▶ Git フロントエンド（認証・認可・ル�
 ## 6. リスクと未解決の問い
 
 - **非公開のリポジトリの中身の漏洩**：経路が多い（Git、Web、API、検索、通知、Webhook、Actions のログ、fork のネットワークの共有 objects）。判定関数の集約（ADR-0002）、`can`・`canMany`・`filterActorsCanRead`・`accessPredicate` の一致の性質ベーステスト、経路ごとの漏洩テスト、本番の権限の合成監視で守る（[quality.md](../quality.md) のリスク 1）。
-- **fork のネットワークの共有 objects**：同じネットワークの他の fork のコミットが、SHA で見えうる（本家と同じ仕様、ADR-0007）。Git のプロトコル v2 の `fetch` で、広告していないハッシュの `want` が弾かれるかは **未検証**（E1 の PoC）。非公開のネットワークで Web・API にも到達可能性の検査をかけるかは、E3 で費用を測って決める。
+- **fork のネットワークの共有 objects**：同じネットワークの他の fork のコミットが、SHA で見えうる（本家と同じ仕様、ADR-0007）。Git のプロトコル v2 の `fetch` は、広告していないハッシュの `want` も弾かない（2026-09-26 に確認。[git-storage.md](git-storage.md) の 7.2 節）。非公開のネットワークで Git・Web・API に到達可能性の検査をかけるかは、E1 の PoC と E3 で費用を測って決める。
 - **成功を返した push の喪失**：3 相の合意（ADR-0006）とチェックサム、障害注入で守る。リージョンの障害では最大 15 分の push を失いうる（ADR-0032。利用規約と SLA に反映する）。
 - **巨大なリポジトリと大量の clone**：少数のリポジトリが、ストレージのノードと帯域を占有しうる（[git-protocols.md](git-protocols.md)、[capacity.md](capacity.md)）。パックのキャッシュ、bundle-uri、clone の制限、読み取りの複製の追加で抑える。
 - **CI の隔離と費用**：信頼できないコードを大量に実行する。隔離の破綻は、他の利用者のシークレットの漏洩につながる（[actions.md](actions.md)）。SMT を無効にするので、1 ホストあたりの VM は約 40 で、Actions は本番の費用の約 6 割を占める（[infrastructure.md](infrastructure.md) の 9 節）。1 ホストあたりの VM の数と起動の時間は E8 の PoC で測る。
 - **権限の組み合わせ**：公開と非公開、fork、Organization・チーム・基本の権限・トークンの上限が絡み合う（[identity-and-permissions.md](identity-and-permissions.md)）。決定表を spec に移し、表駆動テストで守る。
 - **ブランチの保護の迂回**：push と API のマージの 2 つの経路で同じ評価関数を呼ぶ（ADR-0011）。判定の材料が読めないときは拒否する（fail closed）。
 - **検索の索引の遅れによる漏洩**：権限の属性の変更は除外の表で即時に効かせる（ADR-0015）。Zoekt の差分のシャードと ID の集合の条件は E6 の試作で確かめる。
-- **CloudFront・NLB 経由の長い転送**：数 GB の clone・push が最後まで通るか、デプロイ時に進行中の転送がどこまで保たれるかは **未検証**（E1・E3）。
+- **CloudFront・NLB 経由の長い転送**：数 GB の clone・push が最後まで通るか、デプロイ時に進行中の転送がどこまで保たれるかは **未検証**（CloudFront・NLB・ECS の各上限は 2026-09-26 に AWS の文書で確かめたが、組み合わせの振る舞いは文書にない。E1 の `frontend-drain-poc` と E3 の `git-load-tests` で確かめる）。
 - **本家の名前を使わないこと**（リポジトリ共通の ADR-0006）：本家の SDK・`gh`・ワークフローは、名前の置き換えなしには使えない。公式の SDK と CLI、ワークフローの移行の道具を用意する。
 
 ### 決定（2026-09-26、既定案）
@@ -157,15 +157,15 @@ PM の方針（本家 GitHub に寄せる、既定案）により、次のとお
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| プロトコル v2 の `fetch` で、広告していないハッシュの `want` による fork のネットワークの漏れ | E1 の `fork-network-want-poc`。Git の版ごとに振る舞いを確かめ、[quality.md](../quality.md) の漏洩テストに固定する（それまで **未検証**） |
+| プロトコル v2 の `fetch` で、広告していないハッシュの `want` による fork のネットワークの漏れ | v2 が検査しないことは 2026-09-26 に確認した。E1 の `fork-network-want-poc` で版ごとの振る舞いを [quality.md](../quality.md) の漏洩テストに固定し、`gitd` での検査の費用を測る |
 | NLB の登録解除の後の接続、ECS の EC2 起動タイプの停止猶予 15 分 | E1 の `frontend-drain-poc`（staging） |
-| 非公開のネットワークで、Web・API の SHA の参照に到達可能性の検査をかけるか | E3 の `fork-network-reachability-check` で費用を測り、ADR-0007 を改める ADR を起票する |
-| CloudFront 経由の数 GB の clone・push、`core.fsync` の性能、reftable、LFS の `x-amz-checksum-sha256`、本家の bundle-uri の広告 | E3 の Git の負荷試験と PoC |
+| 非公開のネットワークで、Git の v2 の `want` と Web・API の SHA の参照に到達可能性の検査をかけるか | E3 の `fork-network-reachability-check` で費用を測り、ADR-0007 を改める ADR を起票する |
+| CloudFront 経由の数 GB の clone・push、`core.fsync` の性能、reftable、LFS の presigned の署名への `x-amz-checksum-sha256` の組み込み | E3 の Git の負荷試験と PoC（本家が bundle-uri を広告していないこと、LFS のクライアントがヘッダーを付けることは 2026-09-26 に確認した） |
 | マージ可能かの再計算の間引き | E4 で既定（5 分）で始め、E9 の負荷試験で直す |
 | Issue の移動を非同期にする上限 | E5 の `issue-transfer` で測る |
-| Zoekt の差分のシャードと ID の集合の条件、OpenSearch の ICU | E6 の `code-search-zoekt-poc` |
+| Zoekt の差分のシャードと ID の集合の条件の性能（機能があることは 2026-09-26 に確認） | E6 の `code-search-zoekt-poc` |
 | Firecracker の VM の起動の時間、1 ホストあたりの VM の数、ログのマスクの二重の確認 | E8 の `firecracker-host-poc`、`log-mask-double-check` |
 | 匿名の閲覧の HTML の CDN のキャッシュ | E9 の負荷試験の後 |
-| 大阪での `i8g` の在庫、東京の各インスタンスの価格 | E9 の `dr-osaka-pilot-light` の前に確かめる |
+| 大阪での `i8g` の在庫（提供されていることと東京の価格は 2026-09-26 に確認） | E9 の `dr-osaka-pilot-light` の前に確かめる |
 | 受信箱の DynamoDB への移行、blob の単位の検索の重複の排除、Docker の pull-through のキャッシュ | E10 |
 | S3 の複数リージョン（ADR-0034 は proposed） | E11。S2 の間に staging で試す |

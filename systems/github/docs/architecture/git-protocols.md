@@ -156,7 +156,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 - 同じ内容の clone・fetch（同じ `want`・`have`・`filter`・capability）が、短い時間に繰り返される（CI、ボット）。ストレージのノードに、`pack-objects` の出力のキャッシュを置く。キーは、要求の内容と、リポジトリのチェックサムのハッシュ。
 - 同時に来た同じ要求は、1 つの `pack-objects` の出力を共有する（1 つが書き、他はそれを読みながら追う）。
 - キャッシュはローカルの NVMe に置き、既定で 5 分で捨てる。容量の上限を超えたら古いものから捨てる。
-- GitLab の Gitaly の pack-objects cache が同じ考え方（[Gitaly の pack-objects cache](https://docs.gitlab.com/administration/gitaly/configure_gitaly/#pack-objects-cache)）。本家 GitHub が同じ仕組みを持つかは公開情報で確かめられない（**未検証**。本家に寄せる対象ではなく、この設計の判断とする）。
+- GitLab の Gitaly の pack-objects cache が同じ考え方（[Gitaly の pack-objects cache](https://docs.gitlab.com/administration/gitaly/configure_gitaly/#pack-objects-cache)）。本家 GitHub が同じ仕組みを持つかは公開情報で確かめられない（**未検証**。docs.github.com と GitHub のブログに記述がない。本家に寄せる対象ではなく、この設計の判断とする）。
 - 非公開のリポジトリのキャッシュは、要求ごとの認可を経た後にしか読まない。キーにリポジトリの ID を含め、リポジトリをまたいで共有しない。
 
 ### 6.4 bundle-uri と CDN
@@ -166,7 +166,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 - クライアントが bundle-uri を使うのは、`transfer.bundleURI` を有効にした場合だけ（Git の既定では無効）。したがって、効果は CI・ボット・大量の clone を行う利用者への案内に依る。一般の clone の負荷は、6.2・6.3 で下げる。
 - 非公開のリポジトリには bundle-uri を使わない（CDN の認可の仕組みが別に要る。MVP の外）。
 - packfile-uris（パックの一部を CDN から取らせる別の仕組み）は使わない。bundle-uri のほうが、静的なファイルとして扱えて運用が単純。
-- 本家が bundle-uri を github.com で広告しているかは **未検証**（E3 で本家の `ls-remote` の capability を確かめる）。
+- 本家は bundle-uri を github.com で広告していない（2026-09-26 に `GIT_TRACE_PACKET=1 git ls-remote` で観測。v2 の capability は `ls-refs=unborn`、`fetch=shallow wait-for-done filter`、`server-option`、`object-format=sha1` で、`bundle-uri` はない。文書での記述はない）。bundle-uri はここでは本家との違いになるが、クライアントの既定で無効のため互換に影響しない。Git の側の仕様は [gitprotocol-v2 の bundle-uri](https://git-scm.com/docs/gitprotocol-v2#_bundle_uri)（サーバーは `uploadpack.advertiseBundleURIs` で広告する）。
 
 ### 6.5 partial clone と shallow clone
 
@@ -188,7 +188,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 - 転送は `basic` を受け付ける。`hash_algo` は `sha256` だけ。
 - 応答の `actions` は S3 の presigned URL にする。
   - `download`：GET の presigned URL。有効期限は 1 時間。
-  - `upload`：PUT の presigned URL。`x-amz-checksum-sha256` を署名に含め、S3 が中身の SHA-256 を oid と照らして検証するようにする（**未検証**：LFS のクライアントが、応答の `header` に入れたこのヘッダーを PUT に付けることを、E3 の PoC で確かめる）。
+  - `upload`：PUT の presigned URL。`x-amz-checksum-sha256`（oid を base64 にした値）を応答の `header` に入れ、署名に含める。S3 は受け取った中身の SHA-256 を計算し、ヘッダーと違えば拒否する（[Checking object integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html)）。LFS のクライアントは、`actions.upload.header` の全ての項目を PUT に付ける（[batch API](https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md)、[tq/adapterbase.go](https://github.com/git-lfs/git-lfs/blob/main/tq/adapterbase.go)。2026-09-26 に確認）。`Content-Type` を署名に含めるなら、クライアントが自分で推定しないよう `header` に入れる。presigned URL の署名にチェックサムのヘッダーを含められることは S3 の文書に明記がないので、E3 の `lfs-batch-api` で結合テストにする。
   - `verify`：アップロードの後に、フロントエンドが S3 の object の存在・大きさ・チェックサムを確かめ、LFS の object の表に登録する。
 - すでにある object への `upload` には、`actions` を返さない（クライアントは転送を省く）。
 - 1 回の batch の objects の数は 100 までにする。
@@ -207,7 +207,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 
 ### 7.4 上限と削除
 
-- 1 つの object の大きさの上限は、S3 の 1 回の PUT の上限の 5 GB 以内でプランごとに決める。本家もプランごとに LFS の上限を持つ（[About Git Large File Storage](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage)）。具体の値は MVP の後のプランの設計で決める（**未検証**：本家の現在のプランごとの値）。
+- 1 つの object の大きさの上限は、S3 の 1 回の PUT の上限の 5 GB 以内でプランごとに決める。本家もプランごとに LFS の上限を持つ（[About Git Large File Storage](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-git-large-file-storage)）。本家の 1 ファイルの上限は、Free・Pro 2 GB、Team 4 GB、Enterprise Cloud 5 GB（同上、2026-09-26 に確認）。本システムの値は MVP の後のプランの設計で決め、それまでは 2 GB とする。
 - 容量と転送量を、リポジトリの持ち主のアカウントごとに数える。上限を超えたら、upload を 403（理由付き）で拒否する。download の超過の扱いは、プランの設計で決める。
 - 使われなくなった LFS の objects を、履歴を走査して消すことはしない。本家と同じく、LFS の objects を消すには、リポジトリを削除する（[Removing files from Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/removing-files-from-git-large-file-storage)）。ネットワークの全てのリポジトリが消えたら、そのネットワークの LFS の objects を、復元の期間（90 日）の後に消す。
 - ファイルのロック（LFS の Locking API）は MVP の外。
@@ -249,7 +249,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 ### デプロイと長い転送
 
 - フロントエンドの入れ替えで、進行中の長い clone・push が切れうる。登録解除の遅延を 15 分にし、その間は新しい接続を受けず、進行中の転送を続ける。15 分を超える転送は切れ、クライアントの再試行に頼る（ADR-0004 の Confirmation）。
-- ECS のタスクの停止猶予（`stopTimeout`）の上限と、NLB で登録解除の後に既存の TCP 接続がどう扱われるかは **未検証**（Slack の realtime.md の 3.5 節と同じ論点）。E1 で staging の PoC を行い、足りなければフロントエンドを EC2 の Auto Scaling グループのライフサイクルフックで入れ替える方式に替える。
+- ECS の EC2 起動タイプの `stopTimeout` には、文書上の上限がない（Fargate は 2〜120 秒。未設定なら ECS エージェントの `ECS_CONTAINER_STOP_TIMEOUT`、どちらもなければ 30 秒。[ContainerDefinition](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html)、2026-09-26 に確認）。NLB は、登録解除した target に新しい接続を送らず、target が健全でアイドルでなければ既存の接続の通信を続ける。登録解除の遅延（既定 300 秒）が過ぎると `unused` になり、`deregistration_delay.connection_termination.enabled` を有効にしたときだけ既存の接続を閉じる（[Deregistration delay](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html#deregistration-delay)、同日に確認）。したがって、登録解除の遅延を 900 秒、`stopTimeout` を 900 秒にし、接続の終了は有効にする。実際に 15 分の転送が切れずに終わるかは、E1 の `frontend-drain-poc`（staging）で確かめる。足りなければ、フロントエンドを EC2 の Auto Scaling グループのライフサイクルフックで入れ替える方式に替える。
 - ストレージのノードの `gitd` の入れ替えは、読み取りの静止（[git-storage.md](git-storage.md) の 6.3 節）で、新しい要求を他の複製へ回してから行う。
 
 ## 10. 障害と振る舞い
@@ -275,9 +275,9 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 
 | 事項 | 確かめ方 | 時期 |
 | --- | --- | --- |
-| LFS のクライアントが `x-amz-checksum-sha256` を PUT に付けるか | PoC | E3 |
-| 本家が bundle-uri を広告しているか | 本家の capability の確認 | E3 |
-| 本家のパックのキャッシュの有無 | 公開情報では確かめられない。この設計の判断とする | — |
-| NLB の登録解除の後の接続の扱い、ECS の EC2 起動タイプの停止猶予（15 分） | AWS の文書と staging の PoC | E1 |
-| 本家の LFS のプランごとの上限 | 本家の文書の確認 | MVP の後のプランの設計 |
-| v2 の `fetch` で広告していないハッシュの `want` の扱い | [git-storage.md](git-storage.md) の 17 節 | E1 |
+| ~~LFS のクライアントが `x-amz-checksum-sha256` を PUT に付けるか~~ | 2026-09-26 に確認：付ける（7.1 節）。presigned の署名に含める動作は E3 の結合テストで固定する | E3 |
+| ~~本家が bundle-uri を広告しているか~~ | 2026-09-26 に観測：広告していない（6.4 節） | — |
+| 本家のパックのキャッシュの有無 | 公開情報では確かめられない（**未検証**）。この設計の判断とする | — |
+| NLB の登録解除の後の接続の扱い、ECS の EC2 起動タイプの停止猶予（15 分） | 文書は 2026-09-26 に確認（9 節）。15 分の転送が実際に保たれるかを staging の PoC で確かめる | E1 |
+| ~~本家の LFS のプランごとの上限~~ | 2026-09-26 に確認（7.4 節）。本システムの値はプランの設計で決める | MVP の後のプランの設計 |
+| ~~v2 の `fetch` で広告していないハッシュの `want` の扱い~~ | 2026-09-26 に確認：v2 は検査しない（[git-storage.md](git-storage.md) の 7.2 節）。非公開のネットワークでの検査の費用は E1 の PoC で測る | E1・E3 |

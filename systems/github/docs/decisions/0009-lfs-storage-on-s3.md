@@ -26,6 +26,8 @@ Git LFS は、大きなファイルを Git の外に置き、Git には pointer 
 
 ## Decision
 
+> 2026-09-26 の注記：LFS のクライアントは、batch API の応答の `actions.upload.header` の全ての項目を PUT に付ける（[batch API](https://github.com/git-lfs/git-lfs/blob/main/docs/api/batch.md)、[tq/adapterbase.go](https://github.com/git-lfs/git-lfs/blob/main/tq/adapterbase.go)）。S3 は `x-amz-checksum-sha256` と中身が違えば拒否する（[Checking object integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html)）。下の「クライアントがヘッダーを付けるかは未検証」は解消した。presigned URL の署名にこのヘッダーを含める動作は S3 の文書に明記がないので、E3 の `lfs-batch-api` の結合テストで固定する（[git-protocols.md](../architecture/git-protocols.md) の 7.1 節）。
+
 1 を採用する。
 
 - batch API は Git フロントエンドが受け、認証・認可を行う（ADR-0002、ADR-0004）。`download` は GET、`upload` は PUT の presigned URL を返す。PUT の署名に SHA-256 のチェックサムを含め、S3 が中身を oid と照らす（クライアントがヘッダーを付けるかは未検証。E3 の PoC で確かめる）。`verify` で、フロントエンドが S3 の object を確かめて登録する。

@@ -27,6 +27,8 @@ Git と本家には、次の道具がある。
 
 ## Decision
 
+> 2026-09-26 の注記：本家は github.com で bundle-uri を広告していない（`GIT_TRACE_PACKET=1 git ls-remote` で観測。v2 の capability に `bundle-uri` がない。文書での記述はない）。bundle-uri はこの設計の判断で、本家との違いになる。クライアントの既定（`transfer.bundleURI` は無効）では使われないので、互換には影響しない（[git-protocols.md](../architecture/git-protocols.md) の 6.4 節）。パックのキャッシュの有無は、引き続き公開情報では確かめられない。
+
 1 を採用する。
 
 - 保守で、multi-pack index のビットマップと commit-graph を全てのリポジトリに作る。

@@ -82,5 +82,6 @@ platform_audit_events (...)                                     -- 運用者の�
 | 削除と保持 | 名前の予約（`name_reservations`）、名前の変更・移管の転送（`repository_redirects`）、消去の予定と削除の記録（バックアップと別に 35 日以上）、リーガルホールド | [ADR-0030](../decisions/0030-data-retention-and-deletion.md)、[identity-and-permissions.md](identity-and-permissions.md) の 14 節、[web.md](web.md) の 2 節 |
 
 - `lfs_objects`・`push_events`・`repository_refs`・`name_reservations`・`repository_redirects`・`issue_assignees`・`issue_labels` の名前は、この索引で仮に付けた。定義は各文書の記述から作る。
+- S2 の候補：実効のロールの事前計算の表（`effective_repo_roles`）。Organization の大きさで判定の遅さを測ってから採るかを決める（[identity-and-permissions.md](identity-and-permissions.md) の 13 節）。
 - 更新の多いテーブルの設定（`fillfactor`、パーティション、古いパーティションの `DROP`）は [capacity.md](capacity.md) の 3.4 節にある。
 - Aurora の外に置くもの：Git の中身（ストレージのノード）、LFS・成果物・ログ・キャッシュ・バックアップ（S3）、検索の索引（Zoekt・OpenSearch）、権限・ルーティング・レート制限のキャッシュとログのライブ表示（Valkey）。どれも正本は上の表か Git にあり、作り直せる。

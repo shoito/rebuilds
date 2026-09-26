@@ -1,6 +1,6 @@
 # API and webhooks: GitHub
 
-REST・GraphQL の API、トークンとスコープ、GitHub App と OAuth アプリ、Webhook、レート制限の設計。API の形と版は [ADR-0021](../decisions/0021-api-shape-and-versioning.md)、トークンは [ADR-0019](../decisions/0019-authentication-and-token-model.md)、App は [ADR-0020](../decisions/0020-github-app-model.md)、Webhook は [ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) に従う。権限の判定は [identity-and-permissions.md](identity-and-permissions.md) にある。
+REST・GraphQL の API、トークンとスコープ、App（本家の GitHub App に相当）と OAuth アプリ、Webhook、レート制限の設計。API の形と版は [ADR-0021](../decisions/0021-api-shape-and-versioning.md)、トークンは [ADR-0019](../decisions/0019-authentication-and-token-model.md)、App は [ADR-0020](../decisions/0020-github-app-model.md)、Webhook は [ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) に従う。権限の判定は [identity-and-permissions.md](identity-and-permissions.md) にある。
 
 方針は「本家 GitHub に寄せる」。本家の振る舞いは docs.github.com で 2026-09-26 に確かめ、確かめられなかったものは **未検証** と書く。本家から外すところは「本家との違い」として理由を書く。
 
@@ -74,7 +74,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 - **互換を壊す変更は、新しい版でだけ行う。** 本家の分類に合わせる：操作の削除、パラメーター・応答の項目の名前の変更・削除、必須のパラメーターの追加、型の変更、列挙値の削除、認証・認可の要件の変更、など。
 - **追加は、すべての版に同時に入れる**：操作、任意のパラメーター、応答の項目、ヘッダー、列挙値の追加。クライアントは知らない項目・列挙値を無視する前提にする（文書に明記する）。
 - 実装：内部の形は常に最新の版にし、版ごとの差分を「変換のモジュール」（要求を新しい形へ、応答を古い形へ）として新しい順に並べ、指定の版まで順にかける。Stripe の日付の版と同じ仕組みで、版の数に比例してコードが増えないようにする。
-- 応答には、使った版を `X-<Brand>-Api-Version-Selected` で返す（本家にあるかは **未検証**。追加の項目として付ける）。
+- 応答には、使った版を `X-<Brand>-Api-Version-Selected` で返す（本家の文書にはない。2026-09-26 に確認。本システムの追加の項目）。
 - 廃止の予告は、`Deprecation`・`Sunset` のヘッダー、変更履歴（changelog）、呼び出しの残る App の持ち主へのメールで行う。
 
 ## 5. GraphQL
@@ -86,7 +86,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 - 接続には `first` か `last` を必須にし、値は 1〜100（本家と同じ）。
 - 実装は TypeScript のコード優先のスキーマ（候補：Pothos ＋ GraphQL Yoga。E7 で決める）。型はサービス関数の戻り値から作り、REST と同じサービス関数を呼ぶ。
 - **権限は節点（node）ごとに `can()` を通す。** 読めない節点は `null` にし、`errors` に `NOT_FOUND` を入れる（存在を漏らさない）。一覧は `accessPredicate` で前段から絞る。DataLoader で `canMany` にまとめ、1 つの問い合わせでの判定を 1 回の往復に寄せる。
-- 変更は `@deprecated` で予告し、削除は予告から 3 か月以上たってから、四半期ごとの決まった日にまとめて行う。本家も破壊的な変更を予告してから行うが、周期の詳細は **未検証**。
+- 変更は `@deprecated` で予告し、削除は予告から 3 か月以上たってから、四半期ごとの決まった日にまとめて行う。本家の GraphQL も、破壊的な変更を 3 か月以上前に予告し、四半期の初日（1/1・4/1・7/1・10/1）に行う（[Breaking changes](https://docs.github.com/en/graphql/overview/breaking-changes)、2026-09-26 に確認）。本システムも同じ周期にする。
 - スキーマ（SDL）と変更の履歴を公開する。イントロスペクションは許す。
 
 ### 5.2 費用と制限
@@ -100,7 +100,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 | 節点の上限 | 1 つの問い合わせで 500,000 | 同じ |
 | 副の制限 | 2,000 点/分。変更（mutation）を含む要求は 5 点、含まないものは 1 点 | 同じ |
 | 実行時間 | 10 秒で打ち切る | 同じ |
-| 深さ | 15 段（本システムの値。本家の値は **未検証**） | |
+| 深さ | 15 段（本システムの値） | 本家は深さの上限を公開していない（深さを減らす助言だけ。[Rate limits and query limits](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api)、2026-09-26 に確認。**未検証**） |
 
 - 費用は静的に計算するので、実行の前に断れる。応答の `rateLimit { cost remaining resetAt }` で知らせる。
 
@@ -141,11 +141,11 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 | クラシックの PAT で Organization の資源に入れるか | 許す / 拒否 | 許す（本家と同じ） |
 | 細粒度の PAT の承認 | 要る / 要らない | 要る（owner が作ったものは除く。本家と同じ） |
 | 最長の有効期間 | 日数 | 細粒度は 366 日（本家と同じ）。クラシックも 366 日（本家は既定で制限なし。**本家との違い**） |
-| OAuth アプリの利用の制限 | 承認したアプリだけ / 制限なし | 承認したアプリだけ（本家の既定は **未検証**） |
+| OAuth アプリの利用の制限 | 承認したアプリだけ / 制限なし | 承認したアプリだけ（本家も新しい Organization では既定で有効。[About OAuth app access restrictions](https://docs.github.com/en/organizations/managing-oauth-access-to-your-organizations-data/about-oauth-app-access-restrictions)、2026-09-26 に確認） |
 
 - 方針に合わないトークンは、失効させずに、その Organization の資源に対してだけ拒否する（本家と同じ）。
 
-## 7. GitHub App
+## 7. App（本家の GitHub App に相当）
 
 ### 7.1 モデル
 
@@ -193,7 +193,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 - 本家と同じく残す。GitHub App を推奨とし、OAuth アプリは既存の道具との互換のために持つ。
 - フロー：認可コード（PKCE を受け付ける）と、デバイスのフロー（CLI・エージェント向け）。
 - トークン（`<brand>o_`）は、利用者かアプリが取り消すまで有効（本家と同じ）。スコープはクラシックの PAT と同じ。
-- 1 つのユーザー × アプリの組でトークンの数に上限を置く（初期値 10。超えたら古いものから失効。本家にも上限があるが値は **未検証**）。
+- ユーザー × アプリ × スコープの組ごとに、トークンは 10 まで、新しい発行は 1 時間に 10 までにする。超えたら古いものから失効する（本家と同じ。[Authorizing OAuth apps](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps)、2026-09-26 に確認）。
 - OAuth アプリには Webhook の仕組みがない（Webhook はリポジトリか Organization に別に作る。本家と同じ）。
 
 ## 9. Webhook
@@ -207,9 +207,9 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 | App の Webhook | App の持ち主 | App の全インストールの事象（1 つの URL） | ○ |
 | Enterprise の Webhook | Enterprise の owner | | E10 |
 
-- 1 つのリポジトリ・Organization に置ける Webhook の数に上限を置く（初期値 20。本家にも上限があるが値は **未検証**）。
+- 1 つのリポジトリ・Organization に置ける Webhook の数は、事象の種類ごとに 20 までにする（本家と同じ。[Troubleshooting webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks)、2026-09-26 に確認）。
 - 初版の事象（E7）：`ping`、`push`、`create`、`delete`、`pull_request`、`pull_request_review`、`pull_request_review_comment`、`issues`、`issue_comment`、`label`、`milestone`、`repository`、`member`、`membership`、`team`、`organization`、`fork`、`release`、`star`、`status`、`check_run`、`check_suite`、`installation`、`installation_repositories`、`github_app_authorization`。Actions の事象（`workflow_run`、`workflow_job`）は E8。
-- ペイロードの形は、本家の事象ごとの形に寄せる。ペイロードは REST の版の変換を受ける（Webhook ごとに版を固定して保存し、作成時の最新の版を既定にする）。本家の Webhook が版を持つかは **未検証**。
+- ペイロードの形は、本家の事象ごとの形に寄せる。ペイロードは REST の版の変換を受ける（Webhook ごとに版を固定して保存し、作成時の最新の版を既定にする）。本家の Webhook は版を持たない（配信のヘッダーと文書に版の記述がない。[Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)、2026-09-26 に確認）。版の固定は本システムの追加（**本家との違い**）。
 
 ### 9.2 送る要求
 
@@ -250,7 +250,7 @@ outbox（ref の更新、Issue の作成など）──▶ SQS ──▶ hook-di
 ```
 
 - **外向きの送信は、隔離された egress から出す。** Slack の ADR-0016・apps.md の 13 節と同じ考え方：本体の VPC に接続しない、権限を持たない Lambda が、署名済みの要求を受け取って送るだけ。宛先の検査（私的な IP・メタデータのアドレスの拒否、検査したアドレスへの直接の接続、リダイレクトを追わない、自分たちのドメインへの送信の禁止、ポートは 443 など許可したものだけ）を行う。秘密は Lambda に渡さない。
-- 送信元の IP の一覧を公開する（本家は `/meta` で Webhook の送信元の IP の範囲を公開している）。そのため hook-egress は、本体の VPC とつながらない専用の VPC（ほかの資源を置かず、ピアリングも持たない）に置き、固定の Elastic IP を持つ NAT から出す。Slack は IP を固定しなかった（Slack の ADR-0016 の選択肢 3 にあたる）が、本家に寄せる。本家の `/meta` の `hooks` の項目は **未検証**。
+- 送信元の IP の一覧を公開する（本家は `/meta` で Webhook の送信元の IP の範囲を公開している）。そのため hook-egress は、本体の VPC とつながらない専用の VPC（ほかの資源を置かず、ピアリングも持たない）に置き、固定の Elastic IP を持つ NAT から出す。Slack は IP を固定しなかった（Slack の ADR-0016 の選択肢 3 にあたる）が、本家に寄せる。本家の `/meta` は `hooks` の項目に Webhook の送信元の範囲を返す（[Meta の REST API](https://docs.github.com/en/rest/meta/meta)、2026-09-26 に確認）。
 - ペイロードは **事象の時点の写し** にする（本家と同じ）。送る時点の最新にはしない。
 - 事象の順序は保証しない（本家と同じ）。同じ宛先への配信は、宛先ごとの同時実行の上限（初期値 20）の中で並行に送る。
 - 応答の待ち時間は 10 秒。2xx を成功とする（本家と同じ。[Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries)、2026-09-26 に確認）。
@@ -280,7 +280,7 @@ outbox（ref の更新、Issue の作成など）──▶ SQS ──▶ hook-di
 - **自動の再試行を行う（本家との違い）。** 本家は失敗した配信を自動では送り直さず、利用者が UI か API で再配信する（同上の文書）。本システムは、一時的な失敗で事象を失わないよう、1 分・10 分・1 時間の後に計 3 回まで自動で送り直す（±20% のジッター）。受け手は `X-<Brand>-Delivery` で重複を捨てる前提で、本家の受け手の多くもそうしている。
 - **手動の再配信は 3 日以内**（本家と同じ。[Redelivering webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks)、2026-09-26 に確認）。UI と API（`POST /repos/{o}/{r}/hooks/{id}/deliveries/{delivery_id}/attempts` など）で行う。再配信できるのは、リポジトリの admin、Organization の owner、App の持ち主（本家と同じ）。
 - 配信の記録（要求と応答のヘッダー・本文）は 3 日間保持し、その後は件数と結果だけを 30 日保持する。
-- 失敗が続く宛先：直近 1 時間の失敗の割合が 90% を超えたら、宛先ごとに送る速さを落とし（回路遮断）、持ち主にメールで知らせる。Webhook を自動では無効にしない（本家の振る舞いは **未検証**）。
+- 失敗が続く宛先：直近 1 時間の失敗の割合が 90% を超えたら、宛先ごとに送る速さを落とし（回路遮断）、持ち主にメールで知らせる。Webhook を自動では無効にしない。本家も、失敗した配信を自動で送り直さないとだけ書き、失敗による自動の無効化は文書にない（[Handling failed webhook deliveries](https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries)、2026-09-26 に確認）。
 - 配信の滞留は runbook `webhook-backlog.md` で扱う（13 節）。
 
 ## 10. AI エージェントを第一の利用者として扱う
@@ -289,7 +289,7 @@ intent.md の「エージェントが使いやすいこと」を、次の形で�
 
 | 論点 | 設計 |
 | --- | --- |
-| 主体 | **推奨は GitHub App。** 組織の自動化は App の bot（インストールのトークン）、人の代わりに動くエージェントは App のユーザーのトークン（人とエージェントの両方が表示・監査に残る）。手元の単発の作業は細粒度の PAT |
+| 主体 | **推奨は App。** 組織の自動化は App の bot（インストールのトークン）、人の代わりに動くエージェントは App のユーザーのトークン（人とエージェントの両方が表示・監査に残る）。手元の単発の作業は細粒度の PAT |
 | 作り方 | マニフェストの流れ（7.4）で、人の確認 1 回でエージェント用の App を作れる |
 | 最小の権限 | 細粒度の権限、リポジトリの選択、インストールのトークンの部分集合への絞り込み。トークンは既定で短命 |
 | 分かる失敗 | `X-Accepted-<Brand>-Permissions` と `errors[].code`（3.2）、`documentation_url`、レート制限の残りと回復の時刻（11.3） |
@@ -316,7 +316,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | OAuth アプリのクライアントの資格情報 | 5,000 回/時 | - | アプリ |
 | Actions のジョブのトークン | 1,000 回/時 | 1,000 点/時 | リポジトリ |
 
-- ユーザーのトークンは、本家と同じく、そのユーザーの全トークンで割り当てを分け合う（**未検証**：本家の文書は「per user」と書くが、App のユーザーのトークンを App ごとに分けるかは確かめられなかった。本システムは App × ユーザーで別に数える）。
+- ユーザーのトークンは、本家と同じく、そのユーザーの全トークンで割り当てを分け合う。本家は、App のユーザーのトークンの割り当ても、他の App・OAuth アプリがそのユーザーの代わりに行う要求と、そのユーザーの PAT と合算すると明記している（[Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)、2026-09-26 に確認）。以前の案（App × ユーザーで別に数える）は採らず、本家に合わせてユーザーで合算する。
 - 計数は GCRA で行い、時間あたりの割り当てを「1 時間に N 回、バースト N」として表す。応答の `x-ratelimit-reset` は、GCRA の `TAT` から、割り当てが満杯に戻る時刻を計算して返す。
 
 ### 11.2 副の制限（濫用の防止）
@@ -326,7 +326,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | 対象 | 上限 |
 | --- | --- |
 | 同時の要求（REST と GraphQL の合計） | 100 |
-| REST の点数 | 900 点/分（`GET`・`HEAD`・`OPTIONS` は 1 点、書き込みは 5 点。点数の割り当ては本家の値を **未検証** のまま初期値とする） |
+| REST の点数 | 900 点/分（`GET`・`HEAD`・`OPTIONS` は 1 点、`POST`・`PATCH`・`PUT`・`DELETE` は 5 点。本家と同じ。同上、2026-09-26 に確認） |
 | GraphQL の点数 | 2,000 点/分（5.2） |
 | CPU 時間 | 実時間 60 秒あたり 90 秒 |
 | 内容を作る要求（Issue、コメント、PR など） | 80 回/分、500 回/時 |
@@ -342,7 +342,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | 主の制限を超えた | `429` | `x-ratelimit-remaining: 0` と `x-ratelimit-reset` |
 | 副の制限を超えた | `429` | `retry-after`（秒） |
 
-- 本家は `403` か `429` を返す。本システムは `429` にそろえる（**本家との違い**）。Octokit など主なクライアントは両方を扱う前提だが、クライアントごとの確認は **未検証** で、E7 で確かめる。
+- 本家の REST は `403` か `429` を返す。GraphQL は、主の制限で `200` とエラーの本文、副の制限で `200` か `403` を返す（[GraphQL の制限](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api)、2026-09-26 に確認）。本システムは REST も GraphQL も `429` にそろえる（**本家との違い**）。Octokit など主なクライアントが `429` を扱うかは、クライアントの実装に依存し文書では確かめられない（**未検証**）ので、E7 の公式の SDK の Story で確かめる。
 - 本家の IETF の `RateLimit` ヘッダー（Slack が付けたもの）は付けない。本家の `x-ratelimit-*` と重ねると、クライアントがどちらを信じるか迷うため。
 - 検索は別の資源（`search`：30 回/分）として数える（[search.md](search.md)）。Git の操作の制限は [git-protocols.md](git-protocols.md) にある。
 
@@ -398,11 +398,17 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | S2 | Enterprise の Webhook と API（E10）。hook-delivery を宛先のハッシュでシャードに分け、遅い宛先を隔てる |
 | S3 | リポジトリのリージョンで事象を作り、そのリージョンの egress から送る。レート制限の割り当ては、主体のホームのリージョンで数え、他のリージョンは近似で数える（E11） |
 
-## 16. 決定（2026-09-26、既定案）
+## 16. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - **ヘッダーの名前・トークンの接頭辞・メディアタイプ**：リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) で決着した。本家の名前を使わず、`<Brand>`・`<brand>` の置き換え用の名前で書き、実際の名前は開発リポジトリの作成時に決める。パスの形（`/repos/{owner}/{repo}/...`）は本家に寄せたままにする（名前を含まないため）。
 - **Webhook の自動の再試行**：[ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) のとおり行う。受け手は `X-<Brand>-Delivery` で重複を捨てる前提を文書に書く。
 - **MCP のサーバー**：MVP の後の候補（[roadmap.md](../roadmap.md) の「後回しにしたもの」）。公開 API の上の薄い層にする（10 節）。
+- **ユーザーのトークンのレート制限**（2026-09-26 の本家の確認による改訂）：App のユーザーのトークンも、PAT・OAuth アプリと合わせてユーザーで合算する（11.1 節）。以前の案の「App × ユーザーで別に数える」は採らない。
+- **Webhook の版**：本家の Webhook は版を持たないが、本システムは Webhook ごとに REST の版を固定する（9.1 節。本家との違い）。
 
 持ち越し：
 

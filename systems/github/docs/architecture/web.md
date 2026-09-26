@@ -92,7 +92,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 | 整形した描画（Markdown・CSV など） | 2 MB 未満のファイルだけ試みる。超えたら生のテキストか「表示できない」 | 本家（[Repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits)） |
 | CSV・TSV の表としての描画 | 512 KB まで | 本家（[Working with non-code files](https://docs.github.com/en/repositories/working-with-files/using-files/working-with-non-code-files)） |
 | STL・GeoJSON の描画 | 10 MB まで | 同上 |
-| 色付けしたテキストの表示 | 1 MB まで。超えたら「生のファイルを見る」だけ | ここでの決定。本家の値は未検証 |
+| 色付けしたテキストの表示 | 1 MB まで。超えたら「生のファイルを見る」だけ | ここでの決定。本家は表示・色付けの上限を公開していない（2026-09-26 に確認。**未検証**） |
 | 1 MB を超え 10 MB 以下のテキスト | 色付けせずに先頭だけを出すか、生のファイルへの案内 | ここでの決定 |
 | バイナリ | 画像・PDF など描画できる種類は描画。それ以外は「生のファイルを見る」 | |
 | LFS のポインタ | LFS のオブジェクトを取り、上の規則で表示する | [git-protocols.md](git-protocols.md) |
@@ -123,7 +123,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 3. **無害化**：許可リスト方式。
    - 要素：見出し、段落、リスト、表、`code`・`pre`、`a`、`img`、`details`・`summary`、`kbd`、`sup`・`sub` など、一覧に載ったものだけ。
    - 属性：`href`・`src`（スキームは `http`・`https`・`mailto` と相対 URL だけ）、`alt`、`title`、`align` など、要素ごとの一覧に載ったものだけ。`on*`・`style`・`class`・`id` は落とす。
-   - `id` と `name` が要る見出しのアンカーは、`user-content-` の接頭辞を付けて後処理で付ける。本家と同じく、アプリの要素の ID と衝突させない（DOM clobbering の対策。本家の接頭辞は観測による。未検証）。
+   - `id` と `name` が要る見出しのアンカーは、`user-content-` の接頭辞を付けて後処理で付ける。本家と同じく、アプリの要素の ID と衝突させない（DOM clobbering の対策。本家の Markdown の API は `id="user-content-…"` を返し、`id` を除いてから名前付きのアンカーを後で付ける。[Markdown の REST API](https://docs.github.com/en/rest/markdown/markdown) の応答で 2026-09-26 に観測、[github/markup](https://github.com/github/markup) の README）。
 4. **後処理**：
    - `@メンション`、`#123`・`owner/repo#123` の参照、コミットの SHA をリンクにする。**参照先のタイトルや状態は、閲覧者の権限で判定してから出す。** 非公開のリポジトリの Issue への参照は、読めない人には番号の文字列のままにする（ADR-0002）。
    - 外部の画像の `src` を、画像のプロキシの URL に書き換える（4.4 節）。
@@ -132,7 +132,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 5. **キャッシュ**：閲覧者に依らない部分（1〜4 の参照の解決を除く）を、`(内容のハッシュ, 文脈のリポジトリ, 描画器の版)` でキャッシュする。参照の解決は、閲覧者ごとに要求の時点で行う。
 
 - 無害化は、描画の Worker の 1 か所で行う。無害化された HTML は、型（`SanitizedHtml`）で区別し、`dangerouslySetInnerHTML` にはこの型だけを渡せるようにする（lint で禁止し、例外はこの 1 か所）。
-- 数式（`$...$`）は、MVP ではサーバーで MathML に変換してから無害化を通す（MathML の要素を許可リストに入れる）。本家の数式の描画方式は未検証。
+- 数式（`$...$`）は、MVP ではサーバーで MathML に変換してから無害化を通す（MathML の要素を許可リストに入れる）。本家は MathJax（ブラウザの JavaScript）で描く（[Writing mathematical expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)、2026-09-26 に確認）。ここはアプリの origin で利用者の内容から JavaScript を動かさないために、サーバーで変換する（**本家との違い**。12 節の決定）。
 
 ### 4.2 SVG
 
@@ -143,13 +143,13 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 ### 4.3 ノートブックとその他の描画
 
 - ノートブックは、本家と同じく静的な HTML として描画し、対話的な機能（独自の JavaScript のグラフなど）は動かさない（同上）。
-- 変換は、描画の隔離のサービスで行う。ノートブックの出力に含まれる HTML は、4.1 節と同じ許可リストで無害化する。変換の期限は 5 秒とする（本家は 5 秒で描画を諦めると言われる。[Jupyter の blog](https://blog.jupyter.org/rendering-notebooks-on-github-f7ac8736d686)。本家の公式の記述は未検証）。
+- 変換は、描画の隔離のサービスで行う。ノートブックの出力に含まれる HTML は、4.1 節と同じ許可リストで無害化する。変換の期限は 5 秒とする（本家は 5 秒で描画を諦めると言われる。[Jupyter の blog](https://blog.jupyter.org/rendering-notebooks-on-github-f7ac8736d686)。本家の文書に期限の記述はない。2026-09-26 に確認。**未検証**。本システムの値とする）。
 - 描画の結果は、**描画の隔離のドメイン**の iframe で表示する。
   - iframe に `sandbox="allow-scripts"` を付け、`allow-same-origin` は付けない。中身は不透明なオリジンになり、Cookie・storage・親の DOM に触れない。
   - 描画の隔離のドメインの応答には、CSP の `frame-ancestors` でアプリのドメインだけを許す。
   - 高さの調整などの親とのやり取りは `postMessage` で行い、親は `origin` と、決めた形のメッセージだけを受け付ける。
 - 非公開のリポジトリのノートブックは、アプリが権限を判定したうえで、短命の署名付きの URL（5.2 節）で iframe に渡す。
-- Mermaid、GeoJSON、STL、PDF も同じ iframe の仕組みで描く。本家は GeoJSON の地図や 3D の表示を持つ（同上）。本家がこれらをどのドメインの iframe で描いているかは未検証。
+- Mermaid、GeoJSON、STL、PDF も同じ iframe の仕組みで描く。本家は GeoJSON の地図や 3D の表示を持つ（同上）。本家の文書は STL・GeoJSON を 10 MB を超えると描かないとするが、描く iframe のドメインは書いていない（[Working with non-code files](https://docs.github.com/en/repositories/working-with-files/using-files/working-with-non-code-files)、2026-09-26 に確認。**未検証**）。本システムは 10 MB の上限を本家に合わせる。
 
 ### 4.4 画像のプロキシ
 
@@ -170,7 +170,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 | `render.<brand>usercontent.<domain>` | ノートブック・Mermaid などの描画の iframe | 受け取らない |
 
 - **利用者の内容のドメインは、アプリとは別の登録可能ドメインにする。** サブドメインにすると、同じサイト（same-site）になり、`SameSite` の Cookie が送られ、Cookie の注入（`Domain=` の上書き）もできる。本家は利用者の内容を `*.githubusercontent.com` から配り、「ドメインの分離そのものが統制である」としている（[GitHub Bug Bounty: *.githubusercontent.com](https://bounty.github.com/targets/githubusercontent-com.html)）。
-- 利用者の内容のドメインを Public Suffix List に登録し、サブドメインどうしも別のサイトにする。本家のドメインが登録されているかは未検証。
+- 利用者の内容のドメインを Public Suffix List に登録し、サブドメインどうしも別のサイトにする。本家も `githubusercontent.com`・`github.io` などを Public Suffix List に登録している（[public_suffix_list.dat](https://publicsuffix.org/list/public_suffix_list.dat)、2026-09-26 に確認）。
 - アプリのドメインの CSP では、利用者の内容のドメインから スクリプトを読まない（6 節）。
 
 ### 5.2 生のファイルの配信
@@ -188,7 +188,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
   - `git` の HTTP のトークン（個人用アクセストークン）による `Authorization` ヘッダーでの取得も受け付ける（CLI・CI のため）。
   - 権限を失った後の最大の露出は、トークンの期限まで。これを受け入れる。
   - CDN にキャッシュしない。
-- 本家の生のファイルの `Content-Type` とトークンの形の詳細は未検証。
+- 本家の生のファイルは `Content-Type: text/plain; charset=utf-8`、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox` で返る（2026-09-26 に応答のヘッダーで観測）。非公開のリポジトリの生のファイルのトークンの形は公開されていない（**未検証**。本システムの形で作る）。
 
 ## 6. CSP とブラウザの防御
 
@@ -261,12 +261,17 @@ upgrade-insecure-requests;
 - Web は独自の Event を出さない。操作は API の内部の関数を通り、そこで outbox に書く。
 - 描画の失敗（無害化の例外、iframe の描画の期限切れ）、CSP の違反の報告を記録し、監視する（[observability.md](observability.md)）。
 
-## 12. 決定（2026-09-26、既定案）
+## 12. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - 1.1 節の描画の方式は [ADR-0035](../decisions/0035-web-rendering-ssr-streaming.md) にした。
 - 画面の言語は英語と日本語（9 節）。
 - 利用者の内容のドメインの名前は、開発リポジトリの作成時に決める（ADR-0006）。Public Suffix List への登録は、一般公開の前（E9 の `usercontent-domains-psl`）に申請する。登録の反映はブラウザの更新に依るので、登録を待たずにドメインの分離（別の登録可能ドメイン）だけで安全が成り立つ設計にしてある（5.1 節）。
 - 数式は、4.1 節のとおりサーバーで MathML に変換してから無害化する。隔離の iframe は使わない。
+- **数式**：本家は MathJax（ブラウザの JavaScript）で描くが、本システムは上のとおりサーバーで MathML に変換する（2026-09-26 に確認した本家との違い）。
 
 持ち越し：
 

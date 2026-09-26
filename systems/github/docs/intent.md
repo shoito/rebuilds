@@ -31,7 +31,7 @@ Git のリポジトリのホスティングと、その上の共同作業を作�
 - Issue、ラベル、マイルストーン、担当者
 - 通知（Web とメール）
 - 検索：リポジトリ・Issue・Pull Request の検索と、コード検索
-- REST API と GraphQL API、Webhook、OAuth のアプリと GitHub App に相当する仕組み、個人用アクセストークン
+- REST API と GraphQL API、Webhook、OAuth のアプリと、本家の GitHub App に相当する仕組み（App）、個人用アクセストークン
 - CI（Actions に相当）：ワークフローの定義、ホストされた実行環境、シークレット、ログ、成果物
 - ステータスとチェック（外部の CI の結果の表示）
 
@@ -66,6 +66,10 @@ Git のリポジトリのホスティングと、その上の共同作業を作�
 | Advanced Security（秘密情報の走査、依存の脆弱性、コードの静的解析） | MVP の後の Epic。ただし、push の中の秘密情報の走査（push protection）は候補として早めに検討する |
 | Enterprise Server（オンプレミス版） | 配布と運用の形が別の製品 |
 
-## Open questions
+## 未解決の問い
 
-- ~~公開リポジトリの大量の clone（CI や AI の学習の収集）への帯域とコストの対策を、どこまで行うか。~~ → 2026-09-26 に既定案で決めた：人気の公開リポジトリの bundle-uri と CDN、リポジトリごと・IP ごとの clone のレート制限。利用者ごとの帯域の課金は MVP に含めない（[architecture/README.md](architecture/README.md) の 6 節）。
+- 公開リポジトリの大量の clone（CI や AI の学習の収集）への帯域とコストの対策を、どこまで行うか。
+
+### 決定（2026-09-26、既定案）
+
+- 人気の公開リポジトリは bundle-uri と CDN で配り、リポジトリごと・IP ごとの clone のレート制限をかける。利用者ごとの帯域の課金は MVP に含めない（[architecture/README.md](architecture/README.md) の 6 節）。

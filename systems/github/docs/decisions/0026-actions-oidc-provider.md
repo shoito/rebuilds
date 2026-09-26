@@ -21,6 +21,8 @@ date: 2026-09-26
 
 ## Decision
 
+> 2026-09-26 の注記：本家の有効期限は値として明記されていないが、文書の例のトークンは `exp − iat` が 300 秒（5 分）で、本決定と一致する（[OpenID Connect](https://docs.github.com/en/actions/concepts/security/openid-connect)）。KMS の `Sign` の上限は、RSA・ECC の鍵でそれぞれ 1 秒に 1,000 件（アカウント・リージョンごと、暗号の操作と共有、引き上げ可）である（[Request quotas](https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html)）。S1 のジョブの開始のピーク（5 件/秒。[capacity.md](../architecture/capacity.md) の 2.9 節）の十分に内側なので、下の「上限は未検証」は解消した。
+
 2 を採用する。
 
 - 発行者は `https://token.actions.<本番のドメイン>`。`/.well-known/openid-configuration` と JWKS を公開する。

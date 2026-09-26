@@ -24,6 +24,8 @@ Actions のジョブは、誰でも出せる Pull Request のコードを含む�
 
 ## Decision
 
+> 2026-09-26 の注記：Fargate は特権のコンテナ（`privileged`）に対応しない（[ContainerDefinition](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html)）ので、選択肢 4 を採らない理由は確かめられた。EC2 の起動の時間は、AWS の FAQ が「RunInstances から起動の開始まで通常 10 分未満」と書くだけで、metal に固有の値は公開されていない（[Amazon EC2 FAQs](https://aws.amazon.com/ec2/faqs/)）。起動の時間は引き続き E8 の `firecracker-host-poc` で測る。入れ子の仮想化は、2026-06 の時点で C8i・M8i・R8i のほか M7i・C7i・R7i などにも広がったが、AWS は性能と遅延に敏感な用途には metal を勧めており、Firecracker も入れ子の仮想化を検証済みの基盤に挙げていない（[Nested virtualization](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nested-virtualization.html)、[Firecracker の README](https://github.com/firecracker-microvm/firecracker/blob/main/README.md)）。決定は変えない。
+
 1 を採用する。
 
 - **隔離の境界は KVM の VM にする。** Firecracker は KVM の上の最小の VMM で、jailer で VM ごとに cgroup・namespace・seccomp を掛けて権限を落とす（[Firecracker](https://github.com/firecracker-microvm/firecracker)）。ホストは、本番のホストの推奨（SMT の無効、KSM の無効、スワップの無効、VM ごとの資源の上限）に従う（[prod-host-setup.md](https://github.com/firecracker-microvm/firecracker/blob/main/docs/prod-host-setup.md)）。

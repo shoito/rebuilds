@@ -35,6 +35,8 @@ AWS の仕様で確かめたこと：
 
 ## Decision
 
+> 2026-09-26 の注記：`i8g` は大阪（ap-northeast-3）でも使える（2025-11 に提供開始。[AWS の告知](https://aws.amazon.com/about-aws/whats-new/2025/11/amazon-ec2-i8g-instances-additional-aws-regions)、[リージョンごとのインスタンスの種類](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-regions.html)）。下の「大阪で `i8g` が使えるかは未検証」は解消した。在庫（オンデマンドの容量）は保証されないので、`i7i`・`i4i`・EBS の構成を変数で選べるようにすることは変えない。
+
 AZ の障害は、[ADR-0003](0003-replicated-git-storage.md) の 3 つの複製（AZ ごとに 1 つ）と Aurora のマルチ AZ で守る。push は 2 つの合意で成功を返すので、1 つの AZ を失っても、成功を返した push は失われず、読み書きが続く（RPO 0）。
 
 リージョンの障害は、S1 では 1 を採用する。

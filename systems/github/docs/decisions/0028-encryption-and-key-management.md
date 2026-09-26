@@ -17,7 +17,7 @@ GitHub の保存するデータは、性質の違う 3 つの層に分かれる�
 
 暗号化の設定のいくつかは、作った後に変えられない（Aurora のクラスタの暗号化、EBS のボリュームの鍵）。最初のリソースを作る前に決める。
 
-本家は、GitHub.com のソースコードを暗号化されたディスクに置いている（[Git data encryption at rest](https://github.blog/changelog/2019-05-22-git-data-encryption-at-rest/)）。鍵の管理の詳細は公開されていない（未検証）。Actions のシークレットは、API に送る前にリポジトリ・Organization ごとの公開鍵で libsodium の sealed box で暗号化させる（[Encrypting secrets for the REST API](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api)）。
+本家は、GitHub.com のソースコードを暗号化されたディスクに置いている（[Git data encryption at rest](https://github.blog/changelog/2019-05-22-git-data-encryption-at-rest/)）。鍵の管理の詳細は公開されていない（2026-09-26 に docs.github.com と GitHub のブログを確認。**未検証**。本家に寄せる対象ではない）。Actions のシークレットは、API に送る前にリポジトリ・Organization ごとの公開鍵で libsodium の sealed box で暗号化させる（[Encrypting secrets for the REST API](https://docs.github.com/en/rest/guides/encrypting-secrets-for-the-rest-api)）。
 
 ## Options
 

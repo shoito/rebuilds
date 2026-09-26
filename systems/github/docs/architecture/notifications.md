@@ -29,7 +29,7 @@
 
 - `repo_watches (user_id, repo_id, level, custom_events, created_at)`。行がなければ既定の水準。
 - 自動の watch：自分の個人のアカウントで作ったリポジトリは自動で watch する。push の権限を持つリポジトリ（fork を除く）を自動で watch する設定を持つ（[通知について](https://docs.github.com/en/account-and-profile/managing-subscriptions-and-notifications-on-github/setting-up-notifications/about-notifications)）。後者は既定で有効にする（本家の設定の画面の既定に合わせる。2026-09-26 の決定）。チームに入ったときに、チームのリポジトリを自動で watch することはしない（本家の「チームの自動の watch」は、チームの告知の購読であり、リポジトリの watch ではないため）。
-- Ignore の人には、メンションでも届けない（画面の文言「Never be notified」に合わせる。細部は未検証）。
+- Ignore の人には、メンションでも届けない（画面の文言「Never be notified」に合わせる。本家の文書は「完全に無視する」とだけ書き、メンションの扱いを個別に述べていない。2026-09-26 に確認。**未検証**。E5 で本家を観測して合わせる）。
 - Security alerts と Discussions の種類は、その機能が MVP にないので持たない。
 
 ### 2.2 スレッドの購読
@@ -46,7 +46,7 @@
 
 ### 2.3 理由
 
-本家の REST API の `reason`（[REST API の通知](https://docs.github.com/en/rest/activity/notifications)）のうち、MVP の機能に対応するものを持つ。1 つのイベントで 1 人に複数の理由が当たるときは、上の行を優先する（優先の順は本設計のもの。本家の順は未検証）。
+本家の REST API の `reason`（[REST API の通知](https://docs.github.com/en/rest/activity/notifications)）のうち、MVP の機能に対応するものを持つ。1 つのイベントで 1 人に複数の理由が当たるときは、上の行を優先する（優先の順は本設計のもの）。本家の `reason` はスレッドごとに 1 つで、最新の通知の理由に替わるが、一度 `mention` になったら `mention` のまま残る（[REST API の通知](https://docs.github.com/en/rest/activity/notifications)、2026-09-26 に確認）。複数の理由が同時に当たるときの順は公開されていない（**未検証**）。本設計も、スレッドの `reason` は `mention` を保つ規則を本家に合わせる。
 
 | 優先 | reason | 条件 | 区分 |
 | --- | --- | --- | --- |
@@ -79,7 +79,7 @@
      ∪ リポジトリを読めない人（下の「権限の確かめ直し」）
 ```
 
-- **メンションの解決**：`@user` は、その人がリポジトリを読めるときだけ受け手にする。読めない人をメンションしても通知せず、購読も作らない。`@org/team` は、チームのメンバーのうちリポジトリを読める人に展開する。1 つの本文で受け手にするメンションは 50 人まで（本設計の値。本家の上限は未検証）。チームのメンションは、メンバーの数をこれに数えない。
+- **メンションの解決**：`@user` は、その人がリポジトリを読めるときだけ受け手にする。読めない人をメンションしても通知せず、購読も作らない。`@org/team` は、チームのメンバーのうちリポジトリを読める人に展開する。1 つの本文で受け手にするメンションは 50 人まで（本設計の値。本家は上限を公開していない。2026-09-26 に確認。**未検証**）。チームのメンションは、メンバーの数をこれに数えない。
 - **権限の確かめ直し**：受け手の全員について、配信の直前に ADR-0002 の判定関数で `can(user, issues:read, thread)`（Pull Request は `pull_requests:read`、リリースと Actions は `contents:read`・`actions:read`）を確かめる。数千人を 1 人ずつ判定しないよう、「1 つのリポジトリ × 多数の利用者」の一括の判定 `filterActorsCanRead(actors, action, resource)`（[identity-and-permissions.md](identity-and-permissions.md) の 5.1 節）を使う。1,000 人ごとの分割（4 節）の単位で呼ぶ。イベントから処理までの間に外された人には送らない。
 - **行為者が Bot・App** の場合も、行為者本人は除く。
 
@@ -99,7 +99,7 @@ SES のイベント（バウンス・苦情）─▶ SNS ─▶ SQS email-feedba
 - **planner** は、イベントの本体と候補を DB（reader）から読み、3 節の規則で受け手と理由を決め、受け手ごとに 5 節の設定で経路を決める。
 - **分割**：受け手が 1,000 人を超えるとき（人気のリポジトリのリリース、All Activity の watch が多いリポジトリ）は、受け手の ID の範囲で分けて `notify-fanout` に積む。`notify-fanout` を別のキューにして、大人数の通知が、レビュー依頼やメンションを待たせないようにする。
 - **受信箱の書き込み** は、1,000 人ごとに 1 つの `INSERT ... ON CONFLICT` でまとめて書く（6 節）。
-- **メール** は 1 受け手 1 ジョブにする。本家は通知を遅らせずに 1 件ずつメールにする（まとめのメールがあるかは未検証）。本設計も遅らせずに送り、7 節の上限を超えたときだけまとめる。
+- **メール** は 1 受け手 1 ジョブにする。本家は通知を遅らせずに 1 件ずつメールにする（一般の通知のまとめのメールは、本家の文書にない。[Configuring notifications](https://docs.github.com/en/subscriptions-and-notifications/get-started/configuring-notifications)、2026-09-26 に確認）。本設計も遅らせずに送り、7 節の上限を超えたときだけまとめる。
 
 ### 4.1 遅延の目標
 
@@ -185,11 +185,11 @@ CREATE INDEX ON notification_inbox (user_id, done, updated_at DESC);
 
 本家は、返信をコメントとして投稿する。`reply-to` のアドレスがスレッドとアカウントを表し、パスワードを再設定するまで有効である。署名と `>` の引用は取り除き、メールアドレスは `***@***.***` に置き換え、添付は取り込まず、コメントは最大 65,530 文字（[通知の設定](https://docs.github.com/en/account-and-profile/managing-subscriptions-and-notifications-on-github/setting-up-notifications/configuring-notifications)）。これに合わせる。
 
-- **アドレス**：`reply+<token>@reply.example.dev`。`token` は `(user_id, thread_id, credential_generation)` を、サーバーの鍵で MAC したもの（形式は本設計のもの。本家の形式は未検証）。`credential_generation` はパスワードの再設定で増やすので、再設定で古いアドレスが無効になる。鍵は Secrets Manager に置き、2 つの鍵を並行して受け付けて入れ替える。
+- **アドレス**：`reply+<token>@reply.example.dev`。`token` は `(user_id, thread_id, credential_generation)` を、サーバーの鍵で MAC したもの（形式は本設計のもの。本家は形式を公開していない）。`credential_generation` はパスワードの再設定で増やすので、再設定で古いアドレスが無効になる。本家も、返信先のアドレスはスレッドとアカウントを表し、パスワードを再設定するまで有効だとしている（[Configuring notifications](https://docs.github.com/en/subscriptions-and-notifications/get-started/configuring-notifications)、2026-09-26 に確認）。鍵は Secrets Manager に置き、2 つの鍵を並行して受け付けて入れ替える。
 - **受信**：SES の受信（東京リージョンで使える。[SES のエンドポイント](https://docs.aws.amazon.com/general/latest/gr/ses.html)）で `reply.example.dev` の MX を受け、本文を S3 に置き、SNS から SQS `inbound-email` に通知する。
 - **取り込み**の手順：
   1. トークンを検証し、利用者とスレッドを得る。無効なら捨てる（送り主に返事をしない。後方散乱を避ける）。
-  2. SES の受信の判定で、SPF か DKIM が通っていて、`From` のアドレスがその利用者の検証済みのアドレスであることを確かめる（本設計の追加の守り。転送されたメールのトークンの悪用を防ぐ。本家が行うかは未検証）。
+  2. SES の受信の判定で、SPF か DKIM が通っていて、`From` のアドレスがその利用者の検証済みのアドレスであることを確かめる（本設計の追加の守り。転送されたメールのトークンの悪用を防ぐ。本家が行うかは文書にない。**未検証**。本家に寄せる対象ではなく、この設計の判断とする）。
   3. 判定関数で、利用者がそのスレッドにコメントできるかを確かめる（リポジトリの read、ロック、ブロック、Issue の機能の有無）。
   4. 本文を取り出す：プレーンテキストの部分を優先し、引用と署名を取り除き、メールアドレスを置き換え、65,530 文字で切る。空なら捨てる。
   5. 通常のコメントの作成の経路（API と同じ関数）で投稿する。`Message-ID` を冪等のキーにし、同じメールで 2 回投稿しない。
@@ -245,13 +245,18 @@ Slack の [read-state-and-notifications.md](../../../slack/docs/architecture/rea
 - 返信：トークンの改ざん、パスワードの再設定の後の古いトークン、`From` の不一致、ロックされたスレッド、引用と署名の除去。
 - 障害注入：SQS・SES の失敗の後、通知が失われず、重複が許容の範囲に収まる。
 
-## 12. 決定（2026-09-26、既定案）
+## 12. 未解決の問い
+
+設計の中で出た問いと、その決定。計測・PoC で決めるものは「持ち越し」に置く。
+
+### 決定（2026-09-26、既定案）
 
 - 通知の遅延を NFR-011 にした（4.1 節。Web の受信箱 p95 30 秒、メール p95 5 分）。
 - 自動の watch：push の権限を得たリポジトリは既定で自動の watch、チームに入っただけでは watch しない（2.1 節）。
 - ブロックした人の行為による通知は届けない（3 節）。
 - 返信の取り込みの失敗は、利用者に知らせない（7.3 節）。
 - Organization のメールのドメインの制限は E10（5 節）。
+- **スレッドの `reason`**（2026-09-26 の本家の確認による追加）：本家と同じく、スレッドの `reason` は最新の通知の理由に替わるが、一度 `mention` になったら `mention` のまま残す（2.3 節）。
 
 持ち越し：
 
