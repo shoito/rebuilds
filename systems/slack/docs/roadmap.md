@@ -74,7 +74,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `thread-replies` | スレッドの返信（チャンネルの `seq` を消費する） |
 | `thread-subscriptions` | スレッドの購読 |
 | `reactions` | リアクション（`PUT` / `DELETE` で冪等） |
-| `mentions-and-broadcast` | メンションと @channel / @here |
+| `mentions-and-broadcast` | メンションと @channel / @here。6 人以上での送信前の確認、使えるロールの設定、10,000 人以上のチャンネルの制限、スレッドの中では通知しない（本家に合わせる。[messaging.md](architecture/messaging.md)） |
 | `composer-prosemirror-ast` | 入力欄と AST の変換、IME |
 | `mention-autocomplete` | @ / # / : の補完 |
 | `jump-to-message` | 指定した `seq` への移動（`around_seq` の API を含む） |
@@ -163,7 +163,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `audit-log-admin-view` | 管理者向けの閲覧 |
 | `retention-policies` | 保持ポリシー |
 | `legal-hold` | リーガルホールド |
-| `workspace-export` | ワークスペースのエクスポート |
+| `workspace-export` | ワークスペースのエクスポート。全データ（プライベート・DM を含む）は Business+ 以上で、申請と運用者の承認を経て有効にする（[security.md](architecture/security.md) の 15 節） |
 | `workspace-deletion` | ワークスペースの削除と消去 |
 | `invite-links` | 招待リンク（S2） |
 | `scim-users` | SCIM（S2） |
@@ -196,9 +196,14 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `modals-and-app-home` | モーダルとアプリのホーム |
 | `ephemeral-messages` | 一時的なメッセージ |
 | `incoming-webhooks` | 受信用の Webhook |
-| `developer-workspaces` | 開発用のワークスペース |
+| `developer-workspaces` | 開発用のワークスペース（本家の開発用のサンドボックスに合わせた上限と、ダミーのメンバーを含むひな形。[public-api.md](architecture/public-api.md) の 15 節） |
 | `app-review-and-verified-domains` | 配布するアプリの審査とドメインの確認 |
 | `public-api-typescript-sdk` | 公式の TypeScript の SDK |
+| `bot-token-rotation` | ボットのトークンのローテーション（アプリごとに有効化、12 時間のアクセストークン＋リフレッシュトークン。[public-api.md](architecture/public-api.md) の 15 節） |
+| `client-secret-overlap` | `client_secret` の入れ替えで旧い秘密を 24 時間有効にする（[apps.md](architecture/apps.md) の 14.3 節） |
+| `user-token-events` | ユーザーのトークンに結び付いたイベントの配送（[apps.md](architecture/apps.md) の 21 節） |
+| `socket-mode` | Socket Mode とアプリ単位のトークン。着手時に ADR-0031 の B を改める ADR を起票する（[apps.md](architecture/apps.md) の 7.6 節） |
+| `audit-logs-api` | Enterprise の監査ログの読み出し API（`auditlogs:read`。[public-api.md](architecture/public-api.md) の 15 節） |
 
 ### E10・E11 規模の拡張
 

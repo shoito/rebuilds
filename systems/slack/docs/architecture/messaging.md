@@ -147,6 +147,11 @@ thread_subscriptions (workspace_id, root_message_id, member_id,
 - 使えないメンションを含む投稿は、403 を返す。チャンネルを読めることは確認済みなので、存在は漏れない。
 - 既定のチャンネル以外での @everyone は、400 を返す。
 - DM・グループ DM での @here / @channel は受け付けるが、通知の対象はもともと全員なので意味は変わらない。
+- 本家 Slack に寄せて、次の制限と確認を置く（2026-09-26 に決定。[README.md](README.md) の 6 節）。詳しい規則と決定表は E3 の `mentions-and-broadcast` の spec に書く。
+  - **確認**：参加者が 6 人以上のチャンネルで @channel / @here / @everyone を含めて送ろうとしたら、クライアントが送信前に確認を求める（通知する人数を示す）。owner・admin は、ワークスペースの設定でこの確認を無効にできる。
+  - **使える人の制限**：owner・admin は、ワークスペースの設定で @channel / @here / @everyone を使えるロールを絞れる（既定は上の表）。
+  - **大規模チャンネル**：参加者が 10,000 人以上のチャンネルでは、@channel / @here を使えるのは owner・admin だけにする。S1（最大 5,000 人）では当たらない。
+  - **スレッドの中**：スレッドの返信に含めた @channel / @here / @everyone では、通知しない（本文はそのまま残す）。
 
 ### 保存
 

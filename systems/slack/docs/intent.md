@@ -68,3 +68,12 @@
 - 未読数をどこまで正確にするか。現時点では近似で許容している（[read-state-and-notifications.md](architecture/read-state-and-notifications.md)）。
 - データの保持期間と、法的保全（リーガルホールド）をいつ扱うか。
 - ワークスペースの削除・エクスポートと、データの保管地域（データレジデンシー）をいつ扱うか。
+
+### 決定（2026-09-26、既定案）
+
+上の Open questions は、本家 Slack に寄せて次のとおり決めた。
+
+- 未読数は近似のままにする。正確さは、クライアントとサーバーの突合で不一致率 0.1% 未満を保つことで担保する（[runbooks](runbooks/README.md) の 1 節、[quality.md](quality.md) の 4.1 節）。
+- データの保持期間とリーガルホールドは、E8 で扱う（[ADR-0019](decisions/0019-data-retention-and-deletion.md)）。保持ポリシーは Pro 以上、リーガルホールドは Enterprise だけ（[ADR-0033](decisions/0033-slack-aligned-platform-and-plan-decisions.md)）。
+- ワークスペースの削除とエクスポートは E8 で扱う（ADR-0019）。プライベートチャンネル・DM を含むエクスポートは Business+ 以上（ADR-0033、[security.md](architecture/security.md) の 15 節）。
+- データの保管地域の選択は、単一リージョン（東京、DR は大阪）の間は提供しない（ADR-0033）。

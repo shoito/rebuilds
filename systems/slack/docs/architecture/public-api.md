@@ -87,11 +87,11 @@ https://api.<domain>/v1/workspaces/{workspace_id}/<リソース>
 | `POST .../files`、`GET .../files/{id}`、`GET .../files/{id}/content` | アップロードの開始（署名付き URL を返す）、情報、本体（署名付き URL への 302） | `files:write` / `files:read` | `tier-write` / `tier-read` |
 | `POST .../views`、`PUT .../views/{view_id}` | モーダルを開く・更新する（アプリだけ） | なし（インストールの `trigger_id` で認可） | `tier-write` |
 | `PUT .../app-home/{member_id}` | アプリのホームの表示を置く（アプリだけ） | なし | `tier-write` |
-| `GET .../admin/audit-events` など管理の API | 後の版で追加する | `admin:*`（未定義） | `tier-admin` |
+| `GET .../audit-events` | 監査ログの読み出し。Enterprise だけ。後の版で追加する（15 節の決定） | `auditlogs:read` | `tier-admin` |
 
 - 表の `...` は `/v1/workspaces/{workspace_id}` を表す。
 - 大量のデータの取り出し（エクスポート）は、公開 API では提供しない。[ADR-0019](../decisions/0019-data-retention-and-deletion.md) のエクスポートの仕組みを使う。提供するときは `concurrency-bulk` を掛ける。
-- **公開 API でも使えないもの**（v1）：@everyone、ワークスペースの設定・ロール・SSO の変更、メンバーの招待と無効化、他人のメッセージの編集。管理の API は、需要を見て `admin:*` のスコープとともに後から加える。
+- **公開 API でも使えないもの**（v1）：@everyone、ワークスペースの設定・ロール・SSO の変更、メンバーの招待と無効化、他人のメッセージの編集。メンバーの作成・無効化は SCIM（[identity-and-access.md](identity-and-access.md) の 5.4 節）で行い、`admin:*` の管理の API は出さない（15 節の決定）。
 - 差分取得（`GET .../events?after_seq`）は公開しない。イベントの封筒（[realtime.md](realtime.md) の 4 節）は内部の形であり、アプリには Events API（[apps.md](apps.md) の 7 節）の形で届ける。
 
 ### 3.3 レート制限
@@ -105,11 +105,11 @@ https://api.<domain>/v1/workspaces/{workspace_id}/<リソース>
 
 | 種類 | 形式 | 誰の権限か | 発行 | 有効期間 | 使う場面 |
 | --- | --- | --- | --- | --- | --- |
-| ボットのトークン | `slk_bot_{token_id}_{secret}`（[identity-and-access.md](identity-and-access.md) の 9 節の形式） | インストールのボットのメンバー（`account_id IS NULL`） | インストールの完了時（[apps.md](apps.md) の 5 節） | 既定は無期限。入れ替えの API を持つ | アプリの大半の処理 |
+| ボットのトークン | `slk_bot_{token_id}_{secret}`（[identity-and-access.md](identity-and-access.md) の 9 節の形式） | インストールのボットのメンバー（`account_id IS NULL`） | インストールの完了時（[apps.md](apps.md) の 5 節） | 既定は無期限。入れ替えの API を持つ。アプリが有効にすれば、12 時間のアクセストークンとリフレッシュトークンの組にできる（15 節の決定） | アプリの大半の処理 |
 | ユーザーのトークン | OAuth 2.1 のアクセストークン（Better Auth の oauth-provider が発行する JWT。`aud` は `https://api.<domain>/v1`）＋リフレッシュトークン | 同意したメンバー | 認可コードのフロー（PKCE、機密クライアント） | アクセストークン 1 時間、リフレッシュトークン 30 日で、使うたびに入れ替える | 「メンバーとして」検索・投稿するアプリ |
 | Incoming Webhook の URL | `https://hooks.<domain>/v1/{webhook_id}/{secret}` | インストールのボット | インストール時、または管理画面 | 取り消すまで | 1 つのチャンネルへの投稿だけ（[apps.md](apps.md) の 11 節） |
 
-- **アプリ単位のトークン（本家の app-level token）は持たない。** 本家では主に Socket Mode の接続に使う。Socket Mode を提供しない（[apps.md](apps.md) の 7.6 節）ので、今は要らない。
+- **アプリ単位のトークン（本家の app-level token）は、E12 の初版では持たない。** 本家では主に Socket Mode の接続に使う。Socket Mode は E12 の後半で提供すると決めた（[apps.md](apps.md) の 21 節）ので、そのときに Socket Mode の接続の用途に限って加える。
 - **ユーザーのトークンは、ボットのトークンより危険が大きい。** メンバーが読めるもの（DM を含む）すべてに届くため。そのため、ユーザーのスコープはワークスペースの管理者の承認の対象にし（[apps.md](apps.md) の 6 節）、entitlement（`feature.api_user_tokens`）で提供の可否を分ける。
 - 個人が自分用に使う「個人のアクセストークン」は提供しない。スクリプトも、単一のワークスペースのアプリ（[apps.md](apps.md) の 4 節）を作って使う。
 - トークンの判別は接頭辞で行う。`slk_bot_` は `auth_resolve_api_token`（[identity-and-access.md](identity-and-access.md) の 9 節）、それ以外の Bearer は Better Auth の JWT の検証に回す。どちらでもなければ 401。
@@ -283,10 +283,10 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 ## 11. 開発用のワークスペース
 
 - 開発者は、無料の **開発用のワークスペース**（`workspaces.kind = 'developer'`）を作れる。本番と同じ環境の中の、通常のワークスペースである。専用のサンドボックスの環境（別の URL）は持たない。環境を分けると、本番との挙動の差が問題の源になるため。
-- 開発用のワークスペースの制限（メンバー数、保存容量、保持期間）は、開発用の区分の entitlement（[ADR-0032](../decisions/0032-plans-and-entitlements.md) の `limit.*`）で持つ。値は PM が決める（仮の値のまま）。
+- 開発用のワークスペースの制限（メンバー数、保存容量、保持期間）は、開発用の区分の entitlement（[ADR-0032](../decisions/0032-plans-and-entitlements.md) の `limit.*`）で持つ。値は 15 節の決定のとおり、本家の開発用のサンドボックスに合わせる。
 - 開発用のワークスペースでは、審査の前の配布型のアプリ（[apps.md](apps.md) の 4 節）をインストールできる。通常のワークスペースではできない。
 - レート制限の tier は、本番と同じにする。開発中に上限に当たる経験を、本番の前にしてもらうため。
-- テストデータの生成のために、開発用のワークスペースに限り、ダミーのメンバー（ボットと同じく `account_id IS NULL`）を作る API を後から検討する（未決定）。
+- テストデータは、開発用のワークスペースを作るときに選べるひな形（ダミーのメンバー 7 人、チャンネル、スレッド、リアクション）で入れる。ダミーのメンバーはボットと同じく `account_id IS NULL` で、ログインできず、上限の人数に数えない。作るための公開の API は持たない（15 節の決定）。
 
 ## 12. プランとエンタイトルメント
 
@@ -296,8 +296,8 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 | --- | --- | --- |
 | `limit.api.*` | 各 tier の値（[rate-limiting.md](rate-limiting.md)） | ADR-0032 の表 |
 | `limit.apps.installed` | インストールできるアプリの数 | ADR-0032 の表 |
-| `feature.api_user_tokens` | ユーザーのトークンを使うアプリを許すか | 追加の提案。値は PM が決める |
-| `feature.apps_admin_policy` | 管理者の承認・許可リストの設定（[apps.md](apps.md) の 6.3 節） | 追加の提案。値は PM が決める |
+| `feature.api_user_tokens` | ユーザーのトークンを使うアプリを許すか | 全プランで有効。ユーザーの機微なスコープ（`messages:read` など）は、ワークスペースの方針にかかわらず管理者の承認を要する（[apps.md](apps.md) の 6.1 節） |
+| `feature.apps_admin_policy` | 管理者の承認・許可リストの設定（[apps.md](apps.md) の 6.3 節） | 全プランで有効。本家もアプリの承認を全プランで提供する（[Manage app approval for your workspace](https://slack.com/help/articles/222386767-Manage-app-approval-for-your-workspace)）。既定の方針は 6.3 節のとおり |
 
 - entitlement は権限の判定を置き換えない。entitlement で許されていても、ADR-0005 の判定とスコープは必ず通す。
 
@@ -324,3 +324,11 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 - ボットのトークンを、短命のアクセストークンと入れ替えのためのトークンの組（本家のトークンのローテーション）にするか。今は無期限＋入れ替えの API。
 - 公開 API の `ETag` と条件付きの更新。
 - 開発用のワークスペースの制限の値と、ダミーのメンバーの作成。
+
+### 決定（2026-09-26、既定案）
+
+- **`admin:*` の管理の API は出さない。** 本家の `admin.*` の API は Enterprise の組織向けで、Enterprise Grid は範囲外（[intent.md](../intent.md) の Non-goals）。メンバーの作成・更新・無効化は SCIM（Business+ 以上、E8）に一本化する。監査ログの読み出しは、本家の Audit Logs API（Enterprise だけ、`auditlogs:read`、組織の owner がインストールする）に倣い、Enterprise だけの `auditlogs:read` として後の版で出す（roadmap の E12 `audit-logs-api`）（[Audit Logs API](https://docs.slack.dev/admins/audit-logs-api/)、2026-09-26 に確認）。
+- **公開のイベントの読み出し（取りこぼしの再取得）は出さない。** 本家の Events API も、再送（3 回まで、すぐ・1 分後・5 分後）はするが、取りこぼしたイベントを読み直す API は持たない。アプリは履歴の API（`GET .../channels/{id}/messages` の `after_seq`）で埋める。本システムの再試行の予定は [apps.md](apps.md) の 7.4 節のまま（[The Events API](https://docs.slack.dev/apis/events-api/)、2026-09-26 に確認）。
+- **ボットのトークンのローテーションは、アプリごとに選べるようにする。** 本家と同じく、アプリの設定で有効にすると、アクセストークンは 12 時間で失効し、リフレッシュトークンで更新する。一度有効にしたら戻せない。既定は今のとおり無期限＋入れ替えの API（[Using token rotation](https://docs.slack.dev/authentication/using-token-rotation/)、2026-09-26 に確認）。roadmap の E12 に `bot-token-rotation` を加えた。
+- **`ETag` と条件付きの更新は、v1 では出さない。** 本家の Web API にもない。後から加えても互換性を壊さない（8.1 節）ので、需要が出たら加える。
+- **開発用のワークスペースは、本家の開発用のサンドボックスに合わせる。** メンバーは 8 人まで（owner・admin を含み、ボットとダミーのメンバーを除く）、ゲストは 2 人まで。1 人が同時に持てるのは 2 つまで、30 日で 10 個まで作れる。有効期間は 6 か月で、延長できる。保存容量・履歴などは Free と同じ（ADR-0033）。作るときに、ダミーのメンバー 7 人とチャンネル・スレッドを含むひな形を選べる。本家のサンドボックスは 1 つに 5 つのワークスペースを持てるが、Enterprise Grid は範囲外なので、1 つの開発用のワークスペースを単位にする（[Developer sandboxes](https://docs.slack.dev/tools/developer-sandboxes/)、2026-09-26 に確認）。

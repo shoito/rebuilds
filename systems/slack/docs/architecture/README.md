@@ -83,6 +83,7 @@
 | NFR-007 | 復旧（AZ の障害） | RPO 0、RTO 5 分以内 | 自動フェイルオーバー |
 | NFR-008 | 復旧（リージョンの障害） | RPO 15 分以内、RTO 4 時間以内 | S3 で RPO 1 分、RTO 1 時間 |
 | NFR-009 | テナント分離 | 別のワークスペースのデータが見える事象は 0 件 | ADR-0009 |
+| NFR-010 | 通知の遅延 | DM と @メンバーの Web Push を、投稿から p95 5 秒以内に送信する | [read-state-and-notifications.md](read-state-and-notifications.md) の 10 節。送信までを測る（端末への到達は Push サービスに依存するため含めない） |
 
 ## 4. 技術スタック
 
@@ -152,12 +153,36 @@
 - **RLS の性能と設定漏れ**：ポリシーの条件が全クエリに加わる。`workspace_id` を先頭にしたインデックスで足りるかを、負荷試験で確認する。コンテキストの設定漏れは 0 件になる（安全側に倒れる）が、「データが消えた」ように見える不具合として現れるため、検知しにくい。
 - **テナント間の負荷の偏り**：大きなワークスペース 1 つが共有 DB と Gateway を占有しうる。テナント単位の上限とレート制限（runbooks）で抑え、足りなければ ADR-0009 の「将来の拡張」へ移る。
 - **未読数の正確さ**：近似で許容したが、「未読 3 件と出ているのに見当たらない」はユーザーの不信を招く。
-- **データ保持と削除**：保持期間ポリシーやリーガルホールドは MVP に含めていないが、企業利用では早い段階で要求される。
-- **マネージドサービスの対応状況**：Aurora が PostgreSQL 18（`uuidv7()`）と pg_bigm に対応しているか。大阪リージョンで Aurora Global Database のインスタンスなしの二次クラスタが使えるか。どちらも着手前に確かめる（ADR-0011、[infrastructure.md](infrastructure.md)）。
+- **データ保持と削除**：保持期間ポリシーやリーガルホールドは MVP に含めていない。E8 で扱う（ADR-0019、ADR-0033）。
+- **マネージドサービスの対応状況**：2026-09 に確認済み。Aurora PostgreSQL は PostgreSQL 18（`uuidv7()`）と pg_bigm に対応し、大阪リージョンも Aurora PostgreSQL 18.3 以降の Global Database に対応している（ADR-0011 の Confirmation）。残るのは、大阪の二次クラスタをインスタンスなしで持ち、切り替え前にインスタンスを足す手順を、実環境で試すことだけ（[infrastructure.md](infrastructure.md)）。
 - **検索の RLS の例外**：`search` スキーマだけは、テナントの分離を関数の実装に頼る（ADR-0027）。関数の変更のレビューと、性質ベーステストで守る。
 - **認証の基盤への依存**：Better Auth の脆弱性（例：SSO プラグインの CVE-2026-53515、1.6.11 で修正）の影響を直接受ける。使うエンドポイントを許可リストで絞り、勧告を監視する（ADR-0012）。
-- **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS の版に依存する。対応の下限（Safari 17 案）を PM が確定する（[client.md](client.md)）。
+- **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS の版に依存する。下限は Safari 17 に決めた（[client.md](client.md) の 13 節）。
 - **第三者のスクリプト**：GA4 を読み込むワークスペースでは、CSP が広がる（ADR-0025）。
 - **AI エージェントの書き込み**：MCP の書き込みは、プロンプトインジェクションで誤用されうる。既定で無効にし、レート制限と監査で抑える（ADR-0028）。
 - **外部との互換性**：公開 API とアプリ（E12）は、提供を始めると互換性を長く保つ義務が生じる。版の方針（ADR-0030）と OpenAPI の破壊的変更の検査で守る。
 - **レート制限の基盤**：判定のたびに Valkey へ 1 往復する。Valkey の障害中は、一般の制限が緩くなる（ADR-0029）。
+
+### 決定（2026-09-26、既定案）
+
+PM の方針（本家 Slack に寄せる、既定案）により、次のとおり決めた。上のリスクのうち、計測で確かめるものは決定の対象にせず、下の「持ち越し」に置いた。
+
+- **対応ブラウザの下限は Safari 17**（macOS・iOS / iPadOS）。本家のモバイルアプリの下限（iOS 17）に合わせ、半年ごとに見直す（[client.md](client.md) の 13 節）。
+- **通知の遅延を NFR にする（NFR-010）。** DM と @メンバーの Web Push を、投稿から p95 5 秒以内に送信する。本家は数値を公開していないが、「取りこぼさない」（[intent.md](../intent.md)）の価値を測るために、PM の案のまま NFR にした。runbooks の SLI と quality.md の E5 の合否基準に加えた。
+- **@channel / @here / @everyone の制限は、本家に合わせる。** 提案の「1,000 人以上のチャンネルで制限」ではなく、本家の規則にした。
+  - 参加者が 6 人以上のチャンネルでは送信前に確認を求める。owner・admin は確認を無効にできる。
+  - owner・admin は使えるロールを絞れる。
+  - 参加者が 10,000 人以上のチャンネルでは、@channel / @here を owner・admin だけが使える。
+  - スレッドの返信の中では通知しない。
+  - 出典：[Notify a channel or workspace](https://slack.com/help/articles/202009646-Notify-a-channel-or-workspace)、[Manage who can notify a channel or workspace](https://slack.com/help/articles/115004855143-Manage-who-can-notify-a-channel-or-workspace)（2026-09-26 に確認）。詳細は [messaging.md](messaging.md) の「誰が使えるか」。E3 の `mentions-and-broadcast` の spec で決定表にする。
+- **監査ログの保持**は [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) で決めた（DB に 1 年、アーカイブに 2 年）。解決済み。
+- 領域ごとの問いの決定は、各文書の「決定（2026-09-26、既定案）」にある：[client.md](client.md)、[security.md](security.md)、[identity-and-access.md](identity-and-access.md)、[search.md](search.md)、[mcp.md](mcp.md)、[public-api.md](public-api.md)、[apps.md](apps.md)。
+
+持ち越し（計測・PoC・後の段階で決めるもの）：
+
+| 項目 | いつ・どう決めるか |
+| --- | --- |
+| 巨大チャンネルのファンアウト、`last_seq` のホットスポット、RLS の性能 | E7 の `capacity-load-tests`（k6）で計測して判断する。足りなければ E10 の `large-channel-path` へ |
+| 大阪の headless の二次クラスタの切り替え手順 | 対応状況は確認済み（ADR-0011）。E1 の `terraform-foundation` の後、staging で手順を試す |
+| S3 で Global が止まったときの、キャッシュの切れたセッションの扱い | E11。ADR-0023（proposed）を accepted にする前に決める（[infrastructure.md](infrastructure.md) の 10.2 節） |
+| iOS の PWA のバックグラウンドでの接続の寿命 | E4 の着手前に、実機の PoC で測る（[client.md](client.md) の 3.4 節） |

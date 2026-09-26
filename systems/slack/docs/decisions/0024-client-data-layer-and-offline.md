@@ -80,6 +80,9 @@ Web クライアント（PWA）は、次のことを満たす必要がある（[
   - SharedWorker のデバッグは、タブより手間がかかる。
   - 同期エンジンを、SharedWorker とタブ単体の 2 つの動かし方で試験する必要がある。
   - IndexedDB に、プライベートチャンネルの本文が端末に残る。ログアウト時に消すが、共有端末での扱いは未解決。
+
+    > 2026-09-26 の注記：共有端末向けの「この端末に保存しない」設定は設けないと決めた。ログアウト時の消去と、セッションの最大有効期間で抑える（[client.md](../architecture/client.md) の 13 節の決定）。
+
   - Safari は、ホーム画面に追加していないサイトのデータを、操作のない 7 日間で消しうる（[WebKit の Tracking Prevention の文書](https://webkit.org/tracking-prevention/)で 2026-09-26 に確認。ホーム画面の Web アプリは対象外）。キャッシュと未送信が消えても、最新ページの取り直しで動くようにする。
   - iOS の PWA がバックグラウンドにある間の SharedWorker と WebSocket の寿命は、公式の文書に定めがなく未検証。フォアグラウンドに戻ったら必ず差分取得する。E4 の着手前に実機の PoC で測る（[client.md](../architecture/client.md) の 3.4 節）。
 

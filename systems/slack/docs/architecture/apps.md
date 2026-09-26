@@ -266,7 +266,7 @@ MCP（[mcp.md](mcp.md) の 3.2 節）の語彙をそのまま使い、足りな�
 - アプリは、マニフェストの `bot_events` で購読するイベントを選ぶ。実際に届くのは、インストールで許されたスコープ（6.2 節）で絞ったもの。
 - **チャンネルのイベントは、ボットがそのチャンネルを読めるときだけ届く。** 判定は配送の直前に ADR-0005 の判定関数で行う。ボットが参加していないパブリックチャンネルのイベントは、ボットが読める（6.4 節の 3 行目）が、既定では届けない。購読の単位を「ボットが参加しているチャンネル」に限り、配送の量をチャンネルの数に比例させないため。
 - `app.mention` は、ボットのメンバーへのメンションを含むメッセージが投稿されたとき、ボットがそのチャンネルを読めれば届く（参加していなくても、パブリックなら届く）。
-- ユーザーのトークンに結び付いたイベント（そのメンバーが見るものすべて）は、提供しない（19 節）。
+- ユーザーのトークンに結び付いたイベント（同意したメンバーが見るもの）は、E12 の後半で提供する（21 節の決定）。E12 の初版では提供しない。
 - DM・グループ DM は、ボットが参加者のときだけ届く。
 
 ### 7.2 封筒とペイロード
@@ -347,7 +347,7 @@ app-delivery-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎ�
 
 ### 7.6 Socket Mode（WebSocket での受け取り）
 
-**E12 では提供しない。**
+**E12 の初版では提供しない。** 本家に寄せて、E12 の後半で提供すると決めた（21 節の決定）。下の理由から、Gateway とは別のサービスにし、着手時に ADR を起票する。
 
 - 利点は、公開の URL を持てない環境（社内のネットワークの中、開発者の手元）でアプリを動かせること。
 - 一方で、アプリごとに長く続く接続を受ける、状態を持つ新しいサービスが要る。Gateway（[realtime.md](realtime.md)）は「ブラウザへのベストエフォートの配信」のためのもので、確実な配送（再試行、未配送の保持）の責務を持たせると、Gateway の設計の前提が崩れる。
@@ -552,7 +552,7 @@ type InputElement = Element | { type: "plain_text_input"; action_id: string; mul
 | --- | --- | --- |
 | ボットのトークン | 公開 API とコンソール（5.3 節） | 24 時間。漏洩時は即時 |
 | 署名の秘密 | コンソール | 24 時間（新旧の 2 つで署名する。8 節） |
-| `client_secret` | コンソール（Better Auth の `/oauth2/client/rotate-secret`） | **なし**。Better Auth は旧い秘密を即座に無効にする（[public-api.md](public-api.md) の 4.1 節）。コンソールで「新しい秘密を表示 → アプリに設定してから確定」の 2 段にし、確定の時点で入れ替える。重なりを持たせる手段は E12 で調べる |
+| `client_secret` | コンソール | 24 時間（本家と同じ。21 節の決定）。Better Auth の `/oauth2/client/rotate-secret` は旧い秘密を即座に無効にする（[public-api.md](public-api.md) の 4.1 節）ので、トークンのエンドポイントを本システムのハンドラーで包み、旧い秘密のハッシュを 24 時間だけ別に持って照合する。漏洩時は即時に失効させる |
 | Incoming Webhook の秘密 | 公開 API とコンソール | 1 時間 |
 | KMS の `apps` キー | KMS の自動ローテーション（[ADR-0017](../decisions/0017-encryption-and-key-management.md)） | — |
 
@@ -646,7 +646,7 @@ quality.md への追加の提案。
 
 | 文書 | 変更 |
 | --- | --- |
-| [intent.md](../intent.md) の Non-goals | 「アプリ / Bot プラットフォーム、汎用の公開 API」を、「MVP の後（E12）で提供する。公開のディレクトリ、Socket Mode、Enterprise 向けの組織単位のインストールは対象外」に改める（PM） |
+| [intent.md](../intent.md) の Non-goals | 「アプリ / Bot プラットフォーム、汎用の公開 API」を、「MVP の後（E12）で提供する。公開のディレクトリ、Socket Mode、Enterprise 向けの組織単位のインストールは対象外」に改める（PM）。Socket Mode は、21 節の決定で E12 の後半に提供することにした |
 | [identity-and-access.md](identity-and-access.md) の 9 節 | ボットのトークンをインストールに属するものにする。管理者が手でボットを作る経路を、単一ワークスペースのアプリに置き換える。`api_tokens` に `installation_id` を加える |
 | 同 6.5 節 | スコープの表を 6.1 節の語彙に改める（`channels:history` → `messages:read`、`chat:write` → `messages:write`、`realtime:connect` はアプリに出さない） |
 | 同 15 節 | `members.kind` を加えることに決める |
@@ -673,3 +673,17 @@ quality.md への追加の提案。
 - Socket Mode（7.6 節）と、送信元の固定の IP（13 節）の需要。
 - `client_secret` の入れ替えに重なりを持たせる方法（Better Auth の拡張か、`private_key_jwt` を勧めるか）。
 - Enterprise 向けに、複数のワークスペースへ一括でインストールする仕組み（Enterprise Grid は範囲外だが、需要は出うる）。
+
+### 決定（2026-09-26、既定案）
+
+残る問いは、本家 Slack に寄せて次のとおり決めた。
+
+- **ユーザーのトークンに結び付いたイベントを提供する（E12 の後半）。** 本家の Events API は、ユーザーのスコープで同意したメンバーが「見える」イベントを届ける。同じイベントが複数の同意したメンバーに見えるときは、1 件だけ送り、見えるメンバーを 1 人 `authorizations` に入れる（[The Events API](https://docs.slack.dev/apis/events-api/)、2026-09-26 に確認）。本システムも同じ形にし、配送の量をメンバーの数に比例させない。統制：
+  - ユーザーの `messages:read`・`search:read` は機微のスコープなので、ワークスペースの方針にかかわらず owner・admin の承認を要する（6.1 節、6.4 節）。プランで提供を分けない（`feature.api_user_tokens` は全プランで有効）。
+  - 同意の画面と承認の依頼に、DM・グループ DM の内容がアプリに届くことを明示する。
+  - 配送の直前に、同意したメンバーが読めるかを ADR-0005 の判定関数で確かめる（7.1 節と同じ）。
+  - roadmap の E12 に `user-token-events` を加えた。配送の量は、着手時に 18.1 節の見積もりに加える。
+- **Socket Mode を提供する（E12 の後半）。** 本家は Socket Mode を提供し、アプリ単位のトークンで接続させる。Socket Mode のアプリは公開の Marketplace に載せられない（[Using Socket Mode](https://docs.slack.dev/apis/events-api/using-socket-mode/)、2026-09-26 に確認）。本システムも、Socket Mode を使えるのを単一ワークスペースのアプリと、審査を受けていない配布型のアプリに限る（審査済みのアプリは HTTPS の配送だけ）。確実な配送の責務を持つので、Gateway（ADR-0013）と別のサービスにする。ADR-0031 の「B」を改める ADR を、`socket-mode` の着手時に起票する（持ち越し：サービスの構成は ADR で決める）。roadmap の E12 に `socket-mode` を加えた。
+- **送信元の IP は固定しない（13 節のまま）。** 本家もアプリへの要求の送信元の IP を案内せず、署名の検証で本物かを確かめるよう求める（[Verifying requests from Slack](https://docs.slack.dev/authentication/verifying-requests-from-slack/)、2026-09-26 に確認）。公開の URL を持てない環境には、Socket Mode を案内する。
+- **`client_secret` の入れ替えに、24 時間の重なりを持たせる。** 本家では、入れ替えの後も旧い秘密が 24 時間有効で、手で取り消せば即座に無効になる（同上）。Better Auth は拡張せず、トークンのエンドポイントを本システムのハンドラーで包む方式にする（5.1 節で、一時的な値の扱いのために包む場合と同じハンドラー）。`private_key_jwt` は本家にないので、勧めない。14.3 節の表を改めた。
+- **Enterprise 向けの、複数のワークスペースへの一括のインストールは提供しない。** 本家では Enterprise Grid の組織単位のインストールにあたり、Enterprise Grid は範囲外（[intent.md](../intent.md) の Non-goals）。
