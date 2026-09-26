@@ -32,7 +32,7 @@
     │   ├── roadmap.md         # Epic
     │   ├── specs/             # 実装済みの振る舞いの正本
     │   ├── decisions/         # ADR
-    │   └── changes/           # 進行中の変更（Story 単位）：spec.md（差分）＋ plan.md
+    │   └── changes/           # 進行中の変更（Story 単位）：spec.md（差分）＋ plan.md、任意で intent.md・quality.md
     └── <実装コード>
 ```
 

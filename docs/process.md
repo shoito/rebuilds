@@ -24,7 +24,8 @@ systems/<name>/
 │       ├── NNNN-<slug>/       # 進行中の変更（Story 単位）
 │       │   ├── intent.md      # 任意：変更の動機が roadmap だけで伝わらないとき
 │       │   ├── spec.md        # 正本への差分：ADDED / MODIFIED / REMOVED
-│       │   └── plan.md        # Files / Order of work / Risks / Proof
+│       │   ├── plan.md        # Files / Order of work / Risks / Proof
+│       │   └── quality.md     # 任意：リスクの高い変更のテスト設計（8 節の条件を満たすとき）
 │       └── archive/           # 完了した変更
 └── <実装コード>
 ```
@@ -48,7 +49,8 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | tasks.md の `_Requirements: 1.2_` | Order of work と Proof の要件 ID | 要件 ID をテスト名にも含め、CI で追跡を検査する |
 | `bugfix.md` | 規模「小」の `plan.md` | Proof に回帰テストを書く。Kiro の「Unchanged Behavior」（直さないこと）の考え方は Risks に書く |
 | `.kiro/specs/<feature>/` 一式（機能ごとに残り続ける） | `specs/<capability>/spec.md`（正本）＋ `changes/archive/` | Kiro は機能ごとの spec がそのまま残る。ここでは完了した差分を capability ごとの正本へ反映し、変更フォルダは履歴として archive に移す |
-| （なし） | `quality.md` | QA が持つ品質戦略。Kiro には対応するものがない |
+| （なし） | `quality.md`（題材レベル） | QA が持つ品質戦略。Kiro には対応するものがない |
+| （なし） | `changes/NNNN-<slug>/quality.md`（任意） | リスクの高い変更のテスト設計。Kiro には対応するものがない |
 
 要するに、**spec.md は requirements.md ＋ design.md（のうち、その変更に固有の部分）**、**plan.md は tasks.md に Files・Risks・Proof を足したもの** にあたる。
 
@@ -57,13 +59,13 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | 段 | 成果物 | 作り手 | 承認者 | 完了条件 |
 | --- | --- | --- | --- | --- |
 | Plan | `intent.md` | 起票者（Claude と壁打ちして作る） | プロダクトオーナー | 問題・望む結果・制約・未解決の問いが本人の言葉で書かれている |
-| Design | `spec.md`（差分）、必要なら ADR | Claude（起票者が指示） | テックリード、**QA** | 要件がすべて ID と受け入れ基準を持つ。QA が受け入れ基準と正しさの性質をレビュー済み |
+| Design | `spec.md`（差分）、必要なら ADR と `quality.md` | Claude（起票者が指示） | テックリード、**QA** | 要件がすべて ID と受け入れ基準を持つ。QA が受け入れ基準と正しさの性質をレビュー済み。8 節の条件に当たる変更は `quality.md` がある |
 | Build | `plan.md`、コード | Claude（plan mode で計画 → 承認 → 実装） | エンジニア | 会話を見ていないエンジニアでも plan だけで実装できる |
 | Test | テスト結果、eval 結果 | Claude（自分で確認ループを回す）、CI | QA | `plan.md` の Proof がすべて満たされている |
 | Deploy | PR とレビュー指摘 | Claude（レビュー） | コードオーナー | `REVIEW.md` の方針で Important の指摘が 0 件 |
 | Maintain | 新しい `intent.md` | 監視 → Claude が調査 | プロダクトオーナー | 指標が許容範囲を外れたら、調査結果が intent として起票される |
 
-変更が完了したら、`spec.md` の差分を `specs/` の正本に反映し、変更フォルダを `changes/archive/` に移す。これを **アーカイブ** と呼ぶ。アーカイブは変更の最後の PR で行う。
+変更が完了したら、`spec.md` の差分を `specs/` の正本に反映し、変更フォルダを `changes/archive/` に移す。これを **アーカイブ** と呼ぶ。アーカイブは変更の最後の PR で行う。変更に `quality.md` がある場合、その内容は正本の `specs/` へは反映しない。他の変更でも使える知見だけを、題材の `quality.md` へ反映する。
 
 ## 3. 規模に応じた経路
 
@@ -74,7 +76,9 @@ Kiro の Spec-Driven Development に慣れている人向けの対応表。
 | 軽微 | typo、依存の更新、振る舞いを変えない修正 | PR のみ |
 | 小 | 既存の振る舞いのバグ修正 | `plan.md`（Proof に回帰テストを書く） |
 | 標準 | Story 1 件の機能追加・変更 | `spec.md` ＋ `plan.md` |
-| 大 | 新しい Epic、アーキテクチャに影響する変更 | `intent.md` ＋ `spec.md` ＋ `plan.md` ＋ ADR。`roadmap.md` も更新する |
+| 大 | 新しい Epic、アーキテクチャに影響する変更 | `intent.md` ＋ `spec.md` ＋ `plan.md` ＋ ADR ＋ `quality.md`。`roadmap.md` も更新する |
+
+規模にかかわらず、8 節の条件に当たる変更には `quality.md` を加える。
 
 ## 4. 粒度
 
@@ -135,12 +139,35 @@ ID は一度振ったら再利用しない。削除した要件の ID は欠番�
 
 ## 8. 品質
 
-品質戦略は題材ごとに `quality.md` にまとめ、QA が持つ。変更ごとのテスト設計は、独立した文書にせず次の 2 か所に書く。
+品質に関する記述は、次の 2 層に分ける。
 
-- `spec.md`：シナリオと正しさの性質
-- `plan.md`：Proof（何を、どのテストで証明するか）
+| 層 | 文書 | 持ち主 | 内容 |
+| --- | --- | --- | --- |
+| 題材 | `docs/quality.md` | QA | 品質戦略、リスク、テストのレベル構成、シフトライト、Epic ごとのテスト計画 |
+| 変更 | `spec.md` | 起票者、Claude | **何が正しいか**：シナリオと正しさの性質 |
+| 変更 | `plan.md` の Proof | Claude | **どう証明するか**：要件・性質ごとの証明方法 |
+| 変更 | `quality.md`（任意） | QA（草案は Claude） | Proof の表に収まらないテスト設計の詳細 |
 
-QA は Design 段の承認者として、受け入れ基準と性質をレビューする（シフトレフト）。本番での検証（シフトライト）は `quality.md` に定義し、Maintain 段で新しい intent を生む。
+### 変更単位の quality.md を作る条件
+
+次のいずれかに当たる変更で作る。当たるかどうかの判断は、Design 段で QA が行う。
+
+- 題材の `quality.md` にあるリスク上位 3 件に触れる
+- 新しい種類のテスト基盤（障害注入、負荷生成、新しいテストデータ生成など）が必要になる
+- 規模が「大」である
+
+中身は [templates/change-quality.md](templates/change-quality.md) に従う。
+
+- テスト設計の詳細（組み合わせ表、障害注入のシナリオ、負荷のモデル）
+- テスト環境とテストデータ
+- 合否の判定基準
+- シフトライト（リリース後に何を見るか、どうなったら戻すか）
+
+### QA の関門
+
+- QA は Design 段の承認者として、`spec.md` の受け入れ基準と性質、変更単位の `quality.md` をレビューする（シフトレフト）。
+- Test 段では、`plan.md` の Proof と変更単位の `quality.md` の合否基準をもとに判定する。
+- 本番での検証（シフトライト）は `quality.md` に定義し、許容範囲を外れたら Maintain 段で新しい intent を起票する。
 
 ## 9. テンプレート
 
@@ -148,7 +175,8 @@ QA は Design 段の承認者として、受け入れ基準と性質をレビュ
 | --- | --- |
 | `intent.md` | [templates/intent.md](templates/intent.md) |
 | `architecture.md` | [templates/architecture.md](templates/architecture.md) |
-| `quality.md` | [templates/quality.md](templates/quality.md) |
+| `quality.md`（題材） | [templates/quality.md](templates/quality.md) |
+| `quality.md`（変更） | [templates/change-quality.md](templates/change-quality.md) |
 | `roadmap.md` | [templates/roadmap.md](templates/roadmap.md) |
 | `spec.md`（正本・差分） | [templates/spec.md](templates/spec.md) |
 | `plan.md` | [templates/plan.md](templates/plan.md) |
