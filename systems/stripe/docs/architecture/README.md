@@ -35,7 +35,7 @@
 │  Vault：カード番号の受け取り・トークン化・保管・復号       │◀┘ │
 │  Connector Gateway：アクワイアラへ送る要求の組み立て       │    │
 └──────────────────────────────────────────────────────────┘    │
-            ▲ トークンだけで呼ぶ                                  │
+     ▲ PrivateLink（pm_ だけ）  │ SQS connector-results        │
 ┌──────────── 本体（CDE の外）────────────────────────────────┐ │
 │  API ──▶ Payments（状態遷移）──▶ Ledger（複式簿記）          │◀┘
 │    │        │                      │                          │
@@ -50,7 +50,7 @@
 | API | 認証（API キー）、冪等、版の変換、入力の検証、レート制限 |
 | Payments | PaymentIntent・Refund の状態遷移。コネクタへの要求と結果の反映 |
 | Ledger | すべてのお金の動きを、借方と貸方が一致する仕訳として追記する。残高はここから求める |
-| Vault（CDE） | カード番号を受け取り、トークンに置き換えて保管する。アクワイアラへの送信のときだけ復号する |
+| Vault（CDE） | vault-ingest がカード番号を受け取って暗号化・保管し、vault-core が本体の要求で `pm_` に紐づける。復号は Connector Gateway だけ（[card-vault.md](card-vault.md)） |
 | Connector Gateway（CDE） | 決済代行・アクワイアラごとの差を吸収する。カード番号を扱うので CDE に置く |
 | Fraud | 決済の前にルールで判定し、3D セキュアの要否を決める |
 | Payouts・照合 | 加盟店への入金と、決済代行の精算ファイル・銀行の明細との照合 |
@@ -66,7 +66,7 @@
 
 | 段階 | 決済の確定（ピーク） | 加盟店 | 構成 |
 | --- | --- | --- | --- |
-| S1（MVP） | 500 件/秒 | 1 万 | 1 リージョン（東京）・3 AZ。Aurora の writer 1 台＋reader。CDE は東京の別アカウント |
+| S1（MVP） | 500 件/秒 | 1 万 | 1 リージョン（東京）・3 AZ。Aurora の writer 1 台＋reader。CDE は東京の別アカウント（cde-live・cde-test）。大阪にウォームスタンバイ（ADR-0030） |
 | S2 | 5,000 件/秒 | 10 万 | 台帳の書き込みを加盟店のハッシュで分割（シャード）する。Webhook の配信を独立したクラスタにする |
 | S3 | 50,000 件/秒（年末商戦の急増を含む） | 100 万 | セル構成。大阪と東京の両方で決済を受ける。大口の加盟店に専用のセル |
 
@@ -94,7 +94,7 @@
 | API | Hono＋Zod。公開 API は `@hono/zod-openapi` で OpenAPI を出す | |
 | DB | Aurora PostgreSQL 18。台帳は追記のみのテーブルと制約で守る | |
 | 非同期 | transactional outbox → SQS | Slack と同じ |
-| CDE | 別の AWS アカウント。暗号鍵は KMS（CDE 専用の鍵）。必要に応じて AWS Payment Cryptography | [ADR-0005](../decisions/0005-pci-scope-segmentation.md) |
+| CDE | 別の AWS アカウント（cde-live・cde-test）。暗号鍵は KMS（CDE 専用の鍵）。必要に応じて AWS Payment Cryptography | [ADR-0005](../decisions/0005-pci-scope-segmentation.md)、[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md)、[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) |
 | 実行基盤 | AWS（ECS Fargate、Aurora、SQS、S3、CloudFront） | [ADR-0001](../decisions/0001-platform-and-stack.md) |
 | IaC | Terraform | Slack と同じ |
 | 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | Slack と同じ |
@@ -109,10 +109,73 @@
 | [0004](../decisions/0004-idempotency.md) | すべての書き込みを冪等にする |
 | [0005](../decisions/0005-pci-scope-segmentation.md) | カード情報は CDE（別の AWS アカウント）に閉じ込め、本体はトークンだけを扱う |
 
-領域ごとの ADR は、各文書から参照する。
+| [0006](../decisions/0006-api-shape.md) | 公開 API は本家 v1 のリソースの形に寄せ、本文は JSON。見出しは `<Brand>-` にする |
+| [0007](../decisions/0007-date-based-api-versions.md) | API の版は日付で持ち、アカウントに固定し、変更モジュールで古い版の形を保つ |
+| [0008](../decisions/0008-api-keys-and-dashboard-access.md) | API キーは本家と同じ 3 種類（接頭辞は `<brand>_`）。ダッシュボードは Better Auth と必須の MFA |
+| [0009](../decisions/0009-rate-limiting.md) | レート制限は本家の単位と値に寄せ、Slack の層と GCRA で行う |
+| [0010](../decisions/0010-payment-intent-state-machine.md) | PaymentIntent を唯一の決済オブジェクトにし、遷移を 1 つの遷移関数に集める |
+| [0011](../decisions/0011-connector-abstraction-and-unknown-outcome.md) | コネクタを共通の操作と能力で抽象し、結果不明は照会と取り消しで確定させる |
+| [0012](../decisions/0012-3ds-via-connector.md) | 3D セキュアはコネクタの 3DS Server を使い、日本発行のカードの CIT では常に要求する |
+| [0013](../decisions/0013-japan-async-payment-methods.md) | コンビニ払いと銀行振込は `requires_action` で待ち、銀行振込は顧客の現金残高を経由する |
+| [0014](../decisions/0014-connector-inbox.md) | コネクタからの通知は受信箱に記録してから、重複と順序を解決して反映する |
+| [0015](../decisions/0015-chart-of-accounts-and-balance-transactions.md) | 保留中・利用可能を別の口座にし、BalanceTransaction を仕訳の射影にする |
+| [0016](../decisions/0016-hot-accounts-and-ledger-sharding.md) | 加盟店の残高の集計をスロットに分ける。S2 は加盟店のハッシュで台帳を分ける |
+| [0017](../decisions/0017-three-way-reconciliation-with-suspense.md) | 台帳・精算・銀行の明細を 3 者で照合し、説明のつかないお金は仮勘定に置く |
+| [0018](../decisions/0018-payout-execution-via-banking-partner.md) | 入金は作成の時点で残高から引き、提携銀行の API（予備に全銀のファイル）で振り込む |
+| [0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) | カード番号は CDE 専用の KMS の鍵でエンベロープ暗号化し、鍵の操作を役割で分ける |
+| [0020](../decisions/0020-cde-access-model.md) | CDE へのアクセスは、人は JIT だけ。AI エージェントには与えない |
+| [0021](../decisions/0021-fraud-rules-engine.md) | 不正検知は Radar に寄せたルールを決済の経路の中で同期に評価する |
+| [0022](../decisions/0022-merchant-onboarding-and-kyc.md) | 加盟店の審査は自前の状態機械で持ち、確認・照合は外部の提供者を使う |
+| [0023](../decisions/0023-audit-log.md) | 監査ログは Slack の方式を引き継ぎ、CDE の記録は別の系統で log-archive へ送る |
+| [0024](../decisions/0024-data-retention-and-deletion.md) | 財務の記録は法定の期間まで残し、カード番号と個人情報は用が済んだら消す |
+| [0025](../decisions/0025-webhook-signing-and-isolated-delivery.md) | Webhook は本家の形式で署名し（`<Brand>-Signature`）、固定 IP の egress VPC から送る |
+| [0026](../decisions/0026-snapshot-event-model.md) | Event は作成時点のスナップショットとして不変に保存する（MVP は snapshot だけ） |
+| [0027](../decisions/0027-checkout-and-elements-isolation.md) | カード入力は CDE の側のオリジンが配る iframe で受け、loader も CDE の変更管理で配る |
+| [0028](../decisions/0028-dashboard-architecture.md) | ダッシュボードは公開 API を呼ぶ SPA にし、第三者のスクリプトを読み込まない |
+| [0029](../decisions/0029-multi-account-and-cde-layout.md) | AWS アカウントを PCI DSS の範囲で分け、CDE は cde-live と cde-test。本体→CDE は PrivateLink、CDE→本体は SQS だけ |
+| [0030](../decisions/0030-payments-disaster-recovery.md) | S1 から大阪にウォームスタンバイを持ち、失った決済はコネクタへの照会で回復する |
+| [0031](../decisions/0031-active-active-cells.md) | S3 で加盟店をセルに固定し、東京・大阪の active-active にする（proposed） |
+| [0032](../decisions/0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから加盟店単位のカナリアで広げる |
+| [0033](../decisions/0033-cde-pipeline-and-change-control.md) | CDE のコードは `cde/` に置き、ビルド・デプロイの経路と承認を本体から分ける |
+
+リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
 ## 6. リスクと未解決事項
 
-- **コネクタの先の障害**：決済の成否は決済代行・アクワイアラに依存する。タイムアウトした要求の結果が分からない状態（オーソリが通ったか不明）を、どう回復するかが最大の難所である（[payments.md](payments.md)）。
-- **台帳の書き込みのホットスポット**：大口の加盟店の残高の口座に書き込みが集中する（[ledger.md](ledger.md)）。
-- **法令**：資金決済法の上の位置づけは、法務の確認待ち（[intent.md](../intent.md)）。
+- **コネクタの先の障害と結果不明**：決済の成否は決済代行・アクワイアラに依存する。タイムアウトした要求の結果が分からない状態は、`processing` で待ち、照会と取り消しで確定させる（[ADR-0011](../decisions/0011-connector-abstraction-and-unknown-outcome.md)、[payments.md](payments.md) の 7 節）。照会 API を持たない接続先は本番で使わない。
+- **台帳の書き込みのホットスポット**：大口の加盟店の残高の口座はスロットで分け、プラットフォームの口座は集計しない（[ADR-0016](../decisions/0016-hot-accounts-and-ledger-sharding.md)）。スロットで足りるかは E10 の負荷試験で確かめる。
+- **エラーにならないお金の誤り**：手数料・仕訳の規則の誤りは、照合や Payout で後から見つかる。影の実行と加盟店単位のカナリア、お金の不変条件のガードで防ぐ（[ADR-0032](../decisions/0032-release-safety-for-money-moving-code.md)）。
+- **カード番号の CDE の外への漏れ**：iframe・Vault・ログの多重の防御と、PAN の形の走査で守る（[card-vault.md](card-vault.md)、[observability.md](observability.md) の 4.2 節）。PrivateLink の扱い、本体に指紋と BIN・下 4 桁を置く扱いは、E10 の QSA の事前相談で確かめる。
+- **リージョンの障害で失う書き込み**：Global Database の複製の遅延ぶんを、コネクタへの照会で回復する（[ADR-0030](../decisions/0030-payments-disaster-recovery.md)）。接続先の重複の扱いと照会 API に依存するので、接続先の選定（E3）で確かめる。
+- **接続先への依存**：最初のカードのコネクタ、コンビニ収納代行、提携銀行が未定。30 日のオーソリ、3DS Server、照会の整合性の時間、精算のサイクル、振込の API の仕様は、選定の後に確かめる。
+- **法令**：資金決済法の上の位置づけなど、法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
+
+### 決定（2026-09-26、既定案）
+
+PM の方針（本家 Stripe に寄せる、既定案）により、次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に集めた。計測・PoC・接続先の選定で決めるものは、下の「持ち越し」に置いた。
+
+- **本家の名前・接頭辞を使わない**（リポジトリ共通の ADR-0006）。見出しは `<Brand>-Version`・`<Brand>-Should-Retry`・`<Brand>-Rate-Limited-Reason`・`<Brand>-Signature`。API キーは `<brand>_{pk|sk|rk}_{live|test}_`、Webhook の署名の秘密は `<brand>_whsec_`。ドメインは `api.<domain>`・`js.<domain>` など。オブジェクトの ID の接頭辞（`pi_`、`cus_`、`du_` など）は秘密ではないので本家に合わせる。ADR-0002・0006・0008・0025 の表記を改めた。
+- **Dispute の ID は `du_`**、手数料は 1 件 1,500 円（本家の日本と同じ。[Stripe 料金](https://stripe.com/jp/pricing)）。
+- **残高が足りないときの返金は本家に合わせる。** 利用可能な残高から引き、足りなければカードの返金は残高が足りるまで保留（最長 30 日、過ぎたら `insufficient_funds` で失敗）、他の決済手段の返金は失敗にする（[支払いの返金とキャンセル](https://docs.stripe.com/refunds)）。Dispute の引き落としはマイナスを許す。[payments.md](payments.md) の 10.2 節、[ledger.md](ledger.md)、ADR-0016 を揃えた。コンビニ・銀行振込の返金のために `refunds_payable` の口座を足した。
+- **CDE の構成は ADR-0029 を正とする。** アカウントは cde-live・cde-test（ほかに cde-nonprod、cde-shared）。本体 → CDE は PrivateLink、CDE → 本体は SQS（`connector-results`）だけ。PaymentMethod の作成は「ブラウザ → vault-ingest（使い捨ての `card_input`）→ 本体の API → vault-core の紐づけ」の向きにし、CDE から本体を呼ばない。境界を越える識別子は `pm_` だけ（紐づけの 1 回だけ `card_input`）。[card-vault.md](card-vault.md)、[security.md](security.md)、[infrastructure.md](infrastructure.md)、[checkout.md](checkout.md)、ADR-0027 を揃えた。
+- **Webhook の送信元の IP** は、専用の egress VPC の Elastic IP 付き NAT から出し、東京 3 個・大阪 3 個を最初から公開する（ADR-0025）。
+- **数値の正本**：レート制限は [rate-limiting.md](rate-limiting.md) の 4 節（エッジの IP は api 5 分に 30,000、Vault・Checkout 5 分に 1,000）。Webhook の送信のタイムアウト（接続 5 秒・全体 15 秒）と送信先ごとの同時実行（10）は [events-and-webhooks.md](events-and-webhooks.md)。`lock_timeout` は 2 秒。冪等キーのパーティションは 48 時間で `DROP`。保持期間は [security.md](security.md) の 13 節。SLO は [runbooks/README.md](../runbooks/README.md) の 1 節。
+- **監査の記録**：`security_events` は `audit_events` の一部として扱い、DB に 1 年、アーカイブに 7 年（ADR-0023）。
+- **API の版**：上げた版を戻せる期間は 72 時間（本システムの決定）。`.preview` の版は持たない（[api.md](api.md) の 15 節）。
+- **その他の既定案**：要求のログは本文を持たずメタデータを 30 日。ダッシュボードのセッションはアイドル 12 時間・絶対 7 日。独自のロールは持たない。レビュー中の決済の入金は止めない。Checkout に CAPTCHA 相当の部品を作らず WAF の Challenge とルールで守る。`fingerprint` は加盟店ごと。銀行振込の PaymentIntent は自動で失効させない。ダッシュボードのホームは日次の集計の表から出す。`Retry-After` を 429 に付ける。
+- 領域ごとの決定は、各文書の「決定と持ち越し」の節にある：[api.md](api.md)、[auth-and-keys.md](auth-and-keys.md)、[payments.md](payments.md)、[payment-methods.md](payment-methods.md)、[events-and-webhooks.md](events-and-webhooks.md)、[checkout.md](checkout.md)、[dashboard.md](dashboard.md)、[fraud.md](fraud.md)、[rate-limiting.md](rate-limiting.md)、[card-vault.md](card-vault.md)、[security.md](security.md)。
+
+持ち越し（計測・PoC・接続先の選定で決めるもの）：
+
+| 項目 | いつ・どう決めるか |
+| --- | --- |
+| 最初のカードのコネクタ（30 日のオーソリ、3DS Server と iframe、照会 API と整合性の時間、重複の扱い、TR-31 の要否、精算のサイクル、Dispute の通知の手段） | E3 の着手前に選ぶ。ADR-0011・0012・0030 の前提を確かめる |
+| コンビニ収納代行（速報・確報、取り消し） | E8 の着手前に選ぶ |
+| 提携銀行（振込の API の件数・締め・重複の識別子・名義照会、バーチャル口座の数と費用、口座振替での回収） | E4（入金）・E8（銀行振込）の着手前に選ぶ。法務の確認の結果にも依る |
+| 外部の不正検知サービス、eKYC・反社・制裁の照合の提供者 | E9、E2 で選ぶ |
+| 同時実行の上限、スロットの数、KMS の上限、コネクタの応答時間の実測 | E10 の負荷試験（k6） |
+| QSA の選定、PrivateLink・指紋の扱い、附属書 A1 | E10 の QSA の事前相談 |
+| JIT の仕組み（AWS TEAM など） | E10 の PoC（ADR-0020） |
+| 検索 API の索引、読み取りの割当を止めるか | E11 の PoC と計測 |
+| Aurora DSQL のマルチリージョン（ADR-0031 の比較の対象） | S2 の運用の後に再評価する |
+| 本家の振る舞いで未確認のもの（手数料の丸め、`cancellation_reason`、アクセスポリシーの `code`、Webhook の自動の無効化の条件など） | 各文書の「持ち越し」に書いた Epic の Story で、本家のサンドボックスを観察して揃える |

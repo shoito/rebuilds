@@ -66,5 +66,22 @@
 
 ## Open questions
 
-- どの決済代行・アクワイアラと接続するか（コネクタの最初の 1 社）。
-- 法務の確認：加盟店の代わりに代金を受け取って後で渡す流れが、資金決済法の上でどう位置づけられるか（収納代行か、資金移動業か）。確認が済むまで、Payout の Epic の spec を承認しない。
+### 法務の確認待ち
+
+設計はどの結論にも対応できる形にしてあるが、結論は出していない。**下の表の「承認を止める spec」は、確認が済むまで PM・QA が承認しない。**
+
+| # | 問い | 関係する設計 | 承認を止める spec |
+| --- | --- | --- | --- |
+| L1 | 資金決済法の位置づけ：加盟店の代わりに代金を受け取って後で渡す流れが、収納代行か資金移動業か。預かり金の分別管理、銀行口座の名義・用途、全銀システムへの直接の参加の可否 | [payouts-and-reconciliation.md](architecture/payouts-and-reconciliation.md)、[ADR-0018](decisions/0018-payout-execution-via-banking-partner.md) | E4 の入金（Payout）の Story。E8 の銀行振込（顧客の現金残高を預かるため。[ADR-0013](decisions/0013-japan-async-payment-methods.md)） |
+| L2 | 割賦販売法：クレジットカード番号等取扱契約締結事業者の登録の要否、加盟店調査の項目・頻度、加盟店情報交換制度への照会・登録、セキュリティガイドラインの適用の範囲 | [merchant-onboarding.md](architecture/merchant-onboarding.md)、[security.md](architecture/security.md) の 14 節 | E2 の審査の Story（`requirements` と照合、リスクの審査、拒否） |
+| L3 | 犯罪収益移転防止法：特定事業者に当たるか（L1 と一体）。取引時確認・記録の保存・届出の義務 | [ADR-0022](decisions/0022-merchant-onboarding-and-kyc.md) | E2 の審査の Story |
+| L4 | 個人情報保護法：加盟店の顧客の情報を委託として扱うか自ら取得するか、外国にある第三者（海外の提供者）への提供、カード番号の漏えい等の報告の義務を負う者と手順 | [security.md](architecture/security.md) の 12・14 節、[fraud.md](architecture/fraud.md) の 6 節 | E2 の本人確認の提供者の連携、E9 の外部の不正検知サービスの連携、E10 の `card-data-exposure` の runbook |
+| L5 | 電気通信事業法の外部送信規律：Checkout・Elements で端末の情報を集めて外部の不正検知サービスへ送ることが当たるか、公表の方法 | [checkout.md](architecture/checkout.md) の 12 節、[fraud.md](architecture/fraud.md) の 6 節 | E6 の端末の信号の収集、E9 の外部の不正検知サービスの連携 |
+| L6 | 帳簿等の保存期間：取引の記録（7 年）、台帳（10 年）、本人確認の記録（7 年）、監査のアーカイブ（7 年）の期間。Object Lock は後から短くできない | [ADR-0023](decisions/0023-audit-log.md)、[ADR-0024](decisions/0024-data-retention-and-deletion.md)、[security.md](architecture/security.md) の 13 節 | E10 の監査のアーカイブと保持のジョブ（本番の Object Lock のバケットを作る前）。E4 の台帳の古いパーティションの書き出し |
+| L7 | 拒否・解約の後の残高の留保：留保の期間（既定案 120 日）と、制裁・反社のリストとの一致で拒否したときに入金してよいか | [merchant-onboarding.md](architecture/merchant-onboarding.md) の 8 節 | E2 の拒否と契約の終了の Story、E4 の入金の停止と解除 |
+| L8 | 消費税の扱い：決済手数料・Dispute の手数料にかかる消費税と、`fee_details` の `tax`、請求書の要件 | [ledger.md](architecture/ledger.md) の 2.2 節 | E4 の手数料（`fee-schedules`）の Story |
+
+### 接続先の選定（法務以外）
+
+- 最初のカードのコネクタ（決済代行・アクワイアラ）：E3 の着手前に選ぶ。条件は照会 API、3DS Server、30 日のオーソリ、S1 のピークの 1.5 倍（750 件/秒）を受けられること（[architecture/README.md](architecture/README.md) の 6 節の「持ち越し」）。
+- コンビニ収納代行（E8）、提携銀行（E4・E8）、eKYC・照合の提供者（E2）、外部の不正検知サービス（E9）、QSA（E10）。
