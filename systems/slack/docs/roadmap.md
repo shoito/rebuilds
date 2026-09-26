@@ -25,6 +25,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E10 S2 への拡張 | Valkey の sharded pub/sub、巨大チャンネルの経路、OpenSearch への移行 | 未着手（S2 の判断の基準を満たしたら） |
 | E11 S3 への拡張 | セル構成、大阪のウォームスタンバイ | 未着手（ADR-0023 は proposed） |
 | E12 公開 API とアプリ | 版付きの公開 API、アプリのプラットフォーム（インストール、イベントの配信、インタラクティブ）。MVP の後 | 未着手 |
+| E13 ワークフロー（候補） | Workflow Builder に相当する自動化。E12 のアプリの基盤の上に作る。着手するときに intent から起票する | 未着手（候補） |
 
 ## Story
 
@@ -62,6 +63,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `bot-member-api-tokens` | ボット・エージェントのメンバーと、スコープ付きのトークン |
 | `auth-rate-limits` | 認証と招待のレート制限、ロックアウト |
 | `account-deletion` | アカウントの削除とメンバーの匿名化 |
+| `member-profile-and-status` | プロフィール（表示名・アイコン・タイムゾーン）とステータス（[identity-and-access.md](architecture/identity-and-access.md)） |
 
 ### E3 会話機能
 
@@ -78,6 +80,10 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `jump-to-message` | 指定した `seq` への移動（`around_seq` の API を含む） |
 | `link-unfurl` | 隔離した取得器でのリンクのプレビュー（ADR-0016） |
 | `pins` | ピン留め（任意） |
+| `user-groups` | ユーザーグループと @team のメンション（AST に `group_mention` を追加） |
+| `scheduled-messages` | 予約送信 |
+| `custom-emoji` | カスタム絵文字 |
+| `saved-items-and-bookmarks` | 後で読む（保存）とチャンネルのブックマーク |
 
 ### E4 リアルタイム同期
 
@@ -109,6 +115,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `notification-prefs-dnd` | 通知の設定とおやすみモード |
 | `web-push-vapid` | Service Worker、Web Push、バッジ |
 | `email-digest-ses` | 遅らせて送るメール |
+| `reminders` | リマインダー（`/remind` のコマンドは E12） |
 
 ### E6 検索とファイル
 

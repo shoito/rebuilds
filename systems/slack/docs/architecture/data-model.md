@@ -84,6 +84,8 @@ Request ─▶ 認証ミドルウェア
 | ファイル | `files` のスキャンの状態、`message_files` に `UNIQUE (workspace_id, file_id)` | [files.md](files.md)、[ADR-0015](../decisions/0015-file-upload-scan-and-delivery.md) |
 | アプリ・公開 API（E12） | アプリ、インストール、トークン、イベントの購読・配信の記録などのテーブル。`members.kind`（`human` / `bot` / `agent`）、`messages.ui_blocks`・`installation_id`、`api_tokens.installation_id`、`api_idempotency_keys` | [apps.md](apps.md)、[public-api.md](public-api.md)、[ADR-0031](../decisions/0031-app-platform.md) |
 | プラン | `plans`、`workspace_entitlements` | [ADR-0032](../decisions/0032-plans-and-entitlements.md) |
+| 会話の周辺 | `user_groups`・`user_group_members`、`scheduled_messages`、`custom_emoji`、`saved_items`、`channel_bookmarks` | [messaging.md](messaging.md) |
+| プロフィール・リマインダー | `members` のプロフィールの列、`member_statuses`、`reminders` | [identity-and-access.md](identity-and-access.md)、[read-state-and-notifications.md](read-state-and-notifications.md) |
 | 監査 | `audit_events`（追記のみ） | [ADR-0018](../decisions/0018-audit-log.md) |
 | 保持と削除 | 保持ポリシー、リーガルホールド、エクスポート、削除の予定 | [ADR-0019](../decisions/0019-data-retention-and-deletion.md)、[security.md](security.md) の 14 節 |
 
