@@ -28,7 +28,7 @@ Skills と Subagent はリポジトリ共通のものとして、ルートの `.
 
 #### Scenario: 標準の Story の草案
 
-- Given `type:story` の Issue と、Size が「標準」
+- Given Issue type が Story の Issue と、Size が「標準」
 - When エージェントが `spec-authoring` で草案を作る
 - Then frontmatter に `capability`・`change`・`issue`・`epic`・`status: draft` があり、すべての要件にシナリオが 1 つ以上ある。spec のすべての ID が plan の Proof に載っており、ci-pipeline の検査が通る
 
@@ -62,7 +62,7 @@ Skills と Subagent はリポジトリ共通のものとして、ルートの `.
 
 `pmo-triage` を実行したとき、システムは Projects の Status が `Inbox` の各項目について、次を行わなければならない。
 
-- `type:*`・`system:*` のラベルがなければ付ける
+- Issue type がなければ設定し、`system:*` のラベルがなければ付ける
 - Story で Size が空なら `needs:pm` を付け、理由をコメントする
 - 重複の疑いがある Issue を示す
 - Status を `Backlog` にする
@@ -71,7 +71,7 @@ Priority・Iteration・Target date は変えてはならない。
 
 #### Scenario: Size のない Story
 
-- Given `type:story` で Size が空の Inbox の項目
+- Given Issue type が Story で Size が空の Inbox の項目
 - When `pmo-triage` を実行する
 - Then `needs:pm` とコメントが付き、Status が `Backlog` になり、Priority は変わらない
 

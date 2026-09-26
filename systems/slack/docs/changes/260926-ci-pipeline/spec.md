@@ -464,7 +464,7 @@ changes ─┬─▶ slack-static ─┐
 - 結合テストは、GitHub のホスト型ランナーの Docker で Testcontainers を動かす。
 - PR のタイトルの検査は、タイトルの編集でも走るよう `title.yml`（`pull_request` の `opened`・`edited`・`synchronize`）に分ける。merge queue では、`ci.yml` の `spec-checks` の中で、キューの PR 番号から PR のタイトルを API で読み直して同じ検査をする（merge queue のコミットメッセージが PR のタイトルになることは **未検証**）。
 - ワークフローの権限は、最上位で `contents: read`。PR にコメントするジョブだけ `pull-requests: write`、Issue を作るジョブだけ `issues: write`、infra のジョブだけ `id-token: write`。
-- この変更が作る Issue（REQ-DLV-012・014）のラベルは、[project-management.md](../../../../../docs/project-management.md) の 5 節に合わせる：`type:task`・`area:delivery`・`source:alert`。`ci-slow` は `needs:dev`、ruleset のドリフトは `needs:ops`。
+- この変更が作る Issue（REQ-DLV-012・014）のラベルは、[project-management.md](../../../../../docs/project-management.md) の 3・5 節に合わせる：Issue type は Task、ラベルは `area:delivery`・`source:alert`。`ci-slow` は `needs:dev`、ruleset のドリフトは `needs:ops`。
 
 ### ruleset（`.github/rulesets/main.json`）
 

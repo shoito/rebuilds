@@ -27,7 +27,7 @@ Epic・Story の計画、優先度、イテレーション、担当、判断待�
   - 承認は、PR のレビューで行う。
 - **成果物から決まる項目は、人に書かせない。** Stage（process.md の段）・Change・Rollout は、GitHub Actions が `spec.md` の frontmatter、PR の状態、フラグの段階から写す。
 - **Story と変更フォルダを 1 対 1 にする。** `spec.md` の frontmatter の `issue` でつなぎ、CI で欠けを検出する。
-- **Issue の種類は、当面ラベル（`type:*`）で表す。** Issue types は Organization でしか使えないため。Organization へ移ったら置き換える。
+- **リポジトリと Project は Organization に置く前提にする。** GitHub App が操作できるのは Organization の Projects だけで、Issue types も Organization でしか使えないため。Issue の種類は Issue types、親子は Sub-issues で表す。
 - 2 は、計画の機能で勝る。ただし、コード・PR・CI と別の場所になり、エージェントの権限の管理も増える。
 - 3 は、優先度やイテレーションの頻繁な変更が PR の往復になり、手で管理する一覧が衝突しやすい（process.md の「衝突の防止」）。
 
@@ -39,7 +39,7 @@ Epic・Story の計画、優先度、イテレーション、担当、判断待�
   - エージェントへの依頼（`agent:ready`）と、判断待ち（`needs:*`）が見える。
 - 引き受けるコスト：
   - Projects の項目を更新するワークフローを、自分で作って保守する。
-  - 個人のリポジトリでは、Issue types が使えない。Sub-issues が使えるかは未検証。
+  - 個人のリポジトリのままでは、Projects の自動化に権限の広い classic PAT が要る。Organization へ移すまで、自動化は動かさない。
 
 ## Confirmation
 

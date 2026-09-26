@@ -24,6 +24,8 @@ date: 2026-09-26
 
 ## Decision
 
+> 基盤のアカウント（management・security・log-archive・shared）のルートモジュールと、最初の apply の手順は、[260926-terraform-foundation](../changes/260926-terraform-foundation/spec.md) で定めた。下の構成の図は、題材のアカウントの部分だけを示す。
+
 1 を採用する。
 
 - **変更を、実行する前に差分で読める。** `terraform plan` の出力は、何が作られ、変わり、消えるかをリソース単位で示す。エージェントが書いたインフラの変更を、人間が plan で承認する運用に合う。

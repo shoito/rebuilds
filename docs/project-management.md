@@ -18,27 +18,30 @@
 
 ## 2. 前提：アカウントの種類
 
-- Issue types は、Organization のリポジトリでしか使えない。今の `shoito/rebuilds` は個人のリポジトリなので、種類はラベル（`type:*`）で表す。
-- Sub-issues（親子）と、Projects の「Parent issue」「Sub-issues progress」の項目が個人のリポジトリで使えるかは、未検証。使えなければ、親の Issue の本文のタスクリストで代わりにする。
-- Organization へ移したら、`type:*` のラベルを Issue types に置き換える。ラベルの名前と Issue types の名前をそろえておき、移行を機械的にする。
+- **実際の開発では、リポジトリと Project を GitHub の Organization に置く。** 今の `shoito/rebuilds` は個人のリポジトリだが、この文書は Organization を前提に書く。
+- Organization を前提にする理由は 2 つある。
+  - GitHub App は、個人アカウントの Projects を操作できない。fine-grained PAT も、個人アカウントの Projects に対応していない。個人アカウントのまま自動化するには、権限の広い classic PAT が要る（[community #156512](https://github.com/orgs/community/discussions/156512)）。
+  - Issue types は、Organization でしか使えない。
+- Issue の種類は Issue types で、親子は Sub-issues で表す。Projects では、組み込みの Type・Parent issue・Sub-issues progress の項目を使う。
+- Organization へ移すまでの間は、Projects の自動化を動かさない（設定の実装は、移した後に行う）。
 
 ## 3. Issue の種類
 
-| 種類（`type:*`） | 対応する成果物 | 親 | 作る人 | 閉じる条件 |
+| 種類（Issue type） | 対応する成果物 | 親 | 作る人 | 閉じる条件 |
 | --- | --- | --- | --- | --- |
-| `intent` | 起票時は Issue だけ。受理されたら `intent.md` か Epic・Story になる | なし | 誰でも（Maintain 段では Claude） | PM が受理（→ Epic か Story を作ってリンク）または却下 |
-| `epic` | `roadmap.md` の 1 行 | なし | PM | 子の Story がすべて閉じた |
-| `story` | `changes/YYMMDD-<slug>/` の 1 フォルダ | `epic` | PM、Dev | 変更がアーカイブされた（`status: done`） |
-| `bug` | 規模「小」の `plan.md`（回帰テストを含む） | `epic`（任意） | 誰でも | 修正がマージされた |
-| `task` | 成果物なし（規模「軽微」、運用の作業） | 任意 | 誰でも | 作業が終わった |
-| `spike` | 調査の結果（ADR の草案や、`intent.md` の Open questions への答え） | 任意 | Dev、QA | 結果を文書に書き戻した |
+| Intent | 起票時は Issue だけ。受理されたら `intent.md` か Epic・Story になる | なし | 誰でも（Maintain 段では Claude） | PM が受理（→ Epic か Story を作ってリンク）または却下 |
+| Epic | `roadmap.md` の 1 行 | なし | PM | 子の Story がすべて閉じた |
+| Story | `changes/YYMMDD-<slug>/` の 1 フォルダ | Epic | PM、Dev | 変更がアーカイブされた（`status: done`） |
+| Bug | 規模「小」の `plan.md`（回帰テストを含む） | Epic（任意） | 誰でも | 修正がマージされた |
+| Task | 成果物なし（規模「軽微」、運用の作業） | 任意 | 誰でも | 作業が終わった |
+| Spike | 調査の結果（ADR の草案や、`intent.md` の Open questions への答え） | 任意 | Dev、QA | 結果を文書に書き戻した |
 
 - Story と変更フォルダは 1 対 1 にする。変更の `spec.md` の frontmatter に `issue: <番号>` を書き、Issue の本文には変更フォルダへのリンクを書く。
 - ADR には専用の Issue を作らない。ADR は PR で起票し、議論も PR で行う。
 
 ## 4. Issue のテンプレート（Issue Forms）
 
-`.github/ISSUE_TEMPLATE/` に、種類ごとのフォームを置く。フォームで種類のラベルを自動で付ける。
+`.github/ISSUE_TEMPLATE/` に、種類ごとのフォームを置く。フォームで Issue type を自動で設定する。
 
 | フォーム | 主な入力 |
 | --- | --- |
@@ -55,7 +58,6 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 
 | 接頭辞 | 値 | 用途 |
 | --- | --- | --- |
-| `type:` | `intent`、`epic`、`story`、`bug`、`task`、`spike` | Issue の種類（Organization に移ったら Issue types へ） |
 | `system:` | `slack`、将来の題材 | 題材。フォームで付ける |
 | `area:` | `identity`、`realtime`、`messaging`、`notifications`、`search`、`files`、`client`、`platform`、`mcp`、`infra`、`delivery`、`security` | 領域。`architecture/` の文書と対応させる |
 | `needs:` | `pm`、`dev`、`qa`、`ops` | そのロールの判断が要る。process.md の「判断に迷ったときの確認先」と同じ区分。判断が済んだら外す |
@@ -97,7 +99,7 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 
 | 条件 | Stage |
 | --- | --- |
-| `type:intent` で、受理される前 | `Plan` |
+| Type が Intent で、受理される前 | `Plan` |
 | Story で、変更フォルダがない、または `spec.md` が `draft` | `Design` |
 | `spec.md` が `approved`、または `in-progress` | `Build` |
 | Build の PR がすべてマージされ、staging で QA の受け入れを待っている | `Test` |
@@ -122,15 +124,15 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 | ワークフロー | きっかけ | すること |
 | --- | --- | --- |
 | `labels-sync` | `.github/labels.yml` の変更 | ラベルを定義に合わせる（ないものは作り、定義にないものは警告する） |
-| `project-fields-sync` | Issue・PR の作成と更新、ラベルの変更 | `system:` から System を、`type:` から種類を写す。Story の Size が空なら `needs:pm` を付ける |
-| `change-link` | 変更フォルダを追加・変更する PR | `spec.md` の frontmatter の `issue` を読み、Issue と PR をつなぐ。Change と Flag の項目を設定する。`issue` がない、または種類が `story` でなければ失敗させる |
+| `project-fields-sync` | Issue・PR の作成と更新、ラベルの変更 | `system:` のラベルから System を写す。種類は Issue type（組み込みの Type の項目）をそのまま使う。Story の Size が空なら `needs:pm` を付ける |
+| `change-link` | 変更フォルダを追加・変更する PR | `spec.md` の frontmatter の `issue` を読み、Issue と PR をつなぐ。Change と Flag の項目を設定する。`issue` がない、または種類が Story でなければ失敗させる |
 | `stage-sync` | `main` への push（`spec.md` の変更）、PR の状態の変化、デプロイの完了 | 6.2 節の規則で Stage を設定する |
 | `rollout-sync` | AppConfig のデプロイの完了（EventBridge → `repository_dispatch`） | そのフラグを使う Story の Rollout を更新する。100% で 2 週間たったら、フラグの削除のタスクを起票する |
-| `intent-from-incident` | インシデントの振り返りの PR のマージ、または監視からの `repository_dispatch` | `type:intent`・`source:*` の Issue を起票する（Maintain 段）。本文は Claude が調査結果から書く |
+| `intent-from-incident` | インシデントの振り返りの PR のマージ、または監視からの `repository_dispatch` | Type が Intent で、`source:*` の付いた Issue を起票する（Maintain 段）。本文は Claude が調査結果から書く |
 | `agent-dispatch` | `agent:ready` のラベルが付いた | Claude Code の GitHub Action で、Story の変更フォルダの草案か、実装の PR を作らせる（8 節） |
 | `weekly-report` | 毎週月曜 | DORA の 4 指標（[delivery.md](../systems/slack/docs/architecture/delivery.md) の 7 節）、Stage ごとの滞留、7 日を超えたブランチ、期限切れのフラグ、`needs:*` の一覧を、Issue に投稿する |
 
-- Projects の API（GraphQL）を呼ぶワークフローは、GitHub App のトークンで動かす。`GITHUB_TOKEN` は、ユーザーの Project を更新できないため（未検証。Organization の Project なら App の権限で足りる）。
+- Projects の API（GraphQL）を呼ぶワークフローは、GitHub App のインストールのトークンで動かす。`GITHUB_TOKEN` では Organization の Project を更新できないため。App には Organization の Projects の読み書きの権限を付ける。
 - ワークフローの定義は、他のコードと同じく PR でレビューする。`uses:` のアクションは、コミットの SHA で固定する（[security.md](../systems/slack/docs/architecture/security.md) の 8 節）。
 
 ## 8. AI エージェントの関わり方
@@ -152,7 +154,7 @@ Epic は PM が roadmap の更新と一緒に作るので、フォームは置�
 | ビュー | 形 | 絞り込み・並べ方 | 主に見る人 |
 | --- | --- | --- | --- |
 | 今週 | ボード（Status） | 今のイテレーション | 全員 |
-| 段の流れ | ボード（Stage） | `type:story`、題材ごと | PM、Dev |
+| 段の流れ | ボード（Stage） | Type が Story、題材ごと | PM、Dev |
 | Epic | 表 | Parent issue でまとめ、Sub-issues progress を出す | PM |
 | ロードマップ | ロードマップ | Iteration と Target date、Epic ごと | PM |
 | 判断待ち | 表 | `needs:*` があるもの、ロールでまとめる | 各ロール |

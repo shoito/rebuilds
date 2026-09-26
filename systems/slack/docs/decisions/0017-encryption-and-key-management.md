@@ -24,6 +24,8 @@ date: 2026-09-26
 
 ## Decision
 
+> Terraform の状態ファイル（`tfstate`）の暗号化の鍵は、[260926-terraform-foundation](../changes/260926-terraform-foundation/spec.md) で、データの種類ごとの鍵の 1 つとして定めた。
+
 2 を採用する。3 は、将来の選択肢として移行の道筋だけを決めておく。
 
 ### 転送中

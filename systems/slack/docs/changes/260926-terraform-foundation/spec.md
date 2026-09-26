@@ -566,7 +566,7 @@ systems/slack/infra/
 - `.github/workflows/infra-pr.yml`（`pull_request`・`merge_group`）：DT-INFRA-006 で対象を決め、静的検査 → `plan` → ポリシー検査 → PR にコメント。
 - `.github/workflows/infra-apply.yml`（`push` to `main`）：ルートモジュールごとのジョブで、環境（DT-INFRA-005）を指定して plan → 承認 → 同じジョブの plan ファイルを apply。PR の plan ファイルは使わない（PR の後に `main` が進むため）。承認を待つ間に状態が変われば REQ-INFRA-015 のとおり失敗させる。
 - `.github/workflows/infra-drift.yml`（`schedule`、毎日 06:00 JST）：全ルートモジュールの `plan -detailed-exitcode`（`tf-plan` を使う）。DT-INFRA-008 を実行する。
-- ドリフトの Issue のラベルは、[project-management.md](../../../../../docs/project-management.md) の 5 節に合わせて `type:task`・`system:slack`・`area:infra`・`source:alert`・`needs:ops` とする。ルートモジュールは Issue のタイトル（`drift: <root>`、エラーは `drift-error: <root>`）で見分ける。
+- ドリフトの Issue のラベルは、[project-management.md](../../../../../docs/project-management.md) の 3・5 節に合わせて、Issue type は Task、ラベルは `system:slack`・`area:infra`・`source:alert`・`needs:ops` とする。ルートモジュールは Issue のタイトル（`drift: <root>`、エラーは `drift-error: <root>`）で見分ける。
 - 必須のチェックへの組み込みは [260926-ci-pipeline](../260926-ci-pipeline/spec.md) の `ci-gate` が行う。そのため `infra-pr.yml` は `workflow_call` でも呼べる再利用可能なワークフローにし、ci-pipeline の `ci.yml` から、DT-DLV-001 で `infra/` の変更があるときに呼ばれる。ci-pipeline より先にマージされる間は、`infra-pr.yml` を `pull_request` でも単独で動かす。
 
 ### 最初の apply（ブートストラップ）
