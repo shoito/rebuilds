@@ -40,7 +40,7 @@ status: approved
 
 ### REQ-DLV-001: main の保護
 
-システムは、`main` への変更を、merge queue を通った PR の squash だけに限らなければならない。具体的には、直接の push、force push、ブランチの削除を拒否し、マージには `CODEOWNERS` の承認 1 件以上と、必須のチェック `ci-gate` の成功を要求しなければならない。バイパスを許す主体を持ってはならない。
+システムは、`main` への変更を、merge queue を通った PR の squash だけに限らなければならない。具体的には、直接の push、force push、ブランチの削除を拒否し、マージには `CODEOWNERS` の承認 1 件以上と、必須のチェック `ci-gate` の成功を要求しなければならない。バイパスを許す主体は、リポジトリの管理者のロールだけとし、PR を通したマージに限らなければならない（[ADR-0004](../../../../../docs/decisions/0004-agent-prs-via-github-app.md)。バイパスしたマージは REQ-DLV-015 で検出する）。
 
 #### Scenario: 直接の push
 
