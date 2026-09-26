@@ -68,6 +68,7 @@
 - 未読数をどこまで正確にするか。現時点では近似で許容している（[read-state-and-notifications.md](architecture/read-state-and-notifications.md)）。
 - データの保持期間と、法的保全（リーガルホールド）をいつ扱うか。
 - ワークスペースの削除・エクスポートと、データの保管地域（データレジデンシー）をいつ扱うか。
+- **法務の確認待ち**：ワークスペースの全データのエクスポート（Business+ 以上、申請と承認が必要）で、メンバーへ自動で通知しないこと（本家 Slack と同じ既定案。[security.md](architecture/security.md) の決定）が、日本の個人情報保護法の扱いとして問題ないか。確認が済むまで、E8 の `workspace-export` の spec を承認しない。
 
 ### 決定（2026-09-26、既定案）
 
