@@ -1,6 +1,6 @@
 # Plan: メッセージの投稿と履歴取得
 
-- Change: 0001-post-and-list-messages
+- Change: 260926-post-and-list-messages
 - Spec: [spec.md](spec.md)
 - Status: draft
 

@@ -1,9 +1,11 @@
-# Spec: メッセージの投稿と履歴取得
+---
+capability: messaging
+change: 260926-post-and-list-messages
+epic: E1
+status: draft
+---
 
-- Capability: messaging
-- Change: 0001-post-and-list-messages
-- Epic: E1 Walking skeleton
-- Status: draft
+# Spec: メッセージの投稿と履歴取得
 
 ## 概要
 

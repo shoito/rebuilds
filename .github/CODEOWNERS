@@ -1,0 +1,23 @@
+# Owners per role (see docs/process.md "ロールと持ち主").
+# This is a personal repository, so every role maps to @shoito for now.
+# Replace with team handles when roles are staffed, e.g. @org/pm, @org/dev, @org/qa, @org/ops.
+# Note: CODEOWNERS requires approval from any one listed owner; the PM + QA
+# dual approval on changes/*/spec.md is enforced by the PR template and CI.
+
+# Default: Dev
+*                                   @shoito
+
+# PM
+/systems/*/docs/intent.md           @shoito
+/systems/*/docs/roadmap.md          @shoito
+/systems/*/docs/changes/*/intent.md @shoito
+
+# PM + QA
+/systems/*/docs/changes/*/spec.md   @shoito
+
+# QA
+/systems/*/docs/quality.md          @shoito
+/systems/*/docs/changes/*/quality.md @shoito
+
+# Ops
+/systems/*/docs/runbooks/           @shoito

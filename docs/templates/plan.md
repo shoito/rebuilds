@@ -1,6 +1,6 @@
 # Plan: <変更名>
 
-- Change: <NNNN-slug>
+- Change: <YYMMDD-slug>
 - Spec: [spec.md](spec.md)
 - Status: draft | approved | done
 

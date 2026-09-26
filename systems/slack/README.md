@@ -6,7 +6,8 @@
 | --- | --- |
 | [intent.md](docs/intent.md) | 本質、スコープ、制約 |
 | [architecture.md](docs/architecture.md) | 構成、データモデル、主要フロー、非機能要件、技術スタック |
-| [quality.md](docs/quality.md) | 品質戦略（シフトレフト / シフトライト）、テスト計画 |
+| [quality.md](docs/quality.md) | 品質戦略（シフトレフト / 本番での品質検証）、テスト計画 |
+| [runbooks/](docs/runbooks/README.md) | SLO、リリースとロールバック、障害対応手順 |
 | [roadmap.md](docs/roadmap.md) | Epic と進め方、AI 前提で作り直すなら |
 | [decisions/](docs/decisions/) | ADR |
 | [specs/](docs/specs/) | 実装済みの振る舞いの正本 |

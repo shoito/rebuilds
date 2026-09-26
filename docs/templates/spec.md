@@ -1,14 +1,19 @@
+---
+capability: <capability>
+# 以下は差分（changes/YYMMDD-<slug>/spec.md）のときのみ
+change: <YYMMDD-slug>
+epic: <E1>
+status: draft | approved | in-progress | done
+---
+
 <!--
-正本（specs/<capability>/spec.md）では、見出し「Requirements」の下に要件を並べる。
-差分（changes/NNNN-<slug>/spec.md）では、ADDED / MODIFIED / REMOVED の見出しの下に並べる。
-MODIFIED には変更後の全文を書く。REMOVED には ID と理由だけを書く。
+正本（specs/<capability>/spec.md）では、見出し「Requirements」の下に要件を並べ、frontmatter は capability だけにする。
+差分（changes/YYMMDD-<slug>/spec.md）では、ADDED / MODIFIED / REMOVED の見出しの下に並べる。
+MODIFIED と REMOVED には、正本から写した「変更前」の本文を必ず書く。アーカイブ時に CI が正本と照合する（process.md「衝突の防止」）。
+決定表・性質も、変更するときは同じ形で書く。
 -->
 
 # Spec: <capability または変更名>
-
-- Capability: <capability>
-- Change: <NNNN-slug>（差分のときのみ）
-- Status: draft | approved
 
 ## 概要
 
@@ -26,7 +31,25 @@ MODIFIED には変更後の全文を書く。REMOVED には ID と理由だけ�
 
 ## MODIFIED Requirements
 
+### REQ-<CAP>-002: <要件名>
+
+#### Before
+
+<正本の本文とシナリオを、そのまま写す>
+
+#### After
+
+<変更後の本文とシナリオ>
+
 ## REMOVED Requirements
+
+### REQ-<CAP>-003: <要件名>
+
+- 理由：
+
+#### Before
+
+<正本の本文とシナリオを、そのまま写す>
 
 ## Decision Tables
 

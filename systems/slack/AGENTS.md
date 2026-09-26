@@ -8,11 +8,12 @@ Slack の再構築。リポジトリ共通のルールはルートの [AGENTS.md
 - [docs/architecture.md](docs/architecture.md) — 構成、データモデル、主要フロー
 - [docs/decisions/](docs/decisions/) — ADR。特に 0001（`seq`）、0002（DB が正本）、0005（権限判定の集約）
 - [docs/quality.md](docs/quality.md) — 品質戦略と、PR 前に回す確認ループ
-- 作業中の変更の `docs/changes/NNNN-<slug>/{spec,plan}.md`
+- [docs/runbooks/](docs/runbooks/README.md) — SLO、リリースとロールバック
+- 作業中の変更の `docs/changes/YYMMDD-<slug>/{spec,plan}.md`
 
 ## Commands
 
-まだ実装がない。[0001-post-and-list-messages](docs/changes/0001-post-and-list-messages/plan.md) の完了時に、次を埋める。
+まだ実装がない。[260926-post-and-list-messages](docs/changes/260926-post-and-list-messages/plan.md) の完了時に、次を埋める。
 
 | 目的 | コマンド | 正常な出力 |
 | --- | --- | --- |

@@ -2,8 +2,8 @@
 
 実装済みの振る舞いの正本。capability（機能領域）ごとに `<capability>/spec.md` を置く。
 
-- ここは直接編集しない。変更は `changes/NNNN-<slug>/spec.md` に差分として書き、変更の最後の PR（アーカイブ）で反映する。
-- まだ実装がないため、現時点では空。最初の反映は [0001-post-and-list-messages](../changes/0001-post-and-list-messages/) の完了時に行う。
+- ここは直接編集しない。変更は `changes/YYMMDD-<slug>/spec.md` に差分として書き、変更の最後の PR（アーカイブ）で反映する。
+- まだ実装がないため、現時点では空。最初の反映は [260926-post-and-list-messages](../changes/260926-post-and-list-messages/) の完了時に行う。
 
 | Capability | 接頭辞 | 内容 |
 | --- | --- | --- |
