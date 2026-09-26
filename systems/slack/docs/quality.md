@@ -68,6 +68,8 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | ファイル・プレビュー（[files.md](architecture/files.md)、ADR-0016） | EICAR のテストファイルでのスキャンと隔離。SSRF のテスト（内部の IP、DNS の再バインド、リダイレクト） |
 | クライアント（[client.md](architecture/client.md)） | 同期エンジンの性質ベーステスト（SharedWorker とタブ単体の両方）。送信キューの性質（`client_msg_id` ごとに 1 件）。3 エンジンの E2E（3 タブで WebSocket が 1 本、送信中の再読み込み、IME）。axe で違反 0。見た目の回帰。性能の予算 |
 | MCP（[mcp.md](architecture/mcp.md)） | MCP が返すデータは、同じメンバーが API で読めるデータの部分集合である性質。`aud`・ワークスペース・取り消しの検証。仕様の適合（Protected Resource Metadata、401、古い版への 405） |
+| 公開 API・アプリ（[public-api.md](architecture/public-api.md)、[apps.md](architecture/apps.md)） | 配信がボットの読める範囲の部分集合である性質。`ui_blocks` を任意に生成しても XSS にならない性質。署名のテストベクター。配信先の SSRF。インストールの判定の決定表。OpenAPI の破壊的変更の検査 |
+| レート制限（[rate-limiting.md](architecture/rate-limiting.md)） | 許可された件数が上限を超えない性質。Valkey の停止中の振る舞い（一般は通す、認証は止める） |
 | 利用状況の計測（ADR-0025） | 送信されるリクエストに本文・名前・ID が含まれない。計測を無効にしたワークスペースで gtag.js が読み込まれない |
 | フィーチャーフラグ（ADR-0026） | release・migration のフラグの両方の状態でのテスト |
 | セキュリティ（[security.md](architecture/security.md) の 10・11 節） | SAST、依存の検査、DAST、定期のペンテスト。脆弱性の期限（Critical は 24 時間で緩和、7 日で修正） |
@@ -133,6 +135,7 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 | E7 本番運用 | NFR-001〜009、デプロイ中の無停止、災害復旧 | k6 で目標を満たす（[capacity.md](architecture/capacity.md) のモデルの 1 倍・2 倍）。デプロイ中の投稿のエラーが 0 件。復元の訓練が RTO 内で終わる。runbooks がそろっている。外部のペンテストで High 以上が 0 件 |
 | E8 企業向け機能 | SSO、監査ログ、保持と削除 | SAML の外部ペンテスト。削除の結合テスト。監査ログの改ざんの検知 |
 | E9 AI エージェント連携 | MCP の権限の部分集合の性質、プロンプトインジェクションへの備え | MCP の性質ベーステストと仕様の適合の検査が通る。書き込みは、読み取りの運用で問題がないことを確かめてから |
+| E12 公開 API とアプリ | 互換性の約束と、アプリからの漏洩の防止 | OpenAPI の破壊的変更の検査が通る。配信の性質ベーステストが通る。外部のペンテストで High 以上が 0 件 |
 | E10・E11 規模の拡張 | S2・S3 の構成への移行 | 移行中の二重書き込みの整合、切り替えと戻しの訓練 |
 
 ## 6. 責任分担

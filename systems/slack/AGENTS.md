@@ -32,3 +32,6 @@ Slack の再構築。リポジトリ共通のルールはルートの [AGENTS.md
 - テナントの中のデータからは `member_id` を参照する。`account_id` を参照しない（ADR-0010）。
 - API のルートはメソッドチェーンで定義し、`c.json()` には必ずステータスコードを明示する。Web からは `packages/api-client` だけを使い、`fetch` を直接書かない（ADR-0008）。
 - API の表面のスナップショット（`packages/api-client` の `.d.ts`）を、契約の変更の承認なしに更新しない（ADR-0008）。
+- 内部 API・公開 API・MCP は、どれも `packages/domain` のサービス関数を呼ぶ。互いを HTTP で呼び合わない。受け取ったトークンを他のサービスへ渡さない（ADR-0028、0030）。
+- レート制限は、共通の制限の仕組み（ADR-0029）を通す。上限の値をコードに直接書かず、entitlement（ADR-0032）から読む。
+- ADR を追加・更新したら、`docs/decisions/README.md` の一覧を生成し直す。

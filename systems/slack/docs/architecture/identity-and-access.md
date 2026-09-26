@@ -289,14 +289,14 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 | スコープ | 許す操作 |
 | --- | --- |
 | `channels:read` | チャンネルの一覧と情報 |
-| `channels:history` | 履歴と差分取得 |
+| `messages:read` | 履歴と差分取得 |
 | `channels:join` | パブリックチャンネルに参加する |
-| `chat:write` | 投稿・自分の投稿の編集と削除 |
+| `messages:write` | 投稿・自分の投稿の編集と削除 |
 | `reactions:write` | リアクション |
 | `members:read` | メンバーの一覧とプロフィール |
 | `files:read` / `files:write` | ファイルの取得 / アップロード |
 | `search:read` | 検索 |
-| `realtime:connect` | WebSocket のチケットの発行 |
+| `realtime:connect` | WebSocket のチケットの発行（内部のボット用。アプリには出さない） |
 
 | # | 6.3・6.4 の結果 | 操作に必要なスコープをトークンが持つ | 結果 |
 | --- | --- | --- | --- |
@@ -362,6 +362,8 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
 
 ## 9. ボット・エージェントの API トークン
 
+> E12 でアプリのプラットフォームを入れたら、ボットのトークンはアプリのインストールに属するものに一本化する（`api_tokens.installation_id`）。管理者が手でボットを作る経路は、単一ワークスペースのアプリに置き換える（[apps.md](apps.md)、ADR-0031）。それまでは、この節の方式で内部のボットを扱う。
+
 - ボット・エージェントは `account_id IS NULL` のメンバーで、ログインしない。API トークンだけで認証する（ADR-0010）。
 - トークンの形式は `slk_{kind}_{token_id}_{secret}`（`kind` は `bot` / `scim`、`token_id` は UUIDv7、`secret` は 32 バイトのランダムな値を base62 にしたもの）。接頭辞を付けるのは、GitHub などのシークレットスキャンで漏洩を検知できるようにするため。
 - `api_tokens` にはシークレットの SHA-256 だけを置く。発行時に 1 回だけ表示する。
@@ -412,7 +414,7 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
 4. すべてのジョブが終わったら、`auth_identities`・`passkeys`・`two_factors`・`sessions` と `accounts` の行を消す。
 
 - Better Auth の `deleteUser` は、ワークスペースごとのジョブを待たずにユーザーの行を消すため、使わない。上の手順を本システムの API として実装する。
-- `account_id IS NULL` は「ボット・エージェント」の印でもある（ADR-0010）。削除されたユーザーと区別するため、`members` に種別（`human` / `bot` / `agent`）の列を加えることを提案する（Open questions）。
+- `account_id IS NULL` は「ボット・エージェント」の印でもある（ADR-0010）。削除されたユーザーと区別するため、`members` に種別の列 `kind`（`human` / `bot` / `agent`）を加える（[apps.md](apps.md) で確定）。
 - メッセージとファイルはワークスペースのデータとして残る（ADR-0019）。
 
 ## 13. 規模の段階ごとの変化
@@ -440,6 +442,5 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
 
 - SSO でログインしたセッションを「MFA 済み」とみなしてよいか。IdP の `amr`・`acr` を検査するか。
 - 人間の代わりに動く AI エージェント（人間の権限を借りる委任）を、いつ、どう扱うか。今はエージェントを独立したメンバーとしてだけ扱う。
-- `members` に種別の列（`human` / `bot` / `agent`）を加えるか。ボットとエージェントの区別（表示、課金、スコープの既定値）と、アカウントを削除したメンバー（`account_id IS NULL` になる）とボットの区別に要る。
 - 管理者によるプライベートチャンネル・DM の閲覧（コンプライアンスのエクスポート）を、いつ扱うか。
 - メールの OTP が届かない（迷惑メール、企業のフィルタ）ときの代替手段。

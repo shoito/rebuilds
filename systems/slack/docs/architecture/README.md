@@ -13,11 +13,14 @@
 | [files.md](files.md) | ファイルのアップロード、スキャン、サムネイル、配信 |
 | [client.md](client.md) | Web クライアント |
 | [mcp.md](mcp.md) | AI エージェント向けのリモート MCP サーバー |
+| [public-api.md](public-api.md) | 版付きの公開 API（MVP の後、E12） |
+| [apps.md](apps.md) | アプリのプラットフォーム：インストール、イベントの配信、インタラクティブ（MVP の後、E12） |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
 | [infrastructure.md](infrastructure.md) | AWS の構成、環境、IaC、冗長化、バックアップと災害復旧、デプロイ、コスト |
 | [observability.md](observability.md) | ログ、メトリクス、トレース |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーターの設定、キャパシティの運用 |
 | [delivery.md](delivery.md) | ブランチ、CI、デプロイ、リリース、フィーチャーフラグ |
+| [rate-limiting.md](rate-limiting.md) | レート制限、同時実行の制限、テナント単位の上限、プランごとの値 |
 
 ## 1. 全体構成
 
@@ -134,6 +137,10 @@
 | [0026](../decisions/0026-feature-flags.md) | フィーチャーフラグの種類と運用 |
 | [0027](../decisions/0027-search-table-rls-exception.md) | 検索用のテーブルだけ RLS を外し、関数を経由してしか読めないようにする |
 | [0028](../decisions/0028-remote-mcp-server.md) | AI エージェント向けに、リモートの MCP サーバーを提供する |
+| [0029](../decisions/0029-rate-limiting.md) | レート制限を、層・主体・テナントの共通の枠組みで行う |
+| [0030](../decisions/0030-versioned-public-api.md) | 版付きの公開 API を、内部 API と分けて提供する（MVP の後） |
+| [0031](../decisions/0031-app-platform.md) | アプリのプラットフォーム（インストール、ボット、イベントの配信、インタラクティブ） |
+| [0032](../decisions/0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
@@ -151,3 +158,5 @@
 - **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS の版に依存する。対応の下限（Safari 17 案）を PM が確定する（[client.md](client.md)）。
 - **第三者のスクリプト**：GA4 を読み込むワークスペースでは、CSP が広がる（ADR-0025）。
 - **AI エージェントの書き込み**：MCP の書き込みは、プロンプトインジェクションで誤用されうる。既定で無効にし、レート制限と監査で抑える（ADR-0028）。
+- **外部との互換性**：公開 API とアプリ（E12）は、提供を始めると互換性を長く保つ義務が生じる。版の方針（ADR-0030）と OpenAPI の破壊的変更の検査で守る。
+- **レート制限の基盤**：判定のたびに Valkey へ 1 往復する。Valkey の障害中は、一般の制限が緩くなる（ADR-0029）。

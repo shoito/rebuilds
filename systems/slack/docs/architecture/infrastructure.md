@@ -34,16 +34,15 @@ AWS Organizations で、用途ごとにアカウントを分ける。本番の�
 | public | ALB、NAT ゲートウェイ | Internet Gateway |
 | private | ECS のタスク（api、gateway、relay、workers） | NAT ゲートウェイ経由（許可したドメインのみ） |
 | isolated | Aurora、ElastiCache | なし |
-| unfurl | リンクのプレビューの取得器（unfurler）だけ | 専用の NAT ゲートウェイ経由 |
 
 - **入口は CloudFront → ALB だけ。** ALB のセキュリティグループは、CloudFront のマネージドプレフィックスリストからの接続だけを許可する。CloudFront には AWS WAF を付ける。
 - **CloudFront は WebSocket を扱える**（HTTP/1.1 のみ）。オリジンリクエストポリシーで `Sec-WebSocket-*` のヘッダーを転送する。CloudFront 経由の WebSocket のアイドル切断時間は **未検証**。Gateway は 25 秒ごとに心拍を送り、アイドル切断が起きないようにする。ALB のアイドルタイムアウトは心拍より十分長くする（例：120 秒）。
 - **VPC エンドポイント**を使い、AWS のサービスへの通信を NAT に出さない：S3（ゲートウェイ型）、ECR、SQS、Secrets Manager、KMS、CloudWatch Logs、STS、X-Ray、AppConfig。
 - **外向きの通信を制限する。** private サブネットからの外向きの通信は、AWS Network Firewall のドメインの許可リスト（Web Push の送信先、外部の IdP など）に限る。DNS は Route 53 Resolver DNS Firewall でも絞る。
 - **リンクのプレビューの取得器（unfurler）は隔離する。** 任意の URL を取りに行くため、SSRF の踏み台になりうる（ADR-0016、[messaging.md](messaging.md)、[security.md](security.md)）。
-  - unfurl の Worker（DB に書く側）は private サブネットに置き、外部の URL を取りに行く取得器だけを専用の ECS サービスとして unfurl サブネットに置く。取得器は専用の NAT ゲートウェイから出る。送信元 IP を他のサービスと分けるので、外部から濫用として遮断されても他に影響しない。
-  - 取得器は、VPC 内の他のサブネット、VPC エンドポイント、IMDS へ到達できないよう、セキュリティグループと NACL で拒否する。受け付けるのは unfurl の Worker からの呼び出しだけにする。取得先がプライベート IP に解決されたら、アプリでも拒否する。
-  - 取得器は DB への接続と、AWS の権限（タスクロール）を持たない。
+  - unfurl の Worker（DB に書く側）は private サブネットに置き、外部の URL を取りに行く取得器だけを、**VPC に接続しない Lambda** にする（ADR-0016）。VPC の中の資源、VPC エンドポイント、DB へ、そもそも経路がない。送信元 IP は AWS の共有のものになり、他のサービスと分かれる。
+  - 取得器の実行ロールは、ログの出力以外の AWS の権限を持たない。取得先がプライベート IP・リンクローカル・ループバックに解決されたら、取得器の中でも拒否する。
+  - アプリへのイベントの配信とインタラクティブの呼び出し（[apps.md](apps.md)）も、同じ方式の外向き送信用の Lambda で行う。署名は VPC の中の Worker で済ませてから渡す（ADR-0031）。
 - Gateway の接続先として、ALB のターゲットグループは gateway 専用にし、api と分ける。
 
 ## 3. ECS サービスとオートスケール
@@ -55,7 +54,7 @@ AWS Organizations で、用途ごとにアカウントを分ける。本番の�
 | api | HTTP API | CPU 使用率（目標 50%）、ALB のターゲットあたりのリクエスト数 | 3（AZ ごとに 1） |
 | gateway | WebSocket の保持とファンアウト | **タスクあたりの接続数**（カスタムメトリクス、目標は上限の 60%）。CPU とメモリは上限として併用 | 3 |
 | relay | outbox → Valkey・SQS | outbox の未処理件数と最古の行の経過時間 | 2（アクティブ 1、待機 1。詳細は [realtime.md](realtime.md)） |
-| workers | 検索インデックス、通知、サムネイル、unfurler | SQS の可視メッセージ数と最古のメッセージの経過時間。キューごとにサービスを分ける | 各 1〜2 |
+| workers | 検索インデックス、通知、サムネイル、unfurl（DB に書く側）、アプリのイベントの振り分けと配信 | SQS の可視メッセージ数と最古のメッセージの経過時間。キューごとにサービスを分ける | 各 1〜2 |
 
 - **Gateway は接続数でスケールする。** WebSocket は長く続くため、CPU では負荷が遅れて見える。スケールインは緩やかにし（クールダウンを長くする）、縮める台の接続を穏やかに移す（[ADR-0022](../decisions/0022-zero-downtime-deploy-and-migrations.md)）。
 - **1 つの AZ を失っても足りる台数を常に持つ。** 各サービスは、残る 2 AZ で最大負荷をさばけるよう、平常時の使用率を 2/3 以下に保つ（NFR-007）。
@@ -76,7 +75,9 @@ S1（同時接続 5 万、最大ワークスペース 5,000 人）の本番の�
 | workers | 0.5〜1 vCPU × 計 6〜8 タスク | キューごとに 1〜2 |
 | SQS | 標準キュー＋デッドレターキュー。キューごとに分ける | |
 | S3 | ファイル用、Web 配信用、ログ用のバケットを分ける | |
-| NAT ゲートウェイ | 一般用 × 3（AZ ごと）、unfurler 用 × 1 | |
+| NAT ゲートウェイ | 一般用 × 3（AZ ごと） | 外部の URL への取得・配信は、VPC に接続しない Lambda で行うので NAT を通らない |
+| public-api（E12） | 1 vCPU / 2 GB × 2 タスク | MVP の後。独立した ECS サービス（[public-api.md](public-api.md)） |
+| mcp（E9） | 0.5 vCPU / 1 GB × 2 タスク | [mcp.md](mcp.md) |
 
 staging は同じ構成を最小の台数（Aurora は writer のみ、各サービス 1〜2 タスク）で持つ。負荷試験のときだけ本番と同じ台数に広げる。dev はさらに小さくし、夜間と週末は止める。
 

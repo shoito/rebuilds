@@ -15,7 +15,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. テナント単位の上限と負荷
 
-特定のワークスペースが共有の資源を占有しないよう、テナント単位で上限を設ける（ADR-0009）。
+特定のワークスペースが共有の資源を占有しないよう、テナント単位で上限を設ける（ADR-0009）。**上限の値の正は [rate-limiting.md](../architecture/rate-limiting.md) の 4 節と、プランごとの値（[ADR-0032](../decisions/0032-plans-and-entitlements.md)）にある。** 下の表は、運用でよく見るものの抜粋である。上限を一時的に厳しくする・緩める操作は、ワークスペース単位の上書き（ADR-0032）で行い、監査ログに残す。
 
 | 対象 | 上限（MVP） | 超えたとき |
 | --- | --- | --- |
@@ -58,6 +58,9 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 鍵・秘密情報のローテーションの失敗 | `key-rotation.md` | E7 で作成 |
 | 削除の処理の遅れ・失敗、リーガルホールドの設定 | `data-deletion.md` | E8 で作成 |
 | MCP の呼び出しの急増、書き込みの異常 | `mcp-abuse.md`（クライアントの遮断を含む） | E9 で作成 |
+| アプリへの配信の失敗の急増、配信先の無効化、配信の遅れ | `app-event-delivery.md` | E12 で作成 |
+| アプリの濫用（スパム、過剰な読み取り） | `app-abuse.md`（インストールの停止を含む） | E12 で作成 |
+| 特定のワークスペース・アプリの 429 の急増、上限の一時的な変更 | `tenant-throttling.md`（[rate-limiting.md](../architecture/rate-limiting.md) の 5 節） | E7 で作成 |
 | 系列数が AMP の上限の 80%、Terraform のドリフトの検出 | `observability-and-drift.md` | E7 で作成 |
 
 ## 5. 定期作業と訓練

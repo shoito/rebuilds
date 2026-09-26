@@ -24,6 +24,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E9 AI エージェント連携 | リモート MCP サーバー（読み取り → 書き込み） | 未着手 |
 | E10 S2 への拡張 | Valkey の sharded pub/sub、巨大チャンネルの経路、OpenSearch への移行 | 未着手（S2 の判断の基準を満たしたら） |
 | E11 S3 への拡張 | セル構成、大阪のウォームスタンバイ | 未着手（ADR-0023 は proposed） |
+| E12 公開 API とアプリ | 版付きの公開 API、アプリのプラットフォーム（インストール、イベントの配信、インタラクティブ）。MVP の後 | 未着手 |
 
 ## Story
 
@@ -163,6 +164,29 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `mcp-read-tools` | 読み取りと検索のツール |
 | `mcp-workspace-policy` | 管理者の設定（利用の可否、許可するクライアント、書き込み） |
 | `mcp-write-tools` | 投稿とリアクションのツール（読み取りの運用で問題がないことを確かめてから） |
+
+### E12 公開 API とアプリ（MVP の後）
+
+| Story | 内容 |
+| --- | --- |
+| `public-api-foundation` | public-api のサービス、認証、エラー（RFC 9457）、カーソル |
+| `public-api-openapi-contract` | OpenAPI の生成、スナップショット、破壊的変更の検査（ADR-0030） |
+| `public-api-idempotency` | `Idempotency-Key` の保存と判定 |
+| `plans-and-entitlements` | `plans`・`workspace_entitlements` と `packages/entitlements`（ADR-0032。E7 で先に入れてもよい） |
+| `app-registry-and-console` | アプリ・マニフェスト・秘密の管理 |
+| `app-oauth-install` | インストールの流れ、ボットのトークンの発行 |
+| `bot-member-lifecycle` | インストールからアンインストールまでのボットの扱い |
+| `app-admin-policy-approval` | 管理者の方針と承認の依頼 |
+| `app-egress-lambda` | 外向き送信用の Lambda |
+| `events-api-delivery` | 振り分け、配信、再試行、配信先の無効化 |
+| `interactivity-slash-commands` | スラッシュコマンドとショートカット |
+| `ui-blocks-renderer` | UI ブロックの描画 |
+| `modals-and-app-home` | モーダルとアプリのホーム |
+| `ephemeral-messages` | 一時的なメッセージ |
+| `incoming-webhooks` | 受信用の Webhook |
+| `developer-workspaces` | 開発用のワークスペース |
+| `app-review-and-verified-domains` | 配布するアプリの審査とドメインの確認 |
+| `public-api-typescript-sdk` | 公式の TypeScript の SDK |
 
 ### E10・E11 規模の拡張
 
