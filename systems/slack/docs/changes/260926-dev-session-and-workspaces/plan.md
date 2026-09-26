@@ -2,7 +2,7 @@
 
 - Change: 260926-dev-session-and-workspaces
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

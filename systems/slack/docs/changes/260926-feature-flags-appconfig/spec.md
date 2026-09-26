@@ -2,7 +2,7 @@
 capability: flags
 change: 260926-feature-flags-appconfig
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: フィーチャーフラグ `packages/flags` と AppConfig
@@ -363,3 +363,14 @@ AppConfig の構成プロファイルは、自由形式（`AWS.Freeform`）の J
 - 企業向けのプランのワークスペースを 100% の段の最後に有効にする運用（delivery.md の 5 節）を、仕組みで支えるか。今は許可リストと割合だけで、プランによる除外はない（PM）。
 - AppConfig Agent をローカルと CI で動かすか。今は動かさず、上書きとメモリ上の取得の差し替えでテストする。Agent の結合テストは、サイドカーを足すインフラの変更で行う（Dev）。
 - REQ-FLAG-012 を、`ci-pipeline` の DT-DLV-001 の MODIFIED に移すか、ADDED のまま持つか。どちらの変更が先にアーカイブされるかで決まる（Dev、QA）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- 除外のリストは今は持たない。必要になったら、DT-FLAG-002 と PROP-FLAG-002 を MODIFIED で変える。
+- release・migration のフラグの期限は、定義から 180 日以内とする。超える定義は CI で失敗させる。
+- 両方の状態のテストは「全部無効」と「全部有効」の 2 回にとどめる。組み合わせが問題になる変更は、その変更の plan の Proof で個別に試す。
+- 企業向けのプランのワークスペースを最後に有効にする運用は、許可リストで手作業で行う。プランによる除外の仕組みは作らない。
+- AppConfig Agent はローカルと CI では動かさない。Agent との結合テストは、サイドカーを足すインフラの変更で行う。
+- REQ-FLAG-012 は ADDED のまま持つ。`ci-pipeline` のほうが後にアーカイブされる場合は、そのときに MODIFIED にまとめる。

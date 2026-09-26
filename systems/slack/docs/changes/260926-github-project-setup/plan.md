@@ -2,7 +2,7 @@
 
 - Change: 260926-github-project-setup
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

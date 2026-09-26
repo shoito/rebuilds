@@ -3,7 +3,7 @@ capability: delivery
 change: 260926-github-project-setup
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: GitHub の Issue・Projects・App の設定と同期
@@ -184,3 +184,11 @@ status: draft
 
 - Organization のチーム（`pm`・`dev`・`qa`・`ops`）と `CODEOWNERS` をどう対応させるか（1 人の間は、全チームに `@shoito` だけが入る）。
 - App の秘密鍵の入れ替えの頻度（ADR-0017 の署名鍵に合わせて 90 日とする案）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- 1 人の間は、Organization のチーム `pm`・`dev`・`qa`・`ops` のすべてに `@shoito` だけを入れ、`CODEOWNERS` はチームで書く。
+- GitHub App の秘密鍵は 90 日ごとに入れ替える（ADR-0017 の署名鍵に合わせる）。
+- この変更の実装は、リポジトリを Organization へ移すまで着手しない。

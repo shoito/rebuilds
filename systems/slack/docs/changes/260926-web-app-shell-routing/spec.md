@@ -2,7 +2,7 @@
 capability: web-client
 change: 260926-web-app-shell-routing
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: Web クライアントの骨格とルーティング
@@ -507,3 +507,14 @@ API の呼び出しが失敗した場合、システムは DT-WEB-003 に従っ�
 - **リリースの識別子のヘッダー名（Dev・Ops）**：仮に `X-Client-Release` とする。API のログ・トレースに載せるのは `telemetry-package` の範囲。
 - **骨格の release フラグ（PM・Ops）**：フラグはワークスペース単位で評価するため、ワークスペースを選ぶ前の骨格そのものは release フラグで隠せない。E1 では本番の利用者がいない前提で、骨格にはフラグを置かない。本番の CloudFront で Web をいつから配るかを決める必要がある（未検証）。
 - **「最後に開いた」の記憶のキー（Dev）**：アカウントを表す値（`account_id` そのものか、その派生値か）を `GET /api/me/workspaces` の応答に含めるか。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- 不足していた API は、`dev-session-and-workspaces` と `channel-list` で作る。
+- 内部 API のパスの接頭辞は `/api` にする（`packages/api-client` もこれを基準にする）。
+- 開発用の認証は、開発用の API が HttpOnly の Cookie を発行する方式にする（`dev-session-and-workspaces`）。
+- リリースの識別子のヘッダー名は `X-Client-Release` にする。
+- E1 の間は、Web を本番に公開しない（staging までにとどめる）。そのため、骨格に release フラグは置かない。
+- 「最後に開いたワークスペース」は、`GET /api/me/workspaces` が返す `account_id` をキーにして記憶する。

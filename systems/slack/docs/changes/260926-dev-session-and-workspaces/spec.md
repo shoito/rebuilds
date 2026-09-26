@@ -3,7 +3,7 @@ capability: workspaces
 change: 260926-dev-session-and-workspaces
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: 開発用のサインインと、自分のワークスペースの一覧
@@ -49,7 +49,7 @@ E1 の Web クライアント（[web-app-shell-routing](../260926-web-app-shell-
 
 - Given アカウント A が W1・W2 のメンバーで、W3 のメンバーではない
 - When A が `GET /api/me/workspaces` を要求する
-- Then W1 と W2 だけが返る。各要素は `{ workspace_id, name, member_id, role }` を持つ
+- Then W1 と W2 だけが返る。応答は `{ account_id, workspaces: [...] }` で、各要素は `{ workspace_id, name, member_id, role }` を持つ
 
 #### Scenario: 無効化されたメンバー
 
@@ -96,3 +96,10 @@ PROP-WS-001 は、テナント分離の性質として ADR-0009・0027 と quali
 ## Open questions
 
 - E2 で Better Auth に置き換えるときに、E1 の `sessions` の行を移すか、捨てるか（dev・staging だけなので、捨ててよい見込み）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- E2 で Better Auth に置き換えるとき、E1 の `sessions` の行は移さずに捨てる（dev・staging だけのため）。
+- `GET /api/me/workspaces` の応答に `account_id` を含める（web-app-shell-routing の「最後に開いたワークスペース」の記憶のキーに使う）。

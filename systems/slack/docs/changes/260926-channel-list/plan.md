@@ -2,7 +2,7 @@
 
 - Change: 260926-channel-list
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

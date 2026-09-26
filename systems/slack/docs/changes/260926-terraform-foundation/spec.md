@@ -3,7 +3,7 @@ capability: infrastructure
 change: 260926-terraform-foundation
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: Terraform の基盤（アカウント、状態、ネットワーク、CI の認証）
@@ -587,3 +587,13 @@ OIDC のロールと状態のバケットができるまでは、CI から apply
 - **IAM の制御プレーンは us-east-1 にある。** 東京の障害は IAM の変更に影響しないが、us-east-1 の障害の間は、ロールの信頼ポリシーを変えられない。災害復旧の手順は、既存のロールの引き受け（STS は大阪のリージョンのエンドポイントを使う）だけで完結させる。これで足りるか（Ops）。
 - **Identity Center の ID ソース**：当面は Identity Center のディレクトリ。外部の IdP に移すか（Ops）。
 - （決定）Dev に prod の常設の許可は与えない。障害の調査のときだけ、Ops の承認で `ViewOnly` を 4 時間だけ割り当てる。DT-INFRA-002 の 4 行目（Ops、2026-09-26）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- staging にも大阪の状態のバケットを置き、災害復旧の手順を staging で練習できるようにする。
+- dev の NAT は 1 つにする（`nat_per_az = false`）。
+- ドリフトの通知先は、オンコールの道具が決まるまで GitHub の Issue とする。
+- us-east-1 の障害の間に IAM を変えられないことは許容する。災害復旧の手順は、既存のロールの引き受けだけで完結させる。
+- ID ソースは、当面は IAM Identity Center のディレクトリとする。外部の IdP への移行は E8 で見直す。

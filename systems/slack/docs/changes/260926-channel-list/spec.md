@@ -3,7 +3,7 @@ capability: channels
 change: 260926-channel-list
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: 参加しているチャンネルの一覧
@@ -54,3 +54,9 @@ E1 の Web クライアントのサイドバーに必要な、参加している
 ## Open questions
 
 - サイドバーの並び順（名前の順か、最近の活動の順か）。E1 は名前の順にし、E5 で見直す（PM）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- E1 のサイドバーは名前の順にする。最近の活動の順は E5 で見直す。

@@ -2,7 +2,7 @@
 
 - Change: 260926-feature-flags-appconfig
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 前提と依存
 

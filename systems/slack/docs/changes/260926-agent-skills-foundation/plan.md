@@ -2,7 +2,7 @@
 
 - Change: 260926-agent-skills-foundation
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

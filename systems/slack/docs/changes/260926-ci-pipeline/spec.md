@@ -3,7 +3,7 @@ capability: delivery
 change: 260926-ci-pipeline
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: PR の CI、merge queue、仕様の追跡と衝突の検査
@@ -504,3 +504,12 @@ ruleset の merge queue の規則の各項目の名前と値の範囲は **未�
 - **検査の道具をどこに置くか**：`tools/spec-checks/` をリポジトリのルートに置き、正本は Slack の `delivery` の capability に置いた。題材が増えたら、正本をリポジトリ共通に移すか（Dev）。
 - **in-progress の変更の未参照を警告にとどめる**（DT-DLV-003 #6）。複数の PR に分けて実装する間に失敗させないためだが、`done` に変える PR で初めて失敗が出る。`plan.md` の Order of work の完了（チェックボックス）と突き合わせて、完了したタスクの ID だけを必須にするか（QA）。
 - **ブランチ名**（`<system>/<YYMMDD-slug>`、ADR-0002）を検査するか。今は要件にしていない（Dev）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- `spec.md` の二重承認を確かめる CI は、Organization のチーム（`pm`・`qa`）と対応づけられる `github-project-setup` の後に、別の変更で入れる。それまでは PR テンプレートのチェック項目で確かめる。
+- 検査の道具は `tools/spec-checks/` に置く。正本は、題材が 2 つになった時点でリポジトリ共通へ移す。
+- `in-progress` の変更の未参照の ID は、警告にとどめる（DT-DLV-003 #6）。`done` にする PR で失敗させる。
+- ブランチ名（`<system>/<YYMMDD-slug>`）は検査するが、失敗させずに警告にとどめる。

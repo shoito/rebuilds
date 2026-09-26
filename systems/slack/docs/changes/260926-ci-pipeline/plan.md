@@ -3,7 +3,7 @@
 - Change: 260926-ci-pipeline
 - Spec: [spec.md](spec.md)
 - Quality: [quality.md](quality.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

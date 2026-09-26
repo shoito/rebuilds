@@ -3,7 +3,7 @@ capability: agent-tooling
 change: 260926-agent-skills-foundation
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: エージェントの Skills と Subagent の土台
@@ -145,3 +145,10 @@ GitHub App による任意の操作の列について、次のどれも起きな
 
 - Skill を Claude Code 以外のエージェント（Codex など）でも使えるようにするか。`AGENTS.md` から Skill を参照する形にすれば、共有できる見込み（未検証）。
 - eval の実行費用の上限（週次の実行の件数）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- Skill は `.claude/skills/` に置き、`AGENTS.md` から一覧と使う場面を参照する。Claude Code 以外のエージェントは `AGENTS.md` を通して手順を読む（共有の可否は実装時に確かめる）。
+- eval は、PR では変更のあった Skill の分だけ、週次では全件（3 つ × 20 件 = 60 件）を上限に実行する。

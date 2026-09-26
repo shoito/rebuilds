@@ -3,7 +3,7 @@
 - Change: 260926-message-body-ast-v1
 - Spec: [spec.md](spec.md)
 - Quality: [quality.md](quality.md)
-- Status: draft
+- Status: approved
 
 ## 前提と依存
 

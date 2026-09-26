@@ -3,7 +3,7 @@
 - Change: 260926-web-channel-view
 - Spec: [spec.md](spec.md)
 - Quality: [quality.md](quality.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 
@@ -115,3 +115,4 @@
 | フラグが無効なら API を呼ばず「準備中」、骨格の転送は壊れない | ADR-0026（無効な状態） | Playwright：`release.web_channel_view` の両方の状態で主要シナリオを回す。無効のときメッセージの API への要求が 0 件 |
 | チャンネルの切り替えの性能 | client.md の 11 節 | Playwright の計測（Chromium）：キャッシュなし p75 500ms、キャッシュあり 100ms。E1 では記録だけにし、失敗の条件にしない |
 | すべての ID がテストから参照されている | — | ID の追跡の検査が CI で通る |
+| 未送信があるときだけ離脱の確認が出る | REQ-WEB-039 | Playwright（`page.on('dialog')` で確かめる） |

@@ -2,7 +2,7 @@
 capability: observability
 change: 260926-telemetry-package
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: 計装の共通部品 `packages/telemetry`
@@ -338,3 +338,12 @@ status: draft
 - 外部のクライアントが付けた `traceparent` の sampled のフラグに従うと、クライアントが全件の記録を強制できる（費用の濫用）。クライアント → API の境界だけ、親のフラグを無視して DT-OBS-001 の 4・5 行で決め直すか（Ops、Dev）。
 - Valkey のクライアントのライブラリ（ioredis・iovalkey など）が未定。決まった変更で自動計装を足す。
 - エラーの `message` を出さない方針で、調査に困らないか。`AppError` のように、安全と分かっている文言だけを出す例外を設けるか（Ops）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- 上位の集合は、DB 時間とリクエスト数のそれぞれの上位 N 件の和集合にする。
+- クライアントから API への境界では、`traceparent` の sampled のフラグに従わず、API の側で標本の採否を決める（親の trace_id は引き継ぐ）。
+- Valkey のクライアントは `iovalkey`（ioredis 互換）を使う前提にする。自動計装は、それを入れる変更で足す。
+- エラーの `message` は原則出さない。例外として、`AppError` の、安全と分かっている文言だけを出す。

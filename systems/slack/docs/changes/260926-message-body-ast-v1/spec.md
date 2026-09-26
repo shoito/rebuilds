@@ -2,7 +2,7 @@
 capability: messaging
 change: 260926-message-body-ast-v1
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: 本文の AST v1
@@ -339,3 +339,12 @@ type Inline =
 - `emoji` の名前を、固定した絵文字の一覧で検証するか。一覧は E3 の `reactions` で `packages/contract` に置く予定なので、それまでは形だけを検証する（Dev）。
 - 双方向の制御文字（U+202E など）による表示の偽装を、スキーマで拒否するか、描画で無害にするか（Dev、QA）。
 - `MessageBody` を `packages/ui` に置くと、この変更で `packages/ui` の骨格も作ることになる。`web-app-shell-routing` と骨格の作成がぶつからないよう、先に着手した側が作る（Dev）。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- 400 の `reason` の値の定義は、この変更（`validateBody`）が持つ。API の応答に載せるのは `post-and-list-messages`（反映済み）。
+- `emoji` の名前は、E3 の `reactions` までは形だけを検証する。
+- 双方向の制御文字は、スキーマでは拒否しない。描画で無害にする（テキストを `bdi` で分離し、`dir="auto"` を付ける）。
+- `packages/ui` の骨格は、この変更と `web-app-shell-routing` のうち、先に着手した側が作る。

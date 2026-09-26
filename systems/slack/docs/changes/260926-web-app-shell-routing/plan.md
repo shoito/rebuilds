@@ -2,7 +2,7 @@
 
 - Change: 260926-web-app-shell-routing
 - Spec: [spec.md](spec.md)
-- Status: draft
+- Status: approved
 
 ## 依存
 

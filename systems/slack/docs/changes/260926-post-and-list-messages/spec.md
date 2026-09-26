@@ -3,7 +3,7 @@ capability: messaging
 change: 260926-post-and-list-messages
 issue:
 epic: E1
-status: draft
+status: approved
 ---
 
 # Spec: メッセージの投稿と履歴取得
@@ -156,3 +156,9 @@ status: draft
   - 指定した `seq` の周辺を取る `around_seq` は、E3 の `jump-to-message` で追加する（[client.md](../../architecture/client.md)）。
 
 - パブリックチャンネルを非メンバーが閲覧できるようにするか（本家は可能）。E2 で決める。この変更では、すべてのチャンネルをメンバー限定として扱う。
+
+## 決定（2026-09-26、PM・QA、既定案）
+
+上の Open questions は、次のとおり決めた。
+
+- パブリックチャンネルを非メンバーが閲覧できるようにする（本家 Slack に合わせる）。E2 の `authorization-decision-tables` で扱う。この変更では、すべてのチャンネルをメンバー限定として扱う。
