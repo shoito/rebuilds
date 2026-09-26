@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -74,6 +74,7 @@ S1 のトークンの発行のピークは 1 秒に 3,000 件で、1 件の発�
 - Signer は、復号した秘密鍵をメモリーにだけ置く。ディスクとコアダンプに出さない。
 - Signer の API は、テナント・`kid`・クレームを受け取って署名した JWT を返すだけにする。任意のバイト列には署名しない。`iss` が要求のテナントのものと一致することを、Signer の中で確かめる。
 - 認可サーバーから Signer へは、VPC の中で相互 TLS で呼ぶ。
+- 外部の IdP へのクライアントの認証に要る署名（Apple のクライアントシークレットの JWT、エンタープライズの OIDC 接続の `private_key_jwt`、SAML の AuthnRequest）も、Signer の中で行う。これはトークンの署名とは別の型の用途（外部 IdP のアサーション）として API を分け、テナントの署名鍵ではなく接続ごとの鍵で署名する。署名する中身は Signer が接続の登録の値から組み立て、呼び出し側に任意のクレームを渡させない（[ADR-0047](0047-signer-api-and-jwks-publishing.md)、[keys-and-secrets.md](../architecture/keys-and-secrets.md) の 6.3 節）。
 - KMS の鍵は、大阪へ複製するマルチリージョンの鍵にし、DR の後も同じ暗号文を復号できるようにする。
 
 ### A・C・D・E を選ばなかった理由

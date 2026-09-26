@@ -1,7 +1,7 @@
 # Intent: Auth0 を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: accepted
 - Date: 2026-09-27
 
 ## Problem
@@ -75,7 +75,7 @@ Web やモバイルのアプリを作るたびに、ログイン、サインア�
 | # | 基準 | 目標 | 測り方 |
 | --- | --- | --- | --- |
 | K1 | 認証の経路の可用性 | 月間 99.99%（NFR-001） | 合成監視と、エンドポイントの 5xx・タイムアウトの割合 |
-| K2 | 標準への準拠 | GA の前に、OpenID Certification の OP の Basic・Config・RP-Initiated Logout・Back-Channel Logout のプロファイルに合格する（Form Post は未定） | OpenID Foundation の適合試験。CI でも毎回回す |
+| K2 | 標準への準拠 | GA の前に、OpenID Certification の OP の Basic・Config・Form Post・RP-Initiated Logout・Back-Channel Logout のプロファイルに合格する（Form Post は 2026-09-27 に対象に加えた。[authentication-flows.md](architecture/authentication-flows.md) の 14 節） | OpenID Foundation の適合試験。CI でも毎回回す。GA の判定は `main` の夜間で 7 日続けて通ること（[quality.md](quality.md)） |
 | K3 | 組み込みの速さ | 新しいテナントを作ってから、サンプルアプリで最初のログインが通るまで、中央値 15 分以内 | オンボーディングのイベントの計測 |
 | K4 | ログインの速さ | Universal Login の送信から応答まで p99 500ms 以内（NFR-002） | サーバーの計測 |
 | K5 | 攻撃の防御 | 模擬のクレデンシャルスタッフィングで、攻撃の試行の 99% 以上をブロックし、正規のログインの誤ブロックは 0.1% 以下 | E8 の模擬試験。本番では日次の集計 |
@@ -121,19 +121,24 @@ Web やモバイルのアプリを作るたびに、ログイン、サインア�
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 個人情報保護法：テナントのエンドユーザーの個人データを、委託として扱うか、本システムが自ら取得するか（いわゆるクラウドの例外に当たるか）。外国にある第三者への提供（海外のソーシャル IdP、メール・ボット検知の提供者、ログストリームの送信先）の扱いと、本人への情報の提供。漏えい等の報告の義務を負う者と手順 | users-and-profiles、connections、logs-and-streams、security の各領域（まだない） | E4 のメールの送信事業者の連携、E6 のソーシャル接続、E8 のボット検知の提供者の連携、E10 のログストリーム |
-| L2 | 電気通信事業法の外部送信規律：本システムがホストする Universal Login のページが、ボット検知や分析のために端末の情報を外部へ送るとき、公表の義務を負うのはテナントか本システムか。公表の方法 | universal-login、attack-protection の各領域（まだない） | E4 のログイン画面の公開、E8 のボット検知 |
-| L3 | 電気通信事業法：メールの送信の代行やログストリームが「他人の通信の媒介」に当たり、届出が要るか | email-delivery の領域（まだない） | E4 のメールの送信、E10 のログストリーム |
-| L4 | SMS・音声の OTP：国内の SMS 配信事業者との契約、送信元の表示、関係する法令（特定電子メール法の対象外と見込むが未確認） | mfa-and-passkeys の領域（まだない） | MVP の後の SMS の Epic |
-| L5 | ログの保持の期間：認証のログ（IP、端末、ユーザーの ID）を何日持つか。本家はプランで 1〜30 日（[Auth0 Pricing](https://auth0.com/pricing)、2026-09-27 に確認）。本システムの監査ログ（管理者の操作）の保持の期間 | logs-and-streams、security の各領域（まだない） | E10 のログの保持とアーカイブ（Object Lock のバケットを作る前） |
-| L6 | データの所在：「日本のリージョンのデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサー、ログストリームの送信先の扱い | infrastructure の領域（まだない）、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E1 のリージョンの構成、E12 の契約の文書 |
-| L7 | テナントとの契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、エンドユーザーからの開示・削除の請求の窓口 | users-and-profiles の領域（まだない） | E12 の GA の判定 |
-| L8 | 同意の記録：サインアップでの利用規約・プライバシーポリシーへの同意、未成年の扱いを、誰の責任で、どう記録するか | universal-login の領域（まだない） | E4 のサインアップの Story |
+| L1 | 個人情報保護法：テナントのエンドユーザーの個人データを、委託として扱うか、本システムが自ら取得するか（いわゆるクラウドの例外に当たるか）。外国にある第三者への提供（海外のソーシャル IdP、メール・ボット検知の提供者、ログストリームの送信先）の扱いと、本人への情報の提供。漏えい等の報告の義務を負う者と手順 | [users-and-profiles.md](architecture/users-and-profiles.md)、[connections.md](architecture/connections.md)、[logs-and-streams.md](architecture/logs-and-streams.md)、[security.md](architecture/security.md) の 13 節 | E4 のメールの送信事業者の連携、E6 のソーシャル接続、E8 のボット検知の提供者の連携、E10 のログストリーム |
+| L2 | 電気通信事業法の外部送信規律：本システムがホストする Universal Login のページが、ボット検知や分析のために端末の情報を外部へ送るとき、公表の義務を負うのはテナントか本システムか。公表の方法 | [universal-login.md](architecture/universal-login.md)、[attack-protection.md](architecture/attack-protection.md)、[ADR-0026](decisions/0026-bot-detection-and-challenge.md) | E4 のログイン画面の公開、E8 のボット検知 |
+| L3 | 電気通信事業法：メールの送信の代行やログストリームが「他人の通信の媒介」に当たり、届出が要るか | [email-delivery.md](architecture/email-delivery.md)、[logs-and-streams.md](architecture/logs-and-streams.md) | E4 のメールの送信、E10 のログストリーム |
+| L4 | SMS・音声の OTP：国内の SMS 配信事業者との契約、送信元の表示、関係する法令（特定電子メール法の対象外と見込むが未確認） | [mfa-and-passkeys.md](architecture/mfa-and-passkeys.md) の 5.5 節 | MVP の後の SMS の Epic |
+| L5 | ログの保持の期間：認証のログ（IP、端末、ユーザーの ID）を何日持つか。本家はプランで 1〜30 日（[Auth0 Pricing](https://auth0.com/pricing)、2026-09-27 に確認）。本システムの監査ログ（管理者の操作）の保持の期間 | [logs-and-streams.md](architecture/logs-and-streams.md) の 4.2 節、[security.md](architecture/security.md) の 9 節、[ADR-0055](decisions/0055-data-retention-and-deletion.md) | E10 のログの保持とアーカイブ（Object Lock のバケットを作る前） |
+| L6 | データの所在：「日本のリージョンのデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサー、ログストリームの送信先の扱い | [infrastructure.md](architecture/infrastructure.md)、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E1 のリージョンの構成、E12 の契約の文書 |
+| L7 | テナントとの契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、エンドユーザーからの開示・削除の請求の窓口 | [users-and-profiles.md](architecture/users-and-profiles.md) の 7 節、[ADR-0055](decisions/0055-data-retention-and-deletion.md) | E12 の GA の判定 |
+| L8 | 同意の記録：サインアップでの利用規約・プライバシーポリシーへの同意、未成年の扱いを、誰の責任で、どう記録するか | [universal-login.md](architecture/universal-login.md)、[ADR-0013](decisions/0013-consent-records.md) | E4 のサインアップの Story |
+
+表の L1〜L8 のほかに、次も法務の確認待ちである（結論は出さない）。
+
+- Pwned Passwords のデータセットを自前で保存して商用のサービスの中で使ってよいか（[ADR-0025](decisions/0025-breached-password-detection.md)）。承認を止める spec：E8 の自前のホストの Story。確認までは公式の range API を使う。
+- 署名鍵の漏えいのとき、本システムの判断でテナントの鍵を失効させる権限と、運用者によるテナントのデータの参照（インシデントの例外）を、契約にどう書くか（[security.md](architecture/security.md) の 13 節）。承認を止める spec：E12 の GA の判定。
 
 ### 選定・計測で決めるもの（法務以外）
 
-- メールの送信事業者（Amazon SES を第一の候補にする。テナントの独自の SMTP も許すか）：E4 の着手前に決める。
-- ボットの検知の方式（第三者の CAPTCHA 相当の部品か、WAF の Challenge か、自前か）：E8 の着手前に決める。L2 の結論にも依る。
+- メールの送信事業者：Amazon SES（東京、DR は大阪）に決めた。テナントの独自の SMTP と SES（クロスアカウント）も許す（[ADR-0040](decisions/0040-email-sending-platform.md)、[ADR-0041](decisions/0041-email-templates-and-tenant-providers.md)）。送信の代行の扱い（L3）は法務の確認待ちのまま。
+- ボットの検知の方式：自前のリスクの点数と proof-of-work のチャレンジに決めた。WAF の Challenge はエッジの後ろ盾、第三者の CAPTCHA は L2 の結論の後（[ADR-0026](decisions/0026-bot-detection-and-challenge.md)）。
 - Argon2id のパラメーターと、ログインの CPU の費用：E12 の負荷試験で決める（[ADR-0004](decisions/0004-credential-storage.md)）。
 - LINE ログインでメールアドレスを得るための申請の要否と条件：未検証。E6 の着手前に確かめる。
-- OpenID Certification の対象のプロファイル（Form Post、Dynamic を含めるか）と、認証の費用：未検証。E12 の前に決める。
+- OpenID Certification の対象のプロファイル：Form Post を含め、Dynamic は含めない（動的な登録を持たない）と決めた（2026-09-27。[authentication-flows.md](architecture/authentication-flows.md) の 13.3・14 節）。認証の費用は未検証で、E12 の前に確かめる。

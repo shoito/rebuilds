@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -56,7 +56,7 @@ rebuilds の他の題材（Slack、Stripe など）で、次の基盤を決め�
 
 ### 適合の確かめ方
 
-- OpenID Foundation の適合試験（conformance suite）を CI で回す。対象は OP の Basic・Config・RP-Initiated Logout・Back-Channel Logout のプロファイル。GA の前に OpenID Certification を受ける。
+- OpenID Foundation の適合試験（conformance suite）を CI で回す。対象は OP の Basic・Config・Form Post・RP-Initiated Logout・Back-Channel Logout のプロファイル（Form Post は [authentication-flows.md](../architecture/authentication-flows.md) の 14 節の決定で加えた）。GA の前に OpenID Certification を受ける。
 - RFC 9700 の要件を、チェックリストとして security の領域の文書に写し、要件ごとにテストを持つ。
 
 ### 2・3 を選ばなかった理由
