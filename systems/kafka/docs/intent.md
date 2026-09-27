@@ -31,7 +31,7 @@
 
 - Apache Kafka のワイヤープロトコルへの互換は、**振る舞いとして** 提供する。API の名前、版、エラーコード、内部トピックの名前、クライアントの設定のキーは本家のものを使う。互換の範囲は [ADR-0005](decisions/0005-compatibility-policy.md) で決める。
 - 製品名、ドメイン、ブートストラップのホスト名、HTTP の API のパスとヘッダー、API キーの接頭辞、CLI、Terraform のプロバイダーには、「Kafka」「Confluent」を自社のブランドとして使わない。設計の文書では `<Brand>`・`<brand>` で書く（[リポジトリ共通の ADR-0006](../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
-  - 例：ブートストラップ `<cluster-id>.<region>.<brand>.<domain>:9092`、API キーの接頭辞 `<brand>_key_...`、CLI `<brand> cluster create`、Terraform のプロバイダー `<brand>/<brand>`、管理 API `api.<brand>.<domain>/v1/...`
+  - 例：ブートストラップ `<lc-id>.<region>.<brand>.<domain>:9092`、API キーの接頭辞 `<brand>_key_...`、CLI `<brand> cluster create`、Terraform のプロバイダー `<brand>/<brand>`、管理 API `api.<brand>.<domain>/v1/...`
 - 「Apache Kafka 互換」と説明の中で書いてよいか、どう書くかは、法務の確認待ち（下の「法務の確認待ち」の L1）。
 
 ### 利用者

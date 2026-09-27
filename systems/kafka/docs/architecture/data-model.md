@@ -90,7 +90,7 @@
 | `az_ids` | 3 つの AZ ID | infrastructure |
 | `broker_count`、`node_instance_type` | ブローカーの台数と型 | control-plane、infrastructure |
 | `capacity_cu` | ブローカーの台数 × ブローカーあたりの CU（[ADR-0048](../decisions/0048-broker-design-point-and-cost-model.md)） | control-plane、capacity |
-| `strimzi_version`、`kafka_version` | 動いている版 | control-plane |
+| `strimzi_version`、`upstream_version` | 動いている版（`upstream_version` は本家の版） | control-plane |
 | `kraft_version`、`metadata_version`、`controller_count`、`partition_limit` | KRaft の状態と上限（10 万） | metadata-and-control |
 
 ### 3.3 ブローカー・メタデータ・耐久性・階層型
@@ -176,6 +176,7 @@
 | `<brand>-ops-<pc-id>-apne1` | dp-prod | `kraft-snapshots/<日付>/<offset>-<epoch>.checkpoint`（形は E3 で決める） | KRaft のスナップショットの写し（1 時間ごと） | 30 日 | 常に | [ADR-0015](../decisions/0015-kraft-dynamic-quorum-and-controller-sizing.md)、[infrastructure.md](infrastructure.md) の 7 節 |
 | `<brand>-audit-apne1` | log-archive | `tenant/<org>/<日付>/…`、`durability/<pc-id>/<日付>/…`（Parquet） | 監査ログ、耐久性の監査の事象 | Object Lock（コンプライアンス）1 年 | 常に（大阪も Object Lock） | [ADR-0030](../decisions/0030-encryption-and-audit-logs.md)、[ADR-0046](../decisions/0046-operator-telemetry-and-cardinality.md) |
 | `<brand>-usage-apne1` | cp-prod | `usage/raw/dt=<日付>/pc=<pc-id>/…parquet` | 使用量の生の記録（請求の根拠） | 10 年の案（経理・法務の確認待ち、L7） | 常に | [metrics-and-billing.md](metrics-and-billing.md) の 5 節 |
+| 同上 | 同上 | `metrics/hourly/dt=<日付>/lc=<lc-id>/…parquet` | テナントのメトリクスの 1 時間の集計 | 13 か月 | しない | [metrics-and-billing.md](metrics-and-billing.md) の 6.2 節 |
 | `<brand>-logs-apne1` | log-archive | Firehose の既定の日付の前方一致 | 運用のログ | 1 年 | しない | [observability.md](observability.md) の 3 節 |
 | 制御面のバケット | cp-prod | `invoices/<org>/<period>.pdf`（`invoices.pdf_s3_key`） | 請求書の PDF | 法定の期間（L7） | 常に | [metrics-and-billing.md](metrics-and-billing.md) の 7.5 節 |
 

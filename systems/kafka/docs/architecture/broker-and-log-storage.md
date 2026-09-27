@@ -28,8 +28,8 @@
 | --- | --- | --- |
 | ファイル記述子の上限 | 1,048,576 | 本家は「少なくとも 100,000」を出発点に勧める（Hardware and OS）。セグメントを小さくするので多めにする |
 | `vm.max_map_count` | 262,144 | 本家の既定の約 65,535 では、索引の mmap で足りなくなる。本家の文書は、5 万のパーティションで 10 万の mmap になり、落ちうると書いている（同上） |
-| `vm.swappiness` | 1 | ページキャッシュを優先する（本家の文書の値は未検証） |
-| JVM のヒープ | 6 GiB（仮） | 残りのメモリーをページキャッシュに回す。本家の文書は、メモリーを「書き込みの速さ × 30 秒」分のキャッシュで見積もる（同上）。ヒープの大きさは E1 の PoC で決める（未検証） |
+| `vm.swappiness` | 1 | ページキャッシュを優先する。本家の 4.3 の Hardware and OS には `vm.swappiness` の推奨の値がない（2026-09-27 に確認）ので、本システムの値として持つ |
+| JVM のヒープ | 6 GiB（仮） | 残りのメモリーをページキャッシュに回す。本家の文書は、メモリーを「書き込みの速さ × 30 秒」分のキャッシュで見積もる（同上）。ヒープの大きさは E1 の `broker-node-baseline` で決める（未検証） |
 | アプリのフラッシュ | 本家の既定（アプリからの fsync なし）。ただし 6.3 節の定期のフラッシュを PoC で評価する | 本家は既定のフラッシュの設定を勧め、「失った節は複製から戻る」ので耐久性にディスクへの同期は要らないとする（同上）。耐久性の議論は [replication-and-durability.md](replication-and-durability.md) の 3 節 |
 
 ## 3. セグメントと索引
@@ -54,7 +54,7 @@
   __cluster_metadata-0/                        # KRaft のメタデータのログの写し（metadata.log.dir）
 ```
 
-- ファイル名と索引の形は本家のまま（[Log](https://kafka.apache.org/43/implementation/log/)）。ファイルとチェックポイントの名前は、本家のソースの名前による（本家の文書での確認は一部未検証）。
+- ファイル名と索引の形は本家のまま（[Log](https://kafka.apache.org/43/implementation/log/)）。ファイルとチェックポイントの名前は、本家のソースの名前による（例：`cleaner-offset-checkpoint` は [LogCleanerManager.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/LogCleanerManager.java)、2026-09-27 に確認）。
 - ディレクトリ名は、名前空間のパッチが付けた内部のトピックの名前になる。テナントのトピックの名前を含むので、ディレクトリの一覧をログに出さない（10 節）。
 
 ### 3.2 索引
@@ -70,7 +70,7 @@
 | --- | --- | --- | --- |
 | `log.segment.bytes`（トピックでは `segment.bytes`） | 1 GiB | 256 MiB（テナントは 64 MiB〜1 GiB） | S3 に上がるのは閉じたセグメントだけ。大きいと、ローカルに残る量と、上がるまでの遅れが増える |
 | `log.roll.ms`（`segment.ms`） | 7 日 | 1 時間（テナントは 10 分〜7 日） | 書き込みの少ないパーティションのセグメントが 7 日閉じないと、S3 と大阪の写しに 7 日上がらない（NFR-009 の S1 の RPO に効く） |
-| `log.roll.jitter.ms` | 0 | 5 分 | 多数のパーティションが同じ時刻に切り替わり、S3 への上げが集中するのを避ける（未検証：効果を PoC で測る） |
+| `log.roll.jitter.ms` | 0 | 5 分 | 多数のパーティションが同じ時刻に切り替わり、S3 への上げが集中するのを避ける。本家の既定は `log.roll.jitter.hours=0`（[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認）。効果は未検証で、E3 の `segment-and-retention-defaults` で測る |
 
 - セグメントは、大きさ、時間、索引の満杯、オフセットの桁あふれのいずれかで切り替わる（本家）。
 - 見積もり（S1、仮）：1 つのブローカーに 2,000 の複製、ローカルの保持 6 時間、1 時間ごとの切り替えなら、ローカルのセグメントは約 1.4 万、ファイルは約 7 万、mmap は約 3 万。2.2 節の上限に収まる。ローカルの保持は 6 時間（[ADR-0019](../decisions/0019-tiered-storage-lifecycle-and-dr-copy.md)）。
@@ -92,17 +92,17 @@
 | --- | --- | --- |
 | `log.cleaner.threads` | 1 | 4 |
 | `log.cleaner.dedupe.buffer.size` | 134217728（128 MiB。全スレッドの合計） | 512 MiB |
-| `log.cleaner.io.max.bytes.per.second` | 無制限（未検証） | 100 MiB/秒（produce と fetch の I/O を守る。PoC で決める） |
+| `log.cleaner.io.max.bytes.per.second` | 無制限（`Double.MAX_VALUE`。[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認） | 100 MiB/秒（produce と fetch の I/O を守る。PoC で決める） |
 | `log.cleaner.min.cleanable.ratio` | 0.5 | 本家のまま（テナントは変えられない） |
 | `log.cleaner.delete.retention.ms` | 1 日 | 本家のまま（テナントは `delete.retention.ms` を変えられる） |
 
-- クリーナーのスレッドが例外で止まると、圧縮が進まず、ディスクが増え続ける。`time-since-last-run-ms` と `uncleanable-partitions-count`（本家の LogCleaner のメトリクス。名前は未検証）を監視する。
+- クリーナーのスレッドが例外で止まると、圧縮が進まず、ディスクが増え続ける。`time-since-last-run-ms`・`uncleanable-partitions-count`・`max-dirty-percent`（`kafka.log:type=LogCleanerManager`）と `DeadThreadCount`（`kafka.log:type=LogCleaner`）を監視する。名前は本家の 4.3 のソースで確かめた（[LogCleanerManager.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/LogCleanerManager.java)、[LogCleaner.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/LogCleaner.java)、2026-09-27 に確認。4.3 の Monitoring の文書には載っていない）。
 - `__consumer_offsets` と `__transaction_state` は圧縮のトピックで、全てのテナントが分け合う。大きさの見積もりは consumer-groups・transactions-and-idempotence の領域と合わせる。
 
 ### 4.3 圧縮のトピックは S3 に上がらない
 
 - 本家の階層型の保存は、圧縮のトピックに対応しない（[Tiered Storage](https://kafka.apache.org/43/operations/tiered-storage/) の Limitations）。圧縮のトピック（Kafka Streams の changelog を含む）は、全てのデータがローカルの 3 つの複製に残る。
-- そこで、論理クラスタごとに「圧縮のトピックのローカルの量」の上限を掛ける。上限は Basic 50 GiB、Standard の CU あたり 100 GiB（複製の前）で、超えたら圧縮のトピックへの書き込みを throttle する（[multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 5・6 節）。値は未検証で、E7 の負荷試験で見直す。
+- そこで、論理クラスタごとに「圧縮のトピックのローカルの量」の上限を掛ける。上限は Basic 50 GiB、Standard の CU あたり 100 GiB（複製の前）で、超えたら圧縮のトピックへの書き込みを throttle する（[multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 5・6 節）。値は未検証で、E7 の `compacted-size-enforcement` の負荷試験で見直す。
 - 階層型の保存の大阪への写し（S1 の災害復旧）にも、圧縮のトピックは入らない。NFR-009 の説明に書く。
 
 ## 5. ローカルのディスク
@@ -147,7 +147,7 @@
 | 90% | そのブローカーにパーティションを置かない（cordon。[metadata-and-control.md](metadata-and-control.md) の 5 節）。パーティションを他のブローカーへ移す |
 | 95% | そのブローカーのリーダーを持つテナントの produce のクォータを絞る（背圧。multi-tenancy-and-quotas の領域） |
 
-- ディスクが満杯になると、ブローカーはログのディレクトリを失い、`log.dirs` が 1 つなので止まる（本家の振る舞い。未検証：4.3 で 1 つのディレクトリの失敗がブローカーの停止になるか）。止まる前に 85% と 90% で逃がす。
+- ディスクが満杯になると、ブローカーはログのディレクトリを失い、`log.dirs` が 1 つなので止まる（本家の 4.3 の `LogManager` は、全てのログのディレクトリが失敗すると `Exit.halt(1)` で止まる。メタデータのログのディレクトリの失敗でも止まる。[LogManager.scala](https://github.com/apache/kafka/blob/4.3/core/src/main/scala/kafka/log/LogManager.scala)、[ReplicaManager.scala](https://github.com/apache/kafka/blob/4.3/core/src/main/scala/kafka/server/ReplicaManager.scala)、2026-09-27 に確認）。止まる前に 85% と 90% で逃がす。
 - S3 への上げが止まる（S3 の障害、RemoteStorageManager の不具合）と、ローカルが消えなくなる。上げの遅れ（最古の上げていないセグメントの経過時間）を、tiered-and-object-storage の領域と一緒に監視する。
 
 ## 6. ログの回復
@@ -181,10 +181,10 @@
 
 ### 6.3 回復の時間の上限
 
-- アプリの fsync がないので、回復の起点は、セグメントの切り替え時のフラッシュでしか進まない（本家のソースの読みによる。未検証）。回復で読み直す量は、各パーティションの書き込み中のセグメントの合計で、最悪で `log.roll.ms` の間の書き込み全部になる。5.2 節の例では、最悪で `segment.ms` の間の書き込みの約 860 GB（240 MB/秒 × 1 時間）で、EBS の基準の帯域（625 MB/秒）で読んでも 20 分を超える。
+- アプリの fsync がないので、回復の起点は、セグメントの切り替え時のフラッシュでしか進まない（切り替えで古いセグメントを非同期にフラッシュし、回復の起点を新しいセグメントの先頭にする。定期のフラッシュは `log.flush.scheduler.interval.ms` の既定が `Long.MAX_VALUE` で動かない。[UnifiedLog.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/UnifiedLog.java)、[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認）。回復で読み直す量は、各パーティションの書き込み中のセグメントの合計で、最悪で `log.roll.ms` の間の書き込み全部になる。5.2 節の例では、最悪で `segment.ms` の間の書き込みの約 860 GB（240 MB/秒 × 1 時間）で、EBS の基準の帯域（625 MB/秒）で読んでも 20 分を超える。
 - 目標：不正な停止からの回復（2 の完了まで）を、p99 で 5 分以内にする。Kora も、ブローカーの再起動の重い部分としてログの回復を挙げている（論文の 4.7 節）。
 - 手段の候補は 2 つ。E1 の PoC で、回復の時間と produce の遅延への影響を測って決める。
-  - a. 定期のフラッシュ：`log.flush.scheduler.interval.ms=60000` と `log.flush.interval.ms=300000` で、各パーティションを 5 分ごとに同期し、回復の起点を進める。OS の書き戻しで多くは既にディスクにあるので、同期の費用は小さい見込み（未検証）。
+  - a. 定期のフラッシュ：`log.flush.scheduler.interval.ms=60000` と `log.flush.interval.ms=300000` で、各パーティションを 5 分ごとに同期し、回復の起点を進める。OS の書き戻しで多くは既にディスクにあるので、同期の費用は小さい見込み（未検証。E1 の `log-recovery-poc` で測る）。
   - b. 回復が上限を超えそうなら、そのブローカーのローカルのデータを捨て、空のブローカーとして複製し直す（6.4 節）。
 - 既定案は a。b は a で足りないときの手段として runbook に置く。
 

@@ -41,7 +41,7 @@ date: 2026-09-27
   - コンテナからの脱出があっても、他のテナントとブローカーに届かない。
   - IMDS がなく、SSRF で AWS の資格情報を盗まれない。
 - 引き受けるコスト：
-  - Fargate の Pod の費用は、EC2 のノードに詰めるより高い（未検証。S3 の capacity で見積もる）。
+  - Fargate の Pod の費用は、EC2 のノードに詰めるより高い（未検証。E17 の `connector-runtime` で見積もる）。
   - Fargate の OS の更新で Pod が消されることがある。Kafka Connect の再開で受ける。
   - 固定の送信元の IP を、出口のプロキシの NAT で用意するか（Confluent のカスタムのコネクターは持たない）は、需要で決める。
 

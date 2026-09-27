@@ -37,7 +37,7 @@ AWS Organizations で、用途と環境ごとに分ける（[ADR-0043](../decisi
 
 ### 2.1 データ面の VPC（dp-prod）
 
-1 つの VPC に、エッジと全ての EKS を置く。AZ は AZ ID で `apne1-az1`・`apne1-az2`・`apne1-az4` に固定する（[ADR-0043](../decisions/0043-aws-accounts-network-and-eks-layout.md)）。東京には AZ ID が 4 つあり（[AWS Availability Zones](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-availability-zones.html)）、`apne1-az3` は新しい資源を作りにくい AZ だという報告がある（[Zenn の解説](https://zenn.dev/ncdc/articles/867f5d20bb61f9)。未検証）ので使わない。
+1 つの VPC に、エッジと全ての EKS を置く。AZ は AZ ID で `apne1-az1`・`apne1-az2`・`apne1-az4` に固定する（[ADR-0043](../decisions/0043-aws-accounts-network-and-eks-layout.md)）。東京には AZ ID が 4 つあり（[AWS Availability Zones](https://docs.aws.amazon.com/global-infrastructure/latest/regions/aws-availability-zones.html)）、`apne1-az3` は新しい資源を作りにくい AZ だという報告がある（[Zenn の解説](https://zenn.dev/ncdc/articles/867f5d20bb61f9)）ので使わない。AWS の文書は、拡張が難しくなった AZ（constrained）では新しい資源を作れなくなることがあるとするが、どの AZ かは書いていない（同上の AWS の文書、2026-09-27 に確認）。apne1-az3 がそれに当たるかは未検証で、E1 の `dataplane-vpc` で、アカウントの `describe-availability-zones` と、r8g・m8g・c8g の `describe-instance-type-offerings --location-type availability-zone-id` で確かめる。
 
 | サブネット（AZ ごと） | 置くもの | 外への経路 |
 | --- | --- | --- |
@@ -71,7 +71,7 @@ AWS Organizations で、用途と環境ごとに分ける（[ADR-0043](../decisi
 | データ面 → 制御面（AMP） | AMP のインターフェイス型のエンドポイント。アカウントをまたぐ remote write の役割 | 運用とテナントのメトリクス |
 | 制御面 → データ面 | 作らない | — |
 
-- control-plane-and-provisioning の領域が持ち越した「エージェントから internal-api への経路」は VPC Lattice にする。PrivateLink＋自前の認証より、IAM の役割と `pc_id` の一致を 1 か所で確かめられる。VPC Lattice の料金（東京の単価）は未検証。流量は小さい。
+- control-plane-and-provisioning の領域が持ち越した「エージェントから internal-api への経路」は VPC Lattice にする。PrivateLink＋自前の認証より、IAM の役割と `pc_id` の一致を 1 か所で確かめられる。VPC Lattice の東京の単価は、サービスごとに $0.0325/時、処理のバイト $0.0325/GB、要求は 1 時間に 30 万まで無料で超えた分が 1 要求 $0.00000013（AWS Price List API の `AmazonVPC`、2026-09-27 に確認）。流量は小さく、internal-api のサービス 1 つで月に約 $24 の固定費が主になる。
 
 ## 3. EKS
 
@@ -105,7 +105,7 @@ AWS Organizations で、用途と環境ごとに分ける（[ADR-0043](../decisi
 ### 3.3 AZ ID の固定
 
 - Terraform は、サブネットとノードグループを AZ ID から作る。AZ の名前は、アカウントの中で `describe-availability-zones` で引き当てる。
-- Strimzi の `rack.topologyKey` は AZ ID のラベル（`topology.k8s.aws/zone-id`）にする。EKS のノードにこのラベルが付くかは未検証（E1）。付かなければ、ノードグループのラベルで `<brand>.io/zone-id` を付け、それを使う。control-plane-and-provisioning の 7.1 節と ADR-0032 も、統合の工程で AZ ID のラベルに改めた（[ADR-0012](../decisions/0012-durability-settings-and-elr.md)）。
+- Strimzi の `rack.topologyKey` は AZ ID のラベル（`topology.k8s.aws/zone-id`）にする。このラベルは、EKS の制御面が動かす AWS のクラウドコントローラーマネージャーがノードに付ける（[cloud-provider-aws の well_known_labels.go](https://github.com/kubernetes/cloud-provider-aws/blob/master/pkg/providers/v1/well_known_labels.go)。2024-03 の [#855](https://github.com/kubernetes/cloud-provider-aws/pull/855) で追加。Karpenter も同じラベルを付ける。2026-09-27 に確認）。E1 の `eks-and-nodegroups` の `broker.rack` の起動の検査で、実際のノードに付くことを確かめる。付かなければ、ノードグループのラベルで `<brand>.io/zone-id` を付け、それを使う。control-plane-and-provisioning の 7.1 節と ADR-0032 も、統合の工程で AZ ID のラベルに改めた（[ADR-0012](../decisions/0012-durability-settings-and-elr.md)）。
 - ブローカーは起動時に、`broker.rack` がノードの AZ ID と一致することを確かめ、違えば起動しない。
 
 ### 3.4 人のアクセス
@@ -188,10 +188,10 @@ sni-router（xDS）が SNI から上流を決める：lc-7kq2vx → pc-3x9k、b1
   - ブローカーの Pod の IP は、各 EKS の EndpointSlice（Strimzi がブローカーごとに作る Service）を直接見る。制御面を通さない。
   - Envoy から on-demand CDS で「SNI のホスト名」の名前のクラスタを問われたら、上流（ブローカー、ブートストラップなら同じ AZ のブローカーの集合）を返す。知らない SNI には空を返し、Envoy は接続を閉じる。
 - **論理クラスタの作成の流れ**（[control-plane-and-provisioning.md](control-plane-and-provisioning.md) の 9 節の手順 4）：制御面が論理クラスタを `provisioning` にした合図で、sni-router が対応を取り込む。DNS は変えない。
-- **IP の許可リスト**：論理クラスタごとの CIDR を、RBAC のネットワークフィルターの DENY の規則（`requested_server_name` が論理クラスタの接頭辞で、送信元が許可リストにない）として配る（[security-and-acls.md](security-and-acls.md) の 15 節の決定）。送信元は Proxy Protocol の値。RBAC の更新が Envoy のリスナーの排出を起こさずに入るかは未検証（E12）。
-- **送信元 IP ごとの制限**：security-and-acls の 3.6 節の「送信元 IP ごとの新しい接続 50 回/秒」は、Envoy の組み込みのフィルターでは送信元ごとに数えられない（`local_ratelimit` はリスナーの全体。送信元ごとには外部のレート制限のサービスが要る。未検証）。S1 は、Envoy ごとの接続の頻度の上限と、制御面が集めた認証の失敗の多い IP の拒否の一覧（RBAC）で代える。送信元ごとの制限は S2 で、外部のレート制限のサービスを入れるかを決める。
-- **ブローカーは送信元 IP を知らない**：Envoy から先は Envoy の IP になる。本家のブローカーは Proxy Protocol を受けない（未検証）。監査ログの IP と、認証の失敗の IP ごとの集計は、Envoy のアクセスログ（下流の送信元と、上流への接続の送信元ポート）とブローカーの接続を突き合わせて作る。security-and-acls の 3.6 節・8 節も、統合の工程でこの前提に改めた。
-- on-demand CDS を `tcp_proxy` で使い、SNI の名前でクラスタを引く形は、E1 の PoC で確かめる。動かなければ、論理クラスタ × ブローカーの filter chain を xDS で配る形に替える（[ADR-0044](../decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md) の B）。
+- **IP の許可リスト**：論理クラスタごとの CIDR を、RBAC のネットワークフィルターの DENY の規則（`requested_server_name` が論理クラスタの接頭辞で、送信元が許可リストにない）として配る（[security-and-acls.md](security-and-acls.md) の 15 節の決定）。送信元は Proxy Protocol の値。RBAC の更新が Envoy のリスナーの排出を起こさずに入るかは未検証（E12 の `edge-production`）。
+- **送信元 IP ごとの制限**：security-and-acls の 3.6 節の「送信元 IP ごとの新しい接続 50 回/秒」は、Envoy の組み込みのフィルターでは送信元ごとに数えられない（`local_ratelimit` の network のフィルターは、フィルターの鎖ごとに 1 つのトークンバケットを Envoy のプロセス全体で持つ。送信元ごとには、外部のレート制限のサービスが要る。[Local rate limit](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/local_rate_limit_filter)、2026-09-27 に確認）。S1 は、Envoy ごとの接続の頻度の上限と、制御面が集めた認証の失敗の多い IP の拒否の一覧（RBAC）で代える。送信元ごとの制限は S2 で、外部のレート制限のサービスを入れるかを決める。
+- **ブローカーは送信元 IP を知らない**：Envoy から先は Envoy の IP になる。本家のブローカーは Proxy Protocol を受けない（4.3 の Broker Configs に Proxy Protocol の設定がなく、KIP の一覧にも採択されたものがない。2026-09-27 に確認）。監査ログの IP と、認証の失敗の IP ごとの集計は、Envoy のアクセスログ（下流の送信元と、上流への接続の送信元ポート）とブローカーの接続を突き合わせて作る。security-and-acls の 3.6 節・8 節も、統合の工程でこの前提に改めた。
+- Envoy の `tcp_proxy` は `on_demand.odcds_config` で、知らないクラスタへの接続を止めて on-demand CDS で問い合わせ、終わってから再開する。`sni_cluster` のフィルターは SNI をそのまま上流のクラスタの名前にする（[TcpProxy](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto)、[Upstream Cluster from SNI](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/sni_cluster_filter)、2026-09-27 に確認）。この 2 つを組み合わせて動くこと、1 万のクラスタでの Envoy のメモリーは未検証で、E1 の `edge-poc` で確かめる。動かなければ、論理クラスタ × ブローカーの filter chain を xDS で配る形に替える（[ADR-0044](../decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md) の B）。
 
 ### 5.5 証明書
 
@@ -259,11 +259,11 @@ sni-router（xDS）が SNI から上流を決める：lc-7kq2vx → pc-3x9k、b1
   - 圧縮のトピック、コンシューマーのオフセット、トランザクションの状態は戻らない。
 - **ホスト名**：ブートストラップの `*.apne1.<brand>.<domain>` を大阪の NLB へ向け直す。大阪のブローカーは `…<az-id>.apne3.<brand>.<domain>` を広告する。クライアントはブートストラップを変えずにつなぎ直せる。そのため、大阪の証明書に東京と大阪の両方の名前を載せる（5.5 節）。
 - 失う範囲は `segment.ms`（と上げの遅れ、CRR の遅れ）で、`local.retention.ms` は関係しない。S3 への上げはセグメントが閉じた直後に行われ、ローカルの保持を待たない（統合の工程で [tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.6 節を直した）。
-- 大阪の EC2 の空き：リージョンの障害では、他社も大阪へ移る。容量の予約（On-Demand Capacity Reservations）は、S1 の費用に見合わないのでしない。代わりの型（r7g、m7g）を Terraform の変数で選べるようにする。
+- 大阪の EC2 の空き：リージョンの障害では、他社も大阪へ移る。ブローカーの台数の容量の予約（On-Demand Capacity Reservations）は、S1 の費用に見合わないのでしない。代わりに（2026-09-27 に改めた。[ADR-0045](../decisions/0045-osaka-disaster-recovery-scope.md) の注記）、大阪（`ap-northeast-3`）に、1 つの物理クラスタのコントローラーの 3 台（m8g.xlarge、AZ ごとに 1 台）と Envoy の 3 台（AZ ごとに 1 台。常設の 2 台はこの予約を使う）の On-Demand Capacity Reservation を持つ。単価（Price List API、2026-09-27 に確認）は m8g.xlarge $0.23188/時、c8g.xlarge $0.20008/時で、予約の全体は月に約 $946、常設の Envoy の分を除いて増えるのは月に約 $654。ブローカーは、四半期の `osaka-capacity-check`（[disaster-recovery.md](../runbooks/disaster-recovery.md) の D-1）と年 1 回の訓練で確かめる。代わりの型（r7g、m7g）を Terraform の変数で選べるようにする。
 
 ### 8.3 論理的な破損
 
-- 誤った操作や不具合で KRaft のメタデータを失ったときの最後の手段は、1 時間ごとの KRaft のスナップショットの写し（[ADR-0015](../decisions/0015-kraft-dynamic-quorum-and-controller-sizing.md)）と `kraft_snapshots`。本家にスナップショットからクォーラムを作り直す正式な手順はない（未検証）。runbook で、検証の環境で年 2 回試す。
+- 誤った操作や不具合で KRaft のメタデータを失ったときの最後の手段は、1 時間ごとの KRaft のスナップショットの写し（[ADR-0015](../decisions/0015-kraft-dynamic-quorum-and-controller-sizing.md)）と `kraft_snapshots`。本家にスナップショットからクォーラムを作り直す正式な手順はない（4.3 の [KRaft](https://kafka.apache.org/43/operations/kraft/) の運用の文書に載っていない。2026-09-27 に確認）。runbook で、検証の環境で年 2 回試す。
 - 誤って消したトピックのデータは、S3 のバージョニング（古い版は 1 日）の間だけ、ログの前の部分を戻せる（Kora の 4.6.2 節と同じ範囲）。S1 では利用者への約束にしない。
 
 ## 9. Terraform の構成
@@ -312,7 +312,7 @@ infra/                                    # 開発リポジトリ
 
 ## 11. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** 東京のオンデマンドの単価（Price List API、2026-09-27）をもとにした ±50% の幅の値。税、サポートプラン、Savings Plans（EC2 で 20〜30% 下がる見込み）を含めない。根拠と式は [capacity.md](capacity.md) の 8〜10 節。
+**大まかな見積もりである。** 東京のオンデマンドの単価（Price List API、2026-09-27）をもとにした ±50% の幅の値。税、サポートプラン、Savings Plans（東京の r8g.4xlarge で、1 年・前払いなしの Compute Savings Plans が約 28%、EC2 Instance Savings Plans が約 34% 下がる。[capacity.md](capacity.md) の 8 節）を含めない。根拠と式は [capacity.md](capacity.md) の 8〜10 節。
 
 ### 11.1 GA の最小の構成
 
@@ -327,9 +327,10 @@ Standard の物理クラスタ 2 つ（各 r8g.4xlarge × 6）、Basic の物理
 | エッジ（NLB、Envoy c8g.xlarge × 6、EIP） | 1,200 |
 | VPC エンドポイント、NAT、VPC Lattice | 800 |
 | 制御面（ECS、Aurora r8g.large × 2＋大阪の二次、SQS、ALB）と大阪の待機 | 4,500 |
+| 大阪の容量の予約（コントローラー m8g.xlarge × 3、Envoy c8g.xlarge × 3。常設の Envoy の分を除いて増える額。8.2 節） | 700 |
 | 可観測性（運用とテナントの AMP、CloudWatch Logs、Grafana） | 2,500 |
 | 合成監視（probe の東京と大阪） | 300 |
-| **固定の費用の合計** | **約 30,000** |
+| **固定の費用の合計** | **約 31,000** |
 | 流量に比例する費用（AZ をまたぐ転送、NLB の処理、S3）：書き込み 1 GB あたり約 $0.085（[capacity.md](capacity.md) の 8 節）× 月 13 万 GB | 約 11,000 |
 | dev・staging・dp-verify（Jepsen、負荷試験は必要なときだけ広げる） | 約 12,000 |
 
@@ -347,7 +348,7 @@ Standard の物理クラスタ 2 つ（各 r8g.4xlarge × 6）、Basic の物理
 | **合計** | **約 363,000** | 書き込み 1 GB あたり約 $0.17。パーティションだけのために持つ約 123 台の分（約 $135,000）を除くと約 $0.11 |
 
 - 高くなる理由は 3 つ。(1) パーティションの数でブローカーの台数が決まり、スループットの 5 倍を超える台数を持つ。(2) AZ をまたぐ転送。(3) NLB の処理のバイト。統合の工程で、(1) はパーティション-時の課金で回収し（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)）、NFR-010 は (2)(3) を含めて設計点で $0.11 以下と改めた（[README.md](README.md) の 3 節、[capacity.md](capacity.md) の 8・10 節。PM・Dev の確認待ち）。
-- 利用者がインターネットから読むときの外への転送（東京で最初の 10 TB まで $0.114/GB。AWSDataTransfer の Price List API）と、同じリージョンの別のアカウントから公開の IP で読むときのリージョン内の転送（$0.01/GB。NLB の経路に当てはまるかは未検証）は、この表に含めない。読み取りの GB の単価（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)）で利用者に渡す前提で、PM に確かめる。
+- 利用者がインターネットから読むときの外への転送（東京で最初の 10 TB まで $0.114/GB。AWSDataTransfer の Price List API）と、同じリージョンの別のアカウントから公開の IP で読むときのリージョン内の転送（$0.01/GB。NLB の経路に当てはまるかは未検証。E12 の `load-test-ga` の T6 で、Cost and Usage Report の使用量の種類を見て確かめる）は、この表に含めない。読み取りの GB の単価（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)）で利用者に渡す前提で、PM に確かめる。
 - 下げる手段は [capacity.md](capacity.md) の 10 節（ブローカーの複製の上限の引き上げ、NLB を通さない経路、パーティションの価格、ローカルの保持の短縮、Savings Plans）。
 
 ## 12. 障害と振る舞い
@@ -395,7 +396,7 @@ Standard の物理クラスタ 2 つ（各 r8g.4xlarge × 6）、Basic の物理
 | E9 | `pc-aws-module` | 4 節の Terraform のモジュールと pc-provisioner の雛形 |
 | E12 | `edge-production` | 5 節の本番の構成（EIP、zonal shift、アイドルのタイムアウト、Proxy Protocol、RBAC の許可リスト） |
 | E12 | `tenant-certificate-rotation` | 5.5 節の書き出し、配布、ロール、期限のアラート |
-| E12 | `osaka-standby` | 8.2 節の大阪の骨組み、制御面のウォームスタンバイ、ホスト名の向け直し |
+| E12 | `osaka-standby` | 8.2 節の大阪の骨組み、制御面のウォームスタンバイ、ホスト名の向け直し、コントローラーとエッジの容量の予約、`osaka-capacity-check` |
 | E12 | `terraform-guardrails` | 9 節の CI の検査 |
 | S2 | `privatelink` | 6 節 |
 | S2 | `dataplane-account-split` | 10 節の目安でアカウントを分ける |
@@ -416,14 +417,14 @@ Standard の物理クラスタ 2 つ（各 r8g.4xlarge × 6）、Basic の物理
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | `topology.k8s.aws/zone-id` のラベルが EKS のノードに付くか | E1 |
-| `tcp_proxy` の on-demand CDS で SNI の名前のクラスタを引けるか。クラスタが 1 万になったときの Envoy のメモリー | E1 の PoC |
+| `sni_cluster` と `tcp_proxy` の on-demand CDS の組み合わせが動くか（それぞれの機能は文書で確かめた。5 節）。クラスタが 1 万になったときの Envoy のメモリー | E1 の `edge-poc` |
 | RBAC の許可リストの更新で、Envoy のリスナーが排出されないか | E12 |
-| 送信元 IP ごとの接続の頻度の制限（security-and-acls の 3.6 節）を、外部のレート制限のサービスで入れるか | S2。Envoy の組み込みの機能の確認（未検証）の後 |
+| 送信元 IP ごとの接続の頻度の制限（security-and-acls の 3.6 節）を、外部のレート制限のサービスで入れるか | S2。Envoy の組み込みの `local_ratelimit` では送信元ごとに数えられないことは確かめた（5 節）。外部のレート制限のサービスの要否を決める |
 | 監査ログの IP を、Envoy のアクセスログとブローカーの接続から作る方式 | E8（security-and-acls の領域と一緒に） |
 | NLB を通さない経路（Envoy に EIP を直接付ける）に替えるか | 流量が増えたとき。10 節の目安 |
 | 同じリージョンの別のアカウントから公開の IP で NLB につなぐときの転送料金 | AWS に確かめる（E12）。読み取りの単価に効く |
 | 大阪で作り直した論理クラスタの履歴のトピックの名前 | E4（tiered-and-object-storage の領域と一緒に） |
-| 大阪の EC2 の空きの確保 | 年 1 回の訓練で、必要な台数を実際に起動できるかを確かめる |
+| 大阪の EC2 の空きの確保 | コントローラーとエッジの最小は予約する（8.2 節）。ブローカーは四半期の `osaka-capacity-check` と年 1 回の訓練で確かめる（E12 の `osaka-standby`） |
 
 ## 17. quality.md・runbooks・data-model への項目
 

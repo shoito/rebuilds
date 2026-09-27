@@ -33,7 +33,7 @@ rebuilds の他の題材で、制御面の基盤（AWS の東京と大阪、Type
 2. **互換のブローカーを自前で書く（Rust）。** 保存層も最初から S3 を前提にする
 3. **既存の互換の実装を土台にする**
    - 3a. AutoMQ（Apache License 2.0 の本家の fork）
-   - 3b. Redpanda（ソースは公開されているが、BSL で、競合する SaaS としての提供に制限がある。未検証。法務の確認待ち）
+   - 3b. Redpanda（ソースは公開されているが、BSL 1.1 で、第三者にトピックを作らせる商用の「Streaming or Queuing Service」への利用を除外している（[Redpanda の BSL](https://github.com/redpanda-data/redpanda/blob/dev/licenses/bsl.md)、2026-09-27 に確認）。解釈は法務の確認待ち（intent.md の L3））
 
 ## Decision
 

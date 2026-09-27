@@ -55,7 +55,10 @@ date: 2026-09-27
   - 大阪の待機の費用が小さい（[infrastructure.md](../architecture/infrastructure.md) の 11 節）。
 - 引き受けるコスト：
   - NFR-009 の「S3 に上がったセグメントだけを大阪から戻せる」は、写しを有効にした論理クラスタに限られる。NFR-009 の文言の見直しを PM に依頼する（ADR-0019 の Consequences と同じ）。
-  - 大阪の EC2 の空きに依存する。リージョンの障害では、他社も大阪に移る。容量の予約はしない（費用）。
+  - 大阪の EC2 の空きに依存する。リージョンの障害では、他社も大阪に移る。ブローカーの台数の容量の予約はしない（費用）。
+
+> 2026-09-27 の注記：「容量の予約はしない」を一部改めた。コントローラーとエッジが立たないと、書き込みの経路の作り直しが始められないため、1 つの物理クラスタのコントローラー 3 台と Envoy 3 台（AZ ごとに 1 台）だけ、大阪で On-Demand Capacity Reservation を持つ（増える費用は月に約 $654）。ブローカーは予約せず、四半期の `osaka-capacity-check` と年 1 回の訓練で空きを確かめる（[architecture/README.md](../architecture/README.md) の 6 節、[infrastructure.md](../architecture/infrastructure.md) の 8.2 節、[disaster-recovery.md](../runbooks/disaster-recovery.md) の D-1）。**Ops・PM の確認事項。**
+
   - 大阪で作り直した論理クラスタのオフセットは 0 から始まる。コンシューマーは時刻で位置を決め直す必要がある。
 
 ## Confirmation

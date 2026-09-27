@@ -25,14 +25,14 @@
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
 | 冪等とトランザクションの基本 | KIP-98（0.11）。プロデューサーは producer ID（PID）とエポックを持ち、パーティションごとの連番で重複を捨てる。トランザクションはコーディネーターが `__transaction_state` に状態を書き、各パーティションにコミット・中止のマーカーを書く | [KIP-98](https://cwiki.apache.org/confluence/display/KAFKA/KIP-98+-+Exactly+Once+Delivery+and+Transactional+Messaging) |
-| 冪等の既定 | Java のクライアントは 3.0 から `enable.idempotence=true`、`acks=all` が既定（KIP-679） | [KIP-679](https://cwiki.apache.org/confluence/display/KAFKA/KIP-679%3A+Producer+will+enable+the+strongest+delivery+guarantee+by+default)（ページの中身は未検証） |
-| Kafka Streams の exactly-once v2 | KIP-447。スレッドごとに 1 つのプロデューサーにし、`sendOffsetsToTransaction` にグループのメタデータを渡してゾンビを締め出す | [KIP-447](https://cwiki.apache.org/confluence/display/KAFKA/KIP-447%3A+Producer+scalability+for+exactly+once+semantics)（ページの中身は未検証） |
-| KIP-890 第 1 段 | 古いクライアント向けに、ブローカーが produce を受ける前に、パーティションがトランザクションに加わっているかをコーディネーターに確かめる（`AddPartitionsToTxn` の `verifyOnly`）。確かめられなければ `INVALID_TXN_STATE`。設定 `transaction.partition.verification.enable`（既定 `true`）。遅れて届いた書き込みが次のトランザクションに混ざることは防げない | [KIP-890](https://cwiki.apache.org/confluence/display/KAFKA/KIP-890%3A+Transactions+Server-Side+Defense)、[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)。入った版は 3.6（未検証） |
+| 冪等の既定 | Java のクライアントは 3.0 から `enable.idempotence=true`、`acks=all` が既定（KIP-679。採択、3.0） | [KIP-679](https://cwiki.apache.org/confluence/display/KAFKA/KIP-679%3A+Producer+will+enable+the+strongest+delivery+guarantee+by+default)（2026-09-27 に確認） |
+| Kafka Streams の exactly-once v2 | KIP-447。スレッドごとに 1 つのプロデューサーにし、`sendOffsetsToTransaction` にグループのメタデータを渡してゾンビを締め出す（採択、2.6） | [KIP-447](https://cwiki.apache.org/confluence/display/KAFKA/KIP-447%3A+Producer+scalability+for+exactly+once+semantics)（2026-09-27 に確認） |
+| KIP-890 第 1 段 | 古いクライアント向けに、ブローカーが produce を受ける前に、パーティションがトランザクションに加わっているかをコーディネーターに確かめる（`AddPartitionsToTxn` の `verifyOnly`）。確かめられなければ `INVALID_TXN_STATE`。設定 `transaction.partition.verification.enable`（既定 `true`）。遅れて届いた書き込みが次のトランザクションに混ざることは防げない | [KIP-890](https://cwiki.apache.org/confluence/display/KAFKA/KIP-890%3A+Transactions+Server-Side+Defense)、[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)。入った版は 3.6（[3.6.0 の発表](https://kafka.apache.org/blog/2023/10/10/apache-kafka-3.6.0-release-announcement/)。KIP の一覧は 3.7.0 と書くが、発表を正とする。2026-09-27 に確認） |
 | KIP-890 第 2 段（TV2） | トランザクションごとにエポックを上げる。`EndTxn` の応答（v4 以上）で新しいエポックを返す。パーティションは最初の produce で暗黙に加わり、クライアントは `AddPartitionsToTxn` を送らない。新しいエラー `TRANSACTION_ABORTABLE`。`transaction.version=2` の機能の版で有効にする。4.0 からサーバーで既定で有効。4.0 以上のクライアントが使う | [Transaction Protocol](https://kafka.apache.org/43/operations/transaction-protocol/)、[KIP-890](https://cwiki.apache.org/confluence/display/KAFKA/KIP-890%3A+Transactions+Server-Side+Defense) |
 | TV2 の後の強化 | 4.2 の KIP-1228 で、`WriteTxnMarkers` に TransactionVersion を足し、TV2 のマーカーのエポックの検査を厳しくした | [4.2.0 の発表](https://kafka.apache.org/blog/2026/02/17/apache-kafka-4.2.0-release-announcement/) |
 | KIP-890 の Jira | KAFKA-14402 は 4.1.0 で解決（2025-06-25） | [KAFKA-14402](https://issues.apache.org/jira/browse/KAFKA-14402) |
 | 2 相コミット | KIP-939。外部のトランザクションのコーディネーターと組む。`transaction.two.phase.commit.enable`（既定 `false`） | [Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/) |
-| 運用の道具 | KIP-664。DescribeProducers、DescribeTransactions、ListTransactions の API と、`kafka-transactions.sh` のぶら下がったトランザクションの検出・中止 | [KIP-664](https://cwiki.apache.org/confluence/display/KAFKA/KIP-664%3A+Provide+tooling+to+detect+and+abort+hanging+transactions)（ページの中身は未検証） |
+| 運用の道具 | KIP-664。DescribeProducers、DescribeTransactions、ListTransactions の API と、`kafka-transactions.sh` のぶら下がったトランザクションの検出（`find-hanging`）・中止（`abort`）（採択） | [KIP-664](https://cwiki.apache.org/confluence/display/KAFKA/KIP-664%3A+Provide+tooling+to+detect+and+abort+hanging+transactions)（2026-09-27 に確認） |
 | producer ID の乱発への備え | KIP-936（`producer_ids_rate` のクォータ）は議論中で、実装されていない | [KIP-936](https://cwiki.apache.org/confluence/display/KAFKA/KIP-936%3A+Throttle+number+of+active+PIDs)、[KAFKA-15063](https://issues.apache.org/jira/browse/KAFKA-15063) |
 
 主な設定の既定（[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認）：
@@ -45,7 +45,7 @@
 | `transaction.state.log.num.partitions`・`replication.factor`・`min.isr` | 50・3・2 |
 | `transaction.abort.timed.out.transaction.cleanup.interval.ms` | 10000（10 秒） |
 | `transaction.remove.expired.transaction.cleanup.interval.ms` | 3600000（1 時間） |
-| `add.partitions.to.txn.retry.backoff.ms`・`add.partitions.to.txn.retry.backoff.max.ms` | TV2 で、サーバー側が `CONCURRENT_TRANSACTIONS` を再試行する間隔（値は未検証） |
+| `add.partitions.to.txn.retry.backoff.ms`・`add.partitions.to.txn.retry.backoff.max.ms` | TV2 で、サーバー側が `CONCURRENT_TRANSACTIONS` を再試行する間隔。既定 20 ms・上限 100 ms（[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認）。本家の既定のままにする |
 
 ### 2.1 Jepsen が本家に報告した問題（2026-09-27 の状態）
 
@@ -55,10 +55,10 @@
 | --- | --- | --- |
 | [KAFKA-17754](https://issues.apache.org/jira/browse/KAFKA-17754) | 遅れて届いた `EndTxn` が、次のトランザクションをコミット・中止する。書き込みの喪失、中止した読み取り、ちぎれたトランザクション | 解決（2026-08-12）。「KIP-890 と関連の修正で解決」とのコメントで閉じられた。修正の版の記載はない |
 | [KAFKA-17582](https://issues.apache.org/jira/browse/KAFKA-17582) | トランザクションの中止の後、Java のコンシューマーの位置が巻き戻らない（リバランスが起きたときだけ戻る）。文書（KIP-98）と振る舞いが食い違い、処理の抜けにつながりうる | 未解決 |
-| KAFKA-17734 | `Consumer.close()` の時間の上限が効かない | 未解決（Jepsen の記述による。Jira は確かめていない。未検証） |
-| エラーの紛らわしさ | トランザクションの時間切れでも `ProducerFencedException` になり、別のプロデューサーがいるかのような文言になる | 未解決（同上。未検証） |
+| [KAFKA-17734](https://issues.apache.org/jira/browse/KAFKA-17734) | `Consumer.close()` の時間の上限が効かない | 未解決（Jira の状態は Open） |
+| エラーの紛らわしさ（[KIP-588](https://cwiki.apache.org/confluence/display/KAFKA/KIP-588%3A+Allow+producers+to+recover+gracefully+from+transaction+timeouts)） | トランザクションの時間切れでも `ProducerFencedException` になり、別のプロデューサーがいるかのような文言になる | 未解決（KIP-588 は KIP の一覧で「2.8.0 (WIP)」のまま） |
 
-KAFKA-17754 の解決は、TV2（トランザクションごとのエポックの上げ）が効くクライアント、つまり 4.0 以上の Java のクライアントが前提になる。古いクライアントは第 1 段の確認だけを受ける。librdkafka と franz-go の TV2 への対応は未検証。
+KAFKA-17754 の解決は、TV2（トランザクションごとのエポックの上げ）が効くクライアント、つまり 4.0 以上の Java のクライアントが前提になる。古いクライアントは第 1 段の確認だけを受ける。franz-go は KIP-890（第 2 段を含む）に対応し、ブローカーと交渉した `transaction.version` で第 2 段を使う（[franz-go の README](https://github.com/twmb/franz-go) の KIP の表と CHANGELOG）。librdkafka は、対応する KIP の一覧に KIP-890 を載せていない（[INTRODUCTION.md](https://github.com/confluentinc/librdkafka/blob/master/INTRODUCTION.md)）ので、第 1 段の確認だけを受ける前提にする（どちらも 2026-09-27 に確認）。
 
 ## 3. 方針
 
@@ -129,7 +129,7 @@ KAFKA-17754 の解決は、TV2（トランザクションごとのエポック�
 | InitProducerId の頻度（`transactional.id` の有無を問わない） | 毎秒 10 | 毎秒 100 | `throttle_time_ms` で遅らせる | ブローカーごと。上限をブローカーの数で割った値（静的） |
 | 1 つのトランザクションの時間 | 15 分 | 15 分 | 本家どおり、コーディネーターが中止する | コーディネーター |
 
-- 値は初期値。Kafka Streams のアプリの典型（スレッド数 × インスタンス数、再起動で変わる ID の積み上げ）を E5 で測って見直す。未検証。
+- 値は初期値。Kafka Streams のアプリの典型（スレッド数 × インスタンス数、再起動で変わる ID の積み上げ）を E5 の `transactional-id-limit` で測って見直す。未検証。
 - **生きている `transactional.id` の数え方**：`__transaction_state` のパーティションは 50 あり、テナントの ID はハッシュで散る。そこで、コーディネーターのパーティションごとに「そのテナントの ID の数 ≤ ceil(2 × 上限 ÷ 50)」を、パーティションのリーダーが手元の状態だけで確かめる。集計の往復がなく、判断が決定的になる。偏りで少し早く断られうるので、テナント全体の数も、クォータの使用量のトピックで集計して見せる（[multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 7 節）。
 - **エラーの選び方**：InitProducerId に本家が定義するエラーの中から、再試行しても直らないことが伝わるものとして `TRANSACTIONAL_ID_AUTHORIZATION_FAILED` を選ぶ。エラーの文言に「上限を超えた」ことを書く。本家との差分テストでは、上限を超えた場合を「許された違い」の表に載せる（[protocol-and-compatibility.md](protocol-and-compatibility.md) の 7 節）。
 - この数え方と断り方は、本家の差し込み口にないので、名前空間のパッチと同じ場所（パッチの一覧）に入れる（[ADR-0021](../decisions/0021-transaction-settings-and-tenant-limits.md)）。
@@ -139,7 +139,7 @@ KAFKA-17754 の解決は、TV2（トランザクションごとのエポック�
 - `processing.guarantee=exactly_once_v2`（KIP-447）を、変更なしで動かすことを目標にする。
 - Streams の内部のトピック（`<application.id>-...-changelog`、`-repartition`）は、普通のトピックとして名前空間を通る。`replication.factor=-1` で作るので、固定の複製 3 と矛盾しない（[protocol-and-compatibility.md](protocol-and-compatibility.md) の 5 節）。
 - changelog は圧縮のトピックなので、階層型の保存に載らず、圧縮のトピックの容量の上限に数える（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 7 節）。状態の大きいアプリは、上限に当たりうる。
-- exactly-once v2 の `transactional.id` は、`application.id` と、Streams のプロセスの ID と、スレッドの番号から作られる（正確な形は未検証）。プロセスの ID が状態のディレクトリに保存されない環境（使い捨てのディスクの Pod など）では、再起動のたびに新しい ID が生まれ、7 日残る。利用者の文書で、状態のディレクトリを永続のボリュームに置くことを勧め、6 節の上限の理由を説明する。
+- exactly-once v2 の `transactional.id` は、`application.id` と、Streams のプロセスの ID と、スレッドの番号から、`<application.id>-<プロセスの UUID>-<スレッドの番号>` の形で作られる（[ActiveTaskCreator.java](https://github.com/apache/kafka/blob/4.3/streams/src/main/java/org/apache/kafka/streams/processor/internals/ActiveTaskCreator.java)、2026-09-27 に確認）。プロセスの ID が状態のディレクトリに保存されない環境（使い捨てのディスクの Pod など）では、再起動のたびに新しい ID が生まれ、7 日残る。利用者の文書で、状態のディレクトリを永続のボリュームに置くことを勧め、6 節の上限の理由を説明する。
 - Streams のリバランスのプロトコル（KIP-1071）は、フラグの裏に置く（[consumer-groups.md](consumer-groups.md) の 7 節）。exactly-once の試験は、従来のプロトコルで回す。
 
 ## 8. LSO、ぶら下がったトランザクション、階層型の保存
@@ -165,7 +165,7 @@ KAFKA-17754 の解決は、TV2（トランザクションごとのエポック�
 
 - `transactional.id` とグループの ID は、名前空間で分ける。同じ文字列を 2 つのテナントが使っても、別のトランザクションになる。他のテナントの ID を締め出す（エポックを上げる）ことはできない。
 - PID とエポックは物理クラスタで共有の数の空間である。PID を推測して他のテナントのパーティションに書くことは、名前空間のパッチがトピックを接頭辞で閉じるので、できない。DescribeProducers・ListTransactions の応答は、テナントのパーティションと ID だけを返す。
-- `TRANSACTIONAL_ID` の ACL は、テナントが自分の名前空間の中で付ける（security-and-acls の領域）。本家と同じく、`transactional.id` を使うには `TRANSACTIONAL_ID` の `WRITE` が要る。冪等なプロデューサーだけなら、本家の 2.8 以降と同じく、トピックの `WRITE` で足りる（KIP-679。未検証）。
+- `TRANSACTIONAL_ID` の ACL は、テナントが自分の名前空間の中で付ける（security-and-acls の領域）。本家と同じく、`transactional.id` を使うには `TRANSACTIONAL_ID` の `WRITE` が要る。冪等なプロデューサーだけなら、本家の 2.8 以降と同じく、トピックの `WRITE` で足りる（`IDEMPOTENT_WRITE` は 3.0 で非推奨。[KIP-679](https://cwiki.apache.org/confluence/display/KAFKA/KIP-679%3A+Producer+will+enable+the+strongest+delivery+guarantee+by+default)、2026-09-27 に確認）。
 - トランザクションの中身（レコード）をログに出さない。`transactional.id` はテナントが付けた文字列なので、運用のログではハッシュにする。
 
 ## 11. テスト
@@ -175,7 +175,7 @@ KAFKA-17754 の解決は、TV2（トランザクションごとのエポック�
 - [jepsen.tests.kafka](https://jepsen-io.github.io/jepsen/jepsen.tests.kafka.html) の `queue` と `txn` のワークロードを、自社のブローカー（パッチ＋差し込み口）の 3 AZ の構成に対して流す。
 - 障害：ブローカーの停止・一時停止、ネットワークの分断（AZ の単位を含む）、時計のずれ、ディスクの遅延、コーディネーターのリーダーの移動、クライアントの再起動（`--crash-clients`）、トランザクションの中の遅延（`--intra-txn-delay`）。
 - 検出するもの：`acks=all` の書き込みの喪失、中止した書き込みの読み取り（aborted read）、ちぎれたトランザクション、重複、コンシューマーの位置の矛盾。
-- クライアント：Java 4.3（TV2）、Java 3.9（第 1 段だけ）。librdkafka と franz-go は、Jepsen のクライアントに組み込めるかを E5 で確かめる（未検証）。
+- クライアント：Java 4.3（TV2）、Java 3.9（第 1 段だけ）。librdkafka と franz-go は、Jepsen のクライアントに組み込めるかを E3 の `jepsen-txn-workload` で確かめる（未検証）。
 - KAFKA-17754 を再現する要求の列（遅れて届く `EndTxn`）を、差分テストの生の要求の送り手で作り、TV2 で締め出されることを確かめる。
 
 ### 11.2 Kafka Streams の exactly-once（毎日、6 時間）
@@ -242,7 +242,7 @@ KAFKA-17754 の解決は、TV2（トランザクションごとのエポック�
 | E5 | `init-producer-id-throttle` | InitProducerId の頻度の上限と `throttle_time_ms` |
 | E5 | `txn-admin-api-namespacing` | DescribeTransactions・ListTransactions・DescribeProducers の名前空間と、PID の絞り込みの漏れの防止 |
 | E5 | `streams-eos-soak` | 11.2 節の長時間の試験 |
-| E5 | `kafka-17754-regression` | 遅れて届く `EndTxn` の再現と、TV2 での締め出しの確認 |
+| E5 | `delayed-endtxn-regression` | 遅れて届く `EndTxn` の再現と、TV2 での締め出しの確認 |
 | E5 | `hanging-txn-detector` | 最も古い開いたトランザクションの経過時間の収集とアラート |
 | E5 | `txn-known-limitations-doc` | 12 節の利用者向けの文書 |
 | E11 | `txn-metrics-api` | テナント向け：進行中のトランザクションの数、中止の率、上限の使用率 |

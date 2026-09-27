@@ -15,7 +15,7 @@ date: 2026-09-27
 
 - KIP-1066（4.3）の `cordoned.log.dirs` は、cordon したディレクトリに新しいパーティションを置かせない。既存は動き続ける。退役の前に cordon して移すための仕組みである（[KIP-1066](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1066%3A+Mechanism+to+cordon+brokers+and+log+directories)）。
 - Kora は、ディスクとネットワークの偏りを再均衡の引き金にし、拡張では負荷への寄与の大きい複製から動かし、劣化したブローカーからリーダーを外す（降格）（[Kora](https://vldb.org/pvldb/vol16/p3822-povzner.pdf) の 4.3・4.5 節）。
-- Cruise Control は Kora の Self-Balancing の元になった。本体の 4.x への対応は途中で、4.3.1 へ上げる PR がある（[cruise-control-for-kafka/cruise-control](https://github.com/cruise-control-for-kafka/cruise-control)）。KRaft の 4.3 で使えるかは未検証。
+- Cruise Control は Kora の Self-Balancing の元になった。本体の最新の版（3.0.4）は本家 3.5 に対して作られ、`main` は 4.3.1 に上げてある（[cruise-control-for-kafka/cruise-control](https://github.com/cruise-control-for-kafka/cruise-control)）。Strimzi 1.2 は Cruise Control 2.5.146 を同梱し、本家 4.3.1 の KRaft の物理クラスタで KafkaRebalance を支える（[Strimzi の文書](https://strimzi.io/docs/operators/latest/deploying.html)。いずれも 2026-09-27 に確認）。4.3 で動くかではなく、下の目標を Cruise Control の目標で表せるかを E9 の `rebalance-planner` で確かめる。
 
 ## Options
 

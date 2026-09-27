@@ -37,7 +37,7 @@ date: 2026-09-27
 - 3 は、ファイルの数と mmap と S3 の PUT が増える。1 時間で NFR-009 の説明（S1 で失いうる範囲）を短く保てる。
 - 切り替えの揺らぎ（`log.roll.jitter.ms`）を 5 分にし、上げの集中を避ける。
 - 圧縮：スレッド 4、重複の除去のバッファ 512 MiB、I/O 100 MiB/秒（PoC で確定）。
-- B の上限の値と掛け方は multi-tenancy-and-quotas の領域で決める。この領域の提案は Standard の CU あたり 100 GiB（複製の前。未検証）。
+- B の上限の値と掛け方は multi-tenancy-and-quotas の領域で決める。この領域の提案は Standard の CU あたり 100 GiB（複製の前。未検証。E7 の `compacted-size-enforcement` の負荷試験で見直す）。
 - 保持と `log-start-offset` の前進は、耐久性の監査の対象にする（[ADR-0014](0014-durability-audit-and-fault-injection.md)）。
 
 ## Consequences

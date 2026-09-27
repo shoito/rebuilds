@@ -82,7 +82,7 @@ S3（東京）──CRR（選んだ論理クラスタの前方一致だけ）─
 | 土台 | Aiven の tiered-storage-for-apache-kafka の S3 の backend（`io.aiven.kafka.tieredstorage.RemoteStorageManager`）。版を固定し、開発リポジトリでソースからビルドする。本家の版を上げるときに、互換性と耐久性のテストを一緒に回す |
 | 包む層（Java、自前） | `TenantAwareRemoteStorageManager`。土台に委ねる前後で、(1) トピックの内部の名前がテナントの接頭辞で始まることを確かめる（始まらないものは上げずに失敗させる）、(2) 上げた・消したオブジェクトのキーと大きさを、テナントごとの計数（メトリクスと使用量）に出す、(3) S3 の失敗を分類して数える |
 | 設定 | `rsm.config.chunk.size=4194304`（4 MiB。土台の推奨値）。`rsm.config.key.prefix` は空（キーをテナントの接頭辞で始めるため。5.2 節） |
-| 圧縮・暗号化 | 土台の圧縮は使わない（クライアントが圧縮したバッチを、さらに圧縮しても縮まない見込み。未検証。E4 で測る）。暗号化は S3 の SSE-KMS（S3 Bucket Keys を有効）に任せ、土台のクライアント側の暗号化は使わない。テナントごとの鍵（BYOK）は S2 の Dedicated で、security-and-acls の領域で決める |
+| 圧縮・暗号化 | 土台の圧縮は使わない（クライアントが圧縮したバッチを、さらに圧縮しても縮まない見込み。未検証。E4 の `rsm-tenant-wrapper` で測る）。暗号化は S3 の SSE-KMS（S3 Bucket Keys を有効）に任せ、土台のクライアント側の暗号化は使わない。テナントごとの鍵（BYOK）は S2 の Dedicated で、security-and-acls の領域で決める |
 | 塊のキャッシュ | ローカルのディスク（ブローカーの EBS の別の領域）に 50 GiB、保持 10 分、先読み 16 MiB。初期値。capacity の領域で見直す |
 
 README の 4 節の技術スタックは、はじめ「自前の S3 の RemoteStorageManager」としていた。この文書で、土台を OSS にし、包む層だけを自前にする形に改め（[ADR-0018](../decisions/0018-s3-remote-storage-manager.md)）、統合の工程で README も直した。
@@ -118,7 +118,7 @@ _rlmm/2026-09-27/partition-17.jsonl.zst        （エージェントが書く。
 | --- | --- | --- |
 | `segment.bytes` | 256 MiB（テナントは 64 MiB〜1 GiB） | [broker-and-log-storage.md](broker-and-log-storage.md) の 3 節と [ADR-0010](../decisions/0010-segment-retention-and-compaction-defaults.md)、許可リストは [ADR-0007](../decisions/0007-topic-config-allowlist.md) |
 | `segment.ms` | 1 時間（テナントは 10 分〜7 日） | 同上。流量の少ないトピックでも 1 時間に 1 回は S3 に上がる。テナントが延ばすと、S3 と大阪への写しが遅れる（12 節の持ち越し） |
-| `local.retention.ms` | 6 時間（ブローカーの `log.local.retention.ms`） | この文書（初期値。[broker-and-log-storage.md](broker-and-log-storage.md) の見積もりの仮置きと同じ値にした。capacity の領域で見直す）。テナントは変えられない。本家は `local.retention.ms` が `retention.ms` を超える設定を拒否する（`LogConfig` の検査）。テナントが `retention.ms` を 6 時間より短くしたときの扱いは 12 節の持ち越し |
+| `local.retention.ms` | 6 時間（ブローカーの `log.local.retention.ms`） | この文書（初期値。[broker-and-log-storage.md](broker-and-log-storage.md) の見積もりの仮置きと同じ値にした。capacity の領域で見直す）。テナントは変えられない。本家は `local.retention.ms` が `retention.ms` を超える設定を拒否する（`LogConfig` の検査）。テナントが `retention.ms` を 6 時間より短くしたときは、名前空間のパッチ（P1）が `local.retention.ms = retention.ms` を足す（12 節。本家の検査で作成が失敗するため） |
 | `local.retention.bytes` | `-2`（`retention.bytes` に従う） | 同上 |
 | `remote.log.manager.task.interval.ms` | 30 秒（本家の既定） | この文書 |
 | `remote.log.manager.copy.max.bytes.per.second` | ブローカーごとに 200 MB/秒 | capacity の領域の NIC の予算で見直す |
@@ -172,7 +172,7 @@ _rlmm/2026-09-27/partition-17.jsonl.zst        （エージェントが書く。
 - **削除は写さない**（削除マーカーの複製を無効）。大阪のバケットは、ライフサイクルの規則で、作ってから「そのテナントの最大の保持＋7 日」で消す。論理クラスタの削除のときは、大阪の前方一致も消す。
 - 大阪のバケットは、別の AWS アカウントに置き、東京のブローカーのロールからは書けない・消せないようにする（ランサムウェアと誤操作への備え）。
 - 戻せるのは「S3 に上がったログの前の部分」だけ。セグメントは閉じた直後に S3 へ上がり、ローカルの保持（`local.retention.ms`）を待たない。したがって失う範囲は、閉じていないセグメント（最大で `segment.ms` の 1 時間か `segment.bytes` の 256 MiB）＋ LSO で止まった部分 ＋ 上げの遅れ（`remote.log.manager.task.interval.ms` の 30 秒と上げの時間）＋ CRR の遅れ（99.9% は 15 分以内）である。`local.retention.ms` は関係しない。圧縮のトピックも戻せない。これは NFR-009 と、利用規約・SLA の説明（intent.md の L6）に書く。
-- S1 の戻しは手順（runbook）で行う：大阪に物理クラスタを作り、`_rlmm/` の最後のスナップショットから、有効なセグメントを RLMM に登録し直して、読み取り専用のトピック（`remote.log.copy.disable=true`）として見せる。RLMM に外から登録し直す道具は自前で作る（本家に道具はない。未検証）。S2 のクラスタの間の複製で置き換える。
+- S1 の戻しは手順（runbook）で行う：大阪に物理クラスタを作り、`_rlmm/` の最後のスナップショットから、有効なセグメントを RLMM に登録し直して、読み取り専用のトピック（`remote.log.copy.disable=true`）として見せる。本家は、`remote.log.copy.disable=true` のときに `local.retention.ms`・`local.retention.bytes` を `-2` にすることを求める（[Tiered Storage](https://kafka.apache.org/43/operations/tiered-storage/)、2026-09-27 に確認）ので、戻したトピックはこの 2 つを `-2` にする。RLMM に外から登録し直す道具は自前で作る（本家の 4.3 の `bin/` と Tiered Storage の文書に、RLMM を書き換える道具はない。2026-09-27 に確認）。S2 のクラスタの間の複製で置き換える。
 
 ### 6.7 監査（日次）
 
@@ -212,7 +212,7 @@ Kora に倣い、階層型の保存の境界を耐久性の監査の対象にす
 | [KIP-1150](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1150%3A+Diskless+Topics) | 要求の合意。従来のトピックと並ぶ別の種類のトピック。順序、冪等、トランザクション、グループ、共有のグループ、階層型の保存との互換を保つとする | 採択（2026-03-02。[Aiven の解説](https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead)） |
 | [KIP-1163](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1163%3A+Diskless+Core) | 中核。トピックの設定 `diskless.enable`（作成時だけ）。どのブローカーでも produce を受け、`diskless.append.commit.interval.ms`（案は約 250ms）か `diskless.append.buffer.max.bytes`（案は約 4 MiB）で WAL のオブジェクトを閉じて S3 に上げ、コーディネーターにオフセットを振ってもらう。遅延の目標は p50 約 500ms、p99 1〜2 秒。最初の版は、圧縮のトピックとトランザクションに対応しない | 議論中 |
 | [KIP-1164](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1164%3A+Diskless+Coordinator) | オフセットを振るコーディネーター。内部トピック `__diskless_metadata` を正本にし、ローカルの SQLite に展開する。冪等の検査は含むが、トランザクションの管理は範囲の外 | 議論中（2026-02-27 の版） |
-| KIP-1165 | WAL のオブジェクトを、階層型の保存のセグメントにまとめ直す | 未検証（ページの状態を確かめていない） |
+| [KIP-1165](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1165%3A+Object+Consolidation+for+Diskless) | WAL のオブジェクトを、階層型の保存のセグメントにまとめ直す | 議論中（「Under Discussion (Re-Opened)」。2026-09-27 に確認） |
 
 Aiven は、自社の fork（Inkless）で試していて、本家に入れば fork を捨てる方針とする（同上の解説）。
 
@@ -230,7 +230,7 @@ Aiven は、自社の fork（Inkless）で試していて、本家に入れば f
 | 合計（ネットワークと S3） | 約 $0.059 | 約 $0.008 |
 
 - ディスクレスのトピックには、流量によらない下限がある。ブローカーは 250ms ごとに WAL を閉じるので、流量が少なくても 1 台で毎秒 4 回の PUT が出る。1 か月で約 1,040 万回、東京で約 $49/台。共有の物理クラスタでは多くのテナントで割るので、小さなテナントほど得になるわけではない。
-- この表は KIP の案の値による概算で、実装で変わる。未検証。
+- この表は KIP の案の値による概算で、実装で変わる。未検証（E13 の `diskless-upstream-tracking` で、本家の実装が入ったら測り直す）。
 - S3 Express One Zone（東京で保存 $0.124/GB-月、PUT $0.00108/1,000、アップロード $0.003/GB）は、1 つの AZ に置くので、AZ の喪失で RPO 0（NFR-001）を満たせない。ディスクレスの正本には使わない（[ADR-0002](../decisions/0002-replicated-log-with-tiered-storage.md)）。
 
 ### 8.3 提供の条件
@@ -307,9 +307,9 @@ Aiven は、自社の fork（Inkless）で試していて、本家に入れば f
 | 土台の Aiven の RSM の保守の状況（最新の版が 2025-10）と、本家の 4.x への追従 | E4 の着手時に、本家の最新の版でのビルドと結合テストを確かめる。追従が止まっていれば fork する |
 | RLMM に外から登録し直す道具（大阪での戻し）の作り方 | E4。本家の RLMM の公開の API で作れるかを確かめる |
 | 圧縮のトピックの容量の上限を超えたときの止め方 | [multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 6 節の既定（produce の throttle）を、E7 でクライアントの振る舞いを見て確かめる |
-| テナントが `retention.ms` を 6 時間より短くしたときに、本家の `local.retention.ms` の検査に当たるか（ブローカーの既定の `log.local.retention.ms` が、トピックの `retention.ms` と比べられるか）。当たるなら、データ面のエージェントがトピックごとに `local.retention.ms` を `min(retention.ms, 6 時間)` にする | E4 の PoC で確かめる。未検証 |
+| テナントが `retention.ms` を 6 時間より短くしたときに、本家の `local.retention.ms` の検査に当たるか（ブローカーの既定の `log.local.retention.ms` が、トピックの `retention.ms` と比べられるか）。**当たる**（2026-09-27 に本家の 4.3 のソースで確認）。トピックの設定の検査は、ブローカーの既定（`log.local.retention.ms` を `local.retention.ms` として含む）にトピックの指定を重ねてから、`local.retention.ms > retention.ms` を `INVALID_CONFIG` で拒否する（[LogConfig.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/LogConfig.java) の `validate`・`validateRemoteStorageRetentionTime`、[KafkaConfig.scala](https://github.com/apache/kafka/blob/4.3/core/src/main/scala/kafka/server/KafkaConfig.scala)）。CreateTopics はコントローラーで失敗するので、作成の後にエージェントが直す案は成り立たない。**設計を改めた**：名前空間のパッチの出入口（P1）が、テナントの CreateTopics・AlterConfigs・IncrementalAlterConfigs で `retention.ms` が 6 時間より短いとき、`local.retention.ms = retention.ms` を足して送る（`retention.ms` を戻したときは `local.retention.ms` を 6 時間に戻す）。E4 の `tiered-topic-policy` と E7 の `namespace-request-rewrite` で作る |
 | 大阪への写しを有効にした論理クラスタで、`segment.ms` の上限を 1 時間に絞るか（テナントが 7 日にすると、写しが最大 7 日遅れる） | E4。PM と、写しの約束の書き方と合わせて決める |
-| 本家の trunk にある `remote.copy.lag.ms`・`remote.copy.lag.bytes`（リリースの版は未検証）を使うか | 本家の版に入ったら、`segment.ms` の上限の代わりに使えるかを見る |
+| 本家の `remote.copy.lag.ms`・`remote.copy.lag.bytes`（KIP-1241。4.4 が目標で、4.3 にはない。2026-09-27 に確認）の扱い | **使わない**（2026-09-27 に改めた）。KIP-1241 は、閉じたセグメントの上げを遅らせて冗長を減らすもので、閉じていないセグメントには効かない（[TopicConfig.java](https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/common/config/TopicConfig.java)）。`segment.ms` の上限の代わりにならず、上げを遅らせると大阪で失う範囲が広がる。4.4 を取り込むときは、テナントの設定の許可リストで「運用だけ」にし、既定のまま（遅らせない）にする |
 | ディスクレスのトピックの提供の時期 | KIP-1163・1164 の本家への取り込みを四半期ごとに確かめる。S2 の開始の時点で入っていなければ、[ADR-0020](../decisions/0020-diskless-topics-adoption.md) を見直す |
 
 ## 13. ADR

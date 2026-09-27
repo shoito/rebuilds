@@ -59,7 +59,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - ブローカーは TLS の送信元を Envoy の IP としか見ない。送信元 IP による制限と監査ログの IP は Envoy で持ち、アクセスログを接続で突き合わせる（security-and-acls の 3.6 節・8 節の前提を改める）。
   - NLB の処理のバイトの費用（書き込み 1 GB あたり約 $0.024、読み取り 3 倍のとき）が、はじめ NFR-010 の見積もりに入っていなかった。統合の工程で NFR-010 に含め、目標を設計点で $0.11 以下に改めた（[capacity.md](../architecture/capacity.md) の 8 節、[architecture/README.md](../architecture/README.md) の 3 節）。
-  - on-demand CDS を `tcp_proxy` で使うこと、クラスタの数が増えたときの Envoy のメモリーは未検証。E1 の PoC で確かめ、だめなら B に替える。
+  - `tcp_proxy` の on-demand CDS（`on_demand.odcds_config`）と `sni_cluster` のフィルターは、どちらも本家の文書にある（[TcpProxy](https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/tcp_proxy/v3/tcp_proxy.proto)、[Upstream Cluster from SNI](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/sni_cluster_filter)、2026-09-27 に確認）。組み合わせて動くことと、クラスタの数が増えたときの Envoy のメモリーは未検証。E1 の `edge-poc` で確かめ、だめなら B に替える。
   - 証明書に載せる名前が増える（大阪を足すと 8 つ）。
 
 ## Confirmation

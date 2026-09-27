@@ -35,7 +35,7 @@
 ### 3.1 本家の形と他の実装の違い
 
 - 本家の Schema Registry の REST API（`/subjects`、`/subjects/{subject}/versions`、`/schemas/ids/{id}`、`/config`、`/compatibility/...`、`/mode`）を、シリアライザーが使う。
-- 本家のワイヤー形式：レコードの値の先頭に、マジックバイト（0）と 4 バイトのスキーマの ID を置く。ID はレジストリの中で一意。Protobuf は、その後にメッセージの索引を置く（本家の文書による。未検証。S2 の PoC で確かめる）。
+- 本家のワイヤー形式：レコードの値の先頭に、マジックバイト（0）と 4 バイトのスキーマの ID を置く。ID はレジストリの中で一意。Protobuf は、その後にメッセージの索引を置く（[Formats, Serializers, and Deserializers](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html)、2026-09-27 に確認）。E16 の `sr-differential-tests` で、本家のシリアライザーの出力と突き合わせる。
 - Apicurio Registry は、Confluent の互換の API（`/apis/ccompat/v7`）を持つが、次の違いがある（[Confluent Schema Registry compatibility API](https://www.apicur.io/registry/docs/apicurio-registry/3.3.x/getting-started/assembly-confluent-schema-registry-compatibility.html)、[Apicurio の ADR-0001](https://github.com/Apicurio/apicurio-registry/blob/main/adr/0001-confluent-schema-registry-compatibility.md)、2026-09-27 に確認）：
   - ID が 2 種類（`globalId`・`contentId`）あり、Confluent の 1 つの ID との対応を設定で選ぶ。
   - スキーマのグループに入れたスキーマは、互換の API から見えないことがある（独自の見出しでグループを選ぶ）。
@@ -49,8 +49,8 @@
 **自前で実装する**（[ADR-0040](../decisions/0040-own-schema-registry.md)）。
 
 - 互換の API のうち、シリアライザーと管理の道具が使う部分を実装し、本家の振る舞い（状態コード、エラーコード、ID の割り当て、正規化）を、本家の Apache 2.0 のクライアントを相手にした差分テストで確かめる。
-- マルチテナント（レジストリごとの ID の空間）を最初から持つ。Apicurio の 3.x のマルチテナントの有無は確かめられなかった（未検証）。
-- 実装の言語は Java 21。スキーマの解析と互換性の判定を、Apache Avro（`SchemaCompatibility`）、protobuf-java、JSON Schema のライブラリ（Apache 2.0 か MIT のものを選ぶ）で行う。TypeScript では、3 つの形式の互換性の判定のライブラリが揃わない（未検証）。
+- マルチテナント（レジストリごとの ID の空間）を最初から持つ。Apicurio の 3.x のマルチテナントは、テナントごとに別のインスタンス（オペレーターの `ApicurioRegistry3` の CR）を立てる形で、1 つのインスタンスの中で ID の空間を分ける機能はない（[Implementing multitenancy](https://www.apicur.io/registry/docs/apicurio-registry/3.3.x/getting-started/assembly-implementing-multitenancy.html)、2026-09-27 に確認）。1,000 以上の論理クラスタには向かない。
+- 実装の言語は Java 21。スキーマの解析と互換性の判定を、Apache Avro（`SchemaCompatibility`）、protobuf-java、JSON Schema のライブラリ（Apache 2.0 か MIT のものを選ぶ）で行う。TypeScript では、3 つの形式の互換性の判定のライブラリが揃わない見込み（未検証。E16 の `sr-compatibility` の着手の前に確かめる。Java を選ぶ理由は、本家の判定と同じ Avro の `SchemaCompatibility` を使えることで足りる）。
 - 保存は Aurora PostgreSQL（制御面と別のクラスタ）。
 
 ### 3.3 資源と URL
@@ -71,14 +71,14 @@
 | `POST /subjects/{s}/versions`（登録）、`POST /subjects/{s}`（検索） | 持つ。`normalize` を含む |
 | `DELETE /subjects/{s}`、`DELETE /subjects/{s}/versions/{v}`（軽い削除と `permanent=true`） | 持つ |
 | `POST /compatibility/subjects/{s}/versions/{v}` | 持つ |
-| `GET/PUT/DELETE /config`、`/config/{s}` | 持つ。互換性の水準（BACKWARD、BACKWARD_TRANSITIVE、FORWARD、FORWARD_TRANSITIVE、FULL、FULL_TRANSITIVE、NONE）。既定は BACKWARD（本家と同じ。未検証） |
+| `GET/PUT/DELETE /config`、`/config/{s}` | 持つ。互換性の水準（BACKWARD、BACKWARD_TRANSITIVE、FORWARD、FORWARD_TRANSITIVE、FULL、FULL_TRANSITIVE、NONE）。既定は BACKWARD（本家と同じ。[Schema Evolution](https://docs.confluent.io/platform/current/schema-registry/fundamentals/schema-evolution.html)、2026-09-27 に確認） |
 | `GET/PUT /mode`（READWRITE、READONLY、IMPORT） | 持つ。IMPORT は移行のため（ID を指定した登録） |
 | スキーマの参照（references） | 持つ |
 | コンテキスト、エクスポーター、データの契約（ルール、メタデータ）、フィールドの暗号化の鍵（DEK） | 持たない（S2 の後に需要で決める） |
 
 ### 3.5 ID の割り当て
 
-- ID はレジストリごとに 1 から増える整数。同じ正規化の内容は、サブジェクトが違っても同じ ID（本家の振る舞い。未検証）。
+- ID はレジストリごとに 1 から増える整数。同じ正規化の内容は、サブジェクトが違っても同じ ID（本家の文書は「スキーマが同じなら、複数のサブジェクトが同じ ID を持ちうる」とする。[Formats, Serializers, and Deserializers](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html)、2026-09-27 に確認）。
 - 移行：本家や他のレジストリから、ID を保ったまま取り込む（`IMPORT` のモード）。これで、既に書かれたレコードのスキーマの ID が、そのまま引ける。
 
 ### 3.6 上限
@@ -89,7 +89,7 @@
 | スキーマ 1 つの大きさ | 1 MiB |
 | 要求 | レジストリごとに 100 回/秒 |
 
-- 値は本システムの初期値。Confluent の値は確かめていない（未検証）。
+- 値は本システムの初期値。Confluent Cloud は、Essentials で 100、Advanced で 20,000 のスキーマを含み（版と論理削除したものを数える）、要求は読み取り 75 回/秒・書き込み 25 回/秒（[Stream Governance packages](https://docs.confluent.io/cloud/current/stream-governance/packages.html)、2026-09-27 に確認）。
 
 ### 3.7 性能と可用性
 

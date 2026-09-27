@@ -1,7 +1,7 @@
 # Runbook: 災害復旧（リージョンの障害、KRaft のクォーラムの喪失、写しの遅れ、訓練）
 
 - Owner: Ops
-- 対応するアラート: 大阪からの合成監視の全失敗、`AuroraGlobalDBRPOLag` の超過、大阪への写しの遅れ（S3 RTC）、KRaft のスナップショットの写しの欠け、訓練（四半期に 1 回）
+- 対応するアラート: 大阪の容量の予約が `active` でない（D-1）、大阪からの合成監視の全失敗、`AuroraGlobalDBRPOLag` の超過、大阪への写しの遅れ（S3 RTC）、KRaft のスナップショットの写しの欠け、訓練（四半期に 1 回）
 - 最終確認日: 2026-09-27
 
 構成は [infrastructure.md](../architecture/infrastructure.md) の 8 節、範囲は [ADR-0045](../decisions/0045-osaka-disaster-recovery-scope.md)、大阪への写しは [ADR-0019](../decisions/0019-tiered-storage-lifecycle-and-dr-copy.md) と [tiered-and-object-storage.md](../architecture/tiered-and-object-storage.md) の 6.6 節にある。AZ の喪失は [incident-response.md](incident-response.md) の「AZ の喪失」で扱う。
@@ -88,7 +88,7 @@
 2. **ボリュームが残っているか**を確かめる。コントローラーの EBS が残っていれば、同じ AZ の新しいノードに付け替えて、同じ投票者として戻す（[metadata-and-control.md](../architecture/metadata-and-control.md) の 3.3 節）。過半数が戻れば終わり。
 3. 1 台だけ残っているなら、残りの 2 台を「足してから外す」手順（`add-controller`・`remove-controller`）で入れ替える。一度に 1 つ。この間、他の変更を止める。
 4. 過半数のボリュームを失ったとき（最後の手段）：
-   - 本家に、スナップショットからクォーラムを作り直す正式な手順はない（未検証）。Dev のテックリードと、本家の文書・開発者への確認の結果に従う。
+   - 本家に、スナップショットからクォーラムを作り直す正式な手順はない（4.3 の [KRaft](https://kafka.apache.org/43/operations/kraft/) の運用の文書に載っていない。2026-09-27 に確認）。Dev のテックリードと、本家の文書・開発者への確認の結果に従う。
    - 材料：`<brand>-ops-<pc-id>-apne1` の最新のスナップショット（1 時間ごと）、`kraft_snapshots`（30 秒ごと）。
    - スナップショットの後に作られたトピック・ACL・パーティションの変更は失われうる。ブローカーのログ（EBS と S3）は残るが、メタデータと合わない部分が出うる。耐久性の監査（AUD-1〜6）を全て回し、影響したテナントを特定する。
 5. この手順は、検証の環境で年 2 回試す（[ADR-0015](../decisions/0015-kraft-dynamic-quorum-and-controller-sizing.md)）。
@@ -98,11 +98,21 @@
 | 訓練 | 頻度 | 合格 |
 | --- | --- | --- |
 | 東京の喪失（staging）：A-2〜A-4 | 四半期 | 制御面 1 時間以内、書き込みの経路 4 時間以内、戻した履歴の中身とオフセットが元と同じ |
+| 大阪の EC2 の空きの確認（D-1） | 四半期 | 予約が `active`、ブローカーの型を AZ ごとに起動できる |
 | 大阪での本番の台数の起動 | 年 1 回 | 東京の本番と同じ台数の r8g・m8g を 1 時間以内に起動できる（起動して消す） |
 | KRaft のクォーラムの喪失（dp-verify） | 年 2 回 | C-4 の手順で、メタデータを戻し、監査の不一致を特定できる |
 | AZ の退避（本番） | 四半期 | 1 つの AZ のブローカーを降格して、SLO を守ったままリーダーを他の AZ へ移し、戻す（[replication-and-durability.md](../architecture/replication-and-durability.md) の 8.4 節） |
 
 - 訓練の結果を `dr_restores` に書く（種類、各段の完了の時刻、失った範囲の見積もり、結果）。
+
+### D-1. 大阪の EC2 の空きの確認（`osaka-capacity-check`、四半期）
+
+リージョンの障害では他社も大阪へ移るので、大阪で EC2 を起動できないおそれがある（[architecture/README.md](../architecture/README.md) の 6 節）。コントローラーとエッジの最小だけを予約し、ブローカーは起動できるかを定期に確かめる。
+
+1. 予約を確かめる：大阪の On-Demand Capacity Reservation（コントローラー m8g.xlarge を AZ ごとに 1 台、Envoy c8g.xlarge を AZ ごとに 1 台）が `active` で、台数と AZ ID が Terraform の定義と一致する。常設の Envoy 2 台が予約を使っている。`active` でなければ ticket を切り、E12 の `osaka-standby` の Terraform で作り直す。
+2. ブローカーの型を起動して消す：dr の検証用のノードグループで、`apne3-az1`〜`az3` の AZ ごとに r8g.4xlarge・m8g.4xlarge を 3 台ずつ、オンデマンドで起動し、`InsufficientInstanceCapacity` が出ないことを確かめてから消す。出た型と AZ は、代わりの型（r7g.4xlarge・m7g.4xlarge）でも同じことを試す。
+3. 結果を `dr_restores`（種類 `capacity_check`）に書く。2 回続けて `InsufficientInstanceCapacity` が出た型は、A-3 の手順 1 の既定の型を代わりの型に替える提案を Ops の責任者に出す。
+4. 費用：1 回あたり 18 台を数分起動するだけで、数ドル。
 
 ## エスカレーション
 

@@ -248,7 +248,7 @@ planned ─▶ provisioning ─▶ burn-in ─▶ active ─▶ closed（新し�
 | ボリュームの拡張 | KafkaNodePool の `storage.size` を増やし、Strimzi が PVC を広げる | ディスクの使用率 75%（[broker-and-log-storage.md](broker-and-log-storage.md) の 5.3 節） |
 | ノードの型の変更 | 新しい型のノードプールを足し、ブローカーを移す（8.2 節の drain） | capacity の領域の見直し |
 
-- ボリュームの拡張の注意：broker-and-log-storage の 5.3 節は、エージェントが Elastic Volumes でボリュームを広げるとした。Strimzi の管理の下で EBS を直接広げると、PVC の宣言と実際の大きさがずれ、Strimzi の調停と衝突しうる。**エージェントは EBS を直接変えず、KafkaNodePool の `storage.size` を変える（PR ではなく、エージェントの権限での直接の更新を許す）**。ただし Strimzi のノードプールは、プールの全ブローカーの大きさを一緒に変える（ブローカーごとに変えられるかは未検証）。AZ ごとのプールなので、最小の単位は 1 つの AZ のブローカー全部になる。
+- ボリュームの拡張の注意：broker-and-log-storage の 5.3 節は、エージェントが Elastic Volumes でボリュームを広げるとした。Strimzi の管理の下で EBS を直接広げると、PVC の宣言と実際の大きさがずれ、Strimzi の調停と衝突しうる。**エージェントは EBS を直接変えず、KafkaNodePool の `storage.size` を変える（PR ではなく、エージェントの権限での直接の更新を許す）**。ただし Strimzi のノードプールは、プールの全ブローカーの大きさを一緒に変える（大きさは `storage.size` だけで、ブローカーごとの上書きはない。[Strimzi の文書](https://strimzi.io/docs/operators/latest/deploying.html) の「Resizing persistent volumes」、2026-09-27 に確認）。AZ ごとのプールなので、最小の単位は 1 つの AZ のブローカー全部になる。
 - 論理クラスタの上限（CU）の引き上げは、クォータの変更だけで済み、物理クラスタの拡張を要さない（NFR-007 の 1 分）。
 
 ## 8. cordon と drain
@@ -262,7 +262,7 @@ cordon の本家の仕組み（KIP-1066、4.3）と、パーティションの�
 3. 同じ ID・同じボリュームで起動し、ISR に戻るのを待ってから次へ進む。
 4. ノードの入れ替え（AMI の更新）は、Drain Cleaner が Kubernetes の退避を止め、Strimzi のローリングに任せる。ボリュームは同じ AZ の新しいノードに付け替える。
 
-- 進める条件：物理クラスタの「`min.insync.replicas` を下回るパーティション」が 0、URP が 0。Strimzi の KafkaRoller が、再起動でパーティションが min ISR を下回らないかを確かめるかは未検証。確かめないなら、エージェントが条件を満たすまで、Strimzi のリソースの一時停止の注釈で待たせる。
+- 進める条件：物理クラスタの「`min.insync.replicas` を下回るパーティション」が 0、URP が 0。Strimzi の KafkaRoller は、再起動でパーティションが `min.insync.replicas` を下回るときはロールしない（ちょうど `min.insync.replicas` になるロールは許す。[strimzi-kafka-operator#13031](https://github.com/strimzi/strimzi-kafka-operator/issues/13031)、2026-09-27 に確認）。URP 0 の条件はこれより厳しいので、エージェントが条件を満たすまで待たせる（止め方は [delivery.md](delivery.md) の 6.2 節）。
 - cordon はしない（再起動では配置を変えない）。
 
 ### 8.2 ブローカーの退役（縮小、ノードの型の変更）
@@ -276,7 +276,7 @@ cordon の本家の仕組み（KIP-1066、4.3）と、パーティションの�
 7.    pc-provisioner：PVC と EBS を消す（Strimzi の削除の設定に従う。消さない設定なら手で消す）
 ```
 
-- Strimzi は、縮小のときに複製の残るブローカーを消さない安全の確認を持つ（未検証。E1 で確かめる）。確かめない場合も、エージェントの 4 の確認が終わるまで 5 の PR を出さない。
+- Strimzi は、縮小の前に、消すブローカーに複製が残っていないかを確かめ、残っていれば縮小しない（`strimzi.io/skip-broker-scaledown-check` で外せるが、使わない。[Strimzi の文書](https://strimzi.io/docs/operators/latest/deploying.html) の 20.2 節、2026-09-27 に確認）。それでも、エージェントの 4 の確認が終わるまで 5 の PR を出さない。
 - Strimzi の縮小のときの自動の再配置（1.2.0 で KIP-1066 の cordon を使う）は無効にする。再配置の計画と実行をエージェントに一本化するため。
 - 2 の移動の量は、ローカルに残っている部分だけ（階層型の保存。[tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.4 節）。
 - 4 までに失敗したら、cordon を外し、降格を戻して、元に戻せる。5 の後は戻さない。

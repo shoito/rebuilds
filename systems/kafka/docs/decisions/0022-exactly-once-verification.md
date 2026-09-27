@@ -40,7 +40,7 @@ date: 2026-09-27
   - 利用者が、本家と同じ制約を知ったうえで使える。
 - 引き受けるコスト：
   - Jepsen の環境と Streams の長時間の試験の費用と保守。失敗の調べに Clojure と Jepsen の知識が要る。
-  - Java 以外のクライアントを Jepsen に組み込めるかは未検証で、しばらく Java だけの検証になる。
+  - Java 以外のクライアントを Jepsen に組み込めるかは未検証（E3 の `jepsen-txn-workload` で確かめる）で、しばらく Java だけの検証になる。
 
 ## Confirmation
 

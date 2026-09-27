@@ -136,7 +136,7 @@ https://api.<brand>.<domain>/v1/...
     "status": 409,
     "code": "topic_already_exists",
     "message": "Topic 'orders' already exists.",
-    "details": { "kafka_error_code": 36 },
+    "details": { "protocol_error_code": 36 },
     "doc_url": "https://docs.<brand>.<domain>/errors/topic_already_exists",
     "request_id": "req_..."
   }
@@ -144,7 +144,7 @@ https://api.<brand>.<domain>/v1/...
 ```
 
 - `code` は小文字のスネークケースにする（Confluent は大文字。好みの差で、互換は目標にしない）。
-- 命令の失敗では、Kafka のエラーコードを `details.kafka_error_code` に載せる。本家のエラーコードとの対応の表は、開発リポジトリの spec に持つ。
+- 命令の失敗では、Kafka のエラーコードを `details.protocol_error_code` に載せる。本家のエラーコードとの対応の表は、開発リポジトリの spec に持つ。
 - すべての応答に `X-<Brand>-Request-Id` を付ける（[architecture/README.md](README.md) の 5 節の例）。
 
 ### 3.9 レート制限
@@ -252,7 +252,7 @@ https://api.<brand>.<domain>/v1/...
 | `<brand>_topic` | `.../topics` | パーティションの数は増やすだけ。減らす計画は、置き換えではなくエラーにする（データを消さないため） |
 | `<brand>_topic_config` を持たず、`<brand>_topic` の `config` で扱う | `.../configs` | 許可リストにない設定は、計画の段階で検証する |
 | `<brand>_service_account` | `/v1/service-accounts` | |
-| `<brand>_api_key` | `/v1/api-keys` | 秘密は状態（state）に `sensitive` で入る。Terraform の ephemeral な資源で秘密を状態に残さない方式を、プロバイダーの版で選べるようにする（未検証：Terraform の対応する版を E10 で確かめる） |
+| `<brand>_api_key` | `/v1/api-keys` | 秘密は状態（state）に `sensitive` で入る。Terraform の ephemeral な資源で秘密を状態に残さない方式を、プロバイダーの版で選べるようにする（ephemeral な資源は Terraform 1.10 から、write-only の引数は 1.11 から。[Terraform 1.10](https://www.hashicorp.com/en/blog/terraform-1-10-improves-handling-secrets-in-state-with-ephemeral-values)、[Terraform 1.11](https://www.hashicorp.com/en/blog/terraform-1-11-ephemeral-values-managed-resources-write-only-arguments)、2026-09-27 に確認。プロバイダーが対応する Terraform の最小の版は E10 の `terraform-provider` で決める） |
 | `<brand>_acl` | `.../acls` | ACL の全部の項目で 1 つの資源。更新は置き換え |
 | `<brand>_role_binding` | `/v1/role-bindings` | |
 | データソース | 論理クラスタ、トピック、サービスアカウント | |
@@ -341,14 +341,14 @@ https://api.<brand>.<domain>/v1/...
 - **環境**：持たない。組織の直下に論理クラスタを置く。本番と開発を分けたい利用者には、組織を分けるか、論理クラスタの名前とロールの付与（論理クラスタの単位）で分けるよう案内する。需要が強ければ S2 で、`/v1` に足す形で足す（任意の項目なので壊さない）。
 - **レコードの閲覧**：MVP では持たない。S2 で持つなら、利用者のブラウザの中で、利用者が選んだ API キーで読む形を第一の候補にする（コンソールのサーバーがレコードに触れない）。
 - **版**：パスの主版（3.3 節）。
-- **Terraform の秘密**：`<brand>_api_key` は状態に `sensitive` で入る。ephemeral な資源を別の資源として用意する（`<brand>_api_key` の ephemeral の版）。Terraform の対応する版は E10 で確かめる（未検証）。
+- **Terraform の秘密**：`<brand>_api_key` は状態に `sensitive` で入る。ephemeral な資源を別の資源として用意する（`<brand>_api_key` の ephemeral の版）。ephemeral な資源は Terraform 1.10 以上で使える（2026-09-27 に確認。7 節の表）。
 - **CLI の produce・consume**：文字列と JSON だけ。スキーマのある形式は、スキーマレジストリ（S2）と一緒に足す。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Terraform の ephemeral な資源に対応する版 | E10 で Terraform の文書を確かめる |
+| プロバイダーが求める Terraform の最小の版 | E10 の `terraform-provider`。ephemeral な資源は 1.10、write-only の引数は 1.11 から（2026-09-27 に確認） |
 | CLI の依存の OSS の表示（NOTICE）の形 | 法務の確認待ち（intent.md の L2） |
 | 管理 API の組織ごとのレート制限の値 | E10 の負荷試験と、ベータの利用の実績 |
 

@@ -77,7 +77,7 @@
 | その他の `group.*`・`offsets.*` | 本家の既定 | |
 
 - 機能の版を 0 にしたとき、共有のグループと Streams のグループの API は、本家でその機能が無効のときと同じ応答を返す（[protocol-and-compatibility.md](protocol-and-compatibility.md) の 4 節の「フラグ」）。
-- 1,000 は初期値。Confluent Cloud・MSK の公開の値は見つからなかった（未検証）。大きなグループを使うテナントの需要を見て、Dedicated（S2）では上げる。
+- 1,000 は初期値。Confluent Cloud の [Cluster types](https://docs.confluent.io/cloud/current/clusters/cluster-types.html) と MSK の [quota](https://docs.aws.amazon.com/msk/latest/developerguide/limits.html) に、グループのメンバーの数の上限は載っていない（2026-09-27 に確認）。大きなグループを使うテナントの需要を見て、Dedicated（S2）では上げる。
 
 ### 4.2 グループの単位の設定（テナントが変えられるもの）
 
@@ -90,7 +90,7 @@ IncrementalAlterConfigs の `GROUP` の資源で、次だけを通す。表に�
 | `share.*` | 7.1 節の表 | 共有のグループを有効にしてから |
 | `streams.*` | 7.2 節 | Streams のグループを有効にしてから |
 
-- グループの資源の設定が AlterConfigPolicy を通るかは未検証。通らなければ、名前空間のパッチの出入口で検査する（E6 の PoC で確かめる）。
+- グループの資源の設定も AlterConfigPolicy を通る。本家の 4.3 では、IncrementalAlterConfigs はコントローラーの `ConfigurationControlManager` で処理され、資源の種類によらず AlterConfigPolicy を呼ぶ（[ConfigurationControlManager.java](https://github.com/apache/kafka/blob/4.3/metadata/src/main/java/org/apache/kafka/controller/ConfigurationControlManager.java)、2026-09-27 に確認）。ポリシーの実装はコントローラーに置く。E6 の `group-config-allowlist` で、GROUP の資源で呼ばれることを結合テストで確かめる。
 
 ### 4.3 consumer の正規表現と名前空間
 
@@ -116,7 +116,7 @@ IncrementalAlterConfigs の `GROUP` の資源で、次だけを通す。表に�
 | グループの要求の頻度 | 要求のクォータ（`request_percentage`）の中 | 同左 | throttle |
 
 - グループの数は、`transactional.id` と同じく、`__consumer_offsets` のパーティションのリーダーが手元で「そのテナントのグループの数 ≤ ceil(2 × 上限 ÷ 50)」を確かめる（[transactions-and-idempotence.md](transactions-and-idempotence.md) の 6 節と同じ形）。
-- 値は初期値。未検証。
+- 値は初期値。未検証（E6 の `group-count-limit`・`group-size-limit` の負荷試験で見直す）。
 
 ## 7. 共有のグループと Streams のグループ（Later）
 
@@ -135,7 +135,7 @@ IncrementalAlterConfigs の `GROUP` の資源で、次だけを通す。表に�
 
 | 設定 | 範囲 |
 | --- | --- |
-| `share.auto.offset.reset` | `earliest`、`latest`（`by_duration` は本家の値の一覧を確かめてから。未検証） |
+| `share.auto.offset.reset` | `earliest`、`latest`、`by_duration:<ISO 8601 の期間>`（本家の値の一覧。既定 `latest`。[Group Configs](https://kafka.apache.org/43/configuration/group-configs/)、2026-09-27 に確認） |
 | `share.isolation.level` | `read_uncommitted`、`read_committed` |
 | `share.record.lock.duration.ms` | 15 秒〜60 秒（ブローカーの最小・最大） |
 | `share.delivery.count.limit` | 2〜10（同上） |
@@ -145,7 +145,7 @@ IncrementalAlterConfigs の `GROUP` の資源で、次だけを通す。表に�
 ### 7.2 Streams のグループ（KIP-1071）
 
 - 4.2 で機能を絞った GA。StreamsGroupHeartbeat は、トポロジー（Streams の内部のトピックの名前を含む）をブローカーに送る。名前空間のパッチは、トポロジーの中のトピックの名前にも接頭辞を付け外しする必要があり、資源の場所が他の API より複雑になる。
-- 有効にする条件：(1) トポロジーの中のトピックの名前の付け外しの性質ベーステスト、(2) exactly-once の試験（[ADR-0022](../decisions/0022-exactly-once-verification.md)）を Streams のグループでも通す、(3) 本家で「機能を絞った」制限が外れていること（何が絞られているかは未検証）。
+- 有効にする条件：(1) トポロジーの中のトピックの名前の付け外しの性質ベーステスト、(2) exactly-once の試験（[ADR-0022](../decisions/0022-exactly-once-verification.md)）を Streams のグループでも通す、(3) 本家の制限が外れていること。4.3 の文書の制限は、トポロジーを大きく変えたら新しいグループが要る、割り当ては sticky だけ（warmup のタスクと rack を考えた割り当てがない）、正規表現の購読がない、CLI のオフセットの戻しがない、classic との移行がない（[Streams Rebalance Protocol](https://kafka.apache.org/43/streams/developer-guide/streams-rebalance-protocol/)、2026-09-27 に確認）。
 - それまで Kafka Streams は classic のプロトコル（Streams の既定）で動く。
 
 ## 8. 遅れ（lag）
@@ -193,7 +193,7 @@ IncrementalAlterConfigs の `GROUP` の資源で、次だけを通す。表に�
 ### 11.3 互換性と負荷
 
 - クライアントの行列（[protocol-and-compatibility.md](protocol-and-compatibility.md) の 6 節）で、両方のプロトコル、正規表現の購読、移行、OffsetDelete を流す。
-- 1 つのテナントがメンバー 1,000 のグループを繰り返しリバランスさせても、他のテナントの ConsumerGroupHeartbeat の p99 が 100ms 以内（初期値。未検証）。
+- 1 つのテナントがメンバー 1,000 のグループを繰り返しリバランスさせても、他のテナントの ConsumerGroupHeartbeat の p99 が 100ms 以内（初期値。未検証。E7 の `group-request-quota` の負荷試験で確かめる）。
 
 ## 12. 未解決の問い
 

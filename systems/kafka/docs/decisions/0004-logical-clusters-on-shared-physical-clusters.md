@@ -24,7 +24,7 @@ intent.md は、MVP を「サーバーレス（容量が伸び縮みする）」
 ## Options
 
 1. **共有の物理クラスタの上の論理クラスタ（Kora の型）。名前空間はブローカーのパッチで作る**
-2. **1 と同じ。ただし名前空間は、Kafka のプロトコルを理解するプロキシで作る**（Kroxylicious など。資源の名前に接頭辞を付け外しするフィルターがある。未検証）
+2. **1 と同じ。ただし名前空間は、Kafka のプロトコルを理解するプロキシで作る**（Kroxylicious など。資源の名前に接頭辞を付け外しする `MultiTenant` のフィルターがある。[kroxylicious-multitenant](https://github.com/kroxylicious/kroxylicious/tree/main/kroxylicious-filters/kroxylicious-multitenant)、2026-09-27 に確認）
 3. **1 と同じ。ただし名前空間を作らず、トピックの名前の接頭辞と、接頭辞の ACL で分ける**（テナントに接頭辞が見える）
 4. **テナントごとに物理クラスタを作る**
 

@@ -55,7 +55,7 @@ CU の値の正本は [ADR-0037](../decisions/0037-capacity-unit-definition.md) 
 
 - EC2 の帯域は送信と受信のそれぞれに掛かる（[Instance network bandwidth](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)）。受信（3W）は送信（6W）より小さいので、送信で決まる。
 - 設計点：送信と EBS が、それぞれ基準の帯域の 60% 以下になる最大の W。1 つの AZ を失うと、残りのブローカーの負荷は約 1.5 倍になり、90% に収まる。MSK も CPU を 60% 未満に保つよう勧める（[MSK best practices](https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html)、2026-09-27 に確認）。
-- 1 つの TCP の流れは、配置グループの外で 5 Gbps までに制限される（同上の帯域の文書）。複製のフェッチャーは `num.replica.fetchers`（4 の案）の数だけ流れを持つので、1 つのブローカーの組の間で 5 Gbps に当たる見込みはない（未検証）。
+- 1 つの TCP の流れは、配置グループの外で 5 Gbps までに制限される（同上の帯域の文書）。複製のフェッチャーは `num.replica.fetchers`（4 の案）の数だけ流れを持つので、1 つのブローカーの組の間で 5 Gbps に当たる見込みはない（未検証。E1 の `load-test-t1-t2` の T1 で、フェッチャーごとの流量を測る）。
 
 ### 3.2 型ごとの設計点（F = 3）
 
@@ -69,7 +69,7 @@ CU の値の正本は [ADR-0037](../decisions/0037-capacity-unit-definition.md) 
 - 帯域は [Memory optimized](https://docs.aws.amazon.com/ec2/latest/instancetypes/mo.html)・[General purpose](https://docs.aws.amazon.com/ec2/latest/instancetypes/gp.html)、単価は Price List API（r8g.4xlarge $1.13696/時、m8g.4xlarge $0.92752/時、r8g.2xlarge $0.56848/時、r8g.8xlarge $2.27392/時）。月は 730 時間。
 - どの型でも EBS の帯域で決まる。1 MB/秒あたりの単価は同じなので、型は「障害の範囲」「パーティションの上限（4,000 の複製）」「ページキャッシュ」で選ぶ。
 - Standard は r8g.4xlarge：ページキャッシュ（約 110 GiB）が、W = 80 のときの約 8 分の書き込み（3W × 480 秒）を持ち、数分遅れたコンシューマーをディスクに落とさない。Basic は m8g.4xlarge：遅延の目標が緩い（[ADR-0047](../decisions/0047-slos-synthetic-probes-and-alerts.md)）。
-- CPU（TLS、SASL、要求の処理、名前空間のパッチ、圧縮の再計算の有無）は未検証。16 vCPU で W = 80 のとき 60% 未満になるかを 11 節の T1 で測る。本家の `num.io.threads`・`num.network.threads` は、MSK の勧め（4xlarge で 16・8）を初期値にする（同上の MSK の文書）。
+- CPU（TLS、SASL、要求の処理、名前空間のパッチ、圧縮の再計算の有無）は未検証。16 vCPU で W = 80 のとき 60% 未満になるかを 11 節の T1（E1 の `load-test-t1-t2`）で測る。本家の `num.io.threads`・`num.network.threads` は、MSK の勧め（4xlarge で 16・8）を初期値にする（同上の MSK の文書）。
 
 ### 3.3 ブローカーあたりの CU
 
@@ -137,8 +137,8 @@ CU の値の正本は [ADR-0037](../decisions/0037-capacity-unit-definition.md) 
 ## 7. NLB と Envoy
 
 - **NLB**：処理のバイト 1 GB/時が 1 NLCU で $0.006/時（[ELB pricing](https://aws.amazon.com/elasticloadbalancing/pricing/)）。書き込み 1 GB あたり、書き込み 1 GB と読み取り F GB が通る。F = 3 で 4 GB × $0.006 ＝ $0.024。接続の次元（同時 10 万、新しい接続 800/秒で 1 NLCU）は、S1 の接続の数（数十万の同時の接続の見込み）で数 NLCU で、処理のバイトより小さい。
-- **Envoy**：TCP をそのまま中継するので、クライアントとの流れの全てが Envoy の受信と送信の両方を通る。書き込み 1 GB あたり、各方向に (1 + F) GB。c8g.2xlarge（ネットワークの基準 3.75 Gbps ＝ 469 MB/秒。c8g の値は同じ世代の m8g・r8g の 2xlarge と同じと見た。未検証）の 60% で、各方向 281 MB/秒 → 書き込み 70 MB/秒分。S1 のピーク（書き込み 2 GB/秒）では、AZ あたり約 10 台。
-- Envoy の CPU（TLS を終端しないので、主に TCP の中継と接続の数）は未検証。11 節の T6 で 1 台の上限を測る。
+- **Envoy**：TCP をそのまま中継するので、クライアントとの流れの全てが Envoy の受信と送信の両方を通る。書き込み 1 GB あたり、各方向に (1 + F) GB。c8g.2xlarge（ネットワークの基準 3.75 Gbps ＝ 469 MB/秒。[Compute optimized](https://docs.aws.amazon.com/ec2/latest/instancetypes/co.html)、2026-09-27 に確認）の 60% で、各方向 281 MB/秒 → 書き込み 70 MB/秒分。S1 のピーク（書き込み 2 GB/秒）では、AZ あたり約 10 台。
+- Envoy の CPU（TLS を終端しないので、主に TCP の中継と接続の数）は未検証。11 節の T6 で 1 台の上限を測る（E1 の `edge-poc`、E12 の `load-test-ga`）。
 
 ## 8. 費用のモデル（NFR-010）
 
@@ -156,7 +156,7 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 
 - **NFR-010 は、統合の工程で「NLB を含めて、設計点で書き込み 1 GB あたり $0.11 以下」に改めた（[README.md](README.md) の 3 節。PM・Dev の確認待ち）。** 上の表で u = 40% のとき $0.107、u = 60% のとき $0.100 で届く。元の $0.08 は S2 の目標として残す（NLB を通さない経路、Savings Plans、ディスクレスのトピックで下げる）。
 - この表は、スループットで台数が決まるとき（設計点）の値である。パーティションで台数が決まる分の原価は 10 節で出し、パーティション-時の課金で回収する（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)）。
-- EC2 の Savings Plans（1 年で 20〜30% の割引の見込み。未検証）で、ブローカーの行が約 $0.005 下がる。
+- EC2 の Savings Plans（東京の r8g.4xlarge、1 年・前払いなしで、Compute Savings Plans $0.82373/時（約 28% 引き）、EC2 Instance Savings Plans $0.7521/時（約 34% 引き）。AWS Price List API の `AWSComputeSavingsPlan`、2026-09-27 に確認）で、ブローカーの行が約 $0.003 下がる（u = 40%。EBS は割り引かれない）。
 - `client.rack` を設定しない利用者が 20% いると、AZ をまたぐ転送が $0.008 増える（5 節）。
 - 下げる手段と効果：
 
@@ -166,7 +166,7 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 | ローカルの保持を 3 時間にする | −$0.004（u = 40%） | 2 時間より古い読み取りが S3 から来る |
 | ディスクレスのトピック（S2。[ADR-0020](../decisions/0020-diskless-topics-adoption.md)） | AZ をまたぐ複製（$0.04）が消える | 遅延、本家の実装待ち |
 | 読み取りのネットワークを利用者に渡す（価格） | 原価は変わらない | PM の判断 |
-| EC2 の Savings Plans | ブローカーの行が約 $0.005 下がる | 1 年の約定 |
+| EC2 の Savings Plans | ブローカーの行が約 $0.003 下がる（u = 40%） | 1 年の約定 |
 
 ## 9. コントローラー
 
@@ -192,11 +192,11 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 | 手段 | 効果 | 確かめること |
 | --- | --- | --- |
 | ブローカーあたりの複製の上限を 8,000 に上げる | 台数が半分（75）。1 GB あたり約 $0.13 | ADR-0017 の値の見直し。流量の少ない複製が多いときの、ブローカーの起動・回復の時間（[ADR-0011](../decisions/0011-log-recovery-and-broker-replacement.md) の 5 分）、ヒープ、mmap（11 節の T2） |
-| パーティションに価格を付ける（**既定案として採った**。10.2 節） | パーティションで決まる台数の原価を回収する。利用者がパーティションを減らす動機 | 単価と含む数は PM が E11 で確定（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)） |
+| パーティションに価格を付ける（**既定案として採った**。10.2・10.3 節） | パーティションで決まる台数の原価を回収する。利用者がパーティションを減らす動機 | 単価と含む数は PM が E11 で確定（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)） |
 | Basic の CU のパーティション（100）を下げる | Basic の台数が減る | Confluent の Basic は 30（[multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 2.3 節） |
 | README の S1 のパーティションの目標（20 万）を見直す | — | PM と、S1 の利用者の想定 |
 
-- MSK は、流量の少ないパーティションが多いときに、試験で確かめれば 1 台に多くを詰めてよいとする（[MSK best practices](https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html)）。本家の KRaft での上限は未検証。
+- MSK は、流量の少ないパーティションが多いときに、試験で確かめれば 1 台に多くを詰めてよいとする（[MSK best practices](https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html)）。本家の KRaft での上限は未検証（E1 の `load-test-t1-t2` の T2 で測る）。
 
 ### 10.2 パーティションの原価とパーティション-時
 
@@ -209,8 +209,25 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 
 - 価格の形（[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)。既定案）：論理クラスタの時間ごとに、`1 CU あたりの含む数 × max(時間の CU, 1)` を超えたパーティションを、パーティション-時で課金する。含む数の初期値は Standard 100、Basic 20。
 - スループットで決まるブローカー（W = 80、3.2 CU）は 1,333 のパーティションを持てるので、含む数（3.2 CU × 100 ＝ 320）は台数を増やさない。含む数を超えた分だけが、パーティションのための台数を生む。
-- S1 の目安（仮定：Standard の論理クラスタ 400・平均 2 CU・12 万のパーティション、Basic 600・平均 1 CU・8 万のパーティション）：含む数は Standard 8 万・Basic 1.2 万で、超える分は約 10.8 万。原価の単価のままのパーティション-時の収入は月に約 $85,000 で、パーティションのための台数の原価（約 $135,000）に足りない。単価を原価の 1.6 倍以上にするか、含む数を下げる。値は PM が E11 で決める。
-- 本家の旧来の Basic・Standard は、クラスタに含む数（Basic 10、Standard 500）を超えたパーティションに課金していた。今の eCKU の形は直接は課金しない（[Billing dimensions](https://docs.confluent.io/cloud/current/billing/billing-dimensions.html)、2026-09-27 に確認。旧来の単価は未検証）。
+- S1 の目安（仮定：Standard の論理クラスタ 400・平均 2 CU・12 万のパーティション、Basic 600・平均 1 CU・8 万のパーティション）：含む数は Standard 8 万・Basic 1.2 万で、超える分は Standard 4 万・Basic 6.8 万（計 10.8 万）。
+
+### 10.3 パーティション-時の定価（既定案、2026-09-27）
+
+原価の単価のままでは、パーティションのための台数の原価を回収できない。定価を原価の 1.6 倍以上にする。
+
+| 項目 | Standard | Basic | 計 |
+| --- | --- | --- | --- |
+| 含む数を超えるパーティション | 40,000 | 68,000 | 108,000 |
+| 原価の単価での月の収入（× 730 時間） | 40,000 × $0.0012 × 730 ＝ $35,040 | 68,000 × $0.0010 × 730 ＝ $49,640 | $84,680 |
+| 回収したい原価 | | | $135,000（10.1 節の約 123 台） |
+| 必要な倍率 | | | $135,000 ÷ $84,680 ＝ 1.59 → **1.6 倍以上** |
+| 定価の下限（原価 × 1.6） | $0.00192 | $0.00160 | 収入 $135,488 |
+| **定価の既定案（円）** | **0.32 円** | **0.27 円** | |
+| 1 ドル 150 円での収入 | 40,000 × 0.32 × 730 ＝ 934.4 万円（$62,293） | 68,000 × 0.27 × 730 ＝ 1,340.3 万円（$89,352） | 2,274.7 万円（$151,645。原価の単価の約 1.8 倍） |
+
+- 円の定価は、原価の 1.6 倍を 1 ドル 150 円で円にし、切り上げて丸めた。1 ドルが約 168 円（2,274.7 万円 ÷ $135,000）を超えると回収が足りなくなるので、E11 の `price-books-and-rating` で、価格の版を改めるときの目安にする。
+- 比べる値：本家の旧来の Standard は 500 を超えた分に $0.0015/パーティション-時、Basic は 10 を超えた分に $0.004/パーティション-時だった（[2022-06 の価格のページの写し](http://web.archive.org/web/20220601000000/https://www.confluent.io/confluent-cloud/pricing/)、2026-09-27 に確認）。今の eCKU の形は直接は課金しない（[Billing dimensions](https://docs.confluent.io/cloud/current/billing/billing-dimensions.html)、2026-09-27 に確認）。既定案の Standard（1 ドル 150 円で約 $0.0021）は本家の旧来より高く、Basic（約 $0.0018）は低い。含む数は、本家がクラスタごとの固定（500・10）、本システムが CU に比例（100・20）で、形が違う。
+- **PM の確認事項**：定価（Standard 0.32 円・Basic 0.27 円のパーティション-時）と含む数（Standard 100・Basic 20）。含む数を下げれば、定価の倍率を下げられる。
 
 ## 11. 負荷試験の計画
 
@@ -243,7 +260,7 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 - **EBS**：設計点の W と 7 時間で容量、型の EBS の基準まででスループット。
 - **ローカルの保持**：6 時間のまま。T11 の結果で見直す。
 - **NFR-010**：NLB の処理のバイトを原価に含め、設計点で $0.11 以下にする。$0.08 は S2 の目標（PM・Dev の確認待ち）。
-- **パーティション**：S1 の目標（20 万）は変えず、台数はパーティションで決まる前提にする。CU に含む数（Standard 100、Basic 20）を超えた分をパーティション-時で課金する（PM・Dev の確認待ち）。
+- **パーティション**：S1 の目標（20 万）は変えず、台数はパーティションで決まる前提にする。CU に含む数（Standard 100、Basic 20）を超えた分をパーティション-時で課金する。定価は原価の 1.6 倍以上（Standard 0.32 円、Basic 0.27 円。10.3 節）にする（PM・Dev の確認待ち）。
 
 ### 持ち越し
 
@@ -251,10 +268,9 @@ Standard のトピック（読み取り 3 倍、保持 7 日）で、書き込�
 | --- | --- |
 | CPU（TLS、パッチ、要求の数）が W = 80 で 60% 未満か | T1（E1） |
 | ブローカーあたりの複製の上限を 8,000 以上にできるか | T2（E1）。ADR-0017 を改める |
-| パーティション-時の単価と、CU に含む数 | PM（E11。10.2 節の原価の目安で） |
+| パーティション-時の単価と、CU に含む数 | PM の確認（E11 の `price-books-and-rating`。10.3 節の既定案：原価の 1.6 倍以上、Standard 0.32 円・Basic 0.27 円） |
 | NLB を外す経路に替えるか（S2 の $0.08 の目標のため） | 流量が増えたとき（[ADR-0044](../decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md) の X の再評価、[infrastructure.md](infrastructure.md) の 10 節） |
 | `segment.ms` の許可の下限（10 分）の PUT の費用 | E9 の実測で。protocol-and-compatibility の許可リストと一緒に |
-| c8g の 2xlarge の基準の帯域（m8g と同じと見た） | E1 で `describe-instance-types` で確かめる |
 | 平均の使用率 u の実際の値 | GA の後の 3 か月の実測 |
 
 ## 13. quality.md・runbooks・data-model への項目

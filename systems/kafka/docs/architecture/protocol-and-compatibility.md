@@ -19,7 +19,7 @@ Kafka のワイヤープロトコル、ApiVersions による版の交渉、テ�
 | --- | --- | --- |
 | 版の交渉 | クライアントは接続ごとに ApiVersions を送り、両者が対応する最大の版を使う | [Protocol Guide](https://kafka.apache.org/43/design/protocol/) |
 | クライアントが先を行くとき | ApiVersions の版をブローカーが知らなければ（2.4.0 以降のブローカー）、v0 の応答で `UNSUPPORTED_VERSION` と、ブローカーが対応する ApiVersions の版を返す | 同上 |
-| クライアントの名前と版 | ApiVersions の要求に `client_software_name`・`client_software_version` を載せる（KIP-511） | 同上。フィールドの詳細は未検証 |
+| クライアントの名前と版 | ApiVersions の要求に `client_software_name`・`client_software_version` を載せる（KIP-511） | 同上。ApiVersions の v3 以上の `ClientSoftwareName`・`ClientSoftwareVersion`（[ApiVersionsRequest.json](https://github.com/apache/kafka/blob/4.3/clients/src/main/resources/common/message/ApiVersionsRequest.json)、2026-09-27 に確認） |
 | 最小のクライアント | 4.0 で、2.1 より古いプロトコルの版を取り除いた（KIP-896）。5.0 からは、主版ごとに機械的に古い版を落とす方針の KIP を別に出す予定 | [KIP-896](https://cwiki.apache.org/confluence/display/KAFKA/KIP-896%3A+Remove+old+client+protocol+API+versions+in+Kafka+4.0) |
 | 従来のリバランスのプロトコル | KafkaConsumer では、4.3 で新しいプロトコルを勧める記録を出し、5.0 で既定を新しいプロトコルにし、6.0 で従来の対応をクライアントから外す。ブローカーは従来のプロトコルを受け続ける | [KIP-1274](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1274%3A+Deprecate+and+remove+support+for+Classic+rebalance+protocol+in+KafkaConsumer) |
 | 共有のグループ・Streams のグループ | KIP-932 は 4.2 で本番向け。KIP-1071（Streams のリバランスのプロトコル）は 4.2 で機能を絞って GA | [4.2.0 の発表](https://kafka.apache.org/blog/2026/02/17/apache-kafka-4.2.0-release-announcement/) |
@@ -67,7 +67,7 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 | InitProducerId（22）、AddPartitionsToTxn（24）、AddOffsetsToTxn（25）、EndTxn（26）、TxnOffsetCommit（28） | 通す | `transactional.id` の上限は transactions-and-idempotence の領域 |
 | OffsetForLeaderEpoch（23） | 通す | クライアントが切り詰めの検出に使う |
 | WriteTxnMarkers（27） | 拒否 | ブローカーの間の API。本家は `CLUSTER_ACTION` の権限を求めるので、テナントには `CLUSTER_AUTHORIZATION_FAILED` になる |
-| DescribeAcls（29）、CreateAcls（30）、DeleteAcls（31） | 絞る | 本家は CreateAcls・DeleteAcls に CLUSTER の ALTER を、DescribeAcls に CLUSTER の DESCRIBE を求める。Authorizer は、テナントの管理の主体に、論理クラスタの範囲の中だけでこれを与える。ACL の資源の種類は TOPIC・GROUP・TRANSACTIONAL_ID だけを通し、他の種類（CLUSTER・DELEGATION_TOKEN・USER）の要素には `CLUSTER_AUTHORIZATION_FAILED` を返す（要素ごとのエラーの形が本家と合うかは未検証。差分テストで確かめる） |
+| DescribeAcls（29）、CreateAcls（30）、DeleteAcls（31） | 絞る | 本家は CreateAcls・DeleteAcls に CLUSTER の ALTER を、DescribeAcls に CLUSTER の DESCRIBE を求める。Authorizer は、テナントの管理の主体に、論理クラスタの範囲の中だけでこれを与える。ACL の資源の種類は TOPIC・GROUP・TRANSACTIONAL_ID だけを通し、他の種類（CLUSTER・DELEGATION_TOKEN・USER）の要素には `CLUSTER_AUTHORIZATION_FAILED` を返す（要素ごとのエラーの形が本家と合うかは未検証。E2 の `differential-test-harness` で確かめる） |
 | DescribeConfigs（32） | 絞る | TOPIC と GROUP の資源だけ。BROKER・BROKER_LOGGER の資源は `CLUSTER_AUTHORIZATION_FAILED`。固定した設定（`min.insync.replicas` など）は値を見せる |
 | AlterConfigs（33）、IncrementalAlterConfigs（44） | 絞る | TOPIC は 5 節の表、GROUP は consumer-groups の領域の表。他の資源の種類は `CLUSTER_AUTHORIZATION_FAILED` |
 | AlterReplicaLogDirs（34）、DescribeLogDirs（35） | 拒否 | ブローカーのディスクの情報。`CLUSTER_AUTHORIZATION_FAILED` |
@@ -106,11 +106,11 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 | `replication.factor`（作成時の引数） | 固定 | `-1`（既定を使う）か `3` だけ。他は `INVALID_REPLICATION_FACTOR` | 3 |
 | `min.insync.replicas` | 固定 | `2` の指定だけを受け付ける（冪等な指定を通すため） | ※ 2 |
 | `unclean.leader.election.enable` | 固定 | `false` の指定だけを受け付ける | `false` |
-| `remote.storage.enable`、`local.retention.ms`、`local.retention.bytes`、`remote.log.copy.disable`、`remote.log.delete.on.disable` | 運用だけ | テナントの指定は `POLICY_VIOLATION` | 階層型の保存の領域が決める |
+| `remote.storage.enable`、`local.retention.ms`、`local.retention.bytes`、`remote.log.copy.disable`、`remote.log.delete.on.disable` | 運用だけ | テナントの指定は `POLICY_VIOLATION`。ただし `local.retention.ms` は、`min(retention.ms, 6 時間)` と同じ値なら通す（名前空間のパッチ P1 が足す値。[tiered-and-object-storage.md](tiered-and-object-storage.md) の 12 節） | 階層型の保存の領域が決める |
 | `flush.messages`、`flush.ms`、`preallocate`、`index.interval.bytes`、`segment.index.bytes`、`segment.jitter.ms`、`file.delete.delay.ms`、`min.cleanable.dirty.ratio`、`leader.replication.throttled.replicas`、`follower.replication.throttled.replicas` | 運用だけ | 同上 | 本家と同じか、[broker-and-log-storage.md](broker-and-log-storage.md) の値 |
 
 - `segment.bytes`・`segment.ms` の既定と範囲の理由は [broker-and-log-storage.md](broker-and-log-storage.md) の 3 節。
-- Kafka Streams は内部のトピックを `replication.factor=-1` で作る（3.0 以降の既定。未検証）。`-1` を通すので、そのまま動く。
+- Kafka Streams は内部のトピックを `replication.factor=-1` で作る（3.0 以降の既定。4.3 の `StreamsConfig` の既定も -1。[StreamsConfig.java](https://github.com/apache/kafka/blob/4.3/streams/src/main/java/org/apache/kafka/streams/StreamsConfig.java)、2026-09-27 に確認）。`-1` を通すので、そのまま動く。
 - `cleanup.policy=compact` のトピックは階層型の保存に載らない（本家の制約。[Tiered Storage](https://kafka.apache.org/43/operations/tiered-storage/)）。ローカルのディスクの量の上限を multi-tenancy-and-quotas の領域で掛ける（[broker-and-log-storage.md](broker-and-log-storage.md) の 4.3 節）。
 
 ## 6. クライアントの行列
@@ -120,7 +120,7 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 | クライアント | 行列の版（2026-09-27） | 確かめたこと |
 | --- | --- | --- |
 | Java のクライアントと Kafka Streams | 4.3.1、4.2 の最新、3.9 の最新、2.1.1 | 4.4.0 は RC。出たら「最新」を置き換える |
-| librdkafka | v2.15.1（2026-09-09）、1 年前の版（2025-09 ごろの v2.x。版の番号は未検証） | `confluentinc/librdkafka` のリリース |
+| librdkafka | v2.15.1（2026-09-09）、1 年前の版 v2.11.1（2025-08-18。2025-09 の時点の最新。次の v2.12.0 は 2025-10-08。2026-09-27 に確認） | `confluentinc/librdkafka` のリリース |
 | franz-go | v1.22.0（タグ） | `twmb/franz-go` のタグ。最終のコミットは 2026-09-25 |
 | Sarama | v1.61.0（2026-09-22） | `IBM/sarama` のリリース |
 | Node.js | confluent-kafka-javascript v1.10.1（2026-09-10）を「対応」に、KafkaJS 2.2.4 を「凍結」に | KafkaJS の最後のリリースは 2.2.4（2023-02-27）、最後の push は 2024-08-02 |
@@ -180,7 +180,7 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 2. パッチを当て直し、パッチの行数の差を記録する（ADR-0001）。
 3. 差分テスト・行列・Jepsen の形のテストを通す。
 4. 本番のバイナリを、Basic の物理クラスタから順にローリングで更新する。
-5. 全ての物理クラスタでバイナリが揃ってから 7 日おき、`metadata.version` などのフィーチャーの版を上げる。フィーチャーの版を上げると戻せないものがあるため、戻せる期間を分けて持つ（未検証：4.3 の `metadata.version` の戻し方の条件を E12 で確かめる）。
+5. 全ての物理クラスタでバイナリが揃ってから 7 日おき、`metadata.version` などのフィーチャーの版を上げる。本家は、間にメタデータの変更がある `metadata.version` へは戻せないとし、4.3-IV0 は変更を含む（[Upgrading](https://kafka.apache.org/43/getting-started/upgrade/)、2026-09-27 に確認）。したがって、上げた後は戻せない前提にし、上げるまでの 7 日を戻せる期間にする。
 
 ### 8.3 古い版の扱い
 
@@ -207,7 +207,7 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 | 設定による耐久性の低下（`min.insync.replicas=1` など） | 5 節の固定の設定。ポリシーのテストを PR ごとに回す |
 | 他のテナントの資源の露出 | 名前空間のパッチ（ADR-0004）。差分テストの隣のテナントの確認（7.3 節） |
 | 認証の前の要求による資源の消費 | 認証の前に受けるのは ApiVersions と SASL の要求だけ（本家と同じ）。接続数の制限は SNI のプロキシで掛ける |
-| 巨大な要求・版の組み合わせによるブローカーの不具合 | `socket.request.max.bytes` は本家の既定（100 MiB。未検証）より下げるかを E2 で決める。差分テストの生成器に、境界の値と壊れた要求を入れる |
+| 巨大な要求・版の組み合わせによるブローカーの不具合 | `socket.request.max.bytes` は本家の既定（100 MiB。[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認）より下げるかを E2 で決める。差分テストの生成器に、境界の値と壊れた要求を入れる |
 | 差分テストの資料への利用者のデータの混入 | 本番の通信を記録しない（7.2 節） |
 
 プロトコルの振る舞いを変える PR は、ルートの規則どおり、行列と差分テストを通す（[AGENTS.md](../../AGENTS.md)）。
@@ -276,7 +276,6 @@ API ごとの扱いを、次の 4 つに分ける。表は開発リポジトリ�
 | `socket.request.max.bytes` を本家の既定から下げるか | E2 の負荷試験 |
 | KIP-714 のテレメトリーを受けて、テナントのメトリクスに使うか | metrics-and-billing の領域（E11） |
 | 5.0 の取り込み（従来のグループの既定の変更、古い版の削除の方針） | 5.0 の RC が出たとき、別の ADR |
-| `metadata.version` を上げた後に戻せる条件 | E12 で本家の文書と試験で確かめる |
 
 ## 15. quality.md・runbooks・data-model への項目
 

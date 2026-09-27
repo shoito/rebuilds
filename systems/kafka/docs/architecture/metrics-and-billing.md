@@ -34,8 +34,8 @@
 | 要求 | 100 回/秒 | 1,500 回/秒 |
 | 最大の eCKU | 50 | 10 |
 
-- 請求の次元は、eCKU、書き込み・読み取りの GB、保存の GB。パーティションには直接は課金しない（ただし eCKU の消費に効く）。2024-04-16 より前の旧来の Basic・Standard は、クラスタに含む数（Basic 10、Standard 500）を超えたパーティションに課金していた（旧来の単価は未検証）。1 時間ごとに積み上げ、1 時間未満は 1 時間とし、UTC で計算し、翌月の初めに請求書を出す（[Billing overview](https://docs.confluent.io/cloud/current/billing/overview.html)）。
-- 価格（[Pricing](https://www.confluent.io/confluent-cloud/pricing/)）：Basic は最初の eCKU が無料で、以降 $0.14/時、書き込み・読み取り $0.05/GB、保存 $0.08/GB-月。Standard は $0.75/eCKU-時、書き込み・読み取り $0.035〜0.050/GB、保存 $0.08/GB-月。価格は「複製の前」の量に対するもの。一方、Billing dimensions の文書は、保存を「複製の後の量」と書いている。どちらが正しいかは未検証。
+- 請求の次元は、eCKU、書き込み・読み取りの GB、保存の GB。パーティションには直接は課金しない（ただし eCKU の消費に効く）。2024-04-16 より前の旧来の Basic・Standard は、クラスタに含む数（Basic 10、Standard 500）を超えたパーティションに課金していた。単価は、Basic が 10 を超えた分に $0.004/パーティション-時、Standard が 500 を超えた分に $0.0015/パーティション-時（[2022-06 の価格のページの写し](http://web.archive.org/web/20220601000000/https://www.confluent.io/confluent-cloud/pricing/)、2026-09-27 に確認）。1 時間ごとに積み上げ、1 時間未満は 1 時間とし、UTC で計算し、翌月の初めに請求書を出す（[Billing overview](https://docs.confluent.io/cloud/current/billing/overview.html)）。
+- 価格（[Pricing](https://www.confluent.io/confluent-cloud/pricing/)）：Basic は最初の eCKU が無料で、以降 $0.14/時、書き込み・読み取り $0.05/GB、保存 $0.08/GB-月。Standard は $0.75/eCKU-時、書き込み・読み取り $0.035〜0.050/GB、保存 $0.08/GB-月。保存は「複製の後の量」で数える（複製 3 で、書いた量のおおむね 3 倍。[Billing dimensions](https://docs.confluent.io/cloud/current/billing/billing-dimensions.html)、2026-09-27 に確認）。価格のページの「複製の前」の注記は、Freight の表に付いたものと読める。本システムは保存を複製の前で数える（7.2 節）ので、比べるときは本家の保存の単価を 3 倍して読む。
 - 新しい利用者には $400 の無料のクレジットがある（Billing overview）。
 
 ### 2.2 メトリクスの API
@@ -45,7 +45,7 @@
 - 上限：IP ごとに毎分 300 回。`/export` は資源・主体ごとに毎時 160 回で、1 分に 1 回までの取得を勧める（同上）。
 - メトリクスの例：`received_bytes`、`sent_bytes`、`retained_bytes`、`partition_count`、`active_connection_count`、`request_count`、`consumer_lag_offsets`（同上）。
 - 使うには、管理の API キーと MetricsViewer のロールが要る（[Metrics API](https://docs.confluent.io/cloud/current/monitoring/metrics-api.html)）。
-- 保持の期間は、文書で確かめられなかった（未検証）。
+- 保持は 7 日。区間の上限は `PT1M` で 6 時間、`PT5M` で 1 日、`PT15M` で 4 日、`PT30M` で 7 日（[Metrics FAQ](https://docs.confluent.io/cloud/current/monitoring/monitor-faq.html)、2026-09-27 に確認）。
 
 ## 3. CU（容量の単位）
 
@@ -65,7 +65,7 @@ CU は、層ごとの「1 単位の容量」の組である。[multi-tenancy-and
 
 - Standard の 1 CU は、Confluent の Standard の eCKU と同じ値にした（2.1 節）。multi-tenancy-and-quotas の 6 節の Standard の列と一致する。
 - Basic は、multi-tenancy-and-quotas の 6 節で「固定」の上限（書き込み 25 MB/秒、読み取り 75 MB/秒、パーティション 500、接続 500、接続の試み 毎秒 50）を持つ。これを 5 つの Basic CU に分けた。上限（クォータ）は 5 CU で固定のまま、請求は使った分（1〜5 CU）にする。
-- Basic の要求の 1 CU（400 回/秒）は、multi-tenancy-and-quotas の Basic の要求の処理時間（100%）を、平均 0.5 ms の要求で割った 2,000 回/秒の 1/5 である。Confluent の Basic（100 回/秒）より多い。未検証（E7 の負荷試験で見直す）。
+- Basic の要求の 1 CU（400 回/秒）は、multi-tenancy-and-quotas の Basic の要求の処理時間（100%）を、平均 0.5 ms の要求で割った 2,000 回/秒の 1/5 である。Confluent の Basic（100 回/秒）より多い。未検証（E7 の `noisy-neighbor-suite` の負荷試験で見直す）。
 - **要求のクォータは処理時間（`request_percentage`）で掛け、説明と請求は「毎秒の要求の数」で行う。** 利用者に処理時間は見えにくいので、Confluent と同じく要求の数で示す（multi-tenancy-and-quotas の 12 節の持ち越しへの答え）。
 
 ### 3.2 1 時間の CU
@@ -78,7 +78,7 @@ CU は、層ごとの「1 単位の容量」の組である。[multi-tenancy-and
 ```
 
 - 1 時間の中の最大を請求する（Confluent と同じ）。
-- パーティションだけがある（トラフィックも接続もない）時間は 0 CU にする。開発で作って放っておいた論理クラスタに、容量の課金をし続けないため。Confluent のこの場合の扱いは文書で確かめられなかった（未検証）。
+- パーティションだけがある（トラフィックも接続もない）時間は 0 CU にする。開発で作って放っておいた論理クラスタに、容量の課金をし続けないため。Confluent は、パーティションが 1 つでもあれば最小の eCKU を課金し、パーティションもトピックもないときだけ 0 にする（[Billing dimensions](https://docs.confluent.io/cloud/current/billing/billing-dimensions.html)、2026-09-27 に確認）。本システムは、この時間の原価を保存と、含む数を超えたパーティション-時で回収する。
 - **パーティション**は、請求の CU から外し、CU に含む数を超えた分をパーティション-時で課金する（統合の工程の既定案。[ADR-0037](../decisions/0037-capacity-unit-definition.md)・[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md) の改定。PM・Dev の確認待ち）。1 CU あたりの含む数は Standard 100、Basic 20（初期値）。0 CU の時間も 1 CU 分は含む。パーティションで台数が決まるブローカーの原価を回収するため（[capacity.md](capacity.md) の 10 節）。
 - 内部の主体の要求（エージェント、合成の監視、複製）は数えない。throttle された要求は数える（受け付けた要求だから）。
 - CU は、テナントの上限（`max_cu`）を超えない。クォータで絞られるので、使用量が上限を超えることはほぼないが、分の平均の揺れで超えたら上限で切る。
@@ -123,7 +123,7 @@ CU は、層ごとの「1 単位の容量」の組である。[multi-tenancy-and
 ### 4.2 保持の量
 
 - 論理のログの大きさ ＝ S3 の有効なセグメントの大きさの合計 ＋ ローカルのうち S3 に上がっていない部分（リーダーの複製だけ）。複製の前の 1 つ分の量にする。
-- S3 の分は、RLMM のスナップショット（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.5 節）と、包む層のテナントごとの計数（同 5.1 節）から出す。ローカルの分は、リーダーのログの大きさから、S3 に上がった分を引く。精度は E4 で確かめる（未検証）。
+- S3 の分は、RLMM のスナップショット（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.5 節）と、包む層のテナントごとの計数（同 5.1 節）から出す。ローカルの分は、リーダーのログの大きさから、S3 に上がった分を引く。精度は E11 の `tiered-usage-metering` で確かめる（未検証）。
 - 5 分ごとの値の、1 時間の平均を「GB-時」にする。月の「GB-月」は、GB-時の合計 ÷ その月の時間の数。
 - 圧縮のトピックは、ローカルの大きさ（リーダー）をそのまま使う（S3 に上げないため。tiered-and-object-storage の 7 節）。
 
@@ -201,7 +201,7 @@ POST /v1/metrics/query
 | `client_connections` | 数 | `client_software_name`、`client_software_version` |
 
 - メトリクスの名前は Confluent に寄せる（`received_bytes` など）。名前に本家の名前やドメイン（`io.confluent...`）を含めない。
-- 粒度：`PT1M`（区間は 6 時間まで）、`PT5M`（1 日まで）、`PT1H`（31 日まで）、`P1D`。保持は 1 分の粒度で 14 日、1 時間の粒度で 13 か月（AMP の保持の設定と、1 時間への間引き。間引きの方式は E11 で決める。未検証）。
+- 粒度：`PT1M`（区間は 6 時間まで）、`PT5M`（1 日まで）、`PT1H`（31 日まで）、`P1D`。保持は 1 分の粒度で 14 日、1 時間の粒度で 13 か月。AMP には間引きの機能がなく、保持はワークスペースごとに 1 つ（既定 150 日、1〜1,095 日。1 回の問い合わせの区間は 95 日まで）である（[AMP の保持](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP-workspace-configuration.html)、[AMP quotas](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP_quotas.html)、2026-09-27 に確認）。そこで、テナントの AMP の保持を 14 日にし、1 時間ごとのジョブが直前の 1 時間を `PT1H` で集計して S3 の `metrics/hourly/`（Parquet）に置く。14 日より古い `PT1H`・`P1D` の問い合わせは、そこから返す（既定案。E11 の `metrics-api`）。
 - データは、発生から 3 分以内（p99）に問い合わせられる（Confluent と同じ目標）。
 
 ### 6.3 認可と上限
@@ -225,7 +225,7 @@ POST /v1/metrics/query
 | 読み取り | GB | 同上 | |
 | 保存 | GB-月（複製の前、S3 とローカルの合計） | 同上 | |
 | 大阪への写し | GB（写した量） | Standard | 論理クラスタごとに選ぶ。既定は無効（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.6 節） |
-| パーティション | パーティション-時（CU に含む数を超えた分） | Basic・Standard で別の単価 | 3.2 節。原価の目安は Standard 約 $0.0012、Basic 約 $0.0010 の 1 パーティション-時（[capacity.md](capacity.md) の 10.2 節） |
+| パーティション | パーティション-時（CU に含む数を超えた分） | Basic・Standard で別の単価 | 3.2 節。原価の目安は Standard 約 $0.0012、Basic 約 $0.0010 の 1 パーティション-時。定価は原価の 1.6 倍以上で、既定案は Standard 0.32 円・Basic 0.27 円（[capacity.md](capacity.md) の 10.2・10.3 節。PM の確認事項） |
 | ディスクレスのトピック（S2） | 別の単価 | — | tiered-and-object-storage の 8 節 |
 
 - 単価は円で定める。ドルの価格を為替で換算しない（為替で毎月の請求が揺れないように）。
@@ -254,7 +254,7 @@ rated_usage(org, lc, 時間, 行) = 数量 × 単価（numeric(20,6) の円）
 | 支払いの方法がない組織 | Basic の論理クラスタ 1 つ、`max_cu = 1`、無料の枠の中だけ | 7.4.1 |
 
 - Confluent の Basic は最初の eCKU が無料だが、書き込み・読み取り・保存には課金する（2.1 節）。本システムは、支払いの方法を登録せずに試せるよう、小さな量の枠を足す（SC-3 の「登録から 5 分」のため）。
-- 値は PM の承認で確定する（未検証）。
+- 値は PM の承認で確定する（E11 の `free-tier`）。
 
 #### 7.4.1 支払いの方法がない組織
 
@@ -383,9 +383,10 @@ invoice_lines
 ### 決定（2026-09-27、既定案）
 
 - **パーティションだけの時間**：0 CU（3.2 節）。放置された開発の論理クラスタに容量の課金をし続けない。保存と、含む数（1 CU 分）を超えたパーティションには課金する。
-- **パーティションの価格**：CU に含む数（Standard 100、Basic 20）を超えた分をパーティション-時で課金する（統合の工程の既定案。PM・Dev の確認待ち。単価は PM が E11 で決める）。
+- **パーティションの価格**：CU に含む数（Standard 100、Basic 20）を超えた分をパーティション-時で課金する（統合の工程の既定案。PM・Dev の確認待ち）。定価は原価の 1.6 倍以上とし、既定案を Standard 0.32 円・Basic 0.27 円のパーティション-時にする（2026-09-27 の検証の工程。[capacity.md](capacity.md) の 10.3 節の計算。PM の確認事項）。
 - **Basic の CU**：3.1 節の値。E7 の負荷試験で見直す。
 - **無料の枠**：7.4 節の値。PM の承認で確定する。
+- **メトリクスの保持**（2026-09-27 の検証で追加）：テナントの AMP は 14 日。1 時間の粒度の 13 か月は、S3 の `metrics/hourly/` に集計して置く（6.2 節）。AMP に間引きの機能がないため。
 - **時刻**：JST。月の境界を、日本の利用者の会計の月に合わせる。
 - **停止の間**：CU は、produce を絞るので実際の使用に応じて小さくなる（課金は使った分のまま）。保存は課金を続ける。削除までの 60 日の保存の費用は、法務・PM の確認で免除するかを決める。
 - **大阪への写し**：既定は無効。有効にした論理クラスタだけ、写した GB に課金する（tiered-and-object-storage の 12 節の持ち越しへの答え）。単価は PM が、東京から大阪への転送の原価（$0.09/GB。tiered-and-object-storage の 6.6 節）を元に決める。
@@ -394,8 +395,6 @@ invoice_lines
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Confluent の保存の課金は複製の前か後か | 公式の文書の食い違い（2.1 節）。参考の情報なので、本システムの決定（複製の前）には影響しない |
-| AMP の保持と、1 時間の粒度への間引きの方式 | E11 |
 | 決済の代行の事業者 | E11。カードと銀行振込（請求書払い）の両方に対応するもの |
 | 適格請求書の登録番号、訂正の手続き、値引きの扱い | 経理の確認待ち |
 | 海外の法人への消費税の扱い | 法務・税務の確認待ち |
@@ -425,6 +424,7 @@ invoice_lines
 | --- | --- |
 | `__<brand>_usage`（データ面の内部のトピック） | 4.1 節の値。保持 3 日 |
 | S3 `usage/raw/`（Parquet） | 分×論理クラスタの使用量。請求の根拠 |
+| S3 `metrics/hourly/`（Parquet） | テナントのメトリクスの 1 時間の集計。保持 13 か月（6.2 節） |
 | `usage_hourly`（制御面） | `logical_cluster_id`、時間（JST）、層、`cu`、`ingress_bytes`、`egress_bytes`、`storage_gb_hours`、`dr_copy_bytes`、`partitions_max`、`partition_hours`、確定の時刻、`reconciliation_status` |
 | `price_books` | 版、効力の開始日、層、行の種類、単価（円、小数） |
 | `rated_usage` | 組織、論理クラスタ、時間、行の種類、数量、単価、金額（numeric） |

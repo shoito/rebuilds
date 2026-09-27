@@ -29,7 +29,7 @@ date: 2026-09-27
 - **CLI の認証**：人はデバイスの認可のフロー（トークンは OS のキーチェーン）、CI は環境変数の管理のキー。秘密をファイルに書かない。
 - **CLI の produce・consume**：franz-go を使う。
 - **プロバイダーの資源**：クラスタ、トピック（設定を含む）、サービスアカウント、API キー、ACL、ロールの付与と、データソース。すべてに `import`。トピックのパーティションは増やすだけで、減らす計画はエラーにする（置き換えでデータを消さない）。
-- **秘密**：`<brand>_api_key` の秘密は状態に `sensitive` で入る。秘密を状態に残さない ephemeral な資源を別に用意する（Terraform の対応の版は未検証）。
+- **秘密**：`<brand>_api_key` の秘密は状態に `sensitive` で入る。秘密を状態に残さない ephemeral な資源を別に用意する（ephemeral な資源は Terraform 1.10 から、write-only の引数は 1.11 から。[Terraform 1.10](https://www.hashicorp.com/en/blog/terraform-1-10-improves-handling-secrets-in-state-with-ephemeral-values)、[Terraform 1.11](https://www.hashicorp.com/en/blog/terraform-1-11-ephemeral-values-managed-resources-write-only-arguments)、2026-09-27 に確認）。
 - **配布**：CLI は GitHub の Releases・Homebrew・`.deb`・`.rpm` で、cosign の署名と SBOM、macOS の公証。プロバイダーは Terraform Registry に GPG の署名で公開する。
 
 2 を選ばない理由：Node.js の実行環境を利用者に求め、1 つのバイナリで配れない。SDK が 2 つになる。

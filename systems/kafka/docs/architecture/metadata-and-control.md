@@ -81,8 +81,8 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 
 ### 3.4 クォーラムを失ったとき
 
-- 過半数のコントローラーを同時に失うと、メタデータは変えられない。既存のリーダーでの produce と fetch は続く見込みだが、リーダーの移動、ISR の変更、トピックの作成は止まる（ブローカーの振る舞いの詳細は未検証。E3 で確かめる）。
-- 過半数のボリュームを失うと、KRaft の正本を失う。本家に、スナップショットからのクォーラムの作り直しの正式な手順はない（未検証）。そこで次を持つ。
+- 過半数のコントローラーを同時に失うと、メタデータは変えられない。既存のリーダーでの produce と fetch は続く見込みだが、リーダーの移動、ISR の変更、トピックの作成は止まる（ブローカーの振る舞いの詳細は未検証。E3 の `fault-injection-matrix` で確かめる。10 節）。
+- 過半数のボリュームを失うと、KRaft の正本を失う。本家に、スナップショットからのクォーラムの作り直しの正式な手順はない（4.3 の [KRaft](https://kafka.apache.org/43/operations/kraft/) の運用の文書は、過半数が生きていることを可用性の条件とし、失った後の手順を載せていない。2026-09-27 に確認）。そこで次を持つ。
   - コントローラーのボリュームは EBS にし、ノードの喪失ではデータを失わない。
   - 最新のスナップショットを 1 時間ごとに S3 に写す（暗号化。調査と、最後の手段の復旧の材料）。
   - 復旧の手順は runbook に書き、検証の環境で年 2 回試す。
@@ -107,7 +107,7 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 | 複製の数、リーダーの数の偏り | 最善の努力の目標 |
 
 - Kora と同じく、重要な指標（ディスク、ネットワーク）の偏りは再均衡を引き起こし、他は最善の努力にする（論文の 4.3.1 節）。
-- 計画は、Cruise Control（Apache License 2.0）を候補にする。Cruise Control の本体の 4.x への対応は途中で（4.3.1 へ上げる PR がある）、KRaft の 4.3 で使えるかは未検証。E9 の PoC で確かめ、使えなければ、データ面のエージェントに上の目標だけの小さな計画器を作る。
+- 計画は、Cruise Control（Apache License 2.0）を候補にする。本体の最新の版（3.0.4、2026-07）は本家 3.5 に対して作られ、`main` は本家 4.3.1 に上げてある（[cruise-control-for-kafka/cruise-control](https://github.com/cruise-control-for-kafka/cruise-control) の `gradle.properties`）。一方、Strimzi 1.2 は Cruise Control 2.5.146 を Kafka のイメージに同梱し、本家 4.3.1 の KRaft の物理クラスタで KafkaRebalance を支える（[Strimzi の文書](https://strimzi.io/docs/operators/latest/deploying.html) の 21 節、[kafka-versions.yaml](https://github.com/strimzi/strimzi-kafka-operator/blob/main/kafka-versions.yaml)。いずれも 2026-09-27 に確認）。4.3 で動くこと自体は確かめられたので、残るのは上の目標（同じ AZ、1 つずつ、テナントの偏り）を Cruise Control の目標で表せるか。E9 の `rebalance-planner` で確かめ、表せなければ、データ面のエージェントに上の目標だけの小さな計画器を作る。
 
 ### 4.3 再配置の実行
 
@@ -171,7 +171,7 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 | ACL（AccessControlEntryRecord） | 約 150 バイト | ACL の数 |
 | クォータ、ブローカーの登録、フィーチャー、プロデューサーの ID の範囲 | 小さい | 少ない |
 
-- 大きさは本家のスキーマから見積もった値で、未検証。E1 の PoC で、`kafka-dump-log.sh` でスナップショットを実測する。
+- 大きさは本家のスキーマから見積もった値で、未検証。E1 の `metadata-scale-poc` で、`kafka-dump-log.sh --cluster-metadata-decoder` でスナップショットを実測する。
 - 見積もり：10 万のパーティション・3 万のトピック・10 万の ACL で、スナップショットは約 35 MB。100 万のパーティションで約 200 MB。
 
 ### 6.2 上限（S1）
@@ -179,7 +179,7 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 | 項目 | 上限（仮） | 理由 |
 | --- | --- | --- |
 | 1 つの物理クラスタのパーティション（複製の前） | 100,000 | コントローラーの切り替えとブローカーの起動の時間を抑える。S1 の全体（20 万、10 物理クラスタ以下）に余裕を持つ |
-| 1 つのブローカーの複製 | 4,000 | ファイルと mmap（[broker-and-log-storage.md](broker-and-log-storage.md) の 3.3 節）、ログの回復の時間、フォロワーの取得の数。未検証 |
+| 1 つのブローカーの複製 | 4,000 | ファイルと mmap（[broker-and-log-storage.md](broker-and-log-storage.md) の 3.3 節）、ログの回復の時間、フォロワーの取得の数。未検証（E1 の `load-test-t1-t2` の T2） |
 | 1 つの論理クラスタの ACL | Basic 1,000、Standard 10,000 | メタデータの膨張を抑える。値は [ADR-0029](../decisions/0029-tenant-scoped-acls-and-rbac.md) と [multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 6 節。物理クラスタの ACL の合計と StandardAuthorizer の評価の性能は E8 の負荷試験で測る |
 | パーティションの作成・削除の頻度 | テナントごとの制御の変更のクォータ（本家の `controller_mutation_rate`）で抑える | 値は multi-tenancy-and-quotas の領域 |
 
@@ -196,9 +196,9 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 ### 6.4 監視
 
 - 活動中のコントローラーの数（物理クラスタで常に 1）、リーダーの交代の回数。
-- 投票者と観測者の遅れ（`kafka-metadata-quorum.sh` と同じ情報のメタデータのメトリクス。名前は未検証）。
+- 投票者と観測者の遅れ：`kafka.server:type=raft-metrics` の `high-watermark` と `log-end-offset` の差、ブローカーの `kafka.server:type=broker-metadata-metrics` の `last-applied-record-lag-ms`（[Monitoring](https://kafka.apache.org/43/operations/monitoring/)、2026-09-27 に確認）。
 - 最後に適用した記録のオフセットの、コントローラーとブローカーの差。
-- メタデータの適用の失敗の件数（本家の `MetadataErrorCount` に当たるもの。名前は未検証）。
+- メタデータの適用の失敗の件数：コントローラーの `kafka.controller:type=KafkaController,name=MetadataErrorCount`、ブローカーの `kafka.server:type=broker-metadata-metrics` の `metadata-load-error-count`・`metadata-apply-error-count`（[Monitoring](https://kafka.apache.org/43/operations/monitoring/)、2026-09-27 に確認）。
 - スナップショットの大きさと、最後のスナップショットからの時間。
 - 再配置中のパーティションの数と最古の経過時間、cordon のブローカーの数と期間。
 
@@ -242,7 +242,7 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 - コントローラーのリーダーの強制終了、一時停止、分断（[replication-and-durability.md](replication-and-durability.md) の 8.3 節の一部）。
 - 3.3 節の入れ替えの各段で、コントローラーやブローカーを止める。
 - 再配置の途中で、足した複製・外す複製・リーダーのブローカーを止める。成功を返した書き込みを失わない。
-- 過半数のコントローラーを止め、データの経路がどこまで続くかを測る（3.4 節の未検証の点）。
+- 過半数のコントローラーを止め、データの経路がどこまで続くかを測る（3.4 節の未検証の点。E3 の `fault-injection-matrix`）。
 
 ### 9.3 性能の測定
 
@@ -295,7 +295,7 @@ KIP-853 の「一度に 1 つ」の制約の下で、足してから外す。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Cruise Control が 4.3 の KRaft で使えるか | E9 の PoC |
+| Cruise Control の目標で 4.2 節の目標を表せるか（4.3 の KRaft で動くことは Strimzi の同梱で確かめた） | E9 の `rebalance-planner` |
 | 過半数のコントローラーを失ったときのデータの経路の振る舞いと、スナップショットからの復旧の手順 | E3 の障害注入と、本家の文書・開発者への確認 |
 | S1 から 5 台にするか（3 台の間の、入れ替えと故障の重なりの危険） | E3 の運用の実績で。コントローラーの費用は小さいので、前倒しもありうる |
 | セル（ブローカーの部分集合）への閉じ込めと、再均衡の目標の関係 | S2。multi-tenancy-and-quotas の領域 |

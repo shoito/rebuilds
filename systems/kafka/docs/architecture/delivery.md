@@ -99,7 +99,7 @@ FROM <Strimzi の同じ版の Kafka のイメージ>@sha256:…
 ```
 
 - 各パッチの先頭に、理由、関連する KIP、ADR、パッチの番号（P1〜P7。[multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 4.5 節）を書く。
-- Strimzi の Kafka のイメージの Java の版と、本家のビルドの Java の版が合うかは未検証（E1）。合わなければ、Strimzi の基のイメージの作り方（公開の Dockerfile）に倣って、自前で基のイメージを作る。
+- Strimzi の Kafka のイメージは UBI 9 に Java 21（`java-21-openjdk-headless`）を入れた基のイメージの上に作られる（[docker-images/base/Dockerfile](https://github.com/strimzi/strimzi-kafka-operator/blob/main/docker-images/base/Dockerfile)、2026-09-27 に確認）。本システムの拡張とパッチも Java 21 でビルドするので合う。Strimzi が基の Java を上げたときは、`broker-build-pipeline` の CI で版の食い違いを止める。
 - パッチなしの参照のブローカー（差分テストの参照側）も、同じ `upstream.lock` から同時にビルドする。
 
 ### 4.2 署名と来歴
@@ -170,8 +170,8 @@ FROM <Strimzi の同じ版の Kafka のイメージ>@sha256:…
 
 - 関門を 30 分満たせなければ止めて人を呼ぶ。自動で戻さない。
 - Strimzi の KafkaRoller は、再起動でパーティションが `min.insync.replicas` を下回るときはロールしないが、ちょうど `min.insync.replicas`（ISR 2）になるロールは許す（[strimzi-kafka-operator#13031](https://github.com/strimzi/strimzi-kafka-operator/issues/13031)、2026-09-27 に確認）。G1 は、全ての ISR が 3 に戻ってから次へ進めるので、KafkaRoller より厳しい。
-- **rolling-update-guard**（データ面のエージェントの責務）が関門を見て、満たさない間は Strimzi のロールを止める。Strimzi の一時停止の注釈（`strimzi.io/pause-reconciliation`）で、ロールの途中を止められるか、AZ の順を強制できるかは未検証（E1）。できなければ、AZ ごとのノードプールに `strimzi.io/manual-rolling-update` の注釈を順に付ける形などを E1 で比べる。
-- ELR を有効にした構成で、`min.insync.replicas` を変えると Strimzi の再起動が止まらない不具合の報告がある（[#11685](https://github.com/strimzi/strimzi-kafka-operator/issues/11685)。状態は未検証）。`min.insync.replicas` は固定（[ADR-0012](../decisions/0012-durability-settings-and-elr.md)）なので当たらない見込みだが、Strimzi の版を上げるたびに確かめる。
+- **rolling-update-guard**（データ面のエージェントの責務）が関門を見て、満たさない間は Strimzi のロールを止める。Strimzi の一時停止の注釈（`strimzi.io/pause-reconciliation`）は、付けている間は資源の変更を調停しない（[Strimzi の文書](https://strimzi.io/docs/operators/latest/deploying.html)、2026-09-27 に確認）。ロールの途中を止められるか、AZ の順を強制できるかは文書に書かれておらず、未検証（E1 の `strimzi-roll-control-poc`）。できなければ、AZ ごとのノードプールに `strimzi.io/manual-rolling-update` の注釈を順に付ける形などを E1 で比べる。
+- ELR を有効にした構成で、`min.insync.replicas` を変えると Strimzi の再起動が止まらない不具合の報告がある（[#11685](https://github.com/strimzi/strimzi-kafka-operator/issues/11685)。2025-08-17 に修正で閉じられた。本家も、ELR を有効にした間はブローカーの単位の `min.insync.replicas` の変更を拒否する。2026-09-27 に確認）。`min.insync.replicas` は固定（[ADR-0012](../decisions/0012-durability-settings-and-elr.md)）なので当たらない見込みだが、Strimzi の版を上げるたびに確かめる。
 
 ### 6.3 戻し
 
@@ -186,7 +186,7 @@ FROM <Strimzi の同じ版の Kafka のイメージ>@sha256:…
 
 ### 6.4 時間
 
-- 30 台の物理クラスタで、1 台 5〜10 分（制御された停止、起動、ISR への戻り）として 3〜5 時間（未検証。T8 で測る。[capacity.md](capacity.md) の 11 節）。起動の時間はログの回復（正しい停止なら飛ばす）とメタデータの読み込み（目標 30 秒）で決まる。
+- 30 台の物理クラスタで、1 台 5〜10 分（制御された停止、起動、ISR への戻り）として 3〜5 時間（未検証。E12 の `load-test-ga` の T8 で測る。[capacity.md](capacity.md) の 11 節）。起動の時間はログの回復（正しい停止なら飛ばす）とメタデータの読み込み（目標 30 秒）で決まる。
 - 1 つの AZ に 20 台を超えたら、AZ の中で 2 台ずつにする案を検討する（Kora は大きなクラスタで AZ の中の数台を並べる）。
 
 ## 7. 本家の版の追従

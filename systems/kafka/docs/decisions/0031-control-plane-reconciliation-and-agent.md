@@ -11,7 +11,7 @@ date: 2026-09-27
 
 - SQS のメッセージに何を載せるか（状態の全体か、変更か、合図だけか）
 - トピックや ACL のように、テナントが Kafka のプロトコルでも作れる資源を、制御面の API からどう変えるか
-- エージェントを何の言語で書くか。[ADR-0001](0001-upstream-brokers-and-stack.md) は TypeScript を既定にし、Admin API のクライアントの選定をこの領域に任せた（未検証とした）
+- エージェントを何の言語で書くか。[ADR-0001](0001-upstream-brokers-and-stack.md) は TypeScript を既定にし、Admin API のクライアントの選定をこの領域に任せた
 
 事実（いずれも 2026-09-27 に確認）：
 

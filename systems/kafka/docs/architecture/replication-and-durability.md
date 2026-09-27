@@ -20,7 +20,7 @@
 | 既定の値 | `default.replication.factor` 1、`min.insync.replicas` 1、`unclean.leader.election.enable` false、`replica.lag.time.max.ms` 30 秒 | [Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/) |
 | プロデューサーの既定 | 3.0 から、Java のクライアントの既定が `acks=all`、`enable.idempotence=true` | [KIP-679](https://cwiki.apache.org/confluence/display/KAFKA/KIP-679%3A+Producer+will+enable+the+strongest+delivery+guarantee+by+default) |
 | ELR | ISR の外でも高水位までのデータを持つと保証された複製（ELR）を、リーダーの候補に残す。高水位は ISR が `min.insync.replicas` 以上のときだけ進む。4.0 で試験、4.1 で新しいクラスタの既定。有効にすると `min.insync.replicas` はクラスタの単位でだけ設定でき、ブローカーの単位の値は消える | [KIP-966](https://cwiki.apache.org/confluence/display/KAFKA/KIP-966%3A+Eligible+Leader+Replicas)、[Eligible Leader Replicas](https://kafka.apache.org/41/operations/eligible-leader-replicas/) |
-| 不正な停止からの回復（KIP-966 の後半） | ログを調べて決まった手順でリーダーを選ぶ（`unclean.recovery.strategy`）。本家の版に入ったかは未検証 | KIP-966 |
+| 不正な停止からの回復（KIP-966 の後半） | ログを調べて決まった手順でリーダーを選ぶ（`unclean.recovery.strategy`）。本家の 4.3 には入っていない（4.3 の Broker Configs に `unclean.recovery.strategy` がなく、KIP の一覧で KIP-966 の版は「TBD」。2026-09-27 に確認） | KIP-966 |
 | fetch-from-follower | 2.4 から。ブローカーの `replica.selector.class` に `RackAwareReplicaSelector`、クライアントの `client.rack`。フォロワーは高水位までを返す。遅れたフォロワーは `OFFSET_NOT_AVAILABLE` を返し、クライアントは再試行する。高水位の伝わりの分だけ遅延が増えうる | [KIP-392](https://cwiki.apache.org/confluence/display/KAFKA/KIP-392%3A+Allow+consumers+to+fetch+from+closest+replica)、[What's New in Apache Kafka 2.4](https://blogsarchive.apache.org/kafka/entry/what-s-new-in-apache1) |
 | フラッシュ | 本家は既定でアプリの fsync をせず、耐久性を複製に任せる | [Hardware and OS](https://kafka.apache.org/43/operations/hardware-and-os/) |
 
@@ -54,7 +54,7 @@
 - `acks=all` の成功は、そのレコードが ISR の全ての複製のメモリー（ページキャッシュ）に届いたことを意味する。ISR は 2 つ以上で、それぞれ異なる AZ にある。ディスクへの同期は待たない（本家の既定）。
 - 失う条件は、ISR の 2 つ以上の複製が、ディスクに書く前に同時に中身を失うこと（2 つ以上の AZ の同時の電源の喪失など）。この残りの危険を引き受け、NFR-001 の説明と利用者の文書に書く。
 - 1 つの複製の不正な停止は、ELR で守る。末尾を失った複製は ISR と ELR から外れ、リーダーにならない（[broker-and-log-storage.md](broker-and-log-storage.md) の 6.2 節）。
-- `acks=1`・`acks=0` の書き込みは、NFR-001 の対象外。ブローカーは受け付ける（互換）。Java のクライアントは 3.0 から既定が `acks=all` だが、他のクライアントの既定は違いうる（librdkafka の冪等の既定は無効と見られる。未検証）。利用者の文書で `acks=all` と冪等を勧める。
+- `acks=1`・`acks=0` の書き込みは、NFR-001 の対象外。ブローカーは受け付ける（互換）。Java のクライアントは 3.0 から既定が `acks=all` だが、他のクライアントの既定は違いうる（librdkafka は `acks` の既定が `-1`（all）だが、`enable.idempotence` の既定は `false`。[CONFIGURATION.md](https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md)、2026-09-27 に確認）。利用者の文書で `acks=all` と冪等を勧める。
 
 ### 3.2 AZ の喪失の間の振る舞い
 
@@ -81,7 +81,7 @@
 ### 5.1 平常
 
 - コントローラーは、ISR の中から、優先リーダーを先に選ぶ。ブローカーが `broker.session.timeout.ms`（既定 9 秒）の間ハートビートを送らないと、締め出して、そのブローカーのリーダーを移す（[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)）。
-- 1 つの AZ の喪失から、リーダーの移動の完了までの目標は 1 分以内（NFR-009）。9 秒の締め出しと選出で、多くは 30 秒以内の見込み。未検証（E3 で測る）。
+- 1 つの AZ の喪失から、リーダーの移動の完了までの目標は 1 分以内（NFR-009）。9 秒の締め出しと選出で、多くは 30 秒以内の見込み。未検証（E3 の `az-loss-drill` と、capacity の T4 で測る）。
 
 ### 5.2 unclean な選出の禁止
 
@@ -101,8 +101,8 @@
 
 - ブローカーの `replica.selector.class` を、本家の `RackAwareReplicaSelector` にする。自前の選び方は作らない。
 - コンシューマーが `client.rack` に自分の AZ ID を設定すると、同じ AZ の、最も追いついた複製から読む。設定しないと、リーダーから読む（本家の振る舞い）。
-- コンソールと文書で、各論理クラスタの AZ ID の一覧と、クライアントごとの設定の例を示す。主なクライアントの対応：Java（2.4 から）、librdkafka・franz-go・Sarama（設定の名前は各クライアントで違う。未検証）。
-- フォロワーは高水位までしか返さない。高水位がフォロワーに伝わるまでの分、端から端の遅延が増える。NFR-004（p99 100ms）を、fetch-from-follower の有無で測って確かめる（未検証）。
+- コンソールと文書で、各論理クラスタの AZ ID の一覧と、クライアントごとの設定の例を示す。主なクライアントの対応：Java（2.4 から）、librdkafka は `client.rack`、franz-go は `kgo.Rack`、Sarama は `Config.RackID`（各クライアントの設定の文書とソース、2026-09-27 に確認）。
+- フォロワーは高水位までしか返さない。高水位がフォロワーに伝わるまでの分、端から端の遅延が増える。NFR-004（p99 100ms）を、fetch-from-follower の有無で測って確かめる（未検証。E3 の `fetch-from-follower`）。
 - AZ をまたぐ転送が本当に減るかは、クライアントからブローカーまでの経路に依る。ブローカーのホスト名に AZ ID を入れ、NLB（cross-zone 無効）と Envoy が同じ AZ のブローカーにだけ送る形にした（[ADR-0044](../decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md)、[infrastructure.md](infrastructure.md) の 5.2 節）。
 
 ## 7. 耐久性の監査

@@ -132,7 +132,7 @@ api_keys                            ┌─────────────�
 | --- | --- | --- |
 | SNI のプロキシ（Envoy） | Envoy ごとの新しい接続の頻度の上限（リスナー全体。送信元 IP ごとではない） | 負荷試験 T6 で決める（[capacity.md](capacity.md) の 11 節） |
 | SNI のプロキシ（Envoy） | 送信元 IP ごとの新しい接続の頻度 | **S2**。Envoy の組み込みのフィルターは送信元ごとに数えられないので、外部のレート制限のサービスを入れて掛ける（[infrastructure.md](infrastructure.md) の 5.4 節） |
-| ブローカー | 認証の失敗の応答の遅延（本家の `connection.failed.authentication.delay.ms`） | 1,000 ms（本家の既定は 100 ms。未検証） |
+| ブローカー | 認証の失敗の応答の遅延（本家の `connection.failed.authentication.delay.ms`） | 1,000 ms（本家の既定は 100 ms。`connections.max.idle.ms` より小さくする必要がある。[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)、2026-09-27 に確認） |
 | ブローカー | 論理クラスタごとの接続の数と頻度 | CU から決める（[metrics-and-billing.md](metrics-and-billing.md) の 3 節）。適用は multi-tenancy-and-quotas の領域 |
 | 制御面 | 送信元 IP ごとの認証の失敗の数 | 1 分に 100 回を超えたら、その IP を 10 分止める（Envoy の RBAC の拒否の一覧として配る） |
 
@@ -196,7 +196,7 @@ api_keys                            ┌─────────────�
 | Alter | 許す（ACL の作成・削除だけ） | 拒否 | CreateAcls、DeleteAcls |
 | DescribeConfigs | 許す | 許す | ブローカーの設定の参照（見せる値は protocol-and-compatibility の 5 節で絞る） |
 | AlterConfigs | 拒否 | 拒否 | ブローカーの設定の変更 |
-| IdempotentWrite | 許す | 許す | 冪等なプロデューサー（本家の 3.0 以降は、トピックの Write だけで冪等に書けるとされる。未検証。どちらでも通るようにする） |
+| IdempotentWrite | 許す | 許す | 冪等なプロデューサー（本家の 2.8 以降は、トピックの Write だけで冪等に書ける。IdempotentWrite は 3.0 で非推奨だが残っている。[KIP-679](https://cwiki.apache.org/confluence/display/KAFKA/KIP-679%3A+Producer+will+enable+the+strongest+delivery+guarantee+by+default)、2026-09-27 に確認。どちらでも通るようにする） |
 | ClusterAction | 拒否 | 拒否 | ブローカーの間の API |
 
 ### 5.4 テナントの ACL の変換
@@ -224,7 +224,7 @@ api_keys                            ┌─────────────�
 | API キー（サービスアカウントごと） | 100 | 100 | 同上 |
 | サービスアカウント（組織ごと） | 1,000 | 1,000 | 同上 |
 
-- ACL の上限は、StandardAuthorizer の評価の性能（物理クラスタ全体の ACL の数）で決まる。物理クラスタあたりの ACL の合計の目安を、E8 の負荷試験で測る（未検証）。
+- ACL の上限は、StandardAuthorizer の評価の性能（物理クラスタ全体の ACL の数）で決まる。物理クラスタあたりの ACL の合計の目安を、E8 の `tenant-authorizer` の負荷試験で測る（未検証）。
 
 ### 5.6 制御面のロール（RBAC）
 
@@ -335,7 +335,7 @@ api_keys                            ┌─────────────�
 
 | 操作 | 振る舞い | 完了の目標 |
 | --- | --- | --- |
-| トピックの削除 | 本家のとおり、KRaft から消え、ローカルのセグメントを消す。S3 のセグメントは RemoteLogManager が非同期に消す | ローカル：数分。S3：24 時間以内（未検証。E4 で測る） |
+| トピックの削除 | 本家のとおり、KRaft から消え、ローカルのセグメントを消す。S3 のセグメントは RemoteLogManager が非同期に消す | ローカル：数分。S3：24 時間以内（未検証。E8 の `data-deletion-verification` で測る） |
 | 論理クラスタの削除 | すべてのトピック・グループ・ACL・キーを消す。名前空間の登録を消す。7 日の猶予の後、S3 の残りを前方一致 `lc-<id>_` で消す（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 6.3 節） | 8 日以内 |
 | 組織の解約 | 論理クラスタを削除し、制御面の行を 30 日後に消す（請求の記録は法定の期間だけ残す） | 30 日 |
 
@@ -417,7 +417,7 @@ api_keys                            ┌─────────────�
 ### 決定（2026-09-27、既定案）
 
 - **急ぎの失効**：S1 は再認証（15 分）で切る。E8 の PoC で、名前空間のパッチの出入口に「失効したキーの接続を閉じる」処理を足す量を測り、20 行程度で済むなら入れる。超えるなら、ADR-0028 を改めて、急ぎの失効は該当する論理クラスタのブローカーの接続を全部切る運用の手順にする。
-- **再認証の期限**：15 分。本家の対応するクライアントは 2.2 以上で、ADR-0005 の最小の版（2.1）の Java のクライアントは再認証に対応しない（KIP-368 は 2.2 で入った）。2.1 のクライアントは 15 分ごとに切れて、つなぎ直す見込み（再認証に対応しないクライアントへのブローカーの振る舞いは未検証。E8 で確かめる）。これは利用者向けの文書に書く。
+- **再認証の期限**：15 分。本家の対応するクライアントは 2.2 以上で、ADR-0005 の最小の版（2.1）の Java のクライアントは再認証に対応しない（KIP-368 は 2.2 で入った）。2.1 のクライアントは 15 分ごとに切れて、つなぎ直す。KIP-368 は、再認証に対応しない古いクライアントの接続も、セッションの期限で切ると定める（[KIP-368](https://cwiki.apache.org/confluence/display/KAFKA/KIP-368%3A+Allow+SASL+Connections+to+Periodically+Re-Authenticate)、2026-09-27 に確認）。E8 の `reauth-and-revocation` で、2.1 のクライアントが切断の後に自動でつなぎ直すことを確かめる。これは利用者向けの文書に書く。
 - **IP の許可リスト**：論理クラスタごとに持つ（SNI のプロキシで掛けるため）。API キーごとの条件は持たない。
 - **証明書**：S1 はリージョンで 1 枚（ACM の書き出せる証明書、リージョンと AZ ごとのワイルドカード）。秘密鍵はブローカーの Secret と書き出しの処理の外に出さない。ACM の上限（最長 198 日）で更新し、2027-03 からの 100 日の上限に合わせて自動化する（[infrastructure.md](infrastructure.md) の 5.5 節）。物理クラスタごとには分けない。
 - **監査ログの保持**：索引 90 日、S3 1 年。延長は法務の確認（L4）の後。

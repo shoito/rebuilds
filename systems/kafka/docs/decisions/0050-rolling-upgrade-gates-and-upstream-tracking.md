@@ -11,7 +11,7 @@ date: 2026-09-27
 
 - 本家の手順は、ブローカーを 1 台ずつ止めて新しいコードで起動し、全てが新しい版になり振る舞いを確かめてから `kafka-features.sh upgrade --release-version` で `metadata.version` を上げる。4.3 はメタデータの変更を含むので、上げた後の戻しはできない（[Upgrading](https://kafka.apache.org/43/getting-started/upgrade/)、2026-09-27 に確認）。
 - Kora は、AZ の順にロールし、2 つの AZ のブローカーを同時にロールしない。ロールしたブローカーが複製の面で完全に戻ったことを確かめてから、次の組に進む。小さなクラスタでは 1 台ずつ（[Kora](https://vldb.org/pvldb/vol16/p3822-povzner.pdf) の 4.7 節、2026-09-27 に確認）。
-- Strimzi の KafkaRoller は、再起動でパーティションが `min.insync.replicas` を下回るときはロールしない。ちょうど `min.insync.replicas` になるロールは許す（[strimzi-kafka-operator#13031](https://github.com/strimzi/strimzi-kafka-operator/issues/13031)、2026-09-27 に確認。閉じられた提案で、余裕を持たせる設定は入っていない）。ELR を有効にした構成で `min.insync.replicas` を変えると再起動が止まらない不具合の報告がある（[#11685](https://github.com/strimzi/strimzi-kafka-operator/issues/11685)、状態は未検証）。
+- Strimzi の KafkaRoller は、再起動でパーティションが `min.insync.replicas` を下回るときはロールしない。ちょうど `min.insync.replicas` になるロールは許す（[strimzi-kafka-operator#13031](https://github.com/strimzi/strimzi-kafka-operator/issues/13031)、2026-09-27 に確認。閉じられた提案で、余裕を持たせる設定は入っていない）。ELR を有効にした構成で `min.insync.replicas` を変えると再起動が止まらない不具合の報告がある（[#11685](https://github.com/strimzi/strimzi-kafka-operator/issues/11685)。2025-08-17 に修正で閉じられた。本家も、ELR を有効にした間はブローカーの単位の `min.insync.replicas` の変更を拒否する。2026-09-27 に確認）。
 - 本家の取り込みは x.y.1 以降、x.y.0 から 3 か月以内。機能の版は全ての物理クラスタでバイナリが揃ってから 7 日後（[ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md)）。本家の版の更新は、Jepsen の形の試験と Kafka Streams の exactly-once の試験を関門にする（[ADR-0022](0022-exactly-once-verification.md)）。本家の版を 2 つ以上遅らせない（[ADR-0001](0001-upstream-brokers-and-stack.md)）。
 
 ## Options
@@ -41,7 +41,7 @@ date: 2026-09-27
 - 関門を 30 分満たせなければ、ロールを止めて人を呼ぶ。自動で戻さない（戻すロールも同じ関門を通るため）。
 - ロールの前の条件：G1・G6・G7、直近の耐久性の監査に不一致がない、エラーの予算が残っている。
 - 順：コントローラー（1 台ずつ）→ ブローカー（AZ の順、AZ の中は 1 台ずつ）。
-- Strimzi に任せる部分と、この順と関門を強制する部分（rolling-update-guard）の分け方は、E1・E12 で確かめる（Strimzi の一時停止で、ロールの途中を止められるかは未検証）。
+- Strimzi に任せる部分と、この順と関門を強制する部分（rolling-update-guard）の分け方は、E1・E12 で確かめる（`strimzi.io/pause-reconciliation` は資源の変更の調停を止める。ロールの途中を止められるかは文書になく未検証で、E1 の `strimzi-roll-control-poc` で確かめる）。
 
 ### 本家の版の取り込みの関門
 
@@ -66,7 +66,7 @@ date: 2026-09-27
   - ロールの途中のどの時点でも、ISR が 2 未満のパーティションができない（1 つの AZ の 1 台だけが止まる）。
   - 本家の版の取り込みの関門が、耐久性と互換性の試験の結果と結び付く。
 - 引き受けるコスト：
-  - 30 台の物理クラスタのロールは、1 台 5〜10 分として 3〜5 時間かかる（未検証）。平日の時間帯に収めるため、AZ ごとに日を分けてよい。
+  - 30 台の物理クラスタのロールは、1 台 5〜10 分として 3〜5 時間かかる（未検証。E12 の `load-test-ga` の T8 で測る）。平日の時間帯に収めるため、AZ ごとに日を分けてよい。
   - rolling-update-guard を自前で保つ。
 
 ## Confirmation

@@ -27,7 +27,7 @@ date: 2026-09-27
 - `ClientQuotaCallback` のタグは `{tenant: lc-id}` だけにし、テナントのすべての主体とクライアントで 1 つのクォータを共有する。
 - 帯域と要求の処理時間は、使用量に応じてブローカーに配る（[ADR-0027](0027-dynamic-quota-coordinator-and-backpressure.md)）。パーティションの作成・削除の頻度は静的な値。
 - 帯域・頻度を超えたら遅らせる（throttle）。数の上限（パーティション、グループ、`transactional.id`）を超えたら断る。
-- 層ごとの初期値（すべて未検証。E7 の負荷試験で見直す）：
+- 層ごとの初期値（すべて未検証。E7 の `noisy-neighbor-suite` の負荷試験で見直す）：
 
 | 項目 | Basic | Standard（1 CU あたり、最大 10 CU） |
 | --- | --- | --- |
@@ -42,7 +42,7 @@ date: 2026-09-27
 - CU の正式な定義は metrics-and-billing の領域で決める。この表は仮の定義として使う。
 - 上限を緩める例外は、論理クラスタの単位の上書きだけで行い、監査ログに残す。
 - 2 を選ばない理由：接続の嵐、パーティションの乱発、PID の乱発は、ブローカーとコントローラーのメモリーを食い、他のテナントに及ぶ。Kora もこれらを掛けている。
-- 3 を選ばない理由：Envoy の SNI ごとの接続の上限は、テナントごとに設定の塊（filter chain）を作る必要があり、1,000 以上のテナントで扱いにくい（未検証）。ブローカーは TLS を終端して SNI を知るので、ブローカーで数える方が 1 か所で済む。
+- 3 を選ばない理由：Envoy の SNI ごとの接続の上限は、テナントごとに設定の塊（filter chain）を作る必要があり、1,000 以上のテナントで扱いにくい。Envoy の `local_ratelimit` の network のフィルターも、フィルターの鎖ごとの 1 つのバケットで、SNI や送信元ごとには数えない（[Local rate limit](https://www.envoyproxy.io/docs/envoy/latest/configuration/listeners/network_filters/local_rate_limit_filter)、2026-09-27 に確認）。ブローカーは TLS を終端して SNI を知るので、ブローカーで数える方が 1 か所で済む。
 
 ## Consequences
 
@@ -52,7 +52,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - パッチ（P4〜P7）が増える。
   - 数の上限で断るときのエラーは、本家にない理由で返すので、差分テストの「許された違い」に載せる。
-  - 値の多くは未検証で、負荷試験の結果で動く。
+  - 値の多くは未検証で、E7 の負荷試験（`noisy-neighbor-suite`）の結果で動く。
 
 ## Confirmation
 

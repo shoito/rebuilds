@@ -14,7 +14,7 @@ date: 2026-09-27
   - KIP-1150 は 2026-03-02 に採択。要求として、順序、冪等、トランザクション、グループ、共有のグループ、階層型の保存との互換を挙げる（[KIP-1150](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1150%3A+Diskless+Topics)、[Aiven の解説](https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead)）。
   - KIP-1163（中核）は議論中。トピックの設定 `diskless.enable`（作成時だけ）。WAL のオブジェクトを約 250ms か約 4 MiB で閉じる案。遅延の目標は p50 約 500ms、p99 1〜2 秒。最初の版は、圧縮のトピックとトランザクションに対応しない（[KIP-1163](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1163%3A+Diskless+Core)）。
   - KIP-1164（コーディネーター）は議論中。`__diskless_metadata` を正本にする。冪等の検査は含むが、トランザクションの管理は範囲の外（[KIP-1164](https://cwiki.apache.org/confluence/display/KAFKA/KIP-1164%3A+Diskless+Coordinator)）。
-- 費用の概算（東京、4 MiB の WAL、3 AZ、7 日の保持）：ネットワークと S3 で、Standard のトピックの約 $0.059/GB に対し、ディスクレスは約 $0.008/GB。ただし、ブローカー 1 台あたり月に約 $49 の、流量によらない PUT の費用がある。KIP の案の値による概算で、未検証。
+- 費用の概算（東京、4 MiB の WAL、3 AZ、7 日の保持）：ネットワークと S3 で、Standard のトピックの約 $0.059/GB に対し、ディスクレスは約 $0.008/GB。ただし、ブローカー 1 台あたり月に約 $49 の、流量によらない PUT の費用がある。KIP の案の値による概算で、未検証（E13 の `diskless-upstream-tracking` で、本家の実装が入ったら測り直す）。
 - 利用者の中心の用途（注文・決済の状態の変化）はトランザクションを使う（intent.md）。
 
 ## Options

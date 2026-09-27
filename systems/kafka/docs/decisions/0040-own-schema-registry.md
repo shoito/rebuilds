@@ -12,7 +12,7 @@ intent.md は、スキーマレジストリを Later とし、Confluent の Sche
 事実（いずれも 2026-09-27 に確認）：
 
 - Confluent Community License は、Confluent の製品と競合する SaaS として提供することを除外する。Schema Registry を競合するオンラインのサービスとして提供することはできないと FAQ が書く（[FAQ](https://www.confluent.io/confluent-community-license-faq/)）。一方、`client`・`avro-serializer`・`protobuf-serializer`・`json-schema-serializer` などのクライアント側のモジュールは Apache License 2.0（[schema-registry の README](https://github.com/confluentinc/schema-registry)）。
-- Apicurio Registry は Apache License 2.0（最新 3.3.3、2026-09-08）で、Confluent の互換の API（`/apis/ccompat/v7`）を持つ。ただし ID が 2 種類ある、グループのスキーマが見えないことがある、一部の状態コードが違う、参照で Confluent のライブラリが失敗する報告がある（[互換の API の文書](https://www.apicur.io/registry/docs/apicurio-registry/3.3.x/getting-started/assembly-confluent-schema-registry-compatibility.html)、GitHub の issue #5133・#7295）。マルチテナントの有無は確かめられなかった（未検証）。
+- Apicurio Registry は Apache License 2.0（最新 3.3.3、2026-09-08）で、Confluent の互換の API（`/apis/ccompat/v7`）を持つ。ただし ID が 2 種類ある、グループのスキーマが見えないことがある、一部の状態コードが違う、参照で Confluent のライブラリが失敗する報告がある（[互換の API の文書](https://www.apicur.io/registry/docs/apicurio-registry/3.3.x/getting-started/assembly-confluent-schema-registry-compatibility.html)、GitHub の issue #5133・#7295）。3.x のマルチテナントは、テナントごとに別のインスタンスを立てる形で、1 つのインスタンスの中で ID の空間を分ける機能はない（[Implementing multitenancy](https://www.apicur.io/registry/docs/apicurio-registry/3.3.x/getting-started/assembly-implementing-multitenancy.html)、2026-09-27 に確認）。
 - Karapace は Apache License 2.0 の Python の互換の実装で、スキーマを Kafka のトピックに保存する（[karapace](https://github.com/Aiven-Open/karapace)）。
 
 ## Options

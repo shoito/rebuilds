@@ -16,7 +16,7 @@ KRaft のメタデータの量は、コントローラーの切り替えの時�
 - 本家の既定：`metadata.log.max.record.bytes.between.snapshots` 20 MiB、`metadata.log.max.snapshot.interval.ms` 1 時間、`metadata.max.retention.bytes` 100 MiB、`metadata.max.retention.ms` 7 日（[Broker Configs](https://kafka.apache.org/43/configuration/broker-configs/)）。
 - 4.3 で、KRaft の取得とスナップショットの取得の大きさの設定が入った（KIP-1219。[4.3.0 の発表](https://kafka.apache.org/blog/2026/05/22/apache-kafka-4.3.0-release-announcement/)）。
 - 本家の文書は、5 万のパーティションで 10 万の mmap になり、既定の OS の上限でブローカーが落ちうると書く（[Hardware and OS](https://kafka.apache.org/43/operations/hardware-and-os/)）。
-- 1 つのパーティションの記録の大きさは、本家のスキーマから約 150 バイトと見積もった（未検証）。
+- 1 つのパーティションの記録の大きさは、本家のスキーマから約 150 バイトと見積もった（未検証。E1 の `metadata-scale-poc` で実測する）。
 
 ## Options
 

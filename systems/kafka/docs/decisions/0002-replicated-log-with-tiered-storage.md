@@ -18,7 +18,7 @@ date: 2026-09-27
 
 - WarpStream の produce の遅延は、S3 Standard で p99 約 400ms、S3 Express One Zone で p50 105ms・p99 170ms。Lightning Topics で p50 33ms・p99 50ms だが、冪等なプロデューサーとトランザクションを受け付けず、返すオフセットも正確でない（[WarpStream のブログ](https://www.warpstream.com/blog/the-art-of-being-lazy-log-lower-latency-and-higher-availability-with-delayed-sequencing)、2026-02-04）。
 - Redpanda の Cloud Topics の端から端までの遅延は、500ms から数秒（[Redpanda Cloud Topics](https://www.redpanda.com/data-streaming/cloud-topics-write-to-object-storage)）。
-- Confluent の Freight は、2026-08 の発表で冪等なプロデューサーとトランザクションに対応したとしている（[2026 Q3 の発表](https://www.confluent.io/blog/2026-q3-confluent-cloud-launch/)）。一方、クライアントの設定の文書は、まだ `enable.idempotence=false` を求めている（[Freight Clients](https://docs.confluent.io/cloud/current/client-apps/optimizing/freight.html)）。どちらが現状かは未検証。
+- Confluent の Freight は、2026-08 の発表で冪等なプロデューサーとトランザクションに対応したとしている（[2026 Q3 の発表](https://www.confluent.io/blog/2026-q3-confluent-cloud-launch/)）。一方、クライアントの設定の文書は、まだ `enable.idempotence=false` を要件としている（[Freight Clients](https://docs.confluent.io/cloud/current/client-apps/optimizing/freight.html)）。どちらも 2026-09-27 に確かめたが、食い違ったまま。本システムの判断は本家の Apache Kafka の実装を待つ（[ADR-0020](0020-diskless-topics-adoption.md)）ので、この食い違いに依らない。E13 の `diskless-upstream-tracking` で四半期ごとに見直す。
 - 本家の KIP-1150 は 2026-03 に採択されたが、実装の KIP-1163・1164 は議論中で、本家の版には入っていない（[Aiven の解説](https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead)）。
 - AZ をまたぐ転送は、送信と受信で各 $0.01/GB（[AWS Architecture Blog](https://aws.amazon.com/blogs/architecture/exploring-data-transfer-costs-for-aws-managed-databases/)）。複製 3 では、1 GB の書き込みごとにネットワークだけで約 $0.053 かかる（[architecture/README.md](../architecture/README.md) の NFR-010）。
 

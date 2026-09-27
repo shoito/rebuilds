@@ -3,7 +3,7 @@
 ## 進め方の原則
 
 - **最初に walking skeleton を通す。** E1 で、本家 4.3.1 ＋ パッチの列 ＋ 差し込み口のブローカーのイメージ、Strimzi の物理クラスタ、NLB と Envoy の入口、SASL/PLAIN の API キー、名前空間のパッチの最小の版、エージェントの骨組みを端から端まで貫き、1 つの論理クラスタで produce・consume・トランザクションを通してから、機能を広げる。Jepsen の形の障害注入、本家との差分テスト、パッチの行数の CI は、E1 から本物の形で作る。後から足すと、喪失と互換の破れを見逃すため。
-- **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する：名前空間のパッチの行数と SNI の取り出し・代理の接続（E7 の前。多すぎれば [ADR-0004](decisions/0004-logical-clusters-on-shared-physical-clusters.md) のプロキシの案を見直す）、Envoy の on-demand CDS と同じ AZ の経路（E12 の前。[ADR-0044](decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md)）、定期のフラッシュと回復の時間（E3 の前。[ADR-0011](decisions/0011-log-recovery-and-broker-replacement.md)）、設計点とパーティションの密度（T1・T2。E9 の前。[ADR-0048](decisions/0048-broker-design-point-and-cost-model.md)）、Strimzi のロールの止め方（E12 の前。[ADR-0050](decisions/0050-rolling-upgrade-gates-and-upstream-tracking.md)）、Cruise Control が 4.3 で使えるか（E9 の前。[ADR-0016](decisions/0016-partition-placement-reassignment-and-cordon.md)）。
+- **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する：名前空間のパッチの行数と SNI の取り出し・代理の接続（E7 の前。多すぎれば [ADR-0004](decisions/0004-logical-clusters-on-shared-physical-clusters.md) のプロキシの案を見直す）、Envoy の on-demand CDS と同じ AZ の経路（E12 の前。[ADR-0044](decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md)）、定期のフラッシュと回復の時間（E3 の前。[ADR-0011](decisions/0011-log-recovery-and-broker-replacement.md)）、設計点とパーティションの密度（T1・T2。E9 の前。[ADR-0048](decisions/0048-broker-design-point-and-cost-model.md)）、Strimzi のロールの止め方（E12 の前。[ADR-0050](decisions/0050-rolling-upgrade-gates-and-upstream-tracking.md)）、Cruise Control の目標で再均衡の目標を表せるか（E9 の前。[ADR-0016](decisions/0016-partition-placement-reassignment-and-cordon.md)）。
 - **耐久性と分離を先に固める。** E3（耐久性）と E7（分離）は、他の Epic の機能を本番に出す前の関門にする。`durability:sensitive`・`security:sensitive` の変更は、Dev のテックリードの承認を要する（[AGENTS.md](../AGENTS.md)）。
 - **契約を先に固定する。** API の表、トピックの設定の表、名前空間の表、許された違いの表、望ましい状態のスキーマ、管理 API の OpenAPI、CU の値は、人間がレビューして確定する。エージェントは勝手に変えない。
 - **法務・経理の確認待ちの Story は、spec を承認しない。** 設計と、法務・経理に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L8）。下の表で「法務：L*」と書いた Story が当たる。
@@ -139,7 +139,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `transactional-id-limit` | コーディネーターのパーティションごとの上限と `TRANSACTIONAL_ID_AUTHORIZATION_FAILED` |
 | `init-producer-id-throttle` | InitProducerId の頻度の上限と `throttle_time_ms` |
 | `txn-admin-api-namespacing` | DescribeTransactions・ListTransactions・DescribeProducers の名前空間と PID の漏れの防止 |
-| `kafka-17754-regression` | 遅れて届く `EndTxn` の再現と、TV2 での締め出し |
+| `delayed-endtxn-regression` | 遅れて届く `EndTxn` の再現と、TV2 での締め出し |
 | `streams-eos-soak` | Streams の exactly-once の 6 時間の試験 |
 | `txn-anomaly-baseline` | トランザクションの異常を本家と比べ、既知の制約の一覧を作る |
 | `hanging-txn-detector` | 最も古い開いたトランザクションの経過時間の収集、アラート、runbook（transactions の `hanging-txn-runbook` を含む） |
@@ -286,7 +286,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `kms-and-encryption-baseline` | 物理クラスタごとの CMK、EBS・S3 の暗号化、Bucket Keys |
 | `edge-production` | EIP、zonal shift、アイドルのタイムアウト、Proxy Protocol、RBAC の許可リスト |
 | `tenant-certificate-rotation` | 証明書の書き出し、配布、ロール、期限のアラート（security の `tls-certificate-rotation` を含む） |
-| `osaka-standby` | 大阪の骨組み、制御面のウォームスタンバイ、ホスト名の向け直し |
+| `osaka-standby` | 大阪の骨組み、制御面のウォームスタンバイ、ホスト名の向け直し、コントローラーとエッジの容量の予約、四半期の `osaka-capacity-check`（[runbooks/disaster-recovery.md](runbooks/disaster-recovery.md) の D-1） |
 | `terraform-guardrails` | Terraform の CI の検査 |
 | `metadata-snapshot-backup` | KRaft のスナップショットの写しと復旧の訓練 |
 | `synthetic-probes` | 合成監視（東京と大阪）、合成監視の論理クラスタとリーダーの固定 |

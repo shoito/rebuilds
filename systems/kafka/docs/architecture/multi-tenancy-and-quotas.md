@@ -64,7 +64,7 @@
 | API キー | 50 | 250 |
 | ACL | 1,000 | 1,000 |
 
-- パーティションの作成・削除は、5 分あたり Basic 250 から Dedicated 5,000（Standard の値は未検証）。
+- パーティションの作成・削除は、5 分あたり Basic 250、Standard 500、Enterprise 500、Dedicated 5,000、Freight 500（[Cluster types](https://docs.confluent.io/cloud/current/clusters/cluster-types.html)、2026-09-27 に確認）。
 - 負荷が高いと、新しい接続を遅らせるか、クライアントを throttle する。最大の上限は厳密には強制していない、としている。
 
 ## 3. 方針
@@ -98,10 +98,10 @@
   4. 以後のすべての要求は、主体の lc-id で名前空間を通る
 ```
 
-- KafkaPrincipalBuilder は、SASL_SSL の接続で `SSLSession` を受け取れる（本家の `SaslAuthenticationContext`）。SNI の取り出しは差し込み口の中で済む見込み。未検証（E1 の PoC で確かめる）。
+- KafkaPrincipalBuilder は、SASL_SSL の接続で `SSLSession` を受け取れる（本家の `SaslAuthenticationContext` が `Optional<SSLSession>` を持つ。[SaslAuthenticationContext.java](https://github.com/apache/kafka/blob/4.3/clients/src/main/java/org/apache/kafka/common/security/auth/SaslAuthenticationContext.java)、2026-09-27 に確認）。SNI を `ExtendedSSLSession` の `getRequestedServerNames()` で取り出せるかは未検証（E1 の `sni-tenant-resolution-poc` で確かめる）。
 - SNI と API キーの一致を求めるのは、他のテナントのホスト名に自分の API キーで繋ぎ、そのテナントのブローカーの一覧を得るような取り違えを防ぐため。
 - 認証の前に届く ApiVersions は、テナントに依らない応答を返す（本家と同じ）。
-- **代理の接続**：データ面のエージェント（[ADR-0031](../decisions/0031-control-plane-reconciliation-and-agent.md)）がテナントの資源に命令する（トピックの作成、ACL の変更など）ときは、内部のリスナーで、エージェントの資格情報に「代理する論理クラスタ」を付けて認証する（SASL/PLAIN のユーザー名を `agent-<pc-id>@<lc-id>` の形にし、自社のコールバックで解く）。主体は、その論理クラスタの管理の主体として扱い、名前空間のパッチ・設定の許可リスト・パーティションの数の上限を、テナントの要求と同じく通す。代理の接続は内部のリスナーだけで受け付け、テナントのリスナーでは断る。本家の PLAIN の認可の ID（authzid）は、ユーザー名と違う値を本家が拒否するため使わない（未検証。E1 で確かめる）。
+- **代理の接続**：データ面のエージェント（[ADR-0031](../decisions/0031-control-plane-reconciliation-and-agent.md)）がテナントの資源に命令する（トピックの作成、ACL の変更など）ときは、内部のリスナーで、エージェントの資格情報に「代理する論理クラスタ」を付けて認証する（SASL/PLAIN のユーザー名を `agent-<pc-id>@<lc-id>` の形にし、自社のコールバックで解く）。主体は、その論理クラスタの管理の主体として扱い、名前空間のパッチ・設定の許可リスト・パーティションの数の上限を、テナントの要求と同じく通す。代理の接続は内部のリスナーだけで受け付け、テナントのリスナーでは断る。本家の PLAIN の認可の ID（authzid）は、ユーザー名と違う値を本家が `Client requested an authorization id that is different from username` で拒否するため使わない（[PlainSaslServer.java](https://github.com/apache/kafka/blob/4.3/clients/src/main/java/org/apache/kafka/common/security/plain/internals/PlainSaslServer.java)、2026-09-27 に確認）。
 
 ### 4.3 要求と応答の書き換え
 
@@ -119,7 +119,7 @@
 | --- | --- |
 | Metadata・DescribeCluster の `cluster_id` | 論理クラスタの ID |
 | Metadata・DescribeCluster のブローカーの一覧 | S1：物理クラスタのすべてのブローカー。S2：セルのブローカー（8 節）。ホスト名はテナントの形で、AZ ID を含む `b<broker-id>-<lc-id>.<az-id>.<region>.<brand>.<domain>:9092`（[ADR-0044](../decisions/0044-nlb-sni-proxy-and-zonal-hostnames.md)。DNS と SNI の振り分けは [infrastructure.md](infrastructure.md) の 5 節）。ラック（AZ）は見せる（fetch-from-follower のため） |
-| `controller_id` | 本家の DescribeCluster の意味に合わせ、ブローカーの 1 つを返す（KRaft では、クライアントに実際のコントローラーは見えない。本家と同じ扱いかは未検証。差分テストで確かめる） |
+| `controller_id` | 本家の DescribeCluster の意味に合わせ、ブローカーの 1 つを返す。本家も、ブローカーが処理したときは生きているブローカーの ID を無作為に返す（[DescribeClusterResponse.json](https://github.com/apache/kafka/blob/4.3/clients/src/main/resources/common/message/DescribeClusterResponse.json)、2026-09-27 に確認）。本システムは、そのテナントに見えるブローカーから選ぶ |
 | FindCoordinator | 接頭辞付きの ID で選んだブローカーを、テナントの形のホスト名で返す |
 
 - S1 でブローカーの一覧をすべて返すのは、グループとトランザクションのコーディネーター（`__consumer_offsets`・`__transaction_state` のリーダー）が、テナントのパーティションを持たないブローカーにもいるため。ブローカーの台数がテナントに見えるが、資源の名前やデータは見えない。
@@ -128,7 +128,7 @@
 
 | # | 場所 | 中身 | 差し込み口で作れない理由 | 関連 |
 | --- | --- | --- | --- | --- |
-| P1 | 要求の出入口 | 4.3 節の書き換えと絞り込み | 本家に名前空間の差し込み口がない | ADR-0004、Kora の 5.1 節 |
+| P1 | 要求の出入口 | 4.3 節の書き換えと絞り込み。`retention.ms` が 6 時間より短いトピックの設定の要求に `local.retention.ms` を足す（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 12 節。2026-09-27 に追加） | 本家に名前空間の差し込み口がない | ADR-0004、Kora の 5.1 節 |
 | P2 | Metadata・DescribeCluster・FindCoordinator の応答 | 4.4 節のクラスタの ID とホスト名 | 広告するリスナーは本家ではブローカーで 1 つ | 同上 |
 | P3 | グループのコーディネーターの正規表現の評価 | consumer のグループの正規表現を、テナントのトピックだけで評価 | コーディネーターの内部の処理 | KIP-848、[consumer-groups.md](consumer-groups.md) の 4.3 節 |
 | P4 | コーディネーターの InitProducerId・グループの作成 | `transactional.id`・グループの数の上限 | `ClientQuotaCallback` にない種類 | KIP-936（未実装）、[transactions-and-idempotence.md](transactions-and-idempotence.md) の 6 節 |
@@ -148,7 +148,7 @@
 | 要求の処理時間 | 同（`REQUEST`、`request_percentage`） | 同上 | throttle |
 | パーティションの作成・削除の頻度 | 同（`CONTROLLER_MUTATION`、`controller_mutation_rate`） | ブローカーごと（要求を受けたブローカー）。静的な値 | 本家どおり `THROTTLING_QUOTA_EXCEEDED`（KIP-599。新しいクライアントは待って再試行） |
 | 接続の数 | パッチ P5（認証の後） | ブローカーごとに ceil(2 × 上限 ÷ ブローカーの数)。全体の合計が上限を超えたら、コーディネーターが上限 ÷ ブローカーの数に絞る | 新しい接続を閉じる |
-| 接続の試みの頻度 | パッチ P5（TLS の握手の後、SASL の前） | ブローカーごとに上限 ÷ ブローカーの数 | 握手の後の処理を遅らせてから閉じる（本家の IP の単位の接続の頻度のクォータの振る舞いに合わせる。具体の振る舞いは未検証） |
+| 接続の試みの頻度 | パッチ P5（TLS の握手の後、SASL の前） | ブローカーごとに上限 ÷ ブローカーの数 | 握手の後の処理を遅らせてから閉じる。本家の IP の単位の接続の頻度のクォータ（KIP-612）は、率を下回るまでか 1 秒の短い方だけ処理を遅らせ、なお超えていれば閉じる（[KIP-612](https://cwiki.apache.org/confluence/display/KAFKA/KIP-612%3A+Ability+to+Limit+Connection+Creation+Rate+on+Brokers)、2026-09-27 に確認）。P5 もこの形に合わせる |
 | パーティションの数 | パッチ P6 | 論理クラスタの合計（ブローカーのメタデータの写しで数える。同時の要求で少し超えうる。制御面の調停で検知） | CreateTopics・CreatePartitions を `POLICY_VIOLATION`（文言に上限を書く） |
 | InitProducerId の頻度 | パッチ P7 | ブローカーごと（静的） | throttle（[transactions-and-idempotence.md](transactions-and-idempotence.md) の 4.2 節） |
 | `transactional.id` の数 | パッチ P4 | コーディネーターのパーティションごと | `TRANSACTIONAL_ID_AUTHORIZATION_FAILED`（同 6 節） |
@@ -160,7 +160,7 @@
 
 ## 6. 層ごとの上限
 
-S1 の初期値。CU（容量の単位）の正式な定義と値段は metrics-and-billing の領域で決める。この表は、Standard を「1 CU あたりの値 × CU（1〜10）」で表す仮の定義で、Confluent Cloud の Standard の eCKU の値に揃えた（2.3 節）。すべて未検証で、E7 の負荷試験で見直す。
+S1 の初期値。CU（容量の単位）の正式な定義と値段は metrics-and-billing の領域で決める。この表は、Standard を「1 CU あたりの値 × CU（1〜10）」で表す仮の定義で、Confluent Cloud の Standard の eCKU の値に揃えた（2.3 節）。すべて未検証で、E7 の `noisy-neighbor-suite` の負荷試験で見直す。
 
 | 項目 | Basic（固定） | Standard（1 CU あたり） | Standard の最大（10 CU） | Dedicated（S2） |
 | --- | --- | --- | --- | --- |
@@ -307,7 +307,7 @@ S1 の初期値。CU（容量の単位）の正式な定義と値段は metrics-
 | N10 | 長いトランザクション（15 分）を多数開く | 被害者の LSO が止まらない。ローカルのディスクの増え方が閾値以内 |
 
 - 頻度：PR ごとに N1・N3・N4 の小さな版（数分）、週次に全体（各 1 時間）。
-- 合格の条件の数値は初期値。未検証。
+- 合格の条件の数値は初期値。未検証（E7 の `noisy-neighbor-suite` で見直す）。
 
 ## 12. 未解決の問い
 
@@ -331,7 +331,7 @@ S1 の初期値。CU（容量の単位）の正式な定義と値段は metrics-
 | 代理の接続のユーザー名の形（`agent-<pc-id>@<lc-id>`）で、本家の PLAIN の検査と衝突しないか | E1 の PoC |
 | パッチ P1〜P7 の行数と、本家の版の更新での当て直しの手間 | E1 の PoC（intent.md の Open questions。多ければ ADR-0004 の選択肢 2 のプロキシを再評価） |
 | 接続の試みの頻度を超えたときの振る舞い（遅らせて閉じる）が、各クライアントで再接続の嵐にならないか | E7 の互換性の行列 |
-| S2 のセルで、グループ・トランザクションのコーディネーターをセルの中に置く方法（Kora がどうしているかは未検証） | S2 の前に [metadata-and-control.md](metadata-and-control.md) と一緒に決める |
+| S2 のセルで、グループ・トランザクションのコーディネーターをセルの中に置く方法（Kora の論文はこの点を書いていない。2026-09-27 に確認） | S2 の前に [metadata-and-control.md](metadata-and-control.md) と一緒に決める |
 | CU の正式な定義と、6 節の表の値 | metrics-and-billing の領域と E7 の負荷試験 |
 | 7.3 節の係数と周期 | E7 の負荷試験で、7.5 節の指標を見て決める |
 | 要求の処理時間のクォータを「毎秒の要求の数」で説明するか（Confluent Cloud は要求の数で示す） | metrics-and-billing と console-and-api の領域 |

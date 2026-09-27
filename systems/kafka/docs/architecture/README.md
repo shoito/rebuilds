@@ -76,11 +76,11 @@ NLB（AZ ごとに EIP、cross-zone 無効）──▶ Envoy（SNI の振り分�
 | --- | --- | --- | --- |
 | NFR-001 | 耐久性 | `acks=all` で成功を返した書き込みは失わない。1 つの AZ の喪失で RPO 0 | 複製 3、`min.insync.replicas=2`、AZ ごとに 1 つの複製、unclean なリーダーの選出を禁止、ELR を有効（[ADR-0002](../decisions/0002-replicated-log-with-tiered-storage.md)、[ADR-0012](../decisions/0012-durability-settings-and-elr.md)）。アプリの fsync をしないので、2 つ以上の AZ で同時にメモリーを失うと、同期していない末尾を失いうる（利用者の文書に書く）。リージョンの喪失は NFR-009 |
 | NFR-002 | 可用性（produce と fetch） | Standard：月間 99.95%（S1）→ 99.99%（S2）。Basic：99.5% | 外からの合成監視の produce・consume の成否で測る（[ADR-0047](../decisions/0047-slos-synthetic-probes-and-alerts.md)）。Confluent Cloud は Standard・Enterprise で最大 99.99%（2 eCKU 以上）、Basic で 99.5%（[Cluster types](https://docs.confluent.io/cloud/current/clusters/cluster-types.html)、2026-09-27 に確認）。MSK はマルチ AZ で 99.9%（[MSK SLA](https://aws.amazon.com/msk/sla)、2026-09-27 に確認） |
-| NFR-003 | produce の遅延 | Standard：`acks=all`、同じリージョンのクライアント、1 KB のレコードで p99 50ms 以内、p50 10ms 以内。Basic：p99 100ms | ブローカーで要求を受けてから応答を返すまで。クライアントの `linger.ms` を除く。SLO は合成監視の最悪のブローカーの値で測る。未検証（PoC で測る） |
+| NFR-003 | produce の遅延 | Standard：`acks=all`、同じリージョンのクライアント、1 KB のレコードで p99 50ms 以内、p50 10ms 以内。Basic：p99 100ms | ブローカーで要求を受けてから応答を返すまで。クライアントの `linger.ms` を除く。SLO は合成監視の最悪のブローカーの値で測る。未検証（E1 の `load-test-t1-t2` の T1、E9 の `load-test-scale` の T3 で測る） |
 | NFR-004 | 端から端までの遅延 | produce の開始から、追いついているコンシューマーが受け取るまで p99 100ms 以内（Basic は 200ms） | ディスクレスのトピック（S2）は別の目標（p99 1 秒以内）にする |
-| NFR-005 | パーティションあたりのスループット | 書き込み 10 MB/秒、読み取り 30 MB/秒を保証する | 参考：MSK Express は 1 パーティションあたり最大 15 MB/秒、MSK Serverless は書き込み 5 MB/秒・読み取り 10 MB/秒（[MSK quota](https://docs.aws.amazon.com/msk/latest/developerguide/limits.html)、2026-09-27 に確認）。未検証 |
+| NFR-005 | パーティションあたりのスループット | 書き込み 10 MB/秒、読み取り 30 MB/秒を保証する | 参考：MSK Express は 1 パーティションあたり最大 15 MB/秒、MSK Serverless は書き込み 5 MB/秒・読み取り 10 MB/秒（[MSK quota](https://docs.aws.amazon.com/msk/latest/developerguide/limits.html)、2026-09-27 に確認）。未検証（E1 の `load-test-t1-t2` の T1 で測る） |
 | NFR-006 | 論理クラスタあたりのスループット | Standard：書き込み 250 MB/秒、読み取り 750 MB/秒まで（10 CU）。物理クラスタ 1 つで書き込み 2 GB/秒 | Confluent Cloud の Standard と同じ上限（同上の Cluster types）。S2 の Dedicated で上限を上げる |
-| NFR-007 | 容量の伸び縮み | 論理クラスタの上限の引き上げは 1 分以内（クォータの変更だけ）。物理クラスタへのブローカーの追加と再配置は 30 分以内 | 階層型の保存で、移すのはローカルの新しいセグメントだけにする。Confluent Cloud は 10 eCKU まで数秒で伸びる（同上）。未検証 |
+| NFR-007 | 容量の伸び縮み | 論理クラスタの上限の引き上げは 1 分以内（クォータの変更だけ）。物理クラスタへのブローカーの追加と再配置は 30 分以内 | 階層型の保存で、移すのはローカルの新しいセグメントだけにする。Confluent Cloud は 10 eCKU まで数秒で伸びる（同上）。未検証（E9 の `broker-scale-out` と T7 で測る） |
 | NFR-008 | テナントの分離 | 他のテナントの資源が見える事象 0 件。クォータの中で使うテナントが、他のテナントのせいで絞られる時間を週 5 分以内（99.95%）にし、これを満たすテナントを 99.9% 以上にする | 後半は Kora の指標に倣う。Kora は動的なクォータで、この目標を満たすテナントの割合を 99% から 99.9% 超に上げた（論文の 5.2 節）。測り方は [multi-tenancy-and-quotas.md](multi-tenancy-and-quotas.md) の 7.5 節 |
 | NFR-009 | 復旧 | **AZ の障害**：RPO 0、リーダーの移動を含めて RTO 1 分以内。**リージョンの障害（制御面）**：RPO 1 分・RTO 1 時間。**リージョンの障害（データ面）**：大阪から戻せるのは、**大阪への写しを有効にした論理クラスタ**（Standard、既定は無効）の、S3 に上がったログの前の部分だけ。失いうる範囲は、閉じていないセグメント（最大 1 時間か 256 MiB）＋ LSO で止まった部分 ＋ 上げと CRR の遅れ（99.9% は 15 分以内）。**戻らないもの**：写しを無効にした論理クラスタのレコード、圧縮のトピック（Kafka Streams の changelog を含む）、コンシューマーのオフセット、トランザクションの状態、テナントのメトリクスの履歴。書き込みの経路の作り直しは目標 4 時間、履歴の戻しは目標 24 時間（どちらも SLA にしない） | 範囲の表は [ADR-0045](../decisions/0045-osaka-disaster-recovery-scope.md)。S2 のクラスタの間の複製で、RPO を分の単位にする。**PM の確認事項**：この書き方で利用者に約束するか、SLA と利用規約の文言（intent.md の L6）と合わせて確定する |
 | NFR-010 | 1 GB の書き込みあたりの原価 | Standard のトピック（読み取り 3 倍、保持 7 日）、ブローカーの平均の使用率が設計点の 40% 以上のとき、**NLB の処理のバイトを含めて $0.11 以下**。パーティションで台数が決まる分の原価は、パーティション-時の課金で回収し、この目標の外に置く | 内訳は下の表と [capacity.md](capacity.md) の 8・10 節（u = 40% で $0.107、u = 60% で $0.100）。**S2 の目標**：元の $0.08（NLB を通さない経路、Savings Plans）。ディスクレスのトピックで $0.02 以下。**PM・Dev の確認事項**：統合の工程で $0.08 から改めた（6 節の決定） |
@@ -183,13 +183,17 @@ AZ をまたぐ転送は、送信と受信で各 $0.01/GB（[AWS Architecture Bl
 - **トランザクションの正しさ**：Jepsen が報告した KAFKA-17754 は、KIP-890 の第 2 段（TV2）で解決として閉じられた。修正の版の記載はなく、KAFKA-17582 は未解決（[transactions-and-idempotence.md](transactions-and-idempotence.md) の 2.1 節）。TV2 を固定で有効にし（ADR-0021）、Jepsen の txn と Kafka Streams の 6 時間の試験を毎日回して、本家の版の更新の関門にする（ADR-0022）。直っていない点は、利用者向けの文書に既知の制約として書く。
 - **本家へのパッチの維持**：名前空間のパッチ P1〜P7（ADR-0025、ADR-0026）を、本家の版の更新のたびに当て直す手間。パッチの行数を CI で出し、E1 の PoC で測る。多すぎれば、プロキシの案（ADR-0004 の選択肢 2）を再評価する。本家の版を 2 つ以上遅らせない（ADR-0050）。
 - **うるさい隣人**：1 つのテナントの急増が全体の遅延を上げうる。動的なクォータと背圧（ADR-0027）、接続・パーティション・`transactional.id`・グループの数の上限（ADR-0026）で抑え、N1〜N10 の試験で確かめる。
-- **パーティションの数で決まる原価**：S1 の目標（20 万）では、ブローカーの台数がスループットの 5 倍を超える。パーティション-時の課金で回収する（6 節の決定）。単価と含む数は PM が決める。ブローカーあたりの複製の上限（4,000）を 8,000 に上げられるかは E1 の T2 で確かめる（ADR-0017）。
+- **パーティションの数で決まる原価**：S1 の目標（20 万）では、ブローカーの台数がスループットの 5 倍を超える。パーティション-時の課金で回収する（6 節の決定）。定価は原価の 1.6 倍以上（既定案 Standard 0.32 円・Basic 0.27 円）で、1 ドルが約 168 円を超えると回収が足りなくなる。定価と含む数は PM が確定する。ブローカーあたりの複製の上限（4,000）を 8,000 に上げられるかは E1 の T2 で確かめる（ADR-0017）。
 - **AZ をまたぐ転送と NLB の費用**：Standard のトピックでは、原価の大きな部分になる（3 節の見積もり）。fetch-from-follower を既定にし、ホスト名に AZ ID を入れて経路を同じ AZ に留める（ADR-0013、ADR-0044）。NLB を通さない経路とディスクレスのトピックは S2。
-- **入口の未検証の点**：Envoy の `tcp_proxy` の on-demand CDS で SNI の名前のクラスタを引けるか、1 万のクラスタでのメモリー。E1 の PoC で確かめ、だめなら filter chain の形に替える（ADR-0044）。ブローカーは送信元 IP を知らないので、IP ごとの制限と監査ログの IP は Envoy のアクセスログとの突き合わせに頼る。
+- **入口の未検証の点**：Envoy の `sni_cluster` と `tcp_proxy` の on-demand CDS の組み合わせが動くか（それぞれの機能は文書で確かめた）、1 万のクラスタでのメモリー。E1 の `edge-poc` で確かめ、だめなら filter chain の形に替える（ADR-0044）。ブローカーは送信元 IP を知らないので、IP ごとの制限と監査ログの IP は Envoy のアクセスログとの突き合わせに頼る。
 - **外部の OSS への依存**：Strimzi（本家の新しい版への対応に約 1 か月）、Aiven の RSM（最新の版が 2025-10）。追従が止まったら、ADR-0032 の見直しの条件と、RSM の fork（ADR-0018）で受ける。
 - **ディスクレスのトピックの本家の実装**：KIP-1150 は採択されたが、実装の KIP-1163・1164 は議論中（2026-09-27）。本家が冪等とトランザクションに対応するまで出さない（ADR-0020）。四半期ごとに状態を確かめる。
-- **リージョンの障害**：S1 では、データ面の大阪への複製がない。戻せるのは写しを有効にした論理クラスタの S3 に上がった部分だけ（NFR-009、ADR-0045）。大阪の EC2 の空きは予約しない。SLA と利用規約に書く（intent.md の L6）。
-- **KRaft の過半数のボリュームの喪失**：本家にスナップショットからクォーラムを作り直す正式な手順がない（未検証）。1 時間ごとのスナップショットの写しと、年 2 回の訓練で備える（ADR-0015）。
+- **リージョンの障害**：S1 では、データ面の大阪への複製がない。戻せるのは写しを有効にした論理クラスタの S3 に上がった部分だけ（NFR-009、ADR-0045）。SLA と利用規約に書く（intent.md の L6）。
+- **大阪の EC2 の空き**（2026-09-27 に追加）：東京のリージョンの障害では、他社も大阪へ移り、大阪で EC2 を起動できないおそれがある。起動できなければ、書き込みの経路の作り直し（目標 4 時間）が止まる。対策（既定案。**Ops・PM の確認事項**）：
+  - 大阪（`ap-northeast-3`）に、1 つの物理クラスタのコントローラーの 3 台（m8g.xlarge、AZ ごとに 1 台）と Envoy の 3 台（AZ ごとに 1 台。常設の 2 台はこの予約を使う）の On-Demand Capacity Reservation を持つ。単価（Price List API、2026-09-27 に確認）は m8g.xlarge $0.23188/時、c8g.xlarge $0.20008/時で、予約の全体は月に約 $946、常設の Envoy の分を除いて増えるのは月に約 $654。コントローラーとエッジが立てば、論理クラスタの作成とブートストラップの向け直しまで進められる。
+  - ブローカーは予約しない（東京の本番と同じ台数を予約すると、月に数万ドルになる）。四半期ごとに `osaka-capacity-check`（[disaster-recovery.md](../runbooks/disaster-recovery.md) の D-1）で、r8g・m8g と代わりの型（r7g・m7g）をオンデマンドで少数起動して消し、年 1 回の訓練で本番の台数を 1 時間以内に起動できるかを確かめる。足りなければ、代わりの型を Terraform の変数で選ぶ。
+  - 予約の作成と確認は E12 の `osaka-standby`。
+- **KRaft の過半数のボリュームの喪失**：本家にスナップショットからクォーラムを作り直す正式な手順がない（4.3 の KRaft の運用の文書に載っていない。2026-09-27 に確認）。1 時間ごとのスナップショットの写しと、年 2 回の訓練で備える（ADR-0015）。
 - **法務・経理**：商標、パッチと配る成果物のライセンス、周辺の OSS、個人データ、電気通信事業法、SLA、適格請求書と税、利用規約は、法務・経理の確認待ち（intent.md の L1〜L8）。結論が出るまで、該当する Story の spec を承認しない。
 
 ### 決定（2026-09-27、既定案）
@@ -204,7 +208,8 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **NFR-009**：大阪から戻せるのは、写しを有効にした論理クラスタだけとし、戻らないものを ADR-0045 の表のとおり書いた（3 節）。**PM の確認事項。**
 - **NFR-010 とパーティションの価格**（**PM・Dev の確認事項**）：
   - NFR-010 を「NLB の処理のバイト（書き込み 1 GB あたり約 $0.024）を含めて、設計点で $0.11 以下」に改めた。元の $0.08 は S2 の目標として残す。
-  - パーティションに値段を付ける。CU に含む数（Standard 100、Basic 20）を超えた分を、パーティション-時で課金する。本家の旧来の Basic・Standard が、クラスタに含む数を超えたパーティションに課金していた形に倣う（今の eCKU は直接は課金しない。旧来の単価は未検証）。パーティションの次元は請求の CU から外し、上限と配置にだけ使う（ADR-0037・ADR-0039 を改めた）。
+  - パーティションに値段を付ける。CU に含む数（Standard 100、Basic 20）を超えた分を、パーティション-時で課金する。本家の旧来の Basic・Standard が、クラスタに含む数を超えたパーティションに課金していた形に倣う（今の eCKU は直接は課金しない。旧来の単価は Basic $0.004・Standard $0.0015 のパーティション-時。[2022-06 の価格のページの写し](http://web.archive.org/web/20220601000000/https://www.confluent.io/confluent-cloud/pricing/)、2026-09-27 に確認）。
+  - 定価（2026-09-27 の検証の工程で追加。**PM の確認事項**）：原価の単価のままでは、S1 のパーティション-時の収入（月 $84,680）が、パーティションのための台数の原価（約 $135,000）の 0.63 倍にしかならない。定価を原価の 1.6 倍以上にし、既定案を Standard 0.32 円・Basic 0.27 円のパーティション-時にした（1 ドル 150 円で月 $151,645。計算は [capacity.md](capacity.md) の 10.3 節、[ADR-0037](../decisions/0037-capacity-unit-definition.md)、[ADR-0039](../decisions/0039-jpy-billing-and-free-tier.md)）。パーティションの次元は請求の CU から外し、上限と配置にだけ使う（ADR-0037・ADR-0039 を改めた）。
   - S1 のパーティションの目標（20 万）は変えない。原価のモデルは、パーティションで決まるブローカーの台数（約 150 台）を示し、1 パーティション-時の原価の目安（Standard 約 $0.0012）を出した（[capacity.md](capacity.md) の 10 節）。
 - **ブローカーのホスト名**：ADR-0044 の AZ ID を含む形 `b<broker-id>-<lc-id>.<az-id>.<region>.<brand>.<domain>` に揃えた（multi-tenancy-and-quotas の 4.4 節）。
 - **rack**：AZ ID（ADR-0012）。Strimzi の `rack.topologyKey` を AZ ID のラベル（`topology.k8s.aws/zone-id`）にした（control-plane-and-provisioning の 7.1 節、ADR-0032）。
@@ -221,18 +226,31 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **Epic**：E1〜E12 が MVP（S1）。S2・S3 の Epic は E13〜E19（[roadmap.md](../roadmap.md)）。それ以外は roadmap.md の延期の一覧。
 - 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
 
+### 検証の工程で改めたこと（2026-09-27）
+
+「未検証」の項目を公式の文書・ソース・Jira・Price List API で確かめ、次を改めた。PoC でしか確かめられないものは「未検証」のまま、確かめる Story を書いた。
+
+- **`retention.ms` が 6 時間より短いトピック**：本家は `log.local.retention.ms`（6 時間）がトピックの `retention.ms` を超えると作成を拒否する。作成の後にエージェントが直す案は成り立たないので、名前空間のパッチ（P1）が `local.retention.ms` を足す形にした（[tiered-and-object-storage.md](tiered-and-object-storage.md) の 12 節、[ADR-0019](../decisions/0019-tiered-storage-lifecycle-and-dr-copy.md) の注記）。
+- **`remote.copy.lag.ms`（KIP-1241、4.4 が目標）**：上げを遅らせる設定で、`segment.ms` の代わりにならない。使わず、運用だけの設定にする（同 12 節）。
+- **テナントのメトリクスの 13 か月**：AMP に間引きの機能がないので、1 時間の集計を S3 に置く（[metrics-and-billing.md](metrics-and-billing.md) の 6.2 節）。
+- **パーティション-時の定価**：原価の 1.6 倍以上。既定案は Standard 0.32 円・Basic 0.27 円（**PM の確認事項**。[capacity.md](capacity.md) の 10.3 節）。
+- **大阪の EC2 の空き**：コントローラーとエッジの最小だけ予約し、ブローカーは四半期に確かめる（**Ops・PM の確認事項**。6 節、[ADR-0045](../decisions/0045-osaka-disaster-recovery-scope.md) の注記）。
+- **Cruise Control**：Strimzi 1.2 が同梱し、本家 4.3.1 で動く。残る問いは目標を表せるか（[ADR-0016](../decisions/0016-partition-placement-reassignment-and-cordon.md)）。
+- **ADR-0009 の容量の使用率**：60% から設計点で 85% に改めた理由を注記した（[ADR-0009](../decisions/0009-ebs-gp3-single-log-volume.md)）。
+- **識別子**：本家の名前を含む自前の識別子を改めた（Story `kafka-17754-regression` → `delayed-endtxn-regression`、管理 API の `details.kafka_error_code` → `details.protocol_error_code`、`physical_clusters` の `kafka_version` → `upstream_version`）。
+
 持ち越し（計測・PoC で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | 名前空間のパッチの行数、KafkaPrincipalBuilder で SNI を取り出せるか、代理の接続のユーザー名 | E1 の PoC |
 | 設計点（W = 80 で CPU 60% 未満）、ブローカーあたりの複製の上限（4,000 → 8,000） | E1 の T1・T2（[capacity.md](capacity.md) の 11 節） |
-| Envoy の on-demand CDS、`topology.k8s.aws/zone-id` のラベル、Strimzi のロールの止め方と Java の版 | E1 の PoC |
+| Envoy の `sni_cluster` と on-demand CDS の組み合わせとメモリー、`topology.k8s.aws/zone-id` のラベルが実際のノードに付くこと、Strimzi のロールの止め方 | E1 の `edge-poc`・`eks-and-nodegroups`・`strimzi-roll-control-poc`（ラベルの付け手と Strimzi の Java 21 は 2026-09-27 に文書で確かめた） |
 | 定期のフラッシュの produce の遅延への影響、不正な停止からの回復の時間 | E1 の PoC（ADR-0011） |
 | KIP-1023 を有効にするか | E3・E4 の Jepsen の形と性能のテスト |
 | ローカルの保持を 3 時間にするか | E9 の T11 |
-| パーティション-時の単価と含む数、無料の枠、CU-時・GB の単価 | PM（E11） |
-| 大阪の EC2 の空きの確保 | 年 1 回の訓練 |
+| パーティション-時の定価（既定案：原価の 1.6 倍以上、Standard 0.32 円・Basic 0.27 円）と含む数、無料の枠、CU-時・GB の単価 | PM の確認（E11 の `price-books-and-rating`） |
+| 大阪の EC2 の空きの確保 | コントローラーとエッジの最小は予約（6 節）。ブローカーは四半期の `osaka-capacity-check` と年 1 回の訓練（E12 の `osaka-standby`） |
 | 費用の単価 | E12 の前に、Price List API で置き換える |
 
 ## 7. 領域の文書と ADR の番号

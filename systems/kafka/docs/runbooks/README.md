@@ -93,7 +93,7 @@ Standard の 99.95% は、30 日の予算が約 21.6 分。Basic の 99.5% は�
 
 ## 5. アラートと手順
 
-「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。作るまでは [incident-response.md](incident-response.md) の該当の節で対応する。アラートの条件の実装は [observability.md](../architecture/observability.md) の 8 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。
+「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。作るまでは [incident-response.md](incident-response.md) の該当の節で対応する。アラートの条件の実装は [observability.md](../architecture/observability.md) の 8 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。「状態」の列の Story は、その手順を作る [roadmap.md](../roadmap.md) の Story である。
 
 | アラート（重さ） | 条件（初期値） | 手順 | 状態 |
 | --- | --- | --- | --- |
@@ -115,59 +115,59 @@ Standard の 99.95% は、30 日の予算が約 21.6 分。Basic の 99.5% は�
 | 大阪への写しの遅れ（ticket） | S3 RTC の `ReplicationLatency` が 15 分超、`OperationsFailedReplication` > 0 | [disaster-recovery.md](disaster-recovery.md) の B | 作成済み |
 | KRaft のスナップショットの写し（ticket） | 2 時間ない | [disaster-recovery.md](disaster-recovery.md) の B | 作成済み |
 | 大阪からの合成監視の全失敗（page、SEV1） | 東京の全ブローカーで 3 分 | [disaster-recovery.md](disaster-recovery.md) の A | 作成済み |
-| 表にない API（page） | `UNSUPPORTED_VERSION` の件数 > 0 | `unknown-api-alert.md`（protocol-and-compatibility の 15 節） | E2 で作成 |
-| 古いクライアントの版を使うテナントの告知 | 計画作業 | `client-deprecation-notice.md`（同上） | E2 で作成 |
-| ディスクの使用率 | 70%（ticket）、85%（page）、90%（cordon の確認） | `broker-disk-pressure.md`（broker-and-log-storage の 13 節） | E3 で作成 |
-| 回復が長い | 回復の経過時間が 5 分超 | `broker-slow-recovery.md`（同上） | E3 で作成 |
-| ボリュームの喪失 | I/O エラー、ログのディレクトリの失敗 | `broker-volume-loss.md`（同上） | E3 で作成 |
-| クリーナーの停止（ticket） | クリーナーの最終の実行からの時間 | `log-cleaner-stalled.md`（同上） | E12 で作成 |
-| オフラインのパーティションと人の判断の unclean な選出 | — | `offline-partitions.md`（replication-and-durability の 15 節） | E3 で作成 |
-| 監査の不一致の調べ方 | — | `durability-audit-mismatch.md`（同上） | E3 で作成 |
-| カナリアの抜けの調べ方 | — | `canary-gap.md`（同上） | E3 で作成 |
-| 劣化したブローカー（1 台で ticket、2 台以上で page） | 中央値の 3 倍かつ p99 50ms 超が 5 分 | `slow-broker-demotion.md`（replication-and-durability・metadata-and-control の `broker-demotion.md`・observability の `degraded-broker.md` をまとめた） | E3 で作成 |
-| コントローラーの入れ替え | 投票者の喪失 | `controller-replacement.md`（metadata-and-control の 13 節） | E3 で作成 |
-| KRaft のクォーラムの喪失 | 活動中のコントローラー 0 | `kraft-quorum-loss.md`（同上。[disaster-recovery.md](disaster-recovery.md) の C を詳しくする） | E3 で作成 |
-| 階層型の上げの遅れ | 閉じたセグメントが 30 分上がらない（ticket）、2 時間（page） | `tiered-copy-stalled.md`（tiered-and-object-storage の 15 節） | E4 で作成 |
-| 階層型の監査の重大な破れ | 1 件以上 | `tiered-audit-violation.md`（同上） | E4 で作成 |
-| リモートの読み取りの待ち行列の満杯 | 満杯の件数 > 0 が続く | `remote-fetch-saturation.md`（同上） | E4 で作成 |
-| 論理クラスタの削除の後の東京と大阪の削除の確認 | 日次のジョブの失敗 | `tenant-tiered-data-deletion.md`（同上） | E4 で作成 |
-| ぶら下がったトランザクション（ticket） | 最も古い開いたトランザクションが 15 分を超える | `hanging-transaction.md`（transactions-and-idempotence の 16 節） | E5 で作成 |
-| コーディネーターの読み込みが遅い | `__consumer_offsets`・`__transaction_state` の読み込み | `coordinator-load.md`（consumer-groups の `coordinator-load.md` と transactions の `transaction-coordinator-load.md` をまとめた） | E5 で作成 |
-| テナントが `transactional.id` の上限に当たった | 断った件数 | `txn-limit-exceeded.md`（transactions-and-idempotence の 16 節） | E5 で作成 |
-| リバランスの嵐 | ConsumerGroupHeartbeat の p99 の悪化 | `rebalance-storm.md`（consumer-groups の 15 節） | E6 で作成 |
-| 遅れのメトリクスが止まった | エージェントの遅れの計算の遅延 | `consumer-lag-collector-down.md`（同上） | E6 で作成 |
-| うるさい隣人の調べ方と上書き | — | `noisy-neighbor.md`（multi-tenancy-and-quotas の 15 節） | E7 で作成 |
-| クォータのコーディネーター（ticket） | 配分が 5 分更新されない | `quota-coordinator-down.md`（同上） | E7 で作成 |
-| 上限の上書きの手順と監査 | — | `tenant-limit-override.md`（同上） | E7 で作成 |
-| テナントの境界の破れの調べ方と報告 | — | `tenant-boundary-violation.md`（security-and-acls の 16 節。multi-tenancy の `cross-tenant-exposure.md` をまとめた。報告は法務の L4） | E8 で作成 |
-| API キーの漏洩（シークレットスキャンの通報） | 通報 | `api-key-leak.md`（security-and-acls の 16 節） | E8 で作成 |
-| 制御面が止まっているときの急ぎの失効 | — | `emergency-credential-revoke.md`（同上） | E8 で作成 |
-| KMS のキーを使えない（BYOK の取り消しを含む） | EBS の付け替えの失敗、KMS の拒否 | `kms-key-access-lost.md`（同上） | E8 で作成 |
-| 反映の遅れ（page） | `observed_generation` の遅れが 5 分 | `agent-down.md`（control-plane-and-provisioning の 18 節） | E9 で作成 |
-| 望ましい状態と実際の食い違いが戻らない | 反映の後の合成の失敗 | `reconcile-drift.md`（同上） | E9 で作成 |
-| 物理クラスタの作成と burn-in | 計画作業 | `physical-cluster-create.md`（同上） | E9 で作成 |
-| 容量（ticket・page） | ブローカーの送信・EBS が基準の 70% を 1 時間（ticket）、85% を 15 分（page）。物理クラスタの `score` が 0.6 超（ticket） | `broker-scale-out.md`（control-plane の提案。capacity の `capacity-add-brokers.md` をまとめた） | E9 で作成 |
-| ブローカーの退役 | 計画作業 | `broker-retire.md`（control-plane の提案。metadata-and-control の `broker-decommission.md` をまとめた） | E9 で作成 |
-| 止まった再配置 | 2 時間進まない | `stuck-reassignment.md`（metadata-and-control の 13 節） | E9 で作成 |
-| 受け入れ可能な物理クラスタがない | 作成の待ちの件数 > 0 | `placement-capacity-exhausted.md`（control-plane-and-provisioning の 18 節） | E9 で作成 |
-| 管理 API の停止 | 管理 API の可用性の SLO | `management-api-outage.md`（console-and-api の 15 節） | E10 で作成 |
-| `/v1` の廃止の告知 | 計画作業 | `api-deprecation.md`（同上） | E10 で作成 |
-| CLI・プロバイダーの公開と戻し | 計画作業 | `cli-release.md`、`terraform-provider-release.md`（同上） | E10 で作成 |
-| 使用量の照合の不一致（ticket） | 1% を超える | `usage-reconciliation-mismatch.md`（metrics-and-billing の 15 節） | E11 で作成 |
-| 使用量の経路の長い停止 | 最新の分の遅れ 15 分、3 日を超える停止 | `usage-pipeline-backlog.md`（同上） | E11 で作成 |
-| 月の締め | 計画作業 | `month-end-close.md`（同上） | E11 で作成 |
-| 誤った請求書の訂正 | 締めの前の検査 | `invoice-correction.md`（同上。経理の確認待ち、L7） | E11 で作成 |
-| 未払いの停止と再開 | 期限から 30 日 | `dunning-suspension.md`（同上。法務の確認待ち、L8） | E11 で作成 |
-| 証明書の期限 | 30 日前（ticket）、7 日前（page） | `tls-certificate-renewal.md`（security-and-acls・infrastructure） | E12 で作成 |
-| 1 つの AZ の Envoy の停止と降格の判断 | NLB の AZ の健全なターゲットが 0 | `edge-az-outage.md`（infrastructure の 17 節） | E12 で作成 |
-| sni-router の停止 | xDS の更新が 10 分ない | `sni-router-down.md`（同上） | E12 で作成 |
-| 大阪の EC2 の空きの確認 | 年次 | `osaka-capacity-check.md`（同上） | E12 で作成 |
-| 合成監視の誤報の見分け方 | probe のアカウント側の障害 | `synthetic-probe-false-alarm.md`（observability の 14 節） | E12 で作成 |
-| Strimzi の版の更新と戻し | 計画作業 | `strimzi-upgrade.md`（control-plane・delivery） | E12 で作成 |
-| `metadata.version` と機能の版の引き上げ | 計画作業 | `feature-version-bump.md`（delivery の 13 節。[deploy-and-rollback.md](deploy-and-rollback.md) の D を詳しくする） | E12 で作成 |
-| スキーマレジストリの誤った削除・破損 | ID の取得の 404 の率 | `schema-registry-restore.md`（connectors-and-schema の 12 節） | E16 で作成 |
-| 悪意のあるプラグイン | 走査、外への通信の異常 | `connector-malicious-plugin.md`（同上） | E17 で作成 |
-| 出口のプロキシの障害と許可リストの誤り | プロキシの健全性 | `connector-egress-proxy.md`（同上） | E17 で作成 |
+| 表にない API（page） | `UNSUPPORTED_VERSION` の件数 > 0 | `unknown-api-alert.md`（protocol-and-compatibility の 15 節） | E2 の `unknown-api-alert` で作成 |
+| 古いクライアントの版を使うテナントの告知 | 計画作業 | `client-deprecation-notice.md`（同上） | E2 の `client-version-telemetry` で作成 |
+| ディスクの使用率 | 70%（ticket）、85%（page）、90%（cordon の確認） | `broker-disk-pressure.md`（broker-and-log-storage の 13 節） | E3 の `disk-pressure-ladder` で作成 |
+| 回復が長い | 回復の経過時間が 5 分超 | `broker-slow-recovery.md`（同上） | E12 の `broker-storage-alerts` で作成 |
+| ボリュームの喪失 | I/O エラー、ログのディレクトリの失敗 | `broker-volume-loss.md`（同上） | E3 の `broker-volume-replacement` で作成 |
+| クリーナーの停止（ticket） | クリーナーの最終の実行からの時間 | `log-cleaner-stalled.md`（同上） | E12 の `broker-storage-alerts` で作成 |
+| オフラインのパーティションと人の判断の unclean な選出 | — | `offline-partitions.md`（replication-and-durability の 15 節） | E3 の `fault-injection-matrix` で作成 |
+| 監査の不一致の調べ方 | — | `durability-audit-mismatch.md`（同上） | E3 の `durability-audit-checks` で作成 |
+| カナリアの抜けの調べ方 | — | `canary-gap.md`（同上） | E3 の `canary-producer-consumer` で作成 |
+| 劣化したブローカー（1 台で ticket、2 台以上で page） | 中央値の 3 倍かつ p99 50ms 超が 5 分 | `slow-broker-demotion.md`（replication-and-durability・metadata-and-control の `broker-demotion.md`・observability の `degraded-broker.md` をまとめた） | E3 の `slow-broker-demotion` で作成 |
+| コントローラーの入れ替え | 投票者の喪失 | `controller-replacement.md`（metadata-and-control の 13 節） | E3 の `controller-replacement` で作成 |
+| KRaft のクォーラムの喪失 | 活動中のコントローラー 0 | `kraft-quorum-loss.md`（同上。[disaster-recovery.md](disaster-recovery.md) の C を詳しくする） | E3 の `controller-replacement`・E12 の `metadata-snapshot-backup` で作成 |
+| 階層型の上げの遅れ | 閉じたセグメントが 30 分上がらない（ticket）、2 時間（page） | `tiered-copy-stalled.md`（tiered-and-object-storage の 15 節） | E4 の `rsm-tenant-wrapper` で作成 |
+| 階層型の監査の重大な破れ | 1 件以上 | `tiered-audit-violation.md`（同上） | E4 の `tiered-durability-audit` で作成 |
+| リモートの読み取りの待ち行列の満杯 | 満杯の件数 > 0 が続く | `remote-fetch-saturation.md`（同上） | E7 の `remote-fetch-quota` で作成 |
+| 論理クラスタの削除の後の東京と大阪の削除の確認 | 日次のジョブの失敗 | `tenant-tiered-data-deletion.md`（同上） | E8 の `data-deletion-verification` で作成 |
+| ぶら下がったトランザクション（ticket） | 最も古い開いたトランザクションが 15 分を超える | `hanging-transaction.md`（transactions-and-idempotence の 16 節） | E5 の `hanging-txn-detector` で作成 |
+| コーディネーターの読み込みが遅い | `__consumer_offsets`・`__transaction_state` の読み込み | `coordinator-load.md`（consumer-groups の `coordinator-load.md` と transactions の `transaction-coordinator-load.md` をまとめた） | E6 の `coordinator-fault-injection` で作成 |
+| テナントが `transactional.id` の上限に当たった | 断った件数 | `txn-limit-exceeded.md`（transactions-and-idempotence の 16 節） | E5 の `transactional-id-limit` で作成 |
+| リバランスの嵐 | ConsumerGroupHeartbeat の p99 の悪化 | `rebalance-storm.md`（consumer-groups の 15 節） | E7 の `group-request-quota` で作成 |
+| 遅れのメトリクスが止まった | エージェントの遅れの計算の遅延 | `consumer-lag-collector-down.md`（同上） | E6 の `consumer-lag-collector` で作成 |
+| うるさい隣人の調べ方と上書き | — | `noisy-neighbor.md`（multi-tenancy-and-quotas の 15 節） | E7 の `noisy-neighbor-suite` で作成 |
+| クォータのコーディネーター（ticket） | 配分が 5 分更新されない | `quota-coordinator-down.md`（同上） | E7 の `quota-coordinator` で作成 |
+| 上限の上書きの手順と監査 | — | `tenant-limit-override.md`（同上） | E7 の `tenant-limit-override` で作成 |
+| テナントの境界の破れの調べ方と報告 | — | `tenant-boundary-violation.md`（security-and-acls の 16 節。multi-tenancy の `cross-tenant-exposure.md` をまとめた。報告は法務の L4） | E8 の `tenant-authorizer` で作成 |
+| API キーの漏洩（シークレットスキャンの通報） | 通報 | `api-key-leak.md`（security-and-acls の 16 節） | E8 の `secret-scanning-partner` で作成 |
+| 制御面が止まっているときの急ぎの失効 | — | `emergency-credential-revoke.md`（同上） | E8 の `reauth-and-revocation` で作成 |
+| KMS のキーを使えない（BYOK の取り消しを含む） | EBS の付け替えの失敗、KMS の拒否 | `kms-key-access-lost.md`（同上） | E12 の `kms-and-encryption-baseline` で作成 |
+| 反映の遅れ（page） | `observed_generation` の遅れが 5 分 | `agent-down.md`（control-plane-and-provisioning の 18 節） | E9 の `desired-state-reconcile` で作成 |
+| 望ましい状態と実際の食い違いが戻らない | 反映の後の合成の失敗 | `reconcile-drift.md`（同上） | E9 の `desired-state-reconcile` で作成 |
+| 物理クラスタの作成と burn-in | 計画作業 | `physical-cluster-create.md`（同上） | E9 の `pc-provisioner` で作成 |
+| 容量（ticket・page） | ブローカーの送信・EBS が基準の 70% を 1 時間（ticket）、85% を 15 分（page）。物理クラスタの `score` が 0.6 超（ticket） | `broker-scale-out.md`（control-plane の提案。capacity の `capacity-add-brokers.md` をまとめた） | E9 の `broker-scale-out` で作成 |
+| ブローカーの退役 | 計画作業 | `broker-retire.md`（control-plane の提案。metadata-and-control の `broker-decommission.md` をまとめた） | E9 の `broker-retire` で作成 |
+| 止まった再配置 | 2 時間進まない | `stuck-reassignment.md`（metadata-and-control の 13 節） | E9 の `reassignment-executor` で作成 |
+| 受け入れ可能な物理クラスタがない | 作成の待ちの件数 > 0 | `placement-capacity-exhausted.md`（control-plane-and-provisioning の 18 節） | E9 の `placement` で作成 |
+| 管理 API の停止 | 管理 API の可用性の SLO | `management-api-outage.md`（console-and-api の 15 節） | E10 の `management-api-foundation` で作成 |
+| `/v1` の廃止の告知 | 計画作業 | `api-deprecation.md`（同上） | E10 の `openapi-contract` で作成 |
+| CLI・プロバイダーの公開と戻し | 計画作業 | `cli-release.md`、`terraform-provider-release.md`（同上） | E10 の `cli-provider-release` で作成 |
+| 使用量の照合の不一致（ticket） | 1% を超える | `usage-reconciliation-mismatch.md`（metrics-and-billing の 15 節） | E11 の `usage-reconciliation` で作成 |
+| 使用量の経路の長い停止 | 最新の分の遅れ 15 分、3 日を超える停止 | `usage-pipeline-backlog.md`（同上） | E11 の `usage-pipeline` で作成 |
+| 月の締め | 計画作業 | `month-end-close.md`（同上） | E11 の `invoices` で作成 |
+| 誤った請求書の訂正 | 締めの前の検査 | `invoice-correction.md`（同上。経理の確認待ち、L7） | E11 の `invoices` で作成 |
+| 未払いの停止と再開 | 期限から 30 日 | `dunning-suspension.md`（同上。法務の確認待ち、L8） | E11 の `dunning-and-suspension` で作成 |
+| 証明書の期限 | 30 日前（ticket）、7 日前（page） | `tls-certificate-renewal.md`（security-and-acls・infrastructure） | E12 の `tenant-certificate-rotation` で作成 |
+| 1 つの AZ の Envoy の停止と降格の判断 | NLB の AZ の健全なターゲットが 0 | `edge-az-outage.md`（infrastructure の 17 節） | E12 の `edge-production` で作成 |
+| sni-router の停止 | xDS の更新が 10 分ない | `sni-router-down.md`（同上） | E12 の `edge-production` で作成 |
+| 大阪の EC2 の空きの確認（予約の健全性、ブローカーの型のオンデマンドの起動） | 四半期（予約が `active` でないときは ticket） | [disaster-recovery.md](disaster-recovery.md) の D-1（`osaka-capacity-check`。個別の手順にするときは同じ名前で作る） | 作成済み（予約は E12 の `osaka-standby`） |
+| 合成監視の誤報の見分け方 | probe のアカウント側の障害 | `synthetic-probe-false-alarm.md`（observability の 14 節） | E12 の `synthetic-probes` で作成 |
+| Strimzi の版の更新と戻し | 計画作業 | `strimzi-upgrade.md`（control-plane・delivery） | E12 の `rolling-update-guard` で作成 |
+| `metadata.version` と機能の版の引き上げ | 計画作業 | `feature-version-bump.md`（delivery の 13 節。[deploy-and-rollback.md](deploy-and-rollback.md) の D を詳しくする） | E12 の `upstream-upgrade-workflow` で作成 |
+| スキーマレジストリの誤った削除・破損 | ID の取得の 404 の率 | `schema-registry-restore.md`（connectors-and-schema の 12 節） | E16 の `sr-core-api` で作成 |
+| 悪意のあるプラグイン | 走査、外への通信の異常 | `connector-malicious-plugin.md`（同上） | E17 の `custom-connector-upload` で作成 |
+| 出口のプロキシの障害と許可リストの誤り | プロキシの健全性 | `connector-egress-proxy.md`（同上） | E17 の `connector-runtime` で作成 |
 
 - 本家の版の取り込みの手順（protocol-and-compatibility の `upstream-upgrade.md` の候補）は、[deploy-and-rollback.md](deploy-and-rollback.md) の D にまとめた。大阪での戻し（tiered の `osaka-restore.md` の候補）は [disaster-recovery.md](disaster-recovery.md) の A-4 にまとめた。AZ の喪失（replication の `az-loss.md` の候補）は [incident-response.md](incident-response.md) の「AZ の喪失」にまとめた。
 
@@ -188,7 +188,7 @@ Standard の 99.95% は、30 日の予算が約 21.6 分。Basic の 99.5% は�
 | [console-and-api.md](../architecture/console-and-api.md) | `management-api-outage.md`、`api-deprecation.md`、`cli-release.md`、`terraform-provider-release.md` |
 | [metrics-and-billing.md](../architecture/metrics-and-billing.md) | `usage-reconciliation-mismatch.md`、`usage-pipeline-backlog.md`、`month-end-close.md`、`invoice-correction.md`、`dunning-suspension.md` |
 | [connectors-and-schema.md](../architecture/connectors-and-schema.md) | `schema-registry-restore.md`、`connector-malicious-plugin.md`、`connector-egress-proxy.md` |
-| [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | [disaster-recovery.md](disaster-recovery.md)、[incident-response.md](incident-response.md) の「AZ の喪失」「エッジの不調」「KMS のスロットリング」、`edge-az-outage.md`、`sni-router-down.md`、`tls-certificate-renewal.md`、`osaka-capacity-check.md`、`broker-scale-out.md` |
+| [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | [disaster-recovery.md](disaster-recovery.md)、[incident-response.md](incident-response.md) の「AZ の喪失」「エッジの不調」「KMS のスロットリング」、`edge-az-outage.md`、`sni-router-down.md`、`tls-certificate-renewal.md`、[disaster-recovery.md](disaster-recovery.md) の D-1（`osaka-capacity-check`）、`broker-scale-out.md` |
 | [observability.md](../architecture/observability.md) | アラートの条件の実装側（8 節）、`synthetic-probe-false-alarm.md` |
 | [delivery.md](../architecture/delivery.md) | [deploy-and-rollback.md](deploy-and-rollback.md)、`strimzi-upgrade.md`、`feature-version-bump.md` |
 | [data-model.md](../architecture/data-model.md) | 索引のみ。運用の対象は各領域の文書で扱う |
@@ -199,7 +199,8 @@ Standard の 99.95% は、30 日の予算が約 21.6 分。Basic の 99.5% は�
 | --- | --- | --- |
 | 東京の喪失の訓練（staging。制御面の切り替え、書き込みの経路の作り直し、履歴の戻し） | 四半期 | [disaster-recovery.md](disaster-recovery.md) の D（合格基準は [quality.md](../quality.md) の 2.4 節） |
 | AZ の退避の訓練（本番。1 つの AZ のブローカーを降格してリーダーを移し、戻す） | 四半期 | [disaster-recovery.md](disaster-recovery.md) の D、[replication-and-durability.md](../architecture/replication-and-durability.md) の 8.4 節 |
-| 大阪での本番の台数の起動の確認 | 年 1 回 | [disaster-recovery.md](disaster-recovery.md) の D、`osaka-capacity-check.md`（E12） |
+| 大阪の EC2 の空きの確認（`osaka-capacity-check`） | 四半期 | [disaster-recovery.md](disaster-recovery.md) の D-1 |
+| 大阪での本番の台数の起動の確認 | 年 1 回 | [disaster-recovery.md](disaster-recovery.md) の D |
 | KRaft のクォーラムの喪失とスナップショットからの復旧（dp-verify） | 年 2 回 | [disaster-recovery.md](disaster-recovery.md) の C・D（[ADR-0015](../decisions/0015-kraft-dynamic-quorum-and-controller-sizing.md)） |
 | 大阪の写しの戻しの演習（staging） | 四半期 | [disaster-recovery.md](disaster-recovery.md) の A-4（[ADR-0019](../decisions/0019-tiered-storage-lifecycle-and-dr-copy.md)） |
 | 大阪の待機の構成の確認（合成監視、Terraform の差分、Global Database と CRR の遅れ） | 月次 | [disaster-recovery.md](disaster-recovery.md)、[infrastructure.md](../architecture/infrastructure.md) の 8.2 節 |

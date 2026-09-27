@@ -43,7 +43,7 @@ date: 2026-09-27
 | 設定 | 値 |
 | --- | --- |
 | `remote.storage.enable` | 削除のポリシーのトピックで常に `true`。テナントは変えられない |
-| `local.retention.ms` | 6 時間（テナントは変えられない） |
+| `local.retention.ms` | 6 時間（テナントは変えられない）。`retention.ms` が 6 時間より短いトピックは `retention.ms` と同じ値（下の注記） |
 | `segment.bytes`・`segment.ms` | 256 MiB・1 時間（[ADR-0010](0010-segment-retention-and-compaction-defaults.md)） |
 | `cleanup.policy` の変更 | 階層型のトピックを `compact` にする変更は、本家の検査で `INVALID_CONFIG` になる（本家と同じ）。`compact` から `delete` への変更の後は、データ面のエージェントが `remote.storage.enable=true` を足す |
 | 圧縮のトピック | ローカルだけ。論理クラスタごとの合計の上限（[ADR-0026](0026-tenant-quotas-and-tier-limits.md)） |
@@ -61,6 +61,8 @@ date: 2026-09-27
 ### 監査
 
 - 日次で、RLMM の有効なセグメントの範囲の連続、S3 のオブジェクトの存在、保持の違反、孤児、RLMM の複製の間の一致を確かめる。重大な破れはページングし、該当するパーティションの削除を止める。
+
+> 2026-09-27 の注記：本家の 4.3 は、ブローカーの既定の `log.local.retention.ms`（6 時間）がトピックの `retention.ms` を超えると、トピックの作成・設定の変更を `INVALID_CONFIG` で拒否する（[LogConfig.java](https://github.com/apache/kafka/blob/4.3/storage/src/main/java/org/apache/kafka/storage/internals/log/LogConfig.java)、2026-09-27 に確認）。許可リストは `retention.ms` を 1 時間から許すので、1〜6 時間のトピックが作れない。名前空間のパッチ（P1）が、その要求に `local.retention.ms = retention.ms` を足す形に改めた（[tiered-and-object-storage.md](../architecture/tiered-and-object-storage.md) の 12 節）。「テナントは `local.retention.ms` を変えられない」は変えない。
 
 ## Consequences
 
