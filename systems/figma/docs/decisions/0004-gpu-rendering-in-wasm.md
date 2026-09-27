@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -29,22 +29,22 @@ GPU の抽象の実装の候補：
 
 ## Decision
 
-1 と a を採用する。詳細は rendering-engine.md（これから作る）に書く。
+1 と a を採用する。詳細は [rendering-engine.md](../architecture/rendering-engine.md) に書く。形は [ADR-0013](0013-scene-graph-and-tile-rendering.md)、バックエンドの選び方は [ADR-0014](0014-gpu-backend-selection-and-fallback.md)、テキストは [ADR-0015](0015-text-shaping-and-glyph-rendering.md) で決めた。
 
 - **シーングラフは自前**：`doc-model` のノードの木から、描画用の木（変換、境界の箱、描画の命令）を作る。ノードの変更は、影響する部分だけを作り直す。
 - **タイルとカリング**：画面を固定の大きさのタイルに分け、見えないノードは描かない。境界の箱の空間索引（R-tree など）で、ヒットテストとカリングを行う。ズームの段階ごとに、描いたタイルを GPU のテクスチャにキャッシュする。
 - **GPU の抽象**：エンジンは自前の `gpu` のインターフェース（描画の呼び出しの引数を明示し、uniform をまとめて送る形。本家の WebGPU 対応の形に倣う）だけを呼ぶ。実装は wgpu にし、シェーダーは WGSL で 1 つに書く。
 - **WebGL2 を必須、WebGPU を使えるときに使う**：
-  - 起動は WebGL2 で速く始め、WebGPU が使えるかの確認は起動の後で行う（本家と同じ）。
+  - 起動は WebGPU を試して始め、互換性のテストは起動の後に、読み込みを止めない形で走らせる（本家と同じ。[Figma rendering: Powered by WebGPU](https://www.figma.com/blog/figma-rendering-powered-by-webgpu/)、2025-09-18。順序と条件は [ADR-0014](0014-gpu-backend-selection-and-fallback.md)）。WebGPU を使えない端末、ブロックリストに載る端末、前のセッションで戻った端末は WebGL2 で始める。
   - WebGPU で失敗が起きたら、セッションの途中でも WebGL2 に戻す。失敗の率が高い端末は、ブロックリストで WebGPU を使わない。
-  - wgpu で、1 つのビルドの中で実行時に切り替えられるかは **未検証**（不具合の報告がある。[gfx-rs/wgpu#6166](https://github.com/gfx-rs/wgpu/issues/6166)、2026-09-27 に確認）。E2 の前の PoC で確かめ、できなければ WebGL2 のビルドと WebGPU のビルドを配り、読み込み時に選ぶ。
-- **テキスト**：フォントの読み込み・整形（shaping）・改行はエンジンの中で行い、ブラウザのテキストの描画を使わない。整形は HarfBuzz と同じ振る舞いの Rust の実装（rustybuzz など）を候補にする。グリフは輪郭をパスとして GPU で描くか、アトラスにラスタライズする。どちらにするか、和文のフォールバック（欧文のフォントに和文がないとき）と合わせて、rendering-engine.md で決める。
+  - wgpu の「WebGPU と WebGL の両方を有効にすると WebGL に戻らない」不具合（[gfx-rs/wgpu#6166](https://github.com/gfx-rs/wgpu/issues/6166)）は、`wgpu::util::new_instance_with_webgpu_detection` を足した [gfx-rs/wgpu#6371](https://github.com/gfx-rs/wgpu/pull/6371) で解決した（2026-09-27 に確認）。1 つのビルドに両方を入れ、実行時に選ぶ。キャンバスを作り直しての切り替えの時間と WASM の大きさは E2 の前の PoC で確かめ、条件を満たさなければ WebGL2 のビルドと WebGPU のビルドを配って読み込み時に選ぶ（ADR-0014 の退路）。
+- **テキスト**：フォントの読み込み・整形（shaping）・改行はエンジンの中で行い、ブラウザのテキストの描画を使わない。整形は HarfBuzz と同じ振る舞いの Rust の実装の HarfRust を使う（rustybuzz は開発を終えてアーカイブされ、HarfRust への移行を勧めている。[harfbuzz/rustybuzz](https://github.com/harfbuzz/rustybuzz)、2026-09-27 に確認）。グリフの描き方（48 px 以下はアトラス、超えたらパス）と和文のフォールバックは [ADR-0015](0015-text-shaping-and-glyph-rendering.md) で決めた。
 - **画像**：デコードは Web Worker で行い、ズームに合わせた縮小版（ミップマップ）を持つ。メモリの上限（NFR-004）を超えそうなら、見えない画像から GPU とメモリから外す。
-- **サーバーでの描画**：同じエンジンをネイティブにビルドし、Worker で wgpu のネイティブの実装（Vulkan、または CPU のソフトウェアの描画）で描く。書き出しとサムネイルに使う。
+- **サーバーでの描画**：同じエンジンをネイティブにビルドし、Render Worker で描く。書き出しとサムネイルに使う。ECS Fargate には GPU がないので、サーバーの描画は CPU だけで、wgpu の Vulkan のバックエンドを Mesa の lavapipe（CPU で動く Vulkan の実装）の上で動かす（[ADR-0014](0014-gpu-backend-selection-and-fallback.md)、[ADR-0034](0034-export-rendering-split.md)）。
 - 2 を採らない理由：本家が避けた理由（文字の描画の差、GPU の保証がない、マスクとブレンドモードの差）が今も残る。10 万ノードで 60fps を守れない。
 - 3 を採らない理由：
   - CanvasKit は C++ の Skia で、WASM のバイナリが大きい。エンジンの他の部分（Rust）との間で、境界をまたぐ呼び出しが増える。
-  - Vello は Rust で有望だが、WebGPU の compute shader を前提にし、WebGL2 で動かない（**未検証**。rendering-engine.md で確かめる）。
+  - Vello は Rust で有望で、Vello GPU（旧 `vello_hybrid`）は WebGL2 にも対応した。ただし、マスクの層・複雑なフィルター・非分離のブレンドの一部は未対応で panic し、WebGL2 では wgpu を通らない独自の経路を使う（[vello_gpu の README](https://github.com/linebender/vello/tree/main/vello_gpu)、2026-09-27 に確認）。GPU の抽象（下の a）とバックエンドの切り替えの外に出るので採らない。比較の参照の実装には使う（[ADR-0013](0013-scene-graph-and-tile-rendering.md)）。
   - どちらも、タイルのキャッシュとカリングを、描画のライブラリの外で自前に持つ必要は残る。
 - 4 を採らない理由：WebGPU を使えない端末とブラウザの版が、日本の企業の管理された端末に残る（**未検証**。対応の割合は E2 の前に計測する）。
 - b を採らない理由：シェーダーを 2 つの言語（GLSL と WGSL）で持つか、本家のように変換の仕組みを自前で持つことになる。wgpu は、その変換（naga）を含む。
@@ -56,7 +56,8 @@ GPU の抽象の実装の候補：
   - WebGPU の compute shader（ぼかし）や MSAA を、後から使える。
 - 引き受けるコスト：
   - テキストの整形・改行・フォントのフォールバックを、自前で持つ。
-  - wgpu の WebGL2 の経路の性能と、実行時の切り替えは PoC で確かめる。
+  - サーバーの描画は CPU（lavapipe）なので遅い。書き出しの時間は E10 の前に計測する。
+  - wgpu の WebGL2 の経路の性能と、キャンバスを作り直しての切り替えの時間は、E2 の前の PoC で確かめる。
   - 描画の正しさは、参照画像との比較で守る。GPU と端末ごとの小さな差の許容範囲を決める必要がある。
 
 ## Confirmation

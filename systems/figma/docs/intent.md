@@ -1,7 +1,7 @@
 # Intent: Figma を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: accepted
 - Date: 2026-09-27
 
 ## Problem
@@ -91,7 +91,7 @@
 
 ## Success criteria
 
-MVP のリリースの判断に使う。計測の方法は quality.md（これから作る）と runbooks で決める。
+MVP のリリースの判断に使う。計測の方法は [quality.md](quality.md) と [runbooks/](runbooks/README.md) にある。
 
 | # | 基準 | 目標 |
 | --- | --- | --- |
@@ -102,13 +102,14 @@ MVP のリリースの判断に使う。計測の方法は quality.md（これ�
 | SC-5 | 日本語 | IME での入力・変換・確定の不具合の報告が、4 週間で重大なもの 0 件 |
 | SC-6 | 書き出し | 参照ファイルの書き出し（PNG・SVG・PDF）が、参照画像との差の許容範囲に収まる |
 
-非機能要件の一覧は [architecture/README.md](architecture/README.md) の 3 節（NFR-001〜010）にある。
+非機能要件の一覧は [architecture/README.md](architecture/README.md) の 4 節（NFR-001〜010）にある。
 
 ## Open questions
 
-- マルチプレイヤーの方式（OT、CRDT、中央のサーバーの順序） → 中央のサーバーの順序にする方向（[ADR-0002](decisions/0002-central-authoritative-multiplayer.md)、proposed）。
-- 描画のエンジンを Rust で書くか、本家と同じ C++ で書くか → Rust にする方向（[ADR-0001](decisions/0001-platform-and-stack.md)、proposed）。
-- キャンバスの上のテキストで、IME の入力をどう受けるか（隠した `textarea` か、EditContext API か）。editor-and-tools の領域で決め、E4 の前の PoC で確かめる。
+- マルチプレイヤーの方式（OT、CRDT、中央のサーバーの順序） → 中央のサーバーの順序に決めた（[ADR-0002](decisions/0002-central-authoritative-multiplayer.md)、accepted）。
+- 描画のエンジンを Rust で書くか、本家と同じ C++ で書くか → Rust に決めた（[ADR-0001](decisions/0001-platform-and-stack.md)、accepted）。
+- キャンバスの上のテキストで、IME の入力をどう受けるか → 全ブラウザで隠した `textarea` に決めた（[ADR-0017](decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方とイベントの順序は E4 の前の PoC で確かめる。
+- 「プロジェクト」の呼び名：本家は 2026-08-03 から「フォルダー」へ改名している（中身と権限は変わらない。[Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、2026-09-27 に確認）。本システムは「プロジェクト」のまま進め、表とコードの名前も `project` にする。画面の呼び名を合わせるかは PM が E9 の前に決める（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 15 節）。
 - 無料のプランの範囲（ファイル数、版の履歴の日数。本家の Starter は履歴 30 日。[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。PM が決める。
 
 ## 法務の確認待ち

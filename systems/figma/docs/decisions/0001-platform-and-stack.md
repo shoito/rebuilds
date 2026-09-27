@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -51,8 +51,8 @@ Figma には、他の題材にない条件が 2 つある。
   - 運用・CI・セキュリティの仕組みは、他の題材のものを使い回せる。
 - 引き受けるコスト：
   - 言語が 2 つ（Rust と TypeScript）になる。境界の型は生成し、手で書き写さない。
-  - Rust のビルドの時間と、WASM のバイナリの大きさ。バイナリは圧縮後 5 MB 以内を目安にし、delivery.md で計測する。
-  - 本家が使う C++ の資産（Skia など）は、そのままでは使えない。テキストの整形・ラスタライズは Rust のライブラリを使う（[ADR-0004](0004-gpu-rendering-in-wasm.md)）。
+  - Rust のビルドの時間と、WASM のバイナリの大きさ。バイナリは圧縮後 5 MB 以内を目安にし、CI で計測する（[delivery.md](../architecture/delivery.md) の 3.3 節、[ADR-0054](0054-wasm-native-parity-and-bundle-budgets.md)）。
+  - 本家が使う C++ の資産（Skia など）は、そのままでは使えない。テキストの整形・ラスタライズは Rust のライブラリを使う（[ADR-0004](0004-gpu-rendering-in-wasm.md)、[ADR-0015](0015-text-shaping-and-glyph-rendering.md)）。
   - `unsafe` は、WASM と JavaScript の境界、GPU のバッファの扱いなど、要る箇所に限り、1 か所ずつレビューする。
 
 ## Confirmation
