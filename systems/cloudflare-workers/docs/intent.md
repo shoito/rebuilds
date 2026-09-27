@@ -1,7 +1,7 @@
 # Intent: Cloudflare Workers を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: accepted
 - Date: 2026-09-27
 
 ## Problem
@@ -20,15 +20,19 @@ Web のアプリの処理を利用者の近くで動かすと、応答が速く�
 Web の開発者が、CLI から 1 回のコマンドで関数をデプロイし、利用者の近くで動かせる基盤を作り直す。次の 3 つの価値を満たす。
 
 1. **速い**：isolate の起動は 5ms 未満で、利用者に近い拠点で応答する。日本の利用者には、東京・大阪から応答する。
-2. **標準のまま書ける**：`fetch`・`Request`・`Response`・Streams・Web Crypto・WebSocket など、WinterTC の最小の共通 API に沿う。手元でも本番と同じランタイムで動かせる。
+2. **標準のまま書ける**：`fetch`・`Request`・`Response`・Streams・Web Crypto など、WinterTC の最小の共通 API（ECMA-429）に沿う。WebSocket は ECMA-429 に含まれないので、追加の API として持つ。手元でも本番と同じランタイムで動かせる。
 3. **安全で止まらない**：信頼できないコードを、多層の防御で隔離する。制御プレーンが止まっても、デプロイ済みの関数は動き続ける。
 
 ### MVP（S1）に含める
 
 - **関数の実行**：JavaScript・TypeScript（ES モジュール）と WebAssembly。HTTP の要求で起動する。isolate で動かし、利用者に近いリージョンで応答する（[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0002](decisions/0002-isolation-model.md)）
-- **標準の Web API**：`fetch`、`Request`・`Response`・`Headers`、Streams、Web Crypto、`URL`・`URLPattern`、`TextEncoder`・`TextDecoder`、WebSocket（サーバーとクライアント）、`setTimeout`、`structuredClone`。互換の日付と互換のフラグで、振る舞いを固定する
+- **標準の Web API**：`fetch`、`Request`・`Response`・`Headers`、Streams、Web Crypto、`URL`・`URLPattern`、`TextEncoder`・`TextDecoder`、`setTimeout`、`structuredClone`。互換の日付と互換のフラグで、振る舞いを固定する（[ADR-0008](decisions/0008-bundle-format-and-compatibility-dates.md)）
+  - **ECMA-429 の外の追加の API**：WebSocket（サーバーとクライアント）、`request.<brand>` の属性（[ADR-0016](decisions/0016-request-brand-metadata.md)）
+  - **ECMA-429 からの逸脱**（セキュリティのため。[ADR-0014](decisions/0014-wintertc-conformance-and-wpt.md)）：実行中に進まない時計、`WebAssembly.compile`・`compileStreaming`・`instantiateStreaming`・バッファからの `instantiate` の禁止
+  - **Node.js の互換**：上流の workerd の組み込みの範囲に従う。`node:net`・`node:tls` の接続と `node:dns` の問い合わせは、MVP では理由の分かるエラーにする（[ADR-0015](decisions/0015-nodejs-compat-scope.md)）
 - **CLI とローカル開発**：`<brand> init`・`<brand> dev`・`<brand> deploy`・`<brand> tail`。ローカル開発は、本番と同じランタイム（workerd を元にしたもの）で動かし、ストレージは手元の模擬で動かす
 - **ルートとカスタムドメイン**：既定のサブドメイン `<worker>.<account>.<brand>.<domain>`、利用者のドメインのルート（`example.jp/api/*`）、カスタムドメインの TLS の証明書の自動の発行と更新
+  - この基盤は DNS の製品（利用者のゾーン）を持たない。ルートに当たらない要求は、ホスト名に設定したオリジンへ転送する（[ADR-0019](decisions/0019-route-matching-and-home-node-forwarding.md)）。つまり、利用者のサーバーの前に立つリバースプロキシになる（キャッシュは持たない）。**PM の確認事項**：この振る舞いを MVP の約束にするか（下の「選定・計測で決めるもの」）
 - **KV**：結果整合のキー・値の保存。読み込みの多い用途（設定、フラグ、静的なデータ）向け
 - **オブジェクトストレージ**：S3 互換の API とバインディング。ホームのリージョンで、書き込みの直後の読み込みが強く整合する
 - **Durable Objects に相当するもの**：名前ごとに 1 つだけの実体（アクター）と、トランザクションのある強い整合の保存。WebSocket の保持、アラーム
@@ -114,18 +118,30 @@ Web の開発者が、CLI から 1 回のコマンドで関数をデプロイし
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 不正な内容のホスティング：既定のサブドメイン（`*.<brand>.<domain>`）とオブジェクトストレージの公開の配信で、フィッシング・マルウェア・著作権の侵害の内容が置かれたときの、削除の義務と手順、発信者の情報の開示の請求への対応。プロバイダの責任を定める法律（2025 年の改正後の名称と義務の範囲は未検証）の上の位置づけ | abuse-and-trust-safety の領域（まだない） | E4 の既定のサブドメインの公開、E8 の公開のバケット |
-| L2 | 電気通信事業法：関数のサブリクエストの中継、WebSocket の中継、キューが「他人の通信の媒介」に当たり、届出・登録が要るか。通信の秘密（不正利用の調査、tail・ログでの要求の本文の扱い） | edge-network-and-routing、developer-tooling、abuse-and-trust-safety の各領域（まだない） | E4 の公開の開始、E6 の tail とログの保存 |
-| L3 | データの所在：関数は近いリージョンで動くので、日本の利用者の要求が、障害の迂回で海外のリージョンで処理されうる。個人情報保護法の外国にある第三者への提供（いわゆるクラウドの例外に当たるか）、日本だけで処理する約束をどこまで持つか（ストレージのリージョンの固定、関数の実行のリージョンの制限） | [ADR-0003](decisions/0003-edge-locations.md)、[ADR-0005](decisions/0005-storage-consistency.md)、infrastructure の領域（まだない） | E4 のリージョンの間の迂回、E9 の Durable Objects の配置、E12 の契約の文書 |
-| L4 | 利用規約と許容される利用の方針（AUP）：暗号資産の採掘、大量の送信、スクレイピングの中継、プロキシとしての悪用の禁止と、停止の手順。捜査機関からの照会への対応 | abuse-and-trust-safety の領域（まだない） | E12 の GA の判定 |
-| L5 | 課金：前払いのクレジットを売るときの資金決済法の前払式支払手段への該当、海外の利用者への消費税（国外の事業者との取引）の扱い | limits-and-billing の領域（まだない） | E11 の課金 |
-| L6 | オープンソースのライセンス：workerd（Apache-2.0）、V8（BSD 系）、ICU などを、CLI に同梱して配るときと、サービスとして動かすときの表示の義務（NOTICE の扱い）。自分たちの差分を公開するか | developer-tooling、runtime-and-isolates の各領域（まだない） | E6 の CLI の配布 |
-| L7 | データの取り扱いの契約：委託の契約（DPA）の雛形、サブプロセッサー（AWS など）の一覧と変更の通知、ログの保持の期間 | security、observability の各領域（まだない） | E12 の GA の判定 |
+| L1 | 不正な内容のホスティング：既定のサブドメイン（`*.<brand>.<domain>`）とオブジェクトストレージの公開の配信で、フィッシング・マルウェア・著作権の侵害の内容が置かれたときの、削除の義務と手順、発信者の情報の開示の請求への対応。プロバイダの責任を定める法律（2025 年の改正後の名称と義務の範囲は未検証）の上の位置づけ | [abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[ADR-0043](decisions/0043-hosted-content-abuse-and-takedown.md) | E4 の既定のサブドメインの公開、E8 の公開のバケット |
+| L2 | 電気通信事業法：関数のサブリクエストの中継、WebSocket の中継、キューが「他人の通信の媒介」に当たり、届出・登録が要るか。通信の秘密（不正利用の調査、tail・ログでの要求の本文の扱い） | [edge-network-and-routing.md](architecture/edge-network-and-routing.md)、[developer-tooling.md](architecture/developer-tooling.md)、[abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[security.md](architecture/security.md) の 9 節 | E4 の公開の開始、E6 の tail とログの保存 |
+| L3 | データの所在：関数は近いリージョンで動くので、日本の利用者の要求が、障害の迂回で海外のリージョンで処理されうる。個人情報保護法の外国にある第三者への提供（いわゆるクラウドの例外に当たるか）、日本だけで処理する約束をどこまで持つか（ストレージのリージョンの固定、関数の実行のリージョンの制限） | [ADR-0003](decisions/0003-edge-locations.md)、[ADR-0005](decisions/0005-storage-consistency.md)、[ADR-0051](decisions/0051-disaster-recovery-and-honest-rpo.md)、[infrastructure.md](architecture/infrastructure.md) | E4 のリージョンの間の迂回、E9 の Durable Objects の配置、E12 の契約の文書 |
+| L4 | 利用規約と許容される利用の方針（AUP）：暗号資産の採掘、大量の送信、スクレイピングの中継、プロキシとしての悪用の禁止と、停止の手順。捜査機関からの照会への対応 | [abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[ADR-0044](decisions/0044-egress-abuse-controls.md) | E12 の GA の判定 |
+| L5 | 課金：前払いのクレジットを売るときの資金決済法の前払式支払手段への該当、海外の利用者への消費税（国外の事業者との取引）の扱い | [limits-and-billing.md](architecture/limits-and-billing.md)、[ADR-0040](decisions/0040-jpy-pricing-invoices-and-spend-controls.md) | E11 の課金 |
+| L6 | オープンソースのライセンス：workerd（Apache-2.0）、V8（BSD 系）、ICU などを、CLI に同梱して配るときと、サービスとして動かすときの表示の義務（NOTICE の扱い）。自分たちの差分を公開するか | [developer-tooling.md](architecture/developer-tooling.md)、[runtime-and-isolates.md](architecture/runtime-and-isolates.md) | E6 の CLI の配布 |
+| L7 | データの取り扱いの契約：委託の契約（DPA）の雛形、サブプロセッサー（AWS など）の一覧と変更の通知、ログの保持の期間 | [security.md](architecture/security.md)、[observability.md](architecture/observability.md) | E12 の GA の判定 |
 
 ### 選定・計測で決めるもの（法務以外）
 
-- workerd の公開版が、多数のテナントのコードを動的に読み込み・退避する機能と、テナントごとの CPU・メモリの制限をどこまで持つか。未検証。E2 の PoC で確かめ、足りない部分を自前の層で作るか、上流に送るかを決める（[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)）。
-- S1 の海外のリージョンの選び方（シンガポール・オレゴン・フランクフルトを第一の候補にする）：E1 の着手前に、想定の利用者の分布で決める。
-- エッジの入口の HTTP のプロキシの実装（Rust の自作か、既存の OSS か）：edge-network-and-routing の領域で決める。
-- KV の中央の保存先（DynamoDB か、Aurora か、S3 か）と、Durable Objects の保存の複製の方式の詳細：各領域の文書で決める（[ADR-0005](decisions/0005-storage-consistency.md)）。
-- 料金の値（円）と無料の枠：本家の構造（月額の基本料と、要求数・CPU 時間の従量）に寄せる。値は E11 の着手前に、費用の見積もりから決める。本家の料金は、月額 5 ドルに 1,000 万要求と 3,000 万 CPU ミリ秒を含み、超過は 100 万要求あたり 0.30 ドル、100 万 CPU ミリ秒あたり 0.02 ドル（[Pricing](https://developers.cloudflare.com/workers/platform/pricing/)、2026-09-27 に確認）。
+2026-09-27 の統合の工程で、次のとおり既定案を決めた（[architecture/README.md](architecture/README.md) の 6 節の「決定」）。
+
+- workerd の公開版の機能：テナントの動的な読み込みは上流の `workerLoader` を元にできる。テナントごとの CPU・メモリの制限の強制は上流になく、自前のパッチが要る（[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0009](decisions/0009-cpu-and-memory-metering.md)）。空の isolate の予備を作れるかと、V8 のサンドボックスが既定で有効かは、E2・E3 の PoC で確かめる。
+- S1 の海外のリージョン：シンガポール・オレゴン・フランクフルトを第一の候補にして見積もった。E1 の着手前に、想定の利用者の分布で PM が決める（[infrastructure.md](architecture/infrastructure.md) の 15 節）。
+- エッジの入口の HTTP のプロキシ：Pingora の上に、入口と外向きを別のプロセスで作る（[ADR-0020](decisions/0020-pingora-ingress-and-egress-proxies.md)）。
+- KV の中央の保存先は東京の DynamoDB（[ADR-0024](decisions/0024-kv-central-store-dynamodb.md)）。Durable Objects の複製は、別の 2 つの AZ のログのノードで 3 台のうち 2 台で確定する（[ADR-0031](decisions/0031-do-sqlite-replication-and-pitr.md)）。
+- 料金の値（円）と無料の枠：本家の構造（月額の基本料と、要求数・CPU 時間の従量）に寄せ、各行を原価の 1.3 倍以上にする（[ADR-0040](decisions/0040-jpy-pricing-invoices-and-spend-controls.md)）。本家の料金は、月額 5 ドルに 1,000 万要求と 3,000 万 CPU ミリ秒を含み、超過は 100 万要求あたり 0.30 ドル、100 万 CPU ミリ秒あたり 0.02 ドル（[Pricing](https://developers.cloudflare.com/workers/platform/pricing/)、2026-09-27 に確認）。
+
+**PM の確認事項**（既定案で進めるが、PM の確認で変えうる）：
+
+| # | 問い | 既定案 | 関係する設計 |
+| --- | --- | --- | --- |
+| P1 | 利用者のオリジンへの転送（ルートに当たらない要求をホスト名のオリジンへ送る）を MVP に含めるか。含めると、この基盤は利用者のサーバーの前に立つリバースプロキシになる（キャッシュ・WAF は持たない） | 含める。キャッシュは持たず、外向きのプロキシと同じ宛先の検査を通す | [ADR-0019](decisions/0019-route-matching-and-home-node-forwarding.md)、[edge-network-and-routing.md](architecture/edge-network-and-routing.md) の 8.3 節 |
+| P2 | NFR-010：リージョンの全体の障害の RPO を「1 分」でなく、製品ごとの実際の値で約束する | 製品ごとの表で約束する | [ADR-0051](decisions/0051-disaster-recovery-and-honest-rpo.md)、[architecture/README.md](architecture/README.md) の 3 節 |
+| P3 | CPU 時間の単価を、原価（設計点の利用率 50%）の 1.3 倍以上にする。本家の値（100 万 ms 0.02 ドル ≒ 3 円）より高くなる | 100 万 ms あたり 7 円。月額 800 円は変えない | [limits-and-billing.md](architecture/limits-and-billing.md) の 6.3 節 |
+| P4 | KV の書き込みとオブジェクトの操作・保存の単価が、本家より高い（原価が本家の料金を上回る） | 原価の 1.3 倍以上（KV の書き込み 100 万 1,120 円） | 同上 |
+| P5 | 海外の 3 リージョンの最終の選択 | シンガポール・オレゴン・フランクフルト | [infrastructure.md](architecture/infrastructure.md) の 2 節 |

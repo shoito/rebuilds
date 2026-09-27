@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -30,7 +30,10 @@ date: 2026-09-27
 - **上流との差分は最小にする。** 上流に送れる修正は送る。自分たちのパッチは、一覧に理由とともに記録し、上流の版の更新のたびに自動で当て直す。ブランドに関わる名前（`request.cf` に相当する属性など）は、差分の中で `<brand>` の名前に置き換える（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - **V8 は自分たちでビルドする。** workerd が固定する V8 の版に、上流の修正を自分たちで当てられるようにする。修正の配信は、通常のリリースと別の緊急の経路で行い、NFR-007（24 時間以内）を守る。
 - **多数のテナントの層は、自前の Rust の部品で作る。** 入口のプロキシ、スーパーバイザー（プロセスの起動と cordon）、外向きのプロキシ、設定の写しの受け手。workerd の外側に置き、workerd のプロセスとは Unix ドメインソケットでだけ通信する（[ADR-0002](0002-isolation-model.md)）。
-- **テナントのコードの動的な読み込みと、テナントごとの CPU・メモリの制限**：公開版の workerd がこれをどこまで持つかは未検証である。E2 の PoC で確かめ、足りなければ workerd の中に最小の拡張を作る（可能なら上流に送る）。
+- **テナントのコードの動的な読み込みと、テナントごとの CPU・メモリの制限**（2026-09-27 に上流のソースで確かめた）：
+  - 動的な読み込みは、上流に `workerLoader` のバインディングがある（名前で Worker を読み込み、使われない Worker を降ろす）。これを元にしたテナントのローダーを、`multitenant` のパッチで作る（[ADR-0007](0007-isolate-lifecycle-and-dynamic-loading.md)）。空の isolate の予備を上流の構造のまま作れるかは、E2 の最初の PoC で確かめる。
+  - テナントごとの制限の強制は、上流にない。公開版は `NullIsolateLimitEnforcer`（制限を強制せず、CPU 時間も 0 を報告する）で、差し込み口の `IsolateLimitEnforcer` だけがある。**自前のパッチが必ず要る**（[ADR-0009](0009-cpu-and-memory-metering.md)）。
+  - V8 のサンドボックスが上流の既定のビルドで有効かは未検証。E3 の最初に確かめ、無効ならビルドの設定で有効にする（[ADR-0010](0010-process-sandbox-and-egress-invariants.md)）。
 - **制御プレーンは、rebuilds の共通の技術を使う。** AWS、TypeScript（Hono＋Zod）、Aurora PostgreSQL 18、Terraform、OpenTelemetry。テナントテーブルは `account_id` と RLS で分ける（他の題材と同じ）。
 - **CLI は TypeScript で作り、ローカル開発では workerd のバイナリを同梱して動かす。** 本番と同じランタイムで手元を動かす。
 - 2 を採らない理由：
@@ -52,7 +55,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - ランタイムの中心が C++ になる。自分たちの差分は C++ で書くので、メモリの安全は Rust の部品より弱い。差分は小さく保ち、ASan のビルドとファズで確かめる。
   - 上流の設計の変更（API、設定の形式）に追従し続ける。上流が方針を変えたときの依存の危険がある。上流は本家の Workers のチームが主に開発している（[Introducing workerd](https://blog.cloudflare.com/workerd-open-source-workers-runtime/)）。
-  - 多数のテナントの層（本家が公開していない部分）を自前で作る。その量は未検証で、E2・E3 の最大の不確実性である。
+  - 多数のテナントの層（本家が公開していない部分：制限の強制、cordon、プロセスのサンドボックス、外向きのプロキシ）を自前で作る。制限の強制はパッチが必ず要る。量は未検証で、E2・E3 の最大の不確実性である。パッチの行数は `multitenant` と `brand` の合計で 3,000 行以内を目標にする（[ADR-0006](0006-workerd-fork-and-upstream-tracking.md)）。
   - C++ と V8 のビルド（Bazel）と、Rust と TypeScript の 3 つの言語の道具を持つ。エージェントと人が使う道具の数が増える。
 
 ## Confirmation
