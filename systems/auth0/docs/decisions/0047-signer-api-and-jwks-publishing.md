@@ -7,9 +7,11 @@ date: 2026-09-27
 
 詳細は [keys-and-secrets.md](../architecture/keys-and-secrets.md) の 6 節・7 節。
 
+> 2026-09-27 の注記：起票の時点の範囲は「Signer の API（テナントのトークンの署名と鍵の管理）と JWKS の書き出し」だった。統合の工程で、connections の領域（ADR-0016・ADR-0017）の求めに応じて、型を分けた外部 IdP のアサーション（`apple_client_secret`・`oidc_client_assertion`・`saml_authn_request`）の署名と、接続ごとの鍵（`external_idp_keys`）を範囲に加え、題名を今のものに改めた。この ADR を参照する文書は、この広げた範囲で参照する。
+
 ## Context
 
-[ADR-0003](0003-token-formats-and-signing-keys.md) は、Signer がテナント・`kid`・クレームを受けて署名した JWT を返し、任意のバイト列には署名しないと決めた。[ADR-0059](0059-signer-isolation.md) は、Signer のネットワークを隔離し、署名のポート（Auth からだけ）と鍵の管理のポート（Management API からだけ）を分けた。[ADR-0005](0005-authentication-path-availability.md) は、JWKS・discovery を S3 に書き出して CloudFront から配り、オリジンの障害中は古い版を返すと決めた。[ADR-0058](0058-edge-and-custom-domains.md) は、キャッシュの期間をこの領域に任せた。
+[ADR-0003](0003-token-formats-and-signing-keys.md) は、Signer がテナントとクレームを受けて署名した JWT を返し、任意のバイト列には署名しないと決めた。[ADR-0059](0059-signer-isolation.md) は、Signer のネットワークを隔離し、署名のポート（Auth からだけ）と鍵の管理のポート（Management API からだけ）を分けた。[ADR-0005](0005-authentication-path-availability.md) は、JWKS・discovery を S3 に書き出して CloudFront から配り、オリジンの障害中は古い版を返すと決めた。[ADR-0058](0058-edge-and-custom-domains.md) は、キャッシュの期間をこの領域に任せた。
 
 決めること：
 
@@ -39,7 +41,7 @@ JWKS のキャッシュ：
 
 1、a、x を採用する。
 
-- 署名の API：`POST /v1/sign`、`POST /v1/sign-batch`（最大 2 件）。種類ごとに `typ`（`JWT`・`at+jwt`・`logout+jwt`）、必須のクレーム、禁止のクレーム（ログアウトトークンの `nonce`）、`exp − iat` の上限（2,592,000 秒・86,400 秒・120 秒）、`iat` のずれ（±60 秒）、`iss` が `signing_key_issuers` にあること、大きさ 8 KiB を検査する。違反は 400 でアラート。
+- 署名の API：`POST /v1/sign`、`POST /v1/sign-batch`（最大 2 件）。種類ごとに `typ`（`JWT`・`at+jwt`・`logout+jwt`）、必須のクレーム、禁止のクレーム（ログアウトトークンの `nonce`）、`exp − iat` の上限（アクセストークン 2,592,000 秒、ID トークン 86,400 秒、ログアウトトークン 120 秒。[ADR-0008](0008-token-lifetimes-and-claims.md)）、`iat` のずれ（±60 秒）、`iss` が `signing_key_issuers` にあること、大きさ 8 KiB を検査する。違反は 400 でアラート。
 - 鍵の管理の API：`keys:generate`（暗号文と公開鍵を返す）、`keys:invalidate`（キャッシュを捨てて読み直す）。状態の遷移は Management API が 1 つのトランザクションで書き、outbox に `jwks.changed` を入れる。Signer は 2 秒ごとに `signing_key_state_versions` を見て追いつく。
 - **外部 IdP のアサーション**（2026-09-27 の統合で追加）：トークンの署名の API とは別のエンドポイント `POST /v1/sign-external-assertion` にし、型も分ける。
   - `purpose` は `apple_client_secret`（E6）、`oidc_client_assertion`（E14）、`saml_authn_request`（E14）の 3 つだけ。

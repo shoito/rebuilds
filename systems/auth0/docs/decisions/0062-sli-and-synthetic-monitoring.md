@@ -13,7 +13,7 @@ NFR-001 は、[ADR-0005](0005-authentication-path-availability.md) の定義の�
 
 - ログインの失敗（パスワードの誤り、`invalid_grant`、`invalid_client`）は、プロトコルの正しい応答で、システムの失敗ではない。
 - 攻撃の防御のブロック（ブルートフォース、不審な IP）と、テナントのレート制限の超過による 429 は、方針どおりの応答である。
-- ADR-0005 の過負荷の時の 429・503（優先の低いものから断る）と、Aurora の writer のフェイルオーバーの間の 503（`Retry-After`）は、システムの都合で断ったもので、利用者には失敗である。
+- ADR-0005 の過負荷の時の 503（優先の低いものから断る。起票の時点では 429・503 としていた。Decision の注記）と、Aurora の writer のフェイルオーバーの間の 503（`Retry-After`）は、システムの都合で断ったもので、利用者には失敗である。
 - クライアントへのリダイレクトの後の失敗（テナントのアプリのコールバックの失敗）は、本システムの外である。
 
 本家の SLA は「特定の中核のサービスの月の平均の可用性」を 99.99% とし、Enterprise の Public Cloud と Private Cloud の両方に適用する（[Service Level Agreements](https://auth0.com/docs/troubleshoot/customer-support/services-level-descriptions)、2026-09-27 に確認）。停止の数え方の詳細は、公開の資料で確かめられなかった（未検証）。
@@ -35,12 +35,14 @@ NFR-001 は、[ADR-0005](0005-authentication-path-availability.md) の定義の�
   | --- | --- | --- |
   | 2xx、3xx | 成功 | |
   | 400・401・403（OAuth のエラー、ログインの失敗、攻撃の防御のブロック、WAF のブロック） | 成功 | 方針どおりの応答 |
-  | 429（テナントのレート制限、攻撃の防御） | 成功 | 方針どおり。応答にヘッダー `<Brand>-RateLimit-Reason: tenant` などを付けて分ける（ヘッダーの名前は management-api-and-rate-limiting の領域で決める） |
-  | 429・503（過負荷で断ったもの、Argon2id の同時実行の上限、writer のフェイルオーバー中） | 失敗 | システムの都合 |
+  | 429（テナントのレート制限、攻撃の防御） | 成功 | 方針どおり。429 は方針の制限だけに使い、理由をヘッダー `<Brand>-RateLimit-Reason` で示す（名前と値は [management-api-and-rate-limiting.md](../architecture/management-api-and-rate-limiting.md) の 7.2 節） |
+  | 503（過負荷で断ったもの、Argon2id の同時実行の上限、writer のフェイルオーバー中） | 失敗 | システムの都合。容量・依存先の都合では 429 を返さない |
   | 5xx、オリジンのタイムアウト、CloudFront の 502・504 | 失敗 | |
   | 応答時間が上限を超えたもの（`/oauth/token` 5 秒、ログインの送信 10 秒） | 失敗 | 利用者は待ちきれない |
 
-  理由の分け方は、サーバーが応答に付ける内部のヘッダー（CloudFront でログに記録し、外には出さない）で行う。
+  エッジでは、状態コードだけで分ける（429 は成功、503 は失敗）。理由ごとの内訳は、サーバーのメトリクス（`http_rejections_total{reason}`）で見る。
+
+  > 2026-09-27 の注記：当初は「サーバーが付ける内部のヘッダーを CloudFront でログに記録して理由を分ける」としていた。CloudFront のリアルタイムのログの項目に、オリジンの応答のヘッダーはない（[Real-time access logs](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/real-time-logs.html)、2026-09-27 に確認）ので、エッジで理由を読めない。そこで、容量・依存先の都合で断るときは 503 に限り、429 を方針の制限だけに使うことにした。`<Brand>-RateLimit-Reason` は外に出す見出しとし、利用者とサーバーのメトリクスのために使う。
 - **対象**：`environment = production` のテナントの要求だけ。合成監視のテナントは、対象に含めて別にも見る。
 - **窓**：30 日の移動の窓と、暦の月（SLA の報告）の両方。
 - **テナントごとの可用性も記録する。** 全体が 99.99% でも、1 つのテナントが大きく下がることがある（そのテナントの接続の障害、カスタムドメイン）。テナントごとの値は SLO にしないが、SLA の報告と大口のテナントのサポートに使う。
@@ -54,10 +56,10 @@ NFR-001 は、[ADR-0005](0005-authentication-path-availability.md) の定義の�
   - エッジの手前の問題（ALB、オリジンの接続）を数え落とさない。
 - 引き受けるコスト：
   - CloudFront のリアルタイムのログと、Kinesis・集計の処理の費用がかかる（[infrastructure.md](../architecture/infrastructure.md) の 10 節）。
-  - 応答の理由の内部のヘッダーを、すべての 429・503 の経路で付ける規律が要る。
+  - 容量・依存先の都合で断る経路は、どれも 503 を返し、429 を使わない規律が要る。
 
 ## Confirmation
 
 - 表駆動テスト：応答の分類の表を `observability.md` から読み込み、集計の処理の分類と一致する。
-- 結合テスト：429・503 を返すすべての経路が、理由の内部のヘッダーを付ける。CloudFront が外へ出す応答には、そのヘッダーがない。
+- 結合テスト：429 を返すすべての経路が `<Brand>-RateLimit-Reason` を付け、容量・依存先の都合で断る経路（過負荷、ハッシュの同時実行の上限、writer の切り替え）は 503 と `Retry-After` を返す。
 - 月次：エッジの SLI と、合成監視の成功の割合の差を比べる。大きく違えば、計測の誤りを疑う。

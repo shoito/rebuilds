@@ -20,10 +20,10 @@
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
 | 種類のコード | 短いコード。`s`（ログインの成功）、`f`・`fp`・`fu`（ログインの失敗）、`ss`・`fs`（サインアップ）、`seacft`・`feacft`（認可コードの交換）、`seccft`・`feccft`（クライアントクレデンシャル）、`sertft`・`fertft`（リフレッシュ）、`ferrt`（ローテーションしたリフレッシュトークンの交換の失敗。再利用の検知を含む）、`slo`・`flo`（ログアウト）、`scp`・`fcp`（パスワードの変更）、`sv`（メールの確認）、`limit_wc`・`limit_mu`（IP のブロック）、`pwd_leak`（漏えいしたパスワード）、`sapi`（Management API の書き込みの成功）、`mgmt_api_read`（秘密を返した GET）、`api_limit`、`depnote`、`w`（警告） | [auth0-log-schemas](https://github.com/auth0/auth0-log-schemas)、[Log Stream Filters](https://auth0.com/docs/customize/log-streams/event-filters) |
-| 共通のフィールド | `log_id`、`date`、`type`、`description`、`client_id`、`client_name`、`connection`、`connection_id`、`strategy`、`strategy_type`、`ip`、`user_agent`、`user_id`、`user_name`、`hostname`、`organization_id`、`details` など | auth0-log-schemas（`s.schema.json`） |
+| 共通のフィールド | `log_id`、`date`、`type`、`description`、`client_id`、`client_name`、`connection`、`connection_id`、`strategy`、`strategy_type`、`ip`、`user_agent`、`user_id`、`user_name`、`hostname`、`organization_id`、`details` など。データベース接続の `user_name` はメールアドレス | auth0-log-schemas（`s.schema.json`）、[Adaptive MFA Log Events](https://auth0.com/docs/secure/multi-factor-authentication/adaptive-mfa/adaptive-mfa-log-events) の例（2026-09-27 に確認） |
 | 秘密 | OTP、OTP の種、生体の情報、秘密鍵を出さない。アクセストークンを出さない。認可コードは一部だけ（`31XXXXX`） | [PII in Auth0 Logs](https://auth0.com/docs/deploy-monitor/logs/pii-in-logs) |
 | 保持 | Starter 1 日、Essentials 5 日、Professional 10 日、Enterprise 30 日。リアルタイムではなく、索引に遅れがありうる | [Log Data Retention](https://auth0.com/docs/deploy-monitor/logs/log-data-retention) |
-| 検索 | Lucene の部分集合。フィールドは大文字小文字を区別。フィールドのない語は `client_name`・`connection`・`description`・`ip`・`log_id` だけを探す。検索では 1,000 件まで。チェックポイントは上限なしで、`log_id` の順 | [Log Search Query Syntax](https://auth0.com/docs/deploy-monitor/logs/log-search-query-syntax)、[Retrieve Logs](https://auth0.com/docs/deploy-monitor/logs/retrieve-log-events-using-mgmt-api) |
+| 検索 | Lucene の部分集合。フィールドは大文字小文字を区別。フィールドのない語は `client_name`・`connection`・`description`・`ip`・`log_id`・`type`・`user_name` だけを探す。検索では 1,000 件まで。チェックポイントは上限なしで、`log_id` の順 | [Log Search Query Syntax](https://auth0.com/docs/deploy-monitor/logs/log-search-query-syntax)、[Retrieve Logs](https://auth0.com/docs/deploy-monitor/logs/retrieve-log-events-using-mgmt-api) |
 | ストリームの種類 | 独自の Webhook、Amazon EventBridge、Azure Event Grid、Datadog、Splunk、Sumo Logic、Segment、Mixpanel など | [Log Streams](https://auth0.com/docs/customize/log-streams)、OpenAPI の `LogStream*` |
 | 配信 | 少なくとも 1 回。順序は保証しない。1 件ごとに最大 3 回試し、失敗は Health に出し、解決するまで繰り返す。7 日続けて届かないと自動で止める。重要な経路や即時の判断に使わないよう勧める | Log Streams |
 | 状態 | `active`、`paused`（利用者が止めた。ログは保持の期間の中で溜め、再開で送る）、`disabled`（連続の失敗で止めた。再開できる）。Health で直近 5 日の最近の 10 件のエラーを見せる | [Check Log Stream Health](https://auth0.com/docs/customize/log-streams/check-log-stream-health) |
@@ -66,6 +66,7 @@ EventBridge の側では、パートナーのイベントソースを利用者�
 
 - フィールドの名前と意味は本家の公開のスキーマに寄せる（[ADR-0042](../decisions/0042-log-event-model-and-type-codes.md)）。種類のコードも本家と同じ短いコードを使う（本家の名前を含む識別子ではないので、ADR-0006 に触れない）。
 - `details` は種類ごとの Zod のスキーマで検証する。**許可リストのスキーマで、知らないフィールドを落とす。** 秘密（パスワード、コード、トークン、クライアントの秘密、TOTP の種、セッションの ID、メールの確認コード）はスキーマに存在しない（AGENTS.md、[ADR-0061](../decisions/0061-secret-free-telemetry.md)）。認可コードの一部の表示（本家の `31XXXXX`）も出さない。
+- **`user_name` には、ログインに使った識別子（データベース接続ならメールアドレス）を入れる**（本家と同じ）。ログはテナントのデータで、不正なログインの調査に要るため。個人データなので、保持はテナントの `log_retention_days`（4.2 節）で切り、ログストリームでは伏せ字（`mask`・`hash`。6.1 節）を選べる。ユーザーの削除では仮名にする（4.2 節）。本システムの運用のテレメトリー（[observability.md](observability.md)）には入れない（[ADR-0061](../decisions/0061-secret-free-telemetry.md)）。
 - `details.session_id` はセッションの ID そのものではなく、セッションの公開の識別子（`sid` のクレームと同じ値）を入れる。
 - `user_agent` は解析した短い形にする。元の文字列は持たない。
 - `$event_schema.version` を持ち、足す変更だけをする（Management API の版と同じ規則。[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 3.5 節）。
@@ -85,7 +86,7 @@ EventBridge の側では、パートナーのイベントソースを利用者�
 | `system.notification` | `api_limit`、`api_limit_warning`、`depnote`、`sys_*`（本システムの保守の告知） | レート制限、版 |
 | `actions`（E13） | `actions_execution_failed` | [extensibility.md](extensibility.md) |
 
-- 本家のコードの意味は、本家の公開のスキーマの `description` で確かめた（`fp`・`fu`・`seccft`・`sertft`・`ferrt`・`limit_wc`・`limit_mu`・`pwd_leak`・`sapi`・`mgmt_api_read` など）。`sede`・`fede`・`srrt`・`scpr`・`fcpr` の意味は、名前から推したもので**未検証**。E10 で本家のスキーマの該当のファイルを確かめる。
+- 本家のコードの意味は、本家の公開のスキーマの `description` で確かめた（`fp`・`fu`・`seccft`・`sertft`・`ferrt`・`limit_wc`・`limit_mu`・`pwd_leak`・`sapi`・`mgmt_api_read` など）。`sede`・`fede`（デバイスコードの交換の成功・失敗）、`srrt`（リフレッシュトークンの失効の成功）、`scpr`・`fcpr`（パスワードの変更の要求の成功・失敗）の意味は、[Log Event Type Codes](https://auth0.com/docs/deploy-monitor/logs/log-event-type-codes) と [Log Stream Filters](https://auth0.com/docs/customize/log-streams/event-filters) で確かめた（2026-09-27）。
 - MFA の種類のコード（`gd_*`）は、本家の名前の由来（Guardian）はあるが、コードそのものは本家の名前を含まないので使う。
 - `sapi`・`fapi` は、監査ログ（ADR-0054）と別に出す。監査ログが正本で、`sapi` は同じ操作をログストリームへ流すための写し。`details` に変更の差分を入れない（秘密の混入を避け、差分は監査ログで見る）。
 
@@ -125,7 +126,7 @@ logs（ログの専用の Aurora のクラスタ。日ごとのパーティシ�
 
 - **S1 は、ログの専用の Aurora PostgreSQL のクラスタに置く**（[ADR-0043](../decisions/0043-log-storage-and-search.md)）。主の Aurora（設定・ユーザー・セッション）と分け、ログの書き込みと検索が認証の経路の DB に及ばないようにする。
 - 見積もり（[capacity.md](capacity.md)）：1 日 約 1 億件、約 50 GB、30 日で約 1.5 TB。日ごとのパーティション（`date` ではなく `log_id` の取り込みの日）。
-- インデックス（すべて `tenant_id` が先頭）：`(tenant_id, log_id)`、`(tenant_id, user_id, log_id)`、`(tenant_id, type, log_id)`、`(tenant_id, client_id, log_id)`、`(tenant_id, ip, log_id)`、`(tenant_id, connection_id, log_id)`、`(tenant_id, organization_id, log_id)`。
+- インデックス（すべて `tenant_id` が先頭）：`(tenant_id, log_id)`、`(tenant_id, user_id, log_id)`、`(tenant_id, type, log_id)`、`(tenant_id, client_id, log_id)`、`(tenant_id, ip, log_id)`、`(tenant_id, connection_id, log_id)`、`(tenant_id, organization_id, log_id)`、`(tenant_id, user_name, log_id)`。
 - RLS をかける（ADR-0002）。
 - **S2 で専用の基盤へ移す**（architecture README の 2 節）。候補は OpenSearch か ClickHouse。Management API の `/logs` の形は変えない。
 
@@ -154,7 +155,7 @@ logs（ログの専用の Aurora のクラスタ。日ごとのパーティシ�
 
 **本家と違うところ**：
 
-- フィールドのない語は、`log_id`・`ip`・`client_name`・`connection` の完全一致だけを探す。本家は `description` も探すが、S1 の Aurora で全文の検索の索引を持たないため外す。
+- フィールドのない語は、`log_id`・`ip`・`client_name`・`connection`・`type`・`user_name` の完全一致だけを探す。本家は `description` も探すが、S1 の Aurora で全文の検索の索引を持たないため外す。`user_name` の索引 `(tenant_id, user_name, log_id)` を 4.1 節の索引に足す。
 - `description`・`user_agent` は、`description:"Wrong password"` のような句の完全一致と前方一致だけ。
 - 1 回の検索は 5 秒の時限（reader）。超えたら 400 `query_too_broad` と、`user_id` や `date` の範囲で絞るよう案内する。
 
@@ -172,7 +173,7 @@ log_streams(tenant_id, id, name, type, status, filters[], pii_config, sink(暗�
 | 項目 | 規則 |
 | --- | --- |
 | 種類 | MVP：`http`（Webhook）、`eventbridge`。後で Datadog・Splunk など（E10 の後） |
-| 1 テナントの本数 | 10（本家の上限は未検証。本システムの決定） |
+| 1 テナントの本数 | 10（本システムの決定。本家の上限は、資料と Entity Limit Policy に記載がない。2026-09-27 に確認） |
 | フィルター | 2 節のカテゴリー。空なら全件 |
 | 個人データの伏せ字 | `mask`（アスタリスク）か `hash`。**`hash` は xxHash ではなく、ストリームごとの鍵の HMAC-SHA-256 にする**（本家は xxHash。非暗号の関数で、メールアドレスの辞書で元に戻せるため） |
 | 開始の位置 | 作成時に、保持の期間の中の日時を選べる（本家と同じ）。既定は「今から」 |
@@ -234,10 +235,10 @@ User-Agent: <Brand>-LogStreams/1.0
 ### 6.4 外向きの送信
 
 - Webhook は `worker-egress`（専用の NAT、本体の VPC エンドポイントと DB への経路なし）から送る（[infrastructure.md](infrastructure.md) の 2.3 節）。
-- 宛先の検査：名前解決の後の IP が、プライベート・ループバック・リンクローカル（`169.254.0.0/16`、`fd00:ec2::254` を含む）・本システムの範囲なら送らない。リダイレクトを追わない。ポートは 443 だけ（本家の許すポートは未検証。本システムの決定）。
+- 宛先の検査：名前解決の後の IP が、プライベート・ループバック・リンクローカル（`169.254.0.0/16`、`fd00:ec2::254` を含む）・本システムの範囲なら送らない。リダイレクトを追わない。ポートは 443 だけ（本システムの決定。本家の許すポートは資料に記載がなく未検証）。
 - 署名は VPC の中の Worker で行い、`worker-egress` には署名済みの要求だけを渡す（Stripe と同じ考え方）。
-- EventBridge は VPC エンドポイントから `PutPartnerEvents` を呼ぶ（infrastructure の 2.3 節）。1 件 256 KB の上限（EventBridge の上限。未検証）を超えるログは、`details` を切り詰めて `details_truncated: true` を付ける。
-- **EventBridge のパートナーになる手続き**（AWS の SaaS パートナーの登録）が要る。手続きの中身と期間は**未検証**。E10 の着手前に確かめる。登録が間に合わないときの代わりは、利用者のイベントバスへの `PutEvents`（アカウントをまたぐ。利用者がバスのリソースポリシーで本システムのアカウントを許す）にする。
+- EventBridge は VPC エンドポイントから `PutPartnerEvents` を呼ぶ（infrastructure の 2.3 節）。要求の全体で 1 MB 未満の上限（[Sending events with PutEvents](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-putevents.html)。`PutPartnerEvents` も同じ大きさの計算を参照する。2026-09-27 に確認）を超えるログは、`details` を切り詰めて `details_truncated: true` を付ける。
+- **EventBridge のパートナーになる手続き**（AWS の SaaS パートナーの登録）が要る。AWS Partner Network に登録し、EventBridge の統合のチームに連絡してパートナーの API を使えるようにする（[Amazon EventBridge Integrations](https://aws.amazon.com/eventbridge/integrations/)、2026-09-27 に確認）。かかる期間は**未検証**。E10 の着手前に申請する。登録が間に合わないときの代わりは、利用者のイベントバスへの `PutEvents`（アカウントをまたぐ。利用者がバスのリソースポリシーで本システムのアカウントを許す）にする。
 
 ## 7. 障害のとき
 
@@ -302,8 +303,7 @@ User-Agent: <Brand>-LogStreams/1.0
 ## 12. 未解決の問い
 
 - 保持の日数を、プランで決めるか、テナントが選ぶか（プランの設計はまだない）。法務の L5 の結論。
-- EventBridge の SaaS パートナーの登録の手続きと期間（未検証）。
-- 本家のコードのうち、名前から推した意味（`sede`・`fede`・`srrt`・`scpr`・`fcpr`）の確認。
+- EventBridge の SaaS パートナーの登録にかかる期間（未検証。手続きは 6.4 節）。
 - 失敗のログのまとめ（3.3 節）を、本家がしているか（未検証）。まとめると、1 件ごとの試行を見たいテナントの期待と合わないか。
 - S2 の専用の基盤（OpenSearch か ClickHouse）の選定。
 - ログストリームの宛先の国外への送信を、テナントの設定だけで許してよいか（法務の L1・L6）。

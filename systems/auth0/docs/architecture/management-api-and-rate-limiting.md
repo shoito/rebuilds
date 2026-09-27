@@ -35,7 +35,7 @@ Management API の形（リソース、ページング、エラー、版）、�
 | 無料 | 認証 API：1 分 300、`/oauth/token` 1 秒 30。Management API 1 秒 2 | [Free](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/free-public) |
 | Universal Login の画面 | IP ごとに 1 分 500（全体）、画面ごと・IP × `state` で GET 1 分 10 | Enterprise の頁 |
 | プラン | プランで値が変わる | 上の各頁 |
-| エラーの本文 | 公開の資料で形を確かめられなかった。`{statusCode, error, message, errorCode}` の形が広く観察されている（**未検証**） | — |
+| エラーの本文 | `{statusCode, error, message}`（`errorCode` は OpenAPI にない。広く観察されているが**未検証**） | Management API の OpenAPI の `BadRequestSchema`・`TooManyRequests` など |
 
 ## 3. Management API の形
 
@@ -81,7 +81,7 @@ MVP のリソース：
 | チェックポイント | `from`、`take` | `take` 最大 100、既定 50 | ログ、ユーザー、アプリ、接続、client grant、メンバー |
 
 - **1 ページの最大は 100 にする。** 本家の資料の食い違い（2 節）は、OpenAPI とログの頁の値に合わせる。
-- `include_totals=true` の応答は `{ "<resource>": [...], "start", "limit", "total" }`。総数は 1,000 で打ち切り、`total_capped: true` を付ける（本家の総数の上限の扱いは未検証）。
+- `include_totals=true` の応答は `{ "<resource>": [...], "start", "limit", "total" }`。総数は 1,000 で打ち切り、`total_capped: true` を付ける（本家は、ページングで読めるのを 1,000 件までとする（OpenAPI の `GET /users` の `per_page` の説明、2026-09-27 に確認）が、`total` の打ち切りの扱いは未検証）。
 - **チェックポイント**：
   - `next` は不透明な文字列。中身は `{v:1, tenant_id, resource, sort_key, filter_hash, issued_at}` を、Management API の専用の鍵（KMS のデータキー）で AES-256-GCM で暗号化したもの。改ざん・他テナントへの流用・別のフィルターでの流用を拒否する（400 `invalid_checkpoint`）。
   - 並びは各リソースの単調な鍵（ログは `log_id`、他は `id` の UUIDv7）。削除・追加があっても、同じ項目を 2 回返さず、既に過ぎた位置に後から入った項目は返さない（前へだけ進む）。
@@ -113,7 +113,7 @@ MVP のリソース：
 | 429 | `too_many_requests` | 6 節 |
 | 503 | `temporarily_unavailable` | DB の切り替え中など。`Retry-After` を付ける |
 
-- 形は本家で広く観察される形（2 節、未検証）に寄せる。`request_id` は本システムで足す。
+- 形は本家の OpenAPI の `{statusCode, error, message}` に、観察される `errorCode`（2 節。`errorCode` だけ未検証）を足した形に寄せる。`request_id` は本システムで足す。
 - `message` に、秘密・トークン・パスワード・内部のスタックを入れない（[ADR-0061](../decisions/0061-secret-free-telemetry.md)）。
 
 ### 3.5 版
@@ -197,11 +197,11 @@ Management API は、2 種類のトークンを受ける（[ADR-0034](../decisio
 | 対象 | 単位 | 本番 | 本番以外 | 本家 |
 | --- | --- | --- | --- | --- |
 | Management API の全体 | テナント | バースト 50、1 秒 16 | バースト 10、1 秒 2 | Enterprise と同じ |
-| ユーザーの読み取り（一覧・検索・取得） | テナント | バースト 40、1 分 500 | バースト 10、1 分 100 | Essentials・Professional と同じ（Enterprise の値は未検証） |
+| ユーザーの読み取り（一覧・検索・取得） | テナント | バースト 40、1 分 500 | バースト 10、1 分 100 | Essentials・Professional と同じ（Enterprise の表にはユーザーの行がなく、全体の枠だけ。[Enterprise](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public)、2026-09-27 に確認） |
 | ユーザーの書き込み | テナント | バースト 20、1 分 200 | バースト 10、1 分 60 | 同上 |
 | ログの読み取り | テナント | バースト 10、1 分 100 | バースト 5、1 分 30 | 同上 |
 | アプリの読み取り | テナント | バースト 5、1 分 100 | 同左 | 同上 |
-| 署名鍵のローテーション | テナント | 1 日 5 | 1 日 5 | 同じ |
+| 署名鍵のローテーション | テナント | バースト 5、1 日 5（緊急のローテーションは別に 1 時間 3） | 同左 | 同じ（緊急の枠は本システムの追加） |
 | カスタムドメインの検証 | テナント | 1 分 5 | 同左 | 同じ |
 | 同時実行：ユーザーの検索、ログの検索 | テナント | 同時に 5 | 同時に 2 | 本家は非公開。本システムの決定 |
 | 同時実行：一覧のチェックポイントの読み出し | テナント | 同時に 10 | 同時に 3 | 同上 |
@@ -221,11 +221,22 @@ Management API は、2 種類のトークンを受ける（[ADR-0034](../decisio
 | 経路 | 超えたとき |
 | --- | --- |
 | Management API | 429、`errorCode: too_many_requests`。見出し `X-RateLimit-Limit`・`X-RateLimit-Remaining`・`X-RateLimit-Reset`（UNIX 秒）と `Retry-After`（秒） |
-| `/oauth/token`、`/oauth/device/code`、`/oauth/revoke` | 429、`{"error": "too_many_requests", "error_description": "..."}`（本家と同じ形。本家の形の確認は未検証）。同じ見出し |
+| `/oauth/token`、`/oauth/device/code`、`/oauth/revoke` | 429、`{"error": "too_many_requests", "error_description": "..."}` と `Retry-After`（本家と同じ形。[Custom Rate Limit Policies](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/custom-rate-limit-policies)、2026-09-27 に確認）。同じ見出し |
 | `/userinfo` | 429、`WWW-Authenticate` は付けない。同じ見出し |
 | Universal Login の画面 | 429 の画面（HTML）。やり直しまでの時間を示す。見出しは付ける |
-| `/authorize` | 429 の画面。`redirect_uri` へエラーを返さない（未検証の要求を戻さない） |
+| `/authorize` | 429 の画面。`redirect_uri` へエラーを返さない（検証の済んでいない要求を戻さない。本家も `/authorize` では JSON を返さず画面を出す。同上） |
 
+- **429 には、理由の見出し `<Brand>-RateLimit-Reason` を付ける**（本システムの追加。本家にはない）。値は次のどれか。429 は方針の制限だけに使い、過負荷・ハッシュの同時実行の上限・writer の切り替えなど容量と依存先の都合では、429 ではなく 503 と `Retry-After` を返す（[ADR-0062](../decisions/0062-sli-and-synthetic-monitoring.md)。エッジの SLI は状態コードで分ける）。
+
+  | 値 | 層 | 例 |
+  | --- | --- | --- |
+  | `tenant` | L3・L5 | 認証 API・Management API のテナントの全体の枠 |
+  | `endpoint` | L2・L6 | エンドポイントごとの枠（ユーザーの読み取り、デバイスコード、画面の送信など） |
+  | `user` | L2 | ユーザーごとの枠（`/userinfo`、パスワードの変更） |
+  | `concurrency` | L7 | 同時実行の上限（ユーザーの検索、ログの検索） |
+  | `attack_protection` | L4 | 不審な IP の抑制、ブルートフォースの防御（[attack-protection.md](attack-protection.md)） |
+
+  サーバーは同じ値を `http_rejections_total{reason}` のラベルにする（[observability.md](observability.md) の 3.2 節）。WAF（L1）の遮断は 403 で、この見出しを付けない。
 - 見出しの名前は本家と同じ（本家の名前を含まない一般の名前なので、そのまま使う）。**全応答に付ける**（本家と同じ。Slack で付けた IETF の `RateLimit` の見出しは付けない）。値は、最初に判定した層（テナントの全体）の値を出す。
 - 429 のたびに、テナントのログに `api_limit` を出す。ただし、テナント × 制限の名前ごとに 1 分 1 件に間引く（ログの洪水を避ける）。枠の 80% を 5 分続けて超えたら `api_limit_warning` を出す（本家にもある種類。[Rate Limit Use Cases](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-use-cases)）。
 
@@ -308,9 +319,8 @@ ADR-0005 の縮退の表のとおり、全部を通す（fail-open）にはし�
 ## 14. 未解決の問い
 
 - 本家の 1 ページの上限（50 か 100）の食い違いを、試用のテナントで確かめるか。
-- 本家の Management API のエラーの本文の形（未検証）と、`/oauth/token` の 429 の本文の形を、試用のテナントで確かめる。
+- 本家の Management API のエラーの本文の `errorCode`（未検証）を、試用のテナントで確かめる（`/oauth/token` の 429 の本文は本家の資料で確かめた）。
 - ダッシュボードの呼び出しを、Management API の全体の枠に数えるか（本家は未検証）。
-- 本家の Enterprise の Management API のエンドポイントごとの値（ユーザーの読み取りなど）が Essentials と同じか。
 - レート制限の値をプランで変えるか（プランの設計はまだない）。
 - 冪等キーを Management API に足すか（Terraform やエージェントの再試行で、作成の重複を 409 に頼る形でよいか）。
 
@@ -319,7 +329,7 @@ ADR-0005 の縮退の表のとおり、全部を通す（fail-open）にはし�
 2026-09-27 の既定案。
 
 - 1 ページの上限は 100 にする。本家の確認はしない（大きいほうに合わせれば、本家から移る利用者のコードは動く）。
-- 本家の未検証の形（エラーの本文、429 の本文）は、観察されている形に寄せて決め、試用のテナントでの確認は E2 の Story の中で行う。確認の結果で形は変えない（標準の OAuth のエラーの形に反しない限り）。
+- 本家の未検証の形（エラーの本文の `errorCode`）は、観察されている形に寄せて決め、試用のテナントでの確認は E2 の Story の中で行う。確認の結果で形は変えない（標準の OAuth のエラーの形に反しない限り）。
 - ダッシュボードの呼び出しは全体の枠に数え、別に 1 秒 5 の予約の枠を置く。
 - 値は環境で変え、プランで変えない。
 - 冪等キーは MVP で持たない。E12 で、Terraform のプロバイダーの試験で問題が出たら足す。

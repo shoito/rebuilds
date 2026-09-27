@@ -367,7 +367,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 - **Management API の権限を分ける。** 読み取り（`read:users`）、更新（`update:users`）、`app_metadata` の更新（`update:users_app_metadata`）、削除（`delete:users`）、ブロック（`update:users` に含める）、エクスポート（`read:users_export`）をスコープで分ける（management-api-and-rate-limiting の領域）。
 - **個人データ**：`email`、`name`、`picture`、`last_ip`、`profile_data`、メタデータは個人データになりうる。
   - `last_ip` は、テナントの設定で記録しないことを選べる。
-  - ログには `user_id` を載せ、メールアドレスは載せない方針を logs-and-streams の領域に提案する（本家のログはメールアドレスを含む。未検証）。
+  - 認証のイベントのログの `user_name` には、本家と同じくログインに使った識別子（メールアドレス）を載せる。ログはテナントのデータで、調査に要るため。保持は `log_retention_days` で切り、ログストリームでは伏せ字を選べ、ユーザーの削除では仮名にする（[logs-and-streams.md](logs-and-streams.md) の 3.1・4.2 節。本家の `user_name` がメールアドレスであることは [Adaptive MFA Log Events](https://auth0.com/docs/secure/multi-factor-authentication/adaptive-mfa/adaptive-mfa-log-events) の例で確認、2026-09-27）。
   - バックアップからの削除は、バックアップの保持の期間（35 日）の後に自然に消える形にする（[ADR-0055](../decisions/0055-data-retention-and-deletion.md)）。
 - **`picture` の URL** は `https:` だけを受け付ける。画面に出すときは、Universal Login の CSP の `img-src` の範囲で表示する（[universal-login.md](universal-login.md)）。
 - 法務の確認待ち：L1（委託か自らの取得か）、L7（開示・削除の請求の窓口と、ログの扱い）。この領域の Story のうち、7.3 のログの扱いと 7.4 の開示の形は、L7 の結論が出るまで PM・QA が承認しない。
@@ -453,7 +453,6 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 ## 16. 未解決の問い
 
 - 仮名の `sub`（pairwise）を提供するか。本家にはない。需要を見て決める。
-- ログにメールアドレスを載せるか（本家は載せる。未検証）。logs-and-streams の領域と合わせて決める。
 - 本人のメタデータの更新（アカウントの画面、My Account の API に相当するもの）をいつ入れるか。
 - 主の ID の変更（`primary_identity_id` の付け替え）を MVP で持つか。
 
@@ -467,6 +466,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 - **従のメタデータ**：本家と同じく捨てる。ただし応答で 1 回だけ返す。
 - **削除とログ**：[ADR-0055](../decisions/0055-data-retention-and-deletion.md) に従う（ログの個人データは仮名化、`user_id` と IP は保持の期間まで）。この領域は、墓石の後も `user_id` の HMAC を消さない点を足す。
 - **主の ID の変更**：MVP の後。
+- **ログのメールアドレス**（2026-09-27）：認証のイベントのログの `user_name` に載せる（本家と同じ。調査のため）。保持は `log_retention_days`、ストリームでは伏せ字を選べる（[logs-and-streams.md](logs-and-streams.md) の 3.1 節）。
 
 持ち越し：
 

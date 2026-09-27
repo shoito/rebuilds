@@ -21,7 +21,7 @@ date: 2026-09-27
 
 OpenTelemetry の自動計装は、HTTP のスパンに URL（クエリ文字列を含む）やヘッダーを属性として付けうる。AWS のアクセスログにも、アプリのロガーの外で要求の中身が残る。
 
-- ALB のアクセスログは、要求の行（URL とクエリ文字列）を含む。項目を選ぶ設定は、AWS の資料で見つからなかった（未検証）。
+- ALB のアクセスログは、要求の行（`request_line`。URL とクエリ文字列）を含む。ログの属性は有効・無効と S3 の置き場所だけで、項目を選ぶ設定はない（[Access logs for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html)、2026-09-27 に確認）。
 - CloudFront の標準のログ（v2）は、出す項目を選べる。`cs-uri-query`（クエリ文字列）と `cs(Cookie)` を外せる。Cookie の記録は配信ごとの設定で、既定は無効（[Configure standard logging (v2)](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/standard-logging.html)、2026-09-27 に確認）。
 - WAF のログは、URI のパス・クエリ文字列・1 つのヘッダー・HTTP のメソッドを `REDACTED` に伏せられる。ただし、伏せるのはその項目を照合に使うルールの記録だけと説明されている。ログに残す要求を、ルールの動作（Block・Count など）で絞れる（[Finding your protection pack (web ACL) records](https://docs.aws.amazon.com/waf/latest/developerguide/logging-management.html)、2026-09-27 に確認）。
 
@@ -49,9 +49,9 @@ OpenTelemetry の自動計装は、HTTP のスパンに URL（クエリ文字列
 
 ### (3) AWS のアクセスログ
 
-- **認証の経路の ALB のアクセスログは無効にする。** クエリ文字列を伏せられない（未検証）ため。代わりに、アプリの要求のログ（許可リスト）と、CloudFront・WAF のログを使う。
+- **認証の経路の ALB のアクセスログは無効にする。** クエリ文字列を伏せられないため。代わりに、アプリの要求のログ（許可リスト）と、CloudFront・WAF のログを使う。
 - CloudFront の標準のログ（v2）は、`cs-uri-query` と `cs(Cookie)` を項目から外し、Cookie の記録を無効にする。リアルタイムのログ（[ADR-0062](0062-sli-and-synthetic-monitoring.md)）も、クエリ文字列と Cookie の項目を選ばない。
-- WAF のログは、クエリ文字列・`Authorization`・`Cookie` を伏せる設定にし、残す要求を Block と Count に絞る。伏せる範囲が照合に使うルールに限られるので、WAF のログ（`httpRequest` の項目）にクエリ文字列が残るかを E1 で確かめる。残るなら、WAF のログの保持を 7 日にし、読み取りを期限つきの権限に限る（未検証）。
+- WAF のログは、クエリ文字列・`Authorization`・`Cookie` を伏せる設定にし、残す要求を Block と Count に絞る。伏せる範囲は、その要素で照合するルールに限られる（[Logging](https://docs.aws.amazon.com/waf/latest/developerguide/logging-management.html)、2026-09-27 に確認）。ログの `httpRequest.args` はクエリ文字列を持つ（[Log fields](https://docs.aws.amazon.com/waf/latest/developerguide/logging-fields.html)、同日に確認）。伏せる設定で `args` が伏せられるかは資料から読み取れない（未検証）。E1 で確かめ、残るなら、WAF のログの保持を 7 日にし、読み取りを期限つきの権限に限る。
 
 ### (4) 走査
 

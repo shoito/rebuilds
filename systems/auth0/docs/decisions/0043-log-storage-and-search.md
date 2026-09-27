@@ -24,8 +24,8 @@ date: 2026-09-27
 
 1 を採用する。
 
-- 索引は `(tenant_id, log_id)` と、`user_id`・`type`・`client_id`・`ip`・`connection_id`・`organization_id` のそれぞれに `log_id` を続けたもの。RLS をかける。
-- 検索は本家の部分集合。フィールドのない語は `log_id`・`ip`・`client_name`・`connection` の完全一致だけ（本家は `description` も探す）。`description`・`user_agent` は句の完全一致と前方一致だけ。1 回 5 秒の時限。
+- 索引は `(tenant_id, log_id)` と、`user_id`・`user_name`・`type`・`client_id`・`ip`・`connection_id`・`organization_id` のそれぞれに `log_id` を続けたもの。RLS をかける。
+- 検索は本家の部分集合。フィールドのない語は `log_id`・`ip`・`client_name`・`connection`・`type`・`user_name` の完全一致だけ（本家は `description` も探す。[Log Search Query Syntax](https://auth0.com/docs/deploy-monitor/logs/log-search-query-syntax)、2026-09-27 に確認）。`description`・`user_agent` は句の完全一致と前方一致だけ。1 回 5 秒の時限。
 - チェックポイントは `q` と組み合わせられる（本家は他の引数を無視する）。索引が揃っているので安く返せる。
 - 保持はテナントの属性 `log_retention_days`（1・5・10・30、既定案）で、問い合わせの条件で切る。クラスタは 31 日でパーティションを `DROP` する。本システムの調査用に、S3 の Parquet に 90 日持つ（テナントには見せない）。
 - 期間は既定案で、法務の L5 で確定する。
@@ -41,7 +41,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - `description` の自由な語の検索ができない（本家との差）。文書に書く。
   - Aurora のクラスタが 1 つ増える。S2 で移すときに、Management API の形を保ったまま裏の基盤を替える作業が要る。
-  - 1.5 TB の Aurora のストレージの費用（金額は未検証）。
+  - 1.5 TB の Aurora のストレージの費用（東京の Aurora PostgreSQL の標準の構成で 1 GB 月 0.12 USD、約 180 USD／月。I/O は別に 100 万回 0.24 USD。[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.csv)、2026-09-27 に確認）。
 
 ## Confirmation
 

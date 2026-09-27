@@ -41,13 +41,13 @@ OIDC・OAuth のエンドポイント、グラント、クライアントの認�
 | DPoP | `dpop_signing_alg_values_supported` は `ES256` |
 | イントロスペクション（RFC 7662） | discovery に載っていない |
 
-- ID トークンの有効期間の既定は 36,000 秒（10 時間）（[Update ID Token Lifetime](https://auth0.com/docs/secure/tokens/id-tokens/update-id-token-lifetime)、2026-09-27 に確認）。最大は資料になかった（未検証）。
-- アクセストークンの有効期間は既定 86,400 秒、最大 2,592,000 秒（[Update Access Token Lifetime](https://auth0.com/docs/secure/tokens/access-tokens/update-access-token-lifetime)、2026-09-27 に確認）。暗黙・ハイブリッドのフロー向けの別の値がある。ブラウザの PKCE のフローは一般の値を使う。ブラウザ向けの値の既定（7,200 秒と見られる）は資料になかった（未検証）。
+- ID トークンの有効期間の既定は 36,000 秒（10 時間）（[Update ID Token Lifetime](https://auth0.com/docs/secure/tokens/id-tokens/update-id-token-lifetime)、2026-09-27 に確認）。最大は、資料にも Management API の OpenAPI（`ClientJwtConfiguration.lifetime_in_seconds`）にも記載がない（同日に確認）。
+- アクセストークンの有効期間は既定 86,400 秒、最大 2,592,000 秒（[Update Access Token Lifetime](https://auth0.com/docs/secure/tokens/access-tokens/update-access-token-lifetime)、2026-09-27 に確認）。暗黙・ハイブリッドのフロー向けの別の値がある。ブラウザの PKCE のフローは一般の値を使う。ブラウザ向けの値（`token_lifetime_for_web`）は `token_lifetime` を超えられない（Management API の OpenAPI、同日に確認）。既定（7,200 秒と見られる）は、資料にも OpenAPI にもなかった（未検証）。
 - デバイスのフロー：`expires_in` 900 秒、`interval` 5 秒。ユーザーコードは BASE20 の文字で 8 文字以上、数字で 9 文字以上、区切りを含めて 20 文字以下。アプリの種類は Native で、トークンのエンドポイントの認証は `none` に限る（[Call Your API Using the Device Authorization Flow](https://auth0.com/docs/get-started/authentication-and-authorization-flow/device-authorization-flow/call-your-api-using-the-device-authorization-flow)、2026-09-27 に確認）。
 - リフレッシュトークンは、`offline_access` のスコープで求める。1 ユーザー × 1 アプリで有効なものは 200 個までで、超えると最も古いものを失効させる（[Refresh Tokens](https://auth0.com/docs/secure/tokens/refresh-tokens)、2026-09-27 に確認）。
 - PAR は Enterprise のプランの追加の契約（Highly Regulated Identity）で使える。アプリごとに PAR を必須にできる（`require_pushed_authorization_requests`）（[Configure PAR](https://auth0.com/docs/get-started/applications/configure-par)、2026-09-27 に確認）。
 - DPoP は ES256 の鍵で使う。公開のクライアントは DPoP の証明に `nonce` を入れる必要があり、ないと `use_dpop_nonce` のエラーと新しい nonce を返す（[Demonstrating Proof-of-Possession](https://auth0.com/docs/secure/sender-constraining/demonstrating-proof-of-possession-dpop)、2026-09-27 に確認）。
-- 認可コードの有効期間は、資料で確かめられなかった（未検証）。
+- 認可コードの有効期間は、資料で確かめられなかった（未検証。auth0.com/docs の全文に数値の記述がない。E3 で試用のテナントで確かめる）。
 
 ## 3. 方針
 
@@ -348,7 +348,7 @@ RP(サーバー)
 | 認可コード | 60 秒 | 固定 | — | 未検証 |
 | アクセストークン（機密のアプリ・M2M） | 86,400 秒 | 60〜2,592,000 秒 | API | 既定 86,400、最大 2,592,000 |
 | アクセストークン（公開のアプリ：SPA・Native・デバイス） | 3,600 秒 | 60〜86,400 秒 | API | ブラウザ向けの値あり（値は未検証） |
-| ID トークン | 36,000 秒 | 60〜86,400 秒 | アプリ | 既定 36,000（最大は未検証） |
+| ID トークン | 36,000 秒 | 60〜86,400 秒 | アプリ | 既定 36,000（最大は資料・OpenAPI に記載なし） |
 | リフレッシュトークン（最終の期限） | 30 日 | 1 日〜1 年 | アプリ | 既定 30 日、最大 1 年 |
 | リフレッシュトークン（使われない期間） | 15 日 | 1 時間〜最終の期限 | アプリ | 既定 30 日（[Configure Refresh Token Expiration](https://auth0.com/docs/secure/tokens/refresh-tokens/configure-refresh-token-expiration)、2026-09-27 に確認） |
 | デバイスコード | 900 秒 | 固定 | — | 900 |
@@ -501,8 +501,8 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 | Dynamic OP、Implicit・Hybrid OP、Front-Channel Logout、Session Management | 対象外（動的な登録と、暗黙・ハイブリッド・iframe の仕組みを持たない） | — |
 | FAPI 2.0 Security Profile | MVP の後 | PAR・DPoP の後 |
 
-- テストプランの名前は、適合試験のリポジトリの記載による（未検証。E3 の着手時に、使う版の suite で確かめる）。
-- 適合試験の実行には、PKCE を使わない機密のクライアント（`require_pkce=false`）を登録したテナントを使う。suite の Basic のプランが PKCE を送るかは未検証。送るなら既定の設定で回す。
+- テストプランの名前は、適合試験のリポジトリの CI の設定（`.gitlab-ci/run-tests.sh`）で確かめた（2026-09-27 に master で確認）。E3 の着手時に、使う版の suite で改めて確かめる。
+- 適合試験の実行には、PKCE を使わない機密のクライアント（`require_pkce=false`）を登録したテナントを使う。OIDC の OP の試験は PKCE を送らない（suite の `AbstractOIDCCServerTest` に PKCE の処理がない。2026-09-27 に master で確認）。
 - 差分テスト：同じ要求を node-oidc-provider に送り、状態コード・`error`・クレームの違いを一覧にする。違いは、この文書の決定に基づくものだけであることを CI で確かめる（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 ### 13.4 結合・E2E
@@ -527,9 +527,8 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 | --- | --- |
 | イントロスペクション（RFC 7662）を出すか | JWT を検証できない API（不透明なトークンを前提にした製品）の需要を見て、E5 の後に決める |
 | `resource`（RFC 8707）と `audience` の両立 | トークン交換の Epic で決める |
-| 本家のブラウザ向けのアクセストークンの既定、ID トークンの最大、認可コードの有効期間 | 本家の試用のテナントで確かめる（E3） |
-| 適合試験のテストプランの正確な名前と、Basic のプランが PKCE を送るか | E3 の着手時 |
-| `private_key_jwt` の `aud` に、トークンのエンドポイントの URL 以外（`issuer`）を許すか | 近年の仕様の議論で `issuer` に揃える流れがある（未検証）。E3 で最新の仕様を確かめる |
+| 本家のブラウザ向けのアクセストークンの既定、認可コードの有効期間 | 本家の試用のテナントで確かめる（E3）。ID トークンの最大は、本家の資料・OpenAPI に記載がないので、本システムの 86,400 秒のままにする |
+| `private_key_jwt` の `aud` を `issuer` だけにするか | `draft-ietf-oauth-rfc7523bis-11`（IETF の Last Call の段階）は、クライアントの認証の `aud` を `issuer` だけにし、トークンのエンドポイントの URL を使わないこと（MUST NOT）と、それ以外の JWT を認可サーバーが拒否すること（MUST）を求める（[draft-ietf-oauth-rfc7523bis-11](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) の 4 節、2026-09-27 に確認）。今の設計（トークンのエンドポイントの URL か `issuer` のどちらかを含めばよい）はこれに合わない。既存のクライアントとの互換と合わせて、RFC になる時点か E3 の着手時に Dev のテックリードとセキュリティの担当が決める |
 | 同意（`grants`）の画面で、スコープごとの一部の許可を許すか | universal-login.md と合わせて E4 |
 | M2M のトークンの発行のログを、Aurora の writer の障害中にどう残すか | [logs-and-streams.md](logs-and-streams.md) の 3.3 節の形（outbox に入れられないときはタスクのメモリーから SQS へ直接送る。失いうるので件数を計る）で扱う。失う件数の許容を E3 で確かめる |
 

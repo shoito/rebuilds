@@ -77,7 +77,7 @@ AWS 上の構成、アカウント、ネットワーク、認証の経路と管�
 | --- | --- | --- |
 | Back-Channel Logout、ログストリームの Webhook（テナントの任意の URL） | egress のサブネットの `worker-egress` → 専用の NAT | SSRF の踏み台にしない。名前解決の後の IP を検査し、リダイレクトを追わない（[security.md](security.md) の 3.6 節） |
 | ソーシャル IdP（トークン・userinfo・JWKS） | private → NAT → Network Firewall（許可リスト） | 宛先が決まっている |
-| メールの送信（Amazon SES を第一の候補） | VPC エンドポイント（SES の SMTP のエンドポイント。使えるかは未検証）か NAT | email-delivery の領域で決める |
+| メールの送信（Amazon SES を第一の候補） | VPC エンドポイント（SES は SMTP と API の VPC エンドポイントを持つ。SMTP は 25 以外のポート（587 など）。東京の AZ は対応の除外にない。[Setting up VPC endpoints with Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html)、2026-09-27 に確認） | email-delivery の領域で決める |
 | EventBridge（ログストリーム） | VPC エンドポイント | logs-and-streams の領域 |
 
 - egress の NAT の Elastic IP を、東京と大阪で最初から公開する（テナントが送信元の IP を許可リストに入れる場合のため）。
@@ -207,7 +207,7 @@ S1 から大阪に**ウォームスタンバイ**を持つ（[ADR-0060](../decis
 - **署名鍵は同じなので、切り替えの後も発行済みのトークンは有効のまま**（ADR-0005）。JWKS も同じ。
 - **POST の要求はオリジングループで切り替わらない**（ADR-0058）。切り替えのワークフローが、CloudFront の配信のオリジンを大阪の ALB に変える（`global/edge` の変数 `active_region`）。
 - **失った範囲のやり直し**（ADR-0060）：失った範囲の、パスワードの変更・再設定、MFA の要素の削除、ユーザーのブロック・削除、ログアウト、リフレッシュトークンの失効、署名鍵の失効、クライアントシークレットのローテーションを、log-archive の記録から大阪の DB へやり直す。手順は [runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md)。
-- **署名鍵の失効は、大阪への複製を確かめてから完了を返す**（ADR-0060。確かめ方は未検証で、E1 で決める）。
+- **署名鍵の失効は、大阪への複製を確かめてから完了を返す**（ADR-0060。`aurora_global_db_status()` のリージョンごとの `highest_lsn_written` と比べる。コミットの LSN の得方は未検証で、E1 で決める）。
 
 ### 6.4 論理的な破損
 
@@ -288,14 +288,14 @@ S2 で行うこと：ユーザー・セッション・リフレッシュトー�
 
 ## 10. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。東京の単価は確かめていない（未検証）。Fargate は米国東部の単価（vCPU 1 時間 約 0.040 USD、Graviton は約 2 割安い。[Fargate Pricing](https://aws.amazon.com/fargate/pricing/)、第三者の要約で確認）に、アジア太平洋の割り増し（1〜3 割）を掛けて置いた。Savings Plans とリザーブドインスタンスで 20〜30% 下げられる。
+**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。Fargate は東京の単価（x86：vCPU 1 時間 0.05056 USD・メモリー 1 GB 1 時間 0.00553 USD、Graviton：0.04045 USD・0.00442 USD。[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-1/index.json)、2026-09-27 に確認）で、vCPU あたりメモリー 2 GB、x86 と置いた。大阪も同じ単価と置いた（未検証）。Aurora のストレージは東京で 1 GB 月 0.12 USD（同じく Price List API で確認）。他の項目の東京の単価は確かめていない（未検証）。Savings Plans とリザーブドインスタンスで 20〜30% 下げられる。
 
 | 項目 | 月額（USD、概算） |
 | --- | --- |
 | Aurora（主：r8g.4xlarge × 3＋大阪 × 1、I/O-Optimized、Global Database の複製） | 9,000 |
 | Aurora（ログ：r8g.2xlarge × 2、ストレージ 約 1.5 TB、大阪は headless） | 3,000 |
 | ElastiCache（東京 6 ノード、大阪 2 ノード） | 1,500 |
-| ECS Fargate（東京 平均 約 90 vCPU、大阪の待機 約 15 vCPU） | 4,000 |
+| ECS Fargate（東京 平均 約 90 vCPU、大阪の待機 約 15 vCPU） | 4,700 |
 | CloudFront（要求数、リアルタイムのログ）、ALB、データ転送 | 3,000 |
 | WAF（ルール、要求数、Bot Control。ATP を使うなら追加） | 1,500 |
 | NAT ゲートウェイ、Network Firewall（東京と大阪） | 3,000 |
@@ -303,10 +303,10 @@ S2 で行うこと：ユーザー・セッション・リフレッシュトー�
 | GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,000 |
 | KMS（マルチリージョンの鍵、要求）、Secrets Manager、Private CA（2 リージョン） | 1,000 |
 | S3、バックアップ、log-archive | 800 |
-| **本番の合計** | **約 30,000** |
+| **本番の合計** | **約 31,000** |
 | staging・dev・shared・edge・security | 約 6,000 |
 
-- Private CA は、CA 1 つあたりの月額の費用がかかる（金額は未検証）。東京と大阪に置く。
+- Private CA は、汎用のモードで CA 1 つ月 400 USD、証明書の有効期間を 7 日以内に限る短命のモードで月 50 USD（[AWS Private CA Pricing](https://aws.amazon.com/private-ca/pricing/)、2026-09-27 に確認）。東京と大阪に置く。相互 TLS の証明書を 7 日以内で回すなら、短命のモードにする。
 - 費用は、アカウントとタグ（`service`、`env`、`path`＝`auth`・`mgmt`）ごとに毎月見る。
 
 ## 11. S3 のセル構成

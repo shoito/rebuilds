@@ -57,7 +57,7 @@ LDAP：
 - 照合の流れ：Auth がパスワードを受け取り、接続の公開鍵ではなく、**コネクタとの TLS の中で**照合の要求を送る。コネクタは LDAP の bind で確かめ、結果とプロフィールの属性を返す。本システムはパスワードを保存しない。
 - 待ち時間：照合の応答を最大 10 秒待つ。すべてのコネクタに届かないときは、その接続だけを失敗させ、画面で案内する（[ADR-0005](0005-authentication-path-availability.md) の「ソーシャル IdP」と同じ扱い）。コネクタは複数を入れて冗長にできる。
 - 本家と同じく、テナントが自分で管理するディレクトリに入れる前提にする。テナントの顧客のディレクトリにつなぐ用途には、SAML か OIDC を勧める。
-- 照合の結果の短いキャッシュ（コネクタが落ちたときのログイン）は、本家にあるか未検証。本システムは作らない（パスワードに由来する値を本システムに残さない）。
+- 本家のコネクタは、プロフィールと資格情報（パスワードのハッシュ）をキャッシュし、コネクタに届かないときだけ使う。接続ごとに無効にできる（[AD/LDAP Connector](https://auth0.com/docs/authenticate/identity-providers/enterprise-identity-providers/active-directory-ldap/ad-ldap-connector)、[Disable AD/LDAP Connection Credential Caching](https://auth0.com/docs/authenticate/identity-providers/enterprise-identity-providers/active-directory-ldap/ad-ldap-connector/disable-credential-caching)、2026-09-27 に確認）。本システムは作らない（パスワードに由来する値を本システムに残さない）。本家でキャッシュを使っていたテナントは、移行でコネクタの停止中にログインできなくなる。
 
 ### 振り分け
 

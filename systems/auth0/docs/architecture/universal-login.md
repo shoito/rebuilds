@@ -150,7 +150,7 @@ CREATE TABLE login_transactions (
 | 名前 | 中身 | 属性 | 有効 |
 | --- | --- | --- | --- |
 | `__Host-<brand>_tx` | 最近のトランザクションの `handle` の集合（最大 5 件）を HMAC で署名したもの | `Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/` | セッションの Cookie（ブラウザを閉じるまで） |
-| `__Host-<brand>_idp` | IdP への往復の間だけ、IdP へ送った `state` の HMAC | `Secure`・`HttpOnly`・`SameSite=None`・`Path=/login/callback` | 10 分 |
+| `__Host-<brand>_idp` | IdP への往復の間だけ、IdP へ送った `state` の HMAC | `Secure`・`HttpOnly`・`SameSite=None`・`Path=/`（`__Host-` の接頭辞は `Path=/` を要する） | 10 分 |
 
 - セッションの Cookie は [sessions-and-sso.md](sessions-and-sso.md) が持つ。
 
@@ -367,7 +367,7 @@ E2・E5・E10・E13 には、この領域の Story はない（E5 のログア�
 - **言語**：MVP は `ja`・`en`。テナントの既定は `ja`。
 - **テンプレート**：テナントの任意の HTML・CSS・JavaScript は MVP で入れない（本家との違い）。
 - **同意の方式の既定**：`checkbox`。`ip`・`user_agent` は記録する（L8 で変えうる）。
-- **エラーの画面**：テナントのエラーの URL への転送は、`error` と `tracking_id` だけを付ける。本家の `client_id` などは付けない（未検証の本家の振る舞いとの違いを E4 で確かめる）。
+- **エラーの画面**：テナントのエラーの URL への転送は、`error` と `tracking_id` だけを付ける。本家は `client_id`・`connection`・`lang`・`error_description`・`tracking` を付ける（[Customize Error Pages](https://auth0.com/docs/customize/login-pages/custom-error-pages)、2026-09-27 に確認）が、本システムは `client_id` などを付けない（本家との違い。移行のテナントのエラーの画面が `client_id` を使っていれば直す必要がある）。
 - **iframe**：どの設定でも許さない。
 
 持ち越し：

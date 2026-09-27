@@ -35,7 +35,7 @@ date: 2026-09-27
 - `redirect_uri` は必須。登録の値と完全に一致させる。正規化しない。Native のアプリのループバックの IP（`127.0.0.1`、`[::1]`）だけ、ポートを無視する。
 - 照合できない `redirect_uri`・`client_id` には何も送らず、本システムのエラーの画面を出す。
 - 認可の応答（成功・エラー）に `iss` を付け、discovery に `authorization_response_iss_parameter_supported: true` を載せる。
-- 3 は、PKCE を使わない既存のサーバー側のライブラリと、適合試験のクライアント（PKCE を送るかは未検証）を締め出す恐れがある。外した場合の警告と監査ログで補う。
+- 3 は、PKCE を使わない既存のサーバー側のライブラリと、適合試験のクライアント（OIDC の OP の試験は PKCE を送らない。スイートの `AbstractOIDCCServerTest` に PKCE の処理がない。2026-09-27 に master で確認）を締め出す恐れがある。外した場合の警告と監査ログで補う。
 - 2 は、RFC 9700 が勧めない選択肢を残す。
 
 ## Consequences

@@ -278,6 +278,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `rate-limit-overrides-and-review` | 上書きの表と運用、値の見直し、OpenAPI の壊す変更の検査 |
 | `slo-and-alert-tuning` | SLO の確定、アラートの調整、DR のダッシュボード、反映の遅れの SLI、Aurora 停止時のキャッシュの障害の注入 |
 | `disclosure-api-and-l7` | 開示の API、法務の L7 の結論の反映（法務：L7） |
+| `secret-scanning-partner` | 本システムのトークン・秘密の接頭辞を、GitHub のシークレットスキャンのパートナーなどに登録し、通知の受け口と失効の手順を作る（[リポジトリ共通の ADR-0006](../../../docs/decisions/0006-brand-neutral-identifiers.md)、runbook の `secret-leak.md`） |
+| `operator-access-jit` | 運用者の期限つきの権限（JIT）の申請・承認・失効と、テナントの許可の確認（[ADR-0056](decisions/0056-operator-access.md)、runbook の `operator-access.md`） |
 | `performance-and-csp-monitoring` | 画面の LCP・HTML の大きさの計測、CSP の違反の監視、検索の負荷試験、列挙の時間の差の測定 |
 | `edge-and-email-readiness` | カスタムドメインの合成監視と配信のテナントの上限の見直し、大阪の SES への切り替えの訓練 |
 | `ga-review` | GA の判定（[quality.md](quality.md) の 5 節の E12 の基準、法務の論点の確定） |

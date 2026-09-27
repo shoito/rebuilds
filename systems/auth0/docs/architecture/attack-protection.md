@@ -27,11 +27,11 @@ WAF のルールの初期値は [infrastructure.md](infrastructure.md) の 4.3 �
 | --- | --- | --- |
 | ブルートフォース | 1 つの IP から 1 つのユーザーの識別子への失敗が既定 10 回（1〜100 で設定）で、その IP からその識別子へのログインを止める。任意で、そのユーザーへのすべてのログインを止めるロックもある。解除は、最後の失敗から 30 日、通知のメールの解除のリンク、パスワードの変更、管理者の API。通知のメールは一意の IP ごとに 1 時間に 1 通。IP の許可リスト（CIDR）。応答の設定をすべて外すと「監視」のモードになり、ログにだけ残す | [Brute-Force Protection](https://auth0.com/docs/secure/attack-protection/brute-force-protection) |
 | 不審な IP の抑制 | 既定で有効。ログインは 1 つの IP から 1 日の失敗の上限と、24 時間で均等に補う速度。サインアップは試行の上限と補う速度。超えると 429。許可リストは 100 件まで。管理者へのメール | [Suspicious IP Throttling](https://auth0.com/docs/secure/attack-protection/suspicious-ip-throttling) |
-| 同・既定値 | ログイン：1 IP 1 日 100 回、補う速度 864,000 ms（1 日 100 回）。サインアップ：50 回、補う速度 1,200 ms | [Support の記事](https://support.auth0.com/center/s/article/Default-values-for-Suspicious-IP-Throttling)、補う速度（864,000 ms・1,200 ms）は検索の結果の要約で確認（未検証。CLI の資料のフラグの既定値は 34,560 ms と 1,200 ms で、食い違う） |
+| 同・既定値 | ログイン：1 IP 1 日 100 回、補う速度 864,000 ms（1 日 100 回）。サインアップ：50 回、補う速度 1,200 ms（下の食い違いを見よ） | Management API の OpenAPI の `SuspiciousIPThrottlingPreLoginStage`（`max_attempts` 既定 100、`rate` 既定 864,000、最小 34,560）、[Custom Token Exchange の攻撃の防御](https://auth0.com/docs/authenticate/custom-token-exchange/cte-attack-protection) の既定の応答の例（サインアップ 50・1,200 ms）、[Support の記事](https://support.auth0.com/center/s/article/Default-values-for-Suspicious-IP-Throttling)。2026-09-27 に確認 |
 | 漏えいしたパスワード | サインアップ・ログイン・再設定で働く。サインアップでは組を拒否、ログインではアカウントを止める。利用者と管理者に通知。標準の検知は公開の漏えいを走査し、反映まで 7〜13 か月。上位の版（Credential Guard）は 12〜36 時間。応答を外すと監視のモード。ログのコードは `signup_pwd_leak`・`pwd_leak`・`reset_pwd_leak`。通知は利用者ごと・IP ごとに 1 時間に 1 通 | [Breached Password Detection](https://auth0.com/docs/secure/attack-protection/breached-password-detection) |
 | ボットの検知 | 統計のモデルで、ログイン・サインアップ・再設定のボットらしい集中を見つける。CAPTCHA は「なし」「危険なときだけ」「常に」。危険の水準は低・中（既定）・高。提供者は本家の Auth Challenge（既定、JavaScript が要る）、Simple CAPTCHA（JavaScript が要らない）、第三者。応答を外すと監視のモード | [Bot Detection](https://auth0.com/docs/secure/attack-protection/bot-detection) |
 
-- 食い違い：サインアップの上限の単位が、本家の資料（「1 分の試行の上限」）とサポートの記事（「1 日 50 回」）で違う。補う速度 1,200 ms（1 日 72,000 回）と合わせると、資料の「1 分」の読みが合う。本システムは 1 分の単位で読む（4.2 節）。
+- 食い違い：サインアップの補う速度の既定が、OpenAPI の `SuspiciousIPThrottlingPreUserRegistrationStage`（`rate` の既定 1,728,000 ms ＝ 1 日 50 回、最小 1,200 ms）と、資料の既定の応答の例（1,200 ms）で違う（未検証）。以前に食い違いとしていた CLI の 34,560 ms は、ログインの `rate` の最小値だった。上限の単位も、本家の資料（「1 分の試行の上限」）とサポートの記事（「1 日 50 回」）で違う。補う速度 1,200 ms（1 日 72,000 回）と合わせると、資料の「1 分」の読みが合う。本システムは 1 分の単位で読む（4.2 節）。
 - 未検証：ブルートフォースの失敗に MFA の失敗・パスワードなしのコードの失敗が含まれるか、不審な IP のブロックが解ける条件（補う速度で自然に戻ると理解している）、各防御のログのコード（漏えいしたパスワード以外）。E8 の着手前に試用のテナントで確かめる。
 
 ## 3. 判定の段
@@ -87,7 +87,7 @@ WAF のルールの初期値は [infrastructure.md](infrastructure.md) の 4.3 �
 
 - **数える単位は「識別子 × IP」**。識別子は、接続・正規化した識別子（メールアドレスは小文字化と NFKC）を、テナントの鍵で HMAC にした値。ユーザーの有無を見ずに数える（列挙を防ぐ）。IPv6 は /64 の接頭辞で数える。
 - 既定の上限は 10 回（1〜100 で設定。本家と同じ）。上限に達したら、`brute_force_blocks` に行を書く（DB。Valkey を失ってもブロックが残る）。
-- **既知の端末は別に数える。** 過去にそのユーザーとしてログインに成功したブラウザには、既知の端末の Cookie（`<brand>_did`）を出す。Cookie を持つ要求の失敗は「識別子 × 端末」で数え、IP のブロックの対象から外す。同じ CGNAT の IP の攻撃者が、正規の利用者を締め出さない（OWASP の device cookie の考え方。出典は References）。Cookie は 256 ビットの乱数の ID と、テナントの鍵の MAC を持ち、ユーザーの識別子の HMAC の一覧（最大 5 件）を中身に含む。有効 180 日。
+- **既知の端末は別に数える。** 過去にそのユーザーとしてログインに成功したブラウザには、既知の端末の Cookie（`__Host-<brand>_did`。`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`。Cookie の一覧は [sessions-and-sso.md](sessions-and-sso.md) の 3.1 節）を出す。Cookie を持つ要求の失敗は「識別子 × 端末」で数え、IP のブロックの対象から外す。同じ CGNAT の IP の攻撃者が、正規の利用者を締め出さない（OWASP の device cookie の考え方。出典は References）。Cookie は 256 ビットの乱数の ID と、テナントの鍵の MAC を持ち、ユーザーの識別子の HMAC の一覧（最大 5 件）を中身に含む。有効 180 日。
 - アカウントのロック（識別子に対するすべての IP のログインを止める）は、テナントの設定で有効にできる（既定は無効）。攻撃者が被害者を締め出す DoS になるため。有効にしたテナントでも、既知の端末の Cookie を持つ要求は通す。
 - 解除：
   - 最後の失敗から 30 日で自動に（本家と同じ）。
@@ -211,7 +211,7 @@ CREATE TABLE brute_force_blocks (
 | IP の評判・匿名の IP | WAF のラベル（[infrastructure.md](infrastructure.md) の 4.3 節のルール 2・4・8）。WAF が付けたラベルを、カスタムの要求ヘッダーで Auth に渡す | ホスティング事業者、Tor |
 | IP の速度 | Valkey（4.3） | 10 分に 20 を超える別の識別子、失敗の割合 80% 超 |
 | プラットフォームの IP の数 | Valkey（4.2） | 多くのテナントでの失敗 |
-| 既知の端末 | `<brand>_did` | ある → 点数を大きく下げる |
+| 既知の端末 | `__Host-<brand>_did` | ある → 点数を大きく下げる |
 | ブラウザの一貫性 | 要求のヘッダー | `Accept-Language`・`Sec-Fetch-*` の欠落、自動化のツールの UA |
 | フォームの時間 | 画面の表示から送信までの時間（トランザクションに記録） | 1 秒未満 |
 | JavaScript の実行 | 画面の JavaScript が付けるトークン | ない（6.3） |

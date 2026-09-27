@@ -13,7 +13,7 @@ SSO とログアウトは、エンドユーザーのセッションの上に成�
 
 本家 Auth0（2026-09-27 に確認）：
 
-- セッションに「使われない期間」と「最終の期限」があり、上限は Enterprise 以外で 3 日・30 日、Enterprise で 100 日・365 日。永続と非永続（`Expires=0`）を選べる（[Session Lifetime Limits](https://auth0.com/docs/manage-users/sessions/session-lifetime-limits)、[Tenant Settings](https://auth0.com/docs/get-started/tenant-settings)）。既定の値は資料になかった（未検証）。
+- セッションに「使われない期間」と「最終の期限」があり、上限は Enterprise 以外で 3 日・30 日、Enterprise で 100 日・365 日。永続と非永続（`Expires=0`）を選べる（[Session Lifetime Limits](https://auth0.com/docs/manage-users/sessions/session-lifetime-limits)、[Tenant Settings](https://auth0.com/docs/get-started/tenant-settings)）。既定は、使われない期間 72 時間・最終の期限 168 時間（Management API の OpenAPI の `idle_session_lifetime`・`session_lifetime` の `default`、2026-09-27 に確認）。
 - Management API でセッションを取り消せ、取り消しで Back-Channel Logout が送られる（[OIDC Back-Channel Logout](https://auth0.com/docs/authenticate/login/logout/back-channel-logout)）。
 
 [ADR-0005](0005-authentication-path-availability.md) は、セッションの正本を DB に置き、Valkey をキャッシュにすると決めている。

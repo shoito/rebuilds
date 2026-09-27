@@ -7,7 +7,7 @@ date: 2026-09-27
 
 ## Context
 
-[ADR-0004](0004-credential-storage.md) で、Pwned Passwords のデータセットを取り込み、k-匿名性の range API を自前でホストすると決めた。データセットの利用条件は未検証とし、E8 の着手前に確かめるとした。
+[ADR-0004](0004-credential-storage.md) で、Pwned Passwords のデータセットを取り込み、k-匿名性の range API を自前でホストすると決めた。データセットの利用条件を確かめていなかったので、E8 の着手前に確かめるとした。
 
 2026-09-27 に確かめたこと：
 

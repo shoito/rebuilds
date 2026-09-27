@@ -48,7 +48,7 @@ IdP のトークン：
 - **メールアドレスの確認の扱い**（ID のリンクの判断に使う。リンクの規則は users-and-profiles の領域）：
   - Google：`email_verified` をそのまま使う。
   - Apple：`email_verified` を使う。`is_private_email` のときは中継のアドレスであることを記録する。
-  - LINE：ID トークンのメールアドレスに確認済みを示すクレームは確かめられなかった（未検証）。確かめられるまでは、未確認として扱う。
+  - LINE：ID トークンの項目は `email` だけで、確認済みを示すクレーム（`email_verified`）はない（[Verify ID token](https://developers.line.biz/en/docs/line-login/verify-id-token/)、2026-09-27 に確認）。未確認として扱う。メールアドレスを得るには、LINE Developers Console で申請し、取得の目的を説明する画面のスクリーンショットを出す（[Integrating LINE Login with your web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/)、2026-09-27 に確認）。
   - GitHub：`/user/emails` の `verified` が真のものだけを使う。
 - **Apple のクライアントシークレット**：テナントが Apple の秘密鍵（`.p8`）を登録する。この鍵での JWT の署名は、テナントの署名鍵と同じく Signer の中で行う（[ADR-0003](0003-token-formats-and-signing-keys.md) と AGENTS.md の「署名の秘密鍵は Signer の外で扱わない」）。有効期間 1 時間の JWT を作り、Auth のプロセスでキャッシュする。Signer に用途（外部の IdP へのクライアントの認証）を足すことは、keys-and-secrets の領域に依頼する（2026-09-27 に [ADR-0047](0047-signer-api-and-jwks-publishing.md) の外部 IdP のアサーション `apple_client_secret` として足した）。
 - **Apple のサーバー間の通知**：`/login/callback/apple/notifications` で受け、Apple の JWKS で署名を確かめる。
@@ -77,7 +77,7 @@ IdP のトークン：
   - IdP のトークンの漏えいの範囲が、使うテナントに限られる。
 - 引き受けるコスト：
   - Apple のシークレットのために、Signer に外部 IdP 向けの署名の用途が増える。
-  - LINE のメールアドレスの確認の扱いが未検証で、ID のリンクに使えない。
+  - LINE のメールアドレスは確認済みと言えないので、ID のリンクに使えない。
   - 開発者キーがないので、試すだけのテナントも IdP にアプリを登録する手間がある。
 
 ## Confirmation

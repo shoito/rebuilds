@@ -140,5 +140,5 @@ Web やモバイルのアプリを作るたびに、ログイン、サインア�
 - メールの送信事業者：Amazon SES（東京、DR は大阪）に決めた。テナントの独自の SMTP と SES（クロスアカウント）も許す（[ADR-0040](decisions/0040-email-sending-platform.md)、[ADR-0041](decisions/0041-email-templates-and-tenant-providers.md)）。送信の代行の扱い（L3）は法務の確認待ちのまま。
 - ボットの検知の方式：自前のリスクの点数と proof-of-work のチャレンジに決めた。WAF の Challenge はエッジの後ろ盾、第三者の CAPTCHA は L2 の結論の後（[ADR-0026](decisions/0026-bot-detection-and-challenge.md)）。
 - Argon2id のパラメーターと、ログインの CPU の費用：E12 の負荷試験で決める（[ADR-0004](decisions/0004-credential-storage.md)）。
-- LINE ログインでメールアドレスを得るための申請の要否と条件：未検証。E6 の着手前に確かめる。
-- OpenID Certification の対象のプロファイル：Form Post を含め、Dynamic は含めない（動的な登録を持たない）と決めた（2026-09-27。[authentication-flows.md](architecture/authentication-flows.md) の 13.3・14 節）。認証の費用は未検証で、E12 の前に確かめる。
+- LINE ログインでメールアドレスを得るための申請：要る。LINE Developers Console で、規約に同意し、取得の目的を説明する画面のスクリーンショットを出す（[Integrating LINE Login with your web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/)、2026-09-27 に確認）。審査の期間は未検証で、E6 の着手前に申請して確かめる。
+- OpenID Certification の対象のプロファイル：Form Post を含め、Dynamic は含めない（動的な登録を持たない）と決めた（2026-09-27。[authentication-flows.md](architecture/authentication-flows.md) の 13.3・14 節）。認証の費用は、OpenID Connect の 1 つのデプロイメントに、会員 700 USD・非会員 3,500 USD で、同じ暦年の中ならプロファイルを足しても追加の費用はない（[OpenID Certification Fees](https://openid.net/certification/fees/)、2026-09-27 に確認）。OpenID Foundation の会員になるかは E12 の前に決める。

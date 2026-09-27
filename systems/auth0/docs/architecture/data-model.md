@@ -24,7 +24,7 @@
 - **テナントテーブルは `tenant_id` を持ち、主キーとインデックスの先頭に置く。** ID は UUIDv7。`FORCE ROW LEVEL SECURITY` と、トランザクションごとの `SET LOCAL app.tenant_id`（ADR-0002）。ログのクラスタも同じ規則。
 - **外部キーは `tenant_id` を含む複合キーにする。** 別のテナントの行を参照するデータは DB が拒否する。
 - **テナントの解決の前に、テナントテーブルを読まない。** 解決に使う表（`tenants`、`tenant_hostnames`）は RLS の外に置き、読み取り専用の関数だけで読む（3 節）。
-- **ユーザーを指す列の名前を揃える**（統合で決めた）。ユーザーを参照する列は、内部の主キー `users.id`（UUIDv7）を持ち、名前は `user_pk` にする。`user_id` は外に出す値（`sub`。`usr_...` かインポートで指定した値）の列の名前で、`users` と、外へ出す記録（認証のイベントの `logs`、`consent_records` の証跡）だけが持つ。各領域の文書で参照の列を `user_id` と書いた箇所は、統合で `user_pk` に揃えた（authentication-flows、sessions-and-sso、organizations）。
+- **ユーザーを指す列の名前を揃える**（統合で決めた）。ユーザーを参照する列は、内部の主キー `users.id`（UUIDv7）を持ち、名前は `user_pk` にする。`user_id` は外に出す値（`sub`。`usr_...` かインポートで指定した値）の列の名前で、`users` と、外へ出す記録（認証のイベントの `logs`）だけが持つ。規約への同意の `consent_records` も `user_pk` で参照する（2026-09-27 に揃えた。ADR-0013）。各領域の文書で参照の列を `user_id` と書いた箇所は、統合で `user_pk` に揃えた（authentication-flows、sessions-and-sso、organizations）。
 - **秘密の列の型を決める**（ADR-0004）。
 
   | 種類 | 列 | 例 |
@@ -454,5 +454,5 @@ CREATE TABLE outbox (
 残り（マイグレーションを書く Story で確かめる）：
 
 - すべてのテナントテーブルに RLS があり、3 節の例外が網羅されていることを、マイグレーションの CI の許可リストと照合する（ADR-0002 の Confirmation）。E1 の `ci-pipeline` の Story で行う。
-- ADR-0013 の `consent_records` の列（`user_id`）は、証跡として外に出す値を持つ。内部の参照の `user_pk` を足すかは、L7・L8 の結論（削除の時の扱い）と一緒に決める。
+- ADR-0013 の `consent_records` は `user_pk` で参照する（2026-09-27 に決めた）。ユーザーの削除の後に同意の証跡をどう残すか（`user_pk` の行を残すか、墓標の `user_id` の HMAC と結ぶか）は、L7・L8 の結論と一緒に決める。
 - `tenants.settings`（jsonb）に載せる設定と、列にする設定の境目は、E2 の `tenant-config-snapshot` の Story で決める。

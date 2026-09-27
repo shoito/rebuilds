@@ -12,7 +12,7 @@ date: 2026-09-27
 ログアウトした後も、アプリがリフレッシュトークンで新しいアクセストークンを得られるなら、ログアウトの意味が薄れる。一方、モバイルアプリやテレビは、ブラウザのセッションと関係なく長くログインを保ちたい。
 
 - OIDC Back-Channel Logout 1.0 は、`offline_access` なしで出したリフレッシュトークンをログアウトで失効させ（SHOULD）、`offline_access` 付きのものは通常は失効させない（SHOULD NOT）とする。
-- 本家 Auth0 は、リフレッシュトークンを出す条件に `offline_access` を求める（[Refresh Tokens](https://auth0.com/docs/secure/tokens/refresh-tokens)、2026-09-27 に確認）。ログアウトでリフレッシュトークンを失効させるかは、資料で確かめられなかった（未検証）。
+- 本家 Auth0 は、リフレッシュトークンを出す条件に `offline_access` を求める（[Refresh Tokens](https://auth0.com/docs/secure/tokens/refresh-tokens)、2026-09-27 に確認）。既定では、セッションが切れた・消された後も、ログアウトの後も、リフレッシュトークンは有効なまま残りうる（[Manage User Sessions with Auth0 Management API](https://auth0.com/docs/manage-users/sessions/manage-user-sessions-with-auth0-management-api)、2026-09-27 に確認）。
 - [ADR-0003](0003-token-formats-and-signing-keys.md) は、系列（family）の単位で失効と再利用の検知を行うと決めた。
 
 本システムもリフレッシュトークンに `offline_access` を求めるので、仕様の考え方をそのまま当てると、すべての系列がログアウトの後も残る。

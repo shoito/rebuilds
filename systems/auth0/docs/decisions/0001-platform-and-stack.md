@@ -69,7 +69,7 @@ rebuilds の他の題材（Slack、Stripe など）で、次の基盤を決め�
   - 状態の保存（adapter）の単位が、RLS と縮退（[ADR-0005](0005-authentication-path-availability.md)）の設計と合わない。
   - 保守者が 1 人である（リポジトリの記載）。
   - このため、実装の手本と差分テストの相手として使う。
-- **3（Better Auth）**：1 つのアプリの利用者を認証するためのもので、多数のテナントの認可サーバーとしての設計ではない。Better Auth の OIDC Provider の機能が OpenID Certified であることは確かめられなかった（未検証）。
+- **3（Better Auth）**：1 つのアプリの利用者を認証するためのもので、多数のテナントの認可サーバーとしての設計ではない。Better Auth は、OpenID Foundation の認証済みの実装の一覧にない（[Certified OpenID Connect Implementations](https://openid.net/developers/certified-openid-connect-implementations/)、2026-09-27 に確認）。
 
 ## Consequences
 

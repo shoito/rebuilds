@@ -52,7 +52,7 @@ S1 のトークンの発行のピークは 1 秒に 3,000 件で、1 件の発�
 - **リフレッシュトークン**：不透明。256 ビットの乱数に、接頭辞 `<brand>_rt_` とチェックサムを付ける（シークレットスキャン向け。リポジトリ共通の ADR-0006）。保存するのは SHA-256 の値だけ（[ADR-0004](0004-credential-storage.md)）。
   - 系列（family）の ID を持ち、ローテーションで新しいトークンを出すたびに前のトークンを使用済みにする。
   - 使用済みのトークンが再び来たら、系列のすべてを失効させ、ログに残す。
-  - 猶予（同じトークンを並行して使える時間）は既定で 0。テナントが 0〜60 秒で設定できる（上限は本システムの決定。本家の上限は未検証）。
+  - 猶予（同じトークンを並行して使える時間）は既定で 0。テナントが 0〜60 秒で設定できる（上限は本システムの決定。本家の `leeway` は既定 0 で、資料と Management API の OpenAPI に上限の記載がない。[Configure Refresh Token Rotation](https://auth0.com/docs/secure/tokens/refresh-tokens/configure-refresh-token-rotation)、OpenAPI の `ClientRefreshTokenConfiguration`、2026-09-27 に確認）。
   - 有効期間は、最終の期限（既定 30 日、最大 1 年、ローテーションで延びない）と、使われない期間の期限を持つ。
 - **認可コード**：不透明、1 回限り、有効 60 秒。2 回目の使用を検知したら、そのコードから出したトークンを失効させる（RFC 6749 の 4.1.2）。
 - 2 は、テナントの API がトークンの検証のたびに本システムを呼ぶことになり、本システムの障害がテナントの API の障害になる。イントロスペクションは、MVP の後に補助として足すかを検討する。
@@ -72,17 +72,18 @@ S1 のトークンの発行のピークは 1 秒に 3,000 件で、1 件の発�
 - 秘密鍵は、KMS の対称鍵（署名鍵の専用の鍵）から得たデータキーで AES-256-GCM で暗号化し、Aurora に保存する。暗号化の追加の認証データ（AAD）に `tenant_id` と `kid` を含め、行の入れ替えを検知する。
 - 復号できるのは、Signer のタスクのロールだけにする（KMS のキーポリシーで限る）。
 - Signer は、復号した秘密鍵をメモリーにだけ置く。ディスクとコアダンプに出さない。
-- Signer の API は、テナント・`kid`・クレームを受け取って署名した JWT を返すだけにする。任意のバイト列には署名しない。`iss` が要求のテナントのものと一致することを、Signer の中で確かめる。
+- Signer の API は、テナント・トークンの種類・クレームを受け取って署名した JWT を返すだけにする（使う鍵は Signer がテナントの `current` から選び、`kid` を呼び出し側に選ばせない。[ADR-0047](0047-signer-api-and-jwks-publishing.md)）。
+  > 2026-09-27 の注記：当初は「テナント・`kid`・クレームを受け取る」としていた。ADR-0047 で `kid` を呼び出し側に選ばせないと決めたので揃えた。任意のバイト列には署名しない。`iss` が要求のテナントのものと一致することを、Signer の中で確かめる。
 - 認可サーバーから Signer へは、VPC の中で相互 TLS で呼ぶ。
 - 外部の IdP へのクライアントの認証に要る署名（Apple のクライアントシークレットの JWT、エンタープライズの OIDC 接続の `private_key_jwt`、SAML の AuthnRequest）も、Signer の中で行う。これはトークンの署名とは別の型の用途（外部 IdP のアサーション）として API を分け、テナントの署名鍵ではなく接続ごとの鍵で署名する。署名する中身は Signer が接続の登録の値から組み立て、呼び出し側に任意のクレームを渡させない（[ADR-0047](0047-signer-api-and-jwks-publishing.md)、[keys-and-secrets.md](../architecture/keys-and-secrets.md) の 6.3 節）。
 - KMS の鍵は、大阪へ複製するマルチリージョンの鍵にし、DR の後も同じ暗号文を復号できるようにする。
 
 ### A・C・D・E を選ばなかった理由
 
-- **A（KMS の `Sign`）**：S1 のピーク（最大 1 秒に 6,000 回の署名）が、既定の RSA の上限（1 秒に 1,000 回）を大きく超える。署名ごとに KMS への往復が増え、KMS の障害がそのままトークンの発行の障害になる。テナントごとに KMS の鍵を持つと、鍵の数も多い（S1 で約 3 万）。KMS の鍵は月額の費用がかかる（金額は未検証）。
+- **A（KMS の `Sign`）**：S1 のピーク（最大 1 秒に 6,000 回の署名）が、既定の RSA の上限（1 秒に 1,000 回。[Request quotas](https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html)、2026-09-27 に確認）を大きく超える。署名ごとに KMS への往復が増え、KMS の障害がそのままトークンの発行の障害になる。テナントごとに KMS の鍵を持つと、鍵の数も多い（S1 で約 3 万）。KMS の鍵は 1 つ月 1 USD（[AWS KMS Pricing](https://aws.amazon.com/kms/pricing/)、2026-09-27 に確認）で、約 3 万の鍵で月 約 3 万 USD になる。
 - **C（認可サーバーの中で署名）**：秘密鍵が、外からの要求を直接受けるプロセスのメモリーに載る。認可サーバーの脆弱性で鍵が読まれうる。
 - **D（CloudHSM）**：費用と運用（クラスタ、HSM の利用者の管理）が重い。S1 の規模に見合わない。
-- **E（Nitro Enclaves）**：隔離は最も強いが、ECS Fargate では使えない（未検証）。S3 で Signer を EC2 に移すときに再評価する。
+- **E（Nitro Enclaves）**：隔離は最も強いが、ECS Fargate では使えない。Nitro Enclaves は、指定のインスタンスタイプの EC2 の親インスタンスを要件とし、Fargate はその対象にない（[What is Nitro Enclaves?](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)、2026-09-27 に確認）。S3 で Signer を EC2 に移すときに再評価する。
 
 ## Consequences
 

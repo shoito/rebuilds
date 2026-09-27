@@ -184,7 +184,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
   | --- | --- |
   | Actions の実行の基盤（Lambda） | Action を使うテナントのトリガーだけが影響を受ける。`on_platform_error` が `deny` のテナントは、ログイン・M2M のトークンの発行が失敗する。`skip` のテナントは Action なしで続く。Action を使わないテナントは影響を受けない |
 
-- Actions を使うテナントの本番の可用性（NFR-001）は、Lambda の可用性にも依る。Lambda の SLA は月間 99.95%（未検証）で、NFR-001 の 99.99% より低い。**Action を使うテナントの SLO の扱い**（Action の基盤の障害を除外するか）は、13 節の問いに挙げる。
+- Actions を使うテナントの本番の可用性（NFR-001）は、Lambda の可用性にも依る。Lambda の SLA は月間 99.95%（[AWS Lambda SLA](https://aws.amazon.com/lambda/sla/)、2026-09-27 に確認）で、NFR-001 の 99.99% より低い。**Action を使うテナントの SLO の扱い**（Action の基盤の障害を除外するか）は、13 節の問いに挙げる。
 - 管理用のテナント（[dashboard.md](dashboard.md)）は Actions を使わない。
 
 ## 8. 上限
@@ -194,16 +194,16 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 | Action の数 | テナントに 100、1 つのトリガーに 20 | 同じ |
 | 版 | 1 つの Action に 50（超えたら使われていない最も古い版を消す） | 同じ |
 | コード（依存を除く） | 100 kB | 同じ（本家は「超えないこと」の目安） |
-| 束（依存を含む） | 10 MiB | 未検証 |
+| 束（依存を含む） | 10 MiB | 資料に記載がない（2026-09-27 に確認） |
 | npm の依存 | 1 つの Action に 10 | 同じ |
 | 秘密 | 1 つの Action に 30。キー 128 文字、値 4,096 文字 | 同じ |
 | 同期のトリガーの時限 | 全体で 10 秒 | 20 秒 |
-| 非同期のトリガーの時限 | 20 秒 | 未検証 |
-| メモリー | 1,024 MB（関数の設定） | 未検証 |
+| 非同期のトリガーの時限 | 20 秒 | 20 秒（トリガーの種類を問わず、1 回の実行は 20 秒以内。Actions Limitations、2026-09-27 に確認） |
+| メモリー | 1,024 MB（関数の設定） | 資料に記載がない（2026-09-27 に確認） |
 | テナントの同時実行 | 本番 100、本番以外 10 | 公開クラウドの拡張の同時実行は 250 |
 | `console.log` の保持 | 1 つの Action で 256 文字、10 日 | 同じ |
 | メタデータの書き込み | 1 回の実行でユーザーとアプリのメタデータ各 32 kB | 同じ |
-| 呼び出しの本文 | 6 MB（Lambda の同期の呼び出しの上限。未検証） | — |
+| 呼び出しの本文 | 6 MB（Lambda の同期の呼び出しの要求・応答の上限。[Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html)、2026-09-27 に確認） | — |
 
 - テナントの同時実行は、Auth が Valkey のセマフォ（[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 7.1 節の同時実行の仕組み）で数える。
 - Lambda のアカウントの同時実行の上限（既定 1,000。[Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html)、2026-09-27 に確認）は、E13 の前に引き上げを申請する。値は capacity の領域で決める。
@@ -262,7 +262,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 - Action を使うテナントの SLO：Lambda の障害を NFR-001 の対象から除くか。
 - `api.redirect`（外部のページへ送って戻る）をいつ足すか。
 - キャッシュ（本家の `api.cache`）を持つか。
-- Lambda のコールドスタートと費用（未検証）が、ログインの体験と採算に合うか。合わなければ、自前の Firecracker（GitHub の方式）へ移すか。
+- Lambda のコールドスタート（未検証。PoC で計る）と、テナントの隔離の実行環境を作るたびの料金（単価は料金のページで表示されず未検証。[AWS Lambda Pricing](https://aws.amazon.com/lambda/pricing/)）が、ログインの体験と採算に合うか。合わなければ、自前の Firecracker（GitHub の方式）へ移すか。
 - テナントが Action から本システムの Management API を呼ぶとき、本家のような組み込みの手段を用意するか。
 
 ### 決定

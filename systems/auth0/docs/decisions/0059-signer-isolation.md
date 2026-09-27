@@ -11,7 +11,7 @@ date: 2026-09-27
 
 Signer をどう隔離するかを、この領域で決める。前提：
 
-- Nitro Enclaves は EC2 の機能で、ECS Fargate での利用の記載は AWS の資料になかった（[What is Nitro Enclaves?](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)、2026-09-27 に確認）。Fargate では使えない前提にする（未検証）。
+- Nitro Enclaves は EC2 の機能で、指定のインスタンスタイプの EC2 の親インスタンスを要件とする。Fargate はその対象にないので、使えない（[What is Nitro Enclaves?](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)、2026-09-27 に確認）。
 - Signer の要求は、S1 のピークで最大 1 秒 6,000 回の署名（トークンの発行 3,000 件 × 2）。遅延の予算は `/oauth/token` の p99 150ms の中にある（NFR-003）。
 
 ## Options
@@ -39,7 +39,7 @@ Signer をどう隔離するかを、この領域で決める。前提：
 
 ### API
 
-- ADR-0003 のとおり、テナント・`kid`・クレームを受け取り、署名した JWT を返すだけ。任意のバイト列には署名しない。`iss` と `kid` のテナントの一致を Signer の中で確かめる。外部 IdP のアサーション（Apple のクライアントシークレットなど）は、署名のポートの別のエンドポイントで、用途と宛先を限って受ける（ADR-0047）。
+- ADR-0003 のとおり、テナント・トークンの種類・クレームを受け取り（`kid` は Signer が選ぶ。ADR-0047）、署名した JWT を返すだけ。任意のバイト列には署名しない。`iss` と `kid` のテナントの一致を Signer の中で確かめる。外部 IdP のアサーション（Apple のクライアントシークレットなど）は、署名のポートの別のエンドポイントで、用途と宛先を限って受ける（ADR-0047）。
 - 鍵の生成・ローテーション・失効は、Signer の別の API で行う。**鍵の管理の API は、`mgmt` のタスクからの相互 TLS だけを受ける別のポートにする。** 署名のポートと分ける（署名のポートからは鍵の管理ができない。Auth からは鍵の管理ができない）。
 
 ### 2・3 を選ばなかった理由

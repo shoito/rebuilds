@@ -17,16 +17,16 @@
 | 項目 | 本家 | 出典（2026-09-27 に確認） |
 | --- | --- | --- |
 | セッションの有効期間 | 「使われない期間（Inactivity timeout）」と「最終の期限（Require log in after）」の 2 つ。上限は、Enterprise 以外で 3 日・30 日、Enterprise で 100 日・365 日 | [Session Lifetime Limits](https://auth0.com/docs/manage-users/sessions/session-lifetime-limits)、[Tenant Settings](https://auth0.com/docs/get-started/tenant-settings) |
-| 既定の値 | 資料になかった（未検証。3 日・7 日と見られる） | 同上 |
+| 既定の値 | 使われない期間 72 時間（3 日）、最終の期限 168 時間（7 日）。非永続のセッションは 72 時間 | Management API の OpenAPI の `idle_session_lifetime`・`session_lifetime`・`ephemeral_session_lifetime` の `default` |
 | 永続と非永続 | 永続のセッションは期限付きの Cookie、非永続は `Expires=0` の Cookie（ブラウザを閉じると消える。ブラウザの実装に依る） | [Session Lifetime Limits](https://auth0.com/docs/manage-users/sessions/session-lifetime-limits) |
 | 設定の単位 | テナント。ログインごとに Actions で変えられる。Management API の単位は時間 | [Configure Session Lifetime Settings](https://auth0.com/docs/manage-users/sessions/configure-session-lifetime-settings) |
-| Cookie の名前 | `auth0` と、`SameSite` に対応しないブラウザ向けの `auth0_compat`（未検証） | — |
+| Cookie の名前 | セッションは `auth0` と、`SameSite=None` に対応しないブラウザ向けの `auth0_compat`。MFA の端末の信頼は `auth0-mf`、攻撃の防御の端末の識別は `did`（それぞれ `_compat` の予備あり） | [Authentication API Cookies](https://auth0.com/docs/manage-users/cookies/authentication-api-cookies) |
 | RP-Initiated Logout | `/oidc/logout`。`id_token_hint`（推奨）、`logout_hint`（`sid`）、`post_logout_redirect_uri`、`client_id`、`state`、`ui_locales`、`federated` | [Log Users Out of Auth0](https://auth0.com/docs/authenticate/login/logout/log-users-out-of-auth0) |
 | ログアウトの確認 | `id_token_hint`・`logout_hint` がないか、ブラウザのセッションと合わないとき、確認の画面を出す。テナントの設定で止められる | 同上 |
 | ログアウト後の URL | 登録と完全に一致（クエリを含む）。サブドメインのワイルドカードを許す（本番では勧めない） | 同上 |
 | Back-Channel Logout | Enterprise のプラン。ログアウトとセッションの取り消しで、非同期の待ち行列から送る。ログアウトトークンは `iss`・`aud`・`iat`・`exp`・`jti`・`sub`・`sid`・`events`。受け手は 200 を返す。再試行の回数は資料にない | [OIDC Back-Channel Logout](https://auth0.com/docs/authenticate/login/logout/back-channel-logout) |
 | 受け手の検証の例 | 本家の例は、ログアウトトークンの古さの上限を 2 分にしている | 同上 |
-| discovery | `backchannel_logout_supported`・`backchannel_logout_session_supported` が `true`。公開のテナント `samples.auth0.com` の discovery には `end_session_endpoint` がなかった（テナントの設定に依ると見られる。未検証） | `https://samples.auth0.com/.well-known/openid-configuration` |
+| discovery | `backchannel_logout_supported`・`backchannel_logout_session_supported` が `true`。`end_session_endpoint` を載せるかはテナントの設定（`oidc_logout.rp_logout_end_session_endpoint_discovery`）。公開のテナント `samples.auth0.com` の discovery には載っていない | [Tenant Settings](https://auth0.com/docs/get-started/tenant-settings)、[Log Users Out of Auth0](https://auth0.com/docs/authenticate/login/logout/log-users-out-of-auth0)、`https://samples.auth0.com/.well-known/openid-configuration` |
 
 標準（各仕様の本文による。2026-09-27 に [Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) と [RP-Initiated Logout 1.0](https://openid.net/specs/openid-connect-rpinitiated-1_0.html) で確認）：
 
@@ -48,9 +48,13 @@
 | --- | --- | --- |
 | `__Host-<brand>_session` | セッションの秘密 | `Secure`、`HttpOnly`、`SameSite=Lax`、`Path=/`、`Domain` なし。永続なら `Max-Age` = 最終の期限までの秒、非永続なら `Max-Age` なし |
 | `__Host-<brand>_tx` | ログインのトランザクション | [ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md) |
+| `__Host-<brand>_idp` | ソーシャル IdP への往復の間の `state` の HMAC | [universal-login.md](universal-login.md) の 4.1 節 |
+| `__Host-<brand>_did` | 既知の端末（攻撃の防御） | [attack-protection.md](attack-protection.md) の 4.1 節 |
+| `__Host-<brand>_mfa_rd` | MFA を省く端末（`remember_device_days`） | [mfa-and-passkeys.md](mfa-and-passkeys.md) の 3.3 節 |
 
+- **本システムの Cookie は、すべて `__Host-` の接頭辞を付ける**（上の表がすべて）。`__Host-` の Cookie は `Secure`・`Path=/` が必須で、`Domain` を持てない（[MDN: Cookie prefixes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#cookie_prefixes)、2026-09-27 に確認）。ログイン・MFA・攻撃の防御の画面は、どれもテナントの 1 つのホスト名（標準のホスト名かカスタムドメイン）で動くので、ホストをまたぐ Cookie は要らない。標準のホスト名とカスタムドメインの間では、既知の端末・MFA の省略も別になる（受け入れる）。
 - `__Host-` の接頭辞で、ホスト名に閉じた Cookie にする。テナントのホスト（`<tenant>.jp.<brand>.<domain>`）とカスタムドメインでは、別のセッションになる。SSO は、同じホスト名を使うアプリの間で効く（4 節）。
-- `SameSite=Lax` にする。`/authorize` と `/oidc/logout` は、トップレベルの GET の遷移で来るので Cookie が送られる。本家は `SameSite=None` の Cookie を使っていると見られる（未検証）。`None` にしないのは、別サイトからの POST に Cookie を送らせないため。
+- `SameSite=Lax` にする。`/authorize` と `/oidc/logout` は、トップレベルの GET の遷移で来るので Cookie が送られる。本家は `SameSite=None` の Cookie を使う（`_compat` の Cookie は `SameSite=None` に対応しないブラウザ向けの予備。2 節）。`None` にしないのは、別サイトからの POST に Cookie を送らせないため。
 - `SameSite=None` を要するのは、別サイトの iframe での `prompt=none` だけ。これはブラウザのサードパーティの Cookie の制限でどのみち動かない場合が多いので、あきらめる（4.3 節）。
 
 ### 3.2 `sessions` の中身
@@ -95,8 +99,8 @@
 
 | 項目 | 既定 | 範囲 | 本家 |
 | --- | --- | --- | --- |
-| 使われない期間 | 3 日（4,320 分） | 5 分〜100 日 | 上限 3 日（Enterprise 以外）・100 日（Enterprise）。既定は未検証 |
-| 最終の期限 | 7 日（10,080 分） | 使われない期間〜365 日 | 上限 30 日・365 日。既定は未検証 |
+| 使われない期間 | 3 日（4,320 分） | 5 分〜100 日 | 上限 3 日（Enterprise 以外）・100 日（Enterprise）。既定 3 日（2 節） |
+| 最終の期限 | 7 日（10,080 分） | 使われない期間〜365 日 | 上限 30 日・365 日。既定 7 日（2 節） |
 | 永続 | 永続 | 永続・非永続 | 両方ある |
 
 - 設定の単位はテナント。アプリごとの上書きは MVP では持たない（本家は Actions で行う。extensibility.md の後）。
@@ -371,7 +375,7 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 
 ### 決定（2026-09-27、既定案）
 
-- **セッションの既定の有効期間**：使われない期間 3 日、最終の期限 7 日。本家の既定は資料で確かめられなかったので、本システムの決定とする（本家の既定と同じと見込む。未検証）。
+- **セッションの既定の有効期間**：使われない期間 3 日、最終の期限 7 日。本家の既定と同じ（Management API の OpenAPI の `default`。2 節）。
 - **ログアウトの確認の画面を止める設定**：持たない（6.1 節）。
 - **ヒントの `sid` の別のブラウザのセッション**：終えない（6.1 節）。
 - **期限の経過での Back-Channel Logout**：送らない（6.3 節）。

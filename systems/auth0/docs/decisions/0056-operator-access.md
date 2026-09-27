@@ -13,7 +13,7 @@ date: 2026-09-27
 - 運用者が、テナントのユーザーになりすまして、テナントのアプリにログインできる（トークンを作れる）。
 - 署名鍵の暗号文と、復号の権限が、同じ人の手に揃う。
 
-他の題材は、SSO と MFA、最小権限、break-glass、四半期のアクセスレビューを決めている（Slack の security.md の 7 節、Stripe の ADR-0020）。本家は、サポートがテナントのデータを見るときに、テナントの許可を求める機能を持つ（未検証。本家の資料で確かめられなかった）。
+他の題材は、SSO と MFA、最小権限、break-glass、四半期のアクセスレビューを決めている（Slack の security.md の 7 節、Stripe の ADR-0020）。本家が、サポートがテナントのデータを見るときにテナントの許可を求める機能を持つかは、未検証（本家の資料で見つかったのは、ダッシュボードの「Support Access」「Elevated Support Access」のロールで、サポートのチケットの操作と集計の指標の参照だけ。[Add Dashboard Users](https://auth0.com/docs/get-started/manage-dashboard-access/add-dashboard-users)、2026-09-27 に確認）。
 
 ## Options
 

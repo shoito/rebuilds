@@ -44,7 +44,7 @@ Management API は、ダッシュボード・CLI・Terraform・テナントの�
   - チェックポイントを DB に保存しないので、状態を持たない。
 - 引き受けるコスト：
   - 壊す変更をしにくい。フィールドの意味を変えたいときは、新しいフィールドを足して古いものを廃止の予定にする。
-  - エラーの本文の形は、本家の資料で確かめられなかった（未検証）。観察されている形に寄せた。
+  - エラーの本文は、本家の OpenAPI の `{statusCode, error, message}` に寄せた（Management API の OpenAPI の `BadRequestSchema` など、2026-09-27 に確認）。`errorCode` は OpenAPI にない。観察されている形に寄せて足した（未検証）。
 
 ## Confirmation
 

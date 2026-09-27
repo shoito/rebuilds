@@ -13,7 +13,7 @@ date: 2026-09-27
 
 本家 Auth0（2026-09-27 に確認）：
 
-- ID トークンの既定は 36,000 秒（[Update ID Token Lifetime](https://auth0.com/docs/secure/tokens/id-tokens/update-id-token-lifetime)）。最大は資料になかった（未検証）。
+- ID トークンの既定は 36,000 秒（[Update ID Token Lifetime](https://auth0.com/docs/secure/tokens/id-tokens/update-id-token-lifetime)）。最大は、資料にも Management API の OpenAPI（`ClientJwtConfiguration.lifetime_in_seconds`）にも記載がない（2026-09-27 に確認）。
 - アクセストークンには、暗黙・ハイブリッドのフロー向けの別の値がある。ブラウザの PKCE のフローは一般の値を使う（[Update Access Token Lifetime](https://auth0.com/docs/secure/tokens/access-tokens/update-access-token-lifetime)）。
 - リフレッシュトークンの使われない期間の既定は 2,592,000 秒、最大 1 年（[Configure Refresh Token Expiration](https://auth0.com/docs/secure/tokens/refresh-tokens/configure-refresh-token-expiration)）。
 

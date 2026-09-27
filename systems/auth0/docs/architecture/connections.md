@@ -160,7 +160,7 @@ interface RedirectStrategy {
 }
 ```
 
-- データベース接続で、どの方法でのログインとサインアップを受けるかを決める。本家にも同じ名前の設定がある（形の細部は未検証）。
+- データベース接続で、どの方法でのログインとサインアップを受けるかを決める。本家にも同じ名前の設定があり、`password`・`passkey` をそれぞれのオブジェクトで持つ（ほかに早期アクセスの `email_otp`・`phone_otp`。Management API の OpenAPI の `ConnectionAuthenticationMethods`、2026-09-27 に確認）。
 - 少なくとも 1 つを有効にする。両方を無効にする保存は 400。
 - `passkey` を有効にすると、パスキーでのログイン（条件付きの UI とボタン）と、パスキーだけのサインアップ（パスワードを作らない）を受ける。パスキーの設計は [mfa-and-passkeys.md](mfa-and-passkeys.md) の 5.2.2 節。パスキーの有効化は、テナントの RP ID の固定（同じく 5.2.1 節）の後にだけできる。
 - `password` を無効にすると、パスワードのログイン・サインアップ・再設定の画面を出さない。既存のユーザーのパスワードの資格情報は消さない（有効に戻せば使える）。パスワードを持たないユーザーの回復は、リカバリーコードかテナントの窓口（mfa-and-passkeys.md の 8 節）。
@@ -280,7 +280,7 @@ IdP → GET または POST /login/callback?code=&state=
 | --- | --- |
 | Google | ID トークンの `email_verified` が真 |
 | Apple | ID トークンの `email_verified` が真（中継のアドレスでも真になりうる。`is_private_email` を `profile` に残す） |
-| LINE | 真にしない（確認済みを示すクレームを確かめられなかった。未検証） |
+| LINE | 真にしない（ID トークンに確認済みを示すクレームがない。[Verify ID token](https://developers.line.biz/en/docs/line-login/verify-id-token/)、2026-09-27 に確認） |
 | GitHub | `/user/emails` で `primary` かつ `verified` のアドレスを選んだとき |
 
 - テナントが「メールアドレスを必須」にしていて、IdP がメールを返さないか未確認のときは、ログインの後にメールアドレスの入力と、確認のコード（4.3 と同じ）の画面を出す。確認したアドレスは、その ID の `email`・`email_verified` に入れる。
@@ -436,7 +436,7 @@ E1・E3・E5・E7・E10・E13 には、この領域の Story はない（E5 の�
 
 ## 13. 未解決の問い
 
-- LINE ログインのメールアドレスの取得の申請の条件と、ID トークンのメールアドレスが確認済みと言えるか（[intent.md](../intent.md) の持ち越し）。未検証。E6 の着手前に LINE の資料と試用で確かめる。
+- LINE ログインのメールアドレスの取得は、LINE Developers Console での申請（規約への同意と、取得の目的を説明する画面のスクリーンショット）が要る（[Integrating LINE Login with your web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/)、2026-09-27 に確認）。ID トークンに確認済みを示すクレームはない（[Verify ID token](https://developers.line.biz/en/docs/line-login/verify-id-token/)、同日に確認）ので、確認済みとして扱わない。申請の審査の期間は未検証で、E6 の着手前に申請して確かめる。
 - 海外のソーシャル IdP との間のデータの移転の扱い（L1）。E6 のソーシャル接続の Story は L1 の結論まで承認しない。
 - 開発者キーを提供しないことで、K3（最初のログインまで中央値 15 分）が満たせるか。データベース接続だけで K3 を測るかを PM と決める。
 - `email_verified=false` のユーザーのログインを、既定で許すか止めるか。

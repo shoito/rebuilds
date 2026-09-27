@@ -133,7 +133,7 @@ account（請求・契約の単位。1 つの顧客の会社）
 | `require_pkce` | 真 | ADR-0006 |
 | `refresh_token` | ローテーションあり | 有効期間と猶予は ADR-0003・ADR-0008 |
 | `oidc_backchannel_logout` | なし | sessions-and-sso の領域 |
-| `client_metadata` | 空 | 文字列の値だけ。キー 10 件、値 255 文字（本家の上限は未検証） |
+| `client_metadata` | 空 | 文字列の値だけ。キー 10 件、値 255 文字（本家と同じ。Management API の OpenAPI の `ClientMetadata`、2026-09-27 に確認） |
 | `organization_usage` | `deny` | E14 で有効（[organizations.md](organizations.md)） |
 
 ## 5. API（リソースサーバー）

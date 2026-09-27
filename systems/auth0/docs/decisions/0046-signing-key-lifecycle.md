@@ -34,7 +34,8 @@ date: 2026-09-27
 - 失効した `kid` の JWT は、本システムの側では即時に拒否する。
 - 定期の自動のローテーションは既定で無効。テナントが 30〜365 日で有効にできる。
 - `kid` は RFC 7638 の thumbprint。
-- ローテーションの API は、テナントごとに 1 時間 10 回（緊急は 3 回）。
+- ローテーションの API は、テナントごとにバースト 5・1 日 5 回（本家の Enterprise と同じ）。緊急のローテーションは別に数え、1 時間 3 回。
+  > 2026-09-27 の注記：当初は「1 時間 10 回（緊急は 3 回）」としていた。本家の値（「Write Signing Keys」がバースト 5・1 日 5。[Enterprise](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public)、2026-09-27 に確認）が分かったので、management-api-and-rate-limiting.md の 6.3 節と揃えて本家に寄せた。
 - 2 は、ローテーションの直後に RP の検証が失敗しうる。`previous` が増え続けると JWKS が大きくなり、漏えいした古い鍵が残り続ける。
 - 3 は、証明書や公開鍵を固定している RP を、テナントの知らないうちに壊しうる。本家から移るテナントの期待とも違う。
 

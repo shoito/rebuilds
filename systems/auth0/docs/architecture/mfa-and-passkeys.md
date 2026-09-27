@@ -30,7 +30,9 @@ Universal Login のトランザクションは [universal-login.md](universal-lo
 | パスキー | データベース接続で使える。ユニバーサルログインで、識別子を先に入れる形。ユーザー名の欄の自動入力の候補（条件付きの UI）に出る。パスワードと並べられる。1 ユーザー 20 個まで。既定では、パスキーでのログインの後も MFA を求め、Actions で省ける | [Passkeys](https://auth0.com/docs/authenticate/database-connections/passkeys) |
 | step-up | `acr_values` に `http://schemas.openid.net/pape/policies/2007/06/multi-factor` を渡す。MFA を行うと ID トークンの `amr` に `mfa` が入る | [Configure Step-up Authentication for Web Apps](https://auth0.com/docs/secure/multi-factor-authentication/step-up-authentication/configure-step-up-authentication-for-web-apps) |
 
-未検証：本家の TOTP の桁数・時間の幅・許す時計のずれ、リカバリーコードの形と数、MFA の試行の上限、「このブラウザを覚える」の期間、1 ユーザーの要素の数の上限。E7 の着手前に試用のテナントで確かめる。
+2026-09-27 に確かめたこと：本家の OTP は 6 桁の数字で、OTP の失敗とリカバリーコードの失敗はユーザーごとに 1 時間 10 回、WebAuthn のチャレンジの失敗はユーザーごとに 1 分 15 回まで（[Enterprise の Rate Limit Configurations](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public) の追加の MFA の制限）。リカバリーコードは 1 つで、使うと新しいコードを出す（[Reset User Multi-Factor Authentication and Recovery Codes](https://auth0.com/docs/secure/multi-factor-authentication/reset-user-mfa)、[Challenge with Recovery Codes](https://auth0.com/docs/secure/multi-factor-authentication/authenticate-using-ropg-flow-with-mfa/challenge-with-recovery-codes)）。
+
+未検証：本家の TOTP の時間の幅・許す時計のずれ、「このブラウザを覚える」の期間、1 ユーザーの要素の数の上限（資料に記述がない）。E7 の着手前に試用のテナントで確かめる。
 
 NIST SP 800-63B-4 の要点（[SP 800-63B-4](https://pages.nist.gov/800-63-4/sp800-63b.html)、2026-09-27 に確認）：
 
@@ -150,7 +152,7 @@ type MfaPolicy = {
 ```
 
 - 方針はテナント全体に 1 つ。アプリごとの上書きは、アプリの `acr_values` の要求（6 節）で行う。
-- `remember_device_days` は、MFA を済ませたブラウザに署名付きの Cookie（`<brand>_mfa_rd`、ユーザー・端末・期限を含む）を置き、期間中はそのブラウザで MFA を省く。既定は無効。`acr` に AAL2 を求める要求では、この省略を使わない（AAL2 の再認証の上限と合わないため）。
+- `remember_device_days` は、MFA を済ませたブラウザに署名付きの Cookie（`__Host-<brand>_mfa_rd`。`Secure`・`HttpOnly`・`SameSite=Lax`・`Path=/`。ユーザー・端末・期限を含む。Cookie の一覧は [sessions-and-sso.md](sessions-and-sso.md) の 3.1 節）を置き、期間中はそのブラウザで MFA を省く。既定は無効。`acr` に AAL2 を求める要求では、この省略を使わない（AAL2 の再認証の上限と合わないため）。
 
 ## 4. 登録
 
@@ -227,7 +229,7 @@ type MfaPolicy = {
 
 - パスキーは RP ID に結び付く。RP ID を変えると、登録済みのパスキーは使えない。
 - **RP ID は、テナントで最初にパスキーを有効にした時点のホスト名に固定する。** カスタムドメインがあればカスタムドメイン、なければ `<tenant>.jp.<brand>.<domain>`。`tenants.webauthn_rp_id` に保存する。
-- その後にカスタムドメインを足した・替えたテナントには、WebAuthn Level 3 の Related Origin Requests（RP ID のホストの `/.well-known/webauthn` に、許す origin の一覧を置く）で、新しいドメインからも古い RP ID のパスキーを使えるようにする。ブラウザの対応は一様でない（未検証。E7 で確かめる）。対応しないブラウザでは、パスワードかパスキーの再登録に回す。
+- その後にカスタムドメインを足した・替えたテナントには、WebAuthn Level 3 の Related Origin Requests（RP ID のホストの `/.well-known/webauthn` に、許す origin の一覧を置く）で、新しいドメインからも古い RP ID のパスキーを使えるようにする。ブラウザの対応は、Chrome・Edge 128 以上、Safari（iOS 18・macOS 15 以上）、Firefox 152 以上（[passkeys.dev の Device Support](https://passkeys.dev/device-support/)、2026-09-27 に確認）。対応は `PublicKeyCredential.getClientCapabilities()` の `relatedOrigins` で調べる（[Related Origin Requests](https://passkeys.dev/docs/advanced/related-origins/)）。対応しないブラウザでは、パスワードかパスキーの再登録に回す。
 - ダッシュボードで、RP ID を固定することと、後から変えられないことを、パスキーを有効にする前に示す。
 
 #### 5.2.2 パスキーでのログイン（パスキー優先）
@@ -254,7 +256,7 @@ type MfaPolicy = {
 - 条件付きの UI に対応しないブラウザでは、「パスキーでログイン」のボタン（モーダルの `get`）を出す。識別子を入れた後にも、そのユーザーのパスキーがあればパスキーを先に勧める。ただし、ユーザーの有無とパスキーの有無で画面の文言を変えない（列挙を防ぐ）。識別子を入れた後は、パスキーとパスワードの両方の選択肢を常に出す。
 - パスキーでのログインを使えるのは、データベース接続の ID を持つユーザー（本家と同じ）。パスワードなしのユーザー（パスキーだけでサインアップ）も作れる。データベース接続の設定 `authentication_methods`（`password`・`passkey`）で選ぶ（[connections.md](connections.md) の 4.1.1 節）。
 - **UV 付きのパスキーでのログインは、単独で MFA を満たす**（`passkey_satisfies_mfa`、既定は真）。パスキーは所持（秘密鍵）と、端末の生体認証か PIN の 2 つの要素を 1 回で確かめる。本家は既定で追加の MFA を求める。本システムは NIST SP 800-63B-4 の多要素の暗号の認証器の扱いに合わせる。偽にしたテナントでは、パスキーの後に別の要素を求める。
-- パスキーを登録した後、Level 3 の Signal API（`signalUnknownCredential`、`signalAllAcceptedCredentials`、`signalCurrentUserDetails`）で、消したパスキーと名前の変更を資格情報の管理者に知らせる。対応しないブラウザでは何もしない（未検証。E7 で対応の状況を確かめる）。
+- パスキーを登録した後、Level 3 の Signal API（`signalUnknownCredential`、`signalAllAcceptedCredentials`、`signalCurrentUserDetails`）で、消したパスキーと名前の変更を資格情報の管理者に知らせる。対応は Chrome・Edge 132 以上と Safari 26 以上で、Firefox は未対応（MDN の browser-compat-data 8.1.3、2026-09-27 に確認）。対応しないブラウザでは何もしない。
 
 #### 5.2.3 ライブラリ
 
@@ -278,7 +280,7 @@ type MfaPolicy = {
 - 各コードは 1 回だけ使える。使ったら `used_at` を記録する。残りが 3 個以下になったら、ログインの後に作り直しを促す。
 - 作り直すと、古い組はすべて使えなくする。作り直しには直近の認証（5 分）を求める。
 - リカバリーコードでログインしたら、ユーザーに通知のメールを送る。
-- 本家は 1 つのコードを使うと新しいコードを出す形（未検証）。本システムは 10 個の組にする（控えを 1 回で済ませ、使うたびに新しいコードを控える手間をなくす）。
+- 本家は 1 つのコードを使うと新しいコードを出す形（[Reset User Multi-Factor Authentication and Recovery Codes](https://auth0.com/docs/secure/multi-factor-authentication/reset-user-mfa)、2026-09-27 に確認）。本システムは 10 個の組にする（控えを 1 回で済ませ、使うたびに新しいコードを控える手間をなくす）。
 
 ### 5.5 SMS（MVP の後）
 
@@ -482,7 +484,7 @@ type MfaPolicy = {
 
 - **パスキーは単独で MFA を満たす**（`passkey_satisfies_mfa` の既定は真）。本家（既定で追加の MFA）と違う。NIST SP 800-63B-4 の扱いに合わせる。テナントは偽にできる。
 - **メールの OTP は補助だけ、AAL1 のまま**。`amr` には `mfa` を入れる（本家と互換）。
-- **リカバリーコードは 10 個の組、Argon2id で保存**。本家の 1 個の形（未検証）とは違う。保存は NIST SP 800-63B-4 の 3.1.2.2 節に合わせる。
+- **リカバリーコードは 10 個の組、Argon2id で保存**。本家の 1 個の形（5.4 節。2026-09-27 に確認）とは違う。保存は NIST SP 800-63B-4 の 3.1.2.2 節に合わせる。
 - **RP ID は最初にパスキーを有効にした時点のホスト名に固定**。変更は Related Origin Requests で補う。
 - **`remember_device_days` の既定は無効**。AAL2 の要求では使わない。
 - **API ごとの `acr` の要求は設定で持つ**（`resource_servers.scope_acr`）。拡張（E13）を待たない。

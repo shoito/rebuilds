@@ -203,9 +203,9 @@
 - **大口のテナントの偏り**：数百万のユーザーを持つテナントや、M2M のトークンを大量に求めるテナントが、共有の DB を占有しうる。テナント単位のレート制限（[ADR-0035](../decisions/0035-rate-limiting.md)）と、S2 のシャードで抑える。
 - **設定の反映の遅れ**：失効させたクライアントの秘密・消したコールバックが最大 15 秒通る（[ADR-0032](../decisions/0032-tenant-config-cache.md)）。受け入れた。反映の遅れを SLI で見る。
 - **メールの到達性**：確認・再設定・OTP のメールが迷惑メールになると、サインアップと再設定が止まる。送信ドメインの認証、SES のテナントでの分離、到達性の合成監視で備える（[email-delivery.md](email-delivery.md)）。
-- **外部の IdP の変化**：Apple の非公開のメールの中継、LINE のメールアドレスの取得の条件（未検証）、各社の仕様の変更に追従が要る。
+- **外部の IdP の変化**：Apple の非公開のメールの中継、LINE のメールアドレスの取得の申請（審査の期間は未検証）と、LINE の ID トークンに確認済みのクレームがないこと、各社の仕様の変更に追従が要る。
 - **自分で自分を使う**：ダッシュボードの管理者のログインが、このシステムの障害で止まる。非常用の経路（[ADR-0037](../decisions/0037-break-glass-and-admin-roles.md)）と年 2 回の訓練で備える。
-- **テナントのコードの隔離（E13）**：Actions の隔離の破れは、他のテナントの秘密と利用者に届く。Lambda のテナントの隔離のモード、権限のない実行ロール、別のアカウント（[ADR-0049](../decisions/0049-extensibility-execution-isolation.md)、[ADR-0057](../decisions/0057-accounts-network-and-path-separation.md)）で抑え、隔離のテストを定期に回す。Lambda の可用性（SLA は未検証）が、Action を使うテナントの NFR-001 に効く。
+- **テナントのコードの隔離（E13）**：Actions の隔離の破れは、他のテナントの秘密と利用者に届く。Lambda のテナントの隔離のモード、権限のない実行ロール、別のアカウント（[ADR-0049](../decisions/0049-extensibility-execution-isolation.md)、[ADR-0057](../decisions/0057-accounts-network-and-path-separation.md)）で抑え、隔離のテストを定期に回す。Lambda の可用性（SLA は月間 99.95%。[AWS Lambda SLA](https://aws.amazon.com/lambda/sla/)、2026-09-27 に確認）が、Action を使うテナントの NFR-001 に効く。
 - **リージョンの障害で失う書き込み**：失効した鍵・変えたパスワードが大阪で有効に戻りうる。失った範囲のやり直し（[ADR-0060](../decisions/0060-disaster-recovery-and-stages.md)）と四半期の訓練で抑える。
 - **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L8 と、Pwned Passwords・契約の論点）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
@@ -228,6 +228,12 @@ PM の方針（本家 Auth0 に寄せる、既定案で進める）により、�
 - **ログの種類のコード**：本家に同じ意味のコードがあればそれを使い（`limit_wc`、`limit_mu`、`pwd_leak` など）、ないものは `ap_*` などの独自のコードにする（ADR-0042。attack-protection.md の 8 節を揃えた）。Back-Channel Logout の失敗は `oidc_backchannel_logout_failed`。
 - **Epic**：E13 は Actions、E14 は Organizations とエンタープライズ接続。インポート・エクスポート、SCIM、PAR・DPoP・トークン交換・mTLS、SMS、MFA の API は「後回し」（[roadmap.md](../roadmap.md)）。
 - **数値の正本**：レート制限は [management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 6 節。トークンの有効期間は [ADR-0008](../decisions/0008-token-lifetimes-and-claims.md)。セッションは使われない期間 3 日・最終の期限 7 日（[ADR-0027](../decisions/0027-server-side-sessions.md)）。JWKS のキャッシュは RP 300 秒・CloudFront 60 秒・オリジンの障害中 24 時間（[ADR-0047](../decisions/0047-signer-api-and-jwks-publishing.md)）。設定の反映は最大 15 秒（ADR-0032）。保持の期間は [security.md](security.md) の 9 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。
+- **検証の工程の後の既定案**（2026-09-27）：
+  - 認証のイベントのログの `user_name` には、本家と同じくメールアドレスを載せる。保持は `log_retention_days`、ストリームでは伏せ字を選べる（[logs-and-streams.md](logs-and-streams.md) の 3.1 節、[users-and-profiles.md](users-and-profiles.md)）。
+  - 429 は方針の制限だけに使い、理由を `<Brand>-RateLimit-Reason`（`tenant`・`endpoint`・`user`・`concurrency`・`attack_protection`）で示す。過負荷・依存先の都合は 503 にする（[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 7.2 節、ADR-0062・ADR-0005 の注記）。
+  - Cookie はすべて `__Host-` の接頭辞にする（`__Host-<brand>_did`・`__Host-<brand>_mfa_rd` を含む。一覧は [sessions-and-sso.md](sessions-and-sso.md) の 3.1 節）。
+  - `consent_records` は `user_pk` で参照する（ADR-0013、[data-model.md](data-model.md) の 2 節）。
+  - 署名鍵のローテーションの API の制限は、本家と同じバースト 5・1 日 5 にする（ADR-0046 の注記）。
 - **訓練の頻度**：1 テナントの緊急のローテーションは四半期（ADR-0046 と keys-and-secrets.md に揃え、runbook を直した）。DR の計画外のフェイルオーバーは四半期、本番の switchover は年 1 回（ADR-0060）。
 - 領域ごとの決定は、各文書の「決定」の節にある：[authentication-flows.md](authentication-flows.md) の 14 節、[universal-login.md](universal-login.md) の 17 節、[connections.md](connections.md) の 13 節、[users-and-profiles.md](users-and-profiles.md) の 16 節、[mfa-and-passkeys.md](mfa-and-passkeys.md) の 15 節、[attack-protection.md](attack-protection.md) の 17 節、[sessions-and-sso.md](sessions-and-sso.md) の 13 節、[tenants-and-applications.md](tenants-and-applications.md) の 13 節、[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 14 節、[dashboard.md](dashboard.md) の 12 節、[custom-domains.md](custom-domains.md) の 12 節、[email-delivery.md](email-delivery.md) の 16 節、[logs-and-streams.md](logs-and-streams.md) の 12 節、[keys-and-secrets.md](keys-and-secrets.md) の 13 節、[extensibility.md](extensibility.md) の 13 節、[organizations.md](organizations.md) の 13 節。
 
@@ -238,11 +244,11 @@ PM の方針（本家 Auth0 に寄せる、既定案で進める）により、�
 | Argon2id のパラメーター、ハッシュのタスクの数、Signer のタスクの数 | E12 の負荷試験（k6。[capacity.md](capacity.md) の 5 節） |
 | pepper の鍵の置き場所を、S3 で専用の隔離（HSM など）へ移すか | S3 の前。NIST SP 800-63B-4 は、鍵をハードウェアで守ることを勧めている |
 | WebAuthn のサーバーのライブラリ、SAML のライブラリ | E7、E14 の着手時 |
-| Nitro Enclaves を Fargate で使えるか | 未検証。S3 の前に確かめる |
+| Nitro Enclaves を Fargate で使えるか | 使えない（EC2 の親インスタンスが要件。[What is Nitro Enclaves?](https://docs.aws.amazon.com/enclaves/latest/user/nitro-enclave.html)、2026-09-27 に確認）。S3 で Signer を EC2 に移すかを、S3 の前に決める |
 | Lambda のテナントの隔離のモードのコールドスタートと費用 | E13 の最初の PoC（[extensibility.md](extensibility.md) の 13 節） |
 | EventBridge の SaaS パートナーの登録 | E10 の着手前に申請（[logs-and-streams.md](logs-and-streams.md) の 12 節） |
-| OpenID Certification の費用 | E12 の前 |
-| 本家の振る舞いで未確認のもの（不審な IP の抑制の既定値、リフレッシュトークンの猶予の上限、セッションの有効期間の既定値、認可コードの有効期間、ログの一部のコードの意味など） | 各領域の文書の「持ち越し」に書いた Epic で、本家の資料か試用のテナントで確かめる |
+| OpenID Certification の費用 | 会員 700 USD・非会員 3,500 USD（1 つのデプロイメント、暦年の中でプロファイルを足せる。[OpenID Certification Fees](https://openid.net/certification/fees/)、2026-09-27 に確認）。会員になるかを E12 の前に決める |
+| 本家の振る舞いで未確認のもの（不審な IP の抑制のサインアップの補う速度の既定、認可コードの有効期間、ログインのトランザクションの有効期間、ブロックしたユーザーのリフレッシュトークン、リフレッシュでの組織のメンバーシップの確認など。セッションの既定値・リフレッシュトークンの猶予・ログのコードの意味は 2026-09-27 に確かめた） | 各領域の文書の「持ち越し」に書いた Epic で、本家の資料か試用のテナントで確かめる |
 
 ## 7. 領域の文書
 

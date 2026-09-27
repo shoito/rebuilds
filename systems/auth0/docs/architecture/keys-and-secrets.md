@@ -20,12 +20,12 @@ Signer、署名鍵の生成・ローテーション・失効・緊急のロー�
 | 署名鍵の状態 | 「使用中」「前の鍵」「次の鍵」 | [Signing Keys](https://auth0.com/docs/get-started/tenant-settings/signing-keys) |
 | ローテーション | ダッシュボードか Management API で手で行う。自動のローテーションの記述はない。鍵のローテーションの API は、他より小さいレート制限を持つ | 同上 |
 | 失効 | 失効できるのは「前の鍵」だけで、先にローテーションが要る。失効した鍵は再び使えない | [Revoke Signing Keys](https://auth0.com/docs/get-started/tenant-settings/signing-keys/revoke-signing-keys) |
-| JWKS | ローテーションの後は複数の鍵が載りうる。数とキャッシュの期間は資料になかった（未検証） | [Signing Keys](https://auth0.com/docs/get-started/tenant-settings/signing-keys) |
-| Management API の形 | `POST /api/v2/keys/signing/rotate`、`PUT /api/v2/keys/signing/{kid}/revoke`（未検証） | — |
+| JWKS | ローテーションの後は複数の鍵が載りうる（資料）。公開のテナント `samples.auth0.com` の JWKS は鍵 2 つで、`Cache-Control: public, max-age=15, stale-while-revalidate=15, stale-if-error=86400`（2026-09-27 に観察。資料には数とキャッシュの期間の記載がない） | [Signing Keys](https://auth0.com/docs/get-started/tenant-settings/signing-keys)、`https://samples.auth0.com/.well-known/jwks.json` |
+| Management API の形 | `POST /api/v2/keys/signing/rotate`、`PUT /api/v2/keys/signing/{kid}/revoke`。ローテーションの API は、バースト 5・1 日 5 | Management API の OpenAPI、[Enterprise の Rate Limit Configurations](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public) |
 | KMS の自動のローテーション | 対称鍵（KMS が作った鍵の素材）だけ。既定は 365 日ごとで、期間を変えられる。非対称鍵は自動でも即時でもローテーションできない。マルチリージョンの鍵では primary でだけ設定し、replica へ複製される。新しい素材は、すべてのリージョンにそろうまで暗号化に使われない。古い素材は、鍵を消すまで残り、古い暗号文を復号できる | [Rotate AWS KMS keys](https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html) |
 | KMS の上限 | 対称鍵の暗号の操作は東京で 1 秒 20,000 回、大阪で 10,000 回。RSA の `Sign` は 1 秒 1,000 回 | [ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)、[ADR-0063](../decisions/0063-cpu-bound-work-sizing.md) |
-| KMS の鍵の削除の待ち | 7〜30 日（未検証） | — |
-| 自動のローテーションの期間の範囲 | 90〜2,560 日と見られる（未検証） | — |
+| KMS の鍵の削除の待ち | 7〜30 日（既定 30 日。実際は最大 24 時間長くなりうる） | [Delete an AWS KMS key](https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html) |
+| 自動のローテーションの期間の範囲 | 90〜2,560 日（`RotationPeriodInDays`） | [EnableKeyRotation](https://docs.aws.amazon.com/kms/latest/APIReference/API_EnableKeyRotation.html) |
 
 ## 3. 鍵の階層
 
@@ -56,7 +56,7 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 - **暗号化の文脈（encryption context）を必ず付ける。** キーポリシーの条件（`kms:EncryptionContext:purpose`）で、用途の違う復号を拒否する。CloudTrail に、どのテナントのどの鍵の復号かが残る。
 - **データの層でも AAD を付ける。** 署名鍵の AES-256-GCM の AAD は `tenant_id|kid|alg`、テナントの DEK で暗号化した秘密の AAD は `tenant_id|行の ID|用途`（[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)、[ADR-0004](../decisions/0004-credential-storage.md)）。DB の行を入れ替えても復号に失敗する。
 - **KMS の鍵そのものの素材は、KMS の自動のローテーション（365 日）に任せる。** 古い素材は KMS が持ち続けるので、暗号文を作り直す必要はない。DEK と、その下の署名鍵・秘密は、KMS のローテーションでは変わらない。変えたいときは、それぞれのローテーション（5 節、3.2 節、4 節）で行う。
-- **削除を防ぐ。** 4 つの鍵の `ScheduleKeyDeletion` と `DisableKey` を、組織の SCP で拒否する。例外は、セキュリティの担当と Ops の責任者の 2 人の承認で得る期限つきのロールだけ。削除の待ちは最大（30 日。未検証）にする。`PutKeyPolicy`・`ScheduleKeyDeletion`・`DisableKey` の呼び出しを、CloudTrail から即時に通知する。
+- **削除を防ぐ。** 4 つの鍵の `ScheduleKeyDeletion` と `DisableKey` を、組織の SCP で拒否する。例外は、セキュリティの担当と Ops の責任者の 2 人の承認で得る期限つきのロールだけ。削除の待ちは最大の 30 日にする（2 節）。`PutKeyPolicy`・`ScheduleKeyDeletion`・`DisableKey` の呼び出しを、CloudTrail から即時に通知する。
 - 鍵の数はリージョンごとに 4 つ（と replica）。テナントごとに KMS の鍵を作らない（鍵の数と費用。[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md) の A を採らなかった理由と同じ）。
 
 ### 3.1 DEK の扱い
@@ -127,7 +127,7 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 | 9 | アルゴリズムの変更 | 任意 | — | `next` を新しいアルゴリズムで作り直す（古い `next` は使われていないので消す）。15 分後にローテーションできる |
 
 - 操作は、ダッシュボードと Management API（テナントの管理者）と、運用の手順（本システムの運用者。2 人の承認。[ADR-0056](../decisions/0056-operator-access.md)）から行う。
-- **ローテーションの API のレート制限**：テナントごとに 1 時間 10 回（本システムの決定。本家も他より小さい制限を持つが、値は未検証）。緊急のローテーションは別に数える（1 時間 3 回）。
+- **ローテーションの API のレート制限**：テナントごとにバースト 5・1 日 5 回（本家の Enterprise の「Write Signing Keys」と同じ。[Enterprise](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public)、2026-09-27 に確認。[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 6.3 節）。緊急のローテーションは別に数える（1 時間 3 回）。
 - **失効の完了**：[ADR-0060](../decisions/0060-disaster-recovery-and-stages.md) のとおり、大阪への複製を確かめてから「完了」を返す。あわせて、JWKS の書き出しと、エッジでの確かめ（7.3 節）が済むまでを、失効の操作の状態として見せる（`pending`→`published`→`completed`）。
 - **定期の自動のローテーション**：既定は無効（本家と同じ）。テナントが 30〜365 日の間隔で有効にできる。有効なときは、Worker のジョブが 5.2 節の 1 を行う（`previous` が 2 つなら、古い方を先に失効させる。その鍵で署名したトークンの最長の有効期間を過ぎているときだけ）。
 - 2 年以上 `current` のままの鍵には、ダッシュボードで警告を出す。
@@ -372,7 +372,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 - **`next` の ready**：JWKS の確かめから 15 分。
 - **JWKS のキャッシュ**：RP に 300 秒、CloudFront に 60 秒、オリジンの障害中は 24 時間の古い版（[ADR-0058](../decisions/0058-edge-and-custom-domains.md) が keys-and-secrets の領域に任せた値）。
 - **`kid`**：RFC 7638 の thumbprint。
-- **ローテーションの API のレート制限**：テナントごとに 1 時間 10 回、緊急は 3 回。
+- **ローテーションの API のレート制限**：テナントごとにバースト 5・1 日 5 回（本家と同じ）、緊急は別に 1 時間 3 回。
 - **古い `current` で署名しうる時間**：2 秒。
 
 ### 持ち越し
@@ -382,8 +382,6 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | JWKS に `x5c`（自己署名の証明書）を載せるか。本家は署名の証明書（PEM）をダッシュボードから取れる。古いライブラリや SAML の相手が求める | E3 で、主要なライブラリの要否を確かめて決める。SAML の IdP の機能（MVP の後）では要る |
 | RSA を 3072 ビットにするか | 署名の CPU（[ADR-0063](../decisions/0063-cpu-bound-work-sizing.md)）と、NIST の移行の時期を見て E12 で決める |
 | 主要な RP のライブラリの JWKS のキャッシュの振る舞い（未知の `kid` での取り直し、`max-age` の扱い） | E3 で、`jose`、`jwks-rsa`、Spring Security などを確かめる（未検証） |
-| 本家の鍵のローテーションのレート制限の値と、Management API の形 | 本家の試用のテナントで確かめる |
-| KMS の鍵の削除の待ちの範囲と、自動のローテーションの期間の範囲 | E1 で AWS の文書を確かめる（未検証） |
 | pepper を HSM などの専用の隔離へ移すか | S3 の前（[architecture/README.md](README.md) の 6 節） |
 | 耐量子の署名（ML-DSA など）への移行 | JOSE の標準化の状況を見て、S2 以降に検討する |
 

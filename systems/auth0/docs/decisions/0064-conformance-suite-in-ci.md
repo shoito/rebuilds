@@ -14,7 +14,7 @@ date: 2026-09-27
 - OpenID Foundation がホストする試験のサーバーに、公開の URL の OP を登録して走らせる。
 - 試験のスイート（オープンソース。Java のサーバーと MongoDB を Docker Compose で起こす）を、自分の環境で動かす。OpenID Foundation は、CI で使うための Python のスクリプト（`scripts/run-test-plan.py`）を用意し、認可サーバーの開発者に CI への組み込みを強く勧めている（[OpenID Conformance Suite](https://openid.net/certification/about-conformance-suite/)、2026-09-27 に確認）。
 
-試験には、ブラウザの操作（ログインの画面への入力）を要するものがある。試験の設定の JSON に、ブラウザの操作（URL ごとに入力とクリック）を書いて自動で行える（第三者の導入例で確認。公式の資料での確認は未検証）。
+試験には、ブラウザの操作（ログインの画面への入力）を要するものがある。試験の設定の JSON の `browser` に、URL の `match` ごとの `tasks`（`text`・`click` の `commands`）を書くと、スイートの中の Selenium が自動で行う（[BrowserControl](https://gitlab.com/openid/conformance-suite/-/wikis/Design/BrowserControl)、2026-09-27 に確認）。
 
 ## Options
 
@@ -32,7 +32,7 @@ date: 2026-09-27
 - **`main` へのマージの後と夜間**：対象のすべてのプロファイルと、将来の対象（FAPI 2.0 などの候補）を「参考」として走らせる。参考の失敗は、必須のチェックにしない。
 - **結果の判定**：スイートの結果の `FAILED` は失敗。`WARNING` は、`conformance/allowed-warnings.yaml` に理由と承認者（QA）を書いたものだけを許す。許可のない `WARNING` は失敗。`REVIEW`（人の確認が要るもの）は、夜間の結果で QA が確かめる。
 - **差分テスト**：node-oidc-provider との差分テスト（ADR-0001）を、同じ CI の段で走らせる。
-- **認証の申請**：E12 で、`main` の CI と同じ設定で、公開の staging に対してホストされた試験のサーバーで走らせ、結果を申請する。対象のプロファイルは上の 5 つ（Dynamic は持たない）。認証の費用は未検証（intent.md の Open questions）。
+- **認証の申請**：E12 で、`main` の CI と同じ設定で、公開の staging に対してホストされた試験のサーバーで走らせ、結果を申請する。対象のプロファイルは上の 5 つ（Dynamic は持たない）。認証の費用は、OpenID Connect の 1 つのデプロイメントに、会員 700 USD・非会員 3,500 USD。同じ暦年の中なら、プロファイルを後から足しても追加の費用はない（[OpenID Certification Fees](https://openid.net/certification/fees/)、2026-09-27 に確認）。
 - 2 は、PR ごとに本システムを公開の URL に置く必要があり、外部のサービスの可用性に CI が依存する。3 は、回帰が GA の直前まで見つからない。
 
 ## Consequences

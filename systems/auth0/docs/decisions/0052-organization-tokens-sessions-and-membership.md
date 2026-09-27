@@ -9,7 +9,7 @@ date: 2026-09-27
 
 ## Context
 
-本家は、組織の文脈のログインで、ID トークンとアクセストークンに `org_id`（設定で `org_name` も）を入れる。テナントの API には、`org_id` を既知の値と照合し、データを `org_id` で分けるよう求める（[Work with Tokens and Organizations](https://auth0.com/docs/manage-users/organizations/using-tokens)、2026-09-27 に確認）。本家が、リフレッシュのときにメンバーシップを確かめるか、組織の切り替えでセッションをどう扱うかは、資料で確かめられなかった（未検証）。
+本家は、組織の文脈のログインで、ID トークンとアクセストークンに `org_id`（設定で `org_name` も）を入れる。テナントの API には、`org_id` を既知の値と照合し、データを `org_id` で分けるよう求める（[Work with Tokens and Organizations](https://auth0.com/docs/manage-users/organizations/using-tokens)、2026-09-27 に確認）。本家が、リフレッシュのときにメンバーシップを確かめるか、組織の切り替えでセッションをどう扱うかは、資料で確かめられなかった（未検証。auth0.com/docs の全文に記述がない。E14 の着手前に試用のテナントで確かめる）。
 
 本システムのリフレッシュトークンは系列（family）を持ち、ローテーションと再利用の検知をする（[ADR-0003](0003-token-formats-and-signing-keys.md)）。SSO のセッションはテナントに 1 つ（sessions-and-sso の領域）。
 

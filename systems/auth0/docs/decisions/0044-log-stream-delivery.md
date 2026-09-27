@@ -33,7 +33,7 @@ date: 2026-09-27
 - 再試行は同じまとまりを 3 回（1 秒・5 秒・30 秒）。その後は Health に記録し、1 分・5 分・15 分・1 時間ごとに試す。最初の失敗から 7 日成功しなければ `disabled`。
 - `paused` と `disabled` からの再開は、カーソルの続きから。カーソルが保持の期間より古ければ、残る最も古いログから再開し、欠けを知らせる。
 - 順序は、実際には `log_id` の順だが、契約としては保証しない。利用者には `log_id` で重複を捨ててもらう。
-- 種類は MVP で Webhook と EventBridge。EventBridge はパートナーのイベントソース（登録の手続きは未検証）。間に合わなければ利用者のイベントバスへの `PutEvents` で代える。
+- 種類は MVP で Webhook と EventBridge。EventBridge はパートナーのイベントソース。登録は、AWS Partner Network に登録してから EventBridge の統合のチームに連絡し、パートナーの API を使えるようにする（[Amazon EventBridge Integrations](https://aws.amazon.com/eventbridge/integrations/)、2026-09-27 に確認。かかる期間は未検証）。間に合わなければ利用者のイベントバスへの `PutEvents` で代える。
 - **Webhook に `<Brand>-Signature`（HMAC-SHA-256、タイムスタンプ付き、Stripe の再構築と同じ形）を足す。** 本家の `Authorization` の値も受ける。
 - **伏せ字の hash は、ストリームごとの鍵の HMAC-SHA-256 にする。** xxHash は非暗号で、メールアドレスの辞書で元に戻せるため。
 - 送信は `worker-egress` から。宛先の IP の検査、リダイレクトを追わない、443 だけ。

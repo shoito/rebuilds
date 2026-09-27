@@ -47,9 +47,9 @@ AWS Lambda のテナントの隔離のモードは、呼び出しの `tenant-id`
   - 基盤の運用（ホスト、カーネル、Firecracker の更新）を AWS に任せられる。
   - 関数の数がテナントの数に比例しない。
 - 引き受けるコスト：
-  - テナントごとの実行環境なので、コールドスタートが増える。プロビジョニングされた同時実行で温められない。遅延は未検証で、E13 の最初の PoC で計る。
-  - 実行環境の作成ごとの追加の料金（金額は未検証）。
-  - Lambda の可用性（SLA は未検証）が、Action を使うテナントのログインに効く。
+  - テナントごとの実行環境なので、コールドスタートが増える。プロビジョニングされた同時実行で温められない（テナントの隔離のモードは、プロビジョニングされた同時実行・SnapStart・関数の URL に対応しない。[Tenant isolation](https://docs.aws.amazon.com/lambda/latest/dg/tenant-isolation.html)、2026-09-27 に確認）。遅延は未検証で、E13 の最初の PoC で計る。
+  - テナントの隔離の実行環境を作るたびに、割り当てたメモリーの量とアーキテクチャに応じた料金がかかる（[Tenant isolation](https://docs.aws.amazon.com/lambda/latest/dg/tenant-isolation.html)、[AWS Lambda Pricing](https://aws.amazon.com/lambda/pricing/)、2026-09-27 に確認。単価は料金のページで表示されず、未検証）。
+  - Lambda の可用性（SLA は月間 99.95%。[AWS Lambda SLA](https://aws.amazon.com/lambda/sla/)、2026-09-27 に確認）が、Action を使うテナントのログインに効く。
   - 同じテナントの Action は、実行環境を共有する（同じテナントの中なので許す）。
 
 ## Confirmation
