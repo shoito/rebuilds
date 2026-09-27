@@ -199,7 +199,7 @@ coordinator                     replica A / B / C（gitd）                  Aur
 
 ### 7.2 セキュリティへの影響
 
-objects がネットワークで共有されるので、次のことが起きる。本家の振る舞いに合わせて、仕様として受け入れる（[About forks](https://docs.github.com/en/pull-requests/reference/forks)）。
+objects がネットワークで共有されるので、次のことが起きる。公開のネットワークでは、本家の振る舞いに合わせて、仕様として受け入れる（[About forks](https://docs.github.com/en/pull-requests/reference/forks)）。非公開のネットワークでは、下の到達可能性の検査で 1 つ目を防ぐ。
 
 - **ある fork に push したコミットは、ネットワークの他のリポジトリ（元のリポジトリを含む）から、ハッシュを指定すれば見えうる。** Web では、本家と同じく「このリポジトリのどのブランチにも属さないコミット」であることを表示する（[web.md](web.md)）。
 - **fork を削除しても、そこから入ったコミットはネットワークに残りうる。**
@@ -211,7 +211,7 @@ objects がネットワークで共有されるので、次のことが起きる
 - **`upload-pack` の `want` の検査は、プロトコルの版で違う（2026-09-26 に確認）。** v0・v1 の交渉では、`uploadpack.allowTipSHA1InWant`・`allowReachableSHA1InWant`・`allowAnySHA1InWant` の設定に従って、広告していない `want` を検査する（既定はいずれも無効。[git-config](https://git-scm.com/docs/git-config#Documentation/git-config.txt-uploadpackallowAnySHA1InWant)）。一方、**v2 の `fetch` は、`want` を広告した objects に限らない**（[gitprotocol-v2](https://git-scm.com/docs/gitprotocol-v2) の「Wants can be anything and are not limited to advertised objects」）。Git の本体の `upload-pack.c` の v2 の処理は、objects が object store（alternates の先を含む）にあるかだけを見る（[upload-pack.c](https://github.com/git/git/blob/master/upload-pack.c)）。したがって、**`network.git` を共有する限り、v2 では、ネットワークのどのリポジトリの経路からも、ネットワークの全ての objects を SHA で取得できる。**
   - 本家も「ネットワークのどのリポジトリに push したコミットも、上流を含むネットワークの他のリポジトリから到達できうる」と文書にしている（[About permissions and visibility of forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-permissions-and-visibility-of-forks)、2026-09-26 に確認）。
   - **公開のネットワーク**：本家と同じく仕様として受け入れる。Web・API の SHA の参照（LEAK-WEB-02）と同じ扱いにする。
-  - **非公開のネットワーク**：Web・API と同じく、既定の方向は「検査する」（[identity-and-permissions.md](identity-and-permissions.md) の 14 節）。検査するときは、`gitd` が v2 の `want` を、要求したリポジトリの ref からの到達可能性で検査する（v0 の `allowReachableSHA1InWant` の無効に相当する処理を、v2 に自前で足す。Git の本体の設定だけでは実現できない）。E1 の `fork-network-want-poc` で v0・v1・v2 の実際の振る舞いを結合テストに固定し、検査の費用を測る。E3 の `fork-network-reachability-check` で Web・API と合わせて決め、ADR-0007 を改める ADR を起票する。一般公開（E9）までに決着させる。
+  - **非公開のネットワーク**：到達可能性の検査を既定でかける（2026-09-28 の決定。ADR-0007 の注記）。`gitd` が v2 の `want` を、要求したリポジトリの ref からの到達可能性で検査する（v0 の `allowReachableSHA1InWant` の無効に相当する処理を、v2 に自前で足す。Git の本体の設定だけでは実現できない）。Web・API の SHA の参照も、同じ検査をストレージの読み取りの RPC で行う。到達できなければ、Git は `not our ref`、Web・API は 404 を返す。検査は commit-graph と到達可能性のビットマップで行い、`(repo_id, ref のチェックサム, sha)` で結果をキャッシュする。本家より厳しいので、**本家との違い** として記録する。E1 の `fork-network-want-poc` で v0・v1・v2 の実際の振る舞いを結合テストに固定し、検査の費用を測る。実装は E3 の `fork-network-reachability-check` で行う。
   - alternates の先の `network.git` の ref（`refs/networks/*`）は、そのリポジトリの ref として広告しない（v2 の `ls-refs` はリポジトリ自身の ref だけを返す）。
 - 秘密情報を push してしまった場合の完全な消去は、本家と同じく運用の手順で行う（11.3 節）。
 

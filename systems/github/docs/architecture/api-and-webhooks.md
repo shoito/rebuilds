@@ -84,7 +84,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 - **1 つの端点**（`POST /graphql`）。版は持たず、スキーマを育てる（本家と同じ）。
 - Relay の規約に従う：`node(id:)`・`nodes(ids:)`、グローバルな ID（型と数値の ID を符号化した不透明な文字列。REST の `node_id` と同じ値）、接続（connection）は `edges`・`nodes`・`pageInfo`・`totalCount`。
 - 接続には `first` か `last` を必須にし、値は 1〜100（本家と同じ）。
-- 実装は TypeScript のコード優先のスキーマ（候補：Pothos ＋ GraphQL Yoga。E7 で決める）。型はサービス関数の戻り値から作り、REST と同じサービス関数を呼ぶ。
+- 実装は TypeScript のコード優先のスキーマ（Pothos ＋ GraphQL Yoga。2026-09-28 の決定）。型はサービス関数の戻り値から作り、REST と同じサービス関数を呼ぶ。
 - **権限は節点（node）ごとに `can()` を通す。** 読めない節点は `null` にし、`errors` に `NOT_FOUND` を入れる（存在を漏らさない）。一覧は `accessPredicate` で前段から絞る。DataLoader で `canMany` にまとめ、1 つの問い合わせでの判定を 1 回の往復に寄せる。
 - 変更は `@deprecated` で予告し、削除は予告から 3 か月以上たってから、四半期ごとの決まった日にまとめて行う。本家の GraphQL も、破壊的な変更を 3 か月以上前に予告し、四半期の初日（1/1・4/1・7/1・10/1）に行う（[Breaking changes](https://docs.github.com/en/graphql/overview/breaking-changes)、2026-09-26 に確認）。本システムも同じ周期にする。
 - スキーマ（SDL）と変更の履歴を公開する。イントロスペクションは許す。
@@ -410,9 +410,12 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 - **ユーザーのトークンのレート制限**（2026-09-26 の本家の確認による改訂）：App のユーザーのトークンも、PAT・OAuth アプリと合わせてユーザーで合算する（11.1 節）。以前の案の「App × ユーザーで別に数える」は採らない。
 - **Webhook の版**：本家の Webhook は版を持たないが、本システムは Webhook ごとに REST の版を固定する（9.1 節。本家との違い）。
 
+### 決定（2026-09-28、推奨案で確定）
+
+- **GraphQL の実装**：Pothos ＋ GraphQL Yoga にする（5.1 節）。どちらも本家と関係のない第三者の部品で、TypeScript のコード優先のスキーマとして REST と同じサービス関数を呼べる。E7 の `graphql-foundation` の試作で問題が出たら、そのときに ADR を起票して見直す。
+
 持ち越し：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | `429` にそろえたことで困るクライアントがないか（11.3 節） | E7 の `public-sdk-and-cli` で、主なクライアントの再試行の振る舞いを確かめる |
-| GraphQL の実装（Pothos ＋ GraphQL Yoga か）（5.1 節） | E7 の `graphql-foundation` の着手時に試作して決める |

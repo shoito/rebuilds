@@ -11,6 +11,7 @@ CI（本家の GitHub Actions に相当）。ワークフローの解釈、実�
 | [0025](../decisions/0025-secrets-and-fork-pr-policy.md) | シークレットはジョブの取得時にだけ復号して渡し、fork の Pull Request には渡さない。`<BRAND>_TOKEN` はジョブごとの最小の権限にする |
 | [0026](../decisions/0026-actions-oidc-provider.md) | 自前の OIDC の発行者を持ち、ジョブごとの短命の ID トークンを KMS の鍵で署名する |
 | [0027](../decisions/0027-artifact-and-cache-storage.md) | 成果物・キャッシュ・ログは S3 にリポジトリ単位で置き、キャッシュは ref の単位で分ける |
+| [0036](../decisions/0036-own-runner-agent-and-no-original-components.md) | ランナーのエージェントは Go で自前で作り、本家の actions/runner を使わない |
 
 前提となる決定は、権限の判定関数（[ADR-0002](../decisions/0002-repository-permission-model.md)）、ref の更新の Event（[ADR-0005](../decisions/0005-git-as-source-of-truth.md)）、基盤（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
@@ -346,8 +347,9 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 
 ### 9.2 ランナーのエージェント
 
-- **本家の [actions/runner](https://github.com/actions/runner)（MIT ライセンス）を fork して使うことを第一候補にする。** アクションの実行（JavaScript・Docker・composite）、式、ログのマスクの互換性を、自前で作り直すより確実に得られる。
-- サーバーとのプロトコルは、上の自前の API に合わせて fork の側を書き換える。本家のサーバー側のプロトコルは公開の仕様がない（docs.github.com に記述がない。互換を目標にしないので確かめない）ので、互換にすることは目標にしない。
+- **ランナーのエージェントは Go で自前で作る**（[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)）。本家の actions/runner は使わない（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。1 つの静的なバイナリを、ホストされたランナーとセルフホストのランナーに配る。
+- アクションの実行（JavaScript・Docker・composite）、ワークフローのコマンド、環境のファイル、式、取り消しの手順は、本家の公開の文書にある振る舞いに合わせる。よく使われる公開のアクションで互換のテストを持つ。
+- サーバーとのプロトコルは、上の自前の API にする。本家のサーバー側のプロトコルは公開の仕様がない（docs.github.com に記述がない。互換を目標にしないので確かめない）ので、互換にすることは目標にしない。
 - ランナーの側で、シークレットの値（と、登録された派生の値。`::add-mask::`）を、ログに出す前に `***` に置き換える。
 
 ### 9.3 マスクの二重の確認
@@ -506,7 +508,8 @@ actions_usage (owner_id, repo_id, job_id, runner_sku, billable_ms, recorded_at)
 
 ### 決定（2026-09-26、既定案）
 
-- **ランナーのエージェントは actions/runner（MIT）を fork して使う**（9.2 節の第一候補）。本家の追従は、アクションの実行・式・マスクの部分に限って四半期ごとに取り込む。サーバーとのプロトコルは自前にする。fork でも、環境変数・パスの名前は ADR-0006 で置き換える。
+- **ランナーのエージェントは Go で自前で作る**（9.2 節、[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)）。
+  - 2026-09-28 の注記：当初は「actions/runner（MIT）を fork して使う」と決めていた。リポジトリ共通の ADR-0007（本家の実装を核に使わない）に反するため覆した。
 - **標準のランナーの大きさ**は、S1 では公開・非公開とも 2 vCPU・8 GiB にする（本家は公開リポジトリに 4 CPU・16 GB を与えている（8 節、2026-09-26 に確認）が、容量の計画を単純にするため。本家との違い）。
 - **課金**：非公開のリポジトリの分の記録（14 節）だけを MVP で持ち、プランと無料の枠は MVP の後の課金の Epic で決める。公開リポジトリのホストされたランナーは無料にする（本家と同じ）。
 - 本家の値の確認（2026-09-26）：分の切り上げ、取り消しの猶予、ランナーのグループの公開リポジトリの既定、fork の PR の承認の既定は本家の文書で確かめ、本文の値と一致した。OIDC のトークンの有効期限は文書の例（5 分）と一致した。1 ジョブのログの上限と、再実行でのアクションの SHA の固定は、本家が公開していないので本システムの値のまま作る。

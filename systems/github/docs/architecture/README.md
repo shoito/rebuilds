@@ -123,13 +123,14 @@ git（HTTPS・SSH）──▶ Git フロントエンド（認証・認可・ル�
 | [0033](../decisions/0033-rolling-storage-node-upgrades.md) | ストレージのノードは 1 つの AZ の中で 1 台ずつ退避して更新し、AZ をまたいで同時に止めない |
 | [0034](../decisions/0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く（proposed） |
 | [0035](../decisions/0035-web-rendering-ssr-streaming.md) | Web は React をサーバーでストリーム描画し、画面の単位でハイドレーションする |
+| [0036](../decisions/0036-own-runner-agent-and-no-original-components.md) | Actions のランナーのエージェントを自前で作り、本家の公開の部品を核に使わない |
 
-リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前を使わない識別子）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。特に [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)：振る舞いは本家に寄せるが、ヘッダー・トークンの接頭辞・ドメイン・環境変数・パスの本家の名前は使わず、`<Brand>`・`<brand>`・`<BRAND>` の置き換え用の名前で書く（例：`X-<Brand>-Api-Version`、`X-<Brand>-Signature-256`、`<brand>p_...`、`<brand>usercontent.<domain>`、`<BRAND>_TOKEN`、`.<brand>/workflows/`）。
+リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前を使わない識別子、本家の実装を核に使わないこと）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。特に [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)：振る舞いは本家に寄せるが、ヘッダー・トークンの接頭辞・ドメイン・環境変数・パスの本家の名前は使わず、`<Brand>`・`<brand>`・`<BRAND>` の置き換え用の名前で書く（例：`X-<Brand>-Api-Version`、`X-<Brand>-Signature-256`、`<brand>p_...`、`<brand>usercontent.<domain>`、`<BRAND>_TOKEN`、`.<brand>/workflows/`）。
 
 ## 6. リスクと未解決の問い
 
 - **非公開のリポジトリの中身の漏洩**：経路が多い（Git、Web、API、検索、通知、Webhook、Actions のログ、fork のネットワークの共有 objects）。判定関数の集約（ADR-0002）、`can`・`canMany`・`filterActorsCanRead`・`accessPredicate` の一致の性質ベーステスト、経路ごとの漏洩テスト、本番の権限の合成監視で守る（[quality.md](../quality.md) のリスク 1）。
-- **fork のネットワークの共有 objects**：同じネットワークの他の fork のコミットが、SHA で見えうる（本家と同じ仕様、ADR-0007）。Git のプロトコル v2 の `fetch` は、広告していないハッシュの `want` も弾かない（2026-09-26 に確認。[git-storage.md](git-storage.md) の 7.2 節）。非公開のネットワークで Git・Web・API に到達可能性の検査をかけるかは、E1 の PoC と E3 で費用を測って決める。
+- **fork のネットワークの共有 objects**：同じネットワークの他の fork のコミットが、SHA で見えうる（本家と同じ仕様、ADR-0007）。Git のプロトコル v2 の `fetch` は、広告していないハッシュの `want` も弾かない（2026-09-26 に確認。[git-storage.md](git-storage.md) の 7.2 節）。公開のネットワークでは本家と同じく受け入れる。非公開のネットワークでは、Go のストレージの層で到達可能性を既定で検査し、Git・Web・API のどれからも返さない（2026-09-28 の決定。本家との違い）。検査の費用は E1 の PoC で測る。
 - **成功を返した push の喪失**：3 相の合意（ADR-0006）とチェックサム、障害注入で守る。リージョンの障害では最大 15 分の push を失いうる（ADR-0032。利用規約と SLA に反映する）。
 - **巨大なリポジトリと大量の clone**：少数のリポジトリが、ストレージのノードと帯域を占有しうる（[git-protocols.md](git-protocols.md)、[capacity.md](capacity.md)）。パックのキャッシュ、bundle-uri、clone の制限、読み取りの複製の追加で抑える。
 - **CI の隔離と費用**：信頼できないコードを大量に実行する。隔離の破綻は、他の利用者のシークレットの漏洩につながる（[actions.md](actions.md)）。SMT を無効にするので、1 ホストあたりの VM は約 40 で、Actions は本番の費用の約 6 割を占める（[infrastructure.md](infrastructure.md) の 9 節）。1 ホストあたりの VM の数と起動の時間は E8 の PoC で測る。
@@ -141,7 +142,7 @@ git（HTTPS・SSH）──▶ Git フロントエンド（認証・認可・ル�
 
 ### 決定（2026-09-26、既定案）
 
-PM の方針（本家 GitHub に寄せる、既定案）により、次のとおり決めた。上のリスクのうち、計測・PoC で確かめるものは決定の対象にせず、下の「持ち越し」に置いた。
+PM の方針（本家 GitHub に寄せる、既定案）により、次のとおり決めた。上のリスクのうち、計測・PoC で確かめるものは決定の対象にせず、下の「持ち越し」に置いた。残りの判断は、2026-09-28 に推奨案で確定した（次の節）。
 
 - **NFR-009 の RTO**：Web・API と、直近 7 日に push か fetch のあったリポジトリの読み書きは 4 時間以内、全リポジトリは 24 時間以内（3 節）。30 TB を 4 時間で全部戻すことは見込めないため（[capacity.md](capacity.md) の 2.8 節、ADR-0032）。認められない場合の代案（大阪に活発なリポジトリの非同期の複製を常に置く）は S2 で採る。
 - **NFR-011 の追加**：通知を Web の受信箱に p95 30 秒以内、メールを p95 5 分以内（3 節）。本家は数値を公開していないが、「開発の流れをつなぐ」（[intent.md](../intent.md)）の価値を測るために NFR にした。[runbooks](../runbooks/README.md) の SLI と [quality.md](../quality.md) の E5 の合否基準に加えた。
@@ -153,13 +154,31 @@ PM の方針（本家 GitHub に寄せる、既定案）により、次のとお
 - **識別子**：リポジトリ共通の ADR-0006 に合わせ、ヘッダー・トークンの接頭辞・ドメイン・環境変数・パスを置き換え用の名前にした。api-and-webhooks.md の「ヘッダーの名前と商標」「トークンの接頭辞」の問いは、これで決着した。
 - 領域ごとの問いの決定は、各文書の「決定（2026-09-26、既定案）」にある：[identity-and-permissions.md](identity-and-permissions.md) の 14 節、[notifications.md](notifications.md) の 12 節、[api-and-webhooks.md](api-and-webhooks.md) の 16 節、[issues.md](issues.md) の 16 節、[search.md](search.md) の 9 節、[web.md](web.md) の 12 節、[pull-requests.md](pull-requests.md) の 14 節、[actions.md](actions.md) の 18 節、[security.md](security.md) の 15 節。
 
-持ち越し（計測・PoC・後の段階で決めるもの）：
+### 決定（2026-09-28、推奨案で確定）
+
+残っていた判断を、推奨案で確定した。あわせて、リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)（本家の実装を核に使わない）に照らして見直した。
+
+- **非公開の fork のネットワークでの SHA の参照**：到達可能性の検査を既定でかける。Go のストレージの層に自前で持ち、Git の v2 の `want` と Web・API の SHA の参照がここを通る。本家より厳しく、本家との違い。費用は E1 で測る（[ADR-0007](../decisions/0007-fork-network-object-sharing.md) の注記、[git-storage.md](git-storage.md) の 7.2 節、[identity-and-permissions.md](identity-and-permissions.md) の 6・14 節）。
+- **Actions のランナーのエージェント**：actions/runner の fork をやめ、Go で自前で作る。ADR-0007 に反していたため（[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)、[actions.md](actions.md) の 9.2・18 節）。
+- **本家の公開の部品**：Markdown に cmark-gfm、UI に Primer を使わない。言語の判定の go-enry（第三者）と、開発の道具の CodeQL などは、核から外れ置き換えがきくので使ってよい（[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)、[web.md](web.md) の 4.1 節）。
+- **NFR-009 の RTO の範囲**：2026-09-26 の既定案のまま確定した。大阪に常にノードを置く案は S1 で採らない（[ADR-0032](../decisions/0032-disaster-recovery-strategy.md)）。
+- **S3 のルーティングの表**：Aurora Global Database に置く。ADR-0032 で使っており、運用を増やさない（[ADR-0034](../decisions/0034-multi-region-repository-placement.md)。proposed のまま）。
+- **S3 のメタデータの置き場所**：PR・Issue などリポジトリに属するものはホームのリージョンに、利用者・Organization などはグローバルに置く。マージと ref の更新を 1 つのリージョンで完結させるため（[ADR-0034](../decisions/0034-multi-region-repository-placement.md)、[infrastructure.md](infrastructure.md) の 10 節）。
+- **GraphQL の実装**：Pothos ＋ GraphQL Yoga。第三者の部品で、REST と同じサービス関数を呼べる（[api-and-webhooks.md](api-and-webhooks.md) の 5.1・16 節）。
+
+法務の確認待ちのものは、ここでは決めない。E9 の `legal-review-before-launch` で確認を受ける。
+
+- DMCA の通知の公開（[security.md](security.md) の 15 節）
+- 日本の発信者情報開示と、外為法・制裁への対応（同）
+- リージョンの障害での push の喪失の、利用規約と SLA への反映（[ADR-0032](../decisions/0032-disaster-recovery-strategy.md)、[roadmap.md](../roadmap.md)）
+
+### 持ち越し（計測・PoC・後の段階で決めるもの）
+
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| プロトコル v2 の `fetch` で、広告していないハッシュの `want` による fork のネットワークの漏れ | v2 が検査しないことは 2026-09-26 に確認した。E1 の `fork-network-want-poc` で版ごとの振る舞いを [quality.md](../quality.md) の漏洩テストに固定し、`gitd` での検査の費用を測る |
+| プロトコル v2 の `fetch` の、広告していないハッシュの `want` の振る舞いと、到達可能性の検査の費用 | v2 が検査しないことは 2026-09-26 に確認した。非公開のネットワークで検査をかけることは 2026-09-28 に決めた。E1 の `fork-network-want-poc` で版ごとの振る舞いを [quality.md](../quality.md) の漏洩テストに固定し、`gitd` での検査の費用を測る |
 | NLB の登録解除の後の接続、ECS の EC2 起動タイプの停止猶予 15 分 | E1 の `frontend-drain-poc`（staging） |
-| 非公開のネットワークで、Git の v2 の `want` と Web・API の SHA の参照に到達可能性の検査をかけるか | E3 の `fork-network-reachability-check` で費用を測り、ADR-0007 を改める ADR を起票する |
 | CloudFront 経由の数 GB の clone・push、`core.fsync` の性能、reftable、LFS の presigned の署名への `x-amz-checksum-sha256` の組み込み | E3 の Git の負荷試験と PoC（本家が bundle-uri を広告していないこと、LFS のクライアントがヘッダーを付けることは 2026-09-26 に確認した） |
 | マージ可能かの再計算の間引き | E4 で既定（5 分）で始め、E9 の負荷試験で直す |
 | Issue の移動を非同期にする上限 | E5 の `issue-transfer` で測る |

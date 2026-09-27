@@ -89,7 +89,7 @@ MVP は E1〜E9。
 | `git-maintenance-scheduler` | 幾何級数の repack、cruft、multi-pack index、commit-graph |
 | `fork-network` | `network.git` と alternates、fork の作成、ネットワークへの移動（ADR-0007） |
 | `network-split-on-visibility-change` | 公開の種類の変更でのネットワークの分割 |
-| `fork-network-reachability-check` | 非公開のネットワークでの SHA の参照（Git の v2 の `want`、Web・API）の到達可能性の検査の費用を測り、ADR を起票する |
+| `fork-network-reachability-check` | 非公開のネットワークでの SHA の参照（Git の v2 の `want`、Web・API）の到達可能性の検査を、Go のストレージの層に実装する。既定で有効（ADR-0007 の 2026-09-28 の注記） |
 | `push-checks` | push の検査（大きさ、fsck、予約した名前空間、LFS の pointer）と時間の予算 |
 | `git-backup-osaka` | 大阪の S3 への増分・完全のバンドル（ADR-0032） |
 | `daily-restore-check` | 毎日の 1,000 リポジトリの復元の確認 |
@@ -186,7 +186,7 @@ MVP は E1〜E9。
 | --- | --- |
 | `firecracker-host-poc` | metal のホスト、jailer、VM の起動の時間、1 ホストの VM の数（約 40 の検証） |
 | `runner-fleet-manager` | ホストと待機中の VM の管理、ホストの設定の検査（ADR-0023） |
-| `runner-agent-fork` | actions/runner の fork と、名前の置き換え |
+| `runner-agent` | Go の自前のランナーのエージェント。アクションの実行、ワークフローのコマンド、式、マスク、公開のアクションとの互換のテスト（ADR-0036） |
 | `broker-protocol` | long poll、割り当て、心拍、取り消し |
 | `workflow-evaluator` | ワークフローの解釈、`on` の評価、再利用可能なワークフロー |
 | `job-scheduler` | 依存、concurrency、持ち主ごとの上限と公平な順番（ADR-0024） |

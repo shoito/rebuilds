@@ -48,8 +48,7 @@ AZ の障害は、[ADR-0003](0003-replicated-git-storage.md) の 3 つの複製�
   - 4 時間以内：Web・API・DB と、直近 7 日に push か fetch のあったリポジトリ（約 20%）の読み書き。
   - 24 時間以内：残りのリポジトリ。アクセスされたものから先に戻し、それまでは「復元中」を返す。
   - 落とすもの：Actions（東京の回復を待つか、別の計画作業で大阪に作る）、コード検索（作り直す）。
-  - **この範囲で NFR-009 を満たすとみなしてよいかは、PM の確認が要る。** 認められなければ、S1 から 2 を採る（大阪にストレージのノードを 14 台前後常に置くので、月に数万ドル増える。[infrastructure.md](../architecture/infrastructure.md) の 9 節）。
-    - 2026-09-26 に、この範囲を NFR-009 の定義とすることを既定案として決めた（[architecture/README.md](../architecture/README.md) の 3 節・6 節）。
+  - **この範囲を NFR-009 の定義とする**（2026-09-26 に既定案で決め、2026-09-28 に確定した。[architecture/README.md](../architecture/README.md) の 3 節・6 節）。S1 から 2 を採る案（大阪にストレージのノードを 14 台前後常に置くので、月に数万ドル増える。[infrastructure.md](../architecture/infrastructure.md) の 9 節）は採らない。
 - **DB と Git の食い違い。** 切り替えの後、DB（RPO 1 秒未満）が Git（RPO 最大 15 分）にないコミットを指しうる。Git を正として DB の写しを作り直し（ADR-0005）、push の Event の記録から失った push を列挙して、利用者に再 push を頼む。
 - 2 は、RTO を短くできるが、S1 で大阪に 14 台前後のストレージのノードを常に置くことになる。S2 で、活発なリポジトリだけを対象に採る（[infrastructure.md](../architecture/infrastructure.md) の 5.2 節）。
 - 3 は、レプリケーションの遅れ（99.9% を 15 分以内）に、バックアップの遅れが加わり、RPO 15 分を守れない。大阪に直接書けば、遅れはバックアップの Worker だけになる。

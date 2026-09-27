@@ -118,7 +118,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
 
 本家の描画の流れは、マークアップを HTML に変換し、`script`・インラインの style・`class`・`id` などを除く強い無害化を行い、構文の色付け、絵文字、タスクリスト、見出しのアンカー、画像の CDN、自動リンクなどの後処理をする、というもの（[github/markup](https://github.com/github/markup)）。同じ順にする。
 
-1. **解析**：GFM（表、取り消し線、タスクリスト、自動リンク、脚注、アラート）を解析する。解析器は CommonMark と GFM の仕様のテストを通るものにする。
+1. **解析**：GFM（表、取り消し線、タスクリスト、自動リンク、脚注、アラート）を解析する。解析器は CommonMark と GFM の仕様のテストを通るものにする。本家の cmark-gfm は使わず、TypeScript の第三者の解析器（micromark と GFM の拡張など）を使う（[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)、リポジトリ共通の ADR-0007）。
 2. **HTML へ変換**：生の HTML は、解析器では通し、次の無害化で落とす。
 3. **無害化**：許可リスト方式。
    - 要素：見出し、段落、リスト、表、`code`・`pre`、`a`、`img`、`details`・`summary`、`kbd`、`sup`・`sub` など、一覧に載ったものだけ。

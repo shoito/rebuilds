@@ -40,6 +40,7 @@ GitHub の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0033](0033-rolling-storage-node-upgrades.md) | ストレージのノードは、1 つの AZ の中で 1 台ずつ退避して更新し、AZ をまたいで同時に止めない | accepted |
 | [0034](0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く | proposed |
 | [0035](0035-web-rendering-ssr-streaming.md) | Web は React をサーバーでストリーム描画し、画面の単位でハイドレーションする | accepted |
+| [0036](0036-own-runner-agent-and-no-original-components.md) | Actions のランナーのエージェントを自前で作り、本家の公開の部品を核に使わない | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。
