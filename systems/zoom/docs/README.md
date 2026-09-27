@@ -8,10 +8,5 @@
 | [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、領域ごとの設計 | Dev |
 | [decisions/](decisions/README.md) | ADR の一覧 | Dev |
 | [runbooks/](runbooks/README.md) | SLO、リリース、アラートと手順、訓練 | Ops |
-
-これから作る文書（まだない）：
-
-| 文書 | 内容 | 持ち主 |
-| --- | --- | --- |
-| `quality.md` | 品質戦略、ネットワークの劣化の試験、メディアの品質の評価、テスト計画 | QA |
-| `roadmap.md` | Epic と Story | PM |
+| [quality.md](quality.md) | 品質戦略、ネットワークの劣化の試験、メディアの品質の評価、テスト計画 | QA |
+| [roadmap.md](roadmap.md) | Epic と Story、延期の一覧 | PM |

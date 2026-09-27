@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -25,7 +25,7 @@ WebRTC のメディアは、必ず DTLS-SRTP で暗号化される（[RFC 8827](
 
 - **SFrame**（[RFC 9605](https://www.rfc-editor.org/rfc/rfc9605)、2024-08）：符号化した後のフレーム全体を暗号化する。SFU は、転送の判断に要るメタデータ（RTP のヘッダーと拡張）だけを読める。
 - **MLS**（[RFC 9420](https://www.rfc-editor.org/rfc/rfc9420.html)、2023-07）：2 人から数千人のグループの鍵を、前方秘匿性と侵害後の安全性を保って更新する。メッセージを配る Delivery Service（DS）は、ほぼ信頼しない前提で設計されている。資格情報を検証する Authentication Service（AS）は信頼する前提。
-- **Encoded Transform**（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、Working Draft）：ブラウザで、符号化した後のフレームを JavaScript か SFrame の変換に通す API。ブラウザごとの対応の状況は未検証。
+- **Encoded Transform**（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、Working Draft）：ブラウザで、符号化した後のフレームを JavaScript か SFrame の変換に通す API。`RTCRtpScriptTransform` は Chrome・Edge 141、Firefox 117、Safari 15.4 から使える（[caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)。[ADR-0021](0021-web-client-browser-support.md)）。組み込みの `SFrameTransform` の対応はブラウザごとに違う（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）。
 - **OpenMLS**（[openmls](https://github.com/openmls/openmls)）：RFC 9420 の Rust の実装。MIT。WebAssembly にできる。
 
 ## Options
@@ -43,9 +43,9 @@ WebRTC のメディアは、必ず DTLS-SRTP で暗号化される（[RFC 8827](
 - **E2EE は、主催者が会議ごとに選ぶ。** 組織の管理者が許可したときだけ選べる。
   - メディアは SFrame で暗号化する。Web では Encoded Transform を使う。SFrame の鍵は、MLS のグループの秘密から導く（エクスポーター）。
   - 鍵管理は MLS で行う。サーバー（シグナリング）は DS の役を務め、MLS のメッセージを順序付けて配るだけにする。参加者の資格情報は、本システムのアカウントの端末ごとの署名鍵で作り、AS の役は本システムが持つ。
-  - 参加・退出のたびに MLS のグループを更新し、新しい鍵に切り替える。退出から 2 秒以内に切り替える（NFR-008）。
+  - 参加・退出のたびに MLS のグループを更新し、新しい鍵に切り替える。退出（Meeting Actor が `Left` か `Removed` を確定した時。切断の猶予の 60 秒の間は、まだ退出ではない）から 2 秒以内に切り替える（NFR-008、[ADR-0029](0029-mls-delivery-and-authentication-service.md)）。
   - 参加者は、MLS のエポックから導いた「会議のセキュリティのコード」を画面で見て、互いに読み上げて確かめられる。AS（本システム）が偽の参加者を作る攻撃は、このコードの照合で見つける前提にする。
-  - 会議の中のチャットも、MLS のアプリケーションのメッセージとして暗号化する。
+  - 会議の中のチャットも、MLS のアプリケーションのメッセージとして暗号化し、シグナリングの `e2ee.app` で送る。Actor は暗号文を中身を見ずに `chat_seq` で順序付けて配り、取りこぼしを埋めるために Valkey には暗号文だけを置く。個別のメッセージは、MLS のグループの全員が復号できるため、E2EE の会議では使えなくする（[ADR-0036](0036-in-meeting-chat-ordering-and-retention.md)）。
 - **E2EE の会議では、サーバーで内容を扱う機能を動かさない。** クラウド録画、ライブ字幕と文字起こし、電話からの参加、AI の機能。主催者が E2EE を選ぶ画面で、使えなくなる機能を示す。端末の上での録画（ローカル録画）は、後の Epic で検討する。
 - **E2EE の会議の参加者の上限**は、S1 で 100 人（通常の会議と同じ）。MLS の更新の遅れを計測してから、上限を上げる。
 - **Encoded Transform に対応しないブラウザは、E2EE の会議に入れない。** 入れない理由を画面に示す。
@@ -60,7 +60,7 @@ WebRTC のメディアは、必ず DTLS-SRTP で暗号化される（[RFC 8827](
   - E2EE の会議では、サーバーの運営者と Media Node の侵害から、メディアとチャットの内容を守れる。
   - 暗号の方式が標準（RFC 9605、RFC 9420）で、実装（OpenMLS）も既存のものを使える。
 - 引き受けるコスト：
-  - E2EE の会議では、SFU は RTP のヘッダーと拡張だけで転送を判断する。SVC の層の判断に要るヘッダー拡張（Dependency Descriptor など）を平文で送る必要がある。mediasoup での対応は未検証（e2ee.md で確かめる）。
+  - E2EE の会議では、SFU は RTP のヘッダーと拡張だけで転送を判断する。mediasoup は VP8 のキーフレームと層をペイロードの先頭で判定するので、フレーム全体を暗号化する SFrame では判定できなくなる。そこで、送り手に Dependency Descriptor を平文のヘッダー拡張で送らせ、mediasoup に VP8・VP9 でも DD からキーフレームと層を判断する処理を足す（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）。RED と同じく、mediasoup のフォークの差分になる。
   - 参加者の出入りが激しい会議では、MLS の更新が頻繁になる。更新をまとめる工夫が要る。
   - 参加者の一覧（誰が会議にいるか）のメタデータは、サーバーに見える。
   - ブラウザの対応の差で、E2EE の会議に入れない参加者が出る。

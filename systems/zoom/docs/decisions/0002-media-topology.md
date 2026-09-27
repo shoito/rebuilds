@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -39,12 +39,12 @@ date: 2026-09-27
   - 既定はカメラの映像を simulcast の 3 本（例：180p・360p・720p）で送る。VP8 を基準にする。
   - SVC（VP9・AV1 の `L3T3_KEY` など）は、送り手と受け手のブラウザがすべて対応する会議で使う。どの形を使うかは Meeting Actor が決め、会議の途中で切り替えうる。
   - 画面共有は、解像度を保ち、フレームの数を落とす方針で、時間の層だけを使う。
-- **音声**：Opus を使い、DTX、インバンド FEC、RED（冗長の符号化）を有効にする。音声の大きさのヘッダー拡張で話者を決め、大きな会議では声の大きい数人（既定で 3 人）の音声だけを転送する。
+- **音声**：Opus を使い、DTX、インバンド FEC、RED（冗長の符号化）を有効にする。mediasoup は RED に対応しないので、RED の転送と受け手ごとの剥がしを mediasoup のフォークに足す（[ADR-0017](0017-opus-dtx-fec-red.md)）。音声の大きさのヘッダー拡張で話者を決め、受け手には声の大きい数人（既定で 3 人）の音声だけを転送する（[ADR-0011](0011-forwarding-and-layer-selection.md)）。100 人を超える会議では、受け手ごとの 3 つの音声の枠に話者を付け替えて送る（[ADR-0057](0057-audio-slots-for-large-meetings.md)）。
 - **帯域の推定**：送り手の側の推定（transport-cc の帰還と Google Congestion Control）を使う。SFU は受け手ごとに下りの帯域を推定し、層を選ぶ。transport-cc と GCC は、どちらも IETF の草案のまま失効している（[transport-cc](https://datatracker.ietf.org/doc/html/draft-holmer-rmcat-transport-wide-cc-extensions-01)、[GCC](https://datatracker.ietf.org/doc/draft-ietf-rmcat-gcc/)、2026-09-27 に確認）が、ブラウザの実装の事実上の標準であり、それに合わせる。
 - **カスケード**：
   - リージョンの中：1 台に収まらない会議は、複数の Media Node に広げ、台の間を中継でつなぐ（S2）。
   - リージョンの間：参加者の近くの Media Node に接続させ、Node の間を中継でつなぐ（S3）。中継の経路は木にし、ある Node から別の Node へは 1 ホップだけにする（遅れを抑えるため）。
-  - 中継は、映像のすべての層ではなく、先の Node の受け手が必要とする層だけを送る。
+  - Node の間の中継（mediasoup の pipe）は、送り手の producer のすべての層を運ぶ（[ADR-0012](0012-media-assignment-and-cascading.md)）。リージョンの中の帯域は安いので S2 では受け入れる。先の Node の受け手が要る層だけを運ぶことは、リージョンの間の帯域が効く S3 の課題として、S3 の前に試作して別の ADR で決める（[media-server-sfu.md](../architecture/media-server-sfu.md) の 8.4 節）。
 - 2 は、1:1 で転送の費用を減らせる。ただし、3 人目の参加や録画の開始で SFU へ移る処理が要り、経路が 2 種類になる。
 - 3 は、サーバーの費用と遅れが大きい。E2EE とも両立しない（サーバーが復号する必要がある）。
 - 4 は、ウェビナーのような視聴専用の配信で検討する価値がある。双方向の会議では、MVP の範囲外にする。
@@ -57,6 +57,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - 送り手の上りは、simulcast で 1 本の場合より 3〜4 割ほど増える（未検証。E4 で計測する）。
   - 層の選択、キーフレームの要求の集約、話者の検出を、SFU で正しく作る必要がある。
+  - RED（[ADR-0017](0017-opus-dtx-fec-red.md)）と、E2EE の会議の Dependency Descriptor の判断（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）のため、mediasoup のフォークを持ち、上流の版に追従する。
   - カスケードの中継の経路と、Node の障害の時の付け替えが、Meeting Actor の設計を複雑にする（[ADR-0005](0005-meeting-state-and-signaling.md)）。
 
 ## Confirmation

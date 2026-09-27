@@ -1,7 +1,7 @@
 # Intent: Zoom を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: accepted
 - Date: 2026-09-27
 
 ## Problem
@@ -53,6 +53,8 @@
 | AI による要約・議事録・質問への応答 | 文字起こしの品質が固まってから。通信の秘密（L2）の整理も要る |
 | 会議室のシステム（Zoom Rooms に相当）、SIP・H.323 の機器の接続 | 機器ごとの対応と相互接続の試験が要る |
 
+- Epic の番号は [roadmap.md](roadmap.md) にある。アプリは E13、電話からの参加は E14、ウェビナーは E15、ブレイクアウトルームは E16。残りは roadmap.md の延期の一覧。
+
 ### 守るべき振る舞い
 
 - 待合室もパスコードもない会議は作れない。
@@ -74,14 +76,14 @@
 | K5 | 体感の品質 | 会議の後の評価（5 段階）で、4 以上の割合が 90% 以上 | 会議の後の任意の評価 |
 | K6 | 荒らしの防止 | 待合室またはパスコードのない会議 0 件。第三者の入り込みの報告に、主催者が 1 回の操作で対処できる | 設定の監査、報告の集計 |
 | K7 | 日本語の字幕 | 会議の音声で、文字の誤り率（CER）15% 以下。発話から字幕の表示まで p95 2 秒以内（NFR-010） | 評価用の会議の音声のセット。本番は遅れだけを測る |
-| K8 | 費用 | 参加者・分あたりの配信の費用を、capacity.md で決める目標以内に保つ | 請求の集計と、送ったバイト数 |
+| K8 | 費用 | 参加者・分あたりのメディアの配信の費用を、S1 で 0.20 円以下、S2 で 0.07 円以下に保つ（[capacity.md](architecture/capacity.md) の 6 節、[ADR-0053](decisions/0053-capacity-model-cost-target-and-load-bots.md)。既定案、PM の承認を要する） | 請求の集計と、送ったバイト数（毎月） |
 
 ## Affected users and systems
 
 - **主催者**（主な利用者）：日本の企業で、社内外の会議を開く人。予定の会議をカレンダーから作り、待合室で参加者を確かめる。
 - **参加者**：社内の人と、社外の人（取引先、候補者など）。社外の人はアカウントなしでブラウザから入る。
 - **組織の管理者**：ユーザー、会議の既定の設定と強制、録画の保持、利用状況を管理する。
-- **外部のシステム**：カレンダー（Google、Microsoft 365）、ID の連携（SAML・OIDC の IdP）、音声認識のエンジン（自前か外部かは未定）、メールの送信事業者、後の段階で電話の通信事業者。
+- **外部のシステム**：カレンダー（Google、Microsoft 365）、ID の連携（SAML・OIDC の IdP）、音声認識のエンジン（S1 は Amazon Transcribe を ASR Adapter の裏で使う。[ADR-0026](decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）、メールの送信事業者、後の段階で電話の通信事業者。
 - **社内の運用**：メディアサーバーの運用、品質の監視、濫用の対応、サポート。
 
 ## Constraints
@@ -112,19 +114,19 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 電気通信事業法の届出：Web 会議は「他人の通信を媒介する」事業として、登録または届出が要るとされる（[電気通信事業参入マニュアル［追補版］](https://www.soumu.go.jp/main_content/000477428.pdf)、2026-09-27 に確認）。登録と届出のどちらか、届出の時期、特定利用者情報の規律（大規模な事業者の規律）が将来かかるか | infrastructure、security の各領域（まだない） | E2 の社外への公開（ベータを含む） |
-| L2 | 通信の秘密：SFU は DTLS-SRTP を終端するので、サーバーの上で平文のメディアを扱う。録画・字幕・品質の診断・濫用の調査で、内容に触れてよい範囲と、そのための同意の取り方。AI の要約に使うときの扱い | media-server-sfu、recording-and-transcription、meeting-security、observability の各領域（まだない）、[ADR-0004](decisions/0004-encryption-and-e2ee.md) | E8 の録画・字幕、E1 の品質の計測で内容を含むもの |
-| L3 | 録画・文字起こしの同意：参加者への通知の方法、同意の記録、同意しない人の扱い（退出するしかないか）。社外の参加者の個人情報の扱い（個人情報保護法の利用目的の通知） | recording-and-transcription の領域（まだない） | E8 の録画の開始の Story |
-| L4 | 捜査機関への対応：通信の傍受の要請（通信傍受法）、記録の差し押さえ・照会（会議の記録、参加者の IP）にどう応じるか。E2EE の会議で応じられないことの扱い | security、e2ee の各領域（まだない） | E9 の E2EE の一般への提供、E12 の GA の判定 |
-| L5 | 外部送信規律（電気通信事業法）：Web クライアントが、端末の情報を外部（分析、エラーの収集）へ送るときの公表の方法 | clients、observability の各領域（まだない） | E2 の Web クライアントの公開 |
-| L6 | 個人情報保護法：録画・文字起こし・チャットの保持の期間と削除。音声認識を外部の事業者に委ねるときの委託と外国にある第三者への提供。データを国内に置くことをどこまで約束するか | recording-and-transcription、infrastructure の各領域（まだない） | E8 の音声認識のエンジンの選定、E12 の契約の文書 |
-| L7 | 電話からの参加：電話番号（0ABJ・050・0120 など）の取得の条件、通信事業者との接続、緊急通報の扱い | telephony の領域（まだない） | MVP の後の電話の Epic |
-| L8 | 組織との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧、録画の開示・削除の請求の窓口 | accounts-and-admin の領域（まだない） | E12 の GA の判定 |
+| L1 | 電気通信事業法の届出：Web 会議は「他人の通信を媒介する」事業として、登録または届出が要るとされる（[電気通信事業参入マニュアル［追補版］](https://www.soumu.go.jp/main_content/000477428.pdf)、2026-09-27 に確認）。登録と届出のどちらか、届出の時期、特定利用者情報の規律（大規模な事業者の規律）が将来かかるか | [infrastructure](architecture/infrastructure.md)、[security](architecture/security.md) | E2 の社外への公開（ベータを含む） |
+| L2 | 通信の秘密：SFU は DTLS-SRTP を終端するので、サーバーの上で平文のメディアを扱う。録画・字幕・品質の診断・濫用の調査で、内容に触れてよい範囲と、そのための同意の取り方。AI の要約に使うときの扱い | [media-server-sfu](architecture/media-server-sfu.md)、[recording-and-transcription](architecture/recording-and-transcription.md)、[meeting-security](architecture/meeting-security.md)、[observability](architecture/observability.md)、[ADR-0004](decisions/0004-encryption-and-e2ee.md)、[ADR-0047](decisions/0047-keys-and-operator-access-to-media.md) | E8 の録画・字幕、E1 の品質の計測で内容を含むもの |
+| L3 | 録画・文字起こしの同意：参加者への通知の方法、同意の記録、同意しない人の扱い（退出するしかないか）。社外の参加者の個人情報の扱い（個人情報保護法の利用目的の通知） | [recording-and-transcription](architecture/recording-and-transcription.md)、[ADR-0027](decisions/0027-capture-consent-and-indicators.md) | E8 の録画の開始の Story |
+| L4 | 捜査機関への対応：通信の傍受の要請（通信傍受法）、記録の差し押さえ・照会（会議の記録、参加者の IP）にどう応じるか。E2EE の会議で応じられないことの扱い | [security](architecture/security.md)、[e2ee](architecture/e2ee.md) | E9 の E2EE の一般への提供、E12 の GA の判定 |
+| L5 | 外部送信規律（電気通信事業法）：Web クライアントが、端末の情報を外部（分析、エラーの収集）へ送るときの公表の方法 | [clients](architecture/clients.md)、[observability](architecture/observability.md)、[ADR-0051](decisions/0051-qos-telemetry-pipeline.md) | E2 の Web クライアントの公開 |
+| L6 | 個人情報保護法：録画・文字起こし・チャットの保持の期間と削除。音声認識を外部の事業者に委ねるときの委託と外国にある第三者への提供。データを国内に置くことをどこまで約束するか | [recording-and-transcription](architecture/recording-and-transcription.md)、[infrastructure](architecture/infrastructure.md)、[ADR-0026](decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) | E8 の音声認識のエンジンの選定、E12 の契約の文書 |
+| L7 | 電話からの参加：電話番号（0ABJ・050・0120 など）の取得の条件、通信事業者との接続、緊急通報の扱い | [telephony](architecture/telephony.md) | E14（MVP の後の電話の Epic） |
+| L8 | 組織との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧、録画の開示・削除の請求の窓口 | [accounts-and-admin](architecture/accounts-and-admin.md)、[api-and-webhooks](architecture/api-and-webhooks.md) | E12 の GA の判定 |
 
 ### 選定・計測で決めるもの（法務以外）
 
-- 日本語の音声認識のエンジン（自前でホストするモデルか、クラウドの API か）と、その遅れ・誤り率・費用：E8 の着手前に、評価用の音声のセットで比べる。未検証。
-- メディアサーバーのインスタンスの種類と、1 台あたりの参加者の数・パケット数の上限：E2 の着手の後に負荷試験で決める。EC2 はインスタンスごとの PPS の上限を公表していない（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。未検証。
-- AWS のインターネットへの転送の費用が、参加者・分あたりの費用の目標（K8）に収まるか。収まらない場合の、ベアメタル・コロケーションへの移行の地点：capacity.md で見積もる。
-- E2EE でのブラウザの対応（Encoded Transform・SFrame の対応の状況）と、対応しないブラウザの扱い：E9 の着手前に確かめる。未検証。
+- 日本語の音声認識のエンジン：S1 は Amazon Transcribe streaming を既定にし、E8 の着手前に、評価用の音声のセットで自前でホストする Whisper 系などと遅れ・誤り率・費用を比べる（[ADR-0026](decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）。値は未検証。
+- メディアサーバーの 1 台あたりの参加者の数・パケット数の上限：c8gn.16xlarge を既定にし（[ADR-0049](decisions/0049-media-node-fleet.md)）、E7 の負荷試験で c8g.16xlarge と比べて決める。EC2 はインスタンスごとの PPS の上限を公表していない（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。未検証。
+- AWS のインターネットへの転送の費用が K8 に収まるか：下りの平均 1.5 Mbps なら収まり、2.5 Mbps なら収まらない見込み（[infrastructure.md](architecture/infrastructure.md) の 12 節）。E2 のベータで下りの平均を測る。ベアメタル・コロケーション（Edge）の構築は、ピークの送出が 4 週続けて 10 Gbps を超えたら始める（[ADR-0050](decisions/0050-disaster-recovery-and-edge-migration.md)）。
+- E2EE でのブラウザの対応：`RTCRtpScriptTransform` は対応ブラウザの最新 2 メジャーのすべてにある（[ADR-0021](decisions/0021-web-client-browser-support.md)）。Dependency Descriptor・depacketizer・SVC の層ごとのフレームの扱いは、E9 の `e2ee-poc-transform` で確かめる（[ADR-0028](decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)）。未検証。
 - 1:1 の会議を P2P にするか：S2 で、費用と品質を計測して決める（[ADR-0002](decisions/0002-media-topology.md)）。
