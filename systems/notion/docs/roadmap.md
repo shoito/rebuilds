@@ -24,7 +24,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E7 API・連携・MCP | 公開 API と版、連携とトークン、Webhook、リモートの MCP サーバー、インポートとエクスポート | 未着手 |
 | E8 本番運用 | 負荷試験、SLO とアラート、災害復旧と訓練、削除の 3 段、濫用対策、セキュリティの試験、runbook | 未着手 |
 | E9 S2 への拡張 | 物理クラスタの分割（再シャーディング）、`global` の分離、Valkey の sharded pub/sub、検索のドメインの分割、CDC のデータレイク | 未着手（[infrastructure.md](architecture/infrastructure.md) の 12 節の基準を満たしたら） |
-| E10 企業向け機能 | SAML SSO、SCIM、監査ログの閲覧と出力、メンバーの管理者、ワークスペースの方針、ゴミ箱の保持期間の変更、管理者の内容の検索（監査付き） | 未着手（MVP の後。intent.md の Non-goals） |
+| E10 企業向け機能 | SAML SSO、SCIM、監査ログの閲覧と出力、メンバーの管理者、ワークスペースの方針、ゴミ箱の保持期間の変更、管理者の内容の検索（監査付き）、無効化したメンバーのページの移し替え、制限付きメンバー | 未着手（MVP の後。intent.md の Non-goals） |
 
 ## Story
 
@@ -171,7 +171,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `load-test-k6` | 負荷のモデルの 1 倍・2 倍、再接続の殺到、巨大なページ・データベース（[capacity.md](architecture/capacity.md)）。結果で capacity.md と infrastructure.md を更新する |
+| `load-test-k6` | 負荷のモデルの 1 倍・2 倍、再接続の殺到、巨大なページ・データベース（[capacity.md](architecture/capacity.md)）。結果で capacity.md と infrastructure.md を更新する。OpenSearch の単価もここで確かめ、コストの概算を直す（[infrastructure.md](architecture/infrastructure.md) の 13 節） |
 | `slo-dashboards-and-alerts` | SLO、バーンレート、偏りの検出（[runbooks/README.md](runbooks/README.md)、[observability.md](architecture/observability.md)） |
 | `synthetic-monitoring` | 大阪からの合成監視（[observability.md](architecture/observability.md) の 6 節） |
 | `dr-global-database` | 大阪の Global Database の二次、パイロットライト、訓練（[ADR-0029](decisions/0029-disaster-recovery.md)） |
@@ -209,6 +209,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `workspace-security-policies` | 公開・ゲスト・エクスポート・連携の禁止、ゲストの追加の申請（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 4.6・10 節） |
 | `enterprise-trash-retention` | ゴミ箱の保持期間の変更（[ADR-0022](decisions/0022-trash-history-and-deletion-retention.md)） |
 | `plan-history-retention` | プランごとの履歴の日数（7・30・90 日・無期限） |
+| `deprovisioned-content-transfer` | 無効化したメンバーのプライベートのページを、所有者が中身を読まずに別のメンバーへ移す。30 日以内、監査ログに残す（[ADR-0033](decisions/0033-transfer-private-pages-of-deactivated-members.md)） |
+| `restricted-member-role` | 制限付きメンバーのロール `restricted_member`（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節、[ADR-0021](decisions/0021-accounts-members-guests-and-teamspaces.md) の注記） |
 | `admin-content-search` | 管理者の内容の検索。監査ログに残す別の経路で、ページの権限の判定は変えない（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節） |
 
 各 Epic の品質面の重点と合否基準は、[quality.md](quality.md) の 5 節にある。

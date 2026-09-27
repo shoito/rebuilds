@@ -296,6 +296,11 @@ Aurora（RLS、論理シャード）
 - ビューの API と `view.*` の Webhook は、E5 のビューの形が固まった後に、E7 の後半の Story として入れる。
 - Webhook の署名の秘密は、本家と同じく `verification_token` を使う。別に入れ替える仕組みは MVP に入れない。
 
+2026-09-28 に、推奨案で次のとおり決めた（[README.md](README.md) の「決定（2026-09-28、推奨案で確定）」）。
+
+- 公開 API のトークンの `{id}` に `workspace_id` を埋め込み、シャードへの振り分けに使う（3.1 節）。`global` にトークンの索引を持たない。
+- データソースのスキーマは、API でも 50KB を推奨の上限として文書に書き、1.5MB を超える更新だけを拒む（[databases.md](databases.md) の 11 節）。
+
 ## 12. 表
 
 連携・API・MCP・ジョブの表の最小の定義。列の型・制約の細部は、E7 の各 Story の `spec.md` で決める。どの表も論理シャード（`shardNNN`）に置き、`workspace_id` を持ち、主キーは `(workspace_id, id)`、索引は `workspace_id` を先頭にし、RLS を付ける（[data-model.md](data-model.md) の 1 節）。公開の連携の定義だけは `global.public_integrations` にある。

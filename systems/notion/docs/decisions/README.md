@@ -37,6 +37,7 @@ Notion の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0030](0030-cdc-data-lake.md) | S2 で、変更データの取り込み（CDC）によるデータレイクを S3 に作る | proposed |
 | [0031](0031-migration-rollout-by-shard-groups.md) | スキーマの変更は、論理シャードの群れの順に expand / contract で当てる | accepted |
 | [0032](0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 のデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補にする | accepted |
+| [0033](0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

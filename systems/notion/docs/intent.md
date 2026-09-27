@@ -67,7 +67,7 @@
 ## Open questions
 
 - 共同編集の方式（操作の変換か、CRDT か）の選択による、オフラインの長時間の編集の扱い → 解決済み。テキストはブロックごとの CRDT、構造とプロパティはサーバーの順序で決める（[ADR-0010](decisions/0010-text-crdt-with-server-ordered-structure.md)、[ADR-0011](decisions/0011-structural-and-property-conflict-rules.md)）。
-- 設計の段階で残った問いは、本家に寄せる既定案で決めた（[architecture/README.md](architecture/README.md) の「決定（2026-09-26、既定案）」）。
+- 設計の段階で残った問いは、本家に寄せる既定案で決めた（[architecture/README.md](architecture/README.md) の「決定（2026-09-26、既定案）」）。2026-09-28 に、残りを推奨案で決めた（同じ文書の「決定（2026-09-28、推奨案で確定）」）。法務の問いは下の表に残した。
 
 ## 法務の確認待ち
 

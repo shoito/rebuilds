@@ -212,7 +212,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 | 行 | 1 データソースあたり 250,000 | 本家はデータベースあたり 25 万（[Optimize database performance](https://www.notion.com/help/optimize-database-load-times-and-performance)、2026-09-27 に確認）。複数のデータソースのときに、データベースあたりかデータソースあたりかは未検証 |
 | プロパティ | 1 データソースあたり 500 | 本家と同じ（[Database properties](https://www.notion.com/help/database-properties)） |
 | 行のプロパティの値の合計 | 2.5MB（files・数式・ロールアップ・本文を除く） | 本家と同じ |
-| スキーマの大きさ | 1.5MB | ヘルプの値と同じ。本家の API の文書は、プロパティ 500 個かスキーマ 50KB を推奨の上限とし、大きすぎるスキーマの更新を止める（[Data source](https://developers.notion.com/reference/data-source)、2026-09-27 に確認）。API での上限は E7 の Story で決める |
+| スキーマの大きさ | 1.5MB（画面・API とも超える更新を拒む）。API は 50KB を推奨の上限として文書に書く | 1.5MB はヘルプの値と同じ。本家の API の文書は、プロパティ 500 個かスキーマ 50KB を推奨の上限とし、大きすぎるスキーマの更新を止める（[Data source](https://developers.notion.com/reference/data-source)、2026-09-27 に確認）。2026-09-28 に、API も 50KB を推奨とし、1.5MB を超える更新だけを 400 で拒むと決めた |
 | データソース | 1 データベースあたり 20 | 本設計の値（本家は未検証） |
 | ビュー | 1 データベースあたり 200 | 本設計の値（本家は未検証） |
 | フィルタの入れ子 | 3 段 | 本家と同じ |

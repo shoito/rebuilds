@@ -122,6 +122,7 @@
 | [0030](../decisions/0030-cdc-data-lake.md) | S2 で、変更データの取り込み（CDC）によるデータレイクを S3 に作る（proposed） |
 | [0031](../decisions/0031-migration-rollout-by-shard-groups.md) | スキーマの変更は、論理シャードの群れの順に expand / contract で当てる |
 | [0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 のデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補にする（ADR-0013 の一部を置き換える） |
+| [0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞・ドメインを使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 
@@ -178,6 +179,7 @@ PM の方針（本家 Notion に寄せる、既定案）により、次のとお
 | OPFS のプライベートブラウズと追い出しの実際の挙動（対応状況・容量・方針は 2026-09-27 に文書で確認。ADR-0008・0013 の注記） | E4 の前の `opfs-poc`（ADR-0008・0013） |
 | ~~Electron の自動更新の仕組み~~ | 2026-09-27 に解消。`electron-updater` の `generic` の提供元を使う（[delivery.md](delivery.md) の 6.2 節）。実装は E4 の `desktop-auto-update` |
 | 負荷のモデルと台数、1 物理クラスタの上限、`pg_stat_statements.max`、`fillfactor`、検索のデータノード、`routing_partition_size` | E8 の負荷試験（k6）。[capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) を置き換える |
+| OpenSearch の単価（コストの概算の 4,500 USD は据え置く） | E8 の `load-test-k6` で確かめる（[infrastructure.md](infrastructure.md) の 13 節） |
 | 確定済みのトランザクションをクライアントが保持し、リージョンの切り替えの後に再送するか | E8 の DR 訓練（[collaboration.md](collaboration.md) の 14 節） |
 | 公開サイトの自動の検査の誤検知の許容度 | E8 の `abuse-reporting-and-takedown` の運用 |
 | `acl_version` の S2 での競合 | E9 の前の計測（ADR-0019） |
@@ -186,3 +188,17 @@ PM の方針（本家 Notion に寄せる、既定案）により、次のとお
 | ~~ADR-0013 の「デスクトップはネイティブの SQLite」と、ADR-0008・0009・editor.md の食い違い~~ | 2026-09-27 に解消。S1 はデスクトップも WASM の SQLite、ネイティブの SQLite は S2 の候補として計測で決める（[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)） |
 | ~~テーブル名の単数・複数の統一~~ | 2026-09-27 に解消。複数形に揃えた（[data-model.md](data-model.md) の冒頭の規約） |
 | 本家の振る舞いで未検証のもの（購読の既定、ゴミ箱へ入れる水準、子で変えた後の親の変更など。2026-09-27 に公式の文書で確かめられなかったもの） | 各 Epic の Story で本家を観察して揃える |
+
+### 決定（2026-09-28、推奨案で確定）
+
+利用者の指示（判断が要るところは推奨案で決める）により、次のとおり決めた。法務の判断が要るもの（[intent.md](../intent.md) の L1〜L5）と、それに依存するものは決めていない。計測・PoC で決めるものは、上の「持ち越し」のまま残した。
+
+- **デスクトップは S1 で WASM の SQLite**：ADR-0032 を承認済みとする。実装を 1 つにし、ネイティブの SQLite は S2 の前に計測で決める（[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。
+- **無効化したメンバーのページの移し替え**：E10（Enterprise）で、所有者が別のメンバーへ移せるようにする。本家に揃え、退職者の記録を組織に残すため。所有者は中身を読まず、無効化から 30 日以内に限り、監査ログに残す。アカウントの削除では移さない決定は変えず、その扱いと保持は法務の確認待ち（L1・L2）のまま（[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)、[permissions-and-sharing.md](permissions-and-sharing.md) の 2.2・11 節、[security.md](security.md) の 7・11 節）。
+- **公開 API のトークンの `{id}` に `workspace_id` を埋め込む**：`global` に索引を持たずにシャードへ振り分けられるため（[api-and-integrations.md](api-and-integrations.md) の 3.1・11 節）。
+- **リンクの閲覧者への編集・コメントの許可は S1 に入れない**：公開の経路を閲覧だけに絞り、濫用と権限の面を小さくするため。本家との差異として記録した（[permissions-and-sharing.md](permissions-and-sharing.md) の 7・11 節）。
+- **ブロックをまたぐ部分的な選択は S1 に入れない**：ブロックごとの ProseMirror（ADR-0007）の上では作る費用が大きいため。本家との差異として記録した（[editor.md](editor.md) の 3.1・17 節）。
+- **制限付きメンバーのロール**：MVP の後、E10 で `restricted_member` を足す。本家の Enterprise の運用に揃えるため（[permissions-and-sharing.md](permissions-and-sharing.md) の 2.2 節、[ADR-0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) の注記、[roadmap.md](../roadmap.md) の E10）。
+- **データソースのスキーマの上限（API）**：50KB を推奨の上限として文書に書き、1.5MB を超える更新だけを拒む。本家の API の文書の推奨に合わせ、画面と API で拒む基準を 1 つにするため（[databases.md](databases.md) の 11 節、[api-and-integrations.md](api-and-integrations.md) の 11 節）。
+- **OpenSearch の単価**：概算（月 4,500 USD）は据え置き、E8 の `load-test-k6` で確かめる。台数と同じ試験で決めるのが確実なため（[infrastructure.md](infrastructure.md) の 13 節、[roadmap.md](../roadmap.md) の E8）。
+- **本家の実装を核に使っていないことを確かめた**（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）：ブロックの層・CRDT（Fugue＋Peritext）・権限の判定・データベースの問い合わせ・数式の評価器・シャードのルーターは自前で作る。ProseMirror・SQLite（WASM）・Electron・OpenSearch・Aurora は本家と関係のない第三者の部品である。公開 API は本家の形に寄せるが、プロトコルの互換であり、本家の SDK や MCP サーバーの実装は使わない。直すところはなかった。

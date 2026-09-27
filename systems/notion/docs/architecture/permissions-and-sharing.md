@@ -10,6 +10,7 @@
 | [0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバーを分け、ゲスト・連携もメンバーの行にし、チームスペースを最上位の暗黙の ACL にする |
 | [0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱は 30 日、完全に削除した後も 30 日戻せ、ページの履歴はプランの日数で消す。バックアップの期限を削除の最終的な期限にする |
 | [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付の版に寄せ、連携は明示的に共有されたページだけを読む |
+| [0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） |
 
 この文書の決定表は設計の草案である。ID（`DT-...`）は、E2 の各変更の `spec.md` に移すときに振る。
 
@@ -62,6 +63,8 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | メンバー | 組織の人。読み・編集・コメント | `member` |
 | ゲスト | 外部の協力者。ページ単位の招待だけ。ワークスペース全体への権限を持てず、メンバーや連携を追加できず、グループに入れない | `guest` |
 
+- 本家には「制限付きメンバー」のロールもある。チームスペースを作れず、同じチームスペース・ページの人にだけ共有できる。本システムは MVP の後、E10 で `restricted_member` として足す（2026-09-28 の決定。[ADR-0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) の注記）。細部は E10 の Story で本家を観察して揃える。
+
 ワークスペースの操作（「○」は許可、「—」は 403）：
 
 | 操作 | owner | membership_admin | member | guest | bot |
@@ -74,8 +77,9 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | グループを作る・編集する（Business 以上） | ○ | ○ | — | — | — |
 | 内部の連携を作る | ○ | — | — | — | — |
 | ワークスペースを削除する | ○ | — | — | — | — |
+| 無効化したメンバーのプライベートのページを移す（Enterprise。E10） | ○ | — | — | — | — |
 
-- **所有者も、ページの権限を迂回しない。** 他のメンバーのプライベートのページやゴミ箱のページは、所有者でも読めない。本家とは違う。本家は、所有者がプライベートのページを含むデータにアクセスしうると明記し、Enterprise では離脱から 30 日以内の利用者のプライベートのページを、所有者が別の利用者へ移せる（[Data your workspace owner can access](https://www.notion.com/help/data-accessible-by-your-workspace-owner)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。本システムは、通常の画面では所有者にも読ませない（差異。2026-09-26 の決定）。離脱した人のページを移す機能は E10 で検討する。Enterprise の管理者向けの内容の検索は、監査ログに残す別の経路として E10 で扱う。
+- **所有者も、ページの権限を迂回しない。** 他のメンバーのプライベートのページやゴミ箱のページは、所有者でも読めない。本家とは違う。本家は、所有者がプライベートのページを含むデータにアクセスしうると明記し、Enterprise では離脱から 30 日以内の利用者のプライベートのページを、所有者が別の利用者へ移せる（[Data your workspace owner can access](https://www.notion.com/help/data-accessible-by-your-workspace-owner)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。本システムは、通常の画面では所有者にも読ませない（差異。2026-09-26 の決定）。無効化したメンバーのプライベートのページは、E10（Enterprise）で、所有者が中身を読まずに別のメンバーへ移せるようにする。無効化から 30 日以内に限り、監査ログに残す（[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)。2026-09-28 の決定）。Enterprise の管理者向けの内容の検索は、監査ログに残す別の経路として E10 で扱う。
 - 最後の所有者は、降格・無効化できない（409）。
 
 ### 2.3 ゲストの上限
@@ -455,6 +459,14 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 | ログインしていない閲覧者を公開サイトのオリジンへ送るか | 送る（7 節、ADR-0020） |
 | `public` の水準 | S1 は `can_view` だけ |
 | 閲覧だけの人にコメントを見せるか | 見せる（4.2 節。本家と同じ）。公開サイトではコメントを描画しない（8 節） |
+
+2026-09-28 に、推奨案で次のとおり決めた（[README.md](README.md) の「決定（2026-09-28、推奨案で確定）」）。
+
+| 問い | 決定 |
+| --- | --- |
+| 無効化したメンバーのプライベートのページを移せるか | E10（Enterprise）で移せるようにする。所有者は中身を読まない。無効化から 30 日以内。監査ログに残す（2.2 節、[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)） |
+| 「制限付きメンバー」のロール | MVP の後、E10 で `restricted_member` を足す（2.2 節） |
+| リンクの閲覧者に編集・コメントを許すか | S1 では許さない。本家との差異として記録する（7 節） |
 
 持ち越し：
 

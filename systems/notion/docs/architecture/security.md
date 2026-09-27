@@ -13,6 +13,7 @@
 | [ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md) | 検索は権限キーと読み直しの二重 |
 | [ADR-0024](../decisions/0024-integration-access-model.md)・[ADR-0025](../decisions/0025-webhook-delivery.md) | 連携は明示的に共有されたページだけ。Webhook は中身を含めず、隔離した egress から送る |
 | [ADR-0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱・履歴・削除の保持 |
+| [ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで移す（E10） |
 | Slack の ADR-0016・0017・0018 | 隔離した外向きの取得、暗号化と鍵管理、監査ログ。Notion でも同じにする |
 
 ## 1. 目標と前提
@@ -175,7 +176,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | --- | --- |
 | ページ | 共有の変更（追加・水準の変更・制限・継承に戻す）、一般アクセスの変更、公開・取り下げ・検索エンジンへの掲載の変更、チームスペースをまたぐ移動、完全な削除、エクスポート |
 | チームスペース | 作成、種類の変更、参加・退出、ロールの変更、アーカイブ |
-| ワークスペース | 設定・セキュリティの方針の変更、メンバーの招待・ロールの変更・無効化、ゲストの追加と申請の承認、グループの変更 |
+| ワークスペース | 設定・セキュリティの方針の変更、メンバーの招待・ロールの変更・無効化、ゲストの追加と申請の承認、グループの変更、無効化したメンバーのプライベートのページの移し替え（E10。ADR-0033） |
 | 連携 | 作成、インストール、ページへの共有・取り消し、トークンの発行・取り消し |
 | アカウント | ログインの成功・失敗、MFA の変更、セッションの取り消し |
 | 運用者 | サポートのためのアクセス、濫用による公開の停止、ワークスペースの停止 |
@@ -203,7 +204,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 
 - 本家の保持の値：ゴミ箱の 30 日、完全に削除した後の 30 日、履歴のプランごとの日数（[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、[Pricing](https://www.notion.com/pricing)）。
 - **ワークスペースの削除**：所有者が再認証して依頼し、30 日の猶予の後に `workspace_id` 単位で消す（Slack の ADR-0019 と同じ）。本家は、ワークスペースの削除をすぐ確定させ、利用者向けの猶予を持たない。サポートが過去 30 日のバックアップから戻せる（[Delete a workspace](https://www.notion.com/help/delete-a-workspace)、[Workspace settings](https://www.notion.com/help/workspace-settings)、2026-09-27 に確認）。30 日の猶予は、本家より手厚い本システムの決定である。
-- **アカウントの削除**：アカウントの個人情報を消し、各ワークスペースのメンバーを「削除されたユーザー」として匿名化する。共有したページはワークスペースのデータとして残る。プライベートの領域のページ（本人しか読めないもの）は、ゴミ箱に入れて通常の削除の段階に流す。所有者に引き継ぐ経路は持たない（所有者もページの権限を迂回しないため。11 節）。
+- **アカウントの削除**：アカウントの個人情報を消し、各ワークスペースのメンバーを「削除されたユーザー」として匿名化する。共有したページはワークスペースのデータとして残る。プライベートの領域のページ（本人しか読めないもの）は、ゴミ箱に入れて通常の削除の段階に流す。アカウントの削除では、所有者に引き継ぐ経路は持たない（11 節）。この扱いと保持の期間は法務の確認待ち（[intent.md](../intent.md) の L1・L2）。メンバーの無効化では、E10 で、所有者が中身を読まずに別のメンバーへ移せる（[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)）。
 - **削除の完了**：ページはゴミ箱から最長 30＋30＋35＝95 日で、バックアップを含めて消える。
 - 表 `deletion_jobs`：主キー `(workspace_id, id)`。列は `kind`（`page_purge`：物理削除 / `workspace_delete`：ワークスペースの削除 / `history_expire`：履歴の期限切れ）、`target_id`、`state`（`scheduled` / `running` / `done` / `failed`）、`scheduled_at`、`attempts`、`last_error`、`completed_at`。索引は `(workspace_id, state, scheduled_at)`。
 - 手順は runbook の `data-deletion`（E8）に書く。
@@ -252,7 +253,7 @@ Slack の security.md の 10 節（SAST、シークレットスキャン、依�
 
 | 問い | 決定 |
 | --- | --- |
-| アカウントの削除で、プライベートの領域のページをどうするか | ゴミ箱に入れて通常の削除の段階に流す。所有者への引き継ぎは持たない（7 節）。本家は、自分だけのワークスペースを消し、共有のワークスペースから外す。外れた後は本人もプライベートのページに入れず、Enterprise の所有者は 30 日以内なら別の利用者へ移せる（[Delete your account](https://www.notion.com/help/delete-your-account)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。引き継ぎを持たない点は本家との差異。契約・個人情報の扱いに関わる点は法務の確認待ち |
+| アカウントの削除で、プライベートの領域のページをどうするか | ゴミ箱に入れて通常の削除の段階に流す。所有者への引き継ぎは持たない（7 節）。本家は、自分だけのワークスペースを消し、共有のワークスペースから外す。外れた後は本人もプライベートのページに入れず、Enterprise の所有者は 30 日以内なら別の利用者へ移せる（[Delete your account](https://www.notion.com/help/delete-your-account)、[Transfer content from a deprovisioned user](https://www.notion.com/help/transfer-content-deprovisioned-user)、2026-09-27 に確認）。アカウントの削除で引き継ぎを持たない点は本家との差異。契約・個人情報の扱いに関わる点は法務の確認待ち（L2）。メンバーの無効化で移す機能は、2026-09-28 に E10 で持つと決めた（[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)） |
 | 完全に削除したページを 30 日戻す経路 | 運用者への依頼だけ（所有者の画面は作らない。ADR-0022）。手順は runbook の `data-deletion`（E8） |
 | 監査ログのアーカイブの保持期間 | 2 年（6 節） |
 | デスクトップアプリのローカルの保存の暗号化 | S1 は Web と同じ実装で、独自の暗号化はしない。ネイティブの SQLite に移すとき（S2 の候補。[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）に OS の資格情報の保管庫の鍵で暗号化する |

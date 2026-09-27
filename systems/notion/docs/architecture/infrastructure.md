@@ -208,7 +208,7 @@ S3（利用者 1 億、同時接続 1,000 万）では、東京だけでなく�
 | 項目 | 月額（USD、概算） |
 | --- | --- |
 | Aurora（r8g.4xlarge × 3、ストレージ約 2 TB、I/O-Optimized、Global Database の複製） | 6,000 |
-| OpenSearch（Multi-AZ with Standby、データノード 6、専用マスター 3、EBS 約 4 TB。[search.md](search.md) の 9.1 節。単価は未検証） | 4,500 |
+| OpenSearch（Multi-AZ with Standby、データノード 6、専用マスター 3、EBS 約 4 TB。[search.md](search.md) の 9.1 節。単価は E8 の `load-test-k6` で確かめる） | 4,500 |
 | ECS Fargate | 1,200 |
 | ElastiCache | 600 |
 | CloudFront、ALB、データ転送 | 1,000 |

@@ -101,7 +101,7 @@ search_cluster_map (logical_shard, search_cluster)                       -- S2 �
 
 | テーブル | 要点 | 正 |
 | --- | --- | --- |
-| `members` | `account_id`（連携は NULL）、`kind`（`human` / `bot`）、`role`（`owner` / `membership_admin` / `member` / `guest`）、表示名、無効化日時、個人のページの並び | [permissions-and-sharing.md](permissions-and-sharing.md) の 2・10 節、[ADR-0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) |
+| `members` | `account_id`（連携は NULL）、`kind`（`human` / `bot`）、`role`（`owner` / `membership_admin` / `member` / `guest`。E10 で `restricted_member` を足す）、表示名、無効化日時、個人のページの並び | [permissions-and-sharing.md](permissions-and-sharing.md) の 2・10 節、[ADR-0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) |
 | `groups`、`group_members` | グループ（メンバーだけ） | 同上の 2.4 節 |
 | `teamspaces`、`teamspace_members` | 種類、`member_access_level`、`workspace_access_level`、最上位のページの並び。メンバーのロール（`owner` / `member`） | 同上の 3 節 |
 | `page_acls`、`page_acl_entries` | ACL を持つページとその項目（`principal`、`level`、`expires_at`） | 同上の 4.3 節、[ADR-0018](../decisions/0018-permission-levels-and-inheritance.md) |
