@@ -370,7 +370,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行う。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
 
 - **RED**：mediasoup に RED の転送と剥がしを足す（ADR-0017）。上流に取り込まれなければフォークで持つ。ブラウザは distance 1 で送るので、Media Node は受け手ごとに残すか剥がすかだけを決める（2026-09-27 に libwebrtc の実装で確かめて直した）。
 - **カメラの既定**：VP8 の simulcast 3 本。SVC は全員 Chromium の会議だけ（ADR-0018）。
@@ -379,6 +379,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 - **層を上げる規則**：1.2 倍を 3 秒、上げた後 10 秒待つ（ADR-0019）。
 - **画面共有**：最大 1920×1080、`detail` は 5 fps、`motion` は 15 fps（ADR-0020）。
 - **E2EE の会議の RED**：確かめるまで使わない（4.3 節）。
+- **1:1 の会議の解像度**：MVP では 720p までにする。1080p は帯域の費用（intent.md の K8）が重いので、MVP の後に回す（[roadmap.md](../roadmap.md) の延期の一覧）。
 
 ### 持ち越し
 
@@ -389,13 +390,12 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | 損失 20% での GCC の損失に基づく制御の実際の振る舞い | E4 の `loss-20-audio` で、推定の時系列を記録する |
 | VP9 の SVC と simulcast の上りの差（ADR-0002 の「3〜4 割」） | E4 の `svc-vp9-mode` で計測する |
 | AV1 を既定にする時期 | mediasoup の #1625 の解決と、Firefox の SVC の復号の対応を待つ。S2 の前に判断する |
-| 1:1 の会議で 720p を超える解像度（1080p）を許すか | PM に確認する。帯域の費用（intent.md の K8）と合わせて決める |
 
 ## 14. quality.md・runbooks・data-model への項目
 
 ### quality.md
 
-- 11.1 節の試験の条件と合格の目安。`loss-20-burst` の閾値を決める。
+- 11.1 節の試験の条件と合格の目安。`loss-20-burst` の閾値は ViSQOL の MOS 2.6 以上（QA が承認した値）。
 - 11.2 節の指標の定義（MOS の推定の道具、フリーズの定義、追従の時間の測り方）と、PR に載せる形。
 - ブラウザの組み合わせ（送り手 × 受け手）の試験の範囲と、Beta の版の夜間の試験。
 - RED の剥がしの試験のベクトル（11.3 節）。

@@ -221,7 +221,7 @@ POST /v1/sign-external-assertion
 | `purpose` | 使う接続 | Signer が決めるもの（接続の登録の値から） | 有効期間 | Epic |
 | --- | --- | --- | --- | --- |
 | `apple_client_secret` | Apple | `alg` ES256、`kid`（Apple の Key ID）、`iss`（Team ID）、`sub`（Services ID）、`aud`（`https://appleid.apple.com`） | 1 時間（Apple の上限は 6 か月。短くする） | E6 |
-| `oidc_client_assertion` | エンタープライズの OIDC・Entra ID（`private_key_jwt`） | `iss`・`sub`（IdP での `client_id`）、`aud`（登録した IdP のトークンのエンドポイント）、`jti`（Signer が作る）、`alg` | 300 秒 | E14 |
+| `oidc_client_assertion` | エンタープライズの OIDC・Entra ID（`private_key_jwt`） | `iss`・`sub`（IdP での `client_id`）、`aud`（登録した IdP の `issuer`。`draft-ietf-oauth-rfc7523bis` に合わせ、トークンのエンドポイントの URL は使わない。[authentication-flows.md](authentication-flows.md) の 14 節）、`jti`（Signer が作る）、`alg` | 300 秒 | E14 |
 | `saml_authn_request` | SAML（SP として） | `Issuer`（SP の Entity ID）、`Destination`（登録した IdP の SSO の URL）、`IssueInstant`、署名のアルゴリズム（RSA-SHA256）。AuthnRequest を Signer が組み立てて署名する | —（`IssueInstant` から IdP が判断） | E14 |
 
 - 鍵は接続ごとに `external_idp_keys` に置く。テナントの署名鍵（`signing_keys`）は使わない。鍵の取り込み・生成は 6.2 節の `external-keys:*`（Management API からだけ）。
@@ -264,7 +264,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 ```
 
 - 並びは `current`、`next`、`previous`（新しい順）。最大 4 つ。
-- `x5c`（証明書の鎖）は載せない（14 節の持ち越し）。
+- `x5c`（証明書の鎖）は載せない（13 節の決定）。
 - `Cache-Control: public, max-age=300, s-maxage=60, stale-while-revalidate=60, stale-if-error=86400`。
   - RP のキャッシュは 5 分。CloudFront は 1 分。
   - オリジン（東京と大阪の S3 の両方）が失敗しても、CloudFront は 24 時間まで古い版を返す（[ADR-0005](../decisions/0005-authentication-path-availability.md) の「古い版を返し続ける」の期間）。
@@ -375,15 +375,20 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 - **ローテーションの API のレート制限**：テナントごとにバースト 5・1 日 5 回（本家と同じ）、緊急は別に 1 時間 3 回。
 - **古い `current` で署名しうる時間**：2 秒。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **JWKS の `x5c`**：載せない。OIDC・JWT の検証は `x5c` なしで足りる。証明書が要る相手（SAML の IdP の機能。MVP の後）には、その機能の中で証明書を別に出す。
+- **外向きの `oidc_client_assertion` の `aud`**：IdP の `issuer` にする（6.3 節。[authentication-flows.md](authentication-flows.md) の 14 節と同じ規則）。
+- **耐量子の署名（ML-DSA など）**：S1 では持たない。JOSE の標準化の状況を見て、S2 以降に新しい ADR で扱う。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| JWKS に `x5c`（自己署名の証明書）を載せるか。本家は署名の証明書（PEM）をダッシュボードから取れる。古いライブラリや SAML の相手が求める | E3 で、主要なライブラリの要否を確かめて決める。SAML の IdP の機能（MVP の後）では要る |
+| 主要な IdP（Entra ID など）が、`issuer` を `aud` にした `private_key_jwt` を受けるか（未検証） | E14 の着手時に確かめる |
 | RSA を 3072 ビットにするか | 署名の CPU（[ADR-0063](../decisions/0063-cpu-bound-work-sizing.md)）と、NIST の移行の時期を見て E12 で決める |
 | 主要な RP のライブラリの JWKS のキャッシュの振る舞い（未知の `kid` での取り直し、`max-age` の扱い） | E3 で、`jose`、`jwks-rsa`、Spring Security などを確かめる（未検証） |
 | pepper を HSM などの専用の隔離へ移すか | S3 の前（[architecture/README.md](README.md) の 6 節） |
-| 耐量子の署名（ML-DSA など）への移行 | JOSE の標準化の状況を見て、S2 以降に検討する |
 
 ## 14. quality.md・runbooks・data-model への項目
 

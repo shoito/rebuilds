@@ -69,7 +69,7 @@
 | NFR-005 | 参加・予定の API の可用性 | 月間 99.95% | 本家の Meetings の SLA は月間 99.9%（再販事業者の配布した [Zoom Availability SLA の写し](https://www.mitel.com/sites/default/files/2025-08/Zoom%20Availability%20SLA_TMP%20%2812Aug25%29%20FINAL%20v1.pdf)、2026-09-27 に確認。一次の文書は未確認） |
 | NFR-006 | 1 会議の参加者 | S1 100 人、S2 300 人、S3 1,000 人。全員が音声・映像・画面共有を使える。映像を同時に受けて表示するのは 1 人あたり最大 25 本 | 本家は 100 人から、追加の契約で 500・1,000 人（[Large Meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065116)、2026-09-27 に確認）。E2EE の会議は S1 で 100 人（[ADR-0030](../decisions/0030-security-code-and-e2ee-feature-limits.md)） |
 | NFR-007 | リージョンの同時の参加者 | S1 3 万人、S2 30 万人（東京・大阪の合計）、S3 200 万人 | 2 節 |
-| NFR-008 | E2EE の保証 | E2EE の会議では、サーバーはメディアとチャットの鍵を持たない。参加者の退出から 2 秒以内に鍵を更新し、以後のメディアは退出した人に復号できない。参加者は、全員で同じ「会議のセキュリティのコード」を確かめられる | 「退出」は、Meeting Actor が `Left`（切断の猶予 60 秒の後の `Left(dropped)` を含む）か `Removed` を確定した時とする（**PM の確認の項目**）。MLS（RFC 9420）の前方秘匿性と侵害後の安全性に頼る（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)、[ADR-0029](../decisions/0029-mls-delivery-and-authentication-service.md)） |
+| NFR-008 | E2EE の保証 | E2EE の会議では、サーバーはメディアとチャットの鍵を持たない。参加者の退出から 2 秒以内に鍵を更新し、以後のメディアは退出した人に復号できない。参加者は、全員で同じ「会議のセキュリティのコード」を確かめられる | 「退出」は、Meeting Actor が `Left`（切断の猶予 60 秒の後の `Left(dropped)` を含む）か `Removed` を確定した時とする（2026-09-27 に確定）。MLS（RFC 9420）の前方秘匿性と侵害後の安全性に頼る（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)、[ADR-0029](../decisions/0029-mls-delivery-and-authentication-service.md)） |
 | NFR-009 | 帯域の適応 | 下りの帯域が半分に下がったら、5 秒以内に映像の層を落として収まり、映像の停止（1 秒以上）を起こさない。下り 150 kbps まで下がっても、音声は続く | GCC（送信側の推定）、Media Node での層の選択（[ADR-0019](../decisions/0019-bandwidth-estimation-and-layer-allocation.md)） |
 | NFR-010 | 字幕と録画 | 日本語の字幕を、発話から p95 2 秒以内に表示する。録画は、会議の終了から録画の長さの半分以内に見られるようになり、成功を知らせた録画は失わない | 字幕の正確さは [intent.md](../intent.md) の K7 |
 
@@ -163,8 +163,8 @@
 
 品質の面のリスクの順位と対策は [quality.md](../quality.md) の 1 節にある。ここは設計の面のリスクを書く。
 
-- **転送の費用**：会議の費用の約 8 割は、SFU からインターネットへの転送である。S1 のピークの送出は、容量の前提で約 75 Gbps、期待の平均で約 45 Gbps。AWS の表の料金の K8（参加者・分あたりのメディアの配信の費用）は、下り 1.5 Mbps で約 0.18 円、2.5 Mbps で約 0.28 円である（[infrastructure.md](infrastructure.md) の 12 節）。**S1 を AWS で容量の前提（2.5 Mbps）のまま動かすと、S1 の目標（0.20 円）に届かない。** 届くかは、下りの実測と Edge の判断に掛かる。目標の値は残し、PM と Ops の確認の項目にする。AWS と Edge の損益の分かれ目はピークの送出で約 8〜10 Gbps で、S1 の途中で越えうる。S1 は AWS で始め、4 週続けて 10 Gbps を超えたら Edge の構築を始める（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。Edge の費用の仮定の多くは**未検証**（E12 の `edge-evaluation` で確かめる）。
-- **Edge の運用の体制**：Edge には、24 時間の当番、自社の AS と BGP の運用、機器と回線の障害の対応、transit の事業者との DDoS の緩和の契約が要る（[infrastructure.md](infrastructure.md) の 12.3 節の「運用の人」3 人）。今の体制にはなく、採用か委託で用意するには、構築の 2 四半期より長くかかりうる。そこで、Edge の構築の閾値（4 週続けて 10 Gbps）の手前に判断の点を置く。ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops が体制を持つかを決める。持たないと決めたら、閾値を超えても Edge を作らず、AWS との料金の合意か国内のベアメタルのクラウドを選ぶ。その場合、S1 の K8 の目標は見直しが要る（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) の注記、[infrastructure.md](infrastructure.md) の 11 節）。
+- **転送の費用**：会議の費用の約 8 割は、SFU からインターネットへの転送である。S1 のピークの送出は、容量の前提で約 75 Gbps、期待の平均で約 45 Gbps。AWS の表の料金の K8（参加者・分あたりのメディアの配信の費用）は、下り 1.5 Mbps で約 0.18 円、2.5 Mbps で約 0.28 円である（[infrastructure.md](infrastructure.md) の 12 節）。**S1 を AWS で容量の前提（2.5 Mbps）のまま動かすと、S1 の目標（0.20 円）に届かない。** 目標の値は残す。AWS の 2.5 Mbps で届かないことは受け入れ、閾値で Edge の構築を始める道を採る（2026-09-27 に確定）。AWS と Edge の損益の分かれ目はピークの送出で約 8〜10 Gbps で、S1 の途中で越えうる。S1 は AWS で始め、4 週続けて 10 Gbps を超えたら Edge の構築を始める（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。Edge の費用の仮定の多くは**未検証**（E12 の `edge-evaluation` で確かめる）。
+- **Edge の運用の体制**：Edge には、24 時間の当番、自社の AS と BGP の運用、機器と回線の障害の対応、transit の事業者との DDoS の緩和の契約が要る（[infrastructure.md](infrastructure.md) の 12.3 節の「運用の人」3 人）。今の体制にはなく、採用か委託で用意するには、構築の 2 四半期より長くかかりうる。そこで、最初はリモートハンドを持つコロケーションの事業者と、IP transit と BGP の運用を任せる事業者を使う。並行して社内にネットワークの SRE の 24 時間の当番を作り、Edge の構築の閾値（4 週続けて 10 Gbps）の前に 2 人を採用する。閾値の手前に判断の点を置き、ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops がこの形で進めるかを決める。進めないと決めたら、閾値を超えても Edge を作らず、AWS との料金の合意か国内のベアメタルのクラウドを選ぶ。その場合、S1 の K8 の目標は見直しが要る（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) の注記、[infrastructure.md](infrastructure.md) の 11 節）。
 - **下りの平均の見込み**：1.5 Mbps は楽観の可能性がある。容量は 2.5 Mbps で見積もり、E2 のベータで測って置き換える（2 節）。
 - **EC2 のネットワークの上限**：PPS の上限は公表されていない。インターネットゲートウェイを通る通信は、32 vCPU 未満のインスタンスで 5 Gbps、それ以上でインスタンスの帯域の 50% に制限される。1 本のフロー（5 タプル）は、クラスタのプレイスメントグループの外では 5 Gbps に制限される（[EC2 のネットワークの帯域](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)、2026-09-27 に確認）。1 台の上限は E7 の負荷試験で決める（[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)）。
 - **セキュリティグループの接続の追跡**：UDP のフローも追跡され、インスタンスごとの上限を超えるとパケットが捨てられる。送信元と宛先を全開（0.0.0.0/0）にした規則は追跡されない（[接続の追跡](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-connection-tracking.html)、2026-09-27 に確認）。Media Node のメディアのポートは追跡しない規則にし、防御は SFU の側の検査（ICE の認証、DTLS）で行う。NLB は通さない（[ADR-0016](../decisions/0016-media-edge-addressing-and-security-groups.md)）。
@@ -193,7 +193,7 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
 - **容量の前提**：下り 2.5 Mbps で容量を見積もり、1.5 Mbps は期待の平均として残す。E2 のベータで測る。2 節、[capacity.md](capacity.md)、[infrastructure.md](infrastructure.md) の 12 節（費用は両方を並べた）を直し、ADR-0053 に注記した。
 - **NFR**：
   - NFR-001 は電話からの参加者を対象の外にした。電話の参加者の目標は [quality.md](../quality.md) に別に置く（p95 400ms、E14 で確かめる）。
-  - NFR-008 の「退出」は、Actor が `Left`（切断の猶予の後の `Left(dropped)` を含む）か `Removed` を確定した時とした。**PM の確認の項目**。
+  - NFR-008 の「退出」は、Actor が `Left`（切断の猶予の後の `Left(dropped)` を含む）か `Removed` を確定した時とした（下の「決定（2026-09-27、推奨案で確定）」で確定）。
 - **`ip_prefix_hash` の pepper**：30 日ごとに替えるが、前の pepper を 30 日残して両方で照合する。`meeting_removals` に pepper の版を持つ（[meeting-security.md](meeting-security.md) の 10 節、ADR-0032 の注記）。
 - **IPv6 と DDoS**：防御のモード（`under_attack`）の Node は IPv6 の候補を出さない（[network-traversal.md](network-traversal.md) の 9 節、[security.md](security.md) の 8.3 節、ADR-0045 の注記）。
 - **シグナリングの版**：Web は N−1、アプリは N−2 まで受け、`min_client_version` より古いものは強制の更新（ADR-0008・0056 の注記、[delivery.md](delivery.md) の 5.3 節）。
@@ -218,11 +218,11 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
 - **TURN の TLS の証明書**：ACM の書き出せる公開の証明書を使う。ワイルドカードの制約から名前を `<region>-<az>-<nn>.turn.<brand>.<domain>` に改めた（[security.md](security.md) の 5 節、[network-traversal.md](network-traversal.md)）。
 - **Shield Advanced の EIP の保護**：事象の報告は保護から 15 分以上たってから。攻撃のときに加える決定は保ち、最初の 15 分以上は Shield Standard と防御のモードで耐える（ADR-0045 の注記）。
 - **SLO の窓**：28 日から 30 日に改めた（他の題材と同じ。[runbooks/README.md](../runbooks/README.md) の 1 節、ADR-0052 の注記）。
-- **公開 API**：E11 を MVP に残し、intent.md の MVP に足した（PM の確認の項目）。
-- **K8**：S1 を AWS で容量の前提のまま動かすと届かないこと、達成が Edge の判断に掛かることを明記した。目標の値は残し、PM と Ops の確認の項目にした（ADR-0053 の注記）。
-- **Edge の運用の体制**：リスクに足し、Edge の閾値の手前に判断の点（2 週続けて 5 Gbps）を置いた（ADR-0050 の注記）。
+- **公開 API**：E11 を MVP に残し、intent.md の MVP に足した（下の「決定」で確定）。
+- **K8**：S1 を AWS で容量の前提のまま動かすと届かないこと、達成が Edge の判断に掛かることを明記した。目標の値は残した（ADR-0053 の注記。下の「決定」で確定）。
+- **Edge の運用の体制**：リスクに足し、Edge の閾値の手前に判断の点（2 週続けて 5 Gbps）を置いた（ADR-0050 の注記。体制の形は下の「決定」で確定）。
 
-持ち越し（計測・PoC・他者の確認で決めるもの）：
+持ち越し（計測・PoC・法務で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
@@ -238,12 +238,38 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
 | CloudFront の WebSocket の長い接続 | E2 の `signaling-via-cloudfront` |
 | Safari の VP9・AV1・DD・VP8 の simulcast、Firefox・Safari の RED | E2 の `browser-capability-probe` |
 | mediasoup で音声の分を下りの推定から残す方法 | E4 の `downlink-allocation` |
-| NFR-008 の「退出」の定義 | PM の確認 |
-| 公開 API と Webhook（E11）を MVP に含めるか | PM の確認（intent.md の MVP に入れた） |
-| SLO（30 日の窓）の値 | PM と Ops の承認 |
-| K8 の目標の値（S1 は AWS の 2.5 Mbps では届かない） | PM と Ops の確認。E2 のベータの実測と、Edge の運用の体制の判断の後 |
-| Edge の運用の体制（24 時間の当番、自社の AS と BGP）を持つか | PM と Ops。ピークの送出が 2 週続けて 5 Gbps を超えたとき（Edge の閾値の手前） |
 | 法務の確認（L1〜L8） | [intent.md](../intent.md) の表の「承認を止める spec」の前 |
+
+### 決定（2026-09-27、推奨案で確定）
+
+利用者の指示（「判断が要るところは推奨案でよい」）により、残っていた法務以外の判断を推奨案で確定した。法務の確認（L1〜L8）と、その結論に掛かるものは決めていない。計測や PoC が要るものは、上の持ち越しの表に残した。
+
+| 項目 | 決定 | 理由 | 文書 |
+| --- | --- | --- | --- |
+| 公開 API と Webhook（E11） | MVP に含める | 基盤の Epic の草案が公開 API を MVP に入れていた | [intent.md](../intent.md)、[roadmap.md](../roadmap.md) |
+| NFR-008 の「退出」 | Actor が `Left`（`Left(dropped)` を含む）か `Removed` を確定した時 | 鍵の更新の起点を、状態の正本の 1 か所に置ける | 3 節、[e2ee.md](e2ee.md)、[ADR-0029](../decisions/0029-mls-delivery-and-authentication-service.md) |
+| K8 の目標 | S1 0.20 円、S2 0.07 円を保つ。S1 を AWS の下り 2.5 Mbps で動かすと届かないことは受け入れる。閾値（4 週続けて 10 Gbps）で Edge の構築を始める | 目標を下げると、費用の大半を決める Edge の判断の基準が消える | [capacity.md](capacity.md) の 6 節、[infrastructure.md](infrastructure.md) の 12 節、[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md) |
+| Edge の運用の体制 | 最初はリモートハンドを持つコロケーションの事業者と、IP transit・BGP の運用を任せる事業者を使う。社内にネットワークの SRE の当番を作り、閾値の前に 2 人を採用する。5 Gbps の判断の点で、この形で進めるかを決める | 採用には時間がかかる。委託で始めれば閾値に間に合い、社内の当番へ移せる | 6 節、[infrastructure.md](infrastructure.md) の 11 節、[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) |
+| SLO（30 日の窓）の値 | [runbooks/README.md](../runbooks/README.md) の 1 節の値で確定 | K2〜K4 と NFR に直接つながり、他の題材と窓が揃う | [ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md)、[observability.md](observability.md) |
+| 災害復旧の目標 | RTO 1 時間、RPO 1 分 | 大阪で新しい会議を受ける形で、訓練で確かめられる | [ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md) |
+| RED | distance 1 | ブラウザは冗長を 1 つしか送らない | [ADR-0017](../decisions/0017-opus-dtx-fec-red.md) |
+| E2EE の外部の送り手の鍵 | KMS へ移す（鍵は 6 つ） | KMS が Ed25519 に対応し、e2ee.md の移す条件を満たした | [ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md) |
+| TURN の名前 | `<region>-<az>-<nn>.turn.<brand>.<domain>` | ACM のワイルドカードの証明書は、いちばん左のラベル全体にしか使えない | [network-traversal.md](network-traversal.md)、[security.md](security.md) の 5 節 |
+| Firehose の上限 | 書き込みをまとめ、上限の引き上げを申請する | 東京の既定（1 MiB/秒）では S1 のピークに足りない | [capacity.md](capacity.md) の 5.4 節 |
+| 組織の表の分離 | FORCE RLS（ADR-0058） | 他の題材と同じ。API の認可の漏れを DB で止める | [ADR-0058](../decisions/0058-tenant-tables-with-force-rls.md)、[data-model.md](data-model.md) |
+| QA の閾値 | 電話の参加者の遅れ p95 400ms、仮想背景の IoU 0.90、画面共有の OCR 95%、`loss-20-burst` の MOS 2.6 | 根拠のある既定で、実測は記録して別の変更で見直せる | [quality.md](../quality.md) |
+| 仮想背景の基準の端末 | 4 年前の中位のノート PC。E5 の着手で QA が機種を 1 台固定する | 利用者の端末の下の方で性能を守る | [clients.md](clients.md) の 14 節 |
+| 待合室を省く条件 | 身元だけ。参加の鍵を持つ人にも省かせない | 参加の URL が漏れても、荒らしを待合室で止められる | [meeting-security.md](meeting-security.md) の 13 節、[signaling-and-meetings.md](signaling-and-meetings.md) の 16 節 |
+| ユーザーの組織 | 1 人は 1 つの組織だけ。複数の組織は MVP の後 | 権限と設定の解決が単純になる | [accounts-and-admin.md](accounts-and-admin.md) の 11 節、[ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md) |
+| 契約のない組織の上限 | 同時の会議 1 つ、1 会議 100 人、1 回 60 分 | ボットで Media Node を使い切る濫用を抑える | [security.md](security.md) の 8.1 節 |
+| サポートによる組織のデータの参照 | 組織の `owner`・`admin` が、対象と期限（最長 7 日）を決めて許可し、監査に残す | 運用者は組織の許可なしに内容を見ない（ADR-0047） | [security.md](security.md) の 7 節 |
+| 組織ごとの品質の SLA | 約束しない | 品質は組織の回線にも左右される | [observability.md](observability.md) の 10 節 |
+| 電話 | 事業者は 1 社で始める。0ABJ は使わない。案内は日本語だけ | E14 の範囲を小さく保つ。0ABJ は取得の条件が重い | [telephony.md](telephony.md) の 11 節、[ADR-0041](../decisions/0041-pstn-via-carrier-sip-trunk-and-own-gateway.md)、[ADR-0042](../decisions/0042-dial-in-numbers-ivr-and-dial-out-limits.md) |
+| MVP の後に回すもの | 1:1 の 1080p、複数の画面共有、チャットの装飾、「この回以降を変える」、ダウンロードを許さない共有の HLS、E2EE の長期の鍵・送り手ごとの署名・個別のメッセージ、API の会議の中の操作、組織ごとのレート制限の引き上げ、鍵の最小・最大、複数のグループ、分けた管理のロール、デスクトップの Linux 版 | roadmap.md の延期の一覧と揃える。MVP の範囲を守る | 各領域の文書の「決定」、[roadmap.md](../roadmap.md) の延期の一覧 |
+| ネットワークの経路 | ポートの範囲は 256 のまま。WebSocket を通さないプロキシの代わりの経路は作らない | 公開の規則を単純に保つ | [network-traversal.md](network-traversal.md) の 14 節 |
+| 各領域の「決定」 | 各文書の「未解決の問い」の「決定」を、そのまま確定 | 統合と確認の工程で矛盾を直してある | 7 節の各文書 |
+
+法務の確認を待つもの（決めていない）：L1〜L8 のすべてと、それに掛かる次のもの。録画の同意の扱い（L3）、録画・字幕でサーバーが内容に触れる範囲（L2）、外部の音声認識の事業者と大阪への切り替えの間の字幕（L6）、会議の後のチャットの保持の既定（L6）、保持の期間（L2・L4・L6・L8）、報告の添付（L2）、捜査機関への対応（L4）、電話の事業の区分・番号・緊急通報・050 の品質の条件と電話の事業者の選定（L1・L7）、外部送信の公表（L5）、仮想背景のモデルのファイルの利用の条件、DPA とサブプロセッサー（L8）。
 
 ## 7. 領域の文書と ADR の番号の範囲
 

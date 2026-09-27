@@ -232,12 +232,12 @@ ErrorReport {
 - クライアントの計測は自前の受け口。外部の RUM は使わない。
 - `file_id` はメトリクスのラベルに入れない。上位のファイルの記録で見る。
 - 編集の SLO は `edit_open` と `edit_commit` の 2 つで守る。
+- NFR-004 の「タブのメモリ」は CPU の側（WASM の線形メモリ＋JS のヒープ）で 1.5 GB、GPU の側はエンジンの数えで別に 720 MB とする（QA の値を推奨案で確定。[quality.md](../quality.md) の 2.2 節、[rendering-engine.md](rendering-engine.md) の 11 節）。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| GPU のメモリをタブのメモリに数えるか（NFR-004 の定義） | QA（[rendering-engine.md](rendering-engine.md) の 19 節） |
 | クライアントの計測の利用規約への書き方 | 法務（[security.md](security.md) の 10 節） |
 | cross-origin isolation を有効にするか（`measureUserAgentSpecificMemory` のため。埋め込みやプラグインの iframe への影響） | E2 の PoC |
 | 反映のボットの組を大阪にも置くか | S2 |
@@ -246,7 +246,7 @@ ErrorReport {
 
 ### quality.md
 
-- 3.1 節のクライアントの指標（フレーム時間の p95、開く時間の p75、メモリの警告の率、異常終了の率）を、ブラウザ・OS・GPU の別に日次で見る。許容の範囲を QA が決める。
+- 3.1 節のクライアントの指標（フレーム時間の p95、開く時間の p75、メモリの警告の率、異常終了の率）を、ブラウザ・OS・GPU の別に日次で見る。許容の範囲は [quality.md](../quality.md) の 4.1 節。
 - ビルドの段階的な配信の各段の合否（前のビルドとの比較）の基準。
 
 ### runbooks

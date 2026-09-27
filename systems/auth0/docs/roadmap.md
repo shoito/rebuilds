@@ -100,7 +100,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `login-transactions` | `login_transactions` の表、`/authorize` からの作成、handle と `__Host-<brand>_tx` の結び付け、状態機械の骨格 |
 | `authorize-endpoint` | `/authorize` のパラメーターの検証、`redirect_uri` の照合、エラーの画面 |
 | `authorization-code-grant` | コードの発行・消費・再利用の検知、PKCE、`iss` の応答 |
-| `client-authentication` | 4 つの方式、秘密の 2 つまでの並行、`private_key_jwt` の `jti` |
+| `client-authentication` | 4 つの方式、秘密の 2 つまでの並行、`private_key_jwt` の `jti` と `aud`（`issuer` だけ。互換のフラグ `legacy_token_endpoint_aud`） |
 | `token-claims-and-lifetimes` | ID トークン・アクセストークンのクレーム（`amr`・`acr`・`auth_time`、`gty`）、有効期間、大きさの上限、`acr_values_supported` |
 | `client-credentials-grant` | M2M、DB に書かない経路 |
 | `userinfo-endpoint` | userinfo と Bearer のエラー |
@@ -274,7 +274,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `key-emergency-drills` | 緊急のローテーションと Signer の侵害の訓練、pepper の復旧の訓練 |
 | `break-glass-cli` | 非常用のトークンの CLI と検証、訓練の runbook（[ADR-0037](decisions/0037-break-glass-and-admin-roles.md)） |
 | `external-pentest` | 外部のペンテスト（認可サーバー、Universal Login、Management API、Signer の境界）、`security.txt` |
-| `openid-certification` | 公開の staging でのホストされた試験、認証の申請、結果の公開 |
+| `openid-certification` | OpenID Foundation の会員の手続き（E12 の前）、公開の staging でのホストされた試験、認証の申請、結果の公開 |
 | `rate-limit-overrides-and-review` | 上書きの表と運用、値の見直し、OpenAPI の壊す変更の検査 |
 | `slo-and-alert-tuning` | SLO の確定、アラートの調整、DR のダッシュボード、反映の遅れの SLI、Aurora 停止時のキャッシュの障害の注入 |
 | `disclosure-api-and-l7` | 開示の API、法務の L7 の結論の反映（法務：L7） |
@@ -334,17 +334,17 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 MVP の後に検討する。着手するときに `intent.md` から起票する（[intent.md](intent.md) の「MVP の後の Epic で扱う」と Non-goals）。E13・E14 に入れなかったもの。
 
 - **ユーザーの一括のインポート・エクスポート**（移行の Epic）：非同期のジョブ、PBKDF2 などのハッシュの取り込み、`user_id` の指定（[users-and-profiles.md](architecture/users-and-profiles.md) の 8 節）。本家の `auth0|...` の `user_id` は顧客のデータとしてそのまま受ける。
-- **SCIM 2.0 の受け入れ**：E14 の後（[users-and-profiles.md](architecture/users-and-profiles.md) の 9 節）。`Groups` は組織のロールの後。
-- **PAR・DPoP・トークン交換・mTLS**、FAPI 2.0 の適合（[ADR-0010](decisions/0010-staged-protocol-extensions.md)、[authentication-flows.md](architecture/authentication-flows.md) の 10 節）。`resource`（RFC 8707）との両立はトークン交換と一緒に。
-- **イントロスペクション（RFC 7662）**：需要を見て E5 の後に決める。
+- **SCIM 2.0 の受け入れ**：E14 の後（[users-and-profiles.md](architecture/users-and-profiles.md) の 9 節）。最初の版は `Users` だけで、`Groups` は組織のロールの後。
+- **PAR・DPoP・トークン交換・mTLS**、FAPI 2.0 の適合（[ADR-0010](decisions/0010-staged-protocol-extensions.md)、[authentication-flows.md](architecture/authentication-flows.md) の 10 節）。`resource`（RFC 8707）はトークン交換と一緒に受け、`audience` と同じ意味に扱う（[authentication-flows.md](architecture/authentication-flows.md) の 14 節）。
+- **イントロスペクション（RFC 7662）**：持たないと決めた（[authentication-flows.md](architecture/authentication-flows.md) の 14 節）。需要が出たら新しい ADR で足す。
 - **MFA の API**（`/mfa/challenge` など、埋め込み・ネイティブ向け）：[mfa-and-passkeys.md](architecture/mfa-and-passkeys.md) の 8.1 節。
 - **SMS・音声の OTP**：法務の L4 の後。SMS pumping の対策とあわせて。
 - **パスワードなしのログイン（メールのリンク・コード）**。
 - **AAL3**（アテステーションと AAGUID の許可リスト）、**リスクに応じた MFA**（S2）。
 - **第三者の CAPTCHA の持ち込み**：法務の L2 の後（[ADR-0026](decisions/0026-bot-detection-and-challenge.md)）。
 - **複数のカスタムドメイン**（S2）、**自分で管理する証明書・持ち込みの証明書**（[ADR-0038](decisions/0038-custom-domain-verification-and-certificates.md)）。
-- **テナントの限った HTML（ヘッダー・フッター）**（[ADR-0012](decisions/0012-branding-and-templates.md) の 2）、サインアップの追加の項目の型。
-- **アカウントの画面（本人の要素・メタデータの管理、My Account の API に相当）**、主の ID の付け替え、仮名の `sub`（pairwise）。
+- **テナントの限った HTML（ヘッダー・フッター）**（[ADR-0012](decisions/0012-branding-and-templates.md) の 2。入れるときは別の ADR）、サインアップの追加の項目（テキスト・選択・チェックボックス。値は `user_metadata`。[universal-login.md](architecture/universal-login.md) の 17 節）。
+- **アカウントの画面（本人の要素・メタデータの管理、My Account の API に相当）**、主の ID の付け替え。仮名の `sub`（pairwise）は持たないと決めた（需要が出たら ADR）。
 - **Actions の `api.redirect` とキャッシュ**、送信事業者を Actions で持つ形。
 - **組織に結ぶ M2M の許可、組織ごとのアプリの明示の許可**（E14 の後）。
 - **トークン交換による AI エージェントの委任、FGA、外部の API のトークンの保管**：需要を見て。

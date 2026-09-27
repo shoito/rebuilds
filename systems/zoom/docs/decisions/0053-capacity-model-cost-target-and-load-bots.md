@@ -42,11 +42,12 @@ K8：
 
 - **1 台の上限**：c8gn.16xlarge で、`consumer_limit` 24,800（62 worker × 400）、`cpu_limit` worker ごとに 70%、`egress_limit`・`pps_limit` は E7 で決める。E7 の前の仮の値は、`egress_limit` 20 Gbps、`pps_limit` は ENA の超過が出始めた値の 70%。
 - **S1 の台数**：consumer で見積もり、ピークで 27 台（東京、AZ ごとに 9 台）。1 つの AZ を失っても残りでピークを受けられる数にする。
-- **K8 の目標**（**既定案**。**PM と Ops の確認の項目**）：
+- **K8 の目標**（2026-09-27 に推奨案で確定）：
   - 定義：（インターネットへの転送 ＋ Media Node ＋ TURN ＋ TURN と Media Node の間の転送 ＋ DDoS の防御）の月の費用 ÷ 月の参加者・分。制御の側、録画、字幕は含めない（別に見る）。
   - S1：0.20 円以下。AWS の表の料金で、平均の下り 1.5 Mbps が保てれば届く。平均の下りが 2 Mbps を超えると届かない。
     - > 2026-09-27 の注記：容量（台数、送出、transit、クォータ）は、参加者 1 人の下り 2.5 Mbps を前提に見積もる。1.5 Mbps は期待の平均として残し、E2 のベータで測って置き換える（[architecture/README.md](../architecture/README.md) の 2 節）。2.5 Mbps のとき、AWS の表の料金の K8 は約 0.28 円で、S1 の目標に届かない（[capacity.md](../architecture/capacity.md) の 6 節）。目標の値は変えない。
-    - > 2026-09-27 の注記：S1 の目標（0.20 円）を AWS のまま容量の前提（2.5 Mbps）で満たす道はない。満たすのは、下りの平均が 1.5 Mbps 前後に収まるか、Edge（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）か AWS との料金の合意で転送の単価が下がるときだけで、達成は Edge の判断（運用の体制の判断の点を含む）に掛かる。目標の値は残し、PM と Ops の確認の項目にする。E2 のベータの実測の後に、PM と Ops が値を保つか直すかを決める。
+    - > 2026-09-27 の注記：S1 の目標（0.20 円）を AWS のまま容量の前提（2.5 Mbps）で満たす道はない。満たすのは、下りの平均が 1.5 Mbps 前後に収まるか、Edge（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）か AWS との料金の合意で転送の単価が下がるときだけで、達成は Edge の判断（運用の体制の判断の点を含む）に掛かる。目標の値は残す。
+    - > 2026-09-27 の注記：推奨案で確定した。S1 0.20 円、S2 0.07 円の目標を保つ。S1 を AWS の下り 2.5 Mbps で動かすと届かないことは受け入れる。閾値（4 週続けて 10 Gbps）で Edge の構築を始める道を採る（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）。
   - S2：0.07 円以下。AWS の表の料金では届かない。コロケーション（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）か、AWS との料金の合意が要る。
   - 毎月、実際の請求と送ったバイトの数から計算し、目標を 2 か月続けて超えたら、Ops が PM と Dev に報告する。
 - **ボット**：

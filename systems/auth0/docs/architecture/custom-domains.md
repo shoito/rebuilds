@@ -173,8 +173,8 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 
 - 1 テナントの上限を、プランで 1〜20 にする（本家の基本の 20 に寄せる）。配信のテナント 1 つに、ドメイン 1 つ（テナントごとの証明書と停止を独立に保つため）。
 - `is_default` はテナントに 1 つ。Management API のメールを送る操作は、`<Brand>-Custom-Domain` のヘッダーで、テナントの `ready` のドメインから選べる。ヘッダーの値がテナントのドメインでなければ 400。
-- `issuer` はドメインごと。アプリごとに「このアプリが使うドメイン」を登録させるかは、E11 の後に決める（13 節）。
-- 配信のテナントの上限（アカウントに 1 万）に対し、S2 の本番 3 万テナント×複数のドメインでは足りない。S2 の前に、上限の引き上げか、edge のアカウントを分けるかを決める（[ADR-0058](../decisions/0058-edge-and-custom-domains.md)）。
+- `issuer` はドメインごと。アプリごとに「このアプリが使うドメイン」は登録させない（12 節の決定）。
+- 配信のテナントの上限（アカウントに 1 万）に対し、S2 の本番 3 万テナント×複数のドメインでは足りない。S2 の前に、まず上限の引き上げを申請し、足りなければ edge のアカウントを分ける（12 節の決定。[ADR-0058](../decisions/0058-edge-and-custom-domains.md)）。
 
 ## 5. 障害時の振る舞い
 
@@ -296,13 +296,19 @@ E5・E6・E8・E13・E14 には、この領域の Story はない（E6 のコー
 - **apex**：条件付きで許す。
 - **開発・ステージングのテナント**：S1 は 1 つまで許す（上限に余裕がある）。S2 の前に見直す。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **自分で管理する証明書**：MVP の後の「後回し」に置く（[roadmap.md](../roadmap.md)）。MVP は CloudFront の管理だけ。
+- **複数のカスタムドメインでアプリごとにドメインを縛るか**：縛らない。`iss` は要求のホスト名で決まり、`/oauth/token` を認可の要求と別のホスト名で呼ぶと `invalid_grant` になる（[authentication-flows.md](authentication-flows.md) の 4 節）ので、取り違えはそこで止まる。複数のカスタムドメインは S2。
+- **Public Suffix List**：`jp.<brand>.<domain>` を登録する（[universal-login.md](universal-login.md) の 17 節）。
+- **配信のテナントの上限**：S2 の前に、まず AWS に上限の引き上げを申請する。足りなければ edge のアカウントを分ける（[ADR-0058](../decisions/0058-edge-and-custom-domains.md)）。
+- **複数のリゾルバー**：DNS over HTTPS の公開のリゾルバーを 2 つ（Google Public DNS と Cloudflare の 1.1.1.1）使い、両方で同じ値が見えたときに確認とする（4.1 節）。問い合わせるのはテナントが登録したドメイン名と TXT の値だけで、個人データを含まない。
+
 持ち越し：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 配信のテナントの上限の引き上げか、edge のアカウントの分割か | S2 の前（[ADR-0058](../decisions/0058-edge-and-custom-domains.md)） |
 | CloudFront の管理する証明書の発行の時間の実測（p50 15 分の目標の妥当性） | E11 の staging |
-| 複数のリゾルバーの選定（DNS over HTTPS の事業者と、国外へのドメイン名の問い合わせの扱い） | E11 の着手前 |
 
 ## References
 

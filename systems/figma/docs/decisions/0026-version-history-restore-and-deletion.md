@@ -36,7 +36,8 @@ date: 2026-09-27
 - 版の種類は `auto`・`named`・`restore_before`・`restore_after`。`auto` は、チェックポイントを書いたときに最後の `auto` から 30 分以上たって変更があれば付ける。手放すときは 5 分。
 - 版の一覧は Aurora の `file_versions`（`org_id`、`FORCE ROW LEVEL SECURITY`）。中身はマニフェストを指す（[ADR-0025](0025-content-addressed-checkpoints-and-loading.md)）。
 - 版の閲覧は、API が判定してチャンクの署名付き URL を出す。Document Server を通さず、ファイルの状態を変えない。
-- 保持の既定案：無料のプランは 30 日（最新の 1 つを除いて消す）、有料はすべて残す。PM が決めるまでの仮置き。
+- 保持：無料のプランは 30 日（最新の 1 つを除いて消す）、有料はすべて残す。本家の Starter と同じ。
+  - > 2026-09-27 の注記：仮置きとしていた無料のプランの 30 日を、推奨案で確定した。見えなくするだけでなく、掃除で消す。
 - 復元：`restore_before` の版を作り、版との差分を `session_id = 0` の 1 つの `ChangeSet` としてジャーナルに書いて配り、`restore_after` の版を作る。差分が 4 MiB を超えたら、クライアントに読み込み直させる。ノードの ID は版のものを使う。
 - 複製：チャンクを S3 の中で新しいファイルのキーへコピーし、`seq = 0` のマニフェストを書く。ノードの ID と `next_session_id` を引き継ぎ、セッションの表・コメント・版は写さない。
 - 削除：`active → trashed → purging → purged`。ゴミ箱は自動で消さない。チームの削除は 28 日で戻せなくなる。完全な削除のジョブは、Router のファイルの割り当て（`file_leases`）を `deleted` にし（[ADR-0047](0047-router-task-liveness-and-file-assignment.md)）、ジャーナル・S3（古い版を含む）・版・コメント・索引・サムネイルを手順ごとに冪等に消す。`files` には ID・組織・日時だけを残す。

@@ -136,7 +136,7 @@ ADR-0043。S1 は料金のプランを持たないので、1 つの値の組に�
 - 数は Valkey のトークンバケットで数える（[meeting-security.md](meeting-security.md) の 8.2 節と同じ仕組み）。
 - すべての応答に `RateLimit-Policy` と `RateLimit` を付ける（IETF の draft-ietf-httpapi-ratelimit-headers-11 の書式。RFC になるまで変わりうる。Slack の題材と同じ）。分類を `X-<Brand>-RateLimit-Category` で返す。
 - 超えたら `429`、`Retry-After`（秒）、本文は RFC 9457 の問題の詳細（`type`・`title`・`detail`、`limit: "per_second" | "daily" | "user_meeting_writes"`）。
-- 値は本家の Business 以上の値より小さい。S1 の規模で足りるかを E11 で見て、組織の契約で上げられる形にする（持ち越し）。
+- 値は本家の Business 以上の値より小さい。S1 の規模で足りるかを E11 で見て、組織の契約で上げる仕組みは、料金のプランを作るときに足す（12 節）。
 
 ### 5.3 共通の規則
 
@@ -285,21 +285,20 @@ webhook-id: msg_01J9...    webhook-timestamp: 1790000000    webhook-signature: v
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行う。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
 
 - **アプリ**：OAuth のアプリ（PKCE 必須）とサーバー間のアプリの 2 種類。共有の秘密だけで署名するトークンは作らない。
 - **トークン**：不透明、1 時間。リフレッシュトークンは入れ替え式で 90 日。
 - **レート制限**：4 つの分類。light 30/秒、medium 20/秒、heavy 10/秒、resource-intensive 10/分、heavy 以上の 1 日 60,000。会議の作成・更新は利用者ごとに 1 日 100 回。
 - **Webhook**：Standard Webhooks の署名、URL の確認、7 回の再送（約 1.9 日）、3 日で止める。中身に会議の内容を入れない。
-- **会議の中の操作**：出さない。会議を終えることだけ。
+- **会議の中の操作**：出さない。会議を終えることだけ。ミュートや退出させる操作は MVP の後（[roadmap.md](../roadmap.md) の延期の一覧）。
+- **組織ごとのレート制限の引き上げ**：S1 では作らない。料金のプランを作るときに足す（[roadmap.md](../roadmap.md) の延期の一覧）。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 組織の契約でレート制限を上げる形 | 料金のプランを作るとき（MVP の外） |
 | Better Auth の OAuth 2.1 の提供者のプラグインで、トークンの形・リフレッシュトークンの入れ替え・`private_key_jwt` を満たせるか | E11 の `oauth-authorization-server` |
-| 会議の中の操作（ミュート、退出させる）を API に出すか | 利用者の声を見て PM が決める。出すなら Actor への命令として |
 | 公開のアプリの審査の基準 | E11 |
 | `participant.*` のイベントの量が多い組織への、まとめた配送 | E11 の負荷試験で決める |
 | 受け手が録画を外部に持ち出すことの契約上の扱い（L8） | 法務の確認の後 |

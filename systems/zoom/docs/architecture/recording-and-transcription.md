@@ -350,7 +350,7 @@ ADR-0026。
   - Media Node：`e2ee: true` の router に `rec_…`・`asr_…` の受け手を足す `subscriptions.apply` を拒否する（[media-server-sfu.md](media-server-sfu.md) の 11 節）。
   - E2EE の入り・切りは開催の前だけで、会議の途中では変えられない（[ADR-0030](../decisions/0030-security-code-and-e2ee-feature-limits.md)、[e2ee.md](e2ee.md) の 12 節）。
 - **Recorder と Node の間**：PlainTransport は SRTP を有効にする。鍵は会議ごとに作り、Actor が Node と Recorder にだけ渡す。VPC の中でも平文で流さない。
-- **再生**：署名付きの URL は 10 分。ダウンロードを許さない共有では、HLS などの分割の配信にするかを E8 で決める（MP4 の範囲の要求だけでは、保存を防げない）。
+- **再生**：署名付きの URL は 10 分。ダウンロードを許さない共有では、ダウンロードのボタンを出さない。MP4 の範囲の要求だけでは保存を防げないので、そのことを共有を作る画面で示す。HLS などの分割の配信は MVP の後（13 節）。
 - **削除**：6.3 節。保全の付いたものは消さない。
 
 ## 11. テスト
@@ -406,7 +406,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行う。法務に関わるものは L2・L3・L6 の結論で見直す。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。法務に関わるものは L2・L3・L6 の結論で見直す。
 
 - **録画の取り方**：SFU から生の RTP を受け、会議の後に合成する。ヘッドレスのブラウザのボットは使わない。
 - **区切り**：10 秒。失ってよい上限は、障害 1 回あたり約 15 秒。
@@ -416,6 +416,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 - **エンジン**：S1 は Amazon Transcribe streaming（ja-JP、東京）。話者ごとの流れ、1 会議 4 枠。
 - **同意**：同意するまで話せない・映せない・共有できない。見る・聞くことはできる。
 - **E2EE**：API・Actor・Media Node の 3 か所で拒否。
+- **ダウンロードを許さない共有**：MVP は MP4 を署名付きの URL で再生し、ダウンロードのボタンを出さない。保存を完全には防げないことを、共有を作る画面で示す。HLS の配信は MVP の後（[roadmap.md](../roadmap.md) の延期の一覧）。
 
 ### 持ち越し
 
@@ -428,7 +429,6 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | 1 会議の話者の枠の数（4） | E8 の `transcriber-live-captions` の実測で見直す |
 | 合成の速さ（Fargate 16 vCPU で 2 倍より速いか） | E8 の `recording-compose` で計測する。足りなければ区間ごとの並列の合成 |
 | 大阪への切り替えの間の字幕（大阪に Transcribe がない） | 止める。別のリージョンへ送るかは法務（L6）の後 |
-| ダウンロードを許さない共有の配信の形（HLS か） | E8 の `recording-share-and-playback` で決める |
 | 組織ごとの鍵（BYOK） | security.md |
 | 端末の上での録画、AI の要約 | MVP の後の Epic |
 

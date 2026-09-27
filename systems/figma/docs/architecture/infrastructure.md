@@ -227,7 +227,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | DynamoDB `journal`・`file_leases` | PITR | 35 日 |
 | S3 | バージョニング（古い版） | 30 日 |
 | Aurora | 自動バックアップ（PITR）＋ AWS Backup の日次のスナップショット（大阪へコピー） | 35 日 |
-| 監査のアーカイブ | log-archive の S3（Object Lock） | 7 年（既定案） |
+| 監査のアーカイブ | log-archive の S3（Object Lock） | 7 年（既定案。法務の確認待ち、L4） |
 
 - 論理的な破損（誤ったジョブがチャンクを消した、など）は、S3 の古い版と、日ごとのチェックポイント＋ジャーナル（30 日）から戻す（[file-storage-and-history.md](file-storage-and-history.md) の 5.3・12 節）。
 

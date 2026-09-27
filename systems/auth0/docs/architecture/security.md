@@ -172,7 +172,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | SEC-010 | 2.2.2、4.14 リフレッシュトークンの保護 | MUST（公開クライアントは送信者の制約かローテーション） | 公開クライアントはローテーションと再利用の検知を必須。機密のクライアントはクライアント認証。DPoP（送信者の制約）は MVP の後 | sessions-and-sso | 使用済みのトークン、別のクライアントのトークン |
 | SEC-011 | 2.3 アクセストークンの権限の制限 | SHOULD | `aud` を 1 つの API に限り、スコープはその API の許可の範囲だけ | authentication-flows | 許可のない API の `audience`、許可のないスコープ |
 | SEC-012 | 2.4 リソースオーナーのパスワードのグラント | MUST NOT | 提供しない | authentication-flows | `grant_type=password` |
-| SEC-013 | 2.5 クライアント認証 | SHOULD（非対称の方式） | `private_key_jwt` を勧める。`client_secret_basic`・`client_secret_post` も受ける。`client_secret_jwt` は提供しない（ADR-0004） | authentication-flows | 期限切れ・`aud` 違い・再利用の `client_assertion`（`jti` の記録） |
+| SEC-013 | 2.5 クライアント認証 | SHOULD（非対称の方式） | `private_key_jwt` を勧める。`client_secret_basic`・`client_secret_post` も受ける。`client_secret_jwt` は提供しない（ADR-0004） | authentication-flows | 期限切れ・`aud` 違い（`issuer` 以外。互換のフラグ `legacy_token_endpoint_aud` が無効なアプリでのトークンのエンドポイントの URL を含む）・再利用の `client_assertion`（`jti` の記録） |
 | SEC-014 | 4.11 オープンリダイレクト | MUST | 検証していない URI へは、エラーでもリダイレクトしない。`post_logout_redirect_uri` も登録との完全一致 | authentication-flows、sessions-and-sso | 未登録の `post_logout_redirect_uri` |
 | SEC-015 | 4.12 307 のリダイレクト | MUST | 資格情報を含む `POST` の後のリダイレクトは 303 にする | universal-login | ログインの送信の応答が 307 でない |
 | SEC-016 | 2.6、RFC 8725 JWT の扱い | — | 受け取る JWT のアルゴリズムを許可リストで限る。`alg: none` を拒否 | authentication-flows | `alg: none`、HS256 の `client_assertion` |

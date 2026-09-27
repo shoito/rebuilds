@@ -91,7 +91,7 @@ RLS を掛けない表の全部。**ここにない表は、すべて `tenant_id
 | `tenant_members`、`tenant_member_invitations` | ダッシュボードの管理者とロール、招待（トークンは SHA-256） | MVP | 同上、[dashboard.md](dashboard.md) の 5 節 |
 | `tenant_name_tombstones` | 名前の再利用の禁止（RLS の外） | MVP | 同上 |
 | `tenant_config_versions` | 設定の版（RLS の外） | MVP | 同上、[ADR-0032](../decisions/0032-tenant-config-cache.md) |
-| `clients` | アプリケーション（種類、グラント、コールバック、ログアウトの URL、Web オリジン、`require_pkce`、`refresh_token` の設定（`binding` を含む）、`oidc_backchannel_logout`、`is_first_party`、`client_metadata`）。後の列：`organization_usage`・`organization_require_behavior`（E14）、`require_pushed_authorization_requests`（PAR） | MVP | [tenants-and-applications.md](tenants-and-applications.md) の 14 節、[ADR-0031](../decisions/0031-application-and-api-registration.md) |
+| `clients` | アプリケーション（種類、グラント、コールバック、ログアウトの URL、Web オリジン、`require_pkce`、`refresh_token` の設定（`binding` を含む）、`oidc_backchannel_logout`、`is_first_party`、`client_metadata`、`legacy_token_endpoint_aud`（`private_key_jwt` の `aud` の互換のフラグ。GA から 12 か月で廃止））。後の列：`organization_usage`・`organization_require_behavior`（E14）、`require_pushed_authorization_requests`（PAR） | MVP | [tenants-and-applications.md](tenants-and-applications.md) の 14 節、[ADR-0031](../decisions/0031-application-and-api-registration.md) |
 | `client_credentials` | **クライアントの秘密（SHA-256）と `private_key_jwt` の公開鍵の唯一の表**（`kind`）。有効なものは種類ごとに 2 つまで | MVP | 5.2 節、同上 |
 | `resource_servers` | API（識別子、スコープ、有効期間、`allow_offline_access`、`is_system`、`scope_acr`（[mfa-and-passkeys.md](mfa-and-passkeys.md) の 6.4 節））。スコープは列（配列）で持ち、別の表を持たない | MVP | 同上 |
 | `client_grants` | M2M の許可（アプリ × API × スコープ）。後の列：`organization_usage`（E14 の後） | MVP | 同上 |

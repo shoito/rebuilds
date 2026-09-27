@@ -152,7 +152,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 - ぼかしの強さは 2 段（弱・強）。背景の画像は、組み込みの数枚と、利用者が選んだ画像（端末の中だけに置き、サーバーへ送らない）。
 - 映像はサーバーへ送る前に処理を終える（intent.md の MVP）。処理しない映像を一瞬でも送らない。処理が止まったら、カメラを止める。
 
-性能の予算（基準の端末は 4 年前の中位のノート PC。機種は E5 の前に QA が決める。[quality.md](../quality.md) の 2.2.1 節）：
+性能の予算（基準の端末は 4 年前の中位のノート PC。E5 の着手で、この条件に合う機種を QA が 1 台選んで固定する。[quality.md](../quality.md) の 2.2.1 節）：
 
 | 項目 | 予算 |
 | --- | --- |
@@ -202,7 +202,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
   - 会議の URL（`https://<brand>.<domain>/j/...`）を開くと、アプリで開く（ユニバーサルリンク・アプリのリンク）。
   - 自動更新、コード署名（Windows・macOS の公証）。
 - 安全の設定：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。preload で公開する API は、画面の選択、通知、自動更新だけにする。読み込むのは自分のオリジンだけ。
-- 対応 OS：Windows 10・11（x64、arm64）、macOS の直近 3 版。Linux は MVP の後に判断する。
+- 対応 OS：Windows 10・11（x64、arm64）、macOS の直近 3 版。Linux は MVP の後に回す。
 
 ## 8. モバイルアプリ（ADR-0023）
 
@@ -325,7 +325,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行う。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
 
 - **対応ブラウザ**：主要な 4 つの最新 2 メジャーと Firefox の ESR（ADR-0021）。
 - **仮想背景**：MediaPipe の Selfie Segmenter、WebGPU、なければ WebGL2（ADR-0022）。
@@ -334,6 +334,8 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 - **モバイル**：ネイティブ＋自前の libwebrtc＋libmediasoupclient＋Rust の共通のコア（ADR-0023）。
 - **Web の状態機械**：TypeScript のまま。Rust 版と試験のベクトルで揃える（ADR-0024）。
 - **処理しない映像**：仮想背景が止まったら、処理しない映像を送らず、カメラを止める。
+- **仮想背景の基準の端末**：4 年前の中位のノート PC とする。E5 の着手で、この条件に合う機種を QA が 1 台選んで固定する。IoU の閾値 0.90 は QA が承認した値（[quality.md](../quality.md)）。
+- **デスクトップの Linux 版**：MVP では作らない（[roadmap.md](../roadmap.md) の延期の一覧）。
 
 ### 持ち越し
 
@@ -341,9 +343,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | --- | --- |
 | Selfie Segmenter のモデルのファイルの利用の条件 | モデルカードは Apache License 2.0（5.1 節）。配るファイルとの対応を E5 の `virtual-background` の着手前に法務と確かめる |
 | Chrome の worker での `MediaStreamTrackProcessor` の動作と、代わりの経路（Firefox は常に）の性能 | E5 の `virtual-background` で計測する。Firefox は持たず、Safari は 18 から持つ（2.2 節） |
-| 仮想背景の基準の端末の機種 | E5 の前に QA が決める（IoU の閾値は [quality.md](../quality.md) の既定 0.90） |
 | RNNoise より新しい雑音の抑制のモデル（より大きい DNN）を使うか | E5 で、CPU と MOS の推定で比べる |
-| デスクトップの Linux 版 | MVP の後。利用者の要望を見る |
 | モバイルの仮想背景を OS の API にするか MediaPipe にするか | E13 の着手時 |
 | Web の状態機械も Rust（WASM）にするか | ベクトルの食い違いが続くなら見直す。E13 の後に判断する |
 

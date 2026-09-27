@@ -205,7 +205,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 - 常設の権限は、ダッシュボード、メトリクス、内容を含まないログだけ。
 - DB・シェル・KMS の管理は期限つき（最長 4 時間）。`media-prod` のシェルは、インシデントの指揮者の承認を要する。
 - **会議に見えない形で入る機能を作らない。** サポートが会議を見るときは、参加者として名前を出して入り、主催者の許可（待合室）を受ける。
-- 組織のデータの参照（録画、チャット）は、組織の管理者の許可を前提にする。許可の仕組みは accounts-and-admin の領域で決める（持ち越し）。
+- 組織のデータの参照（録画、チャット）は、組織の管理者の許可を前提にする。組織の `owner` か `admin` が、問い合わせごとに、対象（録画・チャット）と期限（最長 7 日）を決めて許可する。許可と参照は、組織の監査とプラットフォームの監査の両方に残す。
 - 四半期ごとにアクセスをレビューする。
 
 ## 8. 濫用への対策
@@ -215,7 +215,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 - 仕組みの正本は [meeting-security.md](meeting-security.md)（待合室とパスコード、退出させた人の ban、活動の停止、報告、推測の防御）。
 - この領域では、横断の対策だけを持つ。
   - **Trust & Safety の対応**：報告（`abuse_reports`）の優先度、アカウントの停止、全体の端末の ban は、プラットフォームの監査に残す。
-  - **会議の数と人数の濫用**：無料・試用の組織の、同時の会議の数、1 会議の人数、会議の長さに上限を置く（値は accounts-and-admin の領域と PM が決める。持ち越し）。ボットで会議を開いて Media Node を使い切る攻撃に備える。
+  - **会議の数と人数の濫用**：契約のない組織（個人で登録した組織など）は、同時の会議 1 つ、1 会議 100 人、1 回 60 分までにする。ボットで会議を開いて Media Node を使い切る攻撃に備える。
   - **ゲストの大量の参加**：1 つの `ip_prefix` からの同時の参加の数の上限（[ADR-0033](../decisions/0033-join-rate-limits-and-enumeration-defense.md) のバケットに足す）。
 
 ### 8.2 TURN の悪用
@@ -256,7 +256,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 録画・文字起こし | 組織の設定（既定 365 日）＋ごみ箱 30 日 | S3 から削除（版も） | [recording-and-transcription.md](recording-and-transcription.md) の 6.3 節 |
 | 録画の生の区切り | 合成の成功から 7 日（失敗は 30 日） | 削除 | 同上 |
 | 報告（`abuse_reports`） | 1 年。報告に添えた生の IP の暗号文は 90 日 | 削除 | [meeting-security.md](meeting-security.md) |
-| 電話の通話の記録（`phone_calls`。MVP の後） | telephony の領域の決定に従う（未決なら 12 か月。発信者の番号はハッシュと下 4 桁だけ） | 削除 | [telephony.md](telephony.md) |
+| 電話の通話の記録（`phone_calls`。MVP の後） | 12 か月。発信者の番号はハッシュと下 4 桁だけ | 削除 | [telephony.md](telephony.md) |
 | Webhook の配送の記録（`webhook_deliveries`） | 7 日 | 削除 | [api-and-webhooks.md](api-and-webhooks.md) |
 | 退出させた人の ban（`meeting_removals`） | 最後の開催から 30 日 | 削除 | [meeting-security.md](meeting-security.md) の 6.1 節 |
 | 監査ログ（3 系統） | DB に 1 年、log-archive に 7 年 | 削除 | この文書 |
@@ -264,7 +264,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | アプリのログ（内容と IP を含めない） | CloudWatch Logs 30 日、log-archive 13 か月 | 自動 | [observability.md](observability.md) |
 | 品質の生の記録（参加者ごと 10 秒） | 30 日 | 自動（S3 のライフサイクル） | [observability.md](observability.md) |
 | 参加ごとの品質の要約（`participant_quality_summaries`） | 12 か月 | 削除 | [observability.md](observability.md) |
-| E2EE の資格情報の記録（`e2ee_credentials`） | e2ee の領域の決定に従う（未決なら 1 年） | 削除 | [e2ee.md](e2ee.md) |
+| E2EE の資格情報の記録（`e2ee_credentials`） | 1 年 | 削除 | [e2ee.md](e2ee.md) |
 | バックアップ（Aurora） | 35 日 | 期限で消える | [infrastructure.md](infrastructure.md) |
 
 - リーガルホールドは、保持の期限に優先する。
@@ -341,21 +341,21 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行う。保持の期間は PM と法務の確認を取る。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。保持の期間は法務の確認を待つ。
 
 - **DDoS**：Shield Advanced で入口を常に守り、メディアの EIP は攻撃のときだけ（ADR-0045）。
 - **監査ログ**：3 系統、DB 1 年・log-archive 7 年（ADR-0046）。
 - **IP**：ログに 30 日。Aurora にはハッシュと報告の暗号文だけ（ADR-0046）。
 - **鍵**：用途ごとの KMS の鍵と `org_id` の文脈。BYOK は MVP の後（ADR-0047）。
 - **運用者**：`media-prod` の分離、会議に見えない形で入る機能を作らない（ADR-0047）。
+- **サポートによる組織のデータの参照**：組織の `owner` か `admin` が、問い合わせごとに、対象（録画・チャット）と期限（最長 7 日）を決めて許可する。許可と参照は、組織の監査とプラットフォームの監査の両方に残す。
+- **契約のない組織の上限**：個人で登録した組織など、契約のない組織は、同時の会議 1 つ、1 会議 100 人、1 回 60 分までにする（8.1 節）。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | Shield Advanced の EIP の保護を攻撃のときに加えた直後の緩和の振る舞い（事象の報告は保護から 15 分以上たってから。[ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md) の注記） | E7 の `shield-advanced-onboarding` で、SRT への問い合わせと `media-lab` の試験で確かめる |
-| サポートによる組織のデータの参照の許可の仕組み | accounts-and-admin の領域と E12 の前に決める |
-| 無料・試用の組織の上限（同時の会議、人数、長さ） | PM が決める |
 | BYOK | MVP の後の Epic |
 
 ## 16. quality.md・runbooks への項目

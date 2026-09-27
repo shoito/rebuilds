@@ -272,6 +272,11 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 - 表にないホスト名は、作成の直後でも DB に問い合わせずに 404 にする。作成の応答に `hostname_ready_by` を入れ、ダッシュボードが待つ。15 秒は K3 の 15 分に比べて小さい。
 - コールバックのワイルドカードは、どの環境でも持たない。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **アカウントと請求**：アカウントを請求・契約の単位にし、テナントはその下に置く（[ADR-0030](../decisions/0030-accounts-tenants-and-members.md) の形のまま）。本家の「子のテナント」のような別の結び付けは足さない。請求の細部は、請求の設計で扱う。
+- **ワイルドカードのコールバックを使うテナントの移行**：URL を 1 つずつ登録してもらう（100 件まで）。移行の文書で案内し、それ以上の支えは作らない（[authentication-flows.md](authentication-flows.md) の 14 節）。
+
 ## 14. quality.md・runbooks・data-model に載せるもの
 
 **quality.md**
@@ -297,7 +302,7 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | `tenant_name_tombstones` | `region`、`name`、`deleted_at` | 再利用の禁止 |
 | `tenant_members` | `tenant_id`、`member_user_id`、`roles`、`app_ids`、`invited_by` | RLS |
 | `tenant_member_invitations` | `tenant_id`、`id`、`email`、`roles`、`token_hash`、`expires_at` | RLS |
-| `clients` | `tenant_id`、`client_id`、`app_type`、`name`、`grant_types`、`token_endpoint_auth_method`、`callbacks`、`allowed_logout_urls`、`web_origins`、`allowed_origins`、`is_first_party`、`require_pkce`、`refresh_token`、`client_metadata`、`status` | RLS |
+| `clients` | `tenant_id`、`client_id`、`app_type`、`name`、`grant_types`、`token_endpoint_auth_method`、`callbacks`、`allowed_logout_urls`、`web_origins`、`allowed_origins`、`is_first_party`、`require_pkce`、`refresh_token`、`client_metadata`、`legacy_token_endpoint_aud`（`private_key_jwt` の `aud` の互換のフラグ。既定は偽、GA から 12 か月で廃止。[authentication-flows.md](authentication-flows.md) の 6.1 節）、`status` | RLS |
 | `client_credentials` | `tenant_id`、`id`、`client_id`、`kind`（`secret`・`public_key`）、`secret_hash`、`jwk`、`kid`、`created_at`、`expires_at`、`last_used_at`、`revoked_at` | RLS。クライアントの秘密と `private_key_jwt` の公開鍵の唯一の表（authentication-flows の提案した `client_secrets`・`client_public_keys` はこの表にまとめた）。有効なものは種類ごとに 2 つまで |
 | `resource_servers` | `tenant_id`、`id`、`identifier`、`name`、`scopes`、`token_lifetime`、`allow_offline_access`、`skip_consent_for_first_party`、`is_system` | RLS。`is_system` は Management API |
 | `client_grants` | `tenant_id`、`id`、`client_id`、`audience`、`scope`、`subject_type` | RLS |

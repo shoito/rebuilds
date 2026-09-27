@@ -1,6 +1,6 @@
 # Runbooks: Zoom
 
-Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節、SLI の計測の仕組みとアラートの条件の実装は [observability.md](../architecture/observability.md) の 5・6 節にある。**SLO の値とアラートの一覧の正本はこの文書** で、observability.md と [ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md) は、これを計測・実装する側の記述である。値を変えるときは、この文書を先に変え、observability.md を合わせる。値はすべて既定案で、SLO の値は PM と Ops が承認する。
+Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節、SLI の計測の仕組みとアラートの条件の実装は [observability.md](../architecture/observability.md) の 5・6 節にある。**SLO の値とアラートの一覧の正本はこの文書** で、observability.md と [ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md) は、これを計測・実装する側の記述である。値を変えるときは、この文書を先に変え、observability.md を合わせる。SLO の値は 2026-09-27 に推奨案で確定した（[architecture/README.md](../architecture/README.md) の 6 節）。
 
 ## 1. SLI と SLO
 

@@ -247,7 +247,7 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 
 - `https` だけ。IP アドレスのリテラル、`localhost`、フラグメントを許さない。
 - 送るときに名前を解決し、私的なアドレス（RFC 1918、ループバック、リンクローカル、ULA、AWS のメタデータのアドレス）なら送らない（SSRF の防御）。解決と接続を同じアドレスで行う（DNS の再バインドの防御）。
-- Worker から外への送信は、専用の出口（プロキシ）を通す。出口は infrastructure.md で決める。
+- Worker から外への送信は、専用の出口を通す。出口は egress のサブネットの `worker-egress` と専用の NAT（[infrastructure.md](infrastructure.md) の 2.3 節）。
 
 ### 6.3 Back-Channel Logout を送るとき
 
@@ -258,7 +258,7 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 | Management API のセッションの取り消し | 送る | 本家と同じ |
 | ユーザーのブロック・削除 | 送る | |
 | 別の利用者でのログイン（`superseded`） | 送る | |
-| パスワードの変更・再設定で他のセッションを終える | 送る | 終えるかどうかは connections.md |
+| パスワードの変更・再設定で他のセッションを終える | 送る | 既定で終える（[connections.md](connections.md) の 4.7 節と 13 節） |
 | 結び付いた系列のリフレッシュトークンの再利用の検知 | 送る | [ADR-0029](../decisions/0029-refresh-token-session-binding.md) |
 | 使われない期間・最終の期限の経過 | 送らない | 本家も、ログアウトと取り消しのときに送るとしている。期限の経過は、アプリの側のセッションの期限で扱う |
 | 上限（100 個）を超えて古いセッションを終えた | 送る | |
@@ -382,16 +382,19 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 - **Back-Channel Logout の再試行**：4 回、約 36 分（6.2 節）。
 - **1 ユーザーの `active` なセッションの上限**：100 個。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **アプリごとのセッションの有効期間の上書き**：持たない。セッションはテナントに 1 つで、有効期間もテナントの設定だけにする。アプリごとに短くしたいときは、アプリの側のセッションと `max_age` で扱う。
+- **`federated` のログアウト**：MVP では受けて無視する（6.1 節の表）。エンタープライズ接続の Epic（E14）で、SAML の SLO と合わせて扱う。ソーシャル IdP からのログアウトはしない。
+- **パスワードの変更・再設定**：既定で、他のセッションとリフレッシュトークンの系列を終える。今のセッションは残す（[connections.md](connections.md) の 4.7 節）。
+- **端末の記憶**：セッションと別の Cookie `__Host-<brand>_mfa_rd` で持つ（[mfa-and-passkeys.md](mfa-and-passkeys.md) の 3.3 節）。
+- **Back-Channel Logout の出口**：egress のサブネットの `worker-egress` と専用の NAT（[infrastructure.md](infrastructure.md) の 2.3 節）。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 本家の既定の有効期間、Cookie の名前と `SameSite`、Back-Channel Logout の再試行 | 本家の試用のテナントで確かめる（E5） |
-| アプリごとのセッションの有効期間の上書き | extensibility.md（Actions）と合わせて決める |
-| `federated` のログアウト（ソーシャル IdP・エンタープライズの IdP からのログアウト） | エンタープライズ接続の Epic（SAML の SLO を含む） |
-| パスワードの変更・再設定で、他のセッションとリフレッシュトークンの系列を終えるか | connections.md（提案：既定で終える） |
-| 端末の記憶（信頼した端末で MFA を省く）をセッションとは別の Cookie で持つか | mfa-and-passkeys.md |
-| Back-Channel Logout の出口のプロキシの形 | infrastructure.md |
 
 ## 14. quality.md・runbooks・data-model への項目
 

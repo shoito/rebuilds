@@ -93,7 +93,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | `loss-5-random` | 下り（受け手）・上り（送り手）にランダム 5%、揺らぎ 30ms | ViSQOL の MOS 3.8 以上（NFR-003） | 夜間 |
 | `loss-5-burst` | Gilbert-Elliott（平均バースト 3 パケット）、平均 5% | ViSQOL の MOS 3.6 以上 | 夜間 |
 | `loss-20-random` | ランダム 20%、揺らぎ 30ms | ViSQOL の MOS 3.0 以上（NFR-003） | **必須** |
-| `loss-20-burst` | Gilbert-Elliott、平均 20% | ViSQOL の MOS 2.6 以上（QA の既定。E4 の実測で見直す）。FEC だけ・RED distance 1 ＋ FEC の値を並べて記録する（ブラウザは distance 1 しか送らない。ADR-0017 の注記） | 夜間 |
+| `loss-20-burst` | Gilbert-Elliott、平均 20% | ViSQOL の MOS 2.6 以上（QA が承認した値。E4 の実測を記録する）。FEC だけ・RED distance 1 ＋ FEC の値を並べて記録する（ブラウザは distance 1 しか送らない。ADR-0017 の注記） | 夜間 |
 | `jitter-30`・`jitter-100` | 揺らぎ 30ms・100ms | mouth-to-ear の p95 200ms 以内（30ms）。100ms は記録し、300ms を超えたら不合格 | 夜間 |
 | `bw-step-down` | 下り 3 Mbps → 500 kbps → 150 kbps → 3 Mbps（各 30 秒） | 5 秒以内に収まる。1 秒以上のフリーズ 0。150 kbps で音声が続く（ViSQOL 3.0 以上）。回復で 10 秒以内に元の層（NFR-009） | **必須** |
 | `bw-half` | 下り 2 Mbps → 1 Mbps | 5 秒以内に収まる。1 秒以上のフリーズ 0 | 夜間 |
@@ -127,12 +127,12 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | **障害の注入**（[signaling-and-meetings.md](architecture/signaling-and-meetings.md) の 14.3 節、[media-server-sfu.md](architecture/media-server-sfu.md) の 12.2 節） | Actor Host の `SIGKILL`（メディアの途切れ 0、10 秒以内に `host.mute` が効く）、Actor Host と Valkey の分断（4.5 秒で止まり、古い `epoch` の指示が拒否される）、同じ会議に 2 つの Actor、Valkey の failover、Gateway の半分の停止（再接続の成功 99%）、Media Node の停止（全参加者の音声が p95 5 秒以内）、worker の `SIGKILL`（他の参加者の途切れ 0）、Node と Assignment の分断（付け替えない）、TURN の停止（5 秒を目標に記録）、drain の make-before-break（途切れ 500ms 以下） |
 | **負荷試験 L0〜L5（と L6）**（[capacity.md](architecture/capacity.md) の 7.2 節） | Pion のボット（送り手は符号化済みの VP8 simulcast と Opus を流し、受け手は復号せず RTCP を返す）を主にし、**会議の 2% に Playwright の実ブラウザ**を入れて `mos_est`・フリーズ・glass-to-glass を測る。L0 worker（遅れ p99 10ms、CPU 85% の consumer の数）、L1 1 台（ENA の `*_allowance_exceeded` 0、転送の遅れ p99 10ms、実ブラウザの `mos_est` 4.0 以上。c8gn と c8g）、L2 付け替え（2,500 人を載せて止め、p95 5 秒）、L3 群れ（S1 のピークの 1.2 倍の 36,000 人・6,000 会議を 2 時間、[runbooks/README.md](runbooks/README.md) の SLO を満たす）、L4 立ち上がり（60 分で 0 からピーク、参加の成功 99.5%、p95 3 秒）、L5 長時間（ピークの 50% で 24 時間、メモリ・記述子の増加なし）、L6 攻撃（参加者でない送信元の洪水で、既存の参加者の途切れなし）。見積もりと実測を並べて capacity.md を置き換える |
 | **DR と AZ の訓練** | 4.3 節の合格基準 |
-| **電話の参加者**（E14。[telephony.md](architecture/telephony.md) の 6・9 節） | **電話の参加者の遅れの目標は NFR-001 と別に置く**：電話の参加者の声が Web の参加者に届くまで p95 400ms 以内（ITU-T G.114 の許容の上限。事業者の網を含む。既定案で、E14 の着手で事業者の網を測って QA が確かめる）。Web の参加者の声が電話に届くまでも同じ。損失 5%・20% の下の MOS の推定を記録する。PROP-TEL-001〜003、IVR とダイヤルアウトの決定表、留守番電話が入らない |
+| **電話の参加者**（E14。[telephony.md](architecture/telephony.md) の 6・9 節） | **電話の参加者の遅れの目標は NFR-001 と別に置く**：電話の参加者の声が Web の参加者に届くまで p95 400ms 以内（ITU-T G.114 の許容の上限。事業者の網を含む。QA が承認した値。E14 の着手で事業者の網を含めて測る）。Web の参加者の声が電話に届くまでも同じ。損失 5%・20% の下の MOS の推定を記録する。PROP-TEL-001〜003、IVR とダイヤルアウトの決定表、留守番電話が入らない |
 | **観測** | すべてのアラートが runbook の URL を持つ（CI）。`qos.report` のスキーマに IP・候補・名前がない（契約）。AMP の系列の数が参加者の数に比例して増えない |
 | **K8（費用）** | **月次**：請求と送ったバイトと参加者・分から K8 を計算し、目標（S1 0.20 円）と下りの平均（期待 1.5 Mbps・容量の前提 2.5 Mbps）を並べる。2 か月続けて超えたら Ops が PM と Dev に報告する（[ADR-0053](decisions/0053-capacity-model-cost-target-and-load-bots.md)）。QA は、下りの平均・カメラの割合・表示のしかたの分布の計測の定義を持つ |
 | アクセシビリティ（[clients.md](architecture/clients.md) の 6 節） | axe の違反 0。VoiceOver・NVDA で、参加・ミュート・挙手・録画の開始の通知を手動で確かめる |
-| 端末の処理（[clients.md](architecture/clients.md) の 5・12 節） | 仮想背景の 1 フレーム p95 12ms（基準の端末：4 年前の中位のノート PC。E5 の前に機種を決める）、glass-to-glass の増加 33ms 以内、合成の人物の正解のマスクとの IoU 0.90 以上（既定案）、処理が止まったときに処理しない映像のフレームが 1 枚も送られない。強い雑音の抑制でも NFR-003 を下回らない |
-| 画面共有（[ADR-0020](decisions/0020-screen-share-encoding.md)） | 下り 500 kbps の受け手で `frameHeight` が下がらない。10pt 相当の文字の画面の OCR の一致率 95% 以上（既定案） |
+| 端末の処理（[clients.md](architecture/clients.md) の 5・12 節） | 仮想背景の 1 フレーム p95 12ms（基準の端末：4 年前の中位のノート PC。E5 の着手で、この条件に合う機種を QA が 1 台選んで固定する）、glass-to-glass の増加 33ms 以内、合成の人物の正解のマスクとの IoU 0.90 以上（QA が承認した値）、処理が止まったときに処理しない映像のフレームが 1 枚も送られない。強い雑音の抑制でも NFR-003 を下回らない |
+| 画面共有（[ADR-0020](decisions/0020-screen-share-encoding.md)） | 下り 500 kbps の受け手で `frameHeight` が下がらない。10pt 相当の文字の画面の OCR の一致率 95% 以上（QA が承認した値） |
 
 ### 2.3 エージェントの確認ループ
 

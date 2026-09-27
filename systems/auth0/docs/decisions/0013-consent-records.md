@@ -28,7 +28,7 @@ OAuth の同意（第三者のアプリにスコープを許すこと）は、�
   - `checkbox`：チェックを必須にする。チェックなしの送信は、サーバーの側で拒否する（画面の `required` だけに頼らない）。
   - `notice`：「登録すると規約に同意したものとみなします」の文言を出す。記録の `method` に `notice` と残す。
   - `none`：出さない。記録もしない。
-- **記録**：`consent_records` に、`tenant_id`・`user_pk`（`users.id`。他の表と同じ。[data-model.md](../architecture/data-model.md) の 2 節）・`document_id`・`version`・`locale`・`method`・`accepted_at`・`client_id`・`transaction_id`・`ip`・`user_agent` を持つ。追記だけにし、更新と削除を DB のロールで禁じる（ユーザーの削除のときの扱いは下の「持ち越し」）。
+- **記録**：`consent_records` に、`tenant_id`・`user_pk`（`users.id`。他の表と同じ。[data-model.md](../architecture/data-model.md) の 2 節）・`document_id`・`version`・`locale`・`method`・`accepted_at`・`client_id`・`transaction_id`・`ip`・`user_agent` を持つ。追記だけにし、更新と削除を DB のロールで禁じる（ユーザーの削除のときの扱いは、法務の L7・L8 の結論と一緒に決める。[data-model.md](../architecture/data-model.md) の 8 節）。
 - **トランザクション**：`checkbox`・`notice` のときは、ユーザーの作成と同意の記録を同じ DB のトランザクションで書く。記録に失敗したら、ユーザーを作らない。
 - **ソーシャル接続での初回のログイン**：ユーザーを作る前に、同じ同意の画面を 1 回出す（テナントが有効にした場合）。
 - **版の更新**：`requires_reconsent` の版が発効したら、次のログインで同意の画面を出す。同意しないとログインを完了しない（テナントの設定で「通知だけ」も選べる）。

@@ -174,7 +174,7 @@ CREATE TABLE login_transactions (
 ### 5.2 CSRF
 
 - 画面のフォームの `POST` は、同期トークン（`csrf_secret` から HMAC で作り、フォームごとに違う値）、`Origin` の一致、`Sec-Fetch-Site` が `same-origin` か `none` であることの 3 つを確かめる。
-- SameSite の Cookie だけに頼らない。標準のホスト名 `<tenant>.jp.<brand>.<domain>` は、他のテナントと登録可能なドメインを共有するので same-site になる（[OWASP CSRF Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)）。`<brand>.<domain>` を Public Suffix List に登録するかは 13 節の問い。
+- SameSite の Cookie だけに頼らない。標準のホスト名 `<tenant>.jp.<brand>.<domain>` は、他のテナントと登録可能なドメインを共有するので same-site になる（[OWASP CSRF Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)）。Public Suffix List への登録は 17 節の決定（`jp.<brand>.<domain>` を登録する）。登録が反映されるまでの間も、下の防御だけで足りる形にする。
 - ログイン CSRF（攻撃者のアカウントで被害者をログインさせる）：URL の `state` と Cookie の結び付けで防ぐ。
 
 ### 5.3 オープンリダイレクト
@@ -190,7 +190,7 @@ CREATE TABLE login_transactions (
 
 - 画面の値は、JSX の既定のエスケープで出す。`dangerouslySetInnerHTML` に相当するものを lint で禁止する。
 - パスワードの欄は `autocomplete` を正しく付け、貼り付けを妨げない（[ADR-0015](../decisions/0015-database-connection-password-and-enumeration.md)）。
-- ボットの検知の部品（未定。intent の選定事項）は、決まった位置に差し込めるようにだけしておく。第三者のスクリプトを入れる場合は、CSP の許可、外部送信の公表（L2）、この表の更新を伴う。
+- ボットの検知の部品は、自前の PoW（[ADR-0026](../decisions/0026-bot-detection-and-challenge.md)）を決まった位置に差し込む。第三者のスクリプトを入れる場合は、CSP の許可、外部送信の公表（L2）、この表の更新を伴う。
 
 ## 6. ブランディングと文言
 
@@ -370,13 +370,19 @@ E2・E5・E10・E13 には、この領域の Story はない（E5 のログア�
 - **エラーの画面**：テナントのエラーの URL への転送は、`error` と `tracking_id` だけを付ける。本家は `client_id`・`connection`・`lang`・`error_description`・`tracking` を付ける（[Customize Error Pages](https://auth0.com/docs/customize/login-pages/custom-error-pages)、2026-09-27 に確認）が、本システムは `client_id` などを付けない（本家との違い。移行のテナントのエラーの画面が `client_id` を使っていれば直す必要がある）。
 - **iframe**：どの設定でも許さない。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **Public Suffix List**：`jp.<brand>.<domain>` を登録し、テナントの標準のホスト名を互いに別の site にする。E11 で申請し、リージョンを足すときは同じ形で足す。CSRF と Cookie の防御は、登録に頼らない今の形（5.2 節、`__Host-` の Cookie）のまま保つ。
+- **テナントの任意の HTML**：MVP では入れない。[ADR-0012](../decisions/0012-branding-and-templates.md) の 2（許可したタグだけのヘッダー・フッター）は、[roadmap.md](../roadmap.md) の「後回し」に置く。入れるときは別の ADR で決める。3（テンプレートと JavaScript）は採らない。
+- **サインアップの追加の項目**：MVP の後に、型をテキスト・選択・チェックボックスの 3 つに限って足す。値は `user_metadata` に保存する（専用の欄を作らない）。
+- **ボットの検知の部品**：自前の PoW（[ADR-0026](../decisions/0026-bot-detection-and-challenge.md)、[attack-protection.md](attack-protection.md) の 17 節）。第三者の CAPTCHA は法務の L2 の後。
+
 持ち越し：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | `form-action` の POST の後のリダイレクトでの、ブラウザごとの実装 | E4 の E2E で確かめ、足りなければ `form-action` の値を広げる ADR の改訂を起票する |
 | 画面の LCP の目標の妥当性 | E12 の計測 |
-| ボットの検知の部品 | E8 の着手前（attack-protection の領域） |
 
 ## References
 

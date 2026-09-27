@@ -76,7 +76,7 @@ OIDC・OAuth のエンドポイント、グラント、クライアントの認�
 | `/activate` | GET、POST | デバイスのユーザーコードの入力の画面 | Auth（Universal Login） | S1 |
 | `/oidc/logout` | GET、POST | RP-Initiated Logout | Auth（[sessions-and-sso.md](sessions-and-sso.md)） | S1 |
 | `/oauth/par` | POST | PAR（RFC 9126） | Auth | MVP の後 |
-| `/oauth/introspect` | POST | イントロスペクション（RFC 7662） | Auth | 未定（13 節） |
+| `/oauth/introspect` | POST | イントロスペクション（RFC 7662） | — | 持たない（14 節） |
 
 - 動的なクライアントの登録（`/oidc/register`）は持たない。アプリは Management API とダッシュボードで登録する。
 - `issuer` は `https://<host>/`（末尾のスラッシュ付き。本家と同じ形）。カスタムドメインで受けた要求には、カスタムドメインの `issuer` を使う。同じテナントに `issuer` が 2 つあることになる。discovery もホスト名ごとに書き出す。
@@ -150,7 +150,7 @@ OIDC・OAuth のエンドポイント、グラント、クライアントの認�
 | `screen_hint` | `signup` でサインアップの画面から始める（本家に固有） |
 | `request`・`request_uri` | 受けない。`request_not_supported`・`request_uri_not_supported`。`request_uri` は PAR を入れた後に、PAR の値だけを受ける |
 | `claims` | 受けない（`claims_parameter_supported: false`）。値は無視する |
-| `resource`（RFC 8707） | MVP では受けない。値があれば `invalid_target`。`audience` と両方を持つ扱いは、トークン交換と合わせて決める |
+| `resource`（RFC 8707） | MVP では受けない。値があれば `invalid_target`。トークン交換の Epic で受けるときは `audience` と同じ意味に扱い、両方を送った要求は値が同じときだけ通す（14 節） |
 
 - 同じパラメーターを 2 回付けた要求は `invalid_request`（RFC 6749 の 3.1 節）。
 - パラメーターの長さの上限：`state`・`nonce` は 2,048 バイト、`login_hint` は 320 バイト、URL 全体は 8,192 バイト（本システムの決定）。
@@ -262,7 +262,8 @@ RP(サーバー)
 - アサーションの検証：
   - `alg` は `RS256`・`PS256`・`ES256`。`none` と `HS*` は拒否する。
   - `iss` と `sub` が `client_id`。
-  - `aud` は、トークンのエンドポイントの URL か `issuer`（どちらか 1 つを含めばよい）。
+  - `aud` は `issuer` の文字列だけを受ける（配列は受けない）。トークンのエンドポイントの URL などほかの値は `invalid_client`（`draft-ietf-oauth-rfc7523bis` の 4 節。14 節の決定）。
+  - 互換のフラグ `legacy_token_endpoint_aud`（アプリごと、既定は無効）：有効なアプリだけ、従来の形（トークンのエンドポイントの URL か `issuer` を含む `aud`）も受ける。本家などから移るクライアントのためのもので、GA から 12 か月で廃止し、その後はすべてのアプリで `issuer` だけにする。従来の形で通った件数をアプリごとに数え、ダッシュボードで示す。
   - `exp` は必須で、`exp − iat` が 300 秒以下。時計のずれは 30 秒まで許す。
   - `jti` は必須。`(tenant_id, client_id, jti)` を `exp` まで覚え、2 回目を拒否する。置き場所は Valkey（`SET NX`、期限付き）。Valkey が使えないときは Aurora の `client_assertion_jtis` に挿入する。両方が使えないときは 503。
 - 本家の対応アルゴリズムは `RS256`・`RS384`・`PS256`（discovery）。本システムは `RS384` を持たず、`ES256` を足す（本システムの決定）。
@@ -299,7 +300,7 @@ RP(サーバー)
 - 機密のアプリだけ。アプリ × API の許可（`client_grants`。tenants-and-applications.md）にあるスコープだけを出す。`scope` の省略は、許可のすべて。
 - `audience` は必須（M2M の許可は API ごとにあるため。本家と同じ）。
 - ID トークンとリフレッシュトークンを出さない。
-- トークンの発行のために DB に書かない。設定のキャッシュと Signer だけで出す（[ADR-0005](../decisions/0005-authentication-path-availability.md) の Aurora の writer の障害の行）。発行のログを、writer に頼らずにどう残すかは logs-and-streams.md で決める（14 節の持ち越し）。
+- トークンの発行のために DB に書かない。設定のキャッシュと Signer だけで出す（[ADR-0005](../decisions/0005-authentication-path-availability.md) の Aurora の writer の障害の行）。発行のログは、[logs-and-streams.md](logs-and-streams.md) の 3.3 節の形（outbox に入れられないときはタスクのメモリーから SQS へ直接送る）で残す（14 節）。
 - `sub` は `<client_id>@clients`（本家と同じ形）。
 
 ### 7.4 デバイス（`urn:ietf:params:oauth:grant-type:device_code`）
@@ -425,7 +426,7 @@ RP(サーバー)
 | DPoP（RFC 9449） | `DPoP` ヘッダーの証明（`typ: dpop+jwt`、`jti`・`htm`・`htu`・`iat`、ES256 と PS256）を検証し、アクセストークンに `cnf.jkt` を入れ、`token_type` を `DPoP` にする。公開のクライアントのリフレッシュトークンも鍵に結ぶ。`DPoP-Nonce` を出す。API ごとに必須にできる | `jti` の再利用の検知は 6.1 節と同じ置き場所 |
 | トークン交換（RFC 8693） | `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`。MVP の後に、テナントが許した組（受け取るトークンの種類 × 出す API）だけを通す。委任は `act` クレームで表す | 利用の形（AI エージェントの委任など）を、需要を見て決める |
 | mTLS（RFC 8705） | クライアントの認証と、トークンの結び付け | カスタムドメインの TLS の終端の場所（custom-domains.md） |
-| イントロスペクション（RFC 7662） | 13 節 | — |
+| イントロスペクション（RFC 7662） | 持たない（14 節の決定） | — |
 
 - FAPI 2.0 の Security Profile の適合は、PAR と DPoP（か mTLS）を入れた後の目標にする。
 
@@ -521,16 +522,20 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 - **公開のアプリのアクセストークンの既定**：3,600 秒。
 - **Signer の障害中の認可コードの有効期間**：延ばさない。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **`private_key_jwt` の `aud`**：`draft-ietf-oauth-rfc7523bis-11` に従い、`issuer` だけを受ける。この草案は、クライアントの認証の `aud` を `issuer` だけにし、トークンのエンドポイントの URL を使わないこと（MUST NOT）と、それ以外の JWT を認可サーバーが拒否すること（MUST）を求める（[draft-ietf-oauth-rfc7523bis-11](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) の 4 節、2026-09-27 に確認）。移るクライアントのために、アプリごとの互換のフラグ `legacy_token_endpoint_aud`（既定は無効、GA から 12 か月で廃止）を置く（6.1 節、[ADR-0007](../decisions/0007-client-authentication-methods.md)）。外向きの `oidc_client_assertion` も同じ規則で、IdP の `issuer` を `aud` にする（[keys-and-secrets.md](keys-and-secrets.md) の 6.3 節）。
+- **イントロスペクション（RFC 7662）**：持たない。アクセストークンは JWT で、テナントの API が JWKS で確かめる（[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)）。需要が出たら、新しい ADR で足す。
+- **`resource`（RFC 8707）と `audience`**：MVP では `resource` を受けない（`invalid_target`）。トークン交換の Epic で受けるときは、`audience` と同じ意味に扱い、両方を送った要求は値が同じときだけ通す。
+- **同意（`grants`）の画面でのスコープごとの一部の許可**：持たない。求められたスコープをまとめて許すか断るかにする。画面と `grants` の形が単純になる。
+- **M2M のトークンの発行のログ（Aurora の writer の障害中）**：[logs-and-streams.md](logs-and-streams.md) の 3.3 節の形で残す。失う件数を E3 で計り、許容を確かめる（計測）。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| イントロスペクション（RFC 7662）を出すか | JWT を検証できない API（不透明なトークンを前提にした製品）の需要を見て、E5 の後に決める |
-| `resource`（RFC 8707）と `audience` の両立 | トークン交換の Epic で決める |
 | 本家のブラウザ向けのアクセストークンの既定、認可コードの有効期間 | 本家の試用のテナントで確かめる（E3）。ID トークンの最大は、本家の資料・OpenAPI に記載がないので、本システムの 86,400 秒のままにする |
-| `private_key_jwt` の `aud` を `issuer` だけにするか | `draft-ietf-oauth-rfc7523bis-11`（IETF の Last Call の段階）は、クライアントの認証の `aud` を `issuer` だけにし、トークンのエンドポイントの URL を使わないこと（MUST NOT）と、それ以外の JWT を認可サーバーが拒否すること（MUST）を求める（[draft-ietf-oauth-rfc7523bis-11](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) の 4 節、2026-09-27 に確認）。今の設計（トークンのエンドポイントの URL か `issuer` のどちらかを含めばよい）はこれに合わない。既存のクライアントとの互換と合わせて、RFC になる時点か E3 の着手時に Dev のテックリードとセキュリティの担当が決める |
-| 同意（`grants`）の画面で、スコープごとの一部の許可を許すか | universal-login.md と合わせて E4 |
-| M2M のトークンの発行のログを、Aurora の writer の障害中にどう残すか | [logs-and-streams.md](logs-and-streams.md) の 3.3 節の形（outbox に入れられないときはタスクのメモリーから SQS へ直接送る。失いうるので件数を計る）で扱う。失う件数の許容を E3 で確かめる |
+| M2M のトークンの発行のログを失う件数の許容 | E3 の計測 |
 
 ## 15. ADR
 
@@ -550,7 +555,7 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 | E3 | `discovery-and-metadata` | discovery と RFC 8414 のメタデータの生成と S3 への書き出し |
 | E3 | `authorize-endpoint` | `/authorize` のパラメーターの検証、`redirect_uri` の照合、`login_transactions` への認可の要求の保存、エラーの画面 |
 | E3 | `authorization-code-grant` | コードの発行・消費・再利用の検知、PKCE、`iss` の応答 |
-| E3 | `client-authentication` | 4 つの方式、秘密の 2 つまでの並行、`private_key_jwt` の `jti` |
+| E3 | `client-authentication` | 4 つの方式、秘密の 2 つまでの並行、`private_key_jwt` の `jti` と `aud`（`issuer` だけ。互換のフラグ `legacy_token_endpoint_aud`） |
 | E3 | `token-claims-and-lifetimes` | ID トークン・アクセストークンのクレーム、8.1 節の値、大きさの上限 |
 | E3 | `client-credentials-grant` | M2M、DB に書かない経路 |
 | E3 | `userinfo-endpoint` | userinfo と Bearer のエラー |

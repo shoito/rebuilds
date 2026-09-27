@@ -189,7 +189,7 @@ Vello との関係：Vello GPU（旧 `vello_hybrid`、0.2.0、2026-08-07）は�
 ### 8.3 ブレンドモードと不透明度
 
 - ブレンドモードは 18 種。W3C Compositing and Blending Level 1 の 16 種（normal、darken、multiply、color-burn、lighten、screen、color-dodge、overlay、soft-light、hard-light、difference、exclusion、hue、saturation、color、luminosity）に、本家が持つ `LINEAR_BURN`（`B = max(0, Cb + Cs − 1)`）と `LINEAR_DODGE`（`B = min(1, Cb + Cs)`）を足す。グループ・フレームの `PASS_THROUGH` は下の非分離の合成で扱う。本家のモードの一覧は [BlendMode](https://developers.figma.com/docs/plugins/api/BlendMode/)（2026-09-27 に確認）。`LINEAR_BURN`・`LINEAR_DODGE` の式が本家と一致するかは **未検証**（E4 の `effects-blend-masks` で本家の書き出しと比べる）。
-  - > 2026-09-27 の注記：W3C の 16 種だけとしていたのを、本家の一覧に合わせて 18 種に改めた。
+  - > 2026-09-27 の注記：W3C の 16 種だけとしていたのを、本家の一覧に合わせて 18 種に改めた。この変更は承認済み。
 - normal 以外は、合成先の画素を読む。合成先の範囲をテクスチャにコピーし、シェーダーで式を当てる（固定のブレンドの機能では表せないため）。
 - 不透明度が 1 未満か normal 以外のブレンドを持つフレーム・グループは、分離した層（オフスクリーン）に描いてから合成する。グループの既定の「pass through」は分離せず、子が直接その下に合成される。
 - オフスクリーンの層は、1 タイルあたり入れ子 8 段まで。超えたら、深い段を 1 つの層にまとめて描く（見た目の差を許す。警告を記録する）。
@@ -274,7 +274,7 @@ NFR-004（10 万ノードの参照ファイルで、タブのメモリ 1.5 GB �
 | 画像 | 384 MB | GPU |
 | グリフのアトラス・オフスクリーンの層 | 80 MB | GPU |
 
-- GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う（**未検証**。E2 の `render-memory-budget` で主要な組み合わせを測る）。計測の定義は quality.md で決める。ここでは CPU の側を 950 MB、GPU の側を 720 MB に抑えることを目標にする。
+- GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う（**未検証**。E2 の `render-memory-budget` で主要な組み合わせを測る）。そのため NFR-004 を 2 つに分ける（2026-09-27 に決定。[quality.md](../quality.md) の 2.2 節）。CPU の側（WASM の線形メモリ＋JS のヒープ）は 1.5 GB 以内で、予算は 950 MB。GPU の側はエンジンの数えで 720 MB 以内。
 - WASM のメモリは 32 ビット（最大 4 GB）。Safari が memory64 に対応していないため（MDN の browser-compat-data、2026-09-27 に確認）、MVP は `wasm32` のままにする。
 - メモリの使用量は 5 秒ごとに数え、1.2 GB（80%）を超えたら、UI の殻に警告を出す。キャッシュ（タイル、ジオメトリ、高解像度の画像）を捨てて、下げられるだけ下げる。
 
@@ -406,7 +406,7 @@ E3・E7・E8・E11 には、この領域の Story はない。
 
 - 参照画像のテストの判定の値（16.1 節）と、参照の端末の一覧（GPU の種類、OS、ブラウザ）。export-and-assets の SC-6 の許容の値と同じものにする。
 - 性能の予算（15 節）を E2 のリリースの基準にする。PR ごとの 20% の後退の検出。
-- NFR-004 の「タブのメモリ」の測り方（GPU のメモリを数えるか）。
+- NFR-004 は CPU の側 1.5 GB と GPU の側 720 MB に分けて測る（11 節。quality.md に反映済み）。
 - 本番での検証：バックエンドごとのフレーム時間の p95、WebGPU → WebGL2 の切り替えの率、コンテキストの喪失の率、安全な描画の状態に入った率、メモリの警告の率を、ブラウザ・OS・GPU の別に日次で見る。
 
 ### runbooks

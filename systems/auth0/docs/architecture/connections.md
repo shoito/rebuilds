@@ -453,14 +453,21 @@ E1・E3・E5・E7・E10・E13 には、この領域の Story はない（E5 の�
 - **LINE の `email_verified`**：確かめられるまで偽として扱う。
 - **`email_verified=false` のログイン**：既定で許す（本家と同じ）。テナントが止められる。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **K3 の測り方**：データベース接続だけで測る。開発者キーを提供しないので、ソーシャル接続は K3 の対象にしない。
+- **よく使われるパスワードの一覧**：本家と同じく SecLists の 1 万件を使う（[Password Options](https://auth0.com/docs/authenticate/database-connections/password-options)）。使う版を E4 の着手時に固定し、ライセンスの表記を確かめて、リポジトリに置く。
+- **SAML のライブラリ**：第一候補を `@node-saml/node-saml` にする。E14 の着手前に [ADR-0017](../decisions/0017-enterprise-connections.md) の条件（XSW の試験、署名した要素だけを取り出す API、XXE を読まない、保守）で確かめる。
+- **列挙の時間の差の合格の基準**：中央値の差 5% 以内、かつ p90 の差 10% 以内（[quality.md](../quality.md) の 2.2.1 節）。統合で足した p90 の条件を受け入れた。
+- **パスワードの変更（4.7 節）**：再設定と同じく、他のセッションとリフレッシュトークンの系列を既定で失効させる。今のセッションは残す（[sessions-and-sso.md](sessions-and-sso.md) の 13 節）。
+
 持ち越し：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| よく使われるパスワードの一覧の出典とライセンス | E4 の着手前。本家は SecLists の 1 万件を使う（[Password Options](https://auth0.com/docs/authenticate/database-connections/password-options)） |
 | Pwned Passwords のデータセットの保存と商用の利用の条件 | 法務の確認（[ADR-0025](../decisions/0025-breached-password-detection.md)）。確認までは公式の range API を使う |
-| SAML のライブラリの選定 | E14 の着手前（[ADR-0017](../decisions/0017-enterprise-connections.md)） |
-| 列挙の時間の差の許容（中央値 5%）の妥当性 | E12 の計測 |
+| SAML のライブラリの評価 | E14 の着手前に、第一候補の `@node-saml/node-saml` を [ADR-0017](../decisions/0017-enterprise-connections.md) の条件で確かめる。満たさなければ他を評価する |
+| 列挙の時間の差の許容（中央値 5%・p90 10%）の妥当性 | E12 の計測 |
 
 ## References
 

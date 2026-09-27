@@ -260,7 +260,7 @@ type MfaPolicy = {
 
 #### 5.2.3 ライブラリ
 
-- 候補は `@simplewebauthn/server`（[architecture/README.md](README.md) の 4 節）。E7 の着手の時点で、保守の状況、Level 3 の項目（`hints`、BE・BS、Related Origin Requests）の対応、依存の数を確かめて決める（ADR-0022 の Confirmation）。
+- `@simplewebauthn/server` を使う（2026-09-27 に推奨案で確定。[architecture/README.md](README.md) の 4 節）。E7 の着手の時点で、保守の状況、Level 3 の項目（`hints`、BE・BS、Related Origin Requests）の対応、依存の数を確かめ、満たさないときだけ見直す（ADR-0022 の Confirmation）。
 - CBOR・COSE の解析と署名の検証を自前で書かない（[AGENTS.md](../../AGENTS.md)）。
 
 ### 5.3 メールの OTP
@@ -490,11 +490,17 @@ type MfaPolicy = {
 - **API ごとの `acr` の要求は設定で持つ**（`resource_servers.scope_acr`）。拡張（E13）を待たない。
 - **AAL3 は MVP で主張しない**。
 
+### 決定（2026-09-27、推奨案で確定）
+
+- **WebAuthn のサーバーのライブラリ**：`@simplewebauthn/server`。E7 の着手時に 5.2.3 節の基準で確かめ、満たさないときだけ見直す。
+- **同期するパスキーを拒む設定（BE=1 の拒否）**：MVP では持たない。AAL3（S2 以降、アテステーションの検証と一緒）で扱う。
+- **アカウントの画面（本人が要素を管理する画面）**：MVP の後（[roadmap.md](../roadmap.md) の「後回し」）。MVP は、登録はログインの途中と登録のチケット、削除は管理者だけ。
+- **`fed` の `amr` で IdP の `amr`・`acr` を引き継ぐか**：既定で引き継がない。`amr` は `fed` だけにする。E14 で、接続ごとに IdP の値を信じる設定（既定は無効）を足す。
+
 持ち越し：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| WebAuthn のサーバーのライブラリ | E7 の着手の時点。5.2.3 の基準で評価する |
 | Related Origin Requests・Signal API・条件付きの作成のブラウザの対応 | E7 で、K8 の組み合わせで確かめる |
 | 本家の TOTP・リカバリーコード・試行の上限の既定値 | E7 の着手前に試用のテナントで確かめる |
 | SMS の送信事業者と SMS pumping の対策 | MVP の後の SMS の Epic（L4 の後） |

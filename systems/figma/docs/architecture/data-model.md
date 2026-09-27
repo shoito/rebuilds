@@ -132,7 +132,7 @@
 | `seq`、`region_gen` | 版の `seq` と、その `seq` の世代 |
 | `manifest_key` | マニフェストのキー（`dr_salvaged` は 6.1 節の `salvage/` の下） |
 | `name`、`description` | 名前付きの版（ログに書かない） |
-| `created_by`、`created_at`、`delete_after` | `delete_after` は無料のプランの保持（30 日。PM の決定待ちの既定案） |
+| `created_by`、`created_at`、`delete_after` | `delete_after` は無料のプランの保持（30 日。本家の Starter と同じ） |
 
 ### 5.3 `file_storage_jobs`
 
@@ -253,4 +253,3 @@
 残り（マイグレーションを書く Story で確かめる）：
 
 - すべてのテナントの表に RLS があり、3.2・3.3 節の例外が網羅されていることを、マイグレーションの CI の許可リストと照合する（E1）。
-- `file_versions.delete_after` の既定（無料のプラン 30 日）は PM の決定待ち（intent.md の Open questions）。

@@ -52,7 +52,7 @@ date: 2026-09-27
   - WASM が静かに大きくなることを防ぐ。
 - 引き受けるコスト：
   - CI で 3 つのビルドと 2 つのブラウザを走らせる時間と費用。
-  - GPU 付きの VM の CI の実行環境を持つ。
+  - GPU 付きの VM の CI の実行環境を持つ。AWS の GPU のインスタンスを、ジョブごとに立てて捨てる自前の runner にする（[delivery.md](../architecture/delivery.md) の決定）。
 
 ## Confirmation
 

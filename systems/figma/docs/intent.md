@@ -109,8 +109,8 @@ MVP のリリースの判断に使う。計測の方法は [quality.md](quality.
 - マルチプレイヤーの方式（OT、CRDT、中央のサーバーの順序） → 中央のサーバーの順序に決めた（[ADR-0002](decisions/0002-central-authoritative-multiplayer.md)、accepted）。
 - 描画のエンジンを Rust で書くか、本家と同じ C++ で書くか → Rust に決めた（[ADR-0001](decisions/0001-platform-and-stack.md)、accepted）。
 - キャンバスの上のテキストで、IME の入力をどう受けるか → 全ブラウザで隠した `textarea` に決めた（[ADR-0017](decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方とイベントの順序は E4 の前の PoC で確かめる。
-- 「プロジェクト」の呼び名：本家は 2026-08-03 から「フォルダー」へ改名している（中身と権限は変わらない。[Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、2026-09-27 に確認）。本システムは「プロジェクト」のまま進め、表とコードの名前も `project` にする。画面の呼び名を合わせるかは PM が E9 の前に決める（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 15 節）。
-- 無料のプランの範囲（ファイル数、版の履歴の日数。本家の Starter は履歴 30 日。[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。PM が決める。
+- 「プロジェクト」の呼び名：本家は 2026-08-03 から「フォルダー」へ改名している（中身と権限は変わらない。[Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、2026-09-27 に確認）。→ S1 は「プロジェクト」のままにし、表とコードの名前も `project` にすると決めた。利用者の調査で混乱が見えたら見直す（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 15 節）。
+- 無料のプランの版の履歴 → 本家の Starter と同じく 30 日に決めた（[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。30 日を過ぎた版は消す（[ADR-0026](decisions/0026-version-history-restore-and-deletion.md)）。ファイル数などの他の範囲は、料金の設計（MVP の後）で決める。
 
 ## 法務の確認待ち
 

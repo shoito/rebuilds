@@ -38,7 +38,7 @@
 - **E2EE のオプション**：主催者が会議ごとに選ぶ。E2EE の会議では、録画・字幕などのサーバーで内容を扱う機能を使えない（[ADR-0004](decisions/0004-encryption-and-e2ee.md)）
 - **カレンダー連携**：Google カレンダーと Microsoft 365 の予定に、会議の URL を付ける
 - **アカウントと管理**：組織のアカウント、ユーザーとロール、会議の既定の設定と強制、利用状況のレポート
-- **公開 API と Webhook**：会議・ユーザー・録画・レポートの公開 API（OAuth のアプリとサーバー間のアプリ）と、署名付きの Webhook（E11。[ADR-0043](decisions/0043-public-api-oauth-apps-and-rate-limits.md)、[ADR-0044](decisions/0044-signed-webhooks-standard-webhooks.md)）。基盤の Epic の草案が公開 API を MVP に入れていたので、MVP に含める。**PM の確認の項目**（MVP から外すなら E11 を MVP の後へ動かす）
+- **公開 API と Webhook**：会議・ユーザー・録画・レポートの公開 API（OAuth のアプリとサーバー間のアプリ）と、署名付きの Webhook（E11。[ADR-0043](decisions/0043-public-api-oauth-apps-and-rate-limits.md)、[ADR-0044](decisions/0044-signed-webhooks-standard-webhooks.md)）。基盤の Epic の草案が公開 API を MVP に入れていたので、MVP に含める（2026-09-27 に推奨案で確定）
 
 ### MVP の後の Epic で扱う
 
@@ -77,7 +77,7 @@
 | K5 | 体感の品質 | 会議の後の評価（5 段階）で、4 以上の割合が 90% 以上 | 会議の後の任意の評価 |
 | K6 | 荒らしの防止 | 待合室またはパスコードのない会議 0 件。第三者の入り込みの報告に、主催者が 1 回の操作で対処できる | 設定の監査、報告の集計 |
 | K7 | 日本語の字幕 | 会議の音声で、文字の誤り率（CER）15% 以下。発話から字幕の表示まで p95 2 秒以内（NFR-010） | 評価用の会議の音声のセット。本番は遅れだけを測る |
-| K8 | 費用 | 参加者・分あたりのメディアの配信の費用を、S1 で 0.20 円以下、S2 で 0.07 円以下に保つ（[capacity.md](architecture/capacity.md) の 6 節、[ADR-0053](decisions/0053-capacity-model-cost-target-and-load-bots.md)）。既定案で、**PM と Ops の確認の項目**。S1 を AWS で容量の前提（下り 2.5 Mbps）のまま動かすと約 0.28 円で届かない。届くかは、下りの実測と Edge の判断（[ADR-0050](decisions/0050-disaster-recovery-and-edge-migration.md)）に掛かる | 請求の集計と、送ったバイト数（毎月） |
+| K8 | 費用 | 参加者・分あたりのメディアの配信の費用を、S1 で 0.20 円以下、S2 で 0.07 円以下に保つ（[capacity.md](architecture/capacity.md) の 6 節、[ADR-0053](decisions/0053-capacity-model-cost-target-and-load-bots.md)）。2026-09-27 に推奨案で確定した。S1 を AWS で容量の前提（下り 2.5 Mbps）のまま動かすと約 0.28 円で届かない。これは受け入れ、閾値で Edge の構築を始める道を採る（[ADR-0050](decisions/0050-disaster-recovery-and-edge-migration.md)） | 請求の集計と、送ったバイト数（毎月） |
 
 ## Affected users and systems
 
@@ -128,6 +128,6 @@
 
 - 日本語の音声認識のエンジン：S1 は Amazon Transcribe streaming を既定にし、E8 の着手前に、評価用の音声のセットで自前でホストする Whisper 系などと遅れ・誤り率・費用を比べる（[ADR-0026](decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）。東京の streaming の料金は 1 分 0.01 USD（2026-09-27 に確認）。日本語の誤り率と遅れは**未検証**で、E8 の `asr-evaluation-set` で測る。
 - メディアサーバーの 1 台あたりの参加者の数・パケット数の上限：c8gn.16xlarge を既定にし（[ADR-0049](decisions/0049-media-node-fleet.md)）、E7 の負荷試験で c8g.16xlarge と比べて決める。EC2 はインスタンスごとの PPS の上限を公表していない（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。上限は**未検証**で、E7 の `load-l0-l2` で測る。
-- AWS のインターネットへの転送の費用が K8 に収まるか：下りの平均 1.5 Mbps なら収まり、2.5 Mbps なら収まらない見込み（[infrastructure.md](architecture/infrastructure.md) の 12 節）。E2 のベータで下りの平均を測る。ベアメタル・コロケーション（Edge）の構築は、ピークの送出が 4 週続けて 10 Gbps を超えたら始める（[ADR-0050](decisions/0050-disaster-recovery-and-edge-migration.md)）。その前に、ピークの送出が 2 週続けて 5 Gbps を超えたら、Edge の運用の体制（24 時間の当番、自社の AS と BGP）を持つかを PM と Ops が決める。
+- AWS のインターネットへの転送の費用が K8 に収まるか：下りの平均 1.5 Mbps なら収まり、2.5 Mbps なら収まらない見込み（[infrastructure.md](architecture/infrastructure.md) の 12 節）。E2 のベータで下りの平均を測る。ベアメタル・コロケーション（Edge）の構築は、ピークの送出が 4 週続けて 10 Gbps を超えたら始める（[ADR-0050](decisions/0050-disaster-recovery-and-edge-migration.md)）。運用の体制は、最初はリモートハンドを持つコロケーションの事業者と、IP transit と BGP の運用を任せる事業者を使い、社内のネットワークの SRE の当番を並行して作る（閾値の前に 2 人を採用）。ピークの送出が 2 週続けて 5 Gbps を超えたら、この形で進めるかを PM と Ops が決める。
 - E2EE でのブラウザの対応：`RTCRtpScriptTransform` は対応ブラウザの最新 2 メジャーのすべてにある（[ADR-0021](decisions/0021-web-client-browser-support.md)）。Dependency Descriptor・depacketizer・SVC の層ごとのフレームの扱いは**未検証**で、E9 の `e2ee-poc-transform` で確かめる（[ADR-0028](decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)）。
 - 1:1 の会議を P2P にするか：S2 で、費用と品質を計測して決める（[ADR-0002](decisions/0002-media-topology.md)）。

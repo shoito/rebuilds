@@ -100,10 +100,10 @@
 
 | ID | 項目 | S1 の目標 | 備考 |
 | --- | --- | --- | --- |
-| NFR-001 | 同時編集の反映 | 入力から、同じファイルを開いた他の人の画面まで p99 250ms 以内（同じリージョン） | ジャーナルの書き込み（group commit）を含む。区間の予算は [multiplayer.md](multiplayer.md) の 8 節 |
+| NFR-001 | 同時編集の反映 | 入力から、同じファイルを開いた他の人の画面まで p99 250ms 以内（同じリージョン） | ジャーナルの書き込み（group commit）を含む。区間の予算は [multiplayer.md](multiplayer.md) の 8 節。書き込みの予算の段に入ったファイルは対象の外にし、p99 1 秒を別に見る（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)） |
 | NFR-002 | 自分の入力の反映 | 入力から自分の画面まで 1 フレーム（16.7ms）以内。サーバーを待たない | 段の予算は [rendering-engine.md](rendering-engine.md) の 15 節 |
 | NFR-003 | 大きなファイルを開く時間 | 10 万ノードの参照ファイルで、最初のページが操作できるまで p75 5 秒以内（キャッシュなし）、2 秒以内（キャッシュあり） | 参照の端末は [quality.md](../quality.md) の 2.4 節 |
-| NFR-004 | メモリ | 10 万ノードの参照ファイルで、タブのメモリ 1.5 GB 以内。80% で警告を出す | 本家はタブあたり 2 GB を上限にしている（[Reduce memory usage in files](https://help.figma.com/hc/en-us/articles/360040528173-Reduce-memory-usage-in-files)、2026-09-27 に確認）。内訳は rendering-engine.md の 11 節（`Doc` は 200 MiB） |
+| NFR-004 | メモリ | 10 万ノードの参照ファイルで、タブのメモリ（CPU の側：WASM の線形メモリ＋JS のヒープ）1.5 GB 以内。80% で警告を出す。GPU の側（タイル・画像・アトラス）はエンジンの数えで別に 720 MB 以内 | 本家はタブあたり 2 GB を上限にしている（[Reduce memory usage in files](https://help.figma.com/hc/en-us/articles/360040528173-Reduce-memory-usage-in-files)、2026-09-27 に確認）。内訳は rendering-engine.md の 11 節（`Doc` は 200 MiB） |
 | NFR-005 | フレームレート | 10 万ノードの参照ファイルのパン・ズームで、フレーム時間 p95 16.7ms 以内（60fps） | |
 | NFR-006 | 耐久性 | 確定を返した編集は失わない（プロセス・ホスト・AZ の障害）。確定の前に失われうる範囲は、送り直しで回復する | 本家の目標は「失うのは 1 秒未満」（同上の Making multiplayer more reliable） |
 | NFR-007 | Document Server の障害からの回復 | 持ち主のプロセスが落ちてから、別の持ち主で編集を再開できるまで p95 15 秒以内 | 内訳は infrastructure.md の 5.4 節 |
@@ -228,7 +228,7 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **版の照合**：`schema_hash` の不一致で再読み込みにする規則を、ADR-0053 の 3 つの版の照合に置き換えた（document-model.md の 8.4 節、multiplayer.md の 4.3 節）。
 - **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻した版は `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 11 節）。
 - **領域の間の提案**：`thumbnail_node`、`cjk_fallback_font`、レイアウトのプロパティ、`component_prop_values` などのコンポーネントのプロパティ、表の列 `public_api`・`api_name`・`api_since`・`public_plugin`、`ChangeSet` の `origin`、マニフェストの `features`、`Hello.protocol_version`、再接続の最初の 0〜5 秒の乱数の待ち、`file_versions.kind = dr_salvaged`、ファイルの `maintenance` の状態を取り込んだ（data-model.md の 9・11 節）。
-- **呼び名**：本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名している。本システムは「プロジェクト」のまま進め、表とコードも `project` にする。画面の呼び名は PM が E9 の前に決める（permissions-and-sharing.md の 15 節）。
+- **呼び名**：本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名している。本システムは「プロジェクト」のまま進め、表とコードも `project` にする。画面の呼び名は下の「決定（2026-09-27、推奨案で確定）」で決めた（permissions-and-sharing.md の 15 節）。
 - **Epic**：E1〜E12 が MVP、E13 ライブラリ、E14 プラグイン、E15 公開 API と Webhook。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。領域の文書の仮の Epic の番号を roadmap.md に揃えた（rendering-engine.md と editor-and-tools.md の E8・E9 の入れ替わり、「後」「後-P」「後-A」の置き換え）。組織の SAML SSO は ADR-0043 のとおり E12 に作るが、MVP の範囲の外で GA の判定に含めない。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限（ファイル・ノード）は document-model.md の 11 節、送受信の上限は multiplayer.md の 4.6 節、メモリの予算は rendering-engine.md の 11 節、容量のパラメーターは capacity.md の 10 節、保持の期間は security.md の 7 節。
 - 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
@@ -253,6 +253,42 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 | CloudFront の応答の期限が WebSocket に効くか、接続の長さの上限 | E3 の `gateway-edge-websocket` の PoC（8 時間）。Fargate の退役は保護を待たない前提にした（資料は保護の対象を縮小とデプロイに限る。[infrastructure.md](infrastructure.md) の 3 節） |
 | RTO の内訳、障害中にグローバルテーブルから東京のレプリカを外せるか | E12 の DR の訓練 |
 | 費用の単価 | E12 の前に、AWS の料金の計算ツールで置き換える |
+| 参照画像のテストの許容の値 | E2 で端末ごとの差を測って決め直す（[rendering-engine.md](rendering-engine.md) の 16.1 節） |
+
+### 決定（2026-09-27、推奨案で確定）
+
+PM の方針（「判断が要るところは推奨案でよい」）により、ロールの決定・確認を待っていた項目を、推奨案で確定した。各文書と ADR の「待ち」の書き方を消し、決定として書き直した。ADR を覆した直しには、日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。法務の項目と、法務の結論に依る項目は決めていない（下の「残したもの」）。
+
+| 決定 | 理由 | 文書 |
+| --- | --- | --- |
+| チームの可視性・参加・一般アクセスは、チームの中身に引き継がない。open のチームへの参加で見えるのはチームだけ。一般アクセスはプロジェクトとファイルにだけ置く | 本家は audience access を中身に引き継がない。本家に寄せる方針に合わせる | [permissions-and-sharing.md](permissions-and-sharing.md) の 3.3・4.3・13・15 節、[ADR-0029](../decisions/0029-hierarchy-roles-seats-and-link-access.md)、[search.md](search.md) の 3.3 節、[ADR-0032](../decisions/0032-name-search-in-aurora.md)、[quality.md](../quality.md) |
+| ブレンドモードは 18 種 | 本家の一覧（`LINEAR_BURN`・`LINEAR_DODGE` を含む）に合わせる | [rendering-engine.md](rendering-engine.md) の 8.3 節 |
+| `strokes_included_in_layout` の既定は true | 本家が内側の線を既定でレイアウトに含める | [layout.md](layout.md) の 2 節 |
+| Gateway の再開のトークンの設計を承認 | 再接続の殺到で API のチケットの発行が律速になるのを避ける | [permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節、[ADR-0030](../decisions/0030-single-policy-engine-and-signed-capabilities.md) |
+| 匿名の閲覧者にコメントを見せない | 「リンクを知っている全員」のファイルで、社内のやり取りを外に出さない | [comments-and-notifications.md](comments-and-notifications.md) の 10 節 |
+| アプリで読んだコメントは、メールのまとめから除く | メールの数を減らす | 同上 |
+| 無料のプランの版の履歴は 30 日。過ぎた版は消す | 本家の Starter と同じ | [intent.md](../intent.md)、[file-storage-and-history.md](file-storage-and-history.md) の 8.4 節、[ADR-0026](../decisions/0026-version-history-restore-and-deletion.md) |
+| 画面の呼び名は、S1 は「プロジェクト」のまま。利用者の調査で混乱が見えたら見直す | 表とコードの名前と揃い、改名の費用がかからない | [permissions-and-sharing.md](permissions-and-sharing.md) の 15 節、[intent.md](../intent.md) |
+| NFR-004 を CPU の側 1.5 GB と GPU の側 720 MB に分ける | GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う | 4 節、[quality.md](../quality.md) の 2.2 節、[rendering-engine.md](rendering-engine.md) の 11 節、[observability.md](observability.md) |
+| 書き込みの予算の段に入ったファイルは NFR-001 の対象の外にし、反映の p99 1 秒を別に見る | 予算の段は、わざと反映を遅らせて編集を続ける仕組みだから | 4 節、[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) |
+| 参照の端末は 3 台（標準 2・下限 1） | Windows と Mac の標準の端末と、WebGL2 だけの下限で NFR を判定する | [quality.md](../quality.md) の 2.4 節 |
+| E7 を出す合格は、作り直しの影の検証の連続 10 万回の一致 | 本家の段階的な出し方に倣い、確定の損失を出す前に見つける | [quality.md](../quality.md) の 2.2.1 節 |
+| インスタンスの中で、大きさの方式（hug・fill・fixed）を上書きできる | 拒否すると、オートレイアウトのインスタンスの使い勝手が大きく落ちる | [components-and-libraries.md](components-and-libraries.md) の 3.4・11 節、[layout.md](layout.md) の 16 節 |
+| 絶対配置の子の制約は、利用者が親の大きさを変えたときだけ当てる。端末のフォントのノードの食い違いは、次にそのテキストを編集した人が直す | 今の振る舞いのままで、収束の規則を増やさない | [layout.md](layout.md) の 16 節 |
+| 在席の `selection` は、MVP は `NodeId` だけ。導出したノードはインスタンスの `NodeId` で送る | 送受信の形式を変えない | [editor-and-tools.md](editor-and-tools.md) の 19 節 |
+| セッションはアイドル 14 日・最長 30 日。匿名のセッションは 24 時間で、匿名の人数は 1 ファイルの参加の上限（500 人）の中で数える | 別の上限を足さず、既存の上限で抑える | [security.md](security.md) の 4・13 節 |
+| プランを上げる前の監査ログは、組織の管理者に見せない | 本家と同じ | [security.md](security.md) の 13 節、[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md) |
+| 1 組織の画像の合計に、MVP では上限を置かない。合計を計測する | 1 枚の上限とファイルの大きさの上限で足りる。容量は料金の設計（MVP の後）で決める | [export-and-assets.md](export-and-assets.md) の 6.1・15 節 |
+| 有料のプラグインは扱わない | 決済の仕組みが要り、範囲の外 | [plugins.md](plugins.md) の 15 節 |
+| MCP のサーバーは出さない | intent は AI の生成を範囲の外にする。出すなら別の ADR | [api-and-webhooks.md](api-and-webhooks.md) の 13 節 |
+| GPU 付きの VM の CI は、AWS の GPU のインスタンスをジョブごとに立てる自前の runner | GPU の種類を固定でき、計測の揺れを抑えやすい | [delivery.md](delivery.md) の 10 節、[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md) |
+| 端末のキャッシュは暗号化せず、組織の方針で止められるようにする。組織ごとの KMS の鍵は MVP で持たない | security.md と ADR-0044 の決定に揃え、file-storage-and-history.md の持ち越しから外した | [file-storage-and-history.md](file-storage-and-history.md) の 16 節、[ADR-0044](../decisions/0044-encryption-keys-and-client-cache.md) |
+
+残したもの：
+
+- 法務の確認待ち（[intent.md](../intent.md) の L1〜L6）と、その結論に依る項目：フォントの配布と埋め込み（L1）、権利侵害の申し立て（L2）、公開のリンクの扱い（L3）、削除とバックアップの期間・監査のアーカイブの 7 年（L4）、漏洩の報告（L5）、本家の UI・ショートカットへの寄せ方（L6）、クライアントの計測の利用規約への書き方。
+- 計測・PoC で決めるもの（上の「持ち越し」の表と、各文書の「持ち越し」）。参照画像の許容の値は、E2 で決め直す。
+- 利用者の声や将来の条件で見直すもの（未確定の変更の IndexedDB への保存、Undo の履歴のタブをまたぐ保存、500 人を超えるファイル、ShadowRealm など）。どれも今の決定があり、見直しの条件だけを書いている。
 
 ## 8. 領域の文書
 

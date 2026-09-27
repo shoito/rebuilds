@@ -88,7 +88,7 @@ Web やモバイルのアプリを作るたびに、ログイン、サインア�
 - **テナントの開発者**（主な利用者）：日本の B2C・B2B のアプリを作る開発者。スタートアップから中堅の事業者を最初の対象にする。LINE ログインと日本語の画面が必須になる B2C を重視する。
 - **テナントの管理者**：ダッシュボードで、設定、ユーザーの管理、ログの確認をする人。
 - **エンドユーザー**：テナントのアプリにログインする人。日本語の画面と、パスキー・ソーシャルログインで使う。
-- **外部のシステム**：ソーシャル IdP（Google、Apple、LINE、GitHub）、メールの送信事業者、ログの送信先、漏えいしたパスワードのデータセット、ボットの検知の提供者（未定）。
+- **外部のシステム**：ソーシャル IdP（Google、Apple、LINE、GitHub）、メールの送信事業者、ログの送信先、漏えいしたパスワードのデータセット、第三者の CAPTCHA の提供者（持つかどうかは法務の L2 の後）。
 - **社内の運用**：サポート、セキュリティの監視、障害の対応。
 
 ## Constraints
@@ -141,4 +141,4 @@ Web やモバイルのアプリを作るたびに、ログイン、サインア�
 - ボットの検知の方式：自前のリスクの点数と proof-of-work のチャレンジに決めた。WAF の Challenge はエッジの後ろ盾、第三者の CAPTCHA は L2 の結論の後（[ADR-0026](decisions/0026-bot-detection-and-challenge.md)）。
 - Argon2id のパラメーターと、ログインの CPU の費用：E12 の負荷試験で決める（[ADR-0004](decisions/0004-credential-storage.md)）。
 - LINE ログインでメールアドレスを得るための申請：要る。LINE Developers Console で、規約に同意し、取得の目的を説明する画面のスクリーンショットを出す（[Integrating LINE Login with your web app](https://developers.line.biz/en/docs/line-login/integrate-line-login/)、2026-09-27 に確認）。審査の期間は未検証で、E6 の着手前に申請して確かめる。
-- OpenID Certification の対象のプロファイル：Form Post を含め、Dynamic は含めない（動的な登録を持たない）と決めた（2026-09-27。[authentication-flows.md](architecture/authentication-flows.md) の 13.3・14 節）。認証の費用は、OpenID Connect の 1 つのデプロイメントに、会員 700 USD・非会員 3,500 USD で、同じ暦年の中ならプロファイルを足しても追加の費用はない（[OpenID Certification Fees](https://openid.net/certification/fees/)、2026-09-27 に確認）。OpenID Foundation の会員になるかは E12 の前に決める。
+- OpenID Certification の対象のプロファイル：Form Post を含め、Dynamic は含めない（動的な登録を持たない）と決めた（2026-09-27。[authentication-flows.md](architecture/authentication-flows.md) の 13.3・14 節）。認証の費用は、OpenID Connect の 1 つのデプロイメントに、会員 700 USD・非会員 3,500 USD で、同じ暦年の中ならプロファイルを足しても追加の費用はない（[OpenID Certification Fees](https://openid.net/certification/fees/)、2026-09-27 に確認）。E12 の前に OpenID Foundation の会員になる（2026-09-27 に推奨案で確定。プロファイルが複数あり、会員の費用のほうが小さい）。

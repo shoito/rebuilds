@@ -47,7 +47,7 @@
 | ゲスト | 組織のドメインに合わないメールアドレスの人。招待された資源だけを使え、組織のチーム・共有のフォント・組織のライブラリを見られない。SAML SSO でログインできない。任意のシートを持てる。ゲストをメンバーに変えられない。Starter と Professional では、ファイル・フォルダーだけに招待された人を「限られたアクセス」のメンバーと呼ぶ | [Members, guests, and limited access](https://help.figma.com/hc/en-us/articles/4420557314967-Members-versus-guests) |
 | 判定の実装 | 以前の Ruby の `has_access?` は長く複雑で、同じ規則を LiveGraph（リアルタイムの API）にも別に書いていて食い違った。権限の判定が DB の読み取りの約 20% を占めた。AWS IAM に倣い、allow / deny（deny が勝つ）・資源の種類・権限・条件を持つ JSON のポリシーの DSL を作った。TypeScript で書いて JSON にし、Ruby・TypeScript・Go の評価器で同じに動かす。条件が参照するデータから読み込みを自動で決め、段階に分けて読み、結論が出たら残りを読まない（実行時間が半分以下）。null どうしの比較を lint で禁じる。社員向けにどの規則が真・偽になったかを示すデバッガーを作った。OPA、Zanzibar、Oso も検討した | [How we rolled out our own permissions DSL at Figma](https://www.figma.com/blog/how-we-rolled-out-our-own-permissions-dsl-at-figma/)、2024-03-13 |
 
-- 本システムは、UI と文書で「プロジェクト」と呼ぶ（[architecture/README.md](README.md) と揃える）。本家の改名に合わせるかは PM が決める（11 節）。
+- 本システムは、UI と文書で「プロジェクト」と呼ぶ（[architecture/README.md](README.md) と揃える）。S1 はこの呼び名のままにし、利用者の調査で混乱が見えたら見直す（15 節）。
 
 ## 3. 階層と主体
 
@@ -81,11 +81,17 @@
 
 | 可視性 | 組織のメンバー（非参加） | ゲスト（非参加） |
 | --- | --- | --- |
-| open | 一覧に出る。参加でき、参加すると閲覧 | 見えない |
+| open | 一覧に出る。参加できる。参加して見えるのはチームだけ（中身には届かない） | 見えない |
 | closed | 一覧に出る。参加を申請する | 見えない |
 | secret | 見えない（招待だけ） | 見えない |
 
-- 本家は、チームの「audience access」（招待した人だけ・ワークスペース・組織。閲覧か編集）と、「招待した人だけ」のときの見え方（Visible・Hidden）で扱い、「audience access はチームの中身に引き継がれない」と書く（[Manage team access and visibility](https://help.figma.com/hc/en-us/articles/360039970673-Manage-team-access-and-visibility)、2026-09-27 に確認）。フォルダー（プロジェクト）を作ったときの既定の一般アクセスは資料にない（**未検証**）。本システムでは、open のチームの一般アクセスを「組織の中・閲覧」を既定にし、下位へ引き継ぐ（管理者が変えられる）。本家との差は PM が E9 の前に決める（15 節）。
+- 本家は、チームの「audience access」（招待した人だけ・ワークスペース・組織。閲覧か編集）と、「招待した人だけ」のときの見え方（Visible・Hidden）で扱い、「audience access はチームの中身に引き継がれない」と書く（[Manage team access and visibility](https://help.figma.com/hc/en-us/articles/360039970673-Manage-team-access-and-visibility)、2026-09-27 に確認）。フォルダー（プロジェクト）を作ったときの既定の一般アクセスは資料にない（**未検証**）。
+- 本システムも本家に合わせる（2026-09-27 に決定。15 節）。
+  - チームの可視性と参加は、チームを見せるだけに効く。チームの中のプロジェクト・ファイルには引き継がない。
+  - open のチームに参加すると、`team_members` の行だけができる。`resource_roles` の行は作らない。中身を開くには、チーム・プロジェクト・ファイルの役割か、プロジェクト・ファイルの一般アクセスが要る。
+  - チームの役割（招待で付ける `resource_roles` の `team` の行）は、今までどおり中身に届く（本家の「チームの役割は最上位のフォルダーに届く」。2 節）。
+  - 一般アクセスは、プロジェクトとファイルにだけ置く。チームには置かない。新しいプロジェクト・ファイルは行を持たず、「招待した人だけ」と同じになる。
+  - > 2026-09-27 の注記：open のチームの一般アクセスを「組織の中・閲覧」にして下位へ引き継ぐ既定を、本家に合わせて取りやめた。
 
 ## 4. 水準と役割
 
@@ -134,7 +140,7 @@ level(actor, file):
   if file が下書き and actor == file.owner: r = owner
 
   // 2. 一般アクセス（最も近い設定を持つ資源から 1 つだけ）
-  ga = file.general_access ?? project.general_access ?? team.general_access
+  ga = file.general_access ?? project.general_access   // チームの一般アクセスはない（3.3 節）
   g  = none
   if ga.scope == anyone and ga 期限内 and org の方針が公開を許す: g = ga.level
   if ga.scope == org and m.role in (member, admin):  g = ga.level
@@ -150,10 +156,10 @@ level(actor, file):
 | 匿名 | ログインしていなければ、`view` を上限にする。コメントは書けない |
 | ゴミ箱 | ゴミ箱のファイルは開けない（接続もしない）。`owner` にだけゴミ箱の一覧に出し、戻す・完全に削除するだけを許す（[file-storage-and-history.md](file-storage-and-history.md) の 11 節） |
 | 組織の方針 | 公開を禁止していれば `anyone` を無視する（上の計算の中）。ゲストとの共有の禁止（MVP の後）なら、ゲストの役割を無視する |
-| チームの可視性 | secret のチームの一般アクセスは、チームのメンバーでない人に届かない |
+| チームの可視性 | 可視性と参加（`team_members`）は、実効の水準に入れない。チームを見せるだけに使う（3.3 節） |
 
 - 役割の保存：`resource_roles (org_id, resource_type, resource_id, account_id, level)`。`resource_type` は `team` / `project` / `file`。
-- 一般アクセスの保存：`general_access (org_id, resource_type, resource_id, scope, level, expires_at, previous_scope, previous_level, viewers_can_copy_share_export)`。ファイルの行がなければ、上位から届く。
+- 一般アクセスの保存：`general_access (org_id, resource_type, resource_id, scope, level, expires_at, previous_scope, previous_level, viewers_can_copy_share_export)`。`resource_type` は `project` / `file` だけ。ファイルの行がなければ、プロジェクトの行から届く。
 
 ### 4.4 シート
 
@@ -246,7 +252,7 @@ FileCapabilityTicket（Ed25519 で署名。有効 60 秒。1 回だけ使える�
 
 ### 5.5 再開のトークン（再接続の殺到のため）
 
-2026-09-27 に既定として採る。再接続のたびに API のチケットを取ると、Gateway のタスクの喪失や入口の短い障害で、チケットの発行が律速になる（[capacity.md](capacity.md) の 2.2 節）。開いている接続には、Gateway が短い「再開のトークン」を出し、同じ持ち主への再接続では API を通さない。
+2026-09-27 に決めた（設計の承認済み）。再接続のたびに API のチケットを取ると、Gateway のタスクの喪失や入口の短い障害で、チケットの発行が律速になる（[capacity.md](capacity.md) の 2.2 節）。開いている接続には、Gateway が短い「再開のトークン」を出し、同じ持ち主への再接続では API を通さない。
 
 ```
 ResumeToken（Gateway が HMAC-SHA256 で署名。有効 60 秒。1 回だけ使える）
@@ -442,6 +448,7 @@ ResumeToken（Gateway が HMAC-SHA256 で署名。有効 60 秒。1 回だけ使
 
 | 表 | 検証 |
 | --- | --- |
+| 3.3 節（チームの可視性） | 可視性 × 主体（メンバー・ゲスト）× 参加の有無。参加だけの人がチームの中のプロジェクト・ファイルで `none` になること |
 | 4.2 節（水準 × 操作） | 全セルを表駆動テストで確かめる |
 | 4.3 節の上限 | 上限ごとに、上限の前後の水準 |
 | 4.4 節（シート） | 各行 |
@@ -455,6 +462,7 @@ ResumeToken（Gateway が HMAC-SHA256 で署名。有効 60 秒。1 回だけ使
 | --- | --- |
 | 上げるだけ | 任意の階層と役割で、下位の役割を足しても実効の水準は下がらない |
 | 遮り | ファイルが `invited_only` の行を持つとき、上位の一般アクセスをどう変えても、役割のない人の水準は `none` |
+| チームは届かない | 任意のチームの可視性と参加で、チーム・プロジェクト・ファイルの役割と、プロジェクト・ファイルの一般アクセスを持たない人の水準は `none` |
 | 取り消しの線形化 | 任意の権限の変更と判定の並行の列で、変更の確定の後に始まった判定は、変更後の権限で判定される |
 | 組織の分離 | 任意の 2 組織で、一方の主体（ゲストでない）が、共有されていない他方のファイルで `none` |
 | 段階の短絡 | 任意の入力で、段階 1 で止めた判定と、全部を読んだ判定の結果が一致する |
@@ -494,7 +502,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1〜E12 �
 ## 15. 未解決の問い
 
 1. 「プロジェクト」を本家に合わせて「フォルダー」と呼ぶか。
-2. open のチームのファイルを、参加していない組織のメンバーが開けるか（3.3 節）。
+2. open のチームのファイルを、組織のメンバーがチームへの参加だけで開けるか（3.3 節）。
 3. 閲覧の人に版の一覧を見せるか（4.2 節）。
 4. リンクの期限を、本家（Enterprise だけ）と違い、すべての有料のプランで出すか。
 5. 判定の API が止まったとき、開いている接続の編集を止めるか（10 節）。
@@ -502,12 +510,12 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1〜E12 �
 
 ### 決定
 
-2026-09-27 に、次の既定で進める。
+2026-09-27 に、次のとおり決めた。1 と 2 は、推奨案で確定した。
 
 | 問い | 決定 |
 | --- | --- |
-| 1 | 「プロジェクト」のまま。改名の要否は PM が E9 の前に決める。表とコードの名前は `project` のまま変えない |
-| 2 | open のチームの一般アクセスを「組織の中・閲覧」を既定にする。管理者が変えられる。本家はチームの audience access を中身に引き継がない（3.3 節。2026-09-27 に確認）ので、この既定は本家と違う。寄せるかは PM が E9 の前に決める |
+| 1 | S1 は「プロジェクト」のまま。利用者の調査で混乱が見えたら見直す。表とコードの名前は `project` のまま変えない |
+| 2 | 開けない。本家に合わせ、チームの可視性と参加は中身に引き継がない。開くには役割か、プロジェクト・ファイルの一般アクセスが要る（3.3 節） |
 | 3 | 見せる。復元と名前付けは `edit` 以上 |
 | 4 | すべての有料のプランで出す |
 | 5 | 止めない。新しい接続だけを止める。再検証の失敗が 15 分続いたら、接続を読み取りに下げる |
@@ -536,11 +544,11 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1〜E12 �
 | `orgs` | プラン、確認済みのドメイン、方針（公開の禁止、シートの承認の設定）、`acl_version` |
 | `org_members` | `org_id`、`account_id`、`role`（`admin` / `member` / `guest`）、`seat`（`full` / `view`）、無効化日時 |
 | `teams` | `org_id`、名前、`visibility`（`open` / `closed` / `secret`） |
-| `team_members` | `team_id`、`account_id`、参加日時（役割は `resource_roles`） |
+| `team_members` | `team_id`、`account_id`、参加日時（役割は `resource_roles`。参加はチームを見せるだけで、中身に届かない） |
 | `projects` | `org_id`、`team_id`、名前 |
 | `files` | `org_id`、`project_id`（下書きは null）、`owner_account_id`、`file_key`、名前。状態（`state`・`trashed_at` など）と `checkpoint_seq` は [file-storage-and-history.md](file-storage-and-history.md) の 17 節に合わせる |
 | `resource_roles` | `org_id`、`resource_type`、`resource_id`、`account_id`、`level`、`granted_by`、作成日時 |
-| `general_access` | `org_id`、`resource_type`、`resource_id`、`scope`、`level`、`expires_at`、`previous_scope`、`previous_level`、`viewers_can_copy_share_export` |
+| `general_access` | `org_id`、`resource_type`（`project` / `file`）、`resource_id`、`scope`、`level`、`expires_at`、`previous_scope`、`previous_level`、`viewers_can_copy_share_export` |
 | `invitations` | `org_id`、資源、`email_normalized`、`level`、`token_hash`、`expires_at`、`accepted_at`、`invited_by` |
 | `access_requests` | `org_id`、`file_id`、`account_id`、`level`、`state`、作成日時 |
 | `seat_requests` | `org_id`、`account_id`、`requested_seat`、`state`、処理した人と日時 |

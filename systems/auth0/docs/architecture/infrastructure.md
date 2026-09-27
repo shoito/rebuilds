@@ -77,7 +77,7 @@ AWS 上の構成、アカウント、ネットワーク、認証の経路と管�
 | --- | --- | --- |
 | Back-Channel Logout、ログストリームの Webhook（テナントの任意の URL） | egress のサブネットの `worker-egress` → 専用の NAT | SSRF の踏み台にしない。名前解決の後の IP を検査し、リダイレクトを追わない（[security.md](security.md) の 3.6 節） |
 | ソーシャル IdP（トークン・userinfo・JWKS） | private → NAT → Network Firewall（許可リスト） | 宛先が決まっている |
-| メールの送信（Amazon SES を第一の候補） | VPC エンドポイント（SES は SMTP と API の VPC エンドポイントを持つ。SMTP は 25 以外のポート（587 など）。東京の AZ は対応の除外にない。[Setting up VPC endpoints with Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html)、2026-09-27 に確認） | email-delivery の領域で決める |
+| メールの送信（Amazon SES。[ADR-0040](../decisions/0040-email-sending-platform.md)） | VPC エンドポイント（SES は SMTP と API の VPC エンドポイントを持つ。SMTP は 25 以外のポート（587 など）。東京の AZ は対応の除外にない。[Setting up VPC endpoints with Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/send-email-set-up-vpc-endpoints.html)、2026-09-27 に確認） | email-delivery の領域で決める |
 | EventBridge（ログストリーム） | VPC エンドポイント | logs-and-streams の領域 |
 
 - egress の NAT の Elastic IP を、東京と大阪で最初から公開する（テナントが送信元の IP を許可リストに入れる場合のため）。

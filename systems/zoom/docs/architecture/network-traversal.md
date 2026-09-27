@@ -281,7 +281,7 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 ### 12.2 回線の劣化（本題材の AGENTS.md の条件）
 
 - 各経路（①・②・⑤）で、損失 5%・20%（ランダム、バースト）、揺らぎ 30・100ms、下りの帯域の 3 Mbps → 500 kbps → 150 kbps と回復、RTT 200ms を加え、音声の MOS の推定と遅れを測る。
-- TCP の経路（②・④・⑤）は、損失で遅れが大きく伸びる。NFR-003 の損失 20% は、UDP の経路（①・③）で満たすことを求め、TCP の経路では計測して記録する（閾値は [quality.md](../quality.md) の 2.2.1 節で決めた。QA の承認が要る）。
+- TCP の経路（②・④・⑤）は、損失で遅れが大きく伸びる。NFR-003 の損失 20% は、UDP の経路（①・③）で満たすことを求め、TCP の経路では計測して記録する（閾値は [quality.md](../quality.md) の 2.2.1 節。QA が承認した値）。
 
 ### 12.3 障害の注入
 
@@ -318,7 +318,7 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 
 ### 決定
 
-2026-09-27 の既定案。承認は Dev（テックリード）が行い、公開する規則は Ops が確かめる。
+2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。公開する規則は Ops が確かめてから出す。
 
 - **STUN**：単独の STUN のサーバーを置かない。第三者の STUN を使わない。
 - **Media Node の候補**：公開の IPv4・IPv6、UDP と ICE-TCP、同じポート。プライベート IP を出さない。
@@ -327,6 +327,8 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 - **資格情報の有効期間**：12 時間。
 - **中継の相手**：Media Node の範囲だけ。
 - **前回の経路の記憶**：30 日、網の指紋ごと。
+- **ポートの範囲**：256 のまま。worker ごとに IP を分けない。
+- **WebSocket を通さないプロキシ**：代わりの経路は作らない。ベータで該当する顧客の割合を記録する。
 
 ### TURN の実装の比較（ADR-0015 の要約）
 
@@ -344,8 +346,6 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 | 公開する IPv4 の範囲の入手の時間と費用 | BYOIP の /24 に決めた（[ADR-0049](../decisions/0049-media-node-fleet.md)）。入手は E1 の前に Ops が始め、間に合わなければ AWS の連続したブロックで始める |
 | CONNECT のプロキシでの各ブラウザの TURN の TLS の振る舞い | E2 の `network-path-matrix-tests`（12.1 節） |
 | TURN を通る参加者の割合 | E2 のベータで計測し、TURN の台の数（capacity.md）に渡す |
-| ポートの範囲（256）を狭めるか（worker ごとに IP を分ける） | 顧客の声で決める。公開の IPv4 の費用と Node の ENI の IP の上限を比べる |
-| WebSocket を通さないプロキシのための代わりの経路 | 作らない方針。ベータで該当する顧客の割合を見て見直す |
 | `MESSAGE-INTEGRITY-SHA256` を使えるか | ブラウザの対応を E2 の `turn-rest-credentials` で記録する（設計は変わらない） |
 | Media Node と TURN の間を公開の IP で通す通信の料金の区分 | 決着：同じリージョンの中の 0.01 USD/GB（向きごと）。料金のデータの `APN1-DataTransfer-Regional-Bytes` が「using elastic IPs」を含む（[infrastructure.md](infrastructure.md) の 2.4 節、2026-09-27 に確認） |
 
