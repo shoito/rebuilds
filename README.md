@@ -20,7 +20,7 @@
 | [Kafka](systems/kafka/) | 分散ログ（マネージドのストリーミング） | パーティションと複製、exactly-once、階層型の保存 | 設計済み |
 | [Zoom](systems/zoom/) | ビデオ会議 | WebRTC、SFU、帯域の推定、低遅延、録画 | 設計済み |
 | [Uber](systems/uber/) | 配車のマーケットプレイス | マッチング、地理空間の索引、動的な料金、リアルタイムの位置 | 設計済み |
-| Cloudflare Workers | エッジのサーバーレス | V8 isolate での隔離、グローバルな配信、エッジのストレージ | 設計中 |
+| [Cloudflare Workers](systems/cloudflare-workers/) | エッジのサーバーレス | V8 isolate での隔離、グローバルな配信、エッジのストレージ | 設計済み |
 
 「設計済み」は、intent・アーキテクチャ・ADR・quality・runbooks・roadmap がそろい、公式の資料での事実の確認と、文書の間の整合の見直しを終えた状態を指す。法務の確認待ちの事項と、PoC・計測で確かめる事項は、各題材の文書に残している。
 
