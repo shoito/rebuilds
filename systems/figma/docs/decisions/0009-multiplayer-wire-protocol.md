@@ -27,12 +27,12 @@ date: 2026-09-27
 
 1 を採用する。詳細は [multiplayer.md](../architecture/multiplayer.md) の 3・4・9 節。
 
-- WebSocket のバイナリのフレーム。符号化は [ADR-0008](0008-canonical-binary-serialization.md)。メッセージの種類は `Hello`・`Changes`・`Presence`・`Follow`・`LoadPage`・`Ping` と、`Welcome`・`Ack`・`Reject`・`Committed`・`PageData`・`PresenceBatch`・`Participants`・`RoleChanged`・`Kick`・`Pong`。
+- WebSocket のバイナリのフレーム。符号化は [ADR-0008](0008-canonical-binary-serialization.md)。メッセージの種類は `Hello`・`Changes`・`Presence`・`Follow`・`LoadPage`・`Ping` と、`Welcome`・`Ack`・`Reject`・`Committed`・`PageData`・`PresenceBatch`・`Participants`・`RoleChanged`・`ResumeToken`・`Kick`・`Pong`（`ResumeToken` は 2026-09-27 に足した。[permissions-and-sharing.md](../architecture/permissions-and-sharing.md) の 5.5 節）。
 - 変更は `ChangeSet`（1 つの利用者の操作）を単位に送り、原子的に当てる。`seq` は `ChangeSet` ごとに 1 つ。
 - セッションごとの `client_seq` を 1 ずつ増やす。サーバーは `last_client_seq` をセッションの表に持ち、ジャーナルとチェックポイントに残す。再送は `≤ last_client_seq` で重複として `Ack` だけを返す。飛びは `Reject(out_of_order)`。
 - 確定の順：検証 → `seq` → メモリに適用 → ジャーナル → `Committed`。ジャーナルに書く前の変更は、誰にも見せない。
 - `Committed` は Gateway のタスクごとに 1 回送る。Gateway が接続に分け、送り手には `Ack`（`ops` を省く）に変える。
-- 接続のチケットは URL に入れず、最初のメッセージで送る。`schema_hash` が合わなければ `Kick(version_mismatch)`。
+- 接続のチケット（または同じ持ち主への再接続での再開のトークン）は URL に入れず、最初のメッセージで送る。`schema_hash` が合わなければ `Kick(version_mismatch)`。
 - 2 を採らない理由：1 つの操作が半分だけ当たる状態が他の人に見える。`create` の重複と Undo の記録のずれを、個別に扱うことになる。
 - 3 を採らない理由：持ち主が確定の前に落ちると、他の人が見た変更が消える（ADR-0003 と同じ理由）。
 - 4 を採らない理由：1 ファイル 500 接続で、Document Server の送信が接続の数に比例し、ホットスポットが悪化する。

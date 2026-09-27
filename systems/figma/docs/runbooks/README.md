@@ -66,62 +66,62 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。作るまでは [incident-response.md](incident-response.md) の該当の節で対応する。アラートの条件の実装は [observability.md](../architecture/observability.md) の 6 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。呼び出し（page）は、利用者に影響が出ているか、放っておくとデータを失うものだけにする。
+「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。「作る Story」の列は、そのアラートの計測と手順を作る [roadmap.md](../roadmap.md) の Story である。手順の文書は、その Story の完了の条件に含める（E12 の分は `runbooks-e12` でもまとめて確かめる）。作るまでは [incident-response.md](incident-response.md) の該当の節で対応する。アラートの条件の実装は [observability.md](../architecture/observability.md) の 6 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。呼び出し（page）は、利用者に影響が出ているか、放っておくとデータを失うものだけにする。
 
-| アラート（重さ） | 手順 | 状態 |
-| --- | --- | --- |
-| 編集の SLO の速いバーンレート（page）・遅いバーンレート（ticket）、反映の遅延（page）、持ち主の回復の遅れ（page） | [incident-response.md](incident-response.md) | 作成済み |
-| 二重の持ち主（`ds_fence_lost_total` が 5 分で 10 超、デプロイの外。page） | [incident-response.md](incident-response.md) の「二重の持ち主」 | 作成済み |
-| 人が集まるファイル（予算の段 100% が 5 分、1 タスクの CPU 80%。ticket） | [incident-response.md](incident-response.md) の「人が集まるファイル」 | 作成済み |
-| 再接続の殺到（`gw_reconnect_total` が平常の 10 倍、API の 429 が 1 分。page） | [incident-response.md](incident-response.md) の「再接続の殺到」 | 作成済み |
-| ジャーナルの飛び（page）、作り直しの検証の不一致（page） | [incident-response.md](incident-response.md) の「ジャーナルの飛び」「ファイルの状態の食い違い」、`journal-gap-or-corruption.md` | 作成済み（個別の手順は E7 で作成） |
-| 漏洩の疑い（監査の不一致、通報） | [incident-response.md](incident-response.md) の「テナントの分離の破れ」、`tenant-isolation-breach.md` | 作成済み（個別の手順は E9 で作成） |
-| デプロイの後の悪化、api の blue/green の自動の戻し、ドレインの停滞（`router_drain_remaining_files` が 30 分減らない。ticket）、新しいビルドの異常終了の急増 | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み |
-| 大阪への複製の遅れ（10 秒で警告、30 秒・S3 の RTC の 15 分超で page）、大阪からの合成の監視の連続の失敗（page）、AZ の障害 | [disaster-recovery.md](disaster-recovery.md) | 作成済み |
-| Document Server のメモリ（`ds_memory_budget_ratio` 85% が 10 分。ticket） | `ds-memory-pressure.md`（capacity.md の 13 節） | E3 で作成 |
-| ジャーナルの遅延・スロットリング（書き込みの p99 100 ms が 10 分、`ThrottledRequests` > 0。page） | `journal-throttling.md`（file-storage-and-history.md の 17 節） | E3 で作成 |
-| 1 ファイルへの集中の調べ方と、まとめの間隔の変更、大きいタスクへの移し | `document-server-hot-file.md`（multiplayer.md の 18 節） | E3 で作成 |
-| 再接続の集中での `retry_after_ms` の引き上げ | `multiplayer-reconnect-storm.md`（multiplayer.md の 18 節） | E3 で作成 |
-| ドレインが進まない（手でファイルを渡す） | `ds-drain-stuck.md`（infrastructure.md の 14 節） | E3 で作成 |
-| router の停止（新しく開けない） | `router-down.md`（infrastructure.md の 14 節） | E3 で作成 |
-| Fargate の退役の通知（定期の作業） | `fargate-retirement.md`（infrastructure.md の 14 節） | E3 で作成 |
-| プロパティの表の変更の出し方と戻し方 | `schema-rollout.md`（document-model.md の 17 節、delivery.md の 6.3 節） | E3 で作成 |
-| `min_client_build` を上げる強い再読み込み | `forced-reload.md`（delivery.md の 11 節） | E3 で作成 |
-| 不変条件の破れ（サーバーの抜き取り。ticket） | `document-invariant-violation.md`（document-model.md の 17 節） | E3 で作成 |
-| 能力のチケットの署名の鍵の入れ替え（定期と漏洩のとき） | `ticket-signing-key-rotation.md`（security.md の 14 節） | E3 で作成 |
-| 受け口の停止（計測の欠け） | `telemetry-ingest-down.md`（observability.md の 10 節） | E2 で作成 |
-| GPU の切り替えの急増（特定の GPU。ticket） | `gpu-blocklist.md`（rendering-engine.md の 19 節） | E2 で作成 |
-| ブラウザの新しい版での描画の崩れ | `browser-render-regression.md`（rendering-engine.md の 19 節） | E2 で作成 |
-| 特定のファイルでタブが落ちる問い合わせ | `file-crashes-tab.md`（rendering-engine.md の 19 節） | E2 で作成 |
-| クライアントの異常終了の急増（新しいビルドで 2 倍。ticket） | `engine-panic-spike.md`（editor-and-tools.md の 20 節）、[deploy-and-rollback.md](deploy-and-rollback.md) | E2 で作成 |
-| IME の不具合の報告、イベントの順序の食い違いの急増 | `ime-regression.md`（editor-and-tools.md の 20 節） | E4 で作成 |
-| レイアウトの食い違い（`layout_divergence` ≥ 1。ticket） | `layout-divergence.md`（layout.md の 17 節） | E5 で作成 |
-| レイアウト・整形の部品の版の上げ | `layout-engine-upgrade.md`（layout.md の 17 節） | E5 で作成 |
-| 「見つからないコンポーネント」の問い合わせ、導出の上限に達したファイル | `missing-component-and-materialize-limit.md`（components-and-libraries.md の 12 節） | E6 で作成 |
-| 手放さずに残るファイル（1 日超。ticket） | `orphaned-file-recovery.md`（file-storage-and-history.md の 17 節） | E7 で作成 |
-| チェックポイントの停滞（30 分。ticket） | `checkpoint-stalled.md`（同上） | E7 で作成 |
-| ジャーナルの飛び・チャンクの破損の直し方（PITR と日ごとのチェックポイント） | `journal-gap-or-corruption.md`（同上） | E7 で作成 |
-| 完全な削除の依頼と、バックアップに残る期間の説明 | `file-purge-request.md`（同上。法務の L4 の後） | E7 で作成 |
-| サポートによる版の復元・複製 | `version-restore-support.md`（同上） | E7 で作成 |
-| 通知・メールが届かない | `notification-delivery.md`（comments-and-notifications.md の 11 節） | E8 で作成 |
-| Realtime・通知の遅れ（p99 1 秒を 15 分。ticket）、edge の再起動と再接続の集中、トリガーの負荷 | `realtime-degraded.md`（同上） | E8 で作成 |
-| 権限の取り消しの遅れ（p99 10 秒超。ticket）、「共有を外したのに見えている」 | `acl-revocation-lag.md`（multiplayer.md の 18 節、permissions-and-sharing.md の 16 節） | E9 で作成 |
-| リンクの期限のスケジューラーの遅れ | `link-expiry-lag.md`（permissions-and-sharing.md の 16 節） | E9 で作成 |
-| 組織をまたぐ漏洩の疑いの範囲の調べ方と報告の判断 | `tenant-isolation-breach.md`（security.md の 14 節。報告は法務の L5） | E9 で作成 |
-| アカウントの乗っ取りの疑い | `session-compromise.md`（security.md の 14 節） | E9 で作成 |
-| Render Worker の滞留（`render-export` の最古 5 分、`render-thumbnail` 30 分。ticket） | `render-worker-backlog.md`（export-and-assets.md の 16 節） | E10 で作成 |
-| CloudFront の障害（S3 の署名付き GET への切り替え） | `cdn-fallback.md`（同上） | E10 で作成 |
-| 画像の `rejected` の急増 | `image-rejected-spike.md`（同上） | E10 で作成 |
-| 検索が遅い、あるはずのファイルが出ない | `search-troubleshooting.md`（search.md の 10 節） | E11 で作成 |
-| 権利の侵害の申し立て、フィッシングの取り下げ、濫用のコメント | `abuse-takedown.md`（security.md の 14 節、export-and-assets.md の `asset-takedown.md` を含む。法務の L2・L3 の後） | E12 で作成 |
-| ライブラリの公開の job の失敗 | `library-publish-failure.md`（components-and-libraries.md の 12 節） | E13 で作成 |
-| 悪意のあるプラグインの停止 | `plugin-kill-switch.md`（plugins.md の 16 節） | E14 で作成 |
-| QuickJS・membrane の脆弱性 | `plugin-sandbox-vulnerability.md`（同上） | E14 で作成 |
-| 審査の滞留 | `plugin-review-queue.md`（同上） | E14 で作成 |
-| トークンの漏れ（シークレットスキャンの通報） | `api-token-leak.md`（api-and-webhooks.md の 14 節） | E15 で作成 |
-| 公開 API だけを止める | `public-api-kill-switch.md`（同上） | E15 で作成 |
-| Webhook の配送の滞留 | `webhook-backlog.md`（同上） | E15 で作成 |
-| 悪意のある OAuth のアプリ | `oauth-app-suspend.md`（同上） | E15 で作成 |
+| アラート（重さ） | 手順 | 状態 | 作る Story |
+| --- | --- | --- | --- |
+| 編集の SLO の速いバーンレート（page）・遅いバーンレート（ticket）、反映の遅延（page）、持ち主の回復の遅れ（page） | [incident-response.md](incident-response.md) | 作成済み | `mp-metrics-and-slis`、`synthetic-bots` |
+| 二重の持ち主（`ds_fence_lost_total` が 5 分で 10 超、デプロイの外。page） | [incident-response.md](incident-response.md) の「二重の持ち主」 | 作成済み | `mp-metrics-and-slis`、`durability-fault-injection` |
+| 人が集まるファイル（予算の段 100% が 5 分、1 タスクの CPU 80%。ticket） | [incident-response.md](incident-response.md) の「人が集まるファイル」 | 作成済み | `hot-files-log`、`journal-write-budget` |
+| 再接続の殺到（`gw_reconnect_total` が平常の 10 倍、API の 429 が 1 分。page） | [incident-response.md](incident-response.md) の「再接続の殺到」 | 作成済み | `reconnect-resume`、`gateway-resume-token` |
+| ジャーナルの飛び（page）、作り直しの検証の不一致（page） | [incident-response.md](incident-response.md) の「ジャーナルの飛び」「ファイルの状態の食い違い」、`journal-gap-or-corruption.md` | 作成済み（個別の手順は E7 で作成） | `journal-fencing-recovery`、`shadow-replay-validation` |
+| 漏洩の疑い（監査の不一致、通報） | [incident-response.md](incident-response.md) の「テナントの分離の破れ」、`tenant-isolation-breach.md` | 作成済み（個別の手順は E9 で作成） | `leak-test-suite`、`audit-events-core` |
+| デプロイの後の悪化、api の blue/green の自動の戻し、ドレインの停滞（`router_drain_remaining_files` が 30 分減らない。ticket）、新しいビルドの異常終了の急増 | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | `ds-drain-deploy`、`client-build-channels` |
+| 大阪への複製の遅れ（10 秒で警告、30 秒・S3 の RTC の 15 分超で page）、大阪からの合成の監視の連続の失敗（page）、AZ の障害 | [disaster-recovery.md](disaster-recovery.md) | 作成済み | `osaka-warm-standby`、`synthetic-bots`、`dr-drill` |
+| Document Server のメモリ（`ds_memory_budget_ratio` 85% が 10 分。ticket） | `ds-memory-pressure.md`（capacity.md の 13 節） | E3 で作成 | `ds-memory-accounting`、`ds-admission-and-shedding` |
+| ジャーナルの遅延・スロットリング（書き込みの p99 100 ms が 10 分、`ThrottledRequests` > 0。page） | `journal-throttling.md`（file-storage-and-history.md の 17 節） | E3 で作成 | `dynamodb-warm-throughput`、`journal-write-budget` |
+| 1 ファイルへの集中の調べ方と、まとめの間隔の変更、大きいタスクへの移し | `document-server-hot-file.md`（multiplayer.md の 18 節） | E3 で作成 | `hot-files-log` |
+| 再接続の集中での `retry_after_ms` の引き上げ | `multiplayer-reconnect-storm.md`（multiplayer.md の 18 節） | E3 で作成 | `reconnect-resume` |
+| ドレインが進まない（手でファイルを渡す） | `ds-drain-stuck.md`（infrastructure.md の 14 節） | E3 で作成 | `ds-drain-controller` |
+| router の停止（新しく開けない） | `router-down.md`（infrastructure.md の 14 節） | E3 で作成 | `router-assignment` |
+| Fargate の退役の通知（定期の作業） | `fargate-retirement.md`（infrastructure.md の 14 節） | E3 で作成 | `ds-drain-controller` |
+| プロパティの表の変更の出し方と戻し方 | `schema-rollout.md`（document-model.md の 17 節、delivery.md の 6.3 節） | E3 で作成 | `schema-write-gate` |
+| `min_client_build` を上げる強い再読み込み | `forced-reload.md`（delivery.md の 11 節） | E3 で作成 | `protocol-and-schema-compat` |
+| 不変条件の破れ（サーバーの抜き取り。ticket） | `document-invariant-violation.md`（document-model.md の 17 節） | E3 で作成 | `tree-invariants` |
+| 能力のチケットの署名の鍵と、再開のトークンの鍵の入れ替え（定期と漏洩のとき） | `ticket-signing-key-rotation.md`（security.md の 14 節） | E3 で作成 | `capability-tickets`、`gateway-resume-token` |
+| 受け口の停止（計測の欠け） | `telemetry-ingest-down.md`（observability.md の 10 節） | E2 で作成 | `telemetry-ingest` |
+| GPU の切り替えの急増（特定の GPU。ticket） | `gpu-blocklist.md`（rendering-engine.md の 19 節） | E2 で作成 | `gpu-backend-selection`、`render-telemetry-and-blocklist` |
+| ブラウザの新しい版での描画の崩れ | `browser-render-regression.md`（rendering-engine.md の 19 節） | E2 で作成 | `golden-image-harness` |
+| 特定のファイルでタブが落ちる問い合わせ | `file-crashes-tab.md`（rendering-engine.md の 19 節） | E2 で作成 | `render-memory-budget` |
+| クライアントの異常終了の急増（新しいビルドで 2 倍。ticket） | `engine-panic-spike.md`（editor-and-tools.md の 20 節）、[deploy-and-rollback.md](deploy-and-rollback.md) | E2 で作成 | `wasm-error-reports` |
+| IME の不具合の報告、イベントの順序の食い違いの急増 | `ime-regression.md`（editor-and-tools.md の 20 節） | E4 で作成 | `text-editing`、`editor-telemetry` |
+| レイアウトの食い違い（`layout_divergence` ≥ 1。ticket） | `layout-divergence.md`（layout.md の 17 節） | E5 で作成 | `layout-repair`、`layout-telemetry` |
+| レイアウト・整形の部品の版の上げ | `layout-engine-upgrade.md`（layout.md の 17 節） | E5 で作成 | `taffy-differential-test` |
+| 「見つからないコンポーネント」の問い合わせ、導出の上限に達したファイル | `missing-component-and-materialize-limit.md`（components-and-libraries.md の 12 節） | E6 で作成 | `incremental-materialize` |
+| 手放さずに残るファイル（1 日超。ticket） | `orphaned-file-recovery.md`（file-storage-and-history.md の 17 節） | E7 で作成 | `orphan-recovery-job` |
+| チェックポイントの停滞（30 分。ticket） | `checkpoint-stalled.md`（同上） | E7 で作成 | `checkpoint-writer` |
+| ジャーナルの飛び・チャンクの破損の直し方（PITR と日ごとのチェックポイント） | `journal-gap-or-corruption.md`（同上） | E7 で作成 | `journal-fencing-recovery` |
+| 完全な削除の依頼と、バックアップに残る期間の説明 | `file-purge-request.md`（同上。法務の L4 の後） | E7 で作成 | `trash-and-purge` |
+| サポートによる版の復元・複製 | `version-restore-support.md`（同上） | E7 で作成 | `version-restore` |
+| 通知・メールが届かない | `notification-delivery.md`（comments-and-notifications.md の 11 節） | E8 で作成 | `email-notifications`、`in-app-notifications` |
+| Realtime・通知の遅れ（p99 1 秒を 15 分。ticket）、edge の再起動と再接続の集中、トリガーの負荷 | `realtime-degraded.md`（同上） | E8 で作成 | `realtime-skeleton`、`in-app-notifications` |
+| 権限の取り消しの遅れ（p99 10 秒超。ticket）、「共有を外したのに見えている」 | `acl-revocation-lag.md`（multiplayer.md の 18 節、permissions-and-sharing.md の 16 節） | E9 で作成 | `acl-version-and-revalidation`、`acl-change-kick` |
+| リンクの期限のスケジューラーの遅れ | `link-expiry-lag.md`（permissions-and-sharing.md の 16 節） | E9 で作成 | `link-expiration` |
+| 組織をまたぐ漏洩の疑いの範囲の調べ方と報告の判断 | `tenant-isolation-breach.md`（security.md の 14 節。報告は法務の L5） | E9 で作成 | `leak-test-suite`、`audit-events-core` |
+| アカウントの乗っ取りの疑い | `session-compromise.md`（security.md の 14 節） | E9 で作成 | `session-revocation-kick` |
+| Render Worker の滞留（`render-export` の最古 5 分、`render-thumbnail` 30 分。ticket） | `render-worker-backlog.md`（export-and-assets.md の 16 節） | E10 で作成 | `render-worker-core` |
+| CloudFront の障害（S3 の署名付き GET への切り替え） | `cdn-fallback.md`（同上） | E10 で作成 | `assets-bucket-and-cdn`、`files-bucket` |
+| 画像の `rejected` の急増 | `image-rejected-spike.md`（同上） | E10 で作成 | `image-ingest-worker` |
+| 検索が遅い、あるはずのファイルが出ない | `search-troubleshooting.md`（search.md の 10 節） | E11 で作成 | `name-search`、`search-perf-baseline` |
+| 権利の侵害の申し立て、フィッシングの取り下げ、濫用のコメント | `abuse-takedown.md`（security.md の 14 節、export-and-assets.md の `asset-takedown.md` を含む。法務の L2・L3 の後） | E12 で作成 | `abuse-takedown-console`、`asset-takedown` |
+| ライブラリの公開の job の失敗 | `library-publish-failure.md`（components-and-libraries.md の 12 節） | E13 で作成 | `library-publish` |
+| 悪意のあるプラグインの停止 | `plugin-kill-switch.md`（plugins.md の 16 節） | E14 で作成 | `plugin-kill-switch` |
+| QuickJS・membrane の脆弱性 | `plugin-sandbox-vulnerability.md`（同上） | E14 で作成 | `plugin-membrane` |
+| 審査の滞留 | `plugin-review-queue.md`（同上） | E14 で作成 | `plugin-public-review` |
+| トークンの漏れ（シークレットスキャンの通報） | `api-token-leak.md`（api-and-webhooks.md の 14 節） | E15 で作成 | `personal-access-tokens` |
+| 公開 API だけを止める | `public-api-kill-switch.md`（同上） | E15 で作成 | `public-api-service` |
+| Webhook の配送の滞留 | `webhook-backlog.md`（同上） | E15 で作成 | `webhooks-v1` |
+| 悪意のある OAuth のアプリ | `oauth-app-suspend.md`（同上） | E15 で作成 | `oauth-app-review` |
 
 ### 4.1 領域との対応
 
@@ -160,7 +160,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 負荷試験（L1〜L10。大きな催しの前は L1 の 2 倍を 1 時間） | 半年ごと、リリース前、大きな変更の後 | [capacity.md](../architecture/capacity.md) の 9 節 |
 | キャパシティの見直し（接続、開いたファイル、Document Server のメモリ、`journal` の書き込みの単位、段階の移行の目安） | 月次（予測は四半期） | [capacity.md](../architecture/capacity.md)、[infrastructure.md](../architecture/infrastructure.md) の 9 節 |
 | 費用の見直し（タグごと） | 月次 | [infrastructure.md](../architecture/infrastructure.md) の 11 節 |
-| 能力のチケットの署名の鍵の入れ替え | 90 日 | `ticket-signing-key-rotation.md`（E3） |
+| 能力のチケットの署名の鍵と、再開のトークンの鍵の入れ替え | 90 日 | `ticket-signing-key-rotation.md`（E3） |
 | Fargate の退役の通知への対応（待つ期間 14 日の平日の昼にドレイン） | 通知のたび | `fargate-retirement.md`（E3） |
 | GPU のブロックリストの見直し（7 日で 1%・100 セッション以上の組） | 週次 | `gpu-blocklist.md`（E2） |
 | クライアントのビルドの段の判定 | 段ごと（24 時間） | [deploy-and-rollback.md](deploy-and-rollback.md) |

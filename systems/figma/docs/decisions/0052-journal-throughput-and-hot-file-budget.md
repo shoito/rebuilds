@@ -10,7 +10,8 @@ date: 2026-09-27
 ジャーナルは `file_id` をパーティションキーにし、1 ファイルの書き込みは 1 つのパーティションに集まる（[ADR-0024](0024-journal-items-and-fencing.md)、[multiplayer.md](../architecture/multiplayer.md) の 12.3 節）。
 
 - DynamoDB の 1 つのパーティションは、書き込みを毎秒 1,000 単位（1 単位は 1 KB）まで出す（[Best practices for designing and using partition keys](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)、2026-09-27 に確認）。
-- `TransactWriteItems` は、各項目を準備と確定の 2 回ずつ読み書きし、その分の単位を使う。条件で取り消されたときも使う（[Amazon DynamoDB Transactions: How it works](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html)、2026-09-27 に確認）。フェンスの `ConditionCheck` が読みと書きのどちらの単位を使うかは、資料から読み取れなかった（**未検証**。ここでは書きの 2 単位として見積もる）。
+- `TransactWriteItems` は、各項目を準備と確定の 2 回ずつ読み書きし、その分の単位を使う。条件で取り消されたときも使う（[Amazon DynamoDB Transactions: How it works](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/transaction-apis.html)、2026-09-27 に確認）。フェンスの `ConditionCheck` が読みと書きのどちらの単位を使うかは、資料から読み取れなかった（**未検証**。ここでは書きの 2 単位として見積もる。E3 の前の `dynamodb-transaction-poc` で `ReturnConsumedCapacity` を見て確かめる）。
+- 頻繁に使われる項目は、別のパーティションへ置き直されうるが、ソートキーが単調に増える項目の集まりはソートキーで分けない（[DynamoDB burst and adaptive capacity](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/burst-adaptive-capacity.html)、2026-09-27 に確認）。1 ファイルのジャーナルの末尾の書き込みは、1 つのパーティションの上限に当たる。
 - オンデマンドの新しい表は、毎秒 4,000 の書き込みまで出せ、それを超えると過去の最高の 2 倍まですぐに出せる。30 分以内に最高の 2 倍を超えると、スロットリングが起きうる。温めた量（warm throughput）を先に設定できる。表ごとの既定の上限は、アカウントで毎秒 4 万（引き上げを申請できる）（[DynamoDB on-demand capacity mode](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/on-demand-capacity-mode.html)、2026-09-27 に確認）。
 - 会議の始まりや全社の発表で、1 つのファイルに数百人が集まる（[architecture/README.md](../architecture/README.md) の 7 節）。
 

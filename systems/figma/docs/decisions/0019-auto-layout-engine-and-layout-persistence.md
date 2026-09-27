@@ -19,8 +19,8 @@ date: 2026-09-27
 
 計算の部品の事情（2026-09-27 に確認）：
 
-- Taffy（0.14）は CSS の Block・Flexbox・Grid を実装する Rust の crate で、Servo・Bevy・Zed などが使う。10 万ノード（深さ 5）の flexbox で約 39 ms（M1 Pro）（[DioxusLabs/taffy](https://github.com/DioxusLabs/taffy)）。
-- 本家のオートレイアウトは flexbox に近いが、縮まない、負の間隔、線の太さを含めるなどの違いがある（本家の資料での確認は一部。未検証の点は [layout.md](../architecture/layout.md) の 2 節）。
+- Taffy（0.14）は CSS の Block・Flexbox・Grid を実装する Rust の crate で、Servo・Bevy・Zed などが使う。10 万ノードの flexbox で、深さ 5 なら約 39 ms、深さ 1（幅の広い木）なら約 247 ms（M1 Pro。テキストの測定を含まない）（[DioxusLabs/taffy](https://github.com/DioxusLabs/taffy)）。
+- 本家のオートレイアウトは flexbox に近いが、縮まない、負の間隔、線の太さを含めるなどの違いがある。本家は、自動の間隔を 0 より小さくせず（収まらなければ先頭に詰める）、内側の線を既定でレイアウトに含める（CSS の `border-box`）形に揃えた（[Use auto layout with CSS Flexbox in mind](https://help.figma.com/hc/en-us/articles/42031586813719-Use-auto-layout-with-CSS-Flexbox-in-mind)、2026-09-27 に確認）。細部の一致は [layout.md](../architecture/layout.md) の 2 節と E5 で確かめる。
 
 ## Options
 

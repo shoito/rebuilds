@@ -82,7 +82,7 @@
 
 1. 持ち主のタスクの生存の記録（10 秒の期限）が切れると、猶予 2 秒の後に、Router は別の Document Server に `epoch` を 1 つ上げて割り当てる（[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)）。誰も開かないファイルは、回復のジョブが 5 分以内に拾う。
 2. 新しい持ち主は、フェンスを上げ、2.2 の 2 と同じ手順で、最後に確定した `seq` まで戻す。古い持ち主が生きていても、フェンスで書き込みが止まる。
-3. クライアントは再接続し（最初は 0〜5 秒の乱数の待ち）、確定していない自分の変更を送り直す。重複は `(session_id, client_seq)` で除く。
+3. クライアントは再接続し（最初は 0〜5 秒の乱数の待ち）、確定していない自分の変更を送り直す。重複は `(session_id, client_seq)` で除く。持ち主が変わったので、API のチケットを取り直す。持ち主が変わらない再接続（Gateway の喪失・入れ替え）は、Gateway が出した 60 秒の再開のトークンで入り、API を通らない（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節）。
 4. デプロイでは、Document Server はファイルを渡してから止まる（ドレイン。[ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md)）。ファイルごとの中断は 1〜2 秒の見込み。
 
 ## 3. 規模の段階
@@ -202,8 +202,8 @@
 - **収束の破れ**：クライアントとサーバーで同じ変更の結果が違うと、画面が収束しない。`doc-model`・`layout` の一致の CI（[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md)）、レイアウトの決定性の規則（[ADR-0020](../decisions/0020-deterministic-layout-arithmetic.md)）、版の照合（[ADR-0053](../decisions/0053-client-server-version-skew.md)）、ファイルごとの文書のフラグ（[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md)）で抑える。
 - **二重の持ち主と確定の損失**：ネットワークの分断や停止で、2 つの Document Server が同じファイルを持つと、変更が分かれうる。割り当ての `epoch` とジャーナルのフェンス（[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)）で片方だけが確定できるようにする。回復のジョブが止まると、ジャーナルの TTL（30 日）で編集を失う危険がある。見張りとアラームで守る。
 - **Document Server のホットスポット**：1 つのファイルに数百人が同時に入ると、1 つのプロセスとジャーナルの 1 つのパーティションに集中する。参加の上限（500 人・編集 200 人。[ADR-0011](../decisions/0011-presence-and-fan-out.md)）、Gateway ごとに 1 回の配信、書き込みの予算の段（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)）、チャンクの CDN での配信（ADR-0025）で抑える。500 人を超える需要は S2 の前に配信の木を ADR にする。
-- **WebGPU と WebGL2 の両立**：wgpu の「両方を有効にすると WebGL に戻らない」不具合（[gfx-rs/wgpu#6166](https://github.com/gfx-rs/wgpu/issues/6166)）は [gfx-rs/wgpu#6371](https://github.com/gfx-rs/wgpu/pull/6371) で解決した（2026-09-27 に確認）。キャンバスを作り直しての切り替えの時間、両方を入れた WASM の大きさ（5 MB）、R16F の加算のブレンドが WebGL2 で使えるかは **未検証** で、E2 の前の PoC で確かめる。満たさなければ 2 つのビルドを配る（[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md) の退路）。
-- **サーバーの描画の性能**：Fargate に GPU がないので、Render Worker は CPU の lavapipe で描く。10 万ノードのサムネイルを p95 10 秒で描けるかは **未検証**（E10 の PoC）。足りなければ GPU のインスタンスを別の ADR で検討する。
+- **WebGPU と WebGL2 の両立**：wgpu の「両方を有効にすると WebGL に戻らない」不具合（[gfx-rs/wgpu#6166](https://github.com/gfx-rs/wgpu/issues/6166)）は [gfx-rs/wgpu#6371](https://github.com/gfx-rs/wgpu/pull/6371) で解決した（2026-09-27 に確認）。キャンバスを作り直しての切り替えの時間、両方を入れた WASM の大きさ（5 MB）、wgpu の WebGL2 の経路で R16F の加算のブレンドが使えるか（WebGL2 の仕様では `EXT_color_buffer_float` で使える。[rendering-engine.md](rendering-engine.md) の 7 節）は **未検証** で、E2 の前の `gpu-backend-poc` で確かめる。満たさなければ 2 つのビルドを配る（[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md) の退路）。
+- **サーバーの描画の性能**：Fargate に GPU がないので、Render Worker は CPU の lavapipe で描く。10 万ノードのサムネイルを p95 10 秒で描けるかは **未検証**（E10 の `render-worker-core` の PoC）。lavapipe は Vulkan 1.3 の適合を得ている（rendering-engine.md の 12 節）。足りなければ GPU のインスタンスを別の ADR で検討する。
 - **キャンバスの上の日本語の入力**：自前で描画するため、IME の変換中の表示と候補の窓の位置を、隠した `textarea` で扱う（[ADR-0017](../decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方と、ブラウザ・IME ごとのイベントの順序は E4 の前の PoC で確かめる。
 - **フォント**：和文のフォントは大きく（1 書体で数 MB）、読み込みの時間とメモリに効く。ライセンスは法務の確認待ち（[intent.md](../intent.md) の L1）。
 - **クライアントとサーバーの版の食い違い**：エンジンの WASM はタブに何時間も残る。接続時に 3 つの版（`protocol_version`、`schema_hash` の互換の一覧、`min_client_build`）で照合し、互換の外だけ強い再読み込みにする（[ADR-0053](../decisions/0053-client-server-version-skew.md)）。
@@ -232,19 +232,25 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **Epic**：E1〜E12 が MVP、E13 ライブラリ、E14 プラグイン、E15 公開 API と Webhook。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。領域の文書の仮の Epic の番号を roadmap.md に揃えた（rendering-engine.md と editor-and-tools.md の E8・E9 の入れ替わり、「後」「後-P」「後-A」の置き換え）。組織の SAML SSO は ADR-0043 のとおり E12 に作るが、MVP の範囲の外で GA の判定に含めない。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限（ファイル・ノード）は document-model.md の 11 節、送受信の上限は multiplayer.md の 4.6 節、メモリの予算は rendering-engine.md の 11 節、容量のパラメーターは capacity.md の 10 節、保持の期間は security.md の 7 節。
 - 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
+- **仕上げの工程（2026-09-27）**：公式の資料で「未検証」を確かめ直し、統合の後に残った食い違いを直した。
+  - 再接続の殺到：持ち主が変わらない再接続は、Gateway が出す 60 秒・1 回だけの再開のトークン（`session_id`・`file_id`・割り当ての `epoch` に束ねる）で入り、API のチケットを通らない（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節、ADR-0030 の注記）。
+  - `files.team_id` の書き換え：ファイル・プロジェクトの移動と同じトランザクションで書き、`acl_version` を上げる（permissions-and-sharing.md の 9.3 節）。
+  - 回復のジョブの割り当ての名前を `recover_then_release` に揃えた（ADR-0047、[infrastructure.md](infrastructure.md) の 5.1 節、[observability.md](observability.md)）。`ds-large` の閾値は ADR-0051 の見積もり 1.5 GiB を正とした（圧縮の前のチェックポイントでおよそ 500 MB）。ADR-0024・0026・0046 の「リース」を、タスクの生存とファイルの割り当てに直した。ADR-0034 に、Render Worker がインスタンスの中のレイアウトを計算することを書いた。
+  - 資料で確かめて設計を変えたもの：ブレンドモードを 18 種に（本家の `LINEAR_BURN`・`LINEAR_DODGE`。[rendering-engine.md](rendering-engine.md) の 8.3 節）、`strokes_included_in_layout` の既定を true に（[layout.md](layout.md) の 2 節）、Render Worker の子のプロセスの通信の遮断を seccomp だけに（Fargate は `CAP_SYS_ADMIN` を与えない。[export-and-assets.md](export-and-assets.md) の 5.3 節）、CloudFront の WebSocket の経路で Gateway も 20 秒ごとに送る（[infrastructure.md](infrastructure.md) の 4 節）、Fargate の退役は保護を待たない前提に、署名の要る CDN の経路は `GET`・`HEAD` だけに（export-and-assets.md の 6.4 節）、DynamoDB の費用に TTL の削除の大阪への複製を足した（[capacity.md](capacity.md) の 4.3 節）。
 
 持ち越し（計測・PoC で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | DynamoDB のトランザクションの書き込みの p99（40ms の予算）、フェンスの `ConditionCheck` の単位の種類 | E3 の前の PoC |
-| 1 つのビルドでの WebGPU と WebGL2 の切り替え、WASM の大きさ、R16F の加算のブレンド | E2 の前の PoC（ADR-0014） |
+| 1 つのビルドでの WebGPU と WebGL2 の切り替え、WASM の大きさ、wgpu の WebGL2 の経路での R16F の加算のブレンド | E2 の前の `gpu-backend-poc`（ADR-0014） |
 | HAMT をクライアントでも使うか、10 万ノードの `Doc` のメモリ | E2 の前の PoC |
 | `textarea` の見えなくし方、ブラウザ・IME ごとのイベントの順序 | E4 の前の PoC（ADR-0017） |
 | レイアウトの全体の計算の時間（10 万ノードで 300 ms）、本家との細部の一致 | E5 の前の計測、E5 で 50 の場面を比べる |
 | 見積もりの係数（メモリ＝圧縮の前のチェックポイント × 3）、ファイルの大きさの分布 | E7 の計測、試用の期間 |
-| lavapipe での書き出しの時間、CloudFront の署名とキャッシュの振る舞い、子のプロセスのネットワークの名前空間 | E10 の PoC |
-| CloudFront の WebSocket のアイドルの期限、Fargate の退役がタスクの保護を待つか | E3 の PoC |
+| lavapipe での書き出しの時間 | E10 の `render-worker-core` の PoC |
+| CloudFront の署名とキャッシュの振る舞い | 資料で確かめた（[export-and-assets.md](export-and-assets.md) の 6.4 節）。`image-sign-endpoint` の結合テストで実際の配信でも確かめる |
+| CloudFront の応答の期限が WebSocket に効くか、接続の長さの上限 | E3 の `gateway-edge-websocket` の PoC（8 時間）。Fargate の退役は保護を待たない前提にした（資料は保護の対象を縮小とデプロイに限る。[infrastructure.md](infrastructure.md) の 3 節） |
 | RTO の内訳、障害中にグローバルテーブルから東京のレプリカを外せるか | E12 の DR の訓練 |
 | 費用の単価 | E12 の前に、AWS の料金の計算ツールで置き換える |
 

@@ -100,7 +100,7 @@ NodeRef = Node(NodeId) | Derived(InstanceSubId)                   // components 
   - ダブルクリック：グループ・フレームの中に入る。テキストなら編集を始める。ベクターならパスの編集を始める。
   - Cmd（Windows は Ctrl）＋クリック：最も深いノードを直接選ぶ。
   - Shift＋クリック：選択に足す・外す。
-  - 範囲の選択（マーキー）：今のコンテナの直下の子のうち、範囲に重なるもの。ページの直下のフレームは、完全に囲んだときだけ（中から始めたドラッグで外のフレームを選ばないため。本家との一致は **未検証**）。
+  - 範囲の選択（マーキー）：今のコンテナの直下の子のうち、範囲に重なるもの。ページの直下のフレームは、完全に囲んだときだけ（中から始めたドラッグで外のフレームを選ばないため。本家との一致は **未検証**。E2 の `hit-test-and-selection` で本家と比べる）。
 - インスタンスの中のノード（導出したノード）も選べる。選んだノードへの編集は、上書きの書き込みになる（[components-and-libraries.md](components-and-libraries.md) の 3.3 節、3.4 節の決定表で拒否されるものは、パネルで無効にする）。
 - 選択は、自分のクライアントの状態で、ドキュメントに書かない。在席で他の人に送る（100 ノードまで。[multiplayer.md](multiplayer.md) の 12.1 節）。在席の `selection` は `NodeId` だけなので、導出したノードを選んでいるときは、そのインスタンスの ID を送る。
 - 他の人が選んでいるノードには、その人の色の枠と名前の札を出す。
@@ -195,7 +195,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 - 整数の演算なので、WASM とネイティブで結果が一致する（レイアウトの決定性に効く）。
 - ズームが 16 倍を超える画面では、描画のためだけに誤差を細かくして計算し直す（境界の箱には使わない）。
 - 結果はノードごとにキャッシュする。1 回の計算が 20 ms を超えたら、ドラッグの途中は前の結果を動かして見せ、離したときに計算する。
-- **平坦化（確定）**：ブール演算を 1 つの `VECTOR` に変える操作では、曲線を残すために iCurve（0.2、線・2 次・3 次ベジェ・楕円の弧のまま演算する）を使う。失敗したら i_overlay の結果を kurbo の曲線の当てはめ（`fit_to_bezpath`）で曲線に直す。iCurve の成熟度と、当てはめの品質は **未検証**（E4 の前に参照の形で比べる）。
+- **平坦化（確定）**：ブール演算を 1 つの `VECTOR` に変える操作では、曲線を残すために iCurve（0.2、線・2 次・3 次ベジェ・楕円の弧のまま演算する）を使う。失敗したら i_overlay の結果を kurbo の曲線の当てはめ（`fit_to_bezpath`）で曲線に直す。iCurve の成熟度と、当てはめの品質は **未検証**（E4 の `boolean-operations` で参照の形で比べる）。
 - **線のアウトライン化**：kurbo の線の展開で輪郭にし、i_overlay で和をとって `VECTOR` にする。
 
 ## 9. テキストの編集と IME
@@ -208,7 +208,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 - `textarea` の置き方：
   - 位置：カーソルの行の左上に合わせる（IME の候補の窓がカーソルの近くに出るように）。
   - 文字の大きさ：画面の上の文字の大きさ（8〜64 px に丸める）。行の高さも合わせる。
-  - 見えなくする：`color: transparent`、`caret-color: transparent`、`background: transparent`、枠なし、`resize: none`。`opacity: 0` と `display: none` は使わない（IME が候補の窓の位置を取れない端末がある。**未検証**。E4 の前の PoC で確かめる）。
+  - 見えなくする：`color: transparent`、`caret-color: transparent`、`background: transparent`、枠なし、`resize: none`。`opacity: 0` と `display: none` は使わない（IME が候補の窓の位置を取れない端末がある。**未検証**。E4 の前の `ime-textarea-poc` で確かめる）。
 - `textarea` の中身は、カーソルのある段落（2,000 文字まで）にし、選択の範囲も合わせる。IME の再変換（選んだ文字を変換し直す）と、前後の文脈による変換の精度のため。
 - 添字の対応：`textarea` は UTF-16 の単位、`text_content` は UTF-8 のバイト。段落の先頭からの位置で変換する。
 
@@ -224,7 +224,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 | `keydown`（`isComposing` か `keyCode === 229`） | ショートカットにも移動にも使わない（変換の確定の Enter で改行しない） |
 
 - 組み立ての文節の区切り（どこを変換中か）は、`textarea` からは取れない。組み立て中の全体に 1 本の下線を引く。EditContext なら文節の書式を受け取れる（ADR-0017 で後回しにした理由のひとつ）。
-- ブラウザごとの `compositionend` と `keydown` の順序の違い（Safari と Chromium で違うという報告がある。**未検証**）は、E4 の前の PoC で主要な組み合わせを記録し、`isComposing` と「直前に組み立てを終えた」印で吸収する。
+- ブラウザごとの `compositionend` と `keydown` の順序の違い（Safari と Chromium で違うという報告がある。**未検証**）は、E4 の前の `ime-textarea-poc` で主要な組み合わせを記録し、`isComposing` と「直前に組み立てを終えた」印で吸収する。
 - 確認する組み合わせ：macOS（日本語入力、Google 日本語入力、ATOK）× Chrome・Safari・Firefox、Windows（Microsoft IME、Google 日本語入力）× Chrome・Edge・Firefox。
 
 ### 9.3 同時の編集
@@ -306,7 +306,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
   - 画像：export-and-assets の 6.2 節のアップロード。
   - 文字：テキストのノードを作る（編集中なら挿入）。
 - ファイルのドラッグ＆ドロップも、貼り付けと同じ経路にする。
-- 独自のデータの MIME（Async Clipboard API の web の独自の形式）は、Safari・Firefox での対応が **未検証** のため、MVP は `text/html` に埋める形だけにする。
+- 独自のデータの MIME（Async Clipboard API の `web ` で始まる独自の形式）は、Chrome・Edge 104 からで、Firefox はプレビューだけ、Safari は未対応である（MDN の browser-compat-data の `api/ClipboardItem.json` の `type_web`、2026-09-27 に確認）。MVP は `text/html` に埋める形だけにする。
 
 ## 14. 障害時の振る舞い
 
@@ -345,7 +345,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 
 - Playwright で、`compositionstart`・`update`・`end` の列を合成して流すテスト（Chromium・Firefox・WebKit）。
 - 9.2 節の組み合わせの手動の確認を、E4 のリリースの前と、ブラウザの大きな版の更新のたびに行う。確認の手順は quality.md に置く。
-- 実機の IME での自動のテストは、OS の入力の注入（macOS の `CGEvent`、Windows の `SendInput`）で、最低限の「ひらがなを入力 → 変換 → 確定」を毎日流す（仕組みは **未検証**。E4 の前に作れるか確かめる）。
+- 実機の IME での自動のテストは、OS の入力の注入（macOS の `CGEvent`、Windows の `SendInput`）で、最低限の「ひらがなを入力 → 変換 → 確定」を毎日流す（仕組みは **未検証**。E4 の前の `ime-textarea-poc` で作れるか確かめる）。
 
 ### 16.3 その他
 

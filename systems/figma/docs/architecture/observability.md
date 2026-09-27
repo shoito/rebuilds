@@ -44,7 +44,7 @@ Grafana（shared）：横断のダッシュボード
 | gateway | `gw_open_total`（`result`）、`gw_open_seconds` | counter、histogram | SLI `edit_open` |
 | gateway | `gw_kick_total`（`reason`） | counter | 再接続の殺到、版の食い違い |
 | gateway | `gw_send_queue_bytes` | histogram | 遅い読み手 |
-| gateway | `gw_reconnect_total`（`resumed`・`reload`） | counter | 再接続の結果 |
+| gateway | `gw_reconnect_total`（`result`：`resumed`・`reload`、`auth`：`ticket`・`resume_token`・`ticket_required`） | counter | 再接続の結果と、再開のトークンで API を通らなかった割合 |
 | ds | `ds_commit_total`（`result`）、`ds_commit_seconds`（`Changes` の受信 → `Ack`） | counter、histogram | SLI `edit_commit`、NFR-001 の予算の区間（[multiplayer.md](multiplayer.md) の 8 節） |
 | ds | `ds_reject_total`（`code`） | counter | 競合の多さ、クライアントの不具合 |
 | ds | `ds_journal_write_seconds`、`ds_journal_batch_bytes`、`ds_journal_batch_changes` | histogram | ジャーナルの遅延と大きさ |
@@ -56,7 +56,7 @@ Grafana（shared）：横断のダッシュボード
 | ds | `ds_checkpoint_seconds`、`ds_checkpoint_bytes`、`ds_checkpoint_stalled_files`（10 分進まない） | histogram、gauge | [file-storage-and-history.md](file-storage-and-history.md) の 12 節 |
 | ds | `ds_recovery_seconds`（`source`：`checkpoint`・`journal`）、`ds_recovery_journal_items` | histogram | NFR-007 の内訳 |
 | ds | `ds_presence_batch_bytes`、`ds_participants` | histogram | 人が集まるファイル |
-| router | `router_assign_total`（`kind`：`open`・`handoff`・`recover_only`・`drain`） | counter | 割り当ての量 |
+| router | `router_assign_total`（`kind`：`open`・`handoff`・`recover_then_release`・`drain`） | counter | 割り当ての量 |
 | router | `router_owner_recovery_seconds` | histogram | SLI `owner_recovery` |
 | router | `router_orphans`（生存の切れた持ち主の割り当て）、`router_orphan_oldest_seconds` | gauge | 回復のジョブの見張り（[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)） |
 | router | `router_drain_remaining_files` | gauge | ドレインの進み |
@@ -196,7 +196,7 @@ ErrorReport {
 | Render Worker の滞留 | `render-export` の最古が 5 分、`render-thumbnail` が 30 分 | ticket | `render-worker-backlog.md`（[export-and-assets.md](export-and-assets.md) の 16 節） |
 | Realtime・通知の遅れ | `realtime_delivery` の p99 が 1 秒を 15 分超える | ticket | [comments-and-notifications.md](comments-and-notifications.md) の 11 節 |
 
-- 名前だけを書いた runbook は、各領域が提案したもので、作る Epic を [runbooks/README.md](../runbooks/README.md) の 4 節に書いた。
+- 名前だけを書いた runbook は、各領域が提案したもので、作る Epic と Story を [runbooks/README.md](../runbooks/README.md) の 4 節に書いた。
 - デプロイの直後 30 分の SLO の悪化は、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の「悪化したとき」を先に見る。
 
 ## 7. 合成の監視

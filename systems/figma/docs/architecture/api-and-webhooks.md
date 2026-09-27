@@ -59,7 +59,7 @@ ADR-0040。
 | 個人のアクセストークン | 利用者が設定画面で作る。期限とスコープを選ぶ。作ったときだけ表示 | 同じ。期限は必須で最大 1 年（既定 90 日）。スコープは必須 | E15 |
 | 組織のトークン | Organization・Enterprise。利用者に結び付かない。期限は最大 1 年。資源の許可リストで絞れる | 同じ形で、後の Story にする。主体は組織のボットで、許可リストのプロジェクト・ファイルだけ | E15 の後半 |
 
-- 本家の個人のアクセストークンの期限の選択肢は **未検証**。
+- 本家の個人のアクセストークンは、作るときに期限とスコープを決める（[Personal access tokens](https://developers.figma.com/docs/rest-api/personal-access-tokens/)）。組織のトークン（plan access token）の期限は最大 1 年（[Authentication](https://developers.figma.com/docs/rest-api/authentication/)）。いずれも 2026-09-27 に確認。個人のトークンの期限の選択肢と上限は資料にない（**未検証**。設計の判断には影響しない）。
 - 認可コードと PKCE の値は、2026-09-27 に確認。
 - 接頭辞は `<brand>pat_`（個人）、`<brand>oat_`（OAuth のアクセス）、`<brand>ort_`（OAuth のリフレッシュ）、`<brand>ogt_`（組織）。本体はランダム 32 バイト、末尾に CRC32 のチェックサム（base62）。他のサービスの接頭辞と重ならないことを確かめ、シークレットスキャンのパートナープログラムに登録する（リポジトリ共通の ADR-0006）。
 - トークンは SHA-256 のハッシュで持ち、定数時間で比べる。
@@ -203,7 +203,7 @@ ADR-0041。本家の Webhook の V2 に寄せる（[Webhooks](https://developers
 
 | 項目 | 設計 | 本家 |
 | --- | --- | --- |
-| 保証 | 少なくとも 1 回。順序は保証しない。受け手はイベントの `id` で重複を除く | 同じとみなす（**未検証**） |
+| 保証 | 少なくとも 1 回。順序は保証しない。受け手はイベントの `id` で重複を除く | 資料に記述なし。再試行があるので重複はありうる（**未検証**。設計の判断には影響しない） |
 | 成功 | 10 秒以内の 2xx | 200 だけ |
 | 再試行 | 1 分・5 分・30 分・3 時間・12 時間の後（最大 6 回） | 5 分・30 分・3 時間（最大 4 回） |
 | 止める | 3 日続けて失敗したら `paused` にし、作った人にメールで知らせる。受け手が 410 を返したら即時に `paused` | 失敗が続いても止めない。誤った passcode への 400 で止まる |
@@ -343,6 +343,6 @@ ADR-0042。
 | Aurora `webhooks`（RLS） | `org_id`、`id`、`context`（`team`・`project`・`file`）、`context_id`、`event_type`、`endpoint`、`secret_ciphertext`、`secret_next_ciphertext`、`secret_rotated_at`、`status`（`active`・`paused`）、`created_by`、`failing_since`、`created_at` |
 | Aurora `webhook_deliveries`（RLS。時間でパーティション、7 日） | `org_id`、`id`（イベントの ID）、`webhook_id`、`event_type`、`envelope`、`attempt`、`next_attempt_at`、`status`（`pending`・`delivered`・`failed`・`skipped_forbidden`）、`last_status_code`、`last_latency_ms`、`created_at` |
 | Aurora `idempotency_keys`（RLS） | `org_id`、`token_id`、`key`、`request_hash`、`response_status`、`response_body`、`expires_at`（24 時間） |
-| Aurora `api_image_jobs` | [export-and-assets.md](export-and-assets.md) の `export_jobs`（`source = api`）を使う |
+| `/v1/image_jobs` の記録 | 別の表を持たない。Aurora の `export_jobs`（`source = api`。[export-and-assets.md](export-and-assets.md)、[data-model.md](data-model.md)）を使う |
 | SQS `webhook-delivery` | 配送のジョブ |
 | 開発リポジトリ `schema/properties.toml` の列 | `public_api`・`api_name`・`api_since`（4.1 節）、`public_plugin`（[plugins.md](plugins.md) の 5.5 節） |

@@ -125,7 +125,7 @@ ADR-0034。
 ### 5.1 構成
 
 - Rust のネイティブのバイナリ。エンジンの crate（`doc-model`・レイアウト・描画）を、ブラウザと同じ版で使う（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
-- ECS Fargate（CPU だけ。GPU はない）で動かす。wgpu の Vulkan のバックエンドを、Mesa の lavapipe（CPU の Vulkan の実装）の上で動かす（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)、[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)）。10 万ノードの参照ファイルのサムネイルを p95 10 秒以内に描けるかは **未検証**。E10 の PoC で計測し、足りなければ GPU のインスタンス（ECS on EC2）を別の ADR で検討する。
+- ECS Fargate（CPU だけ。GPU はない）で動かす。wgpu の Vulkan のバックエンドを、Mesa の lavapipe（CPU の Vulkan の実装）の上で動かす（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)、[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)）。10 万ノードの参照ファイルのサムネイルを p95 10 秒以内に描けるかは **未検証**（E10 の `render-worker-core` の PoC で計測する）。lavapipe は Vulkan 1.3 の適合を得ている（Khronos の Vulkanised 2025 の発表 [Current state of Lavapipe](https://vulkan.org/user/pages/09.events/vulkanised-2025/T5-Lucas-Fryzek-Igalia.pdf)、2025-02-13、2026-09-27 に確認）。足りなければ足りなければ GPU のインスタンス（ECS on EC2）を別の ADR で検討する。
 - キューは 2 つに分ける：`render-export`（利用者が待つ。優先）、`render-thumbnail`（待たない。ファイルのサムネイルと、コメントの通知のプレビューの画像。[comments-and-notifications.md](comments-and-notifications.md) の 5.5 節）。同じサービスの 2 つのタスクの群れで受ける。
 - **1 ジョブを 1 つの子プロセスで描く。** 親のプロセスが SQS を受け、子のプロセスを起こし、結果を受け取って S3 に書く。子は、メモリの上限（`RLIMIT_AS` 8 GiB）と時間の上限を持ち、描き終えたら終わる。組織をまたいで、メモリに前のジョブの中身が残らないようにする。
 
@@ -142,7 +142,8 @@ ADR-0034。
 ### 5.3 通信の制限
 
 - Render Worker のタスクは、インターネットへの経路を持たない。S3・SQS・DynamoDB・Aurora（ジョブの状態の更新）には VPC エンドポイントで届く。外部の URL の画像を描くことはない（9 節で、取り込みの時点で S3 に入れる）。
-- 子のプロセスは、親とのパイプ以外の通信を持たない（ネットワークの名前空間を分ける。Fargate で使えるかは **未検証**。使えなければ seccomp で `socket` を禁止する）。
+- 子のプロセスは、親とのパイプ以外の通信を持たない。子は起動の直後に、自分で `PR_SET_NO_NEW_PRIVS` を立てて seccomp のフィルタを入れ、`socket`・`connect`・`bind` などを禁止する（特権を要らない）。ネットワークの名前空間は使わない。Fargate は特権のコンテナを許さず、`CAP_SYS_ADMIN`・`CAP_NET_ADMIN` を与えない（足せるのは `CAP_SYS_PTRACE` だけ）ため（[Fargate security considerations for Amazon ECS](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-security-considerations.html)、2026-09-27 に確認）。
+  - > 2026-09-27 の注記：「ネットワークの名前空間を分け、使えなければ seccomp」を、seccomp だけに改めた。
 
 ## 6. 画像
 
@@ -201,7 +202,9 @@ Worker（TypeScript）が、Rust の検査器（`asset-inspect`。子プロセ�
 ### 6.4 配信
 
 - クライアントは、描く画像のハッシュを集めて `POST /internal/files/{file_key}/images:sign { hashes, size }` を呼ぶ。API は、閲覧の権限を判定関数で確かめ、`images` の表（ファイルを持つ組織）に `ready` の行があるハッシュだけに、CloudFront の署名付き URL を返す。
-- 署名付き URL の期限は 15 分。パスはハッシュで決まるので、中身は不変で、CloudFront と S3 の応答に `Cache-Control: public, max-age=31536000, immutable` を付ける。署名の検査は CloudFront の縁で要求ごとに行い、署名の引数をキャッシュの鍵に含めない。署名付き URL は取得を許すもので、キャッシュしたオブジェクトは中身のハッシュで名付けた不変のものである。パスが組織を含む（`images/{org_id}/{sha256}`）ので、ある組織の文脈で出した URL で他の組織のオブジェクトは取れず、キャッシュを組織の間で共有しない（[permissions-and-sharing.md](permissions-and-sharing.md) の 11 節と揃えた）。キャッシュに当たった要求でも、署名のないものと期限の切れたものを拒むことは、E10 の PoC で確かめる（**未検証**）。
+- 署名付き URL の期限は 15 分。パスはハッシュで決まるので、中身は不変で、CloudFront と S3 の応答に `Cache-Control: public, max-age=31536000, immutable` を付ける。署名の検査は CloudFront の縁で要求ごとに行い、署名の引数をキャッシュの鍵に含めない。署名付き URL は取得を許すもので、キャッシュしたオブジェクトは中身のハッシュで名付けた不変のものである。パスが組織を含む（`images/{org_id}/{sha256}`）ので、ある組織の文脈で出した URL で他の組織のオブジェクトは取れず、キャッシュを組織の間で共有しない（[permissions-and-sharing.md](permissions-and-sharing.md) の 11 節と揃えた）。CloudFront は、署名と方針（期限）を確かめてから、キャッシュを見る。期限は要求の時点で確かめる。署名の引数（`Expires`・`Key-Pair-Id`・`Policy`・`Signature`）はオリジンへ送る前に外す（[Use signed URLs](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-urls.html)、[Cache content based on query string parameters](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/QueryStringParameters.html)、いずれも 2026-09-27 に確認）。キャッシュの方針はクエリ文字列を鍵に含めない。E10 の `image-sign-endpoint` の PoC では、実際の配信で、キャッシュに当たった要求でも署名のないものと期限の切れたものが 403 になることを結合テストで確かめる。
+- CloudFront は `OPTIONS` の要求では署名を確かめない（同上の Use signed URLs）。署名の要る経路（`files`・`assets` の `<brand>usercontent`）の許すメソッドは `GET`・`HEAD` だけにする。チャンクと画像の `fetch` は単純な要求（独自のヘッダーなし）にして、事前の確認（preflight）を起こさない。
+- CloudFront の標準のログは、クエリ文字列（署名を含む）を記録する（同上）。ログの置き場所は security.md の 7 節の保持と権限に従う。
 - 応答のヘッダーは経路ごとに CloudFront で固定する：`Content-Type` は登録の値、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: sandbox; default-src 'none'`、`Cross-Origin-Resource-Policy: cross-origin`（エンジンが `fetch` で読むため。CORS はアプリのオリジンだけを許す）。
 - ブラウザは、読んだ画像をキャッシュ（Cache Storage）に鍵をハッシュにして持つ。権限を失った後も、端末に残ったキャッシュは消せない（本家も同じとみなす。**未検証**）。
 
@@ -230,7 +233,7 @@ ADR-0036。
 - 和文を先に揃える（[intent.md](../intent.md) の「日本の市場を先に狙う」）。候補は Noto Sans JP・Noto Serif JP・BIZ UDPGothic・BIZ UDPMincho・M PLUS 系など、OFL で配られているもの。欧文は Inter と、Google Fonts の OFL・Apache のもの。一覧と版は、開発リポジトリの `fonts/catalog.toml` に持ち、ライセンスの文と出典を並べる。
 - 既定のフォントは、UI の言語が日本語なら Noto Sans JP、それ以外は Inter。
 - 配信：`fonts/catalog/{sha256}` を CloudFront から配る。同梱のフォントは権限が要らないので、署名なしで、`immutable` のキャッシュにする。
-- 和文のフォントは 1 書体で数 MB になる（Noto Sans JP の大きさは **未検証**。E10 で計測する）。書体ごとにファイル全体を読み、ブラウザのキャッシュ（Cache Storage）に持つ。文字の範囲ごとに分けて読む方式（Web フォントの `unicode-range` のような分割）は、整形（GSUB・GPOS）がファイル全体を要するため MVP では採らない。読み込みの時間を E10 で計測して見直す。
+- 和文のフォントは 1 書体で数 MB になる（Noto Sans JP は、日本語のサブセットの OTF の Regular が約 4.5 MB、Google Fonts の可変フォント `NotoSansJP[wght].ttf` が約 9.6 MB。[notofonts/noto-cjk](https://github.com/notofonts/noto-cjk) の `Sans/SubsetOTF/JP`、[google/fonts](https://github.com/google/fonts) の `ofl/notosansjp`、2026-09-27 に確認）。読み込みの時間は E2 の `bundled-font-catalog` で計測する。書体ごとにファイル全体を読み、ブラウザのキャッシュ（Cache Storage）に持つ。文字の範囲ごとに分けて読む方式（Web フォントの `unicode-range` のような分割）は、整形（GSUB・GPOS）がファイル全体を要するため MVP では採らない。読み込みの時間を E10 で計測して見直す。
 
 ### 7.3 組織のフォント
 
@@ -381,7 +384,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 - **サーバーの書き出しの結果の保持は 14 日、URL は 24 時間**（4.4 節）。本家の API（30 日）より短い。
 - **端末のフォントは、MVP では Chromium の Local Font Access API だけ**（7.4 節、ADR-0036）。補助のアプリは MVP の後に別の ADR で決める。
 - **組織のフォントの PDF への埋め込みは、L1 が決まるまでアウトライン化**（7.6 節）。
-- **Render Worker は Fargate の CPU で、lavapipe の上の wgpu**（5.1 節）。性能は E10 の PoC で確かめる。
+- **Render Worker は Fargate の CPU で、lavapipe の上の wgpu**（5.1 節）。性能は E10 の `render-worker-core` の PoC で確かめる。
 - **CDN の署名とキャッシュ**：署名はキャッシュの鍵に含めない。キャッシュのオブジェクトは中身のハッシュで名付け、パスに組織かファイルを含める（6.4 節。統合の工程で permissions-and-sharing と揃えた）。
 
 ### 持ち越し
@@ -389,10 +392,9 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 組織のフォントを、ゲスト・リンクを知っている人に配るか。サーバーの描画・PDF への埋め込みに使ってよいか | 法務（L1）。決まるまで該当の Story の spec を承認しない |
-| 同梱の和文のフォントの読み込みの時間とメモリ（NFR-003・004） | E10 で計測。遅ければ文字の範囲ごとの分割を別の ADR で検討する |
-| キャッシュに当たった要求でも、CloudFront が署名と期限を毎回確かめること（署名はキャッシュの鍵に含めないと統合の工程で決めた。6.4 節） | E10 の PoC |
-| ソフトウェアの描画の性能（10 万ノードのサムネイル p95 10 秒） | E10 の PoC。足りなければ GPU のインスタンスの ADR |
-| 子プロセスのネットワークの名前空間を Fargate で使えるか | E10 の PoC。使えなければ seccomp |
+| 同梱の和文のフォントの読み込みの時間とメモリ（NFR-003・004） | E2 の `bundled-font-catalog` で計測。遅ければ文字の範囲ごとの分割を別の ADR で検討する |
+| キャッシュに当たった要求でも、CloudFront が署名と期限を毎回確かめること（署名はキャッシュの鍵に含めないと統合の工程で決めた。6.4 節） | 資料で確かめた（6.4 節）。`image-sign-endpoint` の結合テストで、実際の配信でも確かめる |
+| ソフトウェアの描画の性能（10 万ノードのサムネイル p95 10 秒） | E10 の `render-worker-core` の PoC。足りなければ GPU のインスタンスの ADR |
 | JPG の品質の値（本家の Low・Medium・High の中身） | 本家の値は確かめられない。この設計の値のまま、利用者の声で見直す |
 | 1 組織の画像の容量の上限とプラン | PM |
 | 補助のアプリを作るか | MVP の後。Firefox・Safari の利用者の声で決める |

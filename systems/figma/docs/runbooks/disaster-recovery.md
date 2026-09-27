@@ -57,7 +57,7 @@
    - 応答しなければ、マネージドなフェイルオーバー（`aws rds failover-global-cluster --allow-data-loss`、大阪で実行）。
    - 大阪の reader を 1 台足す。
 6. **アプリを広げる。** 「DR：大阪を有効化」のワークフローで、大阪の各サービスのタスク数を東京と同じにする（状態ファイルは大阪のバケットにある）。Valkey を平常の大きさにする。
-7. **DynamoDB の東京のレプリカを外すことを試みる。** 大阪から `UpdateTable` でレプリカの削除を求める。障害中に外せるかは **未検証**。外せなくても続ける。
+7. **DynamoDB の東京のレプリカを外すことを試みる。** 大阪から `UpdateTable` でレプリカの削除を求める。障害中に外せるかは **未検証**（資料に記述がない。E12 の `dr-drill` で、AWS FIS のリージョンの切り離し（複製の停止）の中で確かめる。[How DynamoDB global tables work](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html)、2026-09-27 に確認）。外せなくても続ける。
 8. **入口を切り替える。** Terraform の `edge` の変数 `active_region` を大阪にして apply する（`app`・`mp`・`rt`・`api`・`telemetry` の CloudFront のオリジン、`files`・`assets` のオリジンのバケット）。
 9. **回復のジョブを見る。** router は、`file_leases` の `region_gen` が古い `owned`・`handoff` の項目を「持ち主なし」とみなす。利用者が開いたファイルから回復し、誰も開かないファイルは回復のジョブが 1 秒に 50 ずつ回復する。`router_orphans` が減ることを確かめる。
    - 回復は、世代をまたぐ読み方になる（大阪にある最新のマニフェスト → 元の世代のジャーナルを飛びの手前まで → 新しい世代に書く。ADR-0048）。

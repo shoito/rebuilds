@@ -36,7 +36,7 @@ rebuilds の Cloudflare Workers は、多数のテナントのコードをサー
 - **ホストの関数（membrane）だけが外へ通じる。** ノードはハンドル（整数）で表し、値は写して渡す。ホストの JavaScript のオブジェクトを渡さない。membrane のコードは 1 か所に小さく置き、変更にコードオーナーのレビューと fuzzing を必須にする。
 - **上限**：ヒープ 512 MiB、スタック 1 MiB、1 回の同期の実行は 10 秒で打ち切る（割り込みの関数）。
 - **UI と通信は、別のオリジン `plugin-ui.<brand>usercontent.<domain>` の iframe**（`sandbox` に `allow-same-origin` を付けない）に置く。null origin なので、アプリのオリジンの Cookie・Storage に届かない。CSP は manifest の `allowedDomains` から作る。サンドボックスの `fetch` も、この iframe から送る。
-- 2 を採らない理由：同じ JavaScript のエンジンの同じヒープの中の境界で、本家が実際に破られた種類の欠陥（オブジェクトの取り違え）が起きうる。ShadowRealm の標準化とブラウザの対応は **未検証**。
+- 2 を採らない理由：同じ JavaScript のエンジンの同じヒープの中の境界で、本家が実際に破られた種類の欠陥（オブジェクトの取り違え）が起きうる。ShadowRealm は TC39 の Stage 2.7 で、ブラウザの実装はない（[tc39/proposals](https://github.com/tc39/proposals)、MDN の browser-compat-data、2026-09-27 に確認）。
 - 3 を採らない理由：本家が失敗した理由（非同期の API の書きにくさ、大きな文書の直列化の時間）がそのまま残る。エンジンが WASM の中に文書を持つので、別の realm へは全部を写すことになる。
 - 4 を採らない理由：`SharedArrayBuffer` にはアプリ全体の cross-origin isolation（COOP・COEP）が要り、埋め込み・外部の資源の読み込みへの影響が大きい。読み取りのたびにスレッドをまたぐ往復が入る。画面を止めない利点はあるので、PoC の性能を見て、長い処理のための別の実行の形として再検討する。
 
@@ -47,10 +47,11 @@ rebuilds の Cloudflare Workers は、多数のテナントのコードをサー
   - 文書をエンジンから同期で読めるので、API が書きやすく、速い。
   - UI の iframe が別のオリジンなので、プラグインの HTML がアプリのセッションに届かない。
 - 引き受けるコスト：
-  - 解釈器なので、ブラウザの JIT より遅い（本家も遅くなったと書く。程度は **未検証**。PoC で計測する）。
+  - 解釈器なので、ブラウザの JIT より遅い（本家も遅くなったと書く。程度は **未検証**。E14 の `quickjs-sandbox-poc` で計測する）。
   - メインスレッドで動くので、同期の実行の間は画面が止まる。10 秒の打ち切りと、`await` で区切る案内で抑える。
   - ブラウザの開発者の道具（デバッガー）が使えない。開発用のコンソールとエラーの位置の表示を自前で用意する。
-  - QuickJS の WASM（数百 KB〜1 MB 程度。**未検証**）を、プラグインを初めて動かすときに読む。
+  - QuickJS の WASM（quickjs-ng の同期の版で約 530 KB。圧縮の前。`@jitl/quickjs-ng-wasmfile-release-sync` 0.32.0 の `emscripten-module.wasm`、jsDelivr の一覧で 2026-09-27 に確認）を、プラグインを初めて動かすときに読む。
+  - quickjs-ng は `Intl` を持たない（[quickjs-ng の ECMAScript Features](https://quickjs-ng.github.io/quickjs/es_features)、2026-09-27 に確認）。地域の書式を使うプラグインは、ホストの助けが要る（[plugins.md](../architecture/plugins.md) の 4.4 節）。
 
 ## Confirmation
 

@@ -75,7 +75,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `gpu-backend-poc` | PoC：1 つのビルドでの WebGPU と WebGL2、キャンバスを作り直しての切り替え、R16F の加算のブレンド、WASM の大きさ（ADR-0014 の Confirmation） |
 | `hamt-node-store-poc` | 10 万ノードでの HAMT と通常の対応表の比較（[document-model.md](architecture/document-model.md) の 10 節） |
 | `layout-crate-skeleton` | `layout` の crate、`LayoutResult`、決定性の lint、PROP-LAYOUT-001 の一致の CI（[layout.md](architecture/layout.md)） |
-| `property-table-extension-columns` | 表に `public_api`・`api_name`・`api_since`・`public_plugin` の列を足し、プロパティ 90 `plugin_data` を予約する（api-and-webhooks・plugins の準備） |
+| `property-table-extension-columns` | 表に `public_api`・`api_name`・`api_since`・`public_plugin` の列を足し、プロパティ 90 `plugin_data` を予約する（api-and-webhooks の `property-table-api-columns`、plugins の `plugin-data-property-reserve` と 1 つ） |
 | `scene-graph` | `RenderNode`、dirty の伝播、部分木の境界の箱、子の R-tree、`ChangeSummary` からの更新 |
 | `tile-cache` | タイルの描画とキャッシュ、ズームの途中の拡大・縮小、画面の外の先読み |
 | `path-coverage-raster` | パスの平坦化・振り分け・被覆率・塗りの規則 |
@@ -118,6 +118,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ordering-keys` | 並びの鍵、サーバーの振り直し、乱数の接頭辞 |
 | `change-origin-tag` | `ChangeSet` の `origin` とジャーナルへの記録（plugins・layout と合わせる） |
 | `reconnect-resume` | `resume`、背圧と `Kick`、最初の 0〜5 秒の乱数の待ち（capacity.md の `reconnect-jitter` と 1 つ） |
+| `gateway-resume-token` | 再開のトークンの発行と検証、`Kick(ticket_required)`、Document Server での水準の上限（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 5.5 節） |
 | `presence-cursors` | 在席とカーソル、ページごとの絞り込み |
 | `remote-selection-and-cursors` | 他の人の選択の枠と名前の札（editor-and-tools） |
 | `follow-viewport` | 視点を追う |
@@ -145,7 +146,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `text-shaping-and-glyphs` | 整形、グリフのアトラス、大きな文字のパスの描画、和文のフォールバック（`cjk_fallback_font`）、カラーの絵文字 |
 | `text-line-breaking` | 行の組み立て、測定の関数とキャッシュ、`text_auto_resize` |
 | `text-editing` | カーソル・選択・書式・行の移動、IME の組み立ての表示、同時の編集の知らせ |
-| `effects-blend-masks` | ブレンドモード 16 種、影・ぼかし・背景のぼかし、マスク 3 種、内容の切り抜き |
+| `effects-blend-masks` | ブレンドモード 18 種、影・ぼかし・背景のぼかし、マスク 3 種、内容の切り抜き |
 | `snapping` | スナップと等間隔、画素への合わせ |
 | `pen-and-vector-network` | ペン、点・辺の編集、曲げ、領域の作り直し、大きなネットワークの送信 |
 | `boolean-operations` | 非破壊のブール演算、平坦化（iCurve）、線のアウトライン化 |
@@ -246,6 +247,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `access-notifications` | 招待・アクセスの申請・シートの申請の通知（通知の仕組みは E8） |
 | `acl-version-and-revalidation` | `acl_version` のキャッシュ、`acl.changed` と接続の再検証 |
 | `acl-change-kick` | Gateway での `acl.changed` の受け取りと判定し直し |
+| `file-and-project-move` | ファイル・プロジェクトの移動、`files.team_id` の書き換えと `acl_version`、ずれの見張り（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 9.3 節） |
 | `session-revocation-kick` | `session.revoked` の配送と接続の切断 |
 | `viewer-mode-ui` | 閲覧の権限での UI、`RoleChanged` への対応、閲覧だけの描画（rendering の `viewer-rendering` と 1 つ） |
 | `sharing-ui` | 共有の画面（ファイル・プロジェクト・チーム） |

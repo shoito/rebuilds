@@ -25,9 +25,11 @@
 | 間隔 | 余白（padding）、間隔（gap）。自動の間隔に「Between」「Around」「Evenly」（同上） | 固定の間隔と「Between」。「Around」「Evenly」は MVP の後 |
 | 大きさ | hug（子に合わせる）、fill（残りを埋める）、fixed。最小・最大の幅と高さ（同上） | 同じ |
 | その他 | 「オートレイアウトを無視」（絶対配置）、ベースラインで揃える（同上） | 同じ |
-| 負の間隔、線を大きさに含めるか、重なりの順（前の子を上に） | この資料には記述なし（未検証） | 持つ（3 節）。本家の振る舞いとの一致は E5 で確かめる |
+| 負の間隔、自動の間隔の下限、線を大きさに含めるか、重なりの順（前の子を上に） | 負の間隔は、重ねたいときに指定できる。自動の間隔（Between など）は 0 より小さくならず、子が収まらなければ先頭に詰める。Between で子が 1 つなら先頭に置く。内側の線は既定でレイアウトに含める（CSS の `border-box` と同じ。fill の子も `border-box` で配る）（[Use auto layout with CSS Flexbox in mind](https://help.figma.com/hc/en-us/articles/42031586813719-Use-auto-layout-with-CSS-Flexbox-in-mind)）。`strokesIncludedInLayout`（true なら `border-box`）と `itemReverseZIndex`（true なら前の子を上に描く）がある。`counterAxisSpacing` は正の値だけ（[Plugin API の node properties](https://developers.figma.com/docs/plugins/api/node-properties/)）。いずれも 2026-09-27 に確認 | 持つ（3 節）。`strokes_included_in_layout` の既定を true にした（下の注記）。線の含め方の細部（内側・中央・外側の線、fill の子の配り方）の一致は E5 の `auto-layout-baseline-and-strokes` で本家と比べる |
 | 制約 | 親のフレームの大きさを変えたときの子の動き（左・右・左右・中央・拡大縮小） | 同じ（8 節） |
 | 計算の場所と保存 | 公開されていない（未検証） | 4 節 |
+
+> 2026-09-27 の注記：`strokes_included_in_layout` の既定を false から true に改めた。本家が内側の線を既定でレイアウトに含めることを確かめたため。7.3 節の Taffy との差分のテストは、線の太さを含む場合を除いたまま。
 
 ## 3. 入力と出力
 
@@ -46,7 +48,7 @@
 | `counter_axis_align` | 同上 | `min`・`center`・`max`・`baseline`（`baseline` は `horizontal` だけ） |
 | `counter_axis_align_content` ★ | 同上 | `auto`・`space_between`（折り返したときの行の並べ方） |
 | `primary_sizing`・`counter_sizing` | 同上 | `fixed`・`hug` |
-| `strokes_included_in_layout` ★ | 同上 | bool（既定 false） |
+| `strokes_included_in_layout` ★ | 同上 | bool（既定 true。2 節の本家の既定に合わせた） |
 | `item_reverse_z_index` ★ | 同上 | bool（既定 false。true なら前の子を上に描く） |
 | `layout_grow` | オートレイアウトの子 | 0・1（1 なら主軸で fill） |
 | `layout_align` | 同上 | `inherit`・`stretch`（`stretch` なら交差軸で fill） |
@@ -110,7 +112,7 @@
 2. 改行の候補は ICU4X の `LineSegmenter`（UAX #14）で求める。強さは `Strict`（ICU4X の既定。日本語の行頭の小書きの仮名などで分けない）、`word_option` は `Normal`。
 3. 先頭から、行に収まる限り候補まで詰める（貪欲法）。行末の空白は幅に数えない（ぶら下げ）。
 4. 1 語が幅に収まらなければ、書記素の境で分ける（CSS の `overflow-wrap: anywhere` と同じ）。
-5. 字間（`letter_spacing`）は書記素ごとに足す。行末の書記素の後にも足す（本家との一致は **未検証**）。
+5. 字間（`letter_spacing`）は書記素ごとに足す。行末の書記素の後にも足す（本家との一致は **未検証**。E4 の `text-line-breaking` で本家と比べる）。
 6. 行の高さ：`auto` は、その行の最初のフォントの `ascender − descender + line_gap`（`OS/2` の `USE_TYPO_METRICS` が立っていれば typo の値、なければ `hhea`）。フォールバックのフォントの値は使わない（和文が混じっても行の高さが跳ねないように）。px と % の指定はそのまま。
 7. ベースラインの位置は、行の高さの中で、`ascender` と `descender` の比で上下を割り振る。
 
@@ -130,7 +132,7 @@
 - 計算の中は f64。入力の f32 を f64 に広げ（誤差なし）、出力で f32 に丸める（最近接の偶数。どこでも同じ）。
 - 使う演算は、`+`・`-`・`*`・`/`・`min`・`max`・`abs`・比較だけ。IEEE 754 はこれらの結果を一意に決める。
 - 使わないもの：
-  - 標準の `f64::sin`・`cos`・`powf` など。ターゲットごとに別の実装（Linux なら glibc）が計算し、結果がずれうる（WASM とネイティブで実際にずれるかは **未検証**。E2 の CI で確かめる）。回転した子の境界の箱は、行列の成分の絶対値の和で求め、三角関数を要らない形にする。どうしても要るときは、純 Rust の `libm` の crate を明示して呼ぶ。
+  - 標準の `f64::sin`・`cos`・`powf` など。ターゲットごとに別の実装（Linux なら glibc）が計算し、結果がずれうる（WASM とネイティブで実際にずれるかは **未検証**。E2 の `layout-crate-skeleton` の一致の CI で確かめる）。回転した子の境界の箱は、行列の成分の絶対値の和で求め、三角関数を要らない形にする。どうしても要るときは、純 Rust の `libm` の crate を明示して呼ぶ。
   - `mul_add`（FMA）と、relaxed SIMD。
   - 並列の計算（足す順が変わる）。
 - NaN と無限は入力の検証で入らない（document-model の 4.3 節）。0 での割り算は、割る前に数を確かめる。
@@ -254,7 +256,7 @@ CSS の flexbox に近いが、本家のデザインツールの意味に合わ�
 | ファイルを開いた後の全体の計算（10 万ノード） | アイドルの時間に分けて 300 ms 以内。最初の描画は保存された値で行い、待たない | NFR-003 |
 | 測定のキャッシュのメモリ | 10 万ノードで 30 MB 以内 | NFR-004 |
 
-- Taffy の README の計測では、10 万ノード（深さ 5）の flexbox の計算が約 39 ms（M1 Pro）である（[DioxusLabs/taffy](https://github.com/DioxusLabs/taffy)、2026-09-27 に確認）。テキストの測定を含む本システムの計算が 300 ms に収まるかは **未検証**。E5 の前に計測する。
+- Taffy の README の計測では、10 万ノードの flexbox の計算が、深さ 5 で約 39 ms、深さ 17 で約 64 ms、深さ 1（1 つの親に 10 万の子）で約 247 ms（M1 Pro。テキストの測定を含まない）である（[DioxusLabs/taffy](https://github.com/DioxusLabs/taffy)、2026-09-27 に確認）。幅の広い木が予算の大半を使いうる。テキストの測定を含む本システムの計算が 300 ms に収まるかは **未検証**。E5 の前に `layout-crate-skeleton` で計測し、E5 の `incremental-relayout` の性能の CI で守る。
 
 ## 13. テスト
 

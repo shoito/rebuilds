@@ -35,7 +35,7 @@ date: 2026-09-27
   - どちらでもない `owned` のまま持ち主の生存が切れたものが「手放さずに落ちた」ファイルである。
 - **回復のジョブ**（Router の中のループ）：
   - 30 秒ごとに `ds_liveness` を読み、期限の切れたタスクを見つける。GSI `by_owner`（`owner_task` をキーにした疎な索引。`owned`・`handoff` の間だけ値を持つ）で、そのタスクのファイルを集める。
-  - 2 分たっても誰も開かず割り当てられないファイルを、回復だけの割り当て（`recover_then_release`）で Document Server に渡す。Document Server は回復し、チェックポイントを書き、`released` にする。目標は落ちてから 5 分以内。
+  - 2 分たっても誰も開かず割り当てられないファイルを、回復だけの割り当て（`recover_then_release`）で Document Server に渡す。Document Server は回復し、チェックポイントを書き、接続が 0 なら `released` にする（`file_leases` の `recover_then_release = true`。[infrastructure.md](../architecture/infrastructure.md) の 5.3 節）。目標は落ちてから 5 分以内。
   - 毎日の見張り：`by_owner` を全部読み、生存の切れた持ち主のファイルが 1 日を超えて残れば、アラームを出す（[observability.md](../architecture/observability.md) の 6 節）。
 - **削除済み**：完全な削除のジョブは `state = deleted`、`epoch` を最大値にする。Router は `deleted` のファイルを割り当てず、Gateway に `gone` を返す（Gateway は `Kick(file_deleted)`）。回復のジョブも `deleted` を扱わない。`deleted` の項目は TTL で 400 日後に消す。
 - **Router はリースの延長の経路にいない。** Document Server が `ds_liveness` を直接延ばす。Router が止まると新しく開けなくなるが、開いているファイルは続く。

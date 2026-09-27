@@ -48,7 +48,7 @@ date: 2026-09-27
   - 残す間隔と、無料のプランの日数は [ADR-0026](0026-version-history-restore-and-deletion.md) で決めた。
 - **リージョンの災害**：ジャーナルは DynamoDB のグローバルテーブルで大阪へ、S3 はクロスリージョンのレプリケーションで大阪へ複製する。複製は非同期なので、リージョンの喪失では最大 1 分の損失を許す（NFR-009）。切り替えのたびに世代を上げてキーを分ける（[ADR-0048](0048-osaka-dr-with-journal-generations.md)）。
 - 1 を採らない理由：最大 60 秒の編集を失い、NFR-006 を満たせない。
-- 3 を採らない理由：確定を返した後に落ちると、その変更が消える。NFR-006 に反する。確定の時間は延びるが、group commit の 20ms と DynamoDB のトランザクションの書き込み（p99 40ms の予算。**未検証**、E3 の前の PoC で計測する。[multiplayer.md](../architecture/multiplayer.md) の 8 節）で NFR-001 に収まる見込み。
+- 3 を採らない理由：確定を返した後に落ちると、その変更が消える。NFR-006 に反する。確定の時間は延びるが、group commit の 20ms と DynamoDB のトランザクションの書き込み（p99 40ms の予算。**未検証**、E3 の前の `dynamodb-transaction-poc` で計測する。[multiplayer.md](../architecture/multiplayer.md) の 8 節）で NFR-001 に収まる見込み。
 - 4 を採らない理由：変更の件数（段階 S3 で 1 日 50 億件）を、メタデータの Aurora に書くと、書き込みの負荷とテーブルの大きさで、メタデータの処理を圧迫する。ファイルの中身とメタデータを分ける原則（[architecture/README.md](../architecture/README.md) の 1 節）にも反する。
 - b を採らない理由：4 と同じ。
 - c を採らない理由：Kinesis は `seq` を条件にした書き込み（二重の持ち主の防御）ができない。自前のログは、複製と障害の扱いを自分で持つことになる。

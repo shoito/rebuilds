@@ -97,7 +97,7 @@ SEV1 では、指揮者は手を動かさない。
 6. デプロイがきっかけなら、入れ替えの割合を下げる（Gateway 10% → 5%、ドレインの波を小さく）。
 7. 収まらないとき、`ops.multiplayer_read_only` で編集を止めると、再接続の後の送り直しの負荷が減る。最後の手段にする。
 
-**エスカレーション**：チケットの発行が律速で、30 分たっても収まらない → Dev のテックリードを呼ぶ（再開のトークンの前倒しの判断。[capacity.md](../architecture/capacity.md) の 2.2 節）。
+**エスカレーション**：チケットの発行が律速で、30 分たっても収まらない → Dev のテックリードを呼ぶ。再開のトークンが効いているか（`gw_reconnect_total` の `auth = resume_token` の割合、`Kick(ticket_required)` の数、Valkey の状態）を先に見る。Gateway の落ちなのにトークンが外れていれば、鍵（`kid`）の配布か Valkey の組織の `acl_version` を疑う（[capacity.md](../architecture/capacity.md) の 2.2 節、[permissions-and-sharing.md](../architecture/permissions-and-sharing.md) の 5.5 節）。
 
 ### ジャーナルの飛び
 

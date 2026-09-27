@@ -24,7 +24,7 @@ Document Server は、開いたファイルを丸ごとメモリに持つ（[ADR
 
 1 を採用する。数値は [capacity.md](../architecture/capacity.md) の 3 節。
 
-- **見積もり**：開く前は、Aurora の `files.size_bytes`（圧縮の前のチェックポイントの大きさ）× 係数（初期値 3。**未検証**。E7 の計測で置き換える）＋ 固定の 16 MiB（直近の変更、セッションの表、待ち行列）。開いた後は、Document Server が実際の使用量（HAMT の節の数×大きさ、直近の変更のバッファ）を 5 秒ごとに数え、`ds_liveness` の負荷に書く（[ADR-0047](0047-router-task-liveness-and-file-assignment.md)）。
+- **見積もり**：開く前は、Aurora の `files.size_bytes`（圧縮の前のチェックポイントの大きさ）× 係数（初期値 3。**未検証**。E3 の `ds-memory-accounting` で見積もりと実際の比を記録し、E7 と試用の期間の計測で置き換える）＋ 固定の 16 MiB（直近の変更、セッションの表、待ち行列）。開いた後は、Document Server が実際の使用量（HAMT の節の数×大きさ、直近の変更のバッファ）を 5 秒ごとに数え、`ds_liveness` の負荷に書く（[ADR-0047](0047-router-task-liveness-and-file-assignment.md)）。
 - **受け入れ**：Router は、見積もりが「タスクのメモリ × 0.75 − 使用中」に収まるタスクだけを選ぶ。残りの 25% は、直列化の一時的な増加、Gateway との接続のバッファ、Rust の実行時に使う。
 - **群れ**：見積もりが 1.5 GiB を超えるファイルは `ds-large`（120 GB）に置く（[ADR-0046](0046-multiplayer-compute-on-fargate-with-drain.md)）。`ds-standard`（60 GB）の 1 ファイルの上限は 1.5 GiB。
 - **直列化の同時の数**：1 タスクで同時に直列化するチェックポイントは 4 つまで。大きなファイルは 1 つずつ。

@@ -18,7 +18,7 @@
 | S3（assets） | 画像、フォント、書き出し、サムネイル、コメントの添付 | バイト列の正本 |
 | S3（その他） | プラグインのコード（E14）、ライブラリの資産（E13）、監査のアーカイブ、WASM の名前の表 | — |
 | Document Server のメモリ | 開いたファイルの今の状態、セッションの表、直近の確定した変更 | 正本ではない（落ちたら上から戻す） |
-| Valkey | チケットの `jti`、持ち主のキャッシュ、レート制限、Realtime の問い合わせのキャッシュと pub/sub | 正本ではない |
+| Valkey | チケットの `jti`、再開のトークンの `rid`、組織の最新の `acl_version`、取り消したログインのセッションの印、持ち主のキャッシュ、レート制限、Realtime の問い合わせのキャッシュと pub/sub | 正本ではない |
 | SQS | Worker のジョブ | 正本ではない（outbox と表から作り直せる） |
 | OpenSearch（延期） | ファイルの中身の検索の索引 | 正本ではない |
 | ブラウザ | IndexedDB（チャンクのキャッシュ、プラグインの保存）、Cache Storage（フォント・画像）、`localStorage`（UI の設定） | 正本ではない |
@@ -89,7 +89,7 @@
 | 表 | キー | 中身 | 複製 | 定義の場所 |
 | --- | --- | --- | --- | --- |
 | `journal` | PK `pk`（世代 1 は `{file_id}`、世代 `g ≥ 2` は `{file_id}#g{g}`）、SK `seq` | `seq = 0` はフェンス（`epoch`、`owner`、`fenced_at`。世代 2 以降は `base_gen`・`base_end_seq`）。`seq ≥ 1` はまとまり（`end_seq`、`epoch`、`fmt`、`body` か `blob_key`、`body_sha256`、`bytes`、`written_at`、`ttl` = 書いた時点＋30 日）。本体の `JournalBatch` は各変更の `seq`・`session_id`・`client_seq`・`origin`・`ops`・`server_ops` と `session_opens` | グローバル（MREC、大阪） | [file-storage-and-history.md](file-storage-and-history.md) の 4.1 節、[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md) |
-| `file_leases` | PK `file_id`。疎な GSI `by_owner`（`gsi_owner`） | 割り当て：`state`（`owned`・`handoff`・`released`・`deleted`）、`owner_task`、`owner_incarnation`、`epoch`、`region_gen`、`assigned_at`、`released_at`、`released_seq`、`recover_only`。`deleted` だけ TTL 400 日 | グローバル（MREC） | [infrastructure.md](infrastructure.md) の 5.1 節、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md) |
+| `file_leases` | PK `file_id`。疎な GSI `by_owner`（`gsi_owner`） | 割り当て：`state`（`owned`・`handoff`・`released`・`deleted`）、`owner_task`、`owner_incarnation`、`epoch`、`region_gen`、`assigned_at`、`released_at`、`released_seq`、`recover_then_release`。`deleted` だけ TTL 400 日 | グローバル（MREC） | [infrastructure.md](infrastructure.md) の 5.1 節、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md) |
 | `ds_liveness` | PK `task_id` | タスクの生存（`incarnation`、`pool`、`az`、`addr`、`state` = `active`・`draining`・`full`、`expires_at_ms`）と負荷（ファイルの数、メモリの使用と予算、接続の数）。TTL は期限＋1 日 | リージョンごと（複製しない） | infrastructure.md の 5.1 節、ADR-0047、[ADR-0051](../decisions/0051-document-server-memory-admission.md) |
 
 - 3 つともオンデマンド。`journal` は warm throughput で書き込み毎秒 5 万単位に温め、PITR 35 日（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) の 4 節）。
@@ -109,7 +109,7 @@
 | `name` | text | permissions | ファイルの名前（ログに書かない） |
 | `name_norm` | text | search | `normalizeForSearch(name)`（[search.md](search.md) の 3.1 節） |
 | `project_id` | uuid、null 可 | permissions | 下書きは null |
-| `team_id` | uuid、null 可 | search | プロジェクトのチーム（非正規化。移動で書き換える）。名前の検索の候補の段に使う（search.md の 3.2 節）。下書きは null |
+| `team_id` | uuid、null 可 | search | プロジェクトのチーム（非正規化。移動のトランザクションで書き換え、`acl_version` を上げる。[permissions-and-sharing.md](permissions-and-sharing.md) の 9.3 節）。名前の検索の候補の段に使う（search.md の 3.2 節）。下書きは null |
 | `owner_account_id` | uuid | permissions | 所有者（`owner` の水準）。移譲で変わる |
 | `state` | enum | file-storage | `creating`・`active`・`maintenance`・`trashed`・`purging`・`purged`（下の遷移） |
 | `maintenance_reason`、`maintenance_since` | enum、timestamptz | file-storage・security | `operator`・`journal_gap`・`invariant_violation`（`maintenance` のときだけ） |
@@ -186,7 +186,7 @@
 | SQS | `image-ingest`、`font-ingest`、`render-export`、`render-thumbnail` | 取り込みと描画のジョブ | [export-and-assets.md](export-and-assets.md) の 16 節 |
 | SQS | `notify`、メール、`search-index`（延期）、`file_storage_jobs` のキュー | Worker のジョブ | comments-and-notifications.md、search.md、file-storage-and-history.md |
 | SQS | `webhook-delivery` | Webhook の配送（E15） | [api-and-webhooks.md](api-and-webhooks.md) の 14 節 |
-| Valkey（チケットとレート制限） | 使ったチケットの `jti`、レート制限の数え | 能力のチケットの使い回しの拒否、利用者・組織・トークンの制限 | [permissions-and-sharing.md](permissions-and-sharing.md) の 5.4 節、api-and-webhooks.md の 5 節 |
+| Valkey（チケットとレート制限） | 使ったチケットの `jti`、使った再開のトークンの `rid`（60 秒）、`acl_version:{org_id}`、`revoked_session:{id}`（2 分）、レート制限の数え | 能力のチケット・再開のトークンの使い回しの拒否と取り消しの確かめ（permissions-and-sharing.md の 5.5 節）、利用者・組織・トークンの制限 | [permissions-and-sharing.md](permissions-and-sharing.md) の 5.4 節、api-and-webhooks.md の 5 節 |
 | Valkey（キャッシュ） | `owner:{file_id}` | 持ち主のキャッシュ（30 秒） | [infrastructure.md](infrastructure.md) の 5.2 節 |
 | Valkey（pub/sub。クラスタモードを使わない） | Realtime の問い合わせのキャッシュ、無効化の pub/sub | | comments-and-notifications.md の 5.2 節 |
 | OpenSearch（延期） | `file_pages`（`routing = org_id`） | 中身の検索 | [search.md](search.md) の 4 節 |
@@ -243,6 +243,7 @@
 | file-storage-and-history.md の 11.2 節の「大阪の複製は削除が伝わる」は S3 では成り立たない | 完全な削除・掃除・mark-and-sweep（export-and-assets.md の 6.5 節）・ライフサイクルを両方のバケットで行う（ADR-0045）。`file_storage_jobs.region` で手順を分けて記録する |
 | `user_preferences` の RLS の扱い | `global` スキーマに置き、`account_id` で絞る関数を通す（3.2 節） |
 | コメントの添付のキーの形（`orgs/{org_id}/files/{file_id}/…`）が他の資産と違った | `comment-attachments/{org_id}/{file_id}/{asset_id}` に揃えた（6.2 節） |
+| `files.team_id` の非正規化の書き換えの手順が決まっていなかった | ファイル・プロジェクトの移動と同じトランザクションで書き換え、`acl_version` を上げる。チームの削除では書き換えない（permissions-and-sharing.md の 9.3 節） |
 | 大阪への切り替えで取り戻した編集の版の種類 | `file_versions.kind` に `dr_salvaged` を足した（ADR-0048 の提案） |
 | 取り戻した版のマニフェストの置き場所が決まっていなかった | `files/{file_id}/salvage/g{g}/{seq:020}`。取り戻した `seq` は今の世代の `seq`（`base_end_seq + 1` から続く）と重なりうるので、`checkpoints/` と分けた |
 | ジャーナルの飛び・不変条件の破れ・運用者の停止で使うファイルの状態 | `files.state = maintenance` と `maintenance_reason` を足した（5.1 節）。runbook の「ファイルの編集を止める」を揃えた |
@@ -252,5 +253,4 @@
 残り（マイグレーションを書く Story で確かめる）：
 
 - すべてのテナントの表に RLS があり、3.2・3.3 節の例外が網羅されていることを、マイグレーションの CI の許可リストと照合する（E1）。
-- `files.team_id` の非正規化を、プロジェクトの移動とチームの削除で書き換える手順（E9・E11）。
 - `file_versions.delete_after` の既定（無料のプラン 30 日）は PM の決定待ち（intent.md の Open questions）。

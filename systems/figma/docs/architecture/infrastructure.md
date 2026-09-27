@@ -78,7 +78,7 @@ router（ドレインの制御）
 
 - Document Server は、ファイルを 1 つでも持つ間、ECS のタスクの保護を立てる（期限 60 分、10 分ごとに延ばす）。保護のあるタスクは、ローリングの更新でも止められない（[Task scale-in protection](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-scale-in-protection.html)、2026-09-27 に確認）。サービスの `maximumPercent` を 200% にし、新しいタスクが先に起動できるようにする。
 - SIGTERM を受けたら（保護の期限切れや強制の停止）、`stopTimeout`（120 秒）の中で、できるだけ渡す。渡せなかったファイルは、生存の期限と回復で拾う（NFR-007）。
-- Fargate の退役の通知（AWS Health → EventBridge）を受けたら、待つ期間（14 日に設定）のうちの平日の昼に、ドレインで入れ替える（[Task retirement and maintenance for AWS Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-maintenance.html)、2026-09-27 に確認）。退役がタスクの保護を待つかは **未検証**。
+- Fargate の退役の通知（AWS Health → EventBridge）を受けたら、待つ期間（14 日に設定）のうちの平日の昼に、ドレインで入れ替える（[Task retirement and maintenance for AWS Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-maintenance.html)、2026-09-27 に確認）。EC2 のイベントの時間帯（2025-12-18 から Fargate に使える）で、退役の時刻を平日の昼に寄せてもよい（同上）。タスクの保護は、オートスケールの縮小とデプロイだけを防ぐと書かれている（[Task scale-in protection](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-scale-in-protection.html)）。退役は保護を待たない前提にし、ドレインが間に合わなければ生存の期限と回復（NFR-007）で拾う。
 
 ## 4. 入口と WebSocket
 
@@ -98,9 +98,9 @@ router（ドレインの制御）
   | 部品 | 期限 | 設定 |
   | --- | --- | --- |
   | クライアント | 20 秒ごとに `Ping` | [multiplayer.md](multiplayer.md) の 4.2 節 |
-  | CloudFront | WebSocket のアイドルの期限は資料で見つけられなかった（**未検証**） | E3 の PoC で、20 秒の `Ping` で 8 時間切れないことを確かめる |
+  | CloudFront | WebSocket に固有のアイドルの期限は資料にない。オリジンの応答の期限（既定 30 秒。オリジンからの次のパケットまで）を 60 秒にする。応答の完了の期限は設定しない（[Origin settings](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html)、2026-09-27 に確認） | 応答の期限が WebSocket のフレームに効くか、接続の長さの上限は **未検証**。E3 の `gateway-edge-websocket` の PoC で 8 時間切れないことを確かめる |
   | ALB | アイドル 300 秒（既定 60 秒、1〜4,000 秒で変えられる） | [ALB の属性](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-27 に確認 |
-  | Gateway | 60 秒 `Ping` がなければ切る | アプリ |
+  | Gateway | 60 秒 `Ping` がなければ切る。20 秒のあいだ送っていない接続に `Pong` を送る（CloudFront の応答の期限の中にオリジンからのパケットを置く） | アプリ |
 - ALB は、WebSocket の接続を確立したターゲットに固定する。ターゲットの選び方は「未処理の要求が最も少ない」で、接続の数では選ばない（[ターゲットグループの属性](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-target-group-attributes.html)、2026-09-27 に確認）。Gateway の間で接続の数が偏ったら、多い Gateway が新しい接続に `Kick(overloaded, retry_after_ms)` を返して、再接続で散らす。
 - **Gateway の入れ替え**：登録解除の遅延を 180 秒にし、その間に接続を `Kick(server_shutdown)` で少しずつ切る（Slack の [ADR-0022](../../../slack/docs/decisions/0022-zero-downtime-deploy-and-migrations.md) の Gateway の形）。`retry_after_ms` を 0〜60 秒に散らす。1 回に入れ替えるのは全体の 10%。
 
@@ -130,7 +130,7 @@ file_leases（DynamoDB、グローバルテーブル）
   region_gen       N   // ADR-0048
   assigned_at, released_at   N
   released_seq     N   // released・handoff のときの durable_seq
-  recover_only     BOOL // 回復のジョブの割り当て（ADR-0047 の recover_then_release。回復してチェックポイントを書き、released にする）
+  recover_then_release BOOL // 回復のジョブの割り当て（ADR-0047。回復してチェックポイントを書き、released にする）
   gsi_owner        S   // owned・handoff の間だけ owner_task（疎な GSI by_owner のキー）
   TTL              N   // deleted のときだけ、400 日後
 ```
@@ -159,7 +159,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 
 1. 30 秒ごとに `ds_liveness` を読む（タスクの数だけの小さな表）。期限の切れたタスクを見つける。
 2. GSI `by_owner` で、そのタスクのファイルを集める。
-3. 期限から 2 分たっても割り当て直されていないファイルを、`recover_only = true` で空きのあるタスクに割り当てる（1 秒に 50 ファイルまで）。
+3. 期限から 2 分たっても割り当て直されていないファイルを、`recover_then_release = true` で空きのあるタスクに割り当てる（1 秒に 50 ファイルまで）。
 4. Document Server は回復し、チェックポイントを書き、接続が 0 なら `released` にする。
 5. 毎日の見張り：`by_owner` を全部読み、生存の切れた持ち主のファイルの数と最古の経過時間を出す。1 日を超えるものがあれば警告（[observability.md](observability.md) の 6 節）。
 
@@ -170,7 +170,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | タスクが落ちてから、生存の期限が切れるまで | 最大 10 秒 |
 | 時計のずれの猶予 | 2 秒 |
 | 割り当て、フェンス | 0.1 秒 |
-| チェックポイントの読み込みと、ジャーナル 60 秒ぶんの当て直し | 1〜3 秒（**未検証**。E7 で計測する） |
+| チェックポイントの読み込みと、ジャーナル 60 秒ぶんの当て直し | 1〜3 秒（**未検証**。E7 の `journal-fencing-recovery` で計測する） |
 
 - タスクの停止を ECS のイベント（EventBridge の `STOPPED`）で先に知れば、期限を待たずに割り当て直せる。ただし、止まったことが確かなとき（ECS が止めた）だけにする。ネットワークの分断では使わない。
 
@@ -185,7 +185,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | S3 `<brand>-assets-{env}-{region}` | 画像・フォント・書き出し・サムネイル・コメントの添付 | 同上 |
 | CloudFront | 静的な資産、チャンク、画像 | 署名付き URL（鍵のグループ）、`files`・`assets` は Cookie を持たないドメイン |
 | Aurora PostgreSQL 18 | メタデータ（RLS） | writer 1＋reader 1（別の AZ）、I/O-Optimized、Global Database（大阪に reader 1） |
-| ElastiCache（Valkey） | チケットの `jti`、持ち主のキャッシュ、レート制限、Realtime の無効化の pub/sub | クラスタモードを使わない構成（プライマリ＋レプリカ 2）。用途ごとにクラスタを分ける |
+| ElastiCache（Valkey） | チケットの `jti`、再開のトークンの `rid` と組織の最新の `acl_version`・取り消したログインのセッションの印（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節）、持ち主のキャッシュ、レート制限、Realtime の無効化の pub/sub | クラスタモードを使わない構成（プライマリ＋レプリカ 2）。用途ごとにクラスタを分ける |
 | SQS | Worker のキュー（`render-export`・`render-thumbnail`・`image-ingest` など） | 標準キュー＋DLQ |
 
 - Valkey の pub/sub は、クラスタモードの構成に置かない。本家は、pub/sub をクラスタモードの ElastiCache に移した数週間後に、クラスタのバスのバッファの膨張で CPU が 100% に張り付き、新しいファイルを開けず共同編集もできない障害を起こし、クラスタモードを使わない構成に戻して用途ごとに分けた（[Postmortem: Service disruptions on June 6 & 7 2022](https://www.figma.com/blog/postmortem-service-disruptions-on-june-6-and-7-2022/)、2026-09-27 に確認）。
@@ -202,7 +202,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | Gateway | その AZ の接続が切れ、クライアントが再接続する | 数十秒（再接続の散らし） |
 | DynamoDB、S3 | リージョンのサービス。AZ の障害で止まらない | — |
 | Aurora | 別の AZ の reader へ自動で切り替わる | 通常 60 秒未満 |
-| Valkey | レプリカへ切り替わる。チケットの `jti` の記録を一部失いうる（再使用の検出が一時的に弱まる） | 数十秒 |
+| Valkey | レプリカへ切り替わる。チケットの `jti`・再開のトークンの `rid` の記録を一部失いうる（再使用の検出が一時的に弱まる）。止まっている間、再開のトークンは使えず、再接続は API のチケットに回る | 数十秒 |
 
 - AZ の障害では、確定した変更を失わない（ジャーナルは確定の前に書かれている）。
 
@@ -216,7 +216,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 
 - **世代**：切り替えのたびに世代を上げ、世代 2 以降のジャーナルは `{file_id}#g{g}`、マニフェストは `checkpoints/g{g}/` に書く。東京の遅れた書き込みが、大阪の確定を上書きしない（ADR-0048）。
 - **RPO**：ジャーナルの複製は通常 1 秒以内（MREC）。`ReplicationLatency` が 10 秒を超えたら警告、30 秒で呼び出し。大阪の最新のチェックポイントが遅れていても、古いチェックポイント＋ジャーナル（30 日）から回復できる。
-- **RTO の内訳（目安）**：判断 15 分、Aurora の切り替え 5 分、ECS を広げる 10〜15 分、入口の切り替え 5 分、回復のジョブが開いていたファイルを回復する 10〜20 分（1 万ファイルを 1 秒に 50 ファイルで回復すると約 3 分半。利用者が開けば先に回復する）。合計 45〜60 分。**未検証**（DR の訓練で計る）。
+- **RTO の内訳（目安）**：判断 15 分、Aurora の切り替え 5 分、ECS を広げる 10〜15 分、入口の切り替え 5 分、回復のジョブが開いていたファイルを回復する 10〜20 分（1 万ファイルを 1 秒に 50 ファイルで回復すると約 3 分半。利用者が開けば先に回復する）。合計 45〜60 分。**未検証**（E12 の `dr-drill` で計る）。
 - **取り戻し**：東京が戻ったら、`dr-salvage` のジョブが、元の世代の `base_end_seq` より後の項目を探し、版として残す（ADR-0048）。
 - **戻す**：大阪で全ファイルを `released` にし、複製の待ちが 0 になってから、東京で世代を上げる（RPO 0）。
 
@@ -311,14 +311,14 @@ infra/
 
 ## 11. 費用の概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** 東京のオンデマンドの料金をもとにした ±50% の幅の値。単価は AWS の料金の画面で確かめていない（**未検証**）。サポートの料金と税は含めない。Savings Plans で計算の費用を 20〜30% 下げられる。
+**大まかな見積もりである。** 東京のオンデマンドの料金をもとにした ±50% の幅の値。Fargate・DynamoDB・CloudFront の単価は AWS の Price List API で 2026-09-27 に確かめた（[capacity.md](capacity.md) の 4.3・6・7 節）。それ以外（Aurora、Valkey、ALB、NAT、可観測性など）の単価は **未検証**（E12 の `cost-dashboard` で実測に置き換える）。サポートの料金と税は含めない。Savings Plans で計算の費用を 20〜30% 下げられる。
 
 | 項目 | 月額（USD、概算） | 根拠 |
 | --- | --- | --- |
-| ECS Fargate：Document Server（ds-standard 12、ds-large 3） | 9,000 | ARM64、平常の台数 |
+| ECS Fargate：Document Server（ds-standard 12、ds-large 3） | 7,700 | ARM64、平常の台数。1 台の時間の費用は ds-standard 0.589、ds-large 1.178 USD（730 時間） |
 | ECS Fargate：gateway、router、api、realtime、workers、telemetry | 4,000 | |
 | ECS Fargate：render-worker（x86-64、平均 6 タスク） | 1,500 | |
-| DynamoDB（`journal` の書き込みと大阪への複製、保存、PITR、`file_leases`） | 11,000 | [capacity.md](capacity.md) の 4 節 |
+| DynamoDB（`journal` の書き込みと大阪への複製、TTL の削除の複製、保存、PITR、`file_leases`） | 13,500 | [capacity.md](capacity.md) の 4 節 |
 | S3（チェックポイント・チャンク・画像、東京と大阪）、リージョンをまたぐ転送 | 5,000 | 同 6 節 |
 | CloudFront（チャンク、WASM、画像、フォント） | 4,000 | 同 6 節。端末のキャッシュの当たりの率で大きく変わる |
 | Aurora（writer・reader・大阪、I/O-Optimized） | 3,500 | |
@@ -327,7 +327,7 @@ infra/
 | 可観測性（ログ、メトリクス、トレース、Grafana） | 3,000 | |
 | WAF、GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,000 | |
 | 大阪のウォームスタンバイの計算の資源 | 1,000 | |
-| **本番の合計** | **約 47,000** | |
+| **本番の合計** | **約 48,000** | |
 | staging・dev・shared | 約 8,000 | |
 
 - Slack の S1（約 1 万）より高いのは、DynamoDB のジャーナル（書き込みの量とトランザクションの 2 倍、大阪への複製）、ファイルの中身の CDN の配信、Document Server のメモリのため。
@@ -367,8 +367,8 @@ infra/
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| CloudFront の WebSocket のアイドルの期限 | E3 の PoC |
-| Fargate の退役が、タスクの保護を待つか | E3 の PoC（staging で退役の通知を受けた時に観察する） |
+| CloudFront の応答の期限が WebSocket のフレームに効くか、接続の長さの上限（資料に WebSocket に固有の期限はない。4 節） | E3 の `gateway-edge-websocket` の PoC（8 時間） |
+| Fargate の退役が、タスクの保護を待つか | 資料は保護の対象を縮小とデプロイに限るので、待たない前提にした（3 節）。staging で退役の通知を受けた時に観察して記録する（`ds-drain-controller`） |
 | ドレインでの 1 ファイルの中断の時間（目標 p95 2 秒） | E3 の計測 |
 | 障害中に、グローバルテーブルから東京のレプリカを外せるか | E12 の DR の訓練（FIS で東京を切り離して試す） |
 | RTO の内訳の実測 | E12 の DR の訓練 |

@@ -45,7 +45,7 @@
 | --- | --- | --- |
 | B1 エッジ | すべての外部の要求、WebSocket | TLS 1.2 以上（1.3 を優先）、HSTS、WAF（マネージドルール、IP ごとのレート制限）、Shield Standard |
 | B2 テナント | API・Realtime・Worker から Aurora | `SET LOCAL app.org_id`、FORCE RLS（ADR-0005）。組織の外の人は、ファイルを持つ組織の文脈で読む |
-| B3 チケット | ブラウザ → Gateway → Document Server | API が判定関数を通して発行した能力のチケット（ADR-0030）。Gateway は `jti` の使い回しを、Document Server は署名と `file_id`・`level` を確かめる（ADR-0043） |
+| B3 チケット | ブラウザ → Gateway → Document Server | API が判定関数を通して発行した能力のチケット（ADR-0030）。Gateway は `jti` の使い回しを、Document Server は署名と `file_id`・`level` を確かめる（ADR-0043）。同じ持ち主への再接続は、Gateway の再開のトークン（60 秒・1 回だけ、`session_id`・`file_id`・`epoch` に束ねる）でも入れる。Document Server は、チケットで確かめた水準を超えさせない（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節） |
 | B4 フェンス | Document Server → ジャーナル | Router の割り当ての `epoch` と、ジャーナルのフェンス（[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)） |
 | B5 ジョブ | API → SQS → Render Worker・file-read | ジョブを作るときに判定し、実行の直前にもう一度判定する（[permissions-and-sharing.md](permissions-and-sharing.md) の 11 節）。Worker は判定関数を持たない |
 | B6 外部の URL | 画像の URL の取り込み、Webhook | VPC の外の権限のない Lambda、宛先の検査（[export-and-assets.md](export-and-assets.md) の 9 節、[api-and-webhooks.md](api-and-webhooks.md) の 6.4 節） |
@@ -75,9 +75,10 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 種類 | 脅威 | 対策 |
 | --- | --- | --- |
 | S | 盗んだ・使い回したチケットで接続する | 60 秒・1 回だけ、`jti` を Valkey に記録（ADR-0030）。チケットは URL に入れず、最初のメッセージで送る（[multiplayer.md](multiplayer.md) の 4.3 節） |
+| S | 盗んだ・使い回した再開のトークンで、権限を外された後に入り直す | 60 秒・1 回だけ（`rid` を Valkey に記録）。`epoch` が今の割り当てと等しいこと、組織の `acl_version` が変わっていないこと（変わっていれば一括の判定に回す）、ログインのセッションが取り消されていないことを確かめる（permissions-and-sharing.md の 5.5 節） |
 | S | 他のサイトのページから WebSocket を張る（CSWSH） | `Origin` の許可の一覧。Cookie では認証しない（チケットだけ） |
 | D | 接続の大量の確立、巨大なフレーム、遅い読み手 | WAF の IP ごとの制限、フレームの上限（4 MiB＋64 KiB）、送信の待ちの上限 8 MiB か 5 秒、セッションの流量の上限（multiplayer.md の 4.6 節） |
-| E | Gateway の欠陥で、閲覧の接続が書き込みになる | Document Server が、チケットの署名と `level` を自分でも確かめる（ADR-0043）。Gateway が伝えてよいのは、水準を下げることだけ |
+| E | Gateway の欠陥で、閲覧の接続が書き込みになる | Document Server が、チケットの署名と `level` を自分でも確かめる（ADR-0043）。再開のトークンでの再接続は、同じ `epoch` で API のチケットで確かめた水準を上限にする。Gateway が伝えてよいのは、水準を下げることだけ |
 | R | 誰が接続したか分からない | 接続の確立と切断を、`session_id`・`account_id`・`file_id`・IP で記録する（中身なし）。組織の監査ログには、1 時間に 1 回に間引いて書く（6 節） |
 
 ### 3.3 Document Server
@@ -117,7 +118,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 種類 | 脅威 | 対策 |
 | --- | --- | --- |
 | I | ジョブの取り違えで、別の組織のファイルを描く | ジョブに `org_id`・`file_id` を入れ、子のプロセスは 1 ジョブで終わる（[export-and-assets.md](export-and-assets.md) の 5.1 節）。結果のキーに `org_id` を含める |
-| E | 悪意のあるファイルで Worker の子のプロセスを乗っ取る | 子のプロセスのメモリ・時間の上限、ネットワークを持たない（名前空間か seccomp）、タスクはインターネットへの経路を持たない（同 5.3 節） |
+| E | 悪意のあるファイルで Worker の子のプロセスを乗っ取る | 子のプロセスのメモリ・時間の上限、ネットワークを持たない（子が自分で入れる seccomp のフィルタ。Fargate は `CAP_SYS_ADMIN` を与えないので名前空間は使わない。export-and-assets.md の 5.3 節）、タスクはインターネットへの経路を持たない（同 5.3 節） |
 | I | 結果の URL の漏れ | 署名付き URL は 24 時間、結果は 14 日（同 4.4 節） |
 | D | 大量の書き出しで Worker を占有する | 公開 API の画素の予算と組織ごとの合計（[api-and-webhooks.md](api-and-webhooks.md) の 5 節）、`render-export` と `render-thumbnail` のキューを分ける |
 
@@ -141,10 +142,10 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | セッション | `global.sessions`。アイドル 14 日、最長 30 日。端末の一覧と、個別の取り消し |
 | 組織の SSO（E12。MVP の範囲の外で、GA の判定に含めない。[roadmap.md](../roadmap.md)） | SAML 2.0・OIDC。確認済みのドメインのメンバーにだけかける。ゲストは対象の外（本家と同じ）。「どの方法でもよい」「SSO だけ」 |
 | SCIM | S2 の前（roadmap.md の延期の一覧）。`active=false` はメンバーの無効化（アカウントは消さない） |
-| WebSocket | 能力のチケット（60 秒・1 回）。セッションの取り消しで `session.revoked` を配り、接続を切る。取りこぼしは 5 分ごとの再検証で拾う |
+| WebSocket | 能力のチケット（60 秒・1 回）。同じ持ち主への再接続は Gateway の再開のトークン（60 秒・1 回。permissions-and-sharing.md の 5.5 節）。セッションの取り消しで `session.revoked` を配り、接続を切る。取りこぼしは 5 分ごとの再検証で拾う |
 | 運用者 | IAM Identity Center の SSO＋MFA。本番のデータを読む役割は、期限つきの承認（最長 4 時間）で得る |
 
-- 本家のセッションの長さとアイドルの期限は、公開のヘルプで見つけられなかった（**未検証**）。上の値はこの設計の既定案で、PM と決め直してよい。
+- 本家は、21 日使われないと自動でログアウトさせる。Enterprise の組織の管理者は、メンバーのアイドルの期限を 12 時間〜14 日にできる（ゲストにはかからない）（[Set an idle session timeout](https://help.figma.com/hc/en-us/articles/14376092335127-Set-an-idle-session-timeout)、2026-09-27 に確認）。上の値（アイドル 14 日、最長 30 日）はこの設計の既定案で、PM と決め直してよい。
 - 匿名の閲覧者（「リンクを知っている全員」）は、ブラウザごとの匿名のセッション（`anonymous_session_id`、24 時間）を持つ。在席では「匿名」と表示する（permissions-and-sharing.md の 11 節）。
 
 ## 5. 暗号化と鍵
@@ -154,7 +155,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 ### 5.1 通信
 
 - 外向きは TLS 1.2 以上。CloudFront のセキュリティのポリシーは `TLSv1.2_2021` 以上。HSTS（preload）。
-- VPC の中：ALB → Gateway・API は TLS。Gateway → Document Server は、セキュリティグループで絞った VPC の中の TCP で、TLS を張る（証明書は自前の CA。費用と運用は E1 で決める。**未検証**）。
+- VPC の中：ALB → Gateway・API は TLS。Gateway → Document Server は、セキュリティグループで絞った VPC の中の TCP で、TLS を張る（証明書は自前の CA。費用と運用は E1 の `ecs-rust-services-baseline` で決める。**未検証**）。
 
 ### 5.2 保存
 
@@ -171,7 +172,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 - 鍵はすべて東京で作り、大阪にレプリカを置くマルチリージョンキー。年 1 回の自動の入れ替え。
 - 鍵のポリシーで、使えるサービスの役割を分ける（ADR-0044）。人は break-glass の役割だけ。
-- 能力のチケットの署名の鍵（Ed25519）は Secrets Manager。90 日ごとに入れ替え、`kid` で 24 時間並べる。Webhook の署名の秘密は [api-and-webhooks.md](api-and-webhooks.md) の 6.3 節。
+- 能力のチケットの署名の鍵（Ed25519）は Secrets Manager。90 日ごとに入れ替え、`kid` で 24 時間並べる。再開のトークンの鍵（HMAC-SHA256）は Gateway だけが読める別の秘密にし、同じ周期で入れ替える。Webhook の署名の秘密は [api-and-webhooks.md](api-and-webhooks.md) の 6.3 節。
 - **組織ごとの鍵は MVP で持たない。** 企業の要望で、S2 の前に別の ADR で扱う。
 
 ### 5.3 端末のキャッシュ
@@ -283,6 +284,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 | E1 | `kms-keys-and-policies` | 5.2 節の鍵、鍵のポリシー、大阪のレプリカ |
 | E1 | `csp-and-security-headers` | CSP（`wasm-unsafe-eval`）、HSTS、`nosniff`、CSRF のヘッダー |
 | E3 | `ds-ticket-verification` | Document Server でのチケットの署名の確認と、Gateway からの水準の下げだけの許可 |
+| E3 | `gateway-resume-token` | 再開のトークンの発行・検証と、Document Server での水準の上限（permissions-and-sharing.md の 5.5 節） |
 | E9 | `session-revocation-kick` | `session.revoked` の配送と接続の切断 |
 | E9 | `audit-events-core` | `audit_events`、outbox、log-archive への送り |
 | E7 | `purge-both-regions` | 完全な削除のジョブと掃除を大阪のバケットにも広げる（file-storage-and-history の `trash-and-purge` と 1 つにする） |
@@ -306,7 +308,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Gateway → Document Server の TLS の証明書の出し方（自前の CA の費用と入れ替え） | E1 の PoC |
+| Gateway → Document Server の TLS の証明書の出し方（自前の CA の費用と入れ替え） | E1 の `ecs-rust-services-baseline` |
 | 匿名の閲覧者のセッションの長さと、匿名の人数の上限 | PM（E9） |
 | 組織の管理者が、プランを上げる前の監査ログを見られるか | PM |
 | 組織ごとの鍵（持ち込みの鍵）の需要 | S2 の前。企業の商談で決める |

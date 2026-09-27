@@ -21,7 +21,7 @@ date: 2026-09-27
 フェンス：
 
 1. **ジャーナルの表の `seq = 0` にフェンスの項目（`epoch`）を置き、`TransactWriteItems` の `ConditionCheck` で確かめる**
-2. **Router のリースの項目を `ConditionCheck` で確かめる**
+2. **Router の割り当ての項目（`file_leases`）を `ConditionCheck` で確かめる**
 3. **ADR-0003 のとおり、`Put` の条件だけ**
 
 TTL：
@@ -35,14 +35,15 @@ TTL：
 1 と a を採用する。詳細は [file-storage-and-history.md](../architecture/file-storage-and-history.md) の 4 節。
 
 - **書き込み**：`TransactWriteItems`（`ConditionCheck journal[file_id, 0] epoch = :mine`、`Put journal[file_id, start_seq] attribute_not_exists`）。`ClientRequestToken = hash(file_id, epoch, start_seq)`。一時的な失敗は同じトークンと同じ中身で再試行し、10 秒書けなければファイルを手放す。条件の失敗は、持ち主でなくなったとみなして手放す。
-- **フェンス**：新しい持ち主は、リースの `epoch` でフェンスの項目を上げてから（`epoch < :E` を条件に）、ジャーナルを強い整合性で読む。フェンスの後、古い持ち主の書き込みはすべて失敗する。
+- **フェンス**：新しい持ち主は、Router の割り当ての `epoch`（[ADR-0047](0047-router-task-liveness-and-file-assignment.md)）でフェンスの項目を上げてから（`epoch < :E` を条件に）、ジャーナルを強い整合性で読む。フェンスの後、古い持ち主の書き込みはすべて失敗する。
 - **group commit**：前の書き込みが終わっていて、20ms・256 KiB・500 件のどれかに達したら書く。同時に書くのは 1 つ。まとまりの中で、同じ `(ノード, プロパティ)` の前の操作を除く（間に `Create`・`Delete` がない場合）。
 - **大きな変更**：圧縮した本体が 350 KiB を超えたら、S3 に置いてから、項目には `blob_key` とハッシュだけを書く。
-- **TTL**：書いた時点で 30 日。Router は、延長されずに切れたリース（手放しの記録がない）を見つけ、5 分以内に回復させてチェックポイントを書かせる。1 日を超えて残ればアラーム。表は PITR（35 日）を有効にする。
+- **TTL**：書いた時点で 30 日。Router は、持ち主のタスクの生存（`ds_liveness`）が切れ、手放しの記録（`released`・`handoff`）がない割り当てを見つけ、5 分以内に回復させてチェックポイントを書かせる（ADR-0047 の回復のジョブ）。1 日を超えて残ればアラーム。表は PITR（35 日）を有効にする。
 - 2 を採らない理由：リースの延長（数秒ごと）とジャーナルの書き込み（毎秒数十回）が同じ項目に当たり、`TransactionConflict` が増える。
+  - > 2026-09-27 の注記：[ADR-0047](0047-router-task-liveness-and-file-assignment.md) で、延長はタスクごとの生存の記録（`ds_liveness`）へ移り、割り当ての項目は割り当てと手放しのときだけ書くようになった。この理由は弱まったが、1 を保つ。フェンスをジャーナルと同じパーティションに置くと、世代ごとの回復（[ADR-0048](0048-osaka-dr-with-journal-generations.md)）がジャーナルの表の中で閉じ、グローバルテーブルの割り当ての表の複製の遅れに書き込みの判定が左右されない（[file-storage-and-history.md](../architecture/file-storage-and-history.md) の 4.2 節）。
 - 3 を採らない理由：上の Context のとおり、書き始めの `seq` がずれた古い持ち主の書き足しを防げない。結果の分からない再試行を区別できない。
 - b を採らない理由：チェックポイントのたびに、数千の項目の書き直しがかかる。
-- c を採らない理由：削除の書き込みの費用がかかる。TTL の削除は書き込みの単位を使わない（上の TTL の資料）。
+- c を採らない理由：削除の書き込みの費用がかかる。TTL の削除は、期限の来たリージョンでは書き込みの単位を使わない（上の TTL の資料）。グローバルテーブルの複製の先（大阪）では、複製の削除が複製の書き込みの単位を使う（同じ資料、2026-09-27 に確認。[capacity.md](../architecture/capacity.md) の 4.3 節）。掃除のジョブで消しても、同じく両方のリージョンで単位を使うので、a の方が安い。
 
 ## Consequences
 
@@ -52,7 +53,7 @@ TTL：
   - 大きな貼り付けも、項目の上限に当たらない。
 - 引き受けるコスト：
   - トランザクションは書き込みの単位を 2 倍使う。1 ファイルの書き込みの上限が約半分になる（[multiplayer.md](../architecture/multiplayer.md) の 12.3 節）。
-  - 回復のジョブが止まると、30 日で編集を失う危険がある。見張りとアラームで守る。
+  - Router の回復のジョブが止まると、30 日で編集を失う危険がある。見張りとアラームで守る。
   - 大きな変更は、S3 の書き込みの分だけ確定が遅れる。
 
 ## Confirmation

@@ -48,7 +48,7 @@ date: 2026-09-27
 - 2 を採らない理由：
   - 入力の転送で 1 回のスレッドの切り替えが入り、ヒットテストの結果（カーソルの形、ホバーの枠）が非同期になる。
   - IME の `textarea` の位置と、エンジンのテキストのカーソルの位置を、スレッドをまたいで合わせる必要がある。
-  - Safari を含む全ブラウザでの `OffscreenCanvas` と WebGPU・WebGL2 の組み合わせの確認が要る（**未検証**）。
+  - `OffscreenCanvas` の WebGL2 は Chrome 69・Firefox 105・Safari 17 から、WebGPU は Chrome 144（113 から一部の OS）・Safari 26 から、Firefox は 141 から Windows だけ（MDN の browser-compat-data の `api/OffscreenCanvas.json`、2026-09-27 に確認）。古い Safari と Firefox の一部の OS では Worker の中で WebGPU を使えず、バックエンドの選び方（[ADR-0014](0014-gpu-backend-selection-and-fallback.md)）がメインスレッドと Worker で分かれる。
 - b を採らない理由：ドラッグの間、変更のたびにイベントが出て、React の状態の更新が 1 フレームに何度も起きる。
 - c を採らない理由：10 万ノードのモデルを JS にも持つと、メモリ（NFR-004）が倍になり、2 つのモデルの食い違いが起きる。
 

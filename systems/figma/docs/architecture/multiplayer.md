@@ -64,7 +64,7 @@ Document Server
 
 | メッセージ | 中身 |
 | --- | --- |
-| `Hello` | `file_id`、`ticket`（API が判定関数を通した後に出す、60 秒の署名付きの能力のチケット。[permissions-and-sharing.md](permissions-and-sharing.md) の 5.4 節）、`protocol_version`、`schema_hash`、`engine_version`（ビルドの ID）、`resume: Option<{session_id, last_seq}>`、`current_page` |
+| `Hello` | `file_id`、`auth`（次のどちらか。`Ticket`：API が判定関数を通した後に出す、60 秒の署名付きの能力のチケット。[permissions-and-sharing.md](permissions-and-sharing.md) の 5.4 節。`ResumeToken`：同じ持ち主への再接続で使う、Gateway の再開のトークン。同 5.5 節）、`protocol_version`、`schema_hash`、`engine_version`（ビルドの ID）、`resume: Option<{session_id, last_seq}>`、`current_page` |
 | `Changes` | `client_seq: u32`、`ops: ChangeSet`（`origin` を含む。[document-model.md](document-model.md) の 7 節） |
 | `LoadPage` | `page_id`（読み込んでいないページの変更がたまりすぎたとき。6.3 節） |
 | `Presence` | `page_id`、`cursor: Option<(f32, f32)>`、`selection: Vec<NodeId>`（100 まで）、`viewport: Rect＋zoom`、`state`（`idle`・`editing_text`・`dragging`） |
@@ -83,8 +83,9 @@ Document Server
 | `PresenceBatch` | `entries: [{session_id, page_id, cursor, selection, viewport, state}]`（変わったものだけ） |
 | `Participants` | 参加と退出（`session_id`、`user_id`、`level`、`color`） |
 | `RoleChanged` | `level`（`view`・`edit`・`owner`）、`batch_interval_ms`（書き込みの予算の段が変わったときの指示。ADR-0052） |
-| `Kick` | `reason`（`owner_changed`・`forbidden`・`file_deleted`・`version_mismatch`・`overloaded`・`server_shutdown`・`resync_required`）、`retry_after_ms` |
-| `Pong` | 時刻 |
+| `ResumeToken` | `token`、`expires_at`（Gateway が `Welcome` の直後と 30 秒ごとに出す。60 秒・1 回だけ。permissions-and-sharing.md の 5.5 節） |
+| `Kick` | `reason`（`owner_changed`・`forbidden`・`file_deleted`・`version_mismatch`・`overloaded`・`server_shutdown`・`resync_required`・`ticket_required`）、`retry_after_ms` |
+| `Pong` | 時刻（`Ping` への応答。Gateway は、20 秒のあいだ何も送っていない接続にも送る。[infrastructure.md](infrastructure.md) の 4 節） |
 
 - `Committed` は、Document Server が Gateway に 1 回だけ送る。Gateway は、送り手の接続には `Ack` に変えて送る（`ops` を省く）。
 - 利用者の名前・アイコンは、メッセージに含めない。`user_id` から、UI の殻が API で取る（権限の判定を API に寄せる）。
@@ -106,6 +107,7 @@ Client          Gateway                    Router          Document Server
 
 - 版の照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) による。Document Server は `protocol_version`（今の版と 1 つ前の版を話す）、`schema_hash`（今の表から追加だけでたどれる直近 30 日の一覧）、`engine_version`（`min_client_build` 以上）を確かめる。どれかが外れたときだけ `Kick(version_mismatch, retry_after_ms)`（0〜5 分に散らす）を返し、クライアントは強い再読み込みをする。`schema_hash` が違っても一覧の中なら、接続を続ける（[delivery.md](delivery.md) の 4 節）。
 - `resume` は、同じ利用者の同じファイルのセッションで、セッションの表にあるときだけ受ける。他の利用者の `session_id` は受けない。
+- 再接続では、最後に受けた再開のトークンが期限の内なら、チケットの代わりに使う（API を通さない）。Gateway は、署名・期限・`rid` の使い回し・`epoch` が今の割り当てと等しいこと・組織の `acl_version`・ログインのセッションの取り消しを確かめる。外れたら `Kick(ticket_required)` を返し、クライアントは API のチケットを取って、0〜1 秒の乱数だけ待ってつなぎ直す（permissions-and-sharing.md の 5.5 節）。
 - チケットは URL に入れない（プロキシとアクセスログに残るため）。最初のメッセージで送る。
 
 ### 4.4 セッションの表
@@ -118,6 +120,7 @@ Document Server は、ファイルごとに次の表を持つ。チェックポ�
 | `user_id` | セッションを開いた利用者 |
 | `last_client_seq` | 確定した最後の `client_seq`。再送の重複を除く |
 | `opened_seq`・`last_active_at` | 表の掃除に使う |
+| `verified_level` | その持ち主（`epoch`）の間に、API のチケットで確かめた最も高い水準。再開のトークンでの再接続の上限に使う（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節）。メモリにだけ持ち、チェックポイントとジャーナルに書かない |
 
 - 30 日使われていないセッションは、チェックポイントの表から外す。`next_session_id` は戻さない。
 
@@ -237,6 +240,7 @@ view = DocView { base: confirmed, overlay }   // 描画・レイアウト・ヒ�
  Live ── RoleChanged(view) ──▶ ReadOnly ── RoleChanged(edit) ──▶ Live
  どこからでも ── Kick(forbidden / file_deleted) ──▶ Closed
  どこからでも ── Kick(version_mismatch) ──▶ Reload（ページを読み込み直す）
+ Connecting ── Kick(ticket_required) ──▶ API のチケットを取り、0〜1s の乱数の後に Connecting
 ```
 
 - `Disconnected` の間も、編集はできる（4.6 節の上限まで）。画面に「オフライン」と未確定の件数を出す。
@@ -251,12 +255,12 @@ view = DocView { base: confirmed, overlay }   // 描画・レイアウト・ヒ�
 | クライアント → Gateway（東京） | 30ms |
 | Gateway → Document Server、待ち行列と検証 | 10ms |
 | group commit の待ち | 20ms |
-| ジャーナルの書き込み（DynamoDB のトランザクション） | 40ms（**未検証**。E3 の前に計測する） |
+| ジャーナルの書き込み（DynamoDB のトランザクション） | 40ms（**未検証**。E3 の前の `dynamodb-transaction-poc` で計測する） |
 | Document Server → Gateway → 相手のクライアント | 40ms |
 | 相手の適用と描画（1 フレーム） | 17ms |
 | 余裕 | 43ms |
 
-- DynamoDB は「1 桁 ms」の性能を掲げる（[What is Amazon DynamoDB?](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html)、2026-09-27 に確認）。トランザクションの書き込みの p99 は資料で確かめられなかった（**未検証**）。
+- DynamoDB は「1 桁 ms」の性能を掲げる（[What is Amazon DynamoDB?](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html)、2026-09-27 に確認）。トランザクションの書き込みの p99 は資料にない（**未検証**。`dynamodb-transaction-poc` で計測する）。
 
 ## 9. 再接続と回復
 
@@ -271,6 +275,7 @@ view = DocView { base: confirmed, overlay }   // 描画・レイアウト・ヒ�
 - `pending` の変更は、値の置き換え（意図）で書かれているので、新しい状態にもそのまま当てられる。対象が消えていれば、サーバーが捨てる。
 - Gateway と Document Server の間の接続が切れたら、Gateway はそのファイルの接続すべてに `Kick(owner_changed)` を送る（クライアントの再接続で Router から持ち主を引き直す）。
 - 再接続の殺到を避けるため、`retry_after_ms`、最初の 0〜5 秒の乱数の待ち、クライアントの指数の待ち（±20% の乱数）を使う（7.2 節）。
+- 持ち主が変わらない再接続（Gateway の入れ替え・喪失、ネットワーク）は、再開のトークンで API のチケットを取らずに入る。持ち主が変わった再接続（`Kick(owner_changed)`）は `epoch` が変わるので、API のチケットを取る（[capacity.md](capacity.md) の 2.2 節）。
 
 ## 10. Undo と Redo
 
@@ -318,7 +323,7 @@ ADR-0011。
 - 参加（編集と閲覧の合計）は 500 人、編集は 200 人まで。本家と同じ（2 節）。
 - 500 人を超えて入った人は、**動かない版**を見る。最新のチェックポイントを読み込み、`Committed` と在席を受けない。「最新にする」ボタンで読み込み直す。閲覧で 500 人に達していても、編集の権限のある人は 20 人まで、通常の参加として入れる。
 - 1 ファイルの処理の見積もり（S1）：編集者 200 人がそれぞれ 20Hz で送ると毎秒 4,000 `ChangeSet`。1 件の検証と適用を 10µs とすると、file actor の CPU は 1 秒あたり 40ms。ジャーナルは group commit の中で同じ鍵をまとめるので（[file-storage-and-history.md](file-storage-and-history.md) の 4.3 節）、書き込みの量は変わった鍵の数で決まる。
-- DynamoDB の 1 パーティションは、書き込みを毎秒 1,000 単位（1 単位は 1 KB）まで出す設計である（[Best practices for designing and using partition keys](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)）。トランザクションの書き込みは 2 倍の単位を使う（[Constraints in Amazon DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Constraints.html)）。いずれも 2026-09-27 に確認。1 ファイルのジャーナルは 1 つのパーティションキーで、ソートキー（`seq`）は増える一方なので、DynamoDB が負荷を見てパーティションを分けても、書き込みは末尾の 1 つに集まると見込む（**未検証**）。1 ファイルの書き込みは予算（毎秒 400 単位）で数え、使った割合が 50%・80% を超えたら、クライアントのまとめの間隔を 100ms・200ms に広げ、100% では確定を遅らせる（Document Server が `Welcome` と `RoleChanged` の `batch_interval_ms` で指示する。[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) の 4.2 節）。
+- DynamoDB の 1 パーティションは、書き込みを毎秒 1,000 単位（1 単位は 1 KB）まで出す設計である（[Best practices for designing and using partition keys](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)）。トランザクションの書き込みは 2 倍の単位を使う（[Constraints in Amazon DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Constraints.html)）。いずれも 2026-09-27 に確認。1 ファイルのジャーナルは 1 つのパーティションキーで、ソートキー（`seq`）は増える一方なので、書き込みは末尾の 1 つのパーティションに集まる。DynamoDB は頻繁に使われる項目を分けて置き直すが、ソートキーが単調に増える項目の集まりは、ソートキーで分けない（[DynamoDB burst and adaptive capacity](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/burst-adaptive-capacity.html)、2026-09-27 に確認）。1 ファイルの書き込みは予算（毎秒 400 単位）で数え、使った割合が 50%・80% を超えたら、クライアントのまとめの間隔を 100ms・200ms に広げ、100% では確定を遅らせる（Document Server が `Welcome` と `RoleChanged` の `batch_interval_ms` で指示する。[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) の 4.2 節）。
 - 在席の送信の量：参加 500 人、100ms ごと、1 項目 40 バイトで、1 回の `PresenceBatch` は最大約 8 KB。Gateway が 10 台なら、Document Server の送信は毎秒約 800 KB。Gateway の側は、1 接続あたり毎秒 80 KB になる。
 - 配信の層を Document Server の外に分ける案（閲覧だけの接続を別のノードから配る）は、Gateway ごとに 1 回の配信で足りる間は採らない。S2 で 1 ファイル 500 人を超える需要があれば、Gateway の間の木構造の配信を ADR にする。
 
@@ -383,6 +388,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 | E3 | `client-overlay-rebase` | `confirmed`・`pending`・`overlay`、7.1 節の規則、一時的な循環 |
 | E3 | `ordering-keys` | 5 節の鍵、サーバーの振り直し、乱数の接頭辞 |
 | E3 | `reconnect-resume` | 9 節、背圧と `Kick`、最初の 0〜5 秒の乱数の待ち |
+| E3 | `gateway-resume-token` | 再開のトークンの発行と検証（permissions-and-sharing.md の 5.5 節） |
 | E3 | `change-origin-tag` | `ChangeSet` の `origin` とジャーナルへの記録（plugins・layout と合わせる） |
 | E3 | `presence-cursors` | 12.1 節、ページごとの絞り込み |
 | E3 | `follow-viewport` | 12.2 節 |
@@ -408,7 +414,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| DynamoDB のトランザクションの書き込みの p99 が 40ms に収まるか | E3 の前の PoC（東京、オンデマンド） |
+| DynamoDB のトランザクションの書き込みの p99 が 40ms に収まるか | E3 の前の `dynamodb-transaction-poc`（東京、オンデマンド） |
 | 未確定の変更を IndexedDB に保存し、タブを閉じても送れるようにするか | 試用のチームの声（SC-2）と、切断の頻度の計測で決める |
 | テキストの同時の入力の損失が問題になるか（ADR-0002 の 4 案への切り替え） | 試用の期間の報告で決める |
 | 1 ファイル 500 人を超える需要（全社の発表）への対応 | S2 の前。Gateway の間の配信の木を ADR にする |

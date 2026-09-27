@@ -70,7 +70,7 @@ date: 2026-09-27
 
 ### 2 つのビルドへの退路
 
-- E2 の前の PoC で、次のどれかが成り立たなければ 2 を採る（この ADR を改訂する）。
+- E2 の前の PoC（`gpu-backend-poc`）で、次のどれかが成り立たなければ 2 を採る（この ADR を改訂する）。
   - キャンバスを作り直しての切り替えが、主要なブラウザで 2 秒以内に終わる。
   - 両方を入れた WASM が、圧縮後 5 MB（ADR-0001）に収まる。
   - WebGL2 の経路の性能が、WebGL2 だけのビルドより 10% 以上遅くならない。
@@ -92,7 +92,7 @@ date: 2026-09-27
   - WASM に両方のバックエンドと、WGSL を GLSL に変える naga が入り、大きくなる。
   - GPU の資源をすべて作り直せるよう、元のデータ（画像の圧縮したバイト列）を CPU の側に残す。
   - lavapipe は遅い。書き出しの時間は E10 の前に計測する。
-  - lavapipe の Vulkan の適合の版と、arm64 での動作は未検証。S1 は x86-64 に固定する。
+  - lavapipe は Vulkan 1.3 の適合を得ている（[Current state of Lavapipe](https://vulkan.org/user/pages/09.events/vulkanised-2025/T5-Lucas-Fryzek-Igalia.pdf)、Vulkanised 2025、2026-09-27 に確認）。arm64 での動作と性能は **未検証**（E10 の `render-native`）。S1 は x86-64 に固定する。
 
 ## Confirmation
 

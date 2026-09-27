@@ -288,7 +288,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| WebGPU と WebGL2 を 1 つのビルドにできるか（大きさの予算の当て方） | E2 の PoC（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)） |
+| WebGPU と WebGL2 を 1 つのビルドにできるか（大きさの予算の当て方） | E2 の前の `gpu-backend-poc`（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)） |
 | GPU 付きの VM の CI の実行環境（自前の runner か、外部のサービスか） | E2 |
 | 穏やかな再読み込みの「5 分操作がない」の値が、利用者に受け入れられるか | 試用の期間 |
 

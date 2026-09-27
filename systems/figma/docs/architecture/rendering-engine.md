@@ -153,7 +153,7 @@
 5. **塗り（GPU）**：マスクの値に塗りの規則（非ゼロ：`min(|w|, 1)`、偶奇：`1 - |1 - (|w| mod 2)|`）を当て、塗り（単色、グラデーション、画像）を掛けて合成する。
 
 - アンチエイリアスは、画素ごとの面積の厳密な被覆率になる（MSAA の 4〜8 段より細かい）。細い線と、ほぼ水平な辺がきれいに出る。
-- WebGL2 で R16F に描くには `EXT_color_buffer_float` が要る。wgpu の WebGL2 の経路で、R16F の加算のブレンドが使えるかは **未検証**。使えない端末では、同じ手順を RGBA8 の 4 チャンネルに固定小数点で分けて足す形にする。E2 の前の PoC で確かめる。
+- WebGL2 で R16F に描くには `EXT_color_buffer_float` が要る。この拡張で R16F・RG16F・RGBA16F が描画の先にでき、ブレンドを禁じられるのは 32 ビットの浮動小数点の形式だけである（16 ビットはブレンドできる。32 ビットのブレンドは `EXT_float_blend` が要る）（[WebGL EXT_color_buffer_float](https://registry.khronos.org/webgl/extensions/EXT_color_buffer_float/)、[OpenGL ES EXT_color_buffer_float](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_color_buffer_float.txt)、[EXT_float_blend](https://registry.khronos.org/webgl/extensions/EXT_float_blend/)、2026-09-27 に確認）。wgpu の WebGL2 の経路が R16F を「描画の先・ブレンド可」として出すかと、拡張のない端末の割合は **未検証**（E2 の前の `gpu-backend-poc`）。拡張のない端末では、同じ手順を RGBA8 の 4 チャンネルに固定小数点で分けて足す形にする。
 - ベクターネットワークの領域（region）の塗りは、領域ごとの輪郭を作って（editor-and-tools の 7 節）、非ゼロで塗る。
 - 平坦化・振り分けの費用は、パスの点の数に比例する。1 ノードのセグメントの上限は、document-model の検証で持つ（14 節）。
 
@@ -182,13 +182,14 @@ Vello との関係：Vello GPU（旧 `vello_hybrid`、0.2.0、2026-08-07）は�
 | 背景のぼかし | ノードの下の画素（タイルの縁を含む）をコピーしてぼかし、ノードの形で切り抜いて合成する |
 
 - ぼかしは、分離できるガウスのぼかしを 2 回（横と縦）。`σ` が画面の上で 8 px を超えたら、1/2 ずつ縮小してからぼかし、拡大する。1 回のぼかしのタップは 25 以内。
-- ぼかしの値から `σ` への換算は `σ = 値 / 2` にする。本家の定義は **未検証** で、E2 で本家の書き出しと比べて合わせる。
+- ぼかしの値から `σ` への換算は `σ = 値 / 2` にする。本家の定義は **未検証** で、E4 の `effects-blend-masks` で本家の書き出しと比べて合わせる。
 - ぼかしの値は、document-model の検証で 0〜1,000 に制限する。描画は、画面の上の `σ` を 256 px で打ち切る。
 - WebGPU では、ぼかしを compute shader にする最適化を後から足してよい（6.1 節の条件で）。
 
 ### 8.3 ブレンドモードと不透明度
 
-- ブレンドモードは W3C Compositing and Blending Level 1 の 16 種（normal、darken、multiply、color-burn、lighten、screen、color-dodge、overlay、soft-light、hard-light、difference、exclusion、hue、saturation、color、luminosity）。本家が持つ他のモード（plus darker など）の有無と定義は **未検証**。
+- ブレンドモードは 18 種。W3C Compositing and Blending Level 1 の 16 種（normal、darken、multiply、color-burn、lighten、screen、color-dodge、overlay、soft-light、hard-light、difference、exclusion、hue、saturation、color、luminosity）に、本家が持つ `LINEAR_BURN`（`B = max(0, Cb + Cs − 1)`）と `LINEAR_DODGE`（`B = min(1, Cb + Cs)`）を足す。グループ・フレームの `PASS_THROUGH` は下の非分離の合成で扱う。本家のモードの一覧は [BlendMode](https://developers.figma.com/docs/plugins/api/BlendMode/)（2026-09-27 に確認）。`LINEAR_BURN`・`LINEAR_DODGE` の式が本家と一致するかは **未検証**（E4 の `effects-blend-masks` で本家の書き出しと比べる）。
+  - > 2026-09-27 の注記：W3C の 16 種だけとしていたのを、本家の一覧に合わせて 18 種に改めた。
 - normal 以外は、合成先の画素を読む。合成先の範囲をテクスチャにコピーし、シェーダーで式を当てる（固定のブレンドの機能では表せないため）。
 - 不透明度が 1 未満か normal 以外のブレンドを持つフレーム・グループは、分離した層（オフスクリーン）に描いてから合成する。グループの既定の「pass through」は分離せず、子が直接その下に合成される。
 - オフスクリーンの層は、1 タイルあたり入れ子 8 段まで。超えたら、深い段を 1 つの層にまとめて描く（見た目の差を許す。警告を記録する）。
@@ -235,14 +236,14 @@ Vello との関係：Vello GPU（旧 `vello_hybrid`、0.2.0、2026-08-07）は�
 
 - 2 をファイルの設定にするのは、全員で同じフォントが選ばれるようにするため（端末ごとの既定に頼らない）。設定のプロパティは `DOCUMENT` の `cjk_fallback_font`（[document-model.md](document-model.md) の 4.2 節の 92）。
 - フォールバックのフォントの太さは、指定の太さに最も近いもの（可変フォントなら `wght` の軸の値をそのまま）にする。
-- 本家のフォールバックの順序は **未検証**。欧文のフォントに和文を打ったときの見え方を、E4 で本家と比べる。
+- 本家のフォールバックの順序は **未検証**。欧文のフォントに和文を打ったときの見え方を、E4 の `text-shaping-and-glyphs` で本家と比べる。
 - フォントの読み込みが終わるまで、そのテキストのノードは灰色の棒で描く。レイアウトは保存された大きさを使う（[layout.md](layout.md) の 6.4 節）。
 
 ### 9.4 グリフの描き方
 
 - 画面の上の文字の大きさが 48 px 以下なら、グリフのアトラスで描く。超えたら、7 節のパスの描画で描く。
 - アトラスは R8 の 2048×2048 のページで、最大 4 ページ（16 MB）。鍵は `(font_blob_id, glyph_id, 大きさ（1/4 px の刻み）, 横の端数の位置（1/4 px の 4 段）, 可変の軸の値のハッシュ)`。グリフは 7 節と同じ被覆率の計算を CPU で行ってラスタライズする。
-- カラーのグリフ（COLRv1）は、Skrifa の塗りの木を、7〜8 節のパスとグラデーションの描画に変えて描く。48 px 以下は RGBA8 のアトラス（別のページ）に置く。Skrifa の COLRv1 の対応の範囲は **未検証**。
+- カラーのグリフ（COLRv1）は、Skrifa の塗りの木を、7〜8 節のパスとグラデーションの描画に変えて描く。48 px 以下は RGBA8 のアトラス（別のページ）に置く。Skrifa（0.47）は COLRv0 と COLRv1 を区別し、`ColorPainter` で塗りの木を辿れる（[skrifa::color](https://docs.rs/skrifa/latest/skrifa/color/index.html)、2026-09-27 に確認）。合成のモードや可変のカラーのフォントまで本家の見え方と合うかは、`text-shaping-and-glyphs` の参照画像で確かめる。
 - ヒンティングはしない。ズームと書き出しで形が変わらないようにするため。Windows の OS の文字より細く見えうる。
 
 ## 10. 画像
@@ -250,7 +251,7 @@ Vello との関係：Vello GPU（旧 `vello_hybrid`、0.2.0、2026-08-07）は�
 - 画像は `Paint` の `image_hash`（中身の SHA-256）で指す。本体と縮小版（長辺 2048・512・128 px の WebP）は、アップロードの後に Worker が作る。取得は `images:sign` で署名付き URL を得て読む（[export-and-assets.md](export-and-assets.md) の 6 節、ADR-0035）。
 - ファイルを開いたら、画面の上の大きさに足りる最も小さい縮小版（まず `w512`、小さく見える画像は `w128`）を読む。画面に見えていて解像度が足りない画像だけ、`w2048` か本体を読む（本家と同じ考え方）。
 - `pending` の画像は灰色の置き場所、`rejected`・`taken_down`・10 分たっても `ready` にならない画像は「読み込めない画像」の印（灰色の斜線）で描く（export-and-assets の 6.2 節）。
-- デコードは専用の Web Worker で行う。Rust のデコーダー（`png`、`zune-jpeg`、`image-webp`、GIF は最初のコマ）を小さな WASM にして動かす。ブラウザの `createImageBitmap` は使わない。ブラウザごとの色の扱いの差をなくし、Render Worker と同じ画素にするため。速さの差は **未検証**（E2 で測る）。
+- デコードは専用の Web Worker で行う。Rust のデコーダー（`png`、`zune-jpeg`、`image-webp`、GIF は最初のコマ）を小さな WASM にして動かす。ブラウザの `createImageBitmap` は使わない。ブラウザごとの色の扱いの差をなくし、Render Worker と同じ画素にするため。速さの差は **未検証**（E2 の `image-decode-worker` で測る）。
 - デコードした画素（乗算済みの RGBA8）は、転送できる `ArrayBuffer` でメインスレッドに渡し、テクスチャに載せたら CPU の側のコピーを捨てる。圧縮したバイト列は Cache Storage に残す（6.2 節の作り直しのため）。
 - ミップマップは、載せた後に GPU の縮小のシェーダーで作る（wgpu は自動で作らない）。
 - アダプターのテクスチャの 1 辺の上限が 4,096 未満なら、2,048 の区画に分けて載せる。
@@ -273,7 +274,7 @@ NFR-004（10 万ノードの参照ファイルで、タブのメモリ 1.5 GB �
 | 画像 | 384 MB | GPU |
 | グリフのアトラス・オフスクリーンの層 | 80 MB | GPU |
 
-- GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う（**未検証**）。計測の定義は quality.md で決める。ここでは CPU の側を 950 MB、GPU の側を 720 MB に抑えることを目標にする。
+- GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う（**未検証**。E2 の `render-memory-budget` で主要な組み合わせを測る）。計測の定義は quality.md で決める。ここでは CPU の側を 950 MB、GPU の側を 720 MB に抑えることを目標にする。
 - WASM のメモリは 32 ビット（最大 4 GB）。Safari が memory64 に対応していないため（MDN の browser-compat-data、2026-09-27 に確認）、MVP は `wasm32` のままにする。
 - メモリの使用量は 5 秒ごとに数え、1.2 GB（80%）を超えたら、UI の殻に警告を出す。キャッシュ（タイル、ジオメトリ、高解像度の画像）を捨てて、下げられるだけ下げる。
 
@@ -282,10 +283,10 @@ NFR-004（10 万ノードの参照ファイルで、タブのメモリ 1.5 GB �
 - どこで描くかは ADR-0034 で決まっている：画面からの書き出しはクライアントのエンジン、サムネイル・一括の書き出し・公開 API は Render Worker（[export-and-assets.md](export-and-assets.md) の 4.2 節、5 節）。
 - Render Worker のために、同じ crate（`doc-model`・`layout`・`scene`・`raster`・`text`・`image`・`gpu`）を `x86_64-unknown-linux-gnu` にビルドし、`render-native` のバイナリにする。
 - Fargate には GPU がない。wgpu の Vulkan のバックエンドを、Mesa の lavapipe（CPU で動く Vulkan の実装）の上で動かす。シェーダーとパイプラインは、ブラウザと同じ WGSL を使う（[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)）。
-- lavapipe の Vulkan の適合の版と、arm64 での動作は **未検証**。S1 では Render Worker を x86-64 に固定する。
+- lavapipe は Vulkan 1.3 の適合を得ている（Khronos の Vulkanised 2025 の発表 [Current state of Lavapipe](https://vulkan.org/user/pages/09.events/vulkanised-2025/T5-Lucas-Fryzek-Igalia.pdf)、2025-02-13、2026-09-27 に確認）。arm64 での動作と性能は **未検証**（E10 の `render-native`）。S1 では Render Worker を x86-64 に固定する。
 - ラスターの書き出しは、1 枚のタイルの描き方（5.3 節）を、書き出しの範囲を覆うタイルの列で繰り返し、つなぐ。ズームの操作がないので、タイルのキャッシュは持たない。クライアントの書き出しも同じ手順で、オフスクリーンに描いて読み戻す。
-- SVG・PDF は画素にしない。シーングラフの `draw_ops`（ジオメトリ、塗り、エフェクト、整形したグリフの列）を、export-and-assets の書き出し器に渡す。この領域は、描画の命令の列を安定した形で公開するだけにする。PDF を書く crate の候補（typst が使う `krilla` など）は **未検証** で、E10 の PoC で決める。
-- 性能の目標（10 万ノードの参照ファイルのサムネイルを p95 10 秒）は export-and-assets の 5.1 節にあり、**未検証**。
+- SVG・PDF は画素にしない。シーングラフの `draw_ops`（ジオメトリ、塗り、エフェクト、整形したグリフの列）を、export-and-assets の書き出し器に渡す。この領域は、描画の命令の列を安定した形で公開するだけにする。PDF を書く crate の候補は `krilla`（0.8。`pdf-writer` の上の高水準の crate で、パスの塗りと線、変換、マスク、切り抜き、ブレンドモード、グラデーション、カラーのフォントを含むフォントのサブセット、タグ付きの PDF を持つ。typst が使う）（[LaurenzV/krilla](https://github.com/LaurenzV/krilla)、typst の `Cargo.toml`、2026-09-27 に確認）。本家の見た目との一致と大きなファイルでの速さは、E10 の `client-export-pdf` で確かめて決める。
+- 性能の目標（10 万ノードの参照ファイルのサムネイルを p95 10 秒）は export-and-assets の 5.1 節にあり、**未検証**（E10 の `render-worker-core` の PoC）。
 
 ## 13. 障害時の振る舞い
 
@@ -342,7 +343,7 @@ NFR-002（自分の入力を 1 フレームで）、NFR-003（開く時間）、
 
 ### 16.1 参照画像のテスト（golden）
 
-- 参照の場面の集合（塗り、線の端と角、グラデーション、ブレンドモード 16 種、影とぼかし、マスク 3 種、テキスト（欧文、和文、混植、絵文字）、画像の塗りの形、10 万ノードのファイル）を、次の 3 つで描く。
+- 参照の場面の集合（塗り、線の端と角、グラデーション、ブレンドモード 18 種、影とぼかし、マスク 3 種、テキスト（欧文、和文、混植、絵文字）、画像の塗りの形、10 万ノードのファイル）を、次の 3 つで描く。
   1. ネイティブ（lavapipe）：CI の PR ごと。結果はビットで安定するので、参照画像との差を厳しく見る。
   2. Chromium の headless（WebGPU と WebGL2 の両方）：GPU 付きの VM で PR ごと。
   3. 実機の群れ（Chrome・Edge・Firefox・Safari、Windows・macOS、Intel・AMD・NVIDIA・Apple）：日次とリリースの前。
@@ -390,12 +391,12 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 | E2 | `render-memory-budget` | メモリの計測と警告、キャッシュの追い出し、安全な描画の状態 |
 | E2 | `render-perf-ci` | 性能の CI（10 万ノードの参照ファイル、GPU 付きの VM）と実機の群れ |
 | E4 | `text-shaping-and-glyphs` | 整形（HarfRust・Skrifa・ICU4X）、グリフのアトラス、大きな文字のパスの描画、和文のフォールバック、カラーの絵文字 |
-| E4 | `effects-blend-masks` | ブレンドモード 16 種、影・ぼかし・背景のぼかし、マスク 3 種、内容の切り抜き |
+| E4 | `effects-blend-masks` | ブレンドモード 18 種、影・ぼかし・背景のぼかし、マスク 3 種、内容の切り抜き |
 | E5 | `layout-to-scene` | レイアウトの結果の受け取りとシーングラフへの反映（layout と一緒に） |
 | E6 | `instance-rendering` | 導出したインスタンスの子を普通のノードとして描く（components と一緒に） |
 | E9 | `viewer-rendering` | 閲覧だけの接続・共有のリンクでの描画（編集の UI なし）の確認 |
 | E10 | `render-native` | lavapipe の上の wgpu のネイティブのビルド、ラスターの書き出しのタイルの列、SVG・PDF への描画の命令の公開（Render Worker は export-and-assets の `render-worker-core`） |
-| E12 | `render-telemetry` | 描画のテレメトリー（フレーム時間、バックエンド、切り替えの回数、メモリ）と、ブロックリストの運用 |
+| E12 | `render-telemetry-and-blocklist` | 描画のテレメトリー（フレーム時間、バックエンド、切り替えの回数、メモリ）と、ブロックリストの運用 |
 
 E3・E7・E8・E11 には、この領域の Story はない。
 
@@ -426,7 +427,7 @@ E3・E7・E8・E11 には、この領域の Story はない。
 ## 20. 未解決の問い
 
 - パスの被覆率を、自前でなく Vello GPU（または Vello CPU）に任せられるか。マスクの層と非分離のブレンドへの対応、wgpu の WebGL2 の経路で動くか、を追う。
-- Display P3 の色をいつ扱うか。本家の対応の範囲は未検証。
+- Display P3 の色をいつ扱うか。本家は、ファイルごとに sRGB か Display P3 を選べ（新しいファイルは sRGB）、変えるときに「値を保つ」「見た目を保つ」を選べ、書き出しはファイルの色空間で行う（[Manage color profiles in design files](https://help.figma.com/hc/en-us/articles/360039825114-Manage-color-profiles-in-design-files)。検索の結果の要約で確認、2026-09-27）。
 - 背景のぼかしを持つノードが多いファイルで、タイルの縁を足して描く方式の費用。
 - 和文のフォントを分割して配るか（export-and-assets の 7.2 節で、MVP は分割しないと決まった）。E10 の計測で見直すとき、整形（GPOS の組の途切れ）への影響をこの領域で確かめる。
 - WASM のスレッド（SharedArrayBuffer）で、タイルの描画の CPU の段を並列にするか。COOP・COEP のヘッダーと、画像・フォントの配信への `Cross-Origin-Resource-Policy` が要る。
@@ -446,11 +447,11 @@ E3・E7・E8・E11 には、この領域の Story はない。
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| R16F の加算のブレンドが wgpu の WebGL2 で使えるか | E2 の前の PoC |
-| 1 つのビルドでのキャンバスの作り直しによる切り替えと、WASM の大きさ | E2 の前の PoC。できなければ 2 つのビルド（ADR-0014 の 2） |
+| R16F の加算のブレンドが wgpu の WebGL2 で使えるか（WebGL2 の仕様では使える。7 節） | E2 の前の `gpu-backend-poc` |
+| 1 つのビルドでのキャンバスの作り直しによる切り替えと、WASM の大きさ | E2 の前の `gpu-backend-poc`。できなければ 2 つのビルド（ADR-0014 の 2） |
 | 参照画像のテストの判定の値 | E2 で端末ごとの差を測って決める |
 | lavapipe での書き出しの時間 | E10 の前に計測 |
-| 本家のぼかしの定義、フォールバックの順序、ブレンドモードの種類 | E2・E4 で本家の書き出しと比べる |
+| 本家のぼかしの定義、フォールバックの順序、`LINEAR_BURN`・`LINEAR_DODGE` の式 | E4 の `effects-blend-masks`・`text-shaping-and-glyphs` で本家の書き出しと比べる（モードの一覧は確かめた。8.3 節） |
 
 ## References
 

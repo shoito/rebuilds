@@ -12,7 +12,7 @@ date: 2026-09-27
 事実：
 
 - IEEE 754 は、四則・平方根・比較の結果を、丸めの方式を決めれば一意に定める。WASM の浮動小数点の命令も、NaN のビットの形を除いて決定的である（WebAssembly の仕様）。
-- 三角関数・指数・べき乗は IEEE 754 で丸めが決まっていない。Rust の標準の `f64::sin` などは、ネイティブではプラットフォームの libm（Linux なら glibc）、`wasm32-unknown-unknown` ではコンパイラに含まれる移植版を呼ぶため、結果がずれうる（**未検証**。E2 の CI で差を確かめる）。
+- 三角関数・指数・べき乗は IEEE 754 で丸めが決まっていない。Rust の標準の `f64::sin` などは、ネイティブではプラットフォームの libm（Linux なら glibc）、`wasm32-unknown-unknown` ではコンパイラに含まれる移植版を呼ぶため、結果がずれうる（**未検証**。E2 の `layout-crate-skeleton` の一致の CI で差を確かめる）。
 - FMA（`mul_add`）は、丸めが 1 回になり、`a * b + c` と結果が違う。Rust は勝手に FMA へまとめない。WASM の relaxed SIMD は、FMA かどうかを実装に任せる。
 - ドキュメントの値は f32 で持つ（[document-model.md](../architecture/document-model.md) の 4.3 節）。整形（HarfRust）は UnitsPerEm の整数を返す（[ADR-0015](0015-text-shaping-and-glyph-rendering.md)）。
 

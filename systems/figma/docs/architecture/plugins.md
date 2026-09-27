@@ -88,11 +88,12 @@ ADR-0037。
 | 同時に動くプラグイン | 1 タブに 1 つ（UI を持つもの）＋ 閉じ待ちのもの | 前のプラグインを閉じるか確かめる |
 
 - 同期の実行の間、画面は止まる（本家と同じ。メインスレッドで動くため）。長い処理は、`await` で区切るよう文書で案内する。区切ると、ホストは描画のフレームを挟む。
-- 値はこの設計の決定。本家の上限は **未検証**。
+- 値はこの設計の決定。本家の上限は公開の資料にない（**未検証**。設計の判断には影響しない）。
 
 ### 4.4 ES の版
 
-- quickjs-ng の対応する ES の版（ES2023 の大半）で動く（**未検証**。PoC で test262 の結果を確かめる）。本家は ES2020 以降と説明している（2 節）。
+- quickjs-ng は、仕様に入った新しい ES の機能を追う方針で、test262 の結果を公開している。ただし `Intl` は大きさの理由で持たない見込みと書く（[quickjs-ng の ECMAScript Features](https://quickjs-ng.github.io/quickjs/es_features)、2026-09-27 に確認）。本家は「ES2020 以降」と説明し、組み込みの一覧に `Intl` を挙げていない（[How Plugins Run](https://developers.figma.com/docs/plugins/how-plugins-run/)、2026-09-27 に確認）。対応する版の範囲（ES2023 の大半を見込む）は **未検証**（E14 の `quickjs-sandbox-poc` で test262 の結果を確かめる）。
+- `Intl`・`toLocaleString` の地域の書式は持たない。プラグインに要る場合は、ホストの `Intl` の結果を membrane の関数として渡すかを `quickjs-sandbox-poc` で決める。
 - `eval`・`Function` は QuickJS の中では使える（外に出られないため）。
 
 ## 5. API
@@ -149,7 +150,7 @@ ADR-0038。
 
 - `plugin_data`（[document-model.md](document-model.md) の 4.2 節、プロパティ 90、`Map<(PluginId, Key), Bytes>`、要素ごとに LWW）に保存する。
 - プラグインは、自分の `PluginId` の要素だけを読み書きできる。ホストが鍵を付けるので、プラグインは他の `PluginId` を指定できない。
-- 上限：鍵 100 バイト、値 100 KiB、1 ノード 1 プラグインで 1 MiB（この設計の値。本家は **未検証**）。
+- 上限：鍵 100 バイト、値 100 KiB、1 ノード 1 プラグインで 1 MiB（この設計の値）。本家は 1 項目（プラグインの ID・鍵・値の合計）を 100 kB までにする（[setPluginData](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/)、2026-09-27 に確認）。1 ノードの合計の上限は本家の資料にない。
 - 全プラグインが読める共有の名前空間（本家の `sharedPluginData` に相当）は、後で別の ADR で決める。
 
 ### 5.5 API の版
@@ -294,7 +295,7 @@ ADR-0039。
 ### 決定（2026-09-27、既定案）
 
 - **サンドボックスはメインスレッドの QuickJS の WASM**（ADR-0037）。Web Worker に置く案は、文書の読み取りが非同期か、`SharedArrayBuffer` と `Atomics.wait` による同期の呼び出し（cross-origin isolation が要る）になり、プロパティの読み取りごとの往復が重い。本家が iframe で失敗した点と同じ。
-- **同期の実行の上限は 10 秒**（4.3 節）。本家の値は **未検証**。
+- **同期の実行の上限は 10 秒**（4.3 節）。本家の値は公開の資料にない（**未検証**。設計の判断には影響しない）。
 - **サンドボックスの `fetch` は UI の iframe から送る**（6.2 節）。アプリのオリジンの CSP を広げない。
 - **組織の中のプラグインは審査なし、公開は初回と権限の拡大で人の審査**（ADR-0039）。本家は承認後の更新を審査しないが、権限・通信先の拡大は審査する。乗っ取りの被害を抑えるため。
 - **API はいま開いたファイルだけ**（5.2 節）。
@@ -308,7 +309,7 @@ ADR-0039。
 | `sharedPluginData`、チームのライブラリの API | 利用者の声で、別の ADR |
 | ウィジェット | 13 節の方向で、別の ADR |
 | 有料のプラグイン | 範囲の外（決済の仕組みが要る）。PM |
-| ShadowRealm が標準になったら、QuickJS より速い選択肢になるか | ShadowRealm の標準化の段階と、ブラウザの対応は **未検証**。標準になったら見直す |
+| ShadowRealm が標準になったら、QuickJS より速い選択肢になるか | ShadowRealm は TC39 の Stage 2.7（[tc39/proposals](https://github.com/tc39/proposals)、2026-09-27 に確認）で、ブラウザの実装は MDN の browser-compat-data にない。Stage 4 になり主要なブラウザが出したら見直す |
 
 ## 16. quality.md・runbooks・data-model への項目
 
