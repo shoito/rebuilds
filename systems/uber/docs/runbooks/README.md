@@ -53,7 +53,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 索引のリース | 期限 5 秒、1 秒ごとの更新、4 秒で降りる、引き継ぎ 約 6.5 秒、再構築 15 秒（目標） | [ADR-0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | — |
 | 位置の送信の間隔 | 4 秒（2〜10 秒） | [ADR-0009](../decisions/0009-location-upload-and-validation.md) | `ops.loc.interval_ms`（`location-ingest-lag.md`） |
 | `backlog` の全体の上限 | 5,000 件/秒 | [location-ingestion.md](../architecture/location-ingestion.md) の 10 節 | 引き下げ（`location-reconnect-storm.md`） |
-| loc-ingest の 1 タスク、rt-gateway の 1 タスク | 2,000 件/秒、2 万接続（**未検証**） | capacity の 8 節 | タスクの数 |
+| loc-ingest の 1 タスク、rt-gateway の 1 タスク | 2,000 件/秒、2 万接続（**未検証**。E3 の `loc-load-test`、E6 の `realtime-load-test`） | capacity の 8 節 | タスクの数 |
 | Kinesis `loc-tokyo` | 8 シャード | capacity の 2 節 | シャードの追加 |
 | タイマーの遅れ | 期限から遷移のコミットまで p99 1 秒。5 秒で呼び出し | [trips-lifecycle.md](../architecture/trips-lifecycle.md) の 6 節 | 処理のタスクの数 |
 | 前もって広げる倍率 | 2〜3 倍（大晦日 3 倍） | capacity の 6 節 | 催しの登録（`prescale_events`） |

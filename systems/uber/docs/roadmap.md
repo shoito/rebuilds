@@ -257,7 +257,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `driver-background-location` | 許可、状態ごとの取り方、熱と電池、溜めと送り直し（location の `driver-location-uploader` と 1 つ） |
 | `driver-location-recovery` | 止まったときの検知と回復のプッシュ |
 | `driver-offer-screen` | オファーの画面、残り時間、受信の確認 |
-| `offer-full-screen-notification` | 全画面の通知と表示の後の `OfferDelivered` |
+| `offer-full-screen-notification` | 優先度の高い通知（全画面は許可のあるときだけ）と表示の後の `OfferDelivered` |
 | `driver-street-hail-toggle` | 流しの実車の操作（タクシーのドライバーだけ）とオファーの自動の辞退 |
 | `nav-handoff-waypoints` | 主要経由地点の URL、間引き、`nav_handoff_targets`、20 のルートの順守の試験 |
 | `route-deviation-alert` | 端末での逸脱の知らせ |
@@ -313,6 +313,8 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 
 設計：[supply-and-operators.md](architecture/supply-and-operators.md) の 6 節、[pricing-and-fares.md](architecture/pricing-and-fares.md) の 2.5 節、[dispatch-and-matching.md](architecture/dispatch-and-matching.md) の 5 節、[infrastructure.md](architecture/infrastructure.md) の 7 節、[capacity.md](architecture/capacity.md) の 7 節、[security.md](architecture/security.md) の 7・11 節
 
+2 つの流れに分ける。どちらも S1 の本番の開始の前に終える条件だが、日本版ライドシェアは法務（L2・L5）の結論を待つので、GA の準備を止めずに並行して進める（[architecture/README.md](architecture/README.md) の 7 節。**PM の確認事項**）。
+
 **日本版ライドシェア**（すべて `release.rideshare.*` と legal のフラグの裏）
 
 | Story | 内容 |
@@ -325,7 +327,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `rideshare-fares` | 係数、事前確定の必須、キャッシュレスの必須（時間制・協議運賃は S2）（法務：L2） |
 | `rideshare-cashless-only` | 日本版ライドシェアで `in_vehicle` を拒否する |
 | `rideshare-dispatch-rules` | 候補の条件 E1・E5 と PROP-DISP-007。`legal.l2.rideshare_dispatch`・`legal.l5.rideshare_drivers`（法務：L2・L5） |
-| `rideshare-safety-requirements` | PIN の必須、ドライブレコーダーの要件の確かめ |
+| `rideshare-safety-requirements` | PIN の必須（ドライブレコーダーは運行管理の通達で必須でない。[safety-and-trust.md](architecture/safety-and-trust.md) の 9 節） |
 | `rideshare-activity-reports` | 稼働の記録と報告の取り出し |
 
 **GA の準備**
@@ -338,7 +340,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `prescale-schedules` | 大晦日・催し・雨の予報の予定の拡大 |
 | `data-deletion-both-regions` | アカウントの削除と、東京・大阪の両方の削除のジョブ（法務：L4） |
 | `pentest-and-fixes` | 外部の侵入試験と修正 |
-| `cost-dashboard` | タグごとの費用の可視化、単価の実測への置き換え |
+| `cost-dashboard` | タグごとの費用の可視化、量（転送・LCU・ログ）と可観測性・セキュリティのサービスの額の実測への置き換え |
 | `runbooks-e12` | [runbooks/README.md](runbooks/README.md) の 4 節の手順がそろっているかの確かめと、足りない手順の作成 |
 
 ### E13 機械学習（S2）

@@ -16,7 +16,7 @@ date: 2026-09-27
 
 [ADR-0005](0005-maps-and-routing.md) は、OSM がこの電子地図に当たるかが法務と運輸局の確認待ち（[intent.md](../intent.md) の L3）の間、商用の提供者の距離を使うと決めた。
 
-商用の提供者の条件（2026-09-27 に確認）：Google Maps Platform では、Directions API・Distance Matrix API の内容を Google 以外の地図と一緒に使ってはならず、Directions API の緯度経度のキャッシュは 30 日まで（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms) の 4.2・4.3・5.2）。ゼンリンと Amazon Location Service の経路の結果の保存の条件は **未検証**。
+商用の提供者の条件（2026-09-27 に確認）：Google Maps Platform では、Directions API・Distance Matrix API の内容を Google 以外の地図と一緒に使ってはならず、Directions API の緯度経度のキャッシュは 30 日まで（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms) の 4.2・4.3・5.2）。ゼンリンと Amazon Location Service の経路の結果の保存の条件は **未検証**（E4 の `fare-distance-provider-adapter` で契約の条件として確かめる）。
 
 ## Options
 

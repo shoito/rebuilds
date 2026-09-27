@@ -41,10 +41,10 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 ### サーバー
 
 - 実行基盤・IaC・可観測性・フラグ・ブランチの運用は、Slack の ADR-0007・0011・0020・0021・0026 と同じにする。Aurora PostgreSQL は 18 を使う。
-- **位置の取り込み、地理空間の索引、配車は Go で書く。** 常時の接続の受け手（`rt-gateway`、[ADR-0030](0030-realtime-grpc-bidirectional-stream-gateway.md)）と、乗客への車の位置の配信（`trip-location-fanout`、ADR-0030・[ADR-0038](0038-compute-on-fargate-and-data-stores.md)）も、同じ理由（多数の接続と位置の流れをメモリで扱う）で Go にする。Go のサービスは、この 5 つ（`loc-ingest`、`geo-index`、`dispatch`、`rt-gateway`、`trip-location-fanout`）とする（統合の工程で 3 つから 5 つにした）。理由は次のとおり。
+- **位置の取り込み、地理空間の索引、配車は Go で書く。** 常時の接続の受け手（`rt-gateway`、[ADR-0030](0030-realtime-grpc-bidirectional-stream-gateway.md)）と、乗客への車の位置の配信（`trip-location-fanout`、ADR-0030・[ADR-0038](0038-compute-on-fargate-and-data-stores.md)）も、同じ理由（多数の接続と位置の流れをメモリで扱う）で Go にする。配車の行列を求める Valhalla の前の層（`eta-service`、[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)）も、配車の熱い経路にあるので Go にする。Go のサービスは、この 6 つ（`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`）とする（統合の工程で 3 つから 5 つにし、2026-09-27 に `eta-service` を加えて 6 つにした）。理由は次のとおり。
   - メモリ上の共有の状態と、多数の同時の処理（goroutine とチャネル）を、単純な書き方で扱える。
   - コンパイルとテストが速く、エージェントの確認ループが短い。学習データも多い。
-  - H3 の公式の束縛（h3-go）と、gRPC・Protocol Buffers の成熟した実装がある。h3-go は C の実装を cgo で呼ぶ。ビルドの手順への影響は E3 で確かめる（**未検証**）。
+  - H3 の公式の束縛（h3-go）と、gRPC・Protocol Buffers の成熟した実装がある。h3-go は C の実装を同梱して cgo で呼び、`CGO_ENABLED=1` を要する（[h3-go](https://github.com/uber/h3-go)、2026-09-27 に確認）。ARM64 のイメージのビルドの手順は E1 の `ci-go-and-contracts` で決める。
 - 1 は、Node.js の単一のスレッドで、メモリ上の大きな索引と重い最適化を同じプロセスに持つことになる。本家は、Node.js で書いた初期の Fulfillment の基盤（乗車の状態を持つ部分）を、使われなくなった技術として後に作り直している（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2026-09-27 に確認）。
 - 3 は、GC がなく、遅延の裾で Go に勝る。ただし、コンパイルが遅く、所有権の制約のためにエージェントの修正の往復が増える。S1〜S2 の規模（索引は都市ごとに数万台）では、Go の GC の停止が NFR-001・NFR-002 を崩すとは見込まない。E3 の負荷試験で、GC の停止を含めた p99 を計測し、足りなければ索引だけを Rust に替える ADR を書く。
 - 4 は、性能は足りるが、他の題材の道具と離れる割に、2 より得るものが少ない。
@@ -61,6 +61,8 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 - 3 は、乗車の状態機械と通信のプロトコルを共有できる利点がある。ただし MVP では、共有するものを Protocol Buffers から生成するモデルと、Trips が出す状態遷移の表（テストのベクター）に留め、ビルドの仕組みを 1 つ増やさない。共有のコアは、S2 で 2 つのアプリの食い違いの不具合が多ければ見直す。
 - 事業者の管理画面とサポートのツールは Web（TypeScript）にする。
 
+> 2026-09-27 の注記：`eta-service` は、独自の API を持ち、ECS のサービスとして別に配備し（3 タスク、ローリング。[infrastructure.md](../architecture/infrastructure.md) の 3 節、[delivery.md](../architecture/delivery.md) の 4 節）、配車・乗客の API・Trips から呼ばれる。付随の役ではなく、Go のサービスに数える。付随の役は、同じ領域の部品として別の ADR が認めた `trail-builder`（ADR-0010）と `dispatch-shadow`（ADR-0042）の 2 つだけにする。
+
 ## Consequences
 
 - 良くなること：
@@ -72,7 +74,7 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 
 ## Confirmation
 
-- Go のサービスは、`loc-ingest`・`geo-index`・`dispatch`・`rt-gateway`・`trip-location-fanout` の 5 つに限る。新しい Go のサービスは ADR を要する（レビューで確かめる）。同じ領域の付随の役として別の ADR が認めたもの（位置の取り込みの `trail-builder`（[ADR-0010](0010-location-trails-map-matching-and-retention.md)）、配車の影の実行の `dispatch-shadow`（[ADR-0042](0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)）、Valhalla の前の層の `eta-service`（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)・[ADR-0035](0035-ml-feature-store-and-shadow-rollout.md)））は、その ADR を根拠とし、5 つに数えない。
+- Go のサービスは、`loc-ingest`・`geo-index`・`dispatch`・`eta-service`・`rt-gateway`・`trip-location-fanout` の 6 つに限る。新しい Go のサービスは ADR を要する（レビューで確かめる）。同じ領域の付随の役として別の ADR が認めたもの（位置の取り込みの `trail-builder`（[ADR-0010](0010-location-trails-map-matching-and-retention.md)）、配車の影の実行の `dispatch-shadow`（[ADR-0042](0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)））は、その ADR を根拠とし、6 つに数えない。
 - lint：金額の型以外で、金額を `number`・`float64` として扱うコードを禁止する。
 - E3 の負荷試験で、S1 のピークの 2 倍（位置 5,000 件/秒）のときの索引への反映の p99 と GC の停止を計測し、NFR-002 を満たすことを確かめる。
 - 両方のアプリで、状態遷移の表のテストのベクターが通ることを CI で確かめる。

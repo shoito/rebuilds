@@ -11,7 +11,7 @@ date: 2026-09-27
 
 都市の GPS は、建物の反射で 50 m 以上ずれることがある（[Rethinking GPS](https://www.uber.com/en-CA/blog/rethinking-gps/)、2018-04-19、2026-09-27 に確認）。端末の通信は切れ、送り直しで同じ点が 2 回届く。端末の壁時計は利用者が変えられる。位置の偽装で、配車の多い場所にいるように見せる不正も起こりうる。
 
-本家は 4 秒ごとの位置を、地理のセルの ID で分けて供給のサービスに渡していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2026-09-27 に確認）。本家の送信のプロトコルは公開されていない（**未検証**）。
+本家は 4 秒ごとの位置を、地理のセルの ID で分けて供給のサービスに渡していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2026-09-27 に確認）。本家の送信のプロトコルは、確かめた本家の資料には書かれていない。
 
 ## Options
 
@@ -54,7 +54,7 @@ date: 2026-09-27
   - 読み手を足しても、取り込みは変わらない。索引の再構築が、流れの読み直しで済む。
   - 壁時計のずれと、1 点の GPS の跳びが、索引に入らない。
 - 引き受けるコスト：
-  - Kinesis の書き込みと配送の分、反映が遅れる（予算は 450 ms。実際の値は **未検証**で、E3 で計る）。
+  - Kinesis の書き込みと配送の分、反映が遅れる（予算は 450 ms。拡張ファンアウトの配送は平均 約 70 ms と文書にある（[Develop enhanced fan-out consumers](https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html)、2026-09-27 に確認）。p99 は **未検証**で、E3 の `location-lag-metrics` で計る）。
   - 跳びの確定に 2 点を待つので、本当の大きな移動（トンネルの出口）の反映が最大 4 秒遅れる。
   - 読み手ごとに重複の除去を書く。
 

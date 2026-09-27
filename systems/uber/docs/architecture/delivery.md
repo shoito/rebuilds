@@ -167,7 +167,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 
 - **列車**：月曜に切り、木曜に審査、金曜から公開。4 つのアプリを同じ列車で出す。
 - **段階的な公開**：iOS の段階的な公開は、1 日目 1%、2 日目 2%、3 日目 5%、4 日目 10%、5 日目 20%、6 日目 50%、7 日目 100%。止められる期間は合計 30 日まで。段階的な公開の最中も、App Store から手で更新する人には届く（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)、2026-09-27 に確認）。手で更新する人がいるので、段階の割合を「新しい版の利用者の上限」として当てにしない。新しい機能は release フラグで守る。
-- Android は Play の段階的な公開（1% → 5% → 20% → 50% → 100%）。Play の段階的な公開の細部は **未検証**。
+- Android は Play の段階的な公開（1% → 5% → 20% → 50% → 100%）。Play は割合を自動で上げないので、`mobile-release-train` が毎日上げる。利用者は公開ごとに無作為に選ばれ、止めた後に同じ割合で再開すれば同じ利用者の群に届く。止めても、すでに更新した利用者は戻らない。段階的な公開は更新だけに使え、最初の公開には使えない（[Release app updates with staged rollouts](https://support.google.com/googleplay/android-developer/answer/6346149)、2026-09-27 に確認）。
 - **サーバーの互換**：サーバーは、最新から 8 つ前の列車の版までの契約（Protocol Buffers、状態機械のベクター、ヘッダー `<Brand>-Client`）を受け付ける。`buf breaking` はその範囲で検査する。
 - **強制の更新**：`required_min` を上げるのは、セキュリティの欠陥、支払いと運賃の誤り、サーバーの互換を保てない変更のときだけ。Dev と Ops の 2 人の承認。乗車の最中と緊急の入口は塞がない（rider-and-driver-apps の 10.3 節）。サーバーは `required_min` より古い版の受諾と出庫を 426 で拒むが、乗車中の操作（journal）は拒まない。
 - **ドライバーのアプリ**は、週末の夜に段階を進めない。

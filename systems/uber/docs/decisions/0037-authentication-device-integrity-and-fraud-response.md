@@ -14,8 +14,8 @@ date: 2026-09-27
 - ドライバーは、事業者が登録した人だけが出庫できる（[ADR-0026](0026-supply-registry-and-document-verification.md)）。白タクの経路を作らない。
 - 位置の偽装で配車の多い場所にいるように見せる不正がある（[location-ingestion.md](../architecture/location-ingestion.md) の 13 節）。
 - 本家は、配車の不正として、払い戻しの要求、支払いの不正、アカウントの乗っ取り、ドライバーと乗客の共謀、特典の濫用、GPS の偽装を挙げ、教師なしの異常の検知と、処置の前の人の確認を組み合わせている（[Risk Entity Watch](https://www.uber.com/blog/risk-entity-watch/)、2023-09-28、2026-09-27 に確認）。
-- 端末の完全性の仕組み（2026-09-27 に確認）：Android の Play Integrity API は、アプリの完全性、端末の完全性、アカウントの情報の判定を返し、既定の上限は 1 日 1 万回（[Overview](https://developer.android.com/google/play/integrity/overview)）。iOS は App Attest（DeviceCheck）で端末に結びつけた鍵でアプリを証明する。App Attest の上限と段階的な導入の案内は **未検証**。
-- サービスの間の通信：ECS Service Connect は AWS Private CA の証明書で TLS 1.3 の暗号化を自動で行い、短い期限（7 日まで）の証明書を 5 日ごとに入れ替える。失効の仕組みは持たない（[Encrypt Amazon ECS Service Connect traffic](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-connect-tls.html)、2026-09-27 に確認）。呼び手の認証（相互の TLS）は資料に記述がない（**未検証**）。
+- 端末の完全性の仕組み（2026-09-27 に確認）：Android の Play Integrity API は、アプリの完全性、端末の完全性、アカウントの情報の判定を返し、既定の上限は 1 日 1 万回（[Overview](https://developer.android.com/google/play/integrity/overview)）。iOS は App Attest（DeviceCheck）で端末に結びつけた鍵でアプリを証明する。App Attest の鍵の証明（attestation）は、通常は利用者と端末ごとに 1 回で、Apple は、1 日 1,000 万人を超えない段階的な有効化と、全体で毎秒 100 回未満の呼び出しを勧める（[Preparing to use the App Attest service](https://developer.apple.com/documentation/devicecheck/preparing-to-use-the-app-attest-service)）。そこで、出庫のたびの確かめは、登録済みの鍵による assertion で行い、鍵の証明は端末の登録のときだけにする。S1 のドライバー 1 万台・1 日数回の出庫では、Play Integrity の既定の上限（1 日 1 万回）を超えうるので、E3 の前に引き上げを申請する。
+- サービスの間の通信：ECS Service Connect は AWS Private CA の証明書で TLS 1.3 の暗号化を自動で行い、短い期限（7 日まで）の証明書を 5 日ごとに入れ替える。失効の仕組みは持たない（[Encrypt Amazon ECS Service Connect traffic](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-connect-tls.html)、2026-09-27 に確認）。同じ文書は、証明書の発行・入れ替え・配布と暗号化だけを説明し、呼び手の証明書による認証（相互の TLS）を説明しない（2026-09-27 に本文で確認）。そのため、呼び手の確かめは TLS に頼らず、サービスのトークンと RPC ごとの許可の一覧で行う（E1 の `service-identity-tokens`）。
 
 ## Options
 

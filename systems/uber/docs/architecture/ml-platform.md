@@ -19,7 +19,7 @@
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
 | 基盤 | Michelangelo は、特徴量のストアをオフライン（HDFS・Hive）とオンライン（Cassandra）に持ち、特徴量の変換を DSL で書いて、学習の時と予測の時に同じ式を使う。当時、約 1 万の特徴量を共有していた（[Meet Michelangelo](https://www.uber.com/us/en/blog/michelangelo-machine-learning-platform/)、2017-09-05） | 変換を 1 か所で定義し、1 つのパイプラインで計算して両方に書く（5 節） |
-| 特徴量のストア | Palette は、バッチ（Hive・Spark）、ほぼ即時（Flink の SQL）、外部のサービスの特徴量を扱い、特徴量に鮮度の情報を持たせる（[ZenML の事例の要約](https://www.zenml.io/mlops-database/uber-michelangelo-michelangelo-palette-feature-engineering-platform-for-consistent-offline-training-and-low-latency-onli)。本家の一次の資料は確認できず **未検証**） | 鮮度（`computed_at`）を特徴量に持たせる |
+| 特徴量のストア | 本家の特徴量のストア Palette は、バッチとほぼ即時の特徴量の計算を扱い、都市・ドライバー・乗客の特徴量を持つ（[Palette Meta Store Journey](https://www.uber.com/us/en/blog/palette-meta-store-journey/)、2024-01-18、2026-09-27 に確認）。ほぼ即時の特徴量は Flink の流れの処理で作る（[Building Scalable Streaming Pipelines for Near Real-Time Features](https://www.uber.com/us/en/blog/building-scalable-streaming-pipelines/)）。特徴量の鮮度の持ち方は本家の資料に見当たらない | 鮮度（`computed_at`）を特徴量に持たせる |
 | ETA のモデル | 経路のエンジンの ETA の残差を DeepETA で予測して足す（[DeepETA](https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/)、2022-02-10） | 同じ残差の形。モデルは S2 は勾配ブースティング（4 節） |
 | 展開の安全 | 400 の用途、ピークで毎秒 1,500 万の予測。影の実行は、利用者の振る舞いを変えずに本番の入力で新しいモデルを確かめる。endpoint の影（交通の割合と検証の論理を用途ごとに決める）と、deployment の影（自動で予測のずれを見る）の 2 つがある。段階的に広げ、失敗の兆しで自動で戻す（[Raising the Bar on ML Model Deployment Safety](https://www.uber.com/us/en/blog/raising-the-bar-on-ml-model-deployment-safety/)、2025-10-30） | 影の実行と段階の展開と自動の戻しを必須にする（7 節） |
 
@@ -43,7 +43,7 @@
 ```
 
 - 推論は、ETA の補正を `eta-service` の中で行い、需要の予測はバッチで行う。オンラインの推論のサービス（別のプロセス）は、S2 では作らない。
-- 学習と登録は SageMaker を使う（料金と日本のリージョンでの機能は **未検証**。E4 の S2 の着手の前に確かめる）。
+- 学習と登録は SageMaker を使う（料金と日本のリージョンでの機能は **未検証**。E13 の `ml-platform-foundation` の前に確かめる）。
 
 ## 4. モデル
 
@@ -72,7 +72,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7, hour_of_week) … S
 | 項目 | 中身 |
 | --- | --- |
 | 予測するもの | 解像度 8 のセル × 15 分の区切りの配車の依頼の数（成立しなかった依頼も含む）。先の 4 区切り（60 分） |
-| 特徴量 | 同じセル・同じ曜日時間帯の過去の数（直近 8 週）、直近 60 分の数、祝日、隣のセルの数、大きな催しの予定（運用が登録。**未検証**：外部のデータの利用の条件）、天気（気象庁のデータの利用の条件は **未検証**） |
+| 特徴量 | 同じセル・同じ曜日時間帯の過去の数（直近 8 週）、直近 60 分の数、祝日、隣のセルの数、大きな催しの予定（運用が登録。外部のデータの利用の条件は **未検証**）、天気（気象庁のデータの利用の条件は **未検証**）。どちらも E13 の `demand-forecast-h3-r8` の前に確かめる |
 | モデル | LightGBM（Tweedie 損失）。都市ごとに 1 つ |
 | 実行 | 5 分ごとのバッチ。結果を S3 と Valkey `demand:{city}:{cell8}` に書く |
 | 評価 | セルの区切りごとの WAPE。ピークの時間帯と、依頼の多いセルで分けて出す |
@@ -105,7 +105,7 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 
 - **1 つの特徴量は 1 つのパイプラインだけが計算する**（バッチかほぼ即時のどちらか）。同じ値を、オフライン（S3 の Iceberg の表、事象の時刻 `event_time` と `computed_at` つき）とオンライン（Valkey、`computed_at` つき）に書く。学習と配信で別々に計算しない。
 - 学習の時は、ラベルの時刻より前に `computed_at` がある値だけを結合する（時点を合わせた結合）。未来の値を学習に入れない。
-- ほぼ即時のパイプラインは Amazon Managed Service for Apache Flink で、Kinesis の位置の流れと、Trips の事象（SQS から写した Kinesis）を読む（Go のサービスを増やさない）。Flink を選ぶかは、S2 の着手の前に費用と運用の手間で確かめる（**未検証**）。
+- ほぼ即時のパイプラインは Amazon Managed Service for Apache Flink で、Kinesis の位置の流れと、Trips の事象（SQS から写した Kinesis）を読む（Go のサービスを増やさない）。Flink を選ぶかは、E13 の `feature-pipelines` の前に費用と運用の手間で確かめる（**未検証**）。
 
 ### 5.3 配信の記録
 
@@ -228,7 +228,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | リポジトリ `features/`（YAML ＋ SQL） | 5.1 節の特徴量の定義 |
 | S3 Iceberg `features/<group>/`（`entity_key`、`event_time`、`computed_at`、値） | オフラインのストア。元のデータの保持を超えない |
 | Valkey `feat:{group}:{key}`（値、`computed_at`、TTL） | オンラインのストア。正本ではない |
-| S3 `feature-logs/`（Parquet：`request_id`、`model_version`、特徴量、予測、`eta_source`） | 5.3 節。90 日（**未検証**の設計の値） |
+| S3 `feature-logs/`（Parquet：`request_id`、`model_version`、特徴量、予測、`eta_source`） | 5.3 節。90 日（既定。法務の確認待ち（L4）。[security.md](security.md) の 7.2 節） |
 | Valkey `demand:{city}:{cell8}`、S3 `demand-forecasts/` | 4.2 節 |
 | SageMaker Model Registry（モデルの版、データの版、特徴量の定義の版、評価、承認者） | 6 節 |
 | AppConfig `eta_model`（区域ごとのモデルの版と割合） | 7 節 |

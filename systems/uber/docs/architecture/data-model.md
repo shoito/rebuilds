@@ -163,16 +163,16 @@
 | S3 `supply-heat/` | 台数の集計（ID なし、解像度 8） | 2 年 | ○ | `app` | 同上 |
 | S3 `dispatch-decisions/zone=/dt=/hour=/` | `DispatchBatchRecord`（解像度 10） | 180 日 | ○ | `location` | dispatch の 9.1 節 |
 | S3 `valhalla/tiles/<tile_version>/` | Valhalla のタイル | 前の版を 24 時間 | — | `app` | [eta-and-routing.md](eta-and-routing.md) の 5.2 節 |
-| S3 `eta/bias-tables/`、`eta/speed-profiles/`、`eta/golden-routes/` | ETA の補正・速度・検査の組 | 版ごと 90 日（**未検証**の既定） | ○ | `app` | eta-and-routing の 14 節 |
-| S3 `eta/accuracy/dt=/` | 乗車ごとの予測と実際（乗車の ID だけ） | 2 年（**未検証**の既定） | — | `app` | 同上 |
+| S3 `eta/bias-tables/`、`eta/speed-profiles/`、`eta/golden-routes/` | ETA の補正・速度・検査の組 | 版ごと 90 日（既定。法務の確認待ち（L4）。security の 7.2 節） | ○ | `app` | eta-and-routing の 14 節 |
+| S3 `eta/accuracy/dt=/` | 乗車ごとの予測と実際（乗車の ID だけ） | 2 年（既定。法務の確認待ち（L4）。security の 7.2 節） | — | `app` | 同上 |
 | S3 `osm/japan/<date>/` | OSM の抽出 | 90 日 | — | `app` | [maps-and-geodata.md](maps-and-geodata.md) の 4 節 |
 | S3 `places/poc/` | 住所の検索の PoC の正解（公開の場所だけ） | — | — | `app` | maps の 15 節 |
-| S3 `supply-documents/` | 免許証・車検証・保険の画像 | 登録の解除から 3 年（既定、**未検証**） | — | `pii` | supply の 3 節 |
+| S3 `supply-documents/` | 免許証・車検証・保険の画像 | 登録の解除から 3 年（既定。法務の確認待ち（L4）） | — | `pii` | supply の 3 節 |
 | S3 顔の画像 | 照合の画像 | 30 日 | — | `biometric` | safety の 12 節 |
 | S3 `settlement-statements/` | 精算の明細 | 帳簿と同じ（10 年を想定） | — | `money` | payments の 11.2 節 |
 | S3（log-archive）`audit/` | 監査のアーカイブ（Object Lock） | 7 年（既定） | — | `audit` | security の 7.1 節 |
 | S3（log-archive）アプリのログ | Firehose 経由 | 1 年 | — | `audit` | [observability.md](observability.md) の 4.2 節 |
-| S3 `ci/replay-results/<pr>/` | 再生の結果 | 1 年（**未検証**の既定） | ○ | `app` | delivery の 11 節 |
+| S3 `ci/replay-results/<pr>/` | 再生の結果 | 1 年（既定。法務の確認待ち（L4）。security の 7.2 節） | ○ | `app` | delivery の 11 節 |
 
 - S3 の大阪への複製の有無は [infrastructure.md](infrastructure.md) の 6 節の表（`loc-raw/` と `dispatch-decisions/` は複製しない）。
 
@@ -213,7 +213,7 @@
 | リポジトリ `features/` | 特徴量の定義 | [ml-platform.md](ml-platform.md) の 13 節 |
 | S3 Iceberg `features/<group>/` | オフラインの特徴量（元のデータの保持を超えない） | 同上 |
 | Valkey `feat:{group}:{key}` | オンラインの特徴量（正本ではない）。どの Valkey のクラスタに置くか（`cache` か専用か）は E13 の前に決める | 同上 |
-| S3 `feature-logs/` | 配信の時の特徴量と予測（90 日、**未検証**の設計の値） | 同上 |
+| S3 `feature-logs/` | 配信の時の特徴量と予測（90 日。既定。法務の確認待ち（L4）。security の 7.2 節） | 同上 |
 | Valkey `demand:{city}:{cell8}`、S3 `demand-forecasts/` | 需要の予測 | 同上 |
 | SageMaker Model Registry | モデルの版と評価 | 同上 |
 
@@ -227,9 +227,9 @@ NFR-009 と [security.md](security.md) の 5・7 節の守りを、置き場所�
 | geo-index のメモリ | 正確 | ドライバー | 最長 10 分（正本ではない） | `FindNearby`（dispatch・ETA）、`GetDriverLocation`（Trips・ETA・share-service・safety-monitor）、`SupplyPreview` は解像度 9 の中心だけ |
 | S3 `loc-raw/` | 正確 | ドライバー | 30 日 | パイプラインの役割だけ。分析は HMAC の写し |
 | S3 `trip-trails/`、`trip_trails` | 正確 | ドライバー（乗車の区間） | 1 年 | `trail-viewer` の窓口（`location_access_grants`、監査 100%） |
-| `trips`・`trip_segments` の乗降のピン | 正確 | 乗客が確かめた地点 | 乗車の記録の期間（法務の結論待ち） | 乗車の相手（乗車の間）、事業者（乗車の間。乗車の後は解像度 9）、運用（解像度 9。正確な値は一時の権限） |
+| `trips`・`trip_segments` の乗降のピン | 正確 | 乗客が確かめた地点 | 乗車の記録の期間（既定 7 年、法務の確認待ち（L4）） | 乗車の相手（乗車の間）、事業者（乗車の間。乗車の後は解像度 9）、運用（解像度 9。正確な値は一時の権限） |
 | `rider_saved_places` | 正確 | 乗客が保存した地点 | アカウントの削除まで | 本人だけ |
-| `safety_incident_locations` | 正確 | 緊急の入口を押した人 | L7 の結論まで（既定 3 年、**未検証**） | 安全の担当（インシデントの ID の許可、監査） |
+| `safety_incident_locations` | 正確 | 緊急の入口を押した人 | 既定 3 年（法務の確認待ち（L7）） | 安全の担当（インシデントの ID の許可、監査） |
 | Valkey `rt` の Stream | オファーの乗車地は正確、`TripSnapshot` は解像度 9 | 乗客の乗車地 | オファーの期限・30 分 | 割り当てのドライバーの接続だけ |
 | `DriverLocation`（一時のメッセージ） | 正確 | ドライバー | 保存しない | 有効な割り当ての乗客の接続だけ（PROP-RT-003） |
 | 乗車の共有のページ | 正確（車の位置） | ドライバー | 保存しない（乗車の終わりで止める） | 共有のトークンを持つ人。**NFR-009 の例外 1**、`legal.l4.share_trip` の裏 |
@@ -252,14 +252,13 @@ NFR-009 と [security.md](security.md) の 5・7 節の守りを、置き場所�
 | 7 | 顔の画像の鍵（safety は専用、security は `pii`） | **専用の `biometric` の鍵**（6 種類目）。security.md の 6.2 節と ADR-0036 を直した |
 | 8 | `assignment_epoch` の比較に `region_gen` を入れる（ADR-0039） | `driver_dispatch_state`・`driver_assignments` に `region_gen` を持ち、比較は `(region_gen, assignment_epoch)`。trips-lifecycle の 4.2 節、geospatial-index の 4.2 節、`TripCommand`・`TripSnapshot` に反映した |
 | 9 | `region.writable` と `ops.region.writable` の 2 つの名前 | `ops.region.writable`（ops のフラグ）に揃えた |
-| 10 | 乗車の記録（`trips`・運賃）の保持の期間 | 法務の結論まで未定（[security.md](security.md) の 7.2 節）。持ち越し |
-| 11 | ml-platform の `feature-logs/` と特徴量の保持の期間（元の位置の保持を超えない規則） | security.md の 7.2 節の表に E13 の前に足す。持ち越し |
+| 10 | 乗車の記録（`trips`・運賃）の保持の期間 | 既定 7 年（乗車の終わりから。期限の後は乗客の ID を切り離す）を [security.md](security.md) の 7.2 節に置いた。法務の確認待ち（L4） |
+| 11 | ml-platform の `feature-logs/` と特徴量の保持の期間（元の位置の保持を超えない規則） | 既定 90 日を security.md の 7.2 節に置いた。法務の確認待ち（L4） |
 
 残り（マイグレーションを書く Story で確かめる）：
 
 - すべての事業者の表に RLS があり、例外（この基盤の運用の横断の読み取り）が理由と監査つきに限られることを、マイグレーションの CI の許可リストと照合する（E1・E2）。
 - `geo_shard_map` の置き場所（DynamoDB か Aurora）は E14 の前に決める。
-- `eta/`・`ci/replay-results/` の保持の既定（**未検証**）を security.md の 7.2 節の表に足す（E4・E5）。
 
 ## 11. 統合した定義
 

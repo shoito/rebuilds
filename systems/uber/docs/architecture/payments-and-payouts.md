@@ -21,7 +21,7 @@
 ### 2.1 PSP（Stripe を例に）
 
 - 与信と売上の確定を分けられる（`capture_method = manual`）。確定の前に与信が切れると、PaymentIntent は `canceled` になる。一部だけ確定すると残りは解放される。ほとんどの決済は、与信に対して確定を 1 回だけ行える。オンラインのカードの与信の有効期間は通常 7 日。**日本のアカウントでは、Visa・Mastercard・JCB・Diners Club・Discover の JPY の取引を最長 30 日保留できる**。American Express と JPY 以外は通常の期間（[支払い方法を保留する](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method)）。
-- オーバーキャプチャー（与信より多く確定する）は、Visa・Mastercard・American Express・Discover のオンラインのカードに限り、Visa はタクシーとリムジンの業種で +20% まで。**JCB は対象の表にない**。IC+ の料金体系で提供される（[オーバーキャプチャー](https://docs.stripe.com/payments/overcapture.md?platform=web&ui=elements)）。
+- オーバーキャプチャー（与信より多く確定する）は、Visa・Mastercard・American Express・Discover のオンラインのカードに限り、Visa はタクシーとリムジンの業種で +20% まで。**JCB は対象の表にない**。IC+ の料金体系で提供される。確定の時に `request_overcapture=if_available` を付け、与信の応答の `overcapture.status` と `maximum_amount_capturable` で使えるかを知る（[オーバーキャプチャー](https://docs.stripe.com/payments/overcapture.md?platform=web&ui=elements)、2026-09-27 に確認）。
 - マーケットプレイスの支払いの形は、ダイレクト支払い（連結アカウントが売り手）、デスティネーション支払い（プラットフォームが請求し連結アカウントへ送る。本家はライドシェアアプリを例にあげる）、支払いと送金別方式の 3 つ。ダイレクト支払いでは返金とチャージバックは連結アカウントの残高から、間接の支払いではプラットフォームの残高から引かれる（[Connect 導入における支払いの仕組み](https://docs.stripe.com/connect/charges)）。
 
 ### 2.2 代金の受け取り（法務の確認待ち L6）
@@ -213,7 +213,7 @@ Stripe の題材の勘定体系（[ledger.md](../../../stripe/docs/architecture/
 
 ### 8.2 主な仕訳（収納代行の形）
 
-運賃 3,000 円、手数料 10%（300 円、うち消費税 27 円とする例。消費税の計算は **未検証**）、クーポン 500 円（この基盤の負担）。
+運賃 3,000 円、手数料 10%（300 円、うち消費税 27 円とする例。税込 300 × 10/110 ＝ 27.27 の 1 円未満を切り捨てた。端数の処理の単位は税理士の確認事項）、クーポン 500 円（この基盤の負担）。
 
 | 事象 | 仕訳 |
 | --- | --- |
@@ -255,7 +255,7 @@ Stripe の題材の勘定体系（[ledger.md](../../../stripe/docs/architecture/
 
 - 既定は A。B は同じ設計（`collection_model` の列と、B の仕訳）で持ち、事業者ごとに選べるようにする。C は L6 の結論が「A は為替取引に当たる」で、B が事業に合わないときに検討する。
 - A と B のどちらも、legal のフラグ（`legal.l6.agent_collection`・`legal.l6.operator_merchant`、事業者ごと）の裏に置き、L6 の結論が `legal_gate_records` に記録されるまで本番の決済を有効にしない（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)）。
-- 乗客に渡す領収書の発行者（運送の主体は事業者）と、適格請求書の扱い（媒介者交付特例を使えるか）は、税理士と法務の確認待ち（**未検証**）。
+- 乗客に渡す領収書の発行者（運送の主体は事業者）と、適格請求書の扱い（媒介者交付特例を使えるか）は、税理士と法務の確認待ち（L6 と合わせる）。
 
 ## 11. 事業者への精算
 
@@ -334,7 +334,7 @@ Stripe の題材の [ADR-0017](../../../stripe/docs/decisions/0017-three-way-rec
 
 - 模擬の PSP（成功、拒否、タイムアウトの後に成功、タイムアウトの後に失敗、オーバーキャプチャーの可否）で、DT-PAY-002 の各行を通す。
 - 模擬の PSP の精算のファイルと模擬の銀行の明細で、一致・端数の差・台帳にない返金・届かない着金を照合する。
-- PSP のテスト環境で、JCB の与信にオーバーキャプチャーが示されないことを確かめる（**未検証** の確認）。
+- PSP のテスト環境で、JCB の与信で `overcapture.status` が `unavailable` になり、不足が追加の請求に回ることを確かめる（文書では JCB は対象外。E8 の `psp-selection-poc` と `capture-at-trip-end`）。
 
 ## 16. Story の候補
 

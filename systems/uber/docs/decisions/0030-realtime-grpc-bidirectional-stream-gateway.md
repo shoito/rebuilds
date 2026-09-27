@@ -34,7 +34,7 @@ ALB は gRPC を HTTP/2 のまま転送できる（[AWS の告知](https://aws.a
 - 接続の持ち主は Valkey の登録表（TTL 90 秒）で引き、ノード宛ての Pub/Sub で渡す。`rt-gateway` は DB に書かない。
 - QUIC は S1 で使わない。
 - 2 を採らない理由：Web のクライアントがないので WebSocket の利点が小さく、受信の確認と型の枠組みを自前で作ることになる。
-- 3 を採らない理由：乗車ごとにトピックの権限を付け外しする仕組みが要り、ブローカーの運用か IoT Core の条件の検討が増える（**未検証**）。
+- 3 を採らない理由：乗車ごとにトピックの権限を付け外しする仕組みが要り、ブローカーの運用か IoT Core の条件の検討が増える。
 - 4 を採らない理由：本家が SSE で困った受信の確認の遅れを、そのまま抱える。
 
 ## Consequences
@@ -45,7 +45,8 @@ ALB は gRPC を HTTP/2 のまま転送できる（[AWS の告知](https://aws.a
 - 引き受けるコスト：
   - Go のサービスが 1 つ増える（言語の運用の範囲は変わらない）。
   - gRPC のモバイルのライブラリの版の追従と、ALB の HTTP/2 の上限（接続あたりの流れの数など）の確かめが要る。
-  - HTTP/2 の PING だけでは ALB の待ちの時間切れを延ばせないとする報告があるため、アプリの層で心拍を送る（**未検証**）。
+  - ALB は HTTP/2 の PING のフレームに対応せず、PING は待ちの時間切れ（既定 60 秒）を延ばさない（[Edit attributes for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-27 に確認）。そのため、アプリの層で心拍を送る。
+  - ALB は、接続の開始から HTTP client keepalive duration（既定 3,600 秒、60 秒〜7 日）が過ぎると、HTTP/2 の接続に `GOAWAY` を送って閉じる（同じ文書）。`rt.<domain>` の ALB は 24 時間（86,400 秒）にし、それでも来る `GOAWAY` はアプリの再接続（配備のときと同じ扱い）で受ける。
 
 ## Confirmation
 

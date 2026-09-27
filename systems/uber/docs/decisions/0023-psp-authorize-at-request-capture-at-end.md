@@ -15,8 +15,8 @@ date: 2026-09-27
 
 事実（2026-09-27 に確認）：
 
-- Stripe は、与信と売上の確定を分けられる。日本のアカウントでは Visa・Mastercard・JCB・Diners Club・Discover の JPY の与信を最長 30 日保留できる。確定は通常 1 回だけで、一部の確定の残りは解放される（[支払い方法を保留する](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method)）。
-- 与信を超える確定（オーバーキャプチャー）は Visa などに限られ、Visa のタクシーの業種で +20% まで。JCB は対象の表にない（[オーバーキャプチャー](https://docs.stripe.com/payments/overcapture.md?platform=web&ui=elements)）。
+- Stripe は、与信と売上の確定を分けられる。日本のアカウントでは Visa・Mastercard・JCB・Diners Club・Discover の JPY の与信を最長 30 日保留できる。確定は通常 1 回だけで、一部の確定の残りは解放される。American Express と JPY 以外は標準の期間（オンラインで通常 7 日）（[支払い方法を保留する](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method)、2026-09-27 に確認）。
+- 与信を超える確定（オーバーキャプチャー）は Visa などに限られ、Visa のタクシーの業種で +20% まで。JCB は対象の表にない。使えるかは与信の応答の `overcapture.status` で分かる（[オーバーキャプチャー](https://docs.stripe.com/payments/overcapture.md?platform=web&ui=elements)、2026-09-27 に確認）。
 
 ## Options
 

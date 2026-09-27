@@ -23,7 +23,7 @@
 | 都市での GPS の誤差 | 建物に遮られる都市では、GPS の誤差が 50 m 以上になる。本家は衛星ごとの信号の強さと 3D の地図で補正する研究をした（[Rethinking GPS](https://www.uber.com/en-CA/blog/rethinking-gps/)、2018-04-19） | 補正は作らない。精度の値で振り分け、跳びを検証で除く（4 節） |
 | 道路への当てはめ | 隠れマルコフモデル（HMM）と Viterbi で、GPS の点の列から最もありそうな道路の区間の列を求める。当てはめの異常から、地図の誤り（右折の禁止、一方通行、欠けた道路）を見つける（[CatchME](https://www.uber.com/us/en/blog/mapping-accuracy-with-catchme/)、2019-04-25） | Valhalla の Meili（同じ HMM の方式）で遅れて当てはめる。地図の誤りの検出は [maps-and-geodata.md](maps-and-geodata.md) |
 
-いずれも 2026-09-27 に確認。本家の送信のプロトコル（HTTP か常時の接続か）と、偽装の検出の方法は公開されていない（**未検証**）。
+いずれも 2026-09-27 に確認。本家の送信のプロトコル（HTTP か常時の接続か）と、偽装の検出の方法は、確かめた本家の資料には書かれていない。この設計はどちらも本家に依らずに決める（ADR-0009）。
 
 ## 3. 構成と流れ
 
@@ -135,7 +135,7 @@ message LocationAck {
 | V7 | 偽装の印 | `integrity` に模擬の位置の印がある。端末の完全性の確認に失敗したセッション | `TRAIL_ONLY`（`spoof_suspect`）。セッションに印を付ける（13 節） |
 | V8 | セッション | セッションがオンラインでない（入庫の後、失効） | バッチごと 409（`session_closed`）。端末は出庫からやり直す |
 
-- **跳び（V6）の考え方**：都市の GPS は、ビルの反射で数百 m 跳ぶことがある。1 点の跳びで索引の位置を動かすと、遠い車にオファーが届く。3 点のうち 2 点がそろって初めて動かすので、本当の移動の反映は最大で 1 回分（4 秒）遅れる。時速 200 km は日本の道路の速度を十分に超える値として置いた（**未検証**の設計の値。E3 で実データの分布から見直す）。
+- **跳び（V6）の考え方**：都市の GPS は、ビルの反射で数百 m 跳ぶことがある。1 点の跳びで索引の位置を動かすと、遠い車にオファーが届く。3 点のうち 2 点がそろって初めて動かすので、本当の移動の反映は最大で 1 回分（4 秒）遅れる。時速 200 km は日本の道路の速度を十分に超える値として置いた（**未検証**の設計の値。E3 の `loc-validation-rules` で合成と匿名化した分布から見直す）。
 - **重複**：同じ点が 2 回届くのは、送り直し（応答が失われた）のときである。鍵は `(driver_session_id, sample_seq)`。
   - 索引は、ドライバーごとに最後に使った `sample_seq` を持ち、それ以下を無視する。
   - 軌跡は、1 時間ごとの詰め直し（7 節）で鍵が同じ行を 1 つにする。
@@ -181,19 +181,19 @@ message LocationEvent {
 
 - **乗車の軌跡**を別に持つ理由：運賃の問い合わせ、事前確定運賃のルートからの逸脱の確認（[eta-and-routing.md](eta-and-routing.md) の 7 節）、事故と安全の調べ、領収書の地図に使う。生の点の保持（30 日）より長く要る。
 - trail-builder は、Trips の状態の変化（`accepted`〜`completed`・取り消し）を購読し、乗車中のドライバーの点を乗車ごとに集める。乗車の終わりから 60 秒待って（遅れて届く点のため）、当てはめ（8 節）を行い、S3 と `trip_trails` に書く。書き込みは `trip_id` で冪等にする。
-- **1 年の根拠**は、事業者が乗務の記録を一定の期間持つ義務との釣り合いで置いた仮の値である（乗務記録の保存の期間の条文は **未検証**）。保持の期間・利用目的・事業者との関係は、法務の確認待ち（[intent.md](../intent.md) の L4）。
+- **1 年の根拠**は、事業者が乗務の記録を一定の期間持つ義務との釣り合いで置いた仮の値である（タクシー事業者は、運転者ごとの業務の記録（乗車した区間、業務の開始・終了の地点と日時など）を 1 年間保存する。[旅客自動車運送事業運輸規則 第 25 条第 3 項](https://laws.e-gov.go.jp/law/331M50000800044)、e-Gov で 2026-09-27 に確認）。保持の期間・利用目的・事業者との関係は、法務の確認待ち（[intent.md](../intent.md) の L4）。
 - 暗号化：S3 は位置の専用の KMS の鍵（SSE-KMS）。鍵の利用は、パイプラインのロールと、監査つきの閲覧の窓口（9 節）のロールだけに許す。
 - 削除：S3 のライフサイクルで接頭辞ごとに消す。ドライバーのアカウントの削除の依頼の扱い（保持の期間の前に消すか）は、法務の確認待ち（L4）。
 
 ## 8. 道路への当てはめ
 
-- **索引には使わない。** 候補の検索は直線の距離で絞り、ETA は道路の上で求める（[dispatch-and-matching.md](dispatch-and-matching.md)）。1 点ごとの当てはめを熱い経路に入れると、遅れと失敗の原因が増える割に、候補の順位はほとんど変わらないと見込む（**未検証**。E3 の再生で確かめる）。
+- **索引には使わない。** 候補の検索は直線の距離で絞り、ETA は道路の上で求める（[dispatch-and-matching.md](dispatch-and-matching.md)）。1 点ごとの当てはめを熱い経路に入れると、遅れと失敗の原因が増える割に、候補の順位はほとんど変わらないと見込む（**未検証**。E5 の `dispatch-replay-cli` で確かめる）。
 - **使う場面**：
   1. 乗車の軌跡（乗車の終わりに 1 回）：当てはめた距離、通った道路の区間、ルートからの逸脱。
   2. 速度の標本（空車・迎車・乗車のすべての走行）：ドライバーごとに 1 分の窓で当てはめ、区間ごとの通過の時間を `speed-samples` に書く。
 - **方式**：Valhalla の `trace_attributes`。Valhalla の当てはめ（Meili）は、Newson と Krumm の HMM の方式で、GPS の点の列から最もありそうな候補の区間の列を求める（[Meili の algorithms](https://github.com/valhalla/valhalla/blob/master/docs/docs/contributing/architecture/meili/algorithms.md)、[Map Matching API](https://github.com/valhalla/valhalla/blob/master/docs/docs/api/map-matching.md)、2026-09-27 に確認）。
 - **引数**：`shape_match=map_snap`、`gps_accuracy` は点の精度を 5〜50 m に丸めた値、`search_radius` 50 m、`breakage_distance` 2,000 m。既定の上限（点の数 16,000、`max_search_radius` 100 m、`max_gps_accuracy` 100 m）の中に収める（[valhalla_build_config](https://github.com/valhalla/valhalla/blob/master/scripts/valhalla_build_config)、2026-09-27 に確認）。
-- **量**：S1 のピークで 1 万台 × 1 分の窓 ＝ 約 170 回/秒。乗車の軌跡は成立した乗車の数（約 3〜6 件/秒。[capacity.md](capacity.md) の 1.1 節）。当てはめ専用の Valhalla のタスクの組を、ETA の組と分けて置く（ETA の遅れを当てはめの量で悪くしない）。1 回の処理の時間と必要なタスクの数は **未検証**（E3 で計る）。
+- **量**：S1 のピークで 1 万台 × 1 分の窓 ＝ 約 170 回/秒。乗車の軌跡は成立した乗車の数（約 3〜6 件/秒。[capacity.md](capacity.md) の 1.1 節）。当てはめ専用の Valhalla のタスクの組を、ETA の組と分けて置く（ETA の遅れを当てはめの量で悪くしない）。1 回の処理の時間と必要なタスクの数は **未検証**（E3 の `trip-trail-builder` と `speed-sample-extractor` で計る）。
 - **品質の印**：当てはめに失敗した点の割合が 30% を超えた窓は、速度の標本に使わない。失敗が続く場所は、地図の誤りの候補として [maps-and-geodata.md](maps-and-geodata.md) の 6 節に渡す。
 
 ## 9. 位置のプライバシー
@@ -224,9 +224,9 @@ message LocationEvent {
 | 項目 | 値 |
 | --- | --- |
 | 要求 | ピーク 2,500 件/秒（1 万台 ÷ 4 秒）。平常の本体は 200 バイト前後 |
-| loc-ingest | 1 タスク（1 vCPU）で 2,000 件/秒を見込み、ピークの 2 倍に対して 4 タスク以上（**未検証**。E3 の負荷試験で決める） |
+| loc-ingest | 1 タスク（1 vCPU）で 2,000 件/秒を見込み、ピークの 2 倍に対して 4 タスク以上（**未検証**。E3 の `loc-load-test` で決める） |
 | Kinesis | 8 シャード |
-| `loc-raw` の量 | 1 日に数 GB〜10 GB 程度（点 1 件あたり圧縮後 30 バイトとして、ピークの 4 割の平均で試算。**未検証**） |
+| `loc-raw` の量 | 1 日に数 GB〜10 GB 程度（点 1 件あたり圧縮後 30 バイトとして、ピークの 4 割の平均で試算。**未検証**。E3 の `loc-raw-firehose` で計る） |
 
 ## 12. 性能の予算（NFR-002：受信から索引への反映 p99 1 秒）
 
@@ -238,7 +238,7 @@ message LocationEvent {
 | 索引での適用 | 10 ms |
 | 余裕 | 520 ms |
 
-Kinesis の書き込みと配送の遅れの実際の値は **未検証**。E3 で計る。
+AWS の文書は、書き込みから読み手に届くまでの遅れを、拡張ファンアウトで平均 約 70 ms（読み手の数に依らない）、共有の読み手で平均 約 200 ms（読み手 5 つで 約 1,000 ms）とする（[Develop enhanced fan-out consumers](https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html)、2026-09-27 に確認）。平均なので、p99 の実際の値は **未検証**。E3 の `location-lag-metrics` と `loc-load-test` で計る。
 
 ## 13. 偽装と不正
 
@@ -246,7 +246,7 @@ Kinesis の書き込みと配送の遅れの実際の値は **未検証**。E3 �
 
 | 兆し | 取り方 | 扱い |
 | --- | --- | --- |
-| OS の模擬の位置の印 | 端末が `integrity` に載せる（Android の模擬の位置の印、iOS のソフトウェアによる模擬の印。API の名前と対応の版は `rider-and-driver-apps.md` で確かめる。**未検証**） | その点を索引に使わない（V7） |
+| OS の模擬の位置の印 | 端末が `integrity` に載せる（Android の `Location.isMock()`（API 31 以上）、iOS の `CLLocationSourceInformation.isSimulatedBySoftware`（iOS 15 以上）。どちらも公式の文書で 2026-09-27 に確認。[rider-and-driver-apps.md](rider-and-driver-apps.md) の 2 節） | その点を索引に使わない（V7） |
 | 端末の完全性の確認の失敗 | 出庫のときに OS の仕組みで確かめる（`security.md`） | セッションを `location_untrusted` にし、配車の候補から外す |
 | 跳びの多さ | V6 の保留の回数 | 10 分に 5 回で集計の対象 |
 | 動きの不自然さ | 精度の値と位置が長く全く変わらない、端末の速度と見かけの速度が合わない | 集計の対象 |

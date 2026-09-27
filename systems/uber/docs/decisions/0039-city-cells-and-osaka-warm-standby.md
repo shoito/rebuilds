@@ -11,12 +11,12 @@ date: 2026-09-27
 
 - 配車の可用性は都市ごとに月間 99.99% で、1 都市の障害を他の都市に広げない（NFR-004）。
 - 乗車の記録は、AZ の障害で RPO 0・RTO 5 分、リージョンの障害で RPO 1 分・RTO 30 分（NFR-007）。
-- 位置の流れ（Kinesis Data Streams）は、リージョンの間で複製されない。Aurora の Global Database は非同期の複製で、計画外の切り替えの RPO は通常は秒の単位、RTO は分の単位。計画外の切り替え（`failover-global-cluster --allow-data-loss`）では、複製されなかった書き込みが失われうる。古い主への書き込みの止め方（write fencing）はベストエフォートで、分断（split-brain）が起こりうる。計画した切り替え（switchover）は RPO 0（[Using switchover or failover in Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)、2026-09-27 に確認）。
+- 位置の流れ（Kinesis Data Streams）は、リージョンの間で複製されない。Aurora の Global Database は非同期の複製で、計画外の切り替えの RPO は通常は秒の単位、RTO は分の単位。計画外の切り替え（`failover-global-cluster --allow-data-loss`）では、複製されなかった書き込みが失われうる。古い主への書き込みの止め方（write fencing）はベストエフォートで、分断（split-brain）が起こりうる。計画した切り替え（switchover）は RPO 0（[Using switchover or failover in Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)、2026-09-27 に確認）。Aurora PostgreSQL 18 の Global Database は、東京と大阪の両方で 18.3 以上に対応する（[Supported Regions and DB engines for Aurora global databases](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.Aurora_Fea_Regions_DB-eng.Feature.GlobalDatabase.html)、2026-09-27 に確認）。
 - 本家の事実（2026-09-27 に確認）：
   - 本家は、データセンターの切り替えのときに、ドライバーの端末に送っておいた状態の要約から乗車を戻していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015）。
   - 本家の複数のリージョンの Kafka は、サージの価格の計算のように各リージョンで同じ計算をする active/active と、支払いのように強い一貫性が要るものの active/passive を使い分ける（[Disaster recovery for multi-region Kafka at Uber](https://www.uber.com/us/en/blog/kafka/)、2020-12-21）。
   - 本家は、全リージョンで 2 倍の容量を持つ形から、事業の重要度で分けて平常の容量を 2 倍から 1.3 倍に下げた（[Uber's Failover Architecture](https://arxiv.org/abs/2603.07345)、2026-03 初版）。
-  - 本家の基盤は、ゾーンの集まりをリージョンとし、変更は小さな単位で少しずつ広げ、問題を見たら自動で戻す（[Up: Portable Microservices Ready for the Cloud](https://www.uber.com/us/en/blog/up-portable-microservices-ready-for-the-cloud/)、公開日は **未検証**）。
+  - 本家の基盤は、ゾーンの集まりをリージョンとし、変更は小さな単位で少しずつ広げ、問題を見たら自動で戻す（[Up: Portable Microservices Ready for the Cloud](https://www.uber.com/us/en/blog/up-portable-microservices-ready-for-the-cloud/)、2023-09-07）。
 
 ## Options
 
@@ -67,7 +67,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - 切り替えの直後、戻した乗車と食い違いを運用が確かめる。
   - `region_gen` を割り当ての比較に入れる変更を、Trips・索引・アプリに入れる。
-  - 大阪の Fargate の容量が、切り替えのときに足りるかは **未検証**（Fargate は容量の予約を持たない）。訓練で確かめる。
+  - 大阪の Fargate の容量が、切り替えのときに足りるかは **未検証**（Fargate は容量の予約を持たない）。E12 の `dr-drill` で確かめる。
 
 ## Confirmation
 

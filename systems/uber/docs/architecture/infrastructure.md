@@ -69,7 +69,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 | valhalla-match | C++（Valhalla） | 軌跡の当てはめ | CPU、trail-builder の待ち | 4 |
 
 - Go のサービスは `GOMEMLIMIT` をタスクのメモリの 80% にする。
-- Valhalla は、起動のときに S3 の `valhalla/tiles/<tile_version>/` から tar を一時の記憶域（50 GiB）に取り、mmap で読む。タイルの切り替えは青緑（[eta-and-routing.md](eta-and-routing.md) の 5.3 節）。日本全体のタイルの大きさ・起動の時間は **未検証**（ドイツの tar は約 4.6 GB という報告。[Valhalla の Discussion #4816](https://github.com/valhalla/valhalla/discussions/4816)、2026-09-27 に確認）。
+- Valhalla は、起動のときに S3 の `valhalla/tiles/<tile_version>/` から tar を一時の記憶域（50 GiB）に取り、mmap で読む。タイルの切り替えは青緑（[eta-and-routing.md](eta-and-routing.md) の 5.3 節）。日本全体のタイルの大きさ・起動の時間は **未検証**（E4 の `valhalla-pool-fargate` で計る。ドイツの tar は約 4.6 GB という報告。[Valhalla の Discussion #4816](https://github.com/valhalla/valhalla/discussions/4816)、2026-09-27 に確認）。
 - geo-index と dispatch は、リースを持つ主と待機の 2 タスク。配備では、待機を先に入れ替え、`READY` の後に主がリースを手放して入れ替わる（[delivery.md](delivery.md) の 4.2 節）。ECS のサービスの `maximumPercent` を 200% にする。
 
 ## 4. 入口
@@ -153,7 +153,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 - **位置と索引**：Kinesis は複製しない。アプリが DNS の切り替えで大阪の `loc-<city>` に送り始め、35 秒で索引が温まる。
 - **リースと割り当ての世代**：大阪の空の `geo_shard_leases` から取り直す。AppConfig の `region_gen` を 1 上げ、`assignment_epoch` の比較を `(region_gen, assignment_epoch)` にする。
 - **緊急の通報**：端末は 110・119 の画面をサーバーなしに開ける。`SafetyIncident` は端末に残って送り直され、大阪の safety-intake が受ける（[safety-and-trust.md](safety-and-trust.md) の 4.3 節）。
-- **RTO の内訳（目安）**：判断 10 分、書き込みの停止と Aurora の切り替え 5 分、ECS を広げる 10 分（Valhalla の起動を含む。**未検証**）、DNS の切り替え 1〜2 分、索引の温まり 1 分。合計 約 30 分。E12 の DR の訓練で計る。
+- **RTO の内訳（目安）**：判断 10 分、書き込みの停止と Aurora の切り替え 5 分、ECS を広げる 10 分（Valhalla の起動を含む。**未検証**。E12 の `dr-drill`）、DNS の切り替え 1〜2 分、索引の温まり 1 分。合計 約 30 分。E12 の DR の訓練で計る。
 - **戻す**：Aurora の switchover（RPO 0）で東京へ戻す。平日の夜に、事前に告知して行う。
 
 ### 7.3 バックアップ
@@ -172,7 +172,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 | リソース | 構成 |
 | --- | --- |
 | TypeScript のサービス（13 種） | 1〜2 vCPU / 2〜4 GB。合計 約 63 vCPU / 126 GB |
-| Go のタスク（5 つのサービスと 3 つの付随の役。[ADR-0001](../decisions/0001-platform-and-stack.md)） | loc-ingest 1 vCPU/2 GB × 6、geo-index 2 vCPU/8 GB × 2、dispatch 2/4 × 2、dispatch-shadow 2/4 × 1、eta-service 1/2 × 3、trail-builder 2/4 × 2、rt-gateway 2/4 × 6、trip-location-fanout 1/2 × 2。合計 約 37 vCPU / 82 GB |
+| Go のタスク（6 つのサービスと 2 つの付随の役。[ADR-0001](../decisions/0001-platform-and-stack.md)） | loc-ingest 1 vCPU/2 GB × 6、geo-index 2 vCPU/8 GB × 2、dispatch 2/4 × 2、dispatch-shadow 2/4 × 1、eta-service 1/2 × 3、trail-builder 2/4 × 2、rt-gateway 2/4 × 6、trip-location-fanout 1/2 × 2。合計 約 37 vCPU / 82 GB |
 | Valhalla | valhalla-eta 4 vCPU/16 GB × 6（予定の拡大で 18 まで）、valhalla-match 4/16 × 4 |
 | Aurora | `core`：`db.r8g.2xlarge` × 2（東京）＋ 1（大阪）。`money`：`db.r8g.xlarge` × 2 ＋ 1 |
 | Valkey | `cache.r7g.large` × 3 × 2 クラスタ。大阪は各 1 |
@@ -225,22 +225,22 @@ infra/
 
 ## 11. 費用の概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** 東京のオンデマンドの料金による ±50% の幅の値。Fargate・Aurora・ElastiCache・Kinesis・DynamoDB・EC2・NAT の単価は、AWS の Price List API（`ap-northeast-1`、2026-09 の公開分）で 2026-09-27 に確かめた。大阪の単価、ALB、VPC エンドポイント、可観測性、S3、Firehose は **未検証**（東京と同じと仮定。E12 の `cost-dashboard` で実測に置き換える）。外部の提供者（地図・住所・推計走行距離・SMS・通話・顔の照合・PSP）の料金は含めない。
+**大まかな見積もりである。** 東京のオンデマンドの料金による ±50% の幅の値。Fargate・Aurora・ElastiCache・Kinesis・DynamoDB・EC2・NAT の単価は、AWS の Price List API（`ap-northeast-1`、2026-09 の公開分）で 2026-09-27 に確かめた。大阪（`ap-northeast-3`）の Fargate・Aurora、両リージョンの ALB・VPC エンドポイント・S3・Firehose の単価も、同じ API（公開日 2026-09-24）で 2026-09-27 に確かめた。量（転送、LCU、ログの量）と、可観測性・セキュリティのサービスの額は **未検証**（E12 の `cost-dashboard` で実測に置き換える）。外部の提供者（地図・住所・推計走行距離・SMS・通話・顔の照合・PSP）の料金は含めない。
 
 | 項目 | 月額（USD、概算） | 根拠 |
 | --- | --- | --- |
 | ECS Fargate（東京、約 140 vCPU・368 GB） | 5,300 | ARM64 の vCPU 時 0.04045、GB 時 0.00442 × 730 時間 |
-| Aurora `core`（`db.r8g.2xlarge` I/O-Optimized 1.732/時 × 2） | 2,550 | 保存 300 GB × 0.27 を含む |
+| Aurora `core`（`db.r8g.2xlarge` I/O-Optimized 1.732/時 × 2） | 2,610 | 保存 300 GB × 0.27 を含む |
 | Aurora `money`（`db.r8g.xlarge` I/O-Optimized 0.866/時 × 2） | 1,290 | 保存 100 GB を含む |
-| Aurora 大阪の二次（`core`・`money` の reader 各 1） | 1,900 | 大阪の単価は **未検証**。リージョンをまたぐ複製の費用は **未検証** |
-| Valkey（`cache.r7g.large` 0.2104/時 × 6）＋大阪 | 1,150 | |
+| Aurora 大阪の二次（`core`・`money` の reader 各 1） | 2,000 | 大阪の I/O-Optimized は `db.r8g.2xlarge` 1.728/時、`db.r8g.xlarge` 0.864/時（東京よりわずかに安い）。保存 400 GB × 0.27 を含む。複製の書き込みの I/O は 100 万回 0.24。複製とリージョンをまたぐ転送の量は **未検証**（E12 の `cost-dashboard`） |
+| Valkey（`cache.r7g.large` 0.2104/時 × 6）＋大阪（0.2103/時 × 2） | 1,230 | |
 | Kinesis（8 シャード 0.0195/時、PUT 1 百万単位 0.0215、拡張ファンアウト 4 読み手 × 8 シャード 0.0195/時、取り出し 0.0169/GB）＋大阪の空のストリーム | 800 | 平均の件数はピークの 4 割と仮定 |
-| S3、Firehose | 400 | **未検証** |
-| ALB × 4、NAT（0.062/時 × 3 ＋ 転送）、VPC エンドポイント、AZ をまたぐ転送 | 1,200 | ALB・エンドポイントは **未検証** |
-| 可観測性（ログ、メトリクス、トレース、Grafana） | 3,000 | **未検証**。位置の件数に比例するログを書かない前提 |
-| WAF、GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,000 | **未検証** |
-| 大阪のウォームスタンバイの計算（約 30 vCPU・70 GB） | 1,100 | 単価は東京と同じと仮定 |
-| **本番の合計** | **約 19,700** | ±50% |
+| S3、Firehose | 400 | S3 標準 0.025/GB 月（東京・大阪）。Firehose は Kinesis から読む量 0.036/GB（東京）。量は **未検証**（E12 の `cost-dashboard`） |
+| ALB × 4、NAT（0.062/時 × 3 ＋ 転送）、VPC エンドポイント、AZ をまたぐ転送 | 1,200 | ALB 0.0243/時 ＋ LCU 0.008/時、VPC エンドポイント 0.014/時・0.01/GB（東京・大阪で同じ）。LCU と転送の量は **未検証**（E12 の `cost-dashboard`） |
+| 可観測性（ログ、メトリクス、トレース、Grafana） | 3,000 | **未検証**（E12 の `cost-dashboard`）。位置の件数に比例するログを書かない前提 |
+| WAF、GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,000 | **未検証**（E12 の `cost-dashboard`） |
+| 大阪のウォームスタンバイの計算（約 30 vCPU・70 GB） | 1,100 | 大阪の Fargate（ARM64）の単価は東京と同じ（vCPU 時 0.04045、GB 時 0.00442） |
+| **本番の合計** | **約 19,900** | ±50% |
 | staging・dev・shared・analytics | 約 4,000 | |
 
 - 大きく効くのは、Fargate（Valhalla と常時の接続）と Aurora（2 クラスタ × 大阪）。Compute Savings Plans で Fargate を 20〜30% 下げられる。

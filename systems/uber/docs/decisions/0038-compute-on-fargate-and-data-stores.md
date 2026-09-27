@@ -20,7 +20,7 @@ date: 2026-09-27
 
 - Fargate の Linux のタスクは、ARM64 を使え、最大 16 vCPU・120 GB、32 vCPU では 60・120・244 GB を選べる（[Task definition differences for Fargate](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html)）。
 - 東京の単価（AWS の Price List API、2026-09 の公開分）：Fargate ARM64 は vCPU 時 0.04045 USD、GB 時 0.00442 USD。EC2 の `r8g.xlarge`（4 vCPU・32 GiB）は 0.284 USD、`m8g.xlarge`（4 vCPU・16 GiB）は 0.232 USD。
-- Valhalla は、タイルの tar を mmap で読み、同じプロセスのスレッドで共有する。ドイツのタイルの tar は約 4.6 GB という利用者の報告がある（[Valhalla の Discussion #4816](https://github.com/valhalla/valhalla/discussions/4816)、2024-07-25）。日本のタイルの大きさは **未検証**（日本の OSM の抽出は 2.4 GB。[maps-and-geodata.md](../architecture/maps-and-geodata.md)）。
+- Valhalla は、タイルの tar を mmap で読み、同じプロセスのスレッドで共有する。ドイツのタイルの tar は約 4.6 GB という利用者の報告がある（[Valhalla の Discussion #4816](https://github.com/valhalla/valhalla/discussions/4816)、2024-07-25）。日本のタイルの大きさは **未検証**（E4 の `valhalla-pool-fargate` で計る。日本の OSM の抽出は約 2.5 GB。[maps-and-geodata.md](../architecture/maps-and-geodata.md)）。
 
 ## Options
 
@@ -40,8 +40,8 @@ date: 2026-09-27
 
 計算は 1、Aurora は b を採用する。リースの表はリージョンごとにする。
 
-- **Go のサービス**（loc-ingest、geo-index、dispatch、eta-service、trail-builder、rt-gateway、trip-location-fanout）は Fargate の ARM64。`GOMEMLIMIT` をタスクのメモリの 80% にし、GC の停止と OOM の余裕を持たせる。
-- **Valhalla** は Fargate の ARM64 の 4 vCPU・16 GB から始め、ETA 用と当てはめ用の組を分ける（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)）。タイルの tar は起動のときに S3 から一時の記憶域（50 GiB に設定）へ取る。起動の時間は **未検証**（E4 で計る）。起動が遅いので、ETA 用は平常のピークの 2 倍の台数を常に持ち、催しの前に予定で広げる（[ADR-0041](0041-load-model-admission-control-and-prescaling.md)）。
+- **Go のサービス**（[ADR-0001](0001-platform-and-stack.md) の 6 つ：loc-ingest、geo-index、dispatch、eta-service、rt-gateway、trip-location-fanout）と付随の役（trail-builder、dispatch-shadow）は Fargate の ARM64。`GOMEMLIMIT` をタスクのメモリの 80% にし、GC の停止と OOM の余裕を持たせる。
+- **Valhalla** は Fargate の ARM64 の 4 vCPU・16 GB から始め、ETA 用と当てはめ用の組を分ける（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)）。タイルの tar は起動のときに S3 から一時の記憶域（50 GiB に設定）へ取る。起動の時間は **未検証**（E4 の `valhalla-pool-fargate` で計る）。起動が遅いので、ETA 用は平常のピークの 2 倍の台数を常に持ち、催しの前に予定で広げる（[ADR-0041](0041-load-model-admission-control-and-prescaling.md)）。
 - **ECS on EC2 の見直しの条件**：Valhalla のタスクが 40 を超えるか、起動の時間が 5 分を超えて予定の拡大で間に合わないとき。EC2 ならインスタンスのページキャッシュで複数のタスクがタイルを共有でき、ウォームプールで起動を早められる。見直すときは ADR を書く。
 - **Aurora `core`**：Trips と供給は同じクラスタに置く。Trips の提案の検査が、供給の判定の表を同じトランザクションで読むため（[ADR-0026](0026-supply-registry-and-document-verification.md)）。
 - **Aurora `money`**：支払いの状態と台帳の仕訳を同じトランザクションで書く（[ADR-0025](0025-ledger-settlement-and-reconciliation.md)）。乗車の群れとの間は outbox の事象だけでつなぎ、2 つのクラスタをまたぐトランザクションを書かない。

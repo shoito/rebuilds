@@ -14,7 +14,7 @@ date: 2026-09-27
 事実（2026-09-27 に確認）：
 
 - 本家の日本の安全の機能は、電話番号の匿名化、車とドライバーの写真での確認、顔での本人確認、相互の評価を含む（[Uber の安全（日本）](https://www.uber.com/jp/ja/ride/safety)、[Uber アプリの安全機能](https://www.uber.com/jp/ja/newsroom/uber-app-safety-features)）。
-- Twilio の Proxy は Public Beta で SLA の対象外（[Twilio Proxy](https://www.twilio.com/docs/proxy)）。Twilio の日本の音声は緊急の番号への発信を許さず、国内の通話は東京の edge を使う（[Japan: Voice Guidelines](https://www.twilio.com/en-us/guidelines/jp/voice)）。Amazon Connect は東京で 050・03・06 の番号を日本の法人の書類つきで取れる（[Claim phone numbers in the Tokyo Region](https://docs.aws.amazon.com/connect/latest/adminguide/connect-tokyo-region.html)）。Amazon Chime SDK の proxy のセッションの日本の番号での提供は **未検証**。
+- Twilio の Proxy は Public Beta で SLA の対象外（[Twilio Proxy](https://www.twilio.com/docs/proxy)）。Twilio の日本の音声は緊急の番号への発信を許さず、国内の通話は東京の edge を使う（[Japan: Voice Guidelines](https://www.twilio.com/en-us/guidelines/jp/voice)）。Amazon Connect は東京で 050・03・06 の番号を日本の法人の書類つきで取れる（[Claim phone numbers in the Tokyo Region](https://docs.aws.amazon.com/connect/latest/adminguide/connect-tokyo-region.html)）。Amazon Chime SDK の海外の番号は SIP Media Application の着信（Dial-In）にだけ使え（[Requesting international phone numbers](https://docs.aws.amazon.com/chime-sdk/latest/ag/request-intl-numbers.html)、2026-09-27 に確認）、proxy のセッションは Voice Connector の機能（`CreateProxySession`）なので、日本の番号の proxy は候補にしない。
 
 ## Options
 
@@ -56,9 +56,9 @@ date: 2026-09-27
   - 乗車の外で相手に連絡できない。提供者を替えても論理は変わらない。
   - 乗る車の取り違えと、なりすましを減らせる。
 - 引き受けるコスト：
-  - 050 の番号の取得の書類と、中継の運用。つながるまでの時間は提供者次第（**未検証**）。
+  - 050 の番号の取得の書類と、中継の運用。つながるまでの時間は提供者次第（**未検証**。E10 の `masked-calling-poc`）。
   - 顔の照合は L4 の確認まで legal のフラグの裏で、その間の本人確認は事業者に頼る。
-  - 評価の閾値は **未検証** で、見直しが要る。
+  - 評価の閾値は **未検証** で、見直しが要る（E10 の `ratings-and-pair-blocks`。QA・PM の確認事項）。
 
 ## Confirmation
 

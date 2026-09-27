@@ -20,13 +20,13 @@
 | --- | --- |
 | OSM のライセンス | ODbL。帰属の表示（「© OpenStreetMap contributors」など、openstreetmap.org/copyright への案内）が要る。データを変えたり足したりした結果を配るときは、同じライセンスでだけ配れる（[OSM の Copyright and License](https://www.openstreetmap.org/copyright)） |
 | ODbL の区別 | 派生データベースを公に使うときは ODbL の条件で（4.4）。収集のデータベース、組織の中だけの使用、製作物（Produced Work）は 4.4 の対象外（4.5）。ただし、派生データベースから作った製作物を公に使うときは、派生データベースそのものか、変えた内容の説明を受け手に提供する（4.6）（[ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/)、[OSMF の Licence and Legal FAQ](https://osmfoundation.org/wiki/Licence/Licence_and_Legal_FAQ)） |
-| 日本の OSM の抽出 | Geofabrik の `japan-latest.osm.pbf` は約 2.4 GB で毎日更新され、差分（`.osc.gz`）と地方ごとの抽出（関東 約 489 MB など）もある（[Geofabrik の Japan](https://download.geofabrik.de/asia/japan.html)） |
+| 日本の OSM の抽出 | Geofabrik の `japan-latest.osm.pbf` は約 2.5 GB で毎日更新され、差分（`.osc.gz`）と地方ごとの抽出（関東 約 489 MB など）もある（[Geofabrik の Japan](https://download.geofabrik.de/asia/japan.html)） |
 | 地図の誤りの検出（本家） | 当てはめの異常から、誤った右折の禁止、欠けた道路、一方通行の誤りを見つけ、3 か月で 2 万 8 千件以上の誤りを見つけた（[CatchME](https://www.uber.com/us/en/blog/mapping-accuracy-with-catchme/)、2019-04-25） |
 | 行政区域のデータ | 国土数値情報の行政区域データ（N03）は、全国の都道府県・市区町村の境界と全国地方公共団体コードを持つ。GML・Shapefile・GeoJSON。年 1 回（1 月 1 日時点）更新。CC BY 4.0 で商用に使えるが、二次利用に国土地理院への申請が要る場合があるとされる（[国土数値情報 行政区域データ](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html)） |
 | H3 の多角形の埋め方 | `polygonToCells` はセルの中心が多角形の中にあるかで判定する。実験的な `polygonToCellsExperimental` は、中心・全体が内側・一部でも重なる・外接の四角形が重なる、の 4 つの方式を持つ（[H3 の Region functions](https://h3geo.org/docs/api/regions/)） |
 | Google Maps Platform | Geocoding API の内容を Google 以外の地図と一緒に使ってはならない（6.2）。緯度経度は 30 日まで一時にキャッシュできる（6.3.1）。緯度経度・整形した住所は、要求したアプリの利用者向けの機能のためだけに、利用者ごとに分けて無期限に持てる（6.3.2）。Directions・Distance Matrix にも Google 以外の地図との併用の禁止がある（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms)） |
-| Amazon Location Service | 結果を保存する（キャッシュも含む）ときは `IntendedUse` を `Storage` にし、高い料金になる。自動補完・候補（Suggest）は `Storage` にできない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、提供者に HERE を選ぶと、日本の場所の結果を `Storage` で保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版の日本の提供者と保存の条件は **未検証** |
-| ゼンリン | ZENRIN Maps API で、住所・建物・施設の検索、経路、渋滞・規制の情報を提供している（ADR-0005）。結果の保存と他の地図との併用の条件は **未検証** |
+| Amazon Location Service | 結果を保存する（キャッシュも含む）ときは `IntendedUse` を `Storage` にし、高い料金になる。自動補完・候補（Suggest）は `Storage` にできない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、提供者に HERE を選ぶと、日本の場所の結果を `Storage` で保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる） |
+| ゼンリン | ZENRIN Maps API で、住所・建物・施設の検索、経路、渋滞・規制の情報を提供している（ADR-0005）。結果の保存と他の地図との併用の条件は公開の文書になく **未検証**（E4 の `geocoding-provider-poc` で契約の条件として確かめる） |
 
 いずれも 2026-09-27 に確認。
 
@@ -46,7 +46,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 ## 4. OSM の取り込みと更新
 
 - **取り込み**：週 1 回（日曜 22:00 JST、タイルの作成の前）に、Geofabrik の `japan-latest.osm.pbf` と `.md5` を取り、照合して S3 の `osm/japan/<date>/` に置く。S3 は版を残し、90 日分を保つ（タイルの版の再現のため）。
-- **差分を当て続けない**：毎週の全体の取り込みにする。2.4 GB の取り込みは問題にならず、版が 1 つの日付で定まる（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)）。
+- **差分を当て続けない**：毎週の全体の取り込みにする。2.5 GB の取り込みは問題にならず、版が 1 つの日付で定まる（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)）。
 - **量の検査**（どれかを外れたら、その週は前の版を使い続け、運用に知らせる）：
 
 | 検査 | 閾値 |
@@ -56,7 +56,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 | 東京 23 区の道路の総延長の差 | ±1% |
 | 黄金の地点（主要な駅・空港・病院の 200 点）が、自動車の通れる道路から 100 m 以内にある | 全件 |
 
-- 閾値は仮の値で、最初の 3 か月の分布で見直す（**未検証**）。
+- 閾値は仮の値で、最初の 3 か月の分布で見直す（**未検証**。E4 の `osm-import-weekly`）。
 - 地方の抽出は使わない。都市の境目の道路が切れるのを避けるため、日本全体から作る。
 
 ## 5. ODbL の義務
@@ -69,7 +69,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 
 - **4.6 の扱いは、法務の確認待ち。** [intent.md](../intent.md) の L3 に、「自前の速度の表・上書きを足したタイルと、そこから作った ETA・経路の表示の ODbL 上の扱い（4.6 の提供の義務の有無）」を加えた。
 - 結論が出るまでの設計の備え：
-  - 速度の表は、OSM の way の ID を鍵にした別のデータとして作り、タイルに入れる直前に合わせる（収集のデータベースとして扱える余地を残す。当たるかは **未検証**）。
+  - 速度の表は、OSM の way の ID を鍵にした別のデータとして作り、タイルに入れる直前に合わせる（収集のデータベースとして扱える余地を残す。当たるかは法務の確認待ち（L3））。
   - 閉鎖の上書きは一覧（way の ID、向き、理由、期間）として持ち、求められたら「変えた内容の説明」としてそのまま出せるようにする。
   - OSM を直すべき誤りは、上書きのままにせず OSM の本体へ直す。
 
@@ -90,7 +90,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 
 | 誤り | 直し方 | 反映 |
 | --- | --- | --- |
-| OSM の誤り（道路の欠け、一方通行、右折の禁止） | 地図の担当が、現地の確認か、使ってよい資料で確かめてから OSM の本体を直す。組織としての編集の OSM の指針に従う（指針の中身と登録の要否は **未検証**。E4 で確かめる） | 翌週の取り込み |
+| OSM の誤り（道路の欠け、一方通行、右折の禁止） | 地図の担当が、現地の確認か、使ってよい資料で確かめてから OSM の本体を直す。組織としての編集の OSM の指針に従う。指針は、複数の人の組織だった編集に、OSM の wiki のページ（連絡先・目的・期間・資料・参加するアカウント）、始める 2 週間前までの地域のコミュニティへの告知、変更のハッシュタグを求める（[Organised Editing Guidelines](https://osmfoundation.org/wiki/Organised_Editing_Guidelines)、2018-11-15 に OSMF の理事会が承認、2026-09-27 に確認）。wiki のページと告知は、E4 の `map-error-candidates` の運用を始める前に用意する | 翌週の取り込み |
 | 急ぐ閉鎖（工事、災害、行事） | タイルの上書き（閉鎖の一覧）。期間を必ず持たせ、期限で自動に外す | 臨時のタイルの作成（[eta-and-routing.md](eta-and-routing.md) の 5.2 節） |
 | 乗降の地点の誤り | `pickup_points` を直す（8 節） | 即時 |
 | 右折の禁止の誤りなど、上書きで表せないもの | OSM の本体を直すまで待つ。その場所の ETA の補正の表の値で急場をしのぐ | 翌週 |
@@ -124,7 +124,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 | P9 | データの所在と外国への提供 | 位置と入力の文字列が送られる国、事業者との契約の形（L4） | 法務の確認待ち |
 | P10 | 電子地図の要件 | 事前確定運賃の「一般的に流通し、定期的に更新される電子地図」に当たるか（L3） | 推計走行距離に使うなら必須 |
 
-- 事実として分かっている条件（2 節）：Google は Google 以外の地図との併用を禁じ、緯度経度の保存に 30 日または利用者ごとの分離の条件がある。Amazon Location は保存に `Storage` の指定と高い料金が要り、以前の版では HERE の日本の結果を保存できなかった。ゼンリンの条件は **未検証**。
+- 事実として分かっている条件（2 節）：Google は Google 以外の地図との併用を禁じ、緯度経度の保存に 30 日または利用者ごとの分離の条件がある。Amazon Location は保存に `Storage` の指定と高い料金が要り、以前の版では HERE の日本の結果を保存できなかった。ゼンリンの条件は **未検証**（E4 の `geocoding-provider-poc`）。
 - 住所の検索と推計走行距離を同じ提供者にするかも、PoC で決める。別にすると、乗客が選んだ地点と経路の出発点が提供者の間でずれうる。
 - 利用条件（保存、併用、帰属）は、選定の後に ADR-0034 の続きの ADR に写し、条件に反する保存のコードをレビューで差し戻す（ADR-0005 の Confirmation）。
 
@@ -194,9 +194,9 @@ CREATE TABLE pickup_points (
 | `taxi_pool` | 空港のタクシープールなどの待機場 | 運用が作る |
 | `airport` | 空港の敷地（乗降の地点の施設） | 運用が作る |
 
-- 東京の「特別区・武三交通圏」は、名前のとおり特別区と武蔵野市・三鷹市からなる区域と見ている（関東運輸局のタクシー協議会のページ（[特別区・武三交通圏](https://wwwtb.mlit.go.jp/kanto/jidou_koutu/tabi2/taxi_kyougikai/tokyo/tokubetu/index.htm)、2026-09-27 に確認）の名前から。構成を定める公示の本文は **未検証**）。
-- 営業区域と交通圏が同じ範囲かは、地域ごとに違いうる（**未検証**）。種類を分けて持ち、同じ範囲なら同じ多角形を 2 つの種類で参照する。
-- 営業区域が市区町村の境界に沿わない地域（町丁目の単位など）があるかは **未検証**。あれば、運用が手で多角形を作り、元の資料を `source_ref` に残す。
+- 東京の「特別区・武三交通圏」は、東京都の特別区と武蔵野市・三鷹市からなる（[関東運輸局の自家用車活用事業の許可事業者の一覧（特別区・武三交通圏）](https://wwwtb.mlit.go.jp/kanto/content/000380535.pdf) の注記、令和 8 年 8 月 31 日現在、2026-09-27 に確認）。
+- 関東運輸局の公示は、営業区域を交通圏の単位で書く（[初乗距離の公示](https://wwwtb.mlit.go.jp/kanto/content/000287810.pdf) の「営業区域」の列、[係数の公示](https://wwwtb.mlit.go.jp/kanto/content/000256355.pdf) の「適用する営業区域」、2026-09-27 に確認）。S1 の東京では営業区域と交通圏は同じ範囲である。他の運輸局で違うかは **未検証**（E14 の `city-data-onboarding` で地域ごとに確かめる）。種類を分けて持ち、同じ範囲なら同じ多角形を 2 つの種類で参照する。
+- 営業区域が市区町村の境界に沿わない地域があるかは **未検証**（関東の地図の公示は、旧北川辺町のように合併の前の町の単位を残す。[各都県の営業区域及び運賃適用地域](https://wwwtb.mlit.go.jp/kanto/content/000108041.pdf)）。E4 の `service-area-polygons` と E14 の `city-data-onboarding` で地域ごとに確かめる。あれば、運用が手で多角形を作り、元の資料を `source_ref` に残す。
 
 ### 9.2 データ
 
@@ -246,7 +246,7 @@ func Contains(areaVersion, p) bool:
 - 写しは、`polygonToCellsExperimental` の「一部でも重なる」方式で区域に触れるセルを全部取り、そのうち「全体が内側」のセルを `inside`、残りを `boundary` にする。
 - 区域の外のセルは写しに入らない。「一部でも重なる」で取るので、区域に触れるセルはすべて写しにあり、区域の中の点を外と誤ることはない（10.1 節の PROP-MAP-001 で確かめる）。
 - 判定の最後は多角形（ADR-0002）。多角形の判定は、配車と API のプロセスの中で、単純化した多角形で行う（PostGIS を毎回引かない）。多角形は区域の版ごとにメモリに持つ。
-- 写しの作り方の関数は H3 v4 の実験的な関数なので、使える版と Go の束縛での対応を E4 で確かめる（**未検証**）。使えなければ、中心の方式の `polygonToCells` に、境目の周り 1 輪のセルを `boundary` として足して代える。
+- 写しの作り方の関数は H3 v4 の実験的な関数である。Go の束縛の h3-go v4.5.0（2026-05-26、H3 v4.5.0 を同梱）は、`PolygonToCellsExperimental` と `ContainmentOverlapping`・`ContainmentFull` などの方式を公開している（[h3-go の h3.go](https://github.com/uber/h3-go/blob/master/h3.go)、2026-09-27 に確認）。実験的な関数なので、版を固定し、PROP-MAP-001 で上げるたびに確かめる。将来の版で消えたら、中心の方式の `polygonToCells` に、境目の周り 1 輪のセルを `boundary` として足して代える。
 
 ## 10. 障害のときの振る舞い
 

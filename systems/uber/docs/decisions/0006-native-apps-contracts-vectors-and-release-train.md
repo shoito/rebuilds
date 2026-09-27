@@ -14,7 +14,7 @@ date: 2026-09-27
 - 2 つのコードベースで、乗車の状態の解釈がずれると、ドライバーが誤った操作をし、乗客が誤った状態を見る。
 - アプリは古い版が長く残る。サーバーは古い版の形を受け続ける必要がある。
 - 乗車の最中に更新を強いると、乗客とドライバーが操作できなくなる。緊急の入口は、どの版でも使えなければならない（NFR-010）。
-- 本家は、4 つのアプリをトランクベースで開発し、週 1 回の列車で出していたと説明されている（[The Pragmatic Engineer の記事](https://blog.pragmaticengineer.com/uber-app-rewrite-yolo/)、2026-09-27 に確認。一次の資料ではないので **未検証**）。
+- 本家は、4 つのアプリをトランクベースで開発し、週 1 回の列車で出していたと説明されている（本家の技術ブログ [The Uber Engineering Tech Stack, Part II](https://www.uber.com/us/en/blog/uber-tech-stack-part-two/)、2016-07-21、2026-09-27 に確認）。
 - App Store の段階的な公開は、7 日で 1%・2%・5%・10%・20%・50%・100% と固定で、止められる。対象は自動の更新をする利用者だけ（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases)、2026-09-27 に確認）。Google Play の `IMMEDIATE` のアプリ内の更新は、更新が終わるまで画面を塞ぐ（[Support in-app updates](https://developer.android.com/guide/playcore/in-app-updates/kotlin-java)、2026-09-27 に確認）。
 
 ## Options

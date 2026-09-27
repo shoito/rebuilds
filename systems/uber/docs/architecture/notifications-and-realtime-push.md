@@ -60,7 +60,7 @@ rt-router ── 接続がない・確認がない ──▶ push-sender（TypeS
 | 本家 | SSE から gRPC へ移った（2 節） | — | — |
 
 - gRPC を選ぶ。本家が SSE で困った点（受信の確認の遅れ）を最初から避け、型の生成を 1 つにできる。
-- WebSocket は、Web のクライアントがない（アプリだけ）ので利点が小さい。MQTT は、トピックの権限を乗車ごとに付け外しする仕組みが要り、IoT Core の料金と接続の上限の検討が増える（**未検証**）。
+- WebSocket は、Web のクライアントがない（アプリだけ）ので利点が小さい。MQTT は、トピックの権限を乗車ごとに付け外しする仕組みが要り、IoT Core の料金と接続の上限の検討が増える。
 
 ### 3.3 接続の手順
 
@@ -100,7 +100,8 @@ message ServerFrame {
 
 - **認証**：gRPC のメタデータにアクセストークンを付ける。`rt-gateway` はトークンの署名と期限を確かめ、受け手の鍵（`rider:{rider_id}` か `driver:{driver_id}`）を決める。トークンの期限の 60 秒前に、アプリが新しいトークンで張り直す。
 - **1 つの受け手の接続は 1 本。** 同じ受け手の新しい接続が来たら、古い接続に `Goaway(reason=replaced)` を送って閉じる。同じアカウントで 2 台の端末に同時にログインしない（ドライバーは出庫のセッションが 1 つ。乗客は後の端末を優先する）。
-- **心拍**：両方向とも 20 秒ごとに `Heartbeat` を送る。40 秒受けなければ切る。ALB の待ちの時間切れ（既定 60 秒）より短くする。HTTP/2 の PING だけでは ALB の待ちの時間切れが延びないとする報告があるので、アプリの層の心拍にする（**未検証**）。
+- **心拍**：両方向とも 20 秒ごとに `Heartbeat` を送る。40 秒受けなければ切る。ALB の待ちの時間切れ（既定 60 秒）より短くする。ALB は HTTP/2 の PING に対応せず、PING は待ちの時間切れを延ばさないので、アプリの層の心拍にする（[Edit attributes for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-27 に確認）。
+- **ALB の接続の寿命**：ALB は接続の開始から HTTP client keepalive duration（既定 1 時間）が過ぎると `GOAWAY` を送る（同じ文書）。`rt.<domain>` の ALB は 86,400 秒（24 時間）にする。`GOAWAY` を受けたアプリは、下の再接続の手順で張り直す（乗車中の `resume_after_seq` で抜けはない）。
 - **再接続**：切れたら 0.5 秒・1 秒・2 秒…最大 30 秒の指数的な待ち（揺らぎつき）で張り直す。ドライバーのアプリがオファーを待つ空車のときは、最初の 3 回を 0.5 秒間隔にする。
 - **配備**：`rt-gateway` を入れ替えるときは、`Goaway` に 0〜30 秒のばらつかせた待ちを付け、再接続を分散させる。
 
@@ -177,13 +178,14 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 | **合計** | **約 1.2 秒** | **約 4 秒** |
 
 - **目標**：オファーの作成から `OfferDelivered` を Trips が記録するまで、p95 1.5 秒、p99 4 秒。これで NFR-008 の p95 2 秒に収まり、ADR-0015 の 5 秒の取り下げは p99 の外の失敗だけになる。
-- SNS と SQS の区間の遅れは **未検証**。E6 で計り、p95 が 300 ms を超えたら、中継から `rt-router` へ直接渡す経路（Valkey の Stream への直接の書き込み）を加える ADR を書く（[trips-lifecycle.md](trips-lifecycle.md) の持ち越しの問いへの答えは「S1 は SNS を経る。計測で足りなければ直接の経路を足す」）。
+- SNS と SQS の区間の遅れは **未検証**。E6 の `offer-delivery-path` で計り、p95 が 300 ms を超えたら、中継から `rt-router` へ直接渡す経路（Valkey の Stream への直接の書き込み）を加える ADR を書く（[trips-lifecycle.md](trips-lifecycle.md) の持ち越しの問いへの答えは「S1 は SNS を経る。計測で足りなければ直接の経路を足す」）。
 
 ### 5.2 `OfferDelivered` の意味
 
 - アプリは、オファーの画面を表示した後（描画の完了の通知の後）に `OfferDelivered(offer_id, shown_elapsed_ms)` を送る。受け取っただけでは送らない。ドライバーが見られない状態で「届いた」としないため。
 - 常時の接続がつながっていれば、`ClientFrame.offer_delivered` で送り、`rt-gateway` が Trips の `MarkOfferDelivered` を呼ぶ。つながっていなければ、アプリは `POST /v1/driver/offers/{id}/delivered` で送る。
-- 画面が消えている（端末が眠っている）ときは、フォアグラウンドサービスか背景の位置の実行で、アプリは動いている（ADR-0007）。アプリはオファーを受けたら、全画面の通知（Android の full-screen intent、iOS は時間に敏感な通知）で画面を点け、表示できたら送る。Android の full-screen intent の許可の条件は **未検証**（E9 で確かめる）。
+- 画面が消えている（端末が眠っている）ときは、フォアグラウンドサービスか背景の位置の実行で、アプリは動いている（ADR-0007）。アプリはオファーを受けたら、優先度の高い通知（Android は heads-up の通知、iOS は時間に敏感な通知）で知らせ、表示できたら送る。
+- **Android の全画面の通知は既定にしない。** Android 14 を対象にするアプリで `USE_FULL_SCREEN_INTENT` を使えるのは通話と目覚ましのアプリだけで、Google Play はそれ以外のアプリの既定の許可を取り消す（[Android 14 の動作の変更](https://developer.android.com/about/versions/14/behavior-changes-14)、2026-09-27 に確認）。配車のオファーはこれに当たらないので、全画面の通知は `NotificationManager.canUseFullScreenIntent()` が真のとき（利用者が設定で許可したとき）だけ使い、既定は heads-up の通知にする。オファーの 15 秒の表示の時間と 5 秒の受信の確認（ADR-0015）は、この既定で計る。
 
 ### 5.3 プッシュに回す条件
 
@@ -232,7 +234,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 事実（2026-09-27 に確認。[Set and manage Android message priority](https://firebase.google.com/docs/cloud-messaging/android-message-priority)）：高い優先度は、眠っている端末を起こしてすぐ届けようとする。利用者に見える通知にならない高い優先度の送信が続くと、7 日の振る舞いから普通の優先度に落とされうる。
 
 - オファー・状態の変化・位置の停止は、`android.priority=high`、`ttl` は APNs の期限と同じ。受けたアプリは必ず利用者に見える通知を出す（落とされないため）。
-- データのメッセージで受け、通知の見た目はアプリが作る（オファーは全画面の通知）。通知の本体は 4 KB まで。
+- データのメッセージで受け、通知の見た目はアプリが作る（オファーは優先度の高い通知。全画面は許可のあるときだけ。5.2 節）。通知の本体は 4 KB まで。
 - 普通の優先度は使わない（S1 で送る通知は、どれも時間に敏感なため）。
 
 ### 7.3 中身と個人の情報
@@ -268,7 +270,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 
 ### 8.3 提供者
 
-- 主：国内の携帯の 4 社に直接つなぐ提供者（候補は NTT コム オンラインの空電プッシュ、メディア4u のメディア SMS など。届く率を公表している提供者がある。[ネクスウェイの解説](https://smslink.nexway.co.jp/column/161)、2026-09-27 に確認。各社の SLA と料金は **未検証**）。
+- 主：国内の携帯の 4 社に直接つなぐ提供者（候補は NTT コム オンラインの空電プッシュ、メディア4u のメディア SMS など。届く率を公表している提供者がある。[ネクスウェイの解説](https://smslink.nexway.co.jp/column/161)、2026-09-27 に確認。各社の SLA と料金は **未検証**。E1 の `sms-otp` の選定で確かめる）。
 - 副：国際の経路の提供者（Twilio）。Twilio の日本の SMS は、国際の経路なら登録なしで英数字の送信者 ID を使え、KDDI の網で 5 分割を超える SMS は遅れうる（[Twilio の日本の SMS の指針](https://www.twilio.com/en-us/guidelines/jp/sms)、2026-09-27 に確認）。ワンタイムコードは 1 通に収める。
 - 主の提供者が 30 秒で受け付けないか、5 分の失敗の率が 20% を超えたら、副に切り替える。
 - 提供者の選定は E1 で、届くまでの時間の p95（目標 10 秒）、4 社への直接の接続、料金、データの所在で行う。
@@ -333,7 +335,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 | E6 | `realtime-load-test` | 12.2 節 |
 | E1 | `sms-otp` | ワンタイムコード、流量の制限、提供者の切り替え（8 節） |
 | E9 | `app-realtime-client` | 両方のアプリの接続・再接続・`seq` の扱い・取り直し（apps と一緒に） |
-| E9 | `offer-full-screen-notification` | 全画面の通知と表示の後の `OfferDelivered` |
+| E9 | `offer-full-screen-notification` | 優先度の高い通知（全画面は許可のあるときだけ。5.2 節）と表示の後の `OfferDelivered` |
 | E10 | `arrival-sms-fallback` | 到着の代わりの SMS（1 乗車 1 回） |
 
 ## 14. 未解決の問い
@@ -358,7 +360,6 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 | SNS・SQS の区間の遅れが予算に収まるか | E6 の計測 |
 | 位置の上り（ADR-0009）を常時の接続にまとめるか | E3・E6 の電池と通信の量の計測の後。まとめるなら ADR-0009 を置き換える |
 | QUIC（HTTP/3）を使うか | S2。ALB の対応と端末のライブラリを確かめてから |
-| Android の全画面の通知の許可の条件（ドライバーのアプリが対象になるか） | E9 で Play の方針を確かめる |
 | メッセージの保持の期間（L4・L7） | 法務の確認待ち |
 | SMS の提供者 | E1 の選定 |
 | 事業者の管理画面への即時の更新（SSE）を `rt-gateway` で持つか、別にするか | [support-and-operations-tools.md](support-and-operations-tools.md) の実装の時に |

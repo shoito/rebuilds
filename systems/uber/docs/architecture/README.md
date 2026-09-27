@@ -80,7 +80,7 @@
 | 層 | 選定 | 理由 |
 | --- | --- | --- |
 | 言語（一般） | TypeScript（API、Trips、Pricing、Payments、供給、管理画面、配信の振り分け） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 言語（熱い経路） | Go の 5 つのサービス：`loc-ingest`、`geo-index`、`dispatch`、`rt-gateway`、`trip-location-fanout`（付随の役：`trail-builder`、`dispatch-shadow`、`eta-service`） | メモリ上の状態と高い並行度を、単純な書き方で扱える（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md)、[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)） |
+| 言語（熱い経路） | Go の 6 つのサービス：`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`（付随の役：`trail-builder`、`dispatch-shadow`） | メモリ上の状態と高い並行度を、単純な書き方で扱える（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md)、[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)） |
 | サービス間の契約 | Protocol Buffers と gRPC（Go と TypeScript の間、アプリとの常時の接続） | 型を 1 か所から生成する |
 | API | Hono＋Zod | 他の題材と同じ |
 | モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、状態機械はテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） |
@@ -101,7 +101,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0001](../decisions/0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、熱い経路の 5 つのサービスは Go で、モバイルはネイティブで書く |
+| [0001](../decisions/0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、熱い経路の 6 つのサービスは Go で、モバイルはネイティブで書く |
 | [0002](../decisions/0002-h3-geospatial-model.md) | 地理の単位は H3 にし、ドライバーの索引はメモリの上で都市と H3 のセルで分ける |
 | [0003](../decisions/0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora の状態機械を正本にし、割り当ては `(region_gen, assignment_epoch)` の fencing token つきのトランザクションで 1 つに限る |
 | [0004](../decisions/0004-batched-dispatch-and-offers.md) | 配車は区域ごとの短いバッチで最適化し、オファーは 1 人ずつ、表示 15 秒・サーバーの期限 16.5 秒で送る |
@@ -175,7 +175,7 @@
 - **索引の分割の境界**：都市や分割の境界の近くの依頼は、隣の分割の候補を取りこぼしうる。S1 は都市ごとに 1 組で避け、S2 は halo で扱う（[geospatial-index.md](geospatial-index.md)）。
 - **ETA の精度**：OSM の上の経路は、日本の細い道や右折の制限で誤差が出うる。本家は、経路のエンジンの ETA に、実績との差を学習したモデルで補正をかけている（[DeepETA](https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/)、2022-02、2026-09-27 に確認）。S1 は偏りの補正の表で NFR-003 を満たせるかを計測し、足りなければ E13 の ETA の補正を前倒しする。時刻に依る行列は Valhalla の設定の変更と PoC が要る。
 - **地図の提供者の利用条件**：商用の地図の利用条件が、結果の保存や他の地図との併用を制限する（Google は併用の禁止と緯度経度のキャッシュの期限。[ADR-0005](../decisions/0005-maps-and-routing.md)）。乗車の行には乗客のピンだけを置き、提供者の内容は期限つきの表に分ける（[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)）。
-- **大阪への切り替え**：Aurora の計画外の切り替えは直近の書き込みを失い、古い主の書き込みの止め方はベストエフォート。端末の要約と journal での復元、`region_gen`、人の判断の切り替えで抑える。RTO の内訳と大阪の Fargate の容量は **未検証**（E12 の DR の訓練）。
+- **大阪への切り替え**：Aurora の計画外の切り替えは直近の書き込みを失い、古い主の書き込みの止め方はベストエフォート。端末の要約と journal での復元、`region_gen`、人の判断の切り替えで抑える。RTO の内訳と大阪の Fargate の容量は **未検証**（E12 の `dr-drill`）。
 - **緊急の通報**：運用の担当の人手が足りなければ、NFR-010 の 30 秒を守れない。安全の担当の人数と夜間の体制は Ops が S1 の前に決める。
 
 ### 決定（2026-09-27、既定案）
@@ -183,11 +183,11 @@
 PM の方針（既定案で進める）により、統合の工程で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」（L1〜L9）に残した。
 
 - **ADR と intent の状態**：基盤の ADR（0001〜0005）と intent.md を、他の題材と同じく `accepted` にした。先に次を直した。
-  - ADR-0001：Go のサービスを 3 つから 5 つにした（`rt-gateway` と `trip-location-fanout` を足した。ADR-0030・0038）。`trail-builder`・`dispatch-shadow`・`eta-service` は、それぞれの ADR で認めた付随の役として数えない。
+  - ADR-0001：Go のサービスを 3 つから 6 つにした（`rt-gateway` と `trip-location-fanout` を足した。ADR-0030・0038。別に配備する `eta-service` も数える）。`trail-builder`・`dispatch-shadow` は、それぞれの ADR で認めた付随の役として数えない。
   - ADR-0003：状態に `payment_pending`・`awaiting_fare`・`cancelled_by_system`・`payment_failed` を足した。`assignment_epoch` は割り当ての作成と解放で増やす（ADR-0021）。比較は DR に備えて `(region_gen, assignment_epoch)` にした（ADR-0039）。trips-lifecycle の 4.2・8 節と geospatial-index の 4.2・6.1 節にも入れた。
   - ADR-0004：サーバーの期限 16.5 秒、表示 15 秒、受信の確認 5 秒の取り下げ（ADR-0015）に揃えた。
   - ADR-0005：本家の Matching のページ（ADR-0004）と Google の利用条件を本文で確かめ、出典を直した。時刻に依る行列は Valhalla の設定の変更と PoC が要ることを書いた。ナビの引き継ぎは主要経由地点を渡す（ADR-0008）。
-  - intent.md：日本版ライドシェアのドライバーは第一種か第二種の免許。変動運賃の上下 5 割・10 円単位は公示の本文で確かめた（モニタリングの後の現行の運用は **未検証**）。流しの実車の切り替えはタクシーだけ。法務の問いに、オファーの降車地と運送引受義務（L1）、派生タイルの ODbL（L3）、収納代行の割賦販売法の加盟店の義務（L6）を足した。
+  - intent.md：日本版ライドシェアのドライバーは第一種か第二種の免許。変動運賃の上下 5 割・10 円単位は公示の本文で確かめた（関東の現行の公示でも同じ。公示の外の運用の指示の有無は L2）。流しの実車の切り替えはタクシーだけ。法務の問いに、オファーの降車地と運送引受義務（L1）、派生タイルの ODbL（L3）、収納代行の割賦販売法の加盟店の義務（L6）を足した。
 - **NFR-009 の例外**：乗車の共有と事業者の稼働の地図の 2 つだけ。どちらも `legal.l4.*` の裏（L4 の記録がある範囲でだけ有効。ADR-0043）。
 - **顔の照合**：`legal.l4.driver_face_check` の裏。頻度は、その日の最初の出庫と 1 日 1 回の抜き打ち（ADR-0029・0037）。顔の画像は専用の `biometric` の鍵（ADR-0036、security.md の 6.2 節）。
 - **提案の時の確かめ直し**：Trips は提案の時に供給・営業区域・運行枠を確かめ直し、配車と共通の決定表のベクター（DT-DISP-001）を使う。拒否の列挙に `NOT_ELIGIBLE` を足した（dispatch の 6.4 節、trips の 4.3 節）。
@@ -198,7 +198,7 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 - **S1 の「依頼 30 件/秒」**：ピークの受け付けの量（成立しない依頼を含む）と定義し、成立は約 3〜6 件/秒とした。容量・Trips・PSP・ETA の見積もりで使い分けた（capacity の 1.1・5 節、ADR-0003）。**PM の確認事項**。
 - **AGENTS.md**：ADR-0043 の強い規則を 2 つ足した（legal のフラグには `legal_gate_records` が要る、緊急の入口に release フラグを置かない）。法務の確認待ちの規則は release ではなく legal のフラグの裏（ADR-0014・0018・0020・0024・0042 と pricing・payments・dispatch を揃えた）。
 - **呼び名と数値**：事業者の管理画面のドメインは `operator.<domain>`（support の `partners.<domain>` を直した）。`ops.region.writable` に揃えた。常時の接続は gRPC の双方向ストリーム（location-ingestion の WebSocket の記述を直した）。オファーの TTL をサーバーの期限 16.5 秒に揃えた（notifications の 4.3 節）。runbook `driver-safety-suspension.md` を `driver-safety-hold.md` に 1 つにした。
-- **Epic**：E1〜E12 が MVP（S1）、E13 機械学習・E14 複数の都市への展開・E15 配車と安全の S2 の改善が S2。それ以外は [roadmap.md](../roadmap.md) の延期の一覧。E12 は「日本版ライドシェアと GA の準備」の 2 つの流れを持つ。
+- **Epic**：E1〜E12 が MVP（S1）、E13 機械学習・E14 複数の都市への展開・E15 配車と安全の S2 の改善が S2。それ以外は [roadmap.md](../roadmap.md) の延期の一覧。E12 は「日本版ライドシェアと GA の準備」の 2 つの流れを持つ。1 つの Epic にしたのは、どちらも S1 の本番の開始の前に終える条件だからで、流れを分けたのは、日本版ライドシェアが法務（L2・L5）の結論を待つ間も、GA の準備を止めずに進めるため（既定。**PM の確認事項**）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。容量のパラメーターは [capacity.md](capacity.md) の 8 節、保持の期間は [security.md](security.md) の 7.2 節、オファーの時間は [ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)。
 - 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
 
@@ -214,8 +214,7 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 | SNS・SQS の区間の遅れ（オファーの配信の予算） | E6 の計測 |
 | Go の GC の停止を含む p99 | E3 の負荷試験 |
 | RTO の内訳、大阪の Fargate の容量、東京の書き込みの止め方 | E12 の DR の訓練 |
-| 費用の単価（大阪、ALB、可観測性） | E12 の `cost-dashboard` |
-| `eta-service` を Go のサービスの数に含めるか（ADR-0001 の Confirmation） | Dev のテックリードが E4 の前に確かめる |
+| 費用の量（転送、LCU、ログ）と可観測性・セキュリティのサービスの額（単価は 2026-09-27 に Price List API で確認済み） | E12 の `cost-dashboard` |
 
 ## 8. 領域の文書
 

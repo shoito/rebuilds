@@ -12,8 +12,8 @@ date: 2026-09-27
 提供者の条件は、結果の保存と他の地図との併用を制限しうる（2026-09-27 に確認）。
 
 - Google Maps Platform：Geocoding API の内容を Google 以外の地図と一緒に使ってはならない。緯度経度は 30 日まで一時にキャッシュできる。緯度経度と整形した住所は、要求したアプリの利用者向けの機能のためだけに、利用者ごとに分けて無期限に持てる（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms) の 6.2・6.3）。
-- Amazon Location Service：保存（キャッシュを含む）には `IntendedUse=Storage` と高い料金が要り、自動補完は保存できない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、HERE の日本の結果を保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版の条件は **未検証**。
-- ゼンリン：保存と併用の条件は **未検証**。
+- Amazon Location Service：保存（キャッシュを含む）には `IntendedUse=Storage` と高い料金が要り、自動補完は保存できない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、HERE の日本の結果を保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる）。
+- ゼンリン：保存と併用の条件は公開の文書になく **未検証**（E4 の `geocoding-provider-poc`）。
 
 一方で、乗車の記録には、乗降の地点が要る（運賃の根拠、領収書、問い合わせ、事故の調べ）。駅・空港・ホテルでは、決められた乗り場で乗せる必要がある。
 
@@ -55,7 +55,7 @@ date: 2026-09-27
   - 乗車の記録に残る座標は、乗客が確かめた値で、提供者の条件に左右されにくい。
   - 乗降の地点が運用の確認を経るので、誤った地点が公開されない。
 - 引き受けるコスト：
-  - 自前の API の分、自動補完の遅れが増える（数十 ms を見込む。**未検証**）。
+  - 自前の API の分、自動補完の遅れが増える（数十 ms を見込む。**未検証**。E4 の `places-service-api` で計る）。
   - PoC の正解の 2,000 件を作り、提供者の変更のたびに計り直す。
   - 乗降の地点のデータを運用が育て続ける。
   - Google を選ぶと、乗客のアプリの地図も Google にする必要があり、Valhalla の経路の線を重ねる設計（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)）と衝突しうる。

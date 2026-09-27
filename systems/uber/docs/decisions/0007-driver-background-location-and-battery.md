@@ -32,7 +32,7 @@ date: 2026-09-27
 - 送れなかった点は暗号化した SQLite に 900 点まで溜め、24 時間で消す。
 - サーバーは、出庫中の最新の点が 60 秒より古ければ、利用者に見えるプッシュ通知で開き直しを促し、5 分で休憩にする。
 - 「おおよその位置」だけのときは出庫させない。
-- 2 を採らない理由：許可と審査が重い割に、iOS は強制で終了したアプリを位置の更新で起こさないと見込み（**未検証**）、得るものが小さい。
+- 2 を採らない理由：許可と審査が重い割に、得るものが小さい。iOS の標準の位置の更新は、アプリが終了すると届かなくなる（[startUpdatingLocation()](https://developer.apple.com/documentation/corelocation/cllocationmanager/startupdatinglocation%28%29)）。終了の後にアプリを背景で起こせるのは大きな移動の通知（[startMonitoringSignificantLocationChanges()](https://developer.apple.com/documentation/corelocation/cllocationmanager/startmonitoringsignificantlocationchanges%28%29)）だけで、数百 m ごとの粗い点しか来ない（どちらも 2026-09-27 に確認）。利用者が強制で終了したときにこれで起きるかは文書に書かれていない（**未検証**、E9 の `driver-location-recovery` で確かめる）。
 - 3 を採らない理由：画面を点け続けると電池と熱の負担が大きく、ナビのアプリに切り替えた間に送信が止まる。
 
 ## Consequences
@@ -42,8 +42,8 @@ date: 2026-09-27
   - 出庫の間だけ取るので、勤務の外の位置を集めない。
 - 引き受けるコスト：
   - OS がアプリを終了すると、ドライバーが開き直すまで送信が止まる。その間は配車の候補から外れる。
-  - Android の機種ごとの電池の最適化で落ちることがある（機種は **未検証**）。
-  - 電池の消費の目標（給電なしの空車で 1 時間 10% 以下）は **未検証** の設計の値。
+  - Android の機種ごとの電池の最適化で落ちることがある（機種は **未検証**。E9 の `driver-background-location` の端末の試験で確かめる）。
+  - 電池の消費の目標（給電なしの空車で 1 時間 10% 以下）は **未検証** の設計の値（E9 の `driver-background-location` で計る）。
 
 ## Confirmation
 

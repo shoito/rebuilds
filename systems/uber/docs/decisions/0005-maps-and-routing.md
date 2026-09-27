@@ -26,9 +26,9 @@ date: 2026-09-27
 - **OSRM**：BSD-2-Clause、C++。Contraction Hierarchies と Multi-Level Dijkstra。route・table（行列）・match（当てはめ）・trip などを持つ（[osrm-backend](https://github.com/Project-OSRM/osrm-backend)）。交通の速度の反映は、CH では再計算が重く、MLD の customize のほうが速い（[OSRM の Traffic の wiki](https://github.com/Project-OSRM/osrm-backend/wiki/Traffic)）。
 - **GraphHopper**：Java。オープンソースに経路・当てはめ・到達圏があるが、行列の API は商用の側にある（[GraphHopper Open Source](https://www.graphhopper.com/open-source/)）。
 - **Google Maps Platform**：Directions・Distance Matrix・Geocoding の内容を Google 以外の地図と一緒に使うことを禁じ、Directions の緯度経度のキャッシュは 30 日まで、Geocoding の緯度経度は 30 日までの一時のキャッシュか、利用者ごとに分けた保存に限る（[Google Maps Platform Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms)。2026-09-27 に本文を確認。[eta-and-routing.md](../architecture/eta-and-routing.md) の 7.3 節、[maps-and-geodata.md](../architecture/maps-and-geodata.md) の 2 節）。
-- **Amazon Location Service**：データの提供者に Esri と HERE がある。HERE を選ぶと、日本の場所の結果を保存（`IntendedUse` を `Storage`）できない（[CreatePlaceIndex](https://docs.aws.amazon.com/location/latest/APIReference/API_CreatePlaceIndex.html)。検索の結果の抜粋で確認。現行の版の API での扱いは **未検証**）。
-- **ゼンリン**：ZENRIN Maps API で、住所・建物・施設の検索、経路の探索、渋滞・規制の情報を提供している（[ZENRIN Maps API](https://www.zenrin-datacom.net/solution/zenrin-maps-api)）。料金と、結果の保存・他の地図との併用の条件は **未検証**。
-- **Mapbox**：経路・行列・住所の検索の API を持つ。日本の住所の網羅と条件は **未検証**。
+- **Amazon Location Service**：データの提供者に Esri と HERE がある。以前の版の API では、HERE を選ぶと、日本の場所の結果を保存（`IntendedUse` を `Storage`）できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる）。
+- **ゼンリン**：ZENRIN Maps API で、住所・建物・施設の検索、経路の探索、渋滞・規制の情報を提供している（[ZENRIN Maps API](https://www.zenrin-datacom.net/solution/zenrin-maps-api)）。料金と、結果の保存・他の地図との併用の条件は公開の文書になく **未検証**（E4 の `geocoding-provider-poc`）。
+- **Mapbox**：経路・行列・住所の検索の API を持つ。日本の住所の網羅と条件は **未検証**（E4 の `geocoding-provider-poc`）。
 
 ## Options
 
@@ -48,7 +48,7 @@ date: 2026-09-27
   - 行列と当てはめと交通の取り込みを、1 つのエンジンでまかなえる。
   - OSRM は行列の速さで勝る。ただし、コストの変更にデータの前処理のやり直しが要る。行列の速さが足りなければ、行列だけを OSRM（MLD）に替える選択を残す。
   - GraphHopper は、オープンソースの側に行列がない。
-- **住所・施設・建物の名前の検索は、商用の提供者を使う。** 日本の住所（番地、建物の名前、施設）の網羅は、OSM では足りないと見込む（**未検証**。E4 で乗降の地点の検索の成功率を比べる）。候補はゼンリン、Google、Amazon Location Service。PoC で、網羅、料金、結果の保存の条件、Valhalla の地図と併用してよいかを比べて決める。
+- **住所・施設・建物の名前の検索は、商用の提供者を使う。** 日本の住所（番地、建物の名前、施設）の網羅は、OSM では足りないと見込む（**未検証**。E4 の `geocoding-provider-poc` で乗降の地点の検索の成功率を比べる）。候補はゼンリン、Google、Amazon Location Service。PoC で、網羅、料金、結果の保存の条件、Valhalla の地図と併用してよいかを比べて決める。
   - Google を選ぶ場合、Google の内容を Google 以外の地図に重ねて見せることが条件に反しうる。乗客のアプリの地図の表示の提供者と合わせて決める。
 - **事前確定運賃の推計走行距離は、制度の条件（一般に流通し、定期的に更新される電子地図）を満たすことが確かめられた地図で求める。** OSM がこれに当たるかは、法務と運輸局の確認待ち（[intent.md](../intent.md) の L3）。確認が済むまでは、商用の提供者の経路の距離を使う。
 - **交通の反映**：S1 は、Valhalla の過去の速度のデータを、自前の走行の実績（当てはめた軌跡の区間ごとの速度）から作る。配車の行列で予測の交通を使うには、時刻に依る行列を有効にする Valhalla の設定の変更（`max_timedep_distance_matrix` を 0 から上げる）と、精度と p99 の PoC が要る。PoC（E4 の `timedep-matrix-poc`）までは、時刻に依らない行列に偏りの補正の表を足して使う（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)、[eta-and-routing.md](../architecture/eta-and-routing.md) の 5.4 節）。現在の渋滞は、商用の提供者の交通の情報を取り込めるかを PoC で確かめる。精度は NFR-003 で測り、足りなければ本家の DeepETA と同じく、経路の ETA を実績で補正するモデルを ml-platform で作る。

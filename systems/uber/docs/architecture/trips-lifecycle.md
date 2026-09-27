@@ -19,7 +19,7 @@
 
 - 本家の Fulfillment の基盤は、last-write-wins の可用性優先の構成で分断のときに状態が壊れたため、Spanner の強い一貫性のトランザクションと、階層的な状態機械へ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07、2026-09-27 に確認）。
 - 本家は、データセンターの切り替えのとき、ドライバーの端末に送っておいた状態の要約から乗車を戻していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015、2026-09-27 に確認）。
-- 本家の日本のヘルプは、ドライバーとのマッチングの前の取り消しは無料で、マッチングの後はキャンセル料がかかることがあると説明している（[Uber の配車をキャンセルする](https://help.uber.com/en/riders/article/uber-%E3%81%AE%E9%85%8D%E8%BB%8A%E3%82%92%E3%82%AD%E3%83%A3%E3%83%B3%E3%82%BB%E3%83%AB%E3%81%99%E3%82%8B?nodeId=56270015-1d1d-4c08-a460-3b94a090de23)、2026-09-27 に確認）。額と時間の条件は、そのページに書かれていない（**未検証**）。
+- 本家の日本のヘルプは、ドライバーとのマッチングの前の取り消しは無料で、マッチングの後はキャンセル料がかかることがあると説明している（[Uber の配車をキャンセルする](https://help.uber.com/en/riders/article/uber-%E3%81%AE%E9%85%8D%E8%BB%8A%E3%82%92%E3%82%AD%E3%83%A3%E3%83%B3%E3%82%BB%E3%83%AB%E3%81%99%E3%82%8B?nodeId=56270015-1d1d-4c08-a460-3b94a090de23)、2026-09-27 に確認）。額と時間の条件は、そのページに書かれていない。この設計は本家の値に依らず、事業者の規則で持つ（pricing の 4.3 節）。
 
 ## 3. 状態と事象
 
@@ -165,7 +165,7 @@ CREATE UNIQUE INDEX one_active_assignment_per_trip ON driver_assignments (trip_i
 
 - `region_gen` は、大阪への切り替え（と戻し）のたびに 1 上がる AppConfig の値である。Trips は、epoch を増やすトランザクションで今の `region_gen` を `driver_dispatch_state` と `driver_assignments` に書く。
 - epoch の比較と一致の検査は、つねに `(region_gen, assignment_epoch)` の辞書順で行う。切り替えで複製されなかった epoch の増分と同じ値が新しいリージョンで再び使われても、世代が違うので古い操作・古い提案と取り違えない。
-- 切り替えの後、`driver_dispatch_state.region_gen` が今の世代より小さい行は、最初の epoch の操作（作成・解放・復元）のときに今の世代で書き直す。epoch の値はそのまま続けて増やす（0 に戻さない）。
+- 切り替えの後、`driver_dispatch_state.region_gen` が今の世代より小さい行は、最初の epoch の操作（作成・解放・復元）のときに今の世代で書き直す。epoch の値はそのまま続けて増やす（0 に戻さない）。比較は `(region_gen, assignment_epoch)` の辞書順なので、戻しても戻さなくても正しさは同じである。戻さないのは、ログ・監査・再生で同じドライバーの epoch の値が世代をまたいで重複せず、読み違えを減らせるため（既定。Dev のテックリードの確認事項）。
 - 復元した割り当て（8.5 節）は、今の世代で epoch を 1 増やして結び直し、新しい `(region_gen, assignment_epoch)` をドライバーのアプリに返す。アプリは以後その組を付けて送る。
 
 ### 4.3 提案の検査（`propose`）

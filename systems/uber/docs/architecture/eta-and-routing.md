@@ -19,7 +19,7 @@
 | 項目 | 本家・公開の事実 | この設計 |
 | --- | --- | --- |
 | ETA の作り方 | 道路を重みつきの辺の小さな区間に分けたグラフで経路のエンジンが ETA を求め、実績との差（残差）を機械学習（DeepETA）で予測して足す。数ミリ秒で返す、本家で最も QPS の高いモデル。評価は平均絶対誤差（MAE）で、損失は遅れと早すぎを非対称に扱える Huber 損失（[DeepETA](https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/)、2022-02-10） | 経路のエンジン（Valhalla）＋補正。S1 の補正は偏りの表（4.5 節）で、機械学習は S2 以降 |
-| 規模 | 本家は ETA を毎秒 50 万件の規模で求める、とする解説がある（[System Design Newsletter の解説](https://newsletter.systemdesign.one/p/uber-eta)。本家の一次の資料は確認できず **未検証**） | S1 は数百件/秒 |
+| 規模 | 本家の経路のエンジンは、毎秒数十万件の ETA の要求を 1 桁ミリ秒で返す（[ETA Phone Home: How Uber Engineers an Efficient Route](https://www.uber.com/us/en/blog/engineering-routing-engine/)、2026-09-27 に確認）。「毎秒 50 万件」は二次の解説の数で、本家の資料にはない | S1 は数百件/秒 |
 | 候補と ETA | 地理の索引の候補を、経路・ETA のサービスに送り、道路の上の近さを求める（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)） | 同じ（4.1 節） |
 | Valhalla の行列 | `sources_to_targets`。`auto`・`taxi` などの costing を使える。行列の上限の既定は `auto` で 2,500 組、距離 400 km。時刻に依る行列は、既定の設定（`max_timedep_distance_matrix` 0）では使えない（[Matrix API](https://github.com/valhalla/valhalla/blob/master/docs/docs/api/matrix.md)、[valhalla_build_config](https://github.com/valhalla/valhalla/blob/master/scripts/valhalla_build_config)） | 5.4 節で設定を変える |
 | Valhalla の速度 | 経路の速度は、現在の交通 → 予測（過去）の交通（1 週を 5 分ごとの 2,016 の値、DCT で圧縮してタイルに入れる）→ 昼の平均 → 夜の平均 → 基本の速度、の順に使う。予測の交通は `valhalla_add_predicted_traffic` で CSV から入れる（[Speeds](https://github.com/valhalla/valhalla/blob/master/docs/docs/concepts/speeds.md)、[Historical traffic](https://github.com/valhalla/valhalla/blob/master/docs/docs/concepts/historical-traffic.md)） | 自前の走行の実績から予測の交通を作る（8 節） |
@@ -55,7 +55,7 @@ Pricing ──▶ fare-distance（TypeScript）──▶ 商用の地図の提�
 - 依頼ごとに、候補（最大 10 人）から乗車地への **many-to-one** の `sources_to_targets` を 1 回呼ぶ。同じバッチの依頼は並列に呼ぶ。
 - 多対多（候補の和集合 × バッチの全依頼）にまとめない。組の数が 60 × 600 ＝ 36,000 になり、上限（既定 2,500）を超え、使わない組を計算する。
 - `date_time` は出発の時刻（`type=1`、今の時刻）にし、予測の交通を使う（5.4 節）。
-- 期限は 400 ms。間に合わない組は、**直線の距離からの概算**にする：`eta = 直線の距離 × 1.4 ÷ 時速 18 km ＋ 60 秒`（係数は東京の実績で E4 に見直す。**未検証**の仮の値）。概算の組は `eta_source=fallback` を付ける。
+- 期限は 400 ms。間に合わない組は、**直線の距離からの概算**にする：`eta = 直線の距離 × 1.4 ÷ 時速 18 km ＋ 60 秒`（係数は東京の実績で E4 の `eta-bias-correction` に見直す。**未検証**の仮の値）。概算の組は `eta_source=fallback` を付ける。
 - 補正（4.5 節）は、配車の行列にも同じように足す。配車が比べるのは、同じ補正を足した値どうしである。
 
 ### 4.2 受諾の時点の迎車の ETA
@@ -94,7 +94,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7(pickup), hour_of_wee
 
 ### 5.1 costing
 
-- `costing=taxi`（タクシーの通れる車線を優先する。OSM の日本のデータでタクシーの車線がどれだけ付いているかは **未検証**）。
+- `costing=taxi`（タクシーの通れる車線を優先する）。ただし、OSM の日本のデータでは、`taxi` のタグを持つ way は 897、`taxi:lanes` は 7 しかない（[taginfo の日本](https://taginfo.geofabrik.de/asia:japan/)、2026-09-26 のデータ、2026-09-27 に確認）。実際は `auto` とほぼ同じ経路になると見込み、差は E4 の黄金の経路の検査で見る。
 - 既定の `costing_options.taxi`：`use_tolls` 0.5（配車・ETA は有料道路の有無を決めない）、`use_highways` 0.5、`top_speed` 120。
 - 事前確定運賃の距離には Valhalla を使わない（7 節）。
 
@@ -122,7 +122,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7(pickup), hour_of_wee
 
 ### 5.3 配置と切り替え
 
-- ETA 用の Valhalla は ECS Fargate のタスクで動かす。起動のときに S3 から tar をタスクの一時の記憶域に取り、読み込む。日本全体のタイルの大きさと、必要なメモリ・起動の時間は **未検証**（E4 で計る。日本の OSM の抽出は 2.4 GB（[Geofabrik](https://download.geofabrik.de/asia/japan.html)、2026-09-27 に確認））。
+- ETA 用の Valhalla は ECS Fargate のタスクで動かす。起動のときに S3 から tar をタスクの一時の記憶域に取り、読み込む。日本全体のタイルの大きさと、必要なメモリ・起動の時間は **未検証**（E4 の `valhalla-pool-fargate` で計る。日本の OSM の抽出は約 2.5 GB（[Geofabrik](https://download.geofabrik.de/asia/japan.html)、2026-09-27 の版で 2,537,341,328 バイト））。
 - **青緑の切り替え**：新しい版のタスクの組を立ち上げ、本番の要求の写しを 1 時間流して応答の時間と差を比べ、`eta-service` の宛先を切り替える。古い組は 24 時間残し、戻せるようにする。
 - 当てはめ用の組は別に置き、同じ版を少し遅れて使う。
 
@@ -134,7 +134,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7(pickup), hour_of_wee
 | `service_limits.taxi.max_matrix_distance` | 100 km | 迎車・乗車の距離に合わせて既定（400 km）より狭める |
 | `max_timedep_distance_matrix` | 30 km（既定 0 から変える） | 予測の交通を行列でも使うため |
 
-- 時刻に依る行列は、出発の時刻を sources に付けると、正確だが遅い `timedistancematrix` が既定になる。`prioritize_bidirectional: true` で速い `costmatrix` を選べる（[Matrix API](https://github.com/valhalla/valhalla/blob/master/docs/docs/api/matrix.md)）。many-to-one（sources が targets より多い）で出発の時刻を使える条件と、速さの両立は **未検証**。E4 の PoC で、(a) 時刻に依る行列、(b) 時刻に依らない行列 ＋ 補正の表、の精度と p99 を比べて決める。決まるまでの既定は (b)。
+- 時刻に依る行列は、出発の時刻を sources に付けると、正確だが遅い `timedistancematrix` が既定になる。`prioritize_bidirectional: true` で速い `costmatrix` を選べる（[Matrix API](https://github.com/valhalla/valhalla/blob/master/docs/docs/api/matrix.md)）。ただし、sources が targets より多い要求では、sources に時刻を付けられない。付けられるのは、targets が sources より少ないときの targets の到着の時刻（`date_time.type = 2`）だけである（同じ文書の Time-dependent matrices、2026-09-27 に確認）。配車の行列は many-to-one（ドライバーが sources、乗車地が target）なので、(a) は「乗車地への到着の時刻＝今 ＋ 迎車の ETA の見込み」を target に付ける形になる。E4 の `timedep-matrix-poc` で、(a) この形の時刻に依る行列、(b) 時刻に依らない行列 ＋ 補正の表、の精度と p99 を比べて決める（**未検証**）。決まるまでの既定は (b)。
 - ETA の要求の期限は、Valhalla の中の処理に対して 300 ms（配車の 400 ms の中）。
 
 ## 6. ETA の精度の計測（NFR-003）
@@ -244,7 +244,7 @@ message RouteOption {
 ## 10. セキュリティと位置のプライバシー
 
 - `eta-service` と `fare-distance` は内部の API だけ。乗客のアプリからの要求は、乗客の API を通し、乗客の依頼に関わる地点（自分の乗車地・降車地）だけを受ける。
-- ETA の要求の緯度経度をログに書かない（解像度 8 のセルまで）。Valhalla のアクセスログは切り、エラーのログから座標を除く設定にする（Valhalla のログに座標が出るかは **未検証**。E4 で確かめる）。
+- ETA の要求の緯度経度をログに書かない（解像度 8 のセルまで）。Valhalla のアクセスログは切り、エラーのログから座標を除く設定にする（Valhalla のログに座標が出るかは **未検証**。E4 の `valhalla-serving` と E3 の `location-log-lint` で確かめる）。
 - 商用の提供者に送るのは、乗車地・降車地の座標と時刻だけ。乗客の ID・電話番号を送らない。外国の提供者に位置を送ることの扱いは、法務の確認待ち（L4）。
 - 速度の表と補正の表は、ドライバーの ID を持たない集計だけ。
 

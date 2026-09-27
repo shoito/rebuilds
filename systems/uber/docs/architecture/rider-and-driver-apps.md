@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | iOS の背景の位置 | 背景で位置を受けるアプリは、`Info.plist` の `UIBackgroundModes` に `location` を入れ、`allowsBackgroundLocationUpdates` を `true` にする。前景で更新を始めると、背景に移っても更新が続き、必要なら青い表示（バーかピル）が出る。`UIBackgroundModes` なしに `true` にすると、アプリが落ちる（[allowsBackgroundLocationUpdates](https://developer.apple.com/documentation/corelocation/cllocationmanager/allowsbackgroundlocationupdates)） | 出庫の間だけ `true` にする（4 節） |
 | iOS の背景の活動の印 | `CLBackgroundActivitySession` を前景で作ると、背景で位置の更新を受け続けられる。アプリが終了されたら、背景で起動された直後に作り直す（[Handling location updates in the background](https://developer.apple.com/documentation/corelocation/handling-location-updates-in-the-background)） | 出庫で作り、入庫で閉じる |
-| iOS の模擬の位置 | `CLLocationSourceInformation.isSimulatedBySoftware` は、端末の上のソフトウェアの模擬（Xcode の GPX など）で作った位置のとき `true`（[isSimulatedBySoftware](https://developer.apple.com/documentation/corelocation/cllocationsourceinformation/issimulatedbysoftware)）。他社の偽装の道具を検出できないという報告がある（[Apple Developer Forums](https://developer.apple.com/forums/thread/803179)） | 印として送るが、頼らない（9 節） |
+| iOS の模擬の位置 | `CLLocationSourceInformation.isSimulatedBySoftware` は、端末の上のソフトウェアの模擬（Xcode の GPX など）で作った位置のとき `true`（[isSimulatedBySoftware](https://developer.apple.com/documentation/corelocation/cllocationsourceinformation/issimulatedbysoftware)、iOS 15 以上）。他社の偽装の道具を検出できないという報告がある（[Apple Developer Forums](https://developer.apple.com/forums/thread/803179)） | 印として送るが、頼らない（9 節） |
 | Android の模擬の位置 | `Location.isMock()` は API 31 で加わった。`isFromMockProvider()` は API 31 で非推奨（[Location](https://developer.android.com/reference/android/location/Location)） | API 31 以上は `isMock()`、それより前は `isFromMockProvider()` |
 | Android のフォアグラウンドサービス | Android 14 以上で、`location` などの型のフォアグラウンドサービスは、使用中のみの許可が要るため、見えている画面があるときに始める必要がある。背景から始めると `SecurityException`。`ACCESS_BACKGROUND_LOCATION` があれば例外がある。高い優先度の FCM を受けたときは背景から始められるが、利用者に見える内容を出さない高い優先度の通知は、普通の優先度に落とされうる（[Restrictions on starting a foreground service from the background](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)） | 出庫の操作で始める。落ちたら通知から開き直してもらう（4.4 節） |
 | Google Play の申告 | Android 14 以上を対象にするアプリは、使うフォアグラウンドサービスの型を Play Console で申告する。背景の位置を使うアプリは、権限の申告の審査を通る必要がある（[Understanding foreground service and full-screen intent requirements](https://support.google.com/googleplay/android-developer/answer/13392821?hl=en)、[Understanding location in the background permissions](https://support.google.com/googleplay/android-developer/answer/9799150?hl=en)） | `location` の型を申告する。背景の位置の権限は求めない |
@@ -32,7 +32,7 @@
 | Apple マップへの引き継ぎ | iOS 18.4 以降の統合の Maps URL は `/directions` で `source`・`destination`・`waypoint`（繰り返して複数）・`mode`・`avoid`（`tolls`・`highways` など）を持つ（[Adopting unified Maps URLs](https://developer.apple.com/documentation/mapkit/unified-map-urls)） | iOS 18.4 以上でだけ Apple マップを引き継ぎ先に出す |
 | App Store の段階的な公開 | 7 日で 1%・2%・5%・10%・20%・50%・100% と固定で広がり、止められる。対象は自動の更新をする利用者で、手で更新する人と新しく入れる人は最新を受け取る（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases)） | 10 節 |
 | Google Play の即時の更新 | アプリ内の更新の `IMMEDIATE` は、更新が終わるまで画面を塞ぐ（[Support in-app updates](https://developer.android.com/guide/playcore/in-app-updates/kotlin-java)） | 強制の更新に使う（10.3 節） |
-| 本家のリリース | 本家の 4 つのアプリ（乗客・ドライバー × iOS・Android）は、トランクベースで開発し、週 1 回の列車で出していたと説明されている（[The Pragmatic Engineer の記事](https://blog.pragmaticengineer.com/uber-app-rewrite-yolo/)。本家の一次の資料は確認できず **未検証**） | 週 1 回の列車（10 節） |
+| 本家のリリース | 本家の 4 つのアプリ（乗客・ドライバー × iOS・Android）は、トランクベースで開発し、週 1 回の列車で出していたと説明されている（本家の技術ブログ [The Uber Engineering Tech Stack, Part II](https://www.uber.com/us/en/blog/uber-tech-stack-part-two/)、2016-07-21、2026-09-27 に確認） | 週 1 回の列車（10 節） |
 
 ## 3. 画面の流れ
 
@@ -89,7 +89,7 @@
 | 降車 | 連携のメーターがなければ額を入れる。照合の保留のときは写真を求める（[pricing-and-fares.md](pricing-and-fares.md) の 5.4 節） |
 | 流しの実車 | タクシーのドライバーだけに出す。日本版ライドシェアのドライバーには出さない（[ADR-0014](../decisions/0014-dispatch-eligibility-and-street-hails.md)） |
 
-- **運転中の操作を減らす。** 走行中（速度 10 km/h 以上）は、受諾・辞退・到着・ナビを開く・緊急以外のボタンを隠す。オファーの受諾は 1 回のタップで済ませる。メッセージは定型文だけにする。道路交通法の運転中の携帯電話の使用との関係は、事業者の車載の器具（ホルダー）と運用に依る（**未検証**。法務と事業者に確かめる）。
+- **運転中の操作を減らす。** 走行中（速度 10 km/h 以上）は、受諾・辞退・到着・ナビを開く・緊急以外のボタンを隠す。オファーの受諾は 1 回のタップで済ませる。メッセージは定型文だけにする。道路交通法の運転中の携帯電話の使用との関係は、事業者の車載の器具（ホルダー）と運用に依る（法務と事業者の確認待ち。E9 の `driving-mode-ui` の spec の承認の前に確かめる）。
 - 文字の大きさは OS の設定に従い、最小でも 17 pt 相当にする。オファーの画面は、色だけでなく形と文字で受諾・辞退を分ける。
 
 ## 4. 背景での位置の送信と電池（[ADR-0007](../decisions/0007-driver-background-location-and-battery.md)）
@@ -117,7 +117,7 @@
 | 入庫 | 止める | 送らない | `CLBackgroundActivitySession` を閉じ、フォアグラウンドサービスを止める |
 
 - **熱と電池**：端末の熱の状態が `serious` 以上（iOS の `ProcessInfo.thermalState`、Android の `PowerManager` の熱の状態）か、電池が 15% 以下で給電がないときは、空車の取り方を 4 秒に 1 点に落とし、画面に「充電してください」を出す。迎車中・乗車中は落とさない。
-- **目標**：基準の端末（各 OS で 2 機種、E9 で決める）で、給電なしの空車の 1 時間の電池の消費を計り、10% 以下を目標にする（**未検証**の設計の値）。タクシーの車内では給電を前提にし、事業者にホルダーと給電を求める（[supply-and-operators.md](supply-and-operators.md) への申し送り）。
+- **目標**：基準の端末（各 OS で 2 機種、E9 で決める）で、給電なしの空車の 1 時間の電池の消費を計り、10% 以下を目標にする（**未検証**の設計の値。E9 の `driver-background-location` で計る）。タクシーの車内では給電を前提にし、事業者にホルダーと給電を求める（[supply-and-operators.md](supply-and-operators.md) への申し送り）。
 - 端末は `LocationSample` に、OS が出す精度・速度・向き・出どころ（GNSS・FUSED・NETWORK）と、模擬の印（2 節の API）を載せる（[location-ingestion.md](location-ingestion.md) の 4.1 節）。
 
 ### 4.3 溜めと送り直し
@@ -131,12 +131,12 @@
 | 起きること | 検知 | 回復 |
 | --- | --- | --- |
 | OS がアプリを終了した（メモリ不足） | サーバー：出庫中のドライバーの最新の点が 60 秒より古い | サーバーが利用者に見えるプッシュ通知（「位置の送信が止まっています。アプリを開いてください」）を送る。通知から開けば、出庫の状態を読み直して取り直す。Android は通知からの起動でフォアグラウンドサービスを始め直せる（2 節の例外） |
-| 利用者がアプリを強制で終了した | 同上 | 同上。iOS は強制で終了したアプリを位置の更新で起こさないと見込む（**未検証**。E9 で確かめる） |
+| 利用者がアプリを強制で終了した | 同上 | 同上。iOS の標準の位置の更新は、アプリが終了すると届かなくなる（[startUpdatingLocation()](https://developer.apple.com/documentation/corelocation/cllocationmanager/startupdatinglocation%28%29)、2026-09-27 に確認）。この設計は大きな移動の通知を使わないので、開き直すまで止まる |
 | 位置の許可を取り消した | 端末：許可の変化の通知 | 出庫を止め（サーバーに `session_paused` を送る）、許可の画面を出す |
 | 位置の機能を切った・機内モード | 端末 | 同上。機内モードは 4.3 節で溜める |
 | 5 分の間、点が来ない | サーバー | ドライバーを休憩（`paused_by_system`）にする。迎車中・乗車中の乗車は、状態を変えずに運用に知らせる（[trips-lifecycle.md](trips-lifecycle.md) の 3.3 節の注） |
 
-- Android のメーカー独自の電池の最適化（アプリを止める機能）で落ちることがある。初回の出庫で、電池の最適化から外す設定の案内を出す（任意）。どのメーカーで起きるかは **未検証**（E9 の端末の試験で確かめる）。
+- Android のメーカー独自の電池の最適化（アプリを止める機能）で落ちることがある。初回の出庫で、電池の最適化から外す設定の案内を出す（任意）。どのメーカーで起きるかは **未検証**（E9 の `driver-background-location` の端末の試験で確かめる）。
 
 ## 5. アプリの中の乗車の状態（[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)）
 
@@ -200,13 +200,13 @@ Effect = SendCommand(TripCommand) | Persist(journal, snapshot) | Render(screen) 
 | 引き継ぎ先 | 形 | 条件 |
 | --- | --- | --- |
 | Google マップ（iOS・Android） | `https://www.google.com/maps/dir/?api=1&destination=<lat,lng>&waypoints=<lat,lng>|<lat,lng>…&travelmode=driving&dir_action=navigate[&avoid=tolls]` | 経由地は最大 8 つ（上限の 9 に 1 つの余裕）。`origin` を省き、今の位置から案内させる。URL は 2,048 文字以内 |
-| Apple マップ（iOS 18.4 以上） | `https://maps.apple.com/directions?destination=<lat,lng>&waypoint=<lat,lng>&waypoint=…&mode=driving[&avoid=tolls]` | 経由地の数の上限は文書にない（**未検証**）。同じく最大 8 つにする |
+| Apple マップ（iOS 18.4 以上） | `https://maps.apple.com/directions?destination=<lat,lng>&waypoint=<lat,lng>&waypoint=…&mode=driving[&avoid=tolls]` | `waypoint` を複数並べられ、数の上限は文書にない（[Unified Map URLs](https://developer.apple.com/documentation/mapkit/unified-map-urls)、2026-09-27 に確認）。Google と同じく最大 8 つにする |
 | 事業者の車載のナビ | 引き継げない | アプリの中のルートの線と主要経由地点を見ながら走る |
 
 - 迎車の区間（今の位置 → 乗車地）は、行き先だけを渡す（事前確定運賃の要件の外）。乗車の区間だけ経由地を渡す。
 - `avoid=tolls` は、見積もりで乗客が有料道路を使わないと選んだとき（`toll=AVOID_TOLLS`）だけ付ける。
 - **経由地の間引き**：`major_waypoints` が 8 を超えたら、有料道路の出入口を先に残し、残りは道のりで等間隔になるように選ぶ。`fare-distance` には、`major_waypoints` を 8 以下で返すよう申し送る（[eta-and-routing.md](eta-and-routing.md) の 7.1 節）。
-- **経由地を守るかの確認**：引き継ぎ先ごとに、E9 の試験で「経由地を渡した URL で、その順にルートが引かれ、案内が始まるか」を確かめる。Maps URLs は「経由地に対応しない製品では無視される」ため、確かめるまで **未検証** とする。確かめられなかった引き継ぎ先は、事前確定運賃の乗車では出さない（アプリの中のルートの表示で走る）。
+- **経由地を守るかの確認**：引き継ぎ先ごとに、E9 の試験で「経由地を渡した URL で、その順にルートが引かれ、案内が始まるか」を確かめる。Maps URLs は「経由地に対応しない製品では無視される」ため、確かめるまで **未検証** とする（E9 の `nav-handoff-waypoints` の 20 のルートの試験）。確かめられなかった引き継ぎ先は、事前確定運賃の乗車では出さない（アプリの中のルートの表示で走る）。
 - 引き継ぎ先の一覧は、アプリに埋めず、サーバーの設定（`nav_handoff_targets`：アプリ、OS、最低の版、事前確定で使えるか）で配る。ナビのアプリの更新で振る舞いが変わったら、アプリの配布なしに外せる。
 
 ### 6.3 引き継ぎの記録
