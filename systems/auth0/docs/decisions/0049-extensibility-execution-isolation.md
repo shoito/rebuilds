@@ -15,7 +15,7 @@ date: 2026-09-27
 
 rebuilds の他の題材の選択：
 
-- Cloudflare Workers の再構築は、共有のプロセスの V8 isolate と多層の防御（[ADR-0002](../../../cloudflare-workers/docs/decisions/0002-isolation-model.md)）。起動 5ms と密度のため。
+- 本家の Cloudflare Workers は、共有のプロセスの V8 isolate と多層の防御を使う。起動 5ms と密度のため。
 - GitHub の Actions のランナーは、EC2 の metal の上の Firecracker の microVM で 1 ジョブ 1 VM（[ADR-0023](../../../github/docs/decisions/0023-firecracker-microvm-runners.md)）。
 
 AWS Lambda のテナントの隔離のモードは、呼び出しの `tenant-id` ごとに実行環境を分け、他のテナントに再利用しない。実行環境は Firecracker で隔離される。実行ロールは全テナントで共通。1,000 の同時実行につき 2,500 の実行環境。プロビジョニングされた同時実行は使えない（[Tenant isolation](https://docs.aws.amazon.com/lambda/latest/dg/tenant-isolation.html)、2026-09-27 に確認）。

@@ -3,6 +3,7 @@
 既存のソフトウェア・SaaS を AI エージェント主体で再構築するなら、どう設計し、どう作るかを記録するリポジトリ。題材ごとに `systems/<name>/` を持ち、設計の文書だけを置く。実装のコード、`specs/`、`changes/`、CI は、題材ごとの開発リポジトリに置く（[ADR-0005](docs/decisions/0005-design-record-repository.md)）。
 
 - このリポジトリに実装のコードを置かない。
+- 題材の核（主な論点を担う部分）に、本家の実装を使わない（[ADR-0007](docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 - 下の「守ること」のうち、`specs/`・`changes/`・テスト・ブランチに関する規則は、開発リポジトリで適用する。
 
 ## 最初に読むもの

@@ -91,7 +91,7 @@ Universal Login
 
 | 方式 | 隔離の境界 | 起動 | 運用 | npm の互換 | 評価 |
 | --- | --- | --- | --- | --- | --- |
-| A. V8 isolate（`isolated-vm`、workerd など） | 同じプロセスの中の isolate | 数 ms | 多層の防御（プロセスのサンドボックス、cordon、Spectre の対策）を自前で作る。Cloudflare Workers の再構築の [ADR-0002](../../../cloudflare-workers/docs/decisions/0002-isolation-model.md) の層がそのまま要る | Node の API が一部しかない。npm のパッケージの多くが動かない | 採らない |
+| A. V8 isolate（`isolated-vm`、workerd など） | 同じプロセスの中の isolate | 数 ms | 多層の防御（プロセスのサンドボックス、cordon、Spectre の対策）を自前で作る。本家の Cloudflare Workers と同じ層が要る | Node の API が一部しかない。npm のパッケージの多くが動かない | 採らない |
 | B. 自前の Firecracker の microVM | KVM の VM | 125 ms 以下（仕様） | EC2 の metal のフリートを運用する（GitHub の [ADR-0023](../../../github/docs/decisions/0023-firecracker-microvm-runners.md)） | Node をそのまま動かせる | 採らない（S3 で再評価） |
 | C. Lambda のテナントごとの関数 | Firecracker（Lambda の実行環境） | Node のコールドスタート（未検証） | テナント × Action の版ごとに関数を作る。1 万テナントで数万の関数、コードの保管の上限、配備の速さの上限を管理する | Node をそのまま | 採らない |
 | **D. Lambda のテナントの隔離のモード** | Firecracker。実行環境はテナントの間で再利用しない | 同上。テナントごとの実行環境なので、コールドスタートが増える | 関数は Node の版ごとに 1 つの共通の実行器。テナントのコードを実行時に読み込む | Node をそのまま | **採る** |

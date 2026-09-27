@@ -19,7 +19,7 @@ date: 2026-09-27
 
 `quickjs-emscripten` は、QuickJS の WASM のビルドで、ランタイムのメモリの上限・スタックの上限・割り込みの関数を持つ（[quickjs-emscripten](https://github.com/justjake/quickjs-emscripten)、2026-09-27 に確認）。
 
-rebuilds の Cloudflare Workers は、多数のテナントのコードをサーバーで動かすため、V8 の isolate に、プロセスのサンドボックス・cordon・外向きのプロキシを重ねた（[Cloudflare Workers の ADR-0002](../../../cloudflare-workers/docs/decisions/0002-isolation-model.md)）。プラグインは利用者の端末で、その利用者が選んだコードを動かすので、他のテナントとの分離ではなく、同じタブの中の分離が問題になる。
+エッジのサーバーレス（本家の Cloudflare Workers など）は、多数のテナントのコードをサーバーで動かすため、V8 の isolate に、プロセスのサンドボックスなどの多層の防御を重ねる。プラグインは利用者の端末で、その利用者が選んだコードを動かすので、他のテナントとの分離ではなく、同じタブの中の分離が問題になる。
 
 ## Options
 

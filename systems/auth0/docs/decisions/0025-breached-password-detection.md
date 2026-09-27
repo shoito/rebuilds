@@ -56,4 +56,3 @@ date: 2026-09-27
 ## References
 
 - 設計の詳細：[attack-protection.md](../architecture/attack-protection.md) の 5 節
-- 同じ論点：Chrome の [safe-browsing-and-permissions.md](../../../chrome/docs/architecture/safe-browsing-and-permissions.md) の 6.4 節

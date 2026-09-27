@@ -177,7 +177,7 @@ CREATE TABLE brute_force_blocks (
 - range API は、登録も API キーも要らない。「ライセンスと帰属の要件はない」とされ、レート制限もない（[HIBP API v3](https://haveibeenpwned.com/API/v3)）。
 - データセットの全体は、公式の downloader で取得できる（[Pwned Passwords](https://haveibeenpwned.com/Passwords)）。ただし、取得したデータの保存・商用の利用の条件は、そのページにも API の資料にも書かれていない。
 - 利用規約は、HIBP のデータの複製・配布を禁じ、「実質的に同じ機能の漏えいのデータベース・検索のサービス」を作ることを禁じる条項を持つ（[Terms of Use](https://haveibeenpwned.com/TermsOfUse)）。Pwned Passwords に適用されるかは明記がない。
-- よって、**第一の案は、法務の確認（とデータの提供者への問い合わせ）が済むまで有効にしない。** 済むまでは予備の案で E8 を進める。Chrome の題材の [safe-browsing-and-permissions.md](../../../chrome/docs/architecture/safe-browsing-and-permissions.md) の 6.4 節も同じ論点を持つ。
+- よって、**第一の案は、法務の確認（とデータの提供者への問い合わせ）が済むまで有効にしない。** 済むまでは予備の案で E8 を進める。
 
 ### 5.4 流れごとの振る舞い
 

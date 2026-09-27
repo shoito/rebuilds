@@ -37,7 +37,7 @@ date: 2026-09-26
 >
 > - ブランチは、版ごとに `main` から切る。修正は `main` に先に入れ、そこから cherry-pick する。ブランチに直接の変更を入れない。
 > - 保護の規則（直接の push の禁止、必須のチェック、`CODEOWNERS` の承認）は `main` と同じにする。
-> - 例：Chrome の `release/M`（[systems/chrome ADR-0031](../../systems/chrome/docs/decisions/0031-ci-tiers-wpt-and-release-branches.md)）。
+> - 例：ブラウザの `release/M` のような、版ごとのブランチ。
 
 題材ごとの CI/CD とリリースの流れは、各題材の `docs/architecture/` に書く（Slack は `delivery.md`）。
 
