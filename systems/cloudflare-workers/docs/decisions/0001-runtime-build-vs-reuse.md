@@ -31,9 +31,9 @@ date: 2026-09-27
 - **V8 は自分たちでビルドする。** workerd が固定する V8 の版に、上流の修正を自分たちで当てられるようにする。修正の配信は、通常のリリースと別の緊急の経路で行い、NFR-007（24 時間以内）を守る。
 - **多数のテナントの層は、自前の Rust の部品で作る。** 入口のプロキシ、スーパーバイザー（プロセスの起動と cordon）、外向きのプロキシ、設定の写しの受け手。workerd の外側に置き、workerd のプロセスとは Unix ドメインソケットでだけ通信する（[ADR-0002](0002-isolation-model.md)）。
 - **テナントのコードの動的な読み込みと、テナントごとの CPU・メモリの制限**（2026-09-27 に上流のソースで確かめた）：
-  - 動的な読み込みは、上流に `workerLoader` のバインディングがある（名前で Worker を読み込み、使われない Worker を降ろす）。これを元にしたテナントのローダーを、`multitenant` のパッチで作る（[ADR-0007](0007-isolate-lifecycle-and-dynamic-loading.md)）。空の isolate の予備を上流の構造のまま作れるかは、E2 の最初の PoC で確かめる。
+  - 動的な読み込みは、上流に `workerLoader` のバインディングがある（名前で Worker を読み込み、使われない Worker を降ろす）。これを元にしたテナントのローダーを、`multitenant` のパッチで作る（[ADR-0007](0007-isolate-lifecycle-and-dynamic-loading.md)）。上流の `Worker::Isolate` は `Worker::Script` と別の物で、コードは後から `newScript()` で読むので、コードの前に isolate を作る形は構造の上で取れる。ただし isolate の作成に、互換の日付・フラグで決まる API の組と制限の強制の物が要る（[worker.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/worker.h)、2026-09-27 に確認）。予備の実際の効果は、E2 の最初の PoC（`dynamic-loading-poc`）で確かめる。
   - テナントごとの制限の強制は、上流にない。公開版は `NullIsolateLimitEnforcer`（制限を強制せず、CPU 時間も 0 を報告する）で、差し込み口の `IsolateLimitEnforcer` だけがある。**自前のパッチが必ず要る**（[ADR-0009](0009-cpu-and-memory-metering.md)）。
-  - V8 のサンドボックスが上流の既定のビルドで有効かは未検証。E3 の最初に確かめ、無効ならビルドの設定で有効にする（[ADR-0010](0010-process-sandbox-and-egress-invariants.md)）。
+  - 上流の既定のビルドは、V8 のサンドボックスを無効にしている（2026-09-27 に上流のソースで確認。[ADR-0010](0010-process-sandbox-and-egress-invariants.md) の注記）。有効にするビルドは E3 の最初の PoC（`v8-sandbox-build-poc`）で作る。
 - **制御プレーンは、rebuilds の共通の技術を使う。** AWS、TypeScript（Hono＋Zod）、Aurora PostgreSQL 18、Terraform、OpenTelemetry。テナントテーブルは `account_id` と RLS で分ける（他の題材と同じ）。
 - **CLI は TypeScript で作り、ローカル開発では workerd のバイナリを同梱して動かす。** 本番と同じランタイムで手元を動かす。
 - 2 を採らない理由：
@@ -41,7 +41,7 @@ date: 2026-09-27
   - 本家との振る舞いの差が増え、利用者の移行が難しくなる。
   - V8 の修正の追従は、rusty_v8 の版の上がり方にも依存する。Chrome の題材では rusty_v8 を選んだが（[chrome の ADR-0010](../../../chrome/docs/decisions/0010-v8-embedding-and-dom-gc.md)）、ブラウザは DOM を自作するので、Web API の既存の実装を使い回す利点がこの題材ほど大きくない。
 - 3 を採らない理由：
-  - Wasm にコンパイルした JavaScript エンジンは、V8 の JIT より遅い（程度は未検証）。
+  - Wasm にコンパイルした JavaScript エンジンは、V8 の JIT より遅い（程度は測っていない。この案を採らないので測らない）。
   - 利用者が書いた JavaScript・TypeScript を、そのまま Web API で動かすという価値（intent の 2）から遠くなる。
   - 要求ごとに新しいサンドボックスを作る方式は隔離が強いが、Durable Objects のような長く生きるアクターと合わせにくい。
   - Wasm のモジュールは、選択肢 1 でも V8 の Wasm として動かせる。
@@ -55,7 +55,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - ランタイムの中心が C++ になる。自分たちの差分は C++ で書くので、メモリの安全は Rust の部品より弱い。差分は小さく保ち、ASan のビルドとファズで確かめる。
   - 上流の設計の変更（API、設定の形式）に追従し続ける。上流が方針を変えたときの依存の危険がある。上流は本家の Workers のチームが主に開発している（[Introducing workerd](https://blog.cloudflare.com/workerd-open-source-workers-runtime/)）。
-  - 多数のテナントの層（本家が公開していない部分：制限の強制、cordon、プロセスのサンドボックス、外向きのプロキシ）を自前で作る。制限の強制はパッチが必ず要る。量は未検証で、E2・E3 の最大の不確実性である。パッチの行数は `multitenant` と `brand` の合計で 3,000 行以内を目標にする（[ADR-0006](0006-workerd-fork-and-upstream-tracking.md)）。
+  - 多数のテナントの層（本家が公開していない部分：制限の強制、cordon、プロセスのサンドボックス、外向きのプロキシ）を自前で作る。制限の強制・止めた時計・V8 のサンドボックスの有効化は、パッチかビルドの変更が必ず要る（ADR-0009、ADR-0010 の注記）。量は未検証で、E2・E3 の最大の不確実性である（`workerd-patch-queue` のパッチの行数の CI で測る）。パッチの行数は `multitenant` と `brand` の合計で 3,000 行以内を目標にする（[ADR-0006](0006-workerd-fork-and-upstream-tracking.md)）。
   - C++ と V8 のビルド（Bazel）と、Rust と TypeScript の 3 つの言語の道具を持つ。エージェントと人が使う道具の数が増える。
 
 ## Confirmation
@@ -64,3 +64,7 @@ date: 2026-09-27
 - V8 の修正の訓練：上流の過去の修正を 1 つ選び、取り込みから全ノードへの配信まで 24 時間以内に終わることを、四半期ごとに訓練する（runbooks）。
 - 自分たちの C++ の差分に、ASan・UBSan のビルドとファズの対象を必ず付ける（[AGENTS.md](../../AGENTS.md)）。
 - WinterTC の最小の共通 API の WPT の通過率が、同じ版の上流の workerd を下回らないことを CI で確かめる（intent の K7）。
+
+## 注記
+
+> 2026-09-27 の注記：上流のソースを確かめ、2 つの点を直した。V8 のサンドボックスは、上流の既定のビルドで無効で、V8 の Bazel のビルドも旗を持たない。「ビルドの設定で有効にする」ではなく、ビルドの変更（必要なら V8 へのパッチ）が要る（ADR-0010 の注記）。止めた時計も上流の単体の workerd にはなく、パッチで作る。どちらも決定（workerd を元にする）は変えない。

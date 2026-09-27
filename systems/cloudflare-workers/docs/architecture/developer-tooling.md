@@ -50,7 +50,7 @@
 
 - 設定ファイルの形は JSONC の 1 つだけにする（ADR-0035）。本家は 3 つの形を持つが、新しい機能を JSON に寄せている。
 - 本家の `dev --remote`（コードごと本家の網で動かす）は持たない。本物の資源が要るときは、バインディングごとのつなぎ込みだけにする（ADR-0036）。
-- `tail` の標本の段の入り方と、ログの伏せ方（秘密の値、ヘッダー）の本家の細部は公開されていない（未検証）。この設計で決める（7 節）。
+- `tail` は、量が多い関数で「標本のモード」に入り、一部のメッセージを捨てて警告を出す（[Real-time logs](https://developers.cloudflare.com/workers/observability/logs/real-time-logs/)、2026-09-27 に確認）。入る条件と、ログの伏せ方（秘密の値、ヘッダー）の細部は公開されていない。この設計で決める（7 節）。
 
 ## 3. 原則
 
@@ -131,8 +131,8 @@
  8. 表示：URL、version_id、number、startup_time_ms、圧縮前後の大きさと上限との比
 ```
 
-- **版とデプロイの時間の目安**（K4 の 5 分の内訳。未検証。E6 で計る）：`init` と依存の導入 90 秒、ログイン 30 秒、最初の `deploy` 30 秒（バンドル 2 秒、検証 5 秒、5 リージョンへの置き 3 秒、伝搬 p99 30 秒）。
-- **設定と遠隔の差**：いまのデプロイの版の `source` が `dashboard`・`api` で、その版のバインディング・変数・互換の設定が手元の設定と違えば、差を表示する。端末では確かめ、CI では `--allow-drift` がなければ終了コード 2 で止める（本家は設定ファイルを正本とするよう勧めるが、差の扱いの細部は未検証）。
+- **版とデプロイの時間の目安**（K4 の 5 分の内訳。未検証。E6 の `k4-e2e` で計る）：`init` と依存の導入 90 秒、ログイン 30 秒、最初の `deploy` 30 秒（バンドル 2 秒、検証 5 秒、5 リージョンへの置き 3 秒、伝搬 p99 30 秒）。
+- **設定と遠隔の差**：いまのデプロイの版の `source` が `dashboard`・`api` で、その版のバインディング・変数・互換の設定が手元の設定と違えば、差を表示する。端末では確かめ、CI では `--allow-drift` がなければ終了コード 2 で止める（本家は設定ファイルを正本とするよう勧め、ダッシュボードで変えた変数とルートを次のデプロイで上書きする。変数は `keep_vars = true` で残せる。[Configuration の Source of truth](https://developers.cloudflare.com/workers/wrangler/configuration/#source-of-truth)、2026-09-27 に確認。この基盤は黙って上書きせず、差を示して止める）。
 - **ソースマップ**：`upload_source_maps: true` のとき、ソースマップを版と一緒に送る。isolate には渡さず、ログの例外のスタックを戻すときだけ使う（8 節）。
 
 ## 5. 設定ファイル
@@ -221,7 +221,7 @@
 ```
 
 - 模擬の保存先は `.<brand>/state/`（`--persist-to` で変える）。`init` で `.gitignore` に足す。`--no-persist` でメモリだけにする。
-- Durable Objects は workerd 自身が手元のディスクで動かせる（本家の Miniflare と同じ考え）。workerd の設定の細部（保存先の指定の形）は E6 の PoC で確かめる（未検証）。
+- Durable Objects は workerd 自身が手元のディスクで動かせる（本家の Miniflare と同じ考え）。上流の設定は `durableObjectStorage` の `localDisk`（`DiskDirectory` のサービスの名前）で、クラスごとの `uniqueKey` のディレクトリに実体ごとの `.sqlite` を置く。上流は「実験。互換を崩す変更がありうる」としている（[workerd.capnp](https://github.com/cloudflare/workerd/blob/main/src/workerd/server/workerd.capnp)、2026-09-27 に確認）。形の変更は週 1 回の取り込みの CI で検知する。
 - 模擬のサービスは、本番のバインディングと同じ JavaScript の API を持つ。API の形の元は、本番のバインディングの型（9 節）と同じ定義にする。
 
 ### 6.2 シークレットと変数
@@ -255,7 +255,7 @@
 | CPU 時間・メモリの上限 | 強制（ADR-0009） | 強制しない | 1 要求ごとの CPU 時間を測り、計画の上限を超えたら警告する。`--enforce-limits` で強制する（手元の機械の速さで結果が変わる） |
 | 外向きの宛先 | 私的なアドレス・内部の範囲を拒否（ADR-0010） | 通す（手元の API を試すため） | 拒否の範囲（[sandbox-and-security.md](sandbox-and-security.md) の 7.1 節）に当たる宛先には「本番では拒否される」と警告する |
 | サブリクエストの数 | 外向きのプロキシが数えて止める | 数えて警告 | `--enforce-limits` で止める |
-| 時計・スレッド | 止めた時計、スレッドなし | 同じ（workerd の振る舞い） | 差なし |
+| 時計・スレッド | 止めた時計、スレッドなし | 時計は実行中も進む（上流の単体の workerd の振る舞い。止めた時計は本番のパッチだけ。[sandbox-and-security.md](sandbox-and-security.md) の 6.1 節）。スレッドなしは同じ | 本家と同じ差（本家の文書も「ローカル開発ではタイマーが進む」）。CLI の文書に書く |
 | KV の一貫性 | 結果整合（最大 `cacheTtl` の古さ） | 強い整合 | 起動時に表示する。古さを試す `--kv-stale-ms` は持たない（S1） |
 | オブジェクトストレージ | ホームのリージョンで強い整合 | 強い整合 | 差なし |
 | Durable Objects | 1 つの名前に 1 つの実体、配置 | 1 プロセスの中に 1 つ | 配置・移動・障害は試せない |
@@ -384,7 +384,7 @@ TTL toDateTime(ts) + toIntervalDay(plan_retention_days);
 -- Row policy: every query runs as the log-query role with account_id = {account} injected by the service.
 ```
 
-- **データの量の見込み**（未検証。E6 で計る）：S1 の平均 2 万件/秒（[capacity.md](capacity.md) の 1 節）のうち、保存を有効にした関数を半分と仮定して 1 万件/秒 × 1KB で 1 日約 860GB、圧縮で約 90GB、7 日で約 630GB。
+- **データの量の見込み**（未検証。E6 の `tenant-logs` で計る）：S1 の平均 2 万件/秒（[capacity.md](capacity.md) の 1 節）のうち、保存を有効にした関数を半分と仮定して 1 万件/秒 × 1KB で 1 日約 860GB、圧縮で約 90GB、7 日で約 630GB。
 - ClickHouse を自前で運用するか、AWS の東京で動くマネージドの ClickHouse を使うかは、E6 の PoC で決める（14 節）。
 
 ### 8.2 検索
@@ -426,7 +426,8 @@ TTL toDateTime(ts) + toIntervalDay(plan_retention_days);
 - `<brand> types` が 2 つを作る。
   1. `worker-env.d.ts`：設定ファイル（`--env` で選ぶ環境）のバインディングから `interface Env { CONFIG: KVNamespace; ASSETS: Bucket; ROOM: DurableObjectNamespace<Room>; … }`。`vars` は値の型（文字列の文字どおりの型）にする。シークレットは `.dev.vars` の名前から `string` にする。
   2. ランタイムの API の型：設定の互換の日付とフラグに合う型を、`@<brand>/runtime-types` から選んで参照する。
-- `@<brand>/runtime-types` は、下流の workerd のビルドで、上流の `types/`（JSG の RTTI から型を作る仕組み）で作り、ランタイムの版ごとに npm に出す。互換の日付ごとの差は、上流の仕組みが作る日付ごとの入口を使う（細部は未検証。E6 で確かめる）。
+- `@<brand>/runtime-types` は、下流の workerd のビルドで、上流の `types/`（JSG の RTTI から型を作る仕組み）で作り、ランタイムの版ごとに npm に出す。**上流が作る入口は「最新」と「実験」の 2 つだけ**で、日付ごとの入口はない（上流の `types/scripts/build-types.ts`。本家の `@cloudflare/workers-types` も v5 で日付ごとの入口をなくした。[TypeScript](https://developers.cloudflare.com/workers/languages/typescript/)、2026-09-27 に確認）。
+- そのため、**互換の日付とフラグに合う型は `types` のコマンドが手元で作る**（本家の `wrangler types` と同じ考え）。CLI が同梱した workerd で上流の型の生成の仕組み（`/<互換の日付>.bundle` を返す Worker）を動かし、設定の日付とフラグの型を `worker-env.d.ts` の隣に書く。npm の `@<brand>/runtime-types` は、ライブラリの作者向けの最新・実験の型に使う。
 - 本家の名前を含む型の名前（`request.cf` の型など）は、`brand` のパッチ（[runtime-and-isolates.md](runtime-and-isolates.md) の 4.2 節）と同じ置き換えを型にも当てる。
 - `<brand> dev` と `<brand> deploy` は、`worker-env.d.ts` が設定と合わなければ警告する（生成し直しを促す）。
 

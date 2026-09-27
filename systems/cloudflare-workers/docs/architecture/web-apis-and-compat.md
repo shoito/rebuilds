@@ -75,7 +75,7 @@
 | `atob`・`btoa`・`structuredClone`・`queueMicrotask`・`reportError` | 持つ | |
 | `globalThis`・`self`・`console` | 持つ | `console` の出力は tail とログへ（developer-tooling・observability） |
 | `navigator.userAgent` | 持つ | 値は単一の製品の記号 `'<Brand>-Workers'`（ECMA-429 の推奨の形）。上流の `global_navigator` のフラグの日付に従う |
-| `onerror`・`onunhandledrejection`・`onrejectionhandled` | 上流の実装に従う | 有無と振る舞いは WPT の結果で確かめる（未検証） |
+| `onerror`・`onunhandledrejection`・`onrejectionhandled` | 上流の実装に従う | 上流のグローバルは `unhandledrejection`・`rejectionhandled` の事象を `addEventListener` で受ける。`error` の事象と `on*` の属性は持たない（[global-scope.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/api/global-scope.h)、2026-09-27 に確認）。**逸脱**として一覧に載せ、WPT の結果で確かめる |
 
 **ECMA-429 の外で持つもの**（本家と同じく上流が持つ）：`WebSocket`・`WebSocketPair`、`scheduler.wait`、`EventSource`、`crypto.DigestStream` など。
 
@@ -96,14 +96,15 @@
 ### 4.4 Web Crypto
 
 - 標準の算法は上流の実装（BoringSSL）に従う。本家の非標準の拡張（`crypto.DigestStream`、`crypto.subtle.timingSafeEqual`、MD5 の digest）も上流にあるので持つ。
-- **PBKDF2 の反復の回数に上限を置く**：公開版の workerd は上限を持たない（`NullIsolateLimitEnforcer` の `checkPbkdfIterations` が「上限なし」を返す。[server.c++](https://github.com/cloudflare/workerd/blob/main/src/workerd/server/server.c%2B%2B)）。本家は上限を持つとされるが値は未検証。S1 は 100,000 回を上限にし、超えたら `NotSupportedError` にする（[ADR-0009](../decisions/0009-cpu-and-memory-metering.md) の `IsolateLimitEnforcer` の実装で入れる）。CPU 時間の上限とは別に、1 回の呼び出しでスレッドを長く占有させないため。
+- **PBKDF2 の反復の回数に上限を置く**：公開版の workerd は上限を持たない（`NullIsolateLimitEnforcer` の `checkPbkdfIterations` が「上限なし」を返す。[server.c++](https://github.com/cloudflare/workerd/blob/main/src/workerd/server/server.c%2B%2B)）。差し込み口の既定の実装は 100,000 回で、「歴史的に 100,000 回に制限してきた」とコメントされている（[limit-enforcer.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/limit-enforcer.h)、2026-09-27 に確認）。S1 も 100,000 回を上限にし、超えたら `NotSupportedError` にする（[ADR-0009](../decisions/0009-cpu-and-memory-metering.md) の `IsolateLimitEnforcer` の実装で入れる）。CPU 時間の上限とは別に、1 回の呼び出しでスレッドを長く占有させないため。
+- **scrypt の費用にも上限を置く**：`node:crypto` の scrypt は、同じ差し込み口の `checkScryptCost` で `N × r × p` を 2^20 までに制限する（上流の既定の実装。公開版の `NullIsolateLimitEnforcer` もこれを受け継ぐ）。S1 も同じ値にする。
 - `crypto.getRandomValues`・`randomUUID` は、ランタイムの CSPRNG（`getrandom`）から。
 
 ### 4.5 WebSocket
 
 - サーバー：`new WebSocketPair()` で作り、片方を `accept()` して、もう片方を `Response` の `webSocket` で返す（本家と同じ）。
 - クライアント：`fetch` に `Upgrade: websocket` を付けるか、`new WebSocket(url)`。外向きのプロキシを通り、宛先の検査も同じ。
-- 1 つのメッセージの大きさの上限と、接続の時間の上限は limits-and-billing で決める（本家の値は確かめられず、未検証）。
+- 受け取る 1 つのメッセージの大きさの上限は **32 MiB**（本家と同じ。超えると `1009` で閉じる。[WebSockets](https://developers.cloudflare.com/workers/runtime-apis/websockets/)、2026-09-27 に確認）。上流の workerd の既定も 32 MiB で、実験のフラグ `increase_websocket_message_size`（128 MiB、手元の開発用）は開かない。接続の時間の上限は置かない（本家の HTTP の要求と同じく、利用者が接続している間は続く）。値の表は limits-and-billing の 3.3 節。
 - WebSocket を持つ要求は、CPU 時間の上限を要求の全体で数える（メッセージごとに数え直さない）。Durable Objects に相当するものの休止（hibernation）は durable-objects の領域。
 
 ## 5. `request.<brand>`
@@ -158,7 +159,7 @@ S1 の入口は、Global Accelerator の edge で TCP を受け、エッジの�
 | `node:fs` | 仮想のファイルシステム | 同じ | 下の注意 |
 | 空の実装（`node:child_process`・`node:worker_threads` など） | 読み込めるが動かない | 同じ | 上流に従う。ネイティブ・スレッドの禁止と矛盾しない（動かないので） |
 
-- **`node:fs` の注意**：本家の仮想のファイルシステムは、ホストのファイルシステムに届かない（メモリの中）。`/tmp` に書いた量は isolate のメモリ（128MiB）に数える。`/tmp` の中身の寿命（要求ごとか、isolate ごとか）は上流の実装に従う（未検証）。**同じ isolate を使う要求の間で `/tmp` が共有されるなら、それは同じ関数の同じ版の中だけ**（[runtime-and-isolates.md](runtime-and-isolates.md) の 3 節）なので、テナントをまたがない。脱出のテストで、`/bundle`・`/tmp`・`/dev` の外が見えないことを確かめる（[sandbox-and-security.md](sandbox-and-security.md) の 9.1 節）。
+- **`node:fs` の注意**：本家の仮想のファイルシステムは、ホストのファイルシステムに届かない（メモリの中）。`/tmp` に書いた量は isolate のメモリ（128MiB）に数える。**`/tmp` の中身は要求ごと**：上流は `/tmp` を要求の文脈（`IoContext`）ごとに持ち、文脈が終わると消す（[worker-fs.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/worker-fs.h)、2026-09-27 に確認）。同じ isolate の別の要求からも見えない。脱出のテストで、`/bundle`・`/tmp`・`/dev` の外が見えないことを確かめる（[sandbox-and-security.md](sandbox-and-security.md) の 9.1 節）。
 - `process.env` は、上流のフラグに従ってバインディング（環境変数・シークレット）から埋める。
 - 互換の状況は、本家の文書の表と同じ形で、この基盤の文書に載せる（developer-tooling）。上流の取り込みで対応が増えたら、文書を更新する。
 
@@ -232,7 +233,7 @@ S1 の入口は、Global Accelerator の edge で TCP を受け、エッジの�
 | E2 | `brand` のパッチ：`request.<brand>`、`<brand>:` のモジュールの名前空間、`navigator.userAgent` |
 | E2 | PBKDF2 の反復の上限と、重いネイティブの API の一覧 |
 | E2 | Node.js の互換の範囲の確認（上流の版ごと）と、`node:net`・`node:tls`・`node:dns` の失敗の形 |
-| E2 | `node:fs` の `/tmp` の寿命とメモリの数え方の確認（未検証の解消） |
+| E2 | `node:fs` の `/tmp` が要求ごとに消えることとメモリの数え方の回帰テスト |
 | E4 | 入口のプロキシで `request.<brand>` の値を計算してランタイムへ渡す（TLS の欄、`colo`、ヘッダーとの一致） |
 | E4 | 位置の表・AS の表の提供元の選定、ノードへの配布と検証 |
 | E4 | 外向きのプロキシの `fetch`・WebSocket・リダイレクトの検査、サブリクエストの数の強制 |
@@ -245,10 +246,10 @@ S1 の入口は、Global Accelerator の edge で TCP を受け、エッジの�
 - 位置の表・AS の表の提供元をどれにするか。ライセンス（商用の利用、再配布の禁止）と、日本の地域の精度。
 - `node:dns` を、外向きのプロキシの名前の解決（DoH など）で開くか。
 - TCP のソケット（`connect()`）を、MVP の後のいつ開くか。開くときの宛先の制限（ポート、SMTP の禁止など）。
-- WebSocket の 1 つのメッセージの大きさと接続の時間の上限。
+- WebSocket の 1 つのメッセージの大きさと接続の時間の上限。→ 2026-09-27 に本家の値（受信 32 MiB）を確かめ、同じにした（4.5 節）。
 - `navigator.userAgent` の値の実際の名前（`<Brand>` の決定の後）。
 - ECMA-429 の次のスナップショット（2026 年）で増えた API への追従を、上流に任せるか。
-- `onerror` など、上流の実装の有無が分からなかった項目の実際。
+- `onerror` など、上流の実装の有無が分からなかった項目の実際。→ 上流のソースで確かめた（4.1 節の表）。
 
 ### 決定
 

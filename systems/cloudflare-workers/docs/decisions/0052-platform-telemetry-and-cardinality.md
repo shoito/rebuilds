@@ -31,7 +31,7 @@ S1 は 5 万関数、1 万アカウント、20 台前後のエッジのノード
 - **トレース**：基盤の部品（入口、転送、外向き、ストレージのゲートウェイ）は OTel のトレースを 1% の標本で X-Ray へ。5xx と 1 秒を超える要求は必ず残す（末尾の標本は Collector で）。
 - **基盤のログ**：ノードの部品のログは Vector で集め、構造化して S3（Parquet、30 日）と CloudWatch Logs（警報に要る少量、7 日）へ。利用者の要求の本文・`Authorization`・`Cookie` を出さない（[edge-network-and-routing.md](../architecture/edge-network-and-routing.md) の 13 節）。
 - **セキュリティの事象**（seccomp の違反、探りの失敗、隔離）は、別の流れで `security` のアカウントへ送り、運用の画面に出さない（[sandbox-and-security.md](../architecture/sandbox-and-security.md) の 11 節）。
-- 2 を採らない理由：時系列の数が費用と問い合わせの速さを壊す。AMP の上限（アカウントの有効な時系列の数。値は未検証）に当たる。
+- 2 を採らない理由：時系列の数が費用と問い合わせの速さを壊す。AMP の上限（ワークスペースの有効な時系列の数。既定 5,000 万、最大 15 億。[AMP quotas](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP_quotas.html)、2026-09-27 に確認）に、関数ごとのラベル（S1 で 5 万関数 × ノード × 指標）ならすぐ当たる。
 - 3 を採らない理由：警報の評価（PromQL、記録の規則、Alertmanager）と、他の題材の運用の道具を捨てることになる。
 
 ## Consequences

@@ -25,7 +25,7 @@
 | 設定の配信の事故と対策 | 設定が数秒で全網に広がる経路（Quicksilver）に、ソフトウェアのような段階がなかった。設定も段階と健全性の判定で配る | [Code Orange: Fail Small](https://blog.cloudflare.com/fail-small-resilience-plan/)（2025-12-19） |
 | ランタイムの配信 | ランタイムを利用者の群ごとの独立したサービスに分け、無料の利用者から先に、重要な群ほどゆっくり配る。7 日で 50 回以上の配信の波 | [Code Orange: Fail Small is complete](https://blog.cloudflare.com/code-orange-fail-small-complete/)（2026-05-01） |
 | V8 の修正 | 公開から 24 時間未満で本番。自動のビルドとリリースに、人の 1 回のクリックの承認 | [Security model](https://developers.cloudflare.com/workers/reference/security-model/) |
-| 段階の例 | 0.05%・0.5%・3%・10%・25%・50%・75%・100% と、段の間の待ち | [Code Orange: Fail Small](https://blog.cloudflare.com/fail-small-resilience-plan/)（段の値は検索の要約で見た。本文での確認は未検証） |
+| 段階の配信 | 健全性を見ながら、無料の利用者から先に、割合を上げて世界へ広げる。異常を見つけたら人の操作なしで戻す。**割合の値は本文にない**（2026-09-27 に本文で確認。前の版の「0.05%・0.5%・…」は検索の要約から入った誤り） | [Code Orange: Fail Small](https://blog.cloudflare.com/fail-small-resilience-plan/)（2025-12-19） |
 
 ## 2. リポジトリと成果物
 
@@ -68,10 +68,10 @@
 
 - **ビルドの場所**：`build-release` のアカウントの使い捨ての環境（ビルドごとに作り直す）。Bazel のリモートキャッシュは同じアカウントに置き、PR の CI からは読むだけ。
 - **入力の固定**：上流のタグ、V8 の版、Rust・npm の依存はハッシュで固定する。
-- **時間**：ランタイムのフルのビルドは 90 分以内（ADR-0012 の予算）。キャッシュが当たれば 20 分以内を目標（未検証）。
+- **時間**：ランタイムのフルのビルドは 90 分以内（ADR-0012 の予算）。キャッシュが当たれば 20 分以内を目標（未検証。E1 の `build-release-and-signing` で測る）。
 - **署名**：ランタイムの版、AMI、CLI の workerd のバイナリに、KMS の `release-signing`（ECC P-256）で署名する（[ADR-0047](../decisions/0047-kms-key-hierarchy.md)）。ノードは、署名と `runtime_releases` の `artifact_sha256` を確かめてから版を置く。
 - **来歴**：SLSA の形の来歴（入力のハッシュ、ビルドの環境、コミット）と SBOM を成果物に付ける（形式の選択は E3）。
-- **再現性**：週 1 回、同じ入力の 2 回のビルドのハッシュを比べ、違いを記録する（完全な再現ができるかは未検証。sandbox-and-security の 8.4 節）。
+- **再現性**：週 1 回、同じ入力の 2 回のビルドのハッシュを比べ、違いを記録する（完全な再現ができるかは未検証。E3 の `reproducible-build-check` で確かめる。sandbox-and-security の 8.4 節）。
 
 ## 5. ランタイムの段階的な配信
 
@@ -251,7 +251,7 @@
 **runbooks/README.md**
 
 - リリースとロールバックの方針：5 節と 7 節。手順は [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
-- 個別の手順の候補：`upstream-rebase-blocked`、`runtime-rollback`、`ami-rollout-stuck`、`platform-config-rollback`、`v8-patch-drill`、`cli-release-rollback`。
+- 個別の手順の候補：`upstream-rebase-blocked`、`runtime-rollback`、`ami-rollout-stuck`、`platform-config-rollback`、`v8-patch-drill`、`cli-release-rollback`。このうち `runtime-rollback`・`ami-rollout-stuck`・`platform-config-rollback`・`v8-patch-drill` は [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の B・F・G・E にまとめた（runbooks/README.md の 5.2 節）。
 - SLI の追加の依頼：配信の制御役の判定の結果、ノードの版の分布、署名の検証の失敗。
 
 **data-model**

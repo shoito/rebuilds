@@ -39,22 +39,22 @@ S1・S2 は 1 を採用し、S3 で 4 に移る。
 - **S3 で自前の PoP と BGP anycast に移る。** 自前の AS 番号で自前の IP の範囲を各 PoP から広告し、PoP の中は L4 の負荷分散で機械に配る。AWS のリージョンは、ストレージの中央・制御プレーン・PoP のない地域の受け皿に使う。移行の手順は [infrastructure.md](../architecture/infrastructure.md) の 8 節。
 - 2 を採らない理由：
   - CloudFront の PoP では自前のランタイムを動かせない。関数はリージョンで動くので、「PoP の数」の利点は TLS の終端とキャッシュに限られる。
-  - TLS を CloudFront で終端すると、カスタムドメインの証明書の数（S1 で数万）を CloudFront の側で管理することになり、その上限と費用の確認が要る（未検証）。
+  - TLS を CloudFront で終端すると、カスタムドメインの証明書の数（S1 で数万）を CloudFront の側で管理することになる。標準の配信は 1 つの証明書と 100 の別名まで、配信はアカウントに 500、多数のテナントの配信は 20 でテナントは 1 万まで（どれも既定。引き上げられる）、ACM の証明書は既定で 2,500 枚（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、[ACM quotas](https://docs.aws.amazon.com/acm/latest/userguide/acm-limits.html)、2026-09-27 に確認）。数万のホスト名は、引き上げを重ねる前提になる。
   - CloudFront とオリジンの 2 段のプロキシで、WebSocket の長い接続と、利用者の IP・ヘッダーの扱いが複雑になる。
   - 静的なオブジェクトの公開の配信のキャッシュとしては、MVP の後に検討する余地を残す。
-- 3 を採らない理由：DNS の TTL とリゾルバのキャッシュのため、リージョンの障害の迂回が遅い（分の単位。未検証）。利用者のリゾルバの位置と、利用者の実際の位置がずれる。
+- 3 を採らない理由：DNS の TTL とリゾルバのキャッシュのため、リージョンの障害の迂回が遅い（分の単位の見込み。採らない案なので測らない）。利用者のリゾルバの位置と、利用者の実際の位置がずれる。
 - 4 を採らない理由：MVP の規模に対して、調達と運用の固定費が大きすぎる。日本の利用者を先にするなら、東京・大阪のリージョンで近さを得られる。
 
-**遅延と範囲の率直な比較**（往復の数での比較と地域ごとの見積もりは [edge-network-and-routing.md](../architecture/edge-network-and-routing.md) の 11 節。値はすべて未検証で、E4 の実測で置き換える）：
+**遅延と範囲の率直な比較**（往復の数での比較と地域ごとの見積もりは [edge-network-and-routing.md](../architecture/edge-network-and-routing.md) の 11 節。値は見積もりで未検証。E4 の `isp-vantage-probes` の実測で置き換える）：
 
 | 観点 | 本家 | S1（この設計） |
 | --- | --- | --- |
 | 関数が動く拠点 | 348 都市（上の資料） | 5 リージョン |
-| TCP を受ける場所 | 各拠点 | AWS の edge（Global Accelerator の edge の数は未検証） |
+| TCP を受ける場所 | 各拠点 | AWS の edge（Global Accelerator は 53 か国・95 都市の 130 の PoP。[Features](https://aws.amazon.com/global-accelerator/features/)、2026-09-27 に確認） |
 | TLS の握手の往復 | 最寄りの拠点まで | TCP は AWS の edge で受けるが、TLS と HTTP はリージョンのノードまで往復する |
 | 新しい接続の TTFB（関数の処理を除く） | 約 3 × `r_pop`（最寄りの拠点との往復） | 約 3 × `r_edge` ＋ 2 × `r_bb`（edge とリージョンの間の往復が 2 回分乗る）。接続を使い回すと差は `r_bb` の 1 回分 |
-| 日本の利用者 | 国内の複数の都市 | 東京・大阪の周辺は本家に近い（TTFB 20〜35ms の見込み）。NFR-003（RTT p50 15ms）と K3（TTFB p50 30ms）は満たせる見込み（未検証。E4 で計測）。札幌・福岡・那覇は往復 2 回分の `r_bb` で本家より遅い（40〜90ms の見込み） |
-| 南米・アフリカ・中東・オセアニアの利用者 | 近くの拠点 | 最寄りのリージョンまで遠く、TTFB は本家の 10 倍以上（200〜430ms）になりうる（未検証） |
+| 日本の利用者 | 国内の複数の都市 | 東京・大阪の周辺は本家に近い（TTFB 20〜35ms の見込み）。NFR-003（RTT p50 15ms）と K3（TTFB p50 30ms）は満たせる見込み（未検証。E4 の `isp-vantage-probes` で計測）。札幌・福岡・那覇は往復 2 回分の `r_bb` で本家より遅い（40〜90ms の見込み） |
+| 南米・アフリカ・中東・オセアニアの利用者 | 近くの拠点 | 最寄りのリージョンまで遠く、TTFB は本家の 10 倍以上（200〜430ms）になりうる（見積もり。未検証。E4 の `isp-vantage-probes` で海外の地点も測る） |
 
 Deno Deploy は、拠点を 35 から 6 に減らした。多くのアプリが 1 つのリージョンの DB を使い、全拠点での実行が生きなかったためとしている（[Reports of Deno's Demise…](https://deno.com/blog/greatly-exaggerated)、2025-05-20、2026-09-27 に確認）。この題材も、拠点の数よりデータの近さを先に考え、S1 を少ないリージョンで始める根拠の 1 つにする。
 
@@ -66,7 +66,7 @@ Deno Deploy は、拠点を 35 から 6 に減らした。多くのアプリが 
   - 国内の利用者には、本家に近い遅延を出せる見込みがある。
 - 引き受けるコスト：
   - 海外の利用者の遅延は、本家より大きい。これを料金と説明（「日本に強いエッジ」）で受け入れる。
-  - Global Accelerator の料金（固定の時間の料金とデータの転送の料金）が、転送の量に応じて増える。S1 の DT-Premium は月に約 5,900 ドルの見込み（[infrastructure.md](../architecture/infrastructure.md) の 10.2 節。未検証）。
+  - Global Accelerator の料金（固定の時間の料金とデータの転送の料金）が、転送の量に応じて増える。S1 の DT-Premium は月に約 5,700 ドルの見込み（価格表の API の単価と、リージョンの割合の仮定から。[infrastructure.md](../architecture/infrastructure.md) の 10.2 節）。
   - Global Accelerator は AWS の単一の制御に依存する。アクセラレーター自体の障害には、予備のアクセラレーター（`ga-standby`）へ DNS の 1 レコードで切り替えて備える（ADR-0017、runbook の `accelerator-failover`）。
   - fail open を避けるため、同時に退かせるリージョンは 2 つまでに限る。3 つ目の障害は、退かせずに受ける。
   - S3 の自前の PoP への移行は、大きな工事になる。BYOIP を S2 で始め、IP を変えずに移れる準備をしておく。

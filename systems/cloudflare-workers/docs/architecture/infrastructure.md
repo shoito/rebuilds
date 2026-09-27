@@ -49,7 +49,7 @@ AWS Organizations で、用途 × リージョンで分ける（[ADR-0049](../de
 | フランクフルト `eu-central-1` | エッジ（欧州・中東・アフリカ） | 第一の候補 | |
 | ソウル `ap-northeast-2` | 韓国 | 代わりの候補 | 韓国の利用者が多ければ、シンガポールより先に置く |
 | バージニア北部 `us-east-1` | 北米東部 | 代わりの候補（S2） | |
-| シドニー `ap-southeast-2` | オセアニア | S2 | シンガポールから往復 90〜100ms（未検証。[edge-network-and-routing.md](edge-network-and-routing.md) の 11 節） |
+| シドニー `ap-southeast-2` | オセアニア | S2 | シンガポールから往復 90〜100ms の見積もり（未検証。E4 の `isp-vantage-probes` の海外の実測で確かめる。[edge-network-and-routing.md](edge-network-and-routing.md) の 11 節） |
 
 - 海外の 3 つは E1 の着手の前に、想定の利用者の分布で決める（intent）。この文書の見積もりは第一の候補で行う。
 - すべてのリージョンで、ノードの型（c7i.24xlarge・c7i.12xlarge・m7i.12xlarge・i4i.2xlarge）が全ての AZ で提供されていることを確かめた（2026-09-27、`describe-instance-type-offerings`）。
@@ -105,10 +105,10 @@ AWS Organizations で、用途 × リージョンで分ける（[ADR-0049](../de
 | DO のホスト | m7i.12xlarge（48 vCPU、192 GiB） | 3.1248 ドル/時 | 同上 |
 | DO のログのノード | i4i.2xlarge（8 vCPU、64 GiB、NVMe 1,875 GB） | 0.805 ドル/時 | テナントのコードなし |
 | 中継 | m7i.xlarge ＋ gp3 300 GB | 0.2604 ドル/時 | |
-| 専用のリゾルバー | c7i.large | 未検証（価格表の値を E1 で確かめる） | |
+| 専用のリゾルバー | c7i.large | 0.11235 ドル/時 | |
 | `c3-dedicated` の専用のノード、研究者用 | c7i.metal-24xl / c7i.12xlarge | 5.3928 / 2.6964 ドル/時 | |
 
-- PMU：Intel は「1 つか 2 つのソケットを丸ごと使う大きさだけが PMU を使える」とし、c7i.12xlarge・24xlarge・48xlarge と m7i の同じ大きさ、metal を挙げる（[Intel VTune Profiler Functionality on AWS Instances](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-vtune-amplifier-functionality-on-aws-instances.html)、2025-02-19 更新、2026-09-27 に確認）。AWS の公式の一覧は見つけられなかった（未検証）。E1 の最初に、5 つのリージョンの実機で `perf stat -e LLC-load-misses,branch-misses` を確かめる。
+- PMU：Intel は「1 つか 2 つのソケットを丸ごと使う大きさだけが PMU を使える」とし、c7i.12xlarge・24xlarge・48xlarge と m7i の同じ大きさ、metal を挙げる（[Intel VTune Profiler Functionality on AWS Instances](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-vtune-amplifier-functionality-on-aws-instances.html)、2025-02-19 更新、2026-09-27 に確認）。AWS の公式の一覧は見つけられなかった（未検証）。E1 の最初（`instance-pmu-pku-check`）に、5 つのリージョンの実機で `perf stat -e LLC-load-misses,branch-misses` を確かめる。
 - ディスク：c7i・m7i はローカルの NVMe を持たない。ノードの LMDB とコードのキャッシュは gp3（200 GB、3,000 IOPS、125 MB/秒。1GB-月 0.096 ドル）。よく使うバンドルはページキャッシュに乗る前提（[capacity.md](capacity.md) の 4 節）。
 
 ### 4.2 AMI
@@ -132,7 +132,7 @@ AWS Organizations で、用途 × リージョンで分ける（[ADR-0049](../de
 7. /healthz が 200 → NLB に入る。中継のノードの一覧に載る（ランデブーハッシュ）
 ```
 
-- **ASG**：リージョン × AZ × 群ごと。最小の台数は [ADR-0054](../decisions/0054-capacity-design-point-and-region-sizing.md)。止めた状態のインスタンスの予備（warm pool）を AZ ごとに 1 台持ち、追加の起動を速くする（warm pool から起動する時間は未検証）。
+- **ASG**：リージョン × AZ × 群ごと。最小の台数は [ADR-0054](../decisions/0054-capacity-design-point-and-region-sizing.md)。止めた状態のインスタンスの予備（warm pool）を AZ ごとに 1 台持ち、追加の起動を速くする（warm pool から起動する時間は未検証。E1 の `asg-warm-pool` と T8 で測る）。
 - **ノードの退避**：[edge-network-and-routing.md](edge-network-and-routing.md) の 9.2 節の手順を、ASG のライフサイクルのフック（終了の前）から呼ぶ。
 
 ## 5. リージョンのサービス
@@ -233,13 +233,13 @@ AWS Organizations で、用途 × リージョンで分ける（[ADR-0049](../de
 | 段 | いつ | すること |
 | --- | --- | --- |
 | P0 | S1 | 既定のドメインと CNAME のカスタムドメインは `edge.<brand>.<domain>` の名前で向ける。apex の A・AAAA は `ga-primary` の IP（予備・移行に追従しない危険を画面で示す。edge-network-and-routing の 6.2 節） |
-| P1 | S2 の前 | APNIC（JPNIC 経由を含む。手続きは未検証）で IPv4 の /24 を 2 つと、IPv6 の範囲と、AS 番号を得る。RPKI の ROA を作る |
+| P1 | S2 の前 | APNIC（JPNIC 経由を含む。手続きは未検証。E13 の `byoip-ranges` で確かめる）で IPv4 の /24 を 2 つと、IPv6 の範囲と、AS 番号を得る。RPKI の ROA を作る |
 | P2 | S2 | 新しいアクセラレーター `ga-byoip` を、2 つの /24 から 1 つずつの IP で作る。`edge.<brand>.<domain>` を `ga-byoip` へ移す。apex の利用者に新しい IP を知らせ、移行の期間（6 か月）を置く。旧 `ga-primary` はその間残す |
 | P3 | S3 の最初 | 自前の PoP（国内の主要都市から）で、**3 つ目の /24**（新しい範囲）を BGP で広告し、合成監視と一部の利用者（選んだ CNAME の向き先）で試す |
 | P4 | S3 | /24 の A を GA から外し（BYOIP の広告の停止と範囲の返却）、自前の PoP から広告する。アクセラレーターは B の IP 1 つで動き続けるので、A と B の両方を持つ利用者の DNS はそのまま届く。合成監視で確かめてから、B も同じく移す |
 | P5 | S3 | IPv6 は自前の範囲を PoP から広告し、`edge` の AAAA を移す（GA の IPv6 は BYOIP の対象外なので、AAAA は変わる） |
 
-- 広告を移す瞬間は、その /24 への通信が数分乱れうる（BGP の収束。値は未検証）。1 つずつ、深夜に行う。
+- 広告を移す瞬間は、その /24 への通信が数分乱れうる（BGP の収束。値は未検証。E13 の `pop-l4-and-transit` で試す）。1 つずつ、深夜に行う。
 - PoP の中の機械の構成（Unimog に当たる L4 の負荷分散）と、PoP と AWS のリージョンの間の経路（Direct Connect など）は、S3 の前に ADR にする。
 - エッジのノードの役割（入口のプロキシ以後）は変えない。TLS をノードで終端する設計（ADR-0003）なので、PoP でも同じソフトウェアで動く。
 
@@ -281,7 +281,7 @@ infra/                                   # 開発リポジトリ
 
 ## 10. 費用の見積もり（S1、本番、1 か月）
 
-**大まかな見積もりである。** 東京などのオンデマンドの定価（AWS の価格表の API、2026-09-27）からの ±50% の幅の値。税、サポート、Savings Plans を含めない。台数の根拠は [capacity.md](capacity.md)。流量は S1 のピーク 5 万件/秒、平均 2 万件/秒、応答の平均 10 KB の仮定（未検証）。
+**大まかな見積もりである。** 東京などのオンデマンドの定価（AWS の価格表の API、2026-09-27）からの ±50% の幅の値。税、サポート、Savings Plans を含めない。台数の根拠は [capacity.md](capacity.md)。流量は S1 のピーク 5 万件/秒、平均 2 万件/秒、応答の平均 10 KB の仮定（未検証。E11 の `cost-model-check` で実際の量に置き換える）。
 
 ### 10.1 固定の費用
 
@@ -305,15 +305,15 @@ infra/                                   # 開発リポジトリ
 | 項目 | 単価 | S1 の見込み（月） | 月額（USD、概算） |
 | --- | --- | --- | --- |
 | インターネットへの転送（利用者への応答） | 東京 0.114→0.084 ドル/GB の段階。シンガポール 0.12→0.08、オレゴン・フランクフルト 0.09→0.05 | 520 TB（平均 2 万件/秒 × 10 KB） | 約 46,600（平均 0.0875 ドル/GB） |
-| GA の DT-Premium | アジア太平洋の edge からアジア太平洋 0.010、北米 0.012、欧州 0.043 ドル/GB など（多い方向だけ） | 520 TB | 約 5,900 |
+| GA の DT-Premium | アジア太平洋のリージョンからアジア太平洋の利用者へ 0.010、北米・欧州のリージョンから同じ地域の利用者へ 0.015 ドル/GB（多い方向だけ） | 520 TB（アジア太平洋のリージョン 80%、北米・欧州 各 10% の仮定） | 約 5,700（416 TB × 0.010 ＋ 52 TB × 0.015 × 2） |
 | AZ をまたぐ転送（ホームのノードへの転送） | 0.01 ドル/GB を両方向 | 要求と応答の 2/3 が AZ をまたぐとして約 370 TB | 約 7,300 |
-| リージョンの間（KV の書き込み、DO、ログ・使用量・tail、配信） | 0.09 ドル/GB ＋ TGW 0.02 ドル/GB | 約 20 TB（未検証） | 約 2,200 |
-| 外への転送（サブリクエストの送信） | 同上の段階 | 約 50 TB（未検証） | 約 4,500 |
-| **流量の小計** | | | **約 66,500** |
+| リージョンの間（KV の書き込み、DO、ログ・使用量・tail、配信） | 東京から 0.09 ドル/GB、オレゴン・フランクフルトから東京へ 0.02 ドル/GB、シンガポールから東京へ 0.09 ドル/GB ＋ TGW 0.02 ドル/GB | 約 20 TB（仮定。E4 の `ga-cost-check` で実際の量を測る） | 約 2,200 |
+| 外への転送（サブリクエストの送信） | 同上の段階 | 約 50 TB（仮定。E4 の `transfer-metering` で測る） | 約 4,500 |
+| **流量の小計** | | | **約 66,300** |
 
 - 合計は **月に約 23 万ドル**（S1 のピークの規模を常に持つ構成）。
-- GA の DT-Premium の表（[Global Accelerator pricing](https://aws.amazon.com/global-accelerator/pricing/)、2026-09-27 に確認）は、edge の場所の地域とエンドポイントのリージョンの地域の組で決まる。表の軸の読み方（行と列のどちらが edge か）は、E4 で Cost and Usage Report の使用量の種類を見て確かめる（未検証）。
-- インターネットへの転送（0.0875 ドル/GB＋DT-Premium 約 0.011 ドル/GB）は、limits-and-billing の外向きの転送の単価（1GB 25 円）の原価（約 18.6 円）と合う（[limits-and-billing.md](limits-and-billing.md) の 6.3 節）。
+- GA の DT-Premium は、エンドポイントのリージョンの地域と利用者の地域の組で決まる。価格表の API の使用量の種類は `<エンドポイントのリージョンの地域>-<利用者の地域>-OUT-Bytes-Internet` の形で、説明も「アジア太平洋のリージョンから北米のインターネットの利用者へ」の向きで書かれている（`AWSGlobalAccelerator`、2026-09-27 に確認）。軸の読み方はこれで決まった。E4 の `ga-cost-check` では、Cost and Usage Report で実際の量の割合を確かめる。
+- インターネットへの転送の S1 の量での平均の原価（0.0875 ドル/GB＋DT-Premium 約 0.011 ドル/GB ＝ 約 0.099 ドル/GB、約 14.8 円）は、limits-and-billing の原価（最初の段の 0.114＋0.010 ドル/GB ＝ 約 18.6 円）より低い。料金（1GB 25 円）はどちらの 1.3 倍も上回る（[limits-and-billing.md](limits-and-billing.md) の 6.3 節）。
 - NAT ゲートウェイを通していたら、サブリクエストの送受の量（数百 TB）に 0.062 ドル/GB が加わり、月に数万ドル増えていた（[ADR-0049](../decisions/0049-aws-accounts-and-network.md)）。
 
 ## 11. 障害と振る舞い
@@ -356,13 +356,13 @@ infra/                                   # 開発リポジトリ
 | E1 | 制御プレーンの Aurora Global Database と大阪の待機 |
 | E1 | Terraform の構成と CI の検査（複数のリージョンを 1 回で変えない等） |
 | E1 | ノードの公開の IPv4 の記録（`node_public_ips`）と、外向きのプロキシだけが外へ出る縛り |
-| E4 | GA の DT-Premium の軸と、AZ をまたぐ転送の実際の量の確認（Cost and Usage Report） |
+| E4 | GA の DT-Premium の実際の量の割合と、AZ をまたぐ転送の実際の量の確認（Cost and Usage Report） |
 | E12 | 東京の全体の障害の訓練（staging） |
 | S2 | IP の範囲と AS 番号の取得、`ga-byoip`、apex の利用者への移行の連絡 |
 
 ## 15. 未解決の問い
 
-- AWS の公式の資料で、c7i・m7i の PMU の条件を確かめられるか。AMD の型（c7a・c8a）は PMU と MPK を使えるか。
+- AWS の公式の資料で、c7i・m7i の PMU の条件を確かめられるか。AMD の型（c7a・c8a）は PMU と MPK を使えるか。→ 2026-09-27 に確かめたこと：AWS の公式の一覧は見つからない。c7a・c8a は大阪で提供されておらず、東京の定価も c7i より高い（c7a.24xlarge 6.2016、c8a.24xlarge 6.51168 ドル/時。[ADR-0050](../decisions/0050-runtime-fleet-instance-types.md)）。
 - warm pool から起動したノードが健全になるまでの時間（スナップショットからの追いつきを含む）。
 - `apne1-az3` を使わない判断が、この題材の型でも正しいか。
 - 海外の 3 リージョンの最終の選択（ソウル・バージニアとの比べ）。

@@ -182,7 +182,7 @@ KV は [kv-store.md](kv-store.md)、外向きのプロキシの約束は [sandbo
 
 - SigV4 のクエリの署名。GET・HEAD・PUT・DELETE。期限は 1 秒〜7 日。
 - S3 の API の口（`<account_id>.storage.<brand>.<domain>`）だけで受ける。カスタムドメインと開発用の URL では受けない（本家と同じ）。
-- 期限の判定はゲートウェイの時計で行い、15 分の時計のずれを許す（SigV4 の通常の許容。未検証）。
+- 期限の判定はゲートウェイの時計で行い、15 分の時計のずれを許す（S3 の SigV4 と同じ。S3 は要求の時刻が 15 分を超えてずれると `RequestTimeTooSkewed` で断る。[Authenticating Requests (SigV4)](https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html)、2026-09-27 に確認）。
 - 署名付きの URL は持っている人なら誰でも使える。文書で、短い期限と PUT の `Content-Type` の固定を勧める。
 
 ## 8. ライフサイクルの規則
@@ -191,12 +191,12 @@ KV は [kv-store.md](kv-store.md)、外向きのプロキシの約束は [sandbo
 - 共有の S3 のバケットには、テナントごとの規則を置けない（S3 の規則はバケットあたり 1,000 で、テナントの規則を写せない）。そこで、自前のジョブで行う。
   1. S3 Inventory の日次の一覧（共有のバケットごと）を受ける。
   2. `bucket_id` ごとに分け、そのバケットの規則を評価する。
-  3. 期限切れは DeleteObjects（1,000 件ずつ）。一覧を取ってから消すまでに同じキーが上書きされていたら消さないよう、消す直前に HeadObject で ETag を確かめる（S3 の条件付きの削除が使えるなら、それに替える。未検証）。
+  3. 期限切れは DeleteObjects（1,000 件ずつ）。一覧を取ってから消すまでに同じキーが上書きされていたら消さないよう、条件付きの削除（`DeleteObjects` の各キーに一覧の時点の `ETag` を付ける）で消す。S3 は ETag が合わないキーを `412` で消さない。条件は最新の版にだけ効く（[Conditional deletes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-deletes.html)、2026-09-27 に確認）。HeadObject と削除の間の競合は起きない。
   4. 低頻度の保存への移動は、同じキーへの CopyObject で保存の種類を S3 Standard-IA に変える。
   5. 未完のマルチパートは ListMultipartUploads で探し、AbortMultipartUpload する。
 - 反映は、規則の変更から 48 時間以内を目標にする（本家は多くの場合 24 時間以内。Inventory が日次のため、この設計は最大で 2 日かかる）。
 - GET・HEAD の応答の `x-amz-expiration` は、ゲートウェイが規則から計算して付ける。
-- 低頻度の保存の料金と最低の保存の期間は、S3 Standard-IA の原価（最低の保存の期間と最低の大きさの課金がある。値は未検証）から limits-and-billing で決める。
+- 低頻度の保存の料金と最低の保存の期間は、S3 Standard-IA の原価から limits-and-billing で決める。Standard-IA は 30 日の最低の保存の期間と、128 KB 未満を 128 KB として数える課金を持つ（[Storage classes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html)、2026-09-27 に確認）。移動の規則は 128 KB 未満のオブジェクトを移さない。
 
 ## 9. 障害の型
 
@@ -222,14 +222,16 @@ KV は [kv-store.md](kv-store.md)、外向きのプロキシの約束は [sandbo
 | 保存 1 TB | 15 ドル | S3 25 ドル（大阪への複製を含めると約 50 ドル＋複製の転送） |
 | 書き込み 100 万回 | 4.50 ドル（Class A） | S3 の PUT 4.70 ドル＋ゲートウェイの計算 |
 | 読み込み 1,000 万回 | 3.60 ドル（Class B） | S3 の GET 3.70 ドル＋ゲートウェイの計算 |
-| インターネットへの転送 1 TB | **0 ドル** | **約 115 ドル**（0.114 ドル/GB）＋ Global Accelerator の DT-Premium（値は未検証） |
+| インターネットへの転送 1 TB | **0 ドル** | **約 115 ドル**（0.114 ドル/GB）＋ Global Accelerator の DT-Premium（アジア太平洋のリージョンからアジア太平洋の利用者へ 0.010 ドル/GB。価格表の API、2026-09-27） |
 | インターネットへの転送 200 TB | **0 ドル** | 約 18,000 ドル（段階の料金の合計。10 TB × 0.114＋40 TB × 0.089＋100 TB × 0.086＋50 TB × 0.084）＋ DT-Premium |
-| 東京以外のリージョンの関数から読む 1 TB | 0 ドル | リージョンの間の転送（東京から他のリージョンへ 0.09 ドル/GB。値は未検証）が加わる |
+| 東京以外のリージョンの関数から読む 1 TB | 0 ドル | リージョンの間の転送（東京から他のリージョンへ 0.09 ドル/GB。価格表の API、2026-09-27）が加わる |
 
-- **原価だけで、保存・操作とも本家の料金を上回る。** 転送を含めると、差はさらに大きい。本家が転送を無料にできる理由（自前の網と相互接続）は、この設計にはない（本家の原価の構造は未検証）。
+- **原価だけで、保存・操作とも本家の料金を上回る。** 転送を含めると、差はさらに大きい。本家が転送を無料にできる理由（自前の網と相互接続）は、この設計にはない（本家の原価の構造は公開されていない）。
 - したがって、料金の構造は「保存（GB-月）＋操作（書き込み系・読み込み系）＋インターネットへの転送（GB）」にし、転送に無料の枠を付ける。値は limits-and-billing で決める。
 - 同じホームのリージョンの関数がバインディングで読む分は、転送として課金しない（利用者の関数の応答として外へ出る分は、関数の転送の扱いになる。limits-and-billing で決める）。
-- CloudFront を前に置けば S3 から CloudFront への転送は無料だが、CloudFront からインターネットへの転送は課金される。定額の計画などで原価が下がるかは未検証。S2 の前に調べる（14 節）。
+- CloudFront を前に置けば S3 から CloudFront への転送は無料だが、CloudFront からインターネットへの転送は課金される。
+- **CloudFront の定額の計画がある**（2026-09-27 に確認。[Flat-rate pricing plans](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/flat-rate-pricing-plan.html)）。1 つの計画は 1 つの配信と 1 つの apex のドメインを覆い、超過の料金を取らない。Premium は月 50 TB・5 億要求で 1,000 ドル（125 TB で 2,250 ドル。最大 600 TB まで選べる）で、転送の単価にすると 0.02 ドル/GB 前後になり、定価（0.114 ドル/GB）より大幅に安い。ただし、目安を続けて大きく超えると配信の質を下げうるとされ、多数のテナントの配信（multi-tenant distributions）は対象外で、WAF の関連付けが必須。
+- 公開のバケットの開発用の URL（`<brand>usercontent.<domain>` の 1 つの apex）の配信に当てられるかは未検証（規約と、多数のテナントの内容を 1 つの計画で配ってよいか）。S2 の前の見直し（[ADR-0028](../decisions/0028-object-egress-pricing.md)）で確かめる。カスタムドメインの公開の配信は、1 つの apex の制限のため当てられない。
 - 利用者への説明では、「転送は無料」を掲げない。日本の利用者への近さと、関数との統合を価値にする。
 
 ## 11. テスト
@@ -326,5 +328,5 @@ KV は [kv-store.md](kv-store.md)、外向きのプロキシの約束は [sandbo
 | `object_bucket_lifecycle_rules`（Aurora） | `bucket_id`、`rule_id`、`prefix`、`action`（`expire`・`transition_ia`・`abort_multipart`）、`days`・`date`、`enabled` | RLS。1 バケットに 1,000 まで |
 | `object_custom_domains`（Aurora） | `bucket_id`、`hostname`、`cache_enabled`、`min_tls`、`status` | RLS。TLS の証明書は edge-network-and-routing |
 | `object_access_keys`（Aurora） | `access_key_id`、`account_id`、`secret_ciphertext`（KMS）、`scope`（アカウント・バケットの一覧）、`permission`（`read`・`read_write`）、`created_at`、`last_used_at`、`revoked_at` | RLS |
-| S3 の共有のバケット `<brand>-obj-apne1-{00..15}` | `<bucket_id>/<key>`、S3 のオブジェクトのメタデータ | SSE-S3。大阪へ CRR。未完のマルチパートを 7 日で中止する規則 |
+| S3 の共有のバケット `<brand>-obj-apne1-{00..15}` | `<bucket_id>/<key>`、S3 のオブジェクトのメタデータ | SSE-S3。大阪へ CRR（CRR のためバージョニングを有効にし、削除の印も複製する。旧い版は両方のバケットで 7 日で消す。[security.md](security.md) の 8.1 節）。未完のマルチパートを 7 日で中止する規則 |
 | 使用量（limits-and-billing） | `account_id`、`bucket_id`、保存の量（日次）、書き込み系・読み込み系の数、インターネットへの転送の量 | `account_id` で分ける |

@@ -51,7 +51,7 @@ AWS の側の事実（2026-09-27 に確認）：
   - 同時の書き込みの勝ち方が本家と違う（本家は最後の書き込みが勝つ。この設計は先に確定した方が勝ち、後は 429）。文書で示す。
   - 一覧が 16 の `Query` になる。区画の数を後から変えるのが難しい。
   - 大阪への複製の分だけ、書き込みの原価が約 2 倍になる。4 KiB の値の書き込みは約 5.7 ドル/100 万で、本家の料金（5.00 ドル/100 万）を上回る。料金は limits-and-billing で決める。
-  - 東京の全体の障害の RPO は、グローバルテーブルの複製の遅れに依る（保証の値は未検証）。NFR-010 の RPO 1 分を満たすかは計測で確かめる。
+  - 東京の全体の障害の RPO は、グローバルテーブルの複製の遅れに依る（MREC は「ふつう 1 秒以下」で、保証の値はない。[How global tables work](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html)、2026-09-27 に確認）。RPO は保証しない（[ADR-0051](0051-disaster-recovery-and-honest-rpo.md)）。
 
 ## Confirmation
 

@@ -32,7 +32,7 @@ npm のパッケージの多くは Node.js の API に依る。intent は Node.j
 - 上流の組み込みを、互換の日付・フラグの意味を変えずに使う（[ADR-0008](0008-bundle-format-and-compatibility-dates.md)）。
 - polyfill は CLI（developer-tooling の領域）がバンドルに足す。ランタイムには足さない。
 - `node:net`・`node:tls` の接続と `node:dns` の問い合わせは、理由の分かるエラーにする。網の約束は、外向きのプロキシが TCP のソケットの要求を受け付けないことで守る（モジュールの有無に頼らない）。
-- `node:fs` の `/tmp` は isolate のメモリに数える。寿命は上流に従う（未検証。E2 で確かめる）。
+- `node:fs` の `/tmp` は isolate のメモリに数える。寿命は要求ごと（上流は `/tmp` の中身を要求の文脈 `IoContext` ごとに持ち、文脈が終わると消す。[worker-fs.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/worker-fs.h)、2026-09-27 に確認）。
 - `node:http`・`node:https` のクライアントは、`fetch` と同じ外向きのプロキシを通るので使える。
 - 2 を採らない理由：ランタイムの差分が増える（[ADR-0006](0006-workerd-fork-and-upstream-tracking.md)）。polyfill の中身は利用者のバンドルに入るので、隔離の面でも CLI で足す方が境界がはっきりする。
 - 3 を採らない理由：npm の多くのパッケージが動かず、intent の価値（標準のまま書ける・移行しやすい）を損なう。上流がすでに持つ実装を捨てる理由がない。

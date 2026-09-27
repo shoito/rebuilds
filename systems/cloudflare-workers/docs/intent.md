@@ -118,7 +118,7 @@ Web の開発者が、CLI から 1 回のコマンドで関数をデプロイし
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 不正な内容のホスティング：既定のサブドメイン（`*.<brand>.<domain>`）とオブジェクトストレージの公開の配信で、フィッシング・マルウェア・著作権の侵害の内容が置かれたときの、削除の義務と手順、発信者の情報の開示の請求への対応。プロバイダの責任を定める法律（2025 年の改正後の名称と義務の範囲は未検証）の上の位置づけ | [abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[ADR-0043](decisions/0043-hosted-content-abuse-and-takedown.md) | E4 の既定のサブドメインの公開、E8 の公開のバケット |
+| L1 | 不正な内容のホスティング：既定のサブドメイン（`*.<brand>.<domain>`）とオブジェクトストレージの公開の配信で、フィッシング・マルウェア・著作権の侵害の内容が置かれたときの、削除の義務と手順、発信者の情報の開示の請求への対応。プロバイダの責任を定める法律の上の位置づけ。この法律は 2025-04-01 に「特定電気通信による情報の流通によって発生する権利侵害等への対処に関する法律」（情報流通プラットフォーム対処法）に改められた（[総務省](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)、2026-09-27 に確認）。この基盤に当たる義務の範囲（大規模特定電気通信役務提供者の指定を含む）は法務が判断する | [abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[ADR-0043](decisions/0043-hosted-content-abuse-and-takedown.md) | E4 の既定のサブドメインの公開、E8 の公開のバケット |
 | L2 | 電気通信事業法：関数のサブリクエストの中継、WebSocket の中継、キューが「他人の通信の媒介」に当たり、届出・登録が要るか。通信の秘密（不正利用の調査、tail・ログでの要求の本文の扱い） | [edge-network-and-routing.md](architecture/edge-network-and-routing.md)、[developer-tooling.md](architecture/developer-tooling.md)、[abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[security.md](architecture/security.md) の 9 節 | E4 の公開の開始、E6 の tail とログの保存 |
 | L3 | データの所在：関数は近いリージョンで動くので、日本の利用者の要求が、障害の迂回で海外のリージョンで処理されうる。個人情報保護法の外国にある第三者への提供（いわゆるクラウドの例外に当たるか）、日本だけで処理する約束をどこまで持つか（ストレージのリージョンの固定、関数の実行のリージョンの制限） | [ADR-0003](decisions/0003-edge-locations.md)、[ADR-0005](decisions/0005-storage-consistency.md)、[ADR-0051](decisions/0051-disaster-recovery-and-honest-rpo.md)、[infrastructure.md](architecture/infrastructure.md) | E4 のリージョンの間の迂回、E9 の Durable Objects の配置、E12 の契約の文書 |
 | L4 | 利用規約と許容される利用の方針（AUP）：暗号資産の採掘、大量の送信、スクレイピングの中継、プロキシとしての悪用の禁止と、停止の手順。捜査機関からの照会への対応 | [abuse-and-trust-safety.md](architecture/abuse-and-trust-safety.md)、[ADR-0044](decisions/0044-egress-abuse-controls.md) | E12 の GA の判定 |
@@ -130,7 +130,7 @@ Web の開発者が、CLI から 1 回のコマンドで関数をデプロイし
 
 2026-09-27 の統合の工程で、次のとおり既定案を決めた（[architecture/README.md](architecture/README.md) の 6 節の「決定」）。
 
-- workerd の公開版の機能：テナントの動的な読み込みは上流の `workerLoader` を元にできる。テナントごとの CPU・メモリの制限の強制は上流になく、自前のパッチが要る（[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0009](decisions/0009-cpu-and-memory-metering.md)）。空の isolate の予備を作れるかと、V8 のサンドボックスが既定で有効かは、E2・E3 の PoC で確かめる。
+- workerd の公開版の機能：テナントの動的な読み込みは上流の `workerLoader` を元にできる。テナントごとの CPU・メモリの制限の強制は上流になく、自前のパッチが要る（[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0009](decisions/0009-cpu-and-memory-metering.md)）。空の isolate の予備は上流の構造で作れるが、互換のフラグの組ごとに持つ必要があり、効果は E2 の PoC で確かめる。V8 のサンドボックスは上流の既定のビルドで無効で、有効にするビルドを E3 の PoC で作る（2026-09-27 に上流のソースで確認。[ADR-0010](decisions/0010-process-sandbox-and-egress-invariants.md) の注記）。
 - S1 の海外のリージョン：シンガポール・オレゴン・フランクフルトを第一の候補にして見積もった。E1 の着手前に、想定の利用者の分布で PM が決める（[infrastructure.md](architecture/infrastructure.md) の 15 節）。
 - エッジの入口の HTTP のプロキシ：Pingora の上に、入口と外向きを別のプロセスで作る（[ADR-0020](decisions/0020-pingora-ingress-and-egress-proxies.md)）。
 - KV の中央の保存先は東京の DynamoDB（[ADR-0024](decisions/0024-kv-central-store-dynamodb.md)）。Durable Objects の複製は、別の 2 つの AZ のログのノードで 3 台のうち 2 台で確定する（[ADR-0031](decisions/0031-do-sqlite-replication-and-pitr.md)）。
@@ -142,6 +142,6 @@ Web の開発者が、CLI から 1 回のコマンドで関数をデプロイし
 | --- | --- | --- | --- |
 | P1 | 利用者のオリジンへの転送（ルートに当たらない要求をホスト名のオリジンへ送る）を MVP に含めるか。含めると、この基盤は利用者のサーバーの前に立つリバースプロキシになる（キャッシュ・WAF は持たない） | 含める。キャッシュは持たず、外向きのプロキシと同じ宛先の検査を通す | [ADR-0019](decisions/0019-route-matching-and-home-node-forwarding.md)、[edge-network-and-routing.md](architecture/edge-network-and-routing.md) の 8.3 節 |
 | P2 | NFR-010：リージョンの全体の障害の RPO を「1 分」でなく、製品ごとの実際の値で約束する | 製品ごとの表で約束する | [ADR-0051](decisions/0051-disaster-recovery-and-honest-rpo.md)、[architecture/README.md](architecture/README.md) の 3 節 |
-| P3 | CPU 時間の単価を、原価（設計点の利用率 50%）の 1.3 倍以上にする。本家の値（100 万 ms 0.02 ドル ≒ 3 円）より高くなる | 100 万 ms あたり 7 円。月額 800 円は変えない | [limits-and-billing.md](architecture/limits-and-billing.md) の 6.3 節 |
+| P3 | CPU 時間の単価を、原価（設計点の利用率 50%）の 1.3 倍以上にする。本家の値（100 万 ms 0.02 ドル ≒ 3 円）より高くなる。それでも S1 の東京の利用率（約 23%）では CPU の行が原価（約 10.2 円）を下回り、月額と外向きの転送の差益で回収する | 100 万 ms あたり 7 円。月額 800 円は変えない。S1 の CPU の行の原価割れは受け入れ、月ごとの比で見る | [limits-and-billing.md](architecture/limits-and-billing.md) の 6.3 節 |
 | P4 | KV の書き込みとオブジェクトの操作・保存の単価が、本家より高い（原価が本家の料金を上回る） | 原価の 1.3 倍以上（KV の書き込み 100 万 1,120 円） | 同上 |
 | P5 | 海外の 3 リージョンの最終の選択 | シンガポール・オレゴン・フランクフルト | [infrastructure.md](architecture/infrastructure.md) の 2 節 |

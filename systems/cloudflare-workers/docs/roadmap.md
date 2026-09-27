@@ -3,7 +3,7 @@
 ## 進め方の原則
 
 - **最初に walking skeleton を通す。** E1〜E5 の最小の版で、下流の workerd（制限の強制のパッチを含む）、スーパーバイザーと seccomp、1 つの cordon、GA → NLB → 入口のプロキシ、1 つのルート、outbox → 採番器 → 中継 → ノードの LMDB、CLI の `deploy` を端から端まで貫き、東京の 1 リージョンで 1 つの関数を公開の URL で動かしてから、機能を広げる。脱出のテスト、配信の性質ベーステスト、V8 の経路の空の実行は、E1〜E3 から本物の形で作る。後から足すと、隔離と伝搬の破れを見逃すため。
-- **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する：PMU と PKU の実機の確認（E1 の最初。[ADR-0050](decisions/0050-runtime-fleet-instance-types.md)）、`workerLoader` でのテナントの動的な読み込みと空の isolate の予備（E2 の最初。[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0007](decisions/0007-isolate-lifecycle-and-dynamic-loading.md)）、V8 のサンドボックス・止めた時計の上流の既定（E3 の最初。[ADR-0010](decisions/0010-process-sandbox-and-egress-invariants.md)）、利用者の IP の保持（E4 の最初。[ADR-0017](decisions/0017-global-accelerator-and-regional-nlb.md)）、ClickHouse の自前とマネージドの比べ（E6。[ADR-0037](decisions/0037-tail-sessions-and-tenant-logs.md)）、DO の保存の層への確定の約束の差し込み（E9 の最初。[ADR-0031](decisions/0031-do-sqlite-replication-and-pitr.md)）。
+- **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する：PMU と PKU の実機の確認（E1 の最初。[ADR-0050](decisions/0050-runtime-fleet-instance-types.md)）、`workerLoader` でのテナントの動的な読み込みと空の isolate の予備（E2 の最初。[ADR-0001](decisions/0001-runtime-build-vs-reuse.md)、[ADR-0007](decisions/0007-isolate-lifecycle-and-dynamic-loading.md)）、V8 のサンドボックスを有効にしたビルド（上流の既定は無効。E3 の最初。[ADR-0010](decisions/0010-process-sandbox-and-egress-invariants.md) の注記）、利用者の IP の保持（E4 の最初。[ADR-0017](decisions/0017-global-accelerator-and-regional-nlb.md)）、ClickHouse の自前とマネージドの比べ（E6。[ADR-0037](decisions/0037-tail-sessions-and-tenant-logs.md)）、DO の保存の層への確定の約束の差し込み（E9 の最初。[ADR-0031](decisions/0031-do-sqlite-replication-and-pitr.md)）。
 - **隔離を先に固める。** E3（サンドボックスとセキュリティ）は、他の Epic の機能を本番に出す前の関門にする。`security:sensitive` の変更は、Dev のテックリードとセキュリティの担当の承認を要する（[AGENTS.md](../AGENTS.md)）。
 - **契約を先に固定する。** 設定ファイルの JSON Schema、管理 API の OpenAPI、変更のログの束の形（Protocol Buffers）、器の種類、エラーの番号、ECMA-429 の逸脱の一覧、WPT の期待の一覧、制限の値、料金の単価は、人間がレビューして確定する。エージェントは勝手に変えない。
 - **法務・経理の確認待ちの Story は、spec を承認しない。** 設計と、法務・経理に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L7）。下の表で「法務：L*」と書いた Story が当たる。
@@ -17,7 +17,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- | --- |
 | E1 基盤と PoC | AWS のアカウントと網、エッジのフリートと AMI、PMU・PKU の確認、ビルドと署名、鍵、監査の保管庫、観測の経路と合成監視の枠、管理 API の骨格・アカウント・ログイン・トークン・監査ログ | 設計中 |
 | E2 ランタイムと Web API | workerd の下流のリポジトリと取り込み、制限の強制、テナントのローダー、isolate の予備と退避、互換の日付、ECMA-429 と WPT、`request.<brand>`、Node.js の互換 | 未着手（前に動的な読み込みの PoC） |
-| E3 サンドボックスとセキュリティ | 名前空間・seccomp・cgroup、cordon、Spectre の対策と検知の実験、V8 の 24 時間の経路、脱出のテスト、ファズ、シークレットの暗号化、署名の検証 | 未着手（前に V8 のサンドボックスの確認） |
+| E3 サンドボックスとセキュリティ | 名前空間・seccomp・cgroup、cordon、Spectre の対策と検知の実験、V8 の 24 時間の経路、脱出のテスト、ファズ、シークレットの暗号化、署名の検証 | 未着手（前に V8 のサンドボックスを有効にしたビルドの PoC） |
 | E4 エッジの網とルーティング | GA と NLB、入口のプロキシ、証明書、ルート、ホームのノード、外向きのプロキシ、`drain`、オリジンへの転送 | 未着手（前に利用者の IP の確認。既定のサブドメインの公開は法務：L1・L2、迂回は L3） |
 | E5 デプロイと設定の配信 | 版とデプロイ、段階的なデプロイ、ロールバック、変更のログと配信、スナップショット、伝搬の SLI、配信の制御役、基盤の器、フィーチャーフラグ | 未着手 |
 | E6 開発者の道具とログ | CLI、設定ファイル、ローカル開発、tail、利用者のログ、関数のメトリクス、型、ダッシュボード、K4 | 未着手（tail とログの保存は法務：L2、CLI の配布は L6） |
@@ -96,7 +96,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `wpt-gate` | WPT の部分集合の CI（期待の一覧、逸脱の理由、門の 2 つの条件、20 分以内） |
 | `brand-patch` | `request.<brand>`、`<brand>:` のモジュールの名前空間、`navigator.userAgent` |
 | `webcrypto-limits` | PBKDF2 の反復の上限と、重いネイティブの API の一覧 |
-| `nodejs-compat-scope` | Node.js の互換の範囲の確認（上流の版ごと）、`node:net`・`node:tls`・`node:dns` の失敗の形、`node:fs` の `/tmp` の寿命とメモリの数え方 |
+| `nodejs-compat-scope` | Node.js の互換の範囲の確認（上流の版ごと）、`node:net`・`node:tls`・`node:dns` の失敗の形、`node:fs` の `/tmp` が要求ごとに消えることとメモリの数え方の回帰テスト |
 | `internal-invoke-api` | キュー・cron の起動の内部の API と、CPU 時間の上限の表の適用（queues-and-cron） |
 | `isolate-metrics` | スーパーバイザー・isolate の集計の指標（observability） |
 | `load-test-t1-t4` | T1〜T4（設計点、isolate の数、冷たい起動、制限の超過の混在）。ADR-0054 の初期値を置き換える（capacity） |
@@ -107,7 +107,8 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `v8-sandbox-default-check` | 確認：上流の workerd の既定のビルドで V8 のサンドボックス・MPK・止めた時計が有効か。無効ならビルドの設定・パッチで有効にし、無効なビルドを CI で落とす（着手の最初） |
+| `v8-sandbox-build-poc` | PoC：V8 のサンドボックスを有効にしたビルド（上流の既定は無効。V8 の Bazel のビルドに旗がない）。定義の追加だけで組めるか、V8 の `BUILD.bazel` へのパッチが要るか。上流のテスト・WPT・性能の門。組めたら無効なビルドを CI で落とす。組めないときの扱いは人が決める（着手の最初。[ADR-0010](decisions/0010-process-sandbox-and-egress-invariants.md) の注記） |
+| `frozen-clock-timer` | 止めた時計の `TimerChannel` のパッチ（上流の単体の workerd は時計を止めない）。`precise_timers` を開かない検査と、脱出のテストの時計の類 |
 | `supervisor-process-launch` | スーパーバイザーのプロセスの起動の順（利用者の名前空間、pivot_root、capability、cgroup） |
 | `seccomp-allowlist` | seccomp の許可リストと、テナントのコードの前の適用（workerd へのパッチ）。ステージングの監査のモード |
 | `cordon-placement` | cordon の段階と配置、信頼を下げる変更の即時の反映。入力に `risk_level`・`abuse_hold`・`payment_failed` を含める（abuse-and-trust-safety、ADR-0011 の注記） |
@@ -152,7 +153,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `isp-vantage-probes` | 国内の ISP の外部の地点の選定と合成監視、TTFB の実測で遅延の表を置き換える（observability、edge-network-and-routing） |
 | `platform-failure-classification` | 入口のプロキシのプラットフォームが原因の失敗の分類と、可用性の SLI（QA が表を承認）（observability） |
 | `transfer-metering` | 入口と外向きのプロキシの転送のバイト数の計測（limits-and-billing） |
-| `ga-cost-check` | GA の DT-Premium の軸と、AZ をまたぐ転送の実際の量の確認（infrastructure） |
+| `ga-cost-check` | GA の DT-Premium の実際の量の割合と、AZ・リージョンをまたぐ転送の実際の量の確認（infrastructure） |
 | `default-subdomain-publish` | 既定のサブドメインの公開の開始。法務：L1・L2 |
 | `region-failover-policy` | リージョンの間の迂回と、国内の 2 リージョンの同時の `drain` の 2 人の承認。法務：L3 |
 | `load-test-t5-t6-t9` | T5（東京から大阪への `drain`）、T6（AZ の喪失）、T9（外向きの接続のプール）（capacity） |
@@ -400,7 +401,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 MVP の後に検討する。E13〜E17 に入れなかったもの。着手するときに `intent.md` から起票する（[intent.md](intent.md) の「MVP の後の Epic で扱う」と、各領域の文書の持ち越し）。
 
-- **S2 の規模**：12〜15 リージョン（Local Zones の利用は未検証）、KV の海外への読み込みの複製（[kv-store.md](architecture/kv-store.md) の 13 節）、Smart Placement に相当する配置、オブジェクトのホームのリージョンの選択、`eu` の管轄、生産者の近くのキューの保存（DO の上の自作への移行を含む。[ADR-0033](decisions/0033-queues-on-sqs-with-own-dispatcher.md)）、cron の起動のリージョンの分散。
+- **S2 の規模**：12〜15 リージョン（Local Zones の利用は未検証。GA のエンドポイントと型の提供を S2 の前に確かめる）、KV の海外への読み込みの複製（[kv-store.md](architecture/kv-store.md) の 13 節）、Smart Placement に相当する配置、オブジェクトのホームのリージョンの選択、`eu` の管轄、生産者の近くのキューの保存（DO の上の自作への移行を含む。[ADR-0033](decisions/0033-queues-on-sqs-with-own-dispatcher.md)）、cron の起動のリージョンの分散。
 - **国内の DR の台数の削減**：warm pool の実測（T8）で、片方のリージョンの待機の台数を減らせるか（[capacity.md](architecture/capacity.md) の 11 節）。
 - **管轄 `jp` の DO の東京・大阪の同期の複製**（[ADR-0051](decisions/0051-disaster-recovery-and-honest-rpo.md)）、DO のリースの DynamoDB への依存の見直し（[ADR-0030](decisions/0030-do-leases-and-fencing.md)）。
 - **Cache API、CDN としてのキャッシュ、WAF**、**静的なアセットの配信（Pages に相当）と画像の変換**、**TCP のソケット（`connect()`。25・465・587 は既定で拒否）**、**`node:dns`**、**メールの受信、ブラウザの実行、ベクトルの索引、分析のエンジン**（intent）。

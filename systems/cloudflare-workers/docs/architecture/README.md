@@ -87,7 +87,7 @@ Global Accelerator の anycast の IP（AWS の edge で TCP を受ける。本�
 | 段階 | 要求（ピーク） | アカウント・関数 | 計算の拠点 | 構成 |
 | --- | --- | --- | --- | --- |
 | S1（MVP） | 5 万 件/秒 | 1 万アカウント、5 万関数 | AWS の 5 リージョン（東京・大阪＋海外 3。シンガポール・オレゴン・フランクフルトを第一の候補にする） | Global Accelerator の anycast の IP → 各リージョンの NLB → エッジのノード。制御プレーンは東京（DR は大阪）。KV の正本とオブジェクトストレージの既定のホームは東京 |
-| S2 | 50 万 件/秒 | 10 万アカウント、50 万関数 | AWS の 12〜15 リージョン（Local Zones の利用は未検証） | 自前の IP の範囲（BYOIP）を Global Accelerator で広告する。KV のリージョンの読み込みの複製、Smart Placement に相当する配置、オブジェクトストレージのホームのリージョンを選べるようにする |
+| S2 | 50 万 件/秒 | 10 万アカウント、50 万関数 | AWS の 12〜15 リージョン（Local Zones の利用は未検証。S2 の前に、GA のエンドポイントと型の提供を確かめる） | 自前の IP の範囲（BYOIP）を Global Accelerator で広告する。KV のリージョンの読み込みの複製、Smart Placement に相当する配置、オブジェクトストレージのホームのリージョンを選べるようにする |
 | S3 | 500 万 件/秒 | 100 万アカウント、500 万関数 | 自前の PoP（国内の主要都市と海外の 50 都市以上）＋ AWS のリージョン | 自前の AS 番号と BGP anycast。拠点の中は L4 の負荷分散で機械に振り分ける。AWS のリージョンは、ストレージの中央と制御プレーン、PoP のない地域の受け皿に使う。設定の配信は Quicksilver v1.5・v2 に近い形（全データを持つレプリカと、使うものだけを持つノード）へ移る |
 
 本家の網は 100 か国以上の 348 都市にあり、インターネットの利用者の 95% が 50ms 以内にいるとしている（[Cloudflare Global Network](https://www.cloudflare.com/network/)、2026-09-27 に確認）。S1・S2 はこれに遠く及ばない。日本の利用者を先にし、東京・大阪の 2 リージョンで国内を賄う（[ADR-0003](../decisions/0003-edge-locations.md)）。台数と費用は [capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) の 10 節（S1 の本番で月に約 23 万ドルの見積もり）。
@@ -210,11 +210,11 @@ Global Accelerator の anycast の IP（AWS の edge で TCP を受ける。本�
 
 品質の面のリスクの順位と対策は [quality.md](../quality.md) の 1 節にある。ここは設計の面のリスクを書く。
 
-- **workerd を多数のテナントで動かすための不足**：上流の README は、workerd だけでは悪意のあるコードへの多層の防御が足りず、VM などのサンドボックスの中で動かすよう求めている（[workerd](https://github.com/cloudflare/workerd)、2026-09-27 に確認）。テナントの動的な読み込みは上流の `workerLoader` を元にできるが、テナントごとの制限の強制は上流になく（`NullIsolateLimitEnforcer`）、自前のパッチが要る（[ADR-0001](../decisions/0001-runtime-build-vs-reuse.md)、[ADR-0009](../decisions/0009-cpu-and-memory-metering.md)）。空の isolate の予備、V8 のサンドボックスの既定の有効化、DO の保存の層への確定の約束の差し込みは未検証で、E2・E3・E9 の最初の PoC で確かめる。`multitenant` と `brand` のパッチは 3,000 行以内を目標にする（[ADR-0006](../decisions/0006-workerd-fork-and-upstream-tracking.md)）。
+- **workerd を多数のテナントで動かすための不足**：上流の README は、workerd だけでは悪意のあるコードへの多層の防御が足りず、VM などのサンドボックスの中で動かすよう求めている（[workerd](https://github.com/cloudflare/workerd)、2026-09-27 に確認）。テナントの動的な読み込みは上流の `workerLoader` を元にできるが、テナントごとの制限の強制は上流になく（`NullIsolateLimitEnforcer`）、自前のパッチが要る（[ADR-0001](../decisions/0001-runtime-build-vs-reuse.md)、[ADR-0009](../decisions/0009-cpu-and-memory-metering.md)）。空の isolate の予備の効果、V8 のサンドボックスを有効にしたビルド（上流の既定は無効。2026-09-27 に確認）、DO の保存の層への確定の約束の差し込みは未検証で、E2・E3・E9 の最初の PoC（`dynamic-loading-poc`・`v8-sandbox-build-poc`・`do-storage-poc`）で確かめる。V8 のサンドボックスを組めないときに S1 をなしで出すかは、Dev のテックリードとセキュリティの担当が決める（[ADR-0010](../decisions/0010-process-sandbox-and-egress-invariants.md) の注記）。`multitenant` と `brand` のパッチは 3,000 行以内を目標にする（[ADR-0006](../decisions/0006-workerd-fork-and-upstream-tracking.md)）。
 - **Spectre と未知のサイドチャネル**：isolate はプロセスの中の境界なので、CPU のサイドチャネルへの耐性は VM より弱い。止めた時計などの対策は攻撃を遅くするが、完全には防がない。性能カウンターの検知の閾値は E3 の実験で決め、誤検知の目標は有料の関数の 0.1% 未満（[ADR-0013](../decisions/0013-spectre-mitigations-and-dynamic-isolation.md)）。性能カウンターを使える EC2 の型は Intel の資料に頼っており、AWS の公式の一覧は見つけられなかった（E1 で実機で確かめる。[ADR-0050](../decisions/0050-runtime-fleet-instance-types.md)）。高い信頼の要るテナントには `c3-dedicated` を用意する。
 - **V8 の修正の 24 時間の配信**：V8 の更新は、workerd の API の変更や性能の退行を伴うことがある。常設の緊急の経路（毎週の空の実行、四半期の訓練）と、波の関門を同じ値で判定することで両立させる（[ADR-0012](../decisions/0012-v8-24-hour-patch-pipeline.md)、[ADR-0055](../decisions/0055-staged-runtime-rollout-by-cordon-and-region.md)）。
-- **拠点の少なさ**：S1 の 5 リージョンでは、日本以外の利用者の遅延は本家より大きい。TCP は GA の edge で受けるが、TLS と HTTP はリージョンのノードまで往復するので、新しい接続の TTFB は本家の約 3 × `r_pop` に対して約 3 × `r_edge` ＋ 2 × `r_bb` になる。南米・アフリカ・中東・オセアニアでは本家の 10 倍以上になりうる（未検証。[ADR-0003](../decisions/0003-edge-locations.md)、[edge-network-and-routing.md](edge-network-and-routing.md) の 11 節）。
-- **GA の fail open**：GA は近い 3 つのグループに健全なものがなければ、最寄りのグループへ送る。同時に退かせるリージョンを 2 つまでに限る（[ADR-0017](../decisions/0017-global-accelerator-and-regional-nlb.md)）。利用者の IP（とくに IPv6）が GA → NLB → ノードで保たれるかは未検証（E4 の最初）。
+- **拠点の少なさ**：S1 の 5 リージョンでは、日本以外の利用者の遅延は本家より大きい。TCP は GA の edge で受けるが、TLS と HTTP はリージョンのノードまで往復するので、新しい接続の TTFB は本家の約 3 × `r_pop` に対して約 3 × `r_edge` ＋ 2 × `r_bb` になる。南米・アフリカ・中東・オセアニアでは本家の 10 倍以上になりうる（見積もり。未検証。E4 の `isp-vantage-probes` で測る。[ADR-0003](../decisions/0003-edge-locations.md)、[edge-network-and-routing.md](edge-network-and-routing.md) の 11 節）。
+- **GA の fail open**：GA は近い 3 つのグループに健全なものがなければ、最寄りのグループへ送る。同時に退かせるリージョンを 2 つまでに限る（[ADR-0017](../decisions/0017-global-accelerator-and-regional-nlb.md)）。利用者の IP（IPv6 を含む）が GA → NLB → ノードで保たれることは文書で確かめた（ADR-0017）。実機での確認は E4 の最初（`client-ip-preservation-check`）。
 - **IP のアドレスの移行**：利用者の apex のドメインは A・AAAA で IP を指す。S3 で自前の PoP に移るとき、IP を変えずに移るには、自前の IP の範囲を S2 で持つ必要がある（[ADR-0003](../decisions/0003-edge-locations.md)、[infrastructure.md](infrastructure.md) の 8 節）。
 - **Durable Objects の一意性と可用性**：1 つの名前に 2 つの実体を確定させないことは、リースとフェンシングの正しさに依存する（[ADR-0030](../decisions/0030-do-leases-and-fencing.md)）。性質ベーステストと Jepsen の形の試験で確かめる。リージョンの DynamoDB の障害では、リースを更新できず 7 秒でそのリージョンの全ホストが止まる（既知の制約。S2 の前に見直す）。
 - **制御プレーンのシークレットのサービスと包み直しのジョブ**：ADK を包む `cp-adk-wrap` を開けるシークレットのサービスと、毎月 RSK・RDK で包み直すジョブ（`cp-prod` から各リージョンの鍵を `GenerateDataKey`・`Decrypt` できる。[ADR-0047](../decisions/0047-kms-key-hierarchy.md)）は、侵害されれば全リージョンの全アカウントのシークレットに届く（[security.md](security.md) の 3.3 節の C3）。**受け入れて、次で抑える**：
@@ -223,7 +223,7 @@ Global Accelerator の anycast の IP（AWS の edge で TCP を受ける。本�
   - 人は常設の `Decrypt` を持たない（[ADR-0046](../decisions/0046-control-plane-privilege-separation-and-operator-access.md)）。ビルド・署名・設定のログの権限と別のアカウント・役割にし、1 つが奪われても全ノードの任意のコードの実行と全シークレットの復号を同時には得られない。
   - アカウントの範囲ごとに役割を分ける案と、`c3-dedicated` のアカウントの単位の RSK は S2 で再評価する。
 - **設定の配信の速い経路**：利用者の器（ルート、停止）は速い経路で全ノードへ届く。基盤の器は段階的に配る（[ADR-0056](../decisions/0056-platform-config-staging-and-flags.md)）が、採番器や受け手の欠陥は全体に広がる。本家は設定の配信の誤りで 2 回、網を広く止めた（[Code Orange: Fail Small](https://blog.cloudflare.com/fail-small-resilience-plan/)、2026-09-27 に確認）。性質ベーステストと障害の注入で守る。採番器は 1 本で、S1 の見込みの 10 倍（毎秒 100 の変更）を越えると詰まりうる。全ノードに全データを持つ v1 の形は S2 まで。S3 の前に Quicksilver v1.5・v2 に近い形（レプリカとキャッシュ）へ移る ADR を起こす。
-- **原価と料金**：CPU 時間の単価は、本家と同じ 3 円では原価を下回っていた。設計点（利用率 50%）の原価の 1.3 倍の 7 円を既定案にしたが、S1 の東京の平常の利用率（約 23%）ではなお原価を下回る（[capacity.md](capacity.md) の 8 節、[limits-and-billing.md](limits-and-billing.md) の 6.5 節）。K8 も S1 の利用率では満たさない（S2 で測る約束）。KV の書き込み（原価 約 5.7 ドル/100 万）、オブジェクトの保存・操作、外向きの転送は本家の料金より高い。**PM の確認事項**（[intent.md](../intent.md) の P3・P4）。
+- **原価と料金**：CPU 時間の単価は、本家と同じ 3 円では原価を下回っていた。設計点（利用率 50%）の原価の 1.3 倍の 7 円を既定案にしたが、S1 の東京の平常の利用率（約 23%）ではなお原価（約 10.2 円）を下回る。この差（100 万 ms あたり約 3.2 円）は、月額と外向きの転送の差益で回収する（[capacity.md](capacity.md) の 8 節、[limits-and-billing.md](limits-and-billing.md) の 6.5 節の式）。K8 も S1 の利用率では満たさない（S2 で測る約束）。KV の書き込み（原価 約 5.7 ドル/100 万）、オブジェクトの保存・操作、外向きの転送は本家の料金より高い。**PM の確認事項**（[intent.md](../intent.md) の P3・P4）。
 - **率直な RPO**：東京の全体の障害では、KV の大きな値・オブジェクト・Durable Objects は最大 15 分（99.9%）の書き込みを失いうる。キューは東京の回復まで止まる。NFR-010 を製品ごとの値に改めた（3 節。**PM・Ops の確認事項**）。
 - **オリジンへの転送**：この基盤は DNS の製品を持たないので、ルートに当たらない要求をホスト名のオリジンへ転送する。これにより、利用者のサーバーの前に立つリバースプロキシになる（[ADR-0019](../decisions/0019-route-matching-and-home-node-forwarding.md)）。中継が「他人の通信の媒介」に当たるかは法務の L2。MVP に含めるかは **PM の確認事項**（intent の P1）。
 - **本家より弱い約束**：オブジェクトのメタデータ 2 KiB（本家 8,192 バイト）とライフサイクルの反映 最大 2 日、キューの遅延の上限（送信 15 分・再試行 12 時間）、KV の同時の書き込みは先に確定した方が勝つ、Durable Objects の複製がリージョンの中の AZ に閉じる。利用者向けの文書に差として書く。
@@ -235,7 +235,7 @@ Global Accelerator の anycast の IP（AWS の edge で TCP を受ける。本�
 PM の方針（本家に寄せる、既定案で進める）により、統合の工程で次のとおり決めた。法務・経理の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」（L1〜L7）に残した。
 
 - **ADR と intent の状態**：基盤の ADR（0001〜0005）と intent.md を、他の題材と同じく `accepted` にした。先に次を直した。
-  - ADR-0001・ADR-0002：テナントの動的な読み込みは上流に `workerLoader` がある。テナントごとの制限の強制は上流になく、パッチが必ず要る（ADR-0009）。V8 のサンドボックスが上流の既定のビルドで有効かは E3 で確かめる（ADR-0010）。
+  - ADR-0001・ADR-0002：テナントの動的な読み込みは上流に `workerLoader` がある。テナントごとの制限の強制は上流になく、パッチが必ず要る（ADR-0009）。V8 のサンドボックスが上流の既定のビルドで有効かは E3 で確かめる（ADR-0010）。→ 2026-09-27 の検証の工程で、上流の既定では無効で、止めた時計も上流の単体の workerd にないと分かった。どちらもパッチ・ビルドの変更で作る（ADR-0010 の注記）。
   - ADR-0003：遅延の率直な比較（TTFB の往復の式と、地域ごとの見込み）と、同時に 2 リージョンまでしか退かせない GA の fail open の制限（ADR-0017）を書いた。
   - ADR-0004：ランタイムは LMDB を開かず、スーパーバイザーが設定を渡す（ADR-0022、サンドボックス）。全体の古さは警報だけで、局所の遅れだけがノードを不健全にする。本家の Quicksilver v2 は RocksDB とキャッシュに移ったが、この題材は S3 まで v1 の形を保つ。
   - ADR-0005：KV の同時の書き込みを ADR-0024 の「先に確定した方が勝ち、後は 429」に揃えた。オブジェクトのメタデータは S3、バケットの設定だけが Aurora。各製品の保存の ADR を参照した。
@@ -291,7 +291,7 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | --- | --- |
 | E1 基盤と PoC | AWS のアカウントと VPC・TGW・PrivateLink、エッジのフリートと AMI、PMU・PKU の実機の確認、`build-release` と署名、KMS の鍵、`log-archive`、観測の経路と合成監視の枠、管理 API の骨格・アカウント・ログイン・API トークン・監査ログ |
 | E2 ランタイムと Web API | workerd の下流のリポジトリとパッチの列、週 1 回の取り込み、`IsolateLimitEnforcer`、テナントのローダー、isolate の予備と退避、互換の日付、ECMA-429 と WPT の門、`request.<brand>`、Node.js の互換、負荷試験 T1〜T4 |
-| E3 サンドボックスとセキュリティ | 名前空間・seccomp・cgroup、V8 のサンドボックスの確認、cordon、止めた時計、性能カウンターの検知と閾値の実験、毎日のプロセスの入れ替え、V8 の 24 時間の経路、脱出のテスト、ファズ、シークレットの暗号化（ADK・RSK）、署名の検証 |
+| E3 サンドボックスとセキュリティ | 名前空間・seccomp・cgroup、V8 のサンドボックスを有効にしたビルド、cordon、止めた時計（パッチ）、性能カウンターの検知と閾値の実験、毎日のプロセスの入れ替え、V8 の 24 時間の経路、脱出のテスト、ファズ、シークレットの暗号化（ADK・RSK）、署名の検証 |
 | E4 エッジの網とルーティング | GA と NLB、入口のプロキシ、ACME と証明書、カスタムドメイン、ルートの解決、ホームのノードへの転送、外向きのプロキシとアカウントの外向きの方針、`drain`、オリジンへの転送、負荷試験 T5・T6・T9 |
 | E5 デプロイと設定の配信 | 版とデプロイ、段階的なデプロイ、ロールバック、outbox と採番器、配信の元と中継、ノードの受け手、スナップショット、伝搬の SLI、配信の制御役、基盤の器の `scope`、フィーチャーフラグ、負荷試験 T7・T8 |
 | E6 開発者の道具とログ | CLI、`<brand>.jsonc`、ローカル開発と模擬、tail、利用者のログ（ClickHouse）、関数のメトリクス、型の生成、ダッシュボードの画面、K4 の E2E |

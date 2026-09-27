@@ -64,7 +64,7 @@
 | `delete(key)` | 正本に削除の印（墓石）を確定してから解決する | 削除 1 |
 | `list({prefix, limit, cursor})` | `{keys:[{name, expiration, metadata}], list_complete, cursor}`。UTF-8 のバイトの辞書順 | 一覧 1 |
 
-- `cacheStatus` は本家にある欄で、キャッシュの当たり・外れを返す。未検証の細部（値の種類）は本家の型定義に合わせる。
+- `cacheStatus` は本家にある欄で、キャッシュの当たり・外れを返す。上流の型は `string | null` で、値の種類は文書にない（[kv.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/api/kv.h)、2026-09-27 に確認）。値の種類はこの基盤で決め、文書に書く（E7 の `kv-l1-cache`）。
 - 一括の書き込み・削除は REST API だけ（1 回に 10,000 組、100MiB まで）。中では 1 キーずつの条件付きの書き込みに分ける（5.3 節）。
 
 ### 4.2 制限（S1 の既定。値は limits-and-billing で決める）
@@ -74,7 +74,7 @@
 | キーの長さ | 512 バイト（空、`.`、`..` は不可） | 同じ |
 | 値の大きさ | 25 MiB | 同じ |
 | メタデータ | JSON にして 1,024 バイト | 同じ |
-| `cacheTtl` | 既定 60 秒、最小 30 秒、最大 1 年 | 最大値は本家の文書に見当たらない（未検証）。1 年にする |
+| `cacheTtl` | 既定 60 秒、最小 30 秒、最大 1 年 | 本家の最大は `Number.MAX_SAFE_INTEGER`（[Read key-value pairs](https://developers.cloudflare.com/kv/api/read-key-value-pairs/)、2026-09-27 に確認）。この基盤は L2 の容量のため 1 年で切る（それより大きい値は 1 年として扱い、エラーにしない） |
 | `expirationTtl` | 最小 60 秒 | 同じ |
 | 同じキーへの書き込み | 1 秒に 1 回 | 同じ。ただし同時の 2 つは「先に確定した方が勝ち、後は 429」（5.3 節） |
 | 1 呼び出しあたりの操作 | 1,000 | 同じ |
@@ -115,7 +115,7 @@
   ttl         Number   （DynamoDB の TTL の属性。expires_at か、墓石は削除の 1 日後）
 ```
 
-- **1 つの名前空間を 16 の区画に分ける。** DynamoDB の区画は 1 秒に読み込み 3,000 単位・書き込み 1,000 単位が上限（[Partition key design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)、2026-09-27 に確認）。LSI のない表では、同じ `pk` の項目の集まりも必要に応じて複数の区画に自動で分けられる（[Partitions and data distribution](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html)、同日に確認）。ただし分けるまでの時間と、その間のスロットリングの程度は未検証なので、書き込みの集中を最初から 16 の `pk` に散らす。
+- **1 つの名前空間を 16 の区画に分ける。** DynamoDB の区画は 1 秒に読み込み 3,000 単位・書き込み 1,000 単位が上限（[Partition key design](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)、2026-09-27 に確認）。LSI のない表では、同じ `pk` の項目の集まりも必要に応じて複数の区画に自動で分けられる（[Partitions and data distribution](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.Partitions.html)、同日に確認）。ただし分けるまでの時間と、その間のスロットリングの程度は未検証（E7 の `kv-entries-and-writer` の負荷試験で見る）なので、書き込みの集中を最初から 16 の `pk` に散らす。
 - 区画の数は名前空間の作成時に決め、S1 では 16 で固定する。変える方法は 13 節の問い。
 - 期限切れの項目は、DynamoDB の TTL が後で消す。消すまでの遅れがあるので、読み込みと一覧は `expires_at` で必ず除く。
 
@@ -160,7 +160,7 @@
 
 - 成功を返した書き込みは、DynamoDB（東京の 3 つの AZ）と、値が大きいときは S3 に確定している。
 - DynamoDB の PITR（35 日）と、S3 のバージョニング（上書き・削除から 7 日で古い版を消す）で、運用の誤りから戻せる。
-- 東京の全体の障害：書き込みは止まる。読み込みは、各リージョンのキャッシュにある分だけ返せる（`cacheTtl` を過ぎても返す「古くても返す」の段。6.4 節）。大阪への切り替えは手動（runbooks の `kv-region-failover`）。RPO はグローバルテーブルの複製の遅れ（通常は秒の単位。保証の値は未検証）。
+- 東京の全体の障害：書き込みは止まる。読み込みは、各リージョンのキャッシュにある分だけ返せる（`cacheTtl` を過ぎても返す「古くても返す」の段。6.4 節）。大阪への切り替えは手動（runbooks の `kv-region-failover`）。RPO はグローバルテーブルの複製の遅れ（MREC は「ふつう 1 秒以下」で、保証の値はない。[How global tables work](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html)、2026-09-27 に確認）。
 
 ## 6. キャッシュ
 
@@ -185,7 +185,7 @@
 - 読み込みごとに `cacheTtl` が違ってよい。キャッシュに置く時間は、そのキーで見た最大の `cacheTtl`（上限 1 年）にする。
 - `expires_at` を過ぎた項目は、`cacheTtl` によらず「ない」として扱う。
 
-**NFR-009 の見込み**：他のリージョンで書いた値が見えるまでの時間は、`cacheTtl`（60 秒）＋ L2 から正本への取り直しの時間（東京から遠いリージョンで 100〜300ms。未検証）＋ 時計のずれ。p99 70 秒以内に収まる見込み。8 節の計測で確かめる。
+**NFR-009 の見込み**：他のリージョンで書いた値が見えるまでの時間は、`cacheTtl`（60 秒）＋ L2 から正本への取り直しの時間（東京から遠いリージョンで 100〜300ms の見込み。未検証。E7 の `kv-consistency-checker` で測る）＋ 時計のずれ。p99 70 秒以内に収まる見込み。8 節の計測で確かめる。
 
 ### 6.3 負のキャッシュ
 
@@ -277,7 +277,7 @@
 ## 13. 未解決の問い
 
 - 名前空間の区画の数（16 固定）を、大きな名前空間でどう増やすか。区画の数を変えると一覧の併合とキーの置き場所が変わる。
-- 一覧をキャッシュするか。遠いリージョンからの一覧は毎回 100ms 以上かかりうる（未検証）。
+- 一覧をキャッシュするか。遠いリージョンからの一覧は毎回 100ms 以上かかりうる（未検証。E7 の `kv-list` で測る）。
 - 海外のリージョンへの正本の読み込みの複製（ADR-0005 の S2 の方針）を、DynamoDB のグローバルテーブルで作るか。書き込みを東京だけにする約束の守り方。
 - アカウントごとの暗号化の鍵を持つか（KMS の要求の数と費用）。
 - L2 を ElastiCache から自前のキャッシュ（ノードの NVMe を使う）に移すか。S2 の費用で決める。

@@ -41,11 +41,11 @@
 | 通報 | 通報の窓口の形。DMCA、フィッシング、商標、マルウェア、児童の搾取などの種類 | [Report abuse](https://developers.cloudflare.com/fundamentals/reference/report-abuse/) |
 | フィッシングの自動化 | 2024 年の前半は通報の 37% を自動で処理し、対処まで中央値 3.4 日。後半は新しい道具で 78% を自動で処理し、中央値 1 時間未満。URL の走査（HTML の描画と網の要求の記録）、機械学習の分類、脅威の情報、担当者の過去の判断に基づく規則を使う | [How Cloudflare is using automation to tackle phishing](https://blog.cloudflare.com/how-cloudflare-is-using-automation-to-tackle-phishing/)（2025-03-17） |
 | 開発者の基盤の規約 | 利用者の内容は、ウイルス、アドウェア、スパイウェア、ワーム、暗号資産の採掘のソフトウェアなどの悪意のあるコードを含まず、広めない。大量の攻撃に使わない。違反の疑いで、基盤のサービスを制限・停止できる | [Service-Specific Terms: Developer Platform](https://www.cloudflare.com/service-specific-terms-developer-platform/) |
-| 既定のドメインの悪用 | 報道では、開発者向けの既定のドメインの悪用が 2023 年より 100〜250% 増えたとされる（第三者の報道。数値は未検証） | [BleepingComputer](https://www.bleepingcomputer.com/news/security/cloudflares-developer-domains-increasingly-abused-by-threat-actors/) |
-| サブリクエストの印 | 本家の `CF-Worker` のヘッダーの細かい振る舞い（値の形、消せるか）は、今回の資料で確かめられなかった（未検証。[edge-network-and-routing.md](edge-network-and-routing.md) の 10.3 節と同じ） | — |
+| 既定のドメインの悪用 | セキュリティの会社 Fortra の集計を報道が伝えた。2024 年（10 月半ばまで）の `workers.dev` のフィッシングは 4,999 件で、2023 年の 2,447 件から 104% 増。`pages.dev` と合わせて 2023 年より 100〜250% 増（第三者の集計。本家の公式の値ではない） | [BleepingComputer](https://www.bleepingcomputer.com/news/security/cloudflares-developer-domains-increasingly-abused-by-threat-actors/)（2024-12-03） |
+| サブリクエストの印 | `fetch()` のすべてのサブリクエストに `CF-Worker` を付ける。値は関数を持つゾーンの名前（例：`example.com`）。受け手が Workers の通信を見分け、絞り、振り分けるため。利用者が消せるかは書かれていない | [Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/) |
 
-- 本家の既定のサブドメインでの警告の頁（interstitial）の有無と形は、今回の資料で確かめられなかった（未検証）。
-- 本家の新しいアカウントのリスクの判定の中身は公開されていない（未検証）。
+- 本家の既定のサブドメインでの警告の頁（interstitial）は、公式の文書で確かめられなかった（未検証）。利用者の掲示板には、`workers.dev` の関数に「Suspected Phishing」の警告の頁が出たという報告がある（非公式。この設計の判断には使わない）。
+- 本家の新しいアカウントのリスクの判定の中身は公開されていない（2026-09-27 に Security model と Trust & Safety の文書で確認）。
 
 ## 3. 原則
 
@@ -122,7 +122,7 @@ c0 のアカウントの関数の毎日の再巡回 ─┤   ホスト名の字�
 ### 5.6 外部の一覧
 
 - 取り込む：Google の Web Risk（商用の利用の条件は E12 で確かめる）、公開のフィッシングの一覧、JPCERT/CC とフィッシング対策協議会からの依頼。取り込みの頻度は 15 分。
-- 既定のドメインは Public Suffix List に載せる（[edge-network-and-routing.md](edge-network-and-routing.md) の 6.1 節）。一覧の多くは、PSL の境の下（アカウントのサブドメイン）で登録するので、1 つの悪用で既定のドメイン全体が止められる危険を下げる（一覧ごとの扱いは未検証）。
+- 既定のドメインは Public Suffix List に載せる（[edge-network-and-routing.md](edge-network-and-routing.md) の 6.1 節）。一覧の多くは、PSL の境の下（アカウントのサブドメイン）で登録するので、1 つの悪用で既定のドメイン全体が止められる危険を下げる（一覧ごとの扱いは未検証。E12 の `default-domain-blocklist-monitor` で、主な一覧の登録の単位を記録する）。
 - 既定のドメインが外部の一覧で丸ごと止められたときの runbook を持つ（18 節）。
 
 ## 6. 措置の段と停止
@@ -160,10 +160,10 @@ c0 のアカウントの関数の毎日の再巡回 ─┤   ホスト名の字�
 | 種類 | 通報・検知から措置まで | 本家（2 節） |
 | --- | --- | --- |
 | フィッシング・マルウェア（確度の高いもの） | 中央値 1 時間、p90 4 時間 | 中央値 1 時間未満（2024 年の後半） |
-| 攻撃の中継 | 中央値 1 時間 | 未検証 |
-| 児童の性的な搾取の内容 | 確認から 1 時間以内に停止と保全 | 未検証 |
-| 著作権・商標 | 法務の手順（L1） | 未検証 |
-| その他 | 営業日 3 日 | 未検証 |
+| 攻撃の中継 | 中央値 1 時間 | 公開されていない |
+| 児童の性的な搾取の内容 | 確認から 1 時間以内に停止と保全 | 公開されていない |
+| 著作権・商標 | 法務の手順（L1） | 公開されていない |
+| その他 | 営業日 3 日 | 公開されていない |
 
 ## 7. 外向きの悪用
 
@@ -304,7 +304,7 @@ received ─▶ triaged ─┬─▶ auto_actioned ─────────�
 - **保全**：法務は `legal_holds` を作れる。保全のあるアカウントは、`terminate` の削除、版の `purged`、バンドルの掃除（[deployment-and-config-distribution.md](deployment-and-config-distribution.md) の 7.4 節）、監査ログの 18 か月の削除を止める。保存するログ（ClickHouse の TTL）は行ごとに止められないので、保全の対象の期間のログを、S3 の Object Lock のバケットに書き出す。
 - **利用者への知らせ**：既定は知らせる。法令・裁判所の命令で知らせてはならないときだけ知らせない（法務の判断）。利用者の監査ログへの載せ方も同じ（[dashboard-and-api.md](dashboard-and-api.md) の 7.3 節）。
 - 生命・身体の危険の急ぎの依頼は、法務の当番を呼ぶ。
-- 発信者の情報の開示の請求（プロバイダの責任を定める法律の上のもの。2025 年の改正後の名称と義務の範囲は未検証。intent の L1）への対応も、法務の手順に従う。
+- 発信者の情報の開示の請求（情報流通プラットフォーム対処法の上のもの。intent の L1）への対応も、法務の手順に従う。
 
 ## 11. `<Brand>-Worker` と送り元の特定
 
@@ -396,7 +396,7 @@ received ─▶ triaged ─┬─▶ auto_actioned ─────────�
 - 宛先・件数の集計と、送信元の IP の記録の保持が、通信の秘密の上で許されるか。利用規約での同意の形（L2）。
 - AUP で禁じる用途（採掘、汎用のプロキシ・VPN、スクレイピングの中継）の線引きと、捜査機関の照会への対応の方針（L4）。
 - 外向きの方針のポートを、edge-network-and-routing の既定より cordon ごとに狭めてよいか。
-- 警告の頁に「理解して進む」を置くか（本家の振る舞いは未検証）。
+- 警告の頁に「理解して進む」を置くか（本家の振る舞いは公式の文書で確かめられない。2 節）。
 - 児童の性的な搾取の内容の能動のハッシュの照合を、いつ、どの一覧で行うか。
 - Google の Web Risk など外部の一覧の商用の利用の条件と費用。
 - 巡回を見分けて内容を変える手口への対策。

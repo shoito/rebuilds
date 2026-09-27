@@ -16,8 +16,9 @@ date: 2026-09-27
 
 確かめたこと（2026-09-27）：
 
-- Intel は、AWS のインスタンスで PMU の事象を使えるのは「1 つか 2 つのソケットを丸ごと使う大きさ」だけとする。一覧に c5.9xlarge 以上、c6i.16xlarge・32xlarge、c7i.12xlarge・24xlarge・48xlarge、m7i.12xlarge・24xlarge・48xlarge、各 metal などがある。m5.16xlarge は 1 つのソケットと 2 つ目の一部を使うので PMU の事象を使えない。metal は、メモリのアクセスの解析に使う uncore の事象も含めて使える（[Intel VTune Profiler Functionality on AWS Instances](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-vtune-amplifier-functionality-on-aws-instances.html)、2025-02-19 更新、2026-09-27 に確認）。AWS の公式の文書での一覧は見つけられなかった（未検証）。
-- 大阪（ap-northeast-3）では、c6id・m6id などのローカルの NVMe を持つ第 6 世代の Intel の型が提供されていない。c7i.24xlarge・m7i.24xlarge・i4i は 5 つのリージョンのすべての AZ で提供されている（`describe-instance-type-offerings`、2026-09-27 に確認）。
+- Intel は、AWS のインスタンスで PMU の事象を使えるのは「1 つか 2 つのソケットを丸ごと使う大きさ」だけとする。一覧に c5.9xlarge 以上、c6i.16xlarge・32xlarge、c7i.12xlarge・24xlarge・48xlarge、m7i.12xlarge・24xlarge・48xlarge、各 metal などがある。m5.16xlarge は 1 つのソケットと 2 つ目の一部を使うので PMU の事象を使えない。metal は、メモリのアクセスの解析に使う uncore の事象も含めて使える（[Intel VTune Profiler Functionality on AWS Instances](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-vtune-amplifier-functionality-on-aws-instances.html)、2025-02-19 更新、2026-09-27 に確認）。AWS の公式の文書での一覧は見つけられなかった（未検証。E1 の `instance-pmu-pku-check` で実機で確かめる）。
+- 大阪（ap-northeast-3）では、c6id・m6id などのローカルの NVMe を持つ第 6 世代の Intel の型が提供されていない。AMD の c7a・c8a も大阪で提供されていない（東京は 3 つの AZ で提供）。c7i.24xlarge・m7i.24xlarge・i4i は 5 つのリージョンのすべての AZ で提供されている（`describe-instance-type-offerings`、2026-09-27 に確認）。
+- 東京の定価：c7i.large 0.11235 ドル/時、c7a.24xlarge 6.2016 ドル/時、c8a.24xlarge 6.51168 ドル/時、c7g.2xlarge 0.3638 ドル/時（価格表の API、2026-09-27 に確認）。
 - 東京の定価（AWS の価格表の API）：c7i.24xlarge（96 vCPU、192 GiB）5.3928 ドル/時、c7i.metal-24xl も同じ、m7i.24xlarge（384 GiB）6.2496 ドル/時、c6i.16xlarge（64 vCPU）3.424 ドル/時。
 - 本家の第 12 世代のサーバーは AMD EPYC 9684X（96 コア、L3 1,152MB）、384GB、NVMe 16TB で、大きな L3 が本家の作業に効くとしている（[Gen 12 servers](https://blog.cloudflare.com/gen-12-servers/)、2024-09-25）。第 13 世代は 192 コアでコアあたりの L3 を 2MB に減らし、要求の処理の層を Rust で書き直してキャッシュへの依存を減らした（[Gen 13 launch](https://blog.cloudflare.com/gen13-launch/)、2026-03-23）。どちらも 2026-09-27 に確認した。
 
@@ -47,9 +48,9 @@ date: 2026-09-27
 - 自前の部品（Rust）とノードの AMI は x86-64 だけにする。arm64 は、マネージドのサービス（ElastiCache の r7g）にだけ使う。
 - AMI：Amazon Linux 2023 の最小の構成から作る。カーネルの重大な修正（名前空間、seccomp、cgroup、KVM のゲストに関わるもの）は、公開から 72 時間以内に全ノードの AMI を入れ替える（[delivery.md](../architecture/delivery.md) の 6 節）。
 - Auto Scaling グループは AZ ごと。起動を速くするため、止めた状態のインスタンスの予備（warm pool）を AZ ごとに 1 台持つ。
-- 2 を採らない理由：c7i.24xlarge と同じ値段だが、metal は起動が遅い（程度は未検証）。検知に要る事象はコアの事象で足りる（ADR-0013 の LLC のミスと分岐の予測の失敗。uncore は要らない）。
-- 3 を採らない理由：大阪で提供されていない。PMU の一覧にも c6id は載っていない（c6i と同じ CPU なので使える見込みだが未検証）。
-- 4 を採らない理由：Intel の一覧のような、AMD の型の PMU の条件の資料を見つけられなかった（未検証）。E1 で c7a・c8a の PMU と MPK を確かめ、費用が合えば ADR を改める。
+- 2 を採らない理由：c7i.24xlarge と同じ値段だが、metal は起動が遅い（程度は測っていない。採らない案なので測らない）。検知に要る事象はコアの事象で足りる（ADR-0013 の LLC のミスと分岐の予測の失敗。uncore は要らない）。
+- 3 を採らない理由：大阪で提供されていない（上の確認）。大阪で使えないので、PMU の可否は確かめない。
+- 4 を採らない理由：c7a・c8a は大阪で提供されておらず、東京の定価も c7i.24xlarge（5.3928 ドル/時）より 15〜21% 高い（上の確認）。Intel の一覧のような、AMD の型の PMU の条件の資料も見つけられなかった（未検証）。E1 の `instance-pmu-pku-check` で東京の c7a・c8a の PMU と PKU も確かめるが、大阪で提供されるまでは採らない。
 
 ## Consequences
 
@@ -58,7 +59,7 @@ date: 2026-09-27
   - 1 つの族なので、性能の計測と AMI を共有できる。
 - 引き受けるコスト：
   - 最小の単位が大きい（48 vCPU）。海外のリージョンの台数を減らせず、S1 の利用率は低い（capacity.md の 6 節）。
-  - Graviton の価格の利点を捨てる（c7g.2xlarge は 0.3638 ドル/時で、vCPU あたりで c7i.24xlarge の 0.0562 ドルより約 19% 安い。Graviton の vCPU は物理のコアなので、実際の差はさらに大きい見込み（未検証））。
+  - Graviton の価格の利点を捨てる（c7g.2xlarge は 0.3638 ドル/時で、vCPU あたりで c7i.24xlarge の 0.0562 ドルより約 19% 安い。Graviton の vCPU は物理のコア（c7g.2xlarge は 8 vCPU・8 コア・コアあたり 1 スレッド。[CPU options](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/cpu-options-supported-instances-values.html)、2026-09-27 に確認）なので、実際の差はさらに大きい見込み（性能の差は測っていない））。
   - PMU の可否を Intel の資料に頼っている。E1 の最初に実機で確かめる。
 
 ## Confirmation

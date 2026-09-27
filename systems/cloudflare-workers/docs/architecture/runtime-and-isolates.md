@@ -49,7 +49,7 @@
 | 制限の強制 | 公開版の workerd は `NullIsolateLimitEnforcer`（「制限を強制しない」とコメントされている）を使う。CPU 時間の報告も 0 | [server.c++](https://github.com/cloudflare/workerd/blob/main/src/workerd/server/server.c%2B%2B) |
 | 互換の日付 | 古い互換の日付を永久に支える。API で日付を省くと、最も古い 2021-11-02 になる | [Compatibility dates](https://developers.cloudflare.com/workers/configuration/compatibility-dates/) |
 
-**ADR-0001 の未検証の点のうち、2 つがこれで分かった。** 動的な読み込みは上流の `workerLoader` が持つ。テナントごとの CPU・メモリの制限は、上流の公開版にない（`IsolateLimitEnforcer` の差し込み口だけがある）。制限の強制は自前のパッチで作る（6 節、[ADR-0009](../decisions/0009-cpu-and-memory-metering.md)）。
+**ADR-0001 の未検証の点のうち、2 つがこれで分かった。** 動的な読み込みは上流の `workerLoader` が持つ。テナントごとの CPU・メモリの制限は、上流の公開版にない（`IsolateLimitEnforcer` の差し込み口だけがある）。制限の強制は自前のパッチで作る（6 節、[ADR-0009](../decisions/0009-cpu-and-memory-metering.md)）。V8 のサンドボックスと止めた時計も、上流の単体の workerd では無効か、持たない（[sandbox-and-security.md](sandbox-and-security.md) の 4.4・6.1 節）。
 
 ## 3. 原則
 
@@ -177,7 +177,10 @@
 | モジュールの解析とコンパイル | 3.0ms | V8 のコードのキャッシュを使う。遅延のコンパイル（関数は呼ばれるまでコンパイルしない） |
 | 余裕 | 0.3ms | |
 
-- **空の isolate の予備**：各ランタイムのプロセスは、テナントのコードを読み込む前の isolate を、既定で 8 個持つ。1 つ使ったら、裏で 1 つ作り足す。予備はどのテナントのコードも読んでいない状態で、一度テナントのコードを読んだ isolate は予備に戻さない。予備の数は、冷たい起動の率から自動で 4〜32 の間で調整する。**workerd がこの形（テナントのコードの前に isolate を作っておく）を許すかは未検証。** E2 の PoC で確かめ、許さなければ、V8 のスナップショットからの作成の速さで代える。
+- **空の isolate の予備**：各ランタイムのプロセスは、テナントのコードを読み込む前の isolate を、既定で 8 個持つ。1 つ使ったら、裏で 1 つ作り足す。予備はどのテナントのコードも読んでいない状態で、一度テナントのコードを読んだ isolate は予備に戻さない。予備の数は、冷たい起動の率から自動で 4〜32 の間で調整する。
+  - **上流の構造**（2026-09-27 に確認。[worker.h](https://github.com/cloudflare/workerd/blob/main/src/workerd/io/worker.h)）：`Worker::Isolate` は `Worker::Script` と別の物で、コードは後から `Isolate::newScript()` で読む。コードの前に isolate を作る形は取れる。ただし isolate の作成に、互換の日付・フラグで決まる API の組（`Api`）と制限の強制の物（`IsolateLimitEnforcer`）を渡す。
+  - そのため、予備は **互換のフラグの組ごと** に持つ。デプロイ済みの版の組を数え、使われている上位の組（既定 4 つ）にだけ予備を置く。それ以外の組の冷たい起動は、V8 のスナップショットからの作成になる。制限の強制の物は、cordon の既定で作り、版の `limits` を読み込みの時に入れられるようにする（`isolate-limit-enforcer` のパッチ）。
+  - 予備の実際の効果（当たりの率、NFR-001 の予算）は E2 の `dynamic-loading-poc` と T3 で確かめる（未検証）。効かなければ、V8 のスナップショットからの作成の速さで代える。
 - **V8 のコードのキャッシュ**：バンドルを最初に読み込んだノードは、V8 のコードのキャッシュ（バイトコード）を作り、ノードのディスクに `(bundle_sha256, v8_version, v8_flags_hash)` の鍵で置く。同じノードの別のプロセスの次の読み込みで使う。**ノードの間では共有しない**（別のノードが作ったキャッシュを信じる理由がなく、V8 はキャッシュの中身の改ざんに耐える設計ではない）。
 - **コードがノードにないとき**（NFR-001 の後半、p99 50ms 以内）：リージョンの中継のキャッシュから取る。デプロイのとき、各リージョンのホームのノードへ先に配る（deployment-and-config-distribution の領域で決める）。
 
@@ -300,7 +303,7 @@ bundle（アップロードの単位。変えられない）
 | --- | --- | --- | --- |
 | バンドルの圧縮後（gzip） | 3MiB | 10MiB | 上限なし（以前は無料 3MB・有料 10MB） |
 | バンドルの圧縮前 | 32MiB | 64MiB | 64MiB |
-| モジュールの数 | 1,000 | 1,000 | 資料で確かめられず（未検証） |
+| モジュールの数 | 1,000 | 1,000 | 記載なし（[Limits](https://developers.cloudflare.com/workers/platform/limits/)、2026-09-27 に確認。この基盤の値） |
 | 起動の CPU 時間 | 1 秒 | 1 秒 | 1 秒 |
 
 - 本家は圧縮後の上限をなくしたが、S1 は残す。ノードのコードのキャッシュの容量と、冷たいノードへの転送の時間（NFR-001 の後半）を守るため。圧縮前は本家と同じ 64MiB を上限にする。
@@ -456,7 +459,7 @@ bundle（アップロードの単位。変えられない）
 - `runtime-process-oom`：cgroup の OOM。退避の閾値の確認、該当のテナントの特定。
 - `cold-start-storm`：冷たい起動の率が 5% を超える。予備の数、先読み、シャードの状態の確認。
 - `upstream-rebase-blocked`：週 1 回の取り込みが止まった。パッチの書き直しの判断と、V8 の修正の緊急の経路が生きていることの確認。
-- `runtime-rollback`：ランタイムの版の切り戻し（ノードの 2 つの版の切り替え）。
+- `runtime-rollback`：ランタイムの版の切り戻し（ノードの 2 つの版の切り替え）。→ [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の B にまとめた（runbooks/README.md の 5.2 節）。
 - SLI の追加の依頼（Ops へ）：冷たい起動の率と時間（p50・p99）、退避の率（理由ごと）、`exceededCpu`・`exceededMemory` の率、プロセスの再起動の数、監視のスレッドの心拍の途切れ。
 
 **data-model**

@@ -195,7 +195,7 @@
 | スナップショット：`snapshots/<db_id>/<applied_seq>.lmdb.zst` | 5 リージョン | なし（作り直せる） | 直近 48 | 同上の 16 節 |
 | `config_log` の書き出し | 東京 | 大阪へ CRR | 90 日（既定案。エポックの補正と調べに使う） | 同上 |
 | `<brand>-kv-values-apne1`：`{namespace_id}/{key_hash}/{version}` | 東京 | 大阪へ CRR（RTC） | 旧い版 7 日 | [kv-store.md](kv-store.md) の 14 節 |
-| `<brand>-obj-apne1-{00..15}`：`<bucket_id>/<key>`（本体と S3 のオブジェクトのメタデータ） | 東京 | 大阪へ CRR（RTC） | 利用者の規則 | [object-storage.md](object-storage.md) の 15 節 |
+| `<brand>-obj-apne1-{00..15}`：`<bucket_id>/<key>`（本体と S3 のオブジェクトのメタデータ） | 東京 | 大阪へ CRR（RTC。バージョニングと削除の印の複製） | 利用者の規則。旧い版 7 日 | [object-storage.md](object-storage.md) の 15 節 |
 | `<brand>-do-<r>`：`{jurisdiction}/{namespace_id}/{object_id}/wal/…`・`snap/…` | 5 リージョン | 東京 ↔ 大阪、海外 → 東京（`jp` は日本の中だけ） | 30 日 | [durable-objects.md](durable-objects.md) の 17 節 |
 | テナントのログの再送用：`tenant-logs/<region>/<date>/<hour>/*.parquet` | 東京 | 大阪へ CRR | 7 日 | [developer-tooling.md](developer-tooling.md) の 16 節 |
 | 使用量の生の束：`usage-raw/<region>/<yyyy>/<mm>/<dd>/*.json.zst` | 東京 | 大阪へ CRR | 13 か月 | [limits-and-billing.md](limits-and-billing.md) の 16 節 |

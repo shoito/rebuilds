@@ -319,7 +319,8 @@ GitHub ──POST https://api.<console-domain>/internal/secret-scanning/github�
 
 - 公開のリポジトリで見つかったものは、知らせを待たずに自動で失効する（本家と同じ）。誤りの失効は、利用者が新しいトークンを作って置き換える（元に戻す機能は持たない）。
 - 知らせの受け口は、1 回に多数の一致を受けても時間切れにならないよう、失効を非同期の処理（SQS）に回し、受け付けを先に返す。
-- GitHub の公開の鍵の一覧の URL と形は、登録の時点で確かめる（未検証）。
+- GitHub の公開の鍵は `https://api.github.com/meta/public_keys/secret_scanning` から取る。複数の `key_identifier` と公開の鍵を返し、署名は `ECDSA-NIST-P256V1-SHA256` で、生の本文に対して検証する（解析して並べ直した JSON で検証しない）。一覧の取得は GitHub の API のレート制限を受けるので、1 時間持ち、未知の `key_identifier` が来たときだけ取り直す（[Secret scanning partner program](https://docs.github.com/en/code-security/secret-scanning/secret-scanning-partnership-program/secret-scanning-partner-program)、2026-09-27 に確認）。
+- GitHub の要求の時間切れは、誤りの情報を返すパートナーで 30 秒（同上）。受け口は 30 秒より十分に短く応答する。
 
 ### 6.5 CLI の OAuth のトークン
 
@@ -430,7 +431,7 @@ CREATE TABLE audit_events (
 | 制御プレーンの API の停止 | 合成監視 | 管理の操作が止まる。デプロイ済みの関数は動く（ADR-0004）。状態の頁に出す |
 | Aurora の停止・DR の切り替え | Aurora の指標 | 書き込みの操作が止まる。切り替えの後の変更のログの扱いは [deployment-and-config-distribution.md](deployment-and-config-distribution.md) の 5.3 節 |
 | レート制限の Valkey の停止 | 接続の失敗 | 制限をかけずに通し、警報を出す |
-| シークレットスキャンの受け口の停止 | 受け口の 5xx | GitHub の再送に任せる（再送の方式は未検証）。回復後、SQS の未処理を流す |
+| シークレットスキャンの受け口の停止 | 受け口の 5xx | GitHub の文書は再送を書いていない（2026-09-27 に確認）ので、再送に頼らない。受け口は検証して SQS に入れたらすぐ返す。停止の間に届かなかった知らせは取り戻せない前提で、停止を呼び出しにする（runbooks の `secret-scanning-endpoint-down`）。回復後、SQS の未処理を流す |
 | 失効の印が届かない（Valkey の停止） | 印の読み込みの失敗 | 30 秒のメモリの持ちの後は DB を直接引く（失効が 30 秒遅れうる） |
 | ログインの基盤の停止 | 合成監視 | ダッシュボードに入れない。既存のセッションと API トークンは動く |
 | 監査ログの書き込みの失敗 | トランザクションの失敗 | 変更も失敗する（監査の行のない変更を作らない） |

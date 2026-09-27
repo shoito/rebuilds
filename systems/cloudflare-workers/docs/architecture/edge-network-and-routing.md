@@ -48,7 +48,7 @@ isolate の温め方（SNI の先読み、ホームのノード）の方針は [
 | クライアントのアフィニティ | 既定は None で、5 つ組のハッシュ。Source IP では送信元と宛先の IP の 2 つ組のハッシュで、同じ送信元を同じエンドポイントグループへ送る。edge の位置が変わると保たれない | [Client affinity](https://docs.aws.amazon.com/global-accelerator/latest/dg/about-listeners-client-affinity.html) |
 | NLB のエンドポイント | 利用者の IP を保つのは、セキュリティグループを持つ NLB の TCP・UDP のリスナーだけ（TLS のリスナーでは保たない）。デュアルスタックのアクセラレーターには、IP を保つエンドポイントだけを足せる。既存の IPv4 のアクセラレーターを、NLB のエンドポイントのままデュアルスタックへ上げられない。NLB はゾーンをまたぐ振り分けを切ることを勧める（接続の衝突を避ける） | [Endpoint requirements](https://docs.aws.amazon.com/global-accelerator/latest/dg/about-endpoints-caveats.html) |
 | 上限 | 標準のアクセラレーター 20／アカウント、リスナー 10、エンドポイントグループはリスナーの数×グループの数で 42 まで、グループあたりの NLB 10、カスタムルーティングのアクセラレーター 10 | [Quotas](https://docs.aws.amazon.com/global-accelerator/latest/dg/limits-global-accelerator.html) |
-| 料金 | アクセラレーター 1 つ 0.025 ドル／時（約 18 ドル／月）。加えて DT-Premium（アジア太平洋の edge からアジア太平洋へ 0.010 ドル／GB、米国へ 0.012 ドル／GB など。多い方向だけ） | [Pricing](https://aws.amazon.com/global-accelerator/pricing/) |
+| 料金 | アクセラレーター 1 つ 0.025 ドル／時（約 18 ドル／月）。加えて DT-Premium（多い方向だけ）。価格表の使用量の種類は `<エンドポイントのリージョンの地域>-<利用者の地域>-OUT-Bytes-Internet` で、アジア太平洋のリージョンからアジア太平洋の利用者へ 0.010、北米の利用者へ 0.012、欧州の利用者へ 0.043 ドル／GB。北米・欧州のリージョンから同じ地域の利用者へは各 0.015 ドル／GB | [Pricing](https://aws.amazon.com/global-accelerator/pricing/)、価格表の API（`AWSGlobalAccelerator`、2026-09-27） |
 | edge の数 | 53 か国の 95 都市に 130 の PoP | [Features](https://aws.amazon.com/global-accelerator/features/) |
 | API の場所 | Global Accelerator の API はすべて us-west-2 で呼ぶ | [Quotas](https://docs.aws.amazon.com/global-accelerator/latest/dg/limits-global-accelerator.html) |
 | BYOIP | IPv4 だけ。他所での広告を止めてから AWS で広告する。自前の範囲から割り当てられるのはアクセラレーターの 1 つの IP で、もう 1 つは Amazon の範囲から（範囲を 2 つ持てば両方を自前にできる） | [BYOIP](https://docs.aws.amazon.com/global-accelerator/latest/dg/using-byoip.html) |
@@ -59,7 +59,7 @@ isolate の温め方（SNI の先読み、ホームのノード）の方針は [
 | Let's Encrypt の上限 | 新しい注文 300／3 時間／アカウント。登録ドメインあたり 50 枚／7 日。同じ名前の組 5 枚／7 日。識別子ごとの認可の失敗 5／時。1 枚に 100 名まで。ARI による更新はすべての上限の対象外。上限の引き上げは「注文」と「登録ドメインあたり」だけ | [Rate Limits](https://letsencrypt.org/docs/rate-limits/) |
 | 証明書の期間 | 2026-05-13 に `tlsserver` のプロファイルが 45 日に。既定の `classic` は 2027-02-10 に 64 日（認可の再利用 10 日）、2028-02-16 に 45 日（認可の再利用 7 時間） | [Decreasing Certificate Lifetimes to 45 Days](https://letsencrypt.org/2025/12/02/from-90-to-45)、[Shorter Certificate Lifetimes and Rate Limits](https://letsencrypt.org/2026/02/24/rate-limits-45-day-certs) |
 | 検証の方式 | HTTP-01 はポート 80、ワイルドカード不可。DNS-01 はワイルドカード可、`_acme-challenge` を CNAME・NS で委ねられる。TLS-ALPN-01 はポート 443、ワイルドカード不可 | [Challenge Types](https://letsencrypt.org/docs/challenge-types/) |
-| 検証の地点 | 複数のネットワークの地点から検証する（2024 年の時点で主 1 と遠隔 4。いまの数と定足数は未検証） | [Princeton partnership](https://letsencrypt.org/2024/05/30/princeton-partnership) |
+| 検証の地点 | 複数のネットワークの地点から検証する（2024 年の時点で主 1 と遠隔 4。いまの数と定足数は公開の文書で確かめられなかった。この設計は「全リージョンの適用を待つ」ので数に依らない。7.2 節） | [Princeton partnership](https://letsencrypt.org/2024/05/30/princeton-partnership) |
 | OCSP | Let's Encrypt は 2025-08-06 に OCSP の応答を止めた | [Ending OCSP Support in 2025](https://letsencrypt.org/2024/12/05/ending-ocsp/) |
 | ZeroSSL | ACME の窓口は EAB が必須。90 日の証明書を無償で数の制限なく発行。EAB の資格情報の発行に 1 日の上限（値は非公開）。サブドメインのラベルは 6 つまで | [ZeroSSL ACME](https://zerossl.com/documentation/acme/) |
 | Public Suffix List | 本家の既定のドメイン（`workers.dev`）は PSL の私的な部分に載っている。PSL は「他社のレート制限を避けるだけの目的」の登録を断る。処理の期限の約束はない。登録ドメインの残りの期間 2 年以上が要る | [public_suffix_list.dat](https://publicsuffix.org/list/public_suffix_list.dat)、[PSL Guidelines](https://github.com/publicsuffix/list/wiki/Guidelines) |
@@ -116,7 +116,7 @@ NLB（TCP 80・443、利用者の IP を保つ、ゾーンをまたがない）
 | ターゲットグループ | インスタンスのターゲット（エッジのノード）。登録の解除の遅延 60 秒。解除時に接続を切る設定は切る（入口のプロキシが GOAWAY で閉じる） | 9.2 節 |
 | NLB の健全性の検査 | HTTP、ポート 8081 の `/healthz`、10 秒ごと、2 回で不健全・3 回で健全 | 9.3 節 |
 
-- 利用者の IP が GA → NLB → インスタンスで保たれることは、E4 の最初に実機で確かめる（仕組みの上は保たれるが、この組み合わせでの確認は未検証）。
+- 利用者の IP が GA → NLB → インスタンスで保たれることは、文書で確かめた（デュアルスタックのアクセラレーターは IP を保つエンドポイントだけを受け、NLB のエンドポイントでは GA と NLB が元の IP を IP ヘッダーに入れる。[ADR-0017](../decisions/0017-global-accelerator-and-regional-nlb.md)、2026-09-27）。IPv4・IPv6 の両方を、E4 の最初（`client-ip-preservation-check`）に実機でも確かめる。
 - ノードは NLB 以外からの 80・443 を受けない（セキュリティグループ）。GA の後ろのエンドポイントへ直接の通信を送ると、接続の衝突が起きうるため（2 節）。
 
 ### 5.2 アフィニティ・ダイヤル・重み
@@ -133,7 +133,7 @@ NLB（TCP 80・443、利用者の IP を保つ、ゾーンをまたがない）
 - **予備のアクセラレーター**：`ga-standby` を同じ NLB に向けて常に作っておく（約 18 ドル／月）。`edge.<brand>.<domain>` の CNAME・A・AAAA を切り替えれば、既定のドメインと CNAME のカスタムドメインは予備へ移る。apex を A レコードで向けた利用者は移らない（6.2 節で危険を示す）。
 - **BYOIP（S2）**：自前の IPv4 の範囲を 2 つ用意し、`ga-primary` の 2 つの IPv4 を両方とも自前にする（範囲 1 つだと 1 つは Amazon の IP のまま。2 節）。S3 で自前の PoP へ移るとき、apex の A レコードを変えずに済む。
 - **IPv6**：BYOIP は IPv4 だけ。IPv6 は S3 まで Amazon の IPv6 のまま。S3 の移行で IPv6 の AAAA は変わる。apex の AAAA を固定で書く利用者には、この点を文書で示す。
-- **HTTP/3**：S1 では持たない（`Alt-Svc` を出さない）。UDP のアイドルのタイムアウトが 30 秒であること、QUIC の接続の移動と NLB の UDP の振り分けの相性を、S2 の前に確かめる（NLB の QUIC の対応の有無と条件は未検証）。
+- **HTTP/3**：S1 では持たない（`Alt-Svc` を出さない）。UDP のアイドルのタイムアウトが 30 秒であること、QUIC の接続の移動と NLB の振り分けの相性を、S2 の前に確かめる。NLB は QUIC・TCP_QUIC のリスナー（通すだけ、QUIC v1 だけ）を持つ（[Listeners](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html)、2026-09-27 に確認）。GA の UDP のリスナーから NLB の QUIC のリスナーへの組み合わせは未検証（HTTP/3 は延期の一覧。S2 の前に確かめる）。
 
 ## 6. DNS
 
@@ -227,10 +227,10 @@ cert-manager             Aurora / 変更のログ          全リージョンの
 | 上限（Let's Encrypt） | S1 の見込み | 対応 |
 | --- | --- | --- |
 | 登録ドメインあたり 50 枚／7 日 | 既定のドメインで新しいアカウントが週 50 を超えうる（1 万アカウント／年で週約 200） | 引き上げを申請する（この上限は引き上げの対象。2 節）。PSL への掲載が済めばアカウントごとの登録ドメインになる。どちらも間に合わない週は ZeroSSL で発行する |
-| 新しい注文 300／3 時間／アカウント | 新規の発行は 1 日 100 未満の見込み（未検証） | 足りる。越えたら引き上げを申請する |
+| 新しい注文 300／3 時間／アカウント | 新規の発行は 1 日 100 未満の見込み（S1 の 1 年でアカウント 1 万・ホスト名 2 万の仮定から 1 日 約 80） | 足りる。越えたら引き上げを申請する |
 | 識別子ごとの認可の失敗 5／時 | 利用者の DNS の誤りで失敗が続く | 向き先の確認（DNS の問い合わせ）を通ってから注文する。失敗は 1 時間に 2 回までに抑え、`failed` の後は利用者の再試行の要求を待つ |
 | 同じ名前の組 5 枚／7 日 | 再発行の繰り返し | 鍵の紛失以外で再発行しない |
-| 更新 | S1 で証明書 3 万枚（アカウント 1 万＋ホスト名 2 万。未検証）を 60 日ごとなら 1 日約 500 | ARI の更新は上限の対象外 |
+| 更新 | S1 で証明書 3 万枚（アカウント 1 万＋ホスト名 2 万の仮定）を 60 日ごとなら 1 日約 500 | ARI の更新は上限の対象外 |
 
 ### 7.4 保管と配布
 
@@ -246,7 +246,7 @@ cert-manager             Aurora / 変更のログ          全リージョンの
 1. ClientHello の SNI を小文字にし、末尾のドットを除く。
 2. 引く順：`certs_by_host/<host>`（完全一致）→ `certs_by_host/*.<親>`（1 段のワイルドカード）。
 3. 見つからない、または SNI がない：GA の IP への直接の接続か、未登録のホスト名。自分たちの既定の証明書は出さず、TLS のアラート `unrecognized_name` で閉じる（名前の列挙を防ぐ）。
-4. 証明書と鍵は、メモリの LRU（既定 2 万枚）に復号した形で持つ。外れたら LMDB から読み、RDK で開く（1ms 未満の見込み。未検証）。
+4. 証明書と鍵は、メモリの LRU（既定 2 万枚）に復号した形で持つ。外れたら LMDB から読み、RDK で開く（1ms 未満の見込み。未検証。E4 の `ingress-proxy` の性能の試験で測る）。
 5. ホスト名がルートを持てば、SNI の時点でホームのノードへ先読みを送る（[runtime-and-isolates.md](runtime-and-isolates.md) の 5.2 節）。
 6. **SNI と `Host` の食い違い**：HTTP/1.1 で `Host` が SNI と違う、または HTTP/2 で `:authority` が証明書の名前に含まれないときは 421 を返す。別のテナントのホスト名への要求を、他のテナントの TLS の接続で通さない。HTTP/2 の接続の合体（coalescing）は、同じ証明書が覆う名前の中でだけ起きる。
 
@@ -320,7 +320,7 @@ routes_wild/<parent-hostname>      → same list for "*.<parent>" patterns
 5. それでも同じなら、作成の早いもの（`pattern_id` の小さいもの）。同じアカウントの中でしか起きない。
 
 - パスの照合は、URL のパスとクエリを合わせた文字列に対して行う（本家と同じ。末尾が `*` でないパターンは、クエリのある要求に当たらない）。パスの正規化（`%2F`、`..`）はしない。照合の前に `..` を含むパスは 400 にする。
-- 照合は、ホスト名ごとの並べ替え済みの一覧を前から見るだけ（1 ホスト名 1,000 ルートで 10µs 未満の見込み。未検証）。
+- 照合は、ホスト名ごとの並べ替え済みの一覧を前から見るだけ（1 ホスト名 1,000 ルートで 10µs 未満の見込み。未検証。E4 の `route-resolution` のベンチマークで測る）。
 
 ### 8.3 オリジンと、自分のホスト名への内部の経路
 
@@ -365,11 +365,11 @@ routes_wild/<parent-hostname>      → same list for "*.<parent>" patterns
 | NLB → ノード | NLB の流れのハッシュ（同じ AZ の中） | 接続をノードへ均等に |
 | 受けたノード → ホームのノード | ランデブーハッシュ（HRW） | 同じ関数の版を同じノードに寄せ、isolate を温かく保つ（[runtime-and-isolates.md](runtime-and-isolates.md) の 5.4 節） |
 
-- **ホームのノード**：鍵 `(script_id, version_id)` と、そのリージョンの健全なノードの一覧から、`score = SipHash-2-4(seed, key ‖ node_id)` が最大のノードを選ぶ。ノードが 1 台抜けると、そのノードをホームにしていた鍵だけが動く。ノードが 60 台でも 1 要求あたりの計算は数 µs（未検証）。結果は鍵ごとに 10 秒持つ。
+- **ホームのノード**：鍵 `(script_id, version_id)` と、そのリージョンの健全なノードの一覧から、`score = SipHash-2-4(seed, key ‖ node_id)` が最大のノードを選ぶ。ノードが 1 台抜けると、そのノードをホームにしていた鍵だけが動く。ノードが 60 台でも 1 要求あたりの計算は数 µs の見込み（未検証。E4 の `home-node-forwarding` のベンチマークで測る）。結果は鍵ごとに 10 秒持つ。
 - **ノードの一覧**：リージョンの中継（[deployment-and-config-distribution.md](deployment-and-config-distribution.md) の 6 節）が、ノードの心拍（1 秒ごと）と Auto Scaling の状態から作り、リージョンの中だけの流れで配る。3 秒心拍のないノード、健全でないノードは一覧から外す。要求の処理で一覧を問い合わせない。
 - **転送**：受けたノードは、ホームのノードの内部のポートへ、ノードの間で張りっぱなしの HTTP/2（mTLS）で要求を流す。転送は 1 回だけ（ホームは再転送しない）。
 - **断る**：ホームのノードは CPU の使用率 70% 以上、またはその cordon のプロセスが hard のメモリの段なら、すぐに「断る」（内部の 503 と印）を返す。受けたノードが自分で動かす（runtime-and-isolates の 5.4 節）。ホームが 50ms で応答の頭を返さないときも、要求の本文を送り始める前なら自分で動かす。
-- **同じ AZ を先にするか**：AZ をまたぐ転送は、AZ の間の転送の料金と約 1ms の往復がかかる（値は未検証）。S1 はリージョン全体で 1 つのランデブーにする（温かさを優先）。費用が合わなければ capacity で見直す。
+- **同じ AZ を先にするか**：AZ をまたぐ転送は、AZ の間の転送の料金（両方向で各 0.01 ドル/GB。[infrastructure.md](infrastructure.md) の 10.2 節）と約 1ms の往復がかかる（往復の値は未検証。E4 の `ga-cost-check` で量と一緒に測る）。S1 はリージョン全体で 1 つのランデブーにする（温かさを優先）。費用が合わなければ capacity で見直す。
 - WebSocket と長い応答も、ホームのノードで動かす。転送の HTTP/2 の流れが、そのまま続く。
 
 ### 9.2 リージョンとノードを退かせる
@@ -377,7 +377,7 @@ routes_wild/<parent-hostname>      → same list for "*.<parent>" patterns
 | 対象 | 手順 | 新しい接続が止まるまで | 既存の接続 |
 | --- | --- | --- | --- |
 | ノード（入れ替え、AMI の更新） | 1. ノードが自分を「退避中」にし、`/healthz` を 503 にする 2. NLB が 2 回の失敗（約 20 秒）で外す 3. 入口のプロキシが HTTP/2 に GOAWAY、HTTP/1.1 に `Connection: close` を返す 4. 処理中の要求を最大 30 秒待つ 5. ターゲットの登録を外す | 約 20 秒 | 30 秒で閉じる。WebSocket も 30 秒で閉じる（runtime-and-isolates の 5.5 節と同じ） |
-| リージョン（障害の疑い、計画の作業） | 1. 運用者が `region_flags/<r>` の `drain=true` を設定の写しで配る（制御プレーンが止まっていれば、そのリージョンの中継に直接書く手順を runbooks に置く） 2. そのリージョンの全ノードの `/healthz` が 503 になる 3. NLB の全ターゲットが不健全 → GA がそのエンドポイントを不健全と見て、新しい接続を近い別のリージョンへ 4. 入口のプロキシが 10 秒後に GOAWAY を送る | 約 30 秒（NLB の検知 20 秒＋GA の反映。GA の反映の時間は未検証） | GOAWAY と 30 秒の待ちで閉じる。GA のアイドルの 340 秒を待たない |
+| リージョン（障害の疑い、計画の作業） | 1. 運用者が `region_flags/<r>` の `drain=true` を設定の写しで配る（制御プレーンが止まっていれば、そのリージョンの中継に直接書く手順を runbooks に置く） 2. そのリージョンの全ノードの `/healthz` が 503 になる 3. NLB の全ターゲットが不健全 → GA がそのエンドポイントを不健全と見て、新しい接続を近い別のリージョンへ 4. 入口のプロキシが 10 秒後に GOAWAY を送る | 約 30 秒（NLB の検知 20 秒＋GA の反映。GA の反映の時間は未検証。T5 で測る。E4 の `load-test-t5-t6-t9`） | GOAWAY と 30 秒の待ちで閉じる。GA のアイドルの 340 秒を待たない |
 | リージョン（計画の、ゆっくりした移動） | トラフィックダイヤルを 100 → 50 → 0 | ダイヤルの変更は新しい接続にだけ効く | 同上 |
 
 - **退かせる操作を、Global Accelerator の API に依存させない。** API は us-west-2 にだけある（2 節）。健全性の検査を落とせば、データプレーンだけで迂回する。
@@ -440,8 +440,8 @@ routes_wild/<parent-hostname>      → same list for "*.<parent>" patterns
 
 - **接続のプールは `(account_id, scheme, host, port, 接続したIP)` ごと。** テナントの間で接続を共有しない。オリジンの側での接続ごとの状態（接続ごとのレート制限、HTTP/2 の設定）や、TLS のセッションの再開を、別のテナントと混ぜないため。代わりに接続の数が増える（capacity で見積もる）。
 - 外への送信元の IP は、**ノードの公開の IPv4** にする（NAT ゲートウェイを通さない。外向きのプロキシのプロセスだけがその IP で外へ出る。[ADR-0049](../decisions/0049-aws-accounts-and-network.md)）。IP はノードの入れ替えで変わり、一覧は公開しない（S1）。不正な利用の通報で送信元を特定できるよう、送信元の IP（`egress_ip`）と時刻と `<Brand>-Ray` を結び付けて記録し、`node_public_ips` でノードを引く（[ADR-0044](../decisions/0044-egress-abuse-controls.md) の注記）。
-- すべてのサブリクエストに `<Brand>-Worker: <送り元の関数のホスト名>` を付ける（本家の `CF-Worker` に当たるとされる。本家の振る舞いは未検証。利用者は消せない）。受け手が送り元を知り、不正な利用を通報できるようにする。
-- タイムアウト：接続 10 秒、TLS の握手 10 秒、応答の頭 100 秒（本家の値は未検証。既定案）。本文の読み込みの時間は制限しない（利用者の切断で中止）。
+- すべてのサブリクエストに `<Brand>-Worker: <送り元の関数のホスト名>` を付ける（利用者は消せない）。受け手が送り元を知り、不正な利用を通報できるようにする。本家の `CF-Worker` は、`fetch()` のすべてのサブリクエストに付き、値は関数を持つ**ゾーンの名前**（[Cloudflare HTTP headers](https://developers.cloudflare.com/fundamentals/reference/http-headers/)、2026-09-27 に確認）。この基盤は DNS のゾーンを持たないので、関数のホスト名にする（既定のサブドメインでは `<worker>.<account>.<brand>.<domain>`）。
+- タイムアウト：接続 10 秒、TLS の握手 10 秒、応答の頭 100 秒（既定案）。本家は個々のサブリクエストの時間の上限を置かず、利用者が接続している間は続ける（[Workers Limits](https://developers.cloudflare.com/workers/platform/limits/)、2026-09-27 に確認）。この基盤は接続のプールを守るため、応答の頭までに上限を置く（本家との差として文書に書く）。本文の読み込みの時間は制限しない（利用者の切断で中止）。
 - 外向きの宛先のポート（cordon ごと。[ADR-0044](../decisions/0044-egress-abuse-controls.md)）：`c0-untrusted` は 80・443、`c1-free` は 80・443・8080・8443、`c2-paid`・`c3-dedicated` は 80・443 と 1024〜65535（`fetch` の URL の任意のポート）。25 番（SMTP）は全 cordon で拒否。アカウントごとの上書きは `account_egress/` の器（[abuse-and-trust-safety.md](abuse-and-trust-safety.md) の 7.1 節）。
 
 ### 10.4 入口のプロキシ
@@ -473,7 +473,7 @@ routes_wild/<parent-hostname>      → same list for "*.<parent>" patterns
 | サンパウロ | オレゴン（またはフランクフルト） | 170〜200ms | 355〜430ms | 15〜30ms |
 | ヨハネスブルグ・ドバイ | フランクフルト | 110〜170ms | 235〜370ms | 15〜30ms |
 
-- **この表の値はすべて未検証の見積もり**（地理と一般的な海底ケーブルの経路からの概算）。E4 で、各地の合成監視から実測して置き換え、公開する（NFR-003）。
+- **この表の値はすべて未検証の見積もり**（地理と一般的な海底ケーブルの経路からの概算）。E4 の `isp-vantage-probes` で、各地の合成監視から実測して置き換え、公開する（NFR-003）。
 - 読み取れること：
   - 国内の主要都市は、本家に近い（K3 の TTFB p50 30ms は東京・大阪の周辺で満たせる見込み）。地方は、往復 2 回分の `r_bb` が効いて本家より遅い。
   - 海外の S1 の 5 リージョンから遠い地域（南米、アフリカ、中東、オセアニア）は、本家の 10 倍以上になりうる。

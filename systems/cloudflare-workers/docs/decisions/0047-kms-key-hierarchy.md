@@ -35,7 +35,7 @@ date: 2026-09-27
 | リージョンのデータ鍵 | RSK・RDK | 256 ビット。KMS で包んだ形で `region_keys` と設定の写しに置く | — | 同上 | 毎月（前の版を 2 か月残す） |
 | アカウント | ADK | 256 ビット。`cp-adk-wrap` で包んで Aurora、RSK で包んで設定の写し | — | スーパーバイザーだけが平文を持つ | 年 1 回と、漏洩の疑いのとき。新しい値は新しい版で暗号化し、古い値は裏で包み直す |
 | 署名 | `release-signing`（ランタイム・AMI・CLI の workerd） | ECC P-256 の `SIGN_VERIFY` | `build-release` | `release-signer` だけ | 年 1 回。公開鍵は 2 つまで AMI に入れる |
-| 内部の CA | 配信・転送の mTLS の CA | AWS Private CA（未検証。E1 で自前の CA と費用を比べる） | `shared` | 中継・ノード | 中間の CA を年 1 回 |
+| 内部の CA | 配信・転送の mTLS の CA | AWS Private CA（東京の定価で、汎用のモード 月 400 ドル・1 枚 0.75 ドルから、短命の証明書のモード 月 50 ドル・1 枚 0.058 ドル。価格表の API、2026-09-27 に確認）。E1 の `kms-keys` で自前の CA と比べて決める | `shared` | 中継・ノード | 中間の CA を年 1 回 |
 
 - リージョンの鍵は、そのリージョンのノードと、制御プレーンの包み直しのジョブ（ADK と証明書の鍵を RSK・RDK で包むため）だけが開ける。包み直しのジョブは平文の RSK・RDK をメモリにだけ置く。リージョンの鍵を単一のリージョンにするのは、1 つのリージョンの鍵が漏れても、他のリージョンのノードのデータ鍵に届かないため。
 - 人は、どの鍵の `Decrypt` も常設では持たない（[ADR-0046](0046-control-plane-privilege-separation-and-operator-access.md)）。

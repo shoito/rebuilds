@@ -11,7 +11,7 @@ date: 2026-09-27
 
 isolate の境界は、V8 の欠陥 1 つで破れうる。そのとき被害が届くのは、同じプロセスのテナントである。[ADR-0002](0002-isolation-model.md) は、少なくとも「無料・未確認」「有料」「専用」の 3 段階でプロセスを分けると決めた。
 
-本家は、無料のプランの利用者を Enterprise の利用者と同じプロセスに載せない（[Security model](https://developers.cloudflare.com/workers/reference/security-model/)、2026-09-27 に確認）。段階の数と基準は公開されていない（未検証）。
+本家は、無料のプランの利用者を Enterprise の利用者と同じプロセスに載せない（[Security model](https://developers.cloudflare.com/workers/reference/security-model/)、2026-09-27 に確認）。段階の数と基準は公開されていない（同じ頁で確認）。
 
 攻撃者は無料で何度でも登録でき、作ったばかりのアカウントが最も疑わしい。一方で、段階を増やすほど、ノードあたりのプロセスの数が増え、密度が落ちる。
 

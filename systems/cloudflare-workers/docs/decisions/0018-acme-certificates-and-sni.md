@@ -9,7 +9,7 @@ date: 2026-09-27
 
 ## Context
 
-[ADR-0003](0003-edge-locations.md) は、TLS をエッジのノードで終端し、既定のドメインとカスタムドメインの証明書を自分たちで ACME で発行して配ると決めた。S1 で証明書は数万枚（アカウント 1 万、カスタムホスト名 2 万の見込み。未検証）になる。
+[ADR-0003](0003-edge-locations.md) は、TLS をエッジのノードで終端し、既定のドメインとカスタムドメインの証明書を自分たちで ACME で発行して配ると決めた。S1 で証明書は数万枚（アカウント 1 万、カスタムホスト名 2 万の見込み。[architecture/README.md](../architecture/README.md) の 2 節の S1 の規模からの仮定）になる。
 
 - 既定のサブドメインは `<worker>.<account>.<brand>.<domain>` の 2 段で、1 枚のワイルドカードでは覆えない。
 - ACME（[RFC 8555](https://www.rfc-editor.org/rfc/rfc8555.html)）の HTTP-01 はポート 80 で、ワイルドカード不可。DNS-01 は TXT でワイルドカード可、`_acme-challenge` を CNAME で委ねられる（[Challenge Types](https://letsencrypt.org/docs/challenge-types/)）。

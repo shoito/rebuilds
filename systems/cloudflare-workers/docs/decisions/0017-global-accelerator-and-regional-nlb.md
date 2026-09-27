@@ -53,7 +53,7 @@ Global Accelerator の事実（2026-09-27 に確認）：
   - 予備のアクセラレーターの固定の料金（約 18 ドル／月）。
   - 健全性の検査での迂回は、NLB の検知（約 20 秒）と GA の反映の時間がかかり、ダイヤルより粗い。
   - apex を A・AAAA で向けた利用者は、予備への切り替えと S3 の IPv6 の変更に追従しない。
-  - 利用者の IP の保持（とくに IPv6）は、この組み合わせで未検証。E4 の最初に確かめ、保たれなければこの ADR を改訂する。
+  - 利用者の IP の保持（とくに IPv6）：文書の上では保たれる。デュアルスタックのアクセラレーターに足せるのは IP を保つエンドポイントだけで、IP を保つ NLB のエンドポイントでは、GA と NLB が元の利用者の IP をパケットの IP ヘッダーに入れる（[Endpoint requirements](https://docs.aws.amazon.com/global-accelerator/latest/dg/about-endpoints-caveats.html)、[How the client IP address is preserved](https://docs.aws.amazon.com/global-accelerator/latest/dg/preserve-client-ip-address.headers.html)、2026-09-27 に確認）。実機での確認は E4 の最初（`client-ip-preservation-check`）に残し、保たれなければこの ADR を改訂する。
 
 ## Confirmation
 

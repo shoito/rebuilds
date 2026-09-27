@@ -4,7 +4,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 1. SLI と SLO
 
-合成監視（`probe` のアカウントから、5 リージョンの外と国内の複数の ISP の地点。利用者と同じ DNS → GA → NLB → ノードの経路）と、入口のプロキシが数える実際の要求のプラットフォームが原因の失敗の、両方で測る（[observability.md](../architecture/observability.md) の 5・6 節）。窓は 28 日の移動の窓（報告は暦の月。`slo_reports`）。
+合成監視（`probe` のアカウントから、5 リージョンの外と国内の複数の ISP の地点。利用者と同じ DNS → GA → NLB → ノードの経路）と、入口のプロキシが数える実際の要求のプラットフォームが原因の失敗の、両方で測る（[observability.md](../architecture/observability.md) の 5・6 節）。窓は 30 日の移動の窓（リポジトリの他の題材と同じ。報告は暦の月。`slo_reports`）。
 
 | SLI | 定義（数える場所） | SLO（S1） | NFR | 許容範囲を外れたときの扱い | 品質の判定に使う |
 | --- | --- | --- | --- | --- | --- |
@@ -33,7 +33,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. エラーの予算とバーンレート
 
-99.99% の 28 日の予算は約 4 分。99.9% は約 40 分。
+99.99% の 30 日の予算は約 4.3 分（43,200 分 × 0.01%）。99.9% は約 43 分。
 
 | 重さ | 長い窓 | 短い窓 | バーンレート | 意味 |
 | --- | --- | --- | --- | --- |
@@ -172,7 +172,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | ホームの断りの率（ticket） | 20% を 10 分 | `home-refusal-high` | E4 の `home-node-forwarding` で作成 |
 | メモリの予算の圧迫（ticket） | hard 85% に入るプロセスが増える | `memory-budget-pressure` | E2 の `isolate-table-and-eviction` で作成 |
 | 証明書の期限（14 日で ticket、7 日で page） | 最小の残りの日数 | `cert-renewal-failure` | E4 の `cert-manager-acme` で作成 |
-| ACME の上限（ticket） | 発行の失敗の率、上限の到達 | `acme-rate-limit` | 同上 |
+| ACME の上限（ticket） | 発行の失敗の率、上限の到達 | `acme-rate-limit` | E4 の `cert-manager-acme` で作成 |
 | 専用のリゾルバーの障害（page） | リゾルバーの健全性 | `egress-resolver-down` | E4 の `egress-proxy` で作成 |
 | KV の古さの SLO（page） | 見えるまでの p99 が 70 秒を 15 分 | `kv-staleness-slo-breach` | E7 の `kv-consistency-checker` で作成 |
 | KV の版の戻り（page、SEV1） | 1 件 | [incident-response.md](incident-response.md) の「耐久性の違反」 | 作成済み |

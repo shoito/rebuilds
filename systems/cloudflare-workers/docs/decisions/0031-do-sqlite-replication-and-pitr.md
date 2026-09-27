@@ -42,7 +42,7 @@ ADR-0005 は、Durable Objects の保存を SQLite にし、変更のログを�
 ## Consequences
 
 - 良くなること：
-  - 読み込みは手元の SQLite から同期で返る。確定の遅延は AZ の間の往復と fsync（数 ms。未検証）。
+  - 読み込みは手元の SQLite から同期で返る。確定の遅延は AZ の間の往復と fsync（数 ms の見込み。未検証。E9 の `do-commit-and-output-gate` で測る）。
   - 1 つの AZ の喪失で、確定済みの書き込みを失わない（NFR-010 の RPO 0）。
   - 30 日の任意の時点に戻せる（本家と同じ）。
 - 引き受けるコスト：

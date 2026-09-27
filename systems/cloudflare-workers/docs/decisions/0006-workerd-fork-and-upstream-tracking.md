@@ -56,3 +56,7 @@ date: 2026-09-27
 - 毎日の CI：上流の最新のタグに `patches/` が当たり、上流のテスト・WPT の対象・脱出のテストが通る。
 - `PATCHES.md` と `patches/` の中身が一致することを、CI の lint で確かめる。
 - 四半期ごとに、パッチの行数と `upstreamable` の PR の状態をレビューする。
+
+## 注記
+
+> 2026-09-27 の注記：上流の workerd は V8 をサンドボックスなしでビルドし、V8 の Bazel のビルドは `v8_enable_sandbox` の旗を持たない（[ADR-0010](0010-process-sandbox-and-egress-invariants.md) の注記）。V8 のサンドボックスを有効にするために V8 の `BUILD.bazel` へのパッチが要ると E3 の PoC で分かったら、「自分たちの V8 のパッチは原則持たない」の例外に加え、分類 `security` で持つ。上流の V8（Bazel のビルド）へ送れる形なら `upstreamable` にする。

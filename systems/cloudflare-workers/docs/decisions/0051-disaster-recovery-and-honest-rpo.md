@@ -66,3 +66,7 @@ AWS の事実（2026-09-27 に確認）：
 
 - 半期ごとに、staging で東京の全体の障害の訓練（[disaster-recovery.md](../runbooks/disaster-recovery.md)）を行い、製品ごとの実際の RPO と RTO を記録する。
 - 常時の計測：`AuroraGlobalDBRPOLag`、DynamoDB の `ReplicationLatency`、S3 の `ReplicationLatency`・`OperationsFailedReplication`、DO の WAL の転送の遅れ。
+
+## 注記
+
+> 2026-09-27 の注記：Decision の「README の NFR の表は統合の工程で直す」は済んだ。[architecture/README.md](../architecture/README.md) の 3 節の NFR-010 を、この ADR の製品ごとの RPO の表に改めた（PM・Ops の確認事項のまま。[intent.md](../intent.md) の P2）。

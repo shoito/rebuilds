@@ -109,7 +109,7 @@ seccomp の違反、脱出の探りの失敗、隔離（`cq-quarantine`）の数
 | ノードあたりの時系列 | 約 5,000（部品 × 指標 × cordon × ヒストグラムの桶） |
 | 合計 | 約 40 万 |
 
-- AMP の上限（ワークスペースの有効な時系列の数）は既定で数百万とされる（値は未検証。E1 で確かめる）。S3 の規模（数万のノード）では、ノードの単位のラベルを、リージョンの集計の記録の規則に置き換える。
+- AMP の上限（ワークスペースの有効な時系列の数）は既定 5,000 万（直近 30 分の使用で 200 万から自動で調整。引き上げは最大 15 億）。取り込みの速さは有効な時系列の 1/30 で最大 1 秒 1,666,666（[AMP quotas](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP_quotas.html)、2026-09-27 に確認）。S1 の約 40 万は十分に収まる。S3 の規模（数万のノード）では、ノードの単位のラベルを、リージョンの集計の記録の規則に置き換える。
 
 ## 5. 合成監視
 
@@ -117,7 +117,7 @@ seccomp の違反、脱出の探りの失敗、隔離（`cq-quarantine`）の数
 
 | 探り | 頻度 | 地点 | 見るもの |
 | --- | --- | --- | --- |
-| 最小の関数（固定の応答） | 10 秒 | 5 リージョンの外の VPC、国内の複数の ISP の外部の地点（提供元は E4 の前に選ぶ。未検証） | 可用性、TTFB、TLS の握手（NFR-003、K3） |
+| 最小の関数（固定の応答） | 10 秒 | 5 リージョンの外の VPC、国内の複数の ISP の外部の地点（提供元は E4 の `isp-vantage-probes` で選ぶ） | 可用性、TTFB、TLS の握手（NFR-003、K3） |
 | 各 cordon の探りの関数 | 1 時間 | 各リージョンの各 cordon | 脱出の探り（sandbox-and-security の 9.1 節） |
 | 合成のデプロイ | 1 分 | 東京の制御プレーンから | デプロイの伝搬（NFR-008） |
 | KV の合成の書き込み・読み込み | 10 秒・1 秒 | 各リージョン | 見えるまでの時間（NFR-009） |
@@ -134,7 +134,7 @@ seccomp の違反、脱出の探りの失敗、隔離（`cq-quarantine`）の数
 
 ## 6. SLI と SLO
 
-### 6.1 SLO（S1、28 日）
+### 6.1 SLO（S1、30 日）
 
 SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。この表は計測の側の記述で、値を変えるときは runbooks を先に変える。
 
@@ -161,7 +161,7 @@ SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。�
 
 ### 6.2 エラーの予算とバーンレート
 
-99.99% の 28 日の予算は約 4 分。
+99.99% の 30 日の予算は約 4.3 分（窓は [runbooks/README.md](../runbooks/README.md) の 1 節）。
 
 | 重さ | 長い窓 | 短い窓 | バーンレート |
 | --- | --- | --- | --- |
@@ -175,45 +175,13 @@ SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。�
 
 ## 7. アラートと runbook
 
-すべてのアラートは runbook の URL を注釈に持つ（CI で検査）。**アラートの一覧と手順の対応の正本は [runbooks/README.md](../runbooks/README.md) の 5 節**で、この表はその実装の側の記述である。手順の列の `…` の名前は、各領域の文書が挙げた個別の runbook で、runbooks/README.md の 5 節に、作る Epic と Story を書いた。それができるまでは [incident-response.md](../runbooks/incident-response.md) の該当の節で対応する。
+**アラートの一覧（名前、条件の初期値、重さ、手順、手順を作る Story）の正本は [runbooks/README.md](../runbooks/README.md) の 5.1 節** で、この文書には写さない（2026-09-27 に、ここの表を正本と食い違わないよう外した）。この節は、その一覧を実装する側の約束だけを書く。
 
-| アラート | 条件（初期値） | 重さ | 手順 |
-| --- | --- | --- | --- |
-| 関数の実行の可用性の速いバーンレート | 6.2 節 | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
-| リージョンの合成監視の全失敗 | 1 つのリージョンで 2 分 | 呼び出し（SEV1 の候補） | [incident-response.md](../runbooks/incident-response.md) の「リージョンの退避」 |
-| 東京の全体の障害 | 東京の合成監視・制御プレーン・ストレージの同時の失敗が 5 分 | 呼び出し（SEV1） | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
-| 脱出の探りの失敗、テナントをまたぐ到達の疑い | 1 件 | 呼び出し（SEV1） | [incident-response.md](../runbooks/incident-response.md) の「サンドボックスの脱出の疑い」 |
-| seccomp の違反 | 1 件 | 呼び出し（セキュリティの当番） | 同上。`seccomp-violation` |
-| V8 の Critical・High の修正の検知 | 検知のジョブ | 呼び出し（セキュリティの当番） | [incident-response.md](../runbooks/incident-response.md) の「V8 の 0-day」、`v8-emergency-patch` |
-| V8 の修正の遅れ | T+16h で全リージョンに届いていない | 呼び出し | 同上 |
-| 設定の伝搬の SLO | 設定 p99 が 10 秒を 15 分超える | 呼び出し | [incident-response.md](../runbooks/incident-response.md) の「設定の伝搬の停止」、`config-propagation-slow` |
-| 全体の古さ | 中継の先頭が 5 分進まない | 呼び出し | 同上、`config-origin-down` |
-| 取りこぼし | 60 秒で埋まらない抜け 1 件 | 呼び出し | 同上 |
-| 局所の遅れのノード | 1 リージョンで 2 台以上 | チケット（1 台）、呼び出し（2 台以上） | `node-lmdb-rebuild` |
-| 監視のスレッドの心拍の途切れ | 1 件 | 呼び出し | `runtime-crash-loop` |
-| ランタイムのプロセスの落ちの繰り返し | 5 分に 5 回 | 呼び出し | `runtime-crash-loop` |
-| プロセスの OOM | 1 件 | チケット（3 件/時で呼び出し） | `runtime-process-oom` |
-| 冷たい起動の嵐 | 冷たい起動の率 5% を 10 分 | チケット | `cold-start-storm` |
-| ランタイムの配信の関門で停止・自動の戻し | 配信の制御役 | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
-| 隔離の急増 | `cq-quarantine` が 1 ノードで 32 に達する | 呼び出し（セキュリティの当番） | `quarantine-surge` |
-| PMU を読めないノード | 起動・動作中の検査の失敗 | チケット | `pmu-unavailable-node` |
-| CPU の余裕の不足 | リージョンの CPU 50% を 15 分、ASG が最大 | 呼び出し | `capacity-headroom-low` |
-| ホームの断りの率 | 20% を 10 分 | チケット | `home-refusal-high` |
-| 証明書の期限 | 最小の残り 14 日（チケット）、7 日（呼び出し） | チケット → 呼び出し | `cert-renewal-failure` |
-| KV の古さの SLO | 見えるまでの p99 が 70 秒を 15 分 | 呼び出し | `kv-staleness-slo-breach` |
-| KV の版の戻り | 1 件 | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
-| DO のカナリアの抜け・戻り | 1 件 | 呼び出し（SEV1） | [incident-response.md](../runbooks/incident-response.md)、`do-unavailable-objects` |
-| DO のログのノードのディスク | 70%（チケット）、90%（呼び出し） | チケット → 呼び出し | `do-log-node-disk-pressure` |
-| キューの `msg_id` の喪失 | 1 件 | 呼び出し（SEV1） | [incident-response.md](../runbooks/incident-response.md) |
-| cron の `missed` | 1 件 | チケット | `cron-missed-fires` |
-| 複製の遅れ（Aurora） | `AuroraGlobalDBRPOLag` が 30 秒を 5 分 | 呼び出し | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
-| 複製の遅れ（S3・DynamoDB） | S3 の `ReplicationLatency` 15 分、`OperationsFailedReplication` > 0、DynamoDB の `ReplicationLatency` 60 秒 | チケット | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
-| 監査の鎖の食い違い | 1 件 | 呼び出し（SEV2） | `audit-chain-mismatch` |
-| ADK の復号の急増 | 平常の 10 倍を 5 分 | 呼び出し（セキュリティの当番） | [incident-response.md](../runbooks/incident-response.md)、`kms-key-compromise` |
-| break-glass の使用 | 1 件 | 知らせ（セキュリティの当番） | `break-glass` |
-| 使用量の経路の遅れ | 束の遅れ p99 が 5 分 | チケット | `usage-pipeline-lag` |
-| 利用者のログの取り込みの遅れ | p99 60 秒を 15 分 | チケット | `tenant-logs-ingest-lag` |
-| テレメトリの経路の停止 | AMP への書き込みの失敗が 5 分 | チケット | [incident-response.md](../runbooks/incident-response.md) |
+- **規則の置き場所**：アラートの規則は AMP の記録の規則と Alertmanager の規則として、開発リポジトリの `infra/` に置く。規則の名前は runbooks/README.md の 5.1 節の手順の名前（`kv-staleness-slo-breach` など）に合わせる。
+- **注釈**：すべての規則は `runbook_url`（runbooks/README.md の 5.1 節の手順、個別の手順ができるまでは [incident-response.md](../runbooks/incident-response.md) などの該当の節）と `severity`（`page`・`ticket`・`notify`）を持つ。CI で検査し、5.1 節の表にない規則と、表にあって規則のない行を、どちらも失敗にする。
+- **経路**：`page` は当番の呼び出し、`ticket` は Ops のチケット、セキュリティの事象（seccomp の違反、脱出の探り、隔離の急増、ADK の復号の急増、break-glass）はセキュリティの当番へ送る（2.4 節）。
+- **条件の元**：可用性のバーンレートは 6.2 節、伝搬は 2.2 節、ストレージは各領域の SLI（2.2 節の表）、DR の複製の遅れは CloudWatch の指標を AMP に取り込んで判定する。
+- **予算を持たない指標**（隔離、耐久性、伝搬の取りこぼし、監査の食い違い）は、1 件で鳴る規則を持つことを CI で確かめる（[ADR-0053](../decisions/0053-slos-probes-and-burn-rate-alerts.md) の Confirmation）。
 
 ## 8. ダッシュボード
 
@@ -257,7 +225,7 @@ SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。�
 ## 12. 未解決の問い
 
 - 国内の ISP の外部の地点の提供元と費用。
-- AMP の有効な時系列の上限と、S3 の規模でのリージョンの集計への切り替えの時期。
+- AMP の有効な時系列の上限と、S3 の規模でのリージョンの集計への切り替えの時期。→ 上限は既定 5,000 万（4 節）。切り替えの時期は S3 の前に決める。
 - プラットフォームが原因の失敗の分類の境目（利用者のオリジンが遅いときのホームへの転送の失敗など）。
 - 入口のアクセスのログの保持（30 日）と、通信の秘密（L2）。
 - `invocation_rollup_1m` の保持（90 日は仮）。
@@ -267,7 +235,7 @@ SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。�
 2026-09-27 の既定案。
 
 - 国内の地点は E4 の前に 3 つ以上の ISP を選ぶ。選べるまで、東京・大阪の外の VPC の合成監視で代える（ISP の経路は測れない）。
-- AMP の上限は E1 で確かめ、ノードあたり 5 万を超えないことを CI で見る。
+- AMP の上限は既定 5,000 万と確かめた（4 節）。ノードあたり 5 万を超えないことを CI で見る。
 - 分類の境目は、利用者のオリジン・利用者の関数の遅さに起因するものは含めない側に倒し、QA が表を承認する。
 - アクセスのログは 30 日で作り、法務の確認で変える。
 - `invocation_rollup_1m` は 90 日で始める。
@@ -284,7 +252,7 @@ SLO の値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節。�
 **runbooks/README.md**
 
 - SLO の表：6.1 節。
-- アラートと手順の表：7 節。
+- アラートと手順の表：runbooks/README.md の 5.1 節が正本（この文書の 7 節は実装の約束だけ）。
 - 手順：[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)。
 
 **data-model**
