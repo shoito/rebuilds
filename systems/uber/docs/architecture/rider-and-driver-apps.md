@@ -54,7 +54,7 @@
 
 | 画面 | 読む API・事象 | 決まり |
 | --- | --- | --- |
-| ホーム | `SupplyPreview`（[geospatial-index.md](geospatial-index.md) の 6.3 節） | 車は解像度 9 のセルの中心で出す。地図の車を動かすアニメーションで、正確な位置のように見せない |
+| ホーム | `SupplyPreview`（[geospatial-index.md](geospatial-index.md) の 6.3 節） | 車は `street` のセルの中心で出す。地図の車を動かすアニメーションで、正確な位置のように見せない |
 | 行き先の検索 | `/v1/places/*`（[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)） | 入力の文字列を端末のログに書かない |
 | 乗車地の確認 | 乗降の地点の提案 | 乗客が確かめたピンを `rider_confirmed_pin` として送る |
 | 見積もり | `fare_quotes`（[pricing-and-fares.md](pricing-and-fares.md) の 5.6 節） | 事前確定運賃は「確定の額」、メーターは「目安の範囲」と文言を分ける。目安の ETA（「約 N 分」）と受諾の時点の ETA も文言を分ける（[eta-and-routing.md](eta-and-routing.md) の 4.4 節）。文言は法務の確認待ち（L8） |
@@ -264,7 +264,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 - **トークン**：アクセストークンは短い期限（発行と更新は `security.md`）。更新のトークンは Keychain（`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`）と Android Keystore で暗号化して置く。
 - **端末の完全性**：ドライバーの出庫のときに、iOS は App Attest、Android は Play Integrity API の判定をサーバーに送り、サーバーが確かめる（判定の扱いは `security.md`）。失敗したら出庫させず、事業者に知らせる。乗客のアプリは、依頼の多すぎる端末でだけ確かめる。
 - **模擬の位置**：2 節の API の印を `integrity` に載せる（[location-ingestion.md](location-ingestion.md) の 13 節の V7）。iOS の印は他社の道具を検出できないとされるので、端末の完全性と、サーバーの側の兆し（跳び・ETA の系統的なずれ）と合わせて使う。
-- **端末に残すもの**：乗車の要約（位置は解像度 9 に丸めた値）、journal（正確な位置を含む。暗号化し、確定したら消す）、よく使う場所（乗客が保存したもの）。相手の電話番号は持たない（番号を隠した通話を使う）。
+- **端末に残すもの**：乗車の要約（位置は `street` に丸めた値）、journal（正確な位置を含む。暗号化し、確定したら消す）、よく使う場所（乗客が保存したもの）。相手の電話番号は持たない（番号を隠した通話を使う）。
 - **ログ・クラッシュの報告**：緯度経度、住所の入力、相手の名前、電話番号を書かない。クラッシュの報告の SDK の自動の収集（パンくず、画面の文字）を切る。lint でログの呼び出しの引数に位置の型を渡すことを禁じる。
 - **スクリーンショット**：乗客の名前と乗車地が出るオファーと迎車の画面は、Android で `FLAG_SECURE` を付けない（ドライバーが問い合わせのために撮ることがある）。代わりに、乗車の終わりで乗客の名前を画面の履歴から消す。
 - **外部送信**：アプリに入れる外部の SDK（分析・クラッシュの報告）は一覧にし、電気通信事業法の外部送信規律の公表の対象にする（法務の確認待ち、L4）。

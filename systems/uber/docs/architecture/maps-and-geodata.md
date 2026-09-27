@@ -2,11 +2,11 @@
 
 地図と地理のデータ。OSM の取り込みと更新、ODbL の義務、地図の誤りの見つけ方と直し方、住所の検索（商用の提供者の選び方と、結果の保存の制約）、乗降の地点、営業区域・交通圏などの規則の区域の多角形を決める。
 
-前提となる決定は、経路と ETA は OSM の上の Valhalla、住所の検索と事前確定運賃の距離は商用の提供者（[ADR-0005](../decisions/0005-maps-and-routing.md)）、規則の区域は行政の境界の多角形（PostGIS）を正本にし、H3 のセルの集合は速い判定の写しにする（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）。タイルの作成と速度の表は [eta-and-routing.md](eta-and-routing.md)。この文書で決めたことは次の ADR にある。
+前提となる決定は、経路と ETA は OSM の上の Valhalla、住所の検索と事前確定運賃の距離は商用の提供者（[ADR-0005](../decisions/0005-maps-and-routing.md)）、規則の区域は行政の境界の多角形（PostGIS）を正本にし、格子のセルの集合は速い判定の写しにする（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）。タイルの作成と速度の表は [eta-and-routing.md](eta-and-routing.md)。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は Geofabrik の日本の抽出を週 1 回取り込み、量の検査を通してから使う。地図の誤りは OSM の本体で直すことを基本にし、急ぐものだけタイルの上書き（閉鎖）で扱う。ODbL の帰属をアプリに出す。営業区域・交通圏などは、国土数値情報の行政区域を公示の構成で合わせた多角形を版と有効の期間つきで PostGIS に持ち、解像度 9 の写し（内側・境目）で速く判定し、境目は多角形で確かめる |
+| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は Geofabrik の日本の抽出を週 1 回取り込み、量の検査を通してから使う。地図の誤りは OSM の本体で直すことを基本にし、急ぐものだけタイルの上書き（閉鎖）で扱う。ODbL の帰属をアプリに出す。営業区域・交通圏などは、国土数値情報の行政区域を公示の構成で合わせた多角形を版と有効の期間つきで PostGIS に持ち、`street` の写し（内側・境目）で速く判定し、境目は多角形で確かめる |
 | [0034](../decisions/0034-geocoding-provider-and-pickup-points.md) | 住所の検索は自前の API の後ろに提供者を隠し、ゼンリン・Google・Amazon Location を PoC の基準（的中の率、遅れ、料金、結果の保存、他の地図との併用、SLA）で比べて選ぶ。乗降の座標は乗客が確かめたピンとして保存し、提供者の内容は提供者ごとの保存の規則でだけ持つ。乗降の地点は運用が整えたデータと、実績から作る候補（運用の確認が要る）で出す |
 
 ## 1. 目的と範囲
@@ -23,7 +23,7 @@
 | 日本の OSM の抽出 | Geofabrik の `japan-latest.osm.pbf` は約 2.5 GB で毎日更新され、差分（`.osc.gz`）と地方ごとの抽出（関東 約 489 MB など）もある（[Geofabrik の Japan](https://download.geofabrik.de/asia/japan.html)） |
 | 地図の誤りの検出（本家） | 当てはめの異常から、誤った右折の禁止、欠けた道路、一方通行の誤りを見つけ、3 か月で 2 万 8 千件以上の誤りを見つけた（[CatchME](https://www.uber.com/us/en/blog/mapping-accuracy-with-catchme/)、2019-04-25） |
 | 行政区域のデータ | 国土数値情報の行政区域データ（N03）は、全国の都道府県・市区町村の境界と全国地方公共団体コードを持つ。GML・Shapefile・GeoJSON。年 1 回（1 月 1 日時点）更新。CC BY 4.0 で商用に使えるが、二次利用に国土地理院への申請が要る場合があるとされる（[国土数値情報 行政区域データ](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html)） |
-| H3 の多角形の埋め方 | `polygonToCells` はセルの中心が多角形の中にあるかで判定する。実験的な `polygonToCellsExperimental` は、中心・全体が内側・一部でも重なる・外接の四角形が重なる、の 4 つの方式を持つ（[H3 の Region functions](https://h3geo.org/docs/api/regions/)） |
+| 格子と多角形の重なり | 自前の格子 `geogrid` のセルは、投影の平面の上の正六角形である（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、[geospatial-index.md](geospatial-index.md) の 2.1 節）。多角形を同じ平面に写せば、セルが多角形に「一部でも重なる」か「全体が内側」かを平面の幾何で正確に判定できる。本家の H3 は使わない（[ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)） |
 | Google Maps Platform | Geocoding API の内容を Google 以外の地図と一緒に使ってはならない（6.2）。緯度経度は 30 日まで一時にキャッシュできる（6.3.1）。緯度経度・整形した住所は、要求したアプリの利用者向けの機能のためだけに、利用者ごとに分けて無期限に持てる（6.3.2）。Directions・Distance Matrix にも Google 以外の地図との併用の禁止がある（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms)） |
 | Amazon Location Service | 結果を保存する（キャッシュも含む）ときは `IntendedUse` を `Storage` にし、高い料金になる。自動補完・候補（Suggest）は `Storage` にできない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、提供者に HERE を選ぶと、日本の場所の結果を `Storage` で保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる） |
 | ゼンリン | ZENRIN Maps API で、住所・建物・施設の検索、経路、渋滞・規制の情報を提供している（ADR-0005）。結果の保存と他の地図との併用の条件は公開の文書になく **未検証**（E4 の `geocoding-provider-poc` で契約の条件として確かめる） |
@@ -40,7 +40,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 乗客のアプリ ──▶ 乗客の API /v1/places/* ──▶ places-service（TypeScript）──▶ 商用の提供者（1 社）
                                                   └──▶ 乗降の地点（pickup_points、PostGIS）
 
-国土数値情報 N03 ＋ 運輸局の公示 ──▶ 区域の多角形（service_areas、PostGIS）──▶ 解像度 9 の写し ──▶ dispatch・Pricing・API
+国土数値情報 N03 ＋ 運輸局の公示 ──▶ 区域の多角形（service_areas、PostGIS）──▶ `street` の写し ──▶ dispatch・Pricing・API
 ```
 
 ## 4. OSM の取り込みと更新
@@ -105,7 +105,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 - `places-service` は、提供者の応答を自前の形（`PlaceCandidate`：表示の名前、住所の文字列、座標、提供者、提供者の ID、`source`、有効の期限）にそろえる。
 - 入力の文字列（自宅の住所などを含む）は、ログ・メトリクスに書かない。数えるのは件数と遅れだけ。
 - 流量の制限：乗客 1 人あたり、自動補完は 1 秒に 5 回・1 日に 500 回。
-- 乗客のアプリの近くの結果を優先するための位置は、解像度 7 のセルの中心に丸めて提供者に送る。
+- 乗客のアプリの近くの結果を優先するための位置は、`district` のセルの中心に丸めて提供者に送る。
 
 ### 7.2 提供者の PoC
 
@@ -152,7 +152,7 @@ CREATE TABLE pickup_points (
   name_ja             text NOT NULL,
   kind                text NOT NULL,   -- roadside / hotel_porch / station_app_pickup / taxi_stand / hospital / airport / venue
   geom                geometry(Point, 4326) NOT NULL,
-  cell10              bigint NOT NULL,
+  spot_cell              bigint NOT NULL,
   heading_constraint  int,             -- 車が向くべき向き（度）。一方通行・中央分離帯のある道路
   allowed_services    text[] NOT NULL, -- TAXI / RIDESHARE
   allowed_hours       tstzrange[],     -- 空なら終日
@@ -177,7 +177,7 @@ CREATE TABLE pickup_points (
 
 ### 8.3 実績から作る候補
 
-- 乗車の軌跡（[location-ingestion.md](location-ingestion.md) の 7 節）から、実際に乗車が始まった位置を解像度 10 のセルで数える。直近 90 日で、10 件以上・異なる乗客 5 人以上のセルを、`status=proposed`・`source=learned` の候補にする。
+- 乗車の軌跡（[location-ingestion.md](location-ingestion.md) の 7 節）から、実際に乗車が始まった位置を `spot` のセルで数える。直近 90 日で、10 件以上・異なる乗客 5 人以上のセルを、`status=proposed`・`source=learned` の候補にする。
 - 候補は運用の確認（2 人）を経て `active` にする。自動で公開しない。
 - 集計は乗客とドライバーの ID を持たない。
 
@@ -222,9 +222,9 @@ CREATE TABLE service_areas (
 CREATE TABLE service_area_cells (
   area_id   text   NOT NULL,
   version   int    NOT NULL,
-  cell9     bigint NOT NULL,
+  street_cell     bigint NOT NULL,
   coverage  text   NOT NULL,   -- inside / boundary
-  PRIMARY KEY (area_id, version, cell9)
+  PRIMARY KEY (area_id, version, street_cell)
 );
 ```
 
@@ -236,17 +236,17 @@ CREATE TABLE service_area_cells (
 
 ```
 func Contains(areaVersion, p) bool:
-    c := LatLngToCell(p, 9)
+    c := geogrid.CellAt(p, geogrid.Street)
     switch cells[areaVersion][c]:
       case inside:   return true
       case boundary: return polygonContains(areaVersion.geom, p)   // 多角形で確かめる
       default:       return false                                   // 写しにないセルは外
 ```
 
-- 写しは、`polygonToCellsExperimental` の「一部でも重なる」方式で区域に触れるセルを全部取り、そのうち「全体が内側」のセルを `inside`、残りを `boundary` にする。
+- 写しは、`geogrid.Cover(polygon, Street, Overlapping)` で区域に触れるセルを全部取り、そのうち `Cover(polygon, Street, Full)`（全体が内側）のセルを `inside`、残りを `boundary` にする。`Cover` は、区域の多角形を格子の投影の平面に写し、六角形と多角形の重なりを平面の幾何で判定する。
 - 区域の外のセルは写しに入らない。「一部でも重なる」で取るので、区域に触れるセルはすべて写しにあり、区域の中の点を外と誤ることはない（10.1 節の PROP-MAP-001 で確かめる）。
 - 判定の最後は多角形（ADR-0002）。多角形の判定は、配車と API のプロセスの中で、単純化した多角形で行う（PostGIS を毎回引かない）。多角形は区域の版ごとにメモリに持つ。
-- 写しの作り方の関数は H3 v4 の実験的な関数である。Go の束縛の h3-go v4.5.0（2026-05-26、H3 v4.5.0 を同梱）は、`PolygonToCellsExperimental` と `ContainmentOverlapping`・`ContainmentFull` などの方式を公開している（[h3-go の h3.go](https://github.com/uber/h3-go/blob/master/h3.go)、2026-09-27 に確認）。実験的な関数なので、版を固定し、PROP-MAP-001 で上げるたびに確かめる。将来の版で消えたら、中心の方式の `polygonToCells` に、境目の周り 1 輪のセルを `boundary` として足して代える。
+- `Cover` は自前の関数なので、正しさを 2 つの方法で守る。PROP-MAP-001 と、版の作成のときに、同じ写しを PostGIS（区域の多角形とセルの六角形（`geogrid.Boundary`）を同じ投影に写し、`ST_Intersects` と `ST_CoveredBy` で判定）で作り直して一致を確かめる。
 
 ## 10. 障害のときの振る舞い
 
@@ -261,7 +261,7 @@ func Contains(areaVersion, p) bool:
 ## 11. セキュリティと位置のプライバシー
 
 - 提供者の API の鍵は、サーバーの秘密の保管だけに置く。アプリに置かない。
-- 住所の検索の入力の文字列、乗降の座標は、ログに書かない。提供者に送る近くの位置は解像度 7 に丸める。
+- 住所の検索の入力の文字列、乗降の座標は、ログに書かない。提供者に送る近くの位置は `district` に丸める。
 - 乗降の地点の実績の候補（8.3 節）、地図の誤りの候補（6.1 節）は、ID を持たない集計だけで作る。
 - 区域の多角形と乗降の地点の変更は、管理画面から 2 人の確認で行い、変更の記録を残す（`support-and-operations-tools.md`）。
 - 提供者への送信が外国への提供に当たるかは、法務の確認待ち（L4）。
@@ -308,7 +308,7 @@ func Contains(areaVersion, p) bool:
 - **住所の検索**：自前の API の後ろに提供者を隠す。PoC の必須の基準は P1・P2・P4・P5。
 - **乗降の座標**：乗客が確かめたピンとして保存し、提供者の座標は持たない。
 - **乗降の地点**：80 m の地点、50 m の辺、最大 3 つ。実績の候補は運用の確認の後に公開。
-- **区域**：N03 ＋ 公示の構成、版と有効の期間、2 人の確認、解像度 9 の写し（内側・境目）と多角形の確認。
+- **区域**：N03 ＋ 公示の構成、版と有効の期間、2 人の確認、`street` の写し（内側・境目）と多角形の確認。
 
 ### 持ち越し
 
@@ -348,7 +348,7 @@ func Contains(areaVersion, p) bool:
 | Aurora（PostGIS）`service_areas`・`service_area_cells` | 9.2 節 |
 | Aurora（PostGIS）`pickup_points` | 8.1 節 |
 | Aurora `map_overrides`（`override_id`、`way_id`、`direction`、`kind`（closure）、`reason`、`valid_from`、`valid_to`、`approved_by`） | 6.2 節 |
-| Aurora `map_error_candidates`（`candidate_id`、`cell9`、`kind`、`evidence_counts`、`status`、`osm_changeset`） | 6.1 節 |
+| Aurora `map_error_candidates`（`candidate_id`、`street_cell`、`kind`、`evidence_counts`、`status`、`osm_changeset`） | 6.1 節 |
 | Aurora（Trips）の乗降の列：`pickup_pin`・`dropoff_pin`（`origin=rider_confirmed_pin`）、`pickup_point_id`、`pickup_area_ids`・`dropoff_area_ids` | 7.3 節（表の持ち主は `trips-lifecycle.md`） |
 | Aurora `trip_place_refs`（`trip_id`、`leg`、`provider`、`place_ref`、`display_name`、`expires_at`） | 7.3 節。提供者の内容だけを置く。提供者ごとの期限で消す（持ち主は places） |
 | S3 `places/poc/ground-truth.parquet` | 7.2 節の 2,000 件の正解（合成・公開の場所だけ。個人の住所を含めない） |

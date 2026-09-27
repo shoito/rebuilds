@@ -29,7 +29,7 @@ Grafana（shared）：都市ごとのダッシュボード
 
 - 計装は、Go は `internal/telemetry`、TypeScript は `packages/telemetry` に集め、属性名・メトリクスの名前・SLI の名前を定数で持つ（ADR-0040 の Confirmation）。
 - 共通の属性：`service.name`、`service.version`、`deployment.environment`、`cloud.region`、`cloud.availability_zone`、`city`、`zone`（配車の区域）、`region_gen`。
-- **書いてよいもの**：`trip_id`、`offer_id`、`decision_id`（バッチの ID）、`driver_session_id`、`assignment_epoch`、`trip_version`、H3 の解像度 8 までのセル、件数、時間、理由のコード。
+- **書いてよいもの**：`trip_id`、`offer_id`、`decision_id`（バッチの ID）、`driver_session_id`、`assignment_epoch`、`trip_version`、`block` までのセル、件数、時間、理由のコード。
 - **書かないもの**：緯度経度、住所・検索の入力、電話番号、名前、メッセージの本文、カードの情報（[security.md](security.md) の 1 節）。Go の位置の型は `String()` を持たず、TypeScript は位置の型をログの引数に渡すことを lint で禁じる。
 - `trip_id`・`driver_id` はログとトレースの属性に書くが、**メトリクスのラベルには入れない**。メトリクスのラベルは `city`・`zone`・`service`・`version`・理由のコードまで。
 - トレースの伝播：アプリの要求 → api → trips → dispatch の提案まで、1 つの依頼を W3C の traceparent でつなぐ。配車のバッチは多数の依頼を扱うので、バッチのスパンから各依頼のトレースへリンク（span link）を張る。
@@ -70,7 +70,7 @@ Grafana（shared）：都市ごとのダッシュボード
 
 - 正本は `DispatchBatchRecord`（[dispatch-and-matching.md](dispatch-and-matching.md) の 9.1 節）。可観測性の側では中身を写さない。
 - 引き方：乗車の ID → `driver_assignments.decision_id`（オファーを出したバッチ。オファーの記録は `driver_assignments` が兼ねる）→ S3 の `dispatch-decisions/zone=/dt=/hour=/` を Athena で引く。オファーのない依頼（候補なし）は、依頼のスパンの属性 `decision_id` から引く。
-- 「なぜこのドライバーか」「なぜ誰も来ないか」の問い合わせは、サポートのツールの「配車の判断」の画面で、1 つの依頼に関わる行（候補、条件の判定の理由のコード、ETA、コスト、結果）だけを出す。位置は解像度 10 のセルで、地図に点を出さない。閲覧は監査ログに残す。
+- 「なぜこのドライバーか」「なぜ誰も来ないか」の問い合わせは、サポートのツールの「配車の判断」の画面で、1 つの依頼に関わる行（候補、条件の判定の理由のコード、ETA、コスト、結果）だけを出す。位置は `spot` のセルで、地図に点を出さない。閲覧は監査ログに残す。
 - Grafana の「配車の区域」のダッシュボード：バッチの段ごとの時間、未割り当ての依頼の数、受け入れの上限で断った数、候補の数の分布、貪欲法の率、ETA の概算の率、提案の拒否の理由。
 
 ## 6. SLI と SLO
@@ -173,11 +173,14 @@ Grafana（shared）：都市ごとのダッシュボード
 - 位置の点ごとのログは書かない。トレースの位置の標本化は 0.1%。
 - 合成の監視は、本番の中の合成の区域で行う。
 
+### 決定（2026-09-28、推奨案で確定）
+
+- **成立率は SLO にしない**：供給の不足（車が足りない）を含み、システムの信頼性だけを表さないため。品質の指標として見続ける。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 成立率を SLO にするか（供給の不足を含むので、今は品質の指標） | S1 の運用の後、PM と QA |
 | 合成の区域を本番の中に置くことが、配車の設定の誤りで本番の区域に漏れないか | E5。区域の設定の検証の関数で `synthetic` のドライバーを本番の区域に出さない |
 | `state_delivery` と `offer_delivery` をアプリの版の不具合から切り分ける方法 | E6・E9 |
 | 可観測性の費用（位置の件数に比例するメトリクスの基数） | E3 の負荷試験で計る |

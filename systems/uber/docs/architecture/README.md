@@ -11,7 +11,7 @@
          API（api.<domain>）              位置の取り込み（Go、loc.<domain>）
               │                                     │ Kinesis loc-<city>
               │                                     ▼
-              │                           地理空間の索引（Go、メモリ、都市×H3 で分割）
+              │                           地理空間の索引（Go、メモリ、都市×格子で分割）
               │                                     ▲
               ▼                                     │ 候補の検索
      Trips（状態機械・割り当ての確定）◀── 割り当ての提案 ── 配車（Go、バッチのマッチング）
@@ -27,7 +27,7 @@
 | --- | --- |
 | API | 認証、入力の検証、レート制限、受け入れの上限。乗客・ドライバー・事業者・運用の窓口 |
 | 位置の取り込み | ドライバーの位置を受け取り、検証し、索引と軌跡のストアへ流す |
-| 地理空間の索引 | オンラインのドライバーの最新の位置と状態を、H3 のセルでメモリに持つ。正本ではない |
+| 地理空間の索引 | オンラインのドライバーの最新の位置と状態を、格子のセルでメモリに持つ。正本ではない |
 | 配車 | 区域ごとに 2 秒のバッチで、依頼とドライバーの組を最適化し、割り当てを Trips に提案する |
 | ETA・経路 | 迎車と乗車の ETA、多対一の ETA の行列、推計走行距離 |
 | Trips | 乗車の状態機械の正本。割り当ての確定、オファーの時間切れ、取り消し、提案の時の条件の確かめ直し |
@@ -39,7 +39,7 @@
 原則は 5 つ。
 
 - **割り当ての正本は Trips の DB。** 配車と索引はメモリの上で速く考えるが、割り当ては Trips が fencing token（`(region_gen, assignment_epoch)`）つきのトランザクションで確定する（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)、[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)、[ADR-0039](../decisions/0039-city-cells-and-osaka-warm-standby.md)）。
-- **位置は流れ、状態は残す。** 位置は失ってよい流れ（次の 4 秒で上書きされる）として扱い、乗車の状態は失わない正本として扱う（[ADR-0002](../decisions/0002-h3-geospatial-model.md)、[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）。
+- **位置は流れ、状態は残す。** 位置は失ってよい流れ（次の 4 秒で上書きされる）として扱い、乗車の状態は失わない正本として扱う（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）。
 - **運賃の規則はデータ。** 地域・事業者・有効期間つきの規則を版で持ち、計算はその版を引数に取る純粋な関数にする（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
 - **配車は再生できる。** 配車の入力（依頼、位置、ETA、乱数の種）を記録し、同じ入力から同じ判断を再現できるようにする（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)、[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）。
 - **法務の確認待ちは仕組みで止める。** 法務の確認待ちの経路は legal のフラグの裏に置き、法務の結論の記録がないと本番で有効にできない。緊急の入口はどのフラグでも止まらない（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)）。
@@ -53,11 +53,11 @@
 | 段階 | 地域 | オンラインの車両（ピーク） | 位置の受信（ピーク） | 配車の依頼の受け付け（ピーク） | 構成 |
 | --- | --- | --- | --- | --- | --- |
 | S1（MVP） | 東京（特別区・武三交通圏） | 1 万台 | 2,500 件/秒 | 30 件/秒（成立は約 3〜6 件/秒） | 東京リージョン・3 AZ。索引と配車は都市ごとに 1 組（主と待機）。Aurora の writer 1 台＋reader |
-| S2 | 日本版ライドシェアの大都市部の 12 地域（東京、横浜、名古屋、京都、札幌、仙台、さいたま、千葉、大阪、神戸、広島、福岡） | 5 万台 | 12,500 件/秒 | 150 件/秒 | 都市ごとに索引と配車の組を分ける。東京は H3 の親のセルでさらに分ける |
+| S2 | 日本版ライドシェアの大都市部の 12 地域（東京、横浜、名古屋、京都、札幌、仙台、さいたま、千葉、大阪、神戸、広島、福岡） | 5 万台 | 12,500 件/秒 | 150 件/秒 | 都市ごとに索引と配車の組を分ける。東京は `metro` のセルの集まりでさらに分ける |
 | S3 | 全国 | 20 万台 | 50,000 件/秒 | 600 件/秒 | 都市のまとまりごとのセル構成。大阪でも受ける active-active を検討する |
 
 - 位置の受信は、オンラインの車両 × 4 秒に 1 回で見積もる。本家もドライバーが 4 秒ごとに位置を送ると説明している（上の High Scalability の記事）。
-- **「配車の依頼の受け付け」は、ピークに受け付ける依頼の数で、成立しない依頼（取り消し、`no_driver_found`、選び直し）を含む。** 1 万台で 1 乗車（迎車 7 分＋乗車 20 分）に約 27 分かかるので、成立する乗車は約 3〜6 件/秒である。容量・Trips・PSP の見積もりは、量ごとにどちらを使うかを分けている（[capacity.md](capacity.md) の 1.1 節）。この定義は PM の確認事項（7 節）。
+- **「配車の依頼の受け付け」は、ピークに受け付ける依頼の数で、成立しない依頼（取り消し、`no_driver_found`、選び直し）を含む。** 1 万台で 1 乗車（迎車 7 分＋乗車 20 分）に約 27 分かかるので、成立する乗車は約 3〜6 件/秒である。容量・Trips・PSP の見積もりは、量ごとにどちらを使うかを分けている（[capacity.md](capacity.md) の 1.1 節）。この定義は 2026-09-28 に確定した（7 節）。
 - S2 の 12 地域は、日本版ライドシェアで国土交通省がアプリのデータから不足の車両数を出した大都市部の地域に合わせた（[関東運輸局の資料](https://wwwtb.mlit.go.jp/kanto/content/000334295.pdf)、2026-09-27 に確認）。
 
 ## 3. 非機能要件
@@ -84,7 +84,7 @@
 | サービス間の契約 | Protocol Buffers と gRPC（Go と TypeScript の間、アプリとの常時の接続） | 型を 1 か所から生成する |
 | API | Hono＋Zod | 他の題材と同じ |
 | モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、状態機械はテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） |
-| 地理 | H3（解像度 7・8・9。判断の記録は 10） | [ADR-0002](../decisions/0002-h3-geospatial-model.md) |
+| 地理 | 自前の六角形の格子 `geogrid`（`metro`・`district`・`block`・`street`・`spot`。判断の記録は `spot`） | [ADR-0002](../decisions/0002-hex-grid-geospatial-model.md) |
 | DB | Aurora PostgreSQL 18 の `core`（乗車・供給・運賃・地図（PostGIS）・安全）と `money`（支払い・台帳） | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md) |
 | キャッシュ・一時の状態 | Valkey（ElastiCache）`rt` と `cache`。正本は置かない | ADR-0038 |
 | 非同期 | transactional outbox → SNS → SQS。位置の流れは Kinesis Data Streams | [ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)、[ADR-0009](../decisions/0009-location-upload-and-validation.md) |
@@ -102,7 +102,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、熱い経路の 6 つのサービスは Go で、モバイルはネイティブで書く |
-| [0002](../decisions/0002-h3-geospatial-model.md) | 地理の単位は H3 にし、ドライバーの索引はメモリの上で都市と H3 のセルで分ける |
+| [0002](../decisions/0002-hex-grid-geospatial-model.md) | 地理の単位は自前の六角形の格子（geogrid）にし、ドライバーの索引はメモリの上で都市とセルで分ける |
 | [0003](../decisions/0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora の状態機械を正本にし、割り当ては `(region_gen, assignment_epoch)` の fencing token つきのトランザクションで 1 つに限る |
 | [0004](../decisions/0004-batched-dispatch-and-offers.md) | 配車は区域ごとの短いバッチで最適化し、オファーは 1 人ずつ、表示 15 秒・サーバーの期限 16.5 秒で送る |
 | [0005](../decisions/0005-maps-and-routing.md) | 経路と ETA は OSM の上の Valhalla を自前で動かし、住所の検索と事前確定運賃の距離は商用の提供者を使う |
@@ -110,8 +110,8 @@
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の許可で、出庫の間だけ背景で位置を取る。止まったら 60 秒で知らせる |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには主要経由地点を経由地として渡し、守ると確かめた引き継ぎ先だけを事前確定運賃で使う |
 | [0009](../decisions/0009-location-upload-and-validation.md) | 位置は HTTP/2 の POST で 4 秒ごとにまとめて送り、無状態の取り込みで検証して Kinesis に流す |
-| [0010](../decisions/0010-location-trails-map-matching-and-retention.md) | 軌跡は保持の期間を持つストアに分け、当てはめは Valhalla で遅れて行う。ログは H3 に丸め、人が見る操作は監査する |
-| [0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市と H3 の解像度 6 の集まりで分け、持ち主は DynamoDB のリースで決め、直近 35 秒から作り直す |
+| [0010](../decisions/0010-location-trails-map-matching-and-retention.md) | 軌跡は保持の期間を持つストアに分け、当てはめは Valhalla で遅れて行う。ログは格子のセルに丸め、人が見る操作は監査する |
+| [0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市と `metro` の集まりで分け、持ち主は DynamoDB のリースで決め、直近 35 秒から作り直す |
 | [0012](../decisions/0012-geo-index-nearby-query-api.md) | 近くの空車の検索は輪を広げて外周までの距離で打ち切る。依頼の前の地図の車は丸めて返す |
 | [0013](../decisions/0013-batch-assignment-solver.md) | バッチの割り当ては迎車の ETA を主にしたコストで最短増加路法で解き、300 ms を超えたら貪欲法 |
 | [0014](../decisions/0014-dispatch-eligibility-and-street-hails.md) | 候補の条件は版つきのデータの純粋な関数で判定し、流しの実車（タクシーだけ）は索引から外す。日本版ライドシェアは承諾・事前確定運賃・運行枠の中だけ |
@@ -133,7 +133,7 @@
 | [0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md) | アプリとの常時の接続は gRPC の双方向ストリーム 1 本にし、Go の rt-gateway で受ける |
 | [0031](../decisions/0031-per-stream-sequence-redelivery-push-and-sms.md) | 配信は受け手ごとの seq と TTL で順序と送り直しを持ち、正しさは API の読み直し。届かなければプッシュ、SMS は限る |
 | [0032](../decisions/0032-ops-console-roles-limits-change-requests-and-audit.md) | 運用のツールはロールと上限、理由つきの一時の権限、書き手と承認者を分ける変更の要求。閲覧と監査を毎日照合する |
-| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込む。営業区域・交通圏は版つきの多角形にし、H3 の写しと多角形で判定する |
+| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込む。営業区域・交通圏は版つきの多角形にし、格子のセルの写しと多角形で判定する |
 | [0034](../decisions/0034-geocoding-provider-and-pickup-points.md) | 住所の検索は自前の API の後ろに 1 社の提供者。乗降は乗客が確かめたピンだけを保存し、乗降の地点は運用が確かめたデータ |
 | [0035](../decisions/0035-ml-feature-store-and-shadow-rollout.md) | 最初のモデルは勾配ブースティングで ETA を補正し、特徴量は 1 つのパイプラインで両方に書き、影の実行を経て展開する（S2） |
 | [0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md) | 位置と個人の情報は 6 種類の KMS の鍵と保持の期間で分け、人が見る操作は理由・範囲・期限つきの許可と改ざんできない監査ログ |
@@ -176,7 +176,7 @@
 - **ETA の精度**：OSM の上の経路は、日本の細い道や右折の制限で誤差が出うる。本家は、経路のエンジンの ETA に、実績との差を学習したモデルで補正をかけている（[DeepETA](https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/)、2022-02、2026-09-27 に確認）。S1 は偏りの補正の表で NFR-003 を満たせるかを計測し、足りなければ E13 の ETA の補正を前倒しする。時刻に依る行列は Valhalla の設定の変更と PoC が要る。
 - **地図の提供者の利用条件**：商用の地図の利用条件が、結果の保存や他の地図との併用を制限する（Google は併用の禁止と緯度経度のキャッシュの期限。[ADR-0005](../decisions/0005-maps-and-routing.md)）。乗車の行には乗客のピンだけを置き、提供者の内容は期限つきの表に分ける（[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)）。
 - **大阪への切り替え**：Aurora の計画外の切り替えは直近の書き込みを失い、古い主の書き込みの止め方はベストエフォート。端末の要約と journal での復元、`region_gen`、人の判断の切り替えで抑える。RTO の内訳と大阪の Fargate の容量は **未検証**（E12 の `dr-drill`）。
-- **緊急の通報**：運用の担当の人手が足りなければ、NFR-010 の 30 秒を守れない。安全の担当の人数と夜間の体制は Ops が S1 の前に決める。
+- **緊急の通報**：運用の担当の人手が足りなければ、NFR-010 の 30 秒を守れない。安全の担当は 24 時間の当番にし、夜間も 2 人以上を置く（2026-09-28 に確定。[safety-and-trust.md](safety-and-trust.md) の 15 節）。人数で 30 秒を守れるかは、S1 の前の訓練で計る。
 
 ### 決定（2026-09-27、既定案）
 
@@ -195,10 +195,10 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 - **到着の判定**：索引の `GetDriverLocation` で行う。位置の Valkey の写しは持たない（trips の 3.3 節）。`GetDriverLocation` を呼べるのは Trips・ETA・share-service・safety-monitor（geospatial-index の 9 節）。
 - **乗降の保存**：乗車の行には乗客が確かめたピンだけ。提供者の内容は `trip_place_refs` に提供者ごとの期限で置く（ADR-0034。trips の 14 節、maps の 7.3 節）。
 - **データモデル**：`trip_offers` は `driver_assignments` に統合し、オファーの配信の列を足した。`fare_distance_quotes` の持ち主は Pricing。区域は `service_areas` だけが持ち、区域を指す列は `*area_id`（`fare_region_id` → `fare_area_id`）。位置の置き場所の一覧を [data-model.md](data-model.md) の 9 節に作った。
-- **S1 の「依頼 30 件/秒」**：ピークの受け付けの量（成立しない依頼を含む）と定義し、成立は約 3〜6 件/秒とした。容量・Trips・PSP・ETA の見積もりで使い分けた（capacity の 1.1・5 節、ADR-0003）。**PM の確認事項**。
+- **S1 の「依頼 30 件/秒」**：ピークの受け付けの量（成立しない依頼を含む）と定義し、成立は約 3〜6 件/秒とした。容量・Trips・PSP・ETA の見積もりで使い分けた（capacity の 1.1・5 節、ADR-0003）。2026-09-28 に確定（下の「決定（2026-09-28、推奨案で確定）」）。
 - **AGENTS.md**：ADR-0043 の強い規則を 2 つ足した（legal のフラグには `legal_gate_records` が要る、緊急の入口に release フラグを置かない）。法務の確認待ちの規則は release ではなく legal のフラグの裏（ADR-0014・0018・0020・0024・0042 と pricing・payments・dispatch を揃えた）。
 - **呼び名と数値**：事業者の管理画面のドメインは `operator.<domain>`（support の `partners.<domain>` を直した）。`ops.region.writable` に揃えた。常時の接続は gRPC の双方向ストリーム（location-ingestion の WebSocket の記述を直した）。オファーの TTL をサーバーの期限 16.5 秒に揃えた（notifications の 4.3 節）。runbook `driver-safety-suspension.md` を `driver-safety-hold.md` に 1 つにした。
-- **Epic**：E1〜E12 が MVP（S1）、E13 機械学習・E14 複数の都市への展開・E15 配車と安全の S2 の改善が S2。それ以外は [roadmap.md](../roadmap.md) の延期の一覧。E12 は「日本版ライドシェアと GA の準備」の 2 つの流れを持つ。1 つの Epic にしたのは、どちらも S1 の本番の開始の前に終える条件だからで、流れを分けたのは、日本版ライドシェアが法務（L2・L5）の結論を待つ間も、GA の準備を止めずに進めるため（既定。**PM の確認事項**）。
+- **Epic**：E1〜E12 が MVP（S1）、E13 機械学習・E14 複数の都市への展開・E15 配車と安全の S2 の改善が S2。それ以外は [roadmap.md](../roadmap.md) の延期の一覧。E12 は「日本版ライドシェアと GA の準備」の 2 つの流れを持つ。1 つの Epic にしたのは、どちらも S1 の本番の開始の前に終える条件だからで、流れを分けたのは、日本版ライドシェアが法務（L2・L5）の結論を待つ間も、GA の準備を止めずに進めるため（2026-09-28 に確定）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。容量のパラメーターは [capacity.md](capacity.md) の 8 節、保持の期間は [security.md](security.md) の 7.2 節、オファーの時間は [ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)。
 - 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
 
@@ -206,7 +206,7 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| S1 の「依頼 30 件/秒」の定義（受け付けの量）と、提携先の車両の数 | PM が E1 の前に確かめる |
+| 提携先の車両の数（S1 の規模の見直し） | 最初の提携先との契約の後に、2 節の表を見直す |
 | 法務の L1〜L9 | 法務。結論まで該当の Story の spec を承認しない |
 | 時刻に依る行列の精度と p99、日本全体の Valhalla のタイルの大きさと起動の時間 | E4 の `timedep-matrix-poc`・`valhalla-pool-fargate` |
 | 住所の検索・推計走行距離の提供者、番号の中継・顔の照合・SMS・PSP の提供者 | E4・E10・E1・E8 の PoC と選定 |
@@ -216,6 +216,44 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 | RTO の内訳、大阪の Fargate の容量、東京の書き込みの止め方 | E12 の DR の訓練 |
 | 費用の量（転送、LCU、ログ）と可観測性・セキュリティのサービスの額（単価は 2026-09-27 に Price List API で確認済み） | E12 の `cost-dashboard` |
 
+### 決定（2026-09-28、推奨案で確定）
+
+PM の方針（判断が要るところは推奨案でよい）により、次のとおり決めた。法務の判断が要るもの（L1〜L9、税理士の確認）と、それに依るものは決めずに残した。PoC と計測で決めるものは、上の持ち越しの表に残した。
+
+**リポジトリ共通の ADR-0007 の適用（題材の核に本家の実装を使わない）**
+
+- **地理の格子を H3 から自前の `geogrid` に替えた。** H3（h3-go）は本家が作った実装で、地理空間の索引はこの題材の核だから。六角形の階層、7 分の 1 ずつの面積、索引の持ち方は変えない。日本を 1 つの正積の平面に写し、正六角形を並べる。レベルは `metro`・`district`・`block`・`street`・`spot`（H3 の解像度 6〜10 と同じ大きさ）。cgo の懸念も消えた（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、[geospatial-index.md](geospatial-index.md) の 2.1 節、[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md)、[ADR-0012](../decisions/0012-geo-index-nearby-query-api.md)、[ADR-0033](../decisions/0033-osm-import-and-service-area-polygons.md)、[maps-and-geodata.md](maps-and-geodata.md) の 9.3 節）。
+- **他の本家の実装も確かめた。** Ringpop は使わない（リースで持ち主を決める。ADR-0011）。Cadence は長い流れの選択肢から外した（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）。Michelangelo・DeepETA・RAMEN は出典としてだけ挙げ、使わない（[ml-platform.md](ml-platform.md)、[notifications-and-realtime-push.md](notifications-and-realtime-push.md)）。Peloton などほかの本家の部品は使っていない。
+- 格子の正しさは、性質ベーステスト PROP-GEO-007 と、PROJ・PostGIS との突き合わせで守る（[quality.md](../quality.md)、[roadmap.md](../roadmap.md) の E3 の `geogrid-core`）。
+
+**確認・判断の待ちだったもの**
+
+| 項目 | 決定 | 理由 | 文書 |
+| --- | --- | --- | --- |
+| S1 の「依頼 30 件/秒」 | ピークに受け付ける依頼の数（成立しない依頼を含む）。成立は約 3〜6 件/秒 | 容量は受け付けの量で、PSP と乗車の量は成立の量で見積もるのが正しいため | [capacity.md](capacity.md) の 1.1 節、[intent.md](../intent.md) |
+| E12 の 2 つの流れ | 日本版ライドシェアと GA の準備に分けたまま | 法務（L2・L5）を待つ間も GA の準備を止めないため | [roadmap.md](../roadmap.md) の E12 |
+| 乗車の共有 | L4 の結論まで `legal.l4.share_trip` の裏。S1 の開始に共有がないことを PM が受け入れた | 法務の結論の前に位置を第三者に見せないため | [safety-and-trust.md](safety-and-trust.md) の 15 節 |
+| Android のオファーの通知 | 優先度の高い heads-up の通知。全画面は許可のあるときだけ。QA が E9 で表示 15 秒・確認 5 秒を確かめる | Android 14 で全画面の通知の既定の許可が取り消されるため | [notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 5.2・14 節、[quality.md](../quality.md) の E9 |
+| Play Integrity の 1 日の上限 | Ops が E3 の `driver-session-integrity` の前に引き上げを申請する | 既定の 1 万回は S1 の出庫の回数に近いため | [ADR-0037](../decisions/0037-authentication-device-integrity-and-fraud-response.md)、[security.md](security.md) の 13 節 |
+| `region_gen` を上げたときの epoch | 0 に戻さない | 正しさは同じで、世代をまたいで値が重ならず読み違えにくいため | [trips-lifecycle.md](trips-lifecycle.md) の 4.2 節 |
+| 抜き打ちの顔の照合の間のオファー | 5 分止める | 自撮りの最中のオファーの時間切れを、自動の休憩に数えないため | [safety-and-trust.md](safety-and-trust.md) の 7.2 節 |
+| `eta-service` | Go のサービスに数え、6 つにする | 独自の API を持ち、別に配備するため | [ADR-0001](../decisions/0001-platform-and-stack.md) の注記 |
+| 運賃のテストの固定の値 | 2026-04-20 の改定の後の値（初乗 1.0 km、加算 232 m） | 現行の認可の値で確かめるため。改定の前の値は版の切り替えの試験だけ | [pricing-and-fares.md](pricing-and-fares.md) の 11.3 節 |
+| 事前確定運賃と影の計算の差の閾値 | 週の比の中央値が平準化係数から ±10% を外れたら知らせる | 係数は実績と推計の比なので、比のずれで乖離を測れるため | [quality.md](../quality.md) の 4 節、[pricing-and-fares.md](pricing-and-fares.md) の 13 節 |
+| 評価の閾値 | 2 以下で組を拒否、乗客の注意は 3.5 | S1 の初めの値。分布を見て見直す | [safety-and-trust.md](safety-and-trust.md) の 7.1 節、[ADR-0029](../decisions/0029-masked-communications-identity-and-ratings.md) |
+| 運用のロールの上限の値 | 設計の値を S1 の初めの値にする | S1 の問い合わせの分布を見て見直す | [support-and-operations-tools.md](support-and-operations-tools.md) の 2.1 節、[ADR-0032](../decisions/0032-ops-console-roles-limits-change-requests-and-audit.md) |
+| 問い合わせの最初の返答の目標 | 普通 24 時間、運賃・キャンセル料 12 時間 | お金の問い合わせを先に返すため | [support-and-operations-tools.md](support-and-operations-tools.md) の 13 節 |
+| 運用を外部に委ねるか | S1 は委ねない | 委託先のロールと監査が要らず、個人の情報を外に出さないため | 同上 |
+| 安全の担当の体制 | 24 時間の当番、夜間も 2 人以上。30 秒を守れるかは S1 の前の訓練で計る | 1 人が受けている間に次の通報を受けるため | [safety-and-trust.md](safety-and-trust.md) の 15 節 |
+| 事業者の管理画面の即時の更新 | `rt-gateway` と分けた SSE | アプリとの常時の接続の部品を小さく保つため | [support-and-operations-tools.md](support-and-operations-tools.md) の 13 節、[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 14 節 |
+| 影の実行の長さ | S1 は小さな変更でも 1 週間を短くしない | 曜日の違いを必ず 1 巡させるため | [delivery.md](delivery.md) の 10 節 |
+| CI が本番の記録を読む形 | prod の中の専用の役割で再生し、差の集計だけを返す | 位置を含む記録を本番の外に出さないため | 同上 |
+| 成立率 | SLO にせず、品質の指標のまま | 供給の不足を含み、システムの信頼性だけを表さないため | [observability.md](observability.md) の 11 節 |
+| 認証の部品 | Better Auth を土台にし、電話番号のワンタイムコードと出庫のセッションを自前で足す | 作り込みを減らし、Slack の題材の知見を使うため | [security.md](security.md) の 4・13 節 |
+| 無事故・無免停の証明 | 1 年ごとの更新と、事業者が知った時点の取り消し | 許可基準が頻度を定めないため、年 1 回を下限にした。運転記録の証明を必須にするかは運輸局に確かめる | [supply-and-operators.md](supply-and-operators.md) の 3.3 節 |
+
+**決めずに残したもの**：法務の L1〜L9 と、それに依る項目（キャンセル料の名目、共有・顔の照合・稼働の地図の有効化、保持の期間、日本版ライドシェアの枠の判定など）、税理士の確認（手数料の消費税の端数、適格請求書）。運輸局・提携先に確かめる事実（無事故・無免停の確かめ方、雨天・酷暑の読み方、車載のナビだけの事業者、端末の貸与）も、外の相手の答えが要るので残した。
+
 ## 8. 領域の文書
 
 持ち主は、どれも Dev が書き、「レビュー」の列のロールが確認する。ADR は下の範囲の中で採番する。
@@ -224,7 +262,7 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 | --- | --- | --- | --- | --- |
 | [rider-and-driver-apps.md](rider-and-driver-apps.md) | 画面の流れ、背景での位置の送信、電池、外部のナビへの引き継ぎ、通信が切れたときの乗車の継続、列車と強制の更新 | 0006〜0008 | QA | E1、E9 |
 | [location-ingestion.md](location-ingestion.md) | 約 4 秒ごとの送信、検証、重複と順序、道路への当てはめ、軌跡の保存と保持 | 0009〜0010 | QA、セキュリティ | E3 |
-| [geospatial-index.md](geospatial-index.md) | H3 のセルの索引、分割、リース、再構築、検索の API | 0011〜0012 | QA | E3、E14 |
+| [geospatial-index.md](geospatial-index.md) | 格子のセルの索引、分割、リース、再構築、検索の API | 0011〜0012 | QA | E3、E14 |
 | [dispatch-and-matching.md](dispatch-and-matching.md) | バッチのマッチング、候補の条件、オファーと時間切れ、流しとの両立、判断の記録と再生 | 0013〜0015 | QA | E5、E6 |
 | [eta-and-routing.md](eta-and-routing.md) | ETA の種類、Valhalla の運用、速度の表、精度の計測、推計走行距離 | 0016〜0017 | QA | E4 |
 | [pricing-and-fares.md](pricing-and-fares.md) | メーターの運賃、事前確定運賃、迎車料金、変動運賃、版つきの規則、端数 | 0018〜0020 | QA、法務の窓口 | E7 |

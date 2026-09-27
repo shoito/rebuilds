@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md) | Valhalla は `taxi` の costing で動かし、配車の行列は依頼ごとの many-to-one にする。タイルは週 1 回、OSM と自前の速度の表（5 分 × 1 週の 2,016 の区切り）から作り、黄金の経路の集合で検査してから青緑で切り替える。ETA ＝ 経路の時間 ＋ 乗車地の固定の時間 ＋ 偏りの補正（解像度 7 × 曜日時間帯の中央値、±120 秒）。精度は受諾の時点の表示と到着の差で毎日計る |
+| [0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md) | Valhalla は `taxi` の costing で動かし、配車の行列は依頼ごとの many-to-one にする。タイルは週 1 回、OSM と自前の速度の表（5 分 × 1 週の 2,016 の区切り）から作り、黄金の経路の集合で検査してから青緑で切り替える。ETA ＝ 経路の時間 ＋ 乗車地の固定の時間 ＋ 偏りの補正（`district` × 曜日時間帯の中央値、±120 秒）。精度は受諾の時点の表示と到着の差で毎日計る |
 | [0017](../decisions/0017-fare-distance-for-pre-fixed-fares.md) | 事前確定運賃の推計走行距離は、法務の確認（L3）が済んだ地図の提供者だけで求める。確認までは商用の提供者を使い、Valhalla の距離で代えない。最短距離と最短時間の 2 つ以上のルート、有料道路の選択、乗客とドライバーに同じルートを示すことを API で守る。見積もりは版と提供者つきで保存し、形状は提供者の条件の期間だけ持つ |
 
 ## 1. 目的と範囲
@@ -72,20 +72,20 @@ Pricing ──▶ fare-distance（TypeScript）──▶ 商用の地図の提�
 ### 4.4 依頼の前の目安
 
 - 乗車地の近くの空車を `FindNearby`（[geospatial-index.md](geospatial-index.md) の 6.1 節、`limit` 3）で取り、many-to-one の行列で求めた最小の値に補正を足し、1 分単位に丸めて「約 N 分」と出す。
-- 同じ解像度 9 のセル・同じ商品の結果を 15 秒キャッシュする。
+- 同じ `street` のセル・同じ商品の結果を 15 秒キャッシュする。
 - 目安は約束ではない。受諾の時点の値（4.2 節）とは別のものとして、画面の文言を分ける（`rider-and-driver-apps.md`）。
 
 ### 4.5 補正（S1）
 
 ```
-eta = route_time + pickup_overhead(point_type) + bias(cell7(pickup), hour_of_week)
+eta = route_time + pickup_overhead(point_type) + bias(district_cell(pickup), hour_of_week)
 ```
 
 | 項 | 中身 |
 | --- | --- |
 | `route_time` | Valhalla の経路の時間（予測の交通つき） |
 | `pickup_overhead` | 乗車地の種類ごとの固定の時間。道路の脇 30 秒、乗降の地点（ホテルの車寄せ、駅の配車の乗り場）60 秒。値は乗降の地点のデータ（[maps-and-geodata.md](maps-and-geodata.md) の 8 節）に持つ |
-| `bias` | 解像度 7 のセル × 1 週の 1 時間ごと（168）の、直近 28 日の残差（実際 − 予測）の中央値。1 つの区切りに 30 件未満なら、解像度 6 の親、次に都市全体の値を使う。±120 秒に丸める。毎日作り直す |
+| `bias` | `district` のセル × 1 週の 1 時間ごと（168）の、直近 28 日の残差（実際 − 予測）の中央値。1 つの区切りに 30 件未満なら、`metro` の親のセル、次に都市全体の値を使う。±120 秒に丸める。毎日作り直す |
 
 - 補正の表は版つきで、`eta-service` は版を応答に付ける。
 - 本家と同じ機械学習の補正（残差の予測）は、S1 の計測で NFR-003 に届かなければ前倒しする（`ml-platform.md`）。
@@ -118,7 +118,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7(pickup), hour_of_wee
   1. 黄金の経路の集合（東京の 2,000 組。合成の乗降の組と、地図の誤りを直した場所）の距離と時間を、前の版と比べる。距離が 20% 以上変わった組が 1% を超えたら止める。
   2. 到達できない組が前の版より増えていない。
   3. 主要な駅・空港の乗車地から、半径 5 km の 100 点へ経路がある。
-  4. 直近 7 日の受諾の後の迎車（解像度 10 に丸めた記録）で、新しい版の ETA の誤差の中央値が前の版より 5 秒以上悪くない（6 節の再計算）。
+  4. 直近 7 日の受諾の後の迎車（`spot` に丸めた記録）で、新しい版の ETA の誤差の中央値が前の版より 5 秒以上悪くない（6 節の再計算）。
 
 ### 5.3 配置と切り替え
 
@@ -244,7 +244,7 @@ message RouteOption {
 ## 10. セキュリティと位置のプライバシー
 
 - `eta-service` と `fare-distance` は内部の API だけ。乗客のアプリからの要求は、乗客の API を通し、乗客の依頼に関わる地点（自分の乗車地・降車地）だけを受ける。
-- ETA の要求の緯度経度をログに書かない（解像度 8 のセルまで）。Valhalla のアクセスログは切り、エラーのログから座標を除く設定にする（Valhalla のログに座標が出るかは **未検証**。E4 の `valhalla-serving` と E3 の `location-log-lint` で確かめる）。
+- ETA の要求の緯度経度をログに書かない（`block` のセルまで）。Valhalla のアクセスログは切り、エラーのログから座標を除く設定にする（Valhalla のログに座標が出るかは **未検証**。E4 の `valhalla-serving` と E3 の `location-log-lint` で確かめる）。
 - 商用の提供者に送るのは、乗車地・降車地の座標と時刻だけ。乗客の ID・電話番号を送らない。外国の提供者に位置を送ることの扱いは、法務の確認待ち（L4）。
 - 速度の表と補正の表は、ドライバーの ID を持たない集計だけ。
 
@@ -287,7 +287,7 @@ message RouteOption {
 
 - **costing**：`taxi`。
 - **配車の行列**：依頼ごとの many-to-one、期限 400 ms、概算は `直線 × 1.4 ÷ 18 km/h ＋ 60 秒`。
-- **補正**：解像度 7 × 1 時間の 168 区切りの中央値の残差、±120 秒、毎日。
+- **補正**：`district` × 1 時間の 168 区切りの中央値の残差、±120 秒、毎日。
 - **タイル**：週 1 回、黄金の経路の集合の検査、青緑、古い組を 24 時間残す。
 - **時刻に依る行列**：E4 の PoC までは使わない（時刻に依らない行列 ＋ 補正の表）。
 - **速度の表**：直近 8 週、5 分 × 1 週、5 件以上かつ異なるドライバー 3 人以上。
@@ -330,7 +330,7 @@ message RouteOption {
 | Aurora（Trips）`trip_eta_snapshots`（`trip_id`、`kind`（pickup_at_accept・pickup_update・dropoff）、`eta_s`、`eta_source`、`tile_version`、`correction_version`、`computed_at`） | 4.2・4.3・6 節 |
 | Aurora（Pricing）`fare_distance_quotes`（`quote_id` PK、`options`（JSON：distance_m・duration_s・uses_tolls・major_waypoints の名前）、`provider`、`provider_map_version`、`computed_at`、`expires_at`、`chosen_option_id`、`polyline_expires_at`） | 7.3 節（表の持ち主は `pricing-and-fares.md` と調整） |
 | S3 `valhalla/tiles/<tile_version>/` | 5.2 節 |
-| S3 `eta/bias-tables/<version>.parquet`（`cell7`、`hour_of_week`、`bias_s`、`n`） | 4.5 節 |
+| S3 `eta/bias-tables/<version>.parquet`（`district_cell`、`hour_of_week`、`bias_s`、`n`） | 4.5 節 |
 | S3 `eta/speed-profiles/<version>/`（Valhalla の CSV） | 8 節 |
 | S3 `eta/golden-routes/<version>.parquet` | 5.2 節の検査の組 |
 | S3 `eta/accuracy/dt=/`（乗車ごとの `P`・`A`・`e`、ID は乗車の ID だけ） | 6 節 |

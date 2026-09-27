@@ -17,7 +17,7 @@
   2. **二重の割り当て・二重の請求**（NFR-005・NFR-006）。攻撃でも不具合でも起こりうる。
   3. **偽のドライバー**：事業者に属さない人が出庫する（白タクの経路）、別の人がアカウントを使う。
   4. **緊急の通報が届かない**（NFR-010）。
-- **ログ・トレース・メトリクス・エラーの報告に、緯度経度・住所の入力・電話番号・名前を書かない。** 位置は H3 の解像度 8 のセルまで（[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）。
+- **ログ・トレース・メトリクス・エラーの報告に、緯度経度・住所の入力・電話番号・名前を書かない。** 位置は `block` のセルまで（[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）。
 - **AI エージェント（コーディング・運用）は、本番のデータに触れない。** テストは合成の軌跡か、匿名化して丸めた軌跡だけ（[AGENTS.md](../../AGENTS.md)）。
 
 ## 2. 信頼境界
@@ -66,7 +66,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | S | ワンタイムコードの横取り（SIM の乗っ取り）でアカウントを奪う | 新しい端末でのログインで、保存したカードの再確認（3-D セキュア）を求める。ドライバーは出庫のときに顔の照合（[safety-and-trust.md](safety-and-trust.md) の 7.2 節） |
 | S | ドライバーのアカウントを別の人が使う（貸し借り） | 1 日の最初の出庫と 1 日 1 回の抜き打ちの顔の照合（`legal.l4.driver_face_check`。記録の前は事業者の点呼）、端末の結びつけ。1 人 1 セッション（部分一意索引、[ADR-0026](../decisions/0026-supply-registry-and-document-verification.md)） |
 | T | 改造したアプリで位置を偽る、状態を偽る | 端末の完全性（App Attest・Play Integrity）、位置の検証 V1〜V8（[location-ingestion.md](location-ingestion.md) の 5 節）。遷移の最終の判定はサーバー（ADR-0021） |
-| I | 端末に残した journal・軌跡の漏洩（端末の紛失） | journal は暗号化し、確定したら消す。要約の位置は解像度 9 に丸める（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 9 節） |
+| I | 端末に残した journal・軌跡の漏洩（端末の紛失） | journal は暗号化し、確定したら消す。要約の位置は `street` に丸める（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 9 節） |
 | I | 依頼の前の地図の車から、特定のドライバーを追う | セルの中心に丸め、ID を付けず、10 秒キャッシュ（ADR-0012） |
 | I | 乗車の後に、相手の位置・電話番号を知る | 位置は受諾から降車までだけ配る。番号は中継で隠し、降車の 30 分後で切る（[safety-and-trust.md](safety-and-trust.md) の 6 節） |
 | D | ワンタイムコードの大量の送信（SMS の料金の攻撃） | 番号の帯・IP・端末ごとの上限（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の runbook `sms-pumping.md`） |
@@ -90,7 +90,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | S | 内部の他のサービスが `FindNearby` で全ドライバーの位置を引く | RPC ごとの許可の一覧（dispatch と eta だけ）、上限（`limit` 50、`k_max` 30） |
 | T | 2 つの配車のタスクが同じドライバーを提案する | Trips の epoch と部分一意索引で片方を拒否（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)） |
 | T | 配車の設定の値の誤り・悪意の変更 | AppConfig の検証の関数、再生の結果の添付、変更の記録と承認（[delivery.md](delivery.md) の 3 節） |
-| I | 判断の記録からの位置の漏洩 | 解像度 10 に丸める、乗客の個人の情報を含めない、`location` の鍵、180 日（ADR-0015） |
+| I | 判断の記録からの位置の漏洩 | `spot` に丸める、乗客の個人の情報を含めない、`location` の鍵、180 日（ADR-0015） |
 | I | 索引のメモリのダンプ | コアダンプを無効、本番でヒープのプロファイルを取らない（[geospatial-index.md](geospatial-index.md) の 9 節） |
 | D | 大量の依頼で配車のバッチを膨らませる | 都市ごとの受け入れの上限とバッチの大きさの上限（[ADR-0041](../decisions/0041-load-model-admission-control-and-prescaling.md)） |
 
@@ -122,7 +122,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | --- | --- | --- |
 | S | 管理者のアカウントの乗っ取りで、偽のドライバーを登録する | 多要素の認証を必須、書類の確認はこの基盤の審査の担当（ADR-0026）。新しいドライバーの初回の出庫は顔の照合 |
 | I | 他の事業者のドライバー・乗車・運賃を見る | RLS（`operator_id`）。事業者どうしで運賃や稼働を共有する経路を作らない（L9） |
-| I | 稼働の地図で自社のドライバーの位置を運行管理の外に使う | 自社の車だけ、アクセスを監査ログに残す（supply の 5.2 節）。乗車の後の履歴は解像度 9 に丸める |
+| I | 稼働の地図で自社のドライバーの位置を運行管理の外に使う | 自社の車だけ、アクセスを監査ログに残す（supply の 5.2 節）。乗車の後の履歴は `street` に丸める |
 | T | 運行枠・台数を偽って登録する | 通知の写しと 2 人の承認（[ADR-0027](../decisions/0027-rideshare-operating-windows.md)） |
 | E | `viewer` が `operator_admin` の操作をする | 役割ごとの許可の一覧を API で確かめる（画面だけで隠さない） |
 
@@ -150,7 +150,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 - 署名の鍵は種類ごとに分ける（Ed25519、90 日ごとに入れ替え、`kid` で 24 時間並べる）。
 - トークンの保存：Keychain・Android Keystore（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 9 節）。
-- 実装は、Slack の題材の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md) の自前でホストする認証の部品を候補にする。電話番号のワンタイムコードと、ドライバーの出庫のセッションは自前で足す。どの部品を使うかは E1 で決める（持ち越し）。
+- 実装は、Slack の題材の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md) の自前でホストする認証の部品（Better Auth）を土台にし、電話番号のワンタイムコードとドライバーの出庫のセッションを自前で足す（2026-09-28 に確定。作り込みを E1 の中で減らせ、Slack の題材の運用の知見を使えるため）。
 
 ## 5. 位置のプライバシー
 
@@ -161,10 +161,10 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 見る人 | 見られるもの | いつ |
 | --- | --- | --- |
 | 乗客 | 割り当てのドライバーの正確な位置 | 受諾から降車まで（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 6 節） |
-| 乗客（依頼の前） | 近くの車の丸めた点（解像度 9 の中心、ID なし） | 依頼の画面（ADR-0012） |
+| 乗客（依頼の前） | 近くの車の丸めた点（`street` の中心、ID なし） | 依頼の画面（ADR-0012） |
 | ドライバー | 乗客の乗車地（正確） | オファーから乗車まで。降車地は受諾の後（[dispatch-and-matching.md](dispatch-and-matching.md) の 8.4 節） |
 | 乗車の共有の相手 | 乗車中の車の位置 | 乗車の終わりまで（[safety-and-trust.md](safety-and-trust.md) の 3 節）。NFR-009 の例外で `legal.l4.share_trip` の裏 |
-| 事業者の運行管理 | 自社の車の位置と状態（稼働の地図）、乗車中の乗降の地点 | 出庫中。乗車の後の履歴は解像度 9 に丸める。稼働の地図は NFR-009 の例外で `legal.l4.operator_fleet_map` の裏 |
+| 事業者の運行管理 | 自社の車の位置と状態（稼働の地図）、乗車中の乗降の地点 | 出庫中。乗車の後の履歴は `street` に丸める。稼働の地図は NFR-009 の例外で `legal.l4.operator_fleet_map` の裏 |
 | サポート・安全の担当 | 1 乗車の軌跡、1 つのインシデントの追記の位置 | 許可（理由・範囲・30 分）の間 |
 | 分析 | ID を HMAC に置き換えた写し、ID を持たない集計 | 別のアカウント |
 | 外部（警察など） | 法務の確認待ち | 2 人の承認（L4・L7） |
@@ -190,7 +190,7 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | Kinesis `loc-<city>` | 検証済みの位置 | `location` の鍵、24 時間 |
 | S3 `loc-raw/` | 生の点 | `location` の鍵、30 日、分析は HMAC の写しだけ |
 | S3 `trip-trails/`、Aurora `trip_trails` | 乗車の軌跡 | `location` の鍵、1 年、窓口だけ |
-| S3 `dispatch-decisions/` | 配車の判断の記録（解像度 10） | `location` の鍵、180 日、配車の担当と再生の仕組みだけ |
+| S3 `dispatch-decisions/` | 配車の判断の記録（`spot`） | `location` の鍵、180 日、配車の担当と再生の仕組みだけ |
 | Aurora `safety_incident_locations` | 緊急の通報の後の位置 | 列の暗号化（`location` の鍵）、L7 の結論まで |
 | Aurora `trips` の乗降の座標 | 乗客が確かめたピン | Aurora の暗号化。API は相手と乗車の間だけ返す |
 | 索引のメモリ | 最新の位置 | 正本ではない。ダンプを取らない |
@@ -255,7 +255,7 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | 乗車の軌跡 | 1 年 | 同上、`trip_trails` は削除のジョブ | 同上 |
 | 速度の標本・台数の集計（ID なし） | 2 年 | 同上 | 同上 |
 | 配車の判断の記録 | 180 日 | 同上 | [dispatch-and-matching.md](dispatch-and-matching.md) の 9.1 節 |
-| 乗車の記録（`trips`、`trip_events`、`trip_segments` の乗降のピン、運賃、`fare_quotes`、`fare_distance_quotes`） | 乗車の終わりから 7 年（既定。**法務の確認待ち（L4）**）。根拠：運賃の訂正・照合の元なので、事業者の業務の記録の保存の 1 年（旅客自動車運送事業運輸規則 第 25 条第 3 項）より長く、台帳（10 年の想定）より短い既定にした | 期限の後、乗客の ID を切り離し、乗降のピンを解像度 9 に丸める | [trips-lifecycle.md](trips-lifecycle.md) |
+| 乗車の記録（`trips`、`trip_events`、`trip_segments` の乗降のピン、運賃、`fare_quotes`、`fare_distance_quotes`） | 乗車の終わりから 7 年（既定。**法務の確認待ち（L4）**）。根拠：運賃の訂正・照合の元なので、事業者の業務の記録の保存の 1 年（旅客自動車運送事業運輸規則 第 25 条第 3 項）より長く、台帳（10 年の想定）より短い既定にした | 期限の後、乗客の ID を切り離し、乗降のピンを `street` に丸める | [trips-lifecycle.md](trips-lifecycle.md) |
 | 台帳・精算・適格請求書 | 10 年（想定。法務） | パーティションの削除 | [payments-and-payouts.md](payments-and-payouts.md) の 17 節 |
 | ドライバーの書類の画像 | 登録の解除から 3 年（既定。**法務の確認待ち（L4）**） | 削除のジョブ | [supply-and-operators.md](supply-and-operators.md) の 9 節 |
 | 顔の画像 | 30 日 | ライフサイクル | [safety-and-trust.md](safety-and-trust.md) の 12 節 |
@@ -267,9 +267,9 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | 位置の閲覧の許可 | 監査ログと同じ | — | 5.2 節 |
 | 監査ログ | 1 年（Aurora）、7 年（アーカイブ） | パーティションの削除、Object Lock の期限 | 7.1 節 |
 | アプリのログ | 30 日（CloudWatch Logs）、1 年（log-archive） | 保持の期間 | [observability.md](observability.md) の 4 節 |
-| ETA の補正・速度・検査の組（S3 `eta/bias-tables/`・`eta/speed-profiles/`・`eta/golden-routes/`） | 版ごと 90 日（既定。**法務の確認待ち（L4）**）。根拠：戻しと再計算には直近の数版があれば足りる。解像度 7〜10 の集計で ID を持たない | S3 のライフサイクル | [eta-and-routing.md](eta-and-routing.md) の 14 節 |
+| ETA の補正・速度・検査の組（S3 `eta/bias-tables/`・`eta/speed-profiles/`・`eta/golden-routes/`） | 版ごと 90 日（既定。**法務の確認待ち（L4）**）。根拠：戻しと再計算には直近の数版があれば足りる。`district`〜`spot` の集計で ID を持たない | S3 のライフサイクル | [eta-and-routing.md](eta-and-routing.md) の 14 節 |
 | ETA の精度の記録（S3 `eta/accuracy/`、乗車の ID だけ） | 2 年（既定。**法務の確認待ち（L4）**）。根拠：前の年の同じ季節と比べるため。乗車の記録より短い | S3 のライフサイクル | 同上 |
-| 再生の結果（S3 `ci/replay-results/<pr>/`、解像度 10） | 1 年（既定。**法務の確認待ち（L4）**）。根拠：変更の後の問題を、元の PR の関門の結果まで遡って調べる期間。元の判断の記録（180 日）から作るが、PR ごとの集計と差だけを持つ | S3 のライフサイクル | [delivery.md](delivery.md) の 11 節 |
+| 再生の結果（S3 `ci/replay-results/<pr>/`、`spot`） | 1 年（既定。**法務の確認待ち（L4）**）。根拠：変更の後の問題を、元の PR の関門の結果まで遡って調べる期間。元の判断の記録（180 日）から作るが、PR ごとの集計と差だけを持つ | S3 のライフサイクル | [delivery.md](delivery.md) の 11 節 |
 | 配信の時の特徴量と予測（S3 `feature-logs/`、E13 から） | 90 日（既定。**法務の確認待ち（L4）**）。根拠：学習の窓（直近 8 週）と影の実行の比べに足りる期間。元の位置のデータの保持を超えない | S3 のライフサイクル | [ml-platform.md](ml-platform.md) の 5.3 節 |
 
 - **アカウントの削除**：乗客・ドライバーの依頼で、ログインの情報、電話番号、保存した場所、端末のトークンを 30 日の猶予の後に消す。乗車・運賃・台帳の記録は、上の期間まで、ID を切り離した形で残す（帳簿と事業者の記録の義務のため）。軌跡を保持の期間の前に消すかは法務の確認待ち（L4）。
@@ -362,12 +362,15 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 - 監査ログは Aurora に 1 年、アーカイブに 7 年。
 - 不正の自動の処置は、配車の候補・特典から外すまで。
 
+### 決定（2026-09-28、推奨案で確定）
+
+- **認証の部品**：Better Auth を土台にし、電話番号のワンタイムコードとドライバーの出庫のセッションは自前で足す（4 節）。
+- **Play Integrity の 1 日の上限**：Ops が、E3 の `driver-session-integrity` の前に Google に引き上げを申請する（[ADR-0037](../decisions/0037-authentication-device-integrity-and-fraud-response.md)）。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 認証の部品（Better Auth を使うか、電話番号の部分を自前で書くか） | E1 |
-| Play Integrity の 1 日の上限（既定 1 万回）の引き上げ | E3 の `driver-session-integrity` の前に Google に申請する（App Attest の上限と段階的な導入は [ADR-0037](../decisions/0037-authentication-device-integrity-and-fraud-response.md) で確認済み） |
 | PCI DSS の SAQ の種類、割賦販売法の加盟店の義務 | PSP の選定（E8）と法務 |
 | 有名人などの注意の一覧の運用 | E11 |
 | 10 節の法務の論点 | 法務 |

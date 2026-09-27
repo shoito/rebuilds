@@ -6,7 +6,7 @@ Uber の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | ADR | 決定 | 状態 |
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、配車の熱い経路は Go で、モバイルはネイティブで書く | accepted |
-| [0002](0002-h3-geospatial-model.md) | 地理の単位は H3 にし、ドライバーの索引はメモリの上で都市と H3 のセルで分ける | accepted |
+| [0002](0002-hex-grid-geospatial-model.md) | 地理の単位は自前の六角形の階層の格子（geogrid）にし、ドライバーの索引はメモリの上で都市とセルで分ける | accepted |
 | [0003](0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora の状態機械を正本にし、割り当ては fencing token つきのトランザクションで 1 つに限る | accepted |
 | [0004](0004-batched-dispatch-and-offers.md) | 配車は区域ごとの短いバッチで最適化し、オファーは 1 人ずつ時間切れつきで送る | accepted |
 | [0005](0005-maps-and-routing.md) | 経路と ETA は OSM の上の Valhalla を自前で動かし、住所の検索と事前確定運賃の距離は商用の提供者を使う | accepted |
@@ -14,9 +14,9 @@ Uber の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | [0007](0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の許可で、出庫の間だけ背景で位置を取る。止まったらサーバーが 60 秒で知らせる | accepted |
 | [0008](0008-navigation-handoff-with-waypoints.md) | 外部のナビには選んだルートの主要経由地点を経由地として渡し、経由地を守ると確かめた引き継ぎ先だけを事前確定運賃で使う | accepted |
 | [0009](0009-location-upload-and-validation.md) | 位置は HTTP/2 の POST で 4 秒ごとにまとめて送り、無状態の取り込みで検証して Kinesis Data Streams に流す | accepted |
-| [0010](0010-location-trails-map-matching-and-retention.md) | 軌跡は保持の期間を持つストアに分けて置き、道路への当てはめは Valhalla で遅れて行う。ログは H3 に丸め、人が見る操作は監査する | accepted |
-| [0011](0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市と H3 の解像度 6 の集まりで分け、持ち主は DynamoDB のリースで決め、直近 35 秒の位置の流れから作り直す | accepted |
-| [0012](0012-geo-index-nearby-query-api.md) | 近くの空車の検索は、解像度 9 の輪を広げ、外周までの距離で打ち切る gRPC の API にする。依頼の前の地図の車は丸めて返す | accepted |
+| [0010](0010-location-trails-map-matching-and-retention.md) | 軌跡は保持の期間を持つストアに分けて置き、道路への当てはめは Valhalla で遅れて行う。ログは格子のセルに丸め、人が見る操作は監査する | accepted |
+| [0011](0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市と `metro` の集まりで分け、持ち主は DynamoDB のリースで決め、直近 35 秒の位置の流れから作り直す | accepted |
+| [0012](0012-geo-index-nearby-query-api.md) | 近くの空車の検索は、`street` の輪を広げ、外周までの距離で打ち切る gRPC の API にする。依頼の前の地図の車は丸めて返す | accepted |
 | [0013](0013-batch-assignment-solver.md) | バッチの割り当ては、迎車の ETA を主にしたコストで、長方形の最短増加路法で解き、300 ms を超えたら貪欲法に切り替える | accepted |
 | [0014](0014-dispatch-eligibility-and-street-hails.md) | 候補の条件は版つきのデータを引数に取る純粋な関数で判定し、流しの実車は索引から外す。日本版ライドシェアは承諾・事前確定運賃・運行枠の中だけで候補にする | accepted |
 | [0015](0015-offer-protocol-decision-log-and-replay.md) | オファーは表示 15 秒・サーバーの期限 16.5 秒で、届かなければ 5 秒で取り下げる。配車の判断は丸めた入力ごと記録し、再生・シミュレーション・影の実行で比べる | accepted |
@@ -37,7 +37,7 @@ Uber の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | [0030](0030-realtime-grpc-bidirectional-stream-gateway.md) | アプリとの常時の接続は gRPC の双方向ストリーム 1 本にし、Go の rt-gateway で受ける | accepted |
 | [0031](0031-per-stream-sequence-redelivery-push-and-sms.md) | 配信は受け手ごとの seq と TTL で順序と送り直しを持ち、正しさは API の読み直しが持つ。届かないときは利用者に見えるプッシュ、SMS はワンタイムコードと到着の代わりの知らせだけ | accepted |
 | [0032](0032-ops-console-roles-limits-change-requests-and-audit.md) | 運用のツールはロールと金額の上限、理由つきの一時の権限、書き手と承認者を分ける変更の要求で作り、閲覧と監査ログを毎日照合する | accepted |
-| [0033](0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込み、誤りは OSM の本体で直す。営業区域・交通圏は国土数値情報と公示から版つきの多角形にし、H3 の写しと多角形で判定する | accepted |
+| [0033](0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込み、誤りは OSM の本体で直す。営業区域・交通圏は国土数値情報と公示から版つきの多角形にし、格子のセルの写しと多角形で判定する | accepted |
 | [0034](0034-geocoding-provider-and-pickup-points.md) | 住所の検索は自前の API の後ろに 1 社の提供者を置き、PoC の基準で選ぶ。乗降の座標は乗客が確かめたピンとして保存し、乗降の地点は運用が確かめたデータで出す | accepted |
 | [0035](0035-ml-feature-store-and-shadow-rollout.md) | 最初のモデルは勾配ブースティングで ETA の補正を eta-service の中で動かし、特徴量は 1 つのパイプラインで両方のストアに書き、影の実行を経て区域ごとに展開する | accepted |
 | [0036](0036-location-privacy-keys-retention-and-audited-access.md) | 位置と個人の情報は種類ごとの KMS の鍵と保持の期間で分け、人が見る操作は理由・範囲・期限つきの許可と改ざんできない監査ログで行う | accepted |

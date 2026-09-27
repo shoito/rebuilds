@@ -185,7 +185,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 - アプリは、オファーの画面を表示した後（描画の完了の通知の後）に `OfferDelivered(offer_id, shown_elapsed_ms)` を送る。受け取っただけでは送らない。ドライバーが見られない状態で「届いた」としないため。
 - 常時の接続がつながっていれば、`ClientFrame.offer_delivered` で送り、`rt-gateway` が Trips の `MarkOfferDelivered` を呼ぶ。つながっていなければ、アプリは `POST /v1/driver/offers/{id}/delivered` で送る。
 - 画面が消えている（端末が眠っている）ときは、フォアグラウンドサービスか背景の位置の実行で、アプリは動いている（ADR-0007）。アプリはオファーを受けたら、優先度の高い通知（Android は heads-up の通知、iOS は時間に敏感な通知）で知らせ、表示できたら送る。
-- **Android の全画面の通知は既定にしない。** Android 14 を対象にするアプリで `USE_FULL_SCREEN_INTENT` を使えるのは通話と目覚ましのアプリだけで、Google Play はそれ以外のアプリの既定の許可を取り消す（[Android 14 の動作の変更](https://developer.android.com/about/versions/14/behavior-changes-14)、2026-09-27 に確認）。配車のオファーはこれに当たらないので、全画面の通知は `NotificationManager.canUseFullScreenIntent()` が真のとき（利用者が設定で許可したとき）だけ使い、既定は heads-up の通知にする。オファーの 15 秒の表示の時間と 5 秒の受信の確認（ADR-0015）は、この既定で計る。
+- **Android の全画面の通知は既定にしない。** Android 14 を対象にするアプリで `USE_FULL_SCREEN_INTENT` を使えるのは通話と目覚ましのアプリだけで、Google Play はそれ以外のアプリの既定の許可を取り消す（[Android 14 の動作の変更](https://developer.android.com/about/versions/14/behavior-changes-14)、2026-09-27 に確認）。配車のオファーはこれに当たらないので、全画面の通知は `NotificationManager.canUseFullScreenIntent()` が真のとき（利用者が設定で許可したとき）だけ使い、既定は heads-up の通知にする。オファーの 15 秒の表示の時間と 5 秒の受信の確認（ADR-0015）は、この既定で計る（2026-09-28 に確定。QA が E9 で確かめる）。
 
 ### 5.3 プッシュに回す条件
 
@@ -301,7 +301,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 
 - 受け手の鍵は、トークンから `rt-gateway` が決める。アプリが受け手を名乗る値を送っても使わない。
 - 車の位置は、有効な割り当ての乗客の接続にだけ送る（6 節）。`trip-location-fanout` のメモリの表は、事象の `assignment_epoch` が今より古ければ更新しない。
-- Stream の中身（`TripSnapshot`）の乗車地・降車地は、解像度 9 に丸めた値（[trips-lifecycle.md](trips-lifecycle.md) の 8.2 節）。オファーの乗車地は正確な値（受諾すれば迎車するため。ADR-0015）で、TTL はオファーの期限まで。
+- Stream の中身（`TripSnapshot`）の乗車地・降車地は、`street` に丸めた値（[trips-lifecycle.md](trips-lifecycle.md) の 8.2 節）。オファーの乗車地は正確な値（受諾すれば迎車するため。ADR-0015）で、TTL はオファーの期限まで。
 - メッセージ（`ChatMessage`）は、定型文と自由な文の両方を、乗車の終わりから 30 日保持する（安全の調べのため。期間は法務の確認待ち、L4・L7）。サポートが読むときは理由と監査ログを必須にする。
 - プッシュの本体と SMS の本文に、位置・住所・電話番号・額を入れない（7.3 節）。
 - ログには受け手の ID と `seq` だけを書き、本体を書かない。
@@ -353,6 +353,11 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 - **プッシュ**：すべて利用者に見える通知で、高い優先度。背景の通知に頼らない。
 - **SMS**：ワンタイムコードと到着の代わりの知らせだけ。国内の直接の接続の提供者を主に、Twilio を副に。国際の番号へは送らない。
 
+### 決定（2026-09-28、推奨案で確定）
+
+- **Android のオファーの通知**：既定は優先度の高い heads-up の通知で、全画面の通知は使わない。全画面は、利用者が設定で許可したときだけ（5.2 節）。QA は、E9 でこの既定のまま、表示 15 秒と受信の確認 5 秒（ADR-0015）が守られることを確かめる。
+- **事業者の管理画面への即時の更新**：`rt-gateway` と分けた SSE にする（[support-and-operations-tools.md](support-and-operations-tools.md) の 13 節）。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
@@ -362,7 +367,6 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 | QUIC（HTTP/3）を使うか | S2。ALB の対応と端末のライブラリを確かめてから |
 | メッセージの保持の期間（L4・L7） | 法務の確認待ち |
 | SMS の提供者 | E1 の選定 |
-| 事業者の管理画面への即時の更新（SSE）を `rt-gateway` で持つか、別にするか | [support-and-operations-tools.md](support-and-operations-tools.md) の実装の時に |
 
 ## 15. quality.md・runbooks・data-model への項目
 

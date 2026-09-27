@@ -83,7 +83,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `roll-call-records` | 点呼の記録の入力と API |
 | `operator-console-core` | 事業者の管理画面の役割、登録の画面、監査ログ |
 | `operator-console-mfa-sso` | 多要素の認証と大手の SAML |
-| `operator-console-trips-and-map` | 乗車の履歴と稼働の地図（`legal.l4.operator_fleet_map`。記録の前は台数と解像度 7 の集計だけ）（法務：L4） |
+| `operator-console-trips-and-map` | 乗車の履歴と稼働の地図（`legal.l4.operator_fleet_map`。記録の前は台数と `district` の集計だけ）（法務：L4） |
 | `operator-bank-accounts` | 振込先の登録・変更・2 人の承認と通知 |
 | `operator-correction-requests` | 事業者からの訂正の申請と増額の確認（support と一緒に） |
 
@@ -99,12 +99,13 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `loc-ingest-service` | 認証、流量の制限、時刻の補正、Kinesis への書き込み、`backlog` の別の制限 |
 | `loc-validation-rules` | V1〜V8 と決定表、PROP-LOC-002〜004 |
 | `loc-dedupe-ordering` | 読み手の側の重複の除去と順序（PROP-LOC-001） |
+| `geogrid-core` | 自前の六角形の格子 `geogrid`（投影、レベル、ID、`Disk`・`Ring`・`Cover`）と PROJ との突き合わせ（PROP-GEO-007。ADR-0002） |
 | `geo-index-core` | 索引の項目、`(region_gen, assignment_epoch, trip_version)` による状態の合わせ方、古い項目、写しの公開（PROP-GEO-002・003） |
 | `geo-find-nearby` | 輪を広げる検索と打ち切り（PROP-GEO-001）、`GetDriverLocation` と呼び手の許可の一覧 |
 | `geo-shard-lease` | DynamoDB のリース、主と待機、配車の側の切り替え（PROP-GEO-005） |
 | `geo-index-rebuild` | Kinesis の直近 35 秒からの再構築、`READY` の判定（PROP-GEO-004） |
 | `geo-reconcile-snapshots` | Trips と供給の写しとの定期の照合 |
-| `geo-supply-aggregates` | 解像度 7 の需給の集計（運用の画面が読む。変動運賃には使わない）と `supply-heat` |
+| `geo-supply-aggregates` | `district` の需給の集計（運用の画面が読む。変動運賃には使わない）と `supply-heat` |
 | `lease-aware-deploy` | geo-index・dispatch の待機を先にした入れ替え、Fargate の退役への対応 |
 | `driver-session-integrity` | 出庫のときの App Attest・Play Integrity の判定と、セッションのトークン（アプリの `device-integrity-at-session` と 1 つ） |
 | `loc-raw-firehose` | Firehose から S3 への Parquet、詰め直し、ライフサイクル（法務：L4 の期間で置き換える） |
@@ -161,7 +162,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `dispatch-propose-offers` | 提案と拒否の扱い |
 | `intake-admission-control` | 受け入れの上限と、断った依頼の需要の記録 |
 | `batch-size-cap` | バッチの依頼の上限と待ちの長い順 |
-| `dispatch-decision-log` | `DispatchBatchRecord` と Firehose（解像度 10） |
+| `dispatch-decision-log` | `DispatchBatchRecord` と Firehose（`spot`） |
 | `dispatch-replay-cli` | 再生と結果の出力 |
 | `dispatch-replay-ci` | 再生と縮小のシミュレーションを配車の PR で回す CI |
 | `market-simulator` | 市場のシミュレーション（PROP-DISP-005・006） |
@@ -313,7 +314,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 
 設計：[supply-and-operators.md](architecture/supply-and-operators.md) の 6 節、[pricing-and-fares.md](architecture/pricing-and-fares.md) の 2.5 節、[dispatch-and-matching.md](architecture/dispatch-and-matching.md) の 5 節、[infrastructure.md](architecture/infrastructure.md) の 7 節、[capacity.md](architecture/capacity.md) の 7 節、[security.md](architecture/security.md) の 7・11 節
 
-2 つの流れに分ける。どちらも S1 の本番の開始の前に終える条件だが、日本版ライドシェアは法務（L2・L5）の結論を待つので、GA の準備を止めずに並行して進める（[architecture/README.md](architecture/README.md) の 7 節。**PM の確認事項**）。
+2 つの流れに分ける。どちらも S1 の本番の開始の前に終える条件だが、日本版ライドシェアは法務（L2・L5）の結論を待つので、GA の準備を止めずに並行して進める（[architecture/README.md](architecture/README.md) の 7 節。2026-09-28 に確定）。
 
 **日本版ライドシェア**（すべて `release.rideshare.*` と legal のフラグの裏）
 
@@ -356,9 +357,9 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `eta-residual-model` | ETA の残差のモデル、評価、Go の評価器（PROP-ML-004） |
 | `eta-model-serving` | `eta-service` への組み込み、代わりの経路、版の記録（PROP-ML-002） |
 | `eta-model-shadow-rollout` | 影の実行・配車の再生とシミュレーション・区域の段階・自動の戻し |
-| `demand-forecast-h3-r8` | 需要の予測のモデルとバッチ |
+| `demand-forecast-block` | 需要の予測のモデルとバッチ |
 | `operator-demand-map` | 事業者の管理画面の需要の地図（5 未満のまとめ） |
-| `driver-demand-hints` | ドライバーのアプリの「依頼の多い場所」（解像度 7） |
+| `driver-demand-hints` | ドライバーのアプリの「依頼の多い場所」（`district`） |
 
 ### E14 複数の都市への展開（S2）
 
@@ -368,7 +369,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | --- | --- |
 | `geo-shard-map-halo` | 分割の表と halo、隣の分割への問い合わせ（置き場所の決定を含む） |
 | `city-wave-rollout` | 都市の波の配備と設定の変更、波ごとの確認 |
-| `city-cells-s2` | 12 地域の都市のセル（`loc-<city>`、geo-index、dispatch）と東京の解像度 6 の分割 |
+| `city-cells-s2` | 12 地域の都市のセル（`loc-<city>`、geo-index、dispatch）と東京の `metro` の分割 |
 | `city-data-onboarding` | 都市ごとの区域の多角形、運賃の規則、運行枠、乗降の地点の登録の手順 |
 | `osaka-secondary-sizing` | 大阪の二次を writer と同じ大きさにする |
 

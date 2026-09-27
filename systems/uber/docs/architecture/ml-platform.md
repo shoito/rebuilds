@@ -1,8 +1,8 @@
 # ML platform: Uber
 
-機械学習の基盤（S2 以降）。ETA の残差を補正するモデル、H3 の解像度 8 での需要の予測、特徴量のストア、学習と配信で特徴量をそろえる方法、影の実行を経たモデルの展開を決める。
+機械学習の基盤（S2 以降）。ETA の残差を補正するモデル、`block` での需要の予測、特徴量のストア、学習と配信で特徴量をそろえる方法、影の実行を経たモデルの展開を決める。
 
-前提となる決定は、S1 の ETA の補正は偏りの表で行い、機械学習の補正は S1 の計測で NFR-003 に届かなければ前倒しすること（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)、[eta-and-routing.md](eta-and-routing.md) の 4.5・6 節）、需要の予測は H3 の解像度 8 で行うこと（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）、配車の変更は再生・シミュレーション・影の実行で比べること（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、Go のサービスを増やさないこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、需要に応じた即時の運賃の変動は L9 の結論まで作らないこと（[ADR-0020](../decisions/0020-dynamic-fares-within-authorized-bands.md)）、位置の保持の期間（[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）。この文書で決めたことは次の ADR にある。
+前提となる決定は、S1 の ETA の補正は偏りの表で行い、機械学習の補正は S1 の計測で NFR-003 に届かなければ前倒しすること（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)、[eta-and-routing.md](eta-and-routing.md) の 4.5・6 節）、需要の予測は `block` で行うこと（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）、配車の変更は再生・シミュレーション・影の実行で比べること（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、Go のサービスを増やさないこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、需要に応じた即時の運賃の変動は L9 の結論まで作らないこと（[ADR-0020](../decisions/0020-dynamic-fares-within-authorized-bands.md)）、位置の保持の期間（[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -51,14 +51,14 @@
 
 ```
 eta = route_time + pickup_overhead(point_type) + residual_model(features)   … S2
-eta = route_time + pickup_overhead(point_type) + bias(cell7, hour_of_week) … S1（代わりの経路としても残す）
+eta = route_time + pickup_overhead(point_type) + bias(district_cell, hour_of_week) … S1（代わりの経路としても残す）
 ```
 
 | 項目 | 中身 |
 | --- | --- |
 | 予測するもの | 迎車の実際の時間 − (`route_time` ＋ `pickup_overhead`)。実際の時間の定義は [eta-and-routing.md](eta-and-routing.md) の 6 節と同じ |
 | 学習のデータ | NFR-003 の対象の乗車（受諾から到着まで）。直近 8 週 |
-| 特徴量 | `route_time`、経路の距離、右左折の回数（Valhalla の応答）、ドライバーの位置と乗車地の解像度 8 のセル、1 週の中の 5 分の区切り、祝日の印、乗車地の種類、タイルの版、セルの直近 30 分の残差の中央値（ほぼ即時）、セルの空車の台数（`supply-heat`）、ドライバーの直近 7 日の残差の中央値（HMAC の ID で集計） |
+| 特徴量 | `route_time`、経路の距離、右左折の回数（Valhalla の応答）、ドライバーの位置と乗車地の `block` のセル、1 週の中の 5 分の区切り、祝日の印、乗車地の種類、タイルの版、セルの直近 30 分の残差の中央値（ほぼ即時）、セルの空車の台数（`supply-heat`）、ドライバーの直近 7 日の残差の中央値（HMAC の ID で集計） |
 | モデル | LightGBM。損失は Huber（遅れと早すぎを分けて評価する。本家の DeepETA と同じ考え方）。出力は ±300 秒に切り詰める |
 | 評価 | NFR-003 の指標（`|e|` の中央値と p90）、偏りの符号、迎車の距離の帯と時間帯ごと。偏りの表（S1）と比べる |
 | 推論の場所 | `eta-service` の中。純粋な Go の LightGBM の評価器（候補：[dmitryikh/leaves](https://github.com/dmitryikh/leaves)。対応の版と速さは **未検証**）で、モデルの JSON を読み込む |
@@ -71,13 +71,13 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7, hour_of_week) … S
 
 | 項目 | 中身 |
 | --- | --- |
-| 予測するもの | 解像度 8 のセル × 15 分の区切りの配車の依頼の数（成立しなかった依頼も含む）。先の 4 区切り（60 分） |
-| 特徴量 | 同じセル・同じ曜日時間帯の過去の数（直近 8 週）、直近 60 分の数、祝日、隣のセルの数、大きな催しの予定（運用が登録。外部のデータの利用の条件は **未検証**）、天気（気象庁のデータの利用の条件は **未検証**）。どちらも E13 の `demand-forecast-h3-r8` の前に確かめる |
+| 予測するもの | `block` のセル × 15 分の区切りの配車の依頼の数（成立しなかった依頼も含む）。先の 4 区切り（60 分） |
+| 特徴量 | 同じセル・同じ曜日時間帯の過去の数（直近 8 週）、直近 60 分の数、祝日、隣のセルの数、大きな催しの予定（運用が登録。外部のデータの利用の条件は **未検証**）、天気（気象庁のデータの利用の条件は **未検証**）。どちらも E13 の `demand-forecast-block` の前に確かめる |
 | モデル | LightGBM（Tweedie 損失）。都市ごとに 1 つ |
-| 実行 | 5 分ごとのバッチ。結果を S3 と Valkey `demand:{city}:{cell8}` に書く |
+| 実行 | 5 分ごとのバッチ。結果を S3 と Valkey `demand:{city}:{block_cell}` に書く |
 | 評価 | セルの区切りごとの WAPE。ピークの時間帯と、依頼の多いセルで分けて出す |
 
-- **使い道（S2）**：事業者の管理画面と運用の画面の需要の地図、ドライバーのアプリの「依頼の多い場所」の案内（解像度 7 に丸めて出す）。
+- **使い道（S2）**：事業者の管理画面と運用の画面の需要の地図、ドライバーのアプリの「依頼の多い場所」の案内（`district` に丸めて出す）。
 - **使わない**：運賃の変動（即時の変動は L9 の結論まで作らない。ADR-0020）、配車のコスト（配車に使うなら、再生とシミュレーションで比べる別の ADR を書く。[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md) の選択肢 3）。
 - 表示では、予測の数が 5 未満のセルを「少ない」とまとめ、数を出さない（少ない数が特定の人の行動を表すのを避ける）。
 
@@ -88,7 +88,7 @@ eta = route_time + pickup_overhead(point_type) + bias(cell7, hour_of_week) … S
 ```yaml
 # features/eta/cell_residual_30m.yaml
 name: eta.cell_residual_30m
-entity: cell8                # 鍵：H3 の解像度 8
+entity: block_cell                # 鍵：`block`
 value_type: int32            # 秒
 source: stream               # batch | stream（1 つだけ）
 pipeline: flink/eta_residuals.sql
@@ -99,7 +99,7 @@ owner: eta
 pii: none                    # none | pseudonymous（HMAC の ID）。raw の位置・ID は定義できない
 ```
 
-- 定義は `features/` のリポジトリに 1 つずつ置き、CI で型・鍵・`pii` の値を検査する。`entity` に使えるのは、H3 のセル（解像度 7〜9）、時刻の区切り、HMAC の ID（90 日ごとに替わる鍵。[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）だけにする。緯度経度と生の ID を鍵や値にできない。
+- 定義は `features/` のリポジトリに 1 つずつ置き、CI で型・鍵・`pii` の値を検査する。`entity` に使えるのは、格子のセル（`district`〜`street`）、時刻の区切り、HMAC の ID（90 日ごとに替わる鍵。[ADR-0010](../decisions/0010-location-trails-map-matching-and-retention.md)）だけにする。緯度経度と生の ID を鍵や値にできない。
 
 ### 5.2 計算と書き込み
 
@@ -144,7 +144,7 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 
 ## 9. セキュリティとプライバシー
 
-- 学習と特徴量のデータは、位置を H3 の解像度 8〜9 に丸め、ドライバーの ID は HMAC に置き換えた写し（ADR-0010 の分析の写し）だけを使う。生の `loc-raw` と乗車の軌跡を、学習の環境から読めない。
+- 学習と特徴量のデータは、位置を `block`〜`street` に丸め、ドライバーの ID は HMAC に置き換えた写し（ADR-0010 の分析の写し）だけを使う。生の `loc-raw` と乗車の軌跡を、学習の環境から読めない。
 - 学習のデータの保持は、元のデータの保持（生の位置 30 日、乗車の軌跡 1 年。L4 の結論で置き換える）を超えない。Iceberg のスナップショットも期限で消す。モデルの中に個人を特定できる値が残らないよう、特徴量の `pii` の検査（5.1 節）で入口を守る。
 - 乗客の個人の特徴量（その人の過去の乗車など）は S2 で作らない。作るときは、利用目的の通知の範囲を法務に確かめる（L4）。
 - 需要の予測は、事業者ごとに分けて見せない（都市全体の予測を同じく見せる）。事業者の運賃や稼働の情報を、予測を通じて他の事業者に渡さない（L9）。
@@ -172,9 +172,9 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | E13 | `eta-residual-model` | 4.1 節のモデル、評価、Go の評価器（PROP-ML-004） |
 | E13 | `eta-model-serving` | `eta-service` への組み込み、代わりの経路、版の記録（PROP-ML-002） |
 | E13 | `eta-model-shadow-rollout` | 7 節の段と自動の戻し（配車の再生・シミュレーションと一緒に） |
-| E13 | `demand-forecast-h3-r8` | 4.2 節のモデルとバッチ |
+| E13 | `demand-forecast-block` | 4.2 節のモデルとバッチ |
 | E13 | `operator-demand-map` | 事業者の管理画面の需要の地図（5 未満のまとめ） |
-| E13 | `driver-demand-hints` | ドライバーのアプリの「依頼の多い場所」（解像度 7） |
+| E13 | `driver-demand-hints` | ドライバーのアプリの「依頼の多い場所」（`district`） |
 
 ## 12. 未解決の問い
 
@@ -185,7 +185,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 - **時期**：S2。S1 で NFR-003 に届かなければ ETA の補正だけを前倒し。
 - **モデル**：LightGBM。ETA は Huber、需要は Tweedie。
 - **推論**：ETA は `eta-service` の中の純粋な Go の評価器。別の推論のサービスを熱い経路に入れない。需要は 5 分ごとのバッチ。
-- **特徴量**：1 つの特徴量は 1 つのパイプライン。オフラインは S3 の Iceberg、オンラインは Valkey。鍵は H3 のセルと HMAC の ID だけ。
+- **特徴量**：1 つの特徴量は 1 つのパイプライン。オフラインは S3 の Iceberg、オンラインは Valkey。鍵は格子のセルと HMAC の ID だけ。
 - **食い違い**：配信の記録で次の学習を行い、PSI で監視する。
 - **展開**：オフライン → 影 7 日 → 配車の再生とシミュレーション → 区域の段階。自動の戻し。
 - **需要の予測の使い道**：表示と案内だけ。運賃と配車には使わない。
@@ -229,6 +229,6 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | S3 Iceberg `features/<group>/`（`entity_key`、`event_time`、`computed_at`、値） | オフラインのストア。元のデータの保持を超えない |
 | Valkey `feat:{group}:{key}`（値、`computed_at`、TTL） | オンラインのストア。正本ではない |
 | S3 `feature-logs/`（Parquet：`request_id`、`model_version`、特徴量、予測、`eta_source`） | 5.3 節。90 日（既定。法務の確認待ち（L4）。[security.md](security.md) の 7.2 節） |
-| Valkey `demand:{city}:{cell8}`、S3 `demand-forecasts/` | 4.2 節 |
+| Valkey `demand:{city}:{block_cell}`、S3 `demand-forecasts/` | 4.2 節 |
 | SageMaker Model Registry（モデルの版、データの版、特徴量の定義の版、評価、承認者） | 6 節 |
 | AppConfig `eta_model`（区域ごとのモデルの版と割合） | 7 節 |

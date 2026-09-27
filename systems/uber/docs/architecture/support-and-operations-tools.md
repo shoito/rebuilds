@@ -31,7 +31,7 @@
 | `release_manager` | アプリの `required_min`、`nav_handoff_targets` の変更の下書きと承認（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 10.3 節） | — |
 | `auditor` | 監査ログの閲覧と書き出しだけ | — |
 
-- 上限の値は設計の値（**未検証**。E11 の `ops-policy-engine`。**QA・PM の確認事項**）。S1 の問い合わせの分布を見て見直す。
+- 上限の値は、S1 の初めの値として 2026-09-28 に確定した（E11 の `ops-policy-engine`）。S1 の問い合わせの分布を見て見直す。
 - 1 人に複数のロールを付けてよいが、同じ変更の要求の書き手と承認者は別の人にする（4 節）。
 - 上限は Cedar などの方針のデータで持ち、コードに書かない。判定は運用の API の 1 か所で行う（Slack の題材の 1 つの判定の関数と同じ考え方）。
 
@@ -64,7 +64,7 @@
 | 区画 | 中身 | 元 |
 | --- | --- | --- |
 | 時系列 | 状態の遷移（発生の時刻と記録の時刻の両方）、オファーの履歴、journal の送り直し、`restored` の印 | `trip_events`、`trip_commands`（[trips-lifecycle.md](trips-lifecycle.md)） |
-| 場所 | 乗車地・降車地（解像度 9 に丸めた点と名前）。正確な値は軌跡の閲覧（3.3 節）で | `trips` |
+| 場所 | 乗車地・降車地（`street` に丸めた点と名前）。正確な値は軌跡の閲覧（3.3 節）で | `trips` |
 | 運賃 | 見積もりの内訳、選んだルート（距離・経由地点の名前・提供者・地図の版）、メーターの額と出どころ、照合の結果、訂正 | `fare_quotes`、`meter_readings`、`fare_adjustments`（[pricing-and-fares.md](pricing-and-fares.md)） |
 | 支払い | 与信・確定・返金の状態、PSP の参照、台帳の仕訳の一覧（読み取りだけ） | [payments-and-payouts.md](payments-and-payouts.md) |
 | ナビ | 引き継ぎの記録、逸脱の知らせ、当てはめの逸脱の距離 | `trip_nav_events`、`trip_trails` |
@@ -133,7 +133,7 @@ change_requests (id, kind, target_ref,
 - 問い合わせは、この基盤の `support_tickets` に置く（S1）。外部のヘルプデスクの SaaS は使わない。乗車・監査・変更の要求と結びつけやすく、個人の情報を外部に出さないため（外部の SaaS を使うかは、S2 で問い合わせの量と、外国への提供の法務の確認（L4）を見て決める）。
 - 振り分け：区分と、乗車の状態（未確定の運賃、食い違いあり）で、`support_t1`・`support_t2`・`safety_agent` の列に入れる。
 - 返答の下書き：エージェントがチケットの中身と乗車の詳細（丸めた位置だけ）から下書きを作り、担当が確かめて送る。エージェントに一時の権限を与えない。
-- 目標：最初の返答まで、普通の区分で 24 時間、運賃・キャンセル料で 12 時間（設計の値、**未検証**。E11 の `support-tickets`。**PM の確認事項**）。
+- 目標：最初の返答まで、普通の区分で 24 時間、運賃・キャンセル料で 12 時間（S1 の目標として 2026-09-28 に確定。E11 の `support-tickets`）。S1 の実績で見直す。
 - 忘れ物：降車の 30 分の後は番号を隠した通話が切れる（[safety-and-trust.md](safety-and-trust.md) の 6 節）。忘れ物の問い合わせは、担当がドライバー（事業者）に連絡し、受け渡しの方法を決める。
 
 ## 7. 事業者の管理画面との共通の部分
@@ -145,7 +145,7 @@ change_requests (id, kind, target_ref,
 | 画面の基盤 | 同じ Web の部品（TypeScript）。ドメインは `ops.<domain>`（社内）と `operator.<domain>`（事業者。[infrastructure.md](infrastructure.md) の 4 節）で分け、API も `ops/v1` と `operator/v1` で分ける |
 | 監査ログ | 同じ `audit_events`。事業者の `operator_owner` は自社の利用者の操作だけを見られる |
 | 即時の更新 | 安全のインシデント、書類の期限、運行枠の上限の変化などを、Server-Sent Events（`/events`）で画面に送る。`rt-gateway`（[notifications-and-realtime-push.md](notifications-and-realtime-push.md)）は使わない。ブラウザーの画面だけの経路で、正しさは再読み込みで保つ |
-| 位置の見せ方 | 乗車の後の履歴は解像度 9 に丸める。正確な位置は理由と監査つき（[supply-and-operators.md](supply-and-operators.md) の 9 節） |
+| 位置の見せ方 | 乗車の後の履歴は `street` に丸める。正確な位置は理由と監査つき（[supply-and-operators.md](supply-and-operators.md) の 9 節） |
 | 変更の要求 | 事業者の申請（振込先の変更、訂正の申請）は 4 節の仕組みに入る |
 
 - 事業者の「稼働の地図」（自社のオンラインの車の位置）は、運行管理の目的で、事業者の利用者に自社の車の位置を見せる（[supply-and-operators.md](supply-and-operators.md) の 5.2 節）。これは「乗車の相手にだけ正確な位置を見せる」規則（NFR-009）の 2 つの例外の 1 つで、運送の主体の事業者の運行管理に限る。見るたびに監査ログを残す。扱いは法務の確認待ち（L4）で、`legal.l4.operator_fleet_map` の裏に置く（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)）。
@@ -173,7 +173,7 @@ change_requests (id, kind, target_ref,
 ## 10. セキュリティとプライバシー
 
 - 社内の運用の API は、社内のネットワークの経路（ゼロトラストの接続の仕組み）からだけ呼べる。インターネットに直接出さない（方式は `security.md`）。
-- 画面に出す個人の情報は、既定で伏せる（名前の頭文字、電話番号の下 4 桁、位置の解像度 9）。全体を出すのは一時の権限の中だけ。
+- 画面に出す個人の情報は、既定で伏せる（名前の頭文字、電話番号の下 4 桁、位置の `street`）。全体を出すのは一時の権限の中だけ。
 - 書き出し（CSV）は、`finance_ops` の明細と `auditor` の監査ログだけに置く。乗車の一覧の書き出しは置かない。
 - ログとトレースに、個人の情報と緯度経度を書かない（[AGENTS.md](../../AGENTS.md)）。
 - 担当の画面のスクリーンショットの防止はしない（管理された端末の方針に任せる）。透かしで出どころを追えるようにする。
@@ -222,6 +222,13 @@ change_requests (id, kind, target_ref,
 - **自動の返金**：キャンセル料の免除の 1 つの規則だけ（フラグの裏）。
 - **即時の更新**：SSE。`rt-gateway` と分ける。
 
+### 決定（2026-09-28、推奨案で確定）
+
+- **運用のロールの上限の値**：2.1 節の値を S1 の初めの値にする。S1 の分布で見直す。
+- **最初の返答の目標**：普通の区分で 24 時間、運賃・キャンセル料で 12 時間。
+- **社内の運用を外部に委ねるか**：S1 は委ねない。夜間のサポートも社内の担当で持つ。委託先のロールと監査の仕組みを足さずに済み、個人の情報を外に出さないため。S2 で問い合わせの量を見て見直す。
+- **事業者の管理画面への即時の更新**：`rt-gateway` と分けた SSE のまま（上の決定）。[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 14 節の持ち越しも、これで閉じた。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
@@ -229,9 +236,8 @@ change_requests (id, kind, target_ref,
 | 問い合わせの保持の期間（L4・L7）。監査ログの保持は ADR-0036 の既定案 | 法務の確認待ち |
 | 事業者の稼働の地図で正確な位置を見せる扱い（L4） | 法務の確認待ち。確認まで `legal.l4.operator_fleet_map` の裏 |
 | 外部のヘルプデスクの SaaS を使うか | S2。量と、外国への提供の確認（L4）を見て |
-| 返金の上限の値、最初の返答の目標の時間 | S1 の運用の結果で見直す |
+| 返金の上限の値、最初の返答の目標の時間の見直し | S1 の運用の結果で |
 | 警察の照会への回答の手順（L7） | 法務が決める |
-| 社内の運用を外部の会社に委ねるか（夜間のサポートなど） | Ops が S1 の前に決める。委ねるなら、委託先のロールと監査を足す |
 
 ## 14. quality.md・runbooks・data-model への項目
 

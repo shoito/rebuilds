@@ -98,7 +98,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
  └─ …（S2 は 12 都市）
 ```
 
-- loc-ingest は、点の H3 の解像度 6 の親から都市を引き、`loc-<city>` に書き分ける（[location-ingestion.md](location-ingestion.md) の 6 節）。
+- loc-ingest は、点の `metro` のセルから都市を引き、`loc-<city>` に書き分ける（[location-ingestion.md](location-ingestion.md) の 6 節）。
 - 配備・設定・フラグは、S2 から都市の単位の波で出す（[delivery.md](delivery.md) の 4 節）。
 - 1 都市のセルの障害（索引・配車の停止）は、その都市の配車だけを止める。依頼は Trips に残る。
 
@@ -112,7 +112,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 | Aurora PostgreSQL 18 `core` | 乗車、供給、運賃の規則、地図（PostGIS）、安全、サポート、監査ログ | writer `db.r8g.2xlarge` 1＋reader 1（別の AZ）、I/O-Optimized、Global Database（大阪に reader 1） |
 | Aurora PostgreSQL 18 `money` | 支払い、台帳、精算、照合 | writer `db.r8g.xlarge` 1＋reader 1、I/O-Optimized、Global Database（大阪に reader 1） |
 | ElastiCache（Valkey）`rt` | 常時の接続の Stream・`seq`・登録表・Pub/Sub | クラスタモードを使わない、`cache.r7g.large` プライマリ＋レプリカ 2 |
-| ElastiCache（Valkey）`cache` | レート制限、需給の集計（`supply:<city>:<cell7>`）、見積もりのキャッシュ、受け入れの上限の数 | 同上 |
+| ElastiCache（Valkey）`cache` | レート制限、需給の集計（`supply:<city>:<district_cell>`）、見積もりのキャッシュ、受け入れの上限の数 | 同上 |
 | SNS・SQS | `trips-events` と購読する側ごとのキュー、`rt-fanout`、`push-requests`、`safety-incidents` | 標準、DLQ |
 | S3 | 位置（`loc-raw/`・`trip-trails/`・`speed-samples/`・`supply-heat/`）、`dispatch-decisions/`、`valhalla/tiles/`、`osm/`、`eta/`、書類、精算の明細 | バージョニング、SSE-KMS（種類ごとの鍵）、ライフサイクル（東京・大阪の両方）。大阪へ複製するのは、タイル・OSM・書類・精算の明細・`trip-trails/`（乗車の記録として）。`loc-raw/` と `dispatch-decisions/` は複製しない（失ってよい、保持が短い） |
 | AppConfig | フラグ、配車の設定、`client_policy`、`region_gen`、`ops.region.writable` | 検証の関数（[delivery.md](delivery.md) の 6 節） |
@@ -191,7 +191,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 | Valhalla のタスク | 40 を超える（ECS on EC2 を見直す。ADR-0038） | — |
 
 - **S2**：機械学習の基盤（SageMaker、Managed Service for Apache Flink、S3 の Iceberg、Step Functions。[ml-platform.md](ml-platform.md)）を analytics と prod のどちらに置くかを決める（位置の流れを読むので、生の位置を読む部分は prod に置く）。
-- **S2**：都市ごとのセル（`loc-<city>`、geo-index、dispatch）を 12 都市に足す。東京は解像度 6 の集まりで分割する。Aurora `core` は共有のまま。大阪の二次を writer と同じ大きさにする。
+- **S2**：都市ごとのセル（`loc-<city>`、geo-index、dispatch）を 12 都市に足す。東京は `metro` の集まりで分割する。Aurora `core` は共有のまま。大阪の二次を writer と同じ大きさにする。
 - **S3**：都市のまとまりのセルに Aurora `core` のシャード（`city_id`）を含める。関西のセルの主を大阪に置く active-active を検討する（Stripe の [ADR-0031](../../../stripe/docs/decisions/0031-active-active-cells.md) と同じ形）。本家は、平常の容量を事業の重要度で分けて 2 倍から 1.3 倍に下げている（[Uber's Failover Architecture](https://arxiv.org/abs/2603.07345)、2026-09-27 に確認）。S3 で、配車の熱い経路（重要）と分析・再生（重要でない）で、大阪の予備の容量を分ける。
 
 ## 10. Terraform の構成

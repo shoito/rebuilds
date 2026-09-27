@@ -2,12 +2,12 @@
 
 ドライバーのアプリから約 4 秒ごとに届く位置を受け取り、検証し、重複と順序を整え、地理空間の索引と軌跡のストアへ流す仕組み。道路への当てはめ（map matching）と、軌跡の保存・保持の期間・人が見るときの規則も、この文書で決める。
 
-前提となる決定は、Go で書く熱い経路（[ADR-0001](../decisions/0001-platform-and-stack.md)）、H3 とメモリ上の索引（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）、自前の Valhalla（[ADR-0005](../decisions/0005-maps-and-routing.md)）、NFR-002（位置の鮮度）と NFR-009（位置のプライバシー）（[architecture/README.md](README.md) の 3 節）。この文書で決めたことは次の ADR にある。
+前提となる決定は、Go で書く熱い経路（[ADR-0001](../decisions/0001-platform-and-stack.md)）、自前の六角形の格子 `geogrid` とメモリ上の索引（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）、自前の Valhalla（[ADR-0005](../decisions/0005-maps-and-routing.md)）、NFR-002（位置の鮮度）と NFR-009（位置のプライバシー）（[architecture/README.md](README.md) の 3 節）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
 | [0009](../decisions/0009-location-upload-and-validation.md) | 位置は HTTPS（HTTP/2）の POST で、Protocol Buffers のバッチとして 4 秒ごとに送る。取り込みは無状態の Go のサービスで、検証の後に Kinesis Data Streams（分割キーは `driver_id`）へ書く。時刻は端末の単調時計とセッションの基準点で決め、重複は `(driver_session_id, sample_seq)` で除く |
-| [0010](../decisions/0010-location-trails-map-matching-and-retention.md) | 生の位置は S3 に 30 日、乗車の軌跡は 1 年（いずれも既定案で、L4 の結論で置き換える）。道路への当てはめは Valhalla（Meili）で遅れて行い、索引には使わない。ログ・調査は H3 の解像度 8 に丸め、人が軌跡を見る操作は理由と監査ログを必須にする |
+| [0010](../decisions/0010-location-trails-map-matching-and-retention.md) | 生の位置は S3 に 30 日、乗車の軌跡は 1 年（いずれも既定案で、L4 の結論で置き換える）。道路への当てはめは Valhalla（Meili）で遅れて行い、索引には使わない。ログ・調査は `block` に丸め、人が軌跡を見る操作は理由と監査ログを必須にする |
 
 ## 1. 目的と範囲
 
@@ -19,7 +19,7 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| 送信の間隔 | ドライバーは 4 秒ごとに位置を送る。受け取った位置は、セルの ID で分けて供給のサービスに渡す（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015） | 同じ 4 秒。分ける単位は H3（ADR-0002） |
+| 送信の間隔 | ドライバーは 4 秒ごとに位置を送る。受け取った位置は、セルの ID で分けて供給のサービスに渡す（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015） | 同じ 4 秒。分ける単位は自前の格子 `geogrid` のセル（ADR-0002） |
 | 都市での GPS の誤差 | 建物に遮られる都市では、GPS の誤差が 50 m 以上になる。本家は衛星ごとの信号の強さと 3D の地図で補正する研究をした（[Rethinking GPS](https://www.uber.com/en-CA/blog/rethinking-gps/)、2018-04-19） | 補正は作らない。精度の値で振り分け、跳びを検証で除く（4 節） |
 | 道路への当てはめ | 隠れマルコフモデル（HMM）と Viterbi で、GPS の点の列から最もありそうな道路の区間の列を求める。当てはめの異常から、地図の誤り（右折の禁止、一方通行、欠けた道路）を見つける（[CatchME](https://www.uber.com/us/en/blog/mapping-accuracy-with-catchme/)、2019-04-25） | Valhalla の Meili（同じ HMM の方式）で遅れて当てはめる。地図の誤りの検出は [maps-and-geodata.md](maps-and-geodata.md) |
 
@@ -150,11 +150,11 @@ message LocationAck {
 message LocationEvent {
   string driver_id = 1;
   string driver_session_id = 2;
-  string city_id = 3;           // S1 は tokyo だけ。S2 は位置の H3 の解像度 6 の親から決める
+  string city_id = 3;           // S1 は tokyo だけ。S2 は位置の `metro` のセルから決める
   string operator_id = 4;
   int64 received_at_ms = 5;
   uint64 batch_seq = 6;
-  repeated ValidatedSample samples = 7;  // LocationSample ＋ t（補正した時刻）＋ cell9 ＋ verdict
+  repeated ValidatedSample samples = 7;  // LocationSample ＋ t（補正した時刻）＋ street_cell ＋ verdict
   DriverReportedState state = 8;
   uint64 state_seq = 9;
   bool backlog = 10;
@@ -164,7 +164,7 @@ message LocationEvent {
 - **容量**：プロビジョンドのシャードは、1 シャードあたり書き込み 1 MB/秒か 1,000 件/秒、読み取り 2 MB/秒。登録できる拡張ファンアウトの読み手は、ストリームごとに 20（オンデマンドの Standard とプロビジョンド）。保持の期間の最小は 24 時間（[Kinesis Data Streams quotas and limits](https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html)、2026-09-27 に確認）。
   - S1：ピーク 2,500 件/秒 × 300 バイト ≒ 0.75 MB/秒。件数の上限で 3 シャードが最小。ピークの 2 倍と偏りを見て **8 シャード**にする。
   - S3：50,000 件/秒で 50 シャード以上。都市ごとのストリームに分ける（下）。
-- **ストリームの分け方**：S1 は `loc-tokyo` の 1 本。S2 からは都市（索引の分割の単位）ごとに 1 本にし、取り込みのサービスが、点の H3 の解像度 6 の親から都市を引いて書き分ける。都市の境目を走る車は、2 本のストリームに交互に現れうる。索引は、古くなった項目を消す規則（[geospatial-index.md](geospatial-index.md) の 4 節）で扱う。
+- **ストリームの分け方**：S1 は `loc-tokyo` の 1 本。S2 からは都市（索引の分割の単位）ごとに 1 本にし、取り込みのサービスが、点の `metro` のセルから都市を引いて書き分ける。都市の境目を走る車は、2 本のストリームに交互に現れうる。索引は、古くなった項目を消す規則（[geospatial-index.md](geospatial-index.md) の 4 節）で扱う。
 - **保持**：24 時間（最小）。索引の再構築は直近の 30 秒しか読まない。長い保存は S3 の役目である。
 - **読み手**：索引の主と待機（拡張ファンアウト。互いの読み取りの量を奪わない）、trail-builder（拡張ファンアウト）、trip-location-fanout（拡張ファンアウト。[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 6 節）、Firehose（共有の読み取り）。S1 で 5 つ（拡張ファンアウトは 4 つ）。上限（20）に十分な余裕がある。
 
@@ -177,7 +177,7 @@ message LocationEvent {
 | S3 `trip-trails/<yyyymm>/<trip_id>.pb` | 1 乗車の軌跡（迎車の開始から降車まで）と当てはめの結果 | trail-builder | 1 年 |
 | Aurora `trip_trails` | 上の索引（件数、当てはめた距離、品質） | trail-builder | S3 と同じ |
 | S3 `speed-samples/`（Parquet） | 道路の区間ごとの通過の速度（ドライバーの ID を持たない） | trail-builder | 2 年（[eta-and-routing.md](eta-and-routing.md) の速度の表の元） |
-| S3 `supply-heat/`（Parquet） | 解像度 8 のセル × 5 分ごとの状態別の台数（ID を持たない） | 索引 | 2 年 |
+| S3 `supply-heat/`（Parquet） | `block` のセル × 5 分ごとの状態別の台数（ID を持たない） | 索引 | 2 年 |
 
 - **乗車の軌跡**を別に持つ理由：運賃の問い合わせ、事前確定運賃のルートからの逸脱の確認（[eta-and-routing.md](eta-and-routing.md) の 7 節）、事故と安全の調べ、領収書の地図に使う。生の点の保持（30 日）より長く要る。
 - trail-builder は、Trips の状態の変化（`accepted`〜`completed`・取り消し）を購読し、乗車中のドライバーの点を乗車ごとに集める。乗車の終わりから 60 秒待って（遅れて届く点のため）、当てはめ（8 節）を行い、S3 と `trip_trails` に書く。書き込みは `trip_id` で冪等にする。
@@ -200,10 +200,10 @@ message LocationEvent {
 
 - **正確な位置を見せる相手**：乗車の相手（乗客とそのドライバー）に、その乗車の間（受諾から降車まで）だけ。配信は `notifications-and-realtime-push.md` の担当で、この領域は、乗車の外の人に位置を返す API を作らない。
 - **依頼の前の地図の車**は、索引の丸めた表示だけを使う（[geospatial-index.md](geospatial-index.md) の 6.3 節）。
-- **ログ・トレース・メトリクス・エラーの報告**に、緯度経度を書かない。書くのは H3 の解像度 8 のセル（辺 約 0.5 km）まで。lint で `lat`・`lng`・`latitude` を含むログの項目を拒否し、`LocationSample` の型に文字列化（`String()`）を持たせない。
+- **ログ・トレース・メトリクス・エラーの報告**に、緯度経度を書かない。書くのは `block` のセル（辺 約 0.5 km）まで。lint で `lat`・`lng`・`latitude` を含むログの項目を拒否し、`LocationSample` の型に文字列化（`String()`）を持たせない。
 - **人が軌跡を見る操作**（サポート、事故の調べ）：サポートのツールの「軌跡の閲覧」だけを窓口にする。理由（問い合わせの番号・事故の番号）の入力、対象は 1 乗車の区間だけ、閲覧の記録を監査ログへ 100% 残す（NFR-009）。仕組みは `support-and-operations-tools.md` と `security.md`。
 - **分析**：`loc-raw` を分析に使うときは、`driver_id` を 90 日ごとに替わる鍵の HMAC に置き換えた写しを作る。解析の担当は生の `loc-raw` を読めない。
-- **テストのデータ**：合成した軌跡か、匿名化して解像度 10 に丸めた軌跡だけを使う（[AGENTS.md](../../AGENTS.md) の規則）。
+- **テストのデータ**：合成した軌跡か、匿名化して `spot` に丸めた軌跡だけを使う（[AGENTS.md](../../AGENTS.md) の規則）。
 - 位置の履歴が個人情報に当たるか、利用目的の通知、事業者への提供の形（委託・共同利用・第三者提供）は、法務の確認待ち（L4）。
 
 ## 10. 障害のときの振る舞い
@@ -307,7 +307,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 - **精度の閾値**：100 m を超えた点は索引に使わない。
 - **ストリーム**：Kinesis Data Streams のプロビジョンド、S1 は 8 シャード、保持は 24 時間。Valkey に最新の位置の写しを置く案（ADR-0002 の持ち越し）は採らない。再構築は Kinesis の時刻の指定の読み直しで足りる（[geospatial-index.md](geospatial-index.md) の 5 節）。
 - **保持**：生の位置 30 日、乗車の軌跡 1 年、速度の標本と台数の集計 2 年（いずれも L4 の結論で置き換える）。
-- **ログの丸め**：H3 の解像度 8。
+- **ログの丸め**：`block`。
 
 ### 持ち越し
 
@@ -347,5 +347,5 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 | S3 `loc-raw/`（Parquet） | 生の点（30 日） |
 | S3 `trip-trails/` と Aurora `trip_trails`（`trip_id` PK、`s3_key`、`sample_count`、`matched_distance_m`、`match_quality`、`created_at`、`expires_at`） | 乗車の軌跡（1 年） |
 | S3 `speed-samples/`（Parquet：`way_id`、`direction`、`edge_id`、`week_bucket_5min`、`speed_kph`、`tile_version`） | 速度の標本（ID なし、2 年） |
-| S3 `supply-heat/`（Parquet：`cell8`、`bucket_5min`、`status`、`count`） | 台数の集計（ID なし、2 年） |
+| S3 `supply-heat/`（Parquet：`block_cell`、`bucket_5min`、`status`、`count`） | 台数の集計（ID なし、2 年） |
 | Aurora `driver_sessions`（出庫の時の基準点 `anchor_server_time`・`anchor_elapsed_ms`、`location_untrusted`） | セッションの本体は `supply-and-operators.md` に置き、この 2 列を足す提案 |

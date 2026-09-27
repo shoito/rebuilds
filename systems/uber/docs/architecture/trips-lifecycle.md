@@ -58,7 +58,7 @@
 | `offer_delivered` | ドライバーのアプリ（オファーを受け取った時） | `offer_id`（= `assignment_id`） |
 | `accept` / `decline` | ドライバー | `offer_id`（= `assignment_id`）、`assignment_epoch`、辞退の理由（`street_hail` を含む） |
 | `depart` | ドライバー（受諾の直後にアプリが自動で送る） | 同上 |
-| `arrive` / `start_trip` / `segment_split` / `end_trip` | ドライバー | 同上と、発生の時刻、位置（H3 に丸めない正確な値は乗車の記録にだけ置く）、`end_trip` はメーターの額か事前確定の確認 |
+| `arrive` / `start_trip` / `segment_split` / `end_trip` | ドライバー | 同上と、発生の時刻、位置（格子のセルに丸めない正確な値は乗車の記録にだけ置く）、`end_trip` はメーターの額か事前確定の確認 |
 | `fare_confirmed` | Pricing（メーターの額の受け取り・保留の確認の後） | 確定の額と `meter_readings` の ID |
 | `rider_cancel` | 乗客 | 理由 |
 | `driver_cancel` | ドライバー | 理由のコード（安全・乗客の迷惑行為・車の故障・その他） |
@@ -165,7 +165,7 @@ CREATE UNIQUE INDEX one_active_assignment_per_trip ON driver_assignments (trip_i
 
 - `region_gen` は、大阪への切り替え（と戻し）のたびに 1 上がる AppConfig の値である。Trips は、epoch を増やすトランザクションで今の `region_gen` を `driver_dispatch_state` と `driver_assignments` に書く。
 - epoch の比較と一致の検査は、つねに `(region_gen, assignment_epoch)` の辞書順で行う。切り替えで複製されなかった epoch の増分と同じ値が新しいリージョンで再び使われても、世代が違うので古い操作・古い提案と取り違えない。
-- 切り替えの後、`driver_dispatch_state.region_gen` が今の世代より小さい行は、最初の epoch の操作（作成・解放・復元）のときに今の世代で書き直す。epoch の値はそのまま続けて増やす（0 に戻さない）。比較は `(region_gen, assignment_epoch)` の辞書順なので、戻しても戻さなくても正しさは同じである。戻さないのは、ログ・監査・再生で同じドライバーの epoch の値が世代をまたいで重複せず、読み違えを減らせるため（既定。Dev のテックリードの確認事項）。
+- 切り替えの後、`driver_dispatch_state.region_gen` が今の世代より小さい行は、最初の epoch の操作（作成・解放・復元）のときに今の世代で書き直す。epoch の値はそのまま続けて増やす（0 に戻さない）。比較は `(region_gen, assignment_epoch)` の辞書順なので、戻しても戻さなくても正しさは同じである。戻さないのは、ログ・監査・再生で同じドライバーの epoch の値が世代をまたいで重複せず、読み違えを減らせるため（2026-09-28 に確定）。
 - 復元した割り当て（8.5 節）は、今の世代で epoch を 1 増やして結び直し、新しい `(region_gen, assignment_epoch)` をドライバーのアプリに返す。アプリは以後その組を付けて送る。
 
 ### 4.3 提案の検査（`propose`）
@@ -325,7 +325,7 @@ outbox_events (id bigserial PRIMARY KEY,
 
 ### 8.2 乗車の要約
 
-- 乗車に関わるすべての応答と、リアルタイムの配信の事象に、署名つきの乗車の要約（`TripSnapshot`）を付ける。中身は `trip_id`、`trip_version`、状態、`assignment_id`・`region_gen`・`assignment_epoch`、乗客と事業者とドライバーの ID、価格の群、見積もりの総額（事前確定なら）、乗車地・降車地（H3 の解像度 9 に丸めた値）、発行の時刻。
+- 乗車に関わるすべての応答と、リアルタイムの配信の事象に、署名つきの乗車の要約（`TripSnapshot`）を付ける。中身は `trip_id`、`trip_version`、状態、`assignment_id`・`region_gen`・`assignment_epoch`、乗客と事業者とドライバーの ID、価格の群、見積もりの総額（事前確定なら）、乗車地・降車地（`street` に丸めた値）、発行の時刻。
 - 署名は Ed25519。鍵は KMS で作り、Trips のサービスだけが署名できる。鍵の交代は `security.md` で扱う。
 - アプリは最新の要約を端末に残す。障害の後の復元（8.5 節）に使う。
 
@@ -401,7 +401,7 @@ message TripCommand {
 ## 10. セキュリティ
 
 - 乗客・ドライバー・事業者・運用は、それぞれの ID と役割でだけ操作できる。ドライバーの操作は、トークンの `driver_id` と割り当ての `driver_id` の一致を確かめる。事業者の管理画面は、自分の事業者の乗車だけを読める（RLS）。
-- 乗車地・降車地の正確な位置は、乗車の相手と、その乗車の間だけに見せる（[AGENTS.md](../../AGENTS.md)）。`TripSnapshot` には丸めた値だけを入れる。ログ・トレースには乗車の ID と H3 の丸めた値だけを書く。
+- 乗車地・降車地の正確な位置は、乗車の相手と、その乗車の間だけに見せる（[AGENTS.md](../../AGENTS.md)）。`TripSnapshot` には丸めた値だけを入れる。ログ・トレースには乗車の ID と セルに丸めた値だけを書く。
 - `system_cancel` と、復元・食い違いの確認の操作は、理由の入力と監査ログを必須にする。
 - `TripSnapshot` の署名の鍵は KMS の外に出さない。復元の経路は、署名の検証に失敗した要約を受けない。
 
@@ -461,6 +461,10 @@ message TripCommand {
 - **提案の時の確かめ直し**：Trips は供給・営業区域・運行枠を確かめ直し、落ちたら `NOT_ELIGIBLE`。判定は配車と共通の決定表のベクターで揃える（4.3 節）。
 - **世代**：割り当ての比較は `(region_gen, assignment_epoch)`（4.2 節、ADR-0039）。
 - **位置の判定**：到着・無断キャンセルの位置は `GetDriverLocation` で読む。
+
+### 決定（2026-09-28、推奨案で確定）
+
+- **`region_gen` を上げても epoch は 0 に戻さない**：比較は組の辞書順なので正しさは同じで、世代をまたいで epoch の値が重ならず、ログと監査を読み違えにくい（4.2 節）。
 
 ### 持ち越し
 

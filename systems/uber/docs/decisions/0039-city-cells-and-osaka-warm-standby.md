@@ -40,7 +40,7 @@ date: 2026-09-27
 
 - **都市のセル**＝{Kinesis `loc-<city>`、geo-index の分割、dispatch の区域、配車の設定（AppConfig `dispatch/<zone>`）}。S1 はセル `tokyo` だけ。
 - セルの外（リージョンで共有）：API、Trips・供給・運賃（Aurora `core`）、Payments（Aurora `money`）、ETA と Valhalla、常時の接続、通知。
-- 都市は、乗車地の H3 の解像度 6 の親から決め（[location-ingestion.md](../architecture/location-ingestion.md) の 6 節）、乗車の間は変えない。
+- 都市は、乗車地の `metro` のセルから決め（[location-ingestion.md](../architecture/location-ingestion.md) の 6 節）、乗車の間は変えない。
 - 配備・設定の変更・フラグは、S2 から都市の単位で波にする（[ADR-0042](0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)）。
 - S3 では、都市のまとまりのセルに Aurora のシャード（`city_id` を鍵）を含め、関西のセルの主を大阪に置く active-active を検討する（Stripe の題材の [ADR-0031](../../../stripe/docs/decisions/0031-active-active-cells.md) と同じ形）。
 

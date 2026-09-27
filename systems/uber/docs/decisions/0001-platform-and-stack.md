@@ -44,7 +44,7 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 - **位置の取り込み、地理空間の索引、配車は Go で書く。** 常時の接続の受け手（`rt-gateway`、[ADR-0030](0030-realtime-grpc-bidirectional-stream-gateway.md)）と、乗客への車の位置の配信（`trip-location-fanout`、ADR-0030・[ADR-0038](0038-compute-on-fargate-and-data-stores.md)）も、同じ理由（多数の接続と位置の流れをメモリで扱う）で Go にする。配車の行列を求める Valhalla の前の層（`eta-service`、[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)）も、配車の熱い経路にあるので Go にする。Go のサービスは、この 6 つ（`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`）とする（統合の工程で 3 つから 5 つにし、2026-09-27 に `eta-service` を加えて 6 つにした）。理由は次のとおり。
   - メモリ上の共有の状態と、多数の同時の処理（goroutine とチャネル）を、単純な書き方で扱える。
   - コンパイルとテストが速く、エージェントの確認ループが短い。学習データも多い。
-  - H3 の公式の束縛（h3-go）と、gRPC・Protocol Buffers の成熟した実装がある。h3-go は C の実装を同梱して cgo で呼び、`CGO_ENABLED=1` を要する（[h3-go](https://github.com/uber/h3-go)、2026-09-27 に確認）。ARM64 のイメージのビルドの手順は E1 の `ci-go-and-contracts` で決める。
+  - gRPC・Protocol Buffers の成熟した実装がある。地理の格子は、自前の純粋な Go のパッケージ `geogrid` で書く（[ADR-0002](0002-hex-grid-geospatial-model.md)）。cgo を使わず、`CGO_ENABLED=0` で ARM64 のイメージを作る。
 - 1 は、Node.js の単一のスレッドで、メモリ上の大きな索引と重い最適化を同じプロセスに持つことになる。本家は、Node.js で書いた初期の Fulfillment の基盤（乗車の状態を持つ部分）を、使われなくなった技術として後に作り直している（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2026-09-27 に確認）。
 - 3 は、GC がなく、遅延の裾で Go に勝る。ただし、コンパイルが遅く、所有権の制約のためにエージェントの修正の往復が増える。S1〜S2 の規模（索引は都市ごとに数万台）では、Go の GC の停止が NFR-001・NFR-002 を崩すとは見込まない。E3 の負荷試験で、GC の停止を含めた p99 を計測し、足りなければ索引だけを Rust に替える ADR を書く。
 - 4 は、性能は足りるが、他の題材の道具と離れる割に、2 より得るものが少ない。
@@ -60,6 +60,8 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 - 2 は、画面の共有には向くが、背景の位置と常時の接続の部分は結局ネイティブのモジュールになる。2 つの層をまたぐ不具合の調べが重い。
 - 3 は、乗車の状態機械と通信のプロトコルを共有できる利点がある。ただし MVP では、共有するものを Protocol Buffers から生成するモデルと、Trips が出す状態遷移の表（テストのベクター）に留め、ビルドの仕組みを 1 つ増やさない。共有のコアは、S2 で 2 つのアプリの食い違いの不具合が多ければ見直す。
 - 事業者の管理画面とサポートのツールは Web（TypeScript）にする。
+
+> 2026-09-28 の注記：地理の格子を H3 の束縛（h3-go、cgo と C の実装の同梱が要る）から、自前の `geogrid` に改めた（ADR-0002 の同じ日の注記、リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。Go を選ぶ理由から h3-go を外し、cgo の懸念を消した。
 
 > 2026-09-27 の注記：`eta-service` は、独自の API を持ち、ECS のサービスとして別に配備し（3 タスク、ローリング。[infrastructure.md](../architecture/infrastructure.md) の 3 節、[delivery.md](../architecture/delivery.md) の 4 節）、配車・乗客の API・Trips から呼ばれる。付随の役ではなく、Go のサービスに数える。付随の役は、同じ領域の部品として別の ADR が認めた `trail-builder`（ADR-0010）と `dispatch-shadow`（ADR-0042）の 2 つだけにする。
 

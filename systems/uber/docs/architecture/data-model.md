@@ -2,7 +2,7 @@
 
 データモデルの索引。すべての置き場所（Aurora・Kinesis・DynamoDB・S3・Valkey・SNS/SQS・AppConfig・メモリ・端末・開発リポジトリ）と、横断の規則、複数の領域が列を足す表の統合した定義を書く。**各表・各キーの定義の正本は、索引の「定義の場所」にある文書** で、ここには置き場所と、どの Aurora のクラスタに置くか、統合した定義（11 節）だけを書く。実装の変更（`changes/`）でマイグレーションを書くときに、ここと各文書を合わせて更新する。
 
-前提となる決定は、乗車の状態と割り当ての正本は Aurora（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)・[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)）、Aurora は `core` と `money` の 2 つのクラスタ（[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)）、位置は流れとして持ち索引は正本にしない（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）、位置と個人の情報は種類ごとの鍵と保持の期間で分ける（[ADR-0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md)）、区域は `service_areas` の多角形を正本にする（[ADR-0033](../decisions/0033-osm-import-and-service-area-polygons.md)）。
+前提となる決定は、乗車の状態と割り当ての正本は Aurora（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)・[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)）、Aurora は `core` と `money` の 2 つのクラスタ（[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)）、位置は流れとして持ち索引は正本にしない（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）、位置と個人の情報は種類ごとの鍵と保持の期間で分ける（[ADR-0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md)）、区域は `service_areas` の多角形を正本にする（[ADR-0033](../decisions/0033-osm-import-and-service-area-polygons.md)）。
 
 2026-09-27 の統合の工程で、全領域の文書の「data-model への項目」（location-ingestion、geospatial-index、dispatch-and-matching、eta-and-routing、maps-and-geodata、pricing-and-fares、trips-lifecycle、payments-and-payouts、supply-and-operators、rider-and-driver-apps、notifications-and-realtime-push、safety-and-trust、support-and-operations-tools、ml-platform、security、infrastructure、observability、capacity、delivery）と照合した。統合で決めたこと（重なりの解消、名前の規則）は 10 節にまとめた。
 
@@ -28,8 +28,8 @@
 - **ID**：内部の ID は UUIDv7（`trips.id` など）。外に出す ID（見積もり、共有のリンク、招待のコード）は推測できない値にする。
 - **金額**は円の整数（`bigint`、列の名前は `_yen`）。係数・率は整数の分子と分母（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
 - **時刻**は UTC で保存し、運賃の時間帯の規則と運行枠だけ地域の時刻（Asia/Tokyo）で評価する（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
-- **区域は `service_areas` だけが持つ。** 営業区域・交通圏・日本版ライドシェアの区域・運賃の区域・待機場・空港の多角形は、[maps-and-geodata.md](maps-and-geodata.md) の 9 節の `service_areas`（PostGIS）が唯一の正本である。区域を指す列は、どの領域でも `service_areas.area_id`（text）を持ち、列の名前は `*area_id` で終える（`service_area_id`、`fare_area_id`、`pickup_area_ids` など）。他の領域は多角形の写しを表に持たない。判定は同じ節の `Contains`（H3 の写しで絞り、境目は多角形で確かめる。[ADR-0002](../decisions/0002-h3-geospatial-model.md)）だけで行う。
-- **位置**は `lat_e7`・`lng_e7`（`int`）。正確な位置を持つ表・キーは、下の表の「位置」の列に印を付け、保持の期間と鍵を [security.md](security.md) の 5.3・7.2 節に従わせる。すべての位置の置き場所は 9 節の一覧に載せる。ログ・メトリクスには H3 の解像度 8 まで。
+- **区域は `service_areas` だけが持つ。** 営業区域・交通圏・日本版ライドシェアの区域・運賃の区域・待機場・空港の多角形は、[maps-and-geodata.md](maps-and-geodata.md) の 9 節の `service_areas`（PostGIS）が唯一の正本である。区域を指す列は、どの領域でも `service_areas.area_id`（text）を持ち、列の名前は `*area_id` で終える（`service_area_id`、`fare_area_id`、`pickup_area_ids` など）。他の領域は多角形の写しを表に持たない。判定は同じ節の `Contains`（格子のセルの写しで絞り、境目は多角形で確かめる。[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）だけで行う。
+- **位置**は `lat_e7`・`lng_e7`（`int`）。正確な位置を持つ表・キーは、下の表の「位置」の列に印を付け、保持の期間と鍵を [security.md](security.md) の 5.3・7.2 節に従わせる。すべての位置の置き場所は 9 節の一覧に載せる。ログ・メトリクスには `block` まで。
 - **乗降の座標**：乗車の行に書ける座標は、乗客が確かめたピン（`rider_confirmed_pin`）だけ。住所の検索の提供者の内容（表示の名前、提供者の ID、提供者の座標）は、提供者ごとの保存の期限を持つ `trip_place_refs` にだけ置く（[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)、PROP-MAP-004）。
 - **事業者の表**は `operator_id` を持ち、RLS で事業者ごとに分ける（[supply-and-operators.md](supply-and-operators.md) の 3 節）。
 - **`core` と `money` をまたぐトランザクションを書かない。** つなぐのは outbox の事象だけ（[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)）。
@@ -60,7 +60,7 @@
 | `trip_trails` | 乗車の軌跡の索引（本体は S3） | — | [location-ingestion.md](location-ingestion.md) の 17 節 |
 | `trip_nav_events` | ナビの引き継ぎと逸脱 | — | [rider-and-driver-apps.md](rider-and-driver-apps.md) の 14 節 |
 | `trip_messages` | 乗車の中のメッセージ（乗車の終わりから 30 日、L4・L7 で置き換える） | — | [notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 15 節 |
-| `demand_rejections` | 受け入れの上限で断った需要（乗客の ID なし） | ○（解像度 8） | [capacity.md](capacity.md) の 11 節 |
+| `demand_rejections` | 受け入れの上限で断った需要（乗客の ID なし） | ○（`block`） | [capacity.md](capacity.md) の 11 節 |
 
 ### 3.2 供給と事業者
 
@@ -91,9 +91,9 @@
 
 | 表 | 中身 | 位置 | 定義の場所 |
 | --- | --- | --- | --- |
-| `service_areas`、`service_area_cells` | 区域の多角形（`area_id`・`version`・`kind`）と解像度 9 の写し。**区域の唯一の正本**（2 節） | — | [maps-and-geodata.md](maps-and-geodata.md) の 9.2 節 |
+| `service_areas`、`service_area_cells` | 区域の多角形（`area_id`・`version`・`kind`）と `street` の写し。**区域の唯一の正本**（2 節） | — | [maps-and-geodata.md](maps-and-geodata.md) の 9.2 節 |
 | `pickup_points` | 乗降の地点（施設の地点。個人の位置ではない） | — | maps の 8.1 節 |
-| `map_overrides`、`map_error_candidates` | 閉鎖の上書き、地図の誤りの候補 | ○（解像度 9） | maps の 6 節 |
+| `map_overrides`、`map_error_candidates` | 閉鎖の上書き、地図の誤りの候補 | ○（`street`） | maps の 6 節 |
 | `rider_saved_places` | 乗客が保存した場所（乗客が確かめたピンと名前だけ） | ◎ | rider-and-driver-apps の 14 節 |
 
 ### 3.5 安全
@@ -160,8 +160,8 @@
 | S3 `loc-raw/dt=/hour=/city=/` | 生の点（Parquet） | 30 日 | ◎ | `location` | location-ingestion の 7 節 |
 | S3 `trip-trails/<yyyymm>/<trip_id>.pb` | 乗車の軌跡 | 1 年 | ◎ | `location` | 同上 |
 | S3 `speed-samples/` | 速度の標本（ID なし） | 2 年 | ○ | `app` | 同上 |
-| S3 `supply-heat/` | 台数の集計（ID なし、解像度 8） | 2 年 | ○ | `app` | 同上 |
-| S3 `dispatch-decisions/zone=/dt=/hour=/` | `DispatchBatchRecord`（解像度 10） | 180 日 | ○ | `location` | dispatch の 9.1 節 |
+| S3 `supply-heat/` | 台数の集計（ID なし、`block`） | 2 年 | ○ | `app` | 同上 |
+| S3 `dispatch-decisions/zone=/dt=/hour=/` | `DispatchBatchRecord`（`spot`） | 180 日 | ○ | `location` | dispatch の 9.1 節 |
 | S3 `valhalla/tiles/<tile_version>/` | Valhalla のタイル | 前の版を 24 時間 | — | `app` | [eta-and-routing.md](eta-and-routing.md) の 5.2 節 |
 | S3 `eta/bias-tables/`、`eta/speed-profiles/`、`eta/golden-routes/` | ETA の補正・速度・検査の組 | 版ごと 90 日（既定。法務の確認待ち（L4）。security の 7.2 節） | ○ | `app` | eta-and-routing の 14 節 |
 | S3 `eta/accuracy/dt=/` | 乗車ごとの予測と実際（乗車の ID だけ） | 2 年（既定。法務の確認待ち（L4）。security の 7.2 節） | — | `app` | 同上 |
@@ -181,7 +181,7 @@
 | 置き場所 | キー・名前 | 中身 | 定義の場所 |
 | --- | --- | --- | --- |
 | Valkey `rt` | `rs:{recipient}`、`seq:{recipient}`、`conn:{recipient}`、`gw:{node}` | Stream（500 件・30 分）、登録表、Pub/Sub | [notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 15 節 |
-| Valkey `cache` | `supply:<city>:<cell7>` | 需給の集計（10 秒）。S1 は運用の画面だけが読む（変動運賃には使わない） | geospatial-index の 6.4 節、pricing の 14 節 |
+| Valkey `cache` | `supply:<city>:<district_cell>` | 需給の集計（10 秒）。S1 は運用の画面だけが読む（変動運賃には使わない） | geospatial-index の 6.4 節、pricing の 14 節 |
 | Valkey `cache` | `intake:<city>`、`quote:<rider>:<hash>` | 受け入れの上限の数、見積もりのキャッシュ（60 秒） | [capacity.md](capacity.md) の 4 節 |
 | Valkey `cache` | レート制限のキー、`jti` などの一時の値 | — | security |
 | SNS | `trips-events` | 乗車の事象 | trips-lifecycle の 8.1 節 |
@@ -214,7 +214,7 @@
 | S3 Iceberg `features/<group>/` | オフラインの特徴量（元のデータの保持を超えない） | 同上 |
 | Valkey `feat:{group}:{key}` | オンラインの特徴量（正本ではない）。どの Valkey のクラスタに置くか（`cache` か専用か）は E13 の前に決める | 同上 |
 | S3 `feature-logs/` | 配信の時の特徴量と予測（90 日。既定。法務の確認待ち（L4）。security の 7.2 節） | 同上 |
-| Valkey `demand:{city}:{cell8}`、S3 `demand-forecasts/` | 需要の予測 | 同上 |
+| Valkey `demand:{city}:{block_cell}`、S3 `demand-forecasts/` | 需要の予測 | 同上 |
 | SageMaker Model Registry | モデルの版と評価 | 同上 |
 
 ## 9. 位置を持つ置き場所の一覧
@@ -224,20 +224,20 @@ NFR-009 と [security.md](security.md) の 5・7 節の守りを、置き場所�
 | 置き場所 | 粒度 | 誰の位置 | 保持 | 読める人・経路 |
 | --- | --- | --- | --- | --- |
 | Kinesis `loc-<city>` | 正確 | ドライバー | 24 時間 | 索引、trail-builder、trip-location-fanout、Firehose（`location` の鍵の役割） |
-| geo-index のメモリ | 正確 | ドライバー | 最長 10 分（正本ではない） | `FindNearby`（dispatch・ETA）、`GetDriverLocation`（Trips・ETA・share-service・safety-monitor）、`SupplyPreview` は解像度 9 の中心だけ |
+| geo-index のメモリ | 正確 | ドライバー | 最長 10 分（正本ではない） | `FindNearby`（dispatch・ETA）、`GetDriverLocation`（Trips・ETA・share-service・safety-monitor）、`SupplyPreview` は `street` の中心だけ |
 | S3 `loc-raw/` | 正確 | ドライバー | 30 日 | パイプラインの役割だけ。分析は HMAC の写し |
 | S3 `trip-trails/`、`trip_trails` | 正確 | ドライバー（乗車の区間） | 1 年 | `trail-viewer` の窓口（`location_access_grants`、監査 100%） |
-| `trips`・`trip_segments` の乗降のピン | 正確 | 乗客が確かめた地点 | 乗車の記録の期間（既定 7 年、法務の確認待ち（L4）） | 乗車の相手（乗車の間）、事業者（乗車の間。乗車の後は解像度 9）、運用（解像度 9。正確な値は一時の権限） |
+| `trips`・`trip_segments` の乗降のピン | 正確 | 乗客が確かめた地点 | 乗車の記録の期間（既定 7 年、法務の確認待ち（L4）） | 乗車の相手（乗車の間）、事業者（乗車の間。乗車の後は `street`）、運用（`street`。正確な値は一時の権限） |
 | `rider_saved_places` | 正確 | 乗客が保存した地点 | アカウントの削除まで | 本人だけ |
 | `safety_incident_locations` | 正確 | 緊急の入口を押した人 | 既定 3 年（法務の確認待ち（L7）） | 安全の担当（インシデントの ID の許可、監査） |
-| Valkey `rt` の Stream | オファーの乗車地は正確、`TripSnapshot` は解像度 9 | 乗客の乗車地 | オファーの期限・30 分 | 割り当てのドライバーの接続だけ |
+| Valkey `rt` の Stream | オファーの乗車地は正確、`TripSnapshot` は `street` | 乗客の乗車地 | オファーの期限・30 分 | 割り当てのドライバーの接続だけ |
 | `DriverLocation`（一時のメッセージ） | 正確 | ドライバー | 保存しない | 有効な割り当ての乗客の接続だけ（PROP-RT-003） |
 | 乗車の共有のページ | 正確（車の位置） | ドライバー | 保存しない（乗車の終わりで止める） | 共有のトークンを持つ人。**NFR-009 の例外 1**、`legal.l4.share_trip` の裏 |
 | 事業者の稼働の地図 | 正確（自社の車） | ドライバー | 保存しない | 事業者の運行管理の役割（監査）。**NFR-009 の例外 2**、`legal.l4.operator_fleet_map` の裏 |
-| S3 `dispatch-decisions/` | 解像度 10 | 乗客の乗降・ドライバー | 180 日 | 配車の担当、再生の仕組み |
-| S3 `speed-samples/`・`supply-heat/`、Valkey `supply:*`、`demand_rejections`、`map_error_candidates`、特徴量 | 解像度 7〜10、ID なし（特徴量は HMAC の ID） | 集計 | 2 年まで（特徴量は元のデータの保持まで） | 運用・分析・ETA |
+| S3 `dispatch-decisions/` | `spot` | 乗客の乗降・ドライバー | 180 日 | 配車の担当、再生の仕組み |
+| S3 `speed-samples/`・`supply-heat/`、Valkey `supply:*`、`demand_rejections`、`map_error_candidates`、特徴量 | `district`〜`spot`、ID なし（特徴量は HMAC の ID） | 集計 | 2 年まで（特徴量は元のデータの保持まで） | 運用・分析・ETA |
 | 端末の `trip_journal`・`location_backlog` | 正確 | 本人（ドライバー） | 確定まで・24 時間 | 端末だけ（暗号化） |
-| ログ・メトリクス・トレース | 解像度 8 まで | — | 30 日・1 年 | 緯度経度は 0 件（検査で 1 件で呼び出し） |
+| ログ・メトリクス・トレース | `block` まで | — | 30 日・1 年 | 緯度経度は 0 件（検査で 1 件で呼び出し） |
 
 ## 10. 統合で決めたこと（2026-09-27）
 
@@ -289,6 +289,6 @@ NFR-009 と [security.md](security.md) の 5・7 節の守りを、置き場所�
 | `pickup_pin`・`dropoff_pin` | 乗客が確かめたピン（`lat_e7`・`lng_e7`、`origin=rider_confirmed_pin`）。降車地のない依頼は `dropoff_pin` が NULL |
 | `pickup_point_id` | 乗降の地点を選んだとき（`pickup_points`） |
 | `pickup_area_ids`・`dropoff_area_ids` | 乗車の作成の時に `Contains` で求めた区域（`service_areas.area_id` と版の組の配列）。営業区域の判定（配車の E4 の条件）と運賃の区域に使う |
-| `city_id` | 乗車地の H3 の解像度 6 の親から決めた都市（ADR-0039）。乗車の間は変えない |
+| `city_id` | 乗車地の `metro` のセルから決めた都市（ADR-0039）。乗車の間は変えない |
 
 提供者の内容は `trip_place_refs` に置く（10 節の 5）。

@@ -3,11 +3,13 @@ status: accepted
 date: 2026-09-27
 ---
 
-# ADR-0033: OSM は週 1 回の検査つきで取り込み、誤りは OSM の本体で直す。営業区域・交通圏は国土数値情報と公示から版つきの多角形にし、H3 の写しと多角形で判定する
+# ADR-0033: OSM は週 1 回の検査つきで取り込み、誤りは OSM の本体で直す。営業区域・交通圏は国土数値情報と公示から版つきの多角形にし、格子のセルの写しと多角形で判定する
+
+> 2026-09-28 の注記：区域の写しの作り方を、H3（h3-go）の `polygonToCellsExperimental` から、自前の格子 `geogrid` の `Cover` に改めた（ADR-0002 の同じ日の注記）。「一部でも重なる」で取り、「全体が内側」を `inside` にする判定は変えない。実験的な関数の版を固定する懸念はなくなった。
 
 ## Context
 
-経路と ETA は、OSM の上の Valhalla で求める（[ADR-0005](0005-maps-and-routing.md)）。営業区域・交通圏などの規則の区域は、行政の境界の多角形を正本にし、H3 のセルの集合は速い判定の写しにする（[ADR-0002](0002-h3-geospatial-model.md)）。
+経路と ETA は、OSM の上の Valhalla で求める（[ADR-0005](0005-maps-and-routing.md)）。営業区域・交通圏などの規則の区域は、行政の境界の多角形を正本にし、格子のセルの集合は速い判定の写しにする（[ADR-0002](0002-hex-grid-geospatial-model.md)）。
 
 事実（2026-09-27 に確認）：
 
@@ -16,7 +18,7 @@ date: 2026-09-27
 - 本家は、当てはめの異常から地図の誤りを見つけている（[CatchME](https://www.uber.com/us/en/blog/mapping-accuracy-with-catchme/)、2019-04-25）。
 - 国土数値情報の行政区域データ（N03）は、市区町村の境界と全国地方公共団体コードを持ち、年 1 回更新、CC BY 4.0（[国土数値情報](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html)）。
 - 一般旅客自動車運送事業者は、発地と着地のいずれもが営業区域の外の運送をしてはならない（道路運送法第 20 条。[e-Gov 法令検索](https://laws.e-gov.go.jp/law/326AC0000000183)、2026-09-27 に本文を確認）。営業区域は運輸局の公示で決まる。
-- H3 の `polygonToCellsExperimental` は、中心・全体が内側・一部でも重なる・外接の四角形の 4 つの方式を持つ（[H3 の Region functions](https://h3geo.org/docs/api/regions/)）。
+- 自前の格子 `geogrid` のセルは、投影の平面の上の正六角形である（[ADR-0002](0002-hex-grid-geospatial-model.md)）。区域の多角形を同じ平面に写せば、セルが多角形に「一部でも重なる」か「全体が内側」かを、平面の幾何で正確に判定できる。
 
 ## Options
 
@@ -33,8 +35,8 @@ OSM の更新：
 
 区域：
 
-- i. **N03 の市区町村の多角形を公示の構成で合わせ、版と有効の期間つきで PostGIS に持つ。解像度 9 の写し（内側・境目）で速く判定し、境目は多角形で確かめる**
-- ii. **H3 のセルの集合だけで持つ**
+- i. **N03 の市区町村の多角形を公示の構成で合わせ、版と有効の期間つきで PostGIS に持つ。`street` の写し（内側・境目）で速く判定し、境目は多角形で確かめる**
+- ii. **格子のセルの集合だけで持つ**
 - iii. **判定のたびに PostGIS を引く**
 
 ## Decision
@@ -62,10 +64,10 @@ OSM の更新：
   - OSM の直しが反映されるまで最大 1 週かかる。右折の禁止など上書きで表せない誤りは、その間 ETA の補正でしのぐ。
   - 公示の変更を月 1 回確かめる定期作業が要る。
   - 特別区・武三交通圏の構成（特別区・武蔵野市・三鷹市）と、関東では営業区域を交通圏の単位で書くことは 2026-09-27 に確かめた（[maps-and-geodata.md](../architecture/maps-and-geodata.md) の 9.1 節）。組織としての OSM の編集の指針も確かめた（同じ文書の 6 節）。他の地域の構成と、市区町村の境界に沿わない区域の有無は **未検証**（E4 の `service-area-polygons`、E14 の `city-data-onboarding`）。
-  - `polygonToCellsExperimental` は h3-go v4.5.0 が `PolygonToCellsExperimental` として公開している（[h3-go の h3.go](https://github.com/uber/h3-go/blob/master/h3.go)、2026-09-27 に確認）。実験的な関数なので版を固定する。消えたら中心の方式に境目の 1 輪を足して代える。
+  - 写しを作る `geogrid.Cover` を自分で持つ。PROP-MAP-001 と、PostGIS（`ST_Intersects`・`ST_CoveredBy`）との突き合わせで正しさを守る（[maps-and-geodata.md](../architecture/maps-and-geodata.md) の 9.2 節）。
 
 ## Confirmation
 
 - 性質ベーステスト：PROP-MAP-001（`Contains` が多角形だけの判定と一致）、PROP-MAP-002（版の期間の重なりなし）、PROP-MAP-005（壊した抽出が検査で止まる）。
 - 区域の版の作成のたびに、ランダムな 10 万点で写しと多角形の判定の一致を確かめてから有効にする。
-- レビュー：運賃・営業区域の最終の判定に H3 のセルだけを使うコード（ADR-0002）、期間のない上書きを差し戻す。
+- レビュー：運賃・営業区域の最終の判定に格子のセルだけを使うコード（ADR-0002）、期間のない上書きを差し戻す。

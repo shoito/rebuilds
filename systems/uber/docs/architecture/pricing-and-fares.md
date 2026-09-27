@@ -2,7 +2,7 @@
 
 運賃と料金の計算。メーターの運賃の受け取り、事前確定運賃、迎車料金、事前確定型変動運賃、日本版ライドシェアの運賃、版つきの運賃の規則、円の整数と端数の処理を決める。
 
-前提となる決定は、金額を円の整数で扱うこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、料金の区域の判定は多角形で行うこと（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）、推計走行距離は法務の確認が済んだ地図で求めること（[ADR-0005](../decisions/0005-maps-and-routing.md)）。この文書で決めたことは次の ADR にある。
+前提となる決定は、金額を円の整数で扱うこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、料金の区域の判定は多角形で行うこと（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）、推計走行距離は法務の確認が済んだ地図で求めること（[ADR-0005](../decisions/0005-maps-and-routing.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -80,7 +80,7 @@
 
 ### 4.1 スキーマ
 
-- 区域の多角形は、この領域では持たない。`fare_area_id` は、[maps-and-geodata.md](maps-and-geodata.md) の 9 節の `service_areas.area_id`（`kind` が `kotsuken`（交通圏）か `fare_zone`）を指す。判定は同じ節の `Contains`（H3 の写しで速く絞り、境目は多角形で確かめる。[ADR-0002](../decisions/0002-h3-geospatial-model.md)）を使う。
+- 区域の多角形は、この領域では持たない。`fare_area_id` は、[maps-and-geodata.md](maps-and-geodata.md) の 9 節の `service_areas.area_id`（`kind` が `kotsuken`（交通圏）か `fare_zone`）を指す。判定は同じ節の `Contains`（格子のセルの写しで速く絞り、境目は多角形で確かめる。[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）を使う。
 - 運賃ブロック（全国 101）と交通圏の対応は、`fare_blocks (id, name, bureau)` と `fare_block_members (fare_block_id, area_id)` で持つ。
 
 ```sql
@@ -345,7 +345,7 @@ fare_quotes (id, rider_id, city_id, pricing_group_id,
 - 規則の作成・承認・有効化は、管理画面の権限（事業者の審査の担当と Dev・法務の窓口）に限り、2 人の承認と監査ログを必須にする（`support-and-operations-tools.md` と `security.md`）。
 - 事業者は自分の運賃の規則を読めるが、承認はできない。変動の時間帯の表は事業者が下書きし、運用が承認する。
 - 見積もりの ID は推測できない値にし、乗客の ID と組で確かめる（他人の見積もりで依頼できない）。
-- 見積もりの入力（乗車地・降車地）は正確な位置を含む。ログに緯度経度を書かず、`inputs_sha256` と H3 の丸めた値だけを書く（[AGENTS.md](../../AGENTS.md)）。
+- 見積もりの入力（乗車地・降車地）は正確な位置を含む。ログに緯度経度を書かず、`inputs_sha256` と セルに丸めた値だけを書く（[AGENTS.md](../../AGENTS.md)）。
 - 運賃の水準の報告は、事業者ごとに閉じる。他の事業者の倍率・額を事業者に見せない（L9 の観点でも、事業者どうしで情報を共有する経路を作らない）。
 
 ## 11. テスト
@@ -404,7 +404,7 @@ fare_quotes (id, rider_id, city_id, pricing_group_id,
 ### 11.3 例のテスト
 
 - 2.2 節の東京の例（500 円 × 1.21 = 610 円）と、5.2 節の例（5,000 m で 2,780 円）を固定の例にする。
-- 特別区・武三の自動認可運賃・料金表の各段（普通車は A・B・下限）の初乗と加算で、境の距離の前後を表にする。値は 2.1 節の公示の原本（令和 8 年 5 月 22 日改正の版）から入れる。
+- 特別区・武三の自動認可運賃・料金表の各段（普通車は A・B・下限）の初乗と加算で、境の距離の前後を表にする。テストの固定の値は、2026-04-20 の運賃の改定の後の値（初乗 1.0 km、加算 232 m・1 分 25 秒）にそろえる（2026-09-28 に確定）。値は 2.1 節の公示の原本（令和 8 年 5 月 22 日改正の版）から入れる。改定の前の値（初乗 1.096 km など）は、規則の版の切り替えの試験にだけ使う。
 
 ## 12. Story の候補
 
@@ -436,6 +436,11 @@ fare_quotes (id, rider_id, city_id, pricing_group_id,
 - **メーターの受け取り**：連携を優先し、`driver_input` は照合つきで許す。自前のソフトメーターは作らない。
 - **乗客の手配料**：0 円（L1 まで）。
 - **キャンセル料の既定**：受諾から 120 秒の後の取り消しで、事業者の迎車料金と同額。無断キャンセルは到着から 300 秒待った後。事業者が変えられる。
+
+### 決定（2026-09-28、推奨案で確定）
+
+- **テストの固定の値**：2026-04-20 の運賃の改定の後の値にそろえる（11.3 節）。
+- **事前確定運賃と影の計算の差の閾値**：事業者ごとの週の比（事前確定運賃 ÷ 影の距離制運賃）の中央値が、その事業者の平準化係数から ±10% を外れたら知らせる（[quality.md](../quality.md) の 4 節）。S1 の分布で見直す。
 
 ### 持ち越し
 
@@ -479,4 +484,4 @@ fare_quotes (id, rider_id, city_id, pricing_group_id,
 | Aurora `fare_distance_quotes` | [eta-and-routing.md](eta-and-routing.md) の 14 節の提案の表。持ち主は Pricing とし、`fare_quotes.distance_quote_id` から指す。保持は運賃の記録と同じ（表示用の線は提供者の条件の期間） |
 | Aurora `fare_level_records`（`trip_id` PK、`operator_id`、`fare_area_id`、`week`、A・B・C・D の額、`multiplier_pct`） | 6.3 節 |
 | Aurora `meter_readings`（`trip_id`、`segment_no`、`source`、`amount_yen`、`distance_m`、`duration_s`、`device_id`、`raw_seq`、`received_at`、`review_status`、`photo_doc_id`） | 5.4 節 |
-| Valkey `supply:<city>:<cell7>` の読み手 | S1 では運用の画面だけが読む。変動運賃には使わない（6.1 節） |
+| Valkey `supply:<city>:<district_cell>` の読み手 | S1 では運用の画面だけが読む。変動運賃には使わない（6.1 節） |

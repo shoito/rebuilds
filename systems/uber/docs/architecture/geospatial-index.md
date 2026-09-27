@@ -1,17 +1,17 @@
 # Geospatial index: Uber
 
-オンラインのドライバーの最新の位置と状態を、H3 のセルでメモリに持つ索引。中身の持ち方、都市とセルでの分割、リースによる持ち主の決め方、位置の流れの直近 30 秒からの再構築、近くの空車を探す検索の API を決める。
+オンラインのドライバーの最新の位置と状態を、自前の六角形の格子（`geogrid`）のセルでメモリに持つ索引。格子の方式、中身の持ち方、都市とセルでの分割、リースによる持ち主の決め方、位置の流れの直近 30 秒からの再構築、近くの空車を探す検索の API を決める。
 
-前提となる決定は、H3 の解像度の使い分けとメモリの上の索引（[ADR-0002](../decisions/0002-h3-geospatial-model.md)）、割り当ての正本は Trips で fencing token（`assignment_epoch`）が守る（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）、位置の流れ（[location-ingestion.md](location-ingestion.md)、[ADR-0009](../decisions/0009-location-upload-and-validation.md)）。この文書で決めたことは次の ADR にある。
+前提となる決定は、geogrid のレベルの使い分けとメモリの上の索引（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）、割り当ての正本は Trips で fencing token（`assignment_epoch`）が守る（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）、位置の流れ（[location-ingestion.md](location-ingestion.md)、[ADR-0009](../decisions/0009-location-upload-and-validation.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市（S1）、S2 からは H3 の解像度 6 のセルの集まりで分ける。分割ごとに主と待機の 2 つのタスクが同じ流れを読む。持ち主は DynamoDB の条件つき書き込みのリース（5 秒、1 秒ごとに更新）で決め、ゴシップは使わない。再構築は Kinesis の `AT_TIMESTAMP` で直近 35 秒を読み直し、供給と Trips の写しを重ねる |
-| [0012](../decisions/0012-geo-index-nearby-query-api.md) | 検索は gRPC の `FindNearby`。解像度 9 の輪を 1 つずつ広げ、条件に合う空車を直線の距離の近い順に N 人返す。輪の外周までの距離で、取りこぼしのない打ち切りを保証する。依頼の前の地図の車は、セルの中心に丸め、ID を付けずに返す |
+| [0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市（S1）、S2 からは `metro` のセルの集まりで分ける。分割ごとに主と待機の 2 つのタスクが同じ流れを読む。持ち主は DynamoDB の条件つき書き込みのリース（5 秒、1 秒ごとに更新）で決め、ゴシップは使わない。再構築は Kinesis の `AT_TIMESTAMP` で直近 35 秒を読み直し、供給と Trips の写しを重ねる |
+| [0012](../decisions/0012-geo-index-nearby-query-api.md) | 検索は gRPC の `FindNearby`。`street` の輪を 1 つずつ広げ、条件に合う空車を直線の距離の近い順に N 人返す。輪の外周までの距離で、取りこぼしのない打ち切りを保証する。依頼の前の地図の車は、セルの中心に丸め、ID を付けずに返す |
 
 ## 1. 目的と範囲
 
-- 扱う：索引の項目と状態の合わせ方、古い項目の削除、分割、持ち主とリース、待機と引き継ぎ、再構築、検索の API、需給の集計の書き出し、依頼の前の地図の車。
+- 扱う：格子の方式（`geogrid`）、索引の項目と状態の合わせ方、古い項目の削除、分割、持ち主とリース、待機と引き継ぎ、再構築、検索の API、需給の集計の書き出し、依頼の前の地図の車。
 - 扱わない：位置の受け取りと検証（[location-ingestion.md](location-ingestion.md)）、候補の条件の中身（[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節）、ETA（[eta-and-routing.md](eta-and-routing.md)）、変動運賃が集計をどう使うか（`pricing-and-fares.md`）、乗客のアプリの地図の描き方（`rider-and-driver-apps.md`）。
 - **索引は正本ではない。** 索引の中身だけで割り当てを確定しない（[AGENTS.md](../../AGENTS.md)）。索引が古い・二重になっても、割り当ての正しさは Trips の `assignment_epoch` と DB の一意の制約が守る。索引の誤りは、無駄なオファーと遅れとして現れる。
 
@@ -19,16 +19,26 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| 地理の単位 | 2015 年は S2 のセル（レベル 12）の ID で分けた。その後、六角形の階層的な索引 H3 を作って公開した（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、[H3](https://www.uber.com/blog/h3/)） | H3（ADR-0002） |
+| 地理の単位 | 2015 年は S2 のセル（レベル 12）の ID で分けた。その後、六角形の階層的な索引 H3 を作って公開した（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、[H3](https://www.uber.com/blog/h3/)） | 自前の六角形の格子 `geogrid`（ADR-0002）。H3 は本家の実装なので使わない（ADR-0007） |
 | 供給の索引 | 「Geo by Supply」は、すべての状態の供給を持ち、毎秒 100 万件の書き込みに耐えるよう作った。候補の一覧を経路・ETA のサービスに送り、道路の上の近さを求めた（High Scalability の同じ記事） | 同じ流れ。候補を直線の距離で絞り、ETA は [eta-and-routing.md](eta-and-routing.md) |
 | 分割の仕組み | Ringpop（一貫ハッシュとゴシップ）でアプリケーションの層を分けた（同上）。後に、Ringpop にはクラスタの大きさによる拡張の制約があったと書いている（[Fulfillment Platform](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)） | ゴシップを使わず、リースで持ち主を決める（ADR-0011） |
 
-いずれも 2026-09-27 に確認。
+いずれも 2026-09-27 に確認。本家の H3 は出典として挙げるだけで、使わない（[ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)、ADR-0002 の 2026-09-28 の注記）。
 
-H3 の性質（[H3 の Overview](https://h3geo.org/docs/core-library/overview/)、[Traversal functions](https://h3geo.org/docs/api/traversal/)、2026-09-27 に確認）：
+### 2.1 geogrid のセルの方式
 
-- 12 個の五角形は、正二十面体の頂点に置かれ、向きの選び方で、すべて海の上にある。日本の陸の上の検索は五角形に当たらない。
-- `gridDisk(origin, k)` は、格子の距離が k 以内のセルをすべて返す。最大の数は `1 + 3k(k+1)`（k = 5 で 91）。五角形をまたぐと穴が空く。
+索引と集計の単位は、自前の Go のパッケージ `geogrid` で作る。方式は次のとおり（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)）。
+
+- **投影**：緯度経度（JGD2011）を、ランベルト正積方位図法で平面の `(x, y)`（m）に写す。中心は北緯 36 度・東経 138 度、楕円体は GRS80。式は EPSG の方法 9820（Lambert Azimuthal Equal Area）で、PROJ の `+proj=laea +lat_0=36 +lon_0=138 +ellps=GRS80` と同じ結果を出す（式の原本の確認は **未検証**。E3 の `geogrid-core` で PROJ と突き合わせて確かめる）。
+- **ゆがみ**：正積なので面積は正しい。形のゆがみ（縦と横の縮尺の差）は、中心から 1,000 km（本州・北海道・九州・四国）で約 0.6%、2,000 km（与那国島・南鳥島）で約 2.5%（ランベルト正積方位図法の縮尺 `cos(c/2)` からの計算）。
+- **範囲**：中心から 2,500 km を超える点は `ErrOutOfDomain` を返す。
+- **格子**：平面の上に、頂点が北を向く正六角形を並べる。原点のセルの中心は投影の原点。セルは軸座標 `(q, r)`（整数）で表す。点からセルを求めるときは、軸座標を立方座標 `(q, r, −q−r)` に直して 3 つを丸め、丸めの誤差の最も大きい成分を他の 2 つから求め直す。
+- **レベル**：`metro`（6）・`district`（7）・`block`（8）・`street`（9）・`spot`（10）。辺の長さは `200 m × √7^(9 − level)`。大きさの表は ADR-0002 にある。レベルごとに独立の格子で、親は「子の中心を含む 1 つ粗いレベルのセル」。
+- **ID**：64 ビット。最上位の 1 ビットは 0、次の 3 ビットがレベル（6〜10 を 0〜4 で）、残りの 60 ビットが `q` と `r`（30 ビットずつ、2 の補数）。PostgreSQL の `bigint` に正の値で入る。文字列は 16 桁の 16 進数。
+- **操作**：`CellAt(p, level)`、`Center(c)`、`Boundary(c)`（6 つの頂点。平面と緯度経度の両方）、`Parent(c)`、`Disk(c, k)`（格子の距離が k 以内のセル。数は `1 + 3k(k+1)`、k = 5 で 91）、`Ring(c, k)`（ちょうど k のセル。k ≥ 1 で `6k` 個）、`GridDistance(a, b)`、`Cover(polygon, level, mode)`（区域の写し。[maps-and-geodata.md](maps-and-geodata.md) の 9.2 節）、`DistanceM(p, q)`（平面の上の直線の距離）。
+- **五角形がない**：平面の格子なので、`Disk` に穴が空かない。
+- **距離**：索引の中の直線の距離と、6.2 節の外周までの距離は、どちらも投影の平面で測る。同じ平面の中で比べるので、打ち切りの正しさは平面の上でそのまま成り立つ。実際の距離との差は、本州で 0.6% 以内である。
+- **依存**：純粋な Go だけで書き、cgo を使わない。投影の式と六角形の丸めは公開の数学で、本家の実装を使わない。
 
 ## 3. 構成
 
@@ -55,7 +65,7 @@ Trips の状態の変化 ──────────────────�
 type DriverEntry struct {
     DriverID        string
     SessionID       string
-    Cell9           h3.Cell   // 最新の位置の解像度 9 のセル
+    StreetCell      geogrid.Cell // 最新の位置の `street` のセル
     LatE7, LngE7    int32
     HeadingCdeg     uint16
     SpeedCms        uint32
@@ -79,7 +89,7 @@ type DriverEntry struct {
 }
 ```
 
-- 1 項目は 300 バイト程度。S1 の 1 万台で数 MB、S3 で 1 都市 5 万台でも数十 MB に収まる。セルからドライバーの集合への写像（`map[h3.Cell][]*DriverEntry`）を別に持つ。
+- 1 項目は 300 バイト程度。S1 の 1 万台で数 MB、S3 で 1 都市 5 万台でも数十 MB に収まる。セルからドライバーの集合への写像（`map[geogrid.Cell][]*DriverEntry`）を別に持つ。
 
 ### 4.2 状態の合わせ方
 
@@ -122,11 +132,11 @@ S2 で都市の境目を走る車は、2 つの分割に現れうる。古い方
 | 段階 | 分割の単位 | 分割の数の目安 |
 | --- | --- | --- |
 | S1 | 都市（特別区・武三交通圏を含む東京）で 1 つ | 1 |
-| S2 | 都市ごと。東京は H3 の解像度 6 のセルの集まりで数個に分ける | 12 都市で 15〜20 |
-| S3 | 都市のまとまりごと。解像度 6 の集まり | 数十 |
+| S2 | 都市ごと。東京は `metro` のセルの集まりで数個に分ける | 12 都市で 15〜20 |
+| S3 | 都市のまとまりごと。`metro` の集まり | 数十 |
 
-- 分割の表（`geo_shard_map`）は、分割の ID と、属する解像度 6 のセルの一覧を版つきで持つ。表の変更は、新しい版を作って両方の索引が温まってから切り替える（runbook）。
-- **境目の写し（halo）**：分割は、自分のセルに加え、周りの解像度 6 の 1 輪（辺 約 3.7 km）の中のドライバーを、`HALO` の印つきで持つ。検索の半径（既定 k = 5、約 2 km。最大 k = 30、約 10 km）が 1 輪の中に収まる限り、他の分割に問い合わせずに答えられる。k が 1 輪を超える検索（郊外）は、隣の分割にも問い合わせて合わせる。
+- 分割の表（`geo_shard_map`）は、分割の ID と、属する `metro` のセルの一覧を版つきで持つ。表の変更は、新しい版を作って両方の索引が温まってから切り替える（runbook）。
+- **境目の写し（halo）**：分割は、自分のセルに加え、周りの `metro` の 1 輪（辺 約 3.7 km）の中のドライバーを、`HALO` の印つきで持つ。検索の半径（既定 k = 5、約 2 km。最大 k = 30、約 10 km）が 1 輪の中に収まる限り、他の分割に問い合わせずに答えられる。k が 1 輪を超える検索（郊外）は、隣の分割にも問い合わせて合わせる。
 - 位置の流れは都市ごとなので（[location-ingestion.md](location-ingestion.md) の 6 節）、分割は自分の都市のストリームから、自分と halo のセルの点だけを取り込む。
 
 ### 5.2 リース
@@ -229,13 +239,13 @@ message Candidate {
 ### 6.2 輪を広げる検索と打ち切り
 
 ```
-origin := h3.LatLngToCell(p, 9)
+origin := geogrid.CellAt(p, geogrid.Street)
 found := []
 for k := 0; k <= k_max; k++ {
-    for cell in gridRing(origin, k) {          // 中空の輪。k=0 は origin だけ
+    for cell in geogrid.Ring(origin, k) {      // 中空の輪。k=0 は origin だけ
         for d in snapshot.cells[cell] { if eligible(d, filter) { found = append(found, d) } }
     }
-    r_k := distance(p, outerBoundary(gridDisk(origin, k)))   // 点から disk の外周までの最短距離
+    r_k := distanceM(p, outerBoundary(geogrid.Disk(origin, k)))   // 点から disk の外周までの最短距離（投影の平面）
     near := count(found, d.straightLine <= r_k)
     if near >= limit { return top(found, limit), guaranteed_radius = r_k }
 }
@@ -245,21 +255,21 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 - **打ち切りの正しさ**：disk(k) は点を含むつながった領域なので、disk(k) の外のドライバーは、点から外周までの距離 `r_k` 以上離れている。`r_k` の内側に N 人いれば、その N 人は全体の中でも近い順の上位 N 人である。
 - 外周までの距離は、輪 k のセルの外側の辺ごとの距離の最小で求める。k ごとに最大 `6k` セルの辺を見るので、k = 30 でも数千回の距離の計算で済む。
 - 輪の番号だけで打ち切る（輪 k の中に N 人いれば返す）方式は採らない。輪 k の角のドライバーより、輪 k + 1 の辺の中ほどのドライバーの方が近いことがあるため。
-- 解像度 9 のセルの中心の間は約 0.35 km なので、既定の k = 5 は約 1.7〜2 km。
+- `street` のセルの中心の間は約 0.35 km なので、既定の k = 5 は約 1.7〜2 km。
 
 ### 6.3 依頼の前の地図の車（SupplyPreview）
 
 乗客のアプリは、依頼の前に近くの車を地図に出す。乗車の相手でない人に正確な位置を見せない規則（NFR-009）と両立させる。
 
-- 返すのは、条件に合う空車の、**解像度 9 のセルの中心**（約 200 m に丸めた点）と、45 度に丸めた向きだけ。ドライバーの ID、車両、事業者は返さない。
+- 返すのは、条件に合う空車の、**`street` のセルの中心**（約 200 m に丸めた点）と、45 度に丸めた向きだけ。ドライバーの ID、車両、事業者は返さない。
 - 最大 10 台、半径は k = 8（約 3 km）まで。同じセルに複数いれば、台数として返す。
-- 結果は、乗客の位置の解像度 8 のセルごとに 10 秒間キャッシュする。同じ車を 4 秒ごとに追いかけられないようにする。
+- 結果は、乗客の位置の `block` のセルごとに 10 秒間キャッシュする。同じ車を 4 秒ごとに追いかけられないようにする。
 - 迎車の ETA の目安（「約 5 分」）は、[eta-and-routing.md](eta-and-routing.md) の 4.4 節が、この結果ではなく `FindNearby` と ETA の行列で出す。
 
 ### 6.4 需給の集計（SupplyByCell）
 
-- 主の役のタスクが、10 秒ごとに、解像度 7 のセル × 有効な状態 × 車両の種類 × サービスの種類の台数を作る。Valkey に置き、Pricing と運用の画面が読む。使い方は `pricing-and-fares.md` で決める。
-- 5 分ごとに、解像度 8 のセル × 状態の台数を S3 の `supply-heat/` に書く（[location-ingestion.md](location-ingestion.md) の 7 節）。ドライバーの ID を含めない。
+- 主の役のタスクが、10 秒ごとに、`district` のセル × 有効な状態 × 車両の種類 × サービスの種類の台数を作る。Valkey に置き、Pricing と運用の画面が読む。使い方は `pricing-and-fares.md` で決める。
+- 5 分ごとに、`block` のセル × 状態の台数を S3 の `supply-heat/` に書く（[location-ingestion.md](location-ingestion.md) の 7 節）。ドライバーの ID を含めない。
 
 ### 6.5 割り当て済みのドライバーの位置（GetDriverLocation）
 
@@ -294,7 +304,7 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 
 - API は内部の gRPC だけにし、サービスの ID（Service Connect の TLS とサービスのトークン、RPC ごとの許可の一覧。[ADR-0037](../decisions/0037-authentication-device-integrity-and-fraud-response.md)）で呼び手を限る。`FindNearby` を呼べるのは dispatch と ETA（迎車の目安）だけ。`SupplyPreview` は乗客の API だけ。`SupplyByCell` は Pricing と運用の画面だけ。`GetDriverLocation` は Trips・ETA・乗車の共有（share-service）・安全の監視（safety-monitor）だけ（[safety-and-trust.md](safety-and-trust.md) の 3・10 節）。
 - 乗客の API に `FindNearby` を公開しない。乗客に返すのは 6.3 節の丸めた点だけ。
-- ログ・メトリクスには、セルの ID を解像度 8 までに丸めて書く。検索の要求の緯度経度も書かない。
+- ログ・メトリクスには、セルの ID を `block` までに丸めて書く。検索の要求の緯度経度も書かない。
 - 索引のメモリのダンプ（障害の調べ）は取らない設定にする（Go のコアダンプを無効にし、`pprof` のヒープのプロファイルは本番で取らない）。
 - 模擬の位置の印のあるセッション（`LOCATION_UNTRUSTED`）は、配車の候補にも依頼の前の地図にも出さない。
 
@@ -308,6 +318,7 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 - **PROP-GEO-004（再構築の同値）**：任意の事象の列で、途中から 5.4 節の手順で作り直した索引の、空車の集合と位置は、止めずに動かした索引と一致する（位置が 35 秒以内に 1 回以上届いたドライバーについて）。
 - **PROP-GEO-005（リース）**：任意のタスクの停止・時計のずれ（1 秒以内）・DynamoDB の遅れの列で、同じ時刻に主の役を名乗るタスクの `lease_epoch` は互いに異なり、読み手が受け入れるのは最大の `lease_epoch` だけである。
 - **PROP-GEO-006（丸め）**：`SupplyPreview` の応答に、ドライバーの ID と、セルの中心以外の座標が含まれない。
+- **PROP-GEO-007（格子）**：日本の範囲の任意の点 p と任意のレベルで、(a) p は `Boundary(CellAt(p))` の六角形の内側か辺の上にある、(b) `Center(CellAt(p))` から p までの平面の距離は辺の長さ以下、(c) 任意のセル c と k で `Disk(c, k)` は `1 + 3k(k+1)` 個で重複がなく、どのセルも `GridDistance ≤ k`、`Ring(c, k)` は k ≥ 1 で `6k` 個、(d) ID を文字列にして戻すと同じセル、(e) `Parent(c)` は c の中心を含む。あわせて、投影を PROJ（PostGIS の `ST_Transform`）と 1 万点で突き合わせ、差が 1 mm 以内であること、セルの面積（`ST_Area` の測地の面積）が ADR-0002 の表の値と 0.5% 以内であることを確かめる。
 
 ### 10.2 障害注入
 
@@ -324,6 +335,7 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
+| E3 | `geogrid-core` | 2.1 節の格子のパッケージ（投影、レベル、ID、`Disk`・`Ring`・`Cover`）と PROJ との突き合わせ（PROP-GEO-007） |
 | E3 | `geo-index-core` | 4 節の項目、状態の合わせ方、古い項目、写しの公開（PROP-GEO-002・003） |
 | E3 | `geo-find-nearby` | 6.1・6.2 節の検索と打ち切り（PROP-GEO-001） |
 | E3 | `geo-shard-lease` | DynamoDB のリース、主と待機、配車の側の切り替え（PROP-GEO-005） |
@@ -338,18 +350,18 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 
 ### 決定（2026-09-27、既定案）
 
-- **分割**：S1 は東京の 1 分割、主と待機。S2 から解像度 6 の集まりと halo。
+- **分割**：S1 は東京の 1 分割、主と待機。S2 から `metro` の集まりと halo。
 - **リース**：DynamoDB の条件つき書き込み。期限 5 秒、1 秒ごとの更新、4 秒で自分から降りる、ずれの余裕 1 秒。
 - **索引の正しさはリースに依らない**：配車は主が答えなければ待機に問い合わせる。
 - **再構築**：Kinesis を T0 − 35 秒から読み直す。Valkey に写しを置かない。
 - **検索**：輪を広げ、外周までの距離で打ち切る。既定 `limit` 10・`k_max` 5、上限 50・30。
-- **依頼の前の地図の車**：解像度 9 のセルの中心、ID なし、10 台まで、10 秒のキャッシュ。
+- **依頼の前の地図の車**：`street` のセルの中心、ID なし、10 台まで、10 秒のキャッシュ。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 車の少ない郊外で、解像度 9 のセルの中心でもドライバーを特定できてしまうか（1 セルに 1 台） | 法務の確認（L4）と、E9 の画面の設計で、郊外では台数だけにするかを決める |
+| 車の少ない郊外で、`street` のセルの中心でもドライバーを特定できてしまうか（1 セルに 1 台） | 法務の確認（L4）と、E9 の画面の設計で、郊外では台数だけにするかを決める |
 | 降車の近い実車のドライバーを候補に入れるか（ADR-0004 の S2 の検討） | 降車の地点と時刻の予測の精度を見て、S2 で |
 | S2 の分割の境目（東京をいくつに分けるか） | E3 の負荷試験の 1 分割の上限と、S2 の車両の数から |
 | Go の GC の停止が p99 を崩すか | E3 の負荷試験。崩すなら索引だけを Rust にする ADR（ADR-0001） |
@@ -362,7 +374,7 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 - `FindNearby` の p99、待機への切り替えの率、`truncated` の率（候補が遠い地域の目安）。
 - 照合で見つかった差の件数（Trips の割り当てとの差、供給との差）。0 に近いことが目標で、増えたら事象の配信の欠けを疑う。
 - 主の役の引き継ぎの回数と時間、再構築の時間。
-- PROP-GEO-001〜006 の実行の数と種。
+- PROP-GEO-001〜007 の実行の数と種。
 
 ### runbooks
 
@@ -377,6 +389,6 @@ return top(found, limit), guaranteed_radius = r_{k_max}, truncated = true
 | --- | --- |
 | メモリ `DriverEntry`（正本ではない） | 4.1 節 |
 | DynamoDB `geo_shard_leases`（`shard_id` PK、`owner_task`、`lease_epoch`、`expires_at_ms`） | 5.2 節。配車のリース（`dispatch/<zone>`）も同じ表に置く（[dispatch-and-matching.md](dispatch-and-matching.md) の 4 節） |
-| DynamoDB または Aurora `geo_shard_map`（`version`、`shard_id`、`cells6[]`、`halo_cells6[]`、`active_from`） | 5.1 節（S2 から） |
-| Valkey `supply:<city>:<cell7>`（状態・車両・サービスごとの台数、10 秒） | 6.4 節 |
+| DynamoDB または Aurora `geo_shard_map`（`version`、`shard_id`、`metro_cells[]`、`halo_metro_cells[]`、`active_from`） | 5.1 節（S2 から） |
+| Valkey `supply:<city>:<district_cell>`（状態・車両・サービスごとの台数、10 秒） | 6.4 節 |
 | Protocol Buffers `GeoIndex` のサービス | 6 節 |
