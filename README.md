@@ -15,7 +15,7 @@
 | [GitHub](systems/github/) | Git ホスティング | Git ストレージと複製、PR / レビュー、CI（Actions）、コード検索 | 設計済み |
 | [Chrome](systems/chrome/) | ブラウザ | レンダリングパイプライン、プロセス分離、サンドボックス、更新と配信 | 設計済み |
 | [Notion](systems/notion/) | ドキュメント / DB | ブロックモデル、共同編集（CRDT）、権限、シャーディング | 設計済み |
-| Auth0 | 認証基盤（CIAM） | OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離 | 設計中 |
+| [Auth0](systems/auth0/) | 認証基盤（CIAM） | OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離 | 設計済み |
 | Figma | デザインツール | 中央の権威サーバーでの共同編集、WebGL / WASM での描画、巨大なドキュメント | 設計中 |
 | Kafka | 分散ログ（マネージドのストリーミング） | パーティションと複製、exactly-once、階層型の保存 | 設計中 |
 | Zoom | ビデオ会議 | WebRTC、SFU、帯域の推定、低遅延、録画 | 設計中 |
