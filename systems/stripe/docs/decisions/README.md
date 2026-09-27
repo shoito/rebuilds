@@ -35,7 +35,7 @@ Stripe の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0028](0028-dashboard-architecture.md) | ダッシュボードは公開 API を呼ぶ SPA にし、第三者のスクリプトを読み込まない | accepted |
 | [0029](0029-multi-account-and-cde-layout.md) | AWS のアカウントを PCI DSS の範囲で分け、CDE は live と test を別のアカウントにする | accepted |
 | [0030](0030-payments-disaster-recovery.md) | S1 から大阪にウォームスタンバイを持ち、失った決済はコネクタへの照会で回復する | accepted |
-| [0031](0031-active-active-cells.md) | S3 で、加盟店をセルに固定し、セルごとに主のリージョンを東京か大阪に置いて active-active にする | proposed |
+| [0031](0031-active-active-cells.md) | S3 で、加盟店をセルに固定し、セルごとに主のリージョンを東京か大阪に置いて active-active にする | accepted |
 | [0032](0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから、加盟店単位のカナリアで広げる | accepted |
 | [0033](0033-cde-pipeline-and-change-control.md) | CDE のコードは同じリポジトリの `cde/` に置き、ビルドとデプロイの経路と承認を本体から分ける | accepted |
 <!-- adr-index:end -->

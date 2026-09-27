@@ -6,7 +6,7 @@ AWS 上の構成、アカウント、ネットワーク、冗長化、災害復�
 | --- | --- |
 | アカウントと CDE の配置、ネットワーク | [ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) |
 | 災害復旧と、結果不明の決済の回復 | [ADR-0030](../decisions/0030-payments-disaster-recovery.md) |
-| S3 のセル構成と東京・大阪の active-active | [ADR-0031](../decisions/0031-active-active-cells.md)（proposed） |
+| S3 のセル構成と東京・大阪の active-active | [ADR-0031](../decisions/0031-active-active-cells.md) |
 | お金を動かすコードのリリース | [ADR-0032](../decisions/0032-release-safety-for-money-moving-code.md) |
 | CDE のデプロイの経路と変更管理 | [ADR-0033](../decisions/0033-cde-pipeline-and-change-control.md) |
 | IaC、デプロイの方式、フラグ、可観測性の道具 | Slack の ADR-0020・0022・0026・0021 を引き継ぐ |
@@ -309,7 +309,7 @@ S2 で行うこと：台帳の書き込みを加盟店のハッシュで分割�
 
 ## 10. S3 のセル構成と東京・大阪の active-active
 
-S3（確定 50,000 件/秒、加盟店 100 万、NFR-001 の 99.995%）では、スタック一式をセルとして複製し、**セルごとに「主のリージョン」を東京か大阪に置く**。全体としては両方のリージョンで決済を受ける（active-active）が、1 つのセルの書き込みは常に 1 つのリージョンで行う。決定は [ADR-0031](../decisions/0031-active-active-cells.md)（proposed）。
+S3（確定 50,000 件/秒、加盟店 100 万、NFR-001 の 99.995%）では、スタック一式をセルとして複製し、**セルごとに「主のリージョン」を東京か大阪に置く**。全体としては両方のリージョンで決済を受ける（active-active）が、1 つのセルの書き込みは常に 1 つのリージョンで行う。決定は [ADR-0031](../decisions/0031-active-active-cells.md)。
 
 ```
                     ┌─────────────────────────────────────────────┐

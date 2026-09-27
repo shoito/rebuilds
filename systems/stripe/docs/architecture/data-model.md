@@ -119,4 +119,4 @@ API キーの行の検索は RLS の前に要るので、`SECURITY DEFINER` の�
 | 段階 | 変化 |
 | --- | --- |
 | S2 | 台帳と、同じトランザクションで書く状態のテーブル（決済・返金・入金）を `account_id` のハッシュで同じシャードに置く（仮想のシャード 1,024 → 物理のクラスタ。[ADR-0016](../decisions/0016-hot-accounts-and-ledger-sharding.md)）。Webhook の配信の表を配信専用のクラスタへ移す（[events-and-webhooks.md](events-and-webhooks.md) の 11 節） |
-| S3 | 加盟店をセルに固定し、テナントのデータはセルの中に閉じる。キー → アカウント → セルの対応表をセルの外（Global）に置く（[ADR-0031](../decisions/0031-active-active-cells.md)、proposed） |
+| S3 | 加盟店をセルに固定し、テナントのデータはセルの中に閉じる。キー → アカウント → セルの対応表をセルの外（Global）に置く（[ADR-0031](../decisions/0031-active-active-cells.md)） |

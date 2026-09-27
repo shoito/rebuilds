@@ -53,3 +53,5 @@ Slack では、利用者が指定した URL への送信を、VPC に接続し�
 - SSRF のテスト：拒否すべきアドレス、内部を指すリダイレクト、DNS の再バインドで送信されない。
 - IaC の検査：egress VPC にピアリング・TGW・VPC エンドポイントがない。Lambda の実行ロールの権限がログの書き込みだけ。`lambda:InvokeFunction` を持つのは webhook-sender だけ。
 - 合成監視：外部の受け手に届いた Webhook の送信元の IP が、公開の一覧に含まれる。
+
+> 2026-09-28 の注記（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md) との関係）：Confirmation で使う本家の `stripe-node` は、互換を確かめるテストの道具としてだけ使う。本システムの署名と検証の実装は自前で書き、製品のコード・依存に `stripe-node` を入れない。テストの依存に置く理由は、加盟店が本家の SDK の手順で検証できることを、本家の実装そのもので確かめるためである。題材の核（署名の方式の実装）は再利用していない。

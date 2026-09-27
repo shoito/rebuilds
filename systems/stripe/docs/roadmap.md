@@ -26,7 +26,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E9 不正検知と Dispute | ルールの言語の全体、速度とリスト、外部の不正検知サービス、Dispute・照会・EFW、継続的な監視 | 未着手（外部サービスの連携は L4・L5） |
 | E10 本番運用（PCI・SLO・DR） | 負荷試験、SLO とアラート、大阪のウォームスタンバイと訓練、PCI DSS の統制と証跡、QSA、runbook | 未着手（監査のアーカイブは L6） |
 | E11 S2 への拡張 | 台帳のシャード、Webhook の配信の分離、2 社目のコネクタ、JPY 以外の通貨、検索 API、追加のサンドボックス、SSO | 未着手（S2 の判断の基準を満たしたら。[infrastructure.md](architecture/infrastructure.md) の 8 節） |
-| E12 S3 への拡張 | セル構成と東京・大阪の active-active | 未着手（ADR-0031 は proposed） |
+| E12 S3 への拡張 | セル構成と東京・大阪の active-active | 未着手 |
 
 ## Story
 

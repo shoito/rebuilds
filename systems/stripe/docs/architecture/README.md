@@ -133,7 +133,7 @@
 | [0028](../decisions/0028-dashboard-architecture.md) | ダッシュボードは公開 API を呼ぶ SPA にし、第三者のスクリプトを読み込まない |
 | [0029](../decisions/0029-multi-account-and-cde-layout.md) | AWS アカウントを PCI DSS の範囲で分け、CDE は cde-live と cde-test。本体→CDE は PrivateLink、CDE→本体は SQS だけ |
 | [0030](../decisions/0030-payments-disaster-recovery.md) | S1 から大阪にウォームスタンバイを持ち、失った決済はコネクタへの照会で回復する |
-| [0031](../decisions/0031-active-active-cells.md) | S3 で加盟店をセルに固定し、東京・大阪の active-active にする（proposed） |
+| [0031](../decisions/0031-active-active-cells.md) | S3 で加盟店をセルに固定し、東京・大阪の active-active にする |
 | [0032](../decisions/0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから加盟店単位のカナリアで広げる |
 | [0033](../decisions/0033-cde-pipeline-and-change-control.md) | CDE のコードは `cde/` に置き、ビルド・デプロイの経路と承認を本体から分ける |
 
@@ -176,5 +176,19 @@ PM の方針（本家 Stripe に寄せる、既定案）により、次のとお
 | QSA の選定、PrivateLink・指紋の扱い、附属書 A1 | E10 の QSA の事前相談 |
 | JIT の仕組み（AWS TEAM など） | E10 の PoC（ADR-0020） |
 | 検索 API の索引、読み取りの割当を止めるか | E11 の PoC と計測 |
-| Aurora DSQL のマルチリージョン（ADR-0031 の比較の対象） | トリガー・RLS を持たないことを 2026-09-27 に確認し、候補から外した。DSQL がこれらを持ったときに再評価する |
 | 本家の振る舞いで未確認のもの（手数料の丸め、`cancellation_reason`、アクセスポリシーの `code`、Webhook の自動の無効化の条件など） | 各文書の「持ち越し」に書いた Epic の Story で、本家のサンドボックスを観察して揃える |
+
+### 決定（2026-09-28、推奨案で確定）
+
+PM の方針（判断が要るところは推奨案でよい）により、法務以外の残りを次のとおり決めた。法務の確認待ち（L1〜L8）と、それに依るものは決めていない。接続先の選定、PoC、計測の項目は、上の「持ち越し」に残した。
+
+- **3D セキュアの範囲は ADR-0012 のまま**（日本で発行されたカードの CIT では常に要求）。ガイドライン 6.1 版の都度の認証の原則に沿い、MVP はリスクの判断を持たないため。本家との違いは記録に残した（[ADR-0012](../decisions/0012-3ds-via-connector.md) の 2026-09-28 の注記、[fraud.md](fraud.md) の 5 節）。
+- **決済の経路のレート制限は、全体の枠だけのまま**。正当な決済を断らないことを優先するため（[ADR-0009](../decisions/0009-rate-limiting.md)、[rate-limiting.md](rate-limiting.md) の 4.2 節）。
+- **Aurora DSQL を S3 の候補から外し、ADR-0031 を accepted にした**。トリガーと RLS がなく、台帳の制約とテナントの分離が DB で守れないため（[ADR-0031](../decisions/0031-active-active-cells.md)、[infrastructure.md](infrastructure.md) の 10 節）。
+- **境界を越える値の例外は `card_input` の 1 つだけとし、承認した**。カード会員データを含まず、使い捨てで 30 分で失効するため（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) の注記、[card-vault.md](card-vault.md) の 2 節）。
+- **DEK のキャッシュは AWS Encryption SDK の caching CMM で行う**。5 分のキャッシュをそのまま表せ、CDE に DynamoDB を足さずに済むため（[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) の 2026-09-28 の注記）。
+- **結果不明を起こすテスト用のカード番号は、`4000000000` で始まり本家の表にない番号から選ぶ**。本家の番号との衝突を CI で防げるため（[payment-methods.md](payment-methods.md) の 4・8 節）。
+- **会計への出力は、MVP では仕訳の CSV を経理が取り込む形にする**。会計システムを選ぶ前に始められるため（[payouts-and-reconciliation.md](payouts-and-reconciliation.md) の 7 節）。勘定科目の名前は法務・経理の確認待ちのまま。
+- **ダッシュボードのセッションの長さは、本システムの値（アイドル 12 時間・絶対 7 日）で確定した**。本家の値が公開されていないため（[auth-and-keys.md](auth-and-keys.md) の 3.3 節）。
+- **接続先の選定の条件と、比べる候補の絞り方を決めた**。コネクタ、収納代行、提携銀行、eKYC、不正検知、QSA を、各 Epic の Story で同じ物差しで選ぶため。どの会社にするかは選ばない（[intent.md](../intent.md) の「接続先の選定（法務以外）」）。QSA の最初の審査は、本番の加盟店を受け入れる前に受ける（[security.md](security.md) の 16 節）。
+- **本家の実装を核に使っていないことを確かめた**（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。本家の `stripe-node` は、Webhook の署名の互換を確かめるテストの道具としてだけ使い、製品のコードには入れない（[ADR-0025](../decisions/0025-webhook-signing-and-isolated-delivery.md) の 2026-09-28 の注記）。

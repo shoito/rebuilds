@@ -58,7 +58,7 @@ PCI DSS は、保存した PAN を読めない形にし（要件 3.5.1）、鍵�
   - 復号のたびに KMS を呼ぶと遅延と費用が増えるので、DEK を 5 分キャッシュする。キャッシュの間は、キーポリシーでの失効が遅れて効く。
   - HMAC 鍵の入れ替えは全件の計算し直しになり、本体の指紋の更新も伴う。
   - 本体に指紋と BIN・下 4 桁を置く扱いは、QSA の確認が要る（未検証）。
-  - AWS Encryption SDK（JavaScript）のデータキーのキャッシュを使うか、自前で書くかは、実装の `plan.md` で決める（SDK の対応状況は未検証）。
+  - DEK のキャッシュは、AWS Encryption SDK（JavaScript）の caching CMM で行う（2026-09-28 の注記）。
 
 ## Confirmation
 
@@ -69,3 +69,8 @@ PCI DSS は、保存した PAN を読めない形にし（要件 3.5.1）、鍵�
 - 鍵のローテーションと `ReEncrypt` の手順を、ステージングで年 1 回実行する（runbook の `key-rotation`）。
 
 > 2026-09-27 の注記：AWS Encryption SDK for JavaScript は、データキーのキャッシュ（caching CMM。Node.js では `NodeCachingMaterialsManager`）を持つ。Node.js では `plaintextLength` を渡さないとキャッシュされない。Node.js 版は 4.1 以降で Hierarchical keyring（ブランチキーを DynamoDB に置く）も使える（[データキーのキャッシュ](https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/implement-caching.html)、[Hierarchical keyring](https://docs.aws.amazon.com/encryption-sdk/latest/developer-guide/use-hierarchical-keyring.html)。2026-09-27 に確認）。SDK の対応状況の「未検証」はこれで解消した。自前で書く必要はなく、実装の `plan.md` では caching CMM と Hierarchical keyring のどちらを使うかを決める。
+
+> 2026-09-28 の注記：DEK のキャッシュは caching CMM（`NodeCachingMaterialsManager`）で行う。Hierarchical keyring は MVP では使わない。
+> - 理由：caching CMM は、決定の「DEK を 5 分キャッシュする」をそのまま表せる。Hierarchical keyring は、ブランチキーを置く DynamoDB を CDE に足すことになり、PCI DSS の範囲の部品が増える。
+> - 暗号化では `plaintextLength` を必ず渡す（渡さないとキャッシュされない）。キャッシュの上限は、時間 5 分に加えて、1 つの DEK で暗号化する件数でも区切る。値は E10 の負荷試験で KMS の呼び出しの数を見て決める。
+> - KMS の上限に近づいたとき（[capacity.md](../architecture/capacity.md) の 2.4 節）は、Hierarchical keyring を新しい ADR で検討する。
