@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -53,27 +53,28 @@ rebuilds の他の題材で、制御面の基盤（AWS の東京と大阪、Type
 | --- | --- |
 | API キーの認証 | SASL/PLAIN のサーバーのコールバック（本家の差し込み口）で、制御面が発行した API キーを確かめる |
 | テナントの識別 | KafkaPrincipalBuilder で、主体（principal）に論理クラスタの ID を持たせる |
-| ACL | 本家の StandardAuthorizer（KRaft）を基本にする。テナントの境界の確認を足す必要があれば、Authorizer を包む |
-| クォータ | ClientQuotaCallback でテナントの単位のクォータを掛ける。値は制御面のクォータのコーディネーターが配る（[ADR-0004](0004-logical-clusters-on-shared-physical-clusters.md)） |
+| ACL | 本家の StandardAuthorizer（KRaft）を TenantAuthorizer で包み、論理クラスタの境界を二重に確かめる（[ADR-0029](0029-tenant-scoped-acls-and-rbac.md)） |
+| クォータ | ClientQuotaCallback でテナントの単位のクォータを掛ける。値は、物理クラスタごとにデータ面に置くクォータのコーディネーターが配る（[ADR-0027](0027-dynamic-quota-coordinator-and-backpressure.md)） |
 | トピックの設定の制限 | CreateTopicPolicy・AlterConfigPolicy で、許可した設定と範囲だけを通す |
-| 階層型の保存 | RemoteStorageManager（S3）と RemoteLogMetadataManager（本家の既定のトピックの方式） |
-| テナントの名前空間 | 差し込み口では作れない。ブローカーの小さなパッチにする（[ADR-0004](0004-logical-clusters-on-shared-physical-clusters.md)） |
+| 階層型の保存 | RemoteStorageManager（S3。Aiven の Apache License 2.0 の実装を土台にし、テナントの検査と計数の層で包む。[ADR-0018](0018-s3-remote-storage-manager.md)）と RemoteLogMetadataManager（本家の既定のトピックの方式） |
+| テナントの名前空間 | 差し込み口では作れない。ブローカーの小さなパッチにする（[ADR-0004](0004-logical-clusters-on-shared-physical-clusters.md)、[ADR-0025](0025-tenant-namespace-patch.md)） |
 
 - パッチは、開発リポジトリの 1 つのディレクトリに、パッチごとの理由と関連する KIP を付けて置く。本家の新しいマイナー版が出たら当て直し、互換性と耐久性のテストを通す。
-- 本家の版は、最新のマイナー版から 2 つ以上遅らせない（delivery の領域で詳しく決める）。
+- 本家の版は、最新のマイナー版から 2 つ以上遅らせない。取り込みの手順と関門は [ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md) と [ADR-0050](0050-rolling-upgrade-gates-and-upstream-tracking.md)。
 
 ### 言語と技術
 
 | 層 | 選定 |
 | --- | --- |
 | ブローカーの拡張とパッチ | Java 21（本家に合わせる。Kotlin は使わない。本家へ提案しやすくし、ビルドを 1 つにする） |
-| 制御面、データ面のエージェント、コンソールのバックエンド | TypeScript（Hono＋Zod）。他の題材と同じ |
-| CLI、Terraform のプロバイダー | Go（Terraform Plugin Framework が Go のため） |
+| 制御面、コンソールのバックエンド | TypeScript（Hono＋Zod）。他の題材と同じ |
+| データ面のエージェント、クォータのコーディネーター | Java 21 と本家の AdminClient（[ADR-0031](0031-control-plane-reconciliation-and-agent.md)） |
+| CLI、Terraform のプロバイダー、sni-router | Go（Terraform Plugin Framework が Go のため） |
 | SNI のプロキシ | Envoy（自前のコードを書かない） |
 | 実行基盤 | AWS の東京（災害復旧は大阪）。データ面は EKS（EC2、EBS）。制御面は ECS Fargate、Aurora PostgreSQL 18、SQS |
 | IaC・可観測性 | Terraform、OpenTelemetry |
 
-- データ面のエージェントを TypeScript で書くのは、制御面と型（望ましい状態のスキーマ）を共有するため。ブローカーとの対話は Kafka の Admin API で行い、そのクライアントは KafkaJS か、保守されている Node.js のクライアントを使う。選定は control-plane-and-provisioning の領域で決める。未検証。
+- データ面のエージェントは Java 21 で書き、本家の AdminClient を使う（[ADR-0031](0031-control-plane-reconciliation-and-agent.md)）。KafkaJS は保守が止まり（最後の版は 2023-02）、confluent-kafka-javascript の管理のクライアントは ACL と設定の変更の API を持たないため（[ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md)）。望ましい状態のスキーマの正本は制御面の Zod で、CI で JSON Schema を出し、Java の型を生成する。
 
 ## Consequences
 

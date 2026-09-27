@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -36,13 +36,14 @@ intent.md の最初の価値は「既存のクライアントがそのまま動�
 ### 受け付ける API
 
 - 動かしている本家の版が広告する API と版を、そのまま広告する。版の範囲は、本家の版を上げると広がる。
+- 広告と、名前空間の表・API の表（[ADR-0006](0006-api-exposure-table-and-denial.md)）の食い違いは、CI の関門で止めるのを主な守りにする。本家が表にない API・版を広告したら CI を失敗にし、本家の版の更新は表の更新と同じ PR でしか入れない。本番に届いてしまったときは、名前空間のパッチが `UNSUPPORTED_VERSION` を返し、アラートを出す（最後の守り）。
 - 次の API は、テナントには拒否する。ApiVersions では広告したまま、本家と同じエラーコード（`CLUSTER_AUTHORIZATION_FAILED`、`TOPIC_AUTHORIZATION_FAILED`、`POLICY_VIOLATION` など、その API に定義されたもの）を返す。接続は切らない。広告から外すと、一部のクライアントや管理の道具が起動時に失敗する恐れがあるため。
   - ブローカー・コントローラーの間の API と、クラスタの構成を変える API（パーティションの再配置、ログのディレクトリの変更、リーダーの選出の強制、クォーラムの変更、フィーチャーの更新、ブローカーの登録の解除など）
   - クライアントのクォータの変更（AlterClientQuotas）。クォータは層と CU で決まる
   - SCRAM の資格情報の変更。API キーは制御面で発行する
   - 許可リストにないトピックの設定の変更（CreateTopicPolicy・AlterConfigPolicy で拒否する）
-- 拒否する API の正確な一覧と、許可するトピックの設定の一覧は、protocol-and-compatibility の領域の文書に表で持ち、開発リポジトリの spec の正本にする。
-- 共有のグループ（KIP-932）は、クォータとテストを足すまで、フィーチャーフラグで無効にしておく。無効の間は、本家で無効のときと同じ応答を返す。
+- 拒否する API の正確な一覧と、許可するトピックの設定の一覧は、[protocol-and-compatibility.md](../architecture/protocol-and-compatibility.md) の 4・5 節に表で持ち、開発リポジトリの spec の正本にする（[ADR-0006](0006-api-exposure-table-and-denial.md)、[ADR-0007](0007-topic-config-allowlist.md)）。
+- 共有のグループ（KIP-932）と Streams のグループ（KIP-1071）は、クォータとテストを足すまで、本家の機能の版（`share.version`・`streams.version`）を 0 にして無効にしておく。無効の間は、本家で無効のときと同じ応答を返す（[ADR-0024](0024-share-and-streams-groups-staging.md)）。
 
 ### 対応するクライアント
 
@@ -52,7 +53,8 @@ intent.md の最初の価値は「既存のクライアントがそのまま動�
 | librdkafka（とその上の Python・Go・.NET のクライアント） | C と、それを包む各言語 | 最新、1 年前の版 |
 | franz-go | Go | 最新 |
 | Sarama（IBM） | Go | 最新 |
-| KafkaJS | Node.js | 最新（保守の状況は未検証。止まっていれば、代わりの Node.js のクライアントを選ぶ） |
+| confluent-kafka-javascript（librdkafka の上の Node.js のクライアント） | Node.js | 最新（[ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md)） |
+| KafkaJS | Node.js | 凍結：最後の版 2.2.4（2023-02）を日次で流すが、壊れても直さない（[ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md)） |
 
 - 「対応する」とは、行列のテストが通り、問題を受け付けて直すことを指す。行列の外のクライアントも、プロトコルに沿っていれば動くが、保証はしない。
 
@@ -69,7 +71,7 @@ intent.md の最初の価値は「既存のクライアントがそのまま動�
 
 ### 版の追従と廃止
 
-- 本家の新しいマイナー版は、出てから 3 か月以内に取り込む。新しい API の版は、名前空間の表（[ADR-0004](0004-logical-clusters-on-shared-physical-clusters.md)）と行列を更新してから広告する。
+- 本家の新しいマイナー版は、x.y.0 から 3 か月以内に、x.y.1 以降を取り込む（[ADR-0008](0008-client-matrix-differential-tests-and-version-tracking.md)）。新しい API の版は、名前空間の表（[ADR-0004](0004-logical-clusters-on-shared-physical-clusters.md)）と行列を更新してから広告する。
 - 本家が古い版を取り除くとき（KIP-896 のような場合）は、本家の版の更新を遅らせてでも、6 か月前に告知する。告知の間は、該当する版で接続しているクライアントの数を、テナントごとにメトリクスとコンソールで見せる。
 - 自社の都合で、本家が受け付けている版を止めることはしない。
 
@@ -86,5 +88,6 @@ intent.md の最初の価値は「既存のクライアントがそのまま動�
 ## Confirmation
 
 - CI：上の表のテストを、決めた頻度で回し、失敗したらマージしない（日次の失敗は、次の PR をマージする前に直すか、Issue にして Dev のテックリードの判断を受ける）。
-- CI：ApiVersions の広告する API の一覧を、本家のパッチなしのブローカーと比べ、違いがないことを確かめる。
+- CI：ApiVersions の広告する API の一覧を、本家のパッチなしのブローカーと比べ、違いがないことを確かめる。広告する全ての (API, 版) が名前空間の表と API の表にあることを確かめる。
+- 監視：本番で `UNSUPPORTED_VERSION` を返した件数（目標 0。1 件でアラート）。
 - テスト名に、対応する要件の ID（`REQ-...`・`PROP-...`）を含める（ルートの AGENTS.md）。

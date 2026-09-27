@@ -7,11 +7,6 @@
 | [intent.md](intent.md) | 本質、MVP の範囲、守るべき振る舞い、成功の基準、やらないこと | PM |
 | [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、領域ごとの設計 | Dev |
 | [decisions/](decisions/README.md) | ADR の一覧 | Dev |
+| [quality.md](quality.md) | 品質戦略、耐久性テスト（障害注入と監査）、互換性テスト、テスト計画 | QA |
+| [roadmap.md](roadmap.md) | Epic と Story | PM |
 | [runbooks/](runbooks/README.md) | SLO、リリース、アラートと手順、訓練 | Ops |
-
-これから作る文書（まだない）：
-
-| 文書 | 内容 | 持ち主 |
-| --- | --- | --- |
-| `quality.md` | 品質戦略、耐久性テスト（障害注入）、互換性テスト、テスト計画 | QA |
-| `roadmap.md` | Epic と Story | PM |

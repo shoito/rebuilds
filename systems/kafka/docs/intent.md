@@ -1,7 +1,7 @@
 # Intent: Kafka をマネージドのストリーミング基盤として AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: accepted
 - Date: 2026-09-27
 
 ## Problem
@@ -12,7 +12,7 @@
 
 - パーティションの配置、複製、ブローカーの入れ替え、版の更新を、止めずに行う必要がある。
 - ディスクの容量を先に見積もって買う必要があり、負荷の山に合わせると、谷の時間は無駄になる。
-- AWS では、AZ をまたぐ複製の転送料金が、費用の大きな部分を占める（1 GB あたり送信と受信で各 $0.01。[AWS Architecture Blog](https://aws.amazon.com/blogs/architecture/exploring-data-transfer-costs-for-aws-managed-databases/)、2026-09-27 に確認。東京リージョンの単価は未検証）。
+- AWS では、AZ をまたぐ複製の転送料金が、費用の大きな部分を占める（1 GB あたり送信と受信で各 $0.01。[AWS Architecture Blog](https://aws.amazon.com/blogs/architecture/exploring-data-transfer-costs-for-aws-managed-databases/)、2026-09-27 に確認。東京の単価も同じ値であることを AWS Price List API で確かめた）。
 - 受け付けた書き込みを失わないこと、トランザクション（exactly-once）が正しく動くことを、自分で確かめる手段が乏しい。本家の実装でも、Jepsen の検証でトランザクションの問題が見つかっている（[Jepsen: Bufstream 0.1.0](https://jepsen.io/analyses/bufstream-0.1.0)。Kafka 本体の論点を含む。2026-09-27 に確認）。
 
 本家に近いサービスとして、Confluent Cloud（Kora という自社のエンジンの上で、多数のテナントが物理クラスタを共有する。[Kora の論文、VLDB 2023](https://vldb.org/pvldb/vol16/p3822-povzner.pdf)）と Amazon MSK がある。一方で、オブジェクトストレージを正本にしてディスクを持たない実装（WarpStream、AutoMQ、Redpanda の Cloud Topics）が増え、本家の Apache Kafka でも Diskless Topics（KIP-1150）が 2026-03 に採択された（[Aiven の解説](https://aiven.io/blog/kip-1150-accepted-and-the-road-ahead)、2026-09-27 に確認）。
@@ -84,7 +84,7 @@
 
 | ID | 基準 | 目標 |
 | --- | --- | --- |
-| SC-1 | 既存のアプリの移行 | 互換性のテストの対象のクライアント（Java、librdkafka、franz-go、Sarama、KafkaJS）の選んだテストの全件が通る。移行はブートストラップと資格情報の変更だけで済む |
+| SC-1 | 既存のアプリの移行 | 互換性のテストの対象のクライアント（Java、librdkafka、franz-go、Sarama、confluent-kafka-javascript。[ADR-0008](decisions/0008-client-matrix-differential-tests-and-version-tracking.md)）の選んだテストの全件が通る。移行はブートストラップと資格情報の変更だけで済む |
 | SC-2 | 受け付けた書き込みの喪失 | 障害注入のテストと本番の耐久性の監査で 0 件 |
 | SC-3 | 最初のメッセージまでの時間 | 登録から、クラスタの作成、トピックの作成、最初の produce と consume まで 5 分以内（コンソールか CLI） |
 | SC-4 | 可用性 | Standard の層で月間 99.95%（S1）、99.99%（S2） |
@@ -126,11 +126,23 @@
 | L3 | 周辺の OSS のライセンス：Confluent Community License の部品（Schema Registry など）は SaaS として提供できない前提で進める。この理解が正しいか。Apache License の代替（Apicurio Registry、Karapace など）を使うときの義務 | connectors-and-schema |
 | L4 | テナントのトピックの中身（個人データを含みうる）について、当社は委託先（処理者）として扱われるか。個人情報保護法の上の安全管理措置と、越境（大阪以外の海外に置かないこと）の約束をどう書くか | security-and-acls、infrastructure、利用規約 |
 | L5 | 他人の通信を媒介するとみなされ、電気通信事業法の届出が要るか | 提供の開始の前 |
-| L6 | SLA の返金（サービスクレジット）の条件と、リージョンの障害で失いうるデータ（S1 では大阪への複製がない）の説明 | 利用規約、SLA |
+| L6 | SLA の返金（サービスクレジット）の条件と、リージョンの障害で失いうるデータの説明。S1 では、大阪から戻せるのは写しを有効にした論理クラスタの S3 に上がった部分だけ（[ADR-0045](decisions/0045-osaka-disaster-recovery-scope.md)、NFR-009） | 利用規約、SLA |
+| L7 | 経理・税務：適格請求書の登録番号と訂正の手続き、値引き（クレジット・SLA の返金）の課税の扱い、海外の法人の利用者への消費税（電気通信利用役務の提供の区分）、使用量の生の記録の保存の期間（10 年の案） | metrics-and-billing、ADR-0039（E11） |
+| L8 | 利用規約：未払いの停止と削除の条件、停止の間の課金、BYOK のキーの取り消しを SLA の対象外にすること、監査ログ（個人データを含む）を 1 年を超えて持つか | metrics-and-billing、security-and-acls |
+
+- L3 に次の問いを足す：Confluent の Schema Registry の REST API と互換の API を自前で提供してよいか、どの表示が要るか。差分テストのために本家の Schema Registry を社内で動かしてよいか（[ADR-0040](decisions/0040-own-schema-registry.md)）。
+- L7・L8 は法務・経理の確認待ちとして扱い、確認が済むまで該当する E11 の Story の spec を承認しない。
 
 ## Open questions
 
-- データ面の Kubernetes の上の運用に、既存のオペレーター（Strimzi など）を使うか、自前で作るか（control-plane-and-provisioning の領域で決める）。
-- テナントの名前空間を、ブローカーのパッチで作るか、Kafka のプロトコルを理解するプロキシ（Kroxylicious など）で作るか。ADR-0004 はブローカーのパッチを選んだ（proposed）。E1 の PoC で、パッチの量と、本家の版の更新の手間を測る。
-- ディスクレスのトピックを、本家の実装を待って提供するか、先に自前で作るか（ADR-0002）。
-- 容量の単位（CU）の定義と値段（metrics-and-billing の領域で決める）。
+統合の工程（2026-09-27）で次のとおり決めた。
+
+- データ面のオペレーター：Strimzi を使い、自前では作らない（[ADR-0032](decisions/0032-strimzi-for-physical-clusters.md)）。
+- テナントの名前空間：ブローカーのパッチで作る（[ADR-0025](decisions/0025-tenant-namespace-patch.md)）。E1 の PoC で、パッチの量と本家の版の更新の手間を測り、多すぎればプロキシの案を見直す。
+- ディスクレスのトピック：本家が冪等とトランザクションに対応してから出す（[ADR-0020](decisions/0020-diskless-topics-adoption.md)）。
+- CU の定義：[ADR-0037](decisions/0037-capacity-unit-definition.md)。値段の形は [ADR-0039](decisions/0039-jpy-billing-and-free-tier.md)（パーティション-時の課金を含む。PM・Dev の確認待ち）。単価の値は PM が E11 で決める。
+
+残る問い：
+
+- NFR-009 の約束の書き方（大阪から戻せる範囲。[architecture/README.md](architecture/README.md) の 3 節）を、PM が SLA と利用規約（L6）と合わせて確定する。
+- パーティション-時の課金と、NFR-010 の目標の改定（同じく 3 節）を、PM と Dev が確定する。

@@ -6,13 +6,14 @@ Kafka（マネージドのストリーミング基盤）の再構築の設計。
 
 - [docs/intent.md](docs/intent.md) — 何を、なぜ作るか
 - [docs/architecture/](docs/architecture/README.md) — 全体像、規模の段階、非機能要件、領域ごとの設計
-- [docs/decisions/](docs/decisions/README.md) — ADR。特に 0001（本家のブローカーを使う）、0002（保存の方式）、0005（互換性の方針）
+- [docs/decisions/](docs/decisions/README.md) — ADR。特に 0001（本家のブローカーを使う）、0002（保存の方式）、0005（互換性の方針）、0025（名前空間のパッチ）、0029（ACL）、0031（反映とエージェント）
+- [docs/quality.md](docs/quality.md)・[docs/roadmap.md](docs/roadmap.md)・[docs/runbooks/](docs/runbooks/README.md) — 品質の戦略、Epic と Story、運用
 
 ## この題材に固有の規則（開発リポジトリで守る）
 
 - **受け付けた書き込みを失わない。** 複製・ログ・階層型の保存・トランザクション・グループのコーディネーター・リーダーの選出に触れる変更は、障害注入の耐久性テスト（Jepsen の形。ノードの停止、ネットワークの分断、時計のずれ、ディスクの遅延、AZ の喪失）を通す。`acks=all` で成功を返した書き込みが消える、読めない、順序が変わる事象が 1 件でも出たら、マージしない（ADR-0002、ADR-0003）。
 - **耐久性の既定値をテナントに変えさせない。** マルチ AZ のトピックの `replication.factor=3`、`min.insync.replicas=2`、`unclean.leader.election.enable=false` は、テナントの設定の API で変えられないようにする。変えるときは ADR を先に書く（ADR-0002、ADR-0004）。
-- **プロトコルの振る舞いを変える変更には、互換性のテストを通す。** 要求の処理、API の版、エラーコード、許可・拒否する API の一覧に触れる PR は、クライアントの行列（Java のクライアント、librdkafka、franz-go、Sarama、KafkaJS）と、本家のブローカーとの差分テストを通す。動いていたクライアントの版を壊す変更は、[ADR-0005](docs/decisions/0005-compatibility-policy.md) の廃止の手順を踏むまで入れない。
+- **プロトコルの振る舞いを変える変更には、互換性のテストを通す。** 要求の処理、API の版、エラーコード、許可・拒否する API の一覧に触れる PR は、クライアントの行列（Java のクライアント、librdkafka、franz-go、Sarama、confluent-kafka-javascript。KafkaJS は凍結で、壊れても直さない。[ADR-0008](docs/decisions/0008-client-matrix-differential-tests-and-version-tracking.md)）と、本家のブローカーとの差分テストを通す。動いていたクライアントの版を壊す変更は、[ADR-0005](docs/decisions/0005-compatibility-policy.md) の廃止の手順を踏むまで入れない。
 - **本家のブローカーへの手の入れ方を最小にする。** まず本家の差し込み口（Authorizer、RemoteStorageManager、ClientQuotaCallback、KafkaPrincipalBuilder、CreateTopicPolicy・AlterConfigPolicy）で作る。本家のコードへのパッチは、テナントの名前空間など差し込み口で作れないものに限る。パッチを足すときは ADR を書き、パッチごとに理由と関連する KIP を記録する（ADR-0001、ADR-0004）。
 - **テナントの分離をアプリのコードの注意だけに頼らない。** ブローカーに届くすべての要求は、テナントの解決（論理クラスタの ID の付与）を通る。新しい API の版・要求の種類を通すときは、他のテナントの資源が見えないことの性質ベーステストを付ける（ADR-0004）。
 - **利用者のデータをログに出さない。** レコードの値・キー・ヘッダー、API キーの秘密、SASL の資格情報を、ログ・エラーの本文・トレースの属性・メトリクスのラベル・テストのスナップショットに書かない。
