@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -38,7 +38,12 @@ date: 2026-09-27
 ### 状態機械
 
 - 乗車（`trips`）の状態の遷移は、Trips のサービスの 1 つの遷移関数だけが行う。遷移関数は、（今の状態、事象）から（次の状態、副作用の一覧）を返す純粋な関数と、それを 1 つのトランザクションで書き込む部分に分ける。
-- 状態：`requested` → `offered` → `accepted` → `arriving` → `arrived` → `on_trip` → `completed`。途中から `cancelled_by_rider`・`cancelled_by_driver`・`no_driver_found`・`no_show` に移れる。細部は trips-lifecycle で決める。
+- 状態：`payment_pending` → `requested` → `offered` → `accepted` → `arriving` → `arrived` → `on_trip` →（`awaiting_fare` →）`completed`。途中から `cancelled_by_rider`・`cancelled_by_driver`・`cancelled_by_system`・`no_driver_found`・`no_show`・`payment_failed` に移れる（統合の工程で [ADR-0021](0021-trip-transition-function-and-assignment-fencing.md) の状態を取り込んだ）。
+  - `payment_pending`：アプリの決済では、与信が通るまで配車しない。車内で払う乗車は飛ばす。
+  - `awaiting_fare`：降車の後、メーターの額が未定か保留の間。ドライバーはこの状態で割り当てから外れる。
+  - `cancelled_by_system`：運用・安全の担当が終える。
+  - `payment_failed`：与信の失敗か時間切れ。
+  - ドライバーの取り消しは、理由が安全・乗客の迷惑行為のときだけ終端の `cancelled_by_driver` にし、それ以外は `requested` に戻して再配車する。細部と遷移の表は [trips-lifecycle.md](../architecture/trips-lifecycle.md) の 3 節。
 - 各行に `version` を持ち、更新は `version` の一致を条件にする（楽観ロック）。
 - 状態の変化は、同じトランザクションで outbox に書き、アプリへの配信、Pricing、Payments に流す（Slack の題材の ADR-0002 と同じ考え方）。
 
@@ -51,9 +56,10 @@ date: 2026-09-27
 
 ### 割り当ての一意性
 
-- **ドライバーごとに `assignment_epoch`（単調に増える整数）を持つ。** 配車がドライバーを提案するときは、索引から読んだ epoch を添える。
+- **ドライバーごとに `assignment_epoch`（単調に増える整数）を持つ。** epoch は割り当ての作成と解放（辞退・時間切れ・取り消し・無断キャンセル・完了）で 1 増やす（[ADR-0021](0021-trip-transition-function-and-assignment-fencing.md)）。配車がドライバーを提案するときは、索引から読んだ epoch を添える。
+- **比較は `(region_gen, assignment_epoch)` の組で行う。** `region_gen` は大阪への切り替えのたびに 1 上がる世代で、切り替えで失われた epoch の増分と同じ値が新しいリージョンで再び使われても取り違えない（[ADR-0039](0039-city-cells-and-osaka-warm-standby.md)）。以下の「epoch」の一致は、すべてこの組の一致を指す。
 - Trips は、1 つのトランザクションで次を行う。
-  1. ドライバーの行を `FOR UPDATE` で取り、epoch が提案と一致し、ドライバーが割り当て可能な状態であることを確かめる。
+  1. 乗車の行、ドライバーの行の順に `FOR UPDATE` で取り、`(region_gen, assignment_epoch)` が提案と一致し、ドライバーが割り当て可能な状態であることを確かめる。
   2. epoch を 1 増やし、オファーを作り、乗車を `offered` にする。
 - **DB の一意の制約を最後の砦にする。** `driver_assignments` に、ドライバーごとに有効な割り当て（`offered`・`accepted`・`arriving`・`arrived`・`on_trip`）が 1 行しかない部分一意索引と、乗車ごとに有効な割り当てが 1 行しかない部分一意索引を置く。
 - ドライバーの受諾は、offer ID と epoch つきで送る。epoch が今の値と違えば、受諾を拒否し、アプリに「このオファーは無効」と返す。
@@ -71,12 +77,12 @@ date: 2026-09-27
   - 二重の割り当ては、配車の不具合があっても DB の制約で止まる。
   - 状態と時間の管理が 1 つの DB にあり、1 つのトランザクションで整合する。
 - 引き受けるコスト：
-  - Trips の DB の書き込みが、配車の依頼と遷移の数に比例する。S1 のピークで依頼 30 件/秒 × 遷移 10 回程度で、Aurora の writer 1 台で足りると見込む。S3（600 件/秒）では、都市ごとに DB を分ける（infrastructure と capacity で扱う）。
+  - Trips の DB の書き込みが、配車の依頼と遷移の数に比例する。S1 のピークで、受け付けの依頼 30 件/秒 × 約 4 回と、成立する乗車 約 3〜6 件/秒 × 約 10 回で、遷移は約 180 件/秒（[capacity.md](../architecture/capacity.md) の 1.1 節）。Aurora の writer 1 台で足りると見込む。S3（受け付け 600 件/秒）では、都市ごとに DB を分ける（infrastructure と capacity で扱う）。
   - タイマーの処理を自前で持つ。遅れの監視（最古の期限切れの行の経過時間）を置く。
 
 ## Confirmation
 
 - DB の制約：同じドライバーに 2 つ目の有効な割り当てを入れるコミットが失敗する。
-- 性質ベーステスト：任意の順序と重複の、提案・受諾・辞退・時間切れ・取り消し・配車のプロセスの切り替えの列の後で、どの時点でもドライバーごと・乗車ごとの有効な割り当ては高々 1 つである。
+- 性質ベーステスト：任意の順序と重複の、提案・受諾・辞退・時間切れ・取り消し・配車のプロセスの切り替え・リージョンの切り替え（epoch の増分の損失）の列の後で、どの時点でもドライバーごと・乗車ごとの有効な割り当ては高々 1 つである。
 - 決定表：遷移関数の（状態、事象）の組をすべて表にし、表駆動テストで確かめる。
 - 本番の監視：有効な割り当てが 2 つある行を探す検査を 1 分ごとに流し、1 件でも SEV1 とする。

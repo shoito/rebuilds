@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -41,7 +41,7 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 ### サーバー
 
 - 実行基盤・IaC・可観測性・フラグ・ブランチの運用は、Slack の ADR-0007・0011・0020・0021・0026 と同じにする。Aurora PostgreSQL は 18 を使う。
-- **位置の取り込み、地理空間の索引、配車は Go で書く。** 理由は次のとおり。
+- **位置の取り込み、地理空間の索引、配車は Go で書く。** 常時の接続の受け手（`rt-gateway`、[ADR-0030](0030-realtime-grpc-bidirectional-stream-gateway.md)）と、乗客への車の位置の配信（`trip-location-fanout`、ADR-0030・[ADR-0038](0038-compute-on-fargate-and-data-stores.md)）も、同じ理由（多数の接続と位置の流れをメモリで扱う）で Go にする。Go のサービスは、この 5 つ（`loc-ingest`、`geo-index`、`dispatch`、`rt-gateway`、`trip-location-fanout`）とする（統合の工程で 3 つから 5 つにした）。理由は次のとおり。
   - メモリ上の共有の状態と、多数の同時の処理（goroutine とチャネル）を、単純な書き方で扱える。
   - コンパイルとテストが速く、エージェントの確認ループが短い。学習データも多い。
   - H3 の公式の束縛（h3-go）と、gRPC・Protocol Buffers の成熟した実装がある。h3-go は C の実装を cgo で呼ぶ。ビルドの手順への影響は E3 で確かめる（**未検証**）。
@@ -72,7 +72,7 @@ rebuilds の他の題材（Slack・Stripe・GitHub・Notion）で、次の基盤
 
 ## Confirmation
 
-- Go のサービスは、位置の取り込み・地理空間の索引・配車の 3 つに限る。新しい Go のサービスは ADR を要する（レビューで確かめる）。
+- Go のサービスは、`loc-ingest`・`geo-index`・`dispatch`・`rt-gateway`・`trip-location-fanout` の 5 つに限る。新しい Go のサービスは ADR を要する（レビューで確かめる）。同じ領域の付随の役として別の ADR が認めたもの（位置の取り込みの `trail-builder`（[ADR-0010](0010-location-trails-map-matching-and-retention.md)）、配車の影の実行の `dispatch-shadow`（[ADR-0042](0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)）、Valhalla の前の層の `eta-service`（[ADR-0016](0016-valhalla-serving-traffic-and-eta-accuracy.md)・[ADR-0035](0035-ml-feature-store-and-shadow-rollout.md)））は、その ADR を根拠とし、5 つに数えない。
 - lint：金額の型以外で、金額を `number`・`float64` として扱うコードを禁止する。
 - E3 の負荷試験で、S1 のピークの 2 倍（位置 5,000 件/秒）のときの索引への反映の p99 と GC の停止を計測し、NFR-002 を満たすことを確かめる。
 - 両方のアプリで、状態遷移の表のテストのベクターが通ることを CI で確かめる。
