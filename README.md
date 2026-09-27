@@ -17,7 +17,7 @@
 | [Notion](systems/notion/) | ドキュメント / DB | ブロックモデル、共同編集（CRDT）、権限、シャーディング | 設計済み |
 | [Auth0](systems/auth0/) | 認証基盤（CIAM） | OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離 | 設計済み |
 | [Figma](systems/figma/) | デザインツール | 中央の権威サーバーでの共同編集、WebGL / WASM での描画、巨大なドキュメント | 設計済み |
-| Kafka | 分散ログ（マネージドのストリーミング） | パーティションと複製、exactly-once、階層型の保存 | 設計中 |
+| [Kafka](systems/kafka/) | 分散ログ（マネージドのストリーミング） | パーティションと複製、exactly-once、階層型の保存 | 設計済み |
 | Zoom | ビデオ会議 | WebRTC、SFU、帯域の推定、低遅延、録画 | 設計中 |
 | Uber | 配車のマーケットプレイス | マッチング、地理空間の索引、動的な料金、リアルタイムの位置 | 設計中 |
 | Cloudflare Workers | エッジのサーバーレス | V8 isolate での隔離、グローバルな配信、エッジのストレージ | 設計中 |
