@@ -60,7 +60,7 @@ SFU の実装の候補を比べた（いずれも 2026-09-27 に確認）。
 - 2 は、始めるのが最も速い。ただし、自前でホストすると 1 つの部屋が 1 台に収まる必要があり、1,000 人の会議（S3）ではカスケードを自分で足すことになる。部屋・シグナリングの仕組みも LiveKit のものになり、[ADR-0005](0005-meeting-state-and-signaling.md) の会議の状態の設計と重なる。制御の言語に Go が加わる。
 - 3 は、作って試験する量が大きすぎる。帯域の推定や層の切り替えの誤りは、ネットワークの劣化の下でしか見えず、発見が遅れる。
 - 4 は、Fargate のタスクに多数の UDP のポートを直接開けにくく、インスタンスの網の性能を選べない。
-- 5 は、立ち上がりの時期（同時の参加者が数千人まで）では、運用の負担と固定費が転送の費用の差に見合わない。ただし、AWS とコロケーションの損益の分かれ目はピークの送出で約 8〜10 Gbps で（[infrastructure.md](../architecture/infrastructure.md) の 12.3 節。**未検証**の仮定を含む）、S1 の途中で越えうる。そこで、S1 は AWS で始め、ピークの送出が 4 週続けて 10 Gbps を超えたら、Media Node と TURN だけを置く Edge（コロケーション・ベアメタル）の構築を始める（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）。移しやすくするため、S1 の着手から、BYOIP の範囲（[ADR-0049](0049-media-node-fleet.md)）、AMI とベアメタルのイメージの共通の定義、Media Assignment Service の場所（`site`）の属性を用意する。
+- 5 は、立ち上がりの時期（同時の参加者が数千人まで）では、運用の負担と固定費が転送の費用の差に見合わない。ただし、AWS とコロケーションの損益の分かれ目はピークの送出で約 8〜10 Gbps で（[infrastructure.md](../architecture/infrastructure.md) の 12.3 節。**未検証**の仮定を含み、E12 の `edge-evaluation` で確かめる）、S1 の途中で越えうる。そこで、S1 は AWS で始め、ピークの送出が 4 週続けて 10 Gbps を超えたら、Media Node と TURN だけを置く Edge（コロケーション・ベアメタル）の構築を始める（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）。移しやすくするため、S1 の着手から、BYOIP の範囲（[ADR-0049](0049-media-node-fleet.md)）、AMI とベアメタルのイメージの共通の定義、Media Assignment Service の場所（`site`）の属性を用意する。
 
 ## Consequences
 

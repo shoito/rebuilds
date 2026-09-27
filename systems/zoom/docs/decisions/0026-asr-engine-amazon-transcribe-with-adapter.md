@@ -13,11 +13,14 @@ date: 2026-09-27
 
 - Amazon Transcribe は ja-JP を batch と streaming の両方で扱う。東京（ap-northeast-1）にストリーミングのエンドポイントがあり、ja-JP は東京で streaming が使えない言語に入っていない（[Supported languages](https://docs.aws.amazon.com/transcribe/latest/dg/supported-languages.html)、[endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)）。
 - ストリーミングは PCM・FLAC・Ogg の Opus を受ける。16 kHz を勧め、塊は 50〜200ms（[Transcribing streaming audio](https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html)）。
-- 同時の流れは既定で 1 リージョン 25（引き上げの申請ができる）。1 つの流れの長さには引き上げられない上限がある（同上）。上限の値は 4 時間とされる（未検証）。
+- 同時の流れは既定で 1 リージョン 25（引き上げの申請ができる）。1 つの流れの長さには引き上げられない上限がある（同上）。上限は 4 時間（[Transcribe の FAQ](https://aws.amazon.com/transcribe/faqs/)）。
+- Transcribe は大阪（ap-northeast-3）に batch・streaming のどちらの受け口もない（[endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)）。
+- カスタム語彙はすべての対応言語で使える（[Custom vocabularies](https://docs.aws.amazon.com/transcribe/latest/dg/custom-vocabulary.html)）。
+- 東京の streaming の料金は 1 秒 0.0001667 USD（1 分 0.01 USD）（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/transcribe/current/ap-northeast-1/index.json)）。
 - 途中の結果の安定化がある（[Streaming and partial results](https://docs.aws.amazon.com/transcribe/latest/dg/streaming-partial-results.html)）。
 - 話者の区別は streaming でも使え、最大 30 人（[Partitioning speakers](https://docs.aws.amazon.com/transcribe/latest/dg/diarization.html)）。
-- 日本語の CER、遅れ、料金は確かめていない（未検証）。
-- Whisper 系のモデルは、そのままではストリーミングに向かず、区切って処理する必要がある（未検証）。
+- 日本語の CER と遅れは確かめていない（**未検証**。E8 の `asr-evaluation-set` で測る）。
+- Whisper は、音声を 30 秒の窓で処理する（[openai/whisper の README](https://github.com/openai/whisper)）。そのままではストリーミングに向かず、区切って処理する必要がある。
 
 SFU は参加者ごとに音声の producer を持つので、参加者ごとの音声を別々に取り出せる。
 
@@ -51,7 +54,8 @@ SFU は参加者ごとに音声の producer を持つので、参加者ごとの
   - エンジンを替えても、ASR Adapter の外は変わらない。
 - 引き受けるコスト：
   - 流れの数が「話している人の数」に比例する。1 会議 4 枠でも、同時の会議が多いと、既定の上限 25 をすぐに超える。
-  - 枠を返すまでの無音も送るので、費用に入る（未検証）。
+  - 枠を返すまでの無音も送るので、費用に入る（streaming は音声の秒で数える。1 回の枠の返却までに最大 20 秒、約 0.0033 USD）。
+  - 東京のリージョンの障害で大阪に切り替えている間は、字幕と文字起こしを止める（大阪に Transcribe がない。[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）。
   - 会議の音声を外部の事業者（AWS）の音声認識に渡す。委託と外国にある第三者の整理は L6 に従う。
   - 1 本のマイクを複数の人で使う会議では、話者を分けられない（MVP では受け入れる）。
 

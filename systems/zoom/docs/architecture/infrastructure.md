@@ -14,7 +14,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 
 負荷と台数の根拠は [capacity.md](capacity.md)、監視は [observability.md](observability.md)、CI とリリースは [delivery.md](delivery.md)、統制と鍵は [security.md](security.md) にある。
 
-数値のうち「初期見積もり」と書いたものは、E7・E12 の負荷試験の前の仮の値である。AWS の仕様で確かめていないものは「未検証」と書く。
+数値のうち「初期見積もり」と書いたものは、E7・E12 の負荷試験の前の仮の値である。AWS の仕様で確かめていないものは「未検証」と書き、確かめる Story を添える。
 
 ## 1. AWS アカウントの構成
 
@@ -50,7 +50,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | isolated | Aurora、ElastiCache（Valkey） | なし |
 
 - 入口は CloudFront → ALB だけ。ALB は CloudFront のマネージドプレフィックスリストだけを許す（他の題材と同じ）。
-- **シグナリングの WebSocket も CloudFront を通す。** CloudFront は WebSocket を通し、HTTP/1.1 だけに対応する（[Use WebSockets with CloudFront distributions](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-working-with.websockets.html)、2026-09-27 に確認）。WAF と Shield Advanced を参加の経路の全体に掛けるため。長い接続の切れ方（CloudFront の側の時間切れ）は**未検証**で、E2 で 5 秒ごとの `ping` のもとで 8 時間の接続を試す。
+- **シグナリングの WebSocket も CloudFront を通す。** CloudFront は WebSocket を通し、HTTP/1.1 だけに対応する（[Use WebSockets with CloudFront distributions](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-working-with.websockets.html)、2026-09-27 に確認）。WAF と Shield Advanced を参加の経路の全体に掛けるため。CloudFront の文書は WebSocket の接続の長さの上限を書いていない。オリジンの応答の時間切れ（既定 30 秒）はパケットの間の待ちにも掛かり、応答の完了の時間切れは設定しなければ掛からない（[Origin settings](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html)、2026-09-27 に確認）。5 秒ごとの `ping` でこの時間切れに掛からない見込みだが、長い接続の切れ方は**未検証**で、E2 の `signaling-via-cloudfront` で 8 時間の接続を試す。応答の完了の時間切れは設定しない。
 - VPC エンドポイント：S3、ECR、SQS、KMS、Secrets Manager、CloudWatch Logs、STS、X-Ray、AppConfig、Private CA、Kinesis Data Firehose。
 
 ### 2.2 media-prod の VPC（東京。S2 から大阪も同じ形）
@@ -87,8 +87,8 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | 同じリージョンの中（AZ の間、または Elastic IP を使う通信） | 0.01（向きごと） |
 | 東京 → 大阪 | 0.09 |
 
-- **TURN と Media Node の間**（両方の公開の IP の間。[network-traversal.md](network-traversal.md) の 7.2 節の持ち越し）は、「Elastic IP を使う同じリージョンの中の通信」に当たり、0.01 USD/GB を送る側と受ける側で払う読みにする。インターネットへの転送の料金にはならない見込み（**未検証**：請求の明細で E2 に確かめる）。
-- 同じ AZ の中の VPC のピアリングの通信の料金は**未検証**（E1 で確かめる）。
+- **TURN と Media Node の間**（両方の公開の IP の間。[network-traversal.md](network-traversal.md) の 7.2 節の持ち越し）は、「Elastic IP を使う同じリージョンの中の通信」に当たり、0.01 USD/GB を向きごとに払う。料金のデータの説明は「regional data transfer - in/out/between EC2 AZs or using elastic IPs or ELB」で、インターネットへの転送の料金にはならない（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/ap-northeast-1/index.json) の `APN1-DataTransfer-Regional-Bytes`、2026-09-27 に確認）。
+- VPC のピアリングの通信は、同じ AZ の中なら無料（アカウントをまたいでも）、AZ をまたぐと向きごとに 0.01 USD/GB（[Amazon VPC Announces Pricing Change for VPC Peering](https://aws.amazon.com/about-aws/whats-new/2021/05/amazon-vpc-announces-pricing-change-for-vpc-peering/)、[VPC の料金](https://aws.amazon.com/vpc/pricing/)、2026-09-27 に確認）。
 
 ## 3. Media Node の群れ
 
@@ -99,17 +99,17 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | リージョン | 標準 | 予備（在庫） | vCPU | 帯域 | worker | 1 時間の料金（オンデマンド） |
 | --- | --- | --- | --- | --- | --- | --- |
 | 東京 | c8gn.16xlarge | c7gn.16xlarge | 64 | 200 Gbps（インターネットへは 50% の 100 Gbps） | 62 | 4.775 USD（c7gn は 5.0368 USD） |
-| 大阪 | c6gn.16xlarge | c6in.32xlarge | 64 | 100 Gbps（同 50 Gbps） | 62 | 3.495 USD |
+| 大阪 | c6gn.16xlarge | c6in.32xlarge、c8g.16xlarge | 64 | 100 Gbps（同 50 Gbps） | 62 | 3.495 USD |
 
 仕様は [コンピューティング最適化のネットワークの仕様](https://docs.aws.amazon.com/ec2/latest/instancetypes/co.html)、料金は [料金のデータ（東京）](https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-ondemand-without-sec-sel/Asia%20Pacific%20(Tokyo)/Linux/index.json)・[同（大阪）](https://b0.p.awsstatic.com/pricing/2.0/meteredUnitMaps/ec2/USD/current/ec2-ondemand-without-sec-sel/Asia%20Pacific%20(Osaka)/Linux/index.json)、いずれも 2026-09-27 に確認。インターネットへの上限は [EC2 のネットワークの帯域](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)（同日に確認）。
 
-- 大阪には c7gn・c8gn がない（上の料金のデータに無い）。大阪の 1 台の上限は、東京と別に負荷試験で求める。
+- 大阪には c7gn・c8gn がない。大阪で提供されるのは c6gn・c6in・c8g で、東京は c6gn・c7gn・c8gn・c8g のすべてを 3 つの AZ（apne1-az1・az2・az4）で提供する（`DescribeInstanceTypeOfferings`、2026-09-27 に確認）。大阪の 1 台の上限は、東京と別に負荷試験で求める。
 - **網の性能を使い切らない見込み。** [capacity.md](capacity.md) の 3 節の見積もりでは、S1 の会議の組み合わせで 1 台の送出は 3〜4 Gbps のうちに consumer と CPU が上限に来る。その場合、c8g.16xlarge（30 Gbps、インターネットへは 15 Gbps、3.2019 USD/時）で足り、約 3 割安い。E7 で両方を測って決める（ADR-0049）。
 
 ### 3.2 AMI
 
 - EC2 Image Builder で作る。中身：Amazon Linux（arm64）、ENA のドライバ（`conntrack_allowance_available` のため 2.8.1 以上）、Node Agent（Node.js）、mediasoup の worker（本システムのフォークの版を固定）、`nftables` の規則、CloudWatch エージェント（ENA の指標）、ADOT Collector。
-- worker を CPU のコアに固定する設定、カーネルの UDP の受信の緩衝の大きさ、IRQ の割り当てを AMI に入れる（値は E7 で決める。**未検証**）。
+- worker を CPU のコアに固定する設定、カーネルの UDP の受信の緩衝の大きさ、IRQ の割り当てを AMI に入れる（値は**未検証**。E7 の `load-l0-l2` で決める）。
 - Node の上に人の SSH の鍵を置かない。入るのは SSM Session Manager だけ（[security.md](security.md) の 7 節）。
 - 同じ定義から、コロケーション向けのベアメタルのイメージも作れる形にしておく（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。
 
@@ -125,16 +125,16 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 - /24 は 256 個。S1 の東京の最大（Media Node 27 台＋入れ替えの 27 台＋TURN 12 台＋ウォームプール 6 台で約 72）に足りる。
 - BYOIP の範囲が E1 に間に合わないときは、AWS の連続したブロック（/28〜/30、既定で 2 つまで。[IPAM の連続した EIP](https://docs.aws.amazon.com/vpc/latest/ipam/tutorials-eip-pool.html)、2026-09-27 に確認）で始め、上限の引き上げを申請する。
 - EIP の付け外しはライフサイクルフックの Lambda が行う。Node のロールには与えない（ADR-0049）。
-- 公開の IPv4 は 1 つ 1 時間 0.005 USD（[VPC の料金](https://aws.amazon.com/vpc/pricing/)、2026-09-27 に確認）。BYOIP の範囲の IP にこの料金がかかるかは**未検証**。
+- 公開の IPv4 は 1 つ 1 時間 0.005 USD。BYOIP で持ち込んだ IPv4 には、この料金がかからない（[VPC の料金](https://aws.amazon.com/vpc/pricing/)、2026-09-27 に確認）。BYOIP のプールから取った EIP は、EIP の数の上限（既定でリージョンに 5）に数えない（[Elastic IP addresses](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)、同日に確認）。AWS の連続したブロックには別の料金がかかる（同上の IPAM の文書）。
 
 ### 3.4 配置と増減
 
-- AZ ごとに 1 つの Auto Scaling グループ。東京は ap-northeast-1a・1c・1d の 3 つ。
+- AZ ごとに 1 つの Auto Scaling グループ。東京は AZ ID で apne1-az1・az2・az4 の 3 つ（apne1-az3 は新しいアカウントで使えない。AZ の名前はアカウントごとに対応が違うので、Terraform は AZ ID で指定する。`DescribeAvailabilityZones`、2026-09-27 に確認）。
 - 台数は、1 つの AZ を失っても残りの 2 つでピークを受けられるように持つ（AZ ごとにピークの半分の容量）。付け替えの予備の Node は別の AZ から選ぶ（[ADR-0012](../decisions/0012-media-assignment-and-cascading.md)）。
 - **増やす**：
   - 指標：Media Assignment Service が出す `fleet_headroom{az}`（点が 0.7 未満の Node の、0.7 までの空きの合計を参加者の数に直したもの）。AZ ごとの目標（ピークの 1 時間の増加の見込み、初期見積もり 1,500 人）を下回ったら 1 台ずつ足す。
   - 予測：Worker が、翌日の予定の会議の招待の数から時間ごとの見込みを作り、Auto Scaling のスケジュールのアクションで前もって台数を上げる（平日の 8 時半〜10 時の立ち上がり）。
-  - ウォームプール：AZ ごとに停止した台を 2 台。起動から `active` までの時間は**未検証**（E1 で測る。目標 90 秒）。
+  - ウォームプール：AZ ごとに停止した台を 2 台。起動から `active` までの時間は**未検証**（E2 の `media-fleet-asg` で測る。目標 90 秒）。
 - **縮める**：インスタンスは縮める保護を付けて起動する。Assignment Service が点の低い Node に `node.drain` を送り、会議が 0 になった台だけ、保護を外して終了させる（[media-server-sfu.md](media-server-sfu.md) の 10 節）。最小は AZ ごとに 2 台。
 - **drain の上限**：自然に終わるのを 4 時間まで待つ。夜間の縮める操作は、4 時間を待たず make-before-break で移してよい（利用者の少ない時間。移動の途切れは数百 ms の見込み）。
 
@@ -152,21 +152,21 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 
 | 段階 | メディアの場所 | 選び方 | 備考 |
 | --- | --- | --- | --- |
-| S1 | 東京の 3 AZ（大阪は最小の台数で待機） | 全会議を東京 | 西日本の参加者も東京へ（東京と大阪の間の RTT の分が増える。**未検証**） |
+| S1 | 東京の 3 AZ（大阪は最小の台数で待機） | 全会議を東京 | 西日本の参加者も東京へ（東京と大阪の間の RTT の分が増える。値は**未検証**で、E2 の `qos-report-pipeline` の RTT で測る） |
 | S2 | 東京と大阪 | 会議のリージョンを、主催者の組織の設定か、最初の参加者の位置（西日本か）で決める。1 会議は 1 リージョン | 大阪は c6gn・c6in で始める |
-| S3 | 東京、大阪、海外のリージョン（候補はシンガポールと米国の西海岸。**未検証**）、国内の Edge | 参加者の近くの Node へつなぎ、リージョンの間をカスケードでつなぐ（[media-server-sfu.md](media-server-sfu.md) の 8.4 節） | Edge の判断は下の閾値で S1 から始めうる |
+| S3 | 東京、大阪、海外のリージョン（候補はシンガポールと米国の西海岸。S3 の前に参加者の分布で決める）、国内の Edge | 参加者の近くの Node へつなぎ、リージョンの間をカスケードでつなぐ（[media-server-sfu.md](media-server-sfu.md) の 8.4 節） | Edge の判断は下の閾値で S1 から始めうる |
 
 - **Edge（コロケーション）**：[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)。Media Node と TURN だけを置き、制御の側と Recorder は AWS に残す。Edge と AWS は Direct Connect でつなぐ（東京の 10G のポートは 1 時間 2.142〜2.25 USD、100G は 22.5 USD。[Direct Connect の料金のデータ（東京）](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDirectConnect/current/ap-northeast-1/index.json)、2026-09-27 に確認）。
-- Media Assignment Service は、Node の属性に `site`（`aws:ap-northeast-1a`、`edge:tyo-1` など）と `generation` を持ち、場所ごとの重みで会議を置く。
+- Media Assignment Service は、Node の属性に `site`（`aws:apne1-az1`、`edge:tyo-1` など）と `generation` を持ち、場所ごとの重みで会議を置く。
 
 ## 5. TURN
 
 | 項目 | S1 |
 | --- | --- |
-| インスタンス | c8gn.8xlarge（32 vCPU、100 Gbps、2.3875 USD/時。32 vCPU 以上の条件は ADR-0016） |
+| インスタンス | 東京は c8gn.8xlarge（32 vCPU、100 Gbps、2.3875 USD/時）、大阪は c6gn.8xlarge（32 vCPU、50 Gbps、1.7475 USD/時。大阪に c8gn がないため）。32 vCPU 以上の条件は ADR-0016 |
 | 台数 | 東京で AZ ごとに 2 台（計 6 台）、大阪で 2 台（初期見積もり。TURN を通る参加者の割合を E2 のベータで測って直す） |
 | 待ち受け | UDP・TCP 3478、TLS 443（[ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md)） |
-| 名前 | `turn-<region>-<az>-<nn>.<brand>.<domain>`（TLS の証明書のため） |
+| 名前 | `<region>-<az>-<nn>.turn.<brand>.<domain>`（ワイルドカードの証明書 `*.turn.<brand>.<domain>` のため） |
 | 増減 | Auto Scaling グループ（AZ ごと）。縮めるのは、参加の応答の一覧から外して割り当てが 0 になった台だけ |
 
 ## 6. 制御の側
@@ -174,7 +174,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | 部品 | 実行 | 初期見積もり（S1 のピーク） | 増やす基準 |
 | --- | --- | --- | --- |
 | API | ECS Fargate（Graviton） | 2 vCPU × 6 タスク | CPU 50% |
-| Signaling Gateway | 同上 | 2 vCPU × 9 タスク（1 タスク 5,000 接続の見込み。**未検証**） | 接続の数、CPU |
+| Signaling Gateway | 同上 | 2 vCPU × 9 タスク（1 タスク 5,000 接続の見込み。**未検証**で、E7 の `signaling-load-test` で測る） | 接続の数、CPU |
 | Actor Host | 同上 | 4 vCPU × 6 タスク（1 タスクの会議の上限 2,000。[signaling-and-meetings.md](signaling-and-meetings.md) の 5.3 節） | 会議の数、イベントループの遅れ |
 | Media Assignment Service | 同上 | 1 vCPU × 3 タスク | — |
 | Worker | 同上 | 1 vCPU × 6 タスク | SQS の古さ |
@@ -219,7 +219,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | 部品 | 振る舞い | 目標 |
 | --- | --- | --- |
 | Media Node | 同じ AZ の Node の会議を、別の AZ の予備の Node へ付け替える | 音声が 5 秒以内（p95） |
-| TURN | クライアントは別の AZ の TURN を候補に持つ。ICE restart | 5 秒（**未検証**） |
+| TURN | クライアントは別の AZ の TURN を候補に持つ。ICE restart | 5 秒（**未検証**。E2 の `ice-restart-flow` で測る） |
 | Actor Host | リースが切れ、別の AZ の Host が取る | 制御が 10 秒以内 |
 | Gateway | クライアントが別のタスクへ再接続 | 数秒 |
 | Aurora | Multi-AZ のフェイルオーバー | 1〜2 分（その間、失ってはならない変更だけ失敗する） |
@@ -232,7 +232,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 - 目標：新しい会議の開始と参加を、切り替えの判断から 1 時間以内に大阪で受ける（RTO 1 時間）。Aurora の RPO 1 分。**既定案**（Ops・PM の承認を要する）。
 - 進行中の会議は守らない。東京の Media Node が生きていればメディアは続くが、制御は戻らない。クライアントは 60 秒でシグナリングが戻らなければ、入り直しの画面を出す。
 - 大阪の Media Node は平時 3 台。切り替えで最大を上げる。大阪の EC2 の在庫は保証されないので、受けられる同時の参加者の数を訓練で測り、運用の上限にする。
-- 大阪で使えない・劣るもの：c7gn・c8gn（c6gn で代える）、Amazon Transcribe の大阪での提供（**未検証**。なければ字幕を止める）、進行中の録画の未合成の区切り。
+- 大阪で使えない・劣るもの：c7gn・c8gn（c6gn で代える）、Amazon Transcribe（大阪には batch・streaming のどちらの受け口もない。[Amazon Transcribe endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)、2026-09-27 に確認。大阪で受けている間は、ライブ字幕と会議の後の文字起こしを止める。東京の外の別のリージョン（ソウルなど）へ音声を送る代わりの経路は、外国にある第三者への提供（intent.md の L6）の結論まで作らない）、進行中の録画の未合成の区切り。
 
 ### 8.4 大阪の待機の構成の確認（月次）
 
@@ -302,11 +302,11 @@ plan のポリシー検査（OPA・Checkov）で、次を拒否する。
 | 同時の参加者（ピーク） | 1.8 万人（S1 の 60%）を 2 週続けて超える | 18 万人（S2 の 60%） |
 | 1 会議の人数の要望 | 100 人を超える会議の契約の見込み | 300 人を超える会議の契約の見込み |
 | 東京の Media Node の台数（ピーク） | 45 台を超える | — |
-| 西日本の参加者 | 参加者の 25% 以上が西日本から、かつ RTT の p95 が東京の参加者より 15ms 以上大きい（**未検証**の閾値） | — |
+| 西日本の参加者 | 参加者の 25% 以上が西日本から、かつ RTT の p95 が東京の参加者より 15ms 以上大きい（閾値は既定案。E2 の `qos-report-pipeline` の RTT の実測で見直す） | — |
 | 海外の参加者 | — | 参加者の 10% 以上が海外から、かつ glass-to-glass が NFR-001 を満たさない |
 | Actor Host の 1 会議の負荷 | — | 1,000 人の会議の Actor の負荷試験が 1 プロセスに収まらない見込み |
 
-**Edge（コロケーション）の判断は段階と別に置く。** ピークの送出が 4 週続けて 10 Gbps を超えたら始める（ADR-0050。S1 の途中で当たる見込み）。
+**Edge（コロケーション）の判断は段階と別に置く。** ピークの送出が 4 週続けて 10 Gbps を超えたら始める（ADR-0050。S1 の途中で当たる見込み）。その手前に、Edge の運用の体制（24 時間の当番、自社の AS と BGP の運用）を持つかの判断の点を置く。ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops が体制（採用か委託か）を決める。持たないと決めたら、Edge の代わりに AWS との料金の合意と国内のベアメタルのクラウドを E12 の `edge-evaluation` で比べる（[architecture/README.md](README.md) の 6 節のリスク）。
 
 ## 12. 費用の概算（S1、本番、1 か月）
 
@@ -314,11 +314,11 @@ plan のポリシー検査（OPA・Checkov）で、次を拒否する。
 
 ### 12.1 前提
 
-- S1 のピーク：同時の参加者 3 万人。送出は、期待の平均（下り 1 人 1.5 Mbps）で 45 Gbps、容量の前提（2.5 Mbps）で 75 Gbps（[architecture/README.md](README.md) の 2 節。どちらも**未検証**。E2 のベータで測る）。費用は両方を並べる。
-- 月の平均の負荷は、ピークの 25% と仮定する（平日の日中に集中する。**未検証**）。
+- S1 のピーク：同時の参加者 3 万人。送出は、期待の平均（下り 1 人 1.5 Mbps）で 45 Gbps、容量の前提（2.5 Mbps）で 75 Gbps（[architecture/README.md](README.md) の 2 節。どちらも**未検証**。E2 のベータで `qos-report-pipeline` の要約から測る）。費用は両方を並べる。
+- 月の平均の負荷は、ピークの 25% と仮定する（平日の日中に集中する。**未検証**。E1 の `cost-dashboard-k8` で参加者・分の実績から直す）。
 - 月の参加者・分：3 万 × 0.25 × 43,800 分 ≈ **3.3 億**。
 - 月のインターネットへの転送：1 参加者・分あたり 1.5 Mbps × 60 秒 ÷ 8 ≈ 11.25 MB。3.3 億 × 11.25 MB ≈ **3.7 PB**（期待の平均）。2.5 Mbps では 18.75 MB で **約 6.2 PB**（容量の前提）。
-- TURN を通る参加者は 10% と仮定する（**未検証**。E2 のベータで測る）。
+- TURN を通る参加者は 10% と仮定する（**未検証**。E2 のベータで `qos-report-pipeline` の `ice_path` から測る）。
 
 ### 12.2 AWS（S1 の設計のまま）
 
@@ -327,23 +327,23 @@ plan のポリシー検査（OPA・Checkov）で、次を拒否する。
 | インターネットへの転送（Media Node・TURN → 利用者） | **約 311,000**（3.7 PB） | **約 521,000**（6.2 PB） | 2.4 節の段階の単価。大半が 0.084 USD/GB |
 | Media Node（東京、c8gn.16xlarge、平均 12 台） | 約 42,000 | 約 42,000 | 4.775 USD/時 × 12 × 730。台数は consumer で決まり、帯域に依らない（[capacity.md](capacity.md) の 3 節） |
 | Media Node（大阪、c6gn.16xlarge × 3） | 約 7,700 | 約 7,700 | 3.495 USD/時 |
-| TURN（東京 6 台、大阪 2 台） | 約 14,000 | 約 14,000 | c8gn.8xlarge 2.3875 USD/時。大阪は種類と単価が**未検証** |
+| TURN（東京 6 台、大阪 2 台） | 約 13,000 | 約 13,000 | 東京は c8gn.8xlarge 2.3875 USD/時。大阪には c8gn がないので c6gn.8xlarge 1.7475 USD/時（[AWS Price List API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/price-changes.html) の `GetProducts`、2026-09-27 に確認）。小計は丸めの範囲で変わらない |
 | TURN と Media Node の間（向きごと 0.01 USD/GB） | 約 11,400（0.57 PB） | 約 16,400（0.82 PB） | 2.4 節 |
 | Shield Advanced（月額と入口の転送） | 約 3,500 | 約 3,500 | [ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md) |
 | **メディアの配信の小計（K8 の分子）** | **約 390,000** | **約 605,000** | |
-| 制御の側（Fargate、Aurora、Valkey、CloudFront・ALB・WAF、NAT、観測、セキュリティのサービス） | 約 30,000 | 約 30,000 | Fargate の単価のほかは**未検証** |
+| 制御の側（Fargate、Aurora、Valkey、CloudFront・ALB・WAF、NAT、観測、セキュリティのサービス） | 約 30,000 | 約 30,000 | Fargate の単価のほかは**未検証**（E1 の `cost-dashboard-k8` で請求から直す） |
 | **合計** | **約 420,000** | **約 635,000** | |
 
 - **K8（参加者・分あたりのメディアの配信の費用）**：期待の平均で 390,000 USD ÷ 3.3 億 ≈ 0.00118 USD ≈ **0.18 円**（制御の側を含めると約 0.19 円）。容量の前提の 2.5 Mbps では 605,000 USD ÷ 3.3 億 ≈ 0.00183 USD ≈ **0.28 円**。
 - 感度：
   - 平均の下りが 2.5 Mbps に近い（ギャラリーの表示でカメラをつけた人が多い会議が中心。[capacity.md](capacity.md) の 2 節）と、S1 の K8 の目標（0.20 円）に AWS の表の料金では届かない。E2 のベータの実測で決める。
   - Media Node の EIP を Shield Advanced で常に守ると、転送の料金が約 12 万 USD 増え、K8 は約 0.23 円（ADR-0045 で退けた）。
-  - 月 500 TB を超える転送は、AWS に個別に相談できる（[EC2 の料金のページ](https://aws.amazon.com/ec2/pricing/on-demand/)、2026-09-27 に確認）。割引の幅は**未検証**。
+  - 月 500 TB を超える転送は、AWS に個別に相談できる（[EC2 の料金のページ](https://aws.amazon.com/ec2/pricing/on-demand/)、2026-09-27 に確認）。割引の幅は公開されていない（**未検証**。E12 の `edge-evaluation` で見積もりを取る）。
 - **費用の約 8 割が、インターネットへの転送である。** インスタンスを安い種類に替えても、全体は数 % しか下がらない。
 
 ### 12.3 コロケーション・ベアメタルとの比較
 
-Media Node と TURN だけを国内の Edge（東京と大阪のコロケーション）に移した場合。制御の側と Recorder は AWS に残す。**IP transit の単価のほかは、すべて未検証の仮定である。**
+Media Node と TURN だけを国内の Edge（東京と大阪のコロケーション）に移した場合。制御の側と Recorder は AWS に残す。**IP transit と Direct Connect の単価のほかは、すべて未検証の仮定である**（E12 の `edge-evaluation` で見積もりと PoC で確かめる）。
 
 | 項目 | 月額（USD、概算） | 仮定 |
 | --- | --- | --- |
@@ -352,8 +352,8 @@ Media Node と TURN だけを国内の Edge（東京と大阪のコロケーシ�
 | ラックと電力（東京 4、大阪 2） | 約 24,000 | 1 ラック 4,000 USD/月 |
 | サーバー（40 台、100GbE × 2） | 約 16,700 | 1 台 2 万 USD、4 年で償却 |
 | ルーターとスイッチ | 約 6,300 | 30 万 USD、4 年で償却 |
-| Direct Connect（東京 10G × 2。制御の API と Recorder への RTP） | 約 3,100 | 2.142 USD/時（2.4 節の料金のデータ） |
-| 運用の人（網とデータセンター、24 時間の当番、3 人） | 約 25,000 | — |
+| Direct Connect（東京 10G × 2。制御の API と Recorder への RTP） | 約 3,100 | 2.142 USD/時（2.4 節の料金のデータ。Equinix TY2 などの専用の 10G のポート。AWS Price List API で 2026-09-27 に確認） |
+| 運用の人（網とデータセンター、24 時間の当番、自社の AS と BGP、3 人） | 約 25,000 | — 。体制を持つかは 11 節の判断の点で決める |
 | **小計（AWS の 390,000 USD に当たるもの）** | **約 109,000** | |
 
 - K8 は約 0.05 円。AWS の約 3 分の 1〜4 分の 1。
@@ -362,11 +362,11 @@ Media Node と TURN だけを国内の Edge（東京と大阪のコロケーシ�
   - S1 を AWS の表の料金で動かすと、ピークの規模では月約 42 万 USD（容量の前提では約 64 万 USD）になり、その約 7 割は Edge なら要らない費用である。S1 の目標の規模に届く前に、Edge を持つ方が安い。
   - 起票の時点の [ADR-0001](../decisions/0001-platform-and-stack.md) の「S1 の規模では運用の負担が費用の差に見合わない」は、運用の人の費用を含めても、S1 のピークでは成り立たなかった。成り立つのは、同時の参加者が数千人までの立ち上がりの時期である。統合の工程で ADR-0001 を「S1 は AWS で始め、閾値（ADR-0050）で Edge を始める」に改めた。
   - ただし Edge には、機器の調達と拠点の契約（数か月）、自社の AS と BGP の運用、機器の障害の対応、DDoS の対策（transit の事業者の緩和の契約）が要る。E2 のベータ〜S1 の前半は AWS で動かし、閾値で Edge を始める（ADR-0050）。
-  - 中間の選択肢として、転送の単価が安いか帯域を定額で含む国内のベアメタルのクラウドがある。機器を持たずに済むが、BYOIP を持ち込めるか、国内の拠点と DDoS の緩和の条件は事業者ごとに違う（**未検証**）。Edge の構築を始めるときに比べる。
+  - 中間の選択肢として、転送の単価が安いか帯域を定額で含む国内のベアメタルのクラウドがある。機器を持たずに済むが、BYOIP を持ち込めるか、国内の拠点と DDoS の緩和の条件は事業者ごとに違う（**未検証**）。E12 の `edge-evaluation` で比べる。Edge の運用の体制を持たないと決めたとき（11 節）の第一の候補にする。
 
 ### 12.4 K8 の目標
 
-[capacity.md](capacity.md) の 6 節（[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)）で決める。S1 で 0.20 円以下、S2 で 0.07 円以下（**既定案**、PM の承認を要する）。上の見積もりでは、S1 の目標は AWS で下り 1.5 Mbps が保てれば届き、S2 の目標は Edge か AWS との料金の合意なしには届かない。
+[capacity.md](capacity.md) の 6 節（[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)）で決める。S1 で 0.20 円以下、S2 で 0.07 円以下（**既定案**。**PM と Ops の確認の項目**）。上の見積もりでは、**S1 を AWS で下り 2.5 Mbps（容量の前提）で動かすと K8 は約 0.28 円で、0.20 円に届かない。** 届くのは、下りの平均が 1.5 Mbps 前後に収まるか、Edge（ADR-0050）か AWS との料金の合意で転送の単価が下がるときだけである。つまり S1 の目標の達成は、Edge の判断（11 節の判断の点と閾値）に掛かる。S2 の目標は、Edge か AWS との料金の合意なしには届かない。
 
 ## 13. Story の候補
 
@@ -399,18 +399,17 @@ Media Node と TURN だけを国内の Edge（東京と大阪のコロケーシ�
 - **災害復旧**：進行中の会議は守らない、RTO 1 時間、RPO 1 分（ADR-0050）。
 - **Edge**：ピークの送出が 4 週続けて 10 Gbps を超えたら始める（ADR-0050）。[ADR-0001](../decisions/0001-platform-and-stack.md) を、S1 は AWS で始めてこの閾値で Edge を始める形に改めた（統合の工程）。
 - **容量の前提**：参加者 1 人の下り 2.5 Mbps。1.5 Mbps は期待の平均として費用の見込みに並べる（統合の工程）。
+- **確かめて決着したもの**（2026-09-27）：BYOIP の IPv4 には公開の IPv4 の料金がかからない（3.3 節）。TURN と Media Node の間は同じリージョンの中の 0.01 USD/GB、同じ AZ の中のピアリングは無料（2.4 節）。Amazon Transcribe は大阪に無く、大阪で受けている間は字幕と文字起こしを止める（8.3 節）。大阪の TURN は c6gn.8xlarge（12.2 節）。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| c8gn.16xlarge と c8g.16xlarge のどちらが参加者あたり安いか | E7 の負荷試験 |
-| BYOIP の範囲の入手の時間と費用 | E1 の前に Ops が始める |
-| BYOIP の IP に公開の IPv4 の料金がかかるか | E1 で請求を確かめる |
-| TURN と Media Node の間、ピアリングの通信の料金の区分 | E2 で請求の明細を確かめる |
+| c8gn.16xlarge と c8g.16xlarge のどちらが参加者あたり安いか | E7 の `load-l0-l2` |
+| BYOIP の範囲の入手の時間と費用 | E1 の `byoip-onboarding` の前に Ops が始める |
 | 参加者 1 人の下りの平均（期待 1.5 Mbps、容量の前提 2.5 Mbps） | E2 のベータで測り、12 節の費用と [capacity.md](capacity.md) を直す |
-| CloudFront の WebSocket の長い接続の切れ方 | E2 で 8 時間の接続を試す |
-| Amazon Transcribe の大阪での提供 | E8 の前に確かめる |
+| CloudFront の WebSocket の長い接続の切れ方 | E2 の `signaling-via-cloudfront` で 8 時間の接続を試す |
+| Edge の運用の体制（24 時間の当番、自社の AS と BGP）を持つか | ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops（11 節） |
 | 大阪の EC2 の在庫と、切り替えの時に受けられる参加者の数 | DR の訓練で測る |
 | 海外のリージョンの候補 | S3 の前に、参加者の分布で決める |
 

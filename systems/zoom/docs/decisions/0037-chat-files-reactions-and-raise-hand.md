@@ -10,8 +10,8 @@ date: 2026-09-27
 会議の中では、ファイルの送信、絵文字のリアクション、挙手を使う（[intent.md](../intent.md) の MVP）。
 
 - ファイルは、マルウェアや、会議の画面のオリジンで中身を描かせる攻撃（HTML・SVG のスクリプト）の経路になる。
-- 本家は会議の中のファイルの送信を持ち、組織の設定で許すかを選ぶ（[Enabling file transfer in meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058822)、2026-09-27 に確認）。大きさの上限の一次の値は確かめていない（未検証）。
-- 本家の絵文字のリアクションは 10 秒で消え、挙手と反応の表示は下げるまで残る（大学の IT の解説。一次は未検証）。
+- 本家は会議の中のファイルの送信を持ち、組織の設定で許すかを選ぶ（[Enabling file transfer in meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058822)、2026-09-27 に確認）。会議の中の送信の大きさの上限の値は一次の文書に書かれていない（管理者が設定で絞れることは同じ文書にある）。
+- 本家の絵文字のリアクションは 10 秒で消え、挙手と反応の表示は下げるまで残る（[Using non-verbal feedback and meeting reactions](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063323)、2026-09-27 に確認）。
 - シグナリングには、状態の差分（`evt`、`seq` あり）と、落としてよい一時的なイベント（`eph`）がある（[ADR-0008](0008-signaling-protocol.md)）。挙手は `self.update` の項目として既にある（[signaling-and-meetings.md](../architecture/signaling-and-meetings.md) の 6.2 節）。
 
 ## Options
@@ -32,7 +32,7 @@ date: 2026-09-27
 1 と 4 を採用する。詳細は [chat-and-reactions.md](../architecture/chat-and-reactions.md) の 4〜6 節。
 
 - **ファイル**：
-  - 署名付きの PUT（10 分）で S3 に直接上げる。S3 のマルウェアの検査（GuardDuty の S3 のマルウェアの保護を想定。未検証）が `clean` を返したものだけを、宛先に配る。
+  - 署名付きの PUT（10 分）で S3 に直接上げる。S3 のマルウェアの検査（GuardDuty の S3 のマルウェアの保護。検査の結果を EventBridge とオブジェクトのタグで返す。[GuardDuty Malware Protection for S3](https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.html)、2026-09-27 に確認）が `clean` を返したものだけを、宛先に配る。
   - 別のドメイン（`<brand>files.<domain>`）から、`Content-Disposition: attachment` と `nosniff` で配る。会議の画面で中身を描かない。
   - 上限は 1 ファイル 100 MB、1 人・1 会議 20 ファイル・500 MB。禁止する拡張子は組織の設定。
   - 保持はチャットと同じ（[ADR-0036](0036-in-meeting-chat-ordering-and-retention.md)）。

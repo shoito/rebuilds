@@ -48,13 +48,13 @@ S1 の Media Node の台数は、ピークで 27 台の見込み（[capacity.md]
 - **mediasoup の worker は arm64 で動かす。** 版を上げるときは、arm64 の上で回線の劣化の試験を通す。
 - **アドレス**：
   - IPv4 は BYOIP にする。東京に /24 を 1 つ、大阪に /24 を 1 つ、将来の Edge のために /24 を 1 つ以上持つ。1 つの ROA で大きな範囲を持ち、/24 ずつリージョンに置く。
-  - 範囲の入手（IPv4 の移転の市場での取得、JPNIC・APNIC の手続き）は、E1 の前に Ops が始める。時間と費用は**未検証**。間に合わなければ、b（/28 を 4 つ、上限の引き上げを申請）で始め、BYOIP に移るときに顧客へ 30 日前に知らせる（[ADR-0016](0016-media-edge-addressing-and-security-groups.md)）。
+  - 範囲の入手（IPv4 の移転の市場での取得、JPNIC・APNIC の手続き）は、E1 の前に Ops が始める。時間と費用は**未検証**（E1 の `byoip-onboarding` の前に Ops が確かめる）。BYOIP で持ち込んだ IPv4 には公開の IPv4 の料金がかからず、そのプールから取った EIP は EIP の数の上限に数えない（[VPC の料金](https://aws.amazon.com/vpc/pricing/)、[Elastic IP addresses](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)、2026-09-27 に確認）。間に合わなければ、b（/28 を 4 つ、上限の引き上げを申請）で始め、BYOIP に移るときに顧客へ 30 日前に知らせる（[ADR-0016](0016-media-edge-addressing-and-security-groups.md)）。
   - BYOIP にする最大の理由は、将来 Media Node をコロケーションへ移すとき（[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）に、同じ範囲を AWS から外して自社の AS から広告できることである。顧客のファイアウォールの規則を変えずに移れる。
   - IPv6 は、VPC に付く Amazon の /56 から、サブネットごとの /64 を使う。VPC を作り直さない限り変わらない。範囲は `ip-ranges.json` に載せる。
 - **EIP の付け方**：Auto Scaling グループの起動のライフサイクルフックで、Lambda が範囲のプールから空いた EIP を選び、インスタンスに付ける。Node のインスタンスのロールには `ec2:AssociateAddress` を与えない（奪われた Node が他の Node の IP を奪えないように）。Node Agent は、メタデータの公開の IP と `announcedAddress` の一致を確かめてから `active` になる（ADR-0016）。
 - **台数の増減**：
   - AZ ごとに 1 つの Auto Scaling グループ（東京で 3 つ）。インスタンスは縮める保護（scale-in protection）を付けて起動する。
-  - 増やす：Media Assignment Service が出す指標（点が 0.7 未満の Node の空きの合計）が、AZ ごとの目標を下回ったら増やす。平日の朝の立ち上がりに備え、予定の会議の数からの予測で、前の日に翌朝の台数を予約する（スケジュールのアクション）。起動の時間を縮めるため、停止した状態の予備（ウォームプール）を AZ ごとに 2 台置く（起動から `active` までの時間は**未検証**。E1 で測る）。
+  - 増やす：Media Assignment Service が出す指標（点が 0.7 未満の Node の空きの合計）が、AZ ごとの目標を下回ったら増やす。平日の朝の立ち上がりに備え、予定の会議の数からの予測で、前の日に翌朝の台数を予約する（スケジュールのアクション）。起動の時間を縮めるため、停止した状態の予備（ウォームプール）を AZ ごとに 2 台置く（起動から `active` までの時間は**未検証**。E2 の `media-fleet-asg` で測る）。
   - 縮める：Assignment Service が点の低い Node を選び、`node.drain` を送る。会議が 0 になった Node だけ、保護を外して終了させる（[media-server-sfu.md](../architecture/media-server-sfu.md) の 10 節）。夜間は、AZ ごとに最小 2 台まで縮める。
 - 2 を採らない理由：上の障害の範囲の理由。
 - 3 を採らない理由（今は）：1 台の上限が網で決まるか CPU で決まるかが分からない。E7 の結果で替える。

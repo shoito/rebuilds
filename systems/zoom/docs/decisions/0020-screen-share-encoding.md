@@ -32,7 +32,7 @@ date: 2026-09-27
 - Media Node は画面共有の consumer を `priority: 255` で作る（[ADR-0019](0019-bandwidth-estimation-and-layer-allocation.md)）。
 - タブの音声は Opus のステレオ 64 kbps、FEC あり、DTX なし。
 - 2 は、細い受け手に低い解像度の共有を送ることになり、文字が読めなくなる。上りも増える。
-- 3 は、`text` の符号器の最適化がブラウザごとに違い（未検証）、図や写真を含む資料で `detail` より悪くなる恐れがある。E5 で比べ、良ければ切り替える。
+- 3 は、`text` の符号器の最適化がブラウザごとに違い（仕様が求めるのは AV1 のときの `text` 用の符号化の道具だけ。[MediaStreamTrack Content Hints](https://www.w3.org/TR/mst-content-hint/)。VP8・VP9 での差は**未検証**）、図や写真を含む資料で `detail` より悪くなる恐れがある。E5 の `screen-share-detail` で比べ、良ければ切り替える。
 
 ## Consequences
 

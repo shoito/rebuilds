@@ -36,7 +36,7 @@ date: 2026-09-27
   - フリーズ、解像度、fps、追従の時間：`getStats`（[codecs-and-bandwidth-adaptation.md](../architecture/codecs-and-bandwidth-adaptation.md) の 11.2 節）。
 - **揺れの扱い**：各条件を 5 回回し、中央値で判定する。基準（`main` の直近 7 日の結果）との差も PR に載せる。閾値そのものは quality.md で決める（QA の承認）。
 - **回し方**：
-  - PR：メディアに触れる変更（[delivery.md](../architecture/delivery.md) の 2 節のパスの一覧）で、代表の条件（`loss-20-random`、`bw-step-down`、`rtt-200`、`mixed-3`）を Chrome で必須にする。約 20 分の見込み（**未検証**）。
+  - PR：メディアに触れる変更（[delivery.md](../architecture/delivery.md) の 2 節のパスの一覧）で、代表の条件（`loss-20-random`、`bw-step-down`、`rtt-200`、`mixed-3`）を Chrome で必須にする。約 20 分の見込み（**未検証**。E1 の `media-paths-and-required-checks` で実測する）。
   - 夜間：全部の条件 × 4 ブラウザ（Safari を含む）× Beta・Dev の版。
   - Safari：macOS の EC2（mac のインスタンス）か社内の Mac で、`dnctl`・`pfctl`（dummynet）で同じ条件を作る。iOS は実機を週に 1 回。
 - 試験の音声と映像は、利用の条件が明らかな公開のデータセットか合成だけ（本題材の AGENTS.md）。
@@ -49,7 +49,7 @@ date: 2026-09-27
   - PR ごとに、本番と同じ部品で、決まった回線の条件を再現できる。
   - 結果の数（遅れ、MOS、フリーズ）を、基準との差で示せる。
 - 引き受けるコスト：
-  - `media-lab` の EC2 と mac のインスタンスの費用（mac のインスタンスは最低の割り当ての時間がある。**未検証**）。
+  - `media-lab` の EC2 と mac のインスタンスの費用（mac のインスタンスは Dedicated Host で、解放できるまでの最低の割り当ての時間が 24 時間ある。[Amazon EC2 Mac instances](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-mac-instances.html)、2026-09-27 に確認）。
   - netem は端末の OS の中の網の処理（Wi-Fi の再送、モバイルの網の振る舞い）を再現しない。実機の週次の試験で補う。
   - 5 回の実行で、PR の待ちが伸びる。
 

@@ -53,13 +53,13 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `byoip-onboarding` | BYOIP の範囲、ROA、IPAM のプール、Elastic IP と IPv6、`ip-ranges.json`（infrastructure の 3.3 節。network-traversal の `media-edge-addressing` と 1 つにした） |
 | `media-sg-untracked` | 追跡しないセキュリティグループと Terraform の検査（network-traversal の 7.2 節） |
 | `terraform-policy-checks-media` | plan のポリシー検査（infrastructure の 9.2 節） |
-| `kms-key-hierarchy` | KMS の鍵 5 つと、`org_id` の文脈の条件（[ADR-0047](decisions/0047-keys-and-operator-access-to-media.md)） |
+| `kms-key-hierarchy` | KMS の鍵 6 つと、`org_id` の文脈の条件（[ADR-0047](decisions/0047-keys-and-operator-access-to-media.md)） |
 | `aurora-tenancy-rls` | `app`・`global` のスキーマ、FORCE RLS、`SET LOCAL app.org_id`、`meeting_number_index`、RLS の試験（[ADR-0058](decisions/0058-tenant-tables-with-force-rls.md)） |
 | `audit-log-three-streams` | 監査ログ 3 系統、`global.outbox`、log-archive への転送、ハッシュの連鎖の検証（security の 6 節、data-model の 5.5 節） |
 | `content-leak-scanner` | 内容・秘密の出力の走査（CI と本番） |
 | `operator-access-media-prod` | 期限つきのシェル、パケットの取得の制限、監査 |
 | `telemetry-package-and-allowlist` | 計装のパッケージ、属性の許可リスト（observability の 2.1・2.4 節） |
-| `qos-report-pipeline` | `qos.report` → Gateway → Firehose → S3・Athena、SQS → `participant_quality_summaries`（[ADR-0051](decisions/0051-qos-telemetry-pipeline.md)） |
+| `qos-report-pipeline` | `qos.report` → Gateway → Firehose → S3・Athena、SQS → `participant_quality_summaries`、Firehose の書き込みのまとめと上限の引き上げの申請（capacity の 5.4 節。[ADR-0051](decisions/0051-qos-telemetry-pipeline.md)） |
 | `ena-metrics-collection` | ENA の `*_allowance_exceeded` の収集 |
 | `alerts-with-runbooks` | アラートと runbook の URL の CI の検査 |
 | `media-paths-and-required-checks` | メディアのパスの一覧と必須の段（delivery の 2.1・2.2 節） |
@@ -95,7 +95,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `subscriptions-and-layers` | 購読の集合、層の上限、優先度 |
 | `audio-opus-baseline` | DTX、FEC、20ms、32 kbps |
 | `video-simulcast-vp8` | 3 本、H.264 の送り手 |
-| `turn-coturn-deploy` | coturn の AMI、UDP・TCP 3478、TLS 443、中継の相手の制限、証明書（infrastructure の `turn-fleet` と 1 つにした） |
+| `turn-coturn-deploy` | coturn の AMI、UDP・TCP 3478、TLS 443、中継の相手の制限、証明書（ACM の書き出せる公開の証明書、`*.turn.<brand>.<domain>`。infrastructure の `turn-fleet` と 1 つにした） |
 | `turn-rest-credentials` | API での発行、秘密の入れ替え |
 | `turn-relay-restriction-tests` | TURN の踏み台の試験と本番の毎日の合成の試験（security の 10 節） |
 | `client-ice-config` | `iceServers`、前回の経路の記憶 |
@@ -314,6 +314,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `org-deletion-and-user-offboarding` | 組織とユーザーの削除（法務：L6・L8） |
 | `edge-evaluation` | Edge の比較を見積もりと PoC で確かめる |
 | `scim-provisioning` | SCIM（S2。GA の判定に要るなら） |
+| `law-enforcement-request-handling` | 捜査機関からの照会の受付、記録の保全と開示の手順、`law-enforcement-request.md`（security の 16 節。中身は法務：L4 の後） |
 
 ### E13 デスクトップ・モバイルのアプリ（MVP の後）
 

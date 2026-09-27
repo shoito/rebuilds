@@ -43,11 +43,14 @@ date: 2026-09-27
 
 | 鍵 | 守るもの | 使える主体 |
 | --- | --- | --- |
-| `<brand>-join-signing` | 参加のトークンの署名（非対称、Ed25519 の対応が無ければ ECDSA P-256。**未検証**：KMS の Ed25519 の対応を E2 で確かめる） | API のタスクのロール（`Sign`）。検証は公開鍵を配る |
+| `<brand>-join-signing` | 参加のトークンの署名（非対称、Ed25519。KMS は `ECC_NIST_EDWARDS25519` の鍵と `ED25519_SHA_512` の署名に対応する。[AWS KMS now supports EdDSA](https://aws.amazon.com/about-aws/whats-new/2025/11/aws-kms-edwards-curve-digital-signature-algorithm/)、2025-11、2026-09-27 に確認） | API のタスクのロール（`Sign`）。検証は公開鍵を配る |
 | `<brand>-meeting-secrets` | パスコードの暗号文、HMAC の pepper、チャットの暗号文、カレンダーのリフレッシュトークン（エンベロープ暗号化。暗号化の文脈に `org_id`） | API、Actor Host、Worker |
 | `<brand>-content` | 録画、文字起こし、チャットのファイルの S3 の SSE-KMS。暗号化の文脈に `org_id` と `recording_id` | `media-prod` の Recorder・Transcriber・Composer、署名付き URL を出す API の読み取りのロール |
 | `<brand>-e2ee-as` | E2EE の AS の中間 CA の署名 | Actor Host（`Sign` だけ） |
+| `<brand>-e2ee-external-sender` | E2EE の MLS の外部の送り手（Actor）の署名（Ed25519。[e2ee.md](../architecture/e2ee.md) の 6.5 節） | Actor Host（`Sign` だけ） |
 | `<brand>-data` | Aurora・Valkey のスナップショット・SQS・Secrets Manager の保存の暗号化 | 各 AWS のサービス（`kms:ViaService`） |
+
+> 2026-09-27 の注記：KMS が Ed25519 に対応すると確かめたので、`<brand>-join-signing` を Ed25519 に決め、ECDSA P-256 の代わりの案を外した。E2EE の外部の送り手の鍵を Secrets Manager から KMS（`<brand>-e2ee-external-sender`）へ移し、鍵を 6 つにした（e2ee.md の「KMS で Ed25519 を使えるならそちらに替える」の条件が満たされたため）。
 
 - **組織ごとの鍵は、S1 で作らない。** 1 つの鍵の暗号化の文脈で組織を分け、キーポリシーの条件（`kms:EncryptionContext:org_id`）で、1 つの要求が他の組織のデータを復号できないようにする。組織ごとの暗号学的な消去が要るとき（組織の削除）は、S3 の実体を消す。
 - **BYOK は MVP の後の Epic で扱う。** 顧客の鍵が止められると録画を読めなくなる振る舞い、鍵の呼び出しの上限、サポートの手順を、先に決める必要がある。

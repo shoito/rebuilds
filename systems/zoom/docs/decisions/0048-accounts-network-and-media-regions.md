@@ -42,8 +42,8 @@ date: 2026-09-27
   - Transit Gateway は S1 では使わない。リージョンの間（S2 の東京と大阪）は、リージョンの間の VPC のピアリングを使う。
 - **メディアのリージョン**：
   - S1：東京（ap-northeast-1）の 3 AZ。全会議を東京に置く。大阪（ap-northeast-3）には、制御の側のウォームスタンバイと、最小の Media Node・TURN を置く（災害の備え。[ADR-0050](0050-disaster-recovery-and-edge-migration.md)）。
-  - S2：大阪でも会議を受ける。Media Assignment Service は、参加者の位置（西日本か）と、主催者の組織の設定で、会議のリージョンを決める。大阪の Media Node は c6gn・c6in で始め、c7gn・c8gn が大阪に来たら替える（在庫の状況は**未検証**）。
-  - S3：海外の参加者のためのリージョン（候補はシンガポールと米国の西海岸。**未検証**）と、国内の Edge（コロケーション）を足す。リージョンの間のカスケードは [media-server-sfu.md](../architecture/media-server-sfu.md) の 8.4 節。
+  - S2：大阪でも会議を受ける。Media Assignment Service は、参加者の位置（西日本か）と、主催者の組織の設定で、会議のリージョンを決める。大阪の Media Node は c6gn・c6in で始め、c7gn・c8gn が大阪に来たら替える（2026-09-27 の時点で、大阪で提供されるのは c6gn・c6in・c8g で、c7gn・c8gn はない。`DescribeInstanceTypeOfferings` で確かめた）。
+  - S3：海外の参加者のためのリージョン（候補はシンガポールと米国の西海岸。S3 の前に参加者の分布で決める）と、国内の Edge（コロケーション）を足す。リージョンの間のカスケードは [media-server-sfu.md](../architecture/media-server-sfu.md) の 8.4 節。
 - 2 を採らない理由：[ADR-0047](0047-keys-and-operator-access-to-media.md) の、平文のメディアに触れる権限の境界が作れない。
 - 3 を採らない理由：公開のインスタンスと、Aurora・Valkey が同じ VPC に並び、誤った規則の影響が大きい。
 - b を採らない理由：S1 の大阪では c7gn・c8gn が使えず、Media Node の種類が 2 つになる。東京の 3 AZ で NFR-004 を満たせ、遅れも国内なら収まる見込み。
@@ -54,8 +54,8 @@ date: 2026-09-27
   - メディアの部品の上限（EIP、vCPU、Shield Advanced の保護の数）を、制御の側と別に管理できる。
   - 平文のメディアに触れる権限の境界が、アカウントの境界になる。
 - 引き受けるコスト：
-  - アカウントをまたぐ通信（ピアリング、ロール）の設定が増える。同じ AZ の中のピアリングの通信は無料、AZ をまたぐと 0.01 USD/GB（上の料金のデータの読み。**未検証**：ピアリングの課金の区分を E1 で確かめる）。
-  - 西日本の参加者は、S1 では東京の Node につなぐ。東京と大阪の間の RTT の分だけ遅れる（数 ms の見込み。**未検証**）。
+  - アカウントをまたぐ通信（ピアリング、ロール）の設定が増える。同じ AZ の中のピアリングの通信は無料（アカウントをまたいでも）、AZ をまたぐと向きごとに 0.01 USD/GB（[Amazon VPC Announces Pricing Change for VPC Peering](https://aws.amazon.com/about-aws/whats-new/2021/05/amazon-vpc-announces-pricing-change-for-vpc-peering/)、[VPC の料金](https://aws.amazon.com/vpc/pricing/)、2026-09-27 に確認）。
+  - 西日本の参加者は、S1 では東京の Node につなぐ。東京と大阪の間の RTT の分だけ遅れる（数 ms の見込み。**未検証**で、E2 のベータの `qos-report-pipeline` の RTT で測る）。
 
 ## Confirmation
 

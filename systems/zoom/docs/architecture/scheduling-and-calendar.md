@@ -20,11 +20,11 @@
 | --- | --- | --- |
 | 会議の ID の桁 | すぐの会議・予定の会議・繰り返しの会議は 11 桁、PMI は 10 桁（[FAQ about meeting and webinar IDs](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065196)） | 同じ（ADR-0006、ADR-0034） |
 | PMI | 個人に割り当てられ、繰り返し使える 10 桁の番号（[Using Personal Meeting ID (PMI)](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0066271)）。推測されやすいので、待合室とパスコードの両方を勧める大学の解説がある | 待合室を強める（ADR-0034） |
-| 繰り返しの回数・期限、時刻の決まっていない繰り返しの有効期限 | 公開の一次の資料で確かめていない（**未検証**） | 回数は 100 まで、期限は 2 年まで。時刻の決まっていない繰り返しは最後の開催から 365 日 |
+| 繰り返しの回数・期限、時刻の決まっていない繰り返しの有効期限 | 繰り返しは 60 回まで。それを超えるときは時刻の決まっていない繰り返しにする。繰り返しの会議の ID は、最後に開いてから 365 日で失効する（[Scheduling a recurring meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064248)） | 回数は 100 まで、期限は 2 年まで（本家より多く許す。業務の定例を 2 年分入れられるように）。時刻の決まっていない繰り返しは最後の開催から 365 日（本家と同じ） |
 | Google のアドオン | Workspace のアドオンのマニフェストで会議の方式（conference solution）を宣言し、利用者が予定を作るときに選べる。`onCreateFunction` が会議の ID と参加の入口（video・phone など。1 つ以上）を持つ `ConferenceData` を返す。予定の変更と削除を検知して、会議の側を合わせられる（[Calendar conferencing overview](https://developers.google.com/workspace/add-ons/calendar/conferencing/overview)） | カレンダーの画面から作る入口（ADR-0035） |
-| Google Calendar API の会議の情報 | `conferenceDataVersion=1` で会議の情報を作り・変えられる。API の説明の `conferenceSolution.key.type` には Google Meet などが並ぶ（[Create events](https://developers.google.com/workspace/calendar/api/guides/create-events)）。第三者が API から直接 `entryPoints` を書けるかは確かめていない（**未検証**） | API から書くときは、場所と説明に URL を入れる（ADR-0035） |
-| Google の push の通知 | `events.watch` で HTTPS の受け口に通知を送る。`X-Goog-Channel-Token`（任意の文字列）、`X-Goog-Resource-State`（`sync`・`exists`・`not_exists`）。通知の中身は変わったことだけで、差分は取りに行く。チャンネルには期限がある（[Push notifications](https://developers.google.com/workspace/calendar/api/guides/push)）。期限の既定と最大は**未検証** | 6.3 節 |
-| Outlook の online-meeting のアドイン | Outlook on the web・Windows（new と classic）・Mac・Android・iOS で動く（Microsoft 365 の契約）。予定の本文に会議の情報を足す。管理者が配ったアドインだけが、予定の作成の画面で Teams の切り替えの代わりに出る。1 分以内に本文を更新する。Join のボタンは、Marketplace で公開し、登録したアドインだけ（[Create an Outlook add-in for an online-meeting provider](https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/online-meeting)） | カレンダーの画面から作る入口（ADR-0035） |
+| Google Calendar API の会議の情報 | `conferenceDataVersion=1` で会議の情報を作り・変えられる。API の説明の `conferenceSolution.key.type` には Google Meet などが並ぶ（[Create events](https://developers.google.com/workspace/calendar/api/guides/create-events)）。`conferenceSolution.key.type` には第三者の提供者の `addOn` もあるが、アドオンの外から API で `entryPoints` を直接書けるかは文書に書かれていない（[Events](https://developers.google.com/workspace/calendar/api/v3/reference/events)。**未検証**。E6 の `google-calendar-oauth-write` で確かめる） | API から書くときは、場所と説明に URL を入れる（ADR-0035） |
+| Google の push の通知 | `events.watch` で HTTPS の受け口に通知を送る。`X-Goog-Channel-Token`（任意の文字列）、`X-Goog-Resource-State`（`sync`・`exists`・`not_exists`）。通知の中身は変わったことだけで、差分は取りに行く。チャンネルには期限があり、自動で延ばす方法はなく、期限の前に新しいチャンネルを張る（[Push notifications](https://developers.google.com/workspace/calendar/api/guides/push)）。期限の既定と最大の値は文書に書かれていない（**未検証**。E6 の `calendar-change-sync` で応答の `expiration` を記録する） | 6.3 節 |
+| Outlook の online-meeting のアドイン | Outlook on the web・Windows（new と classic）・Mac・Android・iOS で動く（Microsoft 365 の契約）。予定の本文に会議の情報を足す。管理者が配ったアドインだけが、予定の作成の画面で Teams の切り替えの代わりに出る。1 分以内に本文を更新する。Join のボタンは、Microsoft Marketplace で公開し（業務用の内部のアドインは不可）、GitHub の issue で登録したアドインだけで、classic Outlook on Windows には出ない（[Create an Outlook add-in for an online-meeting provider](https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/online-meeting)） | カレンダーの画面から作る入口（ADR-0035） |
 | Graph の予定 | `onlineMeetingProvider` は `unknown`・`teamsForBusiness`・`skypeForBusiness`・`skypeForConsumer` だけ。`transactionId` で作成の再試行の重複を防げる。`originalStartTimeZone` を持つ（[event resource type](https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0)） | 第三者は `onlineMeeting` を使えないので、本文と場所に書く（ADR-0035） |
 | Graph の変更の通知 | Outlook の予定の購読は最長 10,080 分（7 日弱）。中身付きの通知は 1,440 分。`clientState`（128 文字まで）で通知を確かめる（[subscription resource type](https://learn.microsoft.com/en-us/graph/api/resources/subscription?view=graph-rest-1.0)） | 6.3 節 |
 
@@ -101,7 +101,7 @@ RFC 5545 の RRULE のうち、次だけを受ける。受けない項目は 422
 
 - 予定の時刻は、現地の時刻（`start_local`、秒まで、タイムゾーンなし）と IANA のタイムゾーン名（`timezone`）で持つ。UTC の時刻は、回ごとに計算して出す。
   - 理由：繰り返しの会議は「毎週火曜の 10 時（東京）」であり、UTC で持つと、夏時間のある地域の主催者の会議が 1 時間ずれる。日本には夏時間はないが、海外の拠点の主催者と、tzdata の変更に備える。
-- 計算には、IANA の tzdata を持つライブラリ（Temporal の API。Node.js の対応の状況は**未検証**で、なければ polyfill）を使う。tzdata の版をサーバーで固定し、上げるときは次の 30 日の回の UTC の時刻が変わる会議を洗い出して、主催者に知らせる。
+- 計算には、IANA の tzdata を持つライブラリ（Temporal の API。Node.js は 26 で Temporal を既定で有効にした（[Node.js 26.0.0](https://nodejs.org/en/blog/release/v26.0.0)、2026-05、2026-09-27 に確認）。Node.js 26 より前の版で動かす間は polyfill を使う）を使う。tzdata の版をサーバーで固定し、上げるときは次の 30 日の回の UTC の時刻が変わる会議を洗い出して、主催者に知らせる。
 - 夏時間の切り替えで存在しない時刻（例：2:30）は、後ろへずらす（Temporal の `disambiguation: "compatible"`）。2 回ある時刻は、前の方を採る。
 - 表示は、見る人の端末のタイムゾーンで行う。招待のメールには、主催者のタイムゾーンと、受け手のタイムゾーン（分かれば）を両方書く。
 - 時刻の決まっていない会議（`recurring_no_fixed_time`・`pmi`）は時刻を持たない。
@@ -150,7 +150,7 @@ ADR-0035。
 
 - 取り込むのは、本システムが作った予定（Google は `extendedProperties.private.<brand>_meeting_id`、Microsoft は拡張のプロパティか `transactionId`）だけにする。他の予定の中身を保存しない。
 - リフレッシュトークンは KMS で守るデータの鍵で暗号化して、`calendar_connections` に置く。取り消されたら（`invalid_grant`）、接続を `revoked` にし、利用者に再接続を案内する。会議そのものは消さない。
-- Google の範囲は「機微な範囲」に当たり、公開のアプリには Google の確認の審査が要る見込み（**未検証**。E6 の前に確かめる）。
+- 利用者のデータに触れる範囲を使う公開のアプリには、Google の確認の審査が要る（[Calendar API の認可](https://developers.google.com/workspace/calendar/api/auth)、2026-09-27 に確認）。`calendar.events` が「機微な範囲」に分類されるかは文書のこの頁に書かれておらず**未検証**で、E6 の `google-calendar-oauth-write` の前に Google Cloud の同意の画面の設定で確かめる。
 
 ### 6.3 変更の取り込み
 
@@ -253,12 +253,12 @@ ADR-0035。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 「この回以降を変える」 | E6 の利用者の声を見て決める。番号を引き継ぐ 2 つの行の索引の設計が要る |
-| Calendar API から第三者が `conferenceData` の `entryPoints` を直接書けるか | E6 の前に試験のテナントで確かめる |
-| Google の確認の審査（機微な範囲）の要否と期間 | E6 の前に確かめる |
-| Outlook の Join のボタンのための Marketplace の公開 | E12 |
-| Google の push のチャンネルの期限の既定と最大 | E6 で応答の `expiration` を実測する |
-| Node.js での Temporal の対応 | E6 の着手時に確かめる。なければ polyfill |
-| 繰り返しの回数・期限の本家の値 | 調べるが、合わせることは目標にしない |
+| Calendar API から第三者が `conferenceData` の `entryPoints` を直接書けるか | E6 の `google-calendar-oauth-write` で試験のテナントで確かめる |
+| Google の確認の審査の期間（審査が要ることは確かめた。範囲の分類は同意の画面で確かめる） | E6 の `google-calendar-oauth-write` の前 |
+| Outlook の Join のボタンのための Microsoft Marketplace の公開と、GitHub の issue での登録 | E12 の `outlook-addin-marketplace` |
+| Google の push のチャンネルの期限の既定と最大 | E6 の `calendar-change-sync` で応答の `expiration` を実測する |
+| Node.js での Temporal の対応 | 決着：Node.js 26 で既定で有効（4.4 節）。それより前の版の間は polyfill |
+| 繰り返しの回数・期限の本家の値 | 決着：60 回、ID は最後の開催から 365 日で失効（2 節）。合わせることは目標にしない |
 
 ## 12. quality.md・runbooks・data-model への項目
 

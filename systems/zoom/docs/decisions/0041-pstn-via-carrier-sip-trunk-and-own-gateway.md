@@ -12,8 +12,9 @@ date: 2026-09-27
 確かめたこと（いずれも 2026-09-27 に確認）：
 
 - 電気通信番号を使う事業者は、番号の種別ごとに電気通信番号使用計画の認定を受ける。自ら指定を受ける場合と、他の事業者から卸を受ける場合で手続きが分かれる（[電気通信番号を使用するための手続](https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/new_framework.html)）。
-- Twilio は日本で 050 と Toll-Free の番号を扱い、規制の書類の審査が要る。日本の番号の再販者は番号使用計画の書類が要る（Twilio のヘルプの検索結果。本文は未検証）。
-- Amazon Chime SDK で日本の番号を取れるかは確かめていない（未検証）。
+- Twilio は日本で 050 と Toll-Free の番号を扱い、規制の書類の審査が要る。日本の番号の再販者は番号使用計画の書類が要る（Twilio のヘルプの検索結果。本文は取得できず**未検証**。E14 の `carrier-selection-and-legal` で確かめる）。
+- Amazon Chime SDK で日本の番号を取れるかは確かめていない（**未検証**。E14 の `carrier-selection-and-legal` で `ListSupportedPhoneNumberCountries` を呼んで確かめる）。
+- 050 の IP 電話の総合品質は、R 値 50 超・平均の遅延 400ms 未満（[通信品質等の現行規定について](https://www.soumu.go.jp/main_content/000690836.pdf)、総務省）。
 
 会議の側は、SFU（mediasoup）で、Opus の音声を扱う。Media Node は PlainTransport で WebRTC ではない RTP を受けられる。Recorder・Transcriber も同じ方式で会議の音声を受ける（[ADR-0025](0025-recording-per-track-capture-and-offline-compose.md)、[ADR-0026](0026-asr-engine-amazon-transcribe-with-adapter.md)）。
 

@@ -157,7 +157,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 ### 4.2 保存時
 
-鍵の階層は [ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md) の表のとおり。KMS の鍵は用途ごとに 5 つで、どれもマルチリージョン（主は東京、レプリカは大阪）。
+鍵の階層は [ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md) の表のとおり。KMS の鍵は用途ごとに 6 つで、どれもマルチリージョン（主は東京、レプリカは大阪）。
 
 - 録画・文字起こし・チャットのファイルは `<brand>-content`、パスコード・チャットの本文・カレンダーのトークンは `<brand>-meeting-secrets` で、どちらも暗号化の文脈に `org_id` を入れる。
 - log-archive の監査ログは、log-archive のアカウントの鍵で暗号化する（prod・media-prod の主体が消せない・読めない）。
@@ -172,11 +172,11 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | `ip_prefix_hash` の pepper | 同上 | 30 日。前の pepper を 30 日残し、照合は今と前の両方で行う（[meeting-security.md](meeting-security.md) の 10 節） |
 | TURN の静的な秘密 | Secrets Manager（今と次の 2 つ） | 90 日（[ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md)）。手順は network-traversal の runbook（`turn-secret-rotation.md`） |
 | E2EE の AS の中間 CA の鍵 | KMS（`<brand>-e2ee-as`） | [e2ee.md](e2ee.md) の決定に従う |
-| E2EE の外部の送り手の鍵 | Secrets Manager | 月 1 回（[e2ee.md](e2ee.md)） |
+| E2EE の外部の送り手の鍵 | KMS（`<brand>-e2ee-external-sender`。Ed25519、Actor Host が `Sign`） | 月 1 回。新しい鍵を作って別名を替え、古い鍵を 24 時間残す（[e2ee.md](e2ee.md) の 6.5 節） |
 | Media Node の DTLS の証明書 | 保存しない（Node の起動ごとに作る） | Node の入れ替えごと |
 | PlainTransport の SRTP の鍵 | 保存しない（会議ごと、Actor のメモリ） | 会議ごと |
 | 相互 TLS の証明書（Actor Host・Node Agent） | AWS Private CA | 7 日で自動 |
-| TURN の TLS の証明書（`turn-*.<brand>.<domain>`） | ACM では EC2 に直接置けないため、Let's Encrypt などの ACME で取り、Secrets Manager に置く（**未検証**：発行の方法は E2 で決める） | 60 日ごとに自動 |
+| TURN の TLS の証明書（`*.turn.<brand>.<domain>`） | ACM の書き出せる公開の証明書（exportable public certificate）で取り、書き出した証明書と秘密鍵を Secrets Manager に置く。TURN は起動の時に読む。ACM は EC2 を含む任意の場所へ書き出せる証明書を出し、有効期間は 198 日、期限の 45 日前に更新し、更新を EventBridge で知らせる（[ACM exportable public certificates](https://docs.aws.amazon.com/acm/latest/userguide/acm-exportable-certificates.html)、2026-09-27 に確認）。書き出しは追加の料金がかかる | ACM の更新（約 153 日ごと）の通知で、Lambda が書き出して Secrets Manager を替え、TURN を順に読み直させる |
 | カレンダーの OAuth のクライアントの秘密 | Secrets Manager | 提供者の上限か 1 年（[scheduling-and-calendar.md](scheduling-and-calendar.md)） |
 | Webhook の署名の秘密 | `<brand>-meeting-secrets` で暗号化（`webhook_endpoints.secret_ciphertext`） | 持ち主の操作。入れ替えの間は 2 つ（[api-and-webhooks.md](api-and-webhooks.md)） |
 | 公開 API の OAuth のトークン、クライアントの秘密 | ハッシュだけ（`oauth_tokens.token_hash`、`client_secret_hash`） | アクセストークン 1 時間（[api-and-webhooks.md](api-and-webhooks.md)） |
@@ -231,7 +231,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 方針は [ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md)。
 
-- **平時**：Shield Standard（追加の料金なし。**未検証**：Standard が EIP への L3・L4 の攻撃をどこまで緩和するかは公開の資料で確かめていない）。ENA の上限まで余白（点 0.7）を残す。
+- **平時**：Shield Standard（追加の料金なし）。Shield は EC2 に付いた EIP への通信を毎分評価し、インスタンスの種類と大きさから求めた容量を超えると緩和を置く。緩和は攻撃の通信を減らすが、なくすとは限らない。Shield Advanced を加えると、容量の半分で緩和を置き、公開のサブネットの NACL を緩和に取り込む（[Shield のインフラストラクチャの層の検知](https://docs.aws.amazon.com/waf/latest/developerguide/ddos-event-detection-infrastructure.html)、[Shield Advanced の EIP の緩和](https://docs.aws.amazon.com/waf/latest/developerguide/ddos-event-mitigation-logic-adv-eip.html)、2026-09-27 に確認）。ENA の上限まで余白（点 0.7）を残す。
 - **攻撃の兆候**：Node の受信の bps・pps が平常の 5 倍、`pps_allowance_exceeded`・`bw_in_allowance_exceeded` の増加、ICE を通らない送信元からの受信の割合の増加。
 - **対処の順**：
   1. 攻撃を受けた Node で防御のモード（`under_attack`）を入れる。ICE を通った送信元だけを通し、STUN の Binding は毎秒の上限つきで通す。防御のモードの Node は IPv6 の候補を出さない（Shield Advanced が IPv6 を守れないため。[network-traversal.md](network-traversal.md) の 9 節、ADR-0045 の注記）。
@@ -353,10 +353,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Shield Advanced の EIP の保護を加えてから効くまでの時間、検知の基準の学習の要否 | E1 の検証の環境で、AWS の資料と SRT への問い合わせで確かめる |
-| Shield Standard が EIP への攻撃をどこまで緩和するか | 同上 |
-| KMS の Ed25519 の対応（参加のトークンの署名） | E2 で確かめる。無ければ ECDSA P-256 |
-| TURN の TLS の証明書の発行の方法 | E2 で決める |
+| Shield Advanced の EIP の保護を攻撃のときに加えた直後の緩和の振る舞い（事象の報告は保護から 15 分以上たってから。[ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md) の注記） | E7 の `shield-advanced-onboarding` で、SRT への問い合わせと `media-lab` の試験で確かめる |
 | サポートによる組織のデータの参照の許可の仕組み | accounts-and-admin の領域と E12 の前に決める |
 | 無料・試用の組織の上限（同時の会議、人数、長さ） | PM が決める |
 | BYOK | MVP の後の Epic |

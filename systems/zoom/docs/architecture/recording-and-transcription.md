@@ -19,11 +19,11 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| 録画の種類 | 話者の表示と共有の画面、ギャラリー、共有の画面だけ、音声だけ、参加者ごとの音声のファイルを選べる（[Enabling cloud recording](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063923)。細かい項目は大学の IT の解説で確かめた。一次の本文は**未検証**） | 話者＋共有、ギャラリー、音声だけ（m4a）を作る。参加者ごとの音声は、組織の設定で選べる（4.4 節） |
-| 録画の表示と同意 | 録画が始まったとき、または録画中の会議に入ったときに通知が出て、残るか退出するかを選べる（Recording Disclaimer。大学の IT の解説。一次は**未検証**） | 残ることを同意とみなさない。本人が押すまで、その人の音声と映像を送らせない（ADR-0027） |
-| 保持と削除 | 自動の削除の日数を設定できる。削除したものはごみ箱に 30 日残る（大学の IT の解説。一次は**未検証**） | 組織の設定で保持の日数を決め、ごみ箱は 30 日（6 節） |
+| 録画の種類 | 話者と共有の画面を 1 本に、ギャラリーと共有の画面を 1 本に、話者・ギャラリー・共有の画面を別々の動画に、音声だけ（全員で 1 つ、参加者ごと、その両方）を選べる。参加者ごとの音声は最大 200 人。会議のチャットを TXT で残す設定もある（[Changing basic and advanced cloud recording settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064676)） | 話者＋共有、ギャラリー、音声だけ（m4a）を作る。参加者ごとの音声は、組織の設定で選べる（4.4 節） |
+| 録画の表示と同意 | 録画が始まると同意の表示が出て、OK で同意し、Leave で退出する。管理者は、同意の表示を社外の参加者だけに出すか全員に出すかを選べる（[Providing consent to be recorded](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059819)）。応答しないまま残る人の扱いは書かれていない | 残ることを同意とみなさない。本人が押すまで、その人の音声と映像を送らせない（ADR-0027） |
+| 保持と削除 | 削除した録画は、ふつう 30 日の間ごみ箱から戻せる。設定によって期間は変わる（[Recovering a deleted local or cloud recording](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060380)） | 組織の設定で保持の日数を決め、ごみ箱は 30 日（6 節） |
 | E2EE の会議 | クラウド録画、ライブの文字起こしなどが使えない（[End-to-end encryption for meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065408)） | 同じ（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)、ADR-0027） |
-| 録画の作り方 | 公開されていない（**未検証**） | 会議の後に合成する（ADR-0025） |
+| 録画の作り方 | 公開の一次の資料に書かれていない | 会議の後に合成する（ADR-0025） |
 
 いずれも 2026-09-27 に確認。
 
@@ -35,11 +35,15 @@
 | 東京のストリーミング | `transcribestreaming.ap-northeast-1.amazonaws.com` がある。ja-JP は「東京で streaming が使えない言語」の印（*）が付いていない | [endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)、同上 |
 | 音声の形式 | FLAC、Ogg に入れた Opus、PCM（符号付き 16 ビット、リトルエンディアン）。16,000 Hz を勧める。1 つの塊は 50〜200ms | [Transcribing streaming audio](https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html) |
 | 同時の流れ | 既定で 1 リージョンに 25（引き上げの申請ができる）。開始の要求は毎秒 25 | [endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html) |
-| 1 つの流れの長さ | 上限がある（引き上げられない）。4 時間とされる | 上限があることは [Transcribing streaming audio](https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html)。4 時間は [Transcribe の FAQ](https://aws.amazon.com/transcribe/faqs/) の検索結果で見た値で、本文は**未検証** |
+| 1 つの流れの長さ | 上限がある（引き上げられない）。4 時間 | 上限があることは [Transcribing streaming audio](https://docs.aws.amazon.com/transcribe/latest/dg/streaming.html)。4 時間は [Transcribe の FAQ](https://aws.amazon.com/transcribe/faqs/)（「The streaming service can accommodate open connections up to four hours long」） |
 | 途中の結果 | `IsPartial` で確定前を示す。安定化（low・medium・high）を有効にすると、`Stable` の語は変わらない | [Streaming and partial results](https://docs.aws.amazon.com/transcribe/latest/dg/streaming-partial-results.html) |
 | 話者の区別 | 最大 30 人。streaming でも使える | [Partitioning speakers](https://docs.aws.amazon.com/transcribe/latest/dg/diarization.html) |
-| batch の上限 | 1 ファイル 4 時間（28,800 秒）、2 GB | [endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html) |
-| 料金、日本語の誤り率 | — | **未検証**。E8 の前に評価する（8 節） |
+| batch の上限 | クォータの表では 1 ファイル 28,800 秒（8 時間）、2 GB。FAQ は batch を 1 回 4 時間（または 2 GB）と書く。設計は短い方の 4 時間に合わせる | [endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)、[Transcribe の FAQ](https://aws.amazon.com/transcribe/faqs/) |
+| 提供のリージョン | 東京に batch と streaming の受け口がある。大阪にはどちらもない | [endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html) |
+| カスタム語彙 | すべての対応言語で使える（ja-JP を含む）。リストの形は廃止に向かっており、表の形を使う。語彙のファイルは 50 KB まで、1 アカウントに 100 まで | [Custom vocabularies](https://docs.aws.amazon.com/transcribe/latest/dg/custom-vocabulary.html) |
+| 料金 | 東京の streaming は 1 秒 0.0001667 USD（1 分 0.01 USD、段階なし）。カスタム言語モデルの streaming は最初の 25 万分まで 1 秒 0.0001 USD | [AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/transcribe/current/ap-northeast-1/index.json)（`APN1-StreamingAudio`・`APN1-TranscribeStreamingClm`） |
+| AI サービスのオプトアウト | Transcribe は AWS Organizations の AI サービスのオプトアウトのポリシーの対象。オプトアウトしないと、内容をサービスの改善に使い、別のリージョンに置くことがある | [AI services opt-out policies](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_ai-opt-out.html)、[対象のサービスの一覧](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_ai-opt-out_all.html) |
+| 日本語の誤り率と遅れ | — | **未検証**。E8 の `asr-evaluation-set` で評価する（8 節） |
 
 いずれも 2026-09-27 に確認。
 
@@ -96,7 +100,7 @@ ADR-0025。
 | `stopping` | 書き終わりを待つ | `off` |
 | `failed` | Recorder を 3 回割り当て直しても動かない | `off`（主催者に知らせる） |
 
-- 1 回の開催（`instance_id`）で、録画を何度止めて始め直しても、1 つの `recording_id` にまとめる。区間（`segments`）を分けて持つ。本家も同じ会議の録画を 1 つにまとめる（**未検証**）。
+- 1 回の開催（`instance_id`）で、録画を何度止めて始め直しても、1 つの `recording_id` にまとめる。区間（`segments`）を分けて持つ。本家の扱いは公開の一次の資料に書かれていない（この設計はそれに依らない）。
 - 状態は Actor の状態（スナップショットの `recording`）に入れ、`meeting.status` の差分で配る（[signaling-and-meetings.md](signaling-and-meetings.md) の 6.2 節）。
 
 ### 4.2 開始の判定（決定表の草案）
@@ -132,7 +136,7 @@ Actor                          Recorder Pool（ECS）             Media Node（N
 - **producer の出入り**：Actor は、producer が増えたり閉じたりするたびに、Recorder の受け手の購読（`subscriptions.apply` の差分）を更新する。同意していない人の producer は購読に入れない（7 節）。
 - **書き方（rtpseg）**：producer ごとに、受けた RTP のパケットをそのまま、受けた時刻（単調な時計の ns）と一緒に書く。10 秒ごとにファイルを閉じ、S3 の `raw/{org}/{recording_id}/{producer_id}/{seq}.rtpseg` に上げる。上げ終わったら、マニフェストに区切りを追記する。
   - SRTP は Recorder の入口で外す。書くのは、SRTP を外した RTP である。S3 の上では SSE-KMS で暗号化する（9 節）。
-  - 生の RTP で書くので、Recorder は符号を解かない。CPU をほぼ使わない。1 タスクで多数の会議を受け持てるが、障害の影響を小さくするため、1 タスクで 1 会議とする（Fargate の最小の大きさで足りる見込み。**未検証**）。
+  - 生の RTP で書くので、Recorder は符号を解かない。CPU をほぼ使わない。1 タスクで多数の会議を受け持てるが、障害の影響を小さくするため、1 タスクで 1 会議とする（Fargate の最小の大きさで足りる見込み。**未検証**で、E8 の `recorder-rtp-capture` で 100 人の会議の CPU とメモリを測る）。
 - **マニフェスト**（`raw/{org}/{recording_id}/manifest.jsonl`、1 行 1 イベント）：
 
 ```jsonc
@@ -164,7 +168,7 @@ Actor                          Recorder Pool（ECS）             Media Node（N
 | `transcript` | WebVTT と JSON | 文字起こしを残す設定のとき（5.5 節） | 話者つき |
 
 - 名前は、マニフェストの `display_name`（参加した時点のもの）を合成の画面に焼き込む。後から名前を直せないので、利用者向けの説明に書く。
-- 合成の速さの目標：NFR-010（会議の終了から、録画の長さの半分以内に見られる）。1 時間の会議で 30 分。Composer は録画の長さの 2 倍より速く合成する必要がある。1280×720 の合成と H.264 の符号化が、16 vCPU の Fargate で何倍の速さで動くかは**未検証**（E8 で計測する。足りなければ区間ごとに並列で合成し、最後につなぐ）。
+- 合成の速さの目標：NFR-010（会議の終了から、録画の長さの半分以内に見られる）。1 時間の会議で 30 分。Composer は録画の長さの 2 倍より速く合成する必要がある。1280×720 の合成と H.264 の符号化が、16 vCPU の Fargate で何倍の速さで動くかは**未検証**（E8 の `recording-compose` で計測する。足りなければ区間ごとに並列で合成し、最後につなぐ）。
 - 成果物を書き終えたら、`recordings.status = completed` にし、outbox に `recording.completed` を書く（通知と Webhook）。この時点で「成功を知らせた録画」になる。以後、保持の期間の中で失わない（S3 の耐久性と、バージョニング）。
 - 生の区切り（`raw/`）は、合成の成功から 7 日後に消す。合成をやり直せる余地として残す。
 
@@ -201,15 +205,15 @@ ADR-0026。
 
 | 項目 | 既定 | 理由 |
 | --- | --- | --- |
-| 1 会議の枠の数 | 4 | 同時に話す人は多くても数人。本家の会議の実測はない（**未検証**。E8 で見直す） |
+| 1 会議の枠の数 | 4 | 同時に話す人は多くても数人。会議の実測はない（**未検証**。E8 の `transcriber-live-captions` で、枠の取り上げの回数を測って見直す） |
 | 枠を渡す条件 | Transcriber の声の検出（VAD）で、ミュートでない人の発話を 200ms 検出した | 咳や物音で枠を使わない |
 | 前の音声 | 枠を渡す前の 1 秒を貯めておき、流れの最初に送る | 流れを開く遅れで、話し始めの語を失わない |
 | 枠を返す条件 | 20 秒続けて発話がない | 流れを開き直す回数を抑える |
 | 枠が埋まっている | 最も長く話していない人の枠を取り上げる | 今話す人を優先する |
-| 流れの長さ | 3 時間 50 分で、新しい流れに切り替える（前の音声 1 秒を重ねて送る） | 1 つの流れの上限（4 時間とされる。**未検証**）の手前で替える |
+| 流れの長さ | 3 時間 50 分で、新しい流れに切り替える（前の音声 1 秒を重ねて送る） | 1 つの流れの上限（4 時間。2.1 節）の手前で替える |
 
 - 流れを話者ごとに分けるので、字幕と文字起こしの話者は、会議の参加者の名前と必ず合う。会議室の 1 本のマイクを複数の人で使う場合は、1 人として扱う（MVP）。
-- 無音の間は、枠を返すまで、同じ長さの無音を送る（AWS の勧め）。料金は送った音声の長さにかかる見込みなので、枠を返すまでの 20 秒の無音が費用に入る（**未検証**）。
+- 無音の間は、枠を返すまで、同じ長さの無音を送る（AWS の勧め）。料金は streaming の音声の秒で数える（2.1 節の料金は 1 秒ごと）ので、枠を返すまでの 20 秒の無音も費用に入る。1 つの枠の 1 回の発話の後ろに、最大 20 秒分（約 0.0033 USD）が足される。
 
 ### 5.4 遅延の予算
 
@@ -220,7 +224,7 @@ NFR-010：発話から字幕の表示まで p95 2 秒。
 | 端末 → Media Node（ジッタを含む） | 150ms |
 | Media Node → Transcriber（VPC の中） | 10ms |
 | 復号・リサンプル・100ms の塊にためる | 120ms |
-| Transcribe の最初の途中の結果 | 1,000ms（**未検証**。E8 で測る） |
+| Transcribe の最初の途中の結果 | 1,000ms（**未検証**。E8 の `asr-evaluation-set` で測る） |
 | Transcriber → Actor Host → Gateway → 端末 | 200ms |
 | 描画 | 50ms |
 | 余裕 | 470ms |
@@ -241,8 +245,8 @@ NFR-010：発話から字幕の表示まで p95 2 秒。
 
 ### 5.6 語彙
 
-- 組織ごとに、固有名詞（社名、製品名、人名）の語彙を登録できる。ASR Adapter が、エンジンのカスタム語彙に写す。ja-JP でカスタム語彙が使えるかは、表の「Acronyms」の列が no であることしか確かめていない（**未検証**。E8 で確かめる）。使えなければ、カスタム言語モデル（ja-JP は streaming でも対応）を検討する。
-- 利用者の会議の内容で、モデルを学習しない（intent.md の Non-goals）。AWS の AI サービスのオプトアウトのポリシーを、AWS Organizations で設定する（Transcribe が対象かは**未検証**。E8 の前に確かめる）。
+- 組織ごとに、固有名詞（社名、製品名、人名）の語彙を登録できる。ASR Adapter が、エンジンのカスタム語彙に写す。カスタム語彙はすべての対応言語で使える（2.1 節）。ja-JP で no なのは、表の形の語彙で頭字語を扱う機能（「Acronyms」の列）だけである。語彙で足りなければ、カスタム言語モデル（ja-JP は streaming でも対応）を検討する。効果は E8 の `custom-vocabulary` で測る。
+- 利用者の会議の内容で、モデルを学習しない（intent.md の Non-goals）。AWS の AI サービスのオプトアウトのポリシーを、AWS Organizations で設定する（Transcribe は対象。2.1 節）。オプトアウトしないと内容が別のリージョンに置かれうるので、E8 の着手前に必ず設定する。
 
 ## 6. 保存・共有・保持
 
@@ -317,7 +321,7 @@ ADR-0026。
 
 - 評価用の音声のセット：会議の音声 20 時間以上。合成した会話と、利用の条件が明らかな公開のデータセットだけを使う（本題材の AGENTS.md）。専門用語、固有名詞、重なった発話、損失 5%・20% の回線を通した音声を含める。
 - 指標：文字の誤り率（CER、K7 の 15% 以下）、最初の途中の結果までの遅れと確定までの遅れ（p50・p95）、話者ごとの流れを 1 時間動かす費用、東京の中で完結するか。
-- 候補：Amazon Transcribe streaming（既定）、自前でホストする Whisper 系（faster-whisper、kotoba-whisper などを GPU の EC2 で動かし、区切って流す）、その他のクラウドの API（東京に置けるもの）。自前でホストするものは、区切って処理するので遅れが大きくなりうる（**未検証**）。
+- 候補：Amazon Transcribe streaming（既定）、自前でホストする Whisper 系（faster-whisper、kotoba-whisper などを GPU の EC2 で動かし、区切って流す）、その他のクラウドの API（東京に置けるもの）。自前でホストするものは、区切って処理するので遅れが大きくなりうる（**未検証**。`asr-evaluation-set` で測る）。
 - 結果は、ADR-0026 の Confirmation にある比較表として、E8 の変更の `quality.md` に残す。基準を満たさなければ、新しい ADR でエンジンを替える。ASR Adapter の境界は替えない。
 
 ## 9. 障害のときの振る舞い
@@ -325,7 +329,7 @@ ADR-0026。
 | 障害 | 起きること | 回復 |
 | --- | --- | --- |
 | Recorder のタスクが落ちた | 最大 10 秒＋付け替えの数秒を失う | 4.3 節。マニフェストに `gap`。3 回で `failed` |
-| S3 への書き込みが失敗する | Recorder の手元の区切りがたまる | 指数の待ちで再試行。手元に 5 分（約 1 GB の見込み。**未検証**）までためる。超えたら `failed` |
+| S3 への書き込みが失敗する | Recorder の手元の区切りがたまる | 指数の待ちで再試行。手元に 5 分（約 1 GB の見込み。**未検証**で、E8 の `recorder-rtp-capture` で 100 人の会議の書き込みの量を測る）までためる。超えたら `failed` |
 | Media Node の付け替え | 付け替えの数秒を失う | 4.3 節 |
 | Actor の持ち主の交代 | 録画は続く（Recorder は最後の購読のまま受ける） | 新しい Actor がスナップショットと Aurora の `recordings` から状態を戻す。`inventory` の `rec_…` の受け手と突き合わせる |
 | Composer が失敗する | 録画が `processing` のまま | 3 回まで再試行。だめなら `compose_failed` にし、Ops に知らせる。生の区切りは 30 日残す |
@@ -420,10 +424,10 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | 同意しない人を退出させるしかないか、同意の文言、社外の参加者への通知（L3） | 法務の確認の後、PM が決める。E8 の録画の開始の Story の承認の前 |
 | 録画・字幕でサーバーが内容に触れる範囲（L2） | 法務の確認の後。E8 の承認の前 |
 | 外部の音声認識の事業者への委託と、国内に置くことの約束（L6） | 法務の確認の後。E8 のエンジンの選定の前 |
-| Transcribe の料金、日本語の CER、最初の途中の結果の遅れ | E8 の前に 8 節の評価で測る |
-| ja-JP でカスタム語彙が使えるか | E8 の前に確かめる |
-| 1 会議の話者の枠の数（4） | E8 の実測で見直す |
-| 合成の速さ（Fargate 16 vCPU で 2 倍より速いか） | E8 で計測する。足りなければ区間ごとの並列の合成 |
+| 日本語の CER、最初の途中の結果の遅れ（料金は 1 分 0.01 USD と確かめた） | E8 の前に `asr-evaluation-set` で測る |
+| 1 会議の話者の枠の数（4） | E8 の `transcriber-live-captions` の実測で見直す |
+| 合成の速さ（Fargate 16 vCPU で 2 倍より速いか） | E8 の `recording-compose` で計測する。足りなければ区間ごとの並列の合成 |
+| 大阪への切り替えの間の字幕（大阪に Transcribe がない） | 止める。別のリージョンへ送るかは法務（L6）の後 |
 | ダウンロードを許さない共有の配信の形（HLS か） | E8 の `recording-share-and-playback` で決める |
 | 組織ごとの鍵（BYOK） | security.md |
 | 端末の上での録画、AI の要約 | MVP の後の Epic |

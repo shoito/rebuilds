@@ -9,7 +9,7 @@ date: 2026-09-27
 
 intent.md の MVP は「会議の既定の設定と強制」を求める。組織の管理者は、待合室・録画・チャットなどの既定を決め、利用者に変えさせないようにしたい。
 
-本家は、組織・グループ・ユーザーの 3 段で設定し、上で鍵をかけると下で変えられない。組織の鍵はどのグループにも勝ち、複数のグループに属するときは優先度の高いグループの鍵を継ぐ（[Using tiered settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065579)、細部は検索結果で確かめた。一次の本文は未検証）。鍵をかけていない設定は、利用者が無効にできる。パスコードの要件の変更は、既に予定した会議に効かない（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)、2026-09-27 に確認）。
+本家は、組織・グループ・ユーザーの 3 段で設定し、上で鍵をかけると下で変えられない。組織の鍵はグループでもユーザーでも変えられず、複数のグループに属するときは鍵をかけた設定が勝つ（[Using tiered settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065579)、2026-09-27 に確認。複数のグループの鍵がぶつかるときは、グループに加えられた順で決まる）。鍵をかけていない設定は、利用者が無効にできる。パスコードの要件の変更は、既に予定した会議に効かない（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)、2026-09-27 に確認）。
 
 設定の解決は、API（会議の作成）、Actor（開催の開始）、カレンダーの連携、公開 API のすべてで同じでなければならない。どこか 1 か所でも違うと、待合室もパスコードもない会議ができうる（[ADR-0031](0031-waiting-room-and-passcode-rules.md)）。
 

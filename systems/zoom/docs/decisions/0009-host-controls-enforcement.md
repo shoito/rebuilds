@@ -10,7 +10,7 @@ date: 2026-09-27
 主催者は、参加者のミュート、ビデオの停止、退出させる、ロック、共同主催者の指名、画面共有の許可、名前の変更の制限を行える（[intent.md](../intent.md) の MVP）。
 
 - 荒らしへの対処では、相手のクライアントが指示に従わない（改造したクライアント）ことを前提にする必要がある。クライアントに「ミュートして」と頼むだけでは、音声は止まらない。
-- 一方で、他人のマイクやカメラを遠隔で入れることは、盗聴・盗撮になりうる。本家も、主催者は解除を「頼む」形である（**未検証**）。
+- 一方で、他人のマイクやカメラを遠隔で入れることは、盗聴・盗撮になりうる。本家も、既定は主催者が解除を「頼む」形（Ask to Unmute）で、すぐに解除できるのは参加者が前もって同意したときだけである（[Muting or unmuting participants in a meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0066716)、2026-09-27 に確認）。
 - SFU は、producer（送り手からの流れ）を止めれば、全員への転送を止められる（mediasoup の `producer.pause()`。[mediasoup v3 API](https://mediasoup.org/documentation/v3/mediasoup/api/)、2026-09-27 に確認）。
 
 ## Options

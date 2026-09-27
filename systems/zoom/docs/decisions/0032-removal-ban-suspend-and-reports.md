@@ -13,7 +13,7 @@ intent.md は「主催者が退出させた参加者は、同じ会議に再び�
 
 ゲストはアカウントを持たないので、同じ人を確実に見分ける方法がない。ブラウザの保存領域は消せる。IP は、同じ会社や携帯の回線で多くの人が共有する。
 
-本家には、Security のメニューの「Suspend Participant Activities」（映像・音声・チャット・共有・録画などを一度に止める）と、参加者の報告（主催者・共同主催者が、理由と添付を付けて Trust and Safety に送る）がある（前者は大学の IT の解説で確かめた。一次は未検証。後者は [3 New Ways We're Combatting Meeting Disruptions](https://www.zoom.com/en/blog/new-ways-to-combat-zoom-meeting-disruptions/)、2026-09-27 に確認）。
+本家には、「Suspend participant activities」（全員の映像・音声・Zoom Apps・画面共有を止め、会議をロックする。[Changing security settings in a Zoom meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061231)、2026-09-27 に確認）と、参加者の報告（主催者・共同主催者が、理由と添付を付けて Trust and Safety に送る）がある（後者は [3 New Ways We're Combatting Meeting Disruptions](https://www.zoom.com/en/blog/new-ways-to-combat-zoom-meeting-disruptions/)、2026-09-27 に確認）。
 
 ## Options
 

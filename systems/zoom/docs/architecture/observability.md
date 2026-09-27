@@ -54,6 +54,7 @@
 
 - 送らない：ICE の候補の文字列、IP、表示の名前、会議の題名、チャット、字幕、端末の識別子（[clients.md](clients.md) の 11 節）。
 - この一覧が、外部送信の公表（intent.md の L5）の文面の元になる。項目を足す PR は、この表と公表の文面を更新する。
+- Gateway は Firehose へ、タスクごとに 1 秒分の報告を改行区切りの 1 件にまとめて `PutRecordBatch` で送る。東京の Firehose の Direct PUT の既定の上限は 1 ストリーム 1 MiB/秒で、S1 のピーク（約 6 MB/秒）に足りないため、上限を引き上げる（[capacity.md](capacity.md) の 5.4 節）。
 - 1 件は約 1〜3 KB（25 本の映像を受けるとき）。S1 のピークで 1 秒に約 3,000 件。
 
 ### 2.3 Media Node と TURN
@@ -78,7 +79,7 @@
 
 | 置き場所 | 中身 | ラベル・鍵 | 保持 |
 | --- | --- | --- | --- |
-| AMP | SLI の分子・分母、Node・TURN・制御の側の数 | リージョン、AZ、Node、世代、ブラウザの系統、`ice_path`、`client_kind`。**会議・参加者・組織・IP は入れない** | 150 日（AMP の既定。**未検証**） |
+| AMP | SLI の分子・分母、Node・TURN・制御の側の数 | リージョン、AZ、Node、世代、ブラウザの系統、`ice_path`、`client_kind`。**会議・参加者・組織・IP は入れない** | 150 日（AMP の既定。最大 1,095 日まで設定できる。[Configure your workspace](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP-workspace-configuration.html)、2026-09-27 に確認） |
 | S3（Firehose、Parquet）＋ Athena | `qos.report` と Media Node の transport・consumer の要約 | `dt`・`hour` の区切り。`instance_id`・`participant_id` の列 | 30 日（参加者の単位の生の記録） |
 | S3（日次の集計） | 組織・ブラウザ・経路ごとの日次の品質の集計（参加者の ID なし） | — | 13 か月 |
 | Aurora `participant_quality_summaries` | 参加ごとの要約（下の表） | `(instance_id, participant_id)` | 12 か月（[accounts-and-admin.md](accounts-and-admin.md) の 6.3 節と同じ） |
@@ -115,8 +116,8 @@ R    = R0 − Idd − Ie,eff                                   // R0 = 93.2（�
 MOS  = 1 + 0.035 R + R (R − 60)(100 − R) × 7 × 10⁻⁶         (0 < R < 100)
 ```
 
-- 上の式は、E-model の既知の形の転記である。G.107 の本文との照合は E1 で行う（**未検証**）。
-- `Ie`・`Bpl`（Opus ＋ FEC ＋ RED の組の符号器の劣化）は、ITU-T の付録の値を確かめていない（**未検証**）。`media-lab` の回線の劣化の試験（損失 0〜30%、揺らぎ 0〜100ms、RTT 20〜300ms の格子）で、同じ条件の ViSQOL v3 の値との二乗誤差が最小になるように決める。初期値は `Ie = 0`、`Bpl = 20`（仮）。
+- 上の式は、G.107（06/2015）の本文の式 7-27〜7-29 と付録 B の B-4 に合う（遅れの感じやすさは既定の `sT = 1`・`mT = 100ms`。R < 0 は MOS 1、R > 100 は MOS 4.5。2026-09-27 に照合）。
+- `Ie`・`Bpl`（Opus ＋ FEC ＋ RED の組の符号器の劣化）は、G.113（09/2024）の付録 I に Opus の値がない（G.711 は PLC ありで `Ie = 0`、`Bpl = 25.1`）。そのため、`media-lab` の回線の劣化の試験（損失 0〜30%、揺らぎ 0〜100ms、RTT 20〜300ms の格子）で、同じ条件の ViSQOL v3 の値との二乗誤差が最小になるように決める（E4 の `mos-est-calibration`）。初期値は `Ie = 0`、`Bpl = 20`（仮）。
 - 係数はブラウザの系統ごとに持てる形にする（NetEQ の振る舞いの違い）。係数を変える PR は QA の承認を要する。
 - 狭帯域の尺度（上限 約 4.4）で出す。G.107.1（06/2019、[G.107.1](https://www.itu.int/rec/T-REC-G.107.1)、2026-09-27 に確認）の広帯域の尺度には、係数を確かめてから移る。
 - **推定は ViSQOL と同じではない。** 本番の値は、傾向の把握、比較（Node の世代、ブラウザ、経路）、SLI に使う。NFR-003 の判定は、試験の環境の ViSQOL で行う。
@@ -126,13 +127,13 @@ MOS  = 1 + 0.035 R + R (R − 60)(100 − R) × 7 × 10⁻⁶         (0 < R < 1
 
 - webrtc-stats の定義（直近 30 フレームの平均の間隔 `d` に対し、`max(3d, d + 150ms)` 以上の間隔。[webrtc-stats](https://www.w3.org/TR/webrtc-stats/)、2026-09-27 に確認）の `freezeCount`・`totalFreezesDuration` を使う。
 - **フリーズのない分**：1 分の中で、受けた映像のどれにも「1 秒以上のフリーズ」がなかった分。1 秒以上かどうかは、10 秒の窓の中の `totalFreezesDuration` の増分 ÷ `freezeCount` の増分が 1 秒以上か、増分が 1 秒以上で回数が 1 のときで判定する（近似）。
-- 受け手が自分で止めた映像（見えないタイル、帯域で止めた consumer でアバターを出したもの）は、フリーズに数えない。Media Node が止めた consumer は `inbound-rtp` が止まるだけで、フリーズの定義（描画の間隔）には当たらない見込み（**未検証**。E4 で確かめる）。
+- 受け手が自分で止めた映像（見えないタイル、帯域で止めた consumer でアバターを出したもの）は、フリーズに数えない。Media Node が止めた consumer は `inbound-rtp` が止まるだけで、フリーズの定義（描画の間隔）には当たらない見込み（**未検証**。E4 の `freeze-sli` で確かめる）。
 
 ## 5. SLI と SLO
 
 [ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md)。SLO の値と表の正本は、Ops の [runbooks/README.md](../runbooks/README.md) の 1 節にある。ここは計測の仕組みを書く。値を変えるときは runbooks を先に変え、ここを合わせる。**値は既定案。**
 
-| SLI | 分子 ／ 分母 | 出所 | SLO（28 日） |
+| SLI | 分子 ／ 分母 | 出所 | SLO（30 日） |
 | --- | --- | --- | --- |
 | 参加の成功 | 10 秒以内に音声の送受信が始まった参加の試行 ／ 参加の試行（待合室の時間を除く） | クライアントの `join.result`（`qos.report` の最初の件と、失敗の報告）と API の `POST /join` | 99.5%（K2） |
 | 参加の速さ | 参加のボタンから最初の音声の送受信まで | 同上 | p95 3 秒（NFR-002）。TURN の経路は 5 秒 |
@@ -247,10 +248,9 @@ MOS  = 1 + 0.035 R + R (R − 60)(100 − R) × 7 × 10⁻⁶         (0 < R < 1
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| E-model の式の G.107 の本文との照合と、Opus の `Ie`・`Bpl` | E1（照合）、E4（係数の合わせ込み） |
-| 止めた consumer・帯域で止めた映像が、webrtc-stats のフリーズに数えられるか | E4 |
+| Opus の `Ie`・`Bpl`（G.107 の式は照合済み。G.113 に Opus の値はない） | E4 の `mos-est-calibration` |
+| 止めた consumer・帯域で止めた映像が、webrtc-stats のフリーズに数えられるか | E4 の `freeze-sli` |
 | 外部送信の公表の文面（L5） | 法務の確認の後。2.2 節の一覧から作る |
-| AMP の保持の期間 | E1 で確かめる |
 | 組織ごとの品質の SLA を約束するか | GA の前に PM が決める（組織の回線の悪さを含むため、難しい） |
 
 ## 11. quality.md・runbooks への項目

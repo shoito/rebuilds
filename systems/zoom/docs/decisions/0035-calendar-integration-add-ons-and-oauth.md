@@ -11,7 +11,7 @@ intent.md の MVP は「Google カレンダーと Microsoft 365 の予定に、�
 
 確かめたこと（いずれも 2026-09-27 に確認）：
 
-- Google：Workspace のアドオンで会議の方式を宣言すると、利用者が予定を作るときに選べ、`onCreateFunction` が会議の情報（`ConferenceData`）を返す。予定の変更と削除を検知して、会議の側を合わせられる（[Calendar conferencing overview](https://developers.google.com/workspace/add-ons/calendar/conferencing/overview)）。Calendar API の `events.watch` で変更の通知を受けられる（[Push notifications](https://developers.google.com/workspace/calendar/api/guides/push)）。API から第三者が `conferenceData` の入口を直接書けるかは確かめていない（未検証）。
+- Google：Workspace のアドオンで会議の方式を宣言すると、利用者が予定を作るときに選べ、`onCreateFunction` が会議の情報（`ConferenceData`）を返す。予定の変更と削除を検知して、会議の側を合わせられる（[Calendar conferencing overview](https://developers.google.com/workspace/add-ons/calendar/conferencing/overview)）。Calendar API の `events.watch` で変更の通知を受けられる（[Push notifications](https://developers.google.com/workspace/calendar/api/guides/push)）。API から第三者が `conferenceData` の入口を直接書けるかは文書に書かれていない（**未検証**。E6 の `google-calendar-oauth-write` で確かめる）。
 - Microsoft：Outlook の online-meeting のアドインは、web・Windows・Mac・モバイルで、予定の本文に会議の情報を足す。管理者が配ったものだけが作成の画面に出る。1 分以内に本文を更新する。Join のボタンは Marketplace での公開と登録が要る（[online-meeting add-in](https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/online-meeting)）。Graph の予定の `onlineMeetingProvider` は Microsoft の方式だけで、第三者は使えない。`transactionId` で作成の重複を防げる（[event](https://learn.microsoft.com/en-us/graph/api/resources/event?view=graph-rest-1.0)）。予定の変更の通知の購読は最長 10,080 分（[subscription](https://learn.microsoft.com/en-us/graph/api/resources/subscription?view=graph-rest-1.0)）。
 
 ## Options
@@ -43,7 +43,7 @@ intent.md の MVP は「Google カレンダーと Microsoft 365 の予定に、�
 - 引き受けるコスト：
   - Google のアドオン、Outlook のアドイン、2 つの API、2 つの通知の方式を持つ。相手の仕様の変更に追従する必要がある。
   - 利用者のリフレッシュトークンを預かる。暗号化と取り消しの扱いが要る。
-  - Google の機微な範囲の確認の審査と、Outlook の Join のボタンのための Marketplace の公開が要る（未検証。E6・E12 で確かめる）。
+  - Google の確認の審査（利用者のデータに触れる範囲を使う公開のアプリに要る。[Calendar API の認可](https://developers.google.com/workspace/calendar/api/auth)）と、Outlook の Join のボタンのための Microsoft Marketplace の公開と登録が要る（[online-meeting add-in](https://learn.microsoft.com/en-us/office/dev/add-ins/outlook/online-meeting)、いずれも 2026-09-27 に確認）。審査の期間は E6 の `google-calendar-oauth-write` と E12 の `outlook-addin-marketplace` で見込む。
   - Graph の予定では、Teams のような「会議の予定」としては表示されない（本文の区切りで示す）。
 
 ## Confirmation

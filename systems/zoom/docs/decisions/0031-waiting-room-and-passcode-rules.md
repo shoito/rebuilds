@@ -11,7 +11,7 @@ date: 2026-09-27
 
 会議の ID は秘密ではなく、URL のフラグメントの参加の鍵はパスコードの入力だけを省く（[ADR-0006](0006-meeting-id-and-join-url.md)）。[signaling-and-meetings.md](../architecture/signaling-and-meetings.md) の 16 節は、「参加の鍵を持つ人に待合室も省かせるか」を、この領域の判断に委ねている。
 
-本家は、待合室を省く条件として、同じアカウントのユーザー、許可したドメイン、会議の中から招待した人などを選ばせる（[Enabling and customizing the waiting room](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059359)、項目は大学の IT の解説で確かめた。一次の本文は未検証）。パスコードは、組織の設定で要件を選べ、招待のリンクに埋め込める（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)、2026-09-27 に確認）。
+本家は、待合室を省く条件として、同じアカウントのユーザー、許可したドメイン、会議の中から招待した人などを選ばせる（[Enabling and customizing the waiting room](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059359)、2026-09-27 に確認）。パスコードは、組織の設定で要件を選べ、招待のリンクに埋め込める（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)、2026-09-27 に確認）。
 
 主催者は招待のためにパスコードを見る必要があるので、ハッシュだけでは持てない。電話からの参加（MVP の後）では、押しボタンで入力できる数字が要る。
 

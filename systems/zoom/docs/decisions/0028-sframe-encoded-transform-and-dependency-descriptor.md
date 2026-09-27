@@ -7,16 +7,17 @@ date: 2026-09-27
 
 ## Context
 
-[ADR-0004](0004-encryption-and-e2ee.md) は、E2EE の会議のメディアを SFrame で暗号化し、鍵を MLS から導くと決めた。そのとき、SFU が SVC の層を判断するヘッダー拡張（Dependency Descriptor など）を平文で送る必要があり、mediasoup の対応は未検証とした。SFrame の形、ブラウザでの暗号化の場所、Media Node の層の選び方を決める必要がある。
+[ADR-0004](0004-encryption-and-e2ee.md) は、E2EE の会議のメディアを SFrame で暗号化し、鍵を MLS から導くと決めた。そのとき、SFU が SVC の層を判断するヘッダー拡張（Dependency Descriptor など）を平文で送る必要があり、mediasoup の対応はそのとき確かめていなかった。SFrame の形、ブラウザでの暗号化の場所、Media Node の層の選び方を決める必要がある。
 
 調べて分かったこと（いずれも 2026-09-27 に確認）。
 
 - SFrame は 5 つの暗号の組を持つ。`AES_128_GCM_SHA256_128`（`0x0004`）はタグ 16 バイト（[RFC 9605](https://www.rfc-editor.org/rfc/rfc9605)）。
 - MLS と組むときは、`base_key = MLS-Exporter("SFrame 1.0 Base Key", "", AEAD.Nk)`、`KID = (context << (S + E)) + (sender_index << E) + (epoch % (1 << E))`（RFC 9605 の 5.2 節）。
 - simulcast の層は別々に暗号化し、一意の CTR を使う。SVC は層ごとに別の暗号文にしなければならない。新しい鍵の後にキーフレームを送ると、新しい参加者の表示が早い（RFC 9605 の 6.1〜6.2 節）。
-- `RTCRtpScriptTransform` は Chrome・Edge 141、Firefox 117、Safari 15.4 から（[caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)）。組み込みの `SFrameTransform` は仕様にあるが、Chrome は出荷していない（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、[Mozilla の bug 1715625](https://bugzilla.mozilla.org/show_bug.cgi?id=1715625)。未検証の二次の情報を含む）。
+- `RTCRtpScriptTransform` は Chrome・Edge 141、Firefox 117、Safari 15.4 から（[caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)）。組み込みの `SFrameTransform` は仕様にあるが、browser-compat-data（v8.1.3）はどのブラウザの対応も「不明」と記録している（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、[Mozilla の bug 1715625](https://bugzilla.mozilla.org/show_bug.cgi?id=1715625)）。
 - mediasoup は、DD を `recvonly` で扱い、AV1 でだけ使う。VP8 のキーフレームはペイロードの先頭で判定する（[supportedRtpCapabilities.ts](https://github.com/versatica/mediasoup/blob/v3/node/src/supportedRtpCapabilities.ts)、[CHANGELOG](https://github.com/versatica/mediasoup/blob/v3/CHANGELOG.md)）。SFrame はフレーム全体を暗号化するので、E2EE の会議ではこの判定ができない。
-- Chrome と Firefox 136 以降は DD を送る（[MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs)）。Safari は未検証。
+- Chrome と Firefox 136 以降は DD を送る（[MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs)）。Safari は MDN に記載がなく**未検証**（E9 の `e2ee-poc-transform` で確かめる）。
+- RFC 9605 は、SFU が層を落とせるように、送り手は SVC の層ごとに別の SFrame の暗号文にしなければならない（MUST）とする（6.1.3 節）。
 
 ## Options
 

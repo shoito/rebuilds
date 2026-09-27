@@ -49,11 +49,11 @@
 | SFrame のメタデータ | フレームのメタデータは、SFU が見える場所（RTP のヘッダー拡張など）に出す。受け手は、復号で認証する前にメタデータを使ってはならない（復号の準備を除く） | RFC 9605 |
 | MLS | DS はほぼ信頼しない、AS は信頼する前提。外部コミットで、KeyPackage なしに GroupInfo から参加できる。`MLS-Exporter(Label, Context, Length)`。必須の暗号の組は `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519`（`0x0001`）。`epoch_authenticator` は帯域外の確認に使える。コミットの送り手は、自分のコミットが次に適用されると分かれば、戻りを待たずに進めてよい | [RFC 9420](https://www.rfc-editor.org/rfc/rfc9420.html) |
 | OpenMLS | 0.9.0（2026-08-25）、MIT。`0x0001` などの 3 つの暗号の組。`js` の機能で WASM に対応。`MlsGroup` に `export_secret`、`epoch_authenticator`、`join_by_external_commit`、`remove_members`、`leave_group_via_self_remove`、`recover_fork_by_readding` がある。1.0 の前 | [openmls](https://github.com/openmls/openmls)、[docs.rs の MlsGroup](https://docs.rs/openmls/latest/openmls/group/struct.MlsGroup.html) |
-| SFrame の Rust の実装 | `sframe` の crate 2.0.0（2026-09-13）。RFC 9605 の純粋な Rust の実装。成熟度と監査の有無は**未検証** | [crates.io の sframe](https://crates.io/crates/sframe)、[TobTheRock/sframe-rs](https://github.com/TobTheRock/sframe-rs) |
+| SFrame の Rust の実装 | `sframe` の crate 2.0.0（2026-09-13）。RFC 9605 の純粋な Rust の実装。成熟度と監査の有無は**未検証**（E9 の `core-e2ee-sframe` で、RFC 9605 の付録 C のベクトルを通し、依存の監査の記録を確かめる） | [crates.io の sframe](https://crates.io/crates/sframe)、[TobTheRock/sframe-rs](https://github.com/TobTheRock/sframe-rs) |
 | Encoded Transform | `RTCRtpScriptTransform`（worker で符号化の後のフレームを変換する）、`SFrameTransform`、`generateKeyFrame(rid)`・`sendKeyFrameRequest()` を定める。2026-06-25 の Working Draft | [WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/) |
 | `RTCRtpScriptTransform` の対応 | Chrome・Edge 141、Firefox 117、Safari 15.4、iOS の Safari 15.4、Android の Chrome 152 から。Baseline 2025 | [caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)、[MDN](https://developer.mozilla.org/en-US/docs/Web/API/RTCRtpScriptTransform) |
-| `SFrameTransform` の対応 | Safari は似たものを持つ。Firefox は `RTCRtpScriptTransform` を優先し、`SFrameTransform` は低い優先度。Chrome は出荷していない。**未検証**（二次の情報） | [Mozilla の bug 1715625](https://bugzilla.mozilla.org/show_bug.cgi?id=1715625) |
-| Dependency Descriptor | Chrome と Firefox 136 以降が送る（Firefox は VP8・H.264・VP9・AV1）。Safari は**未検証**。VP8 の simulcast で DD を送るには、2 バイトのヘッダー拡張が要る（1 バイトの形の上限 16 バイトを超えるため）。**未検証**（二次の情報） | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
+| `SFrameTransform` の対応 | browser-compat-data は、Chrome・Firefox・Safari のどれも対応を「不明」（null）と記録している。Firefox は `RTCRtpScriptTransform` を優先し、`SFrameTransform` は低い優先度とする。この設計は `SFrameTransform` を使わない（ADR-0028）ので、対応の有無に依らない | [Mozilla の bug 1715625](https://bugzilla.mozilla.org/show_bug.cgi?id=1715625)、browser-compat-data v8.1.3（2026-09-27 に確認） |
+| Dependency Descriptor | Chrome と Firefox 136 以降が送る（Firefox は VP8・VP9・AV1。H.264 は 137 からでデスクトップだけ）。Safari は MDN に記載がなく**未検証**。VP8 の simulcast で DD を送るには、2 バイトのヘッダー拡張が要る（1 バイトの形の上限 16 バイトを超えるため）という二次の情報がある（**未検証**）。どちらも E9 の `e2ee-poc-transform` で確かめる | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
 | mediasoup と DD | DD の拡張は `recvonly`。AV1 でだけ DD を使う。VP8・VP9 はペイロードの記述子とペイロードの先頭から判断する | [supportedRtpCapabilities.ts](https://github.com/versatica/mediasoup/blob/v3/node/src/supportedRtpCapabilities.ts)、[CHANGELOG](https://github.com/versatica/mediasoup/blob/v3/CHANGELOG.md)、[#1625](https://github.com/versatica/mediasoup/issues/1625) |
 
 ## 4. 構成
@@ -89,7 +89,7 @@ API（AS）
   - 主体：`participant_id`、`instance_id`、`user_id`（ゲストは空と `guest` の印）、`org_id`、表示の名前の SHA-256。
   - 有効期限：会議の予定の終わり＋ 1 時間、最大 24 時間。
   - 発行者：AS の中間 CA。中間 CA の鍵は KMS で守る。根の証明書は、クライアントに同梱し、ずらして入れ替える（2 つを並べて持つ）。
-- MLS の資格情報の型は `x509`。クライアントは、名簿の全員の証明書の連鎖を、同梱の根まで検証する。OpenMLS は資格情報の中身の検証をアプリに任せるので、`core-e2ee` に検証を実装する（**未検証**：OpenMLS の `x509` の資格情報の扱いの細部）。
+- MLS の資格情報の型は `x509`。クライアントは、名簿の全員の証明書の連鎖を、同梱の根まで検証する。OpenMLS は資格情報を中を見ずに渡すだけで、組み込みの実装は `BasicCredential` だけである。`CredentialType::X509` の型はあり、`Credential::new(CredentialType::X509, …)` で証明書の連鎖を載せられる（[openmls の credentials](https://github.com/openmls/openmls/blob/main/openmls/src/credentials/mod.rs)、v0.9.0、2026-09-27 に確認）。証明書の連鎖の符号化と検証は `core-e2ee` に実装する（E9 の `e2ee-credentials-as`）。
 - 同じ人が長く同じ鍵を使う形（端末に残る鍵と、その履歴の公開）は、S1 では作らない。AS のなりすましは、セキュリティのコードと名簿の表示で見つける前提にする（10 節、11 節）。
 
 ## 6. MLS のグループと DS（ADR-0029）
@@ -161,7 +161,7 @@ API（AS）
 ### 6.5 外部の送り手の制限
 
 - クライアントは、外部の送り手からの提案のうち Remove だけを受ける。Add、PSK、グループの拡張の変更の提案は拒む（サーバーが勝手に人を足せないようにする）。
-- 外部の送り手の鍵は、Actor Host がリージョンごとに持つ Ed25519 の鍵。Secrets Manager から起動の時に読み、月に 1 回入れ替える。グループは作った時の鍵を使い続けるので、古い鍵は 24 時間残す（**未検証**：KMS で Ed25519 の署名を直接使えるなら、そちらに替える）。
+- 外部の送り手の鍵は、リージョンごとの KMS の Ed25519 の鍵（`<brand>-e2ee-external-sender`。[ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md)）。Actor Host は `Sign` だけを持ち、秘密鍵を読めない。KMS は Ed25519 の鍵（`ECC_NIST_EDWARDS25519`）と、メッセージをそのまま渡す `ED25519_SHA_512` の署名に対応する（[AWS KMS now supports EdDSA](https://aws.amazon.com/about-aws/whats-new/2025/11/aws-kms-edwards-curve-digital-signature-algorithm/)、2026-09-27 に確認）。月に 1 回、新しい鍵を作って別名を替える。グループは作った時の鍵を使い続けるので、古い鍵は 24 時間残す。KMS の署名の呼び出しは Remove の提案ごとに 1 回で、9 節の「退出の確定 → Remove の提案を全員へ」の 150ms に入れる。
 
 ## 7. SFrame とメディア（ADR-0028）
 
@@ -178,7 +178,7 @@ API（AS）
 
 - S=10 は、leaf の番号 1,024 までを表せる（S3 の 1,000 人）。E=4 は、16 エポックの並べ替えの窓。
 - context を送り方と層で分けるのは、同じ参加者の複数の送り方（と simulcast の層）が、同じ鍵で CTR を重ねないようにするため（RFC 9605 の 6.1.2 節）。
-- SVC の会議（ADR-0018 の `svc`）では、ブラウザが層ごとに別のフレームとして変換に渡すことを前提にする（RFC 9605 の 6.1.3 節の MUST）。Chrome の実際の振る舞いは**未検証**。E9 の PoC で確かめ、満たさなければ E2EE の会議は `simulcast` だけにする。
+- SVC の会議（ADR-0018 の `svc`）では、ブラウザが層ごとに別のフレームとして変換に渡すことを前提にする（RFC 9605 の 6.1.3 節の MUST）。Chrome の実際の振る舞いは**未検証**。E9 の `e2ee-poc-transform` で確かめ、満たさなければ E2EE の会議は `simulcast` だけにする。
 
 ### 7.2 ブラウザでの暗号化の場所
 
@@ -189,12 +189,12 @@ API（AS）
 5. ネイティブ（モバイル）は、libwebrtc の `FrameTransformerInterface` から共通のコアの SFrame を呼ぶ。Electron は Web と同じ。
 
 - `SFrameTransform`（ブラウザに組み込みの SFrame）は使わない。Chrome が出荷しておらず、ブラウザごとに鍵の渡し方が変わるため。
-- ワーカーの中の SFrame は、`core-e2ee` の SFrame（Rust、WASM）を使う。WebCrypto の AES-GCM は非同期で、フレームごとの呼び出しの費用が大きい見込み（**未検証**。PoC で両方を測る）。
+- ワーカーの中の SFrame は、`core-e2ee` の SFrame（Rust、WASM）を使う。WebCrypto の AES-GCM は非同期で、フレームごとの呼び出しの費用が大きい見込み（**未検証**。E9 の `e2ee-poc-transform` で両方を測る）。
 
 ### 7.3 RED と FEC
 
 - Opus のインバンド FEC は、符号化したフレームの中にあるので、そのまま暗号化される。
-- RED（[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)）と Encoded Transform を組んだとき、変換が RED で包む前に呼ばれるか後に呼ばれるかは**未検証**。確かめるまで、E2EE の会議では RED を使わない。
+- RED（[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)）と Encoded Transform を組んだとき、変換が RED で包む前に呼ばれるか後に呼ばれるかは**未検証**（E9 の `e2ee-poc-transform`）。確かめるまで、E2EE の会議では RED を使わない。
 
 ## 8. 層の選択と Dependency Descriptor（ADR-0028）
 
@@ -212,9 +212,9 @@ Media Node は、ペイロード（SFrame の暗号文）を読まずに、次�
 - そこで次のとおりにする。
   1. E2EE の会議では、全員の送り手に DD を送らせる（2 バイトのヘッダー拡張の交渉を含む）。
   2. Media Node（mediasoup の worker）に、VP8・VP9 でも DD からキーフレームと層を判断する処理を足す。mediasoup は AV1 の DD の読み取りを持つので、それを広げる。RED と同じく上流に提案し、取り込まれるまではフォークで持つ（[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)）。
-  3. DD を送れない送り手（Safari の対応は**未検証**）は、simulcast をやめ、1 本（360p、`L1T1`）だけを送る。層の切り替えが要らないので、キーフレームの判定も要らない。受け手の参加時のキーフレームは、送り手に PLI を送って得る。
+  3. DD を送れない送り手（Safari の対応は**未検証**。E9 の `e2ee-poc-transform`）は、simulcast をやめ、1 本（360p、`L1T1`）だけを送る。層の切り替えが要らないので、キーフレームの判定も要らない。受け手の参加時のキーフレームは、送り手に PLI を送って得る。
 - DD は、ヘッダー拡張の暗号化（RFC 9335 の cryptex など）に含めない。Media Node が読めなくなるため。
-- 受け手のブラウザの復号の前の処理（depacketizer）が、暗号化したペイロードの中を読むかどうかは**未検証**。読んで失敗する場合は、VP8 のフレームのヘッダー（キーフレームで 10 バイト、それ以外で 3 バイト。RFC 6386 の frame tag）を暗号化せず、SFrame の認証の対象（メタデータ）として残す。Insertable Streams で、先頭の数バイトを暗号化しないことで復号器と中継を通した例がある（[webrtcHacks](https://webrtchacks.com/true-end-to-end-encryption-with-webrtc-insertable-streams/)、2020-04、2026-09-27 に確認）。これは RFC 9605 の外の扱いなので、使うなら ADR-0028 を改める。
+- 受け手のブラウザの復号の前の処理（depacketizer）が、暗号化したペイロードの中を読むかどうかは**未検証**（E9 の `e2ee-poc-transform`）。読んで失敗する場合は、VP8 のフレームのヘッダー（キーフレームで 10 バイト、それ以外で 3 バイト。RFC 6386 の frame tag）を暗号化せず、SFrame の認証の対象（メタデータ）として残す。Insertable Streams で、先頭の数バイトを暗号化しないことで復号器と中継を通した例がある（[webrtcHacks](https://webrtchacks.com/true-end-to-end-encryption-with-webrtc-insertable-streams/)、2020-04、2026-09-27 に確認）。これは RFC 9605 の外の扱いなので、使うなら ADR-0028 を改める。
 
 ## 9. 退出からの鍵の更新（NFR-008）
 
@@ -223,9 +223,9 @@ Media Node は、ペイロード（SFrame の暗号文）を読まずに、次�
 | 区間 | 予算（p95） |
 | --- | --- |
 | 退出の確定 → Remove の提案を全員へ | 150ms |
-| 担当者がコミットを作る（100 人、WASM） | 150ms（**未検証**） |
+| 担当者がコミットを作る（100 人、WASM） | 150ms（**未検証**。E9 の `e2ee-rekey-on-leave` で測る） |
 | コミット → Actor の順序付け → 全員へ | 200ms |
-| 各自がコミットを処理し、SFrame に新しい鍵を入れる | 150ms（**未検証**） |
+| 各自がコミットを処理し、SFrame に新しい鍵を入れる | 150ms（**未検証**。同上） |
 | 送り手の次のフレーム | 20ms（音声）〜33ms（映像） |
 | 余裕（担当者の交代 1 回の 400ms を含む） | 約 1,300ms |
 
@@ -381,7 +381,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | Safari の DD の対応 | 同上。対応しなければ 1 本だけ送る形のまま |
 | SVC の層ごとに別のフレームとして変換に渡るか | 同上 |
 | SFrame を WASM と WebCrypto のどちらで動かすか | 同上。1 フレームの処理時間で決める |
-| `sframe` の crate の成熟度と監査 | E9 の着手時。足りなければ `core-e2ee` の中に RFC 9605 を実装し、試験のベクトルで確かめる |
+| `sframe` の crate の成熟度と監査 | E9 の `core-e2ee-sframe` の着手時。足りなければ `core-e2ee` の中に RFC 9605 を実装し、試験のベクトルで確かめる |
 | 端末に残る長期の鍵（本家の sigchain に相当）を作るか | S2 の前。AS のなりすましへの守りを強めたい組織の要望を見て決める |
 | 参加者どうしのなりすましを防ぐ送り手ごとの署名 | S2 の前。費用（フレームごとの署名）を測る |
 | 捜査機関への対応で、E2EE の会議について何を示せるか | 法務（intent.md の L4）。E9 の一般への提供の前 |

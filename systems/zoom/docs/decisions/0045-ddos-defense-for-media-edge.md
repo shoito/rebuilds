@@ -34,7 +34,7 @@ S1 のインターネットへの転送は、月に約 3.7 PB の見込みであ
 
 - **入口は常に守る。** CloudFront（Web、API、シグナリングの WebSocket）、その後ろの ALB、Route 53 のホストゾーンを Shield Advanced の保護に入れる。これらの外への転送は小さい。
 - **Media Node と TURN の EIP は、常には守らない。** 攻撃を検知したら（ENA の `pps_allowance_exceeded`・`bw_in_allowance_exceeded` の急増、受信の急増）、攻撃を受けた範囲の EIP を保護に加える。攻撃が止んで 24 時間たったら外す。手順は [runbooks/incident-response.md](../runbooks/incident-response.md) の「メディアの IP への DDoS」。
-  - 保護を加えてから効くまでの時間と、検知の基準が学習を要するかは**未検証**。E1 の検証の環境で、保護を加えた直後の洪水の扱いを AWS の資料と SRT への問い合わせで確かめる。
+  - > 2026-09-27 の注記：AWS の資料で次を確かめた。Shield Standard は、保護を加えなくても、EC2 に付いた EIP への通信を毎分評価し、インスタンスの容量を超えると緩和を置く（[インフラストラクチャの層の検知](https://docs.aws.amazon.com/waf/latest/developerguide/ddos-event-detection-infrastructure.html)）。Shield Advanced を加えると、容量の半分で緩和を置き、公開のサブネットの NACL を緩和に取り込む（[EIP の緩和](https://docs.aws.amazon.com/waf/latest/developerguide/ddos-event-mitigation-logic-adv-eip.html)）。ただし Shield Advanced は、期待する通信の基準を先に作る必要があり、インフラストラクチャの層の事象を報告するのは保護から 15 分以上たってからで、AWS は攻撃の前に保護することを勧めている（[Viewing Shield Advanced events](https://docs.aws.amazon.com/waf/latest/developerguide/ddos-events.html)、いずれも 2026-09-27 に確認）。攻撃のときに加える形では、最初の 15 分以上は Shield Standard と防御のモードだけで耐える。決定（常には守らない）は、転送の料金の差が大きいので変えない。代わりに、NACL で送信元を絞る手順を防御のモードと並べて runbook に入れ、保護を加えた直後の緩和の振る舞いは E7 の `shield-advanced-onboarding` で SRT に確かめる。
 - **Media Node の防御のモード（`under_attack`）**：Node Agent が `nftables` の集合に、その Node で ICE を通った参加者の送信元のアドレス（IP とポート）を入れる。モードを入れると、集合にない送信元からの UDP は、STUN の Binding 要求を毎秒の上限つきで通すほかは捨てる。新しい参加は、STUN から始まるので通る。モードは Node ごとに、Media Assignment Service の指示か手動で入れる。
 - **攻撃を受けた Node から会議を逃がす。** 防御のモードでも ENA の上限を超えるなら、その Node を `draining` にし、会議を別の Node へ make-before-break で移す（[ADR-0013](0013-media-node-failover-and-reattach.md)）。攻撃を受けた EIP は、会議がなくなったら Node から外し、しばらく（既定 7 日）新しい Node に付けない。
 - **ENA の上限の近くで動かさない。** 平時の Node の点の上限（0.7。[ADR-0012](0012-media-assignment-and-cascading.md)）は、攻撃の分の余白も兼ねる。
@@ -50,7 +50,7 @@ S1 のインターネットへの転送は、月に約 3.7 PB の見込みであ
   - 参加の入口は、L3〜L7 の攻撃から常に守られる。
   - メディアの転送に、Shield Advanced の料金を常にはかけない。
 - 引き受けるコスト：
-  - Media Node への攻撃の最初の数分は、防御のモードと Node の入れ替えだけで耐える。攻撃を受けた Node の会議の参加者は、移動のときに数百 ms の途切れを受ける。
+  - Media Node への攻撃の最初の 15 分以上は、Shield Standard の緩和、防御のモード、Node の入れ替えで耐える（Shield Advanced の事象の報告は保護から 15 分以上たってから）。攻撃を受けた Node の会議の参加者は、移動のときに数百 ms の途切れを受ける。
   - 攻撃を検知して保護を加える運用を、runbook と自動化で持つ。
   - ENA の上限を超える洪水は、Shield Advanced を加えても、効くまでは Node の側で止められない。
   - 月額 3,000 USD と、1 年の契約。

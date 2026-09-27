@@ -94,7 +94,7 @@ Media impairment report (Chrome 1xx, 5 runs, median)   base = main@<sha> (7-day 
 ### 3.2 条件
 
 - 条件の正本は各領域の試験の表。ラボは、条件を宣言の形（YAML）で持ち、同じ名前で呼ぶ（`loss-20-random`、`loss-20-burst`、`jitter-100`、`bw-step-down`、`bw-half`、`rtt-200`、`uplink-20`、`mixed-3` など）。
-- netem の損失の型：ランダム（`loss random`）と、Gilbert-Elliott（`loss gemodel`）（[tc-netem(8)](https://man7.org/linux/man-pages/man8/tc-netem.8.html)、2026-09-27 に確認）。乱数の種を固定できるかは iproute2 の版による（**未検証**）。固定できない場合は 5 回の中央値で揺れを吸収する。
+- netem の損失の型：ランダム（`loss random`）と、Gilbert-Elliott（`loss gemodel`）（[tc-netem(8)](https://man7.org/linux/man-pages/man8/tc-netem.8.html)、2026-09-27 に確認）。netem は `seed` で損失と破損の乱数の種を固定できる（同じ man page の `SEED`）。ラボの AMI のカーネルと iproute2 で効くことは E1 の `netem-lab-namespaces` で確かめる。効かない場合は 5 回の中央値で揺れを吸収する。
 - 帯域の段階の変化（`bw-step-down`）は、試験のスクリプトが時刻に合わせて `tc qdisc change` を送る。
 
 ### 3.3 測り方
@@ -154,7 +154,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 - **比べる SLI**：良い音声の分、フリーズのない分、意図しない脱落、付け替えの時間、`worker.died`、転送の遅れ（合成の会議）、ENA の超過。Node の世代（`media.node_generation`）で分けて、同じ時間の古い台と比べる（[observability.md](observability.md) の 5 節）。
 - **合格の基準**：[quality.md](../quality.md) の 4.1 節（良い音声の分の差が −0.5 ポイント以内、`worker.died` が 0 など）。
-- **make-before-break**：Actor が別の Node に router を作り、`media.reattach{reason: planned, make_before_break: true}` を送る。クライアントは古い transport を残したまま新しい transport を作り、音声の produce・consume ができたら古い consumer を止め、古い transport を閉じる（[media-server-sfu.md](media-server-sfu.md) の 10 節）。途切れの目標は 500ms 以下（**未検証**）。
+- **make-before-break**：Actor が別の Node に router を作り、`media.reattach{reason: planned, make_before_break: true}` を送る。クライアントは古い transport を残したまま新しい transport を作り、音声の produce・consume ができたら古い consumer を止め、古い transport を閉じる（[media-server-sfu.md](media-server-sfu.md) の 10 節）。途切れの目標は 500ms 以下（**未検証**。E10 の `make-before-break-migration` で測る）。
 - **戻す**：新しい台を全部 `draining` にし、古いグループの台数を戻す。重い回帰では、新しい台の会議を make-before-break で古い台へ移す。
 - **急ぎ**（重大な脆弱性）：カナリア 1 時間、波は 15 分ごとに 20%、残りはすぐに移す。インシデントの指揮者が判断する。
 - Media Node の変更は、Node Agent の TypeScript だけの変更でも、AMI の入れ替えで出す（Node Agent は worker の親なので、再起動で worker も止まる）。
@@ -162,7 +162,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 ### 4.4 TURN
 
 - 同じ形で、新しい台を足す。参加の応答の ICE のサーバーの一覧から古い台を外し（新しい割り当てを作らせない）、割り当てが 0 になるか 4 時間で終了させる。
-- 残った参加者は、古い台が止まると ICE restart で別の TURN へ移る（[network-traversal.md](network-traversal.md) の 10 節）。途切れは数秒（**未検証**）。
+- 残った参加者は、古い台が止まると ICE restart で別の TURN へ移る（[network-traversal.md](network-traversal.md) の 10 節）。途切れは数秒（**未検証**。E10 の `turn-rolling-replacement` で測る）。
 
 ### 4.5 Terraform
 
@@ -191,7 +191,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 | 項目 | デスクトップ（Electron） | モバイル（iOS・Android） |
 | --- | --- | --- |
 | 列車 | 2 週ごと | 2 週ごと |
-| 広げ方 | 自前の更新の配信で 1% → 10% → 50% → 100%（1 週） | ストアの段階的な公開（期間と割合の仕様は**未検証**） |
+| 広げ方 | 自前の更新の配信で 1% → 10% → 50% → 100%（1 週） | ストアの段階的な公開。App Store は 7 日で 1% → 2% → 5% → 10% → 20% → 50% → 100%、止められるのは合計 30 日まで（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)）。Google Play は割合を選んで手で上げ、止められる（[Release app updates with staged rollouts](https://support.google.com/googleplay/android-developer/answer/6346149)）。いずれも 2026-09-27 に確認 |
 | 止める | 配信の停止、前の版への戻し（`desktop-app-update-rollback.md`、clients の領域の提案） | 段階的な公開の停止。前の版に戻せないので、次の版で直す |
 | 最低の版 | `client_releases` に持ち、古すぎる版は参加の前に更新を求める | 同じ |
 
@@ -204,7 +204,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 ## 6. フラグ
 
-[ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md)。配布は AWS AppConfig（他の題材の決定を引き継ぐ前提。**未検証**）。
+[ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md)。配布は AWS AppConfig（Slack の題材の [ADR-0026](../../../slack/docs/decisions/0026-feature-flags.md) の決定を引き継ぐ）。
 
 | 種類 | 評価の単位 | 決める時 | 例 |
 | --- | --- | --- | --- |
@@ -227,7 +227,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 | 指標 | 目標（案） |
 | --- | --- |
-| PR の「メディア」の段の時間（p50） | 25 分以内（**未検証**） |
+| PR の「メディア」の段の時間（p50） | 25 分以内（**未検証**。E1 の `media-paths-and-required-checks` で実測して見直す） |
 | ラボの揺れ（同じコミットで判定が変わる割合） | 5% 以下 |
 | Media Node の全体の入れ替えの日数 | 5 日（急ぎは 1 日） |
 | 入れ替えで make-before-break で移した参加者の割合 | 20% 以下（大半は自然に終わるのを待つ） |
@@ -263,10 +263,9 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| netem の乱数の種の固定 | E1 で iproute2 の版を確かめる |
-| PR の「メディア」の段の時間と費用 | E1 で測る。長ければ条件を 2 つずつの組に分けて並べる |
-| mac のインスタンスの費用と、社内の Mac との使い分け | E2 |
-| AppConfig を他の題材と同じく使うか | E1 で他の題材の決定を確かめる |
+| netem の `seed` がラボの AMI のカーネルで効くか | E1 の `netem-lab-namespaces` |
+| PR の「メディア」の段の時間と費用 | E1 の `media-paths-and-required-checks` で測る。長ければ条件を 2 つずつの組に分けて並べる |
+| mac のインスタンスの費用と、社内の Mac との使い分け（mac のインスタンスは Dedicated Host の最低の割り当てが 24 時間） | E2 の `safari-dummynet-nightly` |
 
 ## 11. quality.md・runbooks への項目
 

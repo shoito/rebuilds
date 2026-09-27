@@ -13,10 +13,10 @@ intent.md の MVP は、仮想背景とぼかしを端末の上で処理し、�
 
 調べて分かったこと（いずれも 2026-09-27 に確認）。
 
-- MediaPipe の Selfie Segmenter は、正方形（256×256）と横長（144×256）の 2 つのモデルを持つ。Pixel 6 で約 33〜35ms。Web は `tasks-vision` のパッケージで動き、GPU の実行に対応する（[Image segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter)）。モデルのファイルの利用の条件は未検証。
+- MediaPipe の Selfie Segmenter は、正方形（256×256）と横長（144×256）の 2 つのモデルを持つ。Pixel 6 で約 33〜35ms。Web は `tasks-vision` のパッケージで動き、GPU の実行に対応する（[Image segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter)）。モデルのファイルは、同じ文書から張られたモデルカードで Apache License 2.0（[Model Card MediaPipe Selfie Segmentation](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Selfie%20Segmentation.pdf)）。
 - RNNoise は、48 kHz・モノラルの PCM を扱う RNN の雑音の抑制。BSD-3-Clause。小さいモデル（`little`）もある（[xiph/rnnoise](https://github.com/xiph/rnnoise)）。
 - WebGPU は Chromium と Safari 26 以降にあり、Firefox は既定で無効（[caniuse](https://caniuse.com/webgpu)）。
-- `MediaStreamTrackProcessor` の公開の場所はブラウザによって違う（[MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrackProcessor)）。
+- `MediaStreamTrackProcessor` の公開の場所はブラウザによって違う（[MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrackProcessor)）。Chrome は 94、Safari は 18 から持ち、Firefox は持たない（browser-compat-data）。
 
 ## Options
 
@@ -41,7 +41,7 @@ intent.md の MVP は、仮想背景とぼかしを端末の上で処理し、�
 - モデルのファイルの利用の条件は、E5 の着手前に法務と確かめる。条件が合わなければ、別のモデルを選び、この ADR を見直す。
 - 2 は、映像を処理しない形でサーバーへ送ることになり、intent.md の要件（送る前に処理を終える）に反する。E2EE の会議でも使えない。
 - 3 は、学習のデータ（人の映像・声）の集め方と費用が重く、小さなチームに見合わない。
-- 4 は、RNNoise の処理が全員の CPU を使い、ブラウザの抑制より良いとは限らない（未検証）。
+- 4 は、RNNoise の処理が全員の CPU を使い、ブラウザの抑制より良いとは限らない（良し悪しは**未検証**。E5 の `noise-suppression-rnnoise` で比べる）。
 
 ## Consequences
 

@@ -10,7 +10,7 @@ date: 2026-09-27
 intent.md の MVP は「利用状況のレポート」を求める。組織の管理者は、会議の数と分、参加者、ユーザーごとの利用、会議ごとの参加者の一覧、録画の容量を見たい。
 
 - 参加の記録（`meeting_participations`）と会議の開催（`meeting_instances`）は、Actor が Aurora に書く（[ADR-0005](0005-meeting-state-and-signaling.md)、[signaling-and-meetings.md](../architecture/signaling-and-meetings.md) の 17 節）。
-- S1 の規模は、同時の会議 5,000、同時の参加者 3 万（[architecture/README.md](../architecture/README.md) の 2 節）。1 日の参加の行は数十万の見込み（未検証）。
+- S1 の規模は、同時の会議 5,000、同時の参加者 3 万（[architecture/README.md](../architecture/README.md) の 2 節）。1 日の参加の行は数十万の見込み（**未検証**。E6 の `usage-reports` で E2 のベータの実績から見直す）。
 - レポートの集計の問い合わせが、会議の開始と参加の書き込みを遅らせてはならない（NFR-002、NFR-005）。
 - 参加の記録の保持の期間は、法務の確認待ち（L6・L8）。
 

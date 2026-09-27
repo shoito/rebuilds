@@ -21,12 +21,12 @@
 | 同時の参加者（ピーク） | 30,000（平均の会議 6 人） | 同上 |
 | 1 会議の上限 | 100 人（NFR-006） | 同上 |
 | 受けて表示する映像 | 1 人あたり最大 25 本 | NFR-006 |
-| 下り（1 人の平均） | **容量の前提 2.5 Mbps**。期待の平均 1.5 Mbps | README の 2 節。2 節の吟味から、容量（台数、送出、transit、クォータ）は 2.5 Mbps で見積もり、1.5 Mbps は期待の平均として費用の見込みに使う。E2 のベータで測って置き換える（**未検証**） |
+| 下り（1 人の平均） | **容量の前提 2.5 Mbps**。期待の平均 1.5 Mbps | README の 2 節。2 節の吟味から、容量（台数、送出、transit、クォータ）は 2.5 Mbps で見積もり、1.5 Mbps は期待の平均として費用の見込みに使う（**未検証**。E2 のベータで `qos-report-pipeline` の要約から測って置き換える） |
 | 上り（1 人の平均） | 0.8 Mbps | 同上 |
 | SFU の送出（ピーク） | 約 75 Gbps（容量の前提）。期待の平均では約 45 Gbps | 30,000 × 2.5 Mbps（1.5 Mbps） |
-| 平均とピークの比 | 0.25 | 平日の日中に集中すると仮定。**未検証** |
-| 朝の立ち上がり | 平日 9 時の前後 30 分で、同時の参加者が 0.2 → 0.8 × ピーク | **未検証**。予定の会議の開始時刻から E2 のベータで測る |
-| TURN を通る参加者 | 10% | **未検証**（[network-traversal.md](network-traversal.md) の持ち越し） |
+| 平均とピークの比 | 0.25 | 平日の日中に集中すると仮定。**未検証**（E1 の `cost-dashboard-k8` で参加者・分の実績から直す） |
+| 朝の立ち上がり | 平日 9 時の前後 30 分で、同時の参加者が 0.2 → 0.8 × ピーク | **未検証**。予定の会議の開始時刻から E2 のベータで測り、E7 の `predictive-scaling` に入れる |
+| TURN を通る参加者 | 10% | **未検証**（E2 のベータで `ice_path` から測る。[network-traversal.md](network-traversal.md) の持ち越し） |
 | 1 人の参加の操作 | 参加で約 15 の往復（transport × 2、produce × 2〜3、consume × 数本） | [signaling-and-meetings.md](signaling-and-meetings.md) の 11 節 |
 
 ## 2. 参加者 1 人あたりの帯域
@@ -35,13 +35,13 @@
 
 | 流れ | ビットレート | パケット/秒 |
 | --- | --- | --- |
-| 音声（Opus 32 kbps、20ms） | ヘッダーを含め約 56 kbps（RED なし）〜約 120 kbps（RED distance 2） | 50（話している間。DTX で黙っている間はほぼ 0） |
+| 音声（Opus 32 kbps、20ms） | ヘッダーを含め約 56 kbps（RED なし）〜約 90 kbps（RED distance 1。ブラウザが送る形。[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 4.2 節） | 50（話している間。DTX で黙っている間はほぼ 0） |
 | 映像 `f`（720p、30 fps） | 1,500 kbps（T1 の 15 fps で約 1,100 kbps と仮定） | 約 130〜170 |
 | 映像 `h`（360p、30 fps） | 500 kbps（T1 で約 375 kbps） | 約 50〜60 |
 | 映像 `q`（180p、15 fps） | 150 kbps（T1 で約 110 kbps） | 約 15〜20 |
 | 画面共有（`detail`、5 fps） | 最大 1,500 kbps | 約 50〜150（変化の量による） |
 
-- 時間の層 T1 のビットレートを T2 の約 75% と置いたのは仮定（**未検証**。E4 で測る）。パケットの大きさは映像で平均 1,000〜1,200 バイトと仮定した。
+- 時間の層 T1 のビットレートを T2 の約 75% と置いたのは仮定（**未検証**。E4 の `downlink-allocation` で層ごとのビットレートを測る）。パケットの大きさは映像で平均 1,000〜1,200 バイトと仮定した。
 
 表示のしかたごとの、受け手 1 人の下り（全員がカメラをつけた場合）：
 
@@ -131,28 +131,28 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 ### 5.3 TURN
 
 - TURN を通る参加者が 10% なら、S1 のピークで 3,000 人。中継する帯域は、下り 3,000 × 2.5 Mbps ＋ 上り 3,000 × 0.8 Mbps ≈ 約 10 Gbps（容量の前提。期待の平均では約 7 Gbps。それぞれの向きで、TURN の入りと出の両方に載る）。
-- coturn の 1 台の処理の上限は**未検証**。c8gn.8xlarge（32 vCPU）で AZ ごとに 2 台（計 6 台）から始め、1 台の中継の帯域が 2 Gbps を超えたら足す（初期見積もり）。
+- coturn の 1 台の処理の上限は**未検証**（E7 の `load-l0-l2` で TURN の台も測る）。東京は c8gn.8xlarge（32 vCPU）で AZ ごとに 2 台（計 6 台）、大阪は c6gn.8xlarge で 2 台から始め、1 台の中継の帯域が 2 Gbps を超えたら足す（初期見積もり）。
 
 ### 5.4 その他の部品
 
 | 部品 | S1 のピークの負荷 | 見積もり |
 | --- | --- | --- |
-| Signaling Gateway | 30,000 の WebSocket、`qos.report` 3,000 件/秒、`ping` 6,000 件/秒 | 1 タスク 5,000 接続で 6 タスク＋余白（[infrastructure.md](infrastructure.md) の 6 節）。**未検証** |
+| Signaling Gateway | 30,000 の WebSocket、`qos.report` 3,000 件/秒、`ping` 6,000 件/秒 | 1 タスク 5,000 接続で 6 タスク＋余白（[infrastructure.md](infrastructure.md) の 6 節）。**未検証**（E7 の `signaling-load-test`） |
 | Actor Host | 5,000 会議。朝の立ち上がりで参加 1 秒に約 50 人 × 15 往復 | 1 タスク 2,000 会議の上限。6 タスク |
 | Media Node の付け替えの集中 | 1 台の障害で約 2,500 人が 2 秒以内に transport を作り直す（約 2 万の往復） | Actor Host は会議ごとに処理するので、1 台の障害の会議（約 400）が 6 タスクに分かれる。E7 の L2 で測る |
 | Valkey | リースの更新（会議ごと 2 秒に 1 回）＝ 2,500 回/秒、スナップショット（500ms ごと、変化があるとき）、チャットの Stream、流量の制限 | 3 シャードで足りる見込み |
 | Aurora | 参加・退出の行（朝の立ち上がりで約 50 件/秒）、監査、outbox | writer の r8g.2xlarge で足りる見込み |
-| Firehose | 品質の記録 3,000 件/秒（1 件 約 2 KB）＝ 約 6 MB/秒 | 1 つのストリームの上限の中（**未検証**） |
+| Firehose | 品質の記録 3,000 件/秒（1 件 約 2 KB）＝ 約 6 MB/秒 | **1 つのストリームの既定の上限を超える。** Direct PUT の既定は、東京では 1 ストリームあたり 1 MiB/秒・1,000 要求/秒・10 万件/秒（5 MiB/秒は米国東部・米国西部（オレゴン）・アイルランドだけ）。料金は 1 件ごとに 5 KB に切り上げて数える（[Amazon Data Firehose Quota](https://docs.aws.amazon.com/firehose/latest/dev/limits.html)、2026-09-27 に確認）。そこで、Gateway のタスクごとに 1 秒分の要約を改行区切りで 1 件にまとめて `PutRecordBatch` で送り（件数と切り上げの費用を減らす）、ストリームの上限の引き上げ（8 MiB/秒）を E12 の `quota-requests` より前、E2 の `qos-report-pipeline` の着手時に申請する。引き上げが間に合わなければ、ストリームを 8 つに分けて Gateway のタスクで振り分ける |
 
 ### 5.5 クォータ（着手前に確かめ、必要なら引き上げを申請する）
 
 | クォータ | 要る量（S1、東京） | 備考 |
 | --- | --- | --- |
 | EC2 のオンデマンドの vCPU（C 系列など） | Media Node 最大 60 台 × 64 ＋ TURN 12 台 × 32 ＋ ウォームプール ≈ 4,400 | 入れ替えの間は倍近くになる |
-| Elastic IP | 約 80 | 既定は少ない。BYOIP でも EIP の数の上限にかかるかは**未検証** |
+| Elastic IP | 約 80 | BYOIP のプールから取った EIP は、EIP の数の上限（既定でリージョンに 5）に数えない（[Elastic IP addresses](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)、2026-09-27 に確認）。BYOIP が間に合わず AWS の連続したブロックで始めるときは、上限の引き上げを申請する |
 | Shield Advanced の保護の数 | 数十（入口と、攻撃のときの EIP） | 1 アカウントで種類ごとに 1,000 |
 | Fargate の vCPU | 約 100 | — |
-| Kinesis Data Firehose の書き込み | 約 6 MB/秒 | — |
+| Kinesis Data Firehose の書き込み | 約 6 MB/秒 | 東京の既定は 1 ストリーム 1 MiB/秒。8 MiB/秒へ引き上げる（5.4 節） |
 | Amazon Transcribe の同時の流れ | [recording-and-transcription.md](recording-and-transcription.md) で決める | — |
 
 ## 6. 費用と K8
@@ -160,13 +160,14 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 方針は [ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)。計算の中身は [infrastructure.md](infrastructure.md) の 12 節。
 
 - **K8 の定義**：（インターネットへの転送 ＋ Media Node ＋ TURN ＋ TURN と Media Node の間の転送 ＋ DDoS の防御）の月の費用 ÷ 月の参加者・分。制御の側、録画、字幕は含めない（別に見る）。
-- **目標**（**既定案**、PM の承認を要する）：S1 で 0.20 円以下、S2 で 0.07 円以下。1 USD = 150 円と仮定する。
+- **目標**（**既定案**。**PM と Ops の確認の項目**）：S1 で 0.20 円以下、S2 で 0.07 円以下。1 USD = 150 円と仮定する。
+- **S1 を AWS で容量の前提（下り 2.5 Mbps）のまま動かすと、K8 は約 0.28 円で 0.20 円に届かない。** 届くのは、下りの平均が 1.5 Mbps 前後に収まるときか、Edge（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）か AWS との料金の合意で転送の単価が下がるときである。S1 の目標の達成は Edge の判断に掛かる。目標の値は変えずに残し、PM と Ops が E2 のベータの実測の後に確かめる。
 - **見積もり**：
 
 | 形 | K8（参加者・分あたり） | 備考 |
 | --- | --- | --- |
 | AWS の表の料金、下り平均 1.5 Mbps（期待の平均） | 約 0.18 円 | S1 の目標に届く |
-| AWS の表の料金、下り平均 2.5 Mbps（容量の前提） | 約 0.28 円 | S1 の目標に届かない。E2 のベータの実測がこちらに近ければ、Edge の判断（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）を早める |
+| AWS の表の料金、下り平均 2.5 Mbps（容量の前提） | 約 0.28 円 | **S1 の目標に届かない。** E2 のベータの実測がこちらに近ければ、Edge の判断（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)。運用の体制の判断の点は [infrastructure.md](infrastructure.md) の 11 節）を早める |
 | AWS で Media Node の EIP を Shield Advanced で常に守る | ＋約 0.05 円 | ADR-0045 で退けた |
 | 国内のコロケーション（Edge） | 約 0.05 円 | 仮定が多い。[infrastructure.md](infrastructure.md) の 12.3 節 |
 
@@ -185,7 +186,7 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 | 受け手のボット | 同上 | 復号しない。RTCP（RR、transport-cc、NACK、PLI）を返す。受けたパケットの数、損失、遅れ（下の 7.3 節）を数える。`view.update` をブラウザと同じ頻度で送る |
 | 品質の見張り | Playwright の Chrome（[ADR-0054](../decisions/0054-network-impairment-lab.md) の測り方） | 会議の 2% に入り、`mos_est`、フリーズ、glass-to-glass を測る |
 
-- 1 台の EC2（c7g.4xlarge を想定）で動かせるボットの数は**未検証**。L0 の前に測る。
+- 1 台の EC2（c7g.4xlarge を想定）で動かせるボットの数は**未検証**。E7 の `loadbot-pion` で、L0 の前に測る。
 - ボットの映像・音声は、合成か、利用の条件が明らかな公開のデータセットだけ（本題材の AGENTS.md）。
 
 ### 7.2 段階
@@ -208,7 +209,7 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 ### 7.4 費用
 
 - ボットの送受信は、同じリージョンの公開の IP の間の通信で、向きごとに 0.01 USD/GB（[infrastructure.md](infrastructure.md) の 2.4 節）。L3 の 2 時間（送出 約 55〜90 Gbps。下り 1.5〜2.5 Mbps）で約 50〜80 TB、約 1,000〜1,600 USD の見込み。
-- ボットの通信が、インターネットゲートウェイの上限（インスタンスの帯域の 50%）に数えられるかは**未検証**。数えられない場合、本番のインターネットへの上限を試せないので、L1 の一部を東京の外（大阪）から流して比べる（リージョンの間の転送 0.09 USD/GB に注意）。
+- ボットの通信が、インターネットゲートウェイの上限（インスタンスの帯域の 50%）に数えられるかは**未検証**（E7 の `load-l0-l2` の最初に確かめる）。数えられない場合、本番のインターネットへの上限を試せないので、L1 の一部を東京の外（大阪）から流して比べる（リージョンの間の転送 0.09 USD/GB に注意）。
 
 ## 8. 余裕の方針
 
@@ -237,7 +238,7 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 
 - 1 台の上限は 4 つの資源で持ち、E7 で決める。それまでは consumer で見積もる。
 - S1 の台数：ピーク 27 台、夜間 6 台（東京）。
-- K8：S1 0.20 円、S2 0.07 円。
+- K8：S1 0.20 円、S2 0.07 円（PM と Ops の確認の項目。S1 は AWS で下り 2.5 Mbps なら届かず、達成は Edge の判断に掛かる）。
 - 容量は下り 2.5 Mbps を前提に見積もる。1.5 Mbps は期待の平均（統合の工程で決めた）。
 - 100 人を超える会議の音声は枠の形（[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)）。
 - 負荷試験は Pion のボットと 2% の実ブラウザ。
@@ -250,8 +251,9 @@ S1 の会議の組み合わせ（平均 6 人）で、どの資源が先に尽�
 | 止めた consumer の費用（数えるか） | E7 の L0 |
 | 1 台の pps と送出の上限 | E7 の L1 |
 | 音声の枠の転送器の性能と、切り替えの聞こえ方 | E7 の `audio-slot-forwarder-poc`（[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)） |
-| TURN の 1 台の上限と、TURN を通る参加者の割合 | E2 のベータと E7 |
-| ボットの通信がインターネットゲートウェイの上限に数えられるか | E7 の最初に確かめる |
+| TURN の 1 台の上限と、TURN を通る参加者の割合 | E2 のベータと E7 の `load-l0-l2` |
+| ボットの通信がインターネットゲートウェイの上限に数えられるか | E7 の `load-l0-l2` の最初に確かめる |
+| K8 の目標（S1 0.20 円、S2 0.07 円）を保つか | PM と Ops。E2 のベータの下りの実測と、Edge の運用の体制の判断（[infrastructure.md](infrastructure.md) の 11 節）の後 |
 
 ## 11. quality.md・runbooks への項目
 

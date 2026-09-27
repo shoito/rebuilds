@@ -114,7 +114,7 @@ SEV1 では、指揮者は手を動かさない。
 5. **範囲の全体への攻撃**：
    - 大阪の Media Node（別の /24）へ新しい会議を寄せる（S1 では大阪の台数が少ない。受けられる数を超えるなら `ops.join_admission` で新しい参加を絞る）。
    - IPv6 だけが攻撃されているなら、`media.ipv6_candidates` を切る（次の ICE から IPv4 だけ）。
-   - 攻撃が TURN の TLS 443 に向くなら、TURN の台を足し、`turn-*` の名前の DNS を新しい台へ向ける。
+   - 攻撃が TURN の TLS 443 に向くなら、TURN の台を足し、`*.turn.<brand>.<domain>` の名前の DNS を新しい台へ向ける。
 6. **攻撃を受けた EIP を隔離する。** 会議がなくなった Node から EIP を外し、`quarantined_until`（既定 7 日）のタグを付ける。EIP のプールの空きを見る（`eip-pool-exhausted.md`、infrastructure の領域の提案）。
 7. **止んだら戻す。** 24 時間、攻撃の兆候がなければ、防御のモードを外し、Shield Advanced の保護を外す（転送の料金がかかり続けるため。[ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md)）。
 8. 事後：攻撃の規模、防御のモードで捨てた数、移した会議の数、途切れの長さを記録する。会議の移動による途切れを組織へ告知する。

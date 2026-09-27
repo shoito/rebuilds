@@ -15,7 +15,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0017](../decisions/0017-opus-dtx-fec-red.md) | 音声は Opus（20ms、モノラル、目標 32 kbps）で、DTX とインバンド FEC を常に有効にする。RED（RFC 2198、distance 2）を使うため、mediasoup に RED の転送と、受け手ごとの RED の剥がしを足す |
+| [0017](../decisions/0017-opus-dtx-fec-red.md) | 音声は Opus（20ms、モノラル、目標 32 kbps）で、DTX とインバンド FEC を常に有効にする。RED（RFC 2198、ブラウザが送る distance 1）を使うため、mediasoup に RED の転送と、受け手ごとの RED の剥がしを足す |
 | [0018](../decisions/0018-video-codec-and-layering-selection.md) | カメラの既定は VP8 の simulcast 3 本（各 L1T3）。iOS・iPadOS の Safari の送り手は H.264 の simulcast。参加者が全員 Chromium の会議だけ VP9 `L3T3_KEY` の SVC にする。AV1 は S1 ではフラグの裏に置く |
 | [0019](../decisions/0019-bandwidth-estimation-and-layer-allocation.md) | 上りはブラウザの GCC に任せ、Media Node は transport-cc の帰還を返す。下りは Media Node が受け手ごとに推定し、優先度（音声 > 画面共有 > 話者 > ギャラリー）の順に配る。下げは速く、上げは遅く。映像の FEC は使わず、NACK と RTX で直す |
 | [0020](../decisions/0020-screen-share-encoding.md) | 画面共有は `contentHint: "detail"` と `maintain-resolution` で、最大 1920×1080・5 fps（動きの多い共有は 15 fps）。時間の層だけ（`L1T3`）を使い、空間の層は作らない |
@@ -39,7 +39,7 @@
 ## 2. 本家の形（確かめたこと）
 
 - 本家の帯域の目安は、グループの 720p で上り 2.6 Mbps・下り 1.8 Mbps、音声だけで 60〜80 kbps（[Zoom の帯域の要件](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060748)、2026-09-27 に確認）。
-- 本家の符号器、層の構成、帯域の推定の方式は、公開の一次の資料で確かめられない。**未検証**。本家の Web クライアントは、ブラウザの WebRTC のメディアの経路を避けてきたと報告されている（[ADR-0003](../decisions/0003-client-platform.md) の Context）。本設計は、標準の WebRTC の上で同じ目標（NFR）を満たすことを狙う。
+- 本家の符号器、層の構成、帯域の推定の方式は、公開の一次の資料に書かれていない（2026-09-27 に探した範囲）。本家の Web クライアントは、ブラウザの WebRTC のメディアの経路を避けてきたと報告されている（[ADR-0003](../decisions/0003-client-platform.md) の Context）。本設計は、標準の WebRTC の上で同じ目標（NFR）を満たすことを狙う。
 
 ## 3. 標準と実装の前提
 
@@ -61,11 +61,13 @@
 | 項目 | Chrome・Edge | Firefox | Safari |
 | --- | --- | --- | --- |
 | VP8・H.264（Constrained Baseline） | 対応（必須の符号器） | 対応 | 対応（VP8 は 12.1 から） |
-| VP9 | 48 から | 対応 | WebRTC での対応は**未検証** |
-| AV1 | 113 から | 136 から（156 で既定で有効と報告） | **未検証** |
-| `scalabilityMode`（SVC） | 111 から（[browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319)、未マージ） | 未対応 | 未対応と記録された後、対応の版が足されたと PR にある。版は**未検証** |
-| Dependency Descriptor（DD） | 対応 | 136 から（VP8・H.264・VP9・AV1） | **未検証** |
-| Opus の RED（`audio/red`） | M96 から、`setCodecPreferences` で RED を先にすると使える（[discuss-webrtc の告知](https://groups.google.com/g/discuss-webrtc/c/5761etCrSuA)） | **未検証** | **未検証** |
+| VP9 | 48 から | 対応 | WebRTC での対応は MDN に記載がない（**未検証**） |
+| AV1 | 113 から | 136 から（156 で既定で有効と報告） | MDN に記載がない（**未検証**） |
+| `scalabilityMode`（SVC） | 111 から（[browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319)、2026-09-27 の時点で未マージ） | 未対応（同じ PR の記録） | 未対応（同じ PR の記録） |
+| Dependency Descriptor（DD） | 対応 | 136 から（VP8・VP9・AV1。H.264 は 137 からでデスクトップだけ） | MDN に記載がない（**未検証**） |
+| Opus の RED（`audio/red`） | M96 から、`setCodecPreferences` で RED を先にすると使える（[discuss-webrtc の告知](https://groups.google.com/g/discuss-webrtc/c/5761etCrSuA)）。冗長は 1 つ（distance 1）で、前のフレームの符号をそのまま写す（libwebrtc の [audio_encoder_copy_red.cc](https://webrtc.googlesource.com/src/+/refs/heads/main/modules/audio_coding/codecs/red/audio_encoder_copy_red.cc) の `kRedNumberOfRedundantEncodings = 1`。数を変えるのはフィールドトライアル `WebRTC-Audio-Red-For-Opus` だけで、Web のページからは変えられない） | **未検証** | **未検証** |
+
+- 表の**未検証**の欄は、E2 の `browser-capability-probe` で `RTCRtpSender.getCapabilities()` と実際の送受信を確かめて埋める。Safari の最新 2 メジャーは 26 と 27（27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) の版の記録、2026-09-27 に確認）。
 
 - Firefox 155 以降は、AV1 の SVC の上の空間の層を正しく復号できず、黒い画面や止まった映像になると報告されている（[livekit/client-sdk-js#2116](https://github.com/livekit/client-sdk-js/issues/2116)、2026-09-23 起票）。
 
@@ -92,24 +94,25 @@ mediasoup の対応（v3.27.1。[supportedRtpCapabilities.ts](https://github.com
 | 目標のビットレート | 32 kbps（`maxaveragebitrate=32000`） | 全帯域の音声の目安 28〜40 kbps の中。VBR（`cbr=0`） |
 | DTX | 有効（`usedtx=1`） | 黙っている間の送出を減らす。100 人の会議で大半は黙っている |
 | インバンド FEC | 有効（`useinbandfec=1`） | 単発の損失を、次のパケットの LBRR で直す |
-| RED | 有効（distance 2）。4.3 節 | 連続した損失に備える |
+| RED | 有効（distance 1。ブラウザの送る形）。4.3 節 | 連続した損失に備える |
 | 音声の NACK | 使わない | 20ms ごとの音声は、再送を待つとジッタバッファが伸び、NFR-001 の mouth-to-ear 200ms を食う |
 | ブラウザの音声の処理 | `echoCancellation`・`autoGainControl` は有効。`noiseSuppression` は既定で有効、強い雑音の抑制を選んだときは無効（[clients.md](clients.md) の 5.2 節） | — |
 | 音量のヘッダー拡張 | `urn:ietf:params:rtp-hdrext:ssrc-audio-level` | Media Node が話者を決める（[media-server-sfu.md](media-server-sfu.md)） |
 
-- ブラウザの Opus の既定のビットレートと、損失の率から FEC を強める閾値は、ブラウザの実装に任せる。値は**未検証**。E4 で `getStats` の `targetBitrate` を記録して確かめる。
+- ブラウザの Opus の既定のビットレートと、損失の率から FEC を強める閾値は、ブラウザの実装に任せる。値は**未検証**。E2 の `audio-opus-baseline` で `getStats` の `targetBitrate` を記録して確かめる。
 
 ### 4.2 損失への備えの組み合わせ
 
-| 損失の形 | インバンド FEC | RED distance 2 | 残る損失（独立な損失 p の見積もり） |
+| 損失の形 | インバンド FEC | RED distance 1 ＋ FEC | 残る損失（独立な損失 p の見積もり） |
 | --- | --- | --- | --- |
-| なし（p = 0） | 費用は小さい | 送出が約 3 倍（下の注） | 0 |
-| ランダム 5% | 単発を直す | 3 連続までを直す | FEC だけ：約 p² = 0.25%。RED：約 p³ = 0.0125% |
-| ランダム 20% | 単発を直す | 3 連続までを直す | FEC だけ：約 4%。RED：約 0.8% |
+| なし（p = 0） | 費用は小さい | 送出が約 2 倍（下の注） | 0 |
+| ランダム 5% | 単発を直す | 2 連続までを直す（2 つ目は LBRR の品質） | FEC だけ：約 p² = 0.25%。RED ＋ FEC：約 p³ = 0.0125% |
+| ランダム 20% | 単発を直す | 2 連続までを直す（同上） | FEC だけ：約 4%。RED ＋ FEC：約 0.8% |
 | バースト（平均 3 パケット） | ほぼ効かない | 一部を直す | 見積もれない。netem の Gilbert-Elliott で測る |
 
-- 見積もりは、損失が独立で、FEC・RED のパケットも同じ率で落ちる、とした単純な計算。MOS との関係は**未検証**。E4 の試験で ViSQOL の値に置き換える。
-- RED は、主の符号の前に過去 2 つの符号を並べるので、送出は最大で約 3 倍になる。webrtcHacks の計測では、distance 1 で音声のビットレートが約 30 kbps から約 60 kbps に倍増した。損失 60% のとき、隠した（concealed）割合は RED なしで 60%、distance 1 で 32%、distance 2 で 18% だった（[RED: Improving Audio Quality with Redundancy](https://webrtchacks.com/red-improving-audio-quality-with-redundancy/)、2020-08、2026-09-27 に確認）。Chrome の RED が、冗長の部分に完全な符号を入れるのか LBRR を入れるのかは、資料によって説明が違う。**未検証**。
+- 見積もりは、損失が独立で、FEC・RED のパケットも同じ率で落ちる、とした単純な計算。MOS との関係は**未検証**。E4 の `loss-20-audio` で ViSQOL の値に置き換える。
+- **ブラウザの RED は distance 1 である。** libwebrtc の RED の符号器は、前のフレームの Opus の符号をそのまま（完全な符号として）写し、冗長の数の既定は 1 つである（3 節の表の出典）。Web のページから distance 2 にする手段はない。写した符号は FEC を有効にした Opus のパケットなので、その中の LBRR も一緒に運ばれる。そのため、フレーム n は、パケット n（主）、n+1（RED の写しと、主の中の LBRR）、n+2（RED の写しの中の LBRR）の 3 か所に載り、独立な損失 p で失うのは約 p³ になる見込み（2 つ目以降は LBRR の低い品質）。この見込みは E4 の `red-forwarding` で確かめる。
+- RED は、主の符号の前に前の符号を 1 つ並べるので、送出は最大で約 2 倍になる。webrtcHacks の計測では、distance 1 で音声のビットレートが約 30 kbps から約 60 kbps に倍増した。損失 60% のとき、隠した（concealed）割合は RED なしで 60%、distance 1 で 32%、distance 2 で 18% だった（[RED: Improving Audio Quality with Redundancy](https://webrtchacks.com/red-improving-audio-quality-with-redundancy/)、2020-08、2026-09-27 に確認。distance 2 はフィールドトライアルでの計測）。
 - DTX と組むので、RED の費用は話している間だけかかる。
 
 ### 4.3 Media Node での RED
@@ -118,16 +121,16 @@ mediasoup に RED が無いので、Media Node（mediasoup の worker）に次�
 
 1. **RED の転送**：router の符号器に `audio/red`（`a=fmtp:<pt> <opus-pt>/<opus-pt>`）を足す。producer が RED で送ったら、RED のまま受け手へ転送する。
 2. **受け手ごとの剥がし**：受け手が RED に対応しないか、受け手の下りの推定が小さいときは、Media Node が RED のブロックを外し、主の Opus の符号だけを Opus のペイロード型で送る。
-3. **受け手の帯域に合わせた冗長の数**：下りの推定から、受け手ごとに distance を 2・1・0 のどれにするかを決める（6.4 節）。
+3. **受け手の帯域に合わせた冗長の数**：下りの推定から、受け手ごとに RED を残す（distance 1）か剥がす（0）かを決める（6.4 節）。送り手より大きい distance は作れない。
 
 - Recorder・Transcriber（[recording-and-transcription.md](recording-and-transcription.md)）は RED に対応しない受け手として扱い、剥がした Opus を渡す。録画と音声認識の側に RED の処理を持たせない。
 - 剥がすときは、RTP の時刻・連番は主の符号のものをそのまま使う。RED のブロックの長さの検査（10 ビット、1,023 バイト）に通らないパケットは捨てる。
-- E2EE の会議で RED と Encoded Transform を組んだときの振る舞いは**未検証**（[e2ee.md](e2ee.md) の 7 節）。確かめるまでは、E2EE の会議では RED を使わず、インバンド FEC だけにする。
+- E2EE の会議で RED と Encoded Transform を組んだときの振る舞いは**未検証**（E9 の `e2ee-poc-transform` で確かめる。[e2ee.md](e2ee.md) の 7 節）。確かめるまでは、E2EE の会議では RED を使わず、インバンド FEC だけにする。
 
 ### 4.4 大きな会議の音声
 
 - ADR-0002 のとおり、Media Node は声の大きい数人（既定 3 人）の音声だけを受け手に送る。受け手の下りに載る音声は、最大で 3 本 ×（32 kbps × RED の倍率 ＋ ヘッダー）。
-- ヘッダーの費用：IPv4・UDP・RTP・SRTP の認証タグ・ヘッダー拡張で、1 パケット約 60 バイト（見込み）。50 パケット/秒で約 24 kbps。1 本あたり、RED なしで約 56 kbps、RED distance 2 で約 120 kbps の見込み（**未検証**。E4 で計測する）。
+- ヘッダーの費用：IPv4・UDP・RTP・SRTP の認証タグ・ヘッダー拡張で、1 パケット約 60 バイト（見込み）。50 パケット/秒で約 24 kbps。1 本あたり、RED なしで約 56 kbps、RED distance 1 で約 90 kbps の見込み（**未検証**。E4 の `red-forwarding` で計測する）。
 - 下りが 150 kbps まで落ちたとき（NFR-009）の音声の扱いは 6.4 節。
 
 ## 5. 映像の符号器と層（ADR-0018）
@@ -148,7 +151,7 @@ Meeting Actor が、会議の参加者の端末の申告（`hello.client` と `m
 - AV1 を S1 の既定にしないのは、次の理由による。
   - mediasoup で、空間の層が複数の AV1 に DD の転送を組むと、映像が止まる問題が開いたまま（[#1625](https://github.com/versatica/mediasoup/issues/1625)）。
   - Firefox の受け手は AV1 の SVC の上の層を復号できないと報告されている（[#2116](https://github.com/livekit/client-sdk-js/issues/2116)）。
-  - AV1 のソフトウェアの符号化は、VP8 より CPU を多く使う（**未検証**。E4 で測る）。
+  - AV1 のソフトウェアの符号化は、VP8 より CPU を多く使う（**未検証**。E4 の `av1-evaluation` で測る）。
 
 ### 5.2 simulcast の層
 
@@ -159,7 +162,7 @@ Meeting Actor が、会議の参加者の端末の申告（`hello.client` と `m
 | `f` | 1280×720 | 30 | 1,500 kbps | 1 | `L1T3` |
 
 - 3 本の上りの合計は最大 2.15 Mbps。本家の 720p の上りの目安 2.6 Mbps より小さい。
-- H.264 の送り手は、時間の層を使わず `L1T1` にする（mediasoup の H.264 の時間の層は 3.21.1 からで、Safari での動作は**未検証**）。
+- H.264 の送り手は、時間の層を使わず `L1T1` にする。mediasoup は 3.21.1 で、1 本の流れに時間の層を持つ VP8・H.264 を SVC の consumer で扱うようにした（[CHANGELOG](https://github.com/versatica/mediasoup/blob/v3/CHANGELOG.md) の PR #1851、2026-09-27 に確認）が、Safari の H.264 の時間の層での動作は**未検証**（E2 の `video-simulcast-vp8` で確かめ、動けば `L1T3` に変える）。
 - **使われない層を止める**：Media Node が、ある層を受ける consumer が 0 の状態を 5 秒続けて見たら、Actor に知らせる。Actor は送り手に `media.layers.hint` で、その層の `active: false` を指示する（`RTCRtpSender.setParameters`。[media-server-sfu.md](media-server-sfu.md) の 5.5 節）。受け手が現れたら `active: true` に戻し、キーフレームを求める。上りの帯域と送り手の CPU を減らす。
 - カメラの入力は 1280×720・30 fps を求める。端末が出せない場合は、出せる最大から層を作る。
 
@@ -171,7 +174,7 @@ Meeting Actor が、会議の参加者の端末の申告（`hello.client` と `m
 | S1 | 640×360 | 7.5 / 15 / 30 |
 | S2 | 1280×720 | 7.5 / 15 / 30 |
 
-- `maxBitrate` は全体で 1,200 kbps（simulcast の合計より小さくてよい見込み。**未検証**）。
+- `maxBitrate` は全体で 1,200 kbps（simulcast の合計より小さくてよい見込み。**未検証**。E4 の `svc-vp9-mode` で上りの差と一緒に測る）。
 - `_KEY` を選ぶのは、上の空間の層がキーフレームでだけ下の層に依存するので、受け手ごとに空間の層を剥がしても、受け手の復号の費用が単一の層と同じになるため。mediasoup は VP9 の K-SVC に対応している。
 
 ### 5.4 キーフレーム
@@ -221,21 +224,21 @@ Media Node が決めるもの：
   - **上げ**：推定が、1 つ上の層に要るビットレートの 1.2 倍を 3 秒続けて超えたら、1 段だけ上げる。上げた後 10 秒は、同じ consumer をもう一度上げない。
   - 上げる前に、mediasoup の probation のパケットで帯域を試す。
 - 目標（NFR-009）：下りが半分になったら、5 秒以内に層を落として収まり、1 秒以上の映像の停止を起こさない。
-- mediasoup の `priority` は 1〜255 で、推定が足りないときだけ効き、映像の consumer の間で配分を決める（[mediasoup の API](https://mediasoup.org/documentation/v3/mediasoup/api/)、2026-09-27 に確認）。配分が「高い順に満たす」のか「重みで分ける」のかは、文書からは分からない。**未検証**。上の上げ下げの規則（1.2 倍、3 秒、10 秒）が mediasoup の既定の振る舞いと違う場合は、worker に手を入れるか、Media Node の制御（TypeScript）から `preferredLayers` を動かして近づける。E4 の `downlink-allocation` で決める。
+- mediasoup の `priority` は 1〜255 で、推定が足りないときだけ効き、映像の consumer の間で配分を決める（[mediasoup の API](https://mediasoup.org/documentation/v3/mediasoup/api/)、2026-09-27 に確認）。配分は worker の `Transport::DistributeAvailableOutgoingBitrate` で、最初の周回は優先度の高い順に 1 層ずつ、次の周回からは 1 周に consumer ごとに `priority` の数まで層を上げる、重み付きの周回である（[Transport.cpp](https://github.com/versatica/mediasoup/blob/v3/worker/src/RTC/Transport.cpp)、2026-09-27 に確認）。「高い順に満たす」ではない。そこで、上の上げ下げの規則（1.2 倍、3 秒、10 秒）と優先度の順は、Media Node の制御（TypeScript）から `preferredLayers` と `priority` を動かして近づける。足りなければ worker に手を入れる。E4 の `downlink-allocation` で決める。
 
 ### 6.4 音声の枠
 
 - 音声は映像より先に割り当てる。音声の枠は、送っている音声の本数 ×（1 本の実際のビットレート）で、推定から先に引く。
+  - mediasoup は音声の consumer を割り当てに入れない（`Consumer::GetBitratePriority` が音声で 0 を返す。[Consumer.cpp](https://github.com/versatica/mediasoup/blob/v3/worker/src/RTC/Consumer.cpp)、2026-09-27 に確認）。そのままでは映像が推定の全部を使いうる。音声の分を残す方法（`transport.setMaxOutgoingBitrate` を推定から音声の分を引いた値に動かすか、worker に手を入れるか）は**未検証**で、E4 の `downlink-allocation` で決める。
 - RED の冗長の数は、受け手ごとに次で決める。
 
 | 受け手の下りの推定 | RED | 送る音声の本数（話者） |
 | --- | --- | --- |
-| 500 kbps 以上 | distance 2 | 3 |
-| 250〜500 kbps | distance 1 | 3 |
+| 250 kbps 以上 | 残す（distance 1） | 3 |
 | 150〜250 kbps | 剥がす（Opus だけ） | 3 |
 | 150 kbps 未満 | 剥がす | 2 |
 
-- 150 kbps の下りで、音声 2 本（約 56 kbps × 2）と RTCP を載せ、残りで最も低い映像の層（S0・T0、約 50 kbps）を 1 本だけ送る。載らなければ映像を止める。これで NFR-009 の「下り 150 kbps でも音声は続く」を満たす見込み（**未検証**）。
+- 150 kbps の下りで、音声 2 本（約 56 kbps × 2）と RTCP を載せ、残りで最も低い映像の層（S0・T0、約 50 kbps）を 1 本だけ送る。載らなければ映像を止める。これで NFR-009 の「下り 150 kbps でも音声は続く」を満たす見込み（**未検証**。E4 の `downlink-allocation` で、帯域の低下の条件 `bw-step-down` で確かめる）。
 
 ### 6.5 映像の損失への備え
 
@@ -265,7 +268,7 @@ Media Node が決めるもの：
 ### 7.2 送り手の順序
 
 1. 共有の許可（[signaling-and-meetings.md](signaling-and-meetings.md) の 9 節）を Actor から得る。
-2. `getDisplayMedia` の後、トラックに `contentHint` を設定してから、`produce` する（設定の前に符号化を始めると、既定の `maintain-framerate` で最初のフレームが粗くなる。**未検証**）。
+2. `getDisplayMedia` の後、トラックに `contentHint` を設定してから、`produce` する（Content Hints の仕様では、`contentHint` が空のときの既定の劣化のさせ方は実装に任されている。設定の前に符号化を始めると、最初のフレームが粗くなる恐れがある。**未検証**で、E5 の `screen-share-detail` で確かめる）。
 3. Media Node は、画面共有の consumer を受け手ごとに `priority: 255` で作る。
 
 ## 8. 損失 20% の回線での振る舞い（NFR-003）
@@ -273,11 +276,11 @@ Media Node が決めるもの：
 | 起きていること | 音声 | 映像 |
 | --- | --- | --- |
 | 送り手の上りで 20% の損失 | FEC と RED で、Media Node に届く前の損失を直す。Media Node は RED のまま受け手へ転送する | 送り手の GCC の損失に基づく推定が、損失 10% 超で下がり続ける。ブラウザは上の本を止め、`q`（180p）だけになる見込み。NACK と RTX で直す。直せないフレームは受け手が PLI を送る |
-| 受け手の下りで 20% の損失 | 送り手の RED・FEC がそのまま効く。Media Node は下りの推定に合わせて RED の distance を決める（6.4 節）。受け手の NetEQ が残りを隠す | Media Node の推定が下がり、その受け手への層を下げる。止まった consumer はアバターを出す |
+| 受け手の下りで 20% の損失 | 送り手の RED・FEC がそのまま効く。Media Node は下りの推定に合わせて RED を残すか剥がすかを決める（6.4 節）。受け手の NetEQ が残りを隠す | Media Node の推定が下がり、その受け手への層を下げる。止まった consumer はアバターを出す |
 | 他の参加者 | 影響しない（受け手ごとに層を選ぶ） | 影響しない |
 
 - 目標：損失 20%・揺らぎ 30ms で、音声の ViSQOL の MOS 3.0 以上（NFR-003）。損失 5% で MOS 3.8 以上。
-- GCC の損失に基づく制御は、損失が 10% を超える間、推定を下げ続ける（3 節）。ブラウザの実装（libwebrtc の損失に基づく推定の新しい版）が草案と違う振る舞いをするかは**未検証**。損失 20% の間、映像が最も低い層にも載らなくなるかを E4 で測る。
+- GCC の損失に基づく制御は、損失が 10% を超える間、推定を下げ続ける（3 節）。ブラウザの実装（libwebrtc の損失に基づく推定の新しい版）が草案と違う振る舞いをするかは**未検証**。損失 20% の間、映像が最も低い層にも載らなくなるかを E4 の `loss-20-audio` で測る。
 - 映像は、損失 20% の間は「最も低い層で途切れがち」か「止めてアバター」になる。どちらも許し、音声を守ることを優先する。
 
 ## 9. 失敗のしかた
@@ -369,7 +372,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 2026-09-27 の既定案。承認は Dev（テックリード）が行う。
 
-- **RED**：mediasoup に RED の転送と剥がしを足す（ADR-0017）。上流に取り込まれなければフォークで持つ。
+- **RED**：mediasoup に RED の転送と剥がしを足す（ADR-0017）。上流に取り込まれなければフォークで持つ。ブラウザは distance 1 で送るので、Media Node は受け手ごとに残すか剥がすかだけを決める（2026-09-27 に libwebrtc の実装で確かめて直した）。
 - **カメラの既定**：VP8 の simulcast 3 本。SVC は全員 Chromium の会議だけ（ADR-0018）。
 - **AV1**：S1 はフラグの裏（ADR-0018）。
 - **映像の FEC**：使わない（ADR-0019）。
@@ -381,8 +384,8 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| RED distance 2 の実際の費用（Chrome が冗長に何を入れるか）と、MOS への効果 | E4 の `red-forwarding` で、FEC だけ・distance 1・distance 2 を ViSQOL で比べる |
-| Firefox・Safari の RED、DD、SVC の対応 | E2 の着手時と、各ブラウザの新しい版ごとに確かめて [clients.md](clients.md) の表を更新する |
+| RED distance 1 の実際の費用と、FEC と組んだときの MOS への効果（冗長に何が入るかは libwebrtc の実装で確かめた） | E4 の `red-forwarding` で、FEC だけ・RED distance 1 ＋ FEC を ViSQOL で比べる |
+| Firefox・Safari の RED、DD、SVC、Safari の VP9・AV1 の対応 | E2 の `browser-capability-probe` と、各ブラウザの新しい版ごとに確かめて、3 節と [clients.md](clients.md) の表を更新する |
 | 損失 20% での GCC の損失に基づく制御の実際の振る舞い | E4 の `loss-20-audio` で、推定の時系列を記録する |
 | VP9 の SVC と simulcast の上りの差（ADR-0002 の「3〜4 割」） | E4 の `svc-vp9-mode` で計測する |
 | AV1 を既定にする時期 | mediasoup の #1625 の解決と、Firefox の SVC の復号の対応を待つ。S2 の前に判断する |

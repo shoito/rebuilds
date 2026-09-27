@@ -20,7 +20,7 @@ date: 2026-09-27
 - 1 台の Media Node の consumer の上限は、初期見積もりで 24,800（62 worker × 400。[ADR-0053](0053-capacity-model-cost-target-and-load-bots.md)）。300 人の会議は、音声だけで 1 台の約 3.6 倍を使う。
 - 止めた consumer でも、作る・止める・再開の操作、worker のメモリ、`inventory` の大きさ、付け替えのときの作り直しの量が、人数の 2 乗で増える。
 - mediasoup の consumer は 1 つの producer に結び付き、途中で別の producer に付け替えられない（[mediasoup v3 API](https://mediasoup.org/documentation/v3/mediasoup/api/)、2026-09-27 に確認）。
-- mediasoup は、Node.js の側で RTP を受け取り・送り出す `DirectTransport`（`DataProducer`・`DataConsumer` と、RTP の `producer.send()`・consumer の `rtp` イベント）と、別の router・別のプロセスと RTP をやり取りする `PipeTransport`・`PlainTransport` を持つ（同上、2026-09-27 に確認。`DirectTransport` の RTP の扱いの性能は**未検証**）。
+- mediasoup は、Node.js の側で RTP を受け取り・送り出す `DirectTransport`（`DataProducer`・`DataConsumer` と、RTP の `producer.send()`・consumer の `rtp` イベント）と、別の router・別のプロセスと RTP をやり取りする `PipeTransport`・`PlainTransport` を持つ（同上、2026-09-27 に確認。`DirectTransport` の RTP の扱いの性能は**未検証**で、E7 の `audio-slot-forwarder-poc` で測る）。
 
 S1（100 人まで）は今の形で収まる。S2 の前に、大きな会議の音声の形を決める必要がある（capacity.md と media-server-sfu.md の持ち越し）。
 
@@ -44,7 +44,7 @@ S1（100 人まで）は今の形で収まる。S2 の前に、大きな会議�
   - 各枠に今どの参加者が入っているかは、`eph` の `audio.slots`（`{slot, participant_id}` の列、変わったときだけ）で受け手に知らせる。音量の輪と字幕の話者の表示に使う。
   - 性能が足りなければ（1 会議あたりの転送器の処理が Node Agent のイベントループを 1 ms 以上止める、など）、転送器を `PipeTransport` でつないだ別のプロセス（Rust）に移す。どちらにするかは PoC で決める（下）。
 - **受け手**：枠の producer の consumer を 3 つ（か 2 つ）だけ持つ。音声の consumer は受け手 1 人あたり 3 で、会議の人数によらない。300 人で 900、1,000 人で 3,000。
-- **RED**：枠の producer は、送り手が送った形（RED か Opus）をそのまま流す。受け手ごとの RED の剥がしと distance（[ADR-0017](0017-opus-dtx-fec-red.md)）は、枠の consumer に今と同じく当てる。
+- **RED**：枠の producer は、送り手が送った形（RED か Opus）をそのまま流す。受け手ごとの RED の剥がし（残すか剥がすか。[ADR-0017](0017-opus-dtx-fec-red.md)）は、枠の consumer に今と同じく当てる。
 - **E2EE**：枠は SFrame の暗号文をそのまま流す。受け手は SFrame のヘッダーの KID で送り手と鍵を選ぶので、枠の中で送り手が替わっても復号できる（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）。E2EE の会議の上限は S1 で 100 人なので（[ADR-0030](0030-security-code-and-e2ee-feature-limits.md)）、枠と E2EE の組み合わせは S2 で上限を上げるときに確かめる。
 - **Recorder・Transcriber・Phone Bridge**：今と同じく、送り手ごとの producer を受ける（録画と字幕は話者ごとの音声が要る。[ADR-0025](0025-recording-per-track-capture-and-offline-compose.md)、[ADR-0026](0026-asr-engine-amazon-transcribe-with-adapter.md)）。枠を使うのは参加者の受け手だけ。
 - **カスケード（S2）**：枠の producer は主な Node で作り、他の Node の受け手へは、枠の producer を pipe で送る（3 本）。送り手ごとの音声を Node の間で全部運ばない。

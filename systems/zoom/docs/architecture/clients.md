@@ -41,7 +41,7 @@
 | --- | --- |
 | Chrome・Edge（Windows、macOS、Linux、ChromeOS） | 最新 2 メジャー |
 | Firefox（Windows、macOS、Linux） | 最新 2 メジャーと、現行の ESR |
-| Safari（macOS） | 最新 2 メジャー（2026-09-27 の時点で 26 と 27 と見込む。**未検証**） |
+| Safari（macOS） | 最新 2 メジャー（2026-09-27 の時点で 26 と 27。27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) の版の記録（v8.1.3）、2026-09-27 に確認） |
 | Safari（iOS・iPadOS） | 同上。iOS の他のブラウザも WebKit なので、同じ扱いにする |
 | Chrome（Android） | 最新 2 メジャー |
 
@@ -50,20 +50,20 @@
 
 ### 2.2 機能の対応表
 
-いずれも 2026-09-27 に確認した。確かめられないものは**未検証**。符号器の対応は [codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 3 節。
+いずれも 2026-09-27 に確認した（MDN の browser-compat-data は v8.1.3）。確かめられないものは**未検証**で、E2 の `browser-capability-probe` で実機で確かめて埋める。符号器の対応は [codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 3 節。
 
 | 機能 | Chrome・Edge | Firefox | Safari | 出典 |
 | --- | --- | --- | --- | --- |
 | mediasoup-client のハンドラー | `Chrome111`（古い版は `Chrome74`） | `Firefox120` | `Safari12` | [mediasoup-client の handlers](https://github.com/versatica/mediasoup-client/tree/v3/src/handlers)（v3.24.1） |
-| simulcast（VP8） | 対応 | 134 から（VP8）、136 から（H.264・AV1） | 対応（H.264 で使う。VP8 の simulcast は**未検証**） | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
-| `scalabilityMode`（SVC） | 111 から | 未対応 | **未検証** | [browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319) |
+| simulcast（VP8） | 対応 | 134 から（VP8）、136 から（H.264・AV1） | 対応（H.264 で使う。VP8 の simulcast は MDN に記載がなく**未検証**） | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
+| `scalabilityMode`（SVC） | 111 から | 未対応 | 未対応 | [browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319)（未マージ） |
 | `RTCRtpScriptTransform`（E2EE） | 141 から | 117 から | 15.4 から | [caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)。Baseline 2025 |
-| Dependency Descriptor | 対応 | 136 から | **未検証** | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
+| Dependency Descriptor | 対応 | 136 から | MDN に記載がなく**未検証** | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
 | WebGPU | 113 から | 既定で無効（159 まで） | 26 から（macOS は部分的、iOS は対応） | [caniuse](https://caniuse.com/webgpu) |
-| `MediaStreamTrackProcessor` | 対応（window と worker） | **未検証**（MDN は「Limited availability」） | worker だけと報告（**未検証**） | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrackProcessor) |
-| `AudioWorklet`・WASM の SIMD | 対応 | 対応 | 対応（SIMD は**未検証**） | — |
+| `MediaStreamTrackProcessor` | 94 から（互換の表は、仕様の worker ではなく window に公開と注記。worker での動作は**未検証**で、E5 の `virtual-background` で確かめる） | 未対応 | 18 から（出す側の `VideoTrackGenerator` も 18 から） | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrackProcessor)、browser-compat-data |
+| `AudioWorklet`・WASM の SIMD | 対応（SIMD は 91 から） | 対応（SIMD は 89 から） | 対応（SIMD は 16.4 から） | browser-compat-data（`webassembly.fixed-width-SIMD`） |
 
-- MDN は、`MediaStreamTrackProcessor` を「ブラウザによって window だけ、worker だけで公開され、互換でない」とする。映像の処理は worker で動かす形を基本にし、使えなければ 5.1 節の代わりの経路を使う。
+- MDN は、`MediaStreamTrackProcessor` を「ブラウザによって window だけ、worker だけで公開され、互換でない」とする。Firefox は持たない。映像の処理は worker で動かす形を基本にし、使えなければ（Firefox は常に）5.1 節の代わりの経路を使う。
 
 ### 2.3 対応しないときの扱い
 
@@ -141,12 +141,14 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
   → 縮小（256×144）→ Selfie Segmenter（横長のモデル、入力 144×256）→ 人物のマスク
   → マスクの平滑化（前のフレームとの指数移動平均 α=0.6、縁のぼかし）
   → 合成（元の解像度で、背景の画像かぼかしと合わせる。WebGPU のシェーダー）
-  → VideoTrackGenerator → 送る映像のトラック
+  → VideoTrackGenerator（Safari）・MediaStreamTrackGenerator（Chrome・Edge）→ 送る映像のトラック
 ```
 
-- 分割のモデルは MediaPipe の Selfie Segmenter（正方形 256×256 と横長 144×256 の 2 つ。Pixel 6 での遅れは約 33〜35ms。[Image segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter)、2026-09-27 に確認）。モデルの利用の条件は、文書の本文が CC BY 4.0・コードが Apache 2.0 と書かれているが、モデルのファイルの条件は**未検証**。E5 の着手前に法務と確かめる。
+- 出す側の API はブラウザで名前が違う。Chrome・Edge は `MediaStreamTrackGenerator`（94 から）で、仕様の `VideoTrackGenerator` を持たない。Safari は `VideoTrackGenerator`（18 から）を持つ（browser-compat-data、2026-09-27 に確認）。
+
+- 分割のモデルは MediaPipe の Selfie Segmenter（正方形 256×256 と横長 144×256 の 2 つ。Pixel 6 での遅れは約 33〜35ms。[Image segmenter](https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter)、2026-09-27 に確認）。モデルの利用の条件は、Image segmenter の文書から張られたモデルカード（[Model Card MediaPipe Selfie Segmentation](https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Selfie%20Segmentation.pdf)、2021-05-06、2026-09-27 に確認）に Apache License 2.0 とある。E5 の着手前に、配るモデルのファイルとモデルカードの対応を法務と確かめる。
 - 実行は WebGPU を第一にし、なければ WebGL2 にする。
-- 代わりの経路：`MediaStreamTrackProcessor` が worker で使えないブラウザでは、`<video>` → `OffscreenCanvas` → `canvas.captureStream()` の経路で同じ処理をする。遅れとフレームの落ちは大きくなる（**未検証**）。
+- 代わりの経路：`MediaStreamTrackProcessor` が worker で使えないブラウザでは、`<video>` → `OffscreenCanvas` → `canvas.captureStream()` の経路で同じ処理をする。遅れとフレームの落ちは大きくなる見込み（**未検証**。E5 の `virtual-background` で、上の性能の予算に対して測る）。
 - ぼかしの強さは 2 段（弱・強）。背景の画像は、組み込みの数枚と、利用者が選んだ画像（端末の中だけに置き、サーバーへ送らない）。
 - 映像はサーバーへ送る前に処理を終える（intent.md の MVP）。処理しない映像を一瞬でも送らない。処理が止まったら、カメラを止める。
 
@@ -163,7 +165,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 - 既定は、ブラウザの `noiseSuppression: true`（と `echoCancellation`、`autoGainControl`）。追加の処理はしない。
 - 「強い雑音の抑制」を選んだら、ブラウザの `noiseSuppression` を切り、RNNoise を AudioWorklet で動かす。
   - RNNoise は 48 kHz のモノラルの 16 ビットの PCM を扱い、BSD-3-Clause（[xiph/rnnoise](https://github.com/xiph/rnnoise)、2026-09-27 に確認）。WASM にしてワークレットに載せる。
-  - RNNoise は 480 サンプル（10ms）ごとに処理する（本家の実装の形。**未検証**）。AudioWorklet は 128 サンプルごとに呼ばれるので、リングバッファで 480 に揃える。遅れは約 10ms 増える。NFR-001 の mouth-to-ear 200ms の予算から引く。
+  - RNNoise は 480 サンプル（48 kHz で 10ms）ごとに処理する（RNNoise の `src/denoise.h` の `FRAME_SIZE 480`、2026-09-27 に確認）。AudioWorklet は 128 サンプルごとに呼ばれるので、リングバッファで 480 に揃える。遅れは約 10ms 増える。NFR-001 の mouth-to-ear 200ms の予算から引く。
   - 小さいモデル（`little`）を既定にし、CPU の余裕があれば通常のモデルにする。
 - 2 つの抑制を重ねない（二重にかけると声がこもる）。
 
@@ -172,7 +174,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 - 5 秒ごとに、仮想背景の 1 フレームの処理時間の p95 と、送り手の `qualityLimitationReason` を見る。
 - 処理時間の p95 が 25ms を 5 秒続けて超えたら：15 fps に落とす → 次に 360p に落とす → 次に仮想背景を切ってカメラを止め、「端末の負荷が高いため、仮想背景を止めました」と出す。利用者が再開を選べる。
 - `qualityLimitationReason` が `cpu` のときは、仮想背景より先に送る映像の上の層を止める（[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 9 節）。
-- 電池の残りを OS から取れる環境では、節電の状態で仮想背景を既定で切る（**未検証**：ブラウザから取れる情報の範囲）。
+- 電池の残りをブラウザから取れる環境では、節電の状態で仮想背景を既定で切る。`navigator.getBattery()` は Chrome・Edge だけが持つ（Firefox は 52 で外し、Safari は持たない。browser-compat-data、2026-09-27 に確認）。他のブラウザでは、この規則を使わない。
 
 ## 6. アクセシビリティ
 
@@ -209,7 +211,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
   - Chrome の安定版の milestone に、2 か月以内に追いつく。libmediasoupclient が対応する milestone に合わせる。
 - OS との統合：iOS は CallKit と、バックグラウンドの音声。Android は `ConnectionService` と前面のサービス。両方でピクチャー・イン・ピクチャー。
 - E2EE：libwebrtc の `FrameTransformerInterface`（Encoded Transform のネイティブの形）で、Rust の共通のコアの SFrame を呼ぶ（[e2ee.md](e2ee.md) の 7 節）。
-- 仮想背景：iOS は Vision の人物の分割、Android は MediaPipe の Selfie Segmenter（**未検証**：OS の API と MediaPipe の品質の差）。
+- 仮想背景：iOS は Vision の人物の分割、Android は MediaPipe の Selfie Segmenter（OS の API と MediaPipe の品質の差は**未検証**。E13 の `mobile-ios-app`・`mobile-android-app` で比べる）。
 
 ## 9. 共通のコア（ADR-0024）
 
@@ -337,8 +339,8 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Selfie Segmenter のモデルのファイルの利用の条件 | E5 の着手前に法務と確かめる |
-| Firefox・Safari の `MediaStreamTrackProcessor` の対応と、代わりの経路の性能 | E5 の着手時に計測する |
+| Selfie Segmenter のモデルのファイルの利用の条件 | モデルカードは Apache License 2.0（5.1 節）。配るファイルとの対応を E5 の `virtual-background` の着手前に法務と確かめる |
+| Chrome の worker での `MediaStreamTrackProcessor` の動作と、代わりの経路（Firefox は常に）の性能 | E5 の `virtual-background` で計測する。Firefox は持たず、Safari は 18 から持つ（2.2 節） |
 | 仮想背景の基準の端末の機種 | E5 の前に QA が決める（IoU の閾値は [quality.md](../quality.md) の既定 0.90） |
 | RNNoise より新しい雑音の抑制のモデル（より大きい DNN）を使うか | E5 で、CPU と MOS の推定で比べる |
 | デスクトップの Linux 版 | MVP の後。利用者の要望を見る |

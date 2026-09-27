@@ -18,10 +18,10 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| ファイルの送信 | 会議の中でファイルを送れる。組織の設定で許すかを選ぶ（[Enabling file transfer in meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058822)）。大きさの上限は 1 GB とする解説や、512 MB・2,048 MB の設定を挙げる利用者の投稿がある（一次の値は**未検証**） | 100 MB（ADR-0037） |
-| リアクション | 絵文字のリアクションは 10 秒で消える。挙手と反応の表示（はい・いいえ・もっとゆっくり など）は、下げるまで残る（大学の IT の解説。一次は**未検証**） | 同じ考え方（ADR-0037） |
-| 途中から入った人のチャットの履歴 | 公開の一次の資料で確かめていない（**未検証**） | 既定は入った後のメッセージだけ。主催者の設定で履歴を見せる |
-| 会議の後のチャット | クラウド録画にチャットを残す設定がある（**未検証**） | 録画があれば全員へのメッセージを録画に入れる |
+| ファイルの送信 | 会議の中でファイルを送れる。組織の設定で許すかを選ぶ（[Enabling file transfer in meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0058822)）。管理者は大きさの上限と許すファイルの種類を設定で絞れる。会議の中の送信の上限の値は、一次の文書に書かれていない（Team Chat は 1 GB。[Zoom Chat specifications and limitations](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0079326)） | 100 MB（ADR-0037） |
+| リアクション | 絵文字のリアクションは 10 秒で消える。挙手と反応の表示（はい・いいえ・ゆっくり・急いで）は、本人か主催者が下げるまで残る（[Using non-verbal feedback and meeting reactions](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063323)） | 同じ考え方（ADR-0037） |
+| 途中から入った人のチャットの履歴 | 社外の招待者とゲストは、入った時からのメッセージだけを見られ、入る前のものは読めない。招待された社内の人は、会議の前後のチャット（継続するチャット）を見られる（[Frequently asked questions for meeting chat before and after the meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0057731)） | 既定は入った後のメッセージだけ。主催者の設定で履歴を見せる |
+| 会議の後のチャット | クラウド録画の設定で、会議のチャットを TXT のファイルとして残せる（[Changing basic and advanced cloud recording settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064676)） | 録画があれば全員へのメッセージを録画に入れる |
 | E2EE の会議 | 会議の前後のチャットなどが使えない（[End-to-end encryption for meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065408)） | 会議の中のチャットは MLS で暗号化して使える。会議の後に残さない |
 
 いずれも 2026-09-27 に確認。
@@ -144,7 +144,7 @@ Actor ── eph chat.message{file: {file_id, name, size, content_type}} ──�
 Client ── GET /v1/chat-files/{file_id} ──▶ API（受け手か確かめる）──▶ 302 署名付き GET（5 分）
 ```
 
-- マルウェアの検査は、GuardDuty の S3 のマルウェアの保護を使う想定（S3 のオブジェクトの作成で検査し、結果をタグと EventBridge で返す。**未検証**。E5 で確かめる）。検査が終わるまで配らない。
+- マルウェアの検査は、GuardDuty の S3 のマルウェアの保護を使う。新しく上げたオブジェクトを自動で検査し、結果を EventBridge に出し、設定すれば結果をオブジェクトのタグに付ける。GuardDuty を有効にせず、この機能だけを使うこともできる。検査するオブジェクトは 100 GB まで（[GuardDuty Malware Protection for S3](https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.html)、[クォータ](https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-s3-quotas-guardduty.html)、2026-09-27 に確認）。検査にかかる時間は E5 の `chat-file-transfer` で測る。検査が終わるまで配らない。
 - 受け手の画面は、検査の間「確認中」と出す。
 
 ### 4.2 上限と規則
@@ -159,7 +159,7 @@ Client ── GET /v1/chat-files/{file_id} ──▶ API（受け手か確かめ
 | 保持 | 3.7 節 |
 
 - 組織の設定 `file_transfer`（既定：許す）で、ファイルの送信を止められる。
-- 本家の上限（**未検証**の 1 GB など）より小さくするのは、マルウェアの検査の時間と費用、会議の中で大きなファイルを送る必要の少なさのため。
+- 本家（Team Chat の 1 GB など）より小さくするのは、マルウェアの検査の時間と費用、会議の中で大きなファイルを送る必要の少なさのため。
 
 ## 5. リアクションと挙手
 
@@ -194,7 +194,7 @@ ADR-0037。
   - 会議の後は、設定にかかわらず残さない（録画も `save_chat` もない）。
 - 個別のメッセージ：MLS のアプリケーションのメッセージはグループの全員が復号できるので、そのままでは 2 人だけに閉じられない。S1 の E2EE の会議では、個別のメッセージを使えなくする（`private_chat = off` を強制）。2 人の間の追加の暗号化（HPKE など）は持ち越し。
 - ファイル：使えない。
-- リアクション：MLS のアプリケーションのメッセージとして暗号化し、`eph` で配る。数のまとめはしない（Actor は中身を読めない）。E2EE の会議の参加者の上限（S1 で 100 人）の間は、まとめなくても流量は収まる見込み（**未検証**）。
+- リアクション：MLS のアプリケーションのメッセージとして暗号化し、`eph` で配る。数のまとめはしない（Actor は中身を読めない）。E2EE の会議の参加者の上限（S1 で 100 人）の間は、まとめなくても流量は収まる見込み（**未検証**。E9 の `e2ee-chat-and-reactions` で 100 人の会議の流量を測る）。
 - 挙手と反応の表示：状態として平文で扱う（ミュートと同じく、会議の運営のためのメタデータ）。サーバーに見えることを、E2EE を選ぶ画面で示す。
 - どの項目がサーバーに見えるかの一覧は e2ee.md に置く。
 
@@ -275,7 +275,7 @@ ADR-0037。
 | --- | --- |
 | 個別のメッセージを組織の記録として残す要求（eDiscovery）への対応（L8） | 法務の確認の後、必要なら新しい ADR |
 | 会議の後のチャットの保持の既定（90 日）と、社外の参加者の削除の請求（L6） | 法務の確認の後、PM が決める |
-| GuardDuty の S3 のマルウェアの保護の振る舞いと費用 | E5 で確かめる |
+| GuardDuty の S3 のマルウェアの保護の検査の時間と費用（振る舞いは 4 節で確かめた） | E5 の `chat-file-transfer` で測る |
 | E2EE の会議の個別のメッセージ（2 人の間の追加の暗号化） | E9 の後に検討する |
 | チャットの装飾（Markdown、メンション） | E5 の利用者の声で決める |
 | 1,000 人の会議（S3）のチャットの流量と、`reaction.batch` の窓 | S3 の前の負荷試験 |

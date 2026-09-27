@@ -20,12 +20,13 @@
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
 | 番号の使用の手続き | 電気通信番号を使う電気通信事業者は、番号の種別ごとに「電気通信番号使用計画」を作り、総務大臣の認定を受ける（2019 年の制度）。自ら番号の指定を受ける場合と、他の事業者から卸を受ける場合で、手続きが分かれる | [電気通信番号を使用するための手続](https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/new_framework.html)、[電気通信番号関係の制度改正について](https://www.soumu.go.jp/main_content/000614856.pdf) |
-| 050 の品質 | 050 の IP 電話の品質（または同等の品質）を確保するか、品質の保証のない回線へ転送するときは相手に知らせるか発信者の番号を通知しないこと、とする記述がある | 同上（検索の結果の要約で見た。原文の該当箇所は**未検証**） |
-| 050 の本人確認 | 050 のアプリ電話の契約のときの本人確認が、携帯音声通信事業者による契約者等の本人確認等に関する法律の施行規則の改正で義務になった（2024-04-01 施行と報じられている） | [総務省の報道資料（意見募集）](https://www.soumu.go.jp/menu_news/s-news/01kiban18_01000197.html)。施行日は報道で確かめた（**未検証**） |
+| 050 の品質 | 050 の IP 電話の総合品質（端末の間）は、R 値 50 超・平均の遅延 400ms 未満。0AB-J の IP 電話は平均の遅延 150ms 未満など、より厳しい | [通信品質等の現行規定について](https://www.soumu.go.jp/main_content/000690836.pdf)（総務省、IP ネットワーク設備委員会の参考資料 58-2、2020-06-04） |
+| 転送の区間の品質と番号の表示 | 固定電話の番号を使う転送電話で、転送の区間が固定電話の網の品質に満たないときは、発信者の番号を通知しないか、050 などの固定電話以外の番号を使う、という整理がある（0AB-J の転送の話で、050 の条件ではない） | [固定電話番号を利用する転送電話サービスの在り方（答申）](https://www.soumu.go.jp/main_content/000583229.pdf)（総務省、2018-11-02） |
+| 050 の本人確認 | いわゆる 050 のアプリ電話の契約のときの本人確認を、携帯電話不正利用防止法の施行規則の改正で義務にした。2023-08 に公布、2024-04-01 に施行 | [意見募集の結果](https://www.soumu.go.jp/main_content/000897635.pdf)（「令和６年４月１日に施行する」）、[総務省の Q&A](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/050526_1.files/Page444.html) |
 | 番号の指定の状況 | 0120・0800（着信課金）、0570、050 などの種別ごとに、指定を受けた事業者の一覧が公表されている | [電気通信番号指定状況](https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/number_shitei.html) |
-| CPaaS の日本の番号 | Twilio は日本で National（050）と Toll-Free の番号を扱い、購入の前に規制の書類の束の審査が要る。日本の番号を再販する者は、番号使用計画の書類の提出が要る | [Japanese Phone Number Regulatory Changes](https://help.twilio.com/articles/4405840066715-Japanese-Phone-Number-Regulatory-Changes)、[Resellers of Japanese Phone Numbers](https://help.twilio.com/articles/9956319880859)（検索の結果の要約で確かめた。本文は**未検証**） |
-| Amazon Chime SDK の番号 | 番号を取れる国は API（`ListSupportedPhoneNumberCountries`）で確かめる。日本の番号を取れるかは確かめていない | [ListSupportedPhoneNumberCountries](https://docs.aws.amazon.com/chime-sdk/latest/APIReference/API_voice-chime_ListSupportedPhoneNumberCountries.html)（日本の対応は**未検証**） |
-| 本家の電話の操作（`*6` でミュートなど） | 公開の一次の資料で確かめていない | **未検証** |
+| CPaaS の日本の番号 | Twilio は日本で National（050）と Toll-Free の番号を扱い、購入の前に規制の書類の束の審査が要る。日本の番号を再販する者は、番号使用計画の書類の提出が要る | [Japanese Phone Number Regulatory Changes](https://help.twilio.com/articles/4405840066715-Japanese-Phone-Number-Regulatory-Changes)、[Resellers of Japanese Phone Numbers](https://help.twilio.com/articles/9956319880859)（検索の結果の要約で確かめた。本文は取得できず**未検証**。E14 の `carrier-selection-and-legal` で確かめる） |
+| Amazon Chime SDK の番号 | 番号を取れる国は API（`ListSupportedPhoneNumberCountries`）で確かめる。身元の書類が要る国の一覧に日本はない | [ListSupportedPhoneNumberCountries](https://docs.aws.amazon.com/chime-sdk/latest/APIReference/API_voice-chime_ListSupportedPhoneNumberCountries.html)、[Country requirements for phone numbers](https://docs.aws.amazon.com/chime-sdk/latest/ag/phone-country-reqs.html)（日本の番号を取れるかは**未検証**。E14 の `carrier-selection-and-legal` で API を呼んで確かめる） |
+| 本家の電話の操作 | 参加者は `*6` でミュートの切り替え、`*9` で挙手の切り替え。主催者は `*4` で会議の終了、`*5` でロック、`*7` で録画、`99` で全員のミュート、`**` で一覧 | [Joining a Zoom meeting or webinar by phone](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060564) |
 
 いずれも 2026-09-27 に確認。
 
@@ -68,7 +69,7 @@ ADR-0042。
 
 | 種類 | 用途 | 既定 | 備考 |
 | --- | --- | --- | --- |
-| 050 | 共用のダイヤルインの番号 | 使う | 事業者から卸を受ける。品質と表示の条件は 2 節（**未検証**） |
+| 050 | 共用のダイヤルインの番号 | 使う | 事業者から卸を受ける。品質の条件（R 値 50 超、平均の遅延 400ms 未満）は 2 節。卸の事業者の網と本システムの区間を合わせて満たすかは、E14 の `carrier-selection-and-legal` で事業者と確かめる |
 | 0120・0800 | 通話料を着信の側（組織）が払う番号 | 組織の選択（別の契約） | 事業者から卸を受ける |
 | 0ABJ（03・06 など） | 信頼感のある番号 | 使わない（持ち越し） | 取得の条件（地域、品質）を法務と確かめる |
 
@@ -107,7 +108,7 @@ ADR-0042。
 | `*1` | 同意（録画・文字起こしが途中で始まったとき） | `consent.give` |
 | `*0` | 操作の案内を聞く | — |
 
-- 番号の割り当ては本家に似せるが、本家の割り当ては確かめていない（**未検証**）。
+- 番号の割り当ては本家（`*6`・`*9`。2 節）に合わせる。`*1`（同意）と `*0`（案内）は本システムの割り当て。
 - 途中で録画が始まったら、電話の参加者に音声で知らせ、同意するまでミュートの解除を拒否する（ADR-0027 と同じ）。
 
 ### 4.4 表示
@@ -138,7 +139,7 @@ ADR-0042。
 ## 6. 音声の品質
 
 - 電話の網の音声は G.711（8 kHz）。会議の側は Opus（48 kHz）。変換は Phone Bridge で行う。
-- 遅れの予算（電話の人の声が Web の参加者に届くまで、p95）：事業者の網 100ms、SIP Edge・Call Controller 20ms、Phone Bridge の符号化 40ms、Media Node と受け手のジッタバッファ 200ms。合計で約 360ms の見込み（**未検証**）。NFR-001 の音声（p95 200ms）は、Web の参加者どうしの目標であり、電話の参加者には当てない（[architecture/README.md](README.md) の 3 節）。電話の参加者の目標は、[quality.md](../quality.md) の 2.2.1 節の既定（電話の参加者の声が Web の参加者に届くまで p95 400ms）とし、E14 の着手のときに事業者の網の実測で QA が確かめる。
+- 遅れの予算（電話の人の声が Web の参加者に届くまで、p95）：事業者の網 100ms、SIP Edge・Call Controller 20ms、Phone Bridge の符号化 40ms、Media Node と受け手のジッタバッファ 200ms。合計で約 360ms の見込み（**未検証**。E14 の `phone-bridge` で事業者の網の実測と合わせて測る）。050 の総合品質の平均の遅延 400ms 未満（2 節）にも、この予算の中で収める。NFR-001 の音声（p95 200ms）は、Web の参加者どうしの目標であり、電話の参加者には当てない（[architecture/README.md](README.md) の 3 節）。電話の参加者の目標は、[quality.md](../quality.md) の 2.2.1 節の既定（電話の参加者の声が Web の参加者に届くまで p95 400ms）とし、E14 の着手のときに事業者の網の実測で QA が確かめる。
 - 下りの混ぜ方：話者の絞り込みで受けた最大 4 本を混ぜ、ピークを抑える（リミッター）。自分の声は混ぜない（Media Node は自分の producer の consumer を作らない）。
 - 電話の網の損失は Phone Bridge では補わない。会議の側の損失は Opus の FEC と PLC で補う。
 
@@ -218,14 +219,14 @@ ADR-0042。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 電気通信事業の登録・届出の区分と、番号使用計画の認定の要否（卸を受ける場合を含む）（L1・L7） | 法務の確認。電話の Epic の着手の前 |
-| 050 の品質の条件と、品質を満たせない場合の発信者の番号の通知（L7） | 法務と事業者に確認 |
+| 050 の品質の条件（R 値 50 超、平均の遅延 400ms 未満。2 節で確かめた）を卸の網と本システムの区間を合わせて満たすか。満たせない場合の扱い（L7） | E14 の `carrier-selection-and-legal` で法務と事業者に確認 |
 | 緊急通報の扱い（会議への参加の番号だけの提供で義務がかかるか）（L7） | 法務の確認 |
 | 事業者の選定（国内の事業者か CPaaS か）、2 社にするか | 電話の Epic の着手の前に、費用と SIP の TLS・SRTP の対応を比べる |
 | Phone Bridge の実装（Rust か、既存の部品か） | 電話の Epic の着手のときに試作して決める |
 | 0ABJ の番号 | 利用者の声と取得の条件を見て決める |
 | 英語の案内 | 利用者の声を見て決める |
 | 電話の参加者の遅れと音質の目標 | [quality.md](../quality.md) の既定（p95 400ms）を、E14 の着手で事業者の網の実測と合わせて QA が確かめる |
-| Amazon Chime SDK で日本の番号を取れるか | 事業者の比較のときに確かめる |
+| Amazon Chime SDK で日本の番号を取れるか | E14 の `carrier-selection-and-legal` で API を呼んで確かめる |
 
 ## 12. quality.md・runbooks・data-model への項目
 

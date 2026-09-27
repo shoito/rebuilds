@@ -67,7 +67,7 @@ ADR-0043。
 
 - 組織の全体に効くスコープ（`:admin` の付くもの）を OAuth のアプリで使うには、組織の `admin` の承認が要る（利用者が同意しても、`admin` が承認するまで発行しない）。
 - アプリの公開の状態：`draft`（作った人の組織だけ）・`private`（許した組織だけ）・`public`（本システムの審査の後、誰でも）。
-- 認可サーバーは `identity` のモジュールの中に置く（[ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md)）。OAuth の安全の確認の表は、Auth0 の題材の [ADR-0053](../../../auth0/docs/decisions/0053-rfc9700-checklist-and-negative-tests.md)（RFC 9700 の確認の表と否定の試験）を写して使う。Better Auth の OAuth の提供者の機能を使えるかは E11 で確かめる（**未検証**）。
+- 認可サーバーは `identity` のモジュールの中に置く（[ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md)）。OAuth の安全の確認の表は、Auth0 の題材の [ADR-0053](../../../auth0/docs/decisions/0053-rfc9700-checklist-and-negative-tests.md)（RFC 9700 の確認の表と否定の試験）を写して使う。Better Auth は OAuth 2.1 の認可サーバーのプラグイン（`@better-auth/oauth-provider`）を持ち、認可コード（公開のクライアントは PKCE が既定で必須）、リフレッシュトークン、クライアントクレデンシャル、RFC 9207 の `iss` を扱う（[OAuth 2.1 Provider](https://better-auth.com/docs/plugins/oauth-provider)、2026-09-27 に確認）。4.2 節のトークンの形（接頭辞とチェックサム）、リフレッシュトークンの入れ替えと再使用の検知、`private_key_jwt` をこのプラグインで満たせるかは**未検証**で、E11 の `oauth-authorization-server` で確かめる。満たせなければ、その部分を自前で足す。
 
 ### 4.2 トークンの形
 
@@ -298,7 +298,7 @@ webhook-id: msg_01J9...    webhook-timestamp: 1790000000    webhook-signature: v
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 組織の契約でレート制限を上げる形 | 料金のプランを作るとき（MVP の外） |
-| Better Auth の OAuth の提供者の機能を使えるか、自前で書くか | E11 の着手のときに確かめる |
+| Better Auth の OAuth 2.1 の提供者のプラグインで、トークンの形・リフレッシュトークンの入れ替え・`private_key_jwt` を満たせるか | E11 の `oauth-authorization-server` |
 | 会議の中の操作（ミュート、退出させる）を API に出すか | 利用者の声を見て PM が決める。出すなら Actor への命令として |
 | 公開のアプリの審査の基準 | E11 |
 | `participant.*` のイベントの量が多い組織への、まとめた配送 | E11 の負荷試験で決める |

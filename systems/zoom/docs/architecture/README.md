@@ -46,7 +46,7 @@
 帯域は、参加者 1 人あたり **下り 2.5 Mbps（容量の前提）**、上り 0.8 Mbps で見積もる。下りの **期待の平均は 1.5 Mbps** で、費用の見込みには両方を並べる。本家のグループ通話の目安は、720p で上り 2.6 Mbps・下り 1.8 Mbps、音声だけで 60〜80 kbps（[Zoom の帯域の要件](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060748)、2026-09-27 に確認）。
 
 - 1.5 Mbps は、カメラを止めた参加者と、小さく表示される映像を含めた見込みである。全員がカメラをつけてギャラリーで見る会議が中心なら、2.5〜3.5 Mbps になる（[capacity.md](capacity.md) の 2 節）。1.5 Mbps は楽観の可能性があるので、容量（台数、送出、IP transit、クォータ）は 2.5 Mbps で見積もる。
-- どちらも**未検証**。E2 のベータで、表示のしかたとカメラの割合を測り、[capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) の 12 節を置き換える。
+- どちらも**未検証**。E2 のベータで、`qos-report-pipeline` の要約から表示のしかたとカメラの割合を測り、[capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) の 12 節を置き換える。
 
 | 段階 | 同時の会議 | 同時の参加者 | 1 会議の上限 | SFU の送出（ピーク。容量の前提） | 構成 |
 | --- | --- | --- | --- | --- | --- |
@@ -54,7 +54,7 @@
 | S2 | 5 万 | 30 万 | 300 人 | 約 750 Gbps（同 約 450 Gbps） | 東京と大阪の両方で会議を受ける（大阪は c6gn）。1 会議を複数の Media Node に広げる（リージョンの中のカスケード。pipe は全部の層を運ぶ）。100 人を超える会議の音声は枠の形（[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)）。1:1 の P2P を評価する |
 | S3 | 30 万 | 200 万 | 1,000 人 | 約 5 Tbps（同 約 3 Tbps） | リージョンをまたぐカスケード（受け手が要る層だけを運ぶ形を S3 の前に ADR にする）。国内の Edge と海外のリージョン。セル構成 |
 
-パケットの数は、映像 1 本（1.5 Mbps、平均 1,200 バイト）で約 160 パケット/秒、音声 1 本（Opus、20ms ごと）で 50 パケット/秒になる。S1 のピークで、SFU の全体で約 1,200 万パケット/秒（送出 約 940 万、受信 約 300 万。平均 1,000 バイトで計算。容量の前提）の見込み（未検証）。EC2 はインスタンスごとの PPS の上限を公表していないため、`pps_allowance_exceeded` の指標を見ながら負荷試験で 1 台の上限を決める（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。初期見積もりでは、1 台の上限は帯域より先に consumer と CPU で決まる（[capacity.md](capacity.md) の 3 節）。
+パケットの数は、映像 1 本（1.5 Mbps、平均 1,200 バイト）で約 160 パケット/秒、音声 1 本（Opus、20ms ごと）で 50 パケット/秒になる。S1 のピークで、SFU の全体で約 1,200 万パケット/秒（送出 約 940 万、受信 約 300 万。平均 1,000 バイトで計算。容量の前提）の見込み（**未検証**。E7 の `load-l0-l2` で 1 台の pps を測って直す）。EC2 はインスタンスごとの PPS の上限を公表していないため、`pps_allowance_exceeded` の指標を見ながら負荷試験で 1 台の上限を決める（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。初期見積もりでは、1 台の上限は帯域より先に consumer と CPU で決まる（[capacity.md](capacity.md) の 3 節）。
 
 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 11 節、台数と上限は [capacity.md](capacity.md) の 3〜5 節にある。
 
@@ -163,7 +163,8 @@
 
 品質の面のリスクの順位と対策は [quality.md](../quality.md) の 1 節にある。ここは設計の面のリスクを書く。
 
-- **転送の費用**：会議の費用の約 8 割は、SFU からインターネットへの転送である。S1 のピークの送出は、容量の前提で約 75 Gbps、期待の平均で約 45 Gbps。AWS の表の料金の K8（参加者・分あたりのメディアの配信の費用）は、下り 1.5 Mbps で約 0.18 円、2.5 Mbps で約 0.28 円で、S1 の目標（0.20 円）に届くかは下りの平均しだいである（[infrastructure.md](infrastructure.md) の 12 節）。AWS と Edge の損益の分かれ目はピークの送出で約 8〜10 Gbps で、S1 の途中で越えうる。S1 は AWS で始め、4 週続けて 10 Gbps を超えたら Edge の構築を始める（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。Edge の費用の仮定の多くは**未検証**。
+- **転送の費用**：会議の費用の約 8 割は、SFU からインターネットへの転送である。S1 のピークの送出は、容量の前提で約 75 Gbps、期待の平均で約 45 Gbps。AWS の表の料金の K8（参加者・分あたりのメディアの配信の費用）は、下り 1.5 Mbps で約 0.18 円、2.5 Mbps で約 0.28 円である（[infrastructure.md](infrastructure.md) の 12 節）。**S1 を AWS で容量の前提（2.5 Mbps）のまま動かすと、S1 の目標（0.20 円）に届かない。** 届くかは、下りの実測と Edge の判断に掛かる。目標の値は残し、PM と Ops の確認の項目にする。AWS と Edge の損益の分かれ目はピークの送出で約 8〜10 Gbps で、S1 の途中で越えうる。S1 は AWS で始め、4 週続けて 10 Gbps を超えたら Edge の構築を始める（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。Edge の費用の仮定の多くは**未検証**（E12 の `edge-evaluation` で確かめる）。
+- **Edge の運用の体制**：Edge には、24 時間の当番、自社の AS と BGP の運用、機器と回線の障害の対応、transit の事業者との DDoS の緩和の契約が要る（[infrastructure.md](infrastructure.md) の 12.3 節の「運用の人」3 人）。今の体制にはなく、採用か委託で用意するには、構築の 2 四半期より長くかかりうる。そこで、Edge の構築の閾値（4 週続けて 10 Gbps）の手前に判断の点を置く。ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops が体制を持つかを決める。持たないと決めたら、閾値を超えても Edge を作らず、AWS との料金の合意か国内のベアメタルのクラウドを選ぶ。その場合、S1 の K8 の目標は見直しが要る（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) の注記、[infrastructure.md](infrastructure.md) の 11 節）。
 - **下りの平均の見込み**：1.5 Mbps は楽観の可能性がある。容量は 2.5 Mbps で見積もり、E2 のベータで測って置き換える（2 節）。
 - **EC2 のネットワークの上限**：PPS の上限は公表されていない。インターネットゲートウェイを通る通信は、32 vCPU 未満のインスタンスで 5 Gbps、それ以上でインスタンスの帯域の 50% に制限される。1 本のフロー（5 タプル）は、クラスタのプレイスメントグループの外では 5 Gbps に制限される（[EC2 のネットワークの帯域](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)、2026-09-27 に確認）。1 台の上限は E7 の負荷試験で決める（[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)）。
 - **セキュリティグループの接続の追跡**：UDP のフローも追跡され、インスタンスごとの上限を超えるとパケットが捨てられる。送信元と宛先を全開（0.0.0.0/0）にした規則は追跡されない（[接続の追跡](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-connection-tracking.html)、2026-09-27 に確認）。Media Node のメディアのポートは追跡しない規則にし、防御は SFU の側の検査（ICE の認証、DTLS）で行う。NLB は通さない（[ADR-0016](../decisions/0016-media-edge-addressing-and-security-groups.md)）。
@@ -173,7 +174,7 @@
 - **大きな会議のキーフレームの要求**：受け手が多い会議では、受け手のキーフレームの要求（PLI・FIR）が送り手に集まり、送り手の送出が 2〜3 倍に増えうる（[mediasoup の Scalability](https://mediasoup.org/documentation/v3/scalability/)、2026-09-27 に確認）。SFU で要求をまとめ、頻度を抑える（[ADR-0011](../decisions/0011-forwarding-and-layer-selection.md)）。
 - **Meeting Actor の二重化と Valkey の切り替え**：ネットワークの分断で、同じ会議の Actor が 2 つ動くと、状態が分かれる。リースにフェンシングの番号（epoch）を付け、古い epoch の指示を Media Node・Gateway・Aurora が拒否する（[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md)）。Valkey の primary の切り替えが 4.5 秒を超えると全会議の Actor が止まり、取り直しが集中する。メディアは止まらない。
 - **メディアの IP への DDoS**：Media Node と TURN は公開の範囲の IP を持つ。Shield Advanced は入口を常に守り、メディアの EIP は攻撃のときだけ守る。Shield Advanced は IPv6 を守れないので、防御のモードの Node は IPv6 の候補を出さない（[ADR-0045](../decisions/0045-ddos-defense-for-media-edge.md) とその注記）。
-- **日本語の字幕の品質**：S1 は Amazon Transcribe を使うが、日本語の CER・遅れ・料金は**未検証**。専門用語、固有名詞、話者の重なりで誤りが増える。E8 の前に評価用の音声のセットで比べる（[ADR-0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）。
+- **日本語の字幕の品質**：S1 は Amazon Transcribe を使うが、日本語の CER と遅れは**未検証**で、E8 の `asr-evaluation-set` で測る（東京の streaming の料金は 1 分 0.01 USD と確かめた）。Transcribe は大阪に無く、大阪への切り替えの間は字幕が止まる。専門用語、固有名詞、話者の重なりで誤りが増える。E8 の前に評価用の音声のセットで比べる（[ADR-0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）。
 - **法令**：電気通信事業法の届出、通信の秘密、録画の同意、捜査機関への対応、外部送信規律、個人情報、電話番号、契約は、法務の確認待ち（[intent.md](../intent.md) の L1〜L8）。結論が出るまで、該当する Story の spec を承認しない。
 
 ### 決定（2026-09-27、既定案）
@@ -204,21 +205,44 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
 - 本家の名前は識別子に使わない（`<brand>`・`<Brand>`。リポジトリ共通の ADR-0006）。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
+### 確認の工程（2026-09-27）
+
+「未検証」の項目を一次の資料で確かめ、決着したものは出典と確認日を付けた。PoC や計測が要るものは「未検証」のまま、確かめる Story を書いた。設計を変えたものは次のとおり（ADR は注記を付けた）。
+
+- **RED は distance 1**：libwebrtc は冗長を 1 つしか作らず、Web のページから増やせない。ADR-0017 の distance 2 を取り消し、受け手ごとに残すか剥がすかだけにした。上りは最大約 2 倍、1 本は約 90 kbps（[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 4 節、[capacity.md](capacity.md) の 2 節）。
+- **mediasoup は音声を下りの割り当てに入れない**：映像が推定の全部を使いうるので、音声の分を残す方法を E4 の `downlink-allocation` で決める。`priority` は重みの周回で、「高い順に満たす」ではない（codecs の 6.3・6.4 節）。
+- **Transcribe は大阪に無い**：大阪への切り替えの間は字幕と文字起こしを止める（ADR-0026・0050、[infrastructure.md](infrastructure.md) の 8.3 節、[disaster-recovery.md](../runbooks/disaster-recovery.md)）。
+- **大阪の TURN は c6gn.8xlarge**：大阪に c8gn がない（infrastructure の 5・12 節）。
+- **Firehose の既定の上限**：東京は 1 ストリーム 1 MiB/秒で、品質の記録（約 6 MB/秒）に足りない。まとめて送り、上限を引き上げる（[capacity.md](capacity.md) の 5.4 節）。
+- **KMS の Ed25519**：参加のトークンの署名を Ed25519 に決め、E2EE の外部の送り手の鍵を KMS へ移した（ADR-0047、鍵は 6 つ）。
+- **TURN の TLS の証明書**：ACM の書き出せる公開の証明書を使う。ワイルドカードの制約から名前を `<region>-<az>-<nn>.turn.<brand>.<domain>` に改めた（[security.md](security.md) の 5 節、[network-traversal.md](network-traversal.md)）。
+- **Shield Advanced の EIP の保護**：事象の報告は保護から 15 分以上たってから。攻撃のときに加える決定は保ち、最初の 15 分以上は Shield Standard と防御のモードで耐える（ADR-0045 の注記）。
+- **SLO の窓**：28 日から 30 日に改めた（他の題材と同じ。[runbooks/README.md](../runbooks/README.md) の 1 節、ADR-0052 の注記）。
+- **公開 API**：E11 を MVP に残し、intent.md の MVP に足した（PM の確認の項目）。
+- **K8**：S1 を AWS で容量の前提のまま動かすと届かないこと、達成が Edge の判断に掛かることを明記した。目標の値は残し、PM と Ops の確認の項目にした（ADR-0053 の注記）。
+- **Edge の運用の体制**：リスクに足し、Edge の閾値の手前に判断の点（2 週続けて 5 Gbps）を置いた（ADR-0050 の注記）。
+
 持ち越し（計測・PoC・他者の確認で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 下りの平均（1.5 Mbps か 2.5 Mbps か）、表示のしかたとカメラの割合、TURN を通る参加者の割合 | E2 のベータで測る |
-| 1 台の Media Node の上限（consumer、pps、送出、CPU）、c8gn と c8g の比較 | E7 の負荷試験 L0〜L2 |
+| 下りの平均（1.5 Mbps か 2.5 Mbps か）、表示のしかたとカメラの割合、TURN を通る参加者の割合 | E2 のベータで `qos-report-pipeline` の要約から測る |
+| 1 台の Media Node の上限（consumer、pps、送出、CPU）、c8gn と c8g の比較 | E7 の `load-l0-l2` |
 | 音声の枠の転送器の性能と聞こえ方（`DirectTransport` か別のプロセスか） | E7 の `audio-slot-forwarder-poc` |
-| RED の効果（FEC だけ・distance 1・2）、mediasoup の帯域の割り当てで音声が守られるか | E4 の `red-forwarding`・`downlink-allocation` |
+| RED の効果（FEC だけ・distance 1 ＋ FEC）、mediasoup の帯域の割り当てで音声の分を残す方法（mediasoup は音声を割り当てに入れない） | E4 の `red-forwarding`・`downlink-allocation` |
 | `mos_est` の係数（`Ie`・`Bpl`）と ViSQOL の差 | E4 の `mos-est-calibration` |
 | E2EE の depacketizer・Safari の DD・SVC の層ごとのフレーム | E9 の `e2ee-poc-transform` |
-| Transcribe の日本語の CER・遅れ・料金 | E8 の前の `asr-evaluation-set` |
-| BYOIP の範囲の入手の時間と費用、Shield Advanced の EIP の保護が効くまでの時間 | E1 の前（Ops） |
+| Transcribe の日本語の CER・遅れ | E8 の前の `asr-evaluation-set` |
+| BYOIP の範囲の入手の時間と費用 | E1 の `byoip-onboarding` の前（Ops） |
+| Shield Advanced の EIP の保護を攻撃のときに加えた直後の緩和の振る舞い | E7 の `shield-advanced-onboarding`（SRT への問い合わせ） |
 | CloudFront の WebSocket の長い接続 | E2 の `signaling-via-cloudfront` |
+| Safari の VP9・AV1・DD・VP8 の simulcast、Firefox・Safari の RED | E2 の `browser-capability-probe` |
+| mediasoup で音声の分を下りの推定から残す方法 | E4 の `downlink-allocation` |
 | NFR-008 の「退出」の定義 | PM の確認 |
-| SLO と K8 の目標の値 | PM と Ops の承認 |
+| 公開 API と Webhook（E11）を MVP に含めるか | PM の確認（intent.md の MVP に入れた） |
+| SLO（30 日の窓）の値 | PM と Ops の承認 |
+| K8 の目標の値（S1 は AWS の 2.5 Mbps では届かない） | PM と Ops の確認。E2 のベータの実測と、Edge の運用の体制の判断の後 |
+| Edge の運用の体制（24 時間の当番、自社の AS と BGP）を持つか | PM と Ops。ピークの送出が 2 週続けて 5 Gbps を超えたとき（Edge の閾値の手前） |
 | 法務の確認（L1〜L8） | [intent.md](../intent.md) の表の「承認を止める spec」の前 |
 
 ## 7. 領域の文書と ADR の番号の範囲

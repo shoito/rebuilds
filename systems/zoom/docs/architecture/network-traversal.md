@@ -24,7 +24,7 @@
 | 同意の確認 | [RFC 7675](https://www.rfc-editor.org/rfc/rfc7675)。約 5 秒（4〜6 秒）ごとに確認し、30 秒応答がなければ送信を止める | 付け替えの検知には使わない（[ADR-0013](../decisions/0013-media-node-failover-and-reattach.md)） |
 | STUN | [RFC 8489](https://www.rfc-editor.org/rfc/rfc8489)（RFC 5389 を置き換え）。既定のポートは UDP・TCP 3478、TLS・DTLS 5349。`MESSAGE-INTEGRITY-SHA256` と、弱い方式への引き下げを防ぐ仕組みを足した | TURN のサーバーが STUN にも答える |
 | TURN | [RFC 8656](https://www.rfc-editor.org/rfc/rfc8656)。割り当ての既定の寿命 600 秒、許可 300 秒、チャネル 10 分。寿命の上限は 3,600 秒以下を推奨。既定のポートは 3478、TLS・DTLS は 5349。`REQUESTED-ADDRESS-FAMILY`・`ADDITIONAL-ADDRESS-FAMILY` で IPv6 と両方の割り当て | 443 番で TLS も待つ（ADR-0015） |
-| TURN の TLS の ALPN | [RFC 7443](https://www.rfc-editor.org/rfc/rfc7443)。`stun.turn` | coturn の設定で受ける。ブラウザが ALPN を送るかは**未検証** |
+| TURN の TLS の ALPN | [RFC 7443](https://www.rfc-editor.org/rfc/rfc7443)。ラベルは `stun.turn`（0x73 0x74 …、TURN の用途）と `stun.nat-discovery` | coturn の設定で受ける。ブラウザが ALPN を送るかは**未検証**（E2 の `network-path-matrix-tests` で、TLS 443 の経路のパケットを取って確かめる） |
 | TURN の資格情報 | [TURN REST API の草案](https://datatracker.ietf.org/doc/html/draft-uberti-behave-turn-rest-00)（2013-07、失効した個人の草案）。`username = 失効の時刻:利用者`、`password = base64(HMAC(秘密, username))`、推奨の有効期間 86,400 秒、応答は `username`・`password`・`ttl`・`uris` | 形は同じ。有効期間は 12 時間（ADR-0015） |
 | coturn | `--use-auth-secret`・`--static-auth-secret`（REST API）、`--allowed-peer-ip`・`--denied-peer-ip`（許可を優先）、`--no-multicast-peers`、ループバックは既定で拒否、`--min-port`・`--max-port`（既定 49152〜65535）、`--user-quota`・`--total-quota`、`--max-bps`、`--no-tlsv1`、`--alternate-server`（[README.turnserver](https://github.com/coturn/coturn/blob/master/README.turnserver)）。BSD の 3 条項のライセンス（[LICENSE](https://github.com/coturn/coturn/blob/master/LICENSE)）。最新の版は 4.18.0（2026-09-08、[Releases](https://github.com/coturn/coturn/releases)） | ADR-0015 |
 | ブラウザ | [WebRTC 1.0](https://www.w3.org/TR/webrtc/)（W3C Recommendation、2025-03-13）。`iceTransportPolicy` は `"relay"` と `"all"`。`RTCIceServer` は `urls`・`username`・`credential`。`iceCandidatePoolSize`。ICE の状態は `new`・`checking`・`connected`・`completed`・`failed`・`disconnected`・`closed` | 5 節 |
@@ -90,7 +90,7 @@ new RTCPeerConnection({             // mediasoup-client の Device が作る
 ```
 
 - 送りと受けの 2 本の transport は、それぞれ別の ICE の組になる（mediasoup の send と recv の transport）。
-- `iceCandidatePoolSize` は使わない（mediasoup-client が transport ごとに作るため、前もって集めた候補を使えない）。**未検証**：mediasoup-client の `Device` に渡せる設定の範囲を E2 で確かめる。
+- `iceCandidatePoolSize` は使わない。mediasoup-client は transport ごとに `RTCPeerConnection` を作り、`iceServers`・`iceTransportPolicy` のほかの `RTCConfiguration` は `additionalSettings` で渡せる（[mediasoup-client の API](https://mediasoup.org/documentation/v3/mediasoup-client/api/)、2026-09-27 に確認）。渡せても、候補の貯めは transport を作るときに始まるので、前もって集めた候補を使えない。
 
 ### 5.2 前回の経路の記憶
 
@@ -125,7 +125,7 @@ new RTCPeerConnection({             // mediasoup-client の Device が作る
 | ① UDP で直接 | 3 秒（NFR-002） |
 | ③〜⑤ TURN | 5 秒（NFR-002） |
 
-直接の経路の確認がすべて失敗するまでの時間は、ブラウザの確認の再送と間隔で決まる（RFC 8445 の Ta と、STUN の再送。RFC 8489 は UDP の初回の再送の時間を 500ms 以上とし、既定の回数は 7 回）。実際の時間はブラウザごとに異なる（**未検証**。E2 で、UDP を閉じた網での `checking` から `connected` までを、ブラウザごとに測る）。
+直接の経路の確認がすべて失敗するまでの時間は、ブラウザの確認の再送と間隔で決まる（RFC 8445 の Ta と、STUN の再送。RFC 8489 は UDP の初回の再送の時間を 500ms 以上とし、既定の回数は 7 回）。RFC 8445 の Ta の既定は 50ms（[RFC 8445](https://www.rfc-editor.org/rfc/rfc8445) の 14.2 節）。実際の時間はブラウザごとに異なる（**未検証**。E2 の `network-path-matrix-tests` で、UDP を閉じた網での `checking` から `connected` までを、ブラウザごとに測る）。
 
 ## 6. 網の変化と ICE restart
 
@@ -143,11 +143,11 @@ ADR-0016。
 | 部品 | IPv4 | IPv6 | 名前 |
 | --- | --- | --- | --- |
 | Media Node | 公開する範囲の Elastic IP（1 台に 1 つ） | サブネットの /64 から 1 つ | 名前は付けない（ICE の候補は IP で渡す） |
-| TURN | 公開する範囲の Elastic IP（1 台に 1 つ） | 同上 | `turn-<region>-<az>-<nn>.<brand>.<domain>`（TLS の証明書のため） |
+| TURN | 公開する範囲の Elastic IP（1 台に 1 つ） | 同上 | `<region>-<az>-<nn>.turn.<brand>.<domain>`（TLS の証明書のため） |
 
 - **公開する範囲**：顧客がファイアウォールで宛先を許すために、Media Node と TURN の IPv4 を、公開した範囲に収める。候補は 2 つ。
   - BYOIP：自社で持つ IPv4 の範囲（/24 以上）を AWS に持ち込む。
-  - AWS の IPAM の、Amazon が提供する連続した公開の IPv4 のブロック（**未検証**：提供の条件と、東京・大阪での可否を E1 で確かめる）。
+  - AWS の IPAM の、Amazon が提供する連続した公開の IPv4 のブロック。/28〜/30 を、既定で 2 つまで。IPAM が要り、別の料金がかかる。アカウントの間で移せない（[Allocate sequential Elastic IP addresses from an IPAM pool](https://docs.aws.amazon.com/vpc/latest/ipam/tutorials-eip-pool.html)、2026-09-27 に確認）。東京・大阪での可否は文書に書かれておらず、E1 の `byoip-onboarding` で確かめる。
 - 公開の IPv4 は、使っていてもいなくても 1 つ 1 時間 0.005 USD かかる（2024-02-01 から。[AWS の告知](https://aws.amazon.com/blogs/aws/new-aws-public-ipv4-address-charge-public-ip-insights/)、[VPC の料金](https://aws.amazon.com/vpc/pricing/)、2026-09-27 に確認）。1 台に 1 つなので、S1 の Node の数では費用は小さい。
 - Media Node をクラスタのプレイスメントグループに入れない。EC2 の 1 つのフロー（5 タプル）の帯域は、プレイスメントグループの外で 5 Gbps（[EC2 のネットワークの帯域](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)、2026-09-27 に確認）。参加者ごとのフローは数 Mbps なので、この上限には当たらない。
 - インターネットゲートウェイを通る通信は、32 vCPU 未満のインスタンスで 5 Gbps、それ以上でインスタンスの帯域の 50% に制限される（同上）。Media Node と TURN は 32 vCPU 以上にする。
@@ -167,7 +167,7 @@ Media Node（`sg-media-node`）：
 | 出 | すべて | すべて | 0.0.0.0/0、::/0 | 応答を追跡させないため |
 
 - メディアの規則は、入りと出の両方が全開なので追跡されない。制御の API とパイプの規則は相手を限るので追跡される。追跡される接続は少数で、上限に当たらない。
-- 出の全開は、Media Node からの任意の外への通信を許すことになる。これは追跡を外す条件であり、外への不正な通信は、Node の上の `nftables` の出の規則（メディアの送り元のポートと、SSM・監視の宛先だけを許す）で抑える（**未検証**：`nftables` の規則が ENA の性能に与える影響を E7 で測る）。
+- 出の全開は、Media Node からの任意の外への通信を許すことになる。これは追跡を外す条件であり、外への不正な通信は、Node の上の `nftables` の出の規則（メディアの送り元のポートと、SSM・監視の宛先だけを許す）で抑える（**未検証**：`nftables` の規則が ENA の性能に与える影響を E7 の `load-l0-l2` で測る）。
 - 同じ理由で、Media Node の前に NLB を置かない（本題材の AGENTS.md）。
 - ネットワーク ACL は、メディアのポートの範囲と一時的なポートだけを許す（ステートレス。追跡とは関係しない）。
 
@@ -181,7 +181,7 @@ TURN（`sg-turn`）：
 | 出 | すべて | すべて | 0.0.0.0/0、::/0 | 追跡を外す |
 
 - 中継の口への入りを全開にするのは、追跡を外すためである。中継の相手は coturn の `--allowed-peer-ip` で Media Node の範囲に限るので、他の相手からのパケットは coturn が捨てる（ADR-0015）。
-- TURN の中継の口と Media Node の間の通信は、両方の公開の IP の間で行う（VPC の中のインターネットゲートウェイ経由）。プライベート IP を使わないのは、Media Node のプライベート IP を ICE の候補に出さないためである（4 節）。この通信の料金の区分は**未検証**（infrastructure.md で確かめる）。
+- TURN の中継の口と Media Node の間の通信は、両方の公開の IP の間で行う（VPC の中のインターネットゲートウェイ経由）。プライベート IP を使わないのは、Media Node のプライベート IP を ICE の候補に出さないためである（4 節）。この通信は「Elastic IP を使う同じリージョンの中の通信」で、向きごとに 0.01 USD/GB。インターネットへの転送の料金にはならない（[infrastructure.md](infrastructure.md) の 2.4 節、2026-09-27 に確認）。
 
 ### 7.3 顧客に公開する規則
 
@@ -202,8 +202,8 @@ TURN（`sg-turn`）：
 | --- | --- | --- |
 | UDP を全部閉じる | ① ③ が通らない | ② ④ ⑤ |
 | 外への TCP を 80・443 だけに限る | ② ④ も通らない | ⑤（TURN の TLS 443） |
-| 明示の HTTP のプロキシ（CONNECT）が必須 | 直接の TCP も通らない | ブラウザが TURN の TLS をプロキシの CONNECT で通す（RFC 8828 のモード 4 の考え方）。ブラウザごとの振る舞いは**未検証**。E2 で、Squid の CONNECT だけを許す網で Chrome・Edge・Firefox・Safari を試す |
-| TLS を検査するプロキシ（中間で復号） | TURN の TLS が、プロキシの証明書に差し替えられる | ブラウザは TURN の TLS の証明書を、OS の信頼の設定で検証する（**未検証**）。検査の対象から `*.<brand>.<domain>` を外すよう、顧客の手引きに書く（本家も自社のドメインを検査から外すよう勧めている。2 節） |
+| 明示の HTTP のプロキシ（CONNECT）が必須 | 直接の TCP も通らない | ブラウザが TURN の TLS をプロキシの CONNECT で通す（RFC 8828 のモード 4 の考え方）。ブラウザごとの振る舞いは**未検証**。E2 の `network-path-matrix-tests` で、Squid の CONNECT だけを許す網で Chrome・Edge・Firefox・Safari を試す |
+| TLS を検査するプロキシ（中間で復号） | TURN の TLS が、プロキシの証明書に差し替えられる | ブラウザは TURN の TLS の証明書を、OS の信頼の設定で検証する見込み（**未検証**。E2 の `network-path-matrix-tests` で、検査のプロキシの証明書を入れた端末で確かめる）。検査の対象から `*.<brand>.<domain>` を外すよう、顧客の手引きに書く（本家も自社のドメインを検査から外すよう勧めている。2 節） |
 | プロキシの認証（NTLM・Kerberos） | ブラウザが認証を扱えれば通る | ブラウザに任せる。通らない網は、顧客の手引きで許可の設定を求める |
 | WebRTC の IP の扱いを組織の方針で制限（Chrome の `WebRtcIPHandling` など） | host の候補が出ない、UDP が使えない | TURN で通る。RFC 8828 のモード 3・4 に当たる |
 | WebSocket を切るプロキシ | シグナリングがつながらない | 参加の画面で検知し、「プロキシが WebSocket を通していません」と出す。WebSocket の代わりの経路（長いポーリング）は作らない（13 節） |
@@ -223,7 +223,7 @@ TURN（`sg-turn`）：
 
 | 障害 | 起きること | 回復 |
 | --- | --- | --- |
-| TURN の 1 台が落ちた | その台で中継していた参加者のメディアが止まる | クライアントが `disconnected` を検知し、2 台目の TURN の候補が残っていればそちらへ。なければ `media.ice_servers.refresh` と ICE restart。目標は 5 秒（**未検証**） |
+| TURN の 1 台が落ちた | その台で中継していた参加者のメディアが止まる | クライアントが `disconnected` を検知し、2 台目の TURN の候補が残っていればそちらへ。なければ `media.ice_servers.refresh` と ICE restart。目標は 5 秒（**未検証**。E2 の `ice-restart-flow` で測る） |
 | TURN の全台が落ちた | 直接つながらない参加者が入れない | 直接つながる参加者には影響しない。TURN の台の自動の回復（ASG） |
 | 資格情報の秘密の入れ替えを誤った | 新しい参加者の TURN が通らない | 秘密は 2 つ（今と次）を同時に受ける（11 節） |
 | 網が変わった（Wi-Fi → モバイル） | 経路が切れる | 6 節の ICE restart |
@@ -239,9 +239,9 @@ TURN（`sg-turn`）：
   - `username = "<失効の時刻の UNIX 秒>:<participant_id>"`
   - `credential = base64(HMAC-SHA1(秘密, username))`
   - 有効期間 12 時間。
-- 秘密は AWS Secrets Manager に置き、90 日ごとに入れ替える。coturn は今の秘密と次の秘密の 2 つを受ける（`--static-auth-secret` を複数行、または `turn_secret` の表。**未検証**：coturn で複数の静的な秘密を同時に受ける設定を E2 で確かめる）。
+- 秘密は AWS Secrets Manager に置き、90 日ごとに入れ替える。coturn は今の秘密と次の秘密の 2 つを受ける（`--static-auth-secret` を複数行、または `turn_secret` の表）。coturn は、静的な設定とデータベースのどちらでも複数の共有の秘密を使える（[README.turnserver](https://github.com/coturn/coturn/blob/master/README.turnserver) の `--static-auth-secret`、2026-09-27 に確認）。
 - 資格情報は、参加者（`participant_id`）と会議の参加の許可に結び付く。会議の外で使える期間は、有効期間の 12 時間に限られる。退出させた人の資格情報は取り消せない（HMAC の形のため）が、中継の相手が Media Node の範囲だけなので、会議の外では中継に使えない（11.2 節）。Media Node の側では、その人の transport は閉じられている。
-- HMAC-SHA1 を使うのは、coturn と草案の形に合わせるためである。STUN の `MESSAGE-INTEGRITY` の方式と同じで、秘密の長さ（32 バイト以上）で強さを保つ。RFC 8489 の `MESSAGE-INTEGRITY-SHA256` を使えるかは、ブラウザの対応による（**未検証**）。
+- HMAC-SHA1 を使うのは、coturn と草案の形に合わせるためである。STUN の `MESSAGE-INTEGRITY` の方式と同じで、秘密の長さ（32 バイト以上）で強さを保つ。RFC 8489 の `MESSAGE-INTEGRITY-SHA256` を使えるかは、ブラウザの対応による（**未検証**。使えなくても設計は変わらない。E2 の `turn-rest-credentials` で記録だけする）。
 
 ### 11.2 TURN を踏み台にさせない
 
@@ -249,7 +249,7 @@ TURN（`sg-turn`）：
 - ループバック、マルチキャスト（`--no-multicast-peers`）、VPC の中のプライベートの範囲、インスタンスのメタデータ（169.254.169.254）への中継を拒否する。RFC 8656 の安全の考え方（中継する相手の制限）に従う。
 - TCP の中継（RFC 6062）は使わない（`--no-tcp-relay`）。Media Node との間は UDP だけ。
 - 1 人あたりの割り当ての数（`--user-quota=4`：送りと受けの transport × IPv4・IPv6）と、1 つの割り当ての帯域（`--max-bps` 10 Mbps）を限る。
-- TLS は 1.2 以上（`--no-tlsv1`、`--no-tlsv1_1`）。証明書は `turn-*.<brand>.<domain>` のワイルドカードで、自動で更新する（発行の方法は infrastructure.md）。
+- TLS は 1.2 以上（`--no-tlsv1`、`--no-tlsv1_1`）。証明書は `*.turn.<brand>.<domain>` のワイルドカードで、自動で更新する（ACM の書き出せる公開の証明書。[security.md](security.md) の 5 節）。ワイルドカードはいちばん左のラベル全体にしか置けないので、`turn-*` の形の名前は使えない。
 
 ### 11.3 Media Node
 
@@ -273,7 +273,7 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 | 制限なし | ① | 参加から音声まで p95 3 秒 |
 | UDP を全部落とす | ② | 5 秒 |
 | UDP と、443 以外の TCP を落とす | ⑤ | 5 秒 |
-| 443 以外を落とし、CONNECT だけの HTTP のプロキシ（Squid）を必須にする | ⑤（プロキシ経由） | 参加できる（時間は記録。**未検証**のため閾値は E2 の後に決める） |
+| 443 以外を落とし、CONNECT だけの HTTP のプロキシ（Squid）を必須にする | ⑤（プロキシ経由） | 参加できる（時間は記録。プロキシ経由の時間は**未検証**のため、閾値は E2 の `network-path-matrix-tests` の後に決める） |
 | UDP 3478 だけを許す | ③ | 5 秒 |
 | IPv6 だけの網（NAT64 なし） | ① の IPv6 | 3 秒 |
 | 前回 ⑤ だった網の指紋で再び参加 | 最初から relay | 3.5 秒 |
@@ -342,12 +342,12 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 公開する IPv4 の範囲の入手の時間と費用 | BYOIP の /24 に決めた（[ADR-0049](../decisions/0049-media-node-fleet.md)）。入手は E1 の前に Ops が始め、間に合わなければ AWS の連続したブロックで始める |
-| CONNECT のプロキシでの各ブラウザの TURN の TLS の振る舞い | E2 の網の試験（12.1 節） |
+| CONNECT のプロキシでの各ブラウザの TURN の TLS の振る舞い | E2 の `network-path-matrix-tests`（12.1 節） |
 | TURN を通る参加者の割合 | E2 のベータで計測し、TURN の台の数（capacity.md）に渡す |
 | ポートの範囲（256）を狭めるか（worker ごとに IP を分ける） | 顧客の声で決める。公開の IPv4 の費用と Node の ENI の IP の上限を比べる |
 | WebSocket を通さないプロキシのための代わりの経路 | 作らない方針。ベータで該当する顧客の割合を見て見直す |
-| `MESSAGE-INTEGRITY-SHA256` を使えるか | ブラウザの対応を E2 で確かめる |
-| Media Node と TURN の間を公開の IP で通す通信の料金の区分 | [infrastructure.md](infrastructure.md) の 2.4 節で 0.01 USD/GB（向きごと）と読んだ。E2 で請求の明細で確かめる |
+| `MESSAGE-INTEGRITY-SHA256` を使えるか | ブラウザの対応を E2 の `turn-rest-credentials` で記録する（設計は変わらない） |
+| Media Node と TURN の間を公開の IP で通す通信の料金の区分 | 決着：同じリージョンの中の 0.01 USD/GB（向きごと）。料金のデータの `APN1-DataTransfer-Regional-Bytes` が「using elastic IPs」を含む（[infrastructure.md](infrastructure.md) の 2.4 節、2026-09-27 に確認） |
 
 ## 15. quality.md・runbooks・data-model への項目
 

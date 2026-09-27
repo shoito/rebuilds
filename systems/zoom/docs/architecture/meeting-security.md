@@ -19,10 +19,10 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| 待合室かパスコード | 2020-09-27 から、どちらかを必ず有効にする（[May 2020: Passcode and security settings](https://support.zoom.us/hc/en-us/articles/360042647952-May-2020-Passcode-and-security-settings)。intent.md の出典）。どれもなければ待合室で守る（大学の IT の解説。一次は**未検証**） | 同じ。既定は両方（ADR-0031） |
-| パスコード | 組織の設定でパスコードの要件を選べる。「招待のリンクにパスコードを埋め込む」設定がある。要件の変更は、既に予定した会議に効かない（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)）。長さは最大 10 文字（開発者の掲示板の API のエラー。一次の本文は**未検証**） | 長さ 6〜10、既定 6 桁の数字。埋め込みはフラグメントの参加の鍵で行う（ADR-0006） |
-| 待合室を省く条件 | 同じアカウントのユーザー、許可したドメイン、会議の中から招待した人などを選べる（[Enabling and customizing the waiting room](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059359)。項目は大学の IT の解説で確かめた。一次の本文は**未検証**） | 身元で判定する条件だけにする（ADR-0031） |
-| 活動の一時停止 | Security のメニューの「Suspend Participant Activities」で、映像・音声・チャット・注釈・共有・録画を止め、ブレイクアウトルームを終える（大学の IT の解説。一次は**未検証**） | 同じ考え方。録画は止めずに一時停止にする（ADR-0032） |
+| 待合室かパスコード | 2020-09-27 から、どちらかを必ず有効にする（[May 2020: Passcode and security settings](https://support.zoom.us/hc/en-us/articles/360042647952-May-2020-Passcode-and-security-settings)。intent.md の出典）。どちらもない場合の扱いは、待合室の文書には書かれていない | 同じ。既定は両方（ADR-0031） |
+| パスコード | 組織の設定でパスコードの要件を選べる。「招待のリンクにパスコードを埋め込む」設定がある。要件の変更は、既に予定した会議に効かない（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)）。長さは最大 10 文字（Meetings API の `password` の `maxLength: 10`。[Meetings API の定義](https://developers.zoom.us/api-hub/meetings/methods/endpoints.json)） | 長さ 6〜10、既定 6 桁の数字。埋め込みはフラグメントの参加の鍵で行う（ADR-0006） |
+| 待合室を省く条件 | 同じアカウントのユーザー、許可したドメインでサインインした人、招待を受けた人（カレンダーの連携を含む）、同じ組織につながったアカウントの人、会議の中で主催者が招待した人、許可した SIP・H.323 の機器を選べる（[Enabling and customizing the waiting room](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059359)） | 身元で判定する条件だけにする（ADR-0031） |
+| 活動の一時停止 | 「Suspend participant activities」で、全員の映像・音声・Zoom Apps・画面共有を止め、会議をロックする（[Changing security settings in a Zoom meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061231)）。チャット・注釈・録画・ブレイクアウトルームは、一次の文書の一覧に無い（大学の IT の解説は含めていた） | 同じ考え方で、チャットも止める。録画は止めずに一時停止にする（ADR-0032） |
 | 参加者の報告 | 主催者・共同主催者が、参加者を選び、理由と添付を付けて本家の Trust and Safety に報告できる（[3 New Ways We're Combatting Meeting Disruptions](https://www.zoom.com/en/blog/new-ways-to-combat-zoom-meeting-disruptions/)） | 同じ。参加者も報告できる（6 節） |
 | 設定の強制 | 設定に鍵をかけると、下の階層で変えられない（KB0063160） | [accounts-and-admin.md](accounts-and-admin.md) |
 
@@ -221,7 +221,7 @@ ADR-0033。
   - API が「この IP は CAPTCHA が要る」と判定したら、`403 challenge_required` を返す。
   - クライアントは、WAF の CAPTCHA の JavaScript の組み込みで画面を出し、解いた印（WAF のトークン）を付けて要求をやり直す。
   - API は、WAF が付けた「CAPTCHA を解いた」の印（WAF のラベルを ALB がヘッダーに写したもの）を見て、制限を 1 時間ゆるめる。
-  - この組み込みの方式が SPA で動くかは**未検証**。E3 で試作する。
+  - WAF は、CAPTCHA のパズルを画面の好きな場所に出す JavaScript の API（`renderCaptcha()`）を持ち、解いた後のトークンを付けて要求できる。使うには、許すドメインを入れた暗号化した API キーが要る（[Using the CAPTCHA JavaScript API](https://docs.aws.amazon.com/waf/latest/developerguide/waf-js-captcha-api.html)、2026-09-27 に確認）。WAF の「解いた」の印を ALB 経由で API に渡す部分は**未検証**で、E3 の `waf-captcha-challenge` で試作する。
 
 ## 9. 障害のときの振る舞い
 
@@ -305,7 +305,7 @@ ADR-0033。
 | 参加の鍵を持つ人に待合室も省かせる設定を作るか | PM に確認する。既定は作らない |
 | 報告の添付（報告した人の画面の画像）を受けてよいか（L2） | 法務の確認の後。E3 の報告の Story の承認の前 |
 | 報告・ban の記録と IP の保持の期間、開示の請求（L4・L8） | 法務の確認の後 |
-| WAF の CAPTCHA を SPA の API の前でどう出すか | E3 で試作する |
+| WAF の CAPTCHA の結果を API にどう渡すか（SPA に出す JavaScript の API はある。8.3 節） | E3 の `waf-captcha-challenge` で試作する |
 | 同じ回線の判定を、携帯の回線（多くの人が同じ IP を共有する）で外すか | E3 で、ASN が携帯の事業者のときの誤判定の率を測って決める |
 | 組織の外の人に題名を見せない既定が、利用者に不便か | E3 の利用者の声で見直す |
 

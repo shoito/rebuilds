@@ -53,7 +53,7 @@ mediasoup の資料で確かめたこと（いずれも 2026-09-27 に確認）�
 - 引き受けるコスト：
   - 同じ WebRtcServer のポートを多数の参加者が使うので、そのポートへの UDP の洪水は、その worker の全参加者に効く。
   - pipe の分だけ、worker の間のコピーが増える。
-  - worker の数（vCPU−2）と consumer の上限（400）は、負荷試験の前の仮の値である（**未検証**）。
+  - worker の数（vCPU−2）と consumer の上限（400）は、負荷試験の前の仮の値である（**未検証**。E7 の `load-l0-l2` の L0 で決める）。
 
 ## Confirmation
 

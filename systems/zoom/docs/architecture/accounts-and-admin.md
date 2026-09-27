@@ -19,10 +19,10 @@
 
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
-| 設定の階層 | 組織（Account）・グループ・ユーザーの 3 段で設定し、上で鍵をかけると下で変えられない。組織の鍵はどのグループの優先度にも勝つ。複数のグループに属するときは、優先度の高いグループの鍵を継ぐ（[Using tiered settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065579)。細部は本家の Technical Library の「Settings Resolution」の検索結果で確かめた。一次の本文は**未検証**） | 同じ 3 段＋会議。S1 はユーザーが属するグループを 1 つに限る（ADR-0039） |
+| 設定の階層 | 組織（Account）・グループ・ユーザーの 3 段で設定し、上で鍵をかけると下で変えられない。組織の鍵はグループでもユーザーでも変えられない。複数のグループに属するときは、鍵をかけた設定が勝つ（[Using tiered settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065579)）。複数のグループの鍵がぶつかるときは、グループに加えられた順で決まり、主のグループを選べても他のグループの鍵は効く（同じ文書） | 同じ 3 段＋会議。S1 はユーザーが属するグループを 1 つに限る（ADR-0039） |
 | 鍵をかけない設定 | 有効でも鍵をかけていなければ、利用者は自分の設定で無効にできる。パスコードの要件の変更は、既に予定した会議に効かない（[Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)） | 鍵のかかった安全の項目は、開催の開始で解決し直す（ADR-0039） |
-| 既存のユーザーを組織に加える | 別のアカウントのユーザーを加えるときは、本人の承諾が要る（[Adding existing users](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063217) の表題。本文は今回確かめていない。**未検証**） | 同じ考え方（4.3 節） |
-| 1 つのメールアドレスが属する組織の数 | 公開の一次の資料で確かめていない（**未検証**） | 1 つ（ADR-0038） |
+| 既存のユーザーを組織に加える | 別のアカウントのユーザーを加えるときは、招待のメールを本人が受け入れる必要がある。受け入れると、予定した会議、クラウド録画、チャットの履歴、設定などが移る（個人の連絡先とレポートは移らない）（[Adding existing users](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063217)） | 同じ考え方（4.3 節） |
+| 1 つのメールアドレスが属する組織の数 | 公開の一次の資料に明記がない。既存のユーザーを加えると、データが新しいアカウントへ移る（上の行）ので、1 つのアカウントに属する形と読める | 1 つ（ADR-0038） |
 
 いずれも 2026-09-27 に確認。
 
@@ -203,7 +203,7 @@ ADR-0040。
 | 品質の要約 | 12 か月（observability.md） |
 | 書き出しのファイル | 7 日 |
 
-- 保持の期間は、L6・L8 の結論で見直す。本家の保持の期間は確かめていない（**未検証**）。
+- 保持の期間は、L6・L8 の結論で見直す。本家は、会議のチャットを既定で収集から 24 か月、会議の診断のデータを 15 か月残し、クラウド録画は利用者のアカウントがある間残す（[Zoom Meetings, Webinar, and Chat Data Retention Standard](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0074786)、2026-09-27 に確認）。
 
 ## 7. 障害のときの振る舞い
 

@@ -12,7 +12,7 @@ date: 2026-09-27
 調べて分かったこと（いずれも 2026-09-27 に確認）。
 
 - VP8 と H.264（Constrained Baseline）は、Chrome・Edge・Firefox・Safari のすべてが対応する必須の符号器（[MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs)）。
-- VP9 は Chrome 48・Firefox、AV1 は Chrome 113・Firefox 136 から。Safari の VP9・AV1 の WebRTC での対応は未検証。
+- VP9 は Chrome 48・Firefox、AV1 は Chrome 113・Firefox 136 から。Safari の VP9・AV1 の WebRTC での対応は MDN に記載がなく**未検証**（E2 の `browser-capability-probe` で確かめる）。
 - `scalabilityMode` は Chrome 111 から。Firefox は未対応。Safari は未確定（[browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319)、未マージ）。
 - Firefox 155 以降の受け手は、AV1 の SVC の上の空間の層を復号できず、映像が黒くなるか止まると報告されている（[livekit/client-sdk-js#2116](https://github.com/livekit/client-sdk-js/issues/2116)）。
 - mediasoup は VP9 の full SVC と K-SVC に対応する。AV1 では、空間の層が複数のとき DD の転送で映像が止まる問題を調べている途中（[#1625](https://github.com/versatica/mediasoup/issues/1625)、開いたまま）。
@@ -48,7 +48,7 @@ date: 2026-09-27
   - 社内の Chromium だけの会議では、上りと CPU を減らせる。
 - 引き受けるコスト：
   - モードの切り替えで、送り手の符号器を替える間（キーフレームまで）映像が一瞬止まる。
-  - VP8 の simulcast は、SVC より上りが多い（ADR-0002 の「3〜4 割」。未検証）。
+  - VP8 の simulcast は、SVC より上りが多い（ADR-0002 の「3〜4 割」。**未検証**。E4 の `svc-vp9-mode` で測る）。
   - AV1 の圧縮の利点は S1 では得られない。
 
 ## Confirmation

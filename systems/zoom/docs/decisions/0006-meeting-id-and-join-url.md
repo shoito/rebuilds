@@ -10,7 +10,7 @@ date: 2026-09-27
 会議には、人が読み上げ・入力できる ID と、クリックで入れる URL が要る（[intent.md](../intent.md) の「すぐに集まれる」）。一方で、URL や ID が漏れると、知らない人が入り込む（intent.md の Problem）。
 
 - 本家は、すぐの会議・予定の会議・繰り返しの会議に 11 桁、個人の会議の ID に 10 桁の数字を使う（[Frequently asked questions about meeting and webinar IDs](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065196)、2026-09-27 に確認）。
-- 本家の URL の `pwd=` の値で、パスコードの入力を省ける（**未検証**）。
+- 本家は、設定でパスコードを暗号化して招待のリンクに入れ、入力を省ける（[Embedding meeting passcode in invite link](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065979)、2026-09-27 に確認）。リンクのどの部分に入るかは書かれていない。
 - 11 桁の数字の空間は 9×10^10 で、推測への強さは約 36 ビットしかない。S3 で予定を含めて有効な ID が 1,000 万あると、1 回の推測で当たる確率は約 1/9,000 になる。ID だけで守ることはできない。
 - URL のクエリ文字列は、CDN・ロードバランサーのアクセスログ、ブラウザの履歴、`Referer` に残りやすい。フラグメント（`#` の後）は HTTP の要求に含まれない（[RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-3.5)、2026-09-27 に確認）。
 

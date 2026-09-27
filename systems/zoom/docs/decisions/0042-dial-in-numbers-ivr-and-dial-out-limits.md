@@ -9,7 +9,7 @@ date: 2026-09-27
 
 電話からの参加では、番号の種類、会議への振り分け、発信者の番号の扱い、ダイヤルアウトの不正な利用への対策を決める必要がある（[ADR-0041](0041-pstn-via-carrier-sip-trunk-and-own-gateway.md)）。
 
-- 日本の番号の種類には、050（IP 電話）、0120・0800（着信課金）、0ABJ（固定の電話）などがある。種別ごとに指定を受けた事業者が公表されている（[電気通信番号指定状況](https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/number_shitei.html)、2026-09-27 に確認）。050 には品質の条件の記述がある（検索結果の要約。原文は未検証）。
+- 日本の番号の種類には、050（IP 電話）、0120・0800（着信課金）、0ABJ（固定の電話）などがある。種別ごとに指定を受けた事業者が公表されている（[電気通信番号指定状況](https://www.soumu.go.jp/main_sosiki/joho_tsusin/top/tel_number/number_shitei.html)、2026-09-27 に確認）。050 の IP 電話の総合品質は、R 値 50 超・平均の遅延 400ms 未満とされる（[通信品質等の現行規定について](https://www.soumu.go.jp/main_content/000690836.pdf)、総務省、2026-09-27 に確認）。
 - 会議の番号は 11 桁、PMI は 10 桁で、人が押せる（[ADR-0006](0006-meeting-id-and-join-url.md)、[ADR-0034](0034-scheduled-recurring-meetings-and-pmi.md)）。パスコードは既定で数字で、英数字の会議は電話用の数字のパスコードを持つ（[ADR-0031](0031-waiting-room-and-passcode-rules.md)）。
 - 録画中の会議では、本人の同意まで話させない（[ADR-0027](0027-capture-consent-and-indicators.md)）。
 - ダイヤルアウトは、盗んだアカウントで料金の高い番号へ大量に発信される（toll fraud）危険がある。

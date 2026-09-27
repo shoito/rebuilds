@@ -15,9 +15,9 @@ date: 2026-09-27
 
 費用について、[capacity.md](../architecture/capacity.md) の 6 節で S1 を見積もった。
 
-- AWS のインターネットへの転送（東京、150 TB/月を超える分）は 0.084 USD/GB（[データ転送の料金のデータ（東京）](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/ap-northeast-1/index.json)、2026-09-27 に確認）。S1 のピーク（45 Gbps）で、月に約 31 万 USD になる。
+- AWS のインターネットへの転送（東京、150 TB/月を超える分）は 0.084 USD/GB（[データ転送の料金のデータ（東京）](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDataTransfer/current/ap-northeast-1/index.json)、2026-09-27 に確認）。S1 のピーク（期待の平均の 45 Gbps）で、月に約 31 万 USD になる（容量の前提の 75 Gbps では約 52 万 USD）。
 - 東京の IP transit の 100 GigE の加重中央値は 0.28 USD/Mbps/月（[TeleGeography の IP Transit Pricing Trends in Asia](https://resources.telegeography.com/ip-transit-pricing-trends-asia)、2026-09-27 に確認）。
-- 損益の分かれ目は、ピークの送出で約 10 Gbps（同時の参加者で約 6,500 人）の見込み（**未検証**。コロケーションの固定費の仮定による）。S1 の目標（3 万人）は、この 3 倍以上である。
+- 損益の分かれ目は、ピークの送出で約 10 Gbps（同時の参加者で約 6,500 人）の見込み（**未検証**。コロケーションの固定費の仮定による。E12 の `edge-evaluation` で見積もりを取って確かめる）。S1 の目標（3 万人）は、この 3 倍以上である。
 
 [ADR-0001](0001-platform-and-stack.md) は「S2 から Media Node だけをコロケーションへ移す」とし、[architecture/README.md](../architecture/README.md) の 2 節は「S3 で判断する」としている。
 
@@ -48,9 +48,11 @@ date: 2026-09-27
   - 目標：新しい会議の開始と参加を、切り替えの判断から 1 時間以内に大阪で受ける（RTO 1 時間）。Aurora の RPO は 1 分。**既定案**で、Ops と PM の承認を要する。
   - 進行中の会議：東京の Media Node が生きていれば、メディアはそのまま流れる（ADR-0005）。制御が戻らない間、主催者の操作は効かない。クライアントは、シグナリングが 60 秒戻らなければ、会議の URL から入り直す画面を出す。入り直しは大阪の新しい開催になる。
   - 失うもの：進行中の会議の状態（待合室、チャット）、進行中の録画の未合成の区切り。利用者に告知する。
+  - 大阪で受けている間は、ライブ字幕と文字起こしを止める。Amazon Transcribe は大阪に受け口がない（[endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/transcribe.html)、2026-09-27 に確認）。別のリージョンへ音声を送る代わりの経路は、intent.md の L6 の結論まで作らない。
   - 大阪の Media Node：平時は 3 台（c6gn.16xlarge、AZ ごとに 1 台）。切り替えで Auto Scaling グループの最大を上げる。EC2 の在庫の確保（オンデマンドの容量の予約）を、S1 のうちは持たない。切り替えの時の起動の失敗は、S1 の同時の参加者の上限を大阪では下げて受ける（受けられる数は訓練で測る）。
 - **Media Node をコロケーションへ移す**：
-  - 閾値：Media Node のピークの送出が 4 週続けて 10 Gbps を超えたら、Edge の構築（場所、IP transit、機器、運用の体制）を始める。構築に 2 四半期の見込み（**未検証**）。
+  - 閾値：Media Node のピークの送出が 4 週続けて 10 Gbps を超えたら、Edge の構築（場所、IP transit、機器、運用の体制）を始める。構築に 2 四半期の見込み（**未検証**。E12 の `edge-evaluation` で事業者の見積もりから確かめる）。
+  - > 2026-09-27 の注記：閾値の手前に、Edge の運用の体制（24 時間の当番、自社の AS と BGP の運用、機器の障害の対応）を持つかの判断の点を足す。ピークの送出が 2 週続けて 5 Gbps を超えたら、PM と Ops が体制を採用か委託で持つかを決める。人の確保は構築の 2 四半期より長くかかりうるため、閾値を待たずに決める。持たないと決めたら、閾値を超えても Edge を作らず、AWS との料金の合意か国内のベアメタルのクラウドを `edge-evaluation` で比べて選ぶ（[infrastructure.md](../architecture/infrastructure.md) の 11 節、[architecture/README.md](../architecture/README.md) の 6 節のリスク）。
   - > 2026-09-27 の注記：損益の分かれ目は、[infrastructure.md](../architecture/infrastructure.md) の 12.3 節の見積もりで、ピークの送出の約 8〜10 Gbps（同時の参加者は、下りの平均 1.5 Mbps で約 5,000〜6,500 人、容量の前提の 2.5 Mbps で約 3,200〜4,000 人）である。Context の「約 10 Gbps（約 6,500 人）」はその上の端にあたる。閾値（4 週続けて 10 Gbps）は変えない。[ADR-0001](0001-platform-and-stack.md) を、S1 は AWS で始め、この閾値で Edge を始める形に改めた（Consequences の「ADR-0001 の見直し」への答え）。
   - 移すのは Media Node と TURN だけ。制御の側、Recorder・Transcriber・Composer は AWS に残す。Edge と AWS は Direct Connect でつなぐ（制御の API、Recorder への RTP）。東京の Direct Connect の 100G のポートは 1 時間 22.5 USD（[Direct Connect の料金のデータ（東京）](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSDirectConnect/current/ap-northeast-1/index.json)、2026-09-27 に確認）。
   - 準備（S1 の着手時から）：BYOIP の範囲（[ADR-0049](0049-media-node-fleet.md)）、Media Node の構成を AMI と同じ定義からベアメタル向けのイメージも作れる形にする、Media Assignment Service が「場所」（AWS の AZ か Edge か）を Node の属性として扱う。

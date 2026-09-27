@@ -53,12 +53,12 @@ EC2（c7gn・c8gn の系列、パブリック IPv4＋IPv6。network-traversal.md
      └─ …  worker N−1（N = vCPU − 2）
 ```
 
-- **worker の数**：vCPU−2。残りの 2 は Node Agent（Node.js のイベントループ）と、カーネルの網の処理（ENA の割り込み）に残す。値は E7 の負荷試験で見直す（**未検証**）。worker は CPU のコアに固定する（`taskset`）。
+- **worker の数**：vCPU−2。残りの 2 は Node Agent（Node.js のイベントループ）と、カーネルの網の処理（ENA の割り込み）に残す。値は**未検証**で、E7 の `load-l0-l2` で見直す。worker は CPU のコアに固定する（`taskset`）。
 - **ポート**：worker ごとに UDP と TCP を 1 つずつ。台の中で 20000〜20255 を使う。1 つの WebRtcServer を多数の transport が共有するので、ポートの数は参加者の数に比例しない。
 - **router**：会議ごと・worker ごとに 1 つ。最初にその worker に参加者を置くときに作る。router の `mediaCodecs` は、全 Node・全会議で同じにする（付け替えのときにクライアントが `Device.load` をやり直さずに済む。9 節）。
 - **参加者の置き場所**：参加者の send と recv の transport は、同じ worker（その人の「家の worker」）に置く。家の worker は、会議が既に使っている worker のうち consumer の数の最も少ないものにする。どれも上限（既定 400 consumer）に近ければ、新しい worker を会議に足す。
 - **worker の間のつなぎ**：受け手の家の worker に、送り手の producer がなければ、`pipeToRouter` で送り手の router からつなぐ。受け手がいなくなって 30 秒たったら、その pipe を閉じる。
-- 1 会議の例（100 人、全員がカメラあり、1 人 25 本を受ける）：映像の consumer は 2,500、音声の consumer は最大 9,900（ミュートの人の consumer は止まっている）。家の worker を 7 つ程度に広げる見込み（**未検証**。E7 で測る）。
+- 1 会議の例（100 人、全員がカメラあり、1 人 25 本を受ける）：映像の consumer は 2,500、音声の consumer は最大 9,900（ミュートの人の consumer は止まっている）。家の worker を 7 つ程度に広げる見込み（**未検証**。E7 の `worker-spread-pipe` で測る）。
 - 100 人を超える会議（S2 から）は、音声の consumer を送り手ごとに作らない。受け手ごとの 3 つの音声の枠の consumer だけにする（5.3 節、[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)）。
 
 ## 4. Node の制御の API
@@ -127,7 +127,7 @@ Actor は、受け手ごとに購読の集合を作り、`subscriptions.apply` �
 ### 5.2 帯域の中で選ぶ（Media Node が決める）
 
 - mediasoup は、受け手の transport ごとに下りの帯域を推定し、consumer の優先度の順に、上限（`preferredLayers`）までの層を割り当てる（[mediasoup の設計](https://mediasoup.org/documentation/v3/mediasoup/design/)、「Sender and receiver bandwidth estimation with spatial/temporal layers distribution」、2026-09-27 に確認）。
-- 下りが足りないときは、優先度の低い映像から層が下がり、最後は止まる。音声は映像より先に守る（音声の consumer は層を持たず、帯域の割り当ての対象にしない。**未検証**：mediasoup の割り当てで音声がどう扱われるかを E4 で確かめる）。
+- 下りが足りないときは、優先度の低い映像から層が下がり、最後は止まる。音声は映像より先に守る（音声の consumer は層を持たず、帯域の割り当ての対象にしない。mediasoup も音声の consumer を割り当てに入れない（`Consumer::GetBitratePriority` が 0 を返す。[Consumer.cpp](https://github.com/versatica/mediasoup/blob/v3/worker/src/RTC/Consumer.cpp)、2026-09-27 に確認）。そのため映像が推定の全部を使いうる。音声の分を推定から引く方法は E4 の `downlink-allocation` で決める。[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 6.4 節）。
 - Node Agent は `layerschange` を集計し、受け手ごとの「受けている層」を 1 秒ごとに Actor へ送らない（量が多い）。品質の指標として、observability.md の経路で送る。
 - NFR-009（下りが半分になったら 5 秒以内に層を落とし、1 秒以上の停止を起こさない）は、mediasoup の推定の速さに頼る。E4 の回線の劣化の試験で確かめる。
 
@@ -136,7 +136,7 @@ Actor は、受け手ごとに購読の集合を作り、`subscriptions.apply` �
 - 受け手に送る音声は、最大 3 本：`AudioLevelObserver` の上位＋主な話者＋直近 1.5 秒に上位にいた人から、自分を除いて選ぶ（`top_n`、N=3）。ミュートでない人が 3 人以下なら、全員の音声が届く。
 - 受け手の下りが 150 kbps を下回ったら、その受け手だけ N=2 にする（[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 6.4 節）。
 - 選ばれなかった音声の consumer は止める（`pause`）。切り替えには 1.5 秒の保持を入れ、話し始めと話し終わりで何度も切り替えない。
-- 新しく話し始めた人の最初の 250〜500ms が落ちうる（観測の間隔 250ms と consumer の再開の分）。3 人を超えて同時に話す場面（笑い、相づち）で、4 人目以降の声が届かない。どちらも受け入れる（**未検証**。E4・E7 で、聞いた人の評価と、落ちた話し始めの長さを計測する）。
+- 新しく話し始めた人の最初の 250〜500ms が落ちうる（観測の間隔 250ms と consumer の再開の分）。3 人を超えて同時に話す場面（笑い、相づち）で、4 人目以降の声が届かない。どちらも受け入れる（**未検証**。E4 の `audio-top-n` と E7 の `audio-slot-forwarder-poc` で、聞いた人の評価と、落ちた話し始めの長さを計測する）。
 - Opus の DTX で、黙っている人の producer からはパケットがほとんど出ない。
 - [ADR-0002](../decisions/0002-media-topology.md) の「声の大きい数人（既定 3 人）」をそのまま使う。
 - **100 人を超える会議（音声の枠）**：受け手ごとに全員の音声の consumer を作る上の形は、consumer が人数の 2 乗で増える（300 人で約 9 万、1,000 人で約 100 万。[capacity.md](capacity.md) の 4 節）。開催の上限が 100 人を超える会議では、Actor が `audio_mode = slots` にする。Node Agent は会議の主な worker に 3 つの「枠の producer」を作り、枠の切り替えの転送器が、上と同じ選び方で選んだ話者の RTP を枠へ付け替えて流す（SSRC・連番・時刻を書き換える）。受け手は枠の producer の consumer を 3 つ（下り 150 kbps 未満なら 2 つ）だけ持つ。枠の中の話者は `eph` の `audio.slots` で知らせる。転送器を Node Agent の `DirectTransport` に置くか、`PipeTransport` でつないだ別のプロセスに置くかは、E7 の `audio-slot-forwarder-poc` で決める（[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)）。Recorder・Transcriber・Phone Bridge は、今と同じく送り手ごとの producer を受ける。
@@ -162,7 +162,7 @@ Actor は、受け手ごとに購読の集合を作り、`subscriptions.apply` �
 
 - 映像の producer に `keyFrameRequestDelay` を置く：カメラ 1,000ms、画面共有 2,000ms。受け手の PLI・FIR は、この間隔でまとめて 1 回だけ送り手へ送る。
 - Node Agent から明示的に `requestKeyFrame` を呼ぶのは、次のときだけにする。
-  - 受け手の consumer を再開したとき（mediasoup が自動で求める。**未検証**：E4 で確かめる）
+  - 受け手の consumer を再開したとき（mediasoup が自動で求める。simulcast・SVC でない consumer は再開ですぐに要求し、simulcast・SVC の consumer は同期をやり直して層を選び直し、その層のキーフレームを求める。`SimpleProducerStreamManager::OnResumed` などの worker の実装、2026-09-27 に確認）
   - 付け替えの後に、新しい Node で最初の consumer を作ったとき
 - 新しい参加者が 25 本の映像を同時に受け始めると、25 人の送り手にキーフレームの要求が集まる。Actor は、新しい参加者の `consume.resume` を、話者と共有を先にして、残りを 100ms ずつずらして返す。
 - 大きな会議（受け手 300 人以上。S2）で、1 人の送り手へのキーフレームの要求が多すぎるときは、層の切り替えに時間の層の境目を使う形（SVC）を優先する。mediasoup の資料が勧める「再符号化の中継」は、ウェビナーの Epic で検討する（Scalability の「Broadcasting」）。
@@ -245,7 +245,7 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 | 余裕 | 1,300ms |
 | 合計（NFR-004） | 5,000ms |
 
-- TURN を通る参加者は、TURN の割り当てが残っていれば、同じ TURN から新しい Node の IP へ許可を足すだけで済む（ICE の中でブラウザが行う）。割り当てを作り直すときは、上の予算を 1 秒超えうる（**未検証**）。
+- TURN を通る参加者は、TURN の割り当てが残っていれば、同じ TURN から新しい Node の IP へ許可を足すだけで済む（ICE の中でブラウザが行う）。割り当てを作り直すときは、上の予算を 1 秒超えうる（**未検証**。E7 の `media-node-failover` で TURN の経路も測る）。
 - 予備の Node Y も落ちている、または点が 0.95 を超えているときは、Assignment Service に新しく選ばせる（+100ms）。
 - 付け替えの後、Actor は新しい予備を求める。
 
@@ -266,7 +266,7 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 - 既にある会議は、終わるのを待つ（最大 4 時間）。待てないときは、Actor に「make-before-break」の移動を頼む：
   1. Actor が別の Node に router を作り、`media.reattach{reason: planned, make_before_break: true}` を送る。
   2. クライアントは、古い transport を残したまま新しい transport を作り、音声の produce と consume ができたら、古い consumer を止め、古い transport を閉じる。
-  3. 聞こえ方の途切れは、ジッタバッファの切り替えの分（数百 ms）に収まる見込み（**未検証**。E10 で計測する）。
+  3. 聞こえ方の途切れは、ジッタバッファの切り替えの分（数百 ms）に収まる見込み（**未検証**。E10 の `make-before-break-migration` で計測する）。
 - AMI の入れ替えは、delivery.md で決める段階的な手順（台の割合を少しずつ増やす）に従う。
 
 ## 11. セキュリティ
@@ -305,7 +305,7 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 | 古い `epoch` の Actor から `producer.pause` | `stale_epoch` で拒否され、音声は止まらない |
 | Node と Assignment Service の間の分断（心拍だけが止まる） | クライアントの `media.stall` がないので、付け替えない（誤判定を起こさない） |
 | 1 人の参加者の回線を 10 秒切る | その人だけ ICE restart。他の人の付け替えはない |
-| drain（make-before-break） | 音声の途切れが 500ms 以下（**未検証**） |
+| drain（make-before-break） | 音声の途切れが 500ms 以下（**未検証**。E10 の `make-before-break-migration` で測る） |
 
 ### 12.3 負荷
 
@@ -364,12 +364,12 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 1 台の Node の上限（consumer、pps、送出） | E7 の負荷試験（capacity.md） |
-| mediasoup の帯域の割り当てで、音声が映像より先に守られるか | E4 の回線の劣化の試験 |
-| consumer の再開で、mediasoup が自動でキーフレームを求めるか | E4 で確かめる |
+| mediasoup は音声を割り当てに入れない（確かめた）。音声の分を推定から残す方法 | E4 の `downlink-allocation` |
+| consumer の再開で、mediasoup が自動でキーフレームを求めるか | 決着：求める（worker の実装で確かめた。7 節） |
 | リージョンの間で「要る層だけ」を運ぶ方法（pipe の代わりの consumer の連結） | S3 の前に試作して ADR にする |
 | `top_n` で話し始めが落ちる長さと、4 人目以降の声が届かないことが許せるか | E4・E7 で、聞いた人の評価で決める。許せなければ、少人数の会議で N を増やす |
 | 1:1 の会議の P2P | S2 で、別の ADR（ADR-0002） |
-| TURN を通る参加者の付け替えの時間 | E7 の障害の注入で測る |
+| TURN を通る参加者の付け替えの時間 | E7 の `media-node-failover` の障害の注入で測る |
 
 ## 15. quality.md・runbooks・data-model への項目
 

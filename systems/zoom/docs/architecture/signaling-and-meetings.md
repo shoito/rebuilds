@@ -22,9 +22,9 @@
 | --- | --- | --- |
 | 会議の ID | すぐの会議・予定の会議・繰り返しの会議は 11 桁、個人の会議の ID は 10 桁（[Frequently asked questions about meeting and webinar IDs](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065196)） | 11 桁は同じ。個人の会議の ID は scheduling-and-calendar.md で決める（ADR-0006） |
 | 待合室とパスコード | 2020-09-27 から、どちらかを必ず有効にする（[intent.md](../intent.md) の MVP の出典） | 同じ（meeting-security.md） |
-| URL にパスコードを埋める | URL の `pwd=` の値でパスコードの入力を省ける（**未検証**。本家の説明の一次の資料を確かめられなかった） | 参加の鍵を URL のフラグメント（`#k=`）に置く。サーバーのアクセスログと `Referer` に残らない（ADR-0006） |
-| シグナリングの形式 | 公開されていない（**未検証**） | JSON＋Zod（ADR-0008） |
-| 主催者によるミュートの解除 | 参加者に解除を求め、本人が応じる形（**未検証**。本家のヘルプの記述を今回は確かめていない） | 同じ考え方にする（ADR-0009） |
+| URL にパスコードを埋める | 設定でパスコードを暗号化して招待のリンクに入れ、1 回のクリックで入れる（[Embedding meeting passcode in invite link](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065979)）。リンクのどの部分に入るか（クエリか）は書かれていない | 参加の鍵を URL のフラグメント（`#k=`）に置く。サーバーのアクセスログと `Referer` に残らない（ADR-0006） |
+| シグナリングの形式 | 公開の一次の資料に書かれていない | JSON＋Zod（ADR-0008） |
+| 主催者によるミュートの解除 | 既定は「Ask to Unmute」で、参加者に解除を求め、本人が応じる。参加者が前もって同意していれば、主催者はすぐに解除できる（同意は同じ主催者の会議に続けて効く）（[Muting or unmuting participants in a meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0066716)） | 求めて本人が応じる形だけにする。前もっての同意による解除は MVP では作らない（ADR-0009） |
 
 いずれも 2026-09-27 に確認。
 
@@ -194,7 +194,7 @@ ADR-0007。
 4. 失ってはならない変更（退出させる、ロック、役割の変更、待合室の設定）は、Aurora に書いてから次へ進む（ADR-0007）。書けなければ `error{code: unavailable}` を返し、状態を変えない。
 5. `seq` を 1 つ進め、メモリの状態に当てる。
 6. 差分を Gateway に送る。命令を送った人には `ack{id, seq}` を返す。
-7. Media Node への指示が要る操作は、差分を送った後に非同期で出す。Node の失敗は、改めて差分（例：`participant.media_error`）で知らせる。
+7. Media Node への指示が要る操作は、差分を送った後に非同期で出す。Node の失敗は、改めて差分（`participant.updated` の `media_error`）で知らせる。
 
 ## 6. シグナリングのプロトコル
 
@@ -235,6 +235,7 @@ ADR-0008。
 | `self.update` | `muted?`、`video?`、`hand_raised?`、`display_name?` | 本人 |
 | `self.leave` | — | 本人 |
 | `state.report` | 10.2 節 | 本人（再同期のとき） |
+| `state.sync` | `epoch`、`seq`（手元の最後）。`seq` の飛びを見つけたときの差分の求め直し（7 節） | 本人 |
 | `media.capabilities` ・ `media.transport.create` ・ `media.transport.connect` ・ `media.produce` ・ `media.consume.resume` ・ `media.producer.close` | 8 節 | 本人 |
 | `media.transport.restart` ・ `media.ice_servers.refresh` | ICE restart と TURN の資格情報の更新（[network-traversal.md](network-traversal.md) の 6 節） | 本人 |
 | `media.stall` | `transport_id`。受信の途絶の報告（[media-server-sfu.md](media-server-sfu.md) の 9.1 節） | 本人 |
@@ -254,7 +255,7 @@ ADR-0008。
 | name | 中身 |
 | --- | --- |
 | `meeting.status` | `open`・`live`・`ending`、`locked`、`recording`・`transcribing`（録画の表示。recording-and-transcription.md） |
-| `participant.joined` ・ `participant.left` ・ `participant.updated` | `participant_id`、`display_name`、`role`、`muted`、`video`、`sharing`、`hand_raised`、`connection`（`ok`・`reconnecting`） |
+| `participant.joined` ・ `participant.left` ・ `participant.updated` | `participant_id`、`display_name`、`role`、`muted`、`video`、`sharing`、`hand_raised`、`connection`（`ok`・`reconnecting`）、`by?`（`host` のとき主催者の操作）、`media_error?`（Media Node への指示の失敗。5.4 節の 7） |
 | `participant.role` | `participant_id`、`role` |
 | `waiting.joined` ・ `waiting.left` | 主催者・共同主催者だけに送る |
 | `speaker.active` | `participant_id`（主な話者。[media-server-sfu.md](media-server-sfu.md) の 6 節） |
@@ -360,7 +361,7 @@ ADR-0009。
 
 ### 9.4 強制の仕組み
 
-- ミュート：Actor は差分 `participant.muted{by: host}` を配った後、Media Node に `producer.pause{producer_id, epoch}` を送る。クライアントが従わず音声を送り続けても、Media Node が転送しない。本人の端末は、差分を受けてマイクのトラックを止める（送る帯域を減らす）。
+- ミュート：Actor は差分 `participant.updated{muted: true, by: host}` を配った後、Media Node に `producer.pause{producer_id, epoch}` を送る。クライアントが従わず音声を送り続けても、Media Node が転送しない。本人の端末は、差分を受けてマイクのトラックを止める（送る帯域を減らす）。
 - 本人のミュートの解除は `self.update{muted:false}` を Actor が許したときだけ、Media Node の `producer.resume` になる。
 - 退出させた人の接続は、`you.removed` を送った後、Gateway が閉じる。Media Node の transport も閉じる。再び入ろうとしたら、`join` で `Rejected(removed)` にする。
 
@@ -413,7 +414,7 @@ t≈8s     主催者の操作が効く（目標：10 秒以内。NFR-004）
 
 ### 10.3 計画した引き渡し（デプロイ）
 
-- Actor Host を止める前に、その Host の会議を 1 つずつ引き渡す：受け取りを止める → スナップショットを書く → リースを返す → Gateway に「移った」と知らせる → Gateway が次の Host に acquire を頼む。1 会議あたり 1 秒未満の見込み（**未検証**。E1 で計測する）。
+- Actor Host を止める前に、その Host の会議を 1 つずつ引き渡す：受け取りを止める → スナップショットを書く → リースを返す → Gateway に「移った」と知らせる → Gateway が次の Host に acquire を頼む。1 会議あたり 1 秒未満の見込み（**未検証**。E7 の `actor-planned-handover` で計測する）。
 - ECS のタスクの停止の猶予（`stopTimeout`）は 120 秒にする。2,000 会議を 16 並列で引き渡して、約 2 分の見積もり。
 
 ## 11. 遅延の予算
@@ -489,7 +490,7 @@ Actor、Gateway、クライアント N 個、偽の Media Node を 1 つのプ�
 
 ### 14.4 回線の劣化
 
-- 本題材の AGENTS.md の条件（損失 5%・20%、揺らぎ 30・100ms、帯域の低下、RTT 200ms）で、シグナリングの操作の遅れ（`cmd` → `ack` の p95）と、WS の切断の率を測る。シグナリングは TCP なので、損失 20% で遅れが大きく伸びる。p95 2 秒を超えないことを目安にする（**未検証**。E2 で測り、[quality.md](../quality.md) の 2.2.1 節の行列に閾値を足す）。
+- 本題材の AGENTS.md の条件（損失 5%・20%、揺らぎ 30・100ms、帯域の低下、RTT 200ms）で、シグナリングの操作の遅れ（`cmd` → `ack` の p95）と、WS の切断の率を測る。シグナリングは TCP なので、損失 20% で遅れが大きく伸びる。p95 2 秒を超えないことを目安にする（**未検証**。E2 の `network-path-matrix-tests` で測り、[quality.md](../quality.md) の 2.2.1 節の行列に閾値を足す）。
 
 ## 15. Story の候補
 
@@ -533,11 +534,11 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) に従う。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | S3（1,000 人）のスナップショットの大きさと、一覧のページ分け | S3 の前。1,000 人の Actor の負荷試験で決める |
-| 計画した引き渡しの 1 会議あたりの時間 | E1 で計測する |
+| 計画した引き渡しの 1 会議あたりの時間 | E7 の `actor-planned-handover` で計測する |
 | Gateway と Actor Host を 1 つのサービスにまとめるか | E2 の負荷試験で、1 ホップの遅れと運用の手間を比べる |
 | 参加の鍵を持つ人に、待合室も省かせる設定を作るか | 既定は作らない（[ADR-0031](../decisions/0031-waiting-room-and-passcode-rules.md)）。PM の確認を取る |
 | 同時に複数の画面共有を許すか | E5 で利用者の声を見て決める |
-| 本家のシグナリングの形式 | 公開されていない。調べない |
+| 本家のシグナリングの形式 | 公開の一次の資料に書かれていない。調べない |
 
 ## 17. quality.md・runbooks・data-model への項目
 

@@ -17,7 +17,7 @@ date: 2026-09-27
 
 API は、存在しない会議とパスコードの誤りを同じ応答で返すと決めている（[signaling-and-meetings.md](../architecture/signaling-and-meetings.md) の 4.3 節）。ただし、待合室だけの会議（パスコードなし）は、参加の要求でトークンが返るので存在が分かる。
 
-AWS WAF は、レートに基づく規則と、CAPTCHA・Challenge のアクションを持つ（AWS WAF の文書。細かい振る舞いは未検証）。
+AWS WAF は、レートに基づく規則と、CAPTCHA・Challenge のアクションを持ち、CAPTCHA を画面の中に出す JavaScript の API（`renderCaptcha()`、許すドメインを入れた API キーが要る）を持つ（[Using the CAPTCHA JavaScript API](https://docs.aws.amazon.com/waf/latest/developerguide/waf-js-captcha-api.html)、2026-09-27 に確認）。WAF の結果を API に渡す細かい振る舞いは**未検証**（E3 の `waf-captcha-challenge`）。
 
 ## Options
 

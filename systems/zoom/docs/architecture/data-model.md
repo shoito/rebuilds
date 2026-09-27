@@ -25,7 +25,7 @@
 | AMP、CloudWatch Logs、X-Ray | メトリクス、アプリのログ、トレース（内容と IP を含めない） | 失ってよい | [observability.md](observability.md) |
 | KMS、Secrets Manager、AWS Private CA | 鍵と秘密（8 節） | 失ってはならない | [ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md) |
 | IPAM（`media-prod`） | BYOIP の範囲、EIP のプール、隔離した EIP のタグ | 失ってはならない（顧客に公開した範囲） | [ADR-0049](../decisions/0049-media-node-fleet.md) |
-| AWS AppConfig | release・meeting・ops・experiment のフラグ、`client-config` の版の割合と最低の版 | 失ってよい（既定の値で動く） | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md)（AppConfig を使うこと自体は他の題材の決定の引き継ぎ。**未検証**） |
+| AWS AppConfig | release・meeting・ops・experiment のフラグ、`client-config` の版の割合と最低の版 | 失ってよい（既定の値で動く） | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md)（AppConfig を使うこと自体は Slack の題材の [ADR-0026](../../../slack/docs/decisions/0026-feature-flags.md) の引き継ぎ） |
 | 公開の `ip-ranges.json` | Media Node と TURN の範囲、更新の日付 | 作り直せる | [ADR-0016](../decisions/0016-media-edge-addressing-and-security-groups.md) |
 | 利用者の端末（`localStorage`・IndexedDB・メモリ） | 端末の鍵、前回の経路、端末の選択、仮想背景、ショートカット。E2EE の鍵はワーカーのメモリだけ | — | [clients.md](clients.md)、[network-traversal.md](network-traversal.md)、[e2ee.md](e2ee.md) |
 | 開発リポジトリ | シグナリングのスキーマ（`@<brand>/signaling-schema`）、試験のベクトル、`settingsRegistry`、`ci/media-paths.yml`、ラボの条件（YAML） | 定義の正本 | [ADR-0008](../decisions/0008-signaling-protocol.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md)、[ADR-0039](../decisions/0039-settings-hierarchy-and-locks.md) |
@@ -246,8 +246,8 @@
 
 | 置き場所 | 中身 |
 | --- | --- |
-| KMS の鍵 5 つ | `<brand>-join-signing`、`-meeting-secrets`、`-content`、`-e2ee-as`、`-data`（[ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md)） |
-| Secrets Manager | `turn/static-auth-secret`（今と次）、パスコードの HMAC の pepper（版つき）、`ip_prefix_hash` の pepper（今と前）、E2EE の外部の送り手の鍵、カレンダーの OAuth のクライアント、TURN の TLS の証明書、DB の認証情報 |
+| KMS の鍵 6 つ | `<brand>-join-signing`、`-meeting-secrets`、`-content`、`-e2ee-as`、`-e2ee-external-sender`、`-data`（[ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md)） |
+| Secrets Manager | `turn/static-auth-secret`（今と次）、パスコードの HMAC の pepper（版つき）、`ip_prefix_hash` の pepper（今と前）、カレンダーの OAuth のクライアント、TURN の TLS の証明書（ACM から書き出したもの）、DB の認証情報 |
 | AWS Private CA | Actor Host と Node Agent の相互 TLS の証明書（7 日） |
 | 保存しない | Media Node の DTLS の証明書、PlainTransport の SRTP の鍵、E2EE の端末の鍵と MLS の秘密 |
 
