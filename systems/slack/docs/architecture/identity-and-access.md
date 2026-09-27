@@ -125,7 +125,8 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 - セッションの正本は Aurora の `sessions` に置く。Valkey（ElastiCache）には、Better Auth の Cookie キャッシュ（`cookieCache`、最大 60 秒）だけを使う。Valkey は失われてもよい（[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)）ので、セッションの正本を置かない。Better Auth は `secondaryStorage` を設定するとセッションをそちらに置く。`secondaryStorage` を使いながらセッションを Valkey に置かない設定はない。`session.storeSessionInDatabase: true` にすると DB にも書き、読み取りは Valkey を先に見て、なければ DB から読む（[Session Management の文書](https://www.better-auth.com/docs/concepts/session-management)、[`internal-adapter.ts` の `findSession`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/db/internal-adapter.ts)、2026-09-26 に確認）。そこで次のようにする。
   - `secondaryStorage`（Valkey）を使うなら、必ず `storeSessionInDatabase: true` にする。`preserveSessionInDatabase` は使わない（有効にすると DB からの読み直しをしなくなり、Valkey を失うと全員がログアウトされる）。
   - Valkey の値が先に読まれるので、セッションの取り消しと変更は Better Auth の API（`revokeSession` など）だけで行い、`sessions` の行を直接書き換えない（Valkey の写しが残るため）。
-  - この制約を持ちたくなければ、`secondaryStorage` を使わない（レート制限と検証の値も DB に置く）。E2 で、どちらにするかを負荷の見込みで決める。
+  - この制約を持ちたくなければ、`secondaryStorage` を使わない（レート制限と検証の値も DB に置く）。
+  - **決定（2026-09-28）：`secondaryStorage` は使わない。** セッション、検証の値、Better Auth のレート制限の値は DB に置き、Valkey は `cookieCache` だけに使う。正本が DB の 1 か所になり、取り消しの反映が単純になる。Valkey を失ってもログアウトは起きない（ADR-0003）。DB の読み取りは `cookieCache`（最大 60 秒）で抑える。E7 の負荷試験で DB の負荷が問題になったら見直す。
 
 ### 3.3 端末の一覧と取り消し
 

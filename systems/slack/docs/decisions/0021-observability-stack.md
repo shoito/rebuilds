@@ -44,6 +44,8 @@ SLO（[runbooks/README.md](../runbooks/README.md)）の計測、障害の調査�
 
 オンコールの通知の道具（SNS の先）は、この ADR では決めない（[runbooks/incident-response.md](../runbooks/incident-response.md)）。
 
+> 2026-09-28 の注記：オンコールの通知の道具は PagerDuty にした。SNS から PagerDuty の連携へ送る。通知にはアラート名・重大度・環境・runbook の URL だけを載せ、テナントのデータを社外に出さない（[runbooks/incident-response.md](../runbooks/incident-response.md)）。
+
 ## Consequences
 
 - 良くなること：

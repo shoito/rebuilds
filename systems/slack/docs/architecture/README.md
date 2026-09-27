@@ -184,5 +184,15 @@ PM の方針（本家 Slack に寄せる、既定案）により、次のとお�
 | --- | --- |
 | 巨大チャンネルのファンアウト、`last_seq` のホットスポット、RLS の性能 | E7 の `capacity-load-tests`（k6）で計測して判断する。足りなければ E10 の `large-channel-path` へ |
 | 大阪の headless の二次クラスタの切り替え手順 | 対応状況は確認済み（ADR-0011）。E1 の `terraform-foundation` の後、staging で手順を試す |
-| S3 で Global が止まったときの、キャッシュの切れたセッションの扱い | E11。ADR-0023（proposed）を accepted にする前に決める（[infrastructure.md](infrastructure.md) の 10.2 節） |
 | iOS の PWA のバックグラウンドでの接続の寿命 | E4 の着手前に、実機の PoC で測る（[client.md](client.md) の 3.4 節） |
+
+### 決定（2026-09-28、推奨案で確定）
+
+残っていた問いを、推奨案で次のとおり決めた。
+
+- **Better Auth の `secondaryStorage` は使わない。** セッションの正本を DB の 1 か所に保ち、取り消しを単純にするため（[identity-and-access.md](identity-and-access.md) の 3.2 節）。
+- **S3 で Global が止まったときは、キャッシュの切れたセッションを最長 4 時間まで延長して受け入れる。** 拒否すると Global が単一障害点に戻るため（[ADR-0023](../decisions/0023-cell-based-architecture.md)、[infrastructure.md](infrastructure.md) の 10.2 節）。上の「持ち越し」から外した。
+- **オンコールの呼び出しの道具は PagerDuty にする。** SNS からそのまま受けられ、当番の表とエスカレーションを自前で作らずに済むため（[runbooks/incident-response.md](../runbooks/incident-response.md)、[ADR-0021](../decisions/0021-observability-stack.md) の注記）。
+- **ファイルのバケットの暗号化は SSE-KMS とバケットキーにする。** ADR-0017 で決まっていたのに、files.md が「security.md で決める」のままだったので直した（[files.md](files.md)、[ADR-0017](../decisions/0017-encryption-and-key-management.md)）。
+
+法務の確認待ちの項目（全データのエクスポートでメンバーへ自動で通知しないこと）は決めていない（[intent.md](../intent.md) の Open questions）。

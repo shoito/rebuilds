@@ -21,7 +21,7 @@
 
 - 両方のバケットで、パブリックアクセスをすべて遮断する。読み出しは CloudFront（OAC）と file Worker にだけ許す。
 - `derived` バケットのキーも `ws/{workspace_id}/files/{file_id}/thumb_{幅}.webp` の形にする。
-- 暗号化の方式（SSE-S3 か SSE-KMS か）は [security.md](security.md) で決める。SSE-KMS にする場合、GuardDuty が使う IAM ロールに、その鍵の `kms:GenerateDataKey` と `kms:Decrypt` を、`kms:ViaService` を S3 に限る条件付きで与える（[AWS のドキュメント](https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-s3-iam-policy-prerequisite.html)）。
+- 暗号化は SSE-KMS とバケットキーにする（`files` の鍵。[ADR-0017](../decisions/0017-encryption-and-key-management.md)）。そのため、GuardDuty が使う IAM ロールに、その鍵の `kms:GenerateDataKey` と `kms:Decrypt` を、`kms:ViaService` を S3 に限る条件付きで与える（[AWS のドキュメント](https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-s3-iam-policy-prerequisite.html)）。
 
 ## 3. 状態
 
