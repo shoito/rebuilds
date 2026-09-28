@@ -76,7 +76,7 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 
 - ドメインの処理は、状態を変えるトランザクションの中で `events` に 1 行を書き、同じトランザクションで `outbox` に「Event ができた」ことを書く。
 - `events` の行には、その時点のリソースの **正規形**（内部の最新の型）と `previous_attributes` と `api_version` を入れる。版ごとの描画は保存しない（ADR-0026）。
-- Event の生成は冪等にする。`events` に `(account_id, idempotency_source)` の一意制約を置き、同じ内部の操作 ID（[ADR-0004](../decisions/0004-idempotency.md) の内部の層）から 2 つの Event を作らない。本家は「まれに 2 つの Event が別々に作られる」ことがあるとしている（[重複するイベントを処理する](https://docs.stripe.com/webhooks#handle-duplicate-events)）。本システムは作らない設計にするが、加盟店向けの案内は本家と同じにする（9 節）。
+- Event の生成は冪等にする。同じ内部の操作 ID（[ADR-0004](../decisions/0004-idempotency.md) の内部の層）から 2 つの Event を作らない。主に遷移関数の冪等（同じ結果への遷移は何もしない）で守り、DB では日ごとのパーティションの中で `(account_id, idempotency_source, created_on)` を一意にする（パーティションをまたぐ一意は張れないため。[data-model/events-and-webhooks.md](data-model/events-and-webhooks.md) の 2.2 節）。本家は「まれに 2 つの Event が別々に作られる」ことがあるとしている（[重複するイベントを処理する](https://docs.stripe.com/webhooks#handle-duplicate-events)）。本システムは作らない設計にするが、加盟店向けの案内は本家と同じにする（9 節）。
 
 ### 3.3 MVP で出す種類
 
@@ -321,14 +321,14 @@ Slack の ADR-0016 の「アプリの検査」をそのまま使い、Webhook �
 
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
-| `events` | `account_id`、`id`、`type`、`api_version`、`created_at`、`object_id`、`object_type`、`data`（正規形）、`previous_attributes`、`request_id`、`idempotency_key`、`idempotency_source` | 日ごとのパーティション、31 日で `DROP`。RLS |
+| `events` | `account_id`、`id`、`created_on`、`type`、`api_version`、`created_at`、`object_id`、`object_type`、`data`（正規形）、`previous_attributes`、`request_id`、`idempotency_key`、`idempotency_source` | 日ごとのパーティション、31 日で `DROP`。RLS |
 | `event_summaries` | `account_id`、`id`、`type`、`created_at`、`object_id`、`request_id` | 月ごと、13 か月 |
 | `webhook_endpoints` | `account_id`、`id`、`url`、`enabled_events`、`api_version`、`status`、`disabled_reason`、`description`、`metadata` | RLS |
-| `webhook_endpoint_secrets` | `endpoint_id`、`ciphertext`、`created_at`、`expires_at` | 入れ替え中は 2 行 |
-| `webhook_deliveries` | `account_id`、`endpoint_id`、`event_id`、`status`、`attempt_count`、`next_attempt_at`、`last_status_code` | 一意キー `(endpoint_id, event_id)` |
-| `webhook_delivery_attempts` | `delivery_id`、`attempted_at`、`status_code`、`error_kind`、`duration_ms`、`response_excerpt`、`manual` | 日ごと、15 日 |
+| `webhook_endpoint_secrets` | `account_id`、`id`、`endpoint_id`、`ciphertext`、`created_at`、`expires_at` | 入れ替え中は 2 行 |
+| `webhook_deliveries` | `account_id`、`id`、`endpoint_id`、`event_id`、`event_created_on`、`status`、`attempt_count`、`next_attempt_at`、`last_status_code` | 一意キー `(endpoint_id, event_id, event_created_on)`。`event_created_on` の日ごと、31 日 |
+| `webhook_delivery_attempts` | `account_id`、`id`、`delivery_id`、`attempted_at`、`status_code`、`error_kind`、`duration_ms`、`response_excerpt`、`manual` | 日ごと、15 日 |
 
-環境（テスト・本番）は DB のクラスタで分かれるので、`livemode` の列は持たない（API の応答では付ける）。索引は [data-model.md](data-model.md) に載せる。
+環境（テスト・本番）は DB のクラスタで分かれるので、`livemode` の列は持たない（API の応答では付ける）。列・索引の正本は [data-model/events-and-webhooks.md](data-model/events-and-webhooks.md)。
 
 ## 14. テスト
 

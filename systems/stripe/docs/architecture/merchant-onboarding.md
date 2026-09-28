@@ -110,6 +110,8 @@ payouts_enabled = true（口座の確認が済んでいれば）
 
 ### データモデル
 
+列・制約・索引の正本は [data-model/onboarding.md](data-model/onboarding.md)。
+
 ```sql
 accounts                 (id, business_type, country, charges_enabled, payouts_enabled,
                           disabled_reason, requirements JSONB, current_deadline, ...)

@@ -74,3 +74,5 @@ PCI DSS は、保存した PAN を読めない形にし（要件 3.5.1）、鍵�
 > - 理由：caching CMM は、決定の「DEK を 5 分キャッシュする」をそのまま表せる。Hierarchical keyring は、ブランチキーを置く DynamoDB を CDE に足すことになり、PCI DSS の範囲の部品が増える。
 > - 暗号化では `plaintextLength` を必ず渡す（渡さないとキャッシュされない）。キャッシュの上限は、時間 5 分に加えて、1 つの DEK で暗号化する件数でも区切る。値は E10 の負荷試験で KMS の呼び出しの数を見て決める。
 > - KMS の上限に近づいたとき（[capacity.md](../architecture/capacity.md) の 2.4 節）は、Hierarchical keyring を新しい ADR で検討する。
+
+> 2026-09-28 の注記（データモデル）：決定の「内部向け（不正検知）は加盟店をまたいで同じにする」指紋は、不正検知が本体で動くため、PaymentMethod の紐づけの応答で本体に返し、`payment_methods.fingerprint_internal` に持つ。API・Event・ダッシュボードには出さない。加盟店向けの指紋と同じく、本体に置く扱いは QSA に確認する。DEK は caching CMM が作り暗号文に包まれるので、DEK の表（`vault_deks`）は持たず、漏洩の疑いの対象は暗号文の包んだ DEK のハッシュ（`edk_hash`）で探す（[data-model/card-vault.md](../architecture/data-model/card-vault.md)）。決定の中身は変えない。

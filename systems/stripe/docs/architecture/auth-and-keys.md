@@ -46,6 +46,8 @@
 | `invitations` | 同上 | 招待先のメールアドレス、ロール、トークンのハッシュ、期限（7 日） |
 | `sandbox_access` | 同上 | サンドボックスへの入り方（E11。11.2 節） |
 
+列・制約・索引の正本は [data-model/accounts-and-keys.md](data-model/accounts-and-keys.md)。
+
 - メンバーとロールは live のクラスタだけに置き、サンドボックスでも同じ行を見る。ダッシュボードでサンドボックスを開くときは、live のクラスタで権限を決めてから、test のクラスタに `SET LOCAL app.account_id = <サンドボックスの acct>` で入る。
 - `users` からテナントのデータを参照しない。テナントのデータは `user_id` だけを持つ（Slack の ADR-0010 と同じ）。
 
@@ -275,7 +277,7 @@ ADR-0002 の `SET LOCAL app.account_id` を、主体ごとに次のように決�
 
 ### 9.1 セキュリティの履歴
 
-本家の「セキュリティの履歴（security history）」に相当する。追記のみのテナントテーブル `security_events` に残し、Owner・Administrator・Developer・View Only などが見られる（本家も View Only が監査ログを見られる）。
+本家の「セキュリティの履歴（security history）」に相当する。監査ログ `audit_events` の `category = 'security'` の行として残し（ビュー `security_events` で読む。[data-model/audit-and-operations.md](data-model/audit-and-operations.md) の 2.2 節）、Owner・Administrator・Developer・View Only などが見られる（本家も View Only が監査ログを見られる）。
 
 - ログインの成功・失敗、MFA の登録・削除、セッションの取り消し
 - 招待、ロールの変更、メンバーの削除、所有者の移転

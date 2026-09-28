@@ -111,7 +111,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | AZ・リージョンの障害と複製の遅延（[disaster-recovery.md](disaster-recovery.md)）、キャパシティの見直し（5 節） |
 | [delivery.md](../architecture/delivery.md) | デプロイとお金の不変条件のガード（[deploy-and-rollback.md](deploy-and-rollback.md)） |
 | [observability.md](../architecture/observability.md) | アラートの条件の正本の実装側（5.2 節） |
-| [data-model.md](../architecture/data-model.md) | 索引のみ。運用の対象は各領域の文書で扱う |
+| [data-model.md](../architecture/data-model.md) | データモデルの正本。保持とパーティションの `DROP` は 3.11 節。運用の手順は各領域の文書で扱う |
 
 ## 5. 定期作業と訓練
 

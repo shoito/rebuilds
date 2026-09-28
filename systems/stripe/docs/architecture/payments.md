@@ -24,7 +24,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | PaymentMethod | `pm_` | 決済手段。カードはトークンと表示用の情報だけを持つ（[payment-methods.md](payment-methods.md)） |
 
 - 本家の Charges API で直接課金する経路（`POST /v1/charges`）は作らない。Charge は PaymentIntent の中の試行としてだけ存在する（[ADR-0010](../decisions/0010-payment-intent-state-machine.md)）。
-- テーブル：`payment_intents`、`charges`、`refunds`、`setup_intents`、`setup_attempts`、`connector_requests`（コネクタへの要求の記録。7 節）。すべて `account_id` と RLS を持つ（[ADR-0002](../decisions/0002-account-tenancy.md)）。索引は [data-model.md](data-model.md) に反映する。
+- テーブル：`payment_intents`、`charges`、`refunds`、`setup_intents`、`setup_attempts`、`connector_requests`（コネクタへの要求の記録。7 節）。すべて `account_id` と RLS を持つ（[ADR-0002](../decisions/0002-account-tenancy.md)）。ほかに受信箱 `connector_inbox`（RLS の例外）と振り分け `connector_routes`。列・索引の正本は [data-model/payments.md](data-model/payments.md)。
 
 ## 3. PaymentIntent の状態遷移
 

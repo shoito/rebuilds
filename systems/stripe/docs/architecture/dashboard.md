@@ -208,7 +208,7 @@ Slack の client.md の 1 節と同じ（Chrome・Edge・Firefox の最新 2 メ
 | `report_runs` | `account_id`、`id`、`type`、`parameters`、`status`、`row_count`、`s3_key`、`expires_at`、`requested_by` | RLS |
 | `dashboard_preferences` | `user_id`、`account_id`、`locale`、`timezone`、`saved_filters` | |
 
-リクエストのログ（`api_request_logs`）とセキュリティの履歴（`security_events`）は [auth-and-keys.md](auth-and-keys.md) にある。環境は DB のクラスタで分かれる。索引は [data-model.md](data-model.md) に載せる。
+リクエストのログ（`api_request_logs`）とセキュリティの履歴（`audit_events` の `category = 'security'` の行、ビュー `security_events`）は [auth-and-keys.md](auth-and-keys.md) にある。環境は DB のクラスタで分かれる。列・索引の正本は [data-model/audit-and-operations.md](data-model/audit-and-operations.md)。
 
 ## 14. 決定と持ち越し（2026-09-26、既定案）
 

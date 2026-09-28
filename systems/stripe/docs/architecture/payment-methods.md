@@ -25,7 +25,7 @@ MVP は 3 つ。本家の `type` の値をそのまま使う（[PaymentIntent ob
 
 - `billing_details`（氏名、メール、電話、住所）はすべての型に持たせる。
 - `pm_` の ID は本体が採番する。Vault のトークンとの対応は、Vault 側にだけ持つ（本体の DB に Vault の内部の ID を置かない）。本体から Vault への要求は `pm_` と `account_id` で行う。
-- テーブル：`payment_methods`（`account_id`、`livemode`、`type`、`customer_id`、`billing_details`、`card_display`、`fingerprint`、`created_at`、`detached_at`）。
+- テーブル：`payment_methods`（`account_id`、`type`、`customer_id`、`billing_details`、`card_display`、`fingerprint`、`fingerprint_internal`、`created_at`、`detached_at`）。環境はクラスタで分かれるので `livemode` の列は持たない。列の正本は [data-model/payment-methods.md](data-model/payment-methods.md)。
 
 ### 2.2 カードの表示用の情報
 
@@ -228,7 +228,7 @@ Payments（本体）
 
 - 顧客の銀行口座に振り込む。返金を作ると `requires_action` にし、PaymentMethod のメールアドレスに口座情報の入力のリンクを送る。入力されたら `pending`、振込が終われば `succeeded`、45 日たっても入力がなければ `failed`（[payments.md](payments.md) の 10.2 節）。
 - 振込は、返金用の銀行（`payout_refund`）で行う。口座名義の不一致などで組み戻されたら、`requires_action` に戻して再び入力を依頼する。
-- 返金の振込先の口座情報は個人情報として暗号化して持ち、返金の完了後に保持期間を過ぎたら消す（[security.md](security.md)）。
+- 返金の振込先の口座情報は個人情報として暗号化して `refund_bank_details` に持ち、返金の完了後に保持期間を過ぎたら消す（[security.md](security.md)、[data-model/payment-methods.md](data-model/payment-methods.md) の 2.5 節）。
 
 ## 6. 銀行振込
 
@@ -237,7 +237,7 @@ Payments（本体）
 ### 6.1 振込先（バーチャル口座）
 
 - Customer ごとに 1 つ、振込先の口座（バーチャル口座）を割り当てる。以後、その Customer の銀行振込はすべてこの口座で受ける。振込ごとに口座を変えないので、顧客は同じ口座を登録して使える。
-- 口座は、提携する銀行から番号の範囲（プール）を受け取って割り当てる。`virtual_bank_accounts`（`account_id`、`livemode`、`customer_id`、`bank_code`、`bank_name`、`branch_code`、`branch_name`、`account_type`、`account_number`、`account_holder_name`、`allocated_at`、`released_at`）。
+- 口座は、提携する銀行から番号の範囲（プール）を受け取って割り当てる。`virtual_bank_accounts`（`account_id`、`customer_id`、`bank_code`、`bank_name`、`branch_code`、`branch_name`、`account_type`、`account_number`、`account_holder_name`、`allocated_at`、`released_at`）。
 - `next_action.display_bank_transfer_instructions` に、`type = jp_bank_transfer`、`amount_remaining`、`currency`、`financial_addresses[].zengin`（銀行名・支店名・口座種別・7 桁の口座番号・口座名義）、`hosted_instructions_url` を入れる。`reference` は日本では使わない（本家と同じ）。
 - 口座名義は、本システムの運営会社の収納用の名義になる（本家の例は「ストライプジャパン（カ　シュウノウダイコウ」）。名義と、加盟店の代わりに代金を受け取る仕組みの法的な位置づけは、法務の確認待ち（[intent.md](../intent.md)）。
 - 外した口座（Customer の削除）は、少なくとも 13 か月は他の Customer に再び割り当てない。古い口座への誤った振込を、別の Customer の入金にしないため。13 か月は仮の値（未検証。提携する銀行の運用と合わせて決める）。

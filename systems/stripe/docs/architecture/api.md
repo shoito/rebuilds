@@ -249,7 +249,7 @@ idempotency_keys（test・live の各クラスタ。テナントテーブル、R
 ### 7.3 手順と決定表
 
 1. 検証（スキーマ、権限、版）。失敗したら記録せずに返す。
-2. `INSERT ... ON CONFLICT DO NOTHING` で `started` の行を作る（`locked_until` = 今 + 60 秒）。
+2. `started` の行を作る（`locked_until` = 今 + 60 秒）。主キーがパーティションの鍵（`created_at`）を含み、パーティションをまたぐ一意を張れないので、`pg_advisory_xact_lock` で `(account_id, key)` を直列にし、直近 48 時間のパーティションに同じキーがないことを確かめてから挿入する（[data-model/audit-and-operations.md](data-model/audit-and-operations.md) の 2.1 節）。
 3. 行が既にあれば、下の表に従う。
 4. 実行する。お金を動かす処理は、内部の冪等キー（ADR-0004 の内部の層）を使う。
 5. 応答を `completed` として保存する。状態を変えた処理では、状態の遷移と同じトランザクションで保存する。コネクタを呼ぶ処理では、コネクタの結果を反映するトランザクションで保存する。

@@ -77,6 +77,8 @@ JPY、手数料 3.6% の例（本家の日本の料金は国内カード 3.6%、
 
 ## 3. 仕訳のスキーマと制約
 
+列・制約・索引の正本は [data-model/ledger.md](data-model/ledger.md)。仕訳の種類と冪等キーの一覧は [data-model/stores.md](data-model/stores.md) の 5 節。
+
 ```sql
 ledger_accounts (id, account_id,           -- 持ち主。プラットフォームは NULL
                  kind, sub_key,             -- 例：kind = connector_receivable, sub_key = 'acq_x'
@@ -92,7 +94,8 @@ journal_entries (id, account_id,           -- 業務上の持ち主の加盟店�
                  idempotency_key,           -- 内部の冪等キー（ADR-0004）
                  effective_at,              -- 会計上の日時。created_at より前にしない
                  reverses_entry_id,         -- 取り消しの仕訳なら元の仕訳
-                 fx_quote_id,               -- 換算があれば（7 節）
+                 fx_quote_id,               -- 換算があれば（10 節）
+                 metadata,                  -- 適用した料金表の版など（7.1 節）
                  created_at,
                  PRIMARY KEY (created_at, id)) PARTITION BY RANGE (created_at)
 
@@ -173,7 +176,7 @@ ledger_balance_slots (ledger_account_id, slot, account_id,
 - **固定**：金額と解放日を決めて `merchant_available` から `merchant_reserved` に移す。解放日に戻す。
 - **ローリング**：決済の純額の N% を、利用可能になる時点で保留し、決済から M 日後に解放する。利用可能への一括の仕訳（5 節）の中で、保留の行も同時に作る。
 - 返金・Dispute が起きた決済にリザーブが残っていれば、それを先に解放して充てる（本家に寄せる）。
-- リザーブの解放の予定は `reserve_holds (account_id, currency, amount, release_on, source_entry_id, released_entry_id)` に持ち、日次のジョブで解放の仕訳を作る。
+- リザーブの解放の予定は `reserve_holds (account_id, reserve_id, currency, amount, release_on, source_entry_id, released_entry_id)`（`reserve_id` は [merchant-onboarding.md](merchant-onboarding.md) の `account_reserves`） に持ち、日次のジョブで解放の仕訳を作る。
 
 ### 4.5 マイナス残高
 

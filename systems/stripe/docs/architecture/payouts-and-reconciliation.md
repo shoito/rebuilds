@@ -209,7 +209,7 @@ payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 AP
 | `recon_matches`、`recon_breaks` | 照合の結果と、ブレイク |
 | `gl_exports` | 会計への出力の履歴（日、ファイルのハッシュ、仕訳の ID の範囲） |
 
-すべて `account_id` を持つ（プラットフォームの行は、プラットフォーム用の `account_id`）。照合と会計の処理は、RLS を迂回できる専用のロールで動かし、その操作は監査ログに残す（[security.md](security.md)）。
+`payout_settings`・`bank_accounts`・`payouts` はテナントテーブル（`account_id` と RLS）。`payout_batches`・`settlement_*`・`bank_statement*`・`recon_*`・`gl_exports` は複数の加盟店にまたがるプラットフォームのテーブルで、RLS の例外にする（[data-model.md](data-model.md) の 3.3 節）。列の正本は [data-model/payouts-and-reconciliation.md](data-model/payouts-and-reconciliation.md)。照合と会計の処理は、RLS を迂回できる専用のロールで動かし、その操作は監査ログに残す（[security.md](security.md)）。
 
 ## 9. Event
 

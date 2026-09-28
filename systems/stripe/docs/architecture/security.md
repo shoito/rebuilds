@@ -47,7 +47,7 @@
 | 境界 | 越えるもの | 主な統制 |
 | --- | --- | --- |
 | B1 エッジ | すべての外部リクエスト | TLS 1.2 以上、HSTS（preload）、WAF（マネージドルール、レート制限）、Shield Standard |
-| B2 テナント | 本体のサービスから DB | `SET LOCAL app.account_id`、FORCE RLS（ADR-0002）。テストと本番は別のクラスタ |
+| B2 テナント | 本体のサービスから DB | `SET LOCAL app.account_id`、FORCE RLS（ADR-0002）。テストと本番は別のクラスタ。RLS の例外のテーブルの一覧の正本は [data-model.md](data-model.md) の 3.3 節 |
 | B3 CDE | 本体と CDE の間 | 本体 → CDE は PrivateLink＋mTLS、CDE → 本体は SQS の `connector-results` だけ（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md)）。CDE の OU の SCP で本体のロールからの `AssumeRole` を拒否。越える識別子は `pm_`（と紐づけの 1 回の `card_input`）だけで、カード番号も `card_ref` も越えない（[card-vault.md](card-vault.md) の 2 節） |
 | B4 管理プレーン | デプロイ、鍵、運用者の操作 | OIDC の短命な認証情報、CDE の経路は別の承認、JIT（ADR-0020）、監査 |
 | B5 Webhook | 加盟店の URL への外向きの送信 | 本体・CDE への経路を持たない専用の egress VPC の Lambda から、Elastic IP 付きの NAT の固定 IP で送る。名前解決後の IP の検査、署名（3.4 節、[ADR-0025](../decisions/0025-webhook-signing-and-isolated-delivery.md)、[infrastructure.md](infrastructure.md) の 2.1 節） |
@@ -148,7 +148,7 @@ Slack の security.md の 3.10・3.11・7.3 節と同じ。加えて次のとお
 
 ## 5. 暗号化と鍵の管理
 
-- **本体**：Slack の ADR-0017 と同じ方式にする。転送中はすべて TLS（内部も）、保存時はデータの種類ごとの KMS の CMK（`db`、`queue`、`files`、`audit`、`backup`、`secrets`、`logs`）。加えて、本人確認の書類の `kyc`、Webhook の署名の秘密の `webhook-secrets`（[events-and-webhooks.md](events-and-webhooks.md) の 7.3 節）を分ける。
+- **本体**：Slack の ADR-0017 と同じ方式にする。転送中はすべて TLS（内部も）、保存時はデータの種類ごとの KMS の CMK（`db`、`queue`、`files`、`audit`、`backup`、`secrets`、`logs`）。加えて、本人確認の書類の `kyc`、Webhook の署名の秘密の `webhook-secrets`（[events-and-webhooks.md](events-and-webhooks.md) の 7.3 節）、銀行の口座番号・名義の列の暗号化の `bank-accounts`（入金先と返金先の口座。2026-09-28 に追加。[data-model.md](data-model.md) の 3.10 節）を分ける。
 - **CDE**：`cde-pan`（DEK を包む）、`cde-fp`（指紋の HMAC）、`cde-sad`（CVC の一時保管）と、CDE のストレージの鍵。役割ごとに使える操作を分ける（ADR-0019、[card-vault.md](card-vault.md) の 4・5 節）。
 - DR のため、`db`・`backup`・`secrets`・`cde-pan`・`cde-sad` はマルチリージョンキー（東京と大阪）にする。
 - 自動のローテーションは年 1 回（KMS の既定）。HMAC 鍵は手動（[card-vault.md](card-vault.md) の 5 節）。

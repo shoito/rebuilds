@@ -118,16 +118,16 @@ Block if :is_3d_secure: and not :is_3d_secure_authenticated:
 
 ```sql
 fraud_rules       (account_id, id, phase, action, source, ast JSONB, traffic_pct,
-                   status, version, created_by, updated_at)          -- account_id NULL はプラットフォーム
+                   status, version, created_by, updated_at)          -- account_id は NOT NULL
 fraud_lists       (account_id, id, alias, item_type, is_default, ...)
 fraud_list_items  (account_id, list_id, value, expires_at, created_by, created_at)
-fraud_evaluations (account_id, payment_attempt_id, phase, outcome, matched_rule_ids,
+fraud_evaluations (account_id, charge_id, phase, outcome, matched_rule_ids,
                    attributes JSONB, risk_score, evaluated_at)        -- 日ごとのパーティション
 reviews           (account_id, id, payment_intent_id, opened_reason, rule_id,
                    status, closed_reason, assigned_to, opened_at, closed_at)
 ```
 
-- すべてテナントテーブル（`account_id` と RLS。ADR-0002）。プラットフォームのルールは別のテーブル `platform_fraud_rules` に置き、RLS の例外を作らない。
+- すべてテナントテーブル（`account_id` と RLS。ADR-0002）。プラットフォームのルールとブロックリストは別のテーブル `platform_fraud_rules`・`platform_fraud_list_items`（RLS の例外）に置き、テナントテーブルに `account_id` が NULL の行を作らない。列の正本は [data-model/fraud.md](data-model/fraud.md)。
 - `fraud_evaluations.attributes` に PAN・CVC は入らない（Fraud は受け取らない）。メール・IP は個人情報として保持期間に従う（ADR-0024）。
 
 ### 4.4 障害時の振る舞い

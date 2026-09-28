@@ -62,12 +62,13 @@
 
   | 向き | 方式 | API・運ぶもの |
   | --- | --- | --- |
-  | 本体 → CDE | PrivateLink（CDE の NLB のエンドポイントサービス）＋mTLS（AWS Private CA の証明書）。許可するのは prod のアカウントだけ | vault-core の `bind_card_input`・`get_card`・`delete_card`、connector-gateway の `authorize` / `capture` / `refund` / `void` / `inquire` / `authenticate_*`。渡すのは `pm_`、`account_id`、金額、参照番号（紐づけのときだけ使い捨ての `card_input`）。応答は表示用の情報と結果だけで、カード番号を含めない |
+  | 本体 → CDE | PrivateLink（CDE の NLB のエンドポイントサービス）＋mTLS（AWS Private CA の証明書）。許可するのは prod のアカウントだけ | vault-core の `bind_card_input`・`get_card`・`set_card_attached`・`delete_card`・`sync_publishable_key`、connector-gateway の `authorize` / `capture` / `refund` / `void` / `inquire` / `authenticate_*`。渡すのは `pm_`、`account_id`、金額、参照番号（紐づけのときだけ使い捨ての `card_input`）。応答は表示用の情報と結果だけで、カード番号を含めない |
   | CDE → 本体 | prod の SQS キュー `connector-results`（キューのポリシーで cde-live・cde-test のロールだけを許す） | コネクタの結果と、カード番号を除いたアクワイアラの通知（[ADR-0014](../decisions/0014-connector-inbox.md)）。CDE から本体へ HTTP で呼ぶ経路は作らない |
 
 - **境界を越える識別子は `pm_` だけ。唯一の例外が `card_input`** で、PaymentMethod の紐づけ（3.1 節の手順 8）の 1 回だけ本体を通る。Vault の内部の `card_ref` は CDE の外に出さない。
   - この例外は 2026-09-28 に確定した（[README.md](README.md) の 6 節の「決定（2026-09-28、推奨案で確定）」）。根拠（2026-09-27 に確かめた）：PAN・有効期限・CVC は、ブラウザの iframe から CDE の vault-ingest へ直接送られ、本体を通らない。本体が受け取るのは `card_input`（`ci_` ＋ 128 bit のランダムな値。PAN から導かない）だけで、カード会員データを含まず、PAN を復元する手がかりにもならない。使い捨てで、30 分で失効し、同じ公開キーからの紐づけにしか使えない。
-  - 紐づけの応答で本体が受け取るのは、表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と加盟店向けの指紋だけ。BIN と下 4 桁と指紋を本体に置く扱いは、QSA に確認する（4 節）。
+  - 紐づけの応答で本体が受け取るのは、表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と、加盟店向けの指紋と内部向けの指紋だけ。内部向けの指紋はプラットフォームの不正検知だけが使い、加盟店に出さない（2026-09-28 の決定。[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) の注記）。BIN と下 4 桁と指紋を本体に置く扱いは、QSA に確認する（4 節）。
+  - 公開可能キーの ID と `account_id` の対応は、本体が `sync_publishable_key` で CDE に写す（`vault_publishable_keys`）。vault-ingest はこれで受け取りの時点の加盟店を決め、加盟店向けの指紋を計算する。公開してよい値で、向きは本体 → CDE なので、境界の規則を変えない（2026-09-28 の決定）。
   - これ以外の値を境界に通すときは、ADR を起票する（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) の 2026-09-27 の注記）。
 - **Checkout のページ（本体）と、Elements を埋め込む加盟店のページは CDE ではない。** ただし Checkout のページは、改ざんされるとカード欄を偽装できるため、CDE のセキュリティに影響する系（connected-to / security-impacting）として扱い、スクリプトの管理（要件 6.4.3）と改ざんの検知（要件 11.6.1）の対象に含める。
 - CDE のデプロイの経路（CI/CD のロール、Terraform の状態、ECR）も CDE と同じ統制に置く（[ADR-0033](../decisions/0033-cde-pipeline-and-change-control.md)、[security.md](security.md) の 8 節）。
@@ -87,15 +88,15 @@ CDE から本体を呼ばない（2 節）ので、`pm_` の作成は「ブラ�
           2. cde-test なら、ブランドのテスト用の番号以外を拒否する（保存もログもしない）
           3. PAN を暗号化（DEK で AES-256-GCM）。DEK は cde-pan の CMK で包む
           4. 指紋を計算（cde-fp の HMAC 鍵。4 節）
-          5. Vault DB に INSERT：card_ref（ランダム）、暗号文、表示用の情報、指紋、公開キーの ID。pm_ は未設定
+          5. Vault DB に INSERT：card_ref（ランダム）、暗号文、表示用の情報、指紋、公開キーの ID と、それから決めた account_id（vault_publishable_keys）。pm_ は未設定
           6. CVC を cde-sad で暗号化し、ElastiCache に TTL 30 分で置く
   ◀── { card_input: "ci_..." }              使い捨て。30 分で失効
   └─▶ POST api.<domain>/v1/payment_methods  （公開キー、type=card、card_input）
         api（本体）
           7. 公開キーを検証し、account_id を決め、pm_ を採番する
           8. PrivateLink で vault-core.bind_card_input(card_input, account_id, pm_, 公開キーの ID)
-             vault-core：card_input が未使用・期限内・同じ公開キーのものかを確かめ、行に pm_ と account_id を書く
-             → 表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と加盟店向けの指紋を返す
+             vault-core：card_input が未使用・期限内・同じ公開キー・同じ account_id のものかを確かめ、行に pm_ を書く
+             → 表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と加盟店向け・内部向けの指紋を返す
           9. payment_methods に INSERT
   ◀── { id: "pm_..." }                      iframe → 加盟店の JS → 加盟店のサーバー
 ```
@@ -157,20 +158,28 @@ Payments（本体）──▶ Connector Gateway.authorize(account_id, pm_, amoun
 
 ### データモデル（CDE）
 
+列・制約・索引の正本は [data-model/card-vault.md](data-model/card-vault.md)。要点は次のとおり。
+
 ```sql
 vault_cards (card_ref PK,                 -- vc_ + 128 bit のランダム。CDE の外に出さない
-             account_id NULL, payment_method_id NULL UNIQUE,   -- 3.1 節の手順 8 で設定
+             account_id,                  -- 受け取りの時点で公開キーから決める（vault_publishable_keys）
+             payment_method_id NULL UNIQUE,                -- 3.1 節の手順 8 で設定
              card_input_hash, card_input_expires_at,        -- 使い捨ての card_input（紐づけで無効にする）
              publishable_key_id,                           -- 受け取ったときの公開キー
-             livemode,
-             pan_ciphertext, dek_id,       -- dek_id → vault_deks
-             pan_fp_internal, bin6, last4, exp_month, exp_year,
-             created_at, last_used_at, attached,   -- attached：Customer に保存済み
+             pan_ciphertext,               -- AWS Encryption SDK のメッセージ（包んだ DEK を含む）
+             edk_hash, cmk_key_id,         -- DEK・CMK の漏洩の疑いで対象の行を探す
+             fp_merchant, fp_internal, bin6, last4, exp_month, exp_year,
+             network_txn_id,               -- MIT 用（payments.md の 11 節）
+             created_at, bound_at, last_used_at, attached,  -- attached：Customer に保存済み
              purge_after)                  -- 6 節
-vault_deks  (dek_id PK, wrapped_dek, cmk_arn, created_at, retired_at)
+vault_publishable_keys (publishable_key_id PK, account_id, status, expires_at)
+vault_bin_ranges       (version, range_start, range_end, brand, funding, country, ...)
+vault_test_cards       (pan_hmac PK, brand, last4, scenario, origin)
 ```
 
 - Vault DB は本体の DB と別のクラスタで、本体のロールは接続できない。RLS は使わず、`account_id` と `payment_method_id` の組の一致を Vault Core と Connector Gateway が確かめる（3.2 節）。
+- cde-live と cde-test は別のクラスタなので、`livemode` の列は持たない。
+- DEK は AWS Encryption SDK の caching CMM が作り、暗号文のメッセージに包んだ形で入る（ADR-0019 の 2026-09-28 の注記）。DEK の表（旧 `vault_deks`）は持たない（2026-09-28 の決定）。
 
 ## 5. 鍵の管理とローテーション
 

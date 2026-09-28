@@ -232,9 +232,9 @@ success_url へ戻す ／ 加盟店のサーバーには checkout.session.comple
 | --- | --- | --- |
 | `checkout_sessions` | `account_id`、`id`、`mode`、`ui_mode`、`status`、`payment_status`、`payment_intent_id`、`setup_intent_id`、`customer_id`、`line_items`、`amount_total`、`currency`、`locale`、`success_url`、`cancel_url`、`return_url`、`expires_at`、`client_secret_hash` | RLS。期限切れはジョブで `expired` にし、`checkout.session.expired` を出す |
 | `checkout_branding` | `account_id`、`logo_file_id`、`icon_file_id`、`brand_color`、`accent_color`、`font`、`shape` | 環境ごと |
-| `konbini_vouchers` | `account_id`、`payment_intent_id`、`voucher_token`、`expires_at` | 払込票のページの ID。店舗の番号は [payment-methods.md](payment-methods.md) の表に置く |
+| `konbini_vouchers` | `account_id`、`payment_intent_id`、`voucher_token_hash`、`confirmation_number`、`store_codes`、`expires_at`、`status` | 払込票のページの ID と、店舗ごとの支払い番号（この表に置く） |
 
-索引は [data-model.md](data-model.md) に載せる。
+列・索引の正本は [data-model/checkout.md](data-model/checkout.md)。
 
 ## 16. 決定と持ち越し（2026-09-26、既定案）
 

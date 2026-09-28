@@ -18,7 +18,7 @@
 | [checkout.md](checkout.md) | ホスト型の決済ページと、埋め込み型の入力部品 |
 | [dashboard.md](dashboard.md) | 加盟店向けのダッシュボード |
 | [security.md](security.md) | 脅威モデル、PCI DSS の統制、暗号化、監査ログ、データのライフサイクル |
-| [data-model.md](data-model.md) | データモデルの索引 |
+| [data-model.md](data-model.md) | データモデルの正本：規約、置き場所、ER 図、テーブルの定義（[data-model/](data-model/) に領域ごと） |
 | [infrastructure.md](infrastructure.md) | AWS の構成、アカウント、ネットワーク、冗長化、災害復旧 |
 | [observability.md](observability.md) | ログ、メトリクス、トレース、SLO |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
@@ -192,3 +192,17 @@ PM の方針（判断が要るところは推奨案でよい）により、法�
 - **ダッシュボードのセッションの長さは、本システムの値（アイドル 12 時間・絶対 7 日）で確定した**。本家の値が公開されていないため（[auth-and-keys.md](auth-and-keys.md) の 3.3 節）。
 - **接続先の選定の条件と、比べる候補の絞り方を決めた**。コネクタ、収納代行、提携銀行、eKYC、不正検知、QSA を、各 Epic の Story で同じ物差しで選ぶため。どの会社にするかは選ばない（[intent.md](../intent.md) の「接続先の選定（法務以外）」）。QSA の最初の審査は、本番の加盟店を受け入れる前に受ける（[security.md](security.md) の 16 節）。
 - **本家の実装を核に使っていないことを確かめた**（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。本家の `stripe-node` は、Webhook の署名の互換を確かめるテストの道具としてだけ使い、製品のコードには入れない（[ADR-0025](../decisions/0025-webhook-signing-and-isolated-delivery.md) の 2026-09-28 の注記）。
+
+### 決定（2026-09-28、データモデル）
+
+データモデルを [data-model.md](data-model.md) と [data-model/](data-model/) にまとめ、列・制約・索引の正本にした（領域の文書は振る舞いの正本）。その際、文書の間の食い違いと抜けを、推奨案で次のとおり決めた。
+
+- **パーティションをまたぐ一意**：PostgreSQL はパーティションの鍵を含まない一意を張れない。`idempotency_keys`・`connector_inbox`・`bank_statement_lines` は、`pg_advisory_xact_lock` で直列にし、直近のパーティションを確かめてから挿入する。`events` は日付の列 `created_on` をパーティションの鍵にし、同じ日の中で `(account_id, idempotency_source, created_on)` を一意にする（主な守りは遷移関数の冪等）。`webhook_deliveries` は `event_created_on` を鍵に含めて一意にする。[api.md](api.md)・[events-and-webhooks.md](events-and-webhooks.md) を揃えた。
+- **`livemode` の列を持たない**（Vault DB を含む）。[payment-methods.md](payment-methods.md)・[card-vault.md](card-vault.md) を揃えた。
+- **DEK の表（`vault_deks`）を持たない。** DEK は AWS Encryption SDK のメッセージに包んだ形で入る（ADR-0019 の注記）。漏洩の疑いの対象は `edk_hash`・`cmk_key_id` で探す。
+- **内部向けの指紋を本体に置く。** 紐づけの応答で返し、`payment_methods.fingerprint_internal` に持つ。プラットフォームの不正検知だけが使い、加盟店に出さない（[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) の 2026-09-28 の注記）。QSA の確認の対象に含める。
+- **公開可能キーの写しを CDE に置く**（`vault_publishable_keys`、本体 → CDE の `sync_publishable_key`）。vault-ingest が加盟店向けの指紋を計算するのに加盟店が要るため。あわせて、保存の状態を CDE に伝える `set_card_attached` を足した（保持の期限の計算に要る）。どちらも本体 → CDE の向きで、境界を越える識別子は変えない。[card-vault.md](card-vault.md) を揃えた。
+- **`security_events` は `audit_events` の `category = 'security'` の行**（ビュー）にする。[auth-and-keys.md](auth-and-keys.md)・[dashboard.md](dashboard.md) を揃えた。
+- **プラットフォームの行はテナントテーブルに入れない。** 不正検知のルール・リストは `platform_fraud_rules`・`platform_fraud_list_items`、入金・照合の加盟店をまたぐ表は RLS の例外にする。RLS の例外の一覧の正本は [data-model.md](data-model.md) の 3.3 節。[fraud.md](fraud.md)・[payouts-and-reconciliation.md](payouts-and-reconciliation.md)・[security.md](security.md) を揃えた。
+- **テナントをまたぐ探索**は、`SECURITY DEFINER` の解決の関数と、読み取りだけの `sweeper` ロールで行う（[data-model.md](data-model.md) の 3.2・3.3 節）。
+- **足りなかった表を最小で定義した**：`connector_routes`、`refund_bank_details`、`vault_publishable_keys`、`vault_bin_ranges`、`vault_test_cards`、`platform_fraud_list_items`。口座番号の列の暗号化に KMS の `bank-accounts` を足した（[security.md](security.md) の 5 節）。
