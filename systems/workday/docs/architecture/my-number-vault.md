@@ -54,7 +54,7 @@
 
 - 保管庫は別の AWS アカウント（[infrastructure.md](infrastructure.md) の 1 節、[ADR-0054](../decisions/0054-accounts-network-and-vault-boundary.md)）。人事の側から保管庫へは、PrivateLink の VPC エンドポイントだけでつながる。保管庫から人事の側へは、書類の生成のときに書類の元のデータを取りに行く読み取りの API（相互 TLS）だけ。
 - 保管庫の画面は別のオリジン（`mn.<tenant>.<brand>.<domain>`）。人事の SPA から別のタブで開く。人事の SPA のコードは番号に触れない（[self-service-ui.md](self-service-ui.md) の 10 節）。
-- 人事の DB の facet（`worker_personal`・`worker_dependents`）は、`mn_ref`（UUIDv7）と `mn_status`（`none`・`registered`・`verified`・`deleted`）だけを持つ。
+- 人事の DB は、有効日付でない表 `mn_links`（人・扶養の親族 → `mn_ref`（UUIDv7）と `mn_status`（`none`・`registered`・`verified`・`deleted`））だけを持つ。状態は保管庫の写しなので facet に入れない（[data-model.md](data-model.md) の 6 節の DM-10）。
 
 ## 4. 収集と本人確認（[ADR-0045](../decisions/0045-my-number-collection-and-identity-verification.md)）
 
@@ -67,7 +67,7 @@
   1. 利用目的の通知を表示（テナントが登録した文面の版）。表示した版を記録
   2. 番号を入力（12 桁。チェックデジットを画面とサーバーで確かめる）
   3. 本人確認の書類を撮影・アップロード（下の表の組み合わせ）
-  4. 送信 ─▶ vault：暗号化して保存（status = registered）。人事の側に mn_ref と registered を通知
+  4. 送信 ─▶ vault：暗号化して保存（status = registered）。人事の側が mn_ref と registered を引き取る（1 分ごと。DM-17）
   ▼
 事務取扱担当者が保管庫の画面で書類を見て確かめる ─▶ verified（方法、書類の種類、確認した人、時刻を記録）
   ▼
@@ -91,7 +91,7 @@
 ### 4.3 扶養の親族
 
 - 扶養控除等申告書に書く扶養の親族の番号は、従業員が保管庫の画面で入れる。扶養の親族の本人確認を事業者が行う必要があるかは、事務の種類による。扶養控除等申告書の親族の番号は、従業員が本人確認を行い、事業者には義務がない。国民年金の第 3 号被保険者の届出は、第 3 号被保険者本人が事業者に出すもので、従業員は代理人として出す（[個人情報保護委員会の Q&A](https://www.ppc.go.jp/legal/policy/faq/) の Q6-2-2・Q1-12、2026-09-28 に確認）。事務ごとに画面の手順をどう分けるかは確認待ち（L46）。
-- 扶養の親族の記録は、人事の facet `worker_dependents` の行の `mn_ref` と結ぶ。扶養から外れたら、10 節の規則で削除の候補になる。
+- 扶養の親族の記録は、人事の `mn_links`（扶養の親族の主体 `dependents` の ID）の `mn_ref` と結ぶ。扶養から外れたら、10 節の規則で削除の候補になる。
 
 ## 5. 保管と暗号（[ADR-0046](../decisions/0046-purpose-bound-vault-api-and-access-log.md)）
 
@@ -230,7 +230,7 @@ mn_access_log (tenant_id, seq bigint, id, at timestamptz, actor_worker_id, on_be
   ▼
 削除：本体の行を消す（番号の暗号文と包んだ DEK と HMAC を消す）。書類の S3 のオブジェクトを消す（版もすべて）
   ▼
-削除の記録（10.3 節）。人事の側に mn_status = deleted を通知
+削除の記録（10.3 節）。人事の側が mn_status = deleted を引き取る（DM-17）
 ```
 
 - 候補が出てから 30 日以内に削除する（NFR-007）。30 日を超えた候補は、テナントの事務取扱責任者と本システムの監視に出す。
@@ -365,5 +365,5 @@ mn_deletions (tenant_id, id, mn_ref, subject_kind, target text,   -- record | do
 | vault Aurora `mn_access_log` | 8 節。追記のみ。ハッシュの連鎖 |
 | vault Aurora `mn_deletions`、`mn_deletion_candidates`、`mn_legal_holds` | 10 節 |
 | vault S3 `docs/{tenant}/{document_id}`、`verification-images/{tenant}/{id}` | `vault-docs` の鍵。Object Lock なし |
-| 人事の Aurora `worker_personal.mn_ref`・`mn_status`、`worker_dependents.mn_ref`・`mn_status` | 3 節 |
+| 人事の Aurora `mn_links`（`mn_ref`・`mn_status`） | 3 節。facet に持たない（DM-10） |
 | 人事の Aurora `mn_handler_designations`（業務プロセスの中身） | 6.3 節 |

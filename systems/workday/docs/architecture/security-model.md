@@ -458,7 +458,8 @@ EXISTS (SELECT 1 FROM org_closure c
 | Aurora `security_policy_versions` | 8 節。有効化した版は書き換えない |
 | Aurora `security_groups`、`security_group_members` | 4.1 節、7.2 節。所属は有効日付 |
 | Aurora `security_effective_grants` | 7.2 節。派生 |
-| Aurora `sod_rules`（方針の版の一部）、`sod_violations` | 5 節 |
+| `security_policy_versions.body` の `sod_rules`（表は持たない。システムの規則はコードの定数）、Aurora `sod_violations` | 5 節 |
+| Aurora `security_membership_versions` | 7.3 節。人ごとの所属の版（キャッシュのキー） |
 | Aurora `proxy_sessions` | 9 節 |
 | Valkey `authz:{tenant}:{worker}:{policy_version}:{membership_version}` | 7.3 節。失われてもよい |
 | 監査ログの事象 `security.*`・`access.sensitive_read`・`access.denied_summary` | 10.1 節（[audit-and-retention.md](audit-and-retention.md)） |

@@ -32,7 +32,8 @@ pay_groups (tenant_id, id, company_id, code, frequency text,   -- monthly (MVP)
             pay_date_rule jsonb,   -- e.g. {"month_offset": 0, "day": 25, "if_holiday": "previous_business_day"}
             time_period_link text, -- same_as_payroll | previous_period
             si_deduction_timing text,  -- next_month (default) | same_month  (payroll-jp-rules 4.5)
-            calendar_id, valid daterange)
+            calendar_id, go_live_on date,  -- integrations-and-bulk 4.2
+            valid daterange)
 pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cutoff_date,
              time_period_id, state)
 ```
@@ -144,7 +145,7 @@ pay_items (tenant_id /* null = system */, code, version, name,
 pay_item_sets (tenant_id, pay_group_id, version, item_refs jsonb, activated_at, activated_by)
 ```
 
-- 法定の項目（源泉所得税、社会保険料、雇用保険料、住民税、割増賃金の最低、非課税の通勤手当の上限の判定）は `owner = system`。テナントは式を変えられない。システムの行は `tenant_id` が空で、全テナントが読むだけの RLS の部分の例外にし、コードに `jp.` の接頭辞を付ける（[data-model.md](data-model.md) の 3.1 節）。割増の率は法定より高くだけできる（[payroll-jp-rules.md](payroll-jp-rules.md) の 7 節）。
+- 法定の項目（源泉所得税、社会保険料、雇用保険料、住民税、割増賃金の最低、非課税の通勤手当の上限の判定）は `owner = system`。テナントは式を変えられない。システムの行は `tenant_id` が空で、全テナントが読むだけの RLS の部分の例外にし、コードに `jp.` の接頭辞を付ける（[data-model.md](data-model.md) の 3.3.1 節）。割増の率は法定より高くだけできる（[payroll-jp-rules.md](payroll-jp-rules.md) の 7 節）。
 - フラグは、どの法定の計算の基礎に入るかを決める。例：通勤手当は `si_remuneration`・`ei_wage` を持ち、`taxable` は持たない（非課税の上限を超える分はシステムの項目が課税に移す）。フラグの誤りは税と保険の誤りになるので、項目の版の有効化に給与の担当の承認を要する（`pay_item_change` の業務プロセス）。
 - 法定外の控除（組合費、社宅の費用など）は `requires_art24_agreement` を持ち、労使協定の記録（24 条 1 項ただし書）がテナントになければ有効化を拒む。
 
@@ -197,12 +198,12 @@ pay_item_sets (tenant_id, pay_group_id, version, item_refs jsonb, activated_at, 
 ### 6.4 結果
 
 ```sql
-payroll_results (tenant_id, id, run_id, employment_id, status text,     -- ok | error | excluded
+payroll_results (tenant_id, id, pay_date date /* partition key */, run_id, employment_id, status text,  -- ok | error | excluded
                  input_hash bytea, rule_versions_hash bytea, engine_digest text, config_version_id,
                  gross bigint, total_deductions bigint, net bigint, computed_at,
                  superseded_by uuid,  -- only within a run before finalize (recompute_one)
-                 UNIQUE (tenant_id, run_id, employment_id) WHERE superseded_by IS NULL)
-payroll_result_lines (tenant_id, result_id, seq, item_code, item_version, amount bigint,
+                 UNIQUE (tenant_id, run_id, employment_id, pay_date) WHERE superseded_by IS NULL)
+payroll_result_lines (tenant_id, result_id, pay_date, seq, item_code, item_version, amount bigint,
                       quantity numeric, rate text, basis jsonb,
                       retro_period date, retro_of_result_id uuid)
 ```
@@ -260,7 +261,7 @@ DT-PAY-003（遡及の差の扱い。上から評価。法令の扱いは [payro
 ```
 freeze ─▶ inputs (S3, per employee) ─▶ chunk manifest (employment_id order, 250 each)
       ─▶ SQS (chunk ids) ─▶ Payroll Compute (ECS tasks × worker threads)
-      ─▶ results/{run}/{chunk}.jsonl + sha256 (S3) ─▶ Loader (Worker): 1 tx per chunk ─▶ payroll_results
+      ─▶ payroll-results/{tenant}/{run}/{chunk}.jsonl + sha256 (S3) ─▶ Loader (Worker): 1 tx per chunk ─▶ payroll_results
 ```
 
 - 束は、雇用の ID の順に 250 人ずつ（既定。E12 の負荷試験で決める）。束の中身は `payroll_chunks (run_id, chunk_no, employment_ids, manifest_hash)` に記録し、再試行でも変えない。
@@ -435,5 +436,5 @@ DT-PAY-004（`in_review` で全員に行う。当たる行をすべて出す）�
 | Aurora `payroll_results`、`payroll_result_lines` | 6.4 節。確定の後は書き換えない。月ごとのパーティション |
 | Aurora `retro_candidates` | 7.1 節 |
 | Aurora `legacy_payroll_results`、`legacy_item_map`、`parallel_diffs`、`parallel_run_gates` | 10 節 |
-| S3 `payroll-inputs/{tenant}/{sha256}.json`、`payroll-results/{run}/{chunk}.jsonl` | 5.2・9 節。SSE-KMS（テナントの鍵）。大阪へ複製 |
+| S3 `payroll-inputs/{tenant}/{sha256}.json`、`payroll-results/{tenant}/{run}/{chunk}.jsonl` | 5.2・9 節。SSE-KMS（テナントの鍵）。大阪へ複製 |
 | ECR のエンジンのイメージ | 5.3 節。保存の期間の間消さない |

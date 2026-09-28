@@ -67,6 +67,8 @@ worker_job (tenant_id, worker_id, valid daterange, position_id, ..., version_id,
               REFERENCES organization (tenant_id, id, PERIOD valid))
 ```
 
+> 2026-09-28 の注記（名前の対応）：上の例の列の名前は、データモデルの正本（[data-model.md](../architecture/data-model.md) の 6 節の DM-8、[data-model/temporal.md](../architecture/data-model/temporal.md)）で次のとおり読み替える。`worker_id` → `subject_id`（facet によらず主体の ID）、`event_id` → `case_id`（業務プロセスの案件）、`rescinded_by_event_id` → `rescinded_by_case_id`、`superseded_by_event_id` → `superseded_by_case_id`、`job_id` → `job_profile_id`、`grade` → `grade_id`、参照先の `organization (tenant_id, id, ...)` → `organization (tenant_id, subject_id, ...)`。決定の中身は変えていない。例は起票の時の記録として残す。
+
 - **差分を畳み込む。** 変更が入ったら、その主体・facet の差分のうち取消されていないものを、有効日と `seq` の順に並べ、影響を受ける日付から後の期間を作り直す。作り直した期間のうち、前と違うものだけを新しい版として追記し、古い版に `superseded_at` を書く。
   - 例：4 月 1 日付の等級の変更（将来日付）が入っている状態で、3 月 1 日付の所属の変更を後から入れる。所属の差分は 3 月 1 日から効き、4 月 1 日の等級の差分は所属に触れないので、4 月 1 日以降の期間も新しい所属になる。期間を丸ごと複製して持つ方式では、ここで 4 月以降の所属が古いまま残る誤りが起きやすい。
 - **現在の知識のテーブル**は、版のうち置き換えられていないものと同じ内容を持つ。PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS` の主キー、`PERIOD` の外部キー）で、期間の重なりと、参照先（組織、ポジション）が存在しない期間への所属を DB で拒む。Aurora で使えなければ、`EXCLUDE USING gist` と、トリガーでの包含の検査で代える（E1 の PoC）。

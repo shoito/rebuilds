@@ -493,6 +493,6 @@ DT-TIME-002 の行は、少なくとも次の境界を持つ：1 日 480 分ち�
 | Aurora `time_clock_corrections`、`time_objective_logs`、`time_divergences` | 3.3・3.4 節 |
 | Aurora `work_rules`（版）、facet `employment_work_rule`、`shift_patterns`、`shift_assignments` | 4 節 |
 | Aurora `work_day_results` | 5.8 節。版の追記 |
-| Aurora facet `overtime_agreements`、`overtime_alerts` | 6 節 |
+| Aurora `overtime_agreements`（事業所ごとの期間つきの行。facet ではない。DM-11）、`overtime_alerts` | 6 節 |
 | Aurora `time_periods`、`time_period_summaries` | 7 節。集計の版とハッシュ |
 | ブラウザ IndexedDB `pending_clock_events` | 3.2 節。送信の前の一時の保存 |

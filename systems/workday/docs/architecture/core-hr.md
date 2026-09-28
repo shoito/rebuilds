@@ -125,7 +125,7 @@ CREATE INDEX ON org_closure USING gist (tenant_id, descendant_id, valid);
 | 表 | 内容 | 有効日付 |
 | --- | --- | --- |
 | `job_families`・`job_profiles` | 職種と職務（名前、職務の等級の範囲、管理監督者に当たりうるかの印、既定の雇用区分） | `job_profile` の facet |
-| `grades` | 等級と号俸の表（テナントが定義） | facet |
+| `grades` ＋ `grade_detail` | 等級と号俸の表（テナントが定義）。`grades` は主体、中身は facet `grade_detail` | `grade_detail` の facet |
 | `positions` ＋ `position_detail` | ポジション（所属の監督組織、職務、事業所、コストセンター、状態 `open`・`filled`・`frozen`・`closed`、自動で作ったかの印） | facet（gapped） |
 
 - ポジションには同時に 1 人（MVP）。ジョブシェアは持たない。
@@ -384,9 +384,11 @@ CREATE INDEX ON org_closure USING gist (tenant_id, descendant_id, valid);
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `workers`、`employments`、`job_assignments` | 3.1 節の変わらない属性。`employee_number` はテナントで一意 |
+| Aurora `workers`、`employments`、`job_assignments` | 3.1 節の変わらない属性。1 つの `employee_number` は 1 人だけを指す（再雇用の同じ番号は許す） |
+| Aurora `worker_address_subjects`、`dependents`、`emergency_contacts` | 住所の種類・扶養の親族・緊急連絡先ごとの facet の主体 |
+| Aurora `employment_terminations` | 5.4 節。退職の理由・通知の日・警告への理由（労働者名簿の退職の事由） |
 | Aurora facet（3 つのテーブルずつ）：`worker_personal`、`worker_address`、`worker_contact`、`worker_dependents`、`worker_emergency_contacts`、`employment_status`、`employment_contract`、`employment_primary_job`、`worker_job`、`worker_compensation`、`worker_payment_election` | 3.3 節 |
-| Aurora facet：`organization`、`org_parent`、`position_detail`、`job_profile`、`grades`、`org_role_assignment` | 4 節 |
+| Aurora facet：`organization`、`org_parent`、`position_detail`、`job_profile`、`grade_detail`、`org_role_assignment` | 4 節。主体の表は `organizations`・`positions`・`job_profiles`・`grades`・`org_role_assignments`（[data-model/core-hr.md](data-model/core-hr.md)） |
 | Aurora `org_closure` | 4.2 節。派生。`WITHOUT OVERLAPS` の主キー |
 | Aurora `organizations`、`positions`（変わらない属性） | 4 節 |
 | Aurora `leave_of_absence_types`（休職の種類）、`termination_reasons` | 5.2・5.4 節。テナントの設定 |

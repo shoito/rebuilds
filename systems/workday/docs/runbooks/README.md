@@ -198,7 +198,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | [disaster-recovery.md](disaster-recovery.md)、`payday-peak-capacity.md` |
 | [delivery.md](../architecture/delivery.md) | [deploy-and-rollback.md](deploy-and-rollback.md)、`statutory-rate-calendar.md` |
 | [observability.md](../architecture/observability.md) | アラートの条件の実装側（5.2 節） |
-| [data-model.md](../architecture/data-model.md) | 索引のみ。運用の対象は各領域の文書で扱う |
+| [data-model.md](../architecture/data-model.md) | データモデルの正本。運用の対象は各領域の文書で扱う（保存の期間の削除は `retention-purge-run.md`） |
 
 ## 5. 定期作業と訓練
 

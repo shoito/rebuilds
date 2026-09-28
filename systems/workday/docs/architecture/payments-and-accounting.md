@@ -97,7 +97,7 @@ payment_instructions (tenant_id, id, run_id, result_id, employment_id, seq small
 
 ### 3.7 振込以外の支払い
 
-- 同意のない人、口座の検査で落ちた人、振込の不能の人は、「振込以外の支払い」の一覧（現金など）に出す。支払ったことの記録（日付、方法、受け取りの確認）を担当が入力する。
+- 同意のない人、口座の検査で落ちた人、振込の不能の人は、「振込以外の支払い」の一覧（現金など）に出す。支払ったことの記録（日付、方法、受け取りの確認）を担当が入力する（`manual_payments`）。
 
 ## 4. 給与明細（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)）
 
@@ -379,4 +379,4 @@ gl_export_batches (tenant_id, id, company_id, seq int, entry_ids uuid[], format 
 | Aurora `payslips`、`payslip_delivery_consents` | 4 節 |
 | Aurora `wage_ledger`（ビュー） | 6 節 |
 | Aurora `gl_account_maps`（版）、`payroll_journal_entries`、`payroll_journal_lines`、`gl_export_batches`、`si_premium_notices` | 7 節。仕訳は追記のみ・遅延制約で釣り合い |
-| S3 `bank-files/{tenant}/{file_id}`（専用の KMS の鍵）、`payslips/{tenant}/{id}.json|.pdf`、`gl-exports/{tenant}/{seq}.csv` | 大阪へ複製 |
+| S3 `bank-files/{tenant}/{file_id}`（専用の KMS の鍵）、`payslips/{tenant}/{id}.json|.pdf`、`gl-exports/{tenant}/{company_id}/{seq}.csv` | 大阪へ複製 |

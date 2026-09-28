@@ -50,9 +50,9 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `terraform-layout-and-policy-checks` | ルートモジュールの分け方、状態ファイル、plan のポリシー検査（payroll の経路表、`vault-mn` の復号、KMS の削除の待ち、Object Lock。同 10 節） |
 | `kms-keys-and-policies` | 用途ごとの KMS の鍵、キーポリシー、大阪のレプリカ、テナントの鍵の作成の処理（[ADR-0052](decisions/0052-kms-key-hierarchy.md)） |
 | `ecs-services-baseline` | ECS のサービスの骨格（api、bp-worker、worker、relay、loader、egress-worker、audit-archiver）、ARM64、ログ、ADOT |
-| `aurora-and-rls` | Aurora PostgreSQL 18、テナントの表と FORCE RLS、`SET LOCAL app.tenant_id`、DB のロール（[data-model.md](architecture/data-model.md) の 2 節） |
+| `aurora-and-rls` | Aurora PostgreSQL 18、テナントの表と FORCE RLS、`SET LOCAL app.tenant_id`、DB のロール（[data-model.md](architecture/data-model.md) の 3.2 節） |
 | `temporal-constraints-poc` | PoC：Aurora の実際の版で `WITHOUT OVERLAPS`・`PERIOD`・`btree_gist`・RLS の組み合わせ。書き込みの関数の権限の方式（[object-model-and-effective-dating.md](architecture/object-model-and-effective-dating.md) の 4 節） |
-| `migration-ci-guards` | マイグレーションの CI：`tenant_id`・RLS・RLS の例外の許可リスト（data-model の 3 節）、列の `pii_class`（DM-7）、有効日付の 3 つのテーブル、追記のみの表の権限（[ADR-0051](decisions/0051-threat-model-and-pii-classification.md)） |
+| `migration-ci-guards` | マイグレーションの CI：`tenant_id`・RLS・RLS の例外の許可リスト（data-model の 3.3 節）、列の `pii_class`（DM-7）、有効日付の 3 つのテーブル、追記のみの表の権限（[ADR-0051](decisions/0051-threat-model-and-pii-classification.md)） |
 | `packages-money` | `Yen`・`Dec`（小数 10 桁）、按分、名前付きの丸めの枠、表示の関数。給与の lint（[ADR-0001](decisions/0001-platform-and-stack.md)、[ADR-0027](decisions/0027-pay-item-graph-and-formula-language.md)） |
 | `ci-baseline` | PR の CI：決定表を `spec.md` から読む表駆動の仕組み、性質ベーステスト、要件 ID と `THR-` の追跡、ゴールデンデータセットの枠（空の事例で動く）、merge queue（[delivery.md](architecture/delivery.md) の 2 節） |
 | `flags-appconfig` | release・payroll・ops・permission の 4 種類のフラグ、テナントのカナリア、ガード（[delivery.md](architecture/delivery.md) の 8 節） |

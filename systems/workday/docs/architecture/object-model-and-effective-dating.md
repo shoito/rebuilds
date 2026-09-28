@@ -51,7 +51,8 @@ interface Delta<F> {
 
 interface FacetSpec<F> {
   name: string;                // e.g. "worker_job"
-  subject: "worker" | "employment" | "job_assignment" | "position" | "organization" | "role_assignment";
+  subject: "worker" | "address" | "dependent" | "emergency_contact" | "employment" | "job_assignment"
+         | "position" | "organization" | "role_assignment" | "job_profile" | "grade";   // data-model DM-9
   fields: z.ZodType<F>;        // full-state schema, validated after each fold step
   gapPolicy: "contiguous" | "gapped";
   coverage?: { facet: string; mode: "within" };   // e.g. worker_job within employment
@@ -112,7 +113,7 @@ CREATE TABLE worker_job_versions (
   subject_id      uuid        NOT NULL,
   valid           daterange   NOT NULL CHECK (NOT isempty(valid)),
   state           jsonb       NOT NULL,    -- full folded state (typed columns below for FK/query)
-  position_id     uuid, job_profile_id uuid, org_id uuid, grade text, ...,
+  position_id     uuid, job_profile_id uuid, org_id uuid, grade_id uuid, ...,
   source_change_ids uuid[]    NOT NULL,    -- deltas that produced this state
   recorded_at     timestamptz NOT NULL,
   superseded_at   timestamptz,
@@ -129,7 +130,7 @@ CREATE TABLE worker_job (
   employment_id uuid     NOT NULL,          -- fixed per job assignment; used for coverage
   valid        daterange NOT NULL,
   version_id   uuid      NOT NULL,
-  position_id  uuid, job_profile_id uuid, org_id uuid, grade text, ...,
+  position_id  uuid, job_profile_id uuid, org_id uuid, grade_id uuid, ...,
   PRIMARY KEY (tenant_id, subject_id, valid WITHOUT OVERLAPS),
   FOREIGN KEY (tenant_id, employment_id, PERIOD valid)
     REFERENCES employment_status (tenant_id, subject_id, PERIOD valid),
@@ -151,7 +152,7 @@ CREATE TABLE worker_job (
 
 ### 4.1 facet の一覧（初期）
 
-facet の中身は [core-hr.md](core-hr.md) の 3 節で決める。この領域は、共通の性質だけを決める。
+facet の中身は [core-hr.md](core-hr.md) の 3 節で決める。この領域は、共通の性質だけを決める。全 22 個の一覧と列の定義は [data-model/temporal.md](data-model/temporal.md) の 3 節にある（下の表は初期の主なもの）。
 
 | facet | 主体 | 隙間 | coverage | 備考 |
 | --- | --- | --- | --- | --- |

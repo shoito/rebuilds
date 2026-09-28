@@ -38,7 +38,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 - [ ] **有効日付のデータを書く要件は、変更・過去日付の変更・訂正・取消の 4 つのシナリオと、同じ日の順序（`seq`）を持つ**。性質（`PROP-...`）が、参照のモデルと比べられる形で書かれている
 - [ ] **人事のデータを変える要件は、業務プロセスの種類と、承認の既定と、職務分掌の行を指している**（[architecture/business-process-engine.md](architecture/business-process-engine.md) の 3.1 節、[architecture/security-model.md](architecture/security-model.md) の 5.1 節）
 - [ ] **データを返す経路を足す要件は、同じ判定（`can`・`scopeFilter`・`project`）を通すことと、4 つの主体（権限のない人、範囲の外の人、別のテナントの人、退職から 3 年を過ぎた人の機微なドメイン）のシナリオを持つ**
-- [ ] **新しい表は `tenant_id` と FORCE RLS と列の `pii_class` を持つか、[architecture/data-model.md](architecture/data-model.md) の 3 節に理由つきで載っている**
+- [ ] **新しい表は `tenant_id` と FORCE RLS と列の `pii_class` を持つか、[architecture/data-model.md](architecture/data-model.md) の 3.3 節に理由つきで載っている**
 - [ ] 個人情報（氏名、住所、額、口座、扶養、休職の種類）とマイナンバーを、ログ・メトリクス・通知の本文・URL・エラーの本文に出さないことが書かれている
 - [ ] 拒否の側のテスト（`THR-NNN`）が要るか。新しい脅威なら [architecture/security.md](architecture/security.md) の 3 節に行を足す
 - [ ] 非機能要件（NFR）への影響が、実装を見ずに判定できる値で書かれている

@@ -1,6 +1,6 @@
 # Architecture: Workday
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。データの置き場所の索引は [data-model.md](data-model.md)、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。データモデルの正本は [data-model.md](data-model.md)、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -234,6 +234,7 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 - **技術スタック**：画面にサーバーでの描画（SSR）は要らない。明細は保存した文書を画面で描き、PDF は確定のときに決定的に作る（4 節、[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)、[ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)）。
 - **休職の持ち主**：休職・復職は core-hr の `employment_status` と `leave_start`・`leave_return` が持ち、休暇の領域は読むだけ（[ADR-0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md)）。7 節の表と [core-hr.md](core-hr.md) の持ち越しを直した。
 - **データモデル**（[data-model.md](data-model.md) の 6 節）：休職の種類を `leave_of_absence_types` に改名（DM-1）。`pay_items` のシステムの行は同じ表で、RLS の部分の例外として 3 節の表に載せた（DM-2）。Better Auth の表はテナントの外に置き、理由と補う統制を書いた（DM-3）。住民税の通知・並行稼働の表の保存の期間を決めた（DM-4）。退職者の閲覧は、機微でないドメインは保存の期間（既定 5 年）の間、機微なドメインは退職から 3 年まで組織の範囲で見られる（DM-5）。口座の HMAC を `worker_payment_election` に足した（DM-6）。
+- **データモデルを正本にした**（[data-model.md](data-model.md) と [data-model/](data-model/temporal.md)。6 節の DM-8〜DM-17）：facet の 3 つの表の列の名前を `subject_id`・`case_id` に揃えた（DM-8。ADR-0002 に注記）。人の中の複数の主体・職務・等級の主体の表を置いた（DM-9）。`mn_ref`・`mn_status` を facet から有効日付でない `mn_links` に移し（DM-10）、保管庫の状態は人事の側が引き取る形にした（DM-17）。時間を持つ表を 5 つの形に分け、`overtime_agreements` は期間つきの行にした（DM-11）。人事の側の HMAC の鍵を `tenant_keys` に置いた（DM-12）。全文検索の製品を置かない（DM-13）。定義のなかった表を最小の形で足した（DM-14）。給与の結果のパーティションの鍵を `pay_date` にした（DM-15）。採用・福利厚生の加入などは表を作らない（DM-16）。
 - **業務プロセスの種類**：各領域が足した種類（`time_correction`、`time_period_reopen`、`overtime_agreement_change`、`annual_leave_designation`、`special_leave_grant`、`leave_balance_adjustment`、`leave_policy_change`、`pay_item_change`、`si_grade_change`、`bonus_entry` など）と、`payroll.retro_override` の権限を、[business-process-engine.md](business-process-engine.md) の 3.1 節に集めた。
 - **権限**（[security-model.md](security-model.md)）：規則表の運用者の権限 `rules.import`・`rules.verify`・`rules.publish` と、取り込みと照合を分ける職務分掌の規則 S8 を足した。集計だけの操作 `aggregate` を足し、必ず少人数の抑止を通す。`security.admin` のドメインを一覧に足した。
 - **支給日の前の口座の変更**：[security.md](security.md) の THR-020 の提案を採り、給与の確認の検査に「支給日の 10 営業日前より後の振込先の変更」の警告を足した（[payroll-engine.md](payroll-engine.md) の DT-PAY-004 の #10）。
@@ -283,7 +284,7 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 | [observability.md](observability.md) | 計装と個人情報を出さない 4 層、SLI、給与の実行の里程標、合成の給与の実行、ログの走査、アラートと runbook、合成監視 | 0058〜0059 | Ops | E1、E6、E8、E10〜E12 |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、予定のスケール、同時の上限、クォータ、負荷試験の計画 | 0060 | Ops | E1、E6、E8、E12 |
 | [delivery.md](delivery.md) | CI、`security:sensitive`、ゴールデンデータセットの CI、デプロイ、規則表のリリースと改正の暦、フラグ、支給日の前の凍結 | 0061〜0063 | QA、Ops | E1、E8、E12 |
-| [data-model.md](data-model.md) | データの置き場所の索引、横断の規則、RLS の例外、outbox の事象 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/temporal.md) | データモデルの正本：規約（ID、テナントと RLS、有効日付、暗号）、置き場所、全体と領域ごとの ER 図、テーブルの定義、DB 以外の置き場所の形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 
 - 領域の範囲はすべて使い切った。**MVP の後の Epic の ADR は 0064 から順に振る。** E13（年末調整と法定調書）は 0064〜0066 を予約する。E14 以降は、着手のときにこの表に行を足してから採番する。
 
