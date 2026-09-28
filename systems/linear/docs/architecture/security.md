@@ -104,7 +104,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 | # | 種類 | 脅威 | 対策 |
 | --- | --- | --- | --- |
-| D1 | I | RLS の外し忘れ、ワークスペースの条件のない問い合わせ | マイグレーションの CI（新しい表の `workspace_id` と FORCE RLS）、RLS の外の表の許可リスト（[data-model.md](data-model.md) の 3 節） |
+| D1 | I | RLS の外し忘れ、ワークスペースの条件のない問い合わせ | マイグレーションの CI（新しい表の `workspace_id` と FORCE RLS）、RLS の外の表の許可リスト（[data-model.md](data-model.md) の 5 節） |
 | D2 | I | OpenSearch（RLS の外）での漏れ | 検索の関数で必ず `workspace_id` と `groups` を付け、結果を読み直す（ADR-0031） |
 | D3 | I | 添付の署名付きの URL の漏れ | 5 分、画面で毎回取り直す、ログに書かない |
 | D4 | I | バックアップ・段置き・書き出しのファイルの漏れ | KMS、非公開のバケット、期限（9 節） |
@@ -196,7 +196,7 @@ ADR-0047。
 | 系統 | 記録するもの | 置き場所 |
 | --- | --- | --- |
 | ワークスペースの監査（`audit_events`） | ログインの手段の制限の変更、メンバーの招待・停止・ロールの変更、チームの作成・削除・公開の切り替え、管理者の非公開のチームへの参加（`admin_joined_private_team`）、API キー・OAuth のアプリ・Webhook・連携の作成・取り消し、書き出し、インポートとその取り消し、遠隔の消去、ワークスペースの削除の依頼と取り消し | Aurora（ワークスペースの表、RLS）→ log-archive |
-| プラットフォームの監査（`platform_audit_events`） | 運用者の本番へのアクセス、サポートの参照（8 節）、`sync_epoch` を上げた操作、DR での権限を狭める操作のやり直し（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)）、ワークスペースの PITR での戻し、リーガルホールド、ワークスペースの停止、break-glass | 同上（RLS の外。[data-model.md](data-model.md) の 3 節） |
+| プラットフォームの監査（`platform_audit_events`） | 運用者の本番へのアクセス、サポートの参照（8 節）、`sync_epoch` を上げた操作、DR での権限を狭める操作のやり直し（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)）、ワークスペースの PITR での戻し、リーガルホールド、ワークスペースの停止、break-glass | 同上（RLS の外。[data-model.md](data-model.md) の 5 節） |
 | AWS の操作 | CloudTrail（組織の証跡） | log-archive |
 | 認証のイベント | ログインの成功・失敗、セッションの取り消し（[accounts-and-auth.md](accounts-and-auth.md)） | `audit_events` の `auth.*` の種類 |
 
@@ -251,6 +251,8 @@ ADR-0048。**期間はすべて既定案で、法務の確認（L5・L7）で確
 | RUM の集計 | 13 か月（集計の値だけ） | 自動 |
 | `client_devices` | 最後の報告から 180 日 | 削除 |
 | `notification_keys` | 30 日 | パーティションを落とす |
+| `notification_deliveries`（送り終えた行） | 30 日 | 削除（[data-model/views-and-notifications.md](data-model/views-and-notifications.md)。2026-09-28 に足した） |
+| `attachment_purges`（消した添付の S3 の鍵の台帳） | 中身を消すまで（削除から 30 日） | 削除（[data-model/issues.md](data-model/issues.md)。2026-09-28 に足した） |
 | `convergence_audits`・`convergence_mismatches` | 90 日・1 年（中身を含めない） | パーティションを落とす・削除 |
 | `narrowing_outbox`、DynamoDB の `narrowing_journal` | 送った行は 7 日、記録は 35 日（バックアップと同じ。ID と列挙の値だけで中身を含めない） | 削除、TTL |
 | 配信の監査の抜き取り（S3） | 90 日 | S3 のライフサイクル |

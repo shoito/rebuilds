@@ -308,7 +308,7 @@ ADR-0016。
 ### 9.3 ブラウザに消されたとき
 
 - ブラウザの消去はオリジンのデータを全部まとめて消す（MDN）。登録も `_meta` も消えるので、手元だけでは、未送信があったことが分からない。
-- そこで、サーバーが HttpOnly のクッキー `<brand>_cid`（端末の ID、乱数）を設定する。Gateway は、握手と `status` の度に、端末の ID ごとに最後に報告された未送信の件数を持つ（`client_devices` の表。端末の ID はワークスペースを決める前に引くので RLS の外に置き、行は `(device_id, account_id, workspace_id)` ごとにする。[data-model.md](data-model.md) の 3 節）。
+- そこで、サーバーが HttpOnly のクッキー `<brand>_cid`（端末の ID、乱数）を設定する。Gateway は、握手と `status` の度に、端末の ID ごとに最後に報告された未送信の件数を持つ（`client_devices` の表。端末の ID はワークスペースを決める前に引くので RLS の外に置き、行は `(device_id, account_id, workspace_id)` ごとにする。[data-model.md](data-model.md) の 5 節）。
 - 手元の DB がない状態で握手したとき、その端末の ID に未送信の報告があれば、`welcome.lost_local = {pending, reported_at}` を返し、画面で「この端末の未送信の変更 n 件が、ブラウザにより消去されました」と示す。
 - Safari の 7 日の消去は、サーバーが設定したクッキーを消さない（MDN）ので、この仕組みが働く。
 - 未送信の中身はサーバーにないので、取り戻せない。見せるのは件数だけである。

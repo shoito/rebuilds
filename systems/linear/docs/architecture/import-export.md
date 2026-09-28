@@ -153,7 +153,7 @@ DT-IMPORT-002。`origin = import` のトランザクションだけに許すこ�
 | # | 項目 | 普通 | `import` |
 | --- | --- | --- | --- |
 | 1 | `created_at` | Writer の確定の時刻（`server_only`） | 操作の値を受ける（今より 1 日先まで。過去の制限なし） |
-| 2 | 作者（`creator_id`、コメントの `user_id`） | `actor` | 操作の値を受ける（そのワークスペースの `User`） |
+| 2 | 作者（`creator_id`、コメントの `author_id`） | `actor` | 操作の値を受ける（そのワークスペースの `User`） |
 | 3 | `completed_at`・`canceled_at` | 派生（ADR-0025） | 操作の値を受ける。なければ派生 |
 | 4 | Triage の入り口 | DT-ISSUE-002 | 操作の `state_id` のまま |
 | 5 | 通知 | 通知係が作る | 作らない（通知係が `origin = import` を飛ばす） |
@@ -306,8 +306,8 @@ ADR-0045。
 | `import_secrets`（サーバーだけ） | 元の認証の暗号文（ジョブの後に消す） | 3 |
 | `export_jobs`（`ExportJob`） | 書き出しのジョブ（`user:<id>`） | 7 |
 | S3 `ws/<workspace_id>/imports/…`・`exports/…` | 段置き（30 日）、書き出し（24 時間） | 3、7 |
-| data-model-and-schema・sync-engine への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | `origin = import` の Writer の扱い（DT-IMPORT-002）：`created_at`・作者・`completed_at` を操作の値で受ける | 5.2 |
-| issues-and-workflow への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | `Issue.creator_id` が `server_only` なら、`import` で受ける例外を DT-ISSUE の表に足す | 5.2 |
+| data-model-and-schema・sync-engine への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | `origin = import` の Writer の扱い（DT-IMPORT-002）：`created_at`・作者・`completed_at` を操作の値で受ける | 5.2 |
+| issues-and-workflow への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | `Issue.creator_id` が `server_only` なら、`import` で受ける例外を DT-ISSUE の表に足す | 5.2 |
 
 ## 出典
 

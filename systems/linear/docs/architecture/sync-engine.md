@@ -233,16 +233,18 @@ COMMIT;
 CREATE TABLE tx_results (
   workspace_id  uuid        NOT NULL,
   client_tx_id  uuid        NOT NULL,
+  created_on    date        NOT NULL,   -- パーティションの鍵（記録した日）
   status        smallint    NOT NULL,   -- 1 = ok, 2 = rejected
   sync_id       bigint,                 -- ok のとき、最後の sync_id
   reject_code   text,
   server_ops    jsonb,                  -- Writer が書き換えた値（並びの鍵など）
   created_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (workspace_id, client_tx_id)
-);
+  PRIMARY KEY (workspace_id, client_tx_id, created_on)
+) PARTITION BY RANGE (created_on);
 ```
 
 - 90 日持つ（ADR-0005）。日ごとのパーティションで持ち、古いものを落とす。
+- パーティションの鍵を主キーに含めるので、`(workspace_id, client_tx_id)` の一意は DB で強制しない。Writer がワークスペースの行のロックの中で先に引く。UUIDv7 の ID は「ID の時刻 − 1 日」の日から今日までのパーティションだけを引き、UUIDv5 の ID（公開 API の `Idempotency-Key`、参加、連携の事象。サーバーの主体だけが使い、クライアントの `submit` では受けない）は全部を引く（[data-model/sync.md](data-model/sync.md) の `tx_results`。2026-09-28 に足した）。
 - 90 日より古いトランザクションは、クライアントが自動では送らない（ADR-0005、[client-store-and-offline.md](client-store-and-offline.md) の 5.4 節）。重複を見分けられないため。
 - `client_tx_id` の UUIDv7 の時刻が、今より 1 日以上先のものは拒否する（`invalid`）。時計の狂った端末の ID が、記録の保持の計算を壊さないため。
 
@@ -326,7 +328,7 @@ CREATE TABLE sync_outbox (
 );
 ```
 
-- `sync_outbox` は RLS の外に置く（[data-model.md](data-model.md) の 3 節）。Relay が全ワークスペースの行を順に読むため。行は `workspace_id` と番号の範囲と時刻だけを持ち、中身を持たない。Relay は範囲の `sync_actions` を、行の `workspace_id` で `SET LOCAL` してから読む。
+- `sync_outbox` は RLS の外に置く（[data-model.md](data-model.md) の 5 節）。Relay が全ワークスペースの行を順に読むため。行は `workspace_id` と番号の範囲と時刻だけを持ち、中身を持たない。Relay は範囲の `sync_actions` を、行の `workspace_id` で `SET LOCAL` してから読む。
 
 - `sync_actions` は日ごとのパーティション。保持の期間（仮に 30 日）を過ぎたパーティションを落とす（[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 8 節）。パーティションの鍵を主キーに含める必要があるので、`(workspace_id, sync_id)` の一意は DB では強制しない。ワークスペースの行のロックが一意を保証する。
 - `workspace_sync` は RLS の対象（ADR-0004）。保持のジョブと DR の手順だけが `floor_sync_id` と `sync_epoch` を書く。

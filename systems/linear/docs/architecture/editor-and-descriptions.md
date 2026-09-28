@@ -199,7 +199,7 @@ ADR-0014 が予約した `_doc_*` の名前で、次の store を持つ（構成
 
 ### 4.7 本文の版
 
-- Worker のまとめが、前の版から 10 分以上経ち、`text_plain` が変わっていれば、`IssueDescriptionVersion`（`via` のグループ、`lazy`）を作る。中身は `state`、`text_plain`、`actor_ids`（その間に書いた人）、`at`。1 つの本文で 100 版か 90 日まで持つ。
+- Worker のまとめが、前の版から 10 分以上経ち、`text_plain` が変わっていれば、`IssueDescriptionVersion`（`via` のグループ、`lazy`）を作る。中身は `state`、`text_plain`、`actor_ids`（その間に書いた人）、`at`（`created_at`）。1 つの本文で 100 版か 90 日まで持つ。`state` は `bytes` の型で、差分に載せず、版を ID で読み込んだ時だけ返す（最大 4 MiB で、Relay の 1 メッセージ 1 MiB に収まらないため）。`text_plain` はサーバーだけの列（[data-model/issues.md](data-model/issues.md)。2026-09-28 に決めた）。
 - 戻す：画面は版の `state` を別の `Y.Doc` に読み込み、ProseMirror の文書にし、今の本文をその内容に置き換える編集として当てる。結果は普通の `append` になる。戻しの間に他の人が書いた分は、置き換えの後に合わさる。
 - 版を消す：`owner`・`admin` は、1 つの版か、ある時刻より前の全部の版を消せる（`delete IssueDescriptionVersion`。DT-PERM-003）。消したつもりの秘密（トークンの貼り付け）を版から消すため。操作はワークスペースの監査に残す（[security.md](security.md) の 6 節）。今の本文の CRDT の状態（`doc_states`）には、ごみ集めの後は消した文字が残らない。security の領域の依頼を受けて、統合の工程で足した。
 
@@ -226,7 +226,7 @@ model("Comment", {
   fields: {
     issue_id:    { type: "ref:Issue", conflict: "server_only", on_delete: "cascade", index: true },
     parent_id:   { type: "ref:Comment", conflict: "server_only", nullable: true, on_delete: "cascade", index: true },
-    author_id:   { type: "ref:User", conflict: "server_only", nullable: true, on_delete: "nullify" },
+    author_id:   { type: "ref:User", conflict: "server_only", nullable: true, on_delete: "nullify", import_writable: true },
     body:        { type: "json", conflict: "lww", schema: "RichTextDoc", max_bytes: 65536, pii: "content" },
     edited_at:   { type: "timestamp", conflict: "server_only", nullable: true },
     resolved_at: { type: "timestamp", conflict: "lww", nullable: true },

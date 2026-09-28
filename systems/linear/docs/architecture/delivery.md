@@ -32,7 +32,7 @@ ADR-0055。
 | 静的な検査 | lint（`packages/policy` の外の権限の条件、リゾルバーの SQL、`visibility ===` の禁止）、型、秘密の走査、依存の検査 | 5 分 |
 | 単体・表駆動 | Vitest。全部の DT-* の表を spec から読んで回す | 5 分 |
 | 生成の検査 | [data-model-and-schema.md](data-model-and-schema.md) の 4.1 節の 14 項目、`schema_version` の上げ忘れ、SDL の破壊の変更 | 2 分 |
-| マイグレーションの比較 | 空の DB に全マイグレーションを当て、望む形と比べる。新しい表の `workspace_id` と FORCE RLS、RLS の外の表の許可リスト（[data-model.md](data-model.md) の 3 節）、秘密の列の型 | 3 分 |
+| マイグレーションの比較 | 空の DB に全マイグレーションを当て、望む形と比べる。新しい表の `workspace_id` と FORCE RLS、RLS の外の表の許可リスト（[data-model.md](data-model.md) の 5 節）、秘密の列の型 | 3 分 |
 | 収束のシミュレーター | 2,000 の列（各 200 の出来事、クライアント 2〜6）と、`sim/regressions/` の全部の種（[sync-engine.md](sync-engine.md) の 12.1 節）。同期の核の区分は 20 万の列（並列で 20 分以内） | 5〜20 分 |
 | 結合 | Testcontainers（PostgreSQL、Valkey、OpenSearch）で Writer・Gateway・Sync API・Relay | 10 分 |
 | オフラインと再送 | Playwright（Chromium・Firefox・WebKit）で、オフラインのまま再起動、送信の途中で落ちる、1 つ前の版の outbox を今の版で送る（[client-store-and-offline.md](client-store-and-offline.md) の 11.1 節）。手元の保存・同期の核の区分で必須 | 15 分 |

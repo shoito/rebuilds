@@ -58,7 +58,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ecs-services-skeleton` | サービス、Service Connect、タスクのロール（同 3 節） |
 | `terraform-root-modules` | ルートモジュールとポリシー検査（同 7.2 節） |
 | `kms-keys-and-envelope` | KMS の鍵と `packages/envelope`（[security.md](architecture/security.md) の 5.2 節） |
-| `rls-migration-guard` | RLS の検査、RLS の外の表と関数の許可リスト（[data-model.md](architecture/data-model.md) の 3 節） |
+| `rls-migration-guard` | RLS の検査、RLS の外の表と関数の許可リスト（[data-model.md](architecture/data-model.md) の 5 節） |
 | `schema-dsl` | 定義の言語と、型・`conflict` の組み合わせの検査（[data-model-and-schema.md](architecture/data-model-and-schema.md) の 3 節） |
 | `schema-conflict-kinds` | `conflict`・`order_scope`・`track_overwrites`・`groups` の必須化（sync-engine と共同） |
 | `schema-load-strategy` | `load`・`condition`・`include`・被覆の鍵の生成（bootstrap-and-partial-sync と共同） |

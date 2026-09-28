@@ -305,4 +305,4 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 | `convergence_mismatches`（サーバーだけ、1 年） | 不一致の行の ID と分類 | 4.3 |
 | `sync_actions` の索引 `(workspace_id, model, model_id, sync_id)` | `L` の時点の作り直し（api-and-webhooks と共有） | 4.2 |
 | S3 の RUM の Parquet、配信の監査の抜き取り | 13 か月、90 日 | 3.2、4.4 |
-| sync-engine への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | `deltas` に `c`、`pong` に Gateway の時刻、`welcome` に `audit_followup` | 3.3、4.3 |
+| sync-engine への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | `deltas` に `c`、`pong` に Gateway の時刻、`welcome` に `audit_followup` | 3.3、4.3 |

@@ -99,7 +99,7 @@ model("WorkflowState", {
 | フィールド | 型・`conflict` | 書く人 |
 | --- | --- | --- |
 | `subscriber_ids` | `set<ref:User>`・`set`、500 まで | 利用者、派生（10 節） |
-| `started_at`・`completed_at`・`canceled_at`・`triaged_at` | `timestamp`・`server_only` | 派生（4.3 節） |
+| `started_at`・`completed_at`・`canceled_at`・`triaged_at` | `timestamp`・`server_only`。`completed_at`・`canceled_at` は `import_writable` | 派生（4.3 節）。`origin = import` は `completed_at`・`canceled_at` に操作の値を受ける（DT-IMPORT-002） |
 | `activity_at` | `timestamp`・`server_only` | 派生。イシューの変更とコメントの作成で進む（自動で閉じるの判定） |
 | `triage_snoozed_until` | `timestamp`・`lww` | 利用者。活動があれば派生で外す |
 | `trashed_at` | `timestamp`・`lww` | 利用者（削除と戻し） |

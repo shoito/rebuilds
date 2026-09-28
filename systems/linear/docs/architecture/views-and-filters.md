@@ -294,7 +294,7 @@ model("View", {
   load: { strategy: "instant" }, archivable: false, delete: { mode: "hard" },
   fields: {
     scope:     { type: "enum<personal,team,workspace>", conflict: "server_only" },
-    owner_id:  { type: "ref:User", conflict: "lww", on_delete: "nullify" },
+    owner_id:  { type: "ref:User", conflict: "lww", nullable: true, on_delete: "nullify" },   // nullify に合わせて nullable（2026-09-28）
     team_id:   { type: "ref:Team", conflict: "server_only", nullable: true, on_delete: "cascade" },
     model:     { type: "enum<Issue,Project>", conflict: "server_only" },
     name:      { type: "string", conflict: "lww", max: 80, pii: "content" },
@@ -451,7 +451,7 @@ DT-VIEW-003。`View` の `create` と `set filter` の Writer の検証。フィ
 | `view_preferences`（`ViewPreference`） | 個人の表示の設定、お気に入り | 7.1 |
 | `issues.title_norm`（サーバーだけ） | 正規化したタイトル | 4.2 |
 | `packages/filter` | 文法、フィールドの登録、評価、SQL の生成、テストの例の集まり | 3、4、10 |
-| data-model-and-schema への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | `view_scope` の規則、M2 の列と `packages/filter` の登録の突き合わせの生成の検査 | 3.2、7.1 |
+| data-model-and-schema への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | `view_scope` の規則、M2 の列と `packages/filter` の登録の突き合わせの生成の検査 | 3.2、7.1 |
 
 ## 出典
 

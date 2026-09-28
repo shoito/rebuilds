@@ -457,8 +457,8 @@ CREATE TABLE integration_secrets (          -- サーバーだけ。モデルに
 | `external_account_links`（`ExternalAccountLink`） | 利用者の外部のアカウント | 4.6 |
 | `slack_channel_subscriptions`（`SlackChannelSubscription`） | チャンネルへの通知の購読 | 5.3 |
 | `teams` に足す列 | `git_on_draft`・`git_on_open`・`git_on_review`・`git_on_merge`・`git_link_comment` | 4.4 |
-| data-model-and-schema への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | `Issue.include` に `GitLink:issue_id` を足す | 4.3 |
-| permissions-and-teams への依頼（反映済み。[data-model.md](data-model.md) の 8 節） | DT-PERM-002 に「連携の作成・削除（`owner`・`admin`）」、DT-PERM-003 に `SlackChannelSubscription` の規則 | 4.1、5.3 |
+| data-model-and-schema への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | `Issue.include` に `GitLink:issue_id` を足す | 4.3 |
+| permissions-and-teams への依頼（反映済み。[data-model.md](data-model.md) の 9 節） | DT-PERM-002 に「連携の作成・削除（`owner`・`admin`）」、DT-PERM-003 に `SlackChannelSubscription` の規則 | 4.1、5.3 |
 
 ## 出典
 

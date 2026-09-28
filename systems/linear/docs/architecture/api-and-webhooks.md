@@ -371,7 +371,7 @@ ADR-0042。
 | 範囲 | 3.5 節。`admin` は認可する人が `owner`・`admin` の時だけ出せる。他の範囲は、ワークスペースの設定（`oauth_apps_allowed`）が許せばメンバーが自分のために認可できる |
 | ワークスペースの選択 | 認可の画面で、1 つのワークスペースを選ぶ。トークンはそのワークスペースだけで使える |
 
-- `oauth_apps` の表はワークスペースの表（RLS）に置く。認可の画面で、ワークスペースのコンテキストを決める前にアプリの名前・戻りの URL・範囲を読むときは、`SECURITY DEFINER` の関数 `oauth_app_public(client_id)` だけを使い、`(workspace_id, name, redirect_uris, scopes)` だけを返す（[data-model.md](data-model.md) の 3 節）。
+- `oauth_apps` の表はワークスペースの表（RLS）に置く。認可の画面で、ワークスペースのコンテキストを決める前にアプリの名前・戻りの URL・範囲を読むときは、`SECURITY DEFINER` の関数 `oauth_app_public(client_id)` だけを使い、`(workspace_id, name, redirect_uris, scopes)` だけを返す（[data-model.md](data-model.md) の 5 節）。
 
 - 実装は、認証の部品（Better Auth）の OAuth の提供者の機能を使わず、Public API の中に小さく持つ。トークンをワークスペースの `User` に結び、上の形と保存の規則にするため。Better Auth の OAuth 2.1 の提供者の部品は、PKCE（公開のクライアントで必須）、リフレッシュトークンの入れ替えと再利用の検出を持つ（[OAuth 2.1 Provider](https://better-auth.com/docs/plugins/oauth-provider)、2026-09-28 に確認）。ただし、その部品には 2026 年に High の告知が複数ある（[accounts-and-auth.md](accounts-and-auth.md) の 2.2 節）。E11 の着手の時に比べ直してよい。
 - `actor=app`（アプリの利用者を主体にする）と client credentials は MVP の後。エージェントの連携（AI の Epic）の時に決める。

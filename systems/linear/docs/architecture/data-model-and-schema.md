@@ -116,6 +116,7 @@ model("Issue", {
 | `order_key` | `order` | `order_scope` が必須 |
 | `crdt_doc` | `crdt` | 本文のモデル（`IssueDescription` など）だけ。1 つのモデルに 1 つ（[editor-and-descriptions.md](editor-and-descriptions.md)） |
 | `json` | `lww` | 中身の JSON Schema を必須にする。任意の形は許さない |
+| `bytes` | `server_only` | バイト列（JSON では base64）。`max_bytes` が必須。行の JSON・差分・ブートストラップに載せず、ID の読み込み（`<Model>:id=…`）の応答だけで返す（`crdt_doc` と同じ扱い）。例：`IssueDescriptionVersion.state`（[data-model.md](data-model.md) の 2.5 節。2026-09-28 に足した） |
 
 - 表にない組み合わせは生成で失敗させる。たとえば `set<...>` を `lww` にすると、同時に別の要素を足した 2 人の変更の片方が消える（ADR-0002 が退けた形）。
 
@@ -127,7 +128,7 @@ model("Issue", {
 | `load` | 必須 | `instant`・`partial`・`lazy`（ADR-0003）。`partial` は `condition` が必須 |
 | `include` | — | この行を ID で読み込んだとき、一緒に読む被覆の鍵（3.7 節） |
 | `archivable` | — | `archive`・`unarchive` を受けるか |
-| `delete` | 必須 | `hard`（すぐに消す）か `trash`（アーカイブしてゴミ箱に置き、後で消す。`purge_after_days`） |
+| `delete` | 必須 | `hard`（すぐに消す）か `trash`（アーカイブしてゴミ箱に置き、後で消す。`purge_after_days`）。`trash` のモデルに `trashed_at`（`timestamp`・`lww`）の宣言がなければ、生成器が足す |
 | `history` | — | 履歴に残すフィールド（[issues-and-workflow.md](issues-and-workflow.md) の 11 節） |
 | `track_overwrites` | — | 上書きを記録するフィールド（ADR-0008） |
 | `derive` | — | 派生の変更の関数の名前（[issues-and-workflow.md](issues-and-workflow.md) の ADR-0025） |
@@ -171,7 +172,7 @@ ADR-0019。
 
 | 出力 | 中身 | 使う場所 |
 | --- | --- | --- |
-| DB の望む形 | 表、列、`workspace_id` を先頭にした主キーと索引、RLS のポリシー（`FORCE`）、同期の列（`updated_sync_id`・`sync_groups`・`field_sync_ids`・`archived_at`） | マイグレーションの差分の検査（4.2 節） |
+| DB の望む形 | 表、列、`workspace_id` を先頭にした主キーと索引、RLS のポリシー（`FORCE`）、共通の列（`created_at`・`updated_at`・`updated_sync_id`・`sync_groups`・`field_sync_ids`・`archived_at`、`trash` のモデルは `trashed_at`。[data-model.md](data-model.md) の 2.4 節） | マイグレーションの差分の検査（4.2 節） |
 | `packages/model` | TypeScript の型、Zod の検証、`applyOp` の表、`groupsOf`、`via` の逆向きの表、`derive` の登録、`on_delete` の表 | Writer とクライアントで同じコード（ADR-0001） |
 | クライアントの構成 | IndexedDB の store と索引、M2 の列の並び、`schema_version`、`schema_hash`、被覆の鍵の生成と解析 | 保存の層、プール |
 | Sync API の構成 | 被覆の鍵の検証、`partial` の条件の SQL | ブートストラップ、遅延の読み込み |
@@ -233,14 +234,16 @@ ADR-0020。
 ### 5.4 チームの移動と別名
 
 ```sql
-CREATE TABLE issue_aliases (
+CREATE TABLE issue_aliases (          -- モデル IssueAlias。共通の列（updated_sync_id など）は生成で足す
   workspace_id  uuid    NOT NULL,
+  id            uuid    NOT NULL,     -- モデルの ID（UUIDv7。Writer が振る）
   team_id       uuid    NOT NULL,     -- 移動の前のチーム
-  number        integer NOT NULL,     -- 移動の前の番号
+  number        bigint  NOT NULL,     -- 移動の前の番号
   issue_id      uuid    NOT NULL,
   sync_groups   text[]  NOT NULL,     -- 今のイシューのグループ（移動のたびに直す）
   created_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (workspace_id, team_id, number)
+  PRIMARY KEY (workspace_id, id),
+  UNIQUE (workspace_id, team_id, number)
 );
 CREATE TABLE team_key_aliases (
   workspace_id  uuid NOT NULL,
@@ -382,6 +385,8 @@ ADR-0019。
 - `issue-number-repair.md`：チームの番号の数が実際の最大の番号より小さくなったとき（手の修正の誤り、復元）の直し方。
 
 ### data-model（索引への追加の提案）
+
+2026-09-28 に [data-model.md](data-model.md) と [data-model/](data-model/) へ反映した。
 
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |

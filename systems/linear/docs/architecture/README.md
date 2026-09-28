@@ -247,7 +247,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **DR の権限の変更**：権限を狭める操作を DynamoDB のグローバルテーブルに追記し、昇格の後、書き込みを受ける前にやり直す（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)。Auth0 の題材の考え方に倣う）。
 - **permessage-deflate**：差分の流れに使う。窓 4 KiB の文脈の持ち越し。E12 で、持ち越しなしと比べて確定する（ADR-0009 の注記）。
 - **`Workspace` の持ち主**：permissions-and-teams。`Workspace`（`workspace` のグループ）と `WorkspaceSettings`（`members` のグループ）に分けた（[permissions-and-teams.md](permissions-and-teams.md) の 3.3 節）。
-- **RLS の外の表**：`sync_outbox`・`client_devices`・`narrowing_outbox` だけを足し、`workspaces`・`oauth_apps` のコンテキストの前の読み出しは関数にした（[data-model.md](data-model.md) の 3 節）。
+- **RLS の外の表**：`sync_outbox`・`client_devices`・`narrowing_outbox` だけを足し、`workspaces`・`oauth_apps` のコンテキストの前の読み出しは関数にした（[data-model.md](data-model.md) の 5 節）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。保持の期間は [security.md](security.md) の 9 節。1 ワークスペースの書き込みの枠は [capacity.md](capacity.md) の 2.2 節。公開 API の枠は [api-and-webhooks.md](api-and-webhooks.md) の 4.2 節。クライアントの上限（outbox 5 万件・100 MiB、M1 5 万個）は [client-store-and-offline.md](client-store-and-offline.md) の 5.3・7.2 節。
 - **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
 - **検証の後の PM の決定（2026-09-28。推奨案）**：
@@ -256,6 +256,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - **イニシアチブの複数の親**：MVP の後。MVP は親を 1 つにする（[cycles-and-projects.md](cycles-and-projects.md) の 3.7・12 節）。
   - **見積もりのキー**：`E`（本家は `Shift+E`）のまま、法務の L8 の後に見直す（下の持ち越し）。
 - **検証の工程での直し（2026-09-28）**：未検証の項目を公式の資料で確かめ、次を直した。本文のスキーマにノードを足すのは破壊の変更にし、`min_build` を先に上げる（y-prosemirror が知らないノードを共有の文書から消すため。ADR-0057 の注記、[editor-and-descriptions.md](editor-and-descriptions.md) の 3.2 節）。自動で閉じる・アーカイブに、本家の文書の除外の条件（進行中のサイクル・未完了のプロジェクト、期日、サブイシュー、親）を足した（ADR-0023 の注記）。データ転送の費用を CloudFront の日本の単価で見積もり直した（[infrastructure.md](infrastructure.md) の 11 節）。
+- **データモデルの統合（2026-09-28）**：データモデルを [data-model.md](data-model.md) と [data-model/](data-model/) に集め、形（表・列・キー・索引）の正本にした。欠けていた `ProjectDescription`・`attachment_purges`・`audit_export_checkpoints` を足し、共通の列に `updated_at`、`trash` のモデルに `trashed_at`、定義の型に `bytes` を足した。日ごとのパーティションの表の一意の守り方（`tx_results` はロックの中の先の引き、`notification_keys`・`webhook_deliveries` は事象の日で分割）を決めた。コンテキストの前の関数 `resolve_api_credential`・`resolve_integration_target`・`scheduler_due_items`・`auth.upsert_workspace_directory` を起票した（セキュリティの担当の承認待ち）。一覧は [data-model.md](data-model.md) の 7 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -296,7 +297,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [api-and-webhooks.md](api-and-webhooks.md) | 公開の GraphQL（スキーマ、ページング、アーカイブを含める、複雑さとレート制限）、API キーと OAuth 2.0 のアプリ、Webhook（対象のモデル、署名の `<Brand>-Signature`、再試行、停止の条件） | 0041–0043 | QA、Ops | E11 |
 | [import-export.md](import-export.md) | インポート（Jira、GitHub Issues、Asana、Shortcut、CSV）、利用者の対応付け、一括の書き込みと同期のログ、やり直しと取り消し、書き出し（CSV・JSON） | 0044–0045 | QA | E11 |
 | [security.md](security.md) | 脅威モデル、手元の DB のデータの扱い（ログアウトでの消去、共有の端末）、暗号化、監査ログ、データのライフサイクル（アーカイブ・削除・解約）、脆弱性の対応、法務の論点の整理 | 0046–0048 | セキュリティ | E1、E12 |
-| [data-model.md](data-model.md) | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)（と [data-model/](data-model/)） | データモデルの正本：規約、ER 図、86 表の列・キー・索引・保持、DB の外のストアの形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、Sync Gateway の配置と再接続の殺到への備え、冗長化、DR（`sync_epoch` と狭める操作のやり直し）、段階を上げる基準、S2 のワークスペースのシャード、S3 のセルとリージョン、コスト | 0049–0051、0058（統合の工程で足した） | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、クライアントの RUM（遅延の予算）、同期の伝播の計測、収束の監査、配信の監査、SLI | 0052–0053 | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル（接続、書き込み、ブートストラップ）、1 ワークスペースの書き込みの上限と割り当て、部品ごとの必要量、負荷試験 L1〜L9 | 0054 | Ops | E12 |
