@@ -15,7 +15,7 @@
 | [api-and-webhooks.md](api-and-webhooks.md) | REST・GraphQL、Webhook、OAuth のアプリと App（本家の GitHub App に相当）、レート制限 |
 | [actions.md](actions.md) | CI：ワークフロー、ジョブのスケジューリング、実行環境の隔離、シークレット、ログ、成果物、キャッシュ |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
-| [data-model.md](data-model.md) | 中核のテーブルと、領域ごとのテーブルの索引 |
+| [data-model.md](data-model.md) | データモデルの正本：置き場所、テーブルの規則、ER 図、全テーブルの定義（[data-model/](data-model/identity.md) に領域ごと）、Git・Valkey・S3・索引・Event の形、横断の不変条件 |
 | [infrastructure.md](infrastructure.md) | AWS の構成、ストレージのノード、冗長化、災害復旧 |
 | [observability.md](observability.md) | ログ、メトリクス、トレース、SLO |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
@@ -165,6 +165,20 @@ PM の方針（本家 GitHub に寄せる、既定案）により、次のとお
 - **S3 のルーティングの表**：Aurora Global Database に置く。ADR-0032 で使っており、運用を増やさない（[ADR-0034](../decisions/0034-multi-region-repository-placement.md)。proposed のまま）。
 - **S3 のメタデータの置き場所**：PR・Issue などリポジトリに属するものはホームのリージョンに、利用者・Organization などはグローバルに置く。マージと ref の更新を 1 つのリージョンで完結させるため（[ADR-0034](../decisions/0034-multi-region-repository-placement.md)、[infrastructure.md](infrastructure.md) の 10 節）。
 - **GraphQL の実装**：Pothos ＋ GraphQL Yoga。第三者の部品で、REST と同じサービス関数を呼べる（[api-and-webhooks.md](api-and-webhooks.md) の 5.1・16 節）。
+
+### 決定（2026-09-28、データモデルの統合）
+
+データモデルを [data-model.md](data-model.md) にまとめるときに、文書の間の食い違いを推奨案で決めた。アーキテクチャの決定は変えていない。
+
+- **テーブルの規則**：主キーは `id bigint`（IDENTITY）、外部キーは `<単数形>_id`、リポジトリは必ず `repo_id`。`repositories`・`repository_networks`・`storage_nodes` の主キーも `id` にし、複製の表のノードの列は `storage_node_id` にした（GraphQL の `node_id` と紛れないため）。`node_id` は列に持たず読み取りのときに計算する。列挙は `text` と `CHECK`、SHA は `bytea`。S3 で複数のリージョンが採番するときは、IDENTITY の範囲をリージョンで分ける。
+- **ユーザーと Organization の ID**：`owners.id` をそのまま使う。App の bot と ghost も `owners` に行を持つ（リポジトリは持てない）。
+- **ref の更新の Event の名前**：`repository.refs_updated` にそろえた（ADR-0006 の Decision と [git-protocols.md](git-protocols.md) の形）。[git-storage.md](git-storage.md) と [roadmap.md](../roadmap.md) の `refs.updated` を直し、ADR-0006 に注記した。
+- **複製のチェックサムのファイル**：`spokes/checksum` を `gitd/checksum` にした（本家の内部の名前を使わない。リポジトリ共通の ADR-0006 の趣旨）。
+- **Issue の削除**：[ADR-0030](../decisions/0030-data-retention-and-deletion.md) のとおり論理削除と日次の消去にした。[issues.md](issues.md) の「物理削除」を直した。
+- **PR の base のリポジトリ**：列は `repo_id` だけにした（`base_repo_id` は持たない。API の `base.repo`）。マージ可能かのキャッシュのキーは `network_id`。
+- **ネットワークの単位の表**（`network_replicas`、`pull_request_merge_states`、`commit_verifications`、`lfs_objects`）は `repo_id` を持てないので、リポジトリの `can()` を通った後にだけ読むシステムの表として扱う。
+- **足りなかったテーブルを最小の形で定めた**：`accounts`（Better Auth のパスワード）、`ssh_auth_fingerprints`、`owner_redirects`、`enterprises`・`enterprise_memberships`（E10）、`repository_stats`・`repository_topics`・`stars`、`issue_comments`、`notification_threads`・`email_suppressions`・`inbound_email_receipts`、`check_suites`・`check_runs`・`commit_statuses`、`merge_queues`（単一ライターのリース）、`releases`・`release_assets`、`repository_bundles`・`repository_backups`・`network_maintenance`・`lfs_usage`、`actions_policies`・`actions_token_revocations`・`runner_registration_tokens`、`oauth_grants`、`code_index_nodes`、`deletion_records`・`legal_holds`。
+- **保持の既定**：`push_events` は 5 週（バックアップの 35 日を覆う）、`ruleset_evaluations` は 180 日、`pull_request_events` は 90 日、`actions_usage` は 13 か月、`notification_deliveries` は 14 日、`deletion_records` は消去から 60 日。
 
 法務の確認待ちのものは、ここでは決めない。E9 の `legal-review-before-launch` で確認を受ける。
 

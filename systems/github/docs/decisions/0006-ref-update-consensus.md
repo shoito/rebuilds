@@ -18,6 +18,8 @@ ADR-0003 で、push は 3 つの複製のうち 2 つ以上で書けたら成功
 
 本家の Spokes は、3 相コミットで複製を更新し、複製を分散ロックとして使って DB の更新の順序を守る。複製の状態は `(refname, value)` のハッシュの XOR のチェックサムで比べる（[Stretching Spokes](https://github.blog/engineering/infrastructure/stretching-spokes/)）。厳密な過半数に書けない書き込みは受け付けない（[Building resilience in Spokes](https://github.blog/engineering/infrastructure/building-resilience-in-spokes/)）。
 
+> 2026-09-28 の注記：Confirmation の `refs.updated` は、Decision の outbox の Event `repository.refs_updated` と同じものを指す。名前は `repository.refs_updated` にそろえた（[data-model.md](../architecture/data-model.md) の 4 節）。
+
 ## Options
 
 1. **3 相の手順（prepare → DB に pending → commit → DB で確定）を coordinator が回す。順序は DB のチェックサムの CAS で決める**（Spokes に寄せる）

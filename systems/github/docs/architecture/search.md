@@ -65,7 +65,7 @@ push（デフォルトブランチ）─▶ Git ストレージ ─▶ outbox（
 - **code-indexer**：リポジトリの単位でシャードを作り、S3 に書き、割り当ての表を更新する。状態を持たない。
 - **索引のノード**：割り当てられたシャードを S3 から取り、ローカルの NVMe に置いて mmap で読み、Zoekt の検索を提供する。1 つのリポジトリのシャードを、異なる AZ の 2 つのノードに置く（索引は Git から作り直せるので、複製は可用性のためで、耐久性のためではない）。
 - **code-search router**：クエリを解析し、権限の条件（4 節）を付け、対象のノードに広げ、結果を合わせて並べ直す。
-- 割り当て：`code_index_shards (repo_id, commit_sha, s3_key, size_bytes, built_at)` と `code_index_placements (repo_id, node_id)`。リポジトリの ID の一貫性ハッシュでノードを選び、ノードの追加・故障では S3 から別のノードに置き直す。
+- 割り当て：`code_index_shards (repo_id, shard_no, commit_sha, s3_key, size_bytes, built_at)` と `code_index_placements (repo_id, search_node_id)`（ノードは `code_index_nodes`。列の定義は [data-model/search.md](data-model/search.md)）。リポジトリの ID の一貫性ハッシュでノードを選び、ノードの追加・故障では S3 から別のノードに置き直す。
 
 ### 3.3 増分の索引
 

@@ -21,7 +21,7 @@ PR は「head の ref の変更を、base の ref に取り込む提案」であ
 
 | 項目 | 内容 |
 | --- | --- |
-| `base_repo_id`、`base_ref` | 取り込み先。PR はこのリポジトリに属する（番号・権限・通知の単位） |
+| `repo_id`（base のリポジトリ）、`base_ref` | 取り込み先。PR はこのリポジトリに属する（番号・権限・通知の単位）。API の `base.repo` |
 | `head_repo_id`、`head_ref` | 取り込む元。同じリポジトリか、同じ fork のネットワークのリポジトリ |
 | `base_sha`、`head_sha` | 最後に観測した SHA の写し（ADR-0005）。正本は Git の ref |
 | `merge_base_sha` | `base_sha` と `head_sha` の merge base。差分の起点 |
@@ -62,7 +62,7 @@ PR は「head の ref の変更を、base の ref に取り込む提案」であ
 
 head または base の ref が動くと、ストレージが順序付きの Event（`repo_id`、`ref`、旧 SHA、新 SHA）を outbox に書く。PR の Worker がこれを読み、次を行う。
 
-1. その ref を head か base に持つ open の PR を探す（`(head_repo_id, head_ref)` と `(base_repo_id, base_ref)` の索引）。
+1. その ref を head か base に持つ open の PR を探す（`(head_repo_id, head_ref)` と `(repo_id, base_ref)` の索引）。
 2. head が動いた PR：
    - `head_sha` と `refs/pull/{number}/head` を更新する。
    - タイムラインに push を記録する（「N 件のコミットを追加」、force push なら旧と新）。
@@ -101,9 +101,9 @@ head または base の ref が動くと、ストレージが順序付きの Eve
 
 | 結果 | キー | 置き場所 |
 | --- | --- | --- |
-| 差分（ファイルの一覧と行数） | `(repo_network_id, merge_base_sha, head_sha, opts)` | ストレージのノードのローカルのキャッシュ＋共有のキャッシュ |
+| 差分（ファイルの一覧と行数） | `(network_id, merge_base_sha, head_sha, opts)` | ストレージのノードのローカルのキャッシュ＋共有のキャッシュ |
 | ファイルごとの差分の本文 | 上のキー ＋ `path` | 同上 |
-| マージ可能か | `(repo_network_id, base_sha, head_sha)` | DB の `pull_request_merge_states`（下） |
+| マージ可能か | `(network_id, base_sha, head_sha)` | DB の `pull_request_merge_states`（下） |
 | テストマージのコミット | 同上 | Git（`refs/pull/{number}/merge`） |
 
 - `opts` は、空白の無視、rename の検出の有無など、結果を変える選択肢だけを含める。
@@ -425,7 +425,7 @@ Worker は outbox に次の Event を書き、通知・Webhook・Actions・検�
 
 ## 13. データ
 
-主なテーブル（詳細は [data-model.md](data-model.md)）。すべて `repo_id`（base のリポジトリ）を持ち、判定を経ない読み取りを lint で禁止する（ADR-0002）。
+主なテーブル（列の定義は [data-model/pull-requests.md](data-model/pull-requests.md) と [data-model/rulesets-and-checks.md](data-model/rulesets-and-checks.md)）。すべて `repo_id`（base のリポジトリ）を持ち、判定を経ない読み取りを lint で禁止する（ADR-0002）。
 
 | テーブル | 中身 |
 | --- | --- |
@@ -436,7 +436,7 @@ Worker は outbox に次の Event を書き、通知・Webhook・Actions・検�
 | `review_requests` | 依頼先（ユーザー・チーム）、コードオーナーによる依頼か |
 | `rulesets`、`ruleset_rules`、`ruleset_bypass_actors`、`ruleset_evaluations` | ruleset と、`evaluate` の記録・バイパスの記録 |
 | `pull_request_merges` | マージの開始・完了の記録（6.2 節） |
-| `merge_queue_entries`、`merge_groups` | キューの状態 |
+| `merge_queues`、`merge_queue_entries`、`merge_groups` | キューの状態（`merge_queues` は base のブランチごとのリース） |
 | `auto_merge_requests` | 自動マージの予約 |
 | `pull_request_events` | PR ごとの Event の順序 |
 

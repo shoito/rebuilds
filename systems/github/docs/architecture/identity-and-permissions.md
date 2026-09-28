@@ -341,14 +341,14 @@ MVP の後。S1 の段階では、`can()` の段 4 と資格情報の表に置�
 - 各事象に、主体の種類（`programmatic_access_type` に相当：Web、PAT、OAuth、App のインストール、App のユーザー）と、トークンの ID（トークンそのものではない）を持たせる。本家も App のユーザーのトークンを、監査ログで区別して記録する（5.4 の行 5 の出典）。
 - 監査ログを読める人：Organization の owner（Organization の事象）、本人（自分のセキュリティのログ）。
 
-## 11. データモデル（[data-model.md](data-model.md) への追加の提案）
+## 11. データモデル（列の定義は [data-model/identity.md](data-model/identity.md)）
 
 | テーブル | 中身 |
 | --- | --- |
 | `users` | Better Auth の `user`。`login`（一意、大文字小文字を区別しない）、2FA が必須になった日時 |
 | `user_emails` | 追加のメールアドレス、確認済みか |
-| `sessions`・`passkeys`・`two_factors`・`verifications` | Better Auth |
-| `owners` | ユーザーと Organization の共通の名前空間（`login` の一意性、名前の変更の履歴） |
+| `accounts`・`sessions`・`passkeys`・`two_factors`・`verifications` | Better Auth（`accounts` はパスワードの Argon2id のハッシュ） |
+| `owners` | ユーザーと Organization の共通の名前空間（`login` の一意性）。名前の変更の転送は `owner_redirects` |
 | `organizations` | 基本の権限、メンバーの権限の方針（リポジトリの作成、非公開の fork、外部のコラボレーターの招待）、2FA の必須 |
 | `org_memberships` | ユーザー × Organization、ロール（`owner` / `member`） |
 | `org_invitations` | 招待、期限 |
@@ -360,7 +360,8 @@ MVP の後。S1 の段階では、`can()` の段 4 と資格情報の表に置�
 | `repository_invitations` | コラボレーターの招待 |
 | `team_repository_roles` | チーム × リポジトリ、ロール |
 | `user_blocks`・`org_blocks` | ブロック |
-| `ssh_keys` | ユーザー、指紋（全体で一意）、種類（`auth` / `signing`）、最終使用日時 |
+| `ssh_keys` | ユーザー、指紋、種類（`auth` / `signing`）、最終使用日時 |
+| `ssh_auth_fingerprints` | 認証に使う指紋の登録簿。認証の鍵とデプロイキーをまたいで指紋を一意にする |
 | `deploy_keys` | リポジトリ、指紋、読み書きか |
 | `gpg_keys` | ユーザー、鍵の ID（S1 の後半） |
 | `commit_verifications` | ネットワーク × コミット、結果、鍵、検証日時 |

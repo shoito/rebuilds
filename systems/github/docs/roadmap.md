@@ -79,7 +79,7 @@ MVP は E1〜E9。
 
 | Story | 内容 |
 | --- | --- |
-| `ref-update-consensus` | 3 相の手順、`version` の CAS、outbox の `refs.updated`（ADR-0006） |
+| `ref-update-consensus` | 3 相の手順、`version` の CAS、outbox の `repository.refs_updated`（ADR-0006） |
 | `ref-transaction-recovery` | `pending` の回収 |
 | `consensus-fault-injection` | push の各段階の障害注入の基盤（PR の短縮版と夜間の完全版） |
 | `replica-repair` | `out_of_sync` の修復、ノードの喪失の作り直し、優先度と帯域の上限 |

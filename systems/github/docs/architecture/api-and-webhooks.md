@@ -222,7 +222,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 | `X-<Brand>-Hook-ID` | Webhook の ID |
 | `X-<Brand>-Hook-Installation-Target-Type`・`-ID` | Webhook を作った資源の種類と ID |
 | `X-<Brand>-Signature-256` | `sha256=` ＋ HMAC-SHA256（秘密、本文の生のバイト列）の 16 進 |
-| `User-Agent` | `<brand>-Hookshot/<ver>` |
+| `User-Agent` | `<brand>-Webhooks/<ver>` |
 | `Content-Type` | `application/json`（`application/x-www-form-urlencoded` も選べる） |
 
 - **署名の方式は本家と同じにする。** 値の形（`sha256=` ＋ 16 進）が本家と同じなので、本家の受け手の検証のコードは、読むヘッダーの名前を変えるだけで使える。ヘッダーの名前は ADR-0006 で本家と違える（本家の `X-Hub-Signature-256` は `X-<Brand>-Signature-256`、`X-GitHub-Delivery` は `X-<Brand>-Delivery`）。署名の秘密は UTF-8 の文字列として扱う。
@@ -346,7 +346,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 - 本家の IETF の `RateLimit` ヘッダー（Slack が付けたもの）は付けない。本家の `x-ratelimit-*` と重ねると、クライアントがどちらを信じるか迷うため。
 - 検索は別の資源（`search`：30 回/分）として数える（[search.md](search.md)）。Git の操作の制限は [git-protocols.md](git-protocols.md) にある。
 
-## 12. データモデル（[data-model.md](data-model.md) への追加の提案）
+## 12. データモデル（列の定義は [data-model/apps-and-webhooks.md](data-model/apps-and-webhooks.md)）
 
 | テーブル | 中身 |
 | --- | --- |
@@ -360,6 +360,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | `app_user_tokens` | ハッシュ、ユーザー、App、期限、リフレッシュの系列 |
 | `oauth_apps` | 持ち主、クライアントの ID、コールバック |
 | `oauth_tokens` | ハッシュ、ユーザー、アプリ、スコープ、最終使用 |
+| `oauth_grants` | 認可コード・デバイスのフローのコード・マニフェストの `code`（短命、1 回限り） |
 | `org_oauth_app_approvals` | Organization × OAuth アプリ、承認の状態 |
 | `webhooks` | 種類（リポジトリ / Organization / App）、対象、URL、秘密（暗号化）、事象、形式、版、有効か |
 | `webhook_deliveries` | GUID、Webhook、事象、ペイロードの場所（S3）、試行の回数、結果、次の試行の時刻（日ごとのパーティション、3 日で本文を消す） |

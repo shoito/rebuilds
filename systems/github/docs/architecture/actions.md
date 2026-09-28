@@ -442,7 +442,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 
 ## 15. データモデル
 
-主なテーブル。[data-model.md](data-model.md) の索引に載せる。すべて `repo_id`（または `owner_id`）を持ち、読み取りは ADR-0002 の判定を通す。
+主なテーブル（列の定義は [data-model/actions.md](data-model/actions.md)）。すべて `repo_id`（または `owner_id`）を持ち、読み取りは ADR-0002 の判定を通す。
 
 ```sql
 workflow_runs (id, repo_id, workflow_path, head_sha, head_ref, event, actor_id, trigger_actor_id,
@@ -452,17 +452,17 @@ workflow_jobs (id, run_id, repo_id, owner_id, name, matrix JSONB, labels TEXT[],
                started_at, completed_at, check_run_id, attempt)
 job_steps (job_id, number, name, state, conclusion, started_at, completed_at, log_key)
 job_action_resolutions (job_id, uses, resolved_repo_id, resolved_sha)
-concurrency_groups (repo_id, group_key, running_job_or_run_id, pending JSONB, updated_at)
+concurrency_groups (repo_id, group_key, running_kind, running_id, pending JSONB, updated_at)
 owner_actions_limits (owner_id, plan, max_concurrent_jobs, weight, suspended_at)
 
-actions_secrets (id, scope ENUM(org, repo, env), scope_id, name, ciphertext, key_version,
+actions_secrets (id, scope ENUM(org, repo, env), scope_id, name, sealed_value, key_id,
                  visibility, selected_repo_ids BIGINT[], updated_at)
-actions_secret_keys (scope, scope_id, key_id, public_key, encrypted_private_key /* KMS */, created_at)
+actions_secret_keys (scope, scope_id, key_id, public_key, private_key_ciphertext, private_key_dek /* app-secrets */, created_at)
 environments (id, repo_id, name, wait_timer_minutes, deployment_branch_policy JSONB)
 environment_reviewers (environment_id, reviewer_type, reviewer_id)
 deployment_reviews (job_id, environment_id, reviewer_id, decision, comment, decided_at)
 
-runners (id, scope ENUM(repo, org), scope_id, group_id, name, labels TEXT[], kind ENUM(hosted, self_hosted),
+runners (id, scope ENUM(repo, org, hosted), scope_id, group_id, name, labels TEXT[], kind ENUM(hosted, self_hosted),
          ephemeral, status, last_seen_at)
 runner_groups (id, org_id, name, allowed_repo_ids BIGINT[], allow_public_repos, allowed_workflows TEXT[])
 
@@ -470,10 +470,14 @@ artifacts (id, repo_id, run_id, job_id, name, size_bytes, digest, s3_key, expire
 cache_entries (id, repo_id, ref, key, version, size_bytes, s3_key, created_by_run_id, created_event,
                last_accessed_at, UNIQUE (repo_id, ref, key, version))
 oidc_sub_templates (scope, scope_id, include_claim_keys TEXT[], use_default)
-actions_usage (owner_id, repo_id, job_id, runner_sku, billable_ms, recorded_at)
+actions_usage (id, owner_id, repo_id, job_id, kind, runner_sku, billable_ms, gb_hours, recorded_at)
+actions_policies (scope, scope_id, allowed_actions, require_sha_pinning, default_token_permissions JSONB, fork_pr_approval, ...)
+actions_token_revocations (jti, job_id, expires_at, revoked_at)
+runner_registration_tokens (id, scope, scope_id, kind, token_hash, runner_id, expires_at, used_at)
 ```
 
-- シークレットの平文、`<BRAND>_TOKEN`、ジョブトークン、OIDC のトークンは、どのテーブルにも置かない。トークンは失効の表（`jti` と期限）だけを持つ。
+- シークレットの平文、`<BRAND>_TOKEN`、ジョブトークン、OIDC のトークンは、どのテーブルにも置かない。ジョブトークンは失効の表（`actions_token_revocations`）、`<BRAND>_TOKEN` はインストールのトークン（`installation_tokens`）のハッシュだけを持つ。
+- 列の定義の正本は [data-model/actions.md](data-model/actions.md)。
 - `workflow_jobs` の `queued` の行が、キューの正本になる（5.2 節）。部分インデックス `(labels, owner_id, created_at) WHERE state = 'queued'` を持つ。
 
 ## 16. 規模の段階

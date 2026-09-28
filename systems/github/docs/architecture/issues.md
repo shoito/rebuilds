@@ -27,7 +27,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 | ロック | 真偽と理由 | 8 節 |
 
 - 本文とコメントの編集履歴を持つ（`user_content_edits`）。履歴は、本文を読める人に見える。
-- 削除は、リポジトリの admin だけができる（[リポジトリのロール](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization)）。削除は物理削除し、検索の文書と通知のスレッドも消す（[search.md](search.md)、[notifications.md](notifications.md)）。Pull Request は削除できない。
+- 削除は、リポジトリの admin だけができる（[リポジトリのロール](https://docs.github.com/en/organizations/managing-user-access-to-your-organizations-repositories/managing-repository-roles/repository-roles-for-an-organization)）。削除は論理削除（`deleted_at`）にしてすぐに見えなくし、日次の消去のジョブで物理削除する（[ADR-0030](../decisions/0030-data-retention-and-deletion.md)）。検索の文書と通知のスレッドも消す（[search.md](search.md)、[notifications.md](notifications.md)）。Pull Request は削除できない。
 
 ## 3. ラベル
 
@@ -50,7 +50,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 
 ### 5.2 sub-issue
 
-- `sub_issues (parent_issue_id, child_issue_id, position)`。子は親を 1 つだけ持つ。
+- `sub_issues (parent_issue_id, child_issue_id, parent_repo_id, child_repo_id, position)`。子は親を 1 つだけ持つ。
 - 本家の上限：1 つの親に子は 100 件、入れ子は 8 段まで。別のリポジトリの Issue も子にできる（[sub-issue の文書](https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues)）。
 - 追加の時に、循環（自分の祖先を子にする）を拒否する。祖先をたどるのは 8 段までなので、再帰の問い合わせで確かめられる。
 - **権限**：親のリポジトリと子のリポジトリの両方で triage 以上を要る（本家の文書に要件の記述がない。2026-09-26 に確認。**未検証**。両側の表示が変わるので、両側で編集の権限を求める。E5 の spec の決定表で確定する）。
@@ -70,13 +70,13 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 | コミットの SHA（短縮を含む）、`owner/repo@sha` | コミット |
 | `@user`、`@org/team` | メンション（[notifications.md](notifications.md)） |
 
-- 本文・コメントの保存の後、Worker が参照を抜き出し、`issue_references (source_kind, source_id, source_repo_id, target_issue_id, created_at)` に書き、参照された側のタイムラインに `cross-referenced` のイベントを積む。本文の編集で参照が増えたときも積む。消えても、イベントは消さない（本家の文書に記述がない。**未検証**。E5 で本家を観測して合わせる）。
+- 本文・コメントの保存の後、Worker が参照を抜き出し、`issue_references (repo_id, source_kind, source_id, source_repo_id, target_issue_id, created_at)`（`repo_id` は参照された側） に書き、参照された側のタイムラインに `cross-referenced` のイベントを積む。本文の編集で参照が増えたときも積む。消えても、イベントは消さない（本家の文書に記述がない。**未検証**。E5 で本家を観測して合わせる）。
 - `redirect.github.com` を使った参照は逆リンクを作らない、という本家の抜け道に相当するものは MVP では作らない。
 - **閉じるキーワード**（`closes #10` など）による自動クローズは、Pull Request のマージの時に行う。詳細は [pull-requests.md](pull-requests.md)。
 
 ### 6.2 タイムライン
 
-`issue_events (repo_id, issue_id, id, actor_id, event, payload, created_at)` に追記だけで積む。コメントとイベントを時刻の順に合わせて表示する。
+`issue_events (repo_id, issue_id, id, actor_id, event, payload, source_repo_id, created_at)` に追記だけで積む。コメントとイベントを時刻の順に合わせて表示する。
 
 | イベント | payload の例 |
 | --- | --- |

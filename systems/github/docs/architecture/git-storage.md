@@ -24,7 +24,7 @@
             Git フロントエンド（git-protocols.md）      Web・API・Worker
                  │ gRPC（mTLS、ストリーム）                │ gRPC（読み取りの RPC）
                  ▼                                          ▼
-   ┌─────────── ルーティングの表（Aurora: storage_nodes, networks, network_replicas, repositories）
+   ┌─────────── ルーティングの表（Aurora: storage_nodes, repository_networks, network_replicas, repositories）
    │                                  │
    ▼ AZ-a                             ▼ AZ-c                         ▼ AZ-d
  storage node（gitd）             storage node（gitd）            storage node（gitd）
@@ -66,7 +66,7 @@
   network.git/                  # 共有のオブジェクト。refs/networks/<repo_id>/... に各リポジトリの ref の写し
   <repo_id>.git/                # 各リポジトリ（fork を含む）。bare
     objects/info/alternates     # ../network.git/objects
-    spokes/checksum             # ref のチェックサム（5 節）
+    gitd/checksum             # ref のチェックサム（5 節）
   tmp/                          # 修復・repack の作業領域
 ```
 
@@ -79,13 +79,15 @@
 
 | 表 | 主な列 | 意味 |
 | --- | --- | --- |
-| `storage_nodes` | `node_id`、`az`、`state`（`active`・`draining`・`offline`・`retired`）、`capacity_bytes`、`used_bytes`、`weight` | ストレージのノード |
-| `repository_networks` | `network_id`、`root_repo_id`、`visibility_class`、`size_bytes`、`placement_class`（`standard`・`large`） | fork のネットワーク |
-| `network_replicas` | `network_id`、`node_id`、`state`（`healthy`・`out_of_sync`・`creating`・`removing`） | ネットワークの複製の場所と状態 |
-| `repositories` | `repo_id`、`network_id`、…（メタデータは [data-model.md](data-model.md)） | リポジトリ |
-| `repository_checksums` | `repo_id`、`checksum`、`version` | 確定した ref の状態の要約と、更新の通し番号（5 節） |
-| `ref_transactions` | `txn_id`、`repo_id`、`base_version`、`state`（`pending`・`committed`・`aborted`）、`updates`、`created_at` | 3 相の手順の途中の記録（5 節） |
-| `repair_jobs` | `network_id`、`repo_id`、`reason`、`priority`、`state` | 修復の待ち行列 |
+| `storage_nodes` | `id`、`az`、`state`（`active`・`draining`・`offline`・`retired`）、`capacity_bytes`、`used_bytes`、`weight` | ストレージのノード |
+| `repository_networks` | `id`（`network_id`）、`root_repo_id`、`visibility_class`、`size_bytes`、`placement_class`（`standard`・`large`） | fork のネットワーク |
+| `network_replicas` | `network_id`、`storage_node_id`、`state`（`healthy`・`out_of_sync`・`creating`・`removing`） | ネットワークの複製の場所と状態 |
+| `repositories` | `id`（`repo_id`）、`network_id`、… | リポジトリ |
+| `repository_checksums` | `repo_id`、`checksum`、`version`、`pending_version` | 確定した ref の状態の要約と、更新の通し番号（5 節） |
+| `ref_transactions` | `id`（`txn_id`）、`repo_id`、`base_version`、`before_checksum`、`after_checksum`、`state`（`pending`・`committed`・`aborted`）、`updates`、`created_at` | 3 相の手順の途中の記録（5 節） |
+| `repair_jobs` | `network_id`、`repo_id`、`storage_node_id`、`reason`、`priority`、`state` | 修復の待ち行列 |
+
+列の定義の正本は [data-model/git-storage-metadata.md](data-model/git-storage-metadata.md)。
 
 ### 4.2 配置の選び方
 
@@ -112,7 +114,7 @@ fork は、元のネットワークの 3 つのノードに置く（新しい配
 
 - リポジトリのチェックサムは、全 ref の `(refname, value)` のハッシュ（SHA-256）の XOR とする（Stretching Spokes と同じ）。
 - 更新は差分で計算できる：`new = old XOR H(ref, old_value) XOR H(ref, new_value)`。作成は `old_value` を、削除は `new_value` を含めない。
-- 各複製は `spokes/checksum` に自分の値を持ち、ref の更新と同じ手順で書き換える。検査のときは、ref の一覧から計算し直して突き合わせる。
+- 各複製は `gitd/checksum` に自分の値を持ち、ref の更新と同じ手順で書き換える。検査のときは、ref の一覧から計算し直して突き合わせる。
 - `HEAD`（既定のブランチの指し先）や、PR 用の `refs/pull/*` も ref に含める。
 
 ### 5.2 手順
@@ -128,18 +130,18 @@ coordinator                     replica A / B / C（gitd）                  Aur
     │◀── vote(ok, before, after) ───────────
     │ 2. 2 票以上が ok で before・after が一致したら
     │    tx: ref_transactions に pending を書く ─────────────────────────▶ （同時に version を CAS で予約）
-    │ 3. COMMIT ─────────────────────────▶ commit（ロックを外して反映）、spokes/checksum を更新
+    │ 3. COMMIT ─────────────────────────▶ commit（ロックを外して反映）、gitd/checksum を更新
     │◀── ack ───────────────────────────────
     │ 4. 2 つ以上の ack で
     │    tx: checksum・version を更新、ref_transactions を committed、
-    │        投票しなかった・失敗した複製を out_of_sync、outbox に refs.updated ─▶
+    │        投票しなかった・失敗した複製を out_of_sync、outbox に repository.refs_updated ─▶
     │ 5. クライアントに成功を返す
 ```
 
 - 1 の `prepare` は、ref のロックを取り、全ての ref の旧値が期待どおりか確かめる。Git の `update-ref --stdin` の `start`・`prepare`・`commit`・`abort` を使う（[git-update-ref](https://git-scm.com/docs/git-update-ref)）。本家が Git に入れた、トランザクションとしての ref の更新と同じもの（Stretching Spokes）。
 - 2 の `version` の予約は、`UPDATE repository_checksums SET pending_version = version + 1 WHERE repo_id = ? AND version = ? AND pending_version IS NULL` の形の CAS で行う。同じリポジトリの push は、ここで直列になる。予約に失敗したら、全ての複製に `abort` を送り、クライアントに再試行を促すエラーを返す（Git のクライアントには「更新の競合」として見える）。
 - 複製が持つロックは、同じ ref への他の更新を止める。本家が「複製を分散ロックとして使う」と書いている役目。
-- 4 の DB のトランザクションで、outbox の Event（`refs.updated`）を書く。Event の順序は `version` で決まる（ADR-0005 の「リポジトリごとの順序付きの Event」）。
+- 4 の DB のトランザクションで、outbox の Event（`repository.refs_updated`）を書く。Event の順序は `version` で決まる（ADR-0005 の「リポジトリごとの順序付きの Event」）。
 - 3 で ack が 2 つ未満なら、成功を返さない。4 を書く前に coordinator が落ちた場合は、5.3 節の回収で決着させる。
 
 ### 5.3 途中で止まったときの回収
@@ -153,7 +155,7 @@ coordinator                     replica A / B / C（gitd）                  Aur
 
 - **失われない**：成功を返した更新は、2 つ以上の複製の ref に反映され、DB の `checksum` と一致している。
 - **一致する**：修復が追いついた後、3 つの複製のチェックサムは DB の `checksum` と等しい。
-- **順序**：outbox の `refs.updated` を `version` の順に適用すると、DB の写しの ref は Git の ref と一致する（ADR-0005）。
+- **順序**：outbox の `repository.refs_updated` を `version` の順に適用すると、DB の写しの ref は Git の ref と一致する（ADR-0005）。
 
 これらは [quality.md](../quality.md) の性質として、障害注入で検証する（10 節）。
 
@@ -176,7 +178,7 @@ coordinator                     replica A / B / C（gitd）                  Aur
 
 ### 6.2 定期の照合
 
-- 毎日、全てのリポジトリについて、3 つの複製のチェックサムを DB と比べる。ノードは `spokes/checksum` ではなく、ref の一覧から計算し直した値を返す。
+- 毎日、全てのリポジトリについて、3 つの複製のチェックサムを DB と比べる。ノードは `gitd/checksum` ではなく、ref の一覧から計算し直した値を返す。
 - 週に 1 度、ネットワークを順に回って `git fsck --connectivity-only` を行う。1 ノードの 1 日の量に上限を置く。
 - 不一致の件数、`out_of_sync` の数、修復の待ち行列の長さと最古の経過時間を監視する（15 節）。
 
@@ -247,10 +249,10 @@ objects がネットワークで共有されるので、次のことが起きる
 ## 9. バックアップ
 
 - 3 つの複製は、ノードや AZ の障害への備え。バックアップは、運用の誤り、ソフトウェアの不具合で 3 つが同時に壊れること、リージョンの障害への備え。
-- **増分**：`refs.updated` の Event（outbox）を契機に、バックアップのワーカーが、リポジトリごとに最大 5 分まとめて、`git bundle create`（[git-bundle](https://git-scm.com/docs/git-bundle)）で「前回のバックアップの ref の先端から、今の ref まで」の bundle を作り、S3 に置く。ref の一覧（名前と値）も一緒に置く。
+- **増分**：`repository.refs_updated` の Event（outbox）を契機に、バックアップのワーカーが、リポジトリごとに最大 5 分まとめて、`git bundle create`（[git-bundle](https://git-scm.com/docs/git-bundle)）で「前回のバックアップの ref の先端から、今の ref まで」の bundle を作り、S3 に置く。ref の一覧（名前と値）も一緒に置く。
 - **全体**：週に 1 度、または増分の鎖が 50 個を超えたら、ネットワークの全体の bundle を作る。
 - **保存**：大阪のバケットに直接書く。東京のバケットに書いて S3 のレプリケーションで送る方式は採らない（レプリケーションの遅れが RPO に足されるため。[ADR-0032](../decisions/0032-disaster-recovery-strategy.md) の選択肢 3）。SSE-KMS で暗号化し、バージョニングと Object Lock（ガバナンスモード、35 日）で守る。保持は 35 日。ただし、最新の完全な復元点は期限を過ぎても常に残す（消去したリポジトリを除く。11.1 節）。バケットと災害復旧の手順は [infrastructure.md](infrastructure.md) の 5 節にある。
-- **RPO**：まとめる時間（5 分）とワーカーの遅れの和。リージョンの障害の RPO 15 分（NFR-009）を満たすよう、バックアップの遅れ（最古の未処理の `refs.updated` の経過時間）を p99 10 分以内に保ち、12 分でアラートを出す。
+- **RPO**：まとめる時間（5 分）とワーカーの遅れの和。リージョンの障害の RPO 15 分（NFR-009）を満たすよう、バックアップの遅れ（最古の未処理の `repository.refs_updated` の経過時間）を p99 10 分以内に保ち、12 分でアラートを出す。
 - **復元の確認**：毎日、無作為に選んだ 1,000 のリポジトリを、バックアップだけから隔離した環境に復元し、ref のチェックサムが本番と一致することを確かめる（infrastructure.md と同じ）。
 - LFS の objects は S3 にあり、別に扱う（[git-protocols.md](git-protocols.md) の 7 節）。
 - 本家のバックアップの方式は公開されていない（**未検証**。本家に寄せる対象ではなく、この設計の判断として扱う）。
@@ -350,7 +352,7 @@ objects がネットワークで共有されるので、次のことが起きる
 - 複製：`healthy` が 3 未満のネットワークの数（2 つ・1 つ別に）、修復の待ち行列の長さと最古の経過時間、定期の照合の不一致の数
 - ノード：ディスクの使用率、IOPS、CPU、進行中の `pack-objects`・`receive-pack` の数、状態ごとの台数
 - 保守：遅れているリポジトリの数、パックの数の分布、repack の失敗の数
-- バックアップ：最古の未処理の `refs.updated` の経過時間、復元の確認の失敗の数
+- バックアップ：最古の未処理の `repository.refs_updated` の経過時間、復元の確認の失敗の数
 
 ## 17. 未検証の事項
 
