@@ -4,15 +4,9 @@
 
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
-| [intent.md](intent.md) | 本質、MVP の範囲、守るべき振る舞い、成功の基準、やらないこと、確認待ちの論点 | PM |
-| [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、領域の計画、Epic の草案 | Dev |
-| [decisions/](decisions/README.md) | ADR の一覧 | Dev |
-| [runbooks/](runbooks/README.md) | SLO、リリース、アラートと手順、訓練 | Ops |
-
-これから作る文書（まだない）：
-
-| 文書 | 内容 | 持ち主 |
-| --- | --- | --- |
-| `quality.md` | 品質戦略、ゴールデンデータセット、並行稼働、テスト計画 | QA |
-| `roadmap.md` | Epic と Story | PM |
-| `architecture/<領域>.md` | 領域ごとの設計（[architecture/](architecture/README.md) の 7 節） | Dev |
+| [intent.md](intent.md) | 本質、MVP の範囲、守るべき振る舞い、成功の基準、やらないこと、確認待ちの論点（L1〜L58） | PM |
+| [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、主な決定、リスク、領域ごとの設計（7 節）、データモデルの索引（[data-model.md](architecture/data-model.md)） | Dev |
+| [decisions/](decisions/README.md) | ADR の一覧（0001〜0063） | Dev |
+| [quality.md](quality.md) | 品質のリスク、仕様のレビューの関門、テストのレベル、ゴールデンデータセットと並行稼働、本番での品質検証、AI の eval、Epic ごとの合否基準 | QA |
+| [roadmap.md](roadmap.md) | Epic（E1〜E16）と Story、延期の一覧 | PM |
+| [runbooks/](runbooks/README.md) | SLO、アラートと手順、リリースの方針（規則表のリリースの暦、支給日の前の凍結）、訓練 | Ops |

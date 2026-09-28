@@ -76,6 +76,8 @@
 | 財務会計（Financials） | 別の題材の大きさがある。MVP は仕訳の出力までにする |
 | 変形労働時間制の 1 年単位、裁量労働制、高度プロフェッショナル制度 | MVP は 1 か月単位の変形とフレックスまで |
 
+- Epic の番号は [roadmap.md](roadmap.md) にある：年末調整と法定調書は E13、電子申請（社会保険・雇用保険の届出、住民税の通知の電子の取り込み）は E14、退職所得と退職金は E15、タレント管理は E16。それ以外は延期の一覧に置く。
+
 ### 守るべき振る舞い
 
 - 有効日付つきのデータで、同じ従業員の同じ項目の有効期間は重ならない。
@@ -137,30 +139,77 @@
 
 ### 法務・社労士・税理士の確認待ち
 
-設計はどの結論にも対応できる形にするが、結論は出さない。**下の表の「承認を止める spec」は、確認が済むまで PM・QA が承認しない。**
+設計はどの結論にも対応できる形にするが、結論は出さない。**下の表の「承認を止める spec」は、確認が済むまで PM・QA が承認しない。** L1〜L11 は題材の全体の論点、L12〜L58 は各領域の文書が L1〜L11 を細かくしたものと、新しく見つけたものである。どれも確認待ちで、結論が出たら、この表と関係する文書を直す。
 
 | # | 問い | 確認先 | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- | --- |
-| L1 | 番号法：本システムの提供者は、テナント（個人番号関係事務実施者）からの委託先に当たるか。クラウドの提供者が個人番号を取り扱わない場合の扱い（いわゆるクラウドの例外）に当てはまらない前提でよいか。再委託（運用の外部委託、サブプロセッサー）の許諾の取り方 | 法務 | `my-number-vault.md`、[ADR-0005](decisions/0005-security-and-my-number.md) | E11 の保管庫の本番の利用 |
-| L2 | マイナンバーの保存と削除：扶養控除等申告書は、提出期限の翌年 1 月 10 日の翌日から 7 年の保存と読める（ガイドライン）。書類ごとの保存期間の一覧、退職者の番号を削除する時期、削除の記録に何を残すか | 税理士・社労士 | `my-number-vault.md`、`audit-and-retention.md` | E11 の削除の Story |
-| L3 | 給与明細の電子交付：従業員の承諾の取り方と記録、承諾しない人への書面の交付、承諾の撤回 | 税理士・社労士 | `self-service-ui.md`、`payments-and-accounting.md` | E10 の明細の電子交付 |
-| L4 | 賃金の口座振込：従業員の同意の取り方と記録。振込先の口座の変更を本人の申請だけで受けてよいか | 社労士 | `payments-and-accounting.md`、`core-hr.md` | E10 の振込ファイル |
-| L5 | 記録の保存期間：賃金台帳・労働者名簿・出勤簿（労働基準法 109 条で 5 年、当分の間 3 年）、年次有給休暇管理簿（3 年）、源泉徴収簿、給与計算のデータが電子帳簿保存法の対象になるか、会計の仕訳の出力の保存 | 税理士・社労士 | `audit-and-retention.md` | E11 の保持の規則 |
-| L6 | 36 協定と労働時間：警告の閾値、管理監督者の扱い（上限の対象外でも労働時間の把握は要る）、客観的な方法での労働時間の把握（打刻と PC のログの乖離）をどこまでシステムが見るか | 社労士 | `time-and-attendance.md` | E6 の 36 協定の警告 |
-| L7 | 年次有給休暇：斉一的な付与日（前倒し）のときの年 5 日の義務の期間の扱い、時間単位の年休の上限（年 5 日）、就業規則の独自の規則をどこまで設定で表すか | 社労士 | `absence-and-leave.md` | E7 の付与の規則 |
-| L8 | 社会保険料の端数：テナントと従業員の間の「特約」による端数処理（切り捨てなど）を許す設定の範囲。子ども・子育て支援金の導入で新たに生じる端数の扱い | 社労士 | `payroll-jp-rules.md` | E8 の社会保険料の Story |
-| L9 | 会計の仕訳：預り金（源泉所得税、住民税、社会保険料）の科目の分け方、法定福利費の計上の時期（発生月か納付月か）、未払金の扱い | 税理士 | `payments-and-accounting.md` | E10 の仕訳の出力 |
-| L10 | 個人情報保護法：本システムの提供者は委託先か。要配慮個人情報（健康の情報、障害、労災）を持つときの取得の同意と権限。漏えい等の報告の手順と、テナントとの分担 | 法務 | `security.md`、[ADR-0005](decisions/0005-security-and-my-number.md) | E12 の GA の判定 |
-| L11 | 並行稼働：本番の給与のデータを、現行のシステムとの比較のために取り込むことの、テナントとの契約と、現行のシステムの提供者との契約上の扱い | 法務 | `integrations-and-bulk.md` | E9 の並行稼働 |
+| L1 | 番号法：本システムの提供者は、テナント（個人番号関係事務実施者）からの委託先に当たるか。クラウドの提供者が個人番号を取り扱わない場合の扱い（いわゆるクラウドの例外）に当てはまらない前提でよいか。再委託（運用の外部委託、サブプロセッサー）の許諾の取り方 | 法務 | [my-number-vault.md](architecture/my-number-vault.md)、[security.md](architecture/security.md) の 11 節、[ADR-0005](decisions/0005-security-and-my-number.md) | E11 の保管庫の本番の利用 |
+| L2 | マイナンバーの保存と削除：扶養控除等申告書は、提出期限の翌年 1 月 10 日の翌日から 7 年の保存と読める（ガイドライン）。書類ごとの保存期間の一覧、退職者の番号を削除する時期、削除の記録に何を残すか | 税理士・社労士 | [my-number-vault.md](architecture/my-number-vault.md) の 10 節、[audit-and-retention.md](architecture/audit-and-retention.md) の 5.2 節 | E11 の `mn-retention-and-deletion` |
+| L3 | 給与明細の電子交付：従業員の承諾の取り方と記録、承諾しない人への書面の交付、承諾の撤回 | 税理士・社労士 | [self-service-ui.md](architecture/self-service-ui.md)、[payments-and-accounting.md](architecture/payments-and-accounting.md) の 4.3 節 | E10 の `payslip-e-delivery-consent` |
+| L4 | 賃金の口座振込：従業員の同意の取り方と記録。振込先の口座の変更を本人の申請だけで受けてよいか | 社労士 | [payments-and-accounting.md](architecture/payments-and-accounting.md) の 3.2 節、[core-hr.md](architecture/core-hr.md) の 6 節 | E10 の `wage-payment-consent` |
+| L5 | 記録の保存期間：労働者名簿・賃金台帳・出勤簿など（労働基準法 109 条で 5 年、143 条で当分の間 3 年）、年次有給休暇管理簿（施行規則 24 条の 7 で 5 年、施行規則附則 71 条で当分の間 3 年）、源泉徴収簿、給与計算のデータが電子帳簿保存法の対象になるか、会計の仕訳の出力の保存。本システムは確認まで長いほう（5 年など）を既定にする | 税理士・社労士 | [audit-and-retention.md](architecture/audit-and-retention.md) の 5.2 節 | E11 の `retention-rules-table` |
+| L6 | 36 協定と労働時間：警告の閾値、管理監督者の扱い（上限の対象外でも労働時間の把握は要る）、客観的な方法での労働時間の把握（打刻と PC のログの乖離）をどこまでシステムが見るか | 社労士 | [time-and-attendance.md](architecture/time-and-attendance.md) | E6 の `overtime-alerts` |
+| L7 | 年次有給休暇：斉一的な付与日（前倒し）のときの年 5 日の義務の期間の扱い、時間単位の年休の上限（年 5 日）、就業規則の独自の規則をどこまで設定で表すか | 社労士 | [absence-and-leave.md](architecture/absence-and-leave.md) | E7 の `annual-leave-grant-rules`、`uniform-grant-policy` |
+| L8 | 社会保険料の端数：テナントと従業員の間の「特約」による端数処理（切り捨てなど）を許す設定の範囲。子ども・子育て支援金の導入で新たに生じる端数の扱い | 社労士 | [payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 4.3 節 | E8 の `social-insurance-premiums` |
+| L9 | 会計の仕訳：預り金（源泉所得税、住民税、社会保険料）の科目の分け方、法定福利費の計上の時期（発生月か納付月か）、未払金の扱い | 税理士 | [payments-and-accounting.md](architecture/payments-and-accounting.md) の 7 節 | E10 の `payroll-journal-entries` |
+| L10 | 個人情報保護法：本システムの提供者は委託先か。要配慮個人情報（健康の情報、障害、労災）を持つときの取得の同意と権限。漏えい等の報告の手順と、テナントとの分担 | 法務 | [security.md](architecture/security.md) の 4・10・11 節、[ADR-0005](decisions/0005-security-and-my-number.md) | E12 の GA の判定 |
+| L11 | 並行稼働：本番の給与のデータを、現行のシステムとの比較のために取り込むことの、テナントとの契約と、現行のシステムの提供者との契約上の扱い | 法務 | [integrations-and-bulk.md](architecture/integrations-and-bulk.md) の 5 節 | E9 の `parallel-run-compare`、`parallel-run-imports` |
+| L12 | 解雇の予告の 30 日の数え方（予告の日を含むか、退職日を含むか）と、解雇の制限の「その後 30 日間」の数え方。警告の境界の決定表の行 | 社労士 | [core-hr.md](architecture/core-hr.md) の 5.4 節 | E3 の `termination-and-legal-warnings` |
+| L13 | 有期の契約の雇止めの予告と、無期転換の申込みの権利の発生の判定を、システムの警告にどこまで入れるか | 社労士 | 同上 | 同上 |
+| L14 | 労働条件の通知の書面：システムで作る項目の範囲、電子での交付（本人の希望）の記録の取り方、変更の範囲の記載の例 | 社労士 | [core-hr.md](architecture/core-hr.md) の 5.3 節 | E3 の `hire-process` |
+| L15 | 派遣の労働者・業務委託の人を登録するときの、個人情報の取得の根拠と、派遣先管理台帳などの法定の帳簿を持つか | 法務・社労士 | [core-hr.md](architecture/core-hr.md) の 7 節 | E3 の `contingent-workers` |
+| L16 | 労働者名簿（107 条）の記入の事項を、本システムのデータで満たすか（履歴、退職の事由など）と、保存（L5 と合わせる） | 社労士 | [core-hr.md](architecture/core-hr.md)、[reporting.md](architecture/reporting.md) の 5.1 節 | E12 の `statutory-registers` |
+| L17 | 月の途中で事業所が変わった人の 36 協定の月・年の時間を、どちらの協定で数えるか。100 時間・80 時間の通算の扱い（L6 を細かくしたもの） | 社労士 | [time-and-attendance.md](architecture/time-and-attendance.md) の 6.2 節 | E6 の `overtime-alerts` |
+| L18 | 月 60 時間の「1 か月」の起算（賃金の締めの期間か、協定の起算か暦月か）。就業規則で定める前提でよいか | 社労士 | 同上の 5.4 節 | E6 の `work-hour-calc-fixed-shift` |
+| L19 | 2 暦日にまたがる勤務、法定の休日の暦日の扱い、週の起算の既定（未検証の通達） | 社労士 | 同上の 2 節 | 同上 |
+| L20 | 乖離のしきい値の既定（30 分）と、自己申告の運用を許す条件（L6 を細かくしたもの） | 社労士 | 同上の 3.3 節 | E6 の `objective-records-divergence` |
+| L21 | 管理監督者・裁量労働の人の「労働時間の状況の把握」（労働安全衛生法）に何を記録すれば足りるか | 社労士 | 同上の 5.7 節 | E6 の `work-rules-and-shifts` |
+| L22 | 変形の期間の途中のシフトの変更を、警告にとどめてよいか | 社労士 | 同上の 4.2 節 | E6 の `work-hour-calc-monthly-variable` |
+| L23 | 出勤率の分母・分子の扱い（DT-ABS-001 の未検証の行：年休の日、会社都合の休業、所定の休日、法定の短期の休暇）（L7 を細かくしたもの） | 社労士 | [absence-and-leave.md](architecture/absence-and-leave.md) の 4.3 節 | E7 の `annual-leave-grant-rules` |
+| L24 | 継続勤務の判定（定年後の再雇用、有期の更新、グループ内の転籍）をどの印で表すか | 社労士 | 同上の 4.2 節 | 同上 |
+| L25 | 年の途中で所定（週の日数・時間）が変わった人の比例付与の判定と、時間単位の 1 日の時間数の見直し。時効の起算と満了の日 | 社労士 | 同上の 4.2・4.5・4.6 節 | E7 の `hourly-and-half-day-leave`、`leave-expiry` |
+| L26 | 斉一的付与で短くなった期間の出勤率、按分の月数の端数、繰越の分の取得を 5 日に数えるか | 社労士 | 同上の 4.4・5 節 | E7 の `uniform-grant-policy`、`five-day-obligation` |
+| L27 | 子の看護等休暇・介護休暇の日数と時間単位の法定の規則（育児・介護休業法）をシステムの規則にするか、テナントの入力にするか | 社労士 | 同上の 3.2・7 節 | E7 の `special-leaves` |
+| L28 | 過払い（遡及で差引が負、誤った支払い）を次の給与から差し引く条件（24 条の協定、本人の同意、1 回に差し引ける額） | 社労士 | [payroll-engine.md](architecture/payroll-engine.md) の 7.2 節 | E9 の `retro-detection-and-delta` |
+| L29 | 遡及の支給を当期の支払いとして源泉徴収する扱い（支給日の属する年の税額表、年をまたぐ遡及） | 税理士 | 同上、[payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 3.5 節 | 同上 |
+| L30 | 賞与に月額表を使う場合の計算の手順 | 税理士 | [payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 3.1・3.4 節 | E9 の `wht-bonus` |
+| L31 | 子ども・子育て支援金は、源泉所得税の計算で控除する「社会保険料等」に入るか | 税理士 | 同上の 3.3 節 | E8 の `wht-monthly-table` |
+| L32 | 健康保険料・介護保険料・支援金の丸めの単位（合算か個別か）と、明細の内訳の出し方。健康保険組合ごとの違い（L8 を細かくしたもの） | 社労士 | 同上の 4.3 節 | E8 の `social-insurance-premiums` |
+| L33 | 当月の分を当月の給与から控除する運用（`same_month`）の扱い | 社労士 | 同上の 4.5 節 | 同上 |
+| L34 | 随時改定の遡及の昇給の扱い（変動の月、平均からの除外）、定時決定の対象外の条件、平均の円未満の扱い | 社労士 | 同上の 4.6・4.7 節 | E9 の `interim-revision-detection`、`regular-determination` |
+| L35 | 住民税の退職の一括徴収の「事由の日」（退職日か最後の給与の支払い日か） | 税理士 | 同上の 6.3 節 | E8 の `resident-tax-withholding` |
+| L36 | 平均賃金の銭未満の扱い、休業手当・解雇予告手当の円未満の扱い | 社労士 | 同上の 7.3 節 | E8 の `leave-pay-and-average-wage` |
+| L37 | 雇用保険料の端数と、料率の改定の適用（締日か支払日か。賞与は支払日か）の一次の資料 | 社労士 | 同上の 5 節 | E8 の `employment-insurance` |
+| L38 | 給与の支払明細書の記載の事項と、電子交付の承諾の文面・みなしの承諾の通知（L3 を細かくしたもの） | 税理士 | [payments-and-accounting.md](architecture/payments-and-accounting.md) の 4 節 | E10 の `payslip-e-delivery-consent` |
+| L39 | 月の途中で事業場が変わった人の賃金台帳の事業場、賃金台帳の様式 | 社労士 | 同上の 6 節 | E10 の `wage-ledger` |
+| L40 | 事業主の雇用保険料（年度更新）と社会保険料の計上の時期と科目（L9 を細かくしたもの） | 税理士 | 同上の 7.2 節 | E10 の `payroll-journal-entries` |
+| L41 | 移行で取り込む過去の退職者の範囲（保存の期間の中の人だけでよいか）と、現行のシステムに残るデータの消去の責任 | 法務・社労士 | [integrations-and-bulk.md](architecture/integrations-and-bulk.md) の 4 節 | E12 の `migration-loads` |
+| L42 | 並行稼働で、現行のシステムの勤怠の集計まで取り込むことの契約上の扱い（L11 を細かくしたもの） | 法務 | 同上の 5 節 | E9 の `parallel-run-imports` |
+| L43 | 打刻機の打刻を「客観的な記録」として扱う条件（カードの貸し借りの扱い） | 社労士 | 同上の 8 節 | E6 の `clock-terminal-integration` |
+| L44 | 本人確認の書類の画像（写し）を保存するか、いつ消すか。保存しない場合に確認の記録だけで足りるか（L2 を細かくしたもの） | 法務・社労士 | [my-number-vault.md](architecture/my-number-vault.md) の 4 節 | E11 の `mn-collection-and-verification` |
+| L45 | 雇用の関係で本人と明らかなときの身元確認の省略の条件と、記録に残すべきこと | 社労士 | 同上の 4.2 節 | 同上 |
+| L46 | 扶養の親族の本人確認を、どの事務で誰が行うか（扶養控除等申告書、第 3 号被保険者の届出） | 税理士・社労士 | 同上の 4.3 節 | 同上 |
+| L47 | 番号の一部（末尾 4 桁）の表示・記録が、特定個人情報の扱いになるか | 法務 | 同上の 6.2 節 | E11 の `vault-api` |
+| L48 | バックアップ（35 日）に残る暗号文の扱いが、削除の要件を満たすか。満たさないなら、DEK を別の保存に置いて消す方式が要る | 法務 | 同上の 10.3 節 | E11 の `mn-retention-and-deletion` |
+| L49 | 本システムが委託先に当たる場合の、テナントとの契約（監督、再委託の許諾、AWS をサブプロセッサーとして扱うこと、漏えいのときの通知の期限）（L1 を細かくしたもの） | 法務 | 同上の 2 節 | E12 の GA の判定 |
+| L50 | 退職者の本体の記録を消す時期と、再雇用の見込みがある人の扱い（L2 を細かくしたもの） | 税理士・社労士 | 同上の 10.1 節 | E11 の `mn-retention-and-deletion` |
+| L51 | 保存の期間の規則表の各行の期間と起算の事象（特に、当分の間 3 年の経過措置の下で 5 年を既定にしてよいか、健康保険・厚生年金の 2 年と労働基準法の記録が重なる記録の扱い）（L5 を細かくしたもの） | 社労士 | [audit-and-retention.md](architecture/audit-and-retention.md) の 5.2 節 | E11 の `retention-rules-table` |
+| L52 | 源泉徴収簿は法定の帳簿か。給与の記録・入力の文書・結果を何年持つべきか | 税理士 | 同上 | 同上 |
+| L53 | 給与明細の控えと振込ファイルの保存の要否と期間 | 税理士・社労士 | 同上 | 同上（給与明細・振込ファイルの行） |
+| L54 | 監査ログと機微な閲覧の記録の保存の期間（法定がないものの目安）と、退職者の記録の消去との関係 | 法務 | 同上 | E11 の `retention-purge-jobs` |
+| L55 | 給与の記録を電子帳簿保存法の国税関係帳簿書類として扱う場合の要件の当てはめ（優良の要件を満たす必要があるか） | 税理士 | 同上の 7 節 | E12 の `ebooks-act-readiness` |
+| L56 | 運用者によるテナントのデータの参照（セキュリティの事象の例外）を、契約でどう約束するか | 法務 | [security.md](architecture/security.md) の 7 節 | E12 の GA の判定 |
+| L57 | テナントの解約の後のデータの返却と、鍵の削除による消去の説明（バックアップ 35 日を含む） | 法務 | 同上の 5.2 節 | E12 の GA の判定 |
+| L58 | 口座の変更の通知を、本人の個人の連絡先に送ってよいか（個人の連絡先の利用目的） | 法務 | 同上の THR-020 | E10 の `payment-election-change-notice` |
 
 ### 選定・計測で決めるもの（法務以外）
 
-- 源泉所得税の計算の方式：月額表の表引きと、電子計算機等による計算の特例のどちらを既定にするか。両方を持ち、テナントの設定（有効日付つき）で選ぶ前提にする。特例の端数の規則は未検証で、`payroll-jp-rules.md` で国税庁の資料から確かめる。
-- 雇用保険の料率の改定を、どの賃金から当てるか（賃金の締切日で決まると理解しているが未検証）。`payroll-jp-rules.md` で厚生労働省の資料から確かめる。
-- 協会けんぽと健康保険組合の料率の持ち方。健康保険組合は組合ごとに料率が違う。MVP は、協会けんぽの都道府県別の料率と、テナントが入力する組合の料率の両方を持つ。
+- 源泉所得税の計算の方式：月額表の表引きと、電子計算機等による計算の特例の両方を持ち、会社ごとの有効日付の設定で選ぶ。既定は表引き。特例の端数は告示の別表で確かめた（**決定**。[ADR-0031](decisions/0031-income-tax-withholding.md)）。
+- 雇用保険の料率の改定は、賃金の締日で選ぶ（**決定**。[ADR-0033](decisions/0033-employment-insurance-and-resident-tax.md)）。一次の資料の確認は L37 に残す。
+- 協会けんぽと健康保険組合の料率の持ち方：協会けんぽの都道府県別の料率は規則表、健康保険組合の料率はテナントが入力する表（**決定**。[payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 2.1 節）。
 - 給与計算の時間（NFR-003）と、S2 の 10 万人のテナントでの計算の分割の単位：E12 の負荷試験で決める。
 - 打刻機の連携の形式：対象の機種と形式を E6 の着手前に決める（未検証）。
-- 銀行への振込データの締め切り（支給日の何営業日前か）は、銀行ごとに違う（未検証）。支給日の逆算の既定値を E10 で決める。
+- 銀行への振込データの締め切り（支給日の何営業日前か）は、銀行ごとに違う（未検証）。既定は支払元の口座の設定の 3 営業日前（[payments-and-accounting.md](architecture/payments-and-accounting.md) の 3.5 節）。銀行ごとの値は E10 の着手の前に対象のテナントの銀行の仕様書で確かめる。
 
 ## 参考
 
@@ -178,10 +227,10 @@
   - 厚生労働省, [令和8年度の雇用保険料率](https://www.mhlw.go.jp/content/001692566.pdf)
   - 日本年金機構, [保険料の計算方法について](https://www.nenkin.go.jp/service/kounen/hokenryo/nofu/20121026.html)
   - 厚生労働省, [時間外労働の上限について（スタートアップ労働条件）](https://www.startup-roudou.mhlw.go.jp/36_pact.html)
-  - 厚生労働省, [年5日の年次有給休暇の確実な取得 わかりやすい解説](https://www.mhlw.go.jp/content/000463186.pdf)
+  - 厚生労働省, [年5日の年次有給休暇の確実な取得 わかりやすい解説](https://www.mhlw.go.jp/content/001140963.pdf)（旧版の 000463186.pdf は 2026-09-28 に 404）
   - 厚生労働省, [月60時間を超える時間外労働の割増賃金率が引き上げられます](https://www.mhlw.go.jp/content/000930914.pdf)
   - 厚生労働省, [改正労働基準法等に関するQ&A（記録の保存）](https://www.mhlw.go.jp/content/000617980.pdf)
-  - 個人情報保護委員会, [特定個人情報の適正な取扱いに関するガイドライン（事業者編）](https://www.ppc.go.jp/legal/policy/my_number_guideline_jigyosha/)
+  - 個人情報保護委員会, [特定個人情報の適正な取扱いに関するガイドライン（事業者編）](https://www.ppc.go.jp/legal/policy/my_number_guideline_jigyosha/)（令和 7 年 6 月の一部改正の版）
   - 国税庁, [電子帳簿保存法一問一答【電子取引関係】](https://www.nta.go.jp/law/joho-zeikaishaku/sonota/jirei/pdf/0024005-113_r603.pdf)
-  - eLTAX, [個人住民税特別徴収税額通知の特設ページ](https://www.eltax.lta.go.jp/news/08036)
-- 厚生年金の標準報酬月額の上限の引き上げ（2027 年 9 月に 68 万円、以後段階的に 75 万円まで）は、社労士事務所などの二次資料でだけ確かめた（未検証）。E8 の前に、厚生労働省・日本年金機構の資料で確かめる。
+  - eLTAX, [個人住民税特別徴収税額通知の特設ページ](https://www.eltax.lta.go.jp/news/08036)（2026-09-28 に 403 で開けなかった。未検証）
+  - 厚生労働省, [厚生年金の標準報酬月額の上限の引き上げ](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000147284_00024.html)（2027 年 9 月に 68 万円、2028 年 9 月に 71 万円、2029 年 9 月に 75 万円。[payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 4.1 節で確かめた）
