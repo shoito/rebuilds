@@ -18,7 +18,7 @@
 | [Figma](systems/figma/) | デザインツール | 中央の権威サーバーでの共同編集、WebGL / WASM での描画、巨大なドキュメント | 設計済み |
 | [Zoom](systems/zoom/) | ビデオ会議 | WebRTC、SFU、帯域の推定、低遅延、録画 | 設計済み |
 | [Uber](systems/uber/) | 配車のマーケットプレイス | マッチング、地理空間の索引、動的な料金、リアルタイムの位置 | 設計済み |
-| [Linear](systems/linear/) | イシュー管理 | ローカルファーストの同期エンジン、オフライン、キーボード中心の即時の操作 | 設計中 |
+| [Linear](systems/linear/) | イシュー管理 | ローカルファーストの同期エンジン、オフライン、キーボード中心の即時の操作 | 設計済み |
 | [Salesforce](systems/salesforce/) | CRM プラットフォーム | メタデータ駆動のマルチテナント、レコードの共有モデル、宣言的な自動化 | 設計中 |
 | [ServiceNow](systems/servicenow/) | IT サービス管理 | 継承するテーブル、ワークフローと SLA、CMDB の識別と照合 | 設計済み |
 | [Workday](systems/workday/) | 人事・給与 | 有効日付のデータ、業務プロセス、日本の給与計算、マイナンバーの保護 | 設計済み |
