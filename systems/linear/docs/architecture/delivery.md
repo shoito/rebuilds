@@ -107,7 +107,7 @@ ADR-0056。
 - 成果物（ハッシュ付きの JS・CSS、Service Worker、`index.html`）を、版ごとの接頭辞で S3 に置く。古い版の資産は 90 日残す（開いたままのタブと、Service Worker の殻が読む）。
 - **段階的な切り替え**：CloudFront Functions が、クッキー `<brand>_cid`（端末の ID。[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節）のハッシュの桶と、KeyValueStore の「版ごとの割合」から、`index.html` の版を選ぶ。1% → 10% → 50% → 100% を、各段で 4 時間以上、RUM の指標（5.1 節）を見て進める。
 - 新しい殻は Service Worker が背景で取り、次の起動で使う（[client-app.md](client-app.md) の 10 節）。
-- **戻し**：KeyValueStore の割合を前の版に戻す。すでに新しい版を開いた端末は、次の起動で前の版に戻る。ただし、**手元の DB の版（`schema_version`）を上げたリリースは戻せない**（前の版のコードは新しい DB を開けず、再読み込みを促すだけになる。[client-store-and-offline.md](client-store-and-offline.md) の 6.4 節）。そこで、DB の版を上げる変更は機能の変更と別のリリースにし（同 6 節の依頼）、1% で 48 時間見てから進め、問題は前へ直す（修正の版を出す）。
+- **戻し**：KeyValueStore の割合を前の版に戻す。KeyValueStore の変更は数秒で全部のエッジに届く（[Introducing Amazon CloudFront KeyValueStore](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)、2026-09-28 に確認）。すでに新しい版を開いた端末は、次の起動で前の版に戻る。ただし、**手元の DB の版（`schema_version`）を上げたリリースは戻せない**（前の版のコードは新しい DB を開けず、再読み込みを促すだけになる。[client-store-and-offline.md](client-store-and-offline.md) の 6.4 節）。そこで、DB の版を上げる変更は機能の変更と別のリリースにし（同 6 節の依頼）、1% で 48 時間見てから進め、問題は前へ直す（修正の版を出す）。
 
 ### 5.1 段階を進める条件
 
@@ -129,7 +129,7 @@ ADR-0056。
 - **更新の案内**：`https://update.<brand>.<domain>/<platform>/<arch>/<channel>?v=<今の版>&b=<桶>` を `public-api` が返す（Squirrel.Mac の JSON の形、Windows は選んだ形）。`b` は端末の ID のハッシュの桶（0〜99）で、案内は「その版の出す割合 > b」の端末にだけ新しい版を返す。配布物は S3 と CloudFront。
 - **段階**：1%（24 時間）→ 10%（24 時間）→ 50% → 100%。各段で、殻の版ごとのクラッシュの率、起動の失敗、RUM の指標を見る。Chromium の High 以上の修正を含む版は、24 時間で 100% まで進める（[security.md](security.md) の 11 節の 7 日の期限）。
 - **止める**：割合を 0 にする。まだ取っていない端末は取らない。**戻す**：前のコードで版の番号を上げた版を出す（Squirrel は版を下げられない）。手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
-- **署名**：macOS は Developer ID の署名と公証、Windows はコード署名。署名の鍵はクラウドの HSM（shared のアカウント）に置き、CI の署名のジョブだけが使う（`security:sensitive`）。更新の案内は TLS で、配布物の署名を `autoUpdater` が確かめる（macOS）。Windows の Squirrel が配布物の署名を確かめるかは E6 で確かめる（**未検証**）。
+- **署名**：macOS は Developer ID の署名と公証、Windows はコード署名。署名の鍵はクラウドの HSM（shared のアカウント）に置き、CI の署名のジョブだけが使う（`security:sensitive`）。更新の案内は TLS で、配布物の署名を `autoUpdater` が確かめる（macOS。Squirrel.Mac は署名を必須にする）。Electron の文書は Windows の Squirrel.Windows の署名の確かめに触れない（[autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)、2026-09-28 に確認）。Windows で配布物の署名が確かめられるかは**未検証**で、E6 の `electron-auto-update` で確かめる。確かめられなければ、更新の案内の応答に配布物の SHA-256 を入れ、殻が入れる前に照らす。
 - **最低の版**：Gateway の `min_build`（AppConfig）は、`build` を「殻の版＋レンダラーの版」の組で比べる（`hello` の `build` の形は `shell@x.y.z+web@<hash>`。[sync-engine.md](sync-engine.md) の 9.2 節）。`min_build` より古いと `kick: upgrade_required` で送信を止めるが、手元の読み書きと outbox への保存は続ける（ADR-0005）。上げる理由は、プロトコル・互換の一覧の外れ（30 日）・セキュリティ（殻の脆弱性）に限る。
 - 殻の版の支え：直近 90 日の殻は動く。それより古い殻には更新を促す表示を出し、セキュリティの理由があれば `min_build` で止める。
 
@@ -199,9 +199,8 @@ ADR-0057。3 つの版（DB の形、モデルの `schema_hash`・`fv`、手元�
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | Windows の配布を Squirrel.Windows にするか MSIX にするか | E6 |
-| Windows の Squirrel が配布物の署名を確かめるか | E6（**未検証**） |
+| Windows の Squirrel が配布物の署名を確かめるか | E6 の `electron-auto-update`（**未検証**） |
 | 固定の機械のランナーの型番と台数 | E1 の `latency-bench-harness` |
-| CloudFront Functions の KeyValueStore の反映の速さ（戻しの時間） | E1 で確かめる（**未検証**） |
 
 ## 12. quality.md・runbooks・data-model への項目
 

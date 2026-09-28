@@ -64,8 +64,8 @@
 | SCIM | SCIM 2.0 の Users と Groups。`/scim/v2`、Bearer のトークン。配ることとログインは別 | [SCIM](https://www.better-auth.com/docs/plugins/scim) |
 | 組織 | 組織・メンバー・ロール・招待（既定 48 時間）・チーム | [Organization](https://www.better-auth.com/docs/plugins/organization) |
 
-- Better Auth の表の名前・列の名前を変えられるか（`modelName` など）は、PostgreSQL のアダプターの文書に書かれていない（**未検証**。E4 で確かめる）。
-- Better Auth の過去の脆弱性の件数と、対応の速さは、この確認では調べていない（**未検証**。3.4 節の手順で見る）。
+- 本体の表（`user`・`session`・`account`・`verification`）の名前と列の名前は、設定の `modelName` と `fields` で変えられる。部品の表は部品の `schema` で変える。コードの型は元の名前のまま（[Database](https://www.better-auth.com/docs/concepts/database)、2026-09-28 に確認）。
+- 公開された脆弱性の告知（GitHub Security Advisories）は 32 件（2024-12〜2026-08。Critical 2 件は SSO と SCIM の部品、High は本体・パスキー・OAuth の提供者の部品にもある）（[better-auth の Security Advisories](https://github.com/better-auth/better-auth/security/advisories)、2026-09-28 に確認）。告知から修正の版までの速さは、この確認では測っていない（3.4 節の手順で見る）。
 
 ## 3. Better Auth の評価と使い方
 
@@ -75,7 +75,7 @@ ADR-0034。
 
 | 観点 | Better Auth | 自前（SimpleWebAuthn、OIDC のクライアントなどの部品から組む） | 管理された IdP（Cognito など） |
 | --- | --- | --- | --- |
-| 必要な手段（メールのコード、Google、パスキー） | 部品がそろう | 全部書く | 多くはそろう。メールのコードとリンクの両方を 1 通で送る形は作り込みが要る（未検証） |
+| 必要な手段（メールのコード、Google、パスキー） | 部品がそろう | 全部書く | 多くはそろう。メールのコードとリンクの両方を 1 通で送る形は作り込みが要る（未検証。管理された IdP を採らないので確かめない） |
 | 技術の合い方 | TypeScript、Hono、PostgreSQL（Kysely）。同じ Aurora の別スキーマに置ける | 同じ | 別のサービス。ユーザーの表が外にある |
 | 後の SAML・SCIM | 部品がある（samlify、SCIM 2.0） | 大きな作業 | ある |
 | データの所在（法務の L4） | 自分の Aurora（東京） | 同じ | リージョンを選べる |
@@ -112,12 +112,13 @@ ADR-0034。
 | `verification` | 確認のコード | メールの OTP |
 | `passkey` | パスキー | 公開鍵、カウンター |
 
-- 表の名前は Better Auth の既定のままにする（名前を変えられるかが未検証のため）。この文書では「アカウント」と書く。
+- 表の名前は Better Auth の既定のままにする。`modelName` で変えられるが、コードの型は元の名前のままなので、名前が 2 つになり、読み違いを招くため。この文書では「アカウント」と書く。
 
 ### 3.4 版と脆弱性
 
 - 版は固定し（`1.7.x` の範囲で、自動の更新は patch だけ）、minor 以上の上げは、6 節の結合テストとログインの E2E を通してから行う。
 - GitHub の Security Advisories と、npm の監査を CI で見る。認証の部品の High 以上の告知は、7 日以内に上げるか、回避を入れる（security の領域の脆弱性の対応に入れる）。
+- 告知は多い（2.2 節。2026-09-28 までに 32 件）。部品は使うまで依存に入れない（組織・OAuth の提供者・stripe は使わない。SSO・SCIM は Enterprise の Epic で入れる）。告知の対象を、依存に入れた部品だけに絞る。
 
 ## 4. アカウントとワークスペース
 
@@ -300,7 +301,7 @@ model("Invitation", {
 - トークンは同期する行に入れない。サーバーだけの表 `invitation_tokens(workspace_id, invitation_id, token_hash)` に SHA-256 だけを置く。
 - 期限は 7 日（本システムの値。本家は**未検証**）。作り直すと前のトークンは無効。
 - `role = guest` は、フラグの裏（[permissions-and-teams.md](permissions-and-teams.md) の 6.4 節）。
-- グループは `role:admin`。`members_can_invite` のワークスペースでは、メンバーが招待を作れるが、招待の一覧は管理者にだけ届く（メンバーには自分が作った招待の結果だけを通知で知らせる）。
+- グループは `role:admin`。`members_can_invite` を真にしたワークスペース（既定は偽）では、メンバーが招待を作れるが、招待の一覧は管理者にだけ届く（メンバーには自分が作った招待の結果だけを通知で知らせる）。
 
 ### 7.2 参加の経路
 
@@ -325,7 +326,7 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 ### 7.4 招待のリンクと許可したドメイン
 
 - 招待のリンク：ワークスペースに 1 つ。`workspace_invite_links(token_hash, created_by, created_at, disabled_at)`。管理者が作り直すと前のリンクは無効。有効・無効は管理者の設定（既定は無効）。
-- 許可したドメイン：ワークスペースの設定 `allowed_email_domains`（10 個まで）。ドメインの持ち主の確認（DNS の TXT）を必須にする（確認の値と状態はサーバーだけの表 `workspace_domain_verifications`）。確かめていないドメインを許すと、誰かが同じドメインの公開のメールサービスのアドレスを作って入れるため。本家がドメインの確認を求めるかは**未検証**。
+- 許可したドメイン：ワークスペースの設定 `allowed_email_domains`（10 個まで）。ドメインの持ち主の確認（DNS の TXT）を必須にする（確認の値と状態はサーバーだけの表 `workspace_domain_verifications`）。確かめていないドメインを許すと、誰かが同じドメインの公開のメールサービスのアドレスを作って入れるため。本家の文書は、許可したドメインを足す手順だけを書き、持ち主の確認に触れない（[Invite members](https://linear.app/docs/invite-members)、2026-09-28 に確認。確認を求めるかは**未検証**）。
 - よく使われる公開のメールのドメイン（`gmail.com` など）は、許可したドメインに入れられない。
 
 ## 8. ワークスペースのログインの制限
@@ -427,8 +428,8 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Better Auth の表・列の名前を変えられるか、クッキーの接頭辞の設定の名前 | E4 の `auth-service-skeleton` |
-| Better Auth の脆弱性の履歴と、告知への対応の速さ | E4 の着手の前に、セキュリティのレビューで調べる |
+| クッキーの接頭辞の設定の名前 | E4 の `auth-service-skeleton` |
+| Better Auth の告知への対応の速さ（告知から修正の版まで） | E4 の着手の前に、セキュリティのレビューで調べる |
 | メールの送信事業者（SES か、別の事業者か）と、2 つ持つか | notifications-and-inbox と法務の L1 の後 |
 | SAML の IdP の属性でロールを決めるか、SCIM の Groups をチームに写すか | Enterprise の Epic（E13 以降） |
 | 本家のコード・招待の期限、ドメインの確認 | 公式の資料では確かめられなかった（**未検証**のまま） |

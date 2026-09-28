@@ -46,7 +46,7 @@
 1. Relay：担当のない区画があれば、Relay のタスクを入れ替える。Valkey が落ちていれば、DB の勧告的ロックでの担当に切り替わっているかを見る。
 2. Valkey：障害なら、Gateway は reader から欠けを埋め続ける（遅いが正しい）。回復を待つ。
 3. Gateway の過負荷：タスクを増やす。1 つの大きなワークスペースの送信が原因なら、そのワークスペースの接続が散っているかを見る。
-4. 1 つのワークスペースのロックの待ち：`ops.write_budget.<origin>` でそのワークスペースの `api`・`worker`・`import` を絞る。インポートなら `paused` にする（`writer-lock-contention.md`、`import-degrades-workspace.md`）。
+4. 1 つのワークスペースのロックの待ち：`ops.write_budget.<origin>` でそのワークスペースの `api`・`notifier`・`worker`・`import` を絞る。インポートなら `paused` にする（`writer-lock-contention.md`、`import-degrades-workspace.md`）。
 5. 全体の Writer・Aurora：Writer の CPU なら増やす。Aurora の writer なら、重い問い合わせ（Worker の一括、書き出し）を止める（`ops.*` のフラグ）。
 6. 直前のリリースが原因なら戻す（[deploy-and-rollback.md](deploy-and-rollback.md)）。
 

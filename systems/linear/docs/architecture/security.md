@@ -134,13 +134,13 @@ ADR-0046。
 | HTTP のキャッシュ | 添付の画像（`private, max-age=300`） | ブラウザの規則 |
 | クッキー | セッション、端末の ID（`<brand>_cid`） | ログアウト（セッション）。端末の ID は残す（[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節） |
 | OS の通知の履歴 | 通知の文面（`desktop_content = full` なら識別子とタイトル） | OS の規則 |
-| Electron のデータの場所（`userData`） | 上の IndexedDB・キャッシュ・クッキーと同じもの（Electron のセッションの区画） | 同上。アンインストールで消えるかは OS とインストーラーによる（**未検証**） |
+| Electron のデータの場所（`userData`） | 上の IndexedDB・キャッシュ・クッキーと同じもの（Electron のセッションの区画） | 同上。アンインストールで消えるかは OS とインストーラーによる（**未検証**。E6 の `electron-shell` で確かめる） |
 
 ### 4.2 暗号化しない理由
 
 - 手元の DB を、アプリの層の鍵で暗号化しない。
   - ブラウザでは、鍵を同じ端末（IndexedDB の `CryptoKey` か、サーバーから毎回受ける鍵）に置くしかない。同じ端末の鍵では、ディスクを読める攻撃者から守れない。サーバーから鍵を受ける形は、オフラインで起動できなくなる（NFR-003・004 と合わない）。
-  - Electron の `safeStorage` は、macOS では同じ利用者の他のアプリからも守るが、Windows（DPAPI）では同じ利用者の他のアプリから守らない。Linux は秘密の保管がなければ守らない（[safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)、2026-09-28 に確認）。IndexedDB の全体を包む仕組みも Chromium にない（**未検証**）。
+  - Electron の `safeStorage` は、macOS では同じ利用者の他のアプリからも守るが、Windows（DPAPI）では同じ利用者の他のアプリから守らない。Linux は秘密の保管がなければ守らない（[safeStorage](https://www.electronjs.org/docs/latest/api/safe-storage)、2026-09-28 に確認）。IndexedDB の全体を包む仕組みも Chromium にない、と見ている（**未検証**。E3 の `idb-layout` で調べる）。
   - XSS（C1）には、どの暗号化も効かない（アプリ自身が復号する）。
 - 代わりに、端末の紛失・盗難には **OS のディスクの暗号化**（FileVault、BitLocker）を前提にし、利用の条件と管理者向けの案内に書く。MDM で確かめる機能は MVP の後。
 
@@ -209,7 +209,7 @@ ADR-0047。
 
 | 秘密情報 | 保存 | 入れ替え |
 | --- | --- | --- |
-| セッションのトークン | Better Auth の `session`（ハッシュの有無は部品の既定。E4 で確かめる。**未検証**） | 30 日の不使用で失効 |
+| セッションのトークン | Better Auth の `session`（ハッシュの有無は部品の既定。文書に書かれていない。**未検証**。E4 の `auth-service-skeleton` で確かめる） | 30 日の不使用で失効 |
 | 同期のチケット | Valkey に SHA-256（60 秒） | 1 回限り |
 | API キー、OAuth のトークン・クライアントの秘密 | SHA-256（ADR-0042） | 期限、入れ替え |
 | Webhook の秘密、連携のトークン、インポートの認証 | 暗号文（5.2 節） | 利用者・管理者の操作、Slack は 12 時間 |
@@ -373,9 +373,9 @@ ADR-0048。**期間はすべて既定案で、法務の確認（L5・L7）で確
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | ASVS 5.0 の要件の番号の照合 | E1 |
-| Better Auth のセッションのトークンの保存の形（ハッシュか） | E4 で確かめる（**未検証**） |
-| Chromium に IndexedDB を包む仕組みがあるか | E3 で調べる（**未検証**）。あれば Electron だけ暗号化を見直す |
-| Electron のアンインストールで `userData` が消えるか | E6 で OS ごとに確かめる（**未検証**） |
+| Better Auth のセッションのトークンの保存の形（ハッシュか） | E4 の `auth-service-skeleton`（**未検証**。[Database](https://www.better-auth.com/docs/concepts/database) の表の説明に書かれていない） |
+| Chromium に IndexedDB を包む仕組みがあるか | E3 の `idb-layout` で調べる（**未検証**）。あれば Electron だけ暗号化を見直す |
+| Electron のアンインストールで `userData` が消えるか | E6 の `electron-shell` で OS ごとに確かめる（**未検証**） |
 | MDM での端末の条件の確かめ、管理者の「端末に保存させない」の設定 | MVP の後（Enterprise） |
 | 監査ログの画面、ログのストリーム | MVP の後（Enterprise） |
 | 解約から削除までの日数 | 法務の L5・L7 |

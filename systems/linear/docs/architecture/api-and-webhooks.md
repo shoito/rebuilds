@@ -43,9 +43,11 @@
 | Webhook の署名 | 本家の名前の付いたヘッダーに、生の本文の HMAC-SHA256。`webhookTimestamp`（ミリ秒）が受けた時刻から 1 分以内かを確かめることを勧める | 同上 |
 | Webhook の送信 | 5 秒で時間切れ。200 以外で再試行、1 分・1 時間・6 時間（最大 3 回）。応答しない Webhook は止めることがある | 同上 |
 | Webhook の作成 | ワークスペースの管理者か、`admin` の範囲の OAuth のアプリだけ。対象は全部の公開のチームか、1 つのチーム | 同上 |
+| API キー | 管理者は、メンバーが自分の API キーを作れるかを設定で決める（管理者は常に作れる）。キーごとに、利用者の読める全部か、範囲（Read・Write・Admin・Create issues・Create comments）に絞れる。特定のチームにも絞れる。管理者はワークスペースのキーの一覧を見て取り消せる | [API and Webhooks](https://linear.app/docs/api-and-webhooks) |
+| ページング | Relay の形の cursor。引数なしで最初の 50 件。既定の並びは `createdAt`、`orderBy: updatedAt` で最近の変更の順 | [Pagination](https://linear.app/developers/pagination) |
 
-- 本家の API キーの期限、範囲、チームでの絞り方は、上の文書では確かめられなかった（**未検証**）。
-- 本家のページングの既定と上限、cursor の形は、上の文書の本文では確かめられなかった（**未検証**）。
+- 本家の API キーの期限は、上の文書では確かめられなかった（**未検証**）。
+- 本家のページングの上限と cursor の中身の形は、上の文書の本文では確かめられなかった（**未検証**）。
 - 本家の Webhook の署名のヘッダーの名前は、本家の名前を含むので、この設計では `<Brand>-Signature` と書く（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 ## 3. GraphQL の API
@@ -371,7 +373,7 @@ ADR-0042。
 
 - `oauth_apps` の表はワークスペースの表（RLS）に置く。認可の画面で、ワークスペースのコンテキストを決める前にアプリの名前・戻りの URL・範囲を読むときは、`SECURITY DEFINER` の関数 `oauth_app_public(client_id)` だけを使い、`(workspace_id, name, redirect_uris, scopes)` だけを返す（[data-model.md](data-model.md) の 3 節）。
 
-- 実装は、認証の部品（Better Auth）の OAuth の提供者の機能を使わず、Public API の中に小さく持つ。トークンをワークスペースの `User` に結び、上の形と保存の規則にするため。Better Auth の該当の部品の機能は**未検証**で、E11 の着手の時に比べ直してよい。
+- 実装は、認証の部品（Better Auth）の OAuth の提供者の機能を使わず、Public API の中に小さく持つ。トークンをワークスペースの `User` に結び、上の形と保存の規則にするため。Better Auth の OAuth 2.1 の提供者の部品は、PKCE（公開のクライアントで必須）、リフレッシュトークンの入れ替えと再利用の検出を持つ（[OAuth 2.1 Provider](https://better-auth.com/docs/plugins/oauth-provider)、2026-09-28 に確認）。ただし、その部品には 2026 年に High の告知が複数ある（[accounts-and-auth.md](accounts-and-auth.md) の 2.2 節）。E11 の着手の時に比べ直してよい。
 - `actor=app`（アプリの利用者を主体にする）と client credentials は MVP の後。エージェントの連携（AI の Epic）の時に決める。
 
 ## 7. 障害のときの振る舞い
@@ -453,7 +455,7 @@ ADR-0042。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 本家の API キーの期限・範囲の形、ページングの既定 | 公式の資料で確かめられない（**未検証**）。本システムの値のまま |
+| 本家の API キーの期限、ページングの上限 | 公式の資料で確かめられない（**未検証**）。本システムの値のまま |
 | `actor=app` と client credentials | AI の Epic の着手の時 |
 | 公開のアプリの一覧（他のワークスペースへの配布） | MVP の後 |
 | Webhook の送りの順序の保証（同じ行の順） | 試用の声。要れば Webhook ごとの FIFO |

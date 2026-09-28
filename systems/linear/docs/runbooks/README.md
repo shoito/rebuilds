@@ -35,7 +35,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
 | 1 ワークスペースの書き込み | 1 秒 300 変更（見込み。E2 の PoC で確かめる） | [capacity.md](../architecture/capacity.md) の 2.1 節 | — |
-| `origin` ごとの枠 | `api` 60（瞬間 300）、`worker` 50（瞬間 500）、`import` 100（自動で下げる）。`client` は数えない | 同 2.2 節（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)） | `ops.write_budget.<origin>` でワークスペースごとに下げる（`writer-lock-contention.md`） |
+| `origin` ごとの枠 | `api` 60（瞬間 300）、`notifier` 50（瞬間 500）、`worker` 50（瞬間 500）、`import` 100（自動で下げる）。`client` は数えない | 同 2.2 節（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)） | `ops.write_budget.<origin>` でワークスペースごとに下げる（`writer-lock-contention.md`） |
 | 1 トランザクション・1 回の `submit` | 500 操作・256 KiB、100 トランザクション・1 MiB | [sync-engine.md](../architecture/sync-engine.md) の 4.3 節 | — |
 | Writer のロックの待ち | `lock_timeout` 2 秒（非公開への切り替えは 10 秒） | 同 5.2 節 | — |
 | outbox（端末） | 未確定 5 万件・100 MiB、警告 1,000 件か 24 時間 | [client-store-and-offline.md](../architecture/client-store-and-offline.md) の 5.3 節 | — |
@@ -74,6 +74,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | Terraform（`regional/network`・`regional/data`） | 平日 10〜16 時。Ops の承認 | 同上 |
 | DR の戻し（大阪 → 東京の switchover） | 計画作業として | 大きな利用者の催しの日を避ける |
 
+- 上の時間帯と凍結は本システムの既定である。問題の観察と戻しを、人がそろう平日の日中に置くため。本家の運用の値ではない。
 - 脆弱性の修正（Critical）と Chromium の High 以上の修正は、時間帯の制限を受けない。レビューと必須の CI（シミュレーター、遅延の予算、オフラインの 3 つの場面を含む）は省かない。
 - 凍結の予定は、Ops が四半期ごとにこの表の下に書き足し、PM と合意する。
 
@@ -139,7 +140,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | ワークスペースの削除のジョブの失敗 | `workspace-deletion.md`（security.md の 16 節） | E12 で作成 | `workspace-deletion-job` |
 | サポートの参照の許しと手順 | `support-access.md`（同上） | E12 で作成 | `support-access-grants` |
 | 秘密の出力の検出（page、SEV2）、監査ログのハッシュの連鎖の失敗（page、SEV2） | [incident-response.md](incident-response.md) の「その他」 | 作成済み | `otel-baseline`、`audit-log-table-and-archive` |
-| ワークスペースのクラスタの移動（S2） | `workspace-move.md`（infrastructure.md の 14 節） | S2 の着手で作成 | S2 の Epic |
+| ワークスペースのクラスタの移動（S2） | `workspace-move.md`（infrastructure.md の 14 節） | S2 の着手で作成 | `workspace-move`（[roadmap.md](../roadmap.md) の延期の一覧の S2 の候補） |
 
 ### 4.1 領域との対応
 

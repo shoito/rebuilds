@@ -9,7 +9,7 @@ date: 2026-09-28
 
 イシュー・コメント・プロジェクトの全文検索が要る（[intent.md](../intent.md)）。日本語の部分一致で取りこぼさず、変更から検索に出るまで p95 10 秒、サーバーの検索の p99 500ms（NFR-010）。
 
-[architecture/README.md](../architecture/README.md) の 4 節は、S1 を PostgreSQL の全文検索（日本語は bigram、`pg_bigm` の可否は未検証）、S2 で専用の基盤と計画していた。確かめたことは次のとおり（いずれも 2026-09-28）。
+[architecture/README.md](../architecture/README.md) の 4 節は、S1 を PostgreSQL の全文検索（日本語は bigram。`pg_bigm` の可否は確かめていなかった）、S2 で専用の基盤と計画していた。確かめたことは次のとおり（いずれも 2026-09-28）。
 
 - Aurora PostgreSQL 18（18.3・18.4）で `pg_bigm` の版 `1.2_20250903` が使える。`pgroonga` は使えない（[Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)）。
 - RLS の方針の条件は、LEAKPROOF でない利用者の条件より先に評価される（[CREATE POLICY](https://www.postgresql.org/docs/18/sql-createpolicy.html)）。`LIKE` は LEAKPROOF でないので、RLS のある表では `pg_bigm` の GIN の索引が効かない。Slack の題材は、検索の表だけ RLS を外し、関数を通してだけ読む例外を置いた（Slack の ADR-0027）。
@@ -46,7 +46,7 @@ date: 2026-09-28
   - S1 から OpenSearch のドメインを運用する（費用、版の更新、スナップショット）。
   - テナントの分離を、DB の RLS ではなく、検索の関数（`buildSearchRequest`）と読み直しで守る（ADR-0031）。
   - [architecture/README.md](../architecture/README.md) の 4 節の計画と違う。README の更新が要る。
-  - 1 文字の N-gram で索引が大きくなる（量は未検証。E8 で測る）。
+  - 1 文字の N-gram で索引が大きくなる（量は未検証。E8 の前の `search-poc` で測る）。
 
 ## Confirmation
 

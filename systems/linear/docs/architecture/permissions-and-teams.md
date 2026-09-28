@@ -125,7 +125,7 @@ model("WorkspaceSettings", {          // 1 ワークスペース 1 行
   groups: { rule: "workspace_members" },   // ゲストに届けない（6 節）
   load: { strategy: "instant" }, delete: { mode: "hard" },
   fields: {
-    members_can_invite:    { type: "bool", conflict: "lww", default: true },
+    members_can_invite:    { type: "bool", conflict: "lww", default: false },
     allowed_email_domains: { type: "set<string>", conflict: "set", max: 10 },   // 確認の状態はサーバーだけの表
     login_methods:         { type: "set<string>", conflict: "set", max: 4 },    // email_otp・google・passkey（後に saml）
     api_keys_allowed:      { type: "enum<all,admins,none>", conflict: "lww", default: "all" },
@@ -149,7 +149,9 @@ model("WorkspaceSettings", {          // 1 ワークスペース 1 行
 
 - `workspaces` の表も、他のワークスペースの表と同じく `workspace_id`（= `id`）と FORCE RLS を持つ。ワークスペースのコンテキストを決める前に slug から ID を引く処理（画面の最初の URL の解決）は、`SECURITY DEFINER` の関数 `resolve_workspace_slug(slug)` だけで行い、`(id, status, region)` だけを返す（[data-model.md](data-model.md) の 3 節）。アカウントから入れるワークスペースの一覧は `auth.workspace_directory`（[accounts-and-auth.md](accounts-and-auth.md) の 4.1 節）。
 - 行はワークスペースを作る時に Writer が作る。`status` と `region` は Writer のシステムのトランザクション（削除のジョブ、移動のジョブ）だけが書く。
-- `members_can_invite` の既定（真）、`slug` の長さは本システムの値（本家は**未検証**）。
+- `members_can_invite` の既定は偽（招待は管理者だけ）。本家の有料のプランの既定と同じで、管理者が設定で全員に広げられる（[Invite members](https://linear.app/docs/invite-members)、[Members and roles](https://linear.app/docs/members-roles)、2026-09-28 に確認）。B2B の利用で、知らない人が勝手に招かれない安全な既定にするため。
+  > 2026-09-28 の注記：当初の既定は真（本家の無料のプランの振る舞い）だった。PM の判断で偽に替えた（[README.md](README.md) の 6 節の決定）。
+- `slug` の長さ（48 文字まで）は本システムの既定である。URL に入れて読める長さに抑えるため。本家の上限は公式の資料で確かめられなかった（**未検証**）。
 - 書ける人は DT-PERM-002 の行 1・行 17 と DT-PERM-003。
 
 ## 4. `can()`
@@ -418,7 +420,7 @@ DT-PERM-004。公開 → 非公開のトランザクションとその後。
 | E4 | `workspace-roles` | 3.1 節のロール、DT-PERM-002 の管理の操作 |
 | E4 | `team-model-and-membership` | 3.2 節の `Team`・`TeamMembership`、参加・脱退（7.1 節） |
 | E4 | `private-teams` | 非公開のチームの作成、DT-PERM-001 の行 3・4、管理者の参加と監査 |
-| E4 | `team-privacy-toggle` | 7.2 節と DT-PERM-004（bootstrap-and-partial-sync の `team-privacy-toggle-sync` と共同） |
+| E4 | `team-privacy-toggle` | 7.2 節と DT-PERM-004（bootstrap-and-partial-sync の 7.8 節の同期の側を含む） |
 | E4 | `role-change-and-suspend` | 7.3・7.4 節 |
 | E4 | `policy-decision-tables` | DT-PERM-001〜004 の表駆動テスト、PROP-PERM-001 |
 | E4 | `permission-sim-props` | PROP-PERM-002〜004 |
@@ -449,6 +451,7 @@ DT-PERM-004。公開 → 非公開のトランザクションとその後。
 - **脱退**：非公開のチームから抜けたら、担当と購読者から外す（7.1 節）。
 - **ゲストに見せるもの**：公開のチームの一覧とメンバー、メールアドレスは見せる（6.3 節）。セキュリティのレビューで覆りうる。
 - **管理者の参加**：できる。監査とチームへの知らせを残す（ADR-0033）。
+- **メンバーの招待**：既定では管理者だけ（`members_can_invite` の既定は偽。本家の有料のプランと同じ）。管理者が設定で全員に広げられる（3.3 節。2026-09-28 に PM が決定）。
 
 ### 持ち越し
 

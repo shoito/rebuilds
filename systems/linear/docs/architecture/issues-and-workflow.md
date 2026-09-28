@@ -43,11 +43,13 @@
 | チームの移動 | 新しい識別子になる。チームのラベルとプロジェクトは外れる。サイクルは対応がなければ外れる。状態は移った先に合わせる。関連と優先度は残る | [Edit issues](https://linear.app/docs/editing-issues) |
 | 削除 | 削除したイシューはアーカイブに 30 日置き、その後に消える。`Cmd/Ctrl Z` か、アーカイブの「最近削除したもの」から戻せる | [Delete and archive issues](https://linear.app/docs/delete-archive-issues) |
 | 自動の処理 | 自動で閉じるは、一定の期間更新のないイシューを閉じる。自動のアーカイブは、閉じたイシューを一定の期間の後にアーカイブし、作った人に知らせる。新しいチームでは両方が有効 | [Issue status](https://linear.app/docs/configuring-workflows)、[Auto-close and auto-archive](https://linear.app/changelog/2020-08-19-auto-close-and-auto-archive)（2020-08-19） |
+| 自動の処理の除外 | 自動で閉じるは、進行中のサイクル・未完了のプロジェクトのイシューを閉じない。期日が先のもの、閉じられないサブイシューを持つものは遅らせる。自動のアーカイブは、閉じて活動のないまま期間を過ぎたものだけ。親が閉じていない、サブイシューが閉じていない、最近の活動がある、進行中のサイクル・未完了のプロジェクトにある（それらが完了して期間を過ぎるまで）ものはアーカイブしない。期間の変更は次の実行（ふつう 24 時間以内）で効く。アーカイブは自動だけで、手動の操作はない | [Delete and archive issues](https://linear.app/docs/delete-archive-issues) |
+| スヌーズ | Triage のスヌーズはイシューごとで、他の人の Triage からも隠れる。選んだ時刻か、イシューに新しい活動があった時の早い方で戻る | [Triage](https://linear.app/docs/triage) |
 | 下書き | 画面を離れると手元に一時の下書き。閉じると端末をまたぐ下書きになり、6 か月で消える | [Create issues](https://linear.app/docs/creating-issues) |
 
-- 自動のアーカイブの期間を「1〜12 か月」とする記載を検索の抜粋で見たが、文書の本文では選べる値を確かめられなかった（**未検証**）。自動で閉じるの期間の選択肢と既定値、対象の種類も**未検証**。
+- 自動のアーカイブの期間を「1〜12 か月」「既定 6 か月」とする記載を検索の抜粋で見たが、文書の本文では選べる値と既定を確かめられなかった（**未検証**）。自動で閉じるの期間の選択肢と既定値、対象の種類も**未検証**。
+- 本家のアーカイブは自動だけで、手動の操作がない。本システムは手動のアーカイブ（4.5 節の DT-ISSUE-003 の行 7）を持つ。本家との意図した差異で、残す（18 節の決定。2026-09-28 に PM が決定）。
 - Triage の文書は「重複にすると Canceled になる」、関連の文書は「予約の Duplicate の状態になる」と書き、食い違う。本システムは Duplicate の状態に統一する（8 節）。
-- 本家のスヌーズが利用者ごとかイシューごとかは**未検証**。
 
 ## 3. モデル
 
@@ -324,7 +326,7 @@ DT-ISSUE-002。`create Issue` の時の状態を Writer が決める。上から
 | 重複にする | `3` | 8 節 |
 | スヌーズ | `H` | `set triage_snoozed_until` |
 
-- スヌーズはイシューごと（チームで共有）にする。コメントの作成とイシューの変更の派生で `triage_snoozed_until` を外す。本家が利用者ごとかは**未検証**。
+- スヌーズはイシューごと（チームで共有）にする。コメントの作成とイシューの変更の派生で `triage_snoozed_until` を外す（本家と同じ。2 節）。
 - ショートカットをどこまで本家に寄せるかは法務の L8 の後に見直す（[client-app.md](client-app.md) の 5 節）。
 
 ## 11. 履歴
@@ -337,7 +339,7 @@ model("IssueHistory", {
   fields: {
     issue_id: { type: "ref:Issue", conflict: "server_only", on_delete: "cascade", index: true },
     actor_id: { type: "ref:User", conflict: "server_only", nullable: true, on_delete: "nullify" },
-    origin:   { type: "enum<client,api,worker,import>", conflict: "server_only" },
+    origin:   { type: "enum<client,api,worker,notifier,import>", conflict: "server_only" },
     tx_id:    { type: "uuid", conflict: "server_only" },
     changes:  { type: "json", conflict: "server_only", schema: "HistoryChanges" },
   },
@@ -354,7 +356,7 @@ model("IssueHistory", {
 ```
 
 - Writer が、1 つのトランザクションで変わったイシューごとに 1 行を、同じ DB のトランザクションで書く（派生）。対象は定義の `history` に挙げたフィールドと、関連・移動・アーカイブ・自動の処理。上書きの記録（ADR-0008）も同じ行に入れる。
-- 本文の変更は履歴に入れない（本文の版は [editor-and-descriptions.md](editor-and-descriptions.md) の 5.5 節）。
+- 本文の変更は履歴に入れない（本文の版は [editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節）。
 - 画面の「活動」は、履歴とコメントを `sync_id` の順に並べたもの。同じ人の 5 分以内の続けての変更は、画面でまとめて見せる（サーバーではまとめない。行を書き換えると差分が増えるため）。
 - 保持の期間は、イシューがある間。法務の L5 の結論で見直す。
 
@@ -369,14 +371,15 @@ ADR-0023。
 
 | ジョブ | いつ | 対象 | 当てる操作 |
 | --- | --- | --- | --- |
-| 自動で閉じる | チームごとに 1 日 1 回（ワークスペースのタイムゾーンで 03:00〜05:00 に散らす） | `backlog`・`unstarted` の種類で、`activity_at` が `auto_close_months` より前、アーカイブ・ゴミ箱でない | `set state_id = auto_close_state_id` |
-| 自動のアーカイブ | 同上 | `completed`・`canceled`・`duplicate` の種類で、`completed_at`・`canceled_at` が `auto_archive_months` より前 | `archive` |
+| 自動で閉じる | チームごとに 1 日 1 回（ワークスペースのタイムゾーンで 03:00〜05:00 に散らす） | `backlog`・`unstarted` の種類で、`activity_at` が `auto_close_months` より前、アーカイブ・ゴミ箱でない。ただし、進行中のサイクル（`Cycle.status = active`）のもの、未完了のプロジェクト（状態の種類が完了・取り消しでない）のもの、`due_date` が今日より後のもの、自動で閉じる条件を満たさない開いたサブイシューを持つものは除く | `set state_id = auto_close_state_id` |
+| 自動のアーカイブ | 同上 | `completed`・`canceled`・`duplicate` の種類で、`completed_at`・`canceled_at` と `activity_at` の遅い方が `auto_archive_months` より前。ただし、親が閉じていないもの、閉じていないサブイシューを持つもの、サイクル・プロジェクトにあり、そのサイクル・プロジェクトが完了から `auto_archive_months` を過ぎていないものは除く | `archive` |
 | ゴミ箱の消去 | 1 日 1 回 | `trashed_at` が 30 日より前 | `delete` |
 | 状態・ラベルの消去の続き | 4.4・6.1 節の操作の後 | 移すイシュー | `set`・`remove` |
 | 派生の続き | 9.3 節の 500 件の超過 | 残りのイシュー | 9.3 節の派生 |
 
 - すべて `actor = system`、`origin = worker` の Writer のトランザクションで、100 件ずつ。1 ワークスペースの `worker` の枠（1 秒 50 変更、瞬間 500。[ADR-0054](../decisions/0054-per-workspace-write-admission.md)、[capacity.md](capacity.md) の 2.2 節）に従い、枠を超えたら `retry` を待って続ける。利用者の書き込みのロックの待ち（`lock_timeout` 2 秒）を伸ばさない。自動で閉じる・アーカイブの開始の時刻は、ワークスペースの ID のハッシュで 03:00〜05:00 に散らし、1 つの Aurora のクラスタで同時に走るワークスペースを 20 までにする（ADR-0023 の注記）。
 - 自動の処理の結果は履歴に `{k: "auto", rule}` で残る。作った人への知らせは notifications-and-inbox の領域が、履歴の行から作る。
+- 除外の条件は本家の文書に合わせた（2 節。2026-09-28 の注記：当初は期間と種類だけを見ていた）。サイクル・プロジェクトの除外は、進行中の計画の中のイシューを、動いていないだけで閉じない・隠さないため。
 - `activity_at` と閾値の比較は Writer の中でもう一度行う。ジョブが読んでから書くまでの間に活動があったイシューは、飛ばす（`workflow_violation` にせず、その件だけ外す）。
 
 ## 14. 障害のときの振る舞い
@@ -422,7 +425,7 @@ ADR-0023。
 | E5 | `labels-and-groups` | 3.4・6.1 節のラベル、グループの排他、アーカイブ、消去のジョブ |
 | E5 | `estimates` | 6.2 節の尺度と検証 |
 | E5 | `sub-issues` | 9.1 節の親子、深さ、並び |
-| E5 | `issue-team-move` | 9.2 節の移動の派生（data-model-and-schema の `issue-team-move-aliases` と共同） |
+| E5 | `issue-team-move` | 9.2 節の移動の派生（data-model-and-schema の 5.4 節を含む） |
 | E5 | `auto-close-parent-sub` | 9.3 節と DT-ISSUE-004 |
 | E5 | `issue-relations` | 7 節の関連と正規化 |
 | E5 | `duplicates` | 8 節の重複、連鎖、解除 |
@@ -451,8 +454,9 @@ ADR-0023。
 - **移り変わり**：制限しない。Duplicate へは重複の関連でだけ入る（ADR-0023）。
 - **期間**：自動で閉じるは 0（無効）・1・3・6・9・12 か月から選び、既定 6 か月、閉じる先は最初の Canceled。自動のアーカイブは 1・3・6・9・12 か月、既定 6 か月（ADR-0023）。
 - **削除**：アーカイブと `trashed_at` の組でゴミ箱へ、30 日で消す（ADR-0023）。
+- **手動のアーカイブ**：残す（DT-ISSUE-003 の行 7）。本家はアーカイブを自動だけにするが、利用者が自動のアーカイブを待たずに片付けられるようにする。本家との意図した差異（2026-09-28 に PM が決定）。
 - **重複**：Duplicate の状態に統一（本家の文書の食い違いは Triage の文書を採らない）。購読者だけを元へ移す（ADR-0024）。
-- **スヌーズ**：イシューごと。活動で外す。
+- **スヌーズ**：イシューごと。活動で外す（本家と同じ。2 節）。
 - **親子**：深さ 10、子 1,000 件（ADR-0024）。
 - **無効な利用者の担当**：外さない。
 - **履歴**：トランザクションとイシューごとに 1 行。まとめは画面だけ（ADR-0025）。
@@ -462,7 +466,7 @@ ADR-0023。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 派生の変更が 1 ワークスペースの書き込みの上限（1 秒 300 件）をどれだけ食うか | E2 の PoC の後、E5 で派生を含めて測る |
-| 本家の自動の処理の期間・対象の種類、スヌーズの単位、担当の扱い | 公式の資料で確かめられなかった（**未検証**のまま） |
+| 本家の自動の処理の期間の選択肢と既定値、無効な利用者の担当の扱い | 公式の資料で確かめられなかった（**未検証**のまま） |
 | ショートカットの割り当てを本家に寄せる範囲 | 法務の L8 |
 
 ## 19. quality.md・runbooks・data-model への項目

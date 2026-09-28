@@ -81,7 +81,7 @@ Notion の題材は、手元の保存に SQLite（WASM）と OPFS を選び、�
 
 - Web では `navigator.storage.persist()` で永続の保存を求める。Electron では、アプリのデータの場所に保存され、ブラウザの消去の方針を受けない。
 - 起動の時に `_meta` がない、または登録と食い違うときは、消去されたとみなし、やり直しのブートストラップをする。outbox が消えていたら、取り戻せないので、そのことを本人に示す。
-- 未送信の outbox がある間に保存の上限に近づいたら、警告する。ブラウザごとの上限は未検証で、client-store-and-offline の領域で確かめる。
+- 未送信の outbox がある間に保存の上限に近づいたら、警告する。ブラウザごとの上限は、Chrome でディスクの 60% まで、Firefox で既定 10%（か 10 GiB）・永続 50%、Safari で約 60%（[Storage quotas and eviction criteria](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria)、2026-09-28 に確認。[client-store-and-offline.md](../architecture/client-store-and-offline.md) の 2 節）。
 - ログアウトでは、そのアカウントのデータベースをすべて消す。未送信の outbox があれば、先に本人に確かめる（security の領域）。
 
 - 2 を採らない理由：手元で SQL の問い合わせをしないので、SQLite の利点が小さい。WASM の読み込み（1 MB 前後）と、OPFS の 1 つの接続の制約（書き手のタブ以外は中継が要る）を払う意味が薄い。IndexedDB は、どのブラウザと Electron にも組み込まれている。一括の書き込みの遅さは、ブートストラップで大きなトランザクションにまとめて抑え、E3 の PoC で測る。遅すぎれば、2 に替える ADR を書く。

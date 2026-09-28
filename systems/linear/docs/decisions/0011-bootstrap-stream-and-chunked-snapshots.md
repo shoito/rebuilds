@@ -9,7 +9,7 @@ date: 2026-09-28
 
 [ADR-0003](0003-bootstrap-and-partial-sync.md) で、全体・部分・手元から・やり直しの 4 つのブートストラップと、「1 つの読み取りのスナップショット（`REPEATABLE READ`）の中でワークスペースの `last_sync_id` とモデルを読む」「NDJSON を圧縮して流す」ことを決めた。残る問いは次のとおり。
 
-- 最大のワークスペース（部分でも十数万行）を 1 つのスナップショットで読むと、Aurora の reader で長い読み取りになる。PostgreSQL のホットスタンバイでは、長い問い合わせが複製の適用と衝突して取り消されうる（Aurora の reader での条件は**未検証**）。
+- 最大のワークスペース（部分でも十数万行）を 1 つのスナップショットで読むと、Aurora の reader で長い読み取りになる。PostgreSQL のホットスタンバイでは、長い問い合わせが複製の適用と衝突して取り消されうる。Aurora の reader でも同じく取り消され（[Replication with Amazon Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.html)）、待つ時間の `max_standby_streaming_delay` は 30 秒までしか延ばせない（[Amazon Aurora PostgreSQL parameters, Part 2](https://aws.amazon.com/blogs/database/amazon-aurora-postgresql-parameters-part-2-replication-security-and-logging/)）。いずれも 2026-09-28 に確認。
 - 途中で切れたとき（タブを閉じた、回線が落ちた）、最初からやり直すと、大きなワークスペースで NFR-003（p95 10 秒）を何度も払う。
 - 画面を早く出すための、モデルの順序。
 

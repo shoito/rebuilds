@@ -76,7 +76,14 @@
 
 - 表と埋め込み（YouTube・Loom・Figma）は MVP で持たない（本家との差異）。外部の `iframe` の安全の検討が要るため。
 - リンクの `href` は `https:`・`http:`・`mailto:` と、本システムの内部の URL だけ。他は装飾を外す。
-- 知らないノード（新しい版のクライアントが作った）は、古いクライアントでは「表示できない要素」の置き物として描き、中身を消さない。y-prosemirror がスキーマに合わせて消しうるかは**未検証**で、E5 の前の PoC（`doc-schema-compat-poc`）で確かめる。消えるなら、ノードの追加をスキーマの破壊の変更として扱う（[data-model-and-schema.md](data-model-and-schema.md) の 6.2 節）。
+- y-prosemirror は、スキーマに合わない要素（知らないノード）を ProseMirror のノードにできないと、その要素を共有の Yjs の文書から消す（`createNodeFromYElement` の `catch` で `_item.delete`。[y-prosemirror 1.3.7 の sync-plugin.js](https://github.com/yjs/y-prosemirror/blob/master/src/plugins/sync-plugin.js)、2026-09-28 に確認）。消した更新は同期で全員に届くので、古いクライアントが 1 台開くだけで、新しい版で作った中身が全員から消える。
+- そこで、本文のスキーマにノード・装飾・属性を足すことを、破壊の変更として扱う（[data-model-and-schema.md](data-model-and-schema.md) の 6.2 節）。手順は次のとおり。
+  1. 足すノードを読める（描ける）だけの版を出す。作る操作はフラグ（`release.*`）の裏に置く。
+  2. Gateway の `min_build` を、その版まで上げる（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。古い版は接続を切られ、差分を受けない。Sync API の本文の読み込み（4.4 節）も `build < min_build` を断る。
+  3. フラグを開き、作れるようにする。
+- 「表示できない要素」の置き物で描く方式は採らない（上のとおり、y-prosemirror が要素を消すため）。
+
+> 2026-09-28 の注記：当初は「古いクライアントは知らないノードを置き物で描き、消さない。消えるかは E5 の前の PoC で確かめる」としていた。y-prosemirror のコードで消すことを確かめたので、ノードの追加を破壊の変更にし、`min_build` を先に上げる手順に替えた。PoC（`doc-schema-compat-poc`）は、この手順の試験（`doc-schema-compat`）に替えた。
 
 ### 3.3 入力の補助
 
@@ -93,7 +100,7 @@
 | `Cmd/Ctrl+Shift+U` | ファイルを上げる |
 | `Cmd/Ctrl+Option+M`（Windows は `Ctrl+Alt+M`） | 選んだ範囲にインラインのコメント（7 節） |
 
-- 入力の規則（`# ` など）とエディタのショートカットは、IME の組み立ての途中では発火させない。ProseMirror の入力の規則は組み立ての確定の後に評価されると見込む（`inputRules` は `handleTextInput` で動く。組み立て中の振る舞いは**未検証**で、E5 の IME の確認で確かめる）。エディタの外のショートカットの抑止は [client-app.md](client-app.md) の 5.3 節。
+- 入力の規則（`# ` など）とエディタのショートカットは、IME の組み立ての途中では発火させない。ProseMirror の入力の規則は、組み立ての途中（`view.composing`）では評価せず、`compositionend` の後に 1 回評価する（[prosemirror-inputrules 1.5.1 の inputrules.ts](https://github.com/ProseMirror/prosemirror-inputrules/blob/master/src/inputrules.ts)、2026-09-28 に確認）。E5 の IME の確認では、確定の直後に規則が 1 回だけ動くことを確かめる。エディタの外のショートカットの抑止は [client-app.md](client-app.md) の 5.3 節。
 - ショートカットの割り当てを本家にどこまで寄せるかは、法務の L8 の後に見直す。
 
 ### 3.4 貼り付け
@@ -166,6 +173,7 @@ CREATE TABLE doc_states (
 
 - 被覆の鍵は `IssueDescription:id=<issue_id>`。イシューの `include` に入っている（[data-model-and-schema.md](data-model-and-schema.md) の 3.1 節）。
 - Sync API は、1 つの読み取りのトランザクションで `doc_states` と `compacted_through` の後の `append` を読み、`Y.mergeUpdates` で 1 つにして、行の `state`（base64）と `_u`（読んだ時点の `sync_id`）として返す。まとめの遅れに関わらず、読んだ時点の全部を含む。
+- 要求の `build` が `min_build` より古ければ、`426 upgrade_required` で断る（3.2 節。知らないノードを古いクライアントに渡さない）。
 - クライアントは、受けた `state` を手元の状態に `Y.mergeUpdates` で合わせる。Yjs の更新は冪等なので、読み込みと差分の `append` が重なっても、順序が入れ替わっても、結果は同じ（[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 6.3 節の `_u` の比べ方は、本文には要らない）。
 
 ### 4.5 手元の保存と画面
@@ -346,7 +354,7 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 | --- | --- | --- |
 | まとめの Worker が遅れる・止まる | `pending_bytes` が増える。検索とメンションの通知が遅れる | 読み込みは `append` を合わせて返すので中身は正しい。`pending_bytes` の上限で `too_large` になる前に警告。保持のジョブがパーティションを落とさない |
 | `append` が拒否された | 画面の文字が消える | 4.5 節の作り直しと、平文を `_rejected` に残す |
-| 知らないノードを古いクライアントが受けた | 消える恐れ | 3.2 節の PoC。消えるならノードの追加を破壊の変更として扱う |
+| 知らないノードを古いクライアントが受けた | 共有の文書から消える（y-prosemirror の振る舞い） | 3.2 節の手順で、古いクライアントに届く前に `min_build` で締め出す |
 | 同じ人が 2 台でコメントを同時に直した | 後に確定した方が勝つ | 仕様（5.1 節）。上書きの記録の対象にしない |
 | アンカーの文字が消えた | 強調が出ない | 7 節の「外れた」の表示 |
 | S3 への上げが途中で切れた | `create Attachment` が送られない、または `pending` のまま | 送り直し。`pending` が 1 時間続けば Worker が `failed` にし、画面が上げ直しを促す |
@@ -373,14 +381,14 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 - 例示テスト：3.3 節の入力の規則、3.4 節の貼り付けの落とし方（`script`、`style`、`javascript:` のリンク）。
 - IME：[client-app.md](client-app.md) の 5.3 節の組み合わせ（OS × IME × ブラウザ）で、本文とコメントの入力、組み立て中の Enter、入力の規則の抑止を確かめる。
 - 結合テスト：上げの URL の署名の外の大きさ・種類の `PUT` が S3 で拒否される。期限切れの `upload_ref` が拒否される。見てよくない人の `/files/<id>` が 404。
-- 互換：3.2 節の `doc-schema-compat-poc`。1 つ前の版のスキーマのクライアントが、新しいノードを含む本文を開いて編集しても、新しいノードが消えない。
+- 互換：3.2 節の手順の試験（`doc-schema-compat`）。(1) 1 つ前の版のスキーマで新しいノードを含む本文を開くと、y-prosemirror がそのノードを消すことを回帰テストに残す（前提が変わったら気づく）。(2) `min_build` より古いクライアントは、Gateway でも Sync API の本文の読み込みでも、新しいノードを含む本文を受けない。(3) フラグを開く前に、新しいノードを作る操作がない。
 
 ## 13. Story の候補
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E5 | `doc-package` | `packages/doc`（Yjs と y-prosemirror を閉じる API） |
-| E5 | `doc-schema-compat-poc` | 知らないノードの扱いの PoC（E5 の前） |
+| E5 | `doc-schema-compat` | 3.2 節のノードの追加の手順（読める版 → `min_build` → 作成のフラグ）と、その試験 |
 | E5 | `description-editor` | 3.2〜3.5 節のスキーマ、入力の補助、貼り付け、Undo |
 | E5 | `description-append-sync` | 4.1・4.3 節の送り方と Writer の検証 |
 | E5 | `doc-compaction-worker` | 4.2 節のまとめ、テキストの抜き出し、保持のジョブとの連携 |
@@ -426,7 +434,6 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| y-prosemirror が知らないノードを消すか | E5 の前の `doc-schema-compat-poc` |
 | Yjs の次の大きな版（更新の形の互換） | 版を固定し、上げる時に 1 つ前の版の更新との互換を試験してから ADR で決める |
 | カーソルと在席の表示 | 試用の声。入れるなら Gateway のプロトコルに一時のメッセージを足す ADR（sync-engine の領域と共同） |
 | 本文の版に残る消した秘密の扱い | security の領域と法務の L5 |

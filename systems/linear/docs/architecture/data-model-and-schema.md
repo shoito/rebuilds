@@ -282,6 +282,7 @@ ADR-0019。
 | 必須のフィールドを足す | 破壊 | 古いクライアントの `create` にその値がない | `default` を必須にすれば互換として扱う |
 | フィールドの削除・改名、型・`conflict` の変更 | 破壊 | 古い操作の形が合わない | 広げてから縮める（6.3 節）と `fv` の変換 |
 | `groups` の規則の変更 | 破壊 | 行の配り先が変わる | 全行の `sync_groups` の計算し直しと移動の差分。別の ADR が要る |
+| 本文のスキーマにノード・装飾・属性を足す | 破壊 | y-prosemirror が知らない要素を共有の文書から消し、消した更新が全員に届く | 読める版を出す → `min_build` をその版まで上げる → 作る操作のフラグを開く（[editor-and-descriptions.md](editor-and-descriptions.md) の 3.2 節、ADR-0057） |
 | `load` の変更 | 互換 | 次のブートストラップから効く | なし |
 
 ### 6.3 広げてから縮める
@@ -335,7 +336,7 @@ ADR-0019。
 | E2 | `uuidv7-validation` | 5.1 節の検証 |
 | E4 | `team-key` | 5.2 節のチームの識別子と `team_key_aliases`（permissions-and-teams と共同） |
 | E5 | `issue-numbering` | 5.3 節の番号と、ack の `server_ops` での番号の受け取り、仮の表示 |
-| E5 | `issue-team-move-aliases` | 5.4 節の移動、別名、`resolve`、URL の転送（issues-and-workflow と共同） |
+| E5 | `issue-team-move` | 5.4 節の移動、別名、`resolve`、URL の転送（issues-and-workflow の同名の Story と 1 つ） |
 | E11 | `codegen-graphql-types` | GraphQL の型の生成（api-and-webhooks と共同） |
 | E12 | `schema-compat-drill` | 1 つ前の版のクライアントとの往復の試験を、リリースの前の必須にする |
 

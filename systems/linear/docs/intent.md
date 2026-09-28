@@ -102,7 +102,7 @@
 
 | 機能 | 理由 |
 | --- | --- |
-| 自前のホスト（オンプレミス）での提供 | 運用の形が別になる。本家も提供していない（未検証） |
+| 自前のホスト（オンプレミス）での提供 | 運用の形が別になる。本家の料金の表にも自前のホストの提供はない（[Pricing](https://linear.app/pricing)、2026-09-28 に確認） |
 | 本家の GraphQL の API・SDK・Webhook との完全な互換 | 形は寄せるが、名前と識別子は独自にする（リポジトリ共通の ADR-0006） |
 | P2P での同期、サーバーなしの共同編集 | サーバーの順序で決める設計（[ADR-0002](decisions/0002-sync-model.md)）と合わない |
 | 汎用のプロジェクト管理（ガントチャートの依存の計算、工数の実績、請求の管理） | ソフトウェアのチームの課題管理に絞る |
@@ -128,10 +128,10 @@
 ### 選定・計測で決めるもの（法務以外）
 
 - 本文の同時編集の CRDT の部品（Yjs を第一の候補にする）：E5 の着手前に、editor-and-descriptions の領域で決める。→ 2026-09-28 に Yjs と y-prosemirror に決めた（[ADR-0021](decisions/0021-description-crdt-yjs-in-sync-log.md)）。
-- 日本語の全文検索の方式（PostgreSQL の `pg_bigm` か、OpenSearch か）：E8 の着手前に決める。Aurora PostgreSQL 18 で `pg_bigm` が使えるかは未検証。→ 2026-09-28 に S1 から OpenSearch に決めた（[ADR-0030](decisions/0030-search-engine-opensearch.md)）。費用は E8 の PoC で確かめる。
+- 日本語の全文検索の方式（PostgreSQL の `pg_bigm` か、OpenSearch か）：E8 の着手前に決める。Aurora PostgreSQL 18 で `pg_bigm` は使える（[Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-09-28 に確認）。→ 2026-09-28 に S1 から OpenSearch に決めた（[ADR-0030](decisions/0030-search-engine-opensearch.md)）。費用は E8 の PoC で確かめる。
 - 反応型のストアを MobX にするか、自前の細かな購読にするか：E2 の PoC で、イシュー 50 万件の描画の速さとメモリーを計測して決める（[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - 全体のブートストラップと部分のブートストラップを切り替える閾値：E3 の PoC で計測して決める（[ADR-0003](decisions/0003-bootstrap-and-partial-sync.md)）。
-- 本家の可用性の SLA の値：未検証。Enterprise の契約の条件として公開の資料で確かめられなかった。
+- 本家の可用性の SLA の値：本家は Enterprise の料金の表に「Uptime SLA」を載せる（[Pricing](https://linear.app/pricing)、2026-09-28 に確認）。値は公開の資料にない（**未検証**。契約の文書でしか分からない）。
 - 本家のオフラインの振る舞いの詳細：本家の文書は、オフラインを「完全な機能ではなく、失敗への備え」と説明し、オフラインでの多くの編集は他の人の変更を上書きしうると書いている（[Download Linear](https://linear.app/docs/get-the-app)、2026-09-28 に確認）。本システムはこれより強い保証（上書きの記録、7 日のオフライン）を目標にする。
 
 ## 出典

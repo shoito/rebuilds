@@ -39,7 +39,7 @@
 | 書き出し | ビュー・プロジェクト・ワークスペースの設定から CSV。メンバーは 250 件まで、管理者は 2,000 件まで。ゲストは書き出せない。準備ができたらメールでリンクを送り、リンクは 12 時間で切れる。管理者はワークスペースの全部を書き出せ、非公開のチームを含める選択がある。Markdown のコピー、PDF の印刷もある | [Exporting data](https://linear.app/docs/exporting-data) |
 
 - 本家の取り込みの時間、添付とコメントの扱い、取り消しの期間の長さは、上の文書では確かめられなかった（**未検証**）。
-- 本家の「非公開のチームを含める」が、管理者がメンバーでない非公開のチームにも及ぶかは**未検証**。
+- 本家の「非公開のチームを含める」は、管理者がメンバーでない非公開のチームにも及ぶ（「どの非公開のチームのイシューも含められる」。[Private teams](https://linear.app/docs/private-teams)、2026-09-28 に確認）。本システムはこれに寄せない（ADR-0045。7 節）。
 
 ### 2.2 元のツールの API
 
@@ -196,7 +196,7 @@ ADR-0045。
 | ワークスペースの JSON | `owner`・`admin` | 頼んだ人が読める全部のモデル（公開のチーム、参加している非公開のチーム、ワークスペースの行）。本文は Markdown、添付は一覧（URL は含めない） | NDJSON（モデルごとのファイル）を zip |
 
 - **権限**：Worker は、頼んだ人の主体の `groupsFor` で絞って reader から読む（[api-and-webhooks.md](api-and-webhooks.md) の 3.3 節と同じ `packages/query`）。管理者も、メンバーでない非公開のチームの中身は書き出せない（DT-PERM-001 の行 4 と同じ）。本家の「非公開のチームを含める」と違いうる（2.1 節）。
-- **CSV の式の注入**：値の先頭が `=`・`+`・`-`・`@`・タブ・改行なら、先頭に `'` を付ける（OWASP の CSV Injection の対策）。
+- **CSV の式の注入**：値の先頭が `=`・`+`・`-`・`@`・タブ・改行なら、先頭に `'` を付ける。全部の値を `"` で囲み、中の `"` は 2 つにする（OWASP の CSV Injection の対策）。OWASP は、Excel で保存し直すと `'` が外れうると書く。その対策（先頭にタブを入れる）は値を変えるので採らない。
 - **置き場所**：S3 の `ws/<workspace_id>/exports/<job_id>/…`（KMS で暗号化、非公開のバケット）。24 時間で消す（ライフサイクル）。
 - **取り出し**：画面の通知（アプリの中）と、メール（リンクはアプリの URL `https://<brand>.<domain>/exports/<job_id>` だけ。署名付きの URL をメールに入れない）。取り出しの時にセッションで頼んだ本人かを確かめ、5 分の署名付きの URL へ 302 で転送する（添付の配りと同じ。[editor-and-descriptions.md](editor-and-descriptions.md) の 8.3 節）。
 - 書き出しは監査ログに残す（[security.md](security.md) の 6 節）。
@@ -318,4 +318,4 @@ ADR-0045。
 - GitHub Docs, [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 - Asana Developers, [Rate limits](https://developers.asana.com/docs/rate-limits)
 - Shortcut, [REST API v3](https://developer.shortcut.com/api/rest/v3)
-- OWASP, [CSV Injection](https://owasp.org/www-community/attacks/CSV_Injection)（中身の確認は**未検証**。一般に知られた対策として書いた）
+- OWASP, [CSV Injection](https://community.owasp.org/attacks/CSV_Injection)

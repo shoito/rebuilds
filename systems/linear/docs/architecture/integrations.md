@@ -38,10 +38,11 @@
 | インストール | GitHub の組織のオーナーが GitHub App を入れ、リポジトリを選ぶ。各メンバーは個人の GitHub のアカウントを結び付ける（作者の表示のため） | 同上 |
 | GitLab | 個人のアクセストークン（`api` か `read_api`）。自前のホストは 15.6 以上で公開されたもの。Webhook の URL を GitLab のグループかプロジェクトに登録する（push・コメント・MR・パイプライン）。閉じる語と閉じない語は GitHub と同じ考え方。対象のブランチごとの規則を正規表現で書ける | [GitLab](https://linear.app/docs/gitlab) |
 | Slack | メッセージからイシューを作る、スレッドの同期、チーム・プロジェクト・イニシアチブのチャンネルへの通知、個人の DM、リンクの展開。最初の接続は管理者が行う。複数の Slack のワークスペースは Enterprise | [Slack](https://linear.app/docs/slack) |
+| 本文の語と非公開のチーム | PR のコメントの中の語では結ばない。非公開のチームのイシューは、PR に識別子とリンクだけを返す | [GitHub](https://linear.app/docs/github)、[Private teams](https://linear.app/docs/private-teams) |
 | Triage | 連携から作られたイシューは Triage に入る | [Configuring workflows](https://linear.app/docs/configuring-workflows)（[issues-and-workflow.md](issues-and-workflow.md) の 2 節で確認済み） |
 
 - 本家が閉じる語を大文字・小文字を区別せずに扱うか、本文のどこまでを見るかは**未検証**。この文書の規則（4.2 節）は本システムの決定である。
-- 本家の Slack の連携が求めるスコープの一覧は、公式の文書で確かめられなかった（**未検証**）。
+- 本家の Slack の連携が求めるスコープの一覧は、公式の文書で確かめられなかった（**未検証**）。本システムのスコープは、使う Slack の API の文書から決める（5.1 節）。
 
 ### 2.2 GitHub
 
@@ -60,7 +61,7 @@
 | 重複 | `webhook-id`（再送で同じ）、旧来の `Idempotency-Key`、`X-Gitlab-Event-UUID` | 同上 |
 | 自動の停止 | 4 回続けて失敗すると一時停止（1 分から 24 時間まで伸びる）。40 回続けて失敗すると恒久に停止 | 同上 |
 
-- GitLab の Webhook の時間切れの秒数は、上の文書では確かめられなかった（**未検証**）。GitHub と同じく、受けたらすぐに返す。
+- GitLab.com の Webhook の時間切れは 10 秒（[GitLab.com settings](https://docs.gitlab.com/user/gitlab_com/)、2026-09-28 に確認。自前のホストは管理者が変えられる）。GitHub と同じく、受けたらすぐに返す。
 
 ### 2.4 Slack
 
@@ -124,7 +125,7 @@ DT-INT-001。PR（MR）の作成・タイトルの変更・本文の変更・ブ
 | 6 | 本文の識別子だけ（語なし） | — | 結ばない（誤りの結び付けを避ける） |
 
 - 識別子の形は `([A-Za-z][A-Za-z0-9]{0,6})-([0-9]{1,9})`。大文字・小文字を区別しない。チームの識別子の規則（[data-model-and-schema.md](data-model-and-schema.md) の 5.2 節）と同じ長さにする。
-- 語の一覧は本家と同じ語（2.1 節）に、日本語の書き方を足さない（開発者が英語で書く前提。足すかは E10 の試用で決める）。コードの塊（`` ` `` の中、```` ``` ```` の中）と引用（`>`）の中は見ない。
+- 語の一覧は本家と同じ語（2.1 節）にする。ただし本家の `linear issue` は本家の名前を含むので、`<brand> issue` に替える（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。日本語の書き方は足さない（開発者が英語で書く前提。足すかは E10 の試用で決める）。コードの塊（`` ` `` の中、```` ``` ```` の中）と引用（`>`）の中は見ない。
 - 識別子は、そのワークスペースの `resolve(key, number)` で引く（今の識別子、チームの古い識別子、イシューの別名。[data-model-and-schema.md](data-model-and-schema.md) の 5.4 節）。引けないものは捨てる（存在を明かさないので、PR に「見つからない」とも書かない）。
 - 1 つの PR が結ぶイシューは 50 まで。超えた分は捨て、PR に返しのコメントで知らせる。
 - 同じ組織が複数のワークスペースにつながるとき、識別子は各ワークスペースで別々に引く。同じ `ENG-123` が 2 つのワークスペースで引ければ、両方に結ぶ（チームの識別子はワークスペースの中でだけ一意）。
@@ -218,7 +219,7 @@ ADR-0039。
 ### 5.1 インストール
 
 - 管理者が「Slack を接続」→ Slack の OAuth v2（ボットのスコープ）→ 戻りで `state` を確かめ、`oauth.v2.access` でボットのトークンとリフレッシュトークンを得る。
-- ボットのスコープ（案）：`commands`、`chat:write`、`im:write`、`links:read`、`links:write`、`channels:read`、`users:read`。最終の一覧は E10 で Slack の文書と照らして決める（**未検証**）。`channels:history` などメッセージの履歴を読むスコープは求めない（ショートカットの操作の中身だけを使う）。
+- ボットのスコープ：`commands`（メッセージのショートカット）、`chat:write`（投稿）、`im:write`（`conversations.open` で DM を開く）、`links:read`（`link_shared` のイベント）、`links:write`（`chat.unfurl`）、`channels:read`・`groups:read`（`conversations.info` でチャンネルの `is_ext_shared` を読む。非公開のチャンネルには `groups:read` が要る）、`users:read`。メソッドごとの要るスコープは Slack の文書で確かめた（[conversations.open](https://docs.slack.dev/reference/methods/conversations.open)、[chat.unfurl](https://docs.slack.dev/reference/methods/chat.unfurl)、[conversations.info](https://docs.slack.dev/reference/methods/conversations.info)、2026-09-28 に確認）。`channels:history` などメッセージの履歴を読むスコープは求めない（ショートカットの操作の中身だけを使う）。
 - トークンの入れ替えを有効にする（2.4 節）。有効にすると戻せないので、E10 の着手の時に dev のアプリで確かめてから本番のアプリで有効にする。
 - 1 つのワークスペースに 1 つの Slack のワークスペース（MVP）。複数は MVP の後。
 - アンインストール・トークンの取り消しのイベント（`app_uninstalled`、`tokens_revoked`）で、インストールを `revoked` にし、秘密を消す。
@@ -258,7 +259,7 @@ Slack の利用者：メッセージのショートカット「イシューを�
 - `link_shared` のイベントで、URL が本システムのイシュー・プロジェクトなら、`chat.unfurl` で展開する。
 - **公開のチームのイシュー（と公開のチームだけのプロジェクト）だけを展開する。** それ以外は何もしない（「非公開」とも書かない。存在を明かさない）。
 - 展開の中身：識別子、タイトル、状態、優先度、担当。本文を載せない。
-- ワークスペースの設定で展開を止められる（既定は有効）。Slack Connect の共有のチャンネルでは展開しない（チャンネルの `is_ext_shared` を見る。フィールドの名前は E10 で確かめる。**未検証**）。
+- ワークスペースの設定で展開を止められる（既定は有効）。Slack Connect の共有のチャンネルでは展開しない（`conversations.info` のチャンネルの `is_ext_shared` を見る。「別の組織と共有したチャンネル」を表す。[The conversation object](https://docs.slack.dev/reference/objects/conversation-object)、2026-09-28 に確認）。
 
 ### 5.5 個人への通知の口
 
@@ -334,7 +335,7 @@ CREATE TABLE integration_secrets (          -- サーバーだけ。モデルに
 ### 7.1 取りこぼしへの備え
 
 - GitHub は自動で再送しない（2.2 節）。本システムの受け口が落ちていた間の事象は、次の 2 つで取り戻す。
-  - GitHub の「アプリの配送の一覧」から、失敗した配送を再送させる（受け口の復旧の後に Worker が行う）。API の形は E10 で確かめる（**未検証**）。
+  - GitHub の「アプリの配送の一覧」から、失敗した配送を再送させる（受け口の復旧の後に Worker が行う）。`GET /app/hook/deliveries` で一覧を読み、`POST /app/hook/deliveries/{delivery_id}/attempts` で再送させる（[REST API endpoints for GitHub App webhooks](https://docs.github.com/en/rest/apps/webhooks)、2026-09-28 に確認）。
   - 7.2 節の読み直し。
 
 ### 7.2 読み直し
@@ -393,7 +394,7 @@ CREATE TABLE integration_secrets (          -- サーバーだけ。モデルに
 | E10 | `slack-create-issue` | 5.2 節のショートカット、モーダル、作成、返信。**法務の L1 の後に承認** |
 | E10 | `slack-channel-notifications` | 5.3 節。**法務の L1 の後に承認** |
 | E10 | `slack-unfurl` | 5.4 節。**法務の L1 の後に承認** |
-| E10 | `slack-personal-dm-sender` | 5.5 節（notifications-and-inbox と共同）。**法務の L1 の後に承認** |
+| E10 | `slack-personal-notifications` | 5.5 節（notifications-and-inbox の同名の Story と 1 つ）。**法務の L1 の後に承認** |
 
 ## 12. 未解決の問い
 

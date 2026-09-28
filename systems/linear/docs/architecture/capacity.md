@@ -7,7 +7,7 @@
 | [ADR-0002](../decisions/0002-sync-model.md)、[ADR-0006](../decisions/0006-transactions-writer-and-idempotency.md) | ワークスペースの行のロックで直列に書く |
 | [ADR-0009](../decisions/0009-sync-gateway-protocol.md) | 再接続の待ち、`retry_after_ms` |
 | [ADR-0013](../decisions/0013-sync-group-changes-retention-and-reset.md) | `epoch` のやり直しを 0〜10 分に散らす |
-| [0054](../decisions/0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にし、`api`（1 秒 60 変更）・`worker`（50）・`import`（100、自動で下げる）を Writer がロックの前に数え、超えたら `retry` を返す。ロックの待ちが伸びたら `client` 以外を半分にする |
+| [0054](../decisions/0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にし、`api`（1 秒 60 変更）・`notifier`（50）・`worker`（50）・`import`（100、自動で下げる）を Writer がロックの前に数え、超えたら `retry` を返す。ロックの待ちが伸びたら `client` 以外を半分にする |
 
 **ここの数値はすべて初期見積もりである。** E2 の PoC（1 ワークスペースの書き込みの上限）と E12 の負荷試験（k6 と、同期のクライアントの模擬）で確かめ、結果で置き換える。
 
@@ -38,7 +38,7 @@ ADR-0054。
 ### 2.1 上限
 
 - 1 ワークスペースの書き込みは、`workspace_sync` の行のロックで直列になる（ADR-0002・0006）。1 回の Writer の DB のトランザクションの中の時間（ロックの保持）が上限を決める。
-- ロックの保持の見積もり：`SELECT … FOR UPDATE`（0.2ms）＋ 変更ごとの検証と適用（1 変更 約 1ms。モデルの行の更新、`sync_actions` の挿入、索引、派生の読み出し）＋ `tx_results`・`sync_outbox`（0.3ms）＋ コミット（Aurora の書き込みの確定、約 1〜2ms。**未検証**）。
+- ロックの保持の見積もり：`SELECT … FOR UPDATE`（0.2ms）＋ 変更ごとの検証と適用（1 変更 約 1ms。モデルの行の更新、`sync_actions` の挿入、索引、派生の読み出し）＋ `tx_results`・`sync_outbox`（0.3ms）＋ コミット（Aurora の書き込みの確定、約 1〜2ms。**未検証**。E2 の前の `writer-throughput-poc` で測る）。
 - 1 回の `submit` が平均 3 変更なら、1 回 約 5ms で 1 秒 200 回・600 変更。ロックの待ちと揺らぎを見て、**1 ワークスペース 1 秒 300 変更を上限**とする（README の 2 節の見込みと同じ）。E2 の PoC で確かめ、届かなければ楽観的な検証や group commit の ADR を書く（[sync-engine.md](sync-engine.md) の 14 節の持ち越し）。
 
 ### 2.2 割り当て
@@ -47,8 +47,9 @@ ADR-0054。
 | --- | --- | --- | --- |
 | `client` | 数えない（1 接続 平均 50 トランザクション/秒の上限だけ。[sync-engine.md](sync-engine.md) の 4.3 節） | 1 | — |
 | `api` | 1 秒 60 変更（瞬間 300） | 2 | `retry`（公開 API は 429。[api-and-webhooks.md](api-and-webhooks.md) の 4 節） |
-| `worker` | 1 秒 50 変更（瞬間 500） | 3 | `retry`。Worker は待って続ける |
-| `import` | 1 秒 100 変更（自動で下げる。[import-export.md](import-export.md) の 5.1 節） | 4 | `retry` |
+| `notifier` | 1 秒 50 変更（瞬間 500） | 3 | `retry`。通知係は待って続ける。受け手ごとに 5 秒に 1 回のトランザクションにまとめる（[notifications-and-inbox.md](notifications-and-inbox.md) の 5.5 節） |
+| `worker` | 1 秒 50 変更（瞬間 500） | 4 | `retry`。Worker は待って続ける |
+| `import` | 1 秒 100 変更（自動で下げる。[import-export.md](import-export.md) の 5.1 節） | 5 | `retry` |
 
 - Writer は、ロックを取る前に Valkey のトークンバケット（キー：`ws:<id>:wr:<origin>`）を数える。Valkey が落ちたら、タスクのメモリーの近似の数（タスクの数で割った値）で続ける。
 - **混雑の制御**：Writer はワークスペースごとに、直近 10 秒のロックの待ちの p99 を持つ（Valkey に 1 秒ごとに書く）。50ms を超えたら、`client` 以外の枠を半分にし、10 秒ごとに見直す（落ち着いたら 1 割ずつ戻す）。
@@ -57,6 +58,7 @@ ADR-0054。
 ### 2.3 既存の決定との食い違い（解消済み）
 
 - [ADR-0023](../decisions/0023-workflow-states-and-lifecycle-automation.md) の自動で閉じる・アーカイブの Worker は、当初「500 件ずつ、1 ワークスペースに 100ms に 1 回まで」で、最大 1 秒 5,000 変更になり、上の `worker` の枠（50）と 1 ワークスペースの上限（300）を超えていた。**統合の工程（2026-09-28）で ADR-0023 を枠に従う形に直した**（100 件ずつ、`worker` の枠、開始の時刻を 03:00〜05:00 に散らし、1 つのクラスタで同時に 20 ワークスペースまで。ADR-0023 の注記）。夜間のクラスタの全体の書き込みは 1 秒 1,000 変更（20 × 50）以下で、平常のピーク（1,500）に重ならない。
+- 通知係の書き込みは、当初 `origin = worker` で、自動の処理と同じ `worker` の枠（50）を取り合っていた。大きなワークスペースで繰り越しや自動で閉じるが枠を使い切ると、通知が遅れる。**統合の工程（2026-09-28）で `notifier` の枠（1 秒 50 変更、瞬間 500）に分けた**（ADR-0054 の注記）。インボックスの行は安く、受け手のグループ（`user:<id>`）にだけ届くので、通知係は受け手ごとに 5 秒に 1 回のトランザクションにまとめ、ロックを取る回数を減らす（[notifications-and-inbox.md](notifications-and-inbox.md) の 5.5 節）。1 ワークスペースの `client` 以外の枠の和は 1 秒 260 変更（60 ＋ 50 ＋ 50 ＋ 100）で、混雑の制御で半分になる。
 
 ## 3. Sync Gateway
 
@@ -77,9 +79,9 @@ ADR-0054。
 - 1 変更あたりの送り先の数：ワークスペースのオンラインの接続のうち、行のグループを購読するもの。最大のワークスペースで 1,200、平均で 12。
 - 送信のピーク：`Σ(ワークスペースの変更/秒 × 送り先)`。最大のワークスペースだけで 100 × 1,200 ＝ 12 万回/秒。全体で約 30 万回/秒と置く。
 - 1 回の `deltas` の JSON を、**同じ `groups` の接続の間で使い回す**（接続ごとに作らない）。同じワークスペースの接続の `groups` の組は、チームの構成で数十に収まる。直列化の CPU は、組の数 × 変更の数に比例する。
-- permessage-deflate（文脈の持ち越しあり）の圧縮は接続ごとに走るので、圧縮の CPU は送信の回数（30 万回/秒）に比例する。1 回 1.5 KB の圧縮を数十 µs と見ると、全体で数 vCPU 分（**未検証**）。E12 の L1 で、文脈の持ち越しなし（圧縮したフレームも同じ `groups` の接続で使い回せる）と比べる（[ADR-0009](../decisions/0009-sync-gateway-protocol.md) の注記）。
+- permessage-deflate（文脈の持ち越しあり）の圧縮は接続ごとに走るので、圧縮の CPU は送信の回数（30 万回/秒）に比例する。1 回 1.5 KB の圧縮を数十 µs と見ると、全体で数 vCPU 分（**未検証**。E12 の `cost-baseline` で測る）。E12 の L1 で、文脈の持ち越しなし（圧縮したフレームも同じ `groups` の接続で使い回せる）と比べる（[ADR-0009](../decisions/0009-sync-gateway-protocol.md) の注記）。
 - Gateway は、Valkey から受けた範囲を 20ms か 64 KiB でまとめて 1 つの `deltas` にしてよい（伝播の予算の「Relay → Valkey → Gateway 50ms」の中。[sync-engine.md](sync-engine.md) の 7.6 節）。
-- 1 タスクの送信の上限を 1 秒 3 万回と置く（**未検証**。E12 で測る）。30 万回/秒 ÷ 3 万 ＝ 10 タスクで、接続の数で決まる 20 タスクの中に収まる。
+- 1 タスクの送信の上限を 1 秒 3 万回と置く（**未検証**。E12 の `load-tests-l1-l9` の L1 で測る）。30 万回/秒 ÷ 3 万 ＝ 10 タスクで、接続の数で決まる 20 タスクの中に収まる。
 
 ### 3.3 再接続の殺到
 
@@ -91,7 +93,7 @@ ADR-0054。
 | デプロイ | 全接続 | 1 タスクずつ 10 分かけて逃がす（3.1 節） | 100 接続/秒 |
 
 - 1 回の再接続のサーバーの仕事：チケットの発行（Valkey のセッションの写しと `User` の読み出し）、`hello` の処理（Valkey の GETDEL、`workspace_sync` と `sync_subscriptions` の読み出し）、取り戻し（`catch_up`。平均 数十変更）。reader に 3〜4 回の読み出し。
-- 1.2 万接続/秒のとき、reader に 5 万回/秒の軽い読み出し。reader 2 台で受けられる見込み（**未検証**。E12 の L4）。足りなければ、Gateway の受け付けの上限（1 タスク 1 秒 300 の `hello`、超えたら `kick: overloaded` と `retry_after_ms`）で散らす。
+- 1.2 万接続/秒のとき、reader に 5 万回/秒の軽い読み出し。reader 2 台で受けられる見込み（**未検証**。E12 の `load-tests-l1-l9` の L4）。足りなければ、Gateway の受け付けの上限（1 タスク 1 秒 300 の `hello`、超えたら `kick: overloaded` と `retry_after_ms`）で散らす。
 
 ## 4. ブートストラップ
 
@@ -116,7 +118,7 @@ ADR-0054。
 
 - DR の引き上げの 1,000 の同時は、Sync API のタスク（1 タスク 20 の同時。[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 4.7 節）で 50 タスク、reader の読み出しで 1 秒 約 200 万行になる。平常の構成（Sync API 6 タスク、reader 2 台）を大きく超える。
 - そこで、DR の手順（[runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md)）で次を行う。
-  1. 引き上げの前に、大阪の Sync API を 60 タスク、reader を 5 台に広げる（Aurora の reader の追加は 10〜15 分。**未検証**）。
+  1. 引き上げの前に、大阪の Sync API を 60 タスク、reader を 5 台に広げる（Aurora の reader の追加は 10〜15 分の見込み。**未検証**。E12 の `dr-drill` で測る）。
   2. 散らしの幅を、Ops のフラグ `ops.epoch_reset_spread_min` で 10 分から 30 分まで伸ばせるようにする。既定は ADR-0013 の 10 分。30 分にすると同時は約 330。
 - 散らしている間、クライアントは古い手元のデータを読み取りの専用で示し、書き込みは outbox に入る（ADR-0013）。利用者の作業は止まらない。
 
@@ -153,7 +155,7 @@ ADR-0054。
 | --- | --- |
 | 文書 | イシュー・プロジェクト・コメントで約 2 億（S1 の終わり） |
 | 大きさ | 1 文書 約 2 KB（N-gram の索引で膨らむ）→ 約 400 GB、レプリカ 1 で 800 GB |
-| 構成 | データノード 3（3 AZ）、専用のマスター 3。インスタンスの型は E8 の PoC で決める（**未検証**） |
+| 構成 | データノード 3（3 AZ）、専用のマスター 3。インスタンスの型は E8 の前の `search-poc` で決める |
 
 ### 5.4 SQS と Worker
 
@@ -162,7 +164,7 @@ ADR-0054。
 | 通知（notifier） | 1,500 変更/秒のうち通知の対象 約 1/3 | notifier 4〜12 |
 | `search-index` | 変更の約 1/2 | 索引 3〜10 |
 | `webhook-fanout`・`webhook-send` | 500 件/秒 | 振り分け 2〜6、送り係（egress）4〜20 |
-| `integrations`（FIFO） | 50 件/秒 | 2〜6。FIFO のメッセージグループの上限の中（**未検証**） |
+| `integrations`（FIFO） | 50 件/秒 | 2〜6。FIFO のキューの上限（高スループットでない形で、分割ごとに API の操作ごと 1 秒 300 回、10 件の束で 3,000 件。[Amazon SQS message quotas](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/quotas-messages.html)、2026-09-28 に確認）の中 |
 | `import` | ジョブ 3（クラスタごと） | 1〜3 |
 
 - スケールの指標は、キューの最も古いメッセージの年齢（他の題材と同じ）。
@@ -183,9 +185,9 @@ ADR-0054。
 | --- | --- |
 | Fargate の vCPU | Gateway 60 × 2 ＋ Sync API 60 × 2（DR の時）＋ その他、デプロイの二重分。大阪でも同じ値 |
 | ALB の LCU、同時接続 | WebSocket 6 万の長い接続と、再接続の 1.2 万/秒 |
-| CloudFront の WebSocket | 同時の接続と新しい接続の速さの上限（**未検証**） |
+| CloudFront の WebSocket | 同時の接続の数の上限は文書にない。配信ごとに 1 秒 25 万の要求と 150 Gbps（引き上げの申請ができる）。WebSocket はオリジンからの送信が 10 分ないと切れる（Gateway の ping のフレームは 20 秒ごとなので当たらない）（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、2026-09-28 に確認）。新しい接続の速さは、再接続の殺到（1.2 万/秒）が 1 秒 25 万の中に収まる |
 | NAT の同時接続 | Webhook の送り、連携、インポート |
-| Aurora の reader の数 | 1 クラスタ 15 まで（他の題材で確かめた値。**未検証**） |
+| Aurora の reader の数 | 1 クラスタ 15 まで（[Replication with Amazon Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.html)、2026-09-28 に確認） |
 
 ## 7. 余裕の方針
 
@@ -247,10 +249,9 @@ staging を本番と同じ台数に広げて行う。道具は k6（HTTP）と�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Aurora のコミットの時間と、1 変更の検証と適用の時間 | E2 の PoC |
+| Aurora のコミットの時間と、1 変更の検証と適用の時間 | E2 の前の `writer-throughput-poc` |
 | Gateway の 1 タスクの送信の上限、1 接続のメモリー、permessage-deflate の CPU と圧縮の率 | E12 の L1・L4 |
 | reader が再接続の殺到の読み出しを受けられるか | E12 の L4 |
-| CloudFront の WebSocket の接続の上限 | E1 で AWS の文書と問い合わせで確かめる（**未検証**） |
 
 ## 12. quality.md・runbooks・data-model への項目
 

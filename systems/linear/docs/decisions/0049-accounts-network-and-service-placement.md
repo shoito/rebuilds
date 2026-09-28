@@ -39,7 +39,7 @@ Gateway の配置：
 - ECS（Fargate、ARM64）のサービス：`auth`、`sync-api`、`gateway`、`writer`、`public-api`、`relay`、`worker-*`、`worker-egress`。Gateway は接続の数（目標 1 タスク 3,000）でスケールし、縮める時は 10 分で逃がす。Writer は Service Connect（HTTP/2、TLS）の内部だけ。Relay は 64 の区画を期限つきの鍵で分け合う。
 - OpenSearch は isolated のサブネット、3 AZ、1 時間ごとのスナップショットを大阪へ。
 - 2 を採らない理由：WAF と、他の入口と同じ TLS・証明書・ログの統制が外れる。DDoS の対策を別に持つ必要がある。
-- 3 を採らない理由：接続の最大の時間と、アイドルの時間切れの制限（2 時間・10 分と記憶しているが、この工程で AWS の文書で確かめられなかった。**未検証**）があり、長く続く同期の接続に合わない。接続ごとの課金も、6 万の常時の接続では高い。範囲の証明と欠けの埋め（[ADR-0007](0007-sync-actions-and-range-proof-deltas.md)）をタスクの状態で持つ設計とも合わない。
+- 3 を採らない理由：接続の最大の時間（2 時間）と、アイドルの時間切れ（10 分）の制限があり（いずれも引き上げられない。[Quotas for configuring and running a WebSocket in API Gateway](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-execution-service-websocket-limits-table.html)、2026-09-28 に確認）、長く続く同期の接続に合わない。接続ごとの課金も、6 万の常時の接続では高い。範囲の証明と欠けの埋め（[ADR-0007](0007-sync-actions-and-range-proof-deltas.md)）をタスクの状態で持つ設計とも合わない。
 - b を採らない理由：ワークスペースの割り当てと、その交代の仕組みが要る。S1 の規模では、Valkey の複製の量（[capacity.md](../architecture/capacity.md) の 5.2 節）で足りる。S2 で見直す。
 
 ## Consequences
@@ -51,7 +51,7 @@ Gateway の配置：
 - 引き受けるコスト：
   - WebSocket のデータ転送に CloudFront の料金がかかる（[infrastructure.md](../architecture/infrastructure.md) の 11 節）。
   - 大きなワークスペースの差分が、多くの Gateway のタスクに複製される。
-  - ALB の keepalive の期間が WebSocket に当たるか、CloudFront の WebSocket の上限は未検証。
+  - ALB の keepalive の期間が WebSocket に当たるかは未検証（E1 の `edge-and-websocket-origin`）。CloudFront は WebSocket の同時の接続の数に上限を置かない（配信ごとの要求の数と帯域の上限だけ。[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、2026-09-28 に確認）。
 
 ## Confirmation
 

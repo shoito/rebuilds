@@ -228,7 +228,7 @@ ADR-0016。
 | M2 の大きさの目安 | イシュー 1 件 200 バイト（`identifier`・`title_norm` を足すと約 300 バイト）。部分のブートストラップの 10 万件で約 30 MB、全体の 5 万件で約 15 MB |
 | JS のヒープの目標 | 最大のワークスペースで p95 500 MB、モデル 5 万件以下で p95 250 MB（基準の端末。E2・E3 で測る） |
 
-- ヒープの計測は、RUM では Chrome の非標準の `performance.memory`、Electron では `process.getProcessMemoryInfo()` を使う。`performance.measureUserAgentSpecificMemory()` はクロスオリジンの隔離が要るので、S1 では使わない。各 API の使える条件は**未検証**（E2 で確かめる）。
+- ヒープの計測は、RUM では Chrome の非標準の `performance.memory`、Electron では `process.getProcessMemoryInfo()` を使う。`performance.measureUserAgentSpecificMemory()` はクロスオリジンの隔離が要るので、S1 では使わない。`performance.memory` は Chromium だけにある非推奨の非標準の API（[MDN の互換性のデータ](https://github.com/mdn/browser-compat-data) 8.1.3）、`measureUserAgentSpecificMemory()` は安全な文脈とクロスオリジンの隔離が要る（[MDN](https://developer.mozilla.org/en-US/docs/Web/API/Performance/measureUserAgentSpecificMemory)）、`process.getProcessMemoryInfo()` は Electron の主とレンダラーの両方で使える（[process](https://www.electronjs.org/docs/latest/api/process)）。いずれも 2026-09-28 に確認。Firefox と Safari では RUM のヒープの値を送らない。
 - M1 から外したモデルを画面が再び読むと、M2（あれば）で一覧を出しながら、IndexedDB から戻す。
 
 ## 8. 複数のタブ
@@ -252,7 +252,7 @@ navigator.locks.request(`<brand>:leader:${dbName}`, async () => {
 ```
 
 - 書き手のタブが閉じると、ロックが外れ、待っている次のタブが書き手になる（Web Locks の性質）。
-- ページが凍結される（`freeze` イベント）ときは、書き手を自分から降りる（WebSocket を閉じ、ロックを返す）。凍結されたページがロックを持ち続けるかは**未検証**なので、自分から降りる。
+- ページが凍結される（`freeze` イベント）ときは、書き手を自分から降りる（WebSocket を閉じ、ロックを返す）。凍結されたページがロックを持ち続けるかは**未検証**なので、自分から降りる（E3 の `multi-tab-leader` で確かめる）。`freeze` イベントは Chromium だけにある（[MDN の互換性のデータ](https://github.com/mdn/browser-compat-data) 8.1.3、2026-09-28 に確認）。他のブラウザは 10 秒の `steal` で補う。
 - 見えているタブが、書き手の `status` を 10 秒受けなければ、`steal: true` で書き手を取る。古い書き手は、ロックを奪われたら直ちに送信をやめる。
 - 2 つの書き手が短い間重なっても、送信は `client_tx_id` で冪等で、各接続の中の順序が保たれ、Writer が 1 回の `submit` をロックの中で順に処理するので、作成の前に更新が当たることはない（[sync-engine.md](sync-engine.md) の 5.2 節）。
 
@@ -280,7 +280,7 @@ navigator.locks.request(`<brand>:leader:${dbName}`, async () => {
 
 ### 8.5 Electron
 
-- Electron の複数のウィンドウは、同じセッション（同じ保存の区画）で開き、タブと同じ扱いにする。同じセッションのウィンドウの間で Web Locks と BroadcastChannel が効くことは**未検証**（E3 で確かめる）。
+- Electron の複数のウィンドウは、同じセッション（同じ保存の区画）で開き、タブと同じ扱いにする。同じセッションのウィンドウの間で Web Locks と BroadcastChannel が効くことは**未検証**（E6 の `electron-shell` で確かめる）。
 
 ## 9. 保存の上限・消去・オフラインの表示
 
@@ -290,7 +290,7 @@ ADR-0016。
 
 - ログインの後、最初にワークスペースを開いたとき（利用者の操作の後）に `navigator.storage.persist()` を求める。結果を登録の `persisted` に書く。
 - 認められなかった Web の利用者で、未送信があるときは、Electron を勧める表示を出す（ADR-0005）。
-- Electron は、アプリのデータの場所に保存され、ブラウザの消去の方針を受けない（ADR-0005）。空きの少ないときの Electron の振る舞いは**未検証**。
+- Electron は、アプリのデータの場所に保存され、ブラウザの消去の方針を受けない（ADR-0005）。空きの少ないときの Electron の振る舞いは**未検証**（E6 の `electron-shell` で確かめる）。
 
 ### 9.2 見張りと退かし
 
@@ -429,11 +429,10 @@ outbox・再接続・スキーマの移行に触れる変更には、次の試�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| IndexedDB の一括の書き込みと読み出しが、NFR-003 に間に合うか | E3 の PoC（基準の端末、3 つのブラウザ）。遅ければ SQLite の WASM（ADR-0005 の代案） |
-| 反応型のストア（MobX か自前か）と、M1・M2 の境 | E2 の PoC（ADR-0001） |
-| 凍結されたページが Web Locks を持ち続けるか | E3 で Chrome・Firefox・Safari を確かめる |
-| Electron の複数のウィンドウでの Web Locks と BroadcastChannel、空きの少ないときの振る舞い | E3 で確かめる |
-| ヒープの計測の API の使える条件 | E2 で確かめる |
+| IndexedDB の一括の書き込みと読み出しが、NFR-003 に間に合うか | E3 の前の `bootstrap-poc`（基準の端末、3 つのブラウザ）。遅ければ SQLite の WASM（ADR-0005 の代案） |
+| 反応型のストア（MobX か自前か）と、M1・M2 の境 | E2 の前の `memory-tiers-poc`（ADR-0001） |
+| 凍結されたページが Web Locks を持ち続けるか | E3 の `multi-tab-leader` で Chrome を確かめる（`freeze` は Chromium だけ） |
+| Electron の複数のウィンドウでの Web Locks と BroadcastChannel、空きの少ないときの振る舞い | E6 の `electron-shell` で確かめる |
 | 未送信の中身をサーバーの側に一時的に預けて、消去から守るか | 試用で消去が問題になれば。預ける中身の扱いは security と法務（L5） |
 
 ## 15. quality.md・runbooks・data-model への項目

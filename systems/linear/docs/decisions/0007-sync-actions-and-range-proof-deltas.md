@@ -14,7 +14,7 @@ date: 2026-09-28
 - `update` の差分に、変わったフィールドだけを載せるか、行の全体を載せるか。[ADR-0003](0003-bootstrap-and-partial-sync.md) は、遅延のモデルの差分も IndexedDB に書くと決めている。
 - 同期グループの参加・脱退・移動を、差分の中でどう表すか。
 
-第三者の解析によれば、本家の sync action は `id`・`modelName`・`modelId`・`action`・`data` を持ち、`action` は I・U・A・D・V と、C（部分の索引の印）、G・S（同期グループの変化）である。手元の `lastSyncId` とサーバーの値を比べ、違えば履歴の API で取り戻す（[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)、[Reverse engineering Linear's sync magic](https://marknotfound.com/posts/reverse-engineering-linears-sync-magic/)、いずれも 2026-09-28 に確認。本家の保証ではない）。本家の差分の `data` が行の全体か一部かは**未検証**。
+第三者の解析によれば、本家の sync action は `id`・`modelName`・`modelId`・`action`・`data` を持ち、`action` は I・U・A・D・V と、C（部分の索引の印）、G・S（同期グループの変化）である。手元の `lastSyncId` とサーバーの値を比べ、違えば履歴の API で取り戻す（[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)、[Reverse engineering Linear's sync magic](https://marknotfound.com/posts/reverse-engineering-linears-sync-magic/)、いずれも 2026-09-28 に確認。本家の保証ではない）。第三者の解析の例では、`U` の `data` は変わったフィールドだけでなく行の全体を持つ（同じ解析。本家の保証ではない）。
 
 ## Options
 

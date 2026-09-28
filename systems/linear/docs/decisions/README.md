@@ -58,7 +58,7 @@ Linear の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0051](0051-workspace-sharding-and-cells.md) | S2 はワークスペースを単位に Aurora のクラスタへ分け、ディレクトリとアカウントを小さな共通のクラスタに置く。移動は `sync_id` を保ち `sync_epoch` を上げない。S3 はワークスペースをセルに固定し、セルごとに主のリージョンを持つ | accepted |
 | [0052](0052-rum-and-propagation-measurement.md) | RUM は自前の口に、端末で集めたヒストグラムを送り、中身と識別子を送らない。伝播は Writer のコミットの直前の時刻を差分と一緒に運び、クライアントは ping の往復で見積もった時計の差で「確定から適用まで」を測る | accepted |
 | [0053](0053-convergence-audit.md) | 収束の監査は、抜き取った端末が IndexedDB の確定した行のハッシュを桶ごとに `(L, sync_epoch)` と送り、サーバーは今の行と `sync_actions` から `L` の時点の状態を作り直して比べる。合わない桶は 2 段目で行を特定し、説明のつかない不一致を K5 に数える | accepted |
-| [0054](0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする | accepted |
+| [0054](0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`notifier`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする | accepted |
 | [0055](0055-ci-gates-latency-convergence-ime.md) | PR の必須の関門に、遅延の予算（固定の機械）、収束のシミュレーターと回帰の種、オフラインと再送の 3 つの場面、IME のテスト、生成とマイグレーションの検査を入れ、変更のパスで重さを足す。関門を外すラベルを持たず、シミュレーターの失敗を再実行で緑にしない | accepted |
 | [0056](0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低の版は Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない | accepted |
 | [0057](0057-schema-change-ordering.md) | スキーマの変更は、サーバーの DB を広げる → サーバーが古い形と新しい形の両方を受ける → クライアントを移す → 古い `schema_hash` の接続が 1% 未満かつ 30 日の後に縮める → 古い列を単独で消す、の順にする。1 つのデプロイで、DB の破壊の変更とそれを読むコードを一緒に出さない | accepted |

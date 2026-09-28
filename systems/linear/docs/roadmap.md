@@ -5,8 +5,7 @@
 - **最初に walking skeleton を通す。** E1〜E3 で、スキーマの定義と生成・Writer・`sync_actions`・Relay・Gateway・Sync API・IndexedDB と outbox を端から端まで貫き、2 つのブラウザで同じイシューの状態を変えて、オフラインで書いて戻れるところまで作ってから、機能を広げる。収束のシミュレーター（[ADR-0010](decisions/0010-deterministic-sync-simulator.md)）、オフラインと再送の 3 つの場面、遅延の予算の CI（[ADR-0055](decisions/0055-ci-gates-latency-convergence-ime.md)）、FORCE RLS と同期グループの絞り込み（[ADR-0004](decisions/0004-tenancy-and-permissions.md)）は、E1〜E3 から本物の形で作る。後から足すと直せないため。
 - **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する。
   - E2 の前：1 ワークスペースの書き込みの上限（`writer-throughput-poc`。1 秒 300 変更、最初にロックを取る方式で届くか）、反応型のストアとメモリーの階層（`memory-tiers-poc`。MobX か自前か、イシュー 50 万件）。
-  - E3 の前：IndexedDB の一括の書き込みと部分のブートストラップの時間（基準の端末で p95 10 秒。だめなら SQLite の WASM の ADR）、Aurora の reader での 10 秒の `REPEATABLE READ` の読み取り、全体と部分の閾値（`bootstrap-kind-threshold`）。
-  - E5 の前：y-prosemirror が知らないノードを消すか（`doc-schema-compat-poc`）。
+  - E3 の前：IndexedDB の一括の書き込みと部分のブートストラップの時間（基準の端末で p95 10 秒。だめなら SQLite の WASM の ADR）と、Aurora の reader での 10 秒の `REPEATABLE READ` の読み取り（`bootstrap-poc`）、全体と部分の閾値（`bootstrap-kind-threshold`）。
   - E6 の前：IME のイベントの順序と `Process` のキー（`ime-shortcut-poc`）。
   - E8 の前：OpenSearch の費用・索引の大きさ・p99（`search-poc`）。
 - **規則は 1 つのコードに。** 競合の規則・`applyOp`・`derive`・検証はスキーマの定義から生成した共有のパッケージ、権限は `packages/policy`、フィルターは `packages/filter` にだけ書く。同期の意味（競合の規則、同期グループの規則、トランザクションの形）はフラグにせず、スキーマの版で変える（[ADR-0056](decisions/0056-flags-client-distribution-and-min-build.md)）。
@@ -63,7 +62,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `schema-dsl` | 定義の言語と、型・`conflict` の組み合わせの検査（[data-model-and-schema.md](architecture/data-model-and-schema.md) の 3 節） |
 | `schema-conflict-kinds` | `conflict`・`order_scope`・`track_overwrites`・`groups` の必須化（sync-engine と共同） |
 | `schema-load-strategy` | `load`・`condition`・`include`・被覆の鍵の生成（bootstrap-and-partial-sync と共同） |
-| `schema-group-rules-ext` | `workspace_members`・`team_row`・`view_scope` の規則、`teams` を結び付けのモデルから読む形、`guest_visible`・`derive_only`・`import_writable` の検査（permissions-and-teams・cycles-and-projects・views-and-filters の `schema-teams-via-join`・`schema-view-scope-rule` と 1 つ） |
+| `schema-group-rules-ext` | `workspace_members`・`team_row`・`view_scope` の規則、`teams` を結び付けのモデルから読む形、`guest_visible`・`derive_only`・`import_writable` の検査（permissions-and-teams・cycles-and-projects・views-and-filters の Story の候補をまとめた） |
 | `codegen-db-desired-state` | DB の望む形、RLS のポリシー、マイグレーションの差分の検査 |
 | `codegen-model-package` | `packages/model`（型、Zod、`applyOp`、`groupsOf`、`via` の逆向きの表） |
 | `codegen-client-layout` | IndexedDB の構成、M2 の列、`schema_version`・`schema_hash` |
@@ -117,6 +116,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
+| `bootstrap-poc` | PoC：基準の端末での IndexedDB の一括の書き込みと部分のブートストラップの時間（p95 10 秒）、Aurora の reader での 10 秒の `REPEATABLE READ` の読み取り（bootstrap-and-partial-sync.md の 4.3・4.7 節）。E3 の前 |
 | `idb-layout` | データベース・store（`_doc_state`・`_doc_updates`・`_drafts` を含む）・索引・行の形と、登録 |
 | `idb-write-paths` | 書き込みの経路と `durability`、保存してから当てる順 |
 | `outbox-store` | outbox の行・状態・上限・送信、`done` の 15 分 |
@@ -173,7 +173,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `team-model-and-membership` | `Team`・`TeamMembership`、参加・脱退 |
 | `team-key` | チームの識別子と `team_key_aliases`（data-model-and-schema と共同） |
 | `private-teams` | 非公開のチーム、DT-PERM-001 の行 3・4、管理者の参加と監査 |
-| `team-privacy-toggle` | 非公開への切り替えと DT-PERM-004、同期の側の `team-privacy-toggle-sync` と 1 つ |
+| `team-privacy-toggle` | 非公開への切り替えと DT-PERM-004、同期の側（bootstrap-and-partial-sync.md の 7.8 節）を含む |
 | `role-change-and-suspend` | ロールの変更と停止・戻し |
 | `workspace-removal-purge` | ワークスペースからの除外と手元の消去（bootstrap-and-partial-sync.md の 7.6 節） |
 | `invitations` | 招待と DT-AUTH-003 |
@@ -193,7 +193,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `doc-schema-compat-poc` | PoC：知らないノードの扱い（E5 の前） |
+| `doc-schema-compat` | 本文のスキーマの追加の手順（読める版 → `min_build` → 作成のフラグ）と試験（editor-and-descriptions.md の 3.2 節。y-prosemirror が知らないノードを消すことは 2026-09-28 に確かめた） |
 | `workflow-states` | 状態、種類、最低の数、Duplicate の自動の作成 |
 | `state-timestamps-derive` | DT-ISSUE-001 と派生の仕組み（ADR-0025） |
 | `issue-core-fields` | フィールド、優先度、担当、購読の派生 |
@@ -205,7 +205,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `duplicates` | 重複、連鎖、解除 |
 | `triage-intake` | Triage の入り口（DT-ISSUE-002。`import` の行を含む）と操作 |
 | `archive-and-trash` | アーカイブとゴミ箱（DT-ISSUE-003）、戻し |
-| `issue-team-move` | チームの移動の派生と、別名・`resolve`・URL の転送（data-model-and-schema の `issue-team-move-aliases` と 1 つ） |
+| `issue-team-move` | チームの移動の派生と、別名・`resolve`・URL の転送（data-model-and-schema.md の 5.4 節を含む） |
 | `auto-close-parent-sub` | 親子の自動で閉じる（DT-ISSUE-004） |
 | `state-delete-migration` | 状態の削除とイシューの移しのジョブ |
 | `issue-history` | 履歴と、活動の表示の元（client-app と共同） |
@@ -315,7 +315,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `notifier-worker` | 通知係、生成、冪等の鍵、PROP-NOTIF-001。書き込みの枠の扱いは着手の前に決める（[architecture/README.md](architecture/README.md) の 6 節の持ち越し） |
+| `notifier-worker` | 通知係、生成、冪等の鍵、PROP-NOTIF-001。`notifier` の枠と受け手ごとの 5 秒のまとめ（[notifications-and-inbox.md](architecture/notifications-and-inbox.md) の 5.5 節、[ADR-0054](decisions/0054-per-workspace-write-admission.md)） |
 | `notification-model-and-inbox` | `Notification`・`InboxState`、インボックスの画面（client-app と共同）。**公開は法務：L2** |
 | `read-snooze-delete` | 既読、スヌーズ、削除、PROP-NOTIF-003 |
 | `issue-reminders` | 後で知らせる |
@@ -347,7 +347,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `slack-create-issue` | メッセージからの作成。**法務：L1** |
 | `slack-channel-notifications` | チャンネルへの通知（公開のチームだけ）。**法務：L1** |
 | `slack-unfurl` | リンクの展開（公開のチームだけ）。**法務：L1** |
-| `slack-personal-notifications` | 個人への通知の口と送り（notifications-and-inbox の同名の Story、`slack-personal-dm-sender` と 1 つ）。**法務：L1** |
+| `slack-personal-notifications` | 個人への通知の口と送り（notifications-and-inbox.md の同名の Story と integrations.md の 5.5 節を含む）。**法務：L1** |
 
 ### E11 公開 API、Webhook、インポートと書き出し
 
@@ -391,7 +391,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `load-tests-l1-l9` | 負荷試験 L1〜L9 |
 | `bootstrap-load-test` | 最大のワークスペースの部分のブートストラップと、やり直しの殺到 |
 | `rollover-load-test` | 全チームの繰り越しが重なる負荷 |
-| `notification-load-test` | 繰り越し・一括の編集・大きな購読者での通知係の負荷 |
+| `notification-load-test` | 繰り越し・一括の編集・大きな購読者での通知係の負荷。`notifier` の枠と受け手ごとのまとめ（notifications-and-inbox.md の 5.5 節） |
 | `offline-endurance` | 7 日のオフラインの耐久試験 |
 | `sync-fault-injection` | 障害注入（Writer・Aurora・Valkey・Relay・Gateway・reader） |
 | `schema-compat-drill` | 1 つ前の版のクライアントとの往復の試験をリリースの前の必須に |
@@ -448,11 +448,11 @@ MVP の後に検討する。E13〜E19 に入れなかったもの。着手する
 - **Slack のスレッドの同期**（[integrations.md](architecture/integrations.md) の 5.6 節、[ADR-0039](decisions/0039-slack-app-issue-creation-and-channel-notifications.md)）、Slack の複数のワークスペース、非公開のチームのチャンネルへの通知。
 - **コミット（push）の結び付け**、対象のブランチごとの規則（integrations.md の 12 節）。
 - **本文のカーソルと在席の表示**、表と埋め込み（[editor-and-descriptions.md](architecture/editor-and-descriptions.md) の 14 節）。
-- **プロジェクトの更新へのコメント、イニシアチブの更新、チームごとのプロジェクトの状態、イニシアチブのリードのチーム**（[cycles-and-projects.md](architecture/cycles-and-projects.md) の 12 節）。
+- **プロジェクトの更新へのコメント、イニシアチブの更新、チームごとのプロジェクトの状態、イニシアチブのリードのチーム、イニシアチブの複数の親**（[cycles-and-projects.md](architecture/cycles-and-projects.md) の 12 節）。
 - **コメントのスレッドだけの購読、一括の編集の通知のまとめ**（[notifications-and-inbox.md](architecture/notifications-and-inbox.md) の 13 節）。
 - **利用者によるショートカットの割り当ての変更**（[client-app.md](architecture/client-app.md) の 5.2 節）。
 - **スプリントをサイクルに写すこと、取り込みの後の差分の取り込み**（[import-export.md](architecture/import-export.md) の 12 節）。
 - **遅延のモデル（コメント）と本文を収束の監査に入れること**、部分のブートストラップの端末の完全さの監査（[observability.md](architecture/observability.md) の 11 節）。
 - **未送信の中身をサーバーに一時に預けて、ブラウザの消去から守ること**（[client-store-and-offline.md](architecture/client-store-and-offline.md) の 14 節）。
 - **グループと `as_of` の組での写しのキャッシュ**（[bootstrap-and-partial-sync.md](architecture/bootstrap-and-partial-sync.md) の 13 節）。
-- **S2 の構成**（ワークスペースのシャード、移動の方式の ADR、Gateway の接続のワークスペースでの寄せ、大口の専用の検索の索引）と **S3 のセル構成と海外のリージョン**（[infrastructure.md](architecture/infrastructure.md) の 10 節、[ADR-0051](decisions/0051-workspace-sharding-and-cells.md)）。
+- **S2 の構成**（ワークスペースのシャード、移動の方式の ADR、Gateway の接続のワークスペースでの寄せ、大口の専用の検索の索引。Story の候補：`workspace-sharding`、`workspace-move`）と **S3 のセル構成と海外のリージョン**（[infrastructure.md](architecture/infrastructure.md) の 10 節、[ADR-0051](decisions/0051-workspace-sharding-and-cells.md)）。

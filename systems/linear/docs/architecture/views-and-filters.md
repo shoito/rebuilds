@@ -218,7 +218,7 @@ DT-VIEW-002。カードを別の列（グループ）へ移したときに作る
 | `labels` | 移さない（1 つの行が複数の列にあるため） | 画面は移動を受け付けない |
 | `parent` | `set parent_id` | 循環は `cycle` |
 
-- 列の中の上下の移動は、並べ方が `manual` のときだけ `sort_key` の `set` にする。他の並べ方では、列の中の位置は並べ方で決まるので、上下の移動を受け付けない（本家の振る舞いは**未検証**）。
+- 列の中の上下の移動は、並べ方が `manual` のときだけ `sort_key` の `set` にする。他の並べ方では、列の中の位置は並べ方で決まるので、上下の移動を受け付けない。本家も、ドラッグで位置を変えるのは並べ方が Manual のときで、Manual はボードの既定である（[Display options](https://linear.app/docs/display-options)、[Board layout](https://linear.app/docs/board-layout)、2026-09-28 に確認）。本家が Manual 以外で列の中の上下の移動を断るかは書かれていない（**未検証**）。
 - 1 回の移動は 1 つのトランザクション。複数選んだカードの移動は、500 操作ずつに分ける（[client-app.md](client-app.md) の 4.3 節）。
 
 ## 6. 手元にないデータを含むビュー
@@ -396,7 +396,7 @@ DT-VIEW-003。`View` の `create` と `set filter` の Writer の検証。フィ
 | E8 | `view-url-share` | 7.3 節 |
 | E6 | `view-latency-bench` | 10 節のベンチマーク（client-app と共同） |
 | E11 | `api-filter-input` | 同じ木を公開 API の入力の型に写す（api-and-webhooks と共同） |
-| E1 | `schema-view-scope-rule` | `view_scope` と `workspace_members` の規則（data-model-and-schema と共同） |
+| E1 | `schema-group-rules-ext` | `view_scope` と `workspace_members` の規則（data-model-and-schema と共同。roadmap で 1 つにまとめた） |
 
 ## 12. 未解決の問い
 
@@ -425,7 +425,7 @@ DT-VIEW-003。`View` の `create` と `set filter` の Writer の検証。フィ
 | M2 の走査で、10 万件のフィルターと増分の評価が予算に収まるか | E6・E8 のベンチマーク |
 | 購読者・関連で絞るビューを手元で答えるか（M2 に列を足すか） | 本番の利用の頻度を見て決める |
 | `title contains` の SQL の走査が大きなワークスペースで重いか | E8 で測る。重ければ pg_bigm の索引（[search.md](search.md) の 3 節の代案）を足す ADR を書く |
-| 本家の「is not」の空の扱い、条件の上限、ボードの列の中の移動 | 公式の資料では確かめられなかった（**未検証**のまま） |
+| 本家の「is not」の空の扱い、条件の上限、Manual 以外のボードの列の中の移動 | 公式の資料では確かめられなかった（**未検証**のまま） |
 
 ## 13. quality.md・runbooks・data-model への項目
 

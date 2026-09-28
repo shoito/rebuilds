@@ -53,7 +53,7 @@
 | 欠け | WebSocket の握手の後、手元とサーバーの `lastSyncId` を比べ、違えば履歴の API から取り戻す | 同上、[Reverse engineering Linear's sync magic](https://marknotfound.com/posts/reverse-engineering-linears-sync-magic/)（2022-12-20） |
 | 競合 | 大部分は LWW。CRDT は本文だけ | [architecture/README.md](README.md) の 1.3 節（講演の要約。第三者） |
 
-- 本家の `lastSyncId` がワークスペースごとか全体で共通かは**未検証**（README の 1.3 節）。
+- 本家の `lastSyncId` は全ワークスペースで共通の 1 つの数である（第三者の解析だけで確認。自分のワークスペースの続く変更の間で数が飛ぶことからの推定。本家の保証ではない。README の 1.3 節）。本システムはワークスペースごとの `sync_id` にする（ADR-0002）。
 - 本家の WebSocket のメッセージの形（`{"cmd": "sync", ...}` など）は、2022 年の観察による。今の形は**未検証**。
 - この設計は、上の考え方を参考にするが、コードも SDK も使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。本家の冪等性の弱さ（送信の後に落ちると 2 回効く）は、`client_tx_id` で除く（ADR-0006）。
 
@@ -174,7 +174,7 @@ ADR-0006。
 
 - Sync Gateway、Public API、Worker は、内部の HTTP/2 で Writer を呼ぶ。本文は `{workspace_id, actor, origin, txs[]}`。
   - `actor`：利用者の ID。Worker の定期処理（自動で閉じる、繰り越し）は `system`。
-  - `origin`：`client`・`api`・`worker`・`import`。`sync_actions` に残し、調査と Webhook の発火の条件に使う。`import` のトランザクションだけは、`server_only` の一部のフィールド（`created_at`、作者、完了・取り消しの時刻）を操作の値で受け、Triage の入り口を当てない（DT-IMPORT-002。[import-export.md](import-export.md) の 5.2 節、[data-model-and-schema.md](data-model-and-schema.md) の 3.2 節の `import_writable`）。
+  - `origin`：`client`・`api`・`worker`・`notifier`（通知係。[notifications-and-inbox.md](notifications-and-inbox.md) の 5.5 節）・`import`。`sync_actions` に残し、調査と Webhook の発火の条件に使う。`import` のトランザクションだけは、`server_only` の一部のフィールド（`created_at`、作者、完了・取り消しの時刻）を操作の値で受け、Triage の入り口を当てない（DT-IMPORT-002。[import-export.md](import-export.md) の 5.2 節、[data-model-and-schema.md](data-model-and-schema.md) の 3.2 節の `import_writable`）。
 - Writer はステートレスな ECS のサービス。ワークスペースの割り当てはしない。順序は DB の行のロックで決まる（ADR-0002）。
 
 ### 5.2 1 回の書き込みの手順
@@ -476,7 +476,7 @@ ADR-0009。接続のライフサイクル（心拍、デプロイの時の穏や
   | クライアント → サーバー | `client_no_context_takeover`（`submit` は小さく、受ける側の窓のメモリーを持たない） |
   | 圧縮しないもの | 1 KiB 未満のフレーム（`ack`・`pong`・空の `deltas`） |
   | 止め方 | Ops のフラグ `ops.ws_deflate = false` で、新しい接続の交渉で拡張を返さない（今の接続はそのまま） |
-  - 見込み：差分の JSON は同じキーの行が続くので、圧縮で送信の量が 3 分の 1〜4 分の 1 になると見込む（**未検証**）。
+  - 見込み：差分の JSON は同じキーの行が続くので、圧縮で送信の量が 3 分の 1〜4 分の 1 になると見込む（**未検証**。E12 の `cost-baseline` で測る）。
   - 文脈の持ち越しがあると、同じ `groups` の接続の間で圧縮したフレームを使い回せない（[capacity.md](capacity.md) の 3.2 節の直列化の使い回しは、圧縮の前の JSON まで）。E12 の負荷試験で、圧縮の率・Gateway の CPU・メモリーを、`server_no_context_takeover`（圧縮した 1 つのフレームを同じ `groups` の接続で使い回せる）と比べて、どちらにするかを確定する。
   - 取り戻しとブートストラップ（HTTP）は、これまでどおり br か gzip。
 
@@ -577,7 +577,7 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
 | `online` イベント | 0〜2 秒の乱数の後に再接続 |
 | 1 接続の拒否の多さ | 1 分に 100 回の拒否で `kick: protocol_error`（壊れたクライアントの暴走を止める） |
 
-- 背景のタブ（書き手が隠れたタブ）では、ブラウザがタイマーを間引く。そこで、生存の確認をクライアントのタイマーに頼らず、サーバーの ping フレームで行う。Chrome のタイマーの間引きの具体的な条件は**未検証**。
+- 背景のタブ（書き手が隠れたタブ）では、ブラウザがタイマーを間引く。そこで、生存の確認をクライアントのタイマーに頼らず、サーバーの ping フレームで行う。Chrome は、5 分より長く隠れ、30 秒音がなく、WebRTC を使わないページで、5 回以上連鎖したタイマーを 1 分に 1 回まで間引く（[Heavy throttling of chained JS timers beginning in Chrome 88](https://developer.chrome.com/blog/timer-throttling-in-chrome-88)、2026-09-28 に確認）。クライアントの 45 秒の無受信の判定は、この条件で遅れうるので、隠れたタブでは使わない。
 
 ## 10. 障害のときの振る舞い
 
@@ -694,7 +694,6 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
 | 複数の接続の `submit` を Writer でまとめて 1 つの DB のトランザクションにする（group commit）か | E2 の PoC で、ロックの待ちの p99 を見て決める |
 | permessage-deflate の文脈の持ち越しを使うか（窓 4 KiB）、使わずに圧縮したフレームを使い回すか | E12 の負荷試験で、圧縮の率・CPU・メモリーを比べて決める（9.1 節） |
 | `update` の行の全体でログが想定（1 日 800 万行）より大きくなるか | E2 で行の大きさの分布を測る。大きければ、遅延のモデルだけ全体、他は変わったフィールドにする |
-| 本家の `lastSyncId` の範囲（ワークスペースか全体か） | 公式の資料では確かめられない。調べない（**未検証**のまま） |
 | 反応型のストア（MobX か自前か） | E2 の PoC（ADR-0001） |
 
 ## 15. quality.md・runbooks・data-model への項目

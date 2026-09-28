@@ -60,7 +60,7 @@
    1. 大阪の Writer が `ops.writes_enabled = false` で待っていることを確かめる。
    2. Aurora の二次を昇格させる。東京の writer が生きていれば switchover（RPO 0。この場合、**7〜9 の `sync_epoch` の引き上げとやり直しは行わない**）、応答しなければ `aws rds failover-global-cluster --allow-data-loss`（大阪で実行）。RDS のイベントで write fencing の成否を確かめる。
    3. 古い一次の障害の時点のスナップショット（`rds:unplanned-global-failover-…`）があれば、手動のスナップショットにコピーして保全する。
-   4. 大阪の reader を 5 台に、Sync API を 60 タスクに、Gateway を東京と同じ最小に広げる（[capacity.md](../architecture/capacity.md) の 4.2 節）。reader の追加に 10〜15 分かかる見込み（未検証）。
+   4. 大阪の reader を 5 台に、Sync API を 60 タスクに、Gateway を東京と同じ最小に広げる（[capacity.md](../architecture/capacity.md) の 4.2 節）。reader の追加に 10〜15 分かかる見込み（未検証。E12 の `dr-drill` で測る）。
    5. `ops.epoch_reset_spread_min` を決める。reader が 5 台そろっていれば 10 分（既定）、そろっていなければ 30 分。
    6. 空の SQS と Valkey を確かめる。Relay の区画の担当が大阪で取れることを確かめる。
    7. **全ワークスペースの `sync_epoch` を 1 つ上げる**（`platform` のロールのジョブ。ワークスペースの ID の範囲ごと。プラットフォームの監査に残る）。ジョブの完了（全ワークスペースの件数の一致）を確かめる。

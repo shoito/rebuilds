@@ -84,7 +84,7 @@
 | --- | --- | --- |
 | 技術 | React、MobX、TypeScript、Node.js、PostgreSQL と、自作の同期 | Tuomas Artman の X への投稿（2019-04 頃。検索結果の抜粋で確認し、本文は未確認） |
 | 手元の保存 | IndexedDB に大部分のデータを持ち、変更を WebSocket で受ける | [Reverse engineering Linear's sync magic](https://marknotfound.com/posts/reverse-engineering-linears-sync-magic/)（第三者の解析） |
-| 順序 | `lastSyncId` という 1 つの整数で、手元の版を表す。解析された値は全ワークスペースで共通の数に見える | 同上、[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)（第三者の解析）。全体で共通かは未検証 |
+| 順序 | `lastSyncId` という 1 つの整数で、手元の版を表す。全ワークスペースで共通の 1 つの数である（自分のワークスペースの続く 2 つの変更の間で数が飛ぶことからの推定） | 同上、[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)（第三者の解析だけで確認。本家の保証ではない） |
 | ブートストラップ | `type=full` と `type=partial` の 2 種。部分は同期グループを指定する。遅延の読み込みは部分の索引で重複を避ける | 同上（第三者の解析） |
 | 差分 | 操作の種類 I（挿入）・U（更新）・A（アーカイブ）・D（削除）・V（アーカイブの解除）・C（依存の読み込み）・G/S（同期グループの変化） | 同上（第三者の解析） |
 | 変更 | トランザクション（作成・更新・削除・アーカイブ・解除）を GraphQL の mutation にまとめて送る。確定の `lastSyncId` を受け、差分が届くまで保持して載せ直す | 同上（第三者の解析） |
@@ -104,7 +104,7 @@
 
 - 数値は本システムの想定。本家の実数は、「40,000 社以上」（[Pricing](https://linear.app/pricing)、2026-09-28 に確認）のほかは、公開の資料で確かめられなかった（未検証）。
 - 書き込みの 1 件は、1 回の送信にまとめたトランザクションの束ではなく、モデルの変更 1 件を数える。
-- 1 つのワークスペースの書き込みは、`sync_id` を振る行のロックで直列になる（[ADR-0002](../decisions/0002-sync-model.md)）。1 ワークスペースの書き込みの上限を S1 で 1 秒 300 件と見込み、E2 の PoC で確かめる。`client` を優先し、`api`・`worker`・`import` は枠で割り当てる（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)）。インポートも Writer を通し、200 変更の束と `import` の枠（1 秒 100 変更）で書く（[ADR-0044](../decisions/0044-import-pipeline-staging-and-throttled-writer-commits.md)）。
+- 1 つのワークスペースの書き込みは、`sync_id` を振る行のロックで直列になる（[ADR-0002](../decisions/0002-sync-model.md)）。1 ワークスペースの書き込みの上限を S1 で 1 秒 300 件と見込み、E2 の PoC で確かめる。`client` を優先し、`api`・`notifier`・`worker`・`import` は枠で割り当てる（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)）。インポートも Writer を通し、200 変更の束と `import` の枠（1 秒 100 変更）で書く（[ADR-0044](../decisions/0044-import-pipeline-staging-and-throttled-writer-commits.md)）。
 - 同期のログ（`sync_actions`）は S1 の平均で 1 日 800 万行ほどと見込む。保持は既定案で 30 日（[ADR-0013](../decisions/0013-sync-group-changes-retention-and-reset.md)）。法務の L5 と、やり直しの頻度の計測（E3）で確定する。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 9 節、負荷のモデルは [capacity.md](capacity.md) の 1 節にある。
 
@@ -205,7 +205,7 @@
 | [0051](../decisions/0051-workspace-sharding-and-cells.md) | S2 はワークスペースを単位に Aurora のクラスタへ分け、ディレクトリとアカウントを小さな共通のクラスタに置く。移動は `sync_id` を保ち `sync_epoch` を上げない。S3 はワークスペースをセルに固定し、セルごとに主のリージョンを持つ |
 | [0052](../decisions/0052-rum-and-propagation-measurement.md) | RUM は自前の口に、端末で集めたヒストグラムを送り、中身と識別子を送らない。伝播は Writer のコミットの直前の時刻を差分と一緒に運び、クライアントは ping の往復で見積もった時計の差で「確定から適用まで」を測る |
 | [0053](../decisions/0053-convergence-audit.md) | 収束の監査は、抜き取った端末が IndexedDB の確定した行のハッシュを桶ごとに `(L, sync_epoch)` と送り、サーバーは今の行と `sync_actions` から `L` の時点の状態を作り直して比べる。合わない桶は 2 段目で行を特定し、説明のつかない不一致を K5 に数える |
-| [0054](../decisions/0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする |
+| [0054](../decisions/0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`notifier`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする |
 | [0055](../decisions/0055-ci-gates-latency-convergence-ime.md) | PR の必須の関門に、遅延の予算（固定の機械）、収束のシミュレーターと回帰の種、オフラインと再送の 3 つの場面、IME のテスト、生成とマイグレーションの検査を入れ、変更のパスで重さを足す。関門を外すラベルを持たず、シミュレーターの失敗を再実行で緑にしない |
 | [0056](../decisions/0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低の版は Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない |
 | [0057](../decisions/0057-schema-change-ordering.md) | スキーマの変更は、サーバーの DB を広げる → サーバーが古い形と新しい形の両方を受ける → クライアントを移す → 古い `schema_hash` の接続が 1% 未満かつ 30 日の後に縮める → 古い列を単独で消す、の順にする。1 つのデプロイで、DB の破壊の変更とそれを読むコードを一緒に出さない |
@@ -219,9 +219,9 @@
 
 - **収束しない不具合**：競合の規則、載せ直し、差分の欠けの検出、派生（`derive`）のどれかの誤りで、クライアントの状態がサーバーとずれ続ける。利用者は再読み込みまで気づかない。決定的なシミュレーター（[ADR-0010](../decisions/0010-deterministic-sync-simulator.md)。PR ごとに 2,000 の列、夜間に 20 万の列）と、本番の収束の監査（[ADR-0053](../decisions/0053-convergence-audit.md)。説明のつかない不一致 0 件）で抑える。
 - **非公開のデータの漏れ**：同期グループの判定の漏れは、クライアントの IndexedDB にデータが残る形で漏れる。画面に出なくても漏えいである。読む権限を「行の同期グループと購読が交わる」の 1 つの定義にし（[ADR-0032](../decisions/0032-single-policy-module-and-group-mapping.md)）、差分・ブートストラップ・検索・ビューの問い合わせ・通知・Webhook・書き出し・連携を同じ関数で絞る。性質ベーステストと配信の監査（[observability.md](observability.md) の 4.4 節）で確かめる。複数のグループの和に入る行（関連、プロジェクト）は ID だけを持つ。
-- **DR で失う権限の変更**：リージョンの切り替えで失った範囲（RPO 1 分以内）の停止・非公開への切り替え・取り消しが戻ると、除外した人の端末へ、やり直しのブートストラップでデータが届く。権限を狭める操作を別の追記だけの記録に書き、書き込みを受ける前にやり直す（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)）。残る窓は、その記録の大阪への複製の遅延（秒の単位の見込み。未検証）。
+- **DR で失う権限の変更**：リージョンの切り替えで失った範囲（RPO 1 分以内）の停止・非公開への切り替え・取り消しが戻ると、除外した人の端末へ、やり直しのブートストラップでデータが届く。権限を狭める操作を別の追記だけの記録に書き、書き込みを受ける前にやり直す（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)）。残る窓は、その記録の大阪への複製の遅延（DynamoDB のグローバルテーブルの既定の形では、ふつう 1 秒以内。[DynamoDB read consistency](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadConsistency.html)、2026-09-28 に確認）。
 - **1 ワークスペースの書き込みの直列化**：`sync_id` を振る行のロックが、大きなワークスペースの書き込みの上限（1 秒 300 変更の見込み）になる。`origin` ごとの枠（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)）で、利用者の書き込みを優先する。E2 の PoC で上限を測り、届かなければ楽観的な検証か group commit の ADR を書く。
-- **大きなワークスペースのメモリーと起動**：イシュー 50 万件を手元に持つと、ブラウザのメモリーと IndexedDB の読み込みが重い。部分のブートストラップと遅延の読み込み（[ADR-0003](../decisions/0003-bootstrap-and-partial-sync.md)）、メモリーの 3 層（[ADR-0016](../decisions/0016-memory-tiers-quota-and-offline-ux.md)）で抑える。基準の端末での計測を CI に入れる（[ADR-0055](../decisions/0055-ci-gates-latency-convergence-ime.md)）。IndexedDB の一括の書き込みが NFR-003 に間に合うかは未検証で、E3 の PoC で測る。
+- **大きなワークスペースのメモリーと起動**：イシュー 50 万件を手元に持つと、ブラウザのメモリーと IndexedDB の読み込みが重い。部分のブートストラップと遅延の読み込み（[ADR-0003](../decisions/0003-bootstrap-and-partial-sync.md)）、メモリーの 3 層（[ADR-0016](../decisions/0016-memory-tiers-quota-and-offline-ux.md)）で抑える。基準の端末での計測を CI に入れる（[ADR-0055](../decisions/0055-ci-gates-latency-convergence-ime.md)）。IndexedDB の一括の書き込みが NFR-003 に間に合うかは未検証で、E3 の前の `bootstrap-poc` で測る。
 - **長いオフラインの上書き**：オフラインの間の変更は、確定の順で LWW になり、他の人の新しい変更を上書きしうる（本家の文書と同じ性質）。上書きを履歴に残し、本人に知らせる（[ADR-0008](../decisions/0008-conflict-rules-and-fractional-keys.md)）。イシューとプロジェクトの説明は CRDT で合わせる（[ADR-0021](../decisions/0021-description-crdt-yjs-in-sync-log.md)）。コメントは作った人だけが書くので LWW にする（[ADR-0022](../decisions/0022-comments-anchors-mentions-attachments.md)）。
 - **クライアントの版の混在**：古い版のクライアントが、新しいスキーマのサーバーへ outbox を送る。トランザクションの形の版と `upcast` を持ち、サーバーが 1 つ前の版を 30 日受ける。スキーマの変更は広げる・移る・縮める・消すの順（[ADR-0057](../decisions/0057-schema-change-ordering.md)）。手元の DB の版を上げるリリースは戻せないので、機能の変更と別にする（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。
 - **ブラウザの保存の消去**：ブラウザが IndexedDB を消すと、未送信の outbox が失われる。永続の保存の許可を求め、Electron を勧め、失った件数をサーバーのクッキーの端末の ID で示す（[ADR-0016](../decisions/0016-memory-tiers-quota-and-offline-ux.md)）。
@@ -242,6 +242,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **並びの鍵の振り直し**：窓（65 個から最大 1,024 個）で振り直す（ADR-0008）。墓標（ADR-0012）と `sync_epoch`（ADR-0013）とあわせて、ADR-0002・0003 に注記を残した。
 - **outbox の `done`**：確定を確かめた後 15 分残し、DR のやり直しで送り直す（ADR-0014）。NFR-007 の「outbox に残っていれば送り直される」を、確定の後 15 分にも広げる。ADR-0005 に注記を残した。同期グループから外れたときの未確定のトランザクションは、サーバーが拒否するまで outbox に残す。
 - **自動の処理の流量**：自動で閉じる・アーカイブ・繰り越しは `worker` の枠（1 ワークスペース 1 秒 50 変更）に従い、開始の時刻を散らす（ADR-0023・0026 の注記）。
+- **通知係の書き込み**：通知係は `worker` と別の `notifier` の枠（1 ワークスペース 1 秒 50 変更、瞬間 500）で書く。インボックスの行は安く、受け手のグループだけに届くので、受け手ごとに 5 秒に 1 回のトランザクションにまとめる（[ADR-0054](../decisions/0054-per-workspace-write-admission.md) の注記、[capacity.md](capacity.md) の 2.2 節、[notifications-and-inbox.md](notifications-and-inbox.md) の 5.5 節）。自動の処理と通知が同じ枠を取り合わない。
 - **やり直しの散らし**：既定 10 分、DR では `ops.epoch_reset_spread_min` で 30 分まで（ADR-0013 の注記）。
 - **DR の権限の変更**：権限を狭める操作を DynamoDB のグローバルテーブルに追記し、昇格の後、書き込みを受ける前にやり直す（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)。Auth0 の題材の考え方に倣う）。
 - **permessage-deflate**：差分の流れに使う。窓 4 KiB の文脈の持ち越し。E12 で、持ち越しなしと比べて確定する（ADR-0009 の注記）。
@@ -249,6 +250,12 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **RLS の外の表**：`sync_outbox`・`client_devices`・`narrowing_outbox` だけを足し、`workspaces`・`oauth_apps` のコンテキストの前の読み出しは関数にした（[data-model.md](data-model.md) の 3 節）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。保持の期間は [security.md](security.md) の 9 節。1 ワークスペースの書き込みの枠は [capacity.md](capacity.md) の 2.2 節。公開 API の枠は [api-and-webhooks.md](api-and-webhooks.md) の 4.2 節。クライアントの上限（outbox 5 万件・100 MiB、M1 5 万個）は [client-store-and-offline.md](client-store-and-offline.md) の 5.3・7.2 節。
 - **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
+- **検証の後の PM の決定（2026-09-28。推奨案）**：
+  - **招待**：`members_can_invite` の既定を偽（管理者だけ）にした。本家の有料のプランの既定と同じで、B2B で安全な既定にするため（[permissions-and-teams.md](permissions-and-teams.md) の 3.3 節の注記）。
+  - **手動のアーカイブ**：残す。本家はアーカイブを自動だけにするが、利用者が自動のアーカイブを待たずに片付けられるようにする。本家との意図した差異（[issues-and-workflow.md](issues-and-workflow.md) の 2・18 節）。
+  - **イニシアチブの複数の親**：MVP の後。MVP は親を 1 つにする（[cycles-and-projects.md](cycles-and-projects.md) の 3.7・12 節）。
+  - **見積もりのキー**：`E`（本家は `Shift+E`）のまま、法務の L8 の後に見直す（下の持ち越し）。
+- **検証の工程での直し（2026-09-28）**：未検証の項目を公式の資料で確かめ、次を直した。本文のスキーマにノードを足すのは破壊の変更にし、`min_build` を先に上げる（y-prosemirror が知らないノードを共有の文書から消すため。ADR-0057 の注記、[editor-and-descriptions.md](editor-and-descriptions.md) の 3.2 節）。自動で閉じる・アーカイブに、本家の文書の除外の条件（進行中のサイクル・未完了のプロジェクト、期日、サブイシュー、親）を足した（ADR-0023 の注記）。データ転送の費用を CloudFront の日本の単価で見積もり直した（[infrastructure.md](infrastructure.md) の 11 節）。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -256,16 +263,15 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | 法務の確認待ち（L1〜L8） | [intent.md](../intent.md) の「法務の確認待ち」、[security.md](security.md) の 13 節。結論まで、そこに挙げた Story の spec を承認しない |
-| 反応型のストア（MobX か自前か） | E2 の PoC。イシュー 50 万件での一覧の描画、フィルターの再計算、メモリー |
-| 1 ワークスペースの書き込みの上限（1 秒 300 変更）、楽観的な検証・group commit の要否 | E2 の PoC、E12 の負荷試験 L3 |
+| 反応型のストア（MobX か自前か） | E2 の前の `memory-tiers-poc`。イシュー 50 万件での一覧の描画、フィルターの再計算、メモリー |
+| 1 ワークスペースの書き込みの上限（1 秒 300 変更）、楽観的な検証・group commit の要否 | E2 の前の `writer-throughput-poc`、E12 の負荷試験 L3 |
 | 全体と部分のブートストラップの閾値（5 万件）、やり直しの閾値（5 万件）、部分の条件（30 日） | E3 の PoC（[ADR-0003](../decisions/0003-bootstrap-and-partial-sync.md)） |
-| IndexedDB の一括の書き込みが NFR-003 に間に合うか（だめなら SQLite の WASM） | E3 の PoC |
+| IndexedDB の一括の書き込みが NFR-003 に間に合うか（だめなら SQLite の WASM） | E3 の前の `bootstrap-poc` |
 | 同期のログの保持の期間（30 日） | E3。法務の L5 の後に確定する |
-| 通知係の書き込みを `worker` の枠に入れるか、別の枠にするか（大きなワークスペースで 1 秒 50 変更を超えうる） | E9 の着手の前に capacity と notifications-and-inbox の領域で決める |
+| 見積もりのキー（本システムは `E`、本家は `Shift+E`） | 法務の L8 の後（[client-app.md](client-app.md) の 5 節） |
 | permessage-deflate の文脈の持ち越しの採否、データ転送の量 | E12 の負荷試験 |
 | OpenSearch の費用と型、1 文字の N-gram の索引の大きさ | E8 の `search-poc` |
-| DynamoDB の AZ の中の永続化と、グローバルテーブルの複製の遅延 | E1 で AWS の文書で確かめる（未検証） |
-| 本家の振る舞いで未確認のもの（同期のログの保持、`lastSyncId` が全体で共通か、本文の CRDT の部品、可用性の SLA） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
+| 本家の振る舞いで未確認のもの（同期のログの保持、本文の CRDT の部品、可用性の SLA の値） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う（`lastSyncId` が全体で共通なことは第三者の解析で確かめた。1.3 節） |
 
 ## 7. 領域の文書
 

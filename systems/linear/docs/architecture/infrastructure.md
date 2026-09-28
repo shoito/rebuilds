@@ -63,9 +63,9 @@ ADR-0049。Auth0 の題材と同じ形にする。
 | `<brand>usercontent.<domain>` | 添付の署名付きの URL | S3（添付。OAC） |
 | `update.<brand>.<domain>` | Electron の更新の案内と配布物 | `alb-api` → `public-api`（案内）、S3（配布物）（[delivery.md](delivery.md) の 6 節） |
 
-- **WebSocket も CloudFront を通す**（ADR-0049）。CloudFront は WebSocket を HTTP/1.1 で扱い、オリジンのリクエストポリシーで `Sec-WebSocket-Key`・`Sec-WebSocket-Version`（と `-Protocol`・`-Accept`・`-Extensions`）を転送する（[Use WebSockets with CloudFront distributions](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-working-with.websockets.html)、2026-09-28 に確認）。CloudFront はオリジンからクライアントへ 10 分流れない接続を切る（Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md) の 2 節で確認済み）。Gateway は 20 秒ごとに ping のフレームを送る（[sync-engine.md](sync-engine.md) の 9.6 節）ので当たらない。
+- **WebSocket も CloudFront を通す**（ADR-0049）。CloudFront は WebSocket を HTTP/1.1 で扱い、オリジンのリクエストポリシーで `Sec-WebSocket-Key`・`Sec-WebSocket-Version`（と `-Protocol`・`-Accept`・`-Extensions`）を転送する（[Use WebSockets with CloudFront distributions](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-working-with.websockets.html)、2026-09-28 に確認）。CloudFront はオリジンからクライアントへ 10 分流れない接続を切る。WebSocket の同時の接続の数の上限はなく、配信ごとの 1 秒 25 万の要求と 150 Gbps が上限になる（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、2026-09-28 に確認）。Gateway は 20 秒ごとに ping のフレームを送る（[sync-engine.md](sync-engine.md) の 9.6 節）ので当たらない。
 - ALB のアイドルの時間切れは 120 秒（既定 60 秒、1〜4,000 秒で設定できる。[Edit attributes for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-28 に確認）。Gateway の ping（20 秒）より十分長く、アプリのアイドルの時間切れをそれより長くする（同じ文書の勧め）。
-- ALB の HTTP のクライアントの keepalive の期間（既定 1 時間）は、WebSocket に当たるかを E1 で確かめる（**未検証**）。当たるなら、Gateway の接続は 1 時間ごとに切れて再接続する。再接続は乱数の待ちと取り戻しで吸収できるが、AZ の切り離し（zonal shift）の後の戻りを速くする利点もあるので、既定のままにする。
+- ALB の HTTP のクライアントの keepalive の期間（既定 1 時間、60 秒〜7 日）は、期間を過ぎた後の次の要求の応答で接続を閉じる仕組みである（HTTP/1.1 は `Connection: close`、HTTP/2 は `GOAWAY`。[Edit attributes for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-28 に確認）。昇格した後の WebSocket には次の要求がないので当たらないと見込むが、文書に書かれていない（**未検証**。E1 の `edge-and-websocket-origin` で確かめる）。当たるなら、Gateway の接続は 1 時間ごとに切れて再接続する。再接続は乱数の待ちと取り戻しで吸収できるが、AZ の切り離し（zonal shift）の後の戻りを速くする利点もあるので、既定のままにする。
 - WAF：共通のルール、IP の評判、IP ごとのレート制限（`/api/auth/*` の送信は 5 分 300、`/sync/ticket` は 5 分 3,000、全体は 5 分 30,000）、`/hooks/*` は連携の相手の IP の一覧を使わず署名で確かめる（相手の IP は変わる）。値は E4・E12 で調整する。
 
 ### 2.3 外向きの送信
@@ -100,7 +100,7 @@ ADR-0049。すべて Fargate（ARM64）。サービスごとにタスク定義�
 
 ### 3.2 Writer と Relay
 
-- Writer は Aurora の writer のエンドポイントだけにつなぐ。Writer のタスクは 3 AZ に置き、Aurora の writer のある AZ との往復（1ms 前後。**未検証**）を受け入れる。
+- Writer は Aurora の writer のエンドポイントだけにつなぐ。Writer のタスクは 3 AZ に置き、Aurora の writer のある AZ との往復（1ms 前後の見込み。**未検証**。E2 の前の `writer-throughput-poc` で測る）を受け入れる。
 - Relay は `hash(workspace_id) mod 64` の区画を持ち、区画の担当を Valkey の期限つきの鍵（10 秒、3 秒ごとに更新）で決める。担当が落ちたら、他のタスクが 10 秒以内に引き継ぐ（Slack の Relay と同じ考え方。[sync-engine.md](sync-engine.md) の 7.3 節）。Valkey が落ちている間は、区画を DB の勧告的ロック（`pg_try_advisory_lock`）で決める。
 
 ### 3.3 OpenSearch
@@ -134,7 +134,7 @@ ADR-0049。すべて Fargate（ARM64）。サービスごとにタスク定義�
 | Aurora PostgreSQL 18 | writer `db.r8g.4xlarge` × 1、reader 同型 × 2（別の AZ）。I/O-Optimized。大阪の Global Database の二次に reader 同型 × 1 |
 | RDS Proxy | 使わない（`SET LOCAL` で接続が固定される。他の題材と同じ） |
 | ElastiCache（Valkey） | `cache.r7g.large`、クラスタモード 3 シャード × （プライマリ 1＋レプリカ 1）。大阪は小さい別のクラスタ（空） |
-| OpenSearch | データノード 3、専用のマスター 3。型は E8 の PoC で決める（**未検証**） |
+| OpenSearch | データノード 3、専用のマスター 3。型は E8 の前の `search-poc` で決める |
 | `gateway` | 2 vCPU / 4 GB × 20（ピーク）、最小 12、最大 60 |
 | `sync-api` | 2 vCPU / 4 GB × 6〜12、DR の殺到の時は 60 まで |
 | `writer` | 2 vCPU / 4 GB × 6〜24 |
@@ -186,12 +186,12 @@ S1 から大阪に**ウォームスタンバイ**を持つ。切り替えは人�
   - 全クライアントは握手で `reset`（`epoch`）になり、確定から 15 分以内の outbox（`done`）も送り直す。失った変更は 1 回だけ当たり、生き残った変更は `tx_results` で前の結果が返る（[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 8.3 節）。
   - やり直しの殺到の構成の広げ方は [capacity.md](capacity.md) の 4.2 節。
 - **失った範囲の権限を狭める操作**（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)）：停止・除外・ロールの引き下げ・非公開への切り替え・脱退・セッションとトークンの取り消し・ログインの制限の強化が失った範囲に入ると、大阪で権限が戻る。そのまま書き込みを受けると、やり直しのブートストラップで、見てよくなくなったデータがその人の端末に届く（NFR-008 の破れ）。そこで、
-  - Writer と認証のサービスは、これらの操作を確定したとき、同じトランザクションでサーバーだけの表 `narrowing_outbox` に書き、コミットの後、ack の前に DynamoDB の `narrowing_journal`（東京の中で複数の AZ に書く、追記だけの記録）へ写す。写せなかった行は Relay が 1 秒ごとに送る。`narrowing_journal` はグローバルテーブルで大阪へ非同期に複製する（遅延は `ReplicationLatency` で見る。秒の単位の見込み。**未検証**）。
+  - Writer と認証のサービスは、これらの操作を確定したとき、同じトランザクションでサーバーだけの表 `narrowing_outbox` に書き、コミットの後、ack の前に DynamoDB の `narrowing_journal`（東京の中で複数の AZ に書く、追記だけの記録）へ写す。写せなかった行は Relay が 1 秒ごとに送る。`narrowing_journal` はグローバルテーブルで大阪へ非同期に複製する（遅延は `ReplicationLatency` で見る。既定の形（MREC）では、ふつう 1 秒以内に届く。[DynamoDB read consistency](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.ReadConsistency.html)、2026-09-28 に確認）。DynamoDB は 200 の応答の時点で書き込みを永続化しており、リージョンの中の 3 つの AZ に複製する（同じ文書、[Resilience and disaster recovery in Amazon DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/disaster-recovery-resiliency.html)、2026-09-28 に確認）。
   - 大阪の昇格のワークフローは、`sync_epoch` を上げた後、`ops.writes_enabled` を開く前に、大阪の `narrowing_journal` のうち失った範囲（東京が応答しなくなった時刻 − 直近の `AuroraGlobalDBRPOLag` − 5 分 から後）の記録を、`tx_results` になければやり直す（`ops.dr_replay_mode` の Writer のシステムのトランザクション）。やり直しが終わるまで入口を切り替えず、書き込みを受けない。
   - 残る窓は、`narrowing_journal` の大阪への複製の遅延と、コミットから記録までの数ミリ秒。権限を広げる操作は記録せず、失われたままにする（安全側）。
   - 性質の候補：**PROP-DR-001（狭める操作の保存）**：シミュレーターの DR の切り替え（最後の k 件を失う）で、`narrowing_journal` に届いた狭める操作は、大阪で書き込みを受ける前に効いており、対象の人の手元に見てよくない行が残らない。
 - **失った範囲の外への影響**：失った範囲の変更で送られた Webhook・メール・Slack の通知・PR へのコメントは取り消せない。送り直しで同じ変更が再び確定すると、Webhook は新しい `syncId` で再び送られる（受け手は `<Brand>-Delivery` では重複を見分けられない）。この性質を公開 API の文書に書く。
-- **検索**：大阪に OpenSearch を常に置かない。切り替えの後に、大阪で最新のスナップショットから戻し（数時間。**未検証**）、数え直し（[search.md](search.md) の 9.4 節）で追いつかせる。その間、サーバーの検索は止め、画面は手元の検索だけにする（[search.md](search.md) の 10 節の縮退）。検索の RTO は 4 時間とする。
+- **検索**：大阪に OpenSearch を常に置かない。切り替えの後に、大阪で最新のスナップショットから戻し（数時間の見込み。**未検証**。E12 の `dr-drill` で測る）、数え直し（[search.md](search.md) の 9.4 節）で追いつかせる。その間、サーバーの検索は止め、画面は手元の検索だけにする（[search.md](search.md) の 10 節の縮退）。検索の RTO は 4 時間とする。
 - **連携**：GitHub の事象は切り替えの間に失われる（GitHub は自動で再送しない）。切り替えの後、失った範囲の開始の時刻から後に更新された PR を読み直す（[integrations.md](integrations.md) の 7.2 節）。
 - **東京へ戻す（フェイルバック）**：東京の回復の後、Aurora が東京を二次として加え直す。別の計画作業として switchover（RPO 0）で戻す。switchover では `sync_id` の番号が保たれるので、`sync_epoch` を上げない。
 
@@ -307,7 +307,7 @@ ADR-0051。
 
 ## 11. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** ±50% の幅。サポートプラン、税は含めない。Fargate は東京の単価（Graviton：vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD。Auth0 の題材の infrastructure.md の 10 節で AWS Price List API から確かめた値を引き継ぐ）。他の項目の東京の単価は確かめていない（**未検証**）。Savings Plans とリザーブドインスタンスで 20〜30% 下げられる。
+**大まかな見積もりである。** ±50% の幅。サポートプラン、税は含めない。次の単価は AWS Price List API で確かめた（2026-09-28。発行日 2026-09-16 の価格表）：Fargate の東京（Graviton：vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD）、Aurora PostgreSQL の東京の `db.r8g.4xlarge`（I/O-Optimized 1 時間 3.464 USD）、CloudFront の日本からのデータ転送（下の注）。他の項目の単価は確かめていない（**未検証**。E12 の `cost-baseline` で請求の実績に置き換える）。Savings Plans とリザーブドインスタンスで 20〜30% 下げられる。
 
 | 項目 | 月額（USD、概算） |
 | --- | --- |
@@ -315,17 +315,17 @@ ADR-0051。
 | ElastiCache（東京 6 ノード、大阪 2 ノード） | 1,500 |
 | OpenSearch（データ 3、マスター 3、ストレージ 約 1 TB） | 3,000 |
 | ECS Fargate（東京 平均 約 100 vCPU・200 GB、大阪の待機 約 15 vCPU） | 4,200 |
-| **CloudFront のデータ転送（WebSocket の差分、ブートストラップ、資産、添付）** | **10,000〜25,000（圧縮なしの見積もり。permessage-deflate で 4,000〜9,000 の見込み。未検証）** |
+| **CloudFront のデータ転送（WebSocket の差分、ブートストラップ、資産、添付）** | **約 21,000（圧縮なし、230 TB）。permessage-deflate で約 6,000〜8,000 の見込み（60〜80 TB。圧縮の率は未検証）** |
 | ALB、NAT、Network Firewall（東京と大阪） | 4,500 |
 | 可観測性（ログ、メトリクス、トレース、Grafana、RUM の収集） | 2,500 |
 | GuardDuty、Security Hub、Inspector、Config、CloudTrail、WAF | 2,000 |
 | S3（添付、資産、配布物、スナップショット）、バックアップ、log-archive | 1,500 |
 | SES、KMS、Secrets Manager、DynamoDB（`narrowing_journal`） | 500 |
-| **本番の合計** | **約 40,000〜55,000（圧縮で約 34,000〜40,000 の見込み）** |
+| **本番の合計** | **約 51,000（圧縮で約 36,000〜38,000 の見込み）** |
 | staging・dev・shared・edge・security | 約 7,000 |
 
-- **データ転送が最大の不確かさである。** 差分の送信のピークを 30 万回/秒、1 回 約 1.5 KB（`update` は行の全体を運ぶ。ADR-0007）、平均をピークの 5 分の 1 と置くと、圧縮なしで月に 約 230 TB になる（[capacity.md](capacity.md) の 3.2 節）。CloudFront の日本の単価は確かめていない（**未検証**）。
-- **決定（2026-09-28）**：差分の流れに permessage-deflate を使う（窓 4 KiB の文脈の持ち越し。[ADR-0009](../decisions/0009-sync-gateway-protocol.md) の注記、[sync-engine.md](sync-engine.md) の 9.1 節）。同じキーの行が続く JSON なので、3 分の 1〜4 分の 1（月に 約 60〜80 TB）になると見込む（**未検証**）。E12 の負荷試験（`cost-baseline`）で、圧縮の率と Gateway の CPU を測り、足りなければ (1) `update` を変わったフィールドだけにする（[sync-engine.md](sync-engine.md) の 14 節の持ち越し）、(2) 同じ `groups` の接続への送信のまとめ、を比べる。
+- **データ転送が最大の不確かさである。** 差分の送信のピークを 30 万回/秒、1 回 約 1.5 KB（`update` は行の全体を運ぶ。ADR-0007）、平均をピークの 5 分の 1 と置くと、圧縮なしで月に 約 230 TB になる（[capacity.md](capacity.md) の 3.2 節）。CloudFront の日本からのデータ転送は、月の最初の 10 TB が 1 GB 0.114 USD、次の 40 TB が 0.089 USD、次の 100 TB が 0.086 USD、次の 350 TB が 0.084 USD（AWS Price List API の `AmazonCloudFront`、2026-09-28 に確認）。230 TB で約 20,500 USD、60〜80 TB で約 5,700〜7,500 USD になる。
+- **決定（2026-09-28）**：差分の流れに permessage-deflate を使う（窓 4 KiB の文脈の持ち越し。[ADR-0009](../decisions/0009-sync-gateway-protocol.md) の注記、[sync-engine.md](sync-engine.md) の 9.1 節）。同じキーの行が続く JSON なので、3 分の 1〜4 分の 1（月に 約 60〜80 TB）になると見込む（**未検証**。E12 の `cost-baseline` で測る）。E12 の負荷試験（`cost-baseline`）で、圧縮の率と Gateway の CPU を測り、足りなければ (1) `update` を変わったフィールドだけにする（[sync-engine.md](sync-engine.md) の 14 節の持ち越し）、(2) 同じ `groups` の接続への送信のまとめ、を比べる。
 - 費用は、アカウントとタグ（`service`、`env`）ごとに毎月見る。
 
 ## 12. Story の候補
@@ -363,13 +363,11 @@ ADR-0051。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| ALB の HTTP のクライアントの keepalive の期間が WebSocket に当たるか | E1 で確かめる（**未検証**） |
-| CloudFront の WebSocket の接続の上限 | E1 で AWS の文書と問い合わせで確かめる（**未検証**） |
+| ALB の HTTP のクライアントの keepalive の期間が WebSocket に当たるか | E1 の `edge-and-websocket-origin`（**未検証**） |
 | Gateway の接続をワークスペースで寄せるか | S2 の着手の前。送信の量と Valkey の複製の量で決める |
 | S2 のワークスペースの移動の方式（論理レプリケーションか、`sync_actions` の再生か） | S2 の着手の前に別の ADR |
 | データ転送の量と費用、permessage-deflate の文脈の持ち越しの採否 | E12 の負荷試験 |
-| DynamoDB の書き込みがリージョンの中の複数の AZ に応答の前に永続化されること、グローバルテーブルの複製の遅延 | E1 で AWS の文書で確かめる（**未検証**） |
-| OpenSearch の型と、大阪での戻しの時間 | E8 の PoC、E12 の DR の訓練 |
+| OpenSearch の型と、大阪での戻しの時間 | E8 の前の `search-poc`、E12 の `dr-drill` |
 
 ## 14. quality.md・runbooks・data-model への項目
 

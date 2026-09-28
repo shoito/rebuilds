@@ -9,7 +9,7 @@ date: 2026-09-28
 
 公開 API の主体は、API キーと OAuth のアプリである（[ADR-0004](0004-tenancy-and-permissions.md)：発行した人の権限を超えない）。`Principal` の型はすでに `kind: "api_key" | "oauth_app"` と `scopes` を持つ（[permissions-and-teams.md](../architecture/permissions-and-teams.md) の 4.1 節）。
 
-本家の OAuth は、範囲 `read`・`write`・`issues:create`・`comments:create`・`admin` など、アクセストークン 24 時間とリフレッシュトークン、PKCE、取り消し、`actor=app`、client credentials を持つ（[OAuth 2.0 authentication](https://linear.app/developers/oauth-2-0-authentication)、2026-09-28 に確認）。本家の API キーの期限と範囲は、公式の文書で確かめられなかった（未検証）。
+本家の OAuth は、範囲 `read`・`write`・`issues:create`・`comments:create`・`admin` など、アクセストークン 24 時間とリフレッシュトークン、PKCE、取り消し、`actor=app`、client credentials を持つ（[OAuth 2.0 authentication](https://linear.app/developers/oauth-2-0-authentication)、2026-09-28 に確認）。本家の API キーは、範囲（Read・Write・Admin・Create issues・Create comments）と特定のチームに絞れる（[API and Webhooks](https://linear.app/docs/api-and-webhooks)、2026-09-28 に確認）。期限は公式の文書で確かめられなかった（未検証）。
 
 トークンの接頭辞には、本家の名前を使わない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
@@ -41,7 +41,7 @@ OAuth の実装：
 - セッションのクッキーでは公開 API を使えない。
 - `actor=app` と client credentials は MVP の後。
 - 2 を採らない理由：辞めた人の手元や CI の設定に、期限のないキーが残り続ける。
-- b を採らない理由：トークンをワークスペースの `User` に結び、上の形と保存にするには、部品の外で多くを足す必要がある（部品の機能の詳細は未検証）。認可の流れは小さく、自前で持つ費用が低い。
+- b を採らない理由：トークンをワークスペースの `User` に結び、上の形と保存にするには、部品の外で多くを足す必要がある（部品は PKCE とリフレッシュトークンの入れ替えを持つ。[OAuth 2.1 Provider](https://better-auth.com/docs/plugins/oauth-provider)、2026-09-28 に確認）。認可の流れは小さく、自前で持つ費用が低い。
 - y を採らない理由：盗まれたリフレッシュトークンが 90 日使える。
 
 ## Consequences

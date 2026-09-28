@@ -14,7 +14,7 @@ date: 2026-09-28
 - 書き手のタブが凍結されたときの交代と、2 つの書き手が重なったときの安全。
 - 複数のタブの outbox の順序。
 
-MDN によれば、Web Locks は同じオリジンのタブとワーカーの間で効き、コールバックの終わりとタブの終了で外れ、`steal` で奪える。BroadcastChannel は同じオリジン・同じ保存の区画で、送り手自身は受けず、構造化複製で送る（[Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API)、[BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel)、2026-09-28 に確認）。凍結されたページがロックを持ち続けるかは**未検証**。本家の複数のタブの扱いは**未検証**。
+MDN によれば、Web Locks は同じオリジンのタブとワーカーの間で効き、コールバックの終わりとタブの終了で外れ、`steal` で奪える。BroadcastChannel は同じオリジン・同じ保存の区画で、送り手自身は受けず、構造化複製で送る（[Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API)、[BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel)、2026-09-28 に確認）。凍結されたページがロックを持ち続けるかは**未検証**（E3 の `multi-tab-leader` で確かめる）。本家の複数のタブの扱いは、公式の資料にも第三者の解析にもない（**未検証**）。
 
 Replicache は、同じブラウザのプロファイルのクライアントを 1 つのクライアントグループにまとめ、キャッシュを共有する（[How Replicache works](https://doc.replicache.dev/concepts/how-it-works)、2026-09-28 に確認）。Notion の題材は SQLite の OPFS の 1 つの接続の制約から SharedWorker を経由させた（Notion の ADR-0008）。
 
@@ -41,7 +41,7 @@ Replicache は、同じブラウザのプロファイルのクライアントを
 - 書き手は、`freeze` で自分から降りる。見えているタブは、書き手の `status`（5 秒ごと）を 10 秒受けなければ `steal` で奪う。奪われた書き手は直ちに送信をやめる。重なっても、`client_tx_id` の冪等と、接続の中の順序と、Writer が 1 回の `submit` を順に処理することで、重複も順序の逆転も起きない。
 - 2 を採らない理由：大きなパケットの構造化複製がタブの数だけ走り、メインのスレッドを止める。受け手は保存済みの行を読めば足りる。
 - 3 を採らない理由：伝播が遅れ（NFR-002）、読み出しが無駄に増える。
-- b を採らない理由：SharedWorker は使えない環境（モバイルのブラウザの一部。どの版で使えるかは**未検証**）があり、Electron と Web で実行の場所が分かれる。IndexedDB はどのタブからも読み書きでき、書き手はネットワークの役割だけなので、ページで足りる（ADR-0005）。
+- b を採らない理由：SharedWorker は、Android の Chrome では 148 からしか使えない（[MDN の互換性のデータ](https://github.com/mdn/browser-compat-data) 8.1.3、2026-09-28 に確認。Safari は 16、Firefox は 29 から）。古い Android の Chrome が残り、Electron と Web で実行の場所が分かれる。IndexedDB はどのタブからも読み書きでき、書き手はネットワークの役割だけなので、ページで足りる（ADR-0005）。
 
 ## Consequences
 

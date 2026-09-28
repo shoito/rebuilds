@@ -48,9 +48,10 @@
 | 更新 | 健康状態は On track・At risk・Off track の 3 つと本文。催促は毎日・毎週・隔週で曜日と時刻を選び、1 営業日後と 2 営業日後にも催促する。催促の周期＋3 日を過ぎると「更新がない」。進捗が 2% を超えて変わったら自動の要約を付ける | [Initiative and Project updates](https://linear.app/docs/initiative-and-project-updates) |
 | イニシアチブ | 状態は Proposed・Planned・Active・Completed・Canceled。オーナー、リードのチーム、目標日、サブイニシアチブ。識別子は `I` と連番 | [Initiatives](https://linear.app/docs/initiatives) |
 | 非公開のチーム | 公開のチームのプロジェクトを非公開のチームと共有できる。そのつながりは非公開のチームのメンバーにだけ見える | [Private teams](https://linear.app/docs/private-teams) |
+| サブイニシアチブ | Enterprise。イニシアチブを 5 段まで入れ子にできる。1 つのイニシアチブは複数の親を持てる。親は子のプロジェクトを進捗に含める。ゲストには見えない | [Sub-initiatives](https://linear.app/docs/sub-initiatives) |
 
 - プロジェクトの状態の種類の名前（Backlog・Planned・In Progress・Paused・Completed・Canceled）は、状態の文書に列挙がなく、**未検証**。本システムは 3.5 節の 6 種類にする。
-- 1 つのプロジェクトが複数のイニシアチブに属せるか、サブイニシアチブの深さの上限は、文書に書かれていない（**未検証**）。
+- 1 つのプロジェクトが複数のイニシアチブに属せるかは、文書に書かれていない（**未検証**）。
 - 「クールダウンの間に Backlog へ移したものは移らない」は、クールダウンの前から Backlog だったイシューの扱いを書いていない（**未検証**）。本システムの決定は 4.4 節。
 - 始まりの時刻の「0 時 1 分」は採らず、0 時 0 分にする（4.2 節）。
 
@@ -199,7 +200,8 @@ model("InitiativeProject", {
 
 - 1 つのプロジェクトは複数のイニシアチブに属せる（本家は**未検証**。本システムの決定）。
 - `InitiativeProject` はプロジェクトのグループに属す。非公開のチームだけのプロジェクトのつながりは、そのチームのメンバーにだけ届く。イニシアチブの画面は、手元にあるつながりだけを描く。
-- 入れ子は `parent_id` の LWW と循環の拒否（`cycle`）。深さは 5 まで（本システムの値。イシューの親子の ADR-0024 と同じ検証）。
+- 入れ子は `parent_id` の LWW と循環の拒否（`cycle`）。深さは 5 まで（本家と同じ。2 節）。検証はイシューの親子の ADR-0024 と同じ。
+- 本家は 1 つのイニシアチブに複数の親を許す（2 節）。本システムは MVP で親を 1 つにする（本家との差異）。複数の親は、進捗の二重の数えと循環の検査が要るので、MVP の後に結び付けのモデル（`InitiativeParent`）を足す ADR を書いて入れる（12 節の決定）。
 - イニシアチブのリードのチーム（本家）は MVP では持たない。
 - イニシアチブの番号はワークスペースの連番で、Writer が振る（イシューの番号と同じ。[ADR-0020](../decisions/0020-ids-and-human-identifiers.md)）。
 - イニシアチブの更新（本家）は `ProjectUpdate` と同じ形の `InitiativeUpdate` で持つ。MVP ではプロジェクトの更新だけを作り、イニシアチブの更新は MVP の後。
@@ -511,7 +513,7 @@ model("ProgressStat", {
 | E7 | `project-update-reminders` | 6.2 節（notifications-and-inbox と共同） |
 | E7 | `initiatives` | 3.7・7.6 節のイニシアチブ、入れ子、つながり |
 | E7 | `cycles-projects-privacy-props` | PROP-PROG-002 と、つながりの漏れの試験（permissions-and-teams と共同） |
-| E1 | `schema-teams-via-join` | `teams` 規則を結び付けのモデルから読む形と、`derive_only`（data-model-and-schema と共同） |
+| E1 | `schema-group-rules-ext` | `teams` 規則を結び付けのモデルから読む形と、`derive_only`（data-model-and-schema と共同。roadmap で 1 つにまとめた） |
 | E12 | `rollover-load-test` | 最大のワークスペース（チーム 200）で、同じ時刻に全チームの繰り越しが重なる負荷の試験 |
 
 ## 12. 未解決の問い
@@ -534,6 +536,7 @@ model("ProgressStat", {
 - **進捗の行**：`(対象, チーム)` ごと。非公開のチームの量を漏らさない（ADR-0027）。
 - **チームの自動の追加**：しない。画面で聞く（DT-PROJ-001 の行 2）。
 - **複数のイニシアチブ**：入れられる（`InitiativeProject`）。
+- **イニシアチブの複数の親**：MVP では親を 1 つにし、複数の親（本家にある）は MVP の後に結び付けのモデルで足す（3.7 節。2026-09-28 に PM が決定）。
 - **図の粒度**：日。今の値は `ProgressStat` から（ADR-0027）。
 - **更新へのコメント**：MVP の後。
 - **催促の既定**：毎週金曜の 10 時（ワークスペースのタイムゾーン）。
@@ -545,7 +548,7 @@ model("ProgressStat", {
 | 派生の `incr` が 1 ワークスペースの書き込みの上限をどれだけ食うか | E5 の派生の計測に、E7 で進捗の派生を足して測る |
 | 同じ時刻に多くのチームの繰り越しが重なるときの Writer の負荷 | E12 の `rollover-load-test` |
 | チームごとのプロジェクトの状態、イニシアチブの更新、リードのチーム | MVP の後 |
-| 本家のプロジェクトの状態の種類、Backlog の繰り越し、複数のイニシアチブ | 公式の資料では確かめられなかった（**未検証**のまま） |
+| 本家のプロジェクトの状態の種類、Backlog の繰り越し、1 つのプロジェクトの複数のイニシアチブ | 公式の資料では確かめられなかった（**未検証**のまま） |
 
 ## 13. quality.md・runbooks・data-model への項目
 
@@ -584,4 +587,4 @@ model("ProgressStat", {
 
 いずれも 2026-09-28 に確認。
 
-- Linear Docs, [Cycles](https://linear.app/docs/use-cycles)、[Cycle graph](https://linear.app/docs/cycle-graph)、[Projects](https://linear.app/docs/projects)、[Project status](https://linear.app/docs/project-status)、[Project milestones](https://linear.app/docs/project-milestones)、[Project graph](https://linear.app/docs/project-graph)、[Initiative and Project updates](https://linear.app/docs/initiative-and-project-updates)、[Initiatives](https://linear.app/docs/initiatives)、[Private teams](https://linear.app/docs/private-teams)
+- Linear Docs, [Cycles](https://linear.app/docs/use-cycles)、[Cycle graph](https://linear.app/docs/cycle-graph)、[Projects](https://linear.app/docs/projects)、[Project status](https://linear.app/docs/project-status)、[Project milestones](https://linear.app/docs/project-milestones)、[Project graph](https://linear.app/docs/project-graph)、[Initiative and Project updates](https://linear.app/docs/initiative-and-project-updates)、[Initiatives](https://linear.app/docs/initiatives)、[Sub-initiatives](https://linear.app/docs/sub-initiatives)、[Private teams](https://linear.app/docs/private-teams)

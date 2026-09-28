@@ -127,8 +127,8 @@ Accept-Encoding: br, gzip
 
 ### 4.3 一貫した写し
 
-- **チャンクごとに 1 つの読み取りのトランザクション**（`REPEATABLE READ, READ ONLY`）で、`workspace_sync.last_sync_id`（= `as_of`）とチャンクの行を読む。PostgreSQL のホットスタンバイは `SERIALIZABLE` を使えないが `REPEATABLE READ` は使える。Aurora の reader で同じ振る舞いになるかは**未検証**（E3 の PoC で確かめる）。
-- チャンクは ID の範囲で 2 万行。1 つのチャンクの読み取りを 10 秒以内に収める。長い読み取りは reader の複製の適用と衝突し、取り消されうる（ホットスタンバイの一般的な性質。Aurora での条件は**未検証**）。
+- **チャンクごとに 1 つの読み取りのトランザクション**（`REPEATABLE READ, READ ONLY`）で、`workspace_sync.last_sync_id`（= `as_of`）とチャンクの行を読む。PostgreSQL のホットスタンバイは `SERIALIZABLE` を使えないが `REPEATABLE READ` は使える。Aurora の reader で同じ振る舞いになるかは**未検証**（E3 の前の `bootstrap-poc` で確かめる）。
+- チャンクは ID の範囲で 2 万行。1 つのチャンクの読み取りを 10 秒以内に収める。長い読み取りは reader の複製の適用と衝突し、取り消されうる。Aurora の reader でも、複製の適用と衝突した読み取りは `canceling statement due to conflict with recovery` で取り消される（[Replication with Amazon Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.html)）。待つ時間の `max_standby_streaming_delay` は 1〜30 秒の範囲でしか設定できない（[Amazon Aurora PostgreSQL parameters, Part 2](https://aws.amazon.com/blogs/database/amazon-aurora-postgresql-parameters-part-2-replication-security-and-logging/)）。いずれも 2026-09-28 に確認。10 秒は、この上限の中に収める値である。取り消されたら、Sync API がそのチャンクだけを読み直す。
 - クライアントは、全チャンクを書いた後、`L = s_min` とし、`s_min` の後の差分を当てる（握手は `catch_up` になる）。
 - **なぜ正しいか**：チャンク `k` の行は、`as_of_k ≥ s_min` の時点の状態である。`s_min` の後の差分を順にすべて当てるとき、行の `_u` 以下の差分は退ける（`_u ≥ s` なら当てない）。行の作成・更新は `_u` で退けられ、写しの後の変更は当たる。写しの前に消えた行は写しになく、`s_min` の後の削除の差分は「ない行を消す」だけになる。写しの前に消えた行への古い `update` が差分で先に来ても、後の `delete` が必ず続く。よって、全差分を当てた後の状態は、サーバーの状態と一致する（PROP-BOOT-001 で確かめる）。
 
@@ -170,7 +170,7 @@ POST /sync/bootstrap/chunks
 | 全体のブートストラップの目安（モデル 5 万件） | 行 1 KB で約 50 MB、圧縮で約 6 MB（見積もり。E3 で測る） |
 | 部分のブートストラップの目安（最大のワークスペース） | `instant` 数万件と、イシュー約 10 万件（未完了と直近 30 日。全体の 2 割と仮定）で約 150 MB、圧縮で約 20 MB（見積もり。E3 で測る） |
 
-- NFR-003（部分で p95 10 秒）は、ダウンロード（20 MB）、JSON の解析、IndexedDB への書き込みの和で決まる。IndexedDB の一括の書き込みの速さは端末とブラウザで大きく違い、**未検証**。E3 の PoC で基準の端末で測る。遅すぎれば ADR-0005 の代案（SQLite の WASM）へ替える ADR を書く。
+- NFR-003（部分で p95 10 秒）は、ダウンロード（20 MB）、JSON の解析、IndexedDB への書き込みの和で決まる。IndexedDB の一括の書き込みの速さは端末とブラウザで大きく違い、**未検証**。E3 の前の `bootstrap-poc` で基準の端末で測る。遅すぎれば ADR-0005 の代案（SQLite の WASM）へ替える ADR を書く。
 
 ## 5. 手元からの起動
 
@@ -434,7 +434,7 @@ ADR-0013。
 | E3 | `group-join-bootstrap` | 7.3 節 |
 | E3 | `group-leave-purge` | 7.4・7.5 節（握手での差を含む） |
 | E3 | `cross-group-move` | 7.7 節と依存の行の移動、Worker の続き |
-| E4 | `team-privacy-toggle-sync` | 7.8 節（permissions-and-teams と共同） |
+| E4 | `team-privacy-toggle` | 7.8 節の同期の側（permissions-and-teams の同名の Story と 1 つ） |
 | E4 | `workspace-removal-purge` | 7.6 節 |
 | E3 | `sync-log-retention` | 8.1 節の保持のジョブと `floor` |
 | E3 | `reset-bootstrap` | 8.2 節のやり直しと、outbox を残す手順 |
@@ -465,8 +465,8 @@ ADR-0013。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 部分のブートストラップが基準の端末で p95 10 秒に収まるか（IndexedDB の一括の書き込み） | E3 の PoC。収まらなければ SQLite の WASM への切り替えの ADR（ADR-0005 の代案） |
-| Aurora の reader での `REPEATABLE READ` の長い読み取りの取り消しの条件 | E3 の PoC |
+| 部分のブートストラップが基準の端末で p95 10 秒に収まるか（IndexedDB の一括の書き込み） | E3 の前の `bootstrap-poc`。収まらなければ SQLite の WASM への切り替えの ADR（ADR-0005 の代案） |
+| Aurora の reader での `REPEATABLE READ` の 10 秒の読み取りが取り消されないか（取り消しの仕組みと 30 秒の上限は確かめた。4.3 節） | E3 の前の `bootstrap-poc` |
 | 同期のログの保持の期間（30 日） | 法務の L5 と、やり直しの頻度の計測（E3） |
 | グループと `as_of` の組での写しのキャッシュ | 非公開 → 公開の切り替えの負荷を E12 で測って決める |
 | 部分のイシューの条件に、自分の担当・購読の古い完了のイシューを足すか | 試用のチームの声（オフラインで見たいもの） |

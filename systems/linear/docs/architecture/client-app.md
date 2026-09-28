@@ -42,7 +42,7 @@
 | ショートカット（文書に出るもの） | `C` 作成、`Option/Alt+C` テンプレートから作成、`P` 優先度、`X` 選択、選択の後 `Shift+↑/↓` で範囲、`Cmd/Ctrl+K` コマンドメニュー、`G` の後のキーで移動、`M` の後 `R`・`B`・`X` で関連、`Cmd/Ctrl+Shift+M` チームの移動、Triage の `1`・`2`・`3`・`H`、`Cmd/Ctrl+Z` で削除・移動を戻す | [Create issues](https://linear.app/docs/creating-issues)、[Priority](https://linear.app/docs/priority)、[Select issues](https://linear.app/docs/select-issues)（検索の抜粋）、[Issue relations](https://linear.app/docs/issue-relations)、[Edit issues](https://linear.app/docs/editing-issues)、[Triage](https://linear.app/docs/triage)、[Delete and archive issues](https://linear.app/docs/delete-archive-issues) |
 
 - 本家の画面の実装（仮想化の方式、描画の予算、ショートカットの仕組み）は、公開の資料で確かめられなかった（**未検証**）。本家が React と MobX を使うことは、README の 1.3 節のとおり、検索の抜粋でしか確かめていない。
-- 状態（`S`）・担当（`A`）・ラベル（`L`）などの 1 打のキーが本家にあるかは、文書で確かめられなかった（**未検証**）。
+- 本家は 1 打のキーで、状態を `S`、担当を `A`、自分への担当を `I`、ラベルを `L` で開く。見積もりは `Shift+E`（[Board layout](https://linear.app/docs/board-layout)、[Assign and delegate issues](https://linear.app/docs/assigning-issues)、[Issue labels](https://linear.app/docs/labels)、[Estimates](https://linear.app/docs/estimates)、2026-09-28 に確認）。
 
 ### 2.2 Web の API と Electron
 
@@ -175,7 +175,7 @@ ADR-0017。
 | 戻す・やり直す | `Cmd/Ctrl+Z`・`Cmd/Ctrl+Shift+Z` | global |
 | ショートカットの一覧 | `?` | global |
 
-- `S`・`A`・`L`・`E` の 1 打の割り当ては本システムの決定で、本家にあるかは**未検証**。
+- `S`・`A`・`L` は本家と同じ。見積もりの `E` は本システムの決定で、本家は `Shift+E`（2.1 節）。どこまで寄せるかは法務の L8 の後に見直す。
 - 利用者が割り当てを変える機能は MVP で持たない。
 
 ### 5.3 IME と編集の領域
@@ -378,7 +378,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 | `compositionend` の後の `keydown` に `keyCode === 229` が付かない組み合わせがあるか。IME がオンのまま英字を押したときの `key` | E6 の前の `ime-shortcut-poc` |
 | コマンドメニューの M2 の走査が、10 万件で p99 50ms に収まるか | E6 のベンチマーク。超えたら Worker の bigram の索引の ADR |
 | 反応型のストア（MobX か自前か）が 9.1 節の内訳に収まるか | E2 の PoC（ADR-0001） |
-| 本家の 1 打の割り当て（`S`・`A`・`L`・`E`）、画面の実装 | 公式の資料では確かめられない（**未検証**のまま）。寄せ方は法務の L8 |
+| 本家の画面の実装 | 公式の資料では確かめられない（**未検証**のまま）。1 打の割り当ては確かめた（2.1 節）。寄せ方は法務の L8 |
 | RUM の送り先と外部送信の規律の公表 | 法務の L2 と observability の領域 |
 
 ## 18. quality.md・runbooks・data-model への項目

@@ -28,7 +28,7 @@ date: 2026-09-28
 `sync_id` の範囲として、次も比べた。
 
 - a. **ワークスペースごとの数**
-- b. 全ワークスペースで共通の 1 つの数（本家の解析された値はこの形に見える。未検証）
+- b. 全ワークスペースで共通の 1 つの数（第三者の解析は、本家がこの形だと推定している。[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)、2026-09-28 に確認。本家の保証ではない）
 
 ## Decision
 
