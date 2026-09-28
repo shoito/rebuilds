@@ -270,7 +270,7 @@ Stripe の題材の勘定体系（[ledger.md](../../../stripe/docs/architecture/
 ```sql
 settlement_periods (id, operator_id, period_start, period_end, status,  -- 'open' | 'closed' | 'statement_final' | 'paid' | 'carried_over'
                     gross_fare_yen, fees_yen, refunds_yen, adjustments_yen, net_yen,
-                    statement_doc_id, fee_invoice_doc_id, payout_id, closed_at)
+                    statement_s3_key, fee_invoice_s3_key, payout_id, closed_at)   -- 明細と請求書は S3（settlement-statements/）
 operator_payouts (id, operator_id, settlement_period_id, amount_yen, bank_account_id,
                   status,  -- 'created' | 'submitted' | 'paid' | 'returned' | 'canceled'
                   bank_ref, idempotency_key UNIQUE, created_at, paid_at)

@@ -194,7 +194,7 @@ PM の方針（既定案で進める）により、統合の工程で次のと�
 - **流しの客のための取り消し**：乗車は再配車に戻り、終端にならない。終端の `cancelled_by_driver` は安全・迷惑行為の理由だけ（dispatch の 7 節を直した）。
 - **到着の判定**：索引の `GetDriverLocation` で行う。位置の Valkey の写しは持たない（trips の 3.3 節）。`GetDriverLocation` を呼べるのは Trips・ETA・share-service・safety-monitor（geospatial-index の 9 節）。
 - **乗降の保存**：乗車の行には乗客が確かめたピンだけ。提供者の内容は `trip_place_refs` に提供者ごとの期限で置く（ADR-0034。trips の 14 節、maps の 7.3 節）。
-- **データモデル**：`trip_offers` は `driver_assignments` に統合し、オファーの配信の列を足した。`fare_distance_quotes` の持ち主は Pricing。区域は `service_areas` だけが持ち、区域を指す列は `*area_id`（`fare_region_id` → `fare_area_id`）。位置の置き場所の一覧を [data-model.md](data-model.md) の 9 節に作った。
+- **データモデル**：`trip_offers` は `driver_assignments` に統合し、オファーの配信の列を足した。`fare_distance_quotes` の持ち主は Pricing。区域は `service_areas` だけが持ち、区域を指す列は `*area_id`（`fare_region_id` → `fare_area_id`）。位置の置き場所の一覧を [data-model.md](data-model.md) の 6 節に作った。
 - **S1 の「依頼 30 件/秒」**：ピークの受け付けの量（成立しない依頼を含む）と定義し、成立は約 3〜6 件/秒とした。容量・Trips・PSP・ETA の見積もりで使い分けた（capacity の 1.1・5 節、ADR-0003）。2026-09-28 に確定（下の「決定（2026-09-28、推奨案で確定）」）。
 - **AGENTS.md**：ADR-0043 の強い規則を 2 つ足した（legal のフラグには `legal_gate_records` が要る、緊急の入口に release フラグを置かない）。法務の確認待ちの規則は release ではなく legal のフラグの裏（ADR-0014・0018・0020・0024・0042 と pricing・payments・dispatch を揃えた）。
 - **呼び名と数値**：事業者の管理画面のドメインは `operator.<domain>`（support の `partners.<domain>` を直した）。`ops.region.writable` に揃えた。常時の接続は gRPC の双方向ストリーム（location-ingestion の WebSocket の記述を直した）。オファーの TTL をサーバーの期限 16.5 秒に揃えた（notifications の 4.3 節）。runbook `driver-safety-suspension.md` を `driver-safety-hold.md` に 1 つにした。
@@ -251,6 +251,11 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | 成立率 | SLO にせず、品質の指標のまま | 供給の不足を含み、システムの信頼性だけを表さないため | [observability.md](observability.md) の 11 節 |
 | 認証の部品 | Better Auth を土台にし、電話番号のワンタイムコードと出庫のセッションを自前で足す | 作り込みを減らし、Slack の題材の知見を使うため | [security.md](security.md) の 4・13 節 |
 | 無事故・無免停の証明 | 1 年ごとの更新と、事業者が知った時点の取り消し | 許可基準が頻度を定めないため、年 1 回を下限にした。運転記録の証明を必須にするかは運輸局に確かめる | [supply-and-operators.md](supply-and-operators.md) の 3.3 節 |
+| データモデルの正本 | 列・制約・索引・保持の正本を [data-model.md](data-model.md) と [data-model/](data-model/)（9 ファイル、105 テーブル、ER 図 11）にした。領域の文書の表は要点と提案 | 領域の文書の間で名前と列が食い違っていたため（Stripe・Slack の題材と同じ形） | [data-model.md](data-model.md) の 1・8 節 |
+| データモデルで足した最小の表 | `pricing_groups`、`operator_bank_accounts`、`recon_lines`、`product_vehicle_map`、`money` の `outbox_events` | 参照先のない ID と、突き合わせの単位がなかったため | [data-model.md](data-model.md) の 10.2 節 |
+| 名前の揃え | 運賃の車種の区分は `fare_vehicle_class`（配車の `vehicle_class` と別）、自動の休憩の列は `paused_by_system_at`、精算の明細は `statement_s3_key`、法務の担当のロール `legal_counsel` | 同じ名前で別の意味、クラスタをまたぐ参照、ロールの欠けを直すため | [data-model.md](data-model.md) の 8 節 |
+| オファーの乗車地の配信 | 正確な乗車地は `offer.created` の事象だけが運び、SNS の購読のフィルターで `rt-fanout` だけに流す。`driver.assignment_changed` は位置を持たない | 分析などのキューに正確な位置を流さないため（NFR-009） | [data-model/stores.md](data-model/stores.md) の 5・7 節 |
+| 保持の既定の追加 | 端末の完全性・顔の照合の結果・不正の点数 1 年、Webhook 13 か月、安全の報告 3 年、問い合わせ 3 年、変更の要求 7 年など（法務の確認待ちの印つき） | 表ごとの保持を欠かさないため | [security.md](security.md) の 7.2 節 |
 
 **決めずに残したもの**：法務の L1〜L9 と、それに依る項目（キャンセル料の名目、共有・顔の照合・稼働の地図の有効化、保持の期間、日本版ライドシェアの枠の判定など）、税理士の確認（手数料の消費税の端数、適格請求書）。運輸局・提携先に確かめる事実（無事故・無免停の確かめ方、雨天・酷暑の読み方、車載のナビだけの事業者、端末の貸与）も、外の相手の答えが要るので残した。
 
@@ -279,7 +284,7 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | [observability.md](observability.md) | ログ、メトリクス、トレース、SLI、アラート、合成の監視 | 0040 | Ops | E1 |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、受け入れの上限、負荷試験 L1〜L11 | 0041 | Ops | E5、E12 |
 | [delivery.md](delivery.md) | CI/CD、関門（再生・影・`fare-replay`）、都市の波、フラグ、アプリの列車 | 0042〜0043 | QA、Ops | E1 |
-| [data-model.md](data-model.md) | データの置き場所の索引と統合した定義 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本：規約、全体の ER 図、横断の不変条件、位置の置き場所。領域ごとのテーブルと ER 図は [data-model/](data-model/) | なし（各領域の ADR を参照する） | QA | 全 Epic |
 
 ## 9. Epic
 

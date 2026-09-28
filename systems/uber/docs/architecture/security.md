@@ -211,7 +211,7 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | Kinesis、S3 の位置の接頭辞、`dispatch-decisions/`、`safety_incident_locations` の列 | SSE-KMS・列の暗号化 | `location` |
 | Aurora `core`（電話番号の列、免許証の書類の S3 を含む） | ストレージの暗号化。電話番号と保険の番号は列の暗号化（supply の 3 節） | `pii`（列）、`app`（ストレージ） |
 | Aurora `money`、精算の明細の S3、振込先の口座 | ストレージと列の暗号化 | `money` |
-| `audit_events`、log-archive | SSE-KMS、Object Lock | `audit` |
+| log-archive（`audit_events` の写し、アプリのログ） | SSE-KMS、Object Lock | `audit`（Aurora `core` の `audit_events` そのものは、クラスタのストレージの `app` の鍵で守る。Aurora の暗号化はクラスタごとのため。[data-model.md](data-model.md) の 3.11 節） |
 | Valkey、SQS、DynamoDB、CloudWatch Logs | 保存時の暗号化 | `app` |
 | 顔の画像（生体の情報） | SSE-KMS、30 日 | `biometric`（専用。照合のサービスと、安全の担当の監査つきの確認の役割だけが使える） |
 
@@ -271,6 +271,13 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | ETA の精度の記録（S3 `eta/accuracy/`、乗車の ID だけ） | 2 年（既定。**法務の確認待ち（L4）**）。根拠：前の年の同じ季節と比べるため。乗車の記録より短い | S3 のライフサイクル | 同上 |
 | 再生の結果（S3 `ci/replay-results/<pr>/`、`spot`） | 1 年（既定。**法務の確認待ち（L4）**）。根拠：変更の後の問題を、元の PR の関門の結果まで遡って調べる期間。元の判断の記録（180 日）から作るが、PR ごとの集計と差だけを持つ | S3 のライフサイクル | [delivery.md](delivery.md) の 11 節 |
 | 配信の時の特徴量と予測（S3 `feature-logs/`、E13 から） | 90 日（既定。**法務の確認待ち（L4）**）。根拠：学習の窓（直近 8 週）と影の実行の比べに足りる期間。元の位置のデータの保持を超えない | S3 のライフサイクル | [ml-platform.md](ml-platform.md) の 5.3 節 |
+| 乗車の記録に準ずるもの（`driver_assignments`、`trip_eta_snapshots`、`trip_nav_events`、`meter_readings`、`fare_level_records`、`ratings`、`driver_sessions`、`roll_call_records`、運行枠と拡大） | 乗車の記録と同じ 7 年（既定。**法務の確認待ち（L4）**）。根拠：運賃の根拠と、日本版ライドシェアの稼働の記録（[supply-and-operators.md](supply-and-operators.md) の 6.6 節）の元 | 乗車の記録と同じ | [data-model.md](data-model.md) の 3.12 節（2026-09-28 に足した） |
+| 端末の完全性の判定、顔の照合の結果（画像は上の 30 日）、不正の点数 | 1 年（既定。**法務の確認待ち（L4）**）。根拠：不正の兆しの前の年との比べに足りる期間 | 削除のジョブ | 同上 |
+| PSP の Webhook の受信箱 | 13 か月 | 削除のジョブ | 同上 |
+| 安全の報告と事業者への書き出し | 緊急の通報と同じ既定 3 年（**法務の確認待ち（L7）**） | 削除のジョブ | 同上 |
+| 問い合わせ（チケットと本文） | 3 年（既定。**法務の確認待ち（L4・L7）**。[support-and-operations-tools.md](support-and-operations-tools.md) の 13 節の持ち越し） | 削除のジョブ | 同上 |
+| 変更の要求 | 7 年。根拠：お金と規則の変更の記録で、乗車の記録と同じ長さ | 削除のジョブ | 同上 |
+| 一時の権限（`jit_grants`）、不正の処置 | 監査ログと同じ | — | 同上 |
 
 - **アカウントの削除**：乗客・ドライバーの依頼で、ログインの情報、電話番号、保存した場所、端末のトークンを 30 日の猶予の後に消す。乗車・運賃・台帳の記録は、上の期間まで、ID を切り離した形で残す（帳簿と事業者の記録の義務のため）。軌跡を保持の期間の前に消すかは法務の確認待ち（L4）。
 - **削除は東京と大阪の両方で行う。** S3 の版を指定した削除とライフサイクルの動作は、複製で伝わらない（Figma の [security.md](../../../figma/docs/architecture/security.md) の 7 節と同じ事実）。

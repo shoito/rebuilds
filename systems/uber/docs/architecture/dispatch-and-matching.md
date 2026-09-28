@@ -381,7 +381,7 @@ message DispatchBatchRecord {
 | DynamoDB `geo_shard_leases` の `dispatch/<zone>` | 4 節の配車のリース |
 | Protocol Buffers `ProposeOffer`・`OfferCreated`・`OfferDelivered`・`AcceptOffer`・`DeclineOffer`・`OfferRevoked` | 6.4・8 節（Trips の表の中身は `trips-lifecycle.md`） |
 | Aurora（Trips）`driver_assignments` の列：`decision_id`、`pickup_eta_s`、`eta_source`、`delivered_at`、`delivery_channel`、`shown_elapsed_ms`、`decline_reason`。結果は `status` | 8 節。試したドライバーの一覧の正本。`trip_offers` の表は作らない（[data-model.md](data-model.md) の 10 節） |
-| Aurora（供給）`driver_sessions.paused_by_system` | 8.3 節 |
+| Aurora（供給）`driver_sessions.paused_by_system_at` | 8.3 節（列の名前は supply の 4.2 節に揃えた） |
 | AppConfig `dispatch/<zone>`（周期、重み、上限、待機場の除外） | 6・7 節 |
 | 版つきのデータ `product_vehicle_map` | 5 節の E2 |
 | S3 `dispatch-decisions/`（`DispatchBatchRecord`、180 日） | 9.1 節 |

@@ -320,12 +320,12 @@
 | --- | --- |
 | Aurora `share_links`（`id`、`trip_id`、`created_by`、`token_sha256`、`created_at`、`revoked_at`、`expires_at`） | 3 節 |
 | Aurora `safety_incidents`（`id`、`trip_id`、`reporter_kind`、`reporter_id`、`kind`、`severity`、`status`、`assigned_to`、`acked_at`、`closed_at`、`outcome`、`operator_notified_at`） | 4・8 節。保持は L7 の結論で決める |
-| Aurora `safety_incident_locations`（`incident_id`、`t`、`lat_e7`、`lng_e7`） | 4.1 節の押した後の位置。位置の専用の KMS の鍵 |
+| Aurora `safety_incident_locations`（`incident_id`、`seq`、`t`、`point_enc`（`lat_e7`・`lng_e7` を列の暗号化）） | 4.1 節の押した後の位置。位置の専用の KMS の鍵 |
 | Aurora `safety_reports`（`id`、`trip_id`、`reporter`、`category`、`severity`、`body`、`created_at`） | 8.1 節 |
-| Aurora `safety_pair_blocks`（`rider_id`、`driver_id`、`source`（rating・report・manual）、`created_at`） | 7.1 節。配車の E7 が読む |
+| Aurora `safety_pair_blocks`（`rider_id`、`driver_id`、`sources`（rating・report・manual・fraud の配列）、`created_at`） | 7.1 節。配車の E7 が読む |
 | Aurora `ratings`（`trip_id`、`rater_kind`、`score`、`tags`、`comment`、`created_at`、`excluded`） | 7.1 節 |
-| Aurora `rating_aggregates`（`subject_kind`、`subject_id`、`avg_centi`、`count`、`updated_at`） | 7.1 節 |
+| Aurora `rating_aggregates`（`subject_kind`、`subject_id`、`avg_centi`、`rating_count`、`updated_at`） | 7.1 節 |
 | Aurora `trip_pins`（`trip_id`、`pin_hmac`、`attempts`） | 5 節。乗車の終わりで消す |
-| Aurora `driver_identity_checks`（`driver_id`、`session_id`、`result`、`score`、`provider`、`checked_at`、`image_s3_key`（30 日）） | 7.2 節 |
+| Aurora `driver_identity_checks`（`driver_id`、`driver_session_id`、`result`、`score_bp`、`provider`、`checked_at`、`image_s3_key`（30 日）） | 7.2 節 |
 | Aurora `call_sessions`（`trip_id`、`proxy_number`、`party_a_hash`、`party_b_hash`、`valid_from`、`valid_until`）、`call_logs`（`session_id`、`direction`、`started_at`、`duration_s`、`result`） | 6.1 節。記録は 90 日 |
 | Aurora `incident_packets`（`incident_id`、`operator_id`、`s3_key`、`created_by`、`created_at`、`delivered_at`） | 8.2 節 |

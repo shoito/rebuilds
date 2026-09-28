@@ -88,7 +88,7 @@ fare_rule_sets (id, fare_area_id,            -- service_areas.area_id
                 scope,                         -- 'public_notice'（公示・自動認可）| 'operator'（事業者の個別の認可）
                 operator_id,                   -- scope = operator のとき
                 service_kind,                  -- 'taxi' | 'rideshare'
-                vehicle_class,                 -- 'standard' | 'large' | 'special_large' | ...
+                fare_vehicle_class,            -- 'standard' | 'large' | 'special_large' | ...（運賃の車種の区分。配車の vehicle_class と別。data-model の 8 節）
                 tier,                          -- 'A' | 'B' | 'C' | 'lower' | 'upper_bound' | 'lower_bound' など
                 version,                       -- 同じ鍵の中で単調に増える
                 effective_from, effective_to,  -- 地域の時刻（Asia/Tokyo）で評価する
@@ -99,9 +99,9 @@ fare_rule_sets (id, fare_area_id,            -- service_areas.area_id
                 evidence_doc_id,               -- 認可書・公示の写し（S3）
                 release_flag,                  -- 法務の確認待ちの規則はフラグの名前を持つ
                 created_by, approved_by_1, approved_by_2, approved_at,
-                UNIQUE (fare_area_id, scope, operator_id, service_kind, vehicle_class, tier, version))
+                UNIQUE (fare_area_id, scope, operator_id, service_kind, fare_vehicle_class, tier, version))
 
-operator_fare_assignments (operator_id, fare_area_id, service_kind, vehicle_class,
+operator_fare_assignments (operator_id, fare_area_id, service_kind, fare_vehicle_class,
                            fare_rule_set_id,     -- 事業者が選んだ運賃（A 運賃など）
                            upfront_enabled, dynamic_policy_id,
                            pickup_fee_rule_id, cancellation_rule_id,
@@ -482,6 +482,6 @@ fare_quotes (id, rider_id, city_id, pricing_group_id,
 | Aurora `upfront_suspensions`（`fare_area_id`、期間、理由、登録者） | 5.2 節 |
 | Aurora `fare_quotes` | 5.6 節（保持は乗車の記録と同じ） |
 | Aurora `fare_distance_quotes` | [eta-and-routing.md](eta-and-routing.md) の 14 節の提案の表。持ち主は Pricing とし、`fare_quotes.distance_quote_id` から指す。保持は運賃の記録と同じ（表示用の線は提供者の条件の期間） |
-| Aurora `fare_level_records`（`trip_id` PK、`operator_id`、`fare_area_id`、`week`、A・B・C・D の額、`multiplier_pct`） | 6.3 節 |
+| Aurora `fare_level_records`（`trip_id` PK、`operator_id`、`fare_area_id`、`week_start_on`、A・B・C・D の額、`multiplier_pct`） | 6.3 節 |
 | Aurora `meter_readings`（`trip_id`、`segment_no`、`source`、`amount_yen`、`distance_m`、`duration_s`、`device_id`、`raw_seq`、`received_at`、`review_status`、`photo_doc_id`） | 5.4 節 |
 | Valkey `supply:<city>:<district_cell>` の読み手 | S1 では運用の画面だけが読む。変動運賃には使わない（6.1 節） |

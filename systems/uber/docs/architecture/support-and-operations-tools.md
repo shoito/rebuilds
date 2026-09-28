@@ -30,6 +30,7 @@
 | `fare_rule_editor` | 運賃の規則の下書きと承認（書き手と別の人） | — |
 | `release_manager` | アプリの `required_min`、`nav_handoff_targets` の変更の下書きと承認（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 10.3 節） | — |
 | `auditor` | 監査ログの閲覧と書き出しだけ | — |
+| `legal_counsel` | `legal_gate_records` とリーガルホールドの作成と取り消し、運賃の規則（L2 の対象）と位置の外部への提供の承認（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)。2026-09-28 に足した） | — |
 
 - 上限の値は、S1 の初めの値として 2026-09-28 に確定した（E11 の `ops-policy-engine`）。S1 の問い合わせの分布を見て見直す。
 - 1 人に複数のロールを付けてよいが、同じ変更の要求の書き手と承認者は別の人にする（4 節）。

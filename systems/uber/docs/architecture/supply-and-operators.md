@@ -85,7 +85,9 @@ offices (id, operator_id, name, address, service_area_id,
 vehicles (id, operator_id, office_id,
           service_kind,                                -- 'taxi'（事業用）| 'rideshare'（自家用）
           owner_driver_id,                             -- rideshare：車の持ち主のドライバー
-          plate_no, vehicle_class, seats, make_model, color,
+          plate_no, vehicle_class,                     -- 配車の車両の種類（standard・large・ud・premium）
+          fare_vehicle_class,                          -- 運賃の車種の区分（standard・large・special_large）
+          seats, make_model, color,
           meter_kind,                                  -- 'integrated' | 'certified_soft' | 'none'（ADR-0019）
           meter_device_id,
           status,                                      -- 'pending_review' | 'active' | 'suspended' | 'retired'

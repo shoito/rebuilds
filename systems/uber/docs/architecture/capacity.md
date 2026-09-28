@@ -238,6 +238,6 @@ staging を本番と同じ台数に広げて行う。E12 のリリースの基�
 | 置き場所 | 中身 |
 | --- | --- |
 | Valkey `cache` `intake:<city>`（未割り当ての数）、`quote:<rider>:<hash>`（60 秒） | 4 節 |
-| Aurora `core` `demand_rejections`（`city_id`、`block_cell`、`at`、`reason`）、または S3 の集計 | 4 節。乗客の ID を持たない |
+| Aurora `core` `demand_rejections`（`city_id`、`bucket_minute`、`block_cell`、`reason`、`count`。1 分ごとの集計の行。[data-model/trips.md](data-model/trips.md) の 3.14 節） | 4 節。乗客の ID を持たない |
 | AppConfig `capacity/<city>`（受け入れの上限の係数、バッチの上限） | 4 節 |
 | AppConfig `prescale_events`（催しの名前、時間、倍率） | 6 節 |

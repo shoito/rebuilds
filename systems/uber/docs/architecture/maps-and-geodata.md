@@ -154,13 +154,13 @@ CREATE TABLE pickup_points (
   geom                geometry(Point, 4326) NOT NULL,
   spot_cell              bigint NOT NULL,
   heading_constraint  int,             -- 車が向くべき向き（度）。一方通行・中央分離帯のある道路
-  allowed_services    text[] NOT NULL, -- TAXI / RIDESHARE
+  allowed_services    text[] NOT NULL, -- taxi / rideshare
   allowed_hours       tstzrange[],     -- 空なら終日
   pickup_overhead_s   int  NOT NULL DEFAULT 30,  -- ETA の固定の時間（eta-and-routing の 4.5 節）
   source              text NOT NULL,   -- ops / facility_agreement / learned
   status              text NOT NULL,   -- active / proposed / retired
   venue_id            text,            -- 駅・空港など、複数の地点をまとめる施設
-  approved_by         text[],          -- 2 人の確認
+  approved_by         uuid[],          -- 2 人の確認（staff_users）
   updated_at          timestamptz NOT NULL
 );
 ```
@@ -213,7 +213,7 @@ CREATE TABLE service_areas (
   source_ref                 text NOT NULL,        -- 公示の番号・URL、N03 の版
   effective_from             date NOT NULL,
   effective_to               date,                 -- null は現在も有効
-  approved_by                text[] NOT NULL,      -- 2 人の確認
+  approved_by                uuid[] NOT NULL,      -- 2 人の確認（staff_users）
   created_at                 timestamptz NOT NULL,
   PRIMARY KEY (area_id, version),
   EXCLUDE USING gist (area_id WITH =, daterange(effective_from, effective_to) WITH &&)
