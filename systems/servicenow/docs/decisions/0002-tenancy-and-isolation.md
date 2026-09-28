@@ -38,12 +38,16 @@ date: 2026-09-28
 - **セルの仕組みは S1 の初日から使う。** S1 は共有のセルを 2 つ動かし、テナントのセル間の移動の手順を試す。専用のセルの販売は S2 から（intent の「選定・計測で決めるもの」で PM が条件を決める）。
 - **ルーターは、ホスト名 → テナント → セルを、テナントのデータを読まずに解決する。** 対応表は制御の面が持ち、ルーターのプロセスの中にキャッシュする。解決できない要求は、どのセルにも送らず 404 を返す。
 
+> 2026-09-28 の注記：ルーターの形は [ADR-0055](0055-accounts-cells-and-edge-router.md) で細かくした。ルーターは ECS のプロセスではなく、CloudFront Functions と KeyValueStore（エッジ）で動く。「ルーターのプロセスの中にキャッシュ」は、エッジの KeyValueStore の写しで満たす。セルの App は、元のホスト名からテナントを解決し直し、そのセルのテナントでなければ 421 にする。決定の趣旨（テナントのデータを読まずに解決し、制御の面が落ちても動く）は変えない。
+
 ### セルの中の分離
 
 - 他の題材（Slack の ADR-0009、Stripe の ADR-0002、Auth0 の ADR-0002）に倣う。
   - 全テナントテーブルに `tenant_id` を持たせ、主キーとインデックスの先頭に置く。ID は UUIDv7。
   - `FORCE ROW LEVEL SECURITY` を設定し、トランザクションごとに `SET LOCAL app.tenant_id` を設定する。
   - RLS を外すのは、テナントをまたぐ管理の処理（テナントの作成・移動、課金の集計）だけにし、別の DB のロールで行う。
+
+> 2026-09-28 の注記：`tenant_id` が NULL の行を持ってよい表を、次の許可の一覧に限る（[ADR-0054](0054-shared-reference-rows-and-cross-tenant-roles.md)、[data-model.md](../architecture/data-model.md) の 3 節）。組み込みの辞書（`dict_table`・`dict_field`・`dict_choice_set`・`dict_choice`）、組み込みのロール（`role`）、組み込みの ACL の規則（`acl_rule`）、国民の祝日（`holiday_set`・`holiday_set_version`・`holiday`）、組み込みの番号の定義（`number_def`）、CMDB の組み込みの参照のデータ（`ci_relation_type`・`ci_attribute`・`ci_identification_rule`）、組み込みのフロー（`flow_def`・`flow_version`）。NULL の行は読み取りだけで、アプリのロールは書けない。テナントをまたいで読む処理（タイマーの取得、outbox の中継、索引の突き合わせ）は、識別子だけを返す関数に限る（同じ ADR-0054）。マイグレーションの CI の許可の一覧は、この一覧と一致させる。
 - OpenSearch の索引はセルごとに持ち、文書に `tenant_id` を入れ、問い合わせに必ず付ける（search の領域）。
 - S3 のオブジェクトは、テナントの接頭辞の下に置き、署名付き URL はテナントを確かめてから出す。
 

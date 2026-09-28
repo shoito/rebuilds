@@ -119,20 +119,21 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 個人情報保護法：テナントの社員の個人データ（氏名、連絡先、端末、チケットの本文）を、委託として扱うか、本システムが自ら取得するか（いわゆるクラウドの例外に当たるか）。漏えい等の報告の義務を負う者と手順 | security、data-model | E3 のユーザーの取り込み、E12 の GA の判定 |
+| L1 | 個人情報保護法：テナントの社員の個人データ（氏名、連絡先、端末、チケットの本文）を、委託として扱うか、本システムが自ら取得するか（いわゆるクラウドの例外に当たるか）。漏えい等の報告の義務を負う者と手順（確報の期限を含む）。個人の削除の請求と監査の履歴の自由記述の関係、ポータルの事象と検索の語の集計の扱い（領域から足した論点） | security、data-model、knowledge、search | E2 の監査の履歴、E3 のユーザーの取り込み、E12 の GA の判定 |
 | L2 | 電気通信事業法：メールの受信と自動の処理（本文の保存・解析）、通知のメールの送信の代行が「他人の通信の媒介」に当たり、届出が要るか。通信の秘密との関係 | notifications-and-email-ingest | E6 のメールからのチケット |
-| L3 | データの所在：「日本のリージョンのデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサーの扱い | infrastructure、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E1 のリージョンの構成、E12 の契約の文書 |
-| L4 | 監査の履歴と記録の保持：変更の記録・承認・権限の変更の履歴を何年持つか。J-SOX の証跡として顧客が求める期間を、契約でどこまで約束するか。削除の請求との関係 | data-dictionary-and-tables、security | E2 の監査の履歴、E7 の変更の承認 |
-| L5 | テナントとの契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、専用のセルの契約の条件 | security、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E12 の GA の判定 |
+| L3 | データの所在：「日本のリージョンのデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサーの扱い。CloudFront・WAF・GuardDuty などのグローバルなサービスの処理の場所、Web Push の配信の事業者（国外の可能性。本文に値は入れない）（領域から足した論点） | infrastructure、security、portal-and-ui、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E1 のリージョンの構成、E12 の契約の文書 |
+| L4 | 監査の履歴と記録の保持：変更の記録・承認・権限の変更の履歴を何年持つか（既定案 7 年）。J-SOX の証跡として顧客が求める期間と出力の形式（CSV・PDF）を、契約でどこまで約束するか。削除の請求との関係、テナントの削除のときの監査の履歴の扱い（領域から足した論点） | data-dictionary-and-tables、security、itsm-processes | E2 の監査の履歴、E7 の変更の承認 |
+| L5 | テナントとの契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知（Web Push の配信の事業者、ステータスのページの事業者を含む）、専用のセルの契約の条件、運用者のテナントのデータの参照の例外（インシデントで許可を待てないとき）の書き方、バックアップの 35 日の説明（領域から足した論点） | security、infrastructure、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E12 の GA の判定 |
 | L6 | 商標：「ITIL」は登録商標である（保有者は未検証）。製品の名前・画面・資料で ITIL の名前やプラクティスの名前をどこまで使えるか | portal-and-ui、knowledge | E6 の画面の文言の確定 |
 | L7 | 本家からの移行：本家のインスタンスから、顧客の許可の下で API でデータを取り出す移行の道具を提供してよいか（本家の利用規約との関係） | api-and-integrations | MVP の後の移行の Epic |
-| L8 | SMS・音声でのオンコールの呼び出し：国内の通信の事業者との契約、関係する法令 | assignment-and-on-call | MVP の後の SMS・音声の Epic |
+| L8 | SMS・音声でのオンコールの呼び出し：国内の通信の事業者との契約、関係する法令 | assignment-and-on-call | MVP の後の SMS・音声の Epic（E13） |
+| L9 | 公的なデータの利用の条件：内閣府の祝日の CSV を取り込み、全テナントの SLA の計算に使い、原本を保存してよいか（政府標準利用規約が当たるか、出典の表示の要否）。取得の元の変更の知らせの受け方（2026-09-28 に sla-and-calendars の領域から足した） | sla-and-calendars、[ADR-0020](decisions/0020-japanese-holiday-data.md) | E5 の祝日の取り込み（`jp-holiday-import`） |
 
 ### 選定・計測で決めるもの（法務以外）
 
 - 専用のセルを出す条件（社員の数、料金、契約の最低の期間）：E12 の前に PM が決める（[ADR-0002](decisions/0002-tenancy-and-isolation.md)）。
-- 日本語の全文検索の解析器（OpenSearch の kuromoji か Sudachi か）：search の領域で、ナレッジの検索の評価のデータで決める。
-- 祝日のデータの取り込み：内閣府の CSV（1955 年から 2027 年までを収録。[国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認）を正本にする。翌年の祝日の公表の時期と、CSV の利用条件は未検証で、sla-and-calendars の領域で確かめる。
+- 日本語の全文検索の解析器：search の領域で Sudachi を既定にした（[ADR-0043](decisions/0043-japanese-analyzer-and-index-layout.md)）。E9 の評価で kuromoji に負ければ置き換える。
+- 祝日のデータの取り込み：内閣府の CSV（1955 年から 2027 年までを収録。[国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認）を正本にする。翌々年の分は前年の 2 月に掲載される（sla-and-calendars の領域で確かめた）。CSV の利用の条件は法務の確認待ち（L9）。
 - 変更のリスクの評価に機械学習を使うか：MVP は質問票と規則だけにする。本家は規則・質問票・機械学習の予測を組み合わせている（[Change Management data sheet](https://www.servicenow.com/content/dam/servicenow-assets/public/en-us/doc-type/resource-center/data-sheet/change-management-data-sheet.pdf)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
 - 本家の既定の値（SLA の再計算の間隔、ACL の既定の規則、識別の規則の既定）で、公式の文書で確かめられないもの：各領域の文書で、本家の資料で確かめるか、未検証と書く。
 

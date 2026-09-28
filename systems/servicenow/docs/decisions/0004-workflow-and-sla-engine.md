@@ -53,6 +53,11 @@ SLA の計時として、次を比べた。
 - **レコードの版の番号で、並行の更新を守る。** 承認の回答は、承認のレコードの版の番号を条件に更新する。同じ承認への 2 つの回答は、先にコミットしたほうだけが効き、後のほうは「すでに回答済み」になる。
 - **公平性と上限**：テナントごとに、同時に動く実行の数・1 実行のステップの数・フローの入れ子の深さ・1 ステップで更新するレコードの数に上限を置く。値は workflow-engine の領域で決める。
 
+> 2026-09-28 の注記：
+> - 冪等のキーの `(flow_run, step, attempt)` の `attempt` は、ノードの実行の回（`iteration`。`for_each` の中の何回目か）の意味である。配送の再試行の回数を含めない。再試行の回数を入れると、同じ依頼の送り直しが別のキーになり、受け手が重複を見分けられないためである（[ADR-0015](0015-flow-execution-and-timers.md)、[workflow-engine.md](../architecture/workflow-engine.md) の 5.5 節）。
+> - タイマーの索引は `(cell, due_at)` ではなく `(shard, due_at)` にした。タイマーの表はセルの DB にあるので、セルの列は要らない（[workflow-engine.md](../architecture/workflow-engine.md) の 5.1 節）。
+> - 期限の来たタイマーの候補は、テナントをまたいで表を読まない。`engine_scheduler` のロールの関数 `claim_due_timers` が識別子（`timer_id`、`tenant_id`）だけを返し、ワーカーはテナントのコンテキスト（RLS の下）で 1 件ずつ `FOR UPDATE SKIP LOCKED` で取り直す（[ADR-0054](0054-shared-reference-rows-and-cross-tenant-roles.md)）。
+
 ### SLA の計時
 
 - **計時の核は、純粋な関数にする。**

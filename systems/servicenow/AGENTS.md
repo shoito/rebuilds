@@ -6,7 +6,8 @@ ServiceNow の再構築の設計。リポジトリ共通のルールはルート
 
 - [docs/intent.md](docs/intent.md) — 何を、なぜ作るか
 - [docs/architecture/](docs/architecture/README.md) — 全体像、規模の段階、非機能要件、領域の一覧
-- [docs/decisions/](docs/decisions/README.md) — ADR。特に 0002（テナントとセル）、0003（テーブルの階層と拡張）、0004（ワークフローと SLA のエンジン）、0005（CMDB の識別と調整）
+- [docs/decisions/](docs/decisions/README.md) — ADR。特に 0002（テナントとセル）、0003（テーブルの階層と拡張）、0004（ワークフローと SLA のエンジン）、0005（CMDB の識別と調整）、0054（NULL の行とテナントをまたぐロール）
+- [docs/quality.md](docs/quality.md)・[docs/roadmap.md](docs/roadmap.md)・[docs/runbooks/](docs/runbooks/README.md) — テストの重点、Epic と Story、SLO とアラート
 
 ## この題材に固有の規則（開発リポジトリで守る）
 
@@ -44,12 +45,15 @@ ServiceNow の再構築の設計。リポジトリ共通のルールはルート
 - **識別と調整は、性質ベーステストで確かめる。** 少なくとも次の性質を持たせる。
   - 同じ内容の取り込みを何回送っても、結果は 1 回と同じになる（冪等）。
   - 同じ CI を指す取り込みを並行に送っても、重複の CI を作らない。
-  - 属性ごとの最終の値は、到着の順序によらず、優先度の規則だけで決まる。
-  - 識別の結果が複数の CI に一致したら、推測で選ばず、重複の候補として止める。
+  - 属性ごとの最終の値と関係の有無は、到着の順序によらない。取り込み元ごとの最新の観測の状態（max の結合）から、優先度・鮮度（その属性の最新の観測の時刻から測る）・観測の時刻・正準の値の順の純粋な関数で選ぶ（ADR-0038）。「最後に書いた取り込み元」だけを来歴に持つ形にしない（順序に依存する）。
+  - 一致は、使えるすべての識別の項目の一致の和集合で決める。2 つ以上の CI に一致したら、推測で選ばず、重複の候補として止める（ADR-0037）。統合は人だけが行う。
+- **識別そのものは、到着の順序で変わりうる。** 識別の値を共有しないペイロードが先に届くと 2 つの CI ができ、後で保留と人の統合になる。順序によらない性質は、調整と、識別の値を共有する入力について確かめる。識別の性質のテストで、任意の順序の不変を求めない（ADR-0005 の注記）。
 
 ### そのほか
 
 - **テナントテーブルには `tenant_id` と RLS を付ける。** セルの解決（ホスト名 → テナント → セル）の前に、テナントのデータを読まない（ADR-0002）。
+- **`tenant_id` が NULL の行は、次の表の組み込みの行だけに許す**（ADR-0002・ADR-0054 の注記、[data-model.md](docs/architecture/data-model.md) の 3 節）：`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`role`、`acl_rule`、`holiday_set`、`holiday_set_version`、`holiday`、`number_def`、`ci_relation_type`、`ci_attribute`、`ci_identification_rule`、`flow_def`、`flow_version`。NULL の行は読み取りだけで、`catalog_loader` のロールだけが書く。表を足すときは、この一覧・data-model・security の 10.2 節・マイグレーションの CI の許可の一覧を同じ PR で直し、`security:sensitive` の承認を受ける。
+- **テナントをまたいで読む処理は、識別子だけを返す関数を通す**（ADR-0054）。タイマーの候補は `engine_scheduler` の `claim_due_timers` で受け取り、本文はテナントのコンテキストで読む。
 - **本家のスクリプトの API と互換にしない。** 本家のサーバーの API やスクリプトの言語に似せた層を作らない。テナントが任意のコードを書ける仕組みは MVP に入れない（[リポジトリ共通の ADR-0007](../../docs/decisions/0007-no-reuse-of-original-implementation.md)、ADR-0003、ADR-0004）。
 - **本家の名前を識別子に使わない。** ドメイン、ヘッダー、メールの参照の印、API のパス、テーブルとフィールドの内部の名前は、本家のものを写さない。ブランドの部分は `<Brand>`・`<brand>` で書く（[リポジトリ共通の ADR-0006](../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - **テストに本物の個人情報を使わない。** 実在の社員の名前・メールアドレス、実在の機器のシリアル番号を、テスト・フィクスチャー・シードに書かない。
