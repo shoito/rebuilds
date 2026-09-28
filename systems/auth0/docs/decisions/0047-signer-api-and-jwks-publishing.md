@@ -46,7 +46,7 @@ JWKS のキャッシュ：
 - **外部 IdP のアサーション**（2026-09-27 の統合で追加）：トークンの署名の API とは別のエンドポイント `POST /v1/sign-external-assertion` にし、型も分ける。
   - `purpose` は `apple_client_secret`（E6）、`oidc_client_assertion`（E14）、`saml_authn_request`（E14）の 3 つだけ。
   - 署名に使うのは、テナントの署名鍵ではなく、接続ごとの鍵（`external_idp_keys`）。Apple の `.p8` はテナントが登録し、Management API が Signer の `POST /v1/external-keys:import` に渡して暗号文を得る（Management API は平文を保存もログもしない）。OIDC・SAML の鍵の対は `POST /v1/external-keys:generate` で Signer の中で作り、公開鍵（JWK、SAML の証明書）だけを返す。どちらも鍵の管理のポート（Management API からだけ）で受ける。
-  - 呼び出し側（Auth）が渡すのは `tenant_id`・`connection_id`・`purpose` と、`saml_authn_request` の AuthnRequest の ID・`AssertionConsumerServiceURL` だけ。`iss`・`sub`・`aud`（宛先）・有効期間は、Signer が `external_idp_keys` の登録の値から決める（Apple：`aud` は `https://appleid.apple.com`、有効 1 時間。OIDC：`aud` は登録した IdP のトークンのエンドポイント、`jti` は Signer が作る、有効 300 秒。SAML：`Destination` は登録した IdP の SSO の URL）。任意のクレーム・任意の宛先には署名しない。
+  - 呼び出し側（Auth）が渡すのは `tenant_id`・`connection_id`・`purpose` と、`saml_authn_request` の AuthnRequest の ID・`AssertionConsumerServiceURL` だけ。`iss`・`sub`・`aud`（宛先）・有効期間は、Signer が `external_idp_keys` の登録の値から決める（Apple：`aud` は `https://appleid.apple.com`、有効 1 時間。OIDC：`aud` は登録した IdP の `issuer`（下の 2026-09-28 の注記）、`jti` は Signer が作る、有効 300 秒。SAML：`Destination` は登録した IdP の SSO の URL）。任意のクレーム・任意の宛先には署名しない。
   - 鍵は `<brand>-signing-keys` の KMS の鍵の DEK で暗号化し、暗号化の文脈は `purpose=external-idp-key`、`tenant_id`、`connection_id`（[ADR-0045](0045-kms-key-hierarchy.md)）。
 - Signer の DB のロールは、`signing_keys`・`signing_key_state_versions`・`signing_key_issuers`・`external_idp_keys` の SELECT と、`signing_keys.last_used_at` の UPDATE だけ（[ADR-0059](0059-signer-isolation.md) のロールの表と同じ）。
 - Back-Channel Logout のトークンは、Worker が Auth の内部の API を通して求める（[ADR-0028](0028-logout-rp-initiated-and-back-channel.md)）。Signer は Worker から受けない。
@@ -54,6 +54,8 @@ JWKS のキャッシュ：
 - 2 は、Auth が乗っ取られると、任意の `typ`・任意の期限のトークン（10 年の ID トークンなど）を作れる。
 - b は、Signer の DB の権限が広がり、outbox との一貫性を Signer が持つことになる。
 - y は、変更のたびの無効化に頼り、無効化の失敗が長い食い違いになる。
+
+> 2026-09-28 の注記：外向きの `oidc_client_assertion` の `aud` は、IdP のトークンのエンドポイントではなく IdP の `issuer` にする（draft-ietf-oauth-rfc7523bis に合わせた推奨案。keys-and-secrets.md の 6.3 節と architecture/README.md の決定と同じ）。トークンのエンドポイントの URL を求める IdP があれば、E14 の着手時に接続ごとの互換の設定で扱う。
 
 ## Consequences
 

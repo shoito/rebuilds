@@ -224,7 +224,7 @@ PM の方針（本家 Auth0 に寄せる、既定案で進める）により、�
 - **データベース接続の `authentication_methods`**（`password`・`passkey`）：connections.md の 4.1.1 節に足した（パスキーだけのユーザーを作るための設定）。
 - **組織ごとのカスタムドメイン**：持たない（organizations.md、ADR-0051 を正とし、custom-domains.md の E14 の Story を外した）。
 - **ログインのトランザクションの用語**：`login_transactions` の行を「トランザクション」、その参照の乱数を「handle」と呼び、画面の URL の `state` で運ぶ。アプリの OAuth の `state` とは別物（authentication-flows.md の 5.4 節、universal-login.md の 4 節）。
-- **データモデル**：クライアントの資格情報は `client_credentials` の 1 つの表、`refresh_token_families` は 1 つの定義にまとめ、ユーザーを指す列は `user_pk` に揃え、テナントの外の表を理由とともに列挙した（[data-model.md](data-model.md) の 3・5・8 節）。
+- **データモデル**：クライアントの資格情報は `client_credentials` の 1 つの表、`refresh_token_families` は 1 つの定義にまとめ、ユーザーを指す列は `user_pk` に揃え、テナントの外の表を理由とともに列挙した（[data-model.md](data-model.md) の 3・9 節）。
 - **ログの種類のコード**：本家に同じ意味のコードがあればそれを使い（`limit_wc`、`limit_mu`、`pwd_leak` など）、ないものは `ap_*` などの独自のコードにする（ADR-0042。attack-protection.md の 8 節を揃えた）。Back-Channel Logout の失敗は `oidc_backchannel_logout_failed`。
 - **Epic**：E13 は Actions、E14 は Organizations とエンタープライズ接続。インポート・エクスポート、SCIM、PAR・DPoP・トークン交換・mTLS、SMS、MFA の API は「後回し」（[roadmap.md](../roadmap.md)）。
 - **数値の正本**：レート制限は [management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 6 節。トークンの有効期間は [ADR-0008](../decisions/0008-token-lifetimes-and-claims.md)。セッションは使われない期間 3 日・最終の期限 7 日（[ADR-0027](../decisions/0027-server-side-sessions.md)）。JWKS のキャッシュは RP 300 秒・CloudFront 60 秒・オリジンの障害中 24 時間（[ADR-0047](../decisions/0047-signer-api-and-jwks-publishing.md)）。設定の反映は最大 15 秒（ADR-0032）。保持の期間は [security.md](security.md) の 9 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。
@@ -246,7 +246,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 - **429 と 503 の分け方**：ADR-0005 の注記（429 は方針の制限、503 は過負荷・依存先の都合）を承認した。SLI を状態コードだけで分けられる（[ADR-0005](../decisions/0005-authentication-path-availability.md)、[ADR-0062](../decisions/0062-sli-and-synthetic-monitoring.md)）。
 - **OpenID Foundation の会員**：E12 の前に会員になる。認証の費用は会員 700 USD・非会員 3,500 USD で、プロファイルが 5 つある（[intent.md](../intent.md)、[ADR-0064](../decisions/0064-conformance-suite-in-ci.md)、[roadmap.md](../roadmap.md) の E12）。
 - **適合試験の Form Post**：対象に含める。PM の決定として確定した（[authentication-flows.md](authentication-flows.md) の 13.3・14 節、intent の K2）。
-- **統合で足した値**：列挙の時間の差の p90 10%（QA。[quality.md](../quality.md) の 2.2.1 節、[ADR-0015](../decisions/0015-database-connection-password-and-enumeration.md)）、`refresh_token_families.rotation` の列（Dev。[data-model.md](data-model.md) の 5.1 節）、Story の名前（PM。[roadmap.md](../roadmap.md)）、runbook の名前（Ops。[runbooks/](../runbooks/README.md)）を、そのまま受け入れた。
+- **統合で足した値**：列挙の時間の差の p90 10%（QA。[quality.md](../quality.md) の 2.2.1 節、[ADR-0015](../decisions/0015-database-connection-password-and-enumeration.md)）、`refresh_token_families.rotation` の列（Dev。[data-model/login-and-sessions.md](data-model/login-and-sessions.md) の 2 節）、Story の名前（PM。[roadmap.md](../roadmap.md)）、runbook の名前（Ops。[runbooks/](../runbooks/README.md)）を、そのまま受け入れた。
 - **漏えいしたパスワードの予備の案**：公式の range API を使う間の ADR-0005 の縮退の表の行を、Dev のテックリードの確認として確定した（[attack-protection.md](attack-protection.md) の 17 節）。
 - **イントロスペクション**：持たない。JWT を JWKS で確かめる形で足りる（[authentication-flows.md](authentication-flows.md) の 14 節）。
 - **`resource`（RFC 8707）**：MVP では受けない。トークン交換で受けるときは `audience` と同じ意味に扱う（同上）。
@@ -281,6 +281,16 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 | 列挙の時間の差の 5% の妥当性、画面の LCP の目標、証明書の発行の時間、共有の送信の 1 日の上限、検索を専用の基盤へ移すか、攻撃の防御の閾値と PoW の難しさ、M2M の発行のログを失う件数 | 計測 | 各領域の文書の「持ち越し」（E3・E8・E11・E12、S2 の前） |
 | 本家の振る舞いで未確認のもの（不審な IP の抑制のサインアップの補う速度の既定、認可コードの有効期間、ログインのトランザクションの有効期間、ブロックしたユーザーのリフレッシュトークン、リフレッシュでの組織のメンバーシップの確認など。セッションの既定値・リフレッシュトークンの猶予・ログのコードの意味は 2026-09-27 に確かめた） | 確かめるだけ（決定は済み） | 各領域の文書の「持ち越し」に書いた Epic で、本家の資料か試用のテナントで確かめる |
 
+### 決定（2026-09-28、データモデル）
+
+ユーザーの依頼（各題材のデータモデルを十分に設計し、ER 図を付ける）により、[data-model.md](data-model.md) を索引から形の正本に変え、`data-model/` に領域ごとの定義（92 テーブル、ER 図 14 個）を置いた。ADR の決定は変えていない。判断が要ったところは推奨案で決めた（詳細は [data-model.md](data-model.md) の 9.2 節）。
+
+- **分割の鍵**：時間で切る表は UUIDv7 の `id` の範囲で切る。旧い `audit_events` の `RANGE (occurred_at)` は主キーと合わず作れなかったので直した。分割した表のハッシュの引き当ては普通の索引にし、1 回限りは条件付きの更新で守る。
+- **テナントの外の表**：`signing_key_state_versions` を足した（Signer が全テナントの版を読むため。値は版と時刻だけ）。
+- **列の名前と型**：管理者を指す列は `member_user_id`（管理用のテナントの `sub`）、`credential_tickets` はリンクの `secret_hash` とコードの `code_hash` に分けた、`clients` の主キーは `(tenant_id, client_id)`。
+- **Valkey とリース**：Valkey のキーは `<用途>:{t:<tenant_id>}:...` で IP を HMAC にする。ログストリームのリースは DB の行で持つ。
+- **持ち越し**：`refresh_tokens` の行の数（再利用の検知のため使用済みの行を残すと S1 で十数億行になりうる）を E12 で測り、多ければ ADR-0003 の改訂を Dev のテックリードに諮る（[data-model.md](data-model.md) の 9.4 節）。
+
 ## 7. 領域の文書
 
 領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
@@ -304,7 +314,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 | [extensibility.md](extensibility.md)（MVP の後） | Actions に相当する拡張：トリガー、実行の隔離、時間とメモリーの上限、秘密、失敗の扱い、認証の経路への影響 | 0048–0050 | セキュリティ、Ops | E13 |
 | [organizations.md](organizations.md)（MVP の後） | B2B の組織、招待、組織ごとの接続とブランド、トークンの組織のクレーム | 0051–0052 | QA | E14 |
 | [security.md](security.md) | 脅威モデル、RFC 9700 のチェックリスト、暗号化、監査ログ、データのライフサイクル、脆弱性の対応、法務の論点の整理 | 0053–0056 | セキュリティ | E1、E12 |
-| [data-model.md](data-model.md) | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)（と `data-model/`） | データモデルの正本（規約、テナントの外の表、ER 図、テーブルの定義、DB の外のストアの形、横断的な不変条件） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、エッジ、冗長化、DR、段階を上げる基準、S3 のセル構成 | 0057–0060 | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、秘密を出さない計装 | 0061–0062 | Ops | E1、E10 |
 | [capacity.md](capacity.md) | 負荷のモデル、Argon2id と署名の CPU、部品ごとの必要量、パラメーター | 0063 | Ops | E12 |

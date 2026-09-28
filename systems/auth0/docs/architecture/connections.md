@@ -95,7 +95,8 @@ CREATE TABLE credential_tickets (         -- email verification links, reset lin
   connection_id uuid        NOT NULL,
   identity_id   uuid,                        -- null for signup_code (user not created yet)
   email_norm    text,
-  secret_hash   text        NOT NULL,       -- SHA-256 for links, Argon2id for 6-digit codes
+  secret_hash   bytea,                       -- links: SHA-256 (ADR-0004)
+  code_hash     text,                        -- 6-digit codes: Argon2id PHC string
   attempts      smallint    NOT NULL DEFAULT 0,
   expires_at    timestamptz NOT NULL,
   consumed_at   timestamptz,

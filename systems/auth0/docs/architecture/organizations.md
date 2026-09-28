@@ -42,7 +42,7 @@ tenant
         ├── organization_members（user_pk。テナントのユーザー）── organization_member_roles
         ├── organization_connections（connection_id、assign_membership_on_login、is_signup_enabled、show_as_button）
         ├── organization_invitations（email、roles、connection_id、ticket_hash、expires_at）
-        ├── organization_branding（ロゴ、色。universal-login のテーマの上書き）
+        ├── （ブランドは organizations.branding の列。ロゴ、色。universal-login のテーマの上書き）
         └── organization_client_grants（M2M の許可を組織に結ぶ。E14 の後）
 organization_roles（テナントの中の組織のロールの定義。名前と説明と権限の文字列）
 ```
@@ -234,5 +234,5 @@ organization_roles（テナントの中の組織のロールの定義。名前�
 | `organization_member_roles` | `tenant_id`、`organization_id`、`user_pk`、`role_id` | RLS |
 | `organization_connections` | `tenant_id`、`organization_id`、`connection_id`、`assign_membership_on_login`、`is_signup_enabled`、`show_as_button`、`is_enabled` | RLS |
 | `organization_invitations` | `tenant_id`、`id`、`organization_id`、`email`、`roles`、`connection_id`、`client_id`、`ticket_hash`、`expires_at`、`used_at`、`inviter` | RLS |
-| `refresh_token_families.organization_id` | 組織の ID（NULL 可） | 列の定義は [data-model.md](data-model.md) の 5.1 節にまとめた |
+| `refresh_token_families.organization_id` | 組織の ID（NULL 可） | 列の定義は [data-model/login-and-sessions.md](data-model/login-and-sessions.md) の 2 節にまとめた |
 | `clients.organization_usage`・`organization_require_behavior` | | [tenants-and-applications.md](tenants-and-applications.md) の `clients` に足す列 |

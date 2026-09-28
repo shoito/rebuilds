@@ -128,7 +128,7 @@ CREATE TABLE email_templates (
   body_html     text        NOT NULL,   -- <= 100 KB
   body_text     text,
   version       integer     NOT NULL,
-  updated_by    uuid        NOT NULL,   -- admin member id
+  updated_by    text        NOT NULL,   -- admin tenant sub (member_user_id, data-model.md 2.4)
   updated_at    timestamptz NOT NULL,
   PRIMARY KEY (tenant_id, kind, locale)
 );
@@ -150,6 +150,7 @@ CREATE TABLE email_providers (
   smtp_port       integer,                -- 465 | 587
   smtp_username   text,
   secret_ct       bytea,                  -- SMTP password, envelope-encrypted (ADR-0004)
+  secret_key_ver  integer,                -- tenant_data_keys.version
   role_arn        text,                   -- ses_cross_account
   external_id     text,
   fallback_to_platform boolean NOT NULL DEFAULT false,

@@ -415,7 +415,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | テーブル | 中身 |
 | --- | --- |
 | `signing_keys` | `tenant_id`、`kid`、`alg`、`state`（`next`・`current`・`previous`・`revoked`）、`public_jwk`、`private_key_ciphertext`、`dek_ciphertext`、`kms_key_arn`、`created_at`、`published_at`、`ready_at`、`activated_at`、`rotated_out_at`、`revoked_at`、`revoke_reason`（`manual`・`emergency`・`scheduled`）、`last_used_at`。失効で `private_key_ciphertext` と `dek_ciphertext` を消す |
-| `signing_key_state_versions` | `tenant_id`、`version`、`updated_at`（Signer のポーリング用） |
+| `signing_key_state_versions` | `tenant_id`、`version`、`updated_at`（Signer のポーリング用）。RLS の外（2026-09-28。版と時刻だけで、Signer が全テナントを 1 回で読むため。[data-model.md](data-model.md) の 3 節） |
 | `signing_key_issuers` | `tenant_id`、`issuer`（テナントのホストとカスタムドメイン。Signer の `iss` の検査用） |
 | `signing_key_operations` | `tenant_id`、`id`、`kind`、`requested_by`、`state`（`pending`・`published`・`completed`・`failed`）、`created_at`、`completed_at` |
 | `jwks_publications` | `tenant_id`、`host`、`state_version`、`sha256`、`s3_version_id`、`published_at`、`verified_at` |

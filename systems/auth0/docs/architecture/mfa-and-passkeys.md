@@ -68,6 +68,7 @@ CREATE TABLE authenticators (
   status         text NOT NULL,             -- pending | active | locked | disabled
   name           text,                      -- user-visible label, <= 64 chars
   failure_count  int  NOT NULL DEFAULT 0,   -- consecutive failures (section 7)
+  lock_count     smallint NOT NULL DEFAULT 0, -- doubles the next lock period (section 7)
   locked_until   timestamptz,
   created_at     timestamptz NOT NULL,
   confirmed_at   timestamptz,

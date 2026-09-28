@@ -110,7 +110,7 @@
 
 ### 3.5 置き場所と読み方
 
-- 読み：Valkey の `sess:{tenant_id}:{secret_hash}`（TTL 60 秒）→ なければ Aurora の reader → なければ writer。
+- 読み：Valkey の `sess:{t:<tenant_id>}:<secret_hash>`（TTL 60 秒。キーの形は [data-model/stores.md](data-model/stores.md) の 1 節）→ なければ Aurora の reader → なければ writer。
 - 終わらせる操作：Aurora の writer で `ended_at` を書き、同じトランザクションで outbox に `session.ended` を入れる。その後、Valkey のキーを消す。
 - Valkey のキーを消せなかったとき（Valkey の障害の途中）、他のタスクがキャッシュを最大 60 秒読みうる。**終わったセッションで SSO が通る時間の上限は 60 秒。** Valkey が使えないタスクは DB を読むので、この窓はキャッシュが残ったまま Valkey に届くタスクだけに生じる。
 - 1 ユーザーの `active` なセッションは 100 個まで。超えたら最も古いものを `superseded` で終える（本システムの決定。本家の上限は未検証）。
@@ -419,6 +419,6 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 | `sessions` | 3.2 節 |
 | `session_clients` | `tenant_id`、`session_id`、`client_id`、`first_issued_at`、`last_issued_at` |
 | `backchannel_logout_deliveries` | `tenant_id`、`id`、`session_id`、`client_id`、`attempts`、`next_attempt_at`、`last_status`、`last_error`（秘密を含めない）、`state`（`pending`・`delivered`・`failed`）、`created_at` |
-| `refresh_token_families` の追加の欄 | `session_id`、`binding`。列の定義は [data-model.md](data-model.md) の 5.1 節にまとめた |
+| `refresh_token_families` の追加の欄 | `session_id`、`binding`。列の定義は [data-model/login-and-sessions.md](data-model/login-and-sessions.md) の 2 節にまとめた |
 | `clients` の追加の欄 | `oidc_backchannel_logout`（`backchannel_logout_uri` を持つ）、`refresh_token` の中の `binding`（tenants-and-applications.md の `clients` の表に足す。`allowed_logout_urls` は同じ表にある） |
 | `tenants` の追加の欄 | `session_idle_minutes`、`session_absolute_minutes`、`session_persistent` |

@@ -117,12 +117,14 @@ WAF のルールの初期値は [infrastructure.md](infrastructure.md) の 4.3 �
 
 ```
 Valkey（クラスタ、キーはテナントでハッシュのスロットをそろえる）
-  ap:{t:<tenant>}:bf:<identifier_hmac>:<ip_prefix>     → 失敗の数、最後の失敗の時刻（TTL 30 日）
-  ap:{t:<tenant>}:bfd:<identifier_hmac>:<device_id>     → 既知の端末ごとの失敗の数（TTL 30 日）
-  ap:{t:<tenant>}:ip:<bucket>:<ip_prefix>               → 残り、最後の補充の時刻（TTL 2 日）
-  ap:{p}:ip:login:<ip_prefix>                           → プラットフォームのバケツ
-  ap:{t:<tenant>}:ch:<challenge_id>                      → チャレンジの使用済み（TTL 10 分）
+  ap:{t:<tenant_id>}:bf:<identifier_hmac>:<ip_hmac>     → 失敗の数、最後の失敗の時刻（TTL 30 日）
+  ap:{t:<tenant_id>}:bfd:<identifier_hmac>:<device_id>   → 既知の端末ごとの失敗の数（TTL 30 日）
+  ap:{t:<tenant_id>}:ip:<bucket>:<ip_hmac>               → 残り、最後の補充の時刻（TTL 2 日）
+  ap:{p}:ip:login:<ip_hmac>                              → プラットフォームのバケツ
+  ap:{t:<tenant_id>}:ch:<challenge_id>                    → チャレンジの使用済み（TTL 10 分）
 ```
+
+- `<ip_hmac>` は IP の接頭辞（IPv4 は /32、IPv6 は /64）の HMAC。Valkey のキーに IP を平文で入れない（[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 7.1 節）。30 日の TTL があるので、日ごとに替える鍵ではなくテナントの鍵で作る（[data-model/stores.md](data-model/stores.md) の 1 節）。
 
 - 増やす・判定する・TTL を延ばすを 1 つの Lua のスクリプトで原子的に行う。
 - バケツは「最後の補充の時刻からの経過で補ってから減らす」形にし、定期のジョブを持たない。
@@ -140,7 +142,7 @@ CREATE TABLE brute_force_blocks (
   expires_at       timestamptz NOT NULL, -- last_failure_at + 30 days
   unblock_token_hash bytea,              -- SHA-256, one-time (ADR-0004)
   PRIMARY KEY (tenant_id, id),
-  UNIQUE (tenant_id, connection_id, identifier_hmac, ip_prefix)
+  UNIQUE NULLS NOT DISTINCT (tenant_id, connection_id, identifier_hmac, ip_prefix) -- one lockout row when ip_prefix is null
 );
 ```
 

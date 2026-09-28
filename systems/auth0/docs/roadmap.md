@@ -51,7 +51,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `pepper-bootstrap` | pepper の生成、Secrets Manager とアーカイブ、起動時の読み込み、版 |
 | `tenant-data-keys` | テナントの DEK の作成・キャッシュ・ローテーション、AAD |
 | `signer-sign-api` | Signer の署名の API（`/v1/sign`、`sign-batch`）と検査（[keys-and-secrets.md](architecture/keys-and-secrets.md) の 6.1 節） |
-| `outbox-and-relay` | `outbox`（RLS の外）、Relay、SQS、`trace_context`（[data-model.md](architecture/data-model.md) の 5.5 節） |
+| `outbox-and-relay` | `outbox`（RLS の外）、Relay、SQS、`trace_context`（[data-model/operations.md](architecture/data-model/operations.md) の 3 節） |
 | `ci-pipeline` | PR の CI の段（差分テスト、`SEC-` の追跡、テナントの分離の性質、秘密の出力の走査、暗号の API の lint、マイグレーションの規則、テストの資格情報の検査）と merge queue（[delivery.md](architecture/delivery.md) の 2 節） |
 | `conformance-suite-ci` | 適合試験のスイートを CI の中で動かす枠（digest の固定、`plans.yaml`、`allowed-warnings.yaml`）と、試験用のクライアントの設定（[ADR-0064](decisions/0064-conformance-suite-in-ci.md)、[authentication-flows.md](architecture/authentication-flows.md) の 13.3 節） |
 | `telemetry-package` | `packages/telemetry`（型付きのイベント、`Secret<T>`）、Collector の許可リスト、ALB・CloudFront・WAF のログの設定、秘密の走査の Lambda と合成の秘密、アラートと runbook の注釈の CI（[ADR-0061](decisions/0061-secret-free-telemetry.md)） |
@@ -152,7 +152,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `session-store-and-cookie` | `sessions`、`__Host-<brand>_session`、Valkey のキャッシュ、秘密の作り直し |
 | `session-lifetimes` | 使われない期間・最終の期限・永続の設定と、`last_active_at` の間引き |
 | `sso-decision` | SSO の判定と `session_clients`、`acr`・要素ごとの認証の時刻の記録 |
-| `refresh-token-grant` | ローテーション、猶予、再利用の検知、200 個の上限、スコープの縮小（[data-model.md](architecture/data-model.md) の 5.1 節） |
+| `refresh-token-grant` | ローテーション、猶予、再利用の検知、200 個の上限、スコープの縮小（[data-model/login-and-sessions.md](architecture/data-model/login-and-sessions.md) の 2 節） |
 | `refresh-session-binding` | 系列の `binding`、ログアウトでの失効、再利用の検知でのセッションの終了 |
 | `revocation-endpoint` | RFC 7009 |
 | `rp-initiated-logout` | `/oidc/logout`、`/u/logout` の確認の画面、`allowed_logout_urls` の照合（SEC-014） |

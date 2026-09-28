@@ -131,18 +131,19 @@ CREATE TABLE login_transactions (
   amr              text[]      NOT NULL DEFAULT '{}',
   idp_state_hash   bytea,                            -- state sent to a social IdP (ADR-0016)
   idp_nonce_hash   bytea,
+  webauthn_challenge bytea,                          -- 32 random bytes; cleared after verification
   failed_attempts  smallint    NOT NULL DEFAULT 0,   -- UI hint only; lockout counters live in attack-protection
   created_at       timestamptz NOT NULL,
   expires_at       timestamptz NOT NULL,             -- created_at + 60 min
   completed_at     timestamptz,
-  PRIMARY KEY (tenant_id, id),
-  UNIQUE (handle_hash)
-);
+  PRIMARY KEY (tenant_id, id)
+) PARTITION BY RANGE (id);                           -- daily UUIDv7 ranges (data-model.md 2.8)
+CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: partitioned; 256-bit random
 ```
 
 - **用語**（[authentication-flows.md](authentication-flows.md) の 5.4 節と同じ）：「ログインのトランザクション」はこの表の 1 行。「トランザクションの handle」は、その行を引く 256 ビットの乱数で、DB には `handle_hash` だけを持つ。handle は画面の URL の `state` のパラメーターで運び、文書の図では `<tx>` と書く（`/u/login?state=<tx>`）。アプリが `/authorize` に送った OAuth の `state` は別物で、`authz_request.state` に保存して最後に返す。この文書で「URL の `state`」と書くときは handle を指す。
 - RLS を付ける。ただし `handle_hash` での引き当ては、ホスト名からテナントを決めた後に、そのテナントのコンテキストで行う。
-- 失効した行（`expires_at` から 24 時間後）は、1 時間ごとのジョブで消す。行は個人データ（`user_pk`、IP はここに持たない）を含むので、長く残さない。
+- 失効した行（`expires_at` から 24 時間後）は、日ごとのパーティションの `DROP` で消す（2 日より古いもの。[data-model.md](data-model.md) の 2.8 節）。行は個人データ（`user_pk`、IP はここに持たない）を含むので、長く残さない。
 - `authz_request` の欄と検証は authentication-flows の領域が持つ（[authentication-flows.md](authentication-flows.md) の 17 節）。
 
 ### 4.1 Cookie

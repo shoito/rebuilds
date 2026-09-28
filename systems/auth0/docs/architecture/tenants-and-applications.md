@@ -45,7 +45,7 @@ account（請求・契約の単位。1 つの顧客の会社）
   └── tenants（環境ごと。region と environment は作成時に決め、変えない）
         ├── tenant_members（ダッシュボードの管理者。ロール付き）
         ├── clients（アプリケーション）── client_credentials（秘密・公開鍵）
-        ├── resource_servers（API）── resource_server_scopes
+        ├── resource_servers（API。スコープは列の配列）
         ├── client_grants（M2M の許可）
         └── 接続・ユーザー・鍵・ブランドなど（各領域）
 ```

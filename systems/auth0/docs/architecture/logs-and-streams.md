@@ -193,7 +193,7 @@ log_streams(tenant_id, id, name, type, status, filters[], pii_config, sink(暗�
 ```
 log-streamer（Worker）
   1. log_stream_notify を見て、新しいログのあるテナントのストリームを取る（SQS の通知 ＋ 1 秒ごとの走査）
-  2. ストリームのリース（Valkey か DB の行ロック、30 秒）を取る。1 つのストリームは同時に 1 つの送り手だけ
+  2. ストリームのリース（DB の行の lease_owner・lease_expires_at、30 秒）を取る。1 つのストリームは同時に 1 つの送り手だけ
   3. logs から log_id > cursor を最大 100 件（または 1 MiB）読み、フィルターと伏せ字をかける
   4. 送る（Webhook は worker-egress、EventBridge は PutPartnerEvents）
   5. 2xx なら cursor を最後の log_id に進める（フィルターで落ちた分も含めて進める）
@@ -340,5 +340,5 @@ User-Agent: <Brand>-LogStreams/1.0
 | `logs`（ログの専用のクラスタ） | `tenant_id`、`log_id`、`date`、`type`、`client_id`、`connection_id`、`user_id`、`user_name`、`ip`、`organization_id`、`hostname`、`description`、`user_agent`、`details`（jsonb）、`references` | RLS。取り込みの日ごとのパーティション。31 日で `DROP` |
 | `log_shard_state` | `shard`、`last_log_id`、`updated_at` | RLS の外。書き手の採番の状態 |
 | `log_stream_notify` | `shard`、`tenant_id`、`max_log_id` | RLS の外。送り手への通知 |
-| `log_streams`（主の Aurora） | `tenant_id`、`id`、`name`、`type`、`status`、`filters`、`pii_config`、`sink_ciphertext`、`signing_key_ciphertext`、`cursor_log_id`、`started_from`、`last_success_at`、`first_failure_at`、`last_errors`（直近 10 件） | RLS |
+| `log_streams`（主の Aurora） | `tenant_id`、`id`、`name`、`type`、`status`、`filters`、`pii_config`、`format`、`sink_ciphertext`、`signing_key_ciphertext`、`data_key_version`、`cursor_log_id`、`started_from`、`last_success_at`、`first_failure_at`、`last_errors`（直近 10 件）、`lease_owner`・`lease_expires_at`（6.2 節のリース） | RLS。列の正本は [data-model/email-and-logs.md](data-model/email-and-logs.md) |
 | `tenants.log_retention_days` | 1・5・10・30 | [tenants-and-applications.md](tenants-and-applications.md) の `tenants` に足す列 |

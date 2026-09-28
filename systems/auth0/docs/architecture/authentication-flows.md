@@ -592,10 +592,10 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 | --- | --- |
 | `login_transactions`（表は [ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md) が持つ） | この領域が `authz_request`（jsonb）に入れる欄：`client_id`、`redirect_uri`、`scope`、`audience`、`state`（アプリの値）、`nonce`、`code_challenge`、`response_mode`、`prompt`、`max_age`、`acr_values`、`ui_locales`、`login_hint`、`connection`、`screen_hint` |
 | `pushed_authorization_requests`（MVP の後） | `tenant_id`、`request_uri_hash`、`client_id`、検証済みの認可の要求の欄、`expires_at`（60 秒）、`consumed_at` |
-| `authorization_codes` | `tenant_id`、`code_hash`、`login_transaction_id`、`user_pk`、`session_id`、`client_id`、`redirect_uri`、`scope`、`audience`、`code_challenge`、`nonce`、`auth_time`、`amr`、`acr`、`expires_at`（60 秒）、`consumed_at`、`refresh_family_id` |
-| `refresh_token_families` | 列の定義は [data-model.md](data-model.md) の 5.1 節にまとめた（この領域、sessions-and-sso、organizations、ADR-0010 の列を合わせたもの） |
+| `authorization_codes` | `tenant_id`、`code_hash`、`login_transaction_id`、`user_pk`、`session_id`、`client_id`、`redirect_uri`、`scope`、`audience`、`code_challenge`、`nonce`、`auth_time`、`amr`、`acr`、`organization_id`（E14）、`expires_at`（60 秒）、`consumed_at`、`refresh_family_id`。列の正本は [data-model/login-and-sessions.md](data-model/login-and-sessions.md) |
+| `refresh_token_families` | 列の定義は [data-model/login-and-sessions.md](data-model/login-and-sessions.md) の 2 節にまとめた（この領域、sessions-and-sso、organizations、ADR-0010 の列を合わせたもの） |
 | `refresh_tokens` | `tenant_id`、`family_id`、`token_hash`、`seq`、`issued_at`、`used_at` |
 | `grants` | `tenant_id`、`user_pk`、`client_id`、`audience`、`scopes`、`created_at`、`updated_at` |
-| `device_authorizations` | `tenant_id`、`device_code_hash`、`user_code_hash`、`client_id`、`scope`、`audience`、`status`（`pending`・`approved`・`denied`・`consumed`・`expired`）、`user_pk`、`interval`、`last_polled_at`、`expires_at` |
+| `device_authorizations` | `tenant_id`、`id`、`device_code_hash`（SHA-256）、`user_code_hash`（短いので pepper の HMAC）、`client_id`、`scope`、`audience`、`status`（`pending`・`approved`・`denied`・`consumed`・`expired`）、`user_pk`、`interval_seconds`、`last_polled_at`、`expires_at` |
 | `client_assertion_jtis` | `tenant_id`、`client_id`、`jti`、`expires_at`（Valkey が使えないときの置き場所） |
-| クライアントの秘密と公開鍵 | 別の表を持たない。tenants-and-applications の `client_credentials`（`kind` が `secret`・`public_key`）に一本化した（[data-model.md](data-model.md) の 4.1 節） |
+| クライアントの秘密と公開鍵 | 別の表を持たない。tenants-and-applications の `client_credentials`（`kind` が `secret`・`public_key`）に一本化した（[data-model/tenancy-and-applications.md](data-model/tenancy-and-applications.md) の 3 節） |
