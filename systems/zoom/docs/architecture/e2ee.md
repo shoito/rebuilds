@@ -405,6 +405,8 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/meeting-runtime.md](data-model/meeting-runtime.md) の 3 節と [data-model/stores.md](data-model/stores.md) の 7 節 にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `meetings.settings`（signaling-and-meetings.md の提案） | `e2ee: {enabled}`。開催の前だけ変えられる |

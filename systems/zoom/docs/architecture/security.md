@@ -265,6 +265,19 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 品質の生の記録（参加者ごと 10 秒） | 30 日 | 自動（S3 のライフサイクル） | [observability.md](observability.md) |
 | 参加ごとの品質の要約（`participant_quality_summaries`） | 12 か月 | 削除 | [observability.md](observability.md) |
 | E2EE の資格情報の記録（`e2ee_credentials`） | 1 年 | 削除 | [e2ee.md](e2ee.md) |
+| 同意（`capture_consents`） | 開催と同じ 12 か月。録画・文字起こしが残る間は残す | 削除 | [data-model/recording.md](data-model/recording.md) |
+| 録画の再生の記録（`recording_access_events`） | 12 か月 | 削除 | 同上 |
+| 録画の削除の記録（`recording_deletions`） | 7 年 | 削除 | 同上 |
+| チャットのファイル（`chat_files`）と報告の添付 | チャットと同じ・報告と同じ | 削除（S3 も） | [data-model/meeting-runtime.md](data-model/meeting-runtime.md)、[data-model/safety.md](data-model/safety.md) |
+| 全体の端末の ban（`global_device_bans`） | 90 日＋ 30 日 | 削除 | [data-model/safety.md](data-model/safety.md) |
+| 会議の番号の履歴（`meeting_number_history`） | 再使用の禁止の 2 年の後、1 年ごとに削除 | 削除 | [data-model/scheduling.md](data-model/scheduling.md) |
+| カレンダーの接続（`calendar_connections`） | 取り消しから 30 日 | 削除 | 同上 |
+| 冪等のキー（`api_idempotency_keys`） | 24 時間 | 削除 | 同上 |
+| 招待（`invitations`）、セッション・OTP（`sessions`・`verifications`） | 失効から 30 日、期限まで | 削除 | [data-model/identity.md](data-model/identity.md) |
+| OAuth のトークン・許可（`oauth_tokens`・`oauth_grants`） | 失効・取り消しから 30 日 | 削除 | [data-model/platform-api.md](data-model/platform-api.md) |
+| レポートの書き出し（`report_exports`） | 7 日 | 削除（S3 も） | [data-model/governance.md](data-model/governance.md) |
+| リーガルホールド（`legal_holds`）、サポートの参照の許可（`support_access_grants`） | 解除から 7 年、期限から 1 年 | 削除 | 同上 |
+| outbox | 送ってから 24 時間 | 削除 | 同上 |
 | バックアップ（Aurora） | 35 日 | 期限で消える | [infrastructure.md](infrastructure.md) |
 
 - リーガルホールドは、保持の期限に優先する。

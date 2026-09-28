@@ -322,6 +322,8 @@ webhook-id: msg_01J9...    webhook-timestamp: 1790000000    webhook-signature: v
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/platform-api.md](data-model/platform-api.md) にある。Webhook の受け口と配送の記録は、アプリの持ち主の組織（`oauth_apps.owner_org_id`）に属する。許可した組織のイベントを Worker が配る（[data-model.md](data-model.md) の 11.2 節の 4）。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `oauth_apps` | `app_id`、`owner_org_id`、`owner_user_id`、`kind`（`oauth`・`server`）、`status`（`draft`・`private`・`public`）、`redirect_uris`、`scopes`、`client_secret_hash` か `jwks_uri` |
@@ -329,6 +331,6 @@ webhook-id: msg_01J9...    webhook-timestamp: 1790000000    webhook-signature: v
 | Aurora `oauth_grants` | `grant_id`、`app_id`、`user_id?`、`org_id`、`scopes`、`created_at`、`revoked_at` |
 | Aurora `oauth_tokens` | `token_hash`、`kind`（`access`・`refresh`）、`grant_id`、`family_id`、`expires_at`、`revoked_at`、`last4` |
 | Aurora `webhook_endpoints` | `endpoint_id`、`app_id`、`org_id`、`url`、`events`、`secret_ciphertext`（入れ替え中は 2 つ）、`status`（`pending`・`active`・`disabled`）、`validated_at`、`failing_since` |
-| Aurora `webhook_deliveries` | `delivery_id`（`webhook-id`）、`endpoint_id`、`event_id`、`attempt`、`status`、`response_code`、`next_attempt_at`、`created_at`（7 日で消す） |
+| Aurora `webhook_deliveries` | `delivery_id`（`webhook-id`）、`endpoint_id`、`event_id`、`attempt`、`status`、`response_code`、`next_attempt_at`、`created_at`（7 日で消す）。主キーは `(org_id, event_id, endpoint_id)` |
 | Aurora `outbox`（既存） | Webhook のイベントのもと |
 | Valkey `rl:api:{app}:{org}:{category}`・`rl:api:mw:{user}:{day}` | 5.2 節 |

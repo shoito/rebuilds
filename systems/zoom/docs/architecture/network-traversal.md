@@ -369,6 +369,8 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/meeting-runtime.md](data-model/meeting-runtime.md) と [data-model/stores.md](data-model/stores.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Secrets Manager `turn/static-auth-secret` | 今と次の秘密 |

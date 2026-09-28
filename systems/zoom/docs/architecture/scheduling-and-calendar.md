@@ -279,6 +279,8 @@ ADR-0035。
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/scheduling.md](data-model/scheduling.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `meetings`（列の追加） | `type`、`topic`、`start_local`、`timezone`、`duration_min`、`recurrence`（RRULE の文字列）、`expires_at`（時刻の決まっていない会議）、`canceled_at`、`ics_sequence` |

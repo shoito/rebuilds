@@ -246,10 +246,12 @@ ADR-0042。
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/telephony.md](data-model/telephony.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `phone_numbers` | `number`（E.164）、`type`（`050`・`0120`・`0800`）、`carrier`、`scope`（`shared`・`org`）、`org_id?`、`active` |
-| Aurora `phone_calls` | `call_id`、`direction`（`in`・`out`）、`number_id`、`caller_id_hash`、`caller_last4`、`instance_id?`、`participant_id?`、`started_at`、`ended_at`、`end_reason`、`duration_s` |
+| Aurora `phone_numbers` | `number_id`、`e164`、`type`（`050`・`0120`・`0800`）、`carrier`、`scope`（`shared`・`org`）、`org_id?`、`active` |
+| Aurora `phone_calls` | `call_id`、`direction`（`in`・`out`）、`number_id`、`caller_id_hash`、`caller_last4`、`instance_id`、`participant_id?`、`started_at`、`ended_at`、`end_reason`、`duration_s`。会議が分かってから書く（会議が分からないまま切れた呼は書かず、数はメトリクスだけ） |
 | Aurora `dial_out_usage_daily` | `org_id`、`day`、`minutes`、`calls`、`blocked` |
 | Aurora `meeting_removals`（列の追加） | `caller_id_hash` |
 | Aurora `meetings`（列の追加） | `phone_passcode_*`（[meeting-security.md](meeting-security.md) の 14 節と同じ） |

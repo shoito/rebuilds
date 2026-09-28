@@ -409,10 +409,12 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/meeting-runtime.md](data-model/meeting-runtime.md) と [data-model/stores.md](data-model/stores.md) の 4・7 節 にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Meeting Actor の状態（スナップショット） | `video_mode`（`simulcast`・`svc`・`av1-svc`）、`video_mode_locked`（その開催で `svc` に戻さない） |
-| Aurora `meeting_participations`（signaling-and-meetings.md の提案に列を足す。clients の提案と重なる列は 1 つにまとめた。[data-model.md](data-model.md) の 5.3 節） | `video_codec`（送った符号器）。`client_kind`・`browser`・`browser_version` は clients の提案と同じ列 |
+| Aurora `meeting_participations`（signaling-and-meetings.md の提案に列を足す。clients の提案と重なる列は 1 つにまとめた。[data-model/meeting-runtime.md](data-model/meeting-runtime.md)） | `video_codec`（送った符号器）。`client_kind`・`browser`・`browser_version` は clients の提案と同じ列 |
 | 品質の時系列（observability.md で決める置き場所） | 参加者ごと 10 秒ごとの `getStats` の要約：損失、揺らぎ、RTT、受けた層、フリーズ、隠しの率、推定のビットレート。会議の内容は含めない |
 | 設定（フラグ） | `media.red`、`media.av1`、`media.svc` |
 

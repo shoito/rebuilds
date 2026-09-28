@@ -134,6 +134,7 @@ export const settingsRegistry = {
 ```
 
 - `levels` は、その項目を置ける階層。`security: true` の項目は、開催の開始で解決し直す（5.3 節）。
+- 項目の名前はこの表の名前を正とする。他の文書の短い呼び名（`save_chat`、`cloud_recording` など）との対応は [data-model.md](data-model.md) の 7 節にある。
 - 項目を足す・変える PR は、この表と、解決の関数の性質ベーステストを通す。
 
 ### 5.2 解決の規則
@@ -300,6 +301,8 @@ ADR-0040。
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/identity.md](data-model/identity.md) と [data-model/governance.md](data-model/governance.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `organizations` | `org_id`、`name`、`owner_user_id`、`sso_mode`、`domain_capture`、`status`、`deleted_at`、`purge_after` |
@@ -308,9 +311,9 @@ ADR-0040。
 | Aurora `invitations` | `org_id`、`email`、`role`、`token_hash`、`expires_at`、`accepted_at`、`revoked_at` |
 | Aurora `sso_connections` | `org_id`、`protocol`（`oidc`・`saml`）、Better Auth の `sso_providers` の ID、`jit`、`attribute_map`、`cert_expires_at` |
 | Aurora `groups` | `group_id`、`org_id`、`name` |
-| Aurora `org_settings`・`group_settings`・`user_settings` | `(owner_id, key)`、`value`（JSON）、`locked`、`updated_by`、`updated_at` |
+| Aurora `org_settings`・`group_settings`・`user_settings` | `(org_id, key)`・`(org_id, group_id, key)`・`(org_id, user_id, key)`、`value`（JSON）、`locked`（組織とグループだけ）、`updated_by`、`updated_at` |
 | Aurora `meeting_instances`（列の追加） | `effective_settings`（開催の開始で解決した値） |
 | Aurora `usage_daily`・`usage_user_daily` | `org_id`（・`user_id`）、`day`、`meetings`、`meeting_minutes`、`participants`、`participant_minutes` |
 | Aurora `report_exports` | `export_id`、`org_id`、`kind`、`params`、`status`、`s3_key`、`expires_at` |
 | Aurora `admin_audit_events` | 管理の操作（security.md で保持を決める） |
-| Better Auth のテーブル（`identity` の中） | `auth_identities`、`sessions`、`verifications`、`passkeys`、`sso_providers`（Slack の題材と同じ改名） |
+| Better Auth のテーブル（`identity` の中） | `auth_users`（Better Auth の `user`。`users` と同じ ID で 1 対 1。メールアドレスの一意はここで判定する）、`auth_identities`、`sessions`、`verifications`、`passkeys`、`sso_providers`（Slack の題材と同じ改名） |

@@ -169,7 +169,7 @@ Actor                          Recorder Pool（ECS）             Media Node（N
 
 - 名前は、マニフェストの `display_name`（参加した時点のもの）を合成の画面に焼き込む。後から名前を直せないので、利用者向けの説明に書く。
 - 合成の速さの目標：NFR-010（会議の終了から、録画の長さの半分以内に見られる）。1 時間の会議で 30 分。Composer は録画の長さの 2 倍より速く合成する必要がある。1280×720 の合成と H.264 の符号化が、16 vCPU の Fargate で何倍の速さで動くかは**未検証**（E8 の `recording-compose` で計測する。足りなければ区間ごとに並列で合成し、最後につなぐ）。
-- 成果物を書き終えたら、`recordings.status = completed` にし、outbox に `recording.completed` を書く（通知と Webhook）。この時点で「成功を知らせた録画」になる。以後、保持の期間の中で失わない（S3 の耐久性と、バージョニング）。
+- 成果物を書き終えたら、`recordings.status = completed` にし、outbox に `recording.completed` を書く（通知と Webhook）。Composer は `media-prod` にあり Aurora に触れないので、結果を SQS `recording-events` で Worker に渡し、Worker がこの更新を行う（[data-model.md](data-model.md) の 2.1 節）。この時点で「成功を知らせた録画」になる。以後、保持の期間の中で失わない（S3 の耐久性と、バージョニング）。
 - 生の区切り（`raw/`）は、合成の成功から 7 日後に消す。合成をやり直せる余地として残す。
 
 ## 5. ライブ字幕と文字起こし
@@ -455,15 +455,17 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/recording.md](data-model/recording.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `recordings` | `recording_id`、`org_id`、`meeting_id`、`instance_id`、`status`（`recording`・`processing`・`completed`・`failed`・`compose_failed`・`trashed`）、`started_by`、`started_at`、`ended_at`、`duration_ms`、`bytes`、`legal_hold`、`retention_until`、`trashed_at` |
 | Aurora `recording_segments` | `recording_id`、`seq`、`started_at`、`ended_at`、`reason`（`start`・`resume`・`gap`） |
 | Aurora `recording_files` | `recording_id`、`kind`（`speaker_share`・`gallery`・`audio`・`audio_per_participant`・`chat`・`transcript`）、`s3_key`、`bytes`、`sha256`、`participant_id?` |
-| Aurora `recording_shares` | `recording_id`、`scope`（`host`・`org`・`link`）、`token_hash`、`passcode_hash`、`expires_at`、`allow_download`、`created_by` |
+| Aurora `recording_shares` | `recording_id`、`scope`（`org`・`link`。主催者だけの状態は行を作らない）、`token_hash`、`passcode_hmac`、`expires_at`、`allow_download`、`created_by` |
 | Aurora `recording_access_events` | `recording_id`、`viewer_user_id?`、`share_id?`、`at`、`ip_hash` |
 | Aurora `recording_deletions` | `recording_id`、`deleted_by`、`deleted_at`、`reason`、`purged_at` |
 | Aurora `capture_consents` | `instance_id`、`participant_id`、`kind`（`recording`・`transcription`）、`notice_version`、`consented_at` |
 | Aurora `transcripts` | `transcript_id`、`org_id`、`instance_id`、`recording_id?`、`engine`、`engine_version`、`status`、`s3_key` |
-| Aurora `asr_vocabularies` | `org_id`、`terms`（暗号化）、`engine_ref`、`updated_at` |
+| Aurora `asr_vocabularies` | `org_id`、`terms_ciphertext`、`engine_ref`、`updated_at` |
 | S3 `raw/`・`final/`・`transcripts/` | 6.1 節 |

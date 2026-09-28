@@ -98,7 +98,7 @@ Node Agent → Actor Host（通知。Actor Host は会議の持ち主へ回す�
 
 ### 4.3 epoch の検査
 
-- Node Agent は、会議ごとに受けた最大の `epoch` を持つ。それより小さい `epoch` の呼び出しは `409 stale_epoch` で拒否する。大きい `epoch` を受けたら、それを記録して処理する。
+- Node Agent は、会議ごとに受けた最大の `epoch` を持つ。それより小さい `epoch` の呼び出しは `409 stale_epoch` で拒否し、応答に見た最大の `epoch`（`max_epoch`）を入れる（Valkey を失った後の取り直しに使う。[data-model.md](data-model.md) の 11.2 節の 16）。大きい `epoch` を受けたら、それを記録して処理する。
 - `epoch` の表は、会議を閉じるまで持つ。Node Agent が再起動したら表は消えるが、その Node の router も消えているので問題ない。
 
 ## 5. 転送の規則と層の選択
@@ -393,9 +393,11 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model.md](data-model.md) と [data-model/meeting-runtime.md](data-model/meeting-runtime.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Valkey `mnode:{node_id}:load` | Node の最新の負荷の報告（TTL 5 秒） |
-| Valkey `mnode:{node_id}:state` | `active`・`draining`・`dead` |
+| Valkey `mnode:{node_id}:state` | `booting`・`active`・`draining`・`under_attack`・`dead`（[infrastructure.md](infrastructure.md) の 3.5 節と同じ） |
 | Aurora `meeting_media_assignments` | `instance_id`、`media_generation`、`node_id`、`role`（`primary`・`secondary`・`standby`）、`assigned_at`、`released_at`、`reason`（診断と費用の集計に使う） |
 | Media Node のメモリ | 会議ごとの最大の `epoch`、router・transport・producer・consumer の表（再起動で消える） |

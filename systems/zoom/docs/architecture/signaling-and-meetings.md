@@ -177,6 +177,7 @@ ADR-0007。
 `{m}` は Valkey のハッシュタグで、1 つの会議の鍵を同じスロットに置く（1 つの Lua のスクリプトで扱うため）。
 
 - **取る**：Lua のスクリプトで、`lease` がなければ `epoch = INCR epoch` とし、`SET lease {host, epoch} PX 6000` を行い、`epoch` を返す。あれば今の持ち主を返す。
+  - Valkey を失うと `epoch` が 1 から数え直しになる。そこで、取るときに下限（Aurora の `meeting_instances.actor_epoch` と、取得を頼む Gateway が見た最大の `epoch` の大きい方＋ 1）を渡し、`epoch = max(INCR, 下限)` にする。Media Node が `stale_epoch` を返したら、応答の `max_epoch` ＋ 1 を下限にして取り直す（[data-model.md](data-model.md) の 11.2 節の 16）。
 - **更新する**：2 秒ごとに、`lease` の `{host, epoch}` が自分のものなら `PEXPIRE 6000`。違えば、その時点で自分の Actor を止める。
 - **自分で止まる**：最後に更新できた時刻から 4.5 秒たったら、Actor は新しい操作を受けず、Media Node に指示を出さない。TTL（6 秒）との差 1.5 秒は、時計の進みの差と GC の止まりのための余裕である。
 - **返す**：Ending の後、または計画した引き渡し（10.3 節）で、自分の `{host, epoch}` のときだけ `DEL`。
@@ -559,6 +560,8 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) に従う。
 - `host-lost-meeting.md`：主催者不在の会議で、待合室の人が入れないという問い合わせへの対処（主催者の鍵での取り戻し。meeting-security.md）。
 
 ### data-model（索引への追加の提案）
+
+確定した形は [data-model/scheduling.md](data-model/scheduling.md)、[data-model/meeting-runtime.md](data-model/meeting-runtime.md)、[data-model/safety.md](data-model/safety.md)、[data-model/stores.md](data-model/stores.md) にある。
 
 | 置き場所 | 中身 |
 | --- | --- |

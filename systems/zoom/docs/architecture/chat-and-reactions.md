@@ -296,6 +296,8 @@ ADR-0037。
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/meeting-runtime.md](data-model/meeting-runtime.md) の 4 節と [data-model/stores.md](data-model/stores.md) の 2・3 節 にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Valkey `mtg:{m}:chat` | Stream。`chat_seq`、`channel`、`ch_seq`、`from`、`text`（会議の鍵で暗号化）、`file_id`、`sent_at`、`deleted`。TTL は会議の終了から 24 時間 |

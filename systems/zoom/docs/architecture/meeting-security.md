@@ -328,11 +328,13 @@ ADR-0033。
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/safety.md](data-model/safety.md) にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `meetings`（列の追加） | `waiting_room`、`passcode_ciphertext`、`passcode_hmac`、`phone_passcode_ciphertext`、`phone_passcode_hmac`、`join_before_host`、`bypass`（`org`・`domains`・`invitees`）、`show_topic_in_waiting_room` |
 | Aurora `meeting_removals`（列の追加） | `device_key_hash`、`ip_prefix_hash`、`ip_pepper_version`、`expires_at`（最後の開催から 30 日） |
-| Aurora `abuse_reports` | `report_id`、`instance_id`、`reporter`（`user_id` か `device_key_hash`）、`reported`（同）、`category`、`detail`（暗号化）、`attachments`、`ip_ciphertext`、`status`、`action`、`created_at`、`resolved_at` |
+| Aurora `abuse_reports` | `report_id`、`instance_id`、`reporter_user_id` か `reporter_device_key_hash`、`category`、`detail_ciphertext`、`context`、`ip_ciphertext`、`status`、`action`、`created_at`、`resolved_at`。対象は `abuse_report_subjects`、添付は `abuse_report_attachments`（子の表） |
 | Aurora `global_device_bans` | `device_key_hash`、`reason`、`report_id`、`expires_at` |
 | Valkey `rl:{axis}:{value}` | 8.2 節のトークンバケット。`rl:nums:{ip_prefix}` は HyperLogLog |
 | Valkey `sec:{m}:pwfail` | 会議のパスコードの誤りの数（1 時間） |

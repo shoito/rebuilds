@@ -365,9 +365,11 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### data-model（索引への追加の提案）
 
+確定した形は [data-model/meeting-runtime.md](data-model/meeting-runtime.md) と [data-model/governance.md](data-model/governance.md) の 6 節 にある。
+
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `meeting_participations`（signaling-and-meetings.md の提案に列を足す。codecs の提案と 1 つにまとめた。[data-model.md](data-model.md) の 5.3 節） | `client_kind`（`web`・`desktop`・`ios`・`android`・`phone`）、`client_version`、`browser`、`browser_version`、`os` |
+| Aurora `meeting_participations`（signaling-and-meetings.md の提案に列を足す。codecs の提案と 1 つにまとめた。[data-model/meeting-runtime.md](data-model/meeting-runtime.md)） | `client_kind`（`web`・`desktop`・`ios`・`android`・`phone`）、`client_version`、`browser`、`browser_version`、`os` |
 | Aurora `client_releases` | デスクトップ・モバイルの版、配布の状態、最低の版（古すぎる版を止める） |
 | 端末の中（`localStorage`・IndexedDB） | 前回の端末の ID、仮想背景の設定と画像、ショートカットの設定。サーバーには置かない |
 

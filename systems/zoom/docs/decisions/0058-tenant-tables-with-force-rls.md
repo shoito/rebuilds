@@ -30,7 +30,7 @@ intent.md の守るべき振る舞いは「他の組織の会議・録画・文�
   - Meeting Actor は、開催の `org_id` を文脈に設定して書く（会議の状態から分かる）。
   - Worker の組織をまたぐ処理（集計、保持の期限の削除、Webhook の配送）は、組織ごとに文脈を設定して回す。組織をまたいで 1 つのトランザクションで書かない。
   - Trust & Safety と運用者の調べは、`BYPASSRLS` を持つ別のロールで行い、使ったことをプラットフォームの監査に残す（[ADR-0046](0046-audit-logs-and-data-lifecycle.md)、[ADR-0047](0047-keys-and-operator-access-to-media.md)）。
-- **組織に属さない表**（`global` スキーマ）：`organizations`、`org_domains`（ドメインの一意の判定）、Better Auth の表、`oauth_apps`、`oauth_tokens`（ハッシュで引く）、`phone_numbers`、`global_device_bans`、`meeting_number_history`、`meeting_number_index`、`client_releases`、`platform_audit_events`、`outbox`（行ごとに `org_id` を持つが、Worker が組織をまたいで読む）。理由は data-model.md の 3.13 節に書く。
+- **組織に属さない表**（`global` スキーマ）：`organizations`、`org_domains`（ドメインの一意の判定）、Better Auth の表、`oauth_apps`、`oauth_tokens`（ハッシュで引く）、`phone_numbers`、`global_device_bans`、`meeting_number_history`、`meeting_number_index`、`client_releases`、`platform_audit_events`、`outbox`（行ごとに `org_id` を持つが、Worker が組織をまたいで読む）。理由は data-model.md の 2.4 節に書く。
 - API の認可（`authorize`）は RLS の上に重ねる。RLS は「認可の書き忘れ」への守りで、認可の代わりではない。
 - 2 を採らない理由：1 つの問い合わせの `WHERE org_id` の書き忘れが、そのまま組織をまたぐ漏えいになる。他の題材と揃わない。
 - 3 を採らない理由：S1 の組織の数では、スキーマの数とマイグレーションの運用が重い。
@@ -47,6 +47,6 @@ intent.md の守るべき振る舞いは「他の組織の会議・録画・文�
 
 ## Confirmation
 
-- RLS の試験（PR）：文脈なし・別の組織の文脈で、テナントの表の行が読めず書けない。新しい表を足すマイグレーションは、`org_id` と FORCE RLS を持つか、data-model.md の 3.13 節に理由つきで載っていなければ CI で失敗する。
+- RLS の試験（PR）：文脈なし・別の組織の文脈で、テナントの表の行が読めず書けない。新しい表を足すマイグレーションは、`org_id` と FORCE RLS を持つか、data-model.md の 2.4 節に理由つきで載っていなければ CI で失敗する。
 - 組織をまたぐ読み取りの拒否の試験（[security.md](../architecture/security.md) の 10 節）が、API の認可を外した場合でも DB で拒否されることを、試験の用の設定で確かめる。
 - 監査：`BYPASSRLS` のロールの使用が、すべてプラットフォームの監査にある。

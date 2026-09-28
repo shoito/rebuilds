@@ -33,6 +33,7 @@ date: 2026-09-27
 1 と a を採用する。詳細は [signaling-and-meetings.md](../architecture/signaling-and-meetings.md) の 5.3・5.4・10 節。
 
 - リースは `mtg:{m}:lease = {host_id, epoch}`、TTL 6,000ms。取るときに `mtg:{m}:epoch` を `INCR` する（Lua のスクリプトで 1 回に行う）。
+  - > 2026-09-28 の注記：Valkey を失うと `mtg:{m}:epoch` が 1 から数え直しになり、Aurora と Media Node と Gateway が新しい持ち主を拒む。そこで、取るときに下限（Aurora の `meeting_instances.actor_epoch` と、取得を頼む Gateway が見た最大の `epoch` の大きい方＋ 1）を渡し、`epoch = max(INCR, 下限)` にする。Media Node の `409 stale_epoch` は見た最大の `epoch` を返し、Actor はその値＋ 1 を下限にして取り直す（[data-model.md](../architecture/data-model.md) の 11.2 節の 16）。`epoch` が減らないという決定の中身は変えない。
 - 持ち主は 2 秒ごとに更新する。最後に更新できた時から 4.5 秒で、新しい操作の受け付けと外への指示を止める。
 - `epoch` を、Media Node・Signaling Gateway・Aurora の書き込みの 3 か所で検査する。Media Node と Gateway は会議ごとに見た最大の `epoch` を覚え、小さい指示を拒否する。Aurora は `actor_epoch <= :epoch` を条件にした更新にする。
 - 退出させる・ロック・役割の変更・待合室の設定は、Aurora に書けてから `seq` を振って配る。その他（ミュート、挙手など）は Valkey のスナップショット（500ms ごと）だけに置く。
