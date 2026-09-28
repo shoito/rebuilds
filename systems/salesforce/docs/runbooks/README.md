@@ -12,11 +12,11 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 1. SLI と SLO
 
-S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Developer の組織は SLO の外（計測はする）。窓は **28 日の移動の窓**（SLA の報告は暦の月）。
+S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Developer の組織は SLO の外（計測はする）。窓は **30 日の移動の窓**（SLA の報告は暦の月。他の題材と同じ）。
 
 | SLI | 定義 | SLO | 許容範囲を外れたときの扱い | 品質の判定に使う |
 | --- | --- | --- | --- | --- |
-| 対話の可用性 | `runtime` の要求のうち 5xx でない割合（ALB）と、合成監視の成功の割合の低い方 | **99.9%**（NFR-006） | 速い燃え方（1 時間 14 倍）で呼び出し、遅い燃え方（6 時間 6 倍）でチケット。エラーバジェットを使い切ったら修正以外のデプロイとフラグの拡大を止める | |
+| 対話の可用性 | `runtime` の要求のうち 5xx でない割合（ALB）と、合成監視の成功の割合の低い方 | **99.9%**（NFR-006） | 速い燃え方（1 時間 14.4 倍）で呼び出し、遅い燃え方（6 時間 6 倍）でチケット。エラーバジェットを使い切ったら修正以外のデプロイとフラグの拡大を止める | |
 | レコードのページの速さ | `GET /api/v1/ui/records/{id}` の p95・p99 | **300ms・800ms**（NFR-001、K1） | 燃え方で扱う。p95 が 15 分続けて超えたらチケット（`record-page-slow`） | ○ |
 | リストビューの速さ | 最初のページの p95（選択的な条件、100 万件まで） | **500ms**（NFR-001） | 15 分続けて超えたらチケット | |
 | REST の 1 件の読み書き | p95・p99（自動化の時間を除く） | **200ms・500ms**（NFR-002） | 15 分続けて超えたらチケット | |
@@ -42,7 +42,7 @@ S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Dev
 | 監査の鎖 | 毎週の鎖の確かめの食い違い | **0** | 1 件で呼び出し（セキュリティ） | ○ |
 | DR の複製の遅延 | `AuroraGlobalDBRPOLag`（主・`events`・`history`） | **10 秒以内** | 10 秒超が 10 分続けばチケット | |
 
-- 28 日の窓で 99.9% のエラーバジェットは約 40 分。合成監視（東京で 3 回続けて失敗で呼び出し）と燃え方の 2 つで見る（[observability.md](../architecture/observability.md) の 3 節）。
+- 30 日の窓で 99.9% のエラーバジェットは約 43 分（30 日 × 0.1%）。合成監視（東京で 3 回続けて失敗で呼び出し）と燃え方の 2 つで見る（[observability.md](../architecture/observability.md) の 3 節）。
 - 「品質の判定に使う」に○がある指標は、QA が品質の判定基準に使う（[quality.md](../quality.md) の 4.1 節）。定義を変えるときは QA と合意する。
 - 組織ごとの可用性と速さも `org_request_minutes` で記録し、大口の組織のサポートと SLA の報告に使う（SLO にはしない）。
 - 復旧の目標：AZ の障害は RPO 0・RTO 5 分（NFR-007）、リージョンの障害は RPO 1 分・RTO 1 時間（NFR-008）。
@@ -63,7 +63,7 @@ S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Dev
 - **組織を単位に段階で広げる**（[ADR-0063](../decisions/0063-org-staged-release-and-shadow-evaluation.md)）：`internal`（社内の組織と監視の組織）→ `nonprod`（Sandbox・試用・Developer）→ `prod_1` → `prod_10` → `prod_50` → `all`。1 つの段は 24 時間以上、アクセスの判定を変えるものは 72 時間以上。Sandbox は元の本番の組織の段を継ぐが、`nonprod` の段で先に有効になる。組織の移動の間は段を変えない。
 - **アクセスの判定を変える時は、`internal` の前に影の段を置く。** アクセスの判定、問い合わせのコンパイラ、共有の条件の生成、検索・レポートのコンパイルを変える時、本番の要求の標本（組織ごとに 1 分 10 件、全体で 1 秒 100 件まで）を新旧のコンパイラで比べる。影の段は 72 時間以上。食い違いが 1 件でもあれば進めない。`new_correct` の `over`（今の本番が多く見せている）は、[incident-response.md](incident-response.md) の「共有の漏えい」へ進む。
 - **次の段へ進む条件**：その段の組織の SLI の悪化がない、エラーの率が変わらない、`access_oracle_mismatch_total{direction="over"}` が 0、影の実行の食い違いが 0。Ops が確かめて進める（自動で進めない）。
-- **ガード**：段の組織の SLO の燃え方が 1 時間 14 倍を超えたら、フラグを自動で前の段に戻す。
+- **ガード**：段の組織の SLO の燃え方が 1 時間 14.4 倍を超えたら、フラグを自動で前の段に戻す。
 - **デプロイの順**：マイグレーション（expand）→ `worker`・`relay`・`indexer` → `metadata`・`bulk` → `runtime`（blue/green、10% → 50% → 100%）。他は 1 AZ ずつのローリング。prod-egress の `sender` は Elastic IP を変えない（変えるなら `egress-ip-change` の 30 日前の知らせが先）。
 - **メタデータのコンパイル済みの部品・カーソル・監査の `details`・パッケージの形を変える時は、新旧の両方を読めるコードを先に出す**（部品の鍵に形の版を含める）。
 - `security:sensitive` の変更は、作成者と別の 2 人（Dev のテックリードとセキュリティの担当）の承認が要る。ロールバックの PR だけ、2 人目の承認を事後 24 時間以内でよい（[ADR-0062](../decisions/0062-security-sensitive-change-flow.md)）。
@@ -89,7 +89,7 @@ S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Dev
 
 | アラート | 重さ | 手順 | 状態 | Epic |
 | --- | --- | --- | --- | --- |
-| SLO の速い燃え方（1 時間 14 倍）・遅い燃え方（6 時間 6 倍）、合成監視の連続失敗（東京で 3 回） | page・ticket | [incident-response.md](incident-response.md) | 作成済み | E1 `synthetic-monitoring`、E12 `slo-and-alert-tuning` |
+| SLO の速い燃え方（1 時間 14.4 倍）・遅い燃え方（6 時間 6 倍）、合成監視の連続失敗（東京で 3 回） | page・ticket | [incident-response.md](incident-response.md) | 作成済み | E1 `synthetic-monitoring`、E12 `slo-and-alert-tuning` |
 | 大阪からの合成監視の全失敗、AZ・リージョンの障害、`AuroraGlobalDBRPOLag`（10 秒を 10 分）、論理的な破損 | page・ticket | [disaster-recovery.md](disaster-recovery.md) | 作成済み | E1 `osaka-warm-standby-skeleton`、E12 `dr-drills` |
 | デプロイの後の悪化、`runtime` の blue/green の自動のロールバック、フラグのガードの自動の段の戻し、影の実行の食い違い | page・ticket | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | E1 `flags-org-stages`、E4 `shadow-evaluation` |
 | 参照の評価器の食い違い `over`（1 件） | page（セキュリティ） | [incident-response.md](incident-response.md) の「共有の漏えい」、`access-oracle-mismatch.md` | 共通は作成済み。個別は E4 で作成 | E4 `access-oracle-sampling` |
@@ -106,6 +106,7 @@ S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Dev
 | `history` のクラスタの障害 | ticket | `history-cluster-degraded.md`（outbox の滞留と、履歴の画面の 503） | E11 で作成 | E11 `field-history-tracking` |
 | 検索の索引の遅れ（p95 60 秒を 5 分） | ticket | `search-index-lag.md` | E5 で作成 | E5 `search-index-pipeline` |
 | OpenSearch の障害（`degraded` の率 5%） | ticket | `search-degraded.md` | E5 で作成 | E5 `lookup-typeahead-and-degraded` |
+| 検索の下限の時間の超過（`search_floor_exceeded_ratio` 5% を 1 時間。LEAK-012） | ticket | `search-floor-exceeded.md`（下限の見直し、検索の負荷の高い組織の特定） | E5 で作成 | E5 `search-api-post-filter` |
 | マッピングの変更、組織・オブジェクトの作り直し | — | `search-reindex.md` | E5 で作成 | E5 `search-index-pipeline` |
 | 検索の整合の検査の直しの急増 | ticket | `search-drift-high.md` | E5 で作成 | E5 `search-index-pipeline` |
 | reader の遅れ（30 秒・5 分） | ticket・page | `reader-replica-lag.md` | E7 で作成 | E7 `report-sync-async` |

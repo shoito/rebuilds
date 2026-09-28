@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [ADR-0002](0002-custom-object-storage.md) は、ピボットの表を正本（`records`）の写しとし、ずれを検出して作り直す整合の検査を運用するとした。また、大口の組織のよく使うオブジェクトの読みが遅い時に、S2 以降で射影の表（組織・オブジェクトの専用の実テーブル）を検討し、この判断を data-storage の領域の ADR で行うとした。
 
-本家は、よく使う項目を持つ skinny table を、元の表の変更と同期して持つ。200 列までで、他のオブジェクトの項目は持てず、サポートへの依頼で作る（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)、2026-09-28 に確認）。同期の方法（同じトランザクションか）は確かめられなかった（未検証）。
+本家は、よく使う項目を持つ skinny table を、元の表の変更と同期して持つ。200 列までで、他のオブジェクトの項目は持てず、サポートへの依頼で作る（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)、2026-09-28 に確認）。資料は「元の表の変更と同期して持つ」とだけ書き、同じトランザクションかは書いていない。本システムの設計はこれに依らない。
 
 ## Options
 

@@ -13,7 +13,7 @@ intent は、Sandbox（メタデータだけの複製と、データを含む複
 
 [ADR-0005](0005-tenancy-and-governor-limits.md) は、Sandbox を別の `org_id` の組織にし、データの複製は組織をまたぐ管理の処理として Worker が行うとした。[ADR-0006](0006-data-dictionary-and-field-lifecycle.md) は、`field_id` を全組織で一意の UUIDv7 とした。レコードの値（JSONB）は親の ID を持ち、フロー・リストビュー・レポートの定義は `field_id` で項目を指す。
 
-本家の Sandbox は、Developer（200MB、1 日）、Developer Pro（1GB、1 日）、Partial Copy（5GB、標本、オブジェクトごとに 1 万件、5 日）、Full（本番と同じ、29 日）と読める（[Sandbox Licenses and Storage Limits by Type](https://help.salesforce.com/s/articleView?language=en_US&id=sf.data_sandbox_environments.htm&type=5)、ヘルプの要約。本文は未検証。2026-09-28 に確認）。本家の Sandbox のレコードの ID が本番と同じか、マスキングの既定は確かめられなかった（未検証）。
+本家の Sandbox は、Developer（データ 200MB、メタデータだけ、1 日）、Developer Pro（1GB、メタデータだけ、1 日）、Partial Copy（データ 5GB、テンプレートで選んだ標本、5 日）、Full（本番と同じ、全てのデータ、29 日）。エディションごとの数は、Enterprise で Developer 25・Partial Copy 1、Unlimited で Developer 100・Developer Pro 5・Partial Copy 1・Full 1（[Sandbox Licenses and Storage Limits by Type](https://help.salesforce.com/s/articleView?id=platform.data_sandbox_environments.htm&type=5)、2026-09-28 に確認）。Partial Copy のオブジェクトごとの件数の上限（1 万件と広く紹介されている）、Sandbox のレコードの ID が本番と同じか、マスキングの既定は、読めた資料に書かれていない（未検証。E10 の `sandbox-data-copy` で確かめる）。
 
 ## Options
 

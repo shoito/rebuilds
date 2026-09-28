@@ -19,7 +19,7 @@ date: 2026-09-28
 
 - 組織・グループ・利用者の単位の統計を持つ（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)）。
 - 統計の表への事前の問い合わせで索引を使うかを決める。標準の索引は最初の 100 万件の 30%・それ以降の 15%、カスタムの索引は 10%・5% を閾値にする。OR は全ての枝に索引と閾値が要る。空で絞る条件は索引を使わない（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。
-- 閾値の上限（カスタム 333,333 件、標準 100 万件）は、ヘルプの記事の要約でしか読めなかった（未検証）。
+- 閾値の上限は、カスタムの索引で 333,333 件、標準の索引で 100 万件（[Make Salesforce Platform SOQL Query Selective](https://help.salesforce.com/s/articleView?id=000385218&type=1)、2026-09-28 に確認）。LDV の資料は割合（標準 30%・15%、カスタム 10%・5%）だけを書き、上限を書いていない。
 
 ## Options
 

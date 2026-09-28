@@ -13,7 +13,7 @@ NFR-004 は、デプロイを全部か無しかにし、検証の失敗で本番
 
 1 回のデプロイは最大 10,000 部品で（[ADR-0039](0039-metadata-package-format.md)）、型の変換・共有のルール・照合の鍵・積み上げ集計のように、確定の後に時間のかかる仕事を伴うものがある。
 
-本家（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）：`checkOnly` で保存せずに試す。本番へのデプロイは `rollbackOnError = true` が必須で、1 つの失敗で全てを戻す。10 日以内に検証に成功した部品の組は、テストを走らせずにデプロイできる（`deployRecentValidation`）。デプロイを戻す専用の操作は確かめられなかった（未検証）。
+本家（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）：`checkOnly` で保存せずに試す。本番へのデプロイは `rollbackOnError = true` が必須で、1 つの失敗で全てを戻す。10 日以内に検証に成功した部品の組は、テストを走らせずにデプロイできる（`deployRecentValidation`）。デプロイを戻す専用の操作は、[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf) に書かれていない（2026-09-28 に確認）。
 
 ## Options
 

@@ -31,7 +31,10 @@ date: 2026-09-28
 - 組織ごとの使用量（DB の時間、要求の数、429 の数、上限に近いトランザクション、Worker の仕事の時間）は、全件を `org_*_minutes` の表に持ち、7 日で集計の粒度を落とす。メトリクスの `org` のラベルは、1 分ごとに上位 50（DB の時間）を選び、他は `org="_other"` にまとめる。選ばれた組織の ID はハッシュでなく ID のまま（運用者が特定するため）。
 - ログは JSON で、`org_id`・`request_id`・`trace_id`・`user_id` を持つ。問い合わせは AST の形のハッシュ、検索の語はハッシュと長さだけ。レコードの値・項目の値・エラーの文言の値の差し込みを入れない（ログの型で禁止する）。保持は 30 日。
 - トレースは OpenTelemetry で、`org_id` と `shard_no`・`cluster_id` を属性に持つ。標本は 1%、エラーと 1 秒を超える要求は全て残す。
-- 2 は、S3 で系列が数千万になり、AMP の費用と問い合わせの速さが持たない（未検証）。3 は、騒がしい隣人の検知が分の単位で遅れる。
+- SLO の窓は 30 日の移動の窓にする（他の題材と同じ。値と燃え方は [runbooks/README.md](../runbooks/README.md) の 1 節）。
+- 2 は、S3 で系列が数千万になり、AMP の費用と問い合わせが持たない。3,000 万系列を 1 分ごとに送ると月に約 1.3 兆の標本で、東京の取り込みの単価（最初の 20 億まで 1,000 万標本 0.90 USD、次の 2,500 億まで 0.35 USD、その先 0.16 USD）で約 25,600 USD/月になり、S1 の本番の全体の費用（約 44,500 USD/月。[infrastructure.md](../architecture/infrastructure.md) の 9 節）の半分を超える。1 回の問い合わせで読める系列は 1,200 万まで（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonPrometheus/current/ap-northeast-1/index.json)、[AMP の quotas](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP_quotas.html)、2026-09-28 に確認）。3 は、騒がしい隣人の検知が分の単位で遅れる。
+
+> 2026-09-28 の注記：起票の時は SLO の窓を 28 日としていた（observability.md、runbooks）。他の題材に合わせて 30 日の移動の窓に直し、エラーバジェットを約 43 分、速い燃え方を 1 時間 14.4 倍にした。
 
 ## Consequences
 

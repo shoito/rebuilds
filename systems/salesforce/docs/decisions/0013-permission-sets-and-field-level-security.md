@@ -11,8 +11,8 @@ date: 2026-09-28
 
 利用者がオブジェクトと項目に何をできるかは、オブジェクトの権限（参照・作成・編集・削除、「すべて参照」「すべて変更」）と FLS で決まる。本家はこれをプロファイルと権限セットで与える（[Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)、2026-09-28 に確認）。
 
-- 本家は、プロファイルの権限を廃止し権限セットに寄せる計画を出したが、取りやめになったと報じられている（未検証。intent）。
-- 権限を狭める権限セット（muting）もある（本家の細部は未検証）。
+- 本家は、Spring '26 からプロファイルの権限を廃止する計画を出したが、取りやめた。今後もプロファイルの権限は使えるが、既定値（アプリ、レコードタイプ、レイアウト、ログインの時間と IP、パスワードとセッションの方針）はプロファイルに、権限は権限セットに置くことを勧める（[Permissions in Profiles Retirement Cancelled](https://help.salesforce.com/s/articleView?id=003834041&type=1)、2026-09-28 に確認）。
+- 権限を狭める権限セット（muting）もある。権限セットのグループの中で、指定した権限を外す（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の MutingPermissionSet、2026-09-28 に確認）。
 - 読めない項目で絞る・並べる問い合わせを許すと、値を二分探索で推し量れる。
 
 ## Options

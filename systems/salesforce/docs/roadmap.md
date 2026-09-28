@@ -84,8 +84,9 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `profiles-base-permsets` | プロファイル（既定値と基本の権限セット）と、利用者の作成での割り当て |
 | `users-lifecycle` | 利用者の招待・作成・無効化・凍結・匿名化（`username` は全ての組織で一意） |
 | `better-auth-login-mfa` | Better Auth のログイン（パスワード、MFA、パスキー、回復の番号）と `DT-AUTH-001`（[ADR-0044](decisions/0044-authentication-better-auth-sso-and-mfa.md)） |
+| `privileged-passkeys` | 特権を持つ利用者（`modify_all_data`・`manage_users`・`customize_application`）のパスキーの必須（TOTP・回復の番号を断る、特権の付与でセッションを切って登録を求める）、`sso_bypass` の非常用の管理者のハードウェアのキー 2 つ（attestation の確かめ）、`DT-AUTH-001` の行 4・6・8、`PROP-AUTH-003`（ADR-0044 の注記） |
 | `sessions-and-login-restrictions` | セッション（無操作の期限、絶対の期限、一覧と取り消し）、ログインの時間帯と IP |
-| `org-sso-saml-oidc` | SSO（SAML・OIDC）、`federation_id`、JIT、`sso_bypass`（法務：L2） |
+| `org-sso-saml-oidc` | SSO（SAML・OIDC）、`federation_id`、JIT、`sso_bypass`、SSO の MFA の主張の確かめ（`amr`・`AuthnContextClassRef` の接続ごとの受け入れの一覧、既定で有効、理由を記録した時だけの無効化と監査・知らせ、主張がない時の 2 つ目の要素。`DT-AUTH-001` の行 5〜8）（法務：L2） |
 | `oauth-clients-and-tokens` | OAuth のクライアント、認可コード＋PKCE、クライアントクレデンシャル、`token_routes`、画面の API をセッションの Cookie だけにする |
 | `org-my-domain` | 組織のドメインと名前の変更の転送（90 日） |
 | `login-history-ingest` | ログインの履歴（outbox から、`username_hash`、1 秒のまとめ） |
@@ -167,7 +168,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `composite-and-collections` | 複合の要求と collections |
 | `search-analysis-poc` | 日本語の解析の PoC（kuromoji と Sudachi、2-gram）と評価のコーパス、1 文書の大きさと台数の計測（[ADR-0031](decisions/0031-search-index-and-japanese-analysis.md)） |
 | `search-index-pipeline` | outbox から indexer（SQS、まとめ、外部の版）、索引の形、作り直しと整合の検査 |
-| `search-api-post-filter` | 検索の API と後の確かめ、`more_may_exist`、強調、全体とオブジェクトの中の検索の画面（[ADR-0032](decisions/0032-search-permission-post-filter.md)） |
+| `search-api-post-filter` | 検索の API と後の確かめ（固定の候補の束、束の全ての確かめ、1 ページの下限の時間。LEAK-012）、`more_may_exist`、強調、全体とオブジェクトの中の検索の画面、`search_floor_exceeded_ratio` と下限の値の決め直し（[ADR-0032](decisions/0032-search-permission-post-filter.md)） |
 | `lookup-typeahead-and-degraded` | 参照の項目の候補（名前のピボットの前方一致＋OpenSearch）と、障害の時の `degraded` |
 | `email-sending` | 1 通ずつのメールの送信、`email_opt_out`、SES と送信のドメインの確認、bounce と苦情（法務：L4） |
 | `email-bcc-logging` | メールの記録（BCC の受信、差出人の検査、照合、未処理のメール）（法務：L1・L4） |

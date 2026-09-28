@@ -17,8 +17,8 @@ date: 2026-09-28
 本家（2026-09-28 に確認）：
 
 - 変換は取引先・取引先責任者・任意で商談を作る。変換済みの状態は、状態の値を書き換えるだけでは作れない。キューが所有するリードは所有者の指定が要る。変換したリードは、専用の権限を持つ人だけが更新できる（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、[Object Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/object_reference.pdf)、Winter '27 版）。
-- 既存の取引先・取引先責任者には空の項目だけを入れる（ヘルプの要約。本文は未検証）。
-- 活動は、リード 1 件か取引先責任者 50 件までに関連付けられ、自分の共有の表を持たない（Object Reference、[Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)）。活動を見られる人の細部は未検証。
+- 既存の取引先・取引先責任者には空の項目だけを入れ、既存の値を上書きしない。リードの活動は、できた取引先・取引先責任者・商談に付く（[What happens when I convert leads?](https://help.salesforce.com/s/articleView?id=sales.faq_leads_what_happens_when.htm&type=5)、2026-09-28 に確認）。
+- 活動は、リード 1 件か取引先責任者 50 件までに関連付けられ、自分の共有の表を持たない（Object Reference、[Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)）。活動の OWD の既定は非公開（[Default Organization-Wide Access Levels](https://help.salesforce.com/s/articleView?id=platform.security_sharing_owd_default_settings.htm&type=5)、2026-09-28 に確認）。割り当てられた人と関連先のどちらで見え方が決まるかの細部は、公開の資料に書かれていない（未検証。E4 の `activity-sharing` で試用の組織で確かめる）。
 
 ## Options
 
@@ -57,7 +57,7 @@ date: 2026-09-28
   - 共有の領域の DT-SHR-001 の行 3 に、活動の割り当ての行を足す必要がある。
     > 2026-09-28 の注記：統合の工程で足した。DT-SHR-001 の行 3 が「活動の割り当て（本人と上司は `full`）」になり、起票の時の行 3（`controlled_by_parent`）は行 4 に繰り下がった。
   - 多態の主の親の条件は、親のオブジェクトの種類ごとの `OR` になり、問い合わせが重くなる。E4 の PoC で測る。
-  - 本家の活動の共有の規則が未検証で、本家から移る組織で見え方が違いうる。
+  - 本家の活動の共有の規則の細部が未検証（E4 の `activity-sharing` で確かめる）で、本家から移る組織で見え方が違いうる。
   - FLS で写さない項目は黙って落ちるので、管理者が気づきにくい。応答と変換の記録に名前を残す。
 
 ## Confirmation

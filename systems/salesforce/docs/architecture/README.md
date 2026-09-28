@@ -75,7 +75,7 @@
 | S2 | 5 万（1 万） | 50 万 | 50 億 | 利用者 3 万、レコード 5 億 | 2 万件/秒 | 論理シャードを複数の Aurora のクラスタに割り当てる。Sandbox と試用の組織を本番とは別のクラスタへ。レポートを分析用の写しへ |
 | S3 | 50 万（10 万） | 500 万 | 500 億 | 利用者 10 万、レコード 50 億 | 20 万件/秒 | セル構成。組織をセルに固定し、セルの間で組織を動かせる。大口の組織に専用のセル。東京・大阪の両方で受ける |
 
-- 数値は本システムの想定。本家の実数は、公開の資料で確かめられなかった（未検証）。本家は、大きな組織の例として「取引先 1,000 万件、利用者 7,000 人、ロール 2,000、テリトリー 1,000」を挙げている（[Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)、2026-09-28 に確認）。
+- 数値は本システムの想定。本家の実数は公開されていない。本家は、大きな組織の例として「取引先 1,000 万件、利用者 7,000 人、ロール 2,000、テリトリー 1,000」を挙げている（[Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)、2026-09-28 に確認）。
 - 1 件の対話の要求は、平均で問い合わせを 3〜5 回行う想定。
 - 共有の表の行は、非公開の OWD のオブジェクトで、レコードあたり平均 3 行を想定する（所有者は表に持たない。[ADR-0004](../decisions/0004-record-access-model.md)）。
 - 段階を上げる判断の基準は、[infrastructure.md](infrastructure.md) の 5 節（[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md)）。部品ごとの量と台数の根拠は [capacity.md](capacity.md)。
@@ -89,7 +89,7 @@
 | NFR-003 | 公平（ガバナ制限） | 1 トランザクションの上限を 100% 強制する。上限まで負荷をかけた組織があっても、他の組織の p95 の悪化が 10% 以内 | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
 | NFR-004 | メタデータのデプロイの安全 | デプロイは全部か無しか。検証の失敗で本番が変わる件数 0 件。デプロイの確定の間の、データの書き込みの止まりが p99 1 秒以内。直前の版へ戻すデプロイが 5 分以内に終わる | [ADR-0003](../decisions/0003-metadata-driven-runtime.md) |
 | NFR-005 | 共有の再計算 | レコードの保存に伴う共有の変更は、同じトランザクションで反映する。**OWD・`grant_via_hierarchy`・所有者の条件の共有ルールの変更は、述語の切り替え（メタデータの版）だけで、行を書き直さない。反映は K2 と同じ p95 5 秒**。**レコードの条件の共有ルールの追加・変更の再計算は、100 万件・1,000 人の組織で 15 分以内**。ロールの木の移動（閉包の新しい世代）は同じ組織で 5 分以内。再計算の間も、古い構成で判定し続ける | [ADR-0014](../decisions/0014-owd-roles-groups-and-closure.md)、[ADR-0016](../decisions/0016-recalculation-rule-versions-and-skew.md)。2026-09-28 に改めた（下の注記） |
-| NFR-006 | 可用性 | 対話の経路（Runtime）の月間 99.9%（本番の組織）。S2 で 99.95% | 本家の標準の SLA は、公開の資料で確かめられなかった（未検証）。Sandbox は対象外 |
+| NFR-006 | 可用性 | 対話の経路（Runtime）の月間 99.9%（本番の組織）。S2 で 99.95% | 本家の標準の SLA は公開の資料に見当たらない。本システムの値は本家に依らない。Sandbox は対象外 |
 | NFR-007 | 耐久性と AZ の障害 | 成功を返したレコードとメタデータの変更を失わない。RPO 0、RTO 5 分以内 | |
 | NFR-008 | リージョンの障害 | RPO 1 分以内、RTO 1 時間以内 | 大阪へ切り替える |
 | NFR-009 | テナントの分離 | 他の組織のデータ・メタデータが見える事象 0 件。Sandbox から本番の組織のデータが見える事象 0 件 | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
@@ -148,13 +148,13 @@
 | [0023](../decisions/0023-layouts-and-record-page-composition.md) | レイアウトを部品にコンパイルし、レコードのページを 1 回の要求で組み立てる。レイアウトは狭めるだけで、画面の保存にだけ効く |
 | [0024](../decisions/0024-list-views-as-filter-ast.md) | リストビューを条件の AST で保存し、見る人の権限で毎回コンパイルする。共有は定義だけで、読めない項目を条件に持つビューは開けない |
 | [0025](../decisions/0025-flow-definition-and-bulk-engine.md) | フローは版を持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える |
-| [0026](../decisions/0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを DML の手順 3・7・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす |
+| [0026](../decisions/0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを DML の手順 3a・7b・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす |
 | [0027](../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md) | 積み上げ集計は子の変更から差分で直し、最小・最大が外れた時だけ集計し直す。整合の検査で差を 0 に保ち、集計する子の項目も読める人にだけ返す |
 | [0028](../decisions/0028-approval-processes-and-record-locks.md) | 承認はプロセスの版・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない |
 | [0029](../decisions/0029-report-execution-on-reader-per-viewer.md) | レポートは見る人の権限で毎回コンパイルし、結ぶ全てのオブジェクトに共有の条件と FLS をかけて reader で集計する。見る人をまたぐ事前の集計を持たない |
 | [0030](../decisions/0030-dashboards-viewer-intersection-and-subscriptions.md) | ダッシュボードは見る人の権限で集計し、部下の視点は部下と見る人の権限の共通部分にする。指定した実行ユーザーの形は持たず、定期の配信は受け取る人ごとに実行する |
 | [0031](../decisions/0031-search-index-and-japanese-analysis.md) | 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部の版にして作る |
-| [0032](../decisions/0032-search-permission-post-filter.md) | 検索の結果は候補とし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。件数の合計を返さない |
+| [0032](../decisions/0032-search-permission-post-filter.md) | 検索の結果は候補とし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。件数の合計を返さず、応答の時間を固定の束と下限の時間でそろえる |
 | [0033](../decisions/0033-change-event-log-and-replay.md) | 変更のイベントは outbox からイベントの専用の Aurora に書き、論理シャードの唯一の書き手が確定の順の replay_id を付けて 3 日保つ |
 | [0034](../decisions/0034-event-subscription-access-and-org-events.md) | 変更のイベントの購読はオブジェクトの view_all を要し、共有で絞らず FLS を配信の時にかける。組織が定義するイベントは型の権限で守り、既定で確定の後に発行する |
 | [0035](../decisions/0035-webhooks-outbound-calls-and-ssrf-guard.md) | Webhook はイベントのログの上の宛先ごとのカーソルで送って <Brand>-Signature で署名し、外向きの呼び出しは登録した宛先だけにし、どちらも宛先を検査して内部に経路のない送信の網から送る |
@@ -166,12 +166,12 @@
 | [0041](../decisions/0041-limits-registry-and-counting-rules.md) | 上限の正本を 1 つの登録簿にし、フローは足並みの 1 歩で、積み上げ集計の集計し直しは取得の行の外で数え、レポート・一括の問い合わせ・検索は別の予算で抑える |
 | [0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md) | 割り当ては 24 時間の移動の窓で数えて有料の本番だけ 110% まで通し、Worker は組織の仮想時刻で公平に回し、上限の情報は見出しと /limits で返す |
 | [0043](../decisions/0043-orgs-editions-licenses-and-users.md) | 組織は種類と状態を持って 30 日の猶予の後に消し、エディションは割り当てと機能だけを変え、ライセンスを権限の上限にし、利用者は消さずに無効にする |
-| [0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) | ログインは自前でホストする Better Auth にし、組織ごとの SAML・OIDC の SSO を持ち、Auth0 の題材を IdP にしない。SSO 以外は MFA を必須にし、画面の API はセッションの Cookie だけで通す |
+| [0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) | ログインは自前でホストする Better Auth にし、組織ごとの SAML・OIDC の SSO を持ち、Auth0 の題材を IdP にしない。SSO を含む全てのログインで MFA を確かめ、特権を持つ利用者はパスキーだけにし、画面の API はセッションの Cookie だけで通す |
 | [0045](../decisions/0045-system-permissions-and-delegation.md) | システムの権限を 25 にして依存を決め、権限を渡す人は自分の権限の部分集合しか渡せず、自分より強い利用者を操作できず、最後の管理者を無くせない |
 | [0046](../decisions/0046-setup-audit-trail-and-login-history.md) | 監査のイベントは変更と同じトランザクションで追記だけの表に書き、組織ごとのハッシュの鎖と毎日の Object Lock の錨で改ざんを見つける。画面は 180 日、ログインの履歴は 180 日 |
 | [0047](../decisions/0047-field-history-tracking-and-retention.md) | 項目の変更の履歴は 1 オブジェクト 20 項目まで、最上位の最後の値との差を同じトランザクションの outbox に書き、別のクラスタの月ごとの分割に写して 18 か月保ち、読みは見る人の共有と FLS で絞る |
 | [0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md) | 利用者のコードは QuickJS-ng を WASM にしたものを、Runtime の隣の別のプロセスの Wasmtime で燃料とメモリーの上限を付けて動かす |
-| [0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3・7・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす |
+| [0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3b・7a・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす |
 | [0050](../decisions/0050-packages-namespaces-and-code-isolation.md) | パッケージは名前空間の接頭辞と署名を持つメタデータの束にし、上限は組織と共有して名前空間ごとに計測する。コードの秘密は宛先の登録だけで渡す |
 | [0051](../decisions/0051-leak-path-register-and-threat-model.md) | 組織をまたぐ漏えいと、見えないデータの漏えいの経路を 1 つの登録簿にし、経路ごとに否定側のテストと本番の検査を必須にする |
 | [0052](../decisions/0052-key-hierarchy-and-per-org-data-keys.md) | KMS の鍵はセルと用途ごとに持ち、組織ごとのデータキーで S3 の組織のファイルとアプリの秘密を暗号化する。レコードは DB の保存時の暗号化だけにし、組織の削除は鍵の破棄で仕上げる |
@@ -218,12 +218,12 @@
   - ADR-0005 のハッシュでのシャードの決め方は ADR-0010・ADR-0055 で細かくし、上限の表に ADR-0041 の外向きの呼び出し・メール（と E13 の `tx.code_*`）を足した。
   - ADR-0002 の JSONB のキーは `field_no`（ADR-0006）。システムの列に `parent_id` を足した。
   - ADR-0018 の「集計した行を取得の行に数える」の例外（積み上げ集計、レポート、一括の問い合わせ）は ADR-0041。
-  - ADR-0026・ADR-0049 の手順は 3a・3b・7a・7b（ADR-0008 の注記）。ADR-0021 の活動の割り当ての行は DT-SHR-001 の行 3 に足した。
+  - ADR-0026・ADR-0049 の手順は 3a・3b・7a・7b（ADR-0008 の注記）。題名も 3a・7b・13（ADR-0026）と 3b・7a・13（ADR-0049）に直した。ADR-0021 の活動の割り当ての行は DT-SHR-001 の行 3 に足した。
   - ADR-0010 の分割の数は、分割する表が 13 に増えて約 3,300 になった。
 - **`field_id` の一意の範囲**：「全組織で一意」（ADR-0006）と、Sandbox が元の組織の ID を共有すること（ADR-0038）の食い違いを、**組織の系統（本番の組織と、その Sandbox）の中で一意**に揃えた（ADR-0006 の注記、[metadata-and-runtime.md](metadata-and-runtime.md) の 3.2 節）。
 - **DML の手順**：3・7 を 3a（保存の前のフロー）・3b（before トリガー）・7a（after トリガー）・7b（保存の後のフロー）に分け、手順 9（項目の変更の履歴）を手順 10・11 と同じく最上位で 1 回にした（ADR-0008 の注記、[metadata-and-runtime.md](metadata-and-runtime.md) の 6 節）。
 - **項目の変更の履歴の置き場所**：18 か月で約 3.5TB になり主のクラスタを圧迫するので、**S1 から `events` と同じ形の別のクラスタ `history` に置く**。手順 9 は同じトランザクションの outbox に書き、Relay が写す。`opportunity_history` は主に残す（ADR-0047・ADR-0060 の注記、[audit-and-field-history.md](audit-and-field-history.md) の 5.2 節、[capacity.md](capacity.md) の 3 節、[infrastructure.md](infrastructure.md) の 4.3 節）。
-- **OpenSearch の台数**：3 台（`r7g.xlarge`）ではメモリーとディスクが足りないので、`r7g.2xlarge.search` × 6（3 AZ に 2 つ）で見積もった（[capacity.md](capacity.md) の 7.1 節）。本番の費用の概算は約 40,000 から約 44,000 USD/月に直した（[infrastructure.md](infrastructure.md) の 9 節）。
+- **OpenSearch の台数**：3 台（`r7g.xlarge`）ではメモリーとディスクが足りないので、`r7g.2xlarge.search` × 6（3 AZ に 2 つ）で見積もった（[capacity.md](capacity.md) の 7.1 節）。本番の費用の概算は約 40,000 から約 44,000 USD/月に直し、単価を確かめた後に約 44,500 USD/月にした（[infrastructure.md](infrastructure.md) の 9 節）。
 - **NFR-005・K6**：OWD の変更は述語の切り替え（再計算なし）。目標をレコードの条件の共有ルールの再計算（15 分）と閉包の世代（5 分）に当て直した（3 節の注記）。
 - **ダッシュボード**：見る人の権限だけで集計し、本家の「指定した実行ユーザー」は持たない（ADR-0030）。PM の確認済みの決定として intent に記録した。
 - **送信の網**：ADR-0035 の「送信の VPC」を、本番と別の prod-egress のアカウントの VPC と SQS の受け渡しに読み替えた（ADR-0035 の注記、ADR-0054）。
@@ -237,6 +237,14 @@
 - **`records.parent_id`**：主従の 1 本目の親に加え、活動の主の親を指す（[data-storage.md](data-storage.md) の 3.1 節）。
 - **data-model**：索引だけに保ち、`shard_no` で分割する表は 13、`org_id` を持ち RLS をかける表は約 145 と数え直した（[data-model.md](data-model.md) の 5・8 節）。
 - **数値の正本**：上限と割り当ては [governor-limits.md](governor-limits.md)。保持と消去は [security.md](security.md) の 7 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md)。漏えいの経路は [security.md](security.md) の 4 節。量と台数は [capacity.md](capacity.md)。
+- **検証の工程（2026-09-28）**：「未検証」の本家の振る舞いと AWS・部品の事実を、本家の PDF・ヘルプの本文、AWS の資料と Price List API、Wasmtime・QuickJS-ng・Better Auth の資料で確かめ、出典と確認日を付けた。確かめられないもの（試用の組織か PoC が要るもの）は「未検証」のまま、確かめる Story を添えた。設計を変えた・注記したものは次のとおり。
+  - SLO の窓を 28 日から他の題材と同じ 30 日の移動の窓に直し、エラーバジェットを約 43 分、速い燃え方を 1 時間 14.4 倍にした（[runbooks/README.md](../runbooks/README.md) の 1 節、[ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md) の注記）。
+  - LEAK-012（検索の応答の時間から見えない一致を推し量れる）の既定の対策：1 ページごとに固定の候補の束（3,000）を取り、束の全てを後で確かめ、下限の時間（600ms）まで待って返す。`more_may_exist` を見えない候補で変えない。残るリスク（下限を超えた要求、繰り返しの平均の比べ）は [search.md](search.md) の 6.4 節（[ADR-0032](../decisions/0032-search-permission-post-filter.md) の注記）。
+  - 本家の Apex は API の版 67.0 から既定で利用者の権限で動く。本システムの既定と同じ向きになった（ADR-0049 の注記。決定は変えない）。
+  - 本家はフローの要素の数の上限（2,000）をなくしていた。本システムは CPU 時間の近似が粗いので残し、差として移行の文書に書く（[ADR-0025](../decisions/0025-flow-definition-and-bulk-engine.md) の注記）。
+  - **SSO の MFA と特権を持つ利用者のパスキー**（利用者の指示による推奨の既定案。本家の 2026 年の方針に揃えた）：SSO でも IdP の `amr`（OIDC）・`AuthnContextClassRef`（SAML）を接続ごとの受け入れの一覧と比べ、確かめは既定で有効、組織の管理者は理由を記録した時だけ無効にでき監査に残る。主張がない・一覧にない時は SSO の後に本システムの 2 つ目の要素を求める。特権を持つ利用者（`modify_all_data`・`manage_users`・`customize_application` のどれか）はパスキーだけで TOTP を許さず、`sso_bypass` の非常用の管理者は 1 人あたりハードウェアのキーを 2 つ持つ（[ADR-0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) の注記、[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6.3・6.4・14 節）。
+  - Aurora・OpenSearch の仮に置いていた単価を Price List API で確かめ、保存を東京と大阪の 2 つ分で数え直して、本番の費用を約 44,500 USD/月にした（[infrastructure.md](infrastructure.md) の 9 節）。
+  - 項目の変更の履歴で `long_text` を選べる型に戻し、「変わった」だけを記録する形に揃えた（ADR-0047 と [audit-and-field-history.md](audit-and-field-history.md) の食い違いを直した）。
 - 各領域の「他の領域への依頼」は、この工程で持ち主の文書へ反映した（一覧は [data-model.md](data-model.md) の 3 節と、各文書の「2026-09-28」の書き込み）。領域ごとの決定は、各文書の「決定」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -250,9 +258,11 @@
 | 日本語の解析器（kuromoji か Sudachi）、OpenSearch の 1 文書の大きさと台数 | PoC | E5 の着手前の PoC（[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)、[capacity.md](capacity.md) の 7.1 節） |
 | `history` のクラスタの Aurora の種類（Standard か I/O-Optimized）と台数 | 計測 | E11 で I/O を測る |
 | 利用者のコードの燃料と CPU 時間の換算の係数、実体化の時間 | PoC | E13 の前の PoC（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)） |
+| IdP ごとの `amr`・`AuthnContextClassRef` の受け入れの一覧の既定値（特に、フィッシングに強いとみなす SAML のクラス） | 選定 | E2 の `org-sso-saml-oidc` で主な IdP の返す値を確かめて決める（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6.4 節） |
+| 検索の 1 ページの下限の時間（600ms）と固定の候補の束（3,000）の値 | 計測 | E5 の `search-api-post-filter` で、固定の束の後の確かめの p95 を測って決め直す（[search.md](search.md) の 6.4 節） |
 | 分析用の写し（レポート）の置き場所 | PoC | S2 の前に別の ADR |
 | S3 の最大の組織（50 億件）の置き方と共有の再計算 | 設計 | S3 の前に別の ADR（ADR-0005 の持ち越し） |
-| 本家の振る舞いで未確認のもの（項目の数の上限、Sandbox の種類と容量、フローの再帰の回数、承認者のアクセス、活動の見え方、レポートの集計が見えない行を数えないか） | 確かめるだけ | 各領域の文書の「未解決の問い」に書いた Epic で、本家の資料か試用の組織で確かめる |
+| 本家の振る舞いで未確認のもの（フローの再帰の回数、承認者のアクセスとロックを越える自動化、活動の見え方、レポートの集計が見えない行を数えないか、数式・積み上げ集計の FLS、レイアウトの必須が API に効くか、リストビューの上限、Partial Copy の件数） | 確かめるだけ | 2026-09-28 に公開の資料で確かめられるものは確かめた（項目の数、Sandbox の種類と容量、承認の数、入力規則の数など）。残りは各文書の「未検証」に添えた Story で、試用の組織で確かめる |
 
 ## 7. 領域の文書
 

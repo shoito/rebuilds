@@ -11,7 +11,7 @@ date: 2026-09-28
 
 ダッシュボードは、複数のレポートの集計をグラフで並べる。営業の管理職は、自分のチームの数字と、部下 1 人ずつの数字を見る。定期の配信は、レポートの結果をメールで決まった時刻に届ける。
 
-本家（2026-09-28 に確認）：ダッシュボードの見え方は 3 つある。指定した実行ユーザー（全員がその人の権限で見る）、ログインしている利用者（動的なダッシュボード）、自分のチームの利用者（上司が部下の視点で見る）（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Dashboard）。組織で 1 時間にダッシュボードの更新 200、結果の取得 5,000。1 人が購読できるレポートは 5（[Reports and Dashboards REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_analytics_rest_api.pdf)）。動的なダッシュボードの数はエディションで 3〜10 に限られる（ヘルプの要約。未検証）。他の人を実行ユーザーにするには「すべてのデータの参照」が要る（ヘルプの要約。未検証）。
+本家（2026-09-28 に確認）：ダッシュボードの見え方は 3 つある。指定した実行ユーザー（全員がその人の権限で見る）、ログインしている利用者（動的なダッシュボード）、自分のチームの利用者（上司が部下の視点で見る）（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Dashboard）。組織で 1 時間にダッシュボードの更新 200、結果の取得 5,000。1 人が購読できるレポートは 5（[Reports and Dashboards REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_analytics_rest_api.pdf)）。動的なダッシュボードは Enterprise 5、Unlimited・Performance 10、Developer 3 まで。動的なダッシュボードは定期の更新と購読ができない（[Dynamic Dashboards](https://help.salesforce.com/s/articleView?id=analytics.dashboards_dynamic_overview.htm&type=5)、2026-09-28 に確認）。他の人を実行ユーザーにするには「自分のチームのダッシュボードの参照」か「すべてのデータの参照」が要る（[Configure Dashboard Data Visibility in Salesforce Classic](https://help.salesforce.com/s/articleView?id=analytics.dashboards_select_running_user.htm&type=5)、2026-09-28 に確認）。
 
 intent は「利用者が見られないレコードは、レポートの集計に現れない」とする。指定した実行ユーザーの形では、見る人が見られない行が、実行ユーザーの権限で集計に入る。
 

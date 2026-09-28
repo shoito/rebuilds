@@ -23,14 +23,14 @@
 | --- | --- | --- |
 | 1 トランザクションの上限 | 同期で問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10,000ms、ヒープ 10MB（非同期は問い合わせ 200、CPU 60,000ms、ヒープ 25MB）。超えると捕まえられない例外で巻き戻る | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) に写した [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版） |
 | API の割り当て | Enterprise は 24 時間で 100,000＋ライセンスの数 × 1,000。Unlimited は 1 ライセンス 5,000。Full の Sandbox は 5,000,000。組織の全体で数え、利用者ごとではない | [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（以下「Limits」。2026-09-11 更新版） |
-| 割り当ての超過 | 有料で有効な組織は、急な増加に備えて一定の量だけ超えて動く。超えられる量には上限（hard cap）がある。試用・Developer・Sandbox には効かない。超えられる量は公開されていない（未検証） | Limits |
+| 割り当ての超過 | 有料で有効な組織は、急な増加に備えて一定の量だけ超えて動く。超えられる量には上限（hard cap）がある。試用・Developer・Sandbox には効かない。超えられる量は資料に書かれていない | Limits |
 | 割り当ての見え方 | REST の応答の `Sforce-Limit-Info`、`/limits`、Setup の画面。使用量が割合を超えたらメールで知らせる設定がある | Limits |
 | 要求の大きさ | URI と見出しの合計 16,384 バイト。超えると 414・431 | Limits |
 | 一括の割り当て | 24 時間で 15,000 の batch（Bulk API と共有）、取り込み 1 億 5,000 万行、問い合わせのジョブ 10,000、問い合わせの結果 1TB。結果は 7 日。1 つのジョブの CSV は 150MB（base64 の前の目安 100MB） | Limits |
 | 長い要求 | 20 秒以上の要求の同時実行は本番で 25 | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)、Limits |
 | イベントの割り当て | 発行は 1 時間 250,000（Enterprise・Unlimited）、配信は 24 時間 50,000（Unlimited）・25,000（Enterprise）。配信は変更のイベントと共有。移動の窓で数える | [Platform Events Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/platform_events.pdf)（Winter '27 版） |
-| フローの要素の数え方 | 確かめられなかった（未検証） | — |
-| 積み上げ集計の読みの数え方 | 確かめられなかった（未検証） | — |
+| フローの要素の数 | 1 トランザクションの要素の数の上限（2,000）は API の版 57.0 でなくした。フローは Apex の上限に従う | [Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)（2026-09-28 に確認） |
+| 集計の読みの数え方 | `COUNT()` 以外の集計の関数は、集計に使った行を全て取得の行に数える。`COUNT()` は 1 行（`GROUP BY` があればグループごとに 1 行）。積み上げ集計の計算し直しの読みの数え方は資料に書かれていない（未検証。E6 の `flow-limit-counting` で試用の組織で確かめる） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版、2026-09-28 に確認） |
 
 ## 3. 上限の登録簿（ADR-0041）
 
@@ -87,20 +87,20 @@
 | `tx.outbound_calls` | 外向きの呼び出し（`call_webhook`） | 100 | 100 | outbox への依頼 1 件を 1。新しい上限（ADR-0041） |
 | `tx.emails` | メールの送信（`send_email`、1 通ずつの送信） | 10 | 10 | 送信の依頼 1 回を 1。1 回の宛先は 100 まで。新しい上限（ADR-0041） |
 | `tx.duration` | トランザクションの時間 | 2 分 | 10 分 | 開始から確定まで |
-| `tx.code_fuel` | 利用者のコードの燃料（E13） | 50 億 | 300 億 | Wasmtime の燃料。トランザクションの全ての呼び出しの合計。値は E13 の PoC で `tx.cpu_ms` の 10 秒・60 秒に見合うよう決める（未検証） |
+| `tx.code_fuel` | 利用者のコードの燃料（E13） | 50 億 | 300 億 | Wasmtime の燃料。トランザクションの全ての呼び出しの合計。値は E13 の `code-engine-poc` で `tx.cpu_ms` の 10 秒・60 秒に見合うよう決める（今の値は仮。未検証） |
 | `tx.code_memory` | 1 回の呼び出しの線形メモリー（E13） | 64MB | 128MB | 実体化の時に確保する大きさ |
 | `tx.code_invocations` | 砂場の呼び出しの数（E13） | 200 | 400 | 1 塊・1 トリガーを 1 |
 
 - 「同期」は画面と REST の要求。「非同期」は Worker のトランザクション（一括の取り込みの 1 つのトランザクション、予定の経路、非同期の経路、スケジュールのフロー、承認の通知の後の処理）。
 - `tx.code_*` は extensibility の領域の依頼（[extensibility.md](extensibility.md) の 7 節、[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）で足した。燃料・メモリーを超えたら全体を巻き戻し、利用者のコードの `try`・`catch` でも捕まえられない（Wasmtime のトラップはホストで扱う）。トリガーの中のホストの API の問い合わせ・DML は、通常の `tx.queries`・`tx.dml` などに数える。
 - 数えないもの：メタデータの読み、共有の評価（手順 10）の中の読み書き、承認のロックの表の読み、outbox の書き込み、項目の変更の履歴の書き込み（手順 9）、監査のログ。これらはシステムの仕事で、利用者の設定で量が決まらないか、別の上限で抑えているため。
-- `tx.outbound_calls` と `tx.emails` は ADR-0005 の表になかった。フローの `call_webhook`・`send_email`（[automation-flows.md](automation-flows.md) の 3.2 節）が 1 回の保存で無制限に送信を依頼できないようにする。本家の似た上限（1 トランザクションの callout 100、メールの送信の呼び出し 10）は、Apex の開発者ガイドの要約でしか確かめていない（未検証）。
+- `tx.outbound_calls` と `tx.emails` は ADR-0005 の表になかった。フローの `call_webhook`・`send_email`（[automation-flows.md](automation-flows.md) の 3.2 節）が 1 回の保存で無制限に送信を依頼できないようにする。本家の似た上限は、1 トランザクションの外への呼び出し 100（合計の待ち 120 秒）、`sendEmail` の呼び出し 10（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版の「Per-Transaction Apex Limits」、2026-09-28 に確認）。
 
 ### 4.2 フローの要素の実行：足並みの 1 歩で数える
 
 - [automation-flows.md](automation-flows.md) の 4.2 節の依頼を受け、**足並みの 1 歩を 1 と数える**ことを正式に決める（ADR-0041）。200 の実行が同じ `assignment` を通っても 1。`loop` は、繰り返しの 1 歩を 1 と数え、実行ごとに繰り返しの数が違えば最も多い実行の数を採る。
 - 理由：実行（インタビュー）ごとに数えると、200 件の塊で 10 要素のフローが 2,000 に達し、一括の取り込みが動かない。同じフローが 1 件では通り、200 件では落ちる。足並みの 1 歩なら、数がフローの形だけで決まり、上限の試験が再現できる。
-- この数え方は本家と違いうる（本家の数え方は未検証）。移行の文書に書く。
+- この数え方は本家と違う（本家はフローの要素の数に上限を持たない。積み上げ集計の読みの数え方は未検証。2 節）。移行の文書に書く。
 - 代わりに、1 つの実行の中の繰り返しの問い合わせ・DML は、`tx.queries`・`tx.dml` で抑える（まとめられないため）。
 
 ### 4.3 積み上げ集計の集計し直し：取得の行に数えない
@@ -145,7 +145,7 @@
 | `report.sync` | レポートの同期の実行 | reader の DB の時間 20 秒、読む行の見積もり 100 万、詳細の行 2,000、グループ 2,000 | 非同期に回す（1 回） | [reports-and-dashboards.md](reports-and-dashboards.md) の 5.3 節 |
 | `report.async` | レポートの非同期の実行 | DB の時間 10 分、読む行 5,000 万、エクスポート 100 万行 | 400 `REPORT_TOO_LARGE` | 同上 |
 | `bulk.query` | 一括の問い合わせのジョブ | reader の DB の時間 1 ジョブ 60 分、1 回の読みの範囲 25 万行、結果の 1 ファイル 1GB | ジョブを `failed`（`QUERY_TIMEOUT`） | [bulk-and-import.md](bulk-and-import.md) の 5 節 |
-| `search.request` | 検索の 1 回の要求 | OpenSearch の時間 2 秒、候補 3,000、後の確かめの問い合わせ 3 回 | 部分の結果と `more_may_exist` | [search.md](search.md) の 6 節 |
+| `search.request` | 検索の 1 回の要求（1 ページ） | OpenSearch の時間 2 秒、候補の固定の束 3,000、後の確かめはオブジェクトごとに 1 回、下限の時間 600ms | 部分の結果と `more_may_exist` | [search.md](search.md) の 6 節 |
 | `ui.record_page` | レコードのページの API | 問い合わせ 10、最初に読む関連リスト 6 | 関連リストを `deferred` | [ui-layouts-and-list-views.md](ui-layouts-and-list-views.md) の 4.1 節 |
 | `ui.list_view_count` | リストビューの件数 | 1 万件で打ち切り | 「1 万件以上」 | 同 5.3 節 |
 | `query.explain` | 計画の説明 | 候補の見積もりだけ（実行しない） | — | [query-language-and-api.md](query-language-and-api.md) の 4.6 節 |
@@ -259,12 +259,12 @@
 | `alloc.file_storage` | ファイルの容量 | — | 10GB＋ライセンス × 2GB | 同じ | 同じ | 20MB | 種類ごと |
 
 - API の要求の数に入れるもの：REST（`/api/versions` と `/api/v1/limits` を除く）、一括のジョブの作成・状態・結果の取り出しの要求、検索の API、イベントの発行・読みの API。画面（本システムの SPA）の要求は数えない（本家も一部の自社のアプリを数えない。Limits）。画面の要求は、長い要求の同時実行と上限で守る。
-- データの容量は、1 レコードを 2KB と数える（本家の数え方に寄せる。本家の値は未検証）。ごみ箱の行は数えない（ADR-0011 の本家の振る舞い）。容量を超えたら、作成を 400 `STORAGE_LIMIT_EXCEEDED` で断り、更新と削除は通す。
+- データの容量は、1 レコードを 2KB と数える（本家の数え方に寄せる。本家も多くのレコードを約 2KB と数える。[Salesforce Data Storage: Estimated Record Size by Object Type](https://help.salesforce.com/s/articleView?id=000383664&type=1)、2026-09-28 に確認）。ごみ箱の行は数えない（本家もごみ箱のレコードをストレージに数えない。ADR-0011）。容量を超えたら、作成を 400 `STORAGE_LIMIT_EXCEEDED` で断り、更新と削除は通す。
 
 ### 8.2 数え方と超過（ADR-0042）
 
 - **24 時間の移動の窓で数える。** Valkey に 1 分ごとの桶（1,440 個）を持ち、合計を読む。桶は 1 分ごとに Aurora の `org_usage_minutes` にも書き、Valkey を失った時は DB から作り直す。
-- **超えた時**：有料の本番の組織は、割り当ての 110% まで通す（本家の「一定の量だけ超えて動く」に寄せる。本家の量は未検証）。110% で 429 `REQUEST_LIMIT_EXCEEDED` と `Retry-After`（最も古い桶が抜けるまでの秒）を返す。試用・Developer・Sandbox は 100% で止める。
+- **超えた時**：有料の本番の組織は、割り当ての 110% まで通す（本家の「一定の量だけ超えて動く」に寄せる。本家は量を公開していない）。110% で 429 `REQUEST_LIMIT_EXCEEDED` と `Retry-After`（最も古い桶が抜けるまでの秒）を返す。試用・Developer・Sandbox は 100% で止める。
 - **知らせ**：80%・100% を超えたら、組織の管理者（`customize_application`）にメールと Setup の通知で知らせる。本家も割合でメールを送れる（Limits）。
 - Valkey の障害の時は、割り当ての検査を**通す側に倒す**（fail open）。止めると全ての組織の API が止まるため。DB の 1 分の集計で後から数え、超過は通知だけにする。
 - 組織の移動（[ADR-0056](../decisions/0056-org-migration-by-row-filtered-logical-replication.md)）の切り替えの後は、移動の先の Valkey の桶を `org_usage_minutes` から作り直す。作り直しが済むまで（最大 1 分）、その組織の割り当ては fail open の範囲で数える（infrastructure の領域の依頼）。

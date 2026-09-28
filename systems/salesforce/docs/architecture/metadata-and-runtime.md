@@ -25,18 +25,18 @@
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
 | データ辞書 | オブジェクトの定義を MT_Objects、項目の定義を MT_Fields（型、索引の要否、位置 FieldNum）に持つ | [Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)（以下「MT」） |
-| 値の置き場所 | MT_Data の文字列の flex 列（Value0〜ValueN）。列の数は資料に書かれていない（未検証） | MT |
+| 値の置き場所 | MT_Data の文字列の flex 列（Value0〜ValueN）。列の数は資料に書かれていない。本システムの設計はこの数に依らない | MT |
 | 型の変更 | 項目の値のために新しい列を割り当て、既存の値を一括で写し、メタデータの指す先を切り替える。変換の間も読める | MT |
-| 項目の削除 | 消した項目と値は、確定するか期間が過ぎるまで、ごみ箱から戻せる（期間の日数は項目については未検証） | MT |
+| 項目の削除 | 消した項目と値は、確定するか期間が過ぎるまで、ごみ箱から戻せる（項目は 15 日） | MT、[Delete a Custom Field](https://help.salesforce.com/s/articleView?id=platform.deleting_fields.htm&type=5)（2026-09-28 に確認） |
 | メタデータのキャッシュ | よく使うメタデータを、大きなメタデータのキャッシュに持つ。コンパイル済みのコードは組織ごとの MRU のキャッシュに持つ | MT |
 | 保存の順序 | 元のレコードを読む → 要求の値を当ててシステムの検証 → 保存の前のフロー → before トリガー → システムの検証と入力規則 → 重複の規則 → 保存（未確定）→ after トリガー → 割り当てのルール → 自動応答 → ワークフロー（項目の更新があれば、トリガーをもう 1 回だけ） → エスカレーション → Process Builder など → 保存の後のフロー → エンタイトルメント → 親の積み上げ集計 → 祖父母の積み上げ集計 → 条件に基づく共有の評価 → 確定 → 確定の後の処理（メール、非同期の処理） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版）の「Triggers and Order of Execution」 |
 | 再帰の保存 | 再帰の保存では、割り当てのルールから祖父母の積み上げ集計まで（9〜17）を飛ばす | 同上 |
 | 一括の単位 | API の要求は、200 件ずつの塊でトリガーを動かす | 同上 |
 | 数式の大きさ | 3,900 文字まで。保存時の大きさ 4,000 バイトまで。コンパイル後の大きさ 15,000 バイトまで。他の数式項目を参照すると、その大きさが加わる | [Tips for Reducing Formula Size](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_formula_size_tipsheet.pdf)（Winter '27 版） |
-| 数式の保存時の大きさ | ヘルプの記事の検索結果の要約では「保存時も 15,000 バイト」と読めた。上の資料（4,000 バイト）と食い違う。ヘルプの本文は読めなかった（未検証） | [Formula Field Limits and Restrictions](https://help.salesforce.com/s/articleView?language=en_US&id=platform.formula_field_limits.htm&type=5) |
+| 数式の保存時の大きさ | 本家の資料どうしが食い違う。数式の上限の記事は、保存時・コンパイル後ともに 15,000 バイトと書く。エディションの割り当ての表は、保存時 4,000 バイト・コンパイル後 5,000 バイトと書く（上の資料は保存時 4,000・コンパイル後 15,000）。本システムの上限は単位が違う（3.5 節）ので、この食い違いに依らない | [Formula Field Limits and Restrictions](https://help.salesforce.com/s/articleView?id=platform.formula_field_limits.htm&type=5)、[Salesforce Enterprise Edition Allocations](https://help.salesforce.com/s/articleView?id=xcloud.overview_limits_enterprise.htm&type=5)（2026-09-28 に確認） |
 | 数式の索引 | 決定的な数式には索引を張れる。他のオブジェクトを参照する数式、時刻で変わる数式には張れない | [Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)（以下「LDV」） |
 | 関係の数 | カスタムオブジェクトは 40 の関係まで持てる | [SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)（Winter '27 版）の「Understanding Relationship Query Limitations」 |
-| 項目の数、主従の数、積み上げ集計の数、選択リストの値の数、数式がたどれる関係の数 | 公式の資料では確かめられなかった（未検証） | — |
+| 項目の数、主従の数、積み上げ集計の数、数式がたどれる関係の数 | 1 オブジェクトのカスタム項目は Enterprise 500・Unlimited 800（パッケージを含めて多くのオブジェクトで 900 まで）。カスタムオブジェクトは Enterprise 200・Unlimited 2,000（全体で 3,000 まで）。主従は 2。積み上げ集計は既定 25、依頼で 40。数式がたどる別々の関係は 1 オブジェクト 15。選択リストの値の数は確かめていない（未検証） | [Salesforce Enterprise Edition Allocations](https://help.salesforce.com/s/articleView?id=xcloud.overview_limits_enterprise.htm&type=5)、[Increase the Maximum Limit of Roll-Up Summary Fields](https://help.salesforce.com/s/articleView?id=000386702&type=1)（2026-09-28 に確認） |
 
 ## 3. データ辞書（ADR-0006）
 
@@ -95,17 +95,19 @@
 
 | 上限 | 値 | 本家 |
 | --- | --- | --- |
-| 組織のカスタムオブジェクト | 800 | 未検証 |
-| オブジェクトの項目（標準を含む、削除中を含む） | 500 | 未検証 |
+| 組織のカスタムオブジェクト | 800 | Enterprise 200、Unlimited 2,000、全体で 3,000 |
+| オブジェクトの項目（標準を含む、削除中を含む） | 500 | カスタム項目 Enterprise 500、Unlimited 800 |
 | オブジェクトの関係（参照・主従） | 40 | 40（SOQL and SOSL Reference） |
-| オブジェクトの主従 | 2 | 未検証 |
+| オブジェクトの主従 | 2 | 2 |
 | 主従の段（孫まで） | 3 | 未検証 |
-| オブジェクトの積み上げ集計 | 25 | 未検証 |
+| オブジェクトの積み上げ集計 | 25 | 既定 25、依頼で 40 |
 | 索引を張る項目（`indexed`・`external_id`・名前を含む） | 50 | 本家はサポートへの依頼で張る（LDV） |
 | 一意の項目 | 25 | 未検証 |
 | 選択リストの値（有効なもの） | 1,000 | 未検証 |
 | `records.data` の大きさ（長いテキストを除く） | 64KB | — |
 | 1 回のメタデータの変更（1 つの版）で変える要素の数 | 10,000 | — |
+
+本家の列の「未検証」は、本家の値を公開の資料で確かめていないもの。本システムの値は本家に依らず、E12 の `limits-final-values` で決める。
 
 - 上限は governor-limits の領域の一覧にも載せ、値はそちらを正とする。項目の数に削除中の項目を数えるのは、確定までキーが `records.data` に残るため。
 - 64KB は、PostgreSQL が JSONB を TOAST に出す大きさ（約 2KB）を大きく超える。1 行の更新での書き直しの量を抑えるため、上限に近いオブジェクトは警告する（[data-storage.md](data-storage.md) の 3.3 節）。
@@ -204,7 +206,7 @@ manifest(org, version)
 5. **切り替え**：全ての範囲が済んだら、1 つの版で、項目の指す `field_no` を新しいものにし、`active` に戻す。古い `field_no` の値は 15 日残してから消去の予定に入れる（5.4 節）。デプロイの戻しで古い型へ切り替え直せるようにするため（[sandboxes-and-deploy.md](sandboxes-and-deploy.md) の 6.5 節）。
 6. 中止：変換の間に管理者が中止したら、1 つの版で古い `field_no` に戻し、新しいキーとピボットの行を消去の予定に入れる。
 
-本家も、新しい置き場所を割り当てて写し、メタデータの指す先を切り替える（MT）。本家は変換の間の書き込みを止めるかを資料に書いていない（未検証）。
+本家も、新しい置き場所を割り当てて写し、メタデータの指す先を切り替える（MT）。本家は変換の間の書き込みを止めるかを資料に書いていない（未検証。E3 の `field-delete-and-conversion` で試用の組織で確かめる）。
 
 ### 5.3 削除と復元
 
@@ -218,7 +220,7 @@ manifest(org, version)
 
 - 依存（`md_dependencies`）のある項目は削除できない。依存の一覧を返す。
 - 削除した項目の名前は、確定までは再利用できない。
-- 15 日は、本家のレコードのごみ箱の期間に合わせた（MT、LDV）。本家の項目の削除の保持の日数は未検証。法務の L5 の結論で見直す。
+- 15 日は、本家のレコードのごみ箱の期間に合わせた（MT、LDV）。本家の項目の削除の保持も 15 日（2 節）。法務の L5 の結論で見直す。
 
 ### 5.4 消去
 
@@ -272,7 +274,7 @@ manifest(org, version)
 ### 6.3 部分の成功
 
 - `all_or_none = true`（既定）：1 件でも失敗したら全体を巻き戻す。
-- `all_or_none = false`：失敗したレコードを外し、残りで手順をやり直す。やり直しは 2 回まで。3 回目も失敗が出たら、残り全てを失敗にする。やり直しの前の上限の数は巻き戻す（トランザクションのセーブポイントで戻す）。本家も部分の成功でトリガーをやり直す（Apex Developer Guide）。本家のやり直しの回数は未検証。
+- `all_or_none = false`：失敗したレコードを外し、残りで手順をやり直す。やり直しは 2 回まで。3 回目も失敗が出たら、残り全てを失敗にする。やり直しの前の上限の数は巻き戻す（トランザクションのセーブポイントで戻す）。本家も部分の成功で、失敗した行を外して 3 回まで試し（最初の 1 回とやり直し 2 回）、やり直しの前に上限の数を戻し、トリガーを残りの行でもう一度動かす。3 回目も失敗が出たら全体を失敗にする（Apex Developer Guide の「Bulk DML Exception Handling」、2026-09-28 に確認）。本システムは本家と同じ回数にする。
 
 ## 7. 数式の言語と評価器（ADR-0009）
 
@@ -352,8 +354,8 @@ literal     = number | string | "TRUE" | "FALSE" | "NULL" ;
 | 式の文字数 | 5,000 | 3,900 文字（Tips for Reducing Formula Size） |
 | 展開した後の AST の節の数 | 2,000 | コンパイル後 15,000 バイト（同上）。単位が違うので、値は E6 で測って決める |
 | 生成した SQL の式の大きさ | 32KB | — |
-| 親への参照の段 | 5 | 未検証 |
-| 1 つのオブジェクトの数式がたどる別々の関係の数 | 15 | 未検証 |
+| 親への参照の段 | 5 | 問い合わせで子から親へ 5 段（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-28 に確認） |
+| 1 つのオブジェクトの数式がたどる別々の関係の数 | 15 | 15（2 節の Enterprise の割り当て） |
 | 数式から数式への参照の深さ | 10 | — |
 
 本家より文字数を増やすのは、日本語の項目の名前やコメントを含めると 3,900 文字が窮屈になるためである。展開した後の大きさの上限で、実行の費用は抑える。
@@ -361,7 +363,7 @@ literal     = number | string | "TRUE" | "FALSE" | "NULL" ;
 ### 7.7 数式と FLS
 
 - **数式の値は、見る人が数式の項目と、数式が（展開した後に）参照する全ての項目を読める時にだけ返す。** 1 つでも読めなければ、その数式の項目を FLS で読めない項目として扱う。
-- 数式を通して、読めない項目の値が漏れないようにするため（intent の「守るべき振る舞い」）。本家は、参照先の項目の FLS に関わらず数式の値を見せると言われる（未検証）。本システムは、それより厳しくする。
+- 数式を通して、読めない項目の値が漏れないようにするため（intent の「守るべき振る舞い」）。本家は、参照先の項目の FLS に関わらず数式の値を見せると言われる（未検証。E6 の `formula-indexing-and-fls` で試用の組織で確かめる）。本システムは、それより厳しくする。
 - 管理者が、数式の項目の FLS を「読める」にしようとして、参照先に読めない項目がある権限セットがあれば、Setup の画面で警告する。
 - 入力規則とフローの中の数式は、システムの文脈で評価する（利用者の FLS に関わらず全ての項目を読む）。入力規則のエラーの文言に、読めない項目の値を差し込めないようにする（差し込めるのは、項目の名前だけ）。
 
@@ -439,7 +441,7 @@ literal     = number | string | "TRUE" | "FALSE" | "NULL" ;
 
 - 数式の上限（展開した後の AST の節の数）の値を、何を基準に決めるか。
 - 部品の粒度を、オブジェクトより細かくする必要があるか（1 つのオブジェクトが項目 500・入力規則 数百を持つ時）。
-- 型の変換の間、その項目の書き込みを止めるのは利用者に重くないか。本家の振る舞いは未検証。
+- 型の変換の間、その項目の書き込みを止めるのは利用者に重くないか。本家の振る舞いは未検証（E3 の `field-delete-and-conversion` で確かめる）。
 - 項目の削除の保持の期間（15 日）は、法務の L5 の結論で変わりうる。
 - 数式の FLS を本家より厳しくすることで、本家から移る組織の画面が変わる。受け入れられるか。
 - 数式の保存時の大きさの本家の値（4,000 バイトか 15,000 バイトか）の食い違い。

@@ -9,7 +9,7 @@ date: 2026-09-28
 
 組織の管理者は、画面の操作でオブジェクトと項目を足し、名前を変え、型を変え、消す。変更は数秒で反映され、他の組織に影響してはならない（[intent.md](../intent.md) の K2）。S1 で 5,000、S3 で 50 万の組織があり、1 組織は標準とカスタムで数十のオブジェクトを持つ。Sandbox も別の組織として数える。
 
-本家は、オブジェクトと項目を DB の構造ではなくメタデータとして持つ。全組織のレコードを 1 つの大きな表（MT_Data）に入れ、項目の値は、型を持たない文字列の「flex 列」（Value0〜ValueN）に入れる。1 つの flex 列は、組織やオブジェクトによって別の項目に使われ、型も違う。そのため flex 列には DB の索引を張れない。索引の要る項目は、型付きの列（StringValue、NumValue、DateValue）を持つピボットの表（MT_Indexes）へ同じトランザクションで写して引く。一意の制約、関係、名前も別のピボットの表で持つ。全ての表は組織の ID で物理的に分割されている（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、2026-09-28 に確認）。flex 列の数は 500 と広く紹介されているが、今の公式の資料では確かめられなかった（未検証）。
+本家は、オブジェクトと項目を DB の構造ではなくメタデータとして持つ。全組織のレコードを 1 つの大きな表（MT_Data）に入れ、項目の値は、型を持たない文字列の「flex 列」（Value0〜ValueN）に入れる。1 つの flex 列は、組織やオブジェクトによって別の項目に使われ、型も違う。そのため flex 列には DB の索引を張れない。索引の要る項目は、型付きの列（StringValue、NumValue、DateValue）を持つピボットの表（MT_Indexes）へ同じトランザクションで写して引く。一意の制約、関係、名前も別のピボットの表で持つ。全ての表は組織の ID で物理的に分割されている（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、2026-09-28 に確認）。flex 列の数は、今の公式の資料に書かれていない。本システムの設計はこの数に依らない。
 
 本システムは PostgreSQL（Aurora PostgreSQL 18）の上に作る（[ADR-0001](0001-platform-and-stack.md)）。PostgreSQL には本家の DB にない JSONB と部分索引がある。一方で、表の数が多いときの負担は大きい。
 
@@ -56,7 +56,7 @@ date: 2026-09-28
 
 ### 選ばなかった理由
 
-- **1（広い表）**：PostgreSQL では、全て文字列にする利点がない。JSONB なら型が残り、列の番号の割り当ての管理も要らない。本家がこの形なのは、その DB に合わせた選択と考える（未検証）。
+- **1（広い表）**：PostgreSQL では、全て文字列にする利点がない。JSONB なら型が残り、列の番号の割り当ての管理も要らない。本家がこの形なのは、その DB に合わせた選択と考える（本家は理由を公開していない。推測）。
 - **2（実テーブル）**：組織ごとの索引が自由に張れる点は最も優れる。ただし、S1 で数十万、S3 で数千万の表になり、PostgreSQL のカタログ・接続ごとのキャッシュ・自動 VACUUM・マイグレーションの負担が、組織の数に比例して増える。DDL は表のロックを取り、多くの組織が同時に項目を変えると、ロックの待ちが他の組織に広がる。Sandbox を作るたびに表を作ることにもなる。
 - **3（式の部分索引）**：部分索引は 1 つの共有の表に付くので、数万になると、全ての書き込みが全ての索引の述語を評価し、計画も遅くなる。索引の作成も DDL で、2 と同じ問題が出る。
 

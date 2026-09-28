@@ -34,8 +34,8 @@
 | ジョブの寿命 | 終わった状態で 7 日を過ぎたジョブを消す。開いたままのジョブは 24 時間まで | Limits |
 | 問い合わせの結果 | 1 ファイル 1GB まで。`locator` と `maxRecords` で全体を読める。結果を読む時間切れ 20 分 | Limits |
 | 行の区切り | `LF` と `CRLF`。列の区切りを選べる | Bulk |
-| インポートのウィザード | 1 回 50,000 件まで、取引先・取引先責任者・リード・カスタムオブジェクトなど（ヘルプの要約。本文は未検証） | — |
-| ウィザードの文字コード | Shift_JIS などを選べる（ヘルプの要約。未検証） | — |
+| インポートのウィザード | 1 回 50,000 件まで、取引先・取引先責任者・リード・カスタムオブジェクトなど。ワークフローとプロセスを動かすかを選べる | [How many records can I import?](https://help.salesforce.com/s/articleView?id=xcloud.faq_data_import_wizard_how_many_records.htm&type=5)、[Import Data with the Data Import Wizard](https://help.salesforce.com/s/articleView?id=xcloud.import_with_data_import_wizard.htm&type=5)（2026-09-28 に確認） |
+| ウィザードの文字コード | ファイルの文字コードを選べる（選べる一覧に Shift_JIS があるかは本文に書かれていない。未検証。E9 の `import-wizard` で確かめる） | 同上 |
 
 ## 3. 一括の取り込みのジョブ（ADR-0036）
 
@@ -68,7 +68,7 @@ DELETE /api/v1/jobs/ingest/{id}             （終わったジョブと結果を
 | `match_update` | 照合の規則で既存を探して更新か作成（ウィザードの「既存を更新」。5.3 節） |
 
 - CSV の 1 行目は API の名前。参照の項目は、親の ID か、`<参照の項目>.<親の外部 ID の項目>`（例：`account.x_erp_id`）で親を指せる（4.2 節）。
-- 空の欄は「変えない」。空にしたい時は `#N/A` と書く（本家の慣習に寄せる。本家の書き方は未検証）。
+- 空の欄は「変えない」。空にしたい時は `#N/A` と書く（本家の慣習に寄せる。本家の一括の API とデータローダーも、更新で空の欄を無視し、空にするには `#N/A` と書く。[Bulk API 2.0 and Bulk API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_asynch.pdf)、[Data Loader Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_data_loader.pdf)、Winter '27 版、2026-09-28 に確認）。
 - ジョブは作った利用者の権限（オブジェクトの権限、FLS、共有）で処理する。API は `api_enabled` が要る。
 - 状態は `open` → `upload_complete` → `in_progress` → `job_complete`・`failed`・`aborted`。`open` のまま 24 時間を過ぎたら `aborted`。
 
@@ -173,7 +173,7 @@ Worker（部分ごと）
 
 - ウィザードは、一括の取り込みのジョブ（3 節）の上の画面で、処理の経路は同じにする。API の割り当ては使わない（画面の要求。[governor-limits.md](governor-limits.md) の 8.1 節）が、`alloc.bulk_rows` には数える。
 - 権限：`import_records` のシステムの権限（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 7 節）と、オブジェクトの `create`・`edit`。`api_enabled` は要らない。
-- 1 回 5 万行まで（本家の 50,000 件はヘルプの要約。未検証）。それより大きい取り込みは一括の API を案内する。
+- 1 回 5 万行まで（本家も 50,000 件。2 節）。それより大きい取り込みは一括の API を案内する。
 - intent の K8（1 万件を取り込んでリストビューで見るまで中央値 30 分）のため、既定の対応の型（名刺管理・表計算の典型の見出し：会社名、氏名、フリガナ、部署、役職、電話、メール、住所）を標準で持つ。
 
 ### 5.2 文字コードと形
@@ -248,9 +248,11 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | 24 時間の取り込みの行（Enterprise） | 1,000 万 | 1 億 5,000 万（Limits） |
 | 24 時間の問い合わせのジョブ・結果（Enterprise） | 10,000・100GB | 10,000・1TB（Limits） |
 | 結果の保持 | 7 日 | 7 日（Limits） |
-| ウィザードの 1 回 | 5 万行・50MB | 5 万件（ヘルプの要約。未検証） |
+| ウィザードの 1 回 | 5 万行・50MB | 5 万件（2 節） |
 | ウィザードの下見 | 200 行 | — |
 | 行のやり直し | DT-BULK-001 | 取り込み 20 回（Limits） |
+
+本家の列の「未検証」は、本家の値を公開の資料で確かめていないもの。本システムの値は本家に依らず、E12 の `limits-final-values` で決める。
 
 - 本家より 24 時間の取り込みの行を小さくするのは、S1 の全体（5 億件）と NFR-010（100 万件 30 分）から見た Worker の量に合わせるため。E12 で見直す。
 
@@ -325,7 +327,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 
 ## 13. 未解決の問い
 
-- 取り込みだけ自動化を止める選択を持つか（本家の組織では、取り込みのためにフローを一時的に無効にする運用がある。未検証）。
+- 取り込みだけ自動化を止める選択を持つか（本家のインポートのウィザードは、ワークフローとプロセスを動かすかを選べる。2 節）。
 - 照合での既存の更新で、見えないレコードとの重複が生まれることを受け入れるか。
 - 24 時間の取り込みの行（Enterprise 1,000 万）は足りるか。
 - ウィザードで Excel（xlsx）を受けるか。

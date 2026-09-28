@@ -15,7 +15,7 @@ date: 2026-09-28
 - 監査の外部の保管は Object Lock で期限まで消せない。組織の削除では、鍵の破棄で読めなくする（[ADR-0046](0046-setup-audit-trail-and-login-history.md)）。
 - レコードの値をアプリで暗号化すると、ピボットの索引・一意・並べ替え・集計ができない。
 
-本家は、組織ごとの tenant secret と本家の master secret（KDF の種）から、HSM の上の PBKDF2 でデータの暗号化の鍵を導き、導いた鍵を保存しない。組織が自分の鍵を持ち込む方式もある（[Shield Platform Encryption Architecture](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/security_shield_platform_encryption.pdf)。検索の結果の要約で読んだ。本文は未検証）。本家の Hyperforce は、組織ごとの暗号の鍵を持つと説明する（[Hyperforce](https://www.salesforce.com/platform/public-cloud-infrastructure/)、2026-09-28 に確認。細部は未検証）。
+本家は、組織ごとの tenant secret と本家の master secret（KDF の種）から、HSM の上の PBKDF2 でデータの暗号化の鍵を導き、導いた鍵を保存しない。組織が自分の鍵を持ち込む方式や、鍵の導出を使わない方式もある（[Behind the Scenes: The Shield Platform Encryption Process for Tenant Secrets](https://help.salesforce.com/s/articleView?id=xcloud.security_pe_encryption_process.htm&type=5)、2026-09-28 に確認。本家は master secret を primary secret と呼び替えた）。本家の Hyperforce は、組織ごとの暗号の鍵を持つと説明する（[Hyperforce](https://www.salesforce.com/platform/public-cloud-infrastructure/)、2026-09-28 に確認）。鍵の置き方の細部は公開されていない。
 
 ## Options
 
@@ -33,7 +33,7 @@ date: 2026-09-28
 - DEK は 1 年ごとに新しい版を作る。古い版は、それで暗号化したものが消えるまで残す。平文の DEK は Runtime・Worker のプロセスの中に 5 分だけ置く。
 - レコード（`records`・ピボット・共有の表・履歴）はアプリで暗号化しない。Aurora の保存時の暗号化と、RLS と、データ層の外からの SQL の禁止で守る。項目ごとの暗号化（本家の Shield に相当）は MVP の後の課題にする。
 - 組織の削除：行と S3 のファイルを消した後（[ADR-0043](0043-orgs-editions-licenses-and-users.md) の 7 日）、全ての `org_keys` の `wrapped_dek` を消し、`destroyed_at` を残す。Object Lock の監査の保管と、S3 のバージョンの残りは、鍵がないので読めない。Aurora のバックアップ（35 日）の中の行は、バックアップの期限で消える（[ADR-0053](0053-operator-access-and-data-lifecycle.md)）。
-- 2 は、S3 で 50 万の鍵になり、既定の上限を超え、鍵の費用（1 鍵 月 1 USD と広く紹介されている。未検証）が組織の数に比例する。3 は、組織の単位で暗号学的に消せない。
+- 2 は、S3 で 50 万の鍵になり、既定の上限を超え、鍵の費用（東京で顧客管理の鍵の版 1 つにつき月 1 USD）が組織の数に比例する。既定の上限はリージョンで 10 万鍵（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/awskms/current/ap-northeast-1/index.json)、[AWS KMS の resource quotas](https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html)、2026-09-28 に確認）。3 は、組織の単位で暗号学的に消せない。
 
 ## Consequences
 

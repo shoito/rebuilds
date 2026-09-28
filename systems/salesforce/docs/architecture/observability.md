@@ -11,12 +11,12 @@
 
 | 種類 | 道具 | 保持 |
 | --- | --- | --- |
-| メトリクス | ADOT → Amazon Managed Service for Prometheus、Grafana | 13 か月（AMP の既定の保持は未検証。設定で決める） |
+| メトリクス | ADOT → Amazon Managed Service for Prometheus、Grafana | 13 か月（AMP の既定の保持は 150 日で、ワークスペースの設定で 1,095 日まで延ばせる。395 日に設定する。[AMP のワークスペースの設定](https://docs.aws.amazon.com/prometheus/latest/userguide/AMP-workspace-configuration.html)、2026-09-28 に確認） |
 | ログ | JSON の構造化ログ → CloudWatch Logs。検索は Logs Insights | 30 日（[security.md](security.md) の 7 節） |
-| トレース | OpenTelemetry → X-Ray | 30 日 |
+| トレース | OpenTelemetry → X-Ray | 30 日（X-Ray のトレースの保持は 30 日で固定。[X-Ray concepts](https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html)、2026-09-28 に確認） |
 | 組織ごとの使用量 | Aurora の `org_*_minutes` の表 | 1 分の粒度 7 日、1 時間の粒度 13 か月 |
 | 合成監視 | CloudWatch Synthetics（東京と大阪から、監視の組織を使う） | 30 日 |
-| DB | Performance Insights、`pg_stat_statements`、`pg_stat_activity` の標本（5 節） | 7 日（PI の無料の範囲は未検証） |
+| DB | Performance Insights、`pg_stat_statements`、`pg_stat_activity` の標本（5 節） | 7 日（Performance Insights は Database Insights に含まれ、既定で 7 日の履歴を追加の料金なしで持つ。延ばすと有料。[Pricing and data retention for Database Insights](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_PerfInsights.Overview.cost.html)、2026-09-28 に確認） |
 | 呼び出し | PagerDuty 相当の道具（E1 で選ぶ） | — |
 
 ## 2. ログとトレース（ADR-0058）
@@ -42,7 +42,7 @@
 
 ## 3. SLI と SLO（ADR-0058）
 
-S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はする）。窓は 28 日。**値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節**（この表はその写し）。
+S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はする）。窓は 30 日の移動の窓（他の題材と同じ）。**値の正本は [runbooks/README.md](../runbooks/README.md) の 1 節**（この表はその写し）。
 
 | SLI | 定義 | SLO | 根拠 |
 | --- | --- | --- | --- |
@@ -66,7 +66,7 @@ S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はす�
 | 公平 | 重い組織がいる時の、他の組織の p95 の悪化 | 10% 以内 | NFR-003 |
 | アクセスの判定の正しさ | `access_oracle_mismatch_total{direction="over"}` | 0 | K3、[ADR-0017](../decisions/0017-reference-access-evaluator.md) |
 
-- エラーバジェットは、対話の可用性と速さの SLI に持つ。28 日の窓で 1 時間 14 倍・6 時間 6 倍の燃え方で呼び出す（多窓の燃え方。他の題材と同じ形）。
+- エラーバジェットは、対話の可用性と速さの SLI に持つ。30 日の窓で 1 時間 14.4 倍・6 時間 6 倍の燃え方で呼び出す（多窓の燃え方。他の題材と同じ形）。
 - 合成監視：監視の組織（東京と大阪に 1 つずつ）で、1 分ごとに、ログイン → レコードの作成 → 読み → 問い合わせ → リストビュー → 検索 → 変更のイベントの受け取り → 削除、を通す。監視の組織には上限・割り当ての例外を与えない。
 
 ### 3.1 各領域から依頼された SLI
@@ -81,7 +81,7 @@ S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はす�
 | ui | レコードのページの p95・p99、リストビューの p95、`layout_compile_fallback_total`、`metadata_conflict_total`、`LIST_VIEW_UNAVAILABLE` |
 | automation | 保存の後のフローを含む保存の p95、予定の経路の遅れ、`rollup_mismatch_total`、`rollup_parent_lock_wait_seconds`、承認の応答の p95、画面のフローの p95 |
 | reports | 同期の p95・p99、非同期の待ち、reader の遅れ、組織ごとのレポートの DB の時間、ダッシュボードの更新の数、定期の配信の遅れ |
-| search | 検索の p95・p99、参照の候補の p95、索引の遅れ、`degraded` の率、OpenSearch の CPU と JVM のヒープ、後の確かめの時間 |
+| search | 検索の p95・p99、参照の候補の p95、索引の遅れ、`degraded` の率、OpenSearch の CPU と JVM のヒープ、後の確かめの時間、`search_floor_exceeded_ratio`（下限の時間を超えた要求の割合。LEAK-012） |
 | events | 確定から `events` までの遅れ、購読者への配信の遅れ、Webhook の成功率と遅れ、`disabled` の宛先の数、`ssrf_blocked_total`、SES の bounce と苦情の率 |
 | bulk | 取り込みの行の速さ、ジョブの待ち、失敗の行の率、問い合わせのジョブの時間、`bulk_ingest` の待ち |
 | sandboxes | 検証・適用の時間、適用の止まりの p99、戻しの時間、複製の時間と失敗の率、マスキングの警告の件数 |
@@ -147,7 +147,7 @@ S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はす�
 
 | アラート | 条件 | 重さ | runbook |
 | --- | --- | --- | --- |
-| SLO の速い燃え方 | 1 時間 14 倍 | page | [incident-response.md](../runbooks/incident-response.md) |
+| SLO の速い燃え方 | 1 時間 14.4 倍 | page | [incident-response.md](../runbooks/incident-response.md) |
 | SLO の遅い燃え方 | 6 時間 6 倍 | ticket | incident-response.md |
 | 合成監視の連続失敗 | 東京で 3 回 | page | incident-response.md |
 | 大阪からの合成監視の全失敗 | 5 分 | page | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
@@ -168,6 +168,7 @@ S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はす�
 | `history` のクラスタの障害 | 書き込みの失敗が 5 分 | ticket | `history-cluster-degraded` |
 | 検索の索引の遅れ | p95 60 秒を 5 分 | ticket | `search-index-lag` |
 | OpenSearch の障害 | `degraded` の率 5% | ticket | `search-degraded` |
+| 検索の下限の時間の超過（LEAK-012） | `search_floor_exceeded_ratio` 5% を 1 時間 | ticket | `search-floor-exceeded` |
 | reader の遅れ | 30 秒・5 分 | ticket・page | `reader-replica-lag` |
 | メタデータの確定の止まり | p99 1 秒を 15 分 | ticket | `deploy-lock-stall` |
 | ピボットの差 | 1 件 | ticket | `pivot-drift-detected` |

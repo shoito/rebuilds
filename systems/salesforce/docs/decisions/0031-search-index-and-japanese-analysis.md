@@ -18,7 +18,7 @@ date: 2026-09-28
 - 索引の遅れと、順の入れ替わり（古い書き込みが後から届く）の扱い。
 - 保存の直後のレコードを参照の項目の候補に出すこと。
 
-本家（2026-09-28 に確認）：全文検索は別の検索の基盤で非同期に索引を作る（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)）。空白で区切らない東アジアの言語は形態素で区切り、「東京都」は「東京」「都」になり、「京都」の検索に当たらない（[SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)、Winter '27 版）。索引の遅れの目安は確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：全文検索は別の検索の基盤で非同期に索引を作る（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)）。空白で区切らない東アジアの言語は形態素で区切り、「東京都」は「東京」「都」になり、「京都」の検索に当たらない（[SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)、Winter '27 版）。索引の遅れの目安は公開の資料に書かれていない。本システムの目標（p95 5 秒）は自前で決めた。
 
 Amazon OpenSearch Service は `analysis-kuromoji`・`analysis-icu` を持ち、Sudachi を任意のプラグインとして辞書と共に足せる（[Plugins by engine version](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)、[Importing and managing packages](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/custom-packages.html)、2026-09-28 に確認）。
 

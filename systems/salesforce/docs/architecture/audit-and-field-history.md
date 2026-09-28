@@ -22,11 +22,11 @@
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
 | 設定の変更の履歴 | Setup での変更を、少なくとも直近 180 日表す（`SetupAuditTrail`）。集計の問い合わせは一部しかできない | [Object Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/object_reference.pdf)（Winter '27 版、以下「OBJ」） |
-| ログインの履歴 | 組織の全ての成功・失敗のログインの試み（`LoginHistory`）。保持は 6 か月と広く紹介されている（未検証）。本人確認の試みは直近 6 か月（`VerificationHistory`） | OBJ |
+| ログインの履歴 | 組織の全ての成功・失敗のログインの試み（`LoginHistory`）。画面は直近 6 か月の最大 2 万件を表す。本人確認の試みは直近 6 か月（`VerificationHistory`） | OBJ、[Monitor Login History](https://help.salesforce.com/s/articleView?id=xcloud.users_login_history.htm&type=5)（2026-09-28 に確認） |
 | 項目の変更の履歴 | 1 オブジェクト 20 項目まで。保持は 18〜24 か月。画面と API で見られる。変更はオブジェクトの履歴の表（例：`AccountHistory`）に入る | [Field Audit Trail Implementation Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/field_history_retention.pdf)（Winter '27 版、以下「FAT」） |
 | 長い保持（追加の製品） | 200 項目まで、消すまで保つ。本番では 18 か月、Sandbox では 1 か月の後に保管の置き場所へ移す。API だけで読む | FAT |
-| 保存の容量 | 項目の変更の履歴は、データの容量に数えない（ヘルプの要約。未検証） | — |
-| 長いテキストの履歴 | 値を持たず「変わった」だけを記録すると広く紹介されている（未検証） | — |
+| 保存の容量 | 項目の変更の履歴は、データの容量に数えない。保持は 18 か月、API では 24 か月まで読める | [Field History Tracking Overview](https://help.salesforce.com/s/articleView?id=xcloud.tracking_field_history.htm&type=5)（2026-09-28 に確認） |
+| 長いテキストの履歴 | 255 文字を超える長いテキストは、値を持たず「変わった」だけを記録する | [Field History Tracking Overview](https://help.salesforce.com/s/articleView?id=xcloud.tracking_field_history.htm&type=5)（2026-09-28 に確認） |
 | 変更のイベントと監査 | 変更のイベントを、記録と項目の変更の監査に使うことは勧めない | [Change Data Capture Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_change_data_capture.pdf) |
 
 ## 3. 設定の変更の履歴と監査のイベント（ADR-0046）
@@ -114,7 +114,7 @@ login_events(org_id, id, at, user_id, username_hash, result, reason, method, mfa
 - **利用者が決まらない失敗**（無い `username`）は、組織が決まる時（組織のドメインのログイン）だけ書き、`user_id` を空、`username_hash` に組織ごとの鍵の HMAC を入れる。打った文字列（パスワードを誤って打ったものかもしれない）をそのまま残さない。
 - 画面の理由は区別しないが（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 10 節）、履歴には理由を残す。
 - 保存：`login_events` は、ログインの経路の DB の負担を減らすため、outbox から Worker がまとめて書く（ログインの結果を先に返す）。書けなかった時は、ログインは止めない（数を計測）。
-- 保持は **180 日**（本家は 6 か月と紹介されている。未検証）。月ごとの分割を `DROP` する。法務の L5 で決める。
+- 保持は **180 日**（本家の画面は直近 6 か月。2 節）。月ごとの分割を `DROP` する。法務の L5 で決める。
 - 読み：`view_audit_trail`、または本人（自分のログインの履歴）。書き出しは 3.4 節と同じ。
 - 短い時間の失敗の急増（1 つの IP で 1 分 100 回など）は、WAF とログインの一時の停止で守り、履歴は 1 秒ごとにまとめて 1 件（`details.count`）にする。
 
@@ -123,7 +123,7 @@ login_events(org_id, id, at, user_id, username_hash, result, reason, method, mfa
 ### 5.1 設定
 
 - オブジェクトで有効にする（`md_objects.field_history_enabled`）。項目ごとに `md_fields.track_history` を選ぶ。**1 オブジェクト 20 項目まで**（本家と同じ。FAT）。メタデータの変更として版を上げる。
-- 選べる型：`long_text`・`rich_text`・数式・積み上げ集計・自動採番以外の全て。長いテキストは、値を持たず「変わった」だけを記録する（本家の紹介に寄せる。未検証）。数式は保存しないので選べない。積み上げ集計は親の値の変化として選べる（子の変化の積み重ねで行が多くなるので警告する）。
+- 選べる型：`rich_text`・数式・積み上げ集計・自動採番以外の全て。`long_text` は、値を持たず「変わった」だけを記録する（本家も 255 文字を超える長いテキストを同じに扱う。2 節。[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) と揃えた）。数式は保存しないので選べない。積み上げ集計は親の値の変化として選べる（子の変化の積み重ねで行が多くなるので警告する）。
 - 所有者（`owner_id`）とレコードタイプも選べる（システムの列）。作成と削除・戻すは、有効にした全てのオブジェクトで常に 1 行書く（`created`・`deleted`・`restored`）。
 
 ### 5.2 書き方（保存の手順 9）
@@ -166,7 +166,7 @@ field_history(org_id, object_id, record_id, changed_at, seq, field_no, changed_b
 | 項目・オブジェクトの削除 | 項目の値の消去と同時（ADR-0006） | 消去の Worker が消す |
 
 - 18 か月は、本家の 18〜24 か月の短い方（FAT）。長い保持（本家の追加の製品に相当）は MVP の後。**法務の L5 の結論で決める**。
-- 容量：履歴は組織のデータの容量に数えない（本家の紹介に寄せる。未検証）。そのかわり、1 オブジェクト 20 項目の上限で量を抑える。S1 の見積もりは、保存の行の平均 500 行/秒 × 平均 1.5 項目 × 18 か月で約 350 億行（1 行 100B で約 3.5TB）。capacity の領域で見直す。量が見積もりを大きく超える組織には、項目の選び方を案内する。
+- 容量：履歴は組織のデータの容量に数えない（本家と同じ。2 節）。そのかわり、1 オブジェクト 20 項目の上限で量を抑える。S1 の見積もりは、保存の行の平均 500 行/秒 × 平均 1.5 項目 × 18 か月で約 350 億行（1 行 100B で約 3.5TB）。capacity の領域で見直す。量が見積もりを大きく超える組織には、項目の選び方を案内する。
 
 ### 5.5 値の消去（本人の請求）
 

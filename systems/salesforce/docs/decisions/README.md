@@ -30,13 +30,13 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0023](0023-layouts-and-record-page-composition.md) | レイアウトを部品にコンパイルし、レコードのページを 1 回の要求で組み立てる。レイアウトは狭めるだけで、画面の保存にだけ効く | accepted |
 | [0024](0024-list-views-as-filter-ast.md) | リストビューを条件の AST で保存し、見る人の権限で毎回コンパイルする。共有は定義だけで、読めない項目を条件に持つビューは開けない | accepted |
 | [0025](0025-flow-definition-and-bulk-engine.md) | フローは版を持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える | accepted |
-| [0026](0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを DML の手順 3・7・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす | accepted |
+| [0026](0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを DML の手順 3a・7b・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす | accepted |
 | [0027](0027-roll-up-summaries-incremental-with-reconciliation.md) | 積み上げ集計は子の変更から差分で直し、最小・最大が外れた時だけ集計し直す。整合の検査で差を 0 に保ち、集計する子の項目も読める人にだけ返す | accepted |
 | [0028](0028-approval-processes-and-record-locks.md) | 承認はプロセスの版・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない | accepted |
 | [0029](0029-report-execution-on-reader-per-viewer.md) | レポートは見る人の権限で毎回コンパイルし、結ぶ全てのオブジェクトに共有の条件と FLS をかけて reader で集計する。見る人をまたぐ事前の集計を持たない | accepted |
 | [0030](0030-dashboards-viewer-intersection-and-subscriptions.md) | ダッシュボードは見る人の権限で集計し、部下の視点は部下と見る人の権限の共通部分にする。指定した実行ユーザーの形は持たず、定期の配信は受け取る人ごとに実行する | accepted |
 | [0031](0031-search-index-and-japanese-analysis.md) | 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部の版にして作る | accepted |
-| [0032](0032-search-permission-post-filter.md) | 検索の結果は候補とし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。件数の合計を返さない | accepted |
+| [0032](0032-search-permission-post-filter.md) | 検索の結果は候補とし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。件数の合計を返さず、応答の時間を固定の束と下限の時間でそろえる | accepted |
 | [0033](0033-change-event-log-and-replay.md) | 変更のイベントは outbox からイベントの専用の Aurora に書き、論理シャードの唯一の書き手が確定の順の replay_id を付けて 3 日保つ | accepted |
 | [0034](0034-event-subscription-access-and-org-events.md) | 変更のイベントの購読はオブジェクトの view_all を要し、共有で絞らず FLS を配信の時にかける。組織が定義するイベントは型の権限で守り、既定で確定の後に発行する | accepted |
 | [0035](0035-webhooks-outbound-calls-and-ssrf-guard.md) | Webhook はイベントのログの上の宛先ごとのカーソルで送って <Brand>-Signature で署名し、外向きの呼び出しは登録した宛先だけにし、どちらも宛先を検査して内部に経路のない送信の網から送る | accepted |
@@ -48,12 +48,12 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0041](0041-limits-registry-and-counting-rules.md) | 上限の正本を 1 つの登録簿にし、フローは足並みの 1 歩で、積み上げ集計の集計し直しは取得の行の外で数え、レポート・一括の問い合わせ・検索は別の予算で抑える | accepted |
 | [0042](0042-org-allocations-fair-queuing-and-limit-info.md) | 割り当ては 24 時間の移動の窓で数えて有料の本番だけ 110% まで通し、Worker は組織の仮想時刻で公平に回し、上限の情報は見出しと /limits で返す | accepted |
 | [0043](0043-orgs-editions-licenses-and-users.md) | 組織は種類と状態を持って 30 日の猶予の後に消し、エディションは割り当てと機能だけを変え、ライセンスを権限の上限にし、利用者は消さずに無効にする | accepted |
-| [0044](0044-authentication-better-auth-sso-and-mfa.md) | ログインは自前でホストする Better Auth にし、組織ごとの SAML・OIDC の SSO を持ち、Auth0 の題材を IdP にしない。SSO 以外は MFA を必須にし、画面の API はセッションの Cookie だけで通す | accepted |
+| [0044](0044-authentication-better-auth-sso-and-mfa.md) | ログインは自前でホストする Better Auth にし、組織ごとの SAML・OIDC の SSO を持ち、Auth0 の題材を IdP にしない。SSO を含む全てのログインで MFA を確かめ、特権を持つ利用者はパスキーだけにし、画面の API はセッションの Cookie だけで通す | accepted |
 | [0045](0045-system-permissions-and-delegation.md) | システムの権限を 25 にして依存を決め、権限を渡す人は自分の権限の部分集合しか渡せず、自分より強い利用者を操作できず、最後の管理者を無くせない | accepted |
 | [0046](0046-setup-audit-trail-and-login-history.md) | 監査のイベントは変更と同じトランザクションで追記だけの表に書き、組織ごとのハッシュの鎖と毎日の Object Lock の錨で改ざんを見つける。画面は 180 日、ログインの履歴は 180 日 | accepted |
 | [0047](0047-field-history-tracking-and-retention.md) | 項目の変更の履歴は 1 オブジェクト 20 項目まで、最上位の最後の値との差を同じトランザクションの outbox に書き、別のクラスタの月ごとの分割に写して 18 か月保ち、読みは見る人の共有と FLS で絞る | accepted |
 | [0048](0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md) | 利用者のコードは QuickJS-ng を WASM にしたものを、Runtime の隣の別のプロセスの Wasmtime で燃料とメモリーの上限を付けて動かす | accepted |
-| [0049](0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3・7・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす | accepted |
+| [0049](0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3b・7a・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす | accepted |
 | [0050](0050-packages-namespaces-and-code-isolation.md) | パッケージは名前空間の接頭辞と署名を持つメタデータの束にし、上限は組織と共有して名前空間ごとに計測する。コードの秘密は宛先の登録だけで渡す | accepted |
 | [0051](0051-leak-path-register-and-threat-model.md) | 組織をまたぐ漏えいと、見えないデータの漏えいの経路を 1 つの登録簿にし、経路ごとに否定側のテストと本番の検査を必須にする | accepted |
 | [0052](0052-key-hierarchy-and-per-org-data-keys.md) | KMS の鍵はセルと用途ごとに持ち、組織ごとのデータキーで S3 の組織のファイルとアプリの秘密を暗号化する。レコードは DB の保存時の暗号化だけにし、組織の削除は鍵の破棄で仕上げる | accepted |

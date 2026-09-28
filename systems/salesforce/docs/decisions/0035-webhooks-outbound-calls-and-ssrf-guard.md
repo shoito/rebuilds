@@ -13,7 +13,7 @@ intent は、変更のイベントと組織が定義するイベントを、外�
 
 送る先の URL は組織の管理者が決める。宛先の検査に漏れがあると、本システムの内部（DB、メタデータのサービス、IMDS）に届く（SSRF）。宛先を乗っ取られた管理者が変えると、組織の全てのデータが外へ出る。
 
-本家の Webhook・アウトバウンドメッセージの署名の方式は確かめられなかった（未検証）。rebuilds の他の題材では、Stripe の再構築が本文の署名（`<Brand>-Signature: t=…,v1=…`）と、内部に経路のない送信の VPC と固定の IP を決めた（[stripe の ADR-0025](../../../stripe/docs/decisions/0025-webhook-signing-and-isolated-delivery.md)）。Auth0 の再構築は、ログのストリームを宛先ごとのカーソルで送る形を決めた（[auth0 の ADR-0044](../../../auth0/docs/decisions/0044-log-stream-delivery.md)）。
+本家の Webhook・アウトバウンドメッセージの署名の方式は確かめられなかった（未検証。本システムの設計はこれに依らない。E8 の `webhooks` の着手の時に、移行の文書のために確かめる）。rebuilds の他の題材では、Stripe の再構築が本文の署名（`<Brand>-Signature: t=…,v1=…`）と、内部に経路のない送信の VPC と固定の IP を決めた（[stripe の ADR-0025](../../../stripe/docs/decisions/0025-webhook-signing-and-isolated-delivery.md)）。Auth0 の再構築は、ログのストリームを宛先ごとのカーソルで送る形を決めた（[auth0 の ADR-0044](../../../auth0/docs/decisions/0044-log-stream-delivery.md)）。
 
 ## Options
 

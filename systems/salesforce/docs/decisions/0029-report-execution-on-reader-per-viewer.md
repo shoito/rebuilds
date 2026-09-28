@@ -15,7 +15,7 @@ intent は、レポートとダッシュボードを MVP に含め、「利用�
 - 見る人ごとに見られる行が違う。同じレポートでも、見る人で件数と合計が違う。
 - 集計は重く、対話のトランザクションの上限（問い合わせ 100、取得の行 50,000。[ADR-0005](0005-tenancy-and-governor-limits.md)）に収まらないことが多い。
 
-本家（2026-09-28 に確認）：表形式・サマリー・マトリックスを同期・非同期で実行できる。API は最初の 2,000 行、列 100 まで。組織で 1 時間に同期 500（同時 20）、非同期 1,200。非同期の結果は 24 時間（[Reports and Dashboards REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_analytics_rest_api.pdf)、Winter '27 版）。大きなデータでは、親に集計を持たせ、集計用のオブジェクトを作るよう勧める（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。集計が見えない行を数えないかの資料は確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：表形式・サマリー・マトリックスを同期・非同期で実行できる。API は最初の 2,000 行、列 100 まで。組織で 1 時間に同期 500（同時 20）、非同期 1,200。非同期の結果は 24 時間（[Reports and Dashboards REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_analytics_rest_api.pdf)、Winter '27 版）。大きなデータでは、親に集計を持たせ、集計用のオブジェクトを作るよう勧める（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。集計が見えない行を数えないかは、公開の資料に書かれていない（未検証。E7 の `report-compile-and-fls` で試用の組織で確かめる）。
 
 ## Options
 
@@ -48,7 +48,7 @@ intent は、レポートとダッシュボードを MVP に含め、「利用�
   - 見る人ごとに集計するので、同じレポートを多くの人が開くと、同じ計算を何度もする。短いキャッシュ（利用者ごと）だけで受ける。
   - reader の遅れの分、保存の直後の値が出ないことがある。
   - reader の障害の時は、レポートが待つ。
-  - 本家の集計の振る舞い（未検証）と違いうる。
+  - 本家の集計の振る舞い（未検証。E7 の `report-compile-and-fls` で確かめる）と違いうる。
 
 ## Confirmation
 

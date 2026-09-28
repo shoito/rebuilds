@@ -15,7 +15,7 @@ intent は「項目やオブジェクトを削除しても、一定の期間は�
 
 - 削除は IsDeleted の印で、15 日は戻せる。主従の親を戻すと子も戻る（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)）。
 - ごみ箱の行も DB に残り、問い合わせは除外する必要があり、性能に響く。ごみ箱は保存の容量に数えず、件数の上限もない。15 日の後に完全な削除の予定に入るが、時刻は保証しない。一括の API に、ごみ箱を通らない完全な削除がある（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。
-- 戻せる人の規則、ごみ箱の間の一意の値の扱いは、確かめられなかった（未検証）。
+- 自分が消したレコードは、そのレコードを読める人が戻せる。他の人が消したレコードを戻すには「すべてのデータの編集」が要る。ごみ箱のレコードはストレージに数えない（[View, Restore, and Manage Items in the Recycle Bin](https://help.salesforce.com/s/articleView?id=xcloud.home_delete.htm&type=5)、2026-09-28 に確認）。ごみ箱の間の一意の値の扱いは公開の資料に書かれていない（未検証。E3 の `recycle-bin-and-purge` で試用の組織で確かめる）。
 
 決めること：ごみ箱の間のピボット・一意・参照の扱い、戻す単位、確定の後に消し終える期限。
 

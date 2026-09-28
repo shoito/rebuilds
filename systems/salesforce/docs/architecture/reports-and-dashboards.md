@@ -5,7 +5,7 @@
 - レポートは、定義（AST）を見る人の権限で毎回コンパイルし、オブジェクトごとの共有の条件と FLS をかけてから、Aurora の reader で集計する。予算に収まらない実行は、自動で非同期の実行に切り替える。見る人をまたいで共有する事前の集計は持たず、結果のキャッシュも見る人ごとにする（[ADR-0029](../decisions/0029-report-execution-on-reader-per-viewer.md)）。
 - ダッシュボードは、見る人の権限で集計する形を既定にし、本家の「指定した実行ユーザー」の形は持たない。上司が部下の視点で見る形は、部下の権限と見る人の権限の**共通部分**で集計する。定期の配信も受け取る人ごとに実行する（[ADR-0030](../decisions/0030-dashboards-viewer-intersection-and-subscriptions.md)）。
 
-本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。ヘルプの記事は検索結果の要約でしか読めなかったものが多く、その値は未検証として扱う。
+本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。ヘルプの記事は、2026-09-28 にブラウザーで本文を読んで確かめた。
 
 ## 1. 目的と範囲
 
@@ -33,11 +33,11 @@
 | 通知 | 1 人の利用者が購読できるレポートは 5 | RD API |
 | カスタムのレポートの型 | 主のオブジェクトに、最大 4 つのオブジェクトを結べる。外部結合（あってもなくても）を選べる。外部結合の後に内部結合を置けない | [Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)（Winter '27 版、以下「MDAPI」）の ReportType |
 | ダッシュボードの見え方 | 指定した実行ユーザー（全員がその人の権限で見る）、ログインしている利用者（動的なダッシュボード）、自分のチームの利用者（上司が部下の視点で見る）の 3 つ | MDAPI の Dashboard（`dashboardType`）、RD API |
-| 動的なダッシュボードの数 | Enterprise 5、Unlimited 10、Developer 3 | [Dynamic Dashboards](https://help.salesforce.com/s/articleView?language=en_US&id=analytics.dashboards_dynamic_overview.htm&type=5)（ヘルプの要約。未検証） |
-| 実行ユーザーの選び方 | 他の人を実行ユーザーにするには「すべてのデータの参照」が要る。「自分のチームのダッシュボードの参照」で部下の視点を選べる | [Configure Dashboard Data Visibility](https://help.salesforce.com/s/articleView?id=sf.dashboards_select_running_user.htm&language=en_US&type=5)（ヘルプの要約。未検証） |
-| 画面の上限 | 表示 2,000 行。サマリーのグループ 3 段、マトリックスの行 2・列 2。条件 20。クロス条件 3（各 5 の副条件）。グラフのグループ 2,000。ダッシュボードの部品 20（Lightning は部品 25 のうちグラフと表 20）。ダッシュボードの条件 5（各 50 の値） | [Reports and Dashboards Limits and Allocations](https://help.salesforce.com/s/articleView?id=rd_reports_dashboards_limits.htm&language=en_US&type=5)（ヘルプの要約。未検証） |
+| 動的なダッシュボードの数 | Enterprise 5、Unlimited 10、Developer 3 | [Dynamic Dashboards](https://help.salesforce.com/s/articleView?id=analytics.dashboards_dynamic_overview.htm&type=5)（2026-09-28 に確認。Performance も 10。動的なダッシュボードは定期の更新と購読ができない） |
+| 実行ユーザーの選び方 | 他の人を実行ユーザーにするには「自分のチームのダッシュボードの参照」か「すべてのデータの参照」が要る。「ログインしている利用者として実行」を選ぶには「動的なダッシュボードの管理」が要る。「自分のチームのダッシュボードの参照」か「すべてのデータの参照」を持つ上司は、部下の視点で下見できる | [Configure Dashboard Data Visibility in Salesforce Classic](https://help.salesforce.com/s/articleView?id=analytics.dashboards_select_running_user.htm&type=5)、[Dynamic Dashboards](https://help.salesforce.com/s/articleView?id=analytics.dashboards_dynamic_overview.htm&type=5)（2026-09-28 に確認） |
+| 画面の上限 | 表示 2,000 行。条件 20。クロス条件 3（各 5 の副条件）。グラフのグループ 2,000（Lightning）。ダッシュボードの部品 25（うちグラフと表 20）。ダッシュボードの条件 5（各 50 の値）。部品の集計は最初の 1,000 グループまで。レポートは既定で 10 分で時間切れ。サマリーのグループの段（3）とマトリックスの行・列（2・2）は、この記事に書かれていない（未検証。E7 の `report-definition` で確かめる） | [Reports and Dashboards Limits and Allocations](https://help.salesforce.com/s/articleView?id=analytics.rd_reports_dashboards_limits.htm&type=5)（2026-09-28 に確認） |
 | 大きなデータのレポート | 選択的な条件、索引のある項目の条件、結合の数を減らす、親に集計を持たせる（子を集計させない）、集計用のオブジェクトを作る | [Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)（以下「LDV」） |
-| レポートと共有 | 見る人の共有で行を絞ることは本家の前提と読めるが、集計の中身（見えない行を数えないか）の資料は確かめられなかった（未検証） | — |
+| レポートと共有 | 見る人の共有で行を絞ることは本家の前提と読めるが、集計の中身（見えない行を数えないか）は公開の資料に書かれていない（未検証。E7 の `report-compile-and-fls` で試用の組織で確かめる） | — |
 
 ## 3. レポートの型
 
@@ -195,7 +195,7 @@ report_type（api_name、label、category、deployed）
 - 形式として：DB の状態 S、見る人 U、レポート R について、`run(R, U, S) = evaluate(R, restrict(S, U))`。`restrict(S, U)` は、U が `read` 以上で見られない行を消し、U が読めない項目を DT-RPT-001 で扱った状態。`evaluate` は、問い合わせの言語の参照の評価器で集計したもの。これを性質ベーステストの性質（`PROP-RPT-001`）にする。
 - 外部結合（あってもなくても）では、子が全て見えない親は「子のない親」として出る。見る人から見た世界として一貫する。
 - 組織全体の統計（計画の見積もり）を、結果にも画面にも出さない。
-- 本家の集計が見えない行を数えないかの資料は確かめられなかった（未検証）。本システムは intent の約束として守る。
+- 本家の集計が見えない行を数えないかは、公開の資料に書かれていない（未検証。E7 の `report-compile-and-fls` で確かめる）。本システムは intent の約束として守る。
 
 ## 7. ダッシュボード（ADR-0030）
 
@@ -211,7 +211,7 @@ dashboard（folder、版、layout）
       └─ 表示の設定（並べ方、上位 N、単位）
 ```
 
-- 部品 20・条件 5（各 50 の値）は、本家の値に合わせる（2 節。ヘルプの要約）。
+- 部品 20・条件 5（各 50 の値）は、本家の値に合わせる（2 節。本家の部品は 25 で、そのうちグラフと表が 20）。
 - 部品は、元のレポートの定義に、ダッシュボードの条件を足したものを実行する。
 
 ### 7.2 見え方
@@ -262,19 +262,21 @@ dashboard（folder、版、layout）
 | --- | --- | --- |
 | レポートの型のオブジェクト | 4 | 4（MDAPI） |
 | 列 | 100 | 100（RD API） |
-| 表示の詳細の行 | 2,000 | 2,000（RD API、ヘルプの要約） |
-| グループ | サマリー 3、マトリックス 行 2・列 2 | 同じ（ヘルプの要約） |
-| 条件 | 20 | 20（RD API、ヘルプの要約） |
-| クロス条件 | 3（副条件 5） | 3・5（ヘルプの要約） |
-| グラフ・集計のグループ | 2,000 | 2,000（ヘルプの要約） |
+| 表示の詳細の行 | 2,000 | 2,000（RD API、2 節） |
+| グループ | サマリー 3、マトリックス 行 2・列 2 | 未検証（2 節） |
+| 条件 | 20 | 20（RD API、2 節） |
+| クロス条件 | 3（副条件 5） | 3・5（2 節） |
+| グラフ・集計のグループ | 2,000 | 2,000（2 節） |
 | 同期の実行（API、組織、1 時間） | 500 | 500（RD API） |
 | 非同期の実行（組織、1 時間） | 1,200 | 1,200（RD API） |
 | 同時の同期の実行 | 利用者 2、組織 20 | 組織 20（RD API） |
 | 非同期の結果の保持 | 24 時間 | 24 時間（RD API） |
-| ダッシュボードの部品・条件 | 20・5（各 50 の値） | 20・5（ヘルプの要約） |
+| ダッシュボードの部品・条件 | 20・5（各 50 の値） | グラフと表 20（部品 25）・5（2 節） |
 | ダッシュボードの更新・結果の取得（組織、1 時間） | 200・5,000 | 200・5,000（RD API） |
 | 1 人の購読 | 5 | 5（RD API） |
 | エクスポート | 100 万行 | 未検証 |
+
+本家の列の「未検証」は、本家の値を公開の資料で確かめていないもの。本システムの値は本家に依らず、E12 の `limits-final-values` で決める。
 
 ## 10. 障害のとき
 
@@ -353,7 +355,7 @@ dashboard（folder、版、layout）
 ## 16. 未解決の問い
 
 - 本家の「指定した実行ユーザー」のダッシュボードを持たないことを、PM が受け入れるか。本家から移る組織では、全員が同じ数字を見る経営のダッシュボードが作れなくなる。
-- 本家のレポートの集計が、見えない行を数えないか（未検証）。
+- 本家のレポートの集計が、見えない行を数えないか（未検証。E7 の `report-compile-and-fls` で確かめる）。
 - 同期の予算（20 秒、100 万行）は、画面の体験として妥当か。
 - レポートを writer で実行しない方針で、reader の障害の時にレポートが止まってよいか。
 - 分析用の写し（S2）の置き場所。

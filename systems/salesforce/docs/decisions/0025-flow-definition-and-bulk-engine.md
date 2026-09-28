@@ -18,7 +18,9 @@ date: 2026-09-28
 - 「要素の実行の数」を何で数えるか。実行（インタビュー）ごとに数えると、200 件の塊で 10 要素のフローが 2,000 に達し、一括の取り込みが動かない。
 - 実行の文脈（利用者の権限か、システムか）。
 
-本家（2026-09-28 に確認）：フローは起動の種類（保存の前・後、スケジュールなど）、実行の順の番号、実行の文脈（既定、システムで共有を守る、全てのデータ、利用者の権限）を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。フローは Apex の上限に従い、超えるとトランザクション全体を巻き戻す（ヘルプの要約。未検証）。本家が要素の実行をどう数えるかは確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：フローは起動の種類（保存の前・後、スケジュールなど）、実行の順の番号、実行の文脈（既定、システムで共有を守る、全てのデータ、利用者の権限）を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。フローは Apex の上限（問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10 秒）に従い、超えると `fault` の経路があってもトランザクション全体を巻き戻す（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。本家は API の版 57.0 で、フローの要素の数の上限（2,000）をなくした。1 つのフローの版は 50 まで（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。
+
+> 2026-09-28 の注記：本家が要素の上限をなくしたことを確かめた。本システムは、CPU 時間を近似でしか数えない（[governor-limits.md](../architecture/governor-limits.md) の 4 節）ので、無限の繰り返しを止めるために要素の実行の上限（2,000、足並みの 1 歩で数える）を残す。本家との差として移行の文書に書く。決定は変えない。
 
 ## Options
 

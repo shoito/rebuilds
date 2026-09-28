@@ -21,7 +21,7 @@ date: 2026-09-28
 
 - 数式は 3,900 文字まで。コンパイル後 15,000 バイトまで。参照した数式の大きさが加わる（[Tips for Reducing Formula Size](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_formula_size_tipsheet.pdf)）。
 - 決定的な数式には索引を張れる。他のオブジェクトを参照する数式、時刻で変わる数式には張れない（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。
-- 参照先の項目の FLS と数式の値の関係は、確かめられなかった（未検証）。
+- 参照先の項目の FLS と数式の値の関係は、公開の資料に書かれていない（未検証。E6 の `formula-indexing-and-fls` で試用の組織で確かめ、移行の文書に書く）。
 
 ## Options
 

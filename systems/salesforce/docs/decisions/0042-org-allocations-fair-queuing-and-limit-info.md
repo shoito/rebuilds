@@ -14,7 +14,7 @@ date: 2026-09-28
 本家（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-28 に確認）：
 
 - Enterprise の API は 24 時間で 100,000＋ライセンス × 1,000。組織の全体で数える。
-- 有料で有効な組織は、急な増加に備えて一定の量だけ超えて動き、超えられる量に上限がある。試用・Developer・Sandbox には効かない。量は公開されていない（未検証）。
+- 有料で有効な組織は、急な増加に備えて一定の量だけ超えて動き、超えられる量に上限がある。試用・Developer・Sandbox には効かない。量は資料に書かれていない。
 - 使用量を `Sforce-Limit-Info` と `/limits` で返し、割合を超えたらメールで知らせられる。
 - 長い要求（20 秒以上）の同時実行は 25。
 
@@ -63,7 +63,7 @@ Worker の順番：
 - 引き受けるコスト：
   - Valkey の障害の間は、割り当てを守らない（fail open）。
   - `jobs` の表の取り出しが Aurora の負荷になる。S2 の前に測る。
-  - 110% の超過の量は本家と違いうる（未検証）。
+  - 本家は超過の量を公開していないので、110% は本家と違いうる。
 
 ## Confirmation
 

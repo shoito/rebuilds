@@ -26,12 +26,12 @@
 | リストビューの形 | 列、条件の行、条件の論理（`(1 AND 2) OR 3`）、範囲（`filterScope`）、共有先（`sharedTo`）を持つ。「自分だけ」のリストビューはメタデータとして扱えない | [Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)（Winter '27 版、以下「MDAPI」）の ListView |
 | 条件の演算 | 等しい、等しくない、より小さい、より大きい、以下、以上、含む、含まない、で始まる、複数選択の含む・含まない | MDAPI の ListView |
 | 範囲 | すべて、自分の、自分とキュー、キュー、チーム（部下）、商談チームなど | MDAPI の FilterScope |
-| 列と条件の数 | 列 15、条件の行 10 と読める記事とコミュニティの投稿がある。本家のヘルプは読めなかった（未検証） | [Edit List View Filters in Lightning Experience](https://help.salesforce.com/s/articleView?id=xcloud.customviews_edit_filters_lex.htm&language=en_US)（未検証） |
+| 列と条件の数 | 列 15、条件の行 10 と読める記事とコミュニティの投稿がある。本家のヘルプ（条件の編集の記事）には数が書かれていない（未検証。E5 の `list-views` で試用の組織で確かめる）。条件の値は 32 ビットの整数の範囲まで、`NOT` は括弧の式に効かない | [Edit List View Filters in Lightning Experience](https://help.salesforce.com/s/articleView?id=xcloud.customviews_edit_filters_lex.htm&type=5)（2026-09-28 に確認） |
 | リストビューの問い合わせ | リストビュー・レポート・問い合わせは、同じ問い合わせの最適化器で選択性を判定する | [Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)（以下「LDV」） |
 | レイアウトの種類 | 画面の API は、レイアウトを `Full` と `Compact` の種類、作成・編集・表示のモードで返す。FLS・共有・権限を確かめて返す | [User Interface API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_ui.pdf)（Winter '27 版、以下「UI API」） |
 | レイアウトの項目の数 | 250 項目を超えるレイアウトは、自動で作る問い合わせが大きくなりすぎて失敗しうる | [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（以下「Limits」） |
-| レイアウトの必須と API | レイアウトで必須にした項目が API の保存でも必須になるかは、確かめられなかった（未検証。一般には画面だけと言われる） | — |
-| レコードタイプ | レコードタイプごとに使える選択リストの値を持つ。プロファイルでレコードタイプとレイアウトを割り当てる | MDAPI の RecordType、Layout（細部は未検証） |
+| レイアウトの必須と API | レイアウトで必須にした項目が API の保存でも必須になるかは、確かめられなかった（未検証。一般には画面だけと言われる。E4 の `layout-access-dt-ui` で試用の組織で確かめる） | — |
+| レコードタイプ | レコードタイプごとに使える選択リストの値を持つ。プロファイルでレコードタイプとレイアウトを割り当てる | MDAPI の RecordType、Layout。プロファイルが既定のレコードタイプとレイアウトを持つことは [Permissions in Profiles Retirement Cancelled](https://help.salesforce.com/s/articleView?id=003834041&type=1)（2026-09-28 に確認） |
 
 ## 3. ページレイアウト（ADR-0023）
 
@@ -77,7 +77,7 @@ layout（object、api_name、版）
 
 - **レイアウトは狭めるだけで、広げない。** FLS で読めない項目がレイアウトにあっても出さない（行 1）。レイアウトにない項目は画面に出ないが、API では FLS のとおり読み書きできる。
 - **レイアウトの `readonly`・`required` は画面の保存だけに効く。** 画面の保存の要求は `layout_id` を付け、Runtime は保存の手順 2 で、そのレイアウトの `readonly` の項目の変更を 400 `FIELD_NOT_EDITABLE`、`required` の項目の空を 400 `REQUIRED_FIELD_MISSING` にする。`layout_id` のない API の保存には効かない。どの経路でも守りたい規則は、項目の `required` か入力規則で書く（Setup にそう書く）。
-- 本家のレイアウトの必須が API に効くかは未検証（2 節）。本システムは、効く範囲を要求の印で明示する。
+- 本家のレイアウトの必須が API に効くかは未検証（2 節。E4 の `layout-access-dt-ui` で確かめる）。本システムは、効く範囲を要求の印で明示する。
 
 ### 3.4 レコードタイプ
 
@@ -152,7 +152,7 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 - 条件は、問い合わせの言語の AST の部分集合を JSON にしたもの（[ADR-0018](../decisions/0018-record-query-language.md) は、画面とフローが AST の JSON を直接作ってよいとした）。項目は API の名前ではなく `field_id` で保存し、名前の変更で壊れないようにする（上の例は読みやすさのため名前で書いた）。
 - 演算：`eq`、`ne`、`lt`、`gt`、`le`、`ge`、`contains`、`not_contains`、`starts_with`、`in`、`not_in`、`is_null`、`is_not_null`、`has_any`、`has_none`。値は定数、日付の関数、`$me`（見る人）だけ。本家の演算（MDAPI）に寄せる。
 - `scope`：`all`、`mine`、`team`（本人と部下）、`queues`（本人のキュー）、`mine_and_queues`。問い合わせの言語の `SCOPE` に写す。**共有の条件に加えて絞るだけで、広げない**（ADR-0018）。
-- 上限：条件の行 10、列 15、並べ替え 2、親への参照 2 段。本家の値は未検証（2 節）。10 行を超える条件が要る時は、数式の項目かレポートを勧める。
+- 上限：条件の行 10、列 15、並べ替え 2、親への参照 2 段。本家の値は未検証（2 節。E5 の `list-views` で確かめる）。10 行を超える条件が要る時は、数式の項目かレポートを勧める。
 - `visibility`：`private`（作った人だけ）、`all`（組織の全員）、`groups`（公開グループ・ロール・ロールと部下）。
 
 ### 5.2 コンパイルと実行
@@ -305,8 +305,8 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 
 ## 14. 未解決の問い
 
-- レイアウトの `required` を API にも効かせるべきか（本家の振る舞いは未検証）。
-- リストビューの条件 10・列 15 で足りるか（本家の値は未検証）。
+- レイアウトの `required` を API にも効かせるべきか（本家の振る舞いは未検証。E4 の `layout-access-dt-ui` で確かめる）。
+- リストビューの条件 10・列 15 で足りるか（本家の値は未検証。E5 の `list-views` で確かめる）。
 - 読めない項目を条件に持つ共有のリストビューを、開けなくする代わりに「その人用の写し」を作る案を持つか。
 - 関連リストに件数を出さないことで、利用者が困らないか。
 - 本家のページのビルダー（部品を自由に並べる画面）に相当するものを MVP に入れるか。

@@ -19,7 +19,7 @@ date: 2026-09-28
 
 上限の値が領域ごとの表に散ると、同じ上限に 2 つの値が生まれ、試験と実装がずれる。
 
-本家は、フローが Apex の上限に従うとする（ヘルプの要約。未検証）。要素の数え方と、積み上げ集計の読みの数え方は確かめられなかった（未検証）。本家の上限の一覧は 1 つの資料（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-28 に確認）にまとまっている。
+本家は、フローが Apex の上限に従い、超えるとトランザクション全体を巻き戻すとする（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。フローの要素の数の上限は、API の版 57.0 でなくした（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。積み上げ集計の読みの数え方は、公開の資料に書かれていない（未検証。E6 の `flow-limit-counting` で試用の組織で確かめる）。本家の上限は、組織の割り当てが [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf) に、1 トランザクションの上限が [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf) の「Execution Governors and Limits」にある（どちらも Winter '27 版、2026-09-28 に確認）。
 
 ## Options
 
@@ -66,7 +66,7 @@ date: 2026-09-28
   - 子の多い親の子の保存が、上限で止まらない。
   - 一括の問い合わせとレポートが、読みの量に見合った予算で動く。
 - 引き受けるコスト：
-  - 数え方が本家と違いうる（未検証）。移行の文書に書く。
+  - 数え方が本家と違う（本家はフローの要素の数に上限を持たない。積み上げ集計の読みの数え方は未検証）。移行の文書に書く。
   - 積み上げ集計の例外で、1 回の保存が最大 5 万行を読む。E12 で p99 を測る。
   - 予算は種類ごとに別なので、組織ごとの DB の時間でまとめて見る必要がある（[ADR-0042](0042-org-allocations-fair-queuing-and-limit-info.md)）。
 

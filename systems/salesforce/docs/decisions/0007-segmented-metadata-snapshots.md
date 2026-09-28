@@ -15,7 +15,7 @@ date: 2026-09-28
 - 1 件の要求は、多くの場合、数個のオブジェクトしか使わない。全体のスナップショットを毎回読み込むのは無駄が多い。
 - S3 では 50 万の組織があり、全ての組織の全体のスナップショットを Valkey に置くと大きい。
 
-本家は、よく使うメタデータを大きなメタデータのキャッシュに載せる（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、2026-09-28 に確認）。キャッシュの単位は公開されていない（未検証）。
+本家は、よく使うメタデータを大きなメタデータのキャッシュに載せる（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、2026-09-28 に確認）。キャッシュの単位は公開の資料に書かれていない。
 
 ## Options
 

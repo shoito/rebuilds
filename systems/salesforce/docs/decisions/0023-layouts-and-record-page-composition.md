@@ -15,7 +15,7 @@ date: 2026-09-28
 - レイアウトは組織・プロファイル・レコードタイプごとに違い、メタデータの版で変わる（[ADR-0003](0003-metadata-driven-runtime.md)、[ADR-0007](0007-segmented-metadata-snapshots.md) の `layouts:<object_id>` の部品）。
 - レイアウトの「読むだけ」「必須」を、アクセス制御と取り違えると、API から書き換えられる穴になる。
 
-本家（2026-09-28 に確認）：画面の API は、レイアウトの種類（`Full`・`Compact`）とモード（作成・編集・表示）でレイアウトと値を返し、FLS・共有・権限を確かめる（[User Interface API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_ui.pdf)、Winter '27 版）。250 項目を超えるレイアウトは、自動で作る問い合わせが大きくなりすぎて失敗しうる（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)）。レイアウトの必須が API の保存に効くかは未検証。
+本家（2026-09-28 に確認）：画面の API は、レイアウトの種類（`Full`・`Compact`）とモード（作成・編集・表示）でレイアウトと値を返し、FLS・共有・権限を確かめる（[User Interface API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_ui.pdf)、Winter '27 版）。250 項目を超えるレイアウトは、自動で作る問い合わせが大きくなりすぎて失敗しうる（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)）。レイアウトの必須が API の保存に効くかは、公開の資料に書かれていない（未検証。E4 の `layout-access-dt-ui` で試用の組織で確かめる）。
 
 ## Options
 

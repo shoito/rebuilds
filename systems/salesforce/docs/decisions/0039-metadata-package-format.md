@@ -13,7 +13,7 @@ intent は、組織の間のメタデータのデプロイを MVP に含め、�
 
 組織ごとに ID は違いうる（Sandbox は同じ ID を持つが、別の系統の組織や、作り直した部品は違う）。項目の名前は変わりうる。
 
-本家のメタデータの API は、1 回 10,000 ファイル、zip 39MB（base64 の後 50MB）、展開して 600MB まで（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）。本家のプロファイルのデプロイの合わせ方の細部は確かめられなかった（未検証）。
+本家のメタデータの API は、1 回 10,000 ファイル、zip 39MB（base64 の後 50MB）、展開して 600MB まで（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）。本家のプロファイルは、取り出しの要求に含めた部品の分の設定だけを持ち、デプロイでは書いた分だけを当てて、書いていない標準のオブジェクト・項目の権限を上書きしない（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Profile、2026-09-28 に確認）。
 
 ## Options
 

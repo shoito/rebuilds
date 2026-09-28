@@ -13,7 +13,7 @@ intent は、組織の作成、エディションとライセンス、利用者�
 
 - 利用者は、レコードの所有者・作成者・更新者・承認者・履歴の変更者として、多くの行から指される。
 - 法務の L1 は、本人からの請求での個人データの扱いを問う。L7 は、解約時のデータの返却と削除を問う。
-- 本家の価格の段（Starter Suite、Pro Suite、Core、Advanced、Max など）と機能の差は、要約でしか確かめていない（intent。未検証）。本家は、ライセンスの種類ごとに API の割り当てが違う（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-28 に確認）。
+- 本家の価格の段（Starter Suite、Pro Suite、Core、Advanced、Max など）は intent に書いた。機能の差のうち、API の割り当て（ライセンスあたり Enterprise 1,000・Unlimited 5,000。[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)）、Sandbox の数（[Sandbox Licenses and Storage Limits by Type](https://help.salesforce.com/s/articleView?id=platform.data_sandbox_environments.htm&type=5)）、カスタムオブジェクト（Enterprise 200）・1 オブジェクトのカスタム項目（Enterprise 500、Unlimited 800）・有効な入力規則（Enterprise 100）（[Salesforce Enterprise Edition Allocations](https://help.salesforce.com/s/articleView?id=xcloud.overview_limits_enterprise.htm&type=5)）を確かめた（どれも 2026-09-28 に確認）。価格の段と、これらのエディションの名前の対応は、価格のページだけでは読めない。
 
 ## Options
 

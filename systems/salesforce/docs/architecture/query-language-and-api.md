@@ -30,7 +30,7 @@
 | 1 回の結果の大きさ | 既定・最大 2,000 件、最小 200 件。ロングテキストを 2 つ以上選ぶと 200 件まで | [REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_rest.pdf)（Winter '27 版、以下「REST」）、SOQL |
 | 次のページ | REST は `nextRecordsUrl` で続きを読む | SOQL |
 | 選択性の閾値 | 標準の索引：最初の 100 万件の 30%、それ以降の 15%。カスタムの索引：最初の 100 万件の 10%、それ以降の 5%。条件を満たさない索引だけが外れる | [Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)（以下「LDV」） |
-| 閾値の上限 | カスタムの索引は 333,333 件、標準の索引は 100 万件が上限と、ヘルプの記事の検索結果の要約で読めた。本文は読めなかった（未検証） | [Make Salesforce Platform SOQL Query Selective](https://help.salesforce.com/s/articleView?id=000385218&language=en_US&type=1) |
+| 閾値の上限 | カスタムの索引は 333,333 件、標準の索引は 100 万件が上限（どちらも全体が 560 万件を超えた時に当たる） | [Make Salesforce Platform SOQL Query Selective](https://help.salesforce.com/s/articleView?id=000385218&type=1)（2026-09-28 に確認） |
 | AND・OR | AND の複合の条件は、各条件が閾値の 2 倍以内か、交わりが閾値以内なら選択的。OR は各条件が閾値を満たす必要がある。OR の全ての項目に索引が要る | LDV |
 | 統計 | 組織・グループ・利用者の単位の統計を持つ。選択リストの値の数、カスタム索引の非空の値と一意の値の数 | [Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html) |
 | 事前の問い合わせ | 統計の表への事前の問い合わせで、索引を使うかを決める | LDV |
@@ -138,7 +138,7 @@ LIMIT 50
 
 - 集計の関数と `GROUP BY` は、同じ `SELECT` にグループの項目以外の項目を混ぜられない。子の副問い合わせとも混ぜられない。
 - 結果のグループは 2,000 行まで。超えたら `LIMIT_EXCEEDED`。カーソルは使えない。大きな集計はレポート（reports-and-dashboards の領域）か一括の問い合わせで行う。
-- 集計した行の数は、トランザクションの「問い合わせで取得する行」（ADR-0005、50,000）に数える。数えないと、上限の外で大きな読みができるため。本家の数え方は未検証。
+- 集計した行の数は、トランザクションの「問い合わせで取得する行」（ADR-0005、50,000）に数える。数えないと、上限の外で大きな読みができるため。本家も、`COUNT()` 以外の集計の関数は集計に使った行を全て取得の行に数える（`COUNT()` は 1 行、`GROUP BY` があればグループごとに 1 行。[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版、2026-09-28 に確認）。本システムは `COUNT()` も使った行で数え、本家より厳しい。
 - 例外（[ADR-0041](../decisions/0041-limits-registry-and-counting-rules.md)、ADR-0018 の 2026-09-28 の注記）：保存の手順 8 の積み上げ集計の集計し直しは取得の行に数えない（子 5 万件の `rollup.sync_recalc_children` で抑える）。レポート（`report.*`）と一括の問い合わせ（`bulk.query`）は、トランザクションの上限の外の予算で抑える。
 - 見る人が読めるレコードだけを集計する（共有の条件と FLS をかけてから集計する）。
 
@@ -152,15 +152,17 @@ LIMIT 50
 | 親への別々の関係 | 35 | 55（SOQL） |
 | 子の副問い合わせ | 10 | 20（SOQL） |
 | 子の副問い合わせの段 | 1 | 5（SOQL） |
-| 半結合 | 2 | 未検証 |
+| 半結合 | 2 | 1 つの半結合・反結合の問い合わせの副問い合わせ 2（SOQL） |
 | `IN` の値 | 1,000 | 未検証 |
-| `GROUP BY` の項目 | 3 | 未検証 |
-| 集計の結果のグループ | 2,000 | 未検証 |
+| `GROUP BY` の項目 | 3 | `ROLLUP`・`CUBE` は 3（SOQL）。ただの `GROUP BY` の上限は書かれていない |
+| 集計の結果のグループ | 2,000 | 集計の結果は `queryMore` できず、Apex の for で 2,000 行を超えると実行時の例外（Apex Developer Guide） |
 | `OFFSET` | 2,000 | 2,000（SOQL） |
 | 1 ページの件数 | 200〜2,000、既定 2,000（ロングテキストを 2 つ以上選ぶと 200） | 同じ（REST、SOQL） |
 | AST の節（数式の項目を展開した後） | 5,000 | 値は未公開（SOQL の `QUERY_TOO_COMPLICATED`） |
 | 生成した SQL の結合 | 20 | — |
-| 同期の問い合わせの時間 | 30 秒 | 未検証 |
+| 同期の問い合わせの時間 | 30 秒 | 実行 2 分、結果の処理 30 分（Limits） |
+
+本家の列の「未検証」は、本家の値を公開の資料で確かめていないもの。本システムの値は本家に依らず、E12 の `limits-final-values` で決める。
 
 - 値は governor-limits の領域の一覧にも載せる。トランザクションの上限（問い合わせの数、取得の行）は ADR-0005 の値に従う。
 - 本家より関係と副問い合わせの数を小さくするのは、生成する SQL の結合の数を抑えるためである。E12 で見直す。
@@ -217,7 +219,7 @@ ADR-0003 の段に沿って、次の順に処理する。
 | システムの列（`id`、`owner_id`、`created_at`、`updated_at`、`record_type_id`、`parent_id`、名前） | `0.30 × min(N, 100万) + 0.15 × max(N − 100万, 0)` | 100 万件 |
 | ピボット（`record_index_values`） | `0.10 × min(N, 100万) + 0.05 × max(N − 100万, 0)` | 333,333 件 |
 
-- 本家の閾値（LDV）と上限（未検証）に合わせる。本家から移る管理者が、同じ感覚で索引を選べるようにするため。
+- 本家の閾値（LDV）と上限（2 節）に合わせる。本家から移る管理者が、同じ感覚で索引を選べるようにするため。
 - **AND**：選択的な条件のうち、見積もりの最も小さいものから進め、残りは結んだ後に当てる。複数の条件をまたいだ索引（2 列の索引）は持たない。
 - **OR**：全ての枝が索引のある項目の選択的な条件で、見積もりの和が閾値以内の時だけ、候補の和集合から進める。1 つでも欠ければ、OR 全体は選択的でない。本家も同じ（LDV）。
 - **選択的にならないもの**：`!=`、`NOT IN`、`NOT LIKE`、`HAS_NONE`、先頭が `%` の `LIKE`（trigram を除く）、分類 B〜D の数式（[metadata-and-runtime.md](metadata-and-runtime.md) の 7.3 節）、型の変換中の項目。
@@ -261,7 +263,7 @@ ORDER BY ... LIMIT ...;
 | レポート（reports-and-dashboards の領域） | 問わない | その領域で決める（reader、非同期の実行） |
 
 - エラーの文言に、件数や見積もりを入れない（8 節）。
-- 本家も、選択的でない問い合わせを大きなオブジェクトで断る場面がある。その件数の境目は確かめられなかった（未検証）。
+- 本家も、選択的でない問い合わせを大きなオブジェクトで断る場面がある。その件数の境目は、公開の資料に書かれていない（未検証。E3 の `query-stats-and-planner` で試用の組織で確かめる）。
 
 ### 4.6 計画の説明
 
@@ -339,7 +341,7 @@ ORDER BY ... LIMIT ...;
 ```
 
 - システムの値（`id`、`object`、`row_version`）と、利用者の項目（`fields`）を分ける。カスタムの項目の名前が、システムの値の名前とぶつからない。
-- **数（`number`・`currency`・`percent`）は文字列で返す。** JSON の数を JS の倍精度で読むと、大きな金額や小数が丸まるため。本家は JSON の数で返す（未検証の細部あり）。
+- **数（`number`・`currency`・`percent`）は文字列で返す。** JSON の数を JS の倍精度で読むと、大きな金額や小数が丸まるため。本家の画面の API は、通貨・倍精度・整数・割合を JSON の数で返す（[User Interface API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_ui.pdf)、Winter '27 版、2026-09-28 に確認）。
 - 日付は `YYYY-MM-DD`、日時は UTC の ISO 8601（ミリ秒）。選択リストは `api_value`、複数選択は配列。空の項目は `null` を返す（キーを省かない）。
 - 作成・更新の本文も同じ `fields` の形にする。未知の項目は 400 `INVALID_FIELD`。
 
@@ -366,7 +368,7 @@ ORDER BY ... LIMIT ...;
   - `all_or_none: true`：全体を 1 つのトランザクションで行い、上限を全体で 1 回数える。1 つでも失敗したら全て巻き戻す。
   - `all_or_none: false`：副要求ごとに別のトランザクション。
 - `collections/{object}`：同じオブジェクトの 200 件まで。`all_or_none` は [metadata-and-runtime.md](metadata-and-runtime.md) の 6.3 節の部分の成功に従う。
-- 複合の要求は、API の割り当てに 1 回と数える。本家の数え方は未検証。
+- 複合の要求は、API の割り当てに 1 回と数える。本家も複合の要求と sObject Tree は全体で 1 回と数え、Composite Batch は副の要求ごとに数える（[REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_rest.pdf)、Winter '27 版、2026-09-28 に確認）。
 
 ## 6. 版、エラー、条件付きの要求、上限の見出し（ADR-0020）
 
@@ -501,7 +503,7 @@ ORDER BY ... LIMIT ...;
 - 対話の経路での `NON_SELECTIVE_QUERY` の境目（20 万件）の値。
 - 数を JSON の文字列で返すことで、連携の開発者の手間が増えないか。
 - 冪等キー（`Idempotency-Key`）を作成の API に持つか。
-- 本家の閾値の上限（333,333 件、100 万件）が未検証のまま使ってよいか。
+- 本家の閾値の上限（333,333 件、100 万件）をそのまま使ってよいか。
 
 ### 決定
 
@@ -513,7 +515,7 @@ ORDER BY ... LIMIT ...;
 - `NON_SELECTIVE_QUERY` の境目は 20 万件で始め、E12 の負荷試験で決める。
 - 数は文字列で返す。公式の SDK（ADR-0006 の Consequences）で 10 進の型に直す。
 - 冪等キーは MVP で持たない。外部 ID の upsert を、連携の再試行の手段として案内する。
-- 本家の閾値の上限は未検証のまま使う。本システムの値として持ち、本家との一致は目標にしない。
+- 本家の閾値の上限（2026-09-28 にヘルプで確かめた）を使う。本システムの値として持ち、本家との一致は目標にしない。
 
 ## 13. quality.md・runbooks・data-model に載せるもの
 

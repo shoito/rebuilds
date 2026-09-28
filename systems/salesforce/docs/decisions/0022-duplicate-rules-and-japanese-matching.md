@@ -18,9 +18,9 @@ date: 2026-09-28
 本家（2026-09-28 に確認）：
 
 - 重複の規則は、作成・更新ごとに許可（警告・記録）か止めるかを選び、照合の規則を持つ。共有を守る設定では、見えないレコードとの重複は何も知らせず保存を通す（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の DuplicateRule）。
-- 照合の方法は、完全一致と、名・姓・会社名・電話・市区町村・番地・郵便番号・役職のあいまいな照合（同 MatchingRule）。あいまいな照合は Jaro-Winkler、Metaphone 3、異表記の辞書、編集距離などを使い、会社名の法人格を無視する（ヘルプの要約。本文は未検証）。
-- 有効な重複の規則は 1 オブジェクト 5、照合の規則は 5、1 つの重複の規則に照合の規則 3（ヘルプの要約。未検証）。
-- 日本語の扱いは確かめられなかった（未検証）。
+- 照合の方法は、完全一致と、名・姓・会社名・電話・市区町村・番地・郵便番号・役職のあいまいな照合（同 MatchingRule）。あいまいな照合は Jaro-Winkler、Metaphone 3、異表記の辞書、編集距離などを使い、会社名は「Inc」「Corp」などを外して正規化する（[Matching Algorithms Used with Matching Methods](https://help.salesforce.com/s/articleView?id=sales.matching_rules_matching_algorithms.htm&type=5)、[Standard Account Matching Rule](https://help.salesforce.com/s/articleView?id=sales.matching_rules_standard_account_rule.htm&type=5)、2026-09-28 に確認）。
+- 有効な重複の規則は 1 オブジェクト 5、有効な照合の規則は 1 オブジェクト 5、1 つの重複の規則に照合の規則 3（[Things to Know About Duplicate Rules](https://help.salesforce.com/s/articleView?id=sales.duplicate_rules_overview.htm&type=5)、2026-09-28 に確認）。
+- 日本語（漢字・カナ）の扱いは、資料に書かれていない。電話と住所は区切りごとに比べ、北米のデータに向くと書く（Standard Account Matching Rule）。
 
 ## Options
 

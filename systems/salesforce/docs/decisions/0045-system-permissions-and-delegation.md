@@ -17,7 +17,7 @@ date: 2026-09-28
 
 この ADR の範囲の領域（イベント、一括、Sandbox とデプロイ、認証、監査）も、管理の操作を分ける権限を要する。また、共有の領域の 11 節は、`manage_users` を持つ利用者が自分より強い権限セットを割り当てることを防ぐ規則を、この領域で決めるとした。
 
-本家は、権限セットの `userPermissions` にアプリとシステムの権限を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）。全体の一覧と、委任の規則は確かめられなかった（未検証）。
+本家は、権限セットの `userPermissions` にアプリとシステムの権限を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版、2026-09-28 に確認）。全体の一覧と、委任の規則は、公開の開発者の資料に書かれていない（未検証。本システムの規則は本家に依らない。E4 の `system-permissions-and-delegation` の着手の時に、移行の文書のために確かめる）。
 
 ## Options
 
@@ -29,7 +29,7 @@ date: 2026-09-28
 渡す規則：
 
 - a. **部分集合の規則：渡す権限・操作する相手の権限は、操作する人の権限の部分集合でなければならない。最後の管理者を無くせない**
-- b. `manage_users` を持てば、誰にでも何でも渡せる（本家の既定の振る舞いに近いと読めるが未検証）
+- b. `manage_users` を持てば、誰にでも何でも渡せる（本家の既定の振る舞いに近いと読めるが未検証。上と同じ Story で確かめる）
 - c. 委任の管理者のような、渡せる権限セットの一覧を別に設定する
 
 ## Decision

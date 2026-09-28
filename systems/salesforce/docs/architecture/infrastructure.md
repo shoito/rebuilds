@@ -9,7 +9,7 @@ AWS のアカウントとネットワーク、サービスの分け方、論理�
 
 ログ・メトリクス・SLI は [observability.md](observability.md)、負荷と台数の根拠は [capacity.md](capacity.md)、CI とリリースは [delivery.md](delivery.md)、鍵と統制は [security.md](security.md) にある。
 
-数値のうち「初期見積もり」は、E12 の負荷試験の前の仮の値である。AWS の仕様で確かめていないものは「未検証」と書く。AWS の資料は 2026-09-28 に確かめた。
+数値のうち「初期見積もり」は、E12 の負荷試験の前の仮の値である。AWS の仕様で確かめていないものは「未検証」と書き、確かめる Story を添える。AWS の資料は 2026-09-28 に確かめた。
 
 ## 1. AWS アカウントの構成（ADR-0054）
 
@@ -83,7 +83,7 @@ prod: worker（webhook-sender、署名を付ける）─SQS─▶ prod-egress: s
 | sender（prod-egress） | Webhook・外向きの呼び出しの送信 | なし | SQS の最古のメッセージ、同時送信数 | 2 |
 
 - `runtime` と `worker` のタスクには、E13 から `code-runner`（Rust＋Wasmtime）のコンテナを足す。資格情報の環境変数を渡さず、読み取り専用のファイルシステム、root でない利用者にする。`runtime` とはタスクの中の共有のボリュームの UNIX ドメインソケットでつなぐ（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）。
-- DB の接続：各タスクは writer と reader の接続のプールを持つ。RDS Proxy は使わない（`SET LOCAL` とアドバイザリロックを多く使うため。トランザクションの単位の接続の固定の扱いが未検証）。接続の数の上限は [capacity.md](capacity.md) の 5 節。
+- DB の接続：各タスクは writer と reader の接続のプールを持つ。RDS Proxy は使わない。PostgreSQL では `SET`・`set_config` とセッションの単位のアドバイザリロックが接続を固定（pinning）し、多重化が効かなくなるため（トランザクションの単位のアドバイザリロックは固定しない。[Avoiding pinning an RDS Proxy](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html)、2026-09-28 に確認）。接続の数の上限は [capacity.md](capacity.md) の 5 節。
 - 各サービスは、残る 2 AZ で最大負荷をさばける台数を常に持つ（平常の使用率を 2/3 以下に保つ）。
 - 台数の根拠は [capacity.md](capacity.md)。
 
@@ -122,7 +122,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 | 保存の上限 | 256 TiB（Aurora PostgreSQL 17.5 以降）。表の上限は 32 TiB | [Quotas and constraints for Amazon Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_Limits.html) |
 | reader の上限 | 1 クラスタ 15 | 同 |
 | 分割 | `shard_no` の LIST 分割（256）。監査・ログインの履歴・商談の履歴は月ごと | [ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)、[ADR-0046](../decisions/0046-setup-audit-trail-and-login-history.md) |
-| バックアップ | 自動バックアップ 35 日（最大の日数は未検証）、PITR | [ADR-0053](../decisions/0053-operator-access-and-data-lifecycle.md) |
+| バックアップ | 自動バックアップ 35 日（Aurora の保持は 1〜35 日。[Overview of backing up and restoring an Aurora DB cluster](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Managing.Backups.html)、2026-09-28 に確認）、PITR | [ADR-0053](../decisions/0053-operator-access-and-data-lifecycle.md) |
 | DR | Global Database の副を大阪に（7 節） | ADR-0057 |
 
 - パラメーター：`rds.force_ssl = 1`、`statement_timeout`（ロールごと。`app_runtime` 30 秒、`app_worker` 10 分）、`idle_in_transaction_session_timeout`（2 分）、`log_min_duration_statement`（1 秒）、`track_io_timing`。
@@ -138,7 +138,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 
 - 項目の変更の履歴（`field_history`）を、S1 から主と別のクラスタに置く。18 か月で約 350 億行・約 3.5TB（[capacity.md](capacity.md) の 3 節）で、主のクラスタの履歴以外の全て（約 2.2TB）より大きい。主に置くと、保存の量の段階の基準、VACUUM、PITR の復元、組織の移動の初期の同期が履歴に引きずられる。
 - 形は `events` と同じ：保存の手順 9 が同じトランザクションの outbox（`kind = field_history`）に書き、Relay（論理シャードごとの唯一の書き手）が `history` に `INSERT` する。outbox の行の ID から作る一意の鍵で二重を捨てる。月ごとの範囲の分割で、19 か月目の最初の日に `DROP` する。
-- S1 は `db.r8g.xlarge` の writer 1＋reader 1（履歴の関連リスト、項目の変更の履歴のレポート、消去）。書き込みは平均 750 行/秒・ピーク 3,000 行/秒で、Relay が 1,000 行ずつまとめて書く。Aurora の種類（Standard か I/O-Optimized）は、E11 で I/O の量を測って決める（履歴は書くだけで読みが少ないので Standard が安い見込み。未検証）。
+- S1 は `db.r8g.xlarge` の writer 1＋reader 1（履歴の関連リスト、項目の変更の履歴のレポート、消去）。書き込みは平均 750 行/秒・ピーク 3,000 行/秒で、Relay が 1,000 行ずつまとめて書く。Aurora の種類（Standard か I/O-Optimized）は、E11 で I/O の量を測って決める（履歴は書くだけで読みが少ないので Standard が安い見込み。東京の単価は、Standard が `db.r8g.xlarge` 1 時間 0.666 USD・保存 1 GB 月 0.12 USD・I/O 100 万回 0.24 USD、I/O-Optimized が 0.866 USD・0.27 USD・I/O の料金なし。9 節）。
 - 主・`events` と同じく、Global Database の副を大阪に置く。`history` の障害の間は、outbox にたまり、保存は止めない。履歴の画面と API は 503 にする。
 
 ### 4.4 OpenSearch
@@ -202,7 +202,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 - 組織の表の一覧は、`org_id` の列を持つ全ての表から機械的に作る（手で書かない）。`org_id` を持ち RLS をかける表は約 145（[data-model.md](data-model.md) の 5 節。2026-09-28 に数え直した）。
 - 組織の `shard_no` は変えない（ADR-0055）。行をそのまま写し、分割の形が同じ。
 - 中止：6 までは、購読を消して先の行を消し、`migrating` を外すだけ。7 の後は逆向きの移動。
-- 所要時間の見込み：5,000 万件（約 100GB）の初期の同期に数時間、止めは数十秒（E12 で測る。未検証）。夜間に行う。
+- 所要時間の見込み：5,000 万件（約 100GB）の初期の同期に数時間、止めは数十秒（E12 の `org-migration-tool` で測る。未検証）。夜間に行う。
 
 ### 6.2 移動の間の各部品
 
@@ -268,15 +268,15 @@ infra/
 
 ## 9. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。単価は、ServiceNow の再構築が AWS の Price List API で 2026-09-28 に確かめた東京のオンデマンドの値を使った（[servicenow の infrastructure.md](../../../servicenow/docs/architecture/infrastructure.md) の 10 節）：Aurora PostgreSQL I/O-Optimized `db.r8g.4xlarge` 1 時間 3.464 USD・`db.r8g.2xlarge` 1.732 USD、OpenSearch `r7g.xlarge.search` 0.429 USD・`m7g.large.search` 0.175 USD、Valkey `cache.r7g.large` 0.2104 USD、Fargate ARM vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD。`db.r8g.8xlarge`（4xlarge の 2 倍と置いた）・`db.r8g.xlarge`（2xlarge の半分と置いた）、Aurora の I/O-Optimized の保存の単価、大阪の単価は確かめていない（未検証）。
+**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。単価は、AWS の Price List API で 2026-09-28 に確かめた東京のオンデマンドの値（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.json) ほか同じ形の AmazonES の価格表。Valkey と Fargate は [servicenow の infrastructure.md](../../../servicenow/docs/architecture/infrastructure.md) の 10 節の同じ日の値）：Aurora PostgreSQL I/O-Optimized `db.r8g.8xlarge` 1 時間 6.928 USD・`db.r8g.4xlarge` 3.464 USD・`db.r8g.xlarge` 0.866 USD、Standard `db.r8g.xlarge` 0.666 USD、保存 1 GB 月 I/O-Optimized 0.27 USD・Standard 0.12 USD、Standard の I/O 100 万回 0.24 USD、OpenSearch `r7g.2xlarge.search` 0.858 USD・`r7g.xlarge.search` 0.429 USD・`m7g.large.search` 0.175 USD、Valkey `cache.r7g.large` 0.2104 USD、Fargate ARM vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD。大阪は東京とほぼ同じ（`db.r8g.4xlarge` 3.456 USD、`db.r8g.xlarge` 0.864 USD、保存は同じ、`r7g.2xlarge.search` 0.85789 USD）なので、同じ単価と置いた。
 
 | 項目 | 月額（USD、概算） |
 | --- | --- |
 | 主の Aurora（writer 8xlarge＋reader 4xlarge × 2＋大阪 4xlarge × 1） | 12,600 |
-| 主の Aurora の保存（約 2.5TB、I/O-Optimized。単価は未検証）と Global Database の複製 | 1,100 |
+| 主の Aurora の保存（約 2.5TB、I/O-Optimized、東京と大阪の 2 つ分） | 1,400 |
 | `events` の Aurora（xlarge × 2＋大阪 × 1、約 130GB） | 2,000 |
-| `history` の Aurora（xlarge × 2＋大阪 × 1、18 か月で約 3.5TB。保存の単価は未検証）と Global Database の複製 | 2,600 |
-| OpenSearch（データ `r7g.2xlarge` × 6＋マスター 3＋gp3 3TB、大阪の小さなドメイン。`r7g.2xlarge` は xlarge の 2 倍と置いた。未検証） | 4,800 |
+| `history` の Aurora（Standard で計算：xlarge × 2＋大阪 × 1 で約 1,460、18 か月で約 3.5TB の保存が東京と大阪で約 860、I/O は仮に月 20 億回で約 500。I/O は E11 で測る） | 2,800 |
+| OpenSearch（データ `r7g.2xlarge` × 6＋マスター 3＋gp3 3TB、大阪の小さなドメイン） | 4,800 |
 | ElastiCache（Valkey 6 ノード、大阪の小さなクラスタ） | 1,300 |
 | ECS Fargate（東京 平均 約 130 vCPU、大阪の待機 約 15 vCPU、vCPU あたり 2GB） | 5,100 |
 | CloudFront、WAF、ALB、データ転送 | 3,000 |
@@ -286,14 +286,14 @@ infra/
 | 可観測性（ログ、メトリクス、トレース、Grafana） | 3,000 |
 | GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,500 |
 | KMS、Secrets Manager | 500 |
-| **本番の合計** | **約 44,000** |
+| **本番の合計** | **約 44,500** |
 | staging・dev・shared・edge・security | 約 8,000 |
 
 - 最も大きいのは Aurora（約半分）。Savings Plans とリザーブドインスタンスで 20〜30% 下げられる。
 - 利用者 5 万人で割ると、1 人あたり月 約 0.9 USD（本番の基盤だけ）。
 - 費用は、アカウント（セル）とタグ（`cell`、`service`、`env`）ごとに毎月見る。組織ごとの費用の配分は、組織の DB の時間（[ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md)）と保存の量で按分する。
 - 項目の変更の履歴は、保存の量の半分以上になる（[capacity.md](capacity.md) の 3 節）ので、S1 から `history` のクラスタに置いた（4.3 節）。費用は上の表の `history` の行。
-- 2026-09-28 の見直し：OpenSearch を 3 台から 6 台（`r7g.2xlarge`）に、履歴を別のクラスタに改め、合計を約 40,000 から約 44,000 USD に直した。
+- 2026-09-28 の見直し：OpenSearch を 3 台から 6 台（`r7g.2xlarge`）に、履歴を別のクラスタに改め、合計を約 40,000 から約 44,000 USD に直した。同じ日に、仮に置いていた単価（`db.r8g.8xlarge`・`db.r8g.xlarge`・`r7g.2xlarge.search`・Aurora の保存）を Price List API で確かめ、保存を東京と大阪の 2 つ分で数え直して、主の保存を 1,100 から 1,400、`history` を 2,600 から 2,800、合計を約 44,500 USD に直した。
 
 ## 10. 障害のとき
 
@@ -347,7 +347,7 @@ infra/
 - 論理レプリケーションの初期の同期が、大きな組織で元の writer の I/O を使いすぎないか。
 - S3 のセルで、東京と大阪の両方で受ける形（組織ごとの書き手のリージョン）に進むか。
 - 大阪の OpenSearch を空で置く方針で、切り替えの後の検索の質の低下（数時間）を受け入れられるか。
-- 本家の組織の移動の読むだけの時間（未検証）と比べて、止めの 60 秒は十分か。
+- 本家の組織の移動の読むだけの時間（未検証。公開の資料にない）と比べて、止めの 60 秒は十分か。
 - `control` の DB（`shard_map`・`org_placements`・`orgs` の解決）を S3 でどのリージョンに置くか。
 
 ### 決定

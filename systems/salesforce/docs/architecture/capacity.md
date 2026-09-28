@@ -5,7 +5,7 @@
 - **負荷と大きさは式（件数 × 係数）で持ち、係数を計測で置き換える。** 見直しは E3・E4・E11・E12 と、GA の後は四半期ごと。
 - **S1 の主のクラスタは writer `db.r8g.8xlarge` に reader `db.r8g.4xlarge` × 2 で始める。** 項目の変更の履歴は、18 か月で主のクラスタの残りの全てより大きくなるので、**S1 から `history` のクラスタに置く**（2026-09-28。[ADR-0060](../decisions/0060-load-model-and-sizing-review.md)・[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) の注記）。OpenSearch は 3 台ではなく `r7g.2xlarge` × 6 で見積もる（7.1 節）。
 
-**全ての数字は本システムの想定（初期見積もり）である。** 本家の実数は、公開の資料で確かめられなかった（未検証。README の 2 節）。係数の「出どころ」の列が「想定」のものは、計測で置き換える。
+**全ての数字は本システムの想定（初期見積もり）である。** 本家の実数は公開されていない（README の 2 節）。係数の「出どころ」の列が「想定」のものは、計測で置き換える。
 
 ## 1. 規模の段階（README の写し）
 
@@ -121,7 +121,7 @@
 
 - 平均の保存（作成 3 割、更新 7 割）で 1 件あたり約 8 行。ピークの 2,000 行/秒の保存で、1 秒 1.6 万行の書き込みと、その索引の更新になる。
 - 全項目にピボットを書く案（ADR-0010 の b）では、1 件あたり項目の数（平均 30）だけ `record_index_values` の行が増え、作成で約 40 行になる。この差を E3 で測り、ADR-0010 の既定（指定のある項目だけ）を確かめる。
-- WAL の量の見積もり：1 行 平均 300B（索引の更新を含めて）× 1.6 万 ≈ 5MB/秒（ピーク）。Global Database の複製の帯域の内（未検証）。
+- WAL の量の見積もり：1 行 平均 300B（索引の更新を含めて）× 1.6 万 ≈ 5MB/秒（ピーク）。Global Database の複製の帯域の上限は AWS の資料に数値がない（未検証。E12 の `dr-drills` で `AuroraGlobalDBRPOLag` を見ながら測る）。
 
 ## 5. 接続の数
 
@@ -133,7 +133,7 @@
 | relay・indexer・cross-org-worker | 8 | 5＋5 | 80 |
 | 合計 | | | 約 1,300 |
 
-- `db.r8g.8xlarge`（メモリー 256GB）の `max_connections` の既定は、メモリーから決まる値で数千（Aurora の既定の式は未検証）。1,300 は収まる見込み。E1 で測る。
+- `db.r8g.8xlarge`（メモリー 256GB）の `max_connections` の既定は `LEAST(DBInstanceClassMemory/9531392, 5000)` で、256GB では上限の 5,000 になる（[Performance and scaling for Amazon Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Managing.html)、2026-09-28 に確認）。1,300 は収まる。接続ごとのメモリーの使い方は E1 で測る。
 - 接続が足りない時は、RDS Proxy ではなく PgBouncer のトランザクションのプールを検討する（[infrastructure.md](infrastructure.md) の 13 節）。
 
 ## 6. 共有の再計算の時間（NFR-005）
@@ -182,17 +182,17 @@
 | 1 文書の索引の大きさ | 形態素・2-gram・名前の前方一致・`keyword`。`_source` は ID と版だけ（[search.md](search.md) の 4.2 節） | 平均 2KB（想定） |
 | 主の索引 | 3 億 × 2KB | 約 0.6TB |
 | 複製を含む | × 2（複製 1） | 約 1.2TB |
-| 要るディスク | × 1.45（セグメントの併合、OS とサービスの予約、使用を 75% 以下に保つ余裕。AWS の手引きの目安の係数。未検証） | 約 1.75TB |
-| シャード | 16 索引 × 主 2 × 2（複製） | 64（主シャード 1 つ約 19GB。検索の用途の目安 10〜30GB の内。未検証） |
+| 要るディスク | × 1.45（索引の余分 10%、Linux の予約 5%、OpenSearch Service の予約 20% を合わせた、AWS の手引きの係数。[Calculating storage requirements](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-storage.html)、2026-09-28 に確認） | 約 1.75TB |
+| シャード | 16 索引 × 主 2 × 2（複製） | 64（主シャード 1 つ約 19GB。検索の速さが大事な用途の目安 10〜30GB の内。[Choosing the number of shards](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-sharding.html)、2026-09-28 に確認） |
 | メモリー | 検索の速さのため、データ（1.2TB）の 1/4 以上をページキャッシュとヒープに載せる | 約 300GB 以上 |
-| CPU | 検索 40 件/秒（対話の 2%）× 候補の取り直し最大 3 回＋参照の候補、索引の書き込みのピーク 約 2,000 文書/秒（まとめて `_bulk`） | 約 40〜50 vCPU |
+| CPU | 検索 40 件/秒（対話の 2%）× 1 ページ 3,000 件の固定の候補の束（毎回 1 回）＋参照の候補、索引の書き込みのピーク 約 2,000 文書/秒（まとめて `_bulk`） | 約 40〜50 vCPU |
 
 - 構成：`r7g.2xlarge.search`（8 vCPU・64GB）× 6 で、メモリー 384GB・48 vCPU・gp3 500GB × 6（3TB、使用 約 58%）。3 AZ に 2 つずつ置き、1 つの AZ を失っても複製で全ての主シャードが残る。専用のマスター `m7g.large.search` × 3。
 - 3 台（`r7g.xlarge`、合計 96GB）では、メモリーがデータの 1/12 しかなく、ディスクも 1 台あたり 600GB 近くになり、1 台の障害で残りの 2 台に全てが寄る。
 - 費用は [infrastructure.md](infrastructure.md) の 9 節（月 約 4,800 USD）。
 - S2（50 億件）は 10 倍になる。大口の組織の専用の索引とドメインを分ける（[search.md](search.md) の 4.1 節）。
 
-- OpenSearch の見積もりは想定の係数による（未検証）。E5 の PoC で 1 文書の大きさと 1 台あたりの検索の速さを測り、台数を直す。
+- OpenSearch の見積もりは、1 文書の大きさ（2KB）が想定である（未検証）。E5 の `search-analysis-poc` で 1 文書の大きさと 1 台あたりの検索の速さを測り、台数を直す。
 
 ## 8. 計測と見直し（ADR-0060）
 

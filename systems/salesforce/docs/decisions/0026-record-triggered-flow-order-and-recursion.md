@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0026: レコードの変更で動くフローを DML の手順 3・7・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす
+# ADR-0026: レコードの変更で動くフローを DML の手順 3a・7b・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす
 
 詳細は [automation-flows.md](../architecture/automation-flows.md) の 5 節と 6 節。
 
@@ -18,7 +18,7 @@ date: 2026-09-28
 - 入れ子の保存で、保存の前のフロー・入力規則・積み上げ集計をもう一度行うか。
 - 時刻で動く経路（予定の経路）と、確定の後の非同期の経路の置き場所と、二重の実行の防ぎ方。
 
-本家（2026-09-28 に確認）：実行の順の番号は 1〜2,000。「条件を満たすように更新された時だけ」を選べる。予定の経路を持てる（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。保存の前のフローは起動したレコードの項目だけを変え、再帰の保存を避ける。再帰は前後の値の比べで防ぐよう勧める（[Record-Triggered Automation](https://architect.salesforce.com/docs/architect/decision-guides/guide/record-triggered.html)）。同じトランザクションで同じフローが何回動くかは未検証。
+本家（2026-09-28 に確認）：実行の順の番号は 1〜2,000。「条件を満たすように更新された時だけ」を選べる。予定の経路を持てる（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。保存の前のフローは起動したレコードの項目だけを変え、再帰の保存を避ける。再帰は前後の値の比べで防ぐよう勧める（[Record-Triggered Automation](https://architect.salesforce.com/docs/architect/decision-guides/guide/record-triggered.html)）。同じトランザクションで同じフローが何回動くかは、公開の資料に書かれていない（未検証。E6 の `record-triggered-flows` で試用の組織で確かめる）。
 
 ## Options
 
@@ -30,7 +30,7 @@ date: 2026-09-28
 
 1 を採用する。
 
-> 2026-09-28 の注記：[ADR-0008](0008-dml-order-of-execution.md) の注記で、手順 3 を 3a（保存の前のフロー）・3b（before トリガー）に、手順 7 を 7a（after トリガー）・7b（保存の後のフロー）に分けた。この ADR の「手順 3」は 3a、「手順 7」は 7b と読む。フローの種類に、組織が定義するイベントで起動する `event_triggered` を足した（[automation-flows.md](../architecture/automation-flows.md) の 3.4 節。[ADR-0034](0034-event-subscription-access-and-org-events.md) の依頼）。
+> 2026-09-28 の注記：[ADR-0008](0008-dml-order-of-execution.md) の注記で、手順 3 を 3a（保存の前のフロー）・3b（before トリガー）に、手順 7 を 7a（after トリガー）・7b（保存の後のフロー）に分けた。この ADR の「手順 3」は 3a、「手順 7」は 7b と読む（題名も 3a・7b・13 に直した）。フローの種類に、組織が定義するイベントで起動する `event_triggered` を足した（[automation-flows.md](../architecture/automation-flows.md) の 3.4 節。[ADR-0034](0034-event-subscription-access-and-org-events.md) の依頼）。
 - 順：`trigger.order`（1〜2,000）の小さい順、同じなら `api_name` の順。
 - 条件：数式（2 値）。`only_when_changed_to_meet` が真なら、更新では「前の値で偽、今の値で真」の時だけ動く。`$Record__prior` は、そのフローがそのレコードで初めて動く保存の手順 1 で読んだ値。
 - 再帰の規則は `DT-FLW-001`（事象 × フローの種類 × 動いたか → 結果）にする。

@@ -15,7 +15,7 @@ intent は、項目の変更の履歴を MVP に含め、法務の L5 で保持�
 
 履歴は、保存の行 × 選んだ項目の数だけ増え、保持の期限で大量に消す必要がある。
 
-本家（[Field Audit Trail Implementation Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/field_history_retention.pdf)、Winter '27 版、2026-09-28 に確認）：1 オブジェクト 20 項目まで、18〜24 か月保ち、画面と API で読める。追加の製品では 200 項目・消すまで保つ。長いテキストは値を持たない、容量に数えない、と広く紹介されている（未検証）。
+本家（[Field Audit Trail Implementation Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/field_history_retention.pdf)、Winter '27 版、2026-09-28 に確認）：1 オブジェクト 20 項目まで、18〜24 か月保ち、画面と API で読める。追加の製品では 200 項目・消すまで保つ。255 文字を超える長いテキストは「変わった」だけを記録し、前後の値を持たない。項目の変更の履歴はデータの容量に数えない（[Field History Tracking Overview](https://help.salesforce.com/s/articleView?id=xcloud.tracking_field_history.htm&type=5)、2026-09-28 に確認）。
 
 ## Options
 

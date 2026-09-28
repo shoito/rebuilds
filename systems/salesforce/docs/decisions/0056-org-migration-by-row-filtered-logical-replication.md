@@ -17,7 +17,7 @@ date: 2026-09-28
 
 PostgreSQL の論理レプリケーションは、PostgreSQL 15 以降で公開（publication）に行の絞り（`WHERE`）を付けられ、初期の同期にも絞りがかかる。`UPDATE`・`DELETE` を公開する時、絞りの列は replica identity に含まれる必要がある。分割の表は `publish_via_partition_root` で根の表の絞りを使える（[Row Filters](https://www.postgresql.org/docs/18/logical-replication-row-filter.html)、2026-09-28 に確認）。Aurora PostgreSQL は論理レプリケーションを持つ（[Aurora PostgreSQL の論理レプリケーション](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html)、2026-09-28 に確認）。
 
-本家は、組織を別のインスタンスへ移す作業で、組織を一定の時間読むだけの状態にすると広く紹介されている（未検証）。
+本家は、組織を別のインスタンスへ移す作業で、組織を一定の時間読むだけの状態にすると広く紹介されている（未検証。本システムの止めの長さ（60 秒）は本家に依らず、E12 の `org-migration-tool` で測って決める）。
 
 ## Options
 

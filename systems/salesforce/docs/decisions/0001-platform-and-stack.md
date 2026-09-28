@@ -49,7 +49,7 @@ rebuilds の他の題材（Slack、Stripe、Notion、Auth0 など）で、次の
 - Valkey は、コンパイル済みのメタデータのキャッシュと、上限・割り当ての数に使う。失われてもよい。
 - OpenSearch は、全文検索の索引にだけ使う。正本の写しで、作り直せる。本家も、全文検索は別の検索の基盤で非同期に索引を作っている（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、2026-09-28 に確認）。
 - 対話の経路（Runtime）、管理の経路（Metadata）、一括の受付（Bulk）、Worker を別の ECS のサービスにする。一括の処理と共有の再計算が、対話の経路の資源を食わないようにする。
-- 2 は、分散 SQL の DB（Aurora DSQL など）で書き込みを広げられる。ただし、RLS、JSONB の索引、長い再計算のトランザクションの扱いが PostgreSQL と揃うかを確かめきれない（未検証）。S1〜S2 の規模は、論理シャードで Aurora のクラスタを増やせば足りる（[ADR-0005](0005-tenancy-and-governor-limits.md)）。
+- 2 は、分散 SQL の DB（Aurora DSQL など）で書き込みを広げられる。ただし、Aurora DSQL は 1 トランザクションで変えられる行が 3,000 まで、分離の水準は Repeatable Read に固定、PL/pgSQL と一時表を持たない（[Migrating from PostgreSQL to Aurora DSQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-unsupported-features.html)、2026-09-28 に確認）。1 トランザクションの DML 1 万行（ADR-0005）と、長い再計算のトランザクションが収まらない。S1〜S2 の規模は、論理シャードで Aurora のクラスタを増やせば足りる（[ADR-0005](0005-tenancy-and-governor-limits.md)）。
 
 ### 本家の実装を核に使わないことの確認（リポジトリ共通の ADR-0007）
 

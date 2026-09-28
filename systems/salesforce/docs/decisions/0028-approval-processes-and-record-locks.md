@@ -16,7 +16,7 @@ intent の MVP は、承認のプロセスを含む。値引きの大きな商�
 - 申請中のレコードを申請者が書き換えると、承認した内容と違うものが通る。
 - 承認者がレコードを見られない時にどうするか。見せるために共有を広げると、共有の判定が 2 か所になる。
 
-本家（2026-09-28 に確認）：1 つのプロセスは 30 段、1 段の承認者は 25 まで。複数の承認者は全員一致か最初の応答。却下は申請の却下か前の承認者へ戻す。申請中のレコードはロックし、編集できるのは管理者か、管理者と今の承認者。申請者の取り消しを許すか選べる。承認後もロックを保つか選べる（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の ApprovalProcess）。承認者へのアクセスの付与、自動化がロックを越えるか、有効なプロセスの数の上限は確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：1 つのプロセスは 30 段、1 段の承認者は 25 まで。複数の承認者は全員一致か最初の応答。却下は申請の却下か前の承認者へ戻す。申請中のレコードはロックし、編集できるのは管理者か、管理者と今の承認者。申請者の取り消しを許すか選べる。承認後もロックを保つか選べる（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の ApprovalProcess）。有効なプロセスは組織で 1,000、1 オブジェクトで 300（[Classic Approval Processes Limits](https://help.salesforce.com/s/articleView?id=platform.approvals_limits.htm&type=5)、2026-09-28 に確認）。承認者へのアクセスの付与と、自動化がロックを越えるかは、公開の資料に書かれていない（未検証。E6 の `approval-processes` で試用の組織で確かめる）。
 
 ## Options
 

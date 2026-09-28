@@ -22,16 +22,16 @@ Sandbox の種類と作成・再作成、データの複製とマスキング（
 
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
-| Sandbox の種類 | Developer（200MB、本番のデータなし、1 日ごとに再作成）、Developer Pro（1GB、データなし、1 日）、Partial Copy（5GB、テンプレートで選んだ標本のデータ、オブジェクトごとに 1 万件まで、5 日）、Full（本番と同じ容量、全てのデータ、29 日） | [Sandbox Licenses and Storage Limits by Type](https://help.salesforce.com/s/articleView?language=en_US&id=sf.data_sandbox_environments.htm&type=5)（ヘルプの要約。本文は画面の読み込みの形で取れず、未検証） |
+| Sandbox の種類 | Developer（データ 200MB、メタデータだけ、1 日ごとに再作成）、Developer Pro（1GB、メタデータだけ、1 日）、Partial Copy（データ 5GB、テンプレートで選んだ標本のデータ、5 日）、Full（本番と同じ容量、全てのデータ、29 日）。数は Enterprise で Developer 25・Partial Copy 1、Unlimited で Developer 100・Developer Pro 5・Partial Copy 1・Full 1。Partial Copy のオブジェクトごとの件数の上限（1 万件と広く紹介されている）は本文にない（未検証。E10 の `sandbox-data-copy` で確かめる） | [Sandbox Licenses and Storage Limits by Type](https://help.salesforce.com/s/articleView?id=platform.data_sandbox_environments.htm&type=5)（2026-09-28 に確認） |
 | Full の Sandbox の API | テンプレートなしの Full の Sandbox の API の割り当ては 24 時間 500 万 | [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（以下「Limits」） |
 | デプロイの大きさ | 1 回 10,000 ファイル、zip 39MB（base64 の後 50MB）、展開して 600MB | Limits、[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)（Winter '27 版、以下「MDAPI」） |
 | 検証 | `checkOnly = true` で、変更を保存せずにデプロイを試す | MDAPI の `deploy()` の `DeployOptions` |
 | 全部か無しか | `rollbackOnError`：真なら 1 つの失敗で全てを戻す。本番へのデプロイでは真が必須 | MDAPI |
 | すばやいデプロイ | 相手の環境で 10 日以内に検証に成功し、テストが通り、網羅の条件を満たした部品の組を、テストを走らせずにデプロイできる | MDAPI の `deployRecentValidation()` |
 | 破壊的な変更 | `destructiveChanges.xml` で消す部品を指す。`purgeOnDelete` はごみ箱を通さない（Developer と Sandbox だけ） | MDAPI |
-| 戻し | デプロイを戻す専用の操作は確かめられなかった（未検証） | — |
-| マスキング | 本家は Sandbox のデータを伏せる別の製品を持つと読めるが、本文は確かめていない（未検証） | — |
-| ID | Sandbox のレコードの ID が本番と同じかは、本文で確かめられなかった（未検証） | — |
+| 戻し | デプロイを戻す専用の操作は資料に書かれていない | [Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)（2026-09-28 に確認） |
+| マスキング | 追加の製品（Data Mask の管理パッケージ）が Full・Partial Copy の Sandbox のデータを伏せる。伏せた値は戻せない。この管理パッケージは 2026-12-31 に提供を終え、Data Mask & Seed に移る | [Secure Your Sandbox Data with Salesforce Data Mask (Legacy)](https://help.salesforce.com/s/articleView?id=platform.data_mask_overview.htm&type=5)（2026-09-28 に確認） |
+| ID | Sandbox のレコードの ID が本番と同じかは、読めた資料に書かれていない（未検証。本システムの設計はこれに依らない。E10 の `sandbox-data-copy` で確かめる） | — |
 
 ## 3. Sandbox の種類（ADR-0038）
 
@@ -42,7 +42,7 @@ Sandbox の種類と作成・再作成、データの複製とマスキング（
 | `partial` | メタデータ、テンプレートで選んだオブジェクトの標本（オブジェクトごとに 1 万件まで）、マスキング | 5GB | 5GB | 5 日 | 1 |
 | `full` | メタデータ、全てのデータ（テンプレートで除けるオブジェクトあり）、マスキング | 本番と同じ | 本番と同じ | 29 日 | 0（Unlimited で 1） |
 
-- 種類・容量・間隔は本家に寄せた（ヘルプの要約。未検証）。エディションごとの数は本システムの初期値で、E2 の着手前に PM が決める（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 4 節）。
+- 種類・容量・間隔は本家に寄せた（2 節）。エディションごとの数は本システムの初期値で、E2 の着手前に PM が決める（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 4 節）。
 - Sandbox は `orgs.kind = sandbox` の別の組織で、`parent_org_id` に元の本番の組織を持つ（ADR-0005）。本番の組織のデータを読む経路を持たない。
 - ドメイン：`<org>--<sandbox>.sandbox.my.<brand>.<domain>`（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - S1 は本番と同じクラスタに置く。S2 で Sandbox と試用の組織を別のクラスタへ置く（ADR-0005）。
@@ -189,7 +189,7 @@ help_text: 税抜きの金額
 
 ### 5.2 部品の置き換えの規則
 
-- 1 つの部品のデプロイは、その部品の**全体の置き換え**にする。権限セットは、書いた項目・オブジェクト・システムの権限が全てで、書いていないものは外す。本家のプロファイルのデプロイの「書いた部分だけを足す」の振る舞い（本家の細部は未検証）は採らない。権限の結果が、パッケージだけで決まるようにするため。
+- 1 つの部品のデプロイは、その部品の**全体の置き換え**にする。権限セットは、書いた項目・オブジェクト・システムの権限が全てで、書いていないものは外す。本家のプロファイルのデプロイの「書いた部分だけを当て、書いていない標準のオブジェクト・項目の権限は上書きしない」振る舞い（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Profile、2026-09-28 に確認）は採らない。権限の結果が、パッケージだけで決まるようにするため。
 - 例外：標準オブジェクト（`standard_objects/`）は、書いた項目・設定だけを足す・変える（標準の項目は消せないため）。
 
 ### 5.3 書き出し（retrieve）
@@ -301,9 +301,11 @@ POST /api/v1/metadata/deploys/{id}/rollback
 | 同時のデプロイ・検証 | 1・3 | 未検証 |
 | すばやいデプロイの期限 | 10 日 | 10 日（MDAPI） |
 | 画面で送ったパッケージの保持 | 30 日 | 未検証 |
-| Sandbox の容量・再作成の間隔・数 | 3 節 | ヘルプの要約（未検証） |
-| `partial` の標本 | オブジェクトごとに 1 万件 | 1 万件（ヘルプの要約） |
+| Sandbox の容量・再作成の間隔・数 | 3 節 | 2 節 |
+| `partial` の標本 | オブジェクトごとに 1 万件 | 1 万件と広く紹介されている（未検証。2 節） |
 | Sandbox の削除から消去 | 7 日 | 未検証 |
+
+本家の列の「未検証」は、本家の値を公開の資料で確かめていないもの。本システムの値は本家に依らず、E12 の `limits-final-values` で決める。
 
 ## 8. 障害のとき
 

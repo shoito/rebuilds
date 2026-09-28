@@ -3,13 +3,13 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0049: トリガーは DML の手順 3・7・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす
+# ADR-0049: トリガーは DML の手順 3b・7a・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす
 
 詳細は [extensibility.md](../architecture/extensibility.md) の 5 節と 6 節。
 
 ## Context
 
-[ADR-0008](0008-dml-order-of-execution.md) は、DML を 200 件の塊で 13 の手順に沿って処理するとした。[ADR-0026](0026-record-triggered-flow-order-and-recursion.md) は、レコードの変更で動くフローを手順 3（保存の前）・7（保存の後）・13（確定の後の非同期）に置き、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かすとした。
+[ADR-0008](0008-dml-order-of-execution.md) は、DML を 200 件の塊で 13 の手順に沿って処理するとした。[ADR-0026](0026-record-triggered-flow-order-and-recursion.md) は、レコードの変更で動くフローを手順 3a（保存の前）・7b（保存の後）・13（確定の後の非同期）に置き、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かすとした。
 
 利用者のコード（トリガー）を足す時に決めること：
 
@@ -18,7 +18,9 @@ date: 2026-09-28
 - 再帰の規則。
 - ホストの API として何を見せるか。権限・共有・FLS をどう効かせるか。
 
-本家（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版の「Triggers and Order of Execution」、2026-09-28 に確認。ADR-0008 に写した内容）：保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす。Apex は既定でシステムの文脈で動き、共有を守るかはクラスの宣言で選ぶ（本家の細部は未検証）。
+本家（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版の「Triggers and Order of Execution」、2026-09-28 に確認。ADR-0008 に写した内容）：保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす。API の版 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS を守る）と `with sharing` で動く。トリガー自体は共有を外した文脈で動くが、その中の問い合わせと DML は、明示しなければ利用者のモードで動く。66.0 以前は、宣言のないクラスの共有の扱いが呼び出しの経路で変わる（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版（API 68.0）の「Apex Security and Sharing」と「Use the with sharing, without sharing, and inherited sharing Keywords」、2026-09-28 に確認）。
+
+> 2026-09-28 の注記：起票の時は「Apex は既定でシステムの文脈で動く」と書いていた。これは API の版 66.0 以前の振る舞いで、今の本家は既定を利用者の権限に改めた。本システムの既定（実行する利用者の権限）は、今の本家と同じ向きになる。決定は変えない。なお、同じ Winter '27 版の [SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf) は、まだ「Apex は既定でシステムのモードで動く」と書いており、本家の資料どうしが食い違う。
 
 ## Options
 

@@ -15,7 +15,7 @@ intent は、設定の変更、権限の変更、データの一括の削除が�
 
 監査のログは、DB の特権を持つ人（運用、侵入者）にも書き換えられないことが求められる。
 
-本家（[Object Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/object_reference.pdf)、Winter '27 版、2026-09-28 に確認）：Setup の変更を少なくとも直近 180 日表す（`SetupAuditTrail`）。組織の全ての成功・失敗のログインの試みを表す（`LoginHistory`）。ログインの履歴の保持は 6 か月と広く紹介されている（未検証）。
+本家（[Object Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/object_reference.pdf)、Winter '27 版、2026-09-28 に確認）：Setup の変更を少なくとも直近 180 日表す（`SetupAuditTrail`）。組織の全ての成功・失敗のログインの試みを表す（`LoginHistory`）。画面のログインの履歴は、直近 6 か月の最大 2 万件を表す（[Monitor Login History](https://help.salesforce.com/s/articleView?id=xcloud.users_login_history.htm&type=5)、2026-09-28 に確認）。
 
 ## Options
 

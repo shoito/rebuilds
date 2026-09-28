@@ -3,7 +3,7 @@
 利用者のコード（トリガー）とパッケージの設計。MVP の後の Epic で作る（トリガーは E13、パッケージの配布は E14。[roadmap.md](../roadmap.md)）。TypeScript で書き、JS のエンジンを WASM にしたものを、燃料（命令の数）とメモリーの上限を付けた砂場で動かす。土台は [ADR-0001](../decisions/0001-platform-and-stack.md)（MVP は宣言的な設定だけにし、利用者のコードは MVP の後に WASM の砂場で動かす）。この文書で決めたことは、次の 3 つの ADR にある。
 
 - **エンジンは QuickJS-ng、実行系は Wasmtime。** 燃料で上限を決定的に判定する。砂場は Runtime・Worker のタスクの中の別のコンテナの別のプロセスで動かし、DB・網・秘密を持たせない（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）。
-- **トリガーは DML の手順 3・7・13 に、フローと並べて置く。** 塊（200 件まで）ごとに 1 回呼び、同じトリガーは同じレコードに 1 トランザクションで 1 回。ホストの API はデータ層の問い合わせと DML の AST だけで、既定は実行する利用者の権限（[ADR-0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md)）。
+- **トリガーは DML の手順 3b・7a・13 に、フローと並べて置く。** 塊（200 件まで）ごとに 1 回呼び、同じトリガーは同じレコードに 1 トランザクションで 1 回。ホストの API はデータ層の問い合わせと DML の AST だけで、既定は実行する利用者の権限（[ADR-0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md)）。
 - **パッケージは名前空間の接頭辞と署名を持つ。** 上限は組織と共有し、名前空間ごとに計測する。コードは秘密を読めない（[ADR-0050](../decisions/0050-packages-namespaces-and-code-isolation.md)）。
 
 本家の振る舞いと部品の事実は、2026-09-28 に確かめた。確かめられなかったものは「未検証」と書く。
@@ -26,9 +26,9 @@
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
 | 本家のトリガーの位置 | 保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす | [ADR-0008](../decisions/0008-dml-order-of-execution.md) に写した [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版） |
-| 本家のコードの文脈 | Apex は既定でシステムの文脈で動き、共有を守るかはクラスの宣言で選ぶ | 広く紹介されている（未検証） |
+| 本家のコードの文脈 | API の版 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS）と `with sharing` で動く。トリガー自体は共有を外した文脈だが、その中の問い合わせと DML は明示しなければ利用者のモード。66.0 以前はシステムの文脈が既定で、共有はクラスの宣言で選んだ（SOQL and SOSL Reference の同じ版は、まだシステムのモードが既定と書き、資料どうしが食い違う） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版、2026-09-28 に確認） |
 | 本家の CPU の上限 | 同期 10,000ms、非同期 60,000ms。壁時計の CPU 時間で数える | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
-| 本家の管理パッケージ | 名前空間の接頭辞と `__` の区切り。認定されたパッケージは一部の上限を別に数える | 広く紹介されている（未検証） |
+| 本家の管理パッケージ | 名前空間の接頭辞と `__` の区切り。セキュリティのレビューを通った認定の管理パッケージは、1 トランザクションの上限の多くを名前空間ごとに別に持ち、全ての名前空間の合計は 11 倍まで。CPU 時間などは全体で共有する | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版の「Per-Transaction Certified Managed Package Limits」、2026-09-28 に確認） |
 | Wasmtime の燃料 | 生成したコードで燃料を減らし、同じ初期状態なら同じ量で止まる（決定的）。epoch の中断は 2〜3 倍速いことがあるが、決定的ではない | [Wasmtime `Config`](https://docs.wasmtime.dev/api/wasmtime/struct.Config.html) |
 | 決定的な実行 | 外からの入力（時計など）の仮想化、NaN の正規化、relaxed SIMD の決定的な形か無効化、メモリーの伸長の扱い、燃料での中断 | [Deterministic Wasm Execution](https://docs.wasmtime.dev/examples-deterministic-wasm-execution.html) |
 | メモリーの上限 | `StoreLimitsBuilder` で線形メモリーの大きさを限る | [StoreLimitsBuilder](https://docs.wasmtime.dev/api/wasmtime/struct.StoreLimitsBuilder.html) |
@@ -48,10 +48,10 @@
 | 外への API | 持たない（殻で決める） | fetch・Streams を持つ（外したい） | `Javy.IO` など道具の API |
 | 燃料との相性 | 良い（インタープリタのループが WASM の命令になる） | 同じく数えられる | 同じ |
 | 版の安定 | エンジンの版だけ追う | WASI 0.2 とコンポーネントの変化を追う | 道具の API の変化（8.x・9.x）を追う |
-| 速さ | インタープリタ | インタープリタ（WASM では JIT なし。未検証） | インタープリタ |
+| 速さ | インタープリタ | インタープリタ（WASM では JIT なしと見込む。未検証。E13 の `code-engine-poc` で測る） | インタープリタ |
 | 本家の実装か | 違う（第三者の汎用の部品） | 違う | 違う |
 
-- 数値の比較（実体化の時間とメモリー、200 件の塊の処理の時間）は、E13 の前の PoC で測る。上の「見込み」は未検証。
+- 数値の比較（実体化の時間とメモリー、200 件の塊の処理の時間）は、E13 の前の PoC で測る。上の「見込み」は未検証（E13 の `code-engine-poc` で測る）。
 - 本家の実装（Apex の実行系）は使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。3 つとも本家と関係のない第三者の部品で、ADR-0007 の「使ってよいもの」（言語の実行系）に当たる。
 
 ### 3.2 決めたこと
@@ -110,7 +110,7 @@ Runtime のタスク（ECS Fargate）
 
 - 利用者は TypeScript で書く。型は、組織のメタデータから作った型の定義（オブジェクトと項目）と、ホストの API の型を配る。
 - デプロイの時（メタデータの版を上げる前の検証。[ADR-0040](../decisions/0040-deploy-validation-and-rollback.md)）に、TypeScript を JS にし、QuickJS-ng のバイトコードにして保存する。型の誤り・構文の誤りは検証の失敗にする。
-- バイトコードは `md_code_versions` に、元のコードとハッシュとともに持つ。エンジンの版を上げる時は、全てのバイトコードを作り直す（互換が保たれるかは未検証）。
+- バイトコードは `md_code_versions` に、元のコードとハッシュとともに持つ。エンジンの版を上げる時は、全てのバイトコードを作り直す。QuickJS-ng はバイトコードに形の版（`BC_VERSION`）を書き、読み込みの時に違えば断るので、版を上げると互換は保たれない（[quickjs.c](https://github.com/quickjs-ng/quickjs/blob/master/quickjs.c)、2026-09-28 に確認）。
 
 ## 5. トリガーと DML の順（ADR-0049）
 
@@ -162,7 +162,7 @@ Runtime のタスク（ECS Fargate）
 
 | ID（案） | 上限 | 同期 | 非同期 | 数え方 |
 | --- | --- | --- | --- | --- |
-| `tx.code_fuel` | 燃料 | 50 億 | 300 億 | Wasmtime の燃料。トランザクションの全ての呼び出しの合計。値は PoC で、`tx.cpu_ms` の 10 秒・60 秒に見合うよう決める（未検証） |
+| `tx.code_fuel` | 燃料 | 50 億 | 300 億 | Wasmtime の燃料。トランザクションの全ての呼び出しの合計。値は E13 の `code-engine-poc` で、`tx.cpu_ms` の 10 秒・60 秒に見合うよう決める（今の値は仮。未検証） |
 | `tx.code_memory` | 1 回の呼び出しの線形メモリー | 64MB | 128MB | 実体化の時に確保する大きさ |
 | `tx.code_invocations` | 砂場の呼び出しの数 | 200 | 400 | 1 塊・1 トリガーを 1 |
 | `code.bundle_size` | 1 つのトリガーのバイトコード | 1MB | — | メタデータの上限 |
@@ -209,7 +209,7 @@ Runtime のタスク（ECS Fargate）
 | 組織をまたぐ状態 | 呼び出しごとに新しい実体。実体を組織・利用者・トランザクションをまたいで使い回さない |
 | 供給の経路 | パッケージの署名、インストール先でのビルドのし直し |
 
-- Spectre のような実行の時間を使う横の経路への対策として、`code-runner` は子プロセスのプールを持ち、1 つの子プロセスは同時に 1 つの呼び出しだけを動かす。同じプロセスの中に、同時に別の組織の実体を持たない。これで十分かは、E13 の外部のペンテストで確かめる（未検証）。
+- Spectre のような実行の時間を使う横の経路への対策として、`code-runner` は子プロセスのプールを持ち、1 つの子プロセスは同時に 1 つの呼び出しだけを動かす。同じプロセスの中に、同時に別の組織の実体を持たない。これで十分かは、E13 の `code-sandbox-pentest` で確かめる（未検証）。
 - `security:sensitive` の対象：`code-runner` の全て、殻（ホストの API の結び付け）、実行の文脈の判定、パッケージの署名とインストール。
 
 ## 10. 障害のとき
@@ -240,7 +240,7 @@ Runtime のタスク（ECS Fargate）
 | ADR | 決定 |
 | --- | --- |
 | [0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md) | 利用者のコードは QuickJS-ng を WASM にしたものを、Runtime の隣の別のプロセスの Wasmtime で燃料とメモリーの上限を付けて動かす |
-| [0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3・7・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす |
+| [0049](../decisions/0049-triggers-in-dml-order-and-platform-api.md) | トリガーは DML の手順 3b・7a・13 にフローと並べて置き、塊ごとに 1 回呼ぶ。ホストの API はデータ層の AST だけにし、既定は実行する利用者の権限で動かす |
 | [0050](../decisions/0050-packages-namespaces-and-code-isolation.md) | パッケージは名前空間の接頭辞と署名を持つメタデータの束にし、上限は組織と共有して名前空間ごとに計測する。コードの秘密は宛先の登録だけで渡す |
 
 他の領域への依頼：
@@ -271,10 +271,10 @@ Runtime のタスク（ECS Fargate）
 - 共有も外す文脈（本家の `without sharing` に相当）を持つか。
 - 独自の API（利用者のコードで REST の口を作る）を持つか。持つなら、割り当てと認証をどう数えるか。
 - スケジュールで動く利用者のコード（本家の Batch・Schedulable に相当）を持つか。
-- QuickJS-ng のバイトコードの互換が、エンジンの版の上げで保たれるか。
+- QuickJS-ng のバイトコードの互換が、エンジンの版の上げで保たれるか。 → 保たれない（`BC_VERSION` が違えば読み込みを断る。4.4 節）。
 - 燃料と CPU 時間の換算の係数を、どの負荷で決めるか。
 - 公開の一覧（マーケットプレイス）と、配布者のセキュリティの審査をいつ作るか。
-- 認定のパッケージに別の上限を与えるか（本家は与えると読めるが未検証）。
+- 認定のパッケージに別の上限を与えるか（本家は与える。2 節）。
 
 ### 決定
 

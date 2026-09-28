@@ -22,7 +22,7 @@
 
 ## 1. 目標と前提
 
-- **OWASP ASVS 5.0 の Level 2 を全体の目標にし、アクセス制御の章は Level 3 を目標にする。** この題材の最も重い誤りは、アクセスの判定の誤りだからである。章の番号との照合は E1 で行う（ASVS の原文との照合は未検証）。
+- **OWASP ASVS 5.0 の Level 2 を全体の目標にし、アクセス制御の章（ASVS 5.0 の V8 Authorization）は Level 3 を目標にする。** この題材の最も重い誤りは、アクセスの判定の誤りだからである。ASVS 5.0 の章は V1〜V17 で、認可は V8、認証は V6、セッションは V7、OAuth と OIDC は V10 にある（[OWASP ASVS 5.0](https://github.com/OWASP/ASVS/tree/master/5.0/en)、2026-09-28 に確認）。要件の 1 件ずつの照合は E1 の `security-sensitive-flow` で行う。
 - 最も重い障害は 4 つ。
   1. **組織をまたぐ漏えい**：他の組織のレコード・メタデータ・ファイル・イベントが見える（NFR-009、K7）。
   2. **組織の中の見えないデータの漏えい**：共有・FLS の判定の誤りで、見せてはならないレコード・項目が、画面・API・レポート・検索・イベント・エクスポートのどこかに出る（K3）。
@@ -33,8 +33,8 @@
 
 本家の比べる相手：
 
-- 本家の Shield Platform Encryption は、組織ごとの tenant secret と本家の master secret（KDF の種）から、HSM の上の PBKDF2 でデータの暗号化の鍵を導き、導いた鍵を保存しない。組織が鍵を持ち込む方式もある（[Shield Platform Encryption Architecture](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/security_shield_platform_encryption.pdf)。検索の結果の要約で読んだ。本文は未検証）。
-- 本家の Hyperforce は、変えない基盤（作り直して入れ替える）、3 つ以上の AZ、ゼロトラスト（全ての経路を明示に認証・認可、JIT の特権）、IaC、保存時・通信時の暗号化、組織ごとの暗号の鍵を原則に挙げる（[Behind the Scenes of Hyperforce](https://engineering.salesforce.com/behind-the-scenes-of-hyperforce-salesforces-infrastructure-for-the-public-cloud-429309542d8e/)、[Hyperforce](https://www.salesforce.com/platform/public-cloud-infrastructure/)、2026-09-28 に確認）。セル・組織の割り当ての細部は公開の記事になかった（未検証）。
+- 本家の Shield Platform Encryption は、組織ごとの tenant secret と本家の master secret（KDF の種）から、HSM の上の PBKDF2 でデータの暗号化の鍵を導き、導いた鍵を保存しない。組織が鍵を持ち込む方式や、鍵の導出を使わない方式もある（[Behind the Scenes: The Shield Platform Encryption Process for Tenant Secrets](https://help.salesforce.com/s/articleView?id=xcloud.security_pe_encryption_process.htm&type=5)、2026-09-28 に確認。本家は master secret を primary secret と呼び替えた）。
+- 本家の Hyperforce は、変えない基盤（作り直して入れ替える）、3 つ以上の AZ、ゼロトラスト（全ての経路を明示に認証・認可、JIT の特権）、IaC、保存時・通信時の暗号化、組織ごとの暗号の鍵を原則に挙げる（[Behind the Scenes of Hyperforce](https://engineering.salesforce.com/behind-the-scenes-of-hyperforce-salesforces-infrastructure-for-the-public-cloud-429309542d8e/)、[Hyperforce](https://www.salesforce.com/platform/public-cloud-infrastructure/)、2026-09-28 に確認）。セル・組織の割り当ての細部は公開の記事にない。本システムの設計はこれに依らない。
 
 ## 2. 信頼境界
 
@@ -123,7 +123,8 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | I | 伏せていない個人データが Sandbox に入る | 複製の経路の中で伏せる。分類の漏れを検出して警告（ADR-0038） |
 | I | Sandbox から本番の組織のデータを読む | 別の `org_id`、RLS（ADR-0005） |
 | T | 改ざんしたメタデータのパッケージのデプロイ | YAML の安全な読み込み、秘密を入れない（[ADR-0039](../decisions/0039-metadata-package-format.md)）。パッケージの署名（[ADR-0050](../decisions/0050-packages-namespaces-and-code-isolation.md)） |
-| S | SSO の検証の漏れ、MFA の抜け道 | Better Auth の結合テスト、IdP 起点の SAML を断る、MFA を外せない（ADR-0044） |
+| S | SSO の検証の漏れ、MFA の抜け道 | Better Auth の結合テスト、IdP 起点の SAML を断る、MFA を外せない、SSO でも IdP の MFA の主張（`amr`・`AuthnContextClassRef`）を確かめ、なければ本システムの 2 つ目の要素を求める（確かめの無効化は理由の記録と監査つき）（ADR-0044） |
+| S | 管理者のアカウントの乗っ取り（フィッシング、TOTP の中継） | 特権を持つ利用者（`modify_all_data`・`manage_users`・`customize_application`）はパスキーだけ。`sso_bypass` の非常用の管理者はハードウェアのセキュリティキーを 2 つ（ADR-0044、[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6.3・6.4 節） |
 | E | 利用者のコードの砂場の脱出（E13） | Wasmtime の境界、WASI なし、別のプロセス、資格情報なし（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)） |
 | I | 利用者のコードで、組織をまたぐ状態が残る | 呼び出しごとに新しい実体（extensibility の 4.2 節） |
 
@@ -153,7 +154,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | LEAK-009 | レポートの集計・グループ・上位 N | in_org | 結ぶ全てに共有の条件 | `PROP-RPT-001` | 結果の行の標本の照合 | reports |
 | LEAK-010 | ダッシュボードの部下の視点・定期の配信 | in_org | 共通部分、受け取る人ごとの実行 | `PROP-RPT-002` | — | reports |
 | LEAK-011 | 全文検索の結果・強調 | cross_org・in_org | 前に絞る＋後で確かめる、値は DB から | `PROP-SRCH-001`・`002` | 標本の照合 | search |
-| LEAK-012 | 検索の件数・応答の時間 | existence | 件数を返さない（時間は未対策） | 件数の合計がない | — | search |
+| LEAK-012 | 検索の件数・応答の時間 | existence | 件数を返さない。`more_may_exist` を見えない候補で変えない。1 ページごとに固定の候補の束（3,000）を取り、束の全てを後で確かめ、下限の時間（600ms）まで待って返す。残るリスク：下限を超えた要求と、繰り返しの平均の比べ（search.md の 6.4 節） | 件数の合計がない。見えない一致の有無で結果と `more_may_exist` が変わらず、時間が下限の内側で区別できない | `search_floor_exceeded_ratio` が 5% 以下 | search |
 | LEAK-013 | 変更のイベントの購読 | in_org | `view_all`、配信の時の FLS | DT-EVT-001 | — | events |
 | LEAK-014 | Webhook の配信 | in_org | `run_as` の利用者で判定 | 同 | 宛先の変更の知らせ | events |
 | LEAK-015 | 組織が定義するイベント | in_org | 型の権限、`system` の写しの警告 | — | — | events |
@@ -212,7 +213,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
 | S3 の組織のファイル | 組織の `files` の DEK | 組織の単位で消せるようにする |
 | 監査の外部の保管 | 組織の `audit` の DEK（log-archive の鍵で包む） | Object Lock で消せないので、鍵の破棄で読めなくする |
 | OpenSearch | ドメインの保存時の暗号化、ノードの間の TLS | 写しで、`_source` に本文を置かない（[search.md](search.md) の 9 節） |
-| パスワード | Better Auth のハッシュ（Argon2id か scrypt。版の既定を確かめる。未検証） | ADR-0044 |
+| パスワード | Better Auth の既定の scrypt（Node.js の標準の実装。[Better Auth の Email & Password](https://www.better-auth.com/docs/authentication/email-password)、2026-09-28 に確認）。Argon2id へ替える時は、Better Auth のハッシュの関数の差し替えで行う | ADR-0044 |
 | OAuth のトークン | ハッシュだけ | ADR-0044 |
 
 - 項目ごとの暗号化（本家の Shield に相当。`sensitive` の項目を組織の鍵で暗号化し、決定的な暗号で等価の検索だけを許す）は、MVP の後の課題にする（14 節）。
@@ -253,7 +254,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
 | 組織の間で送ったパッケージ（受ける側） | 30 日 | ジョブ | — | [ADR-0039](../decisions/0039-metadata-package-format.md) |
 | 影の実行の結果（ID の集合のハッシュだけ） | 30 日 | ジョブ | — | [ADR-0063](../decisions/0063-org-staged-release-and-shadow-evaluation.md) |
 | アプリのログ | 30 日 | CloudWatch Logs の保持 | — | [ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md) |
-| トレース | 30 日 | X-Ray の保持（既定の日数は未検証） | — | ADR-0058 |
+| トレース | 30 日 | X-Ray の保持（30 日で固定。[X-Ray concepts](https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html)、2026-09-28 に確認） | — | ADR-0058 |
 | 組織ごとの使用量の表 | 1 分の粒度 7 日、1 時間の粒度 13 か月 | ジョブ | — | ADR-0058 |
 | Aurora のバックアップ | 35 日 | 自動バックアップの期限 | — | ADR-0053 |
 | OpenSearch の文書 | 正本に従う | 削除・消去・組織の削除で消し、整合の検査で確かめる | `search_drift_repaired_total` | ADR-0031 |
@@ -304,7 +305,7 @@ Aurora のバックアップの期限で、バックアップの中の行も消�
 
 手順は [runbooks/incident-response.md](../runbooks/incident-response.md)。組織をまたぐ漏えい、見えないデータの漏えい（参照の評価器の食い違い）、Sandbox のマスキングの事故は、範囲が 1 件でも SEV2 以上にし、セキュリティの担当と法務を呼ぶ。
 
-- 個人データの漏えい等に当たるか、報告の主体（組織か本システムか）、本人への通知の要否は、法務が判断する（法務の L1）。個人情報保護委員会への報告の期限（速報・確報）は、法務の確認を前提にする（未検証）。
+- 個人データの漏えい等に当たるか、報告の主体（組織か本システムか）、本人への通知の要否は、法務が判断する（法務の L1）。個人情報保護委員会への報告の期限（速報・確報）は、法務の確認を前提にする（法務の L1。ここでは決めない）。
 
 ## 11. 法務の論点（確認待ち）
 
@@ -355,7 +356,7 @@ Aurora のバックアップの期限で、バックアップの中の行も消�
 
 - 項目ごとの暗号化（本家の Shield に相当）を持つか。持つなら、決定的な暗号での等価の検索と、索引・並べ替え・集計の制約をどう見せるか。
 - 組織が鍵を持ち込む方式（BYOK）を、専用のセルで持つか。
-- 検索の応答の時間から見えない一致を推し量れる経路（LEAK-012）に対策が要るか。
+- 検索の応答の時間から見えない一致を推し量れる経路（LEAK-012）に対策が要るか。 → 決定を見よ。
 - 読みの操作（誰がどのレコードを見たか）を監査に残すか（[audit-and-field-history.md](audit-and-field-history.md) の 11 節）。
 - Aurora のバックアップの 35 日の間、削除したデータが残ることを、組織への説明（DPA）でどう書くか（法務の L7）。
 - 運用者の `support-data` の許可を、組織の管理者が事前に常時で与えられるようにするか。
@@ -366,7 +367,7 @@ Aurora のバックアップの期限で、バックアップの中の行も消�
 
 - 項目ごとの暗号化は MVP の後。要望と規制（金融・医療の組織）を見て、別の ADR で決める。
 - BYOK は MVP の後。専用のセルで、セルの鍵を組織の管理の KMS にする形から検討する。
-- 応答の時間はそろえない。E12 の外部のペンテストで影響を確かめる（search の領域と同じ）。
+- 検索の応答の時間は、固定の候補の束・束の全ての確かめ・1 ページ 600ms の下限でそろえる（2026-09-28 に改めた。[ADR-0032](../decisions/0032-search-permission-post-filter.md) の注記）。下限を超えた要求の残るリスクは、E12 の外部のペンテストで確かめる。
 - 読みの操作の記録は MVP の後（audit の領域の決定のまま）。
 - バックアップの 35 日は DPA に書く。法務の確認を待つ。
 - 常時の許可は持たない。許可は最大 7 日とし、組織の管理者が毎回与える。

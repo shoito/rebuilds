@@ -5,7 +5,7 @@
 - リードの変換は、1 つのトランザクションで行う合成の DML にする。作る・更新するレコードは、全て通常の DML の手順を通る。活動は多態の参照（誰と・何と）を持ち、共有は「主の親」1 つの判定と、割り当てられた人の判定の強い方で決める（[ADR-0021](../decisions/0021-lead-conversion-and-activity-parents.md)）。
 - 重複の規則は、保存の手順 5 で、同じトランザクションで書く正規化した照合の鍵で候補を引き、評価器で点数を付けて判定する。日本語は NFKC、カナの統一、長音の統一、法人格の除去、異体字の表で正規化する。見えないレコードとの重複は、既定で知らせない（[ADR-0022](../decisions/0022-duplicate-rules-and-japanese-matching.md)）。
 
-本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。ヘルプの記事は、本文が画面の読み込みの形で取れず、検索結果の要約でしか読めなかったものが多い。その場合は「ヘルプの要約」と書き、細部は未検証として扱う。
+本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。ヘルプの記事は、2026-09-28 にブラウザーで本文を読んで確かめた。
 
 ## 1. 目的と範囲
 
@@ -27,17 +27,17 @@
 | キューが所有するリード | 取引先と取引先責任者はキューに所有させられないので、変換の時に所有者の指定が要る | Apex |
 | 変換した後のリード | 問い合わせはできる。更新できるのは「変換済みのリードの参照・編集」の権限を持つ人だけ。`ConvertedAccountId`・`ConvertedContactId`・`ConvertedOpportunityId`・`ConvertedDate` を持つ | OBJ の Lead |
 | 項目の対応 | 標準の項目は決まった対応で写る。カスタム項目は、設定で取引先・取引先責任者・商談の項目に対応を付ける。変換の画面で商談を「表示・任意」「表示・必須」「表示しない」にできる | [Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)（Winter '27 版、以下「MDAPI」）の LeadConvertSettings |
-| 既存のレコードへの変換 | 既存の取引先・取引先責任者の値は上書きせず、空の項目にだけ入れる。リードの活動は、できた取引先・取引先責任者・商談に付く | [What happens when I convert leads?](https://help.salesforce.com/s/articleView?language=en_US&id=sales.faq_leads_what_happens_when.htm&type=5)（ヘルプの要約。本文は未検証） |
+| 既存のレコードへの変換 | 既存の取引先・取引先責任者の値は上書きせず、空の項目にだけ入れる。リードの活動は、できた取引先・取引先責任者・商談に付く。変換済みのリードは読むだけになる | [What happens when I convert leads?](https://help.salesforce.com/s/articleView?id=sales.faq_leads_what_happens_when.htm&type=5)（2026-09-28 に確認） |
 | 商談のフェーズ | フェーズごとに既定の確度、完了か、成立か、売上予測の分類を持つ | OBJ の OpportunityStage |
 | 活動の関連先 | ToDo・行動は、リード 1 件か、取引先責任者 50 件までに関連付けられる（共有の活動を有効にした時） | OBJ の TaskRelation、EventRelation |
 | 活動の共有 | 活動は自分の共有の表を持たない | [Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)（以下「RLA」） |
-| 活動を見られる人の細部 | 割り当てられた人と、関連先を見られる人のどちらで決まるか、複数の関連先の時にどうなるかは、確かめられなかった（未検証） | — |
+| 活動を見られる人の細部 | 活動の OWD の既定は非公開。割り当てられた人と、関連先を見られる人のどちらで決まるか、複数の関連先の時にどうなるかは、公開の資料に書かれていない（未検証。E4 の `activity-sharing` で試用の組織で確かめる） | [Default Organization-Wide Access Levels](https://help.salesforce.com/s/articleView?id=platform.security_sharing_owd_default_settings.htm&type=5)（2026-09-28 に確認） |
 | 重複の規則 | 作成・更新ごとに「許可（警告・記録）」か「止める」を選ぶ。照合の規則を 1 つ以上持つ。共有の扱いを「共有を守る」「共有を無視する」から選ぶ。「共有を守る」では、見えないレコードとの重複は何も知らせず保存を通す | MDAPI の DuplicateRule |
 | 照合の規則 | 項目ごとに「完全一致」か、あいまいな照合の方法（名、姓、会社名、電話、市区町村、番地、郵便番号、役職）を選ぶ。空の値を一致とみなすかを選ぶ。条件の論理を持つ | MDAPI の MatchingRule |
-| あいまいな照合の中身 | 会社名の法人格を無視する。Jaro-Winkler 距離、Metaphone 3、名前の異表記の辞書、編集距離などを組み合わせる | [Matching Algorithms Used with Matching Methods](https://help.salesforce.com/s/articleView?id=sales.matching_rules_matching_algorithms.htm&language=en_US&type=5)（ヘルプの要約。本文は未検証） |
-| 規則の数 | 1 オブジェクトで有効な重複の規則 5、有効な照合の規則 5、1 つの重複の規則に照合の規則 3 | [Things to Know About Duplicate Rules](https://help.salesforce.com/s/articleView?language=en_US&id=sales.duplicate_rules_overview.htm&type=5)（ヘルプの要約。本文は未検証） |
-| 日本語の照合 | あいまいな照合が日本語（漢字・カナ）をどう扱うかは、確かめられなかった（未検証） | — |
-| メールの記録 | 利用者ごとの BCC の宛先で送ったメールを記録できる。別の機能（活動の取り込み）では、取り込んだメールが通常のレコードとして保存されず、レポートに出ないと第三者の記事が書く | [Emails and Einstein Activity Capture](https://help.salesforce.com/s/articleView?id=sf.aac_email_parent.htm&language=en_US&type=5)（ヘルプの要約。本文は未検証） |
+| あいまいな照合の中身 | 会社名は「Inc」「Corp」などを外して正規化する。Jaro-Winkler 距離、Metaphone 3、名前の異表記、頭字語、編集距離などを組み合わせ、大文字と小文字を区別しない | [Matching Algorithms Used with Matching Methods](https://help.salesforce.com/s/articleView?id=sales.matching_rules_matching_algorithms.htm&type=5)、[Standard Account Matching Rule](https://help.salesforce.com/s/articleView?id=sales.matching_rules_standard_account_rule.htm&type=5)（2026-09-28 に確認） |
+| 規則の数 | 1 オブジェクトで有効な重複の規則 5、有効な照合の規則 5、1 つの重複の規則に照合の規則 3 | [Things to Know About Duplicate Rules](https://help.salesforce.com/s/articleView?id=sales.duplicate_rules_overview.htm&type=5)（2026-09-28 に確認） |
+| 日本語の照合 | あいまいな照合が日本語（漢字・カナ）をどう扱うかは、資料に書かれていない。電話と住所は区切りごとに比べ、北米のデータに向くと書く | Standard Account Matching Rule |
+| メールの記録 | 利用者ごとの BCC の宛先で送ったメールを、宛先のメールの一致するレコードの活動の履歴か、未処理の一覧に記録する。別の機能（活動の取り込み）は、「メールを活動として同期」を有効にすると、取り込んだメールをレコードとして保存し、レポート・ワークフロー・API で使える | [How Does Email to Salesforce Work?](https://help.salesforce.com/s/articleView?id=sales.email_my_email_2_sfdc.htm&type=5)、[Emails and Einstein Activity Capture](https://help.salesforce.com/s/articleView?id=sales.aac_email_parent.htm&type=5)（2026-09-28 に確認） |
 
 ## 3. 標準オブジェクト
 
@@ -154,7 +154,7 @@
 | 割り当て | `owner`（利用者。キュー不可） | `owner` |
 
 - **多態の参照**は、`data` に `{"id": ..., "object": ...}` を持つ新しい項目の型 `polymorphic_lookup` とし、`record_relationships` に書く（参照先のオブジェクトの ID を行に含める）。型の追加は [metadata-and-runtime.md](metadata-and-runtime.md) の 3.3 節の表への追加の依頼として扱う（12 節）。
-- `who` がリードで、`what` を持つことはできない（本家と同じ扱いにする。本家の細部は未検証）。
+- `who` がリードで、`what` を持つことはできない（本家と同じ扱いにする。[Object Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/object_reference.pdf)、Winter '27 版の Task、2026-09-28 に確認）。
 - カスタムオブジェクトは、`md_objects.allow_activities` が真の時だけ `what` になれる。
 - 活動の共有は 4 節。
 
@@ -212,7 +212,7 @@ POST /api/v1/leads/convert
 ```
 
 - 1 回の要求は 50 件まで。1 件の変換は、1 つの**変換の単位**で、全部か無しかにする。`all_or_none = true` なら要求の全体を 1 つのトランザクションにする。`false` なら、単位ごとにセーブポイントを取り、失敗した単位だけを巻き戻す（[metadata-and-runtime.md](metadata-and-runtime.md) の 6.3 節と同じ考え方）。
-- 本家の 1 回の上限は確かめられなかった（未検証）。本システムは、1 件で DML が 4〜6 回（作成 3、リードの更新 1、活動の付け替え）になるので、DML の 150 回（ADR-0005）の中に収まる 50 件にする。
+- 本家の 1 回の上限は、公開の資料に見当たらない（未検証。E5 の `lead-conversion` で試用の組織で確かめる）。本システムは、1 件で DML が 4〜6 回（作成 3、リードの更新 1、活動の付け替え）になるので、DML の 150 回（ADR-0005）の中に収まる 50 件にする。
 - 画面の「変換」も同じ API を使う。
 
 ### 5.2 手順
@@ -234,7 +234,7 @@ POST /api/v1/leads/convert
 
 - 手順 5〜9 の保存の後のフローは、通常どおり動く。フローは `lead_conversions` の行と、リードの `is_converted` を見て、変換の途中の保存かを判断できる。
 - 重複の規則（6 節）は、手順 5・6 の作成にも効く。止める設定の規則に当たれば、その変換の単位を失敗にし、重複の候補（見られるものだけ）を返す。画面は、候補の既存のレコードを選んで変換し直す流れを出す。
-- 変換を元に戻す操作は持たない（本家にもない。未検証）。誤った変換は、できたレコードの削除と、リードの `edit_converted_leads` での直しで扱う。
+- 変換を元に戻す操作は持たない（本家の資料にも戻す操作の記述はない。変換済みのリードは読むだけになる。2 節）。誤った変換は、できたレコードの削除と、リードの `edit_converted_leads` での直しで扱う。
 
 ### 5.3 項目の対応
 
@@ -246,7 +246,7 @@ POST /api/v1/leads/convert
 
 - 対応の保存の時に、型が合うこと（同じ型か、[metadata-and-runtime.md](metadata-and-runtime.md) の 5.1 節で変換できる型）と、1 つの先の項目に 2 つの元が向かないことを検査する。
 - 変換する人が、元の項目を読めない、または先の項目を編集できない時は、その項目を写さない（黙って落とす）。変換を失敗にすると、FLS の細かい違いで営業の業務が止まるため。落とした項目は、応答の `skipped_fields` に項目の名前だけを返す（値は返さない）。
-- 既存のレコードへの変換では、先の項目が空の時だけ写す（ヘルプの要約に合わせる）。
+- 既存のレコードへの変換では、先の項目が空の時だけ写す（本家に合わせる。2 節）。
 
 ## 6. 重複の規則と照合（ADR-0022）
 
@@ -346,14 +346,14 @@ CREATE INDEX ON record_match_keys (org_id, record_id);
 | `sharing` | 見えないレコードとの一致 | 本家 |
 | --- | --- | --- |
 | `enforce`（既定） | 無いものとして扱う。止めない、知らせない、記録しない | 同じ（MDAPI の EnforceSharingRules） |
-| `bypass` | `block` の時は止める。返す一致は見られるものだけで、見えない一致は件数も返さず「表示できない重複があります」とだけ返す。`allow_*` の時は、見えない一致を無いものとして扱い、記録だけ書く | 本家は共有を無視する（MDAPI の BypassSharingRules）。返す内容の細部は未検証 |
+| `bypass` | `block` の時は止める。返す一致は見られるものだけで、見えない一致は件数も返さず「表示できない重複があります」とだけ返す。`allow_*` の時は、見えない一致を無いものとして扱い、記録だけ書く | 本家は共有を無視する（MDAPI の BypassSharingRules）。返す内容の細部は未検証（E5 の `matching-and-duplicate-rules` で確かめる） |
 
 - `bypass` は、見えないレコードの存在を 1 ビット漏らす（止められたことから、同じ値のレコードがあると分かる）。`customize_application` を持つ管理者が、Setup で警告を読んで選んだ時だけ有効にし、監査に残す。
 - 重複の記録（`duplicate_record_sets`、`duplicate_record_items`）は、共有の判定の対象のオブジェクトにする。見る人が見られる項目の行だけを返す。
 
 ## 7. 商談・リードの周辺の規則
 
-- 取引先の所有者の変更で、子の商談・取引先責任者の所有者を一緒に変える選択肢を、所有者の変更の API に持つ（`cascade_owner: ["opportunity", "contact"]`、自分が所有する子だけ・全て）。本家の同様の選択肢の細部は未検証。子の所有者の変更は、それぞれ通常の DML（手動の共有は消える。共有の領域の 5.3 節）。
+- 取引先の所有者の変更で、子の商談・取引先責任者の所有者を一緒に変える選択肢を、所有者の変更の API に持つ（`cascade_owner: ["opportunity", "contact"]`、自分が所有する子だけ・全て）。本家の同様の選択肢の細部は未検証（E5 の `accounts-and-contacts` で確かめる）。子の所有者の変更は、それぞれ通常の DML（手動の共有は消える。共有の領域の 5.3 節）。
 - 完了した商談（`is_closed`）の `amount`・`close_date` の変更を止めるかは、組織の入力規則に任せる。システムでは止めない。
 - リードの割り当て（本家の割り当てのルール）は、MVP では持たない。保存の前のフローでキューや所有者を決める（[automation-flows.md](automation-flows.md)）。
 
@@ -460,10 +460,10 @@ email_message を作る（who は最初の一致、残りは activity_relations�
 
 ## 14. 未解決の問い
 
-- 活動を見られる人の本家の規則（割り当て・関連先・複数の関連先）が未検証。本システムの規則（4 節）で本家から移る組織が困らないか。
+- 活動を見られる人の本家の規則（割り当て・関連先・複数の関連先）が未検証（E4 の `activity-sharing` で確かめる）。本システムの規則（4 節）で本家から移る組織が困らないか。
 - カナの読みの項目が空の日本語の名前を、どこまで照合するか。形態素の解析で読みを推定するか。
 - 重複の規則の `bypass` を MVP に入れるか。
-- 1 回のリードの変換の件数（50）は十分か。本家の値は未検証。
+- 1 回のリードの変換の件数（50）は十分か。本家の値は未検証（E5 の `lead-conversion` で確かめる）。
 - 取引先責任者に `controlled_by_parent` を選べるようにするか（本家は選べる）。
 - 取引先の所有者の変更で子の所有者も変える選択肢の既定。
 - メールの記録で、Cc の宛先のうち社内の利用者を照合から外すか。

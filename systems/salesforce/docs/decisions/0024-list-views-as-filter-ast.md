@@ -15,7 +15,7 @@ date: 2026-09-28
 - 項目の名前は変わり、項目は消える。条件を文字列で持つと壊れる。
 - 20 万件を超えるオブジェクトでは、選択的でない条件を断る（[ADR-0019](0019-selectivity-statistics-and-planning.md)）。
 
-本家（2026-09-28 に確認）：リストビューは列、条件の行、条件の論理、範囲（すべて・自分の・キューなど）、共有先を持つ。「自分だけ」のリストビューはメタデータとして扱えない（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の ListView）。リストビュー・レポート・問い合わせは同じ最適化器で選択性を判定する（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。見る人が読めない条件の項目の扱いは確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：リストビューは列、条件の行、条件の論理、範囲（すべて・自分の・キューなど）、共有先を持つ。「自分だけ」のリストビューはメタデータとして扱えない（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の ListView）。リストビュー・レポート・問い合わせは同じ最適化器で選択性を判定する（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。見る人が読めない条件の項目の扱いは、公開の資料に書かれていない（未検証。E5 の `list-views` で試用の組織で確かめる）。
 
 ## Options
 
@@ -52,7 +52,7 @@ date: 2026-09-28
 - 引き受けるコスト：
   - 権限の違う人には開けない共有のリストビューが生まれる。保存の時に作った人へ警告する。
   - 件数は打ち切りで、正確な大きな件数は出ない。レポートを案内する。
-  - 本家の上限（条件・列の数）は未検証で、足りない組織がありうる。
+  - 本家の上限（条件・列の数）は公開のヘルプに見当たらない（未検証。E5 の `list-views` で確かめる）。足りない組織がありうる。
 
 ## Confirmation
 

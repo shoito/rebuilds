@@ -15,7 +15,7 @@ intent は、CSV の取り込みのウィザード、重複の照合、外部 ID
 
 取り込みでは、同じファイルに同じ会社・同じ人の行が何度も出ることがある。並行の部分で同じ鍵の行を同時に作ると、一意の違反か重複のレコードになる。
 
-本家のインポートのウィザードは 1 回 5 万件まで（ヘルプの要約。未検証）。本家のウィザードが照合でどう既存を選ぶか、見えないレコードをどう扱うかは確かめられなかった（未検証）。
+本家のインポートのウィザードは 1 回 5 万件まで（[How many records can I import?](https://help.salesforce.com/s/articleView?id=xcloud.faq_data_import_wizard_how_many_records.htm&type=5)、2026-09-28 に確認）。文字コードを選べ、ワークフローとプロセスを動かすかを選べる（[Import Data with the Data Import Wizard](https://help.salesforce.com/s/articleView?id=xcloud.import_with_data_import_wizard.htm&type=5)、2026-09-28 に確認）。本家のウィザードが照合でどう既存を選ぶか、見えないレコードをどう扱うかは、公開の資料に書かれていない（未検証。E9 の `import-match-update` で試用の組織で確かめる）。
 
 ## Options
 

@@ -15,7 +15,7 @@ date: 2026-09-28
 - 最小・最大は、今の値を持つ子が消えると、差分だけでは直せない。
 - 積み上げ集計の値から、読めない子の項目（金額など）を推し量れる。
 
-本家（2026-09-28 に確認）：積み上げ集計を持つ親は、値を計算し直して親の保存の手順を通る。祖父母も同じ（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版）。子の変更は親の行ロックの競合を起こすので、子を親ごとにまとめるよう勧める（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。1 オブジェクト 25 が既定（ヘルプの要約。未検証）。計算の仕方（差分か全体か）と FLS の扱いは確かめられなかった（未検証）。
+本家（2026-09-28 に確認）：積み上げ集計を持つ親は、値を計算し直して親の保存の手順を通る。祖父母も同じ（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版）。子の変更は親の行ロックの競合を起こすので、子を親ごとにまとめるよう勧める（[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)）。1 オブジェクト 25 が既定で、依頼で 40 まで（[Increase the Maximum Limit of Roll-Up Summary Fields](https://help.salesforce.com/s/articleView?id=000386702&type=1)、2026-09-28 に確認）。計算の仕方（差分か全体か）と FLS の扱いは、公開の資料に書かれていない（未検証。E6 の `rollup-summaries` で試用の組織で確かめる）。
 
 ## Options
 

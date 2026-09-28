@@ -16,7 +16,7 @@ date: 2026-09-28
 - 項目・オブジェクトの削除から、値を実際に消すまでの期間と手順。
 - カスタムの名前の付け方。本家の `__c` の接尾辞は本家の識別子である（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
-本家は、型の変更で値のために新しい列を割り当て、既存の値を一括で写し、メタデータの指す先を切り替える。変換の間も読める。消した項目と値は、確定するか期間が過ぎるまで戻せる。レコードのごみ箱は 15 日である（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)、2026-09-28 に確認）。項目の削除の保持の日数は確かめられなかった（未検証）。
+本家は、型の変更で値のために新しい列を割り当て、既存の値を一括で写し、メタデータの指す先を切り替える。変換の間も読める。レコードのごみ箱は 15 日である（[Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)、[Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)、2026-09-28 に確認）。消した項目と値は、確定するか 15 日が過ぎるまで戻せる（[Delete a Custom Field](https://help.salesforce.com/s/articleView?id=platform.deleting_fields.htm&type=5)、2026-09-28 に確認）。
 
 ## Options
 
