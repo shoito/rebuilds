@@ -23,11 +23,11 @@
 | --- | --- | --- |
 | レポートの ACL | `report_view` の操作の ACL で、テーブル・フィールドのデータをレポートで見られるかを決める。`report_view` の規則がなければ、テーブルの `read` の規則のロールで確かめる。フィールドの規則は、グループ化・行・列・集計に使うフィールドに効く | [Report_view access control](https://www.servicenow.com/docs/bundle/zurich-now-intelligence/page/use/reporting/concept/report-view-access-control.html) |
 | 一覧の型 | `report_view` の規則は、`read` のある一覧のレポートを止められない | 同上 |
-| 集計と行の ACL | 一覧・掘り下げ以外の型のレポートは、行の `read` がなくても（`report_view` で止められていなければ）見られることがある | コミュニティの記事（[Data Visibility vs. Data Security](https://www.servicenow.com/community/developer-articles/data-visibility-vs-data-security-the-balancing-act-of-servicenow/ta-p/2500061)）。公式の本文は未検証 |
-| 事前の計算 | 指標の値（スコア）を、データの収集のジョブが時点ごとに集めて推移を作る。新しい形では、変更の取り込み（CDC）で定期に写しを取り、問い合わせの時に値を計算する | コミュニティの記事（[Meet Data Snapshots](https://www.servicenow.com/community/performance-analytics-blog/meet-data-snapshots-powering-the-next-level-of-analytics-with/ba-p/3451200)）と [Performance Analytics indicators](https://www.servicenow.com/docs/bundle/xanadu-now-intelligence/page/use/performance-analytics/concept/c_Indicators.html)（本文は未検証） |
-| 定期の配信 | 定期のレポートを、PDF・PNG・CSV・XLS で、利用者と外部のメールアドレスに送れる | コミュニティの記事（[Creating a Scheduled Report](https://www.servicenow.com/community/itsm-articles/creating-a-scheduled-report-in-servicenow/ta-p/2970255)）。公式の本文は未検証 |
+| 集計と行の ACL | 一覧・掘り下げ以外の型のレポートは、行の `read` がなくても（`report_view` で止められていなければ）見られることがある | コミュニティの記事（[Data Visibility vs. Data Security](https://www.servicenow.com/community/developer-articles/data-visibility-vs-data-security-the-balancing-act-of-servicenow/ta-p/2500061)）。公式の本文は未検証（本家の振る舞いで、設計の前提ではない） |
+| 事前の計算 | 指標の値（スコア）を、データの収集のジョブが時点ごとに集めて推移を作る。新しい形では、変更の取り込み（CDC）で定期に写しを取り、問い合わせの時に値を計算する | コミュニティの記事（[Meet Data Snapshots](https://www.servicenow.com/community/performance-analytics-blog/meet-data-snapshots-powering-the-next-level-of-analytics-with/ba-p/3451200)）と [Performance Analytics indicators](https://www.servicenow.com/docs/bundle/xanadu-now-intelligence/page/use/performance-analytics/concept/c_Indicators.html)（本文は未検証で、本家の振る舞いで、設計の前提ではない） |
+| 定期の配信 | 定期のレポートを、PDF（縦・横）・XLS・PNG・CSV・本文に埋め込む PNG で、利用者・グループと、インスタンスの利用者でないメールアドレスに送れる | [Schedule emails of reports](https://www.servicenow.com/docs/r/now-intelligence/reporting/t_ScheduleAReport.html) |
 
-- 本家は、行の `read` と別の `report_view` の権限を持ち、集計の型では行の `read` を問わない場合がある（未検証）。本システムは、集計も行の `read` と `visible(f)` の上で行う（差異。[ADR-0046](../decisions/0046-acl-aware-aggregation-and-per-recipient-delivery.md)）。「件数だけは全体を見せたい」要望は、7.2 節で扱う。
+- 本家は、行の `read` と別の `report_view` の権限を持ち、集計の型では行の `read` を問わない場合があるとされる（コミュニティの記事。未検証で、本家の振る舞いで、設計の前提ではない）。本システムは、集計も行の `read` と `visible(f)` の上で行う（差異。[ADR-0046](../decisions/0046-acl-aware-aggregation-and-per-recipient-delivery.md)）。「件数だけは全体を見せたい」要望は、7.2 節で扱う。
 - 本家のレポートの型の名前、表の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 ## 3. レポートの定義
@@ -36,7 +36,7 @@
 | --- | --- |
 | `id`、`stable_key`、`owner_id`、`name`（翻訳の対象） | |
 | `kind` | `list`（一覧）/ `aggregate`（棒・円・1 つの値）/ `pivot`（2 つのグループ化の表）/ `trend`（時系列） |
-| `source` | `table`（テーブルとその子のクラス）/ `daily_fact`（6 節の日次の事実）/ `sla`（`task_sla` と `task`。8 節）/ 組み込みの集計の表（`deflection_daily` など） |
+| `source` | `table`（テーブルとその子のクラス）/ `daily_fact`（6 節の日次の事実）/ `sla`（`sla_clock` と `task`。8 節）/ 組み込みの集計の表（`deflection_daily` など） |
 | `condition` | 式の言語の条件（リストのフィルターと同じ形） |
 | `group_by` | 最大 2 つのフィールド（参照のたどりは 1 段まで） |
 | `measure` | `count`、または数・長さのフィールドの `sum`・`avg`・`min`・`max` |
@@ -169,7 +169,7 @@ DT-RPT-001（レポートを開いたときの振る舞い）：
 期間 P（テナントのタイムゾーンの暦の半開区間 `[開始, 終わり)`）、SLA の定義 D（`stable_key`。版をまたいで同じ定義として数え、版ごとの内訳も出す）について：
 
 ```
-母数 = task_sla のうち、定義が D、stage = completed、stop_at ∈ P の行
+母数 = sla_clock のうち、定義が D、stage = completed、stop_at ∈ P の行
 達成 = 母数のうち breached = false
 違反 = 母数のうち breached = true
 達成率 = 達成 ÷（達成 ＋ 違反）         … 母数が 0 なら「—」
@@ -182,7 +182,7 @@ DT-RPT-001（レポートを開いたときの振る舞い）：
 
 ### 8.2 `breach_disputed`
 
-- `breach_disputed` は、カレンダー・祝日の計算し直しで期限が後ろに動き、すでに違反した行の新しい期限がまだ来ていなかったときに、`task_sla_event` に残る事象である（[sla-and-calendars.md](sla-and-calendars.md) の 8 節）。違反の事実（`breached = true`）は取り消されない。
+- `breach_disputed` は、カレンダー・祝日の計算し直しで期限が後ろに動き、すでに違反した行の新しい期限がまだ来ていなかったときに、`sla_clock_event` に残る事象である（[sla-and-calendars.md](sla-and-calendars.md) の 8 節）。違反の事実（`breached = true`）は取り消されない。
 - 停止の後、その行は次のどれかになる。
 
 DT-RPT-002（停止した行の分類）：
@@ -203,7 +203,7 @@ DT-RPT-002（停止した行の分類）：
 | 調整の達成率 | 達成に数える | 祝日の追加（法の改正）で期限が延びたことを、契約の評価に反映したいとき |
 
 - **既定の表示は厳格の達成率にし、調整の達成率と争いのある件数を並べて出す**（決定）。どちらを契約の報告に使うかは PM が E11 で決める（[sla-and-calendars.md](sla-and-calendars.md) の 13 節の持ち越し）。テナントは、レポートの設定で既定の表示を選べる（選んだことを監査に残す）。
-- `breach_disputed` は事象の表にしかないので、毎回 `task_sla_event` を探すと遅い。**`task_sla` に `breach_disputed_at` の列を足し、事象と同じトランザクションで入れる**（統合で決めた。[sla-and-calendars.md](sla-and-calendars.md) の 6.2・8 節）。DT-RPT-002 の「`breach_disputed` の事象がある」は、この列が空でないことで判定する。
+- `breach_disputed` は事象の表にしかないので、毎回 `sla_clock_event` を探すと遅い。**`sla_clock` に `breach_disputed_at` の列を足し、事象と同じトランザクションで入れる**（統合で決めた。[sla-and-calendars.md](sla-and-calendars.md) の 6.2・8 節）。DT-RPT-002 の「`breach_disputed` の事象がある」は、この列が空でないことで判定する。
 
 ### 8.3 組み込みのレポート
 
@@ -213,7 +213,7 @@ DT-RPT-002（停止した行の分類）：
 | 違反の近い計時 | 進行中で、残りの業務時間が 25% 未満の行（今の行から。残り時間は読み取りの時に計算。[sla-and-calendars.md](sla-and-calendars.md) の 6.6 節） |
 | 滞留 | 担当のグループ別の未解決の件数と経過の日数の分布。推移は日次の事実の表 |
 | 担当ごとの件数 | 担当者別の作成・解決の件数、再割り当ての回数 |
-| 変更の成功率 | `close_code` 別、種類別（[itsm-processes.md](itsm-processes.md) の quality の項目） |
+| 変更の成功率 | `resolution_code` 別、種類別（[itsm-processes.md](itsm-processes.md) の quality の項目） |
 | 自己解決 | `deflection_daily` から（[knowledge.md](knowledge.md) の 7.4 節） |
 
 - 組み込みのレポートの定義はコードの版に持ち、テナントは複製して変える。
@@ -313,7 +313,7 @@ DT-RPT-002（停止した行の分類）：
 - **定期の配信は受け手ごとに計算し、外部に送らない**（10 節）。
 - **達成率の母数は期間の中に停止した行**（8.1 節、ADR-0047）。
 - **`breach_disputed` は厳格と調整の両方を出し、既定の表示は厳格**（8.2 節）。
-- **`task_sla.breach_disputed_at` を足し、分類はこの列で行う**（8.2 節。統合で決めた）。
+- **`sla_clock.breach_disputed_at` を足し、分類はこの列で行う**（8.2 節。統合で決めた）。
 - **`packaged` の印の付いたレポート・ダッシュボードだけを設定のパッケージで移す**（3 節。統合で決めた）。
 
 ### 持ち越し
@@ -351,7 +351,7 @@ DT-RPT-002（停止した行の分類）：
 | Aurora `report_def`、`dashboard`、`dashboard_widget` | 3・9 節。テナントのデータ（組み込みの印の付いたものはパッケージの対象の候補） |
 | Aurora `report_schedule`、`report_run`（実行の記録、30 日） | 10 節 |
 | Aurora `task_daily_fact` | 6 節。月ごとのパーティション、13 か月 |
-| Aurora `task_sla.breach_disputed_at`（列の追加。統合で決めた） | 8.2 節。sla-and-calendars の表 |
+| Aurora `sla_clock.breach_disputed_at`（列の追加。統合で決めた） | 8.2 節。sla-and-calendars の表 |
 | Aurora `export_job` | 11 節。S3 の置き場所と期限 |
 | Valkey 結果のキャッシュ | 7.3 節。失われてもよい |
 | S3 エクスポートのファイル（24 時間） | 11 節 |

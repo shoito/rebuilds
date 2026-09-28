@@ -26,15 +26,15 @@
 | スケジュールの取り方 | スケジュールなし（24 時間 365 日）、SLA の定義のスケジュール、タスクのフィールドのスケジュール | 同上 |
 | タイムゾーンの取り方 | 呼び出し元のタイムゾーン、SLA の定義のタイムゾーン、CI の場所、タスクの場所、呼び出し元の場所 | 同上 |
 | 条件 | 開始・一時停止・停止・リセット。取り消しの時点：「開始の条件を満たさなくなったとき」（既定）、「取り消しの条件を満たしたとき」、「しない」。再開の時点：「一時停止の条件を満たさなくなったとき」（既定）、「再開の条件を満たしたとき」 | 同上 |
-| さかのぼりの開始 | 開始の時刻を、タスクの日時のフィールド（例：作成の時刻）にできる。さかのぼりの一時停止を選ぶと、その間の一時停止の時間も数える | 同上。さかのぼりの一時停止の説明は本家の KB（[Configure SLA retroactive start and pause](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB1605073)、検索の結果の抜粋で確認。本文は未検証） |
-| 計時の更新 | 違反までの近さで分けた定期のジョブで更新する | [ADR-0004](../decisions/0004-workflow-and-sla-engine.md) の Context（未検証） |
-| 祝日のスケジュール | 祝日は、除外の型の予定を持つ子のスケジュールとして、営業時間のスケジュールに付ける。毎年の繰り返しの設定がないと効かない | コミュニティの記事で確認（[SLA Schedule excluding Holidays](https://www.servicenow.com/community/sysadmin-forum/sla-schedule-excluding-holidays/m-p/2530767)）。公式の文書は未検証 |
-| 警告の既定 | 50%・75%・100% で通知する既定のフロー | 未検証（公式の文書で確かめられなかった） |
+| さかのぼりの開始 | 開始の時刻を、タスクの日時のフィールド（例：作成の時刻）にできる。さかのぼりの一時停止を選ぶと、その間の一時停止の時間も数える | 同上。さかのぼりの一時停止は、さかのぼりの開始から今までにたまった一時停止の時間を新しい計時の行に入れ、違反の時刻をその分だけ後ろにずらす（[Configure SLA retroactive start and pause](https://www.servicenow.com/docs/r/it-service-management/service-level-management/t_UseSLARetroactiveStartAndPause.html)） |
+| 計時の更新 | 違反までの近さで分けた 6 つの定期のジョブで更新する（10 分以内は 1 分ごと、1 時間以内は 10 分ごと、1 日以内は 1 時間ごと、30 日以内は毎日、30 日より先は 5 日ごと、違反済みは毎日）。一時停止の行は対象外 | [Scheduled jobs for SLA](https://www.servicenow.com/docs/r/it-service-management/service-level-management/c_ScheduledJobsForSLA.html) |
+| 祝日のスケジュール | 祝日は、除外の型の予定を持つ子のスケジュールとして、営業時間のスケジュールに付ける。毎年の繰り返しの設定がないと効かない | コミュニティの記事で確認（[SLA Schedule excluding Holidays](https://www.servicenow.com/community/sysadmin-forum/sla-schedule-excluding-holidays/m-p/2530767)）。公式の文書は未検証（本家の振る舞いで、設計の前提ではない） |
+| 警告の既定 | 既定の SLA のワークフローが 50%・75% で警告、100% で違反の事象を出す | コミュニティの記事で確認（[Send 50% and 75% SLA notifications](https://www.servicenow.com/community/developer-forum/send-50-and-75-sla-notifications/m-p/1442198)）。公式の文書は未検証（本家の振る舞いで、設計の前提ではない。本システムの既定は 6.1 節） |
 | 日本の祝日の CSV | 内閣府が「昭和 30 年（1955 年）から令和 9 年（2027 年）国民の祝日（csv 形式）」を公開。翌々年の分（令和 10 年）は前年の 2 月に掲載する | [国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html) |
 | CSV の形 | `https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv`。Shift_JIS、見出し「国民の祝日・休日月日,国民の祝日・休日名称」、日付は `YYYY/M/D`（0 で埋めない）。振替休日と国民の休日は、どちらも名称が「休日」（例：`2026/5/6,休日`（振替）、`2026/9/22,休日`（国民の休日））。取得の時点で 21,538 バイト、更新の日時は 2026-02-02 | CSV を取得して確認 |
 | 振替休日・国民の休日 | 祝日が日曜日に当たるときは、その日の後で最も近い祝日でない日を休日とする（第 3 条第 2 項）。前日と翌日が祝日である祝日でない日は休日とする（第 3 条第 3 項） | [国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html) |
-| CSV の利用の条件 | ページに利用の条件の記載がない | 同上。未検証（政府標準利用規約が適用されるかは確かめられなかった） |
-| ITIL 4 のサービスレベル管理 | 目的は、事業に基づくサービスレベルの目標を定め、提供をそれに照らして評価・監視・管理すること。ITIL 4 は OLA・UC の区別を用語から外した | [What's New and Changed in the ITIL 4 Service Level Management Practice](https://www.beyond20.com/blog/itil-4-service-level-management-practice/)（二次の資料。PeopleCert の原典は未検証） |
+| CSV の利用の条件 | ページに利用の条件の記載はない。内閣府のサイトの利用規約は、権利の表記のないコンテンツに公共データ利用規約（第 1.0 版）を当てる。この規約は商用の利用を認め、出典の記載（加工したときはその旨も）を求め、数値のデータ・簡単な表は著作権の保護の対象でないとする | [内閣府ホームページ利用規約](https://www.cao.go.jp/notice/rule.html)、[公共データ利用規約（第 1.0 版）](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)。当てはめの判断は法務の L9 |
+| ITIL 4 のサービスレベル管理 | 目的は、事業に基づくサービスレベルの目標を定め、提供をそれに照らして評価・監視・管理すること。ITIL 4 は OLA・UC の区別を用語から外した | [What's New and Changed in the ITIL 4 Service Level Management Practice](https://www.beyond20.com/blog/itil-4-service-level-management-practice/)（二次の資料。PeopleCert の原典は会員向けで未検証。画面の文言の理由にだけ使い、設計の前提にしない） |
 
 - 本システムは、SLA・OLA・UC の種類を定義の属性として持つ（本家と同じ）。ITIL 4 が用語の区別を外したことは、画面の文言で「SLA」を総称に使う理由にする。種類ごとの振る舞いの違いは持たない（レポートの絞り込みにだけ使う）。
 - 本家の「定期のジョブで更新する」方式は採らない（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)）。
@@ -182,7 +182,7 @@ DT-CAL-001：
 | `table_id` | 対象のクラス。子のクラスにも効く |
 | `duration` | 業務時間の秒（MVP は長さだけ。相対の長さは持ち越し） |
 | `schedule_source` | `none`（24 時間 365 日）/ `definition`（`calendar_id`）/ `task_field`（タスクの参照のフィールド。値が空なら `definition` の既定） |
-| `tz_source` | `caller` / `definition` / `ci_location` / `task_location` / `caller_location`。値が取れなければカレンダーのタイムゾーン |
+| `tz_source` | `requester` / `definition` / `ci_location` / `task_location` / `requester_location`。値が取れなければカレンダーのタイムゾーン |
 | `start_condition`、`pause_condition`、`stop_condition`、`reset_condition` | 式の言語の条件（保存の後の値で評価） |
 | `cancel_when` | `start_not_met`（既定）/ `cancel_condition`（`cancel_condition` を持つ）/ `never` |
 | `resume_when` | `pause_not_met`（既定）/ `resume_condition`（`resume_condition` を持つ） |
@@ -194,7 +194,7 @@ DT-CAL-001：
 
 - 本家の「タイムゾーンの取り方」「スケジュールの取り方」「取り消し・再開の時点」の選択肢（2 節）に寄せた。名前は本システムのもの。
 - タイムゾーンの取り方の値（利用者の `time_zone`、場所のタイムゾーン）は、開始の時に解いて計時の行に固定する（6.2 節）。
-- **組み込みの定義の一時停止の既定は、[itsm-processes.md](itsm-processes.md) の 4.4 節で決めた**（統合で決めた）。SLA（インシデントの応答・解決）は、依頼者の回答待ち（`on_hold` かつ `hold_reason = awaiting_caller`）と解決（`resolved`）でだけ止める。ベンダー待ち・問題待ち・変更待ちは IT の側の都合なので、依頼者との約束を止めない。担当のグループの OLA は、ベンダー待ち（`awaiting_vendor`）でも止める。組み込みの定義は、テナントの作成の時にテナントの行として作り、テナントが変えられる（[data-model.md](data-model.md) の 3 節）。
+- **組み込みの定義の一時停止の既定は、[itsm-processes.md](itsm-processes.md) の 4.4 節で決めた**（統合で決めた）。SLA（インシデントの応答・解決）は、依頼者の回答待ち（`on_hold` かつ `hold_reason = awaiting_requester`）と解決（`resolved`）でだけ止める。ベンダー待ち・問題待ち・変更待ちは IT の側の都合なので、依頼者との約束を止めない。担当のグループの OLA は、ベンダー待ち（`awaiting_vendor`）でも止める。組み込みの定義は、テナントの作成の時にテナントの行として作り、テナントが変えられる（[data-model.md](data-model.md) の 3 節）。
 
 ### 6.2 計時の行
 
@@ -210,12 +210,12 @@ DT-CAL-001：
 | `planned_end` | 期限の時刻（UTC）。`paused` のときは再開までの目安として持たず NULL |
 | `stop_at` | |
 | `breached`、`breached_at` | 違反したか（段階とは別に持つ。違反の後も進む） |
-| `breach_disputed_at` | 計算し直しで期限が後ろに動き、違反した行の新しい期限がまだ来ていないと分かった時刻（8 節）。`task_sla_event` の `breach_disputed` と同じトランザクションで入れる。レポートの分類（[reports.md](reports.md) の DT-RPT-002）はこの列で判定する。統合で足した |
+| `breach_disputed_at` | 計算し直しで期限が後ろに動き、違反した行の新しい期限がまだ来ていないと分かった時刻（8 節）。`sla_clock_event` の `breach_disputed` と同じトランザクションで入れる。レポートの分類（[reports.md](reports.md) の DT-RPT-002）はこの列で判定する。統合で足した |
 | `warned_pct` | 送った警告の最大の割合 |
 | `calendar_coverage_exceeded` | 5.4 節 |
 | `cancel_reason` | `start_not_met` / `cancel_condition` / `reset` / `definition_deactivated` / `task_deleted` |
 
-- `task_sla_event`：計時の行の変化（開始、一時停止、再開、停止、取り消し、リセット、警告、違反、計算し直し）を、前後の値と原因とともに追記する。監査の対象。
+- `sla_clock_event`：計時の行の変化（開始、一時停止、再開、停止、取り消し、リセット、警告、違反、計算し直し）を、前後の値と原因とともに追記する。監査の対象。
 
 ### 6.3 状態機械
 
@@ -263,13 +263,13 @@ paused_bus = retroactive_pause なら、[start_at, now) の間の一時停止の
 planned_end = addBusinessTime(start_at, duration + paused_bus, cc)
 ```
 
-- **`tz_source` のタイムゾーンは、カレンダーの営業時間を読み替えるタイムゾーンである。** 例：カレンダーが「平日 9〜18 時」で、呼び出し元がニューヨークなら、ニューヨークの 9〜18 時を数える。祝日の日付も、そのタイムゾーンの暦の日で引く。本家の意味と同じかは未検証（2 節の「タイムゾーンの取り方」から推した）。
+- **`tz_source` のタイムゾーンは、カレンダーの営業時間を読み替えるタイムゾーンである。** 例：カレンダーが「平日 9〜18 時」で、呼び出し元がニューヨークなら、ニューヨークの 9〜18 時を数える。祝日の日付も、そのタイムゾーンの暦の日で引く。本家の意味と同じかは未検証（2 節の「タイムゾーンの取り方」から推した。本家の振る舞いで、設計の前提ではない。本システムの意味は PROP-SLA の性質で固める）。
 - `planned_end` を秒で持ち、警告と違反のタイマーを登録する（7 節）。
 
 #### 6.5.1 さかのぼりの一時停止
 
 - `retroactive_pause` のとき、監査の履歴（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 7 節の `record_change`）から、`start_at` から今までのタスクの値の変化を読み、一時停止の条件の真の区間を求める。純粋な関数 `pauseIntervals(history, pause_condition)` にする。
-- 読む履歴は 1,000 件まで。超えたら、さかのぼりの一時停止を 0 として計算し、`task_sla_event` に `retro_pause_truncated` を残す。
+- 読む履歴は 1,000 件まで。超えたら、さかのぼりの一時停止を 0 として計算し、`sla_clock_event` に `retro_pause_truncated` を残す。
 - 一時停止の条件が、監査から外したフィールドを使うときは、定義の保存の時に 422 にする（履歴から求められないため）。
 
 ### 6.6 一時停止と再開
@@ -292,7 +292,7 @@ planned_end = addBusinessTime(start_at, duration + paused_bus, cc)
   - 警告：`warn_at` の各 p について、`addBusinessTime(start_at, ⌈duration × p / 100⌉ + paused_business, cc)`。すでに `warned_pct ≥ p` なら登録しない。
   - 違反：`planned_end`。
   - `target_version` は計時の行の `version`。
-- 発火のトランザクション：計時の行を `FOR UPDATE`、版がタイマーと違えば何もしない。同じなら、警告は `warned_pct = p`、違反は `breached = true`・`breached_at = due_at`（発火の時刻ではなく期限の時刻）、`task_sla_event`、outbox（`sla.warning` / `sla.breached`。通知とフローのトリガーが使う）を書き、タイマーを消す。
+- 発火のトランザクション：計時の行を `FOR UPDATE`、版がタイマーと違えば何もしない。同じなら、警告は `warned_pct = p`、違反は `breached = true`・`breached_at = due_at`（発火の時刻ではなく期限の時刻）、`sla_clock_event`、outbox（`sla.warning` / `sla.breached`。通知とフローのトリガーが使う）を書き、タイマーを消す。
 - 違反の後も計時は続く（停止まで経過の時間を数える）。違反の時刻は `planned_end` で、発火の遅れの影響を受けない。
 - 通知の受け手は、送る直前に受け手の主体で ACL を判定する（[access-control.md](access-control.md) の 6.2 節の 11 行）。
 - NFR-003：違反の発火は期限から p99 60 秒以内。発火の遅れ（`fired_at − due_at`）を計測する。
@@ -317,8 +317,8 @@ DT-SLA-002（タイマーの発火）：
 | テナントの祝日の集合・カレンダーの公開 | そのカレンダーを使う、動いている計時の行 | 同上。管理者は「新しく始まる計時だけに効かせる」も選べる（既定は動いている行にも効かせる） |
 | SLA の定義の新しい版 | なし | 動いている行は開始の時の版のまま |
 
-- ジョブが、対象の行を 500 件ずつ、行ごとのトランザクションで処理する：行を `FOR UPDATE`、`calendar_version_id` を新しい版に替え、`planned_end`・経過を計算し直し、タイマーを登録し直し、`version += 1`、`task_sla_event`（`recalculated`、前後の `planned_end` とカレンダーの版）を書く。
-- **違反の事実は取り消さない。** 計算し直しで `planned_end` が後ろに動き、すでに `breached = true` の行の新しい期限がまだ来ていないとき、`breached` はそのままにし、`task_sla_event` に `breach_disputed` を残し、同じトランザクションで `breach_disputed_at` を入れる（決定。13 節）。レポートは `breach_disputed` の行を別に数えられる。
+- ジョブが、対象の行を 500 件ずつ、行ごとのトランザクションで処理する：行を `FOR UPDATE`、`calendar_version_id` を新しい版に替え、`planned_end`・経過を計算し直し、タイマーを登録し直し、`version += 1`、`sla_clock_event`（`recalculated`、前後の `planned_end` とカレンダーの版）を書く。
+- **違反の事実は取り消さない。** 計算し直しで `planned_end` が後ろに動き、すでに `breached = true` の行の新しい期限がまだ来ていないとき、`breached` はそのままにし、`sla_clock_event` に `breach_disputed` を残し、同じトランザクションで `breach_disputed_at` を入れる（決定。13 節）。レポートは `breach_disputed` の行を別に数えられる。
 - まだ違反していない行で、新しい `planned_end` がすでに過ぎているときは、今すぐの違反のタイマーを登録する（`breached_at` は新しい `planned_end`）。
 - 計算し直しのジョブは冪等である（同じカレンダーの版なら何も変えない）。途中で落ちたら、残りの行から続ける。
 
@@ -329,15 +329,15 @@ DT-SLA-002（タイマーの発火）：
 | Aurora の writer のフェイルオーバー | 保存と発火が数十秒止まる。復旧の後、期限の古い順に発火する。`breached_at` は `planned_end` なので、遅れても違反の時刻は正しい |
 | タイマーのワーカーの遅れ（9 時の集中） | SLA のタイマーは優先度 0 で先に取る（[workflow-engine.md](workflow-engine.md) の 8.2 節）。p99 60 秒を超えたら SEV2 |
 | CSV の取得の失敗・形式の変更 | 版を作らない。前の版のまま計算する。SEV4 |
-| 祝日の版の誤った公開 | 前の版を「最新」に戻す新しい版を公開する（版は消さない）。計算し直しが走り、`task_sla_event` に残る |
-| カレンダーの業務時間が 0 の版 | 保存の時の検証で防ぐ（DT-CAL-001）。関数は `no_working_time` を返し、計時の行は開始せず、`task_sla_event`（`calendar_error`）と管理者への通知を残す |
+| 祝日の版の誤った公開 | 前の版を「最新」に戻す新しい版を公開する（版は消さない）。計算し直しが走り、`sla_clock_event` に残る |
+| カレンダーの業務時間が 0 の版 | 保存の時の検証で防ぐ（DT-CAL-001）。関数は `no_working_time` を返し、計時の行は開始せず、`sla_clock_event`（`calendar_error`）と管理者への通知を残す |
 | 計算し直しのジョブの停止 | 行ごとのトランザクションなので、止まった行から続ける。進み具合を計測する |
 
 ## 10. セキュリティ
 
 - SLA の定義・カレンダー・テナントの祝日の変更は `sla_admin`。国民の祝日の版の承認は、本システムの運用者（Ops）の 2 人（5.1 節）。
 - CSV の取得は HTTPS で、取得の元の URL は設定で固定する。リダイレクトで別のホストに移ったら止める。
-- 計時の行と `task_sla_event` は、タスクの ACL に従って読む（計時の行の `read` はタスクの `read` を要る組み込みの規則）。
+- 計時の行と `sla_clock_event` は、タスクの ACL に従って読む（計時の行の `read` はタスクの `read` を要る組み込みの規則）。
 - 通知は受け手ごとに判定する（7 節）。
 
 ## 11. テスト
@@ -366,7 +366,7 @@ DT-SLA-002（タイマーの発火）：
 - **PROP-SLA-006（加法）**：`f ≤ m ≤ t` なら `businessTimeBetween(f, t) = businessTimeBetween(f, m) + businessTimeBetween(m, t)`。
 - **PROP-SLA-007（参照の実装と一致）**：任意の入力（長さは 30 日以下）で、2 つの関数の結果は、4.3 節の素朴な参照の実装と秒で一致する（K2）。
 - **PROP-SLA-008（決定性）**：同じ入力で、何度・どのプロセスで・どの時刻に呼んでも同じ結果（関数が現在の時刻を読まないことの確かめ。実行の時計を任意にずらして比べる）。
-- **PROP-SLA-009（評価の 1 回）**：任意の保存の列（条件の真偽の任意の組）で、DT-SLA-001 の後の計時の行は、同じ定義で動いている行が高々 1 つで、`task_sla_event` の列を順に適用すると今の行になる。
+- **PROP-SLA-009（評価の 1 回）**：任意の保存の列（条件の真偽の任意の組）で、DT-SLA-001 の後の計時の行は、同じ定義で動いている行が高々 1 つで、`sla_clock_event` の列を順に適用すると今の行になる。
 - **PROP-SLA-010（計算し直しの冪等）**：同じカレンダーの版で 2 回計算し直しても、2 回目は何も変えない。
 - **PROP-HOL-001（法の規則）**：固定の版の CSV の、名称が「休日」以外の日から第 3 条第 2 項・第 3 項で求めた集合は、名称が「休日」の日の集合と一致する（DT-HOL-001 の 4 行の検査が正しいことの確かめ）。
 
@@ -385,7 +385,7 @@ DT-SLA-002（タイマーの発火）：
 | E5 | `jp-holiday-import` | 5.1・5.2 節、DT-HOL-001（PROP-HOL-001）、承認の画面 |
 | E5 | `tenant-holiday-sets` | 5.3 節 |
 | E5 | `sla-definition-model` | 6.1 節、定義の版 |
-| E5 | `task-sla-evaluation-in-save` | 6.2〜6.6 節、DT-SLA-001（PROP-SLA-009） |
+| E5 | `sla-clock-evaluation-in-save` | 6.2〜6.6 節、DT-SLA-001（PROP-SLA-009） |
 | E5 | `sla-retroactive-pause` | 6.5.1 節 |
 | E5 | `sla-timers-and-notifications` | 7 節、DT-SLA-002 |
 | E5 | `sla-recalculation-job` | 8 節（PROP-SLA-010） |
@@ -411,7 +411,7 @@ DT-SLA-002（タイマーの発火）：
 - **収録の範囲の外は祝日なしで計算し、印を付けて後で計算し直す**（5.4 節、ADR-0020）。
 - **祝日の版の公開は運用者 2 人の承認**（5.1 節）。
 - **一時停止の既定：SLA は依頼者の回答待ちだけ、OLA はベンダー待ちでも止める**（6.1 節、[itsm-processes.md](itsm-processes.md) の 4.4 節。統合で決めた）。
-- **`task_sla.breach_disputed_at` の列を足す**（6.2・8 節。統合で決めた）。
+- **`sla_clock.breach_disputed_at` の列を足す**（6.2・8 節。統合で決めた）。
 - **法の規則との不一致は止めずに強く示す**（DT-HOL-001 の 4 行）。
 
 ### 持ち越し
@@ -449,7 +449,7 @@ DT-SLA-002（タイマーの発火）：
 | Aurora `calendar`、`calendar_version` | 3.1 節。メタデータ |
 | Aurora `holiday_set`、`holiday_set_version`、`holiday` | 3.1・5 節。国民の祝日は `tenant_id` が NULL の共通のデータ（RLS の例外として許可の一覧に載せる） |
 | Aurora `sla_def`（版付き） | 6.1 節。メタデータ |
-| Aurora `task_sla` | 6.2 節。部分一意索引 `(tenant_id, task_id, sla_def_id) WHERE stage IN ('in_progress','paused')`。`breach_disputed_at` の列を持つ |
-| Aurora `task_sla_event` | 6.2 節。追記だけ、月ごとのパーティション、監査の対象 |
+| Aurora `sla_clock` | 6.2 節。部分一意索引 `(tenant_id, task_id, sla_def_id) WHERE stage IN ('in_progress','paused')`。`breach_disputed_at` の列を持つ |
+| Aurora `sla_clock_event` | 6.2 節。追記だけ、月ごとのパーティション、監査の対象 |
 | Aurora `timer`（`sla_warning`・`sla_breach`、`priority = 0`） | 7 節。workflow-engine と共有 |
 | S3（取り込みの元の CSV の原本、版ごと） | 5.1 節。版の `source_sha256` と対応 |

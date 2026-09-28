@@ -27,11 +27,11 @@
 | フローの部品 | トリガー、アクション、サブフロー、条件（フローの論理）でフローを組む | [Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html) |
 | 承認のアクション | 規則：「誰か 1 人が承認」「全員が承認」「全員が回答し、誰か 1 人が承認」「% の人が承認」「n 人が承認」。却下の規則も持つ。期限を過ぎたら自動で承認・却下・取り消しにできる。承認の結果を待って次へ進む | [Ask for Approval action](https://www.servicenow.com/docs/r/washingtondc/build-workflows/ask-approval-flow-designer.html) |
 | 上限の既定値 | ループの繰り返し 1,000、フローのアクション 50、アクションのステップ 20、アクションの入力 20、分岐 100 など | [Flow Designer system properties](https://www.servicenow.com/docs/bundle/washingtondc-build-workflows/page/administer/flow-designer/reference/flow-designer-system-properties.html) |
-| 版 | 公開した版は 1 つだけ有効で、過去の版は記録として残る。新しい版を公開しても、動いている実行は影響を受けない | 旧来のワークフローについての本家の KB（[Overview: Workflow Versioning](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0538526)、検索の結果の抜粋で確認）。Flow Designer のフローで同じかは未検証 |
-| 条件の待ち | フローの中で、レコードの条件が真になるまで待つアクションがある | [Wait For Condition](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/wait-for-condition-flow-designer.html)（本文は取得できず、検索の結果で存在だけ確認。未検証） |
-| レコードのルール | サーバーのスクリプト（Business Rules）で、保存の前・後・非同期に処理を書く | [ADR-0001](../decisions/0001-platform-and-stack.md) の Context。順序と種類の細部は未検証 |
+| 版 | 公開した版は 1 つだけ有効で、過去の版は記録として残る。新しい版を公開しても、動いている実行は影響を受けない | 旧来のワークフローについての本家の KB（[Overview: Workflow Versioning](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0538526)、検索の結果の抜粋で確認）。Flow Designer は、設定を変えて公開し直しても動いているフローは変わらないとする（[Flow execution details](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/flow-execution-details.html)）。版の対応の細部は未検証（本家の振る舞いで、設計の前提ではない） |
+| 条件の待ち | フローの中で、レコードの値が条件に合うまで待つアクションがある。期限を付けると、合わないまま期限が来たら待たずに次へ進む | [Wait For Condition](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/wait-for-condition-flow-designer.html) |
+| レコードのルール | サーバーのスクリプト（Business Rules）で、保存の前・後・非同期に処理を書く | [ADR-0001](../decisions/0001-platform-and-stack.md) の Context。保存の前・後・非同期・表示の種類はコミュニティの記事で確認。順序の細部は未検証（本家の振る舞いで、設計の前提ではない） |
 
-- 本家のフローの実行の基盤（表の形、タイマーの取り方）は、公開の資料で確かめられなかった（未検証）。
+- 本家のフローの実行の基盤（表の形、タイマーの取り方）は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、設計の前提ではない）。
 - 本家のフローの定義の形式・アクションの名前は写さない。スクリプトのステップは持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 ## 3. フローの DSL と版（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）
@@ -262,7 +262,7 @@ worker loop（shard ごと）:
 | `approval` | `tenant_id`、`id`、`set_id`、`approver_id`、`state`（`requested` / `approved` / `rejected` / `no_longer_required` / `cancelled`）、`version`、`answered_by`（代理のとき代理の人）、`answered_at`、`comment`、`channel` |
 | `delegation` | `tenant_id`、`user_id`、`delegate_id`、`starts_at`、`ends_at`、`scope`（`approvals` / `requests` の集合。`approvals` は承認の代理（DT-APR-001）、`requests` は本人のための申請の代理（[service-catalog-and-requests.md](service-catalog-and-requests.md) の DT-REQ-003 の 4 行）） |
 
-- 承認者は、`ask_approval` のノードの設定（利用者、グループのメンバー、式：`trigger.record.caller.manager` など）から、ノードの実行の時に決めて `approval` の行にする。後からグループのメンバーが変わっても、行は変えない（誰に依頼したかを証跡として固定する）。
+- 承認者は、`ask_approval` のノードの設定（利用者、グループのメンバー、式：`trigger.record.requester.manager` など）から、ノードの実行の時に決めて `approval` の行にする。後からグループのメンバーが変わっても、行は変えない（誰に依頼したかを証跡として固定する）。
 
 ### 7.2 規則
 
@@ -322,7 +322,7 @@ DT-APR-001（回答できるか）：
 ### 7.5 回答の経路
 
 - 画面（作業の画面とポータル）と REST API（利用者の主体のトークン）で受ける。
-- **メールの返信での承認は、MVP で受けない。** 差出人のなりすましの対策（SPF・DKIM・DMARC）は受信のサーバーの設定に左右され、承認の証跡の本人性を保証できない。承認の依頼のメールには、ログインを求める画面へのリンクだけを入れる（`notifications-and-email-ingest.md`）。本家がメールでの承認を持つかは未検証。
+- **メールの返信での承認は、MVP で受けない。** 差出人のなりすましの対策（SPF・DKIM・DMARC）は受信のサーバーの設定に左右され、承認の証跡の本人性を保証できない。承認の依頼のメールには、ログインを求める画面へのリンクだけを入れる（`notifications-and-email-ingest.md`）。本家は、承認の依頼のメールへの返信で承認を受ける既定の受信の処理を持つとされる（コミュニティの記事。公式の本文は未検証で、本家の振る舞いで、設計の前提ではない）。
 
 ## 8. 上限と公平性（[ADR-0018](../decisions/0018-flow-limits-and-tenant-fairness.md)）
 

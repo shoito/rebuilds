@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [ADR-0005](0005-cmdb-identification-and-reconciliation.md) は、クラスごとに識別の規則（識別の項目を優先度の順に並べたもの）を持ち、子は親の規則を継承し、識別の値を正規化して一意の索引の表に持つと決めた。細部（クラスの階層、複数の値の属性、取り込み元の固有のキー、クラスの違う一致）は、この領域に残した。
 
-本家は、取り込み元の名前と固有のキーでの識別を速い道にし、属性の組での照合を遅い道にする。依存の CI は、親を先に識別する（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。ネットワークのアダプターの表のような、関係の表の上の識別の項目を持てる（二次の資料。未検証）。
+本家は、取り込み元の名前と固有のキーでの識別を速い道にし、属性の組での照合を遅い道にする。依存の CI は、親を先に識別する（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。ネットワークのアダプターの表のような、関係の表の上の識別の項目を持てる（二次の資料。公式の本文は未検証。本システムは同じ形を自分で設計しており、本家の細部は前提にしない）。
 
 [data-dictionary-and-tables.md](../architecture/data-dictionary-and-tables.md) の 3.4 節は、レコードのクラスを作成の後に変えないと決めた。
 

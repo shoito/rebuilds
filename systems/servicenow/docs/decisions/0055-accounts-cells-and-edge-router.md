@@ -13,7 +13,7 @@ date: 2026-09-28
 
 メールの受信も、封筒の受け手 → テナント → セルを、テナントのデータを読む前に解決する（[ADR-0034](0034-inbound-email-threading-and-sender-trust.md)）。
 
-CloudFront Functions は KeyValueStore を読め、要求のオリジンを関数の中で選べる（[Helper methods for origin modification](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)、[Amazon CloudFront KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、2026-09-28 に確認）。KeyValueStore の大きさの上限と反映の時間は未検証。
+CloudFront Functions は KeyValueStore を読め、要求のオリジンを関数の中で選べる（[Helper methods for origin modification](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)、[Amazon CloudFront KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、2026-09-28 に確認）。KeyValueStore の上限は、1 つのストアが 5 MB、キーが 512 バイト、値が 1 KB、1 つの関数に 1 つのストア、アカウントに 200 のストア（引き上げ可）である。1 つの配信のオリジンは 100（引き上げ可）である（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、2026-09-28 に確認）。書き込みがエッジに届くまでの時間は公式の文書に数値がなく、未検証（E1 `edge-router-kvs` で計測する）。
 
 ## Options
 
@@ -57,7 +57,7 @@ y を採らない理由：テナントを別のセルへ移すと、受信のア
   - ルーターに同期の依存がない。
 - 引き受けるコスト：
   - アカウントの数が増える（セルごと）。アカウントの作成を Terraform（`org/`）で自動にする。
-  - KeyValueStore と配信のオリジンの数の上限（未検証）が、セルとテナントの数の上限になりうる。E1 で確かめ、S3 の前にセルの群ごとに配信を分ける。
+  - KeyValueStore の 5 MB と、配信のオリジンの 100（引き上げ可）が、テナントとセルの数の上限になりうる。S3 の 3 万テナントは、1 件 100 バイトで約 3 MB で収まるが余裕は小さい。S3 の前にセルの群ごとに配信とストアを分ける。
   - mail-ingress の一時のバケットに、全テナントの原本が短い時間置かれる。読めるのは `mail-router` だけにする。
 
 ## Confirmation

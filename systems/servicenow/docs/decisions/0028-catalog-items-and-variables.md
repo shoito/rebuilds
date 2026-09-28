@@ -11,7 +11,7 @@ date: 2026-09-28
 
 カタログの品目（PC の申請、アカウントの作成など）は、入力の項目（変数）と、入力に応じて項目を出し入れする条件を持つ。品目の管理者は、進行中の申請がある間も品目を直す。
 
-本家の変数は、HTML・UI ページ・カスタム・マスクなどを含む多くの型を持つ（[Types of service catalog variables](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/service-catalog-management/reference/r_VariableTypes.html)、2026-09-28 に確認）。表示の条件はカタログの UI の方針とクライアントのスクリプトで書く（コミュニティの記事で確認。未検証）。
+本家の変数は、HTML・UI ページ・カスタム・マスクなどを含む多くの型を持つ（[Types of service catalog variables](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/service-catalog-management/reference/r_VariableTypes.html)、2026-09-28 に確認）。表示の条件はカタログの UI の方針とクライアントのスクリプトで書く（コミュニティの記事で確認。公式の本文は未検証。本家の振る舞いの細部で、この決定の前提ではない）。
 
 本システムは、テナントに任意のコードを書かせず（[ADR-0001](0001-platform-and-stack.md)）、テナントの HTML を描かない（[intent.md](../intent.md) の Non-goals）。フローは版を固定する（[ADR-0014](0014-flow-dsl-and-versioning.md)）。
 

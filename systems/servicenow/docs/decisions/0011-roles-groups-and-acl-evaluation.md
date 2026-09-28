@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [AGENTS.md](../../AGENTS.md) は、ACL を決定表で書き、既定を拒否にし、判定を 1 つの関数に集めることを求める。条件の列に「継承したクラスの規則」を含める。
 
-本家の ACL は、対象（テーブル・フィールド・レコード）、操作、ロール・条件・スクリプトを持ち、テーブルの規則とフィールドの規則の両方を満たす必要がある。規則の種類は「条件を満たさない限り拒否」と「条件を満たせば許可」の 2 つ。一致する規則がなければ許可する（[Access control list rules](https://www.servicenow.com/docs/bundle/zurich-platform-security/page/administer/contextual-security/concept/exploring-access-control-list.html)、2026-09-28 に確認）。既定の拒否は設定で有効にし、一度変えると戻せない（[Deny by default with empty ACLs](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/security-center/reference/sc-security-manager-default-deny.html)、2026-09-28 に確認）。子のテーブルに規則がなければ親の規則を使う（コミュニティの記事で確認。未検証）。
+本家の ACL は、対象（テーブル・フィールド・レコード）、操作、ロール・条件・スクリプトを持ち、テーブルの規則とフィールドの規則の両方を満たす必要がある。規則の種類は「条件を満たさない限り拒否」と「条件を満たせば許可」の 2 つ。一致する規則がなければ許可する（[Access control list rules](https://www.servicenow.com/docs/bundle/zurich-platform-security/page/administer/contextual-security/concept/exploring-access-control-list.html)、2026-09-28 に確認）。既定の拒否は設定で有効にし、一度変えると戻せない（[Deny by default with empty ACLs](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/security-center/reference/sc-security-manager-default-deny.html)、2026-09-28 に確認）。規則は、テーブル名、親のテーブル名、`*` の順（フィールドは `テーブル.フィールド`、`親.フィールド`、`*.フィールド`、`テーブル.*`、`親.*`、`*.*` の順）に探す（[ACL rule types](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/contextual-security/concept/acl-rule-types.html)、2026-09-28 に確認）。
 
 テナントは組み込みのクラス（`task`）を継承した子のクラスを作る（[ADR-0003](0003-table-hierarchy-and-extensible-schema.md)）。親で決めた制限（例：承認の記録は本人だけが書ける）が、子のクラスで外れてはいけない。
 

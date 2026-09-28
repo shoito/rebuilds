@@ -21,13 +21,13 @@
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| 割り当ての規則とデータの参照の規則 | 割り当ての規則は条件でグループ（と担当者）を入れる。データの参照の規則は一致の列の完全一致で値を入れる。順序（order）の既定は 100 | コミュニティの記事と検索の結果の抜粋（[Difference between assignment rule and data lookup](https://www.servicenow.com/community/itsm-forum/difference-between-assignment-rule-and-data-lookup/td-p/544009)）。未検証 |
+| 割り当ての規則とデータの参照の規則 | 割り当ての規則は条件でグループ（と担当者）を入れる。データの参照の規則は一致の値の規則のうち、順序（order）の最も小さいものを使う | [Create an assignment data lookup rule](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/t_DataLookupRule.html)。順序の既定が 100 であることはコミュニティの記事（[Difference between assignment rule and data lookup](https://www.servicenow.com/community/itsm-forum/difference-between-assignment-rule-and-data-lookup/td-p/544009)）だけで未検証 |
 | 評価の順序 | 保存の前のスクリプト（order < 1000）→ データの参照・割り当てなどのエンジン → 保存の前のスクリプト（order ≥ 1000）。エンジンどうしの順序は決まっていない | [Precedence between data lookup, assignment, and business rules](https://www.servicenow.com/docs/bundle/xanadu-platform-administration/page/administer/task-table/concept/c_PrecBetweenAssignmentAndBusRules.html) |
-| 担当者の選び方 | 作業の割り当ての機能（Advanced Work Assignment）は、「最後に割り当てた」（順番）や「最も余裕がある」の方針と、スキルの一致・必須のスキルを持つ | コミュニティの記事と検索の結果の抜粋。公式の本文は未検証 |
-| 当番のエスカレーション | 応答がないと次の段へ進む。受け付けの要求を SMS・音声・メールで送る。「最後の受け手（catch-all）」がある。トリガーの規則で始まる | [Escalations in On-Call Scheduling](https://www.servicenow.com/docs/r/it-service-management/on-call-scheduling/escalations-oncall.html)、コミュニティの記事。段の間の既定の時間は未検証 |
+| 担当者の選び方 | 作業の割り当ての機能（Advanced Work Assignment）は、「最も長く割り当てのない人」（順番）と「最も余裕がある人」の方針と、スキルでの割り当てを持つ | [Create an assignment rule (Advanced Work Assignment)](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/administer/advanced-work-assignment/task/awa-create-assignment-rule.html) |
+| 当番のエスカレーション | 応答がないと次の段へ進む。受け付けの要求を SMS・音声・メールで送る。「最後の受け手（catch-all）」がある。トリガーの規則で始まる | [Escalations in On-Call Scheduling](https://www.servicenow.com/docs/r/it-service-management/on-call-scheduling/escalations-oncall.html)、コミュニティの記事。段の間の時間は方針ごとの設定で、既定の値は未検証（本家の振る舞いで、設計の前提ではない） |
 | メジャーインシデントとの関係 | 昇格のとき、当番の機能が有効なら当番へ割り当てうる | [Create a major incident candidate](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/incident-management/task/create-major-incident-candidate.html) |
 
-- 本家の当番表の内部のモデル（ロスターとシフトの表）と既定の値は、公開の資料で確かめられなかった（未検証）。本システムのモデルは、当番の SaaS で一般的な「層とローテーション」の形で自前に設計する。
+- 本家の当番表の内部のモデル（ロスターとシフトの表）と既定の値は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、設計の前提ではない）。本システムのモデルは、当番の SaaS で一般的な「層とローテーション」の形で自前に設計する。
 - 本家の「割り当てとデータの参照の順序が決まっていない」は採らない。本システムは順序を明示する（3.2 節）。
 
 ## 3. 割り当ての規則（[ADR-0026](../decisions/0026-assignment-rules-and-member-selection.md)）
@@ -40,7 +40,7 @@
 | `table_id` | 対象のクラス。子のクラスにも効く |
 | `order` | 小さいほど先。同じなら子のクラスの規則が先、次に `stable_key` の順 |
 | `condition` | 式の言語の条件（保存の後の値。カテゴリ、CI、CI のサポートのグループ、場所、サービス、依頼者の部署など） |
-| `set_group` | 固定のグループ、または式（例：`cmdb_ci.support_group`） |
+| `set_group` | 固定のグループ、または式（例：`ci.support_group`） |
 | `set_fields` | 任意。影響度・緊急度などの既定値（空のフィールドにだけ入れる） |
 | `member_selection` | `none`（グループのキューに置く）/ `round_robin` / `least_loaded` / `skills`（4 節） |
 | `required_skills` | `skills` のとき。スキルの一覧 |

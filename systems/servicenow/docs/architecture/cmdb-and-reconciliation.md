@@ -25,14 +25,14 @@ CI のクラスの階層と属性、識別の規則（独立・依存の CI）�
 | --- | --- | --- |
 | 識別 | 識別の規則で CI を一意に見分ける。取り込み元の名前と取り込み元の固有のキー（`source_name`・`source_native_key`）での識別が速い道。属性の組での照合は遅い道 | [Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html) |
 | 依存の CI | 依存の CI（アプリなど）は、依存の分類（ホストのサーバーなど）で先に親を識別してから識別する。同じ設定のパスが複数の機器にありうるため | 同上 |
-| 識別の項目 | 識別の項目を優先度の順に試す。参照の表（ネットワークのアダプターなど）の上の項目を持てる。関係の項目（related entries）は識別には使わず、関係の表のレコードを作る | 二次の資料とコミュニティの記事。細部は未検証 |
-| 調整 | 権威のある取り込み元だけが CI の属性を書ける（静的な調整の規則）。子のクラスの規則が親の規則を上書きする | IRE の文書、コミュニティの記事。上書きの細部は未検証 |
+| 識別の項目 | 識別の項目を優先度の順に試す。参照の表（ネットワークのアダプターなど）の上の項目を持てる。関係の項目（related entries）は識別には使わず、関係の表のレコードを作る | 二次の資料とコミュニティの記事。細部は未検証（本家の振る舞いで、設計の前提ではない） |
+| 調整 | 権威のある取り込み元だけが CI の属性を書ける（静的な調整の規則。取り込み元の優先度を決める旧来の規則）。子のクラスの規則が親の規則を上書きする | IRE の文書、[Reconciliation rules](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/r_ReconciliationRulesPrinciples.html) |
 | 時刻 | 最後に見つけた時刻はペイロードの時刻が新しいときだけ更新する。取り込み元の新しさの時刻（`source_recency_timestamp`）で、衝突したときの値の優先を決める | IRE の文書 |
-| データの更新の規則・動的な調整 | 取り込み元が CI を更新してよい時期を決める規則（データの更新の規則）と、複数の取り込み元の値から選ぶ動的な調整の規則がある。動的な規則は静的な規則より優先する | 二次の資料とコミュニティの記事（[Understanding IRE Reconciliation Rules](https://www.servicenow.com/community/cmdb-articles/understanding-ire-reconciliation-rules/ta-p/3289239) など）。未検証 |
+| データの更新の規則・動的な調整 | データの更新の規則は、取り込み元の観測が古くなったとみなし、優先度の低い取り込み元に書かせる時期を決める。動的な調整の規則は、複数の取り込み元の値から最大の値や最も多く報告された値を選ぶ。同じ属性に両方があれば動的な規則が勝つ | [Reconciliation rules](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/r_ReconciliationRulesPrinciples.html) |
 | ペイロードの重複 | ペイロードの中の重複の項目を 1 つにまとめて処理する | IRE の文書 |
-| CSDM 5 | 領域（基盤、構想と戦略、設計と計画、構築と統合、サービスの提供、サービスの消費、ポートフォリオの管理）を持つ。「アプリのサービス」は「サービスのインスタンス」、「技術のサービス」は「技術の管理のサービス」に名前が変わった（表の名前は同じ）。サービスの消費の領域はビジネスのサービス・その提供・要求のカタログ | 二次の資料（[CSDM 5.0 Explained](https://dss.bg/news/csdm-5-0-explained-whats-new-how-it-works-why-it-matters)、[Your A-Z guide to CSDM 5.0](https://plat4mation.com/blog/your-a-z-guide-to-csdm-5-0/)）。白書（[CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)）の本文は未検証 |
+| CSDM 5 | 領域（基盤、構想と戦略、設計と計画、構築と統合、サービスの提供、サービスの消費、ポートフォリオの管理）を持つ。「アプリのサービス」は「サービスのインスタンス」、「技術のサービス」は「技術の管理のサービス」に名前が変わった（表の名前は同じ）。サービスの消費の領域はビジネスのサービス・その提供・要求のカタログ | [CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)（7 つの領域、表のラベルの変更）。二次の資料（[CSDM 5.0 Explained](https://dss.bg/news/csdm-5-0-explained-whats-new-how-it-works-why-it-matters)、[Your A-Z guide to CSDM 5.0](https://plat4mation.com/blog/your-a-z-guide-to-csdm-5-0/)）も参照 |
 
-- 本家の複数の CI に一致したときの振る舞い（どれかを選ぶか、エラーにするか）は、公式の本文で確かめられなかった（未検証）。本システムは保留にする（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）。
+- 本家は、複数の CI に一致したとき、既定で最も古い CI を選んで更新し、重複の解消のタスクを作るとされる（コミュニティの記事で確認。公式の本文は未検証で、本家の振る舞いで、設計の前提ではない）。本システムは推測で選ばず保留にする（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）。
 - 本家の CI のクラスの名前、表の名前、CSDM の表の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。CSDM の版の追従は目標にしない（ADR-0005）。
 
 ## 3. CI のクラスと属性（[ADR-0036](../decisions/0036-ci-classes-and-identification-rules.md)）
@@ -112,7 +112,7 @@ IdentificationRule {                 ← クラスごと。なければ最も近
 | `cloud_resource_id` | 取り込み元の形のまま（大文字・小文字を区別する） | 空 |
 
 - 正規化の関数は純粋で、冪等である（`normalize(normalize(x)) = normalize(x)`。PROP-CMDB-007）。
-- `bios_uuid` の 2 つの形の登録は、同じ機器の取り込み元によってバイトの順が違う形で送られる、よく知られた食い違いへの対策である（一般に知られる事情。本家の扱いは未検証）。2 つの形が別の CI にすでに登録されていれば、それは保留（5.3 節）になる。
+- `bios_uuid` の 2 つの形の登録は、同じ機器の取り込み元によってバイトの順が違う形で送られる、よく知られた食い違いへの対策である（一般に知られる事情。本家の扱いは未検証で、本家の振る舞いで、設計の前提ではない）。2 つの形が別の CI にすでに登録されていれば、それは保留（5.3 節）になる。
 
 ### 4.3 識別の値の表
 
@@ -262,7 +262,7 @@ COMMIT
   - `d` の取り込み元ごとの観測の状態を `s` の状態に合わせる（6 節の max の結合。統合も同じ演算で行う）。属性の値を選び直す。
   - `d` の関係を `s` に付け替える（重複する関係は 1 つにし、取り込み元の状態を結合する。自分への関係になるものは捨てる）。
   - `d` を `operational_status = retired`、`merged_into_id = s` にする。
-  - `d` を参照するタスク（`task.cmdb_ci_id`、変更の影響を受ける CI）は、`bulk_job` で `s` に付け替える（進行中のタスクだけ。完了したタスクは履歴として `d` のまま）。
+  - `d` を参照するタスク（`task.ci_id`、変更の影響を受ける CI）は、`bulk_job` で `s` に付け替える（進行中のタスクだけ。完了したタスクは履歴として `d` のまま）。
 - 統合を戻す操作は MVP に持たない（統合の前の状態を `ci_merge_log` に残し、`cmdb_admin` が手で直せるようにする）。
 
 ## 6. 調整（[ADR-0038](../decisions/0038-attribute-reconciliation-per-source-state.md)）
@@ -431,7 +431,7 @@ SELECT ci_id, min(depth) FROM impacted GROUP BY ci_id LIMIT $max_nodes + 1
 | `technology_service` | IT の内部の提供（例：データベースの基盤） | `contains` → `technology_service_offering` |
 | `technology_service_offering` | その提供の単位（例：PostgreSQL・本番・東京）。担当のグループを持つ | `depends_on` → `ci_group` など |
 
-- タスクの参照：`task` の共通の列に `service_offering_id` を足す（`cmdb_ci_id` は既存）。インシデントの報告のフォームでは、依頼者がサービスの提供を選び、担当者が CI を入れる。
+- タスクの参照：`task` の共通の列に `service_offering_id` を足す（`ci_id` は既存）。インシデントの報告のフォームでは、依頼者がサービスの提供を選び、担当者が CI を入れる。
 - `business_service_offering` の `criticality` を、優先度のトリガー（メジャーインシデントの候補）と変更のリスクの規則の式で使う（[itsm-processes.md](itsm-processes.md) の 6.1・8.3 節）。
 - 割り当ての規則は `service_offering.support_group` を式で使える（[assignment-and-on-call.md](assignment-and-on-call.md) の 3.1 節）。
 - サービスのクラスは `manual` の取り込み元だけが作る（5.1 節）。サービスどうしの関係は手入力と、後のサービスマッピングで作る。

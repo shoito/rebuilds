@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [ADR-0012](0012-acl-enforcement-at-every-exit.md) は、読めない値をその利用者にとって NULL として扱い、集計・グループ化もその値で行うと決めた。[access-control.md](../architecture/access-control.md) の 6.2 節の 5 行は、集計を見る人の主体で行い、定期の配信を受け手ごとに受け手の主体で計算すると決めた。
 
-本家は、行の `read` と別の `report_view` の権限を持つ。`report_view` の規則がなければ `read` のロールで確かめ、フィールドの規則はグループ化・集計に使うフィールドに効く（[Report_view access control](https://www.servicenow.com/docs/bundle/zurich-now-intelligence/page/use/reporting/concept/report-view-access-control.html)、2026-09-28 に確認）。一覧以外の型では行の `read` がなくても見られることがあるとされる（コミュニティの記事。未検証）。本家は外部のメールアドレスにも定期のレポートを送れる（コミュニティの記事。未検証）。
+本家は、行の `read` と別の `report_view` の権限を持つ。`report_view` の規則がなければ `read` のロールで確かめ、フィールドの規則はグループ化・集計に使うフィールドに効く（[Report_view access control](https://www.servicenow.com/docs/bundle/zurich-now-intelligence/page/use/reporting/concept/report-view-access-control.html)、2026-09-28 に確認）。一覧以外の型では行の `read` がなくても見られることがあるとされる（コミュニティの記事。公式の本文は未検証。本システムは本家と違う形を採るので、決定の前提ではない）。本家は、利用者・グループのほか、インスタンスの利用者でないメールアドレスにも定期のレポートを送れる（[Schedule emails of reports](https://www.servicenow.com/docs/r/now-intelligence/reporting/t_ScheduleAReport.html)、2026-09-28 に確認）。
 
 決めることは次のとおり。
 

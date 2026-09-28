@@ -9,9 +9,9 @@ date: 2026-09-28
 
 ## Context
 
-[intent.md](../intent.md) の K2 と MVP の範囲は、SLA の達成率のレポートを求める。[ADR-0021](0021-sla-definitions-and-timers.md) は、カレンダー・祝日の計算し直しで期限が後ろに動いても違反の事実を取り消さず、`task_sla_event` に `breach_disputed` を残し、その扱いをレポートで決めるとした。[sla-and-calendars.md](../architecture/sla-and-calendars.md) の 13 節は、契約の報告での扱いを E11 で PM が決めると持ち越した。
+[intent.md](../intent.md) の K2 と MVP の範囲は、SLA の達成率のレポートを求める。[ADR-0021](0021-sla-definitions-and-timers.md) は、カレンダー・祝日の計算し直しで期限が後ろに動いても違反の事実を取り消さず、`sla_clock_event` に `breach_disputed` を残し、その扱いをレポートで決めるとした。[sla-and-calendars.md](../architecture/sla-and-calendars.md) の 13 節は、契約の報告での扱いを E11 で PM が決めると持ち越した。
 
-計時の行は、`stage`（`in_progress`・`paused`・`completed`・`cancelled`）、`breached`、`stop_at`、`planned_end` を持つ（同じ文書の 6.2 節）。本家の達成率の数え方は、公開の資料で確かめられなかった（未検証）。
+計時の行は、`stage`（`in_progress`・`paused`・`completed`・`cancelled`）、`breached`、`stop_at`、`planned_end` を持つ（同じ文書の 6.2 節）。本家の達成率の数え方は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、この決定の前提ではない）。
 
 ## Options
 
@@ -52,7 +52,7 @@ c を採らない理由：違反の通知・エスカレーション・フロー
   - `breach_disputed` の扱いを、事実を消さずに顧客の契約に合わせられる。
 - 引き受けるコスト：
   - 2 つの達成率を出すので、画面と説明が増える。
-  - `breach_disputed` は事象の表にしかない。`task_sla.breach_disputed_at` の列を足す提案を sla-and-calendars の領域に出す（統合で決める）。2026-09-28 の注記：統合で足すと決めた。計算し直しのジョブが `breach_disputed` の事象を書くのと同じトランザクションで `task_sla.breach_disputed_at` を入れる（[sla-and-calendars.md](../architecture/sla-and-calendars.md) の 6.2・8 節）。DT-RPT-002 の「`breach_disputed` の事象がある」は、この列が空でないことで判定する。
+  - `breach_disputed` は事象の表にしかない。`sla_clock.breach_disputed_at` の列を足す提案を sla-and-calendars の領域に出す（統合で決める）。2026-09-28 の注記：統合で足すと決めた。計算し直しのジョブが `breach_disputed` の事象を書くのと同じトランザクションで `sla_clock.breach_disputed_at` を入れる（[sla-and-calendars.md](../architecture/sla-and-calendars.md) の 6.2・8 節）。DT-RPT-002 の「`breach_disputed` の事象がある」は、この列が空でないことで判定する。
   - 調整の達成率は、進行中の行の計算し直しで後から変わりうる（停止の後は変わらない）。
 
 ## Confirmation

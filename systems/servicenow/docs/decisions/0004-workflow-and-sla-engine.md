@@ -13,7 +13,7 @@ ITSM の業務は、長く続く処理の組み合わせである。
 - フロー：レコードの作成・更新・時刻をきっかけに、条件・承認・タスクの作成・通知・待ち・外部の呼び出しを進める。管理者がノーコードで作る。
 - SLA：業務カレンダーの上で時間を数え、期限の前に警告し、期限で違反にする。一時停止・再開・リセットがある。
 
-本家の Flow Designer は、トリガー・アクション・サブフロー・条件でフローを組み、承認のアクションで規則の組を書ける（[Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html)、2026-09-28 に確認）。本家の SLA の定義は、開始・一時停止・停止・リセットの条件、スケジュールの取り方、タイムゾーンの取り方（呼び出し元、SLA の定義、CI の場所、タスクの場所、呼び出し元の場所）、さかのぼりの開始を持つ（[Create an SLA definition](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/service-level-management/task/t_CreateAnSLADefinition.html)、2026-09-28 に確認）。本家は SLA の計時を、違反までの近さで分けた複数の定期のジョブで更新する（例：「1 時間以内に違反」のものを 10 分ごと）とされる（[SLA 関連のコミュニティの記事](https://www.servicenow.com/community/in-other-news/understanding-my-slas-part-i-scheduled-jobs-and-the-task-sla/ba-p/2272370)、2026-09-28 に検索の結果の抜粋で確認。未検証）。
+本家の Flow Designer は、トリガー・アクション・サブフロー・条件でフローを組み、承認のアクションで規則の組を書ける（[Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html)、2026-09-28 に確認）。本家の SLA の定義は、開始・一時停止・停止・リセットの条件、スケジュールの取り方、タイムゾーンの取り方（呼び出し元、SLA の定義、CI の場所、タスクの場所、呼び出し元の場所）、さかのぼりの開始を持つ（[Create an SLA definition](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/service-level-management/task/t_CreateAnSLADefinition.html)、2026-09-28 に確認）。本家は SLA の計時を、違反までの近さで分けた 6 つの定期のジョブで更新する。10 分以内に違反のものは 1 分ごと、1 時間以内は 10 分ごと、1 日以内は 1 時間ごと、30 日以内は毎日、30 日より先は 5 日ごと、違反済みは毎日である（[Scheduled jobs for SLA](https://www.servicenow.com/docs/r/it-service-management/service-level-management/c_ScheduledJobsForSLA.html)、2026-09-28 に確認）。
 
 守るべきことは次のとおり（intent の「守るべき振る舞い」）。
 
@@ -64,7 +64,7 @@ SLA の計時として、次を比べた。
   - `addBusinessTime(start, duration, calendar) → deadline`
   - `businessTimeBetween(from, to, calendar) → duration`
   - カレンダーは、営業時間の週の型、IANA のタイムゾーン、祝日の表の版、会社の休日を持つ。現在の時刻・DB を関数の中で読まない。
-- **計時の行（`task_sla`）には、開始の時刻、一時停止の累計、カレンダーの版、期限の時刻（UTC）を持つ。** 開始・一時停止・再開・停止・リセットは、タスクのレコードの更新と同じトランザクションで評価し、期限を計算し直して、警告と違反のタイマーを登録し直す。
+- **計時の行（`sla_clock`）には、開始の時刻、一時停止の累計、カレンダーの版、期限の時刻（UTC）を持つ。** 開始・一時停止・再開・停止・リセットは、タスクのレコードの更新と同じトランザクションで評価し、期限を計算し直して、警告と違反のタイマーを登録し直す。
 - **期限は、カレンダーの版を固定して計算する。** 祝日の表が更新されたら、動いている計時の期限を、新しい版で計算し直す（ジョブで行い、変更を履歴に残す）。
 - **日本の祝日は、内閣府の CSV から取り込んだ版付きの表にする**（[国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認）。振替休日・国民の休日を含める。会社の休日（年末年始、創立記念日）は、テナントが足す。
 - b を採らない理由：定期のジョブでは、警告と違反の時刻の精度が、ジョブの間隔に左右される。NFR-003（期限から p99 60 秒以内の発火）を、動いている計時の数によらず満たすには、期限の時刻をタイマーに登録するほうがよい。表示の残り時間は、画面が期限の時刻から計算する。

@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) の K8 は、ポータルでナレッジを見て申請をやめた割合（自己解決の率）を計測できることを求める。目標の値は E9 で決める。記事の持ち主は、古い・誤った記事を知りたい。
 
-本家は、「役に立ったか」と星の評価、理由が必須の旗を持ち、旗や低い評価からフィードバックのタスクを作る（コミュニティの記事で確認。未検証）。本家は、ポータルのフォームで記事の閲覧を計測の表に残す（KB0712999 の抜粋。未検証）。
+本家は、「役に立ったか（はい・いいえ）」、1〜5 の星、変更の提案を書く旗を持つ（[Provide feedback on knowledge articles](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeFeedback.html)、2026-09-28 に確認）。旗、「いいえ」、しきい値以下の星からフィードバックのタスクを作り、否定の評価に理由を必須にする設定がある（[Enable actionable knowledge feedback](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/knowledge-management/task/configure-act-know-feedback-properties.html)、2026-09-28 に確認）。本家は、ポータルのフォームで記事の閲覧を計測の表に残す（KB0712999 の抜粋。未検証。本家の振る舞いで、この決定の前提ではない）。
 
 自己解決は、そもそも「申請しなかった」ことの計測で、直接には観測できない。どこまで推定に頼るかを決める必要がある。ポータルの利用者の行動の記録は個人の情報になりうる（[intent.md](../intent.md) の L1）。
 

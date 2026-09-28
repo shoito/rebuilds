@@ -9,7 +9,7 @@ date: 2026-09-28
 
 ## Context
 
-インシデント・変更などは、人が読む番号（接頭辞＋桁）を持つ。電話やメールで番号を伝え、監査で番号を引く。本家はテーブルごとに接頭辞・開始の番号・桁数を持つ（[Number Maintenance](https://www.servicenow.com/community/itsm-forum/number-maintenance-auto-numbering-records/td-p/711117)、2026-09-28 に確認。コミュニティの記事で、公式の文書の本文は未検証）。
+インシデント・変更などは、人が読む番号（接頭辞＋桁）を持つ。電話やメールで番号を伝え、監査で番号を引く。本家はテーブルごとに接頭辞・開始の番号・桁数を持つ（[Number Maintenance](https://www.servicenow.com/community/itsm-forum/number-maintenance-auto-numbering-records/td-p/711117)、2026-09-28 に確認。コミュニティの記事で、公式の文書の本文は未検証。本家の振る舞いで、この決定の前提ではない）。
 
 共有のセルに多数のテナントを置く（[ADR-0002](0002-tenancy-and-isolation.md)）。PostgreSQL のシーケンスをテナント × テーブルごとに作ると、テナントごとの DDL が要る（ADR-0003 が避けたもの）。
 

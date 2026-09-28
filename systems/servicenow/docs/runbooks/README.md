@@ -65,14 +65,14 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。できるまでは [incident-response.md](incident-response.md) の該当の場面で対応する（[ADR-0060](../decisions/0060-alerts-and-runbook-mapping.md)）。アラートの条件は [observability.md](../architecture/observability.md) の 7.2 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。呼び出しは SLO、正しさの約束（0 件の監視）、セキュリティの症状に限る。
+「作成済み」は、その場面の専用の手順（個別の runbook か、incident-response・deploy-and-rollback・disaster-recovery の中の専用の場面）があるものだけを指す。共通の進め方だけで受けているものは「E? で作成」とし、それまでの受け皿を手順の列に書いた（2026-09-28 の統合の後の見直し）。「作成済み」以外の手順は、各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。できるまでは [incident-response.md](incident-response.md) の該当の場面で対応する（[ADR-0060](../decisions/0060-alerts-and-runbook-mapping.md)）。アラートの条件は [observability.md](../architecture/observability.md) の 7.2 節。すべてのアラートは、対応する runbook の URL を注釈に持つ（CI で検査する）。呼び出しは SLO、正しさの約束（0 件の監視）、セキュリティの症状に限る。
 
 ### 4.1 アラート → runbook
 
 | アラート | 重さ | 手順 | 状態 | 作る Story（[roadmap.md](../roadmap.md)） |
 | --- | --- | --- | --- | --- |
-| 可用性の SLO の速いバーンレート（セル別）、合成監視の連続失敗 | 呼び出し | [incident-response.md](incident-response.md) | 作成済み | E1 `edge-availability-sli` |
-| フォーム・リストの遅れ | チケット（1 時間で呼び出し） | [incident-response.md](incident-response.md) | 作成済み | E2 `save-pipeline` |
+| 可用性の SLO の速いバーンレート（セル別）、合成監視の連続失敗 | 呼び出し | `availability-burn.md`（それまでは [incident-response.md](incident-response.md) の共通の進め方） | E1 で作成 | E1 `edge-availability-sli` |
+| フォーム・リストの遅れ | チケット（1 時間で呼び出し） | `form-list-latency.md`（それまでは [incident-response.md](incident-response.md) の共通の進め方） | E2 で作成 | E2 `save-pipeline` |
 | **タイマーの遅れ**（優先度 0 の p99 60 秒を 5 分、期限を 60 秒過ぎた優先度 0 のタイマー 100 件） | 呼び出し（SEV2） | [incident-response.md](incident-response.md) の「タイマーの遅れ」→ `timer-lag.md` | E4 で作成 | E4 `timer-lag-sli` |
 | **期限を過ぎた未発火の違反**（1 件以上が 5 分） | 呼び出し（SEV2） | 同上 → `sla-breach-lag.md` | E5 で作成 | E5 `sla-correctness-monitors` |
 | 止まった実行の回収 | SEV3（10 件/時で SEV2） | `stuck-flow-runs.md` | E4 で作成 | E4 `stuck-run-reconciler` |
@@ -108,7 +108,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 定期の配信の滞留、日次の事実の表のジョブの失敗 | チケット | `scheduled-report-backlog.md`、`daily-facts-job-failure.md` | E11 で作成 | E11 `scheduled-report-delivery`、`task-daily-facts` |
 | 429 の急増 | チケット | `api-rate-limit-storm.md` | E11 で作成 | E11 `tenant-rate-limits` |
 | 取り込みの変換の停止・失敗 | チケット | `import-run-stuck-or-failed.md` | E11 で作成 | E11 `import-runs-and-transform-maps` |
-| outbox の遅れ（最古の行が 30 秒） | 呼び出し | [incident-response.md](incident-response.md) | 作成済み | E1 `outbox-and-relay` |
+| outbox の遅れ（最古の行が 30 秒） | 呼び出し | `outbox-lag.md`（それまでは [incident-response.md](incident-response.md) の共通の進め方） | E1 で作成 | E1 `outbox-and-relay` |
 | 当番の呼び出しの未達（`page_attempt` の失敗が経路で 10%） | 呼び出し | `paging-not-delivered.md` | E5 で作成 | E5 `pager-channel-interface` |
 | 呼び出しの洪水、当番の空き、未割り当ての滞留 | チケット | `paging-storm.md`、`on-call-gap.md`、`unassigned-queue-growth.md` | E5 で作成 | E5 `escalation-policies-and-paging`、`on-call-schedules`、`assignment-rules` |
 | 祝日の取り込みの失敗、収録の残り 10 か月 | チケット | `holiday-import.md` | E5 で作成 | E5 `jp-holiday-import` |
@@ -122,11 +122,11 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 索引を写すジョブの停止、存在しない参照、パッケージの適用の失敗、番号の定義の誤り | チケット | `extension-index-backfill.md`、`dangling-reference.md`、`package-apply-failure.md`、`number-counter-exhausted-or-reset.md` | E2 で作成 | E2 `ext-and-extension-index`、`reference-integrity`、`config-packages`、`record-numbering` |
 | マルウェアの検出 | 呼び出し | `malware-detected.md` | E2 で作成 | E2 `attachment-malware-scan` |
 | デプロイ中の自動のロールバック、フラグのガード | 呼び出し | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | E1 `cell-staged-deploy`、`appconfig-flags-per-cell-tenant` |
-| ルーターの 421 の急増（テナントの移動の外） | 呼び出し | `router-mapping-mismatch.md`（それまでは [incident-response.md](incident-response.md)） | E1 で作成 | E1 `edge-router-kvs` |
-| AZ・リージョンの障害、`AuroraGlobalDBRPOLag` の超過、大阪の待機の構成の異常、論理的な破損、東京の SES の受信の障害（MX の切り替え。notifications の提案の `ses-inbound-failover.md` はここに含めた） | 呼び出し | [disaster-recovery.md](disaster-recovery.md) | 作成済み | E12 `dr-failover-drill` |
+| ルーターの 421 の急増（テナントの移動の外） | 呼び出し | `router-mapping-mismatch.md`（それまでは [incident-response.md](incident-response.md) の共通の進め方） | E1 で作成 | E1 `edge-router-kvs` |
+| AZ・リージョンの障害、`AuroraGlobalDBRPOLag` の超過、大阪の待機の構成の異常、論理的な破損、東京の SES の受信の障害（MX の切り替え。notifications の提案の `ses-inbound-failover.md` はここに含めた） | 呼び出し（大阪の待機の構成の異常はチケット、30 分続いたら呼び出し） | [disaster-recovery.md](disaster-recovery.md) | 作成済み | E12 `dr-failover-drill` |
 | テナントのセル間の移動 | 計画作業 | `tenant-cell-move.md` | E12 で作成 | E12 `tenant-cell-move-drill` |
 | テナントの削除の停止 | チケット | `tenant-deletion.md` | E12 で作成 | E12 `tenant-deletion-job` |
-| 秘密・個人データの形のログの検出、重要なセキュリティの仕組みの停止 | 呼び出し（SEV2） | [incident-response.md](incident-response.md) | 作成済み | E1 `telemetry-package` |
+| 秘密・個人データの形のログの検出、重要なセキュリティの仕組みの停止 | 呼び出し（SEV2） | `sensitive-data-in-logs.md`、`security-control-disabled.md`（それまでは [incident-response.md](incident-response.md) の共通の進め方と「ACL の漏れの疑い」の証拠の保全） | E1 で作成 | E1 `telemetry-package` |
 | 週次のキャパシティの見直し | 定期 | `capacity-review.md` | E12 で作成 | E12 `slo-and-alert-tuning` |
 
 ## 5. 定期作業と訓練

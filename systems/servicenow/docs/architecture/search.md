@@ -25,11 +25,11 @@
 | Sudachi の辞書の更新 | 辞書のファイルを関連付け直しても、すぐには効かない。次の blue/green のデプロイで効く。あるいは新しいパッケージで新しい索引を作って入れ直し、別名で切り替える | 同上 |
 | Sudachi の提供 | 全リージョンで任意のプラグインとして使える。コンソールか `AssociatePackage` の API で関連付ける | [Amazon OpenSearch Service adds support for four new language analyzers](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/) |
 | Sudachi の分割 | A（最も短い単位）、B（中くらい）、C（固有の名前の単位）の 3 つ。正規化の形のフィルターで表記の揺れを揃え、動詞・形容詞を基本の形にする。Apache-2.0 | [WorksApplications/elasticsearch-sudachi](https://github.com/WorksApplications/elasticsearch-sudachi) |
-| kuromoji | 分割の方式は `normal`・`search`・`extended`。`search` は長い名詞を分け、元の複合語も同義語として持つ。既定の辞書は IPADIC | [kuromoji_tokenizer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-tokenizer)（Elasticsearch の文書。OpenSearch の同じプラグインとの違いは未検証） |
+| kuromoji | 分割の方式は `normal`・`search`・`extended`。`search` は長い名詞を分け、元の複合語も同義語として持つ。既定の辞書は IPADIC | [kuromoji_tokenizer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-tokenizer)（Elasticsearch の文書。OpenSearch Service も kuromoji をすべてのドメインに入れる（[Plugins by engine version](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。版ごとの細かな違いは未検証で、E9 `search-analyzer-evaluation` で確かめる）。`kuromoji_stemmer` は 4 文字以上のカタカナの語の末尾の長音（ー）を消す（[kuromoji_stemmer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-stemmer)） |
 | シャードの大きさ | 検索の遅れが大事なときは 1 シャード 10〜30 GiB。1 ノードの JVM のヒープ 1 GiB あたり 25 シャードまで | [Choosing the number of shards](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-sharding.html) |
-| マルチテナント | 索引をテナントごとに分ける形と、共有する形と、その組み合わせがある | [Storing multi-tenant SaaS data with Amazon OpenSearch Service](https://aws.amazon.com/blogs/apn/storing-multi-tenant-saas-data-with-amazon-opensearch-service)（本文は未検証。検索の結果の抜粋で確認） |
+| マルチテナント | 索引をテナントごとに分ける形と、共有する形と、その組み合わせがある | [Storing multi-tenant SaaS data with Amazon OpenSearch Service](https://aws.amazon.com/blogs/apn/storing-multi-tenant-saas-data-with-amazon-opensearch-service)（AWS のブログ。本文は取得できず、検索の結果の抜粋で確認。未検証で、形の選択は 5 節で自前に決める） |
 
-- 本家の検索の基盤と ACL の効かせ方は、公開の資料で確かめられなかった（未検証）。本家の全体の検索の名前と画面は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
+- 本家の検索の基盤と ACL の効かせ方は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、設計の前提ではない）。本家の全体の検索の名前と画面は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 ## 3. 索引に入れるもの
 
@@ -52,10 +52,10 @@
 | 観点 | Sudachi | kuromoji |
 | --- | --- | --- |
 | OpenSearch Service での扱い | 任意のプラグイン。関連付けが要る。「日本語に勧める」とされる | すべてのドメインに入っている |
-| 表記の揺れ | 正規化の形（例：「サーバー」と「サーバ」、「問い合わせ」と「問合せ」を揃える。辞書の正規化の情報による） | 基本の形・読みのフィルターはあるが、表記の揺れの正規化の仕組みはない（未検証） |
+| 表記の揺れ | 正規化の形（例：「サーバー」と「サーバ」、「問い合わせ」と「問合せ」を揃える。辞書の正規化の情報による） | 基本の形・読みのフィルターと、カタカナの末尾の長音を消す `kuromoji_stemmer` がある（「サーバー／サーバ」は揃う）。送り仮名・漢字の表記の揺れ（「問い合わせ／問合せ」）を揃える仕組みはない |
 | 分割の単位 | A・B・C を選べる。索引は C（複合語を保つ）＋ A（短い単位）の併用ができる | `search` の方式で複合語を分け、元の語も持つ |
 | 辞書 | 公式の辞書（小・中・大）。利用者の辞書 | IPADIC。利用者の辞書 |
-| 辞書の更新 | 次の blue/green まで効かない。新しい索引への入れ直しで効かせる | 利用者の辞書の更新も入れ直しが要る（未検証） |
+| 辞書の更新 | 次の blue/green まで効かない。新しい索引への入れ直しで効かせる | 利用者の辞書は索引の設定なので、変えるには新しい索引への入れ直しが要る（未検証。E9 `search-analyzer-evaluation` で確かめる） |
 | エンジンの版との結び付き | プラグインのパッケージが OpenSearch の版ごと。エンジンの版を上げるときに、同じ版のパッケージが要る | 同梱 |
 
 - **Sudachi を既定にする**（決定）。ITSM の文章は「サーバー／サーバ」「ログイン／ログオン」「問合せ／問い合わせ」のような表記の揺れが多く、正規化の形の効果が大きいと見込む。
@@ -215,7 +215,7 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 
 - **日次の突き合わせ**：テナントごとに、DB の `(id, version)` の抜き取り（1%、最大 1 万件）と、索引の同じ ID の外部の版を比べる。違いがあれば、その ID を入れ直し、件数を記録する。違いが 0.1% を超えたら SEV3。
 - **作り直し**：新しい索引 `*_v{n+1}` を作り、DB から全件を入れ、その間の事象は両方の索引に書く（Indexer は別名ではなく、2 つの具体の索引に書く）。全件の入れ直しが済み、突き合わせで違いがなければ、別名を切り替え、古い索引を消す。
-- 作り直しの速さは、1 セルで 1 秒 5,000 文書を目安にする（`task` 3,500 万件で約 2 時間。未検証。E9 で計測）。
+- 作り直しの速さは、1 セルで 1 秒 5,000 文書を目安にする（`task` 3,500 万件で約 2 時間。未検証。E9 `index-reconcile-and-rebuild` と E12 `search-rebuild-drill` で計測）。
 
 ## 8. 検索の語
 
@@ -230,7 +230,7 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 | Indexer の停止・SQS の滞留 | 検索の結果が古くなる。6.4 節の確かめ直しで、削除・権限の変更は結果に出ない。遅れが 5 分を超えたら SEV3 |
 | DB の reader の遅れ | 確かめ直しは reader で行うので、reader が遅れると、直前に権限を与えられた行が出ないことがある（読めない行は出ない側に倒れる）。reader の遅れが 1 秒を超えたら、確かめ直しを writer で行う |
 | AZ の障害 | 3 AZ のドメインで、残る 2 AZ のレプリカで続ける |
-| リージョンの障害 | 大阪には小さな待機のドメインだけを置き、索引は複製しない。切り替えの後、`kb` と `catalog` を先に DB から作り直し（数分。ポータルの自己解決を先に戻す）、`task`・`ci`・`record` は後から作り直す（数時間。未検証）（[infrastructure.md](infrastructure.md) の 6 節）。作り直しの間は全体の検索が使えない |
+| リージョンの障害 | 大阪には小さな待機のドメインだけを置き、索引は複製しない。切り替えの後、`kb` と `catalog` を先に DB から作り直し（数分。ポータルの自己解決を先に戻す）、`task`・`ci`・`record` は後から作り直す（数時間。未検証。E12 `search-rebuild-drill` で計測）（[infrastructure.md](infrastructure.md) の 6 節）。作り直しの間は全体の検索が使えない |
 
 ## 10. セキュリティ
 

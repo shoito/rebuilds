@@ -37,7 +37,7 @@ ServiceNow の再構築に関する決定。リポジトリ共通の決定は [d
 | [0030](0030-portal-requester-scope-and-record-producers.md) | 依頼者は自分が依頼した・自分のための・見守りに入った要求だけを見る。変数ごとに依頼者への公開を持ち、他人のための申請は品目の許可と関係があるときだけ許す。フォームからのレコードの作成も依頼者の主体で保存する | accepted |
 | [0031](0031-knowledge-articles-versions-and-publishing.md) | ナレッジの記事は記事の行と版の行で持ち、公開中と編集中の版をそれぞれ高々 1 つにする。レビューに出した本文を固定し、承認した本文だけを公開する。本文は制限付きの Markdown だけにする | accepted |
 | [0032](0032-knowledge-feedback-and-deflection.md) | 評価は利用者・版ごとに 1 件にし、旗は理由を必須にして持ち主のタスクにまとめる。自己解決は仮名のセッションの事象から、明示と推定を分けて数える | accepted |
-| [0033](0033-notification-rules-and-outbound-email.md) | 通知は Notifier で受け手ごとに作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込み、送るメールには自前の `Message-ID` と推測できない参照の印を付ける | accepted |
+| [0033](0033-notification-rules-and-outbound-email.md) | 通知は Notifier で受け手ごとに作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込み、送るメールには推測できない参照の印を付け、返信は印と SES が付けた `Message-ID` で紐付ける | accepted |
 | [0034](0034-inbound-email-threading-and-sender-trust.md) | 受信は共有の入口（SES → S3 → SQS → mail-router）からセルの Ingest へ送り、SES の ID で冪等にし、転送 → ヘッダー → 参照の印 → 件名の番号（関係者だけ）の順で紐付ける。差出人は認証の結果で信頼の段階を決め、返信の追記は差出人の主体の ACL を通す | accepted |
 | [0035](0035-mail-loop-prevention-and-japanese-decoding.md) | 自動のメールはヘッダーで見分けて自動の応答を返さず、不在の返信は追記しない。流量の上限を最後の守りにする。文字コードは WHATWG の対応で復号し、ラベルのない 8 ビットは UTF-8 → Shift_JIS → EUC-JP の順に試し、送るメールは UTF-8 だけにする | accepted |
 | [0036](0036-ci-classes-and-identification-rules.md) | CI のクラスは組み込みの階層にテナントが子を足す形で持ち、識別の規則は優先度付きの識別の項目の一覧にする。複数の値の属性は値ごとに、取り込み元の固有のキーは最も優先の項目にし、クラスの違う一致でもクラスを変えない | accepted |

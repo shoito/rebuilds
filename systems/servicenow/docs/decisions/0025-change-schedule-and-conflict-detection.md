@@ -11,7 +11,7 @@ date: 2026-09-28
 
 変更の予定は、禁止期間（凍結期間を含む）、保守の時間帯、同じ CI・関係する CI の他の変更、担当者の他の予定とぶつかりうる。日本の企業は、年末年始・期末・決算の前後に変更を止める。
 
-本家の衝突の検知は、CI がすでに予定済み、親・子の CI が予定済み、保守の時間帯の外、禁止期間の中、担当者が予定済み、を調べ、CI と予定の時刻が入ったとき・変わったとき・状態が変わったときに動く（[Conflict detection](https://www.servicenow.com/docs/r//washingtondc/it-service-management/change-management/c_ConflictDetection.html)、2026-09-28 に確認）。次の空きの探索は 90 日・100 件、衝突の件数の上限は 1,000 が既定である（[Detect change conflicts](https://www.servicenow.com/docs/r/it-service-management/change-management/configure-conflict-properties.html)、2026-09-28 に確認）。禁止期間と保守の時間帯は、CMDB のクラスと条件に結び付けたスケジュールである（コミュニティの記事で確認。未検証）。
+本家の衝突の検知は、CI がすでに予定済み、親・子の CI が予定済み、保守の時間帯の外、禁止期間の中、担当者が予定済み、を調べ、CI と予定の時刻が入ったとき・変わったとき・状態が変わったときに動く（[Conflict detection](https://www.servicenow.com/docs/r//washingtondc/it-service-management/change-management/c_ConflictDetection.html)、2026-09-28 に確認）。次の空きの探索は 90 日・100 件、衝突の件数の上限は 1,000 が既定である（[Detect change conflicts](https://www.servicenow.com/docs/r/it-service-management/change-management/configure-conflict-properties.html)、2026-09-28 に確認）。禁止期間と保守の時間帯は、CI のクラスや動的な CI の群に結び付けたスケジュールで、上流のサービス・CI に付けたものは下流の CI にも効く（[Create blackout and maintenance schedules](https://www.servicenow.com/docs/r/it-service-management/change-management/t_CreateBlkoutMaintSched.html)、2026-09-28 に確認）。
 
 本システムは、業務時間を半開区間の列で表す純粋な関数を持つ（[ADR-0019](0019-business-calendar-and-pure-time-functions.md)）。
 

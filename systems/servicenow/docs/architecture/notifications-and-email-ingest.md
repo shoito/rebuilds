@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0033](../decisions/0033-notification-rules-and-outbound-email.md) | 通知は、事象 → 規則 → 受け手 → 受け手ごとの本文、の順に Notifier で作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込む。送るメールは UTF-8 だけにし、自前の `Message-ID` と、推測できない乱数の参照の印を付け、送った ID を記録する |
+| [0033](../decisions/0033-notification-rules-and-outbound-email.md) | 通知は、事象 → 規則 → 受け手 → 受け手ごとの本文、の順に Notifier で作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込む。送るメールは UTF-8 だけにし、推測できない乱数の参照の印を付け、SES が付けた `Message-ID` を記録して返信の照合に使う |
 | [0034](../decisions/0034-inbound-email-threading-and-sender-trust.md) | 受信は共有の入口（mail-ingress の SES → 一時の S3 → SQS → `mail-router`）からセルの S3・SQS を経て Ingest へ送り、SES のメッセージの ID で冪等にする。解決できない受け手はバウンスしない。紐付けは、転送の判定、`In-Reply-To`・`References` と送った ID の照合、参照の印、件名の番号（差出人がそのレコードの関係者のときだけ）の順で行う。差出人は認証の結果で信頼の段階を決め、社内のドメインを名乗る認証の通らないメールは保留にする。返信の追記は差出人の主体の ACL を通す |
 | [0035](../decisions/0035-mail-loop-prevention-and-japanese-decoding.md) | 自動のメールは、ヘッダー（`Auto-Submitted`、`Precedence`、`List-Id`、空の差出人など）で見分け、自動の応答（受け付けの通知）を返さない。不在の自動の返信はチケットに追記しない。差出人・レコードごとの流量の上限で止める。文字コードは WHATWG の Encoding Standard の対応で復号し、ラベルのない 8 ビットは UTF-8 → Shift_JIS → EUC-JP の順に試す。原本は S3 に残す |
 
@@ -23,19 +23,21 @@
 | --- | --- | --- |
 | 受信のメールの種類 | 返信の接頭辞（既定 `re:`、`aw:`、`r:` など）と転送の接頭辞（`fw:`、`fwd:`）で種類を見分ける。参照の印（watermark）があれば、それを優先して既存のレコードに結ぶ。印がなければ件名の番号の接頭辞（INC など）でレコードを探す | [Inbound email action processing](https://www.servicenow.com/docs/r/platform-administration/inbound-action-processing.html) |
 | 差出人の照合 | 差出人のメールアドレスを、有効な利用者のメールアドレスと照合する。メールアドレスは利用者ごとに一意であることが前提 | 同上 |
-| 返信・転送・新規の順 | 返信の条件（印、`In-Reply-To`）のどれかで返信、転送は接頭辞と本文の `From:` の両方で転送。転送は返信より優先し、どちらでもなければ新規 | 二次の資料（[Inbound Email - New, Reply, and Forward](https://servicenowguru.com/system-definition/inbound-email-new-reply-forward/)）。公式の本文と細部は未検証 |
-| 参照の印 | 通知の本文の末尾に `Ref:` と接頭辞（既定 `MSG`）と番号の印を入れる。印を省くと、返信が新しいレコードになる | コミュニティの記事と検索の結果の抜粋（[Working with watermarks](https://www.servicenow.com/docs/r/platform-administration/c_WorkingWithWatermarks.html) の存在を確認）。本文は未検証 |
+| 返信・転送・新規の順 | 転送は件名の接頭辞（既定 `fw:`、`fwd:`）、返信は返信の接頭辞か `In-Reply-To` で見分け、どちらの接頭辞もなければ新規。受信のフローは受信の処理より先に動く。転送に本文の `From:` も要ること、転送が返信より先に判定されることは二次の資料（[Inbound Email - New, Reply, and Forward](https://servicenowguru.com/system-definition/inbound-email-new-reply-forward/)）だけで、細部は未検証（本家の振る舞いで、DT-MAIL-001 の前提ではない） | [Inbound email action processing](https://www.servicenow.com/docs/r/platform-administration/inbound-action-processing.html) |
+| 参照の印 | 通知の本文の末尾に、`Ref:` で始まる印（既定の接頭辞 `MSG`、自動の番号とランダムな文字列）を入れる。印を省くと、受信の処理が正しく動かないことがある | [Working with watermarks](https://www.servicenow.com/docs/r/platform-administration/c_WorkingWithWatermarks.html) |
 | SES の受信 | 受信の規則（受け手の条件と、順に実行する動作：S3 へ、SNS へ、Lambda、ヘッダーの追加、バウンス、停止）。受け手の条件は SMTP の封筒の受け手（`RCPT TO`）で比べる。SPF・DKIM・DMARC で認証し、結果を `Authentication-Results` のヘッダーと通知に入れる。スパムとウイルスの判定を `X-SES-Spam-Verdict`・`X-SES-Virus-Verdict` に入れる。S3 に置くメールは 40 MB まで、SNS で受けるメールは 150 KB まで | [Amazon SES email receiving concepts](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-concepts.html)、[Deliver to S3 bucket action](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-action-s3.html) |
 | SES の S3 の暗号化 | SES の暗号化を選ぶと、S3 の暗号化のクライアント（クライアント側の暗号化）で暗号化して置き、SES は復号しない。オブジェクトロックの既定の保持の期間のあるバケットには置けない | [Deliver to S3 bucket action](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-action-s3.html) |
 | 返信のヘッダー | 返信は `In-Reply-To` に親の `Message-ID` を、`References` に親の `References` と親の `Message-ID` を入れる | [RFC 5322 3.6.4](https://www.rfc-editor.org/rfc/rfc5322#section-3.6.4) |
 | 自動の応答 | 自動の応答は `Auto-Submitted: auto-replied` を付けるべき。`Auto-Submitted` が `no` 以外のメールには自動の応答を返すべきでない | [RFC 3834](https://www.rfc-editor.org/rfc/rfc3834) |
 | `Precedence` | 標準ではなく、使うことは勧められない。`bulk`・`list`・`junk` が自動の応答の抑止に使われている | [RFC 2076](https://www.rfc-editor.org/rfc/rfc2076)、RFC 3834 |
 | ISO-2022-JP | 行の中に JIS X 0208 の文字があれば、行の終わりの前に ASCII（または JIS X 0201 のローマ字）へ戻す。本文は ASCII で終わる | [RFC 1468](https://www.rfc-editor.org/rfc/rfc1468) |
-| 文字コードの対応 | `shift_jis`・`sjis`・`windows-31j`・`ms932` などのラベルは同じ Shift_JIS の復号器に対応し、その表（index jis0208）は IBM と NEC の拡張を含む。`iso-2022-jp`・`csiso2022jp` は ISO-2022-JP の復号器 | [WHATWG Encoding Standard](https://encoding.spec.whatwg.org/) |
+| 文字コードの対応 | `shift_jis`・`sjis`・`windows-31j`・`ms932` などのラベルは同じ Shift_JIS の復号器に対応し、その表（index jis0208）は IBM と NEC の拡張を含む。`iso-2022-jp`・`csiso2022jp` は ISO-2022-JP の復号器で、同じ index jis0208 を引く。NEC の特殊文字（13 区。丸数字など）と NEC 選定の IBM 拡張（89〜92 区）は 7 ビットの範囲にあり復号できる。IBM 拡張（115〜119 区）は 7 ビットの範囲の外で、ISO-2022-JP では表せない | [WHATWG Encoding Standard](https://encoding.spec.whatwg.org/) の 12.2.1 節、[index-jis0208.txt](https://encoding.spec.whatwg.org/index-jis0208.txt) |
+| SES の送信のヘッダー | 送る側が `Message-ID` を付けても、SES が自分の値で上書きする。`Date` も上書きする | [Amazon SES header fields](https://docs.aws.amazon.com/ses/latest/dg/header-fields.html) |
+| SES の送信の API | `SendEmail` は冪等のキーを持たない。応答は SES の `MessageId` だけ | [SendEmail（SES API v2）](https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_SendEmail.html) |
 
 - 本家の参照の印の形（`Ref:MSG…`）、ヘッダー、受信の処理のスクリプトは写さない。
-- SES の送信で、送る側が付けた `Message-ID` が保たれるか、SES の ID で置き換わるかは、公式の文書で確かめられなかった（未検証）。3.5 節は、どちらでも紐付けられる形にする。
-- 日本の携帯のキャリアのメール、古いメールの道具が、ISO-2022-JP のラベルで NEC・IBM の拡張の文字（丸数字など）を送る実態がある（一般に知られる事情。出典は未確認で未検証）。WHATWG の ISO-2022-JP の復号器がこれらを復号するかは、E6 の試験で確かめる（未検証）。
+- SES は送る側の `Message-ID` を上書きする（上の表）。3.4・3.5 節は、自前の `Message-ID` を付けず、SES の ID から受け手に届く `Message-ID` を記録して照合する形にした（2026-09-28、検証の工程で直した。ADR-0033 の注記）。
+- 日本の携帯のキャリアのメール、古いメールの道具が、ISO-2022-JP のラベルで NEC の特殊文字（丸数字など）を送ったり、Shift_JIS の中身に ISO-2022-JP のラベルを付けたりする実態がある（一般に知られる事情。出典はなく未検証。E6 `japanese-mime-decoding` で集めた実例の試験で確かめる）。前者は WHATWG の ISO-2022-JP の復号器で復号できる（上の表）。後者は 7.2 節の 2 行で救う。
 
 ## 3. 通知と送信（[ADR-0033](../decisions/0033-notification-rules-and-outbound-email.md)）
 
@@ -46,7 +48,7 @@
 | `id`、`stable_key` | メタデータの共通の列 |
 | `event` | `record.inserted` / `record.updated`（テーブルと条件） / `sla.warning` / `sla.breached` / `approval.requested` / `approval.decided` / `page.notify` / `flow.notify`（フローの `notify` のノード） / `kb.feedback` など |
 | `table_id`、`condition` | 式の言語。保存の後の値と、変わったフィールド（`changes.<field>`）を読める |
-| `recipients` | `field:<参照のフィールド>`（依頼者、担当者、承認者）、`group_members:<フィールドか固定>`、`group_manager`、`watch_list`、`users:[…]`、`groups:[…]`、`emails:[…]`（テナントの外の宛先。上限 10） |
+| `recipients` | `field:<参照のフィールド>`（依頼者、担当者、承認者）、`group_members:<フィールドか固定>`、`group_manager`、`watchers`、`users:[…]`、`groups:[…]`、`emails:[…]`（テナントの外の宛先。上限 10） |
 | `exclude_actor` | 真なら、事象を起こした本人に送らない（既定 真） |
 | `template_id` | 4 節のテンプレート |
 | `channels` | `email` / `push` / `in_app` |
@@ -71,7 +73,7 @@ Notifier：事象ごとに
 ```
 
 - **レコードの値は、事象の時点の版で読む。** outbox の事象は `record_version` を持ち、Notifier は監査の履歴（`record_change`）からその版の値を組み立てる（今の値ではない）。遅れて送っても、通知の内容が事象と食い違わない。ただし ACL の判定は送る時点の権限で行う（権限を外された人に古い値を送らない）。
-- 4 の一意の制約で、outbox の配送の重複（少なくとも 1 回）でも、同じ通知は 1 回だけ作る。6 の送信は `notification_message` の状態（`pending` → `sent` / `failed` / `suppressed`）を版の条件で進め、SES の送信の API の再試行で重複しないよう、`notification_message.id` を冪等のキーとして記録する（SES の送信の API に冪等のキーの仕組みがあるかは未検証。送信の直前に状態を `sending` にし、応答を受けたら `sent` にする。応答の前に落ちたら、再開の時に `sending` の行は「送ったかもしれない」として 1 回だけ再送する。重複は高々 1 通）。
+- 4 の一意の制約で、outbox の配送の重複（少なくとも 1 回）でも、同じ通知は 1 回だけ作る。6 の送信は `notification_message` の状態（`pending` → `sent` / `failed` / `suppressed`）を版の条件で進め、SES の送信の API の再試行で重複しないよう、`notification_message.id` を冪等のキーとして記録する（SES の送信の API は冪等のキーを持たない（2 節）。送信の直前に状態を `sending` にし、応答を受けたら `sent` にする。応答の前に落ちたら、再開の時に `sending` の行は「送ったかもしれない」として 1 回だけ再送する。重複は高々 1 通）。
 
 ### 3.3 送信のドメインと差出人
 
@@ -83,8 +85,8 @@ Notifier：事象ごとに
 
 | ヘッダー | 値 | 理由 |
 | --- | --- | --- |
-| `Message-ID` | `<{notification_message.id}.{tenant_short}@mail.<brand>.<domain>>` | 返信の紐付け（5.3 節） |
-| `In-Reply-To`・`References` | 同じレコードへの、その受け手への直前の通知の `Message-ID`（あれば） | メールの道具でスレッドにまとまる |
+| `Message-ID` | 付けない（SES が上書きする。2 節） | - |
+| `In-Reply-To`・`References` | 同じレコードへの、その受け手への直前の通知の、受け手に届いた `Message-ID`（`email_outbound` にあれば） | メールの道具でスレッドにまとまる |
 | `Auto-Submitted` | `auto-generated` | 受け手の自動の応答を抑える（RFC 3834） |
 | `X-Auto-Response-Suppress` | `OOF, AutoReply` | Exchange・Microsoft 365 の不在の返信を抑える（標準ではない） |
 | `<Brand>-Loop` | セルの ID とテナントの ID のハッシュ | 自分の送ったメールが戻ってきたことを見分ける（6 節） |
@@ -92,8 +94,8 @@ Notifier：事象ごとに
 
 ### 3.5 送った ID の記録
 
-- `email_outbound(tenant_id, message_id, ses_message_id, notification_message_id, table_id, record_id, recipient_user_id, sent_at)` に、自前の `Message-ID` と、SES が返す ID の両方を記録する。
-- 返信の `In-Reply-To`・`References` の照合（5.3 節）は、自前の `Message-ID` と、SES の ID から作った形の両方で引く。SES が `Message-ID` を置き換えるかが未検証（2 節）のためである。
+- `email_outbound(tenant_id, message_id, ses_message_id, notification_message_id, table_id, record_id, recipient_user_id, sent_at)` に、SES が返す ID（`ses_message_id`）と、そこから作った、受け手に届く `Message-ID`（`message_id`）を記録する。
+- 返信の `In-Reply-To`・`References` の照合（5.3 節）は `message_id` で引く。SES の ID と受け手に届く `Message-ID` のドメインの部分の対応は公式の文書に書かれていないため、E6 `notifier-outbound-email` で、送ったメールを受け手の側で読んで確かめ、作り方を固定する（未検証）。確かめるまでは、参照の印（5.4 節）が紐付けの主な手がかりである。
 - 保持：90 日（返信は通常この中に来る）。その後の返信は参照の印か件名の番号で紐付く。
 
 ### 3.6 配信の失敗と苦情
@@ -105,7 +107,7 @@ Notifier：事象ごとに
 ## 4. テンプレートと本文（[ADR-0033](../decisions/0033-notification-rules-and-outbound-email.md)）
 
 - テンプレートは、件名と本文（制限付きの Markdown。[knowledge.md](knowledge.md) の 3.5 節と同じ）を、言語（`ja`・`en`）ごとに持つ。受け手の `user.language`、なければテナントの既定の言語で選ぶ。
-- 差し込みは `{{record.number}}`、`{{record.short_description}}`、`{{record.caller.name}}`（参照のたどりは 2 段まで）、`{{record.link}}`、`{{comment.latest}}`、`{{approval.link}}` などの決まった形だけで、式の言語の式に限る（任意のコードを書かせない）。
+- 差し込みは `{{record.number}}`、`{{record.title}}`、`{{record.requester.name}}`（参照のたどりは 2 段まで）、`{{record.link}}`、`{{comment.latest}}`、`{{approval.link}}` などの決まった形だけで、式の言語の式に限る（任意のコードを書かせない）。
 - **差し込みは、受け手の主体で ACL を判定する。** 読めないフィールドは空、読めない参照先は「（表示できないレコード）」にする（[access-control.md](access-control.md) の 6.2 節の 6・11 行）。受け手がレコードそのものを読めなければ、その受け手には送らない（`suppressed`、理由 `no_read_access`）。
 - 作業メモ（`work_note`）は、読める受け手（`agent` 以上）にだけ差し込む。依頼者への通知の `{{comment.latest}}` は、コメントだけを見る。
 - テナントの外の宛先（`emails:[…]`）は、主体を持たないので、テンプレートの差し込みを「公開の項目」（番号、短い説明、状態）に限る。公開の項目の一覧はテーブルごとに組み込みで決め、テナントが狭められる。
@@ -170,7 +172,7 @@ DT-MAIL-002（返信の扱い）：
 | --- | --- | --- | --- | --- | --- |
 | 1 | `untrusted` | - | - | - | 保留（`quarantined`）。担当者の保留の一覧に出す |
 | 2 | - | 見つからない（未登録のアドレス） | - | - | 保留。担当者が「このレコードに追記」「新しいレコード」「捨てる」を選ぶ |
-| 3 | `trusted` | あり | 開いている（open・hold） | コメントの書き込みの ACL あり | コメントとして追記（`channel = email`、`source_message_id`）。インシデントで `on_hold` かつ `awaiting_caller` なら、組み込みのルールで再開（[itsm-processes.md](itsm-processes.md) の 4.2 節） |
+| 3 | `trusted` | あり | 開いている（open・hold） | コメントの書き込みの ACL あり | コメントとして追記（`channel = email`、`source_message_id`）。インシデントで `on_hold` かつ `awaiting_requester` なら、組み込みのルールで再開（[itsm-processes.md](itsm-processes.md) の 4.2 節） |
 | 4 | `trusted` | あり | `resolved`、再オープンの期間の中 | 依頼者 | 追記し、`reopen` の遷移（主体は差出人、`actor_kind = email`）。本文が「ありがとう」などの短い感謝だけのとき（テナントの語の一覧に一致、かつ 40 文字以下）は、追記だけで再オープンしない |
 | 5 | `trusted` | あり | `resolved`、依頼者でない | コメントの書き込みの ACL あり | 追記だけ |
 | 6 | `trusted` | あり | `closed`・`cancelled` | - | 新しいレコード（5.6 節）を作り、`reopened_from` で元に結ぶ |
@@ -181,8 +183,8 @@ DT-MAIL-002（返信の扱い）：
 
 ### 5.6 新しいレコードの作成
 
-- 受信の規則（`inbound_rule`、メタデータ）：`order`、条件（受け手の別名、差出人のドメイン、件名、信頼の段階の式）、作る先のテーブル（インシデント、または `record_producer` の品目）、フィールドの写し（件名 → `short_description`、本文 → `description`、差出人 → `caller`、別名 → カテゴリ）。最初に一致した規則を使う。一致がなければテナントの既定（インシデント）。
-- 作成は、差出人の利用者の主体で Record Service を通す。差出人が未登録で、テナントが「未登録の差出人からも作る」を選んでいるときは、組み込みの連携の主体 `email_intake`（`kind = integration`）で作り、`caller` を空にし、差出人のアドレスを `external_caller_email` に入れる。既定は保留（DT-MAIL-002 の 2 行と同じ）。
+- 受信の規則（`inbound_rule`、メタデータ）：`order`、条件（受け手の別名、差出人のドメイン、件名、信頼の段階の式）、作る先のテーブル（インシデント、または `record_producer` の品目）、フィールドの写し（件名 → `title`、本文 → `description`、差出人 → `requester`、別名 → カテゴリ）。最初に一致した規則を使う。一致がなければテナントの既定（インシデント）。
+- 作成は、差出人の利用者の主体で Record Service を通す。差出人が未登録で、テナントが「未登録の差出人からも作る」を選んでいるときは、組み込みの連携の主体 `email_intake`（`kind = integration`）で作り、`requester` を空にし、差出人のアドレスを `external_requester_email` に入れる。既定は保留（DT-MAIL-002 の 2 行と同じ）。
 - 受け付けの通知（「受け付けました」）は、6 節の条件で抑える。
 
 ### 5.7 差出人の信頼（DT-MAIL-003）
@@ -222,7 +224,7 @@ DT-MAIL-002（返信の扱い）：
 | 6 | そのほか | `human` |
 
 - 5（監視の道具からのアラートのメールなど）は、レコードを作ってよい（受信の規則で、差出人ごとに許すかを決める。既定は許す）。ただし、**`auto_generated`・`auto_reply` の差出人へは、組み込みの受け付けの通知と、そのメールをきっかけにしたどの通知も送らない**（RFC 3834）。
-- 不在の返信をレコードに追記しないのは、依頼者の不在の返信で `awaiting_caller` の保留が解けたり、担当者への通知が連鎖したりするのを防ぐためである。
+- 不在の返信をレコードに追記しないのは、依頼者の不在の返信で `awaiting_requester` の保留が解けたり、担当者への通知が連鎖したりするのを防ぐためである。
 
 ### 6.2 流量の上限
 
@@ -248,13 +250,13 @@ DT-MAIL-002（返信の扱い）：
 | # | 宣言（`charset` のラベル） | 中身 | 復号 |
 | --- | --- | --- | --- |
 | 1 | WHATWG の Encoding Standard のラベル（`iso-2022-jp`、`shift_jis`・`sjis`・`windows-31j`・`ms932`、`euc-jp`、`utf-8` など） | 宣言の復号器で置き換えの文字（U+FFFD）が出ない | 宣言のとおり |
-| 2 | `iso-2022-jp` | 置き換えの文字が出る | NEC の特殊文字と IBM の拡張を含む表（CP932 と同じ文字の集合）で復号し直す。それでも出るなら 5 行 |
+| 2 | `iso-2022-jp` | 置き換えの文字が出る | 8 ビットのバイトを含むなら（ラベルの誤り）、4 行と同じ順で試す。7 ビットだけなら 5 行 |
 | 3 | `shift_jis` などの別名 | - | WHATWG の Shift_JIS の復号器（IBM・NEC の拡張を含む。CP932 と同じ扱い） |
 | 4 | なし・`us-ascii`・未知のラベルで、8 ビットの文字がある | - | UTF-8（厳格）→ Shift_JIS → EUC-JP の順に試し、置き換えの文字が出ない最初のもの |
 | 5 | どれでも置き換えの文字が出る | - | 宣言（なければ UTF-8）で置き換えの文字を許して復号し、`decode_lossy` の印を付ける。担当者の画面に「文字化けの可能性」と原本へのリンクを出す |
 
 - 復号した文字列は NFC に正規化する（辞書の `string` と同じ。[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 3.3 節）。半角カタカナ（ISO-2022-JP の `ESC ( I`、Shift_JIS の 1 バイトのカナ）は、半角のまま残す（NFC は半角を全角に変えない。検索の索引の側で正規化する）。
-- 2 行の拡張の表は、WHATWG の ISO-2022-JP の復号器が拡張の文字を復号しないと E6 の試験で分かったときにだけ要る（2 節の未検証）。
+- 拡張の表は持たない。WHATWG の ISO-2022-JP の復号器は、NEC・IBM の拡張を含む index jis0208 を引くためである（2 節。2026-09-28 に確かめ、2 行を直した）。
 - **送るメールは UTF-8 だけにする**（本文は `quoted-printable` か `base64`、件名は RFC 2047 の UTF-8 の B の形）。ISO-2022-JP で送る選択肢を持たない。今の主なメールの道具は UTF-8 を読め、送る文字コードを増やすと、丸数字などの表せない文字の扱いが要るためである。古い道具が読めない利用者の報告があれば、持ち越しで扱う。
 
 ## 8. 障害のときの振る舞い
@@ -327,7 +329,7 @@ DT-MAIL-002（返信の扱い）：
 ### 決定（2026-09-28、既定案）
 
 - **通知は `(事象, 規則, 受け手, 経路)` の一意で 1 回だけ作り、レコードの値は事象の時点の版で読み、ACL は送る時点で判定する**（3.2 節、ADR-0033）。
-- **自前の `Message-ID` と SES の ID の両方を記録して照合する**（3.5 節）。
+- **自前の `Message-ID` は付けず、SES の ID から受け手に届く `Message-ID` を記録して照合する**（3.5 節。検証の工程で直した）。
 - **参照の印は通知の 1 通ごとの推測できない乱数にする**（5.4 節）。
 - **紐付けは、転送 → ヘッダー → 印 → 件名の番号（関係者だけ）の順**（5.3 節、ADR-0034）。
 - **テナントは封筒の受け手で決め、`To:` で決めない**（5.1 節）。
@@ -343,8 +345,7 @@ DT-MAIL-002（返信の扱い）：
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 電気通信事業法の届出と通信の秘密（L2） | 法務の確認。済むまで E6 のメールからのチケットの `spec.md` を承認しない |
-| SES が送信の `Message-ID` を保つか | E6 の検証の環境で確かめ、2 節と 3.5 節を直す |
-| WHATWG の ISO-2022-JP の復号器が拡張の文字を復号するか | E6 の試験（7.2 節の 2 行の要否） |
+| SES の ID と、受け手に届く `Message-ID` のドメインの部分の対応 | E6 `notifier-outbound-email` で確かめ、3.5 節の作り方を固定する |
 | ARC（転送の認証の連鎖）の結果の扱い | E6 の後。顧客の転送のサーバーの実態を見て |
 | メールでの承認（署名付きの一回だけのリンクと送信のドメインの認証） | MVP の後（[workflow-engine.md](workflow-engine.md) の 14 節） |
 | 原本の保持の期間（1 年） | L2・L4 の結論の後、`security.md` で |

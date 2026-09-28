@@ -25,11 +25,11 @@
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
 | 継承と物理の配置 | 子のクラスは親のフィールドを継承する。物理の配置は 3 つ：階層ごとに 1 つの表（タスクの階層。クラスの名前の列で分ける）、クラスごとの表（子のレコードを同じ ID で親の表に複製する）、パーティションごとの表（CI の基底の表。上限に達すると区画を足す） | [Table extension and classes](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/table-extension-and-classes.html) |
-| 辞書の上書き | 子のテーブルだけで、継承したフィールドの既定値・読み取り専用・必須・参照の絞り込みなどを変えられる | [Define a dictionary override](https://docs.servicenow.com/en-US/bundle/vancouver-platform-administration/page/administer/data-dictionary-tables/task/t_DefineADictionaryOverride.html)（検索の結果の抜粋で確認。本文は未検証） |
-| 番号 | テーブルごとに 1 つの番号の書式（接頭辞、開始の番号、桁数）を持つ。桁の埋めは既存と新規のレコードに効く | コミュニティの記事と検索の結果の抜粋で確認（[Number Maintenance](https://www.servicenow.com/community/itsm-forum/number-maintenance-auto-numbering-records/td-p/711117)）。公式の文書の本文は未検証 |
-| 監査の履歴 | フィールドの値の変更は監査の表に、作業メモ・コメントは別の表に入る。テーブル・フィールドの単位で監査を止められる | コミュニティの記事で確認（[How to activate/deactivate auditing](https://www.servicenow.com/community/developer-blog/servicenow-things-to-know-55-how-to-activate-deactivate-auditing/ba-p/2774658)）。公式の文書は未検証 |
+| 辞書の上書き | 子のテーブルだけで、継承したフィールドの既定値・読み取り専用・必須・参照の絞り込みなどを変えられる | [Define a dictionary override](https://www.servicenow.com/docs/bundle/zurich-platform-administration/page/administer/data-dictionary-tables/task/t_DefineADictionaryOverride.html) |
+| 番号 | テーブルごとに 1 つの番号の書式（接頭辞、開始の番号、桁数）を持つ。桁の埋めは既存と新規のレコードに効く | コミュニティの記事と検索の結果の抜粋で確認（[Number Maintenance](https://www.servicenow.com/community/itsm-forum/number-maintenance-auto-numbering-records/td-p/711117)）。公式の文書の本文は未検証（本家の振る舞いで、設計の前提ではない） |
+| 監査の履歴 | 監査するレコードの作成・更新は監査の表に、作業メモ（ジャーナル）と履歴は別の表に入る。辞書の監査の印でテーブルの単位で有効にする。フィールドの単位で外す方法はコミュニティの記事だけで未検証 | [Viewing Sys Audit and Audit Relationship Change tables](https://www.servicenow.com/docs/r/platform-security/c_UnderstandingTheSysAuditTable.html)、[コミュニティの記事](https://www.servicenow.com/community/developer-blog/servicenow-things-to-know-55-how-to-activate-deactivate-auditing/ba-p/2774658) |
 | 設定の移送（更新のセット） | 衝突は、更新の記録の「名前」と「更新の時刻」を比べて見つける。一部の表は ID ではなく一意の列の組（coalesce）で同じレコードを見つける。移送のときに、参照の ID を書き換える | [Update set collision resolution](https://www.servicenow.com/docs/r/application-development/system-update-sets/update-set-collisions.html) |
-| 移送の手順 | 取り込んだ更新のセットをプレビューし、問題（衝突・依存の欠け）を「取り込む」か「飛ばす」で決めてからコミットする | コミュニティの記事で確認（[Update set branch/collision detection](https://www.servicenow.com/community/developer-articles/update-set-branch-collision-detection/ta-p/2320755)）。公式の手順の本文は未検証 |
+| 移送の手順 | 取り込んだ更新のセットをプレビューし、問題（衝突・依存の欠け）を「取り込む」か「飛ばす」で決めてからコミットする | [Preview a remote update set](https://www.servicenow.com/docs/r/application-development/system-update-sets/t_PreviewARemoteUpdateSet.html) |
 
 - 本家の内部の表の名前・フィールドの名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。本家の更新のセットの形式は読み込まない（[intent.md](../intent.md) の Non-goals）。
 
@@ -93,7 +93,7 @@
 
 - 子は、親のフィールド、ACL、レコードのルール、フローのトリガー、SLA の定義の対象を継承する（ADR-0003）。
 - テナントのクラスは、組み込みのクラスとテナントのクラスを親にできる。**階層の深さは、ルートから 6 段まで**にする（`task` → `change` → テナントの子 → …）。
-- **レコードのクラスは、作成の後に変えない。** インシデントを問題に変えたいときは、新しいレコードを作って関係で結ぶ（`itsm-processes.md`）。本家がクラスの変更を許すかは未検証。
+- **レコードのクラスは、作成の後に変えない。** インシデントを問題に変えたいときは、新しいレコードを作って関係で結ぶ（`itsm-processes.md`）。本家がクラスの変更を許すかは未検証（本家の振る舞いで、設計の前提ではない）。
 - テナントのクラスを削除できるのは、行が 0 件で、子のクラスがないときだけにする。
 
 ## 4. 物理の配置（[ADR-0007](../decisions/0007-physical-layout-and-extension-index.md)）
@@ -102,14 +102,14 @@
 
 | 物理の表 | 置くクラス | 列 |
 | --- | --- | --- |
-| `task` | `task` と、組み込み・テナントの子のクラスすべて | 共通の列（`tenant_id`、`id`、`class_id`、`number`、`state`、`active`、`priority`、`impact`、`urgency`、`assignment_group_id`、`assigned_to_id`、`opened_by_id`、`caller_id`、`cmdb_ci_id`、`short_description`、`description`、`opened_at`、`resolved_at`、`closed_at`、`due_at`、`parent_id`、`version`、`created_at`、`created_by`、`updated_at`、`updated_by`）＋ 組み込みの子のクラスの型付きの列（変更の予定の時刻、リスクなど）＋ `ext` |
+| `task` | `task` と、組み込み・テナントの子のクラスすべて | 共通の列（`tenant_id`、`id`、`class_id`、`number`、`state`、`active`、`priority`、`impact`、`urgency`、`assignment_group_id`、`assigned_to_id`、`opened_by_id`、`requester_id`、`ci_id`、`title`、`description`、`opened_at`、`resolved_at`、`closed_at`、`due_at`、`parent_id`、`version`、`created_at`、`created_by`、`updated_at`、`updated_by`）＋ 組み込みの子のクラスの型付きの列（変更の予定の時刻、リスクなど）＋ `ext` |
 | `ci` | CI の全クラス | 共通の属性の型付きの列 ＋ クラスに固有の属性（組み込みも）を `ext`（ADR-0003 の例外） |
 | `custom_record` | テナントの独立のテーブル | `tenant_id`、`id`、`table_id`、`number`、`version`、作成・更新の人と時刻、`ext` |
 | 専用の表 | `user`、`group`、`role`、`kb_article`、`catalog_item` など | 型付きの列 ＋ `ext` |
 
 - 主キーは `(tenant_id, id)`、`id` は UUIDv7（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
 - `version` は保存ごとに 1 上げる。更新は `WHERE version = $expected` で行い、一致しなければ 409（`record_changed`）にする。フォームは読んだときの版を送る。
-- `task` の主な索引（すべて `tenant_id` を先頭に置く）：`(tenant_id, number)` 一意、`(tenant_id, assignment_group_id, active, updated_at)`、`(tenant_id, assigned_to_id) WHERE active`、`(tenant_id, class_id, state) WHERE active`、`(tenant_id, caller_id, opened_at)`、`(tenant_id, cmdb_ci_id) WHERE active`、`(tenant_id, parent_id)`。
+- `task` の主な索引（すべて `tenant_id` を先頭に置く）：`(tenant_id, number)` 一意、`(tenant_id, assignment_group_id, active, updated_at)`、`(tenant_id, assigned_to_id) WHERE active`、`(tenant_id, class_id, state) WHERE active`、`(tenant_id, requester_id, opened_at)`、`(tenant_id, ci_id) WHERE active`、`(tenant_id, parent_id)`。
 - **S1 では `task` と `ci` をパーティションに分けない。** 完了したレコードを別の区画に移すと、再オープンのたびに行が区画をまたいで動き、索引の書き込みが増える。進行中のレコードの問い合わせは `WHERE active` の部分索引で速くする。S1 の見込み（`task` が年 7,000 万行）で、1 つの表の vacuum と索引の大きさを E2 の計測で確かめ、S2 の前に分け方（テナントのハッシュ、または完了の年）を決め直す（持ち越し）。
 - 監査の履歴と作業メモは、追記だけで大きくなるので、月ごとの範囲のパーティションにする（7 節）。
 
@@ -150,7 +150,7 @@ ext_index（tenant_id, field_id, record_id, value_text, value_number, value_time
 | 階層の深さ | 6 | 422 `hierarchy_too_deep` |
 | 選択肢の集合の値の数 | 1,000 | 422 |
 
-- 本家の上限の値は、公開の資料で確かめられなかった（未検証）。
+- 本家の上限の値は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、設計の前提ではない）。
 
 ## 5. 保存の流れ
 

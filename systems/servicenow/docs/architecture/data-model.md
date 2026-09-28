@@ -25,7 +25,7 @@
 - **テナントの解決の前に、テナントテーブルを読まない。** 解決に使う表（台帳）は制御の面にあり、セルの DB にはない。
 - **行は `version` を持ち、更新は版の条件付き**（レコード、実行、承認、計時の行、呼び出し）。
 - **メタデータの表は共通の列**（`stable_key`、`rev`、`content_hash`、`updated_in_version`、`deleted`）を持ち、変更は `meta_version` を上げる 1 つのトランザクションで行う（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)）。
-- **追記だけの表**（`record_change`、`journal_entry`、`task_sla_event`、`meta_change`）は、アプリのロールに `UPDATE`・`DELETE` を与えない。
+- **追記だけの表**（`record_change`、`journal_entry`、`sla_clock_event`、`meta_change`）は、アプリのロールに `UPDATE`・`DELETE` を与えない。
 - **時間で消える表は、時間のパーティションで持ち、`DROP` で消す**（[ADR-0053](../decisions/0053-data-retention-and-deletion.md)）。
 - **テナントの秘密の列**は、テナントの DEK のエンベロープ暗号化（`*_ciphertext`）か、ハッシュ（`*_hash`）にする（[security.md](security.md) の 5・7 節）。
 - **DB のロール**：アプリのロール（RLS の対象）、`migrator`、`catalog_loader`（NULL の行だけ）、`engine_scheduler`（`claim_due_timers` で `(timer_id, tenant_id)` だけ）・`relay`（outbox だけ）・`indexer_scan`（`(tenant_id, id, version)` だけ）、`platform`（`BYPASSRLS`、期限付き）、`maintenance`（パーティションの操作だけ）（[security.md](security.md) の 10.4 節）。
@@ -47,7 +47,7 @@
 | 番号の定義（`number_def`） | **NULL の行** | 組み込みの辞書の `number_def_id` と、テナントの `number_counter` が参照する。接頭辞・桁の変更は、同じテーブルのテナントの行で上書きする | [data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 8 節 |
 | CI の関係の型（`ci_relation_type`） | **NULL の行** | テナントの `ci_relation` が参照する。テナントは型を足せる | [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 7.1 節 |
 | CI の属性と識別の規則（`ci_attribute`、`ci_identification_rule`） | **NULL の行** | テナントの `ci_precedence`・`ci_identifier` が参照する。テナントの同じクラスの規則は組み込みの行に勝つ | 同上の 3.2・4.1 節 |
-| 組み込みのフロー（`flow_def`、`flow_version`：`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | **NULL の行** | テナントの `flow_run` が版を参照する。コードの新しい版は新しい `flow_version` の行にし、前の版を変えない。テナントが変える値（承認者・規則）は、フローの入力となるテナントの行に持つ | [workflow-engine.md](workflow-engine.md) の 3.4 節 |
+| 組み込みのフロー（`flow_def`、`flow_version`：`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | **NULL の行** | テナントの `flow_run` が版を参照する。コードの新しい版は新しい `flow_version` の行にし、前の版を変えない。テナントが変える値（承認者・規則）は、フローの入力となるテナントの行に持つ（`change_approval_policy` は `change_approval_policy_rule`。[itsm-processes.md](itsm-processes.md) の 8.5.1 節） | [workflow-engine.md](workflow-engine.md) の 3.4 節 |
 | 優先度の表の既定（`priority_matrix`） | コードの版だけ | テナントはテーブルごとの行で上書きする。行がなければ親のクラス、最後はコードの既定 | [itsm-processes.md](itsm-processes.md) の 5.1 節 |
 | 配置と画面の規則の既定（`form_layout`、`list_layout`、`view_rule`、`ui_rule`） | コードの版だけ | テナントは `view` を足すか、既定を上書きする | [portal-and-ui.md](portal-and-ui.md) の 4.2 節 |
 | 状態のモデル、組み込みのレコードのルール | コードの版だけ | テナントは条件と保留の理由だけを足す | [itsm-processes.md](itsm-processes.md) の 3 節、[workflow-engine.md](workflow-engine.md) の 6 節 |
@@ -56,7 +56,7 @@
 | 画面の文言の辞書（`ja.json`・`en.json`） | コードの版だけ | テナントの文言は `translation` | [portal-and-ui.md](portal-and-ui.md) の 7.2 節 |
 | 取り込み元の優先度とデータ源の規則の既定（`ci_precedence`、`ci_source_rule`） | コードの版だけ | テナントの行が既定に勝つ | [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 5.1・6.2 節 |
 | 既定のカレンダー（`calendar`、`calendar_version`） | テナントの作成の時のテナントの行 | テナントが自由に変える | [sla-and-calendars.md](sla-and-calendars.md) の 3.1 節 |
-| 組み込みの SLA の定義（インシデントの応答・解決、OLA。`sla_def`） | テナントの作成の時のテナントの行 | テナントが変える。`task_sla` はテナントの行を参照する | [itsm-processes.md](itsm-processes.md) の 4.4 節 |
+| 組み込みの SLA の定義（インシデントの応答・解決、OLA。`sla_def`） | テナントの作成の時のテナントの行 | テナントが変える。`sla_clock` はテナントの行を参照する | [itsm-processes.md](itsm-processes.md) の 4.4 節 |
 | 既定のポータルとテーマ（`portal`、`portal_theme`）、既知のエラーのナレッジベース（`kb_base`） | テナントの作成の時のテナントの行 | テナントが変える | [portal-and-ui.md](portal-and-ui.md) の 6.2 節、[knowledge.md](knowledge.md) の 5 節 |
 | 組み込みの取り込み元（`ci_source` の `manual`・`system_group`）、連携の主体（`user` の `email_intake`） | テナントの作成の時のテナントの行 | 連携の主体（利用者の行）を持つので、テナントごとに要る | [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 5.1・7.4 節、[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 5.6 節 |
 
@@ -140,8 +140,8 @@
 | `calendar`、`calendar_version` | 業務カレンダー | メタデータ | [sla-and-calendars.md](sla-and-calendars.md) の 3.1 節 |
 | `holiday_set`、`holiday_set_version`、`holiday` | 祝日。国民の祝日は NULL の行 | 版を消さない | 同上の 5 節 |
 | `sla_def` | SLA の定義（版付き） | メタデータ | 同上の 6.1 節 |
-| `task_sla` | 計時の行。部分一意索引。`breach_disputed_at` の列を持つ（統合で足した。[reports.md](reports.md) の 8.2 節の分類に使う） | タスクに従う | 同上の 6.2 節 |
-| `task_sla_event` | 計時の事象。追記だけ、月ごと | 監査 | 同上の 6.2 節 |
+| `sla_clock` | 計時の行。部分一意索引。`breach_disputed_at` の列を持つ（統合で足した。[reports.md](reports.md) の 8.2 節の分類に使う） | タスクに従う | 同上の 6.2 節 |
+| `sla_clock_event` | 計時の事象。追記だけ、月ごと | 監査 | 同上の 6.2 節 |
 
 ### 4.5 割り当てとオンコール（E5）
 
@@ -161,8 +161,10 @@
 | `major_incident_candidate`、`major_incident_trigger` | メジャーインシデント | テナント | 同上の 6.1 節 |
 | `std_change_template`、`std_change_template_version` | 標準の変更の雛形 | 版を消さない | 同上の 8.2 節 |
 | `risk_condition`、`risk_questionnaire`、`change_risk_assessment` | リスクの評価 | 監査 | 同上の 8.3 節 |
+| `change_approval_policy_rule` | 変更の承認の方針のテナントの値（段ごとの承認者・規則・期限・期限切れの動作）。組み込みのフロー `change_approval_policy` の入力 | メタデータ | 同上の 8.5.1 節 |
 | `cab_definition`、`cab_meeting`、`cab_agenda_item` | CAB | 監査 | 同上の 8.6 節 |
-| `change_window`、`change_conflict`、`change_impact_snapshot`、`change_affected_ci` | 予定表・衝突・影響 | 変更に従う | 同上の 9 節、[cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 8.2 節 |
+| `change_window`、`change_conflict`、`change_affected_ci` | 予定表・衝突・影響を受ける CI | 変更に従う（`change_window` はメタデータ） | 同上の 9 節 |
+| `change_impact_snapshot` | 影響の範囲の写し | 監査（変更が残る間は残す。[security.md](security.md) の 9 節） | 同上の 9.4 節、[cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 8.2 節 |
 
 ### 4.7 カタログと要求（E8）
 
@@ -244,13 +246,14 @@
 | # | 点 | 決定 | 直した文書 |
 | --- | --- | --- | --- |
 | 1 | 3.1 節の候補の表（組み込みの行を DB に NULL の行として持つか、コードの中だけにするか） | 3 つに分けた（NULL の行、コードの版だけ、テナントの作成の時の行）。NULL の行はテナントの行が外部キーで参照するか同じ一意の空間で照合するものだけ。`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を許可の一覧に足した | この文書の 3.1 節、security の 10.2 節、ADR-0054・ADR-0002 の注記、AGENTS.md |
-| 2 | `task_sla.breach_disputed_at` の列の追加 | 足す。計算し直しのジョブが `breach_disputed` の事象と同じトランザクションで入れる | sla-and-calendars の 6.2・8 節、reports の 8.2 節、ADR-0047 の注記 |
+| 2 | `sla_clock.breach_disputed_at` の列の追加 | 足す。計算し直しのジョブが `breach_disputed` の事象と同じトランザクションで入れる | sla-and-calendars の 6.2・8 節、reports の 8.2 節、ADR-0047 の注記 |
 | 3 | `timer` の取得の SQL がテナントをまたいで読む | `engine_scheduler` の関数 `claim_due_timers` に置き換え、識別子だけを返す | workflow-engine の 5.3・8.3 節、security の 10.4 節、ADR-0004・0015・0018 の注記 |
 | 4 | 受信のメールの経路と、解決できない受け手のバウンス | infrastructure の形（mail-ingress の共有の入口と `mail-router`）に揃え、バウンスしない（後方散乱を避ける） | notifications-and-email-ingest の 5.1 節、infrastructure の 2.3 節、ADR-0034・0035 の注記 |
 | 5 | `dict_table.searchable`・`dict_field.searchable` の列 | 辞書の列に足す | data-dictionary-and-tables の 3.2 節、search の 14 節 |
 | 6 | レポートの定義・翻訳・画面の配置をパッケージの対象に入れるか | 配置・`view_rule`・画面の規則・翻訳は入れる。レポートとダッシュボードは `packaged` の印の付いたものだけ | data-dictionary-and-tables の 10.1 節、reports の 3 節 |
 | 7 | 監査の保持の案（「（案）」と書いたもの） | security の 9 節の表に一本化した | security の 9 節、この文書の 4・5 節 |
 | 8 | 組み込みのロールに `problem_manager`・`major_incident_manager` があるか | 組み込みのロールに足す（どちらも `agent` を含む）。あわせて、`requester` がポータルから自分のインシデントを作る組み込みの規則を足す | access-control の 3.3 節、itsm-processes の 11 節 |
+| 9 | 組み込みのフロー `change_approval_policy` のテナントが変える値の置き場所（検証の工程で決めた） | テナントの設定の表 `change_approval_policy_rule` に持つ。フローの版には既定だけを持ち、段の数は変えさせない。保存の時の検査は DT-CHG-003 | itsm-processes の 8.5・8.5.1 節、この文書の 3.1・4.6 節、roadmap の `change-approval-policy-flows` |
 
 そのほかに統合で揃えたもの：
 

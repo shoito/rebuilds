@@ -11,7 +11,7 @@ date: 2026-09-28
 
 ナレッジの記事は、公開の後も直される。直している間も、利用者は公開中の版を読む。承認の要るナレッジベースでは、承認者が見た本文と公開される本文が同じでなければならない。記事の番号は、担当者と依頼者の会話で使う。
 
-本家は、公開済みの記事を編集すると新しい下書きの版を作り（チェックアウト）、版の番号を「主.副」で持ち、即時の公開と承認を経る公開の流れを持つ（KB0713200 とコミュニティの記事、2026-09-28 に確認。公式の本文は未検証）。本家の記事の本文は HTML である。
+本家は、公開済みの記事を編集すると新しい下書きの版を作り（チェックアウト）、版の番号を「主.副」で持ち、即時の公開と承認を経る公開の流れを持つ（チェックアウトで新しい版を作ること、「廃止の予定」「取り消し」の版の状態は [Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)、2 つの公開の流れと、却下で下書きに戻ることは [Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html)、2026-09-28 に確認。「主.副」の番号の増やし方は KB0713200 の題名とコミュニティの記事だけで、未検証）。本家の記事の本文は HTML である。
 
 本システムはテナントの HTML を描かない（[intent.md](../intent.md) の Non-goals）。承認は 1 回だけ反映する（[ADR-0016](0016-approvals.md)）。
 

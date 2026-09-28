@@ -20,15 +20,15 @@
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| 記事の状態 | 下書き、レビュー、公開、廃止。版は「廃止の予定」「取り消し」の状態も持つ | 検索の結果の抜粋と二次の資料。公式の本文は未検証 |
-| 公開の流れ | 即時の公開と、ナレッジベースの管理者の承認を経る公開の 2 つの既定の流れがある。却下されると下書きに戻る | コミュニティの記事（[Knowledge - Approval Publish workflow](https://www.servicenow.com/community/developer-forum/knowledge-approval-publish-workflow-articles-gets-stuck-in-draft/m-p/2467884)）。未検証 |
-| 版 | 版の番号は「主.副」。公開前の編集は副（0.01 ずつ）、公開で主の番号が上がる。公開済みの記事を編集すると、新しい下書きの版ができる（チェックアウト） | コミュニティの記事と KB の抜粋（[Versioning in Knowledge Management – FAQ KB0713200](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0713200)）。公式の本文（[Article versioning](https://www.servicenow.com/docs/bundle/yokohama-servicenow-platform/page/product/knowledge-management/concept/article-versioning.html)）は検索の結果で存在だけ確認。未検証 |
-| 評価とフィードバック | 「役に立ったか（はい・いいえ）」と 1〜5 の星。旗（要見直し）は理由のコメントが必須で、持ち主のグループへのフィードバックのタスクになる。役に立たない・低い星でタスクを作る設定がある | コミュニティの記事（[Knowledge Feedback Tasks](https://www.servicenow.com/community/developer-forum/knowledge-feedback-tasks-are-created-when-article-is-flagged-or/m-p/2618219) など）。未検証 |
-| 既知のエラーの記事 | 問題の原因と回避策から、1 回の操作で既知のエラーの記事を作る | 検索の結果の抜粋（[Problem Management data sheet](https://www.servicenow.com/content/dam/servicenow-assets/public/en-us/doc-type/resource-center/data-sheet/problem-management-data-sheet.pdf)）。本文は未検証 |
-| 自己解決の計測 | ポータルの報告のフォームで、入力に合う記事を示し、記事の閲覧・クリックを計測の表に残す | [KB0712999](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0712999)（検索の結果の抜粋）。未検証 |
+| 記事の状態 | 下書き、レビュー、公開、廃止。版は「廃止の予定」「取り消し」の状態も持つ | [Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)、[Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html) |
+| 公開の流れ | 即時の公開と、ナレッジベースの管理者の承認を経る公開の 2 つの既定の流れがある（廃止も即時と承認の 2 つ）。公開の承認が却下されると、流れが取り消され、記事は下書きのまま残る | [Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html) |
+| 版 | 版の番号は「主.副」。公開前の編集は副（0.01 ずつ）、公開で主の番号が上がる。公開済みの記事を編集すると、新しい下書きの版ができる（チェックアウト） | コミュニティの記事と KB の抜粋（[Versioning in Knowledge Management – FAQ KB0713200](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0713200)）。チェックアウトで新しい版を作ることは公式の本文（[Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)）で確認。「主.副」の増やし方は未検証（本家の振る舞いで、設計の前提ではない） |
+| 評価とフィードバック | 「役に立ったか（はい・いいえ）」と 1〜5 の星。旗では変更の提案を書く。旗、「いいえ」、しきい値以下の星からフィードバックのタスクを作れ、否定の評価に理由を必須にする設定がある | [Provide feedback on knowledge articles](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeFeedback.html)、[Enable actionable knowledge feedback](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/knowledge-management/task/configure-act-know-feedback-properties.html)。タスクの割り当ての先はコミュニティの記事（[Knowledge Feedback Tasks](https://www.servicenow.com/community/developer-forum/knowledge-feedback-tasks-are-created-when-article-is-flagged-or/m-p/2618219)）だけで未検証 |
+| 既知のエラーの記事 | 問題の画面の関連のリンクから、1 回の操作で既知のエラーの記事を作り、レビューと承認に送る | [Create a known error article](https://www.servicenow.com/docs/r/it-service-management/problem-management/create-known-error-from-problem.html) |
+| 自己解決の計測 | ポータルの報告のフォームで、入力に合う記事を示し、記事の閲覧・クリックを計測の表に残す | [KB0712999](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0712999)（検索の結果の抜粋）。未検証（本家の振る舞いで、設計の前提ではない） |
 
 - 本家の版の番号の形（主.副）は採らない（3.2 節）。本家のテーブルの名前、状態の値は写さない。
-- ITIL 4 のナレッジ管理のプラクティスの原典は確かめていない（未検証）。この文書の業務の流れは実務の一般的な形である。
+- ITIL 4 のナレッジ管理のプラクティスの原典（PeopleCert の会員向けのプラクティスガイド）は確かめていない（未検証）。この文書の業務の流れは実務の一般的な形で、原典を前提にしない。
 
 ## 3. 記事と版（[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md)）
 

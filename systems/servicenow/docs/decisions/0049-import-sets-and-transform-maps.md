@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、取り込みの API と CSV の取り込み（社員・組織、資産管理、本家からのデータの移行）を求める。CI の作成・更新は識別と調整の 1 つの入口だけを通す（[ADR-0005](0005-cmdb-identification-and-reconciliation.md)、[ADR-0037](0037-ci-ingest-entry-point-and-ambiguity-hold.md)）。人事の一括の取り込みは `acl_version` を取り込みの単位で 1 回だけ上げる（[access-control.md](../architecture/access-control.md) の 7 節）。
 
-本家は、取り込みの表に置き、変換の対応で対象の表に写す。一致のキー（coalesce）が既存のレコードと一致すれば更新、なければ作成する。複数のキーはすべて一致したときだけ更新する（[Import set coalesce](https://www.servicenow.com/docs/bundle/zurich-integrate-applications/page/administer/import-sets/concept/c_ImportSetCoalesce.html)、2026-09-28 に確認。本文は未検証で、解説の記事と検索の結果の抜粋で確認）。キーが複数のレコードに一致したときの本家の振る舞いは未検証。
+本家は、取り込みの表に置き、変換の対応で対象の表に写す。一致のキー（coalesce）が既存のレコードと一致すれば更新、なければ作成する。複数のキーはすべて一致したときだけ更新する（[Import set coalesce](https://www.servicenow.com/docs/bundle/zurich-integrate-applications/page/administer/import-sets/concept/c_ImportSetCoalesce.html)、2026-09-28 に確認。本文は未検証で、解説の記事と検索の結果の抜粋で確認）。キーが複数のレコードに一致したときの本家の振る舞いは未検証（本家の振る舞いで、この決定の前提ではない。本システムは推測で選ばず失敗にする）。
 
 ## Options
 

@@ -13,7 +13,7 @@ date: 2026-09-28
 
 影響の範囲は、変更のリスクと承認者（[itsm-processes.md](../architecture/itsm-processes.md) の 8.3・9.4 節）、メジャーインシデントの影響を受けるサービスの表示に使う。[intent.md](../intent.md) は、ACL で読めないレコードの値も件数も、どの出口からも漏らさないことを求める。
 
-CSDM 5 は、「アプリのサービス」を「サービスのインスタンス」、「技術のサービス」を「技術の管理のサービス」と呼び直した（二次の資料、2026-09-28 に確認。白書の本文は未検証）。
+CSDM 5 は、「アプリのサービス」を「サービスのインスタンス」、「技術のサービス」を「技術の管理のサービス」と呼び直した（表のラベルの変更で、表の名前は同じ。[CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)、2026-09-28 に確認）。
 
 ## Options
 

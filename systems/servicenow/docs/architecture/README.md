@@ -96,7 +96,7 @@
 | S2 | 3,000（1,000） | 1,000 万 | 30 万 | 200 万件/日 | 20,000 件/秒 | 5 億・2,000 万 | 共有のセルを増やす。大口の企業に専用のセルを出す。レポートの集計を分析の専用の置き場所へ。RTO を 15 分に縮める |
 | S3 | 3 万（1 万） | 1 億 | 300 万 | 2,000 万件/日 | 200,000 件/秒 | 50 億・1 億 | セルを東京・大阪の両方で受ける。海外のリージョン。関係のグラフの走査の置き場所を再評価（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)） |
 
-- 数値は本システムの想定。本家の実数は公開の資料で確かめられなかった（未検証）。
+- 数値は本システムの想定。本家の実数は公開の資料で確かめられなかった（未検証。本家の数値は設計の前提ではない）。
 - API のピークは、画面の操作、REST API、ポータルを合わせた要求の数。取り込み（メール・CMDB）は別に数える。
 - 動いている SLA の計時は、S1 でおよそ 200 万件、動いているフローの実行はおよそ 100 万件と見込む。タイマーの発火は、業務の開始の時刻（平日の 9 時）に集中する。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 9 節にある。
@@ -107,12 +107,12 @@
 | --- | --- | --- | --- |
 | NFR-001 | フォームとリストの速さ | フォームを開く（レコード＋関連リストの最初の 1 ページ）のサーバーの処理 p99 300ms 以内、画面の表示まで p95 1 秒以内。リストの 1 ページ（索引のある条件、50 行まで）のサーバーの処理 p99 500ms 以内 | ACL の判定を含む。カスタムのフィールドでの絞り込みは、索引の対象のフィールドに限る（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)） |
 | NFR-002 | 保存の速さ | レコードの保存（検証、ACL、同期のルール、履歴、outbox）のサーバーの処理 p99 700ms 以内 | 同期のルールの数と重さに上限を置く（workflow-engine の領域） |
-| NFR-003 | SLA の計時の正しさ | 期限の時刻は、同じ入力に対して参照の実装と秒の単位で一致する。警告と違反の発火は、期限の時刻から p99 60 秒以内。停止・一時停止の反映は、レコードの更新と同じトランザクション | 本家は違反の近さで分けた定期のジョブで計時を更新する（検索の結果の抜粋で確認。未検証）。本システムは期限の時刻をタイマーに登録する（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)） |
+| NFR-003 | SLA の計時の正しさ | 期限の時刻は、同じ入力に対して参照の実装と秒の単位で一致する。警告と違反の発火は、期限の時刻から p99 60 秒以内。停止・一時停止の反映は、レコードの更新と同じトランザクション | 本家は違反の近さで分けた 6 つの定期のジョブで計時を更新する（10 分以内に違反のものでも 1 分ごと。[Scheduled jobs for SLA](https://www.servicenow.com/docs/r/it-service-management/service-level-management/c_ScheduledJobsForSLA.html)、2026-09-28 に確認）。本システムは期限の時刻をタイマーに登録する（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)） |
 | NFR-004 | ワークフローの耐久性 | 受け付けたフローのステップ・承認・タイマーを失わない。各遷移はちょうど 1 回。プロセスや AZ の障害の後、止まった実行は 60 秒以内に再開する | 外への呼び出しは少なくとも 1 回で、冪等のキーを付ける |
 | NFR-005 | CMDB の調整の正しさ | 取り込みで作られた重複の CI 0 件。属性の最終の値は、到着の順序によらず優先度と鮮度の規則だけで決まる。取り込みは 1 セルで 1 秒 1,000 CI を処理する | [ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md) |
-| NFR-006 | 可用性 | 本番のテナントで月間 99.95%（画面・API・ポータル・メールの受信） | 本家の契約の可用性の値は未検証。サブプロダクション（開発・検証）のテナントは対象外 |
+| NFR-006 | 可用性 | 本番のテナントで月間 99.95%（画面・API・ポータル・メールの受信） | 本家の契約の可用性の値は未検証（契約の文書は公開されていない）。サブプロダクション（開発・検証）のテナントは対象外 |
 | NFR-007 | 耐久性と AZ の障害 | 成功を返した書き込みを失わない。RPO 0、RTO 5 分以内 | Aurora の Multi-AZ |
-| NFR-008 | リージョンの障害 | RPO 1 分以内、RTO 1 時間以内 | 本家の AHA は RPO 1 時間・RTO 2 時間を目標にしている（[Advanced High Availability Architecture](https://www.servicenow.com/lpwhp/high-availability-whitepaper.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。S2 で RTO 15 分以内 |
+| NFR-008 | リージョンの障害 | RPO 1 分以内、RTO 1 時間以内 | 本家の AHA は RPO 1 時間・RTO 2 時間を目標にしている（[Advanced High Availability Architecture](https://www.servicenow.com/lpwhp/high-availability-whitepaper.html)、2026-09-28 に検索の結果の抜粋で確認。白書の本文は取得できず（403）未検証で、本家の振る舞いとして参考にだけ使う）。S2 で RTO 15 分以内 |
 | NFR-009 | テナントの分離 | 他のテナントのデータが見える事象 0 件。専用のセルのテナントは、DB・キャッシュ・検索の索引・暗号の鍵を他のテナントと共有しない | [ADR-0002](../decisions/0002-tenancy-and-isolation.md) |
 | NFR-010 | アクセス制御と監査 | ACL で読めない値が、どの出口からも漏れた件数 0 件。監査の対象のテーブルの変更は、変更と同じトランザクションで履歴に残り、欠けが 0 件 | access-control、data-dictionary-and-tables の領域 |
 
@@ -138,7 +138,7 @@
 
 ## 5. 主な決定
 
-どれも `accepted`（2026-09-28）。状態の一覧は [decisions/README.md](../decisions/README.md)。題材の最初の設計の間なので、統合の工程で直した ADR には日付付きの注記を残した（0002・0003・0004・0005・0015・0018・0034・0035・0047・0054。[process.md](../../../../docs/process.md) の 9 節）。
+どれも `accepted`（2026-09-28）。状態の一覧は [decisions/README.md](../decisions/README.md)。題材の最初の設計の間なので、統合の工程で直した ADR には日付付きの注記を残した（0002・0003・0004・0005・0015・0018・0034・0035・0047・0054。[process.md](../../../../docs/process.md) の 9 節）。検証の工程（2026-09-28）で公式の文書と照らして直した ADR（0024・0033・0035）にも注記を残した。
 
 | ADR | 決定 |
 | --- | --- |
@@ -174,7 +174,7 @@
 | [0030](../decisions/0030-portal-requester-scope-and-record-producers.md) | 依頼者は自分が依頼した・自分のための・見守りに入った要求だけを見る。変数ごとに依頼者への公開を持ち、他人のための申請は品目の許可と関係があるときだけ許す。フォームからのレコードの作成も依頼者の主体で保存する |
 | [0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) | ナレッジの記事は記事の行と版の行で持ち、公開中と編集中の版をそれぞれ高々 1 つにする。レビューに出した本文を固定し、承認した本文だけを公開する。本文は制限付きの Markdown だけにする |
 | [0032](../decisions/0032-knowledge-feedback-and-deflection.md) | 評価は利用者・版ごとに 1 件にし、旗は理由を必須にして持ち主のタスクにまとめる。自己解決は仮名のセッションの事象から、明示と推定を分けて数える |
-| [0033](../decisions/0033-notification-rules-and-outbound-email.md) | 通知は Notifier で受け手ごとに作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込み、送るメールには自前の `Message-ID` と推測できない参照の印を付ける |
+| [0033](../decisions/0033-notification-rules-and-outbound-email.md) | 通知は Notifier で受け手ごとに作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込み、送るメールには推測できない参照の印を付け、返信は印と SES が付けた `Message-ID` で紐付ける |
 | [0034](../decisions/0034-inbound-email-threading-and-sender-trust.md) | 受信は共有の入口（SES → S3 → SQS → mail-router）からセルの Ingest へ送り、SES の ID で冪等にし、転送 → ヘッダー → 参照の印 → 件名の番号（関係者だけ）の順で紐付ける。差出人は認証の結果で信頼の段階を決め、返信の追記は差出人の主体の ACL を通す |
 | [0035](../decisions/0035-mail-loop-prevention-and-japanese-decoding.md) | 自動のメールはヘッダーで見分けて自動の応答を返さず、不在の返信は追記しない。流量の上限を最後の守りにする。文字コードは WHATWG の対応で復号し、ラベルのない 8 ビットは UTF-8 → Shift_JIS → EUC-JP の順に試し、送るメールは UTF-8 だけにする |
 | [0036](../decisions/0036-ci-classes-and-identification-rules.md) | CI のクラスは組み込みの階層にテナントが子を足す形で持ち、識別の規則は優先度付きの識別の項目の一覧にする。複数の値の属性は値ごとに、取り込み元の固有のキーは最も優先の項目にし、クラスの違う一致でもクラスを変えない |
@@ -217,7 +217,7 @@
 - **テナントの分離の破れ**：RLS のコンテキストの漏れ、NULL の行の誤用、テナントをまたぐロール、検索の `tenant_id` の抜け、ルーター・メールの振り分けの取り違え。NULL の行の許可の一覧と識別子だけを返す関数（[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md)）、セルの App の解決し直し（421。[ADR-0055](../decisions/0055-accounts-cells-and-edge-router.md)）、検索の DB での確かめ直しで二重に守る。
 - **「1 回だけ」の破れ**：承認の二重の反映、遷移の欠落、タイマーの喪失、承認なしの実施。同じトランザクションでの遷移と版の条件（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../decisions/0015-flow-execution-and-timers.md)、[ADR-0016](../decisions/0016-approvals.md)）、障害注入の CI（[ADR-0062](../decisions/0062-spec-driven-ci-fault-injection-and-leak-suite.md)）、本番の突き合わせで抑える。
 - **SLA の計時の誤り**：カレンダー・祝日・夏時間・日付をまたぐ営業時間の組み合わせ、計算し直し。純粋な関数と参照の実装との比較（[ADR-0019](../decisions/0019-business-calendar-and-pure-time-functions.md)）、違反の事実を取り消さない規則（[ADR-0021](../decisions/0021-sla-definitions-and-timers.md)）で抑える。
-- **タイマーの集中**：平日 9 時に SLA の警告・違反と定期のトリガーが一斉に来る。優先度とテナントの取り分、ばらつき、予定の台数の拡大（[ADR-0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md)）で受ける。見積もりは未検証で、E4・E12 の負荷試験で置き換える。
+- **タイマーの集中**：平日 9 時に SLA の警告・違反と定期のトリガーが一斉に来る。優先度とテナントの取り分、ばらつき、予定の台数の拡大（[ADR-0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md)）で受ける。見積もりは未検証で、E4 `timer-burst-generator` と E12 `timer-burst-load-test` の負荷試験で置き換える。
 - **CMDB の識別の誤り**：弱い規則は重複を、強すぎる・誤った値は誤った統合を生む。誤った統合は戻す操作が MVP にない。あいまいなら止め（[ADR-0037](../decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md)）、統合は人だけにする。識別は到着の順序で変わりうる（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md) の注記）ので、重複は日次の検出で拾う。
 - **関係のグラフの走査**：深い・広いグラフで遅くなる。深さ 6・節 10,000・2 秒で打ち切る（[ADR-0039](../decisions/0039-ci-relations-impact-traversal-and-service-model.md)）。E10 で最大のテナントの規模で計測する。
 - **メタデータ駆動の互換と性能**：新しいコードが古いメタデータを読めないと、ACL の拒否や既定の配置になる。リリースの前の全テナントのコンパイルの検査（[ADR-0064](../decisions/0064-migrations-and-metadata-compatibility-check.md)）で防ぐ。カスタムのフィールドの絞り込み・集計は索引の対象に限る（[ADR-0007](../decisions/0007-physical-layout-and-extension-index.md)）。
@@ -238,7 +238,7 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **メールの受信**：infrastructure の共有の入口（mail-ingress）と `mail-router` でセルへ振り分ける。解決できない受け手はバウンスしない（後方散乱を避ける）（[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 5.1 節、ADR-0034・0035 の注記）。
 - **ルーター**：ADR-0002 のルーターは、CloudFront Functions と KeyValueStore に細かくした（ADR-0002 の注記、ADR-0055）。
 - **`ext_index`**：`value_ref` を持ち、参照のフィールドを必ず写す（ADR-0003 の注記、ADR-0007）。
-- **SLA**：`task_sla.breach_disputed_at` を足した（[sla-and-calendars.md](sla-and-calendars.md) の 6.2 節、ADR-0047 の注記）。一時停止の既定は [itsm-processes.md](itsm-processes.md) の 4.4 節で決めた形（SLA は依頼者の回答待ちだけ、OLA はベンダー待ちでも止める）を、sla-and-calendars に写した。
+- **SLA**：`sla_clock.breach_disputed_at` を足した（[sla-and-calendars.md](sla-and-calendars.md) の 6.2 節、ADR-0047 の注記）。一時停止の既定は [itsm-processes.md](itsm-processes.md) の 4.4 節で決めた形（SLA は依頼者の回答待ちだけ、OLA はベンダー待ちでも止める）を、sla-and-calendars に写した。
 - **ロールと ACL**：組み込みのロールに `major_incident_manager`・`problem_manager` を足し、`requester` がポータルから自分のインシデントを作る組み込みの規則を足した（[access-control.md](access-control.md) の 3.3 節）。
 - **代理**：`delegation.scope` に `requests` を足した（[workflow-engine.md](workflow-engine.md) の 7.1 節）。
 - **辞書**：`searchable` の列を足した。CMDB の `multi` の属性は、CMDB の入口だけの辞書の型の例外とした。CI のクラスの付け替えは持ち越し（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 3.2・3.3 節）。
@@ -247,6 +247,9 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **保持**：各領域の「（案）」を [security.md](security.md) の 9 節の表に一本化した。
 - **Epic と Story**：Story の Epic の食い違いを揃えた（`cmdb-ingest-api` は E10、`business-time-wait` は E5、`incident-default-slas` は E6、`known-error-articles`・`catalog-form-kb-suggestions`・`catalog-search` は E9、`opensearch-domain-per-cell` は E1、タイマーの山の負荷試験は E4 の `timer-burst-generator` と E12 の `timer-burst-load-test`）。当番の呼び出しは E5 でメールの経路から始め、プッシュは E8 の `web-push-and-pwa` の後に有効にする（[roadmap.md](../roadmap.md)）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節、保持は [security.md](security.md) の 9 節、上限は各領域の文書（フローは [workflow-engine.md](workflow-engine.md) の 8.1 節、API のレート制限は [api-and-integrations.md](api-and-integrations.md) の 7.1 節）、負荷の見積もりは [capacity.md](capacity.md)。
+- **本家の内部の名前の置き換え**（2026-09-28、検証の工程の後）：AGENTS.md の「内部の名前を写さない」に従い、本家の内部の名前と同じだったフィールド・表・値を、全文書・ADR・決定表・data-model で置き換えた。`caller_id` → `requester_id`（参照のたどりは `requester`。`caller_location` → `requester_location`、保留の理由 `awaiting_caller` → `awaiting_requester`、`external_caller_email` → `external_requester_email`）、`short_description` → `title`、`close_code` → `resolution_code`・`close_notes` → `resolution_notes`（インシデントと変更で同じ列を使う。選択肢はクラスごと）、`watch_list` → `watchers`、`cmdb_ci_id` → `ci_id`（たどりは `ci`）、`task_sla` → `sla_clock`・`task_sla_event` → `sla_clock_event`（Story `task-sla-evaluation-in-save` → `sla-clock-evaluation-in-save`）。`assignment_group`・`opened_by`・`kb_category` のような、どの ITSM の製品も使う一般の語は残した。出典の URL と本家の説明の中の名前は変えていない。
+- **ITIL の版**：S1 は ITIL 4 の用語のままにする。ITIL（Version 5）は、安定した後、S2 の前に見直す（PM が決めた。[intent.md](../intent.md)）。
+- **変更の承認の方針の期限の既定**：`change_approval_policy_rule.due_after` の既定（通常 3 日、緊急 4 時間）を承認した（[itsm-processes.md](itsm-processes.md) の 8.5.1 節）。
 - 領域ごとの決定は、各文書の「決定（2026-09-28、既定案）」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -262,9 +265,9 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 | レポートの S2 の置き場所（別の Aurora か Redshift か） | E11・E12 の計測。S2 の前（[ADR-0045](../decisions/0045-report-execution-on-reader-and-daily-facts.md)） |
 | 契約の SLA の報告で厳格と調整のどちらを使うか | E11 で PM（[ADR-0047](../decisions/0047-sla-attainment-and-breach-disputed.md)） |
 | 選べる変更の期間（60 日）と予告の仕方 | E12 の前に PM（[ADR-0063](../decisions/0063-flags-and-staged-release-per-cell.md)） |
-| KeyValueStore・配信のオリジン・SES の受信の規則の上限 | E1（[infrastructure.md](infrastructure.md) の 12 節） |
+| KeyValueStore の書き込みがエッジに届くまでの時間（上限の値は 2026-09-28 に確かめた。[infrastructure.md](infrastructure.md) の 3.1 節） | E1 `edge-router-kvs` で計測（[infrastructure.md](infrastructure.md) の 12 節） |
 | CI のクラスの付け替え、統合を戻す操作 | E10 の利用者の調査と運用の後（[cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 14 節） |
-| 本家の既定の値で未確認のもの | 各領域の文書の 2 節。確かめられたら直す（設計は本システムの値で進める） |
+| 本家の既定の値で確かめられなかったもの | 各領域の文書の 2 節に「未検証」と、設計の前提でないことを書いた（2026-09-28 の検証の工程）。確かめられたら直す（設計は本システムの値で進める） |
 
 ## 7. 領域の文書
 

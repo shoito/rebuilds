@@ -11,7 +11,7 @@ date: 2026-09-28
 
 社員（`requester` のロールだけの利用者）は、ポータルで申請し、自分の要求の状況を見る。担当者の作業メモや、担当者だけが使う変数（払い出した機器の管理の番号など）は、依頼者に見せたくない。秘書やサービスデスクが、他人のために申請することもある。インシデントの報告のフォームは、要求を作らずにインシデントを作る。
 
-[access-control.md](../architecture/access-control.md) は、ポータルの自分のチケットの出口を、リストと同じ判定で扱い、ポータル用の抜け道を作らないと決めた（6.2 節の 16 行）。本家の「利用できる人の条件」の意味は、公式の本文で確かめられなかった（未検証）。
+[access-control.md](../architecture/access-control.md) は、ポータルの自分のチケットの出口を、リストと同じ判定で扱い、ポータル用の抜け道を作らないと決めた（6.2 節の 16 行）。本家の「利用できる人の条件」は、品目・カテゴリに「利用できる人」と「利用できない人」を付け、「利用できない人」が優先する（[Apply user criteria to items and categories](https://www.servicenow.com/docs/bundle/zurich-servicenow-platform/page/product/service-catalog-management/task/t_AppUserCritItemsCat.html)、2026-09-28 に確認）。
 
 ## Options
 

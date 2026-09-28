@@ -143,7 +143,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `flow-fault-injection-suite` | 障害の点と、PR・夜間の CI への組み込み |
 | `timer-lag-sli` | コミットの時刻での遅れ、期限を過ぎたタイマーの毎分の数え、止まった実行の監視 |
 | `timer-burst-generator` | タイマーの山の生成の道具と、仮の構成での負荷試験 |
-| `schedule-trigger-jitter` | 定期のトリガー・日次のジョブの 0〜5 分のばらつき |
+| `schedule-trigger-jitter` | 定期のトリガー・日次のジョブの 0〜5 分のばらつき（[ADR-0061](decisions/0061-load-model-cell-sizing-and-timer-bursts.md)） |
 | `flow-admin-ui` | フローの編集・公開・実行の一覧と詳細・一括の取り消し |
 
 ### E5 SLA・割り当て・オンコール
@@ -158,7 +158,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `tenant-holiday-sets` | テナントの祝日の集合 |
 | `holiday-coverage-monitor` | 収録の範囲の監視 |
 | `sla-definition-model` | SLA の定義と版 |
-| `task-sla-evaluation-in-save` | 保存の時の評価、DT-SLA-001（PROP-SLA-009） |
+| `sla-clock-evaluation-in-save` | 保存の時の評価、DT-SLA-001（PROP-SLA-009） |
 | `sla-retroactive-pause` | さかのぼりの一時停止 |
 | `sla-timers-and-notifications` | 警告と違反のタイマー、DT-SLA-002 |
 | `sla-recalculation-job` | 計算し直し、`breach_disputed` と `breach_disputed_at`（PROP-SLA-010） |
@@ -204,7 +204,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `mail-loop-prevention` | ループの防止、DT-MAIL-004（PROP-MAIL-002） |
 | `japanese-mime-decoding` | 文字コードの復号、DT-MAIL-005（PROP-MAIL-003） |
 | `inbound-quarantine-ui` | 保留の一覧と処理の画面 |
-| `email-ingest-sli` | メールの取り込みの SLI、メールの合成監視、ループの兆し |
+| `email-ingest-sli` | メールの取り込みの SLI、メールの合成監視、ループの兆し（[observability.md](architecture/observability.md) の 3・7.2 節） |
 
 ### E7 変更
 
@@ -215,7 +215,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `change-models` | 変更の種類と状態、DT-CHG-001（PROP-CHG-001・002）（法務：L4） |
 | `standard-change-templates` | 標準の変更の雛形 |
 | `change-risk-assessment` | リスクの評価、DT-RISK-001 |
-| `change-approval-policy-flows` | 承認の方針、DT-CHG-002（組み込みのフロー `change_approval_policy`）（法務：L4） |
+| `change-approval-policy-flows` | 承認の方針、DT-CHG-002（組み込みのフロー `change_approval_policy`）、テナントの設定の表 `change_approval_policy_rule` と DT-CHG-003（[itsm-processes.md](architecture/itsm-processes.md) の 8.5.1 節）（法務：L4） |
 | `cab-meetings` | CAB の会議 |
 | `change-windows-and-freeze` | 禁止期間・保守の時間帯・凍結期間 |
 | `change-conflict-detection` | 衝突の関数、DT-CONF-001（PROP-CONF-001・002） |
@@ -245,7 +245,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `portal-catalog-ui` | カタログと申請の画面 |
 | `portal-approvals-mobile` | スマートフォンでの 1 回の操作の承認 |
 | `web-push-and-pwa` | Web Push、購読、当番の端末のセッション。E5 の呼び出しのプッシュの経路を有効にする |
-| `portal-rum` | RUM の送信（ポータルの LCP） |
+| `portal-rum` | RUM の送信（ポータルの LCP。[portal-and-ui.md](architecture/portal-and-ui.md)、[observability.md](architecture/observability.md) の 3 節） |
 
 ### E9 ナレッジと検索
 
@@ -361,7 +361,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `sms-voice-ack-adr` | SMS・音声の受け付けの本人性を決める ADR（法務：L8） |
+| `sms-voice-ack-adr` | SMS・音声の受け付けの本人性を決める ADR（[assignment-and-on-call.md](architecture/assignment-and-on-call.md) の 6.5 節。法務：L8） |
 | `pager-sms-voice` | `PagerChannel` の `sms`・`voice` の実装（法務：L8） |
 
 ### E14 ディスカバリーとサービスマッピング（MVP の後）
@@ -370,7 +370,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `discovery-agent-adr` | 顧客の網の中で動く部品の配布・更新・セキュリティの ADR |
+| `discovery-agent-adr` | 顧客の網の中で動く部品の配布・更新・セキュリティの ADR（[cmdb-and-reconciliation.md](architecture/cmdb-and-reconciliation.md) の 1 節） |
 | `discovery-source` | ディスカバリーを入口の取り込み元 `discovery` として足し、優先度の既定を決める |
 | `network-adapter-identification` | アダプターの表の識別が要るなら、別の ADR で足す（[ADR-0036](decisions/0036-ci-classes-and-identification-rules.md)） |
 
@@ -380,9 +380,9 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `migration-extract-tool` | 本家のインスタンスからの取り出し（法務：L7） |
-| `migration-transform-maps` | 取り込みの変換の対応の雛形 |
-| `kb-html-to-markdown` | HTML の記事の変換 |
+| `migration-extract-tool` | 本家のインスタンスからの取り出し（[intent.md](intent.md) の L7。法務：L7） |
+| `migration-transform-maps` | 取り込みの変換の対応の雛形（[api-and-integrations.md](architecture/api-and-integrations.md) の 5 節） |
+| `kb-html-to-markdown` | HTML の記事の変換（[knowledge.md](architecture/knowledge.md) の 3.5 節） |
 
 ## エージェントに任せないこと
 

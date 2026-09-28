@@ -94,7 +94,7 @@
 
 - 本家の実装（プラットフォームのコード、スクリプトの API、アプリの定義）を使わない。本家のスクリプトの API（サーバーのレコードの操作の API、クライアントのフォームの API）との互換は目標にしない（[リポジトリ共通の ADR-0007](../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 - 本家の名前は識別子に使わない。ドメインは `<tenant>.<brand>.<domain>`、ヘッダーは `<Brand>-Tenant` の形で書く（[リポジトリ共通の ADR-0006](../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
-- 業務の流れは ITIL 4 のプラクティス（インシデント管理、問題管理、変更の実現、サービス要求管理、サービス構成管理、サービスレベル管理、ナレッジ管理）に沿う。ITIL 4 は 34 のプラクティスを持ち、うち 17 がサービス管理のプラクティスである（[ITIL 4 Management Practices Explained](https://itsm.tools/34-itil-4-management-practices/)、2026-09-28 に確認。PeopleCert の原典は未確認のため未検証）。
+- 業務の流れは ITIL 4 のプラクティス（インシデント管理、問題管理、変更の実現、サービス要求管理、サービス構成管理、サービスレベル管理、ナレッジ管理）に沿う。ITIL 4 は 34 のプラクティスを持つ（[ITIL 4 Management Practices 2023](https://www.peoplecert.org/news-and-announcements/2023/itil-4-management-practices-2023)、PeopleCert、2026-09-28 に確認）。うち 17 がサービス管理のプラクティスとする分け方は二次の資料（[ITIL 4 Management Practices Explained](https://itsm.tools/34-itil-4-management-practices/)）による（PeopleCert の原典では未検証）。PeopleCert は 2026 年に ITIL（Version 5）の認定を始めた（[ITIL Foundation (Version 5)](https://www.peoplecert.org/browse-certifications/it-governance-and-service-management/ITIL-1/itil-5-foundation-version-50-4154)、2026-09-28 に確認）。この題材は S1 で ITIL 4 の用語を使う（下の「選定・計測で決めるもの」。PM が決めた）。
 - 実行基盤と技術は、rebuilds の他の題材の決定（AWS 東京・大阪、TypeScript、Terraform、OpenTelemetry）を引き継ぐ（[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - テナントの分離は、共有の基盤を既定にし、大口の企業には専用のセルを出す（[ADR-0002](decisions/0002-tenancy-and-isolation.md)）。
 - 日本の法令（個人情報保護法、電気通信事業法）と、顧客の内部統制（J-SOX）の要件への対応は、法務の確認を前提に設計する。
@@ -124,18 +124,19 @@
 | L3 | データの所在：「日本のリージョンのデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサーの扱い。CloudFront・WAF・GuardDuty などのグローバルなサービスの処理の場所、Web Push の配信の事業者（国外の可能性。本文に値は入れない）（領域から足した論点） | infrastructure、security、portal-and-ui、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E1 のリージョンの構成、E12 の契約の文書 |
 | L4 | 監査の履歴と記録の保持：変更の記録・承認・権限の変更の履歴を何年持つか（既定案 7 年）。J-SOX の証跡として顧客が求める期間と出力の形式（CSV・PDF）を、契約でどこまで約束するか。削除の請求との関係、テナントの削除のときの監査の履歴の扱い（領域から足した論点） | data-dictionary-and-tables、security、itsm-processes | E2 の監査の履歴、E7 の変更の承認 |
 | L5 | テナントとの契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知（Web Push の配信の事業者、ステータスのページの事業者を含む）、専用のセルの契約の条件、運用者のテナントのデータの参照の例外（インシデントで許可を待てないとき）の書き方、バックアップの 35 日の説明（領域から足した論点） | security、infrastructure、[ADR-0002](decisions/0002-tenancy-and-isolation.md) | E12 の GA の判定 |
-| L6 | 商標：「ITIL」は登録商標である（保有者は未検証）。製品の名前・画面・資料で ITIL の名前やプラクティスの名前をどこまで使えるか | portal-and-ui、knowledge | E6 の画面の文言の確定 |
+| L6 | 商標：「ITIL」は AXELOS Limited の登録商標である（[PeopleCert の Acknowledgements](https://www.peoplecert.org/acknowledgements)、2026-09-28 に確認）。製品の名前・画面・資料で ITIL の名前やプラクティスの名前をどこまで使えるか | portal-and-ui、knowledge | E6 の画面の文言の確定 |
 | L7 | 本家からの移行：本家のインスタンスから、顧客の許可の下で API でデータを取り出す移行の道具を提供してよいか（本家の利用規約との関係） | api-and-integrations | MVP の後の移行の Epic |
 | L8 | SMS・音声でのオンコールの呼び出し：国内の通信の事業者との契約、関係する法令 | assignment-and-on-call | MVP の後の SMS・音声の Epic（E13） |
-| L9 | 公的なデータの利用の条件：内閣府の祝日の CSV を取り込み、全テナントの SLA の計算に使い、原本を保存してよいか（政府標準利用規約が当たるか、出典の表示の要否）。取得の元の変更の知らせの受け方（2026-09-28 に sla-and-calendars の領域から足した） | sla-and-calendars、[ADR-0020](decisions/0020-japanese-holiday-data.md) | E5 の祝日の取り込み（`jp-holiday-import`） |
+| L9 | 公的なデータの利用の条件：内閣府の祝日の CSV を取り込み、全テナントの SLA の計算に使い、原本を保存してよいか（内閣府のサイトの利用規約は、権利の表記のないコンテンツに公共データ利用規約（第 1.0 版）を当てるとする。[内閣府ホームページ利用規約](https://www.cao.go.jp/notice/rule.html)、2026-09-28 に確認。当てはまるか、出典の表示の仕方）。取得の元の変更の知らせの受け方（2026-09-28 に sla-and-calendars の領域から足した） | sla-and-calendars、[ADR-0020](decisions/0020-japanese-holiday-data.md) | E5 の祝日の取り込み（`jp-holiday-import`） |
 
 ### 選定・計測で決めるもの（法務以外）
 
 - 専用のセルを出す条件（社員の数、料金、契約の最低の期間）：E12 の前に PM が決める（[ADR-0002](decisions/0002-tenancy-and-isolation.md)）。
 - 日本語の全文検索の解析器：search の領域で Sudachi を既定にした（[ADR-0043](decisions/0043-japanese-analyzer-and-index-layout.md)）。E9 の評価で kuromoji に負ければ置き換える。
-- 祝日のデータの取り込み：内閣府の CSV（1955 年から 2027 年までを収録。[国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認）を正本にする。翌々年の分は前年の 2 月に掲載される（sla-and-calendars の領域で確かめた）。CSV の利用の条件は法務の確認待ち（L9）。
-- 変更のリスクの評価に機械学習を使うか：MVP は質問票と規則だけにする。本家は規則・質問票・機械学習の予測を組み合わせている（[Change Management data sheet](https://www.servicenow.com/content/dam/servicenow-assets/public/en-us/doc-type/resource-center/data-sheet/change-management-data-sheet.pdf)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
-- 本家の既定の値（SLA の再計算の間隔、ACL の既定の規則、識別の規則の既定）で、公式の文書で確かめられないもの：各領域の文書で、本家の資料で確かめるか、未検証と書く。
+- 祝日のデータの取り込み：内閣府の CSV（1955 年から 2027 年までを収録。[国民の祝日について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認）を正本にする。翌々年の分は前年の 2 月に掲載される（sla-and-calendars の領域で確かめた）。CSV の利用の条件の当てはめは法務の確認待ち（L9）。
+- 変更のリスクの評価に機械学習を使うか：MVP は質問票と規則だけにする。本家は規則・質問票・機械学習の予測を組み合わせている（[Change Management data sheet](https://www.servicenow.com/content/dam/servicenow-assets/public/en-us/doc-type/resource-center/data-sheet/change-management-data-sheet.pdf)、2026-09-28 に検索の結果の抜粋で確認。本文は取得できず（403）未検証。規則の条件と質問票の組み合わせは [Risk assessment](https://www.servicenow.com/docs/r/it-service-management/change-management/c_RskAsmtCalc.html) で確認）。
+- 本家の既定の値（SLA の再計算の間隔、ACL の既定の規則、識別の規則の既定）で、公式の文書で確かめられないもの：各領域の文書で、本家の資料で確かめるか、未検証と書く（2026-09-28 の検証の工程で、SLA の更新の間隔と ACL の探す順は確かめた）。
+- 業務の用語の ITIL の版：**決定（PM、2026-09-28）**。S1 は ITIL 4 の用語のままにする。ITIL（Version 5）は、刊行物と認定が安定した後、S2 の前に見直す（L6 の商標の確認はこれと別に続ける）。
 
 ## 出典（2026-09-28 に確認）
 

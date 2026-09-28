@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、日本語の画面を最初から持つことを求める。日本の企業の中にも、英語を使う社員と海外の拠点がある。テナントは、テーブル・フィールド・選択肢・カタログの品目・通知のテンプレートを自分の言葉で作る。メタデータは `stable_key` を持ち、パッケージで移送する（[ADR-0010](0010-metadata-versions-and-config-packages.md)）。
 
-本家は、国際化のプラグインと言語ごとの翻訳のプラグインを持ち、翻訳した値をフィールドの種類ごとに別の表に持つ（コミュニティの記事 [ServiceNow Localization and Language Translation](https://www.servicenow.com/community/itsm-forum/servicenow-localization-and-language-translation/m-p/3455929)、2026-09-28 に確認。公式の本文は未検証）。
+本家は、国際化のプラグインと言語ごとの翻訳のプラグインを持ち、翻訳した値をフィールドの種類ごとに別の表に持つ（コミュニティの記事 [ServiceNow Localization and Language Translation](https://www.servicenow.com/community/itsm-forum/servicenow-localization-and-language-translation/m-p/3455929)、2026-09-28 に確認。公式の本文は未検証。本家の振る舞いで、この決定の前提ではない）。
 
 ## Options
 

@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、レコードの CRUD、取り込みの API、Webhook を MVP に含める。テナントはフィールドとテーブルを足す（[ADR-0003](0003-table-hierarchy-and-extensible-schema.md)）。REST API は ACL の出口の 1 つで、API のクライアントの主体で判定する（[access-control.md](../architecture/access-control.md) の 6.2 節の 12 行）。本家の API と互換にしない（[ADR-0001](0001-platform-and-stack.md)）。
 
-本家のテーブルの API は、符号化した問い合わせの文字列、件数の上限と開始の位置でのページ送り、表示の値の選択を持つ（[Table API](https://www.servicenow.com/docs/r/zurich/api-reference/rest-apis/c_TableAPI.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+本家のテーブルの API は、符号化した問い合わせの文字列、件数の上限と開始の位置でのページ送り、表示の値の選択を持つ（件数の上限の既定は 10,000、開始の位置の既定は 0。表示の値は `true`・`false`（既定）・`all`。[Table API](https://www.servicenow.com/docs/r/api-reference/rest-apis/c_TableAPI.html)、2026-09-28 に確認）。
 
 ## Options
 

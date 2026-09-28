@@ -6,7 +6,7 @@
 | --- | --- |
 | [0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md) | セルは S1 の負荷の半分（テナント 150、担当者 1.5 万、API のピーク 1,000 件/秒、動いているタイマー 約 400 万）を 1 つの Aurora の writer で受ける大きさにする。9 時のタイマーの山は、優先度（SLA を先）、定期のトリガーのばらつき、平日 8:50 の予定の台数の拡大で受け、優先度 2・3 の遅れは山の間 5 分まで許す |
 
-**ここの数値はすべて初期見積もりである。** 本家の実数は公開の資料で確かめられなかった（[architecture/README.md](README.md) の 2 節、未検証）。E4・E12 の負荷試験（k6 と、タイマーの山の専用の生成の道具）で確かめ、結果で置き換える。
+**ここの数値はすべて初期見積もりである。** 本家の実数は公開の資料で確かめられなかった（[architecture/README.md](README.md) の 2 節、未検証）。E4 `timer-burst-generator` と E12 の負荷試験（`timer-burst-load-test` ほか 5 節の試験。k6 と、タイマーの山の専用の生成の道具）で確かめ、結果で置き換える。AWS の仕様の値で確かめたものは、出典を書いた。
 
 ## 1. 負荷のモデル（S1）
 
@@ -75,7 +75,7 @@
 | `record_change` | 1 |
 | `ext_index` | 2 |
 | `journal_entry` | 0.5 |
-| `task_sla` の更新・`task_sla_event` | 1.5 |
+| `sla_clock` の更新・`sla_clock_event` | 1.5 |
 | `timer` の作成・削除 | 2 |
 | `flow_run`・`flow_step`・`flow_wait` | 1 |
 | outbox | 1 |
@@ -91,11 +91,11 @@
 | **合計** | | **約 9,700** |
 
 - 山の最初の 1 分の書き込みの主はタイマーの発火である。1 件のトランザクションは短い（行のロック、数行の書き込み、タイマーの削除）が、件数が多い。
-- `db.r8g.4xlarge`（16 vCPU、128 GiB）の writer で、山の最初の 1 分に CPU 70%、平常の 9〜10 時に 40% 以下を目標にする（未検証。E4 で計測）。超えるなら、(1) タイマーの取得の上限（1 回 100 件、同時のワーカー）で書き込みを平らにし、優先度 2・3 を後ろにずらす、(2) writer を `db.r8g.8xlarge` に上げる、(3) セルを足す、の順に考える。
+- `db.r8g.4xlarge`（16 vCPU、128 GiB）の writer で、山の最初の 1 分に CPU 70%、平常の 9〜10 時に 40% 以下を目標にする（未検証。E4 `timer-burst-generator`、E12 `timer-burst-load-test` で計測）。超えるなら、(1) タイマーの取得の上限（1 回 100 件、同時のワーカー）で書き込みを平らにし、優先度 2・3 を後ろにずらす、(2) writer を `db.r8g.8xlarge` に上げる、(3) セルを足す、の順に考える。
 
 ### 2.2 タイマーのワーカー（engine）
 
-- 1 件のトランザクションを DB の時間で 8ms と置く（未検証）。1 つの engine のタスクは同時に 8 本のトランザクションを持つ（接続 8）。1 タスクで 1 秒 約 1,000 件（DB の待ちを除く上限）。
+- 1 件のトランザクションを DB の時間で 8ms と置く（未検証。E4 `timer-burst-generator` で計測）。1 つの engine のタスクは同時に 8 本のトランザクションを持つ（接続 8）。1 タスクで 1 秒 約 1,000 件（DB の待ちを除く上限）。
 - 山の最初の 1 分の 1,667 件/秒は、4 タスクで理屈の上は受けられる。DB の CPU の上限が先に来るので、**engine は 6 タスク（ピーク）、最大 24** とする（[infrastructure.md](infrastructure.md) の 5 節）。
 - 優先度 0 の 333 件/秒は、取得の順（優先度、期限）で先に取られ、最初の 1 分の中で消化される。p99 60 秒（NFR-003）はこれで守る。
 - 優先度 2・3（フローのステップ、一括の処理の続き）は、山の間に最大で数分遅れうる。**山の間の優先度 2・3 の遅れは p99 5 分まで許す**（案。[observability.md](observability.md) の 3.1 節）。
@@ -118,11 +118,11 @@
 | レポート | 5（月初は 50） | reader B |
 | 毎分の突き合わせ | 小さい | reader A |
 
-- reader A は `db.r8g.4xlarge` で足りる見込み（未検証）。リストの問い合わせは索引の上の短いもの（NFR-001 の p99 500ms の条件）。
+- reader A は `db.r8g.4xlarge` で足りる見込み（未検証。E12 `task-table-scale-test` で計測）。リストの問い合わせは索引の上の短いもの（NFR-001 の p99 500ms の条件）。
 
 ### 2.5 DB の接続数
 
-規則は他の題材と同じ：**オートスケールの上限まで増えたときの writer の接続の合計を、`max_connections` の 50% 以下に保つ。** `db.r8g.4xlarge` の既定の `max_connections` は 5,000（Auth0 の capacity.md の 2.5 節の記載による。未検証）。
+規則は他の題材と同じ：**オートスケールの上限まで増えたときの writer の接続の合計を、`max_connections` の 50% 以下に保つ。** `db.r8g.4xlarge` の既定の `max_connections` は 5,000 である（既定は `LEAST({DBInstanceClassMemory/9531392}, 5000)` で、128 GiB では上限の 5,000 になる。[Performance and scaling for Amazon Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Managing.html)、2026-09-28 に確認）。
 
 | 利用者 | タスクあたりのプール（writer） | 最大タスク数 | 最大の接続数（writer） |
 | --- | --- | --- | --- |
@@ -145,7 +145,7 @@
 | `record_change`（1 年） | 約 1 KB | 5.8 億（保存 160 万/日＋フロー・ルール 80 万/日） | 約 600 GB。7 年で 約 4 TB |
 | `journal_entry`（1 年） | 約 1 KB | 1 億 | 約 100 GB |
 | `ci`＋`ci_source_state`＋`ci_identifier` | CI 1 件で約 10 KB | 5,000 万 | 約 500 GB |
-| `timer`、`task_sla`、`flow_run` | — | 約 1,000 万（動いているもの） | 約 20 GB |
+| `timer`、`sla_clock`、`flow_run` | — | 約 1,000 万（動いているもの） | 約 20 GB |
 | S3 の添付（1 年） | 平均 1 MB | 作成の 20% に添付 | 約 15 TB |
 | S3 のメールの原本（1 年保持） | 平均 100 KB | 5,500 万 | 約 5.5 TB |
 
@@ -168,12 +168,12 @@
 | メールの流量の窓 | 100 |
 | **合計** | **約 1 万** |
 
-- `cache.r7g.large` の 2 シャードで収まる見込み（1 ノードの処理量は未検証）。
+- `cache.r7g.large` の 2 シャードで収まる見込み（1 ノードの処理量は未検証。E12 `api-load-and-abuse-test` で計測）。
 
 ### 2.9 メール
 
 - 受信：1 セルで 9:00 の直後に 17 通/秒。ingest 2 タスクで足りる（1 通の処理を 100ms と置く）。
-- 送信：1 セルで 40 通/秒（9:00 の直後）。SES の送信の上限（アカウントごと、毎秒の通数）を、各セルのアカウントで 100 通/秒以上に上げる申請をする（既定の値は未検証）。テナントごとのバケット（毎秒 10 通、毎日 5 万通。[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 3.3 節）で、1 テナントの一斉の通知が他を待たせない。
+- 送信：1 セルで 40 通/秒（9:00 の直後）。SES の送信の上限（アカウントとリージョンごと、受け手の数で数える）は、サンドボックスでは 1 通/秒・1 日 200 通で、本番の利用では用途に応じて決まり、固定の既定の値はない（[Service quotas in Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/quotas.html)、2026-09-28 に確認）。各セルのアカウントで 100 通/秒以上を申請する（E12 `quota-increases`）。テナントごとのバケット（毎秒 10 通、毎日 5 万通。[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 3.3 節）で、1 テナントの一斉の通知が他を待たせない。
 
 ## 3. タイマーの山の扱い（[ADR-0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md)）
 
@@ -193,9 +193,9 @@
 | クォータ | 必要（1 セルのアカウント） | 備考 |
 | --- | --- | --- |
 | Fargate の vCPU（東京・大阪） | 東京 300、大阪 300（切り替えの後に東京の平常を受ける） | 大阪も同じ値にする（[infrastructure.md](infrastructure.md) の 6.5 節） |
-| SES の送信の毎秒の通数・1 日の通数 | 100 通/秒、100 万通/日 | 既定の値は未検証 |
+| SES の送信の毎秒の通数・1 日の通数 | 100 通/秒、100 万通/日 | 本番の利用の上限は用途に応じた申請で決まる（[Service quotas in Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/quotas.html)） |
 | OpenSearch のドメインのノード | 6（大阪を含む） | |
-| CloudFront の KeyValueStore の大きさ、配信のオリジンの数 | S1 は小さい | 上限は未検証（[infrastructure.md](infrastructure.md) の 3.1 節） |
+| CloudFront の KeyValueStore の大きさ、配信のオリジンの数 | S1 は小さい | ストア 5 MB（キー 512 バイト、値 1 KB）、配信のオリジン 100（引き上げ可）（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)。[infrastructure.md](infrastructure.md) の 3.1 節） |
 | SQS | 既定で足りる見込み | |
 
 ## 5. 負荷試験の計画

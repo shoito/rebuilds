@@ -11,7 +11,7 @@ date: 2026-09-28
 
 テナントの管理者は、利用者からの「見えない」「押せない」の問い合わせに答えるため、その利用者の画面を確かめたい。本家は成り代わりの機能を持ち、成り代わった相手と実際の人の両方を監査の表に残せる（[Enable impersonation tracking in audit logs](https://www.servicenow.com/docs/r/platform-security/enable-impersonation-tracking-audit-logs.html)、2026-09-28 に確認）。一方で、承認は J-SOX の証跡であり、他人が成り代わって答えてはいけない（[intent.md](../intent.md)）。
 
-日本の企業の多くは、Microsoft Entra ID などの IdP で SSO を求める。本家は複数の IdP（SAML 2.0・OIDC）と利用者の自動の作成を持つ（[SAML 2.0 configuration using Multi-Provider SSO](https://www.servicenow.com/docs/r/washingtondc/platform-security/authentication/t_CreateASAML2Upd1SSOConfigMultiSSO.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+日本の企業の多くは、Microsoft Entra ID などの IdP で SSO を求める。本家は、SAML 2.0・OIDC の IdP を最大 10 までログインの画面に並べ、SSO の時に利用者を作ってグループに入れられる（[Multi-Provider single sign-on (SSO)](https://www.servicenow.com/docs/r/zurich/platform-security/authentication/c_MultipleProviderSingleSignOn.html)、2026-09-28 に確認）。成り代わりには専用のロール（impersonator）が要る（[Impersonate a user](https://www.servicenow.com/docs/r/platform-administration/user-administration/t_ImpersonateAUserInUI16.html)、2026-09-28 に確認）。
 
 ## Options
 

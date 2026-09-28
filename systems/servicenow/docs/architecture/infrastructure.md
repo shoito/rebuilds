@@ -70,7 +70,7 @@ AWS のアカウントとネットワーク、セルの構成とルーター、�
    ─▶ セルの Ingest（[notifications-and-email-ingest.md] の 5 節の流れ）
 ```
 
-- SES の受信の規則は、受け手のアドレス・ドメインで選ぶ。テナントの受信のアドレスは同じドメイン（`in.<brand>.<domain>`）の下にあるので、受信の規則の段でセルのバケットを選ぶには、テナントごとに規則を持つことになる（受信の規則の数の上限は未検証）。そこで、共有の入口に置いてから、`mail-router` がセルへ振り分ける。
+- SES の受信の規則は、受け手のアドレス・ドメインで選ぶ。テナントの受信のアドレスは同じドメイン（`in.<brand>.<domain>`）の下にあるので、受信の規則の段でセルのバケットを選ぶには、テナントごとに規則を持つことになる（受信の規則は 1 つの規則の集合に 200 まで、1 つの規則の受け手は 500 まで、規則の集合はアカウントに 40 までで、どれも引き上げられない。[Service quotas in Amazon SES](https://docs.aws.amazon.com/ses/latest/dg/quotas.html)、2026-09-28 に確認）。S3 の 3 万テナントは規則に収まらない。そこで、共有の入口に置いてから、`mail-router` がセルへ振り分ける。
 - 一時のバケットには、全テナントの原本が数秒から数分だけ置かれる。読めるのは `mail-router` のロールだけで、中身を解析しない（封筒の受け手は SES の通知から読む）。
 - 専用のセルは、この共有の入口を通さず、専用の受信のサブドメインで受ける（4.1 節）。
 - notifications-and-email-ingest の 5.1 節と [ADR-0034](../decisions/0034-inbound-email-threading-and-sender-trust.md) は、統合でこの節の形に合わせた。
@@ -93,8 +93,8 @@ AWS のアカウントとネットワーク、セルの構成とルーター、�
 
 - CloudFront Functions は、KeyValueStore を読み（関数のランタイム 2.0 と `cf.kvs()`）、`updateRequestOrigin()`・`selectRequestOriginById()` で要求のオリジンを変えられる（[Helper methods for origin modification](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)、[Amazon CloudFront KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、2026-09-28 に確認）。
 - **ルーターの処理の経路に、同期の依存（制御の面の API）を置かない。** 対応表はエッジの KeyValueStore にあり、制御の面が落ちてもルーターは動く（[ADR-0002](../decisions/0002-tenancy-and-isolation.md) の「ルーターは対応表のキャッシュで、制御の面が落ちても動き続ける」を、エッジのキャッシュで満たす）。
-- KeyValueStore の大きさの上限と、書き込みがエッジに届くまでの時間は、公式の文書で確かめられなかった（未検証）。S1 は 300 テナント（キーは 1 件 100 バイト程度）で小さい。S3 の 3 万テナントで上限に近いかは E1 で確かめ、足りなければセルの群ごとに配信と KeyValueStore を分ける。
-- 1 つの配信に置けるオリジンの数の上限（未検証）が、セルの数の上限になる。S1・S2 は 1 つの配信、S3 はセルの群ごとに配信を分ける（[ADR-0058](../decisions/0058-terraform-layout-stages-and-cost.md) の段階の基準）。
+- KeyValueStore は 1 つのストアが 5 MB、キーが 512 バイト、値が 1 KB まで、1 つの関数に 1 つのストアである（[CloudFront quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)、2026-09-28 に確認）。S1 は 300 テナント（1 件 100 バイト程度）で小さい。S3 の 3 万テナントは約 3 MB で収まるが余裕が小さいので、S3 の前にセルの群ごとに配信と KeyValueStore を分ける。書き込みがエッジに届くまでの時間は公式の文書に数値がなく、未検証（E1 `edge-router-kvs` で計測し、下のテナントの移動の「数十秒」を直す）。
+- 1 つの配信に置けるオリジンは 100 まで（引き上げ可。同上）で、これがセルの数の上限になる。S1・S2 は 1 つの配信、S3 はセルの群ごとに配信を分ける（[ADR-0058](../decisions/0058-terraform-layout-stages-and-cost.md) の段階の基準）。
 - セルの App は、制御の面の台帳の写し（ホスト名 → テナント → セル）を、起動の時に全件読み、以後は制御の面の変更の事象（SNS）で更新する。事象を落としても、5 分ごとの全件の読み直しで追いつく。
 - テナントの移動（4 節）の切り替えの間は、古いセルが 421 を返し、画面と API の SDK は 1 回だけ送り直す（エッジの対応表が新しいセルを指すまでの数十秒）。
 
@@ -296,7 +296,7 @@ main へのマージ ─▶ ビルド ─▶ shared の ECR ─▶ dev ─▶ st
 
 ## 10. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。東京の単価は AWS の Price List API で 2026-09-28 に確認した値（オンデマンド）：Aurora PostgreSQL I/O-Optimized `db.r8g.4xlarge` 1 時間 3.464 USD、`db.r8g.2xlarge` 1.732 USD、OpenSearch `r7g.xlarge.search` 0.429 USD・`r7g.large.search` 0.214 USD・`m7g.large.search` 0.175 USD、gp3 1 GB 月 0.1464 USD、ElastiCache Valkey `cache.r7g.large` 0.2104 USD、Fargate ARM vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.json) ほか同じ形の AmazonES・AmazonElastiCache・AmazonECS の東京の価格表）。大阪も同じ単価と置いた（未検証）。SES・CloudFront・WAF・NAT・GuardDuty の単価は確かめていない（未検証）。
+**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。東京の単価は AWS の Price List API で 2026-09-28 に確認した値（オンデマンド）：Aurora PostgreSQL I/O-Optimized `db.r8g.4xlarge` 1 時間 3.464 USD、`db.r8g.2xlarge` 1.732 USD、OpenSearch `r7g.xlarge.search` 0.429 USD・`r7g.large.search` 0.214 USD・`m7g.large.search` 0.175 USD、gp3 1 GB 月 0.1464 USD、ElastiCache Valkey `cache.r7g.large` 0.2104 USD、Fargate ARM vCPU 1 時間 0.04045 USD・メモリー 1 GB 1 時間 0.00442 USD（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.json) ほか同じ形の AmazonES・AmazonElastiCache・AmazonECS の東京の価格表）。大阪の単価も同じ API で確かめ、東京とほぼ同じ（`db.r8g.4xlarge` 3.456 USD、`r7g.xlarge.search` 0.42894 USD、`cache.r7g.large` Valkey 0.2103 USD、gp3 0.1464 USD、Fargate ARM は同じ）なので、同じ単価と置いた。SES（東京）は送信 受け手 1 件 0.0001 USD、添付 1 GB 0.12 USD、受信 1 通 0.0001 USD ＋ 256 KB ごとに 0.00009 USD。GuardDuty の S3 のマルウェアの保護（東京）は、検査 1 GB 0.1185 USD（1 GB を超えた分）と、オブジェクト 1 件 0.000282 USD（どれも AmazonSES・AmazonGuardDuty の東京の価格表、2026-09-28 に確認）。CloudFront・WAF・NAT の単価は確かめていない（未検証。E12 `cost-baseline` で請求の実績に置き換える）。
 
 | 項目 | 月額（USD、概算） |
 | --- | --- |
@@ -342,8 +342,8 @@ main へのマージ ─▶ ビルド ─▶ shared の ECR ─▶ dev ─▶ st
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| KeyValueStore の上限と反映の時間、配信のオリジンの数の上限 | E1 で AWS の文書と試験で確かめる |
-| SES の受信の規則の数の上限と、受け手ごとの振り分けの代わりの形 | E1（mail-ingress の Story） |
+| KeyValueStore の書き込みがエッジに届くまでの時間（上限の値は 2026-09-28 に AWS の文書で確かめた。3.1 節） | E1 `edge-router-kvs` の試験で計測する |
+| SES の受信の規則の数の上限と、受け手ごとの振り分けの代わりの形 | 済み（2026-09-28。規則の集合に 200 までで引き上げられないので、2.3 節の共有の入口と `mail-router` の形にした） |
 | 1 セルのテナントの数の上限 | E12 の負荷試験 |
 | S3 のレプリケーションの時間の保証（RTC）を使うか | E12 の DR の訓練と費用 |
 | 専用のセルの顧客の管理する鍵 | S2 の前（[security.md](security.md)） |

@@ -162,9 +162,9 @@ CloudWatch Synthetics のカナリアを、大阪から東京の各セルへ実�
 
 | アラート | 条件 | 重さ | 手順 |
 | --- | --- | --- | --- |
-| 可用性の SLO の速いバーンレート（セル別） | 7.1 節 | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
-| 合成監視の連続失敗 | 2 回続けて失敗 | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
-| フォーム・リストの遅れ | フォームのサーバーの p99 が 300ms を 15 分超える、またはリストの p99 が 500ms を 15 分超える | チケット（1 時間で呼び出し） | [incident-response.md](../runbooks/incident-response.md) |
+| 可用性の SLO の速いバーンレート（セル別） | 7.1 節 | 呼び出し | `availability-burn.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
+| 合成監視の連続失敗 | 2 回続けて失敗 | 呼び出し | `availability-burn.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
+| フォーム・リストの遅れ | フォームのサーバーの p99 が 300ms を 15 分超える、またはリストの p99 が 500ms を 15 分超える | チケット（1 時間で呼び出し） | `form-list-latency.md`（E2）。それまでは [incident-response.md](../runbooks/incident-response.md) |
 | **タイマーの遅れ** | 優先度 0 の p99 が 60 秒を 5 分超える、または期限を 60 秒過ぎた優先度 0 のタイマーが 100 件を超える | 呼び出し（SEV2） | [incident-response.md](../runbooks/incident-response.md) の「タイマーの遅れ」（個別：`timer-lag.md`、`sla-breach-lag.md`） |
 | **期限を過ぎた未発火の違反** | 1 件以上が 5 分続く | 呼び出し（SEV2） | 同上 |
 | 止まった実行の回収 | 1 件（チケット）、10 件/時（呼び出し） | SEV3・SEV2 | `stuck-flow-runs.md`（E4） |
@@ -175,14 +175,14 @@ CloudWatch Synthetics のカナリアを、大阪から東京の各セルへ実�
 | ACL の規則のコンパイルの失敗 | 1 件（テーブルが拒否になる） | 呼び出し（SEV2） | `acl-compile-failure.md`（E3） |
 | **メールのループの疑い** | 流量の上限に当たった件数が、1 テナントで 10 分に 20 件を超える、または同じ差出人の保留が 1 時間に 50 件 | チケット（全体で 10 倍なら呼び出し） | [incident-response.md](../runbooks/incident-response.md) の「メールのループ」（個別：`mail-loop-detected.md`） |
 | メールの取り込みの遅れ・DLQ | 取り込みの遅れの p99 が 10 分、または DLQ が 1 件以上 | 呼び出し | `inbound-email-backlog.md`（E6） |
-| 送信の評判（バウンス・苦情の率） | SES のアカウントのバウンスの率 2%、苦情の率 0.05%（案。SES の停止の基準は未検証） | 呼び出し | `sending-reputation.md`（E6） |
+| 送信の評判（バウンス・苦情の率） | SES のアカウントのバウンスの率 2%、苦情の率 0.05%（案。SES はバウンス 5%・苦情 0.1% で審査、10%・0.5% で送信の停止がありうるとする（[Amazon SES Sending review process FAQs](https://docs.aws.amazon.com/ses/latest/dg/faqs-enforcement.html)、2026-09-28 に確認）ので、その半分の値で呼ぶ） | 呼び出し | `sending-reputation.md`（E6） |
 | **CMDB の統合の後の保留の急増** | 統合の後 24 時間に、統合の先の CI を候補に含む保留が 5 件 | チケット | [incident-response.md](../runbooks/incident-response.md) の「CMDB の誤った統合」（個別：`cmdb-wrong-merge.md`） |
 | 重複の CI の検出 | 1 件 | チケット | `cmdb-duplicate-detected.md`（E10） |
 | CI の保留の急増 | 平常の 5 倍 | チケット | `cmdb-hold-surge.md`（E10） |
 | 索引の遅れ | p99 30 秒を 15 分超える、または 5 分を超える | チケット（5 分超は呼び出し） | `search-index-lag.md`（E9） |
 | 検索のドメインの赤の状態 | クラスタの状態が赤 | 呼び出し | `opensearch-domain-degraded.md`（E9） |
 | Webhook の配達の滞留 | 最古の配達が 30 分を超える（受け手の失敗を除く） | チケット | `webhook-delivery-backlog.md`（E11） |
-| outbox の遅れ | 最古の行が 30 秒を超える | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
+| outbox の遅れ | 最古の行が 30 秒を超える | 呼び出し | `outbox-lag.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
 | レポートの reader の飽和 | reader B の CPU 90% が 15 分 | チケット | `report-reader-saturation.md`（E11） |
 | 当番の呼び出しの未達 | `page_attempt` の失敗が経路で 10% | 呼び出し | `paging-not-delivered.md`（E5） |
 | 祝日の取り込みの失敗、収録の残り 10 か月 | ジョブの失敗・残りの月数 | チケット | `holiday-import.md`（E5） |
@@ -190,8 +190,8 @@ CloudWatch Synthetics のカナリアを、大阪から東京の各セルへ実�
 | 大阪の待機の構成の異常 | 大阪の合成監視の失敗、plan の差分 | チケット（30 分で呼び出し） | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
 | デプロイ中の自動のロールバック、フラグのガード | [delivery.md](delivery.md) の 5・6 節 | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
 | ルーターの 421 の急増 | テナントの移動の外で 1 分に 10 件 | 呼び出し | `router-mapping-mismatch.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
-| 秘密・個人データの形のログの検出 | 走査で 1 件 | 呼び出し（SEV2） | [incident-response.md](../runbooks/incident-response.md) |
-| 重要なセキュリティの仕組みの失敗 | GuardDuty・CloudTrail・走査の Lambda・マルウェアの検査の停止 | 呼び出し | [incident-response.md](../runbooks/incident-response.md) |
+| 秘密・個人データの形のログの検出 | 走査で 1 件 | 呼び出し（SEV2） | `sensitive-data-in-logs.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
+| 重要なセキュリティの仕組みの失敗 | GuardDuty・CloudTrail・走査の Lambda・マルウェアの検査の停止 | 呼び出し | `security-control-disabled.md`（E1）。それまでは [incident-response.md](../runbooks/incident-response.md) |
 
 - 呼び出しのアラートは、SLO、正しさの約束（0 件の監視）、セキュリティの症状に限る。原因の側の指標（CPU、接続数）はチケットとダッシュボードにとどめる。
 - アラートの条件の値は案で、E12 の負荷試験と運用の最初の 3 か月で調整する。
@@ -256,6 +256,7 @@ CloudWatch Synthetics のカナリアを、大阪から東京の各セルへ実�
 
 - [incident-response.md](../runbooks/incident-response.md)：タイマーの遅れ、ACL の漏れの疑い、メールのループ、CMDB の誤った統合の場面を持つ。
 - [runbooks/README.md](../runbooks/README.md)：3.1 節の SLO と 7.2 節のアラートの一覧を正本として持つ（統合で作った）。
+- `availability-burn.md`・`outbox-lag.md`・`sensitive-data-in-logs.md`・`security-control-disabled.md`（E1）、`form-list-latency.md`（E2）：共通の進め方だけで受けていたアラートの専用の手順（2026-09-28 の見直しで計画に入れた）。
 
 ### data-model（索引への追加の提案）
 

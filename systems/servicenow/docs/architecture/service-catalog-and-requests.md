@@ -22,10 +22,10 @@
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
 | 変数の型 | 添付、区切り、チェックボックス、コンテナ、日付・日時・長さ、メール、HTML、IP アドレス、ラベル、リストの選択、参照の複数選択、参照の選択、カスタム、マスク、複数行の文字列、複数の選択肢、数値の尺度、参照、依頼の対象者、リッチテキストのラベル、選択、1 行の文字列、UI ページ、URL、幅広の 1 行の文字列、はい・いいえ | [Types of service catalog variables](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/service-catalog-management/reference/r_VariableTypes.html) |
-| 要求・要求の品目・実行のタスク | 1 つの要求は 1 つ以上の要求の品目を持ち、要求の品目はそれぞれのフローを持ち、フローの中で実行のタスクを作る。すべての要求の品目が閉じると要求が閉じる | コミュニティの記事で確認（[Request - Request Item - Task Why three?](https://www.servicenow.com/community/developer-forum/request-request-item-task-why-three/m-p/2116744) など）。公式の本文は未検証 |
-| 参照の絞り込み | 参照の変数の候補を、他の変数の値でスクリプトの条件により絞れる | コミュニティと二次の資料で確認。未検証 |
-| 利用できる人の条件 | 品目・カテゴリに「利用できる人」「利用できない人」の条件（ユーザーの条件）を付ける | 公式の本文で確かめられなかった（未検証） |
-| 自己解決の計測 | ポータルのフォームで、入力の内容に合うナレッジの記事を示し、記事を見て申請をやめたことを計測する | [KB0712999](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0712999)（検索の結果の抜粋）。未検証 |
+| 要求・要求の品目・実行のタスク | 1 つの要求は 1 つ以上の要求の品目を持ち、要求の品目はそれぞれのフローを持ち、フローの中で実行のタスクを作る。すべての要求の品目が閉じると要求が閉じる | コミュニティの記事で確認（[Request - Request Item - Task Why three?](https://www.servicenow.com/community/developer-forum/request-request-item-task-why-three/m-p/2116744) など）。公式の [Service Catalog request fulfillment](https://www.servicenow.com/docs/r/servicenow-platform/service-catalog/request-fulfillment.html) は、注文で要求ができ、実行の流れで承認・タスク・完了を定めるとだけ書く。3 段の閉じ方の細部は未検証（本家の振る舞いで、設計の前提ではない） |
+| 参照の絞り込み | 参照の変数の候補を、他の変数の値でスクリプトの条件により絞れる | コミュニティと二次の資料で確認。未検証（本家の振る舞いで、設計の前提ではない） |
+| 利用できる人の条件 | 品目・カテゴリに「利用できる人」「利用できない人」の条件（ユーザーの条件）を付ける。両方の一覧に入る人には「利用できない人」が勝つ | [Apply user criteria to items and categories](https://www.servicenow.com/docs/bundle/zurich-servicenow-platform/page/product/service-catalog-management/task/t_AppUserCritItemsCat.html) |
+| 自己解決の計測 | ポータルのフォームで、入力の内容に合うナレッジの記事を示し、記事を見て申請をやめたことを計測する | [KB0712999](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0712999)（検索の結果の抜粋）。未検証（本家の振る舞いで、設計の前提ではない） |
 
 - 本家のスクリプトの変数（UI ページ、カスタム）、HTML の変数は持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)、[intent.md](../intent.md) の Non-goals）。
 - 本家のテーブルの名前、変数の内部の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
@@ -50,7 +50,7 @@
 
 ```
 ItemDefinition {
-  name, short_description, description（Markdown の制限付き。HTML を受けない）, category_ids, icon
+  name, title, description（Markdown の制限付き。HTML を受けない）, category_ids, icon
   audience_id                         ← 利用できる人（6 節）
   allow_request_for_others: bool
   quantity: { enabled, max }          ← 既定は無効
@@ -222,7 +222,7 @@ DT-REQ-002（`requester` のロールだけの利用者が、要求・要求の�
 
 | # | 対象 | 条件 | 読める範囲 |
 | --- | --- | --- | --- |
-| 1 | `request`・`request_item` | `requested_by_id = me` または `requested_for_id = me` または `me ∈ watch_list` | 行と、共通の項目（番号、状態、`stage`、作成・更新の時刻、品目の名前） |
+| 1 | `request`・`request_item` | `requested_by_id = me` または `requested_for_id = me` または `me ∈ watchers` | 行と、共通の項目（番号、状態、`stage`、作成・更新の時刻、品目の名前） |
 | 2 | 同上の `answers` | 1 と同じ | `visible_to_requester = true` の変数だけ（フィールドの判定の中で変数ごとに絞る） |
 | 3 | 同上の作業メモ（`work_note`） | - | 読めない |
 | 4 | 同上のコメント（`comment`） | 1 と同じ | 読める・書ける |

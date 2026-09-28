@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、当番表（ローテーション）とエスカレーションを MVP に含め、オンコールの通知を MVP ではメールとアプリのプッシュに限るとした。SMS・音声は、通信の事業者との契約と法令の確認（L8）の後にする。
 
-本家の当番のエスカレーションは、応答がないと次の段へ進み、SMS・音声・メールで受け付けを求め、最後の受け手を持つ（[Escalations in On-Call Scheduling](https://www.servicenow.com/docs/r/it-service-management/on-call-scheduling/escalations-oncall.html)、2026-09-28 に確認。内部のモデルと既定の値は未検証）。
+本家の当番のエスカレーションは、応答がないと次の段へ進み、SMS・音声・メールで受け付けを求め、最後の受け手を持つ（[Escalations in On-Call Scheduling](https://www.servicenow.com/docs/r/it-service-management/on-call-scheduling/escalations-oncall.html)、2026-09-28 に確認。内部のモデルと、段の間の時間の既定の値は未検証。本家の振る舞いで、この決定の前提ではない）。
 
 要ることは次のとおり。
 

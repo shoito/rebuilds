@@ -17,7 +17,7 @@ CMDB は、サーバー・アプリ・ネットワーク機器・クラウドの
 - **データ源の規則**：ある取り込み元が、あるクラスの CI を作ってよいかを決める。
 - 取り込みのペイロードの中の重複をまとめる。時刻（最初・最後に見つけた時刻、取り込み元の時刻）で新しさを判断する。
 
-本家は CSDM で、ビジネスのサービス・アプリのサービス（CSDM 5 では「サービスのインスタンス」）・技術のサービスなどのモデルを定めている（[CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+本家は CSDM で、ビジネスのサービス・アプリのサービス（CSDM 5 では「サービスのインスタンス」）・技術のサービスなどのモデルを定めている（[CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)、2026-09-28 に確認）。
 
 誤りは 2 種類ある。
 

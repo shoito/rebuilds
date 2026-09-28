@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [ADR-0003](0003-table-hierarchy-and-extensible-schema.md) は、テーブルをクラスの継承の階層として辞書に持つと決めた。細部（辞書の置き場所、型の集合、子のクラスでの変更の範囲、名前の扱い）は data-dictionary-and-tables の領域に残した。
 
-本家は、子のテーブルだけで継承したフィールドの既定値・読み取り専用・必須・参照の絞り込みを変える「上書き」を持つ（[Define a dictionary override](https://docs.servicenow.com/en-US/bundle/vancouver-platform-administration/page/administer/data-dictionary-tables/task/t_DefineADictionaryOverride.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+本家は、子のテーブルだけで継承したフィールドの既定値・読み取り専用・必須・参照の絞り込みを変える「上書き」を持つ（[Define a dictionary override](https://www.servicenow.com/docs/bundle/zurich-platform-administration/page/administer/data-dictionary-tables/task/t_DefineADictionaryOverride.html)、2026-09-28 に確認。ほかに計算・表示の値・依存のフィールド・辞書の属性も上書きできる）。
 
 決めることは次のとおり。
 

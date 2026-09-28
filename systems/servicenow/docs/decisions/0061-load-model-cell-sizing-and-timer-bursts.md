@@ -11,7 +11,7 @@ date: 2026-09-28
 
 S1 は共有のセル 2 つで、セルごとに Aurora の writer 1 台＋reader 2 台（[architecture/README.md](../architecture/README.md) の 2 節）。タイマーの発火は平日 9 時に集中する（同じ文書の 2・6 節）。タイマーは 1 つの表で、フロー・承認・SLA が共有する（[ADR-0004](0004-workflow-and-sla-engine.md)）。優先度とテナントの取り分は [ADR-0018](0018-flow-limits-and-tenant-fairness.md) で決めた。NFR-003 は SLA の警告と違反の発火を期限から p99 60 秒以内に求める。
 
-山の大きさは本家の資料で確かめられず（未検証）、この題材の見積もりで置くしかない。
+山の大きさは本家の資料で確かめられず（未検証。E4 `timer-burst-generator` と E12 `timer-burst-load-test` で計測して置き換える）、この題材の見積もりで置くしかない。
 
 ## Options
 

@@ -11,7 +11,7 @@ date: 2026-09-28
 
 テナントはテーブル・フィールド・配置を足す（[ADR-0003](0003-table-hierarchy-and-extensible-schema.md)、[ADR-0006](0006-data-dictionary-and-field-types.md)）。フォームとリストは、どのテナントのどのテーブルでも同じ画面の束で描く必要がある。NFR-001 は、フォームを開くまで p95 1 秒、リストの 1 ページのサーバーの処理 p99 500ms を求める。ACL で読めない値は画面に出さない（[ADR-0012](0012-acl-enforcement-at-every-exit.md)）。
 
-本家の UI の方針（UI policy）は、ブラウザで条件を評価し、フィールドを表示・必須・読み取り専用にする（本家の SDK の文書 [UI Policies](https://servicenow.github.io/sdk/guides/ui-policy-guide)、2026-09-28 に確認。公式の製品の文書の本文は未検証）。本家は、クライアントのスクリプトで任意の処理も書ける。本システムは書かせない（[ADR-0001](0001-platform-and-stack.md)）。
+本家の UI の方針（UI policy）は、ブラウザで条件を評価し、フィールドを表示・必須・読み取り専用にする（[Using UI policies](https://www.servicenow.com/docs/bundle/zurich-platform-administration/page/administer/form-administration/task/t_CreateAUIPolicy.html)、2026-09-28 に確認）。本家は、クライアントのスクリプトで任意の処理も書ける。本システムは書かせない（[ADR-0001](0001-platform-and-stack.md)）。
 
 ## Options
 

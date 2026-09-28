@@ -20,7 +20,7 @@ rebuilds の他の題材（Slack、Stripe、Auth0 など）で、次の基盤を
 - **全文検索と集計が主な機能である。** ナレッジの検索、チケットの検索、ダッシュボードの集計が要る。
 - **メールが主な入口の 1 つである。** サービスデスクへのメールを受けてチケットにする。
 
-本家は、インスタンスごとのアプリの処理と DB の処理（[ADR-0002](0002-tenancy-and-isolation.md)。アプリの言語と DB の製品は、公式の資料で確かめられなかったため未検証）の上に、テーブルの辞書、サーバーとクライアントの JavaScript のスクリプト（レコードを操作する API、Business Rules、クライアントのスクリプト）、Flow Designer を載せている（[Table extension and classes](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/table-extension-and-classes.html)、[Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html)、2026-09-28 に確認）。
+本家は、インスタンスごとのアプリの処理と DB の処理（[ADR-0002](0002-tenancy-and-isolation.md)。アプリの言語と DB の製品は、公式の資料で確かめられなかったため未検証。本家の振る舞いで、この決定の前提ではない）の上に、テーブルの辞書、サーバーとクライアントの JavaScript のスクリプト（レコードを操作する API、Business Rules、クライアントのスクリプト）、Flow Designer を載せている（[Table extension and classes](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/table-extension-and-classes.html)、[Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html)、2026-09-28 に確認）。
 
 リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md) により、本家の実装は核に使えない。
 
@@ -59,7 +59,7 @@ rebuilds の他の題材（Slack、Stripe、Auth0 など）で、次の基盤を
 ### 2・3・4 を選ばなかった理由
 
 - **2（本家のスクリプトの API に似せる）**：移行は楽になる。ただし、本家の API の振る舞い（暗黙の ACL、ドット参照の遅延の読み込み、同期のルールの順序）を写すことになり、ADR-0007 の趣旨（核を自分で設計する）に反する。任意のコードの実行の隔離も MVP で必要になる。
-- **3（OSS の ITSM）**：iTop・GLPI は PHP、Frappe は Python で、他の題材の道具と揃わない。マルチテナントの RLS、耐久性のあるワークフロー、CMDB の調整の設計を、外から変えるのが難しい。これらの製品のマルチテナントの運用の実績は、公開の資料で確かめられなかった（未検証）。
+- **3（OSS の ITSM）**：iTop・GLPI は PHP、Frappe は Python で、他の題材の道具と揃わない。マルチテナントの RLS、耐久性のあるワークフロー、CMDB の調整の設計を、外から変えるのが難しい。これらの製品のマルチテナントの運用の実績は、公開の資料で確かめられなかった（未検証。選ばない理由は前の 2 文で足りる）。
 - **4（ローコードの SaaS）**：テナントの分離、データの所在（intent の L3）、SLA の計時の正しさを、自分で保証できない。
 
 ## Consequences

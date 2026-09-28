@@ -13,7 +13,7 @@ date: 2026-09-28
 
 RFC 3834 は、自動の応答に `Auto-Submitted: auto-replied` を付け、`Auto-Submitted` が `no` 以外のメールに自動の応答を返さないよう勧める（[RFC 3834](https://www.rfc-editor.org/rfc/rfc3834)、2026-09-28 に確認）。`Precedence` は標準ではない（[RFC 2076](https://www.rfc-editor.org/rfc/rfc2076)）。古い道具はこれらのヘッダーを見ない。
 
-日本のメールは、ISO-2022-JP（[RFC 1468](https://www.rfc-editor.org/rfc/rfc1468)）、Shift_JIS、EUC-JP、UTF-8 が混ざる。ラベルの誤り（Shift_JIS の中身に ISO-2022-JP のラベル、ラベルなしの 8 ビット）や、NEC・IBM の拡張の文字（丸数字など）がある。WHATWG の Encoding Standard は、Shift_JIS の別名（`windows-31j` など）を 1 つの復号器にまとめ、その表は IBM と NEC の拡張を含む（[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/)、2026-09-28 に確認）。ISO-2022-JP の復号器が拡張の文字を復号するかは未検証である。
+日本のメールは、ISO-2022-JP（[RFC 1468](https://www.rfc-editor.org/rfc/rfc1468)）、Shift_JIS、EUC-JP、UTF-8 が混ざる。ラベルの誤り（Shift_JIS の中身に ISO-2022-JP のラベル、ラベルなしの 8 ビット）や、NEC・IBM の拡張の文字（丸数字など）がある。WHATWG の Encoding Standard は、Shift_JIS の別名（`windows-31j` など）を 1 つの復号器にまとめ、その表は IBM と NEC の拡張を含む（[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/)、2026-09-28 に確認）。ISO-2022-JP の復号器も同じ index jis0208 を引く。この表は NEC の特殊文字（13 区。丸数字 ① は pointer 1128）と NEC 選定の IBM 拡張（89〜92 区）を含むので、ISO-2022-JP の 7 ビットの範囲で送られた丸数字などは復号できる。IBM 拡張（115〜119 区）は 7 ビットの範囲の外で、ISO-2022-JP では表せない（[WHATWG Encoding Standard](https://encoding.spec.whatwg.org/) の 12.2.1 節と [index-jis0208.txt](https://encoding.spec.whatwg.org/index-jis0208.txt)、2026-09-28 に確認）。
 
 ## Options
 
@@ -41,11 +41,13 @@ RFC 3834 は、自動の応答に `Auto-Submitted: auto-replied` を付け、`Au
 - `auto_generated`・`auto_reply` の差出人へは、受け付けの通知も、そのメールをきっかけにした通知も送らない。`auto_reply` はレコードに追記しない。
 - 流量の上限（S1 の既定）：同じ差出人からの新しいレコードの作成 10 分に 20 件、同じレコードへの追記 1 時間に 30 件、同じ受け手への同じレコードの通知 10 分に 5 通（超えた分は要約）。超えたら保留にして知らせる。
 - 送るメールに `Auto-Submitted: auto-generated`、`X-Auto-Response-Suppress: OOF, AutoReply`、`<Brand>-Loop` を付ける。
-- 復号は DT-MAIL-005。宣言の復号器で置き換えの文字が出なければ宣言どおり。`iso-2022-jp` で出たら拡張の表で復号し直す（要否は E6 の試験で決める）。ラベルのない 8 ビットは UTF-8（厳格）→ Shift_JIS → EUC-JP。どれも失敗なら置き換えを許し `decode_lossy` を付ける。NFC に正規化し、原本を S3 に残す。
+- 復号は DT-MAIL-005。宣言の復号器で置き換えの文字が出なければ宣言どおり。`iso-2022-jp` で出たら、8 ビットのバイトを含むとき（ラベルの誤り）はラベルのない 8 ビットと同じ順で試し、7 ビットだけなら置き換えを許す（拡張の表は持たない。下の注記）。ラベルのない 8 ビットは UTF-8（厳格）→ Shift_JIS → EUC-JP。どれも失敗なら置き換えを許し `decode_lossy` を付ける。NFC に正規化し、原本を S3 に残す。
 - 符号化の語は、隣り合う同じ文字コードの語をバイトでつないでから復号する。
 - 送るメールは UTF-8 だけにする。
 
 > 2026-09-28 の注記：受信の入口で受け手を解決できないメールと、`own_loop`・`bounce` と判定したメールには、送り主へのバウンス・自動の応答を返さず、捨てて記録する（後方散乱を避け、第三者を巻き込むループを作らない）。受信の経路は [ADR-0034](0034-inbound-email-threading-and-sender-trust.md) の注記の形（共有の入口と `mail-router`）にした。流量の上限の数は、セルの Valkey で数える（`mail-router` では数えない）。
+
+> 2026-09-28 の注記：検証の工程で、WHATWG の ISO-2022-JP の復号器が NEC・IBM の拡張を含む index jis0208 を使うことを確かめた。そのため、`iso-2022-jp` の復号に失敗したときに拡張の表（CP932 と同じ文字の集合）で復号し直す案をやめた。失敗の原因は、Shift_JIS などの 8 ビットの中身に `iso-2022-jp` のラベルが付いた誤りか、JIS X 0212 などの表せない文字であり、前者はラベルのない 8 ビットと同じ順で試して救う（DT-MAIL-005 の 2 行）。
 
 2 を採らない理由：ヘッダーを見ない古い自動の応答との往復を止められない。
 

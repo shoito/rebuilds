@@ -15,7 +15,7 @@
 
 ## 1. 目標と前提
 
-- **OWASP ASVS 5.0 の Level 2 を全体の目標にする**（[OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)。章と要件の番号の照合は E1 で行う。未検証）。他の題材（Slack、Stripe）と同じ段にする。
+- **OWASP ASVS 5.0 の Level 2 を全体の目標にする**（[OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)。最新の版が 5.0.0 であることは 2026-09-28 に確認。章と要件の番号の照合は E1 `sec-checklist-traceability-ci` で行う（未検証））。他の題材（Slack、Stripe）と同じ段にする。
 - 最も重い障害は 5 つ。
   1. **テナントをまたいだデータの漏えい**（NFR-009）。
   2. **ACL で読めない値の漏えい**（NFR-010、K6）。出口が 16 あり、1 つの抜けで漏れる（[access-control.md](access-control.md) の 6.2 節）。
@@ -267,7 +267,7 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 | データ | 保持（既定案） | 期限後 | 関わる法務の論点 |
 | --- | --- | --- | --- |
 | テナントのレコード（`task`、`ci`、ナレッジ、カタログの要求） | テナントが消すまで | 削除（監査の履歴に削除の前の値が残る） | L1 |
-| 監査の履歴（`record_change`、`journal_entry`）、`meta_change`、承認の行、`task_sla_event` | 7 年（延長は 10 年まで、短縮はできない） | パーティションを外して消す（保守のロール、プラットフォームの監査） | L4 |
+| 監査の履歴（`record_change`、`journal_entry`）、`meta_change`、承認の行、`sla_clock_event` | 7 年（延長は 10 年まで、短縮はできない） | パーティションを外して消す（保守のロール、プラットフォームの監査） | L4 |
 | テナントの監査ログ | DB に 1 年、log-archive に 7 年 | 削除 | L4 |
 | プラットフォームの監査、CloudTrail | log-archive に 7 年 | 削除 | L5 |
 | フローの実行（`flow_run`・`flow_step`） | 90 日（承認の行は監査と同じ） | 削除 | — |
@@ -407,7 +407,7 @@ CREATE POLICY tenant_only ON task
 ## 13. インシデントへの対応
 
 - 手順は [runbooks/incident-response.md](../runbooks/incident-response.md)。ACL の漏れの疑いは同じ runbook の場面にある。
-- **個人データの漏えい等のおそれ**のとき、個人情報保護委員会への報告と本人への通知の要否、報告の主体（テナントか本システムか）は法務が判断する（L1）。報告は速やか（概ね 3〜5 日以内）に行う（[漏えい等報告・本人への通知の義務化について](https://www.ppc.go.jp/news/kaiseihou_feature/roueitouhoukoku_gimuka/)、2026-09-28 に確認）。確報の期限（30 日、不正の目的によるものは 60 日とされる）は同じページでは確かめられなかった（未検証。Stripe の [security.md](../../../stripe/docs/architecture/security.md) の 12 節の記載を参考にする）。
+- **個人データの漏えい等のおそれ**のとき、個人情報保護委員会への報告と本人への通知の要否、報告の主体（テナントか本システムか）は法務が判断する（L1）。報告は速やか（概ね 3〜5 日以内）に行う（[漏えい等報告・本人への通知の義務化について](https://www.ppc.go.jp/news/kaiseihou_feature/roueitouhoukoku_gimuka/)、2026-09-28 に確認）。確報の期限は、発覚から 30 日以内、不正の目的で行われたおそれがあるときは 60 日以内である（[漏えい等の対応とお役立ち資料](https://www.ppc.go.jp/personalinfo/legal/leakAction/)、2026-09-28 に確認）。当てはめと主体の判断は法務が行う（L1）。
 - 検知の源：GuardDuty、Security Hub、出口の漏れの試験の本番の抜き取り、監査のハッシュの鎖の検証、承認のない実施の突き合わせ、SEC の検知のアラート、テナントからの報告、シークレットスキャンのパートナーからの通知。
 
 ## 14. 法務の論点（法務の確認待ち）
@@ -484,6 +484,7 @@ CREATE POLICY tenant_only ON task
 - `malware-detected.md`：マルウェアが見つかったときの隔離の確かめ方とテナントへの連絡。
 - `leaked-api-credential.md`（api-and-integrations の提案）。
 - `operator-access-review.md`：四半期のアクセスのレビューの手順。
+- `sensitive-data-in-logs.md`・`security-control-disabled.md`（E1 `telemetry-package`）：ログの走査で秘密・個人データの形を見つけたとき、GuardDuty・CloudTrail・走査・マルウェアの検査が止まったときの手順。それまでは incident-response の共通の進め方。
 
 ### data-model（索引への追加の提案）
 

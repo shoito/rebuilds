@@ -22,9 +22,9 @@
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| 画面の規則 | UI の方針（UI policy）は、条件に合うと、フィールドを表示・必須・読み取り専用・消去にする。ブラウザで評価する | 本家の SDK の文書（[UI Policies](https://servicenow.github.io/sdk/guides/ui-policy-guide)）と解説の記事。公式の製品の文書の本文は未検証 |
-| 多言語 | 国際化のプラグインと、言語ごとの翻訳のプラグイン（日本語を含む）を有効にする。翻訳した値はフィールドの種類ごとに別の表に持つ | コミュニティの記事（[ServiceNow Localization and Language Translation](https://www.servicenow.com/community/itsm-forum/servicenow-localization-and-language-translation/m-p/3455929)）。公式の本文は未検証 |
-| ポータル | 部品（widget）とテーマで作り、部品は複製して中身（HTML・スクリプト）を変えられる | [Employee Center widgets](https://www.servicenow.com/docs/r/employee-service-management/employee-experience-foundation/employee-center-widgets-list.html)（検索の結果の抜粋で確認。本文は未検証） |
+| 画面の規則 | UI の方針（UI policy）は、条件に合うと、フィールドを表示・必須・読み取り専用にする。ブラウザで評価し、条件は利用者がフィールドを変えたときに評価し直す。値の消去は、本家の SDK の文書（[UI Policies](https://servicenow.github.io/sdk/guides/ui-policy-guide)）にあるが公式の製品の文書では未検証 | [Using UI policies](https://www.servicenow.com/docs/bundle/zurich-platform-administration/page/administer/form-administration/task/t_CreateAUIPolicy.html) |
+| 多言語 | 国際化のプラグインと、言語ごとの翻訳のプラグイン（日本語を含む）を有効にする。翻訳した値はフィールドの種類ごとに別の表に持つ | コミュニティの記事（[ServiceNow Localization and Language Translation](https://www.servicenow.com/community/itsm-forum/servicenow-localization-and-language-translation/m-p/3455929)）。公式の本文は未検証（本家の振る舞いで、設計の前提ではない） |
+| ポータル | 部品（widget）とテーマで作り、部品は複製して中身（HTML・スクリプト）を変えられる | [Employee Center widgets](https://www.servicenow.com/docs/r/employee-service-management/employee-experience-foundation/employee-center-widgets-list.html)（検索の結果の抜粋で確認。本文は未検証で、本家の振る舞いで、設計の前提ではない） |
 
 - 本家は部品の中身とクライアントのスクリプトを顧客が書ける。本システムは書かせない（[intent.md](../intent.md) の Non-goals）。本家の画面の名前・部品の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
@@ -211,7 +211,7 @@ DT-UI-001（保存の時の画面の規則の適用）：
 
 ## 8. アクセシビリティ
 
-- **WCAG 2.2 の AA を目標にする。** WCAG 2.2 は 2025 年に ISO/IEC 40500:2025 になり、JIS X 8341-3 は ISO/IEC 40500:2025 との一致規格への改正の作業中である（[JIS X 8341-3 改正概要（ウェブアクセシビリティ基盤委員会）](https://waic.jp/wp-content/uploads/2026/02/20260206-waic-a11y-seminar-2.pdf)、2026-09-28 に確認。改正の発行の時期は未検証）。公共機関の顧客への説明は、改正の JIS の発行の後に合わせる。
+- **WCAG 2.2 の AA を目標にする。** WCAG 2.2 は 2025 年に ISO/IEC 40500:2025 になり、JIS X 8341-3 は ISO/IEC 40500:2025 との一致規格への改正の作業中である（[JIS X 8341-3 改正概要（ウェブアクセシビリティ基盤委員会）](https://waic.jp/wp-content/uploads/2026/02/20260206-waic-a11y-seminar-2.pdf)、2026-09-28 に確認。原案は 2026 年 5 月ごろの完成を目標にしていた。2026-09-28 の時点で改正の JIS の公示は確かめられなかった）。公共機関の顧客への説明は、改正の JIS の発行の後に合わせる。
 - 画面のモデルから描くので、ラベル・必須の印・エラーの結び付け（`aria-describedby`）を部品の側で一度だけ正しく作れば、全テナントのフォームに効く。
 - 自動の検査（axe-core）を E2E の中で動かし、重大な違反 0 件を CI の条件にする（[delivery.md](delivery.md) の 2 節）。手での検査（スクリーンリーダー：NVDA と VoiceOver）を E8 と E12 で行う。
 

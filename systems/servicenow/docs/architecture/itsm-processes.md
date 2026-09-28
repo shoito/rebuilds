@@ -23,19 +23,19 @@
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| インシデントの状態 | 新規、対応中、保留、解決、完了、取り消し。保留には理由（依頼者の回答待ち、変更待ち、問題待ち、ベンダー待ち）がある | コミュニティの記事と検索の結果の抜粋（[Incident Management State Model KB0564465](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0564465) など）。公式の文書の本文は未検証 |
-| 解決の後の自動の完了 | 解決から一定の日数で自動で完了にする設定がある。既定は 7 日とされる | コミュニティの記事（[Auto close configuration](https://www.servicenow.com/community/itsm-articles/incident-auto-close-configuration/ta-p/2302132)）。既定の値は未検証 |
+| インシデントの状態 | 新規、対応中、保留、解決、完了、取り消し。保留には理由（依頼者の回答待ち、変更待ち、問題待ち、ベンダー待ち）がある | [Incident Management state model](https://www.servicenow.com/docs/r/it-service-management/incident-management/c_IncidentManagementStateModel.html) |
+| 解決の後の自動の完了 | 解決の状態で一定の期間がたつと完了になる（公式の文書）。既定は 7 日とされる | [Incident Management state model](https://www.servicenow.com/docs/r/it-service-management/incident-management/c_IncidentManagementStateModel.html)。日数の既定はコミュニティの記事（[Auto close configuration](https://www.servicenow.com/community/itsm-articles/incident-auto-close-configuration/ta-p/2302132)）だけで未検証（本家の振る舞いで、設計の前提ではない。本システムの既定は 4.3 節） |
 | 優先度 | 優先度は読み取り専用で、影響度と緊急度から、データの参照の規則（一致の列と設定の列）で決まる。既定の 3 × 3：高・高 → 1、高・中 → 2、高・低 → 3、中・高 → 2、中・中 → 3、中・低 → 4、低・高 → 3、低・中 → 4、低・低 → 4 | [Define priority lookup rules](https://www.servicenow.com/docs/r/it-service-management/incident-management/def-prio-lookup-rules.html) |
 | メジャーインシデント | 候補は、トリガーの規則、担当者の提案、直接の作成で作る。状態は提案・昇格・却下。昇格すると親のインシデントを作り、候補を子にする。解決・完了・取り消しのインシデントからは提案できない | [Create a major incident candidate](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/incident-management/task/create-major-incident-candidate.html) |
-| 問題の状態 | 新規、評価、根本原因の分析、修正中、解決、完了。既知のエラーは状態ではなく分類として扱う | コミュニティの記事と検索の結果の抜粋（[Investigate root cause of a problem](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/problem-management/task/investigate-root-cause.html) の存在を確認）。状態の一覧の公式の本文は未検証 |
+| 問題の状態 | 新規、評価、根本原因の分析、修正中、解決、完了。今のモデルは既知のエラーを状態に持たず、既知のエラーの記事を参照するフィールドを持つ。問題から 1 回の操作で既知のエラーの記事を作れる | [Investigate root cause of a problem](https://www.servicenow.com/docs/r/it-service-management/problem-management/investigate-root-cause.html)、[Create a known error article](https://www.servicenow.com/docs/r/it-service-management/problem-management/create-known-error-from-problem.html)。「新規」「評価」はコミュニティの記事で確認 |
 | 変更の状態 | 通常：新規 → 評価 → 承認 → 予定済み → 実施 → 振り返り → 完了。標準：新規 → 予定済み → 実施 → 振り返り → 完了。緊急：新規 → 承認 → 予定済み → 実施 → 振り返り → 完了。振り返りと完了は取り消せない。遷移は時間の経過ではなく、条件・操作・承認の結果で起きる | [State progression for change models](https://www.servicenow.com/docs/r/it-service-management/change-management/normal-standard-emergency-states.html) |
-| 標準の変更 | 雛形の提案を変更管理のチームが承認すると、カタログに加わる。雛形から作った変更は人の承認を要らない | [Propose a standard change template](https://www.servicenow.com/docs/bundle/xanadu-it-service-management/page/product/change-management/task/propose-standard-chg-template.html)（検索の結果の抜粋で確認。本文は未検証） |
-| リスクの評価 | 質問票（重み付きの得点としきい値）と、リスクの条件（規則）を持つ。両方を定義すると条件が優先するとされる | コミュニティの記事と KB（[KB0825522](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0825522)、検索の結果の抜粋）。未検証 |
+| 標準の変更 | 雛形の提案を変更管理のグループが承認すると、標準の変更のカタログに載る。雛形から作った変更は評価・承認の状態を通らない | [Propose a standard change template](https://www.servicenow.com/docs/r/it-service-management/change-management/propose-standard-chg-template.html)、[State progression for change models](https://www.servicenow.com/docs/r/it-service-management/change-management/normal-standard-emergency-states.html) |
+| リスクの評価 | 規則の条件（Change Risk Calculator）と、利用者の回答の質問票（Risk Assessment）を持つ。両方を使うと、常に高いほうのリスクを採る | [Risk assessment](https://www.servicenow.com/docs/r/it-service-management/change-management/c_RskAsmtCalc.html) |
 | CAB | CAB の作業台で、会議の議題（変更の一覧）、議題ごとの時間、出席者、決定の記録を扱う。議題の決定は会議の記録に残る | [CAB meeting management using the CAB workbench](https://www.servicenow.com/docs/r/it-service-management/change-management/manage-cab-meeting-using-cab-workbench.html) |
 | 衝突の検知 | CI がすでに予定済み、親・子の CI がすでに予定済み、CI が保守の時間帯の外、親・子が保守の時間帯の外、CI が禁止期間の中、親・子が禁止期間の中、担当者がすでに予定済み。CI・予定の開始と終わりが入ったとき、変わったとき、状態が変わったときに動く | [Conflict detection](https://www.servicenow.com/docs/r//washingtondc/it-service-management/change-management/c_ConflictDetection.html) |
 | 衝突の設定 | 次の空きの探索は 90 日・候補 100 件、衝突の件数の上限 1,000、連続する変更を許す、など | [Detect change conflicts](https://www.servicenow.com/docs/r/it-service-management/change-management/configure-conflict-properties.html) |
-| 禁止期間と保守の時間帯 | CMDB のクラスと条件に結び付けたスケジュールとして持つ | [Blackout & Maintenance Schedules in a nutshell](https://www.servicenow.com/community/itsm-blog/blackout-maintenance-schedules-in-a-nutshell/ba-p/2269223)（コミュニティの記事）。公式の本文は未検証 |
-| ITIL 4 | 変更の実現（change enablement）は、標準・通常・緊急の 3 種を持ち、承認する者を「変更の権限者」と呼ぶ | [Change Enablement in ITIL 4](https://itsm.tools/change-enablement/)（二次の資料）。PeopleCert のプラクティスガイドの原典は未検証 |
+| 禁止期間と保守の時間帯 | 禁止期間は通常の変更を予定しない時間、保守の時間帯は予定すべき時間。CI のクラスや動的な CI の群に結び付け、上流のサービス・CI に付けたものは下流の CI にも効く。衝突の検知が使う | [Create blackout and maintenance schedules](https://www.servicenow.com/docs/r/it-service-management/change-management/t_CreateBlkoutMaintSched.html) |
+| ITIL 4 | 変更の実現（change enablement）は、標準・通常・緊急の 3 種を持ち、承認する者を「変更の権限者」と呼ぶ | [Change Enablement in ITIL 4](https://itsm.tools/change-enablement/)（二次の資料）。PeopleCert のプラクティスガイドは会員向けで、原典は未検証。業務の一般的な形として使い、設計の前提にしない |
 
 - 本家の状態の値（数値）、テーブルの名前、画面の文言は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - 本家の CAB の会議のリアルタイムの画面（出席者の在席の表示など）は、MVP では写さない。
@@ -109,7 +109,7 @@ if changes に state がある:
 | `closed` | closed | 完了 |
 | `cancelled` | cancelled | 取り消し（重複、誤りの起票） |
 
-`hold_reason` の組み込みの値：`awaiting_caller`（依頼者の回答待ち）、`awaiting_vendor`（ベンダー待ち）、`awaiting_problem`（問題の修正待ち）、`awaiting_change`（変更の実施待ち）。テナントは値を足せる。
+`hold_reason` の組み込みの値：`awaiting_requester`（依頼者の回答待ち）、`awaiting_vendor`（ベンダー待ち）、`awaiting_problem`（問題の修正待ち）、`awaiting_change`（変更の実施待ち）。テナントは値を足せる。
 
 ### 4.2 遷移の表（DT-INC-001）
 
@@ -125,13 +125,13 @@ if changes に state がある:
 | 8 | `closed`・`cancelled` | どれも | - | - | - | 422 `invalid_transition`（終わったインシデントは戻さない。新しく起票し `reopened_from` で結ぶ） |
 | 9 | 上のどれにも当たらない | | | | | 422 `invalid_transition` |
 
-- `on_hold` で `hold_reason = awaiting_caller` のとき、依頼者のコメント（ポータル・メールの返信）が付くと、組み込みのルールで `resume` を行う（主体は `system`、`cause` はコメントの `journal_entry`）。
+- `on_hold` で `hold_reason = awaiting_requester` のとき、依頼者のコメント（ポータル・メールの返信）が付くと、組み込みのルールで `resume` を行う（主体は `system`、`cause` はコメントの `journal_entry`）。
 - 担当のグループが変わっても状態は変えない（本家の「割り当て済み」の状態は持たない。割り当ては `assignment_group_id` と `assigned_to_id` だけで表す）。
 
 ### 4.3 自動の完了
 
 - `resolve` の効果で、`auto_close_at = resolved_at + auto_close_days`（既定 7 日、テナントで 0〜30。0 は自動の完了なし）の時刻のタイマー（`kind = run_step`、組み込みのフロー `incident_auto_close`）を登録する。
-- 日数は暦の日で数える。業務カレンダーを使わない（本家の既定の意味は未検証。依頼者に示す文言を単純にするため）。
+- 日数は暦の日で数える。業務カレンダーを使わない（依頼者に示す文言を単純にするため。本家の日数の数え方は未検証で、本家の振る舞いで、設計の前提ではない）。
 - 発火のとき、インシデントの `version` がタイマーの `target_version` と同じで、状態が `resolved` のままなら `close` を行う。再オープン・手での完了の後の発火は何もしない（[workflow-engine.md](workflow-engine.md) の DT-FLOW-002 の 10 行）。
 
 ### 4.4 SLA の一時停止の既定
@@ -141,8 +141,8 @@ if changes に state がある:
 | SLA の定義（組み込みの既定） | 開始 | 一時停止 | 停止 |
 | --- | --- | --- | --- |
 | インシデントの応答（`response`） | 作成 | なし | `state != new`、または `assigned_to` が入った |
-| インシデントの解決（`resolution`） | 作成 | `state = on_hold AND hold_reason = awaiting_caller`、または `state = resolved` | `state IN (closed, cancelled)` |
-| インシデントの解決の OLA（担当のグループ） | `assignment_group_id` が入った | `state = on_hold AND hold_reason IN (awaiting_caller, awaiting_vendor)` | `state IN (resolved, closed, cancelled)` |
+| インシデントの解決（`resolution`） | 作成 | `state = on_hold AND hold_reason = awaiting_requester`、または `state = resolved` | `state IN (closed, cancelled)` |
+| インシデントの解決の OLA（担当のグループ） | `assignment_group_id` が入った | `state = on_hold AND hold_reason IN (awaiting_requester, awaiting_vendor)` | `state IN (resolved, closed, cancelled)` |
 
 - **依頼者の回答待ちだけで SLA を止める。** ベンダー待ち・問題待ち・変更待ちは IT の側の都合なので、依頼者との約束（SLA）を止めない。担当のグループの OLA は、ベンダー待ちでも止める（グループの責任の外）。
 - `resolved` で一時停止にするのは、再オープンで計時を続けるためである（停止すると、再オープンで新しい計時が始まる）。テナントは定義を変えられる。
@@ -227,7 +227,7 @@ DT-MIM-001：
 
 ### 6.3 振り返りと問題
 
-- メジャーインシデントの完了（`close`）の `guard`：関連の問題が 1 件以上ある、または `problem_waiver_reason`（問題を作らない理由）がある。メジャーインシデントの根本原因を問題として追うことを既定にするためである（ITIL の実務の一般的な形。本家の既定は未検証）。
+- メジャーインシデントの完了（`close`）の `guard`：関連の問題が 1 件以上ある、または `problem_waiver_reason`（問題を作らない理由）がある。メジャーインシデントの根本原因を問題として追うことを既定にするためである（ITIL の実務の一般的な形。本家の既定は未検証で、本家の振る舞いで、設計の前提ではない）。
 - 振り返りの記録（時系列、影響、対応、再発の防止）は、インシデントの `ext` のフィールドではなく、問題の側に持つ（7 節）。
 
 ### 6.4 子への伝播
@@ -273,7 +273,7 @@ DT-PRB-001：
 ### 7.3 インシデントとの関係
 
 - インシデントは `problem_id`（参照）で問題に結ぶ。1 つのインシデントは 1 つの問題にだけ結ぶ。
-- 問題の `resolve` のとき、`problem_id` でこの問題に結ばれ、`on_hold` かつ `hold_reason = awaiting_problem` のインシデントを、`bulk_job` で処理する。既定は「解決」（解決のコード `problem_fixed`）。テナントは「対応中に戻す」を選べる。本家は問題の完了で結ばれたインシデントを解決するとみられる（[KB0955987](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0955987) の題名から推した。未検証）。
+- 問題の `resolve` のとき、`problem_id` でこの問題に結ばれ、`on_hold` かつ `hold_reason = awaiting_problem` のインシデントを、`bulk_job` で処理する。既定は「解決」（解決のコード `problem_fixed`）。テナントは「対応中に戻す」を選べる。本家の旧い流れ（London 以前）は、問題を解決すると、その問題に結ばれ、保留で理由が「問題待ち」のインシデントを解決の状態にする組み込みのルールを持つ（[Problem Management process](https://www.servicenow.com/docs/r/it-service-management/problem-management/c_ProblemManagementProcess.html)、2026-09-28 に確認）。
 - 問題の子のタスク（`problem_task`）は、`generic_task` のモデルに `problem_task` 用の種類（調査・回避策の検証）の選択肢を足したものにする。
 
 ## 8. 変更（[ADR-0024](../decisions/0024-change-models-risk-and-cab.md)）
@@ -292,24 +292,24 @@ DT-PRB-001：
 | `cancelled` | cancelled | ○ | ○ | ○ |
 
 - 種類（`change_type`）は作成の時に決め、後から変えない。変えたいときは取り消して作り直す（状態のモデルが種類で決まるため）。
-- 変更の固有のフィールド（`task` の型付きの列）：`change_type`、`risk`（1 高〜4 低。`risk_source`）、`planned_start`、`planned_end`、`actual_start`、`actual_end`、`implementation_plan`、`backout_plan`、`test_plan`、`justification`、`std_template_version_id`、`close_code`（`successful` / `successful_with_issues` / `unsuccessful`）、`conflict_status`（`none` / `warning` / `blocking` / `not_checked`）、`conflict_checked_at`、`cab_required`、`cab_meeting_id`、`emergency_post_review_required`。
+- 変更の固有のフィールド（`task` の型付きの列）：`change_type`、`risk`（1 高〜4 低。`risk_source`）、`planned_start`、`planned_end`、`actual_start`、`actual_end`、`implementation_plan`、`backout_plan`、`test_plan`、`justification`、`std_template_version_id`、`resolution_code`（`successful` / `successful_with_issues` / `unsuccessful`）、`conflict_status`（`none` / `warning` / `blocking` / `not_checked`）、`conflict_checked_at`、`cab_required`、`cab_meeting_id`、`emergency_post_review_required`。
 
 DT-CHG-001（遷移）：
 
 | # | 種類 | 前 | 後 | 操作 | 条件・必須 | 効果 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | 通常 | `new` | `assess` | `request_assessment` | `cmdb_ci_id`、`planned_start`、`planned_end`、`implementation_plan`、`backout_plan`、`test_plan`、`justification` | リスクの評価（8.3 節）、`recompute_conflicts`、`request_approval(assess)`（8.5 節の技術の承認） |
+| 1 | 通常 | `new` | `assess` | `request_assessment` | `ci_id`、`planned_start`、`planned_end`、`implementation_plan`、`backout_plan`、`test_plan`、`justification` | リスクの評価（8.3 節）、`recompute_conflicts`、`request_approval(assess)`（8.5 節の技術の承認） |
 | 2 | 通常 | `assess` | `authorize` | system（技術の承認の決着） | 承認のまとまりが `approved` | `request_approval(authorize)`（CAB など） |
 | 3 | 通常 | `authorize` | `scheduled` | system（承認の決着） | 承認のまとまりが `approved`、`conflict_status != blocking` | |
 | 4 | 通常・緊急 | `assess`・`authorize` | `new` | system（承認の却下） | 承認のまとまりが `rejected` | 却下の理由を作業メモに |
 | 5 | 標準 | `new` | `scheduled` | `schedule` | `std_template_version_id` が有効、`planned_start`・`planned_end`、`conflict_status != blocking` | `recompute_conflicts` |
-| 6 | 緊急 | `new` | `authorize` | `request_emergency_authorization` | `cmdb_ci_id`、`justification`、`implementation_plan`、`backout_plan` | リスクを 1（高）、`request_approval(emergency)` |
+| 6 | 緊急 | `new` | `authorize` | `request_emergency_authorization` | `ci_id`、`justification`、`implementation_plan`、`backout_plan` | リスクを 1（高）、`request_approval(emergency)` |
 | 7 | 緊急 | `authorize` | `scheduled` | system（承認の決着） | 承認のまとまりが `approved`。禁止期間の衝突は許す（記録する） | `emergency_post_review_required = true` |
 | 8 | 全種 | `scheduled` | `implement` | `implement` | `planned_start - 実施の前倒しの許容（既定 0）≤ now`、直前の衝突の再計算で `blocking` がない（緊急を除く） | `actual_start = now` |
-| 9 | 全種 | `implement` | `review` | `complete_implementation` | `close_code`、`close_notes` | `actual_end = now` |
-| 10 | 全種 | `review` | `closed` | `close` | 緊急なら事後の CAB の承認のまとまりが `approved`。`close_code = unsuccessful` なら関連のインシデントか `review_notes` | |
+| 9 | 全種 | `implement` | `review` | `complete_implementation` | `resolution_code`、`resolution_notes` | `actual_end = now` |
+| 10 | 全種 | `review` | `closed` | `close` | 緊急なら事後の CAB の承認のまとまりが `approved`。`resolution_code = unsuccessful` なら関連のインシデントか `review_notes` | |
 | 11 | 全種 | `new`・`assess`・`authorize`・`scheduled`・`implement` | `cancelled` | `cancel` | `cancel_reason`。`implement` からの取り消しは `backout_performed` を必須 | 開いている承認を `cancelled` |
-| 12 | 全種 | `scheduled` | `new`（通常・標準）・`authorize`（緊急） | `reschedule` | `planned_start` か `planned_end` か `cmdb_ci_id` を変えるとき | 承認を取り直す（通常は `assess` から） |
+| 12 | 全種 | `scheduled` | `new`（通常・標準）・`authorize`（緊急） | `reschedule` | `planned_start` か `planned_end` か `ci_id` を変えるとき | 承認を取り直す（通常は `assess` から） |
 | 13 | 全種 | `review`・`closed`・`cancelled` | 取り消し・前の状態 | - | - | 422（振り返りと完了は取り消せない。本家と同じ） |
 | 14 | そのほか | | | | | 422 `invalid_transition` |
 
@@ -330,7 +330,7 @@ DT-CHG-001（遷移）：
 
 ### 8.3 リスクの評価
 
-- リスクは 2 つの方法で求め、**高いほう（数値の小さいほう）を採る。** 本家は規則の条件を優先するとされる（2 節）が、規則が「低」を返して質問票が「高」を返すとき、低いほうを採る理由がない。
+- リスクは 2 つの方法で求め、**高いほう（数値の小さいほう）を採る。** 本家も両方を使うときは高いほうを採る（2 節）。規則が「低」を返して質問票が「高」を返すとき、低いほうを採る理由がない。
   - 規則（`risk_condition`）：メタデータ。`condition`（式）と `risk`、`order`。一致したすべての規則のうち、最も高いリスク。CI の重要度、影響を受けるサービスの数（9.4 節の影響の範囲の件数）、過去 90 日の同じ CI の `unsuccessful` の件数、禁止期間への近さを式で使える。
   - 質問票（`risk_questionnaire`）：質問ごとに選択肢と得点、重み。合計の得点をしきい値でリスクに写す。
 - DT-RISK-001：
@@ -363,9 +363,43 @@ DT-CHG-002（種類 × リスク → 承認の段）：
 | 6 | 緊急 | - | - | ECAB（緊急の CAB のグループ、`any`） | 却下 |
 | 7 | 緊急（`review` で） | - | - | 事後の CAB（`percent(50)`） | 引き上げ |
 
-- 方針は組み込みのフロー `change_approval_policy`（[workflow-engine.md](workflow-engine.md) の 13 節の Story `change-approval-policy-flows`）で実装する。テナントは、決定表の段の承認者と規則を変えられる。**段を「なし」にできるのは標準だけである**（保存の時の検査）。
+- 方針は組み込みのフロー `change_approval_policy`（[workflow-engine.md](workflow-engine.md) の 13 節の Story `change-approval-policy-flows`）で実装する。テナントは、決定表の段の承認者・規則・期限・期限切れの動作を、テナントの設定の表 `change_approval_policy_rule`（8.5.1 節）で変えられる。**段を「なし」にできるのは標準だけである**（保存の時の検査。DT-CHG-003）。
 - 承認のまとまりは `requires_explicit_approval` の変更のテーブルの上にあるので、期限切れの自動の承認は選べず、本人の承認は禁止される（[ADR-0016](../decisions/0016-approvals.md)）。承認者が依頼者・担当者と同じ人なら、その人の承認の行を作らない（まとまりの規則の分母から除く）。除いた結果、承認者が 0 人になれば、方針の検査で 422 にし、`change_manager` に承認者の設定の不足を知らせる。
 - **緊急の変更も、1 人以上の承認なしに `implement` へ進めない。** 緊急の変更で CAB を待てないときは ECAB の 1 人の承認で進め、事後の CAB の承認（7 行）を完了の条件にする（[intent.md](../intent.md) の「緊急の変更は、事後の承認の記録を必須にする」）。
+
+#### 8.5.1 テナントの設定の表（`change_approval_policy_rule`）
+
+組み込みのフロー `change_approval_policy` の版（`flow_version`。NULL の行）は、DT-CHG-002 を既定の値として持つ。テナントが変える値は、フローの版に書かず、この表のテナントの行に持つ。フローは段ごとに、この表の有効な行を読み、なければ既定を使う（2026-09-28 に決定。期限の既定も承認済み）。
+
+| 列 | 意味 |
+| --- | --- |
+| `tenant_id`、`id` | テナントの行（NULL の行を持たない） |
+| `change_type` | `normal` / `standard` / `emergency` |
+| `risk` | 1〜4、または `*`（種類のすべてのリスク）。緊急は `*` だけ |
+| `stage` | `assess`（段 1）/ `authorize`（段 2）/ `post_review`（緊急の事後の CAB） |
+| `approver_kind` | `ci_support_group_manager` / `group` / `cab` / `ecab` / `business_service_owners` / `user` / `none` |
+| `approver_group_id`、`approver_user_id` | `group`・`user` のときの相手。`cab`・`ecab` は `cab_definition` のグループを使う |
+| `rule` | 承認の規則（[workflow-engine.md](workflow-engine.md) の 7.2 節の `any` / `all` / `all_responded_any_approves` / `percent(p)` / `count(k)`） |
+| `due_after` | 依頼から期限までの長さ（既定：通常 3 日、緊急 4 時間。暦の時間。既定の値は 2026-09-28 に承認済み） |
+| `on_due` | `escalate` / `reject`（`approve` と `cancel` は選べない） |
+| `escalate_to_group_id` | `on_due = escalate` の引き上げの先（なければ承認者の上長） |
+| `active`、`version`、共通のメタデータの列 | 変更は `meta_version` を上げる 1 つのトランザクションで行い、監査の履歴に残る（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)） |
+
+- 一意：`(tenant_id, change_type, risk, stage)` の有効な行は 1 つ。具体的な `risk` の行は `*` の行に勝つ。
+- 書けるのは `change_manager` のロールだけ。設定のパッケージ（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 10 節）で移送できる。
+- 段の数と、段を置く状態（`assess`・`authorize`・`review`）はテナントが変えられない。変えられるのは、各段の承認者・規則・期限・期限切れの動作だけである。
+- 承認の依頼のとき、使った行の `id` と `version`（既定なら組み込みのフローの版）を `approval_set` の作成の記録に残す。進行中のまとまりは、後から行を変えても作成の時の値で進む。
+
+DT-CHG-003（保存の時の検査）：
+
+| # | 条件 | 結果 |
+| --- | --- | --- |
+| 1 | `approver_kind = none` で、`change_type` が `standard` でない | 422 `approval_stage_required` |
+| 2 | `change_type = emergency` で、`stage` が `authorize`・`post_review` でない、または `risk` が `*` でない | 422 `invalid_emergency_stage` |
+| 3 | `on_due` が `approve`・`cancel` | 422 `auto_approval_not_allowed`（[ADR-0016](../decisions/0016-approvals.md) の `requires_explicit_approval`） |
+| 4 | `approver_kind` が `group`・`user` で、相手の列が空、または相手が無効 | 422 `approver_missing` |
+| 5 | `rule` が `percent(p)` で p が 1〜100 の外、`count(k)` で k < 1 | 422 `invalid_rule` |
+| 6 | そのほか | 保存する |
 
 ### 8.6 CAB の会議
 
@@ -396,7 +430,7 @@ DT-CHG-002（種類 × リスク → 承認の段）：
 
 ```
 conflicts(change, ctx) → [Conflict]
-  change：cmdb_ci_id、影響を受ける CI の一覧（affected_ci）、planned_start、planned_end、assigned_to_id、change_type
+  change：ci_id、影響を受ける CI の一覧（affected_ci）、planned_start、planned_end、assigned_to_id、change_type
   ctx：時間帯の一覧と区間（コンパイル済み）、関係のグラフの近傍（親・子、深さ 1）、
        同じ期間に予定のある他の変更（state IN (scheduled, implement)、および authorize）、担当者の他の変更
 Conflict = { kind, severity, ci_id, other_change_id?, window_id?, overlap: [s, e) }
@@ -408,7 +442,7 @@ DT-CONF-001（衝突の種類と重さ）：
 
 | # | 種類 | 条件 | 重さ（通常・標準） | 重さ（緊急） |
 | --- | --- | --- | --- | --- |
-| 1 | `blackout` | 対象の CI（`cmdb_ci_id` と `affected_ci`）が、禁止期間の区間と重なる | `blocking` | `warning`（記録する） |
+| 1 | `blackout` | 対象の CI（`ci_id` と `affected_ci`）が、禁止期間の区間と重なる | `blocking` | `warning`（記録する） |
 | 2 | `blackout_related` | 親・子の CI が禁止期間と重なる | `warning` | `warning` |
 | 3 | `freeze` | `tenant_wide` の禁止期間と重なる | `blocking` | `warning` |
 | 4 | `outside_maintenance` | 対象の CI が保守の時間帯を持ち、予定がその外にはみ出る | `warning` | `warning` |
@@ -426,7 +460,7 @@ DT-CONF-001（衝突の種類と重さ）：
 
 | 時点 | どこで | 振る舞い |
 | --- | --- | --- |
-| `planned_start`・`planned_end`・`cmdb_ci_id`・`affected_ci`・`assigned_to_id` の変更 | 保存の流れの効果 `recompute_conflicts`（同じトランザクション） | `change_conflict` を書き直し、`conflict_status` と `conflict_checked_at` を更新 |
+| `planned_start`・`planned_end`・`ci_id`・`affected_ci`・`assigned_to_id` の変更 | 保存の流れの効果 `recompute_conflicts`（同じトランザクション） | `change_conflict` を書き直し、`conflict_status` と `conflict_checked_at` を更新 |
 | `assess`・`schedule`・`implement` への遷移 | 遷移の `guard` の前 | 計算し直し、`blocking` なら遷移を 422 `blocking_conflict` |
 | 他の変更の予定の変更、時間帯の追加・変更 | outbox の `record.changed` から、非同期のジョブ | 影響を受ける変更（同じ CI・期間）を計算し直す。`blocking` が新しく出たら担当と `change_manager` に知らせる |
 
@@ -468,13 +502,13 @@ DT-CONF-001（衝突の種類と重さ）：
 
 ### 12.1 決定表（`spec.md` から読む表駆動テスト）
 
-- DT-INC-001、DT-PRB-001、DT-CHG-001（種類ごと）、DT-PRIO-001、DT-PRIO-002、DT-MIM-001、DT-RISK-001、DT-CHG-002、DT-CONF-001。
+- DT-INC-001、DT-PRB-001、DT-CHG-001（種類ごと）、DT-PRIO-001、DT-PRIO-002、DT-MIM-001、DT-RISK-001、DT-CHG-002、DT-CHG-003、DT-CONF-001。
 - 否定の表：各モデルで、表にない（前、後、主体）の組をすべて作り、422 で DB が変わらないことを確かめる。
 
 ### 12.2 性質ベーステスト（fast-check）
 
 - **PROP-CHG-001（承認なしに実施しない）**：任意の変更の種類と、任意の操作・承認の回答・期限の発火・予定の変更の列で、`implement` に入った変更は、その直前の `scheduled` への遷移の時点で、決着が `approved` の承認のまとまり（標準は承認済みの雛形の版）を持つ。
-- **PROP-CHG-002（予定の固定）**：任意の列で、`implement` に入った変更の `planned_start`・`planned_end`・`cmdb_ci_id` は、最後の承認の決着の時点の値と同じ。
+- **PROP-CHG-002（予定の固定）**：任意の列で、`implement` に入った変更の `planned_start`・`planned_end`・`ci_id` は、最後の承認の決着の時点の値と同じ。
 - **PROP-PRIO-001（優先度の導出）**：任意の影響度・緊急度・上書きの操作の列で、上書きがない間は `priority = matrix(impact, urgency)`。
 - **PROP-CONF-001（衝突の関数の対称と単調）**：任意の 2 つの変更で、`ci_overlap` は両方の側に出る（対称）。予定の区間を縮めても、衝突の集合は増えない（単調）。
 - **PROP-CONF-002（blocking は時間帯だけで決まる）**：任意の他の変更の集合を足しても消しても、`blocking` の衝突の集合は変わらない。
@@ -502,7 +536,7 @@ DT-CONF-001（衝突の種類と重さ）：
 | E7 | `change-models` | 8.1 節、DT-CHG-001（PROP-CHG-001・002） |
 | E7 | `standard-change-templates` | 8.2 節 |
 | E7 | `change-risk-assessment` | 8.3 節、DT-RISK-001 |
-| E7 | `change-approval-policy-flows` | 8.5 節、DT-CHG-002（workflow-engine と一緒に） |
+| E7 | `change-approval-policy-flows` | 8.5・8.5.1 節、DT-CHG-002・003、`change_approval_policy_rule`（workflow-engine と一緒に） |
 | E7 | `cab-meetings` | 8.6 節と画面 |
 | E7 | `change-windows-and-freeze` | 9.1 節 |
 | E7 | `change-conflict-detection` | 9.2・9.3 節、DT-CONF-001（PROP-CONF-001・002） |
@@ -539,7 +573,7 @@ DT-CONF-001（衝突の種類と重さ）：
 | 機械学習によるリスクの予測 | MVP の後。変更の履歴がたまった後 |
 | CAB の会議のリアルタイムの画面（在席、議題の自動の進行） | E7 の後。利用者の要望で |
 | 変更の承認の記録を J-SOX の証跡として出す形式（CSV、PDF） | L4 の確認と E11 のエクスポートで |
-| 本家の既定の値（自動の完了の日数、状態の値、リスクの優先の順） | 本家の公式の本文で確かめられたら 2 節を直す。設計は本システムの値で進める |
+| 本家の既定の値（自動の完了の日数、状態の値） | 本家の公式の本文で確かめられたら 2 節を直す。設計は本システムの値で進める（リスクの優先の順は 2026-09-28 に確かめた） |
 
 ## 15. quality.md・runbooks・data-model への項目
 
@@ -548,7 +582,7 @@ DT-CONF-001（衝突の種類と重さ）：
 - 承認なしに `implement` に入った変更の件数：常に 0（本番の突き合わせのジョブで日次に数える。PROP-CHG-001 の本番の版）。
 - 緊急の変更の割合と、事後の CAB の承認の滞留（`review` の日数）。
 - 禁止期間の例外の承認の件数（月次）。
-- 変更の成功率（`close_code` 別）、標準の変更の雛形ごとの失敗の件数。
+- 変更の成功率（`resolution_code` 別）、標準の変更の雛形ごとの失敗の件数。
 - メジャーインシデントの候補の件数と、昇格・却下の割合、提案から決定までの時間。
 - 自動の完了の件数と、再オープンの割合。
 - 優先度の上書きの割合（高すぎると表の設計の誤りの兆し）。
@@ -571,6 +605,7 @@ DT-CONF-001（衝突の種類と重さ）：
 | Aurora `major_incident_candidate`、`major_incident_trigger` | 6.1 節 |
 | Aurora `std_change_template`、`std_change_template_version` | 8.2 節 |
 | Aurora `risk_condition`、`risk_questionnaire`、`change_risk_assessment` | 8.3 節 |
+| Aurora `change_approval_policy_rule` | 8.5.1 節。テナントの承認の方針の値（メタデータ） |
 | Aurora `cab_definition`、`cab_meeting`、`cab_agenda_item` | 8.6 節 |
 | Aurora `change_window` | 9.1 節。区間はカレンダーの版 |
 | Aurora `change_conflict`（変更ごとの衝突の行）、`change_impact_snapshot` | 9.2〜9.4 節。`(tenant_id, change_id)`、`(tenant_id, ci_id, overlap)` |

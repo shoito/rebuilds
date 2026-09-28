@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、監査の対象のテーブルの変更が、変更と同じトランザクションで履歴に残り、利用者が消したり書き換えたりできないことを求める。NFR-010 は、履歴の欠けを 0 件にする。顧客は J-SOX の証跡として、変更の記録・承認・権限の変更の履歴を使う。保持の年数は法務の確認待ち（L4）である。
 
-本家は、フィールドの値の変更を監査の表に、作業メモ・コメントを別の表に持ち、テーブル・フィールドの単位で監査を止められる（[How to activate/deactivate auditing](https://www.servicenow.com/community/developer-blog/servicenow-things-to-know-55-how-to-activate-deactivate-auditing/ba-p/2774658)、2026-09-28 に確認。コミュニティの記事で、公式の文書は未検証）。
+本家は、フィールドの値の変更を監査の表に、作業メモ・コメントを別の表に持ち、テーブル・フィールドの単位で監査を止められる（監査の表と、作業メモ・履歴の別の表、辞書の監査の印でのテーブルの単位の有効は [Viewing Sys Audit and Audit Relationship Change tables](https://www.servicenow.com/docs/r/platform-security/c_UnderstandingTheSysAuditTable.html)、2026-09-28 に確認。フィールドの単位で外す方法は [コミュニティの記事](https://www.servicenow.com/community/developer-blog/servicenow-things-to-know-55-how-to-activate-deactivate-auditing/ba-p/2774658) だけで、未検証）。
 
 ## Options
 

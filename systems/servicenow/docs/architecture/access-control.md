@@ -27,12 +27,12 @@
 | 規則の種類 | 「条件を満たさない限り拒否」（Deny-Unless）と「条件を満たせば許可」（Allow-If） | 同上 |
 | 規則がないとき | 一致する規則がなければ、アクセスを許す。ただし、既定の規則の集合がすべてのレコードの操作を守る | 同上 |
 | 既定の拒否 | 既定の拒否の設定を「deny」にすると、規則がないとき、またはテーブルのワイルドカードの規則しかないときに拒否する。一度変えると戻せない | [Deny by default with empty ACLs](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/security-center/reference/sc-security-manager-default-deny.html) |
-| 行とフィールド | テーブルの規則に落ちると、フィールドの規則を通ってもどのフィールドにも触れられない。行とフィールドは AND | コミュニティの記事と検索の結果の抜粋で確認（[Evaluating Row level and Field level ACLs](https://www.servicenow.com/community/in-other-news/evaluating-row-level-and-field-level-acls/ba-p/2268703)）。公式の本文は未検証 |
-| クラスの継承 | 子のテーブルに規則がなければ、親のテーブルの規則を使う（具体的なものから一般的なものへ探す） | 同上（コミュニティの記事）。未検証 |
-| 管理者の上書き | 規則ごとに、管理者のロールが条件を飛ばせるかの印を持つ | 未検証（公式の文書で確かめられなかった） |
+| 行とフィールド | 利用者は、フィールドに一致する最初の規則と、テーブルに一致する最初の規則の両方を満たす必要がある。行とフィールドは AND | [Access control list rules](https://www.servicenow.com/docs/r/platform-security/access-control/exploring-access-control-list.html) |
+| クラスの継承 | テーブルの規則は、テーブル名 → 親のテーブル名 → `*` の順に探す。フィールドの規則は、`テーブル.フィールド` → `親.フィールド` → `*.フィールド` → `テーブル.*` → `親.*` → `*.*` の順 | [ACL rule types](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/contextual-security/concept/acl-rule-types.html) |
+| 管理者の上書き | 規則ごとに、管理者のロールが条件を飛ばせるかの印を持つ | コミュニティの記事で確認。公式の本文は未検証（本家の振る舞いで、設計の前提ではない。本システムは管理者の上書きを持たない） |
 | 成り代わり | 成り代わりの操作を監査の表に、成り代わった相手と実際の人の両方で記録できる | [Enable impersonation tracking in audit logs](https://www.servicenow.com/docs/r/platform-security/enable-impersonation-tracking-audit-logs.html) |
-| 成り代わりのロール | 専用のロールが要る。管理者は既定で持つ | コミュニティの記事で確認。未検証 |
-| SSO | 複数の IdP を持てる。SAML 2.0 と OIDC。IdP のメタデータから設定を作る。利用者の自動の作成 | [SAML 2.0 configuration using Multi-Provider SSO](https://www.servicenow.com/docs/r/washingtondc/platform-security/authentication/t_CreateASAML2Upd1SSOConfigMultiSSO.html)（検索の結果の抜粋で確認。本文は未検証） |
+| 成り代わりのロール | 専用のロール（impersonator）が要る | [Impersonate a user](https://www.servicenow.com/docs/r/platform-administration/user-administration/t_ImpersonateAUserInUI16.html)。管理者が既定で持つかは未検証（本家の振る舞いで、設計の前提ではない） |
+| SSO | SAML 2.0・OIDC の IdP を最大 10 までログインの画面に並べられる。SSO の時に利用者を作り、グループに入れられる | [Multi-Provider single sign-on (SSO)](https://www.servicenow.com/docs/r/zurich/platform-security/authentication/c_MultipleProviderSingleSignOn.html) |
 
 - 本家は、規則のスクリプト（サーバーのコード）で条件を書ける。本システムはスクリプトを持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。条件は式の言語だけで書く。
 - 本家のロールの名前、既定の規則の中身は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
@@ -50,7 +50,7 @@
 - `group`（担当のグループ）：`tenant_id`、`id`、`name`（一意）、`manager_id`、`parent_id`、`type`（`assignment` / `approval` / `other` の複数）、`active`。
 - `group_member`：`group_id`、`user_id`。
 - `group_role`：グループに付けたロール。メンバーは、グループのロールを持つ。
-- **親のグループのロールは、子のグループのメンバーに継承しない。** 親は、レポートと割り当ての規則の階層にだけ使う。本家の振る舞いは未検証。継承させると、組織の変更（親の付け替え）で権限が黙って広がるためである。
+- **親のグループのロールは、子のグループのメンバーに継承しない。** 親は、レポートと割り当ての規則の階層にだけ使う。本家の振る舞いは未検証（本家の振る舞いで、設計の前提ではない）。継承させると、組織の変更（親の付け替え）で権限が黙って広がるためである。
 
 ### 3.3 ロール
 
@@ -77,8 +77,8 @@
 - `major_incident_manager`・`problem_manager` は、統合で組み込みのロールに足した（itsm-processes が使う。テナントのロールにしないのは、組み込みの遷移の表と ACL の規則がこの名前を参照するため）。
 - **`requester` の組み込みの規則（主なもの）**：
   - 要求・要求の品目・実行のタスク：[service-catalog-and-requests.md](service-catalog-and-requests.md) の DT-REQ-002。
-  - インシデントの作成（`create`）：`allow_if`、ロール `requester`、条件 `caller_id = me`（他人のための報告は `agent` の代行だけ）。ポータルの報告のフォーム（フォームからのレコードの作成。[ADR-0030](../decisions/0030-portal-requester-scope-and-record-producers.md)）が依頼者の主体で保存するために要る。書けるフィールドは `short_description`、`description`、`caller_id`、`urgency`、`category`、`service_offering_id`、`cmdb_ci_id`、`watch_list` と添付だけにする（フィールドの `*` の `deny_unless` で、優先度・影響度・担当・状態を書かせない）。`channel = portal`・`opened_by` はシステムが入れる。
-  - インシデントの読み取り：`caller_id = me` または `opened_by = me` または `me ∈ watch_list` の行。作業メモは読めない（DT-ACL-003 の 13 行）。
+  - インシデントの作成（`create`）：`allow_if`、ロール `requester`、条件 `requester_id = me`（他人のための報告は `agent` の代行だけ）。ポータルの報告のフォーム（フォームからのレコードの作成。[ADR-0030](../decisions/0030-portal-requester-scope-and-record-producers.md)）が依頼者の主体で保存するために要る。書けるフィールドは `title`、`description`、`requester_id`、`urgency`、`category`、`service_offering_id`、`ci_id`、`watchers` と添付だけにする（フィールドの `*` の `deny_unless` で、優先度・影響度・担当・状態を書かせない）。`channel = portal`・`opened_by` はシステムが入れる。
+  - インシデントの読み取り：`requester_id = me` または `opened_by = me` または `me ∈ watchers` の行。作業メモは読めない（DT-ACL-003 の 13 行）。
   - インシデントの更新：コメントの追加と、`resolved` からの再オープン（[itsm-processes.md](itsm-processes.md) の DT-INC-001 の 5 行）だけ。
   - 統合で決めた。カタログの品目の公開の検査（DT-CAT-001 の 5 行）は、この規則で `field_map` の先を確かめる。
 - ロールの付け外しは `acl_admin` だけができる。自分へのロールの付与も記録し、`auditor` が読める。
@@ -99,7 +99,7 @@ principal(actor) =
 ### 3.5 昇格
 
 - `elevated` のロール（`acl_admin`、`impersonator`）の権限は、セッションで「昇格」を済ませたときだけ効く。昇格は、MFA（SSO の人は IdP での再認証。`prompt=login`・`ForceAuthn`）を通すことで行い、15 分で切れる。
-- 昇格していない間は、`elevated` のロールを持たないものとして判定する。本家にも昇格の仕組みがある（[Security Admin role | High Security plugin](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0688286)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+- 昇格していない間は、`elevated` のロールを持たないものとして判定する。本家にも昇格の仕組みがある。昇格の役割は、利用者が手で責任を引き受けてから使え、セッションの間だけ効く（[Elevated privilege roles](https://www.servicenow.com/docs/r/platform-security/c_ElevatedPrivilege.html)、2026-09-28 に確認）。
 
 ## 4. ACL の規則（[ADR-0011](../decisions/0011-roles-groups-and-acl-evaluation.md)）
 
@@ -229,7 +229,7 @@ visible(f) = CASE WHEN field_read_predicate(f, principal) THEN f END
 | 4 | 並べ替え・絞り込み・グループ化 | `visible(f)` の上で行う（6.1 節） |
 | 5 | 集計・レポート・ダッシュボード | 見る人の主体で 2〜4 を行う。定期の配信は、受け手ごとに受け手の主体で計算する（`reports.md`） |
 | 6 | 参照の表示の値 | 参照先の行の `read` と表示のフィールドの `read` があるときだけ表示の値を出す。なければ「（表示できないレコード）」と ID を出さない |
-| 7 | 参照のたどり（リストの列 `caller.department`、条件） | たどる各段で、行とフィールドの `read` を判定する |
+| 7 | 参照のたどり（リストの列 `requester.department`、条件） | たどる各段で、行とフィールドの `read` を判定する |
 | 8 | 関連のリスト | 関連の先のテーブルでの 2〜4 |
 | 9 | 検索 | 索引の ACL の属性で絞った後、返す直前に各結果を判定の関数で確かめ直す。読めないフィールドの一致の強調を出さない（`search.md`） |
 | 10 | エクスポート（CSV など） | リストと同じ問い合わせ。行の上限は 10 万。`auditor` は含まない |
@@ -384,9 +384,9 @@ DT-IMP-001（成り代わりの開始）：
 | E3 | `break-glass-admins` | 9.3 節 |
 | E3 | `hr-import-principals` | 人事のシステムからの利用者・部署・上長・グループの取り込み（L1 の確認待ち） |
 | E6 | `incident-acl-defaults` | インシデント・問題の既定の規則（担当のグループ、依頼者本人） |
-| E8 | `portal-requester-scope` | ポータルの自分のチケット・承認の範囲の規則 |
+| E8 | `requester-acl` | ポータルの自分のチケット・承認の範囲の規則（統合で service-catalog の依頼者の範囲の Story とまとめた） |
 | E11 | `report-acl-aggregation` | 集計と定期の配信での受け手ごとの判定 |
-| E12 | `acl-pentest-scope` | 外部のペンテストの範囲に、出口の推測と成り代わりを含める |
+| E12 | `external-pentest` | 外部のペンテストの範囲に、出口の推測と成り代わりを含める（統合で roadmap の Story にまとめた） |
 
 ## 14. 未解決の問い
 

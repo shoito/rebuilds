@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [ADR-0003](0003-table-hierarchy-and-extensible-schema.md) は、テナントの辞書を版付きにし、版ごとにコンパイルした判定をキャッシュすると決めた。[ADR-0002](0002-tenancy-and-isolation.md) は、本番とサブプロダクションを別のテナントにし、同じ顧客のテナントを同じセルに置き、設定の移送（開発 → 本番）を data-dictionary-and-tables の領域で決めるとした。
 
-本家の更新のセットは、更新の記録の名前と更新の時刻で衝突を見つけ、一部の表は一意の列の組で同じレコードを見つけ、移送のときに参照の ID を書き換える（[Update set collision resolution](https://www.servicenow.com/docs/r/application-development/system-update-sets/update-set-collisions.html)、2026-09-28 に確認）。取り込んだ更新のセットはプレビューで問題を確かめてからコミットする（コミュニティの記事で確認。公式の手順の本文は未検証）。本家の更新のセットの形式との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
+本家の更新のセットは、更新の記録の名前と更新の時刻で衝突を見つけ、一部の表は一意の列の組で同じレコードを見つけ、移送のときに参照の ID を書き換える（[Update set collision resolution](https://www.servicenow.com/docs/r/application-development/system-update-sets/update-set-collisions.html)、2026-09-28 に確認）。取り込んだ更新のセットはプレビューで問題（衝突、欠けた依存など）を見つけ、取り込むか飛ばすかを決めてからコミットする（[Preview a remote update set](https://www.servicenow.com/docs/r/application-development/system-update-sets/t_PreviewARemoteUpdateSet.html)、2026-09-28 に確認）。本家の更新のセットの形式との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
 
 ## Options
 

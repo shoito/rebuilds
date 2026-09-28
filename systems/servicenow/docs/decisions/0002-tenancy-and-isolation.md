@@ -7,7 +7,7 @@ date: 2026-09-28
 
 ## Context
 
-本家は「マルチインスタンス」の構成をとる。顧客ごとのインスタンスが、自分のアプリの処理と DB の処理を持つ。そのため、インスタンスごとに版と更新の時期が違ってよい。データセンターは 2 つを 1 組にし、主のほうで読み書き、副のほうへ非同期で複製する。障害のときの目標は RPO 1 時間・RTO 2 時間である（[Advanced High Availability Architecture](https://www.servicenow.com/lpwhp/high-availability-whitepaper.html)、2026-09-28 に検索の結果の抜粋で確認。本文は取得できず未検証）。日本では東京と大阪のデータセンターを 1 組にしている（[ServiceNow to launch two new data centres in Japan](https://datacenternews.asia/story/servicenow-to-launch-two-new-data-centres-in-japan)、2026-09-28 に確認。報道の記事であり、本家の公式の資料では未検証）。
+本家は「マルチインスタンス」の構成をとる。顧客ごとのインスタンスが、自分のアプリの処理と DB の処理を持つ。そのため、インスタンスごとに版と更新の時期が違ってよい。データセンターは 2 つを 1 組にし、主のほうで読み書き、副のほうへ非同期で複製する。障害のときの目標は RPO 1 時間・RTO 2 時間である（[Advanced High Availability Architecture](https://www.servicenow.com/lpwhp/high-availability-whitepaper.html)、2026-09-28 に検索の結果の抜粋で確認。白書の PDF は取得できず（403）未検証。本家の振る舞いで、この決定の前提ではない）。日本では東京と大阪のデータセンターを 1 組にしている（[ServiceNow to launch two new data centres in Japan](https://datacenternews.asia/story/servicenow-to-launch-two-new-data-centres-in-japan)、2026-09-28 に確認。報道の記事であり、本家の公式の資料では未検証。本家の振る舞いで、この決定の前提ではない）。
 
 本家の顧客は、本番のほかに開発・検証のインスタンス（サブプロダクション）を持ち、設定を更新のセットで移す。本家の版を上げるときに、顧客が変えた設定と本家の変更がぶつかると「skipped」として顧客が確かめる（[Best Practices to manage skipped updates](https://www.servicenow.com/community/developer-blog/best-practices-to-manage-skipped-updates-effectively-during/ba-p/3421456)、2026-09-28 に確認。コミュニティの記事）。
 

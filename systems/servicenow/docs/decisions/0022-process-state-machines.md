@@ -11,7 +11,7 @@ date: 2026-09-28
 
 [intent.md](../intent.md) は、インシデント・問題・変更が既定の設定のまま動き、状態の遷移がちょうど 1 回、正しく行われることを求める。SLA の条件、承認の方針、メールの処理、レポートは、どれも状態の値を前提にする。
 
-本家は、インシデント（新規・対応中・保留・解決・完了・取り消し）、問題（新規・評価・根本原因の分析・修正中・解決・完了）、変更（種類ごとの状態の進み）を持つ（[State progression for change models](https://www.servicenow.com/docs/r/it-service-management/change-management/normal-standard-emergency-states.html)、2026-09-28 に確認。インシデントと問題の状態の一覧はコミュニティの記事で確認。公式の本文は未検証）。本家は、顧客がスクリプトで状態を足したり遷移を変えたりできる。既知のエラーは、問題の状態ではなく分類として扱うとされる（コミュニティの記事。未検証）。
+本家は、インシデント（新規・対応中・保留・解決・完了・取り消し）、問題（新規・評価・根本原因の分析・修正中・解決・完了）、変更（種類ごとの状態の進み）を持つ（[State progression for change models](https://www.servicenow.com/docs/r/it-service-management/change-management/normal-standard-emergency-states.html)、2026-09-28 に確認。[Incident Management state model](https://www.servicenow.com/docs/r/it-service-management/incident-management/c_IncidentManagementStateModel.html)、2026-09-28 に確認。問題の「根本原因の分析」「修正中」「解決」「完了」は [Investigate root cause of a problem](https://www.servicenow.com/docs/r/it-service-management/problem-management/investigate-root-cause.html)、「新規」「評価」はコミュニティの記事で確認）。本家は、顧客がスクリプトで状態を足したり遷移を変えたりできる。今の問題の状態のモデルは既知のエラーを状態に持たず、既知のエラーの記事を参照するフィールドを持つ（同上）。London 以前の旧い流れは「既知のエラー」を状態に持っていた（[Problem Management process](https://www.servicenow.com/docs/r/it-service-management/problem-management/c_ProblemManagementProcess.html)、2026-09-28 に確認）。
 
 本システムは、テナントに任意のコードを書かせない（[ADR-0001](0001-platform-and-stack.md)）。状態の遷移は保存の流れ（[data-dictionary-and-tables.md](../architecture/data-dictionary-and-tables.md) の 5 節）の中で、版の条件付きで行う（[ADR-0004](0004-workflow-and-sla-engine.md)）。
 

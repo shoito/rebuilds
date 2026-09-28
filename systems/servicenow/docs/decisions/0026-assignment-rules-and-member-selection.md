@@ -11,7 +11,7 @@ date: 2026-09-28
 
 インシデント・要求・変更のタスクを、カテゴリ・CI・場所などから担当のグループへ自動で振り分けたい。グループの中では、順番・負荷・スキルで担当者を決めたい要望がある。
 
-本家は、条件でグループを入れる割り当ての規則と、完全一致の表で値を入れるデータの参照の規則を持ち、保存の前のエンジンとして動かす。2 つの順序は決まっていない（[Precedence between data lookup, assignment, and business rules](https://www.servicenow.com/docs/bundle/xanadu-platform-administration/page/administer/task-table/concept/c_PrecBetweenAssignmentAndBusRules.html)、2026-09-28 に確認）。担当者の選び方は、別の機能（作業の割り当て）で「最後に割り当てた」「最も余裕がある」とスキルの一致を持つ（コミュニティの記事。未検証）。
+本家は、条件でグループを入れる割り当ての規則と、完全一致の表で値を入れるデータの参照の規則を持ち、保存の前のエンジンとして動かす。2 つの順序は決まっていない（[Precedence between data lookup, assignment, and business rules](https://www.servicenow.com/docs/bundle/xanadu-platform-administration/page/administer/task-table/concept/c_PrecBetweenAssignmentAndBusRules.html)、2026-09-28 に確認）。担当者の選び方は、別の機能（作業の割り当て）で「最も長く割り当てのない人」「最も余裕がある人」の方針と、スキルの一致を持つ（[Create an assignment rule (Advanced Work Assignment)](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/administer/advanced-work-assignment/task/awa-create-assignment-rule.html)、2026-09-28 に確認）。
 
 同じグループへの割り当ては、メールの一斉の受信で並行に起きる。素朴に「最後に割り当てた時刻の古い人」を読んで選ぶと、並行の保存が同じ人を選ぶ。
 

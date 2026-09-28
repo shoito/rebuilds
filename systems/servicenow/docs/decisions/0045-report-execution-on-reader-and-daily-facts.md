@@ -13,7 +13,7 @@ date: 2026-09-28
 
 集計の結果は、見る人ごとに違う（[ADR-0012](0012-acl-enforcement-at-every-exit.md)、[access-control.md](../architecture/access-control.md) の 6.2 節の 5 行）。「未解決の件数の推移」は、今の行からは作れず、過去の状態が要る。
 
-Aurora の reader の遅れは通常 100ms を大きく下回り、書き込みが多いと増える（[Replication with Amazon Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Replication.html)、2026-09-28 に確認）。本家は、指標の値（スコア）を時点ごとに集める仕組みと、写しを取って問い合わせの時に計算する仕組みを持つ（コミュニティの記事、2026-09-28 に確認。公式の本文は未検証）。
+Aurora の reader の遅れは通常 100ms を大きく下回り、書き込みが多いと増える（[Replication with Amazon Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Replication.html)、2026-09-28 に確認）。本家は、指標の値（スコア）を時点ごとに集める仕組みと、写しを取って問い合わせの時に計算する仕組みを持つ（コミュニティの記事、2026-09-28 に確認。公式の本文は未検証。本家の振る舞いで、この決定の前提ではない）。
 
 ## Options
 

@@ -13,7 +13,7 @@ date: 2026-09-28
 
 ADR-0005 は「上から順に照合し、一致したら既存の CI を更新する」と書いた。最初の一致で止めると、優先の高い項目が CI A に、低い項目が CI B に一致する入力（A と B は同じ機器の重複の疑い）で、推測で A を更新し、B の値を A の識別の値として登録しようとすることになる。
 
-本家は、ペイロードの中の重複をまとめて処理する（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。複数の一致のときの本家の振る舞いは未検証。
+本家は、ペイロードの中の重複をまとめて処理する（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。複数の一致のとき、本家は既定で最も古い CI を選んで更新し、残りを重複として印を付け、重複の解消のタスクを作るとされる（重複の数のしきい値の既定 5。コミュニティの記事で確認。公式の本文は未検証。本家の振る舞いで、この決定の前提ではない）。
 
 ## Options
 

@@ -11,7 +11,7 @@ date: 2026-09-28
 
 社員は IT に詳しくない人を前提にし、スマートフォンからも申請・承認・報告をする（[intent.md](../intent.md)）。承認はスマートフォンで 1 回の操作で答えられるようにする（[ADR-0016](0016-approvals.md)）。当番の呼び出しの通知は MVP でメールとアプリのプッシュに限り、受け付けは本人のログインを要る（[ADR-0027](0027-on-call-rotations-and-escalation.md)）。テナントに HTML・JavaScript を差し込ませない（[intent.md](../intent.md) の Non-goals）。
 
-本家のポータルは、部品（widget）とテーマで作り、部品の中身（HTML・スクリプト）を顧客が書ける（[Employee Center widgets](https://www.servicenow.com/docs/r/employee-service-management/employee-experience-foundation/employee-center-widgets-list.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証）。
+本家のポータルは、部品（widget）とテーマで作り、部品の中身（HTML・スクリプト）を顧客が書ける（[Employee Center widgets](https://www.servicenow.com/docs/r/employee-service-management/employee-experience-foundation/employee-center-widgets-list.html)、2026-09-28 に検索の結果の抜粋で確認。本文は未検証。本家の振る舞いで、この決定の前提ではない。本システムは部品の中身を顧客に書かせない）。
 
 iOS・iPadOS は 16.4 から、ホーム画面に置いた Web アプリで Web Push を受けられる。Safari のタブの中では受けられない（[Web Push for Web Apps on iOS and iPadOS](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/)、2026-09-28 に確認）。
 

@@ -13,7 +13,7 @@ date: 2026-09-28
 
 この決定表は、来歴に最後に書いた 1 つの取り込み元しか持たないため、到着の順で結果が変わる場合がある。例：強い取り込み元 H が 1 日目に x、弱い取り込み元 L が 40 日目に y を観測し、鮮度が 30 日とする。H → L の順では「H の値は L の時刻から見て古い」で y を書く。L → H の順では、L が先に書き、H は「優先度が高い」で x を書く。
 
-本家は、属性の最新の観測の時刻と、取り込み元の新しさの時刻で値を選ぶ（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。本家のデータの更新の規則と動的な調整の規則の細部は未検証。
+本家は、属性の最新の観測の時刻と、取り込み元の新しさの時刻で値を選ぶ（[Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)、2026-09-28 に確認）。本家は、取り込み元の優先度で決める静的な調整の規則と、複数の取り込み元の値から選ぶ動的な調整の規則を持ち、両方があれば動的な規則が勝つ。子のクラスの規則は親の規則を上書きする。データの更新の規則は、取り込み元の観測が古くなったとみなし、優先度の低い取り込み元に書かせる時期を決める（[Reconciliation rules](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/r_ReconciliationRulesPrinciples.html)、2026-09-28 に確認）。
 
 ## Options
 

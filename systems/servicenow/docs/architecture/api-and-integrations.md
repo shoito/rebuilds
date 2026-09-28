@@ -21,9 +21,9 @@ REST のテーブルの API（データ辞書から作る）、API のクライ�
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| テーブルの API | テーブルのレコードの作成・読み取り・更新・削除の REST API。符号化した問い合わせの文字列で絞り、取得の件数の上限と開始の位置でページを送る。参照のフィールドに表示の値を付けるかを選べる | [Table API](https://www.servicenow.com/docs/r/zurich/api-reference/rest-apis/c_TableAPI.html)、[Query parameters for display value and header](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/query-parameters-display-value.html)（本文は検索の結果の抜粋で確認。未検証） |
+| テーブルの API | テーブルのレコードの作成・読み取り・更新・削除の REST API。符号化した問い合わせの文字列で絞り、取得の件数の上限と開始の位置でページを送る。参照のフィールドに表示の値を付けるかを選べる | [Table API](https://www.servicenow.com/docs/r/api-reference/rest-apis/c_TableAPI.html)（件数の上限の既定 10,000、開始の位置の既定 0、表示の値は `true`・`false`・`all`） |
 | レート制限 | 1 時間あたりの受け付けの数の規則を、利用者・ロール・全員に置ける。利用者の規則がロールの規則に、ロールの規則が全員の規則に勝つ。応答に上限・戻る時刻・規則の ID のヘッダーを付け、超えたら 429 と `Retry-After`。ノードごとに数え、30 秒ごとに DB に書くので、効くまでに最大 30 秒かかる | [Inbound REST API rate limiting](https://www.servicenow.com/docs/bundle/zurich-api-reference/page/integrate/inbound-rest/concept/inbound-REST-API-rate-limiting.html) |
-| 取り込み | 取り込みの表（import set）に置き、変換の対応（transform map）で対象の表に写す。一致のキー（coalesce）にしたフィールドが既存のレコードと一致すれば更新、なければ作成。複数のフィールドを一致のキーにすると、すべてが一致したときだけ更新 | [Import set coalesce](https://www.servicenow.com/docs/bundle/zurich-integrate-applications/page/administer/import-sets/concept/c_ImportSetCoalesce.html)（本文は未検証）と解説の記事 |
+| 取り込み | 取り込みの表（import set）に置き、変換の対応（transform map）で対象の表に写す。一致のキー（coalesce）にしたフィールドが既存のレコードと一致すれば更新、なければ作成。複数のフィールドを一致のキーにすると、すべてが一致したときだけ更新 | [Import set coalesce](https://www.servicenow.com/docs/bundle/zurich-integrate-applications/page/administer/import-sets/concept/c_ImportSetCoalesce.html)（本文は取得できず、検索の結果の抜粋と解説の記事で確認。未検証で、本家の振る舞いで、設計の前提ではない） |
 | 署名付き Webhook の形 | Standard Webhooks は、`webhook-id`・`webhook-timestamp`・`webhook-signature` のヘッダーと、`id.timestamp.本文` の HMAC-SHA256（`v1,` と Base64）を定める | [Standard Webhooks の仕様](https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md) |
 
 - 本家の API のパス、問い合わせのパラメーターの名前、ヘッダーの名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。本家の API と互換にしない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。Standard Webhooks は公開の仕様で、形を寄せる（名前は `<Brand>-` にする）。
@@ -81,13 +81,13 @@ GET    /api/v1/openapi.json                      このテナントの今の辞�
 
 ```
 GET /api/v1/tables/incident?q=active = true and priority <= 2
-                           &fields=number,short_description,assignment_group,c_building
+                           &fields=number,title,assignment_group,c_building
                            &display=true&limit=100&sort=-updated_at
 → 200
 {
   "data": [
     { "id": "0192...", "class": "incident", "version": 7,
-      "number": "INC0001234", "short_description": "...",
+      "number": "INC0001234", "title": "...",
       "assignment_group": { "id": "0191...", "display": "サービスデスク" },
       "c_building": "本社 3F" }
   ],
@@ -190,7 +190,7 @@ DT-IMP-001（1 行の変換）：
 | 7 | - | - | 保存が ACL・検証・遷移で失敗 | `error`（Record Service のエラーのコード） |
 | 8 | - | - | - | `error`（網羅の確かめ） |
 
-- 2 行を推測で片付けないのは、CMDB と同じ考え（あいまいなら止める。[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）である。本家の振る舞いは未検証。
+- 2 行を推測で片付けないのは、CMDB と同じ考え（あいまいなら止める。[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）である。本家の振る舞いは未検証（本家の振る舞いで、設計の前提ではない）。
 - 一致の検索は、`run_as` の主体の ACL で読める行だけを対象にする。読めない行と一致して「一致なし → 作成」になると、重複を作る。これを防ぐため、**一致の検索だけは `run_as` の主体の ACL で行い、見つからなかったときは、ACL を外した件数の確かめ（存在するかだけ）を行い、存在すれば `error`（`coalesce_target_not_readable`）にする**。存在の有無だけを行のエラーに残し、値は返さない（取り込みの実行者は、その主体の権限の外の行があることを知る。変換の対応の `run_as` を決めた管理者の責任の範囲とする）。
 
 ### 5.4 変換の式と文字コード
