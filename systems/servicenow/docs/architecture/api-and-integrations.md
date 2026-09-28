@@ -163,7 +163,7 @@ GET /api/v1/tables/incident?q=active = true and priority <= 2
 | 表 | 中身 |
 | --- | --- |
 | `import_source` | 名前、形式（`csv` / `json`）、文字コード（`auto` / `utf-8` / `shift_jis`）、既定の変換の対応。メタデータ |
-| `transform_map`（版付き） | 対象のテーブル、フィールドの対応（対象のフィールド ← 式。式は原本の列を読む）、一致のキー、一致のとき（`update` / `skip`）、一致しないとき（`insert` / `skip`）、選択肢の値の対応の表、`run_as`（実行の主体）、空の値の扱い（`ignore` / `clear`）。メタデータ、公開で不変の版 |
+| `transform_map`（版付き。版は `transform_map_version`） | 対象のテーブル、フィールドの対応（対象のフィールド ← 式。式は原本の列を読む）、一致のキー、一致のとき（`update` / `skip`）、一致しないとき（`insert` / `skip`）、選択肢の値の対応の表、`run_as`（実行の主体）、空の値の扱い（`ignore` / `clear`）。メタデータ、公開で不変の版 |
 | `import_run` | 取り込み元、変換の対応の版、`run_key`（7 日一意）、状態（`loading` / `ready` / `transforming` / `completed` / `failed` / `cancelled`）、件数、開始・終わり |
 | `import_row` | `run_id`、`row_no`、`raw`（JSONB。原本の 1 行）、`lane`（一致のキーのハッシュの区画）、状態、`target_id`、`error_code`、`error_detail` |
 
@@ -410,7 +410,7 @@ outbox（record.changed、sla.*、approval.*、ci.held、import.completed）
 | --- | --- |
 | Aurora `api_client`、`api_client_secret`（ハッシュ）、`oauth_token`（ハッシュ）、`oauth_refresh_family` | 3.1 節 |
 | Aurora `idempotency_key` | 4.5 節。`(tenant_id, client_id, key)` 一意、24 時間 |
-| Aurora `import_source`、`transform_map`（版付き） | 5.2 節。メタデータ |
+| Aurora `import_source`、`transform_map`、`transform_map_version`（不変の版） | 5.2 節。メタデータ |
 | Aurora `import_run`、`import_row` | 5.2 節。`(tenant_id, source_id, run_key)` 7 日一意。`import_row` は 30 日 |
 | Aurora `webhook_subscription`、`webhook_secret`（KMS で暗号化） | 6.1 節 |
 | Aurora `webhook_delivery` | 6.4 節。`(tenant_id, event_id, subscription_id)` 一意、7 日 |

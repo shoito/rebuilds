@@ -211,7 +211,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 
 | 表 | 列 | 備考 |
 | --- | --- | --- |
-| `record_change` | `tenant_id`、`table_id`、`record_id`、`record_version`、`op`（`insert` / `update` / `delete`）、`changed_at`、`tx_id`、`actor_kind`（`user` / `flow` / `rule` / `integration` / `system`）、`actor_id`、`real_actor_id`（成り代わりのとき本人）、`channel`（`ui` / `api` / `email` / `flow` / `import` / `package`）、`cause_id`（フローの実行・ルール・取り込みの ID）、`changes`（`{field_id: [old, new]}`）、`snapshot`（削除のときだけ、削除の前の全体の値） | 月ごとのパーティション。保存ごとに 1 行 |
+| `record_change` | `tenant_id`、`table_id`、`record_id`、`record_version`、`op`（`insert` / `update` / `delete`）、`changed_at`、`tx_id`、`actor_kind`（`user` / `flow` / `rule` / `integration` / `system` / `email`）、`actor_id`、`real_actor_id`（成り代わりのとき本人）、`channel`（`ui` / `api` / `email` / `flow` / `import` / `package`）、`cause_id`（フローの実行・ルール・取り込みの ID）、`changes`（`{field_id: [old, new]}`）、`snapshot`（削除のときだけ、削除の前の全体の値） | 月ごとのパーティション。保存ごとに 1 行 |
 | `journal_entry` | `tenant_id`、`table_id`、`record_id`、`id`、`kind`（`work_note` / `comment`）、`body`、`created_by`、`real_actor_id`、`created_at`、`channel`、`source_message_id`（メールから） | 月ごとのパーティション。編集・削除しない |
 | `audit_digest` | `tenant_id`、`day`、`partition`、`row_count`、`chain_hash` | 日次。S3 Object Lock（compliance モード）にも写す |
 
@@ -261,7 +261,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 | --- | --- |
 | `tenant_meta` | `tenant_id`、`meta_version`（単調に増える整数）、`acl_version`（[access-control.md](access-control.md) の 7 節） |
 | `meta_change` | `tenant_id`、`meta_version`、`committed_at`、`actor_id`、`real_actor_id`、`package_apply_id`、`objects`（変えたメタデータのオブジェクトの `stable_key` と前後のハッシュ） |
-| メタデータの各表（`dict_*`、`acl_rule`、`flow_def`、`record_rule`、`sla_def`、`calendar` など） | 共通の列：`stable_key`、`rev`、`content_hash`、`updated_in_version`、`deleted` |
+| メタデータの各表（`dict_*`、`acl_rule`、`flow_def`、`record_rule`、`sla_def`、`calendar` など） | 共通の列：`stable_key`、`rev`、`content_hash`、`updated_in_version`、`deleted_at`（列の定義は [data-model.md](data-model.md) の 3.9 節） |
 
 ### 9.2 反映
 
@@ -297,6 +297,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 ```
 
 - 固めたパッケージは変えない。直すときは新しいパッケージを作る。
+- 移送先へは、元のテナントで固めた JSON をダウンロードし、移送先でアップロードして渡す（テナントをまたいで DB を読まない）。移送先は受けた本文を適用の記録（`config_package_apply`）に持つ（[data-model/platform-metadata.md](data-model/platform-metadata.md) の 5 節）。
 - 署名は、セルの KMS の鍵で行う。移送先は署名と、元のテナントが登録済みの組であることを確かめる。
 
 ### 10.4 プレビューと衝突

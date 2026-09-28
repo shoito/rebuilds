@@ -316,7 +316,7 @@ PagerChannel {
 | Aurora `assignment_rule` | 3.1 節。メタデータ |
 | Aurora `group_member`（列の追加）、`skill`、`user_skill`、`user_availability` | 4.1 節 |
 | Aurora `on_call_schedule`、`on_call_schedule_version`、`on_call_override` | 5.1 節 |
-| Aurora `escalation_policy`（版付き） | 6.1 節 |
+| Aurora `escalation_policy`、`escalation_policy_version`（不変の版。`page.policy_version_id` の参照先） | 6.1 節 |
 | Aurora `page`、`page_attempt` | 6.3 節。`(tenant_id, task_id, group_id) WHERE state = 'notifying'` の一意 |
 | Aurora `timer`（種類の追加） | `page_escalation`、優先度 0 |
 | Aurora `task`（列の追加） | `reassignment_count` |

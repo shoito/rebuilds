@@ -267,7 +267,7 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 | データ | 保持（既定案） | 期限後 | 関わる法務の論点 |
 | --- | --- | --- | --- |
 | テナントのレコード（`task`、`ci`、ナレッジ、カタログの要求） | テナントが消すまで | 削除（監査の履歴に削除の前の値が残る） | L1 |
-| 監査の履歴（`record_change`、`journal_entry`）、`meta_change`、承認の行、`sla_clock_event` | 7 年（延長は 10 年まで、短縮はできない） | パーティションを外して消す（保守のロール、プラットフォームの監査） | L4 |
+| 監査の履歴（`record_change`、`journal_entry`）、`meta_change`、承認の行、`sla_clock_event` | 7 年（延長は 10 年まで、短縮はできない） | パーティションを外して消す（保守のロール、プラットフォームの監査）。パーティションを持たない表（`meta_change`、承認の行）は保守のジョブが古い行を消す（[data-model.md](data-model.md) の 3.6 節） | L4 |
 | テナントの監査ログ | DB に 1 年、log-archive に 7 年 | 削除 | L4 |
 | プラットフォームの監査、CloudTrail | log-archive に 7 年 | 削除 | L5 |
 | フローの実行（`flow_run`・`flow_step`） | 90 日（承認の行は監査と同じ） | 削除 | — |
@@ -279,7 +279,7 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 | 取り込みの原本（`import_row`、S3 のファイル） | 30 日 | 削除 | L1 |
 | CMDB の取り込みの結果（`ingest_batch`・`ingest_item`） | 30 日 | 削除 | — |
 | CMDB の統合の前の状態（`ci_merge_log`） | 監査の履歴と同じ（7 年） | パーティションを外して消す | L4 |
-| 当番の呼び出し（`page`・`page_attempt`） | 監査の履歴と同じ（7 年） | 同上 | L4 |
+| 当番の呼び出し（`page`・`page_attempt`） | 監査の履歴と同じ（7 年） | 同上（`page` はパーティションを持たないので保守のジョブが消す） | L4 |
 | 成り代わり（`impersonation_session`）、サポートの参照の許可（`support_access_grant`）、テナントの削除の記録（`tenant_deletion_run`） | 監査の履歴と同じ（7 年） | 削除 | L4・L5 |
 | 変更のリスクの評価・CAB・影響の写し（`change_risk_assessment`、`cab_*`、`change_impact_snapshot`）、ナレッジの版 | 監査の履歴と同じ（7 年）。変更・記事が残る間は残す | 削除 | L4 |
 | リーガルホールド（`legal_hold`） | 解除の後 7 年 | 削除 | L4・L5 |
@@ -496,5 +496,5 @@ CREATE POLICY tenant_only ON task
 | log-archive `platform_audit_event` | 6 節。7 年、Object Lock |
 | Aurora `support_access_grant` | 8 節 |
 | Aurora `legal_hold` | 9.3 節 |
-| Aurora `tenant_deletion_run` | 9.1 節 |
+| 制御の面の Aurora `tenant_deletion_run`（セルのテナントの行を消した後も記録を残すため、セルの DB に置かない） | 9.1 節 |
 | 10.2 節の NULL の行を持つ表の一覧 | [data-model.md](data-model.md) の 3 節と一致させる |

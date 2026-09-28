@@ -38,7 +38,7 @@
    │                 ─▶ Notifier（メール・プッシュ・Webhook）                               │
    │                 ─▶ Indexer（OpenSearch：検索・ナレッジ）                                │
    │  Ingest（メールの受信：mail-router → セルの S3・SQS、CMDB の取り込みと識別・調整）       │
-   │  Valkey（辞書と ACL のコンパイル済みのキャッシュ、セッション、レート制限）               │
+   │  Valkey（辞書と ACL のコンパイル済みのキャッシュ、セッションの写し、レート制限）         │
    │  S3（添付ファイル、メールの原本、エクスポート）                                          │
    └───────────────────────────────────────────────────────────────────────────────────┘
    制御の面（全セルで共有）：テナントの台帳とセルの対応、プロビジョニング、版とフラグの配布
@@ -234,7 +234,7 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **CMDB の調整と識別**：ADR-0005 の調整の決定表は到着の順序に依存するので、取り込み元ごとの状態の max の結合と純粋な選び方（[ADR-0038](../decisions/0038-attribute-reconciliation-per-source-state.md)）に置き換えた。一致は識別の項目の和集合で決める（[ADR-0037](../decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md)）。識別そのものは順序で変わりうることを ADR-0005 の注記と [AGENTS.md](../../AGENTS.md) に書いた。
 - **NULL の `tenant_id` と組み込みのデータ**：組み込みのデータを「NULL の行」「コードの版だけ」「テナントの作成の時の行」の 3 つに分けた。NULL の行の許可の一覧は、辞書・ロール・ACL の規則・国民の祝日に、`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を足したもの（[data-model.md](data-model.md) の 3.1 節、ADR-0002・ADR-0054 の注記、AGENTS.md）。
 - **タイマーの取得**：テナントをまたいで `timer` を読まない。`engine_scheduler` の関数 `claim_due_timers` が識別子だけを返し、テナントのコンテキストで取り直す（[workflow-engine.md](workflow-engine.md) の 5.3・8.3 節、ADR-0015・0018 の注記）。
-- **タイマーの種類**：`page_escalation`（優先度 0）と `bulk_step`（優先度 3）を足した（[data-model.md](data-model.md) の 4.3.1 節）。
+- **タイマーの種類**：`page_escalation`（優先度 0）と `bulk_step`（優先度 3）を足した（[data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) の 4 節）。
 - **メールの受信**：infrastructure の共有の入口（mail-ingress）と `mail-router` でセルへ振り分ける。解決できない受け手はバウンスしない（後方散乱を避ける）（[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 5.1 節、ADR-0034・0035 の注記）。
 - **ルーター**：ADR-0002 のルーターは、CloudFront Functions と KeyValueStore に細かくした（ADR-0002 の注記、ADR-0055）。
 - **`ext_index`**：`value_ref` を持ち、参照のフィールドを必ず写す（ADR-0003 の注記、ADR-0007）。
@@ -250,6 +250,7 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **本家の内部の名前の置き換え**（2026-09-28、検証の工程の後）：AGENTS.md の「内部の名前を写さない」に従い、本家の内部の名前と同じだったフィールド・表・値を、全文書・ADR・決定表・data-model で置き換えた。`caller_id` → `requester_id`（参照のたどりは `requester`。`caller_location` → `requester_location`、保留の理由 `awaiting_caller` → `awaiting_requester`、`external_caller_email` → `external_requester_email`）、`short_description` → `title`、`close_code` → `resolution_code`・`close_notes` → `resolution_notes`（インシデントと変更で同じ列を使う。選択肢はクラスごと）、`watch_list` → `watchers`、`cmdb_ci_id` → `ci_id`（たどりは `ci`）、`task_sla` → `sla_clock`・`task_sla_event` → `sla_clock_event`（Story `task-sla-evaluation-in-save` → `sla-clock-evaluation-in-save`）。`assignment_group`・`opened_by`・`kb_category` のような、どの ITSM の製品も使う一般の語は残した。出典の URL と本家の説明の中の名前は変えていない。
 - **ITIL の版**：S1 は ITIL 4 の用語のままにする。ITIL（Version 5）は、安定した後、S2 の前に見直す（PM が決めた。[intent.md](../intent.md)）。
 - **変更の承認の方針の期限の既定**：`change_approval_policy_rule.due_after` の既定（通常 3 日、緊急 4 時間）を承認した（[itsm-processes.md](itsm-processes.md) の 8.5.1 節）。
+- **データモデルの正本**（2026-09-28、データモデルの工程）：[data-model.md](data-model.md) と [data-model/](data-model/) を列・制約・索引・ER 図の正本にした（184 テーブル）。領域の文書は振る舞いの正本で、食い違ったらデータモデルに合わせて直す。主な決定：版付きのメタデータは「定義の表 ＋ 不変の版の表」にそろえた（`sla_def_version`・`escalation_policy_version`・`transform_map_version` を足した）。メタデータの論理削除は `deleted_at`。参照の列は `<name>_id`、辞書の名前は `_id` を除く。セッションの正本は Aurora の `user_session`（Valkey は写し）。`tenant_deletion_run` は制御の面に置く。NULL の行を持つ表の主キーは `id` だけにし、参照の先をトリガー `check_shared_ref()` で確かめる。列の決まっていなかった参照の先（`company`・`department`・`location`、`tenant_setting` など）を最小の形で定義した。一覧は [data-model.md](data-model.md) の 7 節の 10〜22。
 - 領域ごとの決定は、各文書の「決定（2026-09-28、既定案）」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -290,7 +291,7 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 | [reports.md](reports.md) | レポート（一覧・集計・推移）、ダッシュボード、定期の配信、集計の置き場所、ACL を効かせた集計 | 0045–0047 | QA | E11 |
 | [api-and-integrations.md](api-and-integrations.md) | REST のテーブルの API、取り込みの API、Webhook とイベントの購読、API のクライアントの認証、レート制限、冪等性、ヘッダー（`<Brand>-` の形） | 0048–0050 | QA、Ops | E11 |
 | [security.md](security.md) | 脅威モデル、暗号化と鍵、運用者のアクセス、運用の監査ログ、データの保持と削除、脆弱性の対応、法務の論点の整理 | 0051–0054 | セキュリティ | E1、E12 |
-| [data-model.md](data-model.md) | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本（置き場所、規約、ER 図、テーブルの列・制約・索引、DB 以外の置き場所の形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、セルの構成とルーター、専用のセル、冗長化、DR、段階を上げる基準 | 0055–0058 | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、タイマーの遅れ・フローの滞留の計測、テナントごとの計測 | 0059–0060 | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル（9 時の集中、月末・期末の変更の集中）、部品ごとの必要量、セルの大きさ | 0061 | Ops | E12 |

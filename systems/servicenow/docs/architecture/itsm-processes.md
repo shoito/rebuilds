@@ -600,7 +600,7 @@ DT-CONF-001（衝突の種類と重さ）：
 | 置き場所 | 中身 |
 | --- | --- |
 | コードの版 | 状態のモデル（`incident`、`problem`、`change.*`、`generic_task`） |
-| Aurora `task`（型付きの列の追加） | インシデント：`hold_reason`、`resolution_code`、`resolution_notes`、`resolved_by`、`reopen_count`、`auto_close_at`、`priority_computed`、`priority_override`、`priority_override_reason`、`major`、`major_manager_id`、`problem_id`、`duplicate_of`、`cancel_reason`。問題：`known_error`、`workaround`、`cause_notes`、`fix_notes`。変更：8.1 節の列 |
+| Aurora `task`（型付きの列の追加） | インシデント：`hold_reason`、`resolution_code`、`resolution_notes`、`resolved_by`、`reopen_count`、`auto_close_at`、`priority_computed`、`priority_override`、`priority_override_reason`、`major`、`major_manager_id`、`problem_id`、`duplicate_of_id`、`reopened_from_id`、`cancel_reason`。問題：`known_error`、`workaround`、`cause_notes`、`fix_notes`。変更：8.1 節の列 |
 | Aurora `priority_matrix` | 5.1 節。メタデータ |
 | Aurora `major_incident_candidate`、`major_incident_trigger` | 6.1 節 |
 | Aurora `std_change_template`、`std_change_template_version` | 8.2 節 |

@@ -177,7 +177,7 @@ DT-CAL-001：
 
 | 列 | 意味 |
 | --- | --- |
-| `id`、`stable_key`、`version_no`、`content_hash` | メタデータの共通の列。定義は版付き（公開で新しい版） |
+| `id`、`stable_key`、`version_no`、`content_hash` | メタデータの共通の列。定義は版付き（公開で新しい版）。表は定義の `sla_def` と不変の版の `sla_def_version` に分ける（[data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) の 4 節） |
 | `name`、`kind`（`sla` / `ola` / `uc`）、`target`（`none` / `response` / `resolution`） | |
 | `table_id` | 対象のクラス。子のクラスにも効く |
 | `duration` | 業務時間の秒（MVP は長さだけ。相対の長さは持ち越し） |
@@ -448,7 +448,7 @@ DT-SLA-002（タイマーの発火）：
 | --- | --- |
 | Aurora `calendar`、`calendar_version` | 3.1 節。メタデータ |
 | Aurora `holiday_set`、`holiday_set_version`、`holiday` | 3.1・5 節。国民の祝日は `tenant_id` が NULL の共通のデータ（RLS の例外として許可の一覧に載せる） |
-| Aurora `sla_def`（版付き） | 6.1 節。メタデータ |
+| Aurora `sla_def`、`sla_def_version`（不変の版） | 6.1 節。メタデータ |
 | Aurora `sla_clock` | 6.2 節。部分一意索引 `(tenant_id, task_id, sla_def_id) WHERE stage IN ('in_progress','paused')`。`breach_disputed_at` の列を持つ |
 | Aurora `sla_clock_event` | 6.2 節。追記だけ、月ごとのパーティション、監査の対象 |
 | Aurora `timer`（`sla_warning`・`sla_breach`、`priority = 0`） | 7 節。workflow-engine と共有 |
