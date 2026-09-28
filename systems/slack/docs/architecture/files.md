@@ -35,7 +35,7 @@ pending_upload ──complete──▶ scanning ──NO_THREATS_FOUND──▶ 
 どの状態からでも ──▶ deleted
 ```
 
-`files` に足す列：`status`、`name`、`declared_mime`、`detected_mime`、`width`、`height`、`scan_result`、`scanned_at`、`deleted_at`（[data-model.md](data-model.md) への反映が必要）。
+`files` に足す列：`status`、`name`、`declared_mime`、`detected_mime`、`width`、`height`、`scan_result`、`scanned_at`、`deleted_at`（[data-model/files-and-search.md](data-model/files-and-search.md) に反映済み。キーは ID から決まるので列に持たない）。
 
 ## 4. アップロード
 

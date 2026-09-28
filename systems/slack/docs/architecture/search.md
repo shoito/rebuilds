@@ -49,7 +49,7 @@ S1 と S2 で、次の 3 つを共有する。バックエンドを替えても�
 | `text` | `normalizeForSearch(toPlainText(body))` とファイル名。@メンバーはインデックス時点の表示名にする |
 
 - 表示名が変わっても、過去の文書は更新しない（既知の制限）。`from:` は ID で絞るので影響しない。
-- チャンネルの権限の情報（メンバー一覧、公開・非公開）は文書に入れない。権限はクエリ時に DB から得る（3 節）。メンバーの出入りで再インデックスが不要になり、権限の変更がすぐに効く。
+- チャンネルの権限の情報（メンバー一覧、公開・非公開）は文書に入れない。権限はクエリ時に DB から得る（3 節）。メンバーの出入りで再インデックスが不要になり、権限の変更がすぐに効く。例外として、S2 では公開・非公開（`is_private`）だけを文書に持つ。パブリックチャンネルを ID で列挙せずに条件を書くため（5.3 節）。切り替えのときは、そのチャンネルの文書を再インデックスする。
 
 ### 2.3 インデックスの更新
 
@@ -184,6 +184,7 @@ LIMIT :limit + 1;                              -- 1 件多く取り、次のペ�
 {
   "workspace_id": "keyword", "message_id": "keyword", "channel_id": "keyword",
   "member_id": "keyword", "thread_root_id": "keyword",
+  "is_private": "boolean",
   "created_at": "date", "content_seq": "long", "deleted": "boolean",
   "has_file": "boolean", "has_link": "boolean",
   "text": { "type": "text", "analyzer": "ja_sudachi",

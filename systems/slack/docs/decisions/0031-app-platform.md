@@ -47,6 +47,9 @@ iii. VPC の中の Worker から、Network Firewall の許可リストで出す
 
 - **インストール単位のボット（1）。** ボットはインストールごとのメンバーで、人間と同じ判定関数と RLS を通る。ワークスペースをまたぐデータを持つ主体を作らない。2 は、テナントの分離の前提（ADR-0009）を崩す。
   - [identity-and-access.md](../architecture/identity-and-access.md) の 9 節のボットは、アプリのインストールに一本化する。`members` に種類の列（`human` / `bot` / `agent`）を加える。
+
+    > 2026-09-28 の注記：開発用のワークスペースのダミーのメンバー（[public-api.md](../architecture/public-api.md) の 11 節）を表すため、`kind` に `sample` を加えた（[data-model/identity.md](../architecture/data-model/identity.md)）。削除されたユーザー（`human` で `account_id` が NULL）とも、ボットとも区別するため。
+
   - アンインストールでは、ボットを無効化してチャンネルから外し、トークンを失効させる。過去の投稿は残す（[ADR-0019](0019-data-retention-and-deletion.md)）。
 - **認可は Better Auth の oauth-provider、ボットのトークンは自前。** インストールの同意・認可コード・ユーザーのトークンは、MCP（[ADR-0028](0028-remote-mcp-server.md)）と同じ Better Auth の oauth-provider で行い、アプリは機密クライアントとして登録する。ボットのトークン（`slk_bot_...`）は、アカウントを持たないメンバーのものなので、本システムが発行する（ADR-0012 の方針どおり）。ボットのスコープはマニフェストの版に固定し、追加は再同意とする。
 - **スコープの語彙は MCP と共通にする。** `channels:read`、`messages:read`、`messages:write`、`search:read`、`members:read`、`reactions:write` に、`channels:join`、`channels:manage`、`reactions:read`、`files:read`、`files:write`、`members:read.email`、`commands`、`incoming-webhook` を加える。機微なスコープは、ワークスペースの方針にかかわらず管理者の承認を要する。

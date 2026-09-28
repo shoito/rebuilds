@@ -34,7 +34,7 @@
 | 境界 | 運び方 |
 | --- | --- |
 | クライアント → API（HTTP） | `traceparent` ヘッダー。クライアントが付けなければ API が始める |
-| API → Relay（outbox の行） | outbox の行に `trace_context` 列（`traceparent` の文字列）を持たせ、同じトランザクションで書く。列の追加は [data-model.md](data-model.md) への変更として別途起票する |
+| API → Relay（outbox の行） | outbox の行に `trace_context` 列（`traceparent` の文字列）を持たせ、同じトランザクションで書く。列は [data-model/realtime-and-notifications.md](data-model/realtime-and-notifications.md) に反映済み |
 | Relay → Workers（SQS） | メッセージ属性 `traceparent` |
 | Relay → Gateway（Valkey Pub/Sub） | イベントの封筒（envelope）に `trace_context` を含める |
 | Gateway → クライアント（WebSocket） | イベントの封筒に `trace_id` だけを含める。親のスパン ID は渡さない。クライアントが報告する遅延（6 節）を、サーバーのトレースと結び付けるため |

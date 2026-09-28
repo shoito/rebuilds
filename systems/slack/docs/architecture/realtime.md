@@ -46,16 +46,17 @@ Client                         API                     Gateway                 V
   │───────────────────────────▶│ セッションを検証        │                            │
   │                            │ ticket を発行（TTL 30s） ───────────────────────────▶ SET
   │◀──── { ticket, url } ──────│                         │                            │
-  │ WSS {url}?ticket=...       │                         │                            │
+  │ WSS {url}                  │                         │                            │
+  │─────────────────────────────────────────────────────▶│                            │
+  │ hello { ticket, protocol, client_id, heads? }       │                            │
   │─────────────────────────────────────────────────────▶│ GETDEL（1 回だけ使える）──▶│
-  │ hello { protocol, client_id, heads? }               │                            │
-  │─────────────────────────────────────────────────────▶│ 1. 読めるチャンネルを解決 ─▶│（ADR-0005 の判定関数）
+  │                                                      │ 1. 読めるチャンネルを解決 ─▶│（ADR-0005 の判定関数）
   │                                                      │ 2. 購読する                │
   │                                                      │ 3. 各チャンネルの last_seq ▶│
   │◀──────────── ready { connection_id, heads, ... } ────│ 4. 2〜3 の間の受信を送る   │
 ```
 
-- **認証はチケットで行う。** ブラウザの WebSocket はヘッダーを付けられないので、API が短命の 1 回限りのチケット（32 バイトの乱数。Valkey には SHA-256 だけを置き、TTL 30 秒）を発行する。チケットには `workspace_id`、`member_id`、`session_id` を結び付ける。Gateway は `GETDEL` で消費するので、再利用できない。
+- **認証はチケットで行う。** ブラウザの WebSocket はヘッダーを付けられないので、API が短命の 1 回限りのチケット（32 バイトの乱数。Valkey には SHA-256 だけを置き、TTL 30 秒）を発行する。チケットには `workspace_id`、`member_id`、`session_id` を結び付ける。Gateway は `GETDEL` で消費するので、再利用できない。チケットは URL のクエリに載せず、最初のメッセージ（`hello`）で送る（アクセスログに残さないため。[identity-and-access.md](identity-and-access.md) の 7 節）。
 - **`Origin` を検査する。** 許可したオリジン以外からの接続は、ハンドシェイクで拒否する（クロスサイトの WebSocket 乗っ取り対策）。
 - **`hello`**：クライアントは、プロトコルの版、端末の ID（`client_id`、端末ごとに固定）を送る。
 - **購読してから `last_seq` を読む。** 逆の順にすると、読んだ直後に来たイベントを取りこぼす。購読から `ready` までに受信したイベントは Gateway が溜めておき、`ready` の直後に送る。クライアントは `seq` で重複を捨てる。
@@ -75,7 +76,7 @@ Client                         API                     Gateway                 V
 ### 3.3 接続の寿命と失効
 
 - 認証は接続時にしか行わないので、**接続の最長寿命を 24 時間（±1 時間のジッター）** とし、超えたら `4000 reconnect` で切る。
-- セッションの失効・メンバーの無効化・ロールの変更は、メンバーのストリーム（`ws:{w}:m:{member_id}`）に流れる。Gateway は受け取ったら、その接続を `4001` で切る、または購読を作り直す。
+- メンバーの無効化・ロールの変更は、メンバーのストリーム（`ws:{w}:m:{member_id}`）に `member.access_changed` として流れる。セッションの失効は、アカウントのチャンネル（`acct:{account_id}`）に `session.revoked` として流れる（[identity-and-access.md](identity-and-access.md) の 3.3 節）。Gateway は受け取ったら、その接続を `4001` で切る、または購読を作り直す。
 
 ### 3.4 切断のコード
 
@@ -132,7 +133,7 @@ WebSocket で送受信するものは、すべて `packages/contract` の Zod �
 | 種類 | 例 | `seq` | 永続化 | 取りこぼしたとき |
 | --- | --- | --- | --- | --- |
 | チャンネル | `message.created/edited/deleted`、`reaction.added/removed`、`pin.added/removed`、`file.updated`、`channel.created/renamed/archived/updated`、`channel.member_joined/left`（一覧は [messaging.md](messaging.md) の「イベント」） | あり | `channel_events` に残る | `after_seq` の差分取得で取り戻す |
-| メンバー | `read.updated`、`thread_subscription.updated`、`channel.joined/left`（自分）、`prefs.updated`、`session.revoked` | なし | 状態は各テーブルが正本 | 再接続時と、タブが前面に戻ったときに、状態を API で取り直す |
+| メンバー | `read.updated`、`thread_subscription.updated`、`channel.joined/left`（自分）、`prefs.updated`、`member.access_changed`（`session.revoked` は `acct:{account_id}`） | なし | 状態は各テーブルが正本 | 再接続時と、タブが前面に戻ったときに、状態を API で取り直す |
 | 一時的 | `typing`、`presence.changed` | なし | しない | 取り戻さない |
 | 制御 | `hello`、`ready`、`ping`/`pong`、`resync`、`focus`、`activity` | なし | しない | — |
 
@@ -142,13 +143,13 @@ WebSocket で送受信するものは、すべて `packages/contract` の Zod �
 
   ```sql
   channel_events (workspace_id, channel_id, seq, event_id, type, payload_v, payload JSONB, created_at,
-                  PRIMARY KEY (workspace_id, channel_id, seq))
+                  PRIMARY KEY (workspace_id, channel_id, seq, event_id))   -- event_id で月ごとに分割
   ```
 
   - 差分取得は `seq > N ORDER BY seq LIMIT 1000` の範囲読みになる。
   - 保持は 30 日とし、月ごとのパーティションを落とす。それより古い位置から追いつくクライアントは、差分が 1,000 件を超えたときと同じく最新ページを取り直す（6 節）。
   - 読む側で ADR-0005 の判定を通す。`payload` は、そのチャンネルを読める人に見せてよい内容だけを持つ。
-  - [data-model.md](data-model.md) に反映済み。
+  - 主キーに分割キーの `event_id` を含める。`seq` の一意性は採番で守る。形は [data-model/realtime-and-notifications.md](data-model/realtime-and-notifications.md) にある。
 
 ## 5. 購読モデル
 
@@ -158,6 +159,7 @@ WebSocket で送受信するものは、すべて `packages/contract` の Zod �
 | --- | --- | --- |
 | チャンネルのストリーム | `ws:{w}:ch:{channel_id}` | 接続のメンバーが読めるチャンネルのうち、参加しているもの（`channel_members` にいる）。未参加のパブリックチャンネルは、表示している間だけ（`focus`） |
 | メンバーのストリーム | `ws:{w}:m:{member_id}` | 常に |
+| アカウント | `acct:{account_id}` | 常に（セッションの失効。[identity-and-access.md](identity-and-access.md) の 3.3 節） |
 | 在席 | `ws:{w}:pr` | 画面に在席を出すメンバーがいるとき（9 節） |
 
 - 読めるチャンネルの一覧は、`hello` のときに ADR-0005 の判定関数（`listReadableChannels` 相当）で解決する。Gateway が `channel_members` を独自に参照しない。
@@ -275,9 +277,9 @@ Gateway ノード
 
 ### 11.4 outbox の掃除と異常な行
 
-- 行は配信の直後にまとめて消す（1 回の DELETE で最大 500 行）。更新と削除が多いテーブルなので、autovacuum の設定を個別に強める。S2 で膨張が問題になれば、時間で区切ったパーティションに変え、古いパーティションを落とす。
+- 行は配信の直後にまとめて消す（1 回の DELETE で最大 500 行）。更新と削除が多いテーブルなので、autovacuum の設定を個別に強める。膨張を VACUUM に任せないよう、最初から日ごとのパーティションに分け、空になった古いパーティションを落とす（[capacity.md](capacity.md) の 3.1 節、[data-model.md](data-model.md) の 2.8 節）。
 - 配信できない行（大きさの上限超え、スキーマ違反）は、`outbox_dead` に移して消し、アラートを出す。1 行のせいでパーティション全体を止めないため。`relay` ロールに `outbox_dead` への INSERT を許す（前提）。
-- outbox はテナントテーブルだが、Relay は全テナントの行を読む。`relay` ロールだけに全行の読み取りと削除を許すポリシーを置く（[data-model.md](data-model.md) 側で定義する前提）。
+- outbox はテナントテーブルだが、Relay は全テナントの行を読む。`relay` ロールだけに全行の読み取りと削除を許すポリシーを置く（[data-model/realtime-and-notifications.md](data-model/realtime-and-notifications.md) で定義した）。
 
 ## 12. 複数端末
 

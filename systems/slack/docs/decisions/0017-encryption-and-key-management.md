@@ -59,6 +59,8 @@ date: 2026-09-26
 | `secrets` | Secrets Manager |
 | `logs` | CloudWatch Logs |
 
+> 2026-09-28 の注記：アプリの署名の秘密と、渡す前のボットのトークンを、アプリ層でエンベロープ暗号化する `apps` キーを加える（[apps.md](../architecture/apps.md) の 8 節・14.3 節、[data-model/app-platform.md](../architecture/data-model/app-platform.md)）。HMAC の署名に使うため、ハッシュにできず、復号できる必要がある。本文などのテナントのデータには使わない。
+
 - 自動のキーローテーション（年 1 回）を有効にする。
 - キーの削除の待機期間は最長の 30 日にする。削除の予約はアラートにする。
 - S3 は SSE-KMS とバケットキーを使い、KMS の呼び出し回数を抑える。

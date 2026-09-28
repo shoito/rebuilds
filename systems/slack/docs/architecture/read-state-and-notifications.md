@@ -19,7 +19,7 @@
 
 スレッドの返信はチャンネルのメッセージとして `seq` を持つ。スレッドの既読は、[messaging.md](messaging.md) の `thread_subscriptions`（`subscribed`、`last_read_seq`）で持つ。自動で購読する条件もそちらにある（親の投稿者、返信した人、スレッドでメンションされた人）。
 
-- **未読の判定**：親メッセージの最後の返信の `seq`（`messages.last_reply_seq`。親に非正規化する。[data-model.md](data-model.md) への追加が前提）が `last_read_seq` より大きく、`subscribed` が真なら未読。
+- **未読の判定**：親メッセージの最後の返信の `seq`（`messages.last_reply_seq`。親に非正規化する。[data-model/conversations.md](data-model/conversations.md) に反映済み）が `last_read_seq` より大きく、`subscribed` が真なら未読。
 - **既読の更新**：`POST /workspaces/{ws}/threads/{root_id}/read {seq}`。チャンネルと同じく後退させない。他の端末へは `thread_subscription.updated` で知らせる（チャンネルの `seq` は消費しない）。
 - **未読の一覧**：「スレッド」画面は、購読中で未読のスレッドを最後の返信の新しい順に並べる。`(workspace_id, member_id, subscribed)` で絞れるインデックスを持つ。
 - チャンネルの未読数には、スレッドの返信を数えない形を目指すが、MVP では 1 節の近似のままにする。「チャンネルにも送信」した返信は、チャンネルのメッセージとしても数える。
@@ -35,7 +35,7 @@
 | DM・グループ DM | 記録しない | すべての未読のメッセージをメンションとして数える |
 | キーワード | 記録しない | バッジの対象にしない（通知だけ） |
 
-- **数え方**：`last_read_seq` より大きい `seq` を持つ、自分へのメンションと @channel / @here のメッセージの数。`mentions` に `seq` を持たせ、`(workspace_id, member_id, channel_id, seq)` のインデックスで数える（[data-model.md](data-model.md) への追加が前提）。
+- **数え方**：`last_read_seq` より大きい `seq` を持つ、自分へのメンションと @channel / @here のメッセージの数。`mentions` に `seq` を持たせ、`(workspace_id, member_id, channel_id, seq)` のインデックスで数える（[data-model/conversations.md](data-model/conversations.md) に反映済み）。
 - **リアルタイムの更新**：`message.created` の本体にはメンションの一覧（メンバー ID と @channel / @here）が入っている。クライアントは、自分が含まれていて、投稿者が自分でなければバッジを増やす。大規模チャンネルで本体を受け取らない接続には、`channel.head` の `has_mention_for_you` で知らせる（[realtime.md](realtime.md) の 5.3 節）。
 - **編集・削除**：編集でメンションが増えたらバッジは増やすが、通知はしない（[messaging.md](messaging.md)）。メッセージが削除されたら、そのメンションは数えない。
 - **正本との突合**：クライアントが数えた値と、未読の要約 API の値を再接続時に比べ、ずれを不一致率の指標として送る（[runbooks](../runbooks/README.md) の SLI）。
@@ -165,7 +165,7 @@ SQS の標準キューは、同じメッセージを 2 回以上渡しうる（A
 | 1 受け手のメール | 設定した遅延の間に 1 通 | まとめる（7.2 節） |
 | SES の送信レート | アカウントのクォータの 80% | 全体で遅らせる |
 
-- 制限の計数は Valkey のトークンバケットで行う（キーは `ws:{workspace_id}:rl:...`）。Valkey が使えないときは、制限なしで送る（通知を止めない）。
+- 制限の計数は Valkey の共通の制限（GCRA）で行う（キーは `rl:{workspace_id}:...`。[rate-limiting.md](rate-limiting.md) の 3.1 節）。Valkey が使えないときは、制限なしで送る（通知を止めない）。
 - 上限値は [runbooks](../runbooks/README.md) の「テナント単位の上限と負荷」に載せる（Ops への依頼事項）。
 
 ## 10. 失敗の扱い

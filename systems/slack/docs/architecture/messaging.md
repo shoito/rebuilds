@@ -162,7 +162,7 @@ thread_subscriptions (workspace_id, root_message_id, member_id,
 
 本家 Slack のユーザーグループに相当する。E3 の `user-groups` で作る。
 
-- `user_groups (workspace_id, id, handle, name, created_by, archived_at)` と `user_group_members (workspace_id, group_id, member_id)` を持つ。`handle` はワークスペースの中で一意で、メンバーの表示名とは別の名前空間にする。
+- `user_groups (workspace_id, id, handle, name, created_by_member_id, archived_at)` と `user_group_members (workspace_id, group_id, member_id)` を持つ。`handle` はワークスペースの中で一意で、メンバーの表示名とは別の名前空間にする。
 - 本文には、AST に `group_mention { group_id }` のノードを足して表す。AST v1 には無いので、E3 で版の規則（「バージョン管理」）に従って追加する。
 - 通知の Worker は、投稿の時点のグループのメンバーに展開する。そのうえで、チャンネルを読めないメンバーには通知しない（ADR-0005）。展開の上限は、@channel と同じく 500 人ずつに分けて処理する（[read-state-and-notifications.md](read-state-and-notifications.md)）。
 - 作成・編集できるのは owner / admin と、ワークスペースの設定で許可された member。ゲストは使えない。
@@ -180,7 +180,7 @@ E3 の `scheduled-messages` で作る。
 
 E3 の `custom-emoji` で作る。
 
-- `custom_emoji (workspace_id, name, file_id, alias_of, created_by)`。画像は [files.md](files.md) の経路でアップロードし、スキャンと再エンコードを経たものだけを使う。
+- `custom_emoji (workspace_id, name, file_id, alias_of, created_by_member_id)`。画像は [files.md](files.md) の経路でアップロードし、スキャンと再エンコードを経たものだけを使う。
 - 名前の形は AST の `emoji` の規則（`/^[a-z0-9_+-]{1,64}$/`）に従い、標準の絵文字の名前と重ならないようにする。
 - 本文とリアクションでは名前で参照する。削除された絵文字は、名前のまま表示する。
 
@@ -189,7 +189,7 @@ E3 の `custom-emoji` で作る。
 E3 の `saved-items-and-bookmarks` で作る。
 
 - **後で読む（保存）**：`saved_items (workspace_id, member_id, message_id, saved_at, remind_at)`。本人だけが見られる。`remind_at` はリマインダー（[read-state-and-notifications.md](read-state-and-notifications.md)）と同じ仕組みで知らせる。
-- **チャンネルのブックマーク**：`channel_bookmarks (workspace_id, channel_id, id, title, url, created_by)`。URL は `isSafeUrl` で検査する。追加・変更は `seq` を消費するイベントとして、チャンネルのメンバーに配る。
+- **チャンネルのブックマーク**：`channel_bookmarks (workspace_id, channel_id, id, title, url, created_by_member_id)`。URL は `isSafeUrl` で検査する。追加・変更は `seq` を消費するイベントとして、チャンネルのメンバーに配る。
 
 ## 本文（AST）
 
@@ -310,7 +310,7 @@ outbox に積むイベントの一覧。Relay が Valkey の Pub/Sub（リアル
 
 ## データモデルへの追加
 
-[data-model.md](data-model.md) に反映が必要な列とテーブル。
+次の列とテーブルは [data-model.md](data-model.md)（[data-model/conversations.md](data-model/conversations.md)、[data-model/files-and-search.md](data-model/files-and-search.md)）に反映済み。
 
 | 対象 | 追加 |
 | --- | --- |

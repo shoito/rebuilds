@@ -48,7 +48,7 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 
 ### 1.2 テーブル（テナントの中）
 
-すべて `workspace_id` を持ち、RLS を有効にする（ADR-0009）。[data-model.md](data-model.md) への追加の提案である。
+すべて `workspace_id` を持ち、RLS を有効にする（ADR-0009）。列とキーは [data-model/identity.md](data-model/identity.md) にある。
 
 | テーブル | 中身 |
 | --- | --- |
@@ -122,11 +122,11 @@ Bot     ─▶│   1. 主体の解決（セッション or API トークン） 
 | 重要な操作の再認証 | 直近 10 分以内の認証を要求する | Better Auth の `freshAge`。対象はアカウントの削除、MFA の変更、パスキーの削除、セッションの一覧と取り消し |
 
 - **セッションの ID はログイン、MFA の完了、権限の昇格（SSO での再認証）のたびに作り直す**（セッション固定攻撃を防ぐ）。Better Auth がログインの都度セッションを新しく作ることは確認した。MFA も、2 要素目の検証（TOTP・OTP・バックアップコード）に通ったときに新しいセッションを作って Cookie に入れ、パスワードの段階のセッションは捨てる。TOTP の登録の完了時も、セッションを作り直して旧いものを消す（[2FA の文書](https://www.better-auth.com/docs/plugins/2fa)、[`verify-two-factor.ts`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/plugins/two-factor/verify-two-factor.ts)、2026-09-26 に確認）。ただし 2FA の要求は既定でメールとパスワードなどの資格情報によるサインインだけにかかり、OTP・ソーシャル・パスキーのサインインにはかからない（同じ文書）。
-- セッションの正本は Aurora の `sessions` に置く。Valkey（ElastiCache）には、Better Auth の Cookie キャッシュ（`cookieCache`、最大 60 秒）だけを使う。Valkey は失われてもよい（[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)）ので、セッションの正本を置かない。Better Auth は `secondaryStorage` を設定するとセッションをそちらに置く。`secondaryStorage` を使いながらセッションを Valkey に置かない設定はない。`session.storeSessionInDatabase: true` にすると DB にも書き、読み取りは Valkey を先に見て、なければ DB から読む（[Session Management の文書](https://www.better-auth.com/docs/concepts/session-management)、[`internal-adapter.ts` の `findSession`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/db/internal-adapter.ts)、2026-09-26 に確認）。そこで次のようにする。
+- セッションの正本は Aurora の `sessions` に置く。Better Auth の Cookie キャッシュ（`cookieCache`、最大 60 秒）は、署名付きの Cookie にセッションの写しを置くもので、Valkey を使わない。Valkey は失われてもよい（[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)）ので、セッションの正本を置かない。Better Auth は `secondaryStorage` を設定するとセッションをそちらに置く。`secondaryStorage` を使いながらセッションを Valkey に置かない設定はない。`session.storeSessionInDatabase: true` にすると DB にも書き、読み取りは Valkey を先に見て、なければ DB から読む（[Session Management の文書](https://www.better-auth.com/docs/concepts/session-management)、[`internal-adapter.ts` の `findSession`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/db/internal-adapter.ts)、2026-09-26 に確認）。そこで次のようにする。
   - `secondaryStorage`（Valkey）を使うなら、必ず `storeSessionInDatabase: true` にする。`preserveSessionInDatabase` は使わない（有効にすると DB からの読み直しをしなくなり、Valkey を失うと全員がログアウトされる）。
   - Valkey の値が先に読まれるので、セッションの取り消しと変更は Better Auth の API（`revokeSession` など）だけで行い、`sessions` の行を直接書き換えない（Valkey の写しが残るため）。
   - この制約を持ちたくなければ、`secondaryStorage` を使わない（レート制限と検証の値も DB に置く）。
-  - **決定（2026-09-28）：`secondaryStorage` は使わない。** セッション、検証の値、Better Auth のレート制限の値は DB に置き、Valkey は `cookieCache` だけに使う。正本が DB の 1 か所になり、取り消しの反映が単純になる。Valkey を失ってもログアウトは起きない（ADR-0003）。DB の読み取りは `cookieCache`（最大 60 秒）で抑える。E7 の負荷試験で DB の負荷が問題になったら見直す。
+  - **決定（2026-09-28）：`secondaryStorage` は使わない。** セッション、検証の値、Better Auth のレート制限の値は DB に置き、Better Auth は Valkey を使わない。正本が DB の 1 か所になり、取り消しの反映が単純になる。Valkey を失ってもログアウトは起きない（ADR-0003）。DB の読み取りは `cookieCache`（最大 60 秒）で抑える。E7 の負荷試験で DB の負荷が問題になったら見直す。
 
 ### 3.3 端末の一覧と取り消し
 
@@ -320,7 +320,7 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
 
 - **接続は 1 ワークスペースにつき 1 本** にする。S3 でワークスペースごとにセルが分かれても、接続の張り先が決まる。
 - Gateway の `Origin` ヘッダーを、許可したオリジンと比べる（Cross-Site WebSocket Hijacking を防ぐ）。
-- **取り消しの反映**：セッションの取り消し・ログアウト・メンバーの無効化・ロールの変更・チャンネルからの削除は、Valkey の `acct:{account_id}` または `ws:{workspace_id}:member:{member_id}` にイベントを publish し、Gateway が接続を閉じるか購読を外す。publish は失われうる（ADR-0003）ので、Gateway は接続ごとに 15 分おきに API の検査用エンドポイントでセッションとメンバーを再検証し、無効なら閉じる。
+- **取り消しの反映**：セッションの取り消し・ログアウト・メンバーの無効化・ロールの変更・チャンネルからの削除は、Valkey の `acct:{account_id}` または `ws:{workspace_id}:m:{member_id}` にイベントを publish し、Gateway が接続を閉じるか購読を外す。publish は失われうる（ADR-0003）ので、Gateway は接続ごとに 15 分おきに API の検査用エンドポイントでセッションとメンバーを再検証し、無効なら閉じる。
 - Valkey が失われると、発行済みのチケットが使えなくなる。クライアントはチケットを取り直して再接続する。
 
 ## 8. 招待とドメインでの参加
@@ -399,7 +399,7 @@ Gateway は DB に触れない（[realtime.md](realtime.md)）。そこで、API
 | API トークンの検証の失敗 | 1 IP あたり 1 分に 20 回 | 429 |
 
 - **アカウント単位のロックアウトはしない。** 攻撃者が他人をロックアウトできてしまうため。止めるのは IP とアカウントの組にする。
-- Better Auth のレート制限は、`storage: "secondary-storage"` で Valkey に置く。Valkey が失われると計数がリセットされるが、外側の AWS WAF のレートベースのルールで最低限を保つ。
+- Better Auth のレート制限は、3.2 節の決定（`secondaryStorage` を使わない）により、`storage: "database"` で DB の `auth_rate_limits` に置く。表の上の上限は、本システムの共通の制限（[rate-limiting.md](rate-limiting.md)、Valkey の GCRA）でかけ、外側で AWS WAF のレートベースのルールが最低限を保つ。
 - ログインの失敗・ロックの発生は、監査ログとメトリクスに出す（runbooks でアラートを定める）。
 
 ## 12. アカウントの削除とメンバーの無効化
