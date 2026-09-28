@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | 1 つの画面の体系 | 画面・モバイル・レポートに同じ権限が効く（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)、2026-09-28 に確認） | 同じ。画面は API の上にだけ作る |
 | 受信箱 | 業務プロセスのタスクを受信箱に集める（[Approval Step](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-step-types/dan1370797855296.html)、2026-09-28 に確認） | 受信箱の射影（[ADR-0015](../decisions/0015-bp-deadlines-reminders-and-inbox.md)）を画面にする |
-| 専用のモバイルのアプリ | 本家はモバイルのアプリを配る（公開の資料の記述。機能の範囲は未検証） | 作らない。スマートフォンのブラウザで同じ SPA を使う（[ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)） |
+| 専用のモバイルのアプリ | 本家は iPhone・iPad・Android のアプリを配り、給与の確認、休暇の申請、打刻、マネージャーの承認などを扱う（[Workday Mobile](https://www.workday.com/en-us/products/platform-product-extensions/workday-mobile.html)、2026-09-28 に確認） | 作らない。スマートフォンのブラウザで同じ SPA を使う（[ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)） |
 
 ## 3. 画面の構成（[ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)）
 
@@ -121,7 +121,8 @@
 
 ## 8. アクセシビリティ
 
-- 目標：WCAG 2.2 の AA。国内の規格の JIS X 8341-3:2016 は WCAG 2.0 と一致する規格で、WCAG 2.2 の AA を満たせば、その達成基準を含む（WCAG 2.2 は WCAG 2.0 の達成基準をほぼ含む。[WAIC の Q&A](https://waic.jp/qa/jis-wcag/)、2026-09-28 に検索の要約で確認。細部は未検証）。
+- 目標：WCAG 2.2 の AA と、国内の規格の JIS X 8341-3:2016 の AA。WCAG 2.2 では達成基準 4.1.1（構文解析）が削除されたが、JIS X 8341-3:2016 に準拠するには 4.1.1 も試験する必要がある。WCAG 2.2 はページの単位、JIS はウェブサイトの単位で試験するので、両方の結果を分けて記録する（[WAIC の Q&A](https://waic.jp/qa/jis-wcag/)、2026-09-28 に確認）。
+  - > 2026-09-28 の注記：最初は「WCAG 2.2 の AA を満たせば JIS の達成基準を含む」と書いていた。WAIC の Q&A の本文で 4.1.1 の違いを確かめたので、JIS の試験を別に行う形に直した。
 - 部品（`packages/ui`）で守る：キーボードだけで操作できる、フォーカスが見える、フォームの項目にラベルとエラーの説明を結ぶ、色だけで状態を示さない（36 協定の段は色と文字）、タップの対象は 24×24 CSS ピクセル以上。
 - 時点の帯・将来の変更・保留中の案件（5 節）は、スクリーンリーダーで読める文にする（アイコンだけにしない）。
 - 打刻のボタンは、押した結果を `aria-live` で読み上げる。
@@ -194,7 +195,7 @@
 - **時点は URL に持つ。** 変更の申請の有効日に既定の値を置かない。
 - **本人のセルフサービスに訂正の操作を出さない。**
 - **給与・口座・退職・権限の案件は、まとめての承認の対象にしない。**
-- **アクセシビリティの目標は WCAG 2.2 の AA。**
+- **アクセシビリティの目標は WCAG 2.2 の AA と JIS X 8341-3:2016 の AA。**
 
 ### 持ち越し
 
@@ -204,7 +205,7 @@
 | プッシュ通知（Web Push）を使うか | E5 の後。通知の本文の規則（個人情報を入れない）は同じ |
 | 英語以外の言語 | 需要を見て MVP の後 |
 | 和暦の既定 | E5 の利用者の試験で |
-| 打刻の画面の PWA のインストールを勧めるか | E6 で、iOS の Safari の Service Worker の保存の期間を確かめてから（未検証） |
+| 打刻の画面の PWA のインストールを勧めるか | Safari は、サイトとの操作がないまま Safari を 7 日使うと、IndexedDB・Service Worker の登録とキャッシュなどスクリプトで書く保存を消す。ホーム画面に追加した Web アプリは別に日数を数え、使えば数え直す（[WebKit の blog](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)、2026-09-28 に確認）。今の版の iOS での振る舞いは E6 の `ui-clock-offline` で実機で確かめて決める |
 
 ## 15. quality.md・runbooks・data-model への項目
 

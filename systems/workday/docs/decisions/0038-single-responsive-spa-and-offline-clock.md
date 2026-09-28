@@ -9,12 +9,12 @@ date: 2026-09-28
 
 ## Context
 
-- 従業員とマネージャーは、PC とスマートフォンのブラウザの両方から使う。打刻・休暇の申請・受信箱の承認は、スマートフォンからが多い見込み（未検証）。
+- 従業員とマネージャーは、PC とスマートフォンのブラウザの両方から使う。打刻・休暇の申請・受信箱の承認は、スマートフォンからが多い見込み（本システムの仮定。E5 の `ui-task-timing` の計測で確かめる）。
 - 打刻は通信が落ちていても失ってはならない（NFR-004、[ADR-0021](0021-clock-events-corrections-and-objective-records.md)）。
 - 画面・API・レポートの権限は同じでなければならない（[ADR-0005](0005-security-and-my-number.md)）。画面のための別の読み取りの経路は作らない。
 - 日本語と英語を出す。法令の用語は誤訳で意味が変わる。
 - [architecture/README.md](../architecture/README.md) の 4 節は「React の SPA と、一部をサーバーで描画（明細、帳票）」とし、決定をこの領域に残した。明細の PDF は確定のときに決定的に作ると決まった（[ADR-0036](0036-payslips-wage-ledger-and-e-delivery-consent.md)）。
-- 本家はモバイルのアプリを配る（公開の資料の記述。機能の範囲は未検証）。
+- 本家は iPhone・iPad・Android のアプリを配り、給与の確認、休暇の申請、打刻、承認を扱う（[Workday Mobile](https://www.workday.com/en-us/products/platform-product-extensions/workday-mobile.html)、2026-09-28 に確認）。
 
 ## Options
 
@@ -48,7 +48,7 @@ date: 2026-09-28
   - 1 つのコードで全利用者の画面を持ち、権限の出し分けを 1 か所で行える。
   - 打刻を通信の断で失わない。
 - 引き受けるコスト：
-  - iOS の Safari の Service Worker と IndexedDB の保存の期間（使われない端末で消えうる）に依存する（未検証）。未送信の件数を画面に出し、72 時間を超えたら警告する。
+  - iOS の Safari の保存の期間に依存する。Safari は、サイトとの操作がないまま Safari を 7 日使うと、IndexedDB と Service Worker の登録・キャッシュを消す（ホーム画面に追加した Web アプリは別に数える。[WebKit の blog](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)、2026-09-28 に確認）。未送信の打刻は 72 時間より前に警告するので、7 日の上限の前に気づける。今の版の iOS での振る舞いは E6 の `ui-clock-offline` で実機で確かめる。未送信の件数を画面に出し、72 時間を超えたら警告する。
   - 英語の訳語の保守（法令の用語の一覧）を QA が持つ。
   - README の 4 節の「一部をサーバーで描画」を統合のときに直す。
 

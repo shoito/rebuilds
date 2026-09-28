@@ -214,7 +214,7 @@ S2 で行うこと：テナントの対応表（`tenant_directory`：テナン�
 | `regional/services` | ECS のクラスタ、サービス、タスク定義、ALB、オートスケール、予定のスケール | shared | Ops |
 | `vault/*`（network、data、keys、services、edge） | 保管庫の全部 | **vault-prod の中の専用のバケット** | **セキュリティの担当＋Ops の責任者。人事の側のパイプラインから apply できない** |
 
-- テナントの鍵（`<brand>-tenant-<id>`）は Terraform で管理しない。テナントの作成の処理（`platform` のロール）が API で作る。
+- テナントの鍵（`<brand>-tenant-<id>`。S1 と、S2 以降の専用の鍵の選択肢）は Terraform で管理しない。テナントの作成の処理（`platform` のロール）が API で作る。S2 以降のセルの鍵（`<brand>-cell-<cell_id>`）はセルの構成と一緒に Terraform で管理する。
 - plan のポリシー検査（OPA・Checkov）で拒否するもの：
   - `payroll` のサブネットの経路表に NAT・IGW、Payroll Compute のセキュリティグループから Aurora・Valkey への出口
   - vault-prod の private のサブネットの経路表に NAT・IGW
@@ -224,12 +224,12 @@ S2 で行うこと：テナントの対応表（`tenant_directory`：テナン�
 
 ## 11. コストの概算（S1、本番、1 か月）
 
-**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。単価は東京（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.json) と [ECS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-1/index.json)、2026-09-28 に確認）：Aurora PostgreSQL の I/O-Optimized で `db.r8g.4xlarge` 1 時間 3.464 USD、`db.r8g.large` 0.433 USD、ストレージ 1 GB 月 0.27 USD。Fargate の Graviton で vCPU 1 時間 0.04045 USD、メモリー 1 GB 1 時間 0.00442 USD。大阪も同じ単価と置いた（未検証）。他の項目の単価は確かめていない（未検証）。Savings Plans とリザーブドで 20〜30% 下げられる。
+**大まかな見積もりである。** ±50% の幅。データ転送、ログの量、サポートプラン、税は含めない。単価は東京（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-1/index.json) と [ECS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-1/index.json)、2026-09-28 に確認）：Aurora PostgreSQL の I/O-Optimized で `db.r8g.4xlarge` 1 時間 3.464 USD、`db.r8g.large` 0.433 USD、ストレージ 1 GB 月 0.27 USD。Fargate の Graviton で vCPU 1 時間 0.04045 USD、メモリー 1 GB 1 時間 0.00442 USD。大阪（[RDS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonRDS/current/ap-northeast-3/index.json)、[ECS](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/ap-northeast-3/index.json)、2026-09-28 に確認）は `db.r8g.4xlarge` 3.456 USD、`db.r8g.large` 0.432 USD、ストレージ 0.27 USD、Fargate は東京と同じ。他の項目の単価は確かめていない（未検証。E12 の `cost-baseline` で確定する）。Savings Plans とリザーブドで 20〜30% 下げられる。
 
 | 項目 | 月額（USD、概算） |
 | --- | --- |
-| Aurora（人事：r8g.4xlarge × 3＋支給日の前の追加の reader 7 日分＋大阪 × 1、ストレージ 3 TB） | 11,500 |
-| Aurora（保管庫：r8g.large × 2＋大阪 × 1） | 1,000 |
+| Aurora（人事：r8g.4xlarge × 3＋支給日の前の追加の reader 7 日分＋大阪 × 1、ストレージ 3 TB を東京と大阪に） | 12,300 |
+| Aurora（保管庫：r8g.large × 2＋大阪 × 1） | 950 |
 | ECS Fargate（東京 平均 約 110 vCPU、大阪の待機 約 15 vCPU、保管庫 約 6 vCPU） | 4,700 |
 | ElastiCache（東京 6 ノード、大阪 2 ノード） | 1,500 |
 | CloudFront、ALB、WAF | 2,500 |
@@ -238,9 +238,11 @@ S2 で行うこと：テナントの対応表（`tenant_directory`：テナン�
 | GuardDuty、Security Hub、Inspector、Config、CloudTrail | 1,000 |
 | KMS（テナントの鍵 600 本＋用途の鍵、要求）、Secrets Manager、Private CA（2 アカウント × 2 リージョン） | 2,500 |
 | S3（明細 年 1 TB、入力の文書、log-archive、複製）、バックアップ | 1,000 |
-| **本番の合計** | **約 30,000** |
+| **本番の合計** | **約 31,000** |
 | staging・dev・vault-staging・shared・edge・security | 約 6,000 |
 
+- Aurora の内訳（730 時間/月）：東京 3.464 × 730 × 3 ＝ 7,586、追加の reader 3.464 × 24 × 7 ＝ 582、大阪 3.456 × 730 ＝ 2,523、ストレージ 3,000 GB × 0.27 × 2 リージョン ＝ 1,620。計 12,311。2026-09-28 の見直しで、大阪の Global Database の二次のストレージ（810）を足し、11,500 から直した。保管庫は 0.433 × 730 × 2 ＋ 0.432 × 730 ＝ 948（ストレージは小さいので除く）。Global Database の複製の書き込みの I/O とリージョン間の転送は含めない。
+- KMS のテナントの鍵は、S1 は 1 テナント 1 本（600 テナントで主とレプリカで月 1,200 USD 程度。上の表の KMS の行に含む）。S2 からはセルごとに 1 本とテナントの DEK にする（[ADR-0052](../decisions/0052-kms-key-hierarchy.md) の 2026-09-28 の注記、[security.md](security.md) の 5.3 節）。S3（2 万テナント）の鍵の費用は、1 テナント 1 本なら月 4 万 USD 程度のところ、セルごとなら数十 USD と、専用の鍵を選んだテナントの数 × 2 USD になる。
 - Private CA は、短命の証明書（7 日以内）のモードで CA 1 つ月 50 USD（Auth0 の題材で確認した値）。
 - 費用は、アカウントとタグ（`service`、`env`、`tenant_tier`）ごとに毎月見る。Payroll Compute は実行ごとのタグ（`payroll_run_id` のハッシュ）で、支給日の集中の費用を見る。
 

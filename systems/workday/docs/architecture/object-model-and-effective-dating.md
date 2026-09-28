@@ -380,7 +380,7 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 - 版の行の見積もり：S1 で 1 人あたり年 20 版（全 facet）× 100 万人 ≒ 年 2,000 万行。差分は年 1,500 万行。
 - 1 人・1 facet の畳み込みは、差分 100 件までで 10ms 以内（Aurora の writer での計測の目標。E2 で測る）。
 - 組織の再編（数千人の所属の変更）は、主体ごとの畳み込みの繰り返しになる。親子の案件で 200 人ずつに分ける（[business-process-engine.md](business-process-engine.md) の 9 節）。
-- S2 で、版と差分のテーブルを `recorded_at` の月ごとのパーティションにする。PostgreSQL は、パーティションをまたぐ `WITHOUT OVERLAPS` を張れないので、現在のテーブルはパーティションにしない（未検証。E2 の PoC で確かめる）。
+- S2 で、版と差分のテーブルを `recorded_at` の月ごとのパーティションにする。`WITHOUT OVERLAPS` の制約は GiST の排他制約として働き、パーティションのテーブルの排他制約は、パーティションの鍵の列をすべて含み、その列を等号で比べなければならない（[PostgreSQL 18：CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、[5.12 Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html)、2026-09-28 に確認）。`recorded_at` で分けると、パーティションをまたぐ期間の重なりを検査できないので、現在のテーブルはパーティションにしない。Aurora の実際の版での振る舞いは E1 の `temporal-constraints-poc` で確かめる。
 
 ## 10. 障害のときの振る舞い
 

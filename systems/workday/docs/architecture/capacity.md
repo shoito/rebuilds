@@ -14,10 +14,10 @@
 | --- | --- | --- |
 | テナント | 600（本番 300） | [architecture/README.md](README.md) の 2 節 |
 | 従業員 | 100 万人。最大のテナント 3 万人 | 同上 |
-| 打刻のピーク | 15 分の平均 400 件/秒。始業の直前の 1 分は平均の 3 倍（1,200 件/秒）と置く | README の「始業の 15 分に 3 割」。分の頭の偏りは仮定（未検証） |
+| 打刻のピーク | 15 分の平均 400 件/秒。始業の直前の 1 分は平均の 3 倍（1,200 件/秒）と置く | README の「始業の 15 分に 3 割」。分の頭の偏りは仮定（未検証。E6 の `clock-sli-and-scheduled-scaling` で本番の打刻の分布を測って置き直す） |
 | 終業の打刻 | 17〜19 時に分散。平均 150 件/秒 | 仮定 |
 | 画面の要求 | 平日 9〜10 時のピークで 1,500 要求/秒（ホーム、打刻の読み取り、受信箱） | 従業員の 3 割が朝に 5 画面と仮定 |
-| 給与計算 | 月末〜25 日支給の前の 5 日に 70 万人。最も重い日に 40%（28 万人）、再計算を含めて 2 倍（56 万人・回） | README。25 日支給が多い前提（未検証） |
+| 給与計算 | 月末〜25 日支給の前の 5 日に 70 万人。最も重い日に 40%（28 万人）、再計算を含めて 2 倍（56 万人・回） | README。25 日支給が多い前提（本システムの仮定。未検証。E12 の `load-test-suite` の前に置き直す） |
 | 給与の結果の行 | 1 人 50〜200 行（平均 125） | README |
 | 明細の PDF | 月 100 万件（賞与の月は 200 万件） | [payments-and-accounting.md](payments-and-accounting.md) の 8 節 |
 | 4 月 1 日の発効 | 従業員の 3 割の異動・昇給（30 万件の発効の予定）が 0 時に来る | 定期の異動の慣行（仮定） |
@@ -121,11 +121,11 @@
 
 | クォータ | 必要量（S1） | 確認 |
 | --- | --- | --- |
-| Fargate の vCPU（東京・大阪） | 平常 110、支給日の前のピーク 1,000（Payroll Compute 200 タスク × 4） | 既定の値は未検証。E1 で申請する。大阪も同じ値にする（[infrastructure.md](infrastructure.md) の 6.6 節） |
-| KMS の暗号の操作の要求数 | 口座の復号、S3 の SSE-KMS（バケットキーで減らす）、保管庫 | 東京の上限は未検証。E1 で確かめる |
+| Fargate の vCPU（東京・大阪） | 平常 110、支給日の前のピーク 1,000（Payroll Compute 200 タスク × 4） | 既定は各リージョン 6 vCPU（On-Demand。引き上げ可）で、大きく足りない（[Amazon ECS endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ecs-service.html)、2026-09-28 に確認）。E1 で 1,200 を申請する。大阪も同じ値にする（[infrastructure.md](infrastructure.md) の 6.6 節） |
+| KMS の暗号の操作の要求数 | 口座の復号、S3 の SSE-KMS（バケットキーで減らす）、保管庫 | 対称の鍵の共有の上限は、東京 20,000 件/秒、大阪 10,000 件/秒（既定。引き上げ可。[KMS の Request quotas](https://docs.aws.amazon.com/kms/latest/developerguide/requests-per-second.html)、2026-09-28 に確認）。大阪は東京の半分なので、切り替えの後の支給日の前の必要量を E12 の負荷試験で測る |
 | SQS | 束のメッセージ、outbox | 標準キューは十分（他の題材と同じ） |
-| KMS の鍵の数 | テナントの鍵 600＋用途の鍵 | 上限は未検証（S2 の 6,000 の前に確かめる。[security.md](security.md) の 13 節） |
-| ECS の RunTask の速度 | 支給日の前の束の起動 | 未検証。E12 で測る。足りなければ、長く動くタスクが束を取りに来る形に変える |
+| KMS の鍵の数 | テナントの鍵 600＋用途の鍵 | 既定の上限は 1 アカウント・1 リージョンで 100,000 本（引き上げ可。[KMS の Resource quotas](https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html)、2026-09-28 に確認）。S3 の 2 万テナントでも収まる。費用の判断は [security.md](security.md) の 13 節 |
+| ECS の RunTask の速度 | 支給日の前の束の起動 | Fargate の起動の速度の既定は、東京で一度に 100・持続 20 タスク/秒、大阪で一度に 25・持続 5 タスク/秒。RunTask 1 回で 10 タスクまで（[Amazon ECS endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ecs-service.html)、2026-09-28 に確認）。200 タスクは東京で約 5 秒、大阪で約 35 秒の計算。実際の起動の時間（イメージの取得を含む）は E12 の `load-test-suite` で測る。足りなければ、長く動くタスクが束を取りに来る形に変える |
 
 ## 7. 負荷試験の計画（E12）
 

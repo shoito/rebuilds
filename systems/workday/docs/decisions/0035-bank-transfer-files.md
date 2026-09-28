@@ -11,7 +11,7 @@ date: 2026-09-28
 
 - 賃金は労働者の同意を得れば、指定の預金口座への振込で払える（[労働基準法施行規則](https://laws.e-gov.go.jp/law/322M40000100023) 7 条の 2、e-Gov で 2026-09-28 に確認）。同意の取り方は社労士の確認待ち（[intent.md](../intent.md) の L4）。
 - intent は、資金を預からず、全銀協の規定形式（給与・賞与振込）のファイルを作り、送信は企業の銀行の仕組みで行うと決めた。
-- 形式は 120 バイトの固定長で、ヘッダー・データ・トレーラー・エンドの 4 種、種別コードは給与 11・賞与 12、コード区分は JIS か EBCDIC、給与の預金種目は普通・当座だけ、0 円のレコードは入れない（[三井住友銀行の仕様](https://www.smbc.co.jp/hojin/eb/firm/manual/resources/pdf/sougoufurikomi_kyuyofurikomi.pdf)、2026-09-28 に確認。全銀協の原本は未取得）。レコードの区切りや使える文字の細部は銀行ごとに違いうる（未検証）。
+- 形式は 120 バイトの固定長で、ヘッダー・データ・トレーラー・エンドの 4 種、種別コードは給与 11・賞与 12、コード区分は JIS か EBCDIC、給与の預金種目は普通・当座だけ、0 円のレコードは入れない（[三井住友銀行の仕様](https://www.smbc.co.jp/hojin/eb/firm/manual/resources/pdf/sougoufurikomi_kyuyofurikomi.pdf)、2026-09-28 に確認。全銀協の原本は未取得）。レコードの区切りや使える文字の細部は銀行ごとに違いうる（未検証。E10 の `zengin-file-generation` の前に、テナントの銀行の仕様書で確かめる）。
 - 振込ファイルは口座番号の平文を含み、改ざんされれば架空の口座への送金になる。振込先の変更と振込ファイルの承認は職務分掌の対象（[security-model.md](../architecture/security-model.md) の 5 節の S2）。
 - Stripe の題材は、銀行の API を主、全銀のファイルを予備にした（[payouts-and-reconciliation.md](../../../stripe/docs/architecture/payouts-and-reconciliation.md) の 4.1 節）。この題材は資金を預からないので、企業の口座からの送信になる。
 

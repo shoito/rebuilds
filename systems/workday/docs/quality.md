@@ -64,7 +64,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 走査 | テストの実行中のログ・スパン・スナップショット・フィクスチャー・入力の文書の個人情報と個人番号の形 | 自前（[ADR-0058](decisions/0058-pii-free-telemetry.md)） | PR |
 | 障害の注入 | 完了のトランザクションの途中の切断、Payroll Compute のタスクの異常終了、Loader の途中の失敗、Aurora の writer・Valkey・SQS・保管庫への到達不能 | テスト用の中継、AWS FIS | PR（短縮版）、夜間、staging（四半期） |
 | E2E | 従業員・マネージャー・人事・給与の担当の主な流れ（日本語と英語、PC とスマートフォンの幅）、打刻のオフライン | Playwright | PR（主要）、夜間（全件） |
-| アクセシビリティ | WCAG 2.2 AA | axe、VoiceOver・NVDA の手の確認 | PR（axe）、E5 の完了の前（手） |
+| アクセシビリティ | WCAG 2.2 AA と JIS X 8341-3:2016 の AA（4.1.1 を含む） | axe、VoiceOver・NVDA の手の確認 | PR（axe）、E5 の完了の前（手） |
 | 負荷 | 7 つのシナリオ（2.2.1 節） | k6、合成のテナントの給与の実行 | E12、半年ごと、大きな変更の後 |
 | セキュリティ | SAST、依存・イメージ・IaC の検査、DAST、外部のペンテスト | 各種 | PR、夜間、E12 と年 1 回 |
 

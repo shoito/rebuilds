@@ -77,6 +77,17 @@ date: 2026-09-28
 
 - 規則表に反する割り当ては、権限の変更の有効化のときに拒む。規則表の変更の前からある違反は、報告に出す。
   - > 2026-09-28 の注記：上の表は例である。規則表の正本は [security-model.md](../architecture/security-model.md) の 5.1 節（S1〜S8）で、ドメインの名前もそこに揃えた（権限の変更の編集は `security.config`、有効化は `security.activation`、給与の個別の調整は `payroll.input`。`security.admin` は SSO の接続・API の利用者・代理のログインなどの管理に使う）。検査点は [ADR-0019](0019-segregation-of-duties-checks.md) の 4 か所に広げた。決定は変えない。
+  - > 2026-09-28 の注記（名前の対応）：上の表の名前は、今の名前に次のとおり読み替える。表は起票の時の記録として残す。
+    >
+    > | 上の表の名前 | 今の名前（[security-model.md](../architecture/security-model.md) の 5.1 節） | 今の規則 |
+    > | --- | --- | --- |
+    > | `worker.compensation` の `modify` | `compensation_change` の `initiate`・`approve`（業務プロセスの権限。`worker.compensation` はドメインとして残り、閲覧に使う） | S1 |
+    > | `payroll_finalize` の `approve` | 同じ（`payroll_finalize` の `approve`） | S1・S4 |
+    > | `worker.payment_election` の `modify`（本人以外） | `payment_election_change` の `approve`（本人以外） | S2 |
+    > | 振込ファイルの承認 | `payroll_payment_release` の `approve` | S2 |
+    > | `security.admin` の `modify` | `security.config` の `modify` | S3 |
+    > | 権限の変更の有効化 | `security.activation` の `modify` | S3 |
+    > | `payroll.results` の `modify`（個別の調整） | `payroll.input` の `modify`（個別の調整） | S4 |
 - 本人が自分の情報を変える申請（住所、口座）は、本人の起票として扱い、承認は他の人が行う。
 
 ### マイナンバーの保管庫（a）

@@ -10,7 +10,7 @@ date: 2026-09-28
 ## Context
 
 - 割増は、時間外 2 割 5 分、休日 3 割 5 分（政令）、月 60 時間を超えた時間外 5 割、深夜 2 割 5 分。家族手当・通勤手当・別居手当・子女教育手当・住宅手当・臨時の賃金・1 か月を超える期間ごとの賃金は基礎に入れない。時間単価は、月給なら月の所定労働時間（月で違えば 1 年の月平均）で割る（[労働基準法](https://laws.e-gov.go.jp/law/322AC0000000049) 37 条、[割増賃金令](https://laws.e-gov.go.jp/law/406CO0000000005)、[施行規則](https://laws.e-gov.go.jp/law/322M40000100023) 19 条・21 条。e-Gov で 2026-09-28 に確認）。60 時間超を深夜に行えば 75%（[厚生労働省のリーフレット](https://www.mhlw.go.jp/content/000930914.pdf)）。
-- 1 か月の各区分の時間の合計の 30 分未満の切り捨て・以上の切り上げ、時間単価と割増の額の円未満の 50 銭未満の切り捨て・以上の切り上げは、違反として扱わないとされる（[基発第 150 号の抜粋](https://jsite.mhlw.go.jp/aichi-roudoukyoku/var/rev0/0119/6636/hasuutoriatukai.pdf)、検索の要約で 2026-09-28 に確認）。
+- 1 か月の各区分の時間の合計の 30 分未満の切り捨て・以上の切り上げ、時間単価と割増の額の円未満の 50 銭未満の切り捨て・以上の切り上げは、違反として扱わない（[厚生労働省：確かめよう労働条件 Q3](https://www.check-roudou.mhlw.go.jp/qa/roudousya/chingin/q3.html)、2026-09-28 に確認。元は基発第 150 号。[愛知労働局の抜粋](https://jsite.mhlw.go.jp/aichi-roudoukyoku/var/rev0/0119/6636/hasuutoriatukai.pdf)）。
 - 並行稼働で差を 0 にするには、現行のシステムの端数の処理（どこで丸めるか）に合わせる必要がある（[ADR-0029](0029-parallel-run-and-compute-partitioning.md)）。
 - 日割りと欠勤控除の方式は法令に定めがなく、会社の就業規則による。
 
@@ -39,7 +39,7 @@ date: 2026-09-28
 - 時間単価は規則 19 条の形（月給 ÷ 1 年の月平均の所定労働時間、日給 ÷ 1 日の所定、時給）。月平均の所定労働時間は年度の始めに求めて設定の版に固定する。基礎に入れる項目は `overtime_base` のフラグで決める。
 - 端数の設定 `overtime_rounding`：時間（`none` 既定・`half_hour_half_up`）、単価（`none` 既定・`round_half_up_yen`）、額（`round_half_up_yen` 既定・`round_up_yen`）。通達にない向き（時間の切り捨てだけ、額の切り捨て）は作らない。
 - 管理監督者は深夜の割増（0.25）だけ。
-- 年休の日の賃金は `normal_wage`（既定）・`average_wage`・`standard_remuneration`（標準報酬月額の 30 分の 1、5 円の処理）。平均賃金は 12 条の形（3 か月の総額 ÷ 総日数、最低の保障、除く期間と賃金）。銭未満の扱いは未検証（L36）。
+- 年休の日の賃金は `normal_wage`（既定）・`average_wage`・`standard_remuneration`（標準報酬月額の 30 分の 1、5 円の処理）。平均賃金は 12 条の形（3 か月の総額 ÷ 総日数、最低の保障、除く期間と賃金）。平均賃金は銭未満を切り捨て、平均賃金から払う手当は円未満を四捨五入する（[神奈川労働局](https://jsite.mhlw.go.jp/kanagawa-roudoukyoku/hourei_seido_tetsuzuki/saiteichingin_chinginseido/heikinchi.html)、2026-09-28 に確認。名前付きの丸め `round_down_sen`・`round_half_up_yen`）。適用の確認は L36 に残す。
 - 日割りは DT-JP-011。欠勤控除は `round_down_yen`。控除は働かなかった時間の割合の月額を超えない（PROP-JP-005）。
 - 2 を採らない理由：法定を下回る率を設定でき、未払いを作る。
 - b を採らない理由：現行のシステムと違う方式に固定すると、並行稼働で `rounding_rule_diff` が全員に出て、切り替えの条件を満たせない。
@@ -56,6 +56,6 @@ date: 2026-09-28
 
 ## Confirmation
 
-- 決定表のテスト：DT-JP-009、DT-JP-011、DT-JP-010（`round_half_up_yen` の境界）。
+- 決定表のテスト：DT-JP-009、DT-JP-011、DT-JP-010（`round_half_up_yen`・`round_down_sen` の境界）。
 - 性質ベーステスト：PROP-JP-005（欠勤控除の上限）、PROP-JP-006（倍率の下限）。
 - ゴールデンデータ：60 時間ちょうど・超え、深夜と重なる 60 時間超、法定の休日の深夜、端数の設定の 8 通り、月の途中の入社の日割り 3 方式。

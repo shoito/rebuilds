@@ -43,7 +43,7 @@ pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cu
 ### 3.2 営業日の暦
 
 - 営業日の暦（`business_calendars`）はこの領域が持つ。業務プロセスの期限（[business-process-engine.md](business-process-engine.md) の 10.1 節）も同じ表を使う。
-- 中身：土日、国民の祝日（内閣府の公表の一覧を規則表として取り込む。形式と URL は未検証）、テナントの休日、銀行の休業日（12 月 31 日〜1 月 3 日。銀行法の施行令による休日とされるが未検証）。
+- 中身：土日、国民の祝日（内閣府の [syukujitsu.csv](https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv) を規則表 `holidays_jp` として取り込む。形式は [payroll-jp-rules.md](payroll-jp-rules.md) の 2.1 節）、テナントの休日、銀行の休業日（銀行の休日は、国民の祝日に関する法律の休日、12 月 31 日〜1 月 3 日、土曜日。[銀行法施行令](https://laws.e-gov.go.jp/law/357CO0000000040) 5 条 1 項、e-Gov で 2026-09-28 に確認）。
 - 支給日が休日のときの扱いは給与のグループの設定（前の営業日が既定）。
 
 ## 4. 実行の段（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）

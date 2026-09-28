@@ -28,7 +28,7 @@ date: 2026-09-28
 - S2 の対応表 `tenant_directory` はテナントの外に置き、要求の始めに 1 回引いて接続のプールを選ぶ（タスクのメモリーにキャッシュ）。ハッシュではなく対応表にするのは、大口のテナントを個別に動かすため。
 - S3 のセルは prod と vault-prod の両方を含む。テナントをセルに固定し、ホスト名でセルを決める。規則表はセルの外から各セルへ配る。
 - 2 を採らない理由：S1 の 600 テナントなら運用できるが、S3 の 2 万テナントで接続・マイグレーション・監視が重い（ADR-0005 の ii と同じ）。
-- 3 を採らない理由：有効日付の時間の制約（`WITHOUT OVERLAPS`、`PERIOD`）と RLS が、分散の DB で同じく使えるか確かめられていない（未検証）。テナントの間が独立しているので、クラスタの分割で足りる。
+- 3 を採らない理由：有効日付の時間の制約（`WITHOUT OVERLAPS`、`PERIOD`）が、分散の DB で使えない。`WITHOUT OVERLAPS` は排他制約として働く（[PostgreSQL 18：CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)）が、Aurora PostgreSQL Limitless Database は排他制約を持てない（[Limitless の DDL の制限](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/limitless-reference.DDL-limitations.html)、どちらも 2026-09-28 に確認）。テナントの間が独立しているので、クラスタの分割で足りる。
 
 ## Consequences
 

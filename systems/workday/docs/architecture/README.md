@@ -15,7 +15,7 @@
 | 有効日付と追記 | DB は追記のみで、有効日付と時点のレポートに使う（[DBMS2, 2010](https://www.dbms2.com/2010/08/22/workday-technology-stack/)。古い第三者の記事で、現在の実装は未検証）。変更は有効日と入力日を分けて持ち、前後の値・変更者・時刻を監査の記録に残す（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)） | 有効時間と記録時間の 2 つの軸（bitemporal）で持つ（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
 | 業務プロセス | 起票・承認・アクション・サービス・通知・完了のステップ。条件の規則、委任、取消（rescind）・訂正（correct）・キャンセル（[Approval Step](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-step-types/dan1370797855296.html)、[Delegation](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/delegate-business-processes/cxi1568047444210.html)） | 自前の永続の状態機械にする（[ADR-0003](../decisions/0003-business-process-engine.md)） |
 | 権限 | 機能の領域（ドメイン）ごとの権限と、業務プロセスごとの権限。セキュリティグループ（ユーザー、ロール、職務、組織、集約、交差）。ロールは組織で絞れる。権限の変更は「有効化」まで保留され、編集と有効化を別の人にできる（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)） | 同じ考え方の権限のモデルを自前で作る（[ADR-0005](../decisions/0005-security-and-my-number.md)） |
-| 1 つのコードライン | 全顧客が 1 つの版を使う（[Defining the Power of One](https://blog.workday.com/en-us/posts/2015/06/defining-the-power-of-one.html)）。機能のリリースは年 2 回（3 月と 9 月）、週ごとに小さな更新（大学の案内などの二次資料。未検証） | 採る。テナントごとの分岐を持たず、違いは設定と規則表で表す |
+| 1 つのコードライン | 全顧客が 1 つの版を使う（[Defining the Power of One](https://blog.workday.com/en-us/posts/2015/06/defining-the-power-of-one.html)）。機能のリリースは年 2 回（おおむね 3 月と 9 月）、週ごとに修正と小さな改善の更新（[Workday のリリースの名前と予定の変更](https://blog.workday.com/en-us/2019/workday-changes-product-release-naming-convention-and-schedule.html)、[Release Best Practices](https://forms.workday.com/content/dam/web/sg/documents/other/release-best-practices-guide-en-sg.pdf)、2026-09-28 に検索の要約で確認） | 採る。テナントごとの分岐を持たず、違いは設定と規則表で表す |
 
 ### 1.2 コンテキスト
 
@@ -94,7 +94,7 @@
 | S3 | 2 万（1 万） | 3,000 万 | 30 万人 | 12,000 件/秒 | 同上 | セル構成。テナントをセルに固定し、東京・大阪の両方で受ける。大口のテナントに専用のセル |
 
 - 数値は本システムの想定。本家の実数（テナント数、従業員数、計算の時間）は公開の資料で確かめられなかった（未検証）。
-- 給与計算の負荷は、支給日の前に集中する。25 日支給の企業が多い前提（未検証）で、S1 は 70 万人分を 5 日の中で計算・再計算する。
+- 給与計算の負荷は、支給日の前に集中する。25 日支給の企業が多い前提（本システムの仮定。公開の統計を見つけられなかった。未検証。E12 の `load-test-suite` の前に、本番のテナントの支給日の分布で置き直す）で、S1 は 70 万人分を 5 日の中で計算・再計算する。
 - 給与計算 1 人あたりの項目は 50〜200 を想定し、1 万人の計算で 200 万回ほどの計算の要素になる。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 8 節（[ADR-0056](../decisions/0056-stages-cluster-sharding-and-cells.md)）。
 
@@ -107,7 +107,7 @@
 | NFR-003 | 給与計算の時間 | 1 万人の月次の計算が 15 分以内、3 万人（S1 の最大）が 45 分以内。1 人の再計算が 5 秒以内 | S2 は 10 万人で 60 分以内。E12 の負荷試験で確かめる |
 | NFR-004 | 可用性 | セルフサービスと人事の画面・API 月間 99.9%。支給日の前の 5 営業日の給与計算・振込ファイルの生成 99.95% | 打刻は、落ちている間も端末に貯めて後で送れる形にする（[time-and-attendance.md](time-and-attendance.md) の 3.2 節）。SLO は [runbooks/README.md](../runbooks/README.md) の 1 節 |
 | NFR-005 | 応答の時間 | 画面の操作 p95 500ms、p99 1.5 秒以内。打刻 p99 300ms 以内。時点を指定した 1 人の問い合わせ p99 300ms 以内 | 一覧・レポートの出力を除く |
-| NFR-006 | 耐久性と障害 | AZ の障害：RPO 0、RTO 15 分以内。リージョンの障害：RPO 5 分以内、RTO 4 時間以内。支給日の前の 5 営業日にリージョンが落ちても、振込ファイルを当日中に出せる | 振込の締め切りは銀行ごとに違う（未検証） |
+| NFR-006 | 耐久性と障害 | AZ の障害：RPO 0、RTO 15 分以内。リージョンの障害：RPO 5 分以内、RTO 4 時間以内。支給日の前の 5 営業日にリージョンが落ちても、振込ファイルを当日中に出せる | 振込の締め切りは銀行ごとに違う（未検証。支払元の口座の設定 `lead_business_days` で持ち、値は E10 の `zengin-file-generation` の前にテナントの銀行の仕様書で確かめる） |
 | NFR-007 | マイナンバーの保護 | 個人番号の平文が保管庫の外に出た件数 0 件。保管庫へのアクセスの記録の欠け 0 件。保存期間を過ぎた番号の削除の遅れ 30 日以内 | [ADR-0005](../decisions/0005-security-and-my-number.md) |
 | NFR-008 | 個人情報の保護 | 権限のない利用者に、給与・口座・健康・扶養の情報が見えた事象 0 件。ログ・トレースに個人情報が出た件数 0 件 | [ADR-0005](../decisions/0005-security-and-my-number.md) |
 | NFR-009 | テナントの分離 | 他のテナントのデータが見える事象 0 件 | [ADR-0005](../decisions/0005-security-and-my-number.md) |
@@ -241,21 +241,22 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 - **Story の名前**：`terminal-import` は `clock-terminal-integration` に、`inbox-ui` は `ui-inbox` に、`worker-register-report`・`attendance-register-report` は `statutory-registers` に、`authz-pentest` は `pentest-and-fixes` に、打刻・給与・業務プロセスの負荷試験は `load-test-suite` にまとめた（[roadmap.md](../roadmap.md)）。
 - **Epic**：E1〜E12 が MVP。E13 年末調整と法定調書、E14 電子申請、E15 退職所得と退職金、E16 タレント管理。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。E13 の ADR は 0064〜0066 を使う（7 節）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節（[observability.md](observability.md) は計測の側）。容量のパラメーターは [capacity.md](capacity.md) の 5 節、台数と費用は [infrastructure.md](infrastructure.md) の 5・11 節、保存の期間は [audit-and-retention.md](audit-and-retention.md) の 5.2 節、上限は各領域の文書（例：[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 3.1 節、[core-hr.md](core-hr.md) の 3.4 節）。
+- **KMS のテナントの鍵の単位**：S1 は 1 テナント 1 本。S2 からはセルごとに 1 本の鍵で、暗号の文脈に `tenant_id` を入れ、テナントの DEK を包んで分ける。解約の暗号の消去はテナントの DEK の破棄で行う。専用の鍵は有料の選択肢として残す。S3 の鍵の費用は月 4 万 USD 程度から数十 USD（と選択肢の分）に下がる（[ADR-0052](../decisions/0052-kms-key-hierarchy.md) の 2026-09-28 の注記、[security.md](security.md) の 5.3 節）。
 - **文書の間の参照**：領域の文書を書いた時点でまだなかった文書を、コードの書式（[payroll-engine.md](payroll-engine.md) など）で書いていたところを、リンクに直した。
 
 持ち越し（計測・PoC・選定で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS`、`PERIOD`）を Aurora で使えるか、性能。有効日付の書き込みを関数だけに限る方式 | E1 の `temporal-constraints-poc`。使えなければ `EXCLUDE USING gist` で代える（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
+| PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS`、`PERIOD`）を Aurora で使ったときの RLS・`btree_gist` との組み合わせと性能。有効日付の書き込みを関数だけに限る方式（Aurora PostgreSQL は 18.3 が 2026-06-11 に出て、2026-09-28 の時点の最新は 18.4.2。[Aurora PostgreSQL の更新](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Updates.html)、2026-09-28 に確認。構文は [PostgreSQL 18 の CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html) で確かめた） | E1 の `temporal-constraints-poc`。使えなければ `EXCLUDE USING gist` で代える（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
 | Payroll Compute のタスクの数と、従業員の束の大きさ、入力の固定の並列の度合い | E12 の負荷試験（[capacity.md](capacity.md) の 7 節） |
 | PDF のライブラリ | E10 の `payslip-pdf` の PoC |
 | 監査の連鎖の単位（1 分か 1 時間か）と、`bp_events`・差分を本体ごと連鎖にするか | E11 で量を測って（[audit-and-retention.md](audit-and-retention.md) の 13 節） |
-| 一次の資料で未検証の値（健康保険の等級表、介護保険の到達の月、標準賞与額の年度の上限、通勤手当の非課税の限度、国民の祝日の取り込みの元、子ども・子育て拠出金の率） | E8 の着手の前（[payroll-jp-rules.md](payroll-jp-rules.md) の 15 節） |
+| 一次の資料で確かめられなかった値（子ども・子育て支援金の丸めの Q&A の原本、雇用保険の料率の適用の区切り） | E8 の `social-insurance-premiums`・`employment-insurance` の spec の前に、L32・L37 の確認で（[payroll-jp-rules.md](payroll-jp-rules.md) の 15 節）。他の値（等級表、介護保険の到達の月、標準賞与額の上限、通勤手当の非課税の限度、祝日の取り込みの元、拠出金の率）は 2026-09-28 に確かめた |
 | 打刻機の機種と形式、銀行ごとの振込の締め切り | E6・E10 の着手の前 |
-| テナントの鍵を S2 以降も 1 テナント 1 本にするか、分析用の基盤のアカウント | S2 の前 |
+| 分析用の基盤のアカウント | S2 の前 |
 | 費用の単価 | E12 の前に、AWS の料金の計算ツールで置き換える |
-| 本家の振る舞いで未確認のもの（委任と進行中のタスク、代理のログインの条件、リリースの周期の現在の形） | 各領域の文書で、本家の資料で確かめる。設計は本家に依らない |
+| 本家の振る舞いで未確認のもの（委任と進行中のタスク、代理のログインの条件。リリースの周期は 2026-09-28 に 1 節で確かめた） | 各領域の文書で、本家の資料で確かめる。設計は本家に依らない |
 
 ## 7. 領域の文書
 

@@ -156,7 +156,7 @@
   - 本システムのトークンの接頭辞（`<brand>_at_`、`<brand>_tk_`）、PEM の秘密鍵。
 - 見つけたら呼び出す（個人番号の形は SEV2、その他は SEV3 から。通知には場所と件数だけを書き、値を書かない）。
 - **走査が止まっていないことを確かめる。** 1 日 1 回、合成の生成器（印つき）の番号を専用のロググループに書き、検出されることを確かめる。検出されなければ呼び出す。
-- CloudWatch Logs のデータ保護の方針を補助として使う（日本の個人番号の管理された識別子があるかは未検証）。
+- CloudWatch Logs のデータ保護の方針を補助として使う。管理された識別子に日本のもの（個人番号を含む）はない（[CloudWatch Logs：PII の種類](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/protect-sensitive-log-data-types-pii.html)、2026-09-28 に確認）。個人番号は、12 桁の数字とチェックデジットの形のカスタムの識別子を定義して使う（誤検出は上の走査で確かめる）。
 - 検出の後は [runbooks/incident-response.md](../runbooks/incident-response.md) の「個人情報の出力」と「マイナンバーの漏えいの疑い」。
 - 四半期ごとに、S3（入力の文書、レポートの出力、取り込みのファイル、分析用の基盤）の抜き取りの走査も行う。
 

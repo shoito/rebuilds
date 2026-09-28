@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | ドメインの権限 | ドメインの方針は、画面・レポートの View・Modify と、連携の Get・Put で、セキュリティグループに権限を与える（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)。検索の要約を含む） | 同じ 4 つの操作（3.2 節） |
 | 範囲で絞る | 絞られたグループは、組織などで対象の一部だけに届く。絞らないグループは全部に届く。両方に属すれば和になる（[Security Group Configuration and Constraints](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-group-configuration-and-constraints.html)） | 範囲は `all`・`orgs`・`self`。権限は和（4.2 節、[ADR-0017](../decisions/0017-authorization-evaluator.md)） |
-| 交差のグループ | 複数のグループのすべてを満たす人だけを含む（検索の要約。未検証） | `intersection` のグループ（4.1 節） |
+| 交差のグループ | 含めたグループのすべてに属し、除くグループに属さない人だけを含む（[Advanced Security Group Types](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-supplemental-for-administrators/advanced-security-group-types.html)、2026-09-28 に検索の要約で確認） | `intersection` のグループ（4.1 節） |
 | 保留と有効化 | ドメイン・業務プロセスの方針の変更は、有効化の作業を行うまで保留される。有効化の時刻を記録し、前の時刻の版を有効化して戻せる。方針の編集と有効化は別のドメインにあり、別のグループに持たせられる。グループの定義と所属の変更は、有効化を待たずにすぐ効く（[Security Policy Configuration and Activation](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-policy-configuration-and-activation.html)） | 同じ考え方（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)）。ただし所属とロールの変更は業務プロセスの承認を経る |
 | 職務分掌の報告 | 職務分掌の潜在的な衝突の報告がある（検索の要約。報告の中身は未検証） | 規則表と 4 か所の検査（[ADR-0019](../decisions/0019-segregation-of-duties-checks.md)） |
 | 同じ権限がすべての経路に効く | レポート・モバイル・API・業務プロセスに同じ権限が効く（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)） | 同じ（7 節） |

@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | 一括の取り込み（EIB） | Web サービスの操作を選び、雛形の表計算を生成し、行を埋めて取り込む（[Teamup9 の解説](https://teamup9.com/workday-eibs-spreadsheet-driven-data-loading/)など二次資料、2026-09-28 に検索の要約で確認。未検証） | 業務プロセスの種類ごとの雛形（[ADR-0042](../decisions/0042-bulk-import-through-business-processes.md)） |
 | 連携の権限 | ドメインの権限に連携の Get・Put がある（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)、2026-09-28 に確認） | `get`・`put`（[security-model.md](security-model.md) の 3.2 節） |
-| 連携用の利用者 | 連携は、人でない連携用の利用者の権限で動くとされる（二次資料。未検証） | API の利用者を連携用の利用者に結ぶ（6 節） |
+| 連携用の利用者 | 連携は、人でない連携用の利用者（Integration System User）の権限で動く。連携のシステムごとに 1 つ作り、その連携に要る権限だけを与える（[Create Integration System Users for Apps](https://developer.workday.com/documentation/GUID-f8d46604-e156-492f-a324-62ed2f6496f7/CreateIntegrationSystemUsersforApps)、[Assign an Integration System User Account to an Integration](https://doc.workday.com/admin-guide/en-us/workday-studio/integration-configuration/say1512990013424.html)、2026-09-28 に検索の要約で確認） | API の利用者を連携用の利用者に結ぶ（6 節） |
 
 ## 3. 一括の取り込み（[ADR-0042](../decisions/0042-bulk-import-through-business-processes.md)）
 
@@ -183,7 +183,7 @@
 
 ## 8. 打刻機（[ADR-0044](../decisions/0044-sso-api-clients-and-clock-terminals.md)）
 
-- 対象の機種と形式は E6 の前に決める（[intent.md](../intent.md) の「選定・計測で決めるもの」。未検証）。どの機種でも次の 2 つの経路のどちらかに乗せる。
+- 対象の機種と形式は E6 の前に決める（[intent.md](../intent.md) の「選定・計測で決めるもの」。未検証。E6 の `clock-terminal-integration` で確かめる）。どの機種でも次の 2 つの経路のどちらかに乗せる。
 
 | 経路 | 形 | 使いどころ |
 | --- | --- | --- |

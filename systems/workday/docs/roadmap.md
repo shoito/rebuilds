@@ -335,27 +335,39 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 ### E14 電子申請（MVP の後）
 
+設計：まだない。関係する記述は [business-process-engine.md](architecture/business-process-engine.md) の 17 節、[my-number-vault.md](architecture/my-number-vault.md) の 15 節、[payroll-jp-rules.md](architecture/payroll-jp-rules.md) の 6 節。ADR は着手のときに [architecture/README.md](architecture/README.md) の 7 節の表に行を足してから、0067 以降で振る。
+
+**下の Story は仮置き（provisional）である。** 着手の前に E14 の領域の文書を書き、Story を確定する。確定するまで `changes/` に起票しない。
+
 | Story | 内容 |
 | --- | --- |
-| `bp-external-wait-step` | 外部のシステムの応答を待つステップ（ADR。[ADR-0003](decisions/0003-business-process-engine.md) の Consequences） |
-| `vault-egress-for-filing` | 保管庫からの電子申請の出口（ADR。[my-number-vault.md](architecture/my-number-vault.md) の 15 節） |
-| `si-ei-e-filing` | 社会保険・雇用保険の届出の電子申請 |
-| `resident-tax-notice-e-import` | 住民税の特別徴収税額通知の電子の取り込み、異動届 |
-| `statutory-reports-e-filing` | 法定調書の電子の提出 |
+| `bp-external-wait-step`（仮） | 範囲：業務プロセスに、外部のシステムの応答（受付・審査の結果）を待つステップを足す。ADR を書く（[ADR-0003](decisions/0003-business-process-engine.md) の Consequences） |
+| `vault-egress-for-filing`（仮） | 範囲：個人番号を含む届出を、保管庫の中から電子申請の窓口へ送る出口を足す。人事の側を経由しない。ADR を書く（[my-number-vault.md](architecture/my-number-vault.md) の 15 節） |
+| `si-ei-e-filing`（仮） | 範囲：資格の取得・喪失、算定基礎届、月額変更届、賞与支払届、雇用保険の届出を、業務プロセスの完了から作って電子で出し、結果を取り込む |
+| `resident-tax-notice-e-import`（仮） | 範囲：市区町村からの特別徴収税額通知を電子で取り込んで `resident_tax_notices` に入れ、異動届を電子で出す（MVP は一括の雛形での取り込み） |
+| `statutory-reports-e-filing`（仮） | 範囲：E13 で作る源泉徴収票・給与支払報告書を、保管庫の中から電子で出す |
 
 ### E15 退職所得と退職金（MVP の後）
 
+設計：まだない。ADR は着手のときに振る（[architecture/README.md](architecture/README.md) の 7 節）。
+
+**下の Story は仮置き（provisional）である。** 着手の前に領域の文書を書き、Story を確定する。
+
 | Story | 内容 |
 | --- | --- |
-| `retirement-income-withholding` | 退職所得の源泉徴収 |
-| `retirement-allowance-calc` | 退職金の計算 |
+| `retirement-income-withholding`（仮） | 範囲：退職所得の受給に関する申告の有無で分け、退職所得控除と勤続の年数から源泉徴収の額を求める純粋な計算と規則表 |
+| `retirement-allowance-calc`（仮） | 範囲：テナントの退職金の規程（勤続・等級・事由の係数）を式で持ち、退職の業務プロセスの完了から退職金の支払いの実行を作る |
 
 ### E16 タレント管理（MVP の後）
 
+設計：まだない。ADR は着手のときに振る（[architecture/README.md](architecture/README.md) の 7 節）。
+
+**下の Story は仮置き（provisional）である。** 着手の前に領域の文書を書き、Story を確定する。
+
 | Story | 内容 |
 | --- | --- |
-| `goals-and-reviews` | 目標と評価 |
-| `succession-planning` | 後継者の計画 |
+| `goals-and-reviews`（仮） | 範囲：期ごとの目標の設定、自己評価と上長の評価、評価の確定を業務プロセスで回し、結果を有効日付の facet に記録する（給与への連動は範囲の外） |
+| `succession-planning`（仮） | 範囲：主要なポジションの後継の候補と準備の度合いを記録し、権限の判定の下で見せる |
 
 ## エージェントに任せないこと
 

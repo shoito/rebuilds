@@ -25,7 +25,7 @@
 - **テナントテーブルは `tenant_id` を持ち、主キーとインデックスの先頭に置く。** ID は UUIDv7。`FORCE ROW LEVEL SECURITY` と、トランザクションごとの `SET LOCAL app.tenant_id`（[ADR-0005](../decisions/0005-security-and-my-number.md)）。保管庫の Aurora も同じ規則。例外は 3 節の表だけで、マイグレーションの CI の許可リストと一致させる。
 - **外部キーは `tenant_id` を含む複合キーにする。** 有効日付の参照は `PERIOD` の外部キー（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)）。
 - **有効日付のデータは facet ごとに `<facet>_changes`・`<facet>_versions`・`<facet>` の 3 つ**を `FacetSpec` から生成する。現在のテーブルは書き込みの専用の経路だけが書く。
-- **追記のみの表**（アプリのロールに `UPDATE`・`DELETE` を与えない）：有効日付の差分と版（印の埋め込みを除く）、`bp_events`、`time_clock_events`、`time_clock_corrections`、`leave_grants`、`leave_ledger_entries`、`payroll_results`・`payroll_result_lines`（確定の後）、`payroll_journal_entries`・`payroll_journal_lines`、`payslip_delivery_consents`、`wage_payment_consents`、`audit_events`、`platform_audit_events`、保管庫の `mn_access_log`・`mn_deletions`。削除は保存の期間の `retention_purger` だけ（[ADR-0049](../decisions/0049-retention-rules-table-and-legal-hold.md)）。
+- **追記のみの表**（アプリのロールに `UPDATE`・`DELETE` を与えない）：有効日付の差分と版（印の埋め込みを除く）、`bp_events`、`time_clock_events`、`time_clock_corrections`、`leave_grants`、`leave_ledger_entries`、`payroll_results`・`payroll_result_lines`（確定の後）、`payroll_journal_entries`・`payroll_journal_lines`、`payslip_delivery_consents`、`payslip_paper_requests`、`wage_payment_consents`、`audit_events`、`platform_audit_events`、保管庫の `mn_access_log`・`mn_deletions`。削除は保存の期間の `retention_purger` だけ（[ADR-0049](../decisions/0049-retention-rules-table-and-legal-hold.md)）。
 - **列ごとに個人情報の区分（`pii_class`：P0〜P4）を注記する。** 区分のない列を CI で拒む。P4（個人番号）は保管庫の外の列に置かない（[ADR-0051](../decisions/0051-threat-model-and-pii-classification.md)）。
 - **金額は `bigint` の円、率は 10 進の固定小数点（小数 10 桁）**（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0027](../decisions/0027-pay-item-graph-and-formula-language.md)）。`numeric` の自由な精度や `double precision` を金額に使わない。
 - **暗号文の列**：口座番号は `*_ct`（例：`account_number_ct`。テナントの鍵の DEK、AAD に `tenant_id` と行の ID）。重複の検知は `*_hmac`（例：`account_hmac`。テナントの HMAC の鍵。[security.md](security.md) の THR-022）。
@@ -189,7 +189,7 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
 | --- | --- | --- | --- |
 | `payer_accounts`、`wage_payment_consents` | 同意は追記のみ | P2 | 賃金に関する書類 |
 | `payment_instructions`、`bank_files` | 口座は暗号文 | P2 | 振込ファイル |
-| `payslips`、`payslip_delivery_consents` | — | P2 | 給与明細 |
+| `payslips`、`payslip_delivery_consents`、`payslip_paper_requests` | — | P2 | 給与明細 |
 | `wage_ledger`（ビュー） | 射影 | P2 | 賃金台帳 |
 | `gl_account_maps`（版）、`payroll_journal_entries`、`payroll_journal_lines`、`gl_export_batches`、`si_premium_notices` | 追記のみ。遅延制約で釣り合い | P0（従業員の ID を持たない） | 給与の仕訳 |
 | S3 `bank-files/{tenant}/{file_id}`（`<brand>-bank-files` の鍵）、`payslips/{tenant}/{id}.json|.pdf`、`gl-exports/{tenant}/{seq}.csv` | 大阪へ複製 | P2 | 各行 |
@@ -249,7 +249,7 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
 | テーブル | 形 | 区分 | 保存 |
 | --- | --- | --- | --- |
 | `support_access_grants` | テナントの管理者の許可（期限、ドメイン） | P0 | 監査ログ |
-| `tenant_keys`（テナントの外） | テナントの KMS の鍵の ARN と状態 | P0 | テナントの削除の後も記録 |
+| `tenant_keys`（テナントの外） | テナントの KMS の鍵の ARN と状態。S2 からは、セルの鍵で包んだテナントの DEK と破棄の記録も持つ（[security.md](security.md) の 5.3 節） | P0 | テナントの削除の後も記録（包んだ DEK は破棄で消す） |
 
 ## 5. outbox の事象（主なもの）
 
