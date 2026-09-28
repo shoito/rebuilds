@@ -116,19 +116,19 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 個人情報保護法：ワークスペースのデータ（イシューの本文、コメント、利用者の名前・メールアドレス）を、顧客からの委託として扱うか。外国にある第三者への提供（GitHub・GitLab・Slack の連携、メールの送信事業者）の扱いと、本人への情報の提供。漏えい等の報告の義務を負う者と手順 | integrations、notifications-and-inbox、security の各領域（まだない） | E9 のメールの送信、E10 の GitHub・GitLab・Slack の連携 |
-| L2 | 電気通信事業法：コメント・メンション・通知で利用者の間の意思の伝達を媒介することが、届出の要る電気通信事業に当たるか。Web の画面で分析のために端末の情報を外部へ送る場合の外部送信規律の公表 | notifications-and-inbox、client-app の各領域（まだない） | E5 のコメント、E9 の通知の公開 |
-| L3 | インポート：顧客の資格情報で他社のツール（Jira、Asana、Shortcut、GitHub）から取り込むことが、それぞれの利用規約・API の規約に反しないか。取り込んだ個人データ（他社のツールの利用者の名前・メールアドレス）の扱い | import-export の領域（まだない） | E11 のインポート |
-| L4 | データの所在：「日本のデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサー、Electron の自動更新の配信、デスクトップの通知の扱い | infrastructure の領域（まだない） | E1 のリージョンの構成、E12 の契約の文書 |
-| L5 | 保持の期間：同期のログ（sync action）、イシューの履歴、削除・アーカイブしたデータ、解約したワークスペースのデータ、クライアントの端末に残るデータを、何日持つか | sync-engine、security の各領域（まだない）、[ADR-0003](decisions/0003-bootstrap-and-partial-sync.md) | E2 の同期のログの保持、E12 の GA の判定 |
+| L1 | 個人情報保護法：ワークスペースのデータ（イシューの本文、コメント、利用者の名前・メールアドレス）を、顧客からの委託として扱うか。外国にある第三者への提供（GitHub・GitLab・Slack の連携、メールの送信事業者）の扱いと、本人への情報の提供。漏えい等の報告の義務を負う者と手順 | integrations、notifications-and-inbox、security の各領域 | E9 のメールの送信、E10 の GitHub・GitLab・Slack の連携 |
+| L2 | 電気通信事業法：コメント・メンション・通知で利用者の間の意思の伝達を媒介することが、届出の要る電気通信事業に当たるか。Web の画面で分析のために端末の情報を外部へ送る場合の外部送信規律の公表 | notifications-and-inbox、client-app の各領域 | E5 のコメント、E9 の通知の公開 |
+| L3 | インポート：顧客の資格情報で他社のツール（Jira、Asana、Shortcut、GitHub）から取り込むことが、それぞれの利用規約・API の規約に反しないか。取り込んだ個人データ（他社のツールの利用者の名前・メールアドレス）の扱い | import-export の領域 | E11 のインポート |
+| L4 | データの所在：「日本のデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサー、Electron の自動更新の配信、デスクトップの通知の扱い | infrastructure の領域 | E1 のリージョンの構成、E12 の契約の文書 |
+| L5 | 保持の期間：同期のログ（sync action）、イシューの履歴、削除・アーカイブしたデータ、解約したワークスペースのデータ、クライアントの端末に残るデータを、何日持つか | sync-engine、security の各領域、[ADR-0003](decisions/0003-bootstrap-and-partial-sync.md) | E2 の同期のログの保持、E12 の GA の判定 |
 | L6 | AI の機能（MVP の後）：イシューのデータを外部のモデルの提供者へ送ることの同意、学習への利用の禁止の契約、出力の責任 | MVP の後の AI の Epic | AI の Epic の着手 |
-| L7 | 顧客との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、SLA の文言、利用者からの開示・削除の請求の窓口 | security の領域（まだない） | E12 の GA の判定 |
-| L8 | 画面の見た目とショートカットを本家に寄せる範囲：不正競争防止法（商品等表示、商品の形態の模倣）と著作権の観点で、どこまで似せてよいか | client-app の領域（まだない） | E6 の画面の Story |
+| L7 | 顧客との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、SLA の文言、利用者からの開示・削除の請求の窓口 | security の領域 | E12 の GA の判定 |
+| L8 | 画面の見た目とショートカットを本家に寄せる範囲：不正競争防止法（商品等表示、商品の形態の模倣）と著作権の観点で、どこまで似せてよいか | client-app の領域 | E6 の画面の Story |
 
 ### 選定・計測で決めるもの（法務以外）
 
-- 本文の同時編集の CRDT の部品（Yjs を第一の候補にする）：E5 の着手前に、editor-and-descriptions の領域で決める。
-- 日本語の全文検索の方式（PostgreSQL の `pg_bigm` か、OpenSearch か）：E8 の着手前に決める。Aurora PostgreSQL 18 で `pg_bigm` が使えるかは未検証。
+- 本文の同時編集の CRDT の部品（Yjs を第一の候補にする）：E5 の着手前に、editor-and-descriptions の領域で決める。→ 2026-09-28 に Yjs と y-prosemirror に決めた（[ADR-0021](decisions/0021-description-crdt-yjs-in-sync-log.md)）。
+- 日本語の全文検索の方式（PostgreSQL の `pg_bigm` か、OpenSearch か）：E8 の着手前に決める。Aurora PostgreSQL 18 で `pg_bigm` が使えるかは未検証。→ 2026-09-28 に S1 から OpenSearch に決めた（[ADR-0030](decisions/0030-search-engine-opensearch.md)）。費用は E8 の PoC で確かめる。
 - 反応型のストアを MobX にするか、自前の細かな購読にするか：E2 の PoC で、イシュー 50 万件の描画の速さとメモリーを計測して決める（[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - 全体のブートストラップと部分のブートストラップを切り替える閾値：E3 の PoC で計測して決める（[ADR-0003](decisions/0003-bootstrap-and-partial-sync.md)）。
 - 本家の可用性の SLA の値：未検証。Enterprise の契約の条件として公開の資料で確かめられなかった。
