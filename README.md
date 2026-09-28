@@ -20,7 +20,7 @@
 | [Uber](systems/uber/) | 配車のマーケットプレイス | マッチング、地理空間の索引、動的な料金、リアルタイムの位置 | 設計済み |
 | [Linear](systems/linear/) | イシュー管理 | ローカルファーストの同期エンジン、オフライン、キーボード中心の即時の操作 | 設計中 |
 | [Salesforce](systems/salesforce/) | CRM プラットフォーム | メタデータ駆動のマルチテナント、レコードの共有モデル、宣言的な自動化 | 設計中 |
-| [ServiceNow](systems/servicenow/) | IT サービス管理 | 継承するテーブル、ワークフローと SLA、CMDB の識別と照合 | 設計中 |
+| [ServiceNow](systems/servicenow/) | IT サービス管理 | 継承するテーブル、ワークフローと SLA、CMDB の識別と照合 | 設計済み |
 | [Workday](systems/workday/) | 人事・給与 | 有効日付のデータ、業務プロセス、日本の給与計算、マイナンバーの保護 | 設計中 |
 
 「設計済み」は、intent・アーキテクチャ・ADR・quality・runbooks・roadmap がそろい、公式の資料での事実の確認と、文書の間の整合の見直しを終えた状態を指す。法務の確認待ちの事項と、PoC・計測で確かめる事項は、各題材の文書に残している。
