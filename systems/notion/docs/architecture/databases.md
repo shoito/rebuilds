@@ -45,7 +45,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 - `data_sources` と `views` の行は、ブロックと同じ操作・トランザクション・配信の仕組みに乗る（[ADR-0005](../decisions/0005-transactions-as-unit-of-change.md)）。レコードの種類が違うだけで、`seq`・履歴・権限の判定は共通。
 - 権限の判定は、行 → `data_source` → `database` ブロック → 親のページ、と祖先をたどる（[ADR-0004](../decisions/0004-inherited-page-permissions.md)）。
 - **行は `data_source` の `content` に並べない。** 行は数十万になり、並びは各ビューの並べ替えで決まるため。行の集合は索引の表で列挙する。ブロックの木の不変条件（[ADR-0002](../decisions/0002-everything-is-a-block.md)）は、行については「親の `data_source` がちょうど 1 つ」と読み替える（[ADR-0014](../decisions/0014-database-query-index.md)）。
-- 手動の並び（ボードでのドラッグなど）は、ビューごとの並びのキー（分数の索引）として索引の表に持つ。
+- 手動の並び（ボードでのドラッグなど）は、前後の行をアンカーにした操作で送り、サーバーが振る並びの鍵として `dbx_view_orders` に持つ。クライアントは鍵を作らない（[ADR-0012](../decisions/0012-child-order-by-sibling-anchors.md)。2026-09-28 に「分数の索引」から改めた）。
 
 ### 2.1 プロパティの種類
 
@@ -137,7 +137,7 @@ linked_database ブロック（別のページ）── view → 他のデータ
 ## 6. リレーション（ADR-0016）
 
 - 本家は、片方向と両方向（`single_property`・`dual_property`）、自分自身へのリレーション、関連できるページを「1 ページ」か「制限なし」に絞る設定を持つ（[Relations & rollups](https://www.notion.com/help/relations-and-rollups)、[Property object](https://developers.notion.com/reference/property-object)）。
-- **正本は辺の表。** `relation_edges`（`workspace_id`、`from_property_id`、`from_row_id`、`to_row_id`、`from_pos`、`to_pos`）。両方向のリレーションは、1 本の辺を両側のプロパティから見る。A 側の値は `from_row_id = A` の辺、B 側の値は `to_row_id = B` の辺で、同じ辺から導くので、片側だけが変わる状態が起きない。
+- **正本は辺の表。** `relation_edges`（`workspace_id`、`from_data_source_id`、`from_property_id`、`from_row_id`、`to_row_id`、`from_pos`、`to_pos`。プロパティ ID はデータソースの中でだけ一意なので `from_data_source_id` を持つ）。両方向のリレーションは、1 本の辺を両側のプロパティから見る。A 側の値は `from_row_id = A` の辺、B 側の値は `to_row_id = B` の辺で、同じ辺から導くので、片側だけが変わる状態が起きない。
 - 辺の追加・削除は 1 つの操作で、両側の行の購読者に配信し、両側の行の `last_edited_time` を進める（本家の細部は未検証）。
 - **ワークスペースをまたぐリレーションは作れない。** 対象のデータソースは同じワークスペースに限る（ADR-0003）。本家も同じと見られるが、文書で明示されていない（未検証）。
 - 「1 ページ」の制限は、辺の追加のときに同じトランザクションで検査する。

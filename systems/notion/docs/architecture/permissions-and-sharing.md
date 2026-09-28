@@ -127,7 +127,7 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 | --- | --- |
 | チームスペース（既定・公開） | `team:{id}` → `member_access_level`、`ws:{id}` → `workspace_access_level` |
 | チームスペース（閉鎖・非公開） | `team:{id}` → `member_access_level` |
-| プライベートの領域 | 本人の `user:{id}` → `full_access` |
+| プライベートの領域（`parent_type = member`、`parent_id` が本人） | 本人の `user:{id}` → `full_access` |
 
 - `member_access_level` と `workspace_access_level` は、チームスペースの所有者が設定する。既定値は `can_edit` と `can_view` にする（本家の既定値は未検証）。
 - **チームスペースの所有者は、配下のすべてのページで `full_access` を持つ。** ACL を持つページでも外れない。管理する人がいないページを作らないためである（本家は「既定で」フルアクセスとする。ACL で外せるかは未検証）。
@@ -446,6 +446,9 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 | `workspace_security_policies` | 公開・ゲスト・エクスポート・連携の禁止、ゲストの追加の申請（Enterprise） |
 | `guest_requests` | ゲストの追加の申請（Enterprise） |
 | `published_sites` | 8 節 |
+| `favorites`、`invitations`、`workspace_settings` | お気に入り、招待、ワークスペースの設定（2026-09-28 に足した） |
+
+列・制約・索引の正は [data-model/permissions.md](data-model/permissions.md)。
 
 ## 11. 決定と持ち越し
 

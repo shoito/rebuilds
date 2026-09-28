@@ -181,6 +181,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | アカウント | ログインの成功・失敗、MFA の変更、セッションの取り消し |
 | 運用者 | サポートのためのアクセス、濫用による公開の停止、ワークスペースの停止 |
 
+- アカウントの分類（ログイン、MFA、セッションの取り消し）と、ワークスペースに属さない運用者の操作は、ワークスペースを持たないので `global.platform_audit_events` に記録する（2026-09-28。[data-model/global.md](data-model/global.md)）。
 - 記録しないもの：ブロックの編集と閲覧（量が多く、ページの履歴が編集の記録になる）。
 - 表 `audit_events`：主キー `(workspace_id, id)`。列は `occurred_at`、`actor_member_id`、`actor_kind`（`human` / `bot` / `mcp` / `operator`）、`action`、`target_type`、`target_id`、`ip`、`user_agent`、`details`（ID だけ。本文を含めない）、`prev_hash`、`hash`。索引は `(workspace_id, occurred_at)`、`(workspace_id, target_id)`。時間でパーティションを切り、365 日を過ぎたパーティションを `DROP` する。
 - 本家の監査ログは Enterprise の機能で、365 日保持し、CSV で出力でき、SIEM へ Webhook で送れる（[Audit log](https://www.notion.com/help/audit-log)）。本システムは記録を全プランで MVP から行い、DB に 365 日置く。閲覧の画面・CSV・SIEM は Enterprise の機能として E10 で作る。アーカイブ（Object Lock の S3）は 2 年保持する（Slack の ADR-0033 に合わせた既定案）。ワークスペースの削除の後にアーカイブを残す期間は、法務の確認待ち（[intent.md](../intent.md)）。

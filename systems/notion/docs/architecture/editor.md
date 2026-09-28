@@ -248,13 +248,16 @@ HTML の無害化の方針：
 
 | 表 | キー | 中身 |
 | --- | --- | --- |
-| `records` | `(table, workspace_id, id)` | 値、`version`、最後に使った時刻 |
+| `records` | `(record_type, workspace_id, id)` | 値、`version`、属するページ、ページの確定した `seq`、最後に使った時刻 |
 | `transaction_queue` | `transaction_id` | 未確定のトランザクション、作った時刻、試行の回数、状態 |
 | `offline_pages` | `(workspace_id, page_id)` | オフラインで使えるページ、最後に取得した時刻 |
 | `offline_actions` | `(workspace_id, page_id, reason)` | オフラインに置く理由（本人の指定、お気に入り、親からの継承、最近開いた） |
-| `text_states` | `(workspace_id, block_id)` | ブロックのテキストの CRDT の状態（[collaboration.md](collaboration.md) の 5 節） |
+| `text_states` | `(workspace_id, block_id, field)` | ブロックのテキストの CRDT の状態（[collaboration.md](collaboration.md) の 5 節） |
 | `failed_changes` | `(workspace_id, id)` | 送れなかった変更（本人が入力したテキストと作ったブロック。30 日。[collaboration.md](collaboration.md) の 10.1 節） |
-| `meta` | 固定 | スキーマの版、総量 |
+| `recent_pages` | `(workspace_id, page_id)` | 最近開いたページと時刻（クイック検索、検索の加点、オフラインの理由「最近開いた」） |
+| `meta` | 固定 | スキーマの版、総量、`device_id`、次の `tx_counter` |
+
+列・索引の正は [data-model/client.md](data-model/client.md)。
 
 - `offline_pages` と `offline_actions` は、本家の `offline_page`・`offline_action` の形に合わせた。理由を複数持ち、最後の理由がなくなったときだけページを外す（[How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)）。オフラインのページの更新の取り方は [collaboration.md](collaboration.md) で決める。
 - `records` は、オフラインのページの部分木と `transaction_queue` が参照するレコードを除いて、LRU で追い出す。総量は 500MB を目安にする（既定案）。

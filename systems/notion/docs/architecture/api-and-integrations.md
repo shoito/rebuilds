@@ -317,6 +317,8 @@ Aurora（RLS、論理シャード）
 | `import_jobs` | `id`、`requested_by`、`format`、`parent_page_id`、`upload_s3_key`、`status`（`queued` / `running` / `succeeded` / `failed`）、`progress`、`error`、`created_at`、`finished_at` | `(workspace_id, requested_by, created_at)` |
 | `export_jobs` | `id`、`requested_by`、`scope`（`page` / `workspace`）、`root_page_id`、`format`、`include_comments`、`status`（同上）、`result_s3_key`、`expires_at`（7 日）、`error`、`created_at`、`finished_at` | `(workspace_id, requested_by, created_at)`、`(workspace_id, status)` |
 
+- 公開の連携の ACL の主体は `bot:{installation_id}`（インストールの ID）にする。内部の連携は `bot:{integration_id}`（2026-09-28）。
+- OAuth の認可コードは `global.oauth_authorization_codes`、MCP のトークンは `global.mcp_tokens` に持つ。列・制約・索引の正は [data-model/api-and-integrations.md](data-model/api-and-integrations.md) と [data-model/global.md](data-model/global.md)。
 - MCP のアクセストークンとリフレッシュトークンは、Slack の ADR-0028 と同じく、`global` の認可サーバーが発行して持つ。`api_tokens` には入れない。シャードの `mcp_grants` は、同意と管理者の許可だけを持ち、MCP サーバーは呼び出しのたびにこれを確かめる。
 - ジョブの実行は SQS の `import-export` のキューで渡す（[capacity.md](capacity.md) の 2.6 節）。表は状態と再実行のために持ち、Worker が表を走査して拾わない。
 

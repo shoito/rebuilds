@@ -33,7 +33,7 @@
 | `type` | text | ブロックの種類（3 節） |
 | `properties` | jsonb | 中身。リッチテキスト（`title`）、チェック、ファイルの参照、URL など。検索の索引の対象 |
 | `format` | jsonb | 表示の設定。色、アイコン、幅、折りたたみの見出しかどうか、など。検索の索引の対象外 |
-| `parent_type` | text | `workspace` / `teamspace` / `block` / `data_source`。`data_source` はデータベースの行のページだけ（[databases.md](databases.md) の 2 節） |
+| `parent_type` | text | `teamspace` / `member` / `block` / `data_source`。`member` はプライベートの領域の最上位のページで、`parent_id` は持ち主の `member_id`（2026-09-28 に `workspace` を改めた。[data-model.md](data-model.md) の 6 節）。`data_source` はデータベースの行のページだけ（[databases.md](databases.md) の 2 節） |
 | `parent_id` | uuid | 親の ID。権限の継承と、削除・ゴミ箱からの復元先に使う |
 | `page_id` | uuid | 自分を含む最も近いページ。ページ自身なら自分の ID。ページごとの `seq`・購読・履歴の単位 |
 | `content` | uuid[] | 子の ID の並び。表示の順 |
@@ -145,7 +145,7 @@
 | --- | --- |
 | T1 | 親は 1 つ。`parent_type = block` のブロックは、`parent_id` の指すブロックの `content` に、ちょうど 1 回だけ現れる。他のブロックの `content` には現れない。`parent_type = data_source` の行は、どの `content` にも現れない |
 | T2 | `content` に同じ ID が 2 回現れない。`content` の各 ID の `parent_id` は、そのブロック自身である |
-| T3 | 循環がない。`parent_id` をたどると（行は `data_source` → `database` ブロックを経て）、有限の段数で `workspace` / `teamspace` に着く |
+| T3 | 循環がない。`parent_id` をたどると（行は `data_source` → `database` ブロックを経て）、有限の段数で `teamspace` / `member` に着く |
 | T4 | 親と子は同じワークスペースにある |
 | T5 | 子を持てない種類（3 節）の `content` は空 |
 | T6 | `page_id` は、自分を含む最も近い `page` の ID と一致する |
@@ -189,7 +189,7 @@
 | スナップショット | ページ | ワークスペースの設定（MVP の既定は 30 日） | 履歴の一覧、比較、復元 |
 
 - **スナップショットの作成**：ページの編集が止まって 10 分たったとき、または編集が続いても 1 時間ごとに、Worker が作る（間隔は既定案。本家は、編集中は 10 分ごとと、最後の編集の 2 分後に版を記録する。[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、2026-09-27 に確認。本システムは本家より粗く、ストレージを抑える側に倒した）。中身は、そのページの部分木のうち、子ページの境界までのブロックの値（子ページは参照だけ）と、そのときの `seq` と、その間に編集したメンバーの一覧である。
-- **置き場所**：スナップショットの本体は、gzip した JSON を S3 に置く（`workspaces/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz`）。Aurora には `page_snapshots` の行（`workspace_id`、`page_id`、`seq`、`created_at`、`editors`、`s3_key`、`size`）だけを持つ。
+- **置き場所**：スナップショットの本体は、gzip した JSON を S3 に置く（`ws/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz`）。Aurora には `page_snapshots` の行（`workspace_id`、`page_id`、`seq`、`created_at`、`editors`、`s3_key`、`size`）だけを持つ。
 - **表示**：スナップショットの本文を描画する前に、現在のページの `can(actor, read, page)` を判定する。同期ブロックの参照は、現在の元の中身ではなく、「同期ブロック」の枠だけを出す。
 - **復元**：過去の版に「巻き戻す」のではなく、現在の値からスナップショットの値へ変える操作を作り、新しいトランザクションとして送る。削除済みのブロックは `alive` を真に戻す（ID が同じまま戻る）。復元にはページの編集の権限が要る。復元そのものも履歴に残り、取り消せる。
 - **期限切れ**：保持期間を過ぎたスナップショットは、日次の Worker が S3 と Aurora から消す。操作のログは、30 日を過ぎたパーティションを消す（スナップショットに含まれていることを確かめてから）。
@@ -267,7 +267,7 @@ CREATE INDEX ON shard042.blocks (workspace_id, trashed_at) WHERE trashed_at IS N
 - `content` の要素の参照の整合（T1・T2）は、外部キーでは表せないので、トランザクションの検証で保証する（5 節）。
 - ページの読み込みは `(workspace_id, page_id)` の索引で、ページの中のブロックを 1 回で取る。子ページの境界の先は取らない。
 - 書き込みの大半は更新なので、`fillfactor` を下げて HOT 更新を効かせる（値は [capacity.md](capacity.md) で決める）。`properties` の索引は張らない。データベースの問い合わせは別の索引で行う（ADR-0002、[databases.md](databases.md)）。
-- 同じシャードに置く表：`page_snapshots`、ACL、データベースの定義、コメント、操作のログ、ファイルの記録。どれも `workspace_id` を先頭に持つ。一覧は [data-model.md](data-model.md) にある。
+- 同じシャードに置く表：`page_snapshots`、ACL、データベースの定義、コメント、操作のログ、ファイルの記録。どれも `workspace_id` を先頭に持つ。列・制約・索引の正は [data-model.md](data-model.md) にある。
 
 ## 12. クライアントのレコードキャッシュ
 
@@ -275,7 +275,7 @@ CREATE INDEX ON shard042.blocks (workspace_id, trashed_at) WHERE trashed_at IS N
 
 | 層 | 持つもの | 置き場所 |
 | --- | --- | --- |
-| RecordStore | 画面が使うレコード（ブロック、ユーザー、データベースの定義など）。キーは `(table, workspace_id, id)`、値と `version` | メモリ |
+| RecordStore | 画面が使うレコード（ブロック、ユーザー、データベースの定義など）。キーは `(record_type, workspace_id, id)`、値と `version` | メモリ |
 | RecordCache | 読んだレコードの写し、オフラインで使えるページの一覧 | SQLite（WASM、OPFS）。[ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md) |
 | TransactionQueue | 送信前・確定前のトランザクション | 同上。追い出さない |
 

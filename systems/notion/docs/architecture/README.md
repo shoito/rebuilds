@@ -13,7 +13,7 @@
 | [comments-and-notifications.md](comments-and-notifications.md) | コメント、メンション、通知 |
 | [api-and-integrations.md](api-and-integrations.md) | 公開 API、Webhook、インポートとエクスポート |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、データのライフサイクル |
-| [data-model.md](data-model.md) | データモデルの索引 |
+| [data-model.md](data-model.md) | データモデルの正（規約、ER 図、全テーブルの定義。領域ごとの定義は [data-model/](data-model/)） |
 | [infrastructure.md](infrastructure.md) | AWS の構成、シャード、冗長化、災害復旧 |
 | [observability.md](observability.md) | ログ、メトリクス、トレース、SLO |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
@@ -202,3 +202,23 @@ PM の方針（本家 Notion に寄せる、既定案）により、次のとお
 - **データソースのスキーマの上限（API）**：50KB を推奨の上限として文書に書き、1.5MB を超える更新だけを拒む。本家の API の文書の推奨に合わせ、画面と API で拒む基準を 1 つにするため（[databases.md](databases.md) の 11 節、[api-and-integrations.md](api-and-integrations.md) の 11 節）。
 - **OpenSearch の単価**：概算（月 4,500 USD）は据え置き、E8 の `load-test-k6` で確かめる。台数と同じ試験で決めるのが確実なため（[infrastructure.md](infrastructure.md) の 13 節、[roadmap.md](../roadmap.md) の E8）。
 - **本家の実装を核に使っていないことを確かめた**（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）：ブロックの層・CRDT（Fugue＋Peritext）・権限の判定・データベースの問い合わせ・数式の評価器・シャードのルーターは自前で作る。ProseMirror・SQLite（WASM）・Electron・OpenSearch・Aurora は本家と関係のない第三者の部品である。公開 API は本家の形に寄せるが、プロトコルの互換であり、本家の SDK や MCP サーバーの実装は使わない。直すところはなかった。
+
+### 決定（2026-09-28、データモデル）
+
+利用者の指示（データモデルを十分に設計し、ER 図を付ける。判断が要るところは推奨案で決める）により、[data-model.md](data-model.md) をデータモデルの正にし、領域ごとの定義を [data-model/](data-model/) に分けた。食い違いと抜けを、次のとおり決めた。ADR の決定は変えていない。
+
+- **プライベートの領域の親**：最上位のプライベートのページを `parent_type = member`、`parent_id = 持ち主の member_id` にした。`workspace` の親では持ち主が決まらず、暗黙の ACL（ADR-0021）と移し替え（ADR-0033）を表せないため。T3 の終点を `teamspace` / `member` に改めた（[block-model.md](block-model.md) の 2・5 節）。
+- **ワークスペースをまたぐ走査**：リマインダー・メールの送信待ち・Webhook の再試行・削除のジョブ・通報を期限で拾うため、DB ロール `sweeper` を足した。対象の表にだけ全行を読むポリシーを付け、中身の処理は拾った `workspace_id` でルーターを通して行う（[data-model.md](data-model.md) の 1.4 節）。
+- **所属の目録**：ワークスペースの切り替えの一覧のため、`global.account_workspaces` を `members` の写しとして持ち、outbox の `member.changed` から更新する。認可には使わない。
+- **`global` に足した表**：`site_subdomains`（公開サイトのホスト名の解決）、`plans`、`oauth_authorization_codes`、`mcp_tokens`、`account_notification_settings`、`push_subscriptions`、`email_suppressions`、`platform_audit_events`（ワークスペースに属さない監査。Slack と同じ）。
+- **シャードに足した表**：`favorites`、`invitations`（トークンに `workspace_id` を埋め、`global` に索引を持たない）、`workspace_settings`、`dbx_view_orders`。クライアントに `recent_pages`。
+- **ビューの手動の並び**：databases.md の「分数の索引」を ADR-0012 の形に揃え、アンカーの操作からサーバーが鍵を振る。
+- **`relation_edges.from_data_source_id`**：プロパティ ID はデータソースの中でだけ一意なので足した。
+- **パーティション**：`page_ops` は週、`outbox` は日、`inbox_items`・監査は月。パーティションの表の主キーは鍵を含め、`(page_id, seq)` の一意は `page_seqs` の採番で保証する。
+- **Relay のリース**：物理クラスタごとのスキーマ `cluster_local.relay_leases` に置き、送り終えた `outbox.id` を持たせた。
+- **公開の連携の主体のキー**：`bot:{installation_id}`。再インストールで古い共有が生き返らないため。
+- **Valkey**：クエリの結果（`query_id`、15 分）を `ws:{w}:q:{query_id}` に置く。行の変更は、データソースを置いたページのチャンネルにも送り、ビューの購読を兼ねる。メールの判定のための最後の操作の時刻 `ws:{w}:ma:{member_id}` を足した。
+- **SQS**：`db-recompute`（ロールアップ・行をまたぐ数式）と `directory-sync` を足した（[capacity.md](capacity.md) の 2.6 節）。
+- **S3**：スナップショットのキーを `ws/{workspace_id}/...` に揃えた（ワークスペース単位の削除と移動のため）。
+- **名前**：`page_seq`・`page_activity`・`block_text_state` の単数の表記、クライアントの `records` のキーの `table`（SQL の予約語）を `record_type` に直した。
+

@@ -104,6 +104,8 @@ S2 と S3 は、S1 の前提の比率を保ったまま、規模だけを伸ば�
 | file-events | 10 件/秒 | 2 秒 | 1 |
 | webhook-delivery | 50 件/秒 | 外部に依存 | Lambda（[api-and-integrations.md](api-and-integrations.md)） |
 | import-export | 1 件/秒 | 数分 | 2 |
+| db-recompute（ロールアップ・行をまたぐ数式。2026-09-28 に追加） | 負荷試験で決める | 数秒 | 1 |
+| directory-sync（`global.account_workspaces` の更新。2026-09-28 に追加） | 1 件/秒 | 50 ms | workers に同居 |
 | backfill（マイグレーション） | 物理クラスタの負荷で制御 | — | 1 |
 
 キューの名前は [search.md](search.md) の 8 節、[comments-and-notifications.md](comments-and-notifications.md) の 5 節、[api-and-integrations.md](api-and-integrations.md) の 6.4・12 節、[infrastructure.md](infrastructure.md) の 5 節に合わせた。

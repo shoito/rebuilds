@@ -166,7 +166,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS notify-events ─▶ 通知の計
 ページの「更新」の欄に、そのページの変更・コメント・解決・プロパティの変更を新しい順に並べる。
 
 - 元は操作のログ（ADR-0005）。操作を人と時間の窓（10 分）でまとめ、「〇〇 が 3 つのブロックを編集」などの要約にする。
-- 要約の表 `page_activity (workspace_id, page_id, window_start, actor_id, kind, block_ids, counts)` を、操作のログから Worker が作る。操作のログがスナップショットに畳まれても、要約は残す（保持は履歴と同じ。[block-model.md](block-model.md)）。
+- 要約の表 `page_activities (workspace_id, page_id, window_start, actor_id, kind, block_ids, counts)` を、操作のログから Worker が作る。操作のログがスナップショットに畳まれても、要約は残す（保持は履歴と同じ。[block-model.md](block-model.md)）。
 - 表示は、ページを読める人だけ。子のページの変更を含めるときは、子のページごとに判定する。
 - ページの履歴と復元は [block-model.md](block-model.md) にある。
 

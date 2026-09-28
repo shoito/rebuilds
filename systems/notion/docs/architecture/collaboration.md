@@ -112,15 +112,15 @@ Peritext は段落をまたぐ構造を扱わない（論文の範囲外）。�
 
 ```
 Client ──(WebSocket or POST /transactions)──▶ API
-  API: page_seq の行を page_id の順にロック → 権限（ADR-0004）→ 操作を当てる → 木の検証
-       → block / block_text_state / page_ops（page_id, seq）/ outbox を 1 トランザクションで書く
+  API: page_seqs の行を page_id の順にロック → 権限（ADR-0004）→ 操作を当てる → 木の検証
+       → blocks / block_text_states / page_ops（page_id, seq）/ outbox を 1 トランザクションで書く
                                    │ poll 25ms
                                    ▼
                                  Relay ──▶ Valkey  ws:{w}:pg:{page_id} ──▶ Sync Gateway ──▶ 購読中のクライアント
                                    └────▶ SQS（検索の索引、通知、Webhook）
 ```
 
-- ページの `seq` は、`page_seq (workspace_id, page_id, last_seq)` の行で採番する。この行のロックが、ページごとの書き込みの直列化になる。ブロックの行（大きい JSON）と分け、更新の多い小さな行にする（[capacity.md](capacity.md) の 3.1 節）。
+- ページの `seq` は、`page_seqs (workspace_id, page_id, last_seq)` の行で採番する。この行のロックが、ページごとの書き込みの直列化になる。ブロックの行（大きい JSON）と分け、更新の多い小さな行にする（[capacity.md](capacity.md) の 3.1 節）。
 - トランザクションが複数のページに触れる（ページの間の移動）ときは、触れた各ページで `seq` を 1 つ進める。ロックはページの ID の順に取り、デッドロックを避ける。
 - 操作のログ `page_ops (workspace_id, page_id, seq, tx_id, actor_id, device_id, ops JSONB, client_created_at, committed_at)` は、差分取得の元にする。保持は 30 日。履歴はスナップショットで持つ（[block-model.md](block-model.md)）。
 - Valkey・Gateway は Slack と同じ（[realtime.md](../../../slack/docs/architecture/realtime.md) の 7・8・11 節、Slack の [ADR-0013](../../../slack/docs/decisions/0013-gateway-scaling-and-presence.md)）。Relay は 7.3 節。

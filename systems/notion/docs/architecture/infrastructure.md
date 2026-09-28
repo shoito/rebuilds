@@ -45,7 +45,7 @@ Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md
 ```
 
 - 論理シャードは、PostgreSQL のスキーマ `shard000`〜`shard479` として持つ。各スキーマに、ブロックとそこから外部キーでたどれるテーブルの一式を置く（[ADR-0027](../decisions/0027-shard-router.md)、[data-model.md](data-model.md)）。
-- シャードに分けないテーブルは、スキーマ `global` に置く：アカウント、ワークスペースの一覧と所在（`logical_shard`、リージョン）、`shard_map`、`shard_groups`、`migration_ledger`。
+- シャードに分けないテーブルは、スキーマ `global` に置く：アカウント、ワークスペースの一覧と所在（`logical_shard`、リージョン）、`shard_map`、`shard_groups`、`migration_ledger` など（一覧は [data-model.md](data-model.md) の 3 節）。物理クラスタに属する Relay のリースは、クラスタごとのスキーマ `cluster_local` に置く。
 - S1 は、1 つの Aurora クラスタに `global` と 480 のスキーマを置く。S2 で `global` を独立した小さなクラスタに移す。
 
 ### 3.2 段階ごとの物理クラスタの数（初期見積もり）
