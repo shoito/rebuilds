@@ -440,7 +440,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `global.user_preferences` | `account_id`、`nudge_small`、`nudge_large`、`snap_to_pixel_grid`、`snapping_enabled`、`updated_at`。組織をまたぐ利用者の設定なので `org_id` を持たない。`global` スキーマに置き、`account_id` で絞る関数を通して読む（統合の工程で決めた。[data-model.md](data-model.md) の 3.2 節） |
+| Aurora `global.user_preferences` | `account_id`、`nudge_small`、`nudge_large`、`snap_to_pixel_grid`、`snapping_enabled`、`updated_at`。組織をまたぐ利用者の設定なので `org_id` を持たない。`global` スキーマに置き、`account_id` で絞る関数を通して読む（統合の工程で決めた。[data-model/identity.md](data-model/identity.md) の `user_preferences`） |
 | document-model のプロパティの表 | `vector_network` の形（7.1 節）。領域ごとの `fills` を含める |
 | ブラウザ `localStorage` | 最後に使ったツール、パネルの幅と開閉（利用者の端末だけ） |
 

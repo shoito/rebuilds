@@ -333,16 +333,20 @@ ADR-0042。
 - `webhook-backlog.md`：配送の滞留の切り分け（egress、受け手、SQS）と、止めた Webhook の再開。
 - `oauth-app-suspend.md`：悪意のある OAuth のアプリを止め、グラントを失効させる手順。
 
-### data-model（索引への追加の提案）
+### data-model
+
+形の正本は [data-model/public-api.md](data-model/public-api.md)。トークンとグラントはアカウントに属し、複数の組織のファイルに使え、組織が決まる前に引くので、`global` に置く（[data-model.md](data-model.md) の 9.1 節の D-4）。
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `global.oauth_apps` | `id`、`owner_user_id`、`owner_org_id`、`name`、`redirect_uris`、`client_secret_hash`、`state`（`draft`・`private`・`public`）、`review_status`、`scopes`、`created_at` |
-| Aurora `oauth_grants`（RLS。利用者の所属の組織） | `org_id`、`id`、`app_id`、`user_id`、`scopes`、`granted_at`、`revoked_at` |
-| Aurora `api_tokens`（RLS） | `org_id`、`id`、`kind`（`pat`・`oauth_access`・`oauth_refresh`・`org`）、`user_id`、`app_id`、`grant_id`、`scopes`、`resource_allowlist`（組織のトークン）、`secret_hash`、`expires_at`、`last_used_at`、`revoked_at`、`replaced_by`、`family_id`（リフレッシュの系列） |
+| Aurora `global.oauth_apps` | `id`、`owner_account_id`、`owner_org_id`、`name`、`redirect_uris`、`client_secret_hash`、`state`（`draft`・`private`・`public`）、`review_status`、`scopes`、`created_at` |
+| Aurora `global.oauth_grants` | `id`、`app_id`、`account_id`、`scopes`、`granted_at`、`revoked_at` |
+| Aurora `global.oauth_authorization_codes` | `code_hash`、`app_id`、`account_id`、`redirect_uri`、`code_challenge`、`scopes`、`expires_at`（30 秒）、`used_at` |
+| Aurora `global.api_tokens` | `id`、`kind`（`pat`・`oauth_access`・`oauth_refresh`・`org`）、`account_id`、`org_id`（組織のトークンだけ）、`app_id`、`grant_id`、`scopes`、`resource_allowlist`（組織のトークン）、`secret_hash`、`expires_at`、`last_used_at`、`revoked_at`、`replaced_by`、`family_id`（リフレッシュの系列） |
 | Aurora `webhooks`（RLS） | `org_id`、`id`、`context`（`team`・`project`・`file`）、`context_id`、`event_type`、`endpoint`、`secret_ciphertext`、`secret_next_ciphertext`、`secret_rotated_at`、`status`（`active`・`paused`）、`created_by`、`failing_since`、`created_at` |
-| Aurora `webhook_deliveries`（RLS。時間でパーティション、7 日） | `org_id`、`id`（イベントの ID）、`webhook_id`、`event_type`、`envelope`、`attempt`、`next_attempt_at`、`status`（`pending`・`delivered`・`failed`・`skipped_forbidden`）、`last_status_code`、`last_latency_ms`、`created_at` |
+| Aurora `webhook_deliveries`（RLS。`event_id` の範囲で 1 日ごとのパーティション、7 日） | `org_id`、`event_id`（イベントの ID。主キーは `(org_id, event_id, webhook_id)`）、`webhook_id`、`event_type`、`envelope`、`attempt`、`next_attempt_at`、`status`（`pending`・`delivered`・`failed`・`skipped_forbidden`）、`last_status_code`、`last_latency_ms`、`created_at` |
+| Aurora `org_oauth_app_allowlist`（RLS） | `org_id`、`app_id`、`approved_by`、`approved_at`（`orgs.oauth_apps_mode = allowlist` のとき。3.4 節） |
 | Aurora `idempotency_keys`（RLS） | `org_id`、`token_id`、`key`、`request_hash`、`response_status`、`response_body`、`expires_at`（24 時間） |
-| `/v1/image_jobs` の記録 | 別の表を持たない。Aurora の `export_jobs`（`source = api`。[export-and-assets.md](export-and-assets.md)、[data-model.md](data-model.md)）を使う |
+| `/v1/image_jobs` の記録 | 別の表を持たない。Aurora の `export_jobs`（`source = api`。[export-and-assets.md](export-and-assets.md)、[data-model/assets.md](data-model/assets.md)）を使う |
 | SQS `webhook-delivery` | 配送のジョブ |
 | 開発リポジトリ `schema/properties.toml` の列 | `public_api`・`api_name`・`api_since`（4.1 節）、`public_plugin`（[plugins.md](plugins.md) の 5.5 節） |

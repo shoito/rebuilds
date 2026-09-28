@@ -331,10 +331,13 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1 基盤�
 
 ### data-model
 
+形の正本は [data-model/identity.md](data-model/identity.md)、[data-model/organization.md](data-model/organization.md)、[data-model/events-and-audit.md](data-model/events-and-audit.md)。
+
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `global.accounts`・`global.sessions`・`global.passkeys`・`global.verification_codes` | 認証（Better Auth の表。Slack と同じ形） |
-| Aurora `org_sso_configs`（RLS） | `org_id`、`protocol`（`saml`・`oidc`）、IdP のメタデータ、`enforcement`（`any`・`sso_only`）、`verified_domains` |
+| Aurora `global.accounts`・`global.auth_identities`・`global.sessions`・`global.passkeys`・`global.two_factors`・`global.verification_codes` | 認証（Better Auth の表。Slack と同じ形） |
+| Aurora `org_sso_configs`（RLS） | `org_id`、`protocol`（`saml`・`oidc`）、IdP のメタデータ、`enforcement`（`any`・`sso_only`）。対象のドメインは `org_domains` の確認済みの行 |
+| Aurora `org_domains`（RLS） | 組織の確認済みのドメイン（組織をまたいで一意） |
 | Aurora `audit_events`（RLS、月のパーティション） | 6 節 |
 | Aurora `global.operator_audit_events` | 運用者の操作 |
 | Aurora `legal_holds`（RLS） | `org_id`、`scope`（`org`・`file`）、`resource_id`、`reason`、`created_by`、`released_at` |

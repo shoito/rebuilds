@@ -413,6 +413,6 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり：E1 基盤�
 
 | 置き場所 | 項目 |
 | --- | --- |
-| ファイルの中身（document-model.md） | `COMPONENT`・`COMPONENT_SET`・`INSTANCE` のプロパティ（3.1 節）、`imported` の根と写し |
+| ファイルの中身（document-model.md） | `COMPONENT`・`COMPONENT_SET`・`INSTANCE` のプロパティ（3.1 節）、`imported` の根と写し。写しの `library_asset_key`・`library_version` はプロパティ 69 `library_source`（予約。[data-model/document.md](data-model/document.md) の 3 節）に持つ |
 | Aurora（MVP の後） | `libraries`（`org_id`、`file_id`、公開先、作成・更新）、`library_versions`（`library_id`、`version`、`source_seq`、説明、公開した人と日時）、`library_assets`（`library_id`、`asset_key`、種類、名前、`content_hash`、最新の版、`removed_at`）、`file_library_links`（`file_id`、`library_id`、有効にした人と日時） |
 | S3（MVP の後） | `libraries/{org_id}/{library_id}/assets/{asset_key}/{content_hash}` |

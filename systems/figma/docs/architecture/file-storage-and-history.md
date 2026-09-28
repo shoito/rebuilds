@@ -126,7 +126,7 @@ TransactWriteItems(
 1. `UpdateItem journal[file_id, 0] SET epoch = :E, owner = :me  IF attribute_not_exists(epoch) OR epoch < :E`。失敗したら、より新しい持ち主がいるので手を引く。
 2. Aurora の `files.checkpoint_seq` と `checkpoint_key` を読み、マニフェストとチャンクを読む（5 節）。
 3. `Query journal  file_id = :f AND seq > :checkpoint_seq`（強い整合性の読み取り、1 MB ごとに続きを読む）。
-4. 項目の範囲が続いているか（`次の seq = 前の end_seq + 1`）を確かめる。飛びがあれば読み込みを止め、ファイルを `maintenance`（理由 `journal_gap`。`files.state`、[data-model.md](data-model.md) の 5.1 節）にしてアラームを出す（12 節）。
+4. 項目の範囲が続いているか（`次の seq = 前の end_seq + 1`）を確かめる。飛びがあれば読み込みを止め、ファイルを `maintenance`（理由 `journal_gap`。`files.state`、[data-model/organization.md](data-model/organization.md) の `files`）にしてアラームを出す（12 節）。
 5. `seq` の順に当てる。`session_opens` と各変更の `(session_id, client_seq)` から、セッションの表を戻す。
 6. 受け付けを始める。
 
@@ -470,7 +470,9 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 - `file-purge-request.md`：利用者・組織からの完全な削除の依頼と、バックアップに残る期間の説明（法務の確認の後）。
 - `version-restore-support.md`：サポートが、利用者の依頼で版を復元・複製する手順と、監査のログ。
 
-### data-model（索引への追加の提案）
+### data-model
+
+形の正本は [data-model/file-storage.md](data-model/file-storage.md)（Aurora・DynamoDB・S3）と [data-model/document.md](data-model/document.md)（直列化）。下は、この領域が持ち込んだ項目の一覧。
 
 | 置き場所 | 中身 |
 | --- | --- |
@@ -478,7 +480,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 | S3 `files/{file_id}/checkpoints/{seq:020}`・`checkpoints/g{g}/{seq:020}` | マニフェスト（世代 1・世代 2 以降） |
 | S3 `files/{file_id}/chunks/{sha256}` | チャンク（世代で分けない） |
 | S3 `files/{file_id}/journal-blobs/{start_seq}-{epoch}`・`journal-blobs/g{g}/…` | 大きな変更の本体 |
-| Aurora `files` の列 | `checkpoint_seq`、`checkpoint_key`、`node_count`、`size_bytes`、`state`、`trashed_at`、`trashed_by`、`purged_at`、`source_file_id`、`source_version_id`、`last_edited_at`。統合した定義は [data-model.md](data-model.md) の 5.1 節 |
-| Aurora `file_versions` | `org_id`、`file_id`、`id`、`kind`（`auto`・`named`・`restore_before`・`restore_after`・`dr_salvaged`）、`seq`、`manifest_key`、`name`、`description`、`created_by`、`created_at`、`delete_after`。`FORCE ROW LEVEL SECURITY` |
-| Aurora `file_storage_jobs` | `org_id`、`id`、`file_id`、`kind`（`gc`・`purge`・`duplicate`・`restore`・`orphan_recovery`）、`step`、`state`、`attempts`、`next_run_at`、`last_error`（中身を含めない） |
+| Aurora `files` の列 | `checkpoint_seq`、`checkpoint_key`、`node_count`、`size_bytes`、`state`、`trashed_at`、`trashed_by`、`purged_at`、`source_file_id`、`source_version_id`、`last_edited_at`、`checkpoint_gen`。定義は [data-model/organization.md](data-model/organization.md) の `files` |
+| Aurora `file_versions` | `org_id`、`file_id`、`id`、`kind`（`auto`・`named`・`restore_before`・`restore_after`・`dr_salvaged`）、`seq`、`region_gen`、`manifest_key`、`name`、`description`、`created_by`、`created_at`、`delete_after`。`FORCE ROW LEVEL SECURITY` |
+| Aurora `file_storage_jobs` | `org_id`、`id`、`file_id`、`kind`（`gc`・`purge`・`duplicate`・`restore`・`orphan_recovery`・`dr_salvage`）、`region`、`step`、`state`、`attempts`、`next_run_at`、`last_error`（中身を含めない） |
 | ブラウザの IndexedDB `chunks` | ハッシュ → 圧縮したチャンク（6.3 節） |

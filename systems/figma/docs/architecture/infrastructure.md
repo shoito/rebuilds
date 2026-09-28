@@ -123,6 +123,7 @@ ds_liveness（DynamoDB、リージョンごと。グローバルテーブルに�
 
 file_leases（DynamoDB、グローバルテーブル）
   PK file_id
+  org_id           S   // ファイルを持つ組織。割り当てのときに Gateway がチケットから渡す。Document Server と回復のジョブが Aurora の文脈に使う
   state            S   // owned | handoff | released | deleted
   owner_task       S
   owner_incarnation S
@@ -142,7 +143,7 @@ file_leases（DynamoDB、グローバルテーブル）
 
 | 場面 | 手順 |
 | --- | --- |
-| 開く | Gateway → router `owner(file_id, size_hint, az)`。`file_leases` を強い整合性で読む。`owned` で持ち主が生きていれば返す。`deleted` なら `gone`。それ以外は、空きのあるタスクを選び（[ADR-0051](../decisions/0051-document-server-memory-admission.md)）、`UpdateItem ... SET epoch = epoch + 1 ... IF epoch = :old`（初めてなら `attribute_not_exists`）。選んだタスクへ `open_file(file_id, epoch)` を送る |
+| 開く | Gateway → router `owner(file_id, org_id, size_hint, az)`（`org_id` はチケットの値。割り当てで `file_leases` に書く）。`file_leases` を強い整合性で読む。`owned` で持ち主が生きていれば返す。`deleted` なら `gone`。それ以外は、空きのあるタスクを選び（[ADR-0051](../decisions/0051-document-server-memory-admission.md)）、`UpdateItem ... SET epoch = epoch + 1 ... IF epoch = :old`（初めてなら `attribute_not_exists`）。選んだタスクへ `open_file(file_id, epoch)` を送る |
 | 持ち主が生きているかの判定 | `ds_liveness[owner_task]` があり、`incarnation` が一致し、`expires_at_ms + 2 秒 > now` |
 | きれいに手放す | Document Server がチェックポイントを書いた後（`durable_seq` まで）、`SET state = released, released_seq = :s REMOVE gsi_owner IF owner_task = :me AND epoch = :e` |
 | 渡す（ドレイン） | ジャーナルを書き切った後、`SET state = handoff, released_seq = :s IF ...`。router がすぐに次の持ち主を割り当てる |
@@ -393,7 +394,7 @@ infra/
 
 | 置き場所 | 中身 |
 | --- | --- |
-| DynamoDB `file_leases`（グローバル） | 5.1 節。GSI `by_owner` |
+| DynamoDB `file_leases`（グローバル） | 5.1 節。GSI `by_owner`。形の正本は [data-model/file-storage.md](data-model/file-storage.md) の 3 節 |
 | DynamoDB `ds_liveness`（リージョンごと） | 5.1 節 |
 | DynamoDB `journal` のパーティションキー | 世代 1 は `{file_id}`、世代 2 以降は `{file_id}#g{g}`（ADR-0048） |
 | S3 `files/{file_id}/checkpoints/g{g}/{seq:020}`、`journal-blobs/g{g}/…` | 世代 2 以降のマニフェストと大きな変更 |

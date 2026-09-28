@@ -48,7 +48,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `terraform-layout` | ルートモジュールの分け方、状態ファイル（東京と大阪）、`prevent_destroy`（10 節） |
 | `ecs-rust-services-baseline` | Rust のサービスの ECS のテンプレート（ARM64、ログ、OTel、ヘルスチェック） |
 | `kms-keys-and-policies` | データの種類ごとの KMS の鍵、鍵のポリシー、大阪のレプリカ（[ADR-0044](decisions/0044-encryption-keys-and-client-cache.md)） |
-| `aurora-orgs-and-rls` | 組織・チーム・プロジェクト・ファイルの表と FORCE RLS、`SET LOCAL app.org_id`、最小の判定関数（所有者だけ）（[permissions-and-sharing.md](architecture/permissions-and-sharing.md)、data-model.md の 5.1 節） |
+| `aurora-orgs-and-rls` | 組織・チーム・プロジェクト・ファイルの表と FORCE RLS、`SET LOCAL app.org_id`、最小の判定関数（所有者だけ）（[permissions-and-sharing.md](architecture/permissions-and-sharing.md)、[data-model/organization.md](architecture/data-model/organization.md)） |
 | `dynamodb-journal-table` | `journal`・`file_leases`・`ds_liveness` の表、TTL、PITR、グローバルテーブル（大阪）、IAM（[file-storage-and-history.md](architecture/file-storage-and-history.md)） |
 | `dynamodb-warm-throughput` | warm throughput と表の上限の申請（[capacity.md](architecture/capacity.md) の 4 節） |
 | `files-bucket` | files のバケット、バージョニング、SSE-KMS、大阪へのレプリケーション、両方のライフサイクル、`files.<brand>usercontent` の CloudFront の署名付き URL |
@@ -251,7 +251,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `session-revocation-kick` | `session.revoked` の配送と接続の切断 |
 | `viewer-mode-ui` | 閲覧の権限での UI、`RoleChanged` への対応、閲覧だけの描画（rendering の `viewer-rendering` と 1 つ） |
 | `sharing-ui` | 共有の画面（ファイル・プロジェクト・チーム） |
-| `file-maintenance-state` | `files.state = maintenance` と、閲覧のチケットだけを出す判定の上限（data-model.md の 5.1 節） |
+| `file-maintenance-state` | `files.state = maintenance` と、閲覧のチケットだけを出す判定の上限（[data-model/organization.md](architecture/data-model/organization.md) の `files`） |
 | `audit-events-core` | `audit_events`、outbox、log-archive への送り |
 | `readable-scopes-property` | `readableScopes` と判定関数の一致の性質ベーステスト（検索の準備） |
 | `leak-test-suite` | 漏洩の経路の表のテスト一式（[quality.md](quality.md) の 2.2.1 節） |

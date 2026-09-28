@@ -137,7 +137,7 @@ level(actor, file):
 
   // 1. 役割（上げるだけ。下位で下げない）
   r = max(role(actor, file), role(actor, file.project), role(actor, file.team))
-  if file が下書き and actor == file.owner: r = owner
+  if actor == file.owner_account_id: r = owner      // 所有者は files の列だけで表す（下書きに限らない）
 
   // 2. 一般アクセス（最も近い設定を持つ資源から 1 つだけ）
   ga = file.general_access ?? project.general_access   // チームの一般アクセスはない（3.3 節）
@@ -158,7 +158,7 @@ level(actor, file):
 | 組織の方針 | 公開を禁止していれば `anyone` を無視する（上の計算の中）。ゲストとの共有の禁止（MVP の後）なら、ゲストの役割を無視する |
 | チームの可視性 | 可視性と参加（`team_members`）は、実効の水準に入れない。チームを見せるだけに使う（3.3 節） |
 
-- 役割の保存：`resource_roles (org_id, resource_type, resource_id, account_id, level)`。`resource_type` は `team` / `project` / `file`。
+- 役割の保存：`resource_roles (org_id, resource_type, resource_id, account_id, level)`。`resource_type` は `team` / `project` / `file`。ファイルの `owner` は `files.owner_account_id` だけで表し、`resource_roles` のファイルの行には置かない（[data-model.md](data-model.md) の 9.1 節の D-12）。
 - 一般アクセスの保存：`general_access (org_id, resource_type, resource_id, scope, level, expires_at, previous_scope, previous_level, viewers_can_copy_share_export)`。`resource_type` は `project` / `file` だけ。ファイルの行がなければ、プロジェクトの行から届く。
 
 ### 4.4 シート
@@ -362,7 +362,7 @@ ResumeToken（Gateway が HMAC-SHA256 で署名。有効 60 秒。1 回だけ使
 | チームの参加・退出・可視性の変更 | ○ |
 | 組織の行の役割・シート・無効化 | ○ |
 | 組織の方針（公開の禁止など） | ○ |
-| ファイルの `maintenance` への出入り（[data-model.md](data-model.md) の 5.1 節） | ○ |
+| ファイルの `maintenance` への出入り（[data-model/organization.md](data-model/organization.md) の `files`） | ○ |
 | ファイルの名前・中身の変更、コメント | —（判定に使わない） |
 
 ### 9.2 長く続く接続
@@ -386,7 +386,7 @@ ResumeToken（Gateway が HMAC-SHA256 で署名。有効 60 秒。1 回だけ使
 
 ### 9.3 移動と `files.team_id` の書き換え
 
-`files.team_id` は、`projects.team_id` を写した非正規化の列である（[data-model.md](data-model.md) の 5.1 節）。名前の検索の候補の段（[search.md](search.md) の 3.2 節）だけが使う。判定関数は `project_id` から鎖をたどるので、`team_id` がずれても漏洩にはならない（読み直しで落ちる）。ずれると、読めるファイルが検索の候補から欠ける。
+`files.team_id` は、`projects.team_id` を写した非正規化の列である（[data-model/organization.md](data-model/organization.md) の `files`）。名前の検索の候補の段（[search.md](search.md) の 3.2 節）だけが使う。判定関数は `project_id` から鎖をたどるので、`team_id` がずれても漏洩にはならない（読み直しで落ちる）。ずれると、読めるファイルが検索の候補から欠ける。
 
 移動は、次のものを **1 つのトランザクション**で書く。
 
@@ -539,15 +539,18 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1〜E12 �
 
 ### data-model
 
+形の正本は [data-model/organization.md](data-model/organization.md) と [data-model/sharing.md](data-model/sharing.md)。
+
 | テーブル | 中身 |
 | --- | --- |
-| `orgs` | プラン、確認済みのドメイン、方針（公開の禁止、シートの承認の設定）、`acl_version` |
+| `orgs` | プラン、方針（公開の禁止、シートの承認の設定）、`acl_version` |
+| `org_domains` | `org_id`、`domain`、TXT の値、確認した日時。確認済みのドメインは組織をまたいで一意 |
 | `org_members` | `org_id`、`account_id`、`role`（`admin` / `member` / `guest`）、`seat`（`full` / `view`）、無効化日時 |
 | `teams` | `org_id`、名前、`visibility`（`open` / `closed` / `secret`） |
 | `team_members` | `team_id`、`account_id`、参加日時（役割は `resource_roles`。参加はチームを見せるだけで、中身に届かない） |
 | `projects` | `org_id`、`team_id`、名前 |
-| `files` | `org_id`、`project_id`（下書きは null）、`owner_account_id`、`file_key`、名前。状態（`state`・`trashed_at` など）と `checkpoint_seq` は [file-storage-and-history.md](file-storage-and-history.md) の 17 節に合わせる |
-| `resource_roles` | `org_id`、`resource_type`、`resource_id`、`account_id`、`level`、`granted_by`、作成日時 |
+| `files` | `org_id`、`project_id`（下書きは null）、`owner_account_id`（所有者の唯一の出どころ）、`file_key`（組織をまたいで一意）、名前。状態（`state`・`trashed_at` など）と `checkpoint_seq` は [file-storage-and-history.md](file-storage-and-history.md) の 17 節に合わせる |
+| `resource_roles` | `org_id`、`resource_type`、`resource_id`、`account_id`、`level`（ファイルの行に `owner` を置かない）、`granted_by`、作成日時 |
 | `general_access` | `org_id`、`resource_type`（`project` / `file`）、`resource_id`、`scope`、`level`、`expires_at`、`previous_scope`、`previous_level`、`viewers_can_copy_share_export` |
 | `invitations` | `org_id`、資源、`email_normalized`、`level`、`token_hash`、`expires_at`、`accepted_at`、`invited_by` |
 | `access_requests` | `org_id`、`file_id`、`account_id`、`level`、`state`、作成日時 |

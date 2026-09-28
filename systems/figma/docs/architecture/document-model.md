@@ -30,7 +30,7 @@
 
 ## 3. ノードの種類
 
-`NodeType` は `u8` の列挙。番号は一度振ったら変えない。
+`NodeType` は `u8` の列挙。番号は一度振ったら変えない。値は [data-model/document.md](data-model/document.md) の 2 節。
 
 | 種類 | 親になれる種類 | 子になれる種類 | MVP | 持ち主の領域 |
 | --- | --- | --- | --- | --- |
@@ -78,7 +78,7 @@
 
 ### 4.2 MVP のプロパティ（抜粋）
 
-完全な表は開発リポジトリの `schema/properties.toml` を正とする。ここでは競合の単位の決め方が分かる代表を挙げる。
+完全な表は開発リポジトリの `schema/properties.toml` を正とする。ここでは競合の単位の決め方が分かる代表を挙げる。番号を 1 つずつ並べた一覧は [data-model/document.md](data-model/document.md) の 3 節にあり、範囲で書いた番号（18〜39 など）は名前の順に 1 つずつ振る。
 
 | id | name | type | kind | 持てる種類 | 備考 |
 | --- | --- | --- | --- | --- | --- |
@@ -93,7 +93,7 @@
 | 9 | `fills` | `Vec<Paint>`（最大 32） | scalar | 図形・フレーム・テキスト | 塗りの配列は 1 つの単位。本家も配列ごとに置き換える（**未検証**） |
 | 10 | `strokes` | `Vec<Paint>`（最大 32） | scalar | 同上 | |
 | 11 | `stroke_weight` | `f32` | scalar | 同上 | |
-| 12 | `stroke_align`・`stroke_cap`・`stroke_join`・`dash_pattern` | 各 1 つ | scalar | 同上 | それぞれ別の単位 |
+| 12 | `stroke_align` | `StrokeAlign (u8)` | scalar | 同上 | `stroke_cap`・`stroke_join`・`dash_pattern` は 43〜45（それぞれ別の単位） |
 | 13 | `corner_radius` | `CornerRadii (f32×4)` | scalar | 矩形・フレーム・コンポーネント | 四隅は同じ単位 |
 | 14 | `effects` | `Vec<Effect>`（最大 16） | scalar | レイヤー | 影・ぼかし |
 | 15 | `is_mask` | `bool` | scalar | レイヤー | |
@@ -101,8 +101,10 @@
 | 17 | `constraints` | `Constraints { h: u8, v: u8 }` | scalar | レイヤー | 持ち主は layout |
 | 18〜39 | `layout_mode`・`layout_wrap`・`item_spacing`・`counter_axis_spacing`・`padding_top`〜`padding_left`・`primary_axis_align`・`counter_axis_align`・`counter_axis_align_content`・`primary_sizing`・`counter_sizing`・`strokes_included_in_layout`・`item_reverse_z_index`・`layout_positioning`・`layout_grow`・`layout_align`・`min_width`・`max_width`・`min_height`・`max_height` | 各 1 つ | scalar | フレーム・コンポーネント・子（最小・最大はレイヤー） | 持ち主は layout。余白と最小・最大は別々の単位にする（別々に編集されるため）。値の範囲は [layout.md](layout.md) の 3.1 節 |
 | 40 | `vector_network` | `VectorNetwork`（頂点・辺・領域。最大 1 MiB） | scalar | `VECTOR` | ベクターネットワーク全体が 1 つの単位 |
-| 41 | `polygon_count`・`star_inner_radius` | 各 1 つ | scalar | 多角形・星 | |
+| 41 | `polygon_count` | `u32` | scalar | 多角形・星 | |
 | 42 | `boolean_op` | `BoolOp (u8)` | scalar | `BOOLEAN_OPERATION` | |
+| 43〜45 | `stroke_cap`・`stroke_join`・`dash_pattern` | 各 1 つ | scalar | 図形・フレーム・テキスト | 線の設定。それぞれ別の単位 |
+| 46 | `star_inner_radius` | `f32`（0〜1） | scalar | 星 | |
 | 50 | `text_content` | `TextContent { chars: String, runs: Vec<StyleRun> }`（最大 64 KiB） | scalar | `TEXT` | 文字と書式の範囲を 1 つの単位にする。分けると、文字の添字と範囲がずれる（ADR-0002 の「テキストは LWW」） |
 | 51〜58 | `font_family`・`font_style`・`font_size`・`line_height`・`letter_spacing`・`text_align_h`・`text_align_v`・`text_auto_resize` | 各 1 つ | scalar | `TEXT` | 範囲の書式がないときの既定。範囲の書式は `text_content` の `runs` |
 | 60 | `component_props` | `Map<PropKey, ComponentPropDef>` | map | `COMPONENT`・`COMPONENT_SET` | 持ち主は components |
@@ -112,6 +114,7 @@
 | 64 | `component_prop_values` | `Map<PropKey, Value>` | map | `INSTANCE` | 持ち主は components（[components-and-libraries.md](components-and-libraries.md) の 3.1 節） |
 | 65 | `component_prop_refs` | `Map<PropRefTarget, PropKey>`（`visible`・`characters`・`main_component`） | map | コンポーネントの中のレイヤー | 同上 |
 | 66〜68 | `publish_key`・`publish_hidden`・`removed_at` | 128 ビットの乱数の文字列・`bool`・時刻 | scalar | `COMPONENT` | 同上。`publish_key` はライブラリ（MVP の後）で使う |
+| 69 | `library_source` | `LibrarySource { library_id, asset_key, version }` | scalar | `COMPONENT`・`COMPONENT_SET` | 予約（E13）。取り込んだライブラリの写しの出どころ（[components-and-libraries.md](components-and-libraries.md) の 7.2 節） |
 | 70 | `export_settings` | `Vec<ExportSetting>`（最大 16） | scalar | レイヤー | 持ち主は export-and-assets |
 | 80 | `derived_layout` | `DerivedLayout { transform, size }` | scalar | レイヤー | `derived`。9.2 節 |
 | 90 | `plugin_data` | `Map<(PluginId, Key), Bytes>` | map | すべて | 予約（MVP の後） |
@@ -322,7 +325,7 @@ struct ChangeSummary {            // 当てた変更の要約。フレームご�
 | クライアントとサーバーの `doc-model` の版が違う | 同じ変更の結果が変わりうる | 接続時に ADR-0053 の 3 つの版で照合し、互換の外なら強い再読み込み。結果を変える規則の変更は文書のフラグでファイルごとに切り替える（8.4 節、ADR-0055） |
 | 知らない `prop_id` を持つチェックポイント | 古い Worker が値を落としうる | 読み飛ばさずに持ち、そのまま書く（8.4 節） |
 | チェックポイントのチャンクの破損 | ハッシュが合わない | 読み込みを止め、前のチェックポイントとジャーナルから作り直す（[file-storage-and-history.md](file-storage-and-history.md) の 12 節） |
-| 不変条件の破れ（バグ） | 描画・書き出しが壊れうる | サーバーは当てた後の検査（重い検査は抜き取り）で見つけたら、そのファイルを `maintenance`（`files.state`。[data-model.md](data-model.md) の 5.1 節）にして編集を止め、修復の手順（runbook）に回す |
+| 不変条件の破れ（バグ） | 描画・書き出しが壊れうる | サーバーは当てた後の検査（重い検査は抜き取り）で見つけたら、そのファイルを `maintenance`（`files.state`。[data-model/organization.md](data-model/organization.md) の `files`）にして編集を止め、修復の手順（runbook）に回す |
 | WASM とネイティブで `f32` の結果が違う | 画面と書き出しの差 | 表の検証と正準形の比較を CI で両方に走らせる（ADR-0001） |
 
 ## 13. セキュリティ

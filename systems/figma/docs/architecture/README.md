@@ -1,6 +1,6 @@
 # Architecture: Figma
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧と ADR の番号の範囲は 8 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md)、データの置き場所の索引は [data-model.md](data-model.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧と ADR の番号の範囲は 8 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md)、データモデルの正本（表・列・キー・ER 図・プロパティの番号）は [data-model.md](data-model.md) と [data-model/](data-model/identity.md) の下にある。
 
 ## 1. 全体構成
 
@@ -226,8 +226,8 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **CDN の署名**：署名はキャッシュの鍵に含めない。署名付き URL は取得を許すもので、キャッシュのオブジェクトは中身のハッシュで名付け、パスに組織（`images/{org_id}/…`）かファイル（`files/{file_id}/…`）を含むので、組織をまたいで共有されない（permissions-and-sharing.md の 11 節を直した）。
 - **S3 の削除**：削除とライフサイクルは大阪へ複製されないので、完全な削除・掃除・画像の mark-and-sweep を東京と大阪の両方で行う（ADR-0045。file-storage-and-history.md の 11.2 節、export-and-assets.md の 6.5 節を直した）。
 - **版の照合**：`schema_hash` の不一致で再読み込みにする規則を、ADR-0053 の 3 つの版の照合に置き換えた（document-model.md の 8.4 節、multiplayer.md の 4.3 節）。
-- **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻した版は `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 11 節）。
-- **領域の間の提案**：`thumbnail_node`、`cjk_fallback_font`、レイアウトのプロパティ、`component_prop_values` などのコンポーネントのプロパティ、表の列 `public_api`・`api_name`・`api_since`・`public_plugin`、`ChangeSet` の `origin`、マニフェストの `features`、`Hello.protocol_version`、再接続の最初の 0〜5 秒の乱数の待ち、`file_versions.kind = dr_salvaged`、ファイルの `maintenance` の状態を取り込んだ（data-model.md の 9・11 節）。
+- **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻した版は `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 9.2 節）。
+- **領域の間の提案**：`thumbnail_node`、`cjk_fallback_font`、レイアウトのプロパティ、`component_prop_values` などのコンポーネントのプロパティ、表の列 `public_api`・`api_name`・`api_since`・`public_plugin`、`ChangeSet` の `origin`、マニフェストの `features`、`Hello.protocol_version`、再接続の最初の 0〜5 秒の乱数の待ち、`file_versions.kind = dr_salvaged`、ファイルの `maintenance` の状態を取り込んだ（data-model.md の 9.2 節、[data-model/document.md](data-model/document.md)）。
 - **呼び名**：本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名している。本システムは「プロジェクト」のまま進め、表とコードも `project` にする。画面の呼び名は下の「決定（2026-09-27、推奨案で確定）」で決めた（permissions-and-sharing.md の 15 節）。
 - **Epic**：E1〜E12 が MVP、E13 ライブラリ、E14 プラグイン、E15 公開 API と Webhook。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。領域の文書の仮の Epic の番号を roadmap.md に揃えた（rendering-engine.md と editor-and-tools.md の E8・E9 の入れ替わり、「後」「後-P」「後-A」の置き換え）。組織の SAML SSO は ADR-0043 のとおり E12 に作るが、MVP の範囲の外で GA の判定に含めない。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限（ファイル・ノード）は document-model.md の 11 節、送受信の上限は multiplayer.md の 4.6 節、メモリの予算は rendering-engine.md の 11 節、容量のパラメーターは capacity.md の 10 節、保持の期間は security.md の 7 節。
@@ -290,6 +290,19 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 - 計測・PoC で決めるもの（上の「持ち越し」の表と、各文書の「持ち越し」）。参照画像の許容の値は、E2 で決め直す。
 - 利用者の声や将来の条件で見直すもの（未確定の変更の IndexedDB への保存、Undo の履歴のタブをまたぐ保存、500 人を超えるファイル、ShadowRealm など）。どれも今の決定があり、見直しの条件だけを書いている。
 
+### 決定（2026-09-28、データモデルの設計）
+
+データモデルを [data-model.md](data-model.md) と [data-model/](data-model/identity.md) の下に、ER 図つきの正本としてまとめた。ADR は変えていない。PM の方針（推奨案でよい）で、次を決めた。一覧と理由は data-model.md の 9.1 節（D-1〜D-23）。
+
+- 形（表・列・キー・プロパティの番号）は data-model を正とし、振る舞いは領域の文書を正とする。
+- トークンとグラント（`api_tokens`・`oauth_grants`）は `global` に置く。アカウントに属し、組織が決まる前に引くため（[api-and-webhooks.md](api-and-webhooks.md) の 14 節を直した）。
+- `files.file_key` は組織をまたいで一意にし、`resolve_file_key` の関数で組織の文脈を決める。
+- `file_leases` に `org_id` を持たせ、Document Server と回復のジョブが Aurora の文脈を得る（[infrastructure.md](infrastructure.md) の 5.1・5.2 節を直した）。
+- ファイルの所有者は `files.owner_account_id` だけで表す（[permissions-and-sharing.md](permissions-and-sharing.md) の 4.3 節の計算を直した）。
+- プロパティの番号の重なり（12・41）を分け、43〜46 を振った。69 `library_source` を予約した（[document-model.md](document-model.md) の 4.2 節を直した）。`NodeType` の値を振った。
+- `outbox`・`global_outbox` と Relay、制御の出来事の Valkey のチャンネル（`ctl:*`）を置いた。
+- 確認済みのドメインを `org_domains` にした（[security.md](security.md) の 14 節を直した）。
+
 ## 8. 領域の文書
 
 持ち主は、どれも Dev が書き、「レビュー」の列のロールが確認する。ADR は下の範囲の中で採番する。
@@ -314,7 +327,7 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 | [observability.md](observability.md) | ログ、メトリクス、トレース、クライアントの計測、SLI、アラート、合成の監視 | 0049〜0050 | Ops | E1〜E3、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター、負荷試験 L1〜L10 | 0051〜0052 | Ops | E3、E12 |
 | [delivery.md](delivery.md) | CI/CD、WASM とネイティブの一致、版の照合、段階的なリリース、プロパティの表の変更 | 0053〜0055 | QA、Ops | E1〜E3 |
-| [data-model.md](data-model.md) | データの置き場所の索引と統合した定義 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本。規約、ER 図、表の索引、横断の不変条件。領域ごとの定義は [data-model/](data-model/identity.md) の下 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 
 ## 9. Epic
 

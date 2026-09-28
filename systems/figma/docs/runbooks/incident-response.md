@@ -66,7 +66,7 @@ SEV1 では、指揮者は手を動かさない。
 
 1 つのファイルだけを止めたいときの共通の操作。
 
-1. 運用者の画面で、ファイルを `maintenance` にする（`files.state`。[data-model.md](../architecture/data-model.md) の 5.1 節）。API は閲覧のチケットだけを出し、`acl.changed` で Gateway が開いている接続を読み取りに下げる。ジャーナルの飛び（`journal_gap`）のときは、Document Server も読み込まない。
+1. 運用者の画面で、ファイルを `maintenance` にする（`files.state`。[data-model/organization.md](../architecture/data-model/organization.md) の `files`）。API は閲覧のチケットだけを出し、`acl.changed` で Gateway が開いている接続を読み取りに下げる。ジャーナルの飛び（`journal_gap`）のときは、Document Server も読み込まない。
 2. 所有者に、アプリ内で「一時的に編集を止めています」を出す。
 3. 解くときは `maintenance` を外す。
 

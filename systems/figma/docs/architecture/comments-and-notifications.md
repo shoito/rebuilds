@@ -56,16 +56,17 @@
 
 | 表 | 主な列 |
 | --- | --- |
-| `comment_threads` | `org_id`、`id`（UUIDv7）、`file_id`、`page_id`（ノードの ID）、`anchor_kind`（`point` / `region`）、`anchor_node_id`（最上位のフレーム・コンポーネント・グループ、なければ null）、`offset_x`・`offset_y`（ノードの座標系での位置）、`region_w`・`region_h`、`abs_x`・`abs_y`（作成時のキャンバスの絶対座標）、`resolved_at`、`resolved_by`、`created_by`、`created_at`、`last_activity_at` |
+| `comment_threads` | `org_id`、`id`（UUIDv7）、`file_id`、`page_id`（ノードの ID の文字列 `"{session_id}:{local_id}"`）、`anchor_kind`（`point` / `region`）、`anchor_node_id`（最上位のフレーム・コンポーネント・グループ、なければ null）、`offset_x`・`offset_y`（ノードの座標系での位置）、`region_w`・`region_h`、`abs_x`・`abs_y`（作成時のキャンバスの絶対座標）、`resolved_at`、`resolved_by`、`created_by`、`created_at`、`last_activity_at`、`deleted_at` |
 | `comments` | `org_id`、`id`、`thread_id`、`file_id`、`author_id`、`body`（リッチテキストの JSON）、`edited_at`、`deleted_at`、`created_at` |
-| `comment_attachments` | `org_id`、`comment_id`、`asset_id`（S3 のキー）、`mime`、大きさ。1 コメント 5 つまで |
-| `comment_reactions` | `org_id`、`comment_id`、`account_id`、`emoji` |
-| `comment_mentions` | `org_id`、`comment_id`、`mentioned_account_id` |
-| `comment_read_states` | `org_id`、`account_id`、`thread_id`、`last_read_comment_id` |
+| `comment_attachments` | `org_id`、`comment_id`、`asset_id`（S3 のキー）、`file_id`、`mime`、大きさ。1 コメント 5 つまで |
+| `comment_reactions` | `org_id`、`comment_id`、`account_id`、`emoji`、`file_id` |
+| `comment_mentions` | `org_id`、`comment_id`、`mentioned_account_id`、`file_id` |
+| `comment_read_states` | `org_id`、`account_id`、`thread_id`、`file_id`、`last_read_comment_id` |
 | `file_comment_subscriptions` | `org_id`、`account_id`、`file_id`、`level`（`all` / `mentions_replies` / `none`）、`source`（`owner_default` / `auto_two_comments` / `explicit`） |
 
 - コメントは、ファイルの中身（ノードの木、ジャーナル、チェックポイント）に入れない。版の履歴で過去の版を開いても、コメントは今のものを出す。
 - 本文は、書いた時点の文字列をそのまま保存する。メンションは `{type: "mention", account_id}` の要素で持ち、表示のたびに名前を解決する。
+- Realtime の問い合わせは 1 つの表への等価の条件だけなので、`file_id` で絞る表（リアクション・既読など）は `file_id` を自分で持つ（非正規化）。削除は墓標（`deleted_at` を設定し、本文を空にする）。列の定義は [data-model/comments-and-notifications.md](data-model/comments-and-notifications.md)。
 
 ### 3.2 固定と位置の解決
 
@@ -228,7 +229,7 @@ Realtime invalidator（TypeScript）
    └─ realtime_invalidations（outbox の表）を読み、無効化のキーを publish する
    ▲
 Aurora：購読の対象の表に AFTER INSERT/UPDATE/DELETE のトリガー
-        → realtime_invalidations (org_id, table, key_columns, txid, committed_at) を同じトランザクションで書く
+        → realtime_invalidations (org_id, table_name, key, txid, created_at) を同じトランザクションで書く
 ```
 
 - **問い合わせは、1 つの表への、等価の条件だけの SELECT**（本家の「易しい式」）に限る。範囲や結合が要るビューは、等価の問い合わせを組み合わせて edge で組み立てる。これで、行の変更から無効化のキー（`table:org_id:file_id` など、等価の条件の列の値）が機械的に決まる。
@@ -372,5 +373,5 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり（E1〜E12 �
 | `notifications` | 4.4 節 |
 | `email_digest_queue` | `org_id`、`account_id`、`file_id`、`comment_id`、`due_at`、`sent_at`。一意のキー `(account_id, comment_id)` |
 | `org_notification_policies` | メールのプレビュー・本文を入れるか |
-| `realtime_invalidations` | `org_id`、`table_name`、`key`、`txid`、`committed_at`。1 分で消す。invalidator は組織をまたいで読むので、`realtime` スキーマに置き、`app` ロールには権限を与えず、トリガーの関数（`SECURITY DEFINER`）と invalidator の専用のロールだけが読み書きする。中身は ID のキーだけで、テナントのデータを持たない（Slack の [ADR-0027](../../../slack/docs/decisions/0027-search-table-rls-exception.md) と同じ形の RLS の例外） |
-| S3（assets） | `comment-attachments/{org_id}/{file_id}/{asset_id}`（他の資産と同じ `{種類}/{org_id}/…` の形に統合の工程で揃えた。[data-model.md](data-model.md) の 6.2 節） |
+| `realtime_invalidations` | `org_id`、`table_name`、`key`、`txid`、`created_at`。1 分を過ぎた行は読まず、1 時間のパーティションを 2 時間で落とす（[data-model/events-and-audit.md](data-model/events-and-audit.md) の 3 節）。invalidator は組織をまたいで読むので、`realtime` スキーマに置き、`app` ロールには権限を与えず、トリガーの関数（`SECURITY DEFINER`）と invalidator の専用のロールだけが読み書きする。中身は ID のキーだけで、テナントのデータを持たない（Slack の [ADR-0027](../../../slack/docs/decisions/0027-search-table-rls-exception.md) と同じ形の RLS の例外） |
+| S3（assets） | `comment-attachments/{org_id}/{file_id}/{asset_id}`（他の資産と同じ `{種類}/{org_id}/…` の形に統合の工程で揃えた。[data-model/stores.md](data-model/stores.md) の 3 節） |
