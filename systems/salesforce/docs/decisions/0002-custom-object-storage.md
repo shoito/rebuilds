@@ -43,6 +43,7 @@ date: 2026-09-28
   - システムの列は実際の列にする：`org_id`、`id`（UUIDv7）、`object_id`、`record_type_id`、`owner_id`、`name`、`created_at`・`created_by`、`updated_at`・`updated_by`、`deleted_at`（ごみ箱）、`row_version`。
   - `owner_id` を実際の列にするのは、共有の判定（[ADR-0004](0004-record-access-model.md)）で毎回使うため。
   - 項目の値は `data`（JSONB）に、**項目の ID をキーにして**入れる。API の名前をキーにしない。名前の変更がメタデータだけで済む。
+    > 2026-09-28 の注記：キーは、項目の ID ではなく、オブジェクトの中で再利用しない短い番号 `field_no` にした（[ADR-0006](0006-data-dictionary-and-field-lifecycle.md)）。ピボットの表も `field_no` で引く（[ADR-0010](0010-record-tables-partitioning-and-pivots.md)）。名前の変更をメタデータだけで済ませる意図は同じ。システムの列には、主従の 1 本目の親と活動の主の親を指す `parent_id` を足した（[ADR-0021](0021-lead-conversion-and-activity-parents.md)、[data-storage.md](../architecture/data-storage.md) の 3.1 節）。
   - 日付・日時は ISO 8601 の文字列、通貨と小数は文字列の十進数で入れる。浮動小数で丸めない。
 - **`record_index_values`**：索引の指定のある項目と、外部 ID の項目の値。`(org_id, object_id, field_id, v_text | v_num | v_ts, record_id)` で、型ごとに B-tree を張る。テキストの「含む」は trigram の索引。
 - **`record_unique_values`**：一意の項目。`(org_id, object_id, field_id, 正規化した値)` に一意の索引を張り、DB で一意を強制する。

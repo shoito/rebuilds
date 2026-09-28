@@ -81,7 +81,7 @@ B2B の営業チームは、顧客（取引先・取引先責任者）、見込�
 | K3 | アクセス制御の正しさ | 参照の評価器と、本番の判定の食い違い 0 件 | 性質ベーステスト、本番での標本の照合（ADR-0004） |
 | K4 | 公平 | 上限まで負荷をかけた組織があっても、他の組織の p95 の悪化が 10% 以内（NFR-003） | 騒がしい隣人の負荷試験（E12） |
 | K5 | デプロイの安全 | デプロイの失敗で本番の組織が部分的に変わった件数 0 件。デプロイ中のデータの書き込みの止まりが p99 1 秒以内（NFR-004） | デプロイの結合テストと本番の計測 |
-| K6 | 共有の再計算 | 100 万件のレコード・1,000 人の組織で、OWD の変更の再計算が 15 分以内（NFR-005） | E12 の負荷試験 |
+| K6 | 共有の再計算 | OWD の変更は行を書き直さない述語の切り替えで、反映が p95 5 秒以内。100 万件のレコード・1,000 人の組織で、レコードの条件の共有ルールの追加・変更の再計算が 15 分以内（NFR-005。2026-09-28 に改めた） | E4 の PoC と E12 の負荷試験 |
 | K7 | テナントの分離 | 他の組織のデータが見える事象 0 件（NFR-009） | 性質ベーステストと本番の監査 |
 | K8 | 導入の速さ | 新しい組織を作ってから、CSV で取引先 1 万件を取り込み、リストビューで見るまで、中央値 30 分以内 | オンボーディングのイベントの計測 |
 
@@ -122,20 +122,29 @@ B2B の営業チームは、顧客（取引先・取引先責任者）、見込�
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 個人情報保護法：組織が登録する取引先責任者・リードの個人データを、本システムが委託を受けて扱うのか、いわゆるクラウドの例外に当たるのか。サポートでの参照、障害の調査、AI の機能での利用の扱い | security、sales-objects の各領域（まだない） | E2 の組織の作成の利用規約、E5 の取引先責任者とリード |
-| L2 | 外国にある第三者への提供：メールの送信事業者、Webhook の送信先、SSO の IdP が海外にある時の扱いと、本人への情報の提供 | events-and-integrations、orgs-users-and-auth の各領域（まだない） | E8 の Webhook、E2 の SSO |
-| L3 | Sandbox へのデータの複製：本番の個人データを、開発・試験の組織に複製してよい条件。安全管理措置として、項目のマスキングを必須にするか | sandboxes-and-deploy の領域（まだない） | E10 のデータを含む Sandbox |
-| L4 | 電気通信事業法：Web-to-リードのフォームや、組織が埋め込む計測で、端末の情報を外部へ送る時の外部送信規律の公表の義務を負うのは誰か。メールの送信の代行が「他人の通信の媒介」に当たるか | events-and-integrations、sales-objects の各領域（まだない） | E5 のメールの記録と送信、E8 の Webhook |
-| L5 | 監査のログと削除：設定の変更の履歴、項目の変更の履歴、ログインの履歴を何日持つか。本人からの削除の請求と、監査の履歴の保持の関係。ごみ箱と、削除の確定までの期間 | audit-and-field-history、security の各領域（まだない） | E11 の監査の保持と削除 |
-| L6 | データの所在：「日本のデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサーの扱い | infrastructure の領域（まだない）、[ADR-0005](decisions/0005-tenancy-and-governor-limits.md) | E1 のリージョンの構成、E12 の契約の文書 |
-| L7 | 組織との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、解約時のデータの返却と削除 | security の領域（まだない） | E12 の GA の判定 |
-| L8 | 特定電子メール法：活動として送るメールや、一括のメールを MVP の後に扱う時の、同意の記録と送信者の表示 | sales-objects の領域（まだない） | MVP の後の一括のメールの Epic |
+| L1 | 個人情報保護法：組織が登録する取引先責任者・リードの個人データを、本システムが委託を受けて扱うのか、いわゆるクラウドの例外に当たるのか。サポートでの参照、障害の調査、AI の機能での利用の扱い。BCC で取り込むメールの本文（第三者の個人データ）の扱い、利用者の匿名化と履歴の値の消去（本人の請求） | [security.md](architecture/security.md) の 6・11 節、[sales-objects.md](architecture/sales-objects.md) の 8 節、[orgs-users-and-auth.md](architecture/orgs-users-and-auth.md) の 5.2 節 | E2 の組織の作成の利用規約、E5 の取引先責任者とリード、メールの記録 |
+| L2 | 外国にある第三者への提供：メールの送信事業者、Webhook の送信先、SSO の IdP が海外にある時の扱いと、本人への情報の提供 | [events-and-integrations.md](architecture/events-and-integrations.md) の 6.3 節、[orgs-users-and-auth.md](architecture/orgs-users-and-auth.md) の 6.4 節 | E8 の Webhook、E2 の SSO |
+| L3 | Sandbox へのデータの複製：本番の個人データを、開発・試験の組織に複製してよい条件。安全管理措置として、項目のマスキングを必須にするか | [sandboxes-and-deploy.md](architecture/sandboxes-and-deploy.md) の 4.3 節 | E10 のデータを含む Sandbox |
+| L4 | 電気通信事業法：Web-to-リードのフォームや、組織が埋め込む計測で、端末の情報を外部へ送る時の外部送信規律の公表の義務を負うのは誰か。メールの送信の代行・BCC の取り込みが「他人の通信の媒介」に当たるか | [events-and-integrations.md](architecture/events-and-integrations.md) の 7 節、[sales-objects.md](architecture/sales-objects.md) の 8 節 | E5 のメールの記録と送信、E8 の Webhook |
+| L5 | 監査のログと削除：設定の変更の履歴、項目の変更の履歴、ログインの履歴を何日持つか。本人からの削除の請求と、監査の履歴の保持の関係。ごみ箱と、削除の確定までの期間 | [audit-and-field-history.md](architecture/audit-and-field-history.md)、[security.md](architecture/security.md) の 7 節 | E11 の監査の保持と削除 |
+| L6 | データの所在：「日本のデータを国外に出さない」をどこまで約束するか。バックアップ、DR（大阪は国内）、サポートでの参照、サブプロセッサーの扱い | [infrastructure.md](architecture/infrastructure.md) の 1 節、[ADR-0005](decisions/0005-tenancy-and-governor-limits.md) | E1 のリージョンの構成、E12 の契約の文書 |
+| L7 | 組織との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、解約時のデータの返却と削除（30 日の猶予、7 日の消去、鍵の破棄、バックアップの 35 日） | [security.md](architecture/security.md) の 7・11 節、[orgs-users-and-auth.md](architecture/orgs-users-and-auth.md) の 3.3 節 | E12 の GA の判定 |
+| L8 | 特定電子メール法：活動として送るメールや、一括のメールを MVP の後に扱う時の、同意の記録と送信者の表示 | [sales-objects.md](architecture/sales-objects.md) の 8.2 節 | MVP の後の一括のメールの Epic |
+| L9 | 捜査機関・裁判所などからのデータの開示の要求：本システムが直接受けた時の応じ方、組織への通知（通知できない時の扱い）、運用者の break-glass で読む時の手続き（2026-09-28 に security の領域から足した） | [security.md](architecture/security.md) の 6 節 | E12 の GA の判定（運用の手順と DPA） |
+| L10 | 個人データの漏えい等の報告：組織をまたぐ漏えい・見えないデータの漏えい・Sandbox のマスキングの事故が起きた時、個人情報保護委員会への報告（速報・確報）と本人への通知の主体（組織か本システムか）と期限（2026-09-28 に security の領域から足した） | [security.md](architecture/security.md) の 10 節、[runbooks/incident-response.md](runbooks/incident-response.md) | E12 の GA の判定（インシデントの手順） |
+| L11 | 第三者のコードとパッケージ（E13・E14）：組織が入れた配布者のパッケージが組織のデータを読み書きする時の、本システム・配布者・組織の責任の分け方、配布者の審査と公開の一覧の条件（2026-09-28 に extensibility の領域から足した） | [extensibility.md](architecture/extensibility.md) の 8 節 | E14 のパッケージの配布 |
+
+- **L1〜L11 は全て確認待ちのまま**にする（2026-09-28 の統合の工程で、結論を出さずに L9〜L11 を足した）。
+
+### PM の確認済みの決定
+
+- **ダッシュボードは見る人の権限だけで集計する。** 本家の「指定した実行ユーザー」（全員が特定の人の権限で見る形）は持たない。上司が部下の視点で見る時も、部下と見る人の権限の共通部分で集計する（[ADR-0030](decisions/0030-dashboards-viewer-intersection-and-subscriptions.md)）。「見られないレコードはレポートの集計に現れない」の約束を優先し、本家から移る組織の、全員が同じ数字を見る経営のダッシュボードは作れなくなることを受け入れる。全員に同じ数字を見せたい需要には、MVP の後に、集計の値を別のオブジェクトに保存するスケジュールのフローで応える案を検討する（値の共有は通常の共有で決まる）。PM が 2026-09-28 に確認した。
 
 ### 選定・計測で決めるもの（法務以外）
 
 - 本家のエディションと価格：日本の価格のページでは、Free Suite 0 円、Starter Suite 3,000 円、Pro Suite 12,000 円、Core 23,400 円、Advanced 47,400 円、Max 66,000 円（ユーザーあたり月額、年間契約）と読めた（[Sales Cloud の価格](https://www.salesforce.com/jp/sales/pricing/)、2026-09-28 に確認）。各エディションの機能の差（API、Sandbox の数、容量）は、ページの要約でしか確かめていない（未検証）。本システムのエディションの分け方と上限の値は、E2 の着手前に PM が決める。
-- 本家の API の割り当て：Enterprise では、24 時間で 100,000＋ライセンスの数×1,000 回。長く続く要求（20 秒以上）の同時実行は、本番の組織で 25（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-11 更新版、2026-09-28 に確認）。本システムの値は governor-limits の領域で決める。
-- 本家の Sandbox の種類（Developer、Developer Pro、Partial Copy、Full）と、再作成の間隔（1 日、1 日、5 日、29 日）、容量：本家のヘルプの記事に当たったが、第三者の要約でしか読めていない（未検証）。E10 の着手前に確かめる。
-- 本家のプロファイルの権限の廃止の計画：取りやめになったと報じられている（未検証）。本システムは、権限セットを中心にし、プロファイルは既定値（レイアウトの割り当て、レコードタイプ、ログインの制限）の入れ物にする方針で進める。sharing-and-record-access の領域で決める。
-- 利用者のログイン：自前の認証（他の題材の Better Auth）か、rebuilds の Auth0 の題材を IdP として使うか：E2 の着手前に orgs-users-and-auth の領域で決める。
-- 全文検索の部品（OpenSearch の既定の日本語の解析器で足りるか）：E5 の着手前に PoC で決める。
+- 本家の API の割り当て：Enterprise では、24 時間で 100,000＋ライセンスの数×1,000 回。長く続く要求（20 秒以上）の同時実行は、本番の組織で 25（[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)、2026-09-11 更新版、2026-09-28 に確認）。本システムの初期値は [governor-limits.md](architecture/governor-limits.md) の 8 節に置いた。値は E2 の着手前に PM が決め、E12 の負荷試験で確かめる。
+- 本家の Sandbox の種類（Developer、Developer Pro、Partial Copy、Full）と、再作成の間隔（1 日、1 日、5 日、29 日）、容量：本家のヘルプの記事に当たったが、第三者の要約でしか読めていない（未検証）。本システムは同じ 4 種類で作る（[ADR-0038](decisions/0038-sandbox-types-and-masked-copy.md)）。E10 の着手前に確かめる。
+- 本家のプロファイルの権限の廃止の計画：取りやめになったと報じられている（未検証）。本システムは、権限セットを中心にし、プロファイルは既定値（レイアウトの割り当て、レコードタイプ、ログインの制限）の入れ物にする（[ADR-0013](decisions/0013-permission-sets-and-field-level-security.md) で決めた）。
+- 利用者のログイン：自前の Better Auth にし、rebuilds の Auth0 の題材を本システムの IdP にしない（[ADR-0044](decisions/0044-authentication-better-auth-sso-and-mfa.md) で決めた）。組織の IdP の 1 つとしてなら、普通の OIDC でつなげる。
+- 全文検索の部品（OpenSearch の既定の日本語の解析器で足りるか）：既定を kuromoji と CJK の 2-gram にし、E5 の着手前の PoC で Sudachi と比べて決める（[ADR-0031](decisions/0031-search-index-and-japanese-analysis.md)）。

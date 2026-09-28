@@ -66,6 +66,7 @@ date: 2026-09-28
   6. **SQL の生成と実行**：値は全てバインド変数にする。実行はガバナ制限の計測の下で行う（[ADR-0005](0005-tenancy-and-governor-limits.md)）。
 - コンパイル結果は、`(org_id, metadata_version, AST のハッシュ, 利用者の権限の形)` をキーにキャッシュする。
 - DML は、決まった順序で処理する：型と必須の検証 → 保存の前のフロー → 入力規則 → 一意の確認 → 書き込み（records とピボットの表）→ 共有の行の更新 → 保存の後のフロー → 積み上げ集計 → 確定 → outbox から変更のイベント。順序の詳細は metadata-and-runtime と automation-flows の領域で決める。
+  > 2026-09-28 の注記：この順序は [ADR-0008](0008-dml-order-of-execution.md) で置き換えた。共有の評価・項目の変更の履歴・outbox は、最上位の保存の最後（確定の直前）に 1 回だけ行う。保存の前・後の手順は、フローとトリガー（MVP の後）を並べるため 3a・3b・7a・7b に分けた（[metadata-and-runtime.md](../architecture/metadata-and-runtime.md) の 6.1 節）。スナップショットは版ごとに 1 つではなく、内容で番地を決めた部品と manifest に分けた（[ADR-0007](0007-segmented-metadata-snapshots.md)）。
 
 ### 独自の言語と参照の評価器
 

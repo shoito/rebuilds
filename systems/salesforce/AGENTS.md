@@ -5,7 +5,7 @@ Salesforce（Sales Cloud とメタデータで動くプラットフォーム）�
 ## 最初に読むもの
 
 - [docs/intent.md](docs/intent.md) — 何を、なぜ作るか
-- [docs/architecture/](docs/architecture/README.md) — 全体像、規模の段階、非機能要件、領域の一覧
+- [docs/architecture/](docs/architecture/README.md) — 全体像、規模の段階、非機能要件、領域ごとの設計
 - [docs/decisions/](docs/decisions/README.md) — ADR。特に 0002（カスタムオブジェクトの保存）、0003（メタデータの実行基盤）、0004（レコードのアクセス）、0005（テナントとガバナ制限）
 
 ## この題材に固有の規則（開発リポジトリで守る）
