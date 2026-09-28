@@ -47,7 +47,7 @@
 | 表 | 主な列 | 備考 |
 | --- | --- | --- |
 | `md_objects` | `object_id`、`api_name`、`label`、`plural_label`、`kind`（`standard`・`custom`）、`owd`、`grant_via_hierarchy`、`name_kind`（`text`・`autonumber`）、`autonumber_format`、`next_field_no`、`field_history_enabled`、`allow_activities`（活動の `what` になれるか。[sales-objects.md](sales-objects.md) の 3.6 節）、`deleted_at` | 標準オブジェクトも行として持つ（組織の作成時に種から入れる） |
-| `md_fields` | `field_id`（UUIDv7）、`object_id`、`field_no`、`api_name`、`label`、`type`、`type_params`（JSONB）、`required`、`unique`、`unique_case_sensitive`、`external_id`、`indexed`、`default_expr`、`help_text`、`data_class`（`none`・`personal`・`sensitive`。[ADR-0038](../decisions/0038-sandbox-types-and-masked-copy.md)）、`searchable`（1 オブジェクト 20 まで。[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)）、`track_history`（1 オブジェクト 20 まで。[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md)）、`state`（`active`・`converting`・`building`・`deleted`）、`deleted_at` | 3.2 節。`building` は積み上げ集計の作成・変更の間（[automation-flows.md](automation-flows.md) の 7.4 節） |
+| `md_fields` | `field_id`（UUIDv7）、`object_id`、`field_no`、`api_name`、`label`、`type`、`type_params`（JSONB）、`required`、`is_unique`、`unique_case_sensitive`、`external_id`、`indexed`、`default_expr`、`help_text`、`data_class`（`none`・`personal`・`sensitive`。[ADR-0038](../decisions/0038-sandbox-types-and-masked-copy.md)）、`searchable`（1 オブジェクト 20 まで。[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)）、`track_history`（1 オブジェクト 20 まで。[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md)）、`state`（`active`・`converting`・`building`・`deleted`）、`deleted_at` | 3.2 節。`building` は積み上げ集計の作成・変更の間（[automation-flows.md](automation-flows.md) の 7.4 節） |
 | `md_relationships` | `field_id`、`child_object_id`、`parent_object_id`、`kind`（`lookup`・`master_detail`）、`master_order`（1・2）、`child_relationship_name`、`on_parent_delete`（`set_null`・`restrict`・`cascade`）、`reparentable` | 主従の 1 本目を `records.parent_id` に写す（[data-storage.md](data-storage.md) の 3.1 節） |
 | `md_picklists`、`md_picklist_values` | 選択リストの ID、`restricted`、`global`。値の `value_id`、`api_value`、`label`、`sort`、`active`、`is_default`、`attrs`（JSONB。フェーズ・リードの状態・ToDo の状態の意味。[sales-objects.md](sales-objects.md) の 3.4.1 節） | 値は `value_id` で持つ。ラベルの変更で `records` を書き換えない |
 | `md_record_types`、`md_record_type_values` | `record_type_id`、`object_id`、`api_name`、`active`。レコードタイプごとに使える選択リストの値 | |
@@ -480,7 +480,7 @@ literal     = number | string | "TRUE" | "FALSE" | "NULL" ;
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
 | `md_objects` | `org_id`、`object_id`、`api_name`、`kind`、`owd`、`grant_via_hierarchy`、`next_field_no`、`field_history_enabled`、`allow_activities`、`deleted_at` | RLS |
-| `md_fields` | `org_id`、`field_id`、`object_id`、`field_no`、`api_name`、`type`、`type_params`、`required`、`unique`、`external_id`、`indexed`、`data_class`、`searchable`、`track_history`、`state`、`deleted_at` | `(org_id, object_id, field_no)` は一意。`field_id` は組織の系統の中で一意 |
+| `md_fields` | `org_id`、`field_id`、`object_id`、`field_no`、`api_name`、`type`、`type_params`、`required`、`is_unique`、`external_id`、`indexed`、`data_class`、`searchable`、`track_history`、`state`、`deleted_at` | `(org_id, object_id, field_no)` は一意。`field_id` は組織の系統の中で一意 |
 | `md_relationships` | `org_id`、`field_id`、`child_object_id`、`parent_object_id`、`kind`、`master_order`、`on_parent_delete` | |
 | `md_picklists`、`md_picklist_values` | `org_id`、`picklist_id`、`value_id`、`api_value`、`label`、`active`、`attrs` | |
 | `md_record_types`、`md_record_type_values` | `org_id`、`record_type_id`、`object_id`、`api_name`、`active` | |

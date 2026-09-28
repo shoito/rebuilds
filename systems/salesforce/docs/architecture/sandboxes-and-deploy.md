@@ -54,7 +54,7 @@ Sandbox の種類と作成・再作成、データの複製とマスキング（
 ### 4.1 流れ
 
 ```
-本番の管理者：POST /api/v1/sandboxes { "name": "uat", "kind": "partial", "template": "tpl_...", "masking_profile": "default" }
+本番の管理者：POST /api/v1/sandboxes { "name": "uat", "kind": "partial", "template": "<template_id>", "masking_profile": "default" }
   │
   ▼ Worker（class sandbox_copy、組織をまたぐ管理の DB のロール。RLS を外す唯一の経路の 1 つ）
   1. 新しい org_id、shard_no（本番と同じクラスタ）、ドメインを決め、orgs に status = provisioning で作る（進みは sandbox_requests.state = copying）
@@ -196,7 +196,7 @@ help_text: 税抜きの金額
 
 ```
 POST /api/v1/metadata/retrieves { "components": [{ "kind": "object", "name": "x_contract" }], "with_dependencies": true }
-→ 202 { "id": "rtv_..." } → GET /api/v1/metadata/retrieves/{id} → zip
+→ 202 { "id": "<retrieve_id>" } → GET /api/v1/metadata/retrieves/{id} → zip
 ```
 
 - `with_dependencies`：数式・フロー・レイアウトが参照する項目・オブジェクト・選択リストを足す（`md_dependencies`）。
@@ -209,7 +209,7 @@ POST /api/v1/metadata/retrieves { "components": [{ "kind": "object", "name": "x_
 ```
 POST /api/v1/metadata/deploys   （multipart：package.zip と options）
   options: { "mode": "validate" | "deploy", "allow_data_loss": false, "allow_warnings": false }
-→ 202 { "id": "dep_...", "state": "queued" }
+→ 202 { "id": "<deploy_id>", "state": "queued" }
 GET  /api/v1/metadata/deploys/{id}        （state、plan の要約、エラー、警告、post_jobs）
 POST /api/v1/metadata/deploys/{id}/quick  （検証した計画を当てる。6.4 節）
 POST /api/v1/metadata/deploys/{id}/rollback（6.5 節）

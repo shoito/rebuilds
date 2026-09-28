@@ -129,10 +129,10 @@ login_events(org_id, id, at, user_id, username_hash, result, reason, method, mfa
 ### 5.2 書き方（保存の手順 9）
 
 ```
-field_history(org_id, object_id, record_id, changed_at, seq, field_no, changed_by, tx_id,
+field_history(org_id, object_id, record_id, changed_at, source_id, seq, field_no, event, changed_by, tx_id,
               via, old_value, new_value, erased)
   PARTITION BY RANGE (changed_at)       -- 月ごと
-  主キー (org_id, record_id, changed_at, seq)
+  主キー (org_id, record_id, changed_at, source_id, seq)   -- source_id は outbox の行の ID（二重の写しを捨てる）
   索引 (org_id, object_id, changed_at)
 ```
 
@@ -285,7 +285,7 @@ field_history(org_id, object_id, record_id, changed_at, seq, field_no, changed_b
 | `audit_heads` | `org_id`、`last_seq`、`last_hash` | 採番 |
 | `audit_pending` | `org_id`、`id`、`payload`、`created_at` | 保存の経路からのイベント。1 秒ごとに移す |
 | `audit_anchors`（S3、監査のアカウント） | 日付、`org_id`、`seq`、`hash` | Object Lock |
-| `audit_exports` | `org_id`、`id`、`from`、`to`、`state`、`requested_by` | |
+| `audit_exports` | `org_id`、`id`、`from_at`、`to_at`、`state`、`requested_by` | |
 | `login_events` | 4 節 | 月ごとの分割、RLS。180 日 |
 | `field_history` | 5.2 節 | `history` のクラスタ。月ごとの分割、RLS。18 か月 |
 | `md_fields.track_history`、`md_objects.field_history_enabled` | 真偽 | metadata-and-runtime の表（後者は既存） |

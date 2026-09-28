@@ -196,7 +196,7 @@ S1 の本番の組織（`kind = production`）が対象。Sandbox・試用・Dev
 | [infrastructure.md](../architecture/infrastructure.md)、[capacity.md](../architecture/capacity.md) | [disaster-recovery.md](disaster-recovery.md)、`org-migration`、`cluster-split`、`kms-outage`、`capacity-review` |
 | [delivery.md](../architecture/delivery.md) | [deploy-and-rollback.md](deploy-and-rollback.md) |
 | [observability.md](../architecture/observability.md) | アラートの条件の実装側（7 節） |
-| [data-model.md](../architecture/data-model.md) | 索引のみ。運用の対象は各領域の文書で扱う |
+| [data-model.md](../architecture/data-model.md) | データモデルの正本。運用の対象は各領域の文書で扱う |
 
 ## 5. 定期作業と訓練
 

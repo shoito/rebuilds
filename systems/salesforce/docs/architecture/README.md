@@ -235,7 +235,14 @@
 - **上限**：一括の問い合わせは `bulk.query` の予算（[query-language-and-api.md](query-language-and-api.md) の 4.5 節）。利用者のコードの `tx.code_*` と、名前空間ごとの内訳を登録簿に足した（[governor-limits.md](governor-limits.md) の 4 節）。
 - **メタデータの部品**：`report_types` を足し、部品の鍵に形の版を含めた（ADR-0007 の注記）。
 - **`records.parent_id`**：主従の 1 本目の親に加え、活動の主の親を指す（[data-storage.md](data-storage.md) の 3.1 節）。
-- **data-model**：索引だけに保ち、`shard_no` で分割する表は 13、`org_id` を持ち RLS をかける表は約 145 と数え直した（[data-model.md](data-model.md) の 5・8 節）。
+- **data-model**：`shard_no` で分割する表は 13。統合の工程では索引だけに保つとしたが、次の工程（下）で正本に改めた。
+- **データモデルの完成（2026-09-28、既定案）**：[data-model.md](data-model.md) と [data-model/](data-model/) を、列・制約・索引・ER 図の正本にした（領域の文書は振る舞いの正本）。表は 171（`main` の RLS 147、`events` 3、`history` 1、RLS の外 20）、ER 図は 19。アーキテクチャの決定は変えず、次を決めた（詳しくは data-model.md の 8 節）。
+  - SQL の予約語の列の名前を改めた（`is_unique`、`can_*`、`sort_order`、`trigger_order`、`from_at`・`to_at`）。`permission_sets`・`profiles` の主キーを `ps_id`・`profile_id` にした。
+  - レコードの ID に接頭辞を持たず、`records` に `(org_id, id)` の索引を足した。
+  - `change_events`・`org_events` を `event_id` の範囲で分割し、主キーを `(org_id, event_id)` にした（ADR-0033 の `event_id` の一意を分割の表で守るため）。`field_history` の主キーに `source_id` を足した。
+  - 期限で動く仕事は `jobs.available_at` で予約し、組織をまたいで表を走査する役割を作らない。Worker の class に `maintenance` を足した。
+  - 外部キーはメタデータと設定の表の間だけに張る。
+  - 足りない表を最小で定めた：`sso_mfa_policies`、`profile_record_types`、`org_sharing_state`、`org_usage_hours`、`autonumber_counters`、`stats_parent_counts`。
 - **数値の正本**：上限と割り当ては [governor-limits.md](governor-limits.md)。保持と消去は [security.md](security.md) の 7 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md)。漏えいの経路は [security.md](security.md) の 4 節。量と台数は [capacity.md](capacity.md)。
 - **検証の工程（2026-09-28）**：「未検証」の本家の振る舞いと AWS・部品の事実を、本家の PDF・ヘルプの本文、AWS の資料と Price List API、Wasmtime・QuickJS-ng・Better Auth の資料で確かめ、出典と確認日を付けた。確かめられないもの（試用の組織か PoC が要るもの）は「未検証」のまま、確かめる Story を添えた。設計を変えた・注記したものは次のとおり。
   - SLO の窓を 28 日から他の題材と同じ 30 日の移動の窓に直し、エラーバジェットを約 43 分、速い燃え方を 1 時間 14.4 倍にした（[runbooks/README.md](../runbooks/README.md) の 1 節、[ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md) の注記）。
@@ -245,7 +252,7 @@
   - **SSO の MFA と特権を持つ利用者のパスキー**（利用者の指示による推奨の既定案。本家の 2026 年の方針に揃えた）：SSO でも IdP の `amr`（OIDC）・`AuthnContextClassRef`（SAML）を接続ごとの受け入れの一覧と比べ、確かめは既定で有効、組織の管理者は理由を記録した時だけ無効にでき監査に残る。主張がない・一覧にない時は SSO の後に本システムの 2 つ目の要素を求める。特権を持つ利用者（`modify_all_data`・`manage_users`・`customize_application` のどれか）はパスキーだけで TOTP を許さず、`sso_bypass` の非常用の管理者は 1 人あたりハードウェアのキーを 2 つ持つ（[ADR-0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) の注記、[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6.3・6.4・14 節）。
   - Aurora・OpenSearch の仮に置いていた単価を Price List API で確かめ、保存を東京と大阪の 2 つ分で数え直して、本番の費用を約 44,500 USD/月にした（[infrastructure.md](infrastructure.md) の 9 節）。
   - 項目の変更の履歴で `long_text` を選べる型に戻し、「変わった」だけを記録する形に揃えた（ADR-0047 と [audit-and-field-history.md](audit-and-field-history.md) の食い違いを直した）。
-- 各領域の「他の領域への依頼」は、この工程で持ち主の文書へ反映した（一覧は [data-model.md](data-model.md) の 3 節と、各文書の「2026-09-28」の書き込み）。領域ごとの決定は、各文書の「決定」の節にある。
+- 各領域の「他の領域への依頼」は、この工程で持ち主の文書へ反映した（一覧は [data-model.md](data-model.md) の付録 A と、各文書の「2026-09-28」の書き込み）。領域ごとの決定は、各文書の「決定」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
 
@@ -287,7 +294,7 @@
 | [audit-and-field-history.md](audit-and-field-history.md) | 設定の変更の履歴、項目の変更の履歴、ログインの履歴、保持と削除、改ざんの防止 | 0046–0047 | セキュリティ、Ops | E11 |
 | [extensibility.md](extensibility.md)（MVP の後） | 利用者のコード（TypeScript、QuickJS-ng と Wasmtime の砂場）、トリガー、上限と計測、パッケージと名前空間 | 0048–0050 | セキュリティ、Ops | E13、E14 |
 | [security.md](security.md) | 信頼境界、脅威モデル、漏えいの経路の登録簿、暗号化と鍵、運用者のアクセス、データのライフサイクル、脆弱性の対応、法務の論点の整理 | 0051–0053 | セキュリティ | E1、E12 |
-| [data-model.md](data-model.md) | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本（規約、列・制約・索引、ER 図、DB 以外の置き場所、横断の不変条件） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、論理シャードと物理のクラスタ、`events`・`history` のクラスタ、セル、組織の移動、DR、段階を上げる基準、コスト | 0054–0057 | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI、組織ごとの資源の使用量、騒がしい隣人の検知、アラート | 0058–0059 | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル、表の大きさ、書き込みの増幅、再計算の時間、部品ごとの必要量（OpenSearch の台数を含む） | 0060 | Ops | E12 |

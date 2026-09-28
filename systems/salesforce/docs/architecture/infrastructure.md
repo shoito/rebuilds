@@ -199,7 +199,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 ```
 
 - 事実：PostgreSQL 15 以降は公開に行の絞りを付けられ、初期の同期にも絞りがかかる。`UPDATE`・`DELETE` を公開する時、絞りの列は replica identity に含まれる必要がある。分割の表は `publish_via_partition_root = true` で根の表の絞りを使う（[Row Filters](https://www.postgresql.org/docs/18/logical-replication-row-filter.html)）。全ての組織の表は主キーの先頭に `org_id` を持つので、既定の replica identity（主キー）で絞りの条件を満たす。Aurora PostgreSQL は論理レプリケーションを持つ（[Aurora PostgreSQL の論理レプリケーション](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html)）。
-- 組織の表の一覧は、`org_id` の列を持つ全ての表から機械的に作る（手で書かない）。`org_id` を持ち RLS をかける表は約 145（[data-model.md](data-model.md) の 5 節。2026-09-28 に数え直した）。
+- 組織の表の一覧は、`org_id` の列を持つ全ての表から機械的に作る（手で書かない）。`org_id` を持ち RLS をかける表は 151（`main` 147、`events` 3、`history` 1。[data-model.md](data-model.md) の 1 節。2026-09-28 に数え直した）。
 - 組織の `shard_no` は変えない（ADR-0055）。行をそのまま写し、分割の形が同じ。
 - 中止：6 までは、購読を消して先の行を消し、`migrating` を外すだけ。7 の後は逆向きの移動。
 - 所要時間の見込み：5,000 万件（約 100GB）の初期の同期に数時間、止めは数十秒（E12 の `org-migration-tool` で測る。未検証）。夜間に行う。
@@ -384,5 +384,5 @@ infra/
 | --- | --- | --- |
 | `shard_map` | `shard_no`、`cluster_id`、`state`（`active`・`moving`） | RLS の外（運用）。data-storage の表 |
 | `org_placements` | `org_id`、`cell_id`、`cluster_id`、`moved_at`、`reason` | RLS の外（運用）。ADR-0055 |
-| `clusters` | `cluster_id`、`cell_id`、`kind`（`main`・`events`）、`writer_endpoint`、`reader_endpoint`、`purpose`（`prod`・`nonprod`・`dedicated`） | RLS の外 |
+| `clusters` | `cluster_id`、`cell_id`、`kind`（`main`・`events`・`history`・`control`）、`writer_endpoint`、`reader_endpoint`、`purpose`（`prod`・`nonprod`・`dedicated`） | RLS の外 |
 | `org_migrations` | `migration_id`、`org_id`、`from_cluster_id`、`to_cluster_id`、`state`（`copying`・`catching_up`・`fenced`・`verifying`・`switched`・`aborted`）、`fence_started_at`、`fence_ms`、`verify_result`、`requested_by` | RLS の外。監査にも写す |

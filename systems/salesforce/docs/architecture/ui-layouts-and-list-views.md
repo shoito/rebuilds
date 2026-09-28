@@ -54,7 +54,7 @@ layout（object、api_name、版）
 
 | 入力 | 決め方 |
 | --- | --- |
-| プロファイル × レコードタイプ | `layout_assignments(profile_id, record_type_id) → layout_id` |
+| プロファイル × レコードタイプ | `layout_assignments(profile_id, object_id, record_type_id) → layout_id` |
 | 割り当てがない | オブジェクトの既定のレイアウト |
 | レコードタイプがない（オブジェクトにレコードタイプがない） | `record_type_id` を空として引く |
 
@@ -233,7 +233,7 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 - WCAG 2.2 の AA を目標にする。レコードのページ、リストビュー、インライン編集、Setup の汎用の画面を、キーボードだけで操作できるようにする。
 - レイアウトのビルダーのドラッグ＆ドロップには、同じ操作をキーボードで行う「上へ・下へ・別の区画へ」のボタンを付ける。
 - エラーは項目の近くと画面の上の要約の両方に出し、要約から項目へ移れるようにする。色だけで状態を示さない。
-- ラベルは日本語と英語（intent）。ラベルの翻訳は `md_translations(org_id, entity_kind, entity_id, locale, text)` に持ち、`layouts`・`object` の部品にロケールごとに入れる。
+- ラベルは日本語と英語（intent）。ラベルの翻訳は `md_translations(org_id, entity_kind, entity_id, attr, locale, text)` に持ち、`layouts`・`object` の部品にロケールごとに入れる。
 - 日付・数・通貨は、利用者のロケールで表示する。API は常に ISO 8601 と 10 進の文字列（ADR-0020）。
 
 ## 9. 障害のとき
@@ -345,8 +345,8 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
 | `md_layouts` | `org_id`、`layout_id`、`object_id`、`api_name`、`definition`（JSONB：区画・項目・関連リスト・ハイライト・操作） | メタデータ |
-| `layout_assignments` | `org_id`、`profile_id`、`record_type_id`、`layout_id` | メタデータ |
+| `layout_assignments` | `org_id`、`profile_id`、`object_id`、`record_type_id`、`layout_id` | メタデータ |
 | `md_list_views` | `org_id`、`list_view_id`、`object_id`、`api_name`、`definition`（JSONB：条件の AST・列・並べ替え・`scope`）、`visibility` | 公開のもの。メタデータ |
 | `user_list_views` | `org_id`、`user_id`、`list_view_id`、`object_id`、`definition` | 自分だけのもの。データ |
 | `recent_items` | `org_id`、`user_id`、`object_id`、`record_id`、`viewed_at` | 利用者 × オブジェクトで 100 件 |
-| `md_translations` | `org_id`、`entity_kind`、`entity_id`、`locale`、`text` | メタデータ |
+| `md_translations` | `org_id`、`entity_kind`、`entity_id`、`attr`、`locale`、`text` | メタデータ |

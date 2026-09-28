@@ -382,7 +382,7 @@ approval_process（object、版、order、active）
 
 ### 9.2 画面のフロー
 
-- 実行の状態を `flow_interviews(interview_id, user_id, version_id, state, current_element, expires_at)` に持つ。`state` は変数の値で、KMS のデータキーで暗号化する。
+- 実行の状態を `flow_interviews(interview_id, user_id, version_id, state_enc, current_element, expires_at)` に持つ。`state_enc` は変数の値で、組織の `secrets` の DEK で暗号化する。
 - 画面の 1 回の送信を 1 つのトランザクションにする。次の画面までの要素を実行し、`screen` で止まって状態を保存する。
 - 「戻る」は、最後の DML の要素より後の画面にだけ戻れる（DML をやり直さないため）。
 - 使われない実行は 7 日で `expired` にし、状態を消す。
@@ -546,14 +546,14 @@ approval_process（object、版、order、active）
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
 | `md_flows`、`md_flow_versions` | `org_id`、`flow_id`、`api_name`、`type`、`object_id`、`trigger_order`、`active_version_id`、`version_id`、`definition`、`status`、`run_as` | メタデータ |
-| `flow_interviews` | `org_id`、`interview_id`、`user_id`、`version_id`、`state`（暗号化）、`current_element`、`expires_at` | 画面のフロー |
+| `flow_interviews` | `org_id`、`interview_id`、`user_id`、`version_id`、`state_enc`（暗号化）、`current_element`、`expires_at` | 画面のフロー |
 | `flow_scheduled_actions` | `org_id`、`id`、`version_id`、`path`、`record_id`、`due_at`、`state`（`pending`・`done`・`skipped`・`cancelled`） | 分割、RLS。`(org_id, state, due_at)` の索引 |
 | `flow_async_runs` | `org_id`、`version_id`、`record_id`、`origin_tx_id`、`ran_at` | 一意。7 日で消す |
 | `flow_schedule_runs` | `org_id`、`flow_id`、`started_at`、`last_record_id`、`count`、`state` | |
 | `md_validation_rules` | `org_id`、`rule_id`、`object_id`、`condition`、`message`、`error_field_id`、`active` | メタデータ |
 | `md_rollups` | `org_id`、`field_id`、`child_relationship_field_id`、`aggregate`、`child_field_id`、`filter`、`state` | メタデータ（`md_fields.type_params` から分けて引く） |
 | `rollup_stale` | `org_id`、`field_id`、`parent_id`、`since` | |
-| `md_approval_processes`、`md_approval_steps` | `org_id`、`process_id`、`version`、`object_id`、`order`、`entry_condition`、`record_editability`、`step_no`、`condition`、`approvers`、`when_multiple`、`reject_behavior` | メタデータ |
-| `approval_instances` | `org_id`、`instance_id`、`process_version`、`record_id`、`state`、`current_step`、`submitted_by`、`submitted_at` | `(org_id, record_id) WHERE state = 'pending'` に一意 |
+| `md_approval_processes`、`md_approval_steps` | `org_id`、`process_id`、`version`、`object_id`、`sort_order`、`entry_condition`、`record_editability`、`step_no`、`condition`、`approvers`、`when_multiple`、`reject_behavior` | メタデータ |
+| `approval_instances` | `org_id`、`instance_id`、`process_id`、`process_version`、`record_id`、`state`、`current_step`、`submitted_by`、`submitted_at` | `(org_id, record_id) WHERE state = 'pending'` に一意 |
 | `approval_work_items` | `org_id`、`work_item_id`、`instance_id`、`step_no`、`approver_group_id`、`state`、`acted_by`、`acted_at`、`comment`、`row_version` | |
 | `approval_locks` | `org_id`、`record_id`、`instance_id`、`editability` | 分割、RLS |

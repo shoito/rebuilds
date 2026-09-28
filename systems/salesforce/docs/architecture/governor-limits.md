@@ -291,7 +291,7 @@
 ```
 仕事の種類（class）ごとに：
   jobs(org_id, class, id, state, available_at, cost_hint)      -- Aurora。FOR UPDATE SKIP LOCKED で取る
-  org_vtime(class, org_id, vtime, weight, running)             -- 組織の仮想時刻
+  org_vtime(class, org_id, vtime, weight, running, next_available_at)  -- 組織の仮想時刻と、待ちの仕事の最も早い時刻
 
 Worker の取り出し：
   1. その class で running < org_cap の組織のうち、vtime が最も小さい組織を選ぶ
@@ -311,6 +311,7 @@ Worker の取り出し：
 | `search_reindex` | 検索の作り直し | 1 |
 | `sandbox_copy` | Sandbox の複製 | 1 |
 | `delivery` | Webhook、外向きの呼び出し、メール | 20 |
+| `maintenance` | ごみ箱の消去、項目の値の消去、期限の掃除、整合の検査（2026-09-28 に足した。期限で動く仕事は `jobs.available_at` で予約し、組織をまたいで表を走査しない） | 1 |
 
 - **重み**は、エディションとライセンスの数で決める（`1 + log2(ライセンスの数 + 1)`、上限 8）。大きな組織は多く回るが、小さな組織が待たされ続けない。7 節の「重い」組織は重みを半分にする。
 - 仮想時刻で回すのは、仕事の大きさがばらつくため（1 万行の取り込みと、10 行の予定の経路）。件数で順番に回すと、大きな仕事の組織が多くを占める。

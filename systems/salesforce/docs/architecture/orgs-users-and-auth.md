@@ -114,9 +114,9 @@ POST /signup（公開の申し込み）か、社内の営業の操作
 
 ```
 users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
-      last_name, first_name, last_name_kana, first_name_kana,
+      last_name, first_name, last_name_kana, first_name_kana, phone,
       profile_id, role_id, manager_id, license, status,
-      locale, timezone, federation_id, is_integration, created_at, deactivated_at, anonymized_at)
+      locale, timezone, federation_id, is_integration, sso_bypass, created_at, deactivated_at, anonymized_at)
 ```
 
 | 状態 | 意味 |

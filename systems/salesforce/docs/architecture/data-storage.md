@@ -61,6 +61,7 @@ CREATE TABLE records (
 | 索引 | 用途 |
 | --- | --- |
 | 主キー `(org_id, object_id, id, shard_no)` | 1 件の読み、ID の範囲での走査（整合の検査、再計算） |
+| `(org_id, id)` | ID だけでの読み（`/api/v1/ui/records/{id}`、最近見たもの）。レコードの ID に接頭辞を持たないため（2026-09-28。[data-model.md](data-model.md) の 8 節） |
 | `(org_id, object_id, owner_id, id) WHERE deleted_at IS NULL` | 所有者での絞り込みと、共有の条件（[sharing-and-record-access.md](sharing-and-record-access.md) の 6 節） |
 | `(org_id, object_id, updated_at, id) WHERE deleted_at IS NULL` | 更新の時刻での取り出し（連携の同期）、最近の更新の並び |
 | `(org_id, object_id, created_at, id) WHERE deleted_at IS NULL` | 作成の時刻での絞り込み |
@@ -131,7 +132,7 @@ CREATE TABLE records (
 - 240〜255 はハッシュで割り当てない予約の番号にする。S2 以降、大口の組織を、作成時か組織の移動で予約の番号へ置き、専用のクラスタへ割り当てられるようにする。ハッシュは 0〜239 の範囲で割り当てる（`% 240`）。
 - `shard_map(shard_no, cluster_id, state)` で、論理シャードを物理のクラスタへ割り当てる。S1 は全て 1 つのクラスタ。
 - 組織の解決（ホスト名・トークン → `org_id`、`shard_no`）の結果は、組織の設定のキャッシュに持つ。データ層は `SET LOCAL app.org_id` と `SET LOCAL app.shard_no` を設定し、RLS の方針で両方を確かめる。
-- 分割する表（13）：`records`、ピボットの 4 つ、`record_shares`、`implicit_parent_grants`、`group_members_closure`（[sharing-and-record-access.md](sharing-and-record-access.md)）、outbox、`record_match_keys`・`activity_relations`（[sales-objects.md](sales-objects.md)）、`flow_scheduled_actions`・`approval_locks`（[automation-flows.md](automation-flows.md)）。メタデータの表のような小さな表は分割しない。一覧の正本は [data-model.md](data-model.md) の 2 節の「分割・保持」の列。
+- 分割する表（13）：`records`、ピボットの 4 つ、`record_shares`、`implicit_parent_grants`、`group_members_closure`（[sharing-and-record-access.md](sharing-and-record-access.md)）、outbox、`record_match_keys`・`activity_relations`（[sales-objects.md](sales-objects.md)）、`flow_scheduled_actions`・`approval_locks`（[automation-flows.md](automation-flows.md)）。メタデータの表のような小さな表は分割しない。一覧の正本は [data-model.md](data-model.md) の 3.4 節。
 - S1 の分割の数は、256 × 13 表 ≒ 3,300。PostgreSQL 18 の計画の時間は、`shard_no` の定数での刈り込みで抑える。E1 で計画の時間を測る。
 - 組織の置き場所は `org_placements` の上書きがあればそれ、なければ `shard_map` で決める（[infrastructure.md](infrastructure.md) の 4.1 節、[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md)）。
 
@@ -169,7 +170,7 @@ CREATE TABLE records (
 
 ### 5.3 確定と消去
 
-- Worker が 1 時間ごとに `purge_after` を過ぎた束を拾い、組織の公平な順番（ADR-0005）で消す：`records`、ピボット、長いテキスト、`record_shares`、`implicit_parent_grants`、`record_match_keys`、`activity_relations`、`recycle_bin_links`、そのレコードの `field_history`（`history` のクラスタ。[audit-and-field-history.md](audit-and-field-history.md) の 5.4 節）と検索の文書。
+- 束を作る時に、Worker の仕事（`jobs`、class `maintenance`、`available_at = purge_after`）として予約し、組織の公平な順番（ADR-0005）で消す（2026-09-28。組織をまたいで表を走査しない。[data-model.md](data-model.md) の 8 節）：`records`、ピボット、長いテキスト、`record_shares`、`implicit_parent_grants`、`record_match_keys`、`activity_relations`、`recycle_bin_links`、そのレコードの `field_history`（`history` のクラスタ。[audit-and-field-history.md](audit-and-field-history.md) の 5.4 節）と検索の文書。
 - 消去は、`purge_after` から 24 時間以内に終える。本家は完全な削除の時刻を保証しない（LDV）が、本システムは個人データを長く残さないために期限を置く。
 - 管理者はごみ箱を空にできる。利用者は自分が削除した束を空にできる。空にする操作は監査に残す。
 - 確定の後、変更のイベントに `purged` を出す（events-and-integrations の領域）。

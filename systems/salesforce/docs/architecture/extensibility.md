@@ -310,7 +310,7 @@ Runtime のタスク（ECS Fargate）
 
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
-| `md_code_units` | `org_id`、`code_id`、`api_name`、`namespace`、`kind`（`trigger`）、`object_id`、`events`（`before_save`・`after_save`・`after_commit`・`before_delete`・`after_delete`）、`order`、`run_as`（`user`・`system_with_sharing`）、`active_version_id` | メタデータ |
+| `md_code_units` | `org_id`、`code_id`、`api_name`、`namespace`、`kind`（`trigger`）、`object_id`、`events`（`before_save`・`after_save`・`after_commit`・`before_delete`・`after_delete`）、`trigger_order`、`run_as`（`user`・`system_with_sharing`）、`active_version_id` | メタデータ |
 | `md_code_versions` | `org_id`、`version_id`、`code_id`、`source`（TypeScript）、`bytecode`、`bytecode_hash`、`engine_version`、`built_at` | メタデータ。エンジンの版の上げで作り直す |
 | `code_async_runs` | `org_id`、`version_id`、`record_id`、`origin_tx_id`、`attempts`、`state`、`ran_at` | 一意。7 日で消す |
 | `code_debug_logs` | `org_id`、`id`、`code_id`、`tx_id`、`user_id`、`lines`、`created_at` | 7 日で消す |

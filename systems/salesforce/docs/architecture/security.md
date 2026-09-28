@@ -255,7 +255,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
 | 影の実行の結果（ID の集合のハッシュだけ） | 30 日 | ジョブ | — | [ADR-0063](../decisions/0063-org-staged-release-and-shadow-evaluation.md) |
 | アプリのログ | 30 日 | CloudWatch Logs の保持 | — | [ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md) |
 | トレース | 30 日 | X-Ray の保持（30 日で固定。[X-Ray concepts](https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html)、2026-09-28 に確認） | — | ADR-0058 |
-| 組織ごとの使用量の表 | 1 分の粒度 7 日、1 時間の粒度 13 か月 | ジョブ | — | ADR-0058 |
+| 組織ごとの使用量の表（`org_*_minutes`。割り当ての `org_usage_minutes` は 25 時間） | 1 分の粒度 7 日、1 時間の粒度（`org_usage_hours`）13 か月 | ジョブ | — | ADR-0058 |
 | Aurora のバックアップ | 35 日 | 自動バックアップの期限 | — | ADR-0053 |
 | OpenSearch の文書 | 正本に従う | 削除・消去・組織の削除で消し、整合の検査で確かめる | `search_drift_repaired_total` | ADR-0031 |
 | 組織の全て（削除の申し込みの後） | 30 日の猶予 | 猶予の後 7 日以内に全て。最後に DEK を破棄 | `org_purge_overdue` | [ADR-0043](../decisions/0043-orgs-editions-licenses-and-users.md)、ADR-0052 |

@@ -74,6 +74,7 @@
 | `DELETE` | なし（ごみ箱へ） |
 | `UNDELETE` | 空でない全ての項目 |
 | `GAP_CREATE`・`GAP_UPDATE`・`GAP_DELETE`・`GAP_UNDELETE` | なし。受け手はレコードを読み直す |
+| `PURGED` | なし。ごみ箱の確定の後の消去（[data-storage.md](data-storage.md) の 5.3 節。2026-09-28 に足した） |
 
 - 見出しは本家の CDC の見出しに寄せる（2 節）。名前は本システムのもの。
 - 1 レコード 1 件にする（本家のように同じ変更の複数のレコードをまとめない）。受け手の処理と、FLS の絞りと、配信の数え方を単純にするため。`record_ids` は、隙間のイベントで複数のレコードをまとめる時だけ複数になる。
@@ -141,7 +142,7 @@ GET /api/v1/events/changes/opportunity?after=<replay_id>&limit=1000   （取り�
 ### 3.5 保存と保持
 
 - `events` は、主の Aurora と別のクラスタに置く。変更のイベントの読み（購読者の追いつき、再生）が、レコードの保存の DB に及ばないようにする。README の持ち越し（「変更のイベントの再生の置き場所：Aurora の分割の表、Kinesis Data Streams など」）をここで決める（ADR-0033）。
-- 表：`change_events(org_id, replay_id, object_id, record_id, change_type, tx_key, tx_seq, body)`。日ごとの分割（取り込みの日）。主キー `(org_id, replay_id)`、索引 `(org_id, object_id, replay_id)`。RLS をかける。
+- 表：`change_events(org_id, event_id, replay_id, object_id, record_id, change_type, tx_key, tx_seq, body)`。`event_id`（outbox の行の ID の UUIDv7）の日ごとの範囲で分割し、主キー `(org_id, event_id)`、索引 `(org_id, replay_id)`・`(org_id, object_id, replay_id)`。分割の表の一意の制約は分割の鍵を含む必要があり、`event_id` の一意で二重を捨てるため（2026-09-28。[data-model.md](data-model.md) の 8 節）。RLS をかける。
 - **保持は 3 日**（NFR-010。本家も 3 日。CDC）。4 日目の分割を `DROP` する。組織の保持を延ばす選択は持たない（3 日を超える同期の遅れは、一括の問い合わせで取り直す）。
 - 量の見積もり（S1）：保存の行の平均 500 行/秒（ピーク 2,000）、1 件 1KB で、1 日 4,300 万件・43GB、3 日で約 130GB。
 - 本文は KMS の暗号化の Aurora に置く。組織の削除で、その組織の行を消す（分割の `DROP` を待たずに `DELETE`）。
@@ -422,7 +423,7 @@ outbound_endpoints(org_id, id, api_name, base_url, auth_kind, auth_secret_enc, h
 
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
-| `outbox`（種類の追加） | `org_id`、`shard_no`、`id`、`kind`（`change_event`・`org_event`・`search_index`・`delivery`・`email`）、`payload`、`relayed_at` | 主の Aurora。分割、RLS |
+| `outbox`（種類の追加） | `org_id`、`shard_no`、`id`、`kind`（8 種類。[data-storage.md](data-storage.md) の 3.5 節）、`payload`、`relayed_at` | 主の Aurora。分割、RLS |
 | `change_events`・`org_events` | `org_id`、`replay_id`、`event_id`、`object_id`・`type_id`、`record_id`、`change_type`、`tx_key`、`tx_seq`、`body` | `events` のクラスタ。日ごとの分割、3 日、RLS |
 | `event_heads` | `org_id`、`max_replay_id` | 購読者への通知 |
 | `cdc_enabled_objects` | `org_id`、`object_id` | メタデータ |

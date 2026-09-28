@@ -46,7 +46,7 @@ POST /api/v1/jobs/ingest
 { "object": "contact", "operation": "upsert", "external_id_field": "x_erp_id",
   "column_delimiter": "comma", "line_ending": "lf", "encoding": "utf-8",
   "concurrency": "parallel", "options": { "allow_duplicates": false } }
-→ 201 { "id": "job_...", "state": "open", "upload_url": "/api/v1/jobs/ingest/job_.../data" }
+→ 201 { "id": "<job_id>", "state": "open", "upload_url": "/api/v1/jobs/ingest/<job_id>/data" }
 
 PUT  /api/v1/jobs/ingest/{id}/data          （CSV。複数回に分けて上げてよい。合計 150MB）
 PATCH /api/v1/jobs/ingest/{id}  {"state": "upload_complete"}   （または "aborted"）

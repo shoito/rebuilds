@@ -559,12 +559,12 @@ WHERE r.org_id = $org AND r.shard_no = $s AND r.object_id = $obj AND r.deleted_a
 
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
-| `permission_sets` | `org_id`、`id`、`api_name`、`is_profile_base`、`license` | メタデータ。`license` は orgs-users-and-auth の依頼 |
-| `permission_set_object_perms` | `org_id`、`ps_id`、`object_id`、`read`、`create`、`edit`、`delete`、`view_all`、`modify_all` | メタデータ |
-| `permission_set_field_perms` | `org_id`、`ps_id`、`field_id`、`read`、`edit` | メタデータ |
+| `permission_sets` | `org_id`、`ps_id`、`api_name`、`is_profile_base`、`license` | メタデータ。`license` は orgs-users-and-auth の依頼 |
+| `permission_set_object_perms` | `org_id`、`ps_id`、`object_id`、`can_read`、`can_create`、`can_edit`、`can_delete`、`can_view_all`、`can_modify_all`（列の名前は [data-model.md](data-model.md) の 8 節） | メタデータ |
+| `permission_set_field_perms` | `org_id`、`ps_id`、`field_id`、`can_read`、`can_edit` | メタデータ |
 | `permission_set_system_perms` | `org_id`、`ps_id`、`perm` | メタデータ |
 | `permission_set_groups`、`permission_set_group_members` | `org_id`、`psg_id`、`ps_id` | メタデータ |
-| `profiles` | `org_id`、`id`、`base_ps_id`、既定のレイアウト・レコードタイプ、ログインの制限 | メタデータ |
+| `profiles` | `org_id`、`profile_id`、`base_ps_id`、既定のレイアウト・レコードタイプ、ログインの制限 | メタデータ |
 | `user_perm_assignments` | `org_id`、`user_id`、`ps_id` または `psg_id`、`expires_at` | データ（版を上げない） |
 | `roles` | `org_id`、`role_id`、`parent_role_id`、`child_access` | メタデータ |
 | `groups`、`group_direct_members` | `org_id`、`group_id`、`kind`、`grant_via_hierarchy`、`member_kind`、`member_id` | 構成 |

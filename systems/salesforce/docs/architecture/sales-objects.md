@@ -505,7 +505,7 @@ email_message を作る（who は最初の一致、残りは activity_relations�
 | --- | --- | --- |
 | `records`（標準オブジェクト） | 取引先・取引先責任者・リード・商談・活動・メール | 3 節。項目は `md_fields` |
 | `md_picklist_values.attrs` | フェーズ・リードの状態・ToDo の状態の属性 | metadata-and-runtime の表への追加 |
-| `opportunity_history` | `org_id`、`opportunity_id`、`changed_at`、`stage`、`amount`、`probability`、`close_date`、`forecast_category`、`changed_by` | 分割、RLS。商談に連動して読む |
+| `opportunity_history` | `org_id`、`id`、`opportunity_id`、`changed_at`、`stage`、`amount`、`probability`、`close_date`、`forecast_category`、`changed_by`、`tx_id` | `changed_at` の月ごとの分割、RLS。商談に連動して読む |
 | `activity_relations` | `org_id`、`activity_id`、`related_object_id`、`related_id`、`kind`（`who`・`attendee`）、`response` | 分割、RLS |
 | `lead_convert_mappings`、`lead_convert_settings` | `org_id`、`lead_field_id`、`target_object`、`target_field_id`、`opportunity_creation` | メタデータ |
 | `lead_conversions` | `org_id`、`lead_id`、`account_id`、`contact_id`、`opportunity_id`、`converted_by`、`converted_at`、`skipped_fields` | |
@@ -513,6 +513,6 @@ email_message を作る（who は最初の一致、残りは activity_relations�
 | `duplicate_rules`、`duplicate_rule_matchers` | `org_id`、`id`、`object_id`、`sort_order`、`on_create`、`on_update`、`sharing`、`condition`、`matching_rule_id` | メタデータ |
 | `record_match_keys` | 6.3 節 | 分割、RLS、整合の検査 |
 | `duplicate_record_sets`、`duplicate_record_items` | `org_id`、`set_id`、`rule_id`、`record_id`、`detected_at` | 共有の判定の対象 |
-| `name_variant_chars` | `org_id`（システムの行は空）、`from_char`、`to_char` | 異体字の表 |
+| `name_variant_chars` | `org_id`（システムの行は nil UUID）、`from_char`、`to_char` | 異体字の表 |
 | `email_log_addresses` | `org_id`、`user_id`、`token_hash`、`created_at`、`expires_at` | token は hash だけ持つ |
 | `email_attachments` | `org_id`、`email_message_id`、`s3_key`、`size`、`content_type` | |
