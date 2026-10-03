@@ -2,10 +2,6 @@
 (() => {
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
-  const store = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch { /* ignore */ } },
-  };
 
   const main = $('main');
   const sections = $$('main > section.s');
@@ -30,7 +26,6 @@
     <div class="title">${title}</div>
     <div class="controls">
       <button class="btn" id="view-btn" aria-pressed="false" title="表示を切り替える（S キー）">スライド表示</button>
-      <button class="btn" id="theme-btn" title="明暗を切り替える">◐</button>
     </div>`;
   document.body.prepend(bar);
   const progress = document.createElement('div');
@@ -62,17 +57,6 @@
   deck.setAttribute('aria-label', 'スライドの操作');
   deck.innerHTML = '<button class="btn" data-go="prev" aria-label="前へ">←</button><span class="count"></span><button class="btn" data-go="next" aria-label="次へ">→</button>';
   document.body.append(deck);
-
-  // Theme
-  const root = document.documentElement;
-  const savedTheme = store.get('primer-theme');
-  if (savedTheme) root.dataset.theme = savedTheme;
-  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-  $('#theme-btn').addEventListener('click', () => {
-    root.dataset.theme = isDark() ? 'light' : 'dark';
-    store.set('primer-theme', root.dataset.theme);
-    rerenderMermaid();
-  });
 
   // Glossary popovers: <a class="t" href="#g-xxx">term</a> pointing at <dt id="g-xxx">
   let pop = null;
@@ -177,18 +161,26 @@
   const mermaidBlocks = $$('pre.mermaid');
   mermaidBlocks.forEach((b) => { b.dataset.src = b.textContent; });
   let mermaidLib = null;
-  let mermaidTheme = null;
+
   async function renderMermaid() {
     const todo = mermaidBlocks.filter((b) => !b.dataset.processed && b.offsetParent !== null);
     if (!todo.length) return;
-    if (!mermaidLib) mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
-    const theme = isDark() ? 'dark' : 'default';
-    if (theme !== mermaidTheme) { mermaidLib.initialize({ startOnLoad: false, theme, fontFamily: getComputedStyle(document.body).fontFamily }); mermaidTheme = theme; }
+    if (!mermaidLib) {
+      mermaidLib = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
+      mermaidLib.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        fontFamily: getComputedStyle(document.body).fontFamily,
+        themeVariables: {
+          primaryColor: '#edf3fa', primaryBorderColor: '#1f4e8c', primaryTextColor: '#1b2430',
+          secondaryColor: '#f4f6f9', tertiaryColor: '#ffffff', lineColor: '#5b6573',
+          noteBkgColor: '#fdf7e8', noteBorderColor: '#9a6a00',
+          actorBkg: '#edf3fa', actorBorder: '#1f4e8c', signalColor: '#1b2430',
+          attributeBackgroundColorOdd: '#ffffff', attributeBackgroundColorEven: '#f4f6f9',
+        },
+      });
+    }
     await mermaidLib.run({ nodes: todo });
-  }
-  function rerenderMermaid() {
-    mermaidBlocks.forEach((b) => { if (b.dataset.processed) { b.removeAttribute('data-processed'); b.textContent = b.dataset.src; } });
-    renderMermaid();
   }
 
   // Scrollspy for the document view

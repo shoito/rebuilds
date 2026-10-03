@@ -7,22 +7,29 @@
 <meta name="description" content="既存の SaaS を AI エージェント主体で再構築する設計の記録。題材ごとの前提知識の資料。">
 <link rel="stylesheet" href="docs/primer/assets/primer.css">
 <style>
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
-  .wrap h1 { font-size: 2em; margin: 0 0 .3em; }
-  .lead { color: var(--muted); margin: 0 0 1.5em; }
+  body { border-top: 3px solid var(--accent); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 16px 64px; }
+  .masthead { padding: 4px 0 20px 18px; border-left: 6px solid var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 28px; }
+  .masthead h1 { font-size: 2em; margin: 0 0 .3em; color: var(--accent-strong); }
+  .lead { color: var(--muted); margin: 0; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-  .card .genre { color: var(--accent); font-size: .8em; font-weight: 600; }
-  .card .links { margin-top: 8px; font-size: .85em; display: flex; gap: 12px; }
-  .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 32px; padding: 14px 16px; background: var(--accent-soft); border-radius: var(--radius); }
+  .card .genre { color: var(--muted); font-size: .78em; font-weight: 700; letter-spacing: .06em; }
+  .card h3 a { color: var(--accent-strong); text-decoration: none; }
+  .card h3 a:hover { text-decoration: underline; }
+  .card .links { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: .85em; display: flex; gap: 14px; }
+  .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 36px; padding: 14px 16px; background: var(--accent-soft); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); }
   .start p { margin: 0; flex: 1; min-width: 220px; }
-  h2 { font-size: 1.2em; margin: 1.6em 0 .6em; }
+  .start .btn { background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; }
+  h2 { font-size: 1.15em; margin: 0 0 .8em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); color: var(--accent-strong); }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <header class="masthead">
   <p class="kicker">rebuilds</p>
   <h1>前提知識の資料</h1>
   <p class="lead">既存の SaaS を、AI のコーディングエージェントを主な作り手として再構築するなら、どう設計するか。その設計の文書を読む前に要る知識を、題材ごとにまとめました。どの資料も、右上のボタンか S キーで資料表示とスライド表示を切り替えられます。</p>
+  </header>
 
   <div class="start">
     <p><strong>はじめに</strong>：どの題材にも出てくる進め方と技術（ADR、RLS、outbox、冪等、規模の段階など）。</p>
@@ -35,7 +42,6 @@
   <p class="hint" style="margin-top:32px">設計の文書の本体は <a href="https://github.com/shoito/rebuilds">GitHub のリポジトリ</a>にあります。</p>
 </div>
 <script>
-  try { const t = localStorage.getItem("primer-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
   const subjects = [
     ['slack', 'Slack', 'チャット', 'リアルタイム配信、メッセージの順序、既読、検索'],
     ['stripe', 'Stripe', '決済', '冪等性、複式簿記の台帳、Webhook、カード情報の隔離'],
