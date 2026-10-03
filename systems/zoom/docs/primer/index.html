@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zoom の前提知識</title>
+<meta name="description" content="Zoom の再構築の設計の文書を読む前に知っておくとよい、ビデオ会議の分野の概念・用語・標準（WebRTC、RTP、ICE、コーデック、SFU、E2EE）。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Zoom · 前提知識</p>
+    <h1>Zoom の設計を読む前に</h1>
+    <p class="lead">ビデオ会議は「映像を送って見せる」だけに見えますが、遅れ・回線の損失・NAT の越え方・帯域の推定・暗号化のそれぞれに、標準と業界の決まりがあります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Zoom · 前提知識</p>
+    <h2>Zoom の設計を読む前に</h2>
+    <p class="lead">WebRTC・SFU・帯域の推定・低遅延・E2EE・録画の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Zoom は何をするサービスか</h2>
+    <p>Zoom Meetings は、離れた人どうしが音声・映像・画面共有で話すビデオ会議です。URL を開くと会議に入れ、主催者が参加者を管理します。社外の人も、アカウントなしでブラウザから入ります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>すぐに集まれる</h3><p>URL を開くだけで、ブラウザから 3 秒程度で音声がつながる。</p></div>
+      <div class="card" data-frag><h3>遅れず、途切れない</h3><p>話してから届くまで p95 300ms 以内。損失 20% の回線でも音声で会話を続けられる。</p></div>
+      <div class="card" data-frag><h3>安全</h3><p>待合室とパスコードを既定にする。望めばサーバーも中身を見られない E2EE を選べる。</p></div>
+    </div>
+    <p>規模の感覚は、S1 で同時に 5,000 会議・3 万人、1 会議 100 人までです（S2 で 300 人、S3 で 1,000 人）。1 人あたりの帯域は、下り 2.5 Mbps（容量の前提）・上り 0.8 Mbps で見積もります。チャットの題材と違い、<strong>データの大半は DB を通らず、メディアサーバーを流れて消えていきます</strong>。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/intent.md">intent.md</a> の「Proposed outcome」と成功の基準（K1〜K8）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="meeting">
+    <h2>会議・開催・参加者・役割</h2>
+    <p>「会議」という言葉は 2 つの意味で使われます。設計では分けて呼びます。</p>
+    <table>
+      <tr><th>言葉</th><th>意味</th><th>表</th></tr>
+      <tr><td>会議</td><td>予定やリンクの単位。11 桁の<strong>会議の番号</strong>と URL を持つ。繰り返しの会議は全回で同じ番号</td><td><code>meetings</code></td></tr>
+      <tr><td>開催</td><td>実際に人が集まった 1 回。同じ会議で同時に動く開催は 1 つだけ</td><td><code>meeting_instances</code></td></tr>
+      <tr><td>参加</td><td>1 人が 1 回の開催に入っていた記録</td><td><code>meeting_participations</code></td></tr>
+    </table>
+    <p>会議の種類は、すぐの会議・予定の会議・繰り返しの会議・時刻のない繰り返し・<a class="t" href="#g-pmi">PMI</a>（個人に固定の 10 桁の番号）です。開催の中の役割は <code>host</code>（主催者。1 人）・<code>cohost</code>（共同主催者）・<code>attendee</code> の 3 つで、主催者はミュート・退出・ロック・待合室の操作ができます。ただし<strong>主催者でも、他人のミュートを本人の同意なしに外せません</strong>（解除を求めるだけ）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/signaling-and-meetings.md">signaling-and-meetings.md</a> の 4・5・9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/scheduling-and-calendar.md">scheduling-and-calendar.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0009-host-controls-enforcement.md">ADR-0009</a>。</div>
+  </section>
+
+  <section class="s" id="latency">
+    <h2>遅れ・揺らぎ・損失：会話の物差し</h2>
+    <p>人は音声の遅れに敏感です。ITU-T G.114 は、片道 150ms 以下なら会話がほぼ自然、400ms を超えると許容できないとしています。そこで設計は、音声の口から耳まで（mouth-to-ear）p95 200ms、映像の撮影から表示まで（<a class="t" href="#g-g2g">glass-to-glass</a>）p95 300ms を目標にします。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>遅れ（RTT）</h3><p>往復の時間。距離と経路で決まる。サーバーを日本に置く理由。</p></div>
+      <div class="card" data-frag><h3>揺らぎ（ジッタ）</h3><p>パケットの到着の間隔のばらつき。受け手は<a class="t" href="#g-jitterbuffer">ジッタバッファ</a>で溜めて均すが、溜めた分だけ遅れる。</p></div>
+      <div class="card" data-frag><h3>損失</h3><p>届かないパケット。Wi-Fi やモバイルで起きる。再送を待つと遅れるので、音声は再送しない工夫をする。</p></div>
+    </div>
+    <p>このため、メディアは TCP ではなく UDP の上の <a class="t" href="#g-rtp">RTP</a> で送ります。TCP は失ったパケットを必ず再送し、後続を止めて待ちます。会話では、古い音声が遅れて届くより、少し欠けても今の音声が届く方が良いのです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/README.md">architecture/README.md</a> の 3 節（NFR-001〜004）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/signaling-and-meetings.md">signaling-and-meetings.md</a> の 11 節（遅延の予算）。</div>
+  </section>
+
+  <section class="s" id="webrtc">
+    <h2>WebRTC の部品</h2>
+    <p>ブラウザどうし、またはブラウザとサーバーで、音声と映像をやり取りする標準が <a class="t" href="#g-webrtc">WebRTC</a> です（W3C の WebRTC 1.0 と IETF の RFC 8825〜8835）。インストールなしで参加できるのは、ブラウザがこれを持っているからです。</p>
+    <pre class="mermaid">flowchart TB
+  A["getUserMedia・getDisplayMedia でマイク・カメラ・画面を取る"] --> B["符号器 Opus・VP8 などで圧縮"]
+  B --> C["RTP にパケット化、RTCP で受信を報告"]
+  C --> D["SRTP で暗号化、鍵は DTLS で交換"]
+  D --> E["ICE で決めた経路、UDP がだめなら TCP・TURN"]</pre>
+    <ul>
+      <li data-frag><a class="t" href="#g-rtcp">RTCP</a> は、受け手が「どれだけ失ったか」「キーフレームが欲しい」を送り手へ返す制御の流れです。</li>
+      <li data-frag><a class="t" href="#g-dtls-srtp">DTLS-SRTP</a> で、メディアは常に暗号化されます。ただし鍵を持つのは<strong>直接の相手（サーバー）</strong>です。</li>
+      <li data-frag>どの符号器を使い、どこへ送るかは <a class="t" href="#g-sdp">SDP</a> で交渉します。SDP を運ぶ<strong>シグナリングの方式は標準の外</strong>で、各サービスが自分で作ります。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0003-client-platform.md">ADR-0003</a>（本家の Web クライアントのような独自の伝送は採らない）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/clients.md">clients.md</a> の 2 節（ブラウザの対応表）。</div>
+  </section>
+
+  <section class="s" id="topology">
+    <h2>多人数の会議の形：P2P・MCU・SFU</h2>
+    <p>N 人が互いの映像を見るとき、誰が何本を送るかで形が分かれます。</p>
+    <div class="tabs">
+      <div data-tab="P2P（メッシュ）"><p><a class="t" href="#g-p2p">P2P</a>：全員が全員へ直接送る。サーバーは要らないが、各自が N−1 本を送る。上りの帯域と CPU が人数とともに増え、4〜5 人が限度。この設計は 1:1 も SFU を通す（P2P は S2 で評価）。</p></div>
+      <div data-tab="MCU（合成）"><p><a class="t" href="#g-mcu">MCU</a>：サーバーが全員の映像を復号し、1 枚に合成して符号化し直す。受け手は 1 本だけ受ければよいが、サーバーの CPU の費用が大きく、復号と再符号化で遅れが増える。この設計は配信には使わず、<strong>録画の合成だけ</strong>サーバーで行う。</p></div>
+      <div data-tab="SFU（選んで転送）"><p><a class="t" href="#g-sfu">SFU</a>：各自は 1 本（または層を重ねた数本）だけを上げ、サーバーは<strong>復号せずに</strong>受け手ごとに選んで転送する。受け手ごとに解像度を変えられ、遅れも小さい。この設計の中心。</p></div>
+    </div>
+    <p>SFU の費用の大半は、サーバーからインターネットへの<strong>送出（egress）</strong>です。受け手 1 人に 25 本の映像を送ることもあるので、「誰に、どの品質を、何本送るか」の判断が、品質と費用の両方を決めます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">SFU が帯域の細い受け手に、720p ではなく 180p の映像を送りました。SFU は何をしましたか？</p>
+      <div class="opts">
+        <button>映像を復号し、180p に縮めて符号化し直した</button>
+        <button>受け手のブラウザに縮めるよう指示した</button>
+        <button>送り手が最初から重ねて送っていた 180p の層を選んで転送した</button>
+      </div>
+      <p class="why">SFU は映像を復号しません。送り手が simulcast や SVC で複数の品質を同時に送り、SFU が受け手ごとに層を選びます（ADR-0002）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0002-media-topology.md">ADR-0002</a>、intent.md の Non-goals（MCU による配信）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/capacity.md">capacity.md</a>。</div>
+  </section>
+
+  <section class="s" id="sfu">
+    <h2>SFU の部品：mediasoup の言葉</h2>
+    <p>Media Node は SFU のライブラリ mediasoup v3 で作ります。設計の文書は、その用語のまま書かれています。</p>
+    <table>
+      <tr><th>言葉</th><th>意味</th></tr>
+      <tr><td><a class="t" href="#g-worker">worker</a></td><td>C++ の子プロセス。CPU のコア 1 つで動く。Media Node は vCPU−2 個を持つ</td></tr>
+      <tr><td><a class="t" href="#g-router">router</a></td><td>会議ごと・worker ごとの部屋。worker をまたぐときは <code>pipeToRouter</code> でつなぐ</td></tr>
+      <tr><td><a class="t" href="#g-transport">transport</a></td><td>参加者との 1 本の接続（ICE・DTLS）。1 人に送り用 1 本・受け用 1 本</td></tr>
+      <tr><td><a class="t" href="#g-producer">producer</a></td><td>参加者が上げる 1 本の流れ（マイク・カメラ・画面）</td></tr>
+      <tr><td><a class="t" href="#g-consumer">consumer</a></td><td>ある producer を、ある受け手へ流す 1 本。層の上限と優先度を持つ</td></tr>
+    </table>
+    <p>参加の手順は、mediasoup-client の流れをシグナリングに写したものです。</p>
+    <div class="stepper">
+      <ol>
+        <li><code>media.capabilities</code>：router の対応する符号器を受け、ブラウザの <code>Device</code> に読み込む。</li>
+        <li><code>media.transport.create</code>：送り用と受け用の transport を作り、ICE と DTLS のパラメーターを受ける。</li>
+        <li><code>media.transport.connect</code>：DTLS を始める。ここで経路と暗号の鍵が決まる。</li>
+        <li><code>media.produce</code>：マイクやカメラを producer として上げる。ミュート中なら止めた状態で作る。</li>
+        <li>他の参加者の分は、サーバーが consumer を止めた状態で作って知らせる。</li>
+        <li><code>media.consume.resume</code>：受け手が準備できたら再開し、キーフレームを求める。</li>
+      </ol>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/media-server-sfu.md">media-server-sfu.md</a> の 2〜4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/signaling-and-meetings.md">signaling-and-meetings.md</a> の 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0010-media-node-process-layout.md">ADR-0010</a>。</div>
+  </section>
+
+  <section class="s" id="ice">
+    <h2>NAT を越える：ICE・STUN・TURN</h2>
+    <p>家庭や会社の端末は <a class="t" href="#g-nat">NAT</a> の内側にあり、外から直接は届きません。<a class="t" href="#g-ice">ICE</a> は、通れそうな経路（候補）を集めて並行に試し、通った中で最も良いものを選ぶ手順です。</p>
+    <table>
+      <tr><th>候補</th><th>意味</th></tr>
+      <tr><td>host</td><td>端末やサーバー自身のアドレス</td></tr>
+      <tr><td>server-reflexive</td><td><a class="t" href="#g-stun">STUN</a> で知った、NAT の外側のアドレス</td></tr>
+      <tr><td>peer-reflexive</td><td>接続の確認の中で相手から見えたアドレス</td></tr>
+      <tr><td>relay</td><td><a class="t" href="#g-turn">TURN</a> のサーバーが中継するアドレス。最後の手段</td></tr>
+    </table>
+    <p>Media Node は公開の IP を持つので <a class="t" href="#g-icelite">ICE Lite</a> で動き、host の候補だけを出します。そのため直接の経路に STUN のサーバーは要りません。UDP が閉じた会社の網のために、TURN を UDP・TCP 3478 と TLS 443 で待ちます。443 番しか通らない網でも、TLS の上で RTP を運べば参加できます（品質は最も悪い）。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">参加者がつながっている Media Node が落ちました。別の Node へ移るには、どうしますか？</p>
+      <div class="opts">
+        <button>ICE restart する。DTLS と producer・consumer はそのまま残る</button>
+        <button>新しい Node に新しい transport を作り、ICE と DTLS をやり直す</button>
+        <button>TURN が自動で新しい Node へ中継し直すので、何もしない</button>
+      </div>
+      <p class="why">ICE restart は、同じ Node のまま参加者の網が変わったとき（Wi-Fi からモバイルへ）の手段です。Node が替わると DTLS の相手も変わるので、新しい transport が要ります（media-server-sfu.md の 9.3 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/network-traversal.md">network-traversal.md</a> の 3〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0014-ice-strategy.md">ADR-0014</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0015-turn-coturn-and-ephemeral-credentials.md">0015</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0013-media-node-failover-and-reattach.md">0013</a>。</div>
+  </section>
+
+  <section class="s" id="audio">
+    <h2>音声：Opus と損失への備え</h2>
+    <p>WebRTC の音声の標準の符号器は <a class="t" href="#g-opus">Opus</a> です。設計では 20ms ごとに 1 パケット（毎秒 50 個）、約 32 kbps で送ります。損失には、再送ではなく「先に冗長を送っておく」方式で備えます。</p>
+    <div class="tabs">
+      <div data-tab="DTX"><p><a class="t" href="#g-dtx">DTX</a>：黙っている間はほとんど送らない。100 人の会議の大半は黙っているので、帯域とパケットの数が大きく減る。</p></div>
+      <div data-tab="インバンド FEC"><p><a class="t" href="#g-fec">FEC</a>：次のパケットの中に、前のフレームを低い品質で重ねる。1 個だけ失ったときに直せる。</p></div>
+      <div data-tab="RED"><p><a class="t" href="#g-red">RED</a>（RFC 2198）：1 つのパケットに、今のフレームと前のフレームをそのまま並べる。ブラウザは冗長を 1 つ（distance 1）だけ作る。送出は最大約 2 倍。mediasoup に無いので、フォークで足す。</p></div>
+      <div data-tab="NACK"><p><a class="t" href="#g-nack">NACK</a>：失ったパケットの再送を求める。音声では使わない。映像は NACK と RTX（再送）で直す。</p></div>
+    </div>
+    <p>大きな会議では、受け手に届ける音声を<strong>声の大きい 3 人まで</strong>に絞ります。100 人を超える会議では、受け手ごとに 3 つの「音声の枠」を持たせ、話している人の音声を枠へ付け替えて送ります（ADR-0057）。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">音声で NACK（再送の要求）を使わないのはなぜ？</p>
+      <div class="opts">
+        <button>再送を待つとジッタバッファが伸び、遅れの目標（200ms）を食うから</button>
+        <button>Opus が NACK に対応していないから</button>
+        <button>音声は暗号化されているので再送できないから</button>
+      </div>
+      <p class="why">20ms ごとの音声は、1 往復待つだけで遅れが増えます。FEC と RED で先回りして直し、直せない分は受け手の補間（隠す処理）に任せます（codecs-and-bandwidth-adaptation.md の 4.1 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/codecs-and-bandwidth-adaptation.md">codecs-and-bandwidth-adaptation.md</a> の 3・4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0017-opus-dtx-fec-red.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0057-audio-slots-for-large-meetings.md">ADR-0057</a>。</div>
+  </section>
+
+  <section class="s" id="video">
+    <h2>映像：符号器・キーフレーム・層</h2>
+    <p>映像の符号器は VP8・H.264（どのブラウザも必須）、VP9、AV1 です。映像は差分で圧縮するので、途中から見るには「それだけで描ける」<a class="t" href="#g-keyframe">キーフレーム</a>が要ります。受け手が欲しいときは RTCP の <a class="t" href="#g-pli">PLI</a> で求めます。</p>
+    <div class="compare">
+      <div data-frag><h3><a class="t" href="#g-simulcast">simulcast</a>（既定）</h3><p>送り手が同じ映像を 3 本（180p・360p・720p）別々に符号化して送る。SFU は受け手ごとに 1 本を選ぶ。本を替えるときはキーフレームが要る。VP8 で使う。</p></div>
+      <div data-frag><h3><a class="t" href="#g-svc">SVC</a></h3><p>1 本の流れの中に層を重ねる。<code>L3T3_KEY</code> は空間の層 3・時間の層 3。SFU は層を剥がすだけ。上りが少なく済む。全員が Chromium の会議だけ VP9 で使う。</p></div>
+    </div>
+    <ul>
+      <li data-frag><strong>空間の層</strong>は解像度、<strong>時間の層</strong>はフレームの数（7.5・15・30 fps）。時間の層を落とすのにキーフレームは要らないので、まず時間の層から下げます。</li>
+      <li data-frag>受け手が多いと、PLI が送り手に集まり、送出が 2〜3 倍になりえます。Media Node は要求を 1 秒（画面共有は 2 秒）にまとめます。</li>
+      <li data-frag>画面共有は文字を読めることを優先し、解像度を保ってフレームの数を落とします（<code>contentHint: "detail"</code>、最大 5 fps）。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/codecs-and-bandwidth-adaptation.md">codecs-and-bandwidth-adaptation.md</a> の 5・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0018-video-codec-and-layering-selection.md">ADR-0018</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0020-screen-share-encoding.md">0020</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/media-server-sfu.md">media-server-sfu.md</a> の 7 節。</div>
+  </section>
+
+  <section class="s" id="bwe">
+    <h2>帯域の推定と層の選び方</h2>
+    <p>回線の帯域は刻々と変わり、誰も正確な値を知りません。そこで送り手は、パケットの到着の遅れと損失から「いま送ってよい速さ」を推定します。この推定の方式が <a class="t" href="#g-gcc">GCC</a> で、受け手が到着の時刻を返す仕組みが <a class="t" href="#g-twcc">transport-cc</a> です。</p>
+    <div class="compare">
+      <div><h3>上り（送り手 → Media Node）</h3><p>ブラウザの GCC が推定し、simulcast の上の本から止める。Media Node は帰還を返すだけ。</p></div>
+      <div><h3>下り（Media Node → 受け手）</h3><p>Media Node が受け手ごとに推定し、優先度の順に層を配る。足りなければ低い優先度から層を下げ、最後は止めてアバターを出す。</p></div>
+    </div>
+    <p>何を誰に送るか（購読と上限の層）は Meeting Actor が決め、帯域の中でどの層を送るかは Media Node が決めます。優先度は画面共有 255、ピン留め・話者 200、ギャラリー 100・50 です。</p>
+    <div class="stepper">
+      <ol>
+        <li>受け手の下りが半分に落ちる。Media Node の推定が下がる。</li>
+        <li>割り当ての合計が推定を超えたので、すぐに下げる。まず時間の層、次に空間の層。</li>
+        <li>優先度の低いギャラリーの映像から下がり、載らない映像は止める。</li>
+        <li>音声は映像より先に守る。下り 150 kbps まで落ちても音声は続く（NFR-009）。</li>
+        <li>回線が戻ったら、1 つ上の層の 1.2 倍の推定が 3 秒続いたときに 1 段ずつ上げる。</li>
+      </ol>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/codecs-and-bandwidth-adaptation.md">codecs-and-bandwidth-adaptation.md</a> の 6 節（mediasoup の <code>priority</code> は「高い順に満たす」ではない点に注意）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0019-bandwidth-estimation-and-layer-allocation.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0011-forwarding-and-layer-selection.md">ADR-0011</a>。</div>
+  </section>
+
+  <section class="s" id="signaling">
+    <h2>シグナリングと Meeting Actor</h2>
+    <p>メディアの経路とは別に、参加・ミュート・待合室などの「会議の状態」を扱う経路があります。これが<a class="t" href="#g-signaling">シグナリング</a>で、WebSocket の上の JSON です。状態の正本は、会議ごとに 1 つだけ動く <a class="t" href="#g-actor">Meeting Actor</a> のメモリにあります。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as ブラウザ
+  participant API as API
+  participant G as Gateway
+  participant A as Meeting Actor
+  participant N as Media Node
+  C->>API: POST join（パスコード・参加の鍵）
+  API-->>C: 参加のトークン（120 秒、1 回限り）
+  C->>G: WebSocket hello{token}
+  G->>A: join
+  A-->>C: welcome{epoch, seq, snapshot}
+  C->>A: media.transport.create など
+  A->>N: epoch 付きの指示</pre>
+    <ul>
+      <li data-frag>状態の変化は <code>evt</code> として <code>(epoch, seq)</code> 付きで配ります。音量や字幕のような落としてよいものは <code>eph</code>（seq なし）です。</li>
+      <li data-frag>Actor の持ち主は Valkey の<a class="t" href="#g-lease">リース</a>（TTL 6 秒）で決め、取るたびに <a class="t" href="#g-epoch">epoch</a> を 1 増やします。</li>
+      <li data-frag>Actor が止まっても、Media Node は最後の指示のまま転送を続けます。<strong>制御が止まってもメディアは止めない</strong>のが原則です。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">網の分断で、古い Actor（epoch 6）と新しい Actor（epoch 7）が同時に動きました。古い Actor の指示が Media Node に届くと？</p>
+      <div class="opts">
+        <button>後から届いた方が勝つ</button>
+        <button>Media Node は見た最大の epoch（7）より小さい指示を <code>stale_epoch</code> で拒む</button>
+        <button>Valkey のリースを確かめてから実行する</button>
+      </div>
+      <p class="why">epoch は<a class="t" href="#g-fencing">フェンシング</a>の番号です。Media Node・Gateway・Aurora は古い epoch の書き込みを拒みます。Media Node は制御の側に問い合わせません（ADR-0007）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/signaling-and-meetings.md">signaling-and-meetings.md</a> の 5〜7・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0005-meeting-state-and-signaling.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0007-meeting-actor-lease-and-epoch.md">0007</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0008-signaling-protocol.md">0008</a>。</div>
+  </section>
+
+  <section class="s" id="safety">
+    <h2>会議の荒らしと、待合室・パスコード</h2>
+    <p>2020 年、会議の URL や番号が漏れて知らない人が入り込み、会議を荒らす事件が相次ぎました（「Zoombombing」）。本家は 2020-09-27 から、<a class="t" href="#g-waitingroom">待合室</a>かパスコードのどちらかを必ず有効にしています。設計も同じ規則を DB の CHECK で守ります。</p>
+    <ul>
+      <li data-frag><strong>会議の番号は秘密ではない。</strong>画面に出し、電話でも読み上げます。11 桁の乱数でも、有効な番号が多ければ推測で当たります（S3 の見込みで 1 回あたり約 1/9,000）。だから番号だけでは入れない形にします。</li>
+      <li data-frag><strong><a class="t" href="#g-joinkey">参加の鍵</a></strong>（128 ビット）は URL の <code>#k=</code> に置きます。フラグメントはサーバーへ送られないので、アクセスログや <code>Referer</code> に残りません。</li>
+      <li data-frag><strong>パスコード</strong>は既定 6 桁の数字です（電話の押しボタンで入れるため）。弱いので、誤りの回数の流量の制限と組みます。</li>
+      <li data-frag>主催者が退出させた人は、主催者が許すまで同じ会議に戻れません（ban）。荒らしには「活動の一時停止」で全員の映像・音声・共有・チャットを 1 回の操作で止めます。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">参加の鍵の入った URL を持つ人は、何を省けますか？</p>
+      <div class="opts">
+        <button>パスコードと待合室の両方</button>
+        <button>待合室だけ</button>
+        <button>パスコードの入力だけ。待合室は省けない</button>
+      </div>
+      <p class="why">URL は転送で漏れます。待合室を省けるのは、同じ組織のログインや主催者の招待など「身元」で判定できる人だけです（ADR-0031）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/meeting-security.md">meeting-security.md</a> の 3〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0006-meeting-id-and-join-url.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0031-waiting-room-and-passcode-rules.md">0031</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0033-join-rate-limits-and-enumeration-defense.md">0033</a>。</div>
+  </section>
+
+  <section class="s" id="e2ee">
+    <h2>暗号化：ホップごとと E2EE</h2>
+    <p>「暗号化している」には 2 つの意味があります。SFU を通す会議では、この違いが機能の可否を決めます。</p>
+    <div class="compare">
+      <div data-frag><h3>ホップごと（既定）</h3><p>DTLS-SRTP。端末と Media Node の間を暗号化する。Media Node は中身を平文で扱えるので、録画・字幕ができる。</p></div>
+      <div data-frag><h3><a class="t" href="#g-e2ee">E2EE</a>（選べる）</h3><p>端末が符号化の後のフレームを <a class="t" href="#g-sframe">SFrame</a> で暗号化し、さらに SRTP で包む。鍵は <a class="t" href="#g-mls">MLS</a> で参加者だけが共有し、サーバーは持たない。</p></div>
+    </div>
+    <ul>
+      <li data-frag>SFU は中身を読めなくても、RTP のヘッダーと拡張（<code>rid</code>、音量、<a class="t" href="#g-dd">Dependency Descriptor</a>）で層を選び、話者を見分けます。<strong>誰がいつ話したかは、サーバーに見えます</strong>。</li>
+      <li data-frag>参加者が抜けたら、2 秒以内に MLS の鍵を替え、抜けた人は以後のメディアを復号できません（NFR-008）。</li>
+      <li data-frag>全員の画面の「セキュリティのコード」が一致すれば、サーバーによるすり替えが無いと確かめられます。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">E2EE の会議で、使えるものはどれ？</p>
+      <div class="opts">
+        <button>クラウド録画</button>
+        <button>日本語のライブ字幕</button>
+        <button>話している人の表示（話者の検出）</button>
+      </div>
+      <p class="why">録画・字幕・電話からの参加・個別のチャットは、サーバーが中身に触れるので使えません。話者の検出は平文の音量のヘッダー拡張で動きます（e2ee.md の 12 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/e2ee.md">e2ee.md</a> の 3〜12 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0004-encryption-and-e2ee.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md">0028</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0030-security-code-and-e2ee-feature-limits.md">0030</a>。</div>
+  </section>
+
+  <section class="s" id="recording">
+    <h2>録画・字幕と同意</h2>
+    <p>録画と文字起こしの部品は、SFU から見ると「受け手の 1 人」です。参加者の一覧には出ませんが、動いている間は全員の画面に消せない表示を出します。</p>
+    <div class="stepper">
+      <ol>
+        <li>主催者が録画を始める。Actor が開始の判定（E2EE なら拒否、組織の設定、役割、容量）をする。</li>
+        <li>全員に「録画中」を表示する。同意していない人は、同意するまでマイク・カメラ・共有を始められない。</li>
+        <li>Recorder が producer ごとの生の RTP を 10 秒の区切りで S3 に書く（会議の間は合成しない）。</li>
+        <li>会議の後に Composer が、復号・合成して 1 本の動画（mp4）にする。<a class="t" href="#g-mcu">MCU</a> の処理を、遅れの許される後処理に回した形。</li>
+      </ol>
+    </div>
+    <p>字幕は Transcriber が音声を受け、<a class="t" href="#g-asr">ASR</a>（S1 は Amazon Transcribe の ja-JP）へ話者ごとに流します。流れが話者ごとなので、話者の名前は必ず合います。日本語の正確さは<a class="t" href="#g-cer">CER</a>（文字の誤り率）15% 以下を目標にしますが、まだ<strong>未検証</strong>です。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>録画・文字起こしの同意の取り方と、同意しない人の扱い（L3）、サーバーが内容に触れてよい範囲（L2）、外部の音声認識の事業者への委託（L6）は結論が出ていません。設計は「同意するまで話せない」を既定にし、文言を差し替えられる形にしています。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/recording-and-transcription.md">recording-and-transcription.md</a> の 3〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0025-recording-per-track-capture-and-offline-compose.md">ADR-0025</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0027-capture-consent-and-indicators.md">0027</a>。</div>
+  </section>
+
+  <section class="s" id="quality">
+    <h2>品質と費用の物差し</h2>
+    <p>ビデオ会議の品質は「API が 200 を返したか」では測れません。ブラウザの <code>getStats</code> と RTCP から、損失・揺らぎ・RTT・フリーズを 10 秒ごとに集めます。</p>
+    <table>
+      <tr><th>物差し</th><th>意味</th></tr>
+      <tr><td><a class="t" href="#g-mos">MOS</a></td><td>音声の品質を 1〜5 で表す値。本番は E-model（ITU-T G.107）の式で推定し、試験の客観評価 ViSQOL で係数を合わせる</td></tr>
+      <tr><td>フリーズ</td><td>映像が 1 秒以上止まること。映像は MOS を推定せず、フリーズと解像度で見る</td></tr>
+      <tr><td>良い参加者・分</td><td>SLO の単位。利用者の回線の悪さでも減るので、サーバーの側の悪化と合わせて見る</td></tr>
+      <tr><td>pps</td><td>1 秒あたりのパケットの数。映像 1 本で約 160、音声 1 本で 50。Media Node 1 台の上限は負荷試験で決める（初期の見積もりでは帯域より先に consumer の数と CPU で決まる）</td></tr>
+      <tr><td>K8</td><td>参加者・分あたりのメディアの配信の費用。S1 で 0.20 円以下が目標</td></tr>
+    </table>
+    <p>会議の費用の約 8 割は、SFU からインターネットへの送出です。クラウドの転送の料金が高いので、送出が一定の量（ピーク 4 週続けて 10 Gbps）を超えたら、自前の機器を置く <a class="t" href="#g-edge">Edge</a> の構築を始めます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/observability.md">observability.md</a> の 3・4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/capacity.md">capacity.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0052-media-slis-and-mos-estimation.md">ADR-0052</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0050-disaster-recovery-and-edge-migration.md">0050</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0053-capacity-model-cost-target-and-load-bots.md">0053</a>。SLO の読み方は<a href="../../../../docs/primer/index.html#slo">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 68 表ありますが、核は次の数個です。組織に属する表は主キーの先頭に <code>org_id</code> を持ち、FORCE RLS で分けます（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。</p>
+    <pre class="mermaid">erDiagram
+  organizations ||--o{ users : "has"
+  users ||--o{ meetings : "hosts"
+  meetings ||--o{ meeting_instances : "held as"
+  meeting_instances ||--o{ meeting_participations : "has"
+  meetings ||--o{ meeting_removals : "bans"
+  meeting_instances ||--o| recordings : "recorded as"
+  meeting_instances ||--o{ capture_consents : "consents"
+  meetings {
+    uuid org_id PK
+    uuid meeting_id PK
+    text meeting_number UK
+    bool waiting_room
+    bytea passcode_hmac
+  }
+  meeting_instances {
+    uuid org_id PK
+    uuid instance_id PK
+    uuid meeting_id FK
+    text status
+    bigint actor_epoch
+  }
+  meeting_participations {
+    uuid org_id PK
+    uuid instance_id PK
+    uuid participant_id PK
+    text role
+  }
+  recordings {
+    uuid org_id PK
+    uuid recording_id PK
+    uuid instance_id UK
+    text status
+  }</pre>
+    <ul>
+      <li><strong>会議の中の状態（誰がミュートか、誰が話者か）は DB にありません。</strong>正本は Meeting Actor のメモリで、DB には失ってはならない変更（退出させた、ロック、役割、同意）だけを先に書きます。</li>
+      <li><code>meeting_number</code> は ID ではなく人が読む番号なので <code>text</code> です。内部の ID は時刻順の 128 ビット（ULID を <code>uuid</code> 型で持つ）です。</li>
+      <li><code>actor_epoch</code> は、古い Actor の書き込みを条件つきの更新で失敗させるための列です。</li>
+      <li>Media Node・Recorder など、メディアに触れる部品は Aurora に直接つながりません。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/data-model.md">data-model.md</a> の 2・3・5 節（不変条件 I-1〜I-26）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/data-model/meeting-runtime.md">data-model/meeting-runtime.md</a>。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・法令の枠組み</h2>
+    <p>振る舞いは本家に寄せますが、作り方と範囲は違います。本家の Web クライアントは独自の符号化と伝送を使うと報告されていますが、この設計は<strong>標準の WebRTC</strong> の上で作ります。本家のクライアントや SDK との互換は目指しません。アプリ（E13）、電話からの参加（E14）、ウェビナー（E15）、ブレイクアウトルーム（E16）は MVP の後です。識別子には本家の名前を使わず、URL は <code>https://&lt;brand&gt;.&lt;domain&gt;/j/&lt;meeting-id&gt;</code>、ヘッダーは <code>X-&lt;Brand&gt;-…</code> と書きます。</p>
+    <p>日本の法令に関わる次の問いは、すべて<strong>法務の確認待ち</strong>です。設計はどの結論にも対応できる形にし、結論が出るまで該当の spec を承認しません。</p>
+    <table>
+      <tr><th>#</th><th>枠組み</th><th>問いの要点</th></tr>
+      <tr><td>L1</td><td>電気通信事業法</td><td>登録か届出か、その時期</td></tr>
+      <tr><td>L2</td><td>通信の秘密</td><td>SFU が平文のメディアを扱う。録画・字幕・診断で内容に触れてよい範囲</td></tr>
+      <tr><td>L3</td><td>録画の同意・個人情報</td><td>通知の方法、同意の記録、同意しない人の扱い</td></tr>
+      <tr><td>L4</td><td>捜査機関への対応</td><td>傍受・照会への応じ方。E2EE で応じられないことの扱い</td></tr>
+      <tr><td>L5</td><td>外部送信規律</td><td>端末の情報を外へ送るときの公表</td></tr>
+      <tr><td>L6〜L8</td><td>個人情報保護法・電話番号・契約</td><td>保持と委託、050 などの番号、DPA とサブプロセッサー</td></tr>
+    </table>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/intent.md">intent.md</a> の Constraints・Non-goals・「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-webrtc">WebRTC</dt><dd>ブラウザで音声・映像・データをリアルタイムにやり取りするための W3C の API と IETF のプロトコルの一式。</dd>
+      <dt id="g-rtp">RTP</dt><dd>Real-time Transport Protocol。音声・映像のパケットに連番と時刻を付けて運ぶ形式。ふつう UDP の上で使う。</dd>
+      <dt id="g-rtcp">RTCP</dt><dd>RTP の制御の流れ。受信の報告、損失、キーフレームの要求（PLI・FIR）、帯域の帰還を送る。</dd>
+      <dt id="g-dtls-srtp">DTLS-SRTP</dt><dd>DTLS（UDP 版の TLS）で鍵を交換し、SRTP（暗号化した RTP）でメディアを送る方式。WebRTC では必須。</dd>
+      <dt id="g-sdp">SDP</dt><dd>Session Description Protocol。符号器・暗号の指紋・経路の候補などを書いた、交渉用の文字列の形式。</dd>
+      <dt id="g-signaling">シグナリング</dt><dd>メディアの前後の交渉と、会議の状態のやり取り。WebRTC の標準の外で、サービスごとに作る。</dd>
+      <dt id="g-p2p">P2P</dt><dd>Peer to Peer。端末どうしが直接メディアを送り合う形。</dd>
+      <dt id="g-mcu">MCU</dt><dd>Multipoint Control Unit。サーバーが全員の映像を復号・合成して送り直す形。</dd>
+      <dt id="g-sfu">SFU</dt><dd>Selective Forwarding Unit。メディアを復号せず、受け手ごとに選んで転送するサーバー。</dd>
+      <dt id="g-worker">worker</dt><dd>mediasoup の C++ の子プロセス。CPU のコア 1 つで RTP を処理する。</dd>
+      <dt id="g-router">router</dt><dd>mediasoup の中の、会議ごとの転送の部屋。producer と consumer をつなぐ。</dd>
+      <dt id="g-transport">transport</dt><dd>参加者と Media Node の間の 1 本の接続。ICE と DTLS の状態を持つ。</dd>
+      <dt id="g-producer">producer</dt><dd>参加者がサーバーへ上げる 1 本のメディアの流れ。</dd>
+      <dt id="g-consumer">consumer</dt><dd>1 つの producer を 1 人の受け手へ流す、受け手ごとの 1 本。</dd>
+      <dt id="g-nat">NAT</dt><dd>Network Address Translation。内側の私的なアドレスを外側の公開のアドレスへ付け替える機器。外から内へは直接届かない。</dd>
+      <dt id="g-ice">ICE</dt><dd>Interactive Connectivity Establishment（RFC 8445）。経路の候補を集めて並行に試し、通る組を選ぶ手順。</dd>
+      <dt id="g-icelite">ICE Lite</dt><dd>公開の IP を持つ側のための簡略な ICE。自分からは確認を送らず、相手の確認に答える。</dd>
+      <dt id="g-stun">STUN</dt><dd>NAT の外側から見た自分のアドレスを知るためのプロトコル（RFC 8489）。</dd>
+      <dt id="g-turn">TURN</dt><dd>直接つながらないときに、メディアを中継するサーバーのプロトコル（RFC 8656）。</dd>
+      <dt id="g-jitterbuffer">ジッタバッファ</dt><dd>受け手が揺らぎを吸収するために、届いたパケットを少し溜めてから再生する仕組み。</dd>
+      <dt id="g-g2g">glass-to-glass</dt><dd>カメラのレンズから相手の画面までの、映像の端から端の遅れ。</dd>
+      <dt id="g-opus">Opus</dt><dd>WebRTC の必須の音声の符号器（RFC 6716）。会話から音楽まで広く使える。</dd>
+      <dt id="g-dtx">DTX</dt><dd>Discontinuous Transmission。無音の間の送出を止める仕組み。</dd>
+      <dt id="g-fec">FEC</dt><dd>Forward Error Correction。冗長を先に送り、損失を受け手の側で直す方式。Opus のインバンド FEC は前のフレームを低い品質で重ねる。</dd>
+      <dt id="g-red">RED</dt><dd>Redundant Audio Data（RFC 2198）。1 つのパケットに過去のフレームを重ねて送る形式。</dd>
+      <dt id="g-nack">NACK</dt><dd>Negative Acknowledgement。受け手が失ったパケットの再送を求める RTCP。</dd>
+      <dt id="g-keyframe">キーフレーム</dt><dd>前のフレームに頼らず、それだけで描けるフレーム。大きいので頻繁には送らない。</dd>
+      <dt id="g-pli">PLI</dt><dd>Picture Loss Indication。受け手がキーフレームを求める RTCP。FIR も同じ目的。</dd>
+      <dt id="g-simulcast">simulcast</dt><dd>同じ映像を複数の解像度で別々に符号化し、同時に送る方式。</dd>
+      <dt id="g-svc">SVC</dt><dd>Scalable Video Coding。1 本の流れの中に、解像度（空間）とフレームの数（時間）の層を重ねる方式。</dd>
+      <dt id="g-gcc">GCC</dt><dd>Google Congestion Control。到着の遅れの変化と損失から、送ってよい速さを推定する方式。</dd>
+      <dt id="g-twcc">transport-cc</dt><dd>送り手が全パケットに連番を付け、受け手が到着の時刻をまとめて返す帰還。GCC を送り手の側で動かすのに使う。</dd>
+      <dt id="g-actor">Meeting Actor</dt><dd>会議ごとに 1 つだけ動き、会議の状態の正本を持つ処理。状態の変化に順番（seq）を付けて配る。</dd>
+      <dt id="g-lease">リース</dt><dd>期限つきの持ち主の権利。更新しなければ切れ、他の誰かが取れる。</dd>
+      <dt id="g-epoch">epoch</dt><dd>Actor の持ち主が替わるたびに増える番号。減らない。</dd>
+      <dt id="g-fencing">フェンシング</dt><dd>古い持ち主の書き込みを、番号（epoch）を比べて受け手の側で拒む仕組み。</dd>
+      <dt id="g-waitingroom">待合室</dt><dd>参加者を会議に入れる前に留め置き、主催者が 1 人ずつ確かめて入れる仕組み。</dd>
+      <dt id="g-joinkey">参加の鍵</dt><dd>URL のフラグメント（<code>#k=</code>）に置く 128 ビットの乱数。パスコードの入力を省ける。</dd>
+      <dt id="g-pmi">PMI</dt><dd>Personal Meeting ID。利用者ごとに固定の 10 桁の会議の番号。繰り返し使うので推測の対象になりやすい。</dd>
+      <dt id="g-e2ee">E2EE</dt><dd>End-to-End Encryption。送り手と受け手だけが鍵を持ち、途中のサーバーは中身を読めない暗号化。</dd>
+      <dt id="g-sframe">SFrame</dt><dd>Secure Frame（RFC 9605）。符号化したフレームごとに暗号化する形式。SFU を通しても中身を守れる。</dd>
+      <dt id="g-mls">MLS</dt><dd>Messaging Layer Security（RFC 9420）。多人数のグループで鍵を共有・更新するプロトコル。抜けた人は以後の鍵を知らない。</dd>
+      <dt id="g-dd">Dependency Descriptor</dt><dd>フレームの層とキーフレームかどうかを示す、平文の RTP のヘッダー拡張。暗号化した中身を読まずに層を選べる。</dd>
+      <dt id="g-asr">ASR</dt><dd>Automatic Speech Recognition。音声を文字にする処理。</dd>
+      <dt id="g-cer">CER</dt><dd>Character Error Rate。文字の誤り率。日本語の音声認識は語の区切りが曖昧なので文字で測る。</dd>
+      <dt id="g-mos">MOS</dt><dd>Mean Opinion Score。品質を 1〜5 で表す値。もとは人の評価の平均で、式や客観評価で推定もする。</dd>
+      <dt id="g-edge">Edge</dt><dd>この設計で、コロケーションに自前のベアメタルの Media Node を置く構成。転送の費用を下げるため。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、Non-goals、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、主な決定の一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0002-media-topology.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0004-encryption-and-e2ee.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0005-meeting-state-and-signaling.md">0005</a> <span>— SFU、暗号化、会議の状態の 3 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/signaling-and-meetings.md">signaling-and-meetings.md</a> <span>— 参加、Meeting Actor、epoch、主催者の操作</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/media-server-sfu.md">media-server-sfu.md</a> <span>— Media Node、転送の規則、付け替え</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/network-traversal.md">network-traversal.md</a> <span>— ICE、TURN、社内のプロキシ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/codecs-and-bandwidth-adaptation.md">codecs-and-bandwidth-adaptation.md</a> <span>— Opus、simulcast と SVC、帯域の推定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/meeting-security.md">meeting-security.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/e2ee.md">e2ee.md</a> <span>— 荒らしへの対策と E2EE</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/recording-and-transcription.md">recording-and-transcription.md</a> <span>— 録画、字幕、同意</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/zoom/docs/decisions">decisions/</a> <span>— 残りの ADR（基盤、品質、運用、電話、API）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

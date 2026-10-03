@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figma の前提知識</title>
+<meta name="description" content="Figma の再構築の設計の文書を読む前に知っておくとよい、デザインツールと共同編集と描画の分野の概念・用語・業界の決まり。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Figma · 前提知識</p>
+    <h1>Figma の設計を読む前に</h1>
+    <p class="lead">デザインツールは「図形を保存して見せる」だけに見えますが、ノードの木・オートレイアウト・コンポーネント・同時編集の競合・ブラウザの中の描画のそれぞれに、分野に固有の決まりがあります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Figma · 前提知識</p>
+    <h2>Figma の設計を読む前に</h2>
+    <p class="lead">ノードの木・レイアウト・コンポーネント・同時編集・描画の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Figma は何をするサービスか</h2>
+    <p>Figma は、ブラウザで動く画面のデザインのツールです。デザインの<strong>ファイルを 1 つだけ置き、全員が同じものを同時に見て編集する</strong>ことで、「どれが最新か分からない」「受け渡しで食い違う」をなくしました。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>手元のアプリのように速い</h3><p>大きなファイルでも、パン・ズーム・変形が 60fps。自分の入力は 1 フレームで画面に出る。</p></div>
+      <div class="card" data-frag><h3>一緒に作れる</h3><p>他の人の編集とカーソルが 0.25 秒以内に見え、競合しても全員の画面が同じ結果になる。</p></div>
+      <div class="card" data-frag><h3>失わない</h3><p>確定を返した編集は、サーバーが落ちても失わない。過去の版に戻れる。</p></div>
+    </div>
+    <p>使う人は、デザイナー（編集）、開発者（寸法・色の確認と書き出し）、PM・レビュアー（閲覧とコメント）、チームの管理者です。規模の感覚は、S1 で月間 10 万人、同時に開かれたファイル 1 万、同時接続 5 万です。性能の目標は「10 万ノードの参照ファイル」で測ります。日本の市場を先に狙い、和文のフォントと IME の入力を MVP で扱います。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/README.md">architecture/README.md</a> の 3〜4 節（規模の段階と NFR）。</div>
+  </section>
+
+  <section class="s" id="tree">
+    <h2>ファイルの中身はノードの木</h2>
+    <p>デザインのファイルは、表の行ではなく<a class="t" href="#g-node">ノード</a>の木です。根に 1 つの <code>DOCUMENT</code>、その子に<a class="t" href="#g-page">ページ</a>（<code>CANVAS</code>）、その下に<a class="t" href="#g-layer">レイヤー</a>が並びます。ノードは「ID と、プロパティの値の集まり」で、親は子が持つ <code>parent_index</code> のプロパティで指します。</p>
+    <pre class="mermaid">flowchart TD
+  D["DOCUMENT 0:0"] --> P1["CANVAS ページ1"]
+  D --> P2["CANVAS ページ2"]
+  P1 --> F["FRAME ログイン画面"]
+  F --> T["TEXT 見出し"]
+  F --> G["GROUP"]
+  G --> R["RECTANGLE"]
+  G --> V["VECTOR"]
+  F --> I["INSTANCE ボタン"]</pre>
+    <div class="tabs">
+      <div data-tab="フレーム"><p><a class="t" href="#g-frame"><code>FRAME</code></a>：画面や部品の枠。自分の大きさを持ち、中身を切り抜け、オートレイアウトを持てる。HTML の <code>div</code> に近い。</p></div>
+      <div data-tab="グループ"><p><a class="t" href="#g-group"><code>GROUP</code></a>：子をまとめるだけ。自分の位置の入力を持たず、境界は子の和。子が 0 になるとサーバーが消す（T8）。</p></div>
+      <div data-tab="セクション"><p><code>SECTION</code>：キャンバスの上の区画。画面の流れや作業の段階を整理する。</p></div>
+      <div data-tab="図形・テキスト"><p><code>RECTANGLE</code>・<code>ELLIPSE</code>・<code>VECTOR</code>・<code>TEXT</code> など。子を持たない葉。種類は作った後に変えない。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/document-model.md">document-model.md</a> の 3 節（ノードの種類と親子の表）・5 節（木の不変条件 T1〜T9）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0006-node-types-and-property-table.md">ADR-0006</a>。</div>
+  </section>
+
+  <section class="s" id="vector">
+    <h2>ベクター・パス・ブール演算</h2>
+    <p><a class="t" href="#g-vector">ベクター</a>は、点と曲線で形を表す方式です。画素で持たないので、拡大しても劣化しません。曲線は<a class="t" href="#g-bezier">3 次ベジェ</a>（端の点 2 つと、向きを決める接線 2 本）で表します。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>ふつうのパス（SVG の path）</h3><p>点を一筆書きでつないだ列。1 つの点から出る線は 2 本まで。</p></div>
+      <div class="good" data-frag><h3><a class="t" href="#g-vnet">ベクターネットワーク</a></h3><p>点と辺のグラフ。1 つの点から 3 本以上の辺が出てよい。閉じた輪が「領域」になり、領域ごとに塗れる。</p></div>
+    </div>
+    <p>塗りの内と外は<a class="t" href="#g-winding">塗りの規則</a>（非ゼロ・偶奇）で決まり、穴の開き方が変わります。<a class="t" href="#g-boolean">ブール演算</a>（和・差・積・排他）は<strong>非破壊</strong>で、元の図形を子として残し、結果の形は保存せずに毎回計算します。計算は整数で行い、ブラウザとサーバーで結果が一致するようにします。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/editor-and-tools.md">editor-and-tools.md</a> の 7〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0018-vector-networks-and-boolean-operations.md">ADR-0018</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/rendering-engine.md">rendering-engine.md</a> の 7 節（パスの描画）。</div>
+  </section>
+
+  <section class="s" id="layout">
+    <h2>制約とオートレイアウト</h2>
+    <p>画面のデザインは、大きさが変わっても崩れないことが大事です。そのための仕組みが 2 つあります。</p>
+    <div class="tabs">
+      <div data-tab="制約">
+        <p><a class="t" href="#g-constraints">制約</a>は、親のフレームの大きさを変えたときに子がどう動くかの指定です。</p>
+        <table>
+          <tr><th>制約</th><th>親の幅が Δ 広がると</th></tr>
+          <tr><td><code>min</code>（左）</td><td>動かない</td></tr>
+          <tr><td><code>max</code>（右）</td><td>右へ Δ 動く</td></tr>
+          <tr><td><code>stretch</code>（左右）</td><td>幅が Δ 広がる</td></tr>
+          <tr><td><code>center</code></td><td>Δ/2 動く</td></tr>
+          <tr><td><code>scale</code></td><td>位置と幅が比で伸びる</td></tr>
+        </table>
+      </div>
+      <div data-tab="オートレイアウト">
+        <p><a class="t" href="#g-autolayout">オートレイアウト</a>は、CSS の flexbox に近い仕組みです。フレームが縦か横の向き・間隔・余白・揃えを持ち、子を自動で並べます。子とフレームの大きさは 3 つの方式から選びます。</p>
+        <ul>
+          <li><a class="t" href="#g-hug">hug</a>：中身に合わせて縮む</li>
+          <li>fill：親の残りを埋める</li>
+          <li>fixed：固定</li>
+        </ul>
+      </div>
+    </div>
+    <p>計算の結果（<code>derived_layout</code>）はファイルに保存しますが、画面は各自が手元で計算した結果を出します。全員の画面とサーバーの書き出しが同じ位置になるには、計算が<strong>ビットまで決定的</strong>でなければなりません。だから算術の種類と順序まで決めています。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/layout.md">layout.md</a> の 3〜4 節（入力と、保存・修復）・6 節（決定性）・8 節（制約）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0019-auto-layout-engine-and-layout-persistence.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0020-deterministic-layout-arithmetic.md">ADR-0020</a>。</div>
+  </section>
+
+  <section class="s" id="components">
+    <h2>コンポーネント・インスタンス・バリアント</h2>
+    <p>ボタンのような部品を何十か所でも使えるのが、デザインシステムの要です。</p>
+    <ul>
+      <li data-frag><strong><a class="t" href="#g-component">コンポーネント</a>は原本</strong>、<a class="t" href="#g-instance">インスタンス</a>はその写しです。原本を直すと、全インスタンスに反映します。</li>
+      <li data-frag><strong>インスタンスで変えた部分が<a class="t" href="#g-override">上書き</a></strong>です。テキスト・塗り・線・エフェクト・表示・名前は上書きできます。並び・位置・子の追加のような構造は変えられず、<a class="t" href="#g-detach">デタッチ</a>が要ります。</li>
+      <li data-frag><strong><a class="t" href="#g-variant">バリアント</a></strong>は、<code>Size=Large, State=Hover</code> のようなプロパティの値の組で、同じ部品の形違いを 1 つのセット（<code>COMPONENT_SET</code>）にまとめたものです。</li>
+      <li data-frag><strong>インスタンスの中身は保存しません。</strong>原本と上書きから、各自のエンジンが導出（materialize）します。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">原本の中のアイコンのレイヤーの名前を変えました。あるインスタンスでそのアイコンの色を上書きしていました。上書きはどうなりますか？</p>
+      <div class="opts">
+        <button>消える。上書きはレイヤーの名前で対応を取るから</button>
+        <button>残る。上書きは元のノードの ID をキーにしているから</button>
+        <button>インスタンスが自動でデタッチされる</button>
+      </div>
+      <p class="why">上書きのキーは「元のノードの ID の経路 × プロパティ」です。名前の変更・並べ替え・移動では消えません。名前で対応を取るのは、バリアントの切り替えとインスタンスの入れ替えのときだけです。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/components-and-libraries.md">components-and-libraries.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0021-derived-instances-and-override-keys.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0022-component-properties-and-variants-by-id.md">ADR-0022</a>。</div>
+  </section>
+
+  <section class="s" id="collab">
+    <h2>同時編集の 3 つの方式</h2>
+    <p>複数の人が同じ文書を同時に変えると、変更がぶつかります。ぶつかりを解く方式は、大きく 3 つあります。</p>
+    <div class="tabs">
+      <div data-tab="OT"><p><a class="t" href="#g-ot">OT</a>（操作変換）。相手の操作に合わせて、自分の操作の位置などを変換する。共同編集のテキストエディタで広く使われてきた。変換の規則の組み合わせが増え、正しさを確かめにくい。</p></div>
+      <div data-tab="CRDT"><p><a class="t" href="#g-crdt">CRDT</a>。どの順で届いても同じ結果に収束するデータ構造。サーバーなしでも収束し、オフラインに強い。ただし「木に循環を作らない」のような全体の規則を保ちにくい。rebuilds の <a href="https://github.com/shoito/rebuilds/tree/main/systems/notion">Notion</a> はこちら。</p></div>
+      <div data-tab="中央のサーバー"><p>ファイルごとに 1 つのサーバーが変更の順序を決め、全員にその順で配る。CRDT の考え方（プロパティごとの <a class="t" href="#g-lww">LWW</a>）を借りつつ、最後の判定はサーバーが下す。全体の規則に反する変更をサーバーが拒否できる。代わりに、サーバーに届くまで確定しない。</p></div>
+    </div>
+    <p>この設計は、本家と同じ<strong>中央のサーバー</strong>です。デザインのファイルは、木の形（親は 1 つ、循環なし）を守ることが大事で、長いオフラインの編集はまれだからです。1 ファイルを 1 つの <a class="t" href="#g-docserver">Document Server</a> が持ちます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0002-central-authoritative-multiplayer.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> の 2〜3 節。</div>
+  </section>
+
+  <section class="s" id="lww">
+    <h2>プロパティ単位の LWW と「競合の単位」</h2>
+    <p>文書は「ノードの ID → プロパティ → 値」の 2 段の対応です。2 人が同じノードの<strong>別の</strong>プロパティを変えれば、両方が残ります。<strong>同じ</strong>プロパティなら、サーバーに後に届いた値が勝ちます（LWW）。だから「何を 1 つのプロパティにするか」が、そのまま<a class="t" href="#g-conflictunit">競合の単位</a>になります。</p>
+    <table>
+      <tr><th>プロパティ</th><th>単位の決め方</th></tr>
+      <tr><td><code>transform</code></td><td>移動と回転は同じ単位</td></tr>
+      <tr><td><code>size</code></td><td>幅と高さは同じ単位</td></tr>
+      <tr><td><code>padding_top</code> など</td><td>余白の四辺は別々の単位</td></tr>
+      <tr><td><code>fills</code></td><td>塗りの配列全体で 1 つ</td></tr>
+      <tr><td><code>text_content</code></td><td>文字と書式の範囲で 1 つ。同時のテキスト編集は合わさらない</td></tr>
+      <tr><td><code>overrides</code></td><td><code>map</code>。要素（上書き 1 項目）ごと</td></tr>
+    </table>
+    <div class="quiz" data-answer="2">
+      <p class="q">A さんが矩形を右へ動かし、同時に B さんが同じ矩形を回転させました。確定した結果は？</p>
+      <div class="opts">
+        <button>移動と回転の両方が反映される</button>
+        <button>サーバーに後に届いた方だけが反映される</button>
+        <button>サーバーが両方を拒否する</button>
+      </div>
+      <p class="why">移動と回転は同じ <code>transform</code> のプロパティなので、LWW で片方が勝ちます。別々に編集されうる値は別のプロパティか <code>map</code> に分ける、というのがこの設計の規則です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/document-model.md">document-model.md</a> の 4 節（プロパティの表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/AGENTS.md">systems/figma/AGENTS.md</a> の競合の単位の規則。</div>
+  </section>
+
+  <section class="s" id="ordering">
+    <h2>並びの鍵と、木の循環</h2>
+    <p>同じ親の子の並び（重なりの順）を 0, 1, 2… の番号で持つと、間に挿入するたびに後ろの全員の番号を書き換え、同時の挿入で衝突します。そこで<a class="t" href="#g-fracindex">分数インデックス</a>を使います。</p>
+    <ul>
+      <li data-frag>並びは文字列の鍵の辞書順で決める。間に入れるときは、前後の鍵の「間」の鍵を新しく作る（例：<code>a0</code> と <code>a1</code> の間に <code>a0V</code>）。他の子は書き換えない。</li>
+      <li data-frag>同じ隙間に同時に入れて鍵が重なったら、サーバーが後の方を書き換える。鍵が 48 バイトを超えたら、サーバーがその親の子をまとめて振り直す。</li>
+      <li data-frag>A を B の下へ、同時に B を A の下へ動かすと、それぞれは正しくても、両方を当てると<strong>循環</strong>になる。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">上の「A を B の下へ」「B を A の下へ」が同時に送られました。サーバーはどうしますか？</p>
+      <div class="opts">
+        <button>両方を当て、後でクライアントが直す</button>
+        <button>先に届いた方を取り消し、後の方を当てる</button>
+        <button>先に届いた方を当て、後に届いた方の変更のまとまり全体を拒否する</button>
+      </div>
+      <p class="why">当てる前に新しい親から根までたどり、自分が現れたら循環とみなして <code>ChangeSet</code> ごと拒否します。拒否されるまでの間、クライアントは循環したノードを木から外して描きます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0010-ordering-keys-and-cycle-rejection.md">ADR-0010</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> の 5〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/data-model.md">data-model.md</a> の 6.3 節（O-1〜O-4）。</div>
+  </section>
+
+  <section class="s" id="commit">
+    <h2>編集が確定するまで</h2>
+    <p>自分の入力はサーバーを待たずに画面に出し（楽観的な反映）、確定はサーバーが決めます。1 回の編集は次の順に進みます。</p>
+    <div class="stepper">
+      <ol>
+        <li>クライアントが変更を自分のモデルに当て、すぐ描く。<strong>未確定</strong>（pending）として持つ。</li>
+        <li>変更のまとまり（<a class="t" href="#g-changeset"><code>ChangeSet</code></a>）に <code>client_seq</code> を付け、WebSocket で送る。ドラッグのような続く操作は 20Hz（50ms）にまとめる。</li>
+        <li>Document Server が権限と木の規則を確かめ、ファイルの中の連番 <code>seq</code> を振る。</li>
+        <li>約 20ms ごとに、たまった変更をまとめて<a class="t" href="#g-journal">ジャーナル</a>に書く（<a class="t" href="#g-groupcommit">group commit</a>）。</li>
+        <li>書けたら、送り手に <code>Ack</code>、他の人に <code>Committed</code> を配る。<strong>書けるまでは誰にも見せない。</strong></li>
+        <li>他の人は、自分の未確定の変更と同じプロパティへの変更を、自分の分が確定するまで画面に出さない（ちらつきを防ぐ）。</li>
+      </ol>
+    </div>
+    <p>切断の後は、確定していない自分の変更を送り直します。サーバーは <code>(session_id, client_seq)</code> で重複を除きます（<a href="../../../../docs/primer/index.html#idempotency">冪等</a>）。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">Document Server が変更を検証してメモリに当てた直後、ジャーナルに書く前に落ちました。この変更は？</p>
+      <div class="opts">
+        <button>誰にも確定を返していない。送り手が新しい持ち主へ送り直す</button>
+        <button>他の人の画面には出たので、全員がもう一度送る</button>
+        <button>失われ、送り手にも知らされない</button>
+      </div>
+      <p class="why">確定の前に永続化する、が原則です。ジャーナルに書く前の変更は外に出ていないので、送り手の pending に残っており、再接続で送り直されます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/README.md">architecture/README.md</a> の 2.1 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> の 4.5・7・9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0009-multiplayer-wire-protocol.md">ADR-0009</a>。</div>
+  </section>
+
+  <section class="s" id="durability">
+    <h2>ジャーナル・チェックポイント・フェンス</h2>
+    <p>考え方は、DB の WAL とスナップショットと同じです。<a class="t" href="#g-checkpoint">チェックポイント</a>はある <code>seq</code> の時点のファイル全体（S3）、ジャーナルはその後に確定した変更の追記のログ（DynamoDB）です。ファイルを開くときは、最新のチェックポイントにジャーナルの残りを当てます。チェックポイントは 60 秒か 5,000 件ごとに、変わったページだけを書きます。</p>
+    <p>難しいのは<strong>二重の持ち主</strong>です。落ちたと思った古いサーバーが、実は止まっていただけで後から書き込むかもしれません。そこで<a class="t" href="#g-fence">フェンス</a>を使います。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant O as 古い持ち主 epoch 3
+  participant R as Router
+  participant N as 新しい持ち主
+  participant J as ジャーナル
+  R->>N: 割り当て epoch 4
+  N->>J: フェンスを epoch 4 に上げる
+  N->>J: チェックポイント後の変更を読む
+  O->>J: epoch 3 で書き込み
+  J-->>O: 条件の失敗
+  O->>O: ファイルを手放す</pre>
+    <p>ジャーナルへの書き込みは「フェンスの <code>epoch</code> が自分と同じ」を条件にした 1 つのトランザクションです。だから、古い持ち主の書き込みは必ず失敗します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0003-journal-and-checkpoints.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0024-journal-items-and-fencing.md">ADR-0024</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0025-content-addressed-checkpoints-and-loading.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0047-router-task-liveness-and-file-assignment.md">ADR-0047</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> の 4〜6 節。</div>
+  </section>
+
+  <section class="s" id="rendering">
+    <h2>ブラウザの中の描画エンジン</h2>
+    <p>数万のノードを 60fps で動かし、どのブラウザでも同じ見た目にするため、DOM や SVG ではなく <code>&lt;canvas&gt;</code> に GPU で自前で描きます。エンジンは Rust で書いて <a class="t" href="#g-wasm">WASM</a> にし、同じコードをサーバーでネイティブに動かして書き出しにも使います。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-webgl2">WebGL2</a> と <a class="t" href="#g-webgpu">WebGPU</a></h3><p>WebGL2 は広く使える必須の土台。WebGPU は新しい API で、使えるときに使い、失敗したら WebGL2 へ戻る。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-scenegraph">シーングラフ</a></h3><p>ドキュメントの木とは別の描画用の木。世界座標と境界の箱を持ち、見えない部分木を飛ばす。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-tile">タイル</a></h3><p>画面を 256×256 の画素の区画に分けて描き、キャッシュする。変わった範囲のタイルだけを描き直す。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-aa">アンチエイリアス</a></h3><p>パスを線分にし、各画素を覆う面積を GPU で求めて、縁を滑らかにする。</p></div>
+    </div>
+    <p>60fps なら 1 フレームは 16.7ms です。入力の適用・レイアウト・描画をこの中に収めます。メモリは WASM の 32 ビットの空間（最大 4GB）の中で、タブ 1.5GB を目標にします。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0004-gpu-rendering-in-wasm.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0013-scene-graph-and-tile-rendering.md">ADR-0013</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0014-gpu-backend-selection-and-fallback.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/rendering-engine.md">rendering-engine.md</a> の 3〜7 節・11 節。</div>
+  </section>
+
+  <section class="s" id="text">
+    <h2>テキスト・フォント・日本語の入力</h2>
+    <p>キャンバスに自前で文字を描くので、ブラウザが普段やっている仕事を自分でします。</p>
+    <ul>
+      <li data-frag><strong><a class="t" href="#g-shaping">整形</a></strong>：文字の列を、フォントの<a class="t" href="#g-glyph">グリフ</a>とその位置の列に変える。合字や字詰めもここで決まる。</li>
+      <li data-frag><strong><a class="t" href="#g-fallback">フォールバック</a></strong>：欧文のフォントに和文を打つと、グリフがない。代わりのフォントを、端末ごとの既定に頼らずファイルの設定（既定は Noto Sans JP）で決め、全員の見た目を揃える。</li>
+      <li data-frag><strong>フォントの出どころ</strong>：同梱のオープンなフォント、組織が上げたフォント、端末のフォント。端末のフォントは本人の画面だけで使う。</li>
+      <li data-frag><strong><a class="t" href="#g-ime">IME</a></strong>：「にほんご」を変換している間の文字列は未確定。<code>&lt;canvas&gt;</code> には入力欄がないので、見えない <code>textarea</code> で受け、確定した文字だけをファイルに書く。</li>
+    </ul>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>フォントのライセンス（L1）：サーバーでの描画と PDF への埋め込み、組織のフォントを全員に配ること。和文のフォントは条件が厳しいものが多く、結論が出るまで該当の Story の spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0015-text-shaping-and-glyph-rendering.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0017-text-input-via-hidden-textarea.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0036-font-sources-and-licensing.md">ADR-0036</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/editor-and-tools.md">editor-and-tools.md</a> の 9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/export-and-assets.md">export-and-assets.md</a> の 7 節。</div>
+  </section>
+
+  <section class="s" id="history">
+    <h2>Undo・版の履歴・削除</h2>
+    <p>「元に戻す」には 2 つの層があります。混同すると設計が読めなくなります。</p>
+    <div class="tabs">
+      <div data-tab="Undo"><p>自分の操作だけを戻す。他の人が後から上書きした値は戻さない。戻す操作も「新しい変更」として送る。履歴は 200 項目までで、タブを閉じると消える。</p></div>
+      <div data-tab="版の履歴"><p>ファイル全体の過去の状態。<a class="t" href="#g-version">版</a>は、変更があれば 30 分ごとに自動で作る。名前付きの版も作れる。無料のプランは 30 日、有料はすべて残す。</p></div>
+      <div data-tab="復元"><p>過去の版との差分を 1 つの変更として当てる。git の revert に近く、<strong>それまでの版は消えない</strong>。復元の前と後の 2 つの版が足される。</p></div>
+      <div data-tab="削除"><p>2 段。まずゴミ箱（所有者が戻せる）、次に完全な削除（戻せない。ジョブが S3・ジャーナル・版を消す）。複製ではコメントと履歴は写らない。</p></div>
+    </div>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>削除したファイルと版をいつまで残し、いつ消すか、利用規約への書き方（L4）。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0012-multiplayer-undo-redo.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0026-version-history-restore-and-deletion.md">ADR-0026</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> の 8〜11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> の 10 節。</div>
+  </section>
+
+  <section class="s" id="permissions">
+    <h2>組織・チーム・プロジェクトと権限</h2>
+    <p>資源は <strong>組織 → チーム → プロジェクト → ファイル</strong> の階層です（ほかに、プロジェクトに属さない個人の下書き）。本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名していますが、この設計は「プロジェクト」のままです。</p>
+    <ul>
+      <li data-frag><strong>水準は全順序</strong>：<code>none &lt; view_prototype &lt; view &lt; edit &lt; owner</code>。上位で与えた役割は下位に届き、下位で下げられない。</li>
+      <li data-frag><strong><a class="t" href="#g-generalaccess">一般アクセス</a></strong>：「招待した人だけ」「組織の中」「リンクを知っている全員」。プロジェクトとファイルに置く。</li>
+      <li data-frag><strong><a class="t" href="#g-seat">シート</a></strong>：使える製品を決める契約の枠。編集には、ファイルの <code>edit</code> の水準と Full のシートの<strong>両方</strong>が要る。</li>
+      <li data-frag><strong><a class="t" href="#g-guest">ゲスト</a></strong>：組織のドメインに合わないメールアドレスの人。招待された資源だけを使える。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">プロジェクトの一般アクセスは「組織の中・編集」、その中のファイルは「招待した人だけ」です。招待されていない組織のメンバーは、このファイルを？</p>
+      <div class="opts">
+        <button>編集できる。プロジェクトの設定が届くから</button>
+        <button>閲覧だけできる</button>
+        <button>開けない。ファイルの「招待した人だけ」が上位の一般アクセスを遮る</button>
+      </div>
+      <p class="why">役割（招待）は上から届いて下げられませんが、一般アクセスは「最も近い設定」を 1 つだけ使います。ファイルが「招待した人だけ」の行を持てば、上位の一般アクセスは届きません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a> の 3〜4・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0029-hierarchy-roles-seats-and-link-access.md">ADR-0029</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0031-org-acl-version-and-connection-revalidation.md">0031</a>。組織の分離は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="paths">
+    <h2>在席・コメント・メタデータ：3 つの経路</h2>
+    <p>エディタの画面に出る情報は、性質ごとに別の経路を通ります。</p>
+    <table>
+      <tr><th>データ</th><th>経路</th><th>保存</th></tr>
+      <tr><td>ファイルの中身（ノード）</td><td>WebSocket → Document Server</td><td>ジャーナル＋チェックポイント</td></tr>
+      <tr><td><a class="t" href="#g-presence">在席</a>・カーソル・選択</td><td>WebSocket → Document Server（編集とは別のタスク）</td><td>保存しない</td></tr>
+      <tr><td>コメント・権限・ファイルの一覧</td><td>API → Aurora、<a class="t" href="#g-realtime">Realtime</a> の購読で配る</td><td>Aurora（RLS）</td></tr>
+    </table>
+    <ul>
+      <li data-frag>1 ファイルに入れるのは 500 人（編集は 200 人）まで。配信は <a class="t" href="#g-gateway">Gateway</a> ごとに 1 回にまとめる。</li>
+      <li data-frag>コメントはファイルの中身に入れず、最上位のフレームなどのノードの ID と、そこからの相対の位置で固定する。フレームを動かすとコメントもついてくる。ノードが消えたら、作ったときの絶対座標に出す。</li>
+      <li data-frag>「リンクを知っている全員」で開いた匿名の人には、コメントを見せない。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0011-presence-and-fan-out.md">ADR-0011</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0027-comments-anchored-to-nodes-in-metadata.md">ADR-0027</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0028-realtime-metadata-subscriptions.md">ADR-0028</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/comments-and-notifications.md">comments-and-notifications.md</a> の 3・5 節。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora の表は 62、DynamoDB の表は 3 あります。核は次の数個です。ファイルの中身は表ではなく、DynamoDB のジャーナルと S3 のチェックポイントにあります。</p>
+    <pre class="mermaid">erDiagram
+  orgs ||--|{ org_members : "has"
+  orgs ||--o{ teams : "has"
+  teams ||--o{ projects : "contains"
+  projects ||--o{ files : "contains"
+  files ||--o{ resource_roles : "role on"
+  files ||--o{ general_access : "link setting"
+  files ||--o{ file_versions : "versions"
+  files ||--o{ comment_threads : "comments"
+  files ||--o{ journal : "changes after checkpoint"
+  orgs {
+    uuid id PK
+    bigint acl_version
+  }
+  files {
+    uuid org_id PK
+    uuid id PK
+    text file_key UK
+    bigint checkpoint_seq
+  }
+  file_versions {
+    uuid org_id PK
+    uuid id PK
+    text kind
+    bigint seq
+  }
+  comment_threads {
+    uuid org_id PK
+    uuid id PK
+    text anchor_node_id
+  }
+  journal {
+    text part_key PK
+    number seq PK
+    number epoch
+  }</pre>
+    <ul>
+      <li>テナントの表は、主キーの先頭に <code>org_id</code> を持ちます。</li>
+      <li>外に見せるのは乱数の <code>file_key</code> で、内部の <code>files.id</code> は出しません。</li>
+      <li><code>files.checkpoint_seq</code> が、最新のチェックポイントの位置です。ジャーナルはそれより後の <code>seq</code> を持ち、<code>seq = 0</code> の項目がフェンスです。</li>
+      <li>ノードの ID は <code>"{session_id}:{local_id}"</code> の文字列で、コメントの <code>anchor_node_id</code> などから参照します。</li>
+      <li>権限に効く変更は、<code>orgs.acl_version</code> を 1 上げます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/data-model.md">data-model.md</a> の 2〜3 節・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/data-model/document.md">data-model/document.md</a>（ノードの概念の図）。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せていますが、後に回すもの、作らないもの、わざと変えたものがあります。</p>
+    <table>
+      <tr><th>本家の機能・振る舞い</th><th>この設計</th></tr>
+      <tr><td>ライブラリ・変数</td><td>MVP の後（E13）。ファイルの中のコンポーネントを先に固める</td></tr>
+      <tr><td>プラグイン・公開 API・Webhook</td><td>MVP の後（E14・E15）</td></tr>
+      <tr><td>プロトタイピング・Dev Mode</td><td>MVP の後</td></tr>
+      <tr><td>FigJam・Slides・Sites・AI の生成</td><td>作らない。別の製品か、題材の外</td></tr>
+      <tr><td>本家の形式のファイルの読み込み</td><td>作らない。SVG の読み込みだけ</td></tr>
+      <tr><td>URL にファイルの名前を入れる</td><td>入れない。Referer や履歴から名前が漏れるため</td></tr>
+      <tr><td>既定のバリアントはキャンバスの左上</td><td>並びの先頭。レイアウトに依らず導出を決定的にするため</td></tr>
+    </table>
+    <p>ドメイン・トークンの接頭辞・バケットには本家の名前を使わず、<code>&lt;brand&gt;</code> と書きます（例：個人のトークン <code>&lt;brand&gt;pat_…</code>）。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>L1 フォントのライセンス、L2 権利侵害の申し立て（情報流通プラットフォーム対処法）、L3「リンクを知っている全員」の扱い、L4 削除の期間、L5 漏洩の報告（個人情報保護法）、L6 本家の UI・ショートカットへの寄せ方。結論が出るまで該当の spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a> の「MVP の後」「やらないこと」「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-node">ノード</dt><dd>ファイルの中の 1 つの要素。ID とプロパティの値の集まり。親を 1 つだけ持つ。</dd>
+      <dt id="g-page">ページ</dt><dd><code>CANVAS</code> のノード。1 つのファイルに複数あり、読み込みもページ単位で行う。</dd>
+      <dt id="g-layer">レイヤー</dt><dd><code>DOCUMENT</code> と <code>CANVAS</code> 以外のノード。レイヤーの一覧に出る。</dd>
+      <dt id="g-frame">フレーム</dt><dd>大きさを持つ枠のノード。中身の切り抜き・オートレイアウト・制約の基準になる。</dd>
+      <dt id="g-group">グループ</dt><dd>子をまとめるだけのノード。境界は子の境界の和。</dd>
+      <dt id="g-vector">ベクター</dt><dd>点と曲線で形を表す方式。拡大しても劣化しない。</dd>
+      <dt id="g-bezier">ベジェ曲線</dt><dd>端の点と制御点（接線）で決まる曲線。3 次ベジェは制御点を 2 つ持つ。</dd>
+      <dt id="g-vnet">ベクターネットワーク</dt><dd>点と辺のグラフで形を表す Figma の方式。1 点から 3 本以上の辺を出せる。</dd>
+      <dt id="g-winding">塗りの規則</dt><dd>パスの内と外を決める規則。非ゼロ（nonzero）と偶奇（even-odd）があり、穴の扱いが違う。</dd>
+      <dt id="g-boolean">ブール演算</dt><dd>図形の和・差・積・排他をとる操作。元の図形を残す非破壊の形で持つ。</dd>
+      <dt id="g-constraints">制約</dt><dd>親のフレームの大きさを変えたときの、子の位置と大きさの変え方の指定。</dd>
+      <dt id="g-autolayout">オートレイアウト</dt><dd>フレームの子を、向き・間隔・余白・揃えの指定で自動で並べる仕組み。CSS の flexbox に近い。</dd>
+      <dt id="g-hug">hug / fill / fixed</dt><dd>オートレイアウトの大きさの方式。中身に合わせる・親の残りを埋める・固定。</dd>
+      <dt id="g-component">コンポーネント</dt><dd>再利用する部品の原本（メインコンポーネント）。</dd>
+      <dt id="g-instance">インスタンス</dt><dd>コンポーネントの写し。中身は原本と上書きから導出する。</dd>
+      <dt id="g-override">上書き</dt><dd>override。インスタンスで原本と違う値にしたプロパティ。原本を直しても残る。</dd>
+      <dt id="g-variant">バリアント</dt><dd>プロパティの値の組で区別する、同じ部品の形違い。コンポーネントセットにまとめる。</dd>
+      <dt id="g-detach">デタッチ</dt><dd>インスタンスと原本のつながりを切り、ふつうのフレームに変える操作。</dd>
+      <dt id="g-ot">OT</dt><dd>Operational Transformation。相手の操作に合わせて自分の操作を変換し、同時編集を合わせる方式。</dd>
+      <dt id="g-crdt">CRDT</dt><dd>Conflict-free Replicated Data Type。どの順で変更が届いても同じ状態に収束するデータ構造。</dd>
+      <dt id="g-lww">LWW</dt><dd>Last Writer Wins。同じ値への同時の書き込みで、最後の書き込みを勝たせる規則。ここでは「サーバーに後に届いた方」。</dd>
+      <dt id="g-conflictunit">競合の単位</dt><dd>LWW で丸ごと置き換わる値のまとまり。この設計では 1 つのプロパティ、または <code>map</code> の 1 要素。</dd>
+      <dt id="g-fracindex">分数インデックス</dt><dd>並びを、前後の値の「間」をいつでも作れる鍵で表す方法。挿入で他の要素の鍵を変えない。</dd>
+      <dt id="g-changeset">ChangeSet</dt><dd>1 つの利用者の操作に当たる変更のまとまり。全部当たるか、全部拒否されるか（原子的）。</dd>
+      <dt id="g-docserver">Document Server</dt><dd>1 つのファイルをメモリに持ち、変更の順序を決め、検証し、ジャーナルに書いて配る Rust のサーバー。</dd>
+      <dt id="g-gateway">Gateway</dt><dd>WebSocket の接続を終端し、Document Server へ中継し、配信を各接続へ分けるサーバー。</dd>
+      <dt id="g-journal">ジャーナル</dt><dd>チェックポイントより後に確定した変更の追記のログ。DynamoDB に置く。</dd>
+      <dt id="g-groupcommit">group commit</dt><dd>短い間にたまった複数の変更を、1 回の書き込みにまとめて永続化すること。</dd>
+      <dt id="g-checkpoint">チェックポイント</dt><dd>ある <code>seq</code> の時点のファイル全体の写し。ページごとのチャンクを中身のハッシュで名付けて S3 に置く。</dd>
+      <dt id="g-fence">フェンス</dt><dd>持ち主の世代番号（<code>epoch</code>）を記録し、古い持ち主の書き込みを条件で止める仕組み。分散システムの fencing token と同じ考え方。</dd>
+      <dt id="g-wasm">WASM</dt><dd>WebAssembly。ブラウザで高速に動く実行形式。Rust や C++ からコンパイルできる。</dd>
+      <dt id="g-webgl2">WebGL2</dt><dd>ブラウザから GPU で描くための、広く使える API。OpenGL ES 3.0 に基づく。</dd>
+      <dt id="g-webgpu">WebGPU</dt><dd>ブラウザから GPU を使う新しい API。compute shader などを使える。</dd>
+      <dt id="g-scenegraph">シーングラフ</dt><dd>描画のための木。座標の変換・境界の箱・描画の命令を持つ。</dd>
+      <dt id="g-tile">タイル</dt><dd>画面を一定の大きさの区画に分けた単位。区画ごとに描いてキャッシュする。</dd>
+      <dt id="g-aa">アンチエイリアス</dt><dd>図形の縁の画素を、覆う面積に応じた中間の色にして、ギザギザを目立たなくすること。</dd>
+      <dt id="g-shaping">整形</dt><dd>shaping。文字の列を、フォントのグリフの列と位置に変える処理。HarfBuzz・HarfRust など。</dd>
+      <dt id="g-glyph">グリフ</dt><dd>フォントの中の 1 つの字形。1 文字が複数のグリフになることも、その逆もある。</dd>
+      <dt id="g-fallback">フォールバック</dt><dd>指定のフォントにグリフがないとき、別のフォントで描くこと。どれにもなければ豆腐（□）になる。</dd>
+      <dt id="g-ime">IME</dt><dd>Input Method Editor。かなを漢字に変換するなど、キーの入力から文字を組み立てる仕組み。変換中の文字は未確定。</dd>
+      <dt id="g-version">版</dt><dd>ファイルの過去の時点の状態。チェックポイントに印を付けたもの。自動と名前付きがある。</dd>
+      <dt id="g-generalaccess">一般アクセス</dt><dd>個人への招待とは別の、範囲を指定した共有の設定（招待した人だけ・組織の中・リンクを知っている全員）。</dd>
+      <dt id="g-seat">シート</dt><dd>組織と結ぶ利用の枠。Full・Dev・Collab・View があり、使える製品を決める。</dd>
+      <dt id="g-guest">ゲスト</dt><dd>組織のドメインに合わないメールアドレスの人。招待された資源だけを使える。</dd>
+      <dt id="g-presence">在席</dt><dd>presence。誰がファイルを開いていて、どこを見て何を選んでいるか。保存しない。</dd>
+      <dt id="g-realtime">Realtime</dt><dd>ファイルの外のメタデータ（コメント、権限、ファイルの一覧）の変更を、購読で配る仕組み。本家の LiveGraph に当たる。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、やらないこと、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要フロー、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0002-central-authoritative-multiplayer.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0003-journal-and-checkpoints.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0004-gpu-rendering-in-wasm.md">0004</a> <span>— 同時編集、永続化、描画の 3 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/document-model.md">document-model.md</a> <span>— ノード、プロパティの表、木の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> <span>— 送受信、LWW、並びの鍵、Undo、在席</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> <span>— ジャーナル、フェンス、チェックポイント、版</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/rendering-engine.md">rendering-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/editor-and-tools.md">editor-and-tools.md</a> <span>— 描画、ベクター、テキストと IME</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/layout.md">layout.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/components-and-libraries.md">components-and-libraries.md</a> <span>— オートレイアウト、コンポーネント</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/comments-and-notifications.md">comments-and-notifications.md</a> <span>— 権限、共有、コメント</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/figma/docs/decisions">decisions/</a> <span>— 残りの ADR（基盤、書き出し、プラグイン、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
