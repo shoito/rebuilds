@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slack の前提知識</title>
+<meta name="description" content="Slack の再構築の設計の文書を読む前に知っておくとよい、チャットの分野の概念・用語・業界の決まり。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Slack · 前提知識</p>
+    <h1>Slack の設計を読む前に</h1>
+    <p class="lead">チームのチャットは「メッセージを保存して見せる」だけに見えますが、順序・リアルタイム配信・未読・通知・検索のそれぞれに、分野に固有の決まりがあります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Slack · 前提知識</p>
+    <h2>Slack の設計を読む前に</h2>
+    <p class="lead">順序・リアルタイム配信・未読・通知・検索の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Slack は何をするサービスか</h2>
+    <p>Slack は、会社やチームの中の会話を<strong>話題ごとの部屋（チャンネル）</strong>に分けて行うチャットです。メールと違い、宛先を選んで送るのではなく、部屋に書き込み、部屋にいる人が読みます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>速い会話</h3><p>送ったメッセージが、相手の画面に 1 秒以内に、正しい順で出る。</p></div>
+      <div class="card" data-frag><h3>取りこぼさない</h3><p>未読・メンション・スレッドで、どこで何が起きたかを後から追える。</p></div>
+      <div class="card" data-frag><h3>積み上がる知識</h3><p>過去のやり取りを検索でき、チームの記録として残る。</p></div>
+    </div>
+    <p>この 3 つが、再構築の intent が掲げる価値です。規模の感覚は、S1 で 1 ワークスペース最大 5,000 人、全体で同時接続 5 万です。1 人が 1 日に何十ものチャンネルを開き、タブを開いたまま何時間も過ごす、という使われ方が設計の前提になっています。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」。</div>
+  </section>
+
+  <section class="s" id="workspace">
+    <h2>ワークスペース・アカウント・メンバー</h2>
+    <p>顧客の組織 1 つが 1 つの<a class="t" href="#g-workspace">ワークスペース</a>です。これがテナントの単位です。1 人の人間は、ログインのための<a class="t" href="#g-account">アカウント</a>を 1 つ持ち、所属するワークスペースごとに別の<a class="t" href="#g-member">メンバー</a>になります。表示名・アイコン・ロールはワークスペースごとに違ってよいのです。</p>
+    <table>
+      <tr><th>ロール</th><th>できること（概要）</th></tr>
+      <tr><td><code>owner</code></td><td>すべて。主たる所有者（1 人）だけが所有権の移転とワークスペースの削除をできる</td></tr>
+      <tr><td><code>admin</code></td><td>メンバーの管理、SSO などの設定</td></tr>
+      <tr><td><code>member</code></td><td>チャンネルを作る・参加する・投稿する</td></tr>
+      <tr><td><code>guest_multi</code></td><td>招かれた複数のチャンネルだけに参加できる<a class="t" href="#g-guest">ゲスト</a></td></tr>
+      <tr><td><code>guest_single</code></td><td>1 つのチャンネルだけに参加できるゲスト</td></tr>
+    </table>
+    <p>ボットと AI エージェントも、<strong>アカウントを持たないメンバー</strong>として表します（<code>account_id</code> が NULL）。人と同じ権限の表で判定し、トークンのスコープで上限をかけます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0010-accounts-and-workspace-members.md">ADR-0010</a>（テナントの中は <code>member_id</code> だけを参照する）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/identity-and-access.md">identity-and-access.md</a> の 6 節。</div>
+  </section>
+
+  <section class="s" id="channels">
+    <h2>会話の場：チャンネルと DM</h2>
+    <p>メッセージはすべて、どれかの「会話の場」に属します。データモデルでは、4 種類をまとめて <code>channels</code> の 1 つの表で持ち、<code>kind</code> と <code>is_private</code> で区別します。</p>
+    <div class="tabs">
+      <div data-tab="パブリック"><p><code>kind = channel</code>、<code>is_private = false</code>。ゲスト以外のメンバーは、<strong>参加していなくても読め、検索でき、自分で参加できます</strong>。<code>#general</code> のように全員が入る既定のチャンネルが 1 つあります。</p></div>
+      <div data-tab="プライベート"><p><code>kind = channel</code>、<code>is_private = true</code>。招かれた人だけが存在を知り、読めます。owner や admin でも、入っていなければ読めません。</p></div>
+      <div data-tab="DM"><p><a class="t" href="#g-dm">DM</a>（1:1）。<code>kind = dm</code>。名前を持たず、参加者の組（<code>dm_key</code>）で一意です。</p></div>
+      <div data-tab="グループ DM"><p>少人数の DM。<code>kind = group_dm</code>。参加者の組が同じなら、同じ場を使い回します。</p></div>
+    </div>
+    <p>チャンネルは削除せず<strong>アーカイブ</strong>します。アーカイブ済みのチャンネルは読めますが、投稿できません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/data-model/conversations.md">data-model/conversations.md</a> の <code>channels</code>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/identity-and-access.md">identity-and-access.md</a> の 6.4 節の決定表。</div>
+  </section>
+
+  <section class="s" id="messages">
+    <h2>メッセージ・スレッド・リアクション</h2>
+    <p>Slack のメッセージには、メールや掲示板にない決まりがいくつかあります。</p>
+    <ul>
+      <li data-frag><strong><a class="t" href="#g-thread">スレッド</a>は 1 段だけ。</strong>返信への返信はありません。「チャンネルにも送信」を選ぶと、返信がチャンネルの一覧にも出ます。</li>
+      <li data-frag><strong>編集は投稿者だけ。</strong>管理者も他人の本文は直せません（削除はできます）。前の本文は残しません。</li>
+      <li data-frag><strong>削除しても行は残る。</strong>本文を消した<a class="t" href="#g-tombstone">tombstone</a> にします。返信のある親は「このメッセージは削除されました」と出し続けます。</li>
+      <li data-frag><strong>リアクションは絵文字で 1 人 1 回ずつ。</strong>同じ絵文字をもう一度押すと外れます。ただし API はトグルにせず、付ける（PUT）と外す（DELETE）を分けます。再送で結果が反転しないためです。</li>
+      <li data-frag><strong>本文は HTML でも Markdown でもない。</strong>独自の軽い構文木（<a class="t" href="#g-ast">AST</a>）を JSON で持ち、メンションは表示名ではなく <code>member_id</code> で持ちます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/messaging.md">messaging.md</a> の「編集」「削除」「スレッド」「リアクション」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0006-message-body-ast.md">ADR-0006</a>。</div>
+  </section>
+
+  <section class="s" id="mentions">
+    <h2>メンションと一斉通知</h2>
+    <p><a class="t" href="#g-mention">メンション</a>は「この人に気づいてほしい」という印です。Slack には、人を指すものと、まとめて知らせるもの（<a class="t" href="#g-broadcast">一斉通知</a>）があります。</p>
+    <table>
+      <tr><th>書き方</th><th>知らせる相手</th><th>使える場所・人</th></tr>
+      <tr><td>@名前</td><td>その人</td><td>誰でも</td></tr>
+      <tr><td>@here</td><td>チャンネルの参加者のうち、いまアクティブな人</td><td>ゲスト以外</td></tr>
+      <tr><td>@channel</td><td>チャンネルの参加者全員</td><td>ゲスト以外</td></tr>
+      <tr><td>@everyone</td><td>ワークスペースの全員</td><td>既定のチャンネルで、owner・admin</td></tr>
+    </table>
+    <p>本家に合わせて、参加者が 6 人以上のチャンネルで一斉通知を送るときは確認を出し、スレッドの返信の中の一斉通知は通知しません。一斉通知は、メンバーごとの行に展開せず、メッセージの属性として 1 回だけ記録します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">投稿を編集して @佐藤 を書き足しました。佐藤さんにはどうなりますか？</p>
+      <div class="opts">
+        <button>通知が届き、メンションのバッジも増える</button>
+        <button>何も起きない。編集のメンションは無視される</button>
+        <button>メンションのバッジ・一覧には反映されるが、通知は送られない</button>
+      </div>
+      <p class="why">編集で増えたメンションに通知を送ると、「後から大量に通知を送る手段」になるためです。メンション一覧とバッジには反映します（messaging.md の「編集」）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/messaging.md">messaging.md</a> の「メンション」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/README.md">architecture/README.md</a> の 6 節の決定。</div>
+  </section>
+
+  <section class="s" id="ordering">
+    <h2>なぜ「順序」が難しいのか</h2>
+    <p>チャンネルの全員が<strong>同じ順</strong>でメッセージを見る必要があります。時刻で並べればよさそうですが、うまくいきません。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>時刻（<code>created_at</code>）や ID で並べる</h3><p>サーバーごとに時計がずれる。同じミリ秒の投稿は順が決まらない。そして「間が抜けている」ことを判定できない。</p></div>
+      <div class="good" data-frag><h3>チャンネル内の連番 <a class="t" href="#g-seq"><code>seq</code></a></h3><p>チャンネルの行の <code>last_seq</code> を、投稿と同じトランザクションで 1 増やして採番する。1, 2, 3… と欠番なく並ぶ。</p></div>
+    </div>
+    <p>連番なら「受け取った <code>seq</code> が直前 + 1 か」だけで欠けを見つけられます。既読の位置・未読数・差分取得も、すべて <code>seq</code> で表せます。編集・削除・リアクションも <code>seq</code> を 1 つ消費する「イベント」にします。代わりに、チャンネルの行のロックが採番のたびに起きます。書き込みが集中するチャンネルでの待ちは、負荷試験で確かめる項目です。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">メッセージに付いたリアクションを外しました。チャンネルの <code>seq</code> はどうなりますか？</p>
+      <div class="opts">
+        <button>変わらない。リアクションはメッセージの付属物だから</button>
+        <button>1 つ消費される。チャンネルの状態を変える操作はすべてイベントになる</button>
+        <button>元のメッセージの <code>seq</code> が新しい値に変わる</button>
+      </div>
+      <p class="why">状態を変える操作は 1 つずつ <code>seq</code> を消費します。メッセージ本体の <code>seq</code>（作成時の値）は変わりません。付いていないリアクションを外すなど、状態が変わらない操作は消費しません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0001-per-channel-sequence.md">ADR-0001</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/data-model.md">data-model.md</a> の不変条件 I-2〜I-4。</div>
+  </section>
+
+  <section class="s" id="realtime">
+    <h2>リアルタイム配信の基本</h2>
+    <p>相手の画面にすぐ出すには、サーバーから押し出す（push）経路が要ります。ブラウザとは <a class="t" href="#g-websocket">WebSocket</a> の接続を張りっぱなしにし、その接続を専門に持つ <a class="t" href="#g-gateway">Gateway</a> が配ります。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant S as 送信者
+  participant A as API
+  participant D as DB
+  participant R as Relay
+  participant V as Valkey Pub/Sub
+  participant G as Gateway
+  participant B as 受信者
+  S->>A: POST messages
+  A->>D: 1 tx で message と outbox を書く
+  A-->>S: seq を返す
+  R->>D: outbox を 25ms ごとに読む
+  R->>V: チャンネルへ publish
+  V->>G: 購読している Gateway へ
+  G->>B: WebSocket で push</pre>
+    <p>書き込みの経路（API → DB）と配信の経路（Relay → Gateway）は分かれています。配信は<strong>落としてもよい</strong>ものとして作り、正しさは DB と次の節の差分取得が持ちます（<a href="../../../../docs/primer/index.html#outbox">outbox</a>）。1 投稿を参加者全員の接続へ配ることを<a class="t" href="#g-fanout">ファンアウト</a>と呼び、<a class="t" href="#g-pubsub">Pub/Sub</a> の購読は Gateway のノードごとに 1 回にまとめます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/realtime.md">realtime.md</a> の 2 節と 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0002-db-as-source-of-truth-with-outbox.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0013-gateway-scaling-and-presence.md">ADR-0013</a>。</div>
+  </section>
+
+  <section class="s" id="reconnect">
+    <h2>接続・切断・差分取得</h2>
+    <p>ノート PC を閉じる、電車でトンネルに入る、サーバーをデプロイする。WebSocket は頻繁に切れます。切れても欠けないようにするのが、この設計の要です。</p>
+    <div class="stepper">
+      <ol>
+        <li>API が短命で 1 回限りの<strong>チケット</strong>を発行する。ブラウザの WebSocket はヘッダーを付けられないため、Cookie や Bearer の代わりにこれで認証する。</li>
+        <li>Gateway に接続し、<code>hello</code> でチケットを渡す。Gateway は読めるチャンネルを<strong>購読してから</strong>各チャンネルの <code>last_seq</code> を読む（逆順だと間のイベントを取りこぼす）。</li>
+        <li><code>ready</code> でチャンネルごとの最新の <code>seq</code>（heads）を受け取り、自分の持つ値と比べる。</li>
+        <li>受け取ったイベントの <code>seq</code> が「直前 + 1」でなければ欠けとみなす。</li>
+        <li><code>GET …/events?after_seq=N</code> で差分を取り、<code>seq</code> の順に当てる。重複は <code>seq</code> で捨てる。</li>
+        <li>差分が 1,000 件を超えたら、差分をあきらめて最新のページを取り直す。</li>
+      </ol>
+    </div>
+    <p>途中の経路が詰まっても、Gateway はイベントを溜め込まず、その接続を切ります（遅い受信者）。クライアントが差分を取れば追いつけるからです。一斉の再接続に備え、待ち時間にはランダムな揺らぎ（ジッター）を入れます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">Valkey が数秒止まり、その間のイベントが Gateway に届きませんでした。メッセージはどうなりますか？</p>
+      <div class="opts">
+        <button>DB には残っている。クライアントが <code>seq</code> の飛びに気づき、差分取得で取り戻す</button>
+        <button>失われる。Valkey が配信の正本だから</button>
+        <button>Gateway が溜めておき、Valkey の復旧後に再送する</button>
+      </div>
+      <p class="why">DB だけが正本で、Valkey は失われてよい配信のバスです。Gateway は状態を作らず、DB にも書きません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/realtime.md">realtime.md</a> の 3 節・6〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/client.md">client.md</a>（クライアントの同期エンジン）。</div>
+  </section>
+
+  <section class="s" id="presence">
+    <h2>在席と入力中：消えてよい情報</h2>
+    <p>チャットには、保存しない種類の情報があります。</p>
+    <div class="cards">
+      <div class="card"><h3><a class="t" href="#g-presence">在席</a></h3><p>名前の横の緑の点。<code>active</code>・<code>away</code>・<code>offline</code> の 3 状態。Valkey に TTL 付きで置き、端末が消えれば 90 秒以内に自然に消える。DB には保存しない。</p></div>
+      <div class="card"><h3>入力中（typing）</h3><p>「○○さんが入力中…」。3 秒に 1 回まで送り、5 秒で消える。DB も <code>seq</code> も通らず、取りこぼしても取り戻さない。</p></div>
+      <div class="card"><h3>端末の操作状態</h3><p>いまどの端末で何を見ているか。「見ている人にはプッシュ通知を送らない」の判定に使う。</p></div>
+    </div>
+    <p>在席は「誰が誰を見るか」の組み合わせが多く、全員分を配ると重くなります。そこで、画面に出している人（最大 500 人）だけを購読します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/realtime.md">realtime.md</a> の 4 節「ストリームの種類」と 9〜10 節。</div>
+  </section>
+
+  <section class="s" id="readstate">
+    <h2>既読・未読とバッジ</h2>
+    <p>チャンネルごとに「どこまで読んだか」を 1 つの数（<code>last_read_seq</code>）で持ちます。メッセージごとに既読の行を作るのではありません。</p>
+    <pre><code>未読数 ≒ channels.last_seq − channel_members.last_read_seq</code></pre>
+    <div class="tabs">
+      <div data-tab="未読数（近似）"><p>差で出すので、自分の投稿・スレッドの返信・リアクションなどのイベントも数に混ざります。「太字にするかどうか」が大事なので、近似で許容しています。</p></div>
+      <div data-tab="メンション（正確）"><p>赤いバッジの数は正確に数えます。見落とすと「取りこぼさない」を損なうからです。<code>last_read_seq</code> より後の、自分へのメンションと一斉通知を数えます。DM は未読のすべてをメンションとして数えます。</p></div>
+      <div data-tab="スレッド"><p>スレッドは購読（フォロー）した人ごとに別の既読位置を持ちます。親の投稿者・返信した人・メンションされた人は自動で購読します。</p></div>
+    </div>
+    <p>既読の位置は<strong>後退しません</strong>（<code>GREATEST</code> で更新）。古い端末が遅れて既読を送っても、新しい位置を上書きしません。既読の変化は自分の他の端末にだけ配ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/read-state-and-notifications.md">read-state-and-notifications.md</a> の 1〜3 節、intent.md の Open questions（未読数の正確さ）。</div>
+  </section>
+
+  <section class="s" id="notify">
+    <h2>通知：誰に、どの経路で</h2>
+    <p>通知の経路は、アプリ内（開いているタブ）、<a class="t" href="#g-webpush">Web Push</a>、メールの 3 つです。1 つのメッセージについて、受け手ごとに「通知するか」「どの経路か」を次の順に決めます。</p>
+    <div class="stepper">
+      <ol>
+        <li>投稿者本人、チャンネルを読めない人、無効化された人には送らない（送る直前に権限を確かめ直す）。</li>
+        <li>チャンネルをミュートしていれば送らない。</li>
+        <li>通知レベル（すべて / メンションのみ / なし）で許されない理由なら送らない。</li>
+        <li><a class="t" href="#g-dnd">おやすみモード</a>の間は、メールだけを終了後に予定する。</li>
+        <li>どこかの端末でそのチャンネルを見ていれば、何も送らない。</li>
+        <li>どこかの端末を操作中なら、アプリ内だけ。</li>
+        <li>それ以外は Web Push を送り、メールを 15 分後（設定による）に予定する。</li>
+      </ol>
+    </div>
+    <p>Web Push は、ブラウザの提供元が運営する Push サービスを経由します。送り手は <a class="t" href="#g-vapid">VAPID</a> の鍵で名乗り、中身は暗号化します。端末に届くまでの時間は Push サービス次第なので、NFR-010 は「送信まで」を測ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/read-state-and-notifications.md">read-state-and-notifications.md</a> の 4〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0014-sqs-worker-queues-and-notification-delivery.md">ADR-0014</a>。</div>
+  </section>
+
+  <section class="s" id="search">
+    <h2>日本語の全文検索</h2>
+    <p>日本語は語の間に空白がないので、「どこで語を区切るか」を決めないと索引を作れません。方法は 2 つあります。</p>
+    <div class="tabs">
+      <div data-tab="N-gram"><p>文字を機械的に 2 文字ずつ（<a class="t" href="#g-ngram">N-gram</a>）切る。「東京都庁」→「東京」「京都」「都庁」。辞書が要らず、未知語や語の途中でも見つかる。ただし「京都」でも当たってしまうなど、関係のない一致が混ざる。S1 の <a class="t" href="#g-pgbigm">pg_bigm</a> はこちら。</p></div>
+      <div data-tab="形態素解析"><p>辞書で意味のある語に切る（<a class="t" href="#g-morph">形態素解析</a>。Sudachi、Kuromoji）。関連度の順位付けに向く。ただし辞書にない語や語の途中は取りこぼす。S2 の OpenSearch では、一致の判定は N-gram、順位付けは Sudachi と使い分ける。</p></div>
+    </div>
+    <p>もう 1 つの要は権限です。<strong>読めるチャンネルの集合を、検索の条件の中に入れます</strong>。PostgreSQL では、RLS のある表に <code>LIKE</code> をかけると pg_bigm の索引が使われません。そこで検索用の表だけ RLS を外し、関数を通してしか読めないようにしています（ADR-0027）。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">検索の結果を取ってから、読めないチャンネルのものを API で除く。この方式の問題は？</p>
+      <div class="opts">
+        <button>特にない。最後に除けば見えないので安全</button>
+        <button>件数・ページの切れ目・ハイライトから、読めないメッセージの存在が漏れうる</button>
+        <button>検索が速くなりすぎる</button>
+      </div>
+      <p class="why">後から除くと「20 件のはずが 17 件」のような形で存在が漏れます。だから条件に入れ、さらに読み直しで落ちた件数を 0 件であるべき指標として測ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/search.md">search.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0004-postgres-fulltext-search-first.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0027-search-table-rls-exception.md">ADR-0027</a>。</div>
+  </section>
+
+  <section class="s" id="authz">
+    <h2>権限：「見えない」は「存在しない」</h2>
+    <p>チャットの権限は、ワークスペースのロールと、チャンネルの種別と、そのチャンネルに入っているかの組み合わせで決まります。この判定を<strong>1 つの関数</strong>にまとめ、API・WebSocket の購読・検索・通知のすべてが同じ関数を使います（ADR-0005）。経路ごとに判定を書くと、どこか 1 つが漏れるからです。</p>
+    <pre><code>0 主体の解決 → 1 テナント → 2 メンバー → SET LOCAL
+→ 3 ワークスペースの操作 → 4 チャンネル → 5 操作・スコープ</code></pre>
+    <p>読めないプライベートチャンネルには、403 ではなく <strong>404</strong> を返します。403 は「そこに何かある」と教えてしまうからです。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">admin が、自分の入っていないプライベートチャンネルの履歴を API で取ろうとしました。結果は？</p>
+      <div class="opts">
+        <button>200。admin は全チャンネルを読める</button>
+        <button>403。権限が足りないと伝える</button>
+        <button>404。存在を漏らさない</button>
+      </div>
+      <p class="why">owner や admin でも、入っていないプライベートチャンネルと DM は読めません。管理者が中身を見る経路（コンプライアンスのエクスポート）は、別の経路と監査ログで設計します。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/identity-and-access.md">identity-and-access.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0005-single-authorization-check.md">ADR-0005</a>。テナントの分離は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="plans">
+    <h2>プラン・アプリ・AI エージェント</h2>
+    <p>Slack のような SaaS は、料金のプランで<strong>容量と機能</strong>を変えます。設計では、プランから決まる値を<a class="t" href="#g-entitlement">entitlement</a> としてワークスペースに持たせます。価格と課金はこの題材では扱いません。</p>
+    <table>
+      <tr><th></th><th>Free</th><th>Pro</th><th>Business+</th><th>Enterprise</th></tr>
+      <tr><td>閲覧・検索できる履歴</td><td>90 日</td><td>無制限</td><td>無制限</td><td>無制限</td></tr>
+      <tr><td>アプリの数</td><td>10</td><td>無制限</td><td>無制限</td><td>無制限</td></tr>
+      <tr><td>SAML の <a class="t" href="#g-sso">SSO</a>・<a class="t" href="#g-scim">SCIM</a></td><td>—</td><td>—</td><td>あり</td><td>あり</td></tr>
+      <tr><td>監査ログ・<a class="t" href="#g-legalhold">リーガルホールド</a></td><td>—</td><td>—</td><td>—</td><td>あり</td></tr>
+    </table>
+    <p>本家に合わせ、<strong>レート制限はプランで変えません</strong>。外の世界とのつながりは 3 つあります。<a class="t" href="#g-mcp">MCP</a> サーバー（AI エージェント向け。E9）、版付きの公開 API とアプリ（MVP の後、E12）です。アプリのボットの投稿は、人間の投稿と別の枠で制限します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0033-slack-aligned-platform-and-plan-decisions.md">ADR-0033</a>（ADR-0032 の初期値を改めたもの）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/mcp.md">mcp.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/apps.md">apps.md</a>。</div>
+  </section>
+
+  <section class="s" id="governance">
+    <h2>保持・削除・エクスポートの枠組み</h2>
+    <p>会社のチャットは、業務の記録でもあります。企業の顧客は早い段階で次の機能を求めます。</p>
+    <ul>
+      <li data-frag><strong>保持ポリシー</strong>：一定の期間を過ぎたメッセージを自動で消す。</li>
+      <li data-frag><strong>リーガルホールド</strong>：訴訟や調査に備え、特定の人や場のデータを、削除の操作や保持ポリシーより優先して残す。</li>
+      <li data-frag><strong>エクスポート</strong>：ワークスペースのデータを書き出す。プライベートチャンネルや DM を含むものは上位のプランだけ。</li>
+      <li data-frag><strong>削除の流れ</strong>：論理削除で即座に見えなくし、本文を消す。行は非同期の Worker が物理削除する。バックアップの期限が、削除の最終的な期限になる。</li>
+    </ul>
+    <p>日本の個人情報保護法では、ワークスペースの中身は顧客から委託を受けて扱うデータ、アカウントの情報は自ら取得するデータ、という整理で設計しています。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>全データのエクスポートで、メンバーへ自動で通知しないこと（本家と同じ既定案）が、個人情報保護法の扱いとして問題ないか。確認が済むまで E8 の <code>workspace-export</code> の spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0019-data-retention-and-deletion.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/security.md">security.md</a> の 13〜14 節、intent.md の Open questions。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 83 表ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>workspace_id</code> を持ちます。</p>
+    <pre class="mermaid">erDiagram
+  accounts ||--o{ members : "has membership"
+  workspaces ||--|{ members : "has"
+  workspaces ||--o{ channels : "has"
+  channels ||--o{ channel_members : "has"
+  members ||--o{ channel_members : "joins"
+  channels ||--o{ messages : "contains"
+  messages ||--o{ messages : "thread root of"
+  messages ||--o{ reactions : "has"
+  messages ||--o{ mentions : "mentions"
+  channels {
+    uuid workspace_id PK
+    uuid id PK
+    text kind
+    bigint last_seq
+  }
+  channel_members {
+    uuid channel_id PK
+    uuid member_id PK
+    bigint last_read_seq
+  }
+  messages {
+    uuid id PK
+    uuid channel_id FK
+    bigint seq
+    uuid thread_root_id FK
+    jsonb body
+  }</pre>
+    <ul>
+      <li><code>channels.last_seq</code> と <code>channel_members.last_read_seq</code> の差が、未読数の元です。</li>
+      <li><code>messages</code> の自己参照（<code>thread_root_id</code>）がスレッドです。返信もチャンネルの <code>seq</code> を持ちます。</li>
+      <li>テナントの外にあるのは <code>accounts</code> など認証の表だけで、中の表は <code>member_id</code> を参照します。</li>
+      <li>DB の外のストア（Valkey、S3、検索）は正本ではなく、DB から作り直せます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/data-model.md">data-model.md</a> の 3〜5 節。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せていますが、作らないものと、名前を変えるものがあります。</p>
+    <table>
+      <tr><th>本家の機能</th><th>この設計</th></tr>
+      <tr><td>Huddle（音声・ビデオ）</td><td>作らない。WebRTC / SFU は別の題材（Zoom）</td></tr>
+      <tr><td>Slack Connect（組織をまたぐチャンネル）</td><td>作らない。テナントの境界をまたぐ権限が要る</td></tr>
+      <tr><td>Canvas・Lists</td><td>作らない。文書の製品は別の題材（Notion）</td></tr>
+      <tr><td>Enterprise Grid（複数ワークスペースの束ね）</td><td>作らない。データモデルの拡張の余地だけ残す</td></tr>
+      <tr><td>モバイルのネイティブアプリ</td><td>作らない。Web（PWA）で代替。下限は Safari 17</td></tr>
+      <tr><td>Workflow Builder</td><td>アプリの基盤（E12）の後に検討</td></tr>
+    </table>
+    <p>トークンの接頭辞やヘッダーには本家の名前を使わず、<code>&lt;brand&gt;</code> と書きます（例：ボットのトークン <code>&lt;brand&gt;_bot_…</code>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/intent.md">intent.md</a> の Non-goals、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-workspace">ワークスペース</dt><dd>1 つの組織の Slack の単位。テナントにあたる。</dd>
+      <dt id="g-account">アカウント</dt><dd>ログインのための、人ごとのグローバルな ID。テナントの外にある。</dd>
+      <dt id="g-member">メンバー</dt><dd>ワークスペースの中での人（またはボット）。表示名とロールを持ち、テナントの中のデータはこれを参照する。</dd>
+      <dt id="g-guest">ゲスト</dt><dd>招かれたチャンネルだけに参加できる外部の人。複数のチャンネル用と 1 チャンネル用がある。</dd>
+      <dt id="g-dm">DM</dt><dd>Direct Message。1:1 または少人数の、名前のない会話の場。</dd>
+      <dt id="g-thread">スレッド</dt><dd>1 つのメッセージにぶら下がる返信の列。Slack では 1 段だけ。</dd>
+      <dt id="g-tombstone">tombstone</dt><dd>「削除済み」の印だけを残し、中身を消した行。順序や一意性を保つために使う。</dd>
+      <dt id="g-ast">AST</dt><dd>Abstract Syntax Tree。本文を段落・リンク・メンションなどの節の木として持つ形。</dd>
+      <dt id="g-mention">メンション</dt><dd>@名前 で特定の人に気づかせる印。通知とバッジの対象になる。</dd>
+      <dt id="g-broadcast">一斉通知</dt><dd>@here・@channel・@everyone。チャンネルやワークスペースの多くの人にまとめて知らせる。</dd>
+      <dt id="g-seq">seq</dt><dd>チャンネルの中で、状態を変える操作ごとに 1 ずつ増える連番。順序・欠けの検知・既読の位置に使う。</dd>
+      <dt id="g-websocket">WebSocket</dt><dd>ブラウザとサーバーの間で、双方向に送り合える張りっぱなしの接続。</dd>
+      <dt id="g-gateway">Gateway</dt><dd>WebSocket の接続を持ち、購読に応じてイベントを配るサーバー。書き込みはしない。</dd>
+      <dt id="g-pubsub">Pub/Sub</dt><dd>送り手が名前付きの経路に流し、その経路を購読している受け手全員に届く仕組み。保存はしない。</dd>
+      <dt id="g-fanout">ファンアウト</dt><dd>1 つのイベントを多数の受け手へ複製して配ること。</dd>
+      <dt id="g-presence">在席</dt><dd>presence。メンバーがいま接続して操作しているかの状態。</dd>
+      <dt id="g-dnd">おやすみモード</dt><dd>DND（Do Not Disturb）。指定した時間帯に通知を止める設定。</dd>
+      <dt id="g-webpush">Web Push</dt><dd>ブラウザを閉じていても通知を届ける標準の仕組み。ブラウザの提供元の Push サービスを経由する。</dd>
+      <dt id="g-vapid">VAPID</dt><dd>Voluntary Application Server Identification。Web Push で送り手のサーバーを鍵で名乗る方式（RFC 8292）。</dd>
+      <dt id="g-ngram">N-gram</dt><dd>文字列を N 文字ずつずらして切った断片。2 文字なら bigram。</dd>
+      <dt id="g-pgbigm">pg_bigm</dt><dd>PostgreSQL の拡張。2 文字の断片で全文検索の索引（GIN）を作り、<code>LIKE</code> の部分一致を速くする。</dd>
+      <dt id="g-morph">形態素解析</dt><dd>辞書を使って文を意味のある語に区切る処理。Sudachi・Kuromoji など。</dd>
+      <dt id="g-entitlement">entitlement</dt><dd>プランや個別の契約から決まる、ワークスペースが使える容量と機能の値。</dd>
+      <dt id="g-sso">SSO</dt><dd>Single Sign-On。会社の認証基盤（SAML・OIDC）でログインさせる仕組み。</dd>
+      <dt id="g-scim">SCIM</dt><dd>会社の人事・ID の台帳から、メンバーの作成・無効化を自動で反映する標準の API。</dd>
+      <dt id="g-legalhold">リーガルホールド</dt><dd>訴訟や調査のために、対象のデータを削除から守って残すこと。</dd>
+      <dt id="g-mcp">MCP</dt><dd>Model Context Protocol。AI エージェントが外部のツールやデータを使うための標準のプロトコル。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP と Non-goals</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0001-per-channel-sequence.md">ADR-0001</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0002-db-as-source-of-truth-with-outbox.md">0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0005-single-authorization-check.md">0005</a> <span>— 順序、正本、権限の 3 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/messaging.md">messaging.md</a> <span>— 投稿・スレッド・メンション・イベントの一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/realtime.md">realtime.md</a> <span>— Gateway、購読、差分取得</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/read-state-and-notifications.md">read-state-and-notifications.md</a> <span>— 未読、バッジ、通知</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/search.md">search.md</a> <span>— 日本語の検索と権限</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/identity-and-access.md">identity-and-access.md</a> <span>— 認証、ロール、決定表</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/slack/docs/decisions">decisions/</a> <span>— 残りの ADR（基盤、セキュリティ、アプリ、プラン）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

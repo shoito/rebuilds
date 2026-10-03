@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stripe の前提知識</title>
+<meta name="description" content="Stripe の再構築の設計の文書を読む前に知っておくとよい、カード決済・複式簿記・照合・PCI DSS・日本の決済手段と法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Stripe · 前提知識</p>
+    <h1>決済基盤の設計を読む前に</h1>
+    <p class="lead">カード決済の登場人物、オーソリとキャプチャ、複式簿記の台帳、精算と照合、カード情報の隔離（PCI DSS）、日本の決済手段と法令の枠組みを、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Stripe · 前提知識</p>
+    <h2>決済基盤の設計を読む前に</h2>
+    <p class="lead">お金が必ず合い、カード番号が漏れない仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="what">
+    <h2>Stripe は何をするサービスか</h2>
+    <p>Stripe は、事業者（<a class="t" href="#g-merchant">加盟店</a>）が<strong>数行のコードでオンラインの代金を受け取れる</strong>ようにする決済の API です。カード会社や銀行との接続、カード情報の保護、返金やチャージバック、売上の入金までを肩代わりします。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>加盟店の開発者</h3><p>API キーで PaymentIntent を作り、Webhook で結果を受け取ります。</p></div>
+      <div class="card" data-frag><h3>加盟店の運用担当</h3><p>ダッシュボードで売上・返金・Dispute・入金を見ます。</p></div>
+      <div class="card" data-frag><h3>加盟店の顧客</h3><p>決済ページ（Checkout）や埋め込みの入力欄（Elements）でカードを入力し、3D セキュアで本人認証をします。</p></div>
+    </div>
+    <p>規模の感覚：S1 で決済の確定のピークが 500 件/秒・加盟店 1 万、S3 で 50,000 件/秒・100 万です。可用性の目標は月間 99.99% です。</p>
+    <p class="doc-only"><small>設計で効くところ：3 つの価値（すぐ組み込める・お金が必ず合う・安全で止まらない）は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/intent.md">intent.md</a>、規模は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/README.md">architecture/README.md</a> の 2・3 節。</small></p>
+  </section>
+
+  <section class="s" id="players">
+    <h2>カード決済の登場人物</h2>
+    <p>カード決済には、加盟店と顧客のほかに、お金と情報を中継する事業者がいます。このシステムは<strong>自分ではカードブランドの会員にならず</strong>、<a class="t" href="#g-psp">決済代行</a>・<a class="t" href="#g-acquirer">アクワイアラ</a>と接続します（intent.md の Constraints）。</p>
+    <pre class="mermaid">flowchart LR
+  C["顧客<br>(カード会員)"] -- "カードを入力" --> M["加盟店"]
+  M -- "API" --> P["このシステム<br>(決済の基盤)"]
+  P -- "コネクタ" --> A["決済代行・<br>アクワイアラ"]
+  A -- "ブランドの網" --> B["カードブランド<br>(Visa・JCB など)"]
+  B --> I["イシュア<br>(カード発行会社)"]
+  I -. "承認・拒否" .-> A
+  A -. "精算 (後日まとめて入金)" .-> P
+  P -. "入金 (Payout)" .-> M</pre>
+    <ul>
+      <li><a class="t" href="#g-issuer">イシュア</a>が、承認するか、チャージバックで顧客に有利な判断をするかを決めます。</li>
+      <li>このシステムとアクワイアラの間をつなぐ部品を<a class="t" href="#g-connector">コネクタ</a>と呼びます。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：コネクタの共通の操作と能力は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payment-methods.md">payment-methods.md</a> の 3 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0011-connector-abstraction-and-unknown-outcome.md">ADR-0011</a>。</small></p>
+  </section>
+
+  <section class="s" id="card-flow">
+    <h2>オーソリ・キャプチャ・精算</h2>
+    <p>カード決済は、1 回の操作に見えて、時間をずらした複数の段からできています。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong><a class="t" href="#g-auth">オーソリ</a></strong>：イシュアに「この額を使えるか」を問い合わせ、枠を押さえる。お金はまだ動かない。</li>
+        <li><strong><a class="t" href="#g-capture">キャプチャ</a></strong>：押さえた枠のうち、実際に請求する額を確定する。ここで売上になる。</li>
+        <li><strong>取り消し（void）</strong>：キャプチャの前なら、オーソリを取り消して枠を解放できる。</li>
+        <li><strong><a class="t" href="#g-settlement">精算</a></strong>：決済代行が、手数料を引いた額を後日まとめて振り込み、明細（精算ファイル）を送る。</li>
+        <li><strong>入金（Payout）</strong>：このシステムが、加盟店の残高から加盟店の銀行口座へ振り込む。</li>
+      </ol>
+    </div>
+    <p>オーソリには有効期限があります。たとえば Visa の CIT は 7 日、日本の加盟店の JPY 取引は最長 30 日です（接続先が許す場合）。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">オーソリが承認された時点で、台帳に売上の仕訳を書きますか？</p>
+      <div class="opts">
+        <button>書く。承認されたので売上が確定している</button>
+        <button>書かない。仕訳はキャプチャ・返金・Dispute などお金が動く時点で書く</button>
+        <button>書く。ただし後でキャプチャのときに消す</button>
+      </div>
+      <p class="why">オーソリは枠を押さえるだけでお金を動かしません。設計でも、仕訳を書くのはキャプチャが確定したときです（payments.md の 1・9 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：キャプチャの方式とオーソリの期限は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payments.md">payments.md</a> の 5 節。</small></p>
+  </section>
+
+  <section class="s" id="payment-intent">
+    <h2>PaymentIntent：1 回の支払いの意図</h2>
+    <p>本家の API では、1 回の支払いを <code>PaymentIntent</code>（<code>pi_</code>）で表し、確定（confirm）1 回ごとの試行を <code>Charge</code>（<code>ch_</code>）で表します。状態の名前は本家と同じ 7 つです。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> requires_payment_method
+  requires_payment_method --> requires_confirmation : 決済手段を付ける
+  requires_confirmation --> requires_action : 3DS・支払い待ち
+  requires_confirmation --> processing : 結果待ち
+  requires_confirmation --> requires_capture : 手動キャプチャ
+  requires_confirmation --> succeeded : 自動キャプチャ
+  requires_action --> succeeded : 認証・入金
+  processing --> succeeded : 照会で承認
+  requires_capture --> succeeded : capture
+  requires_action --> requires_payment_method : 失敗
+  processing --> requires_payment_method : 取り消しが確定
+  requires_capture --> canceled : cancel・期限切れ
+  succeeded --> [*]
+  canceled --> [*]</pre>
+    <div class="tabs">
+      <div data-tab="automatic_async"><p>オーソリの承認で <code>succeeded</code> を返し、キャプチャは後ろで行う。本家の最新の版の既定で、最初の版の既定もこれ。</p></div>
+      <div data-tab="automatic"><p>承認に続けて同じ要求の中でキャプチャし、<code>succeeded</code> を返す。</p></div>
+      <div data-tab="manual"><p>オーソリだけで <code>requires_capture</code> に止め、加盟店が後で capture する（在庫を確かめてから請求する、など）。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：遷移の表と不変条件は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payments.md">payments.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0010-payment-intent-state-machine.md">ADR-0010</a>。図は主な遷移だけです。</small></p>
+  </section>
+
+  <section class="s" id="three-ds">
+    <h2>3D セキュアと不正検知</h2>
+    <p><a class="t" href="#g-3ds">3D セキュア</a>（EMV 3-D セキュア、3DS2）は、イシュアが顧客本人かを確かめる仕組みです。リスクが低ければ顧客の操作なしで通り（<a class="t" href="#g-frictionless">frictionless</a>）、高ければパスワードなどを求めます（チャレンジ）。</p>
+    <ul>
+      <li data-frag>日本の「クレジットカード・セキュリティガイドライン」（現行 6.1 版）は、EC 加盟店に EMV 3-D セキュアの導入と、原則として決済の都度の認証を求めています。</li>
+      <li data-frag>設計は、日本で発行されたカードの <a class="t" href="#g-cit">CIT</a> で常に 3DS を要求します。事前に認証した <a class="t" href="#g-mit">MIT</a> は免除です。</li>
+      <li data-frag>3DS Server は自前で持たず、コネクタが提供するものを使います（EMVCo の認定が要るため）。</li>
+      <li data-frag>不正検知は、本家の Radar に寄せたルール（allow・block・review、3DS の要求）を決済の経路の中で評価します。機械学習は MVP の範囲外です。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">3DS の認証に成功した決済は、チャージバックで加盟店が負けることはない？</p>
+      <div class="opts">
+        <button>負けない。3DS の成功で責任は必ずイシュアに移る</button>
+        <button>負けない。3DS の成功で Dispute は起こせなくなる</button>
+        <button>保証はされない。ライアビリティシフトの適用はブランドの規則次第</button>
+      </div>
+      <p class="why">本家も保証しないと明言しています。設計も画面・文書で「保証」と書かないと決めています（payments.md の 6.2 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0012-3ds-via-connector.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/fraud.md">fraud.md</a> の 2・5 節。本システムへの法的な当てはめは法務の確認待ちです。</small></p>
+  </section>
+
+  <section class="s" id="unknown">
+    <h2>結果不明：最大の難所</h2>
+    <p>オーソリを送った後にタイムアウトすると、<strong>アクワイアラ側で承認されたかが分かりません</strong>。「失敗」と返して顧客が払い直すと二重請求になり、「成功」と見なすと受け取っていない代金で発送させてしまいます。</p>
+    <div class="stepper">
+      <ol>
+        <li>送る前に、試行（Charge）と<a class="t" href="#g-ref">参照番号</a>を DB に記録してコミットする。</li>
+        <li>送信後のタイムアウト・5xx は <code>unknown</code>。PaymentIntent を <code>processing</code> にする。</li>
+        <li>回復のジョブが、参照番号でコネクタに<strong>照会</strong>する（5 秒・30 秒・2 分…）。</li>
+        <li>見つかれば、その結果（承認・拒否）を反映する。</li>
+        <li>見つからなければ、整合性の時間を待ってから同じ参照番号で<strong>取り消し</strong>を送り、確定してから失敗として返す。</li>
+        <li>最後の網：精算ファイルとの照合で、記録にない売上を見つけたら取り消す。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="1">
+      <p class="q">コネクタ A へのオーソリがタイムアウトしました。コネクタ B に送り直してよいのはいつ？</p>
+      <div class="opts">
+        <button>A で「送っていない」ことが確実か、A での取り消しが受理された後だけ</button>
+        <button>すぐ。顧客を待たせないことが最優先</button>
+        <button>30 秒待って A から応答がなければ</button>
+      </div>
+      <p class="why">結果が分からないうちに別の試行を作ると、二重オーソリになります。設計は「送信中・結果不明の試行は同時に 1 つまで」を DB の制約で守ります（payments.md の 8.1 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payments.md">payments.md</a> の 7・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0011-connector-abstraction-and-unknown-outcome.md">ADR-0011</a>、コネクタからの通知は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0014-connector-inbox.md">ADR-0014</a>。</small></p>
+  </section>
+
+  <section class="s" id="api">
+    <h2>開発者向け API の約束</h2>
+    <p>本家の API の使い心地は、加盟店の開発者との 3 つの約束からできています。</p>
+    <div class="tabs">
+      <div data-tab="API キー"><p>公開可能キー（ブラウザーに置いてよい）、秘密キー（全権限）、制限付きキー（権限を絞る）の 3 種類。接頭辞で本番とテストを分けます：<code>&lt;brand&gt;_sk_live_</code>・<code>&lt;brand&gt;_sk_test_</code>。本番とテスト（サンドボックス）は DB のクラスタごと分かれます。</p></div>
+      <div data-tab="冪等キー"><p>POST に <code>Idempotency-Key</code> を付けると、同じキーの再送には最初の結果（500 を含む）を 24 時間返します。仕組みは<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。設計は API・内部（仕訳）・コネクタ（参照番号）の 3 層で冪等にします。</p></div>
+      <div data-tab="日付の版"><p>版は <code>YYYY-MM-DD.&lt;名前&gt;</code>。最初の要求の時点の版がアカウントに固定され、互換性を壊す変更は新しい版にだけ入ります。古い版の形は「変更モジュール」で最新の形から変換して作ります。</p></div>
+    </div>
+    <div class="callout"><span class="label">金額の表し方</span>金額は通貨ごとの最小単位の整数（<code>bigint</code>）と <a class="t" href="#g-iso4217">ISO 4217</a> の通貨コードで持ちます。JPY は小数がないので 1,000 円は <code>1000</code>、USD は 10.00 ドルが <code>1000</code> です。浮動小数点は使いません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/api.md">api.md</a> の 6・7・11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0004-idempotency.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0007-date-based-api-versions.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0008-api-keys-and-dashboard-access.md">ADR-0008</a>。</small></p>
+  </section>
+
+  <section class="s" id="ledger">
+    <h2>複式簿記の台帳</h2>
+    <p>お金の正本は<a class="t" href="#g-double-entry">複式簿記</a>の台帳です。1 つの<a class="t" href="#g-journal">仕訳</a>は 2 行以上からなり、<strong>借方（+）と貸方（−）の合計が必ず 0</strong> になります。お金は消えも湧きもせず、口座の間を移るだけです。</p>
+    <table>
+      <tr><th>口座</th><th>区分（自社から見て）</th><th>10,000 円のカード決済の確定</th></tr>
+      <tr data-frag><td><code>connector_receivable</code></td><td>資産：決済代行からの未収金</td><td>+10,000</td></tr>
+      <tr data-frag><td><code>merchant_pending</code></td><td>負債：加盟店に払うべき、まだ使えない売上</td><td>−9,640</td></tr>
+      <tr data-frag><td><code>fee_revenue</code></td><td>収益：決済手数料（3.6%）</td><td>−360</td></tr>
+    </table>
+    <p>加盟店の残高は、自社から見ると<strong>預かっている負債</strong>です。だから貸方（負）が普通の状態で、加盟店に見せるときは符号を反転します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">返金の処理で、加盟店の残高を減らすにはどうしますか？</p>
+      <div class="opts">
+        <button>残高の列を UPDATE で減らす</button>
+        <button>前の仕訳を書き換える</button>
+        <button>新しい仕訳を追記し、状態の変更と同じトランザクションで書く</button>
+      </div>
+      <p class="why">台帳は追記だけで、UPDATE・DELETE はトリガーで拒否します。誤りも逆の仕訳で直します（ledger.md の 3 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/ledger.md">ledger.md</a> の 2・3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0003-double-entry-ledger.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0015-chart-of-accounts-and-balance-transactions.md">ADR-0015</a>。</small></p>
+  </section>
+
+  <section class="s" id="balance">
+    <h2>保留中・利用可能・リザーブ</h2>
+    <p>本家の加盟店の残高（Balance）は、<code>pending</code>（まだ使えない）と <code>available</code>（入金・返金に使える）に分かれます。残高を動かす 1 件ごとの記録が <a class="t" href="#g-bt">BalanceTransaction</a> で、設計では仕訳の射影です。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>available_on</h3><p>売上が利用可能になる日。確定日＋売上処理のタイミング（日本の既定は初回 7 暦日、以後 4 営業日）。確定時に固定します。</p></div>
+      <div class="card" data-frag><h3>リザーブ</h3><p>リスクに応じて残高の一部を留め置く。固定（指定日に解放）とローリング（決済から N 日後に解放）があります。</p></div>
+      <div class="card" data-frag><h3>マイナス残高</h3><p>Dispute の引き落としは残高が足りなくても行います。以後の売上で相殺します。</p></div>
+    </div>
+    <div class="callout warn"><span class="label">書き込みの集中</span>大口の加盟店では、1 つの残高の行に毎秒数百件の書き込みが集まり、行ロックで直列になります。設計は集計をスロット（16〜64 行）に分け、プラットフォームの口座は即時に集計しません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/ledger.md">ledger.md</a> の 4〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0016-hot-accounts-and-ledger-sharding.md">ADR-0016</a>。</small></p>
+  </section>
+
+  <section class="s" id="refunds-disputes">
+    <h2>返金とチャージバック</h2>
+    <p>どちらもお金が顧客に戻りますが、<strong>誰が始め、誰が決めるか</strong>が違います。</p>
+    <div class="compare">
+      <div><h3>返金（Refund）</h3><p>加盟店が自分の判断で行う。利用可能な残高から引く。足りなければカードは最長 30 日保留し、他の手段は失敗にする。決済手数料は戻らない。</p></div>
+      <div><h3><a class="t" href="#g-chargeback">チャージバック</a>（Dispute）</h3><p>顧客がイシュアに異議を申し立てて始まる。通知の時点で額と手数料（1 件 1,500 円）を引き、加盟店は証拠を<strong>1 回だけ</strong>提出できる。勝てば額は戻るが、手数料は戻らない。</p></div>
+    </div>
+    <p>本家の Dispute の状態は 8 つです。<code>warning_</code> が付くもの（<a class="t" href="#g-inquiry">照会</a>）はお金を動かさず、付かないもの（<code>needs_response</code> → <code>under_review</code> → <code>won</code> / <code>lost</code>）が正式なチャージバックです。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">Dispute の勝ち負けを決めるのは誰？</p>
+      <div class="opts">
+        <button>このシステムが、加盟店の証拠を見て決める</button>
+        <button>イシュア。このシステムはアクワイアラからの通知を正本として状態を進める</button>
+        <button>加盟店と顧客の話し合いで決まる</button>
+      </div>
+      <p class="why">設計は自分で勝ち負けを決めず、証拠をアクワイアラへ届けるだけです（disputes.md の 1 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/disputes.md">disputes.md</a> の 3・5 節、返金は <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payments.md">payments.md</a> の 10 節。</small></p>
+  </section>
+
+  <section class="s" id="payouts">
+    <h2>入金と 3 者照合</h2>
+    <p>台帳が正しくても、外の世界と合っているとは限りません。そこで、<strong>台帳・決済代行の精算ファイル・銀行の入出金明細</strong>の 3 つを突き合わせます（<a class="t" href="#g-recon">3 者照合</a>）。</p>
+    <pre class="mermaid">flowchart LR
+  L["台帳<br>(未収金・入金の仕訳)"] -- "参照番号で" --- S["精算ファイル<br>(決済代行)"]
+  S -- "純額・日付で" --- B["銀行の明細<br>(着金・出金)"]
+  B -- "振込の依頼番号で" --- L
+  B -. "相手が分からない入金" .-> X["仮勘定<br>(suspense)"]</pre>
+    <ul>
+      <li>説明のつかない差は「ブレイク」として記録し、T+2 営業日までに 0 件にします（NFR-005）。</li>
+      <li>お金が実際に動いたのに相手が分からないときは、まず<a class="t" href="#g-suspense">仮勘定</a>に置きます。</li>
+      <li>加盟店への入金は、提携銀行の API で振り込み、予備に<a class="t" href="#g-zengin">全銀フォーマット</a>のファイルを持ちます。日本の本家の既定は手動入金で、週次・月次も選べます。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payouts-and-reconciliation.md">payouts-and-reconciliation.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0017-three-way-reconciliation-with-suspense.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0018-payout-execution-via-banking-partner.md">ADR-0018</a>。入金の Epic は法務の確認待ち（L1）です。</small></p>
+  </section>
+
+  <section class="s" id="japan">
+    <h2>日本の決済手段：コンビニ払いと銀行振込</h2>
+    <p>どちらも顧客が後から払う「非同期」の手段です。PaymentIntent は <code>requires_action</code> で支払いを待ちます。</p>
+    <div class="tabs">
+      <div data-tab="コンビニ払い">
+        <ul>
+          <li><a class="t" href="#g-konbini-agent">収納代行</a>の事業者が支払い番号を発行し、顧客が店頭で現金で払う。120 円〜300,000 円、期限の既定は 3 日。</li>
+          <li>支払うと「速報」が届き、後日「確報」と精算ファイルが届く。設計は速報で <code>succeeded</code> にし、確報で照合する。</li>
+          <li>チャージバックはない。返金は顧客の銀行口座への振込。</li>
+        </ul>
+      </div>
+      <div data-tab="銀行振込">
+        <ul>
+          <li>Customer ごとに<a class="t" href="#g-virtual-account">バーチャル口座</a>（振込専用の口座番号）を割り当てる。</li>
+          <li>振込はまず Customer の<strong>現金残高</strong>に入り、そこから PaymentIntent に充てる。過不足が起きうる。</li>
+          <li>顧客のお金を預かる形になるため、資金決済法の上の扱いが法務の確認待ち（L1）。</li>
+        </ul>
+      </div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payment-methods.md">payment-methods.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0013-japan-async-payment-methods.md">ADR-0013</a>。</small></p>
+  </section>
+
+  <section class="s" id="pci">
+    <h2>PCI DSS とカード情報の隔離</h2>
+    <p><a class="t" href="#g-pci">PCI DSS</a> は、カード番号（<a class="t" href="#g-pan">PAN</a>）を扱う事業者が守る業界の基準です。カード番号に触れる範囲（<a class="t" href="#g-cde">CDE</a>）がすべて審査の対象になるので、<strong>範囲を小さく閉じ込める</strong>ことが設計の要になります。</p>
+    <div class="stepper">
+      <ol>
+        <li>顧客のカード番号は、CDE が配る iframe に入力され、CDE（別の AWS アカウント）へ直接送られる。</li>
+        <li>CDE は番号を暗号化して保存し、使い捨ての <code>card_input</code> を返す。</li>
+        <li>本体は <code>card_input</code> と引き換えに <code>pm_</code>（<a class="t" href="#g-token">トークン</a>）を得る。手に入るのはブランド・下 4 桁などの表示用の情報だけ。</li>
+        <li>オーソリのときだけ、CDE の Connector Gateway が番号を復号してアクワイアラへ送る。</li>
+        <li>CVC はオーソリの後に一切残さない（オーソリ後の機密認証データの保存は禁止）。</li>
+      </ol>
+    </div>
+    <p>加盟店は番号に触れないので、最も軽い自己評価（<a class="t" href="#g-saq-a">SAQ A</a>）で済みます。目標は v4.0.1 のサービスプロバイダー レベル 1 です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/card-vault.md">card-vault.md</a> の 2・3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0005-pci-scope-segmentation.md">ADR-0005</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0029-multi-account-and-cde-layout.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0020-cde-access-model.md">ADR-0020</a>（AI エージェントは CDE に入れない）。</small></p>
+  </section>
+
+  <section class="s" id="webhooks">
+    <h2>Event と Webhook</h2>
+    <p>決済の結果は、非同期に決まることが多い（3DS・結果不明・コンビニの入金）ため、加盟店は Webhook で知ります。Event は状態の変化と同じトランザクションで outbox に書きます（<a href="../../../../docs/primer/index.html#outbox">共通の資料</a>）。</p>
+    <ul>
+      <li data-frag><strong>少なくとも 1 回・順序なし</strong>：加盟店は Event の <code>id</code> で重複を捨てる。</li>
+      <li data-frag><strong>失敗は 3 日間、指数的に再試行</strong>：2xx 以外はすべて失敗。</li>
+      <li data-frag><strong><a class="t" href="#g-hmac">HMAC</a> で署名</strong>：<code>&lt;Brand&gt;-Signature: t=…,v1=…</code>。<code>v1</code> は「時刻.本文」の HMAC-SHA256。加盟店は<strong>生の本文</strong>で検証し、時刻の差で再送の攻撃を防ぐ。</li>
+      <li data-frag><strong>隔離された経路から送る</strong>：加盟店の URL への送信は、内部に届かない egress VPC の固定 IP から。</li>
+    </ul>
+    <div class="quiz" data-answer="1">
+      <p class="q"><code>payment_intent.succeeded</code> の後に <code>payment_intent.created</code> が届きました。何が起きた？</p>
+      <div class="opts">
+        <button>正常。配信の順序は保証しないので、加盟店は順序に依存しない作りにする</button>
+        <button>バグ。Event は必ず作られた順に届く</button>
+        <button>二重決済が起きた</button>
+      </div>
+      <p class="why">本家も設計も順序を保証しません。1 つの遅いエンドポイントで全体を詰まらせないためです（events-and-webhooks.md の 1・5.3 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/events-and-webhooks.md">events-and-webhooks.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0025-webhook-signing-and-isolated-delivery.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0026-snapshot-event-model.md">ADR-0026</a>。</small></p>
+  </section>
+
+  <section class="s" id="onboarding-law">
+    <h2>加盟店の審査と日本の法令の枠組み</h2>
+    <p>決済の基盤は、誰にでも使わせてよいわけではありません。本番で決済を受ける前に、本人確認（<a class="t" href="#g-kyc">KYC</a>）、反社会的勢力・制裁の照合、業種と Web サイトの審査をし、通れば <code>charges_enabled</code>・<code>payouts_enabled</code> が開きます。</p>
+    <table>
+      <tr><th>法令</th><th>論点（設計は結論を出していない）</th></tr>
+      <tr><td>資金決済法</td><td>代金を受け取って後で渡す流れが、収納代行か資金移動業か（L1）</td></tr>
+      <tr><td>割賦販売法</td><td>締結事業者の登録の要否、加盟店調査の項目（L2）</td></tr>
+      <tr><td>犯罪収益移転防止法</td><td>特定事業者に当たるか、取引時確認の義務（L3）</td></tr>
+      <tr><td>個人情報保護法</td><td>顧客の情報を委託で扱うか、外国の提供者への提供（L4）</td></tr>
+      <tr><td>電気通信事業法</td><td>端末の情報を不正検知へ送ることの外部送信規律（L5）</td></tr>
+      <tr><td>帳簿・税</td><td>保存期間（L6）、留保の期間（L7）、手数料の消費税（L8）</td></tr>
+    </table>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>上の L1〜L8 はすべて法務の確認待ちです。確認が済むまで、関係する Epic の spec は承認しません。この資料は枠組みの紹介で、法的な判断ではありません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/intent.md">intent.md</a> の「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/merchant-onboarding.md">merchant-onboarding.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0022-merchant-onboarding-and-kyc.md">ADR-0022</a>。</small></p>
+  </section>
+
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>中心は「支払い」と「お金」の 2 つの系です。支払いの系（PaymentIntent → Charge → Refund・Dispute）が状態を持ち、お金の系（仕訳 → 行 → 口座）が金額の正本を持ちます。BalanceTransaction は両者をつなぐ射影です。</p>
+    <pre class="mermaid">erDiagram
+  accounts ||--o{ payment_intents : "owns"
+  payment_intents ||--o{ charges : "attempts"
+  charges ||--o{ refunds : "refunded by"
+  charges ||--o{ disputes : "disputed by"
+  journal_entries ||--|{ ledger_postings : "has lines"
+  ledger_accounts ||--o{ ledger_postings : "posted to"
+  journal_entries ||--o{ balance_transactions : "projected to"
+  payouts ||--o{ balance_transactions : "includes"
+  payment_intents {
+    uuid id PK "pi_"
+    uuid account_id FK
+    bigint amount
+    text status
+  }
+  charges {
+    uuid id PK "ch_"
+    text internal_status "unknown etc"
+  }
+  journal_entries {
+    uuid id PK
+    text entry_type
+    text idempotency_key
+  }
+  ledger_postings {
+    uuid id PK
+    bigint amount "debit positive"
+  }
+  ledger_accounts {
+    uuid id PK
+    uuid account_id FK "NULL for platform"
+    text kind
+  }
+  balance_transactions {
+    uuid id PK "txn_"
+    bigint net
+  }</pre>
+    <ul>
+      <li>テナントのテーブルは <code>account_id</code> と RLS を持ちます（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。テストと本番は DB のクラスタで分かれるので、<code>livemode</code> の列はありません。</li>
+      <li>カード番号の表（<code>vault_cards</code>）は CDE の別の DB にあり、外部キーはなく <code>pm_</code> の値で対応します。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/data-model.md">data-model.md</a> の 3・4 節と <a href="https://github.com/shoito/rebuilds/tree/main/systems/stripe/docs/architecture/data-model">data-model/</a>。図は主な列だけです。</small></p>
+  </section>
+
+  <section class="s" id="naming">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>API の形・状態の名前・オブジェクトの ID の接頭辞（<code>pi_</code>・<code>cus_</code>・<code>du_</code> など）は本家に合わせます。秘密やブランドを含む名前だけを置き換えます（リポジトリ共通の ADR-0006）。</p>
+    <table>
+      <tr><th>本家</th><th>この設計</th></tr>
+      <tr><td><code>Stripe-Version</code>・<code>Stripe-Signature</code></td><td><code>&lt;Brand&gt;-Version</code>・<code>&lt;Brand&gt;-Signature</code></td></tr>
+      <tr><td><code>sk_live_</code>・<code>pk_test_</code>・<code>whsec_</code></td><td><code>&lt;brand&gt;_sk_live_</code>・<code>&lt;brand&gt;_pk_test_</code>・<code>&lt;brand&gt;_whsec_</code></td></tr>
+      <tr><td><code>next_action.type = use_stripe_sdk</code></td><td><code>use_&lt;brand&gt;_sdk</code></td></tr>
+      <tr><td>版の名前（acacia・basil など）</td><td>別の木の名前（本家の版と互換と誤解させない）</td></tr>
+    </table>
+    <p>範囲の違い：Connect・Billing・Radar の機械学習・Terminal などは範囲外です。<code>POST /v1/charges</code> は作らず、Charge は PaymentIntent の中の試行としてだけ存在します。本番の秘密キーは作成時の 1 回だけ表示します。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/README.md">architecture/README.md</a> の 6 節の「決定」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-merchant">加盟店</dt><dd>代金を受け取る事業者。このシステムのテナント（<code>acct_</code>）。</dd>
+      <dt id="g-psp">決済代行</dt><dd>加盟店とカード会社などの間をつなぐ事業者（PSP）。</dd>
+      <dt id="g-acquirer">アクワイアラ</dt><dd>加盟店の契約を持ち、カードブランドの網に取引を送るカード会社。</dd>
+      <dt id="g-issuer">イシュア</dt><dd>顧客にカードを発行した会社。オーソリの承認と、チャージバックの判断をする。</dd>
+      <dt id="g-connector">コネクタ</dt><dd>決済代行・アクワイアラ・収納代行・銀行ごとの差を吸収する、このシステムの部品。共通の操作と「能力」を持つ。</dd>
+      <dt id="g-auth">オーソリ</dt><dd>与信の確認。イシュアに利用可能かを問い合わせ、枠を押さえる。お金は動かない。</dd>
+      <dt id="g-capture">キャプチャ</dt><dd>オーソリした枠のうち請求する額を確定すること。日本では「売上確定」「実売上」とも呼ぶ。</dd>
+      <dt id="g-settlement">精算</dt><dd>決済代行が、取引の代金から手数料を引いてまとめて振り込むこと。明細が精算ファイル。</dd>
+      <dt id="g-cit">CIT</dt><dd>Customer-Initiated Transaction。顧客がその場にいて始める取引。</dd>
+      <dt id="g-mit">MIT</dt><dd>Merchant-Initiated Transaction。保存したカードで、加盟店が顧客の不在時に始める取引。</dd>
+      <dt id="g-3ds">3D セキュア</dt><dd>EMV 3-D セキュア（3DS2）。イシュアがカード会員本人かを認証する仕組み。</dd>
+      <dt id="g-frictionless">frictionless</dt><dd>3DS で、イシュアがリスクを低いと見て、顧客の操作なしに認証を通すこと。逆がチャレンジ。</dd>
+      <dt id="g-ref">参照番号</dt><dd>コネクタへの要求ごとの一意の番号。再送・照会・取り消しを同じ番号で行い、重複を防ぐ。</dd>
+      <dt id="g-chargeback">チャージバック</dt><dd>顧客の異議を受けて、イシュアが加盟店から代金を取り戻す仕組み。API では Dispute（<code>du_</code>）。</dd>
+      <dt id="g-inquiry">照会（inquiry）</dt><dd>チャージバックの前の段階の問い合わせ。お金は動かない。</dd>
+      <dt id="g-double-entry">複式簿記</dt><dd>1 つの取引を、借方と貸方の 2 つ以上の口座の動きとして、合計が釣り合うように記録する方法。</dd>
+      <dt id="g-journal">仕訳</dt><dd>台帳への 1 回の記録（<code>journal_entries</code>）。行（<code>ledger_postings</code>）の合計は通貨ごとに 0。</dd>
+      <dt id="g-bt">BalanceTransaction</dt><dd>加盟店の残高を動かす 1 件ごとの記録（<code>txn_</code>）。<code>amount</code>・<code>fee</code>・<code>net</code>・<code>available_on</code> を持つ。</dd>
+      <dt id="g-recon">3 者照合</dt><dd>台帳・決済代行の精算・銀行の明細の 3 つが一致することを確かめる処理。</dd>
+      <dt id="g-suspense">仮勘定</dt><dd>実際に動いたが行き先・出どころが分からないお金を一時的に置く口座（<code>suspense:*</code>）。</dd>
+      <dt id="g-zengin">全銀フォーマット</dt><dd>全国銀行協会が定めた、総合振込や入出金明細のファイルの固定長の形式。</dd>
+      <dt id="g-konbini-agent">収納代行</dt><dd>コンビニでの支払いを受け付け、事業者に代金を渡す事業者。</dd>
+      <dt id="g-virtual-account">バーチャル口座</dt><dd>振込の受け取り専用に割り当てる口座番号。番号で振込人（Customer）を特定する。</dd>
+      <dt id="g-pci">PCI DSS</dt><dd>カードブランドが作った PCI SSC の、カード情報を守るための基準。v4.0.1 が現行。</dd>
+      <dt id="g-pan">PAN</dt><dd>Primary Account Number。カード番号。</dd>
+      <dt id="g-cde">CDE</dt><dd>Cardholder Data Environment。カード会員データを扱う、またはそれに接続する範囲。</dd>
+      <dt id="g-token">トークン</dt><dd>カード番号の代わりに使う、番号を復元できない値。ここでは <code>pm_</code>。</dd>
+      <dt id="g-saq-a">SAQ A</dt><dd>カード情報の処理を全面的に外部へ任せた加盟店向けの、最も短い自己評価の質問票。</dd>
+      <dt id="g-hmac">HMAC</dt><dd>共有の秘密の鍵とハッシュ関数で作る、改ざん検知用の署名。</dd>
+      <dt id="g-kyc">KYC</dt><dd>Know Your Customer。事業者の本人確認と審査。オンラインで行うものを eKYC と呼ぶ。</dd>
+      <dt id="g-iso4217">ISO 4217</dt><dd>通貨コードの国際規格（JPY・USD など）。通貨ごとの小数の桁数も定める。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「お金」と「カード番号」の 2 本の柱を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、3 つの原則、規模の段階、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payments.md">payments.md</a> <span>— 状態遷移、3DS、結果不明の回復</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/ledger.md">ledger.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/payouts-and-reconciliation.md">payouts-and-reconciliation.md</a> <span>— 台帳、残高、入金、照合</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/card-vault.md">card-vault.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/security.md">security.md</a> <span>— CDE、暗号化、PCI DSS</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/api.md">api.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/events-and-webhooks.md">events-and-webhooks.md</a> <span>— 開発者との約束</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/stripe/docs/decisions">decisions/</a> <span>— 特に 0003（台帳）、0004（冪等）、0005（CDE）、0011（結果不明）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/data-model.md">data-model.md</a> <span>— 表・制約・索引の正本</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GitHub の前提知識</title>
+<meta name="description" content="GitHub の再構築の設計の文書を読む前に要る、Git のしくみ・Pull Request・権限・Actions・Webhook などの前提知識。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · GitHub の前提知識</p>
+    <h1>GitHub の設計を読む前に</h1>
+    <p class="lead">Git がデータをどう持つか、Pull Request がどう取り込まれるか、権限と CI の安全がなぜ難しいか。設計の文書が前提にしている知識を、順に押さえます。共通の前提知識（RLS、outbox、冪等、ER 図の記号など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · GitHub の前提知識</p>
+    <h2>GitHub の設計を読む前に</h2>
+    <p class="lead">Git のしくみ、Pull Request、権限、Actions、Webhook</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <!-- 1 -->
+  <section class="s" id="what">
+    <h2>GitHub は何をするサービスか</h2>
+    <p>Git のリポジトリを預かり、その上でレビュー・課題の管理・CI を回す場です。使うのは、開発者・Organization の管理者・外部のツール、そして API で操作する AI エージェントです。</p>
+    <div class="stepper">
+      <ol>
+        <li>リポジトリを <code>git clone</code> で手元に取る。</li>
+        <li>ブランチを切ってコミットし、<code>git push</code> でサーバーに送る。</li>
+        <li>Pull Request（PR）を開き、取り込みを提案する。</li>
+        <li>CI が走り、レビュアーが差分を読んで承認する。</li>
+        <li>保護の規則を満たしたら、既定のブランチにマージする。</li>
+        <li>マージの事象が Webhook・通知・CI に伝わり、デプロイなどが続く。</li>
+      </ol>
+    </div>
+    <p>公開のリポジトリはだれでも読め、非公開のリポジトリは権限のある人だけが読めます。<strong>この 2 つが同じ基盤に混ざっている</strong>ことが、設計の難しさの多くを生みます。規模は S1 で 100 万リポジトリ、1 日 10 万人、Git の要求はピークで 2,000 件/秒を見込みます。</p>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>3 つの価値と「守るべき振る舞い」は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/intent.md">intent.md</a>、規模は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/README.md">architecture/README.md</a> の 2 節にあります。規模の段階の考え方は<a href="../../../../docs/primer/index.html#stages">共通の資料</a>を見てください。</div>
+  </section>
+
+  <!-- 2 -->
+  <section class="s" id="git-basics">
+    <h2>Git のしくみ：オブジェクトと ref</h2>
+    <p>Git の中身は、中身のハッシュを名前にした<a class="t" href="#g-object">オブジェクト</a>の集まりです。名前が中身で決まるので、<strong>一度書いたオブジェクトは変わりません</strong>。</p>
+    <pre class="mermaid">flowchart LR
+  R["ref: refs/heads/main"] --> C3["commit C3"]
+  C3 -- "parent" --> C2["commit C2"]
+  C2 -- "parent" --> C1["commit C1"]
+  C3 --> T["tree: ディレクトリ"]
+  T --> B1["blob: README.md"]
+  T --> B2["blob: main.go"]</pre>
+    <ul>
+      <li data-frag><strong>blob</strong>（ファイルの中身）、<strong>tree</strong>（ディレクトリ）、<strong>commit</strong>（tree と親と作者）、<strong>tag</strong> の 4 種類があります。名前は <a class="t" href="#g-sha">SHA</a> です。</li>
+      <li data-frag><a class="t" href="#g-ref">ref</a> は「名前 → コミットの SHA」の対応だけです。ブランチは ref の 1 つにすぎません。</li>
+      <li data-frag>オブジェクトは <a class="t" href="#g-packfile">packfile</a> にまとめて圧縮し、やり取りします。</li>
+    </ul>
+    <div class="callout key"><span class="label">要点</span>push で変わるのは、新しいオブジェクトの追加と ref の付け替えだけです。だから「ref をどう安全に動かすか」が保存の設計の中心になります。</div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>中身の正本を Git に置く決定（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0005-git-as-source-of-truth.md">ADR-0005</a>）と、SHA の組で差分をキャッシュできる理由（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0010-server-side-merge-and-diff.md">ADR-0010</a>）の前提です。</div>
+  </section>
+
+  <!-- 3 -->
+  <section class="s" id="push-fetch">
+    <h2>push と fetch でサーバーがすること</h2>
+    <p>Git のクライアントは HTTPS か SSH でサーバーと話します。いまの既定は<a class="t" href="#g-v2">プロトコル v2</a> です。HTTPS では、パスワードではなくトークンで認証します。</p>
+    <div class="tabs">
+      <div data-tab="push（receive-pack）">
+        <div class="stepper">
+          <ol>
+            <li>認証し、そのリポジトリに書き込めるかを判定する。</li>
+            <li>クライアントが「ref・旧い SHA・新しい SHA」の一覧を送る。</li>
+            <li>packfile を受け、<a class="t" href="#g-quarantine">検疫</a>の領域で壊れていないかを検査する。</li>
+            <li>大きさ・ref の名前・ブランチの保護の規則を検査する。</li>
+            <li>ref を「旧い値のときだけ新しい値へ」更新する。</li>
+            <li>ref ごとに <code>ok</code> か理由つきの <code>ng</code> を返す。</li>
+          </ol>
+        </div>
+      </div>
+      <div data-tab="fetch・clone（upload-pack）">
+        <div class="stepper">
+          <ol>
+            <li><code>ls-refs</code>：サーバーが ref の一覧を返す。</li>
+            <li>クライアントが欲しいコミット（<code>want</code>）と、持っているコミット（<code>have</code>）を伝える。</li>
+            <li>サーバーが差分のオブジェクトを数え、packfile を作って流す。</li>
+          </ol>
+        </div>
+        <p>3 の「数える」が重い処理です。clone は全履歴を数えるので、とくに重くなります。</p>
+      </div>
+      <div data-tab="fast-forward と force push">
+        <p>新しいコミットが旧いコミットの子孫なら、ref を前に進めるだけで済みます。これが <a class="t" href="#g-ff">fast-forward</a> です。子孫でない更新は履歴を書き換えるので、<code>--force</code> が要ります。保護の規則はこれを禁止できます。</p>
+      </div>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>検査の順序と時間の予算は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-protocols.md">git-protocols.md</a> の 5 節、フロントエンドが状態を持たない理由は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0004-stateless-git-frontend.md">ADR-0004</a> です。</div>
+  </section>
+
+  <!-- 4 -->
+  <section class="s" id="replication">
+    <h2>3 つの複製と ref の更新の合意</h2>
+    <p>リポジトリは、別々の AZ にある 3 台のストレージのノードに、普通の Git のリポジトリとして置きます。ディスクはノードのローカルの NVMe で、ノードは使い捨てです。だから<strong>過半数（2 つ）に書けたときだけ</strong>成功を返します。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as 調整役
+  participant R as 複製 A・B・C
+  participant D as Aurora
+  C->>R: 1 PREPARE ref をロックし旧い値を確かめる
+  R-->>C: 票 ok と前後のチェックサム
+  C->>D: 2 version を CAS で予約
+  C->>R: 3 COMMIT
+  R-->>C: ack
+  C->>D: 4 checksum と version を確定し outbox に書く
+  C-->>C: 5 クライアントに成功を返す</pre>
+    <p>複製が同期しているかは、全 ref の「名前と値」のハッシュの XOR である<a class="t" href="#g-checksum">チェックサム</a>で判定します。同じリポジトリへの push は、DB の <code>version</code> の <a class="t" href="#g-cas">CAS</a> で 1 列に並びます。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">3 つの複製のうち 1 つにしか書けなかったとき、push はどうなりますか？</p>
+      <div class="opts">
+        <button>成功を返し、残り 2 つは後で修復する</button>
+        <button>成功を返さない。クライアントは結果が不明として再試行する</button>
+        <button>書けた 1 つを正として、他の 2 つを作り直す</button>
+      </div>
+      <p class="why">成功を返した push を失わないため、2 つ以上の ack と DB の確定の後にだけ成功を返します。同じ push を再送しても、ref がすでに新しい値なら「最新」として扱われます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>手順と回収は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-storage.md">git-storage.md</a> の 5 節、決定は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0003-replicated-git-storage.md">ADR-0003</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0006-ref-update-consensus.md">ADR-0006</a> です。outbox は<a href="../../../../docs/primer/index.html#outbox">共通の資料</a>を見てください。</div>
+  </section>
+
+  <!-- 5 -->
+  <section class="s" id="fork">
+    <h2>fork とネットワーク</h2>
+    <p><strong>fork</strong> は、他人のリポジトリを自分のアカウントの下に写したものです。権限のない人も、fork に push してから元のリポジトリへ PR を出せます。これが OSS への貢献の普通の形です。</p>
+    <p>元のリポジトリと全ての fork を、1 つの<a class="t" href="#g-network">ネットワーク</a>にまとめます。オブジェクトはネットワークで 1 か所に集め、各リポジトリは <a class="t" href="#g-alternates">alternates</a> でそこを参照します。fork の作成は ref を写すだけで、コピーはありません。</p>
+    <div class="callout warn"><span class="label">共有の副作用</span>ある fork に push したコミットは、同じネットワークの他のリポジトリから SHA を指定すると見ええます。Git のプロトコル v2 の <code>fetch</code> は、広告していない <code>want</code> も弾かないためです。公開のネットワークでは本家と同じく仕様として受け入れ、非公開のネットワークでは到達できるかを検査します（本家との違い）。</div>
+    <div class="quiz" data-answer="3">
+      <p class="q">公開のリポジトリを非公開に変えました。その公開の fork はどうなりますか？</p>
+      <div class="opts">
+        <button>一緒に非公開になる</button>
+        <button>削除される</button>
+        <button>公開のまま、別のネットワークに切り離される</button>
+      </div>
+      <p class="why">1 つのネットワークに公開と非公開を混ぜると、非公開のオブジェクトが公開の側から SHA で引けてしまいます。そこで切り離し、ネットワークの公開の種類を常に 1 つに保ちます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0007-fork-network-object-sharing.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-storage.md">git-storage.md</a> の 7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/identity-and-permissions.md">identity-and-permissions.md</a> の 6 節です。</div>
+  </section>
+
+  <!-- 6 -->
+  <section class="s" id="clone">
+    <h2>clone を速く・安くする道具</h2>
+    <p>clone は「送るオブジェクトを数えて pack を作る」計算と、帯域を食います。Git の本体にある道具と、配り方の工夫を組み合わせます。</p>
+    <div class="tabs">
+      <div data-tab="保守（repack）"><p>push のたびに小さな pack が増えます。<a class="t" href="#g-repack">repack</a> でまとめ、到達できないオブジェクトは猶予の後に消します。消すのが早すぎると、進行中の push が参照するオブジェクトを壊します。</p></div>
+      <div data-tab="ビットマップ・commit-graph"><p><a class="t" href="#g-bitmap">到達可能性のビットマップ</a>は、あるコミットから届くオブジェクトの集合を前もって計算したものです。clone で履歴を歩かずに済みます。<a class="t" href="#g-commit-graph">commit-graph</a> は、merge base の計算や fetch の交渉を速くします。</p></div>
+      <div data-tab="パックのキャッシュ・CDN"><p>CI やボットは同じ clone を短い間に繰り返します。同じ要求の pack をノードで使い回します。人気の公開リポジトリは、<a class="t" href="#g-bundle-uri">bundle-uri</a> で CDN から配ります（クライアントの既定では無効）。</p></div>
+      <div data-tab="partial・shallow"><p><a class="t" href="#g-partial">partial clone</a> は blob を後で取り、shallow clone は古い履歴を取りません。CI は shallow が既定です。</p></div>
+      <div data-tab="LFS"><p><a class="t" href="#g-lfs">Git LFS</a> は、大きなファイルを Git の外に置き、リポジトリには小さな「指し先」だけを入れます。本体は S3 に、presigned URL で直接やり取りします。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0008-pack-caching-and-bundle-cdn.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0009-lfs-storage-on-s3.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-storage.md">git-storage.md</a> の 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-protocols.md">git-protocols.md</a> の 6・7 節です。</div>
+  </section>
+
+  <!-- 7 -->
+  <section class="s" id="pull-request">
+    <h2>Pull Request：base・head・三点の差分</h2>
+    <p>PR は「<strong>head</strong> の ref の変更を、<strong>base</strong> の ref に取り込む提案」です。head は同じリポジトリか、同じネットワークの fork のブランチです。</p>
+    <pre class="mermaid">flowchart LR
+  M["merge base"] --> B1["base の新しいコミット"]
+  M --> H1["head のコミット 1"]
+  H1 --> H2["head のコミット 2"]</pre>
+    <p>画面の差分は <a class="t" href="#g-merge-base">merge base</a> から head までの<a class="t" href="#g-three-dot">三点の差分</a>です。「PR が持ち込む変更」だけが見えます。</p>
+    <div class="tabs">
+      <div data-tab="PR 用の ref"><p>base のリポジトリに <code>refs/pull/{number}/head</code>（head の最新）と <code>refs/pull/{number}/merge</code>（試しにマージした結果）を持ちます。fork が消えても PR を読め、CI は merge の方を対象に走ります。</p></div>
+      <div data-tab="マージの 3 方式"><p><strong>merge</strong>：親が 2 つのマージのコミットを作る。<strong>squash</strong>：変更を 1 つのコミットにまとめる。<strong>rebase</strong>：head の各コミットを base の上に載せ直す（SHA が変わる）。</p></div>
+      <div data-tab="マージ可能か"><p>衝突の有無は裏で計算し、終わるまで <code>mergeable</code> は <code>null</code> です。入力の SHA が決まれば結果も決まるので、SHA の組でキャッシュできます。</p></div>
+    </div>
+    <div class="quiz" data-answer="1">
+      <p class="q">PR を開いた後、base のブランチに他の人の変更がマージされました。PR の画面の差分はどうなりますか？</p>
+      <div class="opts">
+        <button>変わらない。merge base から head までの差分だから</button>
+        <button>base の新しい変更が、逆向きの差分として混ざる</button>
+        <button>head を更新するまで、差分を表示できない</button>
+      </div>
+      <p class="why">三点の差分は、base が進んでも変わりません。ただし、マージ可能かの計算は base と head の現在の SHA でやり直します。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/pull-requests.md">pull-requests.md</a> の 1・3・6 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0010-server-side-merge-and-diff.md">ADR-0010</a> です。</div>
+  </section>
+
+  <!-- 8 -->
+  <section class="s" id="review-rules">
+    <h2>レビューとブランチの保護（ruleset）</h2>
+    <p>既定のブランチは、だれでも書き換えてよいものではありません。「承認が 2 件」「CI が成功」などの条件を、<a class="t" href="#g-ruleset">ruleset</a> で表します。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>レビュー</h3><p>結論は承認・変更の依頼・コメント。数に入るのは、書き込み権限を持つ人の、レビュアーごとの最新の結論だけ。新しい push で古い承認を取り消せる。</p></div>
+      <div class="card" data-frag><h3>CODEOWNERS</h3><p>パスごとのオーナーを書いたファイル。<strong>base 側</strong>のファイルを使い、後に書いた一致が優先する。<a class="t" href="#g-codeowners">詳しく</a></p></div>
+      <div class="card" data-frag><h3>ステータスチェック</h3><p>CI の結果はコミットの SHA に付く。送り手の App を指定し、名前のなりすましを防ぐ。<a class="t" href="#g-check">詳しく</a></p></div>
+      <div class="card" data-frag><h3>ruleset</h3><p>対象の ref のパターン、規則、バイパスできる主体を持つ。複数が重なれば、最も厳しいものが効く。</p></div>
+    </div>
+    <div class="callout key"><span class="label">要点</span>規則は「git push」と「PR のマージ」の 2 つの経路で効きます。片方だけで判定すると、もう片方から迂回されます。だから 1 つの評価関数を両方から呼び、判定の材料が読めないときは拒否します（<a class="t" href="#g-fail-closed">fail closed</a>）。</div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0011-rulesets-as-single-protection-model.md">ADR-0011</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/pull-requests.md">pull-requests.md</a> の 4・5 節です。</div>
+  </section>
+
+  <!-- 9 -->
+  <section class="s" id="merge-queue">
+    <h2>merge queue</h2>
+    <p>「最新の base で CI が通ったものだけ入れる」とすると、だれかがマージするたびに、他の全ての PR が base を取り込み直して CI をやり直します。PR の多いリポジトリでは進みません。<a class="t" href="#g-merge-queue">merge queue</a> はこれを解きます。</p>
+    <div class="stepper">
+      <ol>
+        <li>承認などの条件を満たした PR を、キューに入れる。</li>
+        <li>「最新の base ＋ 前に並ぶ PR ＋ その PR」を合わせた一時的なブランチを作る。</li>
+        <li>CI に <code>merge_group</code> の事象を送り、必須のチェックを走らせる。</li>
+        <li>通ったら、base をそのブランチの SHA へ fast-forward で進める。検査した SHA と取り込む SHA が同じになる。</li>
+        <li>失敗した PR は外し、後ろのグループを作り直して続ける。</li>
+      </ol>
+    </div>
+    <p>一時的なブランチの名前は <code>&lt;brand&gt;-readonly-queue/…</code> です。CI のワークフローが <code>merge_group</code> を契機に持たないと、キューでチェックが走りません。</p>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0012-merge-queue-with-speculative-groups.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/pull-requests.md">pull-requests.md</a> の 8 節です。</div>
+  </section>
+
+  <!-- 10 -->
+  <section class="s" id="permissions">
+    <h2>権限：公開の種類とロールの合成</h2>
+    <p>リポジトリの公開の種類は <code>public</code>・<code>private</code>・<code>internal</code>（E10 から）です。ロールは本家と同じ 5 つです。</p>
+    <p><code>read &lt; triage &lt; write &lt; maintain &lt; admin</code></p>
+    <table>
+      <tr><th>権限の元</th><th>与えるロール</th></tr>
+      <tr><td>個人のリポジトリの持ち主、Organization の owner</td><td>admin</td></tr>
+      <tr><td>直接のコラボレーター</td><td>付けたロール</td></tr>
+      <tr><td>チーム（親チームのロールは子に引き継ぐ）</td><td>チームのロール</td></tr>
+      <tr><td><a class="t" href="#g-base-perm">基本の権限</a>（メンバーだけ。外部のコラボレーターには効かない）</td><td>既定は read</td></tr>
+      <tr><td>公開の種類が public</td><td>だれでも read</td></tr>
+    </table>
+    <p>実効のロールは、これらの<strong>最大値</strong>です。「拒否」の規則はありません。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">権限のない人が、非公開のリポジトリの URL を開きました。何を返しますか？</p>
+      <div class="opts">
+        <button>403 Forbidden</button>
+        <button>404 Not Found</button>
+        <button>401 Unauthorized</button>
+      </div>
+      <p class="why">403 を返すと「そこにリポジトリがある」ことが漏れます。読めない資源には 404 を返し、存在を明かしません。403 は、読めるが書けないときだけです。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>なぜ RLS（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）ではなく判定関数 <code>can()</code> にするかは <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0002-repository-permission-model.md">ADR-0002</a> です。1 人が多数の持ち主の公開リポジトリを読むので、持ち主はテナントになりません。合成の規則は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0018-repository-roles-and-permission-composition.md">ADR-0018</a> です。</div>
+  </section>
+
+  <!-- 11 -->
+  <section class="s" id="credentials">
+    <h2>資格情報：トークンと App</h2>
+    <p>人もプログラムも、ロールの上に「資格情報の上限」がかかります。<strong>できること ＝ ロールが許すこと ∩ 資格情報の上限</strong>です。</p>
+    <table>
+      <tr><th>種類</th><th>主体</th><th>上限と期限</th></tr>
+      <tr><td><a class="t" href="#g-pat">細粒度の PAT</a>（既定）</td><td>ユーザー</td><td>1 つの持ち主・選んだリポジトリ・権限ごと。最長 366 日</td></tr>
+      <tr><td>クラシックの PAT・OAuth アプリのトークン</td><td>ユーザー</td><td><code>repo</code> などのスコープ。入れる全リポジトリ</td></tr>
+      <tr><td><a class="t" href="#g-installation-token">App のインストールのトークン</a></td><td>App の bot</td><td>インストールの権限とリポジトリ。1 時間</td></tr>
+      <tr><td><code>&lt;BRAND&gt;_TOKEN</code></td><td>CI のジョブ</td><td>そのリポジトリだけ。ジョブの完了まで</td></tr>
+      <tr><td><a class="t" href="#g-deploy-key">デプロイキー</a></td><td>リポジトリの鍵</td><td>1 つのリポジトリの Git だけ</td></tr>
+    </table>
+    <p><a class="t" href="#g-app">App</a> は、ユーザーに成り代わらず、<strong>自分の権限だけで動く bot</strong> です。Organization の owner が入れても、App が owner の権限を得るわけではありません。App は秘密鍵で JWT を作り、それと引き換えに 1 時間のトークンを得ます。</p>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0019-authentication-and-token-model.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0020-github-app-model.md">ADR-0020</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/identity-and-permissions.md">identity-and-permissions.md</a> の 3.4・5.4 節です。</div>
+  </section>
+
+  <!-- 12 -->
+  <section class="s" id="api-webhooks">
+    <h2>API と Webhook</h2>
+    <p>外部のツールと AI エージェントは、REST と GraphQL の API で操作します。REST は<strong>日付の版</strong>をヘッダー <code>X-&lt;Brand&gt;-Api-Version</code> で選びます。互換を壊す変更は新しい版だけに入れ、追加は全ての版に入れます。</p>
+    <p><a class="t" href="#g-webhook">Webhook</a> は逆向きで、事象が起きたらサーバーが相手の URL へ POST します。受け手は、次の順で確かめます。</p>
+    <div class="stepper">
+      <ol>
+        <li>本文の生のバイト列と、共有の秘密で <a class="t" href="#g-hmac">HMAC-SHA256</a> を計算する。</li>
+        <li><code>X-&lt;Brand&gt;-Signature-256</code> の <code>sha256=…</code> と、定数時間で比べる。</li>
+        <li><code>X-&lt;Brand&gt;-Delivery</code> の GUID で重複を捨てる（再送でも同じ値）。</li>
+        <li>順序は保証されないので、本文の状態で冪等に処理する。</li>
+      </ol>
+    </div>
+    <p>送る側は、送る直前に権限を確かめ直し、宛先が社内のアドレスでないかを検査します（<a class="t" href="#g-ssrf">SSRF</a> の対策）。送信は本体とつながらない隔離した環境から出します。</p>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0021-api-shape-and-versioning.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0022-webhook-signing-and-delivery.md">ADR-0022</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/api-and-webhooks.md">api-and-webhooks.md</a> の 4・9 節です。冪等は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>を見てください。</div>
+  </section>
+
+  <!-- 13 -->
+  <section class="s" id="actions">
+    <h2>CI（Actions）：だれのコードを、どの秘密で動かすか</h2>
+    <p><a class="t" href="#g-workflow">ワークフロー</a>は <code>.&lt;brand&gt;/workflows/*.yml</code> に書き、push や PR などの事象で起動します。1 つの実行は複数のジョブ、ジョブは複数のステップからなり、ジョブは<a class="t" href="#g-runner">ランナー</a>で動きます。</p>
+    <div class="callout warn"><span class="label">前提</span>公開のリポジトリには、だれでも PR を出せます。<strong>ジョブのコードは常に悪意があるもの</strong>として扱います。ホストのランナーは 1 ジョブ 1 つの <a class="t" href="#g-microvm">microVM</a> で、使ったら壊します。</div>
+    <table>
+      <tr><th>起動</th><th>シークレット</th><th><code>&lt;BRAND&gt;_TOKEN</code></th></tr>
+      <tr><td>同じリポジトリのブランチからの PR</td><td>渡す</td><td>ワークフローの <code>permissions</code> の範囲</td></tr>
+      <tr><td>fork からの PR（<code>pull_request</code>）</td><td>渡さない</td><td>読み取りだけ</td></tr>
+      <tr><td><a class="t" href="#g-pr-target"><code>pull_request_target</code></a></td><td>渡す</td><td>公開のリポジトリでは既定で止める</td></tr>
+    </table>
+    <p>クラウドへのデプロイには、長命の鍵の代わりに <a class="t" href="#g-oidc">OIDC</a> の短命の ID トークンを使います。クラウドの側は <code>sub</code> などの claim で「どのリポジトリのどのブランチか」を確かめます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">fork からの PR で動くジョブが、デプロイ用のシークレットを読めないのはなぜですか？</p>
+      <div class="opts">
+        <button>fork のリポジトリには Actions が無効だから</button>
+        <button>シークレットの容量に上限があるから</button>
+        <button>PR のコードは第三者が書いたもので、秘密を持たせると盗まれうるから</button>
+      </div>
+      <p class="why">PR のワークフローやテストのコードは、PR を出した人が自由に書き換えられます。そこで秘密を渡さず、トークンも読み取りだけにします。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/actions.md">actions.md</a> の 6・7・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0023-firecracker-microvm-runners.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0025-secrets-and-fork-pr-policy.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0026-actions-oidc-provider.md">ADR-0026</a> です。</div>
+  </section>
+
+  <!-- 14 -->
+  <section class="s" id="untrusted">
+    <h2>信頼できない内容を安全に見せる</h2>
+    <p>README、Issue の本文、SVG、ノートブックは、だれでも書けます。アプリと同じオリジンで描くと、利用者の書いたスクリプトが閲覧者のセッションで動きます（XSS）。</p>
+    <div class="compare">
+      <div class="bad"><h3>危ない</h3><p>生のファイルをアプリのサブドメインから HTML として返す。サブドメインは同じサイトなので、Cookie が送られ、上書きもされうる。</p></div>
+      <div class="good"><h3>安全</h3><p>利用者の内容は<strong>別の登録可能ドメイン</strong>（<code>&lt;brand&gt;usercontent.&lt;domain&gt;</code>）から、<code>text/plain</code>・<code>nosniff</code>・CSP の <code>sandbox</code> 付きで返す。</p></div>
+    </div>
+    <ul>
+      <li data-frag>Markdown は、サーバーで HTML にしてから<a class="t" href="#g-sanitize">許可リストで無害化</a>します。</li>
+      <li data-frag>SVG は <code>&lt;img&gt;</code> で読み、スクリプトを動かしません。</li>
+      <li data-frag>ノートブックや Mermaid は、<code>allow-same-origin</code> を付けない sandbox の iframe で描きます。</li>
+      <li data-frag>利用者の内容のドメインは <a class="t" href="#g-psl">Public Suffix List</a> に登録し、サブドメインどうしも別のサイトにします。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0013-untrusted-content-domain-isolation.md">ADR-0013</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/web.md">web.md</a> の 4・5 節です。</div>
+  </section>
+
+  <!-- 15 -->
+  <section class="s" id="search-notify">
+    <h2>検索と通知：権限を前段で効かせる</h2>
+    <div class="tabs">
+      <div data-tab="コード検索">
+        <p>コードを部分一致で探すには、全文検索の単語の索引では足りません。<a class="t" href="#g-zoekt">Zoekt</a> は、3 文字ずつの断片（<a class="t" href="#g-trigram">trigram</a>）の索引で候補を絞ってから、本文を照合します。索引するのは既定のブランチだけです。Issue・PR・リポジトリの検索は OpenSearch に置きます。</p>
+      </div>
+      <div data-tab="権限の絞り込み">
+        <p>結果を取った後に権限で除くと、件数やページの欠けから、読めないリポジトリの存在が漏れます。そこで「読めるリポジトリ」の条件を、<strong>クエリの中に入れて</strong>前段で絞ります。公開の種類を変えたリポジトリは、索引を直すまで除外の表で全ての検索から外します。</p>
+      </div>
+      <div data-tab="通知">
+        <p>リポジトリの <a class="t" href="#g-watch">watch</a> と、スレッドへの「参加」（作った・コメントした・メンションされた・レビューを頼まれた）で受け手が決まります。権限は事象のときと送るときで変わりうるので、<strong>送る直前に確かめ直します</strong>。</p>
+      </div>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0014-code-search-engine.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0015-search-permission-filtering.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0016-notification-fanout.md">ADR-0016</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/search.md">search.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/notifications.md">notifications.md</a> の 2・3 節です。</div>
+  </section>
+
+  <!-- 16 -->
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>中身の正本は Git、メタデータの正本は Aurora です。DB にある ref や SHA は<strong>写し</strong>で、マージの判定には使いません。</p>
+    <pre class="mermaid">erDiagram
+  owners ||--o{ repositories : "owns"
+  repository_networks ||--|{ repositories : "groups"
+  repository_networks ||--|{ network_replicas : "placed on"
+  storage_nodes ||--o{ network_replicas : "hosts"
+  repositories ||--o{ repository_checksums : "has one"
+  repositories ||--o{ issues : "has"
+  issues ||--o{ pull_requests : "0 or 1"
+  pull_requests ||--o{ pull_request_reviews : "has"
+  repositories {
+    bigint id PK
+    bigint owner_id FK
+    bigint network_id FK
+    text visibility
+    bigint next_issue_number
+  }
+  repository_checksums {
+    bigint repo_id PK
+    bytea checksum
+    bigint version
+  }
+  issues {
+    bigint id PK
+    bigint repo_id FK
+    bigint number UK
+  }
+  pull_requests {
+    bigint issue_id PK
+    bigint repo_id FK
+    bigint head_repo_id FK
+    bytea head_sha
+  }</pre>
+    <ul>
+      <li data-frag>主キーは UUIDv7 ではなく <code>bigint</code> の IDENTITY です。API に数値の <code>id</code> として出すためです。</li>
+      <li data-frag>ユーザーと Organization は <code>owners</code> の 1 つの名前空間を共有します。</li>
+      <li data-frag>Issue と PR は同じ <code>issues</code> の表で、番号の列を共有します（<code>#1</code> が Issue なら次の PR は <code>#2</code>）。</li>
+      <li data-frag>各表には権限の区分（R・A・O・U・S・P）があります。R の表は必ず <code>repo_id</code> を持ち、<code>can()</code> を通して読みます。</li>
+    </ul>
+    <div class="callout warn"><span class="label">読み違えやすい点</span>「S3」は、規模の段階の S3 と、AWS の Amazon S3 の両方の意味で出てきます。前後の文脈で見分けてください。</div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/data-model.md">data-model.md</a> の 2・3・4 節と、<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0017-shared-issue-numbering.md">ADR-0017</a> です。記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>を見てください。</div>
+  </section>
+
+  <!-- 17 -->
+  <section class="s" id="differences">
+    <h2>本家との違いと、法令の枠組み</h2>
+    <div class="tabs">
+      <div data-tab="名前の置き換え">
+        <p>振る舞いは本家に寄せますが、本家の名前は識別子に使いません（リポジトリ共通の ADR-0006）。</p>
+        <table>
+          <tr><th>本家</th><th>この設計</th></tr>
+          <tr><td><code>.github/workflows/</code></td><td><code>.&lt;brand&gt;/workflows/</code></td></tr>
+          <tr><td><code>GITHUB_TOKEN</code></td><td><code>&lt;BRAND&gt;_TOKEN</code></td></tr>
+          <tr><td><code>X-Hub-Signature-256</code></td><td><code>X-&lt;Brand&gt;-Signature-256</code></td></tr>
+          <tr><td><code>ghp_</code>（PAT の接頭辞）</td><td><code>&lt;brand&gt;p_</code></td></tr>
+        </table>
+      </div>
+      <div data-tab="振る舞いの違い">
+        <ul>
+          <li>非公開のネットワークで、SHA の参照に到達可能性の検査をかける。</li>
+          <li>Webhook は秘密を必須にし、宛先は https だけ。失敗は自動で 3 回まで再送する。</li>
+          <li>2FA に SMS を使わない。クラシックの PAT も期限は最長 366 日。</li>
+          <li>Web の画面は英語と日本語。</li>
+        </ul>
+      </div>
+      <div data-tab="法令の枠組み">
+        <ul>
+          <li><strong>DMCA</strong>：米国の著作権法の手続き。通知を受けて対象を無効にし、反論の通知があれば一定期間の後に戻す。</li>
+          <li><strong>発信者情報開示</strong>：日本の情報流通プラットフォーム対処法（旧プロバイダ責任制限法）。窓口と手順が要る。</li>
+          <li><strong>輸出管理・制裁</strong>：本家は米国の規則に従う。日本の外為法での扱いは<strong>法務の確認待ち</strong>。</li>
+          <li><strong>個人情報</strong>：個人情報保護法と GDPR。</li>
+        </ul>
+        <p>DMCA の通知の公開、発信者情報開示と外為法への対応、リージョンの障害での push の喪失を利用規約にどう書くかは、<strong>法務の確認待ち</strong>です。</p>
+      </div>
+    </div>
+    <div class="callout"><span class="label">設計の文書のどこで効くか</span>違いの一覧と法務の確認待ちは <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/README.md">architecture/README.md</a> の 6 節、法令は <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/security.md">security.md</a> の 6・13・15 節です。</div>
+  </section>
+
+  <!-- 18 -->
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-object">オブジェクト</dt><dd>Git が保存する単位。blob・tree・commit・tag の 4 種類。中身のハッシュが名前になる。</dd>
+      <dt id="g-sha">SHA</dt><dd>オブジェクトの名前に使うハッシュ。多くのリポジトリは SHA-1（20 バイト）で、SHA-256 のリポジトリもある。</dd>
+      <dt id="g-ref">ref</dt><dd>名前からコミットの SHA への対応。ブランチ（<code>refs/heads/*</code>）やタグ（<code>refs/tags/*</code>）。</dd>
+      <dt id="g-packfile">packfile</dt><dd>多数のオブジェクトを差分で圧縮して 1 つにまとめたファイル。転送と保存に使う。</dd>
+      <dt id="g-v2">プロトコル v2</dt><dd>Git の通信の新しい版。<code>ls-refs</code> で要る ref だけを聞き、<code>fetch</code> で pack を取る。</dd>
+      <dt id="g-quarantine">検疫</dt><dd>push で届いたオブジェクトを、検査が終わるまで本体と分けて置く領域。</dd>
+      <dt id="g-ff">fast-forward</dt><dd>新しいコミットが旧いコミットの子孫で、ref を前に進めるだけで済む更新。</dd>
+      <dt id="g-checksum">チェックサム</dt><dd>この設計では、全 ref の「名前と値」のハッシュの XOR。複製が同期しているかの判定に使う。</dd>
+      <dt id="g-cas">CAS</dt><dd>Compare-and-swap。「今の値が期待どおりのときだけ書き換える」操作。</dd>
+      <dt id="g-network">ネットワーク</dt><dd>元のリポジトリとその全ての fork の集まり。オブジェクトを共有し、同じノードに置く。</dd>
+      <dt id="g-alternates">alternates</dt><dd>Git の仕組み。別の場所のオブジェクトの置き場も、自分のものとして読む。</dd>
+      <dt id="g-repack">repack</dt><dd>pack をまとめ直す保守の作業。不要なオブジェクトは cruft pack に移し、猶予の後に消す。</dd>
+      <dt id="g-bitmap">到達可能性のビットマップ</dt><dd>あるコミットから届くオブジェクトの集合を、ビット列で前もって持つ索引。</dd>
+      <dt id="g-commit-graph">commit-graph</dt><dd>コミットの親子と世代を持つファイル。履歴の走査を速くする。</dd>
+      <dt id="g-bundle-uri">bundle-uri</dt><dd>clone の前に、サーバーが案内する URL から bundle（履歴の固まり）を取らせる Git の仕組み。</dd>
+      <dt id="g-partial">partial clone</dt><dd>blob などを一部だけ取り、要るときに後から取る clone。</dd>
+      <dt id="g-lfs">Git LFS</dt><dd>大きなファイルを別の保存先に置き、リポジトリには指し先（pointer）だけを入れる拡張。</dd>
+      <dt id="g-merge-base">merge base</dt><dd>2 つのコミットの共通の祖先のうち、最も新しいもの。</dd>
+      <dt id="g-three-dot">三点の差分</dt><dd><code>base...head</code>。merge base から head までの差分。PR が持ち込む変更だけを表す。</dd>
+      <dt id="g-ruleset">ruleset</dt><dd>ref のパターンに掛ける保護の規則の集まり。本家の旧来の branch protection rule の後継。</dd>
+      <dt id="g-codeowners">CODEOWNERS</dt><dd>パスのパターンごとにオーナーを書くファイル。該当するファイルの変更に、オーナーのレビューを求められる。</dd>
+      <dt id="g-check">ステータスチェック</dt><dd>コミットの SHA に付く外部の検査の結果。commit status と check run の 2 つの形がある。</dd>
+      <dt id="g-fail-closed">fail closed</dt><dd>判定に要る情報が得られないとき、許可ではなく拒否の側に倒すこと。</dd>
+      <dt id="g-merge-queue">merge queue</dt><dd>PR を順に並べ、まとめて検査してから取り込む仕組み。</dd>
+      <dt id="g-base-perm">基本の権限</dt><dd>Organization のメンバー全員に、その Organization の全リポジトリへ与えるロール。</dd>
+      <dt id="g-pat">PAT</dt><dd>Personal Access Token。ユーザーが作るトークン。細粒度のものとクラシックのものがある。</dd>
+      <dt id="g-app">App</dt><dd>本家の GitHub App に相当する連携の形。アカウントに「インストール」し、自分の bot として権限の範囲で動く。</dd>
+      <dt id="g-installation-token">インストールのトークン</dt><dd>App がインストールの範囲で API を呼ぶための、1 時間で切れるトークン。</dd>
+      <dt id="g-deploy-key">デプロイキー</dt><dd>1 つのリポジトリにだけ結び付いた SSH の鍵。</dd>
+      <dt id="g-webhook">Webhook</dt><dd>事象が起きたとき、登録した URL へサーバーから HTTP で知らせる仕組み。</dd>
+      <dt id="g-hmac">HMAC</dt><dd>共有の秘密とハッシュで作る署名。送り手と改ざんのなさを確かめる。</dd>
+      <dt id="g-ssrf">SSRF</dt><dd>サーバーに内部のアドレスへ要求を出させる攻撃。</dd>
+      <dt id="g-workflow">ワークフロー</dt><dd>CI の定義の YAML。起動の事象、ジョブ、ステップを書く。</dd>
+      <dt id="g-runner">ランナー</dt><dd>ジョブを受け取って実行する環境とエージェント。ホストのものとセルフホストのものがある。</dd>
+      <dt id="g-microvm">microVM</dt><dd>起動の速い軽量の仮想マシン。この設計は Firecracker を使う。</dd>
+      <dt id="g-pr-target">pull_request_target</dt><dd>base のリポジトリのワークフローを、秘密と書き込みのトークン付きで動かす起動の事象。PR のコードを実行すると危ない。</dd>
+      <dt id="g-oidc">OIDC</dt><dd>OpenID Connect。ジョブが署名付きの短命の ID トークンを得て、クラウドに身元を示す。</dd>
+      <dt id="g-sanitize">無害化</dt><dd>HTML から、許可した要素と属性以外を落とすこと。</dd>
+      <dt id="g-psl">Public Suffix List</dt><dd>ブラウザが「どこまでが 1 つのサイトか」を決めるのに使う公開の一覧。</dd>
+      <dt id="g-zoekt">Zoekt</dt><dd>オープンソースのコード検索のエンジン。trigram の索引を使う。</dd>
+      <dt id="g-trigram">trigram</dt><dd>連続する 3 文字の断片。部分一致の検索の候補を絞るのに使う。</dd>
+      <dt id="g-watch">watch</dt><dd>リポジトリの活動の通知を受け取る設定。参加とメンションだけ、全て、無視などの水準がある。</dd>
+    </dl>
+  </section>
+
+  <!-- 19 -->
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の節の順に、設計の文書を読むと進めやすいです。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。守るべき振る舞い</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、決定の一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-storage.md">git-storage.md</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/git-protocols.md">git-protocols.md</a> <span>— 複製、合意、fork、push と clone</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/pull-requests.md">pull-requests.md</a> <span>— 差分、レビュー、ruleset、merge queue</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/identity-and-permissions.md">identity-and-permissions.md</a> <span>— ロール、<code>can()</code>、トークン</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/actions.md">actions.md</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/api-and-webhooks.md">api-and-webhooks.md</a> <span>— CI、App、Webhook</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/web.md">web.md</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/security.md">security.md</a> <span>— 信頼できない内容、脅威モデル、法令</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/search.md">search.md</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/notifications.md">notifications.md</a> <span>— 検索と通知</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/architecture/data-model.md">data-model.md</a> <span>— 表の規則、ER 図、横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/README.md">decisions/</a> <span>— ADR の一覧。まず 0002・0003・0005</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

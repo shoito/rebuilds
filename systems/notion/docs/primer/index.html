@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Notion の前提知識</title>
+<meta name="description" content="Notion の再構築の設計の文書を読む前に知っておくとよい、ブロックのモデル・データベース・CRDT の共同編集・権限の継承・シャーディングの前提知識。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Notion · 前提知識</p>
+    <h1>Notion の設計を読む前に</h1>
+    <p class="lead">ブロックでできた文書とデータベース、同時編集、ページの木を継承する権限、ワークスペースでのシャーディング。設計の文書が前提にしている分野の知識を、先に押さえます。RLS・outbox・冪等・UUIDv7・ER 図の記号は<a href="../../../../docs/primer/index.html">共通の前提知識</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Notion · 前提知識</p>
+    <h2>Notion の設計を読む前に</h2>
+    <p class="lead">ブロック・データベース・CRDT・権限の継承・シャーディング</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Notion は何をするサービスか</h2>
+    <p>チームの文書・wiki・表・タスク・議事録を、1 つの道具の中で作り、つなげるサービスです。文書の中に表を置き、表の行を開くとまた文書になる、という入れ子が特徴です。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>書く</h3><p>見出し・リスト・ToDo・トグル・コードなどを、<code>/</code> で呼ぶメニュー（スラッシュコマンド）や Markdown の入力で並べます。</p></div>
+      <div class="card" data-frag><h3>まとめる</h3><p>データベースに行を足し、表・ボード・カレンダーなどの「ビュー」で見ます。タスク管理や CRM の代わりにも使われます。</p></div>
+      <div class="card" data-frag><h3>一緒に使う</h3><p>同じページを複数人で同時に編集し、コメントし、ページごとに共有の相手を決めます。Web にも公開できます。</p></div>
+    </div>
+    <p>規模の感覚：本家のブロックは 2021 年の 200 億から、2024 年に 2,000 億を超えました。書き込みの 90% は既存の行の更新です。本設計の S1 は、利用者 10 万・ブロック 10 億・同時接続 1 万を見込みます。</p>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/intent.md">intent.md</a> の MVP の範囲と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/README.md">architecture/README.md</a> の規模の段階。</p>
+  </section>
+
+  <section class="s" id="blocks">
+    <h2>すべてはブロック</h2>
+    <p>段落 1 つ、見出し 1 つ、画像 1 つが、それぞれ 1 つの<a class="t" href="#g-block">ブロック</a>です。<strong>ページもブロックの一種</strong>で、データベースの行もページです。どれも同じ表に、同じ形で入ります。</p>
+    <pre class="mermaid">flowchart TD
+  P["page: 議事録"] --> H["heading_1: 決定事項"]
+  P --> L["bulleted_list_item: 予算を承認"]
+  L --> L2["paragraph: 補足（インデントした子）"]
+  P --> C["page: 子ページ"]
+  C --> X["to_do: 資料を送る"]</pre>
+    <ul>
+      <li data-frag><code>content</code>：子の ID の並び（下向き）。表示の順を決めます。</li>
+      <li data-frag><code>parent_id</code>：親の ID（上向き）。権限の継承と、ゴミ箱からの戻し先に使います。</li>
+      <li data-frag><code>page_id</code>：自分を含む最も近いページ。共同編集の順序・購読・履歴の単位です。</li>
+    </ul>
+    <p>下向きと上向きの両方を持つので、両者が食い違わないこと（親はちょうど 1 つ、循環がない）を、サーバーが毎回検査します（不変条件 T1〜T8）。</p>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/block-model.md">block-model.md</a> の 2・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0002-everything-is-a-block.md">ADR-0002</a>。</p>
+  </section>
+
+  <section class="s" id="workspace">
+    <h2>ワークスペース・チームスペース・メンバーとゲスト</h2>
+    <p><a class="t" href="#g-workspace">ワークスペース</a>は会社やチームの単位で、テナントの境界です。その中を<a class="t" href="#g-teamspace">チームスペース</a>（部署やプロジェクト）と、各人の<strong>プライベート</strong>の領域に分けます。</p>
+    <table>
+      <tr><th>人</th><th>どう参加するか</th><th>見えるもの</th></tr>
+      <tr><td>所有者・メンバー</td><td>ワークスペースに所属する</td><td>チームスペースと、共有されたページ</td></tr>
+      <tr><td><a class="t" href="#g-guest">ゲスト</a></td><td>ページ単位で招待される外部の人</td><td>共有されたページとその子孫だけ。グループやチームスペースに入れない</td></tr>
+      <tr><td>連携（bot）</td><td>API のトークンで動く</td><td>明示的に共有されたページとその子孫だけ</td></tr>
+    </table>
+    <p>1 人の人（アカウント）は、複数のワークスペースに入れます。設計では、ログインの単位の<strong>アカウント</strong>と、ワークスペースの中の<strong>メンバー</strong>を別の表に分け、ゲストと連携もメンバーの行にします。</p>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a> の 2・3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0021-accounts-members-guests-and-teamspaces.md">ADR-0021</a>。</p>
+  </section>
+
+  <section class="s" id="editor">
+    <h2>ブロックのエディタとリッチテキスト</h2>
+    <p>Word のような「1 枚の長い文書」ではなく、<strong>ブロックが縦に並んだ一覧</strong>を編集します。Enter でブロックが分かれ、行頭の Backspace で前のブロックとつながり、ドラッグでブロックごと動きます。</p>
+    <div class="tabs">
+      <div data-tab="リッチテキスト"><p>1 ブロックのテキストは、<a class="t" href="#g-span">スパン</a>の配列で持ちます。装飾（太字・色・リンク）が同じ範囲が 1 つのスパンです。</p>
+<pre><code>[ { "text": "会議は " },
+  { "text": "明日", "marks": { "bold": true } },
+  { "text": "‣", "mention": { "type": "user", ... } } ]</code></pre>
+        <p>メンションは 1 文字（<code>‣</code>）として埋め込み、タイトルは持ちません。表示のたびに ID から引くので、読めない人にタイトルが漏れません。</p></div>
+      <div data-tab="エディタの部品"><p>ブロックの層（並び・選択・ドラッグ）は自前で作り、ブロックの中のテキストの編集だけを <a class="t" href="#g-prosemirror">ProseMirror</a> に任せます。テキストを持つブロック 1 つに、エディタ 1 つです。</p></div>
+      <div data-tab="日本語の入力"><p><a class="t" href="#g-ime">IME</a> で変換している間の Enter は「確定」です。ブロックの分割と取り違えないよう、変換中のキー操作を無視します。</p></div>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/editor.md">editor.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/block-model.md">block-model.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0006-rich-text-as-normalized-spans.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0007-block-editor-with-per-block-prosemirror.md">0007</a>。</p>
+  </section>
+
+  <section class="s" id="databases">
+    <h2>データベース：行はページ、見え方はビュー</h2>
+    <p>Notion のデータベースは、表計算というより「型付きのプロパティを持つページの集まり」です。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>データベース</h3><p>タイトル・アイコン・置き場所を持つ入れ物。ページの中に置きます。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-datasource">データソース</a></h3><p>スキーマ（プロパティの名前と型）と行を持つ。2025 年に本家でデータベースから分かれました。</p></div>
+      <div class="card" data-frag><h3>行</h3><p>1 行が 1 ページ。プロパティの値と、本文のブロックを持ちます。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-view">ビュー</a></h3><p>表・ボード・リスト・カレンダー・ギャラリー・タイムライン。フィルタ・並べ替え・グループ化を持ちます。</p></div>
+    </div>
+    <p>プロパティの型は、テキスト・数値・選択・日付・人・チェック・URL・リレーション・ロールアップ・数式などです。別の場所から同じデータソースを見る<a class="t" href="#g-linked">リンクドビュー</a>もあり、権限は元のデータベースに従います。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">データベースの行（ページ）は、ブロックの木のどこにありますか？</p>
+      <div class="opts">
+        <button>データソースの <code>content</code> に、全行の ID が並ぶ</button>
+        <button>ビューごとに、別の表へ行を複製する</button>
+        <button>親は データソース（<code>parent_type = data_source</code>）だが、どの <code>content</code> にも並べず、索引の表で列挙する</button>
+      </div>
+      <p class="why">行は数十万になり、並びはビューごとに違うためです。ADR-0002 の不変条件は、行については「親のデータソースがちょうど 1 つ」と読み替えます。</p>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/databases.md">databases.md</a> の 1〜4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0014-database-query-index.md">ADR-0014</a>。</p>
+  </section>
+
+  <section class="s" id="relations">
+    <h2>リレーション・ロールアップ・数式</h2>
+    <p>データベースどうしをつなぎ、つないだ先の値を集計できます。表計算の参照と集計関数に近い働きです。</p>
+    <div class="tabs">
+      <div data-tab="リレーション"><p>行と行をつなぐプロパティ。「プロジェクト」の行から「タスク」の行を指す、など。両方向にすると、相手側にも逆向きのプロパティが出ます。設計では、1 本の<strong>辺</strong>（<code>relation_edges</code> の 1 行）を正本にし、両側の値をそこから導きます。片側だけ変わる状態が起きません。</p></div>
+      <div data-tab="ロールアップ"><p>リレーションの先の行のプロパティを集計します（件数・合計・平均・最古の日付など）。「プロジェクトの残りのタスク数」が典型です。ロールアップのロールアップは作れません。</p></div>
+      <div data-tab="数式"><p>行ごとに計算するプロパティ（本家の Formulas 2.0）。<code>prop("Tasks").map(current.prop("Status"))</code> のように、リレーションの先もたどれます。参照の深さは 15 層まで。設計では、クライアントとサーバーで同じ評価器を使い、サーバーの値を正とします。</p></div>
+    </div>
+    <div class="callout warn"><span class="label">権限が絡む</span>ロールアップは「見る人が読める行だけ」で計算します。全行で計算した値を、一部の行しか読めない人に返すと、読めない行の存在や値が合計から漏れるためです。</div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/databases.md">databases.md</a> の 6〜8・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0015-formula-evaluation-model.md">ADR-0015</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0016-relation-edges-as-single-source.md">0016</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0017-rollups-over-readable-rows-only.md">0017</a>。</p>
+  </section>
+
+  <section class="s" id="sync-methods">
+    <h2>同時編集の方式：OT と CRDT</h2>
+    <p>2 人が同じ文を同時に書き換えると、それぞれの画面では違う順で変更が届きます。どの画面も同じ内容に<strong>収束</strong>させ、入力を失わない仕組みが要ります。代表的な方式は 2 つです。</p>
+    <div class="tabs">
+      <div data-tab="OT（操作の変換）"><p><a class="t" href="#g-ot">OT</a> は「3 文字目に挿入」のような位置の操作を、先に当たった他人の操作に合わせて変換します。Google Docs の系統です。中央のサーバーと短い分岐が前提で、長いオフラインの後は、基にした版からの全操作との変換が要ります。</p></div>
+      <div data-tab="CRDT"><p><a class="t" href="#g-crdt">CRDT</a> は、どの順で操作を当てても同じ結果になるデータ構造です。文字ごとに一意の ID を振り、位置を「この ID の文字の右」と ID で指します。長いオフラインに強い反面、ページ全体を 1 つの CRDT にすると、サーバーが結果を拒否できません。</p></div>
+      <div data-tab="この設計"><p><strong>テキストはブロックごとの CRDT、構造（ブロックの追加・移動・削除）とプロパティはサーバーの順序</strong>で決めます。テキストは必ず合わさり、木の不変条件と権限はサーバーで守れます。本家も 2025 年 7 月から、テキストに CRDT を使っています。</p></div>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> の 1〜3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0010-text-crdt-with-server-ordered-structure.md">ADR-0010</a>。</p>
+  </section>
+
+  <section class="s" id="text-crdt">
+    <h2>テキストの CRDT の中身</h2>
+    <p>設計は、列の CRDT に <a class="t" href="#g-fugue">Fugue</a>、書式に <a class="t" href="#g-peritext">Peritext</a> を使います。押さえる点は 4 つです。</p>
+    <ul>
+      <li data-frag><strong>文字の ID</strong>：<code>(replica_id, counter)</code>。位置を添字でなく ID で指すので、他人の挿入でずれません。カーソルの位置も ID で送ります。</li>
+      <li data-frag><strong>墓標</strong>：消した文字は中身だけ消し、ID は<a class="t" href="#g-tombstone">墓標</a>として残します。何か月も前の版を基にした操作でも、アンカーの文字が見つかるようにするためです。</li>
+      <li data-frag><strong>交ざり</strong>：2 人が同じ位置に長く書くと、文字単位で交ざる（<a class="t" href="#g-interleaving">interleaving</a>）方式があります。本家の RGA より交ざりにくい Fugue を選んでいます。</li>
+      <li data-frag><strong>書式の広がり</strong>：太字の末尾で打った文字は太字になり、リンクの末尾で打った文字はリンクになりません。Peritext はこの区別を同時編集でも保ちます。</li>
+    </ul>
+    <p>段落の分割（Enter）と結合は、文字の範囲（<a class="t" href="#g-textslice">text slice</a>）を別のブロックへ移す操作で表します。文字の ID は変わらないので、分割の後に届いた操作も正しい場所に当たります。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">CRDT で文字を削除したとき、ID ごと消さずに墓標として残すのはなぜ？</p>
+      <div class="opts">
+        <button>取り消し（Undo）のために中身を残しておくため</button>
+        <button>古い版を基にした他人の操作が、その文字を位置の目印にしていても当てられるようにするため</button>
+        <button>削除の件数を数えて課金するため</button>
+      </div>
+      <p class="why">操作は「この ID の文字の右に挿入」と書かれます。目印の ID が消えると、遅れて届いた操作の位置が決まりません。中身の文字列は消すので、残るのは ID の範囲だけです。</p>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0010-text-crdt-with-server-ordered-structure.md">ADR-0010</a>。</p>
+  </section>
+
+  <section class="s" id="transactions">
+    <h2>変更はトランザクションで送り、ページごとに seq を振る</h2>
+    <p>クライアントは操作（ブロックの作成、プロパティの設定、テキストの挿入など）をまとめた<strong>トランザクション</strong>を送ります。サーバーは検証してから確定し、ページごとの連番 <a class="t" href="#g-seq">seq</a> を振ります。</p>
+    <div class="stepper">
+      <ol>
+        <li>打鍵を 100ms ごとにまとめ、端末の待ち行列に保存してから送る。ID（UUIDv7）はクライアントが振る。</li>
+        <li>API が、ページの <code>seq</code> の行をロックする。これがページごとの書き込みの直列化になる。</li>
+        <li>権限・値・木の不変条件を検証し、ブロック・操作のログ・<a href="../../../../docs/primer/index.html#outbox">outbox</a> を 1 つの DB トランザクションで書く。</li>
+        <li>Relay が outbox を読み、そのページを開いている人へ配る。</li>
+        <li>受け手は <code>seq</code> が飛んでいたら欠けを検知し、差分を取り直す。</li>
+      </ol>
+    </div>
+    <p>再送で二重に当たらないよう、端末ごとの連番 <code>tx_counter</code> で適用済みを判定します（<a href="../../../../docs/primer/index.html#idempotency">冪等</a>）。入力から他人の画面まで p99 500ms 以内が目標です（NFR-001）。</p>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> の 4・7・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0005-transactions-as-unit-of-change.md">ADR-0005</a>。</p>
+  </section>
+
+  <section class="s" id="conflicts">
+    <h2>構造の衝突と、兄弟のアンカー</h2>
+    <p>ブロックの並びの位置は、添字ではなく「X の後、Y の前」と前後の兄弟の ID で指します（<a class="t" href="#g-anchor">アンカー</a>）。</p>
+    <div class="compare">
+      <div class="bad"><h3>添字</h3><p>「3 番目に挿入」。他の人が先に 1 つ消すと、意図と違う場所に入る。</p></div>
+      <div class="good"><h3>兄弟のアンカー</h3><p>「A の後に挿入」。A があればその直後、なければ後ろの兄弟の直前、どちらもなければ親の末尾。</p></div>
+    </div>
+    <p>Figma などが使う<a class="t" href="#g-fracindex">分数インデックス</a>は使いません。サーバーが順序を決める構成では要らないためです。構造とプロパティの競合は、サーバーに着いた順と決まった規則で解きます。</p>
+    <table>
+      <tr><th>競合</th><th>結果</th></tr>
+      <tr><td>同じプロパティへの同時の設定</td><td>後に着いた方が勝つ（<a class="t" href="#g-lww">LWW</a>）。負けた側に「上書きされた変更」を出す</td></tr>
+      <tr><td>複数選択への追加と削除</td><td>集合として合わせる。両方の追加が残る</td></tr>
+      <tr><td>A を B の下へ、B を A の下へ</td><td>循環になる後着の方を取り消す</td></tr>
+    </table>
+    <div class="quiz" data-answer="1">
+      <p class="q">オフラインで「ブロック A の後に C を挿入」した。再接続までに A は他の人に削除され、後ろの兄弟 B は残っている。C はどこに入る？</p>
+      <div class="opts">
+        <button>B の直前</button>
+        <button>親の先頭</button>
+        <button>トランザクション全体が拒否される</button>
+      </div>
+      <p class="why"><code>after</code> が見つからなければ <code>before</code> の直前、どちらもなければ親の末尾です（ADR-0012）。「取り消す」のは個々の操作で、全体の拒否は権限や不変条件の違反に使います。</p>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0011-structural-and-property-conflict-rules.md">ADR-0011</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0012-child-order-by-sibling-anchors.md">0012</a>。</p>
+  </section>
+
+  <section class="s" id="offline">
+    <h2>オフラインとブラウザの中の DB</h2>
+    <p>開いたことのあるページは、ネットがなくても読めて書けます。ブラウザの中で SQLite を動かし、端末に写しと未送信の待ち行列を持ちます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-wasm">WASM</a> の SQLite</h3><p>C で書かれた SQLite を WebAssembly にしてブラウザで動かします。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-opfs">OPFS</a></h3><p>ブラウザがサイトごとに持つ、高速なファイルの置き場。SQLite のファイルをここに置きます。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-weblocks">Web Locks</a></h3><p>タブが複数開いても、DB に書くのは選ばれた 1 つのタブだけにします。</p></div>
+    </div>
+    <p>どのページを持つかは、理由（明示・最近開いた・お気に入り・データベースから）ごとに記録し、最後の理由が消えたら外します。本家のオフラインはデスクトップとモバイルのアプリだけですが、本設計は Web（<a class="t" href="#g-pwa">PWA</a>）にも広げます。</p>
+    <div class="callout warn"><span class="label">ブラウザが消す</span>Safari は、ホーム画面に追加していないサイトのデータを 7 日で消すことがあります。未送信の変更があるのに消えうる環境では、警告を出します。</div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> の 11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/editor.md">editor.md</a> の 10・11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0008-sqlite-wasm-opfs-local-store.md">ADR-0008</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0013-offline-availability-policy.md">0013</a>。</p>
+  </section>
+
+  <section class="s" id="permissions">
+    <h2>権限：ページの木を継承する</h2>
+    <p>共有の設定（<a class="t" href="#g-acl">ACL</a>）は、設定したページにだけ持ちます。子のページは、親の設定をそのまま受け継ぎます。水準は本家と同じ 5 段です。</p>
+    <pre><code>none &lt; can_view &lt; can_comment &lt; can_edit_content &lt; can_edit &lt; full_access</code></pre>
+    <div class="stepper">
+      <ol>
+        <li>ブロックから、属するページ（<code>page_id</code>）を引く。</li>
+        <li>ページから祖先へたどり、<strong>最初に ACL を持つページ</strong>を見つける（自身を含む）。</li>
+        <li>なければ最上位の暗黙の ACL を使う：チームスペースの設定か、プライベートなら本人だけ。</li>
+        <li>見つけた ACL のうち、自分（個人・グループ・チームスペース・ワークスペース）に当たる項目の最大の水準を取る。</li>
+        <li>無効化されたメンバー・ゴミ箱・連携の能力などの上限を重ねる。上限は権限を広げない。</li>
+      </ol>
+    </div>
+    <p>子で共有を変えると、そのページに ACL ができ、<strong>以後は親の変更を受けません</strong>（継承を置き換える）。判定は <code>can(actor, action, block)</code> の 1 つの関数に集め、画面・API・検索・通知・Webhook のすべてが通ります。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">子ページ C で、ある人を個別に追加した。その後、親ページ P の共有から「全員」を外した。C はどうなる？</p>
+      <div class="opts">
+        <button>C からも「全員」が外れる</button>
+        <button>C は自分の ACL を持つので、P の変更は届かない（画面で「子孫にも同じ変更を加える」を選べば届く）</button>
+        <button>C の ACL が消えて、P の継承に戻る</button>
+      </div>
+      <p class="why">ACL は設定したページで継承を置き換えます（ADR-0018）。親の変更が届くかは本家の文書で確かめられず、本システムの決定として書かれています。</p>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0004-inherited-page-permissions.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0018-permission-levels-and-inheritance.md">0018</a>。</p>
+  </section>
+
+  <section class="s" id="leaks">
+    <h2>漏らさない経路：キャッシュ・検索・公開・連携</h2>
+    <p>「権限のないページの中身（タイトルを含む）は、どこからも見えない」が最重要の振る舞いです（NFR-010）。判定関数の外を通る経路ごとに、守り方を決めています。</p>
+    <div class="tabs">
+      <div data-tab="キャッシュ"><p>ワークスペースに <code>acl_version</code>（単調に増える番号）を持ち、権限の変更と同じトランザクションで上げます。キャッシュのキーに必ずこの版を含めるので、変更の後に始まった要求が古い権限で判定されません。読めないページは 404、読めるが水準が足りないときは 403 にして、存在も漏らしません。</p></div>
+      <div data-tab="検索"><p>検索の索引（<a class="t" href="#g-opensearch">OpenSearch</a>）は 1 ページ 1 文書で、「読める主体のキー」の配列を持たせて絞ります。それでも索引の権限は数秒遅れうるので、結果のページを DB で<strong>読み直し</strong>、判定関数を通ったものだけを、DB の値で表示します。日本語は <a class="t" href="#g-ngram">N-gram</a> で一致を判定します。</p></div>
+      <div data-tab="Web への公開"><p>公開ページは、アプリと別の<a class="t" href="#g-regdomain">登録可能ドメイン</a>（<code>&lt;brand&gt;.site</code>、仮）から、専用の描画サービスで配ります。利用者が作った内容が、アプリのセッションの cookie と同じサイトで動かず、フィッシングの評判もアプリと分けるためです。既定で検索エンジンに載せません（noindex）。</p></div>
+      <div data-tab="連携と AI"><p>API の連携は、明示的に共有されたページとその子孫だけを読めます。メンバーの権限は引き継ぎません。AI エージェントには、利用者の委任で動くリモートの <a class="t" href="#g-mcp">MCP</a> サーバーを用意します。Webhook は中身を含めず、配送の時点で権限を判定し直します。</p></div>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">検索の結果に出すページのタイトルは、どこから取りますか？</p>
+      <div class="opts">
+        <button>検索の索引の <code>title</code> フィールド</button>
+        <button>クライアントのローカルの写し</button>
+        <button>結果の ID で DB を読み直し、判定関数を通った値</button>
+      </div>
+      <p class="why">索引は ID の一覧を得るためだけに使います。索引が古い間も、権限を失ったページのタイトルが出ません。</p>
+    </div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a> の 4.7・5・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/search.md">search.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/api-and-integrations.md">api-and-integrations.md</a>、ADR-<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0019-workspace-acl-version-cache.md">0019</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0020-published-pages-isolation.md">0020</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0023-search-engine-and-permission-filtering.md">0023</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0024-integration-access-model.md">0024</a>。</p>
+  </section>
+
+  <section class="s" id="sharding">
+    <h2>シャーディング：論理シャードと物理クラスタ</h2>
+    <p>1 台の DB に入りきらない量を、複数の DB に分けて持つのが<a class="t" href="#g-shard">シャーディング</a>です。分ける鍵はワークスペースで、1 つの操作が 1 つのシャードで閉じます。</p>
+    <pre class="mermaid">flowchart LR
+  W["workspace_id"] -- "末尾 64 ビット mod 480" --> L["論理シャード shard000 から shard479"]
+  L -- "global.shard_map" --> C1["物理クラスタ 1"]
+  L -. "S2 で分割" .-> C2["物理クラスタ 2..24"]</pre>
+    <ul>
+      <li data-frag><strong>論理シャード</strong>：PostgreSQL のスキーマ（<code>shard042.blocks</code> など）。数は 480 で、本家に合わせて S1 から変えません。</li>
+      <li data-frag><strong>物理クラスタ</strong>：実際の Aurora。S1 は 1 つに 480 スキーマを全部置き、負荷に応じて 480 を割り切れる数へ増やします。</li>
+      <li data-frag><strong>移し方</strong>：スキーマの束を<a class="t" href="#g-logrep">論理レプリケーション</a>で新しいクラスタへ写し、<a class="t" href="#g-shadowread">影の読み取り</a>で一致を確かめ、書き込みを止める（フェンス）短い時間で切り替えます。</li>
+    </ul>
+    <p>テナントの分離は、シャードとは別に <a href="../../../../docs/primer/index.html#tenancy">RLS</a> で行います。同じスキーマに多くのワークスペースが同居するためです。</p>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/infrastructure.md">infrastructure.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/data-model.md">data-model.md</a> の 1.2〜1.4 節、ADR-<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0003-workspace-sharding.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0027-shard-router.md">0027</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0028-zero-downtime-resharding.md">0028</a>。</p>
+  </section>
+
+  <section class="s" id="lifecycle">
+    <h2>同期ブロック・履歴・ゴミ箱と削除</h2>
+    <p><a class="t" href="#g-synced">同期ブロック</a>は、同じ中身を複数のページに置く機能です。中身は元の場所に 1 つだけあり、元のページを読めない人には中身を見せません。</p>
+    <p>ページの履歴は、30 日分の操作のログと、10 分の休止か 1 時間ごとに作るスナップショットの 2 段で持ちます。復元は「巻き戻し」ではなく、今の値から過去の値へ変える新しいトランザクションです。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>ゴミ箱</strong>：30 日。<code>can_edit</code> 以上の人が戻せる。</li>
+        <li><strong>完全に削除</strong>：利用者からは見えず、戻せない。30 日の間は、所有者の依頼で運用者だけが戻せる。</li>
+        <li><strong>物理削除</strong>：行・ファイル・スナップショット・検索の索引を消す。</li>
+        <li><strong>バックアップ</strong>：最長 35 日残る。削除から完全に消えるまで最長 95 日。</li>
+      </ol>
+    </div>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>最長 95 日を利用規約・データ処理の契約にどう書くか（L1）と、アカウントの削除でプライベートのページを消す既定案が契約・個人情報の扱いに合うか（L2）は、法務の確認待ちです。結論が出るまで、該当する Story の spec を承認しません。</div>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/block-model.md">block-model.md</a> の 7〜9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/security.md">security.md</a> の 6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0022-trash-history-and-deletion-retention.md">ADR-0022</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/intent.md">intent.md</a> の「法務の確認待ち」。</p>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>中心は <code>blocks</code> の 1 つの表です。ページ・データベース・行がすべてここに入り、権限・共同編集・データベースの索引が周りを囲みます。シャードの表は、主キーに <code>workspace_id</code> を含みます（記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>）。</p>
+    <pre class="mermaid">erDiagram
+  teamspaces ||--o{ blocks : "top-level pages"
+  blocks ||--o{ blocks : "parent and children"
+  blocks ||--o| page_acls : "page with ACL"
+  page_acls ||--o{ page_acl_entries : "entries"
+  blocks ||--o| page_seqs : "seq per page"
+  page_seqs ||--o{ page_ops : "op log"
+  blocks ||--o{ data_sources : "database block"
+  data_sources ||--o{ blocks : "row pages"
+  data_sources ||--o{ views : "views"
+  data_sources ||--o{ dbx_values : "query index"
+  blocks ||--o{ relation_edges : "relation edge"
+  blocks {
+    uuid workspace_id PK
+    uuid id PK
+    text type
+    text parent_type
+    uuid parent_id
+    uuid page_id
+    jsonb properties
+    uuid_array content
+    boolean alive
+  }
+  page_seqs {
+    uuid workspace_id PK
+    uuid page_id PK
+    bigint last_seq
+  }
+  page_acl_entries {
+    uuid workspace_id
+    uuid page_id
+    text principal
+    text level
+  }
+  dbx_values {
+    uuid data_source_id
+    text property_id
+    uuid row_id
+    numeric v_num
+    text v_text
+  }</pre>
+    <table>
+      <tr><th>表</th><th>読み方</th></tr>
+      <tr><td><code>blocks</code></td><td><code>content</code>（子の並び）と <code>parent_id</code>（親）を両方持つ。<code>alive</code> が偽なら削除済み</td></tr>
+      <tr><td><code>page_seqs</code> / <code>page_ops</code></td><td>ページの順序の採番と、操作のログ（30 日）</td></tr>
+      <tr><td><code>page_acls</code> / <code>page_acl_entries</code></td><td>ACL を持つページにだけ行がある</td></tr>
+      <tr><td><code>dbx_rows</code> / <code>dbx_values</code></td><td>データベースの問い合わせ用の写し。正本は行の <code>properties</code></td></tr>
+      <tr><td><code>relation_edges</code></td><td>リレーションの正本。両側の値をここから導く</td></tr>
+    </table>
+    <p class="hint">設計の文書で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/data-model.md">data-model.md</a> の 2〜4 節と、<a href="https://github.com/shoito/rebuilds/tree/main/systems/notion/docs/architecture/data-model">data-model/</a> の各ファイル。</p>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ、名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、意図して変えた点があります。文書で「差異」と書かれた箇所です。</p>
+    <table>
+      <tr><th>点</th><th>本家</th><th>本設計</th></tr>
+      <tr><td>ワークスペースの所有者</td><td>プライベートのページを含むデータにアクセスしうる</td><td>通常の画面では所有者も読めない</td></tr>
+      <tr><td>テキストの列の CRDT</td><td>RGA</td><td>Fugue（交ざりにくい）</td></tr>
+      <tr><td>オフライン</td><td>デスクトップとモバイルのアプリだけ</td><td>Web（PWA）も含める</td></tr>
+      <tr><td>ページの URL</td><td>タイトルを含む</td><td>ID だけ（ログや Referer にタイトルを残さない）</td></tr>
+      <tr><td>検索の文書</td><td>ブロック単位</td><td>ページ単位</td></tr>
+    </table>
+    <p>トークンの接頭辞や公開のドメインなど、ブランドを含む識別子は <code>&lt;brand&gt;</code> と書きます（例：<code>&lt;brand&gt;_int_…</code>、<code>&lt;brand&gt;.site</code>）。本家の内部の表の名前（<code>collection</code> など）は出典として書くだけで、識別子には使いません。</p>
+    <p class="hint">設計の文書で効くところ：各領域の文書の「本家との対応」の表、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>。</p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-block">ブロック</dt><dd>Notion の内容の最小の単位。段落・見出し・画像・ページ・データベースなど。<code>type</code>・<code>properties</code>・<code>content</code>・<code>parent</code> を持つ。</dd>
+      <dt id="g-workspace">ワークスペース</dt><dd>会社やチームの単位。テナントの境界で、シャードを決める鍵でもある。</dd>
+      <dt id="g-teamspace">チームスペース</dt><dd>ワークスペースの中の部署やプロジェクトの領域。既定・公開・閉鎖・非公開の種類があり、直下のページの暗黙の ACL になる。</dd>
+      <dt id="g-guest">ゲスト</dt><dd>ページ単位で招待される外部の人。ワークスペース全体の権限、グループ、チームスペースを持てない。</dd>
+      <dt id="g-span">スパン</dt><dd>リッチテキストの、装飾が同じ連続した範囲。本設計はテキストをスパンの配列で持ち、同じ内容が同じ JSON になるよう正規化する。</dd>
+      <dt id="g-prosemirror">ProseMirror</dt><dd>ブラウザのリッチテキストのエディタを作るための、オープンソースの部品集。</dd>
+      <dt id="g-ime">IME</dt><dd>かな漢字変換などの入力の仕組み。変換中のキー入力は、確定まで文書の操作として扱わない。</dd>
+      <dt id="g-datasource">データソース</dt><dd>データベースのスキーマ（プロパティ）と行を持つもの。1 つのデータベースに複数置ける。</dd>
+      <dt id="g-view">ビュー</dt><dd>データソースの見え方の設定。種類（表・ボードなど）とフィルタ・並べ替え・グループ化を持つ。</dd>
+      <dt id="g-linked">リンクドビュー</dt><dd>既存のデータソースを、別のページから参照するビュー。ビューの設定だけが独立し、権限は元に従う。</dd>
+      <dt id="g-ot">OT</dt><dd>Operational Transformation。位置で書いた操作を、先に当たった操作に合わせて変換して収束させる方式。</dd>
+      <dt id="g-crdt">CRDT</dt><dd>Conflict-free Replicated Data Type。どの順で操作を当てても同じ状態に収束するように作ったデータ構造。</dd>
+      <dt id="g-fugue">Fugue</dt><dd>テキストの列の CRDT の 1 つ。同じ位置への同時の長い入力が交ざりにくい。</dd>
+      <dt id="g-peritext">Peritext</dt><dd>Ink &amp; Switch による、太字やリンクなどの書式を同時編集で正しく合わせる CRDT の方式。</dd>
+      <dt id="g-tombstone">墓標</dt><dd>tombstone。削除した要素の ID を消さずに残した印。後から届く操作の位置の目印になる。</dd>
+      <dt id="g-interleaving">interleaving</dt><dd>2 人が同じ位置に同時に書いた文が、文字単位で交互に混ざってしまう現象。</dd>
+      <dt id="g-textslice">text slice</dt><dd>ブロックのテキストの、文字の ID の範囲。分割・結合で範囲ごと別のブロックへ移す。本家の考え方に倣った。</dd>
+      <dt id="g-seq">seq</dt><dd>ページごとにサーバーが振る連番。順序の確定と、欠けの検知・差分の取得に使う。</dd>
+      <dt id="g-anchor">アンカー</dt><dd>挿入や移動の位置を示す目印。ここでは前後の兄弟のブロックの ID。</dd>
+      <dt id="g-fracindex">分数インデックス</dt><dd>各要素に「0 と 1 の間の値」のような並びの鍵を持たせ、間に入れるときは間の値を作る方式。</dd>
+      <dt id="g-lww">LWW</dt><dd>Last Writer Wins。同じ値への競合する書き込みのうち、後のものを残す規則。</dd>
+      <dt id="g-wasm">WASM</dt><dd>WebAssembly。C などで書いたプログラムを、ブラウザで高速に動かす形式。</dd>
+      <dt id="g-opfs">OPFS</dt><dd>Origin Private File System。サイトごとに分かれた、ブラウザの中のファイルの置き場。</dd>
+      <dt id="g-weblocks">Web Locks</dt><dd>同じサイトのタブやワーカーの間で、排他のロックを取るブラウザの API。</dd>
+      <dt id="g-pwa">PWA</dt><dd>Progressive Web App。インストールやオフラインに対応した Web アプリ。</dd>
+      <dt id="g-acl">ACL</dt><dd>Access Control List。誰にどの水準を許すかの一覧。ここではページごとの共有の設定。</dd>
+      <dt id="g-opensearch">OpenSearch</dt><dd>Elasticsearch から分かれたオープンソースの検索エンジン。AWS がマネージドで提供する。</dd>
+      <dt id="g-ngram">N-gram</dt><dd>文字列を N 文字ずつずらして切り出し、索引にする方法。単語の区切りがない日本語でも取りこぼしにくい。</dd>
+      <dt id="g-regdomain">登録可能ドメイン</dt><dd>example.com のように、Public Suffix List で決まる「別のサイト」の単位。これが違えば cookie を共有しない。</dd>
+      <dt id="g-mcp">MCP</dt><dd>Model Context Protocol。AI エージェントが外部の道具やデータを呼ぶための共通の手順。</dd>
+      <dt id="g-shard">シャーディング</dt><dd>データを鍵で分け、複数の DB に分けて持つこと。分けた 1 つをシャードと呼ぶ。</dd>
+      <dt id="g-logrep">論理レプリケーション</dt><dd>PostgreSQL の、行の変更を論理的な形で別の DB へ流す複製。表やスキーマを選んで写せる。</dd>
+      <dt id="g-shadowread">影の読み取り</dt><dd>shadow read。同じ問い合わせを新旧の両方に投げ、結果を比べる照合。利用者には旧の結果だけを返す。</dd>
+      <dt id="g-synced">同期ブロック</dt><dd>同じ中身を複数の場所に置き、どこで編集しても全部に反映されるブロック。元と参照の 2 つの形がある。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="next">
+    <h2>読む順</h2>
+    <p>この資料で用語を押さえたら、次の順に設計の文書を読むと、つながりが追いやすくなります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、非機能要件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/block-model.md">block-model.md</a> <span>— ブロックの形、ページの木の不変条件、履歴とゴミ箱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/collaboration.md">collaboration.md</a> <span>— CRDT、衝突の規則、配信、オフライン</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a> <span>— 権限の水準と継承、公開</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/databases.md">databases.md</a> <span>— 問い合わせの索引、リレーション、数式</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/search.md">search.md</a> と <a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/infrastructure.md">infrastructure.md</a> <span>— 検索の権限、シャードと災害復旧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/notion/docs/decisions">decisions/</a> <span>— 33 本の ADR。気になった決定の理由を読む</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/architecture/data-model.md">data-model.md</a> <span>— 全テーブルの正本</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
