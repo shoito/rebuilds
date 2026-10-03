@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workday の前提知識</title>
+<meta name="description" content="Workday の再構築の設計の文書を読む前に知っておくとよい、人事・給与の分野の概念・用語・日本の法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Workday · 前提知識</p>
+    <h1>Workday の設計を読む前に</h1>
+    <p class="lead">人事・給与のシステムは「社員の表と給与の計算」に見えますが、日付の 2 つの軸、承認の流れ、日本の税と社会保険の決まり、マイナンバーの法令のそれぞれに、分野に固有の前提があります。設計の文書が説明なしに使っている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Workday · 前提知識</p>
+    <h2>Workday の設計を読む前に</h2>
+    <p class="lead">有効日付・業務プロセス・日本の給与計算・マイナンバーの前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Workday は何をするサービスか</h2>
+    <p>Workday は、企業の人事（<a class="t" href="#g-hcm">HCM</a>）と給与を 1 つのシステムで扱う SaaS です。組織と従業員の記録を持ち、異動や昇給を承認を経て反映し、そこから給与を計算します。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>人事・給与の担当者</h3><p>組織と従業員の記録、承認の流れの定義、給与の計算・確定・振込を扱う。主な利用者。</p></div>
+      <div class="card" data-frag><h3>マネージャー</h3><p>部下の勤怠・休暇を見て、異動・昇給を起票し、承認の受信箱で承認する。</p></div>
+      <div class="card" data-frag><h3>従業員</h3><p>打刻、休暇の申請、住所や口座の変更の申請、給与明細の閲覧（セルフサービス）。</p></div>
+    </div>
+    <p>再構築の intent は 3 つの価値を掲げます。<strong>履歴を失わない</strong>、<strong>給与を誤らない</strong>、<strong>権限と個人情報を守る</strong>。最初の対象は従業員 300〜3 万人の日本の企業で、S1 では 600 テナント・従業員 100 万人を想定します。給与の計算は支給日の前の数日に集中する、という使われ方が設計の前提です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="people">
+    <h2>人・雇用・ポジション</h2>
+    <p>人事のシステムでは「人」と「その人が座る席」を分けて考えます。席を<a class="t" href="#g-position">ポジション</a>と呼びます。人が辞めても席は残り、後任がその席に座ります。</p>
+    <pre><code>worker（人）1 ── n employment（雇用：会社ごと・期間ごと）1 ── n job_assignment（職務：主と兼務）
+                                                                  └─ position（ポジション）</code></pre>
+    <ul>
+      <li data-frag><a class="t" href="#g-worker">worker</a>（人）は、退職して再雇用されても同じ人です。</li>
+      <li data-frag><a class="t" href="#g-employment">雇用</a>は、1 つの会社との 1 回の在籍の期間です。退職と再雇用で別の雇用になります。</li>
+      <li data-frag><a class="t" href="#g-job-assignment">職務の割り当て</a>は、雇用の中の仕事です。主たる職務が 1 つ、兼務を足せます。</li>
+    </ul>
+    <div class="tabs">
+      <div data-tab="ポジション管理"><p>本家の人員の管理の方式の 1 つ。空いた承認済みのポジションがないと、採用も異動もできません。人員の枠を席の数で縛ります。</p></div>
+      <div data-tab="ジョブ管理"><p>もう 1 つの方式。組織ごとに職務を決めるだけで、席の数の上限はありません。この設計では、入社・異動のときにポジションを自動で作り、<strong>ポジションに一本化</strong>します（ADR-0010）。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/core-hr.md">core-hr.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0010-person-employment-job-assignment-model.md">ADR-0010</a>。</div>
+  </section>
+
+  <section class="s" id="orgs">
+    <h2>組織の種類と監督組織</h2>
+    <p>組織は 1 種類ではありません。目的ごとに別の組織の切り方があり、1 人が同時に複数の組織に属します。</p>
+    <table>
+      <tr><th>種類</th><th>意味</th><th>主な使いみち</th></tr>
+      <tr><td><code>supervisory</code></td><td><a class="t" href="#g-supervisory">監督組織</a>（部・課・チーム）。上長と部下の組。1 つの木</td><td>所属、承認の経路、権限の範囲</td></tr>
+      <tr><td><code>company</code></td><td>法人</td><td>雇用の相手、給与の実行の単位、仕訳</td></tr>
+      <tr><td><code>cost_center</code></td><td>費用の集計の単位</td><td>仕訳の配賦</td></tr>
+      <tr><td><code>location</code></td><td>事業所（働く場所）</td><td>36 協定（事業場ごと）、社会保険の適用事業所</td></tr>
+    </table>
+    <p>上長などの<strong>ロールは、人ではなくポジションに割り当てます</strong>。「組織 A とその下位」の判定はすべての読み取りに入るので、木を<a class="t" href="#g-closure">閉包テーブル</a>で持ち、再帰の問い合わせを毎回走らせません。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">営業 1 課の課長が別の部に異動しました。営業 1 課の <code>manager</code> のロールはどうなりますか？</p>
+      <div class="opts">
+        <button>課長について行き、異動先でも営業 1 課の承認をする</button>
+        <button>課長のポジションに残る。後任が座ればそのまま後任のロールになり、空席の間は予備の担当に回る</button>
+        <button>自動で 1 つ上の部長に付け替わる</button>
+      </div>
+      <p class="why">ロールは組織とポジションの組に割り当てます。人が動いても席に残るので、異動のたびに権限を付け替えずに済みます（core-hr.md の 4.5 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/core-hr.md">core-hr.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0011-effective-dated-org-hierarchy-closure.md">ADR-0011</a>。</div>
+  </section>
+
+  <section class="s" id="effective">
+    <h2>有効日付：2 つの時間の軸</h2>
+    <p>人事のデータには「いつから有効か」があります。3 月に 4 月 1 日付の異動を入力するのは日常です。さらに、後から誤りに気づいて直すこともあります。そこで、時間を 2 つの軸で持ちます（<a class="t" href="#g-bitemporal">bitemporal</a>）。</p>
+    <div class="compare">
+      <div data-frag><h3><a class="t" href="#g-effective">有効時間</a>（<code>valid</code>）</h3><p>現実の世界で、その値が有効な期間。日単位の半開区間 <code>[開始日, 終了日)</code>。</p></div>
+      <div data-frag><h3><a class="t" href="#g-known-at">記録時間</a>（<code>known_at</code>）</h3><p>システムがその値を正しいと記録していた期間。DB の時計で決まる。</p></div>
+    </div>
+    <table>
+      <tr><th>いつ記録したか</th><th>何を記録したか</th></tr>
+      <tr data-frag><td>3 月 15 日</td><td>4 月 1 日から等級 3（将来日付の変更）</td></tr>
+      <tr data-frag><td>6 月 2 日</td><td>実は 4 月 1 日から等級 4 だった（訂正）</td></tr>
+    </table>
+    <div class="quiz" data-answer="1">
+      <p class="q">6 月 10 日に「5 月 1 日の時点で、システムは 4 月 15 日の等級を何と知っていたか」を問い合わせました。答えは？</p>
+      <div class="opts">
+        <button>等級 3</button>
+        <button>等級 4</button>
+        <button>訂正で上書きされたので答えられない</button>
+      </div>
+      <p class="why">訂正は過去の記録を消さず、新しい版を足すだけです。5 月の給与は等級 3 で計算されたので、その知識を再現できることが、遡及の差額や監査の前提になります（ADR-0002）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0002-effective-dated-data-model.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> の 3 節。</div>
+  </section>
+
+  <section class="s" id="corrections">
+    <h2>変更・訂正・取消の違い</h2>
+    <p>データの上では、どれも「新しい版を足す」操作です。それでも意味が違うので、区別して記録します。監査、承認に要る権限、社会保険の届出（訂正は届出の訂正になりうる）で扱いが変わるからです。</p>
+    <div class="tabs">
+      <div data-tab="変更（将来日付）"><p>「その日から変わる」。3 月に入力する 4 月 1 日付の異動。発効の日までは旧の値が有効です。</p></div>
+      <div data-tab="変更（過去日付）"><p>「その日から変わっていた」。6 月に入力する 4 月 1 日付の昇給。確定した給与に差額が出ます（<a class="t" href="#g-retro">遡及</a>）。90 日より前は特別な権限が要ります。</p></div>
+      <div data-tab="訂正"><p>「元の入力がもともと誤っていた」。入社日や等級の打ち間違いを直す。元の差分を退け、訂正の差分を足します。</p></div>
+      <div data-tab="取消"><p>「元の変更は無かった」（<a class="t" href="#g-rescind">rescind</a>）。後の変更がその変更を前提にしていれば拒み、後の案件から先に取り消させます。</p></div>
+    </div>
+    <p>どの操作でも「過去の知識は変わらない」ことを守ります。行を消したり上書きしたりせず、置き換えた印（<code>superseded_at</code>）を付けて追記するだけにするからです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0007-change-correction-rescind-semantics.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> の 6 節（DT-TEMP-003・004）。</div>
+  </section>
+
+  <section class="s" id="fold">
+    <h2>差分の畳み込みと時点の問い合わせ</h2>
+    <p>項目は「一緒に変わるもの」ごとに<a class="t" href="#g-facet">facet</a> にまとめます（住所、職務、給与など）。facet ごとに、変更を<a class="t" href="#g-delta">差分</a>として貯め、有効日の順に<strong>畳み込んで</strong>期間を作ります。</p>
+    <pre class="mermaid">flowchart LR
+  BP["業務プロセスの案件"] -- "完了で書く" --> C["差分 changes"]
+  C -- "有効日と seq の順に畳み込む" --> V["版 versions"]
+  V -- "いま正しい版を写す" --> N["現在 current"]
+  V -. "known_at を指定した問い合わせ" .-> Q["過去の知識"]
+  N -. "effective_on の問い合わせ" .-> R["ある日の値"]</pre>
+    <ul>
+      <li>同じ日に複数の差分があるときは、入力の順ではなく事象の種類の優先度（<code>seq</code>）で並べます。入社が先、退職が最後です。</li>
+      <li>現在の表は、同じ主体の期間が重ならないことを DB の制約で守ります。</li>
+      <li><code>known_at</code> は「今 − 10 秒」（安定の境界）より前に限ります。後からコミットする長いトランザクションで、過去の答えが変わらないようにするためです。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0006-temporal-table-triplet-and-fold.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0008-point-in-time-queries-and-activation-timers.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> の 4・5・7 節。</div>
+  </section>
+
+  <section class="s" id="lifecycle">
+    <h2>入社から退職まで</h2>
+    <p>人事の事象には、日付の決まりがあります。業務の言葉と、有効期間での書き方を対応させておくと、文書が読みやすくなります。</p>
+    <table>
+      <tr><th>事象</th><th>業務の日付</th><th>有効期間での書き方</th></tr>
+      <tr><td>入社</td><td>入社日（最初の在籍日）</td><td>雇用の状態を入社日から始める</td></tr>
+      <tr><td>異動・昇格</td><td>発令日</td><td>職務の facet の差分をその日に書く</td></tr>
+      <tr><td>休職・復職</td><td>開始日・復職日</td><td>在籍の区分を <code>on_leave</code>・<code>active</code> にする</td></tr>
+      <tr><td>退職</td><td>退職日（最後の在籍日）</td><td>雇用の期間の終わりを<strong>退職日の翌日</strong>にする</td></tr>
+    </table>
+    <p>退職の業務プロセスは、解雇の予告（30 日）や解雇の制限の期間などに当たりうるとき、<strong>止めずに警告</strong>を出し、進める理由の入力を求めます。当てはめの判断は企業と社労士が行います。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">退職日が 3 月 31 日の人の、雇用の有効期間の終わり（<code>valid</code> の上限）は？</p>
+      <div class="opts">
+        <button>3 月 31 日。最後の在籍日だから</button>
+        <button>3 月 30 日</button>
+        <button>4 月 1 日。半開区間なので最後の日の翌日を上限にする</button>
+      </div>
+      <p class="why">期間は <code>[入社日, 退職日＋1)</code> で持ちます。社会保険の資格の喪失日も「退職日の翌日」なので、日付の変換は決まった関数だけに任せます（core-hr.md の 5.1 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/core-hr.md">core-hr.md</a> の 5 節（DT-HR-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0012-worker-lifecycle-events-and-legal-checks.md">ADR-0012</a>。L12〜L14 は社労士の確認待ちです。</div>
+  </section>
+
+  <section class="s" id="bp">
+    <h2>業務プロセス：変更はすべて承認を通る</h2>
+    <p>本家の中心の考え方は、人事のデータを<strong><a class="t" href="#g-bp">業務プロセス</a>を経ずに変えない</strong>ことです。入社・異動・住所の変更・一括の取り込みまで、すべて案件として起票され、決まったステップを進みます。図は異動の既定の流れの例です。</p>
+    <pre class="mermaid">flowchart LR
+  I["起票 initiation"] --> A1["承認 approval 送り出す側の上長"]
+  I --> A2["承認 approval 受け入れる側の上長"]
+  A1 --> H["承認 approval 人事"]
+  A2 --> H
+  H --> D["完了 completion 差分を書く"]
+  A1 -. "差し戻し・却下" .-> I</pre>
+    <ul>
+      <li data-frag>ステップの種類：起票、承認（並列も可）、<code>action</code>（人の作業）、<code>service</code>（システムの処理）、通知、完了。</li>
+      <li data-frag>定義はテナントが変えられ、<strong>版</strong>を持ちます。案件は起票の日に有効な版に固定され、途中で定義が変わっても影響しません。</li>
+      <li data-frag>発令日（<code>effective_on</code>）と、定義の版を選ぶ日（起票の日）は別のものです。</li>
+      <li data-frag>完了した案件は、取消（<code>rescind</code>）か訂正（<code>correct</code>）で直します。進行中の案件はキャンセルします。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> の 3・4・6・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0003-business-process-engine.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0013-bp-definition-format-and-versions.md">ADR-0013</a>。</div>
+  </section>
+
+  <section class="s" id="authz">
+    <h2>ルーティング・委任・職務分掌・権限</h2>
+    <p>承認者は名前で指定せず、「対象の人の監督組織の <code>manager</code>」のように<strong>組織とロールで</strong>決めます（<a class="t" href="#g-routing">ルーティング</a>）。休暇中の上長は、期間を決めて<a class="t" href="#g-delegation">委任</a>できます。</p>
+    <p>権限は、機能の領域（<a class="t" href="#g-domain">ドメイン</a>。給与、住所、口座など）ごとに、<a class="t" href="#g-security-group">セキュリティグループ</a>に与えます。グループは組織の範囲で絞れます。さらに、1 人に持たせてはいけない権限の組を<a class="t" href="#g-sod">職務分掌</a>の規則表で禁じます。</p>
+    <table>
+      <tr><th>規則</th><th>同じ人に持たせない組</th><th>防ぎたいこと</th></tr>
+      <tr><td>S1</td><td>昇給の起票・承認 と 給与の確定の承認</td><td>自分で決めた昇給を、自分で確定させる</td></tr>
+      <tr><td>S2</td><td>振込先の口座の変更の承認 と 振込ファイルの承認</td><td>口座をすり替えて振り込む</td></tr>
+      <tr><td>S3</td><td>権限の方針の編集 と 有効化</td><td>自分に権限を与えて、すぐ効かせる</td></tr>
+    </table>
+    <div class="quiz" data-answer="2">
+      <p class="q">課長が、自分の課の部下の昇給を起票しました。承認のステップの担当は、ルーティングでは課長自身になります。どうなりますか？</p>
+      <div class="opts">
+        <button>課長が自分で承認して進む</button>
+        <button>起票者は承認の担当から除かれ、組織を 1 つ上にたどって部長などが担当になる</button>
+        <button>案件はエラーで止まる</button>
+      </div>
+      <p class="why">同じ人が同じ案件で起票と承認をしません（DT-BP-002 の #3）。除いて空になれば上へたどります。委任を経た操作では、代理人と委任した人の両方で確かめます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> の 5・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/security-model.md">security-model.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0019-segregation-of-duties-checks.md">ADR-0019</a>。テナントの分離は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="time">
+    <h2>労働時間と 36 協定</h2>
+    <p>日本の労働基準法は、<a class="t" href="#g-statutory-hours">法定労働時間</a>（1 日 8 時間・1 週 40 時間）を超えて働かせるには、労使の協定（<a class="t" href="#g-36">36 協定</a>）を結んで届け出ることを求めます。協定があっても、時間外には上限があります。</p>
+    <ul>
+      <li data-frag><strong>所定と法定は違う。</strong>会社の定める時間（所定）を超えても法定以内なら「法定内残業」。法定を超えた分だけが 36 協定と割増の対象です。</li>
+      <li data-frag><strong>原則の上限</strong>：月 45 時間・年 360 時間。</li>
+      <li data-frag><strong><a class="t" href="#g-special-clause">特別条項</a>でも</strong>：年 720 時間以内、月 45 時間を超える月は年 6 か月まで。</li>
+      <li data-frag><strong>実績の上限</strong>（休日の労働を含む）：単月 100 時間未満、2〜6 か月の平均 80 時間以内。事業場が変わっても通算します。</li>
+      <li data-frag><strong>記録</strong>：労働時間は打刻や PC のログなど客観的な記録で把握します。</li>
+    </ul>
+    <p>設計は、実績と「このままだと超える」見込みで段階的に警告し、月次の締め（本人の確認 → 上長の承認 → 人事の確定）の集計を給与に渡します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">ある人の今月の時間外が上限に近づきました。システムは退勤の後の打刻をどう扱いますか？</p>
+      <div class="opts">
+        <button>上限を超える打刻を拒む</button>
+        <button>上限で打ち切って記録する</button>
+        <button>拒まずに記録し、本人・上長・人事に段階的に警告する</button>
+      </div>
+      <p class="why">打刻を拒むと、働いた事実の記録が残らず、労働時間を把握する義務に反します。超える労働をさせないかの判断は企業が行います（time-and-attendance.md の 6.3 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/time-and-attendance.md">time-and-attendance.md</a> の 2・5・6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0023-overtime-agreement-monitoring-and-monthly-close.md">ADR-0023</a>。警告の閾値や管理監督者の扱い（L6、L17〜L22）は社労士の確認待ちです。</div>
+  </section>
+
+  <section class="s" id="leave">
+    <h2>年次有給休暇の決まり</h2>
+    <p><a class="t" href="#g-nenkyu">年休</a>は会社の制度ではなく、法律で日数が決まる権利です。設計の決定表の多くは、次の枠組みをそのまま表にしたものです。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>付与の要件</strong>：雇入れから 6 か月継続して勤務し、全労働日の 8 割以上出勤すると 10 日。</li>
+        <li><strong>加算</strong>：その後 1 年ごとに日数が増え、6 年 6 か月以上で 20 日。週の所定の日数が少ない人には、日数を減らした<strong>比例付与</strong>。</li>
+        <li><strong>出勤率</strong>：業務上の傷病の休業、育児・介護休業、産前産後の休業の期間は「出勤したとみなす」。</li>
+        <li><strong>年 5 日の取得義務</strong>：10 日以上を与える人には、付与の日（<a class="t" href="#g-kijunbi">基準日</a>）から 1 年以内に 5 日を取らせる。足りなければ会社が時季を指定する。</li>
+        <li><strong>時効</strong>：使わなかった分は翌年に繰り越せるが、2 年で消える。</li>
+        <li><strong>管理簿</strong>：時季・日数・基準日を労働者ごとに記録し、保存する。</li>
+      </ol>
+    </div>
+    <p>全員の付与の日を同じ日にそろえる「斉一的付与」や、法定より前に与える「前倒し」をすると、年 5 日の義務の期間が重なり、按分の計算が要ります。設計は年休を追記のみの台帳で持ちます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/absence-and-leave.md">absence-and-leave.md</a> の 2・4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0024-annual-leave-grant-ledger.md">ADR-0024</a>。斉一的付与・出勤率の細部（L7、L23〜L26）は社労士の確認待ちです。</div>
+  </section>
+
+  <section class="s" id="payroll-month">
+    <h2>日本の給与計算の 1 か月</h2>
+    <p>月給の計算は「総支給額から法定の控除を引いて、差引支給額を振り込む」形です。控除の順序に意味があります。源泉所得税は、社会保険料などを引いた後の額に表を当てはめるからです。</p>
+    <pre class="mermaid">flowchart LR
+  G["総支給 基本給・手当・割増賃金"] --> SI["社会保険料 健康・介護・厚生年金・支援金"]
+  G --> EI["雇用保険料"]
+  SI --> T["課税の対象額"]
+  EI --> T
+  T --> W["源泉所得税"]
+  G --> NET["差引支給額"]
+  SI --> NET
+  EI --> NET
+  W --> NET
+  RT["住民税 通知の月割額"] --> NET
+  NET --> B["振込ファイル"]</pre>
+    <div class="stepper">
+      <ol>
+        <li>勤怠の締日（例：20 日）が来る。勤怠を本人・上長・人事が確かめて確定する。</li>
+        <li>入力を固定する（その時点の人事のデータ・勤怠・規則表の版を写し取る）。</li>
+        <li>全員を計算し、前回との差や異常値を確かめる。</li>
+        <li>給与の担当が確定する（業務プロセス）。仕訳と明細ができる。</li>
+        <li>振込ファイルを承認し、企業が銀行へ送る。支給日（例：25 日）に振り込まれる。</li>
+      </ol>
+    </div>
+    <p>振込は全銀協の規定形式のファイルで作り、送信は企業が行います（支払いの代行はしません）。明細の電子交付には従業員の承諾が要ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-engine.md">payroll-engine.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payments-and-accounting.md">payments-and-accounting.md</a>。口座振込の同意・電子交付の承諾（L3・L4）は社労士・税理士の確認待ちです。</div>
+  </section>
+
+  <section class="s" id="withholding">
+    <h2>源泉所得税と年末調整</h2>
+    <p>会社は、給与を払うときに所得税を天引きして国に納めます（<a class="t" href="#g-withholding">源泉徴収</a>）。税額は、国税庁の<strong>源泉徴収税額表</strong>から引きます。表は毎年 1 月に改まりうるので、規則表として版で持ちます。</p>
+    <table>
+      <tr><th>欄</th><th>使う人</th></tr>
+      <tr><td><a class="t" href="#g-kou-otsu">甲欄</a></td><td><a class="t" href="#g-fuyou">扶養控除等申告書</a>を出した人（主たる勤め先）。扶養の数で税額が変わる</td></tr>
+      <tr><td>乙欄</td><td>申告書を出していない人（副業の勤め先など）。高めの税額</td></tr>
+      <tr><td>丙欄</td><td>日雇いの賃金（日額表）</td></tr>
+    </table>
+    <ul>
+      <li>甲欄の月額表は、表を引く方法と、式で計算する「電子計算機等による計算の特例」があり、会社ごとの設定で選びます。</li>
+      <li>賞与は、前月の給与（社会保険料などを引いた後）と扶養の数で「算出率」を引いて掛けます。そのため、前月の給与の確定が賞与の計算の前提になります。</li>
+      <li>毎月の天引きは概算なので、年末に 1 年分の税額を計算し直し、過不足を精算します（<a class="t" href="#g-nencho">年末調整</a>）。源泉徴収票などの<strong>法定調書</strong>には、マイナンバーを書きます。</li>
+    </ul>
+    <div class="callout"><span class="label">MVP の範囲</span>年末調整と法定調書は MVP の後（E13）です。最初の年は現行のシステムで行います。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-jp-rules.md">payroll-jp-rules.md</a> の 3 節（DT-JP-001）と 10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0031-income-tax-withholding.md">ADR-0031</a>。遡及の支給・賞与の細部（L29〜L31）は税理士の確認待ちです。</div>
+  </section>
+
+  <section class="s" id="social">
+    <h2>社会保険・雇用保険・住民税</h2>
+    <p>給与からの控除は、それぞれ別の法律と別の改正の暦で動きます。料率と表は規則表に持ち、コードに書きません。</p>
+    <div class="tabs">
+      <div data-tab="社会保険"><p>健康保険・介護保険（40〜64 歳）・厚生年金と、令和 8 年 4 月分からの子ども・子育て支援金。保険料は実際の給与ではなく、<a class="t" href="#g-std-remuneration">標準報酬月額</a>（給与を等級に丸めた額）× 料率で計算し、会社と本人で折半します。等級は 4〜6 月の平均で毎年決め直し（<a class="t" href="#g-teiji">定時決定</a>）、固定的な賃金が大きく変わると途中で改めます（<a class="t" href="#g-zuiji">随時改定</a>）。設計は候補を示すだけで、等級を自動では変えません。</p></div>
+      <div data-tab="控除の月"><p>厚生年金保険法は、<strong>前月分</strong>の保険料を今月の給与から控除できると定めています。設計の既定もこの形です（<code>next_month</code>）。そのため「3 月分から」の料率の改定は、4 月の給与から効きます。本人の負担の端数は「50 銭以下切り捨て、50 銭超切り上げ」が基本です。</p></div>
+      <div data-tab="雇用保険"><p>標準報酬ではなく、その月の賃金の総額 × 料率。料率は 4 月に改まりうるので、設計はどの給与から新しい料率にするかを、賃金の締日で決めます。</p></div>
+      <div data-tab="住民税"><p>前年の所得に対する税を、市区町村が計算して会社に通知します。会社は 6 月から翌年 5 月まで、通知の月割額を天引きします（<a class="t" href="#g-juminzei">特別徴収</a>）。設計は通知の額をそのまま使い、自分では計算しません。</p></div>
+    </div>
+    <div class="callout warn"><span class="label">社労士・税理士の確認待ち</span>端数の特約の範囲（L8）、健康保険の側をまとめて丸めるか個別か（L32）、当月の分を当月に控除する運用（L33）、雇用保険の料率の切り替えの基準（L37）、退職の月の住民税の一括徴収（L35）。確認が済むまで関係する spec は承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-jp-rules.md">payroll-jp-rules.md</a> の 4〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0032-social-insurance-premiums-and-standard-remuneration.md">ADR-0032</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0033-employment-insurance-and-resident-tax.md">ADR-0033</a>。</div>
+  </section>
+
+  <section class="s" id="determinism">
+    <h2>給与を誤らない仕組み</h2>
+    <p>給与の誤りは、1 円でもエラーにならずに従業員の信頼と届出の誤りにつながります。そこで、給与の計算を<strong>入力から決まる純粋な関数</strong>にします。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-snapshot">入力のスナップショット</a></h3><p>計算に使う事実を <code>known_at</code> で固定し、正規の JSON にしてハッシュを取る。計算は DB を読まない。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-rule-table">規則表</a>の版</h3><p>税額表・料率・等級表を、公的な資料から取り込み、2 人で照合して公開する。</p></div>
+      <div class="card" data-frag><h3>お金は整数の円</h3><p><code>bigint</code> と固定小数点。丸めは「社会保険料の本人負担の丸め」のような、法令ごとに名前の付いた関数だけで行う。</p></div>
+    </div>
+    <p>同じ入力・同じ規則表の版・同じエンジンの版で計算し直すと、1 円も違わない結果になります。確定した結果は書き換えず、後から分かった変更は次の給与の<a class="t" href="#g-retro">遡及</a>の差額の行で払います。正しさは<a class="t" href="#g-golden">ゴールデンデータセット</a>と、現行のシステムとの<a class="t" href="#g-parallel-run">並行稼働</a>で確かめます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">エンジンを更新した後、確定済みの 4 月分を元の入力のまま計算し直したら、結果が 3 円違いました。遡及の処理はどうしますか？</p>
+      <div class="opts">
+        <button>実行を止める。データの変更ではなくエンジンの違いによる差なので、差額として払わない</button>
+        <button>3 円を遡及の差額として次の給与で払う</button>
+        <button>4 月分の確定した結果を新しい値で書き換える</button>
+      </div>
+      <p class="why">遡及の前に、元の入力と元の規則表で再現できるかを確かめ、違えば <code>ENGINE_DRIFT</code> で止めます（ADR-0028）。エンジンの誤りを、データの遡及として払わないためです。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0004-payroll-engine.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-engine.md">payroll-engine.md</a> の 5・7・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0030-rule-table-ingestion-and-verification.md">ADR-0030</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0061-golden-dataset-ci.md">ADR-0061</a>。</div>
+  </section>
+
+  <section class="s" id="mynumber">
+    <h2>マイナンバーの決まり</h2>
+    <p><a class="t" href="#g-mynumber">マイナンバー</a>（個人番号）は、番号法と個人情報保護委員会のガイドラインで、ふつうの個人情報より厳しく扱いが決まっています。会社は、源泉徴収票や社会保険の届出に書くために従業員と扶養の親族の番号を集めます。</p>
+    <ul>
+      <li data-frag><strong>利用の制限</strong>：社会保障・税・災害対策の、決められた事務にしか使えない。</li>
+      <li data-frag><strong>本人確認</strong>：集めるときに、番号の確認と身元の確認をする（個人番号カードなど）。</li>
+      <li data-frag><strong>担当者を限る</strong>：扱うのは指定した<a class="t" href="#g-jimu">事務取扱担当者</a>だけ。誰がいつ扱ったかを記録するが、記録に番号は書かない。</li>
+      <li data-frag><strong>保存と廃棄</strong>：法定の保存の期間を過ぎたら、できるだけ速やかに廃棄する。</li>
+      <li data-frag><strong>委託</strong>：委託元は委託先を監督し、再委託には委託元の許諾が要る。</li>
+    </ul>
+    <pre class="mermaid">flowchart LR
+  HR["人事の側 mn_ref と状態だけ"] -- "目的と担当者を添えて呼ぶ" --> V["保管庫 別の AWS アカウント"]
+  V -- "書類の ID だけ返す" --> HR
+  V --> D["法定の書類は保管庫の中で作る"]</pre>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>本システムの提供者がテナントからの委託先に当たるか、再委託の許諾の取り方（L1）。書類ごとの保存の期間と、退職者の番号を消す時期（L2、税理士・社労士）。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/my-number-vault.md">my-number-vault.md</a> の 2・6・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0005-security-and-my-number.md">ADR-0005</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0046-purpose-bound-vault-api-and-access-log.md">ADR-0046</a>。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 160 表と 22 の facet がありますが、核は次の数個です。facet は図では「現在の表」の名前で描かれ、実際には差分・版・現在の 3 つの表を持ちます。</p>
+    <pre class="mermaid">erDiagram
+  workers ||--o{ employments : "employed as"
+  employments ||--o{ job_assignments : "has"
+  employments ||--o{ employment_status : "has"
+  job_assignments ||--o{ worker_job : "has"
+  positions ||--o{ worker_job : "filled by"
+  organizations ||--o{ worker_job : "supervises"
+  bp_cases ||--o{ worker_job_changes : "writes deltas"
+  employments ||--o{ payroll_results : "paid in"
+  workers ||--o{ mn_links : "refers by mn_ref"
+  employments {
+    uuid tenant_id PK
+    uuid id PK
+    uuid worker_id FK
+    uuid company_id FK
+    text employee_number
+  }
+  worker_job {
+    uuid tenant_id PK
+    uuid subject_id PK "job_assignment"
+    daterange valid PK "WITHOUT OVERLAPS"
+    uuid position_id FK
+    uuid org_id FK
+  }
+  worker_job_changes {
+    uuid tenant_id PK
+    uuid id PK
+    date effective_on
+    text kind "change correction end"
+    uuid case_id FK
+    timestamptz recorded_at
+  }
+  mn_links {
+    uuid tenant_id PK
+    uuid mn_ref "vault record id"
+    text mn_status
+  }</pre>
+    <ul>
+      <li>主キーに <code>valid</code> を含む表は facet の現在の表です。<code>WITHOUT OVERLAPS</code> で期間の重なりを DB が拒みます。</li>
+      <li><code>*_changes</code> の <code>case_id</code> が、どの業務プロセスの案件で変わったかを指します。</li>
+      <li>保管庫は別の DB です。人事の側は <code>mn_ref</code> の値で対応させるだけで、外部キーはありません。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/data-model.md">data-model.md</a> の 3.4 節と 4 節。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>考え方は本家に寄せていますが、作り方と範囲を変えたところがあります。</p>
+    <table>
+      <tr><th>本家</th><th>この設計</th></tr>
+      <tr><td>業務の概念をメタデータで定義し、少数の汎用の表に追記する</td><td>型のある facet の表と DB の制約（ADR-0002）</td></tr>
+      <tr><td>同じ有効日の変更は、入力の時点で最後のものを取る</td><td>事象の種類の優先度（<code>seq</code>）で順序を決める</td></tr>
+      <tr><td>人員の管理はポジション管理とジョブ管理を選べる</td><td>ポジションに一本化（ADR-0010）</td></tr>
+      <tr><td>日本の給与はパートナーとの連携で扱う形と見られる（未検証）</td><td>日本の給与計算を自前の中心の機能にする（ADR-0004）</td></tr>
+      <tr><td>メタデータでの開発の環境、テナントが書くコードでの拡張</td><td>持たない。違いは設定と規則表で表す</td></tr>
+      <tr><td>タレント管理・採用・学習・海外の給与</td><td>MVP の後の Epic か延期</td></tr>
+    </table>
+    <p>API のパス、ヘッダー、トークンの接頭辞、ホスト名には本家の名前を使わず、<code>&lt;brand&gt;</code> と書きます（例：<code>&lt;tenant&gt;.&lt;brand&gt;.&lt;domain&gt;</code>、<code>&lt;brand&gt;_at_</code>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/README.md">architecture/README.md</a> の 1.1 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/intent.md">intent.md</a> の Non-goals、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-hcm">HCM</dt><dd>Human Capital Management。人事の記録・組織・報酬・勤怠などを扱う業務システムの分野。</dd>
+      <dt id="g-worker">worker</dt><dd>人。退職と再雇用をまたいで同じ個人を指す。</dd>
+      <dt id="g-employment">雇用</dt><dd>1 つの会社との 1 回の在籍の期間。社員番号と雇用の種類を持つ。</dd>
+      <dt id="g-job-assignment">職務の割り当て</dt><dd>雇用の中の 1 つの仕事。主たる職務と兼務があり、それぞれがポジションに座る。</dd>
+      <dt id="g-position">ポジション</dt><dd>組織の中の席。人が離れても残り、ロールの割り当てもここに付く。</dd>
+      <dt id="g-supervisory">監督組織</dt><dd>上長と部下の組（部・課・チーム）。所属・承認の経路・権限の範囲の起点になる。</dd>
+      <dt id="g-closure">閉包テーブル</dt><dd>木の祖先と子孫のすべての組を行として持つ表。「この組織の下位か」を 1 回の索引の検索で判定できる。</dd>
+      <dt id="g-bitemporal">bitemporal</dt><dd>有効時間と記録時間の 2 つの時間の軸でデータを持つ方式。</dd>
+      <dt id="g-effective">有効時間</dt><dd>現実の世界でその値が有効な期間。発令日や入社日で決まる。</dd>
+      <dt id="g-known-at">記録時間</dt><dd>システムがその値を正しいと記録していた期間。問い合わせでは <code>known_at</code> で時点を指定する。</dd>
+      <dt id="g-facet">facet</dt><dd>一緒に変わる項目のまとまり（住所、職務、給与など）。有効日付の単位で、差分・版・現在の 3 つの表を持つ。</dd>
+      <dt id="g-delta">差分</dt><dd>「どの項目を、いつから、どの案件で変えたか」の記録。追記だけで、畳み込んで期間を作る。</dd>
+      <dt id="g-rescind">取消（rescind）</dt><dd>完了した変更を「無かった」ことにする操作。記録は消さず、取消の印を付ける。</dd>
+      <dt id="g-retro">遡及</dt><dd>過去の日付の変更が、確定済みの給与に影響すること。差額を次の給与で精算する。</dd>
+      <dt id="g-bp">業務プロセス</dt><dd>起票・承認・作業・システムの処理・完了のステップを持つ、変更の手続き。案件ごとに状態を持つ。</dd>
+      <dt id="g-routing">ルーティング</dt><dd>ステップの担当を、組織とロールから決めること。</dd>
+      <dt id="g-delegation">委任</dt><dd>期間を決めて、自分のタスクを代理人に任せること。代理人は再委任できない。</dd>
+      <dt id="g-domain">ドメイン</dt><dd>権限を与える機能・項目の領域（給与、住所、口座など）。操作は閲覧・変更・連携の読み書き・集計。</dd>
+      <dt id="g-security-group">セキュリティグループ</dt><dd>権限を与える相手の集まり。人を直接入れる、ロール・職務・所属から自動で決まる、交差などの種類がある。</dd>
+      <dt id="g-sod">職務分掌</dt><dd>不正や誤りを防ぐため、両立させてはいけない権限の組を 1 人に持たせないこと。SoD（Segregation of Duties）。</dd>
+      <dt id="g-statutory-hours">法定労働時間</dt><dd>労働基準法の上限の 1 日 8 時間・1 週 40 時間。会社が定める所定労働時間とは別。</dd>
+      <dt id="g-36">36 協定</dt><dd>時間外・休日労働に関する労使協定。労働基準法 36 条による。事業場ごとに結んで届け出る。</dd>
+      <dt id="g-special-clause">特別条項</dt><dd>臨時の事情があるときに、36 協定の原則の上限（月 45 時間・年 360 時間）を超えられるようにする定め。それでも法の上限がある。</dd>
+      <dt id="g-nenkyu">年休</dt><dd>年次有給休暇。労働基準法 39 条で、勤続と出勤率に応じて日数が決まる。</dd>
+      <dt id="g-kijunbi">基準日</dt><dd>年休を与える日。年 5 日の取得義務の 1 年はここから数える。</dd>
+      <dt id="g-withholding">源泉徴収</dt><dd>給与を払う者が、所得税を差し引いて国に納める仕組み。</dd>
+      <dt id="g-kou-otsu">甲欄・乙欄</dt><dd>源泉徴収税額表の欄。扶養控除等申告書を出した人は甲欄、出していない人は乙欄を使う。</dd>
+      <dt id="g-fuyou">扶養控除等申告書</dt><dd>従業員が主たる勤め先へ出す申告書。扶養の親族とその番号を書く。出した勤め先では甲欄を使う。</dd>
+      <dt id="g-nencho">年末調整</dt><dd>1 年分の給与の税額を年末に計算し直し、毎月の源泉徴収との過不足を精算する手続き。</dd>
+      <dt id="g-std-remuneration">標準報酬月額</dt><dd>社会保険料の計算のため、月の報酬を等級の表に当てはめて丸めた額。</dd>
+      <dt id="g-teiji">定時決定</dt><dd>4〜6 月の報酬の平均で、標準報酬月額を毎年決め直すこと。算定基礎届を出す。</dd>
+      <dt id="g-zuiji">随時改定</dt><dd>固定的な賃金が変わり、等級が大きく変わるとき、年の途中で標準報酬月額を改めること。月額変更届を出す。</dd>
+      <dt id="g-juminzei">特別徴収</dt><dd>住民税を、市区町村の通知に従って会社が給与から天引きして納めること。6 月から翌年 5 月まで。</dd>
+      <dt id="g-snapshot">入力のスナップショット</dt><dd>給与の計算に使う事実を、ある時点の知識で固定して保存した文書。ハッシュで同一性を確かめる。</dd>
+      <dt id="g-rule-table">規則表</dt><dd>税額表・料率・等級表など、公的な資料から取り込んで版と適用の開始日で持つ表。</dd>
+      <dt id="g-golden">ゴールデンデータセット</dt><dd>合成の従業員と、社労士・税理士が確かめた期待値の組。CI で全件の一致を求める。</dd>
+      <dt id="g-parallel-run">並行稼働</dt><dd>本番の切り替えの前に、現行のシステムと同じ月を並べて計算し、差異をすべて説明すること。</dd>
+      <dt id="g-mynumber">マイナンバー</dt><dd>個人番号。番号法で、社会保障・税・災害対策の事務だけに使える 12 桁の番号。</dd>
+      <dt id="g-jimu">事務取扱担当者</dt><dd>会社の中で、マイナンバーを扱う事務を行うと指定された人。</dd>
+      <dt>社労士・税理士</dt><dd>社会保険労務士（労働・社会保険の法令の専門家）と税理士。設計は法令の当てはめの結論を、この確認に委ねる。</dd>
+      <dt>全銀協の規定形式</dt><dd>全国銀行協会が定める振込のデータの固定長の形式。給与・賞与の振込に使う。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、Non-goals、確認待ちの L1〜L58</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0002-effective-dated-data-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0003-business-process-engine.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0004-payroll-engine.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0005-security-and-my-number.md">0005</a> <span>— 有効日付、業務プロセス、給与、権限とマイナンバーの 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> <span>— 差分の畳み込み、変更・訂正・取消、時点の問い合わせ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/core-hr.md">core-hr.md</a> <span>— 人・雇用・職務、組織、入社から退職</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> <span>— 定義の版、ルーティング、委任、取消と訂正</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/security-model.md">security-model.md</a> <span>— ドメイン、セキュリティグループ、職務分掌</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/time-and-attendance.md">time-and-attendance.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/absence-and-leave.md">absence-and-leave.md</a> <span>— 労働時間、36 協定、年休</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-engine.md">payroll-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-jp-rules.md">payroll-jp-rules.md</a> <span>— 実行の段、入力の固定、遡及、税と保険の規則</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payments-and-accounting.md">payments-and-accounting.md</a> <span>— 振込ファイル、明細、仕訳</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/my-number-vault.md">my-number-vault.md</a> <span>— 保管庫、目的に縛られた API、保存と削除</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/workday/docs/decisions">decisions/</a> <span>— 残りの ADR（勤怠、監査、基盤、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
