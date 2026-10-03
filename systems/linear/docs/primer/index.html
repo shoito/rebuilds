@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Linear の前提知識</title>
+<meta name="description" content="Linear の再構築の設計の文書を読む前に知っておくとよい、課題管理とローカルファーストの同期の概念・用語・決まり。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Linear · 前提知識</p>
+    <h1>Linear の設計を読む前に</h1>
+    <p class="lead">課題管理のツールは「イシューの表を CRUD する」だけに見えますが、この題材の設計の中心は、ワークスペースのデータを手元に持ち、サーバーを待たずに操作し、後でサーバーの順序に合わせる<strong>同期エンジン</strong>です。課題管理の分野の決まりと、ローカルファーストの同期の考え方を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Linear · 前提知識</p>
+    <h2>Linear の設計を読む前に</h2>
+    <p class="lead">課題管理の決まりと、ローカルファーストの同期・オフライン・キーボード操作の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Linear は何をするサービスか</h2>
+    <p>Linear は、ソフトウェアのチームのための課題管理のツールです。開発者・PM・デザイナーが、やること（<a class="t" href="#g-issue">イシュー</a>）を登録し、状態を進め、期間（<a class="t" href="#g-cycle">サイクル</a>）や<a class="t" href="#g-project">プロジェクト</a>にまとめて計画します。本家の料金のページには「40,000 社以上」が使うとあります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>待たない</h3><p>状態・優先度・担当の変更は、入力から描画まで p99 50ms 以内。サーバーの応答を待たない（NFR-001）。</p></div>
+      <div class="card" data-frag><h3>全員が同じものを見る</h3><p>他の人の変更は 1 秒以内に届き、切断や同時の編集の後も全員が同じ状態に収束する（NFR-002・005）。</p></div>
+      <div class="card" data-frag><h3>失わない</h3><p>オフラインの変更は再起動をまたいでも失わず、つながったら 1 回だけ効く（NFR-004）。</p></div>
+    </div>
+    <p>使われ方の特徴は、<strong>キーボードだけで、何百件ものイシューを素早く整理する</strong>ことです。一覧で <code>P</code> を押して優先度を変え、次の行へ移り、また変える。1 回ごとにサーバーを待つと、この使い方が成り立ちません。規模は S1 で 5,000 ワークスペース、同時接続 6 万、最大のワークスペースでメンバー 2,000 人・イシュー 50 万件を想定しています。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/intent.md">intent.md</a> の Problem と Proposed outcome、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/README.md">architecture/README.md</a> の 2〜3 節（規模の段階と NFR）。</div>
+  </section>
+
+  <section class="s" id="structure">
+    <h2>ワークスペース・チーム・識別子</h2>
+    <p>顧客の組織 1 つが 1 つの<a class="t" href="#g-workspace">ワークスペース</a>で、これがテナントの単位です（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。その中を<a class="t" href="#g-team">チーム</a>に分けます。チームは、ワークフロー・サイクル・識別子の接頭辞を持つ、課題管理の基本の単位です。</p>
+    <ul>
+      <li data-frag><strong>人が読む識別子</strong>：イシューは <code>ENG-123</code> のように「チームの接頭辞 − 番号」で呼びます。番号はチームごとの連番で、サーバーの Writer が<strong>確定の時に</strong>振ります。確定するまで画面は <code>ENG-…</code> と仮に出します。</li>
+      <li data-frag><strong>ID は別にある</strong>：イシューの本当の ID は、クライアントが振る UUIDv7 です（<a href="../../../../docs/primer/index.html#ids">共通の資料</a>）。サーバーを待たずに、作ったイシューへの参照を作れます。チームを移ると番号は振り直され、古い識別子は別名として残ります。</li>
+      <li data-frag><strong>公開と非公開のチーム</strong>：公開のチームはワークスペースの全メンバーが見て参加できます。<a class="t" href="#g-private">非公開のチーム</a>は、そのチームのメンバーだけが中身を見られます。</li>
+    </ul>
+    <table>
+      <tr><th>ロール</th><th>できること（概要）</th></tr>
+      <tr><td><code>owner</code></td><td>管理者のすべてに加えて、請求・セキュリティの設定・ワークスペースの削除</td></tr>
+      <tr><td><code>admin</code></td><td>メンバーの招待・停止、チームの作成と公開の切り替え、連携</td></tr>
+      <tr><td><code>member</code></td><td>見てよいチームで読み書き。チームを作る、公開のチームに参加する</td></tr>
+      <tr><td><code>guest</code></td><td>参加させられたチームだけ。MVP の後</td></tr>
+    </table>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0020-ids-and-human-identifiers.md">ADR-0020</a>（ID と人が読む番号）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/permissions-and-teams.md">permissions-and-teams.md</a> の 3 節。</div>
+  </section>
+
+  <section class="s" id="workflow">
+    <h2>イシューのワークフローと属性</h2>
+    <p>各チームは、イシューの<a class="t" href="#g-state">状態</a>を自分で定義します（「In Review」など）。ただし、どの状態も決まった<strong>種類</strong>のどれかに属し、種類の順は変えられません。集計や自動化は、名前ではなく種類で判断します。</p>
+    <pre class="mermaid">flowchart LR
+  T[triage] --> B[backlog] --> U[unstarted] --> S[started] --> C[completed]
+  S --> X[canceled]
+  D["duplicate（システムだけが付ける）"]</pre>
+    <p>状態はどこからどこへも移せます。例外は 2 つで、<code>duplicate</code> へは「重複の関連を作る」操作でだけ入り、<a class="t" href="#g-triage">Triage</a> は連携やチーム外の人が作ったイシューの受け皿です。削除は 30 日の<a class="t" href="#g-trash">ゴミ箱</a>で、すぐには消えません。</p>
+    <div class="tabs">
+      <div data-tab="優先度"><p>なし・Urgent・High・Medium・Low の 5 つ。並べ替えでは「なし」が最後です。Urgent にすると担当に通知し、メールでも知らせます。</p></div>
+      <div data-tab="ラベル"><p>ワークスペースのラベルとチームのラベル。<strong>グループの中からは 1 つだけ</strong>付けられます（例：「種別」の中の Bug か Feature）。</p></div>
+      <div data-tab="見積もり"><p>点数で持ち、尺度は表示の形だけを決めます。指数（1・2・4・8・16）、フィボナッチ（1・2・3・5・8）、線形（1〜5）、T シャツ（XS〜XL）。親の見積もりに子の合計は足しません。</p></div>
+      <div data-tab="親子・関連"><p>サブイシューの深さの上限を本家は書いていません。この設計は 10 段までです。関連は blocks・related・duplicate。設定により、子が全部閉じたら親を閉じる、親を閉じたら子を閉じる、という自動の処理があります。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/issues-and-workflow.md">issues-and-workflow.md</a> の 4〜10 節の決定表、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0023-workflow-states-and-lifecycle-automation.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0024-hierarchy-relations-duplicates-and-triage.md">ADR-0024</a>。</div>
+  </section>
+
+  <section class="s" id="cycles">
+    <h2>サイクル：チームの短い期間</h2>
+    <p><a class="t" href="#g-cycle">サイクル</a>はスクラムのスプリントにあたる、チームごとの 1〜8 週の期間です。決めた曜日から自動で繰り返し、先のサイクルを最大 15 個まで用意します。サイクルの間に任意の<a class="t" href="#g-cooldown">クールダウン</a>を置けます。クールダウンにはイシューを割り当てられません。</p>
+    <ul>
+      <li data-frag><strong>境界はチームのタイムゾーンで決まる。</strong>同じワークスペースでも、東京のチームとロンドンのチームでは、サイクルの始まりの時刻が違います。</li>
+      <li data-frag><strong><a class="t" href="#g-rollover">繰り越し</a></strong>：サイクルが終わると、未完了のイシューは次のサイクルへ自動で移ります。</li>
+      <li data-frag><strong>成功の割合</strong>：完了を 1、着手中（started）を 1/4 と数えます。完了 5・着手中 4・手つかず 1 なら (5 + 4/4) / 10 = 60% です。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">サイクルが終わり、次のサイクルが始まりました。残っていたイシューのうち、この設計で次のサイクルへ自動で移るのは？</p>
+      <div class="opts">
+        <button>完了していないものすべて（Triage・Backlog を含む）</button>
+        <button>種類が unstarted と started のものだけ</button>
+        <button>何も移らない。人が手で移す</button>
+      </div>
+      <p class="why">Triage・Backlog は「まだ計画していない」ものなので、元のサイクルに残します（DT-CYCLE-001）。繰り越しは次のサイクルの始まりに行うので、クールダウンの間に Backlog へ戻したものも移りません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/cycles-and-projects.md">cycles-and-projects.md</a> の 4 節（境界の計算、繰り越し、遅れた割り当て）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0026-cycle-rows-and-rollover.md">ADR-0026</a>。</div>
+  </section>
+
+  <section class="s" id="projects">
+    <h2>プロジェクト・イニシアチブ・進捗</h2>
+    <p>サイクルが「チームの時間の区切り」なら、<a class="t" href="#g-project">プロジェクト</a>は「成果の単位」です。複数のチームにまたがり、リーダー・状態・期日・<a class="t" href="#g-milestone">マイルストーン</a>を持ちます。リーダーは定期的に進捗の更新を書き、健康状態（On track・At risk・Off track）を示します。複数のプロジェクトを束ねるのが<a class="t" href="#g-initiative">イニシアチブ</a>（識別子は <code>I-</code> と連番）です。</p>
+    <table>
+      <tr><th>イシューの種類</th><th>範囲（scope）</th><th>進捗への寄与</th></tr>
+      <tr><td>triage・backlog・unstarted</td><td>入る</td><td>0</td></tr>
+      <tr><td>started</td><td>入る</td><td>1/4</td></tr>
+      <tr><td>completed</td><td>入る</td><td>1</td></tr>
+      <tr><td>canceled・duplicate・ゴミ箱</td><td>入らない</td><td>—</td></tr>
+    </table>
+    <p>点は見積もりの値です。見積もりのないイシューは、設定により 1 点か 0 点と数えます。進捗は<strong>チームごとの行</strong>に分けて持ちます。プロジェクトが非公開のチームにまたがると、そのチームの件数を、他のチームの人に見せてはいけないからです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/cycles-and-projects.md">cycles-and-projects.md</a> の 3・5〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0027-progress-stats-per-team-via-derive.md">ADR-0027</a>。</div>
+  </section>
+
+  <section class="s" id="localfirst">
+    <h2>ローカルファーストとは</h2>
+    <p>この題材の核です。<a class="t" href="#g-localfirst">ローカルファースト</a>では、ワークスペースのデータを端末の DB に持ち、画面はそれを読みます。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>よくある Web アプリ</h3><p>操作 → API に送る → 応答を待つ → 描く。数百ミリ秒かかり、回線が切れると何もできない。他の人の変更は再読み込みまで見えない。</p></div>
+      <div class="good" data-frag><h3>ローカルファースト</h3><p>操作 → 手元のモデルに<a class="t" href="#g-optimistic">楽観的に</a>当てて描く → 後で送る。サーバーが順序を決めて確定し、他の人の変更は<a class="t" href="#g-delta">差分</a>で届く。</p></div>
+    </div>
+    <p data-frag>ただし、これは P2P ではありません。<strong>正本はサーバーの 1 本の順序</strong>です。クライアントは「確定した状態」の上に「自分の未確定の変更」を重ねて見せているだけで、最後はサーバーの順序に合わせます。似た系統に Replicache・Zero があります。本家の文書は、オフラインを「完全な機能ではなく失敗への備え」と書き、この設計はそれより強い保証（7 日のオフライン、上書きの記録）を目標にしています。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">あなたはオフラインで優先度を High にしました。その後、同僚がオンラインで Low にしました。あなたが再接続すると、どうなりますか？</p>
+      <div class="opts">
+        <button>あなたの編集の時刻が早いので、同僚の Low が残る</button>
+        <button>後に確定したあなたの High が残り、同僚の値を上書きしたことが履歴に残る</button>
+        <button>サーバーが衝突として拒否し、手で解決するよう求める</button>
+      </div>
+      <p class="why">端末の時刻は順序に使いません。サーバーで確定した順に後が勝ちます（<a class="t" href="#g-lww">LWW</a>）。作った時点の版（<code>base</code>）より後に他の人が変えていれば、上書きとして履歴に残し、古い操作なら本人にも知らせます（ADR-0008）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0002-sync-model.md">ADR-0002</a>（同期のモデル）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> の 2 節（本家の形と他の方式との比較）。</div>
+  </section>
+
+  <section class="s" id="syncid">
+    <h2>sync_id：ワークスペースの 1 本の順序</h2>
+    <p>サーバーは、ワークスペースの中の<strong>すべての変更</strong>に、1 つずつ増える番号 <a class="t" href="#g-syncid"><code>sync_id</code></a> を欠けなく振ります。クライアントの手元の版は「どの <code>sync_id</code> まで当てたか」の 1 つの数（<code>L</code>）で表せます。</p>
+    <ul>
+      <li data-frag><strong>なぜ DB のシーケンスを使わないか。</strong>シーケンスは、番号の順とコミットの順がずれます。ワークスペースの行をロックして数を増やすと、番号の順とコミットの順が一致し、「x より後」を読んで取りこぼすことがなくなります。代わりに、1 ワークスペースの書き込みは直列になります（S1 で 1 秒 300 変更の見込み）。</li>
+      <li data-frag><strong>絞ると番号が飛ぶ。</strong>非公開のチームの変更は、見てよくない人に送りません。すると受け手から見た番号は飛び飛びになり、番号の連続では欠けを判定できません。</li>
+      <li data-frag><strong>そこで<a class="t" href="#g-rangeproof">範囲の証明</a>。</strong>差分は <code>{from: a, to: b}</code> の形で送り、「(a, b] のうち、あなたが見てよい変更はこれで全部」を表します。中身が 0 件の範囲も知らせます。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">手元の <code>L</code> は 100 です。届いたパケットは <code>{from: 120, to: 130}</code> でした。クライアントはどうしますか？</p>
+      <div class="opts">
+        <button>そのまま当てて、<code>L</code> を 130 にする</button>
+        <button>捨てて、ブートストラップをやり直す</button>
+        <button>パケットを持ったまま、(100, 120] を HTTP で取り戻し、順に当てる</button>
+      </div>
+      <p class="why"><code>from &gt; L</code> は欠けです。配信（Valkey の pub/sub）は落ちてよいものとして作り、正しさは範囲の連続と取り戻しが持ちます。取り戻せないほど古い（ログの保持の外、5 万件より先）ときだけ、やり直しになります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0007-sync-actions-and-range-proof-deltas.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> の 7 節（<code>sync_actions</code>、Gateway での絞り込み、欠けの検出）。</div>
+  </section>
+
+  <section class="s" id="transaction">
+    <h2>トランザクションの一生と載せ直し</h2>
+    <p>1 回の入力（キーの操作 1 回、ドラッグ 1 回）が 1 つの<a class="t" href="#g-tx">トランザクション</a>になります。中身は「priority を 2 にする」「label を 1 つ足す」のような<strong>意図の操作</strong>の列で、行の全体ではありません。</p>
+    <div class="stepper">
+      <ol>
+        <li>トランザクションを作り、メモリーの<a class="t" href="#g-pool">オブジェクトプール</a>の未確定（<code>pending</code>）に積んで、すぐ描く。ネットワークも IndexedDB も待たない。</li>
+        <li>端末の <a class="t" href="#g-outbox">outbox</a> に保存する。ここが「失わない」の起点。</li>
+        <li>WebSocket で Sync Gateway に送る。<code>client_tx_id</code>（UUIDv7）が冪等の鍵になる（<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>）。</li>
+        <li><a class="t" href="#g-writer">Writer</a> がワークスペースの行をロックし、権限・参照・ワークフローの規則を確かめ、モデルの表と <code>sync_actions</code> を 1 つの DB のトランザクションで書く。</li>
+        <li>送り手に ack（確定の <code>sync_id</code> = s）が返る。まだ <code>pending</code> から外さない。</li>
+        <li>s までの差分が届き、手元に保存したら <code>pending</code> から外す。ack と差分の順が揺れても、画面は自分の値から動かない。</li>
+        <li>拒否されたら、<code>pending</code> から外して画面を作り直し、理由を本人に示す。</li>
+      </ol>
+    </div>
+    <p>他の人の差分が来たら、確定した値に当ててから、自分の未確定の操作を当て直します。これが<a class="t" href="#g-rebase">載せ直し</a>です。ある変更から決まる別の変更（状態の時刻、親の自動で閉じるなど）は、共有のコードの <a class="t" href="#g-derive"><code>derive</code></a> で求め、クライアントは同じコードで予測します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> の 4〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0006-transactions-writer-and-idempotency.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0025-derived-changes-in-writer.md">ADR-0025</a>。</div>
+  </section>
+
+  <section class="s" id="conflicts">
+    <h2>競合の規則：フィールドの型ごとに決める</h2>
+    <p>課題管理では、同じフィールドを同時に編集することはまれです。そこで、全部を <a class="t" href="#g-crdt">CRDT</a> にはせず、フィールドの型ごとに単純な規則を決めます。規則はスキーマの 1 か所に書き、規則のないフィールドはコードの生成で失敗させます。</p>
+    <div class="tabs">
+      <div data-tab="lww"><p>タイトル・状態・優先度・担当など。確定の順で後が勝ちます。フィールドごとに独立なので、Aさんが状態、Bさんが担当を同時に変えても両方残ります。</p></div>
+      <div data-tab="set"><p>ラベルなどの集合。「足す」「除く」の操作で送り、集合の全体を置き換えません。2 人が別のラベルを同時に足せば、両方残ります。</p></div>
+      <div data-tab="order"><p>手動の並び。<a class="t" href="#g-fractional">分数インデックス</a>の文字列の鍵で、「a0 と a1 の間」に <code>a0V</code> を作って入れます。兄弟の番号を振り直さないので、1 件の移動が 1 行の変更で済みます。</p></div>
+      <div data-tab="counter・server_only"><p><code>counter</code> は加算（進捗の数）。<code>server_only</code> は Writer だけが書く値（イシューの番号、作成の時刻）。</p></div>
+      <div data-tab="crdt"><p>イシューとプロジェクトの説明（本文）だけ。複数の人が同時に打っても文字が混ざって合わさるよう、<a class="t" href="#g-yjs">Yjs</a> の更新をそのまま足します。コメントは作った人だけが直すので LWW です。</p></div>
+    </div>
+    <p>集合の規則だけでは、ラベルの「グループの中から 1 つだけ」が崩れます（2 人が同時に別のラベルを足すと両方残る）。そこで、足す操作の派生として同じグループの他のラベルを除き、後に確定した方だけを残します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> の 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0008-conflict-rules-and-fractional-keys.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0021-description-crdt-yjs-in-sync-log.md">ADR-0021</a>。</div>
+  </section>
+
+  <section class="s" id="bootstrap">
+    <h2>ブートストラップと遅延の読み込み</h2>
+    <p>手元に何もない初回は、サーバーから見てよいデータをまとめて受け取ります。これが<a class="t" href="#g-bootstrap">ブートストラップ</a>です。2 回目からは手元の DB から画面を出し、その後で WebSocket の握手をして続きを受けます。</p>
+    <div class="tabs">
+      <div data-tab="instant"><p>起動の時に全部を取るモデル。チーム、メンバー、状態、ラベルなど、画面の骨格に要る小さなもの。</p></div>
+      <div data-tab="partial"><p>条件に合うものだけを取るモデル。イシューは「未完了か、30 日以内に閉じたもの」。見てよいモデルが 5 万件（E3 の PoC で決める仮の値）を超えるワークスペースでは、この<a class="t" href="#g-partial">部分のブートストラップ</a>になります。</p></div>
+      <div data-tab="lazy"><p>開いたときに読むモデル。コメント・履歴・本文・アーカイブしたもの。読んだ範囲を<a class="t" href="#g-coverage">被覆の鍵</a>（例：<code>Comment:issue_id=…</code>）として記録し、二度読まない。</p></div>
+    </div>
+    <table>
+      <tr><th>握手の結果</th><th>いつ</th><th>すること</th></tr>
+      <tr><td><code>resume</code></td><td>手元が最新</td><td>そのまま差分を受ける</td></tr>
+      <tr><td><code>catch_up</code></td><td>手元が少し古い</td><td>HTTP で (L, head] を取り戻す</td></tr>
+      <tr><td><code>reset</code></td><td>ログの保持（30 日）の外、5 万件より先、<a class="t" href="#g-epoch"><code>sync_epoch</code></a> が違う</td><td>手元のモデルを捨て、<strong>outbox は残して</strong>取り直す</td></tr>
+    </table>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/bootstrap-and-partial-sync.md">bootstrap-and-partial-sync.md</a> の 3〜6・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0003-bootstrap-and-partial-sync.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0009-sync-gateway-protocol.md">ADR-0009</a> の握手の決定表。</div>
+  </section>
+
+  <section class="s" id="groups">
+    <h2>同期グループ：配る単位 = 権限の単位</h2>
+    <p>手元に持たせるということは、<strong>届いたデータは全部見られる</strong>ということです。画面に出さなくても、端末の IndexedDB に入れば漏えいです。そこで、各行に<a class="t" href="#g-syncgroup">同期グループ</a>を付け、利用者が購読するグループの行だけを配ります。</p>
+    <table>
+      <tr><th>グループ</th><th>購読する人</th><th>例</th></tr>
+      <tr><td><code>workspace</code></td><td>全員（ゲストを含む）</td><td>ワークスペース、利用者</td></tr>
+      <tr><td><code>members</code></td><td>ゲストを除くメンバー</td><td>設定、イニシアチブ</td></tr>
+      <tr><td><code>team:&lt;id&gt;</code></td><td>公開：ゲスト以外の全員と、そのチームのゲスト。非公開：そのチームのメンバー</td><td>イシュー、状態、サイクル</td></tr>
+      <tr><td><code>user:&lt;id&gt;</code></td><td>本人</td><td>通知、個人のビュー</td></tr>
+      <tr><td><code>role:admin</code></td><td>owner・admin</td><td>連携の設定、招待</td></tr>
+    </table>
+    <p>読む権限は「行のグループと購読が交わる」という 1 つの定義で、差分・ブートストラップ・検索・API・Webhook・通知が同じ関数を使います。チームへの参加・脱退も同期のログに載るので、どの <code>sync_id</code> から送り始め、どこで止めるかが一意に決まります。脱退したら、手元の行をまとめて消します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">非公開のチームのイシューを全員の端末に配り、メンバーでない人の画面では隠す。この設計の問題は？</p>
+      <div class="opts">
+        <button>特にない。画面に出なければ見えない</button>
+        <button>描画が遅くなるだけ</button>
+        <button>開発者のツールで手元の DB を読めば中身が見える。届いた時点で漏えいである</button>
+      </div>
+      <p class="why">クライアントに届いたデータは、見てよいデータだけでなければなりません（NFR-008）。だから配る前に Gateway で絞ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0004-tenancy-and-permissions.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0032-single-policy-module-and-group-mapping.md">ADR-0032</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/permissions-and-teams.md">permissions-and-teams.md</a> の 5〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/bootstrap-and-partial-sync.md">bootstrap-and-partial-sync.md</a> の 7 節。</div>
+  </section>
+
+  <section class="s" id="browser">
+    <h2>ブラウザの保存とオフライン</h2>
+    <p>手元の DB はブラウザの <a class="t" href="#g-indexeddb">IndexedDB</a> です。アカウント × ワークスペースごとに 1 つの DB を持ちます。ブラウザの保存には、サーバーの DB にない癖があります。</p>
+    <ul>
+      <li data-frag><strong>書けたかの強さを選べる。</strong>IndexedDB のトランザクションの <a class="t" href="#g-durability"><code>durability</code></a> は、<code>strict</code>（ディスクに書けてから完了）と <code>relaxed</code>（OS に渡したら完了）を選べます。Chrome 121 から既定が <code>relaxed</code> です。この設計は outbox だけを <code>strict</code> にし、差分は <code>relaxed</code> にします（失っても取り戻せるため）。</li>
+      <li data-frag><strong>ブラウザに消されうる。</strong>空きが少ないと、永続でないオリジンのデータは丸ごと消されます。Safari は追跡の防止で、7 日操作のないサイトのデータを消します。永続の保存（<code>persist()</code>）を求め、デスクトップのアプリ（Electron）を勧めます。</li>
+      <li data-frag><strong>タブが複数ある。</strong><a class="t" href="#g-weblocks">Web Locks</a> で書き手のタブを 1 つ選び、そのタブだけが WebSocket を持って送ります。他のタブは outbox に書いて <a class="t" href="#g-broadcast">BroadcastChannel</a> で知らせます。</li>
+    </ul>
+    <p>outbox の上限は 5 万件・100 MiB です。7 日のオフラインは上限の内に収まる見積もりです。90 日より古い未送信は、自動では送らず本人に選ばせます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/client-store-and-offline.md">client-store-and-offline.md</a> の 2〜5・8〜9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0014-indexeddb-layout-durability-and-migrations.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0015-multi-tab-leader-and-broadcast.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0016-memory-tiers-quota-and-offline-ux.md">ADR-0016</a>。</div>
+  </section>
+
+  <section class="s" id="keyboard">
+    <h2>キーボード・コマンドメニュー・IME</h2>
+    <p>Linear の使い心地の要はキーボードです。<code>C</code> で作成、<code>P</code> で優先度、<code>X</code> で選択、<code>Cmd/Ctrl+K</code> で<a class="t" href="#g-cmdk">コマンドメニュー</a>、<code>G</code> の後のキーで移動、のように 1〜2 打で操作します。設計では、操作を 1 つの Action の登録にまとめ、ショートカット・コマンドメニュー・メニューが同じ登録を使います。</p>
+    <p data-frag><strong>50ms の予算</strong>：入力 → トランザクション → プールへの適用 → 変わった行だけの描き直し、の経路で何も待ちません。一覧は固定の高さで仮想化し、50 万件でも見えている行だけを描きます。予算を超えた PR は、CI の固定の機械で失敗させます。</p>
+    <p data-frag><strong>日本語の入力</strong>：<a class="t" href="#g-ime">IME</a> で変換している途中の <code>Enter</code> や <code>Esc</code> は、確定や取り消しのためのキーです。これをショートカットとして扱うと、意図しないイシューが送られます。変換中は <code>event.isComposing</code> が真か、<code>keyCode</code> が 229 になるので、そのキーはどのショートカットにも使いません。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>画面の見た目とショートカットを本家にどこまで寄せてよいか（不正競争防止法・著作権の観点。intent.md の L8）。見積もりのキーは本家の <code>Shift+E</code> でなく <code>E</code> のまま、L8 の後に見直します。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/client-app.md">client-app.md</a> の 4〜6・9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0017-keymap-command-menu-and-ime.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0018-render-path-and-latency-budget.md">ADR-0018</a>。</div>
+  </section>
+
+  <section class="s" id="views">
+    <h2>フィルターとビュー：手元とサーバーで同じ答え</h2>
+    <p>Linear の一覧は、条件を AND・OR で組み合わせたフィルター、グループ化、並べ方で作ります。保存した<a class="t" href="#g-view">ビュー</a>は個人・チーム・ワークスペースの範囲を持ちます。ビューのリンクを共有しても、見る権限は与えません。</p>
+    <p data-frag>この題材では、同じフィルターを<strong>クライアントの手元</strong>でも<strong>サーバーの SQL</strong> でも評価します。手元にないイシュー（古い完了）を含む条件は、サーバーに問い合わせて補うからです。両者がずれると、同じビューで結果が変わります。そこで、フィルターを型の付いた JSON の木で持ち、1 つの定義から両方の評価を生成します。手元だけで答えられるかは、<a class="t" href="#g-coverage">被覆の鍵</a>から「手元だけ」「手元とサーバー」「サーバー」を選びます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">フィルター「担当が Alice でない」に、担当のいないイシューは入りますか？</p>
+      <div class="opts">
+        <button>入る。言語の側で、空の値への「でない」を真と決めている</button>
+        <button>入らない。SQL の <code>assignee &lt;&gt; 'Alice'</code> は NULL の行を返さないから</button>
+        <button>クライアントでは入り、サーバーでは入らない</button>
+      </div>
+      <p class="why">SQL の三値の論理に任せると、手元の評価とずれます。空の値の扱いを言語の側で真か偽に決め、SQL は <code>IS DISTINCT FROM</code> などで同じ意味に訳します（DT-FILTER-001）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/views-and-filters.md">views-and-filters.md</a> の 3.4 節と 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0028-filter-language-and-shared-evaluation.md">ADR-0028</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0029-view-coverage-planner-and-server-query.md">ADR-0029</a>。</div>
+  </section>
+
+  <section class="s" id="integrations">
+    <h2>連携：Git のホスティング・Slack・Webhook</h2>
+    <p>ソフトウェアのチームの課題管理は、コードの変更とつながって初めて楽になります。GitHub・GitLab の連携では、<a class="t" href="#g-pr">PR</a>（GitLab では MR）とイシューを、次の手がかりで結びます。</p>
+    <ul>
+      <li data-frag>ブランチ名に識別子を入れる（<code>eng-123-fix-login</code>）。タイトルに識別子を書く。</li>
+      <li data-frag>本文に<a class="t" href="#g-magicword">閉じる語</a>と識別子を書く（<code>Fixes ENG-123</code>）。<code>ref</code>・<code>part of</code> などは閉じない結び付け、<code>skip</code>・<code>ignore</code> は結ばない。</li>
+      <li data-frag>PR が開くと started、マージされると completed へ、チームの設定に従って<strong>前へだけ</strong>進めます。複数の PR があれば、全部が終わってから進めます。</li>
+    </ul>
+    <p>GitHub の組織の誰でも PR のタイトルに識別子を書けるので、非公開のチームのイシューは、書く権限のある人の PR のときだけ状態を動かします。Slack からはメッセージでイシューを作れ、チャンネルへの通知は公開のチームに限ります。外部へ送る <a class="t" href="#g-webhook">Webhook</a> は時刻を含む <code>&lt;Brand&gt;-Signature</code> で署名し、失敗したら 1 分・1 時間・6 時間後に送り直します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/integrations.md">integrations.md</a> の 4〜5 節（DT-INT-001〜003）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0038-git-hosting-linking-and-state-automation.md">ADR-0038</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0043-signed-webhooks-from-sync-log.md">ADR-0043</a>。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 86 表（うち同期するモデル 45）ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>workspace_id</code> を持ちます（ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>）。</p>
+    <pre class="mermaid">erDiagram
+  workspaces ||--o{ teams : "has"
+  workspaces ||--|| workspace_sync : "counter"
+  workspace_sync ||--o{ sync_actions : "numbers"
+  teams ||--o{ workflow_states : "defines"
+  teams ||--o{ issues : "owns"
+  teams ||--o{ cycles : "has"
+  workflow_states ||--o{ issues : "state of"
+  cycles ||--o{ issues : "contains"
+  issues ||--o{ issues : "parent of"
+  issues ||--o{ comments : "has"
+  projects ||--|{ project_teams : "linked"
+  teams ||--o{ project_teams : "linked"
+  projects ||--o{ issues : "contains"
+  workspace_sync {
+    uuid workspace_id PK
+    bigint last_sync_id
+    integer sync_epoch
+  }
+  sync_actions {
+    uuid workspace_id PK
+    bigint sync_id PK
+    text model
+    uuid model_id
+    jsonb data
+    text_array groups
+  }
+  issues {
+    uuid workspace_id PK
+    uuid id PK
+    uuid team_id FK
+    bigint number
+    uuid state_id FK
+    text sort_key
+    bigint updated_sync_id
+    text_array sync_groups
+  }</pre>
+    <ul>
+      <li>モデルの表は共通の列を持ちます。<code>updated_sync_id</code>（最後に変えた番号。手元では <code>_u</code>）、<code>sync_groups</code>（同期グループ。手元では <code>_g</code>）、<code>archived_at</code>、<code>trashed_at</code>。</li>
+      <li><code>sync_actions</code> が同期のログです。1 行が 1 つの変更で、差分の配信・取り戻し・Webhook の元になります。保持は 30 日の既定案です。</li>
+      <li><code>project_teams</code> は、プロジェクトがどのチームのグループに属すかを決める結び付けの表です。行の中の配列から決めると、非公開のチームの ID が他の人に届くからです。</li>
+      <li>正本は Aurora だけです。Valkey・OpenSearch・端末の IndexedDB は写しで、作り直せます（端末の outbox は例外で、送るまでは端末が正本）。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/data-model.md">data-model.md</a> の 2〜3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/data-model-and-schema.md">data-model-and-schema.md</a> の 3.5 節（同期グループの規則）。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前・法務</h2>
+    <p>振る舞いは本家に寄せていますが、意図して変えたところ、MVP で作らないもの、法務の結論を待つものがあります。</p>
+    <div class="tabs">
+      <div data-tab="意図した差異">
+        <table>
+          <tr><th>本家</th><th>この設計</th></tr>
+          <tr><td>番号（<code>lastSyncId</code>）は全ワークスペースで共通（第三者の解析）</td><td>ワークスペースごとの <code>sync_id</code></td></tr>
+          <tr><td>送った後に落ちると 2 回効きうる（第三者の解析）</td><td><code>client_tx_id</code> で 1 回だけ</td></tr>
+          <tr><td>オフラインは失敗への備え</td><td>7 日のオフライン、上書きを履歴に残す</td></tr>
+          <tr><td>アーカイブは自動だけ</td><td>手動のアーカイブも持つ</td></tr>
+          <tr><td>サイクルは 0 時 1 分に始まる</td><td>0 時 0 分（隙間を作らない）</td></tr>
+          <tr><td>オーナーは Enterprise だけ</td><td>MVP からオーナーを置く</td></tr>
+        </table>
+      </div>
+      <div data-tab="作らないもの">
+        <p>MVP の後：ゲスト、サブチーム、AI の機能、モバイルのアプリ、SAML・SCIM、ロードマップとインサイト、トリアージの自動化。作らない：自前のホストでの提供、本家の API・SDK との完全な互換、P2P の同期、汎用のプロジェクト管理。</p>
+        <p>本家の名前は識別子に使いません。閉じる語の <code>linear issue</code> は <code>&lt;brand&gt; issue</code>、トークンは <code>&lt;brand&gt;_api_…</code>、署名のヘッダーは <code>&lt;Brand&gt;-Signature</code> と書きます。</p>
+      </div>
+      <div data-tab="法務の確認待ち">
+        <p>設計はどの結論にも対応できる形にし、結論は出していません。確認が済むまで、関わる Epic の spec を承認しません。</p>
+        <ul>
+          <li>L1 個人情報保護法：ワークスペースのデータを委託として扱うか、外国の第三者（GitHub・Slack・メールの送信事業者）への提供</li>
+          <li>L2 電気通信事業法：コメントや通知での媒介が届出の要る事業に当たるか、外部送信規律</li>
+          <li>L3 インポートが他社のツールの規約に反しないか</li>
+          <li>L4 データの所在、L5 保持の期間（同期のログの 30 日を含む）、L6 AI の機能、L7 顧客との契約（DPA）</li>
+          <li>L8 画面とショートカットを本家にどこまで似せてよいか</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/intent.md">intent.md</a> の Non-goals と「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/README.md">architecture/README.md</a> の 1.3 節と 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-issue">イシュー</dt><dd>課題管理の 1 件のやること。状態・優先度・担当・ラベル・見積もりなどを持つ。</dd>
+      <dt id="g-workspace">ワークスペース</dt><dd>1 つの組織の Linear の単位。契約とデータの単位で、テナントにあたる。</dd>
+      <dt id="g-team">チーム</dt><dd>ワークスペースの中の作業の単位。ワークフロー・サイクル・識別子の接頭辞（<code>ENG</code>）を持ち、権限の範囲にもなる。</dd>
+      <dt id="g-private">非公開のチーム</dt><dd>そのチームのメンバーだけが中身を見られるチーム。メンバーでない人の端末には行が届かない。</dd>
+      <dt id="g-state">ワークフローの状態</dt><dd>チームが定義するイシューの状態。triage・backlog・unstarted・started・completed・canceled・duplicate のどれかの種類に属す。</dd>
+      <dt id="g-triage">Triage</dt><dd>連携やチーム外の人が作ったイシューを、受け入れる・却下する・重複にする前に置く受け皿の状態。</dd>
+      <dt id="g-trash">ゴミ箱</dt><dd>削除したイシューを 30 日置く場所。アーカイブと <code>trashed_at</code> の組で表し、期限の後に本当に消す。</dd>
+      <dt id="g-cycle">サイクル</dt><dd>チームごとに繰り返す 1〜8 週の作業の期間。スプリントにあたる。</dd>
+      <dt id="g-cooldown">クールダウン</dt><dd>サイクルとサイクルの間の、イシューを割り当てない期間。</dd>
+      <dt id="g-rollover">繰り越し</dt><dd>サイクルの終わりに残った未完了のイシューを、次のサイクルへ移すこと。</dd>
+      <dt id="g-project">プロジェクト</dt><dd>期日のある成果の単位。複数のチームにまたがれる。イシューは 1 つのプロジェクトにだけ属す。</dd>
+      <dt id="g-milestone">マイルストーン</dt><dd>プロジェクトの中の区切り。任意の目標日を持ち、結び付いたイシューの完了の割合を示す。</dd>
+      <dt id="g-initiative">イニシアチブ</dt><dd>複数のプロジェクトを束ねる、より大きな目標の単位。</dd>
+      <dt id="g-localfirst">ローカルファースト</dt><dd>データを端末に持ち、操作をまず手元で反映し、後でサーバーや他の端末と合わせる作り方。</dd>
+      <dt id="g-optimistic">楽観的な更新</dt><dd>サーバーの確定を待たずに、成功する前提で画面に反映すること。拒否されたら取り消す。</dd>
+      <dt id="g-delta">差分</dt><dd>delta。サーバーで確定した変更を、<code>sync_id</code> の範囲ごとにクライアントへ送るもの。</dd>
+      <dt id="g-syncid">sync_id</dt><dd>ワークスペースの中のすべての変更に、確定の順に欠けなく振る番号。手元の版を 1 つの数で表せる。</dd>
+      <dt id="g-rangeproof">範囲の証明</dt><dd>差分のパケットに付ける <code>(from, to]</code>。その範囲で受け手が見てよい変更はこれで全部、という宣言。</dd>
+      <dt id="g-epoch">sync_epoch</dt><dd><code>sync_id</code> の世代。DR の切り替えや時点の復元で上げ、全クライアントに取り直させる。</dd>
+      <dt id="g-tx">トランザクション</dt><dd>1 回の入力で生まれる、意図の操作の列。全体が確定するか、全体が拒否されるか。</dd>
+      <dt id="g-pool">オブジェクトプール</dt><dd>クライアントのメモリーにあるモデルの集まり。確定の値と未確定の操作の 2 層を持ち、画面はその重ね合わせを読む。</dd>
+      <dt id="g-outbox">outbox（クライアント）</dt><dd>送る前のトランザクションを保存する端末の IndexedDB の store。確定を差分で確かめてから消す。サーバー側の outbox とは別物。</dd>
+      <dt id="g-writer">Writer</dt><dd>すべての書き込みを検証し、モデルの表と同期のログに書き、<code>sync_id</code> を振るサーバーの部品。</dd>
+      <dt id="g-rebase">載せ直し</dt><dd>rebase。確定した状態に他の人の差分を当ててから、自分の未確定の操作を当て直すこと。</dd>
+      <dt id="g-derive">derive</dt><dd>ある変更から決まる別の変更（派生）を求める共有のコード。Writer が書き、クライアントが同じコードで予測する。</dd>
+      <dt id="g-lww">LWW</dt><dd>Last Writer Wins。後に確定した値が勝つ規則。この設計の「後」は端末の時刻でなく確定の順。</dd>
+      <dt id="g-crdt">CRDT</dt><dd>Conflict-free Replicated Data Type。どの順で何回当てても同じ状態に合わさるように作ったデータ構造。</dd>
+      <dt id="g-yjs">Yjs</dt><dd>テキストの同時編集のための CRDT のライブラリ。エディタの ProseMirror とは y-prosemirror でつなぐ。</dd>
+      <dt id="g-fractional">分数インデックス</dt><dd>並びを「2 つの鍵の間の新しい鍵」で表す方法。挿入や移動で他の行の鍵を書き換えずに済む。</dd>
+      <dt id="g-bootstrap">ブートストラップ</dt><dd>初回やり直しのときに、見てよいデータをサーバーからまとめて受け取ること。</dd>
+      <dt id="g-partial">部分のブートストラップ</dt><dd>大きなワークスペースで、条件に合うイシュー（未完了と直近 30 日）だけを最初に受け取る形。</dd>
+      <dt id="g-coverage">被覆の鍵</dt><dd>「この条件の行は手元にすべてある」を表す記録。例：<code>Comment:issue_id=…</code>。</dd>
+      <dt id="g-syncgroup">同期グループ</dt><dd>行を配る宛先の単位（<code>workspace</code>・<code>members</code>・<code>team:&lt;id&gt;</code>・<code>user:&lt;id&gt;</code>・<code>role:admin</code>）。権限の単位と同じ。</dd>
+      <dt id="g-indexeddb">IndexedDB</dt><dd>ブラウザに組み込まれた、キーと値のトランザクションつきのデータベース。</dd>
+      <dt id="g-durability">durability</dt><dd>IndexedDB のトランザクションの完了をいつとみなすかの指定。<code>strict</code> はディスクへの書き込みの後、<code>relaxed</code> は OS に渡した後。</dd>
+      <dt id="g-weblocks">Web Locks</dt><dd>同じオリジンのタブの間で使えるロックの API。タブが閉じると自動で外れる。</dd>
+      <dt id="g-broadcast">BroadcastChannel</dt><dd>同じオリジンのタブの間でメッセージを送り合う API。</dd>
+      <dt id="g-cmdk">コマンドメニュー</dt><dd><code>Cmd/Ctrl+K</code> で開く、名前で操作を探して実行する入力欄。</dd>
+      <dt id="g-ime">IME</dt><dd>Input Method Editor。かなを漢字に変換するなど、文字の組み立てを助ける入力の仕組み。</dd>
+      <dt id="g-view">ビュー</dt><dd>フィルター・グループ化・並べ方を保存した一覧。個人・チーム・ワークスペースの範囲がある。</dd>
+      <dt id="g-pr">PR</dt><dd>Pull Request。コードの変更をレビューしてから取り込むための依頼。GitLab では MR（Merge Request）。</dd>
+      <dt id="g-magicword">閉じる語</dt><dd>PR の本文で識別子の前に書く <code>fixes</code>・<code>closes</code> などの語。マージでイシューを完了へ進める。</dd>
+      <dt id="g-webhook">Webhook</dt><dd>イベントが起きたときに、利用者が登録した URL へ HTTP で知らせる仕組み。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。3 つの価値、MVP、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、本家の形、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0002-sync-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0003-bootstrap-and-partial-sync.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0004-tenancy-and-permissions.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0005-client-persistence-and-offline.md">0005</a> <span>— 同期のモデル、ブートストラップ、権限、手元の保存の 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> <span>— トランザクション、Writer、差分、競合の規則、Gateway のプロトコル</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/bootstrap-and-partial-sync.md">bootstrap-and-partial-sync.md</a> <span>— 起動、遅延の読み込み、同期グループ、やり直し</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/client-store-and-offline.md">client-store-and-offline.md</a> <span>— IndexedDB、outbox、複数のタブ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/permissions-and-teams.md">permissions-and-teams.md</a> <span>— ロール、<code>can()</code>、非公開のチーム</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/issues-and-workflow.md">issues-and-workflow.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/cycles-and-projects.md">cycles-and-projects.md</a> <span>— 課題管理の分野の規則</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/client-app.md">client-app.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/views-and-filters.md">views-and-filters.md</a> <span>— キーボード、IME、遅延の予算、フィルター</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本、規約、横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/linear/docs/decisions">decisions/</a> <span>— 残りの ADR（連携、API、通知、検索、運用、DR）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
