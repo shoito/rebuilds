@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uber の前提知識</title>
+<meta name="description" content="Uber の再構築の設計の文書を読む前に知っておくとよい、配車の分野の概念・用語と、日本のタクシー・日本版ライドシェアの制度の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Uber · 前提知識</p>
+    <h1>Uber の設計を読む前に</h1>
+    <p class="lead">配車のアプリは「近くの車を呼ぶ」だけに見えますが、中には位置の流れ、地理の索引、配車の最適化、到着の予測、運賃の制度、決済と精算があります。そして日本では、誰が客を運んでよいか・運賃をどう決めるかが法令で細かく決まっています。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Uber · 前提知識</p>
+    <h2>Uber の設計を読む前に</h2>
+    <p class="lead">配車・位置・運賃と、日本のタクシーの制度の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Uber は何をするサービスか</h2>
+    <p>Uber は、車に乗りたい人（乗客）と、近くを走っている車（ドライバー）を、その場で結びつける<strong>配車のマーケットプレイス</strong>です。乗客から見た 1 回の使われ方は、次のとおりです。</p>
+    <div class="stepper">
+      <ol>
+        <li>乗車地と降車地を地図で指定する。近くの車の数、迎車の時間の目安（「約 5 分」）、運賃の目安か確定の額が出る。</li>
+        <li>依頼する。数秒のうちに、近くのドライバーに「この客を迎えに行きますか」という<a class="t" href="#g-offer">オファー</a>が届く。</li>
+        <li>ドライバーが受諾すると、乗客の画面に車両の番号・ドライバーの名前・迎車の <a class="t" href="#g-eta">ETA</a> と、近づいてくる車が出る。</li>
+        <li>乗って、降りる。運賃は登録したカードで払われ、互いに評価する。</li>
+        <li>後日、この基盤が受け取った運賃を、手数料を引いてタクシー事業者に精算する。</li>
+      </ol>
+    </div>
+    <p>関わるのは乗客・ドライバー・<a class="t" href="#g-operator">タクシー事業者</a>の 3 者です。再構築の intent は「すぐに確実に来る」「制度に合った納得できる運賃」「安全で位置を守る」の 3 つを価値に掲げます。規模の感覚は、S1 で東京のオンラインの車両 1 万台、位置の受信 2,500 件/秒、配車の依頼の受け付け 30 件/秒（成立は約 3〜6 件/秒）です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> の「Proposed outcome」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="forms">
+    <h2>日本で「誰が客を運んでよいか」</h2>
+    <p>海外の Uber は、個人が自分の車で客を運ぶライドシェアが中心です。日本では、<strong>自家用車で客を有償で運ぶことは、道路運送法第 78 条で原則として禁じられています</strong>。そのため、この設計は運送の主体にならず、許可を持つ事業者の配車の道具として動きます。</p>
+    <div class="tabs">
+      <div data-tab="タクシー"><p>道路運送法第 4 条の許可を持つタクシー事業者が運ぶ。ドライバーは<a class="t" href="#g-license2">第二種免許</a>を持つ乗務員。この設計の MVP の中心です。</p></div>
+      <div data-tab="日本版ライドシェア"><p><a class="t" href="#g-rideshare">日本版ライドシェア</a>（自家用車活用事業、第 78 条第 3 号、2024 年 3 月から）。一般のドライバーが自分の車で運びますが、<strong>運送の主体はタクシー事業者</strong>です。地域・時間帯・台数に制約があります。MVP で、認められた地域・時間帯だけ含めます。</p></div>
+      <div data-tab="公共ライドシェア"><p><a class="t" href="#g-public-rs">公共ライドシェア</a>（自家用有償旅客運送、第 78 条第 2 号）。市町村・NPO 法人などが登録を受けて行う。MVP には含めません。</p></div>
+      <div data-tab="白タク"><p>許可のない自家用車の有償運送。<a class="t" href="#g-shirotaku">白タク</a>と呼ばれ、違法です。<strong>この経路は設計しません。</strong>事業者に属さないドライバーは出庫できないことを、DB の制約でも守ります。</p></div>
+    </div>
+    <p>運賃を決めるのも事業者で、その運賃は運輸局の認可や公示の範囲に入ります。この基盤は、事業者が選んだ運賃の規則で計算し、表示し、代わりに受け取るだけです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> の「日本での運営の形」「日本の制度」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/data-model.md">data-model.md</a> の 5 節の不変条件「白タクの経路がない」。</div>
+  </section>
+
+  <section class="s" id="where-when">
+    <h2>どこで・いつ走れるか：営業区域と運行枠</h2>
+    <p>タクシー事業者は、許可された<a class="t" href="#g-area">営業区域</a>の中で営業します。道路運送法第 20 条により、<strong>発地と着地のどちらもが営業区域の外</strong>の運送はできません。運賃は<a class="t" href="#g-fare-block">運賃ブロック</a>ごと、需給の管理は<a class="t" href="#g-kotsuken">交通圏</a>ごとに決まります（東京なら「特別区・武三交通圏」）。</p>
+    <p>日本版ライドシェアには、さらに次の条件が重なります。</p>
+    <ul>
+      <li data-frag>国土交通省が、配車アプリのデータなどから、タクシーが足りない<strong>曜日・時間帯と台数</strong>（<a class="t" href="#g-shortage">不足車両数</a>）を指定する。この設計はこれを<a class="t" href="#g-window">運行枠</a>として持ち、出庫の時点で台数を数える。</li>
+      <li data-frag>雨天・酷暑・イベントで、枠と台数が広がる決まりがある。</li>
+      <li data-frag>発着地が引受けの時点で決まっていること、乗客の事前の承諾、事前確定運賃に準ずる運賃、原則キャッシュレス。</li>
+      <li data-frag>事業者は<a class="t" href="#g-unkokanri">運行管理者</a>を置き、<a class="t" href="#g-tenko">点呼</a>・指導・研修を行う。ドライバーは第一種免許（初心運転者期間を除く）か第二種免許。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">日本版ライドシェアのドライバーが、走行中に手を挙げた人を見つけました。乗せてよいですか？</p>
+      <div class="opts">
+        <button>乗せてよい。アプリで「実車」に切り替えればよい</button>
+        <button>乗せられない。発着地が引受けの時点で決まっている必要があり、アプリに「実車」の操作もない</button>
+        <button>運行枠の時間帯の中なら乗せてよい</button>
+      </div>
+      <p class="why">流しで乗せられるのはタクシーだけです。日本版ライドシェアは発着地の事前の確定が条件なので、ドライバーのアプリに流しの切り替えを置きません（dispatch-and-matching.md の 7 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/supply-and-operators.md">supply-and-operators.md</a> の 2 節と 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0027-rideshare-operating-windows.md">ADR-0027</a>、候補の条件 E4・E5（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/dispatch-and-matching.md">dispatch-and-matching.md</a> の 5 節）。</div>
+  </section>
+
+  <section class="s" id="states">
+    <h2>乗車の状態機械</h2>
+    <p>1 回の乗車は、決まった状態を順に進みます。設計の文書は、状態の名前をそのまま使って振る舞いを書くので、図を頭に入れておくと読みやすくなります。</p>
+    <pre class="mermaid">stateDiagram-v2
+  direction LR
+  [*] --> payment_pending : 依頼（アプリ決済）
+  [*] --> requested : 依頼（車内払い）
+  payment_pending --> requested : 与信の成功
+  payment_pending --> payment_failed : 与信の失敗
+  requested --> offered : 配車の提案
+  offered --> requested : 辞退・時間切れ
+  offered --> accepted : 受諾
+  accepted --> arriving : 出発
+  arriving --> arrived : 到着
+  arrived --> on_trip : 乗車の開始
+  on_trip --> awaiting_fare : 降車（額が未定）
+  on_trip --> completed : 降車（額が確定）
+  awaiting_fare --> completed : 額の確定
+  requested --> no_driver_found : 3 分・10 回
+  arrived --> no_show : 無断キャンセル</pre>
+    <ul>
+      <li><code>awaiting_fare</code>：メーターの額が届かないとき。<strong>ドライバーはここで解放され</strong>、次のオファーを受けられます。</li>
+      <li>乗客の取り消しは、受諾の前は無料、受諾から 120 秒の猶予を過ぎると<a class="t" href="#g-cancel-fee">キャンセル料</a>（ドライバーが約束より遅れていれば無料）。到着から 300 秒待ち、乗車地の 200 m 以内なら<a class="t" href="#g-noshow">無断キャンセル</a>にできます。</li>
+      <li>ドライバーの取り消しは、乗車を <code>requested</code> に戻して再配車します。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/trips-lifecycle.md">trips-lifecycle.md</a> の 3 節（遷移の表 DT-TRIP-001）と 7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0003-trip-state-and-single-assignment.md">ADR-0003</a>。</div>
+  </section>
+
+  <section class="s" id="location">
+    <h2>位置の流れ：4 秒ごとの GPS</h2>
+    <p>オンラインのドライバーのアプリは、<strong>約 4 秒ごと</strong>に位置を送ります。1 万台なら 2,500 件/秒です。スマートフォンの位置は <a class="t" href="#g-gnss">GNSS</a>（GPS など）で測りますが、都市ではビルの反射で数十〜数百 m ずれ、トンネルでは途切れます。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>1 点ずつそのまま信じる</h3><p>1 点の跳びで車の位置が数百 m 動き、遠い車にオファーが届く。古い点が後から届くと、位置が過去に戻る。</p></div>
+      <div class="good" data-frag><h3>検証してから使う</h3><p>範囲・時刻・精度・順序・跳びを点ごとに判定する。跳んだ点は保留し、次の点が整合したときだけ動かす。15 秒より古い位置のドライバーは候補から外す。</p></div>
+    </div>
+    <p>位置は<strong>失ってよい流れ</strong>です。次の 4 秒で上書きされるからです。一方、乗車の状態は失ってはいけない正本です。この区別が設計全体の原則になっています。乗車の軌跡は、遅れて<a class="t" href="#g-mapmatch">マップマッチング</a>（道路への当てはめ）をし、距離の確認や地図の誤りの発見に使います。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/location-ingestion.md">location-ingestion.md</a> の 5 節（検証 V1〜V8）と 8 節、NFR-002、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0009-location-upload-and-validation.md">ADR-0009</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0010-location-trails-map-matching-and-retention.md">ADR-0010</a>。</div>
+  </section>
+
+  <section class="s" id="geogrid">
+    <h2>地理の索引と六角形の格子</h2>
+    <p>「依頼の地点の近くの空車」を毎秒何十回も探すには、地図を小さな区画に分け、区画ごとにドライバーを入れておく索引が要ります。この設計は、日本を 1 つの平面に写し、<a class="t" href="#g-hexgrid">六角形の格子</a>（自前の <code>geogrid</code>）を敷きます。六角形は、隣のセルの中心までの距離が 1 種類で、「輪を広げて探す」ときに半径の近似が素直になります。</p>
+    <table>
+      <tr><th>レベル</th><th>辺の長さ</th><th>主な使い道</th></tr>
+      <tr><td><code>metro</code></td><td>約 3.70 km</td><td>索引の分割（S2）、都市の判定</td></tr>
+      <tr><td><code>district</code></td><td>1.40 km</td><td>需給の集計、ETA の偏りの表</td></tr>
+      <tr><td><code>block</code></td><td>約 529 m</td><td>ログ・メトリクスの丸め</td></tr>
+      <tr><td><code>street</code></td><td>200 m</td><td>ドライバーの索引のキー、候補の検索</td></tr>
+      <tr><td><code>spot</code></td><td>約 75.6 m</td><td>配車の判断の記録、乗降の地点</td></tr>
+    </table>
+    <p>1 つ細かいレベルは、面積が約 7 分の 1 です。索引はメモリの上にあり、<strong>正本ではありません</strong>。失っても位置の流れの直近の分から作り直せます。営業区域などの判定の最終の結果は、セルではなく行政の境界の多角形で確かめます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">乗車地のセルから輪を 1 つずつ広げて探し、輪 k までに 3 人見つかりました。この 3 人が「近い順の上位 3 人」だと言えるのは、どんなときですか？</p>
+      <div class="opts">
+        <button>輪 k までに 3 人見つかった時点で、いつでも言える</button>
+        <button>3 人が同じセルにいるときだけ</button>
+        <button>3 人とも、乗車地から輪 k の外周までの距離より内側にいるとき</button>
+      </div>
+      <p class="why">輪 k の角にいる人より、輪 k + 1 の辺の中ほどにいる人のほうが近いことがあります。外周までの距離より内側の人だけを数えて打ち切ります（geospatial-index.md の 6.2 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0002-hex-grid-geospatial-model.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/geospatial-index.md">geospatial-index.md</a> の 2.1 節と 6 節。</div>
+  </section>
+
+  <section class="s" id="dispatch">
+    <h2>配車：近い順ではなく、まとめて組む</h2>
+    <p>依頼が来るたびに「いちばん近い空車」を割り当てると、その場では良くても、全体では待ちが延びることがあります。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>1 件ずつ、いちばん近い車</h3><p>依頼 A に車 1（2 分）を取った直後に依頼 B が来ると、B には遠い車 2（12 分）しか残らない。合計 14 分。</p></div>
+      <div class="good" data-frag><h3>2 秒ためて、まとめて組む</h3><p>A に車 2（4 分）、B に車 1（3 分）と組めば、合計 7 分。依頼と車の組を<a class="t" href="#g-assignment">割り当て問題</a>として解く。</p></div>
+    </div>
+    <p data-frag>この設計の<a class="t" href="#g-batch">バッチのマッチング</a>は、区域ごとに 2 秒ごとに締め、索引から候補を取り、道路の上の迎車の ETA でコストの行列を作って最小にします。条件（車両の種類、営業区域、運行枠、位置の鮮度など E1〜E9）に合わない組は解けない組にします。計算が 300 ms を超えたら、貪欲法に切り替えます。</p>
+    <p data-frag>配車は同じ入力と乱数の種から同じ結果を出すように書き、判断の入力を記録します。アルゴリズムを変えるときは、記録を再生して変更前と比べます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/dispatch-and-matching.md">dispatch-and-matching.md</a> の 3・5・6・9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0004-batched-dispatch-and-offers.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0013-batch-assignment-solver.md">ADR-0013</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0042-replay-and-shadow-gates-for-dispatch-and-pricing.md">ADR-0042</a>。</div>
+  </section>
+
+  <section class="s" id="offers">
+    <h2>オファーと、タクシーの現場の決まり</h2>
+    <p>配車が組を決めても、ドライバーが受諾するまで乗車は成立しません。オファーは 1 人ずつ送り、時間を区切ります。</p>
+    <table>
+      <tr><th>時間</th><th>意味</th></tr>
+      <tr><td>15 秒</td><td>アプリが表示する残り時間</td></tr>
+      <tr><td>16.5 秒</td><td>サーバーの期限（配信と送信の遅れの猶予 1.5 秒）</td></tr>
+      <tr><td>5 秒</td><td>アプリが「受け取った」と返さなければ取り下げ（罰則にしない）</td></tr>
+      <tr><td>3 分・10 回</td><td>成立しなければ <code>no_driver_found</code></td></tr>
+    </table>
+    <p>タクシーは、アプリの配車の合間に<a class="t" href="#g-nagashi">流し</a>や乗り場でも客を乗せます。<a class="t" href="#g-meter">タクシーメーター</a>の状態（空車・迎車・実車・支払）とアプリの状態がずれると、客を乗せている車にオファーが届きます。そこで、流しの実車はアプリの「実車」かメーターの信号で索引から外し、時間切れが 2 回続いたら自動で休憩にします。</p>
+    <p>タクシーには<a class="t" href="#g-hikiuke">運送引受義務</a>（道路運送法第 13 条）があります。降車地を見て断れると乗車の拒否に当たりうるので、<strong>降車地は受諾の後に見せる</strong>のが既定です。この扱いは法務の確認待ち（L1）です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/dispatch-and-matching.md">dispatch-and-matching.md</a> の 7・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0014-dispatch-eligibility-and-street-hails.md">ADR-0014</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0015-offer-protocol-decision-log-and-replay.md">ADR-0015</a>。</div>
+  </section>
+
+  <section class="s" id="fencing">
+    <h2>1 台 1 乗車を守る：fencing token</h2>
+    <p>索引は数百 ms 遅れた写しで、配車のタスクが一時的に 2 つ動くこともあります。古い情報で割り当てると、1 台の車が 2 つの乗車に付きます。これを防ぐのが <a class="t" href="#g-fencing">fencing token</a> です。</p>
+    <div class="stepper">
+      <ol>
+        <li>ドライバーごとに、単調に増える数 <a class="t" href="#g-epoch"><code>assignment_epoch</code></a> を Trips の DB に持つ。</li>
+        <li>配車は、索引から読んだ epoch を付けて「このドライバーを割り当てたい」と提案する。</li>
+        <li>Trips は 1 つのトランザクションで、DB の epoch と提案の epoch を比べる。違えば拒否する（<code>EPOCH_MISMATCH</code>）。</li>
+        <li>割り当ての作成と解放のたびに epoch を 1 増やす。古い提案や古い受諾は、すべて食い違いで落ちる。</li>
+        <li>最後の砦として、「ドライバーごと・乗車ごとに有効な割り当ては 1 つ」の部分一意索引を置く。</li>
+      </ol>
+    </div>
+    <p>大阪への切り替えで epoch の増分が失われても取り違えないよう、比較は世代を前に付けた <code>(<a class="t" href="#g-region-gen">region_gen</a>, assignment_epoch)</code> の組で行います。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">索引の上では、ドライバー X は空車です。配車がこの情報で X を乗車 B に割り当てる提案をしました。でも実は、X は直前に乗車 A を受諾していました。どうなりますか？</p>
+      <div class="opts">
+        <button>索引が空車と言っているので、B に割り当てられる</button>
+        <button>A の割り当てで DB の epoch が増えているので、提案の epoch と合わず、Trips が拒否する</button>
+        <button>A と B の両方に割り当て、後でサポートが直す</button>
+      </div>
+      <p class="why">索引は正本ではなく、索引の情報だけで割り当てを確定しません。確定は Trips の遷移関数だけが、epoch を確かめて行います（ADR-0003・0021）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/trips-lifecycle.md">trips-lifecycle.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0021-trip-transition-function-and-assignment-fencing.md">ADR-0021</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0039-city-cells-and-osaka-warm-standby.md">ADR-0039</a>。</div>
+  </section>
+
+  <section class="s" id="eta">
+    <h2>ETA と地図</h2>
+    <p>ETA（到着の見込みの時間）は、道路を辺と節のグラフにした<a class="t" href="#g-routing">経路のエンジン</a>で求めます。直線の距離では、川や一方通行や右折の禁止を考えられないからです。配車は候補を直線の距離で絞り、順位は道路の上の ETA で決めます。</p>
+    <div class="tabs">
+      <div data-tab="経路と ETA"><p>地図は <a class="t" href="#g-osm">OpenStreetMap</a>（OSM）、エンジンは自前で動かす <a class="t" href="#g-valhalla">Valhalla</a>。過去の走行の実績から時間帯ごとの速度を入れ、さらに区画 × 時間帯の偏りの表で補正します。OSM の派生データには <a class="t" href="#g-odbl">ODbL</a> の義務が関わり、法務の確認待ち（L3）です。</p></div>
+      <div data-tab="住所と運賃の距離"><p>住所の検索と、事前確定運賃の推計走行距離は、商用の地図の提供者を使います。運賃の距離には「一般に流通し、定期的に更新される電子地図」という要件があるためです。OSM がこれに当たるかは法務の確認待ち（L3）です。</p></div>
+      <div data-tab="精度の測り方"><p>NFR-003 は、<strong>受諾の時点で乗客に表示した迎車の ETA</strong> と実際の到着の差で測ります（中央値 60 秒以内、p90 180 秒以内）。依頼の前の「約 5 分」は目安で、約束ではありません。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/eta-and-routing.md">eta-and-routing.md</a> の 4・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/maps-and-geodata.md">maps-and-geodata.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0005-maps-and-routing.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0017-fare-distance-for-pre-fixed-fares.md">ADR-0017</a>。</div>
+  </section>
+
+  <section class="s" id="fares">
+    <h2>タクシーの運賃の基本</h2>
+    <p>タクシーの運賃は、国土交通大臣の<strong>認可</strong>事項です。運賃ブロックごとに幅が決まり、事業者はその中で運賃を選びます。基本は<a class="t" href="#g-distance-fare">距離制運賃</a>です。</p>
+    <ul>
+      <li data-frag><strong>初乗運賃と加算</strong>：特別区・武三地区の普通車の A 運賃は、2026-04-20 の改定から、初乗 1.0 km 500 円、以後 232 m ごとに 100 円。</li>
+      <li data-frag><strong><a class="t" href="#g-time-distance">時間距離併用制</a></strong>：時速 10 km 以下で走った時間を距離に換算して加算する（A 運賃で 1 分 25 秒ごとに 100 円）。</li>
+      <li data-frag><strong>割増と割引</strong>：深夜早朝割増は原則 22 時〜5 時で 2 割。身体障害者割引は 1 割。</li>
+      <li data-frag><strong>料金</strong>：運賃とは別に、<a class="t" href="#g-pickup-fee">迎車料金</a>、待料金など。迎車料金は事業者ごとに違い、採らない事業者もある。</li>
+    </ul>
+    <p>メーターの運賃は、この基盤が計算しません。車載のメーターか、国が認定した<a class="t" href="#g-softmeter">ソフトメーター</a>から額を受け取ります。連携がなければドライバーが入力し、軌跡から求めた「影の計算」で照合します（影の額では請求しません）。運賃は改定されるので、規則は版つきのデータで持ち、金額は円の整数だけで計算します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/pricing-and-fares.md">pricing-and-fares.md</a> の 2.1・2.4・5.4・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0018-versioned-fare-rules-and-integer-yen.md">ADR-0018</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0019-meter-fare-sources.md">ADR-0019</a>。</div>
+  </section>
+
+  <section class="s" id="upfront">
+    <h2>事前確定運賃と変動運賃</h2>
+    <p>配車アプリでは、乗る前に額を確定する<a class="t" href="#g-upfront">事前確定運賃</a>を使えます。地図で求めた<a class="t" href="#g-est-distance">推計走行距離</a>から距離制運賃を出し、運輸局が定める<a class="t" href="#g-coefficient">係数</a>を掛け、1 円の位を四捨五入して 10 円単位にします。</p>
+    <p data-frag>例：5,000 m なら、500 + ⌈4,000 ÷ 232⌉ × 100 = 2,300 円。係数 1.21 を掛けて 2,783 円。四捨五入して <strong>2,780 円</strong>。</p>
+    <div class="tabs">
+      <div data-tab="事前確定運賃"><p>乗客が 2 つ以上の経路から選び、同意してから乗る。<strong>渋滞しても額は変わらない</strong>。乗客の都合で経路を変えたら、その地点で精算し、そこから新しい運送を始める（区間の分割）。</p></div>
+      <div data-tab="事前確定型変動運賃"><p><a class="t" href="#g-dynamic">事前確定型変動運賃</a>。需給に応じて、事前確定運賃の<strong>上下 5 割の範囲で、10 円単位</strong>で変える。平均が運賃ブロックの上限と下限の間に収まることを、3 か月ごとに運輸局へ報告する。導入した事業者は、事前確定運賃をすべて変動運賃にする。</p></div>
+      <div data-tab="価格の群"><p>額は事業者の運賃・係数・迎車料金・変動の方針で変わります。同じ額を出す事業者を<a class="t" href="#g-pricing-group">価格の群</a>にまとめ、乗客が選んだ群の事業者の車だけに配車します。</p></div>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">雨で需要が普段の 3 倍になりました。変動運賃の事業者の、事前確定運賃 2,000 円の乗車は、最大いくらにできますか？</p>
+      <div class="opts">
+        <button>6,000 円。需要に比例して上げられる</button>
+        <button>上限はない。乗客が同意すればよい</button>
+        <button>3,000 円。認可の幅（上下 5 割）の中だけ</button>
+      </div>
+      <p class="why">海外のサージ料金と違い、日本の変動運賃は認可の幅の中でだけ動きます。幅を超える値は、計算の段階で拒否します（ADR-0020）。公示の外の運用の指示の有無は、法務の確認待ち（L2）です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/pricing-and-fares.md">pricing-and-fares.md</a> の 2.2・2.3・5.2・5.3・6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0020-dynamic-fares-within-authorized-bands.md">ADR-0020</a>。</div>
+  </section>
+
+  <section class="s" id="payments">
+    <h2>決済：与信、売上の確定、精算</h2>
+    <p>カードの決済は、外部の <a class="t" href="#g-psp">PSP</a> が行います。この基盤はカード番号を持たず、PSP のトークンだけを持ちます。乗車では、決済を 2 段に分けます。</p>
+    <div class="stepper">
+      <ol>
+        <li>依頼のとき：<a class="t" href="#g-auth">与信</a>をとる。見積もりの額に上乗せした枠を押さえるだけで、まだ請求ではない。通らなければ配車しない（<code>payment_pending</code>）。</li>
+        <li>降車のとき：確定した運賃で<a class="t" href="#g-capture">売上を確定</a>する。足りなければ追加の請求をする。</li>
+        <li>PSP の応答が切れたら、照会で結果を確かめてから次へ進む。同じ乗車で 2 回請求しない。</li>
+        <li>月 2 回の締めで、受け取った運賃から手数料を引き、事業者に振り込む。</li>
+      </ol>
+    </div>
+    <p>運賃は本来、乗客が事業者に払うものです。この基盤が代わりに受け取る形は<a class="t" href="#g-agent-collection">収納代行</a>と呼ばれ、既定の案です。これが<a class="t" href="#g-fund-transfer">資金移動業</a>の規制に当たらないかは、法務の確認待ち（L6）です。お金の動きは<a class="t" href="#g-ledger">複式簿記の台帳</a>で記録し、受け取った運賃は事業者への預り金（負債）として持ちます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">依頼のときに与信が通りました。この時点で、乗客のカードはどうなっていますか？</p>
+      <div class="opts">
+        <button>枠が押さえられただけで、請求は降車の後の売上の確定で行う</button>
+        <button>見積もりの額がもう請求されている</button>
+        <button>何も起きていない。与信は PSP の中の記録だけ</button>
+      </div>
+      <p class="why">与信は利用枠を一時的に押さえる操作で、お金は動きません。そのため台帳の仕訳も書かず、売上の確定で初めて仕訳を書きます（payments-and-payouts.md の 3 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/payments-and-payouts.md">payments-and-payouts.md</a> の 4・5・8・10・11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0023-psp-authorize-at-request-capture-at-end.md">ADR-0023</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0024-fare-collection-model.md">ADR-0024</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0025-ledger-settlement-and-reconciliation.md">ADR-0025</a>。台帳の考え方は Stripe の題材と同じ。</div>
+  </section>
+
+  <section class="s" id="privacy-safety">
+    <h2>位置のプライバシーと安全の機能</h2>
+    <p>位置の履歴は、住まいや行動を明かす情報です。この設計の規則は 1 つです：<strong>正確な位置は、乗車の相手にだけ、その乗車の間だけ見せる</strong>（NFR-009）。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>依頼の前の地図の車</h3><p>約 200 m のセルの中心に丸め、ID を出さない。10 秒キャッシュして、同じ車を追えないようにする。</p></div>
+      <div class="card" data-frag><h3>ログと調査</h3><p>ログに緯度経度を書かない。人が軌跡を見るときは、理由の入力と監査ログを必須にする。</p></div>
+      <div class="card" data-frag><h3>例外は 2 つだけ</h3><p><a class="t" href="#g-share">乗車の共有</a>と、事業者の稼働の地図。どちらも L4 の結論の記録がある範囲でだけ有効。</p></div>
+    </div>
+    <p>安全の機能も、日本の仕組みに合わせます。110・119 への通報では、電話の網が発信の位置を受理機関に伝えます。そこでアプリは、<strong>端末の側だけで</strong>通報の画面を開き、サーバーの障害でも止まらないようにします。電話は <a class="t" href="#g-masked">番号の中継</a>（050 の番号）で互いの番号を隠します。ドライバーの顔の照合は生体の情報なので、法務の確認待ち（L4）です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/safety-and-trust.md">safety-and-trust.md</a> の 2〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/data-model.md">data-model.md</a> の 6 節（位置を持つ置き場所）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0036-location-privacy-keys-retention-and-audited-access.md">ADR-0036</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0028-emergency-share-trip-and-incident-flow.md">ADR-0028</a>。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>法務の確認待ちと legal のフラグ</h2>
+    <p>この設計は、法令の解釈が要る点に結論を出していません。intent.md に L1〜L9 として並べ、<strong>結論が出るまで、該当の経路を本番で動かさない仕組み</strong>を持ちます。</p>
+    <table>
+      <tr><th>#</th><th>問い（要約）</th></tr>
+      <tr><td>L1</td><td>この基盤が運送事業者に当たらないか。オファーで降車地を見せることと運送引受義務</td></tr>
+      <tr><td>L2</td><td>運賃の規則（認可運賃、係数、変動運賃、日本版ライドシェアの運賃）</td></tr>
+      <tr><td>L3</td><td>事前確定運賃の電子地図の要件、OSM の派生データの ODbL</td></tr>
+      <tr><td>L4</td><td>位置の履歴・顔の画像の扱い（個人情報保護法など）</td></tr>
+      <tr><td>L5・L6</td><td>ドライバーの労働の位置づけ／代金の受け取り（収納代行か資金移動業か）</td></tr>
+      <tr><td>L7〜L9</td><td>事故と記録／運賃の表示（景品表示法など）／共通の計算での変動（独占禁止法）</td></tr>
+    </table>
+    <p>該当の経路は <a class="t" href="#g-legal-flag">legal のフラグ</a>（<code>legal.&lt;L番号&gt;.&lt;feature&gt;</code>）の裏に置きます。本番で有効にするには、法務の担当が書いた <code>legal_gate_records</code> が要ります。release フラグで代えてはいけません。逆に、<strong>緊急の入口にはどのフラグも置きません</strong>。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> の「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md">ADR-0043</a>。フラグの一般論は<a href="../../../../docs/primer/index.html#flags">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>テナントはタクシー事業者（<code>operators</code>）です。中心は乗車（<code>trips</code>）と、オファーを兼ねる割り当て（<code>driver_assignments</code>）です。</p>
+    <pre class="mermaid">erDiagram
+  operators ||--o{ drivers : "registers"
+  operators ||--o{ vehicles : "owns"
+  drivers ||--o{ driver_sessions : "goes online"
+  drivers ||--|| driver_dispatch_state : "fenced by"
+  pricing_groups ||--o{ trips : "restricts dispatch"
+  fare_quotes ||--o{ trips : "chosen for"
+  trips ||--o{ driver_assignments : "offered as"
+  driver_sessions ||--o{ driver_assignments : "during"
+  trips ||--o| trip_payments : "paid by (money)"
+  driver_dispatch_state {
+    uuid driver_id PK
+    bigint region_gen
+    bigint assignment_epoch
+  }
+  trips {
+    uuid id PK
+    text state
+    bigint version
+    uuid operator_id FK
+  }
+  driver_assignments {
+    uuid id PK "offer_id"
+    uuid trip_id FK
+    uuid driver_id FK
+    bigint assignment_epoch
+    text status
+  }
+  fare_quotes {
+    uuid id PK
+    text fare_type
+    bigint total_yen
+  }
+  trip_payments {
+    uuid id PK
+    uuid trip_id "core value"
+    text status
+  }</pre>
+    <ul>
+      <li>1 つの乗車に、オファーの数だけ <code>driver_assignments</code> の行ができます。有効な行は、乗車ごと・ドライバーごとに 1 つだけです。</li>
+      <li><code>driver_dispatch_state</code> が fencing token の正本です。地理の索引（メモリ）は写しです。</li>
+      <li>お金の表は別の DB（<code>money</code>）にあり、<code>trip_id</code> を値で持ちます。2 つの DB をまたぐトランザクションは書きません。</li>
+      <li>格子のセルの列は <code>&lt;レベル&gt;_cell</code>（例：<code>street_cell</code>）の名前で <code>bigint</code> です。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/data-model.md">data-model.md</a> の 2〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/data-model/trips.md">data-model/trips.md</a>。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>配車の考え方は本家の公開情報に寄せていますが、日本の制度と、本家の実装を使わない決まりで、違うところがあります。</p>
+    <table>
+      <tr><th>本家</th><th>この設計</th></tr>
+      <tr><td>個人ドライバーのライドシェア</td><td>作らない。タクシーと、事業者が運営する日本版ライドシェアだけ</td></tr>
+      <tr><td>需要に応じたサージ料金</td><td>認可の幅（上下 5 割）の中の変動運賃だけ</td></tr>
+      <tr><td>六角形の索引 H3、Ringpop</td><td>使わない。自前の <code>geogrid</code> と、リースで持ち主を決める分割（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0007-no-reuse-of-original-implementation.md">共通の ADR-0007</a>）</td></tr>
+      <tr><td>機械学習の ETA の補正（DeepETA）</td><td>S1 は偏りの表。機械学習は S2 以降で、本家の実装は使わない</td></tr>
+      <tr><td>アプリ内のナビ、予約、相乗り、配送</td><td>作らない（外部のナビへ引き継ぐ。ほかは後の Epic）</td></tr>
+    </table>
+    <p>ドメイン・ヘッダー・ID の接頭辞には本家の名前を使わず、<code>&lt;brand&gt;</code> や <code>&lt;domain&gt;</code> と書きます（例：<code>api.&lt;domain&gt;</code>、<code>operator.&lt;domain&gt;</code>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> の Non-goals、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/README.md">architecture/README.md</a> の「決定（2026-09-28）」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-operator">タクシー事業者</dt><dd>道路運送法第 4 条の許可を持ち、運送の主体になる会社。この設計のテナント。営業所・車両・ドライバーを持つ。</dd>
+      <dt id="g-license2">第二種免許</dt><dd>旅客を有償で運ぶ自動車を運転するための運転免許。タクシーの乗務に要る。</dd>
+      <dt id="g-rideshare">日本版ライドシェア</dt><dd>自家用車活用事業（道路運送法第 78 条第 3 号）。タクシー事業者が、一般のドライバーと自家用車で、不足する地域・時間帯に運ぶ。</dd>
+      <dt id="g-public-rs">公共ライドシェア</dt><dd>自家用有償旅客運送（第 78 条第 2 号）。市町村・NPO 法人などが登録を受けて行う。</dd>
+      <dt id="g-shirotaku">白タク</dt><dd>許可のない自家用車で客を有償で運ぶこと。違法。</dd>
+      <dt id="g-area">営業区域</dt><dd>タクシー事業者が営業してよい区域。発地と着地のどちらもが外の運送はできない（道路運送法第 20 条）。</dd>
+      <dt id="g-kotsuken">交通圏</dt><dd>タクシーの需給を考える地域の単位。例：特別区・武三交通圏（東京 23 区・武蔵野市・三鷹市）。</dd>
+      <dt id="g-fare-block">運賃ブロック</dt><dd>タクシーの運賃の幅を決める地域の単位。全国で 101。</dd>
+      <dt id="g-shortage">不足車両数</dt><dd>日本版ライドシェアで、国がタクシーの不足として指定する曜日・時間帯ごとの台数。</dd>
+      <dt id="g-window">運行枠</dt><dd>この設計の呼び名。日本版ライドシェアが走れる区域・曜日・時間帯と台数の上限を、承認済みのデータにしたもの。</dd>
+      <dt id="g-unkokanri">運行管理者</dt><dd>営業所で、点呼・乗務の管理・指導を行う責任者。</dd>
+      <dt id="g-tenko">点呼</dt><dd>乗務の前後に、運行管理者がドライバーの健康・酒気・車両の状態を確かめる手続き。</dd>
+      <dt id="g-nagashi">流し</dt><dd>空車で走りながら、道で手を挙げた客を乗せること。タクシーだけができる。</dd>
+      <dt id="g-meter">タクシーメーター</dt><dd>距離と時間から運賃を計る車載の機器。空車・迎車・実車・支払の状態を持つ。</dd>
+      <dt id="g-softmeter">ソフトメーター</dt><dd>GPS などで距離を測るソフトウェアのメーター。国土交通省が「特定運賃収受ソフトウェア」として認定する。</dd>
+      <dt id="g-hikiuke">運送引受義務</dt><dd>法令の定める場合を除き、タクシーが運送の申込みを断ってはならない決まり（道路運送法第 13 条）。</dd>
+      <dt id="g-distance-fare">距離制運賃</dt><dd>初乗の距離までの初乗運賃に、一定の距離ごとの加算を足す運賃。タクシーの原則の運賃。</dd>
+      <dt id="g-time-distance">時間距離併用制</dt><dd>低速（時速 10 km 以下）の時間を距離に換算して加算する方式。渋滞の分を運賃に反映する。</dd>
+      <dt id="g-pickup-fee">迎車料金</dt><dd>迎えに行くことへの料金。運賃とは別。事業者ごとに違い、需要に応じて変える制度もある。</dd>
+      <dt id="g-upfront">事前確定運賃</dt><dd>配車アプリで、乗る前に推計走行距離から求めて確定する運賃。渋滞しても変わらない。</dd>
+      <dt id="g-est-distance">推計走行距離</dt><dd>電子地図で求めた、乗車地から降車地までの走行距離の見込み。事前確定運賃の元。</dd>
+      <dt id="g-coefficient">係数</dt><dd>事前確定運賃で距離制運賃に掛ける値（平準化係数）。運輸局が地域ごとに定める。特別区・武三は 1.21。</dd>
+      <dt id="g-dynamic">事前確定型変動運賃</dt><dd>需給に応じて、事前確定運賃を上下 5 割の範囲・10 円単位で変える運賃。</dd>
+      <dt id="g-pricing-group">価格の群</dt><dd>この設計の呼び名。同じ見積もりの額を出す事業者の集まり。配車の候補を絞るのに使う。</dd>
+      <dt id="g-cancel-fee">キャンセル料</dt><dd>受諾の後、猶予を過ぎて乗客が取り消したときの料金。額は事業者の規則のデータで持つ。</dd>
+      <dt id="g-noshow">無断キャンセル</dt><dd>no-show。ドライバーが到着して待っても、乗客が現れないこと。</dd>
+      <dt id="g-offer">オファー</dt><dd>ドライバーに乗車を提示し、受諾か辞退を求めること。この設計では割り当ての 1 行。</dd>
+      <dt id="g-eta">ETA</dt><dd>Estimated Time of Arrival。到着までの見込みの時間。迎車の ETA と乗車の ETA がある。</dd>
+      <dt id="g-batch">バッチのマッチング</dt><dd>依頼を短い時間ためて、依頼とドライバーの組をまとめて最適化する配車の方式。</dd>
+      <dt id="g-assignment">割り当て問題</dt><dd>行と列の組ごとのコストの表から、合計が最小になる 1 対 1 の組み合わせを求める問題。</dd>
+      <dt id="g-fencing">fencing token</dt><dd>単調に増える番号を操作に付け、古い番号の操作を拒否して、古い持ち主や古い情報による書き込みを防ぐ方法。</dd>
+      <dt id="g-epoch">assignment_epoch</dt><dd>ドライバーごとの fencing token。割り当ての作成と解放で 1 増える。</dd>
+      <dt id="g-region-gen">region_gen</dt><dd>リージョンの切り替えのたびに 1 上がる世代の番号。epoch の前に付けて比べる。</dd>
+      <dt id="g-gnss">GNSS</dt><dd>Global Navigation Satellite System。GPS・みちびきなど、衛星で位置を測る仕組みの総称。</dd>
+      <dt id="g-mapmatch">マップマッチング</dt><dd>誤差のある位置の点の列を、道路の上の最もありそうな経路に当てはめる処理。隠れマルコフモデル（HMM）を使うことが多い。</dd>
+      <dt id="g-hexgrid">六角形の格子</dt><dd>平面を正六角形のセルで覆い、レベルごとに大きさを変えた階層。この設計では自前の <code>geogrid</code>。</dd>
+      <dt id="g-routing">経路のエンジン</dt><dd>道路のグラフの上で最短の経路と所要時間を求めるソフトウェア。</dd>
+      <dt id="g-osm">OpenStreetMap</dt><dd>OSM。誰でも編集できる、オープンなデータの世界の地図。</dd>
+      <dt id="g-valhalla">Valhalla</dt><dd>OSM の上で動く、オープンソースの経路のエンジン。経路・時間の行列・マップマッチングを持つ。</dd>
+      <dt id="g-odbl">ODbL</dt><dd>Open Database License。OSM のデータの利用条件。派生したデータベースの扱いに条件がある。</dd>
+      <dt id="g-psp">PSP</dt><dd>Payment Service Provider。カードなどの決済を代わりに処理する事業者。決済代行。</dd>
+      <dt id="g-auth">与信</dt><dd>オーソリ。カードの利用枠を一時的に押さえる操作。お金はまだ動かない。</dd>
+      <dt id="g-capture">売上の確定</dt><dd>キャプチャ。与信した枠から、実際に請求する額を確定する操作。</dd>
+      <dt id="g-agent-collection">収納代行</dt><dd>事業者の代わりに代金を受け取り、後で事業者に渡す形。乗客が払った時点で乗客の債務が消えることを契約で定める。</dd>
+      <dt id="g-fund-transfer">資金移動業</dt><dd>銀行以外が為替取引（送金）を業として行うための、資金決済法の登録の制度。</dd>
+      <dt id="g-ledger">複式簿記の台帳</dt><dd>お金の動きを、借方と貸方の合計が 0 になる仕訳で記録する方式。追記のみで、誤りは逆の仕訳で直す。</dd>
+      <dt id="g-share">乗車の共有</dt><dd>乗客が、乗車中の車の位置と状態を、リンクで家族などに見せる機能。乗車の終わりで止まる。</dd>
+      <dt id="g-masked">番号の中継</dt><dd>乗客とドライバーが、中継の電話番号を経由して話し、互いの本当の番号を知らずに済む仕組み。</dd>
+      <dt id="g-legal-flag">legal のフラグ</dt><dd>この設計の 3 種類のフラグの 1 つ。法務の結論の記録（<code>legal_gate_records</code>）の範囲でだけ、本番で有効にできる。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。日本での運営の形、日本の制度、法務の確認待ち（L1〜L9）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、5 つの原則、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0002-hex-grid-geospatial-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0003-trip-state-and-single-assignment.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0004-batched-dispatch-and-offers.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md">0043</a> <span>— 格子、乗車と割り当て、配車、法務の関門の 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/trips-lifecycle.md">trips-lifecycle.md</a> <span>— 状態機械、epoch、取り消し、通信が切れたときの継続</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/location-ingestion.md">location-ingestion.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/geospatial-index.md">geospatial-index.md</a> <span>— 位置の流れと索引</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/dispatch-and-matching.md">dispatch-and-matching.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/eta-and-routing.md">eta-and-routing.md</a> <span>— バッチ、候補の条件、オファー、ETA</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/pricing-and-fares.md">pricing-and-fares.md</a> <span>— 運賃の制度と計算、変動運賃</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/payments-and-payouts.md">payments-and-payouts.md</a> <span>— 与信と確定、収納代行、台帳、精算</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/supply-and-operators.md">supply-and-operators.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/safety-and-trust.md">safety-and-trust.md</a> <span>— 事業者と運行枠、安全の機能</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本、横断の不変条件、位置を持つ置き場所</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/uber/docs/decisions">decisions/</a> <span>— 残りの ADR（アプリ、配信、基盤、DR、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

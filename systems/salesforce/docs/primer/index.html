@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Salesforce の前提知識</title>
+<meta name="description" content="Salesforce の再構築の設計の文書を読む前に知っておくとよい、CRM の分野の概念・用語・業界の決まりと、メタデータ駆動・共有のモデル・ガバナ制限の基本。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Salesforce · 前提知識</p>
+    <h1>Salesforce の設計を読む前に</h1>
+    <p class="lead">CRM は「顧客の台帳」に見えますが、会社ごとに項目や画面や自動の処理を変えられ、しかも「誰に何を見せるか」を細かく決められる基盤です。設計の文書が前提にしている営業の業務の知識と、メタデータ駆動・共有のモデル・ガバナ制限の考え方を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Salesforce · 前提知識</p>
+    <h2>Salesforce の設計を読む前に</h2>
+    <p class="lead">営業の業務・メタデータ駆動・共有のモデル・ガバナ制限の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Salesforce は何をするサービスか</h2>
+    <p>Salesforce は、B2B の営業チームが顧客・見込み客・商談・活動を記録し、チームで共有して、売上の見込みを管理する <a class="t" href="#g-crm">CRM</a> です。同時に、会社ごとに項目・画面・自動化を変えられる「業務アプリの基盤」でもあります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>業務に合わせて変えられる</h3><p>管理者が画面の操作で、オブジェクト・項目・画面・自動化を足す。コードは書かない。</p></div>
+      <div class="card" data-frag><h3>見せてよい人にだけ見せる</h3><p>上司は部下の商談を見られるが、他の支店の商談は見えない、を設定で決める。</p></div>
+      <div class="card" data-frag><h3>安全に変える</h3><p>Sandbox で試し、検証してから本番へ全部か無しかでデプロイする。</p></div>
+      <div class="card" data-frag><h3>公平で止まらない</h3><p>ある会社の重い処理が、他の会社を遅くしない。</p></div>
+    </div>
+    <p>顧客の会社 1 つが 1 つの<a class="t" href="#g-org">組織（org）</a>で、これがテナントです。使う人は、営業の担当者・管理職・組織の管理者・連携の開発者です。S1 の規模は、組織 5,000（本番 1,000）、利用者 5 万、レコード 5 億です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a> の「Proposed outcome」と「Affected users」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="crm">
+    <h2>CRM の基本の登場人物</h2>
+    <p>営業の記録は、決まった数個の<strong>標準オブジェクト</strong>（表のようなもの）に入れます。名前が似ていて混同しやすいので、先に区別します。</p>
+    <table>
+      <tr><th>オブジェクト</th><th>何を表すか</th><th>例</th></tr>
+      <tr><td><a class="t" href="#g-lead">リード</a>（<code>lead</code>）</td><td>まだ確かめていない見込み客。会社名と人が 1 件にまとまっている</td><td>展示会で名刺を交換した人</td></tr>
+      <tr><td><a class="t" href="#g-account">取引先</a>（<code>account</code>）</td><td>取引の相手の会社</td><td>株式会社〇〇</td></tr>
+      <tr><td><a class="t" href="#g-contact">取引先責任者</a>（<code>contact</code>）</td><td>取引先に属する人</td><td>〇〇社の購買部の佐藤さん</td></tr>
+      <tr><td><a class="t" href="#g-opportunity">商談</a>（<code>opportunity</code>）</td><td>売れるかもしれない 1 件の案件。金額と完了予定日を持つ</td><td>2026 年度の 100 ライセンスの導入</td></tr>
+      <tr><td><a class="t" href="#g-activity">活動</a>（<code>task</code>・<code>event</code>）</td><td>ToDo と行動（予定）。誰と・何について、を持つ</td><td>来週の提案の訪問</td></tr>
+    </table>
+    <p>活動の「誰と」（<code>who</code>）は取引先責任者かリード、「何について」（<code>what</code>）は取引先や商談です。1 つの項目が複数の種類のオブジェクトを指せるので、<a class="t" href="#g-poly">多態の参照</a>と呼びます。日本向けに、会社名のカナ、13 桁の<a class="t" href="#g-corpno">法人番号</a>、6 項目の日本の住所を持ちます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sales-objects.md">sales-objects.md</a> の 3 節（標準オブジェクトの項目）。</div>
+  </section>
+
+  <section class="s" id="pipeline">
+    <h2>商談とパイプライン</h2>
+    <p>商談は<a class="t" href="#g-stage">フェーズ</a>を順に進みます。全ての進行中の商談を並べたものが<a class="t" href="#g-pipeline">パイプライン</a>で、管理職はこれを見て「今期いくら売れそうか」を判断します。フェーズの名前は組織が決めます。</p>
+    <pre class="mermaid">flowchart LR
+  L["リード"] -->|変換| O["商談"]
+  O --> S1["見込み"] --> S2["提案"] --> S3["交渉"]
+  S3 --> W["成立 (完了)"]
+  S3 --> X["不成立 (完了)"]</pre>
+    <p>フェーズの値ごとに、既定の確度（<code>default_probability</code>）、完了か（<code>is_closed</code>）、成立か（<code>is_won</code>）、<a class="t" href="#g-forecast">売上予測の分類</a>（<code>pipeline</code>・<code>best_case</code>・<code>commit</code>・<code>closed</code>・<code>omitted</code>）を持ちます。フェーズを変えると、保存の手順 2 でこれらを入れ直します。フェーズ・金額・確度・完了予定日などが変わるたびに <code>opportunity_history</code> に 1 行残り、パイプラインの推移のレポートの元になります。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">MVP で、利用者が商談の画面で直接書き換えられるのはどれですか？</p>
+      <div class="opts">
+        <button>売上予測の分類（<code>forecast_category</code>）</button>
+        <button>確度（<code>probability</code>）</button>
+        <button>成立か（<code>is_won</code>）</button>
+      </div>
+      <p class="why">確度はフェーズの既定値が入りますが、利用者が変えられます。売上予測の分類と <code>is_closed</code>・<code>is_won</code> はフェーズから決まり、利用者は書けません（sales-objects.md の 3.5 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sales-objects.md">sales-objects.md</a> の 3.5 節。売上予測そのもの（フォーキャスト）は MVP の後です（intent.md）。</div>
+  </section>
+
+  <section class="s" id="leadconvert">
+    <h2>リードの変換と重複</h2>
+    <p>見込み客が本物の商機だと分かったら、リードを<a class="t" href="#g-convert">変換</a>します。1 件のリードから、取引先・取引先責任者・（任意で）商談を作るか、既存のものに合わせます。</p>
+    <div class="stepper">
+      <ol>
+        <li>リードを読み、まだ変換していないこと、権限（<code>convert_leads</code> など）を確かめる。</li>
+        <li>変換済みを表す状態の値を選ぶ。キューが持つリードなら、新しい所有者を指定する。</li>
+        <li>取引先を作る（既存なら、空の項目にだけ値を入れる）。</li>
+        <li>取引先責任者を作り、その取引先に付ける。</li>
+        <li>商談を作るなら、取引先に付け、主の取引先責任者の役割を 1 件作る。</li>
+        <li>リードの活動を、できた取引先責任者・商談に付け替える。</li>
+        <li>リードを「変換済み」にする。以後は読むだけになる。1 件の変換は全部か無しか。</li>
+      </ol>
+    </div>
+    <p>変換や登録の時に、同じ会社や人の二重登録を<a class="t" href="#g-duprule">重複の規則</a>で見つけます。日本語では、全角と半角、カナの表記の揺れ、「株式会社」の有無などを正規化してから比べます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">API でリードの <code>status</code> を「変換済み」の値に更新しました。どうなりますか？</p>
+      <div class="opts">
+        <button>変換したことになり、取引先などが自動で作られる</button>
+        <button>状態だけが変わり、変換済みのリードとして扱われる</button>
+        <button><code>INVALID_VALUE</code> で断られる。変換は変換の API でだけ行う</button>
+      </div>
+      <p class="why">本家と同じく、状態を書き換えるだけでは変換できません。変換を元に戻す操作もありません（sales-objects.md の 3.4 節と 5 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0021-lead-conversion-and-activity-parents.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0022-duplicate-rules-and-japanese-matching.md">ADR-0022</a>、sales-objects.md の 5〜6 節。</div>
+  </section>
+
+  <section class="s" id="metadata">
+    <h2>メタデータ駆動：オブジェクトも項目も「データ」</h2>
+    <p>Salesforce の一番の特徴は、会社ごとの違いをコードや DB の構造ではなく<a class="t" href="#g-metadata">メタデータ</a>として持つことです。管理者が<a class="t" href="#g-customobj">カスタムオブジェクト</a>「契約」や、取引先の項目「地域」を足すと、メタデータの表に行が増えるだけです。</p>
+    <ul>
+      <li data-frag><strong>名前の決まり</strong>：標準は接頭辞なしの小文字のスネーク（<code>account</code>、<code>close_date</code>）、カスタムは <code>x_</code> の接頭辞（<code>x_region</code>）。本家の <code>__c</code> は使いません。</li>
+      <li data-frag><strong>項目の型</strong>：テキスト、数値、通貨、日付、<a class="t" href="#g-picklist">選択リスト</a>、<a class="t" href="#g-lookup">参照</a>、<a class="t" href="#g-md">主従</a>、<a class="t" href="#g-formula">数式</a>、<a class="t" href="#g-rollup">積み上げ集計</a>など。</li>
+      <li data-frag><strong>版</strong>：メタデータを変えるたびに組織の版（<code>metadata_version</code>）が 1 つ上がる。1 つの要求は 1 つの版に固定して動く。</li>
+      <li data-frag><strong>コンパイル</strong>：版ごとのメタデータを部品に分けてコンパイルし、キャッシュする。問い合わせや保存は、それを使って SQL を作る。</li>
+    </ul>
+    <p>目標は「カスタム項目を足してから、画面と API で使えるまで p95 5 秒」で、他の組織を遅くしないことです（K2）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0003-metadata-driven-runtime.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0007-segmented-metadata-snapshots.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/metadata-and-runtime.md">metadata-and-runtime.md</a> の 3〜4 節。</div>
+  </section>
+
+  <section class="s" id="storage">
+    <h2>1 つの表に全部入れる：records とピボット</h2>
+    <p>組織ごとにオブジェクトが違うのに、DB の構造は全組織で同じです。全てのレコードを 1 つの <code>records</code> の表に入れ、項目の値は JSONB の <code>data</code> に入れます。キーは項目の番号 <code>field_no</code>（再利用しない連番）です。</p>
+    <pre class="mermaid">flowchart LR
+  F["md_fields: x_region は field_no 12"] -.-> R["records.data: 12 は 関東"]
+  R --> P["record_index_values: field_no 12 の v_text"]
+  R --> U["record_unique_values: 一意の値"]
+  R --> RL["record_relationships: 参照と主従"]</pre>
+    <p>JSONB の中には型付きの索引を張りにくいので、索引の要る項目だけ、型付きの<a class="t" href="#g-pivot">ピボットの表</a>へ同じトランザクションで写して引きます。本家も、型のない値の列と、型付きの索引の表という形を公開しています。値の検索が「どの索引で絞れるか」に左右されるので、問い合わせには<a class="t" href="#g-selective">選択性</a>の見積もりが要ります。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">ある組織が、取引先にカスタム項目 <code>x_region</code> を足しました。DB では何が起きますか？</p>
+      <div class="opts">
+        <button>メタデータの表に行が増え、版が上がる。<code>ALTER TABLE</code> は走らない</button>
+        <button><code>records</code> に列が 1 つ増える</button>
+        <button>その組織専用の表が作られる</button>
+      </div>
+      <p class="why">カスタムオブジェクトや項目を足しても DDL は走りません（architecture/README.md の原則）。名前の変更もメタデータだけで済み、値を書き換えません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0002-custom-object-storage.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0006-data-dictionary-and-field-lifecycle.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/data-storage.md">data-storage.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0019-selectivity-statistics-and-planning.md">ADR-0019</a>。</div>
+  </section>
+
+  <section class="s" id="dml">
+    <h2>保存の順序（DML の手順）</h2>
+    <p>レコードを 1 件保存すると、検証・自動化・集計・共有が決まった順に動きます。この順は本家の「Order of Execution」に寄せたもので、多くの設計の文書が「手順 3a」「手順 10」のように番号で参照します。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>1–2</strong>：元のレコードを読み、要求の値を当てる。権限・FLS・型・参照先を確かめる（システムの検証）。</li>
+        <li><strong>3a・3b</strong>：保存の前の<a class="t" href="#g-flow">フロー</a>、before トリガー（MVP の後）。同じレコードの項目だけを変えられる。</li>
+        <li><strong>4–5</strong>：<a class="t" href="#g-valrule">入力規則</a>と、重複の規則。</li>
+        <li><strong>6</strong>：書く（未確定）。一意の違反はここで分かる。</li>
+        <li><strong>7a・7b</strong>：after トリガー、保存の後のフロー。他のレコードの保存は入れ子になる。</li>
+        <li><strong>8</strong>：積み上げ集計。親の値が変われば、親も入れ子で保存する。</li>
+        <li><strong>9–11</strong>：項目の変更の履歴、共有の評価、変更のイベントの outbox。最上位で 1 回だけ。</li>
+        <li><strong>12–13</strong>：確定。その後に、非同期の処理・メール・Webhook・検索の索引。</li>
+      </ol>
+    </div>
+    <p>手順 12 までは 1 つの DB のトランザクションです。どこかで上限を超えたら全体を巻き戻します。1 つの DML は 200 件ずつの塊で、この手順を塊ごとにまとめて行います。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0008-dml-order-of-execution.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/metadata-and-runtime.md">metadata-and-runtime.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0026-record-triggered-flow-order-and-recursion.md">ADR-0026</a>。</div>
+  </section>
+
+  <section class="s" id="limits">
+    <h2>ガバナ制限と割り当て</h2>
+    <p>全組織が同じ DB とサーバーを共有するので、1 つの組織の重い処理が他を遅くします（<a class="t" href="#g-noisy">騒がしい隣人</a>）。そこで 2 種類の上限を置きます。</p>
+    <div class="tabs">
+      <div data-tab="ガバナ制限（1 トランザクション）"><p><a class="t" href="#g-governor">ガバナ制限</a>は 1 つのトランザクションの上限です。超えたら全体を巻き戻し、フローの例外の経路でも捕まえられません。エディションで変えません。</p>
+        <table>
+          <tr><th>上限</th><th>同期</th><th>非同期</th></tr>
+          <tr><td>問い合わせの数</td><td>100</td><td>200</td></tr>
+          <tr><td>取得の行</td><td>50,000</td><td>50,000</td></tr>
+          <tr><td>DML の数・行</td><td>150・10,000</td><td>150・10,000</td></tr>
+          <tr><td>CPU 時間</td><td>10 秒</td><td>60 秒</td></tr>
+        </table></div>
+      <div data-tab="割り当て（組織ごと）"><p><a class="t" href="#g-allocation">割り当て</a>は組織ごとの 24 時間・1 時間の量です。例：API の要求は Enterprise で「100,000＋ライセンスの数 × 1,000」。超えたら 429 を返します。値は<a class="t" href="#g-edition">エディション</a>で変わります。</p></div>
+      <div data-tab="エディションとライセンス"><p>エディション（<code>starter</code>・<code>pro</code>・<code>enterprise</code>・<code>unlimited</code>・<code>developer</code>）は、割り当て・機能・カスタムオブジェクトの数・Sandbox の数を変えます。<a class="t" href="#g-license">ライセンス</a>（<code>full</code>・<code>platform</code>・<code>integration</code>）は、利用者ごとの権限の上限です。</p></div>
+    </div>
+    <p>上の数は本家の公開の値に寄せた初期値で、確定の値は E12 の負荷試験で決めます。上限の正本は 1 つの登録簿にあり、CI で文書と照合します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/governor-limits.md">governor-limits.md</a> の 4 節と 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0005-tenancy-and-governor-limits.md">ADR-0005</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0042-org-allocations-fair-queuing-and-limit-info.md">ADR-0042</a>。テナントの分離は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="access">
+    <h2>アクセスの 2 つの層</h2>
+    <p>「誰が何を見られるか」は、<strong>オブジェクトと項目の層</strong>と、<strong>レコードの層</strong>の 2 段で決まります。両方を通ったものだけが見えます。</p>
+    <div class="tabs">
+      <div data-tab="オブジェクトの権限"><p>オブジェクトごとに <code>read</code>・<code>create</code>・<code>edit</code>・<code>delete</code>・<code>view_all</code>・<code>modify_all</code>。<code>view_all</code>（すべて参照）と <code>modify_all</code>（すべて変更）は、共有の設定に関わらず全レコードに届く強い権限です。</p></div>
+      <div data-tab="項目（FLS）"><p><a class="t" href="#g-fls">FLS</a> は項目ごとの <code>read</code>・<code>edit</code>。読めない項目は「存在しない項目」と同じに扱い、条件・並べ替え・集計・数式・レポート・イベントのどこからも値を漏らしません。</p></div>
+      <div data-tab="権限セットとプロファイル"><p>権限は全て<a class="t" href="#g-permset">権限セット</a>で与え、割り当てた全ての権限セットの<strong>和</strong>になります。<a class="t" href="#g-profile">プロファイル</a>は 1 人に 1 つで、レイアウトの割り当て・使えるレコードタイプ・ログインの制限などの既定値の入れ物にします。</p></div>
+      <div data-tab="レコードの共有"><p>レコードごとの水準（<code>none</code>・<code>read</code>・<code>edit</code>・<code>full</code>）。次の節の OWD・ロール階層・共有ルールで決まります。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">ある利用者は項目 <code>x_salary</code> を FLS で読めません。その項目で <code>WHERE</code> を書いた問い合わせはどうなりますか？</p>
+      <div class="opts">
+        <button>条件は効くが、結果の列には出ない</button>
+        <button><code>INVALID_FIELD</code>。存在しない項目と同じ応答</button>
+        <button>403 で、権限が足りないと伝える</button>
+      </div>
+      <p class="why">読めない項目で絞れると、件数の差から値を推し量れます。だから存在しない項目と同じエラーにします（sharing-and-record-access.md の 3.4 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0013-permission-sets-and-field-level-security.md">ADR-0013</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sharing-and-record-access.md">sharing-and-record-access.md</a> の 3 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0045-system-permissions-and-delegation.md">ADR-0045</a>（システムの権限 25）。</div>
+  </section>
+
+  <section class="s" id="sharing">
+    <h2>共有のモデル：OWD から広げる</h2>
+    <p>レコードの層は「既定でどこまで見せるか」を決め、そこから<strong>広げる</strong>だけの仕組みです。狭める道具はありません。</p>
+    <ol>
+      <li data-frag><strong><a class="t" href="#g-owd">OWD</a></strong>（組織の共有設定）：オブジェクトごとの既定。<code>private</code>・<code>public_read</code>・<code>public_read_write</code>・<code>controlled_by_parent</code>（親に連動）。</li>
+      <li data-frag><strong><a class="t" href="#g-role">ロール階層</a></strong>：上司は、部下が所有するレコードを見られる（<code>grant_via_hierarchy</code>）。</li>
+      <li data-frag><strong><a class="t" href="#g-sharerule">共有ルール</a></strong>：「グループ A が所有するもの」か「条件 C を満たすもの」を、グループ B に共有する。</li>
+      <li data-frag><strong>手動の共有・チーム</strong>：レコードごとに人やグループへ与える。所有者が変わると手動の共有は消える。</li>
+      <li data-frag><strong><a class="t" href="#g-implicit">暗黙の共有</a></strong>：商談を見られる人は親の取引先を読める。取引先の所有者は子を見られる。</li>
+    </ol>
+    <pre class="mermaid">flowchart TB
+  CEO["社長"] --> E["東日本 営業部長"]
+  CEO --> W["西日本 営業部長"]
+  E --> T["東京 担当"]
+  E --> S["仙台 担当"]
+  W --> O["大阪 担当"]</pre>
+    <div class="quiz" data-answer="3">
+      <p class="q">OWD が <code>public_read</code> の商談を、共有ルールで「西日本の部からは見えない」ようにできますか？</p>
+      <div class="opts">
+        <button>できる。共有ルールで <code>none</code> を与える</button>
+        <button>できる。ロール階層で西日本の部を外す</button>
+        <button>できない。共有は広げるだけなので、OWD を <code>private</code> にしてから必要な人に広げる</button>
+      </div>
+      <p class="why">複数の付与があれば最も強いものが勝ちます（決定表 DT-SHR-001）。見せたくない人がいるなら、OWD を狭くして広げる設計にします。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sharing-and-record-access.md">sharing-and-record-access.md</a> の 4〜6 節（DT-SHR-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0014-owd-roles-groups-and-closure.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0015-sharing-reasons-and-where-they-live.md">ADR-0015</a>。</div>
+  </section>
+
+  <section class="s" id="recalc">
+    <h2>事前計算・閉包・再計算・スキュー</h2>
+    <p>読むたびに共有を全て計算すると、ページの表示の目安 300ms に収まりません。本家も、設定が変わった時に計算して保存しています。この設計は、何を行に持ち、何を問い合わせの時に結ぶかを分けています。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>行に持つ（事前計算）</h3><p>レコードの条件の共有ルール・手動・チームは <code>record_shares</code> に、暗黙の親は子ごとの行に持つ。条件のルールの追加は、全レコードを評価し直す<a class="t" href="#g-recalc">再計算</a>になる。</p></div>
+      <div class="card" data-frag><h3>問い合わせの時に結ぶ</h3><p>所有者・ロール階層・所有者の条件のルール・OWD は、<code>owner_id</code> と<a class="t" href="#g-closure">閉包</a>の表を結んで判定する。OWD の変更は版の切り替えだけで、行を書き直さない。</p></div>
+    </div>
+    <p>再計算の間は、古い構成で判定し続け、できたら版を 1 つ上げて一度に切り替えます（新しいルールの版、閉包の新しい世代）。「古い設定と新しい設定が混ざった判定をしない」は intent の約束です。また、1 人が 1 万件を超えて所有する、1 つの親に 1 万件を超える子を置く、という<a class="t" href="#g-skew">スキュー</a>は、本家も避けるよう勧めており、この設計でも警告します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0004-record-access-model.md">ADR-0004</a>（注記を必ず読む）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0016-recalculation-rule-versions-and-skew.md">ADR-0016</a>、sharing-and-record-access.md の 7〜8 節、NFR-005。</div>
+  </section>
+
+  <section class="s" id="automation">
+    <h2>宣言的な自動化</h2>
+    <p>管理者はコードを書かずに業務の決まりを設定します。どれも保存の手順のどこかで動きます。</p>
+    <div class="tabs">
+      <div data-tab="フロー"><p>処理の手順を図で組むもの。保存の前（3a）・保存の後（7b）・スケジュール・画面・イベントで起動します。200 件の塊を「足並みをそろえて」1 歩ずつ進め、同じフローは同じレコードに 1 トランザクションで 1 回だけ動きます。</p></div>
+      <div data-tab="入力規則"><p>数式で書いた条件が真なら保存を断ります（手順 4）。例：「成立のフェーズなのに金額が空」。</p></div>
+      <div data-tab="積み上げ集計"><p>主従の親に、子の件数・合計・最小・最大を持たせる項目（手順 8）。例：取引先の「成立した商談の合計金額」。子の変更から差分で直します。</p></div>
+      <div data-tab="承認のプロセス"><p><a class="t" href="#g-approval">承認</a>の段（30 まで）と承認者（25 まで）を決め、申請から承認・却下・取り消しまでを状態で持ちます。申請中のレコードはロックされます。承認者にアクセスを与えません。</p></div>
+    </div>
+    <p>フローの要素の実行も、ガバナ制限で数えます。本家は要素の数の上限をなくしましたが、この設計は残します（本家との差）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/automation-flows.md">automation-flows.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0025-flow-definition-and-bulk-engine.md">ADR-0025</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0028-approval-processes-and-record-locks.md">0028</a>。</div>
+  </section>
+
+  <section class="s" id="reports">
+    <h2>画面・レポート・検索：見えない行を数えない</h2>
+    <p>営業の担当者は、<a class="t" href="#g-layout">ページレイアウト</a>の画面でレコードを開き、<a class="t" href="#g-listview">リストビュー</a>で一覧を見て、レポートとダッシュボードで集計を見ます。どれも<strong>見る人の権限</strong>で毎回コンパイルします。</p>
+    <ul>
+      <li data-frag><strong>レイアウトは狭めるだけ。</strong>FLS で読めない項目は、レイアウトにあっても出ない。レイアウトの必須は画面の保存だけに効く。</li>
+      <li data-frag><strong>レポート</strong>：表形式・サマリー・マトリックス。件数・合計・平均のどれにも、見えない行を入れない。</li>
+      <li data-frag><strong>ダッシュボード</strong>：本家の「指定した実行ユーザー」（全員が特定の人の権限で見る）は持たない。</li>
+      <li data-frag><strong>検索</strong>：日本語は形態素と 2-gram で索引し、結果は候補として共有を後で確かめる。件数の合計は返さない。</li>
+    </ul>
+    <div class="quiz" data-answer="1">
+      <p class="q">営業部長が、ダッシュボードを部下 S の視点に切り替えました。集計に入る行は？</p>
+      <div class="opts">
+        <button>S が見られて、かつ部長も見られる行（共通部分）</button>
+        <button>S が見られる全ての行</button>
+        <button>部長が見られる全ての行</button>
+      </div>
+      <p class="why">視点の切り替えは「絞る」道具で、広げる道具になりません（DT-DSH-001）。PM が確認済みの決定です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0029-report-execution-on-reader-per-viewer.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0030-dashboards-viewer-intersection-and-subscriptions.md">ADR-0030</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0023-layouts-and-record-page-composition.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0032-search-permission-post-filter.md">ADR-0032</a>。</div>
+  </section>
+
+  <section class="s" id="integrations">
+    <h2>API・一括・変更のイベント・Webhook</h2>
+    <p>CRM は、基幹システム・名刺管理・MA（マーケティングの自動化）とつながって使われます。連携の道具は 4 つです。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>REST API と問い合わせの言語</h3><p>レコードの CRUD と、SQL に寄せた独自の問い合わせの言語。親へは <code>account.name</code> のようにドットでたどる。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-bulk">一括の API</a></h3><p>大量の登録・更新・削除・問い合わせのジョブ。200 行ずつ処理し、行ごとに成否を返す（部分の成功）。<a class="t" href="#g-upsert">upsert</a> は<a class="t" href="#g-extid">外部 ID</a> で既存を探す。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-cdc">変更のイベント</a></h3><p>レコードの変更を確定の順に配り、3 日は <code>replay_id</code> の位置から取り直せる。少なくとも 1 回届く。</p></div>
+      <div class="card" data-frag><h3>Webhook</h3><p>外のサーバーへ署名付きで送る。宛先は検査し、本番と別の送信の網から送る（SSRF の守り）。</p></div>
+    </div>
+    <p>変更のイベントの購読は、オブジェクトの <code>view_all</code> が要り、レコードの共有では絞りません（読めない項目は落とします）。本家の変更のイベントも、共有の設定を無視して配ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/query-language-and-api.md">query-language-and-api.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/bulk-and-import.md">bulk-and-import.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/events-and-integrations.md">events-and-integrations.md</a>（ADR-0033〜0037）。</div>
+  </section>
+
+  <section class="s" id="sandbox">
+    <h2>Sandbox とデプロイ</h2>
+    <p>本番で設定を直接いじると営業が止まります。そこで、本番の複製の<a class="t" href="#g-sandbox">Sandbox</a>（別の組織）で作って試し、メタデータを本番へ<a class="t" href="#g-deploy">デプロイ</a>します。</p>
+    <table>
+      <tr><th>種類</th><th>写すもの</th><th>データの容量</th><th>再作成の間隔</th></tr>
+      <tr><td><code>developer</code></td><td>メタデータ</td><td>200MB</td><td>1 日</td></tr>
+      <tr><td><code>developer_pro</code></td><td>メタデータ</td><td>1GB</td><td>1 日</td></tr>
+      <tr><td><code>partial</code></td><td>メタデータ＋選んだデータの標本（伏せる）</td><td>5GB</td><td>5 日</td></tr>
+      <tr><td><code>full</code></td><td>メタデータ＋全てのデータ（伏せる）</td><td>本番と同じ</td><td>29 日</td></tr>
+    </table>
+    <ul>
+      <li data-frag><strong>検証だけの実行</strong>：本番を一切変えずに、差分・型・依存・データへの影響を調べて計画を作る。</li>
+      <li data-frag><strong>全部か無しか</strong>：計画を 1 つの版で当てる。途中で失敗すれば何も変わらない。</li>
+      <li data-frag><strong>戻し</strong>：版を巻き戻さず、逆の差分を新しいデプロイとして当てる。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sandboxes-and-deploy.md">sandboxes-and-deploy.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0038-sandbox-types-and-masked-copy.md">ADR-0038</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0040-deploy-validation-and-rollback.md">ADR-0040</a>、NFR-004。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み</h2>
+    <p>取引先責任者やリードは、個人の名前・メール・電話を持つ個人データです。設計は、次の法令の論点に、どの結論にも対応できる形にしてあります。<strong>結論は出していません。</strong></p>
+    <ul>
+      <li data-frag><strong>個人情報保護法</strong>：組織が登録した個人データを、本システムが委託を受けて扱うのか（L1）。外国の事業者（メールの送信、Webhook の宛先、IdP）への提供（L2）。Sandbox への本番の個人データの複製と、マスキングを必須にするか（L3）。漏えいの報告の主体と期限（L10）。</li>
+      <li data-frag><strong>電気通信事業法</strong>：Web からのリードのフォームなどでの外部送信規律、BCC でのメールの取り込みが「他人の通信の媒介」に当たるか（L4）。</li>
+      <li data-frag><strong>特定電子メール法</strong>：MVP の後の一括のメールでの同意の記録と送信者の表示（L8）。</li>
+      <li data-frag><strong>保持と削除</strong>：監査の履歴の日数、本人の削除の請求、解約時の返却と削除（L5・L7）、データの所在（L6）。</li>
+    </ul>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>L1〜L11 は全て確認待ちです。確認が済むまで、intent の表に挙げた spec（E2 の組織の作成、E5 の取引先責任者とリード、E8 の Webhook、E10 のデータを含む Sandbox など）を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a> の「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/security.md">security.md</a> の 6・7・11 節。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 171 表ありますが、核は次の数個です。組織の表は、主キーと全ての索引の先頭に <code>org_id</code> を持ち、レコードの系の表は末尾に <code>shard_no</code> を持ちます。</p>
+    <pre class="mermaid">erDiagram
+  orgs ||--o{ users : "has"
+  orgs ||--o{ md_objects : "defines"
+  md_objects ||--o{ md_fields : "has"
+  md_objects ||--o{ records : "typed rows"
+  records ||--o{ record_index_values : "pivot rows"
+  records ||--o{ record_relationships : "child of"
+  records ||--o{ record_shares : "shared by"
+  groups ||--o{ record_shares : "grantee"
+  groups ||--o{ group_members_closure : "expanded to"
+  users ||--o{ group_members_closure : "member of"
+  records {
+    uuid org_id PK
+    uuid object_id PK
+    uuid id PK
+    uuid owner_id
+    uuid parent_id
+    jsonb data
+  }
+  md_fields {
+    uuid field_id PK
+    uuid object_id FK
+    smallint field_no
+    text api_name
+    text type
+  }
+  record_shares {
+    uuid record_id
+    uuid grantee_group_id
+    text access_level
+    text row_cause
+  }
+  group_members_closure {
+    bigint generation
+    uuid user_id
+    uuid group_id
+    boolean via_hierarchy
+  }</pre>
+    <ul>
+      <li>標準オブジェクトの取引先や商談も、専用の表を持たず、<code>records</code> の 1 行です。項目の値は <code>data</code> の <code>field_no</code> のキーで引きます。</li>
+      <li>利用者のグループの ID は利用者の ID と同じです。だから <code>records.owner_id</code> をそのまま閉包の <code>group_id</code> と結べます。</li>
+      <li><code>records.parent_id</code> は、主従の親か活動の主の親で、「親に連動」の判定に使います。</li>
+      <li>変更のイベント（<code>events</code>）と項目の変更の履歴（<code>history</code>）は、主と別のクラスタにあります。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/data-model.md">data-model.md</a> の 3〜5 節と <a href="https://github.com/shoito/rebuilds/tree/main/systems/salesforce/docs/architecture/data-model">data-model/</a>。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、本家の言語との互換は持たず、作らないものと変えるものがあります。</p>
+    <table>
+      <tr><th>本家</th><th>この設計</th></tr>
+      <tr><td>Apex・SOQL・SOSL・本家のメタデータの XML</td><td>受け付けない。問い合わせ・数式の言語とメタデータの形式（YAML）は独自</td></tr>
+      <tr><td>利用者のコード（トリガー）</td><td>MVP の後（E13）。TypeScript を WASM の砂場で動かす</td></tr>
+      <tr><td>新しいカスタムオブジェクトの OWD の既定</td><td>本家より狭い <code>private</code></td></tr>
+      <tr><td>ダッシュボードの指定した実行ユーザー</td><td>持たない。見る人の権限だけで集計</td></tr>
+      <tr><td>Service Cloud・Marketing Cloud・Experience Cloud</td><td>作らない。Sales Cloud と基盤に絞る</td></tr>
+      <tr><td>CPQ・売上予測・AI（Einstein・Agentforce）</td><td>MVP の後の Epic</td></tr>
+    </table>
+    <p>識別子に本家の名前を使いません。カスタムの接尾辞 <code>__c</code> は <code>x_</code> の接頭辞に、組織のドメインは <code>&lt;org&gt;.my.&lt;brand&gt;.&lt;domain&gt;</code>、上限の見出しは <code>&lt;Brand&gt;-Limit-Info</code>、Webhook の署名は <code>&lt;Brand&gt;-Signature</code> と書きます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a> の Constraints と Non-goals、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0007-no-reuse-of-original-implementation.md">ADR-0007</a>（リポジトリ共通）、architecture/README.md の 6 節の「本家との差」。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-crm">CRM</dt><dd>Customer Relationship Management。顧客との関係（会社、人、案件、やり取り）を記録して管理する仕組み。</dd>
+      <dt id="g-org">組織（org）</dt><dd>顧客の会社 1 つ分の環境。テナントにあたる。本番の組織と Sandbox の組織がある。</dd>
+      <dt id="g-lead">リード</dt><dd>まだ確かめていない見込み客。会社と人の情報を 1 件に持ち、確かめた後に変換する。</dd>
+      <dt id="g-account">取引先</dt><dd>取引の相手の会社。<code>account</code>。</dd>
+      <dt id="g-contact">取引先責任者</dt><dd>取引先に属する人。<code>contact</code>。</dd>
+      <dt id="g-opportunity">商談</dt><dd>売上になるかもしれない 1 件の案件。金額・完了予定日・フェーズを持つ。<code>opportunity</code>。</dd>
+      <dt id="g-activity">活動</dt><dd>ToDo（<code>task</code>）と行動（<code>event</code>）。誰と（<code>who</code>）・何について（<code>what</code>）を持つ。</dd>
+      <dt id="g-poly">多態の参照</dt><dd>1 つの参照の項目が、複数の種類のオブジェクトのどれかを指せるもの。値はレコードの ID とオブジェクトの組。</dd>
+      <dt id="g-corpno">法人番号</dt><dd>国税庁が法人に指定する 13 桁の番号。取引先の一意の鍵や外部 ID に使える。</dd>
+      <dt id="g-stage">フェーズ</dt><dd>商談の進み具合を表す選択リストの値。値ごとに既定の確度・完了・成立・売上予測の分類を持つ。</dd>
+      <dt id="g-pipeline">パイプライン</dt><dd>進行中の商談の集まり。フェーズごとの件数や金額で、売上の見込みを見る。</dd>
+      <dt id="g-forecast">売上予測の分類</dt><dd>商談を売上予測でどう数えるか（パイプライン、最善、確約、完了、除外）。フェーズから決まる。</dd>
+      <dt id="g-convert">リードの変換</dt><dd>リードから取引先・取引先責任者・商談を作る（または既存に合わせる）操作。変換したリードは読むだけになる。</dd>
+      <dt id="g-duprule">重複の規則</dt><dd>作成・更新の時に、照合の規則で重複の候補を探し、知らせるか止めるかを決める設定。</dd>
+      <dt id="g-metadata">メタデータ</dt><dd>オブジェクト・項目・画面・自動化・権限などの「設定」。本システムでは版を持ち、コンパイルして使う。</dd>
+      <dt id="g-customobj">カスタムオブジェクト</dt><dd>組織が自分で足すオブジェクト。API の名前は <code>x_</code> で始まる。</dd>
+      <dt id="g-picklist">選択リスト</dt><dd>決まった値から選ぶ項目。値は ID で持ち、ラベルを変えてもレコードを書き換えない。</dd>
+      <dt id="g-lookup">参照</dt><dd>他のレコードを指す項目（lookup）。親を消しても子は残せる。</dd>
+      <dt id="g-md">主従</dt><dd>master-detail。子の所有と共有が親に従う強い関係。親を消すと子も消える。</dd>
+      <dt id="g-formula">数式</dt><dd>他の項目から値を計算する項目。値は保存せず、読む時に計算する。</dd>
+      <dt id="g-rollup">積み上げ集計</dt><dd>主従の子の件数・合計・最小・最大を、親の項目に持つもの。</dd>
+      <dt id="g-pivot">ピボットの表</dt><dd>JSONB の中の値を、型付きの列に写して索引を張るための表。正本の写しで、同じトランザクションで書く。</dd>
+      <dt id="g-selective">選択性</dt><dd>条件が全体のうちどれだけの行に絞れるか。十分に絞れる条件だけが索引から進める。</dd>
+      <dt id="g-flow">フロー</dt><dd>コードを書かずに組む自動化。レコードの保存・スケジュール・画面・イベントで動く。</dd>
+      <dt id="g-valrule">入力規則</dt><dd>数式の条件が真なら保存を断る設定。</dd>
+      <dt id="g-approval">承認のプロセス</dt><dd>レコードを申請し、決めた承認者が段ごとに承認・却下する流れ。申請中はレコードをロックする。</dd>
+      <dt id="g-governor">ガバナ制限</dt><dd>1 つのトランザクションで使える資源の上限。超えると全体を巻き戻す。</dd>
+      <dt id="g-allocation">割り当て</dt><dd>組織ごとの一定の時間あたりの量（API の要求、一括の行、イベントの配信など）。</dd>
+      <dt id="g-noisy">騒がしい隣人</dt><dd>共有の基盤で、ある組織の重い処理が他の組織を遅くすること。</dd>
+      <dt id="g-edition">エディション</dt><dd>組織の契約の段。割り当て・機能・カスタムオブジェクトや Sandbox の数を変える。トランザクションの上限は変えない。</dd>
+      <dt id="g-license">ライセンス</dt><dd>利用者ごとの契約の種類。使えるオブジェクトと権限の上限を決める。</dd>
+      <dt id="g-fls">FLS</dt><dd>Field-Level Security。項目ごとの読み・編集の権限。</dd>
+      <dt id="g-permset">権限セット</dt><dd>オブジェクト・項目・システムの権限の束。利用者の権限は、割り当てた権限セットの和。</dd>
+      <dt id="g-profile">プロファイル</dt><dd>利用者に 1 つ必ず付く既定値の入れ物（レイアウト、レコードタイプ、ログインの制限）。基本の権限セットを 1 つ持つ。</dd>
+      <dt id="g-owd">OWD</dt><dd>Organization-Wide Defaults。オブジェクトごとに、既定で誰がレコードを見られるかの設定。</dd>
+      <dt id="g-role">ロール階層</dt><dd>組織の上下関係の木。上司は部下が所有するレコードを見られる。</dd>
+      <dt id="g-sharerule">共有ルール</dt><dd>所有者のグループか、レコードの条件で、別のグループにレコードを共有する設定。広げるだけ。</dd>
+      <dt id="g-implicit">暗黙の共有</dt><dd>設定せずに起きる共有。子の商談を見られれば親の取引先を読め、取引先の所有者は子を見られる。</dd>
+      <dt id="g-closure">閉包の表</dt><dd>入れ子のグループとロール階層を展開し、「利用者 U はグループ G に属する」を全て行にした表。</dd>
+      <dt id="g-recalc">共有の再計算</dt><dd>共有の設定の変更に合わせて、共有の行を作り直すこと。終わるまで古い構成で判定する。</dd>
+      <dt id="g-skew">スキュー</dt><dd>1 人の所有者や 1 つの親に、レコードが極端に集まること。ロックの待ちと再計算が重くなる。</dd>
+      <dt id="g-layout">ページレイアウト</dt><dd>レコードの画面の項目の並びと関連リスト。アクセスは与えず、狭めるだけ。</dd>
+      <dt id="g-listview">リストビュー</dt><dd>条件・列・並び順を保存した一覧。見る人の権限で毎回コンパイルする。</dd>
+      <dt id="g-bulk">一括の API</dt><dd>大量のレコードを、非同期のジョブで登録・更新・削除・問い合わせする API。</dd>
+      <dt id="g-upsert">upsert</dt><dd>鍵で既存のレコードを探し、あれば更新、なければ作成する操作。</dd>
+      <dt id="g-extid">外部 ID</dt><dd>他のシステムの ID を入れる、一意で索引のある項目。upsert の鍵に使う。</dd>
+      <dt id="g-cdc">変更のイベント</dt><dd>レコードの作成・更新・削除を、確定の順に購読者へ配るイベント。本家の Change Data Capture にあたる。</dd>
+      <dt id="g-sandbox">Sandbox</dt><dd>本番の組織の複製の、開発・試験用の別の組織。</dd>
+      <dt id="g-deploy">デプロイ</dt><dd>メタデータのパッケージを、他の組織へ全部か無しかで当てること。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。ADR-0002〜0005 は後の ADR で細部を置き換えているので、各 ADR の「2026-09-28 の注記」を必ず読んでください。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、守るべき振る舞い、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、ADR の一覧と決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0002-custom-object-storage.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0003-metadata-driven-runtime.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0004-record-access-model.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0005-tenancy-and-governor-limits.md">0005</a> <span>— 保存、メタデータ、共有、上限の 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sales-objects.md">sales-objects.md</a> <span>— 標準オブジェクト、リードの変換、重複</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/metadata-and-runtime.md">metadata-and-runtime.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/data-storage.md">data-storage.md</a> <span>— データ辞書、DML の順序、数式、records とピボット</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sharing-and-record-access.md">sharing-and-record-access.md</a> <span>— 権限、OWD、閉包、決定表、再計算</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/governor-limits.md">governor-limits.md</a> <span>— 上限と割り当ての正本</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/automation-flows.md">automation-flows.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/reports-and-dashboards.md">reports-and-dashboards.md</a> <span>— 自動化と集計</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sandboxes-and-deploy.md">sandboxes-and-deploy.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/events-and-integrations.md">events-and-integrations.md</a> <span>— 安全に変える、外とつなぐ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/salesforce/docs/decisions">decisions/</a> <span>— 残りの ADR（認証、監査、セキュリティ、基盤、運用、拡張）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
