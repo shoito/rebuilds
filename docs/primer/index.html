@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>共通の前提知識</title>
+<meta name="description" content="rebuilds の設計の文書を読む前に知っておくとよい、題材に共通する前提知識。">
+<meta name="primer-home" content="../../index.html">
+<link rel="stylesheet" href="assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · 共通の前提知識</p>
+    <h1>設計の文書を読む前に</h1>
+    <p class="lead">どの題材にも出てくる進め方・技術・用語を、先にまとめて押さえます。題材ごとの資料は、ここに書いたことを知っている前提で書いています。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · 共通の前提知識</p>
+    <h2>設計の文書を読む前に</h2>
+    <p class="lead">どの題材にも出てくる進め方・技術・用語</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="what">
+    <h2>このリポジトリは何か</h2>
+    <p>既存の SaaS を「AI のコーディングエージェントを主な作り手として作り直すなら、どう設計するか」を記録しています。<strong>置いてあるのは設計の文書だけ</strong>で、実装のコードはありません（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0005-design-record-repository.md">ADR-0005</a>）。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>振る舞いは本家に寄せる</h3><p>使い心地や API の形は本家を手本にします。</p></div>
+      <div class="card" data-frag><h3>名前は本家のものを使わない</h3><p>ヘッダー・トークンの接頭辞・ドメインは <code>&lt;brand&gt;</code> と書きます（ADR-0006）。</p></div>
+      <div class="card" data-frag><h3>核に本家の実装を使わない</h3><p>主な論点を担う部分は自分で設計します（ADR-0007）。</p></div>
+    </div>
+  </section>
+
+  <section class="s" id="docs">
+    <h2>題材ごとの文書の地図</h2>
+    <p>どの題材も <code>systems/&lt;name&gt;/docs/</code> の下に同じ形の文書を持ちます。持ち主（承認する人）のロールも決まっています。</p>
+    <table>
+      <tr><th>文書</th><th>答える問い</th><th>持ち主</th></tr>
+      <tr><td><code>intent.md</code></td><td>なぜ、何を作るか。誰のどんな問題を解くか</td><td>PM</td></tr>
+      <tr><td><code>architecture/</code></td><td>どう作るか。全体像（README）と領域ごとの設計</td><td>Dev</td></tr>
+      <tr><td><code>architecture/data-model.md</code></td><td>表・列・制約・索引の正本と ER 図</td><td>Dev</td></tr>
+      <tr><td><code>decisions/</code></td><td>なぜその設計にしたか（ADR）</td><td>Dev</td></tr>
+      <tr><td><code>quality.md</code></td><td>何をもって正しいとするか。テストの戦略</td><td>QA</td></tr>
+      <tr><td><code>runbooks/</code></td><td>本番でどう動かし続けるか。SLO・リリース・障害対応</td><td>Ops</td></tr>
+      <tr><td><code>roadmap.md</code></td><td>どの順で作るか。Epic と Story</td><td>PM</td></tr>
+    </table>
+    <div class="callout key"><span class="label">おすすめの読む順</span>intent → architecture/README → 気になる領域の文書 → その領域の ADR → data-model。</div>
+  </section>
+
+  <section class="s" id="lifecycle">
+    <h2>開発の流れ（AI-Native SDLC）</h2>
+    <p>各段は、次の段が読める成果物をコミットします。エージェントは草案と実装を担い、<strong>承認は人間のロールの持ち主</strong>がします。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>Plan</strong>：<code>intent.md</code> で問題と望む結果を書く。PM が受理する。</li>
+        <li><strong>Design</strong>：<code>spec.md</code>（差分）に要件を書く。必要なら ADR と <code>quality.md</code>。PM と QA が承認する。</li>
+        <li><strong>Build</strong>：<code>plan.md</code> を書き、承認されたら実装する。Dev がレビューする。</li>
+        <li><strong>Test</strong>：エージェントが自分で確認ループを回し、CI を通す。QA が受け入れる。</li>
+        <li><strong>Deploy</strong>：デプロイし、フィーチャーフラグで段階的にリリースする。Ops が本番を承認する。</li>
+        <li><strong>Maintain</strong>：監視と SLO。逸脱やインシデントは、新しい intent として起票する。</li>
+      </ol>
+    </div>
+    <p>変更が小さければ、全部の成果物は要りません。typo は PR だけ、新しい Epic は intent・spec・plan・ADR・quality まで、と規模で重さを変えます。</p>
+  </section>
+
+  <section class="s" id="adr">
+    <h2>ADR：決定の記録</h2>
+    <p>アーキテクチャに影響する選択は、<a class="t" href="#g-adr">ADR</a> に残します。形式は MADR で、次の節を持ちます。</p>
+    <div class="tabs">
+      <div data-tab="Context"><p>何が問題で、何に縛られているか。</p></div>
+      <div data-tab="Options"><p>検討した選択肢。たいてい 2〜4 個。</p></div>
+      <div data-tab="Decision"><p>どれを選んだか。選ばなかった案を退けた理由も書く。</p></div>
+      <div data-tab="Consequences"><p>良くなることと、引き受けるコスト。</p></div>
+      <div data-tab="Confirmation"><p>決定が守られていることを、どう確かめるか。</p></div>
+    </div>
+    <div class="callout"><span class="label">決定を変えるとき</span>確定した ADR の本文は書き換えず、日付つきの注記（<code>&gt; 2026-09-28 の注記：…</code>）を足すか、新しい ADR で置き換えます。文書の中で「注記」を見かけたら、後から決定が補われた印です。</div>
+    <div class="quiz" data-answer="2">
+      <p class="q">確定した ADR の決定を変えたくなりました。どうしますか？</p>
+      <div class="opts">
+        <button>Decision の節を新しい内容に書き換える</button>
+        <button>日付つきの注記を足すか、新しい ADR で置き換える</button>
+        <button>ADR を消して、領域の文書に書き直す</button>
+      </div>
+      <p class="why">過去の判断の理由を残すため、本文は書き換えません。いつ・なぜ変わったかが追えることが ADR の価値です。</p>
+    </div>
+  </section>
+
+  <section class="s" id="requirements">
+    <h2>要件の書き方：ID と EARS</h2>
+    <p>要件には ID を振り、テストの名前にもその ID を入れて追跡します。</p>
+    <table>
+      <tr><th>種類</th><th>形式</th><th>例</th></tr>
+      <tr><td>要件</td><td><code>REQ-&lt;CAP&gt;-NNN</code></td><td><code>REQ-MSG-001</code></td></tr>
+      <tr><td>正しさの性質</td><td><code>PROP-&lt;CAP&gt;-NNN</code></td><td>どんな入力でも成り立つべきこと</td></tr>
+      <tr><td>決定表</td><td><code>DT-&lt;CAP&gt;-NNN</code></td><td>条件の組み合わせで結果が決まる規則</td></tr>
+      <tr><td>非機能要件</td><td><code>NFR-NNN</code></td><td>遅延・可用性・規模の目標</td></tr>
+    </table>
+    <p>文は <a class="t" href="#g-ears">EARS</a> の型で書きます。例：「〈事象〉とき、システムは〈振る舞い〉しなければならない」。</p>
+  </section>
+
+  <section class="s" id="stages">
+    <h2>規模の段階：S1・S2・S3</h2>
+    <p>最初から最大の構成にはしません。題材ごとに、構成を変える地点を段階として決めています。</p>
+    <div class="compare">
+      <div data-frag><h3>S1（MVP）</h3><p>東京の 1 リージョン・3 AZ。DB は writer 1 台と reader。大阪に災害復旧の控えを置く。</p></div>
+      <div data-frag><h3>S2</h3><p>reader やキャッシュを増やし、検索などを専用の部品へ分ける。</p></div>
+      <div data-frag><h3>S3</h3><p><a class="t" href="#g-cell">セル</a>の構成。スタック一式を複製し、テナントをセルに割り当てる。</p></div>
+    </div>
+    <p>表の「S1 の規模」は、この S1 の段階で見込む行数や容量です。</p>
+  </section>
+
+  <section class="s" id="stack">
+    <h2>共通の技術の土台</h2>
+    <p>題材によって差はありますが、多くは次の組み合わせです。</p>
+    <table>
+      <tr><th>層</th><th>選定</th><th>ひとことで</th></tr>
+      <tr><td>言語・API</td><td>TypeScript、Hono</td><td>型を API の契約として、サーバーとクライアントで共有する</td></tr>
+      <tr><td>DB</td><td>Aurora PostgreSQL</td><td>AWS が運用する PostgreSQL。<strong>正本</strong>はここに置く</td></tr>
+      <tr><td>キャッシュ・配信</td><td><a class="t" href="#g-valkey">Valkey</a>（ElastiCache）</td><td>Redis 互換。失われても正本から作り直せるものだけを置く</td></tr>
+      <tr><td>ファイル</td><td>S3</td><td>添付・録画・書き出しなどの大きなデータ</td></tr>
+      <tr><td>キュー</td><td>SQS・SNS</td><td>非同期の処理と、イベントの配布</td></tr>
+      <tr><td>実行基盤</td><td>ECS Fargate</td><td>サーバーを管理せずにコンテナを動かす</td></tr>
+      <tr><td>IaC</td><td>Terraform</td><td>インフラの変更を plan で読んでから承認する</td></tr>
+      <tr><td>可観測性</td><td>OpenTelemetry</td><td>ログ・メトリクス・トレースを共通の形で集める</td></tr>
+      <tr><td>フラグ</td><td>AWS AppConfig</td><td>デプロイとリリースを分ける</td></tr>
+    </table>
+  </section>
+
+  <section class="s" id="tenancy">
+    <h2>マルチテナントと RLS</h2>
+    <p>1 つの DB に多くの顧客（<a class="t" href="#g-tenant">テナント</a>）のデータが入ります。別の顧客のデータが見えることは、最も重い事故です。そこで DB 自身に、行ごとの読み書きの許可を判定させます（<a class="t" href="#g-rls">RLS</a>）。</p>
+    <div class="stepper">
+      <ol>
+        <li>リクエストが来たら、認証の結果からテナントの ID を決める。</li>
+        <li>トランザクションの最初に <code>SET LOCAL app.tenant_id = '…'</code> を実行する。</li>
+        <li>各表のポリシーが <code>tenant_id</code> が設定の値と同じ行だけを通す。</li>
+        <li><code>FORCE ROW LEVEL SECURITY</code> で、表の持ち主のロールにもポリシーを効かせる。</li>
+        <li>トランザクションが終わると設定は消え、次のリクエストに漏れない。</li>
+      </ol>
+    </div>
+    <pre><code>ALTER TABLE items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE items FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON items
+  USING (tenant_id = current_setting('app.tenant_id')::uuid);</code></pre>
+    <div class="callout warn"><span class="label">RLS の外</span>テナントが決まる前に引く表（ログインの照合など）は RLS をかけられません。各題材の data-model に「RLS の外の表」として一覧があり、専用の関数やロールに限って読ませます。</div>
+  </section>
+
+  <section class="s" id="ids">
+    <h2>ID：UUIDv7</h2>
+    <p>主キーは多くの題材で <a class="t" href="#g-uuidv7">UUIDv7</a> です。先頭 48 ビットが作った時刻（ミリ秒）なので、<strong>ほぼ作った順に並びます</strong>。</p>
+    <pre><code>0192 3e4f-8a1b-7c3d-9e2f-1a2b3c4d5e6f
+└── 時刻(48bit) ─┘ └ 版=7 ┘ └── ランダム ──┘</code></pre>
+    <ul>
+      <li>B-tree の索引の末尾に追記されるので、ランダムな UUIDv4 より書き込みが速い。</li>
+      <li>ID の範囲で時刻の範囲を表せるので、ID でパーティションを切れる。</li>
+      <li>PostgreSQL 18 は <code>uuidv7()</code> を標準で持つ。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">パーティションに分けた表の主キーに、分割の鍵を含めなければならないのはなぜ？</p>
+      <div class="opts">
+        <button>索引が小さくなるから</button>
+        <button>UUIDv7 が時刻を含むから</button>
+        <button>PostgreSQL は、分割の鍵を含まない一意の制約を、パーティションをまたいで張れないから</button>
+      </div>
+      <p class="why">そのため、多くの題材で「UUIDv7 の ID の範囲で分割する」か「主キーに日付を含める」という形を取っています。</p>
+    </div>
+  </section>
+
+  <section class="s" id="outbox">
+    <h2>正本と outbox</h2>
+    <p>「DB に書いた」と「イベントを流した」を別々に行うと、片方だけ成功して食い違います。そこで <a class="t" href="#g-outbox">outbox</a> を使います。</p>
+    <pre class="mermaid">flowchart LR
+  API[API] -- "1 tx: 行 + outbox" --> DB[(Aurora)]
+  DB -- "2 outbox を順に読む" --> R[Relay]
+  R -- "3 配る" --> Q[SNS / SQS / Valkey]
+  Q -- "4 処理" --> W[Worker・Gateway]</pre>
+    <ol>
+      <li>業務の行と、送るべきイベントの行を、<strong>同じトランザクション</strong>で書く。</li>
+      <li>Relay が outbox を順に読み、キューや Pub/Sub に流す。</li>
+      <li>受け手は<strong>少なくとも 1 回</strong>届く前提で、重複を捨てる（冪等）。</li>
+    </ol>
+    <p>配信の経路（Valkey など）が落ちても正本は失われず、クライアントは再接続のときに差分を取り直します。</p>
+  </section>
+
+  <section class="s" id="idempotency">
+    <h2>冪等：同じ要求を 2 回送っても 1 回分</h2>
+    <p>ネットワークが切れると、クライアントは「届いたか分からない」まま再送します。<a class="t" href="#g-idempotent">冪等</a>にしておけば、再送しても二重にはなりません。</p>
+    <div class="compare">
+      <div class="bad"><h3>冪等でない</h3><p>決済の API を再送 → 2 回請求される。</p></div>
+      <div class="good"><h3>冪等</h3><p><code>Idempotency-Key</code> を付けて再送 → 1 回目の結果をそのまま返す。</p></div>
+    </div>
+    <p>DB では、キーに一意の制約を張り、同じキーの 2 回目は保存した応答を返します。キューの受け手も、イベントの ID で重複を捨てます。</p>
+  </section>
+
+  <section class="s" id="flags">
+    <h2>デプロイとリリースを分ける</h2>
+    <p>トランクベース開発で、<code>main</code> に毎日小さく入れます（ADR-0002）。未完成の機能は<strong>フィーチャーフラグの裏</strong>に置き、コードはデプロイしても、利用者には見せません。</p>
+    <div class="stepper">
+      <ol>
+        <li>フラグを off のまま、コードを本番にデプロイする。</li>
+        <li>社内のテナントだけ on にする。</li>
+        <li>一部の顧客に広げ、指標を見る。</li>
+        <li>全体に on。問題があればフラグを off に戻す（再デプロイしない）。</li>
+        <li>定着したら、フラグとその分岐を消す。</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="s" id="er">
+    <h2>ER 図の読み方</h2>
+    <p>data-model の ER 図は Mermaid の <code>erDiagram</code> です。線の両端の記号が、相手が何件あるか（多重度）を表します。</p>
+    <pre class="mermaid">erDiagram
+  workspaces ||--o{ channels : "has"
+  channels ||--o{ messages : "contains"
+  users }o--o{ channels : "joins via members"
+  workspaces {
+    uuid id PK
+    text name
+  }
+  channels {
+    uuid id PK
+    uuid workspace_id FK
+    text name UK "unique per workspace"
+  }
+  messages {
+    uuid id PK
+    uuid channel_id FK
+    bigint seq "order in channel"
+  }</pre>
+    <table>
+      <tr><th>記号</th><th>意味</th></tr>
+      <tr><td><code>||</code></td><td>ちょうど 1 件</td></tr>
+      <tr><td><code>o{</code></td><td>0 件以上</td></tr>
+      <tr><td><code>|{</code></td><td>1 件以上</td></tr>
+      <tr><td><code>PK</code> / <code>FK</code> / <code>UK</code></td><td>主キー / 外部キー / 一意</td></tr>
+    </table>
+    <p>図には主な列だけを描き、全部の列・索引・CHECK は、図の下の表の一覧に書いています。</p>
+  </section>
+
+  <section class="s" id="slo">
+    <h2>SLO と復旧の目標</h2>
+    <p>非機能の目標は数字で書きます。よく出る略語です。</p>
+    <dl class="glossary">
+      <dt>p99</dt><dd>遅い順に並べて上位 1% を除いた値。「p99 200ms」は、99% の要求が 200ms 以内に終わること。</dd>
+      <dt>SLO</dt><dd>目標とする信頼性（例：月間 99.9% 成功）。破りそうになったら機能の開発より安定を優先する。</dd>
+      <dt>RPO</dt><dd>障害で失ってよいデータの時間幅。RPO 0 は「成功を返したものは失わない」。</dd>
+      <dt>RTO</dt><dd>障害から復旧するまでの時間の目標。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-adr">ADR</dt><dd>Architecture Decision Record。設計の決定を、理由と退けた案と一緒に残す短い文書。</dd>
+      <dt id="g-ears">EARS</dt><dd>Easy Approach to Requirements Syntax。「〈条件〉とき、システムは〈振る舞い〉しなければならない」のような決まった型で要件を書く方法。</dd>
+      <dt id="g-tenant">テナント</dt><dd>データを分けて持つ単位の顧客。題材によりワークスペース・組織・アカウントなどと呼ぶ。</dd>
+      <dt id="g-rls">RLS</dt><dd>Row Level Security。PostgreSQL の機能で、行ごとに読み書きの可否をポリシーで判定する。</dd>
+      <dt id="g-uuidv7">UUIDv7</dt><dd>先頭に作成時刻を持つ UUID。時刻の順にほぼ並ぶ。</dd>
+      <dt id="g-outbox">outbox</dt><dd>送るべきイベントを、業務のデータと同じトランザクションで DB の表に書き、後から別の処理が配る方式。</dd>
+      <dt id="g-idempotent">冪等</dt><dd>同じ操作を何回行っても、1 回行ったのと同じ結果になる性質。</dd>
+      <dt id="g-valkey">Valkey</dt><dd>Redis から分かれたオープンソースのインメモリのデータストア。キャッシュ・Pub/Sub・レート制限に使う。</dd>
+      <dt id="g-cell">セル</dt><dd>サービスのスタック一式の複製。テナントをセルに割り当て、障害の影響を 1 つのセルに閉じ込める。</dd>
+      <dt>AZ</dt><dd>Availability Zone。同じリージョンの中で、電源やネットワークが独立したデータセンターの群。</dd>
+      <dt>Aurora Global Database</dt><dd>別のリージョンに読み取り用の複製を持つ Aurora の構成。災害のときに昇格させる。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="next">
+    <h2>次に読むもの</h2>
+    <p>題材を選んで、その題材の前提知識の資料へ進んでください。</p>
+    <p><a class="btn" href="../../index.html">題材の一覧へ</a></p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/docs/process.md">docs/process.md</a> <span>— 開発の流れと成果物の正式な定義</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/docs/decisions">docs/decisions/</a> <span>— リポジトリ共通の ADR</span></li>
+      </ol>
+    </div>
+  </section>
+</main>
+<script src="assets/primer.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rebuilds 前提知識</title>
+<meta name="description" content="既存の SaaS を AI エージェント主体で再構築する設計の記録。題材ごとの前提知識の資料。">
+<link rel="stylesheet" href="docs/primer/assets/primer.css">
+<style>
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 16px 64px; }
+  .wrap h1 { font-size: 2em; margin: 0 0 .3em; }
+  .lead { color: var(--muted); margin: 0 0 1.5em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .card .genre { color: var(--accent); font-size: .8em; font-weight: 600; }
+  .card .links { margin-top: 8px; font-size: .85em; display: flex; gap: 12px; }
+  .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 32px; padding: 14px 16px; background: var(--accent-soft); border-radius: var(--radius); }
+  .start p { margin: 0; flex: 1; min-width: 220px; }
+  h2 { font-size: 1.2em; margin: 1.6em 0 .6em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="kicker">rebuilds</p>
+  <h1>前提知識の資料</h1>
+  <p class="lead">既存の SaaS を、AI のコーディングエージェントを主な作り手として再構築するなら、どう設計するか。その設計の文書を読む前に要る知識を、題材ごとにまとめました。どの資料も、右上のボタンか S キーで資料表示とスライド表示を切り替えられます。</p>
+
+  <div class="start">
+    <p><strong>はじめに</strong>：どの題材にも出てくる進め方と技術（ADR、RLS、outbox、冪等、規模の段階など）。</p>
+    <a class="btn" href="docs/primer/index.html">共通の前提知識を読む</a>
+  </div>
+
+  <h2>題材</h2>
+  <div class="grid" id="grid"></div>
+
+  <p class="hint" style="margin-top:32px">設計の文書の本体は <a href="https://github.com/shoito/rebuilds">GitHub のリポジトリ</a>にあります。</p>
+</div>
+<script>
+  try { const t = localStorage.getItem("primer-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  const subjects = [
+    ['slack', 'Slack', 'チャット', 'リアルタイム配信、メッセージの順序、既読、検索'],
+    ['stripe', 'Stripe', '決済', '冪等性、複式簿記の台帳、Webhook、カード情報の隔離'],
+    ['github', 'GitHub', 'Git ホスティング', 'Git の保存と複製、PR とレビュー、CI、コード検索'],
+    ['notion', 'Notion', 'ドキュメント / DB', 'ブロックのモデル、CRDT の共同編集、権限、シャーディング'],
+    ['auth0', 'Auth0', '認証基盤', 'OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離'],
+    ['figma', 'Figma', 'デザインツール', '権威サーバーでの共同編集、WebGL / WASM の描画、巨大な文書'],
+    ['zoom', 'Zoom', 'ビデオ会議', 'WebRTC、SFU、帯域の推定、低遅延、録画'],
+    ['uber', 'Uber', '配車', 'マッチング、地理空間の索引、動的な料金、リアルタイムの位置'],
+    ['linear', 'Linear', 'イシュー管理', 'ローカルファーストの同期、オフライン、即時の操作'],
+    ['salesforce', 'Salesforce', 'CRM プラットフォーム', 'メタデータ駆動のマルチテナント、共有のモデル、宣言的な自動化'],
+    ['servicenow', 'ServiceNow', 'IT サービス管理', '継承するテーブル、ワークフローと SLA、CMDB'],
+    ['workday', 'Workday', '人事・給与', '有効日付のデータ、業務プロセス、日本の給与計算、マイナンバー'],
+  ];
+  document.getElementById('grid').innerHTML = subjects.map(([id, name, genre, topics]) => `
+    <div class="card">
+      <div class="genre">${genre}</div>
+      <h3><a href="systems/${id}/docs/primer/index.html">${name}</a></h3>
+      <p>${topics}</p>
+      <div class="links">
+        <a href="systems/${id}/docs/primer/index.html">資料</a>
+        <a href="systems/${id}/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/${id}/docs">設計の文書</a>
+      </div>
+    </div>`).join('');
+</script>
+</body>
+</html>

@@ -6,6 +6,14 @@
 
 開発プロセスは Anthropic の [AI-Native SDLC Playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) の intent → spec → plan を骨格にしている。そこへ Kiro の EARS 記法と要件 ID、OpenSpec の正本／差分の分離、MADR 形式の ADR を組み合わせた。詳細は [docs/process.md](docs/process.md)、採用の理由は [ADR-0001](docs/decisions/0001-adopt-ai-native-lifecycle.md) にある。
 
+## 前提知識の資料
+
+題材ごとに、設計の文書を読む前に要る知識をまとめた資料を、GitHub Pages で公開している。資料表示とスライド表示を切り替えられる（[ADR-0008](docs/decisions/0008-primers-on-github-pages.md)）。
+
+- 入口：<https://shoito.github.io/rebuilds/>
+- 共通の前提知識：[docs/primer/index.html](docs/primer/index.html)
+- 書き方：[docs/primer/AUTHORING.md](docs/primer/AUTHORING.md)
+
 ## 題材
 
 | 題材 | ジャンル | 主な論点 | 状態 |
@@ -30,11 +38,13 @@
 ```
 .
 ├── AGENTS.md                  # エージェント向けの共通ルール（CLAUDE.md は symlink）
+├── index.html                 # GitHub Pages の入口
 ├── .github/                   # CODEOWNERS、PR テンプレート
 ├── docs/
 │   ├── process.md             # 開発プロセス（方法論）の定義
 │   ├── project-management.md  # GitHub での回し方
 │   ├── templates/             # 各成果物のテンプレート
+│   ├── primer/                # 共通の前提知識の資料と、資料の CSS・JS
 │   └── decisions/             # リポジトリ共通の ADR
 └── systems/<name>/            # 題材ごとの設計
     ├── AGENTS.md              # 題材固有のルール
@@ -45,6 +55,7 @@
         ├── quality.md         # 品質戦略（QA）
         ├── runbooks/          # SLO、リリース、障害対応（Ops）
         ├── roadmap.md         # Epic と Story（PM）
+        ├── primer/            # 前提知識の資料（HTML、GitHub Pages）
         ├── specs/             # 開発リポジトリへ移す予定（ADR-0005）
         └── changes/           # 開発リポジトリへ移す予定（ADR-0005）
 ```
