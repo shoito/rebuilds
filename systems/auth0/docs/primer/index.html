@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auth0 の前提知識</title>
+<meta name="description" content="Auth0 の再構築の設計の文書を読む前に知っておくとよい、認証基盤（CIAM）の分野の概念・用語・標準・業界の決まり。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Auth0 · 前提知識</p>
+    <h1>Auth0 の設計を読む前に</h1>
+    <p class="lead">ログインは「パスワードを照合するだけ」に見えますが、OAuth・OpenID Connect の流れ、トークンと署名鍵、セッションとログアウト、MFA とパスキー、攻撃の防御のそれぞれに、標準と業界の決まりがあります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7 など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Auth0 · 前提知識</p>
+    <h2>Auth0 の設計を読む前に</h2>
+    <p class="lead">OAuth・OIDC、トークンと鍵、セッション、MFA とパスキー、攻撃の防御の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Auth0 は何をするサービスか</h2>
+    <p>Auth0 は、アプリの利用者（顧客）のログインを肩代わりする認証基盤です。この分野を <a class="t" href="#g-ciam">CIAM</a> と呼びます。アプリはログインの画面もパスワードも持たず、本システムへリダイレクトして、戻ってきた結果をトークンとして受け取ります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>テナントの開発者</h3><p>テナントを作り、アプリと API を登録し、標準の OIDC のライブラリでつなぐ。主な利用者。</p></div>
+      <div class="card" data-frag><h3>テナントの管理者</h3><p>ダッシュボードと Management API で、設定・ユーザー・ログを扱う。</p></div>
+      <div class="card" data-frag><h3>エンドユーザー</h3><p>テナントのアプリにログインする人。ホスト型の画面で、パスワード・パスキー・ソーシャルログインを使う。</p></div>
+    </div>
+    <p>規模の感覚は、S1 でテナント 1 万（うち本番 3,000）、エンドユーザー合計 2,000 万、パスワードを照合するログインのピーク 500 件/秒、トークンの発行のピーク 3,000 件/秒です。<strong>ログインが止まると、テナントのアプリの全機能が止まる</strong>ので、認証の経路は月間 99.99% を目標にしています。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="roles">
+    <h2>登場人物：OAuth と OpenID Connect</h2>
+    <p><a class="t" href="#g-oauth">OAuth 2.0</a> は「API を呼ぶ許可を、パスワードを渡さずに委ねる」ための<strong>認可</strong>の標準です。<a class="t" href="#g-oidc">OpenID Connect</a>（OIDC）は、その上に「誰がログインしたか」を伝える<strong>認証</strong>の層を足したものです。</p>
+    <pre class="mermaid">flowchart LR
+  U["エンドユーザー（リソースオーナー）"] -- "ログイン・同意" --> AS["本システム（認可サーバー・OP）"]
+  C["テナントのアプリ（クライアント・RP）"] -- "認可の要求" --> AS
+  AS -- "トークン" --> C
+  C -- "アクセストークン" --> RS["テナントの API（リソースサーバー）"]
+  RS -. "JWKS で署名を検証" .-> AS</pre>
+    <div class="tabs">
+      <div data-tab="OAuth 2.0 の呼び名"><p>リソースオーナー（利用者）、クライアント（アプリ）、<a class="t" href="#g-as">認可サーバー</a>、リソースサーバー（API）。RFC 6749。</p></div>
+      <div data-tab="OIDC の呼び名"><p><a class="t" href="#g-op">OP</a>（OpenID Provider、ID を証明する側）と <a class="t" href="#g-rp">RP</a>（Relying Party、その証明を信じる側）。外から見ると本システムは <a class="t" href="#g-idp">IdP</a> です。</p></div>
+      <div data-tab="本システムの呼び名"><p>クライアントは「アプリケーション」（<code>clients</code>）、リソースサーバーは「API」（<code>resource_servers</code>）。本家の画面の呼び方に合わせています。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/authentication-flows.md">authentication-flows.md</a> の 1・4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/tenants-and-applications.md">tenants-and-applications.md</a> の 4・5 節。</div>
+  </section>
+
+  <section class="s" id="tokens">
+    <h2>3 つのトークンと JWT</h2>
+    <table>
+      <tr><th>トークン</th><th>何を表すか</th><th>宛先（<code>aud</code>）</th><th>形</th></tr>
+      <tr><td><a class="t" href="#g-idtoken">ID トークン</a></td><td>誰が、いつ、どう認証したか</td><td>アプリ（<code>client_id</code>）</td><td>JWT</td></tr>
+      <tr><td><a class="t" href="#g-accesstoken">アクセストークン</a></td><td>どの API を、どの <a class="t" href="#g-scope">スコープ</a>で呼んでよいか</td><td>1 つの API</td><td>JWT（RFC 9068、<code>typ: at+jwt</code>）</td></tr>
+      <tr><td><a class="t" href="#g-refreshtoken">リフレッシュトークン</a></td><td>ログインし直さずに新しいトークンを得る権利</td><td>本システムだけ</td><td>不透明な乱数（<code>&lt;brand&gt;_rt_…</code>）</td></tr>
+    </table>
+    <p><a class="t" href="#g-jwt">JWT</a> は「ヘッダー.中身.署名」の 3 つを base64url でつないだものです。中身は誰でも読めます。受け手は、公開鍵で署名を確かめるだけで、本システムに問い合わせずに検証できます。だから API は本システムが落ちても動き続けます。その代わり、<strong>発行済みの JWT は期限まで止められません</strong>。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">管理者がユーザーをブロックしました。そのユーザーが持っているアクセストークン（JWT、残り 40 分）はどうなりますか？</p>
+      <div class="opts">
+        <button>その場で無効になり、API での検証に失敗する</button>
+        <button>API での検証は期限まで通りうる。リフレッシュトークンでの更新は拒否される</button>
+        <button>署名鍵が JWKS から外れるので、検証に失敗する</button>
+      </div>
+      <p class="why">本システムは JWT の失効の一覧を持ちません（ADR-0003）。止めたいテナントには、短い有効期間とリフレッシュトークンの失効を勧めます。<code>/oauth/revoke</code> にアクセストークンを渡すと <code>unsupported_token_type</code> を返し、止められないことを明示します。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0003-token-formats-and-signing-keys.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0008-token-lifetimes-and-claims.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/authentication-flows.md">authentication-flows.md</a> の 8 節（有効期間とクレーム）。</div>
+  </section>
+
+  <section class="s" id="codeflow">
+    <h2>認可コード＋PKCE の流れ</h2>
+    <p>本システムが受ける認可の要求は、この 1 つの形だけです。トークンをブラウザの URL に載せず、短命の「コード」をいったん返してから、裏で交換します。</p>
+    <div class="stepper">
+      <ol>
+        <li>アプリが乱数の <code>code_verifier</code> を作り、その SHA-256 を <code>code_challenge</code> にする。<a class="t" href="#g-state"><code>state</code></a> と <a class="t" href="#g-nonce"><code>nonce</code></a> も乱数で作る。</li>
+        <li>ブラウザを <code>/authorize</code> へ送る（<code>client_id</code>・<code>redirect_uri</code>・<code>scope=openid …</code>・<code>code_challenge</code>・<code>state</code>・<code>nonce</code>）。</li>
+        <li>本システムが <a class="t" href="#g-redirecturi"><code>redirect_uri</code></a> を登録と完全一致で照合し、ログインの画面を出す。有効なセッションがあれば画面を省く（<a class="t" href="#g-sso">SSO</a>）。</li>
+        <li>ログインが済むと、<code>redirect_uri</code> へ <code>code</code>・<code>state</code>・<code>iss</code> を付けて戻す。コードは 60 秒、1 回限り。</li>
+        <li>アプリは <code>state</code> が自分の送った値かを確かめる（CSRF の防御）。<code>iss</code> で発行者の取り違え（mix-up 攻撃）を防ぐ。</li>
+        <li>アプリが <code>/oauth/token</code> へ <code>code</code> と <code>code_verifier</code> を送る。本システムは SHA-256(<code>code_verifier</code>) が <code>code_challenge</code> と一致するかを確かめる。</li>
+        <li>ID トークン・アクセストークン（・リフレッシュトークン）を返す。アプリは ID トークンの署名・<code>aud</code>・<code>nonce</code> を確かめる。</li>
+      </ol>
+    </div>
+    <div class="callout key"><span class="label">要点</span><a class="t" href="#g-pkce">PKCE</a> は、コードを盗んだ人がトークンに交換できないようにする仕組みです。秘密を持てないアプリ（SPA・ネイティブ）で必須で、本システムは <code>S256</code> だけを受け、機密のアプリでも既定で必須にします。2 回目のコードの使用を検知したら、そのコードから出したリフレッシュトークンの系列を失効させます。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0006-authorization-code-pkce-and-exact-redirect.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/authentication-flows.md">authentication-flows.md</a> の 5 節（パラメーター・照合の決定表・シーケンス）。</div>
+  </section>
+
+  <section class="s" id="clients">
+    <h2>アプリの種類と、その他のフロー</h2>
+    <p>アプリが秘密を安全に持てるかどうかで、<a class="t" href="#g-public">公開クライアント</a>と<a class="t" href="#g-confidential">機密クライアント</a>に分かれます。種類が、クライアントの認証の方式と使えるグラントの上限を決めます。</p>
+    <div class="tabs">
+      <div data-tab="種類">
+        <table>
+          <tr><th><code>app_type</code></th><th>公開・機密</th><th>使えるグラント</th></tr>
+          <tr><td><code>spa</code></td><td>公開（ブラウザの JS は秘密を隠せない）</td><td>認可コード、リフレッシュ</td></tr>
+          <tr><td><code>native</code></td><td>公開（配った実行ファイルは解析できる）</td><td>認可コード、リフレッシュ、デバイス</td></tr>
+          <tr><td><code>regular_web</code></td><td>機密（サーバーで秘密を持つ）</td><td>認可コード、リフレッシュ、クライアントクレデンシャル</td></tr>
+          <tr><td><code>m2m</code></td><td>機密</td><td>クライアントクレデンシャル</td></tr>
+        </table>
+      </div>
+      <div data-tab="M2M"><p>利用者のいないサーバー同士の呼び出しです。アプリが自分の秘密か <code>private_key_jwt</code> で名乗り、<code>client_credentials</code> でトークンを得ます。出せるスコープは「アプリ × API」の許可（<code>client_grants</code>）の範囲だけ。<code>sub</code> は <code>&lt;client_id&gt;@clients</code> の形です。</p></div>
+      <div data-tab="デバイス"><p>テレビなど入力の限られた端末向けの <a class="t" href="#g-device">デバイス認可グラント</a>（RFC 8628）。端末が <code>XXXX-XXXX</code> のコードを表示し、利用者がスマートフォンで <code>/activate</code> を開いて入力・承認します。端末は 5 秒ごとに問い合わせます。遠隔のフィッシングを防ぐため、確認の画面で「許可」を押すまで承認しません。</p></div>
+      <div data-tab="持たないフロー"><p><a class="t" href="#g-implicit">暗黙フロー</a>とパスワードのグラント（<a class="t" href="#g-ropg">ROPG</a>）は出しません。OAuth 2.0 のセキュリティの BCP である <a class="t" href="#g-rfc9700">RFC 9700</a> が非推奨にしているためです。</p></div>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">登録した <code>redirect_uri</code> は <code>https://app.example.com/callback</code>。要求に <code>https://app.example.com/callback/</code>（末尾にスラッシュ）が来ました。どうなりますか？</p>
+      <div class="opts">
+        <button>実質同じ URL なので通す</button>
+        <button>正規化してから比べ、一致したので通す</button>
+        <button>拒否し、<code>redirect_uri</code> へは何も送らず、本システムのエラーの画面を出す</button>
+      </div>
+      <p class="why">正規化はせず、文字列の完全一致だけで照合します。ワイルドカードも許しません。照合に失敗した URL へエラーを送ると、コードやエラーを攻撃者の URL へ流すオープンリダイレクトになるためです。例外は、ネイティブアプリのループバックのポートだけ（RFC 8252）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0031-application-and-api-registration.md">ADR-0031</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0007-client-authentication-methods.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0009-device-authorization-grant.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/tenants-and-applications.md">tenants-and-applications.md</a> の 4〜6 節。</div>
+  </section>
+
+  <section class="s" id="keys">
+    <h2>署名鍵・JWKS・Signer</h2>
+    <p>トークンは秘密鍵で署名し、受け手は公開鍵で確かめます。公開鍵の一覧が <a class="t" href="#g-jwks">JWKS</a>（<code>/.well-known/jwks.json</code>）で、JWT のヘッダーの <a class="t" href="#g-kid"><code>kid</code></a> でどの鍵かを選びます。エンドポイントの一覧は <a class="t" href="#g-discovery">discovery</a> の文書にあります。</p>
+    <pre class="mermaid">stateDiagram-v2
+  direction LR
+  [*] --> next : 生成
+  next --> current : ローテーション
+  current --> previous : ローテーション
+  previous --> revoked : 失効
+  current --> revoked : 緊急のローテーション</pre>
+    <ul>
+      <li data-frag><strong>次の鍵を先に配る。</strong>RP は JWKS を数分キャッシュします。<code>next</code> を JWKS に載せて 15 分たってから切り替えるので、新しい鍵の署名を知らない RP が出ません。</li>
+      <li data-frag><strong>秘密鍵は <a class="t" href="#g-signer">Signer</a> の中だけ。</strong>秘密鍵は <a class="t" href="#g-envelope">エンベロープ暗号化</a>で DB に置き、KMS で復号できるのは Signer だけです。外からの要求を受ける Auth は秘密鍵を持ちません。</li>
+      <li data-frag><strong>失効しても、発行済みのトークンは消えない。</strong>失効が効くのは、RP が新しい JWKS を読んだとき（キャッシュ 5 分＋エッジ 1 分）からです。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/keys-and-secrets.md">keys-and-secrets.md</a> の 3・5・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0046-signing-key-lifecycle.md">ADR-0046</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0047-signer-api-and-jwks-publishing.md">ADR-0047</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0059-signer-isolation.md">ADR-0059</a>。</div>
+  </section>
+
+  <section class="s" id="sessions">
+    <h2>セッション・SSO・ログアウト</h2>
+    <p>ログインの状態は 3 か所にあります。ログアウトが難しいのはこのためです。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>アプリのセッション</h3><p>アプリが自分の Cookie で持つ。本システムからは見えない。</p></div>
+      <div class="card" data-frag><h3>本システムのセッション</h3><p><code>__Host-&lt;brand&gt;_session</code> の Cookie と DB の <code>sessions</code>。SSO の元。使われない期間 3 日・最終 7 日。</p></div>
+      <div class="card" data-frag><h3>外部の IdP のセッション</h3><p>Google などに残るもの。MVP ではここまでログアウトさせない。</p></div>
+    </div>
+    <p>SSO は、同じホスト名で <code>/authorize</code> を呼ぶアプリの間で効きます。<code>prompt=none</code>（画面を出さない）、<code>prompt=login</code>・<code>max_age</code>（再認証させる）で、アプリが振る舞いを選べます。別サイトの iframe で行う「サイレント認証」は、ブラウザのサードパーティの Cookie の制限で動かないことが多いので、SPA にはリフレッシュトークンを勧めます。</p>
+    <div class="tabs">
+      <div data-tab="RP-Initiated"><p>アプリがブラウザを <code>/oidc/logout</code> へ送り、本システムのセッションを終えます。<code>id_token_hint</code> がないか合わないときは、ログアウトの CSRF を防ぐため確認の画面を出します。戻り先は登録と完全一致。</p></div>
+      <div data-tab="Back-Channel"><p>本システムのサーバーが、各アプリの登録した URL へ署名したログアウトトークン（<code>sid</code>・<code>sub</code>・<code>events</code> を持つ JWT）を直接 POST します。ブラウザを経由しないので、閉じたタブのアプリにも届きます。再試行のたびにトークンを作り直します。</p></div>
+      <div data-tab="Front-Channel"><p>ブラウザの iframe で各アプリのログアウトの URL を開く方式。サードパーティの Cookie に頼るので、持ちません。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/sessions-and-sso.md">sessions-and-sso.md</a> の 3・4・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0027-server-side-sessions.md">ADR-0027</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0028-logout-rp-initiated-and-back-channel.md">ADR-0028</a>。</div>
+  </section>
+
+  <section class="s" id="refresh">
+    <h2>リフレッシュトークンのローテーション</h2>
+    <p>SPA やモバイルでは、長くログインを保ちたい一方、トークンが盗まれる危険も高くなります。そこで、使うたびに新しいトークンに替え（<a class="t" href="#g-rotation">ローテーション</a>）、古いトークンの再使用を盗用の印とみなします。1 回のログインから続くトークンの列を<a class="t" href="#g-family">系列</a>と呼びます。</p>
+    <div class="stepper">
+      <ol>
+        <li>ログインで系列 F を作り、RT1 を出す。</li>
+        <li>アプリが RT1 を使う → RT2 と新しいアクセストークンを出し、RT1 を使用済みにする。</li>
+        <li>攻撃者が盗んでいた RT1 を使う。使用済みなので「再利用」と判定する。</li>
+        <li>系列 F をすべて失効させる（正規の利用者の RT2 も）。結び付いたセッションも終える。</li>
+        <li>正規の利用者は次の更新で失敗し、ログインし直す。この不便が、盗用を見つける代わりの費用。</li>
+      </ol>
+    </div>
+    <p>系列はアプリの設定でセッションに結び付けます（<code>binding</code>）。<code>session</code>（SPA・Web の既定）はログアウトで一緒に止まり、<code>independent</code>（ネイティブ・デバイスの既定）はログアウトの後も使えます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">2 つのタブが同じリフレッシュトークンで同時に更新を送りました（猶予は既定の 0 秒）。遅れた方はどうなりますか？</p>
+      <div class="opts">
+        <button>再利用とみなされ、系列ごと失効する</button>
+        <button>同じ新しいトークンを受け取る</button>
+        <button>先の要求が終わるまで待たされ、別の新しいトークンを受け取る</button>
+      </div>
+      <p class="why">行のロックで順に処理し、遅れた方は使用済みのトークンを送ったことになります。テナントは猶予を 0〜60 秒で設定でき、SDK には更新を 1 つのタブに寄せるよう文書で勧めます（authentication-flows.md の 7.2 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/authentication-flows.md">authentication-flows.md</a> の 7.2 節の決定表、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0029-refresh-token-session-binding.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/sessions-and-sso.md">sessions-and-sso.md</a> の 7 節。</div>
+  </section>
+
+  <section class="s" id="ulogin">
+    <h2>Universal Login とログインのトランザクション</h2>
+    <p><a class="t" href="#g-ul">Universal Login</a> は、本システムのドメインで出すホスト型のログインの画面です。アプリの画面にログインの部品を埋め込む方式は持ちません。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>埋め込み型</h3><p>パスワードがアプリのページを通る。偽の画面と見分けにくい。アプリごとに CSP や MFA の画面を作り直す。</p></div>
+      <div class="good" data-frag><h3>ホスト型</h3><p>パスワードは本システムにしか渡らない。パスキーの RP ID が 1 つにそろう。厳しい CSP をかけられる。</p></div>
+    </div>
+    <p>画面はサーバーで組み立てる HTML で、JavaScript は最小です。<code>/authorize</code> で検証を通った要求は、ログインの<a class="t" href="#g-transaction">トランザクション</a>（<code>login_transactions</code> の 1 行、有効 60 分）に保存し、<code>__Host-&lt;brand&gt;_tx</code> の Cookie と結び付けます。ブランディングはテーマの変数と文言の上書きだけで、テナントの任意の HTML や JavaScript は入れません。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">ログインの画面の URL <code>/u/login?state=…</code> の <code>state</code> は何ですか？</p>
+      <div class="opts">
+        <button>アプリが <code>/authorize</code> に送った OAuth の <code>state</code> そのもの</button>
+        <button>ログインのトランザクションを指す handle。アプリの <code>state</code> とは別物</button>
+        <button>画面の CSRF のトークン</button>
+      </div>
+      <p class="why">本家と同じ形で、トランザクションの handle（256 ビットの乱数）を <code>state</code> の名前で運びます。アプリの <code>state</code> はトランザクションの中に保存し、最後に <code>redirect_uri</code> へそのまま返します（authentication-flows.md の 5.4 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/universal-login.md">universal-login.md</a> の 3〜5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0011-universal-login-rendering-and-transaction.md">ADR-0011</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0012-branding-and-templates.md">ADR-0012</a>。</div>
+  </section>
+
+  <section class="s" id="connections">
+    <h2>接続・ユーザー・ID のリンク</h2>
+    <p><a class="t" href="#g-connection">接続</a>は「資格情報を確かめて、外部の ID を返す部品」です。MVP はデータベース接続（メールアドレスとパスワード）と、ソーシャル接続（Google・Apple・LINE・GitHub）を持ちます。1 人のユーザーは、接続ごとの <a class="t" href="#g-identity">ID</a> を複数持てます。</p>
+    <ul>
+      <li data-frag><strong><code>user_id</code> は接続から独立。</strong><code>usr_</code> ＋乱数で、そのままトークンの <code>sub</code> になります。接続の種類を含めず、削除しても再利用しません（OIDC Core が <code>sub</code> の再割り当てを禁じるため）。</li>
+      <li data-frag><strong>メールアドレスの「確認済み」は IdP ごとに違う。</strong>Google・Apple は ID トークンの <code>email_verified</code> を使い、LINE はそのクレームがないので確認済みにしません。</li>
+      <li data-frag><strong>同じ人の ID をつなぐのが<a class="t" href="#g-linking">リンク</a>。</strong>つなぐと、どちらでログインしても同じ <code>sub</code> になります。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">Google でログインした人の確認済みのメールアドレスが、既存のパスワードのユーザーと同じでした（テナントの設定は <code>prompt</code>）。どうしますか？</p>
+      <div class="opts">
+        <button>同じメールアドレスなので、黙って既存のユーザーにつなぐ</button>
+        <button>既存のユーザーとしても本人に認証させてから（MFA を含む）つなぐ</button>
+        <button>重複なので、Google でのログインを拒否する</button>
+      </div>
+      <p class="why">メールアドレスの一致だけでつなぐと、IdP の確認の甘さを突いたアカウントの乗っ取りの経路になります。両方の ID で本人が認証してからつなぎます（ADR-0019）。設定の既定は <code>off</code> で、提案せずに新しいユーザーを作ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/connections.md">connections.md</a> の 3・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/users-and-profiles.md">users-and-profiles.md</a> の 3・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0014-connection-abstraction.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0018-user-identifier-and-profile-store.md">ADR-0018</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0019-account-linking.md">ADR-0019</a>。</div>
+  </section>
+
+  <section class="s" id="passwords">
+    <h2>パスワードを守る：保存・ポリシー・列挙</h2>
+    <p>パスワードの扱いは、米国の <a class="t" href="#g-nist">NIST SP 800-63B-4</a> が事実上の基準です。昔の常識と逆になっている点があります。</p>
+    <div class="compare">
+      <div class="bad" data-frag><h3>昔の常識</h3><p>SHA-256 で保存（速すぎて総当たりされる）。記号を必須にする。定期的に変えさせる。</p></div>
+      <div class="good" data-frag><h3>この設計</h3><p><a class="t" href="#g-argon2id">Argon2id</a> ＋ <a class="t" href="#g-pepper">pepper</a> で保存。組み合わせの規則は持たず、長さ（既定 15 文字）と、よく使われる・漏えいしたパスワードの一覧で拒否する。</p></div>
+    </div>
+    <ul>
+      <li data-frag><strong>漏えいの照合は <a class="t" href="#g-kanon">k-匿名性</a>。</strong>パスワードの SHA-1 の先頭 5 文字だけで範囲を問い合わせ、残りは手元で比べます。データセットの自前のホストは<strong>法務の確認待ち</strong>で、それまでは公式の API を使います。</li>
+      <li data-frag><strong><a class="t" href="#g-enumeration">アカウントの列挙</a>を防ぐ。</strong>登録の有無で画面・文言・時間を変えません。ユーザーがいなくてもダミーのハッシュで同じ計算をし、再設定は「登録があれば送りました」と返します。</li>
+      <li data-frag><strong>Argon2id は重い。</strong>攻撃の判定をハッシュの前に置き、同時に計算する数に上限を置きます（超えたら 503）。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0004-credential-storage.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0015-database-connection-password-and-enumeration.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0025-breached-password-detection.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/connections.md">connections.md</a> の 4 節。</div>
+  </section>
+
+  <section class="s" id="mfa">
+    <h2>MFA の要素と保証の水準（AAL）</h2>
+    <p><a class="t" href="#g-mfa">MFA</a> は、知っているもの（パスワード）・持っているもの（端末の鍵）・本人の特徴（生体）のうち、異なる 2 つを確かめることです。どれだけ確かかを、NIST は <a class="t" href="#g-aal">AAL</a> の 3 段階で表します。</p>
+    <table>
+      <tr><th>使った手段</th><th><a class="t" href="#g-amr"><code>amr</code></a></th><th>AAL（<a class="t" href="#g-acr"><code>acr</code></a>）</th></tr>
+      <tr><td>パスワードだけ</td><td><code>pwd</code></td><td>AAL1</td></tr>
+      <tr><td>パスワード＋<a class="t" href="#g-totp">TOTP</a></td><td><code>pwd otp mfa</code></td><td>AAL2</td></tr>
+      <tr><td>パスキー（UV あり）</td><td><code>swk</code>/<code>hwk</code> <code>user</code> …</td><td>AAL2（フィッシングに強い）</td></tr>
+      <tr><td>パスワード＋メールの OTP</td><td><code>pwd email mfa</code></td><td>AAL1</td></tr>
+    </table>
+    <p><code>amr</code> は「使った手段」（RFC 8176）、<code>acr</code> は「達成した水準」です。<code>amr</code> に <code>mfa</code> があっても AAL2 とは限りません。アプリが <code>acr_values</code> や <code>max_age</code> で高い水準を求め、足りなければ追加の要素だけを求めることを <a class="t" href="#g-stepup">step-up</a> と呼びます。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">パスワードの後にメールの OTP を通しました。ID トークンの <code>acr</code> はどれですか？</p>
+      <div class="opts">
+        <button>AAL2。2 つの要素を使ったから</button>
+        <button>AAL1。NIST はメールを out-of-band の認証に使うことを禁じている</button>
+        <button>AAL3。コードが 1 回限りだから</button>
+      </div>
+      <p class="why">メールの OTP は、TOTP かパスキーを登録した人の予備に限り、AAL2 に数えません（ADR-0021）。本家との互換のため <code>amr</code> には <code>mfa</code> を入れるので、水準は <code>acr</code> で判断します。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/mfa-and-passkeys.md">mfa-and-passkeys.md</a> の 3・6 節（対応の表と step-up の決定表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0021-authenticator-model-and-assurance-levels.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0023-otp-and-recovery-codes.md">ADR-0023</a>。</div>
+  </section>
+
+  <section class="s" id="passkeys">
+    <h2>WebAuthn とパスキー</h2>
+    <p><a class="t" href="#g-webauthn">WebAuthn</a> は、ブラウザと端末の認証器で公開鍵暗号のログインをする標準です。端末が秘密鍵を持ち、サーバーは公開鍵だけを持ちます。署名は <a class="t" href="#g-rpid">RP ID</a> とページの origin に結び付くので、偽のドメインでは使えず、フィッシングに強いのです。</p>
+    <div class="stepper">
+      <ol>
+        <li>識別子の画面を出すときに、サーバーが 1 回限りのチャレンジを作り、ブラウザで条件付きの UI（<code>mediation: "conditional"</code>）を待たせる。</li>
+        <li>利用者が入力欄の自動入力の候補から<a class="t" href="#g-passkey">パスキー</a>を選び、端末の生体認証か PIN で本人を確かめる（<a class="t" href="#g-uv">UV</a>）。</li>
+        <li>認証器が、チャレンジ・origin・RP ID のハッシュに秘密鍵で署名して返す。</li>
+        <li>サーバーが公開鍵で署名を確かめ、チャレンジ・origin・RP ID・UP/UV のフラグを照合する。</li>
+        <li>セッションに <code>amr</code> と AAL2 を記録する。UV 付きのパスキーは、所持と本人の確認を 1 回で済ませるので、単独で MFA を満たす（本家は既定で追加の MFA を求める）。</li>
+      </ol>
+    </div>
+    <ul>
+      <li data-frag><strong>同期するパスキーと端末に固定の鍵。</strong>クラウドで複製されうるものは BE フラグが立ちます。NIST は同期するパスキーを AAL2 までとし、MVP は AAL3 を主張しません。</li>
+      <li data-frag><strong>RP ID は後から変えられない。</strong>テナントで最初にパスキーを有効にしたときのホスト名に固定し、後から足したカスタムドメインは Related Origin Requests で受けます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/mfa-and-passkeys.md">mfa-and-passkeys.md</a> の 5.2 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0022-webauthn-and-passkeys.md">ADR-0022</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/connections.md">connections.md</a> の 4.1.1 節（パスキーだけのユーザー）。</div>
+  </section>
+
+  <section class="s" id="attack">
+    <h2>攻撃の防御</h2>
+    <p>ログインの画面は、常に自動化された攻撃を受けます。代表は 2 つです。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-bruteforce">ブルートフォース</a></h3><p>1 つのアカウントに、多くのパスワードを試す。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-stuffing">クレデンシャルスタッフィング</a></h3><p>他のサービスから漏れたメールアドレスとパスワードの組を、多くのアカウントに 1 回ずつ試す。使い回しを突く。</p></div>
+    </div>
+    <div class="stepper">
+      <ol>
+        <li>エッジ：WAF が IP の評判とレートで明らかな攻撃を落とす。</li>
+        <li>段 1・不審な IP：IP ごとのトークンのバケツ。ログインの失敗は既定で 1 日 100 回。空になったら 429。</li>
+        <li>段 2・ボット：リスクの点数が高ければ、自前の <a class="t" href="#g-pow">proof-of-work</a> のチャレンジをブラウザに解かせる（画像のパズルなし）。</li>
+        <li>段 3・ブルートフォース：「識別子 × IP」の失敗が既定 10 回でブロック。ユーザーがいなくても同じに数え、同じ画面を返す。</li>
+        <li>ここまで通ってから、初めて Argon2id で照合する。成功したら漏えいしたパスワードを調べる。</li>
+      </ol>
+    </div>
+    <div class="callout warn"><span class="label">日本の携帯回線</span><a class="t" href="#g-cgnat">CGNAT</a> では、多くの利用者が 1 つの IP を共有します。IP だけで止めると正規の利用者を締め出すため、ログインに成功したことのあるブラウザには「既知の端末」の Cookie を出し、別に数えます。目標は、攻撃の 99% 以上を止め、誤ブロックを 0.1% 以下にすることです（K5）。新しい防御は「監視」のモードで件数を見てから有効にできます。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/attack-protection.md">attack-protection.md</a> の 3〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0024-attack-protection-counters-and-enforcement.md">ADR-0024</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0026-bot-detection-and-challenge.md">ADR-0026</a>。</div>
+  </section>
+
+  <section class="s" id="tenancy">
+    <h2>テナント・ホスト名・止まらない認証の経路</h2>
+    <p>テナントは環境（開発・ステージング・本番）ごとに作り、ユーザー・鍵・セッションを共有しません。その上に、請求と契約の単位の「アカウント」を置きます。テナントは <code>&lt;tenant&gt;.jp.&lt;brand&gt;.&lt;domain&gt;</code> のホスト名を持ち、これがトークンの <a class="t" href="#g-issuer"><code>iss</code></a> になります。</p>
+    <ul>
+      <li data-frag><strong>ホスト名からテナントを決めてから DB を読む。</strong>対応表は各プロセスのメモリーに持ちます。テナントの分け方そのもの（RLS）は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</li>
+      <li data-frag><strong>テナントの名前は再利用しない。</strong>別の顧客が同じ名前を取ると、<code>iss</code> が同じなので、古いアプリがそのトークンを信じてしまいます。</li>
+      <li data-frag><strong>カスタムドメインは別の <code>iss</code> と別の Cookie。</strong>標準のホスト名と混ぜると、SSO が効きません。</li>
+    </ul>
+    <pre class="mermaid">flowchart LR
+  E["CloudFront + WAF"] -- "認証の経路" --> A["Auth"]
+  A -- "相互 TLS" --> S["Signer"]
+  E -- "管理の経路" --> M["Management API"]
+  A --> DB[("Aurora")]
+  M --> DB
+  A -. "失われてもよい" .-> V[("Valkey")]</pre>
+    <p>認証の経路と管理の経路は、入口から DB の接続まで分けます。依存先ごとに縮退を決めておき、たとえば Valkey が落ちたらセッションを DB から読み、KMS が落ちてもメモリーの鍵で署名を続けます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0002-tenancy-and-isolation.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0005-authentication-path-availability.md">ADR-0005</a>（縮退の表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0039-hostname-resolution-and-issuer.md">ADR-0039</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/tenants-and-applications.md">tenants-and-applications.md</a> の 3 節。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>法令の枠組み（法務の確認待ち）</h2>
+    <p>認証基盤は、テナントのエンドユーザーの個人データを大量に預かります。設計の文書は法的な結論を出さず、<strong>どの結論にも対応できる形</strong>にし、確認が済むまで関係する spec を承認しません。</p>
+    <table>
+      <tr><th>法令</th><th>論点の枠組み</th><th>状態</th></tr>
+      <tr><td>個人情報保護法</td><td>テナントからの<a class="t" href="#g-itaku">委託</a>か、自ら取得か。海外の IdP・送信事業者などの「外国にある第三者」への提供。漏えい等の報告を誰が行うか（L1）。ログの保持（L5）、データの所在（L6）、委託の契約（L7）</td><td>法務の確認待ち</td></tr>
+      <tr><td>電気通信事業法</td><td>ログインの画面が端末の情報を外部へ送るときの<a class="t" href="#g-gaibu">外部送信規律</a>の公表を誰が負うか（L2）。メールの送信の代行が「他人の通信の媒介」に当たるか（L3）</td><td>法務の確認待ち</td></tr>
+      <tr><td>SMS の送信</td><td>送信事業者との契約、送信元の表示、関係する法令（L4）</td><td>法務の確認待ち（MVP の後）</td></tr>
+      <tr><td>規約の同意</td><td>同意を誰の責任で、どう記録するか。未成年の扱い（L8）</td><td>法務の確認待ち</td></tr>
+    </table>
+    <p>ほかに、漏えいしたパスワードのデータセットの利用の条件と、署名鍵の失効の権限を契約にどう書くかも、法務の確認待ちです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a> の「法務の確認待ち」の表（承認を止める spec の列）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/security.md">security.md</a> の 13 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0055-data-retention-and-deletion.md">ADR-0055</a>。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>全部で 92 表（MVP 73）ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>tenant_id</code> を持ちます。</p>
+    <pre class="mermaid">erDiagram
+  tenants ||--o{ clients : "has"
+  tenants ||--o{ connections : "has"
+  tenants ||--|{ signing_keys : "signs with"
+  users ||--|{ user_identities : "has"
+  connections ||--o{ user_identities : "authenticates"
+  users ||--o{ authenticators : "enrolls"
+  users ||--o{ sessions : "signs in"
+  sessions |o--o{ refresh_token_families : "binds"
+  clients ||--o{ refresh_token_families : "holds"
+  refresh_token_families ||--|{ refresh_tokens : "rotates"
+  users {
+    uuid tenant_id PK
+    uuid id PK
+    text user_id UK "sub"
+  }
+  user_identities {
+    uuid user_pk FK
+    uuid connection_id FK
+    text provider_user_id
+  }
+  sessions {
+    uuid user_pk FK
+    bytea secret_hash "SHA-256 of cookie"
+    text sid
+  }
+  refresh_token_families {
+    uuid session_id
+    text binding
+    timestamptz revoked_at
+  }
+  refresh_tokens {
+    bytea token_hash PK
+    uuid family_id FK
+    int seq
+    timestamptz used_at
+  }
+  signing_keys {
+    text kid PK
+    text state
+  }</pre>
+    <ul>
+      <li><strong>内部の結合は <code>user_pk</code>（<code>users.id</code>）、外に出すのは <code>user_id</code>（<code>sub</code>）。</strong>UUIDv7 は作成の時刻を含むので外に出しません。</li>
+      <li>秘密は平文で持ちません。<code>*_hash</code> は SHA-256（高エントロピーの秘密）、パスワードは Argon2id、戻す必要のある秘密は暗号文です。</li>
+      <li><code>refresh_tokens</code> は再利用の検知のため、使用済みの行も系列が消えるまで残します。</li>
+      <li>ホスト名の対応表や <code>outbox</code> など、テナントの外（RLS の外）の表は data-model.md の 3 節に全部並んでいます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/data-model.md">data-model.md</a> の 2〜4 節と、<a href="https://github.com/shoito/rebuilds/tree/main/systems/auth0/docs/architecture/data-model">data-model/</a> の領域ごとの定義。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せていますが、標準の指針（RFC 9700・NIST）を優先して変えたところがあります。</p>
+    <table>
+      <tr><th>本家</th><th>この設計</th></tr>
+      <tr><td>暗黙フロー・パスワードのグラントを出せる</td><td>認可コード＋PKCE（S256）だけ</td></tr>
+      <tr><td>コールバックにワイルドカードを許す</td><td>完全一致だけ</td></tr>
+      <tr><td>HS256 で署名できる。クライアントシークレットをいつでも表示</td><td>HS256 なし。シークレットは作成時に 1 回だけ表示し、ハッシュで持つ</td></tr>
+      <tr><td><code>user_id</code> に接続の種類を含む</td><td>接続から独立した <code>usr_…</code></td></tr>
+      <tr><td>パスキーの後も既定で MFA を求める</td><td>UV 付きのパスキーは単独で MFA を満たす</td></tr>
+      <tr><td>埋め込み型のログイン（Lock）、プッシュの認証アプリ（Guardian）、SMS</td><td>持たない（SMS は MVP の後）</td></tr>
+    </table>
+    <p>ドメイン・ヘッダー・Cookie・クレームの名前空間・トークンの接頭辞には本家の名前を使わず、<code>&lt;brand&gt;</code>・<code>&lt;Brand&gt;</code> と書きます（例：<code>__Host-&lt;brand&gt;_session</code>、<code>&lt;Brand&gt;-RateLimit-Reason</code>）。本家から移るテナントの既存の <code>user_id</code> は、顧客のデータとしてそのまま受け取ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a> の Non-goals、各領域の文書の「本家の振る舞い」の節、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-ciam">CIAM</dt><dd>Customer Identity and Access Management。自社のサービスの利用者（顧客）のログインと認可を扱う分野。社員向けの IdP とは利用者の数と使われ方が違う。</dd>
+      <dt id="g-oauth">OAuth 2.0</dt><dd>パスワードを渡さずに、アプリへ API を呼ぶ許可を委ねる認可の標準（RFC 6749）。</dd>
+      <dt id="g-oidc">OpenID Connect</dt><dd>OAuth 2.0 の上に、ログインした人を ID トークンで伝える認証の層を足した標準。</dd>
+      <dt id="g-as">認可サーバー</dt><dd>利用者を認証し、トークンを発行するサーバー。本システムそのもの。</dd>
+      <dt id="g-op">OP</dt><dd>OpenID Provider。OIDC で ID を証明する側。認可サーバーと同じもの。</dd>
+      <dt id="g-rp">RP</dt><dd>Relying Party。OP の証明（ID トークン）を信じてログインさせるアプリ。</dd>
+      <dt id="g-idp">IdP</dt><dd>Identity Provider。利用者の ID を確かめて証明するサービス。本システムも、Google・LINE なども IdP。</dd>
+      <dt id="g-jwt">JWT</dt><dd>JSON Web Token。ヘッダー・中身・署名を base64url でつないだトークン。中身は誰でも読め、署名で改ざんを検知する。</dd>
+      <dt id="g-idtoken">ID トークン</dt><dd>誰が・いつ・どの手段でログインしたかをアプリに伝える JWT。API の呼び出しには使わない。</dd>
+      <dt id="g-accesstoken">アクセストークン</dt><dd>API を呼ぶ許可を表すトークン。宛先の API（<code>aud</code>）とスコープを持つ。</dd>
+      <dt id="g-refreshtoken">リフレッシュトークン</dt><dd>ログインし直さずに新しいアクセストークンを得るための、長命で不透明なトークン。</dd>
+      <dt id="g-scope">スコープ</dt><dd>トークンで許す操作の範囲を表す名前（<code>openid</code>、<code>read:orders</code> など）。</dd>
+      <dt id="g-pkce">PKCE</dt><dd>Proof Key for Code Exchange（RFC 7636）。認可の要求でハッシュを送り、交換のときに元の値を見せて、コードの横取りを防ぐ。</dd>
+      <dt id="g-state">state</dt><dd>アプリが認可の要求に付け、戻りで同じ値かを確かめる乱数。CSRF を防ぐ。</dd>
+      <dt id="g-nonce">nonce</dt><dd>アプリが要求に付け、ID トークンに入って戻る乱数。ID トークンの使い回しを防ぐ。</dd>
+      <dt id="g-redirecturi">redirect_uri</dt><dd>認可の結果（コード）をアプリへ返す URL。事前に登録したものだけを使える。</dd>
+      <dt id="g-public">公開クライアント</dt><dd>秘密を安全に持てないアプリ（SPA、ネイティブ）。クライアントの認証は <code>none</code> で、PKCE が必須。</dd>
+      <dt id="g-confidential">機密クライアント</dt><dd>サーバーで秘密や秘密鍵を持てるアプリ。トークンのエンドポイントで自分を認証する。</dd>
+      <dt id="g-device">デバイス認可グラント</dt><dd>入力の限られた端末のための OAuth のフロー（RFC 8628）。別の端末でコードを入力して承認する。</dd>
+      <dt id="g-implicit">暗黙フロー</dt><dd>トークンを URL のフラグメントで直接返す旧来のフロー。漏えいしやすく、非推奨。</dd>
+      <dt id="g-ropg">ROPG</dt><dd>Resource Owner Password Credentials Grant。アプリが利用者のパスワードを受け取ってトークンに替える旧来のグラント。非推奨。</dd>
+      <dt id="g-rfc9700">RFC 9700</dt><dd>OAuth 2.0 Security Best Current Practice。OAuth の安全な使い方の現行の指針。</dd>
+      <dt id="g-jwks">JWKS</dt><dd>JSON Web Key Set。署名を確かめるための公開鍵の一覧。</dd>
+      <dt id="g-kid">kid</dt><dd>Key ID。JWT がどの鍵で署名されたかを示す値。本システムは公開鍵の thumbprint（RFC 7638）。</dd>
+      <dt id="g-discovery">discovery</dt><dd><code>/.well-known/openid-configuration</code> にある、エンドポイントと対応する機能の一覧。ライブラリはここから設定を読む。</dd>
+      <dt id="g-signer">Signer</dt><dd>本システムで、テナントの署名鍵を復号して署名する唯一のサービス。外からの要求を受けない。</dd>
+      <dt id="g-envelope">エンベロープ暗号化</dt><dd>データをデータキー（DEK）で暗号化し、DEK を KMS の鍵で暗号化して一緒に保存する方式。</dd>
+      <dt id="g-sso">SSO</dt><dd>Single Sign-On。1 回のログインで、同じ IdP を使う複数のアプリに入れること。</dd>
+      <dt id="g-rotation">ローテーション</dt><dd>リフレッシュトークンを使うたびに新しいものに替え、古いものを使用済みにすること。</dd>
+      <dt id="g-family">系列</dt><dd>1 回のログインから、ローテーションで続くリフレッシュトークンの列。再利用を検知したら全体を失効させる。</dd>
+      <dt id="g-ul">Universal Login</dt><dd>本家の呼び名で、IdP のドメインで出すホスト型のログインの画面。</dd>
+      <dt id="g-transaction">トランザクション</dt><dd>ここでは、<code>/authorize</code> から認可の応答までのログインの途中の状態（<code>login_transactions</code> の 1 行）。DB のトランザクションとは別。</dd>
+      <dt id="g-connection">接続</dt><dd>資格情報を確かめて外部の ID を返す部品。データベース・ソーシャル・（後に）エンタープライズの種類がある。</dd>
+      <dt id="g-identity">ID（identity）</dt><dd>接続ごとの利用者の ID（<code>user_identities</code> の 1 行）。1 人のユーザーが複数持てる。</dd>
+      <dt id="g-linking">ID のリンク</dt><dd>別々の接続の ID を、同じ 1 人のユーザーにまとめること。</dd>
+      <dt id="g-nist">NIST SP 800-63B-4</dt><dd>米国の国立標準技術研究所のデジタル ID の指針のうち、認証を扱う巻。パスワード・MFA・AAL を定める。</dd>
+      <dt id="g-argon2id">Argon2id</dt><dd>計算とメモリーを多く使う、パスワードのハッシュの方式。総当たりを遅くする。</dd>
+      <dt id="g-pepper">pepper</dt><dd>パスワードのハッシュに加える秘密の鍵。DB と別に保管し、DB だけが漏れても総当たりできなくする。</dd>
+      <dt id="g-kanon">k-匿名性</dt><dd>ここでは、ハッシュの先頭だけで範囲を問い合わせ、同じ範囲の多数の候補に紛れさせて、照会の中身を相手に知らせない方式。</dd>
+      <dt id="g-enumeration">アカウントの列挙</dt><dd>応答の違いから、あるメールアドレスが登録済みかを探る攻撃。</dd>
+      <dt id="g-mfa">MFA</dt><dd>多要素認証。種類の違う 2 つ以上の要素で本人を確かめること。</dd>
+      <dt id="g-totp">TOTP</dt><dd>Time-based One-Time Password（RFC 6238）。共有した種と時刻から、30 秒ごとに 6 桁のコードを作る。</dd>
+      <dt id="g-aal">AAL</dt><dd>Authentication Assurance Level。NIST の認証の確かさの 3 段階。AAL2 は 2 要素、AAL3 はさらに強い認証器を求める。</dd>
+      <dt id="g-amr">amr</dt><dd>Authentication Methods References。使った認証の手段の一覧のクレーム（RFC 8176）。</dd>
+      <dt id="g-acr">acr</dt><dd>Authentication Context Class Reference。達成した認証の水準を表すクレーム。</dd>
+      <dt id="g-stepup">step-up</dt><dd>より高い水準が要る操作の前に、足りない要素だけを追加で求めること。</dd>
+      <dt id="g-webauthn">WebAuthn</dt><dd>ブラウザから端末の認証器を使い、公開鍵暗号でログインする W3C の標準。</dd>
+      <dt id="g-passkey">パスキー</dt><dd>発見可能で、本人の確認（UV）付きの WebAuthn の資格情報。識別子もパスワードも入れずにログインできる。</dd>
+      <dt id="g-rpid">RP ID</dt><dd>WebAuthn の資格情報が結び付くドメイン。違うドメインのページからは使えない。</dd>
+      <dt id="g-uv">UV</dt><dd>User Verification。認証器が生体認証や PIN で本人を確かめたことを示すフラグ。UP（User Presence）は触れただけ。</dd>
+      <dt id="g-bruteforce">ブルートフォース</dt><dd>1 つのアカウントに対し、パスワードを総当たりで試す攻撃。</dd>
+      <dt id="g-stuffing">クレデンシャルスタッフィング</dt><dd>他で漏れた ID とパスワードの組を、別のサービスで大量に試す攻撃。</dd>
+      <dt id="g-pow">proof-of-work</dt><dd>ブラウザに一定の計算をさせてから送信を受け付ける仕組み。1 回は軽く、大量の自動化には重い。</dd>
+      <dt id="g-cgnat">CGNAT</dt><dd>Carrier-Grade NAT。携帯の事業者などが、多くの利用者に同じグローバル IP を共有させる仕組み。</dd>
+      <dt id="g-issuer">issuer（iss）</dt><dd>トークンの発行者を表す URL。受け手は、信じる発行者かを <code>iss</code> で確かめる。</dd>
+      <dt id="g-itaku">委託</dt><dd>個人情報保護法で、個人データの取り扱いを他の事業者に任せること。任せた側が監督の責任を負う。</dd>
+      <dt id="g-gaibu">外部送信規律</dt><dd>電気通信事業法の規律で、利用者の端末の情報を外部へ送らせるときに、送る内容や送り先の公表などを求めるもの。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、Non-goals、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、主な決定の一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0002-tenancy-and-isolation.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0003-token-formats-and-signing-keys.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0004-credential-storage.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0005-authentication-path-availability.md">0005</a> <span>— テナント、トークンと鍵、資格情報、可用性の柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/authentication-flows.md">authentication-flows.md</a> <span>— エンドポイント、PKCE、グラント、トークン</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/sessions-and-sso.md">sessions-and-sso.md</a> <span>— セッション、SSO、ログアウト</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/universal-login.md">universal-login.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/connections.md">connections.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/users-and-profiles.md">users-and-profiles.md</a> <span>— 画面、接続、ユーザーとリンク</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/mfa-and-passkeys.md">mfa-and-passkeys.md</a> <span>— 要素、AAL、パスキー、step-up</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/attack-protection.md">attack-protection.md</a> <span>— 判定の段、漏えいの照合、ボット</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/keys-and-secrets.md">keys-and-secrets.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/tenants-and-applications.md">tenants-and-applications.md</a> <span>— 鍵の階層と JWKS、テナントとアプリの登録</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/security.md">security.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/architecture/data-model.md">data-model.md</a> <span>— 脅威モデルと RFC 9700 のチェックリスト、表の正本</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/auth0/docs/decisions">decisions/</a> <span>— 残りの ADR（管理の経路、ログ、メール、基盤、MVP の後の拡張）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
