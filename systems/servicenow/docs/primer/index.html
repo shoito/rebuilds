@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ServiceNow の前提知識</title>
+<meta name="description" content="ServiceNow の再構築の設計の文書を読む前に知っておくとよい、IT サービス管理（ITSM・ITIL）の分野の概念・用語・業界の決まり。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · ServiceNow · 前提知識</p>
+    <h1>ServiceNow の設計を読む前に</h1>
+    <p class="lead">IT 部門の「依頼と障害の受け付け台帳」に見えますが、中身は ITIL という業界の型に沿った業務の流れと、その下の「どんな業務の表でも作れる記録の基盤」です。インシデント・問題・変更・要求の違い、SLA の計時、CMDB の識別、継承するテーブル、ACL といった、設計の文書が説明なしに使う知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7、セル など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · ServiceNow · 前提知識</p>
+    <h2>ServiceNow の設計を読む前に</h2>
+    <p class="lead">ITIL の業務・SLA と業務カレンダー・CMDB・継承するテーブルの前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>ServiceNow は何をするサービスか</h2>
+    <p>ServiceNow は、企業の IT 部門が受ける<strong>障害の報告と依頼</strong>を 1 つの記録にまとめ、誰が・いつまでに・何をするかを管理する SaaS です。この分野を <a class="t" href="#g-itsm">ITSM</a>（IT サービス管理）と呼びます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>サービスデスク</h3><p>電話・メール・ポータルで受けた障害と依頼を、分類し、担当のグループに割り当て、解決する。</p></div>
+      <div class="card" data-frag><h3>運用・開発のチーム</h3><p>繰り返す障害の原因を調べ、本番の変更を計画し、承認を得て実施する。</p></div>
+      <div class="card" data-frag><h3>社員（依頼者）</h3><p>ポータルで PC やアカウントを申請し、自分のチケットの状況を見る。IT に詳しくない前提。</p></div>
+    </div>
+    <p>ほかに、変更を承認する人、設定をする管理者、証跡を確かめる監査の担当がいます。再構築の S1 の規模は、テナント 300（本番 100）、社員 100 万人、担当者 3 万人、チケットの作成 20 万件/日です。<strong>平日の 9 時に SLA の期限とタイマーが一斉に来る</strong>、という偏りも設計の前提です。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a> の「Affected users and systems」と MVP の範囲、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/README.md">architecture/README.md</a> の 2 節「規模の段階」。</div>
+  </section>
+
+  <section class="s" id="platform">
+    <h2>アプリの下にある「記録の基盤」</h2>
+    <p>ServiceNow の特徴は、ITSM のアプリが<strong>汎用の記録の基盤</strong>の上に載っていることです。インシデントも変更も、基盤から見れば「テーブルの 1 行」にすぎません。</p>
+    <div class="compare">
+      <div data-frag><h3>記録の基盤</h3><p><a class="t" href="#g-dictionary">データ辞書</a>（テーブルとフィールドの定義）、フォームとリスト、<a class="t" href="#g-acl">ACL</a>、ワークフロー、通知、レポート、REST API、監査の履歴。</p></div>
+      <div data-frag><h3>ITSM のアプリ</h3><p>インシデント・問題・変更・要求・ナレッジ・CMDB・SLA。基盤の上の「テーブルの定義 ＋ 状態の流れ ＋ 既定の設定」の束。</p></div>
+    </div>
+    <p>管理者は、画面でフィールド・テーブル・フォーム・承認・SLA を足します。つまり<strong>振る舞いの多くがコードではなく<a class="t" href="#g-metadata">メタデータ</a>で決まります</strong>。本家はここにスクリプト（サーバーで動くコード）も書かせますが、再構築ではテナントに任意のコードを書かせず、ノーコードの設定だけにします。</p>
+    <div class="callout key"><span class="label">要点</span>設計の文書の「メタデータが振る舞いを決める」「Record Service がすべての書き込みの唯一の入口」は、この 2 層の構造を自前で作るための原則です。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/README.md">architecture/README.md</a> の 1.2 節の原則、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0001-platform-and-stack.md">ADR-0001</a>（スクリプトの API と互換にしない）。</div>
+  </section>
+
+  <section class="s" id="itil">
+    <h2>ITIL：インシデント・問題・変更・要求の違い</h2>
+    <p><a class="t" href="#g-itil">ITIL</a> は IT サービス管理の実務の型をまとめた枠組みです。ITIL 4 は 34 のプラクティスを持ち、この題材はそのうち<a class="t" href="#g-incident">インシデント</a>・<a class="t" href="#g-problem">問題</a>・<a class="t" href="#g-change">変更</a>・<a class="t" href="#g-request">サービス要求</a>などの業務を作ります。言葉が日常語と少し違うので、まずここをそろえます。</p>
+    <div class="tabs">
+      <div data-tab="インシデント"><p><strong>計画外のサービスの中断や品質の低下。</strong>例：「メールが送れない」。目的は<strong>早く元に戻すこと</strong>で、原因の究明ではありません。再起動での回復も立派な解決です。</p></div>
+      <div data-tab="問題"><p><strong>1 つ以上のインシデントの原因（または原因になりうるもの）。</strong>例：「メールサーバーのディスクが毎週あふれる」。根本原因を調べ、恒久の対策につなげます。原因が分かり回避策がある状態を<a class="t" href="#g-knownerror">既知のエラー</a>と呼びます。</p></div>
+      <div data-tab="変更"><p><strong>サービスに影響しうるものの追加・修正・削除。</strong>例：「メールサーバーのディスクを増設する」。リスクを評価し、権限のある人の承認を得てから実施します。</p></div>
+      <div data-tab="サービス要求"><p><strong>障害ではない、決まった手順で応える依頼。</strong>例：「新しい PC がほしい」「パスワードを再設定したい」。カタログから選んで申請し、承認と作業で応えます。</p></div>
+    </div>
+    <pre class="mermaid">flowchart LR
+  I1[インシデント] --> P[問題]
+  I2[インシデント] --> P
+  P -- 恒久の対策 --> C[変更]
+  P -- 回避策 --> K[既知のエラーの記事]
+  R[サービス要求] -.別の流れ.-> F[実行のタスク]</pre>
+    <div class="quiz" data-answer="2">
+      <p class="q">同じ VPN の切断が今週 5 回起き、そのたびに再接続で直しています。原因を調べる作業は、どの記録で追いますか？</p>
+      <div class="opts">
+        <button>6 件目のインシデント</button>
+        <button>問題（5 件のインシデントを結ぶ）</button>
+        <button>変更</button>
+        <button>サービス要求</button>
+      </div>
+      <p class="why">インシデントは「戻すこと」が目的で、再接続で解決済みです。原因の調査は問題として起票し、インシデントを結びます。対策でルーターの設定を変えるなら、それは問題から作る変更です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> の 1 節（扱う範囲）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a> の Constraints（ITIL 4 の用語を使う）。</div>
+  </section>
+
+  <section class="s" id="incident">
+    <h2>インシデントの流れと優先度</h2>
+    <p>インシデントは、受け付けから完了まで決まった状態を進みます。「解決」と「完了」を分けるのが ITSM の習慣です。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>新規</strong>：ポータル・メール・API・担当者の入力で受け付ける。割り当ての規則が担当のグループを決める。</li>
+        <li><strong>対応中</strong>：担当者が着手する。</li>
+        <li><strong>保留</strong>：依頼者の回答待ち・ベンダー待ちなど、<strong>理由を付けて</strong>止める。理由で SLA を止めるかが変わる。</li>
+        <li><strong>解決</strong>：担当者が直した。依頼者の確認を待つ。一定の期間（既定 7 日）がたつと自動で完了。</li>
+        <li><strong>完了</strong>：終わり。再オープンはしない（新しく起票して結ぶ）。</li>
+      </ol>
+    </div>
+    <p><strong>優先度は人が選ぶ値ではありません。</strong><a class="t" href="#g-impact">影響度</a>（どれだけ広く効くか）と<a class="t" href="#g-urgency">緊急度</a>（どれだけ急ぐか）の表から導きます。</p>
+    <table>
+      <tr><th>影響度＼緊急度</th><th>1 高</th><th>2 中</th><th>3 低</th></tr>
+      <tr><td>1 高</td><td>1 緊急</td><td>2</td><td>3</td></tr>
+      <tr><td>2 中</td><td>2</td><td>3</td><td>4</td></tr>
+      <tr><td>3 低</td><td>3</td><td>4</td><td>4</td></tr>
+    </table>
+    <p>この 3 × 3 は本家の既定と同じ形です。優先度を直接書き換えるには、専用のロールと理由が要ります（上書き）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> の 4 節（DT-INC-001）と 5 節（DT-PRIO-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0022-process-state-machines.md">ADR-0022</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0023-priority-matrix-and-major-incident.md">ADR-0023</a>。</div>
+  </section>
+
+  <section class="s" id="problem">
+    <h2>メジャーインシデント・問題・既知のエラー</h2>
+    <div class="cards">
+      <div class="card" data-frag><h3>メジャーインシデント</h3><p>全社のメールが止まった、のような<a class="t" href="#g-major">重大な障害</a>。宣言すると当番の呼び出し・経営への連絡・定期の状況の更新が始まる重い判断なので、規則は<strong>候補を作るだけ</strong>で、昇格は人が決めます。</p></div>
+      <div class="card" data-frag><h3>親子のインシデント</h3><p>同じ障害の報告が何百件も来たら、1 件を親にして残りを子に結ぶ。親を解決すると子もまとめて解決します。</p></div>
+      <div class="card" data-frag><h3>問題と RCA</h3><p>問題は「評価 → 根本原因の分析 → 修正中 → 解決」と進む。<a class="t" href="#g-rca">根本原因の分析</a>の結果、恒久の対策は変更として実施します。</p></div>
+    </div>
+    <p><a class="t" href="#g-workaround">回避策</a>が分かったら、原因が不明でも既知のエラーにでき、その記事をナレッジに公開してサービスデスクが使います。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">根本原因を調査中ですが、回避策は分かりました。再構築の設計で、この問題はどう表しますか？</p>
+      <div class="opts">
+        <button>状態を「既知のエラー」に進める</button>
+        <button>原因が分かるまで既知のエラーにはできない</button>
+        <button>状態は「根本原因の分析」のまま、既知のエラーの印を立てる</button>
+      </div>
+      <p class="why">既知のエラーを状態にすると「修正中だが既知のエラー」を表せません。そのため状態ではなく印（<code>known_error</code>）にし、条件は回避策があることだけです。本家の今のモデルも状態に持ちません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> の 6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/knowledge.md">knowledge.md</a> の 5 節（既知のエラーの記事）。</div>
+  </section>
+
+  <section class="s" id="change">
+    <h2>変更：種類・リスク・CAB</h2>
+    <p>本番の変更は障害の大きな原因なので、ITIL は種類ごとに承認の重さを変えます。</p>
+    <div class="tabs">
+      <div data-tab="標準"><p>手順が決まり、リスクの低い、繰り返す変更（例：決まった手順のパッチ）。<strong>雛形を一度承認すれば、個々の変更は承認を通らない。</strong>雛形の承認が証跡になります。</p></div>
+      <div data-tab="通常"><p>リスクを評価し、技術の承認（担当のグループの管理者）と、リスクに応じて変更の管理者または <a class="t" href="#g-cab">CAB</a> の承認を経て実施します。</p></div>
+      <div data-tab="緊急"><p>障害の復旧などで待てない変更。<a class="t" href="#g-ecab">ECAB</a> の承認で進め、<strong>実施の後に CAB の事後の承認</strong>を完了の条件にします。</p></div>
+    </div>
+    <div class="stepper">
+      <ol>
+        <li><strong>新規</strong>：対象の CI、予定の時刻、実施・切り戻し・テストの計画を書く。</li>
+        <li><strong>評価</strong>：リスクを規則と質問票で求め、<strong>高いほう</strong>を採る。</li>
+        <li><strong>承認</strong>：種類 × リスクの決定表で、誰の何段の承認かが決まる。</li>
+        <li><strong>予定済み</strong>：<a class="t" href="#g-blackout">禁止期間</a>や他の変更との衝突を確かめる。</li>
+        <li><strong>実施 → 振り返り → 完了</strong>：結果（成功・失敗）を残す。振り返りと完了は取り消せない。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">深夜の障害で、緊急の変更をすぐ実施したい。CAB は朝まで集まれません。設計ではどうなりますか？</p>
+      <div class="opts">
+        <button>緊急の変更は承認なしで実施へ進める</button>
+        <button>承認の期限切れで自動の承認にする</button>
+        <button>ECAB の 1 人の承認で進め、事後の CAB の承認を完了の条件にする</button>
+      </div>
+      <p class="why">intent の「変更の記録は、承認のないまま実施に進まない」を守るため、どの種類も承認なしに実施へ入れません。変更のテーブルでは期限切れの自動の承認も選べません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> の 8・9 節（DT-CHG-001〜003、DT-RISK-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0024-change-models-risk-and-cab.md">ADR-0024</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0025-change-schedule-and-conflict-detection.md">ADR-0025</a>。</div>
+  </section>
+
+  <section class="s" id="catalog">
+    <h2>サービスカタログ・要求・ナレッジ</h2>
+    <p>社員は<a class="t" href="#g-portal">ポータル</a>のカタログから品目を選び、<a class="t" href="#g-variable">変数</a>（入力の項目）に答えて申請します。1 回の申請（カート）は、3 段の記録になります。</p>
+    <pre class="mermaid">flowchart LR
+  REQ["要求（request）<br>1 回の申請"] --> RI1["要求の品目<br>ノート PC × 1"]
+  REQ --> RI2["要求の品目<br>モニター × 2"]
+  RI1 -- 実行のフロー --> T1["実行のタスク<br>キッティング"]
+  RI1 -- 実行のフロー --> T2["実行のタスク<br>配送"]
+  RI2 -- 実行のフロー --> T3["実行のタスク"]</pre>
+    <ul>
+      <li>品目ごとに承認とタスクの流れ（<a class="t" href="#g-fulfillment">実行</a>のフロー）が違うので、<a class="t" href="#g-ritm">要求の品目</a>が単位になる。</li>
+      <li>要求の状態は自分では持たず、子の要求の品目の状態から導く。</li>
+      <li>申請の前に、入力に合うナレッジの記事を見せて自分で解決してもらう（<a class="t" href="#g-deflection">自己解決</a>）。その割合が K8 の指標。</li>
+    </ul>
+    <p>ナレッジの記事は版を持ち、レビューと承認を経て公開します。承認者が見た本文と公開する本文を同じにするため、レビューに出した版の本文は変えません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/service-catalog-and-requests.md">service-catalog-and-requests.md</a> の 5 節（DT-REQ-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0029-request-item-task-model.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/knowledge.md">knowledge.md</a> の 3・7 節。</div>
+  </section>
+
+  <section class="s" id="sla">
+    <h2>SLA・OLA・UC と計時</h2>
+    <p><a class="t" href="#g-sla">SLA</a> は「この種類のインシデントには 4 業務時間以内に応答する」のような約束です。誰との約束かで呼び名が変わります。</p>
+    <table>
+      <tr><th>種類</th><th>約束の相手</th><th>例</th></tr>
+      <tr><td>SLA</td><td>サービスの利用者（社員・顧客）</td><td>P1 の解決は 4 時間</td></tr>
+      <tr><td><a class="t" href="#g-ola">OLA</a></td><td>社内のチーム どうし</td><td>ネットワークのチームは 2 時間で調査</td></tr>
+      <tr><td><a class="t" href="#g-uc">UC</a></td><td>外部の事業者</td><td>保守のベンダーが翌営業日に部品交換</td></tr>
+    </table>
+    <p>1 つのインシデントに、応答・解決・OLA など複数の<strong>計時</strong>が並行して動きます。計時は開始・一時停止・停止の条件で進みます。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> in_progress : 開始の条件
+  in_progress --> paused : 一時停止の条件
+  paused --> in_progress : 再開
+  in_progress --> completed : 停止の条件
+  paused --> completed : 停止の条件
+  in_progress --> cancelled : 取り消し・リセット
+  paused --> cancelled : 取り消し・リセット</pre>
+    <p>期限を過ぎると「違反」の印が立ちますが、計時は停止まで続きます。期限の 50%・75% で警告を出すのが既定です。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">担当者がインシデントを「保留（ベンダー待ち）」にしました。組み込みの既定で、依頼者向けの解決の SLA と、担当のグループの OLA はどうなりますか？</p>
+      <div class="opts">
+        <button>どちらも止まる</button>
+        <button>SLA は止まらず、OLA は止まる</button>
+        <button>SLA は止まり、OLA は止まらない</button>
+      </div>
+      <p class="why">ベンダー待ちは IT の側の都合なので、依頼者との約束（SLA）は止めません。SLA を止めるのは依頼者の回答待ちと解決だけです。担当のグループの OLA は、ベンダー待ちがグループの責任の外なので止めます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/sla-and-calendars.md">sla-and-calendars.md</a> の 6・7 節（DT-SLA-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> の 4.4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0021-sla-definitions-and-timers.md">ADR-0021</a>。</div>
+  </section>
+
+  <section class="s" id="calendar">
+    <h2>業務カレンダーと日本の祝日</h2>
+    <p>SLA の「4 時間」は、たいてい<strong>業務時間</strong>で数えます。期限は<a class="t" href="#g-calendar">業務カレンダー</a>（営業時間・タイムゾーン・祝日・会社の休日）から計算します。</p>
+    <div class="stepper">
+      <ol>
+        <li>カレンダー：平日 9:00〜18:00、Asia/Tokyo、国民の祝日、会社の休日 12/29〜1/3（テナントの既定）。</li>
+        <li>2026-09-18（金）17:00 に、業務時間 4 時間の SLA が始まる。金曜に 1 時間を使う。</li>
+        <li>19・20 日は週末。21 日は敬老の日、23 日は秋分の日、その間の 22 日は<a class="t" href="#g-kokumin">国民の休日</a>。</li>
+        <li>残り 3 時間を 24 日（木）の 9:00 から数え、期限は <strong>24 日 12:00</strong>。カレンダーなしなら 18 日 21:00。</li>
+      </ol>
+    </div>
+    <ul>
+      <li>祝日が日曜に当たると、後の平日が<a class="t" href="#g-furikae">振替休日</a>になる。内閣府の CSV では、振替休日も国民の休日も名称が「休日」。</li>
+      <li>内閣府の CSV は翌年の分までを収録し、翌々年の分は前年の 2 月ごろに載る。収録の外の日付は祝日なしで計算し、後で計算し直す。</li>
+      <li>計算し直しで期限が後ろに動いても、すでに起きた違反は取り消さない（<code>breach_disputed</code> として別に数える）。</li>
+    </ul>
+    <div class="callout warn"><span class="label">法務の確認待ち（L9）</span>内閣府の祝日の CSV を全テナントの SLA の計算に使い、原本を保存してよいか（公共データ利用規約の当てはめ、出典の表示の仕方）。確認が済むまで E5 の祝日の取り込みの spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/sla-and-calendars.md">sla-and-calendars.md</a> の 3〜5・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0019-business-calendar-and-pure-time-functions.md">ADR-0019</a>（純粋な関数 <code>addBusinessTime</code>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0020-japanese-holiday-data.md">ADR-0020</a>。</div>
+  </section>
+
+  <section class="s" id="cmdb">
+    <h2>CMDB：CI・関係・サービスのモデル</h2>
+    <p><a class="t" href="#g-cmdb">CMDB</a> は、サーバー・PC・ネットワーク機器・クラウドの資源・アプリ・サービスの台帳です。1 つ 1 つを <a class="t" href="#g-ci">CI</a>（構成アイテム）と呼び、CI どうしを<strong>関係</strong>で結びます。</p>
+    <pre class="mermaid">flowchart TB
+  BS["ビジネスのサービス<br>経費精算"] -- contains --> BSO["サービスの提供<br>経費精算・本社向け"]
+  BSO -- depends_on --> SI["サービスのインスタンス<br>経費精算・本番"]
+  SI -- depends_on --> DB["DB のインスタンス"]
+  APP["アプリのサーバー"] -- runs_on --> SV["Linux のサーバー"]
+  SI -- depends_on --> APP
+  DB -- runs_on --> SV</pre>
+    <ul>
+      <li><strong>影響の範囲</strong>：Linux のサーバーが落ちると、関係を逆にたどって「経費精算」が影響を受けると分かる。変更のリスクやメジャーインシデントの判断に使う。</li>
+      <li>CI にはクラスの階層がある（<code>ci</code> → <code>hardware</code> → <code>computer</code> → <code>server</code> → <code>linux_server</code>）。</li>
+      <li>サービスの形は、本家の <a class="t" href="#g-csdm">CSDM</a> の考え方に寄せる（ビジネスのサービス・その提供・サービスのインスタンス）。名前と範囲は再構築のもの。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/cmdb-and-reconciliation.md">cmdb-and-reconciliation.md</a> の 3・7〜9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0039-ci-relations-impact-traversal-and-service-model.md">ADR-0039</a>。</div>
+  </section>
+
+  <section class="s" id="reconcile">
+    <h2>識別と調整：取り込み元が食い違うとき</h2>
+    <p>CI の情報は、手入力・CSV・クラウドの API・資産管理のツールなど複数の<a class="t" href="#g-source">取り込み元</a>から届きます。同じサーバーが別の名前で届くこともあります。そこで 2 段で処理します。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong><a class="t" href="#g-identification">識別</a></strong>：届いたものが既存のどの CI かを、クラスごとの規則で探す。例：シリアル番号 ＋ メーカー → BIOS の UUID → MAC → FQDN の順。値は正規化する（<code>00:1A:2B…</code> と <code>001a2b…</code> を同じに）。</li>
+        <li>一致がなければ新しい CI を作る。<strong>2 つ以上の CI に一致したら推測で選ばず、保留にして人が統合する。</strong></li>
+        <li><strong><a class="t" href="#g-reconciliation">調整</a></strong>：一致した CI の属性ごとに、どの取り込み元の値を採るかを、取り込み元の優先度と<a class="t" href="#g-staleness">鮮度</a>で決める。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="1">
+      <p class="q">強い取り込み元 H が 1 日目に値 x、弱い取り込み元 L が 40 日目に値 y を観測しました（鮮度 30 日）。L の報告が先に、H の報告が後に届きました。属性の値は？</p>
+      <div class="opts">
+        <button>y（H の観測は最新の観測から 30 日より古い）</button>
+        <button>x（H のほうが強く、後から届いた）</button>
+        <button>届いた順で決まるので、どちらもありうる</button>
+      </div>
+      <p class="why">鮮度は届いた時刻ではなく、観測の時刻で測ります。取り込み元ごとの最新の観測を持ち、その集合から純粋な関数で選ぶので、届く順によらず y になります（NFR-005）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/cmdb-and-reconciliation.md">cmdb-and-reconciliation.md</a> の 4〜6 節（DT-CMDB-002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md">ADR-0037</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0038-attribute-reconciliation-per-source-state.md">ADR-0038</a>（ADR-0005 の調整の表を置き換えた）。</div>
+  </section>
+
+  <section class="s" id="tables">
+    <h2>継承するテーブルとデータ辞書</h2>
+    <p>ServiceNow のテーブルは、オブジェクト指向のクラスのように<strong>親を継承</strong>します。インシデント・問題・変更・要求は、どれも <code>task</code>（作業）の子です。</p>
+    <pre class="mermaid">flowchart TB
+  task --> incident
+  task --> problem
+  task --> change
+  task --> request
+  task --> request_item
+  task --> catalog_task
+  task --> change_task
+  task --> c_facilities_request["c_facilities_request<br>（テナントのクラス）"]</pre>
+    <ul>
+      <li>子は親のフィールド・ACL・ルール・SLA の対象を引き継ぐ。「担当のグループ」「番号」「状態」はすべての作業に共通。</li>
+      <li>テナントはフィールドや子のクラスを足せる。名前は <code>c_</code> で始める。</li>
+      <li>再構築では、<code>task</code> の階層を 1 つの物理の表に置き、組み込みのフィールドは型付きの列、テナントのフィールドは JSONB の <code>ext</code> に入れる。DDL は発行しない。</li>
+      <li>レコードの<a class="t" href="#g-class">クラス</a>は作成の後に変えない。番号（INC… など）は一意だが欠番はありうる。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/data-dictionary-and-tables.md">data-dictionary-and-tables.md</a> の 3・4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0003-table-hierarchy-and-extensible-schema.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0006-data-dictionary-and-field-types.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0007-physical-layout-and-extension-index.md">ADR-0007</a>。</div>
+  </section>
+
+  <section class="s" id="acl">
+    <h2>ロールと ACL：テーブル・行・フィールド</h2>
+    <p>ITSM では、同じインシデントでも見せてよい範囲が人で違います。依頼者には作業メモを見せない、人事の案件は人事のグループだけ、などです。ACL はこれを<strong>テーブル × 操作（作成・読み取り・書き込み・削除）</strong>の規則で書きます。</p>
+    <div class="compare">
+      <div data-frag><h3>行の規則</h3><p>そのレコードを読めるか。例：「依頼者は自分が依頼したものだけ」。</p></div>
+      <div data-frag><h3>フィールドの規則</h3><p>その項目を読めるか。行が読めても、作業メモや原価は読めないことがある。</p></div>
+    </div>
+    <ul>
+      <li>規則は 2 種：<code>deny_unless</code>（満たさなければ拒否）と <code>allow_if</code>（満たせば許可）。</li>
+      <li>クラスの継承に沿って探す。拒否は親のすべての段で効き、許可は最も近い段の規則を使う。</li>
+      <li><strong>許可の規則がなければ拒否</strong>（既定の拒否）。本家は規則がなければ許可が既定で、設定で拒否に変える。</li>
+      <li>読めない値は、その人にとって NULL として扱う。並べ替えや件数からも推測させない。出口（フォーム・リスト・レポート・検索・通知・API など）は 16 あり、すべて同じ判定を通す。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">ある人が読めないフィールド「原価」で、リストを並べ替えようとしました。どうなりますか？</p>
+      <div class="opts">
+        <button>本当の値で並べ、列の表示だけ隠す</button>
+        <button>その人にとって原価はすべて NULL として並べる</button>
+        <button>読めないことが分かるよう 403 を返す</button>
+      </div>
+      <p class="why">本当の値で並べると、並び順から値を推測できます。絞り込み・並べ替え・集計はすべて <code>visible(f)</code> の上で行います（ADR-0012）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/access-control.md">access-control.md</a> の 4・6 節（DT-ACL-001〜003）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0011-roles-groups-and-acl-evaluation.md">ADR-0011</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0012-acl-enforcement-at-every-exit.md">ADR-0012</a>。テナントの分離は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="workflow">
+    <h2>ワークフロー・承認・タイマー</h2>
+    <p>管理者は「レコードが作られたら → 条件 → 承認 → タスク → 通知 → 待ち」をノーコードの<a class="t" href="#g-flow">フロー</a>として組みます。承認には決まった規則があります。</p>
+    <table>
+      <tr><th>規則</th><th>承認に決まる条件</th></tr>
+      <tr><td><code>any</code></td><td>誰か 1 人が承認</td></tr>
+      <tr><td><code>all</code></td><td>全員が承認（1 人の却下で却下）</td></tr>
+      <tr><td><code>all_responded_any_approves</code></td><td>全員が回答し、1 人以上が承認</td></tr>
+      <tr><td><code>percent(p)</code> / <code>count(k)</code></td><td>p% 以上 / k 人以上が承認（CAB は 50%）</td></tr>
+    </table>
+    <ul>
+      <li><a class="t" href="#g-delegation">代理</a>：不在の承認者の代わりに答えられる人。誰が答えたかは記録に残す。</li>
+      <li><a class="t" href="#g-sod">職務の分離</a>：依頼した本人は承認できない。変更のテーブルでは外せない。</li>
+      <li>メールの返信での承認は受けない（差出人の本人性を保証できないため）。</li>
+    </ul>
+    <div class="callout key"><span class="label">「ちょうど 1 回」</span>2 人が同時に最後の承認を押しても、SLA の違反のタイマーが障害の後に再実行されても、状態は 1 回だけ進みます。遷移・タイマー・outbox を 1 つのトランザクションで書き、行の版で守ります（NFR-004、K3）。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/workflow-engine.md">workflow-engine.md</a> の 3・5・7 節（DT-APR-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0004-workflow-and-sla-engine.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0015-flow-execution-and-timers.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0016-approvals.md">ADR-0016</a>。</div>
+  </section>
+
+  <section class="s" id="intake">
+    <h2>受け付け：メール・割り当て・当番</h2>
+    <p>日本の企業では、今も多くの依頼がメールで来ます。サービスデスクの宛先に届いたメールから起票し、返信を同じチケットに追記します。</p>
+    <ul>
+      <li><strong>スレッドの紐付け</strong>：<code>In-Reply-To</code>・<code>References</code> のヘッダー → 送ったメールに入れた推測できない<a class="t" href="#g-watermark">参照の印</a> → 件名の番号（関係者だけ）の順で探す。</li>
+      <li><strong>ループの防止</strong>：不在の返信や監視のアラートに自動の返信を返すと、メールが往復し続ける。<code>Auto-Submitted</code> などのヘッダー（RFC 3834）で見分け、応答しない。</li>
+      <li><strong>文字コード</strong>：ISO-2022-JP・Shift_JIS・ラベルのない 8 ビットの本文を復号する。送るメールは UTF-8。</li>
+    </ul>
+    <p>起票すると、<strong>割り当ての規則</strong>（カテゴリ・CI・場所などの条件）が担当のグループを決め、必要なら順番・受け持ちの少ない順・スキルで担当者を選びます。人が入れた割り当ては上書きしません。業務時間の外の P1 などでは、<a class="t" href="#g-oncall">当番</a>を呼び、応答がなければ次の段へ<a class="t" href="#g-escalation">エスカレーション</a>します（MVP の経路はメールとプッシュ）。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち（L2・L8）</span>メールの受信と自動の処理が電気通信事業法の「他人の通信の媒介」に当たるか（L2、E6 の spec を止める）。SMS・音声での呼び出しの契約と法令（L8、MVP の後）。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/notifications-and-email-ingest.md">notifications-and-email-ingest.md</a> の 5〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/assignment-and-on-call.md">assignment-and-on-call.md</a> の 3〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0034-inbound-email-threading-and-sender-trust.md">ADR-0034</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0035-mail-loop-prevention-and-japanese-decoding.md">ADR-0035</a>。</div>
+  </section>
+
+  <section class="s" id="compliance">
+    <h2>監査と法令の枠組み</h2>
+    <p>ITSM の記録は、顧客の内部統制の証跡にもなります。設計の文書が前提にしている枠組みだけを示します。法的な判断はしません。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>J-SOX と IT 全般統制</h3><p>上場企業の財務報告に関わる内部統制の制度。<a class="t" href="#g-itgc">IT 全般統制</a>では、本番の変更が承認されてから行われたか、権限を誰に与えたかの証跡を監査人が確かめます。</p></div>
+      <div class="card" data-frag><h3>監査の履歴</h3><p>フィールドごとに「誰が・いつ・何を何に」を、変更と同じトランザクションで追記だけの表に残す。利用者は消せない。</p></div>
+      <div class="card" data-frag><h3>個人データ</h3><p>チケットには社員の氏名・連絡先・端末・本文が入る。削除の請求と、消せない監査の履歴が衝突しうる。</p></div>
+    </div>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>個人情報保護法での立場（委託かどうか）と漏えいの報告（L1）、データを国外に出さない約束の範囲（L3）、監査の履歴の保持の期間（既定案 7 年）と出力の形式（L4）、契約（L5）、「ITIL」の名前の使い方（L6。ITIL は AXELOS Limited の登録商標）、本家からの移行の道具（L7）。結論が出るまで、関係する spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a> の「法務の確認待ち」L1〜L9、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0009-record-audit-history-and-journal.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0053-data-retention-and-deletion.md">ADR-0053</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/security.md">security.md</a> の 9・14 節。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>184 の表がありますが、中心は少数です。作業はすべて <code>task</code> の 1 つの表に、CI はすべて <code>ci</code> の表に入り、<code>class_id</code> で辞書のクラスを指します。</p>
+    <pre class="mermaid">erDiagram
+  dict_table ||--o{ task : "class of"
+  dict_table ||--o{ ci : "class of"
+  group ||--o{ task : "assigned to"
+  ci ||--o{ task : "affected"
+  ci ||--o{ ci_relation : "parent or child"
+  task ||--o{ sla_clock : "measured"
+  sla_def_version ||--o{ sla_clock : "pins"
+  calendar_version ||--o{ sla_clock : "pins"
+  task ||--o{ flow_run : "triggers"
+  flow_run ||--o{ approval_set : "asks"
+  approval_set ||--|{ approval : "approvers"
+  task ||--o{ record_change : "audited"
+  task {
+    uuid tenant_id PK
+    uuid id PK
+    uuid class_id FK
+    text number UK
+    text state
+    bigint version
+    jsonb ext
+  }
+  ci {
+    uuid tenant_id PK
+    uuid id PK
+    uuid class_id FK
+    text operational_status
+  }
+  sla_clock {
+    uuid id PK
+    text stage
+    boolean breached
+  }
+  approval {
+    uuid id PK
+    text state
+  }</pre>
+    <ul>
+      <li><strong>版を固定する</strong>：計時の行は、開始の時の SLA の定義の版とカレンダーの版を指す。フローの実行もフローの版に固定する。後から定義を変えても、動いているものは変わらない。</li>
+      <li><code>version</code> は保存ごとに増え、同時の更新の衝突（409）と、タイマーの古さの判定に使う。</li>
+      <li><code>tenant_id</code> が NULL の行は、全テナント共通の組み込みのデータ（辞書・ロール・国民の祝日など）。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/data-model.md">data-model.md</a> の 3〜6 節と <a href="https://github.com/shoito/rebuilds/tree/main/systems/servicenow/docs/architecture/data-model">data-model/</a> の各ファイル。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>へ。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <table>
+      <tr><th>点</th><th>本家</th><th>再構築</th></tr>
+      <tr><td>拡張</td><td>サーバー・画面のスクリプトを書ける</td><td>ノーコードの設定だけ。スクリプトの API と互換にしない</td></tr>
+      <tr><td>版</td><td>顧客ごとのインスタンスで版を選べる</td><td>全テナントが同じ版。振る舞いの変更はフラグで段階的に</td></tr>
+      <tr><td>ACL の既定</td><td>規則がなければ許可（設定で拒否）</td><td>常に既定の拒否</td></tr>
+      <tr><td>SLA の更新</td><td>定期のジョブで計時を更新</td><td>期限の時刻をタイマーに登録</td></tr>
+      <tr><td>CI の複数の一致</td><td>最も古い CI を選ぶとされる</td><td>選ばず保留にし、人が統合</td></tr>
+      <tr><td>メジャーインシデント</td><td>新しい親を作る</td><td>候補のインシデント自体を親にする</td></tr>
+      <tr><td>メールでの承認</td><td>返信で承認できるとされる</td><td>受けない</td></tr>
+    </table>
+    <p>識別子には本家の名前を使いません。ホスト名は <code>&lt;tenant&gt;.&lt;brand&gt;.&lt;domain&gt;</code>、ヘッダーは <code>&lt;Brand&gt;-Tenant</code>・<code>&lt;Brand&gt;-Ref</code> の形です。表・フィールド・状態の値も、本家の内部の名前と同じものは置き換えています（例：依頼者は <code>requester_id</code>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a> の Non-goals と Constraints、各領域の文書の 2 節「本家の形（確かめたこと）」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-itsm">ITSM</dt><dd>IT Service Management。IT を「サービス」として利用者に提供し、障害・依頼・変更などを管理する実務。</dd>
+      <dt id="g-itil">ITIL</dt><dd>IT サービス管理の実務の枠組み。ITIL 4 は 34 のプラクティスを持つ。ITIL は AXELOS Limited の登録商標。</dd>
+      <dt id="g-incident">インシデント</dt><dd>計画外のサービスの中断や品質の低下。早く元に戻すことが目的。</dd>
+      <dt id="g-problem">問題</dt><dd>1 つ以上のインシデントの原因、または原因になりうるもの。</dd>
+      <dt id="g-knownerror">既知のエラー</dt><dd>分析が済み、回避策が分かっているが、まだ恒久に解決していない問題。再構築では問題の印として持つ。</dd>
+      <dt id="g-workaround">回避策</dt><dd>原因を取り除かずに、インシデントの影響を減らす・なくす手段。</dd>
+      <dt id="g-rca">根本原因の分析</dt><dd>RCA（Root Cause Analysis）。問題の本当の原因を突き止める調査。</dd>
+      <dt id="g-change">変更</dt><dd>サービスに影響しうるものの追加・修正・削除。標準・通常・緊急の 3 種がある。</dd>
+      <dt id="g-request">サービス要求</dt><dd>障害ではない、決まった手順で応える利用者の依頼（PC の申請、パスワードの再設定など）。</dd>
+      <dt id="g-impact">影響度</dt><dd>インシデントがどれだけ広い範囲（人数・業務）に及ぶか。1（高）〜3（低）。</dd>
+      <dt id="g-urgency">緊急度</dt><dd>どれだけ早く対応しなければならないか。1（高）〜3（低）。影響度と組み合わせて優先度を導く。</dd>
+      <dt id="g-major">メジャーインシデント</dt><dd>影響が大きく、通常と別の体制（当番の呼び出し、経営への連絡）で扱うインシデント。</dd>
+      <dt id="g-cab">CAB</dt><dd>Change Advisory Board。変更のリスクを見て承認を判断する会議・グループ。</dd>
+      <dt id="g-ecab">ECAB</dt><dd>Emergency CAB。緊急の変更をすぐに判断する少人数の CAB。</dd>
+      <dt id="g-blackout">禁止期間</dt><dd>決算の期間など、通常の変更を予定してはならない時間帯。逆に変更を予定すべき時間帯を保守の時間帯と呼ぶ。</dd>
+      <dt id="g-portal">ポータル</dt><dd>社員が申請・報告・ナレッジの検索・承認をする、IT の担当者向けの画面とは別のセルフサービスの画面。</dd>
+      <dt id="g-variable">変数</dt><dd>カタログの品目の申請で答える入力の項目（機種、数量、理由など）。</dd>
+      <dt id="g-ritm">要求の品目</dt><dd>1 回の申請（要求）に含まれる品目ごとの記録。承認と実行のフローの単位。</dd>
+      <dt id="g-fulfillment">実行</dt><dd>fulfillment。承認された要求に応えて、実際に作業すること。その作業を実行のタスクと呼ぶ。</dd>
+      <dt id="g-deflection">自己解決</dt><dd>deflection。ポータルでナレッジを見て、申請・報告をやめて自分で解決すること。</dd>
+      <dt id="g-sla">SLA</dt><dd>Service Level Agreement。サービスの提供者と利用者の間の、応答・解決の時間などの約束。</dd>
+      <dt id="g-ola">OLA</dt><dd>Operational Level Agreement。社内のチームどうしの約束。SLA を守るための内訳。</dd>
+      <dt id="g-uc">UC</dt><dd>Underpinning Contract。外部の事業者との契約上の約束。</dd>
+      <dt id="g-calendar">業務カレンダー</dt><dd>営業時間・タイムゾーン・祝日・会社の休日の定義。SLA の業務時間を数える物差し。</dd>
+      <dt id="g-furikae">振替休日</dt><dd>国民の祝日が日曜日に当たったとき、その後の最も近い祝日でない日を休日にするもの（祝日法 第 3 条第 2 項）。</dd>
+      <dt id="g-kokumin">国民の休日</dt><dd>前日と翌日が祝日である、祝日でない日を休日にするもの（祝日法 第 3 条第 3 項）。</dd>
+      <dt id="g-cmdb">CMDB</dt><dd>Configuration Management Database。CI とその関係の台帳。</dd>
+      <dt id="g-ci">CI</dt><dd>Configuration Item。サーバー・PC・ネットワーク機器・アプリ・サービスなど、管理の対象の構成要素。</dd>
+      <dt id="g-csdm">CSDM</dt><dd>Common Service Data Model。ServiceNow が示す、サービスと CI の表し方の標準の型。</dd>
+      <dt id="g-source">取り込み元</dt><dd>CI の情報を送ってくる元（手入力、CSV、API、クラウド、資産管理のツール）。属性ごとに優先度を持つ。</dd>
+      <dt id="g-identification">識別</dt><dd>届いた CI の情報が、既存のどの CI を指すかを決めること。</dd>
+      <dt id="g-reconciliation">調整</dt><dd>複数の取り込み元の値が食い違うとき、属性ごとにどの値を採るかを決めること。</dd>
+      <dt id="g-staleness">鮮度</dt><dd>取り込み元の観測が「まだ有効」とみなせる期間。古くなった強い取り込み元より、新しい弱い取り込み元の値を採る。</dd>
+      <dt id="g-dictionary">データ辞書</dt><dd>テーブル・フィールド・型・選択肢・参照の定義を持つメタデータ。</dd>
+      <dt id="g-metadata">メタデータ</dt><dd>振る舞いを決める設定のデータ（辞書・ACL・フロー・SLA・フォームの配置など）。テナントごとに版を持つ。</dd>
+      <dt id="g-class">クラス</dt><dd>継承の階層の中のテーブル。例：<code>task</code> の子の <code>incident</code>。</dd>
+      <dt id="g-acl">ACL</dt><dd>Access Control List。テーブル・行・フィールドごとに、誰が何の操作をできるかの規則。</dd>
+      <dt id="g-flow">フロー</dt><dd>きっかけ・条件・承認・タスク・通知・待ちを組み合わせたノーコードの業務の流れ。公開すると不変の版になる。</dd>
+      <dt id="g-delegation">代理</dt><dd>期間を決めて、本人の代わりに承認や申請をする人を指定すること。</dd>
+      <dt id="g-sod">職務の分離</dt><dd>依頼した人と承認する人を分け、1 人で不正を完結できないようにする内部統制の原則。</dd>
+      <dt id="g-watermark">参照の印</dt><dd>送ったメールに入れる推測できない文字列。返信を元のチケットに結ぶ手がかりで、権限ではない。</dd>
+      <dt id="g-oncall">当番</dt><dd>オンコール。業務時間の外も含めて、呼び出しに応じる担当者。当番表とローテーションで決まる。</dd>
+      <dt id="g-escalation">エスカレーション</dt><dd>応答がない・期限が近いときに、次の担当や上位の人へ引き上げること。</dd>
+      <dt id="g-itgc">IT 全般統制</dt><dd>ITGC。システムの開発・変更・運用・アクセスの管理についての内部統制。変更の承認と権限の付与の証跡が対象になる。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、守るべき振る舞い、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、64 の ADR の一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0003-table-hierarchy-and-extensible-schema.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0004-workflow-and-sla-engine.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0005-cmdb-identification-and-reconciliation.md">0005</a> <span>— 継承するテーブル、ワークフローと SLA、CMDB の 3 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/itsm-processes.md">itsm-processes.md</a> <span>— インシデント・問題・変更の状態と決定表</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/sla-and-calendars.md">sla-and-calendars.md</a> <span>— 業務カレンダー、祝日、計時</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/workflow-engine.md">workflow-engine.md</a> <span>— フロー、承認、タイマー、上限</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/cmdb-and-reconciliation.md">cmdb-and-reconciliation.md</a> <span>— 識別、調整、関係、影響の範囲</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/data-dictionary-and-tables.md">data-dictionary-and-tables.md</a> <span>— 辞書、物理の配置、監査の履歴、番号</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/access-control.md">access-control.md</a> <span>— ロール、ACL、出口、成り代わり、SSO</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/service-catalog-and-requests.md">service-catalog-and-requests.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/knowledge.md">knowledge.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/notifications-and-email-ingest.md">notifications-and-email-ingest.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/assignment-and-on-call.md">assignment-and-on-call.md</a> <span>— 受け付けと自己解決の周り</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本と横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/servicenow/docs/decisions">decisions/</a> <span>— 残りの ADR（画面、検索、レポート、API、セキュリティ、基盤、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
