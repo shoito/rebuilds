@@ -243,25 +243,25 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
-| `events-and-recurrence.md` | 予定オブジェクトの形、予定の種類、RRULE・RDATE・EXDATE の受け付けと上限、`expand()` の仕様、1 回分の例外、「これ以降」の分割、系列の全体の変更での例外の扱い、展開の索引の範囲の維持、その場の展開との照合 | 0008–0011 | QA（展開の性質） | E2 |
-| `time-zones-and-holidays.md` | `packages/tz`・`packages/tzdata`、壁時計＋TZID の解決（存在しない時刻、2 回ある時刻）、浮動の時刻、終日、tzdb の更新の採用と再計算、Windows のゾーン名などの別名、VTIMEZONE の書き出し、日本の祝日のカレンダー、和暦の表示 | 0012–0013 | QA | E3 |
-| `invitations-and-itip.md` | 主催者の写しと参加者の写し、内部の iTIP の配送、出欠と `SEQUENCE`、参加者の権限、グループの招待と展開、主催者の変更、iMIP の送信（SES）と受信（返事の照合、送信元の認証）、迷惑な招待の対策 | 0014–0016 | QA、セキュリティ | E5 |
-| `free-busy-and-scheduling.md` | 空き時間の照会（人・グループ・会議室）、テナントをまたぐ照会の方針、空き時間のキャッシュ、複数の人の候補の計算、勤務の時間の考慮 | 0017–0018 | QA、Ops | E6 |
-| `rooms-and-resources.md` | 建物・階・定員・設備の属性、会議室のカレンダー、自動の承諾と管理者の承認、排他の制約、繰り返しの予約の一部の辞退、会議室の検索と提案 | 0019–0020 | QA | E6 |
-| `sharing-and-acl.md` | カレンダーの ACL のロール、予定の公開範囲、`can()`・`redact()` の決定表、組織の外への共有の方針、委任（代理の人） | 0021–0022 | セキュリティ | E4 |
-| `sync-and-caldav.md` | 変更のログの形と保持、同期のトークンの形と失効、Web クライアントの差分の取り方、CalDAV（リソースの形、ETag・CTag、`sync-collection`、`calendar-query`・`calendar-multiget`、スケジュールの受信箱）、ICS の購読と公開、ICS の取り込みと書き出し | 0023–0025 | QA | E8 |
-| `api-and-push.md` | 公開の REST API（リソース、ページング、条件つきの更新、エラー）、OAuth 2.0 のアプリとスコープ、レート制限、Webhook の通知（`watch`、期限、署名、再試行） | 0026–0028 | QA、Ops | E8 |
-| `reminders-and-notifications.md` | リマインダーの時計（分の桶とタイマーホイール）、送信の記録と重複の除去、予定の変更での付け替え、画面の通知・Web Push・メール、招待・変更・返事の通知、毎朝の予定の一覧 | 0029–0031 | QA、Ops | E9 |
-| `booking-pages.md` | 予約ページの設定（長さ、間の時間、1 日の上限、予約の受け付けの期間）、枠の計算、予約の作成と取り消し、予約者の確認、ボットの対策 | 0032–0033 | QA、セキュリティ | E10 |
-| `search.md` | 検索の表、`pg_bigm` の索引、`redact()` の後の文字列、更新の遅れ、S2 の検索の基盤 | 0034 | QA、Ops | E11 |
-| `accounts-and-orgs.md` | 個人のアカウント、組織とドメインの確認、SSO（SAML・OIDC）、SCIM、セッション、CalDAV のアプリ用のパスワード、組織のディレクトリ（利用者・グループ・会議室）、管理の画面 | 0035–0037 | セキュリティ | E4、E11 |
-| `clients.md` | Web の画面（日・週・月・予定リスト）、ドラッグの操作、タイムゾーンの表示、IME、キーボードの操作、最近の範囲のキャッシュとオフラインの閲覧、PWA と Web Push の登録 | 0038–0039 | QA | E7 |
-| `security.md` | 脅威モデル、iMIP・ICS・CalDAV の入力の検査、監査ログ、データのライフサイクル（削除、解約）、暗号化、管理者の閲覧の記録、法務の論点の整理 | 0040–0042 | セキュリティ | E1、E11、E12 |
+| [events-and-recurrence.md](events-and-recurrence.md) | 予定オブジェクトの形、予定の種類、RRULE・RDATE・EXDATE の受け付けと上限、`expand()` の仕様、1 回分の例外、「これ以降」の分割、系列の全体の変更での例外の扱い、展開の索引の範囲の維持、その場の展開との照合 | [0008](../decisions/0008-recurrence-expansion-semantics.md)、[0009](../decisions/0009-series-edit-and-override-rebasing.md)、[0010](../decisions/0010-occurrence-index-maintenance.md)、[0011](../decisions/0011-inbound-recurrence-normalization.md) | QA（展開の性質） | E2 |
+| [time-zones-and-holidays.md](time-zones-and-holidays.md) | `packages/tz`・`packages/tzdata`、壁時計＋TZID の解決（存在しない時刻、2 回ある時刻）、浮動の時刻、終日、tzdb の更新の採用と再計算、Windows のゾーン名などの別名、VTIMEZONE の書き出し、日本の祝日のカレンダー、和暦の表示 | [0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)、[0013](../decisions/0013-external-timezone-definitions.md) | QA | E3 |
+| [invitations-and-itip.md](invitations-and-itip.md) | 主催者の写しと参加者の写し、内部の iTIP の配送、出欠と `SEQUENCE`、参加者の権限、グループの招待と展開、主催者の変更、iMIP の送信（SES）と受信（返事の照合、送信元の認証）、迷惑な招待の対策 | [0014](../decisions/0014-itip-state-transfer-and-sequence.md)、[0015](../decisions/0015-imip-addressing-and-trust.md)、[0016](../decisions/0016-group-invitation-expansion.md) | QA、セキュリティ | E5 |
+| [free-busy-and-scheduling.md](free-busy-and-scheduling.md) | 空き時間の照会（人・グループ・会議室）、テナントをまたぐ照会の方針、空き時間のキャッシュ、複数の人の候補の計算、勤務の時間の考慮 | [0017](../decisions/0017-freebusy-source-and-cache.md)、[0018](../decisions/0018-find-a-time-algorithm.md) | QA、Ops | E6 |
+| [rooms-and-resources.md](rooms-and-resources.md) | 建物・階・定員・設備の属性、会議室のカレンダー、自動の承諾と管理者の承認、排他の制約、繰り返しの予約の一部の辞退、会議室の検索と提案 | [0019](../decisions/0019-room-booking-rows-and-recurring-acceptance.md)、[0020](../decisions/0020-room-approval-and-needs-review.md) | QA | E6 |
+| [sharing-and-acl.md](sharing-and-acl.md) | カレンダーの ACL のロール、予定の公開範囲、`can()`・`redact()` の決定表、組織の外への共有の方針、委任（代理の人） | [0021](../decisions/0021-effective-role-and-redact-table.md)、[0022](../decisions/0022-delegation-and-acting-on-behalf.md) | セキュリティ | E4 |
+| [sync-and-caldav.md](sync-and-caldav.md) | 変更のログの形と保持、同期のトークンの形と失効、Web クライアントの差分の取り方、CalDAV（リソースの形、ETag・CTag、`sync-collection`、`calendar-query`・`calendar-multiget`、スケジュールの受信箱）、ICS の購読と公開、ICS の取り込みと書き出し | [0023](../decisions/0023-caldav-resource-model-and-conditional-writes.md)、[0024](../decisions/0024-caldav-implicit-scheduling.md)、[0025](../decisions/0025-ics-subscriptions-both-directions.md) | QA | E8 |
+| [api-and-push.md](api-and-push.md) | 公開の REST API（リソース、ページング、条件つきの更新、エラー）、OAuth 2.0 のアプリとスコープ、レート制限、Webhook の通知（`watch`、期限、署名、再試行） | [0026](../decisions/0026-public-rest-api-shape.md)、[0027](../decisions/0027-oauth-apps-scopes-and-rate-limits.md)、[0028](../decisions/0028-push-channels-signed-webhooks.md) | QA、Ops | E8 |
+| [reminders-and-notifications.md](reminders-and-notifications.md) | リマインダーの時計（分の桶とタイマーホイール）、送信の記録と重複の除去、予定の変更での付け替え、画面の通知・Web Push・メール、招待・変更・返事の通知、毎朝の予定の一覧 | [0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[0030](../decisions/0030-reminder-planning-horizon-and-replan.md)、[0031](../decisions/0031-notification-channels-and-content.md) | QA、Ops | E9 |
+| [booking-pages.md](booking-pages.md) | 予約ページの設定（長さ、間の時間、1 日の上限、予約の受け付けの期間）、枠の計算、予約の作成と取り消し、予約者の確認、ボットの対策 | [0032](../decisions/0032-booking-slot-computation.md)、[0033](../decisions/0033-booking-creation-and-exclusion.md) | QA、セキュリティ | E10 |
+| [search.md](search.md) | 検索の表、`pg_bigm` の索引、`redact()` の後の文字列、更新の遅れ、S2 の検索の基盤 | [0034](../decisions/0034-search-pg-bigm-acl-aware.md) | QA、Ops | E11 |
+| [accounts-and-orgs.md](accounts-and-orgs.md) | 個人のアカウント、組織とドメインの確認、SSO（SAML・OIDC）、SCIM、セッション、CalDAV のアプリ用のパスワード、組織のディレクトリ（利用者・グループ・会議室）、管理の画面 | [0035](../decisions/0035-accounts-auth-library-and-credentials.md)、[0036](../decisions/0036-org-domains-sso-and-scim.md)、[0037](../decisions/0037-admin-roles-delegation-and-event-access.md) | セキュリティ | E4、E11 |
+| [clients.md](clients.md) | Web の画面（日・週・月・予定リスト）、ドラッグの操作、タイムゾーンの表示、IME、キーボードの操作、最近の範囲のキャッシュとオフラインの閲覧、PWA と Web Push の登録 | [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[0039](../decisions/0039-offline-read-cache-and-local-data.md) | QA | E7 |
+| [security.md](security.md) | 脅威モデル、iMIP・ICS・CalDAV の入力の検査、監査ログ、データのライフサイクル（削除、解約）、暗号化、管理者の閲覧の記録、法務の論点の整理 | [0040](../decisions/0040-untrusted-calendar-input-gate.md)、[0041](../decisions/0041-encryption-keys-and-secret-storage.md)、[0042](../decisions/0042-audit-log-and-data-lifecycle.md) | セキュリティ | E1、E11、E12 |
 | `data-model.md` | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `infrastructure.md` | AWS のアカウントとネットワーク、サービスの分け方、egress の経路、冗長化、DR（`sync_epoch`）、段階を上げる基準、S2 のテナントのシャード、S3 のセルとリージョン、コスト | 0043–0045 | Ops | E1、E12 |
-| `observability.md` | ログ・メトリクス・トレース、伝播とリマインダーの遅れの計測、展開の照合、権限の応答の監査、SLI | 0046 | Ops | E1、E12 |
-| `capacity.md` | 負荷のモデル（読み書き、配送、リマインダーの集中、CalDAV）、1 カレンダーの書き込みの上限、部品ごとの必要量、負荷試験 | 0047 | Ops | E12 |
-| `delivery.md` | CI/CD、展開の性質ベーステストと相互運用の試験を CI に入れる、tzdb の版の更新の流れ、フラグ、Web のクライアントの配布、スキーマの変更の順序 | 0048–0049 | QA、Ops | E1、E3、E12 |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、egress の経路、冗長化、DR（`sync_epoch`）、段階を上げる基準、S2 のテナントのシャード、S3 のセルとリージョン、コスト | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)、[0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md)、[0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | Ops | E1、E12 |
+| [observability.md](observability.md) | ログ・メトリクス・トレース、伝播とリマインダーの遅れの計測、展開の照合、権限の応答の監査、SLI | [0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) | Ops | E1、E12 |
+| [capacity.md](capacity.md) | 負荷のモデル（読み書き、配送、リマインダーの集中、CalDAV）、1 カレンダーの書き込みの上限、部品ごとの必要量、負荷試験 | [0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) | Ops | E12 |
+| [delivery.md](delivery.md) | CI/CD、展開の性質ベーステストと相互運用の試験を CI に入れる、tzdb の版の更新の流れ、フラグ、Web のクライアントの配布、スキーマの変更の順序 | [0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md)、[0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | QA、Ops | E1、E3、E12 |
 
 - 次に採番する ADR は 0050。
 
