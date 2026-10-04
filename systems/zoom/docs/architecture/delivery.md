@@ -2,13 +2,13 @@
 
 変更からマージ、デプロイ、リリースまでの流れ。CI、回線の劣化の試験の基盤（netem のラボ、偽のメディアでブラウザを動かす自動化）、Media Node を会議を落とさずに入れ替える手順（drain と make-before-break）、クライアントのリリースの列車、フラグ。流れの骨格は他の題材と同じ（トランクベース開発、1 回ビルドして昇格、prod は Ops の承認。[リポジトリ共通の ADR-0002](../../../../docs/decisions/0002-trunk-based-development.md)）で、ここにはビデオ会議に固有の部分を書く。
 
-前提となる決定は、メディアに触れる変更に回線の劣化の試験を求める規則（本題材の [AGENTS.md](../../AGENTS.md)）、Media Node の計画した入れ替え（[media-server-sfu.md](media-server-sfu.md) の 10 節、[ADR-0013](../decisions/0013-media-node-failover-and-reattach.md)）、Actor の計画した引き渡し（[signaling-and-meetings.md](signaling-and-meetings.md) の 10.3 節）、シグナリングの版の互換（[ADR-0008](../decisions/0008-signaling-protocol.md)）。この文書で決めたことは次の ADR にある。
+前提となる決定は、メディアに触れる変更に回線の劣化の試験を求める規則（本題材の [AGENTS.md](../../AGENTS.md)）、Media Node の計画した入れ替え（[media-server-sfu.md](media-server-sfu.md) の 10 節、[ADR-0013](../decisions/0013-media-node-failover-and-reattach.md)）、Actor の計画した引き渡し（[signaling-and-meetings.md](signaling-and-meetings.md) の 10.3 節）、シグナリングのバージョンの互換（[ADR-0008](../decisions/0008-signaling-protocol.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
 | [0054](../decisions/0054-network-impairment-lab.md) | 回線の劣化の試験は、`media-lab` の EC2 の上で、参加者ごとのネットワークの名前空間と tc netem で作る。各条件を 5 回回して中央値で判定し、`main` の基準との差を PR に載せる。Safari は macOS の dummynet で夜間 |
 | [0055](../decisions/0055-media-node-rolling-replacement.md) | Media Node と TURN はその場で更新しない。新しい AMI の台を足し、カナリアの台の会議の SLI を古い台と比べてから、日ごとの波（10 → 25 → 50 → 100%）で古い台を drain する。残った会議は make-before-break で移す |
-| [0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) | Web は毎日出せるが、利用者の割合で段階的に広げ、会議の中では版を変えない。アプリは 2 週ごとの列車。メディアに関わるフラグは開催の開始で Actor が決め、会議の全員と Media Node で揃える。止める向きだけは進行中の会議にもすぐ効かせる |
+| [0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) | Web は毎日出せるが、利用者の割合で段階的に広げ、会議の中ではバージョンを変えない。アプリは 2 週ごとの列車。メディアに関わるフラグは開催の開始で Actor が決め、会議の全員と Media Node で揃える。止める向きだけは進行中の会議にもすぐ効かせる |
 
 ## 1. 変更からマージまで
 
@@ -36,7 +36,7 @@
 
 | 段 | 中身 | 必須 |
 | --- | --- | --- |
-| 基本 | lint、型、単体、性質ベーステスト（PROP-SFU-*、PROP-BWE-*、PROP-SIG-* など。PR ごとに 1 万の列）、契約の試験（シグナリングの受ける版（Web は N−1、アプリは N−2）、配布中の Web の版の組） | 全 PR |
+| 基本 | lint、型、単体、性質ベーステスト（PROP-SFU-*、PROP-BWE-*、PROP-SIG-* など。PR ごとに 1 万の列）、契約の試験（シグナリングの受けるバージョン（Web は N−1、アプリは N−2）、配布中の Web のバージョンの組） | 全 PR |
 | ビルド | コンテナ（制御の側）、mediasoup の worker（arm64 と x86）、Web の資産 | 全 PR |
 | セキュリティ | SAST、依存・イメージ・IaC の検査、秘密の走査、Terraform のポリシーの検査（[infrastructure.md](infrastructure.md) の 9.2 節） | 全 PR |
 | E2E | Playwright（Chromium）で、参加、音声・映像・共有、再接続、主催者の操作 | 全 PR |
@@ -66,7 +66,7 @@ Media impairment report (Chrome 1xx, 5 runs, median)   base = main@<sha> (7-day 
 | 週次 | iOS・iPadOS の Safari と Android の Chrome の実機 |
 | 週次 | 負荷の小さな回し（[capacity.md](capacity.md) の L1 の一部）で、1 台の上限が下がっていないか |
 
-- Beta・Dev の版での失敗は、ブラウザの回帰の可能性として `browser-release-regression.md`（clients・codecs の領域の提案）の手順で扱う。
+- Beta・Dev のバージョンでの失敗は、ブラウザの回帰の可能性として `browser-release-regression.md`（clients・codecs の領域の提案）の手順で扱う。
 
 ## 3. 回線の劣化の試験の基盤
 
@@ -178,13 +178,13 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 | 段 | 割合 | 時間 | 見るもの |
 | --- | --- | --- | --- |
 | 社内 | 社内の組織だけ | 最短 2 時間 | 参加の成功、JavaScript の例外 |
-| 1% | 利用者（`user_id`・端末の鍵のハッシュ） | 4 時間 | 版ごとの SLI（参加の成功、良い音声の分、フリーズのない分、例外の率） |
+| 1% | 利用者（`user_id`・端末の鍵のハッシュ） | 4 時間 | バージョンごとの SLI（参加の成功、良い音声の分、フリーズのない分、例外の率） |
 | 10% → 50% → 100% | 同上 | それぞれ 4 時間 | 同上 |
 
-- 版ごとの資産（`/app/<version>/...`）を不変で CloudFront に置く。入口のページは `client-config`（API）が返す版を読む。
-- 会議の中では版を変えない。新しい版は次の参加から。
-- **戻す**：割合を 0 にする（次の参加から前の版）。参加できない・音声が出ない重い不具合は、最低の版を上げ、Gateway が古い版の `hello` に `upgrade_required` を返す（会議の途中で読み込み直させるのは、この場合だけ）。
-- 同時に動く Web の版は最大 3。契約の試験をその組で回す（2.2 節）。
+- バージョンごとの資産（`/app/<version>/...`）を不変で CloudFront に置く。入口のページは `client-config`（API）が返すバージョンを読む。
+- 会議の中ではバージョンを変えない。新しいバージョンは次の参加から。
+- **戻す**：割合を 0 にする（次の参加から前のバージョン）。参加できない・音声が出ない重い不具合は、最低のバージョンを上げ、Gateway が古いバージョンの `hello` に `upgrade_required` を返す（会議の途中で読み込み直させるのは、この場合だけ）。
+- 同時に動く Web のバージョンは最大 3。契約の試験をその組で回す（2.2 節）。
 
 ### 5.2 アプリ（MVP の後）
 
@@ -192,15 +192,15 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 | --- | --- | --- |
 | 列車 | 2 週ごと | 2 週ごと |
 | 広げ方 | 自前の更新の配信で 1% → 10% → 50% → 100%（1 週） | ストアの段階的な公開。App Store は 7 日で 1% → 2% → 5% → 10% → 20% → 50% → 100%、止められるのは合計 30 日まで（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)）。Google Play は割合を選んで手で上げ、止められる（[Release app updates with staged rollouts](https://support.google.com/googleplay/android-developer/answer/6346149)）。いずれも 2026-09-27 に確認 |
-| 止める | 配信の停止、前の版への戻し（`desktop-app-update-rollback.md`、clients の領域の提案） | 段階的な公開の停止。前の版に戻せないので、次の版で直す |
-| 最低の版 | `client_releases` に持ち、古すぎる版は参加の前に更新を求める | 同じ |
+| 止める | 配信の停止、前のバージョンへの戻し（`desktop-app-update-rollback.md`、clients の領域の提案） | 段階的な公開の停止。前のバージョンに戻せないので、次のバージョンで直す |
+| 最低のバージョン | `client_releases` に持ち、古すぎるバージョンは参加の前に更新を求める | 同じ |
 
-- Electron の Chromium の版は、安定版に 1 か月以内に追いつく（[clients.md](clients.md) の 10 節）。
+- Electron の Chromium のバージョンは、安定版に 1 か月以内に追いつく（[clients.md](clients.md) の 10 節）。
 
-### 5.3 シグナリングの版の互換
+### 5.3 シグナリングのバージョンの互換
 
-- サーバーは、Web には今と 1 つ前の版（N−1）を、アプリ（MVP の後）には 2 つ前の版（N−2）までを受ける（[ADR-0008](../decisions/0008-signaling-protocol.md) の注記）。版の中では項目を足すだけ。
-- 最低の版（`min_client_version`。Web は `client-config`、アプリは `client_releases`）より古いクライアントには、`upgrade_required` で更新を求める（強制の更新）。
+- サーバーは、Web には今と 1 つ前のバージョン（N−1）を、アプリ（MVP の後）には 2 つ前のバージョン（N−2）までを受ける（[ADR-0008](../decisions/0008-signaling-protocol.md) の注記）。バージョンの中では項目を足すだけ。
+- 最低のバージョン（`min_client_version`。Web は `client-config`、アプリは `client_releases`）より古いクライアントには、`upgrade_required` で更新を求める（強制の更新）。
 
 ## 6. フラグ
 
@@ -241,7 +241,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 | E1 | `media-paths-and-required-checks` | 2.1・2.2 節。パスの一覧と必須の段 |
 | E1 | `netem-lab-namespaces` | 3.1〜3.3 節。名前空間、netem・tbf・ifb、条件の宣言、測り方 |
 | E1 | `pr-media-report-bot` | 2.2 節の結果のコメントと、`main` の基準 |
-| E1 | `web-release-percentage` | 5.1 節。版の資産、`client-config`、割合、版ごとの SLI |
+| E1 | `web-release-percentage` | 5.1 節。バージョンの資産、`client-config`、割合、バージョンごとの SLI |
 | E1 | `meeting-scoped-flags` | 6 節。`effective_flags`、ops のフラグの配り直し |
 | E2 | `safari-dummynet-nightly` | 3.4 節 |
 | E2 | `gateway-gradual-drain` | 4.2 節の Gateway の少しずつ閉じる手順 |
@@ -257,7 +257,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 - ラボは `media-lab` の EC2 の名前空間と netem。5 回の中央値（ADR-0054）。
 - Media Node はカナリアと日ごとの波（ADR-0055）。
-- Web は割合で広げ、会議の中では版を変えない。meeting のフラグは開催の開始で揃える（ADR-0056）。
+- Web は割合で広げ、会議の中ではバージョンを変えない。meeting のフラグは開催の開始で揃える（ADR-0056）。
 
 ### 持ち越し
 
@@ -279,5 +279,5 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 ### runbooks
 
 - [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)：制御の側、Media Node、TURN、Web、Terraform の手順と戻し方（この文書と一緒に書いた）。
-- `netem-lab-broken.md`：ラボの自己診断が失敗し続けるときの確かめ方（台の種類、カーネル、ブラウザの版）。
+- `netem-lab-broken.md`：ラボの自己診断が失敗し続けるときの確かめ方（台の種類、カーネル、ブラウザのバージョン）。
 - `stale-flags.md`：期限を過ぎたフラグの整理。

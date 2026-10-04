@@ -67,7 +67,7 @@
 | Dependency Descriptor（DD） | 対応 | 136 から（VP8・VP9・AV1。H.264 は 137 からでデスクトップだけ） | MDN に記載がない（**未検証**） |
 | Opus の RED（`audio/red`） | M96 から、`setCodecPreferences` で RED を先にすると使える（[discuss-webrtc の告知](https://groups.google.com/g/discuss-webrtc/c/5761etCrSuA)）。冗長は 1 つ（distance 1）で、前のフレームの符号をそのまま写す（libwebrtc の [audio_encoder_copy_red.cc](https://webrtc.googlesource.com/src/+/refs/heads/main/modules/audio_coding/codecs/red/audio_encoder_copy_red.cc) の `kRedNumberOfRedundantEncodings = 1`。数を変えるのはフィールドトライアル `WebRTC-Audio-Red-For-Opus` だけで、Web のページからは変えられない） | **未検証** | **未検証** |
 
-- 表の**未検証**の欄は、E2 の `browser-capability-probe` で `RTCRtpSender.getCapabilities()` と実際の送受信を確かめて埋める。Safari の最新 2 メジャーは 26 と 27（27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) の版の記録、2026-09-27 に確認）。
+- 表の**未検証**の欄は、E2 の `browser-capability-probe` で `RTCRtpSender.getCapabilities()` と実際の送受信を確かめて埋める。Safari の最新 2 メジャーは 26 と 27（27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) のバージョンの記録、2026-09-27 に確認）。
 
 - Firefox 155 以降は、AV1 の SVC の上の空間の層を正しく復号できず、黒い画面や止まった映像になると報告されている（[livekit/client-sdk-js#2116](https://github.com/livekit/client-sdk-js/issues/2116)、2026-09-23 起票）。
 
@@ -142,12 +142,12 @@ Meeting Actor が、会議の参加者の端末の申告（`hello.client` と `m
 | モード | 条件 | カメラの送り方 |
 | --- | --- | --- |
 | `simulcast`（既定） | 常に使える | VP8 の simulcast 3 本。iOS・iPadOS の Safari の送り手だけ H.264 の simulcast 3 本 |
-| `svc` | 参加者が全員 Chromium（Chrome・Edge、最新 2 版）で、VP9 の `L3T3_KEY` を `RTCRtpSender.getCapabilities` で申告した。かつ会議の参加者が 5 人以上 | VP9 `L3T3_KEY` 1 本 |
+| `svc` | 参加者が全員 Chromium（Chrome・Edge、最新 2 バージョン）で、VP9 の `L3T3_KEY` を `RTCRtpSender.getCapabilities` で申告した。かつ会議の参加者が 5 人以上 | VP9 `L3T3_KEY` 1 本 |
 | `av1-svc` | S1 ではフラグ（`media.av1`）の裏。社内の会議だけで試す | AV1 `L3T3_KEY` 1 本 |
 
 - 受け手は、VP8 と H.264 をどのブラウザでも復号できる（必須の符号器）。送り手ごとに符号器が違っても、受け手の側に追加の条件は要らない。
 - VP9 の SVC を選ぶのは、上りの帯域（simulcast より 1 本分少ない）と CPU を減らすため。受け手ごとに層を剥がすだけで済む。
-- `svc` の会議に条件を満たさない人（Firefox、Safari、古い版）が入ったら、Actor はモードを `simulcast` に変え、送り手に符号器の切り替えを指示する。その会議の開催の間は `svc` に戻さない（行き来を防ぐ）。
+- `svc` の会議に条件を満たさない人（Firefox、Safari、古いバージョン）が入ったら、Actor はモードを `simulcast` に変え、送り手に符号器の切り替えを指示する。その会議の開催の間は `svc` に戻さない（行き来を防ぐ）。
 - AV1 を S1 の既定にしないのは、次の理由による。
   - mediasoup で、空間の層が複数の AV1 に DD の転送を組むと、映像が止まる問題が開いたまま（[#1625](https://github.com/versatica/mediasoup/issues/1625)）。
   - Firefox の受け手は AV1 の SVC の上の層を復号できないと報告されている（[#2116](https://github.com/livekit/client-sdk-js/issues/2116)）。
@@ -280,7 +280,7 @@ Media Node が決めるもの：
 | 他の参加者 | 影響しない（受け手ごとに層を選ぶ） | 影響しない |
 
 - 目標：損失 20%・揺らぎ 30ms で、音声の ViSQOL の MOS 3.0 以上（NFR-003）。損失 5% で MOS 3.8 以上。
-- GCC の損失に基づく制御は、損失が 10% を超える間、推定を下げ続ける（3 節）。ブラウザの実装（libwebrtc の損失に基づく推定の新しい版）が草案と違う振る舞いをするかは**未検証**。損失 20% の間、映像が最も低い層にも載らなくなるかを E4 の `loss-20-audio` で測る。
+- GCC の損失に基づく制御は、損失が 10% を超える間、推定を下げ続ける（3 節）。ブラウザの実装（libwebrtc の損失に基づく推定の新しいバージョン）が草案と違う振る舞いをするかは**未検証**。損失 20% の間、映像が最も低い層にも載らなくなるかを E4 の `loss-20-audio` で測る。
 - 映像は、損失 20% の間は「最も低い層で途切れがち」か「止めてアバター」になる。どちらも許し、音声を守ることを優先する。
 
 ## 9. 失敗のしかた
@@ -293,7 +293,7 @@ Media Node が決めるもの：
 | 送り手の端末が符号化に追いつかない（CPU） | ブラウザが解像度か fps を落とす（`qualityLimitationReason: "cpu"`） | 送り手は `f` の本を止める。10 秒続けば `h` も止める。仮想背景を切るよう勧める（[clients.md](clients.md)） |
 | 推定の誤り（上げすぎ） | 遅れが伸び、損失が出る | GCC の遅れに基づく制御で下がる。上げの規則（6.3 節）の 10 秒の待ちで行き来を抑える |
 | キーフレームの要求が集中する | 送り手の送出が一時的に 2〜3 倍になる | PLI の集約と頻度の制限（[media-server-sfu.md](media-server-sfu.md)） |
-| 新しいブラウザの版で符号器の振る舞いが変わる | 品質の回帰 | Beta・Dev の版での夜間の試験（10 節）。runbooks の `browser-release-regression.md` |
+| 新しいブラウザのバージョンで符号器の振る舞いが変わる | 品質の回帰 | Beta・Dev のバージョンでの夜間の試験（10 節）。runbooks の `browser-release-regression.md` |
 
 ## 10. セキュリティ
 
@@ -337,7 +337,7 @@ Media Node が決めるもの：
 
 - **RED**：RFC 2198 の形の RED のパケットの列（主＋冗長 2、長さ・時刻の差の境界の値、壊れたヘッダー）を固定の試験のベクトルにし、Media Node の剥がしの出力（Opus のパケットの列）と突き合わせる。Chrome が送る実際の RED のパケットを録ったものも加える。
 - **層の選択**：推定の時系列と consumer の集合を入力にし、6.3 節の規則の期待する層を出力にした表駆動の試験。Media Node の制御（TypeScript）と、mediasoup の worker の実際の選択を比べる。
-- **ブラウザの組み合わせ**：送り手 × 受け手の 4 × 4（Chrome、Edge、Firefox、Safari）で、`simulcast` と `svc` の各モード、モードの切り替え。Beta の版は夜間に回す。
+- **ブラウザの組み合わせ**：送り手 × 受け手の 4 × 4（Chrome、Edge、Firefox、Safari）で、`simulcast` と `svc` の各モード、モードの切り替え。Beta のバージョンは夜間に回す。
 
 ### 11.4 性質ベーステスト
 
@@ -386,7 +386,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | RED distance 1 の実際の費用と、FEC と組んだときの MOS への効果（冗長に何が入るかは libwebrtc の実装で確かめた） | E4 の `red-forwarding` で、FEC だけ・RED distance 1 ＋ FEC を ViSQOL で比べる |
-| Firefox・Safari の RED、DD、SVC、Safari の VP9・AV1 の対応 | E2 の `browser-capability-probe` と、各ブラウザの新しい版ごとに確かめて、3 節と [clients.md](clients.md) の表を更新する |
+| Firefox・Safari の RED、DD、SVC、Safari の VP9・AV1 の対応 | E2 の `browser-capability-probe` と、各ブラウザの新しいバージョンごとに確かめて、3 節と [clients.md](clients.md) の表を更新する |
 | 損失 20% での GCC の損失に基づく制御の実際の振る舞い | E4 の `loss-20-audio` で、推定の時系列を記録する |
 | VP9 の SVC と simulcast の上りの差（ADR-0002 の「3〜4 割」） | E4 の `svc-vp9-mode` で計測する |
 | AV1 を既定にする時期 | mediasoup の #1625 の解決と、Firefox の SVC の復号の対応を待つ。S2 の前に判断する |
@@ -397,7 +397,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 - 11.1 節の試験の条件と合格の目安。`loss-20-burst` の閾値は ViSQOL の MOS 2.6 以上（QA が承認した値）。
 - 11.2 節の指標の定義（MOS の推定の道具、フリーズの定義、追従の時間の測り方）と、PR に載せる形。
-- ブラウザの組み合わせ（送り手 × 受け手）の試験の範囲と、Beta の版の夜間の試験。
+- ブラウザの組み合わせ（送り手 × 受け手）の試験の範囲と、Beta のバージョンの夜間の試験。
 - RED の剥がしの試験のベクトル（11.3 節）。
 - 性質ベーステスト PROP-BWE-001〜003、PROP-RED-001。
 
@@ -405,7 +405,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 - `audio-quality-degradation.md`：音声の MOS の推定や隠しの率が落ちたときの切り分け（送り手の上り、Media Node、受け手の下り）と、`media.red` のフラグで RED を止める手順。
 - `video-freeze-spike.md`：フリーズの率が上がったときの切り分け（PLI の集中、推定の誤り、送り手の CPU）。
-- `browser-release-regression.md`：ブラウザの新しい版で符号器や推定の振る舞いが変わったときの確かめ方と、モード（`svc` を止める、AV1 を止める）の切り替え。
+- `browser-release-regression.md`：ブラウザの新しいバージョンで符号器や推定の振る舞いが変わったときの確かめ方と、モード（`svc` を止める、AV1 を止める）の切り替え。
 
 ### data-model（索引への追加の提案）
 

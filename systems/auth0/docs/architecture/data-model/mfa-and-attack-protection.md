@@ -160,7 +160,7 @@ erDiagram
 | `tenant_id` | `uuid` | NO | | |
 | `authenticator_id` | `uuid` | NO | | `type = 'recovery_code'` の認証器 |
 | `slot` | `smallint` | NO | | 1〜10。表示の `NN-` で秘密ではない |
-| `code_hash` | `text` | NO | | Argon2id の PHC ＋ pepper の版 |
+| `code_hash` | `text` | NO | | Argon2id の PHC ＋ pepper のバージョン |
 | `used_at` | `timestamptz` | YES | | |
 
 - 主キー：`(tenant_id, authenticator_id, slot)`。検査：`CHECK (slot BETWEEN 1 AND 10)`。
@@ -234,13 +234,13 @@ erDiagram
 
 ### breached_password_versions
 
-漏えいしたパスワードのデータセットの版。テナントの外（[data-model.md](../data-model.md) の 3 節）。
+漏えいしたパスワードのデータセットのバージョン。テナントの外（[data-model.md](../data-model.md) の 3 節）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `version` | `integer` | NO | | |
 | `source` | `text` | NO | | `range_api`（予備の案。データは持たない）・`self_hosted`（法務の確認の後） |
-| `s3_prefix` | `text` | YES | | `pwned/v<版>/`（`self_hosted` だけ） |
+| `s3_prefix` | `text` | YES | | `pwned/v<バージョン>/`（`self_hosted` だけ） |
 | `range_count` | `bigint` | YES | | 取り込んだ範囲の数（1,048,576 のはず） |
 | `state` | `text` | NO | | `importing`・`current`・`previous`・`retired` |
 | `imported_at` | `timestamptz` | YES | | |

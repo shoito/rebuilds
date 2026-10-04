@@ -36,7 +36,7 @@ date: 2026-10-04
 | 種類 | 置き場所 | 書くもの | 読める人 |
 | --- | --- | --- | --- |
 | テナントの監査（`tenant_audit_events`） | Aurora、月で分割、RLS | 共有・ACL・方針の変更、管理者の操作、管理者の予定の閲覧、会議室の承認、アプリ用のパスワード・OAuth のアプリ・Webhook の作成と取り消し、ICS の秘密のアドレスの作り直し、未確認の返事の手での受け入れ、保留の招待の受け入れ、書き出し、SSO・SCIM の設定 | 組織の管理者（画面と書き出し）、個人のテナントは本人 |
-| プラットフォームの監査（`platform_audit_events`） | Aurora の保守用のスキーマ（RLS の外） | 運用者の JIT のアクセス、break-glass、テナントをまたぐ関数の呼び出しの集計、tzdb の版の採用、`sync_epoch` の更新、データの直接の修正（`packages/writer` の保守の経路） | セキュリティの担当 |
+| プラットフォームの監査（`platform_audit_events`） | Aurora の保守用のスキーマ（RLS の外） | 運用者の JIT のアクセス、break-glass、テナントをまたぐ関数の呼び出しの集計、tzdb のバージョンの採用、`sync_epoch` の更新、データの直接の修正（`packages/writer` の保守の経路） | セキュリティの担当 |
 
 - 1 行は `(id, tenant_id, at, actor_kind, actor_id, action, target_kind, target_id, reason_code, request_id, ip_hash, prev_hash, row_hash)`。予定のタイトル・場所・本文は書かない（ID だけ）。
 - `row_hash = SHA-256(prev_hash ‖ 行の正規化した形)`。テナントごと・日ごとに連鎖を作り、毎日の終わりの値を log-archive の S3（Object Lock のコンプライアンスモード）へ写す。行そのものも 1 時間ごとに写す。
@@ -64,7 +64,7 @@ date: 2026-10-04
 | Web の画面の手元の DB | 30 日使われなければ消す（[ADR-0039](0039-offline-read-cache-and-local-data.md)） | クライアント |
 | バックアップ（Aurora の PITR、AWS Backup） | 35 日 | 期限で消える |
 
-- 値の正本は `retention_policies` の表（データの種類 → 期間、根拠、L5 の結論の版）と、Terraform の S3 のライフサイクルにする。CI が両者を比べる。
+- 値の正本は `retention_policies` の表（データの種類 → 期間、根拠、L5 の結論のバージョン）と、Terraform の S3 のライフサイクルにする。CI が両者を比べる。
 - 法的な保全（訴訟の保全の依頼）は、テナントごとに `legal_hold` を立て、`lifecycle` のジョブがそのテナントを飛ばす。分割を落とす表は、保全の間、そのテナントの行を保全の表へ写してから落とす。
 
 ### テナントの解約と削除

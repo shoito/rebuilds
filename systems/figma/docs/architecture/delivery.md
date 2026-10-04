@@ -1,13 +1,13 @@
 # Delivery: Figma
 
-ブランチ、CI、デプロイ、リリースの流れ。Slack の [delivery.md](../../../slack/docs/architecture/delivery.md) を引き継ぎ、この題材に固有の 4 つを足す：**WASM とネイティブの一致の CI**、**クライアントとサーバーの版の食い違い**、**プロパティの表の変更の出し方**、**Document Server を止めずに入れ替えるデプロイ**。
+ブランチ、CI、デプロイ、リリースの流れ。Slack の [delivery.md](../../../slack/docs/architecture/delivery.md) を引き継ぎ、この題材に固有の 4 つを足す：**WASM とネイティブの一致の CI**、**クライアントとサーバーのバージョンの食い違い**、**プロパティの表の変更の出し方**、**Document Server を止めずに入れ替えるデプロイ**。
 
 | 対象 | 方針 |
 | --- | --- |
 | ブランチモデル | リポジトリ共通の [ADR-0002](../../../../docs/decisions/0002-trunk-based-development.md)（トランクベース開発） |
 | デプロイとマイグレーション、フラグ | Slack の [ADR-0022](../../../slack/docs/decisions/0022-zero-downtime-deploy-and-migrations.md)・[ADR-0026](../../../slack/docs/decisions/0026-feature-flags.md) を引き継ぐ |
 | WASM とネイティブの一致、大きさと性能の予算 | [ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md) |
-| クライアントとサーバーの版 | [ADR-0053](../decisions/0053-client-server-version-skew.md) |
+| クライアントとサーバーのバージョン | [ADR-0053](../decisions/0053-client-server-version-skew.md) |
 | 段階的なリリースとプロパティの表の変更 | [ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md) |
 | Document Server のドレイン | [ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) |
 | 手順 | [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
@@ -116,15 +116,15 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 - crate ごとの内訳（`twiggy` など）を PR に貼る。
 - WebGPU と WebGL2 で 2 つのビルドを配ることになったら（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md) の PoC の結果）、それぞれに 5 MB を当てる。
 
-## 4. クライアントとサーバーの版
+## 4. クライアントとサーバーのバージョン
 
 [ADR-0053](../decisions/0053-client-server-version-skew.md) による。
 
-### 4.1 3 つの版
+### 4.1 3 つのバージョン
 
-| 版 | 中身 | 合わないとき |
+| バージョン | 中身 | 合わないとき |
 | --- | --- | --- |
-| `protocol_version`（u16） | 送受信の形式（[ADR-0009](../decisions/0009-multiplayer-wire-protocol.md)）。サーバーは今の版と 1 つ前の版を話す | 強い再読み込み |
+| `protocol_version`（u16） | 送受信の形式（[ADR-0009](../decisions/0009-multiplayer-wire-protocol.md)）。サーバーは今のバージョンと 1 つ前のバージョンを話す | 強い再読み込み |
 | `schema_hash` | プロパティの表。サーバーは「追加だけでたどれる直近 30 日の表」を受け入れる | 一覧の外なら強い再読み込み |
 | `min_client_build` | AppConfig に置く、使わせたくない古いビルドの下限 | 強い再読み込み |
 

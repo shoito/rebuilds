@@ -1,6 +1,6 @@
 # Data model: API・取り込み・Webhook・outbox
 
-[data-model.md](../data-model.md) の一部。API のクライアントと秘密・トークン、API の冪等のキー、取り込み（取り込み元・変換の対応と版・実行・原本の行）、Webhook の購読・署名の秘密・配達、outbox を定義する。振る舞い（クライアントの種類とスコープ、テーブルの API、DT-IMP-001、Webhook の本文と署名と配達、レート制限）は [api-and-integrations.md](../api-and-integrations.md) を正とする。本文と外に出すファイルの形は [stores.md](stores.md) の 4〜6 節。
+[data-model.md](../data-model.md) の一部。API のクライアントと秘密・トークン、API の冪等のキー、取り込み（取り込み元・変換の対応とバージョン・実行・原本の行）、Webhook の購読・署名の秘密・配達、outbox を定義する。振る舞い（クライアントの種類とスコープ、テーブルの API、DT-IMP-001、Webhook の本文と署名と配達、レート制限）は [api-and-integrations.md](../api-and-integrations.md) を正とする。本文と外に出すファイルの形は [stores.md](stores.md) の 4〜6 節。
 
 - **秘密とトークンは SHA-256 のハッシュだけを持つ**（クライアントシークレット `<brand>_cs_`、アクセストークン `<brand>_at_`）。Webhook の署名の秘密だけは送るときに要るので、テナントの DEK で暗号化して持つ（[security.md](../security.md) の 7 節）。
 - API のクライアントの主体は `kind = integration` の利用者。スコープは主体の ACL を広げない。
@@ -154,7 +154,7 @@ erDiagram
 | `redirect_uris` | `text[]` | NOT NULL | `'{}'` | `user_app` |
 | `scopes` | `text[]` | NOT NULL | — | `records:read`・`records:write`・`imports:write`・`cmdb:ingest`・`webhooks:manage` |
 | `table_allowlist` | `uuid[]` | NULL | — | 使えるテーブル。NULL は全テーブル |
-| `api_version` | `date` | NOT NULL | — | 固定した振る舞いの版（`<Brand>-Api-Version`） |
+| `api_version` | `date` | NOT NULL | — | 固定した振る舞いのバージョン（`<Brand>-Api-Version`） |
 | `rate_share` | `integer` | NULL | — | テナントの中の取り分の上書き（NULL は既定の 1 秒 50） |
 | `active` | `boolean` | NOT NULL | `true` | |
 | レコードの共通の列 | | | | |
@@ -238,7 +238,7 @@ erDiagram
 
 ### 3.2 `transform_map`・`transform_map_version`
 
-変換の対応と、公開で不変の版。実行は開始の時の版に固定する。2026-09-28 の統合で、版を別の表に分けた（`flow_def`・`flow_version` と同じ形）。定義元：同じ文書の 5.2・5.3・5.5 節。
+変換の対応と、公開で不変のバージョン。実行は開始の時のバージョンに固定する。2026-09-28 の統合で、バージョンを別の表に分けた（`flow_def`・`flow_version` と同じ形）。定義元：同じ文書の 5.2・5.3・5.5 節。
 
 | 表 | 列 |
 | --- | --- |
@@ -247,7 +247,7 @@ erDiagram
 
 - キー：どちらも PK `(tenant_id, id)`。`transform_map` UK `(tenant_id, stable_key)`。`transform_map_version` UK `(tenant_id, map_id, version_no)`。
 - CHECK：`(target_kind = 'table') = (target_table_id IS NOT NULL)`。対象のクラスが `ci` の階層なら公開で拒否する（アプリ）。一致のキーの索引の有無も公開の時に確かめる。
-- 版は `UPDATE` を与えない。保持：版を消さない（実行が指すため。実行の保持の後は消せる）。S1 の量：1 テナント 数十行。
+- バージョンは `UPDATE` を与えない。保持：バージョンを消さない（実行が指すため。実行の保持の後は消せる）。S1 の量：1 テナント 数十行。
 
 ### 3.3 `import_run`
 
@@ -344,7 +344,7 @@ erDiagram
 | `created_at` | `timestamptz` | NOT NULL | `now()` | パーティションのキー（時間） |
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `topic` | `text` | NOT NULL | — | `record.changed`・`meta.changed`・`sla.warning` など |
-| `payload` | `jsonb` | NOT NULL | — | ID と版だけ（値を入れない） |
+| `payload` | `jsonb` | NOT NULL | — | ID とバージョンだけ（値を入れない） |
 | `trace_context` | `jsonb` | NULL | — | W3C の `traceparent`・`tracestate` |
 | `published_at` | `timestamptz` | NULL | — | `relay` の送信済みの印 |
 

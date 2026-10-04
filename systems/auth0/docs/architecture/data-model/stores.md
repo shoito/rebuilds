@@ -42,17 +42,17 @@ ElastiCache（Valkey）。クラスタモード。VPC の中だけ、TLS と AUT
 
 | バケット（論理名） | キーの形 | 中身 | 書く | 保持 |
 | --- | --- | --- | --- | --- |
-| `edge-origin`（prod、東京 → 大阪へ複製） | `discovery/<hostname>/openid-configuration`、`jwks/<hostname>/jwks.json` | ホスト名ごとの discovery と JWKS。メタデータに `state_version` と SHA-256 | Worker だけ | 最新。古い版はバージョニングで 30 日 |
+| `edge-origin`（prod、東京 → 大阪へ複製） | `discovery/<hostname>/openid-configuration`、`jwks/<hostname>/jwks.json` | ホスト名ごとの discovery と JWKS。メタデータに `state_version` と SHA-256 | Worker だけ | 最新。古いバージョンはバージョニングで 30 日 |
 | 同上 | `assets/<tenant_id>/<sha256>.<ext>` | Universal Login のロゴ・ファビコン・背景画像（SVG は無害化の後） | Management API | テナントの削除まで。参照のなくなった資産は 30 日で消す |
 | 同上 | `static/<release>/...` | Universal Login の CSS・JavaScript・書体 | CI | 直近 10 リリース |
-| `breached-passwords`（prod） | `pwned/v<version>/<prefix5>.txt` | 漏えいしたパスワードの範囲。**法務の確認の後だけ** | Worker | `current` と `previous` の版 |
+| `breached-passwords`（prod） | `pwned/v<version>/<prefix5>.txt` | 漏えいしたパスワードの範囲。**法務の確認の後だけ** | Worker | `current` と `previous` のバージョン |
 | `user-transfer`（prod、MVP の後） | `imports/<tenant_id>/<job_id>/input.jsonl.gz`、`imports/<tenant_id>/<job_id>/result.jsonl`、`exports/<tenant_id>/<job_id>/output.<jsonl|csv>.gz` | インポート・エクスポートのファイル | Management API（署名付き URL）、Worker | 7 日 |
 | `auth-events-analytics`（prod） | `events/dt=<YYYY-MM-DD>/hour=<HH>/part-*.parquet` | 認証のイベントの調査用（Firehose）。テナントには見せない | Firehose | 90 日 |
 | `log-archive`（log-archive のアカウント、Object Lock） | `audit/tenant/<YYYY>/<MM>/<DD>/<batch>.jsonl.gz`、`audit/platform/...` | 監査ログ（ハッシュの連鎖） | Relay | 7 年 |
 | 同上 | `auth-events/<YYYY>/<MM>/<DD>/<shard>/<batch>.jsonl.gz` | 認証のイベントの保管（DR のやり直しの材料） | log-ingester | 90 日（既定案。期間は security.md の 9 節に行がないので、法務の L5 と一緒に決める。[data-model.md](../data-model.md) の 8 節の持ち越し） |
 | 同上 | `pepper/v<version>.ciphertext` | pepper の暗号文の予備 | 運用の手順 | 消さない |
 | 同上 | CloudTrail、CloudFront・WAF のログ | AWS の標準の形 | AWS | 13 か月〜7 年（infrastructure の領域） |
-| `actions-bundles`（actions のアカウント、MVP の後） | `bundles/<tenant_id>/<action_id>/<version_id>/<sha256>.zip` | Action の束 | CodeBuild | 版が参照されなくなって 30 日 |
+| `actions-bundles`（actions のアカウント、MVP の後） | `bundles/<tenant_id>/<action_id>/<version_id>/<sha256>.zip` | Action の束 | CodeBuild | バージョンが参照されなくなって 30 日 |
 
 - カスタムドメインの discovery と JWKS は、`issuer` がそのホスト名になるので、テナントの ID ではなくホスト名でキーを分ける（CloudFront Functions でパスを書き換える。[infrastructure.md](../infrastructure.md) の 4.2 節）。
 - テナントの削除で、`assets/<tenant_id>/` と、テナントのホスト名の `discovery/`・`jwks/` を消す。

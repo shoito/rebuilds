@@ -205,7 +205,7 @@ erDiagram
 | `taxi_business_permit_no` | `text` | NOT NULL | — | 一般乗用旅客自動車運送事業の許可の番号 |
 | `invoice_registration_no` | `text` | NULL | — | 適格請求書の登録番号（`T` ＋ 13 桁） |
 | `status` | `text` | NOT NULL | `'applying'` | `applying`・`reviewing`・`active`・`suspended`・`terminated` |
-| `contract_version` | `text` | NULL | — | 代理受領権の付与を含む契約の版 |
+| `contract_version` | `text` | NULL | — | 代理受領権の付与を含む契約のバージョン |
 | `contract_signed_at` | `timestamptz` | NULL | — | |
 | `collection_model` | `text` | NOT NULL | `'agent_collection'` | `agent_collection`・`operator_merchant`（[ADR-0024](../../decisions/0024-fare-collection-model.md)） |
 | `settlement_cycle` | `text` | NOT NULL | `'semi_monthly'` | `semi_monthly`・`weekly`・`monthly` |
@@ -229,7 +229,7 @@ erDiagram
 | `effective_from` | `date` | NOT NULL | — | |
 | `effective_to` | `date` | NULL | — | NULL は現在も有効 |
 
-- キー：PK `(operator_id, service_area_id, effective_from)`。区域は版つきなので外部キーを張れない。区域の参照はトリガー `check_area_ref(area_id, kinds)` で確かめる（[data-model.md](../data-model.md) の 3.5 節）。
+- キー：PK `(operator_id, service_area_id, effective_from)`。区域はバージョンつきなので外部キーを張れない。区域の参照はトリガー `check_area_ref(area_id, kinds)` で確かめる（[data-model.md](../data-model.md) の 3.5 節）。
 - 排他：`EXCLUDE USING gist (operator_id WITH =, service_area_id WITH =, daterange(effective_from, effective_to) WITH &&)`。
 - 索引：`(service_area_id)` — 区域から事業者を引く（配車の E4 の写しの作成）。
 - S1 の量：数十行。

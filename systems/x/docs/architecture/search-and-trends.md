@@ -7,7 +7,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0025](../decisions/0025-search-engine-and-japanese-analysis.md) | Amazon OpenSearch Service を使う。一致の判定は 1〜2 文字の N-gram のフィールドで連続を求め（取りこぼさない）、関連度の点は kuromoji のフィールドで付ける。正規化は `packages/text` の `normalizeForSearch`（NFKC、小文字、長音と波ダッシュの統一）で、索引と問い合わせの両方にかける。ひらがなとカタカナは同一視しない。Sudachi は `search-poc` で比べる |
-| [0026](../decisions/0026-search-index-layout-and-visibility.md) | 投稿の索引は月ごとに分け、投稿の `tid` の時刻で書き先を決める。書き込みは `state_version` を外部の版にして古い版で上書きしない。削除は墓石。問い合わせは 1 つの組み立て関数だけで作り、削除・措置・鍵・ブロックの条件を必ず含め、返す前に `visible()` で判定し直す。検索はログインした人だけ |
+| [0026](../decisions/0026-search-index-layout-and-visibility.md) | 投稿の索引は月ごとに分け、投稿の `tid` の時刻で書き先を決める。書き込みは `state_version` を外部のバージョンにして古いバージョンで上書きしない。削除は墓石。問い合わせは 1 つの組み立て関数だけで作り、削除・措置・鍵・ブロックの条件を必ず含め、返す前に `visible()` で判定し直す。検索はログインした人だけ |
 | [0027](../decisions/0027-trends-burst-detection.md) | トレンドは、全国と 8 つの地方ごとに、5 分の区切りで語ごとの「重み付きの一意の投稿者の数」を数える。1 人は 1 つの語に区切りあたり 1 回だけ数え、新しい・スパムの点の高いアカウントの重みを下げる。急上昇は直近 15 分と基準の差をポアソンの揺れで割った点で決め、最低の人数と増え方の比を満たすものだけを出す。T&S は語を即座に外せる |
 
 ## 1. 範囲
@@ -85,7 +85,7 @@ flowchart LR
 
 - ひらがなとカタカナは同一視しない（[ADR-0025](../decisions/0025-search-engine-and-japanese-analysis.md)）。濁点の有無も区別する。
 - 絵文字は残す。ハッシュタグは `#` を除いた語を正規化して `hashtags` に持つ。
-- 正規化の版を `norm_version` として文書に持つ。版を変えたら索引を作り直す（7.5 節）。
+- 正規化のバージョンを `norm_version` として文書に持つ。バージョンを変えたら索引を作り直す（7.5 節）。
 
 ### 5.2 フィールドと解析
 
@@ -194,15 +194,15 @@ flowchart LR
 | `deleted`、`mod_hidden`、`mod_regions`、`search_excluded`、`sensitive` | 粗い絞り込みの印（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)） |
 | `author_protected`、`author_suspended` | 作者の状態の印 |
 | `likes`、`reposts`、`replies` | 数（概算） |
-| `state_version`、`norm_version` | 版 |
+| `state_version`、`norm_version` | バージョン |
 
 - リポストは文書にしない（元の投稿を検索する）。引用は自分の本文を持つ投稿として入れる。
 
 ### 7.2 流れ
 
 1. Search Indexer は `posts`・`moderation`・`accounts` の流れを読み、出来事を「きっかけ」として扱う。
-2. 投稿の現在の状態（本文、`state`、`mod_flags`、`state_version`、作者の鍵と凍結）を Aurora から読む。reader の遅れで古い版を読んだら、版の比較で捨てられるので害はない。最新の版が出来事の版より古ければ、1 秒待って 3 回まで読み直す。
-3. 文書を作り、`version_type = external_gte`・`version = state_version` で書く。古い版で新しい版を上書きしない。
+2. 投稿の現在の状態（本文、`state`、`mod_flags`、`state_version`、作者の鍵と凍結）を Aurora から読む。reader の遅れで古いバージョンを読んだら、バージョンの比較で捨てられるので害はない。最新のバージョンが出来事のバージョンより古ければ、1 秒待って 3 回まで読み直す。
+3. 文書を作り、`version_type = external_gte`・`version = state_version` で書く。古いバージョンで新しいバージョンを上書きしない。
 4. 書き込みは 1 秒か 1,000 件ごとに `_bulk` でまとめる。`refresh_interval` は 1 秒。
 5. 失敗した文書は SQS の再試行の待ち行列に入れ、5 回で DLQ とアラート。
 
@@ -217,11 +217,11 @@ flowchart LR
 ### 7.3 作者の状態と数の更新
 
 - 作者の鍵の切り替え・凍結・解除は、`accounts` の流れから、その作者の文書を `update_by_query`（`author_id` で絞る）で更新する。投稿の多い作者は時間がかかるので、更新の間は返す前の `visible()` が守る。作業は作者ごとに 1 つに絞り、途中で失敗したら最初からやり直す（冪等）。
-- 数（いいね・リポスト・返信）は、Counter Aggregator の書き戻し（[engagement-and-counters.md](engagement-and-counters.md)）を待たず、10 分ごとに「直近 7 日の、数が 10 以上変わった投稿」だけを部分更新する。数の更新は `state_version` を上げないので、版の比較の外で、`script` で単調に大きい値だけを書く。
+- 数（いいね・リポスト・返信）は、Counter Aggregator の書き戻し（[engagement-and-counters.md](engagement-and-counters.md)）を待たず、10 分ごとに「直近 7 日の、数が 10 以上変わった投稿」だけを部分更新する。数の更新は `state_version` を上げないので、バージョンの比較の外で、`script` で単調に大きい値だけを書く。
 
 ### 7.4 削除
 
-- 削除・措置の非表示は墓石（`deleted = true` か `mod_hidden = true`、本文と代替のテキストを空）で書く。物理に消すと、遅れて届いた古い版の書き込みで戻りうるため。
+- 削除・措置の非表示は墓石（`deleted = true` か `mod_hidden = true`、本文と代替のテキストを空）で書く。物理に消すと、遅れて届いた古いバージョンの書き込みで戻りうるため。
 - 墓石は 7 日後に、定期のジョブが `delete_by_query` で消す。
 - 措置の取り消しは、`state_version` の上がった新しい文書として書き直す。
 
@@ -230,7 +230,7 @@ flowchart LR
 - 投稿の索引は月ごとに分ける（`posts-YYYYMM`）。書き先は `post_id` の `tid` の時刻で決まるので、古い投稿の更新も同じ索引に届く（[ADR-0026](../decisions/0026-search-index-layout-and-visibility.md)）。
 - 読み出しは別名 `posts-read`（全月）。「最新」の既定の範囲が直近なので、日付の範囲に合わない索引は OpenSearch が速く飛ばす。
 - 主シャードは、S1 で月あたり 3（1 シャード 30〜50 GB を目安）。S2 で直近 3 か月より前を UltraWarm に移す。値は `search-poc` と [capacity.md](capacity.md) で決める。
-- マッピングや正規化の版を変えるときは、新しい索引の組（`posts-v2-YYYYMM`）を作り、二重書き込み → Aurora からの埋め直し（`post_id` の順、チェックポイントつき）→ 件数と抜き取りの一致の検証 → 別名の付け替えの順で移る。古い組は 2 週間残してから消す。
+- マッピングや正規化のバージョンを変えるときは、新しい索引の組（`posts-v2-YYYYMM`）を作り、二重書き込み → Aurora からの埋め直し（`post_id` の順、チェックポイントつき）→ 件数と抜き取りの一致の検証 → 別名の付け替えの順で移る。古い組は 2 週間残してから消す。
 
 ## 8. 失敗のしかた（検索）
 
@@ -370,7 +370,7 @@ z   = (c − e) / sqrt(e + β)          β = 5
 | ID | 性質・試験 |
 | --- | --- |
 | PROP-SRCH-001 | 任意の投稿・措置・ブロック・鍵の切り替えの列と、任意の索引の遅れに対して、検索が返す投稿はすべて、その時点の `visible()` が `show` を返す |
-| PROP-SRCH-002 | 任意の順・重複の出来事を Indexer に与えても、最後の文書は Aurora の最新の状態（`state_version` の最大）と一致する。墓石は古い版で戻らない |
+| PROP-SRCH-002 | 任意の順・重複の出来事を Indexer に与えても、最後の文書は Aurora の最新の状態（`state_version` の最大）と一致する。墓石は古いバージョンで戻らない |
 | PROP-SRCH-003 | 任意の `SearchQuery` について、`buildPostSearch` の結果は 6.3 節の `filter` をすべて含む |
 | PROP-SRCH-004 | `normalizeForSearch` は冪等（2 回かけても同じ）で、Web・アプリ・サーバーで同じ結果になる |
 | PROP-TRND-001 | 任意の投稿の列で、1 人の作者が 1 つの語の 1 つの区切りに足す値は、その作者の重み以下 |
@@ -388,10 +388,10 @@ z   = (c − e) / sqrt(e + β)          β = 5
 | --- | --- | --- |
 | E9 | `search-poc` | kuromoji と Sudachi、N-gram の大きさ、月ごとの索引のシャード、p99（5・7.5 節）。E9 の前 |
 | E9 | `search-normalization` | `normalizeForSearch` と例の集まり（5.1 節） |
-| E9 | `search-indexer` | 流れの消費、版つきの書き込み、墓石、作者の状態の更新（7 節） |
+| E9 | `search-indexer` | 流れの消費、バージョンつきの書き込み、墓石、作者の状態の更新（7 節） |
 | E9 | `post-search` | 構文、`buildPostSearch`、返す前の `visible()`、2 つのタブ（6 節） |
 | E9 | `user-search` | 利用者の索引と補完（6.5 節） |
-| E9 | `search-reindex` | 版を変える作り直しの手順（7.5 節） |
+| E9 | `search-reindex` | バージョンを変える作り直しの手順（7.5 節） |
 | E9 | `trends` | 語の取り出し、数え方、検出、表示（9 節） |
 | E9 | `trends-manipulation-defense` | 重み、群れと貼り付けの検出、`trend_overrides`、T&S の待ち行列（9.5 節） |
 | E9 | `trends-regional` | 地方の地域。法務：L4（IP アドレスからの推定） |
@@ -402,7 +402,7 @@ z   = (c − e) / sqrt(e + β)          β = 5
 
 - **検索の部品と解析**：OpenSearch。一致は N-gram、点は kuromoji（ADR-0025）。
 - **ひらがなとカタカナ**：同一視しない。Slack の題材と同じ理由（同一視すると索引と問い合わせの両方に同じ変換が要り、差の源になる）。
-- **索引の形**：月ごとの索引、`tid` の時刻で書き先を決める、`state_version` の外部の版（ADR-0026）。
+- **索引の形**：月ごとの索引、`tid` の時刻で書き先を決める、`state_version` の外部のバージョン（ADR-0026）。
 - **検索の入口**：ログインした人だけ。
 - **ミュートの扱い**：ミュートした作者と語は、検索の結果からも除く。`from:` で作者を指定したときだけ、ミュートした作者を出す。
 - **トレンドの地域**：全国と 8 つの地方。個人化しない（ADR-0027）。

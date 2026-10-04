@@ -29,7 +29,7 @@
 | 一括の割り当て | 24 時間で 15,000 の batch（Bulk API と共有）、取り込み 1 億 5,000 万行、問い合わせのジョブ 10,000、問い合わせの結果 1TB。結果は 7 日。1 つのジョブの CSV は 150MB（base64 の前の目安 100MB） | Limits |
 | 長い要求 | 20 秒以上の要求の同時実行は本番で 25 | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)、Limits |
 | イベントの割り当て | 発行は 1 時間 250,000（Enterprise・Unlimited）、配信は 24 時間 50,000（Unlimited）・25,000（Enterprise）。配信は変更のイベントと共有。移動の窓で数える | [Platform Events Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/platform_events.pdf)（Winter '27 版） |
-| フローの要素の数 | 1 トランザクションの要素の数の上限（2,000）は API の版 57.0 でなくした。フローは Apex の上限に従う | [Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)（2026-09-28 に確認） |
+| フローの要素の数 | 1 トランザクションの要素の数の上限（2,000）は API のバージョン 57.0 でなくした。フローは Apex の上限に従う | [Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)（2026-09-28 に確認） |
 | 集計の読みの数え方 | `COUNT()` 以外の集計の関数は、集計に使った行を全て取得の行に数える。`COUNT()` は 1 行（`GROUP BY` があればグループごとに 1 行）。積み上げ集計の計算し直しの読みの数え方は資料に書かれていない（未検証。E6 の `flow-limit-counting` で試用の組織で確かめる） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版、2026-09-28 に確認） |
 
 ## 3. 上限の登録簿（ADR-0041）
@@ -196,7 +196,7 @@
 | `md.indexed_fields`・`md.unique_fields` | 索引の項目・一意の項目 | 50・25 | metadata-and-runtime |
 | `md.picklist_values` | 有効な選択リストの値 | 1,000 | metadata-and-runtime |
 | `md.record_data_bytes` | `records.data` | 64KB | metadata-and-runtime、data-storage |
-| `md.change_elements` | 1 つの版で変える要素 | 10,000 | metadata-and-runtime、sandboxes-and-deploy |
+| `md.change_elements` | 1 つのバージョンで変える要素 | 10,000 | metadata-and-runtime、sandboxes-and-deploy |
 | `formula.*` | 式の文字・展開後の AST の節・親への参照の段・たどる関係・参照の深さ | 5,000・2,000・5・15・10 | metadata-and-runtime |
 | `sharing.*` | ロール・ロールの深さ・グループとキュー・入れ子・共有ルール（うちレコードの条件）・手動の共有・チーム・利用者の権限セット・組織の権限セット | 2,000・20・5,000・5・300（50）・500・100・100・1,000 | sharing-and-record-access |
 | `sharing.closure_sync_rows` | 閉包の同期の更新 | 1 万行 | sharing-and-record-access |
@@ -205,7 +205,7 @@
 | `activity.relations` | 活動の追加の関係者 | 取引先責任者 50 かリード 1 | sales-objects |
 | `layout.*` | レイアウトの項目・関連リスト | 200・20 | ui-layouts-and-list-views |
 | `list_view.*` | 条件・列・並べ替え | 10・15・2 | ui-layouts-and-list-views |
-| `flow.*` | 版の要素・版の数・1 オブジェクト 1 手順の有効なフロー・予定の経路・実行の順の番号 | 500・50・50・10・1〜2,000 | automation-flows |
+| `flow.*` | バージョンの要素・バージョンの数・1 オブジェクト 1 手順の有効なフロー・予定の経路・実行の順の番号 | 500・50・50・10・1〜2,000 | automation-flows |
 | `validation.*` | 有効な入力規則・返すエラー | 100・20 | automation-flows |
 | `approval.*` | 段・承認者・有効なプロセス（オブジェクト・組織） | 30・25・50・1,000 | automation-flows |
 | `report.*` | レポートの型のオブジェクト・列・グループ・条件・クロス条件 | 4・100・サマリー 3／マトリックス 2×2・20・3（副 5） | reports-and-dashboards |
@@ -305,7 +305,7 @@ Worker の取り出し：
 | `bulk_ingest` | 一括の取り込みの部分（1 万行） | 10 |
 | `bulk_query` | 一括の問い合わせ | 3 |
 | `report_async` | レポートの非同期の実行、定期の配信、エクスポート | 5 |
-| `sharing` | ルールの版・閉包の世代のジョブ | 2（閉包は 1） |
+| `sharing` | ルールのバージョン・閉包の世代のジョブ | 2（閉包は 1） |
 | `flow_async` | 予定の経路、非同期の経路、スケジュールのフロー | 5 |
 | `metadata_post` | 型の変換、索引の作成、照合の鍵の作成、積み上げ集計の `building` | 2 |
 | `search_reindex` | 検索の作り直し | 1 |
@@ -326,7 +326,7 @@ Worker の取り出し：
 <Brand>-Limit-Info: api-usage=10018/115000; long-running=3/25
 ```
 
-- 形は [ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md) と [query-language-and-api.md](query-language-and-api.md) の 6.5 節のまま。版の一覧を除く全ての応答に付ける。
+- 形は [ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md) と [query-language-and-api.md](query-language-and-api.md) の 6.5 節のまま。バージョンの一覧を除く全ての応答に付ける。
 - 110% までの超過の間は、`api-usage=121000/115000` のように使用量が割り当てを超えて見える。
 
 ### 9.2 `<Brand>-Tx-Usage`（求めた時だけ）

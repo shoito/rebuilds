@@ -13,7 +13,7 @@
 ## 1. 目的と範囲
 
 - 扱う：書き出しの設定と形式、書き出しをどこで描くか、Render Worker、画像のアップロード・重複の除去・縮小版・配信・削除、フォントの出どころ・配信・代わりのフォント、サムネイル、外部の URL からの画像の取り込み。
-- 扱わない：画面の描画とテキストの整形（rendering-engine.md）、画像のデコードと GPU のメモリ（rendering-engine.md）、SVG の読み込みの UI（editor-and-tools.md）、版とチェックポイントの保存（[file-storage-and-history.md](file-storage-and-history.md)）、権限の判定関数（permissions-and-sharing.md）、公開 API の `/images`（[api-and-webhooks.md](api-and-webhooks.md)。描画はこの文書の Render Worker を使う）。
+- 扱わない：画面の描画とテキストの整形（rendering-engine.md）、画像のデコードと GPU のメモリ（rendering-engine.md）、SVG の読み込みの UI（editor-and-tools.md）、バージョンとチェックポイントの保存（[file-storage-and-history.md](file-storage-and-history.md)）、権限の判定関数（permissions-and-sharing.md）、公開 API の `/images`（[api-and-webhooks.md](api-and-webhooks.md)。描画はこの文書の Render Worker を使う）。
 
 ## 2. 本家の形（確かめたこと）
 
@@ -124,14 +124,14 @@ ADR-0034。
 
 ### 5.1 構成
 
-- Rust のネイティブのバイナリ。エンジンの crate（`doc-model`・レイアウト・描画）を、ブラウザと同じ版で使う（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+- Rust のネイティブのバイナリ。エンジンの crate（`doc-model`・レイアウト・描画）を、ブラウザと同じバージョンで使う（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 - ECS Fargate（CPU だけ。GPU はない）で動かす。wgpu の Vulkan のバックエンドを、Mesa の lavapipe（CPU の Vulkan の実装）の上で動かす（[ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)、[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)）。10 万ノードの参照ファイルのサムネイルを p95 10 秒以内に描けるかは **未検証**（E10 の `render-worker-core` の PoC で計測する）。lavapipe は Vulkan 1.3 の適合を得ている（Khronos の Vulkanised 2025 の発表 [Current state of Lavapipe](https://vulkan.org/user/pages/09.events/vulkanised-2025/T5-Lucas-Fryzek-Igalia.pdf)、2025-02-13、2026-09-27 に確認）。足りなければ足りなければ GPU のインスタンス（ECS on EC2）を別の ADR で検討する。
 - キューは 2 つに分ける：`render-export`（利用者が待つ。優先）、`render-thumbnail`（待たない。ファイルのサムネイルと、コメントの通知のプレビューの画像。[comments-and-notifications.md](comments-and-notifications.md) の 5.5 節）。同じサービスの 2 つのタスクの群れで受ける。
 - **1 ジョブを 1 つの子プロセスで描く。** 親のプロセスが SQS を受け、子のプロセスを起こし、結果を受け取って S3 に書く。子は、メモリの上限（`RLIMIT_AS` 8 GiB）と時間の上限を持ち、描き終えたら終わる。組織をまたいで、メモリに前のジョブの中身が残らないようにする。
 
 ### 5.2 ファイルの読み方
 
-1. ジョブには `org_id`・`file_id`・`seq`（描く版）・ノードの ID・設定が入る。ジョブを作るときに、API が判定関数で権限を確かめる（[ADR-0005](../decisions/0005-tenancy-and-document-routing.md)）。Render Worker は権限を判定しない。
+1. ジョブには `org_id`・`file_id`・`seq`（描くバージョン）・ノードの ID・設定が入る。ジョブを作るときに、API が判定関数で権限を確かめる（[ADR-0005](../decisions/0005-tenancy-and-document-routing.md)）。Render Worker は権限を判定しない。
 2. 子のプロセスは、`seq` 以下で最新のチェックポイントを S3 から読み、`seq` までのジャーナルを当てる（[ADR-0003](../decisions/0003-journal-and-checkpoints.md) の回復と同じコード）。Document Server には問い合わせない。持ち主の負荷を増やさないため。
 3. 対象のノードを含むページのチャンクだけを読む（[document-model.md](document-model.md) の 8.2 節）。
 4. 画像は `images/{org_id}/{sha256}` から、描く大きさに合う縮小版を読む（6.4 節）。フォントは 7.5 節の規則で集める。
@@ -210,10 +210,10 @@ Worker（TypeScript）が、Rust の検査器（`asset-inspect`。子プロセ�
 
 ### 6.5 削除（参照の数え上げ）
 
-- 画像の参照は、各ファイルのチェックポイントの `blob_refs_chunk` にある。参照の数は数えない。ファイルや版を消すとき（[file-storage-and-history.md](file-storage-and-history.md) の削除の手順）に、この領域で行うことはなく、次の掃除で消える。
-- 週に 1 回、組織ごとに「残している全チェックポイント（版の履歴を含む）の `blob_refs_chunk` の和集合」を作り、どこからも参照されず、作ってから 7 日を過ぎた画像を消す（mark-and-sweep）。7 日は、上げた直後でまだチェックポイントに入っていない画像を守るため。
-- **消すのは東京と大阪の両方のバケット。** S3 のレプリケーションは、版を指定した削除とライフサイクルの動作を大阪へ複製しない（[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md)、[security.md](security.md) の 7 節）。mark-and-sweep の削除・取り下げの削除・`exports/` と `thumbnails/` のライフサイクルの規則は、両方のバケットに同じものを置く。大阪が止まっているときは、大阪の分を後から流す。
-- ファイルと版の保持の期間は [file-storage-and-history.md](file-storage-and-history.md) と法務（[intent.md](../intent.md) の L4）で決まる。画像はそれに従って消える。
+- 画像の参照は、各ファイルのチェックポイントの `blob_refs_chunk` にある。参照の数は数えない。ファイルやバージョンを消すとき（[file-storage-and-history.md](file-storage-and-history.md) の削除の手順）に、この領域で行うことはなく、次の掃除で消える。
+- 週に 1 回、組織ごとに「残している全チェックポイント（バージョンの履歴を含む）の `blob_refs_chunk` の和集合」を作り、どこからも参照されず、作ってから 7 日を過ぎた画像を消す（mark-and-sweep）。7 日は、上げた直後でまだチェックポイントに入っていない画像を守るため。
+- **消すのは東京と大阪の両方のバケット。** S3 のレプリケーションは、バージョンを指定した削除とライフサイクルの動作を大阪へ複製しない（[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md)、[security.md](security.md) の 7 節）。mark-and-sweep の削除・取り下げの削除・`exports/` と `thumbnails/` のライフサイクルの規則は、両方のバケットに同じものを置く。大阪が止まっているときは、大阪の分を後から流す。
+- ファイルとバージョンの保持の期間は [file-storage-and-history.md](file-storage-and-history.md) と法務（[intent.md](../intent.md) の L4）で決まる。画像はそれに従って消える。
 - 権利の侵害の申し立てで画像を消すとき（[intent.md](../intent.md) の L2）は、`images` の行を `taken_down` にし、S3 のオブジェクトを消す。参照するノードは「読み込めない画像」になる。ファイルの中身（`image_hash`）は変えない。
 
 ## 7. フォント
@@ -230,7 +230,7 @@ ADR-0036。
 
 ### 7.2 同梱のフォント
 
-- 和文を先に揃える（[intent.md](../intent.md) の「日本の市場を先に狙う」）。候補は Noto Sans JP・Noto Serif JP・BIZ UDPGothic・BIZ UDPMincho・M PLUS 系など、OFL で配られているもの。欧文は Inter と、Google Fonts の OFL・Apache のもの。一覧と版は、開発リポジトリの `fonts/catalog.toml` に持ち、ライセンスの文と出典を並べる。
+- 和文を先に揃える（[intent.md](../intent.md) の「日本の市場を先に狙う」）。候補は Noto Sans JP・Noto Serif JP・BIZ UDPGothic・BIZ UDPMincho・M PLUS 系など、OFL で配られているもの。欧文は Inter と、Google Fonts の OFL・Apache のもの。一覧とバージョンは、開発リポジトリの `fonts/catalog.toml` に持ち、ライセンスの文と出典を並べる。
 - 既定のフォントは、UI の言語が日本語なら Noto Sans JP、それ以外は Inter。
 - 配信：`fonts/catalog/{sha256}` を CloudFront から配る。同梱のフォントは権限が要らないので、署名なしで、`immutable` のキャッシュにする。
 - 和文のフォントは 1 書体で数 MB になる（Noto Sans JP は、日本語のサブセットの OTF の Regular が約 4.5 MB、Google Fonts の可変フォント `NotoSansJP[wght].ttf` が約 9.6 MB。[notofonts/noto-cjk](https://github.com/notofonts/noto-cjk) の `Sans/SubsetOTF/JP`、[google/fonts](https://github.com/google/fonts) の `ofl/notosansjp`、2026-09-27 に確認）。読み込みの時間は E2 の `bundled-font-catalog` で計測する。書体ごとにファイル全体を読み、ブラウザのキャッシュ（Cache Storage）に持つ。文字の範囲ごとに分けて読む方式（Web フォントの `unicode-range` のような分割）は、整形（GSUB・GPOS）がファイル全体を要するため MVP では採らない。読み込みの時間を E10 で計測して見直す。
@@ -272,9 +272,9 @@ ADR-0036。
 ## 8. サムネイル
 
 - **何を描くか**：ファイルのサムネイルの対象のノード（利用者が選んだフレーム。なければ最初のページの最初の最上位のフレーム。それもなければ最初のページ全体）。対象のノードは、`DOCUMENT` のプロパティ `thumbnail_node`（[document-model.md](document-model.md) の 4.2 節の 91）に持つ。
-- **いつ描くか**：チェックポイントを書いた後、前のサムネイルから 5 分以上たち、対象のページが変わっていれば、Document Server が `render-thumbnail` にジョブを入れる。名前付きの版を作ったときは、その版のサムネイルも描く。
+- **いつ描くか**：チェックポイントを書いた後、前のサムネイルから 5 分以上たち、対象のページが変わっていれば、Document Server が `render-thumbnail` にジョブを入れる。名前付きのバージョンを作ったときは、そのバージョンのサムネイルも描く。
 - **大きさ**：長辺 960 px の WebP と、一覧用の長辺 320 px の WebP。
-- **置き場所**：`thumbnails/{org_id}/{file_id}/{seq}-{960|320}.webp`。`file_thumbnails` の表に最新の `seq` を持つ。古いものは 7 日後に消す。版のサムネイルは版と同じ期間残す。
+- **置き場所**：`thumbnails/{org_id}/{file_id}/{seq}-{960|320}.webp`。`file_thumbnails` の表に最新の `seq` を持つ。古いものは 7 日後に消す。バージョンのサムネイルはバージョンと同じ期間残す。
 - **配信**：ファイルの一覧の API が、閲覧の権限を判定関数で確かめたファイルだけに、署名付き URL（期限 15 分）を付けて返す。権限を外した後、新しい URL は出ない（NFR-010。サムネイルもファイルの中身として扱う）。
 - 共有のリンクのプレビュー（OGP の画像）は、「リンクを知っている全員」で共有したファイルにだけ出す。組織の中・招待だけのファイルは、一般の画像を出す（permissions-and-sharing.md と合わせる）。
 
@@ -339,7 +339,7 @@ ADR-0036。
 - 性質ベーステスト：
   - **PROP-EA-001**：任意の画像のバイト列で、クライアントの正規化 → ハッシュ → サーバーの検査のハッシュが一致する（冪等）。同じバイト列の 2 回目の登録は、PUT を求めない。
   - **PROP-EA-002**：任意の 2 組織で、一方の組織の文脈の署名の API に他方の画像のハッシュを渡しても、URL が返らない。
-  - **PROP-EA-003**：任意のファイルと版の集合で、6.5 節の削除の後、残したチェックポイントが参照する画像がすべて残る。
+  - **PROP-EA-003**：任意のファイルとバージョンの集合で、6.5 節の削除の後、残したチェックポイントが参照する画像がすべて残る。
   - **PROP-EA-004**：任意のレイヤー名（制御文字、`<`・`"`・`]]>` を含む）で、書き出した SVG が正しい XML で、スクリプトの要素・イベントの属性を含まない。
 - fuzzing：`asset-inspect` の画像とフォントの解析（任意のバイト列で落ちない、上限を超える確保をしない）、SVG の読み込みの解析器。
 - SSRF：Slack の ADR-0016 の Confirmation と同じ宛先の一覧で、`asset-fetch` が取得しない。

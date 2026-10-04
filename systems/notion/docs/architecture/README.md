@@ -108,12 +108,12 @@
 | [0016](../decisions/0016-relation-edges-as-single-source.md) | リレーションは 1 本の辺を正本にして、両側の値を導く |
 | [0017](../decisions/0017-rollups-over-readable-rows-only.md) | ロールアップとリレーションをたどる数式は、見る人が読める行だけで計算する |
 | [0018](../decisions/0018-permission-levels-and-inheritance.md) | 権限の水準を本家に合わせ、ACL は設定したページで継承を置き換える |
-| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限の版（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションで版を上げる |
+| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限のバージョン（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションでバージョンを上げる |
 | [0020](../decisions/0020-published-pages-isolation.md) | 公開ページは別の登録可能ドメインで、専用の描画サービスから配り、既定で検索エンジンに載せない |
 | [0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバーを分け、ゲスト・連携もメンバーの行にし、チームスペースを最上位の暗黙の ACL にする |
 | [0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱は 30 日、完全に削除した後も 30 日戻せ、ページの履歴はプランの日数で消す。バックアップの期限を削除の最終的な期限にする |
 | [0023](../decisions/0023-search-engine-and-permission-filtering.md) | 検索は S1 から OpenSearch でページ単位に索引し、権限キーと読み直しの二重で権限を効かせる |
-| [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付の版に寄せ、連携は明示的に共有されたページだけを読む |
+| [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付のバージョンに寄せ、連携は明示的に共有されたページだけを読む |
 | [0025](../decisions/0025-webhook-delivery.md) | Webhook は中身を含まない署名付きのイベントを、配送の時点の権限で、隔離した egress から送る |
 | [0026](../decisions/0026-remote-mcp-server.md) | AI エージェント向けに、利用者の委任で動くリモートの MCP サーバーを提供する |
 | [0027](../decisions/0027-shard-router.md) | 論理シャードを PostgreSQL のスキーマで持ち、アプリの中のルーターで物理クラスタへ振り分ける |
@@ -183,7 +183,7 @@ PM の方針（本家 Notion に寄せる、既定案）により、次のとお
 | 確定済みのトランザクションをクライアントが保持し、リージョンの切り替えの後に再送するか | E8 の DR 訓練（[collaboration.md](collaboration.md) の 14 節） |
 | 公開サイトの自動の検査の誤検知の許容度 | E8 の `abuse-reporting-and-takedown` の運用 |
 | `acl_version` の S2 での競合 | E9 の前の計測（ADR-0019） |
-| 再シャーディングの未検証の点（`FOR TABLES IN SCHEMA` と `rds_superuser`、使う版での `aurora_volume_logical_start_lsn()`）。フェイルオーバーでのスロットとクローンからの初期コピーは 2026-09-27 に解消（ADR-0028 の注記） | E9 の `reshard-drill-staging`（ADR-0028） |
+| 再シャーディングの未検証の点（`FOR TABLES IN SCHEMA` と `rds_superuser`、使うバージョンでの `aurora_volume_logical_start_lsn()`）。フェイルオーバーでのスロットとクローンからの初期コピーは 2026-09-27 に解消（ADR-0028 の注記） | E9 の `reshard-drill-staging`（ADR-0028） |
 | データレイクの形式（Hudi・Iceberg・zero-ETL） | S2 の前の比較（ADR-0030 は proposed のまま） |
 | ~~ADR-0013 の「デスクトップはネイティブの SQLite」と、ADR-0008・0009・editor.md の食い違い~~ | 2026-09-27 に解消。S1 はデスクトップも WASM の SQLite、ネイティブの SQLite は S2 の候補として計測で決める（[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)） |
 | ~~テーブル名の単数・複数の統一~~ | 2026-09-27 に解消。複数形に揃えた（[data-model.md](data-model.md) の冒頭の規約） |

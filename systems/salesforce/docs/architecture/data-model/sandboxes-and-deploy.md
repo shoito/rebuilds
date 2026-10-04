@@ -115,7 +115,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `org_id`・`id` | `uuid` | NOT NULL | — | |
 | `components` | `jsonb` | NOT NULL | — | 種類と名前の一覧、`with_dependencies` |
-| `metadata_version` | `bigint` | NULL | — | 書き出した版 |
+| `metadata_version` | `bigint` | NULL | — | 書き出したバージョン |
 | `state` | `text` | NOT NULL | `'queued'` | `queued`・`running`・`succeeded`・`failed` |
 | `s3_key` | `text` | NULL | — | `package.zip` |
 | `requested_by`・`created_at`・`expires_at` | | NOT NULL | — | 7 日 |
@@ -132,8 +132,8 @@ erDiagram
 | `mode` | `text` | NOT NULL | — | `validate`・`deploy`・`rollback` |
 | `state` | `text` | NOT NULL | `'queued'` | `queued`・`validating`・`validated`・`applying`・`succeeded`・`failed`・`cancelled` |
 | `options` | `jsonb` | NOT NULL | `'{}'` | `allow_data_loss`・`allow_warnings` |
-| `base_version` | `bigint` | NULL | — | 検証した時の版（V0） |
-| `result_version` | `bigint` | NULL | — | 適用で作った版 |
+| `base_version` | `bigint` | NULL | — | 検証した時のバージョン（V0） |
+| `result_version` | `bigint` | NULL | — | 適用で作ったバージョン |
 | `plan_hash` | `text` | NULL | — | 正規化した計画の SHA-256 |
 | `package_s3_key`・`plan_s3_key` | `text` | NULL | — | |
 | `validated_at` | `timestamptz` | NULL | — | |

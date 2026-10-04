@@ -189,7 +189,7 @@ CREATE DOMAIN rider_pin AS geo_pin
 | `pickup_area_ids` | `text[]` | NOT NULL | — | 乗車地を含む区域。要素は `<area_id>@<version>`（作成の時の `Contains`） |
 | `dropoff_area_ids` | `text[]` | NOT NULL | `'{}'` | 同上（降車地） |
 | `rideshare_consented_at` | `timestamptz` | NULL | — | 日本版ライドシェアの承諾 |
-| `upfront_notice_version` | `text` | NULL | — | 事前確定運賃の注意事項の版 |
+| `upfront_notice_version` | `text` | NULL | — | 事前確定運賃の注意事項のバージョン |
 | `upfront_consented_at` | `timestamptz` | NULL | — | 注意事項への同意 |
 | `payment_mode` | `text` | NOT NULL | — | `app`・`in_vehicle` |
 | `rider_payment_method_id` | `uuid` | NOT NULL | — | `money` の `rider_payment_methods.id`（クラスタが別なので外部キーなし）。車内払いでも登録を必須にする |
@@ -427,7 +427,7 @@ CREATE DOMAIN rider_pin AS geo_pin
 
 ### 3.11 `trip_eta_snapshots`
 
-受諾の時点などの ETA と、その出どころの版。定義元：[eta-and-routing.md](../eta-and-routing.md) の 4.2・4.3・6 節。
+受諾の時点などの ETA と、その出どころのバージョン。定義元：[eta-and-routing.md](../eta-and-routing.md) の 4.2・4.3・6 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -437,7 +437,7 @@ CREATE DOMAIN rider_pin AS geo_pin
 | `eta_s` | `int` | NOT NULL | — | |
 | `eta_source` | `text` | NOT NULL | — | `valhalla:<tile_version>`・`fallback`・`model:<version>` |
 | `tile_version` | `text` | NULL | — | |
-| `correction_version` | `text` | NULL | — | 偏りの補正の表の版 |
+| `correction_version` | `text` | NULL | — | 偏りの補正の表のバージョン |
 | `model_version` | `text` | NULL | — | E13 の ETA の補正のモデル（S2） |
 | `computed_at` | `timestamptz` | NOT NULL | — | |
 
@@ -499,7 +499,7 @@ CREATE DOMAIN rider_pin AS geo_pin
 
 ### 3.15 `product_vehicle_map`
 
-商品と車両の種類の対応（版つき）。配車の E2 と Trips の確かめ直しが同じ版を読む。定義元：[dispatch-and-matching.md](../dispatch-and-matching.md) の 5 節。
+商品と車両の種類の対応（バージョンつき）。配車の E2 と Trips の確かめ直しが同じバージョンを読む。定義元：[dispatch-and-matching.md](../dispatch-and-matching.md) の 5 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -509,5 +509,5 @@ CREATE DOMAIN rider_pin AS geo_pin
 | `effective_from` | `timestamptz` | NOT NULL | — | |
 | `status` | `text` | NOT NULL | `'draft'` | `draft`・`active`・`retired` |
 
-- キー：PK `(version, product_code, vehicle_class)`。有効な版は 1 つ（`UNIQUE (status) WHERE status = 'active'` を版の表に持つ代わりに、`active` の行の `version` がすべて同じことをトリガーで確かめる）。
+- キー：PK `(version, product_code, vehicle_class)`。有効なバージョンは 1 つ（`UNIQUE (status) WHERE status = 'active'` をバージョンの表に持つ代わりに、`active` の行の `version` がすべて同じことをトリガーで確かめる）。
 - 保持：消さない。S1 の量：数十行。

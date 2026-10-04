@@ -2,7 +2,7 @@
 
 [data-model.md](../data-model.md) の一部。フォームとリストの配置・画面の規則・利用者のリストの設定、ポータル・ページ・テーマ、テナントの文言の翻訳、検索の同義語と突き合わせ、レポート・ダッシュボード・定期の配信・実行の記録・エクスポート・日次の事実の表を定義する。振る舞いは [portal-and-ui.md](../portal-and-ui.md)、[search.md](../search.md)、[reports.md](../reports.md) を正とする。OpenSearch の索引の形は [stores.md](stores.md) の 3 節。
 
-- 配置と画面の規則の既定（`form_layout`・`list_layout`・`view_rule`・`ui_rule`）と、組み込みのレポートとダッシュボードは、コードの版だけに持つ。テナントは自分の行で上書き・複製する（[data-model.md](../data-model.md) の 3.1 節）。
+- 配置と画面の規則の既定（`form_layout`・`list_layout`・`view_rule`・`ui_rule`）と、組み込みのレポートとダッシュボードは、コードのバージョンだけに持つ。テナントは自分の行で上書き・複製する（[data-model.md](../data-model.md) の 3.1 節）。
 - **レポートの定義を共有しても、データは共有しない。** 開いた人・受け手の主体で計算する（[ADR-0046](../../decisions/0046-acl-aware-aggregation-and-per-recipient-delivery.md)）。
 
 ## 1. ER 図

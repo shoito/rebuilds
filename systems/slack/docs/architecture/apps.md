@@ -48,7 +48,7 @@ Web クライアント ─ スラッシュコマンド・ボタン ─▶ api �
 
 ### 3.1 マニフェスト
 
-アプリの定義を 1 つの JSON（YAML でも書ける）で持つ。開発者コンソールで編集し、公開すると版が 1 つ増える。スキーマは `packages/contract/public/v1` の Zod で定義し、公開 API と同じく OpenAPI（JSON Schema）として公開する。
+アプリの定義を 1 つの JSON（YAML でも書ける）で持つ。開発者コンソールで編集し、公開するとバージョンが 1 つ増える。スキーマは `packages/contract/public/v1` の Zod で定義し、公開 API と同じく OpenAPI（JSON Schema）として公開する。
 
 ```yaml
 manifest_version: 1
@@ -86,7 +86,7 @@ privacy_policy_url: https://deploy.example.com/privacy
 ```
 
 - スラッシュコマンドとショートカットは、`interactivity.request_url` を必須にする。コマンドごとに URL を分けない（検証と署名の対象を 1 つにする）。
-- マニフェストの版を上げても、既存のインストールは、インストールしたときの版のスコープのままにする。スコープの追加には、ワークスペースでの再同意が要る（5.3 節）。スコープ以外（名前、URL、コマンド、購読するイベント）は、公開と同時に全インストールに反映する。ただし、購読するイベントは、インストールで許されたスコープで絞る（7.1 節）。
+- マニフェストのバージョンを上げても、既存のインストールは、インストールしたときのバージョンのスコープのままにする。スコープの追加には、ワークスペースでの再同意が要る（5.3 節）。スコープ以外（名前、URL、コマンド、購読するイベント）は、公開と同時に全インストールに反映する。ただし、購読するイベントは、インストールで許されたスコープで絞る（7.1 節）。
 - 配布型のアプリで URL（`redirect_uris`、`request_url`）を変えると、ドメインの確認（14.2 節）をやり直す。
 
 ### 3.2 テーブル（テナントの外）
@@ -95,8 +95,8 @@ privacy_policy_url: https://deploy.example.com/privacy
 
 | テーブル | 中身 |
 | --- | --- |
-| `apps` | ID、所有するワークスペース、配布の種類、審査の状態（`none` / `pending` / `approved` / `rejected` / `blocked`）、公開中のマニフェストの版、作成日時、削除日時 |
-| `app_manifest_versions` | アプリ、版、マニフェストの JSON、公開日時 |
+| `apps` | ID、所有するワークスペース、配布の種類、審査の状態（`none` / `pending` / `approved` / `rejected` / `blocked`）、公開中のマニフェストのバージョン、作成日時、削除日時 |
+| `app_manifest_versions` | アプリ、バージョン、マニフェストの JSON、公開日時 |
 | `app_credentials` | アプリ、署名の秘密（KMS の `apps` キーで暗号化。HMAC に使うので復号できる必要がある）、旧い署名の秘密と失効の予定時刻（14.3 節）。`client_secret` は Better Auth の OAuth クライアントに置く |
 | `app_collaborators` | アプリ、所有するワークスペースの `member_id`、役割（`owner` / `editor`）。所有するワークスペースの中の ID なので、コンソールの読み取りは `SECURITY DEFINER` 関数で行う |
 | `app_verified_domains` | アプリ、ドメイン、DNS TXT の確認日時 |
@@ -112,7 +112,7 @@ privacy_policy_url: https://deploy.example.com/privacy
 
 | テーブル | 中身 |
 | --- | --- |
-| `app_installations` | ID、`app_id`、インストールしたマニフェストの版、許したボットのスコープ、許したユーザーのスコープ、ボットの `member_id`、インストールしたメンバー、状態（`pending_approval` / `active` / `suspended` / `uninstalled`）、作成・停止・アンインストールの日時。`UNIQUE (workspace_id, app_id)` |
+| `app_installations` | ID、`app_id`、インストールしたマニフェストのバージョン、許したボットのスコープ、許したユーザーのスコープ、ボットの `member_id`、インストールしたメンバー、状態（`pending_approval` / `active` / `suspended` / `uninstalled`）、作成・停止・アンインストールの日時。`UNIQUE (workspace_id, app_id)` |
 | `api_tokens`（既存を拡張） | `installation_id` を加える。種類 `bot` のトークンはインストールに属する（[identity-and-access.md](identity-and-access.md) の 9 節）。入れ替え中の旧いトークンの失効の予定時刻を持つ |
 | `app_user_authorizations` | インストール、`member_id`、許したユーザーのスコープ、日時、取り消しの日時。Better Auth の同意（グローバル）と対応させ、管理者の一覧と取り消しに使う |
 | `workspace_app_policies` | インストールの方針（`open` / `approval_required`）、メンバーのインストールを許すか、配布型のアプリを許すか |
@@ -294,7 +294,7 @@ HTTPS の `POST` で、次の JSON を送る。
 ```
 
 - `event` の中身は、公開 API のリソースと同じ形（[public-api.md](public-api.md) の 5.4 節）にする。内部のイベント（[realtime.md](realtime.md) の 4 節）をそのまま出さない。
-- `payload_v` は公開のペイロードの版。版を上げるときは、[public-api.md](public-api.md) の 8 節と同じ期間と手段で告知する。移行の間は、アプリがマニフェストで版を選ぶ。
+- `payload_v` は公開のペイロードのバージョン。バージョンを上げるときは、[public-api.md](public-api.md) の 8 節と同じ期間と手段で告知する。移行の間は、アプリがマニフェストでバージョンを選ぶ。
 - **中身は送る時点の DB から作る。** 投稿の後に編集されていれば編集後の本文を送る。削除済みのメッセージの `message.created` は送らない（`skipped`）。削除の事実は `message.deleted` で届く。再試行の間に消されたデータを外へ出さないため。
 - **順序は保証しない。** チャンネルのイベントには `channel_id` と `seq` を付けるので、アプリは `seq` で並べ直し、重複を捨てられる。`event_id` は再試行でも変わらない。
 - 1 回の配送の本文は 64 KB まで。超える本文のメッセージは、`truncated: true` を付けて本文を省き、アプリに公開 API で取り直させる（[realtime.md](realtime.md) の 16 KB の規則と同じ考え方）。
@@ -460,7 +460,7 @@ type InputElement = Element | { type: "plain_text_input"; action_id: string; mul
                   | { type: "checkboxes" | "radio_buttons"; action_id: string; options: Option[] };
 ```
 
-- スキーマは `packages/contract/public/v1` の Zod で定義し、公開 API と Events API の文書に出す。版を上げる規則は、本文の AST と同じ（変換関数、未知の型は描画しない）。
+- スキーマは `packages/contract/public/v1` の Zod で定義し、公開 API と Events API の文書に出す。バージョンを上げる規則は、本文の AST と同じ（変換関数、未知の型は描画しない）。
 - **画像は、本システムに置いたファイル（`file_id`）だけ。** 外部の画像の URL は受け付けない。CSP の `img-src` を広げず（[security.md](security.md) の 5 節）、閲覧者の IP を外部に渡さないため。アプリは `files:write` で画像を上げてから参照する。
 - ボタンの `url` は `https` だけ。押すと、遷移先のドメインを示す確認を挟んでから、新しいタブで開く（`noopener`）。
 - `members_select`・`channels_select` の選択肢は、操作するメンバーの権限でクライアントが引く。アプリは選択肢の中身を知らない。
@@ -534,7 +534,7 @@ type InputElement = Element | { type: "plain_text_input"; action_id: string; mul
 | S | 偽のアプリが、有名なサービスの名前で同意を得る | 同意の画面に、所有者・確認済みのドメイン・審査の状態（「未審査」「審査済み」）を示す。審査は任意なので（ADR-0033 の 4）、未審査のアプリには読み取りの厳しい上限をかけ、管理者は審査済みのアプリだけを許す方針を選べる |
 | T | `trigger_id`・`response_url` の使い回し | `trigger_id` は 10 秒・1 回限り・インストールに結び付ける。`response_url` は 30 分・5 回まで |
 | E | ボットのトークンの漏洩 | 接頭辞とシークレットスキャン、入れ替え、即時の失効、最終使用日時の表示 |
-| E | スコープの追加を黙って行う | スコープはインストールの版に固定し、追加は再同意（5.1 節） |
+| E | スコープの追加を黙って行う | スコープはインストールのバージョンに固定し、追加は再同意（5.1 節） |
 | E | 混乱した代理：アプリが、操作したメンバーの権限を借りて読めないものを読む | インタラクションはアプリにメンバーの権限を与えない。アプリはボットの権限（またはそのメンバーのユーザーのトークン）でしか読めない |
 | D | アプリの遅い応答・大量のイベントによる資源の枯渇 | 関数の分離と同時実行の上限、配送の上限、宛先の無効化（7.5 節、13 節） |
 | D | SSRF | 13 節 |
@@ -544,7 +544,7 @@ type InputElement = Element | { type: "plain_text_input"; action_id: string; mul
 - 審査は任意で、本家の Marketplace の審査に相当する。審査済みになると、読み取りの厳しい上限が外れ、「審査済み」の表示が付く（ADR-0033）。
 - 審査は、Ops の配下の「プラットフォームの審査」の担当が行う。エージェントは審査しない。
 - 観点：所有者とドメインの確認、プライバシーポリシー、求めるスコープの理由（開発者が記入する）、署名の検証を実装しているか（テストの配送で確かめる）、UI ブロックが紛らわしくないか、データの扱い（保存・第三者への提供・削除の依頼への対応）。
-- スコープを加える版の公開、配布の種類の変更、ドメインの変更は、再審査にする。それ以外の変更は、審査なしで公開できる。
+- スコープを加えるバージョンの公開、配布の種類の変更、ドメインの変更は、再審査にする。それ以外の変更は、審査なしで公開できる。
 - 審査で拒否・後から問題が見つかったアプリは `blocked` にでき、全インストールを停止する（`app_suspended`）。停止は監査ログに残し、各ワークスペースの管理者に知らせる。
 
 ### 14.3 秘密の入れ替え

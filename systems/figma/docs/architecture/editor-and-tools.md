@@ -64,7 +64,7 @@ NodeRef = Node(NodeId) | Derived(InstanceSubId)                   // components 
 
 ### 3.3 スナップショット（エンジン → 殻）
 
-- エンジンは、描画を終えた後、フレームに 1 回、変わった**話題**（topic）だけの版の番号を上げる。
+- エンジンは、描画を終えた後、フレームに 1 回、変わった**話題**（topic）だけのバージョンの番号を上げる。
 
 | 話題 | 中身 |
 | --- | --- |
@@ -76,7 +76,7 @@ NodeRef = Node(NodeId) | Derived(InstanceSubId)                   // components 
 | `text_edit` | 編集中のテキスト、カーソルの画面の位置（9 節の `textarea` の配置に使う） |
 | `status` | 接続、未確定の件数、メモリの警告、描画の簡略化 |
 
-- 殻は `useSyncExternalStore` で話題ごとに購読し、版が上がった話題の部品だけを再描画する。
+- 殻は `useSyncExternalStore` で話題ごとに購読し、バージョンが上がった話題の部品だけを再描画する。
 - レイヤーのパネルは仮想化する。10 万ノードでも、画面に見える行（とその前後 50 行）だけをエンジンに求める。
 
 ### 3.4 1 フレームの流れ
@@ -84,7 +84,7 @@ NodeRef = Node(NodeId) | Derived(InstanceSubId)                   // components 
 1. ブラウザのイベント（pointer、key、`beforeinput`）は、エンジンの入力の列に積むだけにする。
 2. `requestAnimationFrame` の最初に、列の入力をまとめて処理し、`ChangeSet` を作る（ドラッグの途中の移動は、1 フレームに 1 つ）。
 3. レイアウト → シーングラフ → 描画（[rendering-engine.md](rendering-engine.md) の 3 節）。
-4. 話題の版を上げる。React は同じフレームの残りで再描画する（11 節の予算）。
+4. 話題のバージョンを上げる。React は同じフレームの残りで再描画する（11 節の予算）。
 
 - `pointermove` は 1 フレームに何回も来る。処理はフレームに 1 回だけ。ペンと曲げのツールは、`getCoalescedEvents()` が使えるときは、まとめられた点をすべて使う。
 
@@ -344,7 +344,7 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 ### 16.2 IME と入力
 
 - Playwright で、`compositionstart`・`update`・`end` の列を合成して流すテスト（Chromium・Firefox・WebKit）。
-- 9.2 節の組み合わせの手動の確認を、E4 のリリースの前と、ブラウザの大きな版の更新のたびに行う。確認の手順は quality.md に置く。
+- 9.2 節の組み合わせの手動の確認を、E4 のリリースの前と、ブラウザの大きなバージョンの更新のたびに行う。確認の手順は quality.md に置く。
 - 実機の IME での自動のテストは、OS の入力の注入（macOS の `CGEvent`、Windows の `SendInput`）で、最低限の「ひらがなを入力 → 変換 → 確定」を毎日流す（仕組みは **未検証**。E4 の前の `ime-textarea-poc` で作れるか確かめる）。
 
 ### 16.3 その他
@@ -425,7 +425,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 
 ### quality.md
 
-- SC-5（IME の重大な不具合 0 件）の確認の手順：9.2 節の OS × IME × ブラウザの組み合わせの手動の確認表と、合成のイベントの自動のテスト。ブラウザの大きな版の更新のたびに流す。
+- SC-5（IME の重大な不具合 0 件）の確認の手順：9.2 節の OS × IME × ブラウザの組み合わせの手動の確認表と、合成のイベントの自動のテスト。ブラウザの大きなバージョンの更新のたびに流す。
 - PROP-EDIT-001〜006 を E4 のリリースの基準にする。
 - 性能の予算（11 節）を E4 のリリースの基準にする。入力から描画までの p95 を RUM で見る。
 - a11y：殻は WCAG 2.2 AA（axe と手動）。キャンバスは 12 節の範囲（キー操作と読み上げ）を手動で確かめる。
@@ -434,7 +434,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 ### runbooks
 
 - `ime-regression.md`：ブラウザや OS の更新で IME の不具合が報告されたとき、組み合わせを絞り込み、PoC の記録と比べ、回避のフラグ（`compositionend` の扱いの切り替え）を出す手順。
-- `engine-panic-spike.md`：エンジンの panic の急増で、版・ブラウザ・場所（ID と場所だけ）で絞り、前の版に戻すか判断する手順。
+- `engine-panic-spike.md`：エンジンの panic の急増で、バージョン・ブラウザ・場所（ID と場所だけ）で絞り、前のバージョンに戻すか判断する手順。
 
 ### data-model（索引への追加の提案）
 

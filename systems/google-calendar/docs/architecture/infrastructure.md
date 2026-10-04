@@ -1,13 +1,13 @@
 # Infrastructure: Google Calendar
 
-AWS のアカウントとネットワーク、入口（画面・API・予約ページ・CalDAV・iMIP の受信）、外への送信（ICS の購読、Webhook、Web Push、メール）、サービスの分け方と配置、データの置き場所、tzdb の版の全サービスへの配り方、バックアップと災害復旧（大阪、`sync_epoch`）、段階を上げる基準、S2 のテナントのシャード、S3 のセルとリージョン、Terraform、コストを決める。他の題材（Linear・Slack・Auth0 の infrastructure.md）を土台にし、この題材に固有の事情だけを変える（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+AWS のアカウントとネットワーク、入口（画面・API・予約ページ・CalDAV・iMIP の受信）、外への送信（ICS の購読、Webhook、Web Push、メール）、サービスの分け方と配置、データの置き場所、tzdb のバージョンの全サービスへの配り方、バックアップと災害復旧（大阪、`sync_epoch`）、段階を上げる基準、S2 のテナントのシャード、S3 のセルとリージョン、Terraform、コストを決める。他の題材（Linear・Slack・Auth0 の infrastructure.md）を土台にし、この題材に固有の事情だけを変える（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 | ADR | 決定 |
 | --- | --- |
 | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md) | アカウントとネットワークは他の題材の形。画面・API・予約ページは CloudFront、CalDAV は WebDAV のメソッドを通すため WAF つきの ALB で受ける。iMIP は東京の SES の受信を主、大阪を副の MX にする。利用者の決める宛先は egress の経路から、Web Push は配信のサービスの許可リストだけへ出す |
 | [0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md) | 大阪のウォームスタンバイへ人の判断で切り替え、書き込みを止めてから昇格し、`sync_epoch` を上げる。外部への iMIP の次の送信で `SEQUENCE` を 1 つ余分に上げ、リマインダーの重複は数えて SLO から分ける |
 | [0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | 段階を上げる基準。S2 はテナントを単位に Aurora のクラスタへ分け、ディレクトリを小さなクラスタに置く。テナントをまたぐ主な経路は SQS の内部の iTIP と、空き時間の内部の RPC。保守用の表はクラスタごと。S3 はセルとリージョン |
-| [0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しい版はイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` で全サービスを一度に切り替える（delivery の領域） |
+| [0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しいバージョンはイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` で全サービスを一度に切り替える（delivery の領域） |
 | IaC、デプロイの方式、可観測性の道具 | 他の題材を引き継ぐ（Terraform、GitHub Actions と OIDC、ADOT・AMP・X-Ray・CloudWatch Logs・Managed Grafana） |
 
 ログ・メトリクス・SLI は [observability.md](observability.md)、負荷と台数の根拠は [capacity.md](capacity.md)、CI とリリースは [delivery.md](delivery.md)、暗号化と統制は [security.md](security.md) にある。
@@ -195,7 +195,7 @@ sequenceDiagram
 - 事実（Aurora Global Database の計画外のフェイルオーバーで複製の遅延ぶんを失いうること、古い一次の書き込みを止める仕組みが最善努力であること、`rds.global_db_rpo` の意味）は、Linear の infrastructure.md の 6.3 節で 2026-09-28 に確かめたもの（[Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)）を引き継ぐ。`rds.global_db_rpo` は設定しない。`AuroraGlobalDBRPOLag` が 10 秒を 5 分超えたら呼び出す。
 - **`sync_epoch` を必ず上げる**（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。Web・API・CalDAV のトークンはすべて 410 になる。取り直しの殺到の構成の広げ方は [capacity.md](capacity.md) の 5 節。
 - **失った範囲の外への副作用**（iMIP の `SEQUENCE` の余白、リマインダーの重複、通知、外部からの iMIP の受信、送信の上限の数）の扱いは ADR-0044 の表。
-- **tzdb の版**：大阪の AppConfig の `tzdata.active_version` が東京と同じことを、6.5 節の確認に入れる。違えば切り替えの前に合わせる。
+- **tzdb のバージョン**：大阪の AppConfig の `tzdata.active_version` が東京と同じことを、6.5 節の確認に入れる。違えば切り替えの前に合わせる。
 - **Web Push**：VAPID の鍵は Secrets Manager の大阪のレプリカで同じものを使う。購読はそのまま使える。
 - **東京へ戻す**：計画作業として switchover（RPO 0）で戻す。番号が保たれるので `sync_epoch` を上げない。
 
@@ -217,18 +217,18 @@ sequenceDiagram
 | Fargate の vCPU のクォータが、大阪でも東京と同じ | 月次 |
 | SES の送信の上限（送信の率、24 時間の数）が、大阪でも東京と同じ | 月次 |
 
-## 7. tzdb の版を全サービスに配る
+## 7. tzdb のバージョンを全サービスに配る
 
 ADR-0049（流れの全体は [delivery.md](delivery.md) の 6 節）。
 
-| 部品 | 版の持ち方 | 切り替え |
+| 部品 | バージョンの持ち方 | 切り替え |
 | --- | --- | --- |
-| サーバーのサービス（`api`、`caldav`、`booking`、`worker-*`） | イメージの中に、`active` とその前後の版（最大 3 版） | AppConfig の `tzdata.active_version` を 15 秒のポーリングで読む。使っている版をメトリクス `tzdata_active_version` で出す |
+| サーバーのサービス（`api`、`caldav`、`booking`、`worker-*`） | イメージの中に、`active` とその前後のバージョン（最大 3 バージョン） | AppConfig の `tzdata.active_version` を 15 秒のポーリングで読む。使っているバージョンをメトリクス `tzdata_active_version` で出す |
 | Web のクライアント | `/tzdata/<version>/<zone>.bin`（S3、変わらない） | API の応答の `tzdata_version` で取る（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)） |
-| CalDAV・ICS・iMIP の VTIMEZONE | `active` の版から作る（[time-zones-and-holidays.md](time-zones-and-holidays.md) の 8 節） | 同上 |
-| `worker-expander` の再計算 | 全タスクが新しい版を 2 分続けて報告したら始める | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) |
+| CalDAV・ICS・iMIP の VTIMEZONE | `active` のバージョンから作る（[time-zones-and-holidays.md](time-zones-and-holidays.md) の 8 節） | 同上 |
+| `worker-expander` の再計算 | 全タスクが新しいバージョンを 2 分続けて報告したら始める | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) |
 | 大阪 | 同じイメージ、同じ AppConfig の値 | 東京と同時に当てる（6.5 節で確かめる） |
-| DB | オフセットの計算に使わない（[ADR-0002](../decisions/0002-time-representation.md)）。Aurora の tzdata の版は気にしない | — |
+| DB | オフセットの計算に使わない（[ADR-0002](../decisions/0002-time-representation.md)）。Aurora の tzdata のバージョンは気にしない | — |
 
 ## 8. CI/CD と Terraform
 
@@ -357,7 +357,7 @@ ADR-0045。
 - **iMIP の受信**：東京を主、大阪を副の MX（ADR-0043）。
 - **DR**：ウォームスタンバイ、`sync_epoch` を上げる、iMIP の `SEQUENCE` の余白、リマインダーの重複の計数（ADR-0044）。
 - **S2・S3**：テナントを単位のクラスタ、ディレクトリ、セル（ADR-0045）。
-- **tzdb**：イメージに複数の版、AppConfig で切り替え（ADR-0049）。
+- **tzdb**：イメージに複数のバージョン、AppConfig で切り替え（ADR-0049）。
 
 ### 持ち越し
 

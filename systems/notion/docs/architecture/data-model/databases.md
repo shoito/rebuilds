@@ -57,7 +57,7 @@ erDiagram
     uuid row_id PK "行のページ"
     boolean in_trash "ゴミ箱"
     boolean has_row_acl "行に固有の ACL"
-    bigint version "行の版"
+    bigint version "行のバージョン"
   }
   dbx_values {
     uuid workspace_id PK "テナント"

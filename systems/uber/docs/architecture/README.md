@@ -40,7 +40,7 @@
 
 - **割り当ての正本は Trips の DB。** 配車と索引はメモリの上で速く考えるが、割り当ては Trips が fencing token（`(region_gen, assignment_epoch)`）つきのトランザクションで確定する（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)、[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)、[ADR-0039](../decisions/0039-city-cells-and-osaka-warm-standby.md)）。
 - **位置は流れ、状態は残す。** 位置は失ってよい流れ（次の 4 秒で上書きされる）として扱い、乗車の状態は失わない正本として扱う（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）。
-- **運賃の規則はデータ。** 地域・事業者・有効期間つきの規則を版で持ち、計算はその版を引数に取る純粋な関数にする（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
+- **運賃の規則はデータ。** 地域・事業者・有効期間つきの規則をバージョンで持ち、計算はそのバージョンを引数に取る純粋な関数にする（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
 - **配車は再生できる。** 配車の入力（依頼、位置、ETA、乱数の種）を記録し、同じ入力から同じ判断を再現できるようにする（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)、[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）。
 - **法務の確認待ちは仕組みで止める。** 法務の確認待ちの経路は legal のフラグの裏に置き、法務の結論の記録がないと本番で有効にできない。緊急の入口はどのフラグでも止まらない（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)）。
 
@@ -114,11 +114,11 @@
 | [0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md) | 索引は都市と `metro` の集まりで分け、持ち主は DynamoDB のリースで決め、直近 35 秒から作り直す |
 | [0012](../decisions/0012-geo-index-nearby-query-api.md) | 近くの空車の検索は輪を広げて外周までの距離で打ち切る。依頼の前の地図の車は丸めて返す |
 | [0013](../decisions/0013-batch-assignment-solver.md) | バッチの割り当ては迎車の ETA を主にしたコストで最短増加路法で解き、300 ms を超えたら貪欲法 |
-| [0014](../decisions/0014-dispatch-eligibility-and-street-hails.md) | 候補の条件は版つきのデータの純粋な関数で判定し、流しの実車（タクシーだけ）は索引から外す。日本版ライドシェアは承諾・事前確定運賃・運行枠の中だけ |
+| [0014](../decisions/0014-dispatch-eligibility-and-street-hails.md) | 候補の条件はバージョンつきのデータの純粋な関数で判定し、流しの実車（タクシーだけ）は索引から外す。日本版ライドシェアは承諾・事前確定運賃・運行枠の中だけ |
 | [0015](../decisions/0015-offer-protocol-decision-log-and-replay.md) | オファーは表示 15 秒・サーバーの期限 16.5 秒、届かなければ 5 秒で取り下げ。判断は丸めた入力ごと記録し、再生・シミュレーション・影の実行で比べる |
 | [0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md) | Valhalla は taxi の costing と週 1 回の検査つきのタイル。ETA は経路の時間に偏りの補正を足し、受諾の時点の表示と実際の差で計る |
 | [0017](../decisions/0017-fare-distance-for-pre-fixed-fares.md) | 事前確定運賃の推計走行距離は確認の済んだ商用の地図だけで求め、通達の要件を API で守る |
-| [0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md) | 運賃の規則は版つきのデータにし、円の整数と決めた段の丸めだけで計算する |
+| [0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md) | 運賃の規則はバージョンつきのデータにし、円の整数と決めた段の丸めだけで計算する |
 | [0019](../decisions/0019-meter-fare-sources.md) | メーターの運賃は車載のメーターか認定ソフトメーターから受け取り、連携がなければ入力を影の計算と照合する |
 | [0020](../decisions/0020-dynamic-fares-within-authorized-bands.md) | 変動運賃と変動迎車料金は、事業者ごとの認可の幅の中で、事業者の時間帯の表で変える |
 | [0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md) | 遷移は 1 つの関数で行い、epoch を作成と解放で増やし、部分一意索引で有効な割り当てを 1 つに限る |
@@ -133,7 +133,7 @@
 | [0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md) | アプリとの常時の接続は gRPC の双方向ストリーム 1 本にし、Go の rt-gateway で受ける |
 | [0031](../decisions/0031-per-stream-sequence-redelivery-push-and-sms.md) | 配信は受け手ごとの seq と TTL で順序と送り直しを持ち、正しさは API の読み直し。届かなければプッシュ、SMS は限る |
 | [0032](../decisions/0032-ops-console-roles-limits-change-requests-and-audit.md) | 運用のツールはロールと上限、理由つきの一時の権限、書き手と承認者を分ける変更の要求。閲覧と監査を毎日照合する |
-| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込む。営業区域・交通圏は版つきの多角形にし、格子のセルの写しと多角形で判定する |
+| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は週 1 回の検査つきで取り込む。営業区域・交通圏はバージョンつきの多角形にし、格子のセルの写しと多角形で判定する |
 | [0034](../decisions/0034-geocoding-provider-and-pickup-points.md) | 住所の検索は自前の API の後ろに 1 社の提供者。乗降は乗客が確かめたピンだけを保存し、乗降の地点は運用が確かめたデータ |
 | [0035](../decisions/0035-ml-feature-store-and-shadow-rollout.md) | 最初のモデルは勾配ブースティングで ETA を補正し、特徴量は 1 つのパイプラインで両方に書き、影の実行を経て展開する（S2） |
 | [0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md) | 位置と個人の情報は 6 種類の KMS の鍵と保持の期間で分け、人が見る操作は理由・範囲・期限つきの許可と改ざんできない監査ログ |
@@ -238,7 +238,7 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | `region_gen` を上げたときの epoch | 0 に戻さない | 正しさは同じで、世代をまたいで値が重ならず読み違えにくいため | [trips-lifecycle.md](trips-lifecycle.md) の 4.2 節 |
 | 抜き打ちの顔の照合の間のオファー | 5 分止める | 自撮りの最中のオファーの時間切れを、自動の休憩に数えないため | [safety-and-trust.md](safety-and-trust.md) の 7.2 節 |
 | `eta-service` | Go のサービスに数え、6 つにする | 独自の API を持ち、別に配備するため | [ADR-0001](../decisions/0001-platform-and-stack.md) の注記 |
-| 運賃のテストの固定の値 | 2026-04-20 の改定の後の値（初乗 1.0 km、加算 232 m） | 現行の認可の値で確かめるため。改定の前の値は版の切り替えの試験だけ | [pricing-and-fares.md](pricing-and-fares.md) の 11.3 節 |
+| 運賃のテストの固定の値 | 2026-04-20 の改定の後の値（初乗 1.0 km、加算 232 m） | 現行の認可の値で確かめるため。改定の前の値はバージョンの切り替えの試験だけ | [pricing-and-fares.md](pricing-and-fares.md) の 11.3 節 |
 | 事前確定運賃と影の計算の差の閾値 | 週の比の中央値が平準化係数から ±10% を外れたら知らせる | 係数は実績と推計の比なので、比のずれで乖離を測れるため | [quality.md](../quality.md) の 4 節、[pricing-and-fares.md](pricing-and-fares.md) の 13 節 |
 | 評価の閾値 | 2 以下で組を拒否、乗客の注意は 3.5 | S1 の初めの値。分布を見て見直す | [safety-and-trust.md](safety-and-trust.md) の 7.1 節、[ADR-0029](../decisions/0029-masked-communications-identity-and-ratings.md) |
 | 運用のロールの上限の値 | 設計の値を S1 の初めの値にする | S1 の問い合わせの分布を見て見直す | [support-and-operations-tools.md](support-and-operations-tools.md) の 2.1 節、[ADR-0032](../decisions/0032-ops-console-roles-limits-change-requests-and-audit.md) |
@@ -270,7 +270,7 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | [geospatial-index.md](geospatial-index.md) | 格子のセルの索引、分割、リース、再構築、検索の API | 0011〜0012 | QA | E3、E14 |
 | [dispatch-and-matching.md](dispatch-and-matching.md) | バッチのマッチング、候補の条件、オファーと時間切れ、流しとの両立、判断の記録と再生 | 0013〜0015 | QA | E5、E6 |
 | [eta-and-routing.md](eta-and-routing.md) | ETA の種類、Valhalla の運用、速度の表、精度の計測、推計走行距離 | 0016〜0017 | QA | E4 |
-| [pricing-and-fares.md](pricing-and-fares.md) | メーターの運賃、事前確定運賃、迎車料金、変動運賃、版つきの規則、端数 | 0018〜0020 | QA、法務の窓口 | E7 |
+| [pricing-and-fares.md](pricing-and-fares.md) | メーターの運賃、事前確定運賃、迎車料金、変動運賃、バージョンつきの規則、端数 | 0018〜0020 | QA、法務の窓口 | E7 |
 | [trips-lifecycle.md](trips-lifecycle.md) | 状態機械、割り当ての確定、取り消し、タイマー、outbox、通信が切れたときの継続と復元 | 0021〜0022 | QA | E6 |
 | [payments-and-payouts.md](payments-and-payouts.md) | PSP、与信と確定、返金、代金の受け取りの形、台帳、精算、照合 | 0023〜0025 | QA、お金の持ち主 | E8 |
 | [supply-and-operators.md](supply-and-operators.md) | 事業者・営業所・車両・ドライバー、書類、出庫の判定、管理画面、日本版ライドシェアの運行枠 | 0026〜0027 | QA | E2、E12 |
@@ -292,13 +292,13 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 
 | Epic | 中身 |
 | --- | --- |
-| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・状態機械のベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格、監査ログ、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車と版の方針、SMS のワンタイムコード |
+| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・状態機械のベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格、監査ログ、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車とバージョンの方針、SMS のワンタイムコード |
 | E2 事業者と供給 | 事業者・営業所・車両・ドライバーの登録、書類の確認、出庫の判定とセッション、点呼、事業者の管理画面、振込先 |
 | E3 位置と索引 | 位置の取り込みと検証、Kinesis、軌跡と当てはめ、索引とリースと再構築、検索、需給の集計、位置の閲覧の許可、端末の完全性 |
 | E4 地図と ETA | Valhalla のタイルと配信、ETA と補正と精度、推計走行距離、OSM と ODbL、住所の検索と乗降の地点、区域の多角形 |
 | E5 配車 | バッチの周期とリース、候補の条件、最適化、提案、判断の記録、再生・市場のシミュレーション・影の実行、受け入れの上限 |
 | E6 乗車とリアルタイム | 状態機械、割り当ての確定、タイマー、outbox、取り消し、journal と復元、オファーの手順、常時の接続、車の位置、プッシュ通知、不変条件の検査 |
-| E7 運賃 | 版つきの運賃の規則、金額の型、距離制と影の計算、事前確定運賃、価格の群、迎車料金、メーターの連携、変動運賃（legal のフラグ）、水準の報告、`fare-replay` |
+| E7 運賃 | バージョンつきの運賃の規則、金額の型、距離制と影の計算、事前確定運賃、価格の群、迎車料金、メーターの連携、変動運賃（legal のフラグ）、水準の報告、`fare-replay` |
 | E8 決済と精算 | PSP の包み、与信と確定、追加の請求、キャンセル料、台帳、締めと振込、照合、代金の受け取りの形（legal のフラグ） |
 | E9 アプリ | 乗客とドライバーの画面、背景の位置と電池、オファーの画面、ナビの引き継ぎ、journal、状態機械のベクター、流しの実車（タクシーだけ） |
 | E10 安全と信頼 | 緊急の入口と受け付け、乗車の共有（`legal.l4.share_trip`）、PIN、番号を隠した通話、メッセージ、評価、顔の照合（`legal.l4.driver_face_check`）、報告と事故、異常の検知、不正の点数 |

@@ -295,7 +295,7 @@ erDiagram
 
 - 主キー：`(tenant_id, identity_id)`。
 - 外部キー：`(tenant_id, identity_id)` → `user_identities` `ON DELETE CASCADE`。
-- 索引：`(pepper_version)` は RLS の下では使えないので持たない。版ごとの件数は `platform` の日次のジョブが数える（`pepper_versions.hash_count`）。
+- 索引：`(pepper_version)` は RLS の下では使えないので持たない。バージョンごとの件数は `platform` の日次のジョブが数える（`pepper_versions.hash_count`）。
 - S1 の規模：約 1,500 万行（データベース接続の利用者を 7 割と仮定）。
 
 ### password_history
@@ -434,7 +434,7 @@ LDAP のコネクタ（外向きの WebSocket、相互 TLS）。
 | `client_cert_fingerprint` | `bytea` | NO | | クライアント証明書の SHA-256 |
 | `status` | `text` | NO | | `online`・`offline`・`revoked` |
 | `last_seen_at` | `timestamptz` | YES | | |
-| `version` | `text` | YES | | コネクタの版 |
+| `version` | `text` | YES | | コネクタのバージョン |
 | `created_at` | `timestamptz` | NO | `now()` | |
 
 - 主キー：`(tenant_id, id)`。一意：`(client_cert_fingerprint)` は RLS の外で効く索引（受け口が証明書からテナントを決めるため。書き込みは `mgmt_app` の関数だけ。`custom_domains` の一意の索引と同じ扱い）。

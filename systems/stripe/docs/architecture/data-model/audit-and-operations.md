@@ -103,8 +103,8 @@ erDiagram
 | `key` | `text` | NOT NULL | — | `Idempotency-Key`（255 文字まで） |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | パーティションの鍵 |
 | `request_method`・`request_path` | `text` | NOT NULL | — | |
-| `request_hash` | `bytea` | NOT NULL | — | メソッド・パス・正規化した本文の SHA-256（版を含めない） |
-| `api_version` | `text` | NOT NULL | — | 最初の要求の版 |
+| `request_hash` | `bytea` | NOT NULL | — | メソッド・パス・正規化した本文の SHA-256（バージョンを含めない） |
+| `api_version` | `text` | NOT NULL | — | 最初の要求のバージョン |
 | `state` | `text` | NOT NULL | `'started'` | `started`・`completed` |
 | `locked_until` | `timestamptz` | NOT NULL | — | 今 ＋ 60 秒 |
 | `response_status` | `integer` | NULL | — | |
@@ -126,7 +126,7 @@ erDiagram
 | `account_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `created_at` | `timestamptz` | NOT NULL | — | パーティションの鍵 |
-| `category` | `text` | NOT NULL | — | `security`（ログイン、MFA、メンバー、API キー、アクセスポリシー、入金先の口座、既定の版）・`operation`（返金、Dispute の提出、不正のルール、Webhook の送信先、エクスポート、運用者の閲覧） |
+| `category` | `text` | NOT NULL | — | `security`（ログイン、MFA、メンバー、API キー、アクセスポリシー、入金先の口座、既定のバージョン）・`operation`（返金、Dispute の提出、不正のルール、Webhook の送信先、エクスポート、運用者の閲覧） |
 | `action` | `text` | NOT NULL | — | `api_key.created`・`login.succeeded` など |
 | `actor_type` | `text` | NOT NULL | — | `user`・`api_key`・`operator`・`system` |
 | `actor_id` | `text` | NULL | — | `user_id`・`rak_`・社内の担当者 |

@@ -64,7 +64,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `org_id`・`object_id` | `uuid` | NOT NULL | — | |
 | `state` | `text` | NOT NULL | `'building'` | `building`・`ready`・`degraded` |
-| `index_version` | `integer` | NOT NULL | — | 索引の版（`rec-v{n}`） |
+| `index_version` | `integer` | NOT NULL | — | 索引のバージョン（`rec-v{n}`） |
 | `index_alias` | `text` | NOT NULL | — | 読む別名（`rec-v{n}-{shard_no % 16}`、大口の組織は専用の索引） |
 | `last_full_build_at` | `timestamptz` | NULL | — | |
 

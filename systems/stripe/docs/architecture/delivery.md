@@ -61,7 +61,7 @@ Slack の delivery.md の 2.1 節の段をすべて持ち、次を足す。目�
 | コネクタの障害注入 | 模擬のアクワイアラで、タイムアウト、応答の欠落、二重の応答、遅延を注入し、結果不明の処理と照会が 1 回だけお金を動かすこと | 1 件でも |
 | カード番号の流出 | テストの実行中のログ・DB・メッセージを走査し、Luhn を満たす 13〜19 桁の列がないこと（テスト用のカード番号を含めて、CDE の外に出ていないこと） | 1 件でも |
 | ログの項目 | ロガーに許可リスト外の項目、`Pan` 型、要求の本文の全体を渡すコード（[observability.md](observability.md) の 4.2 節） | 1 件でも |
-| API の版 | 公開 API の OpenAPI の差分が、版の規則（[api.md](api.md)）に沿う。固定した版の応答が変わらない | 規則の違反 |
+| API のバージョン | 公開 API の OpenAPI の差分が、バージョンの規則（[api.md](api.md)）に沿う。固定したバージョンの応答が変わらない | 規則の違反 |
 | お金の区分 | お金の区分 A（2.2 節）の変更に、5 節の比較の計画が `plan.md` にある | 計画がない |
 | CDE（`cde/` の変更時） | 上記に加えて、CDE の SAST、依存の脆弱性、コンテナの検査を厳しい基準（Medium 以上）で行う | Medium 以上 |
 
@@ -109,7 +109,7 @@ CDE ：main ─▶ cde-nonprod（自動）─▶ cde-test（CDE の承認）─�
 | 順 | 対象 | 方式 |
 | --- | --- | --- |
 | 1 | マイグレーション（expand） | 1 回だけ実行する ECS タスク（`migrator`）。台帳のテーブルへの変更は、5.3 節の追加の規則に従う |
-| 2 | relay、workers、webhook-router・sender・scheduler、connectors。webhook-egress の Lambda は新しい版を発行して別名を切り替える | ローリング（`minimumHealthyPercent` 100%） |
+| 2 | relay、workers、webhook-router・sender・scheduler、connectors。webhook-egress の Lambda は新しいバージョンを発行して別名を切り替える | ローリング（`minimumHealthyPercent` 100%） |
 | 3 | api | ECS のネイティブな blue/green のカナリア（10% → 100%）。アラームで自動ロールバック |
 | 4 | dashboard、checkout | blue/green |
 | 5 | CDE（別の経路。6 節） | vault-core → vault-ingest → connector-gateway。それぞれ blue/green。Elements の iframe の静的ファイルは最後に差し替える |

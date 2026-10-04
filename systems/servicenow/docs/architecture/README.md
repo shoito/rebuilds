@@ -41,7 +41,7 @@
    │  Valkey（辞書と ACL のコンパイル済みのキャッシュ、セッションの写し、レート制限）         │
    │  S3（添付ファイル、メールの原本、エクスポート）                                          │
    └───────────────────────────────────────────────────────────────────────────────────┘
-   制御の面（全セルで共有）：テナントの台帳とセルの対応、プロビジョニング、版とフラグの配布
+   制御の面（全セルで共有）：テナントの台帳とセルの対応、プロビジョニング、バージョンとフラグの配布
    mail-ingress（全セルで共有）：SES の受信 → 一時の S3 → mail-router（封筒の受け手 → テナント → セル）
 ```
 
@@ -61,10 +61,10 @@
 
 原則は 5 つ。
 
-- **メタデータが振る舞いを決める。** テーブル・フィールド・フォーム・ACL・フロー・SLA は、テナントごとの版付きのメタデータとして持つ。コードはメタデータを解釈する（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)）。
+- **メタデータが振る舞いを決める。** テーブル・フィールド・フォーム・ACL・フロー・SLA は、テナントごとのバージョン付きのメタデータとして持つ。コードはメタデータを解釈する（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)）。
 - **読み書きは 1 つの入口と 1 つの判定を通す。** Record Service と ACL の判定の関数を、画面・API・レポート・検索・通知が共有する。
 - **状態の遷移は、DB のトランザクションで 1 回だけ行う。** レコード・フローの実行・タイマー・outbox を同じトランザクションで書く（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)）。
-- **セルで分け、テナントで閉じる。** 共有のセルと専用のセルは同じコード・同じ版で動く（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
+- **セルで分け、テナントで閉じる。** 共有のセルと専用のセルは同じコード・同じバージョンで動く（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
 - **本家の実装を使わず、互換も求めない。** スクリプトの API に似せた層を作らない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 
 ### 1.3 主要なフロー
@@ -79,7 +79,7 @@
 **変更の承認（CAB）**
 
 1. 変更の記録を「評価」に進めると、リスクの質問票と規則からリスクを決める。リスクと種類で、承認の方針（誰の、何段の承認か）が決まる。
-2. Engine が承認の依頼を作り、承認者へ通知する。承認者の回答は、承認のレコードの版の番号で守った 1 回の遷移として反映する。
+2. Engine が承認の依頼を作り、承認者へ通知する。承認者の回答は、承認のレコードのバージョンの番号で守った 1 回の遷移として反映する。
 3. すべての承認がそろうと、同じトランザクションで変更の状態を「予定済み」に進め、次のステップのタイマーを登録する。
 
 **CMDB の取り込み**
@@ -143,7 +143,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、記録の基盤を自前で実装する。本家のスクリプトの API との互換は求めない |
-| [0002](../decisions/0002-tenancy-and-isolation.md) | 共有のセルでの RLS のマルチテナントを既定にし、大口の企業には同じ版の専用のセルを出す |
+| [0002](../decisions/0002-tenancy-and-isolation.md) | 共有のセルでの RLS のマルチテナントを既定にし、大口の企業には同じバージョンの専用のセルを出す |
 | [0003](../decisions/0003-table-hierarchy-and-extensible-schema.md) | テーブルはクラスの継承の階層として辞書に持ち、組み込みのクラスは型付きの列、テナントの拡張は JSONB と型付きの索引の表で持つ |
 | [0004](../decisions/0004-workflow-and-sla-engine.md) | ワークフロー・承認・SLA は Aurora の上の自前の耐久性のあるエンジンで動かし、遷移をレコードと同じトランザクションで 1 回だけ行う |
 | [0005](../decisions/0005-cmdb-identification-and-reconciliation.md) | CI の作成・更新を識別と調整の 1 つの入口に集め、正規化した識別の値の一意の索引で重複を防ぐ。関係のグラフは PostgreSQL に持つ |
@@ -151,29 +151,29 @@
 | [0007](../decisions/0007-physical-layout-and-extension-index.md) | `task`・`ci` を階層ごとに 1 つの表に置き、S1 ではパーティションに分けない。参照のフィールドは必ず索引の表に写す |
 | [0008](../decisions/0008-record-numbering.md) | 番号はテナント・番号の定義ごとの数の行から、保存とは別の短いトランザクションで取る。欠番のないことは約束しない |
 | [0009](../decisions/0009-record-audit-history-and-journal.md) | 監査の履歴は保存ごとに 1 行、変更と同じトランザクションで追記だけの表に書く。日ごとのハッシュの鎖を S3 Object Lock に置く |
-| [0010](../decisions/0010-metadata-versions-and-config-packages.md) | メタデータの変更はテナントの版の番号を上げる 1 つのトランザクションで行う。設定の移送は、安定したキーと元の版のハッシュを持つパッケージで行う |
+| [0010](../decisions/0010-metadata-versions-and-config-packages.md) | メタデータの変更はテナントのバージョンの番号を上げる 1 つのトランザクションで行う。設定の移送は、安定したキーと元のバージョンのハッシュを持つパッケージで行う |
 | [0011](../decisions/0011-roles-groups-and-acl-evaluation.md) | ACL は許可の条件と拒否の条件の 2 種の規則で書き、拒否は階層のすべての段で、許可は最も近いクラスの段で評価する。一致する許可がなければ拒否する |
 | [0012](../decisions/0012-acl-enforcement-at-every-exit.md) | 行の規則の条件は SQL の述語にコンパイルできる式に限り、読めないフィールドの値は利用者にとって NULL として扱う。判定の材料は `acl_version` をキーにキャッシュする |
 | [0013](../decisions/0013-impersonation-and-tenant-sso.md) | 成り代わりは権限を広げず、承認・権限の変更・エクスポートをさせない。テナントの SSO は複数の IdP を持ち、SP 起点を既定にし、非常用の管理者を残す |
-| [0014](../decisions/0014-flow-dsl-and-versioning.md) | フローは決まったノードと式の言語だけの JSON の文書で書き、公開すると不変の版になる。実行は開始したときの版に固定し、移し替えない |
+| [0014](../decisions/0014-flow-dsl-and-versioning.md) | フローは決まったノードと式の言語だけの JSON の文書で書き、公開すると不変のバージョンになる。実行は開始したときのバージョンに固定し、移し替えない |
 | [0015](../decisions/0015-flow-execution-and-timers.md) | 実行は `flow_run`・`flow_step`・`timer` の表で持ち、1 回の進みを 1 つのトランザクションで行う。トリガーは保存と同じトランザクションで実行を作る |
-| [0016](../decisions/0016-approvals.md) | 承認はまとまりと個々の承認の 2 つの行で持ち、回答を版の条件付きで 1 回だけ反映する。本人の承認を既定で禁止し、承認の記録が要るテーブルでは期限切れの自動の承認とメールの返信での承認を受けない |
+| [0016](../decisions/0016-approvals.md) | 承認はまとまりと個々の承認の 2 つの行で持ち、回答をバージョンの条件付きで 1 回だけ反映する。本人の承認を既定で禁止し、承認の記録が要るテーブルでは期限切れの自動の承認とメールの返信での承認を受けない |
 | [0017](../decisions/0017-no-code-record-rules.md) | レコードのルールは保存の前・保存の後・非同期の 3 種で、決まった操作だけを持つ。連鎖の深さを 3 にし、超えたら全体を巻き戻す |
 | [0018](../decisions/0018-flow-limits-and-tenant-fairness.md) | テナントごと・実行ごとの上限を置き、タイマーの取得をテナントごとの取り分で行い、SLA と承認の発火をフローのステップより先にする |
-| [0019](../decisions/0019-business-calendar-and-pure-time-functions.md) | カレンダーは不変の版で持ち、計時は秒の単位の半開区間の上の純粋な関数 2 つで行う。祝日はその暦の日の 0〜24 時を除き、期限は業務時間がちょうど d になる最も早い時刻とする |
-| [0020](../decisions/0020-japanese-holiday-data.md) | 内閣府の祝日の CSV を定期に取りに行き、法の規則との突き合わせと人の承認を経て版として公開する。収録の範囲の外は祝日なしで計算し、後で計算し直す |
-| [0021](../decisions/0021-sla-definitions-and-timers.md) | SLA の計時の行は定義の版・カレンダーの版・タイムゾーンを開始の時に固定し、条件を保存と同じトランザクションで決まった優先の順に評価する。警告と違反はタイマーで発火し、違反の事実は後の計算し直しで取り消さない |
-| [0022](../decisions/0022-process-state-machines.md) | インシデント・問題・変更の状態は、コードの版に含む宣言の遷移の表で持つ。テナントは状態と辺を足せず、条件と保留の理由だけを足せる。既知のエラーは状態ではなく印にする |
+| [0019](../decisions/0019-business-calendar-and-pure-time-functions.md) | カレンダーは不変のバージョンで持ち、計時は秒の単位の半開区間の上の純粋な関数 2 つで行う。祝日はその暦の日の 0〜24 時を除き、期限は業務時間がちょうど d になる最も早い時刻とする |
+| [0020](../decisions/0020-japanese-holiday-data.md) | 内閣府の祝日の CSV を定期に取りに行き、法の規則との突き合わせと人の承認を経てバージョンとして公開する。収録の範囲の外は祝日なしで計算し、後で計算し直す |
+| [0021](../decisions/0021-sla-definitions-and-timers.md) | SLA の計時の行は定義のバージョン・カレンダーのバージョン・タイムゾーンを開始の時に固定し、条件を保存と同じトランザクションで決まった優先の順に評価する。警告と違反はタイマーで発火し、違反の事実は後の計算し直しで取り消さない |
+| [0022](../decisions/0022-process-state-machines.md) | インシデント・問題・変更の状態は、コードのバージョンに含む宣言の遷移の表で持つ。テナントは状態と辺を足せず、条件と保留の理由だけを足せる。既知のエラーは状態ではなく印にする |
 | [0023](../decisions/0023-priority-matrix-and-major-incident.md) | 優先度は影響度 × 緊急度の表から導き、直接は書かせない。メジャーインシデントは候補の行で扱い、自動では昇格させず、候補のインシデント自体を親にする |
 | [0024](../decisions/0024-change-models-risk-and-cab.md) | 変更は種類ごとの状態のモデルで扱い、リスクは規則と質問票の高いほうにする。承認の方針は種類 × リスクの決定表で決め、CAB の決定も各承認者の回答として反映する。緊急の変更も承認なしに実施へ進めない |
 | [0025](../decisions/0025-change-schedule-and-conflict-detection.md) | 禁止期間と保守の時間帯はカレンダーと同じ区間の表現で CI の条件に結び付けて持ち、衝突は純粋な関数で求める。禁止期間と凍結期間だけを実施の妨げにし、ほかの衝突は警告にする |
 | [0026](../decisions/0026-assignment-rules-and-member-selection.md) | 割り当ての規則は順序付きで最初に一致した 1 つだけを使い、人が入れた割り当てを上書きしない。担当者はメンバーの行を SKIP LOCKED で取って選ぶ |
-| [0027](../decisions/0027-on-call-rotations-and-escalation.md) | 当番表は不変の版の層と差し替えで持ち、当番を純粋な関数で求める。呼び出しは専用の状態機械とタイマーで進め、本人の受け付けで止める。経路は差し込み口にし、MVP はメールとプッシュだけにする |
-| [0028](../decisions/0028-catalog-items-and-variables.md) | カタログの品目は公開で不変の版になり、申請の時の版に固定する。変数は 12 種と配置の 2 種に限り、表示の条件は画面とサーバーで同じ評価器を使ってサーバーを正とする |
-| [0029](../decisions/0029-request-item-task-model.md) | 1 回の申請で要求と要求の品目を 1 つのトランザクションで作り、依頼者の冪等のキーで 1 回だけにする。要求の品目ごとに固定した版の実行のフローを動かし、要求の状態は子から導く |
+| [0027](../decisions/0027-on-call-rotations-and-escalation.md) | 当番表は不変のバージョンの層と差し替えで持ち、当番を純粋な関数で求める。呼び出しは専用の状態機械とタイマーで進め、本人の受け付けで止める。経路は差し込み口にし、MVP はメールとプッシュだけにする |
+| [0028](../decisions/0028-catalog-items-and-variables.md) | カタログの品目は公開で不変のバージョンになり、申請の時のバージョンに固定する。変数は 12 種と配置の 2 種に限り、表示の条件は画面とサーバーで同じ評価器を使ってサーバーを正とする |
+| [0029](../decisions/0029-request-item-task-model.md) | 1 回の申請で要求と要求の品目を 1 つのトランザクションで作り、依頼者の冪等のキーで 1 回だけにする。要求の品目ごとに固定したバージョンの実行のフローを動かし、要求の状態は子から導く |
 | [0030](../decisions/0030-portal-requester-scope-and-record-producers.md) | 依頼者は自分が依頼した・自分のための・見守りに入った要求だけを見る。変数ごとに依頼者への公開を持ち、他人のための申請は品目の許可と関係があるときだけ許す。フォームからのレコードの作成も依頼者の主体で保存する |
-| [0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) | ナレッジの記事は記事の行と版の行で持ち、公開中と編集中の版をそれぞれ高々 1 つにする。レビューに出した本文を固定し、承認した本文だけを公開する。本文は制限付きの Markdown だけにする |
-| [0032](../decisions/0032-knowledge-feedback-and-deflection.md) | 評価は利用者・版ごとに 1 件にし、旗は理由を必須にして持ち主のタスクにまとめる。自己解決は仮名のセッションの事象から、明示と推定を分けて数える |
+| [0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) | ナレッジの記事は記事の行とバージョンの行で持ち、公開中と編集中のバージョンをそれぞれ高々 1 つにする。レビューに出した本文を固定し、承認した本文だけを公開する。本文は制限付きの Markdown だけにする |
+| [0032](../decisions/0032-knowledge-feedback-and-deflection.md) | 評価は利用者・バージョンごとに 1 件にし、旗は理由を必須にして持ち主のタスクにまとめる。自己解決は仮名のセッションの事象から、明示と推定を分けて数える |
 | [0033](../decisions/0033-notification-rules-and-outbound-email.md) | 通知は Notifier で受け手ごとに作り、`(事象, 規則, 受け手, 経路)` の一意で 1 回だけ送る。本文は受け手の主体で ACL を判定して差し込み、送るメールには推測できない参照の印を付け、返信は印と SES が付けた `Message-ID` で紐付ける |
 | [0034](../decisions/0034-inbound-email-threading-and-sender-trust.md) | 受信は共有の入口（SES → S3 → SQS → mail-router）からセルの Ingest へ送り、SES の ID で冪等にし、転送 → ヘッダー → 参照の印 → 件名の番号（関係者だけ）の順で紐付ける。差出人は認証の結果で信頼の段階を決め、返信の追記は差出人の主体の ACL を通す |
 | [0035](../decisions/0035-mail-loop-prevention-and-japanese-decoding.md) | 自動のメールはヘッダーで見分けて自動の応答を返さず、不在の返信は追記しない。流量の上限を最後の守りにする。文字コードは WHATWG の対応で復号し、ラベルのない 8 ビットは UTF-8 → Shift_JIS → EUC-JP の順に試し、送るメールは UTF-8 だけにする |
@@ -183,29 +183,29 @@
 | [0039](../decisions/0039-ci-relations-impact-traversal-and-service-model.md) | 関係は型ごとに影響の向きを持つ表にし、影響の範囲は深さ 6・節 10,000・2 秒で打ち切る再帰の CTE で求める。画面の走査は見る人の ACL を押し込み、変更の評価はシステムの主体で走査して写しを残す。サービスのモデルは CSDM に寄せたクラスで持つ |
 | [0040](../decisions/0040-metadata-driven-forms-and-lists.md) | フォームとリストはサーバーがコンパイルした画面のモデルを描く。画面の規則は画面とサーバーで同じ評価器を使いサーバーを正とし、リストはキーセットのページ送りと上限付きの件数にする |
 | [0041](../decisions/0041-employee-portal-themes-widgets-and-push.md) | 従業員のポータルは同じホスト名の別の画面の束にし、見た目はテーマのトークンと決まった部品だけで変える。プッシュは Web Push で送り、ネイティブのアプリは MVP で作らない |
-| [0042](../decisions/0042-i18n-ja-en-and-translations.md) | 画面の決まった文言はコードの版の ICU MessageFormat の辞書に、テナントの文言は安定したキーの翻訳の表に持つ。言語は利用者 → テナント → 日本語の順に決め、日時は UTC で保存し見る人のタイムゾーンで出す |
+| [0042](../decisions/0042-i18n-ja-en-and-translations.md) | 画面の決まった文言はコードのバージョンの ICU MessageFormat の辞書に、テナントの文言は安定したキーの翻訳の表に持つ。言語は利用者 → テナント → 日本語の順に決め、日時は UTC で保存し見る人のタイムゾーンで出す |
 | [0043](../decisions/0043-japanese-analyzer-and-index-layout.md) | 日本語の解析器は Sudachi を既定にし、2 文字の n-gram を併せて持つ。索引はセルのドメインに種類ごとの共有の索引を置いて `tenant_id` で経路を決め、テナントのフィールドは入れ子の枠に入れる |
-| [0044](../decisions/0044-acl-aware-search-and-index-freshness.md) | 検索は ACL の述語の索引で表せる部分を絞り込みにし、返す直前に DB で行とフィールドの読み取りを確かめ直す。一致と強調を読めるフィールドに限り、総数を出さない。索引は DB の今の行を外部の版で入れる |
+| [0044](../decisions/0044-acl-aware-search-and-index-freshness.md) | 検索は ACL の述語の索引で表せる部分を絞り込みにし、返す直前に DB で行とフィールドの読み取りを確かめ直す。一致と強調を読めるフィールドに限り、総数を出さない。索引は DB の今の行を外部のバージョンで入れる |
 | [0045](../decisions/0045-report-execution-on-reader-and-daily-facts.md) | 集計は S1 ではセルの Aurora のレポート用の reader で問い合わせの時に行い、推移のための過去の状態は日次の事実の表（行の写し）に持つ。集計の結果を事前に計算せず、S2 で PostgreSQL と互換の分析のクラスタへ移す |
 | [0046](../decisions/0046-acl-aware-aggregation-and-per-recipient-delivery.md) | 集計は見る人の行の述語と `visible(f)` の上で行い、読めない値を空の値と区別しない。結果のキャッシュは主体を当てはめた問い合わせのハッシュで共有し、定期の配信は受け手ごとに計算してテナントの有効な利用者だけに送る |
 | [0047](../decisions/0047-sla-attainment-and-breach-disputed.md) | SLA の達成率は期間の中に停止した計時の行を母数にし、`breach_disputed` の行は厳格と調整の 2 つの値と件数で出す。既定の表示は厳格にする |
 | [0048](../decisions/0048-dictionary-driven-table-api.md) | REST のテーブルの API は実効の辞書から型を作る 1 組のエンドポイントにし、リストと同じ式の言語、キーセットのページ送り、`If-Match`、`Idempotency-Key` を持つ。連携のクライアントは OAuth 2.0 のクライアントクレデンシャルで、主体は `integration` の利用者にする |
-| [0049](../decisions/0049-import-sets-and-transform-maps.md) | 一括の取り込みは取り込みの行の表に原本を置いてから、版付きの変換の対応で 1 行ずつ Record Service を通して書く。一致のキーは索引のあるフィールドに限り、キーごとの助言ロックで重複を防ぎ、2 つ以上に一致したら行のエラーにする。CI への取り込みは CMDB の入口を通す |
+| [0049](../decisions/0049-import-sets-and-transform-maps.md) | 一括の取り込みは取り込みの行の表に原本を置いてから、バージョン付きの変換の対応で 1 行ずつ Record Service を通して書く。一致のキーは索引のあるフィールドに限り、キーごとの助言ロックで重複を防ぎ、2 つ以上に一致したら行のエラーにする。CI への取り込みは CMDB の入口を通す |
 | [0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) | Webhook は値を入れない薄い事象を、Standard Webhooks に寄せた HMAC-SHA256 の署名で少なくとも 1 回送り、送る時点で購読の主体の ACL で確かめる。レート制限はテナントとクライアントのトークンバケットで、使いすぎは 429、容量の都合は 503 にする |
 | [0051](../decisions/0051-threat-model-and-security-checklist.md) | 脅威は信頼境界と部品ごとの STRIDE で洗い出し、対策を `SEC-NNN` のチェックリストにして各行に拒否の側のテストを持たせる。ACL・テナントの分離・監査・承認に触れる変更は `security:sensitive` にする |
 | [0052](../decisions/0052-keys-encryption-and-operator-access.md) | 鍵はセルごと・用途ごとの KMS のマルチリージョンの鍵にし、テナントの秘密をテナントごとの DEK で包む。運用者はテナントのデータへの常設の権限を持たず、テナントが出すサポートの参照の許可と期限付きの権限でだけ読む。AI エージェントは本番に経路を持たない |
 | [0053](../decisions/0053-data-retention-and-deletion.md) | 保持の期間を種類ごとに既定案として決め、時間で消える表は時間のパーティションで持つ。テナントの削除は 30 日の猶予の後に全置き場所から消し、個人の削除の請求は利用者の行の仮名化で受ける。監査の履歴との関係は法務の L1・L4 まで保留する |
 | [0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md) | `tenant_id` が NULL の行は、全テナントに同じで機密でない参照のデータだけに許し、RLS は読み取りだけで通す。テナントをまたいで読む DB のロールは、識別子だけを返す関数に限る |
 | [0055](../decisions/0055-accounts-cells-and-edge-router.md) | セルごとに AWS アカウントを分け、制御の面・エッジ・メールの受信の入口を別のアカウントに置く。ルーターは CloudFront Functions と KeyValueStore でホスト名からセルを選び、セルの App はテナントを解決し直す |
-| [0056](../decisions/0056-dedicated-cells-and-tenant-moves.md) | 専用のセルは 1 つの顧客のための共有のセルと同じ形のセルにし、同じコード・同じ版で動かす。テナントのセル間の移動は、写し・差分・短い停止・ルーターの切り替え・索引の作り直しの手順で行う |
+| [0056](../decisions/0056-dedicated-cells-and-tenant-moves.md) | 専用のセルは 1 つの顧客のための共有のセルと同じ形のセルにし、同じコード・同じバージョンで動かす。テナントのセル間の移動は、写し・差分・短い停止・ルーターの切り替え・索引の作り直しの手順で行う |
 | [0057](../decisions/0057-disaster-recovery-per-cell.md) | DR はセルごとに大阪のウォームスタンバイを持ち、人の判断で切り替える。検索の索引は複製せず切り替えの後に DB から作り直し、失った範囲の受信のメールは S3 の原本から冪等に取り込み直す |
 | [0058](../decisions/0058-terraform-layout-stages-and-cost.md) | Terraform はセルを 1 つのモジュールとして持ち、セルの一覧のファイルから作る。セルを足す・段階を上げる基準を決め、費用をセル・アカウント・タグで配分する |
 | [0059](../decisions/0059-slis-timer-lag-and-correctness-monitors.md) | 可用性はエッジで、画面の速さはサーバーの計測と自前の RUM で数える。タイマーと SLA の違反の発火の遅れはコミットの時刻と期限の差で数え、期限を過ぎた未発火の数を別に数える。正しさの監視を SLI と同じ扱いにする |
 | [0060](../decisions/0060-alerts-and-runbook-mapping.md) | 呼び出しのアラートは SLO のバーンレート、正しさの監視の違反、セキュリティの症状に限り、すべてのアラートに runbook を注釈で持たせて CI で確かめる。個別の runbook ができるまでは incident-response の場面を指す |
 | [0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md) | セルは S1 の負荷の半分を 1 つの Aurora の writer で受ける大きさにし、9 時のタイマーの山は優先度・定期のトリガーのばらつき・平日 8:50 の予定の台数の拡大で受ける。優先度 2・3 の遅れは山の間 5 分まで許す |
-| [0062](../decisions/0062-spec-driven-ci-fault-injection-and-leak-suite.md) | CI は `spec.md` の決定表を直接読み込んで動かし、性質ベーステスト・障害注入・出口ごとの漏れの試験を、PR（変更に関わるもの、短い版）と夜間（全体）の 2 段で必須にする |
+| [0062](../decisions/0062-spec-driven-ci-fault-injection-and-leak-suite.md) | CI は `spec.md` の決定表を直接読み込んで動かし、性質ベーステスト・障害注入・出口ごとの漏れの試験を、PR（変更に関わるもの、短いバージョン）と夜間（全体）の 2 段で必須にする |
 | [0063](../decisions/0063-flags-and-staged-release-per-cell.md) | デプロイは制御の面 → カナリアのセル → 共有のセル → 専用のセルの段で行い、振る舞いはフラグで社内 → サブプロダクション → 本番の段で広げる。業務の振る舞いの変更は、顧客が最大 60 日の中で有効にする時期を選べる |
-| [0064](../decisions/0064-migrations-and-metadata-compatibility-check.md) | DB は expand・移行・contract の 3 段、組み込みの定義はコードの版で変え、フローの意味は `engine_schema` で分ける。デプロイの前に、各セルの中で新しいコードが全テナントの今のメタデータをコンパイルできることを確かめる |
+| [0064](../decisions/0064-migrations-and-metadata-compatibility-check.md) | DB は expand・移行・contract の 3 段、組み込みの定義はコードのバージョンで変え、フローの意味は `engine_schema` で分ける。デプロイの前に、各セルの中で新しいコードが全テナントの今のメタデータをコンパイルできることを確かめる |
 
 領域ごとの ADR は、7 節の番号の範囲で起票する。リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)、本家の実装を使わない規則の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 
@@ -215,7 +215,7 @@
 
 - **ACL の漏れ**：出口が 16 あり（[access-control.md](access-control.md) の 6.2 節）、1 つでも判定を通らないと値や件数が漏れる。1 つの `decide` と述語のコンパイラ、読めない値の NULL の意味（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、出口ごとの漏れの試験、本番の漏れの合成監視（[ADR-0059](../decisions/0059-slis-timer-lag-and-correctness-monitors.md)）で抑える。検索と集計は、推測の経路（総数、強調、「（読めない値）」のグループ）を閉じた（[ADR-0044](../decisions/0044-acl-aware-search-and-index-freshness.md)、[ADR-0046](../decisions/0046-acl-aware-aggregation-and-per-recipient-delivery.md)）。
 - **テナントの分離の破れ**：RLS のコンテキストの漏れ、NULL の行の誤用、テナントをまたぐロール、検索の `tenant_id` の抜け、ルーター・メールの振り分けの取り違え。NULL の行の許可の一覧と識別子だけを返す関数（[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md)）、セルの App の解決し直し（421。[ADR-0055](../decisions/0055-accounts-cells-and-edge-router.md)）、検索の DB での確かめ直しで二重に守る。
-- **「1 回だけ」の破れ**：承認の二重の反映、遷移の欠落、タイマーの喪失、承認なしの実施。同じトランザクションでの遷移と版の条件（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../decisions/0015-flow-execution-and-timers.md)、[ADR-0016](../decisions/0016-approvals.md)）、障害注入の CI（[ADR-0062](../decisions/0062-spec-driven-ci-fault-injection-and-leak-suite.md)）、本番の突き合わせで抑える。
+- **「1 回だけ」の破れ**：承認の二重の反映、遷移の欠落、タイマーの喪失、承認なしの実施。同じトランザクションでの遷移とバージョンの条件（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../decisions/0015-flow-execution-and-timers.md)、[ADR-0016](../decisions/0016-approvals.md)）、障害注入の CI（[ADR-0062](../decisions/0062-spec-driven-ci-fault-injection-and-leak-suite.md)）、本番の突き合わせで抑える。
 - **SLA の計時の誤り**：カレンダー・祝日・夏時間・日付をまたぐ営業時間の組み合わせ、計算し直し。純粋な関数と参照の実装との比較（[ADR-0019](../decisions/0019-business-calendar-and-pure-time-functions.md)）、違反の事実を取り消さない規則（[ADR-0021](../decisions/0021-sla-definitions-and-timers.md)）で抑える。
 - **タイマーの集中**：平日 9 時に SLA の警告・違反と定期のトリガーが一斉に来る。優先度とテナントの取り分、ばらつき、予定の台数の拡大（[ADR-0061](../decisions/0061-load-model-cell-sizing-and-timer-bursts.md)）で受ける。見積もりは未検証で、E4 `timer-burst-generator` と E12 `timer-burst-load-test` の負荷試験で置き換える。
 - **CMDB の識別の誤り**：弱い規則は重複を、強すぎる・誤った値は誤った統合を生む。誤った統合は戻す操作が MVP にない。あいまいなら止め（[ADR-0037](../decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md)）、統合は人だけにする。識別は到着の順序で変わりうる（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md) の注記）ので、重複は日次の検出で拾う。
@@ -232,7 +232,7 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **ADR の状態**：0001〜0064 はすべて `accepted`。題材の最初の設計の間なので、食い違いは ADR を直接直し、日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
 - **冪等のキー**：ADR-0004 の `(flow_run, step, attempt)` の `attempt` は、ノードの実行の回（`iteration`）の意味で、配送の再試行の回数を含めない（ADR-0004 の注記、[workflow-engine.md](workflow-engine.md) の 5.5 節）。タイマーの索引は `(shard, due_at)`。
 - **CMDB の調整と識別**：ADR-0005 の調整の決定表は到着の順序に依存するので、取り込み元ごとの状態の max の結合と純粋な選び方（[ADR-0038](../decisions/0038-attribute-reconciliation-per-source-state.md)）に置き換えた。一致は識別の項目の和集合で決める（[ADR-0037](../decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md)）。識別そのものは順序で変わりうることを ADR-0005 の注記と [AGENTS.md](../../AGENTS.md) に書いた。
-- **NULL の `tenant_id` と組み込みのデータ**：組み込みのデータを「NULL の行」「コードの版だけ」「テナントの作成の時の行」の 3 つに分けた。NULL の行の許可の一覧は、辞書・ロール・ACL の規則・国民の祝日に、`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を足したもの（[data-model.md](data-model.md) の 3.1 節、ADR-0002・ADR-0054 の注記、AGENTS.md）。
+- **NULL の `tenant_id` と組み込みのデータ**：組み込みのデータを「NULL の行」「コードのバージョンだけ」「テナントの作成の時の行」の 3 つに分けた。NULL の行の許可の一覧は、辞書・ロール・ACL の規則・国民の祝日に、`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を足したもの（[data-model.md](data-model.md) の 3.1 節、ADR-0002・ADR-0054 の注記、AGENTS.md）。
 - **タイマーの取得**：テナントをまたいで `timer` を読まない。`engine_scheduler` の関数 `claim_due_timers` が識別子だけを返し、テナントのコンテキストで取り直す（[workflow-engine.md](workflow-engine.md) の 5.3・8.3 節、ADR-0015・0018 の注記）。
 - **タイマーの種類**：`page_escalation`（優先度 0）と `bulk_step`（優先度 3）を足した（[data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) の 4 節）。
 - **メールの受信**：infrastructure の共有の入口（mail-ingress）と `mail-router` でセルへ振り分ける。解決できない受け手はバウンスしない（後方散乱を避ける）（[notifications-and-email-ingest.md](notifications-and-email-ingest.md) の 5.1 節、ADR-0034・0035 の注記）。
@@ -248,9 +248,9 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 - **Epic と Story**：Story の Epic の食い違いを揃えた（`cmdb-ingest-api` は E10、`business-time-wait` は E5、`incident-default-slas` は E6、`known-error-articles`・`catalog-form-kb-suggestions`・`catalog-search` は E9、`opensearch-domain-per-cell` は E1、タイマーの山の負荷試験は E4 の `timer-burst-generator` と E12 の `timer-burst-load-test`）。当番の呼び出しは E5 でメールの経路から始め、プッシュは E8 の `web-push-and-pwa` の後に有効にする（[roadmap.md](../roadmap.md)）。
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節、保持は [security.md](security.md) の 9 節、上限は各領域の文書（フローは [workflow-engine.md](workflow-engine.md) の 8.1 節、API のレート制限は [api-and-integrations.md](api-and-integrations.md) の 7.1 節）、負荷の見積もりは [capacity.md](capacity.md)。
 - **本家の内部の名前の置き換え**（2026-09-28、検証の工程の後）：AGENTS.md の「内部の名前を写さない」に従い、本家の内部の名前と同じだったフィールド・表・値を、全文書・ADR・決定表・data-model で置き換えた。`caller_id` → `requester_id`（参照のたどりは `requester`。`caller_location` → `requester_location`、保留の理由 `awaiting_caller` → `awaiting_requester`、`external_caller_email` → `external_requester_email`）、`short_description` → `title`、`close_code` → `resolution_code`・`close_notes` → `resolution_notes`（インシデントと変更で同じ列を使う。選択肢はクラスごと）、`watch_list` → `watchers`、`cmdb_ci_id` → `ci_id`（たどりは `ci`）、`task_sla` → `sla_clock`・`task_sla_event` → `sla_clock_event`（Story `task-sla-evaluation-in-save` → `sla-clock-evaluation-in-save`）。`assignment_group`・`opened_by`・`kb_category` のような、どの ITSM の製品も使う一般の語は残した。出典の URL と本家の説明の中の名前は変えていない。
-- **ITIL の版**：S1 は ITIL 4 の用語のままにする。ITIL（Version 5）は、安定した後、S2 の前に見直す（PM が決めた。[intent.md](../intent.md)）。
+- **ITIL のバージョン**：S1 は ITIL 4 の用語のままにする。ITIL（Version 5）は、安定した後、S2 の前に見直す（PM が決めた。[intent.md](../intent.md)）。
 - **変更の承認の方針の期限の既定**：`change_approval_policy_rule.due_after` の既定（通常 3 日、緊急 4 時間）を承認した（[itsm-processes.md](itsm-processes.md) の 8.5.1 節）。
-- **データモデルの正本**（2026-09-28、データモデルの工程）：[data-model.md](data-model.md) と [data-model/](data-model/) を列・制約・索引・ER 図の正本にした（184 テーブル）。領域の文書は振る舞いの正本で、食い違ったらデータモデルに合わせて直す。主な決定：版付きのメタデータは「定義の表 ＋ 不変の版の表」にそろえた（`sla_def_version`・`escalation_policy_version`・`transform_map_version` を足した）。メタデータの論理削除は `deleted_at`。参照の列は `<name>_id`、辞書の名前は `_id` を除く。セッションの正本は Aurora の `user_session`（Valkey は写し）。`tenant_deletion_run` は制御の面に置く。NULL の行を持つ表の主キーは `id` だけにし、参照の先をトリガー `check_shared_ref()` で確かめる。列の決まっていなかった参照の先（`company`・`department`・`location`、`tenant_setting` など）を最小の形で定義した。一覧は [data-model.md](data-model.md) の 7 節の 10〜22。
+- **データモデルの正本**（2026-09-28、データモデルの工程）：[data-model.md](data-model.md) と [data-model/](data-model/) を列・制約・索引・ER 図の正本にした（184 テーブル）。領域の文書は振る舞いの正本で、食い違ったらデータモデルに合わせて直す。主な決定：バージョン付きのメタデータは「定義の表 ＋ 不変のバージョンの表」にそろえた（`sla_def_version`・`escalation_policy_version`・`transform_map_version` を足した）。メタデータの論理削除は `deleted_at`。参照の列は `<name>_id`、辞書の名前は `_id` を除く。セッションの正本は Aurora の `user_session`（Valkey は写し）。`tenant_deletion_run` は制御の面に置く。NULL の行を持つ表の主キーは `id` だけにし、参照の先をトリガー `check_shared_ref()` で確かめる。列の決まっていなかった参照の先（`company`・`department`・`location`、`tenant_setting` など）を最小の形で定義した。一覧は [data-model.md](data-model.md) の 7 節の 10〜22。
 - 領域ごとの決定は、各文書の「決定（2026-09-28、既定案）」の節にある。
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
@@ -276,14 +276,14 @@ PM の方針（判断が要るところは推奨の既定案で進める）に�
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
-| [data-dictionary-and-tables.md](data-dictionary-and-tables.md) | データ辞書（テーブル・フィールド・型・参照・選択肢）、クラスの継承（タスク → インシデントなど）、物理の配置、カスタムのフィールドとテーブル、番号の採番、レコードの監査の履歴と作業メモ、メタデータの版と反映、テナントの間の設定の移送（開発 → 本番） | 0006–0010 | QA | E2 |
+| [data-dictionary-and-tables.md](data-dictionary-and-tables.md) | データ辞書（テーブル・フィールド・型・参照・選択肢）、クラスの継承（タスク → インシデントなど）、物理の配置、カスタムのフィールドとテーブル、番号の採番、レコードの監査の履歴と作業メモ、メタデータのバージョンと反映、テナントの間の設定の移送（開発 → 本番） | 0006–0010 | QA | E2 |
 | [access-control.md](access-control.md) | ユーザー・グループ・ロール、ACL（テーブル・レコード・フィールド × 作成・読み取り・書き込み・削除）、評価の順序と既定の拒否、継承したクラスの規則、判定のキャッシュ、代理と成り代わり、テナントの SSO（SAML・OIDC） | 0011–0013 | QA、セキュリティ | E3 |
-| [workflow-engine.md](workflow-engine.md) | フローの定義（ノーコードの DSL）と版、実行とタイマー、承認（多段、代理、期限切れ）、レコードのルール（同期・非同期、スクリプトなし）、外への呼び出し、上限と公平性 | 0014–0018 | QA、Ops | E4 |
+| [workflow-engine.md](workflow-engine.md) | フローの定義（ノーコードの DSL）とバージョン、実行とタイマー、承認（多段、代理、期限切れ）、レコードのルール（同期・非同期、スクリプトなし）、外への呼び出し、上限と公平性 | 0014–0018 | QA、Ops | E4 |
 | [sla-and-calendars.md](sla-and-calendars.md) | 業務カレンダー（営業時間、タイムゾーン、祝日、会社の休日）、祝日のデータの取り込み、SLA・OLA の定義（開始・一時停止・停止・リセット、さかのぼりの開始）、期限の計算、警告と違反 | 0019–0021 | QA | E5 |
 | [itsm-processes.md](itsm-processes.md) | インシデント・問題・変更の状態のモデル、優先度の表（影響度 × 緊急度）、メジャーインシデント、変更の種類・リスクの評価・承認の方針・CAB、変更の予定表・衝突・凍結期間 | 0022–0025 | QA、PM | E6、E7 |
 | [assignment-and-on-call.md](assignment-and-on-call.md) | 割り当ての規則、担当のグループ、当番表とローテーション、エスカレーション、オンコールの通知 | 0026–0027 | QA、Ops | E5 |
 | [service-catalog-and-requests.md](service-catalog-and-requests.md) | カタログと品目、入力の項目（変数）と表示の条件、利用できる人の条件、要求・要求の品目・実行のタスクのモデル、承認と実行のフロー | 0028–0030 | QA | E8 |
-| [knowledge.md](knowledge.md) | 記事と版、レビューと公開の流れ、公開の範囲、評価とフィードバック、問題からの既知のエラーの公開、ポータルでの自己解決の計測 | 0031–0032 | QA | E9 |
+| [knowledge.md](knowledge.md) | 記事とバージョン、レビューと公開の流れ、公開の範囲、評価とフィードバック、問題からの既知のエラーの公開、ポータルでの自己解決の計測 | 0031–0032 | QA | E9 |
 | [notifications-and-email-ingest.md](notifications-and-email-ingest.md) | 通知の規則とテンプレート、SES での送信、メールの受信とチケットへの紐付け（参照の印、`In-Reply-To`）、差出人の照合、ループの防止、なりすましへの対策、文字コード | 0033–0035 | QA、Ops | E6 |
 | [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) | CI のクラスの階層と属性、識別の規則（独立・依存の CI）、取り込み元の優先度と鮮度、重複の候補、関係の型とグラフの走査、影響の範囲、CSDM に寄せたサービスのモデル。後のディスカバリーとサービスマッピング | 0036–0039 | QA | E10 |
 | [portal-and-ui.md](portal-and-ui.md) | 作業の画面（メタデータから描くフォームとリスト、関連リスト、UI の方針の規則）、従業員のポータル（テーマと部品）、多言語（日本語・英語）、アクセシビリティ | 0040–0042 | QA | E2、E6、E8 |

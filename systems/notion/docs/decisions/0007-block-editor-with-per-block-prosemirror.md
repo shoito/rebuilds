@@ -18,7 +18,7 @@ date: 2026-09-26
 
 2026-09-26 に npm で確認した各ライブラリの状態：
 
-| ライブラリ | 版 | 形 |
+| ライブラリ | バージョン | 形 |
 | --- | --- | --- |
 | ProseMirror（`prosemirror-view`） | 1.42 | 1 つの文書と 1 つの `contenteditable`。スキーマ・トランザクション・IME の扱いが成熟。Slack の入力欄で採用済み |
 | TipTap（`@tiptap/core`） | 3.x | ProseMirror の上の拡張の仕組み。一部の拡張は有償 |

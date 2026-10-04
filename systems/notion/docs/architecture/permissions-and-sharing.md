@@ -5,11 +5,11 @@
 | ADR | 決定 |
 | --- | --- |
 | [0018](../decisions/0018-permission-levels-and-inheritance.md) | 権限の水準を本家に合わせ、ACL は設定したページで継承を置き換える |
-| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限の版（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションで版を上げる |
+| [0019](../decisions/0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限のバージョン（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションでバージョンを上げる |
 | [0020](../decisions/0020-published-pages-isolation.md) | 公開ページは別の登録可能ドメインで、専用の描画サービスから配り、既定で検索エンジンに載せない |
 | [0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバーを分け、ゲスト・連携もメンバーの行にし、チームスペースを最上位の暗黙の ACL にする |
 | [0022](../decisions/0022-trash-history-and-deletion-retention.md) | ゴミ箱は 30 日、完全に削除した後も 30 日戻せ、ページの履歴はプランの日数で消す。バックアップの期限を削除の最終的な期限にする |
-| [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付の版に寄せ、連携は明示的に共有されたページだけを読む |
+| [0024](../decisions/0024-integration-access-model.md) | 公開 API は本家の形と日付のバージョンに寄せ、連携は明示的に共有されたページだけを読む |
 | [0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） |
 
 この文書の決定表は設計の草案である。ID（`DT-...`）は、E2 の各変更の `spec.md` に移すときに振る。
@@ -175,7 +175,7 @@ none < can_view < can_comment < can_edit_content < can_edit < full_access
 | コメントする | — | ○ | ○ | ○ | ○ |
 | データベースの行を作る・プロパティの値と行のページを編集する | — | — | ○ | ○ | ○ |
 | ページの本文を編集する、データベースの構造・ビューを変える | — | — | — | ○ | ○ |
-| ページの履歴を見る・版を戻す | — | — | — | ○ | ○ |
+| ページの履歴を見る・バージョンを戻す | — | — | — | ○ | ○ |
 | ページを移す（実効の権限が変わらない移動） | — | — | — | ○（移動先の親にも `can_edit`） | ○ |
 | ページを移す（実効の権限が変わる移動） | — | — | — | — | ○（移動先の親に `can_edit`） |
 | ゴミ箱へ入れる・ゴミ箱から戻す | — | — | — | ○ | ○ |
@@ -196,7 +196,7 @@ ACL は、設定をしたページにだけ持つ（ADR-0004、[block-model.md](
 | `page_acls` | `workspace_id`、`page_id`、`version`、作成・更新の人と日時。行があれば、そのページは ACL を持つ（中身が空でもよい） |
 | `page_acl_entries` | `workspace_id`、`page_id`、`principal`、`level`、`expires_at`、`granted_by` |
 | `page_general_access` | `page_id`、`scope`（`workspace` / `public`）、`level`、`hide_from_search`、`expires_at` |
-| `workspace_acl_versions` | `workspace_id`、`acl_version`。権限に影響する変更のたびに増える番号（5 節）。[search.md](search.md) の「ワークスペースの権限の版」と同じもの。権限の変更と同じトランザクションで上げるので、`global` ではなくシャードに置く（[data-model.md](data-model.md)） |
+| `workspace_acl_versions` | `workspace_id`、`acl_version`。権限に影響する変更のたびに増える番号（5 節）。[search.md](search.md) の「ワークスペースの権限のバージョン」と同じもの。権限の変更と同じトランザクションで上げるので、`global` ではなくシャードに置く（[data-model.md](data-model.md)） |
 
 `principal` は、[search.md](search.md) の主体のキーと同じ形にする。
 

@@ -37,7 +37,7 @@ date: 2026-09-27
 - **揺れの扱い**：各条件を 5 回回し、中央値で判定する。基準（`main` の直近 7 日の結果）との差も PR に載せる。閾値そのものは quality.md で決める（QA の承認）。
 - **回し方**：
   - PR：メディアに触れる変更（[delivery.md](../architecture/delivery.md) の 2 節のパスの一覧）で、代表の条件（`loss-20-random`、`bw-step-down`、`rtt-200`、`mixed-3`）を Chrome で必須にする。約 20 分の見込み（**未検証**。E1 の `media-paths-and-required-checks` で実測する）。
-  - 夜間：全部の条件 × 4 ブラウザ（Safari を含む）× Beta・Dev の版。
+  - 夜間：全部の条件 × 4 ブラウザ（Safari を含む）× Beta・Dev のバージョン。
   - Safari：macOS の EC2（mac のインスタンス）か社内の Mac で、`dnctl`・`pfctl`（dummynet）で同じ条件を作る。iOS は実機を週に 1 回。
 - 試験の音声と映像は、利用の条件が明らかな公開のデータセットか合成だけ（本題材の AGENTS.md）。
 - 2 を採らない理由：共有の台の揺れ（CPU の奪い合い）が結果に混ざる。台の種類と CPU の固定を選べない。

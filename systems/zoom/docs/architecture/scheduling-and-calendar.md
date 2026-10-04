@@ -101,7 +101,7 @@ RFC 5545 の RRULE のうち、次だけを受ける。受けない項目は 422
 
 - 予定の時刻は、現地の時刻（`start_local`、秒まで、タイムゾーンなし）と IANA のタイムゾーン名（`timezone`）で持つ。UTC の時刻は、回ごとに計算して出す。
   - 理由：繰り返しの会議は「毎週火曜の 10 時（東京）」であり、UTC で持つと、夏時間のある地域の主催者の会議が 1 時間ずれる。日本には夏時間はないが、海外の拠点の主催者と、tzdata の変更に備える。
-- 計算には、IANA の tzdata を持つライブラリ（Temporal の API。Node.js は 26 で Temporal を既定で有効にした（[Node.js 26.0.0](https://nodejs.org/en/blog/release/v26.0.0)、2026-05、2026-09-27 に確認）。Node.js 26 より前の版で動かす間は polyfill を使う）を使う。tzdata の版をサーバーで固定し、上げるときは次の 30 日の回の UTC の時刻が変わる会議を洗い出して、主催者に知らせる。
+- 計算には、IANA の tzdata を持つライブラリ（Temporal の API。Node.js は 26 で Temporal を既定で有効にした（[Node.js 26.0.0](https://nodejs.org/en/blog/release/v26.0.0)、2026-05、2026-09-27 に確認）。Node.js 26 より前のバージョンで動かす間は polyfill を使う）を使う。tzdata のバージョンをサーバーで固定し、上げるときは次の 30 日の回の UTC の時刻が変わる会議を洗い出して、主催者に知らせる。
 - 夏時間の切り替えで存在しない時刻（例：2:30）は、後ろへずらす（Temporal の `disambiguation: "compatible"`）。2 回ある時刻は、前の方を採る。
 - 表示は、見る人の端末のタイムゾーンで行う。招待のメールには、主催者のタイムゾーンと、受け手のタイムゾーン（分かれば）を両方書く。
 - 時刻の決まっていない会議（`recurring_no_fixed_time`・`pmi`）は時刻を持たない。
@@ -218,7 +218,7 @@ ADR-0035。
 
 - Google と Microsoft の試験のテナントで、作成・時刻の変更・1 回の取り消し・全体の取り消し・トークンの取り消しを確かめる。
 - Outlook のアドインを、web・new Windows・Mac で動かし、1 分以内に本文が更新されることを確かめる。
-- tzdata の版を上げる PR で、影響を受ける会議の洗い出しの試験を回す。
+- tzdata のバージョンを上げる PR で、影響を受ける会議の洗い出しの試験を回す。
 
 ## 10. Story の候補
 
@@ -226,7 +226,7 @@ ADR-0035。
 | --- | --- | --- |
 | E6 | `scheduled-meeting-crud` | 4.1 節。作成・更新・取り消し、`idempotency_key` |
 | E6 | `recurrence-rrule-subset` | 4.2〜4.3 節。回の計算、例外 |
-| E6 | `timezone-handling` | 4.4 節。現地の時刻、tzdata の版の固定と洗い出し |
+| E6 | `timezone-handling` | 4.4 節。現地の時刻、tzdata のバージョンの固定と洗い出し |
 | E6 | `invite-email-ics` | 4.5 節 |
 | E6 | `pmi` | 5 節。割り当て、作り直し、待合室の強化 |
 | E6 | `google-calendar-oauth-write` | 6.1・6.2 節。本システムの画面から Google に書く |
@@ -257,7 +257,7 @@ ADR-0035。
 | Google の確認の審査の期間（審査が要ることは確かめた。範囲の分類は同意の画面で確かめる） | E6 の `google-calendar-oauth-write` の前 |
 | Outlook の Join のボタンのための Microsoft Marketplace の公開と、GitHub の issue での登録 | E12 の `outlook-addin-marketplace` |
 | Google の push のチャンネルの期限の既定と最大 | E6 の `calendar-change-sync` で応答の `expiration` を実測する |
-| Node.js での Temporal の対応 | 決着：Node.js 26 で既定で有効（4.4 節）。それより前の版の間は polyfill |
+| Node.js での Temporal の対応 | 決着：Node.js 26 で既定で有効（4.4 節）。それより前のバージョンの間は polyfill |
 | 繰り返しの回数・期限の本家の値 | 決着：60 回、ID は最後の開催から 365 日で失効（2 節）。合わせることは目標にしない |
 
 ## 12. quality.md・runbooks・data-model への項目
@@ -274,7 +274,7 @@ ADR-0035。
 
 - `calendar-sync-lag.md`：通知が止まったときの確かめ方（チャンネル・購読の期限、受け口のエラー）と、差分の取り込みを手で回す手順。
 - `calendar-provider-outage.md`：Google・Microsoft の API が止まったときの、書き込みの待ち行列の扱い。
-- `tzdata-update.md`：tzdata の版を上げる手順と、影響を受ける会議の主催者への連絡。
+- `tzdata-update.md`：tzdata のバージョンを上げる手順と、影響を受ける会議の主催者への連絡。
 - `oauth-app-credentials-rotation.md`：Google・Microsoft の OAuth のクライアントの秘密の入れ替え。
 
 ### data-model（索引への追加の提案）

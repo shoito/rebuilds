@@ -6,8 +6,8 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0030](../decisions/0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で行う。文書はモデルの行ごと（イシュー、コメント、プロジェクト）。一致の判定は 1〜2 文字の N-gram、関連度は同梱の kuromoji。正規化はアプリの共有の関数で行う。文書の版は行の `sync_id` で、外部の版（`version_type: external`）で古い書き込みを捨てる。Aurora PostgreSQL 18 の `pg_bigm` は使えることを確かめたが、Writer のクラスタに大きな GIN の索引を足すこと、RLS の下で索引が効かないこと、関連度の並べ替えが弱いことから、代案として残す |
-| [0031](../decisions/0031-search-permission-by-sync-groups.md) | 権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索した人の購読（`groupsFor`）を `terms` の条件にする。結果は Aurora で今の `sync_groups` と削除を読み直して、合わないものを落とす。抜粋は、索引の版が行の版と同じときだけ返す。画面は手元の検索（M2 のタイトルと識別子）をすぐに出し、サーバーの結果を後から足す |
+| [0030](../decisions/0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で行う。文書はモデルの行ごと（イシュー、コメント、プロジェクト）。一致の判定は 1〜2 文字の N-gram、関連度は同梱の kuromoji。正規化はアプリの共有の関数で行う。文書のバージョンは行の `sync_id` で、外部のバージョン（`version_type: external`）で古い書き込みを捨てる。Aurora PostgreSQL 18 の `pg_bigm` は使えることを確かめたが、Writer のクラスタに大きな GIN の索引を足すこと、RLS の下で索引が効かないこと、関連度の並べ替えが弱いことから、代案として残す |
+| [0031](../decisions/0031-search-permission-by-sync-groups.md) | 権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索した人の購読（`groupsFor`）を `terms` の条件にする。結果は Aurora で今の `sync_groups` と削除を読み直して、合わないものを落とす。抜粋は、索引のバージョンが行のバージョンと同じときだけ返す。画面は手元の検索（M2 のタイトルと識別子）をすぐに出し、サーバーの結果を後から足す |
 
 ## 1. 目的と範囲
 
@@ -43,11 +43,11 @@
 
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
-| `pg_bigm` | Aurora PostgreSQL 18（18.3・18.4）で版 `1.2_20250903` が使える。17・16 でも使える。`pgroonga` は一覧にない | [Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html) |
+| `pg_bigm` | Aurora PostgreSQL 18（18.3・18.4）でバージョン `1.2_20250903` が使える。17・16 でも使える。`pgroonga` は一覧にない | [Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html) |
 | RLS と関数 | 行の方針の条件は、利用者の問い合わせの条件より先に評価する。LEAKPROOF の印のある関数・演算子だけが、方針より先に評価されうる | [CREATE POLICY](https://www.postgresql.org/docs/18/sql-createpolicy.html) |
 | kuromoji | Amazon OpenSearch Service の全ドメインに同梱 | [Plugins by engine version](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html) |
-| Sudachi | 任意のプラグイン（日本語に推奨と書かれている）。パッケージは版ごとに結び付け、辞書の差し替えはすぐには反映されない | 同上 |
-| 外部の版 | `version_type=external` は、指定の版が保存の版より大きいときだけ書く | [Index document](https://docs.opensearch.org/latest/api-reference/document-apis/index-document/) |
+| Sudachi | 任意のプラグイン（日本語に推奨と書かれている）。パッケージはバージョンごとに結び付け、辞書の差し替えはすぐには反映されない | 同上 |
+| 外部のバージョン | `version_type=external` は、指定のバージョンが保存のバージョンより大きいときだけ書く | [Index document](https://docs.opensearch.org/latest/api-reference/document-apis/index-document/) |
 
 ## 3. 基盤の選択
 
@@ -60,7 +60,7 @@ ADR-0030。
 | RLS | `LIKE` は LEAKPROOF でないので、RLS のある表では GIN の索引が効かない。Slack の題材と同じく、RLS を外した専用の表と `SECURITY DEFINER` の関数が要る（Slack の ADR-0027） | RLS の外。テナントの条件を検索の関数で必ず付ける |
 | 書き込みの負荷 | Writer と同じクラスタに GIN の索引の更新が増える（索引を同じクラスタに置く場合）。`sync_id` を振るロックの書き込みの上限（ADR-0002）と同じ資源を使う | 別の基盤。Aurora の負荷を増やさない |
 | 規模 | S1 のイシュー・コメントの合計を数億行と見込む。1 つの Aurora の GIN の索引は重い | 索引をシャードに分ける。S2 で大口のワークスペースを専用の索引へ |
-| 運用 | 追加の部品なし | ドメインの運用、版の更新、費用 |
+| 運用 | 追加の部品なし | ドメインの運用、バージョンの更新、費用 |
 | S2 への移行 | 必要（README の技術スタックの計画では S2 で専用の基盤） | 不要 |
 
 - 採用：**S1 から OpenSearch**。関連度の並べ替え（本家の並び）と、Writer のクラスタへの負荷を避けることを重く見る。
@@ -91,17 +91,17 @@ ADR-0030。
 | `updated_at` | date | — |
 | `title` | text | タイトル（プロジェクトは名前）。`normalizeForSearch` の後 |
 | `body` | text | イシューの本文（`doc_states.text_plain`）、コメントの本文の文字、プロジェクトの説明。先頭 256 KiB まで |
-| `v` | long | 文書の版（4.3 節） |
+| `v` | long | 文書のバージョン（4.3 節） |
 
 - `title` と `body` は多重のフィールドにする：`.gram`（1〜2 文字の N-gram。一致の判定）、既定（kuromoji。関連度）。
 - 添付のファイル名は `body` の末尾に足す。
 - 担当・ラベルなどのフィールドは入れない。絞り込みは検索の後に手元のモデルで行う（7.2 節）か、`team_id`・`state_type` の条件だけにする。
 
-### 4.3 版
+### 4.3 バージョン
 
-- 文書の版 `v` は、索引の Worker が文書を作るときに読んだ行の `updated_sync_id` の最大（イシューなら、イシューの行、本文の `compacted_through`、別名の行のうち最大）。どれもワークスペースの `sync_id` なので、同じ文書の版は単調に増える。
-- 書き込みは `version_type=external`。古い版の書き込みは衝突で捨てられる。索引の Worker が並列に動いても、新しい版が残る。
-- 削除：行がない・削除済みなら、`deleted: true` の墓標の文書を、削除の `sync_id` を版にして書く。本物の削除は数え直しのジョブ（9.4 節）が 1 日後に行う。OpenSearch の削除の記録（`index.gc_deletes`、既定 60 秒）より遅れて届いた古い書き込みが、文書を生き返らせないようにするため。
+- 文書のバージョン `v` は、索引の Worker が文書を作るときに読んだ行の `updated_sync_id` の最大（イシューなら、イシューの行、本文の `compacted_through`、別名の行のうち最大）。どれもワークスペースの `sync_id` なので、同じ文書のバージョンは単調に増える。
+- 書き込みは `version_type=external`。古いバージョンの書き込みは衝突で捨てられる。索引の Worker が並列に動いても、新しいバージョンが残る。
+- 削除：行がない・削除済みなら、`deleted: true` の墓標の文書を、削除の `sync_id` をバージョンにして書く。本物の削除は数え直しのジョブ（9.4 節）が 1 日後に行う。OpenSearch の削除の記録（`index.gc_deletes`、既定 60 秒）より遅れて届いた古い書き込みが、文書を生き返らせないようにするため。
 
 ## 5. 日本語の解析
 
@@ -119,7 +119,7 @@ ADR-0030。
 | `title`・`body` | kuromoji（`search` モード） | 関連度。`should` にだけ使う |
 
 - 1 文字の語（「件」）でも取りこぼさないよう 1 文字の N-gram を入れる。索引の大きさの増え方は**未検証**で、E8 の前の `search-poc` で測る。
-- Sudachi は、AWS が日本語に推奨している。辞書の管理と版ごとのパッケージの結び付けの運用が要るので、S1 は同梱の kuromoji で始め、関連度の不満が出たら Sudachi に替える（索引の作り直しで切り替える）。
+- Sudachi は、AWS が日本語に推奨している。辞書の管理とバージョンごとのパッケージの結び付けの運用が要るので、S1 は同梱の kuromoji で始め、関連度の不満が出たら Sudachi に替える（索引の作り直しで切り替える）。
 - 英語の語幹の処理と stop words の除去はしない（本家は英語の stop words を除く）。日本語の文の中の英字の語を取りこぼさないため。
 
 ## 6. 権限
@@ -164,11 +164,11 @@ ADR-0031。
 1. OpenSearch から `(m, id, v, score)` を最大 60 件得る（1 ページ 50 件に、落ちる分の余裕）。
 2. Aurora の reader で、RLS の下で、行の `sync_groups`・`updated_sync_id`（本文は `compacted_through`）・削除とゴミ箱を読む。
 3. 今の `sync_groups` が呼んだ人の購読と交わらない行、削除・ゴミ箱の行を落とす。落ちた数を `search_hydration_drop` として数える。
-4. 抜粋（ハイライトの前後 80 字）は、文書の `v` が今の行の版と同じときだけ返す。違えば抜粋なしで、ID だけを返す。
+4. 抜粋（ハイライトの前後 80 字）は、文書の `v` が今の行のバージョンと同じときだけ返す。違えば抜粋なしで、ID だけを返す。
 5. 50 件に切って返す。合計の件数は返さない。結果は最大 500 件（本家と同じ）、10 ページまで。
 
 - 読み直しの理由：索引の遅れ（9 節）の間、文書の `groups` は古い。イシューが公開のチームから非公開のチームへ移った直後に、前のチームの人の検索に出うる。Aurora の今の値で落とせば、遅れの間も漏れない。
-- 抜粋を版で絞る理由：タイトルを書き換えて秘密を消した直後に、古い文書の抜粋が出ないようにするため。
+- 抜粋をバージョンで絞る理由：タイトルを書き換えて秘密を消した直後に、古い文書の抜粋が出ないようにするため。
 
 ### 6.4 権限の変化の反映
 
@@ -235,11 +235,11 @@ ADR-0031。
                                                                    │ 行を Aurora の reader から読み直す
                                                                    │ （min_sync_id まで待つ。2 秒で writer）
                                                                    ▼
-                                                             OpenSearch（bulk、external の版）
+                                                             OpenSearch（bulk、external のバージョン）
 ```
 
 - Relay は、`search` の印のあるフィールド（[data-model-and-schema.md](data-model-and-schema.md) の 3.2 節）か `sync_groups` が変わった変更、作成・削除・アーカイブ・移動だけを `search-index` に流す。本文は、まとめの Worker が `text_plain` を書いた時に流す。
-- 索引の Worker は差分の中身を使わず、行を読み直して文書を作る（4.3 節の版を付ける）。差分の到着の順にかかわらず、新しい状態が残る。
+- 索引の Worker は差分の中身を使わず、行を読み直して文書を作る（4.3 節のバージョンを付ける）。差分の到着の順にかかわらず、新しい状態が残る。
 - 1 秒か 500 件で bulk にまとめる。
 
 ### 9.2 遅れの目標（NFR-010）
@@ -272,14 +272,14 @@ ADR-0031。
 | OpenSearch が落ちた | サーバーの検索ができない | `/search` は `503`。画面は手元の検索だけを出し、「本文とコメントの検索は使えません」と示す。`pg_bigm` などの非常の経路は持たない |
 | 索引の Worker が遅れる | 新しい変更が検索に出ない | 9.3 節の遅れの表示。SQS の滞留で Worker を増やす |
 | 移動の直後で `groups` が古い | 前のチームの人の検索に出る候補になる | 6.3 節の読み直しで落とす |
-| 文書が生き返る（遅れた古い書き込み） | 消したイシューが候補に出る | 外部の版と墓標（4.3 節）。読み直しで削除を落とす |
+| 文書が生き返る（遅れた古い書き込み） | 消したイシューが候補に出る | 外部のバージョンと墓標（4.3 節）。読み直しで削除を落とす |
 | 本文のまとめが止まる | 本文の変更が検索に出ない | まとめの Worker の監視（[editor-and-descriptions.md](editor-and-descriptions.md) の 10 節） |
 | 1 つのワークスペースが索引の書き込みを占める（インポート） | 他のワークスペースの遅れ | インポートの経路の変更は別の SQS（`search-bulk`）に流す（import-export の領域と決める） |
 
 ## 11. セキュリティ
 
 - **テナント**：`buildSearchRequest` が必ず `routing` と `workspace_id` の条件を付ける（PROP-SEARCH-001）。OpenSearch はワークスペースの分離を持たないので、この関数が唯一の守りの 1 つ目で、読み直し（RLS の下）が 2 つ目。
-- **非公開のチーム**：`groups` の条件と、Aurora の読み直し。索引の値（タイトル・本文）を、読み直しを通らずに返さない。抜粋は版が同じときだけ。
+- **非公開のチーム**：`groups` の条件と、Aurora の読み直し。索引の値（タイトル・本文）を、読み直しを通らずに返さない。抜粋はバージョンが同じときだけ。
 - **件数・並びの漏れ**：合計の件数を返さない。見てよくない文書は `filter` で除かれるので、並びにも影響しない。
 - **検索の語**：利用者の書いた中身と同じに扱う。ログには語の長さと語の数だけを書く。遅い問い合わせのログ（OpenSearch のスローログ）は有効にしない。
 - **OpenSearch への接続**：VPC の中、細かなアクセス制御の IAM のロール。索引の Worker は書き込みだけ、検索の API は読み取りだけのロール。
@@ -304,7 +304,7 @@ ADR-0031。
 | --- | --- | --- |
 | E8 | `search-poc` | 3 節の比較の計測（索引の大きさ、p99、費用）。OpenSearch の決定を確かめる |
 | E8 | `search-index-mapping` | 4 節の索引、フィールド、アナライザー、正規化 |
-| E8 | `search-indexer` | 9.1 節の Relay の選別と、索引の Worker、外部の版、墓標 |
+| E8 | `search-indexer` | 9.1 節の Relay の選別と、索引の Worker、外部のバージョン、墓標 |
 | E8 | `search-query-and-rehydrate` | 6.2・6.3 節の `buildSearchRequest`、読み直し、抜粋、PROP-SEARCH-001・002 |
 | E8 | `search-api` | 7 節の API、識別子の解決、上限 |
 | E8 | `search-local-merge` | 8 節の手元とサーバーの組み合わせ（client-app と共同） |
@@ -361,7 +361,7 @@ ADR-0031。
 
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| OpenSearch の `docs` の索引 | 行ごとの文書、`groups`、版 | 4 |
+| OpenSearch の `docs` の索引 | 行ごとの文書、`groups`、バージョン | 4 |
 | `packages/search` | `normalizeForSearch`（views-and-filters・client-app と共有）、`buildSearchRequest` | 5.1、6.2 |
 | SQS の `search-index`・`search-bulk` | 索引の更新の流れ | 9.1 |
 

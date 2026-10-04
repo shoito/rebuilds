@@ -90,7 +90,7 @@ erDiagram
 | `source` | `text` | NOT NULL | `'api'` | `api`・`wizard` |
 | `created_by` | `uuid` | NOT NULL | — | ジョブはこの利用者の権限で処理する |
 | `rows_processed`・`rows_failed` | `bigint` | NOT NULL | `0` | |
-| `metadata_version` | `bigint` | NULL | — | 見出しを解決した版 |
+| `metadata_version` | `bigint` | NULL | — | 見出しを解決したバージョン |
 | `first_range_at`・`last_range_at` | `timestamptz` | NULL | — | `query` の最初と最後の範囲の時刻 |
 | `created_at`・`completed_at` | `timestamptz` | | | |
 | `expires_at` | `timestamptz` | NOT NULL | — | `open` は 24 時間、終わったら 7 日 |
@@ -119,7 +119,7 @@ erDiagram
 
 ### 2.3 `bulk_job_columns`
 
-CSV の見出しの解決（`upload_complete` の時の版で）。
+CSV の見出しの解決（`upload_complete` の時のバージョンで）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

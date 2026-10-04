@@ -1,36 +1,36 @@
 # Knowledge: ServiceNow
 
-ナレッジの記事と版、ナレッジベースとカテゴリ、レビューと公開の流れ、公開の範囲、問題からの既知のエラーの記事、評価とフィードバック、ポータルでの自己解決（申請をやめた割合）の計測を決める。
+ナレッジの記事とバージョン、ナレッジベースとカテゴリ、レビューと公開の流れ、公開の範囲、問題からの既知のエラーの記事、評価とフィードバック、ポータルでの自己解決（申請をやめた割合）の計測を決める。
 
-前提の決定は、承認を 1 回だけ反映すること（[ADR-0016](../decisions/0016-approvals.md)）、フローを版付きで動かすこと（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）、ACL の条件を SQL の述語にコンパイルできる式に限り、検索を含むすべての出口で同じ判定を使うこと（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、テナントの HTML を描かないこと（[intent.md](../intent.md) の Non-goals）である。既知のエラーの印は [itsm-processes.md](itsm-processes.md) の 7.2 節で決めた。この文書で決めたことは次の ADR にある。
+前提の決定は、承認を 1 回だけ反映すること（[ADR-0016](../decisions/0016-approvals.md)）、フローをバージョン付きで動かすこと（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）、ACL の条件を SQL の述語にコンパイルできる式に限り、検索を含むすべての出口で同じ判定を使うこと（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、テナントの HTML を描かないこと（[intent.md](../intent.md) の Non-goals）である。既知のエラーの印は [itsm-processes.md](itsm-processes.md) の 7.2 節で決めた。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) | 記事は、変わらない記事の行と、版の行で持つ。1 つの記事に、公開中の版は高々 1 つ、編集中の版も高々 1 つ。版はレビューに出した時点で本文を固定し、公開の後は変えない。公開はナレッジベースごとの方針（即時か承認か）で、組み込みのフローの承認を通す。本文は制限付きの Markdown だけにする |
-| [0032](../decisions/0032-knowledge-feedback-and-deflection.md) | 評価は利用者・版ごとに 1 件（上書き）にし、旗（要見直し）は理由を必須にして記事の持ち主のグループへのタスクにまとめる。自己解決は、ポータルのセッションの事象の記録から、明示の「解決した」と、記事を見た後に申請を出さなかったことの 2 つで数える。事象の記録は仮名のセッションで持つ |
+| [0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) | 記事は、変わらない記事の行と、バージョンの行で持つ。1 つの記事に、公開中のバージョンは高々 1 つ、編集中のバージョンも高々 1 つ。バージョンはレビューに出した時点で本文を固定し、公開の後は変えない。公開はナレッジベースごとの方針（即時か承認か）で、組み込みのフローの承認を通す。本文は制限付きの Markdown だけにする |
+| [0032](../decisions/0032-knowledge-feedback-and-deflection.md) | 評価は利用者・バージョンごとに 1 件（上書き）にし、旗（要見直し）は理由を必須にして記事の持ち主のグループへのタスクにまとめる。自己解決は、ポータルのセッションの事象の記録から、明示の「解決した」と、記事を見た後に申請を出さなかったことの 2 つで数える。事象の記録は仮名のセッションで持つ |
 
 この文書の決定表・性質は設計の草案である。ID は E9 の各変更の `spec.md` に移すときに確定する。
 
 ## 1. 目的と範囲
 
-- 扱う：ナレッジベース、カテゴリ、記事と版、編集の排他、レビューと公開の状態、承認の方針、公開の予定と有効の期限、廃止、公開の範囲（読める人・書ける人）、既知のエラーの記事、評価・旗・フィードバックのタスク、閲覧の数、自己解決の事象と指標。
-- 扱わない：全文検索の索引と日本語の解析器（`search.md`。この文書は「索引に入れてよい版」と ACL の約束だけを書く）、ポータルの画面（`portal-and-ui.md`）、多言語の翻訳の版（持ち越し）、匿名の閲覧（MVP はログインを必須にする。[access-control.md](access-control.md) の 14 節）。
+- 扱う：ナレッジベース、カテゴリ、記事とバージョン、編集の排他、レビューと公開の状態、承認の方針、公開の予定と有効の期限、廃止、公開の範囲（読める人・書ける人）、既知のエラーの記事、評価・旗・フィードバックのタスク、閲覧の数、自己解決の事象と指標。
+- 扱わない：全文検索の索引と日本語の解析器（`search.md`。この文書は「索引に入れてよいバージョン」と ACL の約束だけを書く）、ポータルの画面（`portal-and-ui.md`）、多言語の翻訳のバージョン（持ち越し）、匿名の閲覧（MVP はログインを必須にする。[access-control.md](access-control.md) の 14 節）。
 
 ## 2. 本家の形（確かめたこと）
 
 | 項目 | 本家 | 出典（2026-09-28 に確認） |
 | --- | --- | --- |
-| 記事の状態 | 下書き、レビュー、公開、廃止。版は「廃止の予定」「取り消し」の状態も持つ | [Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)、[Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html) |
+| 記事の状態 | 下書き、レビュー、公開、廃止。バージョンは「廃止の予定」「取り消し」の状態も持つ | [Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)、[Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html) |
 | 公開の流れ | 即時の公開と、ナレッジベースの管理者の承認を経る公開の 2 つの既定の流れがある（廃止も即時と承認の 2 つ）。公開の承認が却下されると、流れが取り消され、記事は下書きのまま残る | [Knowledge workflows](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeWorkflows.html) |
-| 版 | 版の番号は「主.副」。公開前の編集は副（0.01 ずつ）、公開で主の番号が上がる。公開済みの記事を編集すると、新しい下書きの版ができる（チェックアウト） | コミュニティの記事と KB の抜粋（[Versioning in Knowledge Management – FAQ KB0713200](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0713200)）。チェックアウトで新しい版を作ることは公式の本文（[Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)）で確認。「主.副」の増やし方は未検証（本家の振る舞いで、設計の前提ではない） |
+| バージョン | バージョンの番号は「主.副」。公開前の編集は副（0.01 ずつ）、公開で主の番号が上がる。公開済みの記事を編集すると、新しい下書きのバージョンができる（チェックアウト） | コミュニティの記事と KB の抜粋（[Versioning in Knowledge Management – FAQ KB0713200](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0713200)）。チェックアウトで新しいバージョンを作ることは公式の本文（[Article versioning](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/article-versioning.html)）で確認。「主.副」の増やし方は未検証（本家の振る舞いで、設計の前提ではない） |
 | 評価とフィードバック | 「役に立ったか（はい・いいえ）」と 1〜5 の星。旗では変更の提案を書く。旗、「いいえ」、しきい値以下の星からフィードバックのタスクを作れ、否定の評価に理由を必須にする設定がある | [Provide feedback on knowledge articles](https://www.servicenow.com/docs/r/servicenow-platform/knowledge-management/r_KnowledgeFeedback.html)、[Enable actionable knowledge feedback](https://www.servicenow.com/docs/bundle/xanadu-servicenow-platform/page/product/knowledge-management/task/configure-act-know-feedback-properties.html)。タスクの割り当ての先はコミュニティの記事（[Knowledge Feedback Tasks](https://www.servicenow.com/community/developer-forum/knowledge-feedback-tasks-are-created-when-article-is-flagged-or/m-p/2618219)）だけで未検証 |
 | 既知のエラーの記事 | 問題の画面の関連のリンクから、1 回の操作で既知のエラーの記事を作り、レビューと承認に送る | [Create a known error article](https://www.servicenow.com/docs/r/it-service-management/problem-management/create-known-error-from-problem.html) |
 | 自己解決の計測 | ポータルの報告のフォームで、入力に合う記事を示し、記事の閲覧・クリックを計測の表に残す | [KB0712999](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0712999)（検索の結果の抜粋）。未検証（本家の振る舞いで、設計の前提ではない） |
 
-- 本家の版の番号の形（主.副）は採らない（3.2 節）。本家のテーブルの名前、状態の値は写さない。
+- 本家のバージョンの番号の形（主.副）は採らない（3.2 節）。本家のテーブルの名前、状態の値は写さない。
 - ITIL 4 のナレッジ管理のプラクティスの原典（PeopleCert の会員向けのプラクティスガイド）は確かめていない（未検証）。この文書の業務の流れは実務の一般的な形で、原典を前提にしない。
 
-## 3. 記事と版（[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md)）
+## 3. 記事とバージョン（[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md)）
 
 ### 3.1 表
 
@@ -42,46 +42,46 @@
 | `kb_article_version` | `tenant_id`、`id`、`article_id`、`version_no`、`state`（3.3 節）、`title`、`body`（制限付きの Markdown）、`keywords`、`language`（`ja` / `en`）、`content_hash`、`checked_out_by`、`checked_out_at`、`submitted_at`、`published_at`、`published_by`、`retired_at`、`approval_set_id`、`change_note` |
 
 - `kb_article` は記事の同一性（番号、評価の合計、ナレッジベース）を持ち、`kb_article_version` が本文を持つ。
-- **1 つの記事に、公開中の版は高々 1 つ、編集中（`draft`・`review`）の版も高々 1 つ。** 部分一意索引で守る：`(tenant_id, article_id) WHERE state = 'published'`、`(tenant_id, article_id) WHERE state IN ('draft', 'review')`。
-- 番号は記事ごとに 1 つ（版で変えない）。依頼者や担当者が「KB0001234 を見て」と伝える番号を安定させる。
+- **1 つの記事に、公開中のバージョンは高々 1 つ、編集中（`draft`・`review`）のバージョンも高々 1 つ。** 部分一意索引で守る：`(tenant_id, article_id) WHERE state = 'published'`、`(tenant_id, article_id) WHERE state IN ('draft', 'review')`。
+- 番号は記事ごとに 1 つ（バージョンで変えない）。依頼者や担当者が「KB0001234 を見て」と伝える番号を安定させる。
 
-### 3.2 版の番号
+### 3.2 バージョンの番号
 
-- 版は `version_no`（1, 2, 3 …）の整数だけにする。下書きの保存ごとに番号を上げない（下書きの中の変更は監査の履歴に残る）。
-- 本家の「主.副」は採らない。副の番号は公開前の保存の回数を示すが、監査の履歴で同じことが分かり、利用者には「今の公開は何版目か」だけが要るためである。
+- バージョンは `version_no`（1, 2, 3 …）の整数だけにする。下書きの保存ごとに番号を上げない（下書きの中の変更は監査の履歴に残る）。
+- 本家の「主.副」は採らない。副の番号は公開前の保存の回数を示すが、監査の履歴で同じことが分かり、利用者には「今の公開は何番目のバージョンか」だけが要るためである。
 
-### 3.3 版の状態（DT-KB-001）
+### 3.3 バージョンの状態（DT-KB-001）
 
 | # | 前 | 後 | 操作 | 主体・条件 | 効果 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | - | `draft` | `create`・`checkout` | 書ける人（`contributors_audience` に合う、または `knowledge_admin`）。`checkout` は公開中の版から本文を写し、記事に編集中の版がないとき | `checked_out_by = 主体`、`draft_version_id` |
+| 1 | - | `draft` | `create`・`checkout` | 書ける人（`contributors_audience` に合う、または `knowledge_admin`）。`checkout` は公開中のバージョンから本文を写し、記事に編集中のバージョンがないとき | `checked_out_by = 主体`、`draft_version_id` |
 | 2 | `draft` | `draft` | `edit` | `checked_out_by = 主体`、または `knowledge_admin`（奪うときは前の人に知らせる） | 本文の更新 |
 | 3 | `draft` | `review` | `submit` | 本文とタイトルが空でない。`publish_policy = approval` | 本文を固定（`content_hash`）、承認の依頼（4 節） |
 | 4 | `draft` | `published` | `publish` | `publish_policy = instant`、主体が書ける人 | 5 行と同じ公開の効果 |
-| 5 | `review` | `published` | system（承認の決着が `approved`） | 版の `content_hash` が承認の依頼の時と同じ | 前の公開の版を `outdated`、`published_version_id` を付け替え、`draft_version_id` を空、索引への反映（outbox） |
+| 5 | `review` | `published` | system（承認の決着が `approved`） | バージョンの `content_hash` が承認の依頼の時と同じ | 前の公開のバージョンを `outdated`、`published_version_id` を付け替え、`draft_version_id` を空、索引への反映（outbox） |
 | 6 | `review` | `draft` | system（承認の却下）・`withdraw`（著者） | - | 承認を取り消す（`withdraw` のとき） |
 | 7 | `published` | `pending_retirement` | `retire` | `retire_policy = approval`、`knowledge_admin` か持ち主のグループ | 承認の依頼 |
 | 8 | `published`・`pending_retirement` | `retired` | `retire`（`instant`）・system（承認の決着・`valid_to` のタイマー） | - | `published_version_id` を空、索引から外す |
 | 9 | `draft` | `cancelled` | `discard` | 著者か `knowledge_admin` | `draft_version_id` を空 |
-| 10 | `outdated`・`retired`・`cancelled` | どれも | - | - | 変わらない。前の版を戻すときは、その本文から新しい `draft` を作る（`checkout` の元に選べる） |
+| 10 | `outdated`・`retired`・`cancelled` | どれも | - | - | 変わらない。前のバージョンを戻すときは、その本文から新しい `draft` を作る（`checkout` の元に選べる） |
 | 11 | そのほか | | | | 422 `invalid_transition` |
 
-- **`review` の版の本文は変えない。** 承認者が見た本文と公開する本文を同じにするため、5 行で `content_hash` を確かめる。直すときは `withdraw` で `draft` に戻す。
-- 公開の版の本文は変えない（誤字も新しい版で直す）。ただし `knowledge_admin` の「軽微な修正」（`minor_fix`）は、公開中の版から新しい版を作って即時に公開する操作を 1 回で行う（承認の方針を飛ばすので、監査の履歴に理由を残す）。MVP に入れるかは E9 で決める（12 節）。
+- **`review` のバージョンの本文は変えない。** 承認者が見た本文と公開する本文を同じにするため、5 行で `content_hash` を確かめる。直すときは `withdraw` で `draft` に戻す。
+- 公開のバージョンの本文は変えない（誤字も新しいバージョンで直す）。ただし `knowledge_admin` の「軽微な修正」（`minor_fix`）は、公開中のバージョンから新しいバージョンを作って即時に公開する操作を 1 回で行う（承認の方針を飛ばすので、監査の履歴に理由を残す）。MVP に入れるかは E9 で決める（12 節）。
 
 ### 3.4 記事の状態（導出）
 
 | 条件 | `kb_article.state` |
 | --- | --- |
 | `published_version_id` あり | `published` |
-| なし、公開した版が 1 つ以上ある（すべて `retired`・`outdated`） | `retired` |
-| なし、公開した版がない | `draft` |
+| なし、公開したバージョンが 1 つ以上ある（すべて `retired`・`outdated`） | `retired` |
+| なし、公開したバージョンがない | `draft` |
 
 ### 3.5 本文
 
 - 本文は制限付きの Markdown にする：見出し、段落、箇条書き、番号付きの箇条書き、表、コードのブロック、引用、太字・斜体、リンク（`https:` と、テナントの中の記事・カタログの品目へのリンクだけ）、画像（記事の添付ファイルだけ）。**HTML を受けない。** 描くときは許可の一覧のタグだけの HTML に変換し、サニタイズの後に出す。
 - 本家からの移行で HTML の記事を取り込むときは、取り込みの道具で Markdown に変換する。変換できない要素（スクリプト、iframe、スタイル）は捨て、捨てたことを取り込みの結果に残す。
-- 1 版の本文は 256 KB まで、添付は 1 記事 20 ファイル・各 25 MB まで。
+- 1 バージョンの本文は 256 KB まで、添付は 1 記事 20 ファイル・各 25 MB まで。
 
 ## 4. 公開の流れ（[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md)）
 
@@ -99,15 +99,15 @@
 
 - 問題の `known_error = true`（[itsm-processes.md](itsm-processes.md) の 7.2 節）の後、担当者の操作 `publish_known_error_article` で、`kind = known_error` の記事の `draft` を作る。本文の雛形：症状（問題の短い説明と説明）、影響を受けるサービス・CI、回避策（`workaround`）、原因（`cause_notes`、空なら「調査中」）、状況（問題の状態）。
 - 記事は `source_task_id` で問題を指す。公開の流れは、記事のナレッジベースの方針に従う（既知のエラーのための専用のナレッジベースを既定で 1 つ作る。`publish_policy = approval`、持ち主は `problem_manager` のグループ）。
-- 問題の `workaround`・`cause_notes`・状態が変わったら、記事の持ち主のグループに「記事の更新の候補」を知らせる。**自動で新しい版の草案を作らない。** 編集中の版があるとき（部分一意索引）にぶつかるのを避け、人が本文を確かめてから公開するためである。
+- 問題の `workaround`・`cause_notes`・状態が変わったら、記事の持ち主のグループに「記事の更新の候補」を知らせる。**自動で新しいバージョンの草案を作らない。** 編集中のバージョンがあるとき（部分一意索引）にぶつかるのを避け、人が本文を確かめてから公開するためである。
 - 問題が `closed`（恒久の対策の後）になったら、記事の持ち主のグループに見直しのタスクを作る（廃止か、「解決済み」への書き換えか）。
 
 ## 6. 公開の範囲
 
 - 読める人：ナレッジベースの `readers_audience_id` に合い、記事に `audience_id` があればそれにも合う人。`audience` の意味は [service-catalog-and-requests.md](service-catalog-and-requests.md) の 6.1 節と同じ（除くが勝つ、含むが空なら誰も読めない）。
-- 読めるのは `published` の版だけ（`requester`）。`draft`・`review`・`outdated`・`retired` の版は、書ける人、承認者（自分の承認の対象の版）、`knowledge_admin` だけ。
+- 読めるのは `published` のバージョンだけ（`requester`）。`draft`・`review`・`outdated`・`retired` のバージョンは、書ける人、承認者（自分の承認の対象のバージョン）、`knowledge_admin` だけ。
 - ACL の組み込みの規則として書き（`kb_article`・`kb_article_version` の `read` の `allow_if`）、条件は主体の属性と記事の列だけで SQL の述語にコンパイルできる（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）。リスト・件数・検索・通知の出口は、同じ述語を使う（[access-control.md](access-control.md) の 6.2 節）。
-- 検索の索引（`search.md`）には、公開中の版だけを入れ、索引の文書に `kb_base_id`・`audience_id` を持たせる。索引で絞った後に、返す直前に判定の関数で確かめ直す（DT-ACL-003 の 9 行）。
+- 検索の索引（`search.md`）には、公開中のバージョンだけを入れ、索引の文書に `kb_base_id`・`audience_id` を持たせる。索引で絞った後に、返す直前に判定の関数で確かめ直す（DT-ACL-003 の 9 行）。
 - 内部だけの記事（担当者向けの手順）は、`readers_audience` を `agent` のロールに限ったナレッジベースに置く。
 
 ## 7. 評価・フィードバック・自己解決（[ADR-0032](../decisions/0032-knowledge-feedback-and-deflection.md)）
@@ -120,8 +120,8 @@
 | `kb_flag` | `tenant_id`、`id`、`article_id`、`version_id`、`user_id`、`reason`（`outdated` / `incorrect` / `unclear` / `broken_link` / `other`）、`comment`（必須、2,000 文字まで）、`task_id`、`created_at` |
 | `kb_feedback_task` | `task` の子のクラス。`article_id`、`reason`（`flag` / `low_rating` / `periodic_review` / `source_changed`）、`flag_count` |
 
-- 評価は利用者・版ごとに 1 件で、送り直しは上書きする（`INSERT … ON CONFLICT DO UPDATE`）。記事の `helpful_yes`・`helpful_no`・`rating_sum`・`rating_count` は、同じトランザクションで差分を足す（上書きのときは前の値を引いて新しい値を足す）。
-- 新しい版を公開しても、前の版の評価は記事の合計に残す。版ごとの評価は `kb_rating` から集計できる。
+- 評価は利用者・バージョンごとに 1 件で、送り直しは上書きする（`INSERT … ON CONFLICT DO UPDATE`）。記事の `helpful_yes`・`helpful_no`・`rating_sum`・`rating_count` は、同じトランザクションで差分を足す（上書きのときは前の値を引いて新しい値を足す）。
+- 新しいバージョンを公開しても、前のバージョンの評価は記事の合計に残す。バージョンごとの評価は `kb_rating` から集計できる。
 
 DT-KB-002（フィードバックのタスク）：
 
@@ -129,12 +129,12 @@ DT-KB-002（フィードバックのタスク）：
 | --- | --- | --- | --- |
 | 1 | 旗 | なし | タスクを作る（持ち主のグループ、`flag_count = 1`）、旗の `task_id` |
 | 2 | 旗 | あり | 既存のタスクに旗を足す（`flag_count += 1`、作業メモに旗の理由） |
-| 3 | 評価（役に立たない、または星 1・2） | なし、かつ公開の版の直近 30 日の「役に立たない」の割合 ≥ 50% かつ件数 ≥ 5 | `low_rating` のタスクを作る |
+| 3 | 評価（役に立たない、または星 1・2） | なし、かつ公開のバージョンの直近 30 日の「役に立たない」の割合 ≥ 50% かつ件数 ≥ 5 | `low_rating` のタスクを作る |
 | 4 | 評価（同上） | あり | 何もしない |
 | 5 | そのほかの評価 | - | 何もしない |
 
 - 1 件の低い評価ごとにタスクを作らない（本家には 1 件でタスクを作る設定がある。2 節）。持ち主のグループのタスクが、少数の評価で溢れるのを避ける。旗は理由が必須で、明確な指摘なので 1 件でタスクにする。
-- 同じ利用者の同じ版への旗は、1 日に 1 件まで。
+- 同じ利用者の同じバージョンへの旗は、1 日に 1 件まで。
 
 ### 7.2 閲覧の数
 
@@ -175,9 +175,9 @@ DT-KB-002（フィードバックのタスク）：
 | 障害 | 振る舞い |
 | --- | --- |
 | 同じ記事の 2 人の同時の `checkout` | 部分一意索引で後のほうが 409 `draft_exists`（誰が編集中かを返す） |
-| 承認の決着と著者の `withdraw` が同時 | 版の行の版の番号で、先にコミットしたほうが効く。`withdraw` が先なら承認の決着は何もしない |
+| 承認の決着と著者の `withdraw` が同時 | バージョンの行のバージョンの番号で、先にコミットしたほうが効く。`withdraw` が先なら承認の決着は何もしない |
 | 公開の直後の索引への反映の遅れ | 公開は DB で確定する。検索に出るまで数秒遅れる。記事の番号での直接の表示は即時 |
-| `valid_to` のタイマーと手での新しい版の公開が同時 | 公開の版が変わっていれば、タイマーは版の条件で何もしない（新しい版は新しい `valid_to` を持つ） |
+| `valid_to` のタイマーと手での新しいバージョンの公開が同時 | 公開のバージョンが変わっていれば、タイマーはバージョンの条件で何もしない（新しいバージョンは新しい `valid_to` を持つ） |
 | 事象の送信の失敗 | 画面が再送する（`seq` で重複を捨てる）。失われた事象は指標の誤差として受け入れる |
 | 評価の合計と `kb_rating` のずれ | 日次の突き合わせのジョブで直し、ずれの件数を記録する |
 
@@ -194,13 +194,13 @@ DT-KB-002（フィードバックのタスク）：
 
 ### 10.1 決定表
 
-- DT-KB-001（版の状態）、DT-KB-002（フィードバックのタスク）、DT-KB-003（自己解決の判定）と否定の表を、`spec.md` から読む表駆動テストにする。
+- DT-KB-001（バージョンの状態）、DT-KB-002（フィードバックのタスク）、DT-KB-003（自己解決の判定）と否定の表を、`spec.md` から読む表駆動テストにする。
 
 ### 10.2 性質ベーステスト（fast-check）
 
-- **PROP-KB-001（版の数）**：任意の操作の列（並行を含む）で、どの時点でも、1 つの記事の `published` の版は高々 1 つ、`draft`・`review` の版も高々 1 つ。
-- **PROP-KB-002（承認した本文を公開する）**：任意の編集・提出・取り下げ・承認の列で、`published` になった版の `content_hash` は、その版の承認の依頼の時の `content_hash` と同じ。
-- **PROP-KB-003（読める範囲）**：任意の記事・版・`audience` と主体で、主体が読める版は `published` で、ナレッジベースと記事の `audience` の両方に合うものだけ（リスト・件数・検索の出口）。
+- **PROP-KB-001（バージョンの数）**：任意の操作の列（並行を含む）で、どの時点でも、1 つの記事の `published` のバージョンは高々 1 つ、`draft`・`review` のバージョンも高々 1 つ。
+- **PROP-KB-002（承認した本文を公開する）**：任意の編集・提出・取り下げ・承認の列で、`published` になったバージョンの `content_hash` は、そのバージョンの承認の依頼の時の `content_hash` と同じ。
+- **PROP-KB-003（読める範囲）**：任意の記事・バージョン・`audience` と主体で、主体が読めるバージョンは `published` で、ナレッジベースと記事の `audience` の両方に合うものだけ（リスト・件数・検索の出口）。
 - **PROP-KB-004（自己解決の判定の決定性）**：任意のセッションの事象の集合で、到着の順と重複（同じ `seq` の再送）によらず、DT-KB-003 の判定は同じ。
 - **PROP-KB-005（評価の合計）**：任意の評価の送信・上書きの列（並行を含む）の後で、記事の `helpful_yes`・`helpful_no`・`rating_sum`・`rating_count` は `kb_rating` の集計と一致する。
 
@@ -225,9 +225,9 @@ DT-KB-002（フィードバックのタスク）：
 
 ### 決定（2026-09-28、既定案）
 
-- **記事の行と版の行に分け、公開中と編集中の版をそれぞれ高々 1 つにする**（3.1 節、ADR-0031）。
-- **版の番号は整数だけにし、主.副の形を採らない**（3.2 節）。
-- **レビューに出した版の本文を固定し、承認した本文だけを公開する**（3.3 節）。
+- **記事の行とバージョンの行に分け、公開中と編集中のバージョンをそれぞれ高々 1 つにする**（3.1 節、ADR-0031）。
+- **バージョンの番号は整数だけにし、主.副の形を採らない**（3.2 節）。
+- **レビューに出したバージョンの本文を固定し、承認した本文だけを公開する**（3.3 節）。
 - **本文は制限付きの Markdown だけ**（3.5 節）。
 - **著者の本人の承認を既定で禁止する**（4 節）。
 - **問題の変更で記事の草案を自動で作らず、持ち主に知らせる**（5 節）。
@@ -239,12 +239,12 @@ DT-KB-002（フィードバックのタスク）：
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 多言語の記事（日本語と英語の版の組） | E9 の後。翻訳の版のモデルを別の変更で |
+| 多言語の記事（日本語と英語のバージョンの組） | E9 の後。翻訳のバージョンのモデルを別の変更で |
 | `knowledge_admin` の軽微な修正の即時の公開 | E9 の利用者の調査で（3.3 節） |
 | 匿名の閲覧（社外への公開） | MVP の後。公開のポータルと一緒に |
 | 自己解決の目標の値と、推定の判定の時間（30 分） | E9 の計測（K8） |
 | 検索の語の分析（記事のない語） | `search.md` で、集計の形で |
-| 本家の既定の値（旗・低い評価のタスクの作り方、版の番号） | 本家の公式の本文で確かめられたら 2 節を直す |
+| 本家の既定の値（旗・低い評価のタスクの作り方、バージョンの番号） | 本家の公式の本文で確かめられたら 2 節を直す |
 
 ## 13. quality.md・runbooks・data-model への項目
 
@@ -273,4 +273,4 @@ DT-KB-002（フィードバックのタスク）：
 | Aurora `task`（クラス `kb_feedback_task`） | 7.1 節 |
 | Aurora `portal_event`（日ごとのパーティション、90 日） | 7.3 節。`(tenant_id, session_id, seq)` 一意 |
 | Aurora `deflection_daily` | 7.4 節。品目・記事・日ごとの集計 |
-| OpenSearch 記事の索引 | 公開中の版だけ。`kb_base_id`・`audience_id` を持つ（`search.md`） |
+| OpenSearch 記事の索引 | 公開中のバージョンだけ。`kb_base_id`・`audience_id` を持つ（`search.md`） |

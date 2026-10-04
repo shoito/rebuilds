@@ -13,7 +13,7 @@ date: 2026-09-28
 - モデルごとの読み込みの方針と、同期グループの規則。規則のないモデルは生成を失敗させる（[ADR-0003](0003-bootstrap-and-partial-sync.md)、[ADR-0004](0004-tenancy-and-permissions.md)）。
 - 被覆の鍵と `include`（[ADR-0012](0012-lazy-loading-coverage-and-tombstones.md)）。
 - `schema_version`・`schema_hash` と、上げ忘れの検査（[ADR-0014](0014-indexeddb-layout-durability-and-migrations.md)）。
-- 1 つ前の版のクライアントを 30 日受ける（[ADR-0005](0005-client-persistence-and-offline.md)）。
+- 1 つ前のバージョンのクライアントを 30 日受ける（[ADR-0005](0005-client-persistence-and-offline.md)）。
 
 第三者の解析によれば、本家はクライアントの `ModelRegistry` にモデルとプロパティのメタデータを持ち、そこからスキーマのハッシュを計算する（[wzhudev/reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)、2026-09-28 に確認。本家の保証ではない）。本家が定義から DB を生成しているかは未検証。
 
@@ -62,4 +62,4 @@ date: 2026-09-28
 - CI：[data-model-and-schema.md](../architecture/data-model-and-schema.md) の 4.1 節の検査（統合の工程で 14 項目に広げた）。わざと誤った定義で各行が失敗することを例示テストで確かめる。
 - CI：全マイグレーションを当てた DB と望む形の比較。
 - 性質ベーステスト：PROP-SCHEMA-001（往復）、PROP-SCHEMA-002（古いクライアントの許容）。
-- リリースの前：1 つ前の版の生成のコードを持つクライアントとの往復の試験。
+- リリースの前：1 つ前のバージョンの生成のコードを持つクライアントとの往復の試験。

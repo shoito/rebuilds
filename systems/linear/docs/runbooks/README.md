@@ -22,7 +22,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 検索 | 変更から検索に出るまで、`/search` の応答 | **p95 10 秒、p99 500ms**（NFR-010） | `search_index_lag_seconds` の p95 が 30 秒を 15 分でチケット、5 分を超えたら呼び出し | ○ |
 
 - SLO の窓は 30 日の移動の窓（報告は暦の月）。エラーバジェットの方針は他の題材と同じ（使い切ったら信頼性の作業を機能より先にする。デプロイの前に残りを確かめる）。
-- **数えないもの**：検証の拒否（`forbidden`・`invalid` など）。ただし、拒否の率の急な上がり（observability.md の 5.3 節）は版のずれや規則の誤りの兆候として見る。社内の監視用のワークスペースは SLO の計算から除き、別に見る。
+- **数えないもの**：検証の拒否（`forbidden`・`invalid` など）。ただし、拒否の率の急な上がり（observability.md の 5.3 節）はバージョンのずれや規則の誤りの兆候として見る。社内の監視用のワークスペースは SLO の計算から除き、別に見る。
 - 伝播の SLI の正本は、合成監視の 2 つのクライアント（同じプロセス、同じ時計）と RUM の両方。RUM は利用者の回線を含む。
 - クライアントの計測（操作の遅延、起動、ヒープ）は SLO の表に置くが、呼び出しにはしない（チケットと日次の確認）。QA が品質の判定に使う（[quality.md](../quality.md) の 4.1 節）。
 - 「品質の判定に使う」に○がある指標は、QA が品質の判定基準に使う。定義を変えるときは QA と合意する。
@@ -52,14 +52,14 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 流れの正本は [delivery.md](../architecture/delivery.md)、手順は [deploy-and-rollback.md](deploy-and-rollback.md)。
 
 - **デプロイとリリースを分ける。** デプロイは Ops が承認し、リリース（フラグを広げる）は PM が判断する。未完成の振る舞いは `release.*` のフラグの裏に置く。`release.*` は 100% の後 30 日で消す。
-- **同期の意味をフラグにしない。** 競合の規則、`applyOp`、`derive`、同期グループの規則、トランザクションの形は、スキーマの版（`schema_hash`・`fv`）で変える（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。
-- **サーバーのデプロイの順**：マイグレーション（広げる段だけ）→ writer（ローリング）→ relay → gateway・sync-api（gateway は 1 タスクずつ 10 分かけて逃がす。全部で約 1 時間）→ public-api・auth・worker-* → Web の資産（置くだけ）。サーバーの版の更新で、クライアントのやり直しを起こさない。自動のロールバックの条件は 5xx、拒否の率の急な上がり、送信から ack の p99、Relay の遅れ。
-- **Web のクライアント（コホートの段階）**：端末の ID（`<brand>_cid`）のハッシュの桶と KeyValueStore の割合で `index.html` を選ぶ。1% → 10% → 50% → 100%、各段 4 時間以上。止める条件（前の版との比べ）：主要な Action の p99 か起動の p95 が 10% 以上遅い、拒否の率・JavaScript のエラーの率が 2 倍、`migration`・`corrupt` のやり直しが 0.5% 以上、収束の監査の `unexplained` が 1 件。戻しは割合を戻す。
-- **手元の DB の版（`schema_version`）を上げるリリース**は戻せない。機能の変更と別のリリースにし、1% で 48 時間見てから進め、問題は前へ直す。
-- **Electron の殻**：更新の案内を端末の桶で返す。1%（24 時間）→ 10%（24 時間）→ 50% → 100%。Chromium の High 以上の修正を含む版は 24 時間で 100%。止めるは割合 0、戻すは前のコードで版を上げて出す（Squirrel は版を下げられない）。
-- **最低の版（`min_build`）**：殻とレンダラーの組で比べる。上げる理由は、プロトコル、互換の一覧の外れ（30 日）、セキュリティに限る。古い端末は送信を止めるが、手元の読み書きと outbox は続ける。上げる前に、古い版の接続の数を確かめる。
+- **同期の意味をフラグにしない。** 競合の規則、`applyOp`、`derive`、同期グループの規則、トランザクションの形は、スキーマのバージョン（`schema_hash`・`fv`）で変える（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。
+- **サーバーのデプロイの順**：マイグレーション（広げる段だけ）→ writer（ローリング）→ relay → gateway・sync-api（gateway は 1 タスクずつ 10 分かけて逃がす。全部で約 1 時間）→ public-api・auth・worker-* → Web の資産（置くだけ）。サーバーのバージョンの更新で、クライアントのやり直しを起こさない。自動のロールバックの条件は 5xx、拒否の率の急な上がり、送信から ack の p99、Relay の遅れ。
+- **Web のクライアント（コホートの段階）**：端末の ID（`<brand>_cid`）のハッシュの桶と KeyValueStore の割合で `index.html` を選ぶ。1% → 10% → 50% → 100%、各段 4 時間以上。止める条件（前のバージョンとの比べ）：主要な Action の p99 か起動の p95 が 10% 以上遅い、拒否の率・JavaScript のエラーの率が 2 倍、`migration`・`corrupt` のやり直しが 0.5% 以上、収束の監査の `unexplained` が 1 件。戻しは割合を戻す。
+- **手元の DB のバージョン（`schema_version`）を上げるリリース**は戻せない。機能の変更と別のリリースにし、1% で 48 時間見てから進め、問題は前へ直す。
+- **Electron の殻**：更新の案内を端末の桶で返す。1%（24 時間）→ 10%（24 時間）→ 50% → 100%。Chromium の High 以上の修正を含むバージョンは 24 時間で 100%。止めるは割合 0、戻すは前のコードでバージョンを上げて出す（Squirrel はバージョンを下げられない）。
+- **最低のバージョン（`min_build`）**：殻とレンダラーの組で比べる。上げる理由は、プロトコル、互換の一覧の外れ（30 日）、セキュリティに限る。古い端末は送信を止めるが、手元の読み書きと outbox は続ける。上げる前に、古いバージョンの接続の数を確かめる。
 - **スキーマの変更（広げる・移る・縮める・消す）**（[ADR-0057](../decisions/0057-schema-change-ordering.md)）：N で DB を広げ、Writer が両方を書き、Worker が枠の中で埋める → N+1 でクライアントを移す（Writer は古い `fv` と新しい `fv` を受ける）→ 古い `schema_hash` の接続が 1% 未満、段 2 から 30 日、古い `fv` の outbox の報告が 0 に近いときに縮める → 縮めたコードが 1 リリース以上動いた後、列を消すマイグレーションを単独で出す。1 つのデプロイで、DB の破壊の変更と、それを読むコードを一緒に出さない。手順は `schema-expand-contract.md`。
-- **ロールバック**：まずフラグ（`release.*`・`ops.*`）で戻す。次に 1 つ前のイメージ（マイグレーションは広げる段だけなので、前の版が今の DB で動く）。クライアントは割合を戻す。縮める段の後は前へ戻さない。
+- **ロールバック**：まずフラグ（`release.*`・`ops.*`）で戻す。次に 1 つ前のイメージ（マイグレーションは広げる段だけなので、前のバージョンが今の DB で動く）。クライアントは割合を戻す。縮める段の後は前へ戻さない。
 - **同期の核の不具合**（収束の不一致、outbox の喪失）は、まず `ops.*` で止められるかを見る。`ops.writes_enabled = false` は最後の手段（止めてもクライアントは outbox に貯める）。
 - 本番へのデプロイは Ops が承認する（作成者と別の人）。
 
@@ -69,7 +69,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | --- | --- | --- |
 | サーバー（writer、relay、gateway、sync-api、public-api、auth、worker-*） | 平日 10〜17 時 | 金曜 15 時以降、日本の祝日の前日、年末年始、エラーバジェットを使い切っている間、夜間の CI（シミュレーター 20 万の列、オフラインの耐久）が 2 日続けて失敗している間 |
 | Web・Electron の段階を進める | 平日 10〜15 時（観察を平日に置く） | 同上 |
-| 手元の DB の版を上げるリリース、`min_build` の引き上げ | 計画作業として平日 10〜12 時（1% の 48 時間の観察を平日に置く） | 同上 |
+| 手元の DB のバージョンを上げるリリース、`min_build` の引き上げ | 計画作業として平日 10〜12 時（1% の 48 時間の観察を平日に置く） | 同上 |
 | 縮める・消す段のマイグレーション | 計画作業として平日 10〜15 時 | 同上 |
 | Terraform（`regional/network`・`regional/data`） | 平日 10〜16 時。Ops の承認 | 同上 |
 | DR の戻し（大阪 → 東京の switchover） | 計画作業として | 大きな利用者の催しの日を避ける |
@@ -92,7 +92,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 購読のずれ（`subscription_drift` の見てよい方向。ticket） | `subscription-drift-repair.md`（permissions-and-teams.md の 13 節） | E4 で作成 | `subscription-audit` |
 | 端末の保存の消去の増加（`lost_local`・`corrupt` が平常の 3 倍を 1 時間。ticket、10 倍で page） | [incident-response.md](incident-response.md) の「端末の保存の消去」、`client-storage-eviction.md`（client-store-and-offline.md の 15 節） | 作成済み（個別の手順は E3 で作成） | `lost-local-notice`、`client-storage-telemetry` |
 | outbox の滞留（最古の未送信が 24 時間を超える端末が平常の 3 倍。ticket） | `outbox-backlog.md`（同上） | E3 で作成 | `outbox-store` |
-| クライアントの版の後の移行の失敗（新しい版で `migration` のやり直しが 1% 超。page） | [deploy-and-rollback.md](deploy-and-rollback.md)、`client-migration-failure.md`（同上） | 作成済み（個別の手順は E3 で作成） | `client-db-migration` |
+| クライアントのバージョンの後の移行の失敗（新しいバージョンで `migration` のやり直しが 1% 超。page） | [deploy-and-rollback.md](deploy-and-rollback.md)、`client-migration-failure.md`（同上） | 作成済み（個別の手順は E3 で作成） | `client-db-migration` |
 | 操作の遅延の後退（RUM の p99 50ms を 2 日。ticket） | `latency-regression.md`（client-app.md の 18 節） | E6 で作成 | `latency-budget-gate`、`rum-latency-marks` |
 | IME の不具合の報告（組み立て中の誤った実行） | `ime-regression.md`（同上） | E6 で作成 | `ime-guard` |
 | 再接続の殺到（1 分の新しい接続が 1 万超。ticket、`overloaded` が 5 分で page） | `reconnect-storm.md`（capacity.md の 12 節） | E3 で作成 | `gateway-hello-admission`、`gateway-heartbeat-backoff` |
@@ -185,8 +185,8 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 収束の監査・配信の監査の結果の確認 | 日次 | [quality.md](../quality.md) の 4.2 節 |
 | 購読の監査（`subscription_drift`） | 日次（自動） | `subscription-drift-repair.md`（E4） |
 | 進捗の数え直し（`progress_reconcile_drift`） | 日次（自動） | `progress-recount.md`（E7） |
-| シミュレーターのミューテーションの試験（わざと誤りを入れた版で失敗を見つける） | 四半期（QA が実行） | [ADR-0010](../decisions/0010-deterministic-sync-simulator.md) の Confirmation |
-| IME の組み合わせの手動の確認 | ブラウザ・OS・Electron の大きな版の更新のたび（QA が実行） | [quality.md](../quality.md) の 2.2.1 節 |
+| シミュレーターのミューテーションの試験（わざと誤りを入れたバージョンで失敗を見つける） | 四半期（QA が実行） | [ADR-0010](../decisions/0010-deterministic-sync-simulator.md) の Confirmation |
+| IME の組み合わせの手動の確認 | ブラウザ・OS・Electron の大きなバージョンの更新のたび（QA が実行） | [quality.md](../quality.md) の 2.2.1 節 |
 | 固定の機械のランナーの較正の基準の見直し、予備の機械の確認 | 四半期 | [delivery.md](../architecture/delivery.md) の 2.3 節 |
 | `release.*` のフラグの消し忘れの一覧 | 週次 | [delivery.md](../architecture/delivery.md) の 3 節 |
 | 秘密の入れ替え（添付の `upload_ref` の HMAC の鍵、CloudFront の署名の鍵、CloudFront → ALB の秘密のヘッダー） | 90 日 | [security.md](../architecture/security.md) の 7 節 |

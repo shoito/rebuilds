@@ -62,7 +62,7 @@ S1 は物理クラスタ 1 つに 480 の論理シャードを置く（[ADR-0003
 3. 移動元の現在の WAL の位置まで、移動先が追いついたことを確かめる。
 4. 移動先のシーケンスを進め、逆向き（移動先 → 移動元）のパブリケーションとサブスクリプションを作る（`copy_data = false`）。
 5. `shard_map` を移動先・`active` に更新し、`version` を上げる。各タスクに再読み込みを通知する。
-6. 各タスクの `shard_map` の版がそろったことを確かめる。1〜5 が 10 秒を超えたら、手順を止めて 1 の前へ戻す（フェンスを外し、`active` に戻す）。
+6. 各タスクの `shard_map` のバージョンがそろったことを確かめる。1〜5 が 10 秒を超えたら、手順を止めて 1 の前へ戻す（フェンスを外し、`active` に戻す）。
 
 戻すときは、同じ手順を逆向きに行う。段 6 の前なら、移動元は逆向きの複製で最新なので、データを失わない。
 
@@ -74,7 +74,7 @@ S1 は物理クラスタ 1 つに 480 の論理シャードを置く（[ADR-0003
 
 > 2026-09-27 の注記：未検証の 3 点を確かめた。
 > - **フェイルオーバーでのスロット（解消）**：Aurora の writer のフェイルオーバーの後は、論理レプリケーションのスロットを作り直す必要がある。PostgreSQL 17 のフェイルオーバースロット（`sync_replication_slots`）は Aurora では使えない（[AWS Database Blog](https://aws.amazon.com/blogs/database/migrate-amazon-aurora-postgresql-across-major-versions-with-active-debezium-cdc-connectors-using-native-logical-replication/)、2026-09-27 に確認。User Guide には記述がない）。「保たれない前提で、段 1 からやり直す」は変えない。
-> - **クローンからの初期コピー（解消）**：AWS は、移動元でパブリケーションとスロットを作ってからクローンし、クローンで `aurora_volume_logical_start_lsn()` を読み、`copy_data = false`・`create_slot = false` のサブスクリプションを `pg_replication_origin_advance` でその位置へ進める手順を示している（[Using logical replication to perform a major version upgrade](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.MajorVersionUpgrade.html)、2026-09-27 に確認）。そこで、段 1 の初期コピーを速くする手段として、この手順を選べるものにする。クローンには全スキーマが入るので、移動先で群れに属さないスキーマを消す。使う版の Aurora で `aurora_volume_logical_start_lsn()` が使えるか（文書の版の一覧は 15.2 まで）は、E9 の `reshard-drill-staging` で確かめる。
+> - **クローンからの初期コピー（解消）**：AWS は、移動元でパブリケーションとスロットを作ってからクローンし、クローンで `aurora_volume_logical_start_lsn()` を読み、`copy_data = false`・`create_slot = false` のサブスクリプションを `pg_replication_origin_advance` でその位置へ進める手順を示している（[Using logical replication to perform a major version upgrade](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.MajorVersionUpgrade.html)、2026-09-27 に確認）。そこで、段 1 の初期コピーを速くする手段として、この手順を選べるものにする。クローンには全スキーマが入るので、移動先で群れに属さないスキーマを消す。使うバージョンの Aurora で `aurora_volume_logical_start_lsn()` が使えるか（文書のバージョンの一覧は 15.2 まで）は、E9 の `reshard-drill-staging` で確かめる。
 > - **`FOR TABLES IN SCHEMA` と `rds_superuser`（未検証のまま）**：PostgreSQL では、この句と `FOR ALL TABLES` はスーパーユーザーを要する（[CREATE PUBLICATION](https://www.postgresql.org/docs/18/sql-createpublication.html)、2026-09-27 に確認）。AWS は `rds_superuser` の利用者が `FOR ALL TABLES` を使う手順を示している（上の文書）が、`FOR TABLES IN SCHEMA` についての記述はない。staging で確かめ、使えなければ `FOR TABLE` で列挙する（決定のとおり）。
 
 ## Consequences

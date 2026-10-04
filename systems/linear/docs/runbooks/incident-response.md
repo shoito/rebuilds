@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | SEV1 | 多くのワークスペースで送信・差分が止まる。非公開のチーム・ワークスペースをまたぐ漏えいの疑い。outbox の喪失が広く起きる | 差分の配信の停止、配信の監査の不一致 |
 | SEV2 | 一部のワークスペース・端末で、SLO を大きく消費。収束の不一致。秘密の出力 | 伝播の遅れ、`unexplained` の不一致 |
-| SEV3 | 利用者の影響が小さい・迂回できる | 端末の保存の消去の増加（1 つのブラウザの版） |
+| SEV3 | 利用者の影響が小さい・迂回できる | 端末の保存の消去の増加（1 つのブラウザのバージョン） |
 
 1. インシデントの指揮者（IC）を決め、チャンネルを作り、時刻を記録し始める。
 2. 影響の範囲（ワークスペースの数、端末の数、経路）を決める。**利用者は手元で作業を続けられるか**（サーバーの障害は、手元の読み書きを止めない）を先に確かめ、告知に書く。
@@ -38,7 +38,7 @@
 | Relay → Gateway | Valkey の障害・遅れ、pub/sub の溢れ | Valkey の CPU・ネットワーク、`PUBLISH` の失敗 |
 | Gateway の欠けの埋め | reader の複製の遅れ、Valkey のメッセージの喪失 | reader の `ReplicaLag`、欠けの埋めの回数 |
 | Gateway → クライアント | Gateway の CPU・送信の待ち、`resync_required` の多発、CloudFront | Gateway のタスクあたりの接続と送信、送信の待ちの大きさ |
-| クライアントの保存と適用 | クライアントの版の不具合、IndexedDB の遅さ | RUM の `build` の別 |
+| クライアントの保存と適用 | クライアントのバージョンの不具合、IndexedDB の遅さ | RUM の `build` の別 |
 | 送信から ack も遅い | Writer・ロックの待ち（1 ワークスペースか全体か） | `top_workspace_lockwait`、Writer の CPU、Aurora の writer |
 
 ### 対処
@@ -66,15 +66,15 @@
 
 ### 確認
 
-1. `convergence_mismatches` から、ワークスペース・モデル・行の ID・端末の版（`build`・`schema_hash`）・`L` を読む。中身は見ない（必要なら、運用者のアクセスの規則で、サポートの参照の許しを得てから。[security.md](../architecture/security.md) の 8 節）。
-2. 版で偏っているか（特定のクライアントの版だけか）、モデルで偏っているか、ワークスペースで偏っているか。
+1. `convergence_mismatches` から、ワークスペース・モデル・行の ID・端末のバージョン（`build`・`schema_hash`）・`L` を読む。中身は見ない（必要なら、運用者のアクセスの規則で、サポートの参照の許しを得てから。[security.md](../architecture/security.md) の 8 節）。
+2. バージョンで偏っているか（特定のクライアントのバージョンだけか）、モデルで偏っているか、ワークスペースで偏っているか。
 3. その行の `sync_actions` を `L` の前後で読み（行の ID と `sync_id` と `changed`、`origin`）、直前に何が起きたか（移動、グループの変化、並びの振り直し、派生、インポート、DR）を見る。
 4. 端末の報告（2 段目の `(id, _u, 行のハッシュ)`）で、`_u` が合っていて中身が違うのか（当て方の誤り・正準形の違い）、`_u` から違うのか（差分の欠け・範囲の証明の誤り）を見分ける。
 
 ### 対処
 
 1. 該当の端末に `resync_required` を送り、正す（監査が自動で行う。行われていなければ手で）。
-2. 版で偏っていれば、その版の段階を止める（[deploy-and-rollback.md](deploy-and-rollback.md) の B・C）。
+2. バージョンで偏っていれば、そのバージョンの段階を止める（[deploy-and-rollback.md](deploy-and-rollback.md) の B・C）。
 3. 範囲の証明・欠けの検出の誤りが疑われる（`_u` から違う）ときは SEV2 のまま、Dev のテックリードを呼ぶ。同じワークスペースの他の端末も抜き取りを増やす（そのワークスペースの監査の割合を一時に 100% にする）。
 4. シミュレーターで再現を試み、再現した種を `sim/regressions/` に足す（`convergence-mismatch.md`）。
 5. 広く起きていて止められない場合の最後の手段：影響のワークスペースの `sync_epoch` を上げ、全端末をやり直させる（プラットフォームの監査に残す。やり直しの負荷は [capacity.md](../architecture/capacity.md) の 4.2 節）。
@@ -97,13 +97,13 @@
 
 1. SEV1 の候補として IC を立て、セキュリティの担当と法務に知らせる（漏えい等の報告の要否の判断のため。法務の L1）。
 2. 経路を決める：差分（Gateway）、ブートストラップ・取り戻し・遅延の読み込み（Sync API）、検索、公開 API、Webhook、書き出し、通知（メール・Slack）、連携（Slack の展開、PR のコメント）。
-3. 配信の監査の記録から、影響の組（行の ID、接続・端末の ID、利用者の ID、時刻）を集める。抜き取りは 1% なので、見つかった組から、同じ条件（同じ Gateway の版、同じグループの変化）の範囲を推定する。
+3. 配信の監査の記録から、影響の組（行の ID、接続・端末の ID、利用者の ID、時刻）を集める。抜き取りは 1% なので、見つかった組から、同じ条件（同じ Gateway のバージョン、同じグループの変化）の範囲を推定する。
 4. 購読の状態：`sync_subscriptions` と `groupsFor` の差（`subscription_drift` のジョブを手で流す）。
 
 ### 対処
 
 1. **止める。**
-   - 原因の版が分かれば戻す（[deploy-and-rollback.md](deploy-and-rollback.md)）。分からなければ、原因の経路を止める：検索は `ops.search_enabled = false`、Webhook は `ops.webhooks_enabled = false`、連携は `ops.integrations.<provider> = false`。差分・ブートストラップの誤りで止める手段がない場合は、影響のワークスペースの書き込みと接続を止めることを IC が判断する。
+   - 原因のバージョンが分かれば戻す（[deploy-and-rollback.md](deploy-and-rollback.md)）。分からなければ、原因の経路を止める：検索は `ops.search_enabled = false`、Webhook は `ops.webhooks_enabled = false`、連携は `ops.integrations.<provider> = false`。差分・ブートストラップの誤りで止める手段がない場合は、影響のワークスペースの書き込みと接続を止めることを IC が判断する。
    - 購読のずれは、Writer のシステムのトランザクションで直す（`subscription-drift-repair.md`）。
 2. **端末から消す。** 影響の利用者の接続に `kick: forbidden`（ワークスペースから外れていない場合も）を送らず、まず握手をやり直させる（`resync_required`）。握手の `welcome.groups` との差で、手元の見てよくない行が消える（[bootstrap-and-partial-sync.md](../architecture/bootstrap-and-partial-sync.md) の 7.5 節）。`sync_epoch` を上げずに該当の人だけを消す方法である。消えたかを、その端末の次の監査の `orphan_rows` で確かめる。オフラインの端末は、つながった時に消える。届いた端末の ID の一覧と、消えたことを確かめた時刻を記録する。
 3. **外に出たもの**（Webhook の宛先、Slack、メール、PR のコメント）は取り消せない。宛先と中身の種類を記録し、法務に渡す。Slack のメッセージは、ボットのトークンで消せるものを消す。
@@ -125,17 +125,17 @@
 
 ### 確認
 
-1. ブラウザの系統と版、OS、`persist()` の結果（認められていたか）、`usage/quota` の帯で偏りを見る。
-2. Safari の 7 日の消去、ブラウザの版の更新、ストレージの圧迫（端末の空き）のどれか。
-3. 本システムの版で偏っていれば、手元の保存の不具合（移行の誤り、`QuotaExceededError` の扱い、退かしが outbox に触れた）を疑う。この場合は場面 4 ではなく、outbox の喪失として SEV2 に上げる（退かしは outbox に触れないはず。PROP-STORE-005）。
+1. ブラウザの系統とバージョン、OS、`persist()` の結果（認められていたか）、`usage/quota` の帯で偏りを見る。
+2. Safari の 7 日の消去、ブラウザのバージョンの更新、ストレージの圧迫（端末の空き）のどれか。
+3. 本システムのバージョンで偏っていれば、手元の保存の不具合（移行の誤り、`QuotaExceededError` の扱い、退かしが outbox に触れた）を疑う。この場合は場面 4 ではなく、outbox の喪失として SEV2 に上げる（退かしは outbox に触れないはず。PROP-STORE-005）。
 
 ### 対処
 
 1. ブラウザの側の原因なら：
    - 影響の利用者に、画面の知らせ（「ブラウザにより n 件が消去されました」）が出ているかを確かめる（[client-store-and-offline.md](../architecture/client-store-and-offline.md) の 9.3 節）。
    - サポートの案内（Electron の利用、永続の保存の許可、ブラウザの設定）を出す（`client-storage-eviction.md`）。
-   - 特定のブラウザの版の既知の問題なら、その版の利用者に、画面で Electron を強く勧める表示を出すフラグを入れる。
-2. 本システムの原因なら：その版の段階を止め（[deploy-and-rollback.md](deploy-and-rollback.md) の B）、修正を前へ出す。
+   - 特定のブラウザのバージョンの既知の問題なら、そのバージョンの利用者に、画面で Electron を強く勧める表示を出すフラグを入れる。
+2. 本システムの原因なら：そのバージョンの段階を止め（[deploy-and-rollback.md](deploy-and-rollback.md) の B）、修正を前へ出す。
 3. 喪失の件数（端末ごと）を記録する。
 
 ### 回復の確かめ

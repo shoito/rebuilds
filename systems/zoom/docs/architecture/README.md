@@ -105,7 +105,7 @@
 | [0005](../decisions/0005-meeting-state-and-signaling.md) | 会議の状態は会議ごとに 1 つの Meeting Actor が持ち、WebSocket のシグナリングと、会議を Media Node に割り当てるサービスで動かす |
 | [0006](../decisions/0006-meeting-id-and-join-url.md) | 会議の ID は秘密にしない 11 桁の乱数にし、URL のフラグメントに 128 ビットの参加の鍵を置く |
 | [0007](../decisions/0007-meeting-actor-lease-and-epoch.md) | Meeting Actor の持ち主は Valkey のリース（TTL 6 秒）で決め、取るたびに epoch を上げる。失ってはならない変更は配る前に Aurora に書く |
-| [0008](../decisions/0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、版はサブプロトコルで決め、状態は (epoch, seq) 付きのスナップショットと差分で配る |
+| [0008](../decisions/0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、バージョンはサブプロトコルで決め、状態は (epoch, seq) 付きのスナップショットと差分で配る |
 | [0009](../decisions/0009-host-controls-enforcement.md) | 主催者の操作は Meeting Actor が決定表で判定し、メディアの操作は Media Node で強制する。ミュートの解除とビデオの開始は本人の同意なしにしない |
 | [0010](../decisions/0010-media-node-process-layout.md) | Media Node は vCPU−2 個の mediasoup の worker を持ち、worker ごとの WebRtcServer で固定のポートを共有し、会議を worker の間で pipeToRouter でつなぐ |
 | [0011](../decisions/0011-forwarding-and-layer-selection.md) | 何を誰に送るかは Meeting Actor が決め、帯域の中での層は Media Node が選ぶ。音声は受け手ごとに最大 3 本にし、キーフレームの要求はまとめる |
@@ -168,7 +168,7 @@
 - **下りの平均の見込み**：1.5 Mbps は楽観の可能性がある。容量は 2.5 Mbps で見積もり、E2 のベータで測って置き換える（2 節）。
 - **EC2 のネットワークの上限**：PPS の上限は公表されていない。インターネットゲートウェイを通る通信は、32 vCPU 未満のインスタンスで 5 Gbps、それ以上でインスタンスの帯域の 50% に制限される。1 本のフロー（5 タプル）は、クラスタのプレイスメントグループの外では 5 Gbps に制限される（[EC2 のネットワークの帯域](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-network-bandwidth.html)、2026-09-27 に確認）。1 台の上限は E7 の負荷試験で決める（[ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)）。
 - **セキュリティグループの接続の追跡**：UDP のフローも追跡され、インスタンスごとの上限を超えるとパケットが捨てられる。送信元と宛先を全開（0.0.0.0/0）にした規則は追跡されない（[接続の追跡](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-connection-tracking.html)、2026-09-27 に確認）。Media Node のメディアのポートは追跡しない規則にし、防御は SFU の側の検査（ICE の認証、DTLS）で行う。NLB は通さない（[ADR-0016](../decisions/0016-media-edge-addressing-and-security-groups.md)）。
-- **mediasoup のフォーク**：RED の転送と剥がし（[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)）と、E2EE の会議の VP8・VP9 の Dependency Descriptor の判断（[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)）を、C++ の worker に足す。上流に取り込まれるまで、版を上げるたびに差分の試験を回す。C++ を読める人が要る。
+- **mediasoup のフォーク**：RED の転送と剥がし（[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)）と、E2EE の会議の VP8・VP9 の Dependency Descriptor の判断（[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)）を、C++ の worker に足す。上流に取り込まれるまで、バージョンを上げるたびに差分の試験を回す。C++ を読める人が要る。
 - **大きな会議の音声**：受け手ごとに全員の音声の consumer を作る形は、人数の 2 乗で増える（300 人で約 9 万、1,000 人で約 100 万）。100 人を超える会議は音声の枠の形にする（[ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)）。転送器の性能と切り替えの聞こえ方は、E7 の PoC で確かめる。
 - **ブラウザの違い**：Safari・Firefox・Chrome で、simulcast、SVC（[WebRTC-SVC](https://www.w3.org/TR/webrtc-svc/)、2026-09-27 に確認した時点で Working Draft）、Encoded Transform（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、同じく Working Draft）、RED、Dependency Descriptor の対応が異なる。対応表は [clients.md](clients.md) の 2.2 節に持ち、E2E の試験を各ブラウザで回す。
 - **大きな会議のキーフレームの要求**：受け手が多い会議では、受け手のキーフレームの要求（PLI・FIR）が送り手に集まり、送り手の送出が 2〜3 倍に増えうる（[mediasoup の Scalability](https://mediasoup.org/documentation/v3/scalability/)、2026-09-27 に確認）。SFU で要求をまとめ、頻度を抑える（[ADR-0011](../decisions/0011-forwarding-and-layer-selection.md)）。
@@ -186,7 +186,7 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
   - ADR-0002：Node の間の pipe は producer のすべての層を運ぶ。Node をまたいで受け手ごとに層を絞ることは S3 の課題にした。RED は mediasoup のフォークが要る（ADR-0017）。100 人を超える会議の音声は ADR-0057。
   - ADR-0003：デスクトップとモバイルの方式を ADR-0023・0024 に揃え、`RTCRtpScriptTransform` の対応を ADR-0021 に揃えた。
   - ADR-0004：E2EE はペイロードからの VP8 のキーフレームと層の判定を壊すので、mediasoup に VP8・VP9 の Dependency Descriptor の判断を足す（ADR-0028）。「退出」の定義と、E2EE のチャット（`e2ee.app`、`chat_seq`、Valkey には暗号文だけ、個別のメッセージは使えない）を書いた。
-  - ADR-0005：別の Media Node へ移るには新しい transport が要り、ICE restart ではない（[media-server-sfu.md](media-server-sfu.md) の 9.3 節）。シグナリングの版の受け方を N−1（Web）・N−2（アプリ）にした。
+  - ADR-0005：別の Media Node へ移るには新しい transport が要り、ICE restart ではない（[media-server-sfu.md](media-server-sfu.md) の 9.3 節）。シグナリングのバージョンの受け方を N−1（Web）・N−2（アプリ）にした。
 - **新しい ADR**：
   - [ADR-0057](../decisions/0057-audio-slots-for-large-meetings.md)：100 人を超える会議は、受け手ごとに 3 つの音声の枠。`DirectTransport`・`PipeTransport` の上の枠の切り替えの転送器。E7 の `audio-slot-forwarder-poc` の後に E10 で作る。
   - [ADR-0058](../decisions/0058-tenant-tables-with-force-rls.md)：組織に属する表は `org_id` と FORCE RLS（他の題材と同じ）。API の認可はその上に重ねる（[data-model.md](data-model.md) の持ち越しだった）。
@@ -194,9 +194,9 @@ PM の方針（既定案で進め、問いにしない）により、統合の�
 - **NFR**：
   - NFR-001 は電話からの参加者を対象の外にした。電話の参加者の目標は [quality.md](../quality.md) に別に置く（p95 400ms、E14 で確かめる）。
   - NFR-008 の「退出」は、Actor が `Left`（切断の猶予の後の `Left(dropped)` を含む）か `Removed` を確定した時とした（下の「決定（2026-09-27、推奨案で確定）」で確定）。
-- **`ip_prefix_hash` の pepper**：30 日ごとに替えるが、前の pepper を 30 日残して両方で照合する。`meeting_removals` に pepper の版を持つ（[meeting-security.md](meeting-security.md) の 10 節、ADR-0032 の注記）。
+- **`ip_prefix_hash` の pepper**：30 日ごとに替えるが、前の pepper を 30 日残して両方で照合する。`meeting_removals` に pepper のバージョンを持つ（[meeting-security.md](meeting-security.md) の 10 節、ADR-0032 の注記）。
 - **IPv6 と DDoS**：防御のモード（`under_attack`）の Node は IPv6 の候補を出さない（[network-traversal.md](network-traversal.md) の 9 節、[security.md](security.md) の 8.3 節、ADR-0045 の注記）。
-- **シグナリングの版**：Web は N−1、アプリは N−2 まで受け、`min_client_version` より古いものは強制の更新（ADR-0008・0056 の注記、[delivery.md](delivery.md) の 5.3 節）。
+- **シグナリングのバージョン**：Web は N−1、アプリは N−2 まで受け、`min_client_version` より古いものは強制の更新（ADR-0008・0056 の注記、[delivery.md](delivery.md) の 5.3 節）。
 - **シグナリングのスキーマ**：他の領域が足した `chat.*`、`reaction.*`、`consent.give`、`host.suspend`・`host.readmit`・`host.admit_all`・`host.to_waiting`・`host.invite`・`host.lower_hands`、`hello.client.features`、`client.kind = "phone"`、録画・字幕・E2EE・品質のメッセージを、[signaling-and-meetings.md](signaling-and-meetings.md) の 6.2 節に集めた。主催者の操作の決定表（9.2 節）にも行を足した。
 - **E2EE のチャット**：[e2ee.md](e2ee.md) と [chat-and-reactions.md](chat-and-reactions.md) を揃えた。`e2ee.app` に `chat_seq`・`ch_seq` を付けて配る。Valkey には取りこぼしを埋めるための暗号文だけを置く。個別のメッセージとファイルは使えない。e2ee.md の 12 節に行を足した。
 - **データモデル**：`meeting_participations` に codecs と clients が別々に提案した列を 1 つにまとめた。監査ログ 3 系統のハッシュの連鎖の列、outbox を 1 つの表にすること、保持の削除のジョブを 1 つにすることを決めた（[data-model.md](data-model.md) の 11 節）。

@@ -11,7 +11,7 @@ Stripe の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0004](0004-idempotency.md) | すべての書き込みを冪等にする | accepted |
 | [0005](0005-pci-scope-segmentation.md) | カード情報は CDE（別の AWS アカウント）に閉じ込め、本体はトークンだけを扱う | accepted |
 | [0006](0006-api-shape.md) | 公開 API は本家 v1 のリソースの形に寄せ、本文は JSON にする | accepted |
-| [0007](0007-date-based-api-versions.md) | API の版は日付で持ち、アカウントに固定し、変更モジュールで古い版の形を保つ | accepted |
+| [0007](0007-date-based-api-versions.md) | API のバージョンは日付で持ち、アカウントに固定し、変更モジュールで古いバージョンの形を保つ | accepted |
 | [0008](0008-api-keys-and-dashboard-access.md) | API キーは本家と同じ 3 種類にし、ダッシュボードは Better Auth と必須の MFA で守る | accepted |
 | [0009](0009-rate-limiting.md) | レート制限は本家の単位と値に寄せ、Slack の層と GCRA の仕組みで行う | accepted |
 | [0010](0010-payment-intent-state-machine.md) | PaymentIntent を唯一の決済オブジェクトにし、状態の遷移を 1 つの遷移関数に集める | accepted |

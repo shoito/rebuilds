@@ -17,7 +17,7 @@ Auth0 の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0010](0010-staged-protocol-extensions.md) | PAR・DPoP・トークン交換・mTLS は、MVP の後に、認可コードの経路の上にフラグで足す | accepted |
 | [0011](0011-universal-login-rendering-and-transaction.md) | Universal Login はサーバーで描く HTML にし、ログインの途中の状態はサーバーのトランザクションに持って、ブラウザの Cookie に結び付ける | accepted |
 | [0012](0012-branding-and-templates.md) | ブランディングはテーマの変数と文言の上書きに限り、テナントの任意の HTML・JavaScript は画面に入れない | accepted |
-| [0013](0013-consent-records.md) | 規約への同意は、文書の版ごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする | accepted |
+| [0013](0013-consent-records.md) | 規約への同意は、文書のバージョンごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする | accepted |
 | [0014](0014-connection-abstraction.md) | 接続を「資格情報を確かめて外部の ID を返す部品」として抽象化し、ユーザーとは ID で結ぶ | accepted |
 | [0015](0015-database-connection-password-and-enumeration.md) | データベース接続は NIST SP 800-63B-4 のパスワードの規則に従い、サインアップ・ログイン・再設定でアカウントの有無を明かさない | accepted |
 | [0016](0016-social-connections-and-idp-tokens.md) | ソーシャル接続は共通の OAuth・OIDC のクライアントと IdP ごとの差分で作り、IdP のトークンは既定で保存しない | accepted |
@@ -36,7 +36,7 @@ Auth0 の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0029](0029-refresh-token-session-binding.md) | リフレッシュトークンの系列は、アプリの設定でセッションに結び付けるか独立にするかを決める | accepted |
 | [0030](0030-accounts-tenants-and-members.md) | テナントの上にアカウントを置き、テナントの名前は再利用せず、環境は昇格だけを許す | accepted |
 | [0031](0031-application-and-api-registration.md) | アプリの種類でクライアントの認証とグラントの上限を決め、コールバックはワイルドカードなしにし、M2M はアプリ × API の許可で守る | accepted |
-| [0032](0032-tenant-config-cache.md) | テナントの設定は版付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する | accepted |
+| [0032](0032-tenant-config-cache.md) | テナントの設定はバージョン付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する | accepted |
 | [0033](0033-management-api-shape.md) | Management API は本家に寄せた `/api/v2` のリソースにし、2 種のページングを持ち、v2 の中では足す変更だけをする | accepted |
 | [0034](0034-management-api-authorization.md) | Management API は 3 種のトークンを受け、M2M は要求ごとに今の許可を確かめ、自分より広い許可を作らせない | accepted |
 | [0035](0035-rate-limiting.md) | レート制限は本家の単位と Enterprise の値に寄せ、環境で変えてプランで変えず、Valkey の GCRA で数え、リフレッシュを優先する | accepted |

@@ -30,7 +30,7 @@
 ## 確認
 
 1. どのアラート・報告から始まったかを記録する。
-2. 影響の範囲を見る：都市か、区域か、AZ か、事業者か、アプリの版・OS か、決済の方法か。
+2. 影響の範囲を見る：都市か、区域か、AZ か、事業者か、アプリのバージョン・OS か、決済の方法か。
 3. 直近の変更を見る：デプロイ、配車の計算・設定（AppConfig）、運賃の規則の有効化、フラグ（release・ops・legal）、アプリの段階的な公開、インフラ、AWS Health、外部の提供者（PSP、地図、SMS、通話）の状態のページ。
 4. お金・乗車・安全の損失の有無を見る：二重の割り当ての検査、二重の請求の検査、`pay_unknown_outcomes`、`trip_conflicts_total`、`safety_incident_unacked`。
 
@@ -54,7 +54,7 @@ SEV1 では、指揮者は手を動かさない。
 1. **宣言する。** インシデント用の場を、このシステムと別の道具に作る。
 2. **安全を最初に確かめる。** どの障害でも、緊急の通報の受け付けが動いているか（`safety_incident_unacked`、合成の緊急の通報）を最初に見る。動いていなければ、下の「緊急の通報の受け付けの失敗」を並べて進める。
 3. **被害を止めることを、原因の特定より優先する。** 順番：
-   - 直近の変更のフラグを切る、配車の計算を前の版に固定する（`ops.dispatch.algo_pin.<zone>`）
+   - 直近の変更のフラグを切る、配車の計算を前のバージョンに固定する（`ops.dispatch.algo_pin.<zone>`）
    - 直近のデプロイ・アプリの段階的な公開を止める・戻す（[deploy-and-rollback.md](deploy-and-rollback.md)）
    - 都市の新しい依頼を断る（`ops.intake.reject.<city>`）、新しいオファーを止める（`ops.dispatch.pause.<city>`）。進行中の乗車は続く
    - 容量を増やす
@@ -80,9 +80,9 @@ SEV1 では、指揮者は手を動かさない。
    | 提案が拒否される（`EPOCH_MISMATCH`、`CONSTRAINT_VIOLATION`） | 索引の遅れ、2 つの配車のタスク、Trips の事象の欠け | `trip_outbox_oldest_seconds`、索引の照合の差 |
    | 提案は通るがオファーが届かない（`undelivered`） | 常時の接続・プッシュの障害 | `offer-delivery-degraded.md` |
    | 受諾は来るが遷移が失敗 | Trips・Aurora `core` の障害 | Aurora のイベント、`trip_transition` |
-   | 直前に配車の計算・設定・候補の条件のデータを変えた | 変更の不具合 | 前の版に固定する |
+   | 直前に配車の計算・設定・候補の条件のデータを変えた | 変更の不具合 | 前のバージョンに固定する |
 3. **被害を抑える**：
-   - 直前の変更があれば、`ops.dispatch.algo_pin.<zone>` と AppConfig の前の版で戻す。
+   - 直前の変更があれば、`ops.dispatch.algo_pin.<zone>` と AppConfig の前のバージョンで戻す。
    - 未割り当ての依頼が溜まり、3 分で `no_driver_found` になる依頼が増えているなら、`ops.intake.reject.<city>` で新しい依頼を断り、乗客に「混み合っています」を出す（与信の前に断るので請求は起きない）。
    - 待っている乗客への案内（アプリの告知の帯）を連絡係が出す。
 4. **索引・配車を作り直す**：geo-index と dispatch の主と待機がともに止まっていれば、両方のタスクを入れ替え、`READY`（35 秒の読み直し）を待つ。依頼は Trips に残っているので失われない。
@@ -98,7 +98,7 @@ SEV1 では、指揮者は手を動かさない。
 2. **区間を切り分ける**（[location-ingestion.md](../architecture/location-ingestion.md) の 12 節の予算）：
    | 区間 | 見るもの | 対処 |
    | --- | --- | --- |
-   | アプリ → loc-ingest | ALB の要求の数、4xx・5xx、`loc_ingest_seconds`、アプリの版ごとの送信の間隔 | loc-ingest のタスクを増やす。特定のアプリの版なら段階的な公開を止める |
+   | アプリ → loc-ingest | ALB の要求の数、4xx・5xx、`loc_ingest_seconds`、アプリのバージョンごとの送信の間隔 | loc-ingest のタスクを増やす。特定のアプリのバージョンなら段階的な公開を止める |
    | loc-ingest → Kinesis | `loc_kinesis_put_seconds`、`WriteProvisionedThroughputExceeded`、熱いシャード | シャードを分ける（`UpdateShardCount`）。すぐ効かなければ `ops.loc.interval_ms` を 8,000 に上げて量を半分にする |
    | Kinesis → geo-index | 拡張ファンアウトの `MillisBehindLatest`（主・待機ごと） | 片方だけ遅いなら、その索引のタスクを入れ替える（待機を先に） |
    | geo-index の適用 | 書き手の CPU、GC の停止、写しの公開の遅れ | `geo-index-lag.md`。タスクの CPU を上げる |
@@ -143,7 +143,7 @@ SEV1 では、指揮者は手を動かさない。
    | api には届くが SQS に入らない | safety-intake の障害 | タスクを入れ替える。前のデプロイを戻す |
    | SQS に溜まる | 受信の処理の停止 | 処理のタスクを増やす・入れ替える |
    | 担当の画面に出るが誰も受けない | 担当の人手、画面の音の不具合、当番の呼び出しの失敗 | `safety-queue-backlog.md`。応援を呼ぶ |
-   | 特定のアプリの版だけ届かない | アプリの不具合 | 段階的な公開を止める。緊急の入口の不具合なら、`required_min` を上げる判断を Dev と Ops で（緊急の入口は塞がない） |
+   | 特定のアプリのバージョンだけ届かない | アプリの不具合 | 段階的な公開を止める。緊急の入口の不具合なら、`required_min` を上げる判断を Dev と Ops で（緊急の入口は塞がない） |
 4. **受けていない通報を確かめる**：戻った後、障害の間の `SafetyIncident` をすべて担当が受け、押した人に電話で安全を確かめる（[safety-and-trust.md](../architecture/safety-and-trust.md) の 4.2 節）。位置は、インシデントの ID を理由に閲覧の許可で見る。
 5. 押した人の端末は、送れなかった通報を 5 秒ごとに送り直しているので、経路が戻ると一度に届く。受信の処理の数を上げて待つ。
 

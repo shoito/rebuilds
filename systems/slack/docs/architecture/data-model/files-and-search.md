@@ -137,7 +137,7 @@ S1 の検索用の表（[search.md](../search.md) の 4 節）。**RLS を持た
 | `channel_id`、`member_id` | `uuid` | NO | | |
 | `thread_root_id` | `uuid` | YES | | |
 | `created_at` | `timestamptz` | NO | | メッセージの投稿時刻 |
-| `content_seq` | `bigint` | NO | | 版。古い版で上書きしない（I-12） |
+| `content_seq` | `bigint` | NO | | バージョン。古いバージョンで上書きしない（I-12） |
 | `deleted` | `boolean` | NO | `false` | 墓標。本文は空 |
 | `has_file`、`has_link` | `boolean` | NO | `false` | |
 | `text` | `text` | NO | | `normalizeForSearch(toPlainText(body))` とファイル名 |

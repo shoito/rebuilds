@@ -81,7 +81,7 @@ CREATE POLICY dm_messages_write ON dm_messages FOR INSERT
               AND dm_member_state(conversation_id) = 'active');
 ```
 
-- **列の暗号化**：本文は会話ごとの DEK（AES-256-GCM）で暗号化し、DEK は KMS の `dm-content` の鍵で包んで `dm_conversations.dek_wrapped` に持つ（[ADR-0035](../../decisions/0035-dm-conversation-model-and-storage.md)）。`body_ct` は `{版 1 バイト, nonce 12 バイト, 暗号文, タグ 16 バイト}`。
+- **列の暗号化**：本文は会話ごとの DEK（AES-256-GCM）で暗号化し、DEK は KMS の `dm-content` の鍵で包んで `dm_conversations.dek_wrapped` に持つ（[ADR-0035](../../decisions/0035-dm-conversation-model-and-storage.md)）。`body_ct` は `{バージョン 1 バイト, nonce 12 バイト, 暗号文, タグ 16 バイト}`。
 - **中身を読む権限**：`ts_reader` を含む運用のロールに `dm_messages.body_ct` の `SELECT` を与えない。通報の証拠は `report_evidence` に写す（参加者の権限で読んでから）。
 - **付随の情報も出さない**：`sender_id`・`created_at`・`seq` もログ・分析に出さない。`dm` の流れは ID だけで、Firehose に写さない。
 - **順**：会話の中の順は `seq`（会話ごとの連番、欠けなし）。`tid` の `message_id` は公開の ID で、順の正本ではない。
@@ -100,7 +100,7 @@ CREATE POLICY dm_messages_write ON dm_messages FOR INSERT
 | `last_seq` | `bigint` | NOT NULL | `0` | 送信のたびに `UPDATE ... RETURNING` で 1 上げる（会話の行の鍵で一列にする） |
 | `last_message_at` | `timestamptz` | NULL | — | |
 | `dek_wrapped` | `bytea` | NULL | — | 包んだ DEK。暗号の削除の後は NULL |
-| `enc_scheme` | `text` | NOT NULL | `'kms-aes256gcm-v1'` | E2EE（MLS）を入れたら版を足す（[ADR-0037](../../decisions/0037-dm-e2ee-readiness.md)） |
+| `enc_scheme` | `text` | NOT NULL | `'kms-aes256gcm-v1'` | E2EE（MLS）を入れたらバージョンを足す（[ADR-0037](../../decisions/0037-dm-e2ee-readiness.md)） |
 | `dek_destroyed_at` | `timestamptz` | NULL | — | 全員が抜けた会話の暗号の削除 |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 

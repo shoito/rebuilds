@@ -69,7 +69,7 @@ EventBridge の側では、パートナーのイベントソースを利用者�
 - **`user_name` には、ログインに使った識別子（データベース接続ならメールアドレス）を入れる**（本家と同じ）。ログはテナントのデータで、不正なログインの調査に要るため。個人データなので、保持はテナントの `log_retention_days`（4.2 節）で切り、ログストリームでは伏せ字（`mask`・`hash`。6.1 節）を選べる。ユーザーの削除では仮名にする（4.2 節）。本システムの運用のテレメトリー（[observability.md](observability.md)）には入れない（[ADR-0061](../decisions/0061-secret-free-telemetry.md)）。
 - `details.session_id` はセッションの ID そのものではなく、セッションの公開の識別子（`sid` のクレームと同じ値）を入れる。
 - `user_agent` は解析した短い形にする。元の文字列は持たない。
-- `$event_schema.version` を持ち、足す変更だけをする（Management API の版と同じ規則。[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 3.5 節）。
+- `$event_schema.version` を持ち、足す変更だけをする（Management API のバージョンと同じ規則。[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 3.5 節）。
 
 ### 3.2 MVP で出す種類
 
@@ -83,7 +83,7 @@ EventBridge の側では、パートナーのイベントソースを利用者�
 | `auth.token_exchange.success`・`.fail` | `seacft`・`feacft`、`seccft`・`feccft`、`sertft`・`fertft`、`ferrt`（再利用の検知）、`sede`・`fede`（デバイスコード）、`srrt`（リフレッシュトークンの失効） | `/oauth/token`、`/oauth/revoke` |
 | `user.success`・`.fail`・`.notification` | `scp`・`fcp`（パスワードの変更）、`scpr`・`fcpr`（再設定の要求）、`sv`・`fv`（メールの確認）、`gd_enrollment_complete`・`gd_auth_succeed`・`gd_auth_failed`（MFA）、`du`（削除）、`limit_wc`・`limit_mu`（ブロック）、`signup_pwd_leak`・`pwd_leak`・`reset_pwd_leak`、攻撃の防御の独自のコード（`ap_*`。[attack-protection.md](attack-protection.md) の 8 節） | 各領域 |
 | `management.success`・`.fail` | `sapi`、`fapi`、`mgmt_api_read`（秘密を返す GET だけ） | Management API |
-| `system.notification` | `api_limit`、`api_limit_warning`、`depnote`、`sys_*`（本システムの保守の告知） | レート制限、版 |
+| `system.notification` | `api_limit`、`api_limit_warning`、`depnote`、`sys_*`（本システムの保守の告知） | レート制限、バージョン |
 | `actions`（E13） | `actions_execution_failed` | [extensibility.md](extensibility.md) |
 
 - 本家のコードの意味は、本家の公開のスキーマの `description` で確かめた（`fp`・`fu`・`seccft`・`sertft`・`ferrt`・`limit_wc`・`limit_mu`・`pwd_leak`・`sapi`・`mgmt_api_read` など）。`sede`・`fede`（デバイスコードの交換の成功・失敗）、`srrt`（リフレッシュトークンの失効の成功）、`scpr`・`fcpr`（パスワードの変更の要求の成功・失敗）の意味は、[Log Event Type Codes](https://auth0.com/docs/deploy-monitor/logs/log-event-type-codes) と [Log Stream Filters](https://auth0.com/docs/customize/log-streams/event-filters) で確かめた（2026-09-27）。

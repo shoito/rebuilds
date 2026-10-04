@@ -8,7 +8,7 @@
 | --- | --- |
 | [0021](../decisions/0021-clock-events-corrections-and-objective-records.md) | 打刻は端末が採番した ID つきの追記のみの事象にする。端末は落ちている間 72 時間まで貯めて送る。訂正は元の打刻を消さず、`time_correction` の業務プロセスで「追加」「無効」の記録を足す。PC のログ・入退室の記録を取り込み、打刻との乖離を日ごとに検知して理由を求める。自動では直さない |
 | [0022](../decisions/0022-work-schedules-and-work-hour-calculation.md) | 勤務体系は有効日付の「勤務の規則」で持ち、種類（固定、シフト、フレックス、1 か月単位の変形）と印（管理監督者、裁量労働のみなし、1 年単位の変形）を分ける。労働時間は分の整数で、日・週・期間の順に区分する純粋な関数で計算する。1 日ごとの切り捨ては持たない。端数の処理は給与の側で行う |
-| [0023](../decisions/0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定は事業所ごとの有効日付の設定で持つ。日次と退勤の打刻ごとに、実績と見込みで 6 つの上限を判定し、本人・上長・人事に段階的に警告する。月次の締めは状態機械で、確定した月の集計を版とハッシュつきで給与に渡す。締めた後の訂正は新しい版を作り、給与の遡及で扱う |
+| [0023](../decisions/0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定は事業所ごとの有効日付の設定で持つ。日次と退勤の打刻ごとに、実績と見込みで 6 つの上限を判定し、本人・上長・人事に段階的に警告する。月次の締めは状態機械で、確定した月の集計をバージョンとハッシュつきで給与に渡す。締めた後の訂正は新しいバージョンを作り、給与の遡及で扱う |
 
 ## 1. 目的と範囲
 
@@ -129,7 +129,7 @@ time_clock_corrections (tenant_id, id, employment_id, work_date, case_id,
 
 ### 4.1 勤務の規則
 
-勤務の規則（`work_rules`）はテナントの設定で、版を持つ。従業員への割り当ては有効日付の facet（`employment_work_rule`）にする。
+勤務の規則（`work_rules`）はテナントの設定で、バージョンを持つ。従業員への割り当ては有効日付の facet（`employment_work_rule`）にする。
 
 | 項目 | 内容 |
 | --- | --- |
@@ -165,7 +165,7 @@ shift_assignments (tenant_id, id, employment_id, work_date, shift_pattern_id,
                    is_rest_day bool, is_legal_holiday bool, published_at, version)
 ```
 
-- シフトは月の単位で公開する。公開の後の変更は版を足し、本人に通知する。
+- シフトは月の単位で公開する。公開の後の変更はバージョンを足し、本人に通知する。
 - 変形では、期間の始まりの前に日ごとの所定を決めて公開する。期間の途中で所定を変えると、変形の要件を欠くおそれがある。システムは公開の後の変更に警告を出し、理由を求める（止めない）。
 
 ## 5. 労働時間の計算（[ADR-0022](../decisions/0022-work-schedules-and-work-hour-calculation.md)）
@@ -238,7 +238,7 @@ shift_assignments (tenant_id, id, employment_id, work_date, shift_pattern_id,
 
 - 計算は純粋な関数 `computeWorkDay(input, rule, calendar) → DayResult` と `computePeriod(days, rule) → PeriodResult` にする。現在時刻を使わない。
 - 退勤の打刻、訂正、休暇の承認、シフトの変更、勤務の規則の割り当ての変更で、その日と、影響する週・期間を再計算する（outbox の事象で Worker が行う）。
-- 結果は `work_day_results` に版として追記する。入力のハッシュが前の版と同じなら書かない。
+- 結果は `work_day_results` にバージョンとして追記する。入力のハッシュが前のバージョンと同じなら書かない。
 
 ```sql
 work_day_results (tenant_id, id, employment_id, work_date, version int,
@@ -334,8 +334,8 @@ overtime_alerts (tenant_id, id, employment_id, agreement_id, metric text, level 
 | `open` | 打刻、訂正、休暇 |
 | `employee_review` | 本人が月の集計を確かめる。問題（未確定の日、乖離）があれば訂正を出す |
 | `manager_review` | 上長が `timesheet_approval` で承認する。問題の残る人は承認できない（人事が理由つきで進められる） |
-| `hr_locked` | 人事が確定する。集計の版を作る（7.3 節） |
-| `handed_off` | 給与の入力の固定がその版を読んだ |
+| `hr_locked` | 人事が確定する。集計のバージョンを作る（7.3 節） |
+| `handed_off` | 給与の入力の固定がそのバージョンを読んだ |
 | reopen | 人事が `time_period_reopen` で開き直す。理由と承認を要する |
 
 - 期限は給与の実行の予定から逆算して受信箱に出す（[business-process-engine.md](business-process-engine.md) の 10.1 節）。
@@ -351,9 +351,9 @@ time_period_summaries (tenant_id, id, period_id, employment_id, version int,
                        PRIMARY KEY (tenant_id, period_id, employment_id, version))
 ```
 
-- `hr_locked` のとき、各人の集計を版として書き、日の結果の版の一覧とハッシュを持たせる。
-- 給与の入力の固定は、`known_at` の時点で最新の集計の版とハッシュを入力の文書に入れる（[ADR-0004](../decisions/0004-payroll-engine.md)）。
-- 締めた後の訂正（reopen の後の訂正、または次の月に入った `time_correction`）は、新しい集計の版を作る。確定した給与にかかれば、給与の遡及の候補になる（[payroll-engine.md](payroll-engine.md) の 7 節）。勤怠の側で給与を直さない。
+- `hr_locked` のとき、各人の集計をバージョンとして書き、日の結果のバージョンの一覧とハッシュを持たせる。
+- 給与の入力の固定は、`known_at` の時点で最新の集計のバージョンとハッシュを入力の文書に入れる（[ADR-0004](../decisions/0004-payroll-engine.md)）。
+- 締めた後の訂正（reopen の後の訂正、または次の月に入った `time_correction`）は、新しい集計のバージョンを作る。確定した給与にかかれば、給与の遡及の候補になる（[payroll-engine.md](payroll-engine.md) の 7 節）。勤怠の側で給与を直さない。
 - 賃金台帳の時間の欄（規則 54 条）は、この集計から作る（[payments-and-accounting.md](payments-and-accounting.md) の 6 節）。
 
 ## 8. 規模
@@ -431,7 +431,7 @@ DT-TIME-002 の行は、少なくとも次の境界を持つ：1 日 480 分ち�
 | E6 | `overtime-agreements` | 6.1 節。協定の設定と保存の検査 |
 | E6 | `overtime-alerts` | 6.2・6.3 節（DT-TIME-003、PROP-TIME-006）。K5 の計測 |
 | E6 | `monthly-close` | 7 節（DT-TIME-005）。本人の確認、`timesheet_approval`、`hr_locked`、reopen |
-| E6 | `time-to-payroll-handoff` | 7.3 節。集計の版とハッシュ |
+| E6 | `time-to-payroll-handoff` | 7.3 節。集計のバージョンとハッシュ |
 | E12 | `statutory-registers` | 出勤簿の元のデータの出力（[reporting.md](reporting.md) の 5.1 節の 4 つの帳簿と 1 つにした） |
 | E12 | `load-test-suite` | 打刻の集中の負荷試験（[capacity.md](capacity.md) の 7 節の負荷試験と 1 つにした） |
 
@@ -445,7 +445,7 @@ DT-TIME-002 の行は、少なくとも次の境界を持つ：1 日 480 分ち�
 - **客観的な記録との乖離は検知して理由を求め、自動では直さない**。既定のしきい値は 30 分。
 - **勤務体系の種類は固定・シフト・フレックス（1 か月）・1 か月単位の変形**。管理監督者・裁量労働・1 年単位の変形・研究開発は印で持つ（[ADR-0022](../decisions/0022-work-schedules-and-work-hour-calculation.md)）。
 - **36 協定の警告は止めない**。打刻を拒まない（[ADR-0023](../decisions/0023-overtime-agreement-monitoring-and-monthly-close.md)）。
-- **締めた後の訂正は集計の新しい版にし、給与の遡及で扱う**。
+- **締めた後の訂正は集計の新しいバージョンにし、給与の遡及で扱う**。
 
 ### 社労士の確認待ち（[intent.md](../intent.md) に載せたもの。L6 を細かくしたもの）
 
@@ -491,8 +491,8 @@ DT-TIME-002 の行は、少なくとも次の境界を持つ：1 日 480 分ち�
 | --- | --- |
 | Aurora `time_clock_events` | 3.1 節。追記のみ。月ごとのパーティション |
 | Aurora `time_clock_corrections`、`time_objective_logs`、`time_divergences` | 3.3・3.4 節 |
-| Aurora `work_rules`（版）、facet `employment_work_rule`、`shift_patterns`、`shift_assignments` | 4 節 |
-| Aurora `work_day_results` | 5.8 節。版の追記 |
+| Aurora `work_rules`（バージョン）、facet `employment_work_rule`、`shift_patterns`、`shift_assignments` | 4 節 |
+| Aurora `work_day_results` | 5.8 節。バージョンの追記 |
 | Aurora `overtime_agreements`（事業所ごとの期間つきの行。facet ではない。DM-11）、`overtime_alerts` | 6 節 |
-| Aurora `time_periods`、`time_period_summaries` | 7 節。集計の版とハッシュ |
+| Aurora `time_periods`、`time_period_summaries` | 7 節。集計のバージョンとハッシュ |
 | ブラウザ IndexedDB `pending_clock_events` | 3.2 節。送信の前の一時の保存 |

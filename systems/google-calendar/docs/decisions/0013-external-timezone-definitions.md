@@ -16,7 +16,7 @@ date: 2026-10-04
 - Windows のゾーン名（`Tokyo Standard Time`）
 - 独自の名前と VTIMEZONE の定義だけ
 
-送り手の tzdb の版は、本システムと違いうる。
+送り手の tzdb のバージョンは、本システムと違いうる。
 
 ## Options
 
@@ -40,14 +40,14 @@ date: 2026-10-04
 - 当たらなければ、DTSTART の時点のオフセットが同じで、遷移の一致が最も多いゾーンに寄せる。それもなければ `Etc/GMT±N`（整数の時間）か `utc` の時刻にする。どちらも `tz_approximated` の印を付けて利用者に示す。
 - 元の TZID は `X-<BRAND>-ORIGINAL-TZID` に残す。
 - 知っている TZID の VTIMEZONE の定義は使わない。送り手と本システムでオフセットが違えば、`vtimezone_mismatch` を数え、壁時計の時刻を保つ。
-- 書き出す VTIMEZONE は、本システムの tzdb の版から、予定の回の範囲に合わせて作る。`TZID` は IANA の正規の名前にする。
-- 対応表（別名、`windowsZones`、遷移の指紋）は `packages/tzdata` の版に含め、tzdb の更新と同じ流れで更新する。
+- 書き出す VTIMEZONE は、本システムの tzdb のバージョンから、予定の回の範囲に合わせて作る。`TZID` は IANA の正規の名前にする。
+- 対応表（別名、`windowsZones`、遷移の指紋）は `packages/tzdata` のバージョンに含め、tzdb の更新と同じ流れで更新する。
 
 ### 他の案を選ばなかった理由
 
 - **2（独自のゾーンとして保存）**：オフセットの元が `packages/tzdata` の外に増え、tzdb の更新の計算し直しの対象にならない。同じ現地のゾーンの予定が、送り手ごとに別のゾーンになる。
 - **3（拒否）**：Outlook・Exchange からの招待の多くを受けられなくなる見込み（Windows のゾーン名を使うため。未検証）。
-- **b（送り手の定義を優先）**：送り手の tzdb が古いと、改正の後の時刻を誤る。同じ TZID の予定が、送り手ごとに違う UTC になり、[ADR-0002](0002-time-representation.md) の「すべての経路で同じ版の同じ規則」に反する。
+- **b（送り手の定義を優先）**：送り手の tzdb が古いと、改正の後の時刻を誤る。同じ TZID の予定が、送り手ごとに違う UTC になり、[ADR-0002](0002-time-representation.md) の「すべての経路で同じバージョンの同じ規則」に反する。
 
 ## Consequences
 

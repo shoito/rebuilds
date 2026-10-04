@@ -6,8 +6,8 @@ Web の画面（日・週・月・予定リスト）、重なる予定の配置�
 
 | ADR | 決定 |
 | --- | --- |
-| [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) | 予定オブジェクトを窓つきの差分の同期で持ち、回は手元の `expand()` で作る。tzdb はサーバーの版のゾーンのデータを版つきの URL から取る。重なる予定は、日ごとの重なりの塊に貪欲に列を割り当てて右へ広げる決定的な配置で描く |
-| [0039](../decisions/0039-offline-read-cache-and-local-data.md) | オフラインは読み出しだけ。アカウントごとの IndexedDB に前後 4 週の予定オブジェクト・トークン・ゾーンのデータを持つ。手元の DB は捨ててよい写しで、版が変われば作り直す。ログアウト・セッションの取り消し・30 日の不使用で消し、共有の端末では保存しない |
+| [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) | 予定オブジェクトを窓つきの差分の同期で持ち、回は手元の `expand()` で作る。tzdb はサーバーのバージョンのゾーンのデータをバージョンつきの URL から取る。重なる予定は、日ごとの重なりの塊に貪欲に列を割り当てて右へ広げる決定的な配置で描く |
+| [0039](../decisions/0039-offline-read-cache-and-local-data.md) | オフラインは読み出しだけ。アカウントごとの IndexedDB に前後 4 週の予定オブジェクト・トークン・ゾーンのデータを持つ。手元の DB は捨ててよい写しで、バージョンが変われば作り直す。ログアウト・セッションの取り消し・30 日の不使用で消し、共有の端末では保存しない |
 
 ## 1. 目的と範囲
 
@@ -16,14 +16,14 @@ Web の画面（日・週・月・予定リスト）、重なる予定の配置�
   - データの取り方（範囲の問い合わせ、差分の同期、Realtime の合図、tzdb のゾーンのデータ）
   - 日・週・月・予定リストの表示、重なる予定の配置、終日と複数日の予定
   - 表示のタイムゾーン、2 つ目のタイムゾーン、夏時間の切り替えの日、予定ごとのタイムゾーンの示し方
-  - ドラッグでの作成・移動・長さの変更、楽観的な描画、版の衝突
+  - ドラッグでの作成・移動・長さの変更、楽観的な描画、バージョンの衝突
   - 繰り返しの予定の編集の選び方（この予定だけ・これ以降・すべて）と、各領域が画面に求めた確かめ
   - 招待と出欠、空き時間の候補の表示
   - キーボード、IME、アクセシビリティ、日本語と和暦の表示
   - オフラインの閲覧と手元のデータ、PWA、Web Push の購読の登録
   - モバイルを OS の標準のカレンダー（CalDAV）で覆うときの案内
 - 扱わない：
-  - `expand()` の規則（[events-and-recurrence.md](events-and-recurrence.md)）、`resolve` と tzdb の版（[time-zones-and-holidays.md](time-zones-and-holidays.md)）
+  - `expand()` の規則（[events-and-recurrence.md](events-and-recurrence.md)）、`resolve` と tzdb のバージョン（[time-zones-and-holidays.md](time-zones-and-holidays.md)）
   - 差分の同期のトークンの形と範囲の問い合わせの API（[sync-and-caldav.md](sync-and-caldav.md)、[api-and-push.md](api-and-push.md)）
   - リマインダーの時計と Web Push の送信（[reminders-and-notifications.md](reminders-and-notifications.md)）
   - 空き時間の候補の計算（[free-busy-and-scheduling.md](free-busy-and-scheduling.md)）
@@ -63,7 +63,7 @@ Web の画面（日・週・月・予定リスト）、重なる予定の配置�
 
 | 環境 | 対応 |
 | --- | --- |
-| デスクトップのブラウザ | Chrome・Edge・Firefox・Safari の最新と 1 つ前の主の版 |
+| デスクトップのブラウザ | Chrome・Edge・Firefox・Safari の最新と 1 つ前の主のバージョン |
 | スマートフォンのブラウザ | iOS の Safari、Android の Chrome の最新と 1 つ前。幅 360px 以上 |
 | PWA | ホーム画面に置ける（iOS は Safari の「ホーム画面に追加」。Web Push は置いたときだけ。11 節） |
 | OS の標準のカレンダー | CalDAV（[sync-and-caldav.md](sync-and-caldav.md)）。MVP のモバイルの主な経路 |
@@ -118,7 +118,7 @@ ADR-0038。
 ### 5.1 窓
 
 - 窓は `[表示の始まり − 4 週, 表示の終わり + 4 週]`（表示のタイムゾーンの日付を、`resolve` で UTC の区間にしたもの）。
-- 表示を開くと、見えるカレンダーごとに、まず今のトークンを取り、次に範囲の問い合わせで窓に回が触れる予定オブジェクトを取る。トークンを先に取るので、間の変更は次の差分で重ねて届き、版の比べで捨てる。差分の同期のトークンを `timeMin`・`timeMax` と一緒に使わない（[ADR-0026](../decisions/0026-public-rest-api-shape.md)）。
+- 表示を開くと、見えるカレンダーごとに、まず今のトークンを取り、次に範囲の問い合わせで窓に回が触れる予定オブジェクトを取る。トークンを先に取るので、間の変更は次の差分で重ねて届き、バージョンの比べで捨てる。差分の同期のトークンを `timeMin`・`timeMax` と一緒に使わない（[ADR-0026](../decisions/0026-public-rest-api-shape.md)）。
 - 差分は `POST /v1/sync` に最大 50 のカレンダーのトークンを束ねて取る（[api-and-push.md](api-and-push.md) の 4.6 節、[sync-and-caldav.md](sync-and-caldav.md) の 5 節）。予定を返さずに今のトークンだけを返す形は、`POST /v1/sync` の `tokensOnly`（[api-and-push.md](api-and-push.md) の 4.6 節。統合の工程で足した）。
 
 ### 5.2 差分
@@ -136,15 +136,15 @@ ADR-0038。
 
 ### 5.4 tzdb のゾーンのデータ
 
-- API の応答の `tzdata_version` と同じ版のゾーンのデータを `/tzdata/<version>/<zone>.bin` から取る（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)）。Service Worker と IndexedDB に持つ。
-- 版が変わったら（API の応答の `tzdata_version` が手元と違う）、使っているゾーンを新しい版で取り直し、回を作り直す。古い版で計算し直さない。
-- 取れないとき、オンラインなら範囲の問い合わせ（`singleEvents=true`）のサーバーの派生の値で描く（[sync-and-caldav.md](sync-and-caldav.md) の 5 節）。オフラインで新しい版を持っていないときは、5.3 節の回のうち、予定オブジェクトの派生の値（`start_utc`）のある単発と上書きはそれで描き、規則の回には「時刻を確かめられない」の印を付ける。
+- API の応答の `tzdata_version` と同じバージョンのゾーンのデータを `/tzdata/<version>/<zone>.bin` から取る（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)）。Service Worker と IndexedDB に持つ。
+- バージョンが変わったら（API の応答の `tzdata_version` が手元と違う）、使っているゾーンを新しいバージョンで取り直し、回を作り直す。古いバージョンで計算し直さない。
+- 取れないとき、オンラインなら範囲の問い合わせ（`singleEvents=true`）のサーバーの派生の値で描く（[sync-and-caldav.md](sync-and-caldav.md) の 5 節）。オフラインで新しいバージョンを持っていないときは、5.3 節の回のうち、予定オブジェクトの派生の値（`start_utc`）のある単発と上書きはそれで描き、規則の回には「時刻を確かめられない」の印を付ける。
 
 ### 5.5 書き込み
 
 - 書き込みはオンラインのときだけ（[ADR-0039](../decisions/0039-offline-read-cache-and-local-data.md)）。`If-Match`（予定オブジェクトの `etag`）を付けて送る。
-- 楽観的に描き、応答の予定オブジェクトで置き換える。手元のトークンは進めない（次の差分で同じ版が届き、版の比べで捨てる）。
-- 412（版の衝突）：最新を取り直し、利用者の変更と最新の違いを示して、もう一度送るか捨てるかを選ばせる。自動でまとめない。
+- 楽観的に描き、応答の予定オブジェクトで置き換える。手元のトークンは進めない（次の差分で同じバージョンが届き、バージョンの比べで捨てる）。
+- 412（バージョンの衝突）：最新を取り直し、利用者の変更と最新の違いを示して、もう一度送るか捨てるかを選ばせる。自動でまとめない。
 - 403（参加者の写しの共有の項目を直そうとした、など）：理由のコードの文言を示し、描画を戻す。
 
 ## 6. 表示
@@ -327,9 +327,9 @@ ADR-0039。
 | Realtime が切れた | 他の端末の変更が届かない | 再接続（0〜5 秒の乱数、その後は指数の待ち、最大 60 秒）。切れている間は 1 分ごとに差分を取る |
 | API が遅い・5xx | 表示・書き込みが止まる | 手元の窓で描き続ける。書き込みは失敗を示し、楽観的な描画を戻す（自動で送り直さない。二重の作成を避ける） |
 | 410 の急増（DR の `epoch`、tzdb の大きな計算し直し） | 全クライアントが取り直す | 取り直しを 0〜60 秒の乱数で遅らせる。サーバーの `Retry-After` に従う |
-| tzdb の新しい版のゾーンを取れない | 回の時刻が確かめられない | 5.4 節の印 |
+| tzdb の新しいバージョンのゾーンを取れない | 回の時刻が確かめられない | 5.4 節の印 |
 | IndexedDB が使えない（プライベートの閲覧、容量） | 手元に持てない | メモリーだけで動く。オフラインの閲覧ができないことを設定に示す |
-| 新しい資産の版で不具合 | 画面のエラー | 段階的な配布を止めて戻す（[delivery.md](delivery.md) の 5 節） |
+| 新しい資産のバージョンで不具合 | 画面のエラー | 段階的な配布を止めて戻す（[delivery.md](delivery.md) の 5 節） |
 
 ## 14. セキュリティ
 
@@ -385,7 +385,7 @@ E2E（Playwright、時計とタイムゾーンを固定、3 つの `TZ`）：
 2026-10-04 の既定案。E7 の試験で覆りうる。
 
 - **データの取り方**：窓つきの差分の同期と手元の展開（ADR-0038）。
-- **tzdb**：版つきの URL からゾーンを取る（ADR-0038）。
+- **tzdb**：バージョンつきの URL からゾーンを取る（ADR-0038）。
 - **重なりの配置**：貪欲な列の割り当てと右への広げ、6 列を超えたら「+N」（ADR-0038）。
 - **オフライン**：前後 4 週の読み出しだけ、捨ててよい写し（ADR-0039）。
 - **夏時間の日**：壁時計の 0〜24 時の軸、存在しない時刻は斜線、2 回ある時刻は印（6.6 節）。
@@ -412,7 +412,7 @@ E2E（Playwright、時計とタイムゾーンを固定、3 つの `TZ`）：
 
 ### runbooks
 
-- `web-client-regression.md`：資産の版ごとのエラーの率・遅れの比べ方と、段階の止め方・戻し方（`deploy-and-rollback.md` の Web の節に含めてよい）。
+- `web-client-regression.md`：資産のバージョンごとのエラーの率・遅れの比べ方と、段階の止め方・戻し方（`deploy-and-rollback.md` の Web の節に含めてよい）。
 
 ### 他の領域への依頼
 
@@ -425,7 +425,7 @@ E2E（Playwright、時計とタイムゾーンを固定、3 つの `TZ`）：
 | --- | --- | --- |
 | 手元の IndexedDB `cal-<account_id>` | `calendars`、`objects`、`tokens`、`tzdata`、`prefs`、`_meta`（`cache_schema`、最後に使った時刻） | 10、ADR-0039 |
 | `user_preferences`（サーバー） | 表示のタイムゾーン、2 つ目のタイムゾーン、週の始まり、刻み、キーボードの割り当て・無効、和暦の表示、辞退した予定の表示 | 6、8 |
-| S3 `/tzdata/<version>/<zone>.bin` | 版ごとのゾーンのデータ（変わらない） | 5.4 |
+| S3 `/tzdata/<version>/<zone>.bin` | バージョンごとのゾーンのデータ（変わらない） | 5.4 |
 
 ## 出典
 

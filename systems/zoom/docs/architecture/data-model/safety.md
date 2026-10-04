@@ -94,7 +94,7 @@ erDiagram
 | `user_id` | `uuid` | YES | | ログインしていた人（他の組織のユーザーも入る。外部キーは張らない） |
 | `device_key_hash` | `bytea` | YES | | ゲストの端末の鍵の HMAC |
 | `ip_prefix_hash` | `bytea` | YES | | ゲストの回線の HMAC。一致しても拒否せず、待合室に回して印を付ける |
-| `ip_pepper_version` | `smallint` | YES | | `ip_prefix_hash` を計算した pepper の版。照合は今と前の pepper の両方で行う |
+| `ip_pepper_version` | `smallint` | YES | | `ip_prefix_hash` を計算した pepper のバージョン。照合は今と前の pepper の両方で行う |
 | `caller_id_hash` | `bytea` | YES | | 電話の参加者の発信者の番号の HMAC（[telephony.md](telephony.md)） |
 | `removed_by_participant_id` | `uuid` | NO | | |
 | `removed_at` | `timestamptz` | NO | `now()` | |

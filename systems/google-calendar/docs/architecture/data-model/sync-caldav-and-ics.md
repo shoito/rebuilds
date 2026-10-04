@@ -1,6 +1,6 @@
 # Data model: 変更のログ・CalDAV・ICS
 
-[data-model.md](../data-model.md) の一部。規約は、そちらの 2 節に従う（版と `change_seq` は 2.6 節）。振る舞いは [sync-and-caldav.md](../sync-and-caldav.md)、[api-and-push.md](../api-and-push.md) の 4.6 節、[observability.md](../observability.md) の 5.4 節を正とする。決定は [ADR-0005](../../decisions/0005-change-log-and-sync-tokens.md)、[ADR-0023](../../decisions/0023-caldav-resource-model-and-conditional-writes.md)〜[ADR-0025](../../decisions/0025-ics-subscriptions-both-directions.md)、[ADR-0046](../../decisions/0046-sli-from-ledgers-and-delivery-tracing.md)。同期のトークン、CalDAV の名前と ETag の形は [stores.md](stores.md) の 5・6 節。
+[data-model.md](../data-model.md) の一部。規約は、そちらの 2 節に従う（バージョンと `change_seq` は 2.6 節）。振る舞いは [sync-and-caldav.md](../sync-and-caldav.md)、[api-and-push.md](../api-and-push.md) の 4.6 節、[observability.md](../observability.md) の 5.4 節を正とする。決定は [ADR-0005](../../decisions/0005-change-log-and-sync-tokens.md)、[ADR-0023](../../decisions/0023-caldav-resource-model-and-conditional-writes.md)〜[ADR-0025](../../decisions/0025-ics-subscriptions-both-directions.md)、[ADR-0046](../../decisions/0046-sli-from-ledgers-and-delivery-tracing.md)。同期のトークン、CalDAV の名前と ETag の形は [stores.md](stores.md) の 5・6 節。
 
 | 表 | テナント | 中身 |
 | --- | --- | --- |
@@ -165,7 +165,7 @@ erDiagram
 | `committed_on` | `date` | NOT NULL | — | `committed_at` の UTC の日（分割の鍵。D-21） |
 | `kind` | `text` | NOT NULL | — | `upsert`・`delete`・`calendar`（名前・色・タイムゾーン）・`acl`（共有・方針の変更） |
 | `event_object_id` | `uuid` | NULL | — | `upsert`・`delete` のとき |
-| `object_version` | `bigint` | NULL | — | 変更の後の予定オブジェクトの版 |
+| `object_version` | `bigint` | NULL | — | 変更の後の予定オブジェクトのバージョン |
 | `origin_msg_id` | `uuid` | NULL | — | 参加者の写しへの当て込みのとき、元の iTIP の `msg_id`（[ADR-0046](../../decisions/0046-sli-from-ledgers-and-delivery-tracing.md)） |
 | `committed_at` | `timestamptz` | NOT NULL | `now()` | |
 

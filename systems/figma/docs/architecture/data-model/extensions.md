@@ -172,8 +172,8 @@ erDiagram
 | `asset_key` | `text` | NO | | 元のコンポーネントの `publish_key` |
 | `kind` | `text` | NO | | `component`・`component_set`（スタイル・変数は延期） |
 | `name` | `text` | NO | | 公開の時点の名前（ログに書かない） |
-| `content_hash` | `bytea` | NO | | blob の SHA-256。前の版と同じなら blob を作らない |
-| `latest_version` | `integer` | NO | | この資産が最後に変わった版 |
+| `content_hash` | `bytea` | NO | | blob の SHA-256。前のバージョンと同じなら blob を作らない |
+| `latest_version` | `integer` | NO | | この資産が最後に変わったバージョン |
 | `removed_at` | `timestamptz` | YES | | 公開から外れた |
 | `updated_at` | `timestamptz` | NO | `now()` | |
 
@@ -221,7 +221,7 @@ erDiagram
 
 ### plugin_versions
 
-すべての版を不変に保存する（ADR-0039）。
+すべてのバージョンを不変に保存する（ADR-0039）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -237,7 +237,7 @@ erDiagram
 | `published_at` | `timestamptz` | YES | | |
 
 - 主キー：`(id)`。外部キー：`plugin_id` → `plugins`。
-- 索引：`(plugin_id, id DESC)`（最新の版）、`(review_status) WHERE review_status = 'pending'`（審査の待ち）。
+- 索引：`(plugin_id, id DESC)`（最新のバージョン）、`(review_status) WHERE review_status = 'pending'`（審査の待ち）。
 - 更新しない（`review_status`・`published_at` を除く）。
 - S1 の規模：数十万行。
 
@@ -291,7 +291,7 @@ erDiagram
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `org_id`・`plugin_id` | `uuid` | NO | | |
-| `pinned_version_id` | `uuid` | YES | | 版を固定するとき |
+| `pinned_version_id` | `uuid` | YES | | バージョンを固定するとき |
 | `approved_by` | `uuid` | NO | | |
 | `approved_at` | `timestamptz` | NO | `now()` | |
 

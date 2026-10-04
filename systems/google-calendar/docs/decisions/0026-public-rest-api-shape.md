@@ -37,7 +37,7 @@ API の形：
 
 1 と a を採用する。詳細は [api-and-push.md](../architecture/api-and-push.md) の 4 節。
 
-- 入口は `https://api.<brand>.<domain>/v1`。JSON、camelCase、RFC 3339。版は URL で、壊す変更は `/v2`。古い項目は告知から 12 か月で消す。
+- 入口は `https://api.<brand>.<domain>/v1`。JSON、camelCase、RFC 3339。バージョンは URL で、壊す変更は `/v2`。古い項目は告知から 12 か月で消す。
 - 予定は予定オブジェクトを単位にする。時刻は `zoned`（`dateTime`＋`timeZone`）、`utc`（`Z`）、`floating`（オフセットなしと `floating: true`）、`date`（`date`）。`timeZone` があれば入力のオフセットを捨てて壁時計の時刻を使う。繰り返しは `timeZone` を必須にする。応答に `tzdataVersion` を付ける。
 - `recurrence` は RFC 5545 の行の配列（DTSTART・DTEND を含めない）。
 - `redact()` が `BUSY` にした予定（[ADR-0021](0021-effective-role-and-redact-table.md)）は、見る人ごとの不透明な ID と時刻と状態だけを返し、`redacted: true` を付ける。

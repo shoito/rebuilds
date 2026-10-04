@@ -167,7 +167,7 @@ DT-IMPORT-002。`origin = import` のトランザクションだけに許すこ�
 
 ### 5.3 ID と冪等
 
-- **モデルの ID**：`uuidv7_from(元の created_at, SHA-256(workspace_id ‖ source_key ‖ 記録の種類 ‖ source_id))`。上位 48 ビットに元の作成の時刻（ミリ秒）、版の 4 ビットに 7、残りにハッシュを入れる。RFC 9562 の UUIDv7 の形を満たし（[data-model-and-schema.md](data-model-and-schema.md) の 5.1 節の検証を通る）、同じ記録からは同じ ID ができる。
+- **モデルの ID**：`uuidv7_from(元の created_at, SHA-256(workspace_id ‖ source_key ‖ 記録の種類 ‖ source_id))`。上位 48 ビットに元の作成の時刻（ミリ秒）、バージョンの 4 ビットに 7、残りにハッシュを入れる。RFC 9562 の UUIDv7 の形を満たし（[data-model-and-schema.md](data-model-and-schema.md) の 5.1 節の検証を通る）、同じ記録からは同じ ID ができる。
 - **`client_tx_id`**：同じ作り方で、`(job の source_key, 束の最初の記録)` から作る。時刻の部分は取り込みを始めた時刻にする（`tx_results` の 90 日の保持に入れるため。元の古い時刻にすると保持の計算から外れる）。
 - **やり直し**（本家と同じく、取り込み済みを飛ばす）：同じ `source_key` の 2 回目のジョブは、`import_items` にある記録を飛ばす。落ちたジョブの続きは、同じ `client_tx_id` で送り直し、`tx_results` の結果を受ける（ADR-0006）。`import_items` にないのに `duplicate_id` で拒否された記録は、前の実行で作られたものとして `import_items` に書き足す。
 - `import_items(workspace_id, source_key, kind, source_id) → model_id, job_id, content_hash`。取り込みの後に元が変わったかを、次のジョブで数えて示す（上書きはしない。MVP）。

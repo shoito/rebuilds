@@ -539,7 +539,7 @@ sealed box の鍵の組。秘密鍵は `app-secrets` のエンベロープ暗号
 | `kind` | text | NO | | `hosted`・`self_hosted` |
 | `ephemeral` | boolean | NO | false | ホストされたランナーは常に真 |
 | `status` | text | NO | `'offline'` | `online`・`offline`・`busy` |
-| `version` | text | YES | | エージェントの版 |
+| `version` | text | YES | | エージェントのバージョン |
 | `last_seen_at` | timestamptz | YES | | |
 | `created_at` | timestamptz | NO | now() | |
 

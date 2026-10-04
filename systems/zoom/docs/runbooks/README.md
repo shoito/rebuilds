@@ -50,7 +50,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 - **フラグは 4 種類**（[ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md)）：release、meeting（開催の開始で Actor が評価し、会議の全員と Media Node で揃える。`media.red`・`media.svc`・`media.av1`）、ops（止める向きはすぐ。進行中の会議に 10 秒以内）、experiment。
 - **デプロイの順**：マイグレーション（expand）→ Worker・API・Assignment（blue/green）→ Actor Host（1/6 ずつのローリング、計画した引き渡し）→ Gateway（1 タスクずつ、接続を 60 秒で少しずつ閉じる）→ Web（割合）。シグナリングのスキーマはサーバーを先に、クライアントを後に。
 - **Media Node の波**（[ADR-0055](../decisions/0055-media-node-rolling-replacement.md)）：その場で更新しない。新しい AMI の台を AZ ごとに 1 台（新しい会議の 5%）→ 平日のピークを含む 24 時間、同じ時間の古い世代と SLI を比べる（合格の基準は [quality.md](../quality.md) の 4.1 節）→ 1 日 1 回 10% → 25% → 50% → 100%、各波の後 4 時間比べる。古い台は会議が自然に終わるのを 4 時間待ち、残りは夜間に make-before-break で移す。急ぎ（重大な脆弱性）はカナリア 1 時間、15 分ごとに 20%。TURN も同じ形。
-- **クライアントの列車**：Web は毎日出せる。社内 → 1% → 10% → 50% → 100%（各 4 時間）で版ごとの SLI を比べ、会議の中では版を変えない。アプリ（E13）は 2 週ごとの列車で、デスクトップは 1 週で 1% → 100%、モバイルはストアの段階的な公開。シグナリングは Web に N−1、アプリに N−2 まで。重い不具合は `min_client_version` を上げて強制の更新。
+- **クライアントの列車**：Web は毎日出せる。社内 → 1% → 10% → 50% → 100%（各 4 時間）でバージョンごとの SLI を比べ、会議の中ではバージョンを変えない。アプリ（E13）は 2 週ごとの列車で、デスクトップは 1 週で 1% → 100%、モバイルはストアの段階的な公開。シグナリングは Web に N−1、アプリに N−2 まで。重い不具合は `min_client_version` を上げて強制の更新。
 - **ロールバック**：まずフラグで戻す。次に 1 つ前のタスク定義（制御の側）、新しい世代の Media Node を全部 `draining`（重い回帰は make-before-break で古い台へ）、Web の割合を 0。マイグレーションは戻さない。
 
 ### 3.1 デプロイの時間帯と凍結
@@ -75,7 +75,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | TURN の過負荷（CPU 70%、1 台 2 Gbps、割り当て 3 倍が 5 分。page）、TURN の拒否の急増（1 分に 100 超。ticket、10 倍で page） | [incident-response.md](incident-response.md) の「TURN の過負荷」 | 作成済み（指標は E2 の `turn-coturn-deploy`） |
 | シグナリングの再接続の嵐（新しい接続が平常の 5 倍、`resume` の失敗 5% 超。page） | [incident-response.md](incident-response.md) の「シグナリングの再接続の嵐」、`signaling-reconnect-storm.md` | 作成済み（個別の手順は E2 の `reconnect-resume`） |
 | 内容・秘密の出力の検出（1 件以上。page、SEV2）、監査ログのハッシュの連鎖の検証の失敗（page、SEV2） | [incident-response.md](incident-response.md) の「内容・秘密の出力」、`content-leak-detected.md` | 作成済み（個別の手順は E1 の `content-leak-scanner`、ハッシュの連鎖は `audit-log-three-streams`） |
-| デプロイ中の自動の戻し、Media Node のカナリアの不合格、Web の版の悪化（page） | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み（E10 の `media-node-canary-and-waves`、E1 の `web-release-percentage`） |
+| デプロイ中の自動の戻し、Media Node のカナリアの不合格、Web のバージョンの悪化（page） | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み（E10 の `media-node-canary-and-waves`、E1 の `web-release-percentage`） |
 | DR の複製の遅延（`AuroraGlobalDBRPOLag` 60 秒を 5 分。page）、大阪の待機の構成の異常（ticket、30 分で page）、AZ の障害 | [disaster-recovery.md](disaster-recovery.md) | 作成済み（E10 の `osaka-media-standby`・`dr-drill-region`） |
 | 待合室もパスコードもない会議が 1 件以上（毎日の監査。page、SEV2） | [incident-response.md](incident-response.md)、`join-guard-violation.md` | E3 の `join-guard-invariant` で作成 |
 | 接続の追跡の上限の超過（`conntrack_allowance_exceeded` ≥ 1。page） | `conntrack-allowance-exceeded.md`（network-traversal の 15 節） | E1 の `media-sg-untracked` で作成 |
@@ -85,7 +85,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 期限を過ぎたフラグ（週次） | `stale-flags.md`（delivery の 11 節） | E1 の `meeting-scoped-flags` で作成 |
 | TURN の台の障害、TURN の秘密の入れ替え（90 日） | `turn-node-failure.md`、`turn-secret-rotation.md`（network-traversal の 15 節） | E2 の `turn-coturn-deploy`・`turn-rest-credentials` で作成 |
 | 顧客の網から入れない問い合わせ | `customer-network-cannot-join.md`（network-traversal の 15 節） | E2 の `customer-firewall-doc` で作成 |
-| ブラウザの新しい版での回帰 | `browser-release-regression.md`（clients の 15 節、codecs の 14 節） | E2 の `browser-capability-probe` で作成 |
+| ブラウザの新しいバージョンでの回帰 | `browser-release-regression.md`（clients の 15 節、codecs の 14 節） | E2 の `browser-capability-probe` で作成 |
 | 空きの不足のうち起動の失敗（在庫）、EIP のプールの枯渇（空き 10 未満で ticket、0 で page） | `ec2-capacity-shortage.md`、`eip-pool-exhausted.md`（infrastructure の 15 節） | E2 の `media-fleet-asg` で作成 |
 | 主催者不在の会議の問い合わせ | `host-lost-meeting.md`（signaling の 17 節） | E3 の `host-handover` で作成 |
 | 推測の疑いの IP・ASN の増加、パスコードの総当たりの疑い | `meeting-id-enumeration.md`、`passcode-bruteforce.md`（meeting-security の 14 節） | E3 の `join-rate-limits`・`enumeration-uniform-response` で作成 |

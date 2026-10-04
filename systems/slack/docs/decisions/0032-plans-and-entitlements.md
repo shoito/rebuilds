@@ -25,7 +25,7 @@ date: 2026-09-26
 
 | テーブル | 中身 |
 | --- | --- |
-| `plans` | プランの定義。コード（`free` / `pro` / `enterprise`）、各上限と機能の既定値（JSON）、版 |
+| `plans` | プランの定義。コード（`free` / `pro` / `enterprise`）、各上限と機能の既定値（JSON）、バージョン |
 | `workspace_entitlements` | ワークスペースのプランと、上書きの値。上書きには理由と期限を持たせる。テナントテーブルとして RLS の対象にする |
 
 - 値の名前は `limit.<対象>`（例：`limit.members.max`、`limit.api.tier_write.per_min`）と、`feature.<機能>`（例：`feature.sso`、`feature.mcp_write`）の 2 種類にする。定義は `packages/entitlements` に型付きで置く。

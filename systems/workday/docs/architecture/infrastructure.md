@@ -116,7 +116,7 @@ staging は同じ構成を最小の台数で持ち、負荷試験のときだけ
 | --- | --- | --- |
 | Aurora（人事・保管庫） | 自動バックアップ（PITR）＋ AWS Backup の連続バックアップ、Vault Lock | 35 日 |
 | Aurora の長期のスナップショット | 取らない。長期の保存は log-archive と S3 の規則表で持つ | — |
-| S3（入力の文書、結果の束、明細、振込ファイル） | 版の管理、大阪への複製（Replication Time Control） | 規則表（[audit-and-retention.md](audit-and-retention.md) の 5 節） |
+| S3（入力の文書、結果の束、明細、振込ファイル） | バージョンの管理、大阪への複製（Replication Time Control） | 規則表（[audit-and-retention.md](audit-and-retention.md) の 5 節） |
 | log-archive | Object Lock、大阪への複製 | 同上 |
 | ECR のエンジンのイメージ | 大阪への複製。ライフサイクルで消さない | 給与の実行の保存の期間（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)） |
 | Valkey、SQS | バックアップしない | 失ってよい。SQS は outbox から作り直す |
@@ -152,7 +152,7 @@ staging は同じ構成を最小の台数で持ち、負荷試験のときだけ
 ### 6.5 論理的な破損
 
 - 他の題材と同じく、Aurora の PITR で隔離した VPC に新しいクラスタを復元し、失われた行だけを戻す。本番のクラスタは上書きしない。
-- 追記のみの表（差分、版、`bp_events`、給与の結果、仕訳、監査）は、戻す行が、その後の差分・版・逆仕訳と矛盾しないことを確かめる。確定した給与の結果は、戻すのではなく、入力の文書から計算し直して一致を確かめる（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）。
+- 追記のみの表（差分、バージョン、`bp_events`、給与の結果、仕訳、監査）は、戻す行が、その後の差分・バージョン・逆仕訳と矛盾しないことを確かめる。確定した給与の結果は、戻すのではなく、入力の文書から計算し直して一致を確かめる（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）。
 
 ### 6.6 大阪の待機の構成の確認
 

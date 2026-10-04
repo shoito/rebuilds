@@ -108,7 +108,7 @@ git（HTTPS・SSH）──▶ Git フロントエンド（認証・認可・ル�
 | [0018](../decisions/0018-repository-roles-and-permission-composition.md) | リポジトリの権限は、本家と同じ 5 つのロールの最大値で決める |
 | [0019](../decisions/0019-authentication-and-token-model.md) | Web のログインは Better Auth、プログラムからのアクセスは細粒度のトークンを既定にする |
 | [0020](../decisions/0020-github-app-model.md) | 外部との連携の主な形を、本家の GitHub App と同じ形（インストールと 1 時間のトークン）にする |
-| [0021](../decisions/0021-api-shape-and-versioning.md) | 公開 API は本家の形に寄せ、REST は日付の版をヘッダーで選び、GraphQL は版を持たない |
+| [0021](../decisions/0021-api-shape-and-versioning.md) | 公開 API は本家の形に寄せ、REST は日付のバージョンをヘッダーで選び、GraphQL はバージョンを持たない |
 | [0022](../decisions/0022-webhook-signing-and-delivery.md) | Webhook は本家と同じ方式の HMAC-SHA256 で署名し、隔離した egress から送り、送る直前に権限を確かめる |
 | [0023](../decisions/0023-firecracker-microvm-runners.md) | ホストされたランナーは EC2 の metal の上の Firecracker の microVM で、1 ジョブ 1 VM・使い捨て |
 | [0024](../decisions/0024-job-scheduling-and-fairness.md) | ジョブは持ち主ごとの同時実行の上限と、持ち主の間の公平な順番で配る |
@@ -191,7 +191,7 @@ PM の方針（本家 GitHub に寄せる、既定案）により、次のとお
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| プロトコル v2 の `fetch` の、広告していないハッシュの `want` の振る舞いと、到達可能性の検査の費用 | v2 が検査しないことは 2026-09-26 に確認した。非公開のネットワークで検査をかけることは 2026-09-28 に決めた。E1 の `fork-network-want-poc` で版ごとの振る舞いを [quality.md](../quality.md) の漏洩テストに固定し、`gitd` での検査の費用を測る |
+| プロトコル v2 の `fetch` の、広告していないハッシュの `want` の振る舞いと、到達可能性の検査の費用 | v2 が検査しないことは 2026-09-26 に確認した。非公開のネットワークで検査をかけることは 2026-09-28 に決めた。E1 の `fork-network-want-poc` でバージョンごとの振る舞いを [quality.md](../quality.md) の漏洩テストに固定し、`gitd` での検査の費用を測る |
 | NLB の登録解除の後の接続、ECS の EC2 起動タイプの停止猶予 15 分 | E1 の `frontend-drain-poc`（staging） |
 | CloudFront 経由の数 GB の clone・push、`core.fsync` の性能、reftable、LFS の presigned の署名への `x-amz-checksum-sha256` の組み込み | E3 の Git の負荷試験と PoC（本家が bundle-uri を広告していないこと、LFS のクライアントがヘッダーを付けることは 2026-09-26 に確認した） |
 | マージ可能かの再計算の間引き | E4 で既定（5 分）で始め、E9 の負荷試験で直す |

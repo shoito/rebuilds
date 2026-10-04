@@ -241,7 +241,7 @@ POST /api/v1/leads/convert
 | 対応 | 持ち方 |
 | --- | --- |
 | 標準の項目 | システムの固定の表（例：`company` → 取引先の `name`、`company_kana` → `name_kana`、`corporate_number` → `corporate_number`、`last_name` → 取引先責任者の `last_name`、住所 → 取引先の `billing_*` と取引先責任者の `mailing_*`） |
-| カスタム項目 | `lead_convert_mappings(org_id, lead_field_id, target_object, target_field_id)`。メタデータで、版を上げて変える |
+| カスタム項目 | `lead_convert_mappings(org_id, lead_field_id, target_object, target_field_id)`。メタデータで、バージョンを上げて変える |
 | 商談の作成の既定 | `lead_convert_settings.opportunity_creation`：`optional`・`required`・`hidden`（MDAPI の VisibleOptional・VisibleRequired・NotVisible に寄せる） |
 
 - 対応の保存の時に、型が合うこと（同じ型か、[metadata-and-runtime.md](metadata-and-runtime.md) の 5.1 節で変換できる型）と、1 つの先の項目に 2 つの元が向かないことを検査する。
@@ -315,7 +315,7 @@ CREATE INDEX ON record_match_keys (org_id, record_id);
 ```
 
 - 鍵は、ピボットの表と同じく、純粋な関数 `deriveMatchKeys(ruleSegment, record)` でレコードとメタデータから決め、保存の手順 6 で同じトランザクションで差分を書く（[ADR-0012](../decisions/0012-derived-copies-consistency-and-projections.md) と同じ考え方）。整合の検査の対象にも入れる。
-- 照合の規則を有効にする時は、Worker が 1 万件の範囲ごとに鍵を作る（`building`）。作り終えるまで、規則は重複の規則で使えない（Setup に「準備中」と出す）。共有のルールの版（[sharing-and-record-access.md](sharing-and-record-access.md) の 7.2 節）と同じ流れにする。
+- 照合の規則を有効にする時は、Worker が 1 万件の範囲ごとに鍵を作る（`building`）。作り終えるまで、規則は重複の規則で使えない（Setup に「準備中」と出す）。共有のルールのバージョン（[sharing-and-record-access.md](sharing-and-record-access.md) の 7.2 節）と同じ流れにする。
 - ごみ箱の間のレコードの鍵は消す（ピボットの索引と同じ。[data-storage.md](data-storage.md) の 5.1 節）。
 
 ### 6.4 保存の手順 5 での判定

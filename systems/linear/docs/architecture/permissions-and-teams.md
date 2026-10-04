@@ -251,7 +251,7 @@ DT-PERM-003。4.3 節で「書く：可」のときに、さらに当てる規�
 | `Issue` | `set assignee_id` | 担当になる人がそのチームを読める（見てよくなければ `invalid_reference`） |
 | 本文・コメントのメンション | 候補 | メンションされる人がそのイシューを読める（本家と同じ） |
 | `SlackChannelSubscription` | `create`・`delete` | `owner`・`admin` と、対象のチームのメンバー（ゲストを除く）。対象は公開のチームと、公開のチームだけにつながるプロジェクト（[integrations.md](integrations.md) の 5.3 節） |
-| `IssueDescriptionVersion` | `delete` | `owner`・`admin`（消したつもりの秘密を版から消す。監査に残す。[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節、[security.md](security.md) の 9 節） |
+| `IssueDescriptionVersion` | `delete` | `owner`・`admin`（消したつもりの秘密をバージョンから消す。監査に残す。[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節、[security.md](security.md) の 9 節） |
 | `Workspace` | `set slug`・`set name`・`set timezone` | `owner`・`admin` |
 | `WorkspaceSettings` | `set login_methods`・`add`・`remove` | `owner` だけ（DT-PERM-002 の行 1） |
 

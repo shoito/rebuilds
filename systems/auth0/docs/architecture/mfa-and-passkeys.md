@@ -427,7 +427,7 @@ type MfaPolicy = {
 ### 11.3 E2E
 
 - Playwright の仮想の認証器（CDP の WebAuthn のドメイン）で、パスキーの登録、条件付きの UI でのログイン、セキュリティキーの 2 つ目の要素、UV なしの拒否を確かめる。
-- K8（[intent.md](../intent.md)）：Chrome・Safari・Edge・Firefox の最新 2 版と、iOS・Android の実機で、登録とログインを確かめる。実機は E7 の最後と、各ブラウザの大きな版の出荷の後に行う。
+- K8（[intent.md](../intent.md)）：Chrome・Safari・Edge・Firefox の最新 2 バージョンと、iOS・Android の実機で、登録とログインを確かめる。実機は E7 の最後と、各ブラウザの大きなバージョンの出荷の後に行う。
 
 ## 12. ADR
 

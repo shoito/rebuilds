@@ -17,10 +17,10 @@ AI エージェントが実装の大部分を書く前提では、QA の仕事�
 | 3 | ruleset を満たさない変更が保護されたブランチに入る（バイパスの記録なし） | レビューを経ない変更、供給網の攻撃 | 1 つの評価関数を push とマージの両方で呼ぶ（ADR-0011）、決定表、fail closed の障害注入、merge queue の性質ベーステスト（ADR-0012） |
 | 4 | CI のジョブが、他のジョブ・他のリポジトリのシークレット、ホストの資格情報、内部のネットワークに触れる | シークレットの漏洩、横移動 | 1 ジョブ 1 microVM（ADR-0023）、別の AWS アカウント、fork の PR の方針（ADR-0025）、隔離の演習、ログのマスクの二重の確認 |
 | 5 | 信頼できない内容（Markdown・SVG・ノートブック・生のファイル）の XSS | セッションの窃取から非公開の中身の漏洩へ | 別の登録可能ドメイン（ADR-0013）、許可リストの無害化、CSP・Trusted Types、XSS の性質ベーステスト |
-| 6 | 3 つの複製、DB の写し、検索の索引が Git と食い違う | 古い・誤った表示、修復の見落とし | チェックサムの照合、`version` の順の適用の性質、索引の版の比較 |
+| 6 | 3 つの複製、DB の写し、検索の索引が Git と食い違う | 古い・誤った表示、修復の見落とし | チェックサムの照合、`version` の順の適用の性質、索引のバージョンの比較 |
 | 7 | トークンの漏洩と、失効の遅れ | 大量の非公開のリポジトリの持ち出し | 接頭辞＋チェックサムの形式、30 秒以内の失効、一斉の失効の訓練（security.md の 12 節） |
 | 8 | 削除・消去が設定どおりに行われない、または消えすぎる（fork のネットワークの objects） | 法令・約束の違反、他のリポジトリの破損 | 消去の結合テスト（全テーブル・S3・索引・複製で 0 件）、到達可能な objects が消えない性質（ADR-0030） |
-| 9 | Git のクライアントとの非互換（版、libgit2・JGit・go-git、LFS、partial clone） | 利用者の道具が壊れる | Git の互換のマトリクス（PR と夜間） |
+| 9 | Git のクライアントとの非互換（バージョン、libgit2・JGit・go-git、LFS、partial clone） | 利用者の道具が壊れる | Git の互換のマトリクス（PR と夜間） |
 | 10 | 遅さ（fetch の開始、PR の画面、Actions の開始、通知） | 「速く配る」の価値が損なわれる | 負荷試験、SLO の監視（runbooks） |
 
 ## 2. シフトレフト
@@ -53,7 +53,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 性質ベース | `PROP-...`：権限の一致、合意、順序、冪等性、XSS、Actions のスケジューリング | fast-check、Go の rapid | PR |
 | 結合 | API ＋ 実 DB ＋ Valkey ＋ ストレージのノード 3 台（Docker） | Testcontainers | PR |
 | 契約 | OpenAPI の破壊的変更、GraphQL の SDL の差分、`.proto` の後方互換 | 生成と差分の検査 | PR |
-| Git の互換 | Git のクライアントの直近 4 つの minor と配布の古い版、libgit2、JGit、go-git で clone・fetch・push・partial clone・LFS | CI のマトリクス | PR（主要）、夜間（全件） |
+| Git の互換 | Git のクライアントの直近 4 つの minor と配布の古いバージョン、libgit2、JGit、go-git で clone・fetch・push・partial clone・LFS | CI のマトリクス | PR（主要）、夜間（全件） |
 | 障害注入 | push の各段階でのノード・coordinator の停止、AZ の分断、ディスクの満杯、policy・ruleset の読み取りの失敗、SQS・SES の失敗 | Toxiproxy、プロセスの停止 | PR（短縮版）、夜間（完全版、staging） |
 | 漏洩 | 経路ごと（Git、Web、REST、GraphQL、検索、通知、Webhook、Actions のログ・成果物・キャッシュ） | 専用のテストの一式（2.2.2 節） | PR |
 | E2E | ブラウザでのレビュー、マージ、merge queue、JavaScript なしの閲覧 | Playwright | PR（主要）、夜間（全件） |
@@ -87,8 +87,8 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | Web（[web.md](architecture/web.md)、ADR-0013・0035） | **XSS の性質**：生成した悪意ある Markdown・HTML（イベントの属性、`javascript:`、`<svg>`、DOM clobbering、変異 XSS）の描画結果に実行可能な要素と属性がない。悪意ある SVG・HTML・ノートブックを各経路で開いても、アプリのオリジンで JavaScript が動かず Cookie が読めない。CSP と利用者の内容のドメインのヘッダーの検査。JavaScript なしで公開リポジトリが読める。ストリームを始める前に権限の判定が済んでいる。axe で違反 0。訳の抜けの検査（英語・日本語） |
 | Issue（[issues.md](architecture/issues.md)、ADR-0017） | 番号の性質（並行な作成で重複と失敗による欠番がない）。12 節の権限の決定表。非公開のリポジトリからの `cross-referenced`、非公開の sub-issue、移動の元が、読めない人のタイムライン・件数・進み具合に出ない |
 | 通知（[notifications.md](architecture/notifications.md)、ADR-0016） | 受け手の決定（3 節）と経路（5 節）の決定表。性質：重複・順序の入れ替わりのあるイベントの列で受信箱の最終状態が一致し、1 イベントで 1 人にメールは最大 1 通。漏洩：外された人、読めない人へのメンション、非公開になったリポジトリの watch の人に届かない。返信のトークンの改ざん・古いトークン・`From` の不一致 |
-| 検索（[search.md](architecture/search.md)、ADR-0014・0015） | `accessPredicate` = `can`。組み立てた要求が必ず権限の条件と除外を含む。公開 → 非公開・移管・コラボレーターの削除・Issue の移動の直後に、結果・件数・ハイライトに出ない（索引の更新を止めた状態でも）。版の比較（任意の順序・重複のイベントで最新の状態に一致） |
-| API・Webhook・App（[api-and-webhooks.md](architecture/api-and-webhooks.md)、ADR-0020〜0022） | OpenAPI の破壊的変更の検査、版の変換のスナップショット。`x-required-permissions` と `can()` の表の一致。送る直前の確認を満たさない Webhook は送られない。再試行・再配信で `X-<Brand>-Delivery` と本文が変わらない。宛先の検査（私的な IP、DNS の再束縛、リダイレクト、`http`）。GraphQL の実行前の費用 ≥ 実際の費用、読めない節点は `null`。インストールのトークンの 1 時間の失効と絞り込み |
+| 検索（[search.md](architecture/search.md)、ADR-0014・0015） | `accessPredicate` = `can`。組み立てた要求が必ず権限の条件と除外を含む。公開 → 非公開・移管・コラボレーターの削除・Issue の移動の直後に、結果・件数・ハイライトに出ない（索引の更新を止めた状態でも）。バージョンの比較（任意の順序・重複のイベントで最新の状態に一致） |
+| API・Webhook・App（[api-and-webhooks.md](architecture/api-and-webhooks.md)、ADR-0020〜0022） | OpenAPI の破壊的変更の検査、バージョンの変換のスナップショット。`x-required-permissions` と `can()` の表の一致。送る直前の確認を満たさない Webhook は送られない。再試行・再配信で `X-<Brand>-Delivery` と本文が変わらない。宛先の検査（私的な IP、DNS の再束縛、リダイレクト、`http`）。GraphQL の実行前の費用 ≥ 実際の費用、読めない節点は `null`。インストールのトークンの 1 時間の失効と絞り込み |
 | Actions（[actions.md](architecture/actions.md)、ADR-0023〜0027） | **隔離の演習**：ジョブから `169.254.169.254`・`fd00:ec2::254`、VPC の内部、ホスト、他の VM、TCP 25 に届かない。使い捨て：ジョブ A の印が次のジョブから見えない。ホストの SMT・KSM・スワップが無効。シークレットの受け渡しの決定表（起動 × fork × 公開 × 環境）。fork の PR の実行のメッセージ・環境変数・ファイルにシークレットがない。DB・キュー・ログ・トレースをテスト用のシークレットの値（Base64 を含む）で検索して見つからない。ジョブトークンで他のジョブの範囲に触れない。OIDC の claim の表、キャッシュの範囲の性質。スケジューリング：持ち主の上限を超えない、1 つのジョブを 2 つのランナーに渡さない |
 | 暗号化・監査（ADR-0028・0029） | CMK 以外の暗号化の IaC の検査。一般のロールで `app-secrets` の復号が拒否される。管理の操作で `audit_events` に成功 1 件・失敗 0 件。ハッシュの連鎖の毎日の検証 |
 | 削除（ADR-0030） | 削除の直後にどの経路からも中身が返らない。消去の後に全テーブル・S3・索引・3 つの複製で 0 件（対象はスキーマから得る）。バックアップの消去したリポジトリの復元点が 35 日後に消える。復元の訓練で削除の再適用 |
@@ -119,8 +119,8 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 1. staging のストレージのノードに、非公開のネットワーク（`P` と `F`）を作り、`F` にだけ固有のコミット `c` を push する。
 2. `P` の経路で、プロトコル v2 の `fetch` の要求を手で組み立て、`want c` を送る。`shallow`・`deepen`・`filter`・`want-ref` との組み合わせ、`not our ref` の後に別の複製で再試行する経路（[git-protocols.md](architecture/git-protocols.md) の 4 節）も試す。
 3. v0・v1（`upload-pack` の従来の交渉）でも同じことを試す。
-4. Git の本体の対象の版（ストレージで使う版と、その前後の minor）ごとに結果を記録する。
-5. 期待（2026-09-26 に Git の文書と `upload-pack.c` で確認）：v0・v1 は `not our ref` で拒否し、v2 は objects を返す。版ごとの結果を記録する。
+4. Git の本体の対象のバージョン（ストレージで使うバージョンと、その前後の minor）ごとに結果を記録する。
+5. 期待（2026-09-26 に Git の文書と `upload-pack.c` で確認）：v0・v1 は `not our ref` で拒否し、v2 は objects を返す。バージョンごとの結果を記録する。
 6. `gitd` の側で v2 の `want` を ref からの到達可能性で検査する処理を試作し、費用（CPU・遅延、ref の多いリポジトリ）を測る。結果を E3 の `fork-network-reachability-check`（実装）に渡す。非公開のネットワークで検査を既定でかけることは 2026-09-28 に決めた（ADR-0007 の注記）。
 7. LEAK-GIT-02 を PR の CI の漏洩テストと、Git の互換のマトリクスに入れる。本家の振る舞いも、公開のリポジトリで観測して記録する。
 
@@ -193,7 +193,7 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 | E3 Git の信頼性 | 合意・修復・保守・バックアップの障害注入、fork のネットワーク、LFS、パックのキャッシュ | push の各段階の障害注入（夜間の完全版）が通る。修復が 2 時間以内。毎日の復元の確認が 2 週続けて不一致 0。Git の互換のマトリクスの全件。LEAK-GIT-02〜04 |
 | E4 Pull Request とレビュー | `MergeTree` と手元の `git merge` の一致、ruleset の決定表、merge queue の性質 | 一致の性質ベーステスト、ruleset の決定表の全行（push と API の両方）、fail closed の障害注入、merge queue の性質が通る。NFR-004 |
 | E5 Issue と通知 | 番号の性質、受け手と経路の決定表、通知の漏洩 | LEAK-WEB-03・LEAK-NTF-01 が通る。k6 で NFR-011 を満たす。メールの返信の検査が通る |
-| E6 検索 | 経路ごとの漏洩、索引の版と除外の表 | LEAK-SRCH-01 が索引の更新を止めた状態でも通る。NFR-005 |
+| E6 検索 | 経路ごとの漏洩、索引のバージョンと除外の表 | LEAK-SRCH-01 が索引の更新を止めた状態でも通る。NFR-005 |
 | E7 API・Webhook・App | 契約、送る直前の確認、トークン | OpenAPI の破壊的変更の検査、LEAK-API-01・LEAK-HOOK-01、NFR-006。公式の SDK の代表の操作が通る |
 | E8 Actions | 隔離、シークレット、スケジューリング | 隔離の演習で到達 0 件。LEAK-ACT-01・02。持ち主の上限の性質。NFR-007（負荷試験） |
 | E9 本番運用 | NFR 全体、DR、セキュリティ | 負荷試験（[capacity.md](architecture/capacity.md) のモデルの 1 倍・2 倍）で NFR を満たす。大阪への切り替えの訓練が NFR-009 の範囲に収まる。外部のペンテストで High 以上 0 件。runbooks がそろっている |

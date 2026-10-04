@@ -18,7 +18,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E1 基盤 | AWS・Terraform・CI（決定表・性質・ゴールデンデータの枠・給与の lint・マイグレーションの検査）、Aurora と RLS、KMS、フラグ、可観測性と個人情報の走査、監査ログの骨格、`packages/money`、時間の制約の PoC | 設計中 |
 | E2 オブジェクトモデルと有効日付 | `packages/temporal`、3 つのテーブルの生成、畳み込みと同じ日の順序、訂正と取消の依存、時点の問い合わせ、発効のタイマー、遡及の事象、夜間の整合の検査 | 未着手（前に E1 の時間の制約の PoC） |
 | E3 Core HR | 組織と階層の閉包、ポジションと職務、人・雇用・職務、入社・異動・休職・復職・退職と法令の警告、個人の情報、外部の人、組織の再編 | 未着手（退職の警告の境界は確認：L12・L13、入社の書面は L14、外部の人は L15） |
-| E4 業務プロセスと権限 | 定義と版、状態機械、ルーティングと除外、委任、取消・訂正、期限と受信箱、定義の検証と有効化、ドメインと業務プロセスの権限、セキュリティグループ、職務分掌、方針の版 | 未着手 |
+| E4 業務プロセスと権限 | 定義とバージョン、状態機械、ルーティングと除外、委任、取消・訂正、期限と受信箱、定義の検証と有効化、ドメインと業務プロセスの権限、セキュリティグループ、職務分掌、方針のバージョン | 未着手 |
 | E5 セルフサービスとログイン | 画面の殻、時点の見せ方、変更の申請、受信箱の画面、マネージャーの画面、画面の計測、Better Auth・パスキー・SSO | 未着手 |
 | E6 勤怠 | 打刻（オフライン、打刻機）、訂正、客観的な記録、勤務体系、労働時間の計算、36 協定の警告、月次の締めと給与への連携 | 未着手（前に打刻機の選定。36 協定・区分の一部は確認：L6・L17〜L22・L43） |
 | E7 休暇 | 年休の付与と台帳、出勤率、斉一的付与、時効、半日・時間単位、年 5 日の義務、管理簿、特別休暇、休暇の申請 | 未着手（確認：L7・L23〜L27） |
@@ -51,7 +51,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `kms-keys-and-policies` | 用途ごとの KMS の鍵、キーポリシー、大阪のレプリカ、テナントの鍵の作成の処理（[ADR-0052](decisions/0052-kms-key-hierarchy.md)） |
 | `ecs-services-baseline` | ECS のサービスの骨格（api、bp-worker、worker、relay、loader、egress-worker、audit-archiver）、ARM64、ログ、ADOT |
 | `aurora-and-rls` | Aurora PostgreSQL 18、テナントの表と FORCE RLS、`SET LOCAL app.tenant_id`、DB のロール（[data-model.md](architecture/data-model.md) の 3.2 節） |
-| `temporal-constraints-poc` | PoC：Aurora の実際の版で `WITHOUT OVERLAPS`・`PERIOD`・`btree_gist`・RLS の組み合わせ。書き込みの関数の権限の方式（[object-model-and-effective-dating.md](architecture/object-model-and-effective-dating.md) の 4 節） |
+| `temporal-constraints-poc` | PoC：Aurora の実際のバージョンで `WITHOUT OVERLAPS`・`PERIOD`・`btree_gist`・RLS の組み合わせ。書き込みの関数の権限の方式（[object-model-and-effective-dating.md](architecture/object-model-and-effective-dating.md) の 4 節） |
 | `migration-ci-guards` | マイグレーションの CI：`tenant_id`・RLS・RLS の例外の許可リスト（data-model の 3.3 節）、列の `pii_class`（DM-7）、有効日付の 3 つのテーブル、追記のみの表の権限（[ADR-0051](decisions/0051-threat-model-and-pii-classification.md)） |
 | `packages-money` | `Yen`・`Dec`（小数 10 桁）、按分、名前付きの丸めの枠、表示の関数。給与の lint（[ADR-0001](decisions/0001-platform-and-stack.md)、[ADR-0027](decisions/0027-pay-item-graph-and-formula-language.md)） |
 | `ci-baseline` | PR の CI：決定表を `spec.md` から読む表駆動の仕組み、性質ベーステスト、要件 ID と `THR-` の追跡、ゴールデンデータセットの枠（空の事例で動く）、merge queue（[delivery.md](architecture/delivery.md) の 2 節） |
@@ -108,9 +108,9 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | Story | 内容 |
 | --- | --- |
 | `bp-definition-schema` | 定義の形、式の木と評価器、種類ごとの payload のスキーマ（3.1 節の種類の一覧） |
-| `bp-definition-versions` | 版と選び方（PROP-BP-005） |
+| `bp-definition-versions` | バージョンと選び方（PROP-BP-005） |
 | `bp-case-state-machine` | 状態、遷移、冪等、楽観ロック（DT-BP-001、PROP-BP-001・004） |
-| `bp-completion-transaction` | 見ていた版の確認、差分の書き込み（PROP-BP-002） |
+| `bp-completion-transaction` | 見ていたバージョンの確認、差分の書き込み（PROP-BP-002） |
 | `bp-routing` | 担当の決め方、予備の担当、除外（DT-BP-002、PROP-BP-003）。`bp-stuck-steps.md` |
 | `bp-delegation` | 委任（DT-BP-005） |
 | `bp-rescind-and-correct` | 取消・訂正（DT-BP-003）、遡及の候補の通知。`rescind-chain.md` |
@@ -124,7 +124,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `authz-cache` | 権限の表のキャッシュ（PROP-SEC-005） |
 | `security-groups` | グループの種類と所属、`security_group_membership_change` |
 | `bp-security-policies` | 業務プロセスの権限、`retro_override`・`payroll.retro_override` |
-| `security-policy-versions` | 方針の版と有効化（DT-SEC-004、PROP-SEC-006）。`security-policy-rollback.md` |
+| `security-policy-versions` | 方針のバージョンと有効化（DT-SEC-004、PROP-SEC-006）。`security-policy-rollback.md` |
 | `sod-rules-and-checks` | 規則表 S1〜S7、4 つの検査点、夜間の走査（DT-SEC-002、PROP-SEC-004）。`sod-violation-report.md` |
 | `tenant-isolation-properties` | PROP-SEC-002（RLS と判定の両方） |
 | `thr-authz-negative-tests` | THR-010〜016 の拒否の側のテスト。`authz-deny-spike.md` |
@@ -164,7 +164,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `overtime-agreements` | 協定の設定と保存の検査（`overtime_agreement_change`） |
 | `overtime-alerts` | 判定と警告（DT-TIME-003、PROP-TIME-006）、K5 の計測（確認：L6・L17）。`overtime-alert-job-delay.md` |
 | `monthly-close` | 本人の確認、`timesheet_approval`、`hr_locked`、`time_period_reopen`（DT-TIME-005）。`time-period-reopen.md` |
-| `time-to-payroll-handoff` | 集計の版とハッシュ |
+| `time-to-payroll-handoff` | 集計のバージョンとハッシュ |
 | `ui-timesheet-and-overtime` | 勤怠、乖離の理由、36 協定の段の画面 |
 | `clock-sli-and-scheduled-scaling` | 打刻の SLI、始業の打刻の予定の作成、36 協定の判定の遅れの監視 |
 
@@ -296,7 +296,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `report-sources-and-definitions` | データの元の宣言、定義の版、静的な検査 |
+| `report-sources-and-definitions` | データの元の宣言、定義のバージョン、静的な検査 |
 | `report-runner` | 同期と非同期、実行の記録、出力（PROP-RPT-001・002・004）。`report-reader-saturation.md` |
 | `report-point-in-time` | `effective_on`・`known_at`・期間 |
 | `report-suppression` | 少人数の抑止（DT-RPT-002、PROP-RPT-003） |

@@ -33,7 +33,7 @@ CI のクラスの階層と属性、識別の規則（独立・依存の CI）�
 | CSDM 5 | 領域（基盤、構想と戦略、設計と計画、構築と統合、サービスの提供、サービスの消費、ポートフォリオの管理）を持つ。「アプリのサービス」は「サービスのインスタンス」、「技術のサービス」は「技術の管理のサービス」に名前が変わった（表の名前は同じ）。サービスの消費の領域はビジネスのサービス・その提供・要求のカタログ | [CSDM 5 White Paper](https://www.servicenow.com/community/s/cgfwn76974/attachments/cgfwn76974/common-service-data-model-kb/744/3/CSDM%205%20w%20links.pdf)（7 つの領域、表のラベルの変更）。二次の資料（[CSDM 5.0 Explained](https://dss.bg/news/csdm-5-0-explained-whats-new-how-it-works-why-it-matters)、[Your A-Z guide to CSDM 5.0](https://plat4mation.com/blog/your-a-z-guide-to-csdm-5-0/)）も参照 |
 
 - 本家は、複数の CI に一致したとき、既定で最も古い CI を選んで更新し、重複の解消のタスクを作るとされる（コミュニティの記事で確認。公式の本文は未検証で、本家の振る舞いで、設計の前提ではない）。本システムは推測で選ばず保留にする（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）。
-- 本家の CI のクラスの名前、表の名前、CSDM の表の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。CSDM の版の追従は目標にしない（ADR-0005）。
+- 本家の CI のクラスの名前、表の名前、CSDM の表の名前は写さない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。CSDM のバージョンの追従は目標にしない（ADR-0005）。
 
 ## 3. CI のクラスと属性（[ADR-0036](../decisions/0036-ci-classes-and-identification-rules.md)）
 
@@ -435,7 +435,7 @@ SELECT ci_id, min(depth) FROM impacted GROUP BY ci_id LIMIT $max_nodes + 1
 - `business_service_offering` の `criticality` を、優先度のトリガー（メジャーインシデントの候補）と変更のリスクの規則の式で使う（[itsm-processes.md](itsm-processes.md) の 6.1・8.3 節）。
 - 割り当ての規則は `service_offering.support_group` を式で使える（[assignment-and-on-call.md](assignment-and-on-call.md) の 3.1 節）。
 - サービスのクラスは `manual` の取り込み元だけが作る（5.1 節）。サービスどうしの関係は手入力と、後のサービスマッピングで作る。
-- CSDM の領域（構想と戦略、ポートフォリオの管理など）のクラスは MVP に入れない。名前と範囲は本システムのもので、CSDM の版の追従は目標にしない（ADR-0005）。
+- CSDM の領域（構想と戦略、ポートフォリオの管理など）のクラスは MVP に入れない。名前と範囲は本システムのもので、CSDM のバージョンの追従は目標にしない（ADR-0005）。
 
 ## 10. 障害のときの振る舞い
 

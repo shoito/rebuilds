@@ -24,7 +24,7 @@ date: 2026-09-26
 
 ## Decision
 
-> 2026-09-26 の確認：Better Auth の `secrets`（版付きの秘密）は、**暗号化**については新旧の鍵を並べて持てる（新しい鍵で暗号化し、版で旧い鍵を選んで復号する）。一方、セッションの Cookie の**署名**は先頭の 1 つの鍵（`secrets[0]`）だけで作り、検証する。旧い鍵で署名した Cookie を受け付ける期間は持てず、入れ替えると全員のセッションが無効になる（[`secrets` の文書](https://www.better-auth.com/docs/reference/options#secrets)、[`create-context.ts`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/context/create-context.ts)）。そこで、Better Auth の秘密は 90 日の定期の入れ替えをせず、漏洩の疑いがあるときだけ、全員の再ログインを受け入れて入れ替える。Cookie の値は DB で照合する不透明なランダムなトークンなので、署名の鍵を長く使っても、トークンの推測のしやすさは変わらない。JWT プラグインの鍵（OAuth のアクセストークン）は `jwks.rotationInterval` と `gracePeriod` で重なりを持って入れ替えられる（[JWT の文書](https://www.better-auth.com/docs/plugins/jwt)）ので、下の表のとおり 90 日で入れ替える。
+> 2026-09-26 の確認：Better Auth の `secrets`（バージョン付きの秘密）は、**暗号化**については新旧の鍵を並べて持てる（新しい鍵で暗号化し、バージョンで旧い鍵を選んで復号する）。一方、セッションの Cookie の**署名**は先頭の 1 つの鍵（`secrets[0]`）だけで作り、検証する。旧い鍵で署名した Cookie を受け付ける期間は持てず、入れ替えると全員のセッションが無効になる（[`secrets` の文書](https://www.better-auth.com/docs/reference/options#secrets)、[`create-context.ts`](https://github.com/better-auth/better-auth/blob/main/packages/better-auth/src/context/create-context.ts)）。そこで、Better Auth の秘密は 90 日の定期の入れ替えをせず、漏洩の疑いがあるときだけ、全員の再ログインを受け入れて入れ替える。Cookie の値は DB で照合する不透明なランダムなトークンなので、署名の鍵を長く使っても、トークンの推測のしやすさは変わらない。JWT プラグインの鍵（OAuth のアクセストークン）は `jwks.rotationInterval` と `gracePeriod` で重なりを持って入れ替えられる（[JWT の文書](https://www.better-auth.com/docs/plugins/jwt)）ので、下の表のとおり 90 日で入れ替える。
 
 > Terraform の状態ファイル（`tfstate`）の暗号化の鍵は、[260926-terraform-foundation](../changes/260926-terraform-foundation/spec.md) で、データの種類ごとの鍵の 1 つとして定めた。
 

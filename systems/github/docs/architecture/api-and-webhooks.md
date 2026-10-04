@@ -1,6 +1,6 @@
 # API and webhooks: GitHub
 
-REST・GraphQL の API、トークンとスコープ、App（本家の GitHub App に相当）と OAuth アプリ、Webhook、レート制限の設計。API の形と版は [ADR-0021](../decisions/0021-api-shape-and-versioning.md)、トークンは [ADR-0019](../decisions/0019-authentication-and-token-model.md)、App は [ADR-0020](../decisions/0020-github-app-model.md)、Webhook は [ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) に従う。権限の判定は [identity-and-permissions.md](identity-and-permissions.md) にある。
+REST・GraphQL の API、トークンとスコープ、App（本家の GitHub App に相当）と OAuth アプリ、Webhook、レート制限の設計。API の形とバージョンは [ADR-0021](../decisions/0021-api-shape-and-versioning.md)、トークンは [ADR-0019](../decisions/0019-authentication-and-token-model.md)、App は [ADR-0020](../decisions/0020-github-app-model.md)、Webhook は [ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) に従う。権限の判定は [identity-and-permissions.md](identity-and-permissions.md) にある。
 
 方針は「本家 GitHub に寄せる」。本家の振る舞いは docs.github.com で 2026-09-26 に確かめ、確かめられなかったものは **未検証** と書く。本家から外すところは「本家との違い」として理由を書く。
 
@@ -9,9 +9,9 @@ REST・GraphQL の API、トークンとスコープ、App（本家の GitHub Ap
 | 面 | 利用者 | 契約 | 互換性の約束 |
 | --- | --- | --- | --- |
 | 内部の API（Hono RPC） | 自分たちの Web | Web と同時にデプロイ | 約束しない |
-| REST API（`api.<domain>`） | 外部のツール、CLI、CI、App、AI エージェント | OpenAPI 3.1 | 日付の版の中で約束する（4 節） |
+| REST API（`api.<domain>`） | 外部のツール、CLI、CI、App、AI エージェント | OpenAPI 3.1 | 日付のバージョンの中で約束する（4 節） |
 | GraphQL API（`api.<domain>/graphql`） | 同上 | GraphQL のスキーマ | スキーマの変更の予告で約束する（5 節） |
-| Webhook（外向き） | App、外部のサービス | 事象ごとのペイロードのスキーマ | REST の版と同じ扱い（9 節） |
+| Webhook（外向き） | App、外部のサービス | 事象ごとのペイロードのスキーマ | REST のバージョンと同じ扱い（9 節） |
 | Git（HTTPS・SSH） | Git のクライアント | Git のプロトコル | [git-protocols.md](git-protocols.md) |
 
 - **3 つの面（内部・REST・GraphQL）は、同じドメインのサービス関数を呼ぶ。** 権限の判定（`can()`）、冪等性、監査はサービス関数の側に置く。面どうしは HTTP で呼び合わない（Slack の ADR-0030 と同じ考え方）。
@@ -24,9 +24,9 @@ REST・GraphQL の API、トークンとスコープ、App（本家の GitHub Ap
 client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
                                  1. 主体の解決（トークン → actor。identity-and-permissions.md の 3.4 節）
                                  2. レート制限（11 節）
-                                 3. 版の解決（REST）/ 費用の計算（GraphQL）
+                                 3. バージョンの解決（REST）/ 費用の計算（GraphQL）
                                  4. サービス関数（can() を含む）
-                                 5. 版の変換（REST の応答）
+                                 5. バージョンの変換（REST の応答）
                                         │
                                         ├─ Aurora（メタデータ）
                                         └─ Git ストレージの RPC（中身）
@@ -63,25 +63,25 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 
 リポジトリ、ブランチ・タグ・ref、コミット・ツリー・ファイルの中身（`contents`）、Issue・コメント・ラベル・マイルストーン、Pull Request・レビュー・レビューのコメント、コラボレーター・チーム・Organization のメンバー、Webhook と配信、App とインストール、チェック（check run・check suite）とステータス、検索、レート制限（`GET /rate_limit`）、利用者（`GET /user`）。Actions の API は E8 で加える。
 
-## 4. REST の版
+## 4. REST のバージョン
 
 本家の方式に合わせる（[API versions](https://docs.github.com/en/rest/about-the-rest-api/api-versions)、2026-09-26 に確認）。
 
-- **版はヘッダー `X-<Brand>-Api-Version: YYYY-MM-DD` で選ぶ。** URL に版を入れない。
-- **ヘッダーがなければ、最初の版を使う。** 本家も、ヘッダーがなければ最初の版（`2022-11-28`）を使う。本システムの最初の版の日付は、公開の日に決める。
-- **新しい版を出したら、前の版を少なくとも 24 か月動かす**（本家と同じ）。
-- 対応しない版を指定されたら `400`。
-- **互換を壊す変更は、新しい版でだけ行う。** 本家の分類に合わせる：操作の削除、パラメーター・応答の項目の名前の変更・削除、必須のパラメーターの追加、型の変更、列挙値の削除、認証・認可の要件の変更、など。
-- **追加は、すべての版に同時に入れる**：操作、任意のパラメーター、応答の項目、ヘッダー、列挙値の追加。クライアントは知らない項目・列挙値を無視する前提にする（文書に明記する）。
-- 実装：内部の形は常に最新の版にし、版ごとの差分を「変換のモジュール」（要求を新しい形へ、応答を古い形へ）として新しい順に並べ、指定の版まで順にかける。Stripe の日付の版と同じ仕組みで、版の数に比例してコードが増えないようにする。
-- 応答には、使った版を `X-<Brand>-Api-Version-Selected` で返す（本家の文書にはない。2026-09-26 に確認。本システムの追加の項目）。
+- **バージョンはヘッダー `X-<Brand>-Api-Version: YYYY-MM-DD` で選ぶ。** URL にバージョンを入れない。
+- **ヘッダーがなければ、最初のバージョンを使う。** 本家も、ヘッダーがなければ最初のバージョン（`2022-11-28`）を使う。本システムの最初のバージョンの日付は、公開の日に決める。
+- **新しいバージョンを出したら、前のバージョンを少なくとも 24 か月動かす**（本家と同じ）。
+- 対応しないバージョンを指定されたら `400`。
+- **互換を壊す変更は、新しいバージョンでだけ行う。** 本家の分類に合わせる：操作の削除、パラメーター・応答の項目の名前の変更・削除、必須のパラメーターの追加、型の変更、列挙値の削除、認証・認可の要件の変更、など。
+- **追加は、すべてのバージョンに同時に入れる**：操作、任意のパラメーター、応答の項目、ヘッダー、列挙値の追加。クライアントは知らない項目・列挙値を無視する前提にする（文書に明記する）。
+- 実装：内部の形は常に最新のバージョンにし、バージョンごとの差分を「変換のモジュール」（要求を新しい形へ、応答を古い形へ）として新しい順に並べ、指定のバージョンまで順にかける。Stripe の日付のバージョンと同じ仕組みで、バージョンの数に比例してコードが増えないようにする。
+- 応答には、使ったバージョンを `X-<Brand>-Api-Version-Selected` で返す（本家の文書にはない。2026-09-26 に確認。本システムの追加の項目）。
 - 廃止の予告は、`Deprecation`・`Sunset` のヘッダー、変更履歴（changelog）、呼び出しの残る App の持ち主へのメールで行う。
 
 ## 5. GraphQL
 
 ### 5.1 スキーマ
 
-- **1 つの端点**（`POST /graphql`）。版は持たず、スキーマを育てる（本家と同じ）。
+- **1 つの端点**（`POST /graphql`）。バージョンは持たず、スキーマを育てる（本家と同じ）。
 - Relay の規約に従う：`node(id:)`・`nodes(ids:)`、グローバルな ID（型と数値の ID を符号化した不透明な文字列。REST の `node_id` と同じ値）、接続（connection）は `edges`・`nodes`・`pageInfo`・`totalCount`。
 - 接続には `first` か `last` を必須にし、値は 1〜100（本家と同じ）。
 - 実装は TypeScript のコード優先のスキーマ（Pothos ＋ GraphQL Yoga。2026-09-28 の決定）。型はサービス関数の戻り値から作り、REST と同じサービス関数を呼ぶ。
@@ -209,7 +209,7 @@ client ─▶ CloudFront ─▶ ALB ─▶ public-api（Hono）
 
 - 1 つのリポジトリ・Organization に置ける Webhook の数は、事象の種類ごとに 20 までにする（本家と同じ。[Troubleshooting webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks)、2026-09-26 に確認）。
 - 初版の事象（E7）：`ping`、`push`、`create`、`delete`、`pull_request`、`pull_request_review`、`pull_request_review_comment`、`issues`、`issue_comment`、`label`、`milestone`、`repository`、`member`、`membership`、`team`、`organization`、`fork`、`release`、`star`、`status`、`check_run`、`check_suite`、`installation`、`installation_repositories`、`github_app_authorization`。Actions の事象（`workflow_run`、`workflow_job`）は E8。
-- ペイロードの形は、本家の事象ごとの形に寄せる。ペイロードは REST の版の変換を受ける（Webhook ごとに版を固定して保存し、作成時の最新の版を既定にする）。本家の Webhook は版を持たない（配信のヘッダーと文書に版の記述がない。[Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)、2026-09-26 に確認）。版の固定は本システムの追加（**本家との違い**）。
+- ペイロードの形は、本家の事象ごとの形に寄せる。ペイロードは REST のバージョンの変換を受ける（Webhook ごとにバージョンを固定して保存し、作成時の最新のバージョンを既定にする）。本家の Webhook はバージョンを持たない（配信のヘッダーと文書にバージョンの記述がない。[Webhook events and payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)、2026-09-26 に確認）。バージョンの固定は本システムの追加（**本家との違い**）。
 
 ### 9.2 送る要求
 
@@ -362,7 +362,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 | `oauth_tokens` | ハッシュ、ユーザー、アプリ、スコープ、最終使用 |
 | `oauth_grants` | 認可コード・デバイスのフローのコード・マニフェストの `code`（短命、1 回限り） |
 | `org_oauth_app_approvals` | Organization × OAuth アプリ、承認の状態 |
-| `webhooks` | 種類（リポジトリ / Organization / App）、対象、URL、秘密（暗号化）、事象、形式、版、有効か |
+| `webhooks` | 種類（リポジトリ / Organization / App）、対象、URL、秘密（暗号化）、事象、形式、バージョン、有効か |
 | `webhook_deliveries` | GUID、Webhook、事象、ペイロードの場所（S3）、試行の回数、結果、次の試行の時刻（日ごとのパーティション、3 日で本文を消す） |
 | `webhook_delivery_attempts` | 試行ごとのステータス、所要時間、応答の先頭 |
 | `idempotency_keys` | 主体、キー、本文のハッシュ、応答（24 時間） |
@@ -370,7 +370,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 ## 13. 観測と運用
 
 - メトリクス：
-  - API：面・版・操作ごとの要求数と遅延、`4xx`/`5xx`、版ごとの呼び出し（廃止の判断）、GraphQL の費用の分布
+  - API：面・バージョン・操作ごとの要求数と遅延、`4xx`/`5xx`、バージョンごとの呼び出し（廃止の判断）、GraphQL の費用の分布
   - レート制限：`ratelimit_limited_total{kind=primary|secondary, resource}`
   - Webhook：最初の配信までの遅延（NFR-006：p95 10 秒）、滞留の件数と最古の年齢、宛先ごとの失敗の割合、`skipped` の件数、egress の拒否（SSRF の試み）
   - トークン：発行・失効・拒否の件数、公開のリポジトリで見つかったトークンの件数
@@ -381,7 +381,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 
 ## 14. テスト
 
-- 契約：OpenAPI の差分を CI で検査し、版の中で互換を壊す変更（削除、型の変更、必須化、列挙値の削除）を失敗させる。版の変換のモジュールは、版ごとの応答のスナップショットで検査する。
+- 契約：OpenAPI の差分を CI で検査し、バージョンの中で互換を壊す変更（削除、型の変更、必須化、列挙値の削除）を失敗させる。バージョンの変換のモジュールは、バージョンごとの応答のスナップショットで検査する。
 - 表駆動テスト：各操作の要る権限（`x-required-permissions`）と `can()` の表が一致する。
 - 性質ベーステスト：
   - 任意の権限の変更と事象の列で、送る直前の確認（9.4）を満たさない Webhook には、何も送られない。
@@ -409,7 +409,7 @@ Slack の [ADR-0029](../../../slack/docs/decisions/0029-rate-limiting.md) と [r
 - **Webhook の自動の再試行**：[ADR-0022](../decisions/0022-webhook-signing-and-delivery.md) のとおり行う。受け手は `X-<Brand>-Delivery` で重複を捨てる前提を文書に書く。
 - **MCP のサーバー**：MVP の後の候補（[roadmap.md](../roadmap.md) の「後回しにしたもの」）。公開 API の上の薄い層にする（10 節）。
 - **ユーザーのトークンのレート制限**（2026-09-26 の本家の確認による改訂）：App のユーザーのトークンも、PAT・OAuth アプリと合わせてユーザーで合算する（11.1 節）。以前の案の「App × ユーザーで別に数える」は採らない。
-- **Webhook の版**：本家の Webhook は版を持たないが、本システムは Webhook ごとに REST の版を固定する（9.1 節。本家との違い）。
+- **Webhook のバージョン**：本家の Webhook はバージョンを持たないが、本システムは Webhook ごとに REST のバージョンを固定する（9.1 節。本家との違い）。
 
 ### 決定（2026-09-28、推奨案で確定）
 

@@ -77,7 +77,7 @@ erDiagram
     uuid id PK "ファイル"
   }
   page_snapshots {
-    bigint seq PK "版"
+    bigint seq PK "バージョン"
   }
   export_jobs {
     uuid id PK "ジョブ"
@@ -114,8 +114,8 @@ erDiagram
 
 | バケット（役割） | キー | 中身 | 保持・削除 | 暗号化・保護 |
 | --- | --- | --- | --- | --- |
-| ファイル | `ws/{w}/files/{file_id}`、`ws/{w}/files/{file_id}/thumb/{size}.webp` | 利用者のファイル、サムネイル | `files` の物理削除で消す。バージョニングで古い版を 30 日 | SSE-KMS（ファイルの鍵）。大阪へ複製。CloudFront の署名付き URL で配る |
-| スナップショット | `ws/{w}/pages/{page_id}/snapshots/{seq}.json.gz` | ページの版（下の形） | 履歴の日数を過ぎたら `page_snapshots` と一緒に消す | SSE-KMS。大阪へ複製 |
+| ファイル | `ws/{w}/files/{file_id}`、`ws/{w}/files/{file_id}/thumb/{size}.webp` | 利用者のファイル、サムネイル | `files` の物理削除で消す。バージョニングで古いバージョンを 30 日 | SSE-KMS（ファイルの鍵）。大阪へ複製。CloudFront の署名付き URL で配る |
+| スナップショット | `ws/{w}/pages/{page_id}/snapshots/{seq}.json.gz` | ページのバージョン（下の形） | 履歴の日数を過ぎたら `page_snapshots` と一緒に消す | SSE-KMS。大阪へ複製 |
 | インポート | `ws/{w}/imports/{job_id}/{name}` | 上げたファイル | 7 日のライフサイクル | SSE-KMS |
 | エクスポート | `ws/{w}/exports/{job_id}.zip` | 成果物 | 7 日のライフサイクル | SSE-KMS。署名付き URL（7 日） |
 | 監査のアーカイブ | `audit/ws/{w}/{yyyy}/{mm}/{dd}/{hh}.jsonl.gz`、`audit/platform/{yyyy}/{mm}/{dd}/{hh}.jsonl.gz` | `audit_events`・`platform_audit_events` の行とハッシュ | Object Lock（コンプライアンスモード）2 年 | SSE-KMS（監査の鍵） |

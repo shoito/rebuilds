@@ -196,14 +196,14 @@ erDiagram
 | `leave_reason` | `text` | YES | | `left` / `dropped` / `removed` / `denied` / `rejected_removed` / `rejected_locked` / `rejected_full` / `rejected_waiting_full` / `rejected_e2ee` / `client_unsupported` / `meeting_ended` |
 | `client_kind` | `text` | NO | | `web` / `desktop` / `ios` / `android` / `phone`（`hello.client.kind`） |
 | `client_version` | `text` | YES | | |
-| `os` | `text` | YES | | OS の系統と主な版 |
+| `os` | `text` | YES | | OS の系統と主なバージョン |
 | `browser`、`browser_version` | `text` | YES | | Web だけ |
 | `video_codec` | `text` | YES | | 送った映像の符号器（`vp8` / `vp9` / `h264` / `av1`） |
 | `ice_path` | `text` | YES | | `udp_direct` / `tcp_direct` / `turn_udp` / `turn_tcp` / `turn_tls` |
 | `ip_family` | `text` | YES | | `ipv4` / `ipv6` |
 | `device_key_hash` | `bytea` | YES | | ゲストの端末の鍵の HMAC（参加のトークンの値） |
 | `ip_prefix_hash` | `bytea` | YES | | 回線（/32・/64）の HMAC |
-| `ip_pepper_version` | `smallint` | YES | | `ip_prefix_hash` の pepper の版 |
+| `ip_pepper_version` | `smallint` | YES | | `ip_prefix_hash` の pepper のバージョン |
 | `asn` | `integer` | YES | | 回線の ASN（報告に添える） |
 | `caller_id_hash` | `bytea` | YES | | 電話の参加者の発信者の番号の HMAC（[telephony.md](telephony.md)） |
 

@@ -222,7 +222,7 @@ CREATE FUNCTION freebusy.freebusy_for(
 | `during` | `tstzrange` | NOT NULL | — | `tstzrange(start_utc, end_utc, '[)')`。終日の予定は建物のタイムゾーンの日の境 |
 | `status` | `text` | NOT NULL | — | `accepted`・`pending`（承認の待ち）・`needs_review`（要確認） |
 | `accepted_at` | `timestamptz` | NULL | — | 承諾した時刻（要確認の判定で、新しいほうを `needs_review` にする） |
-| `tzdata_version` | `text` | NOT NULL | — | 区間を計算した版 |
+| `tzdata_version` | `text` | NOT NULL | — | 区間を計算したバージョン |
 | `decided_by` | `uuid` | NULL | — | 承認・辞退した管理者 |
 | `review_notified_at` | `timestamptz` | NULL | — | 要確認の知らせ（72 時間後と開始の 24 時間前にもう一度） |
 | `created_at`・`updated_at` | `timestamptz` | NOT NULL | `now()` | |
@@ -247,6 +247,6 @@ ALTER TABLE resource_bookings ADD CONSTRAINT resource_bookings_no_overlap
 
 - CHECK：`status IN ('accepted','pending','needs_review')`、`(status = 'pending') = (accepted_at IS NULL)`、`NOT isempty(during)`。
 - 分割：しない（D-5）。`lifecycle` が毎日、`upper(during) < now()` の行を消す。
-- 切り替えの窓：tzdb の再計算の間、制約は新旧の版の区間を比べる（[ADR-0012](../../decisions/0012-tzdb-update-recompute-and-propagation.md)）。`during` の `UPDATE` が制約に当たったら、`accepted_at` の新しいほうを `needs_review` にしてからやり直す。旧の版の区間とだけ重なった辞退は、参加者の行の `decline_reason = conflict_tz_pending` で、窓の終わりに判定し直す。
+- 切り替えの窓：tzdb の再計算の間、制約は新旧のバージョンの区間を比べる（[ADR-0012](../../decisions/0012-tzdb-update-recompute-and-propagation.md)）。`during` の `UPDATE` が制約に当たったら、`accepted_at` の新しいほうを `needs_review` にしてからやり直す。旧のバージョンの区間とだけ重なった辞退は、参加者の行の `decline_reason = conflict_tz_pending` で、窓の終わりに判定し直す。
 - 書き込み：主催者の書き込みのトランザクションで、会議室の行をロックしてから書き、`resources.booking_seq` を上げる。範囲の端の移動は `expander.advance` が同じ手順で足す。
 - RLS：テナント（組織だけ）。保持：終わった回の行を毎日消す。S1 の量：約 2,000 万行（会議室 1 万 × 範囲の中の未来の回 約 2,000）。

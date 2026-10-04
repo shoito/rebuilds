@@ -203,7 +203,7 @@ erDiagram
   blocks ||--o{ relation_edges : "リレーションの辺"
   blocks ||--o{ page_acls : "ACL を持つページ"
   page_acls ||--o{ page_acl_entries : "項目"
-  workspace_acl_versions ||--o{ page_acls : "変更で版を上げる"
+  workspace_acl_versions ||--o{ page_acls : "変更でバージョンを上げる"
   blocks ||--o{ discussions : "コメントのスレッド"
   discussions ||--|{ comments : "コメント"
   members ||--o{ inbox_items : "受信箱"
@@ -309,7 +309,7 @@ erDiagram
   }
   workspace_acl_versions {
     uuid workspace_id PK "shard"
-    bigint acl_version "権限の版"
+    bigint acl_version "権限のバージョン"
   }
   discussions {
     uuid workspace_id PK "shard"
@@ -372,7 +372,7 @@ erDiagram
 | `email_suppressions` | G | 送信を止めた宛先 | 数千 | 同上 | 同上の 5.4 節 |
 | `platform_audit_events` | G | ワークスペースに属さない監査 | 3,600 万 | 同上 | [security.md](security.md) の 6 節 |
 | `blocks` | S | すべてのブロック | 10 億（約 1 TB） | [blocks.md](data-model/blocks.md) | [block-model.md](block-model.md) の 2・11 節 |
-| `page_snapshots` | S | 履歴の版の目録 | 1 億 | 同上 | 同上の 8 節 |
+| `page_snapshots` | S | 履歴のバージョンの目録 | 1 億 | 同上 | 同上の 8 節 |
 | `files` | S | アップロードしたファイル | 5,000 万 | 同上 | 同上の 3 節、[infrastructure.md](infrastructure.md) の 5 節 |
 | `page_seqs` | S | ページの `seq` の採番 | 5,000 万 | [collaboration.md](data-model/collaboration.md) | [collaboration.md](collaboration.md) の 7 節 |
 | `page_ops` | S | 操作のログ | 26 億（30 日） | 同上 | 同上の 7・8 節 |
@@ -395,7 +395,7 @@ erDiagram
 | `guest_requests` | S | ゲストの追加の申請 | 数千 | 同上 | [permissions-and-sharing.md](permissions-and-sharing.md) の 2.3 節 |
 | `page_acls`、`page_acl_entries` | S | ACL | 500 万、1,500 万 | 同上 | 同上の 4.3 節 |
 | `page_general_access` | S | 一般アクセス | 300 万 | 同上 | 同上の 4.3・7 節 |
-| `workspace_acl_versions` | S | 権限の版 | 2 万 | 同上 | 同上の 5 節 |
+| `workspace_acl_versions` | S | 権限のバージョン | 2 万 | 同上 | 同上の 5 節 |
 | `workspace_settings` | S | ワークスペースの設定 | 2 万 | 同上 | この文書（2026-09-28） |
 | `workspace_security_policies` | S | セキュリティの方針 | 2 万以下 | 同上 | [permissions-and-sharing.md](permissions-and-sharing.md) の 10 節 |
 | `published_sites` | S | 公開サイト | 数十万 | 同上 | 同上の 8 節 |
@@ -425,7 +425,7 @@ erDiagram
 | `offline_pages`、`offline_actions` | L | オフラインのページと理由 | 2,000 ページまで | 同上 | 同上 |
 | `failed_changes` | L | 送れなかった変更 | 小 | 同上 | [collaboration.md](collaboration.md) の 10.1 節 |
 | `recent_pages` | L | 最近開いたページ | 小 | 同上 | この文書（2026-09-28） |
-| `meta` | L | スキーマの版など | 数行 | 同上 | [editor.md](editor.md) の 10 節 |
+| `meta` | L | スキーマのバージョンなど | 数行 | 同上 | [editor.md](editor.md) の 10 節 |
 
 数：サーバーのテーブルは 78（`global` 21、シャード 56、`cluster_local` 1）、クライアントのテーブルは 8。ER 図は 12（全体 1、領域 11）。
 
@@ -462,7 +462,7 @@ erDiagram
 - **冪等**：`(workspace_id, device_id)` の `max_tx_counter` 以下のトランザクションは、適用済みとして成功を返す（`device_cursors`）。
 - **LWW はサーバーの到着順**：`prop.set` の勝ち負けは `seq` の順で決まる。負けた値は `sync_conflicts` に残す（[ADR-0011](../decisions/0011-structural-and-property-conflict-rules.md)）。
 - **outbox**：変更と同じトランザクションで積み、論理シャードごとに 1 つの Relay が `id` の順に送る。ページの中の順序は保たれる。
-- **検索の版**：文書の `index_version` はページの `seq`。古い版で新しい版を上書きしない。
+- **検索のバージョン**：文書の `index_version` はページの `seq`。古いバージョンで新しいバージョンを上書きしない。
 
 ### 4.3 データベース
 
@@ -474,7 +474,7 @@ erDiagram
 ### 4.4 権限
 
 - **判定は 1 つの関数**：中身を返す経路は `can(actor, action, block)` を通す。表の上では、`blocks.page_id` → 最も近い `page_acls` を持つ祖先（自身を含む）→ なければ最上位（`teamspaces` か `members`）の暗黙の ACL（[ADR-0004](../decisions/0004-inherited-page-permissions.md)、[ADR-0018](../decisions/0018-permission-levels-and-inheritance.md)）。
-- **ACL の版**：[permissions-and-sharing.md](permissions-and-sharing.md) の 5.2 節の変更は、同じトランザクションで `workspace_acl_versions.acl_version` を 1 上げ、outbox に `acl.changed` を積む。キャッシュのキーは必ず `acl_version` を含む（[ADR-0019](../decisions/0019-workspace-acl-version-cache.md)）。
+- **ACL のバージョン**：[permissions-and-sharing.md](permissions-and-sharing.md) の 5.2 節の変更は、同じトランザクションで `workspace_acl_versions.acl_version` を 1 上げ、outbox に `acl.changed` を積む。キャッシュのキーは必ず `acl_version` を含む（[ADR-0019](../decisions/0019-workspace-acl-version-cache.md)）。
 - **一般アクセスは ACL の一部**：`page_general_access` の行は、同じページの `page_acls` の行があるときだけ置ける（外部キー）。
 - **主体のキーの形**：`page_acl_entries.principal`、検索の `access_keys`、判定の `keys(actor)` は同じ文字列の形（`user:`・`group:`・`team:`・`ws:`・`bot:`・`public`）。ゲストは `user:` だけを持つ。
 - **テナントの中は `member_id`**：`account_id` を持つのは `members` だけ。

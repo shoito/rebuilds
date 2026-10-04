@@ -94,14 +94,14 @@
         <button>等級 4</button>
         <button>訂正で上書きされたので答えられない</button>
       </div>
-      <p class="why">訂正は過去の記録を消さず、新しい版を足すだけです。5 月の給与は等級 3 で計算されたので、その知識を再現できることが、遡及の差額や監査の前提になります（ADR-0002）。</p>
+      <p class="why">訂正は過去の記録を消さず、新しいバージョンを足すだけです。5 月の給与は等級 3 で計算されたので、その知識を再現できることが、遡及の差額や監査の前提になります（ADR-0002）。</p>
     </div>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0002-effective-dated-data-model.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> の 3 節。</div>
   </section>
 
   <section class="s" id="corrections">
     <h2>変更・訂正・取消の違い</h2>
-    <p>データの上では、どれも「新しい版を足す」操作です。それでも意味が違うので、区別して記録します。監査、承認に要る権限、社会保険の届出（訂正は届出の訂正になりうる）で扱いが変わるからです。</p>
+    <p>データの上では、どれも「新しいバージョンを足す」操作です。それでも意味が違うので、区別して記録します。監査、承認に要る権限、社会保険の届出（訂正は届出の訂正になりうる）で扱いが変わるからです。</p>
     <div class="tabs">
       <div data-tab="変更（将来日付）"><p>「その日から変わる」。3 月に入力する 4 月 1 日付の異動。発効の日までは旧の値が有効です。</p></div>
       <div data-tab="変更（過去日付）"><p>「その日から変わっていた」。6 月に入力する 4 月 1 日付の昇給。確定した給与に差額が出ます（<a class="t" href="#g-retro">遡及</a>）。90 日より前は特別な権限が要ります。</p></div>
@@ -117,8 +117,8 @@
     <p>項目は「一緒に変わるもの」ごとに<a class="t" href="#g-facet">facet</a> にまとめます（住所、職務、給与など）。facet ごとに、変更を<a class="t" href="#g-delta">差分</a>として貯め、有効日の順に<strong>畳み込んで</strong>期間を作ります。</p>
     <pre class="mermaid">flowchart LR
   BP["業務プロセスの案件"] -- "完了で書く" --> C["差分 changes"]
-  C -- "有効日と seq の順に畳み込む" --> V["版 versions"]
-  V -- "いま正しい版を写す" --> N["現在 current"]
+  C -- "有効日と seq の順に畳み込む" --> V["バージョン versions"]
+  V -- "いま正しいバージョンを写す" --> N["現在 current"]
   V -. "known_at を指定した問い合わせ" .-> Q["過去の知識"]
   N -. "effective_on の問い合わせ" .-> R["ある日の値"]</pre>
     <ul>
@@ -164,8 +164,8 @@
   A1 -. "差し戻し・却下" .-> I</pre>
     <ul>
       <li data-frag>ステップの種類：起票、承認（並列も可）、<code>action</code>（人の作業）、<code>service</code>（システムの処理）、通知、完了。</li>
-      <li data-frag>定義はテナントが変えられ、<strong>版</strong>を持ちます。案件は起票の日に有効な版に固定され、途中で定義が変わっても影響しません。</li>
-      <li data-frag>発令日（<code>effective_on</code>）と、定義の版を選ぶ日（起票の日）は別のものです。</li>
+      <li data-frag>定義はテナントが変えられ、<strong>バージョン</strong>を持ちます。案件は起票の日に有効なバージョンに固定され、途中で定義が変わっても影響しません。</li>
+      <li data-frag>発令日（<code>effective_on</code>）と、定義のバージョンを選ぶ日（起票の日）は別のものです。</li>
       <li data-frag>完了した案件は、取消（<code>rescind</code>）か訂正（<code>correct</code>）で直します。進行中の案件はキャンセルします。</li>
     </ul>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> の 3・4・6・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0003-business-process-engine.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0013-bp-definition-format-and-versions.md">ADR-0013</a>。</div>
@@ -251,7 +251,7 @@
     <div class="stepper">
       <ol>
         <li>勤怠の締日（例：20 日）が来る。勤怠を本人・上長・人事が確かめて確定する。</li>
-        <li>入力を固定する（その時点の人事のデータ・勤怠・規則表の版を写し取る）。</li>
+        <li>入力を固定する（その時点の人事のデータ・勤怠・規則表のバージョンを写し取る）。</li>
         <li>全員を計算し、前回との差や異常値を確かめる。</li>
         <li>給与の担当が確定する（業務プロセス）。仕訳と明細ができる。</li>
         <li>振込ファイルを承認し、企業が銀行へ送る。支給日（例：25 日）に振り込まれる。</li>
@@ -263,7 +263,7 @@
 
   <section class="s" id="withholding">
     <h2>源泉所得税と年末調整</h2>
-    <p>会社は、給与を払うときに所得税を天引きして国に納めます（<a class="t" href="#g-withholding">源泉徴収</a>）。税額は、国税庁の<strong>源泉徴収税額表</strong>から引きます。表は毎年 1 月に改まりうるので、規則表として版で持ちます。</p>
+    <p>会社は、給与を払うときに所得税を天引きして国に納めます（<a class="t" href="#g-withholding">源泉徴収</a>）。税額は、国税庁の<strong>源泉徴収税額表</strong>から引きます。表は毎年 1 月に改まりうるので、規則表としてバージョンで持ちます。</p>
     <table>
       <tr><th>欄</th><th>使う人</th></tr>
       <tr><td><a class="t" href="#g-kou-otsu">甲欄</a></td><td><a class="t" href="#g-fuyou">扶養控除等申告書</a>を出した人（主たる勤め先）。扶養の数で税額が変わる</td></tr>
@@ -297,10 +297,10 @@
     <p>給与の誤りは、1 円でもエラーにならずに従業員の信頼と届出の誤りにつながります。そこで、給与の計算を<strong>入力から決まる純粋な関数</strong>にします。</p>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-snapshot">入力のスナップショット</a></h3><p>計算に使う事実を <code>known_at</code> で固定し、正規の JSON にしてハッシュを取る。計算は DB を読まない。</p></div>
-      <div class="card" data-frag><h3><a class="t" href="#g-rule-table">規則表</a>の版</h3><p>税額表・料率・等級表を、公的な資料から取り込み、2 人で照合して公開する。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-rule-table">規則表</a>のバージョン</h3><p>税額表・料率・等級表を、公的な資料から取り込み、2 人で照合して公開する。</p></div>
       <div class="card" data-frag><h3>お金は整数の円</h3><p><code>bigint</code> と固定小数点。丸めは「社会保険料の本人負担の丸め」のような、法令ごとに名前の付いた関数だけで行う。</p></div>
     </div>
-    <p>同じ入力・同じ規則表の版・同じエンジンの版で計算し直すと、1 円も違わない結果になります。確定した結果は書き換えず、後から分かった変更は次の給与の<a class="t" href="#g-retro">遡及</a>の差額の行で払います。正しさは<a class="t" href="#g-golden">ゴールデンデータセット</a>と、現行のシステムとの<a class="t" href="#g-parallel-run">並行稼働</a>で確かめます。</p>
+    <p>同じ入力・同じ規則表のバージョン・同じエンジンのバージョンで計算し直すと、1 円も違わない結果になります。確定した結果は書き換えず、後から分かった変更は次の給与の<a class="t" href="#g-retro">遡及</a>の差額の行で払います。正しさは<a class="t" href="#g-golden">ゴールデンデータセット</a>と、現行のシステムとの<a class="t" href="#g-parallel-run">並行稼働</a>で確かめます。</p>
     <div class="quiz" data-answer="1">
       <p class="q">エンジンを更新した後、確定済みの 4 月分を元の入力のまま計算し直したら、結果が 3 円違いました。遡及の処理はどうしますか？</p>
       <div class="opts">
@@ -333,7 +333,7 @@
 
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
-    <p>全部で 160 表と 22 の facet がありますが、核は次の数個です。facet は図では「現在の表」の名前で描かれ、実際には差分・版・現在の 3 つの表を持ちます。</p>
+    <p>全部で 160 表と 22 の facet がありますが、核は次の数個です。facet は図では「現在の表」の名前で描かれ、実際には差分・バージョン・現在の 3 つの表を持ちます。</p>
     <pre class="mermaid">erDiagram
   workers ||--o{ employments : "employed as"
   employments ||--o{ job_assignments : "has"
@@ -408,7 +408,7 @@
       <dt id="g-bitemporal">bitemporal</dt><dd>有効時間と記録時間の 2 つの時間の軸でデータを持つ方式。</dd>
       <dt id="g-effective">有効時間</dt><dd>現実の世界でその値が有効な期間。発令日や入社日で決まる。</dd>
       <dt id="g-known-at">記録時間</dt><dd>システムがその値を正しいと記録していた期間。問い合わせでは <code>known_at</code> で時点を指定する。</dd>
-      <dt id="g-facet">facet</dt><dd>一緒に変わる項目のまとまり（住所、職務、給与など）。有効日付の単位で、差分・版・現在の 3 つの表を持つ。</dd>
+      <dt id="g-facet">facet</dt><dd>一緒に変わる項目のまとまり（住所、職務、給与など）。有効日付の単位で、差分・バージョン・現在の 3 つの表を持つ。</dd>
       <dt id="g-delta">差分</dt><dd>「どの項目を、いつから、どの案件で変えたか」の記録。追記だけで、畳み込んで期間を作る。</dd>
       <dt id="g-rescind">取消（rescind）</dt><dd>完了した変更を「無かった」ことにする操作。記録は消さず、取消の印を付ける。</dd>
       <dt id="g-retro">遡及</dt><dd>過去の日付の変更が、確定済みの給与に影響すること。差額を次の給与で精算する。</dd>
@@ -432,7 +432,7 @@
       <dt id="g-zuiji">随時改定</dt><dd>固定的な賃金が変わり、等級が大きく変わるとき、年の途中で標準報酬月額を改めること。月額変更届を出す。</dd>
       <dt id="g-juminzei">特別徴収</dt><dd>住民税を、市区町村の通知に従って会社が給与から天引きして納めること。6 月から翌年 5 月まで。</dd>
       <dt id="g-snapshot">入力のスナップショット</dt><dd>給与の計算に使う事実を、ある時点の知識で固定して保存した文書。ハッシュで同一性を確かめる。</dd>
-      <dt id="g-rule-table">規則表</dt><dd>税額表・料率・等級表など、公的な資料から取り込んで版と適用の開始日で持つ表。</dd>
+      <dt id="g-rule-table">規則表</dt><dd>税額表・料率・等級表など、公的な資料から取り込んでバージョンと適用の開始日で持つ表。</dd>
       <dt id="g-golden">ゴールデンデータセット</dt><dd>合成の従業員と、社労士・税理士が確かめた期待値の組。CI で全件の一致を求める。</dd>
       <dt id="g-parallel-run">並行稼働</dt><dd>本番の切り替えの前に、現行のシステムと同じ月を並べて計算し、差異をすべて説明すること。</dd>
       <dt id="g-mynumber">マイナンバー</dt><dd>個人番号。番号法で、社会保障・税・災害対策の事務だけに使える 12 桁の番号。</dd>
@@ -452,7 +452,7 @@
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0002-effective-dated-data-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0003-business-process-engine.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0004-payroll-engine.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0005-security-and-my-number.md">0005</a> <span>— 有効日付、業務プロセス、給与、権限とマイナンバーの 4 本柱</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/object-model-and-effective-dating.md">object-model-and-effective-dating.md</a> <span>— 差分の畳み込み、変更・訂正・取消、時点の問い合わせ</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/core-hr.md">core-hr.md</a> <span>— 人・雇用・職務、組織、入社から退職</span></li>
-        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> <span>— 定義の版、ルーティング、委任、取消と訂正</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/business-process-engine.md">business-process-engine.md</a> <span>— 定義のバージョン、ルーティング、委任、取消と訂正</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/security-model.md">security-model.md</a> <span>— ドメイン、セキュリティグループ、職務分掌</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/time-and-attendance.md">time-and-attendance.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/absence-and-leave.md">absence-and-leave.md</a> <span>— 労働時間、36 協定、年休</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-engine.md">payroll-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/architecture/payroll-jp-rules.md">payroll-jp-rules.md</a> <span>— 実行の段、入力の固定、遡及、税と保険の規則</span></li>

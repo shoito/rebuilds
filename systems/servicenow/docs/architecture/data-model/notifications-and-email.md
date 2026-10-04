@@ -3,7 +3,7 @@
 [data-model.md](../data-model.md) の一部。通知の規則とテンプレート、通知（受け手 × 経路の 1 通）、利用者の通知の設定と Web Push の購読、送ったメール・参照の印・抑止のリスト、受けたメール・受信の規則・転送の元・別名・ドメインを定義する。振る舞い（通知の流れ、DT-MAIL-001〜005、ループの防止、流量の上限）は [notifications-and-email-ingest.md](../notifications-and-email-ingest.md) を正とする。受信のアドレス → テナント → セルの対応は制御の面の `inbound_address`（[security-and-operations.md](security-and-operations.md) の 3 節）。
 
 - **通知は `(event_id, rule, recipient, channel)` で 1 回だけ作る**（[ADR-0033](../../decisions/0033-notification-rules-and-outbound-email.md)）。**受けたメールは `(tenant_id, ses_message_id)` で 1 回だけ処理する**（[ADR-0034](../../decisions/0034-inbound-email-threading-and-sender-trust.md)）。
-- 組み込みの通知の規則とテンプレートはコードの版だけに持つ。テナントは `stable_key` で無効にし、自分の行で足す（[data-model.md](../data-model.md) の 3.1 節）。
+- 組み込みの通知の規則とテンプレートはコードのバージョンだけに持つ。テナントは `stable_key` で無効にし、自分の行で足す（[data-model.md](../data-model.md) の 3.1 節）。
 
 ## 1. ER 図
 
@@ -186,13 +186,13 @@ erDiagram
 | `recipient_email` | `text` | NULL | — | 外の宛先のとき。PII |
 | `channel` | `text` | NOT NULL | — | `email`・`push`・`in_app` |
 | `table_id`・`record_id` | `uuid` | NULL | — | |
-| `record_version` | `bigint` | NULL | — | 事象の時点の版（本文はこの版の値で作る） |
+| `record_version` | `bigint` | NULL | — | 事象の時点のバージョン（本文はこのバージョンの値で作る） |
 | `state` | `text` | NOT NULL | `'pending'` | `pending`・`sending`・`sent`・`failed`・`suppressed` |
 | `suppress_reason` | `text` | NULL | — | `no_read_access`・`address_suppressed`・`user_pref`・`auto_sender`・`rate_limited_digest` |
 | `attempts` | `smallint` | NOT NULL | `0` | |
 | `sent_at` | `timestamptz` | NULL | — | |
 | `read_at` | `timestamptz` | NULL | — | `in_app` の既読 |
-| `version` | `bigint` | NOT NULL | `1` | 状態を版の条件で進める |
+| `version` | `bigint` | NOT NULL | `1` | 状態をバージョンの条件で進める |
 
 - キー：PK `(tenant_id, id, event_at)`。UK `(tenant_id, event_id, rule_key, recipient_key, channel, event_at)`。
 - 索引：`(tenant_id, state, event_at) WHERE state IN ('pending','sending')` — 送信の再開（`sending` は 1 回だけ再送）。`(tenant_id, recipient_user_id, event_at DESC) WHERE channel = 'in_app'` — 画面の通知の一覧。

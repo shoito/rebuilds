@@ -143,11 +143,11 @@
 - `HashMap` の走査の順に結果を依存させない。ノードの集合は `NodeId` の順に並べてから処理する。
 - 増分の計算（9 節）と一からの計算で、同じ式を同じ順で当てる。
 
-### 6.3 版
+### 6.3 バージョン
 
-- 整形の部品（HarfRust、Skrifa、ICU4X のデータ）の版を固定する。上げるときは、参照ファイルのレイアウトの結果が変わらないことを CI で確かめる。変わるなら、ADR を書く（ADR-0020）。
+- 整形の部品（HarfRust、Skrifa、ICU4X のデータ）のバージョンを固定する。上げるときは、参照ファイルのレイアウトの結果が変わらないことを CI で確かめる。変わるなら、ADR を書く（ADR-0020）。
 - レイアウトの計算の規則を変えて、既存のファイルの結果が変わる変更はしない。新しい振る舞いは、新しいプロパティの値として足す（例：`primary_axis_align` に `space_around` を足す）。
-- クライアントとサーバーの版の食い違いは、接続時の版の照合（[ADR-0053](../decisions/0053-client-server-version-skew.md)）で防ぐ。レイアウトの結果を変える規則の変更は、文書のフラグ（`release.doc.*`。[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md)）でファイルごとに切り替え、同じファイルを開いた全員とサーバーが同じ規則で計算する（[delivery.md](delivery.md) の 6.3 節）。
+- クライアントとサーバーのバージョンの食い違いは、接続時のバージョンの照合（[ADR-0053](../decisions/0053-client-server-version-skew.md)）で防ぐ。レイアウトの結果を変える規則の変更は、文書のフラグ（`release.doc.*`。[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md)）でファイルごとに切り替え、同じファイルを開いた全員とサーバーが同じ規則で計算する（[delivery.md](delivery.md) の 6.3 節）。
 
 ### 6.4 フォントがないとき
 
@@ -285,7 +285,7 @@ CSS の flexbox に近いが、本家のデザインツールの意味に合わ�
 
 ### 13.3 性能
 
-- 12 節の場面を、CI のネイティブのベンチマークと、Chromium の headless（WASM）で測る。前の版より 20% 遅くなったら落とす（[rendering-engine.md](rendering-engine.md) の 16.3 節と同じ仕組み）。
+- 12 節の場面を、CI のネイティブのベンチマークと、Chromium の headless（WASM）で測る。前のバージョンより 20% 遅くなったら落とす（[rendering-engine.md](rendering-engine.md) の 16.3 節と同じ仕組み）。
 
 ## 14. ADR
 
@@ -357,7 +357,7 @@ E1・E3・E7・E8・E9・E11 には、この領域の Story はない。
 
 ### runbooks
 
-- `layout-divergence.md`：`layout_divergence` が出たとき、ブラウザ・OS・エンジンの版の組で絞り込み、該当のファイルのノードの ID から、決定性の破れ（6 節）か版の食い違いかを切り分ける手順。中身は見ない。
+- `layout-divergence.md`：`layout_divergence` が出たとき、ブラウザ・OS・エンジンのバージョンの組で絞り込み、該当のファイルのノードの ID から、決定性の破れ（6 節）かバージョンの食い違いかを切り分ける手順。中身は見ない。
 - `layout-engine-upgrade.md`：整形の部品や計算の規則を上げるときに、参照ファイルのダンプの差を確かめ、ADR を書き、サーバー → クライアントの順で出す手順（document-model の `schema-rollout.md` と一緒に）。
 
 ### data-model（索引への追加の提案）

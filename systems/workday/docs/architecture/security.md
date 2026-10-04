@@ -70,7 +70,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | --- | --- | --- | --- |
 | THR-010 | E | ID の書き換えで、範囲の外の従業員を読む（IDOR） | すべての読み取りで `can`・`scopeFilter`（[ADR-0017](../decisions/0017-authorization-evaluator.md)）。PROP-SEC-001 |
 | THR-011 | E | 自分の給与の変更を自分で承認する、委任を使って承認する | 起票者と本人の除外（[ADR-0014](../decisions/0014-bp-routing-and-delegation.md)）、職務分掌（[ADR-0019](../decisions/0019-segregation-of-duties-checks.md)） |
-| THR-012 | E | 権限の方針を 1 人で広げる | 方針の版と、別の人の有効化（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)） |
+| THR-012 | E | 権限の方針を 1 人で広げる | 方針のバージョンと、別の人の有効化（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)） |
 | THR-013 | I | `known_at` の問い合わせで、訂正で退いた誤りの値（誤って入れた他人の口座など）を見る | `audit` の権限を加えて要る（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)） |
 | THR-014 | I | レポートの集計から個人の給与を割り出す | 少人数の抑止（[ADR-0041](../decisions/0041-small-cell-suppression-for-sensitive-aggregates.md)） |
 | THR-015 | R | 給与の担当が、誰かの給与を見たことを否認する | 機微なドメインの閲覧の記録（[ADR-0020](../decisions/0020-sensitive-read-audit-and-access-explanations.md)）と連鎖（[ADR-0048](../decisions/0048-audit-log-hash-chain-and-anchoring.md)） |
@@ -84,7 +84,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | THR-021 | T | 給与の担当が、承認の後に振込ファイルをすり替える | 承認をファイルの SHA-256 に結ぶ（[ADR-0035](../decisions/0035-bank-transfer-files.md)）。取り出しは再認証、1 回限りの URL、記録 |
 | THR-022 | E | 架空の従業員を入社させて給与を振り込む | 入社の起票と振込先の承認の職務分掌（S7。警告を止めるに変えることを勧める）。新しい口座が既存の従業員の口座と同じなら警告（口座の HMAC で重複を検知） |
 | THR-023 | E | 自分の給与の個別の調整を入れて自分で確定する | 職務分掌 S1・S4（[security-model.md](security-model.md) の 5.1 節） |
-| THR-024 | T | 規則表（税額表・料率）を書き換えて、多くの人の控除を変える | 取り込みと独立の照合の 2 人、公開の後は書き換えない、訂正は新しい版と遡及（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)） |
+| THR-024 | T | 規則表（税額表・料率）を書き換えて、多くの人の控除を変える | 取り込みと独立の照合の 2 人、公開の後は書き換えない、訂正は新しいバージョンと遡及（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)） |
 | THR-025 | T | 給与の計算のエンジンの供給網の侵害（依存の改ざん） | 依存の固定、SBOM、イメージのダイジェストを結果に記録、ゴールデンデータセット、夜間の再現の抜き取り（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)、[delivery.md](delivery.md)） |
 
 ### 3.4 保管庫

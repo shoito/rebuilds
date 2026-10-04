@@ -5,7 +5,7 @@
 - **最初に walking skeleton を通す。** E1 で、論理シャード・ルーター・ブロックの表・トランザクションとページの `seq`・最小の Web 表示を端から端まで貫いてから、機能を広げる。木の不変条件（T1〜T8）と RLS は、E1 から本物の形で作る。後から足すと、壊れたデータを直す作業になるため。
 - **論理シャードは最初から 480。** 物理は 1 つのまま、ルーター・スキーマ・マイグレーションの群れを E1 で作る（[ADR-0003](decisions/0003-workspace-sharding.md)、[ADR-0027](decisions/0027-shard-router.md)、[ADR-0031](decisions/0031-migration-rollout-by-shard-groups.md)）。CI とローカルは 8 シャードで動かす。
 - **権限を先に固める。** E2 で判定関数 `can()`・決定表・`acl_version` を作り、以後の Epic の中身を返す経路は、すべてこれを通す。経路を足す変更は、[quality.md](quality.md) の漏洩の行列に行を足す。
-- **契約を先に固定する。** トランザクションの操作の形、WebSocket のイベント、リッチテキストのスパン（[ADR-0006](decisions/0006-rich-text-as-normalized-spans.md)）、公開 API の形と版（[ADR-0024](decisions/0024-integration-access-model.md)）は、人間がレビューして確定する。エージェントは勝手に変えない。
+- **契約を先に固定する。** トランザクションの操作の形、WebSocket のイベント、リッチテキストのスパン（[ADR-0006](decisions/0006-rich-text-as-normalized-spans.md)）、公開 API の形とバージョン（[ADR-0024](decisions/0024-integration-access-model.md)）は、人間がレビューして確定する。エージェントは勝手に変えない。
 - **PoC を先に行う。** E3 の前にエディタの計測（ADR-0007）、E4 の前に OPFS の各ブラウザでの確認（ADR-0008・0013）を行い、結果で設計を見直してから Story に入る。
 - **1 変更 1 PR を目安に、差分を小さくする。** 並列に動くエージェントどうしが同じファイルを触らないよう、パッケージの境界（`packages/ops`、`packages/rich-text`、`packages/text-crdt`、`packages/shard-router`）で変更を切る。
 
@@ -21,7 +21,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E4 共同編集とオフライン | Relay と Sync Gateway、テキストの CRDT、構造とプロパティの規則、在席、端末の SQLite、オフライン、デスクトップアプリ | 未着手（OPFS の PoC が前提） |
 | E5 データベース | データソースとプロパティ、問い合わせの索引、ビュー、フィルタ・並べ替え・グループ、リレーション、ロールアップ、数式 | 未着手 |
 | E6 検索・コメント・通知 | OpenSearch の検索と権限キー、クイック検索、コメントとディスカッション、メンションの通知、リマインダー、受信箱、メール・push、ページの更新 | 未着手 |
-| E7 API・連携・MCP | 公開 API と版、連携とトークン、Webhook、リモートの MCP サーバー、インポートとエクスポート | 未着手 |
+| E7 API・連携・MCP | 公開 API とバージョン、連携とトークン、Webhook、リモートの MCP サーバー、インポートとエクスポート | 未着手 |
 | E8 本番運用 | 負荷試験、SLO とアラート、災害復旧と訓練、削除の 3 段、濫用対策、セキュリティの試験、runbook | 未着手 |
 | E9 S2 への拡張 | 物理クラスタの分割（再シャーディング）、`global` の分離、Valkey の sharded pub/sub、検索のドメインの分割、CDC のデータレイク | 未着手（[infrastructure.md](architecture/infrastructure.md) の 12 節の基準を満たしたら） |
 | E10 企業向け機能 | SAML SSO、SCIM、監査ログの閲覧と出力、メンバーの管理者、ワークスペースの方針、ゴミ箱の保持期間の変更、管理者の内容の検索（監査付き）、無効化したメンバーのページの移し替え、制限付きメンバー | 未着手（MVP の後。intent.md の Non-goals） |
@@ -151,7 +151,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `public-api-foundation` | `api.<domain>` のサービス、`<Brand>-Version` と版の変換層、エラーの形（[api-and-integrations.md](architecture/api-and-integrations.md) の 2・4 節、[ADR-0024](decisions/0024-integration-access-model.md)） |
+| `public-api-foundation` | `api.<domain>` のサービス、`<Brand>-Version` とバージョンの変換層、エラーの形（[api-and-integrations.md](architecture/api-and-integrations.md) の 2・4 節、[ADR-0024](decisions/0024-integration-access-model.md)） |
 | `internal-integrations-and-tokens` | 内部の連携、`<brand>_int_` のトークン、能力、`bot:` の共有（同じ文書の 3 節） |
 | `pages-and-blocks-api` | ページ・ブロック・子・移動・Markdown の API、`Idempotency-Key`（同じ文書の 4.2 節） |
 | `databases-and-data-sources-api` | データベース・データソース・問い合わせ（同じ文書の 4.2 節） |
@@ -217,7 +217,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ## エージェントに任せないこと
 
-- **契約（トランザクションの操作、WebSocket のイベント、スパンの形、公開 API と版、MCP のツール）の確定**：後から変えるコストがいちばん高い。
+- **契約（トランザクションの操作、WebSocket のイベント、スパンの形、公開 API とバージョン、MCP のツール）の確定**：後から変えるコストがいちばん高い。
 - **権限の決定表と漏洩の行列の最終確認**：テストが通っていても、ケースの漏れはエージェント自身では気づきにくい。
 - **CRDT と衝突の規則の変更**：収束の性質が通っても、利用者の意図に合うかは人が判断する。
 - **再シャーディングの切り替えの実行と判断**：runbook に従い Ops が行う。

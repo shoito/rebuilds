@@ -342,25 +342,25 @@ Worker が毎時、終わった開催を `instance_id` ごとに 1 回だけ集�
 - 保持：期限から 1 年（既定案）。
 - S1 の規模：数千行。
 
-## 6. クライアントの版
+## 6. クライアントのバージョン
 
 ### client_releases（global）
 
-デスクトップ・モバイルのアプリの版と配布の状態、最低の版（MVP の後）。Web の版と最低の版は AppConfig の `client-config`。
+デスクトップ・モバイルのアプリのバージョンと配布の状態、最低のバージョン（MVP の後）。Web のバージョンと最低のバージョンは AppConfig の `client-config`。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `platform` | `text` | NO | | `desktop_mac` / `desktop_win` / `ios` / `android` |
 | `version` | `text` | NO | | セマンティックバージョン |
-| `signaling_protocol` | `smallint` | NO | | 対応するシグナリングの版（N−2 の判定） |
+| `signaling_protocol` | `smallint` | NO | | 対応するシグナリングのバージョン（N−2 の判定） |
 | `rollout_status` | `text` | NO | `'staged'` | `staged` / `rolling` / `complete` / `halted` / `withdrawn` |
 | `rollout_pct` | `smallint` | NO | `0` | 0〜100 |
-| `is_min_supported` | `boolean` | NO | `false` | これより古い版は参加の前と `hello` で `upgrade_required`（`min_client_version`） |
+| `is_min_supported` | `boolean` | NO | `false` | これより古いバージョンは参加の前と `hello` で `upgrade_required`（`min_client_version`） |
 | `released_at` | `timestamptz` | YES | | |
 | `created_at` | `timestamptz` | NO | `now()` | |
 
 - 主キー：`(platform, version)`。
-- 一意：`UNIQUE (platform) WHERE is_min_supported`（プラットフォームごとに最低の版は 1 つ）。
+- 一意：`UNIQUE (platform) WHERE is_min_supported`（プラットフォームごとに最低のバージョンは 1 つ）。
 - CHECK：`rollout_pct BETWEEN 0 AND 100`。
 - 書く主体：リリースの CI（[delivery.md](../delivery.md)）。API と Gateway は起動時と 60 秒ごとに読んでメモリに持つ。
 - S1 の規模：数百行。

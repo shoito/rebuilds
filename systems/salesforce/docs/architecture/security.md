@@ -191,7 +191,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
  └─（log-archive アカウント）audit-archive … 監査の外部の保管の DEK を包む
        │
        ▼
- org_keys（組織 × 用途 × 版）の包んだ DEK
+ org_keys（組織 × 用途 × バージョン）の包んだ DEK
        │ AES-256-GCM、AAD = org_id ‖ purpose ‖ 対象の ID
        ▼
  S3 の組織のファイル（一括・レポート・エクスポート・添付・監査の保管）
@@ -199,7 +199,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
 ```
 
 - KMS の顧客管理の鍵は、アカウントとリージョンごとに既定で 100,000 まで（引き上げを申請できる。[AWS KMS resource quotas](https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html)、2026-09-28 に確認）。S3 の 50 万の組織に鍵を 1 つずつ持つと足りない。組織の単位は DEK で持つ。
-- DEK は 1 年ごとに新しい版を作る。平文の DEK はプロセスの中に 5 分だけ置く。
+- DEK は 1 年ごとに新しいバージョンを作る。平文の DEK はプロセスの中に 5 分だけ置く。
 - S3 のバケットは、組織の接頭辞ごとに DEK で暗号化したオブジェクトを置き、S3 の保存時の暗号化（SSE-KMS、`s3-org` とは別の鍵）も重ねる。
 
 ### 5.2 何を暗号化するか
@@ -271,7 +271,7 @@ AWS KMS（セルごと、マルチリージョンの鍵で大阪へ）
 4. S3 の組織の接頭辞を消す（バージョンを含む）
 5. Valkey の組織の鍵を消す
 6. Sandbox の組織を同じ順で消す
-7. 全ての org_keys の wrapped_dek を消し、destroyed_at を残す（監査の外部の保管と、S3 に残りうる版は読めなくなる）
+7. 全ての org_keys の wrapped_dek を消し、destroyed_at を残す（監査の外部の保管と、S3 に残りうるバージョンは読めなくなる）
 8. org_purge_log に組織の ID のハッシュと日時を残す
   ▼ 35 日の後
 Aurora のバックアップの期限で、バックアップの中の行も消える

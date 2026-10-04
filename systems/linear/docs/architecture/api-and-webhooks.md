@@ -108,7 +108,7 @@ query {
 ```
  mutation { issueUpdate(id: "…", input: { priority: 1, stateId: "…" }) { success lastSyncId issue { id priority } } }
    │ Public API：入力の検証（Zod、生成した型）→ 範囲の確かめ（3.5 節）
-   │ トランザクションを作る：{ id: client_tx_id, fv: 今の版, base: reader の last_sync_id, ops: [set priority, set state_id] }
+   │ トランザクションを作る：{ id: client_tx_id, fv: 今のバージョン, base: reader の last_sync_id, ops: [set priority, set state_id] }
    ▼
  Writer（origin = api、actor = 主体の User）── 5.3 節の決定表で検証、derive、sync_actions
    ▼
@@ -156,9 +156,9 @@ query {
 - 要求全体の失敗は HTTP の状態で返す：認証なし・無効 `401`、流量 `429`（4 節）、構文・検証・複雑さの超過 `400`、サーバーの失敗 `500`、Writer の一時の停止 `503`。
 - `message` に値（タイトルなど）を入れない。モデルとフィールドの名前だけ（[sync-engine.md](sync-engine.md) の 5.3 節と同じ）。
 
-### 3.7 版と廃止
+### 3.7 バージョンと廃止
 
-- URL にも ヘッダーにも版を持たない。足すだけの変更を続け、壊す変更は次の順で行う。
+- URL にも ヘッダーにもバージョンを持たない。足すだけの変更を続け、壊す変更は次の順で行う。
   1. 新しいフィールドを足し、古いものに `@deprecated(reason: "…")` を付ける。変更の記録（changelog）に書く。
   2. 古いフィールドの利用を、主体（アプリ・キー）ごとに数える（メトリクス。値は数だけ）。
   3. 告知から 6 か月後、利用が 0 か、利用している主体の管理者に 2 回知らせた後に消す。

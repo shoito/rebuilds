@@ -38,7 +38,7 @@ date: 2026-09-28
 
 1 と a を採用する。詳細は [data-model-and-schema.md](../architecture/data-model-and-schema.md) の 5 節。
 
-- ID はすべて UUIDv7。Writer は版と変種を確かめ、時刻が 1 日以上先のものを拒否する。過去の側は制限しない。
+- ID はすべて UUIDv7。Writer はバージョンと変種を確かめ、時刻が 1 日以上先のものを拒否する。過去の側は制限しない。
 - チームの識別子は `^[A-Z][A-Z0-9]{0,6}$`、ワークスペースの中で一意（大文字・小文字を区別しない）。変えたら古い識別子を `team_key_aliases` に残し、他のチームに使わせない。
 - 番号は `teams.next_issue_number` から Writer が `create` の適用の時に振る。`server_only`。ワークスペースの行のロックの中なので、番号の順は確定の順である。番号は再利用しない。
 - クライアントは ack の `server_ops` で番号を受ける。それまでは `ENG-…` と示し、URL は ID の形（`/issue/<uuid>`）で開ける。

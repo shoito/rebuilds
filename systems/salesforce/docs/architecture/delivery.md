@@ -71,7 +71,7 @@ merge queue（夜間の重い組の結果も必須）─▶ squash で main へ
 | **上限の登録簿と設計の記録の一致** | 2.3 節 | 食い違い |
 | **漏えいの経路** | [security.md](security.md) の 4 節の全ての `LEAK-*` のテストの ID が参照され、通る | 参照のない行、失敗 |
 | 要件の追跡 | `specs/` と `changes/` の全ての `REQ-*`・`PROP-*`・`DT-*` がテストから参照される（[process.md](../../../../docs/process.md) の 7 節） | 参照のない ID |
-| API の契約 | OpenAPI の前の版と比べて壊す変更がない（[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)） | 壊す変更 |
+| API の契約 | OpenAPI の前のバージョンと比べて壊す変更がない（[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)） | 壊す変更 |
 | メタデータの形式 | パッケージの JSON Schema、書き出しの正規化の往復（[ADR-0039](../decisions/0039-metadata-package-format.md)） | 失敗 |
 | 日本語の検索の評価 | 生成したコーパスで再現率・適合率（[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)） | 2 ポイント以上の悪化 |
 | アクセシビリティ | axe の重大な違反（[ui-layouts-and-list-views.md](ui-layouts-and-list-views.md)） | 1 件 |
@@ -141,7 +141,7 @@ merge queue（夜間の重い組の結果も必須）─▶ squash で main へ
 - ECS のサービスは、1 AZ ずつのローリングで入れ替える（`runtime` は blue/green。ALB のターゲットグループで切り替え、悪化で戻す）。
 - デプロイの順：マイグレーション（expand）→ `worker`・`relay`・`indexer` → `metadata`・`bulk` → `runtime`。
 - マイグレーションは expand → 移行 → contract の 3 回に分ける。contract は 1 つ前のリリースで参照をやめてから行う。分割の表（約 3,300）への `ALTER` は、根の表に行い、ロックの時間を staging で測る。
-- **メタデータのコンパイル済みの部品の形を変える時は、部品の鍵に形の版を含める。** 新旧のタスクが同時に動いても、互いの部品を読み違えない（[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md)）。
+- **メタデータのコンパイル済みの部品の形を変える時は、部品の鍵に形のバージョンを含める。** 新旧のタスクが同時に動いても、互いの部品を読み違えない（[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md)）。
 - カーソルの形・監査の `details` のスキーマ・パッケージの形式を変える時は、新旧の両方を読めるコードを先に出す。
 - デプロイできる時間帯：平日 10〜17 時。月末・四半期末の営業の締め（月末の 3 営業日）は、修正だけ。
 
@@ -196,7 +196,7 @@ merge queue（夜間の重い組の結果も必須）─▶ squash で main へ
 | E1 | AppConfig のフラグ（組織の ID での評価、段、ガード） |
 | E1 | 夜間の CI（性質 10 万通り、障害の注入）と merge queue の必須の検査 |
 | E4 | 影の実行（標本、reader での実行、比べ、評価器での判定） |
-| E12 | デプロイの手順の訓練（ロールバック、部品の形の版） |
+| E12 | デプロイの手順の訓練（ロールバック、部品の形のバージョン） |
 
 ## 9. 未解決の問い
 

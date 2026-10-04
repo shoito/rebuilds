@@ -39,4 +39,4 @@ date: 2026-10-04
 ## Confirmation
 
 - CI：一覧の画面に触れる PR で、固定の端末の落ちたフレームを測り、基準を超えたら失敗。
-- 本番：RUM の `client.scroll_dropped_frames` を版・機種の帯ごとに見る。
+- 本番：RUM の `client.scroll_dropped_frames` をバージョン・機種の帯ごとに見る。

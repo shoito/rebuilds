@@ -151,7 +151,7 @@ erDiagram
   - `(org_id) INCLUDE (bytes) WHERE status IN ('processing', 'completed', 'trashed')`：組織の保存の容量（開始の判定の 4 行目）。
 - 書く主体：Actor（作成・`recording` の間。2.10 節の形）、Worker（`processing` 以降、成果物の登録、期限、ごみ箱、削除）、API（主催者・管理者のごみ箱・戻す・保全）。
 - 状態の遷移と outbox：`completed` への更新と同じトランザクションで `recording.completed` を outbox に書く（Webhook と通知）。
-- 削除：ごみ箱（30 日）の後、S3 の `final/`・`transcripts/` の実体（版を含む）と、この行と子の行を消し、`recording_deletions` に記録する。
+- 削除：ごみ箱（30 日）の後、S3 の `final/`・`transcripts/` の実体（バージョンを含む）と、この行と子の行を消し、`recording_deletions` に記録する。
 - 保持：組織の設定（既定 365 日）＋ごみ箱 30 日（[security.md](../security.md) の 9 節）。L6・L8 で見直す。
 - S1 の規模：開催の 10% として 1 日約 4,000 行、1 年で約 150 万行。
 
@@ -268,7 +268,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `org_id`、`instance_id`、`participant_id` | `uuid` | NO | | |
 | `kind` | `text` | NO | | `recording` / `transcription` |
-| `notice_version` | `text` | NO | | 表示した文言（音声の案内を含む）の版 |
+| `notice_version` | `text` | NO | | 表示した文言（音声の案内を含む）のバージョン |
 | `method` | `text` | NO | | `ui`（同意の画面）/ `dtmf`（電話の 1）/ `start_action`（録画を始めた本人） |
 | `consented_at` | `timestamptz` | NO | `now()` | |
 

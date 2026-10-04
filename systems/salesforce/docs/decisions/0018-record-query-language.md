@@ -16,7 +16,7 @@ date: 2026-09-28
 - 文字列の比べ方。日本語では全角・半角の英数字が混ざる。
 - 集計の範囲と、トランザクションの上限との関係。
 
-本家（2026-09-28 に確認）：文は 100,000 文字、`WHERE` の文字列は 4,000 文字、子から親へ 55 の関係・1 本 5 段、親から子へ 20 の関係（API の版 58.0 以降は 5 段）、`OFFSET` は 2,000、`ORDER BY` がなければ順は保証しない（[SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)、[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)）。
+本家（2026-09-28 に確認）：文は 100,000 文字、`WHERE` の文字列は 4,000 文字、子から親へ 55 の関係・1 本 5 段、親から子へ 20 の関係（API のバージョン 58.0 以降は 5 段）、`OFFSET` は 2,000、`ORDER BY` がなければ順は保証しない（[SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)、[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)）。
 
 ## Options
 

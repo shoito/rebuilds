@@ -39,7 +39,7 @@
    学習（SageMaker の学習ジョブ、Step Functions）             eta-service（Go、モデルを内蔵）／ demand-batch（毎 5 分）
              │                                                              │ 使った特徴量と予測を記録
              ▼                                                              ▼
-   モデルの登録（SageMaker Model Registry）── 版を AppConfig で配る ──▶ 配信の記録 S3 `feature-logs/`
+   モデルの登録（SageMaker Model Registry）── バージョンを AppConfig で配る ──▶ 配信の記録 S3 `feature-logs/`
 ```
 
 - 推論は、ETA の補正を `eta-service` の中で行い、需要の予測はバッチで行う。オンラインの推論のサービス（別のプロセス）は、S2 では作らない。
@@ -58,10 +58,10 @@ eta = route_time + pickup_overhead(point_type) + bias(district_cell, hour_of_wee
 | --- | --- |
 | 予測するもの | 迎車の実際の時間 − (`route_time` ＋ `pickup_overhead`)。実際の時間の定義は [eta-and-routing.md](eta-and-routing.md) の 6 節と同じ |
 | 学習のデータ | NFR-003 の対象の乗車（受諾から到着まで）。直近 8 週 |
-| 特徴量 | `route_time`、経路の距離、右左折の回数（Valhalla の応答）、ドライバーの位置と乗車地の `block` のセル、1 週の中の 5 分の区切り、祝日の印、乗車地の種類、タイルの版、セルの直近 30 分の残差の中央値（ほぼ即時）、セルの空車の台数（`supply-heat`）、ドライバーの直近 7 日の残差の中央値（HMAC の ID で集計） |
+| 特徴量 | `route_time`、経路の距離、右左折の回数（Valhalla の応答）、ドライバーの位置と乗車地の `block` のセル、1 週の中の 5 分の区切り、祝日の印、乗車地の種類、タイルのバージョン、セルの直近 30 分の残差の中央値（ほぼ即時）、セルの空車の台数（`supply-heat`）、ドライバーの直近 7 日の残差の中央値（HMAC の ID で集計） |
 | モデル | LightGBM。損失は Huber（遅れと早すぎを分けて評価する。本家の DeepETA と同じ考え方）。出力は ±300 秒に切り詰める |
 | 評価 | NFR-003 の指標（`|e|` の中央値と p90）、偏りの符号、迎車の距離の帯と時間帯ごと。偏りの表（S1）と比べる |
-| 推論の場所 | `eta-service` の中。純粋な Go の LightGBM の評価器（候補：[dmitryikh/leaves](https://github.com/dmitryikh/leaves)。対応の版と速さは **未検証**）で、モデルの JSON を読み込む |
+| 推論の場所 | `eta-service` の中。純粋な Go の LightGBM の評価器（候補：[dmitryikh/leaves](https://github.com/dmitryikh/leaves)。対応のバージョンと速さは **未検証**）で、モデルの JSON を読み込む |
 | 予算 | 1 回の評価 p99 0.5 ms、特徴量の取得（Valkey の 1 回の `MGET`）p99 2 ms。配車の行列（1 回 10 組）でも ETA の期限（400 ms）を食わない |
 | 代わり | 特徴量が取れない・古い（`computed_at` が 60 分より前）・モデルの読み込みの失敗では、S1 の偏りの表を使い、応答に `eta_source=bias_table` を付ける |
 
@@ -109,15 +109,15 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 
 ### 5.3 配信の記録
 
-- `eta-service` と `demand-batch` は、予測ごとに、使った特徴量の値、モデルの版、予測の値を `feature-logs/`（S3、Firehose）に書く。ETA は 1% を抽出し、NFR-003 の対象の乗車（受諾の時点の ETA）は全件書く。
+- `eta-service` と `demand-batch` は、予測ごとに、使った特徴量の値、モデルのバージョン、予測の値を `feature-logs/`（S3、Firehose）に書く。ETA は 1% を抽出し、NFR-003 の対象の乗車（受諾の時点の ETA）は全件書く。
 - **次の学習は、この記録の特徴量で行う**（最初のモデルだけは 5.2 節の時点を合わせた結合で作る）。配信の時の値そのもので学習するので、学習と配信の食い違いが入らない。
 - 毎日、記録の特徴量と、オフラインのストアの同じ鍵・同じ時刻の値の分布を比べ、PSI が 0.2 を超えた特徴量を知らせる（食い違いの監視）。
 
 ## 6. 学習と登録
 
 - 学習は Step Functions で、データの取り出し → 学習（SageMaker の学習ジョブ）→ オフラインの評価 → 登録の順に、ETA は週 1 回、需要は毎日動かす。
-- 同じデータの版・同じ設定・同じ種から、同じモデルができるようにする（配車と同じく再現できること。[AGENTS.md](../../AGENTS.md)）。学習のデータの版（Iceberg のスナップショットの ID）をモデルの登録に残す。
-- モデルの登録には、データの版、特徴量の定義の版、評価の結果、影の実行の結果、承認者を残す。本番に出す承認は人が行う（エージェントは評価の報告を作るまで）。
+- 同じデータのバージョン・同じ設定・同じ種から、同じモデルができるようにする（配車と同じく再現できること。[AGENTS.md](../../AGENTS.md)）。学習のデータのバージョン（Iceberg のスナップショットの ID）をモデルの登録に残す。
+- モデルの登録には、データのバージョン、特徴量の定義のバージョン、評価の結果、影の実行の結果、承認者を残す。本番に出す承認は人が行う（エージェントは評価の報告を作るまで）。
 
 ## 7. 展開（影の実行）
 
@@ -129,7 +129,7 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 | 4. 区域の段階の展開 | AppConfig のフラグで、区域の 10% → 50% → 100%、各 2 日以上 | 区域ごとの NFR-003 の指標が今より悪くならない |
 | 自動の戻し | 段 4 の間に、1 時間の窓で `|e|` の中央値が 10% 以上悪くなるか、`eta_source=bias_table` の割合が 5% を超えたら、フラグを前のモデルに戻す | — |
 
-- ETA の応答と、配車の判断の記録（`DispatchBatchRecord`）に、モデルの版を残す。再生で同じ判断を再現するため。
+- ETA の応答と、配車の判断の記録（`DispatchBatchRecord`）に、モデルのバージョンを残す。再生で同じ判断を再現するため。
 - 需要の予測は、使い道が表示だけなので、段 1 と段 2（7 日の影の記録で WAPE を比べる）だけで出してよい。
 
 ## 8. 失敗のしかた
@@ -137,7 +137,7 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 | 失敗 | 起きること | 抑え方 |
 | --- | --- | --- |
 | オンラインの特徴量が古い・欠ける（Flink の停止、Valkey の障害） | 補正が誤る | `freshness_sla` を過ぎた特徴量は使わず、偏りの表に落ちる |
-| モデルのファイルが壊れている・読めない | 補正ができない | 読み込みの時に検査の入力で予測を確かめてから切り替える。失敗なら前の版のまま |
+| モデルのファイルが壊れている・読めない | 補正ができない | 読み込みの時に検査の入力で予測を確かめてから切り替える。失敗なら前のバージョンのまま |
 | 学習のデータの偏り（障害の日、大きな催し） | モデルが悪くなる | 障害の時間帯を学習から除く印（運用が登録）。段 1〜3 で止まる |
 | 世の中の変化（道路の工事、新しい駅） | 残差が系統的にずれる | 毎日の偏りの監視。S1 の偏りの表も毎日作り直して、比べる基準に残す |
 | 需要の予測の外れ | 表示の地図が外れる | 表示だけなので、配車と運賃には影響しない |
@@ -154,7 +154,7 @@ pii: none                    # none | pseudonymous（HMAC の ID）。raw の位
 
 - **PROP-ML-001（時点の結合）**：任意の特徴量とラベルの列で、学習のデータに入る特徴量の `computed_at` は、ラベルの時刻より前。
 - **PROP-ML-002（代わりの経路）**：特徴量の欠け・古さ・モデルの読み込みの失敗を任意に注入しても、`eta-service` は期限の中で値を返し、`eta_source` が正しい。
-- **PROP-ML-003（再現）**：同じデータの版・設定・種から、同じモデルのファイル（ハッシュ）ができる。
+- **PROP-ML-003（再現）**：同じデータのバージョン・設定・種から、同じモデルのファイル（ハッシュ）ができる。
 - **PROP-ML-004（Go の評価器の一致）**：無作為の入力 10 万件で、Go の評価器と LightGBM の Python の予測の差が 1e-6 秒以下。
 - 特徴量の定義の検査：`entity` と `pii` の規則、`freshness_sla` と `online_ttl` の関係。
 - 負荷：`eta-service` に補正を入れた状態で、配車の行列の p99 が ETA の期限（400 ms）の予算を崩さない。
@@ -170,7 +170,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | E13 | `feature-pipelines` | バッチと Flink のパイプライン、両方への書き込み（5.2 節、PROP-ML-001） |
 | E13 | `feature-logging-and-skew` | 配信の記録と PSI の監視（5.3 節） |
 | E13 | `eta-residual-model` | 4.1 節のモデル、評価、Go の評価器（PROP-ML-004） |
-| E13 | `eta-model-serving` | `eta-service` への組み込み、代わりの経路、版の記録（PROP-ML-002） |
+| E13 | `eta-model-serving` | `eta-service` への組み込み、代わりの経路、バージョンの記録（PROP-ML-002） |
 | E13 | `eta-model-shadow-rollout` | 7 節の段と自動の戻し（配車の再生・シミュレーションと一緒に） |
 | E13 | `demand-forecast-block` | 4.2 節のモデルとバッチ |
 | E13 | `operator-demand-map` | 事業者の管理画面の需要の地図（5 未満のまとめ） |
@@ -196,7 +196,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | --- | --- |
 | S1 で NFR-003 に届くか（前倒しの判断） | S1 の運用の 4 週の計測 |
 | SageMaker と Managed Service for Apache Flink の費用と運用 | S2 の着手の前に試算 |
-| 純粋な Go の LightGBM の評価器の対応の版と速さ | 前倒しを決めたら最初に PoC |
+| 純粋な Go の LightGBM の評価器の対応のバージョンと速さ | 前倒しを決めたら最初に PoC |
 | 天気・催しの外部のデータの利用の条件 | 需要の予測の着手の前に確かめる |
 | 深層学習（DeepETA の形）に移るか | 勾配ブースティングで NFR-003 の目標を下げる余地がなくなったら |
 | 需要の予測を配車（空車の誘導、コスト）に使うか | 別の ADR で。再生とシミュレーションの結果を添える |
@@ -207,7 +207,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 
 ### quality.md
 
-- ETA のモデルの版ごとの NFR-003 の指標（`|e|` の中央値・p90、偏り）と、偏りの表との差。
+- ETA のモデルのバージョンごとの NFR-003 の指標（`|e|` の中央値・p90、偏り）と、偏りの表との差。
 - `eta_source` の内訳（`model`・`bias_table`・`fallback`）の割合。
 - 特徴量の鮮度（`computed_at` の遅れ）の p95、`freshness_sla` を過ぎた割合。
 - 配信の記録とオフラインのストアの PSI（特徴量ごと）。
@@ -216,7 +216,7 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 
 ### runbooks
 
-- `eta-model-rollback.md`：ETA のモデルを前の版か偏りの表に戻す手順（AppConfig のフラグ）と、戻した後の確かめ。
+- `eta-model-rollback.md`：ETA のモデルを前のバージョンか偏りの表に戻す手順（AppConfig のフラグ）と、戻した後の確かめ。
 - `feature-pipeline-stale.md`：Flink やバッチが止まり特徴量が古くなったときの確かめ方と、再開・埋め戻し。
 - `feature-skew-alert.md`：PSI の警告のときの切り分け（定義の変更、元のデータの変化、パイプラインの誤り）。
 - `ml-training-failure.md`：学習の失敗・評価の不合格のときの確かめ方（前のモデルのまま動くことの確認）。
@@ -230,5 +230,5 @@ S2 以降の Story で、Epic は E13（機械学習。[roadmap.md](../roadmap.m
 | Valkey `feat:{group}:{key}`（値、`computed_at`、TTL） | オンラインのストア。正本ではない |
 | S3 `feature-logs/`（Parquet：`request_id`、`model_version`、特徴量、予測、`eta_source`） | 5.3 節。90 日（既定。法務の確認待ち（L4）。[security.md](security.md) の 7.2 節） |
 | Valkey `demand:{city}:{block_cell}`、S3 `demand-forecasts/` | 4.2 節 |
-| SageMaker Model Registry（モデルの版、データの版、特徴量の定義の版、評価、承認者） | 6 節 |
-| AppConfig `eta_model`（区域ごとのモデルの版と割合） | 7 節 |
+| SageMaker Model Registry（モデルのバージョン、データのバージョン、特徴量の定義のバージョン、評価、承認者） | 6 節 |
+| AppConfig `eta_model`（区域ごとのモデルのバージョンと割合） | 7 節 |

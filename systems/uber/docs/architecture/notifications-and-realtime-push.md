@@ -2,7 +2,7 @@
 
 乗客とドライバーのアプリへの配信。アプリとの常時の接続、ストリームごとの順序と送り直し、オファーの配信の速さ、車の位置の配信、APNs・FCM のプッシュ通知、SMS（ワンタイムコードと代わりの知らせ）を決める。
 
-前提となる決定は、乗車の事象は outbox から少なくとも 1 回配り、購読する側が版で古い事象を捨てること（[ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)）、オファーは受け取ってから 5 秒で受信の確認がなければ取り下げること（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、位置の上りは HTTPS で常時の接続と分けること（[ADR-0009](../decisions/0009-location-upload-and-validation.md)）、Go のサービスを増やすには ADR が要ること（[ADR-0001](../decisions/0001-platform-and-stack.md)）、NFR-008（状態の配信 p95 2 秒、車の位置の表示の遅れ p95 6 秒）。この文書で決めたことは次の ADR にある。
+前提となる決定は、乗車の事象は outbox から少なくとも 1 回配り、購読する側がバージョンで古い事象を捨てること（[ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)）、オファーは受け取ってから 5 秒で受信の確認がなければ取り下げること（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、位置の上りは HTTPS で常時の接続と分けること（[ADR-0009](../decisions/0009-location-upload-and-validation.md)）、Go のサービスを増やすには ADR が要ること（[ADR-0001](../decisions/0001-platform-and-stack.md)）、NFR-008（状態の配信 p95 2 秒、車の位置の表示の遅れ p95 6 秒）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -143,7 +143,7 @@ message Envelope {
 - アプリは、`Envelope` を reducer に渡して保存した後、`Ack(seq)` を返す。確認は累積（`seq` 以下をすべて受け取った）。
 - `rt-gateway` は、接続ごとに未確認の窓（最大 64 件）を持ち、2 秒で確認がなければ同じ接続で 1 回送り直す。再接続では、`resume_after_seq` の次から Stream を読み直して送る。
 - アプリは、`seq` が今までの最大以下なら捨てる（重複）。`seq` が飛んだら（`最大 + 1` でない）、`Ready` の後に `GET /v1/me/stream?after_seq=N` で取り直す。Stream に残っていなければ、API で全体を読み直す。
-- **事象の版**：`TripStateChanged` は `trip_version` を持つ。`seq` の順と `trip_version` の順が入れ替わることがある（outbox の配信は順序を保証しない）。アプリは `trip_version` の大きいものだけを採る（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 5.1 節）。
+- **事象のバージョン**：`TripStateChanged` は `trip_version` を持つ。`seq` の順と `trip_version` の順が入れ替わることがある（outbox の配信は順序を保証しない）。アプリは `trip_version` の大きいものだけを採る（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 5.1 節）。
 
 ### 4.3 優先度と TTL
 
@@ -381,7 +381,7 @@ ADR-0015：Trips がオファーを作ってから 5 秒で `OfferDelivered` が
 
 ### runbooks
 
-- `offer-delivery-degraded.md`：取り下げの率が上がったときの切り分け（中継、SNS・SQS、`rt-router`、`rt-gateway`、携帯の網、アプリの版）と、プッシュの経路への切り替えの確かめ。
+- `offer-delivery-degraded.md`：取り下げの率が上がったときの切り分け（中継、SNS・SQS、`rt-router`、`rt-gateway`、携帯の網、アプリのバージョン）と、プッシュの経路への切り替えの確かめ。
 - `realtime-reconnect-storm.md`：再接続の殺到のときの `Hello` の流量の制限と、`rt-gateway` の増やし方。
 - `valkey-realtime-failover.md`：Stream を失ったときの確かめ方（`resync_required` の急増は正常な振る舞い）。
 - `push-provider-outage.md`：APNs・FCM の障害のときの確かめ方と、ドライバーへの案内。

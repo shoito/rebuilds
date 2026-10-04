@@ -17,7 +17,7 @@
 ## 1. 原則
 
 - **正本はサーバーの操作のログと、ブロックの表である。** クライアントの画面は、確定した状態に、未確定の自分の変更を重ねたものである（Replicache と同じ考え方。[How Replicache works](https://doc.replicache.dev/concepts/how-it-works)）。
-- **操作は「意図」で書く。** 位置は添字ではなく、ID（文字の ID、兄弟のブロックの ID）で指す。これにより、サーバーは古い版を基にした操作も、今の状態へそのまま当てられる。操作の変換（OT）のように、途中のすべての操作と突き合わせる必要がない。
+- **操作は「意図」で書く。** 位置は添字ではなく、ID（文字の ID、兄弟のブロックの ID）で指す。これにより、サーバーは古いバージョンを基にした操作も、今の状態へそのまま当てられる。操作の変換（OT）のように、途中のすべての操作と突き合わせる必要がない。
 - **テキストは CRDT で必ず合わさる。構造とプロパティはサーバーの順序で決まる。** テキストの入力は失わない。構造とプロパティの競合で捨てた値は、衝突の記録として残し、本人に見せる（6 節）。
 - **配信はベストエフォート。** 欠けたものは、クライアントがページの `seq` の飛びで検知して取り戻す（Slack の [ADR-0001](../../../slack/docs/decisions/0001-per-channel-sequence.md)、[ADR-0002](../../../slack/docs/decisions/0002-db-as-source-of-truth-with-outbox.md)）。
 - **権限は、操作を当てるときの権限で判定する。** オフラインの間に失った権限で書いた変更は、受け付けない（10 節）。
@@ -27,7 +27,7 @@
 | 項目 | 本家（公開情報） | この設計 |
 | --- | --- | --- |
 | 変更の単位 | 操作をトランザクションにまとめ、`/saveTransactions` でサーバーが検証して記録する。クライアントは `TransactionQueue` に保存してから送る（[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)） | 同じ（ADR-0005） |
-| 配信 | `MessageStore` への WebSocket でレコードを購読し、版が変わったら `syncRecordValues` で取り直す（同上） | ページ単位の購読と、`seq` による操作の差分取得（7〜8 節） |
+| 配信 | `MessageStore` への WebSocket でレコードを購読し、バージョンが変わったら `syncRecordValues` で取り直す（同上） | ページ単位の購読と、`seq` による操作の差分取得（7〜8 節） |
 | テキストの統合 | 2025 年 7 月から、RGA に Peritext の書式の操作を足した CRDT。ブロックの分割・結合に「text slice / text instance」を使う。以前は同じブロックへの同時の編集が LWW で失われた（[How Notion handles concurrent editing with CRDTs](https://www.notion.com/blog/how-notion-handles-concurrent-editing-with-crdts)） | Fugue＋Peritext の CRDT。分割・結合は本家の text slice に倣う（ADR-0010） |
 | テキスト以外 | 選択などのプロパティは合わさらず、片方だけが残る（[ヘルプ：オフラインで使う](https://www.notion.com/help/use-pages-offline)） | 単一値は LWW。複数値（複数選択・人・リレーション）は追加・削除で合わせる。負けた値は衝突の記録に残す（ADR-0011） |
 | オフライン | デスクトップとモバイルのアプリだけ。明示したページ、有料プランでは最近のページとお気に入り。データベースは最初のビューの先頭 50 行。子ページは含めない。`offline_page` と、理由を持つ `offline_action` の表で管理する（[How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)、ヘルプ） | Web（PWA）も含める。理由の表の考え方は同じ（ADR-0013） |
@@ -39,7 +39,7 @@
 
 | 方式 | 長時間のオフライン | 書式の統合 | サーバーでの検証（木・権限） | 採否 |
 | --- | --- | --- | --- | --- |
-| OT（Google Docs の Jupiter 系、ProseMirror collab） | 基にした版からの全操作と変換が要る。ログを長く残し、統合が遅い（[Eg-walker](https://arxiv.org/abs/2409.14252) の評価）。ProseMirror のガイドは、中央の権威と短い分岐を前提にする（[ProseMirror guide](https://prosemirror.net/docs/guide/#collab)） | 変換関数の組み合わせが増える | しやすい | 採らない |
+| OT（Google Docs の Jupiter 系、ProseMirror collab） | 基にしたバージョンからの全操作と変換が要る。ログを長く残し、統合が遅い（[Eg-walker](https://arxiv.org/abs/2409.14252) の評価）。ProseMirror のガイドは、中央の権威と短い分岐を前提にする（[ProseMirror guide](https://prosemirror.net/docs/guide/#collab)） | 変換関数の組み合わせが増える | しやすい | 採らない |
 | ページ全体を 1 つの CRDT 文書（Yjs、Automerge、Loro） | 強い | Peritext 系なら良い | CRDT の結果を拒否できない。木の不変条件と権限をサーバーで守れない。ブロック単位の保存・権限・検索（ADR-0002・0004）と合わない | 採らない |
 | **サーバーの順序＋ブロック内テキストの CRDT** | テキストは強い。構造はアンカーと規則で当てる | Peritext | できる | **採る**（本家に近く、Figma の方式にも近い。[How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)） |
 
@@ -66,7 +66,7 @@
 
 - 各ブロックのテキストは、Fugue の列 CRDT で持つ（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)）。本家の RGA ではなく Fugue にするのは、2 人が同じ位置へ前向きに（左から右へ）長く書いたときに、互いの文が文字単位で交ざらないためである。RGA は、後ろ向きの挿入が重なると交ざりうる。交ざりを最小にする性質（maximal non-interleaving）が証明されているのは変種の FugueMax で、Fugue は実装が簡単な代わりに、後ろ向きの挿入で交ざる文字が少し多くなりうる（同じ論文、2026-09-27 に確認）。通常の入力は前向きなので、Fugue で足りるとする。オフラインの長い編集ほど効く。
 - 文字の ID は `(replica_id, counter)`。`replica_id` は端末とセッションごとに振る。連続して入力した文字は 1 つの run にまとめて保存する。
-- 削除は墓標（tombstone）にする。中身の文字列は消し、ID の範囲だけを run で残す。墓標は消さない。何か月も前の版を基にした操作でも、アンカーの ID が必ず見つかるようにするため。
+- 削除は墓標（tombstone）にする。中身の文字列は消し、ID の範囲だけを run で残す。墓標は消さない。何か月も前のバージョンを基にした操作でも、アンカーの ID が必ず見つかるようにするため。
 - メンション（人・ページ・日付）とインラインの数式は、属性を持つ 1 文字として扱う。
 
 ### 5.2 書式
@@ -232,8 +232,8 @@ Client ──(WebSocket or POST /transactions)──▶ API
 
 ## 12. 履歴との関係
 
-- 履歴の各版は、確定の時刻（`committed_at`）で並べる。オフラインの編集は `client_created_at` も持ち、履歴に「オフラインで編集」と出す。
-- 版の復元は、過去に戻すのではなく、今の状態から復元先への差分を新しいトランザクションとして当てる。復元の後に届いたオフラインのテキストの挿入は、アンカーの文字の位置（墓標を含む）に入る。復元で消えた文字の隣に入ることがあり、衝突の記録として出す。
+- 履歴の各バージョンは、確定の時刻（`committed_at`）で並べる。オフラインの編集は `client_created_at` も持ち、履歴に「オフラインで編集」と出す。
+- バージョンの復元は、過去に戻すのではなく、今の状態から復元先への差分を新しいトランザクションとして当てる。復元の後に届いたオフラインのテキストの挿入は、アンカーの文字の位置（墓標を含む）に入る。復元で消えた文字の隣に入ることがあり、衝突の記録として出す。
 - 操作のログは 30 日で畳み、履歴はスナップショットで持つ（[block-model.md](block-model.md)）。統合に古いログは要らない（1 節の「操作は意図で書く」）。
 
 ## 13. 規模

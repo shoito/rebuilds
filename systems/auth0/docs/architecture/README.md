@@ -133,7 +133,7 @@
 | [0010](../decisions/0010-staged-protocol-extensions.md) | PAR・DPoP・トークン交換・mTLS は、MVP の後に、認可コードの経路の上にフラグで足す |
 | [0011](../decisions/0011-universal-login-rendering-and-transaction.md) | Universal Login はサーバーで描く HTML にし、ログインの途中の状態はサーバーのトランザクションに持って、ブラウザの Cookie に結び付ける |
 | [0012](../decisions/0012-branding-and-templates.md) | ブランディングはテーマの変数と文言の上書きに限り、テナントの任意の HTML・JavaScript は画面に入れない |
-| [0013](../decisions/0013-consent-records.md) | 規約への同意は、文書の版ごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする |
+| [0013](../decisions/0013-consent-records.md) | 規約への同意は、文書のバージョンごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする |
 | [0014](../decisions/0014-connection-abstraction.md) | 接続を「資格情報を確かめて外部の ID を返す部品」として抽象化し、ユーザーとは ID で結ぶ |
 | [0015](../decisions/0015-database-connection-password-and-enumeration.md) | データベース接続は NIST SP 800-63B-4 のパスワードの規則に従い、サインアップ・ログイン・再設定でアカウントの有無を明かさない |
 | [0016](../decisions/0016-social-connections-and-idp-tokens.md) | ソーシャル接続は共通の OAuth・OIDC のクライアントと IdP ごとの差分で作り、IdP のトークンは既定で保存しない |
@@ -152,7 +152,7 @@
 | [0029](../decisions/0029-refresh-token-session-binding.md) | リフレッシュトークンの系列は、アプリの設定でセッションに結び付けるか独立にするかを決める |
 | [0030](../decisions/0030-accounts-tenants-and-members.md) | テナントの上にアカウントを置き、テナントの名前は再利用せず、環境は昇格だけを許す |
 | [0031](../decisions/0031-application-and-api-registration.md) | アプリの種類でクライアントの認証とグラントの上限を決め、コールバックはワイルドカードなしにし、M2M はアプリ × API の許可で守る |
-| [0032](../decisions/0032-tenant-config-cache.md) | テナントの設定は版付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する |
+| [0032](../decisions/0032-tenant-config-cache.md) | テナントの設定はバージョン付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する |
 | [0033](../decisions/0033-management-api-shape.md) | Management API は本家に寄せた `/api/v2` のリソースにし、2 種のページングを持ち、v2 の中では足す変更だけをする |
 | [0034](../decisions/0034-management-api-authorization.md) | Management API は 3 種のトークンを受け、M2M は要求ごとに今の許可を確かめ、自分より広い許可を作らせない |
 | [0035](../decisions/0035-rate-limiting.md) | レート制限は本家の単位と Enterprise の値に寄せ、環境で変えてプランで変えず、Valkey の GCRA で数え、リフレッシュを優先する |
@@ -262,7 +262,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 - **ブランディング**：テナントの任意の HTML は MVP で入れない。サインアップの追加の項目は MVP の後に 3 つの型で足し、`user_metadata` に保存する（[universal-login.md](universal-login.md) の 17 節）。
 - **カスタムドメイン**：アプリごとにドメインを縛らない。配信のテナントの上限は、先に引き上げを申請する。DNS の確認は Google Public DNS と Cloudflare の DoH の 2 つで行う（[custom-domains.md](custom-domains.md) の 12 節）。
 - **メール**：SES の上限は S2 の前に引き上げを申請する。予備の SES のアカウントは、合成監視のメールで毎日暖める（[email-delivery.md](email-delivery.md) の 16 節）。
-- **ユーザー**：仮名の `sub` は持たない。本人のメタデータの更新は MVP の後。SCIM の最初の版は `Users` だけ（[users-and-profiles.md](users-and-profiles.md) の 16 節）。
+- **ユーザー**：仮名の `sub` は持たない。本人のメタデータの更新は MVP の後。SCIM の最初のバージョンは `Users` だけ（[users-and-profiles.md](users-and-profiles.md) の 16 節）。
 - **テナント**：アカウントを請求・契約の単位にする。ワイルドカードのコールバックの移行は、URL の個別の登録で支える（[tenants-and-applications.md](tenants-and-applications.md) の 13 節）。
 - **Actions**：同期のトリガーの時限は既定 10 秒、テナントの上書きで 20 秒まで（[extensibility.md](extensibility.md) の 13 節、[ADR-0048](../decisions/0048-extensibility-triggers-and-failure-policy.md)）。
 - **EventBridge の SaaS パートナーの登録**：E10 の着手前に申請する（[logs-and-streams.md](logs-and-streams.md) の 12 節）。
@@ -286,7 +286,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 ユーザーの依頼（各題材のデータモデルを十分に設計し、ER 図を付ける）により、[data-model.md](data-model.md) を索引から形の正本に変え、`data-model/` に領域ごとの定義（92 テーブル、ER 図 14 個）を置いた。ADR の決定は変えていない。判断が要ったところは推奨案で決めた（詳細は [data-model.md](data-model.md) の 9.2 節）。
 
 - **分割の鍵**：時間で切る表は UUIDv7 の `id` の範囲で切る。旧い `audit_events` の `RANGE (occurred_at)` は主キーと合わず作れなかったので直した。分割した表のハッシュの引き当ては普通の索引にし、1 回限りは条件付きの更新で守る。
-- **テナントの外の表**：`signing_key_state_versions` を足した（Signer が全テナントの版を読むため。値は版と時刻だけ）。
+- **テナントの外の表**：`signing_key_state_versions` を足した（Signer が全テナントのバージョンを読むため。値はバージョンと時刻だけ）。
 - **列の名前と型**：管理者を指す列は `member_user_id`（管理用のテナントの `sub`）、`credential_tickets` はリンクの `secret_hash` とコードの `code_hash` に分けた、`clients` の主キーは `(tenant_id, client_id)`。
 - **Valkey とリース**：Valkey のキーは `<用途>:{t:<tenant_id>}:...` で IP を HMAC にする。ログストリームのリースは DB の行で持つ。
 - **持ち越し**：`refresh_tokens` の行の数（再利用の検知のため使用済みの行を残すと S1 で十数億行になりうる）を E12 で測り、多ければ ADR-0003 の改訂を Dev のテックリードに諮る（[data-model.md](data-model.md) の 9.4 節）。
@@ -305,7 +305,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 | [attack-protection.md](attack-protection.md) | ブルートフォースの防御、不審な IP の抑制、漏えいしたパスワードの検知、ボットの検知、利用者と管理者への通知、監視のモード | 0024–0026 | セキュリティ | E8 |
 | [sessions-and-sso.md](sessions-and-sso.md) | セッション（Cookie、有効期間、端末）、テナントの中の SSO、ログアウト（RP-Initiated、Back-Channel）、セッションとリフレッシュトークンの系列の関係 | 0027–0029 | QA、セキュリティ | E5 |
 | [tenants-and-applications.md](tenants-and-applications.md) | テナント（作成、環境、アカウント、メンバーとロール）、アプリケーション（種類、グラント、コールバック）、API（スコープ、M2M の許可）、設定のキャッシュと反映 | 0030–0032 | QA | E2 |
-| [management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) | Management API の形（リソース、ページング、エラー、版）、認可（スコープ）、レート制限（認証・管理の両方、テナントの環境ごとの上限）、ヘッダー（`<Brand>-` の形） | 0033–0035 | QA、Ops | E2、E9、E12 |
+| [management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) | Management API の形（リソース、ページング、エラー、バージョン）、認可（スコープ）、レート制限（認証・管理の両方、テナントの環境ごとの上限）、ヘッダー（`<Brand>-` の形） | 0033–0035 | QA、Ops | E2、E9、E12 |
 | [dashboard.md](dashboard.md) | ダッシュボードの SPA、管理者のログイン（管理用のテナント）、非常用の経路、管理者のロール | 0036–0037 | QA、セキュリティ | E9 |
 | [custom-domains.md](custom-domains.md) | カスタムドメインの検証、証明書の発行と更新、ホスト名からテナントの解決、エッジの構成。後の複数のカスタムドメイン | 0038–0039 | Ops | E11 |
 | [email-delivery.md](email-delivery.md) | メールの送信（確認、再設定、OTP、通知）、テンプレート、送信ドメインの認証（SPF・DKIM・DMARC）、テナントの独自の送信事業者、到達性の監視 | 0040–0041 | Ops | E4、E11 |

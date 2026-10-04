@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は Geofabrik の日本の抽出を週 1 回取り込み、量の検査を通してから使う。地図の誤りは OSM の本体で直すことを基本にし、急ぐものだけタイルの上書き（閉鎖）で扱う。ODbL の帰属をアプリに出す。営業区域・交通圏などは、国土数値情報の行政区域を公示の構成で合わせた多角形を版と有効の期間つきで PostGIS に持ち、`street` の写し（内側・境目）で速く判定し、境目は多角形で確かめる |
+| [0033](../decisions/0033-osm-import-and-service-area-polygons.md) | OSM は Geofabrik の日本の抽出を週 1 回取り込み、量の検査を通してから使う。地図の誤りは OSM の本体で直すことを基本にし、急ぐものだけタイルの上書き（閉鎖）で扱う。ODbL の帰属をアプリに出す。営業区域・交通圏などは、国土数値情報の行政区域を公示の構成で合わせた多角形をバージョンと有効の期間つきで PostGIS に持ち、`street` の写し（内側・境目）で速く判定し、境目は多角形で確かめる |
 | [0034](../decisions/0034-geocoding-provider-and-pickup-points.md) | 住所の検索は自前の API の後ろに提供者を隠し、ゼンリン・Google・Amazon Location を PoC の基準（的中の率、遅れ、料金、結果の保存、他の地図との併用、SLA）で比べて選ぶ。乗降の座標は乗客が確かめたピンとして保存し、提供者の内容は提供者ごとの保存の規則でだけ持つ。乗降の地点は運用が整えたデータと、実績から作る候補（運用の確認が要る）で出す |
 
 ## 1. 目的と範囲
@@ -25,7 +25,7 @@
 | 行政区域のデータ | 国土数値情報の行政区域データ（N03）は、全国の都道府県・市区町村の境界と全国地方公共団体コードを持つ。GML・Shapefile・GeoJSON。年 1 回（1 月 1 日時点）更新。CC BY 4.0 で商用に使えるが、二次利用に国土地理院への申請が要る場合があるとされる（[国土数値情報 行政区域データ](https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-N03-2024.html)） |
 | 格子と多角形の重なり | 自前の格子 `geogrid` のセルは、投影の平面の上の正六角形である（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、[geospatial-index.md](geospatial-index.md) の 2.1 節）。多角形を同じ平面に写せば、セルが多角形に「一部でも重なる」か「全体が内側」かを平面の幾何で正確に判定できる。本家の H3 は使わない（[ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)） |
 | Google Maps Platform | Geocoding API の内容を Google 以外の地図と一緒に使ってはならない（6.2）。緯度経度は 30 日まで一時にキャッシュできる（6.3.1）。緯度経度・整形した住所は、要求したアプリの利用者向けの機能のためだけに、利用者ごとに分けて無期限に持てる（6.3.2）。Directions・Distance Matrix にも Google 以外の地図との併用の禁止がある（[Service Specific Terms](https://cloud.google.com/maps-platform/terms/maps-service-terms)） |
-| Amazon Location Service | 結果を保存する（キャッシュも含む）ときは `IntendedUse` を `Storage` にし、高い料金になる。自動補完・候補（Suggest）は `Storage` にできない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前の版の API では、提供者に HERE を選ぶと、日本の場所の結果を `Storage` で保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行の版（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる） |
+| Amazon Location Service | 結果を保存する（キャッシュも含む）ときは `IntendedUse` を `Storage` にし、高い料金になる。自動補完・候補（Suggest）は `Storage` にできない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)）。以前のバージョンの API では、提供者に HERE を選ぶと、日本の場所の結果を `Storage` で保存できない（[DataSourceConfiguration（previous）](https://docs.aws.amazon.com/location/previous/APIReference/API_DataSourceConfiguration.html)）。現行のバージョン（Places V2）の文書は、日本の住所・施設の網羅を Comprehensive とし（[Data quality and coverage](https://docs.aws.amazon.com/location/latest/developerguide/data-quality.html)）、日本の結果の保存の制限を書いていない（[IntendedUse](https://docs.aws.amazon.com/location/latest/developerguide/places-intended-use.html)、どちらも 2026-09-27 に確認）。契約の上で日本の結果を保存してよいかは **未検証**（E4 の `geocoding-provider-poc` で提供者の条件として確かめる） |
 | ゼンリン | ZENRIN Maps API で、住所・建物・施設の検索、経路、渋滞・規制の情報を提供している（ADR-0005）。結果の保存と他の地図との併用の条件は公開の文書になく **未検証**（E4 の `geocoding-provider-poc` で契約の条件として確かめる） |
 
 いずれも 2026-09-27 に確認。
@@ -45,9 +45,9 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 
 ## 4. OSM の取り込みと更新
 
-- **取り込み**：週 1 回（日曜 22:00 JST、タイルの作成の前）に、Geofabrik の `japan-latest.osm.pbf` と `.md5` を取り、照合して S3 の `osm/japan/<date>/` に置く。S3 は版を残し、90 日分を保つ（タイルの版の再現のため）。
-- **差分を当て続けない**：毎週の全体の取り込みにする。2.5 GB の取り込みは問題にならず、版が 1 つの日付で定まる（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)）。
-- **量の検査**（どれかを外れたら、その週は前の版を使い続け、運用に知らせる）：
+- **取り込み**：週 1 回（日曜 22:00 JST、タイルの作成の前）に、Geofabrik の `japan-latest.osm.pbf` と `.md5` を取り、照合して S3 の `osm/japan/<date>/` に置く。S3 はバージョンを残し、90 日分を保つ（タイルのバージョンの再現のため）。
+- **差分を当て続けない**：毎週の全体の取り込みにする。2.5 GB の取り込みは問題にならず、バージョンが 1 つの日付で定まる（[ADR-0016](../decisions/0016-valhalla-serving-traffic-and-eta-accuracy.md)）。
+- **量の検査**（どれかを外れたら、その週は前のバージョンを使い続け、運用に知らせる）：
 
 | 検査 | 閾値 |
 | --- | --- |
@@ -124,7 +124,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 | P9 | データの所在と外国への提供 | 位置と入力の文字列が送られる国、事業者との契約の形（L4） | 法務の確認待ち |
 | P10 | 電子地図の要件 | 事前確定運賃の「一般的に流通し、定期的に更新される電子地図」に当たるか（L3） | 推計走行距離に使うなら必須 |
 
-- 事実として分かっている条件（2 節）：Google は Google 以外の地図との併用を禁じ、緯度経度の保存に 30 日または利用者ごとの分離の条件がある。Amazon Location は保存に `Storage` の指定と高い料金が要り、以前の版では HERE の日本の結果を保存できなかった。ゼンリンの条件は **未検証**（E4 の `geocoding-provider-poc`）。
+- 事実として分かっている条件（2 節）：Google は Google 以外の地図との併用を禁じ、緯度経度の保存に 30 日または利用者ごとの分離の条件がある。Amazon Location は保存に `Storage` の指定と高い料金が要り、以前のバージョンでは HERE の日本の結果を保存できなかった。ゼンリンの条件は **未検証**（E4 の `geocoding-provider-poc`）。
 - 住所の検索と推計走行距離を同じ提供者にするかも、PoC で決める。別にすると、乗客が選んだ地点と経路の出発点が提供者の間でずれうる。
 - 利用条件（保存、併用、帰属）は、選定の後に ADR-0034 の続きの ADR に写し、条件に反する保存のコードをレビューで差し戻す（ADR-0005 の Confirmation）。
 
@@ -210,7 +210,7 @@ CREATE TABLE service_areas (
   member_municipality_codes  text[],               -- 全国地方公共団体コード
   geom                       geometry(MultiPolygon, 4326) NOT NULL,
   source                     text NOT NULL,        -- n03_union / manual
-  source_ref                 text NOT NULL,        -- 公示の番号・URL、N03 の版
+  source_ref                 text NOT NULL,        -- 公示の番号・URL、N03 のバージョン
   effective_from             date NOT NULL,
   effective_to               date,                 -- null は現在も有効
   approved_by                uuid[] NOT NULL,      -- 2 人の確認（staff_users）
@@ -230,7 +230,7 @@ CREATE TABLE service_area_cells (
 
 - 同じ区域で有効の期間が重ならないことを、DB の排他の制約で守る。
 - 作り方：N03 の該当の市区町村の多角形を合わせ（`ST_Union`）、単純化は 5 m 以内に留める。N03 の出典の表示（「国土数値情報（行政区域データ）（国土交通省）を加工して作成」）を、区域の画面と文書に出す。
-- 変更（公示の変更、市町村の合併、N03 の年ごとの更新）は、新しい版として作り、有効の日から切り替える。変更の前後で面積と構成の差を出し、2 人が確かめる。
+- 変更（公示の変更、市町村の合併、N03 の年ごとの更新）は、新しいバージョンとして作り、有効の日から切り替える。変更の前後で面積と構成の差を出し、2 人が確かめる。
 
 ### 9.3 判定
 
@@ -245,18 +245,18 @@ func Contains(areaVersion, p) bool:
 
 - 写しは、`geogrid.Cover(polygon, Street, Overlapping)` で区域に触れるセルを全部取り、そのうち `Cover(polygon, Street, Full)`（全体が内側）のセルを `inside`、残りを `boundary` にする。`Cover` は、区域の多角形を格子の投影の平面に写し、六角形と多角形の重なりを平面の幾何で判定する。
 - 区域の外のセルは写しに入らない。「一部でも重なる」で取るので、区域に触れるセルはすべて写しにあり、区域の中の点を外と誤ることはない（10.1 節の PROP-MAP-001 で確かめる）。
-- 判定の最後は多角形（ADR-0002）。多角形の判定は、配車と API のプロセスの中で、単純化した多角形で行う（PostGIS を毎回引かない）。多角形は区域の版ごとにメモリに持つ。
-- `Cover` は自前の関数なので、正しさを 2 つの方法で守る。PROP-MAP-001 と、版の作成のときに、同じ写しを PostGIS（区域の多角形とセルの六角形（`geogrid.Boundary`）を同じ投影に写し、`ST_Intersects` と `ST_CoveredBy` で判定）で作り直して一致を確かめる。
+- 判定の最後は多角形（ADR-0002）。多角形の判定は、配車と API のプロセスの中で、単純化した多角形で行う（PostGIS を毎回引かない）。多角形は区域のバージョンごとにメモリに持つ。
+- `Cover` は自前の関数なので、正しさを 2 つの方法で守る。PROP-MAP-001 と、バージョンの作成のときに、同じ写しを PostGIS（区域の多角形とセルの六角形（`geogrid.Boundary`）を同じ投影に写し、`ST_Intersects` と `ST_CoveredBy` で判定）で作り直して一致を確かめる。
 
 ## 10. 障害のときの振る舞い
 
 | 障害 | 起きること | 回復・影響の抑え方 |
 | --- | --- | --- |
-| Geofabrik から取れない、検査を外れた | その週の OSM を更新できない | 前の版を使い続ける。2 週続いたら警告 |
+| Geofabrik から取れない、検査を外れた | その週の OSM を更新できない | 前のバージョンを使い続ける。2 週続いたら警告 |
 | 住所の検索の提供者の障害 | 自動補完が出ない | アプリはピンでの指定と、よく使う場所・最近の場所を出す。乗降の地点のデータの名前での検索（自前）を代わりに出す |
 | 提供者の割り当て・料金の上限 | 同上 | 利用の量を 1 日ごとに計り、80% で警告 |
 | 区域の多角形の誤り（公示の変更の反映漏れ） | 営業区域の判定を誤る | 変更に 2 人の確認。公示の変更の確かめを月 1 回の定期作業にする（runbook） |
-| 区域の写しと多角形の食い違い | 判定の誤り | 版の作成のときに、ランダムな 10 万点で写しの判定と多角形の判定が一致することを確かめてから有効にする |
+| 区域の写しと多角形の食い違い | 判定の誤り | バージョンの作成のときに、ランダムな 10 万点で写しの判定と多角形の判定が一致することを確かめてから有効にする |
 
 ## 11. セキュリティと位置のプライバシー
 
@@ -271,7 +271,7 @@ func Contains(areaVersion, p) bool:
 ### 12.1 性質ベーステスト
 
 - **PROP-MAP-001（区域の判定）**：任意の区域の多角形と任意の点で、`Contains` の結果は、多角形だけでの判定と一致する。
-- **PROP-MAP-002（版の重なりなし）**：任意の区域の版の追加の列で、同じ区域の有効の期間は重ならず、任意の日に有効な版は高々 1 つ。
+- **PROP-MAP-002（バージョンの重なりなし）**：任意の区域のバージョンの追加の列で、同じ区域の有効の期間は重ならず、任意の日に有効なバージョンは高々 1 つ。
 - **PROP-MAP-003（乗降の地点の提案）**：任意のピンで、提案はピンから 80 m 以内の有効な地点か、50 m 以内の、除外の種類でない辺の上の点だけ。施設の中のピンでは、施設の地点だけ。
 - **PROP-MAP-004（保存の規則）**：提供者の内容の型（提供者の座標・名前・ID）は、提供者ごとの保存の期間を持つストアにしか書けない（型と保存の関数で強制し、テストで確かめる）。乗車の記録に書ける座標は `rider_confirmed_pin` だけ。
 - **PROP-MAP-005（取り込みの検査）**：途中で切れた・中身の大きく減った抽出は、4 節の検査で必ず止まる（壊した抽出を作って確かめる）。
@@ -302,13 +302,13 @@ func Contains(areaVersion, p) bool:
 
 ### 決定（2026-09-27、既定案）
 
-- **OSM の取り込み**：Geofabrik の日本全体、週 1 回、量の検査、90 日の版の保持。
+- **OSM の取り込み**：Geofabrik の日本全体、週 1 回、量の検査、90 日のバージョンの保持。
 - **地図の誤り**：OSM の本体で直すのが基本。急ぐ閉鎖だけ期間つきの上書き。
 - **ODbL**：アプリに帰属を出す。速度の表は way の ID を鍵にした別のデータとして持ち、上書きは一覧として出せるようにする。
 - **住所の検索**：自前の API の後ろに提供者を隠す。PoC の必須の基準は P1・P2・P4・P5。
 - **乗降の座標**：乗客が確かめたピンとして保存し、提供者の座標は持たない。
 - **乗降の地点**：80 m の地点、50 m の辺、最大 3 つ。実績の候補は運用の確認の後に公開。
-- **区域**：N03 ＋ 公示の構成、版と有効の期間、2 人の確認、`street` の写し（内側・境目）と多角形の確認。
+- **区域**：N03 ＋ 公示の構成、バージョンと有効の期間、2 人の確認、`street` の写し（内側・境目）と多角形の確認。
 
 ### 持ち越し
 
@@ -330,15 +330,15 @@ func Contains(areaVersion, p) bool:
 - 乗客が提案の乗降の地点を選んだ割合、到着から乗車までの時間の中央値（乗降の地点の良さの目安）。
 - 地図の誤りの候補の件数と、直すまでの日数。
 - OSM の取り込みの検査の結果（週ごと）。
-- 区域の写しと多角形の判定の一致（版の作成ごとに 10 万点）。
+- 区域の写しと多角形の判定の一致（バージョンの作成ごとに 10 万点）。
 - PROP-MAP-001〜005 の実行の数と種。
 
 ### runbooks
 
-- `osm-import-failed.md`：取り込みの検査を外れたときの確かめ方（Geofabrik の状態、OSM の大きな編集・破壊）と、前の版を使い続ける判断。
+- `osm-import-failed.md`：取り込みの検査を外れたときの確かめ方（Geofabrik の状態、OSM の大きな編集・破壊）と、前のバージョンを使い続ける判断。
 - `map-closure-override.md`：工事・災害・行事の閉鎖を上書きに入れ、臨時のタイルを作る手順と、期限の確かめ方。
 - `geocoding-provider-outage.md`：住所の検索の提供者の障害のときの確かめ方と、アプリの代わりの表示への切り替え。
-- `service-area-update.md`：公示の変更・市町村の合併・N03 の更新を区域の新しい版にする手順（2 人の確認、判定の一致の確かめ、有効の日の設定）。月 1 回の公示の確かめの定期作業も含める。
+- `service-area-update.md`：公示の変更・市町村の合併・N03 の更新を区域の新しいバージョンにする手順（2 人の確認、判定の一致の確かめ、有効の日の設定）。月 1 回の公示の確かめの定期作業も含める。
 
 ### data-model（索引への追加の提案）
 

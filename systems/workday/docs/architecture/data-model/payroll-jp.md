@@ -4,7 +4,7 @@
 
 - 規則表の値をコードに書かない。コードは表を読むだけ（[AGENTS.md](../../../AGENTS.md)）。
 - 料率は `numeric(12,10)`（表の値をそのまま）。計算は `packages/money` の `Dec` に読み替える。金額の区間は円の `bigint` の半開区間 `[from, to)`（`to` が NULL は上限なし）。
-- 保存：規則表と元のファイルは「給与の実行の入力の文書・結果」（結果が版を指す間は消さない）。facet は「扶養控除等申告書・健康保険・厚生年金保険・雇用保険に関する書類」の長いほう。
+- 保存：規則表と元のファイルは「給与の実行の入力の文書・結果」（結果がバージョンを指す間は消さない）。facet は「扶養控除等申告書・健康保険・厚生年金保険・雇用保険に関する書類」の長いほう。
 
 ## 1. ER 図
 
@@ -206,7 +206,7 @@ erDiagram
 
 ### 2.1 `rule_tables`
 
-規則表の版。全テナントに共通（RLS の例外。[data-model.md](../data-model.md) の 3.3 節）。定義元：[payroll-jp-rules.md](../payroll-jp-rules.md) の 2 節、[delivery.md](../delivery.md) の 6 節。
+規則表のバージョン。全テナントに共通（RLS の例外。[data-model.md](../data-model.md) の 3.3 節）。定義元：[payroll-jp-rules.md](../payroll-jp-rules.md) の 2 節、[delivery.md](../delivery.md) の 6 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -220,25 +220,25 @@ erDiagram
 | `fetched_on` | `date` | NOT NULL | — | 取得日 |
 | `source_sha256` | `bytea` | NOT NULL | — | 元のファイル（S3 の `rule-sources/{kind}/{sha256}`） |
 | `parsed_sha256` | `bytea` | NOT NULL | — | 読み取った行の正規の形のハッシュ |
-| `auto_checks` | `jsonb` | NOT NULL | — | 自動の検査の結果（連続、単調、範囲、前の版との差） |
+| `auto_checks` | `jsonb` | NOT NULL | — | 自動の検査の結果（連続、単調、範囲、前のバージョンとの差） |
 | `imported_by` | `uuid` | NOT NULL | — | 運用者（`rules.import`） |
 | `verified_by` | `uuid` | NULL | — | 運用者（`rules.verify`） |
 | `verification` | `jsonb` | NULL | — | 照合の記録（計算の例、無作為の 30 行、境界の行の一致） |
 | `published_at` | `timestamptz` | NULL | — | 規則表のリリース（`rules.publish`） |
 | `release_bundle_sha256` | `bytea` | NULL | — | 署名した束のハッシュ（[ADR-0062](../../decisions/0062-rule-table-release-calendar.md)） |
-| `supersedes_id` | `uuid` | NULL | — | 訂正で置き換えた版（同じ `valid`） |
+| `supersedes_id` | `uuid` | NULL | — | 訂正で置き換えたバージョン（同じ `valid`） |
 | `note` | `text` | NULL | — | |
 
 - キー：PK `(id)`。UK `(kind, version)`。FK `(supersedes_id)` → 同じ表。
-- 排他：`EXCLUDE USING gist (kind WITH =, valid WITH &&) WHERE (status = 'published')` — 公開した版の期間は重ならない。
+- 排他：`EXCLUDE USING gist (kind WITH =, valid WITH &&) WHERE (status = 'published')` — 公開したバージョンの期間は重ならない。
 - CHECK：`verified_by IS NULL OR verified_by <> imported_by`（S8）、`status NOT IN ('verified','published') OR verified_by IS NOT NULL`、`status <> 'published' OR published_at IS NOT NULL`。
 - 更新：`published` の後は `superseded` への変更だけ。訂正の公開は outbox の `rule_table.corrected` を書く。
 - 運用：RLS なし。書くのは `platform` だけ。`app` は読むだけ。S3 のセル構成では Global の原本を各セルへ配る。
-- S1 の量：年 数十版。
+- S1 の量：年 数十バージョン。
 
 ### 2.2 `rule_rows_*`（行の表）
 
-種類ごとの型のある行。どれも `rule_table_id uuid NOT NULL`（→ `rule_tables`）と `row_no int NOT NULL` を持ち、PK は `(rule_table_id, row_no)`。版の行は公開の後に変えない。RLS なし（テナントの外）。
+種類ごとの型のある行。どれも `rule_table_id uuid NOT NULL`（→ `rule_tables`）と `row_no int NOT NULL` を持ち、PK は `(rule_table_id, row_no)`。バージョンの行は公開の後に変えない。RLS なし（テナントの外）。
 
 | 表 | 対象の種類 | 列（`rule_table_id`・`row_no` に加えて） | 制約・索引 |
 | --- | --- | --- | --- |
@@ -255,7 +255,7 @@ erDiagram
 | `rule_rows_holidays_jp` | `holidays_jp` | `day date`、`name text`。PK は `(rule_table_id, day)`（`row_no` は持つが鍵にしない） | PK `(rule_table_id, day)` |
 
 - 区間の行は、自動の検査で「隙間なく続く」「税額が給与に対して減らない」「扶養の人数に対して増えない」「等級の境界が単調」を確かめる（[payroll-jp-rules.md](../payroll-jp-rules.md) の 2.2 節）。
-- S1 の量：月額表は 1 版 数千行、日額表 数千行、等級表 数十行。全体で 1 年 数万行。
+- S1 の量：月額表は 1 バージョン 数千行、日額表 数千行、等級表 数十行。全体で 1 年 数万行。
 
 ## 3. テナントの規則と設定
 
@@ -273,7 +273,7 @@ erDiagram
 
 ### 3.2 `company_payroll_settings`
 
-会社の給与の計算の設定（版の表）。実行の設定の版（`payroll_config_snapshots`）に入る。定義元：[payroll-jp-rules.md](../payroll-jp-rules.md) の 3.3・4.3・7・8・9 節。
+会社の給与の計算の設定（バージョンの表）。実行の設定のバージョン（`payroll_config_snapshots`）に入る。定義元：[payroll-jp-rules.md](../payroll-jp-rules.md) の 3.3・4.3・7・8・9 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

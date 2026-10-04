@@ -3,16 +3,16 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0013: 業務プロセスの定義を JSON の宣言と型のある式の木で書き、起票の日に有効な版に案件を固定する
+# ADR-0013: 業務プロセスの定義を JSON の宣言と型のある式の木で書き、起票の日に有効なバージョンに案件を固定する
 
 詳細は [business-process-engine.md](../architecture/business-process-engine.md) の 3・4 節。
 
 ## Context
 
-[ADR-0003](0003-business-process-engine.md) は、テナントが定義を持ち、定義は版を持ち、進行中の案件は起票の時点の版で進むと決めた。条件は「限られた式」とした。次を決める必要がある。
+[ADR-0003](0003-business-process-engine.md) は、テナントが定義を持ち、定義はバージョンを持ち、進行中の案件は起票の時点のバージョンで進むと決めた。条件は「限られた式」とした。次を決める必要がある。
 
 - 定義と条件の式の書き方。テナントの人事が画面で編集し、システムが静的に検査できなければならない。
-- 版の選び方。本家の定義は有効日を持ち、その日から使える。業務プロセスの案件の有効日（昇給の始まりの日など）とは別の意味である。進行中の案件は定義の変更を拾わない。子のプロセスは既定で親の有効日を引き継ぐ（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)、[Business Process Framework](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/business-process-framework.html)、2026-09-28 に確認。後者は検索の要約による）。
+- バージョンの選び方。本家の定義は有効日を持ち、その日から使える。業務プロセスの案件の有効日（昇給の始まりの日など）とは別の意味である。進行中の案件は定義の変更を拾わない。子のプロセスは既定で親の有効日を引き継ぐ（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)、[Business Process Framework](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/business-process-framework.html)、2026-09-28 に確認。後者は検索の要約による）。
 
 ## Options
 
@@ -22,11 +22,11 @@ date: 2026-09-28
 2. 文字列の式（JEXL、CEL などの汎用の式の言語）
 3. テナントが書くスクリプト
 
-版の選び方：
+バージョンの選び方：
 
-- a. **案件の起票の日（テナントの暦）に有効な版。子の案件は親の起票の日で選ぶ**
-- b. 案件の `effective_on`（発令の日）に有効な版
-- c. 常に最新の有効な版（進行中の案件も新しい版に移す）
+- a. **案件の起票の日（テナントの暦）に有効なバージョン。子の案件は親の起票の日で選ぶ**
+- b. 案件の `effective_on`（発令の日）に有効なバージョン
+- c. 常に最新の有効なバージョン（進行中の案件も新しいバージョンに移す）
 
 ## Decision
 
@@ -34,9 +34,9 @@ date: 2026-09-28
 
 - 定義は JSON で、ステップの直列の並び、並列の承認のまとまり（`all`・`any`・`quorum`）、条件（`when`）、子のプロセスで表す。戻りの辺と合流は書かせない。差し戻しは操作で表す。
 - 条件は式の木：比較、論理演算、`in`、`is_null`、項目の参照（`case.*`・`subject.*`・`initiator.*`）、定数、組み込みの関数（`age_on`・`org_is_under`・`days_between`）。数は 10 進の文字列。深さ 10、節 200 まで。マイナンバー・口座番号の項目は参照できない。
-- `bp_definitions` は `(process_type, version)` と `effective_from` と状態（`draft`・`pending_activation`・`active`・`retired`）を持つ。有効化した版は書き換えない。
-- 案件の起票のとき、起票の日に有効な版を選んで固定する。子の案件は親の起票の日で選ぶ。
-- システムの既定の定義の新しい版は、テナントの写しを上書きしない。差分を知らせる。
+- `bp_definitions` は `(process_type, version)` と `effective_from` と状態（`draft`・`pending_activation`・`active`・`retired`）を持つ。有効化したバージョンは書き換えない。
+- 案件の起票のとき、起票の日に有効なバージョンを選んで固定する。子の案件は親の起票の日で選ぶ。
+- システムの既定の定義の新しいバージョンは、テナントの写しを上書きしない。差分を知らせる。
 - 2 を採らない理由：文字列の式は、画面での組み立てと、項目の型の静的な検査の両方で、構文解析の層が 1 つ増える。汎用の言語は関数と演算子が多く、許す範囲を絞る作業が要る。木なら、許す節の種類がそのまま型になる。
 - 3 を採らない理由：任意のコードの実行は、検証・監査人への説明・停止の保証ができない（[intent.md](../intent.md) の Non-goals）。
 - b を採らない理由：将来日付の発令（3 月に 4 月付の異動）が、まだ有効化されていない将来の定義で進むことになる。定義の変更の効き始めが、担当から見て予測しにくい。
@@ -46,13 +46,13 @@ date: 2026-09-28
 
 - 良くなること：
   - 式を保存のときに型で検査でき、誤った定義を有効化の前に止められる。
-  - 案件がどの版で進んだかが一意に決まり、監査で説明できる。
+  - 案件がどのバージョンで進んだかが一意に決まり、監査で説明できる。
 - 引き受けるコスト：
   - 式の表現力が限られる。足りない関数は、システムのリリースで足す。
   - 定義の画面（式の組み立ての UI）を作る必要がある。
 
 ## Confirmation
 
-- 性質ベーステスト：PROP-BP-005（案件は起票の日の版で最後まで進む）、PROP-BP-008（検査を通った定義は有限のステップで終わる）。
+- 性質ベーステスト：PROP-BP-005（案件は起票の日のバージョンで最後まで進む）、PROP-BP-008（検査を通った定義は有限のステップで終わる）。
 - 決定表のテスト：DT-BP-004（静的な検査）。
 - 式の評価器の性質ベーステスト：任意の式の木と値で、評価が停止し、副作用がなく、同じ入力で同じ結果になる。

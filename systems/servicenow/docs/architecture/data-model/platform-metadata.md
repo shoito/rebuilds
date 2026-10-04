@@ -1,6 +1,6 @@
 # Data model: 辞書とメタデータの基盤
 
-[data-model.md](../data-model.md) の一部。テナントの設定、データ辞書（テーブル・フィールド・上書き・選択肢）、番号、メタデータの版、設定のパッケージの表を定義する。振る舞い（保存の流れ、型の検証、2 段の削除、パッケージのプレビュー）は [data-dictionary-and-tables.md](../data-dictionary-and-tables.md) を正とする。規約（ID、RLS、NULL の行、共通の列）は [data-model.md](../data-model.md) の 3 節にある。
+[data-model.md](../data-model.md) の一部。テナントの設定、データ辞書（テーブル・フィールド・上書き・選択肢）、番号、メタデータのバージョン、設定のパッケージの表を定義する。振る舞い（保存の流れ、型の検証、2 段の削除、パッケージのプレビュー）は [data-dictionary-and-tables.md](../data-dictionary-and-tables.md) を正とする。規約（ID、RLS、NULL の行、共通の列）は [data-model.md](../data-model.md) の 3 節にある。
 
 - 「メタデータの共通の列」は `stable_key`、`rev`、`content_hash`、`updated_in_version`、`deleted_at`、`created_at`、`created_by`、`updated_at`、`updated_by` の 9 列（[data-model.md](../data-model.md) の 3.9 節）。表では 1 行にまとめて書く。
 - NULL の行を持つ表（`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`number_def`）は、主キーを `id` だけにし、参照の先が同じテナントか NULL の行であることをトリガー `check_shared_ref()` で確かめる（[data-model.md](../data-model.md) の 3.3 節）。
@@ -109,7 +109,7 @@ erDiagram
     }
 ```
 
-## 2. テナントの設定と版
+## 2. テナントの設定とバージョン
 
 ### 2.1 `tenant_setting`
 
@@ -132,7 +132,7 @@ erDiagram
 
 ### 2.2 `tenant_meta`
 
-メタデータの版と ACL の版。要求・ステップの始めに同じ往復で読む。定義元：[data-dictionary-and-tables.md](../data-dictionary-and-tables.md) の 9.1 節、[access-control.md](../access-control.md) の 7 節。
+メタデータのバージョンと ACL のバージョン。要求・ステップの始めに同じ往復で読む。定義元：[data-dictionary-and-tables.md](../data-dictionary-and-tables.md) の 9.1 節、[access-control.md](../access-control.md) の 7 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -153,7 +153,7 @@ erDiagram
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
-| `meta_version` | `bigint` | NOT NULL | — | この変更で上がった後の版 |
+| `meta_version` | `bigint` | NOT NULL | — | この変更で上がった後のバージョン |
 | `committed_at` | `timestamptz` | NOT NULL | `now()` | |
 | `actor_id` | `uuid` | NOT NULL | — | → `user` |
 | `real_actor_id` | `uuid` | NULL | — | 成り代わりのときの本人 |
@@ -174,7 +174,7 @@ erDiagram
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `id` | `uuid` | NOT NULL | `uuidv7()` | 組み込みはコードの版で固定の値 |
+| `id` | `uuid` | NOT NULL | `uuidv7()` | 組み込みはコードのバージョンで固定の値 |
 | `tenant_id` | `uuid` | NULL | — | 組み込みは NULL |
 | `name` | `text` | NOT NULL | — | 内部の名前。作成の後に変えない。テナントは `c_` で始める |
 | `label` | `text` | NOT NULL | — | 作成の時の言語の文言。訳は `translation` |
@@ -233,7 +233,7 @@ erDiagram
 
 ### 3.3 `dict_override`
 
-子のクラスでの、祖先のフィールドの属性の上書き。テナントの行だけ（組み込みの上書きはコードの版の中で解いてから `dict_field` に入れる）。定義元：同じ文書の 3.2 節。
+子のクラスでの、祖先のフィールドの属性の上書き。テナントの行だけ（組み込みの上書きはコードのバージョンの中で解いてから `dict_field` に入れる）。定義元：同じ文書の 3.2 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

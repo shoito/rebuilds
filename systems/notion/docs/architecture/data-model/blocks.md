@@ -13,7 +13,7 @@ erDiagram
   blocks ||--o{ blocks : "synced_from（同期ブロックの参照）"
   data_sources ||--o{ blocks : "行のページの親"
   blocks ||--o{ data_sources : "database ブロックが持つ"
-  blocks ||--o{ page_snapshots : "ページの版"
+  blocks ||--o{ page_snapshots : "ページのバージョン"
   blocks ||--o{ files : "添付したブロック"
   members ||--o{ files : "上げた人"
   members ||--o{ blocks : "created_by と updated_by"
@@ -32,7 +32,7 @@ erDiagram
     boolean alive "偽なら削除済み"
     timestamptz trashed_at "ゴミ箱の根だけ"
     timestamptz purged_at "完全に削除"
-    bigint version "行の版"
+    bigint version "行のバージョン"
   }
   page_snapshots {
     uuid workspace_id PK "テナント"
@@ -122,10 +122,10 @@ erDiagram
 
 ## page_snapshots
 
-- 目的：ページの履歴の版の目録。本体は S3（gzip の JSON）。
+- 目的：ページの履歴のバージョンの目録。本体は S3（gzip の JSON）。
 - 正：[block-model.md](../block-model.md) の 8 節
-- 保持・削除：ワークスペースの履歴の日数（MVP は 30 日。プランで 7・30・90 日・無期限）を過ぎた版を、日次の Worker が S3 と一緒に消す（`deletion_jobs` の `history_expire`。[ADR-0022](../../decisions/0022-trash-history-and-deletion-retention.md)）。
-- 規模（S1）：約 1 億行（1 日に更新されるページ 300 万 × 30 日の見積もり）。S3 は約 20 TB（1 版 平均 200 KB の見積もり）
+- 保持・削除：ワークスペースの履歴の日数（MVP は 30 日。プランで 7・30・90 日・無期限）を過ぎたバージョンを、日次の Worker が S3 と一緒に消す（`deletion_jobs` の `history_expire`。[ADR-0022](../../decisions/0022-trash-history-and-deletion-retention.md)）。
+- 規模（S1）：約 1 億行（1 日に更新されるページ 300 万 × 30 日の見積もり）。S3 は約 20 TB（1 バージョン 平均 200 KB の見積もり）
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -133,14 +133,14 @@ erDiagram
 | `page_id` | uuid | NO | | `blocks.id`（`type = page`） |
 | `seq` | bigint | NO | | 作成時のページの `seq` |
 | `created_at` | timestamptz | NO | `now()` | |
-| `editors` | uuid[] | NO | `'{}'` | 前の版からこの版までに編集したメンバー |
+| `editors` | uuid[] | NO | `'{}'` | 前のバージョンからこのバージョンまでに編集したメンバー |
 | `s3_key` | text | NO | | `ws/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz` |
 | `size` | int | NO | | 圧縮後のバイト数 |
-| `block_count` | int | NO | | 版に含むブロックの数 |
+| `block_count` | int | NO | | バージョンに含むブロックの数 |
 
 - PK `(workspace_id, page_id, seq)`。
 - FK `(workspace_id, page_id)` → `blocks(workspace_id, id)` ON DELETE CASCADE。
-- 索引 `(workspace_id, created_at)`：保持期間を過ぎた版の検出。一覧は PK の範囲で読む（新しい順）。
+- 索引 `(workspace_id, created_at)`：保持期間を過ぎたバージョンの検出。一覧は PK の範囲で読む（新しい順）。
 
 ## files
 

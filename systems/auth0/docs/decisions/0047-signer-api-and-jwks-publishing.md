@@ -11,7 +11,7 @@ date: 2026-09-27
 
 ## Context
 
-[ADR-0003](0003-token-formats-and-signing-keys.md) は、Signer がテナントとクレームを受けて署名した JWT を返し、任意のバイト列には署名しないと決めた。[ADR-0059](0059-signer-isolation.md) は、Signer のネットワークを隔離し、署名のポート（Auth からだけ）と鍵の管理のポート（Management API からだけ）を分けた。[ADR-0005](0005-authentication-path-availability.md) は、JWKS・discovery を S3 に書き出して CloudFront から配り、オリジンの障害中は古い版を返すと決めた。[ADR-0058](0058-edge-and-custom-domains.md) は、キャッシュの期間をこの領域に任せた。
+[ADR-0003](0003-token-formats-and-signing-keys.md) は、Signer がテナントとクレームを受けて署名した JWT を返し、任意のバイト列には署名しないと決めた。[ADR-0059](0059-signer-isolation.md) は、Signer のネットワークを隔離し、署名のポート（Auth からだけ）と鍵の管理のポート（Management API からだけ）を分けた。[ADR-0005](0005-authentication-path-availability.md) は、JWKS・discovery を S3 に書き出して CloudFront から配り、オリジンの障害中は古いバージョンを返すと決めた。[ADR-0058](0058-edge-and-custom-domains.md) は、キャッシュの期間をこの領域に任せた。
 
 決めること：
 
@@ -34,7 +34,7 @@ Signer の API：
 
 JWKS のキャッシュ：
 
-- x. **RP 300 秒、CloudFront 60 秒、オリジンの障害中は 24 時間の古い版**
+- x. **RP 300 秒、CloudFront 60 秒、オリジンの障害中は 24 時間の古いバージョン**
 - y. 長いキャッシュ（1 日）と、変更のたびの無効化
 
 ## Decision

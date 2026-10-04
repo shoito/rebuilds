@@ -4,7 +4,7 @@
 
 | ファイル | 領域 |
 | --- | --- |
-| [api.md](api.md) | 公開 API：リソース、版、冪等、ページング、エラー、SDK、テスト環境 |
+| [api.md](api.md) | 公開 API：リソース、バージョン、冪等、ページング、エラー、SDK、テスト環境 |
 | [auth-and-keys.md](auth-and-keys.md) | 加盟店のアカウント、ダッシュボードのログイン、API キー、権限 |
 | [payments.md](payments.md) | PaymentIntent の状態遷移、オーソリ・キャプチャ・取り消し、返金、3D セキュア |
 | [payment-methods.md](payment-methods.md) | 決済手段（カード、コンビニ払い、銀行振込）と、決済代行・アクワイアラのコネクタ |
@@ -47,7 +47,7 @@
 
 | コンポーネント | 責務 |
 | --- | --- |
-| API | 認証（API キー）、冪等、版の変換、入力の検証、レート制限 |
+| API | 認証（API キー）、冪等、バージョンの変換、入力の検証、レート制限 |
 | Payments | PaymentIntent・Refund の状態遷移。コネクタへの要求と結果の反映 |
 | Ledger | すべてのお金の動きを、借方と貸方が一致する仕訳として追記する。残高はここから求める |
 | Vault（CDE） | vault-ingest がカード番号を受け取って暗号化・保管し、vault-core が本体の要求で `pm_` に紐づける。復号は Connector Gateway だけ（[card-vault.md](card-vault.md)） |
@@ -109,7 +109,7 @@
 | [0004](../decisions/0004-idempotency.md) | すべての書き込みを冪等にする |
 | [0005](../decisions/0005-pci-scope-segmentation.md) | カード情報は CDE（別の AWS アカウント）に閉じ込め、本体はトークンだけを扱う |
 | [0006](../decisions/0006-api-shape.md) | 公開 API は本家 v1 のリソースの形に寄せ、本文は JSON。見出しは `<Brand>-` にする |
-| [0007](../decisions/0007-date-based-api-versions.md) | API の版は日付で持ち、アカウントに固定し、変更モジュールで古い版の形を保つ |
+| [0007](../decisions/0007-date-based-api-versions.md) | API のバージョンは日付で持ち、アカウントに固定し、変更モジュールで古いバージョンの形を保つ |
 | [0008](../decisions/0008-api-keys-and-dashboard-access.md) | API キーは本家と同じ 3 種類（接頭辞は `<brand>_`）。ダッシュボードは Better Auth と必須の MFA |
 | [0009](../decisions/0009-rate-limiting.md) | レート制限は本家の単位と値に寄せ、Slack の層と GCRA で行う |
 | [0010](../decisions/0010-payment-intent-state-machine.md) | PaymentIntent を唯一の決済オブジェクトにし、遷移を 1 つの遷移関数に集める |
@@ -160,7 +160,7 @@ PM の方針（本家 Stripe に寄せる、既定案）により、次のとお
 - **Webhook の送信元の IP** は、専用の egress VPC の Elastic IP 付き NAT から出し、東京 3 個・大阪 3 個を最初から公開する（ADR-0025）。
 - **数値の正本**：レート制限は [rate-limiting.md](rate-limiting.md) の 4 節（エッジの IP は api 5 分に 30,000、Vault・Checkout 5 分に 1,000）。Webhook の送信のタイムアウト（接続 5 秒・全体 15 秒）と送信先ごとの同時実行（10）は [events-and-webhooks.md](events-and-webhooks.md)。`lock_timeout` は 2 秒。冪等キーのパーティションは 48 時間で `DROP`。保持期間は [security.md](security.md) の 13 節。SLO は [runbooks/README.md](../runbooks/README.md) の 1 節。
 - **監査の記録**：`security_events` は `audit_events` の一部として扱い、DB に 1 年、アーカイブに 7 年（ADR-0023）。
-- **API の版**：上げた版を戻せる期間は 72 時間（本システムの決定）。`.preview` の版は持たない（[api.md](api.md) の 15 節）。
+- **API のバージョン**：上げたバージョンを戻せる期間は 72 時間（本システムの決定）。`.preview` のバージョンは持たない（[api.md](api.md) の 15 節）。
 - **その他の既定案**：要求のログは本文を持たずメタデータを 30 日。ダッシュボードのセッションはアイドル 12 時間・絶対 7 日。独自のロールは持たない。レビュー中の決済の入金は止めない。Checkout に CAPTCHA 相当の部品を作らず WAF の Challenge とルールで守る。`fingerprint` は加盟店ごと。銀行振込の PaymentIntent は自動で失効させない。ダッシュボードのホームは日次の集計の表から出す。`Retry-After` を 429 に付ける。
 - 領域ごとの決定は、各文書の「決定と持ち越し」の節にある：[api.md](api.md)、[auth-and-keys.md](auth-and-keys.md)、[payments.md](payments.md)、[payment-methods.md](payment-methods.md)、[events-and-webhooks.md](events-and-webhooks.md)、[checkout.md](checkout.md)、[dashboard.md](dashboard.md)、[fraud.md](fraud.md)、[rate-limiting.md](rate-limiting.md)、[card-vault.md](card-vault.md)、[security.md](security.md)。
 

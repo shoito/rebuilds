@@ -7,7 +7,7 @@
 | 表 | スキーマ | テナント | 中身 |
 | --- | --- | --- | --- |
 | `reminder_plans` | `ops` | 外 | 7 日先までの送る予定（ID と時刻だけ） |
-| `reminder_plan_heads` | `ops` | 外 | （受け手, 予定オブジェクト）の計画の頭の版 |
+| `reminder_plan_heads` | `ops` | 外 | （受け手, 予定オブジェクト）の計画の頭のバージョン |
 | `reminder_shard_leases` | `ops` | 外 | 256 のシャードの借り |
 | `reminder_deliveries` | `ops` | 外 | 送信の記録（一意の鍵で重複を消す） |
 | `calendar_list_reminder_subscribers` | 既定 | 内（カレンダー） | 共有のカレンダーに既定のリマインダーを持つ利用者 |
@@ -155,7 +155,7 @@ erDiagram
 | `kind` | `text` | NOT NULL | — | `reminder`・`agenda`・`booker` |
 | `method` | `text` | NOT NULL | — | `popup`・`email` |
 | `minutes` | `integer` | NOT NULL | — | 0〜40,320（`agenda` は 0） |
-| `plan_version` | `bigint` | NOT NULL | — | 計画した時の予定オブジェクトの版（`agenda` は `notification_settings.settings_version`） |
+| `plan_version` | `bigint` | NOT NULL | — | 計画した時の予定オブジェクトのバージョン（`agenda` は `notification_settings.settings_version`） |
 | `status` | `text` | NOT NULL | `'pending'` | `pending`・`claimed`・`done`・`skipped_late` |
 | `claimed_at` | `timestamptz` | NULL | — | |
 | `claimed_by` | `text` | NULL | — | 借りたタスク |
@@ -176,14 +176,14 @@ erDiagram
 
 ### 2.2 `ops.reminder_plan_heads`
 
-（受け手, 予定オブジェクト）の計画の頭の版（[reminders-and-notifications.md](../reminders-and-notifications.md) の 5.3 節）。届いた `reminder.replan` の `version` が頭以下なら捨てる。
+（受け手, 予定オブジェクト）の計画の頭のバージョン（[reminders-and-notifications.md](../reminders-and-notifications.md) の 5.3 節）。届いた `reminder.replan` の `version` が頭以下なら捨てる。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `recipient_id` | `uuid` | NOT NULL | — | 利用者か予約（D-6） |
 | `event_object_id` | `uuid` | NOT NULL | — | `agenda` は全 0 の UUID |
-| `version` | `bigint` | NOT NULL | — | 最後に計画した版 |
+| `version` | `bigint` | NOT NULL | — | 最後に計画したバージョン |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` | |
 
 - キー：PK `(tenant_id, recipient_id, event_object_id)`。

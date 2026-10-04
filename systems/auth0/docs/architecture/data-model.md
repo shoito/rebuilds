@@ -14,11 +14,11 @@
 | ファイル | 内容 | テーブル数 | ER 図 |
 | --- | --- | --- | --- |
 | この文書 | 規約、テナントの外の表、全体の ER 図、テーブルの索引、横断的な不変条件、テナントのコンテキスト、決めたこと | — | 1 |
-| [data-model/tenancy-and-applications.md](data-model/tenancy-and-applications.md) | アカウント、テナント、ホスト名の解決、設定の版、メンバー、アプリ、資格情報、API、M2M の許可、カスタムドメイン | 13 | 2 |
+| [data-model/tenancy-and-applications.md](data-model/tenancy-and-applications.md) | アカウント、テナント、ホスト名の解決、設定のバージョン、メンバー、アプリ、資格情報、API、M2M の許可、カスタムドメイン | 13 | 2 |
 | [data-model/users-and-connections.md](data-model/users-and-connections.md) | ユーザー、墓標、ID、接続、パスワード、識別子、チケット、IdP のトークン。後のインポート・エクスポート、SCIM、エンタープライズ接続 | 16 | 2 |
-| [data-model/mfa-and-attack-protection.md](data-model/mfa-and-attack-protection.md) | 認証器、TOTP、WebAuthn、リカバリーコード、メールの OTP、登録のチケット、ブルートフォースのブロック、漏えいしたパスワードの版 | 8 | 1 |
+| [data-model/mfa-and-attack-protection.md](data-model/mfa-and-attack-protection.md) | 認証器、TOTP、WebAuthn、リカバリーコード、メールの OTP、登録のチケット、ブルートフォースのブロック、漏えいしたパスワードのバージョン | 8 | 1 |
 | [data-model/login-and-sessions.md](data-model/login-and-sessions.md) | ログインのトランザクション、認可コード、リフレッシュトークン、同意、デバイス認可、`jti`、PAR、セッション、Back-Channel Logout、ブランディング、規約と同意の記録 | 15 | 2 |
-| [data-model/keys-and-secrets.md](data-model/keys-and-secrets.md) | 署名鍵（Signer が読む表）、鍵の操作、JWKS の書き出し、外部 IdP の鍵、テナントの DEK、pepper の版 | 8 | 1 |
+| [data-model/keys-and-secrets.md](data-model/keys-and-secrets.md) | 署名鍵（Signer が読む表）、鍵の操作、JWKS の書き出し、外部 IdP の鍵、テナントの DEK、pepper のバージョン | 8 | 1 |
 | [data-model/email-and-logs.md](data-model/email-and-logs.md) | メールのテンプレート・事業者・送信ドメイン・送信の待ち・記録・抑止、ログストリーム、ログのクラスタの表 | 10 | 2 |
 | [data-model/organizations-and-actions.md](data-model/organizations-and-actions.md) | Organizations（E14）と Actions（E13） | 12 | 2 |
 | [data-model/operations.md](data-model/operations.md) | 監査、outbox、サポートの参照、リーガルホールド、DR、レート制限の上書き、非常用の経路、ダッシュボードの設定 | 10 | 1 |
@@ -122,7 +122,7 @@ DB のロール：
 | 用途 | 型 | 規則 |
 | --- | --- | --- |
 | ID | `uuid` | 2.2 節 |
-| 件数・連番・版 | `bigint`（小さいものは `integer`・`smallint`） | |
+| 件数・連番・バージョン | `bigint`（小さいものは `integer`・`smallint`） | |
 | 時刻 | `timestamptz` | UTC で保存する |
 | 期間 | `integer`（秒・分・日） | 列名に単位を付ける（`session_idle_minutes`、`interval_seconds`）。`interval` 型は使わない |
 | 列挙 | `text` ＋ `CHECK (x IN (...))` | `ENUM` 型は使わない（値の追加を expand / contract で扱うため） |
@@ -155,10 +155,10 @@ DB のロール：
 
 | 種類 | 列 | 例 |
 | --- | --- | --- |
-| 人の選ぶ秘密・低エントロピーの秘密 | `*_hash`（`text`、PHC 形式。Argon2id＋pepper の版） | `password_credentials.password_hash`、`password_history.password_hash`、`recovery_codes.code_hash`、`credential_tickets.code_hash` |
+| 人の選ぶ秘密・低エントロピーの秘密 | `*_hash`（`text`、PHC 形式。Argon2id＋pepper のバージョン） | `password_credentials.password_hash`、`password_history.password_hash`、`recovery_codes.code_hash`、`credential_tickets.code_hash` |
 | 短いコードの鍵付きハッシュ | `*_hmac`・`*_hash`（`bytea`、HMAC-SHA-256。pepper かテナントの鍵） | `otp_challenges.code_hmac`、`device_authorizations.user_code_hash`、`brute_force_blocks.identifier_hmac`、`email_messages.to_hash`、`user_tombstones.user_id_hmac` |
 | 高エントロピーの秘密 | `*_hash`（`bytea`、SHA-256） | `authorization_codes.code_hash`、`refresh_tokens.token_hash`、`client_credentials.secret_hash`、`sessions.secret_hash`、`login_transactions.handle_hash`、`credential_tickets.secret_hash`、`scim_tokens.token_hash`、各種の `ticket_hash`・`token_hash` |
-| 戻す必要のある秘密 | `*_ciphertext`（`bytea`、AES-256-GCM、AAD 付き）とテナントの DEK の版 | `totp_secrets.secret_ciphertext`、`connections.secrets_ct`、`idp_tokens.ciphertext`、`log_streams.sink_ciphertext`、`email_providers.secret_ct`、`action_secrets.ciphertext`、`email_outbox.secret_vars_ciphertext` |
+| 戻す必要のある秘密 | `*_ciphertext`（`bytea`、AES-256-GCM、AAD 付き）とテナントの DEK のバージョン | `totp_secrets.secret_ciphertext`、`connections.secrets_ct`、`idp_tokens.ciphertext`、`log_streams.sink_ciphertext`、`email_providers.secret_ct`、`action_secrets.ciphertext`、`email_outbox.secret_vars_ciphertext` |
 | 署名の秘密鍵 | `*_ciphertext`（Signer だけが復号できる） | `signing_keys.private_key_ciphertext`、`external_idp_keys.private_key_ciphertext` |
 
 - マイグレーションの CI で、`password`・`secret`・`token`・`code`・`seed`・`private_key` を含む名前の列が、上のどれかであることを確かめる（[delivery.md](delivery.md) の 2.1 節）。既存の名前の `secrets_ct`・`secret_ct` は `*_ciphertext` と同じ扱いにする。新しい列は `*_ciphertext` にする。
@@ -169,8 +169,8 @@ KMS の鍵の階層（正本は [keys-and-secrets.md](keys-and-secrets.md) の 3
 | KMS の鍵 | 包むもの | DB の列 | 復号できる主体 |
 | --- | --- | --- | --- |
 | `<brand>-signing-keys` | 署名鍵ごとの DEK、外部 IdP の鍵ごとの DEK | `signing_keys.dek_ciphertext`、`external_idp_keys.dek_ciphertext` | Signer だけ |
-| `<brand>-credentials` | テナントごとの DEK（版つき） | `tenant_data_keys.dek_ciphertext` | Auth・Management API・Worker |
-| `<brand>-pepper` | pepper（暗号文は Secrets Manager） | `pepper_versions`（版と名前だけ） | Auth・Management API（`Decrypt` だけ） |
+| `<brand>-credentials` | テナントごとの DEK（バージョンつき） | `tenant_data_keys.dek_ciphertext` | Auth・Management API・Worker |
+| `<brand>-pepper` | pepper（暗号文は Secrets Manager） | `pepper_versions`（バージョンと名前だけ） | Auth・Management API（`Decrypt` だけ） |
 | `<brand>-data` | Aurora・S3・SQS・Secrets Manager の保存の暗号化 | — | AWS のサービス（`kms:ViaService`） |
 
 - AAD は、署名鍵が `tenant_id|kid|alg`、テナントの DEK で包む秘密が `tenant_id|行の ID|用途`。DB の行を入れ替えても復号に失敗する。
@@ -212,7 +212,7 @@ KMS の鍵の階層（正本は [keys-and-secrets.md](keys-and-secrets.md) の 3
 
 - 無停止の expand / contract で行う。列の削除・改名・型の変更・既定値のない `NOT NULL` の追加を、同じリリースで行わない。
 - テナントテーブルの追加は、`tenant_id`、複合キー、`FORCE ROW LEVEL SECURITY`、ポリシーをマイグレーションの lint で検査する（ADR-0002 の Confirmation）。例外は 3 節の表と一致させる。
-- 設定の表（[data-model/tenancy-and-applications.md](data-model/tenancy-and-applications.md) の `tenant_config_versions` の節の一覧）に書く関数が、版を上げる関数を呼んでいることを CI で確かめる（ADR-0032）。
+- 設定の表（[data-model/tenancy-and-applications.md](data-model/tenancy-and-applications.md) の `tenant_config_versions` の節の一覧）に書く関数が、バージョンを上げる関数を呼んでいることを CI で確かめる（ADR-0032）。
 - 個人データの列に、分類と保持の区分の注記を付ける（マイグレーションの lint。ADR-0055）。
 
 ## 3. RLS の例外（テナントの外の表）
@@ -225,11 +225,11 @@ RLS を掛けない表の全部。**ここにない表は、すべて `tenant_id
 | `tenants` | テナントの解決と、コンテキストを決める前の読み取り。秘密を持たない | 解決の関数、`platform` | `platform` | 同上 |
 | `tenant_name_tombstones` | 名前の再利用の禁止を、テナントをまたいで確かめる | 作成の関数 | `platform` | 同上 |
 | `tenant_hostnames` | ホスト名 → テナントの解決はテナントの決定の前。一意はテナントをまたぐ | 解決の関数 | `mgmt_app` の遷移の関数だけ | 同上 |
-| `tenant_config_versions` | 全タスクが全テナントの版を 5 秒ごとに読む。値は版と時刻だけ | 全タスク | 設定を書くトランザクション（関数） | 同上 |
-| `signing_key_state_versions` | Signer が全テナントの鍵の版を 2 秒ごとに読む。値は版と時刻だけ（2026-09-28 に追加） | `signer`、`mgmt_app` | `mgmt_app` の遷移の関数だけ | [keys](data-model/keys-and-secrets.md) |
+| `tenant_config_versions` | 全タスクが全テナントのバージョンを 5 秒ごとに読む。値はバージョンと時刻だけ | 全タスク | 設定を書くトランザクション（関数） | 同上 |
+| `signing_key_state_versions` | Signer が全テナントの鍵のバージョンを 2 秒ごとに読む。値はバージョンと時刻だけ（2026-09-28 に追加） | `signer`、`mgmt_app` | `mgmt_app` の遷移の関数だけ | [keys](data-model/keys-and-secrets.md) |
 | `outbox`、`email_outbox` | Relay が全テナントの行を順に読む。行は `tenant_id` を持つ。`outbox` に秘密を入れない。`email_outbox` の秘密は暗号文で、送信の後に消す | `relay` | 各サービス（業務のトランザクションの中で。`WITH CHECK` で自分のテナント） | [operations](data-model/operations.md)、[email-and-logs](data-model/email-and-logs.md) |
 | `pepper_versions` | pepper はテナントに属さない | `auth_app`、`mgmt_app` | `platform` | [keys](data-model/keys-and-secrets.md) |
-| `breached_password_versions` | プラットフォームのデータセットの版 | `auth_app`、`worker` | `worker`（取り込みのジョブ） | [mfa-and-attack-protection](data-model/mfa-and-attack-protection.md) |
+| `breached_password_versions` | プラットフォームのデータセットのバージョン | `auth_app`、`worker` | `worker`（取り込みのジョブ） | [mfa-and-attack-protection](data-model/mfa-and-attack-protection.md) |
 | `rate_limit_overrides` | Ops が扱う上書き。全タスクが読む | 全タスク | `platform`（Ops の承認） | [operations](data-model/operations.md) |
 | `mgmt_api_deprecations` | 本システムの設定 | `mgmt_app` | `migrator` | 同上 |
 | `platform_audit_events` | テナントをまたぐ操作と、`tenant_id` のない操作を含む | `platform`、監査のロール | 各サービス（追記だけ） | 同上 |
@@ -457,7 +457,7 @@ erDiagram
 | I-12 | ログ・outbox・監査の差分・ストリームに秘密を入れない | 許可リストのスキーマ、秘密の形の走査、性質ベーステスト | [ADR-0061](../decisions/0061-secret-free-telemetry.md)、[ADR-0054](../decisions/0054-audit-log.md) |
 | I-13 | 有効なカスタムドメインのホスト名は、テナントをまたいで 1 つ | `custom_domains_active_hostname` と `tenant_hostnames` の主キー | [ADR-0038](../decisions/0038-custom-domain-verification-and-certificates.md) |
 | I-14 | テナントの名前は、削除の後も再利用しない | `UNIQUE (region, name)` と `tenant_name_tombstones` | [ADR-0030](../decisions/0030-accounts-tenants-and-members.md) |
-| I-15 | 設定の表を変えたトランザクションは、同じトランザクションでテナントの設定の版を上げる | 書き込みの関数と CI の静的な検査 | [ADR-0032](../decisions/0032-tenant-config-cache.md) |
+| I-15 | 設定の表を変えたトランザクションは、同じトランザクションでテナントの設定のバージョンを上げる | 書き込みの関数と CI の静的な検査 | [ADR-0032](../decisions/0032-tenant-config-cache.md) |
 | I-16 | 監査の対象の操作が成功したら、同じトランザクションに監査ログが 1 件ある。監査ログは追記だけ | アプリのロールに UPDATE・DELETE を与えない。表駆動の結合テスト | ADR-0054 |
 | I-17 | 規約の同意は、ユーザーの作成と同じトランザクションで書く。記録は追記だけ | `consent_records` の INSERT だけの権限 | [ADR-0013](../decisions/0013-consent-records.md) |
 | I-18 | TOTP のコード・OTP・リカバリーコード・チケットは 1 回だけ使える | `last_used_step`・`consumed_at`・`used_at` の条件付きの更新（writer） | [ADR-0023](../decisions/0023-otp-and-recovery-codes.md)、ADR-0005 |
@@ -472,7 +472,7 @@ erDiagram
 
 ```
 要求 ─▶ ホスト名 → tenant_id（メモリーの対応表。なければ DB を読まずに 404）
-      ─▶ 設定のスナップショット（メモリー。版で確かめる）
+      ─▶ 設定のスナップショット（メモリー。バージョンで確かめる）
       ─▶ DB を使うとき：BEGIN; SET LOCAL app.tenant_id = …
       ─▶ ハンドラー（以降のクエリはすべて RLS の下）
       ─▶ COMMIT（SET LOCAL の値はここで消える）
@@ -515,7 +515,7 @@ PM の方針（既定案・推奨案で進める）により、次のとおり�
 | D-1 | この文書の役割 | 索引から、形の正本に変えた。領域ごとに `data-model/` へ分けた | 列・索引・規模を 1 か所で見られるようにする。振る舞いの正本は領域の文書のまま |
 | D-2 | 時間で切る表の分割の鍵 | UUIDv7 の `id` の範囲で切る（2.8 節）。旧い `audit_events` の `RANGE (occurred_at)` は作れない定義だったので直した | PostgreSQL は主キーに分割の鍵を求める |
 | D-3 | 分割した表のハッシュの引き当て | 一意の制約ではなく普通の索引にし、1 回限りは条件付きの更新で守る。`login_transactions` の `UNIQUE (handle_hash)` を外した | 同上。値は 256 ビットの乱数 |
-| D-4 | `signing_key_state_versions` | テナントの外の表にした（3 節） | Signer が全テナントの版を 1 回で読むため。行は版と時刻だけで、`tenant_config_versions` と同じ扱い |
+| D-4 | `signing_key_state_versions` | テナントの外の表にした（3 節） | Signer が全テナントのバージョンを 1 回で読むため。行はバージョンと時刻だけで、`tenant_config_versions` と同じ扱い |
 | D-5 | `credential_tickets.secret_hash` が SHA-256 と Argon2id を 1 つの列で持っていた | リンクは `secret_hash`（`bytea`、SHA-256）、コードは `code_hash`（`text`、PHC）に分けた | 2.7 節の型の規則に合わせ、`CHECK` で目的と結ぶ |
 | D-6 | `clients` の主キー | `(tenant_id, client_id)`。`uuid` の `id` を持たない | 他の表がすべて `client_id` で指している |
 | D-7 | 管理者を指す列 | `member_user_id`（`text`、管理用のテナントの `sub`）に揃えた。`email_templates.updated_by`・`support_access_grants.granted_by` の `uuid` を直した | 管理者はテナントをまたぐので `user_pk` で指せない |

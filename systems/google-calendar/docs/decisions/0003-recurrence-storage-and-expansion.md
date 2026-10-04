@@ -43,9 +43,9 @@ CalDAV は、同じ UID の VEVENT（マスターと上書き）を 1 つのリ�
 ### 予定オブジェクト
 
 - 1 つの UID を 1 つの予定オブジェクト（`event_objects`）にする。マスター（規則つき、または単発）と、`RECURRENCE-ID`（回の元の開始の壁時計の時刻＋TZID、終日なら日付）ごとの上書き（`event_overrides`）を持つ。
-- 版（`version`）は予定オブジェクトに 1 つ。マスターか上書きのどれかが変われば上がる。CalDAV の ETag、API の `etag`、変更のログの `object_version` の元になる（[ADR-0005](0005-change-log-and-sync-tokens.md)）。iTIP の `SEQUENCE` は別の値で、意味のある変更でだけ上がる（[ADR-0014](0014-itip-state-transfer-and-sequence.md)）。
+- バージョン（`version`）は予定オブジェクトに 1 つ。マスターか上書きのどれかが変われば上がる。CalDAV の ETag、API の `etag`、変更のログの `object_version` の元になる（[ADR-0005](0005-change-log-and-sync-tokens.md)）。iTIP の `SEQUENCE` は別の値で、意味のある変更でだけ上がる（[ADR-0014](0014-itip-state-transfer-and-sequence.md)）。
 
-> 2026-10-04 の注記：最初の設計では、版を `SEQUENCE` の元とした。領域の工程で、`SEQUENCE` は RFC 5546 の 2.1.4 節の項目などの変更でだけ上げる別の値にした（[ADR-0014](0014-itip-state-transfer-and-sequence.md)）。
+> 2026-10-04 の注記：最初の設計では、バージョンを `SEQUENCE` の元とした。領域の工程で、`SEQUENCE` は RFC 5546 の 2.1.4 節の項目などの変更でだけ上げる別の値にした（[ADR-0014](0014-itip-state-transfer-and-sequence.md)）。
 - 上書きは、変えた項目だけを持つ差分ではなく、その回の VEVENT の全体を持つ。iCalendar の意味と同じにし、マスターの変更で上書きの意味が変わらないようにする。系列の全体の変更で、上書きの中のマスターと同じ値だった項目を追従させるかは、events-and-recurrence の領域で決める。
 - 消した回は EXDATE に入れる。上書きを持つ回を消すときは、上書きも消して EXDATE に入れる。
 
@@ -66,10 +66,10 @@ CalDAV は、同じ UID の VEVENT（マスターと上書き）を 1 つのリ�
 
 - 範囲は、今日から過去 31 日と未来 548 日（約 18 か月）。毎日 `expander` が範囲の端を進め、新しく入った日の回を足し、外れた日の回を消す。
 - 行：`(tenant_id, calendar_id, event_object_id, recurrence_id, start_utc, end_utc, transparency, status, tzdata_version, object_version)`。月で分割する（`pg_partman`）。
-- 行の `object_version` は「その行が最後に変わった予定オブジェクトの版」である。予定オブジェクトの今の版ではない。照合は版ではなく、その場の `expand()` との比べで行う（[ADR-0010](0010-occurrence-index-maintenance.md)）。
+- 行の `object_version` は「その行が最後に変わった予定オブジェクトのバージョン」である。予定オブジェクトの今のバージョンではない。照合はバージョンではなく、その場の `expand()` との比べで行う（[ADR-0010](0010-occurrence-index-maintenance.md)）。
 - 索引は写しである。予定オブジェクトの書き込みと同じトランザクションで、その予定オブジェクトの範囲の中の回の集合の差分だけを書く（[ADR-0010](0010-occurrence-index-maintenance.md)）。捨ててもその場の展開から作り直せる。
 
-> 2026-10-04 の注記：最初の設計では、書き込みのたびに範囲の中の行を作り直すとし、`object_version` の意味を決めていなかった。領域の工程で、差分だけを書き、`object_version` を行が最後に変わった版とした（[ADR-0010](0010-occurrence-index-maintenance.md)）。
+> 2026-10-04 の注記：最初の設計では、書き込みのたびに範囲の中の行を作り直すとし、`object_version` の意味を決めていなかった。領域の工程で、差分だけを書き、`object_version` を行が最後に変わったバージョンとした（[ADR-0010](0010-occurrence-index-maintenance.md)）。
 - 空き時間・会議室・リマインダー・範囲の表示は、範囲の中は索引を読み、範囲の外（未来 548 日より先、過去 31 日より前）は、その場で `expand` を呼ぶ。会議室の予約は範囲の中に限る（[architecture/README.md](../architecture/README.md) の 6 節）。
 - 範囲と行の数は、E2 の前の `occurrence-index-poc` で確かめる。
 

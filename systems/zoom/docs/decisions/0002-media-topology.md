@@ -57,7 +57,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - 送り手の上りは、simulcast で 1 本の場合より 3〜4 割ほど増える（**未検証**。E4 の `svc-vp9-mode` で計測する）。
   - 層の選択、キーフレームの要求の集約、話者の検出を、SFU で正しく作る必要がある。
-  - RED（[ADR-0017](0017-opus-dtx-fec-red.md)）と、E2EE の会議の Dependency Descriptor の判断（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）のため、mediasoup のフォークを持ち、上流の版に追従する。
+  - RED（[ADR-0017](0017-opus-dtx-fec-red.md)）と、E2EE の会議の Dependency Descriptor の判断（[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）のため、mediasoup のフォークを持ち、上流のバージョンに追従する。
   - カスケードの中継の経路と、Node の障害の時の付け替えが、Meeting Actor の設計を複雑にする（[ADR-0005](0005-meeting-state-and-signaling.md)）。
 
 ## Confirmation

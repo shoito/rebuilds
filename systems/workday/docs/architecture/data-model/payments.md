@@ -196,7 +196,7 @@ erDiagram
 
 ### 2.2 `consent_terms`
 
-同意・承諾の文面の版（口座振込の同意、明細の電子交付の承諾）。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。
+同意・承諾の文面のバージョン（口座振込の同意、明細の電子交付の承諾）。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -362,7 +362,7 @@ erDiagram
 
 ### 4.1 `gl_account_maps`
 
-勘定の対応（版の表）。定義元：[payments-and-accounting.md](../payments-and-accounting.md) の 7.1 節。
+勘定の対応（バージョンの表）。定義元：[payments-and-accounting.md](../payments-and-accounting.md) の 7.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

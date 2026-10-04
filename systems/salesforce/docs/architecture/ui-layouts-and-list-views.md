@@ -1,6 +1,6 @@
 # UI, layouts and list views: Salesforce
 
-ページレイアウト、関連リスト、レコードタイプごとの画面、リストビュー（条件の保存、問い合わせの言語へのコンパイル、共有に従う件数）、インライン編集、メタデータを変える Setup の画面、アクセシビリティの設計。土台は [ADR-0003](../decisions/0003-metadata-driven-runtime.md)（メタデータの版とコンパイル）、[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md)（`layouts:<object_id>` の部品）、[ADR-0018](../decisions/0018-record-query-language.md)（問い合わせの言語）、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)（REST API）。この文書で決めたことは、次の 2 つの ADR にある。
+ページレイアウト、関連リスト、レコードタイプごとの画面、リストビュー（条件の保存、問い合わせの言語へのコンパイル、共有に従う件数）、インライン編集、メタデータを変える Setup の画面、アクセシビリティの設計。土台は [ADR-0003](../decisions/0003-metadata-driven-runtime.md)（メタデータのバージョンとコンパイル）、[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md)（`layouts:<object_id>` の部品）、[ADR-0018](../decisions/0018-record-query-language.md)（問い合わせの言語）、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)（REST API）。この文書で決めたことは、次の 2 つの ADR にある。
 
 - ページレイアウトとレコードタイプは、オブジェクトごとの `layouts` の部品にコンパイルする。レコードの画面は、レイアウト・値・関連リストの最初のページを 1 回の要求で組み立てる「レコードのページ」の API で返す。レイアウトはアクセスを与えず、FLS と共有が常に優先する（[ADR-0023](../decisions/0023-layouts-and-record-page-composition.md)）。
 - リストビューの条件は、問い合わせの言語の文字列ではなく、条件の AST（JSON）で保存し、見る人の権限で毎回コンパイルする。共有するのは定義だけで、データではない。見る人が読めない項目を条件に持つリストビューは、条件を落とさず、その人には開けないものにする（[ADR-0024](../decisions/0024-list-views-as-filter-ast.md)）。
@@ -16,7 +16,7 @@
 | レコードのページの API と、画面の組み立て | 問い合わせの言語と計画（[query-language-and-api.md](query-language-and-api.md)） |
 | リストビュー（条件、列、並べ替え、範囲、共有、件数）、最近見たもの | レポート（[reports-and-dashboards.md](reports-and-dashboards.md)） |
 | インライン編集（詳細・リストビュー） | 全文検索の画面（search の領域） |
-| Setup の画面の枠（メタデータの編集、版、同時編集） | フローのビルダーの中身（[automation-flows.md](automation-flows.md)）、デプロイ（sandboxes-and-deploy の領域） |
+| Setup の画面の枠（メタデータの編集、バージョン、同時編集） | フローのビルダーの中身（[automation-flows.md](automation-flows.md)）、デプロイ（sandboxes-and-deploy の領域） |
 | アクセシビリティ、日本語・英語の表示 | 利用者・ログイン（orgs-users-and-auth の領域） |
 
 ## 2. 本家の仕組み（確かめたこと）
@@ -38,7 +38,7 @@
 ### 3.1 形
 
 ```
-layout（object、api_name、版）
+layout（object、api_name、バージョン）
  ├─ sections[]：label、columns（1・2）、collapsed、tab_order（横・縦）
  │    └─ items[]：field_id | blank | canvas_component、behavior（edit | readonly | required）
  ├─ related_lists[]：child_relationship、columns（10 まで）、sort、page_size（5・10・25）、actions
@@ -46,7 +46,7 @@ layout（object、api_name、版）
  └─ actions[]：標準の操作（編集、削除、所有者の変更、共有、変換、承認の申請）と、画面のフロー
 ```
 
-- レイアウトは `md_layouts` にメタデータとして持ち、変更で版を上げる。コンパイルして `layouts:<object_id>` の部品に入れる（ADR-0007）。
+- レイアウトは `md_layouts` にメタデータとして持ち、変更でバージョンを上げる。コンパイルして `layouts:<object_id>` の部品に入れる（ADR-0007）。
 - 1 つのレイアウトの項目は 200 まで、関連リストは 20 まで。本家は 250 項目を超えると問い合わせが大きくなりすぎると書く（Limits）。
 - `canvas_component` は、MVP では「活動のタイムライン」「関連するレコードの要約」「承認の履歴」の組み込みの部品だけ。利用者の作る部品は MVP の後。
 
@@ -59,7 +59,7 @@ layout（object、api_name、版）
 | レコードタイプがない（オブジェクトにレコードタイプがない） | `record_type_id` を空として引く |
 
 - 割り当てはプロファイルの既定値（[sharing-and-record-access.md](sharing-and-record-access.md) の 3.1 節。プロファイルは既定値の入れ物）。
-- 割り当ての変更はメタデータの変更で、版を上げる。
+- 割り当ての変更はメタデータの変更で、バージョンを上げる。
 
 ### 3.3 レイアウトはアクセスを与えない
 
@@ -109,7 +109,7 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 }
 ```
 
-- 手順：版を固定 → レイアウトを決める（3.2 節）→ レコードを読む（レイアウトの項目のうち読めるものだけ。FLS で落として返す画面用の要求。ADR-0003）→ 関連リストの最初のページを並行で読む → 操作の一覧を、水準とオブジェクトの権限で決める。
+- 手順：バージョンを固定 → レイアウトを決める（3.2 節）→ レコードを読む（レイアウトの項目のうち読めるものだけ。FLS で落として返す画面用の要求。ADR-0003）→ 関連リストの最初のページを並行で読む → 操作の一覧を、水準とオブジェクトの権限で決める。
 - NFR-001（レコードの詳細の API の p95 300ms）に収めるため、次の予算を置く。
 
 | 予算 | 値 | 超えた時 |
@@ -159,7 +159,7 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 
 ```
 リストビューの定義（AST の JSON）
-   │ 見る人の版・権限の形で
+   │ 見る人のバージョン・権限の形で
    ▼
 束縛（field_id → 項目）→ 型の検査 → 権限（FLS：条件・列・並べ替え）→ 共有の条件の付加 → 計画 → SQL
 ```
@@ -200,7 +200,7 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 | `GET /api/v1/objects/{object}/list-views/{id}/records?page_size=50` | 結果（カーソル付き）。`count=true` で打ち切った件数 |
 | `POST`・`PATCH`・`DELETE /api/v1/objects/{object}/list-views[/{id}]` | 作成・変更・削除 |
 
-- `visibility = private` のリストビューは、作った人のデータ（`user_list_views`）で、メタデータの版を上げない。`all`・`groups` のものはメタデータ（`md_list_views`）で、`manage_public_list_views` のシステムの権限か `customize_application` が要り、版を上げる。本家も「自分だけ」のリストビューをメタデータにしない（MDAPI）。
+- `visibility = private` のリストビューは、作った人のデータ（`user_list_views`）で、メタデータのバージョンを上げない。`all`・`groups` のものはメタデータ（`md_list_views`）で、`manage_public_list_views` のシステムの権限か `customize_application` が要り、バージョンを上げる。本家も「自分だけ」のリストビューをメタデータにしない（MDAPI）。
 
 ## 6. インライン編集
 
@@ -215,13 +215,13 @@ GET /api/v1/ui/objects/{object}/new?record_type=...
 ### 7.1 形
 
 - Setup は、メタデータの種類ごとの JSON Schema から作る**汎用の編集の画面**と、専用のビルダー（レイアウト、リストビュー、フロー、レポートの型、承認）で作る。新しいメタデータの種類は、Schema を足すだけで一覧・詳細・編集の画面ができる。
-- Setup の要求は Metadata のサービスが受け、1 回の保存は 1 つのメタデータの版になる（ADR-0003。[metadata-and-runtime.md](metadata-and-runtime.md) の 4.1 節）。
+- Setup の要求は Metadata のサービスが受け、1 回の保存は 1 つのメタデータのバージョンになる（ADR-0003。[metadata-and-runtime.md](metadata-and-runtime.md) の 4.1 節）。
 - Setup に入れるのは `customize_application` を持つ利用者。利用者・権限の画面は `manage_users`、共有の画面は `manage_sharing` も見る（共有の領域の 3.2 節）。
 
 ### 7.2 同時編集
 
 - 2 人の管理者が同じ要素（例：同じレイアウト）を同時に編集した時、後の保存が先の保存を黙って上書きしないよう、要素ごとの `updated_version` を楽観の鍵にする。編集を始めた時の `updated_version` を保存に付け、違えば 409 `METADATA_CONFLICT` にし、差分を見せる。
-- 組織の版（`metadata_version`）全体を鍵にしない。別の要素の変更で、関係ない編集が失敗するため。
+- 組織のバージョン（`metadata_version`）全体を鍵にしない。別の要素の変更で、関係ない編集が失敗するため。
 
 ### 7.3 変更の下見と影響
 

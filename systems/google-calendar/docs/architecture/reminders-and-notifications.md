@@ -7,7 +7,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md) | リマインダーの時計は、Aurora の分の桶の表（`reminder_plans`、発火の日で分割、利用者のハッシュで 256 のシャード）と、シャードを借りた `reminder-scheduler` のタスクのメモリーのタイマーホイール（1 秒の刻み、5 分先まで）の組み合わせにする。発火は、計画の行を `pending` から `claimed` に変える 1 回の更新と、送信の記録（`reminder_deliveries`）への一意の鍵の挿入で行い、挿入できたものだけを notifier へ渡す。15 分を超えて遅れたものは送らずに数える |
-| [0030](../decisions/0030-reminder-planning-horizon-and-replan.md) | リマインダーの計画は、今から 7 日先までの回だけを桶に置き、毎時の `reminder-planner.advance` が端を進める。予定オブジェクト・出欠・リマインダーの設定・カレンダーのタイムゾーン・tzdb の再計算の変更は、outbox の `reminder.replan` で、その（利用者, 予定オブジェクト）の待ちの行を作り直す。時刻つきの予定は UTC の瞬間から分を引き、終日と浮動の予定は壁時計の時刻で分を引いてから `resolve` する。送信の記録の一意の鍵は（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）で、版は鍵に入れず古さの確かめに使う |
+| [0030](../decisions/0030-reminder-planning-horizon-and-replan.md) | リマインダーの計画は、今から 7 日先までの回だけを桶に置き、毎時の `reminder-planner.advance` が端を進める。予定オブジェクト・出欠・リマインダーの設定・カレンダーのタイムゾーン・tzdb の再計算の変更は、outbox の `reminder.replan` で、その（利用者, 予定オブジェクト）の待ちの行を作り直す。時刻つきの予定は UTC の瞬間から分を引き、終日と浮動の予定は壁時計の時刻で分を引いてから `resolve` する。送信の記録の一意の鍵は（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）で、バージョンは鍵に入れず古さの確かめに使う |
 | [0031](../decisions/0031-notification-channels-and-content.md) | 通知の経路は画面の通知・Web Push・メールの 3 つ。送る時に `redact()` と出欠を確かめ直す。Web Push の本文には通知の ID だけを入れ、Service Worker が本システムから中身を取って表示する（予定の中身を外国の配信のサービスへ渡さない）。招待・変更・取り消し・返事の通知は、受け手と予定ごとに 2 分まとめる。毎朝の予定の一覧は、利用者のタイムゾーンの 06:00 に、計画の表の `agenda` の行として送る |
 
 ## 1. 目的と範囲
@@ -116,7 +116,7 @@ ADR-0030。
 | `tenant_id`・`user_id`・`calendar_id`・`event_object_id`・`recurrence_id` | 対象 |
 | `occurrence_start_utc` | 計画した時の回の開始 |
 | `kind`・`method`・`minutes` | `reminder`・`agenda`・`booker`（予約者へのリマインダー。`user_id` の代わりに `booking_id`。[booking-pages.md](booking-pages.md) の 8 節）、`popup`・`email`、分 |
-| `plan_version` | 計画した時の予定オブジェクトの版（`agenda` は利用者の設定の版） |
+| `plan_version` | 計画した時の予定オブジェクトのバージョン（`agenda` は利用者の設定のバージョン） |
 | `status` | `pending`・`claimed`・`done`・`skipped_late`（6.4 節） |
 | `claimed_at`・`claimed_by` | 借りたタスク |
 
@@ -149,9 +149,9 @@ DT-REM-002。outbox の `reminder.replan { tenant_id, user_id?, calendar_id, eve
 
 `reminder-planner`（Worker）の処理：
 
-1. （利用者, 予定オブジェクト）の頭の版 `reminder_plan_heads.version` を読む。届いた `version` 以下なら捨てる（順序の入れ替わりと重複）。
+1. （利用者, 予定オブジェクト）の頭のバージョン `reminder_plan_heads.version` を読む。届いた `version` 以下なら捨てる（順序の入れ替わりと重複）。
 2. テナントのコンテキストで、予定オブジェクトの範囲の中の回を展開の索引から読み、DT-REM-001 と設定から（回, 方法, 分）の一覧を作る。
-3. 1 つのトランザクションで、その（利用者, 予定オブジェクト）の `pending` の行を消し、新しい行を入れ、頭の版を上げる。`claimed`・`done` の行は消さない。
+3. 1 つのトランザクションで、その（利用者, 予定オブジェクト）の `pending` の行を消し、新しい行を入れ、頭のバージョンを上げる。`claimed`・`done` の行は消さない。
 4. `fire_at < now − 15 分` の行は作らない。`now − 15 分 ≤ fire_at < now` の行は作る（遅れて届いた付け替えで、まだ送っていなければ送る。重複は送信の記録の鍵で消える）。
 
 - 付け替えの遅れ（予定の確定から行の作り直しまで）の目標は p99 10 秒。10 秒より近い先のリマインダーは、古い行のまま発火しうるが、notifier の送る時の確かめ（7.1 節）が古い時刻のものを捨てる。
@@ -213,7 +213,7 @@ sequenceDiagram
 ```
 
 - 送信の記録の一意の鍵：`(tenant_id, user_id, event_object_id, recurrence_id, method, minutes, occurrence_start_utc)`（ADR-0030）。
-  - 版（`plan_version`）は鍵に入れず、列に持つ。版を鍵に入れると、タイトルだけの変更（版が上がる）の後に、遅れて作り直した行がもう一度送られるためである。古い時刻の行を送らない役目は、付け替えでの行の削除と、notifier の確かめ（7.1 節）が持つ。最初の設計の `(reminder_id, occurrence_start, method, version)` の書き方は、統合の工程で [architecture/README.md](README.md) の 1.3 節・題材の `AGENTS.md`・[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) とも、この鍵に揃えた（2026-10-04）。
+  - バージョン（`plan_version`）は鍵に入れず、列に持つ。バージョンを鍵に入れると、タイトルだけの変更（バージョンが上がる）の後に、遅れて作り直した行がもう一度送られるためである。古い時刻の行を送らない役目は、付け替えでの行の削除と、notifier の確かめ（7.1 節）が持つ。最初の設計の `(reminder_id, occurrence_start, method, version)` の書き方は、統合の工程で [architecture/README.md](README.md) の 1.3 節・題材の `AGENTS.md`・[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) とも、この鍵に揃えた（2026-10-04）。
 - 1 つの刻みの行は 5,000 件まで 1 回の更新にする。超えたら分けて続けて行う。
 - 時計の時刻は、タスクの時計（NTP で同期した ECS の時計）を使う。DB の `now()` と比べない。
 
@@ -385,7 +385,7 @@ notifier は、送信の記録 1 件ごとに、テナントのコンテキス�
 - **PROP-REM-001（高々 1 回）**：任意の予定の作成・移動・削除・リマインダーの変更・出欠の変更・参加者の写しの更新と、時刻の経過、障害の注入（claim の後・記録の後・SQS の後・送りの途中の停止、借りの交代、SQS の重複）を混ぜたとき、（回, 方法, 分）ごとの送信は高々 1 回。例外は 6.5 節の「送った後・`sent` の書き込みの前」の停止だけで、その数を数える。
 - **PROP-REM-002（古い時刻を送らない）**：送った各通知の回の開始は、送った時点の予定の回の開始と同じ。
 - **PROP-REM-003（漏れなし）**：任意の列で、停止が 15 分未満なら、範囲の中の送るべき（回, 方法, 分）がすべて送られる。15 分を超えたものは `skipped_late` に数えられる。
-- **PROP-REM-004（時刻の計算）**：任意の時刻の種類・TZID・分・tzdb の版で、`fire_at` が 5.4 節の式に等しい。終日の予定の `fire_at` を持ち主のタイムゾーンの壁時計に戻すと、その日の 00:00 から `minutes` を引いた壁時計の時刻（存在しない時刻を除く）になる。
+- **PROP-REM-004（時刻の計算）**：任意の時刻の種類・TZID・分・tzdb のバージョンで、`fire_at` が 5.4 節の式に等しい。終日の予定の `fire_at` を持ち主のタイムゾーンの壁時計に戻すと、その日の 00:00 から `minutes` を引いた壁時計の時刻（存在しない時刻を除く）になる。
 - **PROP-REM-005（中身）**：任意の ACL・公開範囲で、通知の本文（画面、Web Push の取得、メール）に `redact()` が隠す項目が現れない。Web Push の本文は通知の ID だけ。
 
 結合テスト：VAPID と RFC 8291 の暗号（既知の答えの組）、`404`・`410` での登録の削除、`List-Unsubscribe` と RFC 8058、SES の Bounce・Complaint から経路の停止。
@@ -416,7 +416,7 @@ notifier は、送信の記録 1 件ごとに、テナントのコンテキス�
 
 - **時計**：分の桶の表とシャードのタイマーホイール（ADR-0029。[architecture/README.md](README.md) の 6 節の決定のとおり）。
 - **計画の範囲**：7 日、毎時に進める（ADR-0030）。
-- **送信の記録の鍵**：版を鍵から外す（ADR-0030。6.3 節）。
+- **送信の記録の鍵**：バージョンを鍵から外す（ADR-0030。6.3 節）。
 - **終日の予定の分**：壁時計で引く（ADR-0030）。
 - **Web Push の本文**：通知の ID だけ（ADR-0031）。
 - **遅れの許容**：15 分（[quality.md](../quality.md) の 2.2.1 節 F のとおり）。

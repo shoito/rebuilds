@@ -55,7 +55,7 @@ rebuilds の他の題材（Slack、Stripe、Notion、Auth0 など）で、次の
 
 | 核（主な論点） | 本システムの作り方 | 本家の実装の使用 |
 | --- | --- | --- |
-| メタデータの実行基盤 | 自前（TypeScript）。データ辞書、版、コンパイラ（[ADR-0003](0003-metadata-driven-runtime.md)） | なし |
+| メタデータの実行基盤 | 自前（TypeScript）。データ辞書、バージョン、コンパイラ（[ADR-0003](0003-metadata-driven-runtime.md)） | なし |
 | カスタムオブジェクトの保存 | 自前の表の設計を PostgreSQL の上に作る（[ADR-0002](0002-custom-object-storage.md)） | なし。本家が公開した考え方（ピボットの索引の表）は参考にする |
 | 共有の計算 | 自前（[ADR-0004](0004-record-access-model.md)） | なし。本家が公開した考え方（共有の表、グループの表）は参考にする |
 | ガバナ制限 | 自前の計測と強制（[ADR-0005](0005-tenancy-and-governor-limits.md)） | なし |

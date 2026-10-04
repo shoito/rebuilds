@@ -43,7 +43,7 @@ S1 と S2 で、次の 3 つを共有する。バックエンドを替えても�
 | --- | --- |
 | `workspace_id`、`message_id`、`channel_id`、`member_id`、`thread_root_id` | ID |
 | `created_at` | 投稿時刻 |
-| `content_seq` | 本文を最後に変えたイベントの `seq`（[messaging.md](messaging.md)）。版番号として使う |
+| `content_seq` | 本文を最後に変えたイベントの `seq`（[messaging.md](messaging.md)）。バージョン番号として使う |
 | `deleted` | 削除済みなら true。本文は空にする |
 | `has_file`、`has_link` | フィルタ用 |
 | `text` | `normalizeForSearch(toPlainText(body))` とファイル名。@メンバーはインデックス時点の表示名にする |
@@ -59,8 +59,8 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS: search-index ─▶ search ind
 ```
 
 - indexer はイベントを「きっかけ」として扱い、メッセージの現在の状態を DB から読む（テナントのコンテキストを設定してから）。
-- 書き込みは `content_seq` で版を比べ、古い版で新しい版を上書きしない。SQS の順序の入れ替わりと重複に耐える。
-- **削除は tombstone として書く**（`deleted = true`、本文は空）。物理的に消すと、遅れて届いた古い版の書き込みで復活しうるため。tombstone は 7 日後に定期ジョブで消す。
+- 書き込みは `content_seq` でバージョンを比べ、古いバージョンで新しいバージョンを上書きしない。SQS の順序の入れ替わりと重複に耐える。
+- **削除は tombstone として書く**（`deleted = true`、本文は空）。物理的に消すと、遅れて届いた古いバージョンの書き込みで復活しうるため。tombstone は 7 日後に定期ジョブで消す。
 - 数件をまとめて書く（最大 100 件、または 500ms）。
 - 失敗したジョブは SQS の再試行に任せ、5 回失敗したら DLQ に送り、アラートを出す。
 
@@ -198,7 +198,7 @@ LIMIT :limit + 1;                              -- 1 件多く取り、次のペ�
 | `text` | Sudachi（形態素解析） | **関連度のスコア**。`should` にだけ使う |
 
 - 一致の判定を N-gram にするのは、S1 から移ったときに「前は見つかったものが見つからない」を起こさないため。形態素解析だけでは、未知語や語の途中での検索を取りこぼす。
-- 形態素解析には Sudachi を使う。表記の揺れの正規化（例：「附属」と「付属」）を持ち、辞書の更新が続いている。Amazon OpenSearch Service は、Sudachi を任意のプラグインとして OpenSearch 1.3 以降で提供し、Kuromoji はすべてのドメインに入っている（[AWS の発表、2023-10](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/)、[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。任意のプラグインのパッケージは OpenSearch の版ごとにあり、関連付けと解除には blue/green のデプロイが走る。Sudachi の辞書を差し替えても、次の blue/green のデプロイまで反映されない（[パッケージの管理](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/custom-packages.html)）。プラグインを関連付けたまま版を上げられるかは未検証（公式の記述なし）。S2 の前に staging のドメインで版の更新を試す。
+- 形態素解析には Sudachi を使う。表記の揺れの正規化（例：「附属」と「付属」）を持ち、辞書の更新が続いている。Amazon OpenSearch Service は、Sudachi を任意のプラグインとして OpenSearch 1.3 以降で提供し、Kuromoji はすべてのドメインに入っている（[AWS の発表、2023-10](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/)、[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。任意のプラグインのパッケージは OpenSearch のバージョンごとにあり、関連付けと解除には blue/green のデプロイが走る。Sudachi の辞書を差し替えても、次の blue/green のデプロイまで反映されない（[パッケージの管理](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/custom-packages.html)）。プラグインを関連付けたままバージョンを上げられるかは未検証（公式の記述なし）。S2 の前に staging のドメインでバージョンの更新を試す。
 - 正規化（NFKC・小文字化）は、アナライザーではなくアプリの `normalizeForSearch` で行う。S1 と同じ関数を使い、結果を揃える。
 - 1 文字の N-gram を含めると、インデックスが大きくなる。増え方はデータに依存し、公式の目安はない（未検証）。バックフィルの前に代表的なワークスペースで測る。
 - 関連度順のスコアは、Sudachi のフィールドの BM25 に、投稿時刻の減衰（ガウス、30 日）を掛ける。
@@ -232,7 +232,7 @@ LIMIT :limit + 1;                              -- 1 件多く取り、次のペ�
 
 1. OpenSearch のドメイン、インデックスのテンプレート、別名を作る。
 2. indexer が、PostgreSQL と OpenSearch の両方に書く（フィーチャーフラグ）。
-3. バックフィル：ワークスペースごとに、`messages` を `message_id`（UUIDv7）の順に読み、チェックポイントを残しながら一括で書く。版は `content_seq` の外部バージョンで書くので、二重書き込みの新しい内容を上書きしない。読み出しは DB の reader を使い、速度を絞る。
+3. バックフィル：ワークスペースごとに、`messages` を `message_id`（UUIDv7）の順に読み、チェックポイントを残しながら一括で書く。バージョンは `content_seq` の外部バージョンで書くので、二重書き込みの新しい内容を上書きしない。読み出しは DB の reader を使い、速度を絞る。
 4. 検証：
    - ワークスペースごとの件数（削除済みを除く）を突き合わせる。
    - シャドーリード：実際の検索を両方に投げ、上位 20 件の一致率を記録する。利用者には PostgreSQL の結果を返す。
@@ -267,7 +267,7 @@ LIMIT :limit + 1;                              -- 1 件多く取り、次のペ�
 - 日本語の部分一致、ひらがな・カタカナの混在、全角・半角、1 文字の語（ADR-0004 の確認方法）。
 - 経路ごとの漏洩テスト：別のワークスペース、参加していないプライベートチャンネル、退出した直後のチャンネルのメッセージが、検索に出ない。
 - S1 と S2 で、同じクエリが同じ集合を返す（並べ替えを除く）。移行の前に、テスト用データで確かめる。
-- 版の比較：同じメッセージのイベントを任意の順序・重複で indexer に与えても、最終的な文書が DB の最新の状態と一致する。
+- バージョンの比較：同じメッセージのイベントを任意の順序・重複で indexer に与えても、最終的な文書が DB の最新の状態と一致する。
 
 ## 9. 未解決の問い
 

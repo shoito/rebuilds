@@ -34,7 +34,7 @@ Slack の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0027](0027-search-table-rls-exception.md) | 検索用のテーブルだけ RLS を外し、関数を経由してしか読めないようにする | accepted |
 | [0028](0028-remote-mcp-server.md) | AI エージェント向けに、リモートの MCP サーバーを提供する | accepted |
 | [0029](0029-rate-limiting.md) | レート制限を、層・主体・テナントの共通の枠組みで行う | accepted |
-| [0030](0030-versioned-public-api.md) | 版を持つ公開 API を、内部の API と別の面として提供する | accepted |
+| [0030](0030-versioned-public-api.md) | バージョンを持つ公開 API を、内部の API と別の面として提供する | accepted |
 | [0031](0031-app-platform.md) | アプリの基盤を、インストール単位のボット、署名付きの HTTPS の配送、宣言的な UI で作る | accepted |
 | [0032](0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ | accepted |
 | [0033](0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める | accepted |

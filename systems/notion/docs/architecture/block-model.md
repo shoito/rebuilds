@@ -43,7 +43,7 @@
 | `purged_at` | timestamptz | ゴミ箱の根が「完全に削除」の段階に入った時刻（9 節、[ADR-0022](../decisions/0022-trash-history-and-deletion-retention.md)） |
 | `created_at` / `created_by` | timestamptz / uuid | 作成。`created_by` はメンバー・ボット（連携）の ID |
 | `updated_at` / `updated_by` | timestamptz / uuid | 最後の更新。サーバーの確定の時刻 |
-| `version` | bigint | 行の版。更新ごとに 1 増やす。クライアントのキャッシュの鮮度の判定に使う（11 節） |
+| `version` | bigint | 行のバージョン。更新ごとに 1 増やす。クライアントのキャッシュの鮮度の判定に使う（11 節） |
 
 - 権限の設定（ACL）は、ブロックの列ではなく、別の表に設定のあるページの分だけ持つ（[permissions-and-sharing.md](permissions-and-sharing.md)）。
 - ページの `properties` は、データベースの行のときにプロパティの値も持つ。形は [databases.md](databases.md) で決める。
@@ -188,10 +188,10 @@
 | 操作のログ（`page_ops`） | トランザクション（ページごとの `seq`） | 30 日（[collaboration.md](collaboration.md) の 8・12 節） | 再接続時の差分の取得、細かい単位の取り消し、スナップショットの作成、ページの更新の欄 |
 | スナップショット | ページ | ワークスペースの設定（MVP の既定は 30 日） | 履歴の一覧、比較、復元 |
 
-- **スナップショットの作成**：ページの編集が止まって 10 分たったとき、または編集が続いても 1 時間ごとに、Worker が作る（間隔は既定案。本家は、編集中は 10 分ごとと、最後の編集の 2 分後に版を記録する。[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、2026-09-27 に確認。本システムは本家より粗く、ストレージを抑える側に倒した）。中身は、そのページの部分木のうち、子ページの境界までのブロックの値（子ページは参照だけ）と、そのときの `seq` と、その間に編集したメンバーの一覧である。
+- **スナップショットの作成**：ページの編集が止まって 10 分たったとき、または編集が続いても 1 時間ごとに、Worker が作る（間隔は既定案。本家は、編集中は 10 分ごとと、最後の編集の 2 分後にバージョンを記録する。[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)、2026-09-27 に確認。本システムは本家より粗く、ストレージを抑える側に倒した）。中身は、そのページの部分木のうち、子ページの境界までのブロックの値（子ページは参照だけ）と、そのときの `seq` と、その間に編集したメンバーの一覧である。
 - **置き場所**：スナップショットの本体は、gzip した JSON を S3 に置く（`ws/{workspace_id}/pages/{page_id}/snapshots/{seq}.json.gz`）。Aurora には `page_snapshots` の行（`workspace_id`、`page_id`、`seq`、`created_at`、`editors`、`s3_key`、`size`）だけを持つ。
 - **表示**：スナップショットの本文を描画する前に、現在のページの `can(actor, read, page)` を判定する。同期ブロックの参照は、現在の元の中身ではなく、「同期ブロック」の枠だけを出す。
-- **復元**：過去の版に「巻き戻す」のではなく、現在の値からスナップショットの値へ変える操作を作り、新しいトランザクションとして送る。削除済みのブロックは `alive` を真に戻す（ID が同じまま戻る）。復元にはページの編集の権限が要る。復元そのものも履歴に残り、取り消せる。
+- **復元**：過去のバージョンに「巻き戻す」のではなく、現在の値からスナップショットの値へ変える操作を作り、新しいトランザクションとして送る。削除済みのブロックは `alive` を真に戻す（ID が同じまま戻る）。復元にはページの編集の権限が要る。復元そのものも履歴に残り、取り消せる。
 - **期限切れ**：保持期間を過ぎたスナップショットは、日次の Worker が S3 と Aurora から消す。操作のログは、30 日を過ぎたパーティションを消す（スナップショットに含まれていることを確かめてから）。
 - データベースの行はページなので、行ごとに履歴を持つ。データベースのスキーマの変更の履歴は [databases.md](databases.md) で扱う。
 
@@ -271,7 +271,7 @@ CREATE INDEX ON shard042.blocks (workspace_id, trashed_at) WHERE trashed_at IS N
 
 ## 12. クライアントのレコードキャッシュ
 
-本家のクライアントは、読んだレコードを SQLite や IndexedDB の LRU のキャッシュ（RecordCache）に持ち、未確定のトランザクションを確定まで永続の待ち行列（TransactionQueue）に置く。変更は WebSocket で「版が上がった」ことだけが届き、クライアントが値を取り直す（`syncRecordValues`）（[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)）。このシステムも同じ 3 層にする。
+本家のクライアントは、読んだレコードを SQLite や IndexedDB の LRU のキャッシュ（RecordCache）に持ち、未確定のトランザクションを確定まで永続の待ち行列（TransactionQueue）に置く。変更は WebSocket で「バージョンが上がった」ことだけが届き、クライアントが値を取り直す（`syncRecordValues`）（[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)）。このシステムも同じ 3 層にする。
 
 | 層 | 持つもの | 置き場所 |
 | --- | --- | --- |

@@ -78,7 +78,7 @@
 2. staging で公開し、ゴールデンデータセットの全件と合成の給与の実行が通っていることを確かめる。
 3. 本番の公開（`rules.publish`。Ops の承認）。公開は `published` にする 1 トランザクション。
 4. 直後の合成の給与の実行が全件一致することを確かめる。
-5. 誤りが分かったら、公開を戻さない（戻すと、その版で計算した実行の再現が崩れる）。訂正の版を同じ流れで出し、遡及の候補を確かめる（`rule-table-correction.md`。[payroll-jp-rules.md](../architecture/payroll-jp-rules.md) の 16 節）。まだその版で確定した実行がなく、適用の日より前なら、訂正の版を急いで公開し、新しい版で入力を固定し直してもらう。
+5. 誤りが分かったら、公開を戻さない（戻すと、そのバージョンで計算した実行の再現が崩れる）。訂正のバージョンを同じ流れで出し、遡及の候補を確かめる（`rule-table-correction.md`。[payroll-jp-rules.md](../architecture/payroll-jp-rules.md) の 16 節）。まだそのバージョンで確定した実行がなく、適用の日より前なら、訂正のバージョンを急いで公開し、新しいバージョンで入力を固定し直してもらう。
 
 ### 給与に効くフラグの有効化
 
@@ -104,7 +104,7 @@
 2. **フラグで戻せないとき、アプリを戻す。** 1 つ前のイメージのダイジェストで再デプロイする（「前のリリースを再デプロイ」のワークフロー）。api の blue/green の途中なら、旧い側に戻す。
 3. **Payroll Compute は上の「Payroll Compute のイメージ」の 3。**
 4. **マイグレーションは戻さない。**
-5. **有効日付の書き込みの誤りで、差分・版がおかしくなったら**：戻した後、夜間の整合の検査を手で走らせ、`temporal-consistency-mismatch.md`（[object-model-and-effective-dating.md](../architecture/object-model-and-effective-dating.md) の 15 節）に従う。誤った差分は、取消・訂正の業務プロセスで直す（テーブルを直接直さない）。
+5. **有効日付の書き込みの誤りで、差分・バージョンがおかしくなったら**：戻した後、夜間の整合の検査を手で走らせ、`temporal-consistency-mismatch.md`（[object-model-and-effective-dating.md](../architecture/object-model-and-effective-dating.md) の 15 節）に従う。誤った差分は、取消・訂正の業務プロセスで直す（テーブルを直接直さない）。
 6. 戻しても直らなければ、インシデントを宣言する（[incident-response.md](incident-response.md)）。
 
 ## エスカレーション

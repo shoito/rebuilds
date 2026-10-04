@@ -162,7 +162,7 @@ AWS Organizations で用途ごとに分ける。Slack・Stripe・Figma と同じ
 | --- | --- | --- |
 | Aurora `core`・`money` | 自動バックアップ（PITR）＋ AWS Backup の日次のスナップショット（大阪へコピー） | 35 日 |
 | DynamoDB `geo_shard_leases` | 不要（作り直せる）。PITR は有効にする | 35 日 |
-| S3 | バージョニング（古い版） | 30 日 |
+| S3 | バージョニング（古いバージョン） | 30 日 |
 | 監査のアーカイブ | log-archive の S3（Object Lock） | 7 年（既定案） |
 
 ## 8. S1 の構成と台数（初期見積もり）

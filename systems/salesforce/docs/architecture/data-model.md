@@ -12,7 +12,7 @@
 | ファイル | 領域 | 表の数 |
 | --- | --- | --- |
 | [data-model/orgs-users-and-auth.md](data-model/orgs-users-and-auth.md) | 組織、機能とライセンス、利用者、認証（`identity`）、OAuth、組織の解決 | 16 |
-| [data-model/metadata.md](data-model/metadata.md) | データ辞書（`md_*`）、版と差分、翻訳、自動採番、型の変換、消去 | 14 |
+| [data-model/metadata.md](data-model/metadata.md) | データ辞書（`md_*`）、バージョンと差分、翻訳、自動採番、型の変換、消去 | 14 |
 | [data-model/records-and-storage.md](data-model/records-and-storage.md) | `records`、ピボット、長いテキスト、ごみ箱、outbox、射影、整合の検査、問い合わせの統計 | 16 |
 | [data-model/access-and-sharing.md](data-model/access-and-sharing.md) | 権限セット、プロファイル、ロール、グループと閉包、共有ルール、`record_shares`、共有のジョブ | 21 |
 | [data-model/sales-objects.md](data-model/sales-objects.md) | 標準オブジェクトの項目、商談の履歴、活動の関係者、リードの変換、重複の規則と照合の鍵、メールの記録 | 15 |
@@ -26,7 +26,7 @@
 | [data-model/limits-and-usage.md](data-model/limits-and-usage.md) | 割り当てと使用量、Worker の順番（`jobs`・`org_vtime`）、上限に近い自動化、組織ごとの資源の使用量 | 10 |
 | [data-model/audit-and-history.md](data-model/audit-and-history.md) | 設定の変更の監査、ログインの履歴、項目の変更の履歴（`history` のクラスタ） | 6 |
 | [data-model/extensibility.md](data-model/extensibility.md) | 利用者のコード、名前空間とパッケージ（E13・E14） | 8 |
-| [data-model/platform-and-operations.md](data-model/platform-and-operations.md) | 論理シャードと置き場所、クラスタ、組織の移動、組織の DEK、運用者のアクセス、API の版、影の実行 | 9 |
+| [data-model/platform-and-operations.md](data-model/platform-and-operations.md) | 論理シャードと置き場所、クラスタ、組織の移動、組織の DEK、運用者のアクセス、API のバージョン、影の実行 | 9 |
 | [data-model/stores.md](data-model/stores.md) | DB 以外：Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント・Webhook・SQS の本文、一括のファイル、メタデータのパッケージの形式 | — |
 
 合計 171 表（`proj_<projection_id>` は 1 つの型として数える）。ER 図は、全体 1、組織の定義したオブジェクトの写し方 1、領域ごとに 17（共有は 2 つ）の、合わせて 19。
@@ -49,7 +49,7 @@
 | `history` の Aurora | 項目の変更の履歴（18 か月）。Relay だけが書く | 同上 |
 | `control` のスキーマ | 組織の解決と置き場所の表（RLS の外）。S1・S2 は主のクラスタの別のスキーマ、S3 で東京の小さな Aurora に分ける | セルをまたぐ |
 | `identity` のスキーマ | Better Auth の表（RLS の外）。主のクラスタの別のスキーマ | 同上（S3 で `control` と一緒に動かすかは S3 の前に決める） |
-| Valkey（ElastiCache） | メタデータの部品（L2）、今の版、割り当ての 1 分の桶、長い要求の数、組織と利用者の設定のキャッシュ、レポートの結果のキャッシュ。**正本を置かない** | セルごと |
+| Valkey（ElastiCache） | メタデータの部品（L2）、今のバージョン、割り当ての 1 分の桶、長い要求の数、組織と利用者の設定のキャッシュ、レポートの結果のキャッシュ。**正本を置かない** | セルごと |
 | OpenSearch | 検索の共有の索引 `rec-v{n}-{00..15}`。`_source` に値を置かない | セルごと |
 | S3 | 一括の CSV と結果、レポートの結果、エクスポート、メールの添付と原本、メタデータのパッケージ、監査の外部の保管と錨 | 組織の接頭辞と組織の DEK |
 | SQS | Relay から indexer・Worker への通知、prod-egress への署名済みの要求 | キューごと |
@@ -117,7 +117,7 @@ RLS をかけない表は次の 20 だけ。**この表が一覧の正本**で�
 | `shard_map`、`org_placements`、`clusters`、`org_migrations` | `control` | 組織の置き場所と移動 | 管理のサービス、`cross-org-worker` |
 | `org_keys` | `control` | 組織の DEK。組織の消去の最後に消す | 管理のサービス、Worker |
 | `org_vtime` | `ops`（主のクラスタ） | Worker の公平な順番（組織をまたいで最小を選ぶ）。`jobs` と同じトランザクションで書くので主のクラスタに置く | Worker |
-| `api_versions` | `control` | 本システムの API の版 | デプロイ |
+| `api_versions` | `control` | 本システムの API のバージョン | デプロイ |
 | `namespaces`、`package_publisher_keys`、`package_versions` | `control` | 全ての組織で一意の名前空間と配布（E13・E14） | 管理のサービス |
 | `shadow_eval_results` | `ops`（主のクラスタ） | 影の実行の結果（値を持たない。30 日） | Runtime（影の実行） |
 
@@ -142,7 +142,7 @@ RLS をかけない表は次の 20 だけ。**この表が一覧の正本**で�
 - 時刻は `timestamptz`、UTC で持つ。API は ISO 8601（ミリ秒、`Z`）で返す。
 - `records.data` の中の日付・日時は、文字列（`"2026-09-28"`、`"2026-09-28T01:02:03.456Z"`）で持つ。ピボットは `v_ts`（日付は UTC の 0 時）に写す（[ADR-0002](../decisions/0002-custom-object-storage.md)）。
 - 組織の暦（タイムゾーン、会計年度の始まりの月）は `orgs.timezone`・`orgs.fiscal_year_start_month`。日付の関数と日付への切り捨ては、組織のタイムゾーンで行う。
-- 作成・更新の時刻は `created_at`・`updated_at`。メタデータの表は、加えて作られた版と最後に変わった版（`created_version`・`updated_version`）を持つ（3.11 節）。
+- 作成・更新の時刻は `created_at`・`updated_at`。メタデータの表は、加えて作られたバージョンと最後に変わったバージョン（`created_version`・`updated_version`）を持つ（3.11 節）。
 - 1 分の桶の表は `minute timestamptz`（分の頭に切り捨て）、1 時間の桶は `hour`、日の集計は `day date`（UTC）。
 
 ### 3.6 論理削除とごみ箱
@@ -160,7 +160,7 @@ RLS をかけない表は次の 20 だけ。**この表が一覧の正本**で�
 
 ### 3.7 命名と型
 
-- 表は英語の複数形の `snake_case`。メタデータ（版を上げる）の表は `md_` の接頭辞。列は `snake_case`。外部キーは `<単数形>_id`、時刻は `_at`、日付は `_on` か `day`、真偽は `is_`・`can_` か状態の形容詞。
+- 表は英語の複数形の `snake_case`。メタデータ（バージョンを上げる）の表は `md_` の接頭辞。列は `snake_case`。外部キーは `<単数形>_id`、時刻は `_at`、日付は `_on` か `day`、真偽は `is_`・`can_` か状態の形容詞。
 - **SQL の予約語を列の名前にしない**（`order`、`unique`、`from`、`to`、`create` など。8 節の決定で直した）。
 - 状態・種類は `text` と `CHECK (x IN (...))` で持つ。PostgreSQL の列挙型は使わない（値の追加でロックを取らないため）。
 - 数・通貨の値は、`records.data` の中では 10 進の文字列、表の列では `numeric`（精度は項目の `type_params`）。浮動小数で持たない（[ADR-0002](../decisions/0002-custom-object-storage.md)）。
@@ -182,7 +182,7 @@ RLS をかけない表は次の 20 だけ。**この表が一覧の正本**で�
 | OpenSearch | ドメインの保存時の暗号化。`_source` に値を置かない | ドメインの鍵 |
 
 - 列の暗号文は `bytea` で、`key_version`（1 バイト）‖ nonce ‖ 暗号文 ‖ タグの形にする。AAD は `org_id ‖ purpose ‖ 表.列 ‖ 行の ID`。別の行・別の組織へ写した暗号文は復号できない。
-- DEK は `org_keys`（組織 × 用途 × 版）に KMS で包んで持つ。1 年ごとに新しい版を作る。組織の消去の最後に `wrapped_dek` を消す。
+- DEK は `org_keys`（組織 × 用途 × バージョン）に KMS で包んで持つ。1 年ごとに新しいバージョンを作る。組織の消去の最後に `wrapped_dek` を消す。
 
 ### 3.9 時間の分割と保持
 
@@ -221,12 +221,12 @@ RLS をかけない表は次の 20 だけ。**この表が一覧の正本**で�
 - `events`・`history` への書き込みは、同じトランザクションの `outbox` に書き、確定の後に Relay（論理シャードごとの唯一の書き手）が写す。outbox の行の ID から作る一意の鍵で二重を捨てる（[ADR-0033](../decisions/0033-change-event-log-and-replay.md)、[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) の注記）。
 - クラスタをまたぐ結合は持たない。`history` の行を主のレコードの条件で絞る時は、主の reader で ID の束を作ってから引く（[audit-and-field-history.md](audit-and-field-history.md) の 5.3 節）。
 
-### 3.11 メタデータの版
+### 3.11 メタデータのバージョン
 
 - メタデータの表（種類 `meta`）の変更は、組織の `orgs.metadata_version` を 1 つ上げる 1 つのトランザクションで行う。排他の `pg_advisory_xact_lock` を取り、`md_changes` に差分、`md_versions` に 1 行を書く（[ADR-0003](../decisions/0003-metadata-driven-runtime.md)、[metadata-and-runtime.md](metadata-and-runtime.md) の 4.1 節）。
 - メタデータの行は `created_version`・`updated_version`（`bigint`）を持つ。Setup の同時編集の楽観の鍵は要素の `updated_version`（[ui-layouts-and-list-views.md](ui-layouts-and-list-views.md) の 7.2 節）。
-- データを書くトランザクションは、メタデータの鍵の共有のロックを取り、`orgs.metadata_version` が要求の開始時の版と同じかを確かめる。
-- 各表の「種類」：`meta`＝メタデータ（版を上げる）、`data`＝データ、`copy`＝正本の写し（純粋な関数で作り、整合の検査で差を 0 に保つ）、`ops`＝運用、`log`＝追記だけで期限で消す。
+- データを書くトランザクションは、メタデータの鍵の共有のロックを取り、`orgs.metadata_version` が要求の開始時のバージョンと同じかを確かめる。
+- 各表の「種類」：`meta`＝メタデータ（バージョンを上げる）、`data`＝データ、`copy`＝正本の写し（純粋な関数で作り、整合の検査で差を 0 に保つ）、`ops`＝運用、`log`＝追記だけで期限で消す。
 
 ## 4. 全体の ER 図
 
@@ -516,7 +516,7 @@ erDiagram
 ```
 
 - 名前を `x_amount` から `x_contract_amount` に変えても、`field_no` は 10 のままで、`records` もピボットも書き換えない。
-- `x_amount` を `text` に変換すると、新しい `field_no`（14）を割り当てて写し、切り替えの版で `md_fields` の指す先を 14 にする。10 のキーは 15 日残してから消す（[data-model/metadata.md](data-model/metadata.md) の `field_conversions`）。10 は再利用しない。
+- `x_amount` を `text` に変換すると、新しい `field_no`（14）を割り当てて写し、切り替えのバージョンで `md_fields` の指す先を 14 にする。10 のキーは 15 日残してから消す（[data-model/metadata.md](data-model/metadata.md) の `field_conversions`）。10 は再利用しない。
 - ピボットの行は `derivePivotRows(objectSegment, record)` で、照合の鍵は `deriveMatchKeys` で、`records` の行とメタデータから決まる。保存では前後の差分の行だけを書く（[data-storage.md](data-storage.md) の 3.4 節）。
 
 ## 6. 横断の不変条件
@@ -524,17 +524,17 @@ erDiagram
 | 不変条件 | 守り方 | 根拠 |
 | --- | --- | --- |
 | **写しは同じトランザクション**：`records` の変更と、ピボット 4 表・照合の鍵・射影・レコードの条件の共有の行・暗黙の親の行・承認のロックは、同じトランザクションで書く。巻き戻れば写しも残らない | データ層の保存の手順 6・10（[ADR-0008](../decisions/0008-dml-order-of-execution.md)）。純粋な関数 `derivePivotRows`・`deriveMatchKeys`・`applySharingDelta`。整合の検査で差 0（`pivot_drift_repaired_total`） | [ADR-0002](../decisions/0002-custom-object-storage.md)、[ADR-0012](../decisions/0012-derived-copies-consistency-and-projections.md)、[ADR-0015](../decisions/0015-sharing-reasons-and-where-they-live.md)、[ADR-0022](../decisions/0022-duplicate-rules-and-japanese-matching.md) |
-| **共有の判定で世代を混ぜない**：1 つの要求は 1 つのメタデータの版に固定され、閉包の世代（`group_members_closure.generation`）と有効なルールの集合（`criteria_rules.state = active` の `rule_id`）も 1 つに固定される | 問い合わせの条件に `generation = $cg` と `rule_id = ANY($rules)` を必ず付ける。切り替えは 1 つの版で行う | [ADR-0016](../decisions/0016-recalculation-rule-versions-and-skew.md)、`PROP-SHR-002` |
+| **共有の判定で世代を混ぜない**：1 つの要求は 1 つのメタデータのバージョンに固定され、閉包の世代（`group_members_closure.generation`）と有効なルールの集合（`criteria_rules.state = active` の `rule_id`）も 1 つに固定される | 問い合わせの条件に `generation = $cg` と `rule_id = ANY($rules)` を必ず付ける。切り替えは 1 つのバージョンで行う | [ADR-0016](../decisions/0016-recalculation-rule-versions-and-skew.md)、`PROP-SHR-002` |
 | **上限はデータ層で強制**：全ての読み書きは実行基盤のデータ層を通り、トランザクションの計測器が数える。`records` とピボットへの直接の SQL はコンパイラのパッケージの外で書かない | lint、DB の `statement_timeout`（最後の守り）、上限の試験 | [ADR-0003](../decisions/0003-metadata-driven-runtime.md)、[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)、[ADR-0041](../decisions/0041-limits-registry-and-counting-rules.md) |
 | **`field_no` は再利用しない** | `md_objects.next_field_no` は増えるだけ（トリガーで減る更新を拒否）。`md_fields` の `CHECK (field_no < 所属のオブジェクトの next_field_no)` をトリガーで確かめる。定義の行を消した後も番号は欠番のまま | [ADR-0006](../decisions/0006-data-dictionary-and-field-lifecycle.md) |
 | **組織の分離** | 3.2 節の RLS（`org_id` と `shard_no`）、`org_id` を先頭に含む主キーと外部キー、キャッシュの鍵への `{o:<org_id>}` の必須化 | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
-| **メタデータの変更は版を 1 つ上げる 1 つのトランザクション**。コンパイル済みの部品は版と内容のハッシュを鍵にして不変 | Metadata のサービスだけが `md_*` を書く。`md_versions` の `(org_id, version)` の一意 | [ADR-0003](../decisions/0003-metadata-driven-runtime.md)、[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md) |
+| **メタデータの変更はバージョンを 1 つ上げる 1 つのトランザクション**。コンパイル済みの部品はバージョンと内容のハッシュを鍵にして不変 | Metadata のサービスだけが `md_*` を書く。`md_versions` の `(org_id, version)` の一意 | [ADR-0003](../decisions/0003-metadata-driven-runtime.md)、[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md) |
 | **別のクラスタへの写しはちょうど 1 回の効果** | 同じトランザクションの outbox。`change_events`・`org_events` は `event_id`（＝outbox の行の ID）の一意、`field_history` は `source_id`（＝outbox の行の ID）を含む主キーで二重を捨てる | [ADR-0033](../decisions/0033-change-event-log-and-replay.md)、[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) |
 | **レコードごとの変更のイベントの順** | 同じレコードの保存は行ロックで順番になり、Relay は論理シャードごとに 1 つで outbox を `id` の順に送る | ADR-0033 |
 | **ごみ箱の戻しは束の単位で全部か無しか**。ごみ箱の間は一意の値を放す | `recycle_bin_batches`。戻す時に `derivePivotRows` で作り直し、一意の違反は `DUPLICATE_VALUE` | [ADR-0011](../decisions/0011-recycle-bin-and-purge.md) |
 | **1 つのレコードで `pending` の承認は 1 つ** | `approval_instances` の部分一意索引 `(org_id, record_id) WHERE state = 'pending'` | [ADR-0028](../decisions/0028-approval-processes-and-record-locks.md) |
 | **監査は追記だけで、組織ごとの鎖** | アプリのロールは `INSERT`・`SELECT` だけ。`seq` は `audit_heads` の行ロックで欠番なく採番。`hash = SHA-256(prev_hash ‖ 行)`。毎日の錨を Object Lock に | [ADR-0046](../decisions/0046-setup-audit-trail-and-login-history.md) |
-| **検索の索引は写し**：値を `_source` に持たず、判定に使わない。共有は後で DB で確かめる | 索引の文書は ID・版だけ。検索の後の確かめはデータ層の問い合わせ | [ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)、[ADR-0032](../decisions/0032-search-permission-post-filter.md) |
+| **検索の索引は写し**：値を `_source` に持たず、判定に使わない。共有は後で DB で確かめる | 索引の文書は ID・バージョンだけ。検索の後の確かめはデータ層の問い合わせ | [ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)、[ADR-0032](../decisions/0032-search-permission-post-filter.md) |
 | **秘密は組織の DEK で暗号化し、返さない、写さない** | 3.8 節。Sandbox の複製は秘密の列を写さない | [ADR-0052](../decisions/0052-key-hierarchy-and-per-org-data-keys.md) |
 | **Sandbox に伏せる前の個人データを書かない** | 複製の経路の中で `md_fields.data_class` に従って伏せてから書く | [ADR-0038](../decisions/0038-sandbox-types-and-masked-copy.md) |
 | **組織の `shard_no` は変えない** | `orgs.shard_no` の更新を拒否するトリガー（組織の移動でも変えない） | [ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)、[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md) |

@@ -1,4 +1,4 @@
-# Data model: ファイルの保存・版・割り当て
+# Data model: ファイルの保存・バージョン・割り当て
 
 [data-model.md](../data-model.md) の一部。規約は、そちらの 2 節に従う。振る舞いは [file-storage-and-history.md](../file-storage-and-history.md)、[infrastructure.md](../infrastructure.md) の 5・7 節、[ADR-0003](../../decisions/0003-journal-and-checkpoints.md)、[ADR-0024](../../decisions/0024-journal-items-and-fencing.md)〜[ADR-0026](../../decisions/0026-version-history-restore-and-deletion.md)、[ADR-0047](../../decisions/0047-router-task-liveness-and-file-assignment.md)、[ADR-0048](../../decisions/0048-osaka-dr-with-journal-generations.md) を正とする。
 
@@ -6,10 +6,10 @@
 
 | 置き場所 | 中身 | 正本か |
 | --- | --- | --- |
-| Aurora `files`・`file_versions`・`file_storage_jobs` | 最新のチェックポイントの位置、版の一覧、ジョブ | メタデータの正本 |
+| Aurora `files`・`file_versions`・`file_storage_jobs` | 最新のチェックポイントの位置、バージョンの一覧、ジョブ | メタデータの正本 |
 | DynamoDB `journal` | チェックポイントより後の確定した変更と、フェンス | 変更の正本 |
 | DynamoDB `file_leases`・`ds_liveness` | ファイルの割り当てとタスクの生存 | 持ち主の正本 |
-| S3 files バケット | マニフェスト、チャンク、大きな変更、取り戻した版 | ファイルの中身の正本 |
+| S3 files バケット | マニフェスト、チャンク、大きな変更、取り戻したバージョン | ファイルの中身の正本 |
 
 ## 1. ER 図
 
@@ -136,30 +136,30 @@ erDiagram
 
 ### file_versions
 
-版の一覧。版はチェックポイントに印を付けたもの（ADR-0026）。
+バージョンの一覧。バージョンはチェックポイントに印を付けたもの（ADR-0026）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `org_id`・`id` | `uuid` | NO | | 主キー |
 | `file_id` | `uuid` | NO | | |
 | `kind` | `text` | NO | | `auto`・`named`・`restore_before`・`restore_after`・`dr_salvaged`（[file-storage-and-history.md](../file-storage-and-history.md) の 8.1 節） |
-| `seq` | `bigint` | NO | | 版の `seq` |
+| `seq` | `bigint` | NO | | バージョンの `seq` |
 | `region_gen` | `integer` | NO | `1` | その `seq` の世代（ADR-0048）。`dr_salvaged` は元の世代 |
 | `manifest_key` | `text` | NO | | マニフェストのキー（`dr_salvaged` は `salvage/` の下。5 節） |
-| `name` | `text` | YES | | 名前付きの版（1〜200 文字。ログに書かない） |
+| `name` | `text` | YES | | 名前付きのバージョン（1〜200 文字。ログに書かない） |
 | `description` | `text` | YES | | 2,000 文字まで |
 | `created_by` | `uuid` | YES | | 作った人。`auto` と `dr_salvaged` は NULL |
-| `restored_from_version_id` | `uuid` | YES | | `restore_before`・`restore_after` の元の版 |
+| `restored_from_version_id` | `uuid` | YES | | `restore_before`・`restore_after` の元のバージョン |
 | `created_at` | `timestamptz` | NO | `now()` | |
 | `delete_after` | `timestamptz` | YES | | 無料のプランの保持（30 日）。有料は NULL |
 
 - 主キー：`(org_id, id)`。外部キー：`(org_id, file_id)` → `files`。
 - CHECK：`kind IN (...)`、`(kind = 'named') = (name IS NOT NULL)`、`seq >= 0`、`region_gen >= 1`。
-- 索引：`(org_id, file_id, id DESC)`（版の一覧。新しい順に 50 件ずつ）、`(delete_after) WHERE delete_after IS NOT NULL`（無料のプランの期限。`scheduler_due_items`）。
+- 索引：`(org_id, file_id, id DESC)`（バージョンの一覧。新しい順に 50 件ずつ）、`(delete_after) WHERE delete_after IS NOT NULL`（無料のプランの期限。`scheduler_due_items`）。
 - 書き方：チェックポイントの `files` の更新と同じトランザクションで足す（`checkpoint_seq < :s` の条件で、再試行でも二重にならない）。
-- 保持：無料のプランは 30 日。過ぎた版は、最新の 1 つを除いて消す（掃除でマニフェストも消す）。プランを下げたとき、既存の版の `delete_after` を埋める。
+- 保持：無料のプランは 30 日。過ぎたバージョンは、最新の 1 つを除いて消す（掃除でマニフェストも消す）。プランを下げたとき、既存のバージョンの `delete_after` を埋める。
 - 削除：ファイルの完全な削除で消す。
-- S1 の規模：1 年で約 5,000 万行（編集されたファイル 1 日 5 万 × 自動の版 3。仮定）。
+- S1 の規模：1 年で約 5,000 万行（編集されたファイル 1 日 5 万 × 自動のバージョン 3。仮定）。
 
 ### file_storage_jobs
 
@@ -226,7 +226,7 @@ file_id は UUID の小文字の 36 文字
 | `pk`・`seq` | S・N | `seq` はまとまりの最初の `seq` |
 | `end_seq` | N | まとまりの最後の `seq` |
 | `epoch` | N | 書いた持ち主の `epoch` |
-| `fmt` | N | 本体の形式の版 |
+| `fmt` | N | 本体の形式のバージョン |
 | `body` | B | `zstd(JournalBatch)`（[document.md](document.md) の 5.3 節）。350 KiB を超えるときは持たない |
 | `blob_key` | S | `body` の代わりに S3 に置いたときのキー（5 節） |
 | `body_sha256` | B | 圧縮した本体の SHA-256（32 バイト） |
@@ -309,12 +309,12 @@ Document Server のタスクの生存と負荷。リージョンの中の事実�
 | S-2 | ジャーナルの書き込みは、フェンスの `epoch` の一致と `seq` の未使用の 2 つを条件にした 1 つの `TransactWriteItems` | ADR-0024、本題材の AGENTS.md |
 | S-3 | チェックポイントのマニフェストは、`durable_seq ≥ S` になってから書く。Aurora の `checkpoint_seq` はマニフェストの後に進める | [file-storage-and-history.md](../file-storage-and-history.md) の 5.2 節 |
 | S-4 | 回復は、フェンスを上げてから、ジャーナルを強い整合性で読む。`seq` の飛びがあれば止め、`files.state = maintenance`（`journal_gap`） | 同 4.4 節 |
-| S-5 | 掃除は `files.checkpoint_key` の指すマニフェストと、版の印のあるマニフェストのチャンクを消さない。集合にないチャンクも 7 日は残す | 同 5.4 節 |
+| S-5 | 掃除は `files.checkpoint_key` の指すマニフェストと、バージョンの印のあるマニフェストのチャンクを消さない。集合にないチャンクも 7 日は残す | 同 5.4 節 |
 | S-6 | 完全な削除は、割り当てを `deleted` にしてから、ジャーナル・S3（東京と大阪）・メタデータの順に消す | 同 11.2 節、ADR-0045 |
 
 ## 5. S3 の files バケット
 
-バケットは `<brand>-files-{env}-{region}`。SSE-KMS（`files` の鍵、バケットキー）、バージョニング（古い版は 30 日）、東京 → 大阪のレプリケーション（RTC）。ライフサイクルの規則は両方のバケットに置く。**キーに `org_id` を入れない**（ファイルの組織は Aurora の `files` で決まる）。
+バケットは `<brand>-files-{env}-{region}`。SSE-KMS（`files` の鍵、バケットキー）、バージョニング（古いバージョンは 30 日）、東京 → 大阪のレプリケーション（RTC）。ライフサイクルの規則は両方のバケットに置く。**キーに `org_id` を入れない**（ファイルの組織は Aurora の `files` で決まる）。
 
 | キー | 中身 | 書く | 消す |
 | --- | --- | --- | --- |
@@ -323,12 +323,12 @@ Document Server のタスクの生存と負荷。リージョンの中の事実�
 | `files/{file_id}/chunks/{sha256}` | zstd のチャンク（ページ・`document_chunk`・`sessions_chunk`・`blob_refs_chunk`）。`sha256` は 64 文字の 16 進。世代で分けない | Document Server、複製のジョブ（`CopyObject`） | 掃除（参照がなく 7 日を過ぎたもの）、完全な削除 |
 | `files/{file_id}/journal-blobs/{start_seq}-{epoch}` | 350 KiB を超える `JournalBatch` の本体（世代 1） | Document Server | 掃除（ジャーナルの TTL の 30 日を過ぎたもの） |
 | `files/{file_id}/journal-blobs/g{g}/{start_seq}-{epoch}` | 同（世代 `g ≥ 2`） | Document Server | 同上 |
-| `files/{file_id}/salvage/g{g}/{seq:020}` | `dr-salvage` が取り戻した版のマニフェスト（`g` は元の世代）。今の世代の `seq` と重なりうるので、`checkpoints/` と分ける | `dr-salvage` のジョブ | 版の保持に従う |
+| `files/{file_id}/salvage/g{g}/{seq:020}` | `dr-salvage` が取り戻したバージョンのマニフェスト（`g` は元の世代）。今の世代の `seq` と重なりうるので、`checkpoints/` と分ける | `dr-salvage` のジョブ | バージョンの保持に従う |
 
 - オブジェクトのメタデータ：マニフェストに `x-amz-meta-schema-hash`・`x-amz-meta-format-version`、チャンクに `x-amz-meta-raw-bytes`。
 - 配信：`files.<brand>usercontent.<domain>` の CloudFront。パスは `files/{file_id}/chunks/{sha256}`、署名付き URL は 5 分、`Cache-Control: public, max-age=31536000, immutable`。署名はキャッシュの鍵に含めない（[permissions-and-sharing.md](../permissions-and-sharing.md) の 11 節）。マニフェストとジャーナルの本体は CloudFront から配らない（Document Server と API が読む）。
 - 大きさの上限：チェックポイント全体（圧縮の前）2 GiB、ページのチャンク 4 MiB（超えたら ID の順に分ける）。
-- S1 の規模：約 300 万ファイル × 平均 1 MB（圧縮後）＋版と 30 日の保持で、約 10 TB（仮定。[capacity.md](../capacity.md) の 6 節で見直す）。
+- S1 の規模：約 300 万ファイル × 平均 1 MB（圧縮後）＋バージョンと 30 日の保持で、約 10 TB（仮定。[capacity.md](../capacity.md) の 6 節で見直す）。
 
 ## 6. 保持の一覧
 
@@ -338,8 +338,8 @@ Document Server のタスクの生存と負荷。リージョンの中の事実�
 | フェンスの項目 | ファイルがある間 | 完全な削除 |
 | `file_leases` | ファイルがある間。`deleted` は 400 日 | TTL |
 | `ds_liveness` | 期限 + 1 日 | TTL |
-| 版の印のないチェックポイント | 48 時間はすべて、30 日までは 1 日 1 つ | 掃除（両方のバケット） |
-| 版 | 無料 30 日、有料はすべて | 掃除 |
+| バージョンの印のないチェックポイント | 48 時間はすべて、30 日までは 1 日 1 つ | 掃除（両方のバケット） |
+| バージョン | 無料 30 日、有料はすべて | 掃除 |
 | 大きな変更の本体 | 30 日 | 掃除 |
-| S3 の古い版 | 30 日 | ライフサイクル（両方のバケット） |
+| S3 の古いバージョン | 30 日 | ライフサイクル（両方のバケット） |
 | PITR（DynamoDB・Aurora） | 35 日 | 期限 |

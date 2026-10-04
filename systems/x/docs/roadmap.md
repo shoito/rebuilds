@@ -34,7 +34,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E14 本番の準備と GA の判定 | 負荷試験、DR の訓練、見える範囲の監査、SLO とアラート、外部のペンテスト、データのライフサイクル、GA の判定 | 未着手（法務：L1・L8 ほか） |
 | E15 みんなで作る注記（MVP の後） | 評価者の合意で付ける注記 | 未着手（MVP の後） |
 | E16 リストとコミュニティ（MVP の後） | タイムラインの別の源 | 未着手（MVP の後） |
-| E17 投稿の編集（MVP の後） | 版、引用・検索・通知への反映 | 未着手（MVP の後） |
+| E17 投稿の編集（MVP の後） | バージョン、引用・検索・通知への反映 | 未着手（MVP の後） |
 | E18 DM の暗号化（MVP の後） | エンドツーエンドの暗号化、鍵の管理 | 未着手（MVP の後。法務：L3） |
 | E19 学習済みのモデルのランキング（MVP の後、S2） | 学習の基盤、特徴の保存、モデルのランク、埋め込みの取り出し（S3） | 未着手（MVP の後） |
 | E20 長文・購読・音声の配信・広告（MVP の後） | 収益と配信の拡張 | 未着手（MVP の後） |
@@ -119,7 +119,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `follow-counters` | フォロー・フォロワーの数の写しと照合 |
 | `follow-limits` | フォローの上限、大量のフォロー・解除の検出 |
 | `follow-lists` | 一覧のページング |
-| `viewer-sets-cache` | 6 節の写し、版の規則、修復の仕事（ADR-0012）（[follow-graph.md](architecture/follow-graph.md)） |
+| `viewer-sets-cache` | 6 節の写し、バージョンの規則、修復の仕事（ADR-0012）（[follow-graph.md](architecture/follow-graph.md)） |
 
 ### E5 ホームのタイムライン
 
@@ -184,7 +184,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `user-search` | 利用者の検索 |
 | `trends` | 窓ごとの数、急上昇の検出、スパムと措置の除外 |
 | `search-normalization` | `normalizeForSearch` と例の集まり（5.1 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
-| `search-reindex` | 版を変える作り直しの手順（7.5 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
+| `search-reindex` | バージョンを変える作り直しの手順（7.5 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
 | `trends-manipulation-defense` | 重み、群れと貼り付けの検出、`trend_overrides`、T&S の待ち行列（9.5 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
 | `trends-regional` | 地方の地域。法務：L4（IP アドレスからの推定）（[search-and-trends.md](architecture/search-and-trends.md)） |
 
@@ -219,7 +219,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `transparency-report` | 運用の状況の公表と報告の集計。法務：L1 |
 | `ts-reader-access` | 6.3 節の理由の必須と範囲（`moderation-console` と共同）（[security.md](architecture/security.md)） |
 | `legal-holds` | 7.3 節。法務：L2・L7（[security.md](architecture/security.md)） |
-| `automated-enforcement` | 規則の措置、`interim_reduce`、規則の版（6.4 節）（[trust-and-safety.md](architecture/trust-and-safety.md)） |
+| `automated-enforcement` | 規則の措置、`interim_reduce`、規則のバージョン（6.4 節）（[trust-and-safety.md](architecture/trust-and-safety.md)） |
 | `account-risk-score` | 危険の点、点による扱い、測り方（8.3・8.4 節）（[trust-and-safety.md](architecture/trust-and-safety.md)） |
 
 ### E12 DM
@@ -261,7 +261,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `account-deletion-pipeline` | 8.2 節から security の 7.2 節へ（security の `data-lifecycle` と共同）。法務：L8（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
 | `load-shedding-controls` | 7 節の削る順の仕組みと自動の規則（[capacity.md](architecture/capacity.md)） |
 | `accessibility-audit` | 10 節の手動の確かめ（[clients.md](architecture/clients.md)） |
-| `compat-nightly` | 2.2 節の 12 週前の版との互換（[delivery.md](architecture/delivery.md)） |
+| `compat-nightly` | 2.2 節の 12 週前のバージョンとの互換（[delivery.md](architecture/delivery.md)） |
 | `dr-failover-workflow` | 7.3 節のワークフロー、outbox の送り直し、`ar:` の先の作成（[infrastructure.md](architecture/infrastructure.md)） |
 | `cost-baseline` | 13 節の確定（[infrastructure.md](architecture/infrastructure.md)） |
 | `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後）（[security.md](architecture/security.md)） |

@@ -17,7 +17,7 @@
 | `ar:{author_id}` | 文字列 | 最後の投稿から 7 日 | 同じ項目の形。直近 7 日・最大 200 件（返信・リポストを含む） | `author-recent`・`timeline` | [ADR-0015](../../decisions/0015-fanout-pipeline-and-burst-control.md) |
 | `pl:{viewer_id}` | Set | 10 分 | フォロー先のうちフォロワー 1,000 人以上の作者 | `timeline` | [timeline-fanout.md](../timeline-fanout.md) の 4 節 |
 | `fanout:pull_any` | Sorted Set | なし | 作者の ID → いつまで（ミリ秒。今プルの作者は `+inf`） | `fanout-router` → `timeline`（手元に 1 秒ごとに読み直す） | 同上 |
-| `fanout:pull_any:v` | 文字列 | なし | `fanout:pull_any` の版（変えるたびに `INCR`） | 同上 | この文書 |
+| `fanout:pull_any:v` | 文字列 | なし | `fanout:pull_any` のバージョン（変えるたびに `INCR`） | 同上 | この文書 |
 | `tlb:{viewer_id}` | 文字列 | 5 秒 | 作り直しの single flight（`SET NX`） | `timeline` | [ADR-0016](../../decisions/0016-timeline-rebuild-single-flight.md) |
 | `cv:{post_id}` | Sorted Set | 10 分（30 秒ごとに作り直す） | 直接の返信が 1,000 件を超えた会話の上位 200 件の返信の ID → 点 | `timeline` | [ADR-0017](../../decisions/0017-profile-and-conversation-reads.md)（TTL はこの文書） |
 
@@ -30,7 +30,7 @@
 | 16〜23 | `ref_id` | リポストなら元の投稿の ID、返信なら返信先の利用者の ID、それ以外は 0 |
 | 24〜31 | `flags` | ビット 0 `REPOST`、1 `REPLY`、2 `QUOTE`、3 `HAS_MEDIA`、4 `SELF_THREAD`、5〜63 予備 |
 
-**頭**（16 バイト）：形の版（1 バイト、今は `1`）、状態（1 バイト：`0 ready`・`1 building`・`2 partial`）、項目の数（2 バイト）、作った時刻（6 バイト、ミリ秒）、予備（6 バイト）。
+**頭**（16 バイト）：形のバージョン（1 バイト、今は `1`）、状態（1 バイト：`0 ready`・`1 building`・`2 partial`）、項目の数（2 バイト）、作った時刻（6 バイト、ミリ秒）、予備（6 バイト）。
 
 Functions：`tl_insert`・`tl_begin`・`tl_merge`・`tl_remove`・`tl_remove_author`・`tl_read`（[timeline-fanout.md](../timeline-fanout.md) の 4.1 節）。
 
@@ -45,7 +45,7 @@ Functions：`tl_insert`・`tl_begin`・`tl_merge`・`tl_remove`・`tl_remove_aut
 | `vm:{viewer_id}` | Sorted Set | 1 時間 | ミュートの相手 → 期限（ミリ秒。なしは `+inf`） | 同上 | 同上（型はこの文書） |
 | `vp:{viewer_id}` | Set | 1 時間 | `active` でフォローしている鍵アカウント | 同上 | 同上 |
 | `vw:{viewer_id}` | 文字列 | 1 時間 | 組み立てたミュートの語の照合器（直列化。範囲ごと） | 同上 | 同上 |
-| `vv:{viewer_id}` | 文字列 | 1 時間 | 上の 4 つの版（`users.graph_version`） | 同上 | 同上 |
+| `vv:{viewer_id}` | 文字列 | 1 時間 | 上の 4 つのバージョン（`users.graph_version`） | 同上 | 同上 |
 | `vl:{viewer_id}` | 文字列 | 5 秒 | 読み込みの single flight（`SET NX`） | 同上 | 同上 |
 | `pf:{post_id}` | ハッシュ | 48 時間 | 投稿の特徴（数、率、速さ、メディア、言語） | ランキングの特徴の集計 | [ranking-and-recommendation.md](../ranking-and-recommendation.md) の 7.1 節 |
 | `af:{author_id}` | ハッシュ | 7 日 | 作者の特徴（フォロワーの対数、経過日数、平均の率、スパムの点） | 同上 | 同上 |
@@ -64,7 +64,7 @@ Functions：`tl_insert`・`tl_begin`・`tl_merge`・`tl_remove`・`tl_remove_aut
 | `tb:{region}` | ハッシュ | なし（毎時 Aurora へ写す） | 語 → 指数移動平均と更新の時刻 | `trends` | 同 9.4 節 |
 | `trends:{region}` | 文字列（JSON） | 15 分 | 表示用の最新の結果 | `trends` → `search-api` | 同 9.6 節 |
 
-- `ps:`・`as:` は版の新しいものだけを書く（Function が今の `v` と比べる）。消さずに `deleted` の状態を書く。
+- `ps:`・`as:` はバージョンの新しいものだけを書く（Function が今の `v` と比べる）。消さずに `deleted` の状態を書く。
 - `vb:`・`vm:`・`vp:`・`vw:`・`vv:` は `{viewer_id}` のハッシュタグで同じスロット。1 回の Function で読む。
 
 ### 1.3 `vk-counters`
@@ -179,7 +179,7 @@ Ingest が 1 束を 1 レコードで書く（outbox を通らないので 2.2 �
 | `ranking-served` | `ranking` | `request_id`、`viewer`（仮名）、`post_id`、`position`、`source`、`reason_code`、`light_score`、`heavy_score`、`model_version`、`weights_version`、`ranking_mode`、`experiment_arms`、`features`（S2） | [ranking-and-recommendation.md](../ranking-and-recommendation.md) の 12.1 節 |
 | `api-usage` | `public-api` | `app_id`、`user`（仮名、なければ NULL）、`endpoint`、`units`、`status`、`ts` | [api-and-rate-limits.md](../api-and-rate-limits.md) の 6.1 節 |
 | `visibility-audit` | 漏れの経路の各サービス（0.1%） | `path`、`viewer`（仮名）、`post_ids[]`、`responded_at` | [observability.md](../observability.md) の 7 節 |
-| `rum` | `ingest` | 画面、端末の種類、指標（描画、落ちたフレーム）、アプリの版。利用者の ID を含めない | [observability.md](../observability.md) の 3 節 |
+| `rum` | `ingest` | 画面、端末の種類、指標（描画、落ちたフレーム）、アプリのバージョン。利用者の ID を含めない | [observability.md](../observability.md) の 3 節 |
 | `lake-<stream>` | Kinesis の流れ（`posts`・`graph`・`engagement`・`moderation`・`accounts`・`views`）を読む Firehose | 出来事そのもの（利用者の ID は変換の Lambda で仮名にする） | この文書（変換の仕組みは E1） |
 
 ## 4. S3
@@ -188,9 +188,9 @@ Ingest が 1 束を 1 レコードで書く（outbox を通らないので 2.2 �
 
 | バケット | パス | 中身 | 鍵 | 保持 | 決めた場所 |
 | --- | --- | --- | --- | --- | --- |
-| `media-uploads` | `u/{media_id}/orig` | クライアントが上げた元（版の管理 30 日） | `media` | 処理の後は `public` か `private` へ。元は保持（[media.md](../media.md) の 10 節） | [media.md](../media.md) の 4・8 節（パスはこの文書） |
-| `media-public` | `m/{media_key}/{variant}.{ext}`、`m/{media_key}/hls/…` | 公開の版 | `media` | メディアと同じ | [media.md](../media.md) の 8.1 節 |
-| `media-private` | `p/{media_key}/{variant}.{ext}` | 鍵アカウントと DM の版 | `media` | 同上 | 同上 |
+| `media-uploads` | `u/{media_id}/orig` | クライアントが上げた元（バージョンの管理 30 日） | `media` | 処理の後は `public` か `private` へ。元は保持（[media.md](../media.md) の 10 節） | [media.md](../media.md) の 4・8 節（パスはこの文書） |
+| `media-public` | `m/{media_key}/{variant}.{ext}`、`m/{media_key}/hls/…` | 公開のバージョン | `media` | メディアと同じ | [media.md](../media.md) の 8.1 節 |
+| `media-private` | `p/{media_key}/{variant}.{ext}` | 鍵アカウントと DM のバージョン | `media` | 同上 | 同上 |
 | `media-quarantine` | `q/{media_id}/{元のキー}` | 隔離（措置・照合の一致）。T&S と法務のロールだけ | `ts-evidence` | 法務の L7・L8 | [media.md](../media.md) の 8.4 節 |
 | `lake` | `iceberg/{table}/…` | データレイクの表（`events_posts`・`events_graph`・`events_engagement`・`events_moderation`・`events_accounts`・`views_raw`・`ranking_served`・`ranking_training_sets`・`ranking_eval_reports`・`api_usage`・`visibility_audit`・`rum`・`ts_actions_daily`・`ts_reports_daily`・`ts_legal_daily`） | `lake` | 法務の L4・L8 | 各領域 |
 | `exports` | `x/{owner_id}/{request_id}.zip` | 本人のデータの書き出し | `pii` | 7 日 | この文書 |
@@ -218,7 +218,7 @@ Ingest が 1 束を 1 レコードで書く（outbox を通らないので 2.2 �
 
 ## 6. OpenSearch
 
-[ADR-0025](../../decisions/0025-search-engine-and-japanese-analysis.md)・[ADR-0026](../../decisions/0026-search-index-layout-and-visibility.md)。外部の版（`version_type = external_gte`）に `state_version` を使う。
+[ADR-0025](../../decisions/0025-search-engine-and-japanese-analysis.md)・[ADR-0026](../../decisions/0026-search-index-layout-and-visibility.md)。外部のバージョン（`version_type = external_gte`）に `state_version` を使う。
 
 ### 6.1 `posts-YYYYMM`（別名 `posts-read`）
 
@@ -286,4 +286,4 @@ FCM（HTTP v1 のデータのメッセージ、`collapse_key` にまとめの鍵
 
 ## 9. 端末の手元の保存
 
-サーバーの data-model の外。形は [clients.md](../clients.md) の 4.1 節（`expo-sqlite`・IndexedDB の `posts`・`users`・`timeline_items`・`drafts`・`send_queue`・`meta`）。`meta` に手元の形の版を持ち、上がったら作り直す。DM の中身は手元に置かない。
+サーバーの data-model の外。形は [clients.md](../clients.md) の 4.1 節（`expo-sqlite`・IndexedDB の `posts`・`users`・`timeline_items`・`drafts`・`send_queue`・`meta`）。`meta` に手元の形のバージョンを持ち、上がったら作り直す。DM の中身は手元に置かない。

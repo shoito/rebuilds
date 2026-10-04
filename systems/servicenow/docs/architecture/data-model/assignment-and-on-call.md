@@ -1,6 +1,6 @@
 # Data model: 割り当てとオンコール
 
-[data-model.md](../data-model.md) の一部。割り当ての規則、スキルと不在、当番表と版・差し替え、エスカレーションの方針と版、呼び出しと送信の記録を定義する。グループの所属の割り当ての列（`assignable`、`max_open`、`last_assigned_at`）は [identity-and-access.md](identity-and-access.md) の 3.2 節の `group_member` に持つ。振る舞い（DT-ASG-001・002、当番の関数、DT-PAGE-001）は [assignment-and-on-call.md](../assignment-and-on-call.md) を正とする。
+[data-model.md](../data-model.md) の一部。割り当ての規則、スキルと不在、当番表とバージョン・差し替え、エスカレーションの方針とバージョン、呼び出しと送信の記録を定義する。グループの所属の割り当ての列（`assignable`、`max_open`、`last_assigned_at`）は [identity-and-access.md](identity-and-access.md) の 3.2 節の `group_member` に持つ。振る舞い（DT-ASG-001・002、当番の関数、DT-PAGE-001）は [assignment-and-on-call.md](../assignment-and-on-call.md) を正とする。
 
 ## 1. ER 図
 
@@ -178,20 +178,20 @@ erDiagram
 
 ### 3.1 `on_call_schedule`・`on_call_schedule_version`
 
-当番表と、公開ごとに不変の版。版は `effective_from` から効く（過去に効かせない）。定義元：同じ文書の 5.1 節、[ADR-0027](../../decisions/0027-on-call-rotations-and-escalation.md)。
+当番表と、公開ごとに不変のバージョン。バージョンは `effective_from` から効く（過去に効かせない）。定義元：同じ文書の 5.1 節、[ADR-0027](../../decisions/0027-on-call-rotations-and-escalation.md)。
 
 | 表 | 列 |
 | --- | --- |
 | `on_call_schedule` | `tenant_id`、`id`、`group_id`（→ `group`）、`name`、`time_zone`（IANA）、`active`、メタデータの共通の列 |
 | `on_call_schedule_version` | `tenant_id`、`id`、`schedule_id`、`version_no`、`layers`（`jsonb`：`[{members, rotation, anchor, restriction}]`。上の層ほど優先）、`effective_from`（`timestamptz`）、`gap_warnings`（`jsonb`。公開の時の 90 日先までの空きの検査の結果）、`content_hash`、`published_at`、`published_by` |
 
-- キー：`on_call_schedule` PK `(tenant_id, id)`、UK `(tenant_id, stable_key)`、索引 `(tenant_id, group_id)`。`on_call_schedule_version` PK `(tenant_id, id)`、UK `(tenant_id, schedule_id, version_no)`、索引 `(tenant_id, schedule_id, effective_from DESC)`（時刻 t に効く版）。
-- CHECK：`effective_from >= published_at - interval '5 minutes'`（過去の当番を変えない）。版は `UPDATE` を与えない。
-- 保持：版を消さない（誰が当番だったかの記録）。S1 の量：当番表 数千、版 年 数万行。
+- キー：`on_call_schedule` PK `(tenant_id, id)`、UK `(tenant_id, stable_key)`、索引 `(tenant_id, group_id)`。`on_call_schedule_version` PK `(tenant_id, id)`、UK `(tenant_id, schedule_id, version_no)`、索引 `(tenant_id, schedule_id, effective_from DESC)`（時刻 t に効くバージョン）。
+- CHECK：`effective_from >= published_at - interval '5 minutes'`（過去の当番を変えない）。バージョンは `UPDATE` を与えない。
+- 保持：バージョンを消さない（誰が当番だったかの記録）。S1 の量：当番表 数千、バージョン 年 数万行。
 
 ### 3.2 `on_call_override`
 
-版の外の一時の差し替え。定義元：同じ文書の 5.1 節。
+バージョンの外の一時の差し替え。定義元：同じ文書の 5.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -212,7 +212,7 @@ erDiagram
 
 ### 4.1 `escalation_policy`・`escalation_policy_version`
 
-エスカレーションの方針と不変の版。2026-09-28 の統合で、`page.policy_version_id` の参照先として版の表に分けた。定義元：同じ文書の 6.1 節。
+エスカレーションの方針と不変のバージョン。2026-09-28 の統合で、`page.policy_version_id` の参照先としてバージョンの表に分けた。定義元：同じ文書の 6.1 節。
 
 | 表 | 列 |
 | --- | --- |
@@ -221,7 +221,7 @@ erDiagram
 
 - キー：`escalation_policy` PK `(tenant_id, id)`、UK `(tenant_id, stable_key)`、索引 `(tenant_id, group_id) WHERE active`。`escalation_policy_version` PK `(tenant_id, id)`、UK `(tenant_id, policy_id, version_no)`。
 - CHECK：`repeat BETWEEN 0 AND 3`、`channels <@ ARRAY['email','push','sms','voice']`。各段の `ack_timeout_minutes` 1〜120 は Zod で検証する。
-- 版は `UPDATE` を与えない。保持：版を消さない。S1 の量：数千行。
+- バージョンは `UPDATE` を与えない。保持：バージョンを消さない。S1 の量：数千行。
 
 ### 4.2 `page`
 

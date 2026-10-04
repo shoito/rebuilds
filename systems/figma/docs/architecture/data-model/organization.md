@@ -111,7 +111,7 @@ erDiagram
 | `id` | `uuid` | NO | `uuidv7()` | 主キー。RLS の鍵 |
 | `name` | `text` | NO | | 1〜100 文字 |
 | `is_implicit` | `boolean` | NO | `false` | チームだけのプランのために作った暗黙の組織 |
-| `plan` | `text` | NO | `'free'` | `free`・`professional`・`organization`。版の保持（無料 30 日）、リンクの期限、API のレート制限、ライブラリの公開を分ける。請求は範囲の外 |
+| `plan` | `text` | NO | `'free'` | `free`・`professional`・`organization`。バージョンの保持（無料 30 日）、リンクの期限、API のレート制限、ライブラリの公開を分ける。請求は範囲の外 |
 | `acl_version` | `bigint` | NO | `0` | 権限に効く変更で同じトランザクションの中で 1 上げる（ADR-0031。[permissions-and-sharing.md](../permissions-and-sharing.md) の 9.1 節） |
 | `public_links_disabled` | `boolean` | NO | `false` | `anyone` の一般アクセスを禁止する |
 | `seat_approval` | `text` | NO | `'manual'` | `manual`・`auto_if_available`・`auto`（[permissions-and-sharing.md](../permissions-and-sharing.md) の 4.4 節） |

@@ -65,7 +65,7 @@ erDiagram
 
 - **組の勧告ロック**：フォロー・解除・申請・承認・拒否・フォロワーの削除・ブロック・解除は、`pg_advisory_xact_lock(graph_pair_key(least(a,b), greatest(a,b)))` を取ってから両向きを読む（[ADR-0011](../../decisions/0011-graph-edge-state-machine-and-locking.md)）。`graph_pair_key` は 2 つの ID から 64 ビットの鍵を作る関数（`hashtextextended`）。
 - **2 つの向きは同じトランザクション**（S1）：`following` と `followers`、`blocks` と `blocked_by` を同時に書き、同時に消す。S2 は `following`・`blocks` を正本にして先に書き、逆向きは `graph` の流れから冪等に作る（[ADR-0013](../../decisions/0013-graph-partitioning.md)）。
-- **版**：辺を変えるトランザクションは、関わる利用者の `users.graph_version` を上げる。確定の直後に閲覧者の集合の写し（`vb:`・`vm:`・`vp:`・`vw:`・`vv:`）を `vs_apply` で更新する（[ADR-0012](../../decisions/0012-viewer-sets-cache.md)）。
+- **バージョン**：辺を変えるトランザクションは、関わる利用者の `users.graph_version` を上げる。確定の直後に閲覧者の集合の写し（`vb:`・`vm:`・`vp:`・`vw:`・`vv:`）を `vs_apply` で更新する（[ADR-0012](../../decisions/0012-viewer-sets-cache.md)）。
 - **ブロックの排他**：ブロックを書くトランザクションで、両向きのフォローの辺（`active`・`pending`）を消す（`follow.deleted`、理由 `block`）。
 - **辺がない＝行がない**：解除・拒否・削除は行を消す。履歴は出来事のログとデータレイクに残る。
 - outbox：`graph` の流れ、鍵は `src_id`。
@@ -74,7 +74,7 @@ erDiagram
 
 ### 3.1 `following`
 
-する側から見たフォローの辺。公開の表（鍵アカウントの一覧は本人と承認したフォロワーだけ。`visible()` の利用者の版）。
+する側から見たフォローの辺。公開の表（鍵アカウントの一覧は本人と承認したフォロワーだけ。`visible()` の利用者のバージョン）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

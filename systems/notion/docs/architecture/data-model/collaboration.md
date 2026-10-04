@@ -132,7 +132,7 @@ erDiagram
 | `field` | text | NO | | `title` / `caption` / 行のページのテキストのプロパティ ID |
 | `page_id` | uuid | NO | | `blocks.page_id` の写し。ページの一括の読み込み用 |
 | `state` | bytea | NO | | `packages/text-crdt` の直列化の形（run ごとに `(instance_id, replica_id, counter)` の範囲と文字、墓標、書式の印） |
-| `format_version` | smallint | NO | `1` | 直列化の形の版 |
+| `format_version` | smallint | NO | `1` | 直列化の形のバージョン |
 | `lamport` | bigint | NO | `0` | 書式の排他的な値の比較に使う Lamport の時刻の最大 |
 | `size` | int | NO | | `state` のバイト数（指標） |
 | `updated_at` | timestamptz | NO | `now()` | |

@@ -26,7 +26,7 @@ webhook-router（Worker、VPC 内）
   ▼
 SQS webhook-delivery ─▶ webhook-sender（Worker、VPC 内）
   │ 1. エンドポイントが enabled か確かめる（外れたら abandoned）
-  │ 2. Event をエンドポイントの API の版で描画する（6 節）
+  │ 2. Event をエンドポイントの API のバージョンで描画する（6 節）
   │ 3. 署名する（7 節）
   │ 4. webhook-egress（Lambda、専用の egress VPC、権限なし）を同期で呼ぶ
   │ 5. 結果を webhook_delivery_attempts に書く。失敗なら next_attempt_at を決める
@@ -62,7 +62,7 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 | 項目 | 意味 |
 | --- | --- |
 | `id` | `evt_` で始まる ID。再試行・手動の再送でも変わらない |
-| `api_version` | `data` を描画した版。作成の時点のアカウントの既定の版で固定し、後から変えない（本家と同じ。[Event object](https://docs.stripe.com/api/events/object)） |
+| `api_version` | `data` を描画したバージョン。作成の時点のアカウントの既定のバージョンで固定し、後から変えない（本家と同じ。[Event object](https://docs.stripe.com/api/events/object)） |
 | `created` | UNIX 秒。秒の精度なので、順序の判断には使えない（本家も同じ注意を書いている） |
 | `data.object` | 作成の時点のリソース。公開 API の GET と同じ形 |
 | `data.previous_attributes` | `*.updated` など、変わった項目の変更前の値 |
@@ -75,7 +75,7 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 ### 3.2 生成（outbox）
 
 - ドメインの処理は、状態を変えるトランザクションの中で `events` に 1 行を書き、同じトランザクションで `outbox` に「Event ができた」ことを書く。
-- `events` の行には、その時点のリソースの **正規形**（内部の最新の型）と `previous_attributes` と `api_version` を入れる。版ごとの描画は保存しない（ADR-0026）。
+- `events` の行には、その時点のリソースの **正規形**（内部の最新の型）と `previous_attributes` と `api_version` を入れる。バージョンごとの描画は保存しない（ADR-0026）。
 - Event の生成は冪等にする。同じ内部の操作 ID（[ADR-0004](../decisions/0004-idempotency.md) の内部の層）から 2 つの Event を作らない。主に遷移関数の冪等（同じ結果への遷移は何もしない）で守り、DB では日ごとのパーティションの中で `(account_id, idempotency_source, created_on)` を一意にする（パーティションをまたぐ一意は張れないため。[data-model/events-and-webhooks.md](data-model/events-and-webhooks.md) の 2.2 節）。本家は「まれに 2 つの Event が別々に作られる」ことがあるとしている（[重複するイベントを処理する](https://docs.stripe.com/webhooks#handle-duplicate-events)）。本システムは作らない設計にするが、加盟店向けの案内は本家と同じにする（9 節）。
 
 ### 3.3 MVP で出す種類
@@ -98,7 +98,7 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 | アカウント | `account.updated`（審査の状態と capability。[merchant-onboarding.md](merchant-onboarding.md) の 3 節） |
 
 - 種類の一覧は `packages/contract` の Zod スキーマに置き、公開の文書と SDK の型をここから生成する。
-- 種類を足すのは、版をまたがない追加の変更として扱う（[api.md](api.md) の版の方針）。
+- 種類を足すのは、バージョンをまたがない追加の変更として扱う（[api.md](api.md) のバージョンの方針）。
 
 ### 3.4 保持
 
@@ -123,12 +123,12 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 | --- | --- |
 | `url` | 送信先。4.2 節の制約を満たすもの |
 | `enabled_events` | 受け取る種類の配列。`["*"]` はすべて（明示の選択が要る種類を除く。本家と同じ） |
-| `api_version` | Event を描画する版。null ならアカウントの既定の版（作成の時点の版で固定された Event の版） |
+| `api_version` | Event を描画するバージョン。null ならアカウントの既定のバージョン（作成の時点のバージョンで固定された Event のバージョン） |
 | `status` | `enabled` / `disabled` |
 | `secret` | 署名の秘密。作成の応答でだけ返す（本家と同じ）。ダッシュボードでは権限のある人が再表示できる（7.3 節） |
 | `description`、`metadata` | 任意 |
 
-- 上限は、アカウント・環境ごとに 16 個。アカウントの既定と違う版を指定したエンドポイントは、異なる版で 3 種類まで（本家と同じ。[イベント送信先の制限](https://docs.stripe.com/event-destinations#event-destination-limits)）。
+- 上限は、アカウント・環境ごとに 16 個。アカウントの既定と違うバージョンを指定したエンドポイントは、異なるバージョンで 3 種類まで（本家と同じ。[イベント送信先の制限](https://docs.stripe.com/event-destinations#event-destination-limits)）。
 - 作成・変更・削除・秘密の入れ替えは、監査ログに残す（[security.md](security.md)）。
 - テスト環境のエンドポイントは、テスト環境の Event だけを受ける。本番のエンドポイントは本番の Event だけを受ける。署名の秘密も別にする（本家と同じ）。
 
@@ -188,12 +188,12 @@ webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配
 - テスト環境では自動の無効化をしない（通知だけ）。
 - 無効の間に作られた Event は、そのエンドポイントの配信を作らない。有効に戻しても、無効の間の Event は自動では送らない。加盟店は `delivery_success=false` の一覧（3.4 節）と手動の再送（8.2 節）で取り戻す。
 
-## 6. API の版と描画
+## 6. API のバージョンと描画
 
-- Event の `api_version` は、作成の時点のアカウントの既定の版にする。アカウントの版を後で上げても、既存の Event は変わらない（本家と同じ）。
-- エンドポイントに `api_version` があれば、その版で描画して送る。なければ Event の `api_version` で描画する（本家と同じ）。
-- 描画は、正規形に [api.md](api.md) の版ごとの変換を順に当てて行う。変換は、公開した後は書き換えない（直すときは新しい版にする）。これで、同じ Event を同じ版で描画すれば、いつでも同じ本文になる（ADR-0026）。
-- 本家の thin events（v2）は、MVP では作らない。版に依存しない通知の需要が出たら、エンドポイントに `event_payload`（`snapshot` / `thin`）を足す（ADR-0026）。
+- Event の `api_version` は、作成の時点のアカウントの既定のバージョンにする。アカウントのバージョンを後で上げても、既存の Event は変わらない（本家と同じ）。
+- エンドポイントに `api_version` があれば、そのバージョンで描画して送る。なければ Event の `api_version` で描画する（本家と同じ）。
+- 描画は、正規形に [api.md](api.md) のバージョンごとの変換を順に当てて行う。変換は、公開した後は書き換えない（直すときは新しいバージョンにする）。これで、同じ Event を同じバージョンで描画すれば、いつでも同じ本文になる（ADR-0026）。
+- 本家の thin events（v2）は、MVP では作らない。バージョンに依存しない通知の需要が出たら、エンドポイントに `event_payload`（`snapshot` / `thin`）を足す（ADR-0026）。
 
 ## 7. 署名
 
@@ -337,7 +337,7 @@ Slack の ADR-0016 の「アプリの検査」をそのまま使い、Webhook �
 | 性質ベース | 任意の状態の遷移の列で、コミットした遷移 1 つにつき Event がちょうど 1 つある。任意の配信の結果の列（失敗・タイムアウト・重複の配送）で、各 `(endpoint, event)` の成功の記録は多くとも 1 つで、失敗の再試行は 72 時間を超えない |
 | 署名 | 本家の公開の SDK（`stripe-node` の `webhooks.constructEvent`）の検証の手順で、本システムの署名を検証できる（ヘッダー名だけ差し替える）。入れ替え中の 2 つの署名のどちらでも通る |
 | SSRF | 10.2 節の拒否すべきアドレス、内部を指すリダイレクト、DNS の再バインドで送信されない |
-| 版 | 同じ Event を同じ版で描画すると、いつでも同じ本文になる（描画のスナップショットテスト） |
+| バージョン | 同じ Event を同じバージョンで描画すると、いつでも同じ本文になる（描画のスナップショットテスト） |
 | 障害 | egress の Lambda の失敗・NAT の停止・加盟店の遅延で、他のエンドポイントの配信の遅延が NFR-006 に収まる |
 
 ## 15. 未検証の事項と確かめ方

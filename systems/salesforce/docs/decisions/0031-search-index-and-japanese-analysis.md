@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0031: 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部の版にして作る
+# ADR-0031: 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部のバージョンにして作る
 
 詳細は [search.md](../architecture/search.md) の 4 節と 5 節。
 
@@ -38,19 +38,19 @@ Amazon OpenSearch Service は `analysis-kuromoji`・`analysis-icu` を持ち、S
 
 作り方：
 
-- x. **outbox → SQS → indexer。`row_version` を外部の版にする。参照の候補は名前のピボットの前方一致を先に使う**
+- x. **outbox → SQS → indexer。`row_version` を外部のバージョンにする。参照の候補は名前のピボットの前方一致を先に使う**
 - y. 保存の同じトランザクションの中で OpenSearch に書く
 
 ## Decision
 
 1、a、x を採用する。
 
-- 索引は `rec-v{版}-{00..15}` の 16 個で、別名で指す。文書の ID は `{org_id}:{record_id}`。`texts` は nested 型で `field_no` ごとに持ち、`_source` には ID と版だけを残す（本文は DB から読む）。
+- 索引は `rec-v{バージョン}-{00..15}` の 16 個で、別名で指す。文書の ID は `{org_id}:{record_id}`。`texts` は nested 型で `field_no` ごとに持ち、`_source` には ID とバージョンだけを残す（本文は DB から読む）。
 - 解析は `icu_normalizer`（NFKC、小文字）→ kuromoji（search モード、原形、助詞を落とす）→ ひらがなをカタカナに。別に `cjk_bigram` の部分の項目を持つ。名前には前方一致用の `edge_ngram` と、カナの読みの項目を持つ。
 - 既定は kuromoji。E5 の PoC で、Sudachi が生成したコーパスでの再現率で 5 ポイント以上良ければ Sudachi に替える。
 - 索引に入れる項目は `searchable` の印のある項目（1 オブジェクト 20 まで）と名前。数式・数・日付は入れない。
 - indexer は 100 件か 1 秒ごとにまとめて `_bulk` で書き、`version_type=external`・`version=row_version` にする。遅れの目標は p95 5 秒・p99 30 秒。ごみ箱のレコードは消す。
-- 組織ごとに 7 日で整合の検査を一周し、`(id, row_version)` の差を直す。マッピングの変更は新しい版の索引を作って切り替える。
+- 組織ごとに 7 日で整合の検査を一周し、`(id, row_version)` の差を直す。マッピングの変更は新しいバージョンの索引を作って切り替える。
 - 参照の項目の候補は、名前のピボット（`record_index_values`）の前方一致を先に引き、足りなければ OpenSearch で足す。OpenSearch の障害の時は、全体の検索も名前の前方一致で答え、`degraded` を返す。
 - 2 は、組織の数だけ索引とシャードを持つことになり、S3 でクラスタの状態が大きくなりすぎる。
 - 3 は、カスタムオブジェクトの項目が組織ごとに違うので、マッピングが膨らむ。

@@ -1,6 +1,6 @@
 # Data model: 業務プロセス
 
-業務プロセスの定義と版、案件、ステップ、担当、イベント、冪等、タイマー、委任、受信箱、添付。振る舞いは [business-process-engine.md](../business-process-engine.md)、決定は [ADR-0003](../../decisions/0003-business-process-engine.md)、[ADR-0013](../../decisions/0013-bp-definition-format-and-versions.md)〜[ADR-0016](../../decisions/0016-bp-definition-validation-and-activation.md)。規約は [data-model.md](../data-model.md) の 3 節。
+業務プロセスの定義とバージョン、案件、ステップ、担当、イベント、冪等、タイマー、委任、受信箱、添付。振る舞いは [business-process-engine.md](../business-process-engine.md)、決定は [ADR-0003](../../decisions/0003-business-process-engine.md)、[ADR-0013](../../decisions/0013-bp-definition-format-and-versions.md)〜[ADR-0016](../../decisions/0016-bp-definition-validation-and-activation.md)。規約は [data-model.md](../data-model.md) の 3 節。
 
 ## 1. ER 図
 
@@ -113,19 +113,19 @@ erDiagram
 
 ### 2.1 `bp_definitions`
 
-業務プロセスの定義の版（版の表）。定義元：[business-process-engine.md](../business-process-engine.md) の 3.3・11 節。
+業務プロセスの定義のバージョン（バージョンの表）。定義元：[business-process-engine.md](../business-process-engine.md) の 3.3・11 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
-| `id` | `uuid` | NOT NULL | `uuidv7()` | 版の ID（案件が固定する） |
+| `id` | `uuid` | NOT NULL | `uuidv7()` | バージョンの ID（案件が固定する） |
 | `process_type` | `text` | NOT NULL | — | [business-process-engine.md](../business-process-engine.md) の 3.1 節の種類 |
 | `version` | `int` | NOT NULL | — | 種類ごとに 1 から |
 | `effective_from` | `date` | NOT NULL | — | 起票の日（テナントの暦）がこの日以後の案件に使う |
 | `body` | `jsonb` | NOT NULL | — | 定義の JSON（ステップ、式の木、`depends_on`、`cancel`・`rescind`・`correct` の方針、`bulk_approval`、`inherit_approval`） |
 | `body_sha256` | `bytea` | NOT NULL | — | RFC 8785 の正規の形のハッシュ |
 | `status` | `text` | NOT NULL | `'draft'` | `draft`・`pending_activation`・`active`・`retired` |
-| `based_on_version` | `int` | NULL | — | 写した元の版（システムの既定か前の版） |
+| `based_on_version` | `int` | NULL | — | 写した元のバージョン（システムの既定か前のバージョン） |
 | `validation` | `jsonb` | NULL | — | 静的な検査・模擬の実行の結果（警告を含む） |
 | `created_by`・`created_at` | `uuid`・`timestamptz` | NOT NULL | — | 編集者 |
 | `activated_by`・`activated_at` | `uuid`・`timestamptz` | NULL | — | `bp_definition_activation` の承認者と時刻 |
@@ -133,11 +133,11 @@ erDiagram
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, process_type, version)`。FK `(tenant_id, activation_case_id)` → `bp_cases`（`DEFERRABLE`）。
 - 一意：`(tenant_id, process_type) WHERE status = 'draft'` — 下書きは種類ごとに 1 つ。
-- 索引：`(tenant_id, process_type, effective_from DESC) WHERE status = 'active'` — 起票のときの版の選び方。
+- 索引：`(tenant_id, process_type, effective_from DESC) WHERE status = 'active'` — 起票のときのバージョンの選び方。
 - CHECK：`status IN (...)`、`status <> 'active' OR (activated_by IS NOT NULL AND activated_by <> created_by)`（編集と有効化は別の人。S5）。
 - 更新：`active` にした後は `status` を `retired` にする更新だけ（トリガー）。
-- 運用：RLS。保存はテナントの契約の間（古い版も消さない。案件が指す）。
-- S1 の量：テナントあたり種類 40 × 版 数個。全体で数万行。
+- 運用：RLS。保存はテナントの契約の間（古いバージョンも消さない。案件が指す）。
+- S1 の量：テナントあたり種類 40 × バージョン 数個。全体で数万行。
 
 ### 2.2 `bp_cases`
 
@@ -148,7 +148,7 @@ erDiagram
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `process_type` | `text` | NOT NULL | — | |
-| `definition_id` | `uuid` | NOT NULL | — | 起票の日に選んだ版 |
+| `definition_id` | `uuid` | NOT NULL | — | 起票の日に選んだバージョン |
 | `parent_case_id` | `uuid` | NULL | — | 親の案件（一括、再編、訂正、退職の後の手続き） |
 | `relation` | `text` | NULL | — | 親との関係：`child`・`correction`・`rescind`・`bulk_row` |
 | `subject_type` | `text` | NOT NULL | — | `worker`・`employment`・`job_assignment`・`organization`・`position`・`role_assignment`・`payroll_run`・`tenant` など |
@@ -157,7 +157,7 @@ erDiagram
 | `effective_on` | `date` | NULL | — | 発令の日 |
 | `state` | `text` | NOT NULL | `'in_progress'` | `in_progress`・`completed`・`partially_applied`・`cancelled`・`denied`・`rescinded` |
 | `payload` | `jsonb` | NOT NULL | — | 提案の値（種類ごとの Zod のスキーマ）。口座は暗号文。P は種類による（最大 P2） |
-| `based_on_version_ids` | `uuid[]` | NOT NULL | `'{}'` | 起票者が見た版 |
+| `based_on_version_ids` | `uuid[]` | NOT NULL | `'{}'` | 起票者が見たバージョン |
 | `initiated_by` | `uuid` | NOT NULL | — | 起票者（委任では委任した人） |
 | `initiated_on_behalf_of` | `uuid` | NULL | — | 実際の操作者が代理人のとき、代理人（[business-process-engine.md](../business-process-engine.md) の 7 節） |
 | `initiator_type` | `text` | NOT NULL | `'worker'` | `worker`・`integration`・`system` |

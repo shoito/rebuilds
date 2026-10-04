@@ -127,7 +127,7 @@ erDiagram
 
 ### 2.2 `leave_grant_policies`
 
-付与の方針（斉一的付与、上乗せ）の版（版の表）。`leave_policy_change` で有効化する。定義元：[absence-and-leave.md](../absence-and-leave.md) の 4.4 節。
+付与の方針（斉一的付与、上乗せ）のバージョン（バージョンの表）。`leave_policy_change` で有効化する。定義元：[absence-and-leave.md](../absence-and-leave.md) の 4.4 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -143,7 +143,7 @@ erDiagram
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, leave_type_id, version)`。
 - 排他：`(tenant_id =, leave_type_id =, valid &&) WHERE status = 'active'`。
-- 運用：RLS。保存は年次有給休暇管理簿（付与が版を指す）。
+- 運用：RLS。保存は年次有給休暇管理簿（付与がバージョンを指す）。
 
 ### 2.3 `leave_grants`
 
@@ -160,7 +160,7 @@ erDiagram
 | `days` | `numeric(5,1)` | NOT NULL | — | 付与の日数 |
 | `statutory_days` | `numeric(5,1)` | NOT NULL | — | そのうち法定の最低 |
 | `hours_per_day` | `smallint` | NOT NULL | — | 時間単位の 1 日の時間数（付与のときに固定） |
-| `basis` | `jsonb` | NOT NULL | — | 継続勤務の月数、出勤率（10 進の文字列）、比例の行、規則の版。P2 |
+| `basis` | `jsonb` | NOT NULL | — | 継続勤務の月数、出勤率（10 進の文字列）、比例の行、規則のバージョン。P2 |
 | `policy_version_id` | `uuid` | NULL | — | → `leave_grant_policies` |
 | `case_id` | `uuid` | NOT NULL | — | 付与の案件（システム）か `special_leave_grant` |
 | `recorded_at` | `timestamptz` | NOT NULL | `now()` | |

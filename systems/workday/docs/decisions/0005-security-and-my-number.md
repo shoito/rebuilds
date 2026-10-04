@@ -15,9 +15,9 @@ date: 2026-09-28
 
 本家は、機能の領域（ドメイン）ごとの権限（View・Modify、連携の Get・Put）と、業務プロセスの種類ごとの権限（起票、承認、取消、訂正など）を持つ。セキュリティグループには、ユーザー、ロール（組織で絞る・絞らない）、職務、組織・勤務地、集約・交差、階層などの種類がある。権限の変更は「有効化」まで保留され、編集と有効化を別の人に分けられる（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)、2026-09-28 に確認）。レポート・モバイル・API・業務プロセスのすべてに、同じロールの権限が効く（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)、2026-09-28 に確認）。
 
-マイナンバー（個人番号）には、番号法と個人情報保護委員会のガイドラインの規律がある（[特定個人情報の適正な取扱いに関するガイドライン（事業者編）](https://www.ppc.go.jp/legal/policy/my_number_guideline_jigyosha/)、令和 7 年 6 月の一部改正の版。2026-09-28 に確認）。
+マイナンバー（個人番号）には、番号法と個人情報保護委員会のガイドラインの規律がある（[特定個人情報の適正な取扱いに関するガイドライン（事業者編）](https://www.ppc.go.jp/legal/policy/my_number_guideline_jigyosha/)、令和 7 年 6 月の一部改正のバージョン。2026-09-28 に確認）。
 
-> 2026-09-28 の注記：最初は令和 6 年 5 月の一部改正の版を引いていた。今の最新は令和 7 年 6 月の一部改正の版で、[my-number-vault.md](../architecture/my-number-vault.md) の 2 節でその本文を確かめたので、引く版を直した。下の要点（利用の制限、安全管理措置、保存期間の後の廃棄、継続的な保管）は、新しい版でも同じで、決定は変えない。
+> 2026-09-28 の注記：最初は令和 6 年 5 月の一部改正のバージョンを引いていた。今の最新は令和 7 年 6 月の一部改正のバージョンで、[my-number-vault.md](../architecture/my-number-vault.md) の 2 節でその本文を確かめたので、引くバージョンを直した。下の要点（利用の制限、安全管理措置、保存期間の後の廃棄、継続的な保管）は、新しいバージョンでも同じで、決定は変えない。
 
 - 利用は、社会保障・税・災害対策の決められた事務に限る。
 - 取り扱う事務、特定個人情報の範囲、事務取扱担当者を明確にする。

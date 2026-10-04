@@ -41,8 +41,8 @@ outbox の形：
 - store はモデルの名前で持つ（本家の解析のようなハッシュの名前にしない）。行に `_u`（`updated_sync_id`）と `_g`（同期グループ）を付け、`_g` に multiEntry の索引を張る。`_tombstones` と `_blobs` を足す。データベースの名前は `<brand>_<SHA-256(account_id:workspace_id) の base32 の先頭 20 文字>` にし、ワークスペースの名前を入れない。
 - `relaxed` の書き込みが電源の喪失で失われても、IndexedDB のトランザクションの原子性で、手元の状態と `last_sync_id` がそろったまま前に戻るだけで、取り戻せる。`strict` と `relaxed` の間の永続の順序には頼らない。
 - outbox の行の状態は `queued`・`sent`・`acked`・`done`。`done` は確定を差分で確かめたもので、15 分後に消す。
-- 移行は a のとおり。`versionchange` を受けた古いタブは、まとめ中の outbox を書き終えてから閉じ、操作を止める。古いコードが新しい版を開いたら（`VersionError`）、DB に触れない。
-- outbox の変換の関数は 180 日分の版を持つ。変換できない古い形は確認の一覧に出す。
+- 移行は a のとおり。`versionchange` を受けた古いタブは、まとめ中の outbox を書き終えてから閉じ、操作を止める。古いコードが新しいバージョンを開いたら（`VersionError`）、DB に触れない。
+- outbox の変換の関数は 180 日分のバージョンを持つ。変換できない古い形は確認の一覧に出す。
 - 2 を採らない理由：ブートストラップの一括の書き込みが遅くなり、NFR-003 を脅かす。取り戻せるデータに `strict` の費用を払う意味がない。
 - 3 を採らない理由：outbox の保証がブラウザの既定に左右される。
 - b を採らない理由：`versionchange` のトランザクションを長く持ち、他のタブを長く止める。途中で落ちると最初からになる。
@@ -62,6 +62,6 @@ outbox の形：
 ## Confirmation
 
 - 性質ベーステスト（[ADR-0010](0010-deterministic-sync-simulator.md)。模した IndexedDB で `relaxed` の直近のコミットを失わせる）：PROP-STORE-001（失わない）、PROP-STORE-002（原子性）、PROP-STORE-004（移行）。
-- Playwright：オフラインのまま再起動、送信の途中で落ちる、古い版の outbox を新しい版で送る、の 3 つの場面（AGENTS.md）。
-- CI：DB の版を上げる PR に、移行の関数と、1 つ前の版の outbox の変換のテストがなければ失敗させる（ADR-0005）。
+- Playwright：オフラインのまま再起動、送信の途中で落ちる、古いバージョンの outbox を新しいバージョンで送る、の 3 つの場面（AGENTS.md）。
+- CI：DB のバージョンを上げる PR に、移行の関数と、1 つ前のバージョンの outbox の変換のテストがなければ失敗させる（ADR-0005）。
 - lint：`durability` を指定しない IndexedDB のトランザクションを、保存の層で禁止する。

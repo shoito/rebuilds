@@ -240,7 +240,7 @@ erDiagram
 | `name` | `text` | NO | | |
 | `trigger` | `text` | NO | | `post-login`・`pre-user-registration`・`post-user-registration`・`post-change-password`・`credentials-exchange` など |
 | `runtime` | `text` | NO | | `node22` など |
-| `deployed_version_id` | `uuid` | YES | | 配備中の版 |
+| `deployed_version_id` | `uuid` | YES | | 配備中のバージョン |
 | `created_at` / `updated_at` | `timestamptz` | NO | `now()` | |
 
 - 主キー：`(tenant_id, id)`。一意：`(tenant_id, name)`。
@@ -255,7 +255,7 @@ erDiagram
 | `action_id` | `uuid` | NO | | |
 | `number` | `integer` | NO | | Action の中の 1, 2, 3 … |
 | `code` | `text` | NO | | テナントのコード（秘密を入れない。ビルドの成果物にも入れない） |
-| `dependencies` | `jsonb` | NO | `'[]'` | 解決した具体の版（10 個まで） |
+| `dependencies` | `jsonb` | NO | `'[]'` | 解決した具体のバージョン（10 個まで） |
 | `status` | `text` | NO | `'draft'` | `draft`・`built`・`deployed`・`failed` |
 | `bundle_s3_key` | `text` | YES | | actions のアカウントの S3 |
 | `bundle_sha256` | `bytea` | YES | | |
@@ -284,7 +284,7 @@ erDiagram
 
 ### trigger_bindings
 
-トリガーごとの Action の並び。配備でテナントの設定の版を上げる（ADR-0032）。
+トリガーごとの Action の並び。配備でテナントの設定のバージョンを上げる（ADR-0032）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -292,7 +292,7 @@ erDiagram
 | `trigger` | `text` | NO | | |
 | `position` | `smallint` | NO | | 1 から |
 | `action_id` | `uuid` | NO | | |
-| `version_id` | `uuid` | NO | | 固定した版 |
+| `version_id` | `uuid` | NO | | 固定したバージョン |
 | `on_platform_error` | `text` | NO | `'deny'` | `deny`・`allow`（ADR-0048） |
 
 - 主キー：`(tenant_id, trigger, position)`。一意：`(tenant_id, trigger, action_id)`。

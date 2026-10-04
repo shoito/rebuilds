@@ -1,6 +1,6 @@
 # Data model: 投稿
 
-投稿の行、冪等の記録、抜き出した要素、短縮 URL、メディアの付け先、下書き、投稿の時の IP の記録、`tid` の生成器の貸し出し、S2 の索引の表と対応表。振る舞いは [posts-and-ids.md](../posts-and-ids.md)、決定は [ADR-0002](../../decisions/0002-post-ids-and-ordering.md)（`tid`）、[ADR-0008](../../decisions/0008-post-write-path-and-idempotency.md)（書き込みと冪等）、[ADR-0009](../../decisions/0009-post-state-tombstones-and-state-cache.md)（墓石と状態の版）、[ADR-0010](../../decisions/0010-post-table-partitioning-s2.md)（S2 の分割）にある。規約は [data-model.md](../data-model.md) の 3 節。
+投稿の行、冪等の記録、抜き出した要素、短縮 URL、メディアの付け先、下書き、投稿の時の IP の記録、`tid` の生成器の貸し出し、S2 の索引の表と対応表。振る舞いは [posts-and-ids.md](../posts-and-ids.md)、決定は [ADR-0002](../../decisions/0002-post-ids-and-ordering.md)（`tid`）、[ADR-0008](../../decisions/0008-post-write-path-and-idempotency.md)（書き込みと冪等）、[ADR-0009](../../decisions/0009-post-state-tombstones-and-state-cache.md)（墓石と状態のバージョン）、[ADR-0010](../../decisions/0010-post-table-partitioning-s2.md)（S2 の分割）にある。規約は [data-model.md](../data-model.md) の 3 節。
 
 ## 1. ER 図
 

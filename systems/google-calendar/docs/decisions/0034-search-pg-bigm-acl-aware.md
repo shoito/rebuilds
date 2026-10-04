@@ -62,6 +62,6 @@ date: 2026-10-04
 ## Confirmation
 
 - 表駆動テスト：DT-SRCH-001（検索の範囲。sharing-and-acl の `redact()` の決定表と同じ表から読む）、DT-SRCH-002（正規化）。
-- 性質ベーステスト：PROP-SRCH-001（見てはいけない中身で当たらない）、PROP-SRCH-002（取りこぼさない）、PROP-SRCH-003（版）、PROP-SRCH-004（件数で推測できない）。
+- 性質ベーステスト：PROP-SRCH-001（見てはいけない中身で当たらない）、PROP-SRCH-002（取りこぼさない）、PROP-SRCH-003（バージョン）、PROP-SRCH-004（件数で推測できない）。
 - lint：検索の SQL の権限の条件を `packages/policy` の外で書くことを禁止する。
 - 本番：応答の p99、更新の遅れの p95、確かめ直しで落とした数。

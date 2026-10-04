@@ -50,7 +50,7 @@ date: 2026-09-27
   - 解釈器なので、ブラウザの JIT より遅い（本家も遅くなったと書く。程度は **未検証**。E14 の `quickjs-sandbox-poc` で計測する）。
   - メインスレッドで動くので、同期の実行の間は画面が止まる。10 秒の打ち切りと、`await` で区切る案内で抑える。
   - ブラウザの開発者の道具（デバッガー）が使えない。開発用のコンソールとエラーの位置の表示を自前で用意する。
-  - QuickJS の WASM（quickjs-ng の同期の版で約 530 KB。圧縮の前。`@jitl/quickjs-ng-wasmfile-release-sync` 0.32.0 の `emscripten-module.wasm`、jsDelivr の一覧で 2026-09-27 に確認）を、プラグインを初めて動かすときに読む。
+  - QuickJS の WASM（quickjs-ng の同期のバージョンで約 530 KB。圧縮の前。`@jitl/quickjs-ng-wasmfile-release-sync` 0.32.0 の `emscripten-module.wasm`、jsDelivr の一覧で 2026-09-27 に確認）を、プラグインを初めて動かすときに読む。
   - quickjs-ng は `Intl` を持たない（[quickjs-ng の ECMAScript Features](https://quickjs-ng.github.io/quickjs/es_features)、2026-09-27 に確認）。地域の書式を使うプラグインは、ホストの助けが要る（[plugins.md](../architecture/plugins.md) の 4.4 節）。
 
 ## Confirmation

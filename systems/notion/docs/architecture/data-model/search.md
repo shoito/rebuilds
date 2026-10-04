@@ -4,7 +4,7 @@
 
 - 別名 `pages` の裏に `pages-v{N}` を置く。マッピングを変えるときは、新しい索引を作って別名を切り替える。
 - ルーティングは `workspace_id`。`index.routing_partition_size` で大きいワークスペースの偏りを抑える（値は負荷試験で決める）。
-- 文書の ID は `page_id`。書き込みは `index_version`（ページの `seq`）を外部バージョンにし、古い版で上書きしない。
+- 文書の ID は `page_id`。書き込みは `index_version`（ページの `seq`）を外部バージョンにし、古いバージョンで上書きしない。
 - 検索の応答に、索引の `title`・`body` を使わない。`page_id` の一覧を得るためだけに使い、DB で読み直す（[search.md](../search.md) の 5.2 節）。
 
 ## ER 図
@@ -33,7 +33,7 @@ erDiagram
     text title "タイトル"
     text body "本文 1MB まで"
     long index_version "ページの seq"
-    long acl_version "権限の版"
+    long acl_version "権限のバージョン"
   }
   blocks {
     uuid workspace_id PK "テナント"
@@ -59,7 +59,7 @@ erDiagram
   }
   workspace_acl_versions {
     uuid workspace_id PK "テナント"
-    bigint acl_version "権限の版"
+    bigint acl_version "権限のバージョン"
   }
   page_seqs {
     uuid workspace_id PK "テナント"

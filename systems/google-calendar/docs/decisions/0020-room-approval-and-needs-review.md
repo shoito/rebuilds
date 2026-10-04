@@ -57,5 +57,5 @@ tzdb の重なり：
 
 - 表駆動テスト：DT-ROOM-003（承認と要確認の状態の遷移）。
 - 性質ベーステスト：PROP-ROOM-001（`accepted` の重なりなし）、PROP-ROOM-004（要確認になるのは `accepted_at` の新しいほう）。
-- tzdb の版の差分の試験：会議室の予約の重なりが要確認になる場面（[quality.md](../quality.md) の 2.2.1 節 E・B）。
+- tzdb のバージョンの差分の試験：会議室の予約の重なりが要確認になる場面（[quality.md](../quality.md) の 2.2.1 節 E・B）。
 - 本番：`needs_review` の数と、解けるまでの時間。承認の待ちの数と古さ。

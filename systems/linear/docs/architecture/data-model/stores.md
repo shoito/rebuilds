@@ -101,7 +101,7 @@
 | `<brand>-exports`：`ws/<workspace_id>/exports/<job_id>/<name>.csv`・`<name>.zip` | 書き出し。KMS は `<brand>-exports` | 24 時間 | しない | 同 7 節 |
 | `<brand>-search-snapshots` | OpenSearch のスナップショット | 7 日分 | 大阪へ | [infrastructure.md](../infrastructure.md) の 3.3 節 |
 | `<brand>-rum`：`rum/dt=<yyyy-mm-dd>/…parquet`、`delivery-audit/dt=<yyyy-mm-dd>/…` | RUM の集計、配信の監査の抜き取り | 13 か月、90 日 | しない | [observability.md](../observability.md) の 3.2・4.4 節 |
-| `<brand>-web`：`web/<build_hash>/…`、`desktop/<version>/…` | Web の資産、Electron の配布物 | 90 日（今と 1 つ前の版は残す） | 大阪へ | [delivery.md](../delivery.md) の 5・6 節 |
+| `<brand>-web`：`web/<build_hash>/…`、`desktop/<version>/…` | Web の資産、Electron の配布物 | 90 日（今と 1 つ前のバージョンは残す） | 大阪へ | [delivery.md](../delivery.md) の 5・6 節 |
 | log-archive のアカウント：`audit/<workspace_id>/<yyyy>/<mm>/<dd>/<hh>.ndjson.gz`、`platform-audit/<yyyy>/<mm>/<dd>/<hh>.ndjson.gz` | 監査ログの写し（行ごとに連鎖のハッシュ）。Object Lock | 3 年、5 年 | log-archive の設定 | [security.md](../security.md) の 6 節 |
 
 - **ブートストラップの写しは S3 に置かない。** ブートストラップは Aurora の reader から毎回ストリームで作り、ワークスペースと写しの組でキャッシュしない（[ADR-0003](../../decisions/0003-bootstrap-and-partial-sync.md)、[ADR-0011](../../decisions/0011-bootstrap-stream-and-chunked-snapshots.md)）。グループの写しのキャッシュは S1 では行わない（[bootstrap-and-partial-sync.md](../bootstrap-and-partial-sync.md) の 7.8 節の持ち越し）。
@@ -148,7 +148,7 @@
 | `archived`・`trashed`・`deleted` | `archived_at`・`trashed_at`、行がない（墓標の文書） |
 | `title` | `issues.title`・`projects.name` を `normalizeForSearch` にかけたもの |
 | `body` | `doc_states.text_plain`（イシュー・プロジェクト）、コメントの本文の文字、添付のファイル名。先頭 256 KiB |
-| `v`（外部の版） | 読んだ行の `updated_sync_id`・`doc_states.compacted_through`・別名の `updated_sync_id` の最大 |
+| `v`（外部のバージョン） | 読んだ行の `updated_sync_id`・`doc_states.compacted_through`・別名の `updated_sync_id` の最大 |
 
 - 担当・ラベルは入れない（[search.md](../search.md) の 4.2 節）。
 - 問い合わせは `buildSearchRequest` だけで作り、`workspace_id` と `groups` の `filter` を必ず付ける（I-17）。
@@ -212,7 +212,7 @@ erDiagram
 | `audit-reports` | 標準 | 端末の報告（[observability.md](../observability.md) の 4.1 節の形） | Gateway → audit-worker | [observability.md](../observability.md) の 4.2 節 |
 
 - キューの名前は、領域の文書にないもの（`notify`・`doc-compact`・`import`・`audit-reports`）をこの文書で決めた。
-- 少なくとも 1 回の配送なので、受け手は冪等にする（通知は `notification_keys`、Writer への書き込みは `client_tx_id`、索引は外部の版、Webhook は `webhook_deliveries` の一意）。
+- 少なくとも 1 回の配送なので、受け手は冪等にする（通知は `notification_keys`、Writer への書き込みは `client_tx_id`、索引は外部のバージョン、Webhook は `webhook_deliveries` の一意）。
 
 ## 7. Webhook の本文
 
@@ -346,7 +346,7 @@ erDiagram
 | `_drafts` | `key` | `updated_at` | 端末だけの一時の下書き | 送った時、ログアウト、除外 |
 
 - 退かさない：`_outbox`・`_rejected`・`_meta`・未送信の `_blobs`・`_drafts`・`instant` のモデル・`partial` の被覆のある行。
-- 移行：`schema_version` を上げるリリースは、1 つ前の版からの移行と、1 つ前の版の `_outbox` を読める `upcast` を付ける。`_outbox` を消さない（[ADR-0005](../../decisions/0005-client-persistence-and-offline.md)）。
+- 移行：`schema_version` を上げるリリースは、1 つ前のバージョンからの移行と、1 つ前のバージョンの `_outbox` を読める `upcast` を付ける。`_outbox` を消さない（[ADR-0005](../../decisions/0005-client-persistence-and-offline.md)）。
 
 ### 8.3 メモリーと localStorage
 
@@ -364,5 +364,5 @@ erDiagram
 | AppConfig | `release.*` | 未完成の振る舞いのフラグ | [delivery.md](../delivery.md) の 3 節 |
 | AppConfig | `ops.*` | `ops.writes_enabled`、`ops.dr_replay_mode`、`ops.ws_deflate`、`ops.epoch_reset_spread_min` など | 同上、[infrastructure.md](../infrastructure.md) の 6.3 節 |
 | AppConfig | `min_build`、互換の一覧（`schema_hash` の今と 1 つ前） | 握手の判定 | [delivery.md](../delivery.md) の 6 節、[data-model-and-schema.md](../data-model-and-schema.md) の 6.1 節 |
-| CloudFront KeyValueStore | Web・Electron の版ごとの割合 | 段階の配布 | [delivery.md](../delivery.md) の 5・6 節 |
+| CloudFront KeyValueStore | Web・Electron のバージョンごとの割合 | 段階の配布 | [delivery.md](../delivery.md) の 5・6 節 |
 | 端末の `_meta.flags` | クライアントのフラグの写し | オフラインでも同じ値 | [client-store-and-offline.md](../client-store-and-offline.md) の 3.2 節 |

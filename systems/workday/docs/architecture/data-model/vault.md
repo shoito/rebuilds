@@ -173,7 +173,7 @@ erDiagram
 | `dedupe_hmac` | `bytea` | NOT NULL | — | テナントの HMAC の鍵による番号の HMAC（重複の登録の検知） |
 | `hmac_key_version` | `int` | NOT NULL | — | → `mn_tenant_keys` |
 | `status` | `text` | NOT NULL | `'registered'` | `registered`・`verified`・`deleted` |
-| `purpose_notice_id` | `uuid` | NOT NULL | — | 表示した利用目的の通知の版 |
+| `purpose_notice_id` | `uuid` | NOT NULL | — | 表示した利用目的の通知のバージョン |
 | `registered_at` | `timestamptz` | NOT NULL | `now()` | |
 | `verified_at` | `timestamptz` | NULL | — | |
 | `verification_id` | `uuid` | NULL | — | → `mn_verifications` |
@@ -223,14 +223,14 @@ erDiagram
 
 ### 3.4 `mn_purposes`・`mn_purpose_notices`
 
-目的（システムの表。テナントの外）と、テナントが登録した利用目的の通知の文面の版。定義元：[my-number-vault.md](../my-number-vault.md) の 4.1・6.3 節。
+目的（システムの表。テナントの外）と、テナントが登録した利用目的の通知の文面のバージョン。定義元：[my-number-vault.md](../my-number-vault.md) の 4.1・6.3 節。
 
 | 表 | 列 | キー |
 | --- | --- | --- |
 | `mn_purposes` | `purpose text`（`identity_verification`・`withholding_slip`・`salary_payment_report`・`health_pension_notification`・`employment_insurance_notification`・`dependents_declaration`）、`allowed_ops text[]`（`verify`・`reveal`・`generate_document`・`download_document`・`delete`）、`allowed_documents text[]` | PK `(purpose)`。RLS なし（`vault_migrator` だけが書く） |
 | `mn_purpose_notices` | `tenant_id`、`id`、`version int`、`body text`、`body_sha256 bytea`、`published_at timestamptz`、`published_by uuid` | PK `(tenant_id, id)`。UK `(tenant_id, version)` |
 
-- 運用：`mn_purpose_notices` は RLS。保存は監査ログ（記録が版を指す）。
+- 運用：`mn_purpose_notices` は RLS。保存は監査ログ（記録がバージョンを指す）。
 
 ### 3.5 `mn_handlers`
 

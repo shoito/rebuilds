@@ -29,7 +29,7 @@ date: 2026-09-27
 
 - **画面からの書き出し（1 回 500 個・合計 200 メガピクセルまで）は、クライアントのエンジンで描く。** 待たずに出せて、端末のフォントを使え、サーバーの費用がかからない。クライアントが持つ状態（未確定の自分の変更を含む）を描く。
 - **サムネイル・公開 API の画像・大きな一括の書き出しは、Render Worker で描く。** Render Worker は、エンジンの crate をネイティブでビルドした Rust のサービスで、ECS Fargate の CPU の上で、wgpu のソフトウェアの描画で描く。
-- **Render Worker は、チェックポイントとジャーナルを読むだけで、Document Server に問い合わせない。** 描く版（`seq`）をジョブに入れる。レイアウトは、保存された `derived_layout` を使う。ただし、インスタンスの中の導出したノードは保存されないので（[ADR-0021](0021-derived-instances-and-override-keys.md)）、Render Worker が導出の後に、クライアントと同じ `layout` の crate でそのレイアウトを計算する（[ADR-0019](0019-auto-layout-engine-and-layout-persistence.md)、[ADR-0020](0020-deterministic-layout-arithmetic.md)、[export-and-assets.md](../architecture/export-and-assets.md) の 5.2 節）。
+- **Render Worker は、チェックポイントとジャーナルを読むだけで、Document Server に問い合わせない。** 描くバージョン（`seq`）をジョブに入れる。レイアウトは、保存された `derived_layout` を使う。ただし、インスタンスの中の導出したノードは保存されないので（[ADR-0021](0021-derived-instances-and-override-keys.md)）、Render Worker が導出の後に、クライアントと同じ `layout` の crate でそのレイアウトを計算する（[ADR-0019](0019-auto-layout-engine-and-layout-persistence.md)、[ADR-0020](0020-deterministic-layout-arithmetic.md)、[export-and-assets.md](../architecture/export-and-assets.md) の 5.2 節）。
 - **1 ジョブを 1 つの子プロセスで描く。** メモリと時間の上限を子プロセスに付け、組織をまたいでメモリに中身を残さない。
 - **権限の判定はジョブを作る API で行い、Render Worker は判定しない**（[ADR-0005](0005-tenancy-and-document-routing.md) の「Worker はジョブを作るときに判定する」）。
 - 1 を採らない理由：サムネイルが、誰かがファイルを開くまで古いままになる。利用者のクライアントが描いた画像を他の人に配ると、改ざんした画像を上げられる。API の画像を描けない。

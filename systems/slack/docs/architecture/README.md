@@ -13,7 +13,7 @@
 | [files.md](files.md) | ファイルのアップロード、スキャン、サムネイル、配信 |
 | [client.md](client.md) | Web クライアント |
 | [mcp.md](mcp.md) | AI エージェント向けのリモート MCP サーバー |
-| [public-api.md](public-api.md) | 版付きの公開 API（MVP の後、E12） |
+| [public-api.md](public-api.md) | バージョン付きの公開 API（MVP の後、E12） |
 | [apps.md](apps.md) | アプリのプラットフォーム：インストール、イベントの配信、インタラクティブ（MVP の後、E12） |
 | [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
 | [infrastructure.md](infrastructure.md) | AWS の構成、環境、IaC、冗長化、バックアップと災害復旧、デプロイ、コスト |
@@ -139,7 +139,7 @@
 | [0027](../decisions/0027-search-table-rls-exception.md) | 検索用のテーブルだけ RLS を外し、関数を経由してしか読めないようにする |
 | [0028](../decisions/0028-remote-mcp-server.md) | AI エージェント向けに、リモートの MCP サーバーを提供する |
 | [0029](../decisions/0029-rate-limiting.md) | レート制限を、層・主体・テナントの共通の枠組みで行う |
-| [0030](../decisions/0030-versioned-public-api.md) | 版付きの公開 API を、内部 API と分けて提供する（MVP の後） |
+| [0030](../decisions/0030-versioned-public-api.md) | バージョン付きの公開 API を、内部 API と分けて提供する（MVP の後） |
 | [0031](../decisions/0031-app-platform.md) | アプリのプラットフォーム（インストール、ボット、イベントの配信、インタラクティブ） |
 | [0032](../decisions/0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ |
 | [0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める |
@@ -157,10 +157,10 @@
 - **マネージドサービスの対応状況**：2026-09 に確認済み。Aurora PostgreSQL は PostgreSQL 18（`uuidv7()`）と pg_bigm に対応し、大阪リージョンも Aurora PostgreSQL 18.3 以降の Global Database に対応している（ADR-0011 の Confirmation）。残るのは、大阪の二次クラスタをインスタンスなしで持ち、切り替え前にインスタンスを足す手順を、実環境で試すことだけ（[infrastructure.md](infrastructure.md)）。
 - **検索の RLS の例外**：`search` スキーマだけは、テナントの分離を関数の実装に頼る（ADR-0027）。関数の変更のレビューと、性質ベーステストで守る。
 - **認証の基盤への依存**：Better Auth の脆弱性（例：SSO プラグインの CVE-2026-53515、1.6.11 で修正）の影響を直接受ける。使うエンドポイントを許可リストで絞り、勧告を監視する（ADR-0012）。
-- **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS の版に依存する。下限は Safari 17 に決めた（[client.md](client.md) の 13 節）。
+- **ブラウザの対応**：SharedWorker と Web Push の対応は、ブラウザと OS のバージョンに依存する。下限は Safari 17 に決めた（[client.md](client.md) の 13 節）。
 - **第三者のスクリプト**：GA4 を読み込むワークスペースでは、CSP が広がる（ADR-0025）。
 - **AI エージェントの書き込み**：MCP の書き込みは、プロンプトインジェクションで誤用されうる。既定で無効にし、レート制限と監査で抑える（ADR-0028）。
-- **外部との互換性**：公開 API とアプリ（E12）は、提供を始めると互換性を長く保つ義務が生じる。版の方針（ADR-0030）と OpenAPI の破壊的変更の検査で守る。
+- **外部との互換性**：公開 API とアプリ（E12）は、提供を始めると互換性を長く保つ義務が生じる。バージョンの方針（ADR-0030）と OpenAPI の破壊的変更の検査で守る。
 - **レート制限の基盤**：判定のたびに Valkey へ 1 往復する。Valkey の障害中は、一般の制限が緩くなる（ADR-0029）。
 
 ### 決定（2026-09-26、既定案）

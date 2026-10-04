@@ -1,10 +1,10 @@
 # Query language and API: Salesforce
 
-独自の問い合わせの言語（構文、関係のたどり方、集計）、選択性の見積もりと計画、REST API（レコード、問い合わせ、記述、複合の要求）、版、エラー、`<Brand>-Limit-Info` の見出しの設計。土台は [ADR-0002](../decisions/0002-custom-object-storage.md)（ピボットの表）、[ADR-0003](../decisions/0003-metadata-driven-runtime.md)（AST からのコンパイル）、[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)（上限と割り当て）。この文書で決めたことは、次の 3 つの ADR にある。
+独自の問い合わせの言語（構文、関係のたどり方、集計）、選択性の見積もりと計画、REST API（レコード、問い合わせ、記述、複合の要求）、バージョン、エラー、`<Brand>-Limit-Info` の見出しの設計。土台は [ADR-0002](../decisions/0002-custom-object-storage.md)（ピボットの表）、[ADR-0003](../decisions/0003-metadata-driven-runtime.md)（AST からのコンパイル）、[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)（上限と割り当て）。この文書で決めたことは、次の 3 つの ADR にある。
 
 - 問い合わせの言語は、SQL に寄せた独自の言語（仮称 RQL、Record Query Language）にする。関係は親へのドットと、子の副問い合わせでたどる。論理は SQL と同じ 3 値にし、文字列は正規化した値で比べる（[ADR-0018](../decisions/0018-record-query-language.md)）。
 - 計画は、組織・オブジェクト・項目ごとの自前の統計で選択性を見積もり、駆動する条件を選ぶ。PostgreSQL の計画に任せず、実体化した CTE で駆動の順を固定し、候補が見積もりを大きく超えたら途中で計画を変える。対話の経路では、選択的でない大きな問い合わせを断る（[ADR-0019](../decisions/0019-selectivity-statistics-and-planning.md)）。
-- REST API は `/api/v1` の下のリソースにし、版の中では足す変更だけをする。レコードの JSON はシステムの項目と利用者の項目を分け、数は文字列で返す。カーソルは暗号化したキーセットにする（[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)）。
+- REST API は `/api/v1` の下のリソースにし、バージョンの中では足す変更だけをする。レコードの JSON はシステムの項目と利用者の項目を分け、数は文字列で返す。カーソルは暗号化したキーセットにする（[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)）。
 
 本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。本家の言語（SOQL）との互換は目標にしない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
@@ -15,7 +15,7 @@
 | 問い合わせの言語の文法と意味、上限 | 数式の言語（[metadata-and-runtime.md](metadata-and-runtime.md) の 7 節） |
 | 選択性の見積もり、統計、計画、SQL の形 | 共有の条件の中身（[sharing-and-record-access.md](sharing-and-record-access.md) の 6.2 節）。ここではどの枝から進めるかだけ |
 | REST API のリソース、JSON、カーソル、複合の要求 | 一括の API（bulk-and-import の領域）、メタデータの API（sandboxes-and-deploy の領域） |
-| 版、エラー、条件付きの要求、`<Brand>-Limit-Info` | 上限の値の一覧と、上限の情報の全ての返し方（governor-limits の領域） |
+| バージョン、エラー、条件付きの要求、`<Brand>-Limit-Info` | 上限の値の一覧と、上限の情報の全ての返し方（governor-limits の領域） |
 | | 全文検索の言語（search の領域）、トークンと認証（orgs-users-and-auth の領域） |
 
 ## 2. 本家の仕組み（確かめたこと）
@@ -24,7 +24,7 @@
 | --- | --- | --- |
 | 文の長さ | 100,000 文字まで。数式の項目を多く含むと、内部で展開されて `QUERY_TOO_COMPLICATED` になりうる | [SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf)（Winter '27 版、以下「SOQL」） |
 | 文字列のリテラル | `WHERE` の中の 1 つの文字列は 4,000 文字まで | [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（以下「Limits」） |
-| 関係 | 子から親へは 55 まで、1 本は 5 段まで。親から子へは 20 まで。API の版 58.0 以降は、親から子へ 5 段まで | SOQL、Limits |
+| 関係 | 子から親へは 55 まで、1 本は 5 段まで。親から子へは 20 まで。API のバージョン 58.0 以降は、親から子へ 5 段まで | SOQL、Limits |
 | OFFSET | 2,000 行まで | SOQL |
 | 並び | `ORDER BY` がなければ、順は保証しない | SOQL |
 | 1 回の結果の大きさ | 既定・最大 2,000 件、最小 200 件。ロングテキストを 2 つ以上選ぶと 200 件まで | [REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_rest.pdf)（Winter '27 版、以下「REST」）、SOQL |
@@ -36,12 +36,12 @@
 | 事前の問い合わせ | 統計の表への事前の問い合わせで、索引を使うかを決める | LDV |
 | 空の値 | 選択リストと参照の空で絞る条件は、索引を使わない | LDV |
 | 計画の説明 | REST の `explain` の引数で、実行せずに計画の情報を返す | REST |
-| 上限の見出し | 全ての応答（版の一覧を除く）に `Sforce-Limit-Info: api-usage=10018/100000` の形で、24 時間の API の使用量を返す | REST |
+| 上限の見出し | 全ての応答（バージョンの一覧を除く）に `Sforce-Limit-Info: api-usage=10018/100000` の形で、24 時間の API の使用量を返す | REST |
 | エラーの本文 | `[{"fields": [...], "message": "...", "errorCode": "MALFORMED_ID"}]` の配列 | REST |
-| 状態 | 300（外部 ID が複数のレコードに当たる）、304、400、401、403（`REQUEST_LIMIT_EXCEEDED` を含む）、404、405、409、410（廃止した版）、412、414（URI 16,384 バイト超）、415、428、431、500、502、503 | REST |
+| 状態 | 300（外部 ID が複数のレコードに当たる）、304、400、401、403（`REQUEST_LIMIT_EXCEEDED` を含む）、404、405、409、410（廃止したバージョン）、412、414（URI 16,384 バイト超）、415、428、431、500、502、503 | REST |
 | 条件付きの要求 | `ETag`、`If-Match`（合わなければ 412）、`If-None-Match`（304）、`If-Modified-Since`、`If-Unmodified-Since` | REST |
 | 複合の要求 | 25 の副要求まで（グラフの形は 500）。sObject Collections は 200 件まで | REST |
-| 版の維持 | 各版を、最初の公開から最低 3 年保つ。廃止した版には 410 を返す | REST |
+| バージョンの維持 | 各バージョンを、最初の公開から最低 3 年保つ。廃止したバージョンには 410 を返す | REST |
 
 ## 3. 問い合わせの言語（ADR-0018）
 
@@ -122,7 +122,7 @@ LIMIT 50
 
 - 子の副問い合わせは、親 1 件あたり 200 件まで返す。超えた分は、子の結果に `next`（カーソル）を付ける（5.3 節）。
 - 親の関係は `record_relationships` か、`records.data` の参照の値と `records` の結合にする。子は `record_relationships` の `(org_id, parent_id, child_object_id, field_no)` の索引で引く（[data-storage.md](data-storage.md) の 3.2 節）。
-- 本家は API の版 58.0 以降、親から子へ 5 段をたどれる（SOQL）。本システムは MVP では 1 段にする（14 節）。
+- 本家は API のバージョン 58.0 以降、親から子へ 5 段をたどれる（SOQL）。本システムは MVP では 1 段にする（14 節）。
 
 ### 3.3 意味
 
@@ -278,7 +278,7 @@ ORDER BY ... LIMIT ...;
 
 | メソッドとパス | 操作 |
 | --- | --- |
-| `GET /api/versions` | 使える版の一覧（認証なし、割り当てに数えない） |
+| `GET /api/versions` | 使えるバージョンの一覧（認証なし、割り当てに数えない） |
 | `GET /api/v1` | リソースの一覧 |
 | `GET /api/v1/objects` | 読めるオブジェクトの一覧（記述の要約） |
 | `GET /api/v1/objects/{object}/describe` | オブジェクトの記述（読める項目、関係、選択リスト、レコードタイプ）。`ETag` と `If-None-Match` |
@@ -359,7 +359,7 @@ ORDER BY ... LIMIT ...;
 - **カーソルはキーセットにする。** 中身は `{v, org_id, user_id, query_hash, metadata_version, last_sort_values, last_id, issued_at}` を、組織のセルごとの鍵（KMS のデータキー）で AES-256-GCM で暗号化したもの。サーバーに状態を持たない。
 - カーソルは 24 時間有効。他の利用者・他の問い合わせでは使えない（400 `INVALID_CURSOR`）。期限切れは 410 `CURSOR_EXPIRED`。
 - 次のページは、最後の行の並びの値と `id` より後から読む。スナップショットではないので、読んでいる間に追加・変更された行は、並びの位置によって出たり出なかったりする。並びの値が変わらない行は、ちょうど 1 回だけ出る。
-- ページの間にメタデータの版が変わったら、問い合わせを新しい版でコンパイルし直す。コンパイルできなければ（項目の削除など）409 `QUERY_INVALIDATED`。
+- ページの間にメタデータのバージョンが変わったら、問い合わせを新しいバージョンでコンパイルし直す。コンパイルできなければ（項目の削除など）409 `QUERY_INVALIDATED`。
 - 集計の問い合わせには、カーソルを付けない（3.4 節）。
 
 ### 5.4 複合の要求
@@ -370,15 +370,15 @@ ORDER BY ... LIMIT ...;
 - `collections/{object}`：同じオブジェクトの 200 件まで。`all_or_none` は [metadata-and-runtime.md](metadata-and-runtime.md) の 6.3 節の部分の成功に従う。
 - 複合の要求は、API の割り当てに 1 回と数える。本家も複合の要求と sObject Tree は全体で 1 回と数え、Composite Batch は副の要求ごとに数える（[REST API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_rest.pdf)、Winter '27 版、2026-09-28 に確認）。
 
-## 6. 版、エラー、条件付きの要求、上限の見出し（ADR-0020）
+## 6. バージョン、エラー、条件付きの要求、上限の見出し（ADR-0020）
 
-### 6.1 版
+### 6.1 バージョン
 
-- 版は URL の大きな番号（`/api/v1`）だけにする。v1 の中では、足す変更（新しいリソース、任意の引数、新しい項目、新しいエラーの `code`、列挙の値の追加）だけをする。利用者には、未知の項目と値を無視するよう文書に書く。
-- 壊す変更は次の版（`/api/v2`）で行う。前の版は、次の版の公開から最低 3 年保つ。本家も各版を最低 3 年保つ（REST）。廃止した版には 410 `VERSION_RETIRED` を返す。
-- 廃止を予定した版・リソースの応答に、`Deprecation` と `Sunset` の見出しを付ける。
-- 組織のメタデータの変更（項目の追加・削除）は API の版と関係なく反映される。記述と OpenAPI を読み直してもらう。
-- CI で、OpenAPI の前の版と比べて壊す変更がないことを検査する（delivery の領域）。
+- バージョンは URL の大きな番号（`/api/v1`）だけにする。v1 の中では、足す変更（新しいリソース、任意の引数、新しい項目、新しいエラーの `code`、列挙の値の追加）だけをする。利用者には、未知の項目と値を無視するよう文書に書く。
+- 壊す変更は次のバージョン（`/api/v2`）で行う。前のバージョンは、次のバージョンの公開から最低 3 年保つ。本家も各バージョンを最低 3 年保つ（REST）。廃止したバージョンには 410 `VERSION_RETIRED` を返す。
+- 廃止を予定したバージョン・リソースの応答に、`Deprecation` と `Sunset` の見出しを付ける。
+- 組織のメタデータの変更（項目の追加・削除）は API のバージョンと関係なく反映される。記述と OpenAPI を読み直してもらう。
+- CI で、OpenAPI の前のバージョンと比べて壊す変更がないことを検査する（delivery の領域）。
 
 ### 6.2 エラーの形
 
@@ -409,7 +409,7 @@ ORDER BY ... LIMIT ...;
 | 413 | `PAYLOAD_TOO_LARGE` | 本文が 10MB を超える |
 | 414 | `URI_TOO_LONG` | URI が 16KB を超える（本家は 16,384 バイト。REST） |
 | 429 | `REQUEST_LIMIT_EXCEEDED`、`CONCURRENT_LIMIT_EXCEEDED` | 24 時間の API の割り当て、長い要求の同時実行（ADR-0005）。`Retry-After` を付ける |
-| 503 | `METADATA_CHANGED`、`TEMPORARILY_UNAVAILABLE` | 版の変更とのやり直しの失敗（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.4 節）、DB の切り替え。`Retry-After` を付ける |
+| 503 | `METADATA_CHANGED`、`TEMPORARILY_UNAVAILABLE` | バージョンの変更とのやり直しの失敗（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.4 節）、DB の切り替え。`Retry-After` を付ける |
 
 - 本家は 24 時間の割り当ての超過を 403 で返す（REST）。本システムは HTTP の意味に合わせて 429 にする。
 - 読めないレコードは 404、読めるが操作できないレコードは 403（[sharing-and-record-access.md](sharing-and-record-access.md) の DT-SHR-002）。
@@ -417,7 +417,7 @@ ORDER BY ... LIMIT ...;
 ### 6.4 条件付きの要求
 
 - レコードの `ETag` は `"<row_version>"`（強い検証子）。`PATCH`・`DELETE` の `If-Match` が合わなければ 412。`GET` の `If-None-Match` が合えば 304。
-- 記述の `ETag` は、そのオブジェクトの部品の鍵と権限の形のハッシュ。版が上がっても、そのオブジェクトと権限が変わらなければ 304 を返せる（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.2 節）。
+- 記述の `ETag` は、そのオブジェクトの部品の鍵と権限の形のハッシュ。バージョンが上がっても、そのオブジェクトと権限が変わらなければ 304 を返せる（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.2 節）。
 - `If-Modified-Since`・`If-Unmodified-Since` は MVP では受けない。
 
 ### 6.5 `<Brand>-Limit-Info`
@@ -426,7 +426,7 @@ ORDER BY ... LIMIT ...;
 <Brand>-Limit-Info: api-usage=10018/115000; long-running=3/25
 ```
 
-- 版の一覧（`/api/versions`）を除く全ての応答に付ける。形は本家の `Sforce-Limit-Info` に寄せる（REST）。名前は本家のものを使わない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
+- バージョンの一覧（`/api/versions`）を除く全ての応答に付ける。形は本家の `Sforce-Limit-Info` に寄せる（REST）。名前は本家のものを使わない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 - `api-usage` は組織の 24 時間の API の使用量と割り当て、`long-running` は長い要求（20 秒以上）の同時実行の数と上限（ADR-0005）。
 - トランザクションの上限の使用量は、要求の見出し `<Brand>-Tx-Usage: request` で求めた時だけ、応答の `<Brand>-Tx-Usage` で返す（`queries=12/100; query-rows=3401/50000; …`）。形と `/limits` の中身の正本は [governor-limits.md](governor-limits.md) の 9 節（[ADR-0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md)）。
 
@@ -461,7 +461,7 @@ ORDER BY ... LIMIT ...;
   - 任意の静的なデータで、カーソルでページを最後まで読むと、各行をちょうど 1 回返す。並びの値を変えない変更が途中に入っても、同じ。
   - 任意の利用者と問い合わせで、結果・件数・集計・子・親の項目に、参照の評価器で読めないレコードと項目が出ない（[sharing-and-record-access.md](sharing-and-record-access.md) の PROP-SHR-003）。
 - 上限の試験：3.5 節の全ての上限で、ちょうどで通り、1 つ超えたら拒否する。集計の行を取得の行に数え、50,000 で通り、50,001 で巻き戻る。
-- 契約テスト：OpenAPI の前の版と比べて壊す変更がない。エラーの本文の形。
+- 契約テスト：OpenAPI の前のバージョンと比べて壊す変更がない。エラーの本文の形。
 - 結合テスト：他の組織・他の利用者のカーソルが拒否される。期限切れのカーソルが 410 になる。
 - 性能テスト（E3）：1 オブジェクト 5,000 万件の組織で、選択的な条件の問い合わせが p95 500ms（NFR-002）。統計の標本の偏りの確認。
 

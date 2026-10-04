@@ -82,7 +82,7 @@ ADR-0038。
 | SCIM | S2 | |
 | パスワード | × | Slack の題材と同じ理由（漏えい・使い回し・総当たり） |
 
-- 認証の実装は Better Auth（`emailOTP`、ソーシャル、`@better-auth/passkey`、`@better-auth/sso`）。Slack の題材の ADR-0012 の使い方の規則（管理系の操作はサーバーの側で権限を確かめてから `auth.api.*` を呼ぶ、版を固定する、`organization` のプラグインを使わない）を引き継ぐ。SSO のプラグインの権限の脆弱性の前例（Slack の ADR-0012 に記録）があるため、ライブラリの権限の判定に頼らない。
+- 認証の実装は Better Auth（`emailOTP`、ソーシャル、`@better-auth/passkey`、`@better-auth/sso`）。Slack の題材の ADR-0012 の使い方の規則（管理系の操作はサーバーの側で権限を確かめてから `auth.api.*` を呼ぶ、バージョンを固定する、`organization` のプラグインを使わない）を引き継ぐ。SSO のプラグインの権限の脆弱性の前例（Slack の ADR-0012 に記録）があるため、ライブラリの権限の判定に頼らない。
 - セッションは Aurora に置き、Cookie は `HttpOnly`・`Secure`・`SameSite=Lax`。アイドル 14 日、絶対 90 日（Slack の題材と同じ値）。
 
 ### 4.2 組織の SSO

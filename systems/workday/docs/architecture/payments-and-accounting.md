@@ -8,7 +8,7 @@
 | --- | --- |
 | [0035](../decisions/0035-bank-transfer-files.md) | 振込は支払の指示（1 人 × 口座ごとの額）を確定の結果から決まった規則で作り、支払元の口座 × 種別（給与・賞与）× 振込指定日ごとに全銀協の形式の 120 バイトの固定長のファイルを作る。同じ指示から同じバイト列を作り、承認はファイルのハッシュに結び付ける。送信は企業が銀行の仕組みで行う。同意のない人は振込から外す |
 | [0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md) | 明細は確定の結果から作る変わらない文書（正規の JSON と決定的な PDF とハッシュ）で、`released` の後の公開の時刻に見せる。電子交付は追記のみの承諾の台帳で持ち、承諾のない人には書面の印刷の一覧を出す。賃金台帳は事業場ごとの結果と勤怠の射影にする |
-| [0037](../decisions/0037-payroll-journal-export.md) | 仕訳は給与の実行の段（確定、支払、取消）ごとに、テナントの勘定の対応表（版つき）で作る。仕訳ごとに借方と貸方の合計が 0 であることをコミットの時に確かめ、追記のみで、直しは逆仕訳。行は会社 × 部門 × 勘定に集計し、従業員の単位では出さない。出力は連番の束で、同じ束は同じバイト列 |
+| [0037](../decisions/0037-payroll-journal-export.md) | 仕訳は給与の実行の段（確定、支払、取消）ごとに、テナントの勘定の対応表（バージョンつき）で作る。仕訳ごとに借方と貸方の合計が 0 であることをコミットの時に確かめ、追記のみで、直しは逆仕訳。行は会社 × 部門 × 勘定に集計し、従業員の単位では出さない。出力は連番の束で、同じ束は同じバイト列 |
 
 ## 1. 目的と範囲
 
@@ -47,7 +47,7 @@ wage_payment_consents (tenant_id, id, employment_id, action text,   -- granted |
                        terms_version, recorded_at, recorded_by, case_id)
 ```
 
-- 同意は追記のみ。振込先の登録の業務プロセスで、本人が同意の文面（版）に同意した記録を作る。紙の同意書は写しを添付する。
+- 同意は追記のみ。振込先の登録の業務プロセスで、本人が同意の文面（バージョン）に同意した記録を作る。紙の同意書は写しを添付する。
 - 同意のない人、撤回した人は、振込から外し、「振込以外の支払い」の一覧（3.7 節）に出す。
 - 同意の文面と取り方は L4 の確認で決める。確認まで、`consent_required` の既定を「必須」にする。
 
@@ -129,7 +129,7 @@ payslip_delivery_consents (tenant_id, id, employment_id, action text,   -- grant
                            recorded_at, recorded_by)
 ```
 
-- 承諾は追記のみ。本人がセルフサービスで、電磁的方法の種類と内容（Web での閲覧、PDF の取り出し、保存の期間）の説明の版を見て承諾する。
+- 承諾は追記のみ。本人がセルフサービスで、電磁的方法の種類と内容（Web での閲覧、PDF の取り出し、保存の期間）の説明のバージョンを見て承諾する。
 - 「期限までに回答がなければ承諾とみなす」方法は、テナントが選んだときだけ使う（既定は使わない）。使うときは、通知の文面・送った日・期限を `notice_id` で記録し、期限の翌日に `deemed` を書く。
 - 承諾のない人、撤回した人の明細は `delivery = paper`。給与の担当に印刷の一覧（PDF の束）を出す。Web での閲覧はそれとは別に許すかをテナントが決める。
 - 撤回は次の公開から効く。
@@ -378,5 +378,5 @@ gl_export_batches (tenant_id, id, company_id, seq int, entry_ids uuid[], format 
 | Aurora `payment_instructions`、`bank_files` | 3.3・3.4 節。口座番号は暗号文 |
 | Aurora `payslips`、`payslip_delivery_consents` | 4 節 |
 | Aurora `wage_ledger`（ビュー） | 6 節 |
-| Aurora `gl_account_maps`（版）、`payroll_journal_entries`、`payroll_journal_lines`、`gl_export_batches`、`si_premium_notices` | 7 節。仕訳は追記のみ・遅延制約で釣り合い |
+| Aurora `gl_account_maps`（バージョン）、`payroll_journal_entries`、`payroll_journal_lines`、`gl_export_batches`、`si_premium_notices` | 7 節。仕訳は追記のみ・遅延制約で釣り合い |
 | S3 `bank-files/{tenant}/{file_id}`（専用の KMS の鍵）、`payslips/{tenant}/{id}.json|.pdf`、`gl-exports/{tenant}/{company_id}/{seq}.csv` | 大阪へ複製 |

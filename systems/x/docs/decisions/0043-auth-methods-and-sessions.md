@@ -54,7 +54,7 @@ date: 2026-10-04
 - 引き受けるコスト：
   - SMS の送信料と、その詐取への備え（上限、Valkey が落ちたら止める）。
   - OTP だけのアカウントは、電話番号の乗っ取り（SIM の差し替え）に弱い。パスキーを勧め、強いログインを用意する。
-  - Better Auth の版の追従（脆弱性の告知が多い）。
+  - Better Auth のバージョンの追従（脆弱性の告知が多い）。
   - Valkey の写しを失うと、セッションの確かめが `auth` に集中する（[capacity.md](../architecture/capacity.md) の 4 節）。
 
 ## Confirmation

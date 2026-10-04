@@ -1,22 +1,22 @@
 # Data dictionary and tables: ServiceNow
 
-データ辞書（テーブル・フィールド・型・参照・選択肢）、クラスの継承と物理の配置、テナントのフィールドとテーブル、番号の採番、レコードの監査の履歴と作業メモ、メタデータの版、テナントの間の設定の移送を決める。
+データ辞書（テーブル・フィールド・型・参照・選択肢）、クラスの継承と物理の配置、テナントのフィールドとテーブル、番号の採番、レコードの監査の履歴と作業メモ、メタデータのバージョン、テナントの間の設定の移送を決める。
 
 前提の決定は、テーブルをクラスの継承の階層として辞書に持ち、組み込みのクラスは型付きの列、テナントの拡張は JSONB（`ext`）と型付きの索引の表で持つこと（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)）、テナントを RLS で分け、同じ顧客のテナントを同じセルに置くこと（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）である。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0006](../decisions/0006-data-dictionary-and-field-types.md) | 辞書は組み込みの定義（コードの版）とテナントの定義（DB）を重ねて持つ。フィールドの型は 14 種に限る。子のクラスは親のフィールドの属性を「上書き」で変えられるが、型は変えられない |
+| [0006](../decisions/0006-data-dictionary-and-field-types.md) | 辞書は組み込みの定義（コードのバージョン）とテナントの定義（DB）を重ねて持つ。フィールドの型は 14 種に限る。子のクラスは親のフィールドの属性を「上書き」で変えられるが、型は変えられない |
 | [0007](../decisions/0007-physical-layout-and-extension-index.md) | `task`・`ci` を階層ごとに 1 つの表に置き、S1 ではパーティションを切らない。テナントのフィールドは `ext` に ID をキーにして入れ、索引は `ext_index` に同じトランザクションで写す。参照のフィールドは必ず索引に写す |
 | [0008](../decisions/0008-record-numbering.md) | 番号はテナント・番号の定義ごとの数の行から、保存とは別の短いトランザクションで取る。一意と増加を約束し、欠番のないことは約束しない |
 | [0009](../decisions/0009-record-audit-history-and-journal.md) | 監査の履歴は保存ごとに 1 行、変更と同じトランザクションで追記だけの表に書く。作業メモとコメントは別の追記だけの表に持つ。日ごとのハッシュの鎖を S3 Object Lock に置く |
-| [0010](../decisions/0010-metadata-versions-and-config-packages.md) | メタデータの変更はテナントの版の番号を上げる 1 つのトランザクションで行う。設定の移送は、安定したキーと元の版のハッシュを持つパッケージで行い、衝突は人が決め、適用は 1 つのトランザクションで行う |
+| [0010](../decisions/0010-metadata-versions-and-config-packages.md) | メタデータの変更はテナントのバージョンの番号を上げる 1 つのトランザクションで行う。設定の移送は、安定したキーと元のバージョンのハッシュを持つパッケージで行い、衝突は人が決め、適用は 1 つのトランザクションで行う |
 
 この文書の決定表・性質は設計の草案である。ID（`DT-...`・`PROP-...`）は、E2 の各変更の `spec.md` に移すときに確定する。
 
 ## 1. 目的と範囲
 
-- 扱う：辞書のモデル、フィールドの型と検証、参照と選択肢、クラスの継承と上書き、物理の配置と索引、テナントのフィールド・テーブルの追加・変更・削除、番号、監査の履歴、作業メモ・コメント、メタデータの版とキャッシュの入れ替え、設定のパッケージ（開発 → 本番）。
+- 扱う：辞書のモデル、フィールドの型と検証、参照と選択肢、クラスの継承と上書き、物理の配置と索引、テナントのフィールド・テーブルの追加・変更・削除、番号、監査の履歴、作業メモ・コメント、メタデータのバージョンとキャッシュの入れ替え、設定のパッケージ（開発 → 本番）。
 - 扱わない：ACL（[access-control.md](access-control.md)）、レコードのルールとフロー（[workflow-engine.md](workflow-engine.md)）、フォームとリストの描き方（`portal-and-ui.md`）、検索の索引（`search.md`）、CI の識別と調整（`cmdb-and-reconciliation.md`）、保持と削除の全体の方針（`security.md`）。
 - **テナントテーブルの読み書きは Record Service だけが行う**（[ADR-0001](../decisions/0001-platform-and-stack.md) の Confirmation）。この文書の「保存の流れ」は Record Service の中の順序である。
 
@@ -38,17 +38,17 @@
 ### 3.1 2 つの層
 
 ```
-組み込みの定義（コードの版に含む。全テナントで同じ）
+組み込みの定義（コードのバージョンに含む。全テナントで同じ）
    task, incident, problem, change, request, request_item, catalog_task, problem_task, change_task,
    ci と CI のクラス, user, group, role, ...
         ＋
-テナントの定義（Aurora、テナントごと、版付き）
+テナントの定義（Aurora、テナントごと、バージョン付き）
    - 組み込みのクラスへのフィールドの追加（c_ で始まる名前）
    - 組み込みのクラスの子のクラス（例：task → c_facilities_request）
    - 独立のテーブル（親を持たない）
    - 上書き（ラベル・既定値・必須・読み取り専用・選択肢の追加・参照の絞り込み・説明）
         ＝
-実効の辞書（テナント × メタデータの版ごとにコンパイルし、キャッシュする）
+実効の辞書（テナント × メタデータのバージョンごとにコンパイルし、キャッシュする）
 ```
 
 - 組み込みの定義は、コードと一緒にリリースする。組み込みの定義の変更は、コードのマイグレーション（`delivery.md`）で行い、振る舞いの変更はフラグの裏に置く。
@@ -64,7 +64,7 @@
 | `dict_override` | `tenant_id`、`table_id`（子のクラス）、`field_id`（祖先のフィールド）、上書きする属性（`label`、`default_expr`、`mandatory`、`read_only`、`ref_condition`、`choice_set_id`、`help`） |
 | `dict_choice_set`、`dict_choice` | 選択肢の集合と値（`value`、`label`、`order`、`inactive`、`dependent_value`） |
 
-- 組み込みの行（`tenant_id` が NULL）は、コードの版の中の定義から起動時に読み込む。DB の行は、テナントの行の参照の先として使うだけである。
+- 組み込みの行（`tenant_id` が NULL）は、コードのバージョンの中の定義から起動時に読み込む。DB の行は、テナントの行の参照の先として使うだけである。
 - 上書きは、子のクラスから祖先へたどって最初に見つかったものを使う。上書きは型・保存の場所・参照先のテーブルを変えられない。
 
 ### 3.3 フィールドの型
@@ -108,7 +108,7 @@
 | 専用の表 | `user`、`group`、`role`、`kb_article`、`catalog_item` など | 型付きの列 ＋ `ext` |
 
 - 主キーは `(tenant_id, id)`、`id` は UUIDv7（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
-- `version` は保存ごとに 1 上げる。更新は `WHERE version = $expected` で行い、一致しなければ 409（`record_changed`）にする。フォームは読んだときの版を送る。
+- `version` は保存ごとに 1 上げる。更新は `WHERE version = $expected` で行い、一致しなければ 409（`record_changed`）にする。フォームは読んだときのバージョンを送る。
 - `task` の主な索引（すべて `tenant_id` を先頭に置く）：`(tenant_id, number)` 一意、`(tenant_id, assignment_group_id, active, updated_at)`、`(tenant_id, assigned_to_id) WHERE active`、`(tenant_id, class_id, state) WHERE active`、`(tenant_id, requester_id, opened_at)`、`(tenant_id, ci_id) WHERE active`、`(tenant_id, parent_id)`。
 - **S1 では `task` と `ci` をパーティションに分けない。** 完了したレコードを別の区画に移すと、再オープンのたびに行が区画をまたいで動き、索引の書き込みが増える。進行中のレコードの問い合わせは `WHERE active` の部分索引で速くする。S1 の見込み（`task` が年 7,000 万行）で、1 つの表の vacuum と索引の大きさを E2 の計測で確かめ、S2 の前に分け方（テナントのハッシュ、または完了の年）を決め直す（持ち越し）。
 - 監査の履歴と作業メモは、追記だけで大きくなるので、月ごとの範囲のパーティションにする（7 節）。
@@ -157,7 +157,7 @@ ext_index（tenant_id, field_id, record_id, value_text, value_number, value_time
 Record Service の `save(actor, table, id?, changes, expected_version?)` は、次の順で 1 つのトランザクションで行う。順序は、フロー・ACL・SLA の各領域と共有する正本である。
 
 ```
- 0. テナントのコンテキスト（SET LOCAL app.tenant_id）と、メタデータの版を読む（9.2 節）
+ 0. テナントのコンテキスト（SET LOCAL app.tenant_id）と、メタデータのバージョンを読む（9.2 節）
  1. ACL：作成・書き込みの行の判定と、変えたフィールドの判定（access-control の 5 節）
  2. 既定値（作成のとき）と型の変換
  3. 同期のレコードのルール（保存の前）：値の設定、中止（workflow-engine の 6 節）
@@ -200,7 +200,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 
 ## 6. フィールド・テーブルの変更と削除
 
-- フィールドの追加・ラベルの変更・上書きは、DDL を発行せず、メタデータの版を上げるだけで即時に反映する（ADR-0003 の Confirmation）。
+- フィールドの追加・ラベルの変更・上書きは、DDL を発行せず、メタデータのバージョンを上げるだけで即時に反映する（ADR-0003 の Confirmation）。
 - **フィールドの削除は 2 段で行う。** まず非表示（`hidden_at`）にし、フォーム・リスト・API・フローから見えなくする。値は保持する。30 日後に、値を消すジョブ（`ext` のキーと `ext_index` の行を消す）を動かす。30 日の間は戻せる。フローや ACL が参照しているフィールドは、参照を外すまで削除できない（409 `field_in_use`）。
 - テナントのテーブルの削除は、行が 0 件のときだけ許す。行があるときは、先にデータを消すジョブを別に動かす（監査の履歴に残す）。
 - 組み込みのフィールドは、削除できない。非表示（画面から隠す）は上書きで行う。
@@ -253,7 +253,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 - 桁数を超えたら、桁を増やして続ける（`INC9999999` の次は `INC10000000`）。桁数を変えても既存の番号は書き換えない。本家は既存のレコードにも桁の埋めを効かせる（2 節）が、本システムは番号を不変の識別子として扱う（差異）。
 - 接頭辞の変更は、新しい番号だけに効く。既存の番号は変えない。
 
-## 9. メタデータの版（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)）
+## 9. メタデータのバージョン（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)）
 
 ### 9.1 表
 
@@ -266,9 +266,9 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 ### 9.2 反映
 
 - メタデータの変更は、1 つのトランザクションで、オブジェクトの行、`tenant_meta.meta_version += 1`、`meta_change`、outbox（`meta.changed`）を書く。同じテナントのメタデータの変更は、`tenant_meta` の行のロックで直列になる（S1 の見込みでは、1 テナントで毎分数件）。
-- App と Engine は、要求・ステップの始めにテナントのコンテキストを設定する同じ往復で `meta_version` を読む。手元のコンパイル済みの辞書・判定・ルールの版が古ければ、読み直す。キャッシュのキーは `(tenant_id, meta_version)` にする。変更のコミットの後に始まった要求が、古いメタデータで保存することはない。
+- App と Engine は、要求・ステップの始めにテナントのコンテキストを設定する同じ往復で `meta_version` を読む。手元のコンパイル済みの辞書・判定・ルールのバージョンが古ければ、読み直す。キャッシュのキーは `(tenant_id, meta_version)` にする。変更のコミットの後に始まった要求が、古いメタデータで保存することはない。
 - `meta.changed` は、Valkey の通知で各プロセスに先に知らせる（最適化）。通知を落としても、上の読み取りで正しさは保たれる。
-- コンパイル済みの辞書は、プロセスの中の LRU（テナント × 版、最大 2,000 件）と Valkey に置く。Valkey は失われてもよい（DB から作り直す）。
+- コンパイル済みの辞書は、プロセスの中の LRU（テナント × バージョン、最大 2,000 件）と Valkey に置く。Valkey は失われてもよい（DB から作り直す）。
 
 ## 10. 設定のパッケージ（開発 → 本番）（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)）
 
@@ -288,7 +288,7 @@ DT-DICT-002（テナントのフィールドの型の変更）：
 ```
 開発のテナント：管理者が「作業のパッケージ」を開く
    → そのパッケージを「今のパッケージ」にしている間のメタデータの変更は、meta_change に package_id を付けて記録する
-   → 閉じると、変更したオブジェクトごとに「元の版のハッシュ（base_hash）」と「最後の内容（content）」を集めて固める
+   → 閉じると、変更したオブジェクトごとに「元のバージョンのハッシュ（base_hash）」と「最後の内容（content）」を集めて固める
 
 パッケージ（JSON、署名付き）
  { id, source_tenant_id, created_at, created_by, items: [
@@ -367,7 +367,7 @@ DT-PKG-001：
 
 - 保存のトランザクションのコミットの直前にプロセスを落とし、行・`ext_index`・`record_change`・outbox のどれも残らないことを確かめる。
 - テナントのフィールドの追加・名前の変更の禁止・削除が、DDL を発行しないこと（マイグレーションの記録が増えない）。
-- 2 つのプロセスで、メタデータの変更の直後の保存が新しい版の検証を使うこと。
+- 2 つのプロセスで、メタデータの変更の直後の保存が新しいバージョンの検証を使うこと。
 
 ## 14. Story の候補
 
@@ -385,7 +385,7 @@ DT-PKG-001：
 | E2 | `record-audit-and-journal` | 7 節（PROP-DICT-003）。L4 の確認待ち |
 | E2 | `audit-digest-verify` | 7.2 節のハッシュの鎖と、監査の担当の突き合わせの道具 |
 | E2 | `record-numbering` | 8 節（PROP-DICT-004） |
-| E2 | `meta-version-cache` | 9 節の版とキャッシュの入れ替え |
+| E2 | `meta-version-cache` | 9 節のバージョンとキャッシュの入れ替え |
 | E2 | `config-packages` | 10 節（DT-PKG-001、PROP-PKG-001〜003） |
 | E6 | `incident-number-and-audit-view` | インシデントの画面の番号・履歴・作業メモの表示（読めないフィールドの除外を含む） |
 | E11 | `table-api-dictionary-driven` | REST のテーブルの API を実効の辞書から作る（`api-and-integrations.md` と一緒に） |

@@ -88,7 +88,7 @@
 | 将来の変更（完了した案件の、有効日が先の差分） | 項目の横に「4 月 1 日から：営業 2 課」 | 3 月に入れた 4 月 1 日付の異動 |
 | 保留中の案件（承認待ち） | 項目の横に「申請中：住所の変更（5 月 1 日から）」と案件へのリンク | 本人の住所の変更の申請 |
 
-- 同じ項目に保留中の案件があるとき、新しい申請の画面は警告を出す（二重の申請を防ぐ。止めはしない。業務プロセスの完了のときの見ていた版の確認で扱う。[business-process-engine.md](business-process-engine.md) の 6.3 節）。
+- 同じ項目に保留中の案件があるとき、新しい申請の画面は警告を出す（二重の申請を防ぐ。止めはしない。業務プロセスの完了のときの見ていたバージョンの確認で扱う。[business-process-engine.md](business-process-engine.md) の 6.3 節）。
 - 履歴の画面は、期間の帯（タイムライン）と、差分の一覧（変更・訂正・取消の種類つき）で出す（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 7.4 節）。
 
 ### 5.3 変更の申請の画面
@@ -96,7 +96,7 @@
 - **有効日を必須にする。** 既定の値は置かない（「今日」を黙って入れない）。候補（今日、来月の 1 日）をボタンで出す。
 - 有効日が今日より前なら、「過去の日付での変更です。確定した給与に差額が出ることがあります」と出す（[ADR-0028](../decisions/0028-retro-deltas-and-bonus-runs.md)）。90 日より前は権限が要る（`retro_override`）。
 - **「訂正」は別の操作にする。** 「変更」は「その日から変わった」、「訂正」は「もともと誤っていた」。訂正は履歴の画面の差分の行から始め、元の差分と理由を示す（[ADR-0007](../decisions/0007-change-correction-rescind-semantics.md)）。本人のセルフサービスには訂正を出さない（人事の担当の操作）。
-- 起票の画面は、読んだ版の ID（`based_on_version_ids`）を案件に持たせる（ADR-0007 の Consequences）。
+- 起票の画面は、読んだバージョンの ID（`based_on_version_ids`）を案件に持たせる（ADR-0007 の Consequences）。
 - `SAME_DAY_CONFLICT` などの拒否は、定型の文と直し方（「訂正として出し直す」）を出す（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md) の Consequences）。
 - 休職の開始は、休暇の申請の画面からはできない。「休職は人事に相談してください」を出す（[ADR-0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md) の Consequences）。
 - 振込先の口座の変更は、次の給与の締め切りを出す（「5 月 25 日の支給に反映するには 5 月 15 日までに承認が必要です」。[core-hr.md](core-hr.md) の 6 節）。
@@ -131,7 +131,7 @@
 ## 9. スマートフォンのブラウザ
 
 - 幅 360 CSS ピクセルで、3.2 節の従業員とマネージャーの画面がすべて使える。人事・給与の担当の画面は、タブレット以上を対象にする（表が多い）。
-- 対象のブラウザ：iOS の Safari、Android の Chrome の最新と 1 つ前の版。PC は Chrome・Edge・Safari・Firefox の最新と 1 つ前の版。
+- 対象のブラウザ：iOS の Safari、Android の Chrome の最新と 1 つ前のバージョン。PC は Chrome・Edge・Safari・Firefox の最新と 1 つ前のバージョン。
 - Service Worker は打刻の画面の資産にだけ使う。他の画面の API の応答を保存しない（個人情報を端末に残さない）。
 - ログアウトのとき、IndexedDB の未送信の打刻以外の保存を消す。
 
@@ -205,7 +205,7 @@
 | プッシュ通知（Web Push）を使うか | E5 の後。通知の本文の規則（個人情報を入れない）は同じ |
 | 英語以外の言語 | 需要を見て MVP の後 |
 | 和暦の既定 | E5 の利用者の試験で |
-| 打刻の画面の PWA のインストールを勧めるか | Safari は、サイトとの操作がないまま Safari を 7 日使うと、IndexedDB・Service Worker の登録とキャッシュなどスクリプトで書く保存を消す。ホーム画面に追加した Web アプリは別に日数を数え、使えば数え直す（[WebKit の blog](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)、2026-09-28 に確認）。今の版の iOS での振る舞いは E6 の `ui-clock-offline` で実機で確かめて決める |
+| 打刻の画面の PWA のインストールを勧めるか | Safari は、サイトとの操作がないまま Safari を 7 日使うと、IndexedDB・Service Worker の登録とキャッシュなどスクリプトで書く保存を消す。ホーム画面に追加した Web アプリは別に日数を数え、使えば数え直す（[WebKit の blog](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)、2026-09-28 に確認）。今のバージョンの iOS での振る舞いは E6 の `ui-clock-offline` で実機で確かめて決める |
 
 ## 15. quality.md・runbooks・data-model への項目
 
@@ -218,7 +218,7 @@
 
 ### runbooks
 
-- `ui-asset-release-rollback.md`：静的な資産の配布の戻し方（CloudFront の無効化、前の版の資産の再配布）。
+- `ui-asset-release-rollback.md`：静的な資産の配布の戻し方（CloudFront の無効化、前のバージョンの資産の再配布）。
 - 大量の端末から貯めた打刻が一度に届いたときの確認：[time-and-attendance.md](time-and-attendance.md) の `clock-ingest-backlog.md` にまとめた（統合の工程で決めた。[runbooks/README.md](../runbooks/README.md) の 4 節）。
 
 ### data-model（索引への追加の提案）

@@ -338,7 +338,7 @@ AppConfig の構成プロファイルは、自由形式（`AWS.Freeform`）の J
 - `percentage` は 0〜100 の整数。`allow_workspaces` は正規形の UUID の配列（最大 1,000 件）。
 - 機能フラグ専用の形式（`AWS.AppConfig.FeatureFlags`）を使わないのは、次の 2 つのため。フラグ名の `.` を、その形式のキーに使えるかが **未検証**。割合と許可リストの評価をアプリで行うので、専用の形式の評価の機能を使わない。
 - 取得は、AppConfig Agent のローカルの HTTP の受け口（`http://localhost:2772/applications/{app}/environments/{env}/configurations/{profile}`）から行う。受け口の形と、Agent が最後の値を持ち続ける振る舞いは **未検証**。
-- 設定の値の変更（段階的なリリースの操作）は、Terraform では行わない。Ops と PM が、AppConfig のコンソールか CLI で新しい版を作り、デプロイ戦略（例：10 分で線形、アラームで自動のロールバック）でデプロイする。Terraform は、アプリケーション・環境・プロファイル・バリデーター・デプロイ戦略だけを持ち、設定の中身は `ignore_changes` にする。
+- 設定の値の変更（段階的なリリースの操作）は、Terraform では行わない。Ops と PM が、AppConfig のコンソールか CLI で新しいバージョンを作り、デプロイ戦略（例：10 分で線形、アラームで自動のロールバック）でデプロイする。Terraform は、アプリケーション・環境・プロファイル・バリデーター・デプロイ戦略だけを持ち、設定の中身は `ignore_changes` にする。
 
 ### テストでの上書き
 

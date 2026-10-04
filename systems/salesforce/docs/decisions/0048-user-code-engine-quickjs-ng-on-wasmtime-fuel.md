@@ -21,9 +21,9 @@ date: 2026-09-28
 調べたこと（2026-09-28 に確認）：
 
 - Wasmtime の燃料は、生成したコードに数を減らす処理を入れ、同じ初期状態なら同じ量で止まる。epoch による中断は速い（測定で 2〜3 倍の差がある）が、決定的ではない（[Wasmtime `Config`](https://docs.wasmtime.dev/api/wasmtime/struct.Config.html)）。決定的な実行には、NaN の正規化、relaxed SIMD の無効化、メモリーの伸長の扱い、時計などの外からの入力の固定が要る（[Deterministic Wasm Execution](https://docs.wasmtime.dev/examples-deterministic-wasm-execution.html)）。メモリーの上限は `StoreLimitsBuilder` で付けられる（[StoreLimitsBuilder](https://docs.wasmtime.dev/api/wasmtime/struct.StoreLimitsBuilder.html)）。
-- QuickJS-ng は、小さく組み込める JS のエンジンで、MIT ライセンス。最新の ECMAScript を目指す。WASI の reactor の入口を持つ。最新の版は v0.17.0（2026-09-18）（[quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs)）。
+- QuickJS-ng は、小さく組み込める JS のエンジンで、MIT ライセンス。最新の ECMAScript を目指す。WASI の reactor の入口を持つ。最新のバージョンは v0.17.0（2026-09-18）（[quickjs-ng/quickjs](https://github.com/quickjs-ng/quickjs)）。
 - StarlingMonkey は SpiderMonkey を元にした WASM のコンポーネント向けの実行系で、Apache-2.0。WASI 0.2 と fetch・Streams を持ち、Fastly と Fermyon が本番で使う（[bytecodealliance/StarlingMonkey](https://github.com/bytecodealliance/StarlingMonkey)）。
-- Javy は JS を WASM にする道具で、Apache-2.0。エンジンは rquickjs（QuickJS-ng の束ね）を使う。静的なリンクで 869KB 以上、動的なリンクで 1〜16KB のモジュールを作る（[bytecodealliance/javy](https://github.com/bytecodealliance/javy)、`crates/javy/Cargo.toml` の依存で確認）。最新の版は v9.1.0（2026-07-30）。
+- Javy は JS を WASM にする道具で、Apache-2.0。エンジンは rquickjs（QuickJS-ng の束ね）を使う。静的なリンクで 869KB 以上、動的なリンクで 1〜16KB のモジュールを作る（[bytecodealliance/javy](https://github.com/bytecodealliance/javy)、`crates/javy/Cargo.toml` の依存で確認）。最新のバージョンは v9.1.0（2026-07-30）。
 - 事前の初期化（Wizer）は Wasmtime に取り込まれ、`wasmtime wizer` になった（[bytecodealliance/wizer](https://github.com/bytecodealliance/wizer)）。
 
 ## Options
@@ -51,7 +51,7 @@ date: 2026-09-28
 - ホストのプロセス（`code-runner`）は Runtime と Worker のタスクに 1 つずつ持つ別のコンテナにする。IAM の権限・DB の資格情報・秘密を持たない。Runtime とは UNIX ドメインソケット（共有のボリューム）だけでつなぐ。ホストの API の呼び出しは、ソケットで Runtime に戻り、Runtime が開いているトランザクションの中でデータ層を通して行う。
 - 1 回の呼び出しの燃料の使用量から、`tx.cpu_ms` にも換算して足す（換算の係数は PoC で決める）。
 - 2 は、エンジンが大きく（SpiderMonkey）、WASI 0.2 とコンポーネントの前提で、fetch のような外への API を持つ。本システムは外への API を持たせないので、利点が小さい。1 回の実体化のメモリーも大きいと見込む（未検証。E13 の `code-engine-poc` で測る）。
-- 3 は、エンジンは 1 と同じだが、Javy の API（`Javy.IO` など）と版の変化（8.x・9.x の間の変更）に合わせ続けることになる。道具としては参考にし、殻は自前で持つ。
+- 3 は、エンジンは 1 と同じだが、Javy の API（`Javy.IO` など）とバージョンの変化（8.x・9.x の間の変更）に合わせ続けることになる。道具としては参考にし、殻は自前で持つ。
 - b は、ホストの API の呼び出しのたびに網を越える。200 件の塊で数百回の往復になり、保存の時間が延びる。
 - c は、V8 の WASM に燃料の仕組みがない。決定的な上限の判定ができない。
 
@@ -64,7 +64,7 @@ date: 2026-09-28
   - 砂場のプロセスが落ちても、Runtime のプロセスは落ちない。
 - 引き受けるコスト：
   - QuickJS-ng はインタープリタで、JIT がない。WASM の中でさらに遅くなる。重い計算は利用者のコードに向かない。PoC で、200 件の塊で 1 件あたりの処理の時間を測る。
-  - 自前の殻と、バイトコードの形の互換を保守する。QuickJS-ng の版を上げると、保存したバイトコードを作り直す必要がある。QuickJS-ng はバイトコードに形の版（`BC_VERSION`）を書き、読み込みの時に今の版と違えば断る（[quickjs.c](https://github.com/quickjs-ng/quickjs/blob/master/quickjs.c)、2026-09-28 に確認）。
+  - 自前の殻と、バイトコードの形の互換を保守する。QuickJS-ng のバージョンを上げると、保存したバイトコードを作り直す必要がある。QuickJS-ng はバイトコードに形のバージョン（`BC_VERSION`）を書き、読み込みの時に今のバージョンと違えば断る（[quickjs.c](https://github.com/quickjs-ng/quickjs/blob/master/quickjs.c)、2026-09-28 に確認）。
   - Runtime のタスクに、もう 1 つのコンテナの資源を割く。
 
 ## Confirmation

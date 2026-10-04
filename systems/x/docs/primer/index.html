@@ -173,7 +173,7 @@
     <p>推薦の良し悪しは、コードを読んでも分かりません。<strong>実際の利用者の行動で比べる</strong>しかありません。そのための道具が <a class="t" href="#g-ab">A/B テスト</a>と<a class="t" href="#g-guardrail">ガードレール</a>です。</p>
     <div class="stepper">
       <ol>
-        <li><strong>オフラインの評価</strong>：過去の配信と行動の記録を再生し、新しい版で並べ直して比べる（NDCG など）。CI の足切りに使う。</li>
+        <li><strong>オフラインの評価</strong>：過去の配信と行動の記録を再生し、新しいバージョンで並べ直して比べる（NDCG など）。CI の足切りに使う。</li>
         <li><strong>割り当て</strong>：利用者の ID のハッシュで、新旧のどちらを見せるかを固定する。同じ人は毎回同じ側になる。</li>
         <li><strong>少しずつ広げる</strong>：1% → 5% → 50% → 100%。各段 7 日以上（曜日の偏りを除く）。</li>
         <li><strong>主な指標</strong>で良くなったかを見る：1 回の訪問の中のいいね・返信・リポストの率（K8）、7 日の再訪の率。</li>
@@ -275,7 +275,7 @@
         <li><strong>見つける</strong>：利用者の<a class="t" href="#g-report">通報</a>、スパムの規則と危険の点、既知の違法な画像の<a class="t" href="#g-hashmatch">ハッシュの照合</a>、法令の申出。</li>
         <li><strong>まとめて並べる</strong>：同じ対象への通報を 1 つの案件にし、重さ・広がり・速さで P0〜P3 の待ち行列に入れる。命に関わるものは P0 で当番を呼ぶ。</li>
         <li><strong>判断して記録する</strong>：<a class="t" href="#g-moderation">措置</a>を、根拠（規約の条項か法令）と判断した人と一緒に、追記だけの表に書く。</li>
-        <li><strong>効かせる</strong>：措置の要約（<code>mod_flags</code>）と状態の版を上げ、<code>visible()</code> が 60 秒以内に全経路で隠す。</li>
+        <li><strong>効かせる</strong>：措置の要約（<code>mod_flags</code>）と状態のバージョンを上げ、<code>visible()</code> が 60 秒以内に全経路で隠す。</li>
         <li><strong>知らせる・覆す</strong>：措置を受けた人に、根拠と<a class="t" href="#g-appeal">異議の申立て</a>の方法を示す。異議は別の担当が見る。</li>
       </ol>
     </div>
@@ -363,7 +363,7 @@
       <li><code>following</code> と <code>followers</code> は同じ辺の 2 つの向きです。「A がフォローしている人」と「B のフォロワー」をどちらも主キーの範囲で速く引くためです。</li>
       <li><code>post_counters</code> は写しです。正本は <code>likes</code>・<code>reposts</code> です（<code>views</code> だけは正本の表がなく、概算です）。</li>
       <li><code>moderation_actions</code> は対象を <code>target_kind</code> と <code>target_id</code> で指す論理の参照で、DB の外部キーではありません。</li>
-      <li>投稿は消さずに状態を変えます（墓石）。<code>state_version</code> は写しが古い状態で上書きしないための版です。</li>
+      <li>投稿は消さずに状態を変えます（墓石）。<code>state_version</code> は写しが古い状態で上書きしないためのバージョンです。</li>
     </ul>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> の 3 節（規約）と 4 節（全体の ER 図）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/x/docs/architecture/data-model">data-model/</a> の領域ごとのファイル。</div>
   </section>
@@ -401,7 +401,7 @@
       <dt id="g-candidate">候補の取り出し</dt><dd>推薦の最初の段。膨大な投稿から、点を付ける価値のありそうな数百件を、いくつかの源から集める。</dd>
       <dt id="g-mixer">混ぜ合わせ</dt><dd>点の順に並べた後、作者の偏りやフォロー外の割合などの規則で、1 ページの並びを整える段。</dd>
       <dt id="g-oon">フォロー外</dt><dd>閲覧者がフォローしていない作者の投稿。英語では out-of-network。</dd>
-      <dt id="g-ab">A/B テスト</dt><dd>利用者を無作為に分け、新旧の版を同じ期間に見せて、指標の差で採否を決める実験。</dd>
+      <dt id="g-ab">A/B テスト</dt><dd>利用者を無作為に分け、新旧のバージョンを同じ期間に見せて、指標の差で採否を決める実験。</dd>
       <dt id="g-guardrail">ガードレール</dt><dd>実験で「悪化させてはいけない」指標。通報・ブロックの率や遅延など。悪化したら止める。</dd>
       <dt id="g-kinesis">Kinesis Data Streams</dt><dd>AWS の出来事のログ。複数の消費者が同じ流れを独立に読み、読み直せる。</dd>
       <dt id="g-eventual">結果整合</dt><dd>更新の直後は写しが古いことがあるが、時間がたてば正本と同じ値に揃う性質。</dd>

@@ -14,7 +14,7 @@
 ## 1. 目的と範囲
 
 - 扱う：クライアント・Gateway・Document Server の間のメッセージ、接続と再接続、変更の確定の順序、競合の解き方、クライアントの画面の状態、Undo と Redo、在席とカーソル、視点を追う、人が集まるファイル、権限の変化への対応。
-- 扱わない：ジャーナル・チェックポイント・読み込みの中身（[file-storage-and-history.md](file-storage-and-history.md)）、ノードとプロパティの定義（[document-model.md](document-model.md)）、Router と Document Server の配置（[infrastructure.md](infrastructure.md)）、権限の判定（[permissions-and-sharing.md](permissions-and-sharing.md)）、テキストの IME（[editor-and-tools.md](editor-and-tools.md)）、版の照合（[delivery.md](delivery.md)）。
+- 扱わない：ジャーナル・チェックポイント・読み込みの中身（[file-storage-and-history.md](file-storage-and-history.md)）、ノードとプロパティの定義（[document-model.md](document-model.md)）、Router と Document Server の配置（[infrastructure.md](infrastructure.md)）、権限の判定（[permissions-and-sharing.md](permissions-and-sharing.md)）、テキストの IME（[editor-and-tools.md](editor-and-tools.md)）、バージョンの照合（[delivery.md](delivery.md)）。
 
 ## 2. 本家の形（確かめたこと）
 
@@ -27,7 +27,7 @@
 | 循環 | サーバーが拒否する。クライアントは、拒否されるまで循環したノードを木から外す（How Figma's multiplayer technology works） | 同じ |
 | Undo | 「たくさん Undo して、コピーして、Redo で今に戻ったとき、文書は変わっていない」。Undo と Redo は、実行の時点で逆の履歴を書き換える（同上） | 同じ原則。他の人の上書きは戻さない（ADR-0012） |
 | オフライン | 再接続では、新しい写しを取り、その上にオフラインの編集を当て直す（同上） | 同じ。長いオフラインは MVP で扱わない（ADR-0002） |
-| 人数 | 1 ファイルに 500 人（編集と閲覧の合計）、編集は 200 人、カーソルの表示は 200 人まで。500 人に達すると、後から入った人は動かない版を見る。閲覧で 500 人に達していても、編集の権限のある人は 20 人まで入れる（[How many people can be in a file at once?](https://help.figma.com/hc/en-us/articles/1500006775761-How-many-people-can-be-in-a-file-at-once)） | 同じ上限にする（ADR-0011） |
+| 人数 | 1 ファイルに 500 人（編集と閲覧の合計）、編集は 200 人、カーソルの表示は 200 人まで。500 人に達すると、後から入った人は動かないバージョンを見る。閲覧で 500 人に達していても、編集の権限のある人は 20 人まで入れる（[How many people can be in a file at once?](https://help.figma.com/hc/en-us/articles/1500006775761-How-many-people-can-be-in-a-file-at-once)） | 同じ上限にする（ADR-0011） |
 | ファイルの外のデータ | コメントや利用者は、Postgres の上の別の仕組み（LiveGraph）で配る（[LiveGraph](https://www.figma.com/blog/livegraph-real-time-data-fetching-at-figma/)、2021-10-14） | 同じ分け方（Realtime。[architecture/README.md](README.md) の 1 節） |
 
 いずれも 2026-09-27 に確認。本家の送受信の形式、在席の送り方、Gateway の構成は公開されていない（**未検証**）。
@@ -105,7 +105,7 @@ Client          Gateway                    Router          Document Server
   │ Changes ─────▶ ...
 ```
 
-- 版の照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) による。Document Server は `protocol_version`（今の版と 1 つ前の版を話す）、`schema_hash`（今の表から追加だけでたどれる直近 30 日の一覧）、`engine_version`（`min_client_build` 以上）を確かめる。どれかが外れたときだけ `Kick(version_mismatch, retry_after_ms)`（0〜5 分に散らす）を返し、クライアントは強い再読み込みをする。`schema_hash` が違っても一覧の中なら、接続を続ける（[delivery.md](delivery.md) の 4 節）。
+- バージョンの照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) による。Document Server は `protocol_version`（今のバージョンと 1 つ前のバージョンを話す）、`schema_hash`（今の表から追加だけでたどれる直近 30 日の一覧）、`engine_version`（`min_client_build` 以上）を確かめる。どれかが外れたときだけ `Kick(version_mismatch, retry_after_ms)`（0〜5 分に散らす）を返し、クライアントは強い再読み込みをする。`schema_hash` が違っても一覧の中なら、接続を続ける（[delivery.md](delivery.md) の 4 節）。
 - `resume` は、同じ利用者の同じファイルのセッションで、セッションの表にあるときだけ受ける。他の利用者の `session_id` は受けない。
 - 再接続では、最後に受けた再開のトークンが期限の内なら、チケットの代わりに使う（API を通さない）。Gateway は、署名・期限・`rid` の使い回し・`epoch` が今の割り当てと等しいこと・組織の `acl_version`・ログインのセッションの取り消しを確かめる。外れたら `Kick(ticket_required)` を返し、クライアントは API のチケットを取って、0〜1 秒の乱数だけ待ってつなぎ直す（permissions-and-sharing.md の 5.5 節）。
 - チケットは URL に入れない（プロキシとアクセスログに残るため）。最初のメッセージで送る。
@@ -321,7 +321,7 @@ ADR-0011。
 ### 12.3 人が集まるファイル
 
 - 参加（編集と閲覧の合計）は 500 人、編集は 200 人まで。本家と同じ（2 節）。
-- 500 人を超えて入った人は、**動かない版**を見る。最新のチェックポイントを読み込み、`Committed` と在席を受けない。「最新にする」ボタンで読み込み直す。閲覧で 500 人に達していても、編集の権限のある人は 20 人まで、通常の参加として入れる。
+- 500 人を超えて入った人は、**動かないバージョン**を見る。最新のチェックポイントを読み込み、`Committed` と在席を受けない。「最新にする」ボタンで読み込み直す。閲覧で 500 人に達していても、編集の権限のある人は 20 人まで、通常の参加として入れる。
 - 1 ファイルの処理の見積もり（S1）：編集者 200 人がそれぞれ 20Hz で送ると毎秒 4,000 `ChangeSet`。1 件の検証と適用を 10µs とすると、file actor の CPU は 1 秒あたり 40ms。ジャーナルは group commit の中で同じ鍵をまとめるので（[file-storage-and-history.md](file-storage-and-history.md) の 4.3 節）、書き込みの量は変わった鍵の数で決まる。
 - DynamoDB の 1 パーティションは、書き込みを毎秒 1,000 単位（1 単位は 1 KB）まで出す設計である（[Best practices for designing and using partition keys](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-partition-key-design.html)）。トランザクションの書き込みは 2 倍の単位を使う（[Constraints in Amazon DynamoDB](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Constraints.html)）。いずれも 2026-09-27 に確認。1 ファイルのジャーナルは 1 つのパーティションキーで、ソートキー（`seq`）は増える一方なので、書き込みは末尾の 1 つのパーティションに集まる。DynamoDB は頻繁に使われる項目を分けて置き直すが、ソートキーが単調に増える項目の集まりは、ソートキーで分けない（[DynamoDB burst and adaptive capacity](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/burst-adaptive-capacity.html)、2026-09-27 に確認）。1 ファイルの書き込みは予算（毎秒 400 単位）で数え、使った割合が 50%・80% を超えたら、クライアントのまとめの間隔を 100ms・200ms に広げ、100% では確定を遅らせる（Document Server が `Welcome` と `RoleChanged` の `batch_interval_ms` で指示する。[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) の 4.2 節）。
 - 在席の送信の量：参加 500 人、100ms ごと、1 項目 40 バイトで、1 回の `PresenceBatch` は最大約 8 KB。Gateway が 10 台なら、Document Server の送信は毎秒約 800 KB。Gateway の側は、1 接続あたり毎秒 80 KB になる。
@@ -338,7 +338,7 @@ ADR-0011。
 | ジャーナルが遅い・スロットリング | 確定が遅れる。`pending` が伸びる | 再試行。10 秒書けなければ、ファイルを手放す（同上） |
 | 1 つの接続が遅い（送信の待ちが伸びる） | Gateway のメモリが伸びる | 8 MiB か 5 秒で `Kick(resync_required)` |
 | クライアントのバグで不正な変更を送り続ける | 拒否が続く | 1 分に 100 回の拒否で `Kick`。拒否の理由をエラーの報告に送る（中身を含めない） |
-| WASM とサーバーの `doc-model` の版が違う | 結果が食い違う | ADR-0053 の 3 つの版の照合で、互換の外だけ `Kick(version_mismatch)`。結果を変える規則は文書のフラグ（`Welcome.features`）で全員そろえる |
+| WASM とサーバーの `doc-model` のバージョンが違う | 結果が食い違う | ADR-0053 の 3 つのバージョンの照合で、互換の外だけ `Kick(version_mismatch)`。結果を変える規則は文書のフラグ（`Welcome.features`）で全員そろえる |
 
 ## 14. セキュリティ
 
@@ -403,11 +403,11 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 
 - **まとめの間隔**：20Hz（50ms）。ジャーナルの書き込みの多いファイルは 100ms（12.3 節）。
 - **1 ファイルの人数**：本家と同じ 500 人・編集 200 人・カーソル 200 人・編集の権限の枠 20 人。
-- **超えた人の扱い**：動かない版（12.3 節）。
+- **超えた人の扱い**：動かないバージョン（12.3 節）。
 - **Undo の範囲**：他の人の上書きは戻さない。履歴は 200 項目、タブを閉じたら消える。
 - **未確定の変更の端末への保存**：MVP ではしない。タブを閉じる前に確認を出す。
 - **再接続の最初の待ち**：予期しない切断では 0〜5 秒の一様な乱数（capacity.md の提案を取り込んだ）。
-- **版の照合**：`schema_hash` の一致ではなく、ADR-0053 の 3 つの版で照合する（delivery.md の提案を取り込んだ）。
+- **バージョンの照合**：`schema_hash` の一致ではなく、ADR-0053 の 3 つのバージョンで照合する（delivery.md の提案を取り込んだ）。
 - **WebSocket の圧縮**：使わない。
 
 ### 持ち越し

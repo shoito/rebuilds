@@ -127,7 +127,7 @@ ruleset。対象の ref の条件と、強制の状態。出典：[pull-requests
 | `target` | text | NO | `'branch'` | `branch`・`tag` |
 | `enforcement` | text | NO | `'active'` | `active`・`evaluate`・`disabled` |
 | `conditions` | jsonb | NO | | `{"ref_name":{"include":[...],"exclude":[...]},"repository_name":{...}}`。`~DEFAULT_BRANCH` を含められる |
-| `version` | bigint | NO | 1 | 変更ごとに増やす。Git フロントエンドのキャッシュの版 |
+| `version` | bigint | NO | 1 | 変更ごとに増やす。Git フロントエンドのキャッシュのバージョン |
 | `created_by_id` | bigint | NO | | |
 | `created_at` | timestamptz | NO | now() | |
 | `updated_at` | timestamptz | NO | now() | |

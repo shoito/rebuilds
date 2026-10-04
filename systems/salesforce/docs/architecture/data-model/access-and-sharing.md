@@ -273,7 +273,7 @@ erDiagram
 
 ### 2.5 `user_perm_assignments`
 
-権限セットか権限セットのグループの割り当て。データの変更で、版を上げない（利用者の `perm_shape` のキャッシュを消す）。
+権限セットか権限セットのグループの割り当て。データの変更で、バージョンを上げない（利用者の `perm_shape` のキャッシュを消す）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -360,12 +360,12 @@ erDiagram
 
 ### 3.5 `criteria_rules`
 
-レコードの条件の共有ルール。ルールの変更は新しい `rule_id` を作り、古いものと 1 つの版で入れ替える。
+レコードの条件の共有ルール。ルールの変更は新しい `rule_id` を作り、古いものと 1 つのバージョンで入れ替える。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `org_id`、`rule_id` | `uuid` | NOT NULL | — | 版ごとの ID |
-| `rule_key` | `text` | NOT NULL | — | 版をまたいで変わらない名前（`api_name`） |
+| `org_id`、`rule_id` | `uuid` | NOT NULL | — | バージョンごとの ID |
+| `rule_key` | `text` | NOT NULL | — | バージョンをまたいで変わらない名前（`api_name`） |
 | `object_id` | `uuid` | NOT NULL | — | |
 | `condition` | `text` | NOT NULL | — | 数式の言語（分類 A、同じレコードの項目だけ） |
 | `grantee_group_id` | `uuid` | NOT NULL | — | |
@@ -388,7 +388,7 @@ erDiagram
 | `grantee_group_id` | `uuid` | NOT NULL | — | 利用者・ロール・ロールと部下・公開グループ（チームは利用者のグループ） |
 | `access_level` | `text` | NOT NULL | — | `read`・`edit` |
 | `row_cause` | `text` | NOT NULL | — | `manual`・`team`・`rule` |
-| `rule_id` | `uuid` | NULL | — | `rule` の時だけ（版ごとの ID） |
+| `rule_id` | `uuid` | NULL | — | `rule` の時だけ（バージョンごとの ID） |
 | `created_by`・`created_at` | | NOT NULL | — | |
 
 - キー：PK `(org_id, id, shard_no)`。UK `(org_id, record_id, grantee_group_id, row_cause, rule_id, shard_no) NULLS NOT DISTINCT`。
@@ -440,11 +440,11 @@ erDiagram
 | `deferred_since` | `timestamptz` | NULL | — | `defer_sharing` で保留にした時刻（7 日で警告） |
 | `deferred_by` | `uuid` | NULL | — | |
 
-- キー：PK `(org_id)`。世代の切り替えは、メタデータの版を上げる同じトランザクションで `closure_generation` を書き換える。
+- キー：PK `(org_id)`。世代の切り替えは、メタデータのバージョンを上げる同じトランザクションで `closure_generation` を書き換える。
 
 ### 3.10 `sharing_jobs`
 
-レコードの条件のルールの版と、閉包の世代のジョブ。
+レコードの条件のルールのバージョンと、閉包の世代のジョブ。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

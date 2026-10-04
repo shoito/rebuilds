@@ -46,7 +46,7 @@ erDiagram
 | `start_utc` | `timestamptz` | NOT NULL | — | マスターは最初の回、上書きはその回 |
 | `series_end_utc` | `timestamptz` | NULL | — | 終わりのない系列は NULL |
 | `doc` | `text` | NOT NULL | — | `packages/search-normalize` で正規化した文字列（タイトル、場所、説明の先頭 2 KiB、参加者・主催者の名前とアドレス） |
-| `object_version` | `bigint` | NOT NULL | — | 写した予定オブジェクトの版（遅れの計測、古い更新の捨て） |
+| `object_version` | `bigint` | NOT NULL | — | 写した予定オブジェクトのバージョン（遅れの計測、古い更新の捨て） |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` | |
 
 - キー：PK `(tenant_id, event_object_id, recurrence_id)`。外部キーなし（写し）。

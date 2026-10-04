@@ -21,7 +21,7 @@ Web クライアント（PWA）の設計。データ層・複数タブ・オフ�
 | Firefox（デスクトップ） | 最新 2 メジャー＋ESR | |
 | Safari（macOS） | 17 以上 | |
 | Safari（iOS / iPadOS） | 17 以上 | Web Push はホーム画面に追加した PWA のみ（16.4 以上） |
-| Chrome（Android） | 最新 2 メジャー | SharedWorker がない版では、タブ単体で動く（3.4 節） |
+| Chrome（Android） | 最新 2 メジャー | SharedWorker がないバージョンでは、タブ単体で動く（3.4 節） |
 
 下限は 13 節の決定（2026-09-26）による。本家 Slack と同じく、半年ごと（5 月・11 月）に見直す。下限を上げ下げしたら、この表と Playwright の対象を同時に変える。
 
@@ -200,13 +200,13 @@ IndexedDB に、次の単位で保存する。データベースはアカウン�
 | `channel_state` | `[workspace_id, channel_id]` | `applied_seq`、窓の範囲、最後に開いた時刻 |
 | `outbox` | `client_msg_id` | 未送信のメッセージ |
 | `drafts` | `[workspace_id, channel_id, thread_root_id]` | 下書き |
-| `meta` | 固定 | スキーマの版、キャッシュの総量 |
+| `meta` | 固定 | スキーマのバージョン、キャッシュの総量 |
 
 - 保存するのは、ワークスペースごとに最近開いた 20 チャンネル、各チャンネルの最新側 200 件まで。
 - 総量の上限は 50MB を目安とし、超えたら最後に開いた時刻が古いチャンネルから消す（LRU）。`outbox` と `drafts` は追い出しの対象にしない。
 - 起動時はキャッシュを `stale` で即座に表示し、接続後に差分取得で追いつく。
 - `navigator.storage.persist()` を、PWA としてインストールされたときに要求する。拒否されても動く。
-- スキーマを変えるときは IndexedDB の版を上げる。移行が難しければ `messages` を捨てて取り直してよい（`outbox` と `drafts` は必ず移す）。
+- スキーマを変えるときは IndexedDB のバージョンを上げる。移行が難しければ `messages` を捨てて取り直してよい（`outbox` と `drafts` は必ず移す）。
 - ログアウト時は、そのアカウントのデータベースを消す（8 節）。ワークスペースから外されたら、そのワークスペースのデータを消す。
 
 Safari の保存の扱い：
@@ -274,8 +274,8 @@ Safari の保存の扱い：
 - `vite-plugin-pwa`（Workbox）で、ビルドしたファイルを事前にキャッシュする。ナビゲーションには、キャッシュしたアプリの骨格（`index.html`）を返す。
 - API の応答は Service Worker でキャッシュしない。メッセージのオフライン保存は IndexedDB だけにする（持ち場所を 1 つにするため）。
 - CloudFront では、`index.html` と Service Worker のファイルを `no-cache`、ハッシュ付きのファイルを `immutable` にする（[infrastructure.md](infrastructure.md)）。
-- 新しい版があれば「新しいバージョンがあります」を出し、ユーザーの操作で切り替える。API が古いクライアントを拒否したとき（契約の版の不一致）は、切り替えを強制する。版の伝え方は [realtime.md](realtime.md) と API の規約に従う。
-- SharedWorker はスクリプトの URL で区別される。新しい版のタブは新しい SharedWorker を起動するので、古いタブが閉じるまで接続が 2 本になる。タブと SharedWorker の間のメッセージには版を付け、合わなければタブに再読み込みを促す。
+- 新しいバージョンがあれば「新しいバージョンがあります」を出し、ユーザーの操作で切り替える。API が古いクライアントを拒否したとき（契約のバージョンの不一致）は、切り替えを強制する。バージョンの伝え方は [realtime.md](realtime.md) と API の規約に従う。
+- SharedWorker はスクリプトの URL で区別される。新しいバージョンのタブは新しい SharedWorker を起動するので、古いタブが閉じるまで接続が 2 本になる。タブと SharedWorker の間のメッセージにはバージョンを付け、合わなければタブに再読み込みを促す。
 
 ### 6.1 Web Push の表示
 
@@ -300,7 +300,7 @@ Safari の保存の扱い：
 | 本文の描画 | AST を React の要素に変換して描く。`dangerouslySetInnerHTML`・`innerHTML`・`eval` を使わない（lint で禁止） |
 | リンク | `http:` / `https:` / `mailto:` 以外のスキームは描画しない。外部リンクには `rel="noopener noreferrer"` を付ける |
 | CSP | `default-src 'self'`、`script-src 'self'`（インラインなし）、`style-src 'self'`、`worker-src 'self'`、`connect-src 'self'`（API と WebSocket が同一オリジンの前提）、`img-src 'self' blob:` とファイル配信のドメイン、`frame-ancestors 'none'`。利用状況の計測を有効にしたワークスペースでだけ、GA の送信先を `script-src`・`connect-src`・`img-src` に加える（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)）、`object-src 'none'`、`base-uri 'none'`。CloudFront の応答ヘッダーで付ける |
-| Trusted Types | `require-trusted-types-for 'script'` を付ける。対応していないブラウザでは無視される。対応は Chrome 83、Firefox 148、Safari 26 から（[MDN browser-compat-data](https://github.com/mdn/browser-compat-data/blob/main/http/headers/Content-Security-Policy.json)、2026-09-26 に確認）。これより古い版では効かないので、本文の描画の方針（上の行）を主な防御とする |
+| Trusted Types | `require-trusted-types-for 'script'` を付ける。対応していないブラウザでは無視される。対応は Chrome 83、Firefox 148、Safari 26 から（[MDN browser-compat-data](https://github.com/mdn/browser-compat-data/blob/main/http/headers/Content-Security-Policy.json)、2026-09-26 に確認）。これより古いバージョンでは効かないので、本文の描画の方針（上の行）を主な防御とする |
 | 認証情報 | セッションは HttpOnly・Secure・SameSite の Cookie に置く。トークンを `localStorage`・IndexedDB・URL に置かない。WebSocket は、API から受け取った短命の 1 回限りのチケットで認証し、Gateway が `Origin` を検査する。Gateway は DB に触れないため、Cookie のセッションを直接は検証しない（[identity-and-access.md](identity-and-access.md)、[realtime.md](realtime.md)） |
 | 利用状況の計測 | `packages/analytics` の型付きのイベントだけを GA に送る。本文・名前・ID を送らない。ワークスペースで無効なら gtag.js を読み込まない（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)） |
 | ログアウト | 全タブに伝えて画面を閉じ、そのアカウントの IndexedDB を消し、Web Push の購読を解除し、SharedWorker の接続を閉じる |
@@ -376,7 +376,7 @@ Playwright の WebKit は Safari そのものではない。SharedWorker のバ�
 
 ### 決定（2026-09-26、既定案）
 
-- **対応ブラウザの下限は Safari 17（macOS・iOS / iPadOS）にする。** 本家のモバイルアプリの下限は iOS 17 以降で、PWA をモバイルアプリの代わりにする本システムでは、これに合わせる。本家の Web 版は Safari 26 以降と、より新しい版だけを対象にしているが、必要な API（SharedWorker は 16 以上）は 17 で揃うので、広い方を採る。Chrome・Edge・Firefox は 1 節の表のまま。本家と同じく、半年ごと（5 月・11 月）に下限を見直す（[System requirements for using Slack](https://slack.com/help/articles/115002037526-System-requirements-for-using-Slack)、2026-09-26 に確認）。
+- **対応ブラウザの下限は Safari 17（macOS・iOS / iPadOS）にする。** 本家のモバイルアプリの下限は iOS 17 以降で、PWA をモバイルアプリの代わりにする本システムでは、これに合わせる。本家の Web 版は Safari 26 以降と、より新しいバージョンだけを対象にしているが、必要な API（SharedWorker は 16 以上）は 17 で揃うので、広い方を採る。Chrome・Edge・Firefox は 1 節の表のまま。本家と同じく、半年ごと（5 月・11 月）に下限を見直す（[System requirements for using Slack](https://slack.com/help/articles/115002037526-System-requirements-for-using-Slack)、2026-09-26 に確認）。
 - 共有端末向けの「この端末に保存しない」設定は設けない。ログアウト時にそのアカウントの IndexedDB を消す（3.7 節）ことと、ワークスペースごとのセッションの最大有効期間（[identity-and-access.md](identity-and-access.md) の 3.2 節）で抑える。
 - 他のワークスペースの未読は、2.3 節のとおりにする。WebSocket は開いているワークスペースだけ。他は、切り替え画面を開いたときと 60 秒ごとに `unreads-summary-api` で取り直し、Web Push が来たら即座に印を付ける。
 - 5,000 人のワークスペースでも、メンバーを手元にすべては持たない。画面に出るメンバー（投稿者、メンションの相手）だけを必要なときに取り、IndexedDB にキャッシュする。補完は `GET .../members?query=` で問い合わせる（5.2 節）。本家も、メンバーとチャンネルのメンバーを遅延して読み込み、補完はサーバーに問い合わせる（[Flannel: An Application-Level Edge Cache to Make Slack Scale](https://slack.engineering/flannel-an-application-level-edge-cache-to-make-slack-scale/)）。

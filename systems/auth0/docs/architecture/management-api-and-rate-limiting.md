@@ -1,6 +1,6 @@
 # Management API and Rate Limiting: Auth0
 
-Management API の形（リソース、ページング、エラー、版）、認可（スコープ）、レート制限（認証の経路と管理の経路の両方）の設計。決定は [ADR-0033](../decisions/0033-management-api-shape.md)（API の形）、[ADR-0034](../decisions/0034-management-api-authorization.md)（認可）、[ADR-0035](../decisions/0035-rate-limiting.md)（レート制限）にある。
+Management API の形（リソース、ページング、エラー、バージョン）、認可（スコープ）、レート制限（認証の経路と管理の経路の両方）の設計。決定は [ADR-0033](../decisions/0033-management-api-shape.md)（API の形）、[ADR-0034](../decisions/0034-management-api-authorization.md)（認可）、[ADR-0035](../decisions/0035-rate-limiting.md)（レート制限）にある。
 
 レート制限の仕組み（層、Valkey の GCRA、障害時の振る舞い）は、Slack の [rate-limiting.md](../../../slack/docs/architecture/rate-limiting.md) と Stripe の [rate-limiting.md](../../../stripe/docs/architecture/rate-limiting.md) を引き継ぐ。単位と値を本家 Auth0 に寄せる。各領域の文書にある上限は、この文書の枠組みに従い、数値は 6 節を正とする。
 
@@ -10,7 +10,7 @@ Management API の形（リソース、ページング、エラー、版）、�
 
 | 範囲に含む | 範囲に含まない（担当の領域） |
 | --- | --- |
-| Management API のリソース、URL、ページング、エラー、版、相関 ID | 各リソースの中身（アプリは [tenants-and-applications.md](tenants-and-applications.md)、ユーザーは [users-and-profiles.md](users-and-profiles.md)、ログは [logs-and-streams.md](logs-and-streams.md)） |
+| Management API のリソース、URL、ページング、エラー、バージョン、相関 ID | 各リソースの中身（アプリは [tenants-and-applications.md](tenants-and-applications.md)、ユーザーは [users-and-profiles.md](users-and-profiles.md)、ログは [logs-and-streams.md](logs-and-streams.md)） |
 | Management API のトークン（M2M とダッシュボード）とスコープ | ダッシュボードのログイン（[dashboard.md](dashboard.md)） |
 | 認証の経路・管理の経路のレート制限、429 の応答、見出し | ブルートフォースの防御・不審な IP の抑制の判定（attack-protection の領域）。この文書はその数え方の基盤だけを持つ |
 | テナントごとの上書き | WAF の IP の制限の値（infrastructure の領域の 4.3 節） |
@@ -116,13 +116,13 @@ MVP のリソース：
 - 形は本家の OpenAPI の `{statusCode, error, message}` に、観察される `errorCode`（2 節。`errorCode` だけ未検証）を足した形に寄せる。`request_id` は本システムで足す。
 - `message` に、秘密・トークン・パスワード・内部のスタックを入れない（[ADR-0061](../decisions/0061-secret-free-telemetry.md)）。
 
-### 3.5 版
+### 3.5 バージョン
 
-- 版は URL の `/api/v2` だけにする。本家も同じ（版 2.0）。日付の版（Stripe の ADR-0007）は持たない。
+- バージョンは URL の `/api/v2` だけにする。本家も同じ（バージョン 2.0）。日付のバージョン（Stripe の ADR-0007）は持たない。
 - v2 の中では、足す変更（新しいリソース、任意のフィールド、新しい `errorCode`、列挙の値の追加）だけをする。利用者は未知のフィールドと列挙の値を無視するよう、文書に書く。
-- 壊す変更は、次の版（`/api/v3`）で行う。v2 は、v3 の公開から最低 12 か月保つ。
+- 壊す変更は、次のバージョン（`/api/v3`）で行う。v2 は、v3 の公開から最低 12 か月保つ。
 - 廃止の予定の機能を呼ぶと、1 時間に 1 回（アプリ × エンドポイントごと）、テナントのログに `depnote` を出す（本家と同じ仕組み。[Migrate to Paginated Queries](https://auth0.com/docs/troubleshoot/product-lifecycle/past-migrations/migrate-to-paginated-queries)）。応答に `Deprecation`・`Sunset` の見出し（RFC 9745、RFC 8594）を付ける。
-- OpenAPI 3.1 を `@hono/zod-openapi` で出し（architecture README の 4 節）、公開する。CI で、前の版の OpenAPI と比べて壊す変更がないことを検査する（oasdiff などで。選定は delivery の領域）。
+- OpenAPI 3.1 を `@hono/zod-openapi` で出し（architecture README の 4 節）、公開する。CI で、前のバージョンの OpenAPI と比べて壊す変更がないことを検査する（oasdiff などで。選定は delivery の領域）。
 
 ## 4. 認可
 
@@ -290,7 +290,7 @@ ADR-0005 の縮退の表のとおり、全部を通す（fail-open）にはし�
 - 結合テスト：他テナントのトークン、他テナントの ID、他テナントのチェックポイントがすべて拒否される。
 - 結合テスト：Valkey の停止中、認証 API は通り、タスクの中の近似の制限が働く。
 - 結合テスト：L3 を超えても、`refresh_token` の交換は 120% まで通る。
-- 契約テスト：OpenAPI の前の版と比べて壊す変更がない。
+- 契約テスト：OpenAPI の前のバージョンと比べて壊す変更がない。
 - 負荷試験（E12）：上限の付近で、判定が Valkey の 1 往復で済み、DB の負荷を増やさない。
 
 ## 12. この領域の ADR

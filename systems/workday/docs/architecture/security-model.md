@@ -6,14 +6,14 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0017](../decisions/0017-authorization-evaluator.md) | 判定は自前の評価器で行う。有効な方針の版とグループの所属から、利用者ごとの権限（ドメイン、操作、範囲の根の組織）を畳んだ表を作り、1 件の判定は関数で、一覧は組織の閉包を使う SQL の条件で絞る。拒否が既定で、権限は和で決まる |
-| [0018](../decisions/0018-security-policy-versions-and-activation.md) | 権限の方針（どのグループにどのドメイン・業務プロセスの権限を与えるか）は版で持ち、下書きを別の人が有効化する。戻すときは前の版の写しを有効化する。グループの所属とロールの割り当ては業務プロセスで変え、完了で効く |
+| [0017](../decisions/0017-authorization-evaluator.md) | 判定は自前の評価器で行う。有効な方針のバージョンとグループの所属から、利用者ごとの権限（ドメイン、操作、範囲の根の組織）を畳んだ表を作り、1 件の判定は関数で、一覧は組織の閉包を使う SQL の条件で絞る。拒否が既定で、権限は和で決まる |
+| [0018](../decisions/0018-security-policy-versions-and-activation.md) | 権限の方針（どのグループにどのドメイン・業務プロセスの権限を与えるか）はバージョンで持ち、下書きを別の人が有効化する。戻すときは前のバージョンの写しを有効化する。グループの所属とロールの割り当ては業務プロセスで変え、完了で効く |
 | [0019](../decisions/0019-segregation-of-duties-checks.md) | 職務分掌は、両立しない権限の組の規則表で持ち、範囲が重なるときに違反とする。方針の有効化、所属・ロールの変更の完了、案件の操作、夜間の走査の 4 か所で検査する。システムの規則は止め、テナントの規則は止めるか警告かを選べる |
 | [0020](../decisions/0020-sensitive-read-audit-and-access-explanations.md) | 給与・口座・扶養・要配慮などの機微なドメインの閲覧を記録する。判定に理由（どの権限で許したか）を付け、「この人は何を見られるか」「この項目を誰が見られるか」を出す。本番の代理のログインは、読み取りだけ・30 分・理由つきに限る |
 
 ## 1. 目的と範囲
 
-- 扱う：ドメインの一覧と項目の割り当て、操作、セキュリティグループの種類と所属、組織で絞るロールの範囲、業務プロセスの権限、判定の API（1 件、一覧、項目の射影）と評価器、キャッシュ、権限の方針の版と有効化、職務分掌の規則表と検査、機微な情報の扱い、代理のログイン、権限の監査と説明の報告。
+- 扱う：ドメインの一覧と項目の割り当て、操作、セキュリティグループの種類と所属、組織で絞るロールの範囲、業務プロセスの権限、判定の API（1 件、一覧、項目の射影）と評価器、キャッシュ、権限の方針のバージョンと有効化、職務分掌の規則表と検査、機微な情報の扱い、代理のログイン、権限の監査と説明の報告。
 - 扱わない：テナントの分離と RLS（[ADR-0005](../decisions/0005-security-and-my-number.md) と [infrastructure.md](infrastructure.md)）、ログインと SSO（[integrations-and-bulk.md](integrations-and-bulk.md)）、マイナンバーの保管庫の権限（[my-number-vault.md](my-number-vault.md)）、監査ログの保管と改ざんの検知（[audit-and-retention.md](audit-and-retention.md)）、暗号と鍵（[security.md](security.md)）。
 - **画面・API・レポート・一括の出力・連携は、すべてこの判定を通す**（[AGENTS.md](../../AGENTS.md)）。
 
@@ -26,7 +26,7 @@
 | ドメインの権限 | ドメインの方針は、画面・レポートの View・Modify と、連携の Get・Put で、セキュリティグループに権限を与える（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)。検索の要約を含む） | 同じ 4 つの操作（3.2 節） |
 | 範囲で絞る | 絞られたグループは、組織などで対象の一部だけに届く。絞らないグループは全部に届く。両方に属すれば和になる（[Security Group Configuration and Constraints](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-group-configuration-and-constraints.html)） | 範囲は `all`・`orgs`・`self`。権限は和（4.2 節、[ADR-0017](../decisions/0017-authorization-evaluator.md)） |
 | 交差のグループ | 含めたグループのすべてに属し、除くグループに属さない人だけを含む（[Advanced Security Group Types](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-supplemental-for-administrators/advanced-security-group-types.html)、2026-09-28 に検索の要約で確認） | `intersection` のグループ（4.1 節） |
-| 保留と有効化 | ドメイン・業務プロセスの方針の変更は、有効化の作業を行うまで保留される。有効化の時刻を記録し、前の時刻の版を有効化して戻せる。方針の編集と有効化は別のドメインにあり、別のグループに持たせられる。グループの定義と所属の変更は、有効化を待たずにすぐ効く（[Security Policy Configuration and Activation](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-policy-configuration-and-activation.html)） | 同じ考え方（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)）。ただし所属とロールの変更は業務プロセスの承認を経る |
+| 保留と有効化 | ドメイン・業務プロセスの方針の変更は、有効化の作業を行うまで保留される。有効化の時刻を記録し、前の時刻のバージョンを有効化して戻せる。方針の編集と有効化は別のドメインにあり、別のグループに持たせられる。グループの定義と所属の変更は、有効化を待たずにすぐ効く（[Security Policy Configuration and Activation](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-policy-configuration-and-activation.html)） | 同じ考え方（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)）。ただし所属とロールの変更は業務プロセスの承認を経る |
 | 職務分掌の報告 | 職務分掌の潜在的な衝突の報告がある（検索の要約。報告の中身は未検証） | 規則表と 4 か所の検査（[ADR-0019](../decisions/0019-segregation-of-duties-checks.md)） |
 | 同じ権限がすべての経路に効く | レポート・モバイル・API・業務プロセスに同じ権限が効く（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)） | 同じ（7 節） |
 
@@ -86,10 +86,10 @@
 | 権限 | 意味 | 決めた場所 |
 | --- | --- | --- |
 | `rules.import` | 規則表・保存の期間の規則表の取り込み（取得、読み取り、自動の検査） | [payroll-jp-rules.md](payroll-jp-rules.md) の 2.2 節、[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md) |
-| `rules.verify` | 取り込んだ版の独立の照合（`verified_by ≠ imported_by`） | 同上 |
-| `rules.publish` | 照合済みの版の本番への公開（Ops の承認。コードのデプロイとは別の操作） | [delivery.md](delivery.md) の 6 節、[ADR-0062](../decisions/0062-rule-table-release-calendar.md) |
+| `rules.verify` | 取り込んだバージョンの独立の照合（`verified_by ≠ imported_by`） | 同上 |
+| `rules.publish` | 照合済みのバージョンの本番への公開（Ops の承認。コードのデプロイとは別の操作） | [delivery.md](delivery.md) の 6 節、[ADR-0062](../decisions/0062-rule-table-release-calendar.md) |
 
-- 取り込みと照合を同じ人に持たせない（5.1 節の S8）。同じ版で、`imported_by` と `verified_by` が同じなら、`verified` にする操作を DB の制約でも拒む。
+- 取り込みと照合を同じ人に持たせない（5.1 節の S8）。同じバージョンで、`imported_by` と `verified_by` が同じなら、`verified` にする操作を DB の制約でも拒む。
 
 ### 3.3 項目の射影
 
@@ -183,7 +183,7 @@
 | S5 | `bp.definition.config` の `modify` | `bp.definition.activation` の `modify` | 常に | 止める |
 | S6 | `role_assignment_change`・`security_group_membership_change` の `initiate` | 同じ業務プロセスの `approve` | 常に | 止める（案件ごとの検査で。5.3 節の #3） |
 | S7 | `hire` の `initiate` | `payment_election_change` の `approve` | 重なるとき | 警告（架空の従業員への振込の防止。テナントが止めるに変えられる） |
-| S8 | `rules.import`（運用者） | `rules.verify`（運用者） | 常に（同じ版で） | 止める（3.4 節。規則表の書き換えで多くの人の控除を変える脅威 THR-024） |
+| S8 | `rules.import`（運用者） | `rules.verify`（運用者） | 常に（同じバージョンで） | 止める（3.4 節。規則表の書き換えで多くの人の控除を変える脅威 THR-024） |
 
 - 「範囲が重なる」：A と B の範囲の根の組織の下位（閉包）に、共通の組織が今日あるとき。`all` はすべてと重なる。
 - テナントの規則は、同じ形（権限 A、権限 B、範囲、強さ）で足す。強さは `block`・`warn`。
@@ -196,13 +196,13 @@
 
 | # | 検査点 | 対象 | 止める違反 | 警告の違反 |
 | --- | --- | --- | --- | --- |
-| 1 | 方針の有効化（8 節） | 新しい版での、テナントの全員 | 有効化を拒み、違反の一覧を出す | 有効化の画面で一覧を示し、確認を求める |
+| 1 | 方針の有効化（8 節） | 新しいバージョンでの、テナントの全員 | 有効化を拒み、違反の一覧を出す | 有効化の画面で一覧を示し、確認を求める |
 | 2 | 所属・ロールの割り当て・職務の変更・異動の案件の完了 | 所属が変わる人 | 完了を拒み、起票者に戻す（[business-process-engine.md](business-process-engine.md) の 6.3 節） | 完了し、報告に出す |
 | 3 | 案件の操作（承認・完了） | 操作者（委任では代理人と委任した人） | 起票者 ＝ 承認者なら拒む。案件の種類の承認の権限 B と両立しない権限 A を、案件の対象の範囲で持つなら拒む | 記録する |
 | 4 | 夜間の走査 | テナントの全員 | 検査点 1・2 を抜けた違反（規則の追加の前からある違反、組織の再編による範囲の重なり）を SEV3 で報告し、テナントの管理者に知らせる。自動では権限を外さない | 報告に出す |
 
 - 検査点 2 で拒まれた職務の変更は、所属の変更（`job` のグループ）を伴わない形で出し直すか、権限の方針を先に直す。
-- 規則表の変更（テナントの規則の追加）も方針の版の一部として有効化する。有効化のときに既存の違反を検査点 1 で出す。
+- 規則表の変更（テナントの規則の追加）も方針のバージョンの一部として有効化する。有効化のときに既存の違反を検査点 1 で出す。
 
 ### 5.4 例外
 
@@ -241,7 +241,7 @@ project<T>(ctx: AuthzContext, op: Op, target: TargetRef, record: T): Projected<T
 canBp(ctx: AuthzContext, op: BpOp, processType: string, target: TargetRef): Decision;
 ```
 
-- `AuthzContext` は、テナント、利用者、実際の操作者（委任・代理のログイン）、方針の版、所属の版、今日の日付を持つ。要求の始めに 1 回作る。
+- `AuthzContext` は、テナント、利用者、実際の操作者（委任・代理のログイン）、方針のバージョン、所属のバージョン、今日の日付を持つ。要求の始めに 1 回作る。
 - 判定のコードは `packages/authz` に 1 つだけ置く。API・Worker・BP Worker・レポート・一括の出力が同じ関数を呼ぶ。`packages/authz` の外で、グループ・方針の表を読んで権限を決めるコードを lint で禁じる。
 
 ### 7.2 権限の表
@@ -265,7 +265,7 @@ security_effective_grants (tenant_id, worker_id, policy_version, membership_vers
                            PRIMARY KEY (tenant_id, worker_id, domain_or_bp, op, scope_kind, ...))
 ```
 
-- 権限の表は、方針の有効化、所属・ロールの変更の完了、発効の日（ロールの割り当ての将来日付）に、影響を受けた人だけ作り直す。`self` の権限は全員に共通なので行を持たない（評価器が方針の版から直接読む）。
+- 権限の表は、方針の有効化、所属・ロールの変更の完了、発効の日（ロールの割り当ての将来日付）に、影響を受けた人だけ作り直す。`self` の権限は全員に共通なので行を持たない（評価器が方針のバージョンから直接読む）。
 - 1 件の判定：権限の表の行（キャッシュ）から、ドメイン・操作に当たる行を取り、範囲を DT-SEC-001 で判定する。組織の下位の判定は閉包の索引の引き（[ADR-0011](../decisions/0011-effective-dated-org-hierarchy-closure.md)）。
 - 一覧：`scopeFilter` が、`all` なら条件なし、`orgs` なら「対象の組織が根の下位」の `EXISTS` を閉包に対して作る。レポートは同じ条件を SQL に入れる（別の経路で DB を読まない）。
 
@@ -281,7 +281,7 @@ EXISTS (SELECT 1 FROM org_closure c
 ### 7.3 キャッシュ
 
 - 利用者ごとの権限の表を、Valkey に `(tenant, worker, policy_version, membership_version)` の鍵で置く（失われてもよい。DB から作り直す）。
-- 版が変われば鍵が変わるので、古いキャッシュは使われない。所属の版は、業務プロセスの完了と発効のタイマーで上げる（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 8 節）。
+- バージョンが変われば鍵が変わるので、古いキャッシュは使われない。所属のバージョンは、業務プロセスの完了と発効のタイマーで上げる（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 8 節）。
 - 範囲は根の組織の ID で持つので、組織の再編ではキャッシュを捨てなくてよい（閉包を判定のときに引く）。
 - 判定の結果（許す・拒む）そのものはキャッシュしない。
 
@@ -298,14 +298,14 @@ EXISTS (SELECT 1 FROM org_closure c
 ```
  draft ──(security_policy_activation の案件を起票)──▶ pending_activation ──(承認・完了)──▶ active
    ▲                                                         │                             │
-   └────────────────────── 却下・キャンセル ◀────────────────┘                  次の版の有効化で superseded
+   └────────────────────── 却下・キャンセル ◀────────────────┘                  次のバージョンの有効化で superseded
 ```
 
-- テナントに下書きの版は 1 つだけ。`security.config` の権限の人が編集する（楽観ロック）。
+- テナントに下書きのバージョンは 1 つだけ。`security.config` の権限の人が編集する（楽観ロック）。
 - 有効化は `security_policy_activation` の業務プロセス。承認者は `security.activation` の権限の人で、編集者と別（S3）。
-- 有効化の前に、背景で新しい版の権限の表を作り、職務分掌の検査点 1 を行い、前の版との差（誰がどの権限を得る・失うか）を承認の画面に出す。
-- 完了のトランザクションで、テナントの有効な版の指し先を新しい版に切り替える。以後の要求は新しい版で判定する。進行中の要求は、始めに作った `AuthzContext` の版で最後まで判定する。
-- 戻すときは、前の版の中身を写した新しい下書きを作り、同じ手順で有効化する。本家の「前の時刻を有効化する」に当たる。
+- 有効化の前に、背景で新しいバージョンの権限の表を作り、職務分掌の検査点 1 を行い、前のバージョンとの差（誰がどの権限を得る・失うか）を承認の画面に出す。
+- 完了のトランザクションで、テナントの有効なバージョンの指し先を新しいバージョンに切り替える。以後の要求は新しいバージョンで判定する。進行中の要求は、始めに作った `AuthzContext` のバージョンで最後まで判定する。
+- 戻すときは、前のバージョンの中身を写した新しい下書きを作り、同じ手順で有効化する。本家の「前の時刻を有効化する」に当たる。
 - 将来の日時の有効化は MVP では持たない。
 
 ## 9. 代理のログイン（[ADR-0020](../decisions/0020-sensitive-read-audit-and-access-explanations.md)）
@@ -322,7 +322,7 @@ EXISTS (SELECT 1 FROM org_closure c
 
 | 事象 | 記録 |
 | --- | --- |
-| 方針の下書きの編集、有効化、戻し | 版、差分、編集者、承認者、時刻、コメント |
+| 方針の下書きの編集、有効化、戻し | バージョン、差分、編集者、承認者、時刻、コメント |
 | 所属・ロールの割り当ての変更 | 案件、前後、有効日 |
 | 職務分掌の違反（止めたもの、警告、夜間の走査） | 規則、利用者、範囲、検査点 |
 | 機微なドメインの閲覧 | 利用者（実際の操作者と代理）、対象の人、ドメイン、経路（画面・API・レポート・一括）、要求の ID、許した権限の ID |
@@ -338,7 +338,7 @@ EXISTS (SELECT 1 FROM org_closure c
 | --- | --- |
 | この人は何を見られるか | 利用者 → ドメイン・操作・範囲（根の組織と下位）・由来のグループと権限 |
 | この項目を誰が見られるか | ドメイン＋対象の人 → 見られる利用者の一覧と由来 |
-| 版の差 | 2 つの方針の版の間で、権限を得る・失う利用者 |
+| バージョンの差 | 2 つの方針のバージョンの間で、権限を得る・失う利用者 |
 | 職務分掌の違反 | 規則ごとの違反の利用者と範囲 |
 | 判定の説明 | 1 件の判定（利用者、操作、ドメイン、対象）の結果と、当たった・外れた権限と理由。データは出さない |
 
@@ -355,11 +355,11 @@ EXISTS (SELECT 1 FROM org_closure c
 | 障害 | 振る舞い |
 | --- | --- |
 | Valkey が落ちる | 権限の表を DB から読む。判定は遅くなるが正しい |
-| 権限の表の作り直しが遅れる（所属の変更の後） | 所属の版が上がった利用者は、表ができるまで DB の所属から直接評価する（遅い経路）。古い表を使わない |
-| 方針の有効化の途中の失敗 | 切り替えは 1 トランザクションなので、前の版のまま。作りかけの表は捨てる |
+| 権限の表の作り直しが遅れる（所属の変更の後） | 所属のバージョンが上がった利用者は、表ができるまで DB の所属から直接評価する（遅い経路）。古い表を使わない |
+| 方針の有効化の途中の失敗 | 切り替えは 1 トランザクションなので、前のバージョンのまま。作りかけの表は捨てる |
 | 閉包の食い違い | 権限の判定を拒否に倒す（[core-hr.md](core-hr.md) の 10 節） |
 | 判定の関数の例外 | 拒否にする（fail closed）。拒否の件数の急増で警告 |
-| 誤った方針を有効化した | 前の版の写しを有効化して戻す（runbook）。有効だった間の機微なドメインの閲覧の記録で影響を調べる |
+| 誤った方針を有効化した | 前のバージョンの写しを有効化して戻す（runbook）。有効だった間の機微なドメインの閲覧の記録で影響を調べる |
 
 ## 13. セキュリティとプライバシー（この仕組み自体）
 
@@ -382,9 +382,9 @@ EXISTS (SELECT 1 FROM org_closure c
 | PROP-SEC-001 | 任意の方針・所属・要求で、API の 1 件の応答、一覧（`scopeFilter`）、レポート、一括の出力の結果が、`can` と `project` の結果と一致する（経路による差がない） |
 | PROP-SEC-002 | 任意の 2 テナントで、一方のコンテキストの判定・一覧に、他方の行が出ない |
 | PROP-SEC-003 | 方針に権限を足しても、どの判定も許すから拒むに変わらない。外しても、拒むから許すに変わらない（単調） |
-| PROP-SEC-004 | 任意の有効化・所属の変更の列の後、有効な版で、止める規則の違反を持つ利用者がいない（夜間の走査の対象の、規則の追加の前からある違反を除く） |
+| PROP-SEC-004 | 任意の有効化・所属の変更の列の後、有効なバージョンで、止める規則の違反を持つ利用者がいない（夜間の走査の対象の、規則の追加の前からある違反を除く） |
 | PROP-SEC-005 | 任意の変更の列の後、キャッシュを使った判定と、キャッシュを使わない判定が一致する |
-| PROP-SEC-006 | 下書きの編集は、有効化までどの判定も変えない。前の版の写しを有効化すると、判定はその版のときと一致する |
+| PROP-SEC-006 | 下書きの編集は、有効化までどの判定も変えない。前のバージョンの写しを有効化すると、判定はそのバージョンのときと一致する |
 | PROP-SEC-007 | 任意の組織の再編の列の後、範囲の判定は、閉包から作り直した判定と一致する |
 
 ### 14.3 本番での検査
@@ -418,7 +418,7 @@ EXISTS (SELECT 1 FROM org_closure c
 - **権限は和で決まり、明示の拒否の規則は持たない**。例外はシステムの固定の規則（本人の案件を承認しない、要配慮は既定で与えない、マイナンバーは保管庫の側）。
 - **範囲は根の組織の ID で持ち、下位は判定のときに閉包で展開する**。
 - **対象の組織は、`effective_on` と今日の早いほうの時点で決める。退職した人は退職日の時点**。
-- **所属とロールの割り当ては業務プロセスの承認を経て、完了で効く**。方針は版で有効化する。
+- **所属とロールの割り当ては業務プロセスの承認を経て、完了で効く**。方針はバージョンで有効化する。
 - **職務分掌は範囲が重なるときに違反とする**。システムの規則に例外はない。
 - **本番の代理のログインは読み取りだけ・30 分・理由つき**。運用者は代理でログインしない。
 - **集計だけの操作 `aggregate` を足す**。機微な値の集計は `view` か `aggregate` で見られ、`aggregate` の結果は必ず少人数の抑止を通る（3.2 節、[ADR-0041](../decisions/0041-small-cell-suppression-for-sensitive-aggregates.md)）。
@@ -455,11 +455,11 @@ EXISTS (SELECT 1 FROM org_closure c
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `security_policy_versions` | 8 節。有効化した版は書き換えない |
+| Aurora `security_policy_versions` | 8 節。有効化したバージョンは書き換えない |
 | Aurora `security_groups`、`security_group_members` | 4.1 節、7.2 節。所属は有効日付 |
 | Aurora `security_effective_grants` | 7.2 節。派生 |
 | `security_policy_versions.body` の `sod_rules`（表は持たない。システムの規則はコードの定数）、Aurora `sod_violations` | 5 節 |
-| Aurora `security_membership_versions` | 7.3 節。人ごとの所属の版（キャッシュのキー） |
+| Aurora `security_membership_versions` | 7.3 節。人ごとの所属のバージョン（キャッシュのキー） |
 | Aurora `proxy_sessions` | 9 節 |
 | Valkey `authz:{tenant}:{worker}:{policy_version}:{membership_version}` | 7.3 節。失われてもよい |
 | 監査ログの事象 `security.*`・`access.sensitive_read`・`access.denied_summary` | 10.1 節（[audit-and-retention.md](audit-and-retention.md)） |

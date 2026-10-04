@@ -81,7 +81,7 @@ erDiagram
 | `partition_key` | `text` | NOT NULL | — | 流れごとの鍵（[stores.md](stores.md) の 2.1 節） |
 | `relay_partition` | `smallint` | NOT NULL | 生成列 `abs(hashtextextended(partition_key, 0) % 64)` | Relay の区画（64） |
 | `type` | `text` | NOT NULL | — | `post.created` など |
-| `version` | `smallint` | NOT NULL | `1` | 中身の型の版（[delivery.md](../delivery.md) の 7.2 節） |
+| `version` | `smallint` | NOT NULL | `1` | 中身の型のバージョン（[delivery.md](../delivery.md) の 7.2 節） |
 | `payload` | `jsonb` | NOT NULL | — | 中身。DM の本文、連絡先、IP を入れない |
 | `traceparent` | `text` | NULL | — | W3C Trace Context |
 | `created_at` | `timestamptz` | NOT NULL | `clock_timestamp()` | 出来事の `committed_at` に使う |

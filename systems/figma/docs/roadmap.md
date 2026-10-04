@@ -17,11 +17,11 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- | --- |
 | E1 基盤とビルド | AWS・Terraform・CI（Rust・WASM・一致・大きさ・参照画像の枠）、Aurora と RLS、DynamoDB と S3 と CDN、GPU の抽象の骨格、殻とエンジンの橋、認証、能力のチケット、可観測性、フラグとビルドの配信 | 設計中 |
 | E2 描画エンジンと大きなファイル | シーングラフ、タイル、パスの被覆率、塗りと線、バックエンドの選択と切り替え、画像のデコード、メモリの予算、性能の CI、キャンバスの入力・選択・変形・基本の図形、クライアントの計測 | 未着手（前に GPU の PoC と HAMT の PoC） |
-| E3 ドキュメントのモデルとマルチプレイヤー | プロパティの表と生成、操作と検証、木の不変条件、正準形、Gateway・Router・Document Server、確定と配信、合わせ直し、並びの鍵、再接続、在席、Undo、版の照合、文書のフラグ、ドレイン、メモリの受け入れと書き込みの予算 | 未着手（前に DynamoDB の PoC） |
+| E3 ドキュメントのモデルとマルチプレイヤー | プロパティの表と生成、操作と検証、木の不変条件、正準形、Gateway・Router・Document Server、確定と配信、合わせ直し、並びの鍵、再接続、在席、Undo、バージョンの照合、文書のフラグ、ドレイン、メモリの受け入れと書き込みの予算 | 未着手（前に DynamoDB の PoC） |
 | E4 ベクターとテキストの編集 | ペンとベクターネットワーク、ブール演算、スナップ、テキストの整形・改行・編集、IME、エフェクト・ブレンド・マスク、パネル、ショートカット、クリップボード、画像のアップロード、SVG の読み込み | 未着手（前に IME の PoC。ショートカットは法務：L6） |
 | E5 フレームとオートレイアウト | 制約、オートレイアウト（折り返し、ベースライン、最小・最大）、`derived_layout` の保存と修復、増分の再計算、Taffy との差分のテスト | 未着手 |
 | E6 コンポーネントとバリアント | インスタンスの導出と上書き、入れ子と入れ替え、バリアント、コンポーネントのプロパティ、デタッチと反映、導出の描画とレイアウト | 未着手 |
-| E7 保存と版の履歴 | ジャーナルの group commit・フェンス・回復、チェックポイント、読み込みの計画と端末のキャッシュ、回復のジョブ、掃除、版の履歴、復元、複製、ゴミ箱と完全な削除（東京と大阪）、障害の注入と影の検証 | 未着手（削除の期間は法務：L4） |
+| E7 保存とバージョンの履歴 | ジャーナルの group commit・フェンス・回復、チェックポイント、読み込みの計画と端末のキャッシュ、回復のジョブ、掃除、バージョンの履歴、復元、複製、ゴミ箱と完全な削除（東京と大阪）、障害の注入と影の検証 | 未着手（削除の期間は法務：L4） |
 | E8 コメントと通知 | コメントとスレッド、固定、メンション、アプリ内とメールの通知、Realtime の購読 | 未着手 |
 | E9 チーム・権限・共有 | 役割と継承、判定関数とポリシー、招待とゲスト、一般アクセスとリンクの期限、シート、取り消し、閲覧の UI、監査ログ、漏洩のテスト | 未着手（公開のリンクの取り下げは法務：L3） |
 | E10 書き出しとアセット | クライアントの書き出し（PNG・JPG・SVG・PDF）、Render Worker、画像の取り込みと配信、フォント、サムネイル、外部の画像の取り込み、描画の一致の集合 | 未着手（組織のフォント・端末のフォントは法務：L1。権利の侵害は L2） |
@@ -124,7 +124,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `follow-viewport` | 視点を追う |
 | `multiplayer-undo` | Undo と Redo（`derived` のプロパティを項目にしない） |
 | `mp-simulator-props` | 収束のシミュレーターと PROP-MP-001〜008 |
-| `protocol-and-schema-compat` | 版の照合（`protocol_version`、`schema/history.json`、受け入れの一覧、再読み込みの 2 つの強さ）（ADR-0053） |
+| `protocol-and-schema-compat` | バージョンの照合（`protocol_version`、`schema/history.json`、受け入れの一覧、再読み込みの 2 つの強さ）（ADR-0053） |
 | `doc-feature-flags` | 文書のフラグと `Welcome.features` |
 | `schema-write-gate` | 書き込みの解禁（`schema.<prop>.write`） |
 | `ds-memory-accounting` | ファイルごとのメモリの計測と `ds_liveness` への報告 |
@@ -195,7 +195,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `instance-rendering` | 導出したインスタンスの子を普通のノードとして描く、参照画像のテスト |
 | `instance-layout` | 導出した木のレイアウト（導出とレイアウトの分離） |
 
-### E7 保存と版の履歴
+### E7 保存とバージョンの履歴
 
 設計：[file-storage-and-history.md](architecture/file-storage-and-history.md)、[ADR-0024](decisions/0024-journal-items-and-fencing.md)〜[ADR-0026](decisions/0026-version-history-restore-and-deletion.md)、[ADR-0047](decisions/0047-router-task-liveness-and-file-assignment.md)
 
@@ -208,12 +208,12 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `orphan-recovery-job` | 回復のジョブと見張り（infrastructure の同じ名前の Story と 1 つ） |
 | `file-lease-deleted-state` | 削除済みの割り当て |
 | `storage-gc` | チェックポイントの保持と掃除（東京と大阪） |
-| `version-history-api` | 一覧、名前付き、版の閲覧 |
+| `version-history-api` | 一覧、名前付き、バージョンの閲覧 |
 | `version-restore` | 復元 |
 | `file-duplicate` | 複製（画像の参照の写しを含む） |
 | `trash-and-purge` | ゴミ箱と完全な削除（東京と大阪。security の `purge-both-regions` と 1 つ。削除の期間は法務：L4） |
 | `image-gc` | 画像の mark-and-sweep（東京と大阪） |
-| `file-change-events` | 編集が止まったこと・版の作成・削除の outbox（通知と、E15 の Webhook で使う） |
+| `file-change-events` | 編集が止まったこと・バージョンの作成・削除の outbox（通知と、E15 の Webhook で使う） |
 | `durability-fault-injection` | 耐久性の障害の注入の枠 |
 | `shadow-replay-validation` | 作り直しの影の検証（連続 10 万回の一致で出す） |
 
@@ -299,7 +299,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `load-test-suite` | 負荷試験 L1〜L10（multiplayer の `hot-file-load-test`、comments の Realtime の負荷試験を含む） |
 | `osaka-warm-standby` | 大阪の構成 |
 | `journal-generations` | 世代のキーと、世代をまたぐ回復（ADR-0048） |
-| `dr-salvage-job` | 取り戻しのジョブと `dr_salvaged` の版 |
+| `dr-salvage-job` | 取り戻しのジョブと `dr_salvaged` のバージョン |
 | `dr-drill` | DR の訓練（staging で四半期、file-storage の `dr-journal-failover-drill` と 1 つ） |
 | `synthetic-bots` | 合成のボット |
 | `alerts-and-dashboards` | アラートとダッシュボード、各領域のテレメトリーの警報（描画・エディタ・レイアウト・検索・通知） |
@@ -334,18 +334,18 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `quickjs-sandbox-poc` | QuickJS の WASM のインスタンス、上限、割り込み、ES の版、性能 |
+| `quickjs-sandbox-poc` | QuickJS の WASM のインスタンス、上限、割り込み、ES のバージョン、性能 |
 | `plugin-membrane` | ハンドルの表、値の写し、コールバック、fuzzing、脱出のテスト |
 | `plugin-api-read` | 読み取りの API、`dynamic-page` |
 | `plugin-api-write` | 書き込み、Undo の単位、送る速さの制御、`origin` |
 | `plugin-ui-iframe` | `plugin-ui` のドメイン、起動用のページ、CSP の生成、メッセージ |
 | `plugin-network-proxy` | サンドボックスの `fetch` の中継、宛先の照合 |
 | `plugin-storage` | `plugin_data`、`clientStorage` |
-| `plugin-dev-mode` | 開発中の版の読み込み、`devAllowedDomains`、コンソール |
+| `plugin-dev-mode` | 開発中のバージョンの読み込み、`devAllowedDomains`、コンソール |
 | `plugin-org-distribution` | 組織の中の配布、管理者の統制 |
 | `plugin-public-review` | 公開、自動の検査、人の審査の道具 |
 | `plugin-kill-switch` | `plugin_blocklist` と Realtime での配信 |
-| `plugin-types-codegen` | `.d.ts` の生成と API の版 |
+| `plugin-types-codegen` | `.d.ts` の生成と API のバージョン |
 
 ### E15 公開 API と Webhook（MVP の後）
 
@@ -360,7 +360,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `oauth-app-review` | public のアプリの審査の道具 |
 | `api-files-and-nodes` | `/files`・`/nodes`・`/meta` |
 | `api-images` | `/images`、`202` と `image_jobs`、画素の予算 |
-| `api-comments-versions-projects` | コメント・版・プロジェクトの一覧 |
+| `api-comments-versions-projects` | コメント・バージョン・プロジェクトの一覧 |
 | `api-rate-limits` | tier のトークンバケット、組織の合計、429 のヘッダー |
 | `webhooks-v1` | Webhook の作成・一覧・変更・削除、`ping`、署名、配送、記録 |
 | `webhook-egress` | `webhook-egress` の Lambda と宛先の検査 |
@@ -372,7 +372,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 - **契約（プロパティの表、送受信のメッセージ、チェックポイントの形式、判定のポリシー、公開 API の形）の確定**：公開した後やファイルに書いた後に変えるコストが最も高い。
 - **参照画像の更新と許容の値の変更**：差の画像を見て Dev が承認し、値は QA が決める。
 - **`schema-breaking` の変更と `min_client_build` の引き上げ**：Dev のテックリードと Ops が判断する。
-- **大阪への切り替えの判断、`dr_salvaged` の版の扱いの利用者への告知**：Ops の責任者と PM（[runbooks/disaster-recovery.md](runbooks/disaster-recovery.md)）。
+- **大阪への切り替えの判断、`dr_salvaged` のバージョンの扱いの利用者への告知**：Ops の責任者と PM（[runbooks/disaster-recovery.md](runbooks/disaster-recovery.md)）。
 - **法務の判断**（L1〜L6）。
 - **負荷試験・PoC の結果の解釈**：数字は出せるが、予算・上限・退路（2 つのビルド、GPU のインスタンス）の採否は Dev と PM の判断。
 

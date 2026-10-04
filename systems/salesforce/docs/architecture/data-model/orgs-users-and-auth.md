@@ -153,7 +153,7 @@ erDiagram
 | `copied_at`・`refresh_available_at` | `timestamptz` | NULL | — | Sandbox の複製の時刻、次に再作成できる時刻 |
 | `locale`・`timezone`・`currency` | `text` | NOT NULL | `'ja_JP'`・`'Asia/Tokyo'`・`'JPY'` | |
 | `fiscal_year_start_month` | `smallint` | NOT NULL | `4` | 1〜12 |
-| `metadata_version` | `bigint` | NOT NULL | `1` | 今のメタデータの版（[ADR-0003](../../decisions/0003-metadata-driven-runtime.md)） |
+| `metadata_version` | `bigint` | NOT NULL | `1` | 今のメタデータのバージョン（[ADR-0003](../../decisions/0003-metadata-driven-runtime.md)） |
 | `trial_ends_at` | `timestamptz` | NULL | — | 試用の終わり |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 | `deletion_requested_at`・`purge_after` | `timestamptz` | NULL | — | 削除の申し込みと、消去を始める時刻（30 日の猶予） |
@@ -242,7 +242,7 @@ erDiagram
 
 ### 2.6 `identity.auth_users`・`auth_accounts`・`auth_sessions`・`passkeys`・`two_factors`・`sso_providers`
 
-Better Auth の表（[ADR-0044](../../decisions/0044-authentication-better-auth-sso-and-mfa.md)）。列の形は Better Auth の版に従い、ここには本システムが頼る列と、足した列（`org_id` と下の太字）だけを書く。全ての行が `org_id` を持つ。RLS の外で、`identity_service` だけが読み書きする。
+Better Auth の表（[ADR-0044](../../decisions/0044-authentication-better-auth-sso-and-mfa.md)）。列の形は Better Auth のバージョンに従い、ここには本システムが頼る列と、足した列（`org_id` と下の太字）だけを書く。全ての行が `org_id` を持つ。RLS の外で、`identity_service` だけが読み書きする。
 
 | 表 | 主な列 | キーと索引 |
 | --- | --- | --- |

@@ -6,7 +6,7 @@
 
 ## Problem
 
-画面のデザインは、デザイナーが作り、開発者が実装し、PM が確かめる。デザインのファイルが個人の端末にあると、最新の版がどれか分からず、書き出しと受け渡しのたびに食い違いが生まれる。
+画面のデザインは、デザイナーが作り、開発者が実装し、PM が確かめる。デザインのファイルが個人の端末にあると、最新のバージョンがどれか分からず、書き出しと受け渡しのたびに食い違いが生まれる。
 
 本家 Figma は、これを「ブラウザで開ける 1 つのファイルを、全員が同時に見て編集できる」形にした。中身は、ブラウザの中に自前の描画エンジンを持ち、ファイルごとに 1 つのサーバーのプロセスが変更の順序を決める仕組みである（[Building a professional design tool on the web](https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/)、2015-12-07。[How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)、2019-10-16。いずれも 2026-09-27 に確認）。
 
@@ -18,7 +18,7 @@
 
 1. **手元のアプリのように速い**：大きなファイルでも、パン・ズーム・選択・変形が 60fps で動く。入力は 1 フレームで画面に出る。
 2. **一緒に作れる**：他の人の編集とカーソルが、すぐに（同じリージョンで 0.25 秒以内に）見える。競合しても全員の画面が同じ結果に収束する。
-3. **失わない**：確定を返した編集は、プロセスが落ちても失わない。過去の版に戻れる。
+3. **失わない**：確定を返した編集は、プロセスが落ちても失わない。過去のバージョンに戻れる。
 
 ### 利用者
 
@@ -38,7 +38,7 @@
 - **コンポーネントとバリアント**：ファイルの中のコンポーネント、インスタンスと上書き（override）、バリアントとプロパティ
 - **リアルタイムのマルチプレイヤー**：同時編集、他の人のカーソルと選択、在席の表示、他の人の視点を追う
 - **コメント**：キャンバスの位置に付けるコメント、スレッド、メンション、解決、通知（アプリ内とメール）
-- **バージョン履歴**：自動の版と名前付きの版、過去の版の表示と復元、複製
+- **バージョン履歴**：自動のバージョンと名前付きのバージョン、過去のバージョンの表示と復元、複製
 - **チーム・プロジェクト・権限**：組織、チーム、プロジェクト、ファイル。閲覧・編集の権限、招待、ゲスト
 - **共有のリンク**：「招待した人だけ」「組織の中」「リンクを知っている全員」と、閲覧・編集の水準
 - **書き出し**：PNG・JPG・SVG・PDF。倍率の指定、書き出しの設定をノードに保存する
@@ -74,7 +74,7 @@
 - 親子の関係に循環ができない。ノードは親を 1 つだけ持つ。
 - 自分の入力は、サーバーの応答を待たずに画面に出る。
 - 組織は、他の組織のファイル・コメント・メタデータを見られない。権限のない人に、ファイルの中身（サムネイルを含む）を返さない。
-- 過去の版から復元しても、それまでの版は消えない。
+- 過去のバージョンから復元しても、それまでのバージョンは消えない。
 
 ## Affected users and systems
 
@@ -85,7 +85,7 @@
 ## Constraints
 
 - 実行基盤と技術は、rebuilds の他の題材の決定を引き継ぐ。描画とマルチプレイヤーのサーバーだけを Rust にする（[ADR-0001](decisions/0001-platform-and-stack.md)）。
-- 動くブラウザ：Chrome・Edge・Firefox・Safari の最新の 2 版。WebGL2 を必須とし、WebGPU は使えるときに使う（[ADR-0004](decisions/0004-gpu-rendering-in-wasm.md)）。
+- 動くブラウザ：Chrome・Edge・Firefox・Safari の最新の 2 バージョン。WebGL2 を必須とし、WebGPU は使えるときに使う（[ADR-0004](decisions/0004-gpu-rendering-in-wasm.md)）。
 - 日本の法令（個人情報保護法、情報流通プラットフォーム対処法）への対応は、法務の確認を前提に設計する。
 - 規模は段階的に広げる（[architecture/](architecture/README.md) の「規模の段階」）。
 
@@ -110,7 +110,7 @@ MVP のリリースの判断に使う。計測の方法は [quality.md](quality.
 - 描画のエンジンを Rust で書くか、本家と同じ C++ で書くか → Rust に決めた（[ADR-0001](decisions/0001-platform-and-stack.md)、accepted）。
 - キャンバスの上のテキストで、IME の入力をどう受けるか → 全ブラウザで隠した `textarea` に決めた（[ADR-0017](decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方とイベントの順序は E4 の前の PoC で確かめる。
 - 「プロジェクト」の呼び名：本家は 2026-08-03 から「フォルダー」へ改名している（中身と権限は変わらない。[Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、2026-09-27 に確認）。→ S1 は「プロジェクト」のままにし、表とコードの名前も `project` にすると決めた。利用者の調査で混乱が見えたら見直す（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 15 節）。
-- 無料のプランの版の履歴 → 本家の Starter と同じく 30 日に決めた（[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。30 日を過ぎた版は消す（[ADR-0026](decisions/0026-version-history-restore-and-deletion.md)）。ファイル数などの他の範囲は、料金の設計（MVP の後）で決める。
+- 無料のプランのバージョンの履歴 → 本家の Starter と同じく 30 日に決めた（[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。30 日を過ぎたバージョンは消す（[ADR-0026](decisions/0026-version-history-restore-and-deletion.md)）。ファイル数などの他の範囲は、料金の設計（MVP の後）で決める。
 
 ## 法務の確認待ち
 
@@ -121,6 +121,6 @@ MVP のリリースの判断に使う。計測の方法は [quality.md](quality.
 | L1 | フォントのライセンス：サーバーでの描画（サムネイル、書き出し）にフォントを使うこと、PDF・SVG へのフォントの埋め込み（サブセット）、組織がアップロードしたフォントを組織のメンバー全員に配ること、利用者の端末のフォントを読み取る補助のアプリ。和文のフォントは、ライセンスの条件が厳しいものが多い | export-and-assets、rendering-engine |
 | L2 | 利用者がアップロードした画像・フォントの権利の侵害の申し立てと、削除の手続き（情報流通プラットフォーム対処法） | export-and-assets、security |
 | L3 | 「リンクを知っている全員」で共有したファイルの扱い：公開の範囲の説明、検索エンジンへの露出、不正な内容（フィッシングの画面など）の通報と取り下げ | permissions-and-sharing、security |
-| L4 | 削除したファイルと版の履歴を、いつまで残し、いつ消すか。利用規約とデータ処理の契約への書き方 | file-storage-and-history、security |
+| L4 | 削除したファイルとバージョンの履歴を、いつまで残し、いつ消すか。利用規約とデータ処理の契約への書き方 | file-storage-and-history、security |
 | L5 | 権限の分離の破れや漏洩が起きたときの、個人情報保護委員会と本人への報告の要否と期限 | security、runbooks |
 | L6 | 本家の UI・操作・ショートカットにどこまで寄せてよいか（画面の見た目の類似、商標）。リポジトリ共通の ADR-0006 は名前と識別子だけを扱う | editor-and-tools |

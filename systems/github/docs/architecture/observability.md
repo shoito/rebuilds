@@ -27,7 +27,7 @@
 
 - Go の側（フロントエンド、ストレージ）と TypeScript の側で、属性名を 1 か所で定義する（`.proto` と同じリポジトリに置き、両方の言語の定数を生成する）。
 - 共通の属性：`service.name`、`service.version`、`deployment.environment`、`cloud.availability_zone`（AZ ID）、`repo.id`（3.2 節の規則で扱う）、`storage.node`。
-- Git の操作の属性：`git.service`（`upload-pack`・`receive-pack`・`ls-refs`）、`git.protocol`（`https`・`ssh`）、`git.protocol_version`、`git.client`（`agent` の値を、既知の名前と主要な版に丸めたもの）、`git.request_kind`（ref の確認・fetch・clone・push）、`git.bytes_sent`、`git.bytes_received`、`git.objects`。
+- Git の操作の属性：`git.service`（`upload-pack`・`receive-pack`・`ls-refs`）、`git.protocol`（`https`・`ssh`）、`git.protocol_version`、`git.client`（`agent` の値を、既知の名前と主要なバージョンに丸めたもの）、`git.request_kind`（ref の確認・fetch・clone・push）、`git.bytes_sent`、`git.bytes_received`、`git.objects`。
 
 ### 2.1 トレースの伝播（Git の RPC を通して）
 

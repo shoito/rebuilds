@@ -2,12 +2,12 @@
 
 全体の検索（テーブルを横断する検索）、ナレッジの検索、カタログの検索、OpenSearch の索引と反映、日本語の解析器、ACL を効かせた検索、索引の鮮度を決める。
 
-前提の決定は、検索に Amazon OpenSearch Service を使い、索引をセルごとに持ち、文書に `tenant_id` を入れて問い合わせに必ず付けること（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）、検索の出口は「索引の ACL の属性で絞った後、返す直前に各結果を判定の関数で確かめ直す。読めないフィールドの一致の強調を出さない」こと（[access-control.md](access-control.md) の 6.2 節の 9 行、[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、ナレッジは公開中の版だけを索引に入れること（[knowledge.md](knowledge.md) の 6 節）である。この文書で決めたことは次の ADR にある。
+前提の決定は、検索に Amazon OpenSearch Service を使い、索引をセルごとに持ち、文書に `tenant_id` を入れて問い合わせに必ず付けること（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）、検索の出口は「索引の ACL の属性で絞った後、返す直前に各結果を判定の関数で確かめ直す。読めないフィールドの一致の強調を出さない」こと（[access-control.md](access-control.md) の 6.2 節の 9 行、[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、ナレッジは公開中のバージョンだけを索引に入れること（[knowledge.md](knowledge.md) の 6 節）である。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
 | [0043](../decisions/0043-japanese-analyzer-and-index-layout.md) | 日本語の解析器は Sudachi を既定にし、正規化の形（表記の揺れの吸収）と、未知の語のための 2 文字の n-gram の副フィールドを併せて持つ。索引はセルの OpenSearch のドメインに種類ごとの共有の索引を置き、`tenant_id` で経路を決める。テナントのフィールドは入れ子のフィールドの枠に入れ、フィールドの数を増やさない。辞書の更新は新しい索引への入れ直しと別名の切り替えで行う |
-| [0044](../decisions/0044-acl-aware-search-and-index-freshness.md) | 検索は、行の ACL の述語のうち索引で表せる部分を OpenSearch の絞り込みにし、返す直前に DB で行の述語とフィールドの読み取りを確かめ直す。一致させるフィールドと強調は、見る人が読めるフィールドに限る。OpenSearch の総数を出さない。索引は outbox から、レコードの版を外部の版として反映し、遅れを計測する |
+| [0044](../decisions/0044-acl-aware-search-and-index-freshness.md) | 検索は、行の ACL の述語のうち索引で表せる部分を OpenSearch の絞り込みにし、返す直前に DB で行の述語とフィールドの読み取りを確かめ直す。一致させるフィールドと強調は、見る人が読めるフィールドに限る。OpenSearch の総数を出さない。索引は outbox から、レコードのバージョンを外部のバージョンとして反映し、遅れを計測する |
 
 この文書の決定表・性質は設計の草案である。ID は E9 の各変更の `spec.md` に移すときに確定する。
 
@@ -25,7 +25,7 @@
 | Sudachi の辞書の更新 | 辞書のファイルを関連付け直しても、すぐには効かない。次の blue/green のデプロイで効く。あるいは新しいパッケージで新しい索引を作って入れ直し、別名で切り替える | 同上 |
 | Sudachi の提供 | 全リージョンで任意のプラグインとして使える。コンソールか `AssociatePackage` の API で関連付ける | [Amazon OpenSearch Service adds support for four new language analyzers](https://aws.amazon.com/about-aws/whats-new/2023/10/amazon-opensearch-four-language-analyzers/) |
 | Sudachi の分割 | A（最も短い単位）、B（中くらい）、C（固有の名前の単位）の 3 つ。正規化の形のフィルターで表記の揺れを揃え、動詞・形容詞を基本の形にする。Apache-2.0 | [WorksApplications/elasticsearch-sudachi](https://github.com/WorksApplications/elasticsearch-sudachi) |
-| kuromoji | 分割の方式は `normal`・`search`・`extended`。`search` は長い名詞を分け、元の複合語も同義語として持つ。既定の辞書は IPADIC | [kuromoji_tokenizer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-tokenizer)（Elasticsearch の文書。OpenSearch Service も kuromoji をすべてのドメインに入れる（[Plugins by engine version](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。版ごとの細かな違いは未検証で、E9 `search-analyzer-evaluation` で確かめる）。`kuromoji_stemmer` は 4 文字以上のカタカナの語の末尾の長音（ー）を消す（[kuromoji_stemmer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-stemmer)） |
+| kuromoji | 分割の方式は `normal`・`search`・`extended`。`search` は長い名詞を分け、元の複合語も同義語として持つ。既定の辞書は IPADIC | [kuromoji_tokenizer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-tokenizer)（Elasticsearch の文書。OpenSearch Service も kuromoji をすべてのドメインに入れる（[Plugins by engine version](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)）。バージョンごとの細かな違いは未検証で、E9 `search-analyzer-evaluation` で確かめる）。`kuromoji_stemmer` は 4 文字以上のカタカナの語の末尾の長音（ー）を消す（[kuromoji_stemmer](https://www.elastic.co/docs/reference/elasticsearch/plugins/analysis-kuromoji-stemmer)） |
 | シャードの大きさ | 検索の遅れが大事なときは 1 シャード 10〜30 GiB。1 ノードの JVM のヒープ 1 GiB あたり 25 シャードまで | [Choosing the number of shards](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp-sharding.html) |
 | マルチテナント | 索引をテナントごとに分ける形と、共有する形と、その組み合わせがある | [Storing multi-tenant SaaS data with Amazon OpenSearch Service](https://aws.amazon.com/blogs/apn/storing-multi-tenant-saas-data-with-amazon-opensearch-service)（AWS のブログ。本文は取得できず、検索の結果の抜粋で確認。未検証で、形の選択は 5 節で自前に決める） |
 
@@ -36,8 +36,8 @@
 | 索引（種類） | 文書 | 入れるフィールド | 使う画面 |
 | --- | --- | --- | --- |
 | `task` | `task` の全クラスのレコード（進行中と完了。削除は除く） | 番号、短い説明、説明、状態、クラス、担当のグループ・担当者・依頼者の ID、CI の ID、作成・更新の時刻、索引の対象のテナントのフィールド、作業メモ・コメントの本文（下の注） | 全体の検索、担当者の類似のチケットの候補 |
-| `kb` | 公開中の版（`published`）だけ | 題名、本文（Markdown を文字列にしたもの）、キーワード、`kb_base_id`、`audience_id`、カテゴリ、評価の合計 | ナレッジの検索、ポータルの候補（[knowledge.md](knowledge.md)） |
-| `catalog` | 公開中の品目の版 | 名前、説明、キーワード、カテゴリ、`audience_id` | ポータルのカタログの検索 |
+| `kb` | 公開中のバージョン（`published`）だけ | 題名、本文（Markdown を文字列にしたもの）、キーワード、`kb_base_id`、`audience_id`、カテゴリ、評価の合計 | ナレッジの検索、ポータルの候補（[knowledge.md](knowledge.md)） |
+| `catalog` | 公開中の品目のバージョン | 名前、説明、キーワード、カテゴリ、`audience_id` | ポータルのカタログの検索 |
 | `ci` | `ci`（`retired` を含む。既定では出さない） | 名前、クラス、識別の値のうち表示してよいもの（シリアル番号、ホスト名、IP）、場所、所有のグループ | 全体の検索、参照の候補 |
 
 - **作業メモとコメントは、`journal` の読み取りの規則（組み込み：作業メモは `agent` 以上）が違うので、文書の中で種類ごとに別のフィールドの枠に入れる**（4.3 節）。依頼者の検索で作業メモの語に一致させない。
@@ -56,7 +56,7 @@
 | 分割の単位 | A・B・C を選べる。索引は C（複合語を保つ）＋ A（短い単位）の併用ができる | `search` の方式で複合語を分け、元の語も持つ |
 | 辞書 | 公式の辞書（小・中・大）。利用者の辞書 | IPADIC。利用者の辞書 |
 | 辞書の更新 | 次の blue/green まで効かない。新しい索引への入れ直しで効かせる | 利用者の辞書は索引の設定なので、変えるには新しい索引への入れ直しが要る（未検証。E9 `search-analyzer-evaluation` で確かめる） |
-| エンジンの版との結び付き | プラグインのパッケージが OpenSearch の版ごと。エンジンの版を上げるときに、同じ版のパッケージが要る | 同梱 |
+| エンジンのバージョンとの結び付き | プラグインのパッケージが OpenSearch のバージョンごと。エンジンのバージョンを上げるときに、同じバージョンのパッケージが要る | 同梱 |
 
 - **Sudachi を既定にする**（決定）。ITSM の文章は「サーバー／サーバ」「ログイン／ログオン」「問合せ／問い合わせ」のような表記の揺れが多く、正規化の形の効果が大きいと見込む。
 - ただし、効果は E9 の評価で確かめる。評価のデータ（架空の社内のナレッジ 2,000 本と、実際の問い合わせを模した検索の語 300 と、正解の記事の組）で、Sudachi と kuromoji の nDCG@10 と再現率@20 を比べる。**Sudachi が kuromoji より低ければ、この決定を新しい ADR で置き換える**（[ADR-0043](../decisions/0043-japanese-analyzer-and-index-layout.md) の Confirmation）。
@@ -80,7 +80,7 @@
 
 ### 4.3 辞書の更新
 
-- Sudachi の辞書の更新（公式の辞書の新しい版、組み込みの利用者の辞書の追加）は、新しいパッケージを作り、新しい索引（`task_v{n+1}`）に DB から入れ直し、別名（`task`）を切り替えてから古い索引を消す（5.4 節の作り直しと同じ手順）。
+- Sudachi の辞書の更新（公式の辞書の新しいバージョン、組み込みの利用者の辞書の追加）は、新しいパッケージを作り、新しい索引（`task_v{n+1}`）に DB から入れ直し、別名（`task`）を切り替えてから古い索引を消す（5.4 節の作り直しと同じ手順）。
 - テナントの利用者の辞書は MVP で持たない。テナントの語は同義語の一覧と `bigram` で拾う（持ち越し）。
 
 ## 5. 索引の配置（[ADR-0043](../decisions/0043-japanese-analyzer-and-index-layout.md)）
@@ -137,7 +137,7 @@ fields: nested [
       表せる部分 F_os と、表せない部分 R（なければ真）に分ける
  3. 読めるフィールドの集合 V を決める（ロールだけで決まる field の read。6.3 節）
  4. OpenSearch：tenant_id = T AND kind AND F_os AND nested(fields.fid ∈ V かつ語に一致)
-      上位 N 件（N = 1 ページの件数 × 3、最大 150）の ID と版と、V の中の強調を取る
+      上位 N 件（N = 1 ページの件数 × 3、最大 150）の ID とバージョンと、V の中の強調を取る
  5. DB で確かめ直す（6.4 節）：
       SELECT id FROM <table> WHERE tenant_id = T AND id = ANY($ids) AND <行の read の述語（全体）>
       一致したフィールドについて、行ごとの field の read（レコードの条件を含む）を確かめる
@@ -167,14 +167,14 @@ fields: nested [
 
 - **一致させるフィールドを、見る人が読めるフィールドに限る。** 3 の V は、フィールドの `read` の判定のうち、ロールだけで決まる（真の定数になる）フィールドの ID の集合である。V の外のフィールドの語には一致させない（入れ子の問い合わせの `fid ∈ V`）。
 - レコードの条件で読めるかが変わるフィールド（例：「依頼者の会社が同じなら読める」）は、V に入れて一致させ、5 で行ごとに確かめる。読めない行では、そのフィールドの一致だけで結果に入った行を落とす（そのフィールド以外にも一致していれば残し、強調から外す）。
-- こうするのは、「読めないフィールドにだけ一致した行が結果に出る」ことで、読めない値に語が含まれることを推測させないためである（PROP-ACL-004 の検索の版）。
+- こうするのは、「読めないフィールドにだけ一致した行が結果に出る」ことで、読めない値に語が含まれることを推測させないためである（PROP-ACL-004 の検索のバージョン）。
 - 強調（ハイライト）は、入れ子の一致のうち、最終的に読めるフィールドの断片だけを返す。断片の長さは 150 文字まで。
 
 ### 6.4 DB での確かめ直し
 
 - 確かめ直しは、リストの出口と同じ述語のコンパイラで作った SQL を、Aurora の reader で行う。1 回の検索で 1〜3 回の問い合わせ（ID の集合で引くので、索引の上で速い）。
-- **索引の遅れと削除にも効く。** 索引に残っている削除済みのレコード、権限を外された後のレコード、索引の版の古いレコードは、DB の今の値で判定されるので、結果に出ない。
-- 強調の断片は、索引の時点の本文から作る。レコードの本文が索引の後に変わったとき、古い断片が出うる。断片を出すのは、索引の版（6.5 節の外部の版）が DB の `version` と等しい行だけにし、違えば断片を出さずに題名だけを出す。
+- **索引の遅れと削除にも効く。** 索引に残っている削除済みのレコード、権限を外された後のレコード、索引のバージョンの古いレコードは、DB の今の値で判定されるので、結果に出ない。
+- 強調の断片は、索引の時点の本文から作る。レコードの本文が索引の後に変わったとき、古い断片が出うる。断片を出すのは、索引のバージョン（6.5 節の外部のバージョン）が DB の `version` と等しい行だけにし、違えば断片を出さずに題名だけを出す。
 
 ### 6.5 ポータルとナレッジ
 
@@ -193,12 +193,12 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
        1. 変わったフィールドが索引の対象でなければ捨てる
        2. DB の reader から今の行を読む（version も）。reader の遅れで version が古ければ、少し待って読み直す（最大 3 回。なお古ければ writer から読む）
        3. OpenSearch に index（version_type = external、version = 行の version）
-          削除なら delete（同じく外部の版）
+          削除なら delete（同じく外部のバージョン）
 ```
 
-- **外部の版で、順序の逆転を防ぐ。** SQS の標準のキューは順序を保たず、同じレコードの 2 つの事象が逆に届きうる。OpenSearch は、今の文書の版より小さい版の書き込みを拒む（`version_conflict`）ので、古い版で新しい版を上書きしない。拒まれたら成功として捨てる。
+- **外部のバージョンで、順序の逆転を防ぐ。** SQS の標準のキューは順序を保たず、同じレコードの 2 つの事象が逆に届きうる。OpenSearch は、今の文書のバージョンより小さいバージョンの書き込みを拒む（`version_conflict`）ので、古いバージョンで新しいバージョンを上書きしない。拒まれたら成功として捨てる。
 - 事象の本文を索引に入れず、DB の今の行を読んで入れる。事象の重複・欠け・逆転があっても、最後の事象の処理で今の行になる。
-- ナレッジは、版の状態が `published` になった・外れたことを事象にし、記事ごとに今の公開中の版を入れる（なければ消す）。
+- ナレッジは、バージョンの状態が `published` になった・外れたことを事象にし、記事ごとに今の公開中のバージョンを入れる（なければ消す）。
 - 一括の処理（取り込み、`bulk_job`）の大量の事象は、Indexer が `_bulk`（最大 500 件・5 MB）でまとめる。テナントごとの取り分（1 回の `_bulk` の中の 1 テナントの割合を 50% まで）で、1 テナントの大量の更新が他のテナントの反映を待たせないようにする。
 
 ### 7.2 鮮度の目標
@@ -206,14 +206,14 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 | 指標 | 定義 | 目標（案。正本は runbooks） |
 | --- | --- | --- |
 | 索引の遅れ | コミットの時刻から OpenSearch の反映（`refresh` の後、検索できる）まで | p95 5 秒、p99 30 秒 |
-| 公開の遅れ（ナレッジ） | 版の公開のコミットから検索できるまで | p99 30 秒 |
+| 公開の遅れ（ナレッジ） | バージョンの公開のコミットから検索できるまで | p99 30 秒 |
 
 - `refresh_interval` は 1 秒（既定）にする。書き込みが多い時間帯でも、検索できるまでの遅れを短くする。取り込みの一括の間は変えない（テナントの数が多く、1 テナントのための変更をしない）。
 - 遅れは、Indexer が事象の中のコミットの時刻と、反映の完了の時刻の差を計測する（[observability.md](observability.md) の 3.2 節）。
 
 ### 7.3 突き合わせと作り直し
 
-- **日次の突き合わせ**：テナントごとに、DB の `(id, version)` の抜き取り（1%、最大 1 万件）と、索引の同じ ID の外部の版を比べる。違いがあれば、その ID を入れ直し、件数を記録する。違いが 0.1% を超えたら SEV3。
+- **日次の突き合わせ**：テナントごとに、DB の `(id, version)` の抜き取り（1%、最大 1 万件）と、索引の同じ ID の外部のバージョンを比べる。違いがあれば、その ID を入れ直し、件数を記録する。違いが 0.1% を超えたら SEV3。
 - **作り直し**：新しい索引 `*_v{n+1}` を作り、DB から全件を入れ、その間の事象は両方の索引に書く（Indexer は別名ではなく、2 つの具体の索引に書く）。全件の入れ直しが済み、突き合わせで違いがなければ、別名を切り替え、古い索引を消す。
 - 作り直しの速さは、1 セルで 1 秒 5,000 文書を目安にする（`task` 3,500 万件で約 2 時間。未検証。E9 `index-reconcile-and-rebuild` と E12 `search-rebuild-drill` で計測）。
 
@@ -237,7 +237,7 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 - テナントの分離は 2 重にする：問い合わせの必須の `tenant_id` の絞り込み（型で強制）と、DB（RLS の下）での確かめ直し。どちらか 1 つの誤りでは、他のテナントの行は返らない。
 - ACL は、索引の近似の絞り込み（広めに取る）と、DB での確かめ直しの 2 段で効かせる。索引に ACL の規則を焼き込まない。
 - 総数・ファセット・一致したフィールドの存在からの推測を閉じる（6.1・6.3 節）。
-- 強調の断片は、今の版の本文だけから出す（6.4 節）。
+- 強調の断片は、今のバージョンの本文だけから出す（6.4 節）。
 - OpenSearch のドメインは VPC の中に置き、アクセスのポリシーで Indexer と App のタスクのロールだけに限る。保存の暗号化はセルの KMS の鍵（[security.md](security.md) の 5 節）。
 - 検索の語を記録しない（8 節）。
 
@@ -252,12 +252,12 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 - **PROP-SRCH-001（検索は ACL を広げない）**：任意の ACL の規則・主体・レコード・語で、検索の結果の行の集合は、同じ主体のリストの出口で読める行の集合に含まれる。
 - **PROP-SRCH-002（近似は読める行を落とさない）**：任意の行の述語で、索引の絞り込み F_os に合う行の集合は、行の述語に合う行の集合を含む。
 - **PROP-SRCH-003（読めないフィールドだけの一致は出ない）**：任意のデータで、語が読めないフィールドの値にだけ含まれる行は、結果にも強調にも出ない。語が読めないフィールドにだけある 2 つのデータの集合で、結果は同じ。
-- **PROP-SRCH-004（反映の順序）**：任意の保存の列と事象の重複・逆転・欠け（最後の事象は届く）で、最終の索引の文書の版は DB の行の版と等しい。
+- **PROP-SRCH-004（反映の順序）**：任意の保存の列と事象の重複・逆転・欠け（最後の事象は届く）で、最終の索引の文書のバージョンは DB の行のバージョンと等しい。
 - **PROP-SRCH-005（テナントの分離）**：任意の 2 テナントで、一方の主体の検索が他方の文書を返さない（索引の絞り込みを外したビルドでも、DB の確かめ直しで返らない）。
 
 ### 11.3 評価
 
-- 4.1 節の解析器の評価（nDCG@10、再現率@20）。評価のデータは開発リポジトリに固定の版で置く。解析器の設定を変える PR は、評価の値が下がらないことを CI で確かめる（[delivery.md](delivery.md) の 2 節）。
+- 4.1 節の解析器の評価（nDCG@10、再現率@20）。評価のデータは開発リポジトリに固定のバージョンで置く。解析器の設定を変える PR は、評価の値が下がらないことを CI で確かめる（[delivery.md](delivery.md) の 2 節）。
 - 漏れの試験の検索の出口（[access-control.md](access-control.md) の 12.3 節）：読めないフィールドに「漏れの印」の語を入れ、その語で検索して、結果・強調・「さらにあるか」の印・応答の時間の差に出ないこと。
 
 ## 12. Story の候補
@@ -286,7 +286,7 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 - **テナントのフィールドは入れ子の枠に入れる**（5.2 節）。
 - **OpenSearch の総数とファセットを出さない**（6.1 節、ADR-0044）。
 - **一致させるフィールドを読めるフィールドに限る**（6.3 節）。
-- **索引には DB の今の行を外部の版で入れる**（7.1 節）。
+- **索引には DB の今の行を外部のバージョンで入れる**（7.1 節）。
 - **大阪には索引を複製せず、切り替えの後に `kb`・`catalog` から DB で作り直す**（9 節）。
 
 ### 持ち越し
@@ -323,8 +323,8 @@ Record Service の保存 → outbox：record.changed（record_id, version, 変�
 
 | 置き場所 | 中身 |
 | --- | --- |
-| OpenSearch `task_v{n}`、`ci_v{n}`、`kb_v{n}`、`catalog_v{n}`、`record_v{n}`（別名付き） | 3・5 節。`_routing = tenant_id`、外部の版 = 行の `version`。写しで、DB から作り直せる |
+| OpenSearch `task_v{n}`、`ci_v{n}`、`kb_v{n}`、`catalog_v{n}`、`record_v{n}`（別名付き） | 3・5 節。`_routing = tenant_id`、外部のバージョン = 行の `version`。写しで、DB から作り直せる |
 | Aurora `search_synonym`（テナントの同義語の一覧） | 4.2 節。メタデータ |
 | Aurora `dict_table.searchable`、`dict_field.searchable` | 3・5.2 節。辞書の列（統合で data-dictionary-and-tables の 3.2 節に足した） |
 | Aurora `search_reconcile_run` | 7.3 節。突き合わせの結果 |
-| S3 Sudachi のパッケージ、評価のデータの版 | 4 節 |
+| S3 Sudachi のパッケージ、評価のデータのバージョン | 4 節 |

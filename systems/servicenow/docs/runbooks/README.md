@@ -46,7 +46,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 - **デプロイはセルを単位に段で行う**（[ADR-0063](../decisions/0063-flags-and-staged-release-per-cell.md)）：control・mail-ingress → cell-s01（カナリアのセル）→ 60 分の観察 → ほかの共有のセル（S2 からは 25% ずつ）→ 専用のセル。各段で Ops が承認する。セルの中は、メタデータのコンパイルの検査 → マイグレーション（expand）→ relay・indexer・notifier・notifier-egress・ingest → engine → app（blue/green のカナリア 10% → 100%）の順。
 - **振る舞いはフラグで広げる**：社内・監視用のテナント → サブプロダクションのテナントの 100%（最低 7 日）→ cell-s01 の 10%・100% → 全共有のセルの 50%・100%（各段 24 時間以上）→ 専用のセル → 100% で 2 週間の後に古いコードとフラグを消す。
-- **顧客が時期を選べる変更**：業務の画面・流れ・通知の文面が変わる変更は「選べる変更」の印を付け、本番の段に入ってから **最大 60 日**、テナントの管理者が有効にする日を選べる。60 日を過ぎると全テナントで有効にする。選べるのは時期だけで、コードの版は選べない。セキュリティと正しさの修正は選べる変更にしない（ADR-0063、[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
+- **顧客が時期を選べる変更**：業務の画面・流れ・通知の文面が変わる変更は「選べる変更」の印を付け、本番の段に入ってから **最大 60 日**、テナントの管理者が有効にする日を選べる。60 日を過ぎると全テナントで有効にする。選べるのは時期だけで、コードのバージョンは選べない。セキュリティと正しさの修正は選べる変更にしない（ADR-0063、[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
 - **ガード**：保存の 422・403 の率（無効な側の 2 倍、15 分）、期限を過ぎた未発火の違反（1 件）、本番の漏れの合成監視の検出（即時）、5xx（0.1%）、フォームの p99（1.5 倍、15 分）で、AppConfig のアラームがフラグを自動で切る。
 - **メタデータのコンパイルの検査**が 1 件でも失敗したら、そのセルのデプロイを止める（[ADR-0064](../decisions/0064-migrations-and-metadata-compatibility-check.md)）。テナントのメタデータを手で書き換えて通さない。
 - ロールバックはまずフラグで行う。次に 1 つ前のイメージ（セルごと）。マイグレーションは戻さない。誤った遷移は、修正のジョブ（Record Service を通す）で直し、DB を直接書き換えない。
@@ -115,7 +115,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 計算し直しのジョブの停止、カレンダーの誤りで計時が始まらない | チケット | `sla-recalculation.md`、`calendar-misconfiguration.md` | E5 で作成 | E5 `sla-recalculation-job`、`calendar-model-and-versions` |
 | 衝突の計算し直しの遅れ、凍結期間の登録 | チケット・定期 | `conflict-recompute-lag.md`、`freeze-window-setup.md` | E7 で作成 | E7 `change-conflict-detection`、`change-windows-and-freeze` |
 | 承認の有無の問い合わせ（監査） | 報告から | `approval-dispute.md` | E4 で作成 | E4 `approvals-core` |
-| 実行のフローの失敗、誤った品目の版、要求の状態の食い違い | チケット | `fulfillment-flow-failed.md`、`catalog-item-rollback.md`、`request-rollup-mismatch.md` | E8 で作成 | E8 `catalog-fulfillment-flows`、`catalog-item-versions`、`request-item-stages-and-rollup` |
+| 実行のフローの失敗、誤った品目のバージョン、要求の状態の食い違い | チケット | `fulfillment-flow-failed.md`、`catalog-item-rollback.md`、`request-rollup-mismatch.md` | E8 で作成 | E8 `catalog-fulfillment-flows`、`catalog-item-versions`、`request-item-stages-and-rollup` |
 | Web Push の配信の失敗 | チケット | `web-push-delivery-failure.md` | E8 で作成 | E8 `web-push-and-pwa` |
 | 画面のモデルのコンパイルの失敗、静的な資産の配信の障害 | SEV3・SEV2 | `ui-model-compile-failure.md`、`static-assets-outage.md` | E2 で作成 | E2 `ui-model-api` |
 | メタデータのコンパイルの検査の失敗 | デプロイの停止 | [deploy-and-rollback.md](deploy-and-rollback.md) の「検査で止まったとき」→ `metadata-compile-check-failure.md` | E2 で作成 | E2 `metadata-compile-check-task` |

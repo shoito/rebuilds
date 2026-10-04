@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0014](../decisions/0014-itip-state-transfer-and-sequence.md) | 内部の iTIP のメッセージは、受け手に見せてよい形の予定オブジェクトの全体を運ぶ（状態の転送）。新旧は `(SEQUENCE, 主催者の版)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に、場所と参加者の削除を足して上げる。日時が変わったら参加者の出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる |
+| [0014](../decisions/0014-itip-state-transfer-and-sequence.md) | 内部の iTIP のメッセージは、受け手に見せてよい形の予定オブジェクトの全体を運ぶ（状態の転送）。新旧は `(SEQUENCE, 主催者のバージョン)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に、場所と参加者の削除を足して上げる。日時が変わったら参加者の出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる |
 | [0015](../decisions/0015-imip-addressing-and-trust.md) | 外部への招待の ORGANIZER は、予定ごとの受け口のアドレス（`o-<token>@imip.<brand>.<domain>`）にし、返事を本システムで受ける。人の返事のメールは Reply-To で主催者へ直接向ける。受信の返事は From と ATTENDEE の一致と、DKIM か SPF の From の揃いで確かめ、満たさないものは「未確認」として当てない。外部からの招待は、利用者・組織が転送する受け口で受け、知らない送信元は保留にする |
 | [0016](../decisions/0016-group-invitation-expansion.md) | グループの招待は、主催者の写しにグループの項目と、展開したメンバーの一覧を持つ。メンバーの変化は、今より後に回がある予定にだけ 15 分ごとのジョブで当てる。入れ子は 10 段まで、展開は 1 予定 10,000 人まで。200 人を超える予定の配送は、バッチにして p99 60 秒にする |
 
@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | 参加者の権限の既定 | `guestsCanInviteOthers` は既定 `true`、`guestsCanModify` は既定 `false`、`guestsCanSeeOtherGuests` は既定 `true` | [Events resource](https://developers.google.com/workspace/calendar/api/v3/reference/events) |
 | 参加者の項目 | `optional`、`resource`、`comment`、`additionalGuests`、`responseStatus`（`needsAction`・`declined`・`tentative`・`accepted`）。`attendeesOmitted` は参加者の一覧を省いたことを示す | 同上 |
-| `sequence` | iCalendar の版の番号 | 同上 |
+| `sequence` | iCalendar のバージョンの番号 | 同上 |
 | 招待の自動の追加 | 「すべての人から」「送信元が知っている人のときだけ」（連絡先、同じ組織、前にやりとりした人）「メールで返事をしたときだけ」から選ぶ | [Choose who can add invitations to your calendar](https://support.google.com/calendar/answer/13159188) |
 | グループの招待 | 参加者は最大 100,000 人。グループの変化は未来の予定に反映され、200 人を超える予定は 24 時間以内 | [Invite groups to calendar events](https://support.google.com/calendar/answer/172013) |
 | 使用の上限 | 外部の参加者へのメールは約 2,000 件（24 時間で回復）、組織の外への招待は短い期間に 10,000 件 | [Avoid Calendar use limits](https://knowledge.workspace.google.com/admin/calendar/avoid-calendar-use-limits) |
@@ -60,7 +60,7 @@ RFC の要点：
 | RFC と節 | 内容 | 本システム |
 | --- | --- | --- |
 | RFC 5546 の 2.1.4 | 主催者が DTSTART・DTEND・DURATION・DUE・RRULE・RDATE・EXDATE・STATUS を変えたら `SEQUENCE` を上げる（MUST） | これに LOCATION と参加者の削除を足す（5.3 節） |
-| RFC 5546 の 2.1.5 | 同じ UID・`RECURRENCE-ID` では `SEQUENCE` の大きいものが勝ち、同じなら `DTSTAMP` で決める。参加者の返事も同じ `SEQUENCE` なら `DTSTAMP` の新しいものが勝つ | 外部とのやりとりはこのとおり。内部は版で同点を破る（5.2 節） |
+| RFC 5546 の 2.1.5 | 同じ UID・`RECURRENCE-ID` では `SEQUENCE` の大きいものが勝ち、同じなら `DTSTAMP` で決める。参加者の返事も同じ `SEQUENCE` なら `DTSTAMP` の新しいものが勝つ | 外部とのやりとりはこのとおり。内部はバージョンで同点を破る（5.2 節） |
 | RFC 5546 の 3.2.2.1・3.2.2.2 | `SEQUENCE` が大きい `REQUEST` は日程の変更、同じなら更新 | 6 節 |
 | RFC 5546 の 3.2.2.3 | 委任：委任する参加者は `PARTSTAT=DELEGATED` と `DELEGATED-TO` の `REPLY` を主催者に送る | 受信だけ（10.4 節） |
 | RFC 5546 の 3.2.2.4・3.2.2.5 | 主催者の変更、`SENT-BY` での代理の送信 | 9 節、[sharing-and-acl.md](sharing-and-acl.md) |
@@ -85,7 +85,7 @@ RFC の要点：
 | `cutype`・`role` | RFC 5545 の `CUTYPE`（3.2.3 節）・`ROLE`（3.2.16 節）。任意の参加は `OPT-PARTICIPANT` |
 | `partstat` | `needs_action`・`accepted`・`tentative`・`declined`・`delegated` |
 | `comment`・`additional_guests` | 返事のコメント（1,024 文字）、同行者の数（0〜10） |
-| `reply_sequence`・`reply_dtstamp` | 最後に当てた返事の版（5.4 節） |
+| `reply_sequence`・`reply_dtstamp` | 最後に当てた返事のバージョン（5.4 節） |
 | `reset_sequence` | 出欠を最後に `needs_action` に戻した時の `SEQUENCE` |
 | `delegated_to`・`delegated_from`・`sent_by` | 委任と代理 |
 | `via_group_id` | グループの展開で入った人（10 節） |
@@ -100,7 +100,7 @@ RFC の要点：
 | 列 | 意味 |
 | --- | --- |
 | `organizer_ref` | 内部の主催者：`(tenant_id, calendar_id, event_object_id)`。外部：`mailto:` |
-| `organizer_sequence`・`organizer_version` | 当てた主催者の写しの版（内部） |
+| `organizer_sequence`・`organizer_version` | 当てた主催者の写しのバージョン（内部） |
 | `itip_state` | 外部の主催者：`recurrence_id`（系列は `*`）ごとの `(SEQUENCE, DTSTAMP)` |
 | `copy_state` | `active`・`hidden`・`cancelled`（7 節） |
 | `guest_permissions` | 主催者から届いた権限（`can_modify`・`can_invite_others`・`can_see_other_guests`） |
@@ -137,7 +137,7 @@ RFC の要点：
 | 外部の主催者の `REQUEST`・`CANCEL` | `recurrence_id` ごとの `(SEQUENCE, DTSTAMP)` | RFC 5546 の 2.1.5 節。加えて、回のメッセージは、系列の鍵の `SEQUENCE` より小さければ捨てる |
 | 返事（内部・外部） | 参加者と `recurrence_id` ごとの `(reply_sequence, reply_dtstamp)` | 新しいものが勝つ。`reply_sequence < reset_sequence` なら捨てる（6.3 節） |
 
-- 内部では、`DTSTAMP` の代わりに主催者の版で同点を破る。版は主催者の写しの変更ごとに 1 ずつ増え、時計のずれに左右されない。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の `(SEQUENCE, DTSTAMP)` の判定と同じ順になる。
+- 内部では、`DTSTAMP` の代わりに主催者のバージョンで同点を破る。バージョンは主催者の写しの変更ごとに 1 ずつ増え、時計のずれに左右されない。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の `(SEQUENCE, DTSTAMP)` の判定と同じ順になる。
 - 外部へ送る iMIP の `DTSTAMP` は、主催者の写しのコミットの時刻にする。
 
 ### 5.3 `SEQUENCE` を上げる変更
@@ -156,7 +156,7 @@ RFC の要点：
 | tzdb の計算し直し | 上げない | — | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) |
 
 - RFC 5546 の 2.1.4 節は STATUS と DURATION も挙げる。RFC の MUST に従って足す（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧にも、統合の工程の 2026-10-04 の注記で足した）。
-- 1 回分の変更でも、予定オブジェクトの `SEQUENCE` は 1 つで上げる（UID に 1 つの版）。外部へは、変えた回の上書きと、上がった `SEQUENCE` を送る。
+- 1 回分の変更でも、予定オブジェクトの `SEQUENCE` は 1 つで上げる（UID に 1 つのバージョン）。外部へは、変えた回の上書きと、上がった `SEQUENCE` を送る。
 
 ### 5.4 当て方の決定表
 
@@ -171,12 +171,12 @@ DT-ITIP-001。`itip-delivery` が受け手のテナントのコンテキスト�
 | 5 | `CANCEL`（系列） | `active`・`hidden` | 新しい | `cancelled` にする。回は出さない |
 | 6 | `CANCEL`（回） | `active`・`hidden` | 新しい | その回を EXDATE に足す |
 | 7 | `CANCEL` | 写しがない | — | 捨てる |
-| 8 | `REPLY` | 主催者の写し | 新しい | その参加者・回の `partstat`・`comment` だけを変える。主催者の写しの版を上げ、`SEQUENCE` は上げない |
+| 8 | `REPLY` | 主催者の写し | 新しい | その参加者・回の `partstat`・`comment` だけを変える。主催者の写しのバージョンを上げ、`SEQUENCE` は上げない |
 | 9 | `REPLY` | 主催者の写し | `reply_sequence < reset_sequence` | 捨てる。参加者に最新の `REQUEST` を送り直す |
 | 10 | `REPLY` | 主催者の写しに、その参加者がいない | — | 10.4 節（招待していない人の返事） |
 | 11 | `REFRESH` | 主催者の写し | — | その参加者に最新の `REQUEST` を送る（1 時間に 1 回まで） |
-| 12 | `X-MODIFY` | 主催者の写し | 基の版が今の版と同じ | `can()` を確かめ、主催者の写しを変えて全員に配る（8.2 節） |
-| 13 | `X-MODIFY` | 主催者の写し | 基の版が古い | 拒否し、依頼した参加者に知らせる |
+| 12 | `X-MODIFY` | 主催者の写し | 基のバージョンが今のバージョンと同じ | `can()` を確かめ、主催者の写しを変えて全員に配る（8.2 節） |
+| 13 | `X-MODIFY` | 主催者の写し | 基のバージョンが古い | 拒否し、依頼した参加者に知らせる |
 
 ### 5.5 配送の流れ
 
@@ -293,8 +293,8 @@ stateDiagram-v2
 
 1. 参加者が画面・API で変更を送る。`packages/writer` は参加者の写しの `guest_permissions` で先に確かめ、`X-MODIFY`（変更の中身と、基の `organizer_version`）を outbox に書く。参加者の写しは変えない。
 2. `itip-delivery` が主催者のテナントで、主催者の写しの今の権限で `can(actor=参加者, "modify_shared", 主催者の写し)` を確かめる。
-3. 基の版が今と同じなら、`packages/writer` で主催者の写しを変え（変更した人として参加者を記録）、全員に配る（決定表の行 12）。違えば拒否する（行 13）。参加者の追加だけの依頼は、基の版が違っても足す（追加はぶつからない）。
-4. 参加者の画面は、自分の写しに主催者の新しい版が届くまで「送信中」を示す。
+3. 基のバージョンが今と同じなら、`packages/writer` で主催者の写しを変え（変更した人として参加者を記録）、全員に配る（決定表の行 12）。違えば拒否する（行 13）。参加者の追加だけの依頼は、基のバージョンが違っても足す（追加はぶつからない）。
+4. 参加者の画面は、自分の写しに主催者の新しいバージョンが届くまで「送信中」を示す。
 
 - 同じテナントの中でも、同じ経路を通す（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の「同じテナントの中でも写しを分ける」と同じ考え）。
 - 外部の参加者は変更できない（`COUNTER` は知らせるだけ。[ADR-0007](../decisions/0007-interop-standards-scope.md)）。

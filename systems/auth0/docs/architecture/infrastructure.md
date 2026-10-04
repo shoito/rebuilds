@@ -122,7 +122,7 @@ AWS 上の構成、アカウント、ネットワーク、認証の経路と管�
 - Worker が、テナントの鍵の状態の変化のたびに、`/.well-known/openid-configuration` と `/.well-known/jwks.json` を S3 に書き出す（東京のバケット → 大阪へレプリケーション）。
 - CloudFront のオリジングループで、東京の S3 を主、大阪の S3 を予備にする。`GET` なので、オリジンのエラー（500・502・503・504）で予備に切り替わる。
 - カスタムドメインの discovery は、`issuer` がカスタムドメインになる。S3 のキーはホスト名ごとに分ける（テナントの ID ではなくホスト名で引く。CloudFront Functions でパスを書き換える）。
-- キャッシュの期間は RP 300 秒・CloudFront 60 秒、オリジンの障害中に古い版を返す期間（`stale-if-error`）は 24 時間（[keys-and-secrets.md](keys-and-secrets.md) の 7.2 節）。
+- キャッシュの期間は RP 300 秒・CloudFront 60 秒、オリジンの障害中に古いバージョンを返す期間（`stale-if-error`）は 24 時間（[keys-and-secrets.md](keys-and-secrets.md) の 7.2 節）。
 
 ### 4.3 WAF
 

@@ -40,11 +40,11 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 │     暗号化の文脈 {purpose: external-idp-key, tenant_id, connection_id}
 │     使える主体：Signer のタスクのロールだけ（GenerateDataKey、Decrypt）
 │
-├─ <brand>-credentials ──GenerateDataKey──▶ テナントごとの DEK（版つき）──AES-256-GCM──▶ 戻す必要のある秘密
+├─ <brand>-credentials ──GenerateDataKey──▶ テナントごとの DEK（バージョンつき）──AES-256-GCM──▶ 戻す必要のある秘密
 │     暗号化の文脈 {purpose: tenant-dek, tenant_id, version}          （TOTP の種、ソーシャル IdP の秘密、ログストリームの資格情報、
 │     使える主体：Auth・Management API・Worker のタスクのロール             メールの送信の資格情報）
 │
-├─ <brand>-pepper ──GenerateDataKey──▶ pepper（版つき。暗号文を Secrets Manager に）──HMAC-SHA-256──▶ パスワードのハッシュ
+├─ <brand>-pepper ──GenerateDataKey──▶ pepper（バージョンつき。暗号文を Secrets Manager に）──HMAC-SHA-256──▶ パスワードのハッシュ
 │     暗号化の文脈 {purpose: pepper, version}
 │     使える主体：Auth・Management API のタスクのロール（Decrypt だけ）
 │
@@ -64,11 +64,11 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 | 用途 | DEK の単位 | 平文の DEK の置き場所 | 期間 |
 | --- | --- | --- | --- |
 | 署名鍵 | 鍵ごとに 1 つ | Signer のメモリー（秘密鍵を復号する間だけ）。秘密鍵を復号したら捨てる | 数ミリ秒 |
-| テナントの秘密 | テナント × 版 | 使うタスクのメモリーの LRU（上限 1 万件） | 最大 5 分 |
+| テナントの秘密 | テナント × バージョン | 使うタスクのメモリーの LRU（上限 1 万件） | 最大 5 分 |
 | pepper | pepper そのものが秘密 | Auth・Management API のタスクのメモリー | タスクの寿命 |
 
 - 平文の DEK と秘密鍵を、ディスク・ログ・トレース・コアダンプに出さない（[ADR-0059](../decisions/0059-signer-isolation.md) の `ulimit core 0`）。
-- テナントの DEK は、テナントの作成のときに Management API が作る。ローテーション（新しい版を作り、以後の暗号化に使う）は年 1 回の Worker のジョブで行い、古い版の暗号文は、読んだときに新しい版で書き直す。古い版は、参照する行が 0 になってから消す。
+- テナントの DEK は、テナントの作成のときに Management API が作る。ローテーション（新しいバージョンを作り、以後の暗号化に使う）は年 1 回の Worker のジョブで行い、古いバージョンの暗号文は、読んだときに新しいバージョンで書き直す。古いバージョンは、参照する行が 0 になってから消す。
 
 ### 3.2 テナントの削除
 
@@ -79,10 +79,10 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 [ADR-0045](../decisions/0045-kms-key-hierarchy.md)。パスワードのハッシュの方式は [ADR-0004](../decisions/0004-credential-storage.md)。
 
 - pepper は 256 ビットの乱数。KMS の `GenerateDataKey`（`<brand>-pepper`）で作り、暗号文だけを Secrets Manager の `<brand>/pepper/v{n}` に置く。平文はどこにも保存しない。Secrets Manager の秘密は大阪へ複製する。
-- Auth と Management API（パスワードの設定・インポート）のタスクは、起動時にすべての有効な版を復号してメモリーに置く。ログインのたびに KMS を呼ばない（[ADR-0005](../decisions/0005-authentication-path-availability.md)）。
-- パスワードのハッシュに版（`pv=n`）を記録する。新しいハッシュは `current` の版で作る。
-- **ローテーション**：新しい版を作って `current` にする。古い版は、その版のハッシュを持つユーザーが 0 になるまで残す。ログインの成功のときに新しい版で作り直す。版ごとのハッシュの数を日次で数える。
-- **漏えいの疑い**：pepper だけでは攻撃にならない（DB のハッシュも要る）。新しい版に替え、古い版のハッシュを持つユーザーは次のログインで作り直す。DB も漏れた疑いがあるときは、テナントに知らせ、古い版のユーザーのパスワードの再設定を求める（手順は runbook）。
+- Auth と Management API（パスワードの設定・インポート）のタスクは、起動時にすべての有効なバージョンを復号してメモリーに置く。ログインのたびに KMS を呼ばない（[ADR-0005](../decisions/0005-authentication-path-availability.md)）。
+- パスワードのハッシュにバージョン（`pv=n`）を記録する。新しいハッシュは `current` のバージョンで作る。
+- **ローテーション**：新しいバージョンを作って `current` にする。古いバージョンは、そのバージョンのハッシュを持つユーザーが 0 になるまで残す。ログインの成功のときに新しいバージョンで作り直す。バージョンごとのハッシュの数を日次で数える。
+- **漏えいの疑い**：pepper だけでは攻撃にならない（DB のハッシュも要る）。新しいバージョンに替え、古いバージョンのハッシュを持つユーザーは次のログインで作り直す。DB も漏れた疑いがあるときは、テナントに知らせ、古いバージョンのユーザーのパスワードの再設定を求める（手順は runbook）。
 - **失う事故への備え**：pepper の KMS の鍵はマルチリージョン、暗号文は Secrets Manager の複製と、log-archive のアカウントの S3（Object Lock）に置く。四半期ごとに、staging で「Secrets Manager の秘密を消した状態から、アーカイブの暗号文で復旧する」訓練をする。
 - S3 の段階の前に、pepper を専用の隔離（HSM など）へ移すかを決める（[architecture/README.md](README.md) の 6 節の持ち越し）。
 
@@ -195,11 +195,11 @@ Signer の中の検査（どれかに当たれば 400。ログに残し、アラ
 | API | 中身 |
 | --- | --- |
 | `POST /v1/keys:generate` | `{tenant_id, alg}` → Signer の中で鍵の対を作り、`GenerateDataKey` の DEK で秘密鍵を暗号化し、`{kid, public_jwk, private_key_ciphertext, dek_ciphertext}` を返す。平文の秘密鍵は返さない |
-| `POST /v1/keys:invalidate` | `{tenant_id, state_version}` → そのテナントの鍵のキャッシュを捨て、DB から読み直す。応答は読み直した版 |
+| `POST /v1/keys:invalidate` | `{tenant_id, state_version}` → そのテナントの鍵のキャッシュを捨て、DB から読み直す。応答は読み直したバージョン |
 | `POST /v1/external-keys:import` | `{tenant_id, connection_id, purpose, private_key}` → テナントが登録した外部 IdP の秘密鍵（Apple の `.p8`）を Signer の中で暗号化し、`{key_id, public_jwk, private_key_ciphertext, dek_ciphertext}` を返す（6.3 節） |
 | `POST /v1/external-keys:generate` | `{tenant_id, connection_id, purpose, alg}` → OIDC の `private_key_jwt`・SAML の SP の鍵の対を Signer の中で作る。公開鍵（JWK、SAML の自己署名の証明書）と暗号文を返す（6.3 節） |
 
-- 状態の遷移（5.2 節）は、Management API が 1 つのトランザクションで `signing_keys` を書き、`signing_key_state_versions` の版を上げ、outbox に `jwks.changed` と監査の事象を入れる。Signer の DB のロールは、`signing_keys`・`signing_key_state_versions`・`signing_key_issuers`・`external_idp_keys` の SELECT と、`signing_keys.last_used_at` の UPDATE だけ（[ADR-0059](../decisions/0059-signer-isolation.md)）。
+- 状態の遷移（5.2 節）は、Management API が 1 つのトランザクションで `signing_keys` を書き、`signing_key_state_versions` のバージョンを上げ、outbox に `jwks.changed` と監査の事象を入れる。Signer の DB のロールは、`signing_keys`・`signing_key_state_versions`・`signing_key_issuers`・`external_idp_keys` の SELECT と、`signing_keys.last_used_at` の UPDATE だけ（[ADR-0059](../decisions/0059-signer-isolation.md)）。
 - 遷移の後、Management API はすべての Signer のタスクに `keys:invalidate` を送る。届かなかったタスクも、2 秒ごとのポーリング（`signing_key_state_versions` の更新）で追いつく。**古い `current` で署名しうる時間の上限は 2 秒。** 緊急のローテーションでは、全タスクの応答を待ってから「署名の停止」を完了とする。
 - Signer の DB のロールの表は、2026-09-27 の統合で [ADR-0059](../decisions/0059-signer-isolation.md) と [ADR-0047](../decisions/0047-signer-api-and-jwks-publishing.md) に揃えた（`signing_keys` に、同じ用途の小さな表 `signing_key_state_versions`・`signing_key_issuers` と、6.3 節の `external_idp_keys` を足した）。
 
@@ -267,7 +267,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 - `x5c`（証明書の鎖）は載せない（13 節の決定）。
 - `Cache-Control: public, max-age=300, s-maxage=60, stale-while-revalidate=60, stale-if-error=86400`。
   - RP のキャッシュは 5 分。CloudFront は 1 分。
-  - オリジン（東京と大阪の S3 の両方）が失敗しても、CloudFront は 24 時間まで古い版を返す（[ADR-0005](../decisions/0005-authentication-path-availability.md) の「古い版を返し続ける」の期間）。
+  - オリジン（東京と大阪の S3 の両方）が失敗しても、CloudFront は 24 時間まで古いバージョンを返す（[ADR-0005](../decisions/0005-authentication-path-availability.md) の「古いバージョンを返し続ける」の期間）。
 - `ETag` を付け、条件付きの GET に 304 を返す。
 - discovery も同じ `Cache-Control` にする。
 
@@ -284,8 +284,8 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | KMS | キャッシュにある鍵で続く。ない鍵のテナントは 503（[ADR-0063](../decisions/0063-cpu-bound-work-sizing.md)） | 鍵を作れないので、ローテーション・緊急のローテーションはできない。`previous` の失効はできる | 続く | 起動済みのタスクは続く。新しいタスクは起動できない。Signer と Auth を縮小しない |
 | Signer の一部のタスク | 他のタスクで続く | 届かないタスクはポーリングで 2 秒以内に追いつく | 続く | — |
 | Signer のすべてのタスク | 503 | できない | 続く | — |
-| Worker・SQS | 続く | DB の遷移は済むが、JWKS の書き出しが遅れる。ローテーションは `next` が ready にならないので止まる。失効は `pending` のまま | 古い版のまま | — |
-| S3（東京） | 続く | 書き出しが失敗し再試行する | 大阪の S3 か、CloudFront の古い版 | — |
+| Worker・SQS | 続く | DB の遷移は済むが、JWKS の書き出しが遅れる。ローテーションは `next` が ready にならないので止まる。失効は `pending` のまま | 古いバージョンのまま | — |
+| S3（東京） | 続く | 書き出しが失敗し再試行する | 大阪の S3 か、CloudFront の古いバージョン | — |
 | Aurora の writer | 続く（読むだけ） | できない | 続く | — |
 | 大阪への切り替え（DR） | 同じ鍵で続く（マルチリージョンの KMS の鍵） | 切り替え前の失効は [ADR-0060](../decisions/0060-disaster-recovery-and-stages.md) でやり直す | 大阪の S3 から | 同じ pepper で続く |
 
@@ -293,7 +293,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 
 - **KMS の障害中に漏えいが起きる**：新しい鍵を作れない。テナントのトークンの発行を止め（キルスイッチ）、漏れた鍵を `revoked` にして JWKS から外す。KMS の回復後に新しい鍵を作る。
 - **JWKS の配信の食い違い**：S3 と CloudFront で古い JWKS が残ると、ローテーション直後の `current` で署名したトークンを RP が検証できない。`next` を 15 分前から載せておくことで、通常のローテーションでは起きない。緊急のローテーションでは、RP の多くは未知の `kid` で JWKS を取り直すので、数分で回復すると見込む（未検証）。
-- **pepper の版の取り違え**：古い版を先に消すと、そのユーザーはログインできない。版ごとのハッシュの数が 0 でない版は消せないように、消す操作の中で数える。
+- **pepper のバージョンの取り違え**：古いバージョンを先に消すと、そのユーザーはログインできない。バージョンごとのハッシュの数が 0 でないバージョンは消せないように、消す操作の中で数える。
 
 ## 9. セキュリティ
 
@@ -309,7 +309,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | 鍵の管理の API の悪用 | 署名のポートと分け、Management API からだけ（[ADR-0059](../decisions/0059-signer-isolation.md)）。操作は監査ログ（[ADR-0054](../decisions/0054-audit-log.md)） |
 | KMS の鍵の削除・キーポリシーの変更 | SCP で拒否。2 人の承認。CloudTrail の即時の通知 |
 | メモリーの露出 | コアダンプなし、ECS Exec なし、依存の最小化（[ADR-0059](../decisions/0059-signer-isolation.md)）。残る危険として受け入れる（[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)） |
-| 秘密のログへの出力 | 秘密鍵、DEK、pepper、復号した秘密をログ・トレースに出さない。`kid` と版だけを出す |
+| 秘密のログへの出力 | 秘密鍵、DEK、pepper、復号した秘密をログ・トレースに出さない。`kid` とバージョンだけを出す |
 
 この領域の変更は `security:sensitive` のラベルを付け、セキュリティの担当の承認を必須にする。
 
@@ -343,14 +343,14 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | --- | --- |
 | [0045](../decisions/0045-kms-key-hierarchy.md) | KMS の鍵を用途ごと（署名鍵、資格情報、pepper、保存）に 4 つに分け、暗号化の文脈とキーポリシーで使える主体を限る。pepper は KMS で作り、暗号文だけを置く |
 | [0046](../decisions/0046-signing-key-lifecycle.md) | 署名鍵は `next`・`current`・`previous`（2 つまで）・`revoked`。`next` は JWKS に載せて 15 分で ready。緊急のローテーションは `current` を直接失効させる。定期の自動のローテーションは既定で無効 |
-| [0047](../decisions/0047-signer-api-and-jwks-publishing.md) | Signer はテナントの 3 つの種類のトークンと、型を分けた外部 IdP のアサーション（3 つの用途）だけに署名し、鍵の生成は Signer の中で行って暗号文だけを返す。JWKS は outbox から Worker が S3 に書き出し、CloudFront で 5 分・1 分のキャッシュ、24 時間の古い版で配る |
+| [0047](../decisions/0047-signer-api-and-jwks-publishing.md) | Signer はテナントの 3 つの種類のトークンと、型を分けた外部 IdP のアサーション（3 つの用途）だけに署名し、鍵の生成は Signer の中で行って暗号文だけを返す。JWKS は outbox から Worker が S3 に書き出し、CloudFront で 5 分・1 分のキャッシュ、24 時間の古いバージョンで配る |
 
 ## 12. Story の候補
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E1 | `kms-key-hierarchy` | 4 つの KMS の鍵、キーポリシー、SCP、CloudTrail の通知、IAM の静的検査（Terraform） |
-| E1 | `pepper-bootstrap` | pepper の生成、Secrets Manager とアーカイブ、起動時の読み込み、版 |
+| E1 | `pepper-bootstrap` | pepper の生成、Secrets Manager とアーカイブ、起動時の読み込み、バージョン |
 | E1 | `tenant-data-keys` | テナントの DEK の作成・キャッシュ・ローテーション、AAD |
 | E1 | `signer-sign-api` | 署名の API と 6.1 節の検査、`sign-batch` |
 | E3 | `signer-key-management-api` | `keys:generate`、`keys:invalidate`、ポーリング |
@@ -370,7 +370,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 - **定期の自動のローテーション**：既定は無効。テナントが 30〜365 日で有効にできる（本家は自動のローテーションを持たない）。
 - **`previous` の数**：2 つまで。超えるローテーションは、古い方の失効を先に求める。
 - **`next` の ready**：JWKS の確かめから 15 分。
-- **JWKS のキャッシュ**：RP に 300 秒、CloudFront に 60 秒、オリジンの障害中は 24 時間の古い版（[ADR-0058](../decisions/0058-edge-and-custom-domains.md) が keys-and-secrets の領域に任せた値）。
+- **JWKS のキャッシュ**：RP に 300 秒、CloudFront に 60 秒、オリジンの障害中は 24 時間の古いバージョン（[ADR-0058](../decisions/0058-edge-and-custom-domains.md) が keys-and-secrets の領域に任せた値）。
 - **`kid`**：RFC 7638 の thumbprint。
 - **ローテーションの API のレート制限**：テナントごとにバースト 5・1 日 5 回（本家と同じ）、緊急は別に 1 時間 3 回。
 - **古い `current` で署名しうる時間**：2 秒。
@@ -399,14 +399,14 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 - JWKS の書き出しから CloudFront での確かめまでの時間（p95 で 2 分以内）と、確かめの失敗の数。
 - 失効の操作の `completed` までの時間。
 - 緊急のローテーションの訓練の所要時間（四半期）。
-- pepper の版ごとのハッシュの数と、古い版の残り。
+- pepper のバージョンごとのハッシュの数と、古いバージョンの残り。
 - KMS の `ThrottlingException` の数（0 を目標）。
 
 ### runbooks
 
 - `emergency-key-rotation.md`：テナントの鍵の漏えいの疑いでの緊急のローテーション。判断の基準、2 人の承認、テナントへの連絡、JWKS の確かめ、キルスイッチ（[ADR-0056](../decisions/0056-operator-access.md) が参照する）。
 - `signer-compromise.md`：Signer 全体の侵害の疑い。全テナントの緊急のローテーションの順序と見積もり。
-- `pepper-recovery.md`：pepper の暗号文を失ったときの、アーカイブからの復旧。pepper の漏えいの疑いのときの版の切り替え。
+- `pepper-recovery.md`：pepper の暗号文を失ったときの、アーカイブからの復旧。pepper の漏えいの疑いのときのバージョンの切り替え。
 - `jwks-publication-stale.md`：JWKS の確かめが失敗したときの切り分け（Worker、S3、CloudFront）と、手での書き出し。
 - `kms-outage.md`：KMS の障害中の振る舞いの確認と、Signer・Auth を縮小しないことの確認。
 
@@ -415,7 +415,7 @@ S3 のレプリケーション → 大阪の S3（オリジングループの予
 | テーブル | 中身 |
 | --- | --- |
 | `signing_keys` | `tenant_id`、`kid`、`alg`、`state`（`next`・`current`・`previous`・`revoked`）、`public_jwk`、`private_key_ciphertext`、`dek_ciphertext`、`kms_key_arn`、`created_at`、`published_at`、`ready_at`、`activated_at`、`rotated_out_at`、`revoked_at`、`revoke_reason`（`manual`・`emergency`・`scheduled`）、`last_used_at`。失効で `private_key_ciphertext` と `dek_ciphertext` を消す |
-| `signing_key_state_versions` | `tenant_id`、`version`、`updated_at`（Signer のポーリング用）。RLS の外（2026-09-28。版と時刻だけで、Signer が全テナントを 1 回で読むため。[data-model.md](data-model.md) の 3 節） |
+| `signing_key_state_versions` | `tenant_id`、`version`、`updated_at`（Signer のポーリング用）。RLS の外（2026-09-28。バージョンと時刻だけで、Signer が全テナントを 1 回で読むため。[data-model.md](data-model.md) の 3 節） |
 | `signing_key_issuers` | `tenant_id`、`issuer`（テナントのホストとカスタムドメイン。Signer の `iss` の検査用） |
 | `signing_key_operations` | `tenant_id`、`id`、`kind`、`requested_by`、`state`（`pending`・`published`・`completed`・`failed`）、`created_at`、`completed_at` |
 | `jwks_publications` | `tenant_id`、`host`、`state_version`、`sha256`、`s3_version_id`、`published_at`、`verified_at` |

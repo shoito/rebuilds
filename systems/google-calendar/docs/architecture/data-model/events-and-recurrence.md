@@ -1,6 +1,6 @@
 # Data model: 予定と繰り返し
 
-[data-model.md](../data-model.md) の一部。規約は、そちらの 2 節に従う（時刻の列は 2.4 節、iCalendar の往復は 2.5 節、版は 2.6 節）。振る舞いは [events-and-recurrence.md](../events-and-recurrence.md)、[invitations-and-itip.md](../invitations-and-itip.md) の 4・5 節、[sharing-and-acl.md](../sharing-and-acl.md) の 5 節を正とする。決定は [ADR-0002](../../decisions/0002-time-representation.md)、[ADR-0003](../../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0006](../../decisions/0006-organizer-and-attendee-copies.md)、[ADR-0008](../../decisions/0008-recurrence-expansion-semantics.md)〜[ADR-0011](../../decisions/0011-inbound-recurrence-normalization.md)、[ADR-0014](../../decisions/0014-itip-state-transfer-and-sequence.md)、[ADR-0019](../../decisions/0019-room-booking-rows-and-recurring-acceptance.md)。
+[data-model.md](../data-model.md) の一部。規約は、そちらの 2 節に従う（時刻の列は 2.4 節、iCalendar の往復は 2.5 節、バージョンは 2.6 節）。振る舞いは [events-and-recurrence.md](../events-and-recurrence.md)、[invitations-and-itip.md](../invitations-and-itip.md) の 4・5 節、[sharing-and-acl.md](../sharing-and-acl.md) の 5 節を正とする。決定は [ADR-0002](../../decisions/0002-time-representation.md)、[ADR-0003](../../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0006](../../decisions/0006-organizer-and-attendee-copies.md)、[ADR-0008](../../decisions/0008-recurrence-expansion-semantics.md)〜[ADR-0011](../../decisions/0011-inbound-recurrence-normalization.md)、[ADR-0014](../../decisions/0014-itip-state-transfer-and-sequence.md)、[ADR-0019](../../decisions/0019-room-booking-rows-and-recurring-acceptance.md)。
 
 すべてテナントの表（FORCE RLS）。書くのは `packages/writer` だけ。
 
@@ -195,7 +195,7 @@ erDiagram
 | `duration_exact_s` | `bigint` | NULL | — | `exact` の秒（0〜366 日） |
 | `duration_nominal` | `text` | NULL | — | `nominal` の ISO 8601 の長さ（`P1D`、`PT1H30M`） |
 | `start_utc`・`end_utc` | `timestamptz` | NOT NULL | — | 派生（最初の回）。`utc` だけ正本 |
-| `tzdata_version` | `text` | NULL | — | 派生の値を計算した版 |
+| `tzdata_version` | `text` | NULL | — | 派生の値を計算したバージョン |
 
 **繰り返し**
 
@@ -225,7 +225,7 @@ erDiagram
 | `reminders` | `jsonb` | NOT NULL | `'{"use_default":true}'` | 自分のリマインダー：`{use_default, overrides:[{method, minutes}]}`、5 件、0〜40,320 分 |
 | `x_props` | `jsonb` | NOT NULL | `'[]'` | 知らないプロパティの原文（32 KiB。[data-model.md](../data-model.md) の 2.5 節） |
 
-**版と iTIP**
+**バージョンと iTIP**
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -338,8 +338,8 @@ erDiagram
 | `attendee_partstat` | `text` | NULL | — | 参加者の写しでの自分の出欠（回ごとの出欠を当てた値）。主催者の写し・単独は NULL |
 | `is_override` | `boolean` | NOT NULL | `false` | |
 | `flags` | `smallint` | NOT NULL | `0` | ビット：1＝存在しない時刻をずらした、2＝`orphan` の上書き、4＝`expansion_truncated` の系列 |
-| `tzdata_version` | `text` | NOT NULL | — | 区間を計算した版（`utc` の予定は `'-'`） |
-| `object_version` | `bigint` | NOT NULL | — | この行が最後に変わった予定オブジェクトの版 |
+| `tzdata_version` | `text` | NOT NULL | — | 区間を計算したバージョン（`utc` の予定は `'-'`） |
+| `object_version` | `bigint` | NOT NULL | — | この行が最後に変わった予定オブジェクトのバージョン |
 
 - キー：PK `(tenant_id, calendar_id, start_utc, event_object_id, recurrence_id)`。外部キーなし（写し）。`(tenant_id, event_object_id, recurrence_id)` の一意は DB で強制しない（D-3、I-8）。
 - 索引：
@@ -349,7 +349,7 @@ erDiagram
 | PK | 範囲の表示・空き時間・候補の計算：`tenant_id = $1 AND calendar_id = ANY($2) AND start_utc < $to AND start_utc >= $from − 366 日 AND end_utc > $from`（1 人の範囲の行は少ないので、長さの上限で下を切る） |
 | `(tenant_id, event_object_id)` | 書き込みの差分（予定オブジェクトの範囲の中の回の今の行）、照合 |
 
-- 古い `tzdata_version` の行の数（[observability.md](../observability.md) の 4 節）は、版の索引を作らず、影響するゾーンの予定オブジェクトから分割ごとに数える。
+- 古い `tzdata_version` の行の数（[observability.md](../observability.md) の 4 節）は、バージョンの索引を作らず、影響するゾーンの予定オブジェクトから分割ごとに数える。
 - CHECK：`status IN ('confirmed','tentative')`、`end_utc >= start_utc`、`attendee_partstat IS NULL OR attendee_partstat IN ('needs_action','accepted','tentative','declined','delegated')`。
 - 分割：`RANGE (start_utc)`、1 か月（`pg_partman`）。`expander` が毎日、終わりが 31 日より前の月の分割を落とす。形の変更は影の表 `occurrences_v<N>` を作って入れ替える（[ADR-0049](../../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。
 - 行を持つ予定：`copy_state = 'active'` で `status <> 'cancelled'` で `trashed_at IS NULL` のもの（D-4）。写しを `hidden`・`cancelled` にしたら、同じトランザクションで行を消す。

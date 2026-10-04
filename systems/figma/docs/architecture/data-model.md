@@ -17,7 +17,7 @@
 | [data-model/identity.md](data-model/identity.md) | アカウントと認証（Better Auth）、利用者の設定 | 7 | 1 |
 | [data-model/organization.md](data-model/organization.md) | 組織、ドメイン、メンバーとシート、SSO、チーム、プロジェクト、ファイル、最近のファイル | 10 | 1 |
 | [data-model/sharing.md](data-model/sharing.md) | 役割、一般アクセス、招待、アクセスとシートの申請 | 5 | 1 |
-| [data-model/file-storage.md](data-model/file-storage.md) | 版、保存のジョブ、DynamoDB（ジャーナル・フェンス・割り当て・生存）、S3 の files バケット | 2（＋ DynamoDB 3） | 2 |
+| [data-model/file-storage.md](data-model/file-storage.md) | バージョン、保存のジョブ、DynamoDB（ジャーナル・フェンス・割り当て・生存）、S3 の files バケット | 2（＋ DynamoDB 3） | 2 |
 | [data-model/document.md](data-model/document.md) | ノードの種類、プロパティの表（番号つき）、ID、木の不変条件、チェックポイント・ジャーナルの直列化 | — | 1 |
 | [data-model/comments-and-notifications.md](data-model/comments-and-notifications.md) | コメント、メンション、既読、購読、通知、メールのまとめ | 9 | 2 |
 | [data-model/events-and-audit.md](data-model/events-and-audit.md) | outbox、無効化の outbox、監査ログ、リーガルホールド | 7 | 1 |
@@ -37,7 +37,7 @@
 | Aurora PostgreSQL 18（writer 1＋reader 1、Global Database で大阪に reader） | メタデータ（`app`・`global`・`realtime` の 3 つのスキーマ） | メタデータの正本 | PITR 35 日から戻す |
 | DynamoDB `journal` | チェックポイントより後の確定した変更と、フェンス | 変更の正本 | PITR 35 日。大阪のレプリカ |
 | DynamoDB `file_leases`・`ds_liveness` | ファイルの割り当て、タスクの生存 | 持ち主の正本 | `file_leases` は PITR。`ds_liveness` は各タスクが 2 秒で書き直す |
-| S3 files | チェックポイント（マニフェストとチャンク）、大きな変更、取り戻した版 | ファイルの中身の正本 | 古い版 30 日、大阪への複製 |
+| S3 files | チェックポイント（マニフェストとチャンク）、大きな変更、取り戻したバージョン | ファイルの中身の正本 | 古いバージョン 30 日、大阪への複製 |
 | S3 assets | 画像、フォント、書き出し、サムネイル、コメントの添付、ライブラリの blob、プラグインのコード | バイト列の正本 | 同上 |
 | S3 log-archive | 監査のアーカイブ | アーカイブの正本 | Object Lock |
 | Document Server のメモリ | 開いたファイルの今の状態、セッションの表、直近の確定した変更 | 正本ではない | ジャーナルとチェックポイントから戻す |
@@ -124,7 +124,7 @@ DB のロール：
 | `accept_invitation(token_hash, account_id)` | 招待の受け入れ（組織の行と役割を作る） | [sharing.md](data-model/sharing.md) の `invitations` |
 | `count_unread_notifications(account_id)` | 組織ごとの未読の数 | [comments-and-notifications.md](data-model/comments-and-notifications.md) の `notifications` |
 | `get_user_preferences(account_id)`・`set_user_preferences(account_id, …)` | 利用者の設定 | [identity.md](data-model/identity.md) |
-| `scheduler_due_items(kind, until, limit)` | 期限の来た行の `org_id` と主キーだけを返す。一般アクセスの期限、メールのまとめ、保存のジョブ、Webhook の再試行、版の期限、`pending` の画像、フォントの削除、チームの削除の期限、解約の期限、冪等性の鍵の期限。Worker は受け取った `org_id` で文脈を設定し、行を RLS の下で読み直す | 各表の索引の節 |
+| `scheduler_due_items(kind, until, limit)` | 期限の来た行の `org_id` と主キーだけを返す。一般アクセスの期限、メールのまとめ、保存のジョブ、Webhook の再試行、バージョンの期限、`pending` の画像、フォントの削除、チームの削除の期限、解約の期限、冪等性の鍵の期限。Worker は受け取った `org_id` で文脈を設定し、行を RLS の下で読み直す | 各表の索引の節 |
 
 ### 2.4 命名
 
@@ -451,7 +451,7 @@ DynamoDB：
 | I-4 | `files.team_id` は `projects.team_id` と等しい（下書きは NULL） | 移動と同じトランザクション、毎日の見張り | 同 9.3 節 |
 | I-5 | ファイルの所有者は 1 人で、`files.owner_account_id` だけで表す | `resource_roles` の CHECK | D-12 |
 | I-6 | 権限に効く変更は、同じトランザクションで `orgs.acl_version` を 1 上げ、監査ログと `acl.changed` を書く | サービス関数、表駆動の結合テスト | ADR-0031 |
-| I-7 | `files.checkpoint_seq` は後退しない。版の行はチェックポイントの更新と同じトランザクションで足す | `WHERE checkpoint_seq < :s` | [file-storage-and-history.md](file-storage-and-history.md) の 5.2 節 |
+| I-7 | `files.checkpoint_seq` は後退しない。バージョンの行はチェックポイントの更新と同じトランザクションで足す | `WHERE checkpoint_seq < :s` | [file-storage-and-history.md](file-storage-and-history.md) の 5.2 節 |
 | I-8 | 画像の重複の除去と署名は、ファイルを持つ組織の `images` の `ready` の行だけで行う | 主キー `(org_id, sha256)`、PROP-EA-002 | ADR-0035 |
 | I-9 | 監査ログは追記だけで、操作と同じトランザクションに 1 件ある | `app` に UPDATE・DELETE を与えない、トリガーで拒否 | ADR-0045 |
 | I-10 | Valkey のキー・チャンネル、S3 のキー、ジョブは、組織かファイルで区切る | [stores.md](data-model/stores.md) の 1 節の形、レビュー | ADR-0005 |
@@ -489,7 +489,7 @@ DynamoDB：
 | G-1 | 世代 `g ≥ 2` のジャーナルは `{file_id}#g{g}`、マニフェストは `checkpoints/g{g}/`、大きな変更は `journal-blobs/g{g}/` に書く。チャンクは世代で分けない | キーを作る関数を 1 つにする | ADR-0048 |
 | G-2 | 新しい世代の `seq` は、フェンスの `base_end_seq + 1` から続く | 回復の手順 | ADR-0048 |
 | G-3 | `file_leases.region_gen` が今の世代でない割り当ては「持ち主なし」とみなす | Router | ADR-0047、ADR-0048 |
-| G-4 | 取り戻した版は `salvage/g{g}/` に置き、今のファイルに自動で混ぜない | `file_versions.kind = dr_salvaged` | ADR-0048 |
+| G-4 | 取り戻したバージョンは `salvage/g{g}/` に置き、今のファイルに自動で混ぜない | `file_versions.kind = dr_salvaged` | ADR-0048 |
 | G-5 | 大阪で確定した変更は、東京の遅れた項目が後から届いても失われない | G-1 のキーの分離、性質ベーステスト | ADR-0048 |
 
 ## 7. テナントの文脈
@@ -517,8 +517,8 @@ DynamoDB：
 | データ | 保持 |
 | --- | --- |
 | ジャーナルの項目 | 書いてから 30 日（TTL）。PITR 35 日 |
-| チェックポイント | 48 時間はすべて、30 日までは 1 日 1 つ。版の印のあるものは版に従う |
-| 版 | 無料のプラン 30 日、有料はすべて |
+| チェックポイント | 48 時間はすべて、30 日までは 1 日 1 つ。バージョンの印のあるものはバージョンに従う |
+| バージョン | 無料のプラン 30 日、有料はすべて |
 | ゴミ箱のファイル | 自動では消さない |
 | チームの削除 | 28 日で戻せなくなる |
 | 組織の解約 | 28 日の猶予 |
@@ -530,7 +530,7 @@ DynamoDB：
 | Webhook の配送の記録 | 7 日 |
 | 冪等性の鍵 | 24 時間 |
 | 無効化の outbox | 1 分（パーティションは 2 時間） |
-| バックアップ（PITR）・S3 の古い版 | 35 日・30 日。どの削除でも最終の期限 |
+| バックアップ（PITR）・S3 の古いバージョン | 35 日・30 日。どの削除でも最終の期限 |
 
 ## 9. 決めたこと
 
@@ -560,7 +560,7 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | D-18 | 組織の OAuth のアプリの許可リストと、個人のトークンの禁止の置き場所がなかった | `org_oauth_app_allowlist` と `orgs.oauth_apps_mode`・`orgs.pat_disabled` | — |
 | D-19 | 通知の二重を防ぐ一意の制約と、時間の分割が両立しない | `notifications` は分割しない。90 日の行は ID の範囲で消す | — |
 | D-20 | Aurora の中の `NodeId` の型 | `"{session_id}:{local_id}"` の `text` | — |
-| D-21 | 版と保存のジョブの列が、世代と取り戻しに足りなかった | `file_versions.region_gen`・`files.checkpoint_gen` を足し、`file_storage_jobs.kind` に `dr_salvage` を足した | [file-storage-and-history.md](file-storage-and-history.md) の 17 節 |
+| D-21 | バージョンと保存のジョブの列が、世代と取り戻しに足りなかった | `file_versions.region_gen`・`files.checkpoint_gen` を足し、`file_storage_jobs.kind` に `dr_salvage` を足した | [file-storage-and-history.md](file-storage-and-history.md) の 17 節 |
 | D-22 | 領域の文書が使うのに定義のない表 | 最小の形で足した：`auth_identities`・`two_factors`（Better Auth）、`oauth_authorization_codes`、`audit_export_checkpoints`、`outbox`・`global_outbox`、`org_domains`、`org_oauth_app_allowlist`。列も最小に足した（`orgs.full_seat_limit`・`state`・`purge_after`、`invitations.role_on_accept`、`teams.deleted_at`、`file_thumbnails.id` など） | — |
 | D-23 | 時間で切る表の切り方 | UUIDv7 の ID の範囲で切る（Slack と同じ）。outbox の類だけ `created_at` | — |
 
@@ -575,8 +575,8 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | `user_preferences` の RLS の扱い | `global` スキーマに置き、`account_id` で絞る関数を通す |
 | コメントの添付のキーの形が他の資産と違った | `comment-attachments/{org_id}/{file_id}/{asset_id}` に揃えた |
 | `files.team_id` の非正規化の書き換えの手順が決まっていなかった | ファイル・プロジェクトの移動と同じトランザクションで書き換え、`acl_version` を上げる（permissions-and-sharing.md の 9.3 節） |
-| 大阪への切り替えで取り戻した編集の版の種類 | `file_versions.kind` に `dr_salvaged` を足した |
-| 取り戻した版のマニフェストの置き場所 | `files/{file_id}/salvage/g{g}/{seq:020}`。取り戻した `seq` は今の世代の `seq` と重なりうるので `checkpoints/` と分けた |
+| 大阪への切り替えで取り戻した編集のバージョンの種類 | `file_versions.kind` に `dr_salvaged` を足した |
+| 取り戻したバージョンのマニフェストの置き場所 | `files/{file_id}/salvage/g{g}/{seq:020}`。取り戻した `seq` は今の世代の `seq` と重なりうるので `checkpoints/` と分けた |
 | ジャーナルの飛び・不変条件の破れ・運用者の停止で使うファイルの状態 | `files.state = maintenance` と `maintenance_reason` を足した |
 | ChangeSet の `origin`、マニフェストの `features`、表の列 `public_api`・`api_name`・`api_since`・`public_plugin` | すべて document-model.md に取り込んだ |
 | CDN の署名とキャッシュの鍵 | 含めない。キャッシュのオブジェクトは中身のハッシュで名付け、パスに組織かファイルを含む |

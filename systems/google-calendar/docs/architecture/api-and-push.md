@@ -1,6 +1,6 @@
 # API and Push: Google Calendar
 
-公開の REST API（リソース、予定の表し方、回の識別子、ページング、差分の同期、条件つきの更新、冪等、エラー、版）、OAuth 2.0 のアプリと範囲（scope）、レート制限、Webhook の通知の経路（`watch`、期限、署名、まとめ、再試行、停止）を決める。
+公開の REST API（リソース、予定の表し方、回の識別子、ページング、差分の同期、条件つきの更新、冪等、エラー、バージョン）、OAuth 2.0 のアプリと範囲（scope）、レート制限、Webhook の通知の経路（`watch`、期限、署名、まとめ、再試行、停止）を決める。
 
 前提となる決定は、時刻の表し方（[ADR-0002](../decisions/0002-time-representation.md)）、繰り返しの保存と展開（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）、テナントと権限（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）、変更のログと同期のトークン（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）、写し（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）、標準の範囲（[ADR-0007](../decisions/0007-interop-standards-scope.md)）、展開の意味（[ADR-0008](../decisions/0008-recurrence-expansion-semantics.md)）、iTIP の状態の転送（[ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md)）、空き時間（[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)）、認証の部品（[ADR-0035](../decisions/0035-accounts-auth-library-and-credentials.md)）。この文書で決めたことは次の ADR にある。
 
@@ -16,7 +16,7 @@
   - 公開の REST API の入口、リソースの一覧、予定の JSON の形、回の識別子
   - 一覧・範囲・展開、ページング、差分の同期（`syncToken`）、束ねた差分（`POST /v1/sync`）
   - 書き込み：条件つきの更新、冪等、招待の送信の指定（`sendUpdates`）、参加者の写しへの書き込み
-  - エラーの形、版と廃止
+  - エラーの形、バージョンと廃止
   - OAuth 2.0 のアプリ、範囲、トークン、組織の制限
   - レート制限
   - Webhook の通知の経路
@@ -68,7 +68,7 @@ ADR-0026。
 
 - 入口は `https://api.<brand>.<domain>/v1`。自社の Web の画面も同じ API を使う（[architecture/README.md](README.md) の 1.2 節）。画面だけの入口（`/v1/sync` の束ね、通知の一覧）も、公開の API として文書にする。
 - JSON、UTF-8、名前は camelCase。時刻は RFC 3339。
-- 版は URL の `/v1`。足すだけの変更を続け、壊す変更は `/v2` にする（4.9 節）。
+- バージョンは URL の `/v1`。足すだけの変更を続け、壊す変更は `/v2` にする（4.9 節）。
 - 読み出しは Aurora の reader から、書き込みとその応答は writer から行う。書き込みの直後の読み出しで古い結果を見ないよう、書き込みの応答に `X-Read-After: <calendar_id>:<seq>` を返し、クライアントが次の要求に付ければ、reader がその `seq` に追いつくまで 500 ms まで待つ（追いつかなければ writer で読む）。
 
 ### 4.2 リソース
@@ -134,7 +134,7 @@ ADR-0026。
 | `attendeesOmitted` | `guestsCanSeeOtherGuests=false` の参加者の写しでは、参加者の一覧を主催者と自分だけにし、`attendeesOmitted: true` |
 | 参加者の写しの自分の項目 | `reminders`、`color`、`transparency`、自分の `responseStatus`、`hidden` |
 | 知らないプロパティ | API に出さない（`x_props` は iCalendar の往復のためだけ。[ADR-0007](../decisions/0007-interop-standards-scope.md)） |
-| `tzdataVersion` | 派生の値を計算した版。クライアントの版が古ければ、自分で計算し直さずにこの値で表示する（[ADR-0002](../decisions/0002-time-representation.md)） |
+| `tzdataVersion` | 派生の値を計算したバージョン。クライアントのバージョンが古ければ、自分で計算し直さずにこの値で表示する（[ADR-0002](../decisions/0002-time-representation.md)） |
 
 ### 4.4 回の識別子
 
@@ -189,7 +189,7 @@ POST /v1/sync
 ```
 
 - カレンダーごとに独立に処理する。1 つの 410 が他を止めない。
-- **トークンだけを取る形**：`{ "calendars": [ { "calendarId": "…" }, … ], "tokensOnly": true }` は、予定を返さずに、各カレンダーの今の `change_seq` のトークン（`nextSyncToken`）だけを返す。トークンを `timeMin`・`timeMax` と一緒に使えないので、Web の画面は窓を取り直す前にこれで今のトークンを取り、次に範囲の問い合わせで予定オブジェクトを取る。間の変更は次の差分で重ねて届き、版の比べで捨てる（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[ADR-0026](../decisions/0026-public-rest-api-shape.md) の注記）。カレンダーを読む権限（`calendar.read`）を確かめ、トークンには今の `view_hash` を入れる。公開 API の利用者も使える。
+- **トークンだけを取る形**：`{ "calendars": [ { "calendarId": "…" }, … ], "tokensOnly": true }` は、予定を返さずに、各カレンダーの今の `change_seq` のトークン（`nextSyncToken`）だけを返す。トークンを `timeMin`・`timeMax` と一緒に使えないので、Web の画面は窓を取り直す前にこれで今のトークンを取り、次に範囲の問い合わせで予定オブジェクトを取る。間の変更は次の差分で重ねて届き、バージョンの比べで捨てる（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[ADR-0026](../decisions/0026-public-rest-api-shape.md) の注記）。カレンダーを読む権限（`calendar.read`）を確かめ、トークンには今の `view_hash` を入れる。公開 API の利用者も使える。
 - 1 回の応答の合計は 2,000 件まで。超えたカレンダーは `nextPageToken` を返し、クライアントは同じ入口で続ける。
 - 変わっていないカレンダー（トークンの `seq` がカレンダーの `change_seq` と同じ）は、予定を読まずに同じトークンを返す。
 
@@ -201,7 +201,7 @@ POST /v1/sync
 | 冪等 | `POST`（作成、出欠、`watch`、取り込み）は `Idempotency-Key`（UUID）を受ける。（アプリ, 利用者, キー）ごとに 24 時間、同じ応答を返す。同じキーで本文が違えば 422 `idempotencyKeyReuse` |
 | 書き込みの経路 | すべて `packages/writer`（`origin = api`）。1 つの要求が 1 つのトランザクション |
 | `sendUpdates` | `all`（既定）・`externalOnly`・`none`。外部の参加者への iMIP と、本システムの中の参加者への通知のメールの有無を決める。本システムの中の参加者の写しは、どれでも作る（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)） |
-| 参加者の写しの共有の項目 | `guestsCanModify` が偽なら 403 `forbiddenForNonOrganizer`。真なら、主催者の写しへの依頼（`X-MODIFY`、[invitations-and-itip.md](invitations-and-itip.md) の 8.2 節）にし、202 と `{"pending": true}` を返す。写しは主催者の新しい版が届くまで変わらない |
+| 参加者の写しの共有の項目 | `guestsCanModify` が偽なら 403 `forbiddenForNonOrganizer`。真なら、主催者の写しへの依頼（`X-MODIFY`、[invitations-and-itip.md](invitations-and-itip.md) の 8.2 節）にし、202 と `{"pending": true}` を返す。写しは主催者の新しいバージョンが届くまで変わらない |
 | `PUT` と `PATCH` | `PUT` は全体の置き換え（書かなかった項目は既定に戻る）。`PATCH` は書いた項目だけ（JSON Merge Patch、RFC 7396） |
 | 1 カレンダーの書き込みの上限 | 1 秒 50 件（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）を超えたら 429 `calendarWriteRateExceeded` と `Retry-After: 1` |
 
@@ -230,7 +230,7 @@ POST /v1/sync
 
 - `message` に予定の中身（タイトル、メールアドレス）を入れない。
 
-### 4.9 版と廃止
+### 4.9 バージョンと廃止
 
 - OpenAPI 3.1 の定義を開発リポジトリに置き、PR で差分を見る。壊す変更（項目の削除、型の変更、必須の引数の追加）は CI で失敗させる。
 - 古い項目は `deprecated` にし、利用を（アプリ, 項目）ごとに数える。告知から 12 か月、または利用が 0 になってから消す。カレンダーの連携は社内のシステム（勤怠、予約）が長く使うので、Linear の題材（6 か月）より長くする。

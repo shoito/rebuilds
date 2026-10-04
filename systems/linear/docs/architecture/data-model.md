@@ -35,12 +35,12 @@
 | OpenSearch | 検索の索引 `docs` | 正本ではない | 数え直しと作り直し（[search.md](search.md) の 9.4 節） |
 | S3 | 添付の中身、インポートの段置き、書き出し、スナップショット、RUM、配布物、log-archive | 添付の中身は正本（行は Aurora） | バージョニングと大阪への複製（添付・配布物） |
 | SQS | Relay・受け口から Worker へのきっかけ | 正本ではない | `sync_outbox`・`sync_actions`・`integration_events` から作り直す |
-| AppConfig・CloudFront KeyValueStore | フラグ、`min_build`、互換の一覧、版の割合 | フラグの正本 | — |
+| AppConfig・CloudFront KeyValueStore | フラグ、`min_build`、互換の一覧、バージョンの割合 | フラグの正本 | — |
 | 端末の IndexedDB | 見てよい行の写し、outbox | `_outbox`・`_rejected`・`_blobs`・`_drafts` だけは端末の正本 | 写しは取り直す。outbox の喪失は件数だけ示す（[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節） |
 
 ### 2.2 ID と人が読む識別子
 
-- **ID はすべて UUIDv7**（[ADR-0020](../decisions/0020-ids-and-human-identifiers.md)）。モデルの ID はクライアントが振り、サーバーが作る行（履歴、購読、派生、サーバーだけの表）は Writer・Worker が振る。PostgreSQL 18 の `uuidv7()` を既定値にしてよい。Writer は版の 4 ビットと変種を確かめ、時刻が 1 日以上先の ID を `invalid` で拒否する。
+- **ID はすべて UUIDv7**（[ADR-0020](../decisions/0020-ids-and-human-identifiers.md)）。モデルの ID はクライアントが振り、サーバーが作る行（履歴、購読、派生、サーバーだけの表）は Writer・Worker が振る。PostgreSQL 18 の `uuidv7()` を既定値にしてよい。Writer はバージョンの 4 ビットと変種を確かめ、時刻が 1 日以上先の ID を `invalid` で拒否する。
 - **例外**：
   - `sync_outbox.id`・`narrowing_outbox.id` は `bigserial`（Relay が `ORDER BY id` で読む）。
   - `sync_id` はワークスペースの中の連番（`bigint`）。ID ではなく位置である。
@@ -187,7 +187,7 @@ CREATE POLICY tenant_isolation ON <t>
 | GraphQL の型（`api: public` のモデルとフィールド） | `api: internal` の列は出さない |
 
 - モデルでない表（41 表。Better Auth の 5 表を含む）は定義の言語で書かず、マイグレーションを手で書く（Better Auth の表は部品のマイグレーション）。この文書の列の表が設計である。
-- スキーマの版（`schema_version`・`schema_hash`・`fv`）と互換の一覧は、開発リポジトリの `schema_versions`（リリースごとの記録）に持つ（[data-model-and-schema.md](data-model-and-schema.md) の 6.1 節）。
+- スキーマのバージョン（`schema_version`・`schema_hash`・`fv`）と互換の一覧は、開発リポジトリの `schema_versions`（リリースごとの記録）に持つ（[data-model-and-schema.md](data-model-and-schema.md) の 6.1 節）。
 
 ### 2.11 S1 の規模の前提
 
@@ -464,7 +464,7 @@ erDiagram
 | D-1 | データモデルを `data-model/` の領域ごとのファイルに分け、形の正本をここに移した。領域の文書の「data-model への項目」は提案の記録として残す | 1 つの文書では 1,500 行を超える | この文書、[data-model-and-schema.md](data-model-and-schema.md) の 12 節 |
 | D-2 | 共通の列に `updated_at` を足した | M2 の「更新の時刻」と Webhook の `updatedFrom.updatedAt` に要るのに、列がなかった | [data-model-and-schema.md](data-model-and-schema.md) の 4 節 |
 | D-3 | `delete: trash` のモデルに `trashed_at` を生成する | `Team`・`Project`・`Initiative` は `trash` なのに列がなかった | 同 3.4・4 節 |
-| D-4 | 定義の型に `bytes`（`server_only`、ID の読み込みだけで返す）を足し、`IssueDescriptionVersion.state` に使う | 版の状態（最大 4 MiB）を差分に載せると、Relay の 1 メッセージ 1 MiB を超える。定義の言語にバイト列の型がなかった | 同 3.3 節、[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節 |
+| D-4 | 定義の型に `bytes`（`server_only`、ID の読み込みだけで返す）を足し、`IssueDescriptionVersion.state` に使う | バージョンの状態（最大 4 MiB）を差分に載せると、Relay の 1 メッセージ 1 MiB を超える。定義の言語にバイト列の型がなかった | 同 3.3 節、[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節 |
 | D-5 | `ProjectDescription`（`project_descriptions`）を足した | ADR-0002 と AGENTS.md は「プロジェクトの説明は CRDT」とするが、モデルがなかった | [data-model/planning.md](data-model/planning.md) |
 | D-6 | `issue_aliases` にモデルの `id` を足し、`(team_id, number)` を一意の制約にした | `IssueAlias` はモデルなので ID と共通の列が要る | [data-model-and-schema.md](data-model-and-schema.md) の 5.4 節 |
 | D-7 | `tx_results` を `created_on` の日ごとのパーティションにし、主キーに含めた。一意はロックの中の先の引きで守る。UUIDv5 の ID はサーバーの主体だけ | 文書は「日ごとのパーティション」と「`(workspace_id, client_tx_id)` の主キー」を同時に書いていた（PostgreSQL では両立しない）。公開 API の `Idempotency-Key` は UUIDv5 で時刻を持たない | [sync-engine.md](sync-engine.md) の 5.4 節 |
@@ -478,7 +478,7 @@ erDiagram
 | D-15 | コメントの書き手の列は `author_id`。`Comment.author_id`・`Issue.canceled_at` を `import_writable` にした | import-export は「コメントの `user_id`」と書き、定義は `author_id` だった。DT-IMPORT-002 の対象の印が定義に欠けていた | [import-export.md](import-export.md) の 5.2 節、[editor-and-descriptions.md](editor-and-descriptions.md) の 5.1 節、[issues-and-workflow.md](issues-and-workflow.md) の 3.3 節 |
 | D-16 | `View.owner_id` を nullable にした | `on_delete: nullify` なのに必須だった | [views-and-filters.md](views-and-filters.md) の 7.1 節 |
 | D-17 | Valkey の鍵、SQS のキュー、S3 のバケットの名前のうち未定のものを決めた | 名前が領域の文書になかった | [data-model/stores.md](data-model/stores.md) |
-| D-18 | `auth.workspace_directory` は Worker（`directory-sync`）が関数で書く | 旧版のこの文書は「`writer`（関数経由）」、accounts-and-auth は「Relay の流れで写す」と書いていた。コミットの後に写すので Worker にした | この文書の 5 節 |
+| D-18 | `auth.workspace_directory` は Worker（`directory-sync`）が関数で書く | 旧バージョンのこの文書は「`writer`（関数経由）」、accounts-and-auth は「Relay の流れで写す」と書いていた。コミットの後に写すので Worker にした | この文書の 5 節 |
 | D-19 | GIN `(sync_groups)` は `teams` と `instant` の `via` のモデルだけ | 全部に張ると書き込みが重い。他はグループを決める列の索引で足りる | この文書の 2.4 節 |
 | D-20 | Better Auth の表の ID は `generateId` で UUIDv7、列の名前は既定（camelCase） | ID の規約を揃える。名前を変えると型と食い違う（[accounts-and-auth.md](accounts-and-auth.md) の 3.3 節） | [data-model/workspace-and-access.md](data-model/workspace-and-access.md) |
 | D-21 | `InboxState`・`NotificationPreference` は `User` の作成の派生で作る。`ViewPreference` の同時の初めての作成は `already_exists` で吸収する。`IssueReminder` は知らせた時に消す | 1 人 1 行のモデルを 2 台の端末が同時に作ると一意に当たる | [data-model/views-and-notifications.md](data-model/views-and-notifications.md) |
@@ -491,7 +491,7 @@ erDiagram
 | D-10・D-18 の関数の承認 | Dev のテックリードとセキュリティの担当が、E4・E9・E10・E11 の spec の前に承認する |
 | `issue_history`・`comments`・`issues` の `HASH (workspace_id)` の分割 | S2 の前に行の数を測って決める（[capacity.md](capacity.md)） |
 | `Project` の「最新の 3 件の更新」を一緒に読む被覆の鍵（件数で切る鍵は定義の言語にない） | E7。S1 はつながる更新を全部読む |
-| `ProjectDescription` の版（イシューの本文の版に当たるもの） | MVP の後 |
+| `ProjectDescription` のバージョン（イシューの本文のバージョンに当たるもの） | MVP の後 |
 | Better Auth の `account` のトークンの列を保存させない設定、`session.token` のハッシュ | E4 の `auth-service-skeleton`（**未検証**） |
 | `platform_audit_events` の DB の保持（1 年は本システムの値） | 法務の L5 |
 | `notification_deliveries`・`invitations` の終わった行の保持（30 日・90 日は本システムの値） | 法務の L5 |

@@ -61,7 +61,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | 段 | 内容 | 失敗の条件 |
 | --- | --- | --- |
 | Go の検査 | `go vet`、`staticcheck`、`govulncheck`、`-race` の単体 | 1 件でも |
-| 契約 | `buf lint`、`buf breaking`（main と比べ、サポートするアプリの版の範囲で互換を壊さない） | 互換を壊す変更に `contract-breaking` のラベルと承認がない |
+| 契約 | `buf lint`、`buf breaking`（main と比べ、サポートするアプリのバージョンの範囲で互換を壊さない） | 互換を壊す変更に `contract-breaking` のラベルと承認がない |
 | 状態機械のベクター | Trips の遷移の表から作ったベクターを、サーバーと 4 つのアプリの reducer で通す（ADR-0006） | 1 件でも |
 | 決定表 | DT-TRIP・DT-DISP・DT-FARE・DT-PAY・DT-SUP を `spec.md` から読む表駆動テスト | 1 件でも |
 | 性質ベーステスト | PROP-LOC・GEO・DISP・TRIP・FARE・PAY・SUP・SEC（PR ごとに 1 万の列） | 1 件でも |
@@ -88,14 +88,14 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | --- | --- | --- | --- |
 | 配車の計算 | 直近 7 日の再生、1 時間の縮小のシミュレーション | 影の実行 1 週間 | 区域の release フラグ：1 区域の 10% のバッチ → 100% → 他の区域 |
 | 配車の設定（AppConfig） | 直近 7 日の再生の結果を変更の要求に添える。検証の関数で範囲 | 重みの大きな変更は影の実行 | AppConfig の段階的な配備（区域ごと） |
-| 候補の条件のデータ | 決定表、PROP-DISP-002・007 | — | 版の承認（2 人）と有効の日時 |
+| 候補の条件のデータ | 決定表、PROP-DISP-002・007 | — | バージョンの承認（2 人）と有効の日時 |
 | 運賃の計算のコード | 公示の例、`fare-replay`（直近 30 日、差 0） | 影の計算 3 日 | Pricing のカナリア |
 | 運賃の規則のデータ | 型の検証、見本の乗車 100 件の試算 | — | 有効の日時。法務の確認待ちは legal のフラグ |
 | Trips の遷移の表 | DT-TRIP、ベクター | — | サーバーを先に、アプリを後に |
 
 ### 3.1 再生とシミュレーション
 
-- **再生**：`dispatch-replay --zone --from --to --algo <新しい版> --config <新しい設定>`。記録（`dispatch-decisions/`、位置は `spot`）の入力を新旧に流し、組の違い、割り当ての数、迎車の ETA の合計と平均、貪欲法の率、計算の時間の p99、二重の使用（0 件）を出す（[dispatch-and-matching.md](dispatch-and-matching.md) の 9.2 節）。
+- **再生**：`dispatch-replay --zone --from --to --algo <新しいバージョン> --config <新しい設定>`。記録（`dispatch-decisions/`、位置は `spot`）の入力を新旧に流し、組の違い、割り当ての数、迎車の ETA の合計と平均、貪欲法の率、計算の時間の p99、二重の使用（0 件）を出す（[dispatch-and-matching.md](dispatch-and-matching.md) の 9.2 節）。
 - **縮小のシミュレーション**：仮の時計で 1 時間分。成立率、迎車の時間、空車の時間、辞退の率、二重の割り当て（0 件でなければ失敗）。
 - CI は、記録を読むための専用の役割（`location` の鍵の復号だけを許す、書き込みなし）で S3 を読む。記録は丸めた値で、乗客の個人の情報を含まない（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）。
 
@@ -107,8 +107,8 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 
 ### 3.3 `fare-replay`
 
-- 直近 30 日の `fare_quotes` の入力（規則の版、距離、時刻、割引、倍率、入力のハッシュ）を新しいコードで計算し直し、額と内訳が一致するかを見る（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
-- 差を許すのは、PR に一覧で書いた見積もりの種類だけ（例：新しい丸めの規則を使う規則の版）。一覧の外の差は失敗にする。
+- 直近 30 日の `fare_quotes` の入力（規則のバージョン、距離、時刻、割引、倍率、入力のハッシュ）を新しいコードで計算し直し、額と内訳が一致するかを見る（[ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)）。
+- 差を許すのは、PR に一覧で書いた見積もりの種類だけ（例：新しい丸めの規則を使う規則のバージョン）。一覧の外の差は失敗にする。
 - すでに確定した見積もりと乗車の額は変えない。
 
 ## 4. デプロイ
@@ -124,7 +124,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 ```
 
 - 事象・契約の形を変えるときは、読み手を先に出す（新旧の形を読める）。サーバーを先に、アプリを後に。
-- 位置の形（`LocationBatch`）と常時の接続の形は、サポートするアプリの版（8 つ前の列車まで）を読める間は古い形を残す。
+- 位置の形（`LocationBatch`）と常時の接続の形は、サポートするアプリのバージョン（8 つ前の列車まで）を読める間は古い形を残す。
 
 ### 4.2 方式
 
@@ -135,7 +135,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | loc-ingest、eta-service | ローリング（1 回に 1/3） | 無状態。端末は送り直す |
 | geo-index、dispatch | **待機を先に**：待機のタスクを入れ替え、`READY`（索引）・未割り当ての依頼の読み込み（配車）を確かめる → 主がリースを自分から手放す → 新しい待機がリースを取る → 古い主を入れ替える | 主の役の引き継ぎを 1 回にし、期限切れ（約 6.5 秒）を待たない（[ADR-0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md)） |
 | rt-gateway | ローリング（1 回に 10%）。`Goaway` で接続を散らして閉じる | 再接続の殺到を避ける（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 10 節） |
-| valhalla-eta、valhalla-match | タイルの版は青緑（[eta-and-routing.md](eta-and-routing.md) の 5.3 節）。コードだけの変更はローリング | 起動に時間がかかる |
+| valhalla-eta、valhalla-match | タイルのバージョンは青緑（[eta-and-routing.md](eta-and-routing.md) の 5.3 節）。コードだけの変更はローリング | 起動に時間がかかる |
 | アプリ | 列車と段階的な公開（5 節） | — |
 
 ### 4.3 都市の波（S2 から）
@@ -166,10 +166,10 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 決定は [ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 10 節）。この領域は、サーバーの側の約束を書く。
 
 - **列車**：月曜に切り、木曜に審査、金曜から公開。4 つのアプリを同じ列車で出す。
-- **段階的な公開**：iOS の段階的な公開は、1 日目 1%、2 日目 2%、3 日目 5%、4 日目 10%、5 日目 20%、6 日目 50%、7 日目 100%。止められる期間は合計 30 日まで。段階的な公開の最中も、App Store から手で更新する人には届く（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)、2026-09-27 に確認）。手で更新する人がいるので、段階の割合を「新しい版の利用者の上限」として当てにしない。新しい機能は release フラグで守る。
+- **段階的な公開**：iOS の段階的な公開は、1 日目 1%、2 日目 2%、3 日目 5%、4 日目 10%、5 日目 20%、6 日目 50%、7 日目 100%。止められる期間は合計 30 日まで。段階的な公開の最中も、App Store から手で更新する人には届く（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)、2026-09-27 に確認）。手で更新する人がいるので、段階の割合を「新しいバージョンの利用者の上限」として当てにしない。新しい機能は release フラグで守る。
 - Android は Play の段階的な公開（1% → 5% → 20% → 50% → 100%）。Play は割合を自動で上げないので、`mobile-release-train` が毎日上げる。利用者は公開ごとに無作為に選ばれ、止めた後に同じ割合で再開すれば同じ利用者の群に届く。止めても、すでに更新した利用者は戻らない。段階的な公開は更新だけに使え、最初の公開には使えない（[Release app updates with staged rollouts](https://support.google.com/googleplay/android-developer/answer/6346149)、2026-09-27 に確認）。
-- **サーバーの互換**：サーバーは、最新から 8 つ前の列車の版までの契約（Protocol Buffers、状態機械のベクター、ヘッダー `<Brand>-Client`）を受け付ける。`buf breaking` はその範囲で検査する。
-- **強制の更新**：`required_min` を上げるのは、セキュリティの欠陥、支払いと運賃の誤り、サーバーの互換を保てない変更のときだけ。Dev と Ops の 2 人の承認。乗車の最中と緊急の入口は塞がない（rider-and-driver-apps の 10.3 節）。サーバーは `required_min` より古い版の受諾と出庫を 426 で拒むが、乗車中の操作（journal）は拒まない。
+- **サーバーの互換**：サーバーは、最新から 8 つ前の列車のバージョンまでの契約（Protocol Buffers、状態機械のベクター、ヘッダー `<Brand>-Client`）を受け付ける。`buf breaking` はその範囲で検査する。
+- **強制の更新**：`required_min` を上げるのは、セキュリティの欠陥、支払いと運賃の誤り、サーバーの互換を保てない変更のときだけ。Dev と Ops の 2 人の承認。乗車の最中と緊急の入口は塞がない（rider-and-driver-apps の 10.3 節）。サーバーは `required_min` より古いバージョンの受諾と出庫を 426 で拒むが、乗車中の操作（journal）は拒まない。
 - **ドライバーのアプリ**は、週末の夜に段階を進めない。
 - **安全の区分**の変更（緊急の入口、乗車の共有）は、変更単位の `quality.md` に端末の試験の結果を付ける。フラグの取得を失敗させた状態でも入口が出ることを、列車ごとの UI の試験で確かめる（ADR-0043）。
 
@@ -191,7 +191,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | --- | --- |
 | `ops.dispatch.pause.<city>` | その都市の新しいオファーを止める（依頼は受けない。進行中の乗車は続く） |
 | `ops.intake.reject.<city>` | その都市の新しい依頼を与信の前に断る（「混み合っています」） |
-| `ops.dispatch.algo_pin.<zone>` | 区域の配車の計算を指定の版に固定する |
+| `ops.dispatch.algo_pin.<zone>` | 区域の配車の計算を指定のバージョンに固定する |
 | `ops.upfront.suspend.<region>` | 事前確定運賃を止め、メーターの目安だけにする（日本版ライドシェアも止まる） |
 | `ops.rideshare.pause.<city>` | 日本版ライドシェアの新しいオファーを止める |
 | `ops.payments.in_vehicle_only` | アプリの決済の新しい与信を止め、タクシーは車内払いへ案内する |
@@ -221,11 +221,11 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | 何を | どう戻す | 注意 |
 | --- | --- | --- |
 | release・legal のフラグ | AppConfig で切る | 進行中の乗車は、始まったときの条件で最後まで続ける |
-| 配車の計算・設定 | `ops.dispatch.algo_pin.<zone>`、AppConfig の前の版 | デプロイを待たない |
+| 配車の計算・設定 | `ops.dispatch.algo_pin.<zone>`、AppConfig の前のバージョン | デプロイを待たない |
 | サーバー（api など） | 1 つ前のイメージの digest で再デプロイ | — |
-| geo-index・dispatch | 待機を先に戻し、リースを渡す（4.2 節と同じ） | 2 つの版が同時に提案しても、Trips の epoch で守られる |
+| geo-index・dispatch | 待機を先に戻し、リースを渡す（4.2 節と同じ） | 2 つのバージョンが同時に提案しても、Trips の epoch で守られる |
 | 運賃のコード | 前のイメージ | 確定した見積もりの額は変えない |
-| アプリ | 段階的な公開を止める。必要なら `required_min` を上げる | 公開した版は取り消せない。フラグで機能を切る |
+| アプリ | 段階的な公開を止める。必要なら `required_min` を上げる | 公開したバージョンは取り消せない。フラグで機能を切る |
 | マイグレーション | 戻さない。前へ進める修正を書く | — |
 
 手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。

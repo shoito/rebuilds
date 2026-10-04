@@ -2,7 +2,7 @@
 
 レポートの型、フォルダと共有、レポート、実行、ダッシュボード、定期の配信、エクスポート。振る舞いは [reports-and-dashboards.md](../reports-and-dashboards.md)、決定は [ADR-0029](../../decisions/0029-report-execution-on-reader-per-viewer.md)・[ADR-0030](../../decisions/0030-dashboards-viewer-intersection-and-subscriptions.md) にある。規約は [data-model.md](../data-model.md) の 3 節。
 
-レポートとダッシュボードは利用者が作るデータで、版を上げない（デプロイの対象にはする）。レポートの型はメタデータ（`report_types` の部品）。集計は常に見る人の権限で行い、事前の集計の表を持たない（[reports-and-dashboards.md](../reports-and-dashboards.md) の 5.6 節）。
+レポートとダッシュボードは利用者が作るデータで、バージョンを上げない（デプロイの対象にはする）。レポートの型はメタデータ（`report_types` の部品）。集計は常に見る人の権限で行い、事前の集計の表を持たない（[reports-and-dashboards.md](../reports-and-dashboards.md) の 5.6 節）。
 
 ## 1. ER 図
 

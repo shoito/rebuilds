@@ -1,12 +1,12 @@
 # Payroll JP rules: Workday
 
-日本の給与計算の法定の規則を決める。規則表の取り込みと版、源泉所得税（月額表・日額表・賞与の算出率の表・電子計算機等による計算の特例）、社会保険料（健康保険、介護保険、厚生年金保険、子ども・子育て支援金、標準報酬月額、定時決定、随時改定の検知、賞与、端数、控除の月）、雇用保険料、住民税の特別徴収、割増賃金、休暇の日の賃金と平均賃金、日割りと欠勤控除を扱う。年末調整は E13 に回す。
+日本の給与計算の法定の規則を決める。規則表の取り込みとバージョン、源泉所得税（月額表・日額表・賞与の算出率の表・電子計算機等による計算の特例）、社会保険料（健康保険、介護保険、厚生年金保険、子ども・子育て支援金、標準報酬月額、定時決定、随時改定の検知、賞与、端数、控除の月）、雇用保険料、住民税の特別徴収、割増賃金、休暇の日の賃金と平均賃金、日割りと欠勤控除を扱う。年末調整は E13 に回す。
 
 前提の決定は、給与計算を純粋な計算にし、法定の値を規則表としてデータで持ち、取り込みを 2 人で確かめること（[ADR-0004](../decisions/0004-payroll-engine.md)）、金額は整数の円と固定小数点で扱い、丸めは名前付きの関数だけで行うこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）。実行・入力・項目のグラフは [payroll-engine.md](payroll-engine.md) にある。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0030](../decisions/0030-rule-table-ingestion-and-verification.md) | 規則表は種類ごとに「適用の鍵」（支払日の年、保険料の何月分、賃金の締日、通知の年度）と有効期間を持つ版で持つ。公的な資料を取得して元のファイルのハッシュを残し、取り込んだ人と別の人が、資料の例と抜き取りの行を独立に入力して照合したときだけ公開する。訂正は同じ適用の期間の新しい版で、遡及の候補を作る |
+| [0030](../decisions/0030-rule-table-ingestion-and-verification.md) | 規則表は種類ごとに「適用の鍵」（支払日の年、保険料の何月分、賃金の締日、通知の年度）と有効期間を持つバージョンで持つ。公的な資料を取得して元のファイルのハッシュを残し、取り込んだ人と別の人が、資料の例と抜き取りの行を独立に入力して照合したときだけ公開する。訂正は同じ適用の期間の新しいバージョンで、遡及の候補を作る |
 | [0031](../decisions/0031-income-tax-withholding.md) | 源泉所得税は、甲欄・乙欄・丙欄と、月額表・日額表・賞与の算出率の表の選び方を決定表にする。甲欄の月額表は、表引きと電子計算機等による計算の特例を、会社ごとの有効日付の設定で選ぶ。特例の式と端数（給与所得控除の 1 円未満の切り上げ、税額の 10 円未満の四捨五入）は告示の別表から取り込む |
 | [0032](../decisions/0032-social-insurance-premiums-and-standard-remuneration.md) | 社会保険料は、標準報酬月額 × 料率 ÷ 2 を固定小数点で求め、健康保険の側（一般の料率、介護保険、子ども・子育て支援金）を合算して 1 回、厚生年金を 1 回、50 銭以下切り捨て・50 銭超切り上げで円にする。明細の内訳は合計を保つ按分で出す。控除の月は前月分を既定にする。随時改定と定時決定は候補を作るだけで、決定は担当が業務プロセスで記録する |
 | [0033](../decisions/0033-employment-insurance-and-resident-tax.md) | 雇用保険料は、賃金 × 料率を 50 銭以下切り捨てで円にし、料率は賃金の締日で選ぶ。住民税は通知の月割額をそのまま使い、計算しない。取り込みのとき合計と 6 月の端数の形を確かめる。退職の月の一括徴収は決定表で決める |
@@ -14,7 +14,7 @@
 
 ## 1. 目的と範囲
 
-- 扱う：規則表の種類・版・取り込み・確認、源泉所得税、社会保険料と標準報酬、雇用保険料、住民税の特別徴収、割増賃金、休暇の日の賃金、平均賃金、日割り、欠勤控除、通勤手当の非課税の判定、名前付きの丸めの一覧、遡及の差の税・保険の扱い。
+- 扱う：規則表の種類・バージョン・取り込み・確認、源泉所得税、社会保険料と標準報酬、雇用保険料、住民税の特別徴収、割増賃金、休暇の日の賃金、平均賃金、日割り、欠勤控除、通勤手当の非課税の判定、名前付きの丸めの一覧、遡及の差の税・保険の扱い。
 - 扱わない：実行と入力と項目の枠組み（[payroll-engine.md](payroll-engine.md)）、労働時間の区分（[time-and-attendance.md](time-and-attendance.md)）、休暇の日数（[absence-and-leave.md](absence-and-leave.md)）、振込・明細・仕訳（[payments-and-accounting.md](payments-and-accounting.md)）、年末調整と法定調書（E13。10 節）、社会保険・雇用保険の届出の電子申請（MVP の後）。
 - 法令の解釈の結論は出さない。確認待ちの事項は 14 節と [intent.md](../intent.md) にある。
 
@@ -41,17 +41,17 @@
 | `holidays_jp`（国民の祝日） | 日付 | 内閣府の [syukujitsu.csv](https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv)（Shift_JIS、「国民の祝日・休日月日」「国民の祝日・休日名称」の 2 列。2026-09-28 の時点で 1955 年〜2027 年を収める。[内閣府](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-09-28 に確認） | 毎年 |
 | `resident_tax_notices`（住民税の通知） | 年度（6 月〜翌 5 月） | 市区町村の通知（テナントが取り込む） | 5 月 |
 
-- 版は `rule_tables (id, kind, version, key_type, valid daterange, status, source_url, fetched_on, source_sha256, parsed_sha256, imported_by, verified_by, published_at, supersedes_id, note)`。行は種類ごとの型のある表（`rule_rows_wht_monthly` など）に置く。
-- 同じ種類の `published` の版の有効期間は重ならない。訂正は、同じ有効期間の新しい版を `supersedes_id` つきで公開し、古い版を `superseded` にする。訂正は `rule_table.corrected` を出し、給与の遡及の候補を作る（[payroll-engine.md](payroll-engine.md) の 7.1 節）。
+- バージョンは `rule_tables (id, kind, version, key_type, valid daterange, status, source_url, fetched_on, source_sha256, parsed_sha256, imported_by, verified_by, published_at, supersedes_id, note)`。行は種類ごとの型のある表（`rule_rows_wht_monthly` など）に置く。
+- 同じ種類の `published` のバージョンの有効期間は重ならない。訂正は、同じ有効期間の新しいバージョンを `supersedes_id` つきで公開し、古いバージョンを `superseded` にする。訂正は `rule_table.corrected` を出し、給与の遡及の候補を作る（[payroll-engine.md](payroll-engine.md) の 7.1 節）。
 - 規則表は全テナントに共通で、テナントの外に置く（[ADR-0005](../decisions/0005-security-and-my-number.md)）。テナントが入力する表（健康保険組合の料率、住民税の通知）は、テナントの中に同じ形で置く。
 
 ### 2.2 取り込みと 2 人の確認
 
 1. **取得**：公的な資料のファイルを取得し、URL、取得日、SHA-256 を記録する。ファイルは S3（Object Lock）に置く。
 2. **読み取り**：種類ごとの読み取り器で行にする。Excel があれば Excel を使う（PDF の読み取りは誤りやすい）。
-3. **自動の検査**：区分が隙間なく続く、税額が給与の額に対して減らない、扶養の人数に対して増えない、料率が 0〜1 の範囲、等級の境界が単調、前の版との差の一覧。
+3. **自動の検査**：区分が隙間なく続く、税額が給与の額に対して減らない、扶養の人数に対して増えない、料率が 0〜1 の範囲、等級の境界が単調、前のバージョンとの差の一覧。
 4. **独立の照合**：取り込んだ人と別の人（`verified_by ≠ imported_by`。権限は `rules.verify`）が、元の資料から、(a) 資料に載っている計算の例（国税庁の使用例など）、(b) 無作為に選ばれた 30 行、(c) 境界の行（最初、最後、改正で変わった行）を画面に手で入力する。読み取った行と全部一致したときだけ `verified` にできる。
-5. **公開**：`verified` の版を、規則表のリリース（コードのリリースと別。[delivery.md](delivery.md)）で `published` にする。公開の前に、ゴールデンデータセットの期待値の更新（社労士・税理士の確認つき）を同じ変更で行う。
+5. **公開**：`verified` のバージョンを、規則表のリリース（コードのリリースと別。[delivery.md](delivery.md)）で `published` にする。公開の前に、ゴールデンデータセットの期待値の更新（社労士・税理士の確認つき）を同じ変更で行う。
 
 - 資料の値を 2 か所（コードと表）に書かない。コードは表を読むだけ（[AGENTS.md](../../AGENTS.md)）。
 - 改正の暦（いつ何を取り込むか）は runbooks に持つ（16 節）。
@@ -253,7 +253,7 @@ ei_wage = Σ items with flag `ei_wage`（通勤手当を含む）
 ei_premium = round_si_employee_share( ei_wage × r_ei(business_type, cutoff_date) )
 ```
 
-- 料率の版は、その給与の締日（賞与は支払日。賞与の扱いは一次の資料で確かめられなかった。未検証。L37）で選ぶ（DT-JP-007）。
+- 料率のバージョンは、その給与の締日（賞与は支払日。賞与の扱いは一次の資料で確かめられなかった。未検証。L37）で選ぶ（DT-JP-007）。
 - 被保険者かどうか（週 20 時間以上など）は、雇用の facet `worker_employment_insurance` に担当が記録する。システムは所定の時間から候補を示すだけ。
 - 事業の種類は、労働保険の適用事業所（[core-hr.md](core-hr.md) の 4.1 節）の設定。
 
@@ -277,7 +277,7 @@ resident_tax_notices (tenant_id, id, employment_id, fiscal_year int, municipalit
 
 - 通知の月割額をそのまま使い、システムで計算しない。取り込みは一括の雛形（MVP）。電子の通知の取り込みは E14。
 - 取り込みの検査：12 か月の合計 ＝ 年税額。7 月〜5 月は同じ額。6 月 ＝ 年税額 − 11 × 月割額で、6 月の額 − 7 月の額が 0 以上かつ 100 円の単位の端数の範囲（0〜1,100 円未満）。合わなければ警告し、担当が通知の値を確かめて進める（市区町村の条例の例外がありうる）。
-- 変更の通知は、`effective_from_month` から後の月を置き換える新しい版。
+- 変更の通知は、`effective_from_month` から後の月を置き換える新しいバージョン。
 
 ### 6.3 退職の月（DT-JP-008）
 
@@ -325,7 +325,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 
 - 月給の人の所定内の時間の賃金は月給に含まれるので、#1〜#8 の「1.00」の部分を払う。
 - 法定の休日の 8 時間を超える労働を時間外として足すかは、既定で足さない（#5・#6 のまま。通達による扱いとされるが、厚生労働省の公開の資料で原本を見つけられなかった。未検証。E8 の `overtime-premiums` の spec の前に社労士に確かめる）。
-- 月平均の所定労働時間 ＝ 1 年の所定労働時間 ÷ 12 を、テナントの暦と勤務の規則から年度の始めに求めて、会社の設定の版に固定する。
+- 月平均の所定労働時間 ＝ 1 年の所定労働時間 ÷ 12 を、テナントの暦と勤務の規則から年度の始めに求めて、会社の設定のバージョンに固定する。
 
 端数の設定（`overtime_rounding`。テナントが有効日付で選ぶ。並行稼働で現行のシステムに合わせるため）：
 
@@ -397,7 +397,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 ## 10. 年末調整（E13）
 
 - MVP の後の Epic で扱う（[intent.md](../intent.md)）。最初の年は現行のシステムで行う。
-- 形の見通し：1 年分の確定した結果（支給、社会保険料、源泉所得税）と、申告（扶養控除等、配偶者控除等、基礎控除、保険料控除、住宅借入金等特別控除）から、年税額と過不足を求める純粋な計算。入力のスナップショット・規則表の版・エンジンの版の形は月次と同じ。過不足は 12 月（または 1 月）の給与の差額の行として出す。
+- 形の見通し：1 年分の確定した結果（支給、社会保険料、源泉所得税）と、申告（扶養控除等、配偶者控除等、基礎控除、保険料控除、住宅借入金等特別控除）から、年税額と過不足を求める純粋な計算。入力のスナップショット・規則表のバージョン・エンジンのバージョンの形は月次と同じ。過不足は 12 月（または 1 月）の給与の差額の行として出す。
 - 源泉徴収票・給与支払報告書は、マイナンバーを要するので保管庫の中で作る（[ADR-0005](../decisions/0005-security-and-my-number.md)）。
 - ADR は E13 の着手のときに起票する。領域の番号の範囲（0030〜0034）は使い切っているので、E13 の ADR は 0064〜0066 を使う（[architecture/README.md](README.md) の 7 節の表に予約した）。
 
@@ -405,8 +405,8 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 
 | 障害 | 振る舞い |
 | --- | --- |
-| 改正の規則表の公開が適用に間に合わない | 支給日の前に、適用の鍵の日に有効な `published` の版がない実行の入力の固定を拒む（`RULE_TABLE_MISSING`）。古い版で黙って計算しない |
-| 取り込んだ規則表の誤り（公開の後に発覚） | 訂正の版を公開し、遡及の候補を作る（2.1 節）。影響する確定済みの実行の一覧を出す |
+| 改正の規則表の公開が適用に間に合わない | 支給日の前に、適用の鍵の日に有効な `published` のバージョンがない実行の入力の固定を拒む（`RULE_TABLE_MISSING`）。古いバージョンで黙って計算しない |
+| 取り込んだ規則表の誤り（公開の後に発覚） | 訂正のバージョンを公開し、遡及の候補を作る（2.1 節）。影響する確定済みの実行の一覧を出す |
 | 健康保険組合の料率の入力の漏れ | 保険者に有効な料率がなければ、その人を `error` にする |
 | 住民税の通知の取り込みの漏れ（6 月） | 6 月の実行の確認の検査で「通知のない特別徴収の対象」を警告する（前年の通知から推定しない） |
 | 等級表の区分の境界の誤り | 自動の検査（単調、隙間なし）で取り込みの段で止める |
@@ -429,7 +429,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 | DT-JP-004 | 控除の月（4.5 節） |
 | DT-JP-005 | 随時改定の候補（4.6 節） |
 | DT-JP-006 | 遡及の差の税・保険の扱い（9 節） |
-| DT-JP-007 | 雇用保険の料率の版の選択（締日の前後） |
+| DT-JP-007 | 雇用保険の料率のバージョンの選択（締日の前後） |
 | DT-JP-008 | 住民税の退職の月（6.3 節） |
 | DT-JP-009 | 割増の倍率（7.2 節） |
 | DT-JP-010 | 名前付きの丸め（9 節） |
@@ -481,7 +481,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 
 ### 決定
 
-- **規則表は種類ごとの適用の鍵で版を持ち、2 人の独立の照合を経て公開する**（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)）。
+- **規則表は種類ごとの適用の鍵でバージョンを持ち、2 人の独立の照合を経て公開する**（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)）。
 - **甲欄の月額表は、表引きと電算機特例を会社の設定で選ぶ。既定は表引き**（[ADR-0031](../decisions/0031-income-tax-withholding.md)）。[intent.md](../intent.md) の「選定・計測で決めるもの」の 1 つ目をこれで閉じる（特例の端数は告示で確かめた）。
 - **健康保険の側（一般、介護、支援金）は合算して 1 回丸め、厚生年金は別に丸める**。テナントは保険者に合わせて変えられる（[ADR-0032](../decisions/0032-social-insurance-premiums-and-standard-remuneration.md)）。
 - **控除の月の既定は前月分**。
@@ -525,7 +525,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 
 - `statutory-rate-calendar.md`：改正の暦（1 月の源泉、3 月分の健康保険・介護、4 月分の支援金、4 月の雇用保険、9 月分の定時決定、2027 年 9 月の厚生年金の上限）。いつ資料が出るか、いつまでに公開するか。
 - `rule-table-import-and-verify.md`：取り込み・照合・公開の手順と、照合の不一致のときの扱い。
-- `rule-table-correction.md`：公開の後に誤りが分かったときの訂正の版と、遡及の候補の確認。
+- `rule-table-correction.md`：公開の後に誤りが分かったときの訂正のバージョンと、遡及の候補の確認。
 - `resident-tax-notice-import.md`：5 月の通知の取り込みと、6 月の実行の前の検査。
 
 ### data-model（索引への追加の提案）
@@ -535,7 +535,7 @@ premium(category) = hourly_base × multiplier(category) × hours(minutes(categor
 | Aurora（テナントの外）`rule_tables`、`rule_rows_*` | 2.1 節。全テナントに共通 |
 | Aurora `tenant_rule_tables`（健康保険組合の料率など） | 2.1 節。テナントの中 |
 | Aurora facet `worker_tax_profile`、`worker_social_insurance`、`worker_employment_insurance` | 3.2・4.2・5.2 節 |
-| Aurora `company_payroll_settings`（版） | 源泉の方式、控除の月、丸めの単位、割増の端数、日割りの方式、年休の賃金 |
+| Aurora `company_payroll_settings`（バージョン） | 源泉の方式、控除の月、丸めの単位、割増の端数、日割りの方式、年休の賃金 |
 | Aurora `resident_tax_notices` | 6.2 節 |
 | Aurora `si_revision_candidates`、`si_regular_determinations` | 4.6・4.7 節 |
 | S3（Object Lock）`rule-sources/{kind}/{sha256}` | 2.2 節。元のファイル |

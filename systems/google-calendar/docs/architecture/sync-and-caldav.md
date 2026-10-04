@@ -311,7 +311,7 @@ sequenceDiagram
   D->>D: 旧と新の差（参加者の追加・削除、SEQUENCE を上げる変更）
   D->>W: 主催者の写しを書く（origin=caldav）
   W->>W: SEQUENCE の決定（invitations-and-itip の 5.3 節）、outbox に REQUEST・CANCEL
-  W-->>D: 版、正規化の有無
+  W-->>D: バージョン、正規化の有無
   D-->>C: 204（正規化したら ETag なし）
   I->>I: 内部の写しと iMIP（ADR-0014・0015）
 ```
@@ -336,8 +336,8 @@ DT-DAV-002。旧と新の VEVENT の差を、マスターと上書きごとに�
 | それ以外（時刻、規則、SUMMARY、他の人の ATTENDEE、ORGANIZER） | 拒否 `403` `CALDAV:allowed-attendee-scheduling-object-change` |
 
 - 拒否は全体で行う（一部だけ受けない）。クライアントは再び `GET` して直す。
-- `guest_permissions.can_modify` が真でも、CalDAV からの共有の項目の変更は受けない。画面と API の参加者の変更の経路（`X-MODIFY`、[invitations-and-itip.md](invitations-and-itip.md) の 8.2 節）は、版の衝突を利用者に示す画面が要るためである。
-- 参加者の写しには `Schedule-Tag` を出す。値は `"<organizer_version>"`。自分の項目の変更では変わらない。クライアントが `If-Schedule-Tag-Match` を送れば、自分の出欠の変更が、主催者の新しい版とぶつからない限り通る（RFC 6638 の 3.2.10 節）。
+- `guest_permissions.can_modify` が真でも、CalDAV からの共有の項目の変更は受けない。画面と API の参加者の変更の経路（`X-MODIFY`、[invitations-and-itip.md](invitations-and-itip.md) の 8.2 節）は、バージョンの衝突を利用者に示す画面が要るためである。
+- 参加者の写しには `Schedule-Tag` を出す。値は `"<organizer_version>"`。自分の項目の変更では変わらない。クライアントが `If-Schedule-Tag-Match` を送れば、自分の出欠の変更が、主催者の新しいバージョンとぶつからない限り通る（RFC 6638 の 3.2.10 節）。
 
 ### 7.3 `SCHEDULE-AGENT`
 
@@ -491,7 +491,7 @@ stateDiagram-v2
 - **PROP-SYNC-001（差分と全件）**：任意の書き込みの列（並行、ACL の変更、tzdb の再計算、参加者の写しの `hidden`・`cancelled` を含む）と任意の時点のトークンで、差分を順に当てた結果が全件の取り直しと一致する（[quality.md](../quality.md) の 2.2.1 節 G）。Web・API・CalDAV の 3 つの経路で同じ例を使う。
 - **PROP-SYNC-002（切り詰め）**：任意の大きさの差分を 1,000 件で切って続きのトークンで繰り返した結果が、切らない差分と一致する。
 - **PROP-DAV-001（見え方）**：任意の ACL と公開範囲で、CalDAV の `calendar-data`・`calendar-query`（`text-match` を含む）・ICS の公開に、`redact()` が隠す項目が現れない。中身の語の `text-match` で `private` の予定が当たらない。
-- **PROP-DAV-002（往復）**：任意の予定オブジェクトを CalDAV で `GET` して同じ本文を `If-Match` つきで `PUT` しても、予定オブジェクトは変わらない（版も上がらない）。
+- **PROP-DAV-002（往復）**：任意の予定オブジェクトを CalDAV で `GET` して同じ本文を `If-Match` つきで `PUT` しても、予定オブジェクトは変わらない（バージョンも上がらない）。
 - **PROP-DAV-003（参加者の写し）**：参加者の写しへの任意の `PUT` で、共有の項目が変わらない。受けた `PUT` の後の写しは、主催者の写しの共有の項目と一致する。
 - **PROP-ICS-001（購読の差分）**：任意の 2 つの ICS の本文 A・B で、A を取り込んだ後に B を取り込んだ結果が、B だけを取り込んだ結果と同じ予定オブジェクトの集合になる。書いた予定オブジェクトの数は、UID ごとの内容のハッシュが変わったものの数に等しい。
 
@@ -524,7 +524,7 @@ stateDiagram-v2
 
 - **CalDAV の URL の形**：主体・ホーム・コレクション・リソースの 4 層。共有のカレンダーは見る人のホームに同じ ID で（ADR-0023）。
 - **空き時間だけのカレンダー**：CalDAV に出さない（ADR-0023）。
-- **ETag**：版と見え方の記号。正規化したら `PUT` の応答に ETag を返さない（ADR-0023）。
+- **ETag**：バージョンと見え方の記号。正規化したら `PUT` の応答に ETag を返さない（ADR-0023）。
 - **`sync-collection` の切り詰め**：1,000 件と 507（ADR-0023）。
 - **参加者の写しへの `PUT`**：自分の項目だけ受ける。`can_modify` でも CalDAV からは共有の項目を受けない（ADR-0024）。
 - **`SCHEDULE-AGENT=CLIENT`**：外部の参加者にだけ従う（ADR-0024）。
@@ -556,7 +556,7 @@ stateDiagram-v2
 - `credential-compromise.md`：CalDAV の認証の失敗の急増（6.7 節の種類ごと）と、アプリ用のパスワードの一括の取り消し。
 
 統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
-- `caldav-client-regression.md`：クライアントの新しい版での 4xx の急増の調べ方（`User-Agent` の大分類、記録した通信の取り直し）。
+- `caldav-client-regression.md`：クライアントの新しいバージョンでの 4xx の急増の調べ方（`User-Agent` の大分類、記録した通信の取り直し）。
 - `ics-subscription-failures.md`：取得の失敗の急増の切り分け（egress の NAT、相手の障害、宛先の検査の拒否）と、取得を止める `ops.ics_fetch_interval_min`。
 
 ### data-model（索引への追加の提案）

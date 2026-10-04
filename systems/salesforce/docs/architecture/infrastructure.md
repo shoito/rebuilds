@@ -151,7 +151,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 ### 4.5 Valkey
 
 - ElastiCache（Valkey）、クラスタモード、`cache.r7g.large` × 3 シャード × 2。失われてよい（ADR-0001）。
-- 中身：メタデータの部品（L2）と今の版の値、割り当ての 1 分の桶、組織の設定のキャッシュ、Pub/Sub の版の通知。
+- 中身：メタデータの部品（L2）と今のバージョンの値、割り当ての 1 分の桶、組織の設定のキャッシュ、Pub/Sub のバージョンの通知。
 - 障害の時：部品は L3（Aurora）から作る。割り当ては fail open（[ADR-0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md)）。
 
 ### 4.6 S3
@@ -159,7 +159,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 | バケット | 中身 | 暗号 | 複製 |
 | --- | --- | --- | --- |
 | `org-files` | 一括の CSV・結果、レポートの結果、エクスポート、添付、メールの原本 | 組織の DEK＋SSE-KMS | 大阪へ |
-| `packages` | メタデータのパッケージ、パッケージの版（E13） | SSE-KMS | 大阪へ |
+| `packages` | メタデータのパッケージ、パッケージのバージョン（E13） | SSE-KMS | 大阪へ |
 | `static` | SPA の資産 | SSE-S3 | 大阪へ |
 | log-archive の `audit-archive` | 監査の外部の保管と錨 | 組織の `audit` の DEK＋SSE-KMS、Object Lock | 大阪へ |
 
@@ -188,7 +188,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 ### 6.1 流れ
 
 ```
-1 準備      ：先のクラスタのマイグレーションの版が同じ。組織の shard_no の分割が先にある。移動の間のマイグレーションを止める
+1 準備      ：先のクラスタのマイグレーションのバージョンが同じ。組織の shard_no の分割が先にある。移動の間のマイグレーションを止める
 2 写し      ：元に公開 org_move_<id>（全ての組織の表、WHERE org_id = '…'、publish_via_partition_root）→ 先で購読
 3 付随の写し：events の 3 日分と history の 18 か月分（同じ方法）、S3 の <org_id>/ の接頭辞、OpenSearch（先の索引へ作り直し）
 4 追いつき  ：遅れが 5 秒を下回り続ける
@@ -210,7 +210,7 @@ org_placements[org_id] があれば → (cell_id, cluster_id)
 | --- | --- |
 | 監査の鎖 | 行をそのまま写すので続く。錨は `org_id` の単位 |
 | `replay_id` | 写した値のまま。先の Relay は、先の outbox から続ける（止めの間に元の outbox を全て送り終える） |
-| 共有の世代・ルールの版のジョブ | 移動の前に完了か保留にする。動いているジョブがあれば移動を始めない |
+| 共有の世代・ルールのバージョンのジョブ | 移動の前に完了か保留にする。動いているジョブがあれば移動を始めない |
 | 一括のジョブ・予定の経路 | 止めの間は待たせ、切り替えの後に先の Worker が続ける（`jobs` の行も写す） |
 | 検索 | 先の索引ができるまで、元の索引を読む（組織の単位で索引の置き場所を持つ） |
 | 割り当ての数 | Valkey は先で作り直す。`org_usage_minutes` から戻す |

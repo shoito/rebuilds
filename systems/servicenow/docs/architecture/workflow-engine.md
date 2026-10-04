@@ -1,14 +1,14 @@
 # Workflow engine: ServiceNow
 
-フローの定義（ノーコードの DSL）と版、トリガー、実行とタイマー、承認（多段・代理・期限切れ）、レコードのルール（同期・非同期、スクリプトなし）、外への呼び出し、上限とテナントの間の公平性を決める。
+フローの定義（ノーコードの DSL）とバージョン、トリガー、実行とタイマー、承認（多段・代理・期限切れ）、レコードのルール（同期・非同期、スクリプトなし）、外への呼び出し、上限とテナントの間の公平性を決める。
 
 前提の決定は、ワークフロー・承認・SLA を Aurora の上の自前のエンジンで動かし、遷移をレコードと同じトランザクションで 1 回だけ行うこと（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)）、テナントに任意のコードを書かせず、条件は副作用のない式の言語で書くこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）である。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0014](../decisions/0014-flow-dsl-and-versioning.md) | フローは JSON の文書で、決まった 16 種のノードと式の言語だけで書く。公開すると内容のハッシュを持つ不変の版になる。実行は開始したときの版に固定し、版の移し替えはしない |
+| [0014](../decisions/0014-flow-dsl-and-versioning.md) | フローは JSON の文書で、決まった 16 種のノードと式の言語だけで書く。公開すると内容のハッシュを持つ不変のバージョンになる。実行は開始したときのバージョンに固定し、バージョンの移し替えはしない |
 | [0015](../decisions/0015-flow-execution-and-timers.md) | 実行は `flow_run`・`flow_step`・`timer` の表で持ち、1 回のステップの進みを 1 つのトランザクションで行う。トリガーはレコードの保存と同じトランザクションで実行を作る。止まった実行は不変条件の検査で見つけて戻す |
-| [0016](../decisions/0016-approvals.md) | 承認は承認のまとまりと個々の承認の 2 つの行で持ち、回答は版の条件付きの更新で 1 回だけ反映する。本人の承認の禁止を既定にし、承認の記録が要るテーブルでは期限切れの自動の承認を許さない。メールの返信での承認は MVP で受けない |
+| [0016](../decisions/0016-approvals.md) | 承認は承認のまとまりと個々の承認の 2 つの行で持ち、回答はバージョンの条件付きの更新で 1 回だけ反映する。本人の承認の禁止を既定にし、承認の記録が要るテーブルでは期限切れの自動の承認を許さない。メールの返信での承認は MVP で受けない |
 | [0017](../decisions/0017-no-code-record-rules.md) | レコードのルールは「保存の前」「保存の後（同じトランザクション）」「非同期」の 3 種で、決まった操作だけを持つ。連鎖の深さを 3、同じ原因の中の同じルールの再実行を禁止する |
 | [0018](../decisions/0018-flow-limits-and-tenant-fairness.md) | テナントごと・実行ごとの上限を置き、タイマーの取得をテナントごとの取り分で行い、SLA と承認の発火をフローのステップより先にする |
 
@@ -16,7 +16,7 @@
 
 ## 1. 目的と範囲
 
-- 扱う：フローの DSL と検証、版と公開、トリガー（レコード・時刻・手動・API）、実行の状態機械、ステップの実行とタイマー、条件の待ち、サブフロー、承認と代理と期限切れ、レコードのルール、外への呼び出し（Webhook）、再試行と失敗の扱い、上限と公平性、完了した実行の保持。
+- 扱う：フローの DSL と検証、バージョンと公開、トリガー（レコード・時刻・手動・API）、実行の状態機械、ステップの実行とタイマー、条件の待ち、サブフロー、承認と代理と期限切れ、レコードのルール、外への呼び出し（Webhook）、再試行と失敗の扱い、上限と公平性、完了した実行の保持。
 - 扱わない：SLA の計時（[sla-and-calendars.md](sla-and-calendars.md)。タイマーの表は共有する）、通知のテンプレートと配信（`notifications-and-email-ingest.md`）、変更の承認の方針（CAB、リスク）の業務の中身（`itsm-processes.md`）、カタログの品目のフロー（`service-catalog-and-requests.md`）、割り当ての規則（`assignment-and-on-call.md`）。
 - **状態の遷移は、この領域の実行器だけが行う。** 画面・API・メールは、承認の回答やレコードの保存を Record Service に渡し、実行器が同じトランザクションの中で次の遷移を決める。
 
@@ -27,14 +27,14 @@
 | フローの部品 | トリガー、アクション、サブフロー、条件（フローの論理）でフローを組む | [Flows, subflows, and actions reference](https://www.servicenow.com/docs/bundle/yokohama-build-workflows/page/administer/flow-designer/reference/flow-designer-reference.html) |
 | 承認のアクション | 規則：「誰か 1 人が承認」「全員が承認」「全員が回答し、誰か 1 人が承認」「% の人が承認」「n 人が承認」。却下の規則も持つ。期限を過ぎたら自動で承認・却下・取り消しにできる。承認の結果を待って次へ進む | [Ask for Approval action](https://www.servicenow.com/docs/r/washingtondc/build-workflows/ask-approval-flow-designer.html) |
 | 上限の既定値 | ループの繰り返し 1,000、フローのアクション 50、アクションのステップ 20、アクションの入力 20、分岐 100 など | [Flow Designer system properties](https://www.servicenow.com/docs/bundle/washingtondc-build-workflows/page/administer/flow-designer/reference/flow-designer-system-properties.html) |
-| 版 | 公開した版は 1 つだけ有効で、過去の版は記録として残る。新しい版を公開しても、動いている実行は影響を受けない | 旧来のワークフローについての本家の KB（[Overview: Workflow Versioning](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0538526)、検索の結果の抜粋で確認）。Flow Designer は、設定を変えて公開し直しても動いているフローは変わらないとする（[Flow execution details](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/flow-execution-details.html)）。版の対応の細部は未検証（本家の振る舞いで、設計の前提ではない） |
+| バージョン | 公開したバージョンは 1 つだけ有効で、過去のバージョンは記録として残る。新しいバージョンを公開しても、動いている実行は影響を受けない | 旧来のワークフローについての本家の KB（[Overview: Workflow Versioning](https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0538526)、検索の結果の抜粋で確認）。Flow Designer は、設定を変えて公開し直しても動いているフローは変わらないとする（[Flow execution details](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/flow-execution-details.html)）。バージョンの対応の細部は未検証（本家の振る舞いで、設計の前提ではない） |
 | 条件の待ち | フローの中で、レコードの値が条件に合うまで待つアクションがある。期限を付けると、合わないまま期限が来たら待たずに次へ進む | [Wait For Condition](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/wait-for-condition-flow-designer.html) |
 | レコードのルール | サーバーのスクリプト（Business Rules）で、保存の前・後・非同期に処理を書く | [ADR-0001](../decisions/0001-platform-and-stack.md) の Context。保存の前・後・非同期・表示の種類はコミュニティの記事で確認。順序の細部は未検証（本家の振る舞いで、設計の前提ではない） |
 
 - 本家のフローの実行の基盤（表の形、タイマーの取り方）は、公開の資料で確かめられなかった（未検証。本家の振る舞いで、設計の前提ではない）。
 - 本家のフローの定義の形式・アクションの名前は写さない。スクリプトのステップは持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
-## 3. フローの DSL と版（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）
+## 3. フローの DSL とバージョン（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）
 
 ### 3.1 文書の形
 
@@ -96,18 +96,18 @@ Node = { type, next?: <node_id>, ...type ごとの設定 }
 - `wait_condition` の期限を必須にするのは、条件が永遠に真にならない実行を残さないためである。期限が来たら、`on_timeout` の辺へ進む。
 - `wait_duration` の業務カレンダーの時間は、[sla-and-calendars.md](sla-and-calendars.md) の `addBusinessTime` で待ち終わりの時刻を計算し、タイマーに登録する。
 
-### 3.4 版と公開
+### 3.4 バージョンと公開
 
 | 表 | 列 |
 | --- | --- |
 | `flow_def` | `tenant_id`、`id`、`stable_key`、`name`、`kind`（`flow` / `subflow`）、`draft`（編集中の文書）、`active_version_id`、`active`、`owner_role_id` |
 | `flow_version` | `tenant_id`、`id`、`flow_def_id`、`version_no`、`document`、`content_hash`、`compiled`（コンパイル済みの形）、`published_at`、`published_by`、`engine_schema` |
 
-- 管理者は `draft` を編集する。**公開すると、`draft` を検証・コンパイルし、新しい `flow_version` の行を作る。** `flow_version` は変えない（DB のロールで `UPDATE` を与えない）。`active_version_id` を新しい版に向け、`meta_version` を上げる（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 9 節）。
-- **実行は `flow_version_id` を持ち、最後までその版で進む。** 新しい版への移し替えはしない。古い版で止めたい実行は、管理者が「取り消し」にして、新しい版で始め直す（画面で対象の実行を条件で選んで一括で行える）。
-- サブフローの呼び出しは、呼ぶ側の公開の時点のサブフローの版に固定する（`subflow` のノードに `flow_version_id` をコンパイルの時に書き込む）。サブフローを新しく公開しても、呼ぶ側を公開し直すまで古い版を呼ぶ。版の間の依存を実行の時に解かないためである。
-- 動いている実行が 1 つでも使っている版は消さない。完了した実行の保持（13 節）の後に、使われていない古い版を消せる。
-- エンジンの版（`engine_schema`）：DSL の意味を変える変更（ノードの振る舞いの修正）は、新しい `engine_schema` として出し、古い `engine_schema` の版は古い意味で動かす。コードは両方の意味を持つ（`delivery.md` のフラグと同じ扱い）。
+- 管理者は `draft` を編集する。**公開すると、`draft` を検証・コンパイルし、新しい `flow_version` の行を作る。** `flow_version` は変えない（DB のロールで `UPDATE` を与えない）。`active_version_id` を新しいバージョンに向け、`meta_version` を上げる（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 9 節）。
+- **実行は `flow_version_id` を持ち、最後までそのバージョンで進む。** 新しいバージョンへの移し替えはしない。古いバージョンで止めたい実行は、管理者が「取り消し」にして、新しいバージョンで始め直す（画面で対象の実行を条件で選んで一括で行える）。
+- サブフローの呼び出しは、呼ぶ側の公開の時点のサブフローのバージョンに固定する（`subflow` のノードに `flow_version_id` をコンパイルの時に書き込む）。サブフローを新しく公開しても、呼ぶ側を公開し直すまで古いバージョンを呼ぶ。バージョンの間の依存を実行の時に解かないためである。
+- 動いている実行が 1 つでも使っているバージョンは消さない。完了した実行の保持（13 節）の後に、使われていない古いバージョンを消せる。
+- エンジンのバージョン（`engine_schema`）：DSL の意味を変える変更（ノードの振る舞いの修正）は、新しい `engine_schema` として出し、古い `engine_schema` のバージョンは古い意味で動かす。コードは両方の意味を持つ（`delivery.md` のフラグと同じ扱い）。
 
 ### 3.5 公開の時の検証（DT-FLOW-001）
 
@@ -118,7 +118,7 @@ Node = { type, next?: <node_id>, ...type ごとの設定 }
 | 3 | 式の型検査（辞書のフィールドの存在と型） | 422 `expression_error` |
 | 4 | `writes` に書くテーブルがすべて入っている | 422 `undeclared_write` |
 | 5 | `wait_condition` に期限がある | 422 |
-| 6 | サブフローの入れ子の深さ（呼ぶ先の版を含めて 3） | 422 |
+| 6 | サブフローの入れ子の深さ（呼ぶ先のバージョンを含めて 3） | 422 |
 | 7 | 同じテーブルの `record_updated` のトリガーで、自分が書くフィールドを条件に含み「真の間は毎回」 | 警告（公開はできる。自己の再起動の危険） |
 | 8 | 承認の記録が要るテーブル（`requires_explicit_approval`）で、期限切れの動作が「承認」 | 422 `auto_approve_forbidden`（7.4 節） |
 
@@ -142,7 +142,7 @@ Node = { type, next?: <node_id>, ...type ごとの設定 }
 
 - `timer` は [ADR-0004](../decisions/0004-workflow-and-sla-engine.md) の 1 つの表で、フロー・承認・SLA・当番の呼び出しが共有する。索引は `(shard, due_at)` と `(tenant_id, target_id)`。
 - 種類の追加（統合で決めた）：`page_escalation` は当番の呼び出しの段の進み（[assignment-and-on-call.md](assignment-and-on-call.md) の 6.3 節。優先度 0）、`bulk_step` は `bulk_job` の次の 100 件の処理（5.3 節。優先度 3）。種類を足すときは、8.2 節の表と観測のヒストグラムの種類のラベル（[observability.md](observability.md) の 3.3 節）を同じ PR で足す。
-- `target_version`：タイマーを作ったときの対象（実行・承認・SLA の計時）の版。発火のときに対象の版と違えば、何もせず消す（古いタイマー）。
+- `target_version`：タイマーを作ったときの対象（実行・承認・SLA の計時）のバージョン。発火のときに対象のバージョンと違えば、何もせず消す（古いタイマー）。
 
 ### 5.2 実行の状態機械
 
@@ -175,7 +175,7 @@ DT-FLOW-002（実行の遷移）：
 | 7 | `waiting` | 待ちの期限 | `running` | `on_timeout` の辺への `run_step` |
 | 8 | 終わっていない | 取り消し | `cancelled` | 待ちの行・タイマーを消す、開いている承認を `cancelled`、子の実行の取り消し |
 | 9 | `completed`・`failed`・`cancelled` | どの事象も | 変わらない | 何もしない（古いタイマーを消すだけ） |
-| 10 | - | 対象の版とタイマーの `target_version` が違う | 変わらない | タイマーを消すだけ |
+| 10 | - | 対象のバージョンとタイマーの `target_version` が違う | 変わらない | タイマーを消すだけ |
 
 ### 5.3 1 回の進み ＝ 1 つのトランザクション
 
@@ -215,7 +215,7 @@ worker loop（shard ごと）:
 - `call_webhook` は、outbox に `webhook.request` を書く。Notifier が送る。
 - **冪等のキーは、`run_id`・`node_id`・`iteration` から作る。** 配送の再試行（同じ依頼の送り直し）は同じキーを使い、`<Brand>-Idempotency-Key` のヘッダーで送る（ヘッダーの形は `api-and-integrations.md`）。[ADR-0004](../decisions/0004-workflow-and-sla-engine.md) の「`(flow_run, step, attempt)` から作った冪等のキー」の `attempt` は、このノードの実行の回（`iteration`）と読む。配送の再試行の回数をキーに入れると、受け手が重複を見分けられないためである。
 - 配送の再試行：指数の間隔（最初 10 秒、最大 1 時間）で、24 時間まで。4xx（408・429 を除く）は再試行しない。
-- 結果を待つとき：Notifier が結果（状態のコード、応答の本文の先頭 64 KB）を `webhook_result` として書き、同じトランザクションで実行の `run_step` のタイマーを作る。結果が同じキーで 2 回届いても、2 回目は実行の版が進んでいるので何もしない。
+- 結果を待つとき：Notifier が結果（状態のコード、応答の本文の先頭 64 KB）を `webhook_result` として書き、同じトランザクションで実行の `run_step` のタイマーを作る。結果が同じキーで 2 回届いても、2 回目は実行のバージョンが進んでいるので何もしない。
 - 秘密の値（資格情報）は、フローの文書に入れず、テナントの資格情報の保管（KMS で暗号化）を名前で参照する。
 - 宛先は、テナントが登録した許可の一覧のホストだけにする。プライベートの IP・リンクローカル・メタデータのアドレスへの解決を拒否する（SSRF の対策。Notifier で名前解決の後に確かめる）。
 
@@ -235,10 +235,10 @@ worker loop（shard ごと）:
 | `after_save` | 保存の流れの 7 段（同じトランザクション） | 他のレコードの作成・更新（1 回の保存で 10 件まで）、通知の依頼 | 外への呼び出し、自分のレコードの更新（`before_save` で行う） |
 | `async` | コミットの後、outbox から Engine が行う | `after_save` と同じ＋外への呼び出し | - |
 
-- ルールは `record_rule(tenant_id, id, stable_key, table_id, kind, on: [insert, update, delete], condition, actions[], order, active)` で、メタデータとして版を持つ。
+- ルールは `record_rule(tenant_id, id, stable_key, table_id, kind, on: [insert, update, delete], condition, actions[], order, active)` で、メタデータとしてバージョンを持つ。
 - 親のクラスのルールは子のクラスにも効く。順序は `order` の昇順、同じなら親のクラスのルールが先、さらに同じなら `stable_key` の順。
 - 条件と値は式の言語で書く。`before_save` の条件は、変わったフィールド（`changes.<field>`）と前の値（`previous.<field>`）を読める。
-- 組み込みのルール（例：状態が「解決」になったら `resolved_at` を入れる）も同じ仕組みで持つ（コードの版に含む）。
+- 組み込みのルール（例：状態が「解決」になったら `resolved_at` を入れる）も同じ仕組みで持つ（コードのバージョンに含む）。
 
 ### 6.2 連鎖と上限
 
@@ -293,7 +293,7 @@ answer(approval_id, actor, decision, expected_version):
   COMMIT
 ```
 
-- 同じ承認への 2 つの回答は、行のロックと版の条件で、先にコミットしたほうだけが効く。後のほうは 409 になる。
+- 同じ承認への 2 つの回答は、行のロックとバージョンの条件で、先にコミットしたほうだけが効く。後のほうは 409 になる。
 - まとまりの決着は、`approval_set` の行のロックの下で評価するので、並行の 2 つの回答が同時に「最後の 1 人」を数えても、決着は 1 回だけ起きる（PROP-FLOW-003）。
 
 DT-APR-001（回答できるか）：
@@ -421,7 +421,7 @@ $$;
 - **PROP-FLOW-001（ちょうど 1 回）**：任意のフローの文書と、任意の順序・重複のタイマーの発火と、任意のワーカーの数で、各ノードの効果（`flow_step` の `completed` の行とレコードへの書き込み）は、実行の経路の上でちょうど 1 回。
 - **PROP-FLOW-002（実行の作成）**：任意の保存の列（途中で巻き戻る保存を含む）で、トリガーに合うコミットした保存と作られた実行が 1 対 1 に対応する。
 - **PROP-FLOW-003（承認の 1 回の決着）**：任意の承認の規則・承認者の数・並行の回答・期限の発火の列で、まとまりの決着はちょうど 1 回、実行の再開もちょうど 1 回。
-- **PROP-FLOW-004（版の固定）**：任意の実行の途中で任意の回数だけ新しい版を公開しても、その実行が動かすノードは、開始したときの版のノードだけ。
+- **PROP-FLOW-004（バージョンの固定）**：任意の実行の途中で任意の回数だけ新しいバージョンを公開しても、その実行が動かすノードは、開始したときのバージョンのノードだけ。
 - **PROP-FLOW-005（止まらない）**：任意の事象の列の後で、INV-FLOW-001 が成り立つ。
 - **PROP-FLOW-006（停止）**：任意の公開できたフローの文書で、実行が動かすノードの数は、ノードの数と `for_each` の上限から決まる有限の値を超えない。
 - **PROP-FLOW-007（公平）**：任意のテナントごとのタイマーの数の偏りで、1 回の取得に 1 つのテナントのタイマーは 20 件を超えず、期限の来たタイマーを持つテナントは有限の回の取得で必ず取られる。
@@ -463,8 +463,8 @@ $$;
 
 ### 決定（2026-09-28、既定案）
 
-- **実行の新しい版への移し替えはしない**：取り消して始め直す（3.4 節、ADR-0014）。
-- **サブフローの版は、呼ぶ側の公開の時点に固定する**（3.4 節）。
+- **実行の新しいバージョンへの移し替えはしない**：取り消して始め直す（3.4 節、ADR-0014）。
+- **サブフローのバージョンは、呼ぶ側の公開の時点に固定する**（3.4 節）。
 - **`wait_condition` の期限を必須にする**（3.3 節）。
 - **待たないノードは 1 つのトランザクションで最大 20 ノード・200ms まで続ける**（5.3 節、ADR-0015）。
 - **フローの実行の主体は、始めた利用者ではなくフローの定義で決める**（5.4 節）。

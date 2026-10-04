@@ -209,7 +209,7 @@ erDiagram
 
 ### tenant_config_versions
 
-テナントの設定の版。全タスクが 5 秒ごとにポーリングで読む（ADR-0032）。
+テナントの設定のバージョン。全タスクが 5 秒ごとにポーリングで読む（ADR-0032）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -219,7 +219,7 @@ erDiagram
 
 - 主キー：`(tenant_id)`。
 - 索引：`(updated_at)`（ポーリングの `updated_at > :last`）。
-- 版を上げる表（設定の表）：`tenants`、`clients`、`client_credentials`、`resource_servers`、`client_grants`、`connections`、`connection_clients`、`branding_themes`、`branding_texts`、`legal_documents`、`email_templates`、`email_providers`、`trigger_bindings`、`organizations` と `organization_connections`（E14）。CI で、これらへの書き込みが版を上げる関数を呼ぶことを確かめる（[tenants-and-applications.md](../tenants-and-applications.md) の 10 節）。
+- バージョンを上げる表（設定の表）：`tenants`、`clients`、`client_credentials`、`resource_servers`、`client_grants`、`connections`、`connection_clients`、`branding_themes`、`branding_texts`、`legal_documents`、`email_templates`、`email_providers`、`trigger_bindings`、`organizations` と `organization_connections`（E14）。CI で、これらへの書き込みがバージョンを上げる関数を呼ぶことを確かめる（[tenants-and-applications.md](../tenants-and-applications.md) の 10 節）。
 - S1 の規模：約 1 万行。
 
 ### tenant_hostnames

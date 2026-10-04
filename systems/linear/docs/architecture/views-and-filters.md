@@ -163,7 +163,7 @@ ADR-0028。
 
 - `title contains q`：`norm(title)` が `norm(q)` を部分文字列として含む。
 - `norm` は共有のパッケージの `normalizeForSearch`：NFKC → 英字の小文字化 → カタカナをひらがなに寄せる → 連続する空白を 1 つにする（[client-app.md](client-app.md) の 6 節のコマンドメニューの照合、[search.md](search.md) の 5.1 節と同じ関数）。
-- M2 の `title_norm` はクライアントが同じ関数で作る。サーバーは、Writer が `issues.title_norm`（サーバーだけの列。同期しない）を同じ関数で書く。SQL は `strpos(title_norm, $q_norm) > 0`。PostgreSQL の正規化の関数を使わないのは、Unicode の版の違いで結果がずれうるため。
+- M2 の `title_norm` はクライアントが同じ関数で作る。サーバーは、Writer が `issues.title_norm`（サーバーだけの列。同期しない）を同じ関数で書く。SQL は `strpos(title_norm, $q_norm) > 0`。PostgreSQL の正規化の関数を使わないのは、Unicode のバージョンの違いで結果がずれうるため。
 - `issues.title_norm` の索引は張らない（ビューの問い合わせは他の条件で絞った後に走査する）。全文の検索は [search.md](search.md) で扱う。
 
 ### 4.3 並べ方
@@ -441,7 +441,7 @@ DT-VIEW-003。`View` の `create` と `set filter` の Writer の検証。フィ
 ### runbooks
 
 - `view-query-slow.md`：重い問い合わせの形の見つけ方（中身の値を除いた木の形）、1 つのワークスペースの問い合わせの上限の一時的な引き下げ。
-- `filter-divergence.md`：`view_candidate_rejected` が増えたときの調べ方（例の再現、クライアントの版ごとの割合、評価のパッケージの版の確認）。
+- `filter-divergence.md`：`view_candidate_rejected` が増えたときの調べ方（例の再現、クライアントのバージョンごとの割合、評価のパッケージのバージョンの確認）。
 
 ### data-model（索引への追加の提案）
 

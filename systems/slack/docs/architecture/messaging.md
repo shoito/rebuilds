@@ -163,7 +163,7 @@ thread_subscriptions (workspace_id, root_message_id, member_id,
 本家 Slack のユーザーグループに相当する。E3 の `user-groups` で作る。
 
 - `user_groups (workspace_id, id, handle, name, created_by_member_id, archived_at)` と `user_group_members (workspace_id, group_id, member_id)` を持つ。`handle` はワークスペースの中で一意で、メンバーの表示名とは別の名前空間にする。
-- 本文には、AST に `group_mention { group_id }` のノードを足して表す。AST v1 には無いので、E3 で版の規則（「バージョン管理」）に従って追加する。
+- 本文には、AST に `group_mention { group_id }` のノードを足して表す。AST v1 には無いので、E3 でバージョンの規則（「バージョン管理」）に従って追加する。
 - 通知の Worker は、投稿の時点のグループのメンバーに展開する。そのうえで、チャンネルを読めないメンバーには通知しない（ADR-0005）。展開の上限は、@channel と同じく 500 人ずつに分けて処理する（[read-state-and-notifications.md](read-state-and-notifications.md)）。
 - 作成・編集できるのは owner / admin と、ワークスペースの設定で許可された member。ゲストは使えない。
 
@@ -303,7 +303,7 @@ outbox に積むイベントの一覧。Relay が Valkey の Pub/Sub（リアル
 | `thread_subscription.updated` | 消費しない | `root_message_id`、`subscribed`、`last_read_seq` | ○（本人の端末だけ） | | | | |
 
 - **Worker は、イベントを「きっかけ」として扱い、中身は DB から読み直す。** SQS（標準キュー）は順序を保証せず、重複もある。DB の現在の状態を読めば、順序が入れ替わっても最終状態が正しくなる。
-- `content_seq` は、本文を最後に変えたイベント（作成・編集・削除）の `seq`。検索インデックスの書き込みで、古い内容が新しい内容を上書きしないための版番号に使う（[search.md](search.md)）。
+- `content_seq` は、本文を最後に変えたイベント（作成・編集・削除）の `seq`。検索インデックスの書き込みで、古い内容が新しい内容を上書きしないためのバージョン番号に使う（[search.md](search.md)）。
 - Worker の冪等キーは `(workspace_id, channel_id, seq)`。
 - `channel.*` のイベントは、アプリへのイベント（[apps.md](apps.md) の 6.2 節）の元にもなる。自分の参加・退出は、別にメンバーのストリームの `channel.joined` / `channel.left` で知らせる（[realtime.md](realtime.md) の 5 節）。
 - 差分取得（`GET .../events?after_seq=N`）は、outbox ではなく、イベントを保存するテーブルから読む。テーブルの形は [realtime.md](realtime.md) で決める。

@@ -165,7 +165,7 @@ MVP は E1〜E9。
 | Story | 内容 |
 | --- | --- |
 | `public-api-foundation` | public-api のサービス、認証、エラー、ページング、`Idempotency-Key` |
-| `rest-versioning` | `X-<Brand>-Api-Version` と版の変換（ADR-0021） |
+| `rest-versioning` | `X-<Brand>-Api-Version` とバージョンの変換（ADR-0021） |
 | `openapi-contract` | OpenAPI の生成、`x-required-permissions`、破壊的変更の検査 |
 | `graphql-foundation` | GraphQL のスキーマ、節点ごとの `can`、費用の計算 |
 | `rest-resources-v1` | 初版の資源（3.4 節） |
@@ -263,7 +263,7 @@ MVP は E1〜E9。
 
 - **契約（`.proto`、公開 API、Webhook のペイロード、ワークフローの構文）の確定**：後から変えるコストがいちばん高い。
 - **権限の判定関数と、複製の合意の最終確認**：テストが通っていても、ケースの漏れはエージェント自身では気づきにくい。Dev と QA のレビューを必須にする（[delivery.md](architecture/delivery.md) の 1 節）。
-- **Git の本体の版の更新の判断**：ディスクの形式と互換に触れる。
+- **Git の本体のバージョンの更新の判断**：ディスクの形式と互換に触れる。
 - **本家の名前に代わる実際の名前の決定**（ADR-0006）：商標と登録の判断。
 - **負荷試験・訓練の結果の解釈**：どこに投資するかはプロダクトの判断。
 

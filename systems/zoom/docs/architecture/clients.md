@@ -41,11 +41,11 @@
 | --- | --- |
 | Chrome・Edge（Windows、macOS、Linux、ChromeOS） | 最新 2 メジャー |
 | Firefox（Windows、macOS、Linux） | 最新 2 メジャーと、現行の ESR |
-| Safari（macOS） | 最新 2 メジャー（2026-09-27 の時点で 26 と 27。27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) の版の記録（v8.1.3）、2026-09-27 に確認） |
+| Safari（macOS） | 最新 2 メジャー（2026-09-27 の時点で 26 と 27。27 は 2026-09-14 に公開。[browser-compat-data](https://github.com/mdn/browser-compat-data) のバージョンの記録（v8.1.3）、2026-09-27 に確認） |
 | Safari（iOS・iPadOS） | 同上。iOS の他のブラウザも WebKit なので、同じ扱いにする |
 | Chrome（Android） | 最新 2 メジャー |
 
-- ADR-0003 の Confirmation（最新 2 版で E2E の試験を回す）と揃える。
+- ADR-0003 の Confirmation（最新 2 バージョンで E2E の試験を回す）と揃える。
 - 対応の外のブラウザでも、参加は止めない。「このブラウザは試験していません」と出し、問題があればアプリか対応ブラウザを勧める。E2EE の会議だけは、必要な API がなければ入れない（2.3 節）。
 
 ### 2.2 機能の対応表
@@ -54,7 +54,7 @@
 
 | 機能 | Chrome・Edge | Firefox | Safari | 出典 |
 | --- | --- | --- | --- | --- |
-| mediasoup-client のハンドラー | `Chrome111`（古い版は `Chrome74`） | `Firefox120` | `Safari12` | [mediasoup-client の handlers](https://github.com/versatica/mediasoup-client/tree/v3/src/handlers)（v3.24.1） |
+| mediasoup-client のハンドラー | `Chrome111`（古いバージョンは `Chrome74`） | `Firefox120` | `Safari12` | [mediasoup-client の handlers](https://github.com/versatica/mediasoup-client/tree/v3/src/handlers)（v3.24.1） |
 | simulcast（VP8） | 対応 | 134 から（VP8）、136 から（H.264・AV1） | 対応（H.264 で使う。VP8 の simulcast は MDN に記載がなく**未検証**） | [MDN の WebRTC の符号器](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/WebRTC_codecs) |
 | `scalabilityMode`（SVC） | 111 から | 未対応 | 未対応 | [browser-compat-data の PR #30319](https://github.com/mdn/browser-compat-data/pull/30319)（未マージ） |
 | `RTCRtpScriptTransform`（E2EE） | 141 から | 117 から | 15.4 から | [caniuse](https://caniuse.com/mdn-api_rtcrtpscripttransform)。Baseline 2025 |
@@ -104,7 +104,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 - send の transport 1 本、recv の transport 1 本（[signaling-and-meetings.md](signaling-and-meetings.md) の 8 節）。
 - `produce` の `encodings` と `codec` は、会議の映像のモードから決める（[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 5・7 節）。
 - consumer は `paused` で作られ、映像の要素が画面に入ってから `media.consume.resume` を送る。画面の外に出た映像は、`view.update` から外して止める。
-- mediasoup-client の版は、Media Node の mediasoup の版と組み合わせて試験したものだけを使う。版を上げる PR は、ブラウザの組み合わせの試験を通す。
+- mediasoup-client のバージョンは、Media Node の mediasoup のバージョンと組み合わせて試験したものだけを使う。バージョンを上げる PR は、ブラウザの組み合わせの試験を通す。
 
 ### 3.3 描画
 
@@ -202,7 +202,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
   - 会議の URL（`https://<brand>.<domain>/j/...`）を開くと、アプリで開く（ユニバーサルリンク・アプリのリンク）。
   - 自動更新、コード署名（Windows・macOS の公証）。
 - 安全の設定：`contextIsolation: true`、`sandbox: true`、`nodeIntegration: false`。preload で公開する API は、画面の選択、通知、自動更新だけにする。読み込むのは自分のオリジンだけ。
-- 対応 OS：Windows 10・11（x64、arm64）、macOS の直近 3 版。Linux は MVP の後に回す。
+- 対応 OS：Windows 10・11（x64、arm64）、macOS の直近 3 バージョン。Linux は MVP の後に回す。
 
 ## 8. モバイルアプリ（ADR-0023）
 
@@ -254,7 +254,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 - ベクトルの作り方：
   - 手で書くもの：[signaling-and-meetings.md](signaling-and-meetings.md) の 7 節（再同期）と 12 節（障害）の各行。
   - 生成するもの：TypeScript 版の状態機械を基準にし、fast-check で入力の列を作って期待値を記録する。夜間に 1 万本を作り、差が出たものを固定のベクトルに加える。
-- CI：スキーマのリポジトリの PR で、TypeScript 版と Rust 版の両方に全ベクトルを通す。どちらかが違う出力を出したら、マージしない。スキーマの版を上げる PR は、1 つ前の版のベクトルも通す。
+- CI：スキーマのリポジトリの PR で、TypeScript 版と Rust 版の両方に全ベクトルを通す。どちらかが違う出力を出したら、マージしない。スキーマのバージョンを上げる PR は、1 つ前のバージョンのベクトルも通す。
 - 状態の比べ方は、要約（決めた項目だけ）で行う。実装の中の補助の状態は比べない。
 - E2EE のベクトル（RFC 9605 の試験のベクトル、MLS の試験のベクトル）は [e2ee.md](e2ee.md) の 14 節。
 
@@ -262,11 +262,11 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 
 | 失敗 | 起きること | 対処 |
 | --- | --- | --- |
-| ブラウザの新しい版で API の振る舞いが変わる | 参加できない、映像が出ない | Beta・Dev の版での夜間の試験。runbooks の `browser-release-regression.md` |
+| ブラウザの新しいバージョンで API の振る舞いが変わる | 参加できない、映像が出ない | Beta・Dev のバージョンでの夜間の試験。runbooks の `browser-release-regression.md` |
 | WebGPU のドライバの不具合 | 仮想背景が黒くなる、タブが落ちる | 出力の検査（マスクがすべて 0 か 1 のフレームが 30 続く）で WebGL2 に落とす。端末とドライバの組み合わせを除外の一覧に足す |
 | 仮想背景のモデルの読み込みの失敗 | 仮想背景を選べない | カメラを止めたまま参加させ、理由を示す。処理しない映像は送らない |
 | AudioWorklet の処理の遅れ（CPU の不足） | 音声が途切れる | 処理の遅れを数え、続いたら RNNoise を切ってブラウザの抑制に戻す |
-| mediasoup-client と Media Node の版の組み合わせの不一致 | 交渉に失敗する | 版の組み合わせを CI で固定する。Web は読み込み直しで新しい版になる |
+| mediasoup-client と Media Node のバージョンの組み合わせの不一致 | 交渉に失敗する | バージョンの組み合わせを CI で固定する。Web は読み込み直しで新しいバージョンになる |
 | Electron の Chromium が古い | Web より機能が遅れる | Electron の安定版に 1 か月以内に追いつく |
 | libwebrtc の更新が遅れる（モバイル） | 脆弱性、ストアからの通知 | Chrome の milestone から 2 か月以内（8 節） |
 | TypeScript 版と Rust 版の状態機械の食い違い | 同じ会議でアプリだけ状態がずれる | 9.2 節のベクトル。本番では、再同期の回数をクライアントの種類ごとに監視する |
@@ -361,7 +361,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 - `browser-release-regression.md`：ブラウザの Beta・安定版の更新で参加や映像が壊れたときの確かめ方と、影響するブラウザへの案内の出し方。[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) と共有する。
 - `virtual-background-failures.md`：仮想背景の失敗（GPU のドライバ）の報告が増えたときの、除外の一覧の更新。
-- `desktop-app-update-rollback.md`：Electron のアプリの更新を止め、前の版に戻す手順。
+- `desktop-app-update-rollback.md`：Electron のアプリの更新を止め、前のバージョンに戻す手順。
 
 ### data-model（索引への追加の提案）
 
@@ -370,7 +370,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora `meeting_participations`（signaling-and-meetings.md の提案に列を足す。codecs の提案と 1 つにまとめた。[data-model/meeting-runtime.md](data-model/meeting-runtime.md)） | `client_kind`（`web`・`desktop`・`ios`・`android`・`phone`）、`client_version`、`browser`、`browser_version`、`os` |
-| Aurora `client_releases` | デスクトップ・モバイルの版、配布の状態、最低の版（古すぎる版を止める） |
+| Aurora `client_releases` | デスクトップ・モバイルのバージョン、配布の状態、最低のバージョン（古すぎるバージョンを止める） |
 | 端末の中（`localStorage`・IndexedDB） | 前回の端末の ID、仮想背景の設定と画像、ショートカットの設定。サーバーには置かない |
 
 ## 参考

@@ -197,7 +197,7 @@ erDiagram
 
 ## 3. 認証（Better Auth）
 
-Better Auth（`emailOTP`、Google・Microsoft のソーシャル、`@better-auth/passkey`、`@better-auth/sso`）の表。パスワードは持たないので、パスワードの列と `two_factors` の表は作らない。版を固定し、列は Better Auth の版に合わせて見直す（E2 の `identity-better-auth`）。
+Better Auth（`emailOTP`、Google・Microsoft のソーシャル、`@better-auth/passkey`、`@better-auth/sso`）の表。パスワードは持たないので、パスワードの列と `two_factors` の表は作らない。バージョンを固定し、列は Better Auth のバージョンに合わせて見直す（E2 の `identity-better-auth`）。
 
 ### auth_users
 

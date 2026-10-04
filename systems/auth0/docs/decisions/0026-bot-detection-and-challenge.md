@@ -13,7 +13,7 @@ date: 2026-09-27
 
 候補の条件（2026-09-27 に確認）：
 
-- Cloudflare Turnstile：無料の版は 20 個のウィジェット、ウィジェットごとに 10 個のホスト名まで。任意のホスト名は Enterprise。トークンは 300 秒・1 回限りで、サーバーから siteverify を呼ぶ（[Plans](https://developers.cloudflare.com/turnstile/plans/)、[Server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)）。
+- Cloudflare Turnstile：無料のバージョンは 20 個のウィジェット、ウィジェットごとに 10 個のホスト名まで。任意のホスト名は Enterprise。トークンは 300 秒・1 回限りで、サーバーから siteverify を呼ぶ（[Plans](https://developers.cloudflare.com/turnstile/plans/)、[Server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)）。
 - Google reCAPTCHA：組織ごとに月 10,000 回の評価まで無料（[Compare tiers](https://docs.cloud.google.com/recaptcha/docs/compare-tiers)）。
 - hCaptcha：Pro は年払いで月 99 USD、10 万回。受動のモードは Pro 以上（[hCaptcha Pro](https://www.hcaptcha.com/pro)）。
 - AWS WAF：CAPTCHA は 1,000 回の試行ごと、Challenge は 1,000 回の応答ごとに 0.40 USD。Bot Control は別に課金（[AWS WAF Pricing](https://aws.amazon.com/waf/pricing/)）。本システムは既にエッジで WAF を使う（[infrastructure.md](../architecture/infrastructure.md) の 4.3 節）。
@@ -39,7 +39,7 @@ date: 2026-09-27
 - JavaScript なしの要求は、チャレンジを求められた時点で先へ進めず、IP のバケツを強く絞る。
 - 大きな攻撃では、テナントの全体を WAF の Challenge に切り替える（runbook）。
 - 第三者の CAPTCHA は、L2 の結論の後に、テナントが自分のキーを持ち込む形で足す。足すときは ADR-0005 の縮退の表に「提供者が落ちたら PoW に切り替える」を先に加える。
-- 2 は、外部への同期の依存と、端末の情報の外部への送信（L2）を既定にする。テナントのホスト名の数で無料の版に収まらない。
+- 2 は、外部への同期の依存と、端末の情報の外部への送信（L2）を既定にする。テナントのホスト名の数で無料のバージョンに収まらない。
 - 3 は、テナントごとの設定と識別子ごとのシグナルを使えず、WAF の CAPTCHA は画面の体験をテナントのブランドに合わせにくい。
 
 ## Consequences

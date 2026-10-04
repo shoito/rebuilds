@@ -31,7 +31,7 @@ A と 1 を採用する。詳細は [identity-and-permissions.md](../architectur
 ### Web のログイン
 
 - Better Auth で、パスワード（漏洩済みのものは拒否）、パスキー、2FA（TOTP、セキュリティキー、リカバリーコード）、セッションを扱う。SMS の 2FA は持たない。
-- 使い方の規則は Slack の ADR-0012 と同じにする：Better Auth は「だれか」だけを持つ。`organization` プラグインは使わない（Organization・チーム・ロールは自前のテーブルと `can()` で持つ）。公開するエンドポイントを許可したものだけにする。版を完全に固定する。
+- 使い方の規則は Slack の ADR-0012 と同じにする：Better Auth は「だれか」だけを持つ。`organization` プラグインは使わない（Organization・チーム・ロールは自前のテーブルと `can()` で持つ）。公開するエンドポイントを許可したものだけにする。バージョンを完全に固定する。
 - 2FA の必須化は、本家の条件（Organization の owner、App の持ち主、リリースの作成者など）に寄せ、45 日の登録期間と 7 日の猶予を置く（[About mandatory 2FA](https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa/about-mandatory-two-factor-authentication)、2026-09-26 に確認）。
 - Git の HTTPS は、アカウントのパスワードを受け付けず、トークンだけを受け付ける（本家と同じ）。
 - B は、Slack の ADR-0012 と同じ理由（アカウント数に比例する費用、組織モデルとの二重管理）で採らない。
@@ -53,7 +53,7 @@ A と 1 を採用する。詳細は [identity-and-permissions.md](../architectur
 - 引き受けるコスト：
   - トークンの種類が 2 つ（PAT）＋ App・OAuth・ジョブのトークンと多く、それぞれの上限を `can()` で正しく扱う必要がある。
   - 期限の必須化は、本家の無期限のクラシックの PAT に慣れた利用者の CI を、期限の切れで止めうる。期限の 7 日前と当日にメールで知らせる。
-  - Better Auth の版の更新のたびに、認証の結合テストを通す運用が要る。
+  - Better Auth のバージョンの更新のたびに、認証の結合テストを通す運用が要る。
 
 ## Confirmation
 

@@ -90,7 +90,7 @@ Event の出口。Relay が読んで SQS に送り、`relayed_at` を書く。�
 | `relayed_at` | timestamptz | YES | | |
 
 - PK：`id`。索引：`(id) WHERE relayed_at IS NULL` — Relay の取り出し。`(relayed_at)` — 掃除。
-- `repository.refs_updated` の順序は payload の `version`、PR の Event は `pull_request_events.seq` が持つ。SQS は順序を保証しないので、受け手が版で並べ直す。
+- `repository.refs_updated` の順序は payload の `version`、PR の Event は `pull_request_events.seq` が持つ。SQS は順序を保証しないので、受け手がバージョンで並べ直す。
 
 ### `audit_events`
 

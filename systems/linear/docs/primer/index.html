@@ -119,14 +119,14 @@
         <button>後に確定したあなたの High が残り、同僚の値を上書きしたことが履歴に残る</button>
         <button>サーバーが衝突として拒否し、手で解決するよう求める</button>
       </div>
-      <p class="why">端末の時刻は順序に使いません。サーバーで確定した順に後が勝ちます（<a class="t" href="#g-lww">LWW</a>）。作った時点の版（<code>base</code>）より後に他の人が変えていれば、上書きとして履歴に残し、古い操作なら本人にも知らせます（ADR-0008）。</p>
+      <p class="why">端末の時刻は順序に使いません。サーバーで確定した順に後が勝ちます（<a class="t" href="#g-lww">LWW</a>）。作った時点のバージョン（<code>base</code>）より後に他の人が変えていれば、上書きとして履歴に残し、古い操作なら本人にも知らせます（ADR-0008）。</p>
     </div>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0002-sync-model.md">ADR-0002</a>（同期のモデル）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/architecture/sync-engine.md">sync-engine.md</a> の 2 節（本家の形と他の方式との比較）。</div>
   </section>
 
   <section class="s" id="syncid">
     <h2>sync_id：ワークスペースの 1 本の順序</h2>
-    <p>サーバーは、ワークスペースの中の<strong>すべての変更</strong>に、1 つずつ増える番号 <a class="t" href="#g-syncid"><code>sync_id</code></a> を欠けなく振ります。クライアントの手元の版は「どの <code>sync_id</code> まで当てたか」の 1 つの数（<code>L</code>）で表せます。</p>
+    <p>サーバーは、ワークスペースの中の<strong>すべての変更</strong>に、1 つずつ増える番号 <a class="t" href="#g-syncid"><code>sync_id</code></a> を欠けなく振ります。クライアントの手元のバージョンは「どの <code>sync_id</code> まで当てたか」の 1 つの数（<code>L</code>）で表せます。</p>
     <ul>
       <li data-frag><strong>なぜ DB のシーケンスを使わないか。</strong>シーケンスは、番号の順とコミットの順がずれます。ワークスペースの行をロックして数を増やすと、番号の順とコミットの順が一致し、「x より後」を読んで取りこぼすことがなくなります。代わりに、1 ワークスペースの書き込みは直列になります（S1 で 1 秒 300 変更の見込み）。</li>
       <li data-frag><strong>絞ると番号が飛ぶ。</strong>非公開のチームの変更は、見てよくない人に送りません。すると受け手から見た番号は飛び飛びになり、番号の連続では欠けを判定できません。</li>
@@ -367,7 +367,7 @@
       <dt id="g-localfirst">ローカルファースト</dt><dd>データを端末に持ち、操作をまず手元で反映し、後でサーバーや他の端末と合わせる作り方。</dd>
       <dt id="g-optimistic">楽観的な更新</dt><dd>サーバーの確定を待たずに、成功する前提で画面に反映すること。拒否されたら取り消す。</dd>
       <dt id="g-delta">差分</dt><dd>delta。サーバーで確定した変更を、<code>sync_id</code> の範囲ごとにクライアントへ送るもの。</dd>
-      <dt id="g-syncid">sync_id</dt><dd>ワークスペースの中のすべての変更に、確定の順に欠けなく振る番号。手元の版を 1 つの数で表せる。</dd>
+      <dt id="g-syncid">sync_id</dt><dd>ワークスペースの中のすべての変更に、確定の順に欠けなく振る番号。手元のバージョンを 1 つの数で表せる。</dd>
       <dt id="g-rangeproof">範囲の証明</dt><dd>差分のパケットに付ける <code>(from, to]</code>。その範囲で受け手が見てよい変更はこれで全部、という宣言。</dd>
       <dt id="g-epoch">sync_epoch</dt><dd><code>sync_id</code> の世代。DR の切り替えや時点の復元で上げ、全クライアントに取り直させる。</dd>
       <dt id="g-tx">トランザクション</dt><dd>1 回の入力で生まれる、意図の操作の列。全体が確定するか、全体が拒否されるか。</dd>

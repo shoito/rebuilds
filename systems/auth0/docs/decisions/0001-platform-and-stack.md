@@ -62,7 +62,7 @@ rebuilds の他の題材（Slack、Stripe など）で、次の基盤を決め�
 ### 2・3 を選ばなかった理由
 
 - **2a（Keycloak）**：機能は最も揃っている。ただし、Java で、他の題材の道具と揃わない。realm の数が数千を超えると管理の性能が落ちるという報告がある（未検証）。テナントの RLS、署名鍵の境界、縮退の振る舞いを、外から変えるのが難しい。
-- **2b（Ory Hydra＋Kratos）**：Hydra は OpenID Certified である（[ory/hydra](https://github.com/ory/hydra)、2026-09-27 に確認）。ただし、Go で道具が揃わない。OSS の版を多数のテナントで使う形は、公開の資料では確かめられなかった（未検証）。ログインの画面と同意の画面を別に作る前提で、2 つのシステムの状態を合わせる運用が要る。
+- **2b（Ory Hydra＋Kratos）**：Hydra は OpenID Certified である（[ory/hydra](https://github.com/ory/hydra)、2026-09-27 に確認）。ただし、Go で道具が揃わない。OSS のバージョンを多数のテナントで使う形は、公開の資料では確かめられなかった（未検証）。ログインの画面と同意の画面を別に作る前提で、2 つのシステムの状態を合わせる運用が要る。
 - **2c（node-oidc-provider）**：TypeScript から使え、Basic・Config・RP-Initiated Logout・Back-Channel Logout・FAPI 2.0 などで OpenID Certified、MIT ライセンス、PAR・DPoP・デバイスフローにも対応する（[panva/node-oidc-provider](https://github.com/panva/node-oidc-provider)、2026-09-27 に確認）。最も近い候補だった。採らない理由は次のとおり（本システムの評価）。
   - 鍵を JWKS としてプロセスの中に持つ前提で、Signer に署名を任せる形に合わない。
   - テナントごとに Provider のインスタンスを持つ形になり、1 万のテナントでメモリーと設定の反映の扱いが重い。

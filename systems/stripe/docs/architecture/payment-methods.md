@@ -115,7 +115,7 @@ Payments（本体）
 
 ### 3.4 拒否コードの正規化
 
-- コネクタの生のコード（アクワイアラ・カード発行会社の応答コード）を、本家の拒否コードに写す表を、コネクタごとに持つ。表はコードで管理し、版を付ける。
+- コネクタの生のコード（アクワイアラ・カード発行会社の応答コード）を、本家の拒否コードに写す表を、コネクタごとに持つ。表はコードで管理し、バージョンを付ける。
 - 出力は本家の形に合わせる：`code`（`card_declined`、`expired_card`、`incorrect_cvc`、`processing_error` など）、`decline_code`、生のコードは `network_decline_code` に入れる（[Stripe の支払い拒否コード](https://docs.stripe.com/declines/codes)、2026-09-26 に確認）。
 - 主な写し先：
 

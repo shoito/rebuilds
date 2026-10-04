@@ -12,7 +12,7 @@
 | --- | --- |
 | トリガーの種類、呼ぶ場所、入力（`event`）と出力（`api`） | トークンのクレームの規則（ADR-0008）、MFA の判定（mfa-and-passkeys） |
 | 実行の隔離（どこで、どう動かすか）、外向きの通信 | 画面の独自のフォーム（本家の Forms。持たない） |
-| ビルド（npm の依存）、秘密、版、上限 | エンドユーザーを外部のページへ送るリダイレクト（MVP の後の後。13 節） |
+| ビルド（npm の依存）、秘密、バージョン、上限 | エンドユーザーを外部のページへ送るリダイレクト（MVP の後の後。13 節） |
 | 失敗と時間切れの扱い、ADR-0005 の縮退の表への行 | |
 
 ## 2. 本家の仕組み（確かめたこと）
@@ -26,13 +26,13 @@
 | 大きさ | Action のコードは 100 kB を超えないこと（npm の依存を除く） | 同上 |
 | 秘密 | キー 128 文字、値 4,096 文字。1 つの Action に 30 個。保存の後は平文で読めない | 同上、[Entity Limit Policy](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/entity-limit-policy)、[Introducing Auth0 Actions](https://auth0.com/blog/introducing-auth0-actions/) |
 | npm | 公開の npm のレジストリのパッケージを使える。1 つの Action に 10 個 | [Manage Dependencies](https://auth0.com/docs/customize/actions/manage-dependencies)、Entity Limit Policy |
-| 件数 | テナントに 100 の Action、1 つのトリガーに 20、1 つの Action に 50 の版 | Entity Limit Policy |
+| 件数 | テナントに 100 の Action、1 つのトリガーに 20、1 つの Action に 50 のバージョン | Entity Limit Policy |
 | ログ | `console.log` は 1 つの Action で 256 文字まで保持。実行のログは 10 日 | Actions Limitations |
 | キャッシュ | トリガーごとに 20 件、キー 64 バイト・値 4 kB・合計 8 kB、最長 24 時間。次の実行で使える保証はない | 同上 |
 | 外向きの通信 | 公開された送信元の IP から出る | 同上 |
 | 同時実行 | 公開クラウドの拡張の同時実行は 250 | [Rate Limit Policy](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy) |
 | 実行の基盤 | 2019 年の記事で、Rules とカスタムのデータベースのスクリプトは Extend（Webtask 由来）の専用のクラスタ（EC2 の Auto Scaling、Docker のコンテナ、独自のプロキシ）で動くとしている。**Actions の今の隔離の方式は公開されていない（未検証）** | [A Look at Auth0 Cloud Architecture: 5 Years In](https://auth0.com/blog/auth0-architecture-running-in-multiple-cloud-providers-and-regions/)（2019-02-26） |
-| 本家が勧める使い方 | 検証の済んだ版だけを配備する。下書きと試験ができる | Introducing Auth0 Actions |
+| 本家が勧める使い方 | 検証の済んだバージョンだけを配備する。下書きと試験ができる | Introducing Auth0 Actions |
 
 ## 3. 原則
 
@@ -93,8 +93,8 @@ Universal Login
 | --- | --- | --- | --- | --- | --- |
 | A. V8 isolate（`isolated-vm`、workerd など） | 同じプロセスの中の isolate | 数 ms | 多層の防御（プロセスのサンドボックス、cordon、Spectre の対策）を自前で作る。本家の Cloudflare Workers と同じ層が要る | Node の API が一部しかない。npm のパッケージの多くが動かない | 採らない |
 | B. 自前の Firecracker の microVM | KVM の VM | 125 ms 以下（仕様） | EC2 の metal のフリートを運用する（GitHub の [ADR-0023](../../../github/docs/decisions/0023-firecracker-microvm-runners.md)） | Node をそのまま動かせる | 採らない（S3 で再評価） |
-| C. Lambda のテナントごとの関数 | Firecracker（Lambda の実行環境） | Node のコールドスタート（未検証） | テナント × Action の版ごとに関数を作る。1 万テナントで数万の関数、コードの保管の上限、配備の速さの上限を管理する | Node をそのまま | 採らない |
-| **D. Lambda のテナントの隔離のモード** | Firecracker。実行環境はテナントの間で再利用しない | 同上。テナントごとの実行環境なので、コールドスタートが増える | 関数は Node の版ごとに 1 つの共通の実行器。テナントのコードを実行時に読み込む | Node をそのまま | **採る** |
+| C. Lambda のテナントごとの関数 | Firecracker（Lambda の実行環境） | Node のコールドスタート（未検証） | テナント × Action のバージョンごとに関数を作る。1 万テナントで数万の関数、コードの保管の上限、配備の速さの上限を管理する | Node をそのまま | 採らない |
+| **D. Lambda のテナントの隔離のモード** | Firecracker。実行環境はテナントの間で再利用しない | 同上。テナントごとの実行環境なので、コールドスタートが増える | 関数は Node のバージョンごとに 1 つの共通の実行器。テナントのコードを実行時に読み込む | Node をそのまま | **採る** |
 
 Lambda のテナントの隔離のモード（[Tenant isolation](https://docs.aws.amazon.com/lambda/latest/dg/tenant-isolation.html)、2026-09-27 に確認）：
 
@@ -111,7 +111,7 @@ Lambda のテナントの隔離のモード（[Tenant isolation](https://docs.aw
 ```
 Auth（認証の経路）                                        actions アカウント（prod と別の AWS アカウント）
   actions-invoker（Auth の中のモジュール）                 ┌──────────────────────────────────────────┐
-   1. トリガーの版の束（bundle）の ID を設定のキャッシュから  │ Lambda 関数 actions-runner-node22          │
+   1. トリガーのバージョンの束（bundle）の ID を設定のキャッシュから  │ Lambda 関数 actions-runner-node22          │
    2. 秘密を復号（ADR-0004）                               │   テナントの隔離のモード、arm64、1,024 MB     │
    3. 束の S3 の署名付き URL（60 秒、その束だけ）を作る      │   実行ロール：権限なし                      │
    4. Invoke(tenant-id = tenant_id, payload) ────────────▶│   VPC：actions-egress（内部への経路なし、     │
@@ -120,7 +120,7 @@ Auth（認証の経路）                                        actions アカ�
                                                           └──────────────────────────────────────────┘
 ```
 
-- **関数は Node の版ごとに 1 つ**（`actions-runner-node22` など）。テナントのコードは、関数のコードに入れず、実行時に読み込む。関数の数はテナントの数に比例しない。
+- **関数は Node のバージョンごとに 1 つ**（`actions-runner-node22` など）。テナントのコードは、関数のコードに入れず、実行時に読み込む。関数の数はテナントの数に比例しない。
 - **`tenant-id` はテナントの ID。** 同じテナントの複数の Action は、同じ実行環境を共有しうる（同じテナントの中なので許す）。Action ごとにすると、実行環境の上限（1,000 の同時実行につき 2,500）を早く使い切る。
 - **実行ロールに権限を持たせない。** 実行ロールはすべてのテナントで共通なので、ロールに S3 や KMS の権限があると、あるテナントのコードが他のテナントの束や秘密を読める。束は、Auth が作る、その束だけの 60 秒の署名付き URL で渡す。秘密は呼び出しの本文で渡す。CloudWatch Logs への書き込みの権限も持たせず、`console.log` は実行器が集めて応答で返す。
 - **網**：関数は、本システムの prod の VPC と経路のない専用の VPC（`actions-egress`）に置き、専用の NAT の Elastic IP を送信元として公開する（本家も送信元の IP を公開している）。本システムの内部（prod の VPC、VPC エンドポイント）には届かない。Lambda の中から IMDS には届かない（Lambda に IMDS はない）。
@@ -134,30 +134,30 @@ Auth（認証の経路）                                        actions アカ�
 - 実行の前後で、グローバルの状態の汚れ（前の実行が残した値）は、同じテナントの中の話として許す（本家のキャッシュも「次の実行で使える保証はない」）。
 - 応答は `{results: [{action_id, commands: [...], logs: "...(256 文字まで)", duration_ms, error?}]}`。`commands` は `api` の呼び出しの記録で、Auth が Zod で検証してから適用する。**テナントのコードは、トークンもユーザーの表も直接変えない。** 変更の指示を返し、Auth が規則（予約のクレーム、大きさ、メタデータの上限）で検証して適用する。
 
-## 6. ビルド、版、秘密
+## 6. ビルド、バージョン、秘密
 
 ### 6.1 ビルド
 
 [ADR-0050](../decisions/0050-extensibility-build-secrets-and-limits.md)。
 
 ```
-Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder（actions アカウントの CodeBuild。網は npm のプロキシだけ）
+Management API（Action のバージョンの作成） ─▶ outbox ─▶ actions-builder（actions アカウントの CodeBuild。網は npm のプロキシだけ）
    1. 依存を解決（npm のプロキシ経由。公開の npm のレジストリだけ）、ロックファイルを作る
    2. npm install --ignore-scripts。ネイティブのアドオン（.node、node-gyp）を含むパッケージは拒否
    3. 既知の脆弱性・悪性のパッケージの照合（OSV のデータ）。悪性は拒否、脆弱性は警告
    4. esbuild で 1 つのファイルに束ねる（node22 向け）。束は 10 MiB まで
-   5. sha256 を付けて S3 に置く。版の状態を built にする
+   5. sha256 を付けて S3 に置く。バージョンの状態を built にする
 ```
 
-- 依存は、版の作成の時点の具体の版に固定する（`^` を解決して記録する）。本家は版を空にすると最新を使う（[Manage Dependencies](https://auth0.com/docs/customize/actions/manage-dependencies)）。本システムも最新に解決するが、解決した版を記録して、同じ版の再ビルドで変わらないようにする。
+- 依存は、バージョンの作成の時点の具体のバージョンに固定する（`^` を解決して記録する）。本家はバージョンを空にすると最新を使う（[Manage Dependencies](https://auth0.com/docs/customize/actions/manage-dependencies)）。本システムも最新に解決するが、解決したバージョンを記録して、同じバージョンの再ビルドで変わらないようにする。
 - ビルドは、テナントのコードを動かさない（`--ignore-scripts`）。CodeBuild の実行環境は、ビルドごとに使い捨てる。
 - TypeScript は受け付けない（本家と同じ）。
 
-### 6.2 版と配備
+### 6.2 バージョンと配備
 
-- Action は版を持つ。状態は `draft` → `built` → `deployed`。1 つの Action の `deployed` の版は 1 つ。
-- 「配備」は、トリガーの並びと各 Action の版を、テナントの設定の版（[ADR-0032](../decisions/0032-tenant-config-cache.md)）として書く。反映は最大 15 秒。
-- 前の版への切り戻しは、配備の操作 1 回。
+- Action はバージョンを持つ。状態は `draft` → `built` → `deployed`。1 つの Action の `deployed` のバージョンは 1 つ。
+- 「配備」は、トリガーの並びと各 Action のバージョンを、テナントの設定のバージョン（[ADR-0032](../decisions/0032-tenant-config-cache.md)）として書く。反映は最大 15 秒。
+- 前のバージョンへの切り戻しは、配備の操作 1 回。
 - 試験の実行（Management API の `test`）：同じ実行器で、テナントが与えた `event` で動かし、`commands` とログを返す。トークンは発行しない。
 
 ### 6.3 秘密
@@ -192,7 +192,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 | 対象 | 上限 | 本家 |
 | --- | --- | --- |
 | Action の数 | テナントに 100、1 つのトリガーに 20 | 同じ |
-| 版 | 1 つの Action に 50（超えたら使われていない最も古い版を消す） | 同じ |
+| バージョン | 1 つの Action に 50（超えたら使われていない最も古いバージョンを消す） | 同じ |
 | コード（依存を除く） | 100 kB | 同じ（本家は「超えないこと」の目安） |
 | 束（依存を含む） | 10 MiB | 資料に記載がない（2026-09-27 に確認） |
 | npm の依存 | 1 つの Action に 10 | 同じ |
@@ -248,7 +248,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 | --- | --- |
 | E13 | PoC：Lambda のテナントの隔離のモードで、コールドスタート・温まった実行の遅延と、費用を計る（着手の最初） |
 | E13 | ADR-0005 の縮退の表の更新の提案とレビュー（spec の承認の前提） |
-| E13 | Action と版の Management API、ビルド（CodeBuild、npm のプロキシ、照合、esbuild） |
+| E13 | Action とバージョンの Management API、ビルド（CodeBuild、npm のプロキシ、照合、esbuild） |
 | E13 | 実行器（束の取得と照合、`commands` の記録、ログの収集と伏せ字） |
 | E13 | `actions-invoker`：秘密の復号、署名付き URL、テナントの同時実行、時限、`on_platform_error` |
 | E13 | `post-login` と `credentials-exchange` の `api`（クレーム、`deny`、MFA の有効化、メタデータ） |
@@ -287,7 +287,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 **runbooks**
 
 - `actions-platform-degraded`：Lambda のスロットリング・エラーの急増。`deny` のテナントへの影響、上限の引き上げ、テナントへの連絡。
-- `actions-malicious-package`：悪性のパッケージが見つかった。該当の版を使うテナントの特定、配備の停止、連絡。
+- `actions-malicious-package`：悪性のパッケージが見つかった。該当のバージョンを使うテナントの特定、配備の停止、連絡。
 - `actions-tenant-runaway`：1 つのテナントの Action が同時実行を使い切る。上限の一時的な引き下げ。
 - SLI の追加の依頼（Ops へ）：Action の実行の時間（p50・p99、コールド・温まった実行）、`actions_execution_failed` の率、Lambda のスロットリング、`on_platform_error` の発動の件数。
 
@@ -296,7 +296,7 @@ Management API（Action の版の作成） ─▶ outbox ─▶ actions-builder�
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
 | `actions` | `tenant_id`、`id`、`name`、`trigger`、`runtime`、`deployed_version_id` | RLS |
-| `action_versions` | `tenant_id`、`id`、`action_id`、`number`、`code`、`dependencies`（解決した版）、`status`（`draft`・`built`・`deployed`・`failed`）、`bundle_s3_key`、`bundle_sha256`、`build_log` | RLS |
+| `action_versions` | `tenant_id`、`id`、`action_id`、`number`、`code`、`dependencies`（解決したバージョン）、`status`（`draft`・`built`・`deployed`・`failed`）、`bundle_s3_key`、`bundle_sha256`、`build_log` | RLS |
 | `action_secrets` | `tenant_id`、`action_id`、`name`、`ciphertext`、`updated_at` | RLS。値は読めない |
-| `trigger_bindings` | `tenant_id`、`trigger`、`position`、`action_id`、`version_id`、`on_platform_error` | RLS。配備でテナントの設定の版を上げる |
+| `trigger_bindings` | `tenant_id`、`trigger`、`position`、`action_id`、`version_id`、`on_platform_error` | RLS。配備でテナントの設定のバージョンを上げる |
 | `action_executions`（ログの専用のクラスタ） | `tenant_id`、`id`、`trigger`、`results`（Action ごとの時間・エラー・256 文字のログ）、`created_at` | RLS。10 日 |

@@ -2,19 +2,19 @@
 
 サービスカタログ（カテゴリ、品目）、入力の項目（変数）と表示の条件、利用できる人の条件、要求 → 要求の品目 → 実行のタスクのモデル、承認と実行のフロー、ポータルの依頼者が見られる範囲、フォームからのレコードの作成（インシデントの報告など）を決める。
 
-前提の決定は、要求・要求の品目・実行のタスクを `task` の子のクラスにすること（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)）、フローを版付きの不変の文書にし、実行を開始の時の版に固定すること（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）、承認を 1 回だけ反映すること（[ADR-0016](../decisions/0016-approvals.md)）、ACL の条件を SQL の述語にコンパイルできる式に限ること（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、フィールドの型を 14 種に限ること（[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）である。この文書で決めたことは次の ADR にある。
+前提の決定は、要求・要求の品目・実行のタスクを `task` の子のクラスにすること（[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)）、フローをバージョン付きの不変の文書にし、実行を開始の時のバージョンに固定すること（[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）、承認を 1 回だけ反映すること（[ADR-0016](../decisions/0016-approvals.md)）、ACL の条件を SQL の述語にコンパイルできる式に限ること（[ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)）、フィールドの型を 14 種に限ること（[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）である。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0028](../decisions/0028-catalog-items-and-variables.md) | 品目は公開で不変の版になる。変数は辞書の型に対応する 12 種と、配置の 2 種に限る。表示・必須・読み取り専用の条件は式の言語で書き、画面とサーバーで同じ評価器を使い、サーバーの評価を正とする。回答は要求の品目に、品目の版に結び付けた JSON の写しとして持つ |
-| [0029](../decisions/0029-request-item-task-model.md) | 1 回の申請で、要求 1 件と品目ごとの要求の品目を 1 つのトランザクションで作る。申請は依頼者の冪等のキーで 1 回だけにする。要求の品目ごとに、品目の版に固定した実行のフローを動かす。要求の状態は、要求の品目の状態から決まった規則で導く |
+| [0028](../decisions/0028-catalog-items-and-variables.md) | 品目は公開で不変のバージョンになる。変数は辞書の型に対応する 12 種と、配置の 2 種に限る。表示・必須・読み取り専用の条件は式の言語で書き、画面とサーバーで同じ評価器を使い、サーバーの評価を正とする。回答は要求の品目に、品目のバージョンに結び付けた JSON の写しとして持つ |
+| [0029](../decisions/0029-request-item-task-model.md) | 1 回の申請で、要求 1 件と品目ごとの要求の品目を 1 つのトランザクションで作る。申請は依頼者の冪等のキーで 1 回だけにする。要求の品目ごとに、品目のバージョンに固定した実行のフローを動かす。要求の状態は、要求の品目の状態から決まった規則で導く |
 | [0030](../decisions/0030-portal-requester-scope-and-record-producers.md) | 依頼者は、自分が依頼した・自分のための・見守りに入った要求だけを見る。変数ごとに依頼者に見せるかを持つ。他人のための申請は、品目の許可と、上長か代理の関係があるときだけ。フォームからのレコードの作成も、依頼者の主体で Record Service を通す |
 
 この文書の決定表・性質は設計の草案である。ID は E8 の各変更の `spec.md` に移すときに確定する。
 
 ## 1. 目的と範囲
 
-- 扱う：カタログとカテゴリ、品目と版、変数と変数のまとまり、表示の条件、利用できる人の条件、申請（カート）、要求・要求の品目・実行のタスク、承認と実行のフロー、状態の導出、依頼者の見える範囲、他人のための申請、フォームからのレコードの作成、品目の画面の検索の索引への反映の約束。
+- 扱う：カタログとカテゴリ、品目とバージョン、変数と変数のまとまり、表示の条件、利用できる人の条件、申請（カート）、要求・要求の品目・実行のタスク、承認と実行のフロー、状態の導出、依頼者の見える範囲、他人のための申請、フォームからのレコードの作成、品目の画面の検索の索引への反映の約束。
 - 扱わない：フローの実行の仕組み（[workflow-engine.md](workflow-engine.md)）、ポータルの見た目とテーマ（`portal-and-ui.md`）、カタログの検索（`search.md`）、価格と課金（MVP に入れない。通貨の型を持たないため。[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）、資産の払い出し（資産管理は MVP の後）、承認の画面（ポータルの承認の一覧は `portal-and-ui.md`）。
 
 ## 2. 本家の形（確かめたこと）
@@ -41,9 +41,9 @@
 | `catalog_item` | `tenant_id`、`id`、`stable_key`、`kind`（`request_item` / `record_producer`）、`draft`（編集中の定義）、`active_version_id`、`owner_group_id`、`active` |
 | `catalog_item_version` | `tenant_id`、`id`、`item_id`、`version_no`、`definition`（下の 3.2 節）、`content_hash`、`fulfillment_flow_version_id`（`request_item` のとき）、`published_at`、`published_by` |
 | `audience` | `tenant_id`、`id`、`name`、`include`（条件の一覧）、`exclude`（条件の一覧） |
-| `variable_set` | 複数の品目で使い回す変数のまとまり。版を持ち、品目の公開の時に中身を品目の版へ写す |
+| `variable_set` | 複数の品目で使い回す変数のまとまり。バージョンを持ち、品目の公開の時に中身を品目のバージョンへ写す |
 
-- **品目は公開で不変の版になる。** `draft` を編集し、公開すると検証（DT-CAT-001）を通して新しい `catalog_item_version` を作る。申請は、申請の時点の `active_version_id` を要求の品目に固定する。後で品目を直しても、進行中の要求の品目の変数と実行のフローは変わらない（フローの版の固定と同じ考え。[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）。
+- **品目は公開で不変のバージョンになる。** `draft` を編集し、公開すると検証（DT-CAT-001）を通して新しい `catalog_item_version` を作る。申請は、申請の時点の `active_version_id` を要求の品目に固定する。後で品目を直しても、進行中の要求の品目の変数と実行のフローは変わらない（フローのバージョンの固定と同じ考え。[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）。
 - 変数のまとまりは、品目の公開の時に中身を写す（参照しない）。変数のまとまりを直したら、使っている品目を公開し直す（画面で一覧を出す）。
 
 ### 3.2 品目の定義
@@ -57,7 +57,7 @@ ItemDefinition {
   variables: [Variable]               ← 最大 150
   ui_rules: [UiRule]                  ← 最大 100
   producer?: { table_id, field_map }  ← kind = record_producer のとき（7 節）
-  fulfillment_flow_id?                ← kind = request_item のとき。公開の時に有効な版に固定
+  fulfillment_flow_id?                ← kind = request_item のとき。公開の時に有効なバージョンに固定
   deflection_hint_query?              ← ナレッジの候補を出す検索の語の組み立て（knowledge.md の 7 節）
 }
 Variable { id, name（品目の中で一意、公開の後に変えない）, label, type, help, order,
@@ -79,7 +79,7 @@ UiRule { condition: 式, effects: [{ variable, visible?, mandatory?, read_only?,
 | `checkbox` | `boolean` | |
 | `date` | `date` | |
 | `datetime` | `datetime` | |
-| `select` | `choice` | 選択肢は品目の版の中に持つ |
+| `select` | `choice` | 選択肢は品目のバージョンの中に持つ |
 | `reference` | `reference` | 参照先の読み取りは依頼者の ACL で判定。`ref_condition` は式（他の変数の値を読める） |
 | `email` | `email` | |
 | `url` | `url` | |
@@ -96,7 +96,7 @@ UiRule { condition: 式, effects: [{ variable, visible?, mandatory?, read_only?,
 | # | 検査 | 失敗のとき |
 | --- | --- | --- |
 | 1 | 変数の数（150）、UI の規則の数（100）、選択肢の数（1,000） | 422 |
-| 2 | 変数の名前が品目の中で一意、前の版の名前を消していない（消すときは `retired` の印を付ける） | 422 `variable_name_conflict` |
+| 2 | 変数の名前が品目の中で一意、前のバージョンの名前を消していない（消すときは `retired` の印を付ける） | 422 `variable_name_conflict` |
 | 3 | 式（`default_expr`、`ref_condition`、UI の規則の条件と値）の型検査。変数と依頼者の属性だけを読む | 422 `expression_error` |
 | 4 | UI の規則の効果が同じ変数の同じ属性を別の値にする規則どうしで、条件が同時に真になりうるときは、`order` の後のほうが勝つ（警告だけ） | 警告 |
 | 5 | `record_producer` の `field_map` の先のフィールドが、依頼者（`requester`）の書き込みの ACL で書ける（7 節） | 422 `producer_field_not_writable` |
@@ -112,7 +112,7 @@ UiRule { condition: 式, effects: [{ variable, visible?, mandatory?, read_only?,
 
 ### 4.2 回答の正規化（DT-VAR-001）
 
-申請の時、サーバーは品目の版の定義と回答から、UI の規則を `order` の順に適用して、各変数の実効の `visible`・`mandatory`・`read_only` を求め、次の表で回答を正規化する。
+申請の時、サーバーは品目のバージョンの定義と回答から、UI の規則を `order` の順に適用して、各変数の実効の `visible`・`mandatory`・`read_only` を求め、次の表で回答を正規化する。
 
 | # | 変数の実効の状態 | 回答 | 結果 |
 | --- | --- | --- | --- |
@@ -132,7 +132,7 @@ UiRule { condition: 式, effects: [{ variable, visible?, mandatory?, read_only?,
 
 | 表・列 | 中身 |
 | --- | --- |
-| `task.ext` ではなく、要求の品目の専用の列 `answers`（JSONB） | `{ <variable_id>: 値 }`。品目の版の `item_version_id` を同じ行に持つ |
+| `task.ext` ではなく、要求の品目の専用の列 `answers`（JSONB） | `{ <variable_id>: 値 }`。品目のバージョンの `item_version_id` を同じ行に持つ |
 | `answer_index` | `reportable = true` の変数だけ、`(tenant_id, item_id, variable_name, value_text | value_number | value_time | value_ref, record_id)` に写す。同じトランザクション |
 
 - 回答は申請の後に変えられるのは、依頼者の「回答の修正」（承認の前だけ）と、`catalog_admin`・担当者の修正（理由付き）だけ。どちらも保存の流れを通り、監査の履歴に残る。修正でも DT-VAR-001 の正規化をやり直す。
@@ -169,7 +169,7 @@ COMMIT
 
 ### 5.3 実行のフロー
 
-- 要求の品目ごとに、品目の版に固定した `fulfillment_flow_version_id` の実行を 1 つ作る（トリガーの種類 `catalog_fulfillment`。[workflow-engine.md](workflow-engine.md) の 3.2 節の `record_created` の特別の形）。
+- 要求の品目ごとに、品目のバージョンに固定した `fulfillment_flow_version_id` の実行を 1 つ作る（トリガーの種類 `catalog_fulfillment`。[workflow-engine.md](workflow-engine.md) の 3.2 節の `record_created` の特別の形）。
 - フローは、承認（`ask_approval`）、実行のタスクの作成（`create_task` で `catalog_task` を作り、完了を待つ）、外への呼び出しを組み合わせる。組み込みの雛形のフローを 3 つ用意する：「承認なし・タスク 1 つ」「上長の承認・タスク 1 つ」「上長と品目の持ち主のグループの承認・タスク 1 つ」。
 - 要求の品目の `stage` はフローが書く。フローが終わると（`end` のノード）、`stage` を `completed` にし、要求の品目を閉じる。フローが `failed` になると、`stage` を `fulfillment_failed` にし、品目の持ち主のグループに知らせる（要求の品目は開いたまま。担当者が手で進めるか取り消す）。
 
@@ -264,7 +264,7 @@ DT-REQ-003：
 | --- | --- |
 | 申請の送り直し（通信の切断） | `submission_key` で同じ要求を返す |
 | 申請のトランザクションの途中の失敗 | 全体が巻き戻る。番号は欠番になる。フローの実行も作られない |
-| 品目の公開と申請が同時 | 申請は、トランザクションの中で読んだ `active_version_id` に固定される。どちらの版でも一貫する |
+| 品目の公開と申請が同時 | 申請は、トランザクションの中で読んだ `active_version_id` に固定される。どちらのバージョンでも一貫する |
 | 実行のフローの失敗 | 要求の品目を `fulfillment_failed` にし、持ち主のグループに知らせる。要求は `attention` |
 | 参照の変数の先のレコードの削除 | 回答は ID のまま残る。表示は「（表示できないレコード）」（[access-control.md](access-control.md) の 6.2 節の 6 行） |
 | 利用できる人のキャッシュの古さ | `acl_version`・`meta_version` をキーにするので、権限・品目の変更の後の要求は新しい判定になる |
@@ -291,7 +291,7 @@ DT-REQ-003：
 - **PROP-REQ-002（状態の導出）**：任意の要求の品目の `stage` の遷移の列（並行を含む）の後で、要求の `stage` は DT-REQ-001 を今の子の集合に当てはめた値に等しい。
 - **PROP-VAR-001（画面とサーバーの一致）**：任意の品目の定義と回答で、画面の評価器とサーバーの評価器の実効の `visible`・`mandatory`・`read_only` は一致する（同じコードの 2 つのビルドで確かめる）。
 - **PROP-VAR-002（見えない値は残らない）**：任意の回答で、保存された `answers` のキーは、実効で見える変数だけ。
-- **PROP-VAR-003（版の固定）**：任意の申請の後の品目の公開の列で、要求の品目の `answers` の解釈（変数の定義）と実行のフローの版は、申請の時の版のまま。
+- **PROP-VAR-003（バージョンの固定）**：任意の申請の後の品目の公開の列で、要求の品目の `answers` の解釈（変数の定義）と実行のフローのバージョンは、申請の時のバージョンのまま。
 - **PROP-REQ-003（依頼者の範囲）**：任意の要求の集合と依頼者で、依頼者が読める要求は DT-REQ-002 の 1 行に当たるものだけ（リスト・件数・検索の出口で確かめる）。
 
 ## 11. Story の候補
@@ -316,7 +316,7 @@ DT-REQ-003：
 
 ### 決定（2026-09-28、既定案）
 
-- **品目は公開で不変の版になり、申請の時の版に固定する**（3.1 節、ADR-0028）。
+- **品目は公開で不変のバージョンになり、申請の時のバージョンに固定する**（3.1 節、ADR-0028）。
 - **変数の型を 12 種と配置の 2 種に限り、マスク・HTML・スクリプトの型を持たない**（3.3 節）。
 - **見えない変数の値は捨て、サーバーの評価を正にする**（4.2 節）。フォームの画面の規則（隠しても捨てない）との違いは意図したもの。
 - **回答は要求の品目の `answers` に持ち、レポートに使う変数だけを索引に写す**（4.3 節）。
@@ -350,7 +350,7 @@ DT-REQ-003：
 ### runbooks
 
 - `fulfillment-flow-failed.md`：実行のフローの失敗の調べ方と、手での進め方・取り消し方。
-- `catalog-item-rollback.md`：誤った品目の版を公開したときの戻し方（前の版の定義で新しい版を公開する）。
+- `catalog-item-rollback.md`：誤った品目のバージョンを公開したときの戻し方（前のバージョンの定義で新しいバージョンを公開する）。
 - `request-rollup-mismatch.md`：要求の状態が子と合わないときの調べ方と、導出のやり直し。
 
 ### data-model（索引への追加の提案）

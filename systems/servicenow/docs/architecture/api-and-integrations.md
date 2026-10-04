@@ -6,15 +6,15 @@ REST のテーブルの API（データ辞書から作る）、API のクライ�
 
 | ADR | 決定 |
 | --- | --- |
-| [0048](../decisions/0048-dictionary-driven-table-api.md) | REST のテーブルの API は、実効の辞書から型と検証を作る 1 組のエンドポイントにする。絞り込みはリストと同じ式の言語、ページ送りはキーセット、更新は `If-Match`（行の版）、作成は `Idempotency-Key` で 1 回にする。OpenAPI はテナントの `meta_version` ごとに作る。連携のクライアントは OAuth 2.0 のクライアントクレデンシャルで認証し、主体は `integration` の利用者にする |
-| [0049](../decisions/0049-import-sets-and-transform-maps.md) | 一括の取り込みは、取り込みの実行と行の表（原本の写し）に置いてから、版付きの変換の対応で 1 行ずつ Record Service を通して書く。一致のキー（coalesce）は索引のあるフィールドに限り、キーごとの助言ロックで並行の重複を防ぎ、2 つ以上に一致したら推測せずに行のエラーにする。CI を対象にする変換は CMDB の入口のペイロードを作る |
-| [0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) | Webhook は薄い事象（ID・版・変わったフィールドの ID）を、Standard Webhooks に寄せた HMAC-SHA256 の署名（`<Brand>-Webhook-Signature`）で、少なくとも 1 回送る。送る時点で購読の主体の ACL で確かめる。レート制限はテナントとクライアントのトークンバケットで、要求の重みを付け、`<Brand>-RateLimit-*` と `Retry-After` を返す |
+| [0048](../decisions/0048-dictionary-driven-table-api.md) | REST のテーブルの API は、実効の辞書から型と検証を作る 1 組のエンドポイントにする。絞り込みはリストと同じ式の言語、ページ送りはキーセット、更新は `If-Match`（行のバージョン）、作成は `Idempotency-Key` で 1 回にする。OpenAPI はテナントの `meta_version` ごとに作る。連携のクライアントは OAuth 2.0 のクライアントクレデンシャルで認証し、主体は `integration` の利用者にする |
+| [0049](../decisions/0049-import-sets-and-transform-maps.md) | 一括の取り込みは、取り込みの実行と行の表（原本の写し）に置いてから、バージョン付きの変換の対応で 1 行ずつ Record Service を通して書く。一致のキー（coalesce）は索引のあるフィールドに限り、キーごとの助言ロックで並行の重複を防ぎ、2 つ以上に一致したら推測せずに行のエラーにする。CI を対象にする変換は CMDB の入口のペイロードを作る |
+| [0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) | Webhook は薄い事象（ID・バージョン・変わったフィールドの ID）を、Standard Webhooks に寄せた HMAC-SHA256 の署名（`<Brand>-Webhook-Signature`）で、少なくとも 1 回送る。送る時点で購読の主体の ACL で確かめる。レート制限はテナントとクライアントのトークンバケットで、要求の重みを付け、`<Brand>-RateLimit-*` と `Retry-After` を返す |
 
 この文書の決定表・性質は設計の草案である。ID は E10・E11 の各変更の `spec.md` に移すときに確定する。
 
 ## 1. 目的と範囲
 
-- 扱う：テーブルの API、画面以外のクライアントの認証とトークン、問い合わせの言語、ページ送り、楽観的な排他、冪等性、エラーの形、API の版、OpenAPI、取り込み、CMDB の取り込みの API の外形、Webhook とイベントの購読、外への送信の SSRF の対策、レート制限。
+- 扱う：テーブルの API、画面以外のクライアントの認証とトークン、問い合わせの言語、ページ送り、楽観的な排他、冪等性、エラーの形、API のバージョン、OpenAPI、取り込み、CMDB の取り込みの API の外形、Webhook とイベントの購読、外への送信の SSRF の対策、レート制限。
 - 扱わない：ACL の判定（[access-control.md](access-control.md)）、CI の識別と調整の中身（[cmdb-and-reconciliation.md](cmdb-and-reconciliation.md)）、フローの `call_webhook` の実行の仕組み（[workflow-engine.md](workflow-engine.md) の 5.5 節。送信の部品と署名はこの文書と共有する）、メールの受信（[notifications-and-email-ingest.md](notifications-and-email-ingest.md)）、本家からの移行の道具（法務の L7 の確認待ち。[intent.md](../intent.md)）。
 
 ## 2. 本家の形（確かめたこと）
@@ -49,11 +49,11 @@ REST のテーブルの API（データ辞書から作る）、API のクライ�
 | ヘッダー | 向き | 意味 |
 | --- | --- | --- |
 | `Authorization: Bearer <brand>_at_...` | 要求 | アクセストークン |
-| `<Brand>-Api-Version: YYYY-MM-DD` | 要求 | 振る舞いの版（4.8 節）。なければクライアントに固定した版 |
+| `<Brand>-Api-Version: YYYY-MM-DD` | 要求 | 振る舞いのバージョン（4.8 節）。なければクライアントに固定したバージョン |
 | `Idempotency-Key` | 要求 | 作成・取り込み・CMDB の取り込みの冪等（4.5 節） |
 | `If-Match: "v<version>"` | 要求 | 更新・削除の楽観的な排他（4.4 節） |
 | `<Brand>-Request-Id` | 応答 | 要求の ID（問い合わせのとき使う） |
-| `ETag: "v<version>"` | 応答 | 行の版 |
+| `ETag: "v<version>"` | 応答 | 行のバージョン |
 | `<Brand>-RateLimit-Limit`・`-Remaining`・`-Reset`、`Retry-After` | 応答 | 7 節 |
 
 ## 4. テーブルの API（[ADR-0048](../decisions/0048-dictionary-driven-table-api.md)）
@@ -113,7 +113,7 @@ GET /api/v1/tables/incident?q=active = true and priority <= 2
 
 ### 4.4 楽観的な排他
 
-- 応答の `ETag` は行の `version`。`PATCH`・`DELETE` に `If-Match` を付けると、版が違えば 412 にする。
+- 応答の `ETag` は行の `version`。`PATCH`・`DELETE` に `If-Match` を付けると、バージョンが違えば 412 にする。
 - `If-Match` は任意にする。付けないときは、送ったフィールドだけを今の行に当てる（フィールドの単位の最後の書き込みが勝つ）。状態の遷移は、遷移の表の照合（今の状態から許されるか）で守られる。
 - 連携のクライアント向けの文書で、状態を変える `PATCH` には `If-Match` を勧める。
 
@@ -135,11 +135,11 @@ GET /api/v1/tables/incident?q=active = true and priority <= 2
 - `/api/v1/openapi.json` は、今のテナントの実効の辞書から作る（`meta_version` ごとにキャッシュ）。見られるのは `records:read` のクライアントと管理者。**クライアントの主体で読めるテーブル・フィールドだけを載せる**（辞書の構造も、読めない部分は見せない）。
 - 本システムの基盤の部分（認証、エラー、ページ送り）の OpenAPI は、`@hono/zod-openapi` で作り、公開の文書にする（[architecture/README.md](README.md) の 4 節）。
 
-### 4.8 API の版
+### 4.8 API のバージョン
 
-- パスの版（`/api/v1`）は、互換を壊す大きな変更のときだけ上げる。
-- 振る舞いの細かな変更は、日付の版（`<Brand>-Api-Version`）で出す。クライアントは作成の時の版に固定され、管理者が版を上げる。古い版は、次の版を出してから 12 か月は動かす。
-- **テナントの辞書の変更は API の版ではない。** フィールドの追加は、すべてのクライアントにすぐに出る（追加は互換を壊さない）。フィールドの削除（2 段の削除。[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 6 節）は、非表示の時点で API から消える。30 日の猶予の間に連携を直す。管理者に、非表示にするフィールドを使っているクライアント（直近 30 日の要求の `fields` と本文に出たもの）を示す。
+- パスのバージョン（`/api/v1`）は、互換を壊す大きな変更のときだけ上げる。
+- 振る舞いの細かな変更は、日付のバージョン（`<Brand>-Api-Version`）で出す。クライアントは作成の時のバージョンに固定され、管理者がバージョンを上げる。古いバージョンは、次のバージョンを出してから 12 か月は動かす。
+- **テナントの辞書の変更は API のバージョンではない。** フィールドの追加は、すべてのクライアントにすぐに出る（追加は互換を壊さない）。フィールドの削除（2 段の削除。[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 6 節）は、非表示の時点で API から消える。30 日の猶予の間に連携を直す。管理者に、非表示にするフィールドを使っているクライアント（直近 30 日の要求の `fields` と本文に出たもの）を示す。
 
 ## 5. 取り込み（[ADR-0049](../decisions/0049-import-sets-and-transform-maps.md)）
 
@@ -150,7 +150,7 @@ GET /api/v1/tables/incident?q=active = true and priority <= 2
    （画面の CSV のアップロードも同じ）
 2. 行を置く：CSV のファイル（S3 の署名付き URL へアップロード）か、JSON の行のまとまり（1 回 1,000 行）
    → Ingest が解析し、import_row に原本の写しとして置く（まだ対象の表を変えない）
-3. 変換：Engine の bulk_job が、変換の対応の版で 1 行ずつ処理する
+3. 変換：Engine の bulk_job が、変換の対応のバージョンで 1 行ずつ処理する
    1 行 = 1 トランザクション：一致のキーのロック → 一致の検索 → Record Service の保存（channel = import）
 4. 結果：行ごとの状態（inserted / updated / skipped / error と理由）、実行の集計
 ```
@@ -163,11 +163,11 @@ GET /api/v1/tables/incident?q=active = true and priority <= 2
 | 表 | 中身 |
 | --- | --- |
 | `import_source` | 名前、形式（`csv` / `json`）、文字コード（`auto` / `utf-8` / `shift_jis`）、既定の変換の対応。メタデータ |
-| `transform_map`（版付き。版は `transform_map_version`） | 対象のテーブル、フィールドの対応（対象のフィールド ← 式。式は原本の列を読む）、一致のキー、一致のとき（`update` / `skip`）、一致しないとき（`insert` / `skip`）、選択肢の値の対応の表、`run_as`（実行の主体）、空の値の扱い（`ignore` / `clear`）。メタデータ、公開で不変の版 |
-| `import_run` | 取り込み元、変換の対応の版、`run_key`（7 日一意）、状態（`loading` / `ready` / `transforming` / `completed` / `failed` / `cancelled`）、件数、開始・終わり |
+| `transform_map`（バージョン付き。バージョンは `transform_map_version`） | 対象のテーブル、フィールドの対応（対象のフィールド ← 式。式は原本の列を読む）、一致のキー、一致のとき（`update` / `skip`）、一致しないとき（`insert` / `skip`）、選択肢の値の対応の表、`run_as`（実行の主体）、空の値の扱い（`ignore` / `clear`）。メタデータ、公開で不変のバージョン |
+| `import_run` | 取り込み元、変換の対応のバージョン、`run_key`（7 日一意）、状態（`loading` / `ready` / `transforming` / `completed` / `failed` / `cancelled`）、件数、開始・終わり |
 | `import_row` | `run_id`、`row_no`、`raw`（JSONB。原本の 1 行）、`lane`（一致のキーのハッシュの区画）、状態、`target_id`、`error_code`、`error_detail` |
 
-- 実行は、開始したときの変換の対応の版に固定する（フローの版と同じ考え。[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）。
+- 実行は、開始したときの変換の対応のバージョンに固定する（フローのバージョンと同じ考え。[ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)）。
 - `import_row` は 30 日で消す（原本の写しに個人の情報が入りうる。[security.md](security.md) の 7 節）。
 
 ### 5.3 一致のキー（coalesce）
@@ -332,7 +332,7 @@ outbox（record.changed、sla.*、approval.*、ci.held、import.completed）
 - **PROP-API-001（冪等）**：任意の作成の要求と送り直しの列（並行を含む）で、同じキー・同じ本文ならレコードはちょうど 1 つ、応答は同じ。
 - **PROP-API-002（API は画面より広くない）**：任意の主体・テーブルで、API の一覧・単体で返る値の集合は、同じ主体の画面のモデルの値の集合と等しい。
 - **PROP-IMP-001（並行でも重複しない）**：任意の取り込みの行の集合と、任意の並行の 2 つの実行で、一致のキーが同じ行から作られるレコードは高々 1 つ。
-- **PROP-IMP-002（決定性）**：同じ原本と同じ変換の対応の版で、区画の処理の順をどう変えても、最終の対象の行は同じ。
+- **PROP-IMP-002（決定性）**：同じ原本と同じ変換の対応のバージョンで、区画の処理の順をどう変えても、最終の対象の行は同じ。
 - **PROP-WH-001（署名の往復）**：任意の本文・時刻・秘密の組で、送る側の署名を受け手の見本の検証が受け、1 バイトでも変えた本文を拒む。
 - **PROP-WH-002（配達は漏らさない）**：任意の ACL と事象の列で、配達の本文に、購読の主体が送る時点で読めないフィールドの名前が出ない。
 
@@ -367,7 +367,7 @@ outbox（record.changed、sla.*、approval.*、ci.held、import.completed）
 - **テーブルの API は 1 組のエンドポイントで、辞書から型を作る**（4.1 節、ADR-0048）。
 - **ページ送りはキーセットだけ。`offset` を受けない**（4.2 節）。
 - **`If-Match` は任意、作成の `Idempotency-Key` は 24 時間**（4.4・4.5 節）。
-- **テナントの辞書の変更は API の版にしない**（4.8 節）。
+- **テナントの辞書の変更は API のバージョンにしない**（4.8 節）。
 - **取り込みの一致のキーは索引のあるフィールドに限り、あいまいなら行のエラー**（5.3 節、ADR-0049）。
 - **CI を直接対象にする変換を作らせない**（5.5 節）。
 - **Webhook の本文に値を入れない**（6.2 節、ADR-0050）。
@@ -410,7 +410,7 @@ outbox（record.changed、sla.*、approval.*、ci.held、import.completed）
 | --- | --- |
 | Aurora `api_client`、`api_client_secret`（ハッシュ）、`oauth_token`（ハッシュ）、`oauth_refresh_family` | 3.1 節 |
 | Aurora `idempotency_key` | 4.5 節。`(tenant_id, client_id, key)` 一意、24 時間 |
-| Aurora `import_source`、`transform_map`、`transform_map_version`（不変の版） | 5.2 節。メタデータ |
+| Aurora `import_source`、`transform_map`、`transform_map_version`（不変のバージョン） | 5.2 節。メタデータ |
 | Aurora `import_run`、`import_row` | 5.2 節。`(tenant_id, source_id, run_key)` 7 日一意。`import_row` は 30 日 |
 | Aurora `webhook_subscription`、`webhook_secret`（KMS で暗号化） | 6.1 節 |
 | Aurora `webhook_delivery` | 6.4 節。`(tenant_id, event_id, subscription_id)` 一意、7 日 |

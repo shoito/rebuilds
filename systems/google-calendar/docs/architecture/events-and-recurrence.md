@@ -8,13 +8,13 @@
 | --- | --- |
 | [0008](../decisions/0008-recurrence-expansion-semantics.md) | `expand()` は規則を壁時計の時刻で求め、無効な日付（2 月 30 日など）は数えずに捨てる。夏時間の切り替えで存在しない時刻は捨てずに、RFC 5545 の 3.3.5 節の規則でずらして残す（3.3.10 節の「捨てる」とは違う）。DTSTART は規則に合わなくても最初の回とし、`COUNT` に数える。長さは DTEND なら正確な長さ、DURATION なら名目の長さで各回に当てる |
 | [0009](../decisions/0009-series-edit-and-override-rebasing.md) | 上書きは VEVENT の全体を持ち、加えて「マスターから切り離した項目」の印（`detached_fields`）を持つ。系列の全体の変更では、切り離していない項目だけを上書きに追従させる。開始の時刻・規則が変わったら、上書きと EXDATE の `recurrence_id` を「同じ日付の回」へ付け替え、行き先のないものは捨てて主催者に示す |
-| [0010](../decisions/0010-occurrence-index-maintenance.md) | 展開の索引は、予定オブジェクトごとに `indexed_through` を持ち、`expander` が毎日、範囲の端を進めた分だけ足す。書き込みでは、新旧の回の集合の差分だけを書く。索引の行の `object_version` は「その行が最後に変わった版」とする。照合は毎時の抜き取りで、不一致は索引だけを作り直す |
+| [0010](../decisions/0010-occurrence-index-maintenance.md) | 展開の索引は、予定オブジェクトごとに `indexed_through` を持ち、`expander` が毎日、範囲の端を進めた分だけ足す。書き込みでは、新旧の回の集合の差分だけを書く。索引の行の `object_version` は「その行が最後に変わったバージョン」とする。照合は毎時の抜き取りで、不一致は索引だけを作り直す |
 | [0011](../decisions/0011-inbound-recurrence-normalization.md) | 対応しない繰り返し（`FREQ` が `HOURLY` 以下、`RANGE=THISANDFUTURE`、`RSCALE`）は、経路で扱いを分ける。API・CalDAV の `PUT` は拒否する。ICS の取り込み・購読と iMIP の受信は、`HOURLY` 以下を範囲の中の RDATE に変えて UID を保つ。`RANGE=THISANDFUTURE` は 1 回分の上書きとして当て、利用者に示す |
 
 ## 1. 目的と範囲
 
 - 扱う：
-  - 予定オブジェクト（`event_objects`）とマスター・上書き（`event_overrides`）の項目、版、`SEQUENCE` の元
+  - 予定オブジェクト（`event_objects`）とマスター・上書き（`event_overrides`）の項目、バージョン、`SEQUENCE` の元
   - 予定の種類（通常・不在・作業の時間）と `transparency`・`status`
   - RRULE・RDATE・EXDATE（と EXRULE）の受け付けの検査と上限
   - `packages/recurrence` の `expand()` の仕様（規則の評価、存在しない時刻、無効な日付、長さ、上書きの当て方）
@@ -22,7 +22,7 @@
   - 展開の索引（`occurrences`）の書き込み、範囲の端の維持、照合
   - 対応しない繰り返しの入力の正規化
 - 扱わない：
-  - `resolve`・`toLocal`・tzdb の版の更新と再計算（[time-zones-and-holidays.md](time-zones-and-holidays.md)）
+  - `resolve`・`toLocal`・tzdb のバージョンの更新と再計算（[time-zones-and-holidays.md](time-zones-and-holidays.md)）
   - 参加者・出欠・`SEQUENCE` での写しの更新（[invitations-and-itip.md](invitations-and-itip.md)）
   - 会議室の予約の行（[rooms-and-resources.md](rooms-and-resources.md)）
   - 公開範囲と `redact()`（[sharing-and-acl.md](sharing-and-acl.md)）
@@ -59,7 +59,7 @@
 | 3.8.5.3 | DTEND で長さを書けば、各回に同じ正確な長さ。DURATION で書けば、同じ名目の長さで、正確な長さは各回の開始で変わる | そのとおりにする（4.5 節） |
 | 3.8.4.4 | `RECURRENCE-ID` の値の型は DTSTART と同じ。`RANGE=THISANDFUTURE` は、その回と以降の回 | `RANGE` は受けて 1 回分に変える（8 節。ADR-0011） |
 | 3.8.5.1・3.8.5.2 | EXDATE・RDATE。回の集合は「DTSTART ∪ RRULE ∪ RDATE」から EXDATE を引いたもの | 同じ |
-| 3.8.7.4 | `SEQUENCE` は版の番号 | 上げる規則は [invitations-and-itip.md](invitations-and-itip.md) |
+| 3.8.7.4 | `SEQUENCE` はバージョンの番号 | 上げる規則は [invitations-and-itip.md](invitations-and-itip.md) |
 
 ## 3. 予定オブジェクト
 
@@ -69,7 +69,7 @@
 
 ```mermaid
 flowchart LR
-  EO["event_objects<br/>UID・マスター・規則・版"] -->|1 対 多| OV["event_overrides<br/>recurrence_id ごとの VEVENT の全体"]
+  EO["event_objects<br/>UID・マスター・規則・バージョン"] -->|1 対 多| OV["event_overrides<br/>recurrence_id ごとの VEVENT の全体"]
   EO -->|1 対 多| AT["event_attendees<br/>系列の参加者"]
   OV -->|1 対 多| AT2["event_attendees<br/>回の参加者"]
   EO -->|写し| OC["occurrences<br/>展開の索引"]
@@ -94,8 +94,8 @@ flowchart LR
 | `event_type` | `default`・`out_of_office`・`focus_time` | 3.2 節 |
 | `visibility` | `default`・`public`・`private`・`confidential` | マスターだけに持つ（[sharing-and-acl.md](sharing-and-acl.md)） |
 | `title`・`location`・`description`・`color`・`conference_url`・`attachments` | 中身 | タイトル 1,024 文字、説明 64 KiB、添付の URL 25 件 |
-| `version` | 予定オブジェクトの版。どの項目が変わっても上がる | ETag の元（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)） |
-| `sequence`・`dtstamp` | iTIP の版（[invitations-and-itip.md](invitations-and-itip.md)） | — |
+| `version` | 予定オブジェクトのバージョン。どの項目が変わっても上がる | ETag の元（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)） |
+| `sequence`・`dtstamp` | iTIP のバージョン（[invitations-and-itip.md](invitations-and-itip.md)） | — |
 | `copy_role` | `organizer`・`attendee`・`standalone`（参加者のいない予定） | [ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) |
 | `split_from`・`related_to` | 「これ以降」の元の系列（6 節） | — |
 | `x_props` | 知らないプロパティの原文 | 32 KiB（[ADR-0007](../decisions/0007-interop-standards-scope.md)） |
@@ -263,7 +263,7 @@ flowchart TD
   D -->|はい| E["系列の全体の変更（7 節）"]
   D -->|いいえ| F["系列を分ける（6 節）"]
   B -->|すべて| E
-  C --> G["版を上げる<br/>索引の差分・change_seq・outbox"]
+  C --> G["バージョンを上げる<br/>索引の差分・change_seq・outbox"]
   E --> G
   F --> G
 ```
@@ -416,7 +416,7 @@ ADR-0011。経路ごとに扱いを分ける。
 
 | 列 | 意味 |
 | --- | --- |
-| `object_version` | その行が最後に変わった予定オブジェクトの版（ADR-0010） |
+| `object_version` | その行が最後に変わった予定オブジェクトのバージョン（ADR-0010） |
 | `is_override` | 上書きの回か |
 | `event_type` | 空き時間の種類のため |
 | `attendee_partstat` | 参加者の写しでの自分の出欠（空き時間の判定のため。[free-busy-and-scheduling.md](free-busy-and-scheduling.md)） |
@@ -431,7 +431,7 @@ ADR-0010。
 1. `packages/writer` は、変更の前と後の予定オブジェクトで、範囲（`[today − 31 日, indexed_through]`）の中の回の集合を `expand()` で求める。
 2. `recurrence_id` で突き合わせ、`(start_utc, end_utc, status, transparency, event_type, attendee_partstat)` が変わった行だけを `DELETE`・`INSERT`・`UPDATE` する。
 3. タイトルだけの変更は、索引の行を書かない。
-4. 変わった行の `object_version` を新しい版にする。
+4. 変わった行の `object_version` を新しいバージョンにする。
 
 書き込みの量の見積もり（S1）：書き込み 1,500 件/秒のうち、繰り返しの系列の時刻の変更を 5% と見て、1 件あたり平均 100 行で 7,500 行/秒。単発と中身だけの変更は 0〜2 行。E2 の前の `occurrence-index-poc` で測る。
 
@@ -468,7 +468,7 @@ flowchart LR
 
 | 事象 | 起きること | 備え |
 | --- | --- | --- |
-| `expand()` の誤り（新しい版で回が増える・欠ける） | 画面・空き時間・会議室・リマインダーで回が違う | 参照との性質ベーステスト（PR・夜間）。本番の照合で検知し、前のイメージへロールバックする。展開の規則はフラグにしない（[runbooks/README.md](../runbooks/README.md) の 3 節、[delivery.md](delivery.md) の 3 節）。戻した後、`expander` が前の版の `expand()` で、新しい版で書いた期間の索引を作り直す |
+| `expand()` の誤り（新しいバージョンで回が増える・欠ける） | 画面・空き時間・会議室・リマインダーで回が違う | 参照との性質ベーステスト（PR・夜間）。本番の照合で検知し、前のイメージへロールバックする。展開の規則はフラグにしない（[runbooks/README.md](../runbooks/README.md) の 3 節、[delivery.md](delivery.md) の 3 節）。戻した後、`expander` が前のバージョンの `expand()` で、新しいバージョンで書いた期間の索引を作り直す |
 | `expander.advance` が止まった | 範囲の端の先の回が索引にない | その場の展開で読み出しは正しい。会議室の予約の行が足りず、範囲の端で二重予約の判定ができない → 会議室の新しい予約を、`indexed_through` の手前までに制限する（rooms-and-resources.md）。止まった日数を監視する |
 | 大きな系列の書き込みでロックが長い | 同じカレンダーの書き込みが待つ | 1 予定オブジェクトの索引の差分は最大 5,000 行。1 トランザクションの上限を超えるものはない |
 | 計算の量の上限に当たった | 回が途中まで | 応答に印を付け、照合の警報の対象にする |
@@ -528,7 +528,7 @@ flowchart LR
 - **DTSTART が規則に合わない**：最初の回として含める。新しい作成では拒否（ADR-0008）。
 - **全体の変更での上書き**：切り離した項目だけを残す（ADR-0009）。
 - **付け替えの基準**：同じ日付の回（ADR-0009）。
-- **索引の書き込み**：差分だけ。`object_version` は行が変わった版（ADR-0010）。
+- **索引の書き込み**：差分だけ。`object_version` は行が変わったバージョン（ADR-0010）。
 - **対応しない繰り返し**：経路で分ける。取り込みは RDATE に変える（ADR-0011）。
 - **不在と作業の時間**：参加者を持たない。自動の辞退は持たない。
 - **「毎月 31 日」**：画面で 2 つの意味を選ばせる。

@@ -70,7 +70,7 @@ ElastiCache（クラスタモード、3 シャード）。
 | --- | --- | --- | --- | --- |
 | `<brand>-recordings-{env}`（`media-prod`、東京） | `raw/{org}/{recording_id}/{producer_id}/{seq}.rtpseg` | producer ごとの生の RTP（SRTP を外したもの）と受けた時刻（単調な時計の ns）。10 秒ごとに 1 ファイル | `<brand>-content`（文脈に `org_id`・`recording_id`） | 合成の成功から 7 日。失敗は 30 日 |
 | 同上 | `raw/{org}/{recording_id}/manifest.jsonl` | 1 行 1 イベント（`segment`・`producer`・`speaker`・`share`・`pause`・`gap`・`participant`）。形は [recording-and-transcription.md](../recording-and-transcription.md) の 4.3 節 | 同上 | 同上 |
-| 同上 | `final/{org}/{recording_id}/speaker_share.mp4`、`gallery.mp4`、`audio.m4a`、`audio/{participant_id}.m4a`、`chat.txt`、`transcript.vtt`、`transcript.json` | 成果物（`recording_files.s3_key`） | 同上 | 組織の設定（既定 365 日）＋ごみ箱 30 日。版も消す |
+| 同上 | `final/{org}/{recording_id}/speaker_share.mp4`、`gallery.mp4`、`audio.m4a`、`audio/{participant_id}.m4a`、`chat.txt`、`transcript.vtt`、`transcript.json` | 成果物（`recording_files.s3_key`） | 同上 | 組織の設定（既定 365 日）＋ごみ箱 30 日。バージョンも消す |
 | 同上 | `transcripts/{org}/{instance_id}/part-{n}.jsonl` | 字幕の確定した結果（Transcriber が 30 秒ごとに追記） | 同上 | 会議の後に Composer がつないだら 7 日 |
 | 同上 | `transcripts/{org}/{instance_id}/transcript.json`、`transcript.vtt` | 録画のない会議の文字起こし（`transcripts.s3_key`） | 同上 | 組織の設定 |
 | `<brand>-files-{env}`（`prod`） | `chat-files/{org}/{instance_id}/{file_id}` | チャットのファイル。GuardDuty の検査のタグ | `<brand>-content` | `chat_files.expires_at` |
@@ -80,7 +80,7 @@ ElastiCache（クラスタモード、3 シャード）。
 | 同上 | `qos/daily/dt={yyyy-mm-dd}/…parquet` | 日次の集計（参加者の ID なし） | 同上 | 13 か月 |
 | log-archive のバケット | `audit/{stream}/{chain_key}/{yyyy}/{mm}/{dd}/{batch_id}.jsonl.gz` | 監査ログ 3 系統のバッチ（行の `hash` を含む） | log-archive の鍵 | Object Lock で 7 年 |
 | 同上 | CloudTrail、Media Node・TURN・CloudFront・ALB・WAF のログ | IP を含むログ | 同上 | IP を含むものは 30 日、その他は 7 年 |
-| shared のバケット | `app/{version}/`、Terraform の状態、AMI の配布 | Web の資産、状態 | — | 版ごと、90 日 |
+| shared のバケット | `app/{version}/`、Terraform の状態、AMI の配布 | Web の資産、状態 | — | バージョンごと、90 日 |
 
 - 録画のバケットは大阪へ複製しない（S1。[recording-and-transcription.md](../recording-and-transcription.md) の 6.1 節）。バージョニングを有効にする（成功を知らせた録画を失わない）。
 - 公開のアクセスを禁じる。読むのは API が出す短命の署名付きの URL（録画は CloudFront で 10 分、チャットのファイルは 5 分、書き出しは 24 時間）だけ。
@@ -276,7 +276,7 @@ Gateway ── SLI の分子・分母（低い種類のラベル）──▶ AMP
 | 置き場所 | 中身 |
 | --- | --- |
 | KMS の鍵 6 つ | `<brand>-join-signing`、`-meeting-secrets`、`-content`、`-e2ee-as`、`-e2ee-external-sender`、`-data`（[ADR-0047](../../decisions/0047-keys-and-operator-access-to-media.md)） |
-| Secrets Manager | `turn/static-auth-secret`（今と次）、パスコードの HMAC の pepper（版つき）、`ip_prefix_hash`・`device_key_hash`・`caller_id_hash`・`ip_hash` の pepper（今と前）、カレンダーの OAuth のクライアント、メールの送信の資格情報、TURN の TLS の証明書（ACM から書き出したもの）、DB の認証情報 |
+| Secrets Manager | `turn/static-auth-secret`（今と次）、パスコードの HMAC の pepper（バージョンつき）、`ip_prefix_hash`・`device_key_hash`・`caller_id_hash`・`ip_hash` の pepper（今と前）、カレンダーの OAuth のクライアント、メールの送信の資格情報、TURN の TLS の証明書（ACM から書き出したもの）、DB の認証情報 |
 | AWS Private CA | Actor Host と Node Agent の相互 TLS の証明書（7 日） |
 | 保存しない | Media Node の DTLS の証明書、PlainTransport の SRTP の鍵、E2EE の端末の鍵と MLS の秘密、会議ごとのチャットのデータの鍵の平文（暗号文をスナップショットと同じく Valkey に置き、Actor がメモリで使う） |
 
@@ -287,4 +287,4 @@ Gateway ── SLI の分子・分母（低い種類のラベル）──▶ AMP
 | IndexedDB | 端末の鍵（128 ビットの乱数。ゲストの ban に使う。サーバーは HMAC だけ） | [meeting-security.md](../meeting-security.md) の 6.1 節 |
 | `localStorage` | 網の指紋ごとの前回の経路（30 日）、前回の端末（マイク・カメラ）の ID、仮想背景の設定と画像、ショートカット | [network-traversal.md](../network-traversal.md)、[clients.md](../clients.md) |
 | ワーカーのメモリ | E2EE の端末の鍵、MLS の状態、SFrame の鍵 | [e2ee.md](../e2ee.md) |
-| AppConfig | release・meeting・ops・experiment のフラグ、`client-config`（Web の版の割合と最低の版） | [ADR-0056](../../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |
+| AppConfig | release・meeting・ops・experiment のフラグ、`client-config`（Web のバージョンの割合と最低のバージョン） | [ADR-0056](../../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |

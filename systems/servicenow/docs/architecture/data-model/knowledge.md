@@ -1,8 +1,8 @@
 # Data model: ナレッジと自己解決の計測
 
-[data-model.md](../data-model.md) の一部。ナレッジベース・カテゴリ・記事と版・評価と旗・ポータルの事象・自己解決の日次の集計を定義する。見直しのタスク（`kb_feedback_task`）は `task` のクラス（[records-and-audit.md](records-and-audit.md) の 2.2 節）。振る舞い（版の状態 DT-KB-001、公開の流れ、自己解決の数え方 DT-KB-003）は [knowledge.md](../knowledge.md) を正とする。
+[data-model.md](../data-model.md) の一部。ナレッジベース・カテゴリ・記事とバージョン・評価と旗・ポータルの事象・自己解決の日次の集計を定義する。見直しのタスク（`kb_feedback_task`）は `task` のクラス（[records-and-audit.md](records-and-audit.md) の 2.2 節）。振る舞い（バージョンの状態 DT-KB-001、公開の流れ、自己解決の数え方 DT-KB-003）は [knowledge.md](../knowledge.md) を正とする。
 
-- **1 つの記事に、公開中の版は高々 1 つ、編集中の版も高々 1 つ**（部分一意索引。[ADR-0031](../../decisions/0031-knowledge-articles-versions-and-publishing.md)）。
+- **1 つの記事に、公開中のバージョンは高々 1 つ、編集中のバージョンも高々 1 つ**（部分一意索引。[ADR-0031](../../decisions/0031-knowledge-articles-versions-and-publishing.md)）。
 - **自己解決の事象に利用者の ID と検索の語を入れない**（[ADR-0032](../../decisions/0032-knowledge-feedback-and-deflection.md)）。
 
 ## 1. ER 図
@@ -112,13 +112,13 @@ erDiagram
 
 ### 2.2 `kb_article`
 
-記事の同一性（番号、評価の合計、ナレッジベース）。本文は版に持つ。専用の表。定義元：同じ文書の 3.1・3.4・7.1・7.2 節。
+記事の同一性（番号、評価の合計、ナレッジベース）。本文はバージョンに持つ。専用の表。定義元：同じ文書の 3.1・3.4・7.1・7.2 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
-| `number` | `text` | NOT NULL | — | `KB0001234`。版で変えない |
+| `number` | `text` | NOT NULL | — | `KB0001234`。バージョンで変えない |
 | `kb_base_id` | `uuid` | NOT NULL | — | |
 | `category_id` | `uuid` | NULL | — | |
 | `owner_group_id` | `uuid` | NULL | — | NULL はナレッジベースの持ち主 |
@@ -142,7 +142,7 @@ erDiagram
 
 ### 2.3 `kb_article_version`
 
-記事の版。`review` と `published` の版の本文は変えない。定義元：同じ文書の 3.1〜3.3・3.5 節。
+記事のバージョン。`review` と `published` のバージョンの本文は変えない。定義元：同じ文書の 3.1〜3.3・3.5 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -160,25 +160,25 @@ erDiagram
 | `submitted_at`・`published_at`・`published_by`・`retired_at` | | NULL | — | |
 | `approval_set_id` | `uuid` | NULL | — | 公開・廃止の承認 |
 | `change_note` | `text` | NULL | — | |
-| `based_on_version_id` | `uuid` | NULL | — | `checkout` の元の版 |
+| `based_on_version_id` | `uuid` | NULL | — | `checkout` の元のバージョン |
 | `created_at`・`created_by`・`updated_at` | | | | |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, article_id, version_no)`。UK `(tenant_id, article_id) WHERE state = 'published'`。UK `(tenant_id, article_id) WHERE state IN ('draft','review')`。FK `(tenant_id, article_id)` → `kb_article`、`approval_set_id` → `approval_set`。
 - CHECK：`octet_length(body) <= 262144`、`state NOT IN ('review','published') OR content_hash IS NOT NULL`。`review`・`published` の本文・題名は更新のトリガーで変えさせない。
-- 保持：監査と同じ 7 年（記事が残る間は残す）。S1 の量：全体で約 30 万行、1 版 平均 8 KB。
+- 保持：監査と同じ 7 年（記事が残る間は残す）。S1 の量：全体で約 30 万行、1 バージョン 平均 8 KB。
 
 ## 3. 評価・旗
 
 ### 3.1 `kb_rating`
 
-利用者 × 版の評価（1 人 1 行、変えられる）。定義元：同じ文書の 7.1 節。
+利用者 × バージョンの評価（1 人 1 行、変えられる）。定義元：同じ文書の 7.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `version_id` | `uuid` | NOT NULL | — | |
 | `user_id` | `uuid` | NOT NULL | — | |
-| `article_id` | `uuid` | NOT NULL | — | 版から写す（記事の合計の更新のため） |
+| `article_id` | `uuid` | NOT NULL | — | バージョンから写す（記事の合計の更新のため） |
 | `helpful` | `boolean` | NULL | — | |
 | `stars` | `smallint` | NULL | — | 1〜5 |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` | |
@@ -190,7 +190,7 @@ erDiagram
 
 ### 3.2 `kb_flag`
 
-旗（理由が必須。1 件でタスクにする）。同じ利用者の同じ版への旗は 1 日 1 件まで。定義元：同じ文書の 7.1 節。
+旗（理由が必須。1 件でタスクにする）。同じ利用者の同じバージョンへの旗は 1 日 1 件まで。定義元：同じ文書の 7.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

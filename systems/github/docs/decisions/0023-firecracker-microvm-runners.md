@@ -45,7 +45,7 @@ Actions のジョブは、誰でも出せる Pull Request のコードを含む�
   - microVM は小さく速い（仕様で `/sbin/init` の開始まで 125 ms 以下、VMM のメモリ 5 MiB 以下。[SPECIFICATION.md](https://github.com/firecracker-microvm/firecracker/blob/main/SPECIFICATION.md)）ので、metal のホストに多くのジョブを詰められる。
   - ジョブの VM ごとに IAM を持たないので、資格情報の管理の面が小さい。
 - 引き受けるコスト：
-  - metal のホストのフリート（カーネル、Firecracker の版、イメージ、tap と nftables）を自分で運用する。
+  - metal のホストのフリート（カーネル、Firecracker のバージョン、イメージ、tap と nftables）を自分で運用する。
   - metal のインスタンスは大きく、増減の単位が粗い。SMT の無効で使える vCPU が半分になり、1 ホストに載る VM は約 40 になる（[actions.md](../architecture/actions.md) の 8.5 節）。
   - Windows・macOS のランナーは別の基盤が要る（MVP の外）。
   - サイドチャネルの攻撃への備えは、ハードウェアとカーネルの更新に追従し続ける必要がある。

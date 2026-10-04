@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0025: フローは版を持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える
+# ADR-0025: フローはバージョンを持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える
 
 詳細は [automation-flows.md](../architecture/automation-flows.md) の 3 節と 4 節。
 
@@ -13,12 +13,12 @@ date: 2026-09-28
 
 決めていなかったこと：
 
-- フローの定義の形と版、有効化の単位。
+- フローの定義の形とバージョン、有効化の単位。
 - 200 件の塊で、フローの問い合わせと DML をどうまとめるか。
 - 「要素の実行の数」を何で数えるか。実行（インタビュー）ごとに数えると、200 件の塊で 10 要素のフローが 2,000 に達し、一括の取り込みが動かない。
 - 実行の文脈（利用者の権限か、システムか）。
 
-本家（2026-09-28 に確認）：フローは起動の種類（保存の前・後、スケジュールなど）、実行の順の番号、実行の文脈（既定、システムで共有を守る、全てのデータ、利用者の権限）を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。フローは Apex の上限（問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10 秒）に従い、超えると `fault` の経路があってもトランザクション全体を巻き戻す（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。本家は API の版 57.0 で、フローの要素の数の上限（2,000）をなくした。1 つのフローの版は 50 まで（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。
+本家（2026-09-28 に確認）：フローは起動の種類（保存の前・後、スケジュールなど）、実行の順の番号、実行の文脈（既定、システムで共有を守る、全てのデータ、利用者の権限）を持つ（[Metadata API Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/api_meta.pdf)、Winter '27 版の Flow）。フローは Apex の上限（問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10 秒）に従い、超えると `fault` の経路があってもトランザクション全体を巻き戻す（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。本家は API のバージョン 57.0 で、フローの要素の数の上限（2,000）をなくした。1 つのフローのバージョンは 50 まで（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。
 
 > 2026-09-28 の注記：本家が要素の上限をなくしたことを確かめた。本システムは、CPU 時間を近似でしか数えない（[governor-limits.md](../architecture/governor-limits.md) の 4 節）ので、無限の繰り返しを止めるために要素の実行の上限（2,000、足並みの 1 歩で数える）を残す。本家との差として移行の文書に書く。決定は変えない。
 
@@ -26,7 +26,7 @@ date: 2026-09-28
 
 定義：
 
-1. **JSON のグラフ（要素と次の要素）。式は数式の言語。版を持ち、有効化でメタデータの版を上げる**
+1. **JSON のグラフ（要素と次の要素）。式は数式の言語。バージョンを持ち、有効化でメタデータのバージョンを上げる**
 2. 独自のテキストの言語（スクリプト）
 3. 要素の列（分岐を持たない手順）
 
@@ -40,8 +40,8 @@ date: 2026-09-28
 
 1 と a を採用する。
 
-- 定義は `md_flows`・`md_flow_versions` に持ち、有効化は 1 つのメタデータの版で行う。レコードの変更で動くフローの有効な版は `object:<object_id>` の部品に入り、1 つの保存の途中で版が混ざらない。
-- 画面のフローと予定の経路は、始めた時の版を最後まで使う。参照されている版は消さない。
+- 定義は `md_flows`・`md_flow_versions` に持ち、有効化は 1 つのメタデータのバージョンで行う。レコードの変更で動くフローの有効なバージョンは `object:<object_id>` の部品に入り、1 つの保存の途中でバージョンが混ざらない。
+- 画面のフローと予定の経路は、始めた時のバージョンを最後まで使う。参照されているバージョンは消さない。
 - 要素は `assignment`、`decision`、`loop`、`get_records`、`create/update/delete_records`、`subflow`、`submit_for_approval`、`send_email`、`call_webhook`、`publish_event`、`screen`。保存の前のフローは DML・送信の要素を使えない（ADR-0008 の手順 3）。
 - 解釈器は、各実行を次の「まとめる要素」まで進め、要素の ID の小さい順に、止まった実行をまとめて 1 回の問い合わせ・DML にする。順は決定的にする。
 - 要素の実行の数（2,000）は、足並みの 1 歩を 1 と数える。問い合わせ・DML は、まとめた 1 回を 1 と数え、行は合計する。
@@ -56,7 +56,7 @@ date: 2026-09-28
 - 良くなること：
   - 一括の保存でも、フローの問い合わせと DML の数が塊の大きさに依らない。
   - 上限の数がフローの形だけで決まり、上限の試験が再現できる。
-  - 1 つの保存が 1 つの版のフローで動く。
+  - 1 つの保存が 1 つのバージョンのフローで動く。
 - 引き受けるコスト：
   - 解釈器が複雑になる。足並みの実行と 1 件ずつの実行の意味が同じであることを、性質ベーステストで守り続ける。
   - 1 つの実行の中の繰り返しの問い合わせはまとめられない。ビルダーで警告する。

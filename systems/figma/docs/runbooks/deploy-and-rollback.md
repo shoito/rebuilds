@@ -4,7 +4,7 @@
 - 対応するアラート: api の blue/green の自動の戻し、デプロイの後の編集の SLO のバーンレート、ドレインの停滞（`router_drain_remaining_files`）、新しいビルドのクライアントの異常終了の急増
 - 最終確認日: 2026-09-27
 
-流れは [delivery.md](../architecture/delivery.md)、Document Server のドレインは [ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) と [infrastructure.md](../architecture/infrastructure.md) の 3.1 節、版の食い違いは [ADR-0053](../decisions/0053-client-server-version-skew.md)、段階的なリリースとプロパティの表の変更は [ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md) にある。
+流れは [delivery.md](../architecture/delivery.md)、Document Server のドレインは [ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) と [infrastructure.md](../architecture/infrastructure.md) の 3.1 節、バージョンの食い違いは [ADR-0053](../decisions/0053-client-server-version-skew.md)、段階的なリリースとプロパティの表の変更は [ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md) にある。
 
 ## 症状
 
@@ -28,7 +28,7 @@
 3. 変更の分類を見る（PR の説明）。
    - マイグレーションが expand だけか。contract を含むなら、1 つ前のリリースで参照をやめていること。
    - **プロパティの表の変更が「追加以外」（`schema-breaking`）なら止める。** 強い再読み込みを伴うので、別の計画作業にする（下の「互換を切る変更」）。
-   - `protocol_version` を上げる変更なら、サーバーが新旧を話せる版が先に本番にあることを確かめる。
+   - `protocol_version` を上げる変更なら、サーバーが新旧を話せるバージョンが先に本番にあることを確かめる。
    - 文書のフラグ（`release.doc.*`）の既定値を変える変更がないか。
 4. 編集の SLO のエラーバジェットが残っている（[observability.md](../architecture/observability.md) の 5 節）。
 5. 進行中のインシデント、ジャーナルの飛び、手放さずに 1 日を超えて残るファイル（`router_orphan_oldest_seconds`）がない。
@@ -71,7 +71,7 @@
 ### プロパティの書き込みの解禁
 
 1. 接続のうち新しい `schema_hash` の割合が 95% 以上であることを確かめる（Grafana の「スキーマの普及」）。
-2. 1 つ前の版の Document Server で、新しいプロパティを書いたファイルを開き、値が保たれることを、staging で確かめてある（結合テスト。[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md) の Confirmation）。
+2. 1 つ前のバージョンの Document Server で、新しいプロパティを書いたファイルを開き、値が保たれることを、staging で確かめてある（結合テスト。[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md) の Confirmation）。
 3. `schema.<prop>.write` を有効にする。**これは戻せない**（書いた値はファイルに残る）。PM の判断を記録する。
 
 ### 互換を切る変更（`schema-breaking`、`protocol_version` の打ち切り）

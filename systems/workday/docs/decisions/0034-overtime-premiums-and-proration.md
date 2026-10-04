@@ -36,7 +36,7 @@ date: 2026-09-28
 1、a、i を採用する。
 
 - 倍率は DT-JP-009（法定外 1.25、深夜と重なれば 1.50、60 時間超 1.50・1.75、法定の休日 1.35・1.60、法定内の残業 1.00・1.25、深夜だけ 0.25）。保存のときに最低を下回る設定を拒む。
-- 時間単価は規則 19 条の形（月給 ÷ 1 年の月平均の所定労働時間、日給 ÷ 1 日の所定、時給）。月平均の所定労働時間は年度の始めに求めて設定の版に固定する。基礎に入れる項目は `overtime_base` のフラグで決める。
+- 時間単価は規則 19 条の形（月給 ÷ 1 年の月平均の所定労働時間、日給 ÷ 1 日の所定、時給）。月平均の所定労働時間は年度の始めに求めて設定のバージョンに固定する。基礎に入れる項目は `overtime_base` のフラグで決める。
 - 端数の設定 `overtime_rounding`：時間（`none` 既定・`half_hour_half_up`）、単価（`none` 既定・`round_half_up_yen`）、額（`round_half_up_yen` 既定・`round_up_yen`）。通達にない向き（時間の切り捨てだけ、額の切り捨て）は作らない。
 - 管理監督者は深夜の割増（0.25）だけ。
 - 年休の日の賃金は `normal_wage`（既定）・`average_wage`・`standard_remuneration`（標準報酬月額の 30 分の 1、5 円の処理）。平均賃金は 12 条の形（3 か月の総額 ÷ 総日数、最低の保障、除く期間と賃金）。平均賃金は銭未満を切り捨て、平均賃金から払う手当は円未満を四捨五入する（[神奈川労働局](https://jsite.mhlw.go.jp/kanagawa-roudoukyoku/hourei_seido_tetsuzuki/saiteichingin_chinginseido/heikinchi.html)、2026-09-28 に確認。名前付きの丸め `round_down_sen`・`round_half_up_yen`）。適用の確認は L36 に残す。

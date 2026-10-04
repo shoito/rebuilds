@@ -12,10 +12,10 @@
 
 | ファイル | 領域 | テーブル |
 | --- | --- | --- |
-| [data-model/temporal.md](data-model/temporal.md) | 有効日付の共通の形（差分・版・現在）、facet の一覧、発効の予定 | 3 つの表の型 ＋ 1 |
+| [data-model/temporal.md](data-model/temporal.md) | 有効日付の共通の形（差分・バージョン・現在）、facet の一覧、発効の予定 | 3 つの表の型 ＋ 1 |
 | [data-model/core-hr.md](data-model/core-hr.md) | 人・雇用・職務の割り当て、個人の情報、報酬、退職、組織（監督組織・会社・コストセンター・事業所）、階層の閉包、ポジション、職務、等級、ロール | 16 ＋ facet 17 |
 | [data-model/business-process.md](data-model/business-process.md) | 業務プロセスの定義、案件、ステップ、担当、イベント、タイマー、委任、受信箱、添付 | 10 |
-| [data-model/security.md](data-model/security.md) | 権限の方針の版、セキュリティグループ、所属、利用者ごとの権限の表、職務分掌の違反、代理のログイン、サポートの参照の許可 | 8 |
+| [data-model/security.md](data-model/security.md) | 権限の方針のバージョン、セキュリティグループ、所属、利用者ごとの権限の表、職務分掌の違反、代理のログイン、サポートの参照の許可 | 8 |
 | [data-model/time.md](data-model/time.md) | 打刻、訂正、客観的な記録、勤務の規則とシフト、日の結果、36 協定、締めの期間と集計、打刻機 | 15 ＋ facet 1 |
 | [data-model/absence.md](data-model/absence.md) | 休暇の種類、付与の方針、付与と台帳、残り、年 5 日の義務、休暇の申請、管理簿 | 7 ＋ ビュー 1 |
 | [data-model/payroll.md](data-model/payroll.md) | 給与のグループと期間、営業日の暦、実行と里程標、入力の固定、束、項目、個別の調整、結果、遡及、並行稼働、移行の期首の値 | 23 ＋ facet 1 |
@@ -80,7 +80,7 @@ DB のロール（人事の Aurora）：
 | ロール | 使うサービス | 権限 |
 | --- | --- | --- |
 | `migrator` | マイグレーション | 所有者。DDL。`BYPASSRLS`（`pay_items` のシステムの行、`report_sources`、`mn_purposes` を書く） |
-| `temporal_owner` | 有効日付の書き込みの関数（`temporal.apply_fold`、`temporal.rebuild_current`） | 差分・版の印の埋め込みと、現在の表の差し替えだけ。関数の方式か専用のロールかは E1 の `temporal-constraints-poc` で決める（8 節） |
+| `temporal_owner` | 有効日付の書き込みの関数（`temporal.apply_fold`、`temporal.rebuild_current`） | 差分・バージョンの印の埋め込みと、現在の表の差し替えだけ。関数の方式か専用のロールかは E1 の `temporal-constraints-poc` で決める（8 節） |
 | `app` | api、worker、bp-worker、loader | RLS の対象。`BYPASSRLS` なし。有効日付の書き込みの関数の `EXECUTE`。追記のみの表は `INSERT`・`SELECT` だけ |
 | `report_app` | report-service（レポートの reader） | 読み取りだけ。RLS の対象。`statement_timeout`（同期 10 秒、非同期 15 分） |
 | `scheduler` | bp-worker・worker の予定のジョブ | `BYPASSRLS`。ただし予定の表（`bp_timers`、`temporal_activations`、`webhook_deliveries`、`pay_periods`、`leave_grant_policies` の付与の日、`retention` の候補）の `tenant_id`・`id`・期限・状態の列の `SELECT` だけ。見つけた `(tenant_id, id)` を SQS に積み、処理は `app` で行う |
@@ -128,7 +128,7 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
   WITH CHECK (tenant_id = current_setting('app.tenant_id')::uuid);
 ```
 
-- 別の表（`system_pay_items`）に分けない。項目の依存のグラフ、`pay_item_sets`、結果の行（`payroll_result_lines.item_code`・`item_version`）が、システムとテナントの項目を同じ形で指すため。分けると、参照と版の検査を 2 つの表の和で書くことになる。
+- 別の表（`system_pay_items`）に分けない。項目の依存のグラフ、`pay_item_sets`、結果の行（`payroll_result_lines.item_code`・`item_version`）が、システムとテナントの項目を同じ形で指すため。分けると、参照とバージョンの検査を 2 つの表の和で書くことになる。
 - 主キーは `id` だけ（`tenant_id` が空になりうるため）。一意は `UNIQUE NULLS NOT DISTINCT (tenant_id, code, version)`。
 - システムの項目のコードは `jp.` の接頭辞を持ち、テナントはこの接頭辞のコードを作れない（`CHECK ((tenant_id IS NULL) = (code LIKE 'jp.%'))`）。テナントの項目がシステムの項目を隠すことはない。
 - システムの行の変更は、エンジンのリリース（マイグレーション）で行う。テナントは式を変えられない（[ADR-0027](../decisions/0027-pay-item-graph-and-formula-language.md)）。
@@ -139,7 +139,7 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
 
 - **理由**：
   - セッションの読み取りは、要求ごとに、テナントのコンテキストを決める前に行う（セッション → テナント → `SET LOCAL`）。RLS の中に置くと、コンテキストのない読み取りが要る。
-  - Better Auth のアダプターは、問い合わせごとに `app.tenant_id` を設定しない。RLS の中に置くには、ライブラリのアダプターを手で直すことになり、版の固定と脆弱性の修正の取り込み（[security.md](security.md) の 9 節）が重くなる。
+  - Better Auth のアダプターは、問い合わせごとに `app.tenant_id` を設定しない。RLS の中に置くには、ライブラリのアダプターを手で直すことになり、バージョンの固定と脆弱性の修正の取り込み（[security.md](security.md) の 9 節）が重くなる。
   - グループの会社を別のテナントにしたとき、同じ人が 1 つのアカウント（パスキー、メール）で複数のテナントに入れる。Slack の題材も同じくアカウントをテナントの外に置いた。
 - **補う統制**：
   - これらの表に人事のデータを置かない。`auth_accounts` はログインの識別子（メール、パスキーの資格情報の ID）だけ。人との結びは `worker_accounts`（テナントの中、RLS）。
@@ -154,8 +154,8 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
 
 | 形 | 使うもの | 時間の列 | 書き方 | 例 |
 | --- | --- | --- | --- | --- |
-| A. facet（2 軸） | 人事の事実（人・雇用・職務・組織・ポジション・給与の資格） | `valid daterange`（有効時間）、`recorded_at`・`superseded_at`・`known`（記録時間） | 差分・版・現在の 3 つの表。`packages/temporal` の関数だけが書く（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)） | `worker_job`、`employment_status`、`worker_social_insurance` |
-| B. 版の表 | テナントの設定（定義、方針、項目、対応表） | `version int`、`effective_from date` か `valid daterange`、`status`、`activated_at` | 版ごとに 1 行。有効化した行は書き換えない。直すときは新しい版 | `bp_definitions`、`security_policy_versions`、`pay_items`、`work_rules`、`gl_account_maps`、`rule_tables` |
+| A. facet（2 軸） | 人事の事実（人・雇用・職務・組織・ポジション・給与の資格） | `valid daterange`（有効時間）、`recorded_at`・`superseded_at`・`known`（記録時間） | 差分・バージョン・現在の 3 つの表。`packages/temporal` の関数だけが書く（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)） | `worker_job`、`employment_status`、`worker_social_insurance` |
+| B. バージョンの表 | テナントの設定（定義、方針、項目、対応表） | `version int`、`effective_from date` か `valid daterange`、`status`、`activated_at` | バージョンごとに 1 行。有効化した行は書き換えない。直すときは新しいバージョン | `bp_definitions`、`security_policy_versions`、`pay_items`、`work_rules`、`gl_account_maps`、`rule_tables` |
 | C. 期間つきの行 | 1 つの主体に対して期間ごとに 1 行を持つ割り当て | `valid daterange` と排他制約 | 行を追記する。前の行の終わりを閉じる `UPDATE` だけを、業務プロセスの完了の関数に許す（`valid` の上限を無限から日付に変える 1 回だけ。トリガーで確かめる） | `security_group_members`、`mn_handlers`、`overtime_agreements`、`terminal_badges`、`worker_accounts` |
 | D. 追記の台帳 | 事象の記録（打刻、休暇の動き、結果、仕訳、監査） | 事象の日時（`occurred_at`、`leave_date`）と `recorded_at` | 追記だけ。訂正は逆の行か訂正の行を足す | `time_clock_events`、`leave_ledger_entries`、`payroll_journal_lines`、`audit_events` |
 | E. 派生 | 正本から作り直せる表 | 元の表に従う | 元の表と同じトランザクションか、夜間の作り直し | `org_closure`、`security_effective_grants`、`leave_balances` |
@@ -165,7 +165,7 @@ CREATE POLICY pay_items_write ON pay_items FOR ALL
 - **日付はテナントの暦の日付**（S1 は `Asia/Tokyo`）。退職日（最後の在籍日）が 3 月 31 日なら、雇用の `valid` の上限は 4 月 1 日。
 - **記録時間は DB の時計だけ。** `recorded_at` はロックを取った後の `clock_timestamp()`。書き込みのトランザクションは `transaction_timeout = 5s`。問い合わせの `known_at` は安定の境界（今 − 10 秒）以下に限る（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。
 - **有効日付の参照は `PERIOD` の外部キー**（`NO ACTION` だけ）。例：`worker_job` の `(tenant_id, org_id, PERIOD valid)` → `organization`。参照先を閉じる前に参照を移す順序は業務プロセスが守る（[core-hr.md](core-hr.md) の 4.4 節）。
-- B の表を参照するときは、安定したコード（`work_rule_code`、`process_type`）で指し、計算に使った版は結果の行に版の ID で残す（`work_day_results.work_rule_version_id`、`bp_cases.definition_id`）。
+- B の表を参照するときは、安定したコード（`work_rule_code`、`process_type`）で指し、計算に使ったバージョンは結果の行にバージョンの ID で残す（`work_day_results.work_rule_version_id`、`bp_cases.definition_id`）。
 
 #### 3.4.2 facet の 3 つの表の概念
 
@@ -227,8 +227,8 @@ erDiagram
     }
 ```
 
-- 差分（`facet_changes`）は何を、いつから、どの案件で変えたか。版（`facet_versions`）は畳み込んだ期間と、それを知っていた記録時間。現在（`facet_current`）は `superseded_at IS NULL` の版の写しで、重なりの制約と `PERIOD` の外部キーを持つ。
-- 問い合わせは 3 つ：今日の値（現在の表で `valid @> today`）、有効日 D の値（現在の表で `valid @> D`）、有効日 D の時刻 T の知識（版の表で `valid @> D AND known @> T`）。
+- 差分（`facet_changes`）は何を、いつから、どの案件で変えたか。バージョン（`facet_versions`）は畳み込んだ期間と、それを知っていた記録時間。現在（`facet_current`）は `superseded_at IS NULL` のバージョンの写しで、重なりの制約と `PERIOD` の外部キーを持つ。
+- 問い合わせは 3 つ：今日の値（現在の表で `valid @> today`）、有効日 D の値（現在の表で `valid @> D`）、有効日 D の時刻 T の知識（バージョンの表で `valid @> D AND known @> T`）。
 - 表の名前は `<facet>_changes`・`<facet>_versions`・`<facet>`。列の定義と facet の一覧は [data-model/temporal.md](data-model/temporal.md)。
 
 ### 3.5 時刻と日付
@@ -247,8 +247,8 @@ erDiagram
 
 ### 3.7 追記のみ・論理削除・訂正と取消
 
-- **追記のみの表**（アプリのロールに `UPDATE`・`DELETE` を与えず、トリガーでも拒む）：facet の差分と版（取消・置き換えの印の埋め込みを除く）、`bp_events`、`time_clock_events`、`time_clock_corrections`、`leave_grants`、`leave_ledger_entries`、`payroll_results`・`payroll_result_lines`（`finalized` の後）、`payroll_journal_entries`・`payroll_journal_lines`、`wage_payment_consents`、`payslip_delivery_consents`、`payslip_paper_requests`、`audit_events`、`platform_audit_events`、`audit_segments`、保管庫の `mn_access_log`・`mn_deletions`。削除は `retention_purger`（保管庫は `vault_purger`）だけ（[ADR-0049](../decisions/0049-retention-rules-table-and-legal-hold.md)）。
-- **論理削除の列（`deleted_at`）は持たない。** 人事の事実は facet の `end` で閉じ、設定は版の `status = 'retired'` で退け、割り当ては期間で閉じる。消えたように見せる必要のあるものだけ、印の列を持つ：`payslips.revoked_at`、`api_clients.revoked_at`、`clock_terminals.revoked_at`、`webhook_endpoints.disabled_at`、`bp_delegations.revoked_at`。
+- **追記のみの表**（アプリのロールに `UPDATE`・`DELETE` を与えず、トリガーでも拒む）：facet の差分とバージョン（取消・置き換えの印の埋め込みを除く）、`bp_events`、`time_clock_events`、`time_clock_corrections`、`leave_grants`、`leave_ledger_entries`、`payroll_results`・`payroll_result_lines`（`finalized` の後）、`payroll_journal_entries`・`payroll_journal_lines`、`wage_payment_consents`、`payslip_delivery_consents`、`payslip_paper_requests`、`audit_events`、`platform_audit_events`、`audit_segments`、保管庫の `mn_access_log`・`mn_deletions`。削除は `retention_purger`（保管庫は `vault_purger`）だけ（[ADR-0049](../decisions/0049-retention-rules-table-and-legal-hold.md)）。
+- **論理削除の列（`deleted_at`）は持たない。** 人事の事実は facet の `end` で閉じ、設定はバージョンの `status = 'retired'` で退け、割り当ては期間で閉じる。消えたように見せる必要のあるものだけ、印の列を持つ：`payslips.revoked_at`、`api_clients.revoked_at`、`clock_terminals.revoked_at`、`webhook_endpoints.disabled_at`、`bp_delegations.revoked_at`。
 - **訂正と取消を分ける**（[ADR-0007](../decisions/0007-change-correction-rescind-semantics.md)）：
 
 | 操作 | facet の書き方 | 業務プロセス | 他の表での同じ考え方 |
@@ -258,12 +258,12 @@ erDiagram
 | 取消（無かったことにする） | 元の差分に `rescinded_at`・`rescinded_by_case_id` を埋める。依存があれば拒む | `rescind` の案件。元の案件は `rescinded` | 給与の実行は `payroll_cancel`（逆仕訳、明細の `revoked_at`） |
 | 終わり | `kind = 'end'` の差分（gapped の facet だけ） | 退職、組織の廃止など | — |
 
-- どの操作も、版の `superseded_at` を埋めるのと追記だけで行うので、過去の知識は変わらない（PROP-TEMP-003）。
+- どの操作も、バージョンの `superseded_at` を埋めるのと追記だけで行うので、過去の知識は変わらない（PROP-TEMP-003）。
 - **確定した給与は書き換えない。** 誤りは次の実行の遡及の差額（`retro_period` つきの行）か、支払の前なら `payroll_cancel` で直す（[ADR-0004](../decisions/0004-payroll-engine.md)）。
 
 ### 3.8 命名と型
 
-- テーブルは英語の複数形の `snake_case`。facet は単数形（`worker_job`、`organization`）で、差分と版の表は `_changes`・`_versions` を付ける。列は `snake_case`。外部キーは `<単数形>_id`、時刻は `_at`、日付は `_on`、真偽は `is_` か形容詞、暗号文は `_ct`、HMAC は `_hmac`、SHA-256 は `_sha256`（`bytea`）、S3 のキーは `s3_key`。
+- テーブルは英語の複数形の `snake_case`。facet は単数形（`worker_job`、`organization`）で、差分とバージョンの表は `_changes`・`_versions` を付ける。列は `snake_case`。外部キーは `<単数形>_id`、時刻は `_at`、日付は `_on`、真偽は `is_` か形容詞、暗号文は `_ct`、HMAC は `_hmac`、SHA-256 は `_sha256`（`bytea`）、S3 のキーは `s3_key`。
 - 状態・種類は `text` と `CHECK (col IN (...))` で持つ。PostgreSQL の列挙型は使わない（値の追加でロックを取らないため）。
 - 検索しない入れ子の値は `jsonb` に持ち、`packages/contract` の Zod のスキーマで検証してから書く。`jsonb` に個人番号・口座番号の平文を入れない（書き込みの前の走査で拒む）。
 - 本家の内部の名前（クラス、タスク、帳票、連携の製品名）を識別子に使わない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。一括の取り込みは `bulk_import`、連携の利用者は `integration_users`。
@@ -292,7 +292,7 @@ erDiagram
 | 監査の日の署名 | 非対称の署名 | `<brand>-audit-anchor`（log-archive） |
 | 保管庫への操作者の主張 | 非対称の署名（JWT） | `<brand>-hr-vault-assertion` |
 
-- 暗号文の列は差分・版・現在の表のどれでも暗号文のまま持ち、畳み込みで復号しない（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 11 節）。画面の末尾 4 桁は、`worker.payment_election` の `view` の判定の後に復号して作る。全桁の復号は振込ファイルの生成（Worker）だけ。
+- 暗号文の列は差分・バージョン・現在の表のどれでも暗号文のまま持ち、畳み込みで復号しない（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 11 節）。画面の末尾 4 桁は、`worker.payment_election` の `view` の判定の後に復号して作る。全桁の復号は振込ファイルの生成（Worker）だけ。
 - 鍵はどれもマルチリージョン（主は東京、レプリカは大阪）。
 
 ### 3.11 パーティションと保存
@@ -566,20 +566,20 @@ erDiagram
 | 不変条件 | 守り方（DB とアプリ） | 根拠 |
 | --- | --- | --- |
 | **同じ主体・同じ facet の有効期間は重ならない**。空の期間はない | 現在の表の `WITHOUT OVERLAPS` の主キー（使えなければ排他制約）。`CHECK (NOT isempty(valid))`。夜間の検査 | [ADR-0002](../decisions/0002-effective-dated-data-model.md)、[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)、PROP-TEMP-001 |
-| **過去の知識は変わらない**：任意の（有効日、記録時刻）の問い合わせが、後のどの操作でも同じ結果 | 差分と版は追記のみ（印の埋め込みを除く。トリガー）。`recorded_at` は DB の時計。安定の境界 | [ADR-0007](../decisions/0007-change-correction-rescind-semantics.md)、[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)、PROP-TEMP-003 |
+| **過去の知識は変わらない**：任意の（有効日、記録時刻）の問い合わせが、後のどの操作でも同じ結果 | 差分とバージョンは追記のみ（印の埋め込みを除く。トリガー）。`recorded_at` は DB の時計。安定の境界 | [ADR-0007](../decisions/0007-change-correction-rescind-semantics.md)、[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)、PROP-TEMP-003 |
 | **現在の表 ＝ 生きている差分の畳み込み** | 書き込みは `temporal.apply_fold` だけ。夜間の突き合わせと 1% の抜き取りの参照のモデル | ADR-0006、[ADR-0009](../decisions/0009-temporal-reference-model-testing.md) |
 | **coverage**：職務・給与・振込先・主たる職務の期間は雇用の期間の中。ポジションは組織の期間の中 | `PERIOD` の外部キー（`NO ACTION`） | ADR-0006、PROP-TEMP-006、PROP-HR-002 |
 | **同じ人・同じ会社の雇用は重ならない** | 同じトランザクションで人の行をロックして検査（`EMPLOYMENT_OVERLAP`）。夜間の検査 | [ADR-0010](../decisions/0010-person-employment-job-assignment-model.md)、PROP-HR-001 |
 | **監督組織の階層は循環せず、根は 1 つ。閉包は辺から作り直したものと一致** | 辺の変更と閉包の作り直しを同じトランザクション。循環の検査（`ORG_CYCLE`）。夜間の検査 | [ADR-0011](../decisions/0011-effective-dated-org-hierarchy-closure.md)、PROP-HR-003 |
 | **人事のデータは業務プロセスを通してだけ変わる** | facet の差分の `case_id NOT NULL`（→ `bp_cases`）。アプリのロールは facet の表に直接書けない | [ADR-0003](../decisions/0003-business-process-engine.md) |
 | **同じ人が、同じ案件で起票と承認をしない** | 承認のたびに `bp_cases.initiated_by`・`initiated_on_behalf_of` と操作者を比べる。職務分掌の規則表 | [ADR-0005](../decisions/0005-security-and-my-number.md)、[ADR-0019](../decisions/0019-segregation-of-duties-checks.md) |
-| **案件は起票の日の定義の版に固定される** | `bp_cases.definition_id NOT NULL`。有効化した `bp_definitions` の行は書き換えない（トリガー） | [ADR-0013](../decisions/0013-bp-definition-format-and-versions.md) |
-| **確定した給与の結果は書き換わらない**。同じ入力・規則表の版・エンジン・設定の版で 1 円も違わない | `finalized` の後の `payroll_results`・`payroll_result_lines` への `UPDATE`・`DELETE` をトリガーで拒む。結果の行の 4 つのハッシュ。夜間の再現の抜き取り | [ADR-0004](../decisions/0004-payroll-engine.md)、[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) |
+| **案件は起票の日の定義のバージョンに固定される** | `bp_cases.definition_id NOT NULL`。有効化した `bp_definitions` の行は書き換えない（トリガー） | [ADR-0013](../decisions/0013-bp-definition-format-and-versions.md) |
+| **確定した給与の結果は書き換わらない**。同じ入力・規則表のバージョン・エンジン・設定のバージョンで 1 円も違わない | `finalized` の後の `payroll_results`・`payroll_result_lines` への `UPDATE`・`DELETE` をトリガーで拒む。結果の行の 4 つのハッシュ。夜間の再現の抜き取り | [ADR-0004](../decisions/0004-payroll-engine.md)、[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) |
 | **差引の支給額 ＝ 支給の合計 − 控除の合計**。配分の合計 ＝ 差引の支給額 | 取り込みの検査（Loader）。支払の指示の作成の検査 | PROP-PAY-002、PROP-PMT-001 |
 | **仕訳は実行の段ごとに釣り合う**：行の合計が 0、2 行以上、0 の行はない | 遅延制約のトリガー。`CHECK (amount <> 0)`。追記のみ。冪等のキー | [ADR-0037](../decisions/0037-payroll-journal-export.md) |
 | **振込ファイルの承認はファイルのバイト列に結ぶ** | `bank_files.file_sha256` と承認の案件。取り出しのときにハッシュを確かめる | [ADR-0035](../decisions/0035-bank-transfer-files.md) |
 | **1 つの実行（`regular`）は給与のグループ・期間ごとに 1 つ** | `payroll_runs` の部分一意 `(tenant_id, pay_group_id, pay_period_id) WHERE run_type = 'regular' AND state <> 'cancelled'` | ADR-0026 |
-| **規則表の公開した版の有効期間は、種類ごとに重ならない**。取り込んだ人と照合した人は違う | `rule_tables` の排他制約（`status = 'published'`）。`CHECK (verified_by IS NULL OR verified_by <> imported_by)` | [ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)、[ADR-0062](../decisions/0062-rule-table-release-calendar.md) |
+| **規則表の公開したバージョンの有効期間は、種類ごとに重ならない**。取り込んだ人と照合した人は違う | `rule_tables` の排他制約（`status = 'published'`）。`CHECK (verified_by IS NULL OR verified_by <> imported_by)` | [ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)、[ADR-0062](../decisions/0062-rule-table-release-calendar.md) |
 | **打刻は消えない**。同じ打刻は 1 回だけ | `time_clock_events` は追記のみ。`client_event_id` の一意 | [ADR-0021](../decisions/0021-clock-events-corrections-and-objective-records.md) |
 | **年休の付与ごとの残りは負にならない** | 台帳の行の追記の後に動く遅延制約のトリガーで、付与ごとの合計を確かめる。`leave_balances` は台帳の増分 | [ADR-0024](../decisions/0024-annual-leave-grant-ledger.md) |
 | **マイナンバーの平文は保管庫の外に出ない** | 人事の側の列は `mn_ref`・`mn_status` だけ。取り込みのファイルと `jsonb` の走査。人の DB のロールに `vault-mn` の `Decrypt` がない | ADR-0005、[ADR-0046](../decisions/0046-purpose-bound-vault-api-and-access-log.md)、[ADR-0053](../decisions/0053-operator-access-and-vault-break-glass.md) |
@@ -605,10 +605,10 @@ erDiagram
 | DM-8 | facet の 3 つの表の列の名前が、[ADR-0002](../decisions/0002-effective-dated-data-model.md) の例（`worker_id`、`event_id`、`superseded_by_event_id`）と [object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 4 節（`subject_id`、`case_id`、`superseded_by_case_id`）で違った | 後者に揃えた。主体は facet によらず `subject_id`、元は業務プロセスの案件（`case_id`・`rescinded_by_case_id`・`superseded_by_case_id`）。ADR-0002 に名前の対応の注記を足した |
 | DM-9 | 人の中の複数の主体（住所の種類、扶養の親族、緊急連絡先）、組織×ロール、職務・等級の facet の主体の表がなかった。`FacetSpec.subject` の型も足りなかった | 主体の表 `worker_address_subjects`・`dependents`・`emergency_contacts`・`org_role_assignments`・`job_profiles`・`grades` を置き、`FacetSpec.subject` に `address`・`dependent`・`emergency_contact`・`job_profile`・`grade` を足した。等級の facet は `grade_detail`（表 `grades` は主体）。`worker_job` の等級は `grade_id`（`grade_detail` への `PERIOD` の外部キー） |
 | DM-10 | `mn_ref`・`mn_status` を facet（`worker_personal`・`worker_dependents`）に持つと、保管庫の通知のたびに業務プロセスの案件の要る差分を書くことになる。状態は人事の事実ではなく保管庫の写し | 有効日付でない表 `mn_links`（主体 → `mn_ref`・`mn_status`）に移した。保管庫の通知で `app` が更新する（[data-model/vault.md](data-model/vault.md)）。[my-number-vault.md](my-number-vault.md) の 3・4.3・17 節を直した |
-| DM-11 | 設定の表（`overtime_agreements`、`security_group_members`、`mn_handlers`、`pay_groups` など）の期間の持ち方がまちまちだった（「facet」と書いたものもあった） | 3.4.1 節の 5 つの形に分けた。人事の事実だけを facet（A）にし、設定は版の表（B）、割り当ては期間つきの行（C）にする。`overtime_agreements` は事業所ごとの期間つきの行（C。協定の届出の単位で行を持つ）で、facet ではない |
+| DM-11 | 設定の表（`overtime_agreements`、`security_group_members`、`mn_handlers`、`pay_groups` など）の期間の持ち方がまちまちだった（「facet」と書いたものもあった） | 3.4.1 節の 5 つの形に分けた。人事の事実だけを facet（A）にし、設定はバージョンの表（B）、割り当ては期間つきの行（C）にする。`overtime_agreements` は事業所ごとの期間つきの行（C。協定の届出の単位で行を持つ）で、facet ではない |
 | DM-12 | 人事の側のテナントの HMAC の鍵（口座の重複、並行稼働の報告の仮の ID）の置き場所が決まっていなかった | 32 バイトの乱数を、テナントの鍵で包んで `tenant_keys.hmac_key_ct` に置く。S2 からはテナントの DEK で包む。鍵の差し替えは HMAC の作り直しを伴うので、MVP では差し替えない（持ち越し） |
 | DM-13 | 人の検索（入社の重複の確認、画面の検索）の置き場所 | 全文検索の製品を置かない。`worker_personal` の現在の表のカナ氏名・漢字氏名に `pg_trgm` の GIN 索引、社員番号に B-tree を張り、権限の `scopeFilter` と同じ SQL で引く。S2 で遅ければ見直す |
-| DM-14 | 領域の文書が使っていて定義のない表 | 最小の形で定義した：`employment_terminations`（退職の事由。facet は退職で閉じて状態が消えるため）、`payroll_adjustments`（個別の調整と賞与の支給額）、`payroll_config_snapshots`（実行の設定の版）、`payroll_run_milestones`（里程標）、`business_calendar_days`、`health_insurers`・`si_offices`・`labor_insurance_offices`、`manual_payments`、`consent_terms`、`si_premium_notices`、`security_membership_versions`、`report_schedules`、`attachments`、`outbox`、`mn_tenant_keys`、`mn_assertion_nonces`、`mn_handler_designations` |
+| DM-14 | 領域の文書が使っていて定義のない表 | 最小の形で定義した：`employment_terminations`（退職の事由。facet は退職で閉じて状態が消えるため）、`payroll_adjustments`（個別の調整と賞与の支給額）、`payroll_config_snapshots`（実行の設定のバージョン）、`payroll_run_milestones`（里程標）、`business_calendar_days`、`health_insurers`・`si_offices`・`labor_insurance_offices`、`manual_payments`、`consent_terms`、`si_premium_notices`、`security_membership_versions`、`report_schedules`、`attachments`、`outbox`、`mn_tenant_keys`、`mn_assertion_nonces`、`mn_handler_designations` |
 | DM-15 | 給与の結果の月ごとのパーティションの鍵 | `pay_date`（支給日）の月。`payroll_results` と `payroll_result_lines` の両方に `pay_date` を持ち、主キーと一意に含める。実行の中で `pay_date` は 1 つなので、`(run_id, employment_id)` の一意は保てる |
 | DM-16 | 本家の範囲で、MVP で扱わないもの（採用、福利厚生の加入、報酬の計画、タレント、学習） | 表を作らない（7 節）。入社の手続き（オンボーディング）は `hire` の案件と子の案件で持ち、専用の表を持たない |
 | DM-17 | 保管庫から人事の側へ `mn_status` を「通知」すると書いていたが、経路は人事 → 保管庫の片方向だけ（[ADR-0054](../decisions/0054-accounts-network-and-vault-boundary.md)） | 人事の側の worker が、保管庫の `status` の操作で変更の一覧（テナントの中の連番 `change_seq` より後）を 1 分ごとに引き取る。本人の登録の直後は画面の戻りでも引き取る。[my-number-vault.md](my-number-vault.md) の 4.1・10.2 節の書き方を直した |
@@ -641,7 +641,7 @@ erDiagram
 | --- | --- |
 | すべてのテナントの表に RLS があり、3.3 節の例外が網羅されていることを、マイグレーションの CI の許可リストと照合する | E1 の `migration-ci-guards` |
 | 有効日付の書き込みを関数だけに限る方式（`SECURITY DEFINER` か専用のロール）と、`WITHOUT OVERLAPS`・`PERIOD`・`btree_gist`・RLS の組み合わせ | E1 の `temporal-constraints-poc`。決まったら 3.2 節の `temporal_owner` の行を直す |
-| facet の差分と版のパーティションの時期 | S2 の前の計測（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 9 節） |
+| facet の差分とバージョンのパーティションの時期 | S2 の前の計測（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 9 節） |
 | 保全（`legal_holds`）の中の行を含むパーティションの扱い（残すか、行を移してから `DROP` するか） | E11 の `retention-rules-and-holds` |
 | `bp_events` と差分の表を監査の連鎖に入れる形（行の本体か、ハッシュの列だけか） | E11（[audit-and-retention.md](audit-and-retention.md) の 13 節） |
 | テナントの HMAC の鍵の差し替え | S2 の前。差し替えるなら HMAC の列を作り直す手順を ADR にする |

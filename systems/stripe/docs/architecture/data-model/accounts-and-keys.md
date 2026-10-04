@@ -226,8 +226,8 @@ TOTP とバックアップコード。Better Auth の `twoFactor` モデル。
 | `country` | `text` | NOT NULL | `'JP'` | ISO 3166-1 |
 | `default_currency` | `text` | NOT NULL | `'jpy'` | |
 | `default_api_version` | `text` | NULL | — | 最初の API の要求で固定する（[ADR-0007](../../decisions/0007-date-based-api-versions.md)） |
-| `api_version_upgraded_at` | `timestamptz` | NULL | — | 版を上げた時刻。72 時間は戻せる |
-| `previous_api_version` | `text` | NULL | — | 戻すときの版 |
+| `api_version_upgraded_at` | `timestamptz` | NULL | — | バージョンを上げた時刻。72 時間は戻せる |
+| `previous_api_version` | `text` | NULL | — | 戻すときのバージョン |
 | `charges_enabled` | `boolean` | NOT NULL | `false` | 本番の決済ができるか。テストのクラスタでは常に `true` |
 | `payouts_enabled` | `boolean` | NOT NULL | `false` | |
 | `disabled_reason` | `text` | NULL | — | `requirements.past_due`・`rejected.fraud` など本家の値（[merchant-onboarding.md](../merchant-onboarding.md) の 8 節） |

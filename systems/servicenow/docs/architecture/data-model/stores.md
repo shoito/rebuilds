@@ -69,7 +69,7 @@
 
 ## 3. OpenSearch（セルごとの 1 つのドメイン）
 
-索引は `task_v{n}`・`ci_v{n}`・`kb_v{n}`・`catalog_v{n}`・`record_v{n}`（別名 `task` など）。すべての文書で `_routing = tenant_id`、外部の版（`version_type = external`）は行の `version`（ナレッジは版の `version_no` ではなく記事の `version`）。定義元：[search.md](../search.md) の 3・4・5・7 節。
+索引は `task_v{n}`・`ci_v{n}`・`kb_v{n}`・`catalog_v{n}`・`record_v{n}`（別名 `task` など）。すべての文書で `_routing = tenant_id`、外部のバージョン（`version_type = external`）は行の `version`（ナレッジはバージョンの `version_no` ではなく記事の `version`）。定義元：[search.md](../search.md) の 3・4・5・7 節。
 
 ### 3.1 解析器（全索引で共通の設定）
 
@@ -114,8 +114,8 @@
 | `task` | `task.id` | `tenant_id`、`class_id`、`number`（`kw_lower`）、`state`、`active`、`priority`、`assignment_group_id`、`assigned_to_id`、`requester_id`、`requested_for_id`、`opened_by_id`、`watchers`、`ci_id`、`opened_at`、`updated_at`、`fields`（`title`・`description`、`searchable` のテナントのフィールド、`kind = journal_work_note`・`journal_comment` の最新 50 件・32 KB まで） | 監査の履歴、添付の本文、完了から 2 年を過ぎた行 |
 | `record` | `custom_record.id` | `tenant_id`、`table_id`、`number`、`updated_at`、`fields` | `searchable` でないテーブル |
 | `ci` | `ci.id` | `tenant_id`、`class_id`、`name`（`text` と `kw`）、`operational_status`、`location_id`、`owner_group_id`、`support_group_id`、`identifiers`（`keyword` の配列：シリアル番号・ホスト名・IP の表示してよいもの） | 識別の値のハッシュ |
-| `kb` | `kb_article.id`（公開中の版だけ） | `tenant_id`、`number`、`kb_base_id`、`category_id`、`audience_id`、`version_id`、`language`、`rating_avg`、`fields`（題名・本文・キーワード） | `draft`・`review`・`retired` の版 |
-| `catalog` | `catalog_item.id`（公開中の版） | `tenant_id`、`item_version_id`、`category_ids`、`audience_id`、`fields`（名前・説明・キーワード） | 変数の定義 |
+| `kb` | `kb_article.id`（公開中のバージョンだけ） | `tenant_id`、`number`、`kb_base_id`、`category_id`、`audience_id`、`version_id`、`language`、`rating_avg`、`fields`（題名・本文・キーワード） | `draft`・`review`・`retired` のバージョン |
+| `catalog` | `catalog_item.id`（公開中のバージョン） | `tenant_id`、`item_version_id`、`category_ids`、`audience_id`、`fields`（名前・説明・キーワード） | 変数の定義 |
 
 - 結果の総数（`hits.total`）を画面にも API にも出さない。集計（ファセット）に OpenSearch の集計を使わない（[ADR-0044](../../decisions/0044-acl-aware-search-and-index-freshness.md)）。
 - 大きさ（S1、1 セル）：`task` 約 110 GB（主）・6 シャード、`ci` 約 25 GB・2 シャード、`kb`・`catalog`・`record` は 1 シャード（[search.md](../search.md) の 5.3 節）。
@@ -124,7 +124,7 @@
 
 ### 4.1 outbox の topic
 
-`outbox.payload` は topic ごとの Zod スキーマ（開発リポジトリの `packages/contract`）。**値を入れず、ID と版だけを入れる**（受け手は DB の今の行、または事象の時点の版を `record_change` から組み立てて読む）。共通の形：
+`outbox.payload` は topic ごとの Zod スキーマ（開発リポジトリの `packages/contract`）。**値を入れず、ID とバージョンだけを入れる**（受け手は DB の今の行、または事象の時点のバージョンを `record_change` から組み立てて読む）。共通の形：
 
 ```json
 { "topic": "record.changed", "event_id": "0192...", "tenant_id": "0191...", "cell": "cell-s01",
@@ -145,7 +145,7 @@
 | `kb.published`・`kb.retired` | `{article_id, version_id}` | `indexer` | ナレッジの索引 |
 | `kb.feedback` | `{article_id, version_id, reason}` | `notifier` | 持ち主のグループへの知らせ |
 
-- SQS は事象の種類ごとの標準のキュー ＋ DLQ（[infrastructure.md](../infrastructure.md) の 3.2 節）。**順序は約束しない。** 受け手は版（`record_version`、外部の版）と一意の制約（`notification_message`、`webhook_delivery`）で重複・逆転に備える。
+- SQS は事象の種類ごとの標準のキュー ＋ DLQ（[infrastructure.md](../infrastructure.md) の 3.2 節）。**順序は約束しない。** 受け手はバージョン（`record_version`、外部のバージョン）と一意の制約（`notification_message`、`webhook_delivery`）で重複・逆転に備える。
 - メッセージの属性に `tenant_id` と `traceparent` を入れる。受け手は処理の始めに `SET LOCAL app.tenant_id` をし、読んだ行の `tenant_id` と違えば止めて SEV2（[security.md](../security.md) の 10.1 節）。
 - テナントの公平のため、`tenant_id` を SQS のメッセージのグループの鍵にしない（[search.md](../search.md) の 7.1 節）。
 
@@ -196,7 +196,7 @@
 ```
 
 - 5,000 項目まで。秘密の値（Webhook・フローの資格情報）と、レコード・利用者・グループの所属・番号の数を入れない。参照は `stable_key` で持ち、移送先で解決する（[data-dictionary-and-tables.md](../data-dictionary-and-tables.md) の 10 節）。
-- `kind` は、辞書（`dict_table`・`dict_field`・`dict_override`・`dict_choice_set`・`dict_choice`）、`acl_rule`、`record_rule`、`flow_def`（版の文書を含む）、`sla_def`、`calendar`、`form_layout`・`list_layout`・`view_rule`・`ui_rule`、`translation`、`notification_template`、`catalog_item`、`assignment_rule`、`change_approval_policy_rule`、`report_def`・`dashboard`（`packaged` だけ）。
+- `kind` は、辞書（`dict_table`・`dict_field`・`dict_override`・`dict_choice_set`・`dict_choice`）、`acl_rule`、`record_rule`、`flow_def`（バージョンの文書を含む）、`sla_def`、`calendar`、`form_layout`・`list_layout`・`view_rule`・`ui_rule`、`translation`、`notification_template`、`catalog_item`、`assignment_rule`、`change_approval_policy_rule`、`report_def`・`dashboard`（`packaged` だけ）。
 
 ### 6.2 取り込みの CSV・JSON
 
@@ -216,4 +216,4 @@
 
 ### 6.5 祝日の CSV（内閣府）
 
-- Shift_JIS、見出し「国民の祝日・休日月日,国民の祝日・休日名称」、行は `YYYY/M/D,名称`。取り込みの元の URL は設定に持つ（コードに埋めない）。原本は `platform/holidays/jp_cabinet_office/<sha256>.csv` に置き、`holiday_set_version.source_sha256` と対応させる。テストは固定の版の原本のファイルを読む（[ADR-0020](../../decisions/0020-japanese-holiday-data.md)）。
+- Shift_JIS、見出し「国民の祝日・休日月日,国民の祝日・休日名称」、行は `YYYY/M/D,名称`。取り込みの元の URL は設定に持つ（コードに埋めない）。原本は `platform/holidays/jp_cabinet_office/<sha256>.csv` に置き、`holiday_set_version.source_sha256` と対応させる。テストは固定のバージョンの原本のファイルを読む（[ADR-0020](../../decisions/0020-japanese-holiday-data.md)）。

@@ -1,6 +1,6 @@
 # Clients: X
 
-Web（React の SPA と PWA）と iOS・Android（React Native、Expo）のクライアントを決める。共通のパッケージ、データの層と手元の保存（タイムラインのオフラインの写し）、タイムラインの描画と先読み、投稿の作成（日本語の入力、文字数、オフラインの送信）、閲覧の出来事の送り方、プッシュ通知と深いリンク、公開の URL の HTML、アクセシビリティ。アプリの配布と最低の版は [delivery.md](delivery.md) にある。
+Web（React の SPA と PWA）と iOS・Android（React Native、Expo）のクライアントを決める。共通のパッケージ、データの層と手元の保存（タイムラインのオフラインの写し）、タイムラインの描画と先読み、投稿の作成（日本語の入力、文字数、オフラインの送信）、閲覧の出来事の送り方、プッシュ通知と深いリンク、公開の URL の HTML、アクセシビリティ。アプリの配布と最低のバージョンは [delivery.md](delivery.md) にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -21,7 +21,7 @@ Web（React の SPA と PWA）と iOS・Android（React Native、Expo）のク�
   - 公開の URL の最小の HTML（リンクのカード、検索エンジン）
   - アクセシビリティ
 - 扱わない：
-  - アプリのストアの配布、OTA の更新、最低の版（[delivery.md](delivery.md)）
+  - アプリのストアの配布、OTA の更新、最低のバージョン（[delivery.md](delivery.md)）
   - プッシュ通知の送信と中身の作り方（[notifications.md](notifications.md)）
   - 端末に残るデータの安全（[security.md](security.md) の 4 節）
   - 画面の見た目を本家にどこまで寄せるか（法務の L10。12 節）
@@ -61,7 +61,7 @@ Web（React の SPA と PWA）と iOS・Android（React Native、Expo）のク�
 - Expo（開発ビルドと `prebuild`）。JS のエンジンは Hermes。画面の移動は Expo Router。
 - 主な部品：FlashList（一覧。ADR-0050）、`expo-image`（画像の取り込みと保存）、`expo-sqlite`（手元の保存）、`expo-secure-store`（セッションのトークン）、`expo-notifications`（プッシュのトークン）、`expo-updates`（OTA。[delivery.md](delivery.md) の 5 節）、`expo-video`（動画、HLS）。
 - バンドル ID・URL のスキームは `<brand>` で書く（`com.<brand>.app`、`<brand>://`）。リポジトリ共通の ADR-0006。
-- 対応する OS：iOS は直近の 2 つの主の版、Android は API 29（Android 10）以上を既定にする。ストアの要求と RUM の分布で毎年見直す。
+- 対応する OS：iOS は直近の 2 つの主のバージョン、Android は API 29（Android 10）以上を既定にする。ストアの要求と RUM の分布で毎年見直す。
 
 ## 3. データの層
 
@@ -105,7 +105,7 @@ sequenceDiagram
 
 - 一覧の残りが 10 件になったら、次のページを取る（`until_id`）。
 - 画像は、画面の 2 枚先の項目まで先に取る（`expo-image` の `prefetch`、Web は `<link rel=preload>` ではなく画像の要素の `loading=lazy` と、近づいたら `decode()`）。動画は画面に入るまで取らない（回線の量を抑える）。
-- 回線が遅い（RUM の推定が 3G 相当）か、データの節約の設定のときは、画像を小さい版で取り、先読みを 1 枚にする。
+- 回線が遅い（RUM の推定が 3G 相当）か、データの節約の設定のときは、画像を小さいバージョンで取り、先読みを 1 枚にする。
 
 ## 4. 手元の保存とオフライン
 
@@ -258,7 +258,7 @@ ADR-0049。
 | --- | --- | --- |
 | `drafts` | 下書き（本人だけ） | 本人だけの表（RLS）。[posts-and-ids.md](posts-and-ids.md) と共有 |
 | `push_devices` | プッシュのトークン | [notifications.md](notifications.md) が持つ |
-| 手元（アプリ）`expo-sqlite`：`posts`・`users`・`timeline_items`・`drafts`・`send_queue`・`meta` | 4.1 節 | 手元の写し（版の番号を `meta` に持ち、上がったら作り直す） |
+| 手元（アプリ）`expo-sqlite`：`posts`・`users`・`timeline_items`・`drafts`・`send_queue`・`meta` | 4.1 節 | 手元の写し（バージョンの番号を `meta` に持ち、上がったら作り直す） |
 | 手元（Web）IndexedDB：同じ形 | 同上 | 同上 |
 
 ## 13. テスト

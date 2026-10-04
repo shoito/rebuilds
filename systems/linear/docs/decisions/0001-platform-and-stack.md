@@ -82,7 +82,7 @@ rebuilds の他の題材（Slack、Notion、Figma など）で、次の基盤を
 - 引き受けるコスト：
   - 同期エンジンの誤りは、収束しない・データを失う形で現れ、気づきにくい。決定的なシミュレーターと性質ベーステスト（[ADR-0002](0002-sync-model.md)）、オフラインと再送の試験（[ADR-0005](0005-client-persistence-and-offline.md)）に投資する。
   - JavaScript の 1 本のスレッドで、大きなワークスペースのモデルを持ち、描く。メモリーと GC の停止が遅延の予算を脅かす。モデルの遅延の復元（[ADR-0003](0003-bootstrap-and-partial-sync.md)）と、CI のベンチマークで抑える。
-  - Electron は配布の大きさとメモリーの費用がかかる。自動更新と最低の版の強制を delivery の領域で扱う。
+  - Electron は配布の大きさとメモリーの費用がかかる。自動更新と最低のバージョンの強制を delivery の領域で扱う。
 
 ## Confirmation
 

@@ -118,7 +118,7 @@ erDiagram
 
 - Better Auth の表は `auth` スキーマに置き、`auth` のロールだけが読み書きする（RLS の外。[data-model.md](../data-model.md) の 3.4 節）。他のサービスは読まない。
 - 列の名前は Better Auth の `fields` の設定で snake_case にする。表の名前は Better Auth の既定（単数形）のままにする。
-- **連絡先の平文を持たない**（[security.md](../security.md) の 5.3 節）。Better Auth は `user.email`・`user.phone_number` で利用者を引くので、`packages/auth` のデータベースのフックで、正規化した値の HMAC を `hmac:<kid>:<base64url>` の文字列にして入れる。OTP の送信は、入力された値を送信の関数が受け取って送るので、DB の平文は要らない。電話だけで登録した人の `email` は Better Auth の仮のメール（`p<tid>@invalid`）にする。この扱いは統合の後の決定（[README.md](../README.md) の 6 節）で、E2 の `auth-signup-login` で Better Auth の版に合うかを確かめる。
+- **連絡先の平文を持たない**（[security.md](../security.md) の 5.3 節）。Better Auth は `user.email`・`user.phone_number` で利用者を引くので、`packages/auth` のデータベースのフックで、正規化した値の HMAC を `hmac:<kid>:<base64url>` の文字列にして入れる。OTP の送信は、入力された値を送信の関数が受け取って送るので、DB の平文は要らない。電話だけで登録した人の `email` は Better Auth の仮のメール（`p<tid>@invalid`）にする。この扱いは統合の後の決定（[README.md](../README.md) の 6 節）で、E2 の `auth-signup-login` で Better Auth のバージョンに合うかを確かめる。
 - IP アドレスは `auth.session` に残さない（`advanced.ipAddress.disableIpTracking`）。ログインの IP は `login_events` に暗号文で持つ。
 
 ### 2.1 `auth.user`
@@ -225,8 +225,8 @@ Google・Apple の結び付け。Better Auth の `account` の表で、パスワ
 | `age_verify_method` | `text` | NULL | — | 書類の画像は持たない | `accounts` |
 | `account_mod` | `smallint` | NOT NULL | `0` | アカウントの措置の要約のビット（[data-model.md](../data-model.md) の 3.5 節） | `ts` |
 | `account_mod_detail` | `jsonb` | NOT NULL | `'{}'` | 要約の値：期限、`feature_limit` の種類と値、解除の条件 | `ts` |
-| `state_version` | `bigint` | NOT NULL | `1` | 作者の状態の写し `as:` の版。`state`・`protected`・`account_mod` を変えるたびに 1 上げる | `accounts`、`ts` |
-| `graph_version` | `bigint` | NOT NULL | `0` | 閲覧者の集合の版（[ADR-0012](../../decisions/0012-viewer-sets-cache.md)） | `graph` |
+| `state_version` | `bigint` | NOT NULL | `1` | 作者の状態の写し `as:` のバージョン。`state`・`protected`・`account_mod` を変えるたびに 1 上げる | `accounts`、`ts` |
+| `graph_version` | `bigint` | NOT NULL | `0` | 閲覧者の集合のバージョン（[ADR-0012](../../decisions/0012-viewer-sets-cache.md)） | `graph` |
 | `fanout_mode` | `text` | NOT NULL | `'push'` | `push`・`pull`（[ADR-0003](../../decisions/0003-timeline-fanout-hybrid.md)） | `stream_consumer`（Graph の数の消費者） |
 | `fanout_mode_changed_at` | `timestamptz` | NULL | — | | 同上 |
 | `pinned_post_id` | `bigint` | NULL | — | 固定の投稿（論理の参照 → `posts`） | `accounts` |
@@ -247,7 +247,7 @@ Google・Apple の結び付け。Better Auth の `account` の表で、パスワ
   - `login_policy IN ('standard','strong')`、`age_band IN ('minor','adult')`、`fanout_mode IN ('push','pull')`
   - `flags <@ ARRAY['synthetic']`
 - トリガー：`state`・`protected`・`account_mod` の変更で `state_version` が上がらない更新を拒む（[ADR-0009](../../decisions/0009-post-state-tombstones-and-state-cache.md) の lint と同じ考え方）。`graph_version` は減らす更新を拒む。
-- RLS：なし（公開の表）。見える範囲は `visible()` の利用者の版（[ADR-0004](../../decisions/0004-single-tenant-and-visibility.md)）。
+- RLS：なし（公開の表）。見える範囲は `visible()` の利用者のバージョン（[ADR-0004](../../decisions/0004-single-tenant-and-visibility.md)）。
 - 保持：`deleted` の行は墓石として残す（ID・`state`・`deleted_at`）。ハンドルは 90 日の保留の後に空ける。中身の物理の削除は法務の L8 の後（[security.md](../security.md) の 7.1 節）。
 - S1 の量：300 万行、1 行 約 300 B。
 
@@ -340,7 +340,7 @@ Google・Apple の結び付け。Better Auth の `account` の表で、パスワ
 | `slot` | `text` | NOT NULL | `'current'` | `current`・`pending`（変更の保留の間の新しい連絡先） |
 | `value_ct` | `bytea` | NOT NULL | — | 封筒の暗号文（`pii` の鍵） |
 | `contact_hmac` | `bytea` | NOT NULL | — | 正規化した値の HMAC-SHA256（鍵 `contact-hmac`） |
-| `hmac_kid` | `smallint` | NOT NULL | — | HMAC の鍵の版 |
+| `hmac_kid` | `smallint` | NOT NULL | — | HMAC の鍵のバージョン |
 | `verified_at` | `timestamptz` | NULL | — | |
 | `pending_until` | `timestamptz` | NULL | — | 48 時間（パスキーなら 24 時間）の保留の終わり |
 | `created_at`・`updated_at` | `timestamptz` | NOT NULL | `now()` | |

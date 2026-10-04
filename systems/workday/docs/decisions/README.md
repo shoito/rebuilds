@@ -7,8 +7,8 @@ Workday の再構築に関する決定。リポジトリ共通の決定は [docs
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、給与計算も TypeScript で書く。お金は整数の円と固定小数点で扱う | accepted |
 | [0002](0002-effective-dated-data-model.md) | 人事のデータを有効時間と記録時間の 2 軸で持ち、変更の差分を有効日の順に畳み込む | accepted |
-| [0003](0003-business-process-engine.md) | 業務プロセスを、版つきの定義と Aurora に永続する状態機械で自前に作る | accepted |
-| [0004](0004-payroll-engine.md) | 給与計算を、入力のスナップショットと規則表の版から決まる純粋な計算にする | accepted |
+| [0003](0003-business-process-engine.md) | 業務プロセスを、バージョンつきの定義と Aurora に永続する状態機械で自前に作る | accepted |
+| [0004](0004-payroll-engine.md) | 給与計算を、入力のスナップショットと規則表のバージョンから決まる純粋な計算にする | accepted |
 | [0005](0005-security-and-my-number.md) | ドメインと業務プロセスの権限と職務分掌で守り、マイナンバーは別アカウントの保管庫に置く | accepted |
 | [0006](0006-temporal-table-triplet-and-fold.md) | facet ごとの 3 つのテーブルを宣言から生成し、同じ日の差分の順序を事象の種類で決める | accepted |
 | [0007](0007-change-correction-rescind-semantics.md) | 変更・訂正・取消を差分の種類で区別し、取消は依存の決定表で拒む | accepted |
@@ -17,24 +17,24 @@ Workday の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0010](0010-person-employment-job-assignment-model.md) | 人・雇用・職務の割り当ての 3 層で持ち、人員の枠をポジションに一本化する | accepted |
 | [0011](0011-effective-dated-org-hierarchy-closure.md) | 組織の階層を有効日付の親子の辺と、日付の範囲つきの閉包テーブルで持つ | accepted |
 | [0012](0012-worker-lifecycle-events-and-legal-checks.md) | 入社・異動・休職・退職を雇用の状態の差分として書き、法令の検査は警告と理由の記録にする | accepted |
-| [0013](0013-bp-definition-format-and-versions.md) | 業務プロセスの定義を JSON の宣言と型のある式の木で書き、起票の日に有効な版に案件を固定する | accepted |
+| [0013](0013-bp-definition-format-and-versions.md) | 業務プロセスの定義を JSON の宣言と型のある式の木で書き、起票の日に有効なバージョンに案件を固定する | accepted |
 | [0014](0014-bp-routing-and-delegation.md) | 担当を組織のロールと閉包で決めて起票者と本人を除き、委任は期間中の未完了のタスクにも効かせる | accepted |
 | [0015](0015-bp-deadlines-reminders-and-inbox.md) | 期限を営業日で決めて表のタイマーで督促し、受信箱は担当の射影に委任を読むときに結ぶ | accepted |
 | [0016](0016-bp-definition-validation-and-activation.md) | 業務プロセスの定義を静的な検査と模擬の実行で確かめ、編集と有効化を別の人に分ける | accepted |
 | [0017](0017-authorization-evaluator.md) | 権限の判定を自前の評価器で行い、利用者ごとの権限の表と、閉包を使う SQL の条件で絞る | accepted |
-| [0018](0018-security-policy-versions-and-activation.md) | 権限の方針を版で持って別の人が有効化し、所属とロールの変更は業務プロセスで効かせる | accepted |
+| [0018](0018-security-policy-versions-and-activation.md) | 権限の方針をバージョンで持って別の人が有効化し、所属とロールの変更は業務プロセスで効かせる | accepted |
 | [0019](0019-segregation-of-duties-checks.md) | 職務分掌を範囲つきの規則表で持ち、有効化・所属の変更・案件の操作・夜間の走査の 4 か所で検査する | accepted |
 | [0020](0020-sensitive-read-audit-and-access-explanations.md) | 機微なドメインの閲覧を記録し、判定に理由を付けて説明の報告を出し、本番の代理のログインを読み取りに限る | accepted |
 | [0021](0021-clock-events-corrections-and-objective-records.md) | 打刻を端末が採番した追記のみの事象にし、訂正は記録の追加で行い、客観的な記録との乖離は検知だけする | accepted |
 | [0022](0022-work-schedules-and-work-hour-calculation.md) | 勤務体系を種類と印に分け、労働時間を分の整数で日・週・期間の順に区分する純粋な関数で計算する | accepted |
-| [0023](0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定を事業所ごとの設定で持ち、実績と見込みで段階的に警告し、月次の締めは集計の版を給与に渡す | accepted |
+| [0023](0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定を事業所ごとの設定で持ち、実績と見込みで段階的に警告し、月次の締めは集計のバージョンを給与に渡す | accepted |
 | [0024](0024-annual-leave-grant-ledger.md) | 年休を付与と追記のみの台帳で持ち、斉一的付与は法定を下回らない検査を通した設定だけを受ける | accepted |
 | [0025](0025-special-leave-and-leave-of-absence-boundary.md) | 休職は core-hr の雇用の状態が持ち、休暇の領域は日・半日・時間の単位の休暇と特別休暇を持つ | accepted |
 | [0026](0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行を状態機械にし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く | accepted |
 | [0027](0027-pay-item-graph-and-formula-language.md) | 項目を段つきの依存のグラフにし、テナントの式は円・10 進・分の型を分けた式の木で書く | accepted |
 | [0028](0028-retro-deltas-and-bonus-runs.md) | 遡及は確定した期間の計算し直しとの差を当期の行にし、エンジンの違いによる差は止め、賞与は前月の確定を前提にする | accepted |
 | [0029](0029-parallel-run-and-compute-partitioning.md) | 計算を決まった束ごとに ECS のタスクで行い、並行稼働は許容の幅なしで差を分類して切り替えを判定する | accepted |
-| [0030](0030-rule-table-ingestion-and-verification.md) | 規則表を適用の鍵つきの版で持ち、元のファイルのハッシュと 2 人の独立の照合を経て公開する | accepted |
+| [0030](0030-rule-table-ingestion-and-verification.md) | 規則表を適用の鍵つきのバージョンで持ち、元のファイルのハッシュと 2 人の独立の照合を経て公開する | accepted |
 | [0031](0031-income-tax-withholding.md) | 源泉所得税の欄と表を決定表で選び、甲欄の月額表は表引きと電算機特例を会社の設定で選ぶ | accepted |
 | [0032](0032-social-insurance-premiums-and-standard-remuneration.md) | 社会保険料は健康保険の側と厚生年金をそれぞれ 1 回だけ丸め、控除の月は前月分を既定にし、等級の改定は候補だけを示す | accepted |
 | [0033](0033-employment-insurance-and-resident-tax.md) | 雇用保険料は締日で料率を選んで 50 銭以下切り捨てにし、住民税は通知の月割額をそのまま使う | accepted |
@@ -65,7 +65,7 @@ Workday の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0058](0058-pii-free-telemetry.md) | 個人情報を出さない計装を型・Collector・URL の規則・走査の 4 層で守り、保管庫のテレメトリーは保管庫のアカウントに閉じる | accepted |
 | [0059](0059-payroll-run-slo-and-synthetic-run.md) | 給与の実行を支給日から逆算した里程標の遅れで監視し、本番の監視用のテナントで合成の給与を毎日計算して期待値と比べる | accepted |
 | [0060](0060-scheduled-peak-capacity.md) | 前もって分かる集中は暦と予定から先に広げ、給与計算とレポートにテナントの同時の上限と支給日の近さの優先を置く | accepted |
-| [0061](0061-golden-dataset-ci.md) | ゴールデンデータセットを事例ごとの入力・規則表の版・期待値・確認の出所で持ち、分類の網羅を検査し、期待値の変更とコードの変更を別の PR にする | accepted |
+| [0061](0061-golden-dataset-ci.md) | ゴールデンデータセットを事例ごとの入力・規則表のバージョン・期待値・確認の出所で持ち、分類の網羅を検査し、期待値の変更とコードの変更を別の PR にする | accepted |
 | [0062](0062-rule-table-release-calendar.md) | 規則表を署名した束でコードと別に出し、改正の暦で監視して適用の 5 営業日前までに公開する | accepted |
 | [0063](0063-payroll-flags-pinning-and-freeze-windows.md) | 給与に効くフラグとエンジンのイメージを実行ごとに固定し、テナントには影の比較の後に期間の境目で広げ、支給日の前は給与の経路のデプロイを凍結する | accepted |
 <!-- adr-index:end -->

@@ -165,11 +165,11 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 
 ## 7. 設定のキャッシュと反映
 
-認証の経路は、テナントの設定（アプリ、API、許可、接続、ブランド、鍵の公開部分）を要求のたびに DB から読まない。各タスクのメモリーに版付きで持ち、DB が読めない間は最後の版で動く（ADR-0005）。その仕組みと、許す古さを決める（[ADR-0032](../decisions/0032-tenant-config-cache.md)）。
+認証の経路は、テナントの設定（アプリ、API、許可、接続、ブランド、鍵の公開部分）を要求のたびに DB から読まない。各タスクのメモリーにバージョン付きで持ち、DB が読めない間は最後のバージョンで動く（ADR-0005）。その仕組みと、許す古さを決める（[ADR-0032](../decisions/0032-tenant-config-cache.md)）。
 
-### 7.1 版
+### 7.1 バージョン
 
-- テナントごとに `tenant_config_versions(tenant_id, version bigint, updated_at)` を持つ。設定の表を変えるトランザクションは、同じトランザクションで `version` を 1 増やす（トリガーではなく、リポジトリの層で必ず呼ぶ。CI で、設定の表への書き込みが版を上げていることを検査する）。
+- テナントごとに `tenant_config_versions(tenant_id, version bigint, updated_at)` を持つ。設定の表を変えるトランザクションは、同じトランザクションで `version` を 1 増やす（トリガーではなく、リポジトリの層で必ず呼ぶ。CI で、設定の表への書き込みがバージョンを上げていることを検査する）。
 - 同じトランザクションで outbox に `tenant.config_changed {tenant_id, version}` を入れる。
 
 ### 7.2 読み込み
@@ -178,11 +178,11 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 要求 → ホスト名 → tenant_id（ホスト名の表。全件をメモリーに持つ。ADR-0002）
      → config_cache.get(tenant_id)
           ├─ あり、かつ version が既知の最新と同じ → そのまま使う
-          ├─ あり、古い → 裏で読み直す（single-flight）。読み直しの間は古い版を使う
+          ├─ あり、古い → 裏で読み直す（single-flight）。読み直しの間は古いバージョンを使う
           └─ なし → DB（reader）から組み立てて入れる。読めなければ 503
 ```
 
-- スナップショットは、テナントの設定を 1 つの不変のオブジェクトに組み立てたもの（Zod で検証した型）。部分の更新はしない。組み立てたスナップショットは、そのテナントの設定の版と対にする。
+- スナップショットは、テナントの設定を 1 つの不変のオブジェクトに組み立てたもの（Zod で検証した型）。部分の更新はしない。組み立てたスナップショットは、そのテナントの設定のバージョンと対にする。
 - **全テナントを常に持たない。** S1 のテナント 1 万のうち、よく使われる本番のテナントは少数と見込む。タスクごとに LRU（既定 5,000 テナント、または 1 GiB）で持つ。本番のテナントのうち、直近 24 時間に要求のあったものは、タスクの起動時に先に読み込む。
 - 1 つのテナントのスナップショットの大きさの上限は 2 MiB。アプリ・接続の件数の上限（本家に合わせた 100 件など）の中では超えない見込み。超えるテナントは、個別に扱う（大口のテナントの専用の構成。S2）。
 
@@ -191,16 +191,16 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | 経路 | 遅れ | 働き |
 | --- | --- | --- |
 | Valkey の pub/sub（`cfg:changed`）。Relay が outbox から流す | 通常 1 秒未満 | 主な経路 |
-| 版の表のポーリング（5 秒ごとに `updated_at > 前回` を読む） | 5 秒以内 | pub/sub の取りこぼし、Valkey の障害 |
+| バージョンの表のポーリング（5 秒ごとに `updated_at > 前回` を読む） | 5 秒以内 | pub/sub の取りこぼし、Valkey の障害 |
 
 - Valkey の pub/sub は届く保証がない。ポーリングで補う。ポーリングは reader に 1 秒 1 回以下（タスク数 × 0.2 回/秒。S1 の auth のタスク 60 で 12 回/秒）の軽い問い合わせで、インデックス `(updated_at)` を使う。
 - **許す古さ**：通常、変更のコミットから全タスクへの反映まで p99 5 秒、最大 15 秒（ポーリングの間隔 ＋ 組み立ての時間 ＋ reader の遅れ）。ダッシュボードと API の文書に「反映まで最大 15 秒」と書く。
-- **DB が読めない間**：新しい変更もコミットできない（正本が同じ DB）ので、手持ちの版は古くならない。期限を切らずに最後の版で動き続ける。reader の遅れ（Aurora のレプリカの遅延）が 15 秒を超えたら、ポーリングを writer に切り替える。
+- **DB が読めない間**：新しい変更もコミットできない（正本が同じ DB）ので、手持ちのバージョンは古くならない。期限を切らずに最後のバージョンで動き続ける。reader の遅れ（Aurora のレプリカの遅延）が 15 秒を超えたら、ポーリングを writer に切り替える。
 - **安全に関わる変更**（クライアントの秘密の失効、アプリの削除、許可の削除、コールバックの削除）も、同じ経路で反映する。15 秒の間は古い設定で通りうる。これを受け入れる理由と、受け入れない場合の案は ADR-0032 にある。Management API（管理の経路）は、キャッシュではなく要求ごとに DB を読む。
 
 ### 7.4 鍵とホスト名
 
-- 署名鍵の公開部分（JWKS）は、discovery・JWKS の書き出し（ADR-0005）と同じ版で更新する。
+- 署名鍵の公開部分（JWKS）は、discovery・JWKS の書き出し（ADR-0005）と同じバージョンで更新する。
 - ホスト名 → `tenant_id` の表は、全件（S1 で 1 万＋カスタムドメイン）をメモリーに持つ。同じ通知で更新する。**表にないホスト名は、DB に問い合わせずに 404 にする**（ADR-0002、AGENTS.md の「テナントの解決の前に DB を読まない」）。
 - このため、作成したテナントのホスト名は、表への反映（最大 15 秒）まで 404 になる。テナントの作成の API は、応答に `hostname_ready_by`（コミットの時刻 ＋ 15 秒）を入れる。ダッシュボードのクイックスタートは、その時刻まで待ってから最初のログインを案内する。
 
@@ -209,9 +209,9 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | 事象 | 振る舞い |
 | --- | --- |
 | Aurora の reader が落ちた | writer から読む（ADR-0005）。キャッシュにあるテナントは影響なし |
-| Aurora 全体が読めない | キャッシュにあるテナントは最後の版で動く。キャッシュにないテナントは 503。タスクの再起動を避ける（スケールインを止める） |
+| Aurora 全体が読めない | キャッシュにあるテナントは最後のバージョンで動く。キャッシュにないテナントは 503。タスクの再起動を避ける（スケールインを止める） |
 | Valkey が落ちた | 通知がポーリングだけになる（最大 15 秒） |
-| 組み立てに失敗した（設定の不整合、Zod の検証の失敗） | 古い版を使い続け、`config_build_failures_total` を上げてアラート。新しいテナントなら 503。不整合を作った変更は、Management API の検証の漏れとして直す |
+| 組み立てに失敗した（設定の不整合、Zod の検証の失敗） | 古いバージョンを使い続け、`config_build_failures_total` を上げてアラート。新しいテナントなら 503。不整合を作った変更は、Management API の検証の漏れとして直す |
 | 反映の遅れ | ダッシュボードの「反映まで最大 15 秒」の表示。15 秒を超える遅れを SLI として計る |
 
 ## 9. セキュリティ
@@ -224,14 +224,14 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 
 ## 10. テスト
 
-- 性質ベーステスト：任意の設定の変更の列について、最後の変更のコミットから 15 秒後に、すべてのタスクのスナップショットの版が DB の版と一致する（Valkey の通知を落とす障害を含めて）。
+- 性質ベーステスト：任意の設定の変更の列について、最後の変更のコミットから 15 秒後に、すべてのタスクのスナップショットのバージョンが DB のバージョンと一致する（Valkey の通知を落とす障害を含めて）。
 - 性質ベーステスト：任意の 2 テナントについて、一方のホスト名の要求が、他方のスナップショットを返さない。
 - 表駆動テスト：4.1 節の種類 × グラント × 認証の方式の表。登録できる組とできない組。
 - 表駆動テスト：4.2 節の URL の規則（ワイルドカード、`http` の非ループバック、フラグメント、カスタムスキーム）。
 - 結合テスト：client grant を消すと、次の `client_credentials` の要求が `unauthorized_client` になり、Management API の呼び出しが 403 になる。
 - 結合テスト：Aurora を止めても、キャッシュにある本番のテナントのクライアントクレデンシャルが通る（ADR-0005 の障害の注入と共通）。
 - 結合テスト：削除したテナントの名前で新しいテナントを作れない。
-- CI：設定の表に書く関数が、版を上げる関数を呼んでいるかを静的に検査する。
+- CI：設定の表に書く関数が、バージョンを上げる関数を呼んでいるかを静的に検査する。
 
 ## 11. この領域の ADR
 
@@ -239,7 +239,7 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | --- | --- |
 | [0030](../decisions/0030-accounts-tenants-and-members.md) | テナントの上にアカウントを置き、請求とテナントの作成をまとめる。テナントの名前は再利用せず、環境は昇格だけを許す |
 | [0031](../decisions/0031-application-and-api-registration.md) | アプリの種類でクライアントの認証とグラントの上限を決め、コールバックはワイルドカードなしの完全一致にする。M2M はアプリ × API の許可で守る |
-| [0032](../decisions/0032-tenant-config-cache.md) | テナントの設定は版付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する |
+| [0032](../decisions/0032-tenant-config-cache.md) | テナントの設定はバージョン付きの不変のスナップショットでタスクに持ち、pub/sub とポーリングで最大 15 秒で反映する |
 
 ## 12. Story の候補
 
@@ -250,7 +250,7 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | E2 | アプリの登録（種類・グラント・URL の規則）、資格情報（秘密 2 つ、公開鍵 2 つ）のローテーション |
 | E2 | API の登録とスコープ、Management API の API をテナントの作成時に作る |
 | E2 | client grant と `client_credentials` の許可の判定 |
-| E2 | 設定のスナップショット、版、pub/sub とポーリングの反映、LRU と起動時の先読み |
+| E2 | 設定のスナップショット、バージョン、pub/sub とポーリングの反映、LRU と起動時の先読み |
 | E3 | 認証の経路での設定のキャッシュの利用（`/authorize`・`/oauth/token` が DB を読まずに動く） |
 | E9 | メンバーの招待とロールの割り当て、本番の点検の一覧、秘密の最終の使用の表示 |
 | E12 | 反映の遅れの SLI、Aurora 停止時のキャッシュの振る舞いの障害の注入 |
@@ -306,4 +306,4 @@ UNIQUE (tenant_id, client_id, audience, subject_type)
 | `client_credentials` | `tenant_id`、`id`、`client_id`、`kind`（`secret`・`public_key`）、`secret_hash`、`jwk`、`kid`、`created_at`、`expires_at`、`last_used_at`、`revoked_at` | RLS。クライアントの秘密と `private_key_jwt` の公開鍵の唯一の表（authentication-flows の提案した `client_secrets`・`client_public_keys` はこの表にまとめた）。有効なものは種類ごとに 2 つまで |
 | `resource_servers` | `tenant_id`、`id`、`identifier`、`name`、`scopes`、`token_lifetime`、`allow_offline_access`、`skip_consent_for_first_party`、`is_system` | RLS。`is_system` は Management API |
 | `client_grants` | `tenant_id`、`id`、`client_id`、`audience`、`scope`、`subject_type` | RLS |
-| `tenant_config_versions` | `tenant_id`、`version`、`updated_at` | RLS の外（ポーリングは全テナントを読む）。値は版だけで、設定の中身を持たない |
+| `tenant_config_versions` | `tenant_id`、`version`、`updated_at` | RLS の外（ポーリングは全テナントを読む）。値はバージョンだけで、設定の中身を持たない |

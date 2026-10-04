@@ -30,7 +30,7 @@ Figma の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0023](0023-library-snapshots-imported-into-files.md) | ライブラリは公開の時点の不変のスナップショットで配り、使う側のファイルに写しを取り込む。ファイルをまたぐ生の参照はしない | accepted |
 | [0024](0024-journal-items-and-fencing.md) | ジャーナルは `seq` の範囲の group commit で、フェンスの `epoch` を確かめる `TransactWriteItems` と `ClientRequestToken` で書く。大きな変更は S3 に置き、TTL の漏れは回復のジョブで拾う | accepted |
 | [0025](0025-content-addressed-checkpoints-and-loading.md) | チェックポイントはマニフェストと中身のハッシュで名付けたページのチャンクにし、変わったページだけを書く。クライアントは署名付き URL で CloudFront からチャンクを読んで端末にキャッシュし、その後の変更だけを Document Server から受け取る | accepted |
-| [0026](0026-version-history-restore-and-deletion.md) | 版はチェックポイントに印を付けたもので、復元は差分を 1 つの変更として当てて履歴を消さない。削除はゴミ箱と完全な削除の 2 段で、完全な削除はジョブで S3・ジャーナル・版を消す | accepted |
+| [0026](0026-version-history-restore-and-deletion.md) | バージョンはチェックポイントに印を付けたもので、復元は差分を 1 つの変更として当てて履歴を消さない。削除はゴミ箱と完全な削除の 2 段で、完全な削除はジョブで S3・ジャーナル・バージョンを消す | accepted |
 | [0027](0027-comments-anchored-to-nodes-in-metadata.md) | コメントは Aurora に置き、ノードの ID と相対の位置で固定する。通知は送る時点で受け手を判定し直し、メールは受け手とファイルごとにまとめる | accepted |
 | [0028](0028-realtime-metadata-subscriptions.md) | メタデータのリアルタイムの更新は、トリガーで書く無効化の outbox と、単純な問い合わせへの分解・再取得の購読層で配る | accepted |
 | [0029](0029-hierarchy-roles-seats-and-link-access.md) | 階層は組織・チーム・プロジェクト・ファイル。水準は全順序で、上位で与えた水準を下位で下げない。ファイルの「招待した人だけ」は上位の一般アクセスを遮る。シートは上限として重ねる | accepted |
@@ -43,10 +43,10 @@ Figma の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0036](0036-font-sources-and-licensing.md) | フォントの出どころは同梱のオープンなフォント・組織のフォント・端末のフォントの 3 つにし、サーバーの描画と PDF への埋め込みはライセンスの確かなものに限る | accepted |
 | [0037](0037-plugin-sandbox-quickjs-wasm.md) | プラグインのコードは QuickJS を WASM にした専用のインスタンスでメインスレッドに動かし、UI と通信は別のオリジンの null origin の iframe に置く | accepted |
 | [0038](0038-plugin-api-and-capabilities.md) | プラグインの API は動かした人の権限の中で動き、manifest で宣言した能力と通信先だけを許し、書き込みは通常の変更（ChangeSet）にする | accepted |
-| [0039](0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは初回と権限の拡大で人が審査する。版は不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR にする | accepted |
+| [0039](0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは初回と権限の拡大で人が審査する。バージョンは不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR にする | accepted |
 | [0040](0040-public-rest-api-surface.md) | 公開 API は別のサービスにし、利用者の権限とスコープの積で動かす。ファイルの中身は Rust の読み取り専用のサービスが返し、中身の書き込みは出さない。トークンは PKCE 必須の OAuth 2.1 と期限必須の個人のトークン | accepted |
 | [0041](0041-webhook-delivery.md) | Webhook は中身を含まない HMAC で署名したイベントを、配送の時点の権限で判定し、隔離した egress から少なくとも 1 回送る | accepted |
-| [0042](0042-api-versioning-and-rate-limits.md) | 公開 API の版は URL の大きな版にし、ノードの JSON はプロパティの表から生成して表の列で公開を決める。レート制限は操作の重さの tier と画素の予算で数える | accepted |
+| [0042](0042-api-versioning-and-rate-limits.md) | 公開 API のバージョンは URL の大きなバージョンにし、ノードの JSON はプロパティの表から生成して表の列で公開を決める。レート制限は操作の重さの tier と画素の予算で数える | accepted |
 | [0043](0043-authentication-sessions-and-org-sso.md) | 認証とセッションは Slack の ADR-0012 を引き継ぎ、組織の SAML SSO はメンバーにだけかける。長く続く接続は、セッションの取り消しでも切る | accepted |
 | [0044](0044-encryption-keys-and-client-cache.md) | 保存時の暗号化はデータの種類ごとの KMS の鍵（マルチリージョン）で行い、組織ごとの鍵は MVP で持たない。端末のキャッシュは暗号化せず、組織の方針で止められるようにする | accepted |
 | [0045](0045-audit-log-and-data-lifecycle.md) | 監査ログは操作と同じトランザクションで書いて改ざんできない保管へ送り、組織の管理者に見せる。削除は東京と大阪の両方で、バックアップの期限を最終の期限にする | accepted |
@@ -57,7 +57,7 @@ Figma の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0050](0050-editing-slis-and-slos.md) | 編集の SLO は「開ける」と「確定する」の 2 つのイベントの SLI で数え、反映の遅延は合成のボットで、回復の時間は Router の記録で測る | accepted |
 | [0051](0051-document-server-memory-admission.md) | Document Server は、ファイルごとのメモリを見積もって受け入れを決め、タスクのメモリの 75% を上限にする。大きなファイルは別の群れに置く | accepted |
 | [0052](0052-journal-throughput-and-hot-file-budget.md) | ジャーナルの表はオンデマンドで事前に温め、1 ファイルの書き込みは予算で抑える。予算を超えそうなファイルは、まとめの間隔を段階的に広げる | accepted |
-| [0053](0053-client-server-version-skew.md) | クライアントとサーバーの版は、送受信の形式の版・スキーマの互換の一覧・最低のビルドの 3 つで照合する。再読み込みは、穏やかなものと強いものを分ける | accepted |
+| [0053](0053-client-server-version-skew.md) | クライアントとサーバーのバージョンは、送受信の形式のバージョン・スキーマの互換の一覧・最低のビルドの 3 つで照合する。再読み込みは、穏やかなものと強いものを分ける | accepted |
 | [0054](0054-wasm-native-parity-and-bundle-budgets.md) | WASM とネイティブの一致を、同じ入力の列から作った正準形のバイト列で PR ごとに確かめ、WASM の大きさと描画の性能に予算を置いて CI で止める | accepted |
 | [0055](0055-staged-rollout-and-schema-changes.md) | クライアントのビルドは組織の割合で段階的に出し、適用の規則を変えるフラグはファイルごとに Document Server が決めて配る。プロパティの表の変更は「サーバー → クライアント → 書き込みの解禁」の 3 段で出す | accepted |
 <!-- adr-index:end -->

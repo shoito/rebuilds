@@ -438,7 +438,7 @@ erDiagram
 
 ### issue_description_versions（`IssueDescriptionVersion`）
 
-本文の版（[editor-and-descriptions.md](../editor-and-descriptions.md) の 4.7 節）。Worker のまとめが作り、管理者が消せる。
+本文のバージョン（[editor-and-descriptions.md](../editor-and-descriptions.md) の 4.7 節）。Worker のまとめが作り、管理者が消せる。
 
 - モデル：グループ `via`（`from: issue_id`）、`lazy`、`delete: hard`。
 
@@ -448,10 +448,10 @@ erDiagram
 | `state` | `bytea` | NO | | `server_only`、`bytes`（読み込みだけで届く。[data-model.md](../data-model.md) の 2.5 節） | その時点の Yjs の状態 |
 | `actor_ids` | `uuid[]` | NO | `'{}'` | `set`、`set<ref:User>`、`max: 50`、`on_delete: remove` | その間に書いた人。Worker だけが書く |
 | `text_len` | `integer` | NO | | `server_only` | |
-| `text_plain` | `text` | NO | | サーバーだけの列（モデルにない） | 変化の判定（前の版と比べる）に使う |
+| `text_plain` | `text` | NO | | サーバーだけの列（モデルにない） | 変化の判定（前のバージョンと比べる）に使う |
 
 - 主キー：`(workspace_id, id)`。索引：`(workspace_id, issue_id, created_at)`。
-- 上限：1 つの本文に 100 版か 90 日（古いものから Worker が消す）。
+- 上限：1 つの本文に 100 バージョンか 90 日（古いものから Worker が消す）。
 - 消す：`owner`・`admin` の `delete`（DT-PERM-003）は、ワークスペースの監査に残す。
 - S1 の規模：約 1 億行、平均 1 行 数 KB（`state` を含む）。
 

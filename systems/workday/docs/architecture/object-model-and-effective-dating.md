@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0006](../decisions/0006-temporal-table-triplet-and-fold.md) | facet ごとに差分・版・現在の 3 つのテーブルを、宣言から生成する。現在のテーブルは `WITHOUT OVERLAPS` の主キーと `PERIOD` の外部キーで守る。書き込みは DB の関数だけが行う。同じ日の差分の順序は、事象の種類の優先度（`seq`）で決め、同じ `seq` で同じ項目に触れる差分は拒む |
+| [0006](../decisions/0006-temporal-table-triplet-and-fold.md) | facet ごとに差分・バージョン・現在の 3 つのテーブルを、宣言から生成する。現在のテーブルは `WITHOUT OVERLAPS` の主キーと `PERIOD` の外部キーで守る。書き込みは DB の関数だけが行う。同じ日の差分の順序は、事象の種類の優先度（`seq`）で決め、同じ `seq` で同じ項目に触れる差分は拒む |
 | [0007](../decisions/0007-change-correction-rescind-semantics.md) | 変更・訂正・取消を差分の種類で区別する。訂正は元の差分を取消の印で退け、新しい差分を足す。取消は、依存する後の差分があれば拒む。依存は決定表（DT-TEMP-004）で判定する |
 | [0008](../decisions/0008-point-in-time-queries-and-activation-timers.md) | 時点の問い合わせは `effective_on` と `known_at` を受け、`known_at` は「安定の境界」（今 − 10 秒）より前に限る。将来日付の副作用は、差分と同じトランザクションで発効の予定を書き、テナントの暦の 0 時に BP Worker が実行する |
 | [0009](../decisions/0009-temporal-reference-model-testing.md) | 純粋な参照のモデル（メモリーの中の畳み込み）を正解として、DB の実装を fast-check のモデルベーステストで比べる。本番では夜間に同じ参照のモデルで抜き取りの検査をする |
@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | 有効の時点と入力の時点 | 変更には、業務の上で有効になる時点（Effective Moment）と、システムに入力した時点（Entry Moment）がある。有効の時点を持たない変更もある。同じ有効日に複数の変更があれば、入力の時点で最後のものを取る（[Change Detection](https://doc.workday.com/workday-education/en-us/course-manuals/creating-integrations-using-global-payroll-connect/change-detection.html)） | 有効時間は日単位の `daterange`。記録時間は `recorded_at` と `superseded_at`。同じ日の順序は入力の順ではなく、事象の種類の `seq` で決める（5.2 節） |
 | 将来日付の発効 | 将来日付の変更は、指定したタイムゾーンの、その日の 0 時に効く（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)） | 見え方は問い合わせの日付で自然に変わる。副作用だけを、テナントの暦の 0 時に発効のタイマーで行う（8 節） |
-| 監査 | 前後の値、変更者、時刻を記録する（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)） | 差分のテーブルが監査の正本の 1 つになる。前後の値は版から出す |
+| 監査 | 前後の値、変更者、時刻を記録する（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)） | 差分のテーブルが監査の正本の 1 つになる。前後の値はバージョンから出す |
 | 保存 | 少数の汎用のテーブルに追記し、メモリーの中のグラフで読む（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)。汎用のテーブルの詳細は古い第三者の記事で未検証） | 採らない。型のある facet のテーブルと DB の制約にする（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
 
 - 本家で、将来日付の変更の後に、それより前の日付の変更が入ったとき、将来日付の変更の項目をどう扱うかは、公開の資料で確かめられなかった（未検証）。本システムは差分の畳み込みで決める（5 節）。
@@ -141,12 +141,12 @@ CREATE TABLE worker_job (
 );
 ```
 
-- **`WITHOUT OVERLAPS`**：主体ごとに有効期間が重ならないことを DB が守る。`WITHOUT OVERLAPS` の列は範囲型で、他の列を GiST に載せるには `btree_gist` が要る（[CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、[btree_gist](https://www.postgresql.org/docs/18/btree-gist.html)、2026-09-28 に確認）。Aurora PostgreSQL は 18.3 から 18 系を提供し（[AWS の発表](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-aurora-postgresql-major-version-18/)、2026-06-11）、`btree_gist` は対応する拡張の一覧にある（[Extensions supported for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)）。どちらも 2026-09-28 に確認。E1 の PoC で、実際の Aurora の版で時間の制約を作れることを確かめる。
+- **`WITHOUT OVERLAPS`**：主体ごとに有効期間が重ならないことを DB が守る。`WITHOUT OVERLAPS` の列は範囲型で、他の列を GiST に載せるには `btree_gist` が要る（[CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、[btree_gist](https://www.postgresql.org/docs/18/btree-gist.html)、2026-09-28 に確認）。Aurora PostgreSQL は 18.3 から 18 系を提供し（[AWS の発表](https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-aurora-postgresql-major-version-18/)、2026-06-11）、`btree_gist` は対応する拡張の一覧にある（[Extensions supported for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)）。どちらも 2026-09-28 に確認。E1 の PoC で、実際の Aurora のバージョンで時間の制約を作れることを確かめる。
 - **`PERIOD` の外部キー**：参照する側の期間の全体が、参照先の期間の和で覆われていることを守る。参照の動作は `NO ACTION` だけが使える（`CASCADE` などは時間の外部キーで使えない。[CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、2026-09-28 に確認）。このため、組織を閉じる前に所属を移す、という順序を業務プロセスの側で守る（[core-hr.md](core-hr.md) の 4.4 節）。
 - **coverage**：`worker_job` は雇用（`employment_status`）の期間の中にだけある（`coverage: within`）。これを `PERIOD` の外部キーで表す。
-- **版の `state`**：畳み込んだ状態の全体を `jsonb` で持ち、外部キーと検索に使う列だけを型のある列にも持つ。時点の問い合わせは `state` を Zod で読み直す。
-- **追記のみ**：差分と版のテーブルに、アプリのロールは `INSERT` と `SELECT` だけを持つ。`rescinded_*` と `superseded_*` を空から埋める更新は、`temporal_owner` が持つ関数だけが行い、トリガーで他の列の更新と、埋めた後の更新を拒む。
-- **現在のテーブル**は、版から作る写し。行の削除と追加は `temporal_owner` の関数（`temporal.apply_fold`）だけが行う。アプリのロールは `EXECUTE` だけを持つ。
+- **バージョンの `state`**：畳み込んだ状態の全体を `jsonb` で持ち、外部キーと検索に使う列だけを型のある列にも持つ。時点の問い合わせは `state` を Zod で読み直す。
+- **追記のみ**：差分とバージョンのテーブルに、アプリのロールは `INSERT` と `SELECT` だけを持つ。`rescinded_*` と `superseded_*` を空から埋める更新は、`temporal_owner` が持つ関数だけが行い、トリガーで他の列の更新と、埋めた後の更新を拒む。
+- **現在のテーブル**は、バージョンから作る写し。行の削除と追加は `temporal_owner` の関数（`temporal.apply_fold`）だけが行う。アプリのロールは `EXECUTE` だけを持つ。
 - **テナント**：3 つのテーブルとも `tenant_id` を先頭に持ち、RLS を掛ける（[ADR-0005](../decisions/0005-security-and-my-number.md)）。関数の中でも、呼び出し元の `app.tenant_id` で RLS が効くことを守る。
   - 注：書き込みを関数だけに限る方法は 2 つある。(a) `SECURITY DEFINER` の関数にする。関数の所有者のロールで動くので、所有者にも `FORCE ROW LEVEL SECURITY` の対象になる設定が要る。(b) 書き込みの専用のロールをアプリの接続で `SET LOCAL ROLE` し、そのロールにだけ表の書き込みを許す。どちらにするかは E1 の `temporal-constraints-poc` で RLS のテストと合わせて決める（持ち越し）。
 
@@ -181,7 +181,7 @@ facet の中身は [core-hr.md](core-hr.md) の 3 節で決める。この領域
 5. 取消されていない差分を `(effective_on, seq)` の順に並べ、`D` より前の最後の状態から始めて、`D` 以降の期間を作り直す。
 6. 各段で、状態の全体を `FacetSpec.fields` で検証する。失敗したら全体を戻す（例：必須の項目が `unset` された）。
 7. 隣り合う同じ状態の期間をまとめる（coalesce）。
-8. 作り直した期間と、現在のテーブルの `D` 以降の期間を比べる。違う期間だけ、古い版に `superseded_at` を書き、新しい版を追記し、現在のテーブルの行を差し替える。`D` をまたぐ期間は `D` で分ける。
+8. 作り直した期間と、現在のテーブルの `D` 以降の期間を比べる。違う期間だけ、古いバージョンに `superseded_at` を書き、新しいバージョンを追記し、現在のテーブルの行を差し替える。`D` をまたぐ期間は `D` で分ける。
 9. outbox に `temporal.changed`（主体、facet、影響の範囲 `[D, ∞)`、`case_id`）を書く。影響の範囲が今日以前なら `temporal.retro_detected` も書く（6.4 節）。
 10. 発効の予定を書き直す（8 節）。
 
@@ -255,7 +255,7 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 | 終わり | `kind = end` | その日から無くなる（gapped の facet だけ） | 変わらない | 退職、組織の廃止など |
 
 - 「過去の知識が変わらない」は、どの操作も、`superseded_at` を埋めるのと追記だけで行うことで守る。PROP-TEMP-003 で確かめる。
-- 過去日付の変更と訂正は、データの上ではどちらも新しい版になる。区別は `kind` で持ち、監査、業務プロセスの権限、社会保険の届出（訂正は届出の訂正になりうる）で使う（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）。
+- 過去日付の変更と訂正は、データの上ではどちらも新しいバージョンになる。区別は `kind` で持ち、監査、業務プロセスの権限、社会保険の届出（訂正は届出の訂正になりうる）で使う（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）。
 
 ### 6.2 訂正（DT-TEMP-003）
 
@@ -276,7 +276,7 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 
 取消は、後の差分がその差分を前提にしているとき拒む（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）。前提にしているかは、次の表で判定する。表は上から評価する。候補の後の差分 `L` は、同じ主体・facet（coverage の子の facet を含む）の、取消されていない差分で、`L.effective_on ≥ R.effective_on` のもの。`R` は取り消す差分。
 
-| # | `R` の種類 | `L` の種類 | `L.based_on_version_ids` が `R` の作った版を含む | `L` と `R` の項目が重なる | 結果 |
+| # | `R` の種類 | `L` の種類 | `L.based_on_version_ids` が `R` の作ったバージョンを含む | `L` と `R` の項目が重なる | 結果 |
 | --- | --- | --- | --- | --- | --- |
 | 1 | `hire`・`rehire` | 何でも（coverage の子を含む） | - | - | 依存。拒む（後の案件から先に取り消す） |
 | 2 | 何でも | `terminate`・`end` | - | - | 依存しない（退職は前の職務を前提にしない）。ただし 6.4 節の警告 |
@@ -285,7 +285,7 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 | 5 | 何でも | 何でも | いいえ | - | 依存しない。受ける |
 | 6 | 業務プロセスの種類が `depends_on` を宣言 | 宣言の相手 | - | - | 依存。拒む（例：昇格の案件の後の、その昇格を条件にした昇給） |
 
-- `based_on_version_ids` は、起票の画面・API が読んだ版の ID を、案件が完了のときに差分へ写したもの。起票の時と完了の時の間に版が変わったら、完了の前に「見ていた版が古い」として担当に確かめ直させる（[business-process-engine.md](business-process-engine.md) の 6.3 節）。
+- `based_on_version_ids` は、起票の画面・API が読んだバージョンの ID を、案件が完了のときに差分へ写したもの。起票の時と完了の時の間にバージョンが変わったら、完了の前に「見ていたバージョンが古い」として担当に確かめ直させる（[business-process-engine.md](business-process-engine.md) の 6.3 節）。
 - 拒んだときは、依存する後の案件の一覧を返す。担当は、後の案件から順に取り消す。一括の取消（依存の連鎖をまとめて取り消す）は MVP では持たない（13 節）。
 
 ### 6.4 遡及の検知
@@ -304,8 +304,8 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 | `known_at` | 記録の時刻 | 今（現在の知識） | テナントの作成の時刻以上、安定の境界以下 |
 | `range`（履歴） | 有効日の範囲 | 全期間 | 1 回の応答は 500 期間まで。カーソルで続ける |
 
-- API の読み取りは `GET /workers/{id}/job?effective_on=2026-04-01&known_at=2026-05-20T09:00:00Z` の形にする。応答に、使った `effective_on`・`known_at`・版の ID を返す。
-- `known_at` を省くと、現在のテーブルを読む（速い）。`known_at` を指定すると、版のテーブルを読む。
+- API の読み取りは `GET /workers/{id}/job?effective_on=2026-04-01&known_at=2026-05-20T09:00:00Z` の形にする。応答に、使った `effective_on`・`known_at`・バージョンの ID を返す。
+- `known_at` を省くと、現在のテーブルを読む（速い）。`known_at` を指定すると、バージョンのテーブルを読む。
 
 ```sql
 -- Value on day D as known at T.
@@ -378,10 +378,10 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 
 ## 9. 規模と性能
 
-- 版の行の見積もり：S1 で 1 人あたり年 20 版（全 facet）× 100 万人 ≒ 年 2,000 万行。差分は年 1,500 万行。
+- バージョンの行の見積もり：S1 で 1 人あたり年 20 バージョン（全 facet）× 100 万人 ≒ 年 2,000 万行。差分は年 1,500 万行。
 - 1 人・1 facet の畳み込みは、差分 100 件までで 10ms 以内（Aurora の writer での計測の目標。E2 で測る）。
 - 組織の再編（数千人の所属の変更）は、主体ごとの畳み込みの繰り返しになる。親子の案件で 200 人ずつに分ける（[business-process-engine.md](business-process-engine.md) の 9 節）。
-- S2 で、版と差分のテーブルを `recorded_at` の月ごとのパーティションにする。`WITHOUT OVERLAPS` の制約は GiST の排他制約として働き、パーティションのテーブルの排他制約は、パーティションの鍵の列をすべて含み、その列を等号で比べなければならない（[PostgreSQL 18：CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、[5.12 Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html)、2026-09-28 に確認）。`recorded_at` で分けると、パーティションをまたぐ期間の重なりを検査できないので、現在のテーブルはパーティションにしない。Aurora の実際の版での振る舞いは E1 の `temporal-constraints-poc` で確かめる。
+- S2 で、バージョンと差分のテーブルを `recorded_at` の月ごとのパーティションにする。`WITHOUT OVERLAPS` の制約は GiST の排他制約として働き、パーティションのテーブルの排他制約は、パーティションの鍵の列をすべて含み、その列を等号で比べなければならない（[PostgreSQL 18：CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、[5.12 Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html)、2026-09-28 に確認）。`recorded_at` で分けると、パーティションをまたぐ期間の重なりを検査できないので、現在のテーブルはパーティションにしない。Aurora の実際のバージョンでの振る舞いは E1 の `temporal-constraints-poc` で確かめる。
 
 ## 10. 障害のときの振る舞い
 
@@ -390,7 +390,7 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 | 畳み込みの途中で検証が失敗する | トランザクションを戻す。案件は完了しない。担当に誤りのコード（`EMPTY_PERIOD` など）を示す |
 | `PERIOD` の外部キーの違反 | 同上。アプリの事前の検査で `OUTSIDE_COVERAGE` を返すのが普通で、DB の違反は設計の漏れとして警告する |
 | 同じ主体への並行の書き込み | 主体の行ロックで直列になる。5 秒の `transaction_timeout` で失敗した側は、案件の完了を再試行する |
-| 現在のテーブルと版の食い違い（バグ） | 夜間の検査で検知する（12.3 節）。直すのは現在のテーブルだけで、`temporal.rebuild_current(subject)` で版から作り直す。差分と版は変えない |
+| 現在のテーブルとバージョンの食い違い（バグ） | 夜間の検査で検知する（12.3 節）。直すのは現在のテーブルだけで、`temporal.rebuild_current(subject)` でバージョンから作り直す。差分とバージョンは変えない |
 | 発効のタイマーの遅れ | 見え方は正しい（読み取りの日付で決まる）。副作用だけが遅れる。5 分の遅れで警告 |
 | Aurora のフェイルオーバー | 進行中のトランザクションは失われ、案件の完了が再試行される。コミット済みの差分は失われない（RPO 0、NFR-006） |
 | 時計のずれ | `recorded_at` は DB の時計だけを使う。アプリの時計は使わない |
@@ -399,7 +399,7 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 
 - 時点の問い合わせも、権限の判定を通す（[security-model.md](security-model.md)）。過去の値を見る権限は、今の値を見る権限と同じドメインで判定する。例外として、`known_at` を指定した問い合わせ（「当時システムが何を知っていたか」）は、監査の権限（`audit` の `view`）を加えて要る。訂正で消した誤りの値（例：誤った口座番号）が、普通の利用者に見えないようにするため。
 - 差分の `delta` にも個人情報が入る。差分のテーブルの読み取りは、facet のドメインの権限で絞る。
-- 暗号化する項目（口座番号）は、差分と版の両方で暗号文を持つ。畳み込みは暗号文のまま行い、復号しない。
+- 暗号化する項目（口座番号）は、差分とバージョンの両方で暗号文を持つ。畳み込みは暗号文のまま行い、復号しない。
 - マイナンバーは有効日付のテーブルに入れない。人事の側は `mn_ref` だけを持つ（[ADR-0005](../decisions/0005-security-and-my-number.md)）。
 - ログには主体の ID、facet、誤りのコードだけを出し、差分の値を出さない。
 
@@ -433,8 +433,8 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 
 - DT-TEMP-001〜005 は `spec.md` から読む表駆動テストにする。
 - 夜間の検査（NFR-002）：
-  - 現在のテーブルと、`superseded_at IS NULL` の版の突き合わせ。
-  - 1% の主体を抜き取り、差分から参照のモデルで畳み込み直し、版と比べる。
+  - 現在のテーブルと、`superseded_at IS NULL` のバージョンの突き合わせ。
+  - 1% の主体を抜き取り、差分から参照のモデルで畳み込み直し、バージョンと比べる。
   - `fired` でない過去の発効の予定。
   - 食い違いは SEV2。検査はリーダーで行う。
 
@@ -470,7 +470,7 @@ temporal_activations (tenant_id, id, subject_type, subject_id, facet,
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 現在のテーブルへの書き込みを関数だけに限る方式（`SECURITY DEFINER` と RLS の関係） | E1 の `temporal-constraints-poc` |
-| 版と差分のパーティションの時期と、`WITHOUT OVERLAPS` とパーティションの関係 | E2 の PoC と S2 の前の計測 |
+| バージョンと差分のパーティションの時期と、`WITHOUT OVERLAPS` とパーティションの関係 | E2 の PoC と S2 の前の計測 |
 | 依存の連鎖をまとめて取り消す操作を持つか | E3 の後に、人事の担当の利用の実績で決める |
 | 社会保険の届出の訂正に要る「訂正の理由」の区分 | [payroll-jp-rules.md](payroll-jp-rules.md) と社労士の確認 |
 

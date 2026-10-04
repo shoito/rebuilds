@@ -3,7 +3,7 @@
 ルール、リスト、評価の記録、レビュー、プラットフォームのルールとブロックリスト。振る舞いは [fraud.md](../fraud.md)、方針は [ADR-0021](../../decisions/0021-fraud-rules-engine.md) にある。速度の集計は Valkey に置く（[stores.md](stores.md) の 1 節）。規約は [data-model.md](../data-model.md) の 3 節。
 
 - 加盟店のルールとリストはテナントテーブル（`account_id NOT NULL`）。プラットフォームのルールとブロックリストは別のテーブル（`platform_fraud_rules`・`platform_fraud_list_items`、RLS の例外）に置き、テナントテーブルに `account_id IS NULL` の行を作らない。
-- 評価は Payments のプロセスの中で行い、ルールとリストは加盟店ごとに版つきでキャッシュする（最大 10 秒の遅れ）。
+- 評価は Payments のプロセスの中で行い、ルールとリストは加盟店ごとにバージョンつきでキャッシュする（最大 10 秒の遅れ）。
 
 ## 1. ER 図
 
@@ -90,7 +90,7 @@ erDiagram
 
 ### 2.1 `fraud_rules`
 
-加盟店のルール（版で持つ）。定義元：[fraud.md](../fraud.md) の 3・4.3 節。
+加盟店のルール（バージョンで持つ）。定義元：[fraud.md](../fraud.md) の 3・4.3 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

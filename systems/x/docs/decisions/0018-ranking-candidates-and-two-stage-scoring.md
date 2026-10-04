@@ -16,7 +16,7 @@ date: 2026-10-04
 - **偏り**：点の上位だけを並べると、同じ作者や、フォロー外の人気の投稿が並ぶ。
 - **ページング**：続きのページのたびに並べ直すと、順が揺れて重複と抜けが出る。
 
-本家の公開の README は、スコアの前と後の絞り込み、行動ごとの確率の重みの和、作者の 2 件目以降の減衰、フォロー外の割り引きを説明している（[xai-org/x-algorithm](https://github.com/xai-org/x-algorithm)、2026-10-04 に確認）。2023 年の版は、軽いランクと重いランクの 2 段を持つ（[twitter/the-algorithm](https://github.com/twitter/the-algorithm)、同日に確認）。
+本家の公開の README は、スコアの前と後の絞り込み、行動ごとの確率の重みの和、作者の 2 件目以降の減衰、フォロー外の割り引きを説明している（[xai-org/x-algorithm](https://github.com/xai-org/x-algorithm)、2026-10-04 に確認）。2023 年のバージョンは、軽いランクと重いランクの 2 段を持つ（[twitter/the-algorithm](https://github.com/twitter/the-algorithm)、同日に確認）。
 
 ## Options
 

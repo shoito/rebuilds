@@ -150,7 +150,7 @@ CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用の
 | # | 種類 | 脅威 | 対策 |
 | --- | --- | --- | --- |
 | OP1 | T | `packages/tzdata` の PR に細工したデータを入れる（全利用者の時刻をずらす） | IANA のリリースのファイルには、URL の末尾に `.asc` を付けた GPG の署名がある（tz-announce のリリースの告知、2026-10-04 に確認）。`tzdata-watch` が署名を `gpg --verify` で確かめ、通らなければ PR を作らない。信頼する鍵の指紋は E3 の `tzdata-package` で固定する。差分の報告を Dev と Ops が見る（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)） |
-| OP2 | T | AppConfig の `tzdata.active_version` の誤った変更 | Ops の承認、許す値をイメージの中の版に限る（同上） |
+| OP2 | T | AppConfig の `tzdata.active_version` の誤った変更 | Ops の承認、許す値をイメージの中のバージョンに限る（同上） |
 | OP3 | E | 運用者の本番のデータへの直接のアクセス | JIT、2 人の承認、プラットフォームの監査（8 節） |
 | OP4 | T | データの直接の修正で変更のログを迂回する | DB のロールで `event_objects` への直接の `UPDATE` を拒否（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。修正は `packages/writer` の保守の経路 |
 
@@ -240,7 +240,7 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 
 | 場面 | 最初の手 | 手順 |
 | --- | --- | --- |
-| 権限の漏れの疑い（応答の監査の不一致） | 該当の経路を `ops.*` のフラグで止める（検索、ICS の公開、Webhook など）。`redact()` を直すのはコードの版として | `access-leak-response.md` |
+| 権限の漏れの疑い（応答の監査の不一致） | 該当の経路を `ops.*` のフラグで止める（検索、ICS の公開、Webhook など）。`redact()` を直すのはコードのバージョンとして | `access-leak-response.md` |
 | 迷惑な招待の急増 | 該当の主催者・テナントの外部への送信を止める（`ops.imip_outbound.<tenant>`） | `invite-abuse.md` |
 | アプリ用のパスワードの大量の漏えいの疑い | 該当の利用者・組織のアプリ用のパスワードを一括で取り消す | `credential-compromise.md` |
 | ICS の秘密のアドレスの漏えい | 利用者に作り直しを促す。組織の全部の秘密のアドレスを一括で作り直す操作 | 同上の手順に含める |
@@ -328,7 +328,7 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 | --- | --- | --- |
 | `tenant_audit_events`（月の分割、RLS） | ADR-0042 の行 | 6 |
 | `platform_audit_events`（保守用のスキーマ） | 同上 | 6、8 |
-| `retention_policies` | データの種類 → 期間、根拠、L5 の結論の版 | 9 |
+| `retention_policies` | データの種類 → 期間、根拠、L5 の結論のバージョン | 9 |
 | `legal_holds` | テナント、理由、開始、終了 | 9 |
 | `tenants.status` に `suspended`・`purging` | 解約の手順 | 9 |
 | `app_passwords`（[accounts-and-orgs.md](accounts-and-orgs.md) の 9 節。ここは要件だけ） | `secret_hash`（SHA-256）、末尾 4 文字、スコープ、期限、最後に使った時刻・クライアントの種類、取り消し | 3.3 |

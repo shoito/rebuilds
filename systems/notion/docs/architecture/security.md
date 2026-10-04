@@ -7,7 +7,7 @@
 | [ADR-0003](../decisions/0003-workspace-sharding.md) | ワークスペースで RLS と論理シャード |
 | [ADR-0004](../decisions/0004-inherited-page-permissions.md) | 権限はページの木を継承し、1 つの判定関数で決める |
 | [ADR-0018](../decisions/0018-permission-levels-and-inheritance.md) | 権限の水準と、置き換えの継承 |
-| [ADR-0019](../decisions/0019-workspace-acl-version-cache.md) | ワークスペースの権限の版によるキャッシュと無効化 |
+| [ADR-0019](../decisions/0019-workspace-acl-version-cache.md) | ワークスペースの権限のバージョンによるキャッシュと無効化 |
 | [ADR-0020](../decisions/0020-published-pages-isolation.md) | 公開ページを別のドメインで配り、既定で noindex |
 | [ADR-0021](../decisions/0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバー、ゲスト、チームスペース |
 | [ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md) | 検索は権限キーと読み直しの二重 |
@@ -194,7 +194,7 @@ Slack の ADR-0018 と同じ方式（操作と同じトランザクションで 
 | --- | --- | --- |
 | ゴミ箱のページ | 30 日（本家と同じ。Enterprise は所有者が変えられる） | 30 日で「完全に削除」の状態へ移す |
 | 完全に削除したページ（`purged_at`） | 30 日は運用者が所有者の依頼で戻せる | 期限の後に Worker が部分木・ファイル・スナップショット・索引を物理削除する（[block-model.md](block-model.md) の 9 節） |
-| ページの履歴（版） | プランで 7 日（Free）・30 日（Plus）・90 日（Business）・無期限（Enterprise）。MVP は 30 日（block-model.md の 8 節） | 期限を過ぎた版を毎日消す。期限は消す時点のプランで決める |
+| ページの履歴（バージョン） | プランで 7 日（Free）・30 日（Plus）・90 日（Business）・無期限（Enterprise）。MVP は 30 日（block-model.md の 8 節） | 期限を過ぎたバージョンを毎日消す。期限は消す時点のプランで決める |
 | 検索の索引 | 元のデータに従う | ゴミ箱に入れたら、文書を残したまま `in_trash: true` にし、通常の検索から外す。ゴミ箱の中のページは、ゴミ箱の画面の検索からだけ出し、`can_edit` 以上の人だけが見る（[search.md](search.md) の 1・6.1 節、ADR-0022 の注記）。物理削除で文書を tombstone にし、7 日後に消す |
 | ファイル | 属するブロックに従う | ブロックの物理削除で S3 のオブジェクトを消す |
 | 公開サイトの CDN のキャッシュ | 最大 60 秒 | 取り下げで無効化 |

@@ -21,7 +21,7 @@
 | [data-model/recording.md](data-model/recording.md) | 録画、区間、成果物、共有、再生の記録、削除の記録、同意、文字起こし、語彙 | 9 |
 | [data-model/platform-api.md](data-model/platform-api.md) | OAuth のアプリ・コード・承認・許可・トークン、Webhook の受け口と配送 | 7 |
 | [data-model/telephony.md](data-model/telephony.md) | 電話番号、通話、ダイヤルアウトの集計（E14、MVP の後） | 3 |
-| [data-model/governance.md](data-model/governance.md) | 利用の集計、レポートの書き出し、監査ログ 3 系統とハッシュの連鎖、outbox、リーガルホールド、サポートの参照の許可、クライアントの版 | 11 |
+| [data-model/governance.md](data-model/governance.md) | 利用の集計、レポートの書き出し、監査ログ 3 系統とハッシュの連鎖、outbox、リーガルホールド、サポートの参照の許可、クライアントのバージョン | 11 |
 | [data-model/stores.md](data-model/stores.md) | Valkey のキー、S3 の置き場所、SQS・Firehose、品質の記録、シグナリングのメッセージ、outbox・Webhook の封筒、Actor と Media Node のメモリ、鍵と秘密、端末 | — |
 
 合計 68 表。ER 図は、全体図 1 つ（3 節）と、領域ごとの図 12 個（各ファイルの冒頭）。
@@ -41,13 +41,13 @@
 | S3（`prod`、ファイルのバケット） | チャットのファイル、報告の添付、レポートの書き出し | 実体の正本 | 期限まで失ってはならない | [stores.md](data-model/stores.md) の 3 節 |
 | S3（`prod`、観測のバケット）＋ Athena | 品質の生の記録（参加者ごと 10 秒）、日次の集計 | 正本 | 失ってよい | [ADR-0051](../decisions/0051-qos-telemetry-pipeline.md) |
 | S3（log-archive、Object Lock） | 監査ログ 3 系統、CloudTrail、Media Node・TURN・ALB・WAF のログ | 正本 | 失ってはならない（7 年） | [ADR-0046](../decisions/0046-audit-logs-and-data-lifecycle.md) |
-| S3（shared） | Web の版ごとの資産（`/app/<version>/`）、Terraform の状態、AMI の配布 | — | 作り直せる | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |
+| S3（shared） | Web のバージョンごとの資産（`/app/<version>/`）、Terraform の状態、AMI の配布 | — | 作り直せる | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |
 | SQS | Worker のジョブ（[stores.md](data-model/stores.md) の 6 節） | 正本ではない | outbox と表から作り直せる | — |
 | Kinesis Data Firehose | `qos.report` と Media Node の要約の流れ | 正本ではない | 失ってよい | [ADR-0051](../decisions/0051-qos-telemetry-pipeline.md) |
 | AMP、CloudWatch Logs、X-Ray | メトリクス、アプリのログ、トレース（内容と IP を含めない） | — | 失ってよい | [observability.md](observability.md) |
 | KMS、Secrets Manager、AWS Private CA | 鍵と秘密 | 正本 | 失ってはならない | [ADR-0047](../decisions/0047-keys-and-operator-access-to-media.md) |
 | IPAM（`media-prod`） | BYOIP の範囲、EIP のプール、隔離した EIP のタグ | 正本 | 失ってはならない | [ADR-0049](../decisions/0049-media-node-fleet.md) |
-| AWS AppConfig | release・meeting・ops・experiment のフラグ、`client-config`（Web の版の割合と最低の版） | フラグの正本 | 既定の値で動く | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |
+| AWS AppConfig | release・meeting・ops・experiment のフラグ、`client-config`（Web のバージョンの割合と最低のバージョン） | フラグの正本 | 既定の値で動く | [ADR-0056](../decisions/0056-client-release-trains-and-meeting-scoped-flags.md) |
 | 公開の `ip-ranges.json` | Media Node と TURN の範囲、更新の日付 | — | 作り直せる | [ADR-0016](../decisions/0016-media-edge-addressing-and-security-groups.md) |
 | 利用者の端末 | 端末の鍵、前回の経路、端末の選択、仮想背景、ショートカット。E2EE の鍵はワーカーのメモリだけ | 端末の鍵だけは端末の正本 | 取り直す | [clients.md](clients.md)、[network-traversal.md](network-traversal.md)、[e2ee.md](e2ee.md) |
 | 開発リポジトリ | シグナリングのスキーマ（`@<brand>/signaling-schema`）、Node の制御の API（`@<brand>/media-node-api`）、`settingsRegistry`、試験のベクトル | 定義の正本 | — | [ADR-0008](../decisions/0008-signaling-protocol.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md)、[ADR-0039](../decisions/0039-settings-hierarchy-and-locks.md) |
@@ -165,7 +165,7 @@ ADR-0058 の「組織に属さない表」。新しい表を `global` に置く�
 | 接尾辞 | 中身 | 型 |
 | --- | --- | --- |
 | `_hash` | SHA-256（照合だけに使う乱数の秘密：参加の鍵、共有のトークン、招待のトークン、OAuth のトークン） | `bytea` |
-| `_hmac` | HMAC-SHA256（pepper つき。推測できる短い値：パスコード） | `bytea`。pepper の版を `_pepper_version` に持つ |
+| `_hmac` | HMAC-SHA256（pepper つき。推測できる短い値：パスコード） | `bytea`。pepper のバージョンを `_pepper_version` に持つ |
 | `device_key_hash`、`ip_prefix_hash`、`ip_hash`、`caller_id_hash` | HMAC-SHA256（pepper つき）。名前は領域の文書の呼び方に合わせた | `bytea` |
 | `_ciphertext` | KMS のデータの鍵でエンベロープ暗号化した値（2.7 節） | `bytea` |
 
@@ -225,7 +225,7 @@ ADR-0058 の「組織に属さない表」。新しい表を `global` に置く�
 | `api_idempotency_keys.response_ciphertext` | 応答にパスコードと参加の URL が入る |
 
 - **照合だけに使う秘密はハッシュだけを持つ**（2.5 節）。定数時間で比べる。
-- **pepper**（HMAC の鍵）は Secrets Manager に版つきで置く（[stores.md](data-model/stores.md) の 9 節）。`ip_prefix_hash` の pepper は 30 日ごとに替え、前の版を 30 日残す（[ADR-0032](../decisions/0032-removal-ban-suspend-and-reports.md) の注記）。
+- **pepper**（HMAC の鍵）は Secrets Manager にバージョンつきで置く（[stores.md](data-model/stores.md) の 9 節）。`ip_prefix_hash` の pepper は 30 日ごとに替え、前のバージョンを 30 日残す（[ADR-0032](../decisions/0032-removal-ban-suspend-and-reports.md) の注記）。
 
 ### 2.9 パーティション
 

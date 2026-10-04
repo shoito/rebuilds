@@ -171,7 +171,7 @@ Relay から Worker へのメッセージは「きっかけ」で、Worker は�
 
 ### 6.2 S2：OpenSearch
 
-- 別名 `messages` の裏に、版付きのインデックス（`messages-v1` など）を置く。ルーティングは `workspace_id`。
+- 別名 `messages` の裏に、バージョン付きのインデックス（`messages-v1` など）を置く。ルーティングは `workspace_id`。
 - マッピング（[search.md](../search.md) の 5.2 節。`is_private` は 5.3 節の権限の条件に使う）：
 
 ```json
@@ -186,7 +186,7 @@ Relay から Worker へのメッセージは「きっかけ」で、Worker は�
 }
 ```
 
-- 文書の ID は `message_id`。版は `content_seq` の外部バージョン（`version_type: external`）。
+- 文書の ID は `message_id`。バージョンは `content_seq` の外部バージョン（`version_type: external`）。
 - チャンネルの公開・非公開を切り替えたら、そのチャンネルの文書を再インデックスする。
 - S3 のセル構成では、セルごとにドメインを持つ。
 
@@ -200,6 +200,6 @@ Relay から Worker へのメッセージは「きっかけ」で、Worker は�
 | `channel_state` | `[workspace_id, channel_id]` | `applied_seq`、窓の範囲、最後に開いた時刻 | LRU |
 | `outbox` | `client_msg_id` | 未送信のメッセージ | しない |
 | `drafts` | `[workspace_id, channel_id, thread_root_id]` | 下書き | しない |
-| `meta` | 固定 | スキーマの版、キャッシュの総量 | — |
+| `meta` | 固定 | スキーマのバージョン、キャッシュの総量 | — |
 
 - データベースはアカウントごとに分ける（`slack:<account_id>`）。ログアウトで消す。ワークスペースから外されたら、そのワークスペースの行を消す。

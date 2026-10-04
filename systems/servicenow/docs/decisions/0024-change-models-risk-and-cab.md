@@ -36,9 +36,9 @@ date: 2026-09-28
 1、a、x を採用する。
 
 - 状態：通常 `new → assess → authorize → scheduled → implement → review → closed`、標準 `new → scheduled → …`、緊急 `new → authorize → scheduled → …`。`review` と `closed` からは取り消せない。
-- どの種類も、承認のまとまりが `approved` にならないと `scheduled` を通れない。標準は、雛形の版の承認をその変更の承認とみなす。承認の後に予定・CI を変えるときは `reschedule` で承認を取り直す。
+- どの種類も、承認のまとまりが `approved` にならないと `scheduled` を通れない。標準は、雛形のバージョンの承認をその変更の承認とみなす。承認の後に予定・CI を変えるときは `reschedule` で承認を取り直す。
 - 承認の方針は DT-CHG-002（種類 × リスク → 段、承認者、規則、期限切れの動作）で決め、組み込みのフロー `change_approval_policy` で依頼する。テナントが変える値（段ごとの承認者・規則・期限・期限切れの動作）はテナントの設定の表 `change_approval_policy_rule` に持ち、段の数は変えさせない（[itsm-processes.md](../architecture/itsm-processes.md) の 8.5.1 節、DT-CHG-003。2026-09-28 に足した）。段を「なし」にできるのは標準だけ。依頼者・担当者は承認者から除く。
-- 標準の変更の雛形は版を持ち、版の承認を `change_manager` のグループで行う。承認済みの版は変えない。
+- 標準の変更の雛形はバージョンを持ち、バージョンの承認を `change_manager` のグループで行う。承認済みのバージョンは変えない。
 - CAB の会議（定義、会議、議題）は、議題の作成と議事の記録を担う。承認の反映は、各承認者の回答（`channel = cab_meeting`）で行う。
 - 緊急の変更は、ECAB の 1 人の承認で `scheduled` へ進み、`review` から `closed` へは事後の CAB の承認を要る。
 - 機械学習によるリスクの予測は MVP に入れない。

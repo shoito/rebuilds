@@ -18,9 +18,9 @@ date: 2026-09-28
 - 再帰の規則。
 - ホストの API として何を見せるか。権限・共有・FLS をどう効かせるか。
 
-本家（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版の「Triggers and Order of Execution」、2026-09-28 に確認。ADR-0008 に写した内容）：保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす。API の版 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS を守る）と `with sharing` で動く。トリガー自体は共有を外した文脈で動くが、その中の問い合わせと DML は、明示しなければ利用者のモードで動く。66.0 以前は、宣言のないクラスの共有の扱いが呼び出しの経路で変わる（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版（API 68.0）の「Apex Security and Sharing」と「Use the with sharing, without sharing, and inherited sharing Keywords」、2026-09-28 に確認）。
+本家（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版の「Triggers and Order of Execution」、2026-09-28 に確認。ADR-0008 に写した内容）：保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす。API のバージョン 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS を守る）と `with sharing` で動く。トリガー自体は共有を外した文脈で動くが、その中の問い合わせと DML は、明示しなければ利用者のモードで動く。66.0 以前は、宣言のないクラスの共有の扱いが呼び出しの経路で変わる（[Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)、Winter '27 版（API 68.0）の「Apex Security and Sharing」と「Use the with sharing, without sharing, and inherited sharing Keywords」、2026-09-28 に確認）。
 
-> 2026-09-28 の注記：起票の時は「Apex は既定でシステムの文脈で動く」と書いていた。これは API の版 66.0 以前の振る舞いで、今の本家は既定を利用者の権限に改めた。本システムの既定（実行する利用者の権限）は、今の本家と同じ向きになる。決定は変えない。なお、同じ Winter '27 版の [SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf) は、まだ「Apex は既定でシステムのモードで動く」と書いており、本家の資料どうしが食い違う。
+> 2026-09-28 の注記：起票の時は「Apex は既定でシステムの文脈で動く」と書いていた。これは API のバージョン 66.0 以前の振る舞いで、今の本家は既定を利用者の権限に改めた。本システムの既定（実行する利用者の権限）は、今の本家と同じ向きになる。決定は変えない。なお、同じ Winter '27 版の [SOQL and SOSL Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_soql_sosl.pdf) は、まだ「Apex は既定でシステムのモードで動く」と書いており、本家の資料どうしが食い違う。
 
 ## Options
 

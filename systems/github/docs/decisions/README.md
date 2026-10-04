@@ -25,7 +25,7 @@ GitHub の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0018](0018-repository-roles-and-permission-composition.md) | リポジトリの権限は、本家と同じ 5 つのロールの最大値で決める | accepted |
 | [0019](0019-authentication-and-token-model.md) | Web のログインは Better Auth、プログラムからのアクセスは細粒度のトークンを既定にする | accepted |
 | [0020](0020-github-app-model.md) | 外部との連携の主な形を、本家と同じ GitHub App（インストールと 1 時間のトークン）にする | accepted |
-| [0021](0021-api-shape-and-versioning.md) | 公開 API は本家の形に寄せ、REST は日付の版をヘッダーで選び、GraphQL は版を持たずに育てる | accepted |
+| [0021](0021-api-shape-and-versioning.md) | 公開 API は本家の形に寄せ、REST は日付のバージョンをヘッダーで選び、GraphQL はバージョンを持たずに育てる | accepted |
 | [0022](0022-webhook-signing-and-delivery.md) | Webhook は本家と同じ HMAC-SHA256 で署名し、隔離した egress から送り、送る直前に権限を確かめる | accepted |
 | [0023](0023-firecracker-microvm-runners.md) | ホストされたランナーは、EC2 の metal の上の Firecracker の microVM で、1 ジョブ 1 VM・使い捨てにする | accepted |
 | [0024](0024-job-scheduling-and-fairness.md) | ジョブは持ち主ごとの同時実行の上限と、持ち主の間の公平な順番で配る | accepted |

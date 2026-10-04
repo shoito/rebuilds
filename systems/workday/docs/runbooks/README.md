@@ -62,7 +62,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 - **デプロイとリリースを分ける。** デプロイは Ops が承認し、リリース（フラグを広げる）は PM が判断する。すべての新しい振る舞いは release フラグの裏に置く。
 - **フラグは 4 種類**（[ADR-0063](../decisions/0063-payroll-flags-pinning-and-freeze-windows.md)）：release（PM）、payroll（PM と QA。影の比較の後、テナントの給与の期間の境目で）、ops（縮退。`ops.read_only_mode`・`ops.payroll_finalize_hold`・`ops.payroll_first`。給与の確定の保留は IC）、permission（契約の機能の有効化）。**給与に効くフラグとエンジンのイメージは、入力の固定のときに実行に固定する。**
 - **デプロイの順**：マイグレーション（expand）→ relay・worker・loader・egress-worker・audit-archiver → bp-worker → api（blue/green のカナリア 10% → 100%）→ Payroll Compute のイメージの登録（次に入力を固定する実行から）。直後に合成の給与の実行。
-- **ロールバック**：まずフラグで戻す（給与に効くフラグは次の実行から）。次に 1 つ前のイメージ。Payroll Compute は「現在のエンジンのダイジェスト」を前に戻す。**マイグレーションは戻さない。確定した給与の結果と公開した規則表は戻さない**（訂正の版と遡及で直す）。
+- **ロールバック**：まずフラグで戻す（給与に効くフラグは次の実行から）。次に 1 つ前のイメージ。Payroll Compute は「現在のエンジンのダイジェスト」を前に戻す。**マイグレーションは戻さない。確定した給与の結果と公開した規則表は戻さない**（訂正のバージョンと遡及で直す）。
 - **保管庫**は別のパイプライン・別の承認者（セキュリティの担当と Ops の責任者）で、人事の側と別の日に出す（[ADR-0057](../decisions/0057-vault-delivery-separation.md)）。
 - 本番へのデプロイは Ops が承認する（作成者と別の人）。`security:sensitive` は Dev のテックリードとセキュリティの担当の 2 人。
 
@@ -99,7 +99,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 国民の祝日 | 日付 | 毎年 | 前年の 11 月（取り込みの元は内閣府の [syukujitsu.csv](https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv)。2026-09-28 の時点で翌年の 2027 年の分まで載っている） |
 
 - 流れ：公表の検知（週 1 回）→ 取り込み（`rules.import`）→ 独立の照合（`rules.verify`。取り込んだ人と別。S8）→ 新しい期間のゴールデンデータの事例（社労士・税理士の確認つき）→ staging に公開してゴールデンデータの全件と合成の給与の実行 → 本番に公開（`rules.publish`。Ops の承認）→ 直後の合成の給与の実行。
-- 公開の後の誤りは、公開を戻さず、訂正の版を同じ流れで出す（`rule-table-correction.md`）。
+- 公開の後の誤りは、公開を戻さず、訂正のバージョンを同じ流れで出す（`rule-table-correction.md`）。
 
 ## 4. アラートと手順
 

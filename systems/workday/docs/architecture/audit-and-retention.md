@@ -22,14 +22,14 @@
 
 | 本家の考え方 | 内容 | このシステムでの扱い |
 | --- | --- | --- |
-| 監査 | 変更は有効日と入力日を分けて持ち、前後の値・変更者・時刻を監査の記録に残す（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)、2026-09-28 に確認） | 変更は差分と版と業務プロセスのイベントで残る（3 節） |
+| 監査 | 変更は有効日と入力日を分けて持ち、前後の値・変更者・時刻を監査の記録に残す（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)、2026-09-28 に確認） | 変更は差分とバージョンと業務プロセスのイベントで残る（3 節） |
 | 改ざんの検知 | 公開の資料で確かめられなかった（未検証。本家の内部の実装で、公開されていない。設計は本家に依らない） | ハッシュの連鎖と Object Lock（[ADR-0048](../decisions/0048-audit-log-hash-chain-and-anchoring.md)） |
 
 ## 3. 監査の記録の系統
 
 | 系統 | 記録するもの | 正本 | 書く時点 |
 | --- | --- | --- | --- |
-| 人事のデータの変更 | 差分、版、取消・訂正の印 | `<facet>_changes`・`<facet>_versions`（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 4 節） | 業務プロセスの完了と同じトランザクション |
+| 人事のデータの変更 | 差分、バージョン、取消・訂正の印 | `<facet>_changes`・`<facet>_versions`（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 4 節） | 業務プロセスの完了と同じトランザクション |
 | 業務プロセス | 起票、承認、差し戻し、却下、委任、取消、訂正、担当の差し替え | `bp_events`（[business-process-engine.md](business-process-engine.md) の 6 節） | 状態の変化と同じトランザクション |
 | 給与・支払・仕訳 | 実行の段、確定、取消、振込ファイルの承認、仕訳 | `payroll_runs` の遷移、`bp_events`、仕訳（追記のみ） | 同上 |
 | テナントの監査（`audit_events`） | 下の 3.1 節 | Aurora の追記のみの表 | 操作と同じトランザクション。閲覧は応答の前 |
@@ -37,7 +37,7 @@
 | マイナンバー | 保管庫のすべての操作 | 保管庫の `mn_access_log` | 同上（保管庫の中） |
 | AWS の操作 | CloudTrail（組織の証跡）、KMS の操作 | log-archive | AWS |
 
-- 人事のデータの変更の「前後の値」は、版の表の前後の版から出す。`audit_events` に値を写さない（二重に持たない）。
+- 人事のデータの変更の「前後の値」は、バージョンの表の前後のバージョンから出す。`audit_events` に値を写さない（二重に持たない）。
 - 監査の画面（6 節）は、これらの系統を 1 つの時系列に並べて見せる。
 
 ### 3.1 `audit_events` の事象
@@ -47,12 +47,12 @@
 | 権限 | 方針の下書きの編集・有効化・戻し、所属とロールの変更の完了、職務分掌の違反（止めた・警告・夜間の走査）、代理のログインの開始・終了・全要求（[security-model.md](security-model.md) の 10.1 節） |
 | 閲覧 | 機微なドメインの閲覧（要求ごと）、拒否のまとめ（1 利用者・1 ドメイン・1 時間）、`known_at` の問い合わせ（[ADR-0020](../decisions/0020-sensitive-read-audit-and-access-explanations.md)） |
 | 出力 | レポートの実行と取り出し、一括の出力、明細の閲覧、振込ファイルの取り出し、賃金台帳などの帳簿の出力 |
-| 設定 | 業務プロセスの定義の有効化、項目・勘定の対応の版の有効化、テナントの規則表（健康保険組合の料率）の公開、保存の期間の延長、保全 |
+| 設定 | 業務プロセスの定義の有効化、項目・勘定の対応のバージョンの有効化、テナントの規則表（健康保険組合の料率）の公開、保存の期間の延長、保全 |
 | 認証 | ログインの成功・失敗、再認証、SSO の接続の変更、API の利用者・打刻機の鍵の発行と取消、セッションの失効 |
 | 連携 | 一括の取り込みの確定、移行の実行、Webhook の登録 |
 
 - 記録の形：`tenant_id`、`id`（UUIDv7）、`recorded_at`、`event_type`、`actor_type`（`worker`・`integration`・`terminal`・`system`・`operator`）、`actor_id`、`on_behalf_of`、`target_type`・`target_id`、`result`、`reason_code`、`request_id`、`client_ip_prefix`（/24）、`details`（許可リストのスキーマ。値を入れない）。
-- **記録に個人情報の値を入れない。** 氏名・住所・額・口座・番号は入れず、ID だけを入れる。変更の前後の値は版の表を参照する。
+- **記録に個人情報の値を入れない。** 氏名・住所・額・口座・番号は入れず、ID だけを入れる。変更の前後の値はバージョンの表を参照する。
 
 ## 4. 改ざんの検知（[ADR-0048](../decisions/0048-audit-log-hash-chain-and-anchoring.md)）
 
@@ -79,7 +79,7 @@
   3. Aurora の `audit_events` の前日の行と、セグメントの行を突き合わせる（DB の行の消去・書き換えの検知）。
   4. 失敗は SEV2 で呼び出す（[runbooks/incident-response.md](../runbooks/incident-response.md)）。
 - 保管庫の `mn_access_log` も同じ形で、保管庫の専用の接頭辞に置く（[my-number-vault.md](my-number-vault.md) の 8 節）。
-- 業務プロセスのイベント（`bp_events`）と差分・版の表も、同じ書き出しの処理でセグメントにする（監査の正本の保全）。量が多いので、行の本体ではなく行のハッシュの列だけを連鎖にし、本体は Aurora とバックアップに置く案を E11 で決める（持ち越し）。
+- 業務プロセスのイベント（`bp_events`）と差分・バージョンの表も、同じ書き出しの処理でセグメントにする（監査の正本の保全）。量が多いので、行の本体ではなく行のハッシュの列だけを連鎖にし、本体は Aurora とバックアップに置く案を E11 で決める（持ち越し）。
 - テナントは、自分のテナントの日の連鎖の頭（ハッシュ）を画面から取り出して、手元に残せる。後で本システムが連鎖を書き換えていないことを、テナントが確かめられる。
 
 ## 5. 保存の期間の規則表（[ADR-0049](../decisions/0049-retention-rules-table-and-legal-hold.md)）
@@ -99,7 +99,7 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
                       started_at, finished_at, approved_by)
 ```
 
-- 規則表はテナントの外の共通のデータ（規則表の版と同じく、取り込み・確認・公開の手順を持つ。[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md) の考え方）。
+- 規則表はテナントの外の共通のデータ（規則表のバージョンと同じく、取り込み・確認・公開の手順を持つ。[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md) の考え方）。
 - テナントは延ばせる（`tenant_retention_overrides`）。短くはできない。
 - `pending_review` の行は、`candidates` のうち最も長い期間で動く。
 
@@ -146,7 +146,7 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
 | データ | 方式 |
 | --- | --- |
 | 時間で並ぶ表（打刻、監査ログ、閲覧の記録、実行の結果の行） | 月ごとのパーティションを、期限を過ぎ、保全がなければ `DROP` する |
-| 主体で並ぶ表（退職者の facet の差分・版・現在） | 専用のロール `retention_purger` が、主体ごとに行を消す。追記のみのトリガーは、このロールと `retention_executions` の行のあるトランザクションだけを通す |
+| 主体で並ぶ表（退職者の facet の差分・バージョン・現在） | 専用のロール `retention_purger` が、主体ごとに行を消す。追記のみのトリガーは、このロールと `retention_executions` の行のあるトランザクションだけを通す |
 | S3 のオブジェクト | ライフサイクルと Object Lock の保存の期限。Object Lock の期限は規則の既定（長いほう）で置くので、確認で短くなっても、それより前には消せない（5.4 節） |
 
 - 削除の実行は、テナントごとに件数の予覧を出し、本システムの運用の担当（2 人）が承認する（`platform_audit_events` に残す）。テナントの管理者には、削除の予定と結果を知らせる。
@@ -156,14 +156,14 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
 ### 5.4 Object Lock の期間と、期間の変更
 
 - log-archive の Object Lock は、コンプライアンスモード（根のユーザーも消せない。期間を短くできない。[S3 Object Lock](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html)、2026-09-28 に確認）で、既定の期間（長いほう）を置く。
-- 確認で期間が短くなっても、置いた Object Lock の期間は縮められない。短くなる見込みのあるデータ（振込ファイル、閲覧の記録）は、コンプライアンスモードではなく、ガバナンスモードか、Object Lock なしの暗号化と版の管理で持つ（[infrastructure.md](infrastructure.md) の 6 節）。
+- 確認で期間が短くなっても、置いた Object Lock の期間は縮められない。短くなる見込みのあるデータ（振込ファイル、閲覧の記録）は、コンプライアンスモードではなく、ガバナンスモードか、Object Lock なしの暗号化とバージョンの管理で持つ（[infrastructure.md](infrastructure.md) の 6 節）。
 - 監査ログ（連鎖と日の署名）は、改ざんの検知が目的なのでコンプライアンスモードにする。
 
 ## 6. 監査人の画面と出力
 
 - 権限は `audit` のドメイン（[security-model.md](security-model.md) の 3.1 節）。監査人（社内監査、監査法人）には、期限つきの利用者として `audit` を与える運用を勧める。
 - 画面：
-  - 従業員ごとの変更の履歴（差分、版、業務プロセスの案件、承認者、`known_at` の切り替え）
+  - 従業員ごとの変更の履歴（差分、バージョン、業務プロセスの案件、承認者、`known_at` の切り替え）
   - 業務プロセスの案件の全イベント
   - 権限の変更の履歴と説明の報告（[security-model.md](security-model.md) の 10.2 節）
   - 機微なドメインの閲覧の記録の検索（利用者別、対象別）
@@ -199,7 +199,7 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
 
 | 要件 | 本システムの形 |
 | --- | --- |
-| システムの概要書・操作説明書の備付け | リリースごとに、給与の計算と記録の流れの概要書と操作説明書を公開し、版を残す（[delivery.md](delivery.md) の 7 節） |
+| システムの概要書・操作説明書の備付け | リリースごとに、給与の計算と記録の流れの概要書と操作説明書を公開し、バージョンを残す（[delivery.md](delivery.md) の 7 節） |
 | 見読可能 | 画面と PDF の出力（[reporting.md](reporting.md)） |
 | ダウンロードの求めへの対応 | 期間・従業員・項目の条件で、給与の記録と仕訳を CSV で出す一括の出力（[integrations-and-bulk.md](integrations-and-bulk.md) の 3.5 節）。税務の調査のための出力の手順を操作説明書に書く |
 | 訂正・削除・追加の事実と内容 | 確定した結果は書き換えない。取消・遡及の差額・逆仕訳の記録で直す（[ADR-0004](../decisions/0004-payroll-engine.md)、[ADR-0028](../decisions/0028-retro-deltas-and-bonus-runs.md)、[ADR-0037](../decisions/0037-payroll-journal-export.md)）。履歴は監査の画面で見られる |
@@ -270,7 +270,7 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
 
 ### 決定
 
-- **監査の記録に個人情報の値を入れない。** 変更の前後の値は版の表を参照する。
+- **監査の記録に個人情報の値を入れない。** 変更の前後の値はバージョンの表を参照する。
 - **連鎖はテナントごと。安定の境界の 10 秒の後に書き出す。日ごとに署名する。**
 - **保存の期間は規則表のデータで持ち、確認待ちの間は長いほうで動く。テナントは延ばすだけ。**
 - **期間が短くなりうるデータにコンプライアンスモードの Object Lock を使わない。**
@@ -290,7 +290,7 @@ retention_executions (id, tenant_id, rule_id, data_kind, cutoff, rows_deleted, o
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| `bp_events`・差分・版を、本体ごと連鎖にするか、行のハッシュだけにするか | E11 で量を測って |
+| `bp_events`・差分・バージョンを、本体ごと連鎖にするか、行のハッシュだけにするか | E11 で量を測って |
 | セグメントの単位（1 分か 1 時間か） | E11 で S3 の物体の数と費用を見て |
 | 日の署名を外部（第三者のタイムスタンプ）にも残すか | E12 の前に。電子帳簿保存法の要件の確認（L55）と合わせる |
 

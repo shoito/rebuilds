@@ -14,7 +14,7 @@
    │ RUM：60 秒ごとに集めたヒストグラム ─▶ /rum（sync-api）─▶ OTel ─▶ AMP（少ない次元）
    │                                                         └──▶ Firehose ─▶ S3（Parquet）─▶ Athena（細かな分析）
    │ 収束の監査の報告（抜き取り）─▶ /sync/audit ─▶ SQS ─▶ audit-worker ─▶ convergence_audits（結果）
-   │ エラーの報告（スタック、Action の ID、版）─▶ /rum/errors
+   │ エラーの報告（スタック、Action の ID、バージョン）─▶ /rum/errors
    ▼
  サーバー：ADOT のサイドカー ─▶ AMP（メトリクス）、X-Ray（トレース）、CloudWatch Logs（JSON のログ）
    Gateway の配信の監査の抜き取り ─▶ Firehose ─▶ S3 ─▶ 日次の検査
@@ -27,7 +27,7 @@
 ### 2.1 中身を出さない
 
 - ログ・トレース・メトリクス・RUM・エラーの報告に、利用者の書いた中身（タイトル、本文、コメント、ラベルの名前、ビューの条件の文字）、識別子（`ENG-123`）、メールアドレス、トークン、URL の問い合わせの部分を出さない。
-- 出してよいもの：`workspace_id`、`user_id`（ID だけ）、`sync_id`、`client_tx_id`、モデルの名前、フィールドの名前、理由のコード、件数、大きさ、時間、版、`schema_hash`。
+- 出してよいもの：`workspace_id`、`user_id`（ID だけ）、`sync_id`、`client_tx_id`、モデルの名前、フィールドの名前、理由のコード、件数、大きさ、時間、バージョン、`schema_hash`。
 - アクセスのログは、パスの ID の部分を残し、問い合わせの部分を落とす（ビューの URL の文字の条件。[views-and-filters.md](views-and-filters.md) の 7.3 節の依頼）。CloudFront・ALB のログも同じにする（ALB のアクセスログは問い合わせを落とせないので、`/sync/*` と `/graphql` の ALB のアクセスログを無効にし、アプリのログで数える。Auth0 の題材の ADR-0061 と同じ考え方）。
 - `Authorization`、クッキー、`<Brand>-Signature`、Slack・GitHub の署名のヘッダーは、どの層でも伏せる。
 - ログの秘密の形の走査（`<brand>_api_` などの接頭辞、外部のトークンの形）を常時流し、見つけたら呼び出す（Auth0 の題材と同じ）。
@@ -59,13 +59,13 @@ ADR-0052。
 | やり直し | 理由（`too_old`・`too_far`・`epoch`・`ahead`・`migration`・`corrupt`）ごとの回数 | 全部 |
 | メモリー | ヒープの p95（[client-store-and-offline.md](client-store-and-offline.md) の 7.2 節） | 端末の 10% |
 
-- 次元：`action_id`、`app`（`web`・`electron`）、`browser`（系統と大きな版）、`os`、`ws_band`、`build`（直近の 3 版まで。古いものは `older`）。
+- 次元：`action_id`、`app`（`web`・`electron`）、`browser`（系統と大きなバージョン）、`os`、`ws_band`、`build`（直近の 3 バージョンまで。古いものは `older`）。
 - 端末で、対数の固定の桶（1ms〜60 秒、隣の桶の比 1.2）のヒストグラムに集め、60 秒ごとと `visibilitychange` で `sendBeacon` を使って送る。1 回の送信は 16 KiB まで。
 
 ### 3.2 収集の口
 
 - `POST https://<brand>.<domain>/rum`（`sync-api`）。セッションのクッキーで認証し（ログインしていない画面の RUM は取らない）、端末ごとに 1 分 5 回までに絞る。値の範囲と次元の値の一覧を確かめ、外れたものを捨てる。
-- AMP へは、上の次元のヒストグラムとして出す（系列の数の見込み：Action 約 100 × app 2 × browser 6 × ws_band 4 × build 4 ≒ 2 万）。細かな分析（OS の版、IME の有無など）は Firehose で S3 の Parquet に置き、Athena で読む（13 か月）。
+- AMP へは、上の次元のヒストグラムとして出す（系列の数の見込み：Action 約 100 × app 2 × browser 6 × ws_band 4 × build 4 ≒ 2 万）。細かな分析（OS のバージョン、IME の有無など）は Firehose で S3 の Parquet に置き、Athena で読む（13 か月）。
 - 外部の分析の事業者に送らない。自前の収集の口にするのは、法務の L2（外部送信の規律）の範囲を狭めるため（[client-app.md](client-app.md) の 9.3 節）。公表の文面は法務の確認を待つ。
 
 ### 3.3 伝播の計測
@@ -123,7 +123,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 | `stale_build` | 端末の `schema_hash` が互換の一覧の外れる直前で、正準形の違い | 数えない（別に数える） |
 | `unexplained` | それ以外 | **数える** |
 
-- `convergence_mismatches` に、ワークスペース・モデル・行の ID・端末の版・`L`・分類を残す（中身は残さない）。`unexplained` が 1 件でも出たら呼び出し（5 節）、[runbooks/incident-response.md](../runbooks/incident-response.md) の「収束の不一致」に従う。端末に `resync_required` を送り、その端末を正す。
+- `convergence_mismatches` に、ワークスペース・モデル・行の ID・端末のバージョン・`L`・分類を残す（中身は残さない）。`unexplained` が 1 件でも出たら呼び出し（5 節）、[runbooks/incident-response.md](../runbooks/incident-response.md) の「収束の不一致」に従う。端末に `resync_required` を送り、その端末を正す。
 
 ### 4.4 配信の監査（NFR-008）
 
@@ -161,7 +161,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 | テナントの分離（NFR-008） | 4.4 節の不一致 | 配信の監査 | 0 |
 
 - 可用性の SLI は、社内の監視用のワークスペースを除いた本番のワークスペースで数える。社内の分は別にも見る。
-- 検証の拒否（`forbidden`・`invalid` など）は可用性を消費しない。ただし、拒否の率の急な上がり（5.3 節）は、版のずれや規則の誤りの兆候なので見る。
+- 検証の拒否（`forbidden`・`invalid` など）は可用性を消費しない。ただし、拒否の率の急な上がり（5.3 節）は、バージョンのずれや規則の誤りの兆候なので見る。
 
 ### 5.2 バーンレート
 
@@ -171,7 +171,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 
 - 拒否の率（コードごと）：過去 4 週の同じ曜日・時間と比べ、`invalid`・`forbidden`・`invalid_reference` が 3 倍を 30 分続けたらチケット、10 倍で呼び出し。直前のリリースを疑う。
 - やり直しの回数（理由ごと）：`corrupt` の増加は保存の消去、`migration` の増加はクライアントの移行の誤り、`too_far` の増加はインポートかログの異常。
-- `lost_local`（ブラウザに消された未送信）：ブラウザの版ごとに、平常の 3 倍でチケット。
+- `lost_local`（ブラウザに消された未送信）：ブラウザのバージョンごとに、平常の 3 倍でチケット。
 - 上書きの記録の件数：平常の 5 倍でチケット（長いオフラインの一斉の送信か、クライアントの誤り）。
 
 ### 5.4 アラートの一覧と runbook
@@ -196,7 +196,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 | ロックの待ち | 上位のワークスペースのロックの待ちの p99 が 200ms を 10 分 | チケット | `writer-lock-contention.md` |
 | 拒否の率の急な上がり | 5.3 節 | チケット・呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)（直前のリリース） |
 | デプロイ中の自動ロールバック、フラグのガード | [delivery.md](delivery.md) の 5・7 節 | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
-| クライアントの版の後の移行の失敗 | `migration` のやり直しが新しい版で 1% を超える | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、`client-migration-failure.md` |
+| クライアントのバージョンの後の移行の失敗 | `migration` のやり直しが新しいバージョンで 1% を超える | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、`client-migration-failure.md` |
 | DR の複製の遅延 | `AuroraGlobalDBRPOLag` が 10 秒を 5 分超える | 呼び出し | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
 | 狭める操作の記録の遅れ | `narrowing_outbox` の送り残しの最古が 5 秒を超える、または `narrowing_journal` の `ReplicationLatency` が 10 秒を 5 分超える（[ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md)） | 呼び出し | [disaster-recovery.md](../runbooks/disaster-recovery.md) の C |
 | 大阪の待機の構成の異常 | 大阪の合成監視の失敗、スナップショットの年齢 | チケット（30 分で呼び出し） | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
@@ -230,7 +230,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 | --- | --- |
 | 同期の全体 | 書き込み/秒、送信から ack、伝播の区間ごと、拒否のコード、`retry`、Gateway の接続と送信、Relay の遅れ、やり直しの理由 |
 | ワークスペースの上位 | 書き込み、ロックの待ち、枠での `retry`、接続の数（上位 50） |
-| クライアント | Action ごとの遅延、起動、ヒープ、outbox、保存、`persist()`、ブラウザと版の別 |
+| クライアント | Action ごとの遅延、起動、ヒープ、outbox、保存、`persist()`、ブラウザとバージョンの別 |
 | 収束と分離 | 監査の件数と分類、配信の監査、`orphan_rows`、`subscription_drift` |
 | 外への配信 | 通知、メール、Webhook、連携、検索の遅れ |
 | DR | 複製の遅延、大阪の合成監視、スナップショット |
@@ -278,7 +278,7 @@ ADR-0053。NFR-005・K5：本番の抜き取りの検査で、説明のつかな
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 遅延のモデル（コメント）と本文（CRDT の状態）を監査に入れるか | E12。本文は `doc_states` のまとめの版と比べる方法が要る |
+| 遅延のモデル（コメント）と本文（CRDT の状態）を監査に入れるか | E12。本文は `doc_states` のまとめのバージョンと比べる方法が要る |
 | 部分のブートストラップの端末の完全さ（被覆の鍵の中の行がそろっているか）の監査 | E12。条件の時刻の扱い（`issue_active_30d`）を決める |
 | RUM の公表の文面 | 法務の L2 |
 | Chrome のタイマーの間引き | 隠れて 5 分を過ぎたタブは、タイマーが 1 分に 1 回まで間引かれる（[sync-engine.md](sync-engine.md) の 9.6 節）。背景のタブの伝播は数えない |

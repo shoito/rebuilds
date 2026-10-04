@@ -136,7 +136,7 @@ CREATE TABLE notification_inbox (
   user_id bigint, thread_id bigint, repo_id bigint,
   subject_type text, reason text,
   unread boolean, saved boolean, done boolean,
-  last_event_id bigint,           -- 最後に反映したイベント（版）
+  last_event_id bigint,           -- 最後に反映したイベント（バージョン）
   updated_at timestamptz, last_read_at timestamptz,
   PRIMARY KEY (user_id, thread_id)
 ) PARTITION BY HASH (user_id);    -- 64 分割

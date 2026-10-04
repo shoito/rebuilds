@@ -138,7 +138,7 @@ SEV1 では、指揮者は手を動かさない。
 | Signer | `/oauth/token` の 503 | タスクの状態、相互 TLS の証明書の期限（Private CA の更新の失敗）、KMS を確かめる。代わりに署名する経路は作らない |
 | ソーシャル IdP | 接続の種類別の成功率 | 外部の状態のページを見る。画面で他の方法を案内する。テナントへ告知する |
 | メールの送信 | 送信の失敗・遅れ | メールの OTP だけのユーザーの MFA が失敗する。送信事業者に連絡する |
-| 漏えいしたパスワードの照合 | サインアップ・パスワードの変更・再設定の 503、`ap_breached_check_skipped` の件数 | 照合を飛ばさない（ADR-0005）。法務の確認までは公式の range API への外部の依存なので、提供者の状態を確かめ、テナントへ告知する。自前のホストに移った後は、前の版のデータで動かせるか確かめる（[attack-protection.md](../architecture/attack-protection.md) の 5 節） |
+| 漏えいしたパスワードの照合 | サインアップ・パスワードの変更・再設定の 503、`ap_breached_check_skipped` の件数 | 照合を飛ばさない（ADR-0005）。法務の確認までは公式の range API への外部の依存なので、提供者の状態を確かめ、テナントへ告知する。自前のホストに移った後は、前のバージョンのデータで動かせるか確かめる（[attack-protection.md](../architecture/attack-protection.md) の 5 節） |
 | Actions の実行の基盤（E13 の後） | Action を使うテナントのログイン・M2M の失敗、Lambda のスロットリング | `on_platform_error` が `deny` のテナントを一覧にして告知する。手順は `actions-platform-degraded.md`（E13 で作る） |
 
 ### オンコール

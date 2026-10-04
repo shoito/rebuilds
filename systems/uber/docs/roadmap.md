@@ -16,13 +16,13 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Epic | 目的 | 状態 |
 | --- | --- | --- |
-| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・状態機械のベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格とワンタイムコード、監査ログ、保持の表の生成、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車と版の方針 | 設計中 |
+| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・状態機械のベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格とワンタイムコード、監査ログ、保持の表の生成、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車とバージョンの方針 | 設計中 |
 | E2 事業者と供給 | 事業者・営業所・車両・ドライバーの登録、書類の確認、招待、出庫の判定とセッション、点呼、事業者の管理画面、振込先 | 未着手（乗車の履歴と稼働の地図は法務：L4。ドライバーの登録は L5） |
 | E3 位置と索引 | 位置の取り込みと検証、Kinesis と都市のセル、軌跡と当てはめ、索引とリースと再構築、検索、需給の集計、端末の完全性、位置の閲覧の許可 | 未着手（位置の保存の期間は法務：L4） |
 | E4 地図と ETA | Valhalla のタイルと配信、ETA と補正と精度、推計走行距離、OSM と ODbL、住所の検索と乗降の地点、区域の多角形 | 未着手（前に ETA・距離・時刻に依る行列の PoC と住所の検索の PoC。推計走行距離は法務：L3） |
 | E5 配車 | 提案の契約、バッチとリース、候補の条件、最適化、受け入れの上限、判断の記録、再生・市場のシミュレーション・影の実行 | 未着手（前に最適化の計算の時間の計測） |
 | E6 乗車とリアルタイム | 状態機械、割り当ての確定と世代、提案の時の確かめ直し、タイマー、outbox、オファーの手順、取り消し、journal と復元、不変条件の検査、常時の接続、車の位置、プッシュ通知 | 未着手（キャンセル料の名目は法務：L2・L8。オファーの降車地は L1） |
-| E7 運賃 | 金額の型、版つきの運賃の規則、距離制と影の計算、事前確定運賃、価格の群、迎車料金、キャンセル料、メーターの連携、変動運賃、水準の報告、`fare-replay` | 未着手（すべての Story が法務：L2。手数料は L1、表示は L8、変動は L9） |
+| E7 運賃 | 金額の型、バージョンつきの運賃の規則、距離制と影の計算、事前確定運賃、価格の群、迎車料金、キャンセル料、メーターの連携、変動運賃、水準の報告、`fare-replay` | 未着手（すべての Story が法務：L2。手数料は L1、表示は L8、変動は L9） |
 | E8 決済と精算 | PSP の選定と包み、与信と確定、追加の請求、キャンセル料の請求、台帳、締めと振込、照合、代金の受け取りの形 | 未着手（前に PSP の選定。精算は法務：L6。請求は L1） |
 | E9 アプリ | 乗客とドライバーの画面、背景の位置と電池、常時の接続、オファーの画面、ナビの引き継ぎ、journal、状態機械のベクター、流しの実車（タクシーだけ） | 未着手（見積もりの文言は法務：L8） |
 | E10 安全と信頼 | 緊急の入口と受け付け、乗車の共有、PIN、番号を隠した通話、メッセージ、評価、顔の照合、報告と事故、異常の検知、不正 | 未着手（共有・顔の照合は法務：L4。事故の記録は L7） |
@@ -129,7 +129,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `valhalla-pool-fargate` | Valhalla のタスク、タイルの取得、起動の時間とメモリの計測 |
 | `valhalla-serving` | 青緑の切り替え、上限の設定、当てはめ用の組 |
 | `timedep-matrix-poc` | 時刻に依る行列（Valhalla の設定の変更）と、時刻に依らない行列 ＋ 補正の表の精度と p99 の比べ |
-| `eta-service` | 配車の行列（many-to-one）、受諾の時点の ETA、更新、依頼の前の目安、概算、版の付与 |
+| `eta-service` | 配車の行列（many-to-one）、受諾の時点の ETA、更新、依頼の前の目安、概算、バージョンの付与 |
 | `eta-bias-correction` | 補正の表と毎日の作り直し（PROP-ETA-002） |
 | `speed-profile-builder` | 自前の走行からの速度の表と CSV |
 | `eta-accuracy-metrics` | 精度の計測の仕事と指標（PROP-ETA-005） |
@@ -181,7 +181,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `region-gen-assignment-compare` | `(region_gen, assignment_epoch)` の比較（Trips・索引・アプリのベクター。PROP-INFRA-001） |
 | `propose-eligibility-recheck` | 提案の時の供給・営業区域・運行枠の確かめ直しと `NOT_ELIGIBLE`（DT-DISP-001 の共通のベクター） |
 | `trip-timers` | タイマーの表と処理、遅れの監視 |
-| `trip-outbox-relay` | outbox、SNS・SQS、版による捨て方（PROP-TRIP-005） |
+| `trip-outbox-relay` | outbox、SNS・SQS、バージョンによる捨て方（PROP-TRIP-005） |
 | `offer-lifecycle` | オファーの事象（表示 15 秒、期限 16.5 秒、5 秒の取り下げ）（オファーの降車地の表示は法務：L1） |
 | `offer-auto-pause` | 時間切れ 2 回の自動の休憩 |
 | `rider-cancellation-and-no-show` | 取り消しと無断キャンセル（DT-TRIP-002・003）。料金の請求は E8（法務：L2・L8） |
@@ -205,7 +205,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | Story | 内容 |
 | --- | --- |
 | `money-and-rounding` | `packages/money` の `Yen` と有理数、4 つの丸めの関数、lint（PROP-FARE-001・005） |
-| `fare-rule-sets` | 運賃の規則の表、Zod の型、2 人の承認、版の不変、有効期間の排他（法務：L2） |
+| `fare-rule-sets` | 運賃の規則の表、Zod の型、2 人の承認、バージョンの不変、有効期間の排他（法務：L2） |
 | `fare-rule-change-approval` | 運賃の規則の変更の要求（support と一緒に） |
 | `distance-fare-and-shadow-meter` | 距離制の関数、時間距離併用、深夜、影の計算（法務：L2） |
 | `upfront-fare-quotes` | 事前確定運賃の見積もり、経路と有料道路の選択、注意事項の同意、停止の区域（DT-FARE-001）（法務：L2・L3・L8） |
@@ -252,7 +252,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `rider-request-flow` | 依頼までの画面（検索、ピン、見積もり、同意、依頼） |
 | `quote-and-consent-ui` | 経路の選択、注意事項、内訳、群の選択肢の画面（法務：L8） |
 | `rider-supply-preview` | 依頼の前の地図の丸めた車と、乗客の API のキャッシュ（PROP-GEO-006） |
-| `rider-trip-tracking` | 迎車中・乗車中の画面、車の位置、版による表示 |
+| `rider-trip-tracking` | 迎車中・乗車中の画面、車の位置、バージョンによる表示 |
 | `rider-offline-mode` | 乗客のアプリの通信が切れたとき |
 | `driver-session-and-onboarding` | 出庫の前の確認と出庫・入庫 |
 | `driver-background-location` | 許可、状態ごとの取り方、熱と電池、溜めと送り直し（location の `driver-location-uploader` と 1 つ） |
@@ -355,7 +355,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `feature-pipelines` | バッチと Flink のパイプライン、両方への書き込み（PROP-ML-001） |
 | `feature-logging-and-skew` | 配信の記録と PSI の監視 |
 | `eta-residual-model` | ETA の残差のモデル、評価、Go の評価器（PROP-ML-004） |
-| `eta-model-serving` | `eta-service` への組み込み、代わりの経路、版の記録（PROP-ML-002） |
+| `eta-model-serving` | `eta-service` への組み込み、代わりの経路、バージョンの記録（PROP-ML-002） |
 | `eta-model-shadow-rollout` | 影の実行・配車の再生とシミュレーション・区域の段階・自動の戻し |
 | `demand-forecast-block` | 需要の予測のモデルとバッチ |
 | `operator-demand-map` | 事業者の管理画面の需要の地図（5 未満のまとめ） |
@@ -386,7 +386,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 
 ## エージェントに任せないこと
 
-- **契約（Protocol Buffers、遷移の表、候補の条件の表、運賃の規則の型）の確定**：アプリの版と本番の記録に残った後に変えるコストが最も高い。
+- **契約（Protocol Buffers、遷移の表、候補の条件の表、運賃の規則の型）の確定**：アプリのバージョンと本番の記録に残った後に変えるコストが最も高い。
 - **法務の判断と `legal_gate_records` の作成、legal のフラグの本番の値の変更**（L1〜L9。ADR-0043）。
 - **配車の計算の展開の判断**：再生・シミュレーション・影の実行の結果は出せるが、区域のフラグを広げる判断は PM、基準の変更は QA。
 - **`fare-replay` で許す差の承認と、運賃の規則の承認（2 人）**。

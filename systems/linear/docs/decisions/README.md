@@ -9,7 +9,7 @@ Linear の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0002](0002-sync-model.md) | ワークスペースごとに、サーバーが全順序を決める変更のログと単調な `sync_id` を持つ。クライアントは楽観的に当て、差分の上に載せ直す。競合はフィールドの型ごとの規則で解く | accepted |
 | [0003](0003-bootstrap-and-partial-sync.md) | 小さなワークスペースは全体のブートストラップ、大きなワークスペースは部分のブートストラップと遅延の読み込み。差分は同期グループで絞って配る | accepted |
 | [0004](0004-tenancy-and-permissions.md) | ワークスペースをテナントにし、FORCE RLS で分ける。チームを権限の範囲にし、非公開のチームは同期グループで差分から外す | accepted |
-| [0005](0005-client-persistence-and-offline.md) | ワークスペースごとの IndexedDB に、モデルと、送る前に保存する outbox を持つ。スキーマの版ごとに移行し、outbox は移行で消さない | accepted |
+| [0005](0005-client-persistence-and-offline.md) | ワークスペースごとの IndexedDB に、モデルと、送る前に保存する outbox を持つ。スキーマのバージョンごとに移行し、outbox は移行で消さない | accepted |
 | [0006](0006-transactions-writer-and-idempotency.md) | トランザクションは意図の操作の列で、全体が確定か拒否。Writer はワークスペースの行を最初にロックし、1 つの DB のトランザクションで書き、結果を 90 日持って再送に同じ結果を返す | accepted |
 | [0007](0007-sync-actions-and-range-proof-deltas.md) | `sync_id` は変更ごとに振って欠けなく続け、差分は範囲の証明つきのパケットで送る。Gateway は絞る前の列の連続を確かめてから範囲を名乗り、`update` は変更後の行の全体を運ぶ | accepted |
 | [0008](0008-conflict-rules-and-fractional-keys.md) | 競合の規則はスキーマの `conflict` に 1 か所で書く。並びの鍵は範囲ごとに一意な base-62 の分数インデックスで、重なりは Writer が振り直し、長くなったら近くの窓だけを振り直す。上書きはフィールドごとの最後の `sync_id` で見つける | accepted |
@@ -34,8 +34,8 @@ Linear の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0027](0027-progress-stats-per-team-via-derive.md) | 進捗は `(対象, チーム)` ごとの `ProgressStat` の行に `counter` で持ち、イシューの変更の `derive` が増減を出す。行はチームの同期グループに属す。イニシアチブの進捗は保存せず画面で足し、1 日 1 回 SQL で数え直す | accepted |
 | [0028](0028-filter-language-and-shared-evaluation.md) | フィルターは型の付いた JSON の木で持ち、共有のパッケージの 1 つの定義から、クライアントの評価の関数と SQL の生成を作る。空の値・文字の正規化・並びの比較を言語の側で決め、共有のテストの例の集まりと差分テストで一致を確かめる | accepted |
 | [0029](0029-view-coverage-planner-and-server-query.md) | ビューは計画の関数が被覆の鍵から「手元だけ」「手元とサーバー」「サーバー」を決める。サーバーの問い合わせは同期グループで絞った行を返し、クライアントはそれを候補として手元に足して同じ関数で評価する。保存したビューは範囲ごとの同期グループに属し、フィルターが参照する ID はビューの読み手全員が見てよいものに限る | accepted |
-| [0030](0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で、行ごとの文書にする。一致は 1〜2 文字の N-gram、関連度は同梱の kuromoji、正規化はアプリの共有の関数。版は行の `sync_id` で外部の版にする。Aurora の `pg_bigm` は使えることを確かめたうえで代案とする | accepted |
-| [0031](0031-search-permission-by-sync-groups.md) | 検索の権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索のたびに呼んだ人の購読を条件にし、結果を Aurora で読み直して今の `sync_groups` と削除で落とす。抜粋は版が同じときだけ返す。画面は手元の検索を先に出し、サーバーの結果を後から足す | accepted |
+| [0030](0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で、行ごとの文書にする。一致は 1〜2 文字の N-gram、関連度は同梱の kuromoji、正規化はアプリの共有の関数。バージョンは行の `sync_id` で外部のバージョンにする。Aurora の `pg_bigm` は使えることを確かめたうえで代案とする | accepted |
+| [0031](0031-search-permission-by-sync-groups.md) | 検索の権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索のたびに呼んだ人の購読を条件にし、結果を Aurora で読み直して今の `sync_groups` と削除で落とす。抜粋はバージョンが同じときだけ返す。画面は手元の検索を先に出し、サーバーの結果を後から足す | accepted |
 | [0032](0032-single-policy-module-and-group-mapping.md) | 権限は `packages/policy` の純粋な関数 `can()` と `groupsFor()` にまとめ、全部の経路とクライアントが同じコードを使う。読む権限は「行の同期グループと購読が交わる」と同じ意味にし、書く権限と管理の権限は決定表で決める | accepted |
 | [0033](0033-team-visibility-changes-and-guests.md) | 同期グループに `members`（ゲストを除くメンバー）を足し、ゲストに届けないワークスペースの行をそこに置く。チームの行は公開なら `workspace`、非公開なら `team:<id>` と `role:admin`。非公開への切り替えは、同期に加えて、担当・購読者・通知・ビューの後始末を行う。管理者は非公開のチームに自分で参加でき、監査に残す | accepted |
 | [0034](0034-accounts-with-better-auth.md) | 認証は Better Auth を `packages/auth` で包んで使う。メールの OTP・Google・パスキー・セッション・複数のセッションの部品を使い、組織の部品は使わない。アカウントは RLS の外の `auth` スキーマ、ワークスペースの中の人は同期するモデルにし、`account_id` で結ぶ | accepted |
@@ -60,7 +60,7 @@ Linear の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0053](0053-convergence-audit.md) | 収束の監査は、抜き取った端末が IndexedDB の確定した行のハッシュを桶ごとに `(L, sync_epoch)` と送り、サーバーは今の行と `sync_actions` から `L` の時点の状態を作り直して比べる。合わない桶は 2 段目で行を特定し、説明のつかない不一致を K5 に数える | accepted |
 | [0054](0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`notifier`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする | accepted |
 | [0055](0055-ci-gates-latency-convergence-ime.md) | PR の必須の関門に、遅延の予算（固定の機械）、収束のシミュレーターと回帰の種、オフラインと再送の 3 つの場面、IME のテスト、生成とマイグレーションの検査を入れ、変更のパスで重さを足す。関門を外すラベルを持たず、シミュレーターの失敗を再実行で緑にしない | accepted |
-| [0056](0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低の版は Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない | accepted |
+| [0056](0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低のバージョンは Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない | accepted |
 | [0057](0057-schema-change-ordering.md) | スキーマの変更は、サーバーの DB を広げる → サーバーが古い形と新しい形の両方を受ける → クライアントを移す → 古い `schema_hash` の接続が 1% 未満かつ 30 日の後に縮める → 古い列を単独で消す、の順にする。1 つのデプロイで、DB の破壊の変更とそれを読むコードを一緒に出さない | accepted |
 | [0058](0058-dr-permission-narrowing-journal.md) | 権限を狭める操作は、Aurora に加えて、東京の中で同期して複製する追記だけの記録にも書き、大阪へ送る。大阪への昇格では、書き込みを受ける前に、失った範囲の記録をやり直す | accepted |
 <!-- adr-index:end -->

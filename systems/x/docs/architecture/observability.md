@@ -49,7 +49,7 @@ flowchart LR
 ### 2.1 中身を出さない
 
 - ログ・トレース・メトリクス・RUM に、投稿・DM の本文、検索の語、プロフィールの文、電話番号、メールアドレス、IP アドレス、トークンを出さない（[security.md](security.md) の 9 節）。
-- 出してよい：利用者・投稿・会話の ID（`tid`。ログとトレースだけ。メトリクスの次元にはしない）、理由のコード、件数、大きさ、時間、版、方式（`push`・`pull`）、モデルの版。
+- 出してよい：利用者・投稿・会話の ID（`tid`。ログとトレースだけ。メトリクスの次元にはしない）、理由のコード、件数、大きさ、時間、バージョン、方式（`push`・`pull`）、モデルのバージョン。
 - ログは `packages/log` の型付きの関数で書く。任意の文字列の引数を受けない。
 - ALB のアクセスログは問い合わせの部分を落とせないので、`/api/search*` と `/v1/search*` の ALB のアクセスログを無効にし、アプリのログで数える（検索の語を残さない）。エッジのアクセスログ（IP を含む）は log-archive に分ける。
 - 常時の走査：CloudWatch Logs の購読で、秘密の形（`<brand>_` の接頭辞、電話・メールの形、E2E のカナリアの文字列）を探し、見つけたら呼び出す。
@@ -186,7 +186,7 @@ ADR-0059。[ADR-0006](../decisions/0006-ranking-boundary.md) のガードレー�
 | フォロー外の割合、作者の偏り | 混ぜ合わせの段の出力 | 同 |
 
 - **群の割り当て**：おすすめの応答ごとに、Ranking は理由の記録（[ranking-and-recommendation.md](ranking-and-recommendation.md)）に `(request_id, arm, model_version, post_ids)` を書き、Firehose へ流す。
-- **5 分ごとの近似**（`guardrail-aggregator`）：`views`・`engagement`・`graph`・`moderation`（通報）の流れを読み、直近 1 時間の理由の記録（`vk-cache` に 1 時間の写し）で群を引いて、群ごとの分子と分母を数える。AMP の `ranking.guardrail{metric, arm}`。前の版（対照の群）より既定 5% 以上悪いのが 30 分続いたら、`experiment.ranking.*` の割合を広げるのを止め（自動）、チケットにする（`ranking-regression.md`）。
+- **5 分ごとの近似**（`guardrail-aggregator`）：`views`・`engagement`・`graph`・`moderation`（通報）の流れを読み、直近 1 時間の理由の記録（`vk-cache` に 1 時間の写し）で群を引いて、群ごとの分子と分母を数える。AMP の `ranking.guardrail{metric, arm}`。前のバージョン（対照の群）より既定 5% 以上悪いのが 30 分続いたら、`experiment.ranking.*` の割合を広げるのを止め（自動）、チケットにする（`ranking-regression.md`）。
 - **日ごとの正しい値**：データレイクで、理由の記録と出来事を結合して数える。100% に広げる判断（PM）と、週ごとの品質の判定（[quality.md](../quality.md) の 4.1 節）は、日ごとの値で行う。
 - 近似の誤差：表示の数は失ってよい出来事（ADR-0005）なので、近似の分母は少なめに出る。群の間で同じ割合で失うので、群の比べには使える。誤差は日ごとの値との差で毎日見る。
 
@@ -201,7 +201,7 @@ ADR-0059。[ADR-0006](../decisions/0006-ranking-boundary.md) のガードレー�
 | ランキング | 8 節の指標を群ごとに、代わりの並び、段ごとの遅延 |
 | カウンター | 表示の遅れ、照合の差、閲覧の誤差 |
 | 公開 API | 遅延、`429`、近似の桶の時間（[api-and-rate-limits.md](api-and-rate-limits.md) の 9 節） |
-| クライアント | RUM（版・OS・回線の別） |
+| クライアント | RUM（バージョン・OS・回線の別） |
 | T&S | 期限、命に関わる通報、措置の数（中身なし） |
 | DR | `AuroraGlobalDBRPOLag`、大阪の合成監視、スナップショットの年齢 |
 
@@ -232,7 +232,7 @@ ADR-0059。[ADR-0006](../decisions/0006-ranking-boundary.md) のガードレー�
 | 性質 | PROP-OBS-001：任意の状態の変更と応答の時刻の列で、抜き取りの監査は「応答の時点で `hide` だった投稿」だけを `hide_unexplained` に数える（変更が後なら数えない） |
 | 結合 | 1 本のトレースが投稿から写しの書き込みまでつながる。ログの走査がカナリアの文字列を見つける |
 | 合成監視 | 4.2 節のシナリオの全部が staging で通る |
-| 品質 | 漏れを人為的に入れた版（staging）で、抜き取りの監査が 1 時間以内に見つける |
+| 品質 | 漏れを人為的に入れたバージョン（staging）で、抜き取りの監査が 1 時間以内に見つける |
 
 ## 13. Story の候補
 

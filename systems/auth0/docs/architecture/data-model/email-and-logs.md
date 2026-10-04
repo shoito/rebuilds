@@ -156,7 +156,7 @@ erDiagram
 - 主キー：`(tenant_id)`。
 - 検査：`CHECK ((secret_ct IS NULL) = (secret_key_ver IS NULL))`。
 
-> 2026-09-28 の統合：email-delivery の 7 節の表に `secret_key_ver` がなかった。復号に DEK の版が要るので足した。
+> 2026-09-28 の統合：email-delivery の 7 節の表に `secret_key_ver` がなかった。復号に DEK のバージョンが要るので足した。
 
 ### sending_domains（E11）
 

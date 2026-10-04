@@ -8,9 +8,9 @@ Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント�
 
 | キー | 型 | TTL | 中身 | 書く・読む |
 | --- | --- | --- | --- | --- |
-| `md:{o:<org_id>}:cur` | string | なし（版の変更で上書き） | 今のメタデータの版 | Relay（確定の後）→ Runtime（5 秒ごとにも読み直す） |
+| `md:{o:<org_id>}:cur` | string | なし（バージョンの変更で上書き） | 今のメタデータのバージョン | Relay（確定の後）→ Runtime（5 秒ごとにも読み直す） |
 | `md:{o:<org_id>}:man:<version>` | string（MessagePack＋zstd） | 7 日（使われなければ） | manifest（部品の鍵の一覧）。不変 | Runtime・Worker |
-| `md:{o:<org_id>}:seg:<hash>` | string（MessagePack＋zstd） | 7 日 | コンパイル済みの部品（`object:<object_id>`・`picklists`・`sharing`・`permsets`・`layouts:<object_id>`・`report_types`）。鍵は内容と形の版のハッシュ | 同上 |
+| `md:{o:<org_id>}:seg:<hash>` | string（MessagePack＋zstd） | 7 日 | コンパイル済みの部品（`object:<object_id>`・`picklists`・`sharing`・`permsets`・`layouts:<object_id>`・`report_types`）。鍵は内容と形のバージョンのハッシュ | 同上 |
 | `md:{o:<org_id>}:perm:<version>:<perm_shape>` | string | 7 日 | 権限の形ごとのオブジェクト × 権限、項目 × 権限の表 | Runtime |
 | `md:{o:<org_id>}:build:<hash>` | string（`SET NX`） | 10 秒 | 部品を作る人の印（同時に 1 つだけが作る） | Runtime・Worker |
 | チャンネル `md:version` | pub/sub | — | `{ "org_id", "version" }` | Relay → Runtime |
@@ -22,7 +22,7 @@ Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント�
 | `conc:{o:<org_id>}:long` | sorted set（要求 ID → 開始のミリ秒） | 要素は 2 分 30 秒で消す | 長い要求の同時実行（`conc.long_running`） | Runtime |
 | `conc:{o:<org_id>}:<conc_id>[:<user_id>]` | sorted set | 同上 | 他の同時の数（`conc.event_streams`・`conc.search`・`conc.report_sync`） | Runtime |
 | `dbt:{o:<org_id>}:<cluster_id>:<minute>` | hash（`path` → ミリ秒） | 2 時間 | 組織の DB の時間 | 計測器。1 分ごとに `org_db_time_minutes` へ写す |
-| `rpt:{o:<org_id>}:<key_hash>` | string（暗号化） | 5 分 | レポートの同期の結果。鍵は（定義のハッシュ、`user_id`、権限の形、版、`as_of` の 60 秒の区切り）のハッシュ。**利用者をまたいで共有しない**。組織の `files` の DEK で暗号化 | Runtime |
+| `rpt:{o:<org_id>}:<key_hash>` | string（暗号化） | 5 分 | レポートの同期の結果。鍵は（定義のハッシュ、`user_id`、権限の形、バージョン、`as_of` の 60 秒の区切り）のハッシュ。**利用者をまたいで共有しない**。組織の `files` の DEK で暗号化 | Runtime |
 | `dsh:{o:<org_id>}:<dashboard_id>:<viewer_id>:<as_user_id>` | string（暗号化） | 10 分 | ダッシュボードの部品の結果 | Runtime |
 | `evt:{o:<org_id>}` | pub/sub | — | `{ "max_replay_id" }`。購読者（SSE・Webhook の送り手）への知らせ | Relay → Runtime・Worker |
 | `evtperm:{o:<org_id>}:<subscriber>` | string | 60 秒 | 購読者の権限の形 | Runtime |
@@ -39,13 +39,13 @@ Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント�
 | バケット | アカウント | 中身 | 暗号 | 保持 |
 | --- | --- | --- | --- | --- |
 | `org-files` | prod | 2.2 節 | 組織の `files` の DEK ＋ SSE-KMS | 種類ごと（2.2 節）。大阪へ複製 |
-| `packages` | prod | `metadata/<org_id>/...`（書き出し・デプロイ・送ったパッケージ）、`registry/<namespace>/<version>/package.zip`・`signature`（E14） | SSE-KMS（組織のものは組織の `files` の DEK も） | 書き出し 7 日、計画 30 日、送ったもの 30 日、配布の版は無期限 |
-| `static` | prod | SPA の資産 | SSE-S3 | 版ごと |
+| `packages` | prod | `metadata/<org_id>/...`（書き出し・デプロイ・送ったパッケージ）、`registry/<namespace>/<version>/package.zip`・`signature`（E14） | SSE-KMS（組織のものは組織の `files` の DEK も） | 書き出し 7 日、計画 30 日、送ったもの 30 日、配布のバージョンは無期限 |
+| `static` | prod | SPA の資産 | SSE-S3 | バージョンごと |
 | `audit-archive` | log-archive | `audit/<org_id>/<yyyy>/<mm>/<dd>.jsonl.gz`（組織ごとの日ごとの JSON Lines）、`anchors/<yyyy-mm-dd>.json`（全ての組織の鎖の先頭） | 組織の `audit` の DEK ＋ SSE-KMS。Object Lock（コンプライアンス） | 1 年 |
 
 ### 2.2 `org-files` の配置
 
-鍵の先頭は `<org_id>/`。組織の消去は接頭辞ごとに消す（版を含む）。
+鍵の先頭は `<org_id>/`。組織の消去は接頭辞ごとに消す（バージョンを含む）。
 
 | 鍵 | 中身 | 保持 |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント�
 
 ## 3. OpenSearch
 
-共有の索引 `rec-v{n}-{00..15}`。`shard_no % 16` で索引を決め、索引の中は `org_id` を routing にする。別名（alias）で指し、マッピングの変更は新しい版を作り直して別名を切り替える（[search.md](../search.md) の 4 節、[ADR-0031](../../decisions/0031-search-index-and-japanese-analysis.md)）。
+共有の索引 `rec-v{n}-{00..15}`。`shard_no % 16` で索引を決め、索引の中は `org_id` を routing にする。別名（alias）で指し、マッピングの変更は新しいバージョンを作り直して別名を切り替える（[search.md](../search.md) の 4 節、[ADR-0031](../../decisions/0031-search-index-and-japanese-analysis.md)）。
 
 | 項目 | 型・解析 | 説明 |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ Valkey のキー、S3 の配置、OpenSearch の索引、outbox・イベント�
 
 ### 4.2 変更のイベント（API・SSE・Webhook の `events[]`）
 
-[events-and-integrations.md](../events-and-integrations.md) の 3.1 節の形。`change_events.body` は同じ見出しと、`field_no` をキーにした値を持ち、配信の時の版で API の名前に直し、購読者（Webhook は `run_as_user_id`）の FLS で落とす。
+[events-and-integrations.md](../events-and-integrations.md) の 3.1 節の形。`change_events.body` は同じ見出しと、`field_no` をキーにした値を持ち、配信の時のバージョンで API の名前に直し、購読者（Webhook は `run_as_user_id`）の FLS で落とす。
 
 ```json
 {
@@ -162,7 +162,7 @@ Content-Type: application/json
 
 | 部分 | 中身 |
 | --- | --- |
-| `package.yaml` | `format: <brand>-md`、`format_version`、`source`（組織の種類、系統のハッシュ、版）、`components[]`（種類・名前・内容のハッシュ）。E14 は `namespace`・`version`・`min_platform_version`・`requires`・`locked`・`signature` を足す |
+| `package.yaml` | `format: <brand>-md`、`format_version`、`source`（組織の種類、系統のハッシュ、バージョン）、`components[]`（種類・名前・内容のハッシュ）。E14 は `namespace`・`version`・`min_platform_version`・`requires`・`locked`・`signature` を足す |
 | `objects/<api_name>/object.yaml`、`fields/`、`record_types/`、`validation_rules/`、`layouts/`、`list_views/` | オブジェクトごとの定義 |
 | `standard_objects/<api_name>/...` | 標準オブジェクトへの追加（書いたものだけを足す・変える） |
 | `flows/`、`approval_processes/`、`permission_sets/`、`profiles/`、`roles/`、`groups/`、`sharing/`、`duplicate_rules/`、`matching_rules/`、`report_types/`、`reports/`、`dashboards/`、`event_types/`、`channels/`、`webhooks/`・`outbound_endpoints/`（秘密なし） | 部品の種類ごと |

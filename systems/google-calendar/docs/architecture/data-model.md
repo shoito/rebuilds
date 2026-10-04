@@ -20,7 +20,7 @@
 | [data-model/booking-pages.md](data-model/booking-pages.md) | 予約ページ、受け付けの時間、日付の上書き、質問、予約、予約の区間、冪等、slug と管理のリンクの解決 | 9 | 1 |
 | [data-model/sync-caldav-and-ics.md](data-model/sync-caldav-and-ics.md) | outbox、変更のログ、削除の墓標、CalDAV の名前、ICS の購読・公開・取り込み・書き出し、トークンの使用の集計、取得の予定 | 11 | 1 |
 | [data-model/api-and-push.md](data-model/api-and-push.md) | 冪等、OAuth のアプリ・認可・トークン、トークンの解決、Webhook の経路と送りの記録 | 8 | 1 |
-| [data-model/reminders-and-notifications.md](data-model/reminders-and-notifications.md) | 計画の行、頭の版、シャードの借り、送信の記録、既定のリマインダーの購読、画面の通知、Web Push の購読、通知の設定、メールの抑止 | 9 | 1 |
+| [data-model/reminders-and-notifications.md](data-model/reminders-and-notifications.md) | 計画の行、頭のバージョン、シャードの借り、送信の記録、既定のリマインダーの購読、画面の通知、Web Push の購読、通知の設定、メールの抑止 | 9 | 1 |
 | [data-model/search.md](data-model/search.md) | 検索の表 | 1 | 1 |
 | [data-model/security-and-audit.md](data-model/security-and-audit.md) | テナントの監査、プラットフォームの監査、保持の表、法的な保全、全体の状態、照合の結果 | 7 | 1 |
 | [data-model/stores.md](data-model/stores.md) | Valkey、S3、SNS・SQS とメッセージ、Webhook、CalDAV のリソースと ETag、同期のトークン、Web Push、iTIP のメッセージ、IndexedDB、AppConfig、データのパッケージ | — | 1 |
@@ -38,7 +38,7 @@
 | Valkey（ElastiCache） | 合図の pub/sub、空き時間のキャッシュ、レート制限、書き込みの枠、Webhook の待ち、資格の写し、取り消しの一覧、失敗の数 | 正本ではない | 正しさは保たれる。遅くなるだけ（[data-model/stores.md](data-model/stores.md) の 1 節） |
 | S3 | iMIP の生のメール、ICS の取り込み・書き出し・購読の本文、大きな iTIP の本文、保留の招待の本文、Web の資産、tzdata、監査ログの写し | 生のメールと ICS のファイルは正本（期限つき）。他は写し | バージョニングと大阪への複製（資産・tzdata） |
 | SNS・SQS | outbox から Worker へのきっかけ | 正本ではない | outbox と各表から送り直す |
-| AppConfig・CloudFront KeyValueStore | フラグ、`tzdata.active_version`、Web の版の割合 | フラグの正本 | Terraform から作り直す |
+| AppConfig・CloudFront KeyValueStore | フラグ、`tzdata.active_version`、Web のバージョンの割合 | フラグの正本 | Terraform から作り直す |
 | 端末の IndexedDB（`cal-<account_id>`） | 前後 4 週の予定オブジェクト、トークン、ゾーンのデータ | 捨ててよい写し（書き込みを持たない） | 取り直す（[ADR-0039](../decisions/0039-offline-read-cache-and-local-data.md)） |
 
 ### 2.2 ID
@@ -98,7 +98,7 @@ CREATE POLICY tenant_isolation ON <t>
 | `start_tzid`・`end_tzid` | `text` | 正本（IANA の正規の名前。開始と終了で違ってよい） | `'UTC'` | NULL | NULL |
 | `start_date`・`end_date` | `date` | NULL | NULL | NULL | 正本（`end_date` は含まない） |
 | `start_utc`・`end_utc` | `timestamptz` | 派生 | 正本 | 派生（持ち主のカレンダーのタイムゾーン） | 派生（同上、日の境） |
-| `tzdata_version` | `text` | 派生を計算した版 | NULL | 同左 | 同左 |
+| `tzdata_version` | `text` | 派生を計算したバージョン | NULL | 同左 | 同左 |
 
 ```sql
 CHECK (
@@ -114,7 +114,7 @@ CHECK (
 ```
 
 - `timestamp`（タイムゾーンなし）は、壁時計の時刻を値として持つためだけに使う。PostgreSQL の `AT TIME ZONE`・`timezone` の設定で変換しない（題材の `AGENTS.md`）。派生の値は `packages/tz` の `resolve()` で作って書く。
-- `tzdata_version` は `packages/tzdata` の版の名前（`2026b-1`。[time-zones-and-holidays.md](time-zones-and-holidays.md) の 4.1 節）。版の違う派生の値を比べない。例外は会議室の予約の行と予約の区間の「切り替えの窓」だけ（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。
+- `tzdata_version` は `packages/tzdata` のバージョンの名前（`2026b-1`。[time-zones-and-holidays.md](time-zones-and-holidays.md) の 4.1 節）。バージョンの違う派生の値を比べない。例外は会議室の予約の行と予約の区間の「切り替えの窓」だけ（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。
 - 時刻を持つ他の表（展開の索引、会議室の予約の行、検索の表、リマインダーの計画）は、派生の UTC と `tzdata_version` を写して持つ。どれも予定オブジェクトから作り直せる。
 - 予定でない時刻（作った時刻、期限など）は `timestamptz`（UTC）。名前は `<過去分詞>_at`、日付は `_on`・`_day`（パーティションの鍵）。
 - 壁時計の時刻の範囲（勤務の時間、予約ページの受け付けの時間）は `time` と IANA の TZID の組で持つ。
@@ -149,14 +149,14 @@ CHECK (
 - `x_props` に、本システムが列で持つプロパティを入れない（書き込みで取り除く）。秘密を含みうるので、検索の表に入れない（[search.md](search.md) の 4.1 節）。
 - 往復の性質（任意の VEVENT の書き込みと読み出しで、列のプロパティは正規の形で、`x_props` は原文で戻る）を、`packages/ical` の性質ベーステストで確かめる。
 
-### 2.6 版と `change_seq`
+### 2.6 バージョンと `change_seq`
 
 | 値 | 持つ場所 | 上がるとき | 使う所 |
 | --- | --- | --- | --- |
-| `event_objects.version` | 予定オブジェクト | マスター・上書き・参加者・自分の項目のどれかが変わるたび（1 ずつ） | ETag、`calendar_changes.object_version`、検索の表の版、リマインダーの `plan_version` |
+| `event_objects.version` | 予定オブジェクト | マスター・上書き・参加者・自分の項目のどれかが変わるたび（1 ずつ） | ETag、`calendar_changes.object_version`、検索の表のバージョン、リマインダーの `plan_version` |
 | `event_objects.sequence` | 予定オブジェクト | `SEQUENCE` を上げる変更（[ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md) の一覧）。DR の後の余白（`seq_margin_epoch`） | iTIP・iMIP |
-| `event_objects.organizer_version` | 参加者の写し | 主催者の写しの新しい版を当てたとき（主催者の写しの `version` の値を写す） | 内部の新旧の判定 `(sequence, organizer_version)`、`Schedule-Tag` |
-| `occurrences.object_version` | 展開の索引の行 | その行が変わった時の予定オブジェクトの版（[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)） | 調査だけ。照合は版でなく、その場の `expand()` との比べ |
+| `event_objects.organizer_version` | 参加者の写し | 主催者の写しの新しいバージョンを当てたとき（主催者の写しの `version` の値を写す） | 内部の新旧の判定 `(sequence, organizer_version)`、`Schedule-Tag` |
+| `occurrences.object_version` | 展開の索引の行 | その行が変わった時の予定オブジェクトのバージョン（[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)） | 調査だけ。照合はバージョンでなく、その場の `expand()` との比べ |
 | `calendars.change_seq` | カレンダー | 予定・カレンダーの属性・ACL の変更ごと（書き込みのトランザクションの最初に行をロック） | 同期のトークン、CTag、空き時間のキャッシュ |
 | `calendars.floor_seq` | カレンダー | 変更のログの分割を落とす前、テナントの移り（7 節の D-11） | 410 の判定 |
 | `calendars.booking_seq`・`resources.booking_seq` | 予約ページの持ち主の主のカレンダー、会議室 | 予約の区間・会議室の予約の行の変更ごと | 枠と空き時間のキャッシュの鍵 |
@@ -468,8 +468,8 @@ erDiagram
 | I-3 | **主催者の写しが正**：参加者の写しの共有の項目は、内部の iTIP（`REQUEST`・`CANCEL`）を当てる時だけ変わる | `packages/writer` の参加者の写しの経路は自分の項目の列だけを書く。API・CalDAV は 403。毎日の写しの照合 | [ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) |
 | I-4 | **`change_seq` はカレンダーごとに単調で欠けない。** 予定・カレンダー・ACL の変更はすべて `calendar_changes` に 1 行ずつ載る | カレンダーの行の `UPDATE ... SET change_seq = change_seq + n RETURNING` を書き込みの最初に行い、同じトランザクションで `calendar_changes` と outbox を書く。直接の `UPDATE` は列の権限で拒む。5 分ごとの `change_seq_gap_total` が 0 | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md) |
 | I-5 | `floor_seq ≤ 残っている最小の seq`。`floor_seq` より古いトークンは 410 | 分割を落とすジョブが、落とす前に `floor_seq` を上げる | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)、[sync-and-caldav.md](sync-and-caldav.md) の 4.1 節 |
-| I-6 | **リマインダーは高々 1 回**：（受け手, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）ごとに送信の記録は 1 行。版は鍵に入れない | `reminder_deliveries` の一意の鍵への `INSERT ... ON CONFLICT DO NOTHING` に成功したものだけを送る。送る時に回の開始を確かめ直す。PROP-REM-001 | [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md) |
-| I-7 | **tzdb の版の一貫**：派生の UTC を持つ行は必ず `tzdata_version` を持ち、版の違う値を比べない（例外は切り替えの窓の排他の制約）。採用から 24 時間後に古い版の行は 0 | 2.4 節の CHECK。再計算のジョブ、`stale_tzdata_rows` の監視。全サービスは AppConfig の 1 つの値で同じ版 | [ADR-0002](../decisions/0002-time-representation.md)、[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)、[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) |
+| I-6 | **リマインダーは高々 1 回**：（受け手, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）ごとに送信の記録は 1 行。バージョンは鍵に入れない | `reminder_deliveries` の一意の鍵への `INSERT ... ON CONFLICT DO NOTHING` に成功したものだけを送る。送る時に回の開始を確かめ直す。PROP-REM-001 | [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md) |
+| I-7 | **tzdb のバージョンの一貫**：派生の UTC を持つ行は必ず `tzdata_version` を持ち、バージョンの違う値を比べない（例外は切り替えの窓の排他の制約）。採用から 24 時間後に古いバージョンの行は 0 | 2.4 節の CHECK。再計算のジョブ、`stale_tzdata_rows` の監視。全サービスは AppConfig の 1 つの値で同じバージョン | [ADR-0002](../decisions/0002-time-representation.md)、[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)、[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) |
 | I-8 | **展開の索引 ＝ `expand()`**：範囲（`[today − 31 日, indexed_through]`）の中の行の集合は、その場の `expand()` の結果と一致する。`copy_state ≠ active` か `status = cancelled` の予定は行を持たない | 書き込みは前後の `expand()` の差分だけ。毎時 10,000 件の照合で不一致 0。不一致は索引だけを作り直す | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0010](../decisions/0010-occurrence-index-maintenance.md) |
 | I-9 | **回の識別子は壁時計**：`recurrence_id` は tzdb の更新で変わらない。UTC で作らない | 2.2 節の形。`packages/recurrence` の性質ベーステスト | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) |
 | I-10 | 1 つのカレンダーの中で UID は一意。1 つの予定オブジェクトは 1 つのカレンダーだけにある | `UNIQUE (tenant_id, calendar_id, uid)` | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md) |
@@ -512,16 +512,16 @@ erDiagram
 | D-14 | `ics_import_jobs` を足した | ICS の取り込みは非同期で、S3 のファイル（7 日）と結果の件数の置き場所がなかった | [data-model/sync-caldav-and-ics.md](data-model/sync-caldav-and-ics.md) |
 | D-15 | `outbox` はテナントの表（FORCE RLS）にし、Relay は ADR-0004 の経路 X10（`relay` のロールに `outbox` の `SELECT`・`DELETE` だけを全テナントで許すポリシー）で読む | outbox の行は iTIP の本文（予定の中身）を持つので、RLS の外の表に置けない。一覧に経路がなかった | [ADR-0004](../decisions/0004-tenancy-and-rls.md)、[README.md](README.md) の 6 節 |
 | D-16 | `imip_addresses` に `token_ciphertext` を足した | ADR-0041 は「送るたびに封筒の暗号化から作る」とするが、列がなかった | [data-model/scheduling-and-itip.md](data-model/scheduling-and-itip.md) |
-| D-17 | 組織ごとの設定は `org_settings` の 1 行（認証、OAuth、予約ページ、参加者の権限の既定、手元の保存、管理者の閲覧の方針）。共有の方針は `org_sharing_policies` に分ける。どちらも既定と違う組織だけが行を持つ | 設定が 4 つの文書に散っていた。共有の方針は `view_hash` の版を持つ | [data-model/tenants-accounts-and-orgs.md](data-model/tenants-accounts-and-orgs.md) |
+| D-17 | 組織ごとの設定は `org_settings` の 1 行（認証、OAuth、予約ページ、参加者の権限の既定、手元の保存、管理者の閲覧の方針）。共有の方針は `org_sharing_policies` に分ける。どちらも既定と違う組織だけが行を持つ | 設定が 4 つの文書に散っていた。共有の方針は `view_hash` のバージョンを持つ | [data-model/tenants-accounts-and-orgs.md](data-model/tenants-accounts-and-orgs.md) |
 | D-18 | `calendars.owner_principal` は `owner_user_id`（組織・システムのカレンダーは NULL）で持つ | 持ち主は利用者か組織だけで、文字列の主体は要らない | [sharing-and-acl.md](sharing-and-acl.md) の 16 節 |
-| D-19 | 予約ページの持ち主の「予約の版」は、持ち主の主のカレンダーの `calendars.booking_seq` | ADR-0033 は持ち主の主のカレンダーの行をロックするので、同じ行で上げられる。置き場所がなかった | [booking-pages.md](booking-pages.md) の 5.3 節 |
+| D-19 | 予約ページの持ち主の「予約のバージョン」は、持ち主の主のカレンダーの `calendars.booking_seq` | ADR-0033 は持ち主の主のカレンダーの行をロックするので、同じ行で上げられる。置き場所がなかった | [booking-pages.md](booking-pages.md) の 5.3 節 |
 | D-20 | Web Push の購読の `auth` は秘密なので `auth_ciphertext` で持つ | reminders-and-notifications は平文の `auth` と書いていた（ADR-0041 の規則） | [reminders-and-notifications.md](reminders-and-notifications.md) の 17 節 |
 | D-21 | `calendar_changes`・`push_deliveries` の主キーに分割の鍵（`committed_on`・`created_on`）を含める。一意はロックの中で振る番号で守る | 文書の主キーは分割の鍵を含まず、PostgreSQL で作れない | [data-model/sync-caldav-and-ics.md](data-model/sync-caldav-and-ics.md)、[data-model/api-and-push.md](data-model/api-and-push.md) |
 | D-22 | 法的な保全で落とす分割の行は、テナントの表 `legal_hold_rows` に写す | ADR-0042 の「保全の表」の形がなかった | [data-model/security-and-audit.md](data-model/security-and-audit.md) |
 | D-23 | `org_domains` の一意は `status IN ('verified','at_risk')` の行に張る | 「先の組織の確認が切れていない限り拒否」は `at_risk` も含む | [accounts-and-orgs.md](accounts-and-orgs.md) の 21 節 |
 | D-24 | `calendar_acl` の `scope_type` に `email`（アカウントのない人への共有の招待。`disabled_reason = 'pending_account'`）を足した | 「相手がアカウントを作ってから行を有効にする」の置き場所がなかった | [data-model/calendars-and-acl.md](data-model/calendars-and-acl.md) |
 | D-25 | 管理者の閲覧の能力 `admin_event_access` は `admin_role_assignments` の `role` の値で持つ | 役割とは別の能力だが、付与・範囲・監査の形が同じ | [data-model/tenants-accounts-and-orgs.md](data-model/tenants-accounts-and-orgs.md) |
-| D-26 | ADR-0006 の写しの版の名前 `organizer_dtstamp` を `organizer_version` に直した（名前だけ） | 統合の工程で新旧の鍵を `(SEQUENCE, 主催者の版)` に直したが、列の名前が残っていた | [ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) |
+| D-26 | ADR-0006 の写しのバージョンの名前 `organizer_dtstamp` を `organizer_version` に直した（名前だけ） | 統合の工程で新旧の鍵を `(SEQUENCE, 主催者のバージョン)` に直したが、列の名前が残っていた | [ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) |
 | D-27 | infrastructure の `worker-reminder-scheduler`・`worker-notifier` の DB のロールを `reminder_clock` に揃えた | ADR-0004 の X5 のロールの名前と違っていた | [infrastructure.md](infrastructure.md) の 3 節 |
 | D-28 | Valkey の鍵、S3 の接頭辞、SQS のキュー、outbox の `topic`、同期のトークンの形のうち未定のものを決めた | 名前が領域の文書になかった | [data-model/stores.md](data-model/stores.md) |
 | D-29 | OAuth のトークンと予約の管理のリンクの解決の表 `ops.oauth_token_directory`・`ops.booking_manage_directory` を足し、ADR-0004 の X6 の入口に足した | Bearer と `/m/<token>` は、テナントを決める前に行を引く必要があった | [ADR-0004](../decisions/0004-tenancy-and-rls.md)、[data-model/api-and-push.md](data-model/api-and-push.md)、[data-model/booking-pages.md](data-model/booking-pages.md) |
@@ -542,4 +542,4 @@ erDiagram
 
 ## 9. 以前の索引からの変更
 
-2026-10-04 の統合の工程の索引（この文書の前の版）は、表と置き場所の一覧だけを持ち、列の詳細を領域の文書に任せていた。その時に揃えた名前（`resources.booking_seq`、`tenant_audit_events`・`platform_audit_events`、`admin_access_grants`、`calendars.kind` の 6 つの値、`reminder_deliveries` の鍵、計画の行の `skipped_late`）は、この版の列の表に引き継いだ。
+2026-10-04 の統合の工程の索引（この文書の前のバージョン）は、表と置き場所の一覧だけを持ち、列の詳細を領域の文書に任せていた。その時に揃えた名前（`resources.booking_seq`、`tenant_audit_events`・`platform_audit_events`、`admin_access_grants`、`calendars.kind` の 6 つの値、`reminder_deliveries` の鍵、計画の行の `skipped_late`）は、このバージョンの列の表に引き継いだ。

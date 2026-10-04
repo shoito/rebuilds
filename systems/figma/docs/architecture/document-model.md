@@ -13,7 +13,7 @@
 ## 1. 目的と範囲
 
 - 扱う：ノードの種類、プロパティの表、ID、変更の操作（`create`・`set`・`delete`）、木の不変条件と検証、メモリの上の持ち方、直列化の形式、大きさの上限、他の領域とのインターフェース。
-- 扱わない：変更の送受信と競合の解き方（[multiplayer.md](multiplayer.md)）、永続化と版（[file-storage-and-history.md](file-storage-and-history.md)）、描画（[rendering-engine.md](rendering-engine.md)）、レイアウトの計算（[layout.md](layout.md)）、コンポーネントの上書きの意味（[components-and-libraries.md](components-and-libraries.md)）、権限の判定（[permissions-and-sharing.md](permissions-and-sharing.md)）。
+- 扱わない：変更の送受信と競合の解き方（[multiplayer.md](multiplayer.md)）、永続化とバージョン（[file-storage-and-history.md](file-storage-and-history.md)）、描画（[rendering-engine.md](rendering-engine.md)）、レイアウトの計算（[layout.md](layout.md)）、コンポーネントの上書きの意味（[components-and-libraries.md](components-and-libraries.md)）、権限の判定（[permissions-and-sharing.md](permissions-and-sharing.md)）。
 
 ## 2. 本家の形（確かめたこと）
 
@@ -70,8 +70,8 @@
 | `validate` | 範囲・長さ・形式（4.4 節） |
 | `derived` | 他のプロパティから計算される値か（レイアウトの結果など。9.2 節） |
 | `owner` | 定義に責任を持つ領域（document-model、layout、components など） |
-| `since` | 追加した形式の版（8.4 節） |
-| `public_api`・`api_name`・`api_since` | 公開 API のノードの JSON に出すか、JSON の鍵、出した API の版（[api-and-webhooks.md](api-and-webhooks.md) の 4.1 節、ADR-0042）。既定は出さない |
+| `since` | 追加した形式のバージョン（8.4 節） |
+| `public_api`・`api_name`・`api_since` | 公開 API のノードの JSON に出すか、JSON の鍵、出した API のバージョン（[api-and-webhooks.md](api-and-webhooks.md) の 4.1 節、ADR-0042）。既定は出さない |
 | `public_plugin` | プラグインの API に出すか（[plugins.md](plugins.md) の 5.5 節、ADR-0038）。既定は出さない。`derived` のプロパティの書き込みは出さない |
 
 **競合の単位の規則**（本題材の AGENTS.md）：1 つのプロパティに、別々に編集されうる値を詰め込まない。別々に編集されうるなら、別のプロパティにするか、`map` にする。
@@ -182,14 +182,14 @@ Op =
   | Delete { id: NodeId }                                                      // 子孫もまとめて消す
 
 ChangeSet { ops: Vec<Op>, origin: Origin }   // 1 つの利用者の操作（ドラッグの 1 フレーム、貼り付け 1 回）。原子的に当たる
-Origin = User | Plugin { plugin_id, version_id } | LayoutRepair | Server   // 版の履歴の表示に使う印
+Origin = User | Plugin { plugin_id, version_id } | LayoutRepair | Server   // バージョンの履歴の表示に使う印
 ```
 
 - 親の付け替え・並びの変更は `Set { prop: parent_index }`。
 - `Delete` は子孫をまとめて消す。消したノードは状態から取り除き、墓標を持たない。同じ ID の後からの `Set` は捨てる（[multiplayer.md](multiplayer.md) の 6 節）。
 - 1 つの `ChangeSet` の操作は、順に当てる。検証に 1 つでも失敗したら、`ChangeSet` 全体を拒否する（原子性）。対象のノードがないことによる「捨てる」は失敗に数えない。
 - 1 つの `ChangeSet` は、直列化して 4 MiB 以下（[multiplayer.md](multiplayer.md) の 4 節）。
-- `origin` は、プラグインの変更（[plugins.md](plugins.md) の 5.3 節、ADR-0038）、レイアウトの修復（[layout.md](layout.md) の 4.2 節）、サーバーが作る操作（`session_id = 0`）を見分ける印で、ジャーナルに残し、版の履歴の表示に使う。クライアントの申告なので、権限の判定には使わない。`Server` はサーバーだけが付けられる。
+- `origin` は、プラグインの変更（[plugins.md](plugins.md) の 5.3 節、ADR-0038）、レイアウトの修復（[layout.md](layout.md) の 4.2 節）、サーバーが作る操作（`session_id = 0`）を見分ける印で、ジャーナルに残し、バージョンの履歴の表示に使う。クライアントの申告なので、権限の判定には使わない。`Server` はサーバーだけが付けられる。
 
 ## 8. 直列化の形式
 
@@ -204,7 +204,7 @@ ADR-0008。1 つの形式を、通信（WebSocket）、ジャーナル、チェ�
 ### 8.2 チェックポイントの中身
 
 ```
-Manifest（ファイル 1 つ・版 1 つ）
+Manifest（ファイル 1 つ・バージョン 1 つ）
   magic "<brand>DOC", format_version: u16, schema_hash: [u8; 16]
   file_id, seq, created_at
   features: [FlagId]              // その seq の時点の文書のフラグ（ADR-0055。Render Worker・file-read が読む）
@@ -228,10 +228,10 @@ PageChunk（1 ページ。4 MiB を超えたら ID の順に分ける）
 - 同じ状態は、いつも同じバイト列になる。ノードは ID の昇順、プロパティは `prop_id` の昇順、既定値と同じプロパティは書かない、`map` の要素は鍵の昇順、`-0.0` は `0.0`。
 - 本家は、チェックポイント A とその後のジャーナルから作り直したファイルが、チェックポイント B とバイト単位で一致することを確かめてからジャーナルを出した（[Making multiplayer more reliable](https://www.figma.com/blog/making-multiplayer-more-reliable/)、2022-10-20、2026-09-27 に確認）。正準形は、同じ検証（[file-storage-and-history.md](file-storage-and-history.md) の 13 節）と、WASM とネイティブの一致の検査（ADR-0001）に使う。
 
-### 8.4 版と互換
+### 8.4 バージョンと互換
 
 - `format_version` は、符号化の規則を変えたときだけ上げる。プロパティを足すだけなら上げない（`since` の列で追う）。
-- `schema_hash` は、表から計算する。接続時の照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) の 3 つの版（`protocol_version`、`schema_hash` の互換の一覧、`min_client_build`）で行う。サーバーは「今の表から追加だけでたどれる直近 30 日の `schema_hash`」を受け入れ、一致しなくても一覧の中なら接続を続ける。一覧の外なら強い再読み込み（`Kick(version_mismatch)`）にする（[delivery.md](delivery.md) の 4 節、[multiplayer.md](multiplayer.md) の 4.3 節）。
+- `schema_hash` は、表から計算する。接続時の照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) の 3 つのバージョン（`protocol_version`、`schema_hash` の互換の一覧、`min_client_build`）で行う。サーバーは「今の表から追加だけでたどれる直近 30 日の `schema_hash`」を受け入れ、一致しなくても一覧の中なら接続を続ける。一覧の外なら強い再読み込み（`Kick(version_mismatch)`）にする（[delivery.md](delivery.md) の 4 節、[multiplayer.md](multiplayer.md) の 4.3 節）。
 - プロパティを足す順：サーバー（Document Server・Worker）を先に出し、クライアントを後に出し、最後に書き込みを解禁する（`schema.<prop>.write`。ADR-0055）。サーバーは、古いクライアントが送らないプロパティを既定値で扱う。
 - 読み手は、知らない `prop_id` を持つチェックポイントを読んだら、値をそのまま持ち、書き出しでもそのまま書く（古い Worker が新しいプロパティを消さない）。
 - プロパティを消すときは、`deprecated` にして読み飛ばし、1 か月後に表から外す。番号は再利用しない。
@@ -294,7 +294,7 @@ struct ChangeSummary {            // 当てた変更の要約。フレームご�
 ## 10. メモリの上の持ち方
 
 - `Doc` は、ノードの表（`NodeId → Node`）と、親ごとの子の索引（`OrderKey` の順の木）を持つ。
-- ノードの表は、永続的な（変更の前の版を共有する）対応表（HAMT）にする。Document Server は、チェックポイントのために状態の写しを O(1) で取り、別のスレッドで直列化する（ADR-0003 の「スナップショットを取ってから別のスレッドで直列化する」）。
+- ノードの表は、永続的な（変更の前のバージョンを共有する）対応表（HAMT）にする。Document Server は、チェックポイントのために状態の写しを O(1) で取り、別のスレッドで直列化する（ADR-0003 の「スナップショットを取ってから別のスレッドで直列化する」）。
 - クライアントも同じ `Doc` を使う（ADR-0001）。HAMT の読み取りの速さが、描画とヒットテストで足りるかは **未検証**。E2 の前の `hamt-node-store-poc` で、10 万ノードで計測する。足りなければ、クライアントだけ通常の対応表に替える（`doc-model` の型の引数で切り替え、適用の規則は 1 つのまま）。
 - 読み込んでいないページのノードは持たない。`CANVAS` のノードと、ページの `node_count` だけを持つ。
 - WASM のメモリは最大 4 GiB（32 ビット）。10 万ノードで `Doc` の大きさを 200 MiB 以内に収める（NFR-004 の 1.5 GB のうち、残りは描画と画像）。
@@ -322,7 +322,7 @@ struct ChangeSummary {            // 当てた変更の要約。フレームご�
 
 | 障害 | 起きること | 対応 |
 | --- | --- | --- |
-| クライアントとサーバーの `doc-model` の版が違う | 同じ変更の結果が変わりうる | 接続時に ADR-0053 の 3 つの版で照合し、互換の外なら強い再読み込み。結果を変える規則の変更は文書のフラグでファイルごとに切り替える（8.4 節、ADR-0055） |
+| クライアントとサーバーの `doc-model` のバージョンが違う | 同じ変更の結果が変わりうる | 接続時に ADR-0053 の 3 つのバージョンで照合し、互換の外なら強い再読み込み。結果を変える規則の変更は文書のフラグでファイルごとに切り替える（8.4 節、ADR-0055） |
 | 知らない `prop_id` を持つチェックポイント | 古い Worker が値を落としうる | 読み飛ばさずに持ち、そのまま書く（8.4 節） |
 | チェックポイントのチャンクの破損 | ハッシュが合わない | 読み込みを止め、前のチェックポイントとジャーナルから作り直す（[file-storage-and-history.md](file-storage-and-history.md) の 12 節） |
 | 不変条件の破れ（バグ） | 描画・書き出しが壊れうる | サーバーは当てた後の検査（重い検査は抜き取り）で見つけたら、そのファイルを `maintenance`（`files.state`。[data-model/organization.md](data-model/organization.md) の `files`）にして編集を止め、修復の手順（runbook）に回す |
@@ -359,7 +359,7 @@ struct ChangeSummary {            // 当てた変更の要約。フレームご�
 
 ## 15. Story の候補
 
-Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり：E1 基盤とビルド、E2 描画エンジンと大きなファイル、E3 ドキュメントのモデルとマルチプレイヤー、E4 ベクターとテキストの編集、E5 フレームとオートレイアウト、E6 コンポーネントとバリアント、E7 保存と版の履歴、E8 コメントと通知、E9 チーム・権限・共有、E10 書き出しとアセット、E11 ファイルの一覧と検索、E12 運用と GA の準備。
+Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり：E1 基盤とビルド、E2 描画エンジンと大きなファイル、E3 ドキュメントのモデルとマルチプレイヤー、E4 ベクターとテキストの編集、E5 フレームとオートレイアウト、E6 コンポーネントとバリアント、E7 保存とバージョンの履歴、E8 コメントと通知、E9 チーム・権限・共有、E10 書き出しとアセット、E11 ファイルの一覧と検索、E12 運用と GA の準備。
 
 | Epic | Story | 中身 |
 | --- | --- | --- |

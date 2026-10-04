@@ -70,7 +70,7 @@ PROP-MSG-005 の判定。`react-dom/server` の `renderToStaticMarkup` の出力
 ## 3. テスト環境とテストデータ
 
 - 単体・性質ベースのテストは Node の Vitest だけで動かす。ブラウザは使わない（描画は `react-dom/server` で調べる）。
-- PROP-MSG-006 の保存の確認だけ、Testcontainers の PostgreSQL（本番と同じ版）を使う。
+- PROP-MSG-006 の保存の確認だけ、Testcontainers の PostgreSQL（本番と同じバージョン）を使う。
 - 攻撃のコーパスは、リポジトリに置くテキストのファイルで、外部から取得しない。
 
 ## 4. 合否の判定基準

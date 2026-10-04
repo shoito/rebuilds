@@ -7,7 +7,7 @@ date: 2026-09-27
 
 ## Context
 
-連携は、ファイルの更新・名前付きの版・削除・コメントを知りたい。本家の Webhook の V2 は次の形である（[Webhooks](https://developers.figma.com/docs/rest-api/webhooks/)、[Webhooks Events](https://developers.figma.com/docs/rest-api/webhooks-events/)、[Webhooks Endpoints](https://developers.figma.com/docs/rest-api/webhooks-endpoints/)、[Webhooks Security](https://developers.figma.com/docs/rest-api/webhooks-security/)、いずれも 2026-09-27 に確認）。
+連携は、ファイルの更新・名前付きのバージョン・削除・コメントを知りたい。本家の Webhook の V2 は次の形である（[Webhooks](https://developers.figma.com/docs/rest-api/webhooks/)、[Webhooks Events](https://developers.figma.com/docs/rest-api/webhooks-events/)、[Webhooks Endpoints](https://developers.figma.com/docs/rest-api/webhooks-endpoints/)、[Webhooks Security](https://developers.figma.com/docs/rest-api/webhooks-security/)、いずれも 2026-09-27 に確認）。
 
 - 文脈はチーム（管理者、20 個まで）・プロジェクト（編集の権限、5 個）・ファイル（編集の権限、3 個）。
 - 種類は `PING`・`FILE_UPDATE`（編集が 30 分止まったとき）・`FILE_VERSION_UPDATE`・`FILE_DELETE`・`LIBRARY_PUBLISH`・`FILE_COMMENT`・`DEV_MODE_STATUS_UPDATE`。本文にファイル名やコメントの本文が入る。

@@ -74,7 +74,7 @@
 | `during` | `tstzrange(start_utc, end_utc, '[)')` |
 | `status` | `accepted`・`pending`（承認の待ち）・`needs_review`（要確認） |
 | `accepted_at` | 承諾した時刻（要確認の判定に使う） |
-| `tzdata_version` | 区間を計算した版 |
+| `tzdata_version` | 区間を計算したバージョン |
 
 ```sql
 EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &&)
@@ -204,7 +204,7 @@ stateDiagram-v2
 
 ADR-0020。
 
-- tzdb の計算し直し（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）で、行の `during` を直す `UPDATE` が排他の制約に当たったら、次をする。切り替えの窓（新旧の版の区間が比べられる間）の扱いは ADR-0012 の「切り替えの窓」。
+- tzdb の計算し直し（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）で、行の `during` を直す `UPDATE` が排他の制約に当たったら、次をする。切り替えの窓（新旧のバージョンの区間が比べられる間）の扱いは ADR-0012 の「切り替えの窓」。
   1. 当たった相手の行と、`accepted_at` を比べる。
   2. 後から承諾したほうを `needs_review` にする（自分なら自分を、相手なら相手を `needs_review` にしてから自分の `UPDATE` をやり直す）。
   3. 主催者と会議室の管理者に、重なった 2 つの予定を知らせる。

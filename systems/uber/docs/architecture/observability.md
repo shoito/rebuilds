@@ -54,7 +54,7 @@ Grafana（shared）：都市ごとのダッシュボード
 
 - 構造化したログ（JSON）。要求・遷移・バッチ・ジョブに `request_id`・`trip_id`・`decision_id`・`job_id` を付ける。
 - 位置の点ごとのログは書かない（S1 で 2,500 件/秒）。検証の結果は `loc_samples_total{verdict}` で数え、ログには 1 分ごとの集計だけを書く。
-- レベル：`error` は Ops が見るべきもの、`warn` は自動で回復したもの、`info` は状態の変化（リースの取得、区域の切り替え、タイルの版の切り替え）。
+- レベル：`error` は Ops が見るべきもの、`warn` は自動で回復したもの、`info` は状態の変化（リースの取得、区域の切り替え、タイルのバージョンの切り替え）。
 - 試験のログの検査：結合試験のログ・トレースの全体に、緯度経度の形の値が 0 件（[location-ingestion.md](location-ingestion.md) の 14.3 節）。本番でも、log-archive に毎日同じ検査を流し、見つかれば 1 件で呼び出す。
 
 ### 4.2 保持
@@ -99,7 +99,7 @@ Grafana（shared）：都市ごとのダッシュボード
 
 - アプリは、オファーの受信・表示・受諾の送信の時刻（端末の経過の時計）、状態の変化の受信、位置の送信の間隔、電池、クラッシュを、集計してから送る（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 14 節）。緯度経度と画面の文字は送らない。
 - `state_delivery` と `offer_delivery` は、アプリの受信の確認（`Ack`・`OfferDelivered`）をサーバーで計る。アプリの時計は使わない。
-- 版ごとの比較（クラッシュ、ANR、受信の確認までの時間）は、段階的な公開の判断に使う（[delivery.md](delivery.md) の 7 節）。
+- バージョンごとの比較（クラッシュ、ANR、受信の確認までの時間）は、段階的な公開の判断に使う（[delivery.md](delivery.md) の 7 節）。
 
 ## 8. アラートと runbook
 
@@ -134,7 +134,7 @@ Grafana（shared）：都市ごとのダッシュボード
 | ログの緯度経度 | 日次の検査で 1 件 | ticket（SEV3） | [incident-response.md](../runbooks/incident-response.md) |
 | Aurora の大阪への複製の遅れ | `AuroraGlobalDBRPOLag` が 30 秒（警告）、60 秒（page） | page | [disaster-recovery.md](../runbooks/disaster-recovery.md) の C |
 | 大阪からの合成の監視の連続の失敗 | 東京の入口への合成の監視が 3 回続けて失敗 | page | [disaster-recovery.md](../runbooks/disaster-recovery.md) の B |
-| デプロイの後の悪化 | 配備の後 30 分の SLO の悪化、新しいアプリの版のクラッシュ | page | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
+| デプロイの後の悪化 | 配備の後 30 分の SLO の悪化、新しいアプリのバージョンのクラッシュ | page | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
 
 - デプロイの直後 30 分の悪化は、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の「悪化したとき」を先に見る。
 
@@ -182,7 +182,7 @@ Grafana（shared）：都市ごとのダッシュボード
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 合成の区域を本番の中に置くことが、配車の設定の誤りで本番の区域に漏れないか | E5。区域の設定の検証の関数で `synthetic` のドライバーを本番の区域に出さない |
-| `state_delivery` と `offer_delivery` をアプリの版の不具合から切り分ける方法 | E6・E9 |
+| `state_delivery` と `offer_delivery` をアプリのバージョンの不具合から切り分ける方法 | E6・E9 |
 | 可観測性の費用（位置の件数に比例するメトリクスの基数） | E3 の負荷試験で計る |
 
 ## 12. quality.md・runbooks・data-model への項目

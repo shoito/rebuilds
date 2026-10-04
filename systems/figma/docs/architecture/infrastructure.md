@@ -182,7 +182,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | DynamoDB `journal` | ジャーナルとフェンス（ADR-0024） | オンデマンド、warm throughput（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)）、TTL、PITR 35 日、グローバルテーブル（MREC、大阪） |
 | DynamoDB `file_leases` | 割り当て（5 節） | オンデマンド、GSI `by_owner`、TTL、PITR、グローバルテーブル |
 | DynamoDB `ds_liveness` | タスクの生存 | オンデマンド、TTL。リージョンごと |
-| S3 `<brand>-files-{env}-{region}` | チェックポイント・チャンク・大きな変更 | バージョニング（古い版 30 日）、SSE-KMS、東京 → 大阪のレプリケーション（RTC）、ライフサイクルを両方に置く |
+| S3 `<brand>-files-{env}-{region}` | チェックポイント・チャンク・大きな変更 | バージョニング（古いバージョン 30 日）、SSE-KMS、東京 → 大阪のレプリケーション（RTC）、ライフサイクルを両方に置く |
 | S3 `<brand>-assets-{env}-{region}` | 画像・フォント・書き出し・サムネイル・コメントの添付 | 同上 |
 | CloudFront | 静的な資産、チャンク、画像 | 署名付き URL（鍵のグループ）、`files`・`assets` は Cookie を持たないドメイン |
 | Aurora PostgreSQL 18 | メタデータ（RLS） | writer 1＋reader 1（別の AZ）、I/O-Optimized、Global Database（大阪に reader 1） |
@@ -190,7 +190,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | SQS | Worker のキュー（`render-export`・`render-thumbnail`・`image-ingest` など） | 標準キュー＋DLQ |
 
 - Valkey の pub/sub は、クラスタモードの構成に置かない。本家は、pub/sub をクラスタモードの ElastiCache に移した数週間後に、クラスタのバスのバッファの膨張で CPU が 100% に張り付き、新しいファイルを開けず共同編集もできない障害を起こし、クラスタモードを使わない構成に戻して用途ごとに分けた（[Postmortem: Service disruptions on June 6 & 7 2022](https://www.figma.com/blog/postmortem-service-disruptions-on-june-6-and-7-2022/)、2026-09-27 に確認）。
-- S3 のレプリケーションは、版を指定した削除とライフサイクルの動作を複製しない（[security.md](security.md) の 7 節、[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md)）。
+- S3 のレプリケーションは、バージョンを指定した削除とライフサイクルの動作を複製しない（[security.md](security.md) の 7 節、[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md)）。
 - DynamoDB のグローバルテーブルで、`TransactWriteItems` は書いたリージョンの中でだけ原子的。大阪では、ジャーナルの項目とフェンスの項目が別々に届きうる（[How DynamoDB global tables work](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_HowItWorks.html)、2026-09-27 に確認）。大阪での回復は、フェンスの項目に頼らず、ジャーナルの項目の連続だけを見る（ADR-0048）。
 
 ## 7. 冗長化と災害復旧
@@ -218,7 +218,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 - **世代**：切り替えのたびに世代を上げ、世代 2 以降のジャーナルは `{file_id}#g{g}`、マニフェストは `checkpoints/g{g}/` に書く。東京の遅れた書き込みが、大阪の確定を上書きしない（ADR-0048）。
 - **RPO**：ジャーナルの複製は通常 1 秒以内（MREC）。`ReplicationLatency` が 10 秒を超えたら警告、30 秒で呼び出し。大阪の最新のチェックポイントが遅れていても、古いチェックポイント＋ジャーナル（30 日）から回復できる。
 - **RTO の内訳（目安）**：判断 15 分、Aurora の切り替え 5 分、ECS を広げる 10〜15 分、入口の切り替え 5 分、回復のジョブが開いていたファイルを回復する 10〜20 分（1 万ファイルを 1 秒に 50 ファイルで回復すると約 3 分半。利用者が開けば先に回復する）。合計 45〜60 分。**未検証**（E12 の `dr-drill` で計る）。
-- **取り戻し**：東京が戻ったら、`dr-salvage` のジョブが、元の世代の `base_end_seq` より後の項目を探し、版として残す（ADR-0048）。
+- **取り戻し**：東京が戻ったら、`dr-salvage` のジョブが、元の世代の `base_end_seq` より後の項目を探し、バージョンとして残す（ADR-0048）。
 - **戻す**：大阪で全ファイルを `released` にし、複製の待ちが 0 になってから、東京で世代を上げる（RPO 0）。
 
 ### 7.3 バックアップ
@@ -226,11 +226,11 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 | 対象 | 方法 | 保持 |
 | --- | --- | --- |
 | DynamoDB `journal`・`file_leases` | PITR | 35 日 |
-| S3 | バージョニング（古い版） | 30 日 |
+| S3 | バージョニング（古いバージョン） | 30 日 |
 | Aurora | 自動バックアップ（PITR）＋ AWS Backup の日次のスナップショット（大阪へコピー） | 35 日 |
 | 監査のアーカイブ | log-archive の S3（Object Lock） | 7 年（既定案。法務の確認待ち、L4） |
 
-- 論理的な破損（誤ったジョブがチャンクを消した、など）は、S3 の古い版と、日ごとのチェックポイント＋ジャーナル（30 日）から戻す（[file-storage-and-history.md](file-storage-and-history.md) の 5.3・12 節）。
+- 論理的な破損（誤ったジョブがチャンクを消した、など）は、S3 の古いバージョンと、日ごとのチェックポイント＋ジャーナル（30 日）から戻す（[file-storage-and-history.md](file-storage-and-history.md) の 5.3・12 節）。
 
 ## 8. S1 の構成と台数（初期見積もり）
 
@@ -279,7 +279,7 @@ ADR-0024 が求める「手放さずに落ちたファイルを 5 分以内に�
 
 - **セル構成**：セル＝{gateway、router、Document Server、`journal`・`file_leases` の表、Aurora のシャードの群れ、Worker}。組織（`org_id`）をセルに固定する。セルの外（グローバル）に置くのは、アカウントとセッション、組織 → セルの対応表、ファイルの鍵 → 組織の対応表。
 - **ファイルは、持つ組織のセルで開く。** ゲストや別の組織の人も、そのセルへ入る（入口のルーターが、ファイルの鍵からセルを引く）。
-- **メタデータを横に分ける**：シャードの鍵は `org_id`（組織の中のメタデータ）と `file_id`（コメント、版）を候補にする（ADR-0005）。
+- **メタデータを横に分ける**：シャードの鍵は `org_id`（組織の中のメタデータ）と `file_id`（コメント、バージョン）を候補にする（ADR-0005）。
 - **大阪でも編集を受ける**：セルごとに主のリージョンを東京か大阪に置く（Stripe の [ADR-0031](../../../stripe/docs/decisions/0031-active-active-cells.md) と同じ形）。1 つのセルの書き込みは 1 つのリージョンだけ。
 - DynamoDB の MRSC（東京・大阪＋第 3 のリージョン）は、トランザクションと TTL が使えないので、S3 でも使わない（ADR-0048）。
 
@@ -380,7 +380,7 @@ infra/
 
 ### quality.md
 
-- DR の訓練の合否の基準：失った範囲が 1 分以内、RTO 1 時間以内、`dr-salvage` が失った範囲の変更を版として残す。
+- DR の訓練の合否の基準：失った範囲が 1 分以内、RTO 1 時間以内、`dr-salvage` が失った範囲の変更をバージョンとして残す。
 - ドレインの品質：デプロイ中のファイルごとの中断の p95、`Kick(owner_changed)` の数、`edit_commit` の悪いイベント。
 
 ### runbooks

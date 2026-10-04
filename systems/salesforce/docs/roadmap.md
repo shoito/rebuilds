@@ -2,7 +2,7 @@
 
 ## 進め方の原則
 
-- **最初に walking skeleton を通す。** E1〜E3 で、組織の作成・ログイン・カスタムオブジェクトと項目の追加・メタデータの版と部品のキャッシュ・レコードの保存（DML の手順の骨格）・問い合わせの言語から SQL・REST API・上限の計測を端から端まで貫いてから、機能を広げる。組織の分離（RLS と `shard_no`）、データ層を通らない SQL の禁止、上限の計測器、漏えいの経路の登録簿の CI は、E1 から本物の形で作る。後から足すと直せないため。
+- **最初に walking skeleton を通す。** E1〜E3 で、組織の作成・ログイン・カスタムオブジェクトと項目の追加・メタデータのバージョンと部品のキャッシュ・レコードの保存（DML の手順の骨格）・問い合わせの言語から SQL・REST API・上限の計測を端から端まで貫いてから、機能を広げる。組織の分離（RLS と `shard_no`）、データ層を通らない SQL の禁止、上限の計測器、漏えいの経路の登録簿の CI は、E1 から本物の形で作る。後から足すと直せないため。
 - **アクセスの判定は決定表と参照の評価器で確かめてから広げる。** 共有・FLS の判定を変える Story は、`DT-*` の表駆動テスト、参照の評価器との性質ベーステスト（`PROP-SHR-*` など）、`LEAK-*` の否定側のテストを通してからマージし、影の実行（[ADR-0063](decisions/0063-org-staged-release-and-shadow-evaluation.md)）を経て組織の単位で広げる（[quality.md](quality.md) の 2 節）。
 - **上限は登録簿と試験を一緒に変える。** 上限を足す・変える Story は、先に [governor-limits.md](architecture/governor-limits.md) を直し、上限の試験（ちょうどで通り、1 つ超えたら巻き戻る）を同じ PR に入れる（[ADR-0061](decisions/0061-access-decision-and-limit-gates-in-ci.md)）。
 - **契約を先に固定する。** 問い合わせの言語の文法、REST API の形とエラー、`<Brand>-Limit-Info`、変更のイベントの形、Webhook の署名、メタデータのパッケージの形式、決定表の列は、人間がレビューして確定する。エージェントは勝手に変えない。
@@ -18,7 +18,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- | --- |
 | E1 基盤 | AWS・Terraform・アカウントとネットワーク、主・`events`・`history` の Aurora と RLS と論理シャード、OpenSearch と Valkey、KMS と組織の DEK、CI（決定表・性質・上限・漏えいの経路の関門）、フラグと組織の段、可観測性と合成監視、outbox と Relay | 設計中 |
 | E2 組織と利用者 | 組織の作成と削除、エディションとライセンス、利用者、Better Auth のログインと MFA、SSO、OAuth、組織のドメイン、Setup の画面の骨格、プロファイル | 未着手（SSO は法務：L2。利用規約は L1・L7） |
-| E3 メタデータの実行基盤 | データ辞書、カスタムオブジェクトと項目、版と部品のキャッシュ、records とピボット、DML の手順の骨格、ごみ箱、問い合わせの言語と計画、REST API、上限の計測と割り当て | 未着手 |
+| E3 メタデータの実行基盤 | データ辞書、カスタムオブジェクトと項目、バージョンと部品のキャッシュ、records とピボット、DML の手順の骨格、ごみ箱、問い合わせの言語と計画、REST API、上限の計測と割り当て | 未着手 |
 | E4 アクセス制御 | 権限セットと FLS、システムの権限、OWD・ロール・グループと閉包、共有ルール・手動の共有、再計算、参照の評価器、本番の標本の照合、影の実行 | 未着手 |
 | E5 営業のオブジェクトと画面 | 取引先・取引先責任者・リードと変換・商談・活動、重複の規則と日本語の照合、レコードのページ、リストビュー、全文検索、メールの記録と送信 | 未着手（取引先責任者・リードは法務：L1。メールは L4） |
 | E6 宣言的な自動化 | 数式、入力規則、フロー（保存の前・後、予定・非同期の経路、スケジュール、画面、イベント）、積み上げ集計、承認 | 未着手 |
@@ -29,7 +29,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E11 監査 | 設定の変更の履歴とハッシュの鎖、ログインの履歴、項目の変更の履歴（`history` のクラスタ）、保持と消去、上限の Setup の画面 | 未着手（保持は法務：L5） |
 | E12 本番の準備 | 負荷試験と上限・割り当ての値の確定、騒がしい隣人の試験、組織の移動、DR の訓練、外部のペンテスト、SLO の確定、GA の判定 | 未着手（GA の判定は法務：L1・L6・L7・L9・L10） |
 | E13 利用者のコード（MVP の後） | TypeScript のトリガー、QuickJS-ng と Wasmtime の砂場（`code-runner`）、ホストの API、`tx.code_*` | 未着手（MVP の後） |
-| E14 パッケージ（MVP の後） | 名前空間、署名、インストールと版の上げ、`locked` の部品、名前空間ごとの上限の内訳 | 未着手（MVP の後。法務：L11） |
+| E14 パッケージ（MVP の後） | 名前空間、署名、インストールとバージョンの上げ、`locked` の部品、名前空間ごとの上限の内訳 | 未着手（MVP の後。法務：L11） |
 | E15 CPQ（MVP の後） | 商品・価格表・商談の商品、見積もりの構成と価格、見積もりの承認、見積書の出力 | 未着手（MVP の後） |
 | E16 売上予測（MVP の後） | 予測の期間と分類、ロール階層での積み上げ、調整と履歴、予測のレポート | 未着手（MVP の後） |
 | E17 AI（MVP の後） | スコアリング、要約、エージェント（本家の Einstein・Agentforce に相当） | 未着手（MVP の後。法務：L1・L2） |
@@ -103,8 +103,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `data-dictionary` | データ辞書の表、オブジェクト・項目の作成・名前の変更（`field_no` の採番、`x_` の接頭辞）、`data_class`・`searchable`・`track_history`（[ADR-0006](decisions/0006-data-dictionary-and-field-lifecycle.md)） |
-| `metadata-versioning` | 版を上げる 1 つのトランザクション、`md_changes`、今の版の配布（Pub/Sub と 5 秒の読み直し） |
-| `segmented-snapshot-cache` | 部品に分けたスナップショット（形の版を含む鍵）、L1・L2・L3、部品の作成の重複の抑え（[ADR-0007](decisions/0007-segmented-metadata-snapshots.md)） |
+| `metadata-versioning` | バージョンを上げる 1 つのトランザクション、`md_changes`、今のバージョンの配布（Pub/Sub と 5 秒の読み直し） |
+| `segmented-snapshot-cache` | 部品に分けたスナップショット（形のバージョンを含む鍵）、L1・L2・L3、部品の作成の重複の抑え（[ADR-0007](decisions/0007-segmented-metadata-snapshots.md)） |
 | `records-and-pivots` | `records` の読み書きと `derivePivotRows`、差分でのピボットの書き込み、`COLLATE "C"` の前方一致 |
 | `unique-and-external-id` | `record_unique_values`、外部 ID、`DUPLICATE_VALUE` |
 | `relationships-and-long-texts` | `record_relationships`・`polymorphic_lookup`・関連リストの読み、長いテキストの別の表 |
@@ -136,7 +136,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `owd-roles-groups-closure` | OWD と `grant_via_hierarchy`、ロールの木、グループの種類、閉包の表と同期の更新（[ADR-0014](decisions/0014-owd-roles-groups-and-closure.md)） |
 | `sharing-predicate-compiler` | 問い合わせの時の条件（6.2 節）の生成と `DT-SHR-001`・`002` の表駆動テスト |
 | `owner-rules` | 所有者の条件の共有ルール（メタデータだけ） |
-| `criteria-rules-versioning` | レコードの条件の共有ルールとルールの版のジョブ、切り替えの前の照合（[ADR-0016](decisions/0016-recalculation-rule-versions-and-skew.md)） |
+| `criteria-rules-versioning` | レコードの条件の共有ルールとルールのバージョンのジョブ、切り替えの前の照合（[ADR-0016](decisions/0016-recalculation-rule-versions-and-skew.md)） |
 | `manual-shares-api` | 手動の共有の API（`/shares`）と、所有者の変更での削除 |
 | `closure-generations-and-defer` | 閉包の世代のジョブと、共有の計算の保留 |
 | `reference-access-evaluator` | 参照の評価器と `PROP-SHR-001`〜`003`（[ADR-0017](decisions/0017-reference-access-evaluator.md)） |
@@ -167,7 +167,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `list-views` | リストビューの定義（AST）、ビルダー、`scope`・`visibility`、コンパイル（`DT-LV-001`）、件数（1 万件で打ち切り）、索引の順の計画（[ADR-0024](decisions/0024-list-views-as-filter-ast.md)） |
 | `composite-and-collections` | 複合の要求と collections |
 | `search-analysis-poc` | 日本語の解析の PoC（kuromoji と Sudachi、2-gram）と評価のコーパス、1 文書の大きさと台数の計測（[ADR-0031](decisions/0031-search-index-and-japanese-analysis.md)） |
-| `search-index-pipeline` | outbox から indexer（SQS、まとめ、外部の版）、索引の形、作り直しと整合の検査 |
+| `search-index-pipeline` | outbox から indexer（SQS、まとめ、外部のバージョン）、索引の形、作り直しと整合の検査 |
 | `search-api-post-filter` | 検索の API と後の確かめ（固定の候補の束、束の全ての確かめ、1 ページの下限の時間。LEAK-012）、`more_may_exist`、強調、全体とオブジェクトの中の検索の画面、`search_floor_exceeded_ratio` と下限の値の決め直し（[ADR-0032](decisions/0032-search-permission-post-filter.md)） |
 | `lookup-typeahead-and-degraded` | 参照の項目の候補（名前のピボットの前方一致＋OpenSearch）と、障害の時の `degraded` |
 | `email-sending` | 1 通ずつのメールの送信、`email_opt_out`、SES と送信のドメインの確認、bounce と苦情（法務：L4） |
@@ -183,7 +183,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `formula-language` | 数式の言語：パーサー、型の検査、分類、評価器、SQL の生成、評価器との一致の性質ベーステスト（[ADR-0009](decisions/0009-formula-language-and-evaluator.md)） |
 | `formula-indexing-and-fls` | 数式の実体化（索引）と作り直し、数式の FLS と Setup の警告 |
 | `validation-rules` | 入力規則（手順 4）：全ての規則の評価、最大 20 件のエラー、文言の差し込みの制限 |
-| `flow-definition-and-activation` | フローの定義の形、版、有効化の検査、`object` の部品のフローの呼び出しの表（[ADR-0025](decisions/0025-flow-definition-and-bulk-engine.md)） |
+| `flow-definition-and-activation` | フローの定義の形、バージョン、有効化の検査、`object` の部品のフローの呼び出しの表（[ADR-0025](decisions/0025-flow-definition-and-bulk-engine.md)） |
 | `flow-interpreter-lockstep` | 解釈器：足並みの実行、まとめる要素、上限の数え方（足並みの 1 歩）、`fault` |
 | `record-triggered-flows` | 保存の前（3a）・後（7b）のフロー、実行の順、条件、`DT-FLW-001`、`$Origin`（[ADR-0026](decisions/0026-record-triggered-flow-order-and-recursion.md)） |
 | `scheduled-paths-and-async` | 予定の経路（行の書き込み、基準の項目の変更、条件の評価し直し）と非同期の経路（`flow_async_runs`） |
@@ -257,8 +257,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `sandbox-disable-integrations` | 連携・送信・スケジュールを止めて作る |
 | `sandbox-refresh-and-delete` | 再作成と削除 |
 | `package-format-and-retrieve` | パッケージの形式（YAML、JSON Schema、正規化）と書き出し（[ADR-0039](decisions/0039-metadata-package-format.md)） |
-| `deploy-validate` | 検証（名前の解決、差分、仮の版のコンパイル、データへの影響）（[ADR-0040](decisions/0040-deploy-validation-and-rollback.md)） |
-| `deploy-apply` | 適用（ロックの外の行の作成、1 つの版、後の仕事）、書き込みの止まりの計測 |
+| `deploy-validate` | 検証（名前の解決、差分、仮のバージョンのコンパイル、データへの影響）（[ADR-0040](decisions/0040-deploy-validation-and-rollback.md)） |
+| `deploy-apply` | 適用（ロックの外の行の作成、1 つのバージョン、後の仕事）、書き込みの止まりの計測 |
 | `deploy-quick-and-rollback` | すばやいデプロイと戻し |
 | `deploy-between-orgs` | 組織の間の送り受け（画面）と CLI |
 | `deployable-components` | レイアウト・公開のリストビュー・翻訳・レポートの型・レポート・ダッシュボードをデプロイの対象に足す |
@@ -325,7 +325,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- |
 | `namespaces-and-publisher-keys` | 名前空間の登録（予約語の表）、配布者の公開鍵、鍵の失効 |
 | `package-manifest-and-signing` | `package.yaml` の追加の項目と JSON Schema、Ed25519 の署名、インストール先でのビルドのし直し |
-| `package-install-and-upgrade` | インストール・版の上げ（`locked` の部品、`DT-PKG-001`）・削除 |
+| `package-install-and-upgrade` | インストール・バージョンの上げ（`locked` の部品、`DT-PKG-001`）・削除 |
 | `namespace-limit-breakdown` | 名前空間ごとの上限の内訳（`tx_limit_peak_ratio{namespace}`、`<Brand>-Tx-Usage-Ns`、「上限に近い自動化」） |
 
 ### E15 以降（MVP の後）

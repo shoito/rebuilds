@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0026](../decisions/0026-supply-registry-and-document-verification.md) | 事業者・営業所・車両・ドライバーは、事業者が登録し、この基盤が書類を確かめる。配車に出てよいかは、書類・期限・停止・運行枠から求める判定を版つきで持ち、出庫と提案の両方で確かめる。事業者を通さないドライバーの登録の経路は作らない |
+| [0026](../decisions/0026-supply-registry-and-document-verification.md) | 事業者・営業所・車両・ドライバーは、事業者が登録し、この基盤が書類を確かめる。配車に出てよいかは、書類・期限・停止・運行枠から求める判定をバージョンつきで持ち、出庫と提案の両方で確かめる。事業者を通さないドライバーの登録の経路は作らない |
 | [0027](../decisions/0027-rideshare-operating-windows.md) | 日本版ライドシェアの運行枠は、運輸局の通知をもとに事業者が登録し運用が承認するデータにする。同時に稼働する台数は、出庫のトランザクションで事業者 × 営業区域ごとに数えて上限を守る。雨天・酷暑・イベントの拡大は、根拠の記録つきで運行管理者が有効にする |
 
 ## 1. 目的と範囲
@@ -218,7 +218,7 @@ roll_call_records (id, operator_id, driver_id, office_id, kind,  -- 'pre_duty' |
 - 位置が 10 分届かないセッションは、`timeout` で終える（索引の項目の削除と合わせる。[geospatial-index.md](geospatial-index.md) の 4.3 節）。有効な割り当てがある間は終えない。
 - 点呼は事業者の責任で、この基盤は記録を受け取るだけにする。受け取り方は、管理画面での入力か、事業者の点呼の仕組みからの API。
 
-### 4.3 判定の版と配信
+### 4.3 判定のバージョンと配信
 
 - ドライバー・車両・書類・停止・許可・運行枠・稼働の台数のどれかが変わったら、影響するオンラインのセッションの判定をやり直し、`eligibility_ver` を 1 増やす。
 - 変化は outbox で `supply.session_changed`（`driver_id`、`session_id`、`eligibility_ver`、オンラインか、サービスの種類、車両の種類、席の数、事業者・営業所、`location_untrusted`、配車に出てよいか）として配る。索引は `eligibility_ver` の大きい事象だけを適用する（[geospatial-index.md](geospatial-index.md) の 4.2 節）。
@@ -388,7 +388,7 @@ L(t)     = base(t) + wx(t) + ev(t)
 
 | ADR | 決定 |
 | --- | --- |
-| [0026](../decisions/0026-supply-registry-and-document-verification.md) | 事業者・営業所・車両・ドライバーの登録と書類の確認、配車に出てよいかの版つきの判定 |
+| [0026](../decisions/0026-supply-registry-and-document-verification.md) | 事業者・営業所・車両・ドライバーの登録と書類の確認、配車に出てよいかのバージョンつきの判定 |
 | [0027](../decisions/0027-rideshare-operating-windows.md) | 日本版ライドシェアの運行枠のデータ、出庫での台数の上限、雨天・酷暑・イベントの拡大 |
 
 ## 12. Story の候補

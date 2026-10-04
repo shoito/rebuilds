@@ -497,7 +497,7 @@ DT-INFRA-003 の 1・2 行に当たる任意のルートモジュールについ
 
 ```
 systems/slack/infra/
-├── .terraform-version          # Terraform のバージョンを固定する（1.11 以上。use_lockfile の GA の版は 未検証）
+├── .terraform-version          # Terraform のバージョンを固定する（1.11 以上。use_lockfile の GA のバージョンは 未検証）
 ├── .tflint.hcl  .checkov.yaml
 ├── modules/
 │   ├── state-bucket/           # バケット、KMS キー、ポリシー

@@ -11,7 +11,7 @@ date: 2026-09-27
 
 本家の形（いずれも 2026-09-27 に確認）：
 
-- ファイル・ノード・画像（描画）・画像の塗り・コメント・版・プロジェクト・Webhook などのリソース。中身の書き込みはない（[File endpoints](https://developers.figma.com/docs/rest-api/file-endpoints/)）。
+- ファイル・ノード・画像（描画）・画像の塗り・コメント・バージョン・プロジェクト・Webhook などのリソース。中身の書き込みはない（[File endpoints](https://developers.figma.com/docs/rest-api/file-endpoints/)）。
 - 認証は OAuth のアプリ（推奨）、組織のトークン（Organization・Enterprise、期限は最大 1 年、資源の許可リスト）、個人のアクセストークン（[Authentication](https://developers.figma.com/docs/rest-api/authentication/)）。
 - OAuth は認可コードだけで、PKCE（S256）は任意。認可コードは 30 秒で切れ、アクセストークンは既定で 90 日。アプリは下書き・private（審査なし）・public（審査あり）（[OAuth apps](https://developers.figma.com/docs/rest-api/oauth-apps/)）。
 - スコープは細かく分かれ、権限を広げない。利用者が読めるファイルだけを読める（[Scopes](https://developers.figma.com/docs/rest-api/scopes/)）。

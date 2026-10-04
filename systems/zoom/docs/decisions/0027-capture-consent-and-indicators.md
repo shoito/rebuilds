@@ -29,9 +29,9 @@ date: 2026-09-27
 2 を採用する。詳細は [recording-and-transcription.md](../architecture/recording-and-transcription.md) の 7 節と 10 節。
 
 - **状態**：録画（`off`・`starting`・`on`・`paused`・`stopping`・`failed`）と文字起こし（`off`・`on`）は Actor の状態に入れ、全員に配る。待合室の人にも録画中であることだけを示す。
-- **表示**：クライアントは `hello` で `capture_indicator.v1` を申告する。申告しない版は、録画か文字起こしが動いている会議に入れない。入った後に動き出したら、その接続を閉じる（ban にはしない）。
+- **表示**：クライアントは `hello` で `capture_indicator.v1` を申告する。申告しないバージョンは、録画か文字起こしが動いている会議に入れない。入った後に動き出したら、その接続を閉じる（ban にはしない）。
 - **同意**：
-  - 動いている種類（`recording`・`transcription`）ごとに、本人の同意の記録が要る。記録は Aurora に書いてから配る。表示した文言の版も残す。
+  - 動いている種類（`recording`・`transcription`）ごとに、本人の同意の記録が要る。記録は Aurora に書いてから配る。表示した文言のバージョンも残す。
   - 記録がない人の `self.update{muted:false}`・`video:true`・`share.request` を、Actor が `consent_required` で拒否する。Media Node の producer は `paused` のままにする。
   - Recorder・Transcriber の購読に、同意していない人の producer を入れない。
 - **E2EE**：開始を 3 か所で拒否する。API（`auto_recording`・`auto_captions` を E2EE の会議に付けられない）、Actor（`e2ee_incompatible`）、Media Node（`e2ee: true` の router に `rec_…`・`asr_…` の受け手を作らない）。
@@ -42,7 +42,7 @@ date: 2026-09-27
 
 - 良くなること：
   - 同意していない人の音声と映像が、録画・文字起こしに入らない。改造したクライアントでも、Media Node で止まる。
-  - 同意の記録が、本人の操作と文言の版に結び付く。
+  - 同意の記録が、本人の操作と文言のバージョンに結び付く。
   - L3 の結論が「残れば同意」でも「明示の同意」でも、文言と画面の差し替えで対応できる（2 は厳しい方に合わせている）。
 - 引き受けるコスト：
   - 録画中の会議に入った人は、1 回の操作をしないと話せない。途中で録画が始まると、全員が 1 回押す必要がある。

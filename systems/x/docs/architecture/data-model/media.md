@@ -1,6 +1,6 @@
 # Data model: メディア
 
-メディアの正本、分割のアップロード、変換の版、自前の PDQ の一覧、照合の結果、配信の停止の進み。振る舞いは [media.md](../media.md)、決定は [ADR-0032](../../decisions/0032-media-upload-and-processing.md)（アップロードと変換）、[ADR-0033](../../decisions/0033-media-delivery-and-takedown.md)（配信と停止）、[ADR-0034](../../decisions/0034-media-hash-matching.md)（ハッシュの照合）にある。S3 の置き場と CloudFront KeyValueStore の形は [stores.md](stores.md) の 4 節。規約は [data-model.md](../data-model.md) の 3 節。
+メディアの正本、分割のアップロード、変換のバージョン、自前の PDQ の一覧、照合の結果、配信の停止の進み。振る舞いは [media.md](../media.md)、決定は [ADR-0032](../../decisions/0032-media-upload-and-processing.md)（アップロードと変換）、[ADR-0033](../../decisions/0033-media-delivery-and-takedown.md)（配信と停止）、[ADR-0034](../../decisions/0034-media-hash-matching.md)（ハッシュの照合）にある。S3 の置き場と CloudFront KeyValueStore の形は [stores.md](stores.md) の 4 節。規約は [data-model.md](../data-model.md) の 3 節。
 
 ## 1. ER 図
 
@@ -146,7 +146,7 @@ erDiagram
 
 ### 2.3 `media_variants`
 
-変換の後の版（[media.md](../media.md) の 5・6 節）。
+変換の後のバージョン（[media.md](../media.md) の 5・6 節）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

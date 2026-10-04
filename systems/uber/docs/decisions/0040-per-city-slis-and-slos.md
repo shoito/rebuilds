@@ -52,7 +52,7 @@ date: 2026-09-27
   - 1 都市の障害が、その都市の SLO に現れる。
 - 引き受けるコスト：
   - サービスごとに良い・悪いの事象を数える計装が要る（共通の部品で持つ）。
-  - `state_delivery` と `offer_delivery` は、アプリの受信の確認に依る。アプリの版の不具合が SLO を食いうる。
+  - `state_delivery` と `offer_delivery` は、アプリの受信の確認に依る。アプリのバージョンの不具合が SLO を食いうる。
 
 ## Confirmation
 

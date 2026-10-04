@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-04
 ---
 
-# ADR-0014: 内部の iTIP のメッセージは受け手に見せてよい形の予定オブジェクトの全体を運び、新旧を `(SEQUENCE, 主催者の版)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に場所と参加者の削除を足して上げ、日時が変わったら出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる
+# ADR-0014: 内部の iTIP のメッセージは受け手に見せてよい形の予定オブジェクトの全体を運び、新旧を `(SEQUENCE, 主催者のバージョン)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に場所と参加者の削除を足して上げ、日時が変わったら出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる
 
 ## Context
 
@@ -34,7 +34,7 @@ date: 2026-10-04
 1 と a を採用する。詳細は [invitations-and-itip.md](../architecture/invitations-and-itip.md) の 5・6 節。
 
 - 内部の `REQUEST` は、受け手に見せてよい形（`can_see_other_guests` を当てたもの）の予定オブジェクトの全体を運ぶ。回だけの参加者には、その回だけを運ぶ。256 KiB を超えたら S3 に置く。
-- 内部の新旧は `(SEQUENCE, 主催者の版)` で決める。主催者の版は変更ごとに 1 ずつ増え、時計に左右されない。外部とのやりとりは RFC 5546 の 2.1.5 節の `(SEQUENCE, DTSTAMP)` に従い、回のメッセージは系列の `SEQUENCE` より小さければ捨てる。
+- 内部の新旧は `(SEQUENCE, 主催者のバージョン)` で決める。主催者のバージョンは変更ごとに 1 ずつ増え、時計に左右されない。外部とのやりとりは RFC 5546 の 2.1.5 節の `(SEQUENCE, DTSTAMP)` に従い、回のメッセージは系列の `SEQUENCE` より小さければ捨てる。
 - `SEQUENCE` を上げる：DTSTART・DTEND・DURATION・TZID・RRULE・RDATE・EXDATE・STATUS（RFC 5546 の 2.1.4 節）、LOCATION と参加者の削除（[ADR-0006](0006-organizer-and-attendee-copies.md)）。タイトル・説明・参加者の追加・出欠・tzdb の計算し直しでは上げない。
 - DTSTART・DTEND・DURATION・TZID・RRULE・RDATE の変更では、主催者以外の人の参加者の出欠を `needs_action` に戻し、`reset_sequence` を記録する。会議室は排他の制約で決め直す。
 - 返事は、参加者と回ごとに `(reply_sequence, reply_dtstamp)` の新しいものが勝つ。`reply_sequence < reset_sequence` の返事は捨て、最新の `REQUEST` を送り直す。

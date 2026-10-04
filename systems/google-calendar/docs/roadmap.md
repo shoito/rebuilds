@@ -2,7 +2,7 @@
 
 ## 進め方の原則
 
-- **最初に walking skeleton を通す。** E1〜E3 で、`packages/writer`・変更のログ・展開の索引・`packages/recurrence`・`packages/tz` を端から端まで貫き、繰り返しの予定を API で作って、Web の画面と CalDAV のクライアントの両方で同じ回が同じ時刻に出るところまで作ってから、機能を広げる。参照との性質ベーステスト、tzdb の版の差分の試験、FORCE RLS、変更のログを通らない書き込みの禁止は、E1〜E3 から本物の形で作る。後から足すと直せないため。
+- **最初に walking skeleton を通す。** E1〜E3 で、`packages/writer`・変更のログ・展開の索引・`packages/recurrence`・`packages/tz` を端から端まで貫き、繰り返しの予定を API で作って、Web の画面と CalDAV のクライアントの両方で同じ回が同じ時刻に出るところまで作ってから、機能を広げる。参照との性質ベーステスト、tzdb のバージョンの差分の試験、FORCE RLS、変更のログを通らない書き込みの禁止は、E1〜E3 から本物の形で作る。後から足すと直せないため。
 - **PoC を先に済ませる。** 次の PoC は、それぞれの Epic の Story の spec を承認する前に結果を記録する。
   - E2 の前：展開の索引の行の数と書き込みの量（`occurrence-index-poc`）、1 カレンダーの書き込みの上限（`calendar-write-throughput-poc`。1 秒 50 件）、参照の実装の選定（`recurrence-reference-survey`）。
   - E6 の前：会議室の排他の制約の書き込みの速さ（`room-exclusion-poc`）、空き時間のキャッシュの形と 50 人＋会議室 20 の探索の速さ（`freebusy-poc`）。
@@ -21,7 +21,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- | --- |
 | E1 基盤 | AWS・Terraform・CI（3 つの `TZ`、性質ベーステストの枠）、Aurora と RLS、`packages/writer` と変更のログの骨格、フラグ、可観測性、監査ログ、大阪の骨格 | 設計中 |
 | E2 予定と繰り返しの核 | 予定オブジェクト、`packages/ical`、`packages/recurrence`、例外と「これ以降」、展開の索引、参照との性質ベーステスト | 未着手（前に索引・書き込み・参照の PoC） |
-| E3 タイムゾーンと祝日 | `packages/tz`・`packages/tzdata`、tzdb の版の更新の流れと再計算、浮動・終日、日本の祝日のカレンダー | 未着手（祝日のカレンダーの公開は法務：L7） |
+| E3 タイムゾーンと祝日 | `packages/tz`・`packages/tzdata`、tzdb のバージョンの更新の流れと再計算、浮動・終日、日本の祝日のカレンダー | 未着手（祝日のカレンダーの公開は法務：L7） |
 | E4 アカウント・組織・共有 | 個人と組織、SSO、ディレクトリ、カレンダー、ACL と公開範囲、`can()`・`redact()`、組織の共有の方針、委任。最後に SCIM（MVP） | 未着手（個人から組織への移りの同意の文面は法務：L1） |
 | E5 招待と出欠 | 参加者の写し、内部の iTIP の配送、出欠、グループの招待、写しの照合、iMIP の送受信 | 未着手（外部への iMIP は法務：L1・L2・L3） |
 | E6 空き時間と会議室 | 空き時間の照会と候補の計算、会議室のディレクトリと自動の承諾、排他の制約 | 未着手（前に会議室と空き時間の PoC） |
@@ -77,7 +77,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ical-parser-writer` | `packages/ical`：行の折り返し、エスケープ、VTIMEZONE、知らないプロパティの保存、上限（ADR-0007） |
 | `ingress-limits` | 上限の表、隔離の worker thread、DT-SEC-001（ADR-0040） |
 | `ical-escaping` | 書き出しのエスケープとメールのヘッダー（PROP-SEC-001・002） |
-| `event-object-model` | 予定オブジェクトとマスター・上書き、版、時刻の種類の列、予定の種類、`detached_fields` |
+| `event-object-model` | 予定オブジェクトとマスター・上書き、バージョン、時刻の種類の列、予定の種類、`detached_fields` |
 | `recurrence-validate` | 受け付けの検査と上限（DT-REC-001） |
 | `recurrence-expand` | `packages/recurrence` の `expand()`（ADR-0008） |
 | `recurrence-reference-prop-tests` | 参照との性質ベーステストの枠、生成器、回帰のシード（PROP-REC-001・005・008） |
@@ -95,16 +95,16 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `tzdata-package` | IANA の tzdb を zic で遷移の表にし、版を固定する。別名と `windowsZones`。署名の鍵の指紋の固定。Web のクライアントへのゾーンごとの配布 |
+| `tzdata-package` | IANA の tzdb を zic で遷移の表にし、バージョンを固定する。別名と `windowsZones`。署名の鍵の指紋の固定。Web のクライアントへのゾーンごとの配布 |
 | `tz-resolve` | `packages/tz` の `resolve`・`toLocal`、存在しない時刻・2 回ある時刻（PROP-TZ-001） |
 | `floating-and-all-day` | 浮動と終日の派生の値、カレンダーのタイムゾーンの変更での作り直し |
 | `tzid-aliases-and-windows-zones` | 外から来る TZID の 7 段の解き方（ADR-0013。DT-TZ-001、PROP-TZ-005） |
 | `vtimezone-export` | VTIMEZONE の書き出し |
-| `tzdata-diff-report` | 版の差分の報告を CI で作る |
+| `tzdata-diff-report` | バージョンの差分の報告を CI で作る |
 | `tzdata-watch-and-rollout` | `tzdata-watch`、署名の確かめ、差分の報告の PR、`/tzdata/<version>/` の配置 |
 | `tzdata-runtime-switch` | AppConfig の `tzdata.active_version` の切り替え、`tzdata_active_version` の報告、切り替えの完了の判定（ADR-0049） |
 | `tzdata-recompute-job` | 再計算のジョブ（会議室の予約の行を先に、施行の近い順）、切り替えの窓、`conflict_tz_pending` の判定し直し（ADR-0012。DT-TZ-002、PROP-TZ-002〜004） |
-| `tzdata-version-telemetry` | 古い版の行、版の不一致、未採用の指標 |
+| `tzdata-version-telemetry` | 古いバージョンの行、バージョンの不一致、未採用の指標 |
 | `tzdata-external-update` | 外部の参加者への同じ `SEQUENCE` の `REQUEST` |
 | `room-needs-review` | tzdb の計算し直しでの会議室の要確認（ADR-0020。PROP-ROOM-004） |
 | `tzdata-version-tests` | 過去の改正の集まりと合成の改正の試験 |
@@ -223,7 +223,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `reminder-burst-poc` | PoC：毎時 50 分 00 秒の集中（約 12 万件）での時計と notifier |
 | `reminder-settings` | リマインダーの設定、VALARM の対応（DT-REM-003） |
-| `reminder-buckets` | 計画の表、7 日の範囲、付け替えと版（ADR-0030。DT-REM-001・002、PROP-REM-004） |
+| `reminder-buckets` | 計画の表、7 日の範囲、付け替えとバージョン（ADR-0030。DT-REM-001・002、PROP-REM-004） |
 | `reminder-timer-wheel` | シャードごとのタイマーホイール、借りと交代（ADR-0029） |
 | `reminder-delivery-ledger` | 送信の記録と重複の除去、遅れすぎたものの扱い、送る時の確かめ（PROP-REM-001〜003） |
 | `reminder-reconciliation` | 送り漏れの照合 |
@@ -285,7 +285,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 - **契約（予定オブジェクトの形、変更のログとトークンの形、`redact()` の決定表、公開 API の形、Webhook のヘッダー）の確定**：クライアントと外部に配った後に変えるコストが最も高い。
 - **参照との食い違いの許可リストへの追加**：QA が判断する。
-- **tzdb の版の採用の判断**：差分の報告を見て Dev と Ops が判断する。施行の日が近い改正の急ぎの採用も同じ。
+- **tzdb のバージョンの採用の判断**：差分の報告を見て Dev と Ops が判断する。施行の日が近い改正の急ぎの採用も同じ。
 - **会議室の重なりや写しの食い違いを直すための、データの直接の書き換え**：Dev のテックリードと Ops が判断し、`packages/writer` を通す。
 - **大阪への切り替えの判断、`sync_epoch` の更新**：IC と Ops の責任者。
 - **法務の判断**（L1〜L10）。

@@ -2,10 +2,10 @@
 
 宣言的な自動化の設計：フロー（保存の前・保存の後・スケジュール・画面）、入力規則、積み上げ集計（主従）、承認のプロセス、再帰の制御、上限との結合。土台は [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)（上限。フローの要素の実行 2,000、入れ子 16）、[ADR-0008](../decisions/0008-dml-order-of-execution.md)（DML の 13 の手順）、[ADR-0009](../decisions/0009-formula-language-and-evaluator.md)（数式の言語）。この文書は ADR-0008 の手順に**合わせて**書き、手順を変えない。この文書で決めたことは、次の 4 つの ADR にある。
 
-- フローは、版を持つ JSON のグラフで定義し、自前の解釈器で動かす。200 件の塊の全ての実行（インタビュー）を足並みをそろえて進め、問い合わせと DML の要素を塊でまとめて 1 回にする。要素の実行の数は、足並みの 1 歩を 1 と数える（[ADR-0025](../decisions/0025-flow-definition-and-bulk-engine.md)）。
+- フローは、バージョンを持つ JSON のグラフで定義し、自前の解釈器で動かす。200 件の塊の全ての実行（インタビュー）を足並みをそろえて進め、問い合わせと DML の要素を塊でまとめて 1 回にする。要素の実行の数は、足並みの 1 歩を 1 と数える（[ADR-0025](../decisions/0025-flow-definition-and-bulk-engine.md)）。
 - レコードの変更で動くフローは、ADR-0008 の手順 3a（保存の前）・7b（保存の後）・13（確定の後の非同期の経路）と、予定の経路（時刻で動く）に置く。同じオブジェクトのフローは実行の順の番号で並べ、同じフローは同じトランザクションで同じレコードに 1 回だけ動く（[ADR-0026](../decisions/0026-record-triggered-flow-order-and-recursion.md)）。
 - 積み上げ集計は、子の変更から親の値を差分で直し、最小・最大の値が外れた時だけ親の子を集計し直す。値は正本の子から作れる写しとして、整合の検査で差を 0 に保つ。値は、集計する子の項目も読める人にだけ返す（[ADR-0027](../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md)）。
-- 承認は、プロセスの版・申請のインスタンス・承認の作業の項目の 3 つの状態で持ち、1 つの応答を 1 つのトランザクションにする。申請中のレコードはロックの表で守り、承認者にアクセスを与えない（[ADR-0028](../decisions/0028-approval-processes-and-record-locks.md)）。
+- 承認は、プロセスのバージョン・申請のインスタンス・承認の作業の項目の 3 つの状態で持ち、1 つの応答を 1 つのトランザクションにする。申請中のレコードはロックの表で守り、承認者にアクセスを与えない（[ADR-0028](../decisions/0028-approval-processes-and-record-locks.md)）。
 
 本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。本家のフローの実行系は使わない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
@@ -13,7 +13,7 @@
 
 | 範囲に含む | 範囲に含まない（担当の領域） |
 | --- | --- |
-| フローの定義の形、版、有効化、要素の種類 | 数式の言語の文法と評価器（[metadata-and-runtime.md](metadata-and-runtime.md) の 7 節） |
+| フローの定義の形、バージョン、有効化、要素の種類 | 数式の言語の文法と評価器（[metadata-and-runtime.md](metadata-and-runtime.md) の 7 節） |
 | 保存の前・後のフロー、予定の経路、非同期の経路、スケジュールのフロー、画面のフロー | DML の手順そのもの（[metadata-and-runtime.md](metadata-and-runtime.md) の 6 節、ADR-0008） |
 | 入力規則（手順 4） | 重複の規則（手順 5。[sales-objects.md](sales-objects.md) の 6 節） |
 | 積み上げ集計（手順 8） | 共有の評価（手順 10。[sharing-and-record-access.md](sharing-and-record-access.md)） |
@@ -35,13 +35,13 @@
 | 保存の前のフロー | 起動したレコードの項目だけを変えられ、2 回目の DML と再帰の保存を避けるので速い。他のレコードの変更と送信は保存の後のフロー | [Record-Triggered Automation](https://architect.salesforce.com/docs/architect/decision-guides/guide/record-triggered.html)（Architect の判断の手引き） |
 | 再帰 | 同じフローが自分の更新で再び動くことを、項目の前後の値の比べで防ぐよう勧める。同じトランザクションで何回動くかの規則は公開の資料に書かれていない（未検証。E6 の `record-triggered-flows` で試用の組織で確かめる） | 同上 |
 | スケジュールのフロー | 24 時間の実行の数は 25 万か「ライセンスの数 × 200」の大きい方。1 つのフローで 25 万。取得した 1 件が 1 つの実行 | [Schedule-Triggered Flow Limits and Considerations](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_trigger_schedule.htm&type=5)（2026-09-28 に確認） |
-| 1 トランザクションの上限 | フローは Apex の上限（問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10 秒）に従い、超えると `fault` の経路があってもトランザクション全体を巻き戻す。フローの要素の数の上限（2,000）は API の版 57.0 でなくした。1 つのフローの版は 50 まで。有効なフローはフローの種類ごとに 2,000 まで | [Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)（2026-09-28 に確認） |
+| 1 トランザクションの上限 | フローは Apex の上限（問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10 秒）に従い、超えると `fault` の経路があってもトランザクション全体を巻き戻す。フローの要素の数の上限（2,000）は API のバージョン 57.0 でなくした。1 つのフローのバージョンは 50 まで。有効なフローはフローの種類ごとに 2,000 まで | [Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)（2026-09-28 に確認） |
 | 承認 | 1 つのプロセスは 30 段まで、1 段の承認者は 25 まで。複数の承認者は全員一致か最初の応答。却下は申請の却下か前の承認者へ戻す。申請中のレコードはロックし、編集できるのは管理者か、管理者と今の承認者。申請者の取り消しを許すか選べる。承認後もロックを保つか選べる | MDAPI の ApprovalProcess |
 | 承認の数の上限 | 有効なプロセスは組織で 1,000、1 オブジェクトで 300。全体で 2,000、1 オブジェクトで 500 | [Classic Approval Processes Limits](https://help.salesforce.com/s/articleView?id=platform.approvals_limits.htm&type=5)（2026-09-28 に確認） |
 | 積み上げ集計の数 | 1 オブジェクト 25 が既定で、依頼で 40 まで | [Increase the Maximum Limit of Roll-Up Summary Fields](https://help.salesforce.com/s/articleView?id=000386702&type=1)（2026-09-28 に確認） |
 | 入力規則の数 | 1 オブジェクトで有効なもの Enterprise・Developer 100、Unlimited・Performance 500。エディションの変更でだけ増やせる | [Increase the Active Validation Rules Limit](https://help.salesforce.com/s/articleView?id=000383591&type=1)（2026-09-28 に確認） |
 
-## 3. フローの定義と版（ADR-0025）
+## 3. フローの定義とバージョン（ADR-0025）
 
 ### 3.1 形
 
@@ -67,8 +67,8 @@
 
 - 式は全て数式の言語（ADR-0009）で書く。項目は保存の時に `field_id` に束縛し、名前の変更で壊れない。
 - フローは `md_flows`（`flow_id`、`api_name`、`type`、`active_version_id`）と `md_flow_versions`（`version_id`、`definition`、`status`：`draft`・`active`・`obsolete`）に持つ。
-- **有効化は、メタデータの版を 1 つ上げる。** 有効な版は、レコードの変更で動くフローなら `object:<object_id>` の部品の「フローの呼び出しの表」に入る（ADR-0007）。1 つの要求は 1 つの版に固定されるので、1 つの保存の途中で古い版と新しい版のフローが混ざらない。
-- 画面のフローと予定の経路は、実行を始めた時の版を最後まで使う（`flow_interviews.version_id`、`flow_scheduled_actions.version_id`）。それらが参照する版は、`obsolete` でも消さない。
+- **有効化は、メタデータのバージョンを 1 つ上げる。** 有効なバージョンは、レコードの変更で動くフローなら `object:<object_id>` の部品の「フローの呼び出しの表」に入る（ADR-0007）。1 つの要求は 1 つのバージョンに固定されるので、1 つの保存の途中で古いバージョンと新しいバージョンのフローが混ざらない。
+- 画面のフローと予定の経路は、実行を始めた時のバージョンを最後まで使う（`flow_interviews.version_id`、`flow_scheduled_actions.version_id`）。それらが参照するバージョンは、`obsolete` でも消さない。
 - 有効化の時に検査する：式の型、到達できない要素、出口のない輪（`loop` 以外の戻り）、保存の前のフローでの禁止の要素、項目の FLS に関わらない構造の誤り。
 
 ### 3.2 要素
@@ -194,7 +194,7 @@ while まだ終わっていない実行がある:
 | 2 | 保存（最上位・入れ子） | 保存の前・後 | 動いていない | 条件を評価して動かす |
 | 3 | 入れ子の保存 | 入力規則・システムの検証・重複の規則 | - | 毎回行う（フローと違い、何度でも） |
 | 4 | 入れ子の保存 | 積み上げ集計 | - | 毎回行う（値が変わった時だけ親を保存） |
-| 5 | 非同期の経路 | 保存の後の非同期の経路 | 同じ `(版, レコード, 起動したトランザクション)` で動いた | 動かさない（再送での重複を防ぐ。5.5 節） |
+| 5 | 非同期の経路 | 保存の後の非同期の経路 | 同じ `(バージョン, レコード, 起動したトランザクション)` で動いた | 動かさない（再送での重複を防ぐ。5.5 節） |
 | 6 | 入れ子の深さ 17 | - | - | 全体を巻き戻す（ADR-0005） |
 
 - 行 1 は ADR-0008 の「同じフローは、同じトランザクションで同じレコードに対して 1 回しか動かない」をそのまま書いたもの。
@@ -268,9 +268,9 @@ while まだ終わっていない実行がある:
 
 ### 7.4 定義の作成・変更
 
-- 積み上げ集計の作成・変更（集計、項目、条件）は、メタデータの版を上げ、項目を `building` にする。Worker が親の ID の範囲（1 万件）ごとに集計し直して書く。
+- 積み上げ集計の作成・変更（集計、項目、条件）は、メタデータのバージョンを上げ、項目を `building` にする。Worker が親の ID の範囲（1 万件）ごとに集計し直して書く。
 - `building` の間、その項目の値は読みで空を返し、記述に `state: building` を返す。条件に使う問い合わせは、ピボットを使わない（型の変換の間と同じ。[metadata-and-runtime.md](metadata-and-runtime.md) の 5.2 節）。
-- `building` の間の子の保存は、範囲を済ませた親だけ 7.2 節の差分で直す（共有のルールの版の作成と同じ考え方。[sharing-and-record-access.md](sharing-and-record-access.md) の 7.2 節）。
+- `building` の間の子の保存は、範囲を済ませた親だけ 7.2 節の差分で直す（共有のルールのバージョンの作成と同じ考え方。[sharing-and-record-access.md](sharing-and-record-access.md) の 7.2 節）。
 
 ### 7.5 整合の検査
 
@@ -288,7 +288,7 @@ while まだ終わっていない実行がある:
 ### 8.1 形
 
 ```
-approval_process（object、版、order、active）
+approval_process（object、バージョン、order、active）
  ├─ entry_condition：数式
  ├─ allowed_submitters：owner | users | roles | groups
  ├─ record_editability：admin_only | admin_or_current_approver
@@ -304,7 +304,7 @@ approval_process（object、版、order、active）
 
 - 本家の承認のプロセスの形（MDAPI の ApprovalProcess）に寄せる。30 段・25 の承認者も同じ。
 - 同じオブジェクトに複数の有効なプロセスを持て、`order` の順に入口の条件を評価し、最初に当てはまったものを使う。1 オブジェクトで有効なプロセスは 50 まで、組織で 1,000 まで（本家は 1 オブジェクト 300、組織 1,000。2 節）。
-- 定義は版を持ち、申請のインスタンスは申請した時の版を最後まで使う。
+- 定義はバージョンを持ち、申請のインスタンスは申請した時のバージョンを最後まで使う。
 
 ### 8.2 状態
 
@@ -397,9 +397,9 @@ approval_process（object、版、order、active）
 
 | 上限 | 値 | 本家 |
 | --- | --- | --- |
-| フローの要素の実行（1 トランザクション、足並みの 1 歩で数える） | 2,000（ADR-0005） | 上限なし（API の版 57.0 でなくした。2 節）。本システムは CPU 時間を近似でしか数えないので残す |
-| 1 つのフローの版の要素 | 500 | 未検証 |
-| 1 つのフローの版の数 | 50（古い `obsolete` から消せる。実行中の参照があれば消さない） | 50（2 節） |
+| フローの要素の実行（1 トランザクション、足並みの 1 歩で数える） | 2,000（ADR-0005） | 上限なし（API のバージョン 57.0 でなくした。2 節）。本システムは CPU 時間を近似でしか数えないので残す |
+| 1 つのフローのバージョンの要素 | 500 | 未検証 |
+| 1 つのフローのバージョンの数 | 50（古い `obsolete` から消せる。実行中の参照があれば消さない） | 50（2 節） |
 | 1 オブジェクト・1 手順の有効なレコードの変更のフロー | 50 | 未検証 |
 | 実行の順の番号 | 1〜2,000 | 1〜2,000（MDAPI） |
 | `subflow` の段 | 10 | 未検証 |
@@ -422,7 +422,7 @@ approval_process（object、版、order、active）
 
 | 事象 | 振る舞い |
 | --- | --- |
-| フローの版の有効化の検査をすり抜けた誤り | 実行時のエラーはその保存の失敗になる。`flow_runtime_errors_total{flow}` を数え、1 時間に 100 件を超えたら管理者に知らせる。管理者は版を戻す（前の版の有効化も版を上げる） |
+| フローのバージョンの有効化の検査をすり抜けた誤り | 実行時のエラーはその保存の失敗になる。`flow_runtime_errors_total{flow}` を数え、1 時間に 100 件を超えたら管理者に知らせる。管理者はバージョンを戻す（前のバージョンの有効化もバージョンを上げる） |
 | 予定の経路の Worker が止まる | 行は `pending` で残る。再開で期限の古い順に動かす。遅れが 1 時間を超えたら警告 |
 | 非同期の経路の二重の配信 | `flow_async_runs` で 2 回目を動かさない |
 | 積み上げ集計の差（整合の検査） | 直して数える。保存の経路の不具合として調べる |
@@ -460,10 +460,10 @@ approval_process（object、版、order、active）
 
 | ADR | 決定 |
 | --- | --- |
-| [0025](../decisions/0025-flow-definition-and-bulk-engine.md) | フローは版を持つ JSON のグラフで定義して自前の解釈器で動かす。塊の実行を足並みをそろえて進めて問い合わせと DML をまとめ、要素の実行は足並みの 1 歩で数える。実行の文脈は、レコードの変更は `system`、画面は `user` を既定にする |
+| [0025](../decisions/0025-flow-definition-and-bulk-engine.md) | フローはバージョンを持つ JSON のグラフで定義して自前の解釈器で動かす。塊の実行を足並みをそろえて進めて問い合わせと DML をまとめ、要素の実行は足並みの 1 歩で数える。実行の文脈は、レコードの変更は `system`、画面は `user` を既定にする |
 | [0026](../decisions/0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを ADR-0008 の手順 3a・7b・13 と予定の経路に置き、実行の順の番号で並べる。同じフローは同じレコードに 1 トランザクションで 1 回。予定の経路は同じトランザクションで行を書き、動かす前に条件を評価し直す |
 | [0027](../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md) | 積み上げ集計は子の変更から差分で直し、最小・最大が外れた時だけ集計し直す。集計し直しは取得の行に数えず、子 5 万件を超える親は非同期にする。整合の検査で差を 0 に保ち、集計する子の項目も読める人にだけ返す |
-| [0028](../decisions/0028-approval-processes-and-record-locks.md) | 承認はプロセスの版・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない |
+| [0028](../decisions/0028-approval-processes-and-record-locks.md) | 承認はプロセスのバージョン・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない |
 
 他の領域への依頼：
 
@@ -478,7 +478,7 @@ approval_process（object、版、order、active）
 | E1 | CI：`DT-FLW-001`・`DT-RUS-001`・`DT-APR-*` の表駆動テストの枠。足並みの実行と 1 件ずつの実行の一致の性質ベーステストの枠 |
 | E3 | 保存の手順 2 のロックの確認の差し込み口（承認がなくても空の表で動く） |
 | E6 | 入力規則（手順 4）：全ての規則の評価、最大 20 件のエラー、文言の差し込みの制限 |
-| E6 | フローの定義の形、版、有効化の検査、`object` の部品のフローの呼び出しの表 |
+| E6 | フローの定義の形、バージョン、有効化の検査、`object` の部品のフローの呼び出しの表 |
 | E6 | 解釈器：足並みの実行、まとめる要素、上限の数え方、`fault` |
 | E6 | 保存の前のフロー（手順 3a）と保存の後のフロー（手順 7b）、実行の順、条件、DT-FLW-001。`$Origin` |
 | E6 | 予定の経路（行の書き込み、基準の項目の変更、Worker、条件の評価し直し） |
@@ -533,7 +533,7 @@ approval_process（object、版、order、active）
 
 **runbooks**
 
-- `flow-runtime-errors-spike`：あるフローの実行時のエラーが急に増えた。版を特定し、組織の管理者に知らせる。
+- `flow-runtime-errors-spike`：あるフローの実行時のエラーが急に増えた。バージョンを特定し、組織の管理者に知らせる。
 - `flow-scheduled-actions-lag`：予定の経路の遅れが 1 時間を超えた。
 - `rollup-mismatch`：積み上げ集計の差が見つかった。保存の経路の不具合を調べる。
 - `rollup-stale-backlog`：`rollup_stale` が 1 時間を超えてたまる。

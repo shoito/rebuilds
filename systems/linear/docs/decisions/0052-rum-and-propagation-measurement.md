@@ -29,7 +29,7 @@ RUM の送り先：
 
 1 と a を採用する。詳細は [observability.md](../architecture/observability.md) の 3・6 節。
 
-- 端末は、対数の固定の桶のヒストグラムに集め、60 秒ごとと `visibilitychange` で `sendBeacon` で送る。次元は Action の ID、app、ブラウザ、OS、ワークスペースの大きさの帯、版（直近 3 版）。操作の遅延と伝播は端末の 10% を抜き取る。
+- 端末は、対数の固定の桶のヒストグラムに集め、60 秒ごとと `visibilitychange` で `sendBeacon` で送る。次元は Action の ID、app、ブラウザ、OS、ワークスペースの大きさの帯、バージョン（直近 3 バージョン）。操作の遅延と伝播は端末の 10% を抜き取る。
 - 送るのは数と ID だけで、タイトル・識別子・ワークスペースの ID を送らない。
 - 収集の口はセッションで認証し、端末ごとに絞り、値と次元を確かめる。AMP には少ない次元で、細かな分析は S3 の Parquet と Athena で。
 - Writer は COMMIT の直前の時刻を `sync_outbox.committed_at` に書き、Relay と Gateway が `deltas` の範囲に `c` として運ぶ。`pong` に Gateway の受けと返しの時刻を入れ、端末は NTP と同じ式で時計の差を見積もる。`catch_up`・ブートストラップ・RTT 200ms 超・背景のタブは数えない。

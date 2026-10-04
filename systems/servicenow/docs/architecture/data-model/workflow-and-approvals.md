@@ -1,6 +1,6 @@
 # Data model: フロー・タイマー・承認・レコードのルール
 
-[data-model.md](../data-model.md) の一部。フローの定義と不変の版、実行・ステップ・待ち、一括の処理、共有のタイマー、承認と代理、レコードのルール、外への呼び出しの結果と資格情報、抑えたトリガーを定義する。振る舞い（1 回の進み ＝ 1 トランザクション、実行の状態機械、承認の規則、上限と優先度）は [workflow-engine.md](../workflow-engine.md) を正とする。
+[data-model.md](../data-model.md) の一部。フローの定義と不変のバージョン、実行・ステップ・待ち、一括の処理、共有のタイマー、承認と代理、レコードのルール、外への呼び出しの結果と資格情報、抑えたトリガーを定義する。振る舞い（1 回の進み ＝ 1 トランザクション、実行の状態機械、承認の規則、上限と優先度）は [workflow-engine.md](../workflow-engine.md) を正とする。
 
 - **ノードの効果・実行の状態・タイマーの消化と登録・outbox は 1 つのトランザクションで書く**（[ADR-0004](../../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../../decisions/0015-flow-execution-and-timers.md)）。どの表も `version` の条件付きで更新する。
 - `flow_def`・`flow_version` は NULL の行（組み込みのフロー）を持つ。主キーは `id` だけ（[data-model.md](../data-model.md) の 3.3 節）。
@@ -150,7 +150,7 @@ erDiagram
 
 `record_rule` は図の中でほかの表と線を持たない（辞書のクラスを参照する）。`timer.target_id` は実行・承認のまとまり・計時の行・呼び出し・一括の処理のどれかを指す（外部キーなし）。
 
-## 2. フローの定義と版
+## 2. フローの定義とバージョン
 
 ### 2.1 `flow_def`
 
@@ -163,8 +163,8 @@ erDiagram
 | `name` | `text` | NOT NULL | — | |
 | `kind` | `text` | NOT NULL | — | `flow`・`subflow` |
 | `draft` | `jsonb` | NULL | — | 編集中の文書（`FlowDocument`） |
-| `active_version_id` | `uuid` | NULL | — | 動かす版（→ `flow_version`） |
-| `trigger_kind` | `text` | NULL | — | 有効な版から写す：`record_created`・`record_updated`・`record_created_or_updated`・`schedule`・`manual`・`api`・`subflow`・`catalog_fulfillment` |
+| `active_version_id` | `uuid` | NULL | — | 動かすバージョン（→ `flow_version`） |
+| `trigger_kind` | `text` | NULL | — | 有効なバージョンから写す：`record_created`・`record_updated`・`record_created_or_updated`・`schedule`・`manual`・`api`・`subflow`・`catalog_fulfillment` |
 | `trigger_table_id` | `uuid` | NULL | — | レコードのトリガーの対象のクラス（祖先を含めて照合する） |
 | `run_as` | `text` | NOT NULL | `'flow_owner_role'` | `flow_owner_role`・`system_declared`（`tenant_admin` と `acl_admin` の両方の承認） |
 | `owner_role_id` | `uuid` | NULL | — | → `role` |
@@ -178,7 +178,7 @@ erDiagram
 
 ### 2.2 `flow_version`
 
-公開した不変の版。DB のロールで `UPDATE` を与えない。定義元：同じ文書の 3.4・3.5 節、[ADR-0014](../../decisions/0014-flow-dsl-and-versioning.md)。
+公開した不変のバージョン。DB のロールで `UPDATE` を与えない。定義元：同じ文書の 3.4・3.5 節、[ADR-0014](../../decisions/0014-flow-dsl-and-versioning.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -189,13 +189,13 @@ erDiagram
 | `document` | `jsonb` | NOT NULL | — | 公開の時の `FlowDocument`（ノード 200 まで） |
 | `compiled` | `jsonb` | NOT NULL | — | コンパイル済みの形。サブフローの呼び出しは `flow_version_id` を固定して書き込む |
 | `content_hash` | `bytea` | NOT NULL | — | |
-| `engine_schema` | `integer` | NOT NULL | — | DSL の意味の版 |
+| `engine_schema` | `integer` | NOT NULL | — | DSL の意味のバージョン |
 | `published_at` | `timestamptz` | NOT NULL | `now()` | |
 | `published_by` | `uuid` | NULL | — | 組み込みは NULL |
 
 - キー：PK `(id)`。UK `(flow_def_id, version_no)`。FK `flow_def_id` → `flow_def(id)`。
-- 動いている実行が使っている版は消さない。完了した実行の保持（90 日）の後、使われていない古い版を消せる。
-- 保持：メタデータ。S1 の量：全体で数十万行（1 版 平均 20 KB）。
+- 動いている実行が使っているバージョンは消さない。完了した実行の保持（90 日）の後、使われていない古いバージョンを消せる。
+- 保持：メタデータ。S1 の量：全体で数十万行（1 バージョン 平均 20 KB）。
 
 ## 3. 実行
 
@@ -207,7 +207,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
-| `flow_version_id` | `uuid` | NOT NULL | — | 開始の時の版に固定（→ `flow_version`。組み込みは NULL の行） |
+| `flow_version_id` | `uuid` | NOT NULL | — | 開始の時のバージョンに固定（→ `flow_version`。組み込みは NULL の行） |
 | `state` | `text` | NOT NULL | `'pending'` | `pending`・`running`・`waiting`・`completed`・`failed`・`cancelled` |
 | `version` | `bigint` | NOT NULL | `1` | タイマーの `target_version` と比べる |
 | `trigger_table_id`・`trigger_record_id` | `uuid` | NULL | — | レコードのトリガーのとき |
@@ -225,7 +225,7 @@ erDiagram
 | `error` | `jsonb` | NULL | — | |
 
 - キー：PK `(tenant_id, id)`。FK `flow_version_id` → `flow_version(id)`（`check_shared_ref()`）、`(tenant_id, parent_run_id)` → `flow_run`。
-- 索引：`(tenant_id, trigger_record_id) WHERE state IN ('pending','running','waiting')` — レコードの削除・取り消しでの実行の取り消し。`(tenant_id, flow_version_id) WHERE state IN (...)` — 版の削除の可否、一括の取り消し。`(tenant_id, parent_run_id)` — 子の実行の取り消し。`(tenant_id, state, started_at) WHERE state IN (...)` — 止まった実行の回収（INV-FLOW-001。毎分）と、テナントの終わっていない実行の数（50 万まで）。`(ended_at) WHERE ended_at IS NOT NULL` — 90 日の削除のジョブ。
+- 索引：`(tenant_id, trigger_record_id) WHERE state IN ('pending','running','waiting')` — レコードの削除・取り消しでの実行の取り消し。`(tenant_id, flow_version_id) WHERE state IN (...)` — バージョンの削除の可否、一括の取り消し。`(tenant_id, parent_run_id)` — 子の実行の取り消し。`(tenant_id, state, started_at) WHERE state IN (...)` — 止まった実行の回収（INV-FLOW-001。毎分）と、テナントの終わっていない実行の数（50 万まで）。`(ended_at) WHERE ended_at IS NOT NULL` — 90 日の削除のジョブ。
 - CHECK：`state IN (...)`、`(state IN ('completed','failed','cancelled')) = (ended_at IS NOT NULL)`、`cause_depth <= 5`。
 - 保持：完了の後 90 日（長く続く実行は終わるまで）。S1 の量：動いている約 100 万行、90 日分で約 2,000 万行。
 
@@ -335,7 +335,7 @@ erDiagram
 | `run_id` | `uuid` | NOT NULL | — | |
 | `node_id` | `text` | NOT NULL | — | |
 | `iteration` | `integer` | NOT NULL | `0` | |
-| `target_table_id`・`target_record_id` | `uuid` | NOT NULL | — | 承認の対象（変更、要求の品目、記事の版、パッケージの適用など） |
+| `target_table_id`・`target_record_id` | `uuid` | NOT NULL | — | 承認の対象（変更、要求の品目、記事のバージョン、パッケージの適用など） |
 | `rule` | `text` | NOT NULL | — | `any`・`all`・`all_responded_any_approves`・`percent`・`count` |
 | `rule_param` | `integer` | NULL | — | `percent` の p、`count` の k |
 | `reject_rule` | `text` | NULL | — | NULL は規則の既定 |
@@ -344,8 +344,8 @@ erDiagram
 | `due_at` | `timestamptz` | NULL | — | `approval_due` のタイマー |
 | `on_due` | `text` | NOT NULL | `'reject'` | `reject`・`cancel`・`escalate`・`approve` |
 | `escalated` | `boolean` | NOT NULL | `false` | `escalate` は 1 回だけ |
-| `policy_rule_id`・`policy_rule_version` | `uuid`・`bigint` | NULL | — | 変更の承認の方針で使った `change_approval_policy_rule` の行と版（既定なら NULL） |
-| `binding` | `jsonb` | NULL | — | 結び付けの条件（禁止期間の例外：変更の `version` と衝突の内容のハッシュ。記事の版：`content_hash`） |
+| `policy_rule_id`・`policy_rule_version` | `uuid`・`bigint` | NULL | — | 変更の承認の方針で使った `change_approval_policy_rule` の行とバージョン（既定なら NULL） |
+| `binding` | `jsonb` | NULL | — | 結び付けの条件（禁止期間の例外：変更の `version` と衝突の内容のハッシュ。記事のバージョン：`content_hash`） |
 | `created_at`・`decided_at` | `timestamptz` | | | |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, run_id, node_id, iteration)`（同じノードの二重の依頼を防ぐ）。FK `(tenant_id, run_id)` → `flow_run`、`(tenant_id, policy_rule_id)` → `change_approval_policy_rule`。
@@ -398,7 +398,7 @@ erDiagram
 
 ## 6. `record_rule`
 
-ノーコードのレコードのルール。組み込みのルールはコードの版だけに持つ（NULL の行にしない）。定義元：同じ文書の 6 節、[ADR-0017](../../decisions/0017-no-code-record-rules.md)。
+ノーコードのレコードのルール。組み込みのルールはコードのバージョンだけに持つ（NULL の行にしない）。定義元：同じ文書の 6 節、[ADR-0017](../../decisions/0017-no-code-record-rules.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

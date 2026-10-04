@@ -50,7 +50,7 @@
 - ユーザーと Organization は、共通の名前空間 `owners` の `id` をそのまま使う（`users.id = owners.id`、`organizations.id = owners.id`）。
 - 外に出す一意の文字列が要るもの（Webhook の配信の GUID、ref のトランザクション）は `uuid` にする。
 - S3（段階）で複数のリージョンが ID を採番するときは、IDENTITY の範囲をリージョンごとに分ける（上位のビットをリージョンに割り当てる）。S1・S2 は 1 つの範囲で始める。
-- Better Auth のテーブル（`users` を除く）は Better Auth の形式の文字列の ID を使う。`users.id` は数値の ID にする設定を使う（版を固定するときに確かめる。[ADR-0019](../decisions/0019-authentication-and-token-model.md)）。
+- Better Auth のテーブル（`users` を除く）は Better Auth の形式の文字列の ID を使う。`users.id` は数値の ID にする設定を使う（バージョンを固定するときに確かめる。[ADR-0019](../decisions/0019-authentication-and-token-model.md)）。
 
 ### 2.2 名前と型
 

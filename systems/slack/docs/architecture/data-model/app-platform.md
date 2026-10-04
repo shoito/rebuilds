@@ -185,7 +185,7 @@ RLS を持たない。開発者コンソールのモジュールと、配送・�
 | `owner_workspace_id` | `uuid` | NO | | 所有するワークスペース。→ `workspaces.id` |
 | `distribution` | `text` | NO | `'single_workspace'` | `single_workspace` / `distributed`。`distributed` から戻さない |
 | `review_status` | `text` | NO | `'none'` | `none` / `pending` / `approved` / `rejected` / `blocked` |
-| `published_version` | `integer` | YES | | 公開中のマニフェストの版 |
+| `published_version` | `integer` | YES | | 公開中のマニフェストのバージョン |
 | `created_by_member_id` | `uuid` | NO | | 所有するワークスペースのメンバー |
 | `created_at` / `updated_at` | `timestamptz` | NO | `now()` | |
 | `deleted_at` | `timestamptz` | YES | | 論理削除。全インストールのアンインストールの後に設定する |
@@ -205,8 +205,8 @@ RLS を持たない。開発者コンソールのモジュールと、配送・�
 | `published_by_member_id` | `uuid` | YES | | |
 | `created_at` | `timestamptz` | NO | `now()` | |
 
-- 主キー：`(app_id, version)`。インストールは、インストールしたときの版を指す（スコープを固定する）。
-- 保持：インストールから参照される版は消さない。
+- 主キー：`(app_id, version)`。インストールは、インストールしたときのバージョンを指す（スコープを固定する）。
+- 保持：インストールから参照されるバージョンは消さない。
 - S1 の規模：数万行。
 
 ### app_credentials
@@ -296,7 +296,7 @@ RLS を持たない。開発者コンソールのモジュールと、配送・�
 | --- | --- | --- | --- | --- |
 | `workspace_id`、`id` | `uuid` | NO | | |
 | `app_id` | `uuid` | NO | | → `apps.id` |
-| `manifest_version` | `integer` | NO | | インストールしたときの版 |
+| `manifest_version` | `integer` | NO | | インストールしたときのバージョン |
 | `bot_scopes` | `text[]` | NO | | 許したボットのスコープ |
 | `user_scopes` | `text[]` | NO | `'{}'` | 許したユーザーのスコープの上限 |
 | `bot_member_id` | `uuid` | NO | | ボットのメンバー |

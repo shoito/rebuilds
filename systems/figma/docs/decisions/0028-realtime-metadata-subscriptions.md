@@ -7,7 +7,7 @@ date: 2026-09-27
 
 ## Context
 
-コメント、通知、ファイルの一覧、共有の設定、版の一覧は、開いている全員の画面に、すぐに反映したい。これらは Aurora にある（[ADR-0005](0005-tenancy-and-document-routing.md)）。[architecture/README.md](../architecture/README.md) の 1.2 節は、Realtime のコンテナを「outbox から、メタデータの変更を購読で配る。本家の LiveGraph に相当」と置いた。
+コメント、通知、ファイルの一覧、共有の設定、バージョンの一覧は、開いている全員の画面に、すぐに反映したい。これらは Aurora にある（[ADR-0005](0005-tenancy-and-document-routing.md)）。[architecture/README.md](../architecture/README.md) の 1.2 節は、Realtime のコンテナを「outbox から、メタデータの変更を購読で配る。本家の LiveGraph に相当」と置いた。
 
 本家の LiveGraph は、Postgres の WAL を Kafka で配り、GraphQL に似た問い合わせを結合のない単純な SELECT に分解し、同じ問い合わせを共有・キャッシュした（[LiveGraph: real-time data fetching at Figma](https://www.figma.com/blog/livegraph-real-time-data-fetching-at-figma/)、2021-10-14）。2024 年の作り直し（LiveGraph 100x）では、edge・cache・invalidator の 3 つのサービスに分け、変更ではなく無効化を送り、問い合わせを「易しい式 AND 難しい式」に正規化して易しい式だけで無効化した。約 700 の問い合わせのうち難しい式は 11 だった（[Keeping it 100(x) with real-time data at scale](https://www.figma.com/blog/livegraph-real-time-data-at-scale/)、2024-05-17）。いずれも 2026-09-27 に確認。
 

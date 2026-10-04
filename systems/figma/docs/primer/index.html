@@ -29,7 +29,7 @@
     <div class="cards">
       <div class="card" data-frag><h3>手元のアプリのように速い</h3><p>大きなファイルでも、パン・ズーム・変形が 60fps。自分の入力は 1 フレームで画面に出る。</p></div>
       <div class="card" data-frag><h3>一緒に作れる</h3><p>他の人の編集とカーソルが 0.25 秒以内に見え、競合しても全員の画面が同じ結果になる。</p></div>
-      <div class="card" data-frag><h3>失わない</h3><p>確定を返した編集は、サーバーが落ちても失わない。過去の版に戻れる。</p></div>
+      <div class="card" data-frag><h3>失わない</h3><p>確定を返した編集は、サーバーが落ちても失わない。過去のバージョンに戻れる。</p></div>
     </div>
     <p>使う人は、デザイナー（編集）、開発者（寸法・色の確認と書き出し）、PM・レビュアー（閲覧とコメント）、チームの管理者です。規模の感覚は、S1 で月間 10 万人、同時に開かれたファイル 1 万、同時接続 5 万です。性能の目標は「10 万ノードの参照ファイル」で測ります。日本の市場を先に狙い、和文のフォントと IME の入力を MVP で扱います。</p>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/README.md">architecture/README.md</a> の 3〜4 節（規模の段階と NFR）。</div>
@@ -244,15 +244,15 @@
   </section>
 
   <section class="s" id="history">
-    <h2>Undo・版の履歴・削除</h2>
+    <h2>Undo・バージョンの履歴・削除</h2>
     <p>「元に戻す」には 2 つの層があります。混同すると設計が読めなくなります。</p>
     <div class="tabs">
       <div data-tab="Undo"><p>自分の操作だけを戻す。他の人が後から上書きした値は戻さない。戻す操作も「新しい変更」として送る。履歴は 200 項目までで、タブを閉じると消える。</p></div>
-      <div data-tab="版の履歴"><p>ファイル全体の過去の状態。<a class="t" href="#g-version">版</a>は、変更があれば 30 分ごとに自動で作る。名前付きの版も作れる。無料のプランは 30 日、有料はすべて残す。</p></div>
-      <div data-tab="復元"><p>過去の版との差分を 1 つの変更として当てる。git の revert に近く、<strong>それまでの版は消えない</strong>。復元の前と後の 2 つの版が足される。</p></div>
-      <div data-tab="削除"><p>2 段。まずゴミ箱（所有者が戻せる）、次に完全な削除（戻せない。ジョブが S3・ジャーナル・版を消す）。複製ではコメントと履歴は写らない。</p></div>
+      <div data-tab="バージョンの履歴"><p>ファイル全体の過去の状態。<a class="t" href="#g-version">バージョン</a>は、変更があれば 30 分ごとに自動で作る。名前付きのバージョンも作れる。無料のプランは 30 日、有料はすべて残す。</p></div>
+      <div data-tab="復元"><p>過去のバージョンとの差分を 1 つの変更として当てる。git の revert に近く、<strong>それまでのバージョンは消えない</strong>。復元の前と後の 2 つのバージョンが足される。</p></div>
+      <div data-tab="削除"><p>2 段。まずゴミ箱（所有者が戻せる）、次に完全な削除（戻せない。ジョブが S3・ジャーナル・バージョンを消す）。複製ではコメントと履歴は写らない。</p></div>
     </div>
-    <div class="callout warn"><span class="label">法務の確認待ち</span>削除したファイルと版をいつまで残し、いつ消すか、利用規約への書き方（L4）。</div>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>削除したファイルとバージョンをいつまで残し、いつ消すか、利用規約への書き方（L4）。</div>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0012-multiplayer-undo-redo.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0026-version-history-restore-and-deletion.md">ADR-0026</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> の 8〜11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> の 10 節。</div>
   </section>
 
@@ -404,7 +404,7 @@
       <dt id="g-glyph">グリフ</dt><dd>フォントの中の 1 つの字形。1 文字が複数のグリフになることも、その逆もある。</dd>
       <dt id="g-fallback">フォールバック</dt><dd>指定のフォントにグリフがないとき、別のフォントで描くこと。どれにもなければ豆腐（□）になる。</dd>
       <dt id="g-ime">IME</dt><dd>Input Method Editor。かなを漢字に変換するなど、キーの入力から文字を組み立てる仕組み。変換中の文字は未確定。</dd>
-      <dt id="g-version">版</dt><dd>ファイルの過去の時点の状態。チェックポイントに印を付けたもの。自動と名前付きがある。</dd>
+      <dt id="g-version">バージョン</dt><dd>ファイルの過去の時点の状態。チェックポイントに印を付けたもの。自動と名前付きがある。</dd>
       <dt id="g-generalaccess">一般アクセス</dt><dd>個人への招待とは別の、範囲を指定した共有の設定（招待した人だけ・組織の中・リンクを知っている全員）。</dd>
       <dt id="g-seat">シート</dt><dd>組織と結ぶ利用の枠。Full・Dev・Collab・View があり、使える製品を決める。</dd>
       <dt id="g-guest">ゲスト</dt><dd>組織のドメインに合わないメールアドレスの人。招待された資源だけを使える。</dd>
@@ -423,7 +423,7 @@
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0002-central-authoritative-multiplayer.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0003-journal-and-checkpoints.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0004-gpu-rendering-in-wasm.md">0004</a> <span>— 同時編集、永続化、描画の 3 本柱</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/document-model.md">document-model.md</a> <span>— ノード、プロパティの表、木の不変条件</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/multiplayer.md">multiplayer.md</a> <span>— 送受信、LWW、並びの鍵、Undo、在席</span></li>
-        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> <span>— ジャーナル、フェンス、チェックポイント、版</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/file-storage-and-history.md">file-storage-and-history.md</a> <span>— ジャーナル、フェンス、チェックポイント、バージョン</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/rendering-engine.md">rendering-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/editor-and-tools.md">editor-and-tools.md</a> <span>— 描画、ベクター、テキストと IME</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/layout.md">layout.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/components-and-libraries.md">components-and-libraries.md</a> <span>— オートレイアウト、コンポーネント</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/permissions-and-sharing.md">permissions-and-sharing.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/architecture/comments-and-notifications.md">comments-and-notifications.md</a> <span>— 権限、共有、コメント</span></li>

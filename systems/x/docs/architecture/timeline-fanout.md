@@ -69,7 +69,7 @@
  flags ：REPOST、REPLY、QUOTE、HAS_MEDIA、SELF_THREAD（作者が自分に返信）、予備
 ```
 
-- 頭（16 バイト）：形の版（1）、状態（`ready`・`building`・`partial`）、項目の数（2）、作った時刻（ミリ秒、6）、予備。
+- 頭（16 バイト）：形のバージョン（1）、状態（`ready`・`building`・`partial`）、項目の数（2）、作った時刻（ミリ秒、6）、予備。
 - Functions：`tl_insert(key, items...)`（鍵があるときだけ。位置を二分探索で決めて挿入し、800 件に切り詰める。同じ `post_id` は 1 つ）、`tl_begin(key)`（なければ `building` の頭だけで作る）、`tl_merge(key, items..., state)`（和を取り、状態を書く）、`tl_remove(key, post_ids...)`、`tl_remove_author(key, author_id)`、`tl_read(key, max_id, n)`。
 - S1 の記憶の量：アクティブな利用者 100 万人 × 25.6 KB ≒ 26 GB（Valkey の上乗せを除く）。S3 は [infrastructure.md](infrastructure.md) で記憶の階層を決める。
 
@@ -149,7 +149,7 @@ stateDiagram-v2
 - 方式は `users.fanout_mode`（[follow-graph.md](follow-graph.md) の 7 節）。プッシュ → プル：振り分け役は以後プッシュしない。`fanout:pull_any` に無限大で足す。
 - プル → プッシュ：以後プッシュする。`fanout:pull_any` の値を「今から 7 日」に変える。プルの間の投稿は、7 日の間 `ar:` から見つかる。
 - どちらの向きでも、過去の投稿を配り直さない・消さない。読み出しは写しと `ar:` を合わせ、`post_id` で重複を落とす。
-- `fanout:pull_any` は、全ての読み出しが引く熱い鍵になる。Timeline のタスクは、これを手元のメモリーに持ち、1 秒ごとに版を見て読み直す。
+- `fanout:pull_any` は、全ての読み出しが引く熱い鍵になる。Timeline のタスクは、これを手元のメモリーに持ち、1 秒ごとにバージョンを見て読み直す。
 
 ## 6. 読み出し（フォロー中）
 

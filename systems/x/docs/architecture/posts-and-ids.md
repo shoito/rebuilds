@@ -7,7 +7,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0008](../decisions/0008-post-write-path-and-idempotency.md) | 投稿の書き込みは、検証 → `tid` → 1 つの DB のトランザクション（`posts`・抜き出した要素・冪等の記録・outbox）で確定する。再送は `(author_id, client_request_id)` で同じ投稿を返す。リポストも `posts` の行で、関係の正本は `reposts` |
-| [0009](../decisions/0009-post-state-tombstones-and-state-cache.md) | 削除と措置は行を消さず、状態と `state_version` を変える。投稿の状態の写し（`ps:`）は版の新しいものだけを書き、削除の確定の直後に書き換える。写しの寿命は 45 秒で、出来事の取りこぼしがあっても 60 秒（NFR-009）の中で正本に戻る |
+| [0009](../decisions/0009-post-state-tombstones-and-state-cache.md) | 削除と措置は行を消さず、状態と `state_version` を変える。投稿の状態の写し（`ps:`）はバージョンの新しいものだけを書き、削除の確定の直後に書き換える。写しの寿命は 45 秒で、出来事の取りこぼしがあっても 60 秒（NFR-009）の中で正本に戻る |
 | [0010](../decisions/0010-post-table-partitioning-s2.md) | S2 で投稿の表を投稿の ID のハッシュで分割し、作者・会話ごとの一覧は別の索引の表（`author_posts`・`conversation_posts`）を、それぞれ作者・会話の ID で分割して出来事から作る |
 
 ## 1. 目的と範囲
@@ -170,7 +170,7 @@ sequenceDiagram
         P->>P: tid を振る
         P->>DB: BEGIN posts, post_mentions, post_hashtags, post_urls, post_media, post_requests, outbox COMMIT
         DB-->>P: 確定
-        P->>V: ps:post_id を版つきで書く
+        P->>V: ps:post_id をバージョンつきで書く
         P-->>C: 201 投稿
         R->>DB: outbox を seq の順に読む
         R->>K: PutRecords 鍵は author_id
@@ -226,7 +226,7 @@ stateDiagram-v2
 ```
 
 - `posts.state` は `active`・`deleted`・`purged`。措置は `moderation_actions` が正本で、`posts` には効いている措置の要約（`mod_flags` のビット：`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED`、地域の一覧は `mod_geo`。[data-model.md](data-model.md) の 3.5 節）を写す（[trust-and-safety.md](trust-and-safety.md)）。図の `restricted` は `LABEL`・`REDUCE` などの制限、`removed` は `REMOVED` を表す。
-- 状態が変わるたびに `state_version` を 1 つ上げる。`state_version` は投稿の状態の写しの版になる（6 節）。
+- 状態が変わるたびに `state_version` を 1 つ上げる。`state_version` は投稿の状態の写しのバージョンになる（6 節）。
 - `deleted` は作者が戻せない。`removed` は異議で戻りうる。
 - `purged` は、本文・抜き出し・メディアの参照を消し、行の骨（ID・作者・状態）だけを残す。保持の期間は法務の L8 の後に決める。開示の請求のための保全（L2）がかかった投稿は、保全が解けるまで `purged` にしない。
 
@@ -239,11 +239,11 @@ stateDiagram-v2
 | `ps:{post_id}` | `PostState`（作者、作者の鍵の状態、`state`、`mod_flags`、センシティブの印、返信の制限、`kind`、`repost_of_id`・`quoted_post_id`）と `state_version` | 45 秒 |
 | `pb:{post_id}` | 表示の本体（本文、抜き出し、メディアの参照、作成の時刻） | 1 時間。状態の判定に使わない |
 
-- **版の新しいものだけを書く。** 書き込みは Valkey Functions の `ps_put(key, version, value, ttl)` で行い、今の版以上のときだけ書く。Aurora の reader から読んだ古い状態が、削除の後の状態を上書きしない。
+- **バージョンの新しいものだけを書く。** 書き込みは Valkey Functions の `ps_put(key, version, value, ttl)` で行い、今のバージョン以上のときだけ書く。Aurora の reader から読んだ古い状態が、削除の後の状態を上書きしない。
 - **削除・措置の確定の直後に、新しい状態を書く**（消すのではなく `deleted` の状態を書く）。書けなかったら（Valkey の障害）、`posts` の流れの消費者（状態の写しの更新役）が出来事から書く。それも遅れたら、45 秒の寿命で切れ、次の読み出しで正本から入る。
-- 鍵アカウントへの切り替え・解除は、作者の状態の写し（`as:{user_id}`、寿命 45 秒、同じ版の規則）で持ち、`PostState` を組み立てるときに合わせる。作者の投稿を 1 件ずつ書き換えない。
+- 鍵アカウントへの切り替え・解除は、作者の状態の写し（`as:{user_id}`、寿命 45 秒、同じバージョンの規則）で持ち、`PostState` を組み立てるときに合わせる。作者の投稿を 1 件ずつ書き換えない。
 - 寿命の 45 秒は、出来事の経路がすべて止まっても NFR-009 の 60 秒に収めるための上限。読み出しの抜き取りの監査（[quality.md](../quality.md) の 4.2 節）で、写しが正本より古かった件数を数える。
-- 正本を引くとき（写しがない）は reader から読む。reader の遅れで古い状態を読んでも、版の比較で新しい写しを壊さない。削除の直後に、写しがなく、reader が遅れている場合は、削除の前の状態が最大で reader の遅れ（p99 1 秒未満を想定）だけ見える。これは NFR-009 の 60 秒の中に入る。
+- 正本を引くとき（写しがない）は reader から読む。reader の遅れで古い状態を読んでも、バージョンの比較で新しい写しを壊さない。削除の直後に、写しがなく、reader が遅れている場合は、削除の前の状態が最大で reader の遅れ（p99 1 秒未満を想定）だけ見える。これは NFR-009 の 60 秒の中に入る。
 
 ## 7. 削除と後始末
 
@@ -260,7 +260,7 @@ sequenceDiagram
     participant W as 消費者
     C->>P: DELETE /posts/id
     P->>DB: BEGIN state を deleted, state_version を上げる, outbox に post.deleted COMMIT
-    P->>V: ps_put 新しい版で deleted
+    P->>V: ps_put 新しいバージョンで deleted
     P-->>C: 204
     K-->>W: post.deleted
     W->>W: 状態の写しの更新, 作者の最近の投稿から除く, 検索の索引, 通知, カウンター, メディア, 短縮 URL
@@ -286,7 +286,7 @@ sequenceDiagram
 
 | 消費者 | 扱い | 文書 |
 | --- | --- | --- |
-| 状態の写しの更新役 | `ps:` を新しい版で書く | この文書の 6 節 |
+| 状態の写しの更新役 | `ps:` を新しいバージョンで書く | この文書の 6 節 |
 | Timeline | 作者の最近の投稿（`ar:`）から除く。ホームの写しからは、読み出しの時の詰め直しで除く | [timeline-fanout.md](timeline-fanout.md) |
 | Search Indexer | 索引の文書に削除の印を入れ、後で消す | [search-and-trends.md](search-and-trends.md) |
 | Notification | 削除された投稿に関わる未送信のプッシュを取り消し、通知の行を隠す | [notifications.md](notifications.md) |
@@ -398,7 +398,7 @@ flowchart LR
 | `author_posts`・`conversation_posts`（S2） | 9 節 | 出来事から作る索引の表 |
 | outbox の出来事 | `posts` の流れ：`post.created`・`post.deleted`・`post.state_changed`（措置の反映） | 鍵は `author_id`（[ADR-0005](../decisions/0005-event-log-and-outbox.md)） |
 | outbox の出来事（数） | `engagement` の流れ：返信・引用のとき `reply.added`・`quote.added`、削除と `removed` の措置で `reply.removed`・`quote.removed` | 鍵は返信先・引用先の `"{post_id}:{sub}"`（[engagement-and-counters.md](engagement-and-counters.md) の 4.1 節）。同じトランザクションで書く |
-| Valkey `ps:{post_id}`・`as:{user_id}` | `PostState`・作者の状態と版、寿命 45 秒 | 6 節 |
+| Valkey `ps:{post_id}`・`as:{user_id}` | `PostState`・作者の状態とバージョン、寿命 45 秒 | 6 節 |
 | Valkey `pb:{post_id}` | 表示の本体、寿命 1 時間 | |
 
 ## 13. テストと性質
@@ -409,7 +409,7 @@ flowchart LR
 - **PROP-TID-002（時刻の順の近さ）**：時計のずれが ε 以内の生成器の間で、時刻 t1 < t2 − ε に振った ID は `id1 < id2`。
 - **PROP-POST-001（冪等）**：同じ `(author_id, client_request_id)` の要求を何回、どの順で送っても、確定する投稿は 1 件で、全ての成功の応答が同じ ID を返す。
 - **PROP-POST-002（確定と出来事）**：`post.created` が流れた投稿は確定しており、確定した投稿は必ず `post.created` が流れる（途中の失敗の注入を含む）。
-- **PROP-POST-003（状態の写しの単調）**：任意の書き込み・正本からの読み込み（遅れた reader を含む）・出来事の再送の列で、`ps:` の版は減らない。最後の出来事から 45 秒後には、写しは正本の状態と一致する。
+- **PROP-POST-003（状態の写しの単調）**：任意の書き込み・正本からの読み込み（遅れた reader を含む）・出来事の再送の列で、`ps:` のバージョンは減らない。最後の出来事から 45 秒後には、写しは正本の状態と一致する。
 - **PROP-POST-004（文字数の一致）**：任意の Unicode の列で、Web・アプリ・サーバーの `weightedLength` が同じ。NFC の正規化の前後で、正規化の後の値が使われる。
 - **PROP-POST-005（会話）**：任意の返信の木で、全ての投稿の `conversation_id` は根の ID と等しい。
 
@@ -447,7 +447,7 @@ flowchart LR
 
 - 書き込みは 1 つのトランザクション、冪等の記録は 24 時間（ADR-0008）。
 - 出来事に本文を載せない（ADR-0008）。
-- 状態の写しは版の新しいものだけを書き、寿命 45 秒（ADR-0009）。
+- 状態の写しはバージョンの新しいものだけを書き、寿命 45 秒（ADR-0009）。
 - S2 の分割の鍵は投稿の ID のハッシュ。作者・会話の一覧は別の表（ADR-0010）。
 - 重み 1 の範囲は 4.2 節の 4 つ。位置はコードポイントで数える。
 - 鍵アカウントの投稿はリポストできない。引用は書けるが、中身は閲覧者ごとに判定する。
@@ -460,7 +460,7 @@ flowchart LR
 | Fargate で時計の誤差の上限が取れるか | E1 の `tid-generator` で確かめる。取れなければ Time Sync の同期の状態だけを見る |
 | 削除の後に本文を消すまでの期間、出来事・データレイクの扱い | 法務の L8 |
 | 開示の請求のための保全と、`purged` の関係 | 法務の L2（[trust-and-safety.md](trust-and-safety.md) と共同） |
-| 投稿の編集（MVP の後、E17） | `state_version` と別に版の表を持つ。E17 の着手の時に ADR |
+| 投稿の編集（MVP の後、E17） | `state_version` と別にバージョンの表を持つ。E17 の着手の時に ADR |
 
 ## 16. quality.md・runbooks への項目
 

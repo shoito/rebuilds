@@ -260,7 +260,7 @@ erDiagram
 | `text_len`・`state_size` | `integer` | NO | `0` | `server_only` | Worker のまとめが書く |
 
 - 主キー：`(workspace_id, id)`。一意：`(workspace_id, project_id)`。CHECK：`id = project_id`。
-- 読み込み：`ProjectDescription:id=<project_id>`（プロジェクトの画面を開いた時）。上限・まとめ・版の規則はイシューの本文と同じ。本文の版（`IssueDescriptionVersion` に当たるもの）は MVP では持たない。
+- 読み込み：`ProjectDescription:id=<project_id>`（プロジェクトの画面を開いた時）。上限・まとめ・バージョンの規則はイシューの本文と同じ。本文のバージョン（`IssueDescriptionVersion` に当たるもの）は MVP では持たない。
 - 検索：`doc_states.text_plain` を `Project` の文書の `body` に入れる（[search.md](../search.md) の 4.2 節）。
 - S1 の規模：`projects` と同じ行数。
 

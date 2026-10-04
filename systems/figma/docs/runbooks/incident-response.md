@@ -80,7 +80,7 @@ SEV1 では、指揮者は手を動かさない。
 2. 書き込みの予算の段（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)）が働いているか（クライアントのまとめの間隔が 100ms・200ms に広がっているか）を見る。
 3. `journal` の `ThrottledRequests` が 0 か。0 でなければ、予算の値がパーティションの実際の上限に合っていない。そのファイルの予算を ops の設定で下げる（毎秒 400 → 250 単位）。
 4. 同じタスクの他のファイルが巻き込まれていれば、router の「ファイルを渡す」で、人が集まるファイルを空いた `ds-large` のタスクへ移す（中断は 1〜2 秒）。
-5. 参加が 500 人に近いときは、後から入る人が「動かない版」になる（[multiplayer.md](../architecture/multiplayer.md) の 12.3 節）。所有者に、閲覧の人にはプロトタイプの表示や書き出しの画像を案内するよう伝える。
+5. 参加が 500 人に近いときは、後から入る人が「動かないバージョン」になる（[multiplayer.md](../architecture/multiplayer.md) の 12.3 節）。所有者に、閲覧の人にはプロトタイプの表示や書き出しの画像を案内するよう伝える。
 6. 収まらず、他のファイルの SLO に響くなら、そのファイルの在席の配信を 200ms にする ops の設定を入れる。
 
 **エスカレーション**：同じファイルで毎週起きる → 1 ファイル 500 人を超える需要として PM に上げる（[multiplayer.md](../architecture/multiplayer.md) の 17 節の持ち越し）。
@@ -110,12 +110,12 @@ SEV1 では、指揮者は手を動かさない。
 3. 原因を切り分ける：
    | 見えること | 疑う原因 |
    | --- | --- |
-   | 飛びの範囲の項目が、DynamoDB に `blob_key` だけあり、S3 の本体がない | 大きな変更の S3 の書き込みの不整合、S3 の複製の遅れ（大阪）。本体が後から届くか、古い版があるかを見る |
+   | 飛びの範囲の項目が、DynamoDB に `blob_key` だけあり、S3 の本体がない | 大きな変更の S3 の書き込みの不整合、S3 の複製の遅れ（大阪）。本体が後から届くか、古いバージョンがあるかを見る |
    | 飛びの範囲の直前に `epoch` が変わっている | 二重の持ち主の書き込みの交ざり（フェンスの不具合）。「二重の持ち主」の場面も見る |
    | TTL の期限を過ぎた項目がない | 回復のジョブの漏れ（手放さずに 30 日）。`router_orphan_oldest_seconds` の履歴を見る |
    | 飛びの範囲が、PITR の時点では存在する | 誤った削除（掃除・完全な削除のジョブの不具合、運用の誤り） |
 4. **項目を戻せるなら戻す**：DynamoDB の PITR（35 日）から、別の表へ復元し、飛びの範囲の項目だけを写す（`seq` の範囲で、そのファイルのパーティションだけ）。写した後、ファイルの `maintenance` を外して回復させる。
-5. **戻せないなら**、`journal-gap-or-corruption.md`（[file-storage-and-history.md](../architecture/file-storage-and-history.md) の 17 節の提案）の手順で、飛びの手前までの状態をチェックポイントとして書き、版の一覧に残し、所有者に失った範囲（時刻）を知らせる。Dev のテックリードの承認を得る。
+5. **戻せないなら**、`journal-gap-or-corruption.md`（[file-storage-and-history.md](../architecture/file-storage-and-history.md) の 17 節の提案）の手順で、飛びの手前までの状態をチェックポイントとして書き、バージョンの一覧に残し、所有者に失った範囲（時刻）を知らせる。Dev のテックリードの承認を得る。
 6. 同じ原因のファイルが他にないか、回復の記録（`ds_journal_gap_total` のログの `file_id`）と、作り直しの検証の不一致を全体で見る。
 
 **エスカレーション**：飛びが 2 ファイル以上、または原因が二重の持ち主・誤った削除 → SEV1。Dev のテックリードと Ops の責任者を呼ぶ。
@@ -132,7 +132,7 @@ SEV1 では、指揮者は手を動かさない。
 
 **症状**：作り直しの検証・`parity` の抜き取りの不一致、`layout_divergence`、不変条件の破れ、利用者の「人によって見え方が違う」。
 
-1. SEV2 を宣言する。影響するファイル、ビルド、Document Server の版、文書のフラグ（`Welcome.features`）を集める。
+1. SEV2 を宣言する。影響するファイル、ビルド、Document Server のバージョン、文書のフラグ（`Welcome.features`）を集める。
 2. 直近に、`doc-model`・`layout`・`text` の変更、文書のフラグの変更、書き込みの解禁があれば、それを戻す（[deploy-and-rollback.md](deploy-and-rollback.md) の「悪化したとき」）。
 3. ファイルを `Kick(resync_required)` で開き直させ、食い違いが消えるかを見る（クライアントの側だけの食い違いなら消える）。
 4. サーバーの状態が壊れている（不変条件の破れ）なら、`document-invariant-violation.md`（[document-model.md](../architecture/document-model.md) の 17 節の提案）の手順で、修復の変更を当てる。

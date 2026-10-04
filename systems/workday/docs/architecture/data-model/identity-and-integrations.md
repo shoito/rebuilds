@@ -113,7 +113,7 @@ erDiagram
 
 ## 2. ログイン（Better Auth。テナントの外）
 
-Better Auth の表を本システムの名前に改名して使う（`auth_` の接頭辞）。列は Better Auth の版に合わせ、ここには本システムが頼る列だけを書く。読み書きは `packages/auth` だけ（lint）。定義元：[integrations-and-bulk.md](../integrations-and-bulk.md) の 7 節、[data-model.md](../data-model.md) の 3.3.2 節（DM-3）。
+Better Auth の表を本システムの名前に改名して使う（`auth_` の接頭辞）。列は Better Auth のバージョンに合わせ、ここには本システムが頼る列だけを書く。読み書きは `packages/auth` だけ（lint）。定義元：[integrations-and-bulk.md](../integrations-and-bulk.md) の 7 節、[data-model.md](../data-model.md) の 3.3.2 節（DM-3）。
 
 | 表 | 本システムが頼る列 | キー・制約 | 備考 |
 | --- | --- | --- | --- |
@@ -228,7 +228,7 @@ Webhook の登録と配信。本文は事象の種類と ID だけ（[stores.md]
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `process_type` | `text` | NOT NULL | — | 雛形の種類（`hire`・`resident_tax_notice` など）。打刻機のファイルは `clock_import`（業務プロセスを使わない） |
-| `template_version` | `int` | NOT NULL | — | 雛形の版 |
+| `template_version` | `int` | NOT NULL | — | 雛形のバージョン |
 | `file_name` | `text` | NOT NULL | — | |
 | `file_sha256` | `bytea` | NOT NULL | — | |
 | `s3_key` | `text` | NOT NULL | — | `import-files/{tenant}/{batch_id}`（30 日で消す） |

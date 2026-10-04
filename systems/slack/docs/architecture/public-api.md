@@ -1,6 +1,6 @@
 # Public API: Slack
 
-外部の開発者（アプリ、社内のスクリプト、連携サービス）が使う、版を持つ公開 API。方針は [ADR-0030](../decisions/0030-versioned-public-api.md) にある。アプリの仕組み（インストール、ボット、Events API、インタラクティブ機能）は [apps.md](apps.md) と [ADR-0031](../decisions/0031-app-platform.md) に書く。
+外部の開発者（アプリ、社内のスクリプト、連携サービス）が使う、バージョンを持つ公開 API。方針は [ADR-0030](../decisions/0030-versioned-public-api.md) にある。アプリの仕組み（インストール、ボット、Events API、インタラクティブ機能）は [apps.md](apps.md) と [ADR-0031](../decisions/0031-app-platform.md) に書く。
 
 公開 API とアプリの基盤は、MVP の後の Epic（E12）で出す。この文書は、それまでに内部の設計が公開の妨げにならないよう、先に形を決めておくためのものである。
 
@@ -87,7 +87,7 @@ https://api.<domain>/v1/workspaces/{workspace_id}/<リソース>
 | `POST .../files`、`GET .../files/{id}`、`GET .../files/{id}/content` | アップロードの開始（署名付き URL を返す）、情報、本体（署名付き URL への 302） | `files:write` / `files:read` | `tier-write` / `tier-read` |
 | `POST .../views`、`PUT .../views/{view_id}` | モーダルを開く・更新する（アプリだけ） | なし（インストールの `trigger_id` で認可） | `tier-write` |
 | `PUT .../app-home/{member_id}` | アプリのホームの表示を置く（アプリだけ） | なし | `tier-write` |
-| `GET .../audit-events` | 監査ログの読み出し。Enterprise だけ。後の版で追加する（15 節の決定） | `auditlogs:read` | `tier-admin` |
+| `GET .../audit-events` | 監査ログの読み出し。Enterprise だけ。後のバージョンで追加する（15 節の決定） | `auditlogs:read` | `tier-admin` |
 
 - 表の `...` は `/v1/workspaces/{workspace_id}` を表す。
 - 大量のデータの取り出し（エクスポート）は、公開 API では提供しない。[ADR-0019](../decisions/0019-data-retention-and-deletion.md) のエクスポートの仕組みを使う。提供するときは `concurrency-bulk` を掛ける。
@@ -200,7 +200,7 @@ RFC 9457（Problem Details）の形で返す。`Content-Type: application/proble
 ### 5.4 本文の形式
 
 - **メッセージの本文は、公開の「リッチテキスト v1」として JSON で受け渡す。** 中身は本文の AST（[ADR-0006](../decisions/0006-message-body-ast.md)、[messaging.md](messaging.md) の「本文（AST）」）の v1 と同じ形から始める。
-- ただし、**公開の形と内部の AST を分ける。** `packages/contract/public/v1` に公開用の Zod スキーマを別に置き、内部の AST との変換関数を持つ。内部の AST の版を上げても、公開の v1 の形は変換で保つ。表せない新しいノードは、公開の v1 では `text` として返す。
+- ただし、**公開の形と内部の AST を分ける。** `packages/contract/public/v1` に公開用の Zod スキーマを別に置き、内部の AST との変換関数を持つ。内部の AST のバージョンを上げても、公開の v1 の形は変換で保つ。表せない新しいノードは、公開の v1 では `text` として返す。
 - 書き込みでは、リッチテキストの代わりに `text`（プレーンテキスト）も受け付ける。メンションは `<@member_id>`、チャンネルへのリンクは `<#channel_id>` の形にする（MCP の `post_message` と同じ。[mcp.md](mcp.md) の 4 節）。サーバーは Markdown を解釈しない（ADR-0006 の方針）。
 - アプリは、本文に加えて `ui_blocks`（宣言的な UI。[apps.md](apps.md) の 10 節）を付けられる。`ui_blocks` を付けるときも、通知・検索・読み上げに使う本文は必ず付ける。
 - 上限（長さ、JSON の大きさ、入れ子の深さ）は内部と同じ（[messaging.md](messaging.md) の「上限」）。超えたら 413 か 400。
@@ -228,7 +228,7 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 - スコープの語彙は MCP と共通にする（[apps.md](apps.md) の 6 節）。MCP のトークンと公開 API のトークンは `aud` で分け、互いに使えない。
 - MCP のツールの入出力は、今後、公開 API のリソースの形に寄せる（例：`read_channel_history` の結果のメッセージを、公開のメッセージの形の部分集合にする）。MCP 側の変更は mcp.md の方針（新しいツール名で出す）に従う。
 
-## 8. 版と廃止
+## 8. バージョンと廃止
 
 ### 8.1 互換性の規則
 
@@ -244,11 +244,11 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 - エラーのステータスの変更、ページングの並びの変更
 - スコープの意味を狭める・広げる変更
 
-### 8.2 版の上げ方
+### 8.2 バージョンの上げ方
 
-- **大きな版は URL に持つ（`/v1`、`/v2`）。** 日付の版をヘッダーで選ぶ方式（Stripe 型）は、1 つのコードで多くの版を保つ変換の層が要り、今の規模に合わない。
-- 新しい版を出したら、古い版は **最低 12 か月** 動かし続ける。
-- 版の中で個別のエンドポイント・項目を廃止するときは、代わりを先に出し、**最低 6 か月** の告知の後に止める。止めるのは次の大きな版を出すときに限る（`/v1` の中では止めない。告知だけ行う）。
+- **大きなバージョンは URL に持つ（`/v1`、`/v2`）。** 日付のバージョンをヘッダーで選ぶ方式（Stripe 型）は、1 つのコードで多くのバージョンを保つ変換の層が要り、今の規模に合わない。
+- 新しいバージョンを出したら、古いバージョンは **最低 12 か月** 動かし続ける。
+- バージョンの中で個別のエンドポイント・項目を廃止するときは、代わりを先に出し、**最低 6 か月** の告知の後に止める。止めるのは次の大きなバージョンを出すときに限る（`/v1` の中では止めない。告知だけ行う）。
 - 例外：セキュリティ上の理由で、すぐに止める必要があるもの。告知と同時に止めてよい。判断は Dev（テックリード）と PM が行い、記録を残す。
 
 ### 8.3 告知の手段
@@ -263,7 +263,7 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 | 開発者コンソール | アプリごとに、廃止予定の操作の呼び出し数を出す |
 
 - 廃止予定の操作の呼び出しを、アプリごとのメトリクスで数える（9 節）。止める前に、呼び出しが残っているアプリへ個別に連絡する。
-- Events API のペイロードの版（[apps.md](apps.md) の 7.2 節）も、同じ期間と手段で扱う。
+- Events API のペイロードのバージョン（[apps.md](apps.md) の 7.2 節）も、同じ期間と手段で扱う。
 
 ## 9. 観測
 
@@ -278,7 +278,7 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 - **公式の SDK は TypeScript の 1 つだけ** を作る。OpenAPI から型と薄いクライアントを生成し、手で書く部分は次に限る：ページングの反復、429 と `Retry-After` に従う再試行、`Idempotency-Key` の自動付与、Events API とインタラクティブ機能の署名の検証（[apps.md](apps.md) の 8 節）。
 - 他の言語は、OpenAPI からの生成に任せる。署名の検証の手順は、言語に依らない形で文書に書き、テスト用のベクター（入力と期待する署名）を公開する。
 - 本家の Bolt のような、アプリを作るためのフレームワークは作らない（需要を見て判断する）。
-- 文書は OpenAPI から生成した参照と、手で書く手引き（認証、ページング、エラー、版と廃止、アプリの作り方）からなる。
+- 文書は OpenAPI から生成した参照と、手で書く手引き（認証、ページング、エラー、バージョンと廃止、アプリの作り方）からなる。
 
 ## 11. 開発用のワークスペース
 
@@ -327,7 +327,7 @@ AI ─▶ mcp（MCP ツール）─────────┘                  
 
 ### 決定（2026-09-26、既定案）
 
-- **`admin:*` の管理の API は出さない。** 本家の `admin.*` の API は Enterprise の組織向けで、Enterprise Grid は範囲外（[intent.md](../intent.md) の Non-goals）。メンバーの作成・更新・無効化は SCIM（Business+ 以上、E8）に一本化する。監査ログの読み出しは、本家の Audit Logs API（Enterprise だけ、`auditlogs:read`、組織の owner がインストールする）に倣い、Enterprise だけの `auditlogs:read` として後の版で出す（roadmap の E12 `audit-logs-api`）（[Audit Logs API](https://docs.slack.dev/admins/audit-logs-api/)、2026-09-26 に確認）。
+- **`admin:*` の管理の API は出さない。** 本家の `admin.*` の API は Enterprise の組織向けで、Enterprise Grid は範囲外（[intent.md](../intent.md) の Non-goals）。メンバーの作成・更新・無効化は SCIM（Business+ 以上、E8）に一本化する。監査ログの読み出しは、本家の Audit Logs API（Enterprise だけ、`auditlogs:read`、組織の owner がインストールする）に倣い、Enterprise だけの `auditlogs:read` として後のバージョンで出す（roadmap の E12 `audit-logs-api`）（[Audit Logs API](https://docs.slack.dev/admins/audit-logs-api/)、2026-09-26 に確認）。
 - **公開のイベントの読み出し（取りこぼしの再取得）は出さない。** 本家の Events API も、再送（3 回まで、すぐ・1 分後・5 分後）はするが、取りこぼしたイベントを読み直す API は持たない。アプリは履歴の API（`GET .../channels/{id}/messages` の `after_seq`）で埋める。本システムの再試行の予定は [apps.md](apps.md) の 7.4 節のまま（[The Events API](https://docs.slack.dev/apis/events-api/)、2026-09-26 に確認）。
 - **ボットのトークンのローテーションは、アプリごとに選べるようにする。** 本家と同じく、アプリの設定で有効にすると、アクセストークンは 12 時間で失効し、リフレッシュトークンで更新する。一度有効にしたら戻せない。既定は今のとおり無期限＋入れ替えの API（[Using token rotation](https://docs.slack.dev/authentication/using-token-rotation/)、2026-09-26 に確認）。roadmap の E12 に `bot-token-rotation` を加えた。
 - **`ETag` と条件付きの更新は、v1 では出さない。** 本家の Web API にもない。後から加えても互換性を壊さない（8.1 節）ので、需要が出たら加える。

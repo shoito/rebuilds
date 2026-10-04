@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0022](../decisions/0022-process-state-machines.md) | インシデント・問題・変更の状態のモデルは、コードの版に含む宣言の遷移の表で持つ。状態の変更は保存の流れの中で表と照合し、表にない遷移は 422 にする。テナントは状態と辺を足せず、条件（必須のフィールド）と保留の理由だけを足せる。既知のエラーは問題の状態ではなく印にする |
+| [0022](../decisions/0022-process-state-machines.md) | インシデント・問題・変更の状態のモデルは、コードのバージョンに含む宣言の遷移の表で持つ。状態の変更は保存の流れの中で表と照合し、表にない遷移は 422 にする。テナントは状態と辺を足せず、条件（必須のフィールド）と保留の理由だけを足せる。既知のエラーは問題の状態ではなく印にする |
 | [0023](../decisions/0023-priority-matrix-and-major-incident.md) | 優先度は影響度 × 緊急度の表から導き、利用者は直接書けない。上書きは専用の権限と理由を要る。メジャーインシデントは候補の行（提案 → 昇格・却下）で扱い、自動では昇格させない。昇格したインシデントを親にし、子の解決は非同期のまとめての更新で行う |
 | [0024](../decisions/0024-change-models-risk-and-cab.md) | 変更の種類ごとに状態のモデルを持つ。リスクは規則の条件と質問票の得点の高いほうにする。承認の方針は種類 × リスクの決定表で決め、組み込みのフローで承認を依頼する。CAB の会議は議題と記録を持つが、承認は各承認者の回答として 1 件ずつ反映する。緊急の変更も、1 人以上の承認なしに「実施」へ進めない |
 | [0025](../decisions/0025-change-schedule-and-conflict-detection.md) | 禁止期間と保守の時間帯は、業務カレンダーと同じ半開区間の表現で、CI の条件に結び付けて持つ。衝突は純粋な関数で求め、保存の時と「予定済み」への遷移の時に評価する。禁止期間（凍結期間を含む）に重なる変更は、例外の承認なしに「予定済み」へ進めない。ほかの衝突は警告にする |
@@ -60,7 +60,7 @@ ProcessModel {
 }
 ```
 
-- モデルはコードの版に含め、全テナントで同じにする（辞書と同じ扱い。[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）。
+- モデルはコードのバージョンに含め、全テナントで同じにする（辞書と同じ扱い。[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）。
 - **テナントは、状態と遷移の辺を足せない。** 足せるのは、遷移の追加の `requires`（必須のフィールド）と追加の `guard`（式）、保留の理由の選択肢、状態のラベルの上書きだけである。状態を足せると、SLA の条件・レポート・承認の方針・メールの処理の前提が、テナントごとに変わるためである。
 - テナントのクラス（例：`task` → `c_facilities_request`）は、組み込みの汎用のモデル `generic_task`（`open` → `work_in_progress` → `closed_complete` / `closed_incomplete` / `closed_skipped`）を使う。
 
@@ -234,7 +234,7 @@ DT-MIM-001：
 
 - 親の `resolve` の効果 `cascade_children(resolve)` は、`bulk_job` を作り、子のうち open・hold のものを 100 件ずつ、別のトランザクションで `resolve` する（解決のコードは親の値、解決のメモは「親 INC… の解決による」）。
 - 保存の後のルール（1 回の保存で 10 件まで。[ADR-0017](../decisions/0017-no-code-record-rules.md)）で行わないのは、メジャーインシデントの子が数百件になりうるためである。親の解決の直後の数秒、子が open のまま見えることを受け入れる。
-- 子の解決に失敗した行（遷移の表に合わない、版の競合）は、`bulk_job` の結果に残し、再試行（3 回）の後も失敗なら担当に知らせる。
+- 子の解決に失敗した行（遷移の表に合わない、バージョンの競合）は、`bulk_job` の結果に残し、再試行（3 回）の後も失敗なら担当に知らせる。
 
 ## 7. 問題と既知のエラー（[ADR-0022](../decisions/0022-process-state-machines.md)）
 
@@ -268,7 +268,7 @@ DT-PRB-001：
 
 - **既知のエラーは状態ではなく印（`known_error = true`）にする。** 根本原因の調査中でも、回避策が分かった時点で既知のエラーにできる。状態にすると、「修正中だが既知のエラー」を表せないためである（本家も分類として扱う。2 節）。
 - `known_error` を真にする条件：`workaround` が空でない。`cause_notes` は空でもよい（原因は不明でも回避策はありうる）。
-- 既知のエラーにすると、ナレッジの記事の草案を作る操作（`publish_known_error_article`）を使える。記事の公開の流れは [knowledge.md](knowledge.md) の 5 節。記事は問題を `source_task_id` で参照し、問題の `workaround` の変更は記事の新しい版の草案を作る（自動では公開しない）。
+- 既知のエラーにすると、ナレッジの記事の草案を作る操作（`publish_known_error_article`）を使える。記事の公開の流れは [knowledge.md](knowledge.md) の 5 節。記事は問題を `source_task_id` で参照し、問題の `workaround` の変更は記事の新しいバージョンの草案を作る（自動では公開しない）。
 
 ### 7.3 インシデントとの関係
 
@@ -313,7 +313,7 @@ DT-CHG-001（遷移）：
 | 13 | 全種 | `review`・`closed`・`cancelled` | 取り消し・前の状態 | - | - | 422（振り返りと完了は取り消せない。本家と同じ） |
 | 14 | そのほか | | | | | 422 `invalid_transition` |
 
-- **どの種類も、承認のまとまりが `approved` にならないと `scheduled` を通れず、`scheduled` を通らないと `implement` に入れない。** 標準の変更の承認は、雛形の版の承認（8.2 節）で済んだものとみなす。これで [intent.md](../intent.md) の「変更の記録は、承認のないまま実施に進まない」を、遷移の表の上で確かめられる（PROP-CHG-001）。
+- **どの種類も、承認のまとまりが `approved` にならないと `scheduled` を通れず、`scheduled` を通らないと `implement` に入れない。** 標準の変更の承認は、雛形のバージョンの承認（8.2 節）で済んだものとみなす。これで [intent.md](../intent.md) の「変更の記録は、承認のないまま実施に進まない」を、遷移の表の上で確かめられる（PROP-CHG-001）。
 - 承認済みの変更で、予定の時刻・CI を変えると、`reschedule` で承認を取り直す（12 行）。承認のときに見た予定と違う予定で実施させないためである。`scheduled` の中で、予定の時刻・CI を `reschedule` 以外で変える保存は 422 `approved_fields_locked` にする（承認の対象のフィールドの一覧を固定する）。
 
 ### 8.2 標準の変更の雛形
@@ -323,9 +323,9 @@ DT-CHG-001（遷移）：
 | `std_change_template` | `tenant_id`、`id`、`stable_key`、`name`、`category`、`active_version_id`、`owner_group_id` |
 | `std_change_template_version` | `tenant_id`、`id`、`template_id`、`version_no`、`field_values`（作る変更の既定値）、`allowed_ci_condition`（式）、`max_duration`、`state`（`proposed` / `approved` / `rejected` / `retired`）、`approved_set_id`、`content_hash` |
 
-- 雛形の新しい版は「提案」として作り、`change_manager` のグループの承認（[workflow-engine.md](workflow-engine.md) の承認）を経て `approved` にする。承認済みの版は変えない。
-- 標準の変更は、作成の時に `std_template_version_id` を固定する。雛形の版の既定値を入れ、`allowed_ci_condition` と `max_duration`（予定の長さの上限）を `schedule` の `guard` で確かめる。
-- 雛形の版の承認の記録が、個々の標準の変更の承認の証跡になる（J-SOX の説明のため、変更の画面から雛形の版の承認へたどれるようにする）。
+- 雛形の新しいバージョンは「提案」として作り、`change_manager` のグループの承認（[workflow-engine.md](workflow-engine.md) の承認）を経て `approved` にする。承認済みのバージョンは変えない。
+- 標準の変更は、作成の時に `std_template_version_id` を固定する。雛形のバージョンの既定値を入れ、`allowed_ci_condition` と `max_duration`（予定の長さの上限）を `schedule` の `guard` で確かめる。
+- 雛形のバージョンの承認の記録が、個々の標準の変更の承認の証跡になる（J-SOX の説明のため、変更の画面から雛形のバージョンの承認へたどれるようにする）。
 - 標準の変更が `unsuccessful` で終わったら、雛形の持ち主のグループに知らせる。同じ雛形で 90 日に 3 回 `unsuccessful` なら、雛形を自動で `retired` にはせず、`change_manager` に見直しのタスクを作る。
 
 ### 8.3 リスクの評価
@@ -342,7 +342,7 @@ DT-CHG-001（遷移）：
 | 3 | なし | 回答済み（r2） | r2 | `questionnaire` |
 | 4 | なし | 未回答 | 通常：進めない。緊急：1（高） | `default` |
 
-- 評価は `request_assessment` の効果として同じトランザクションで行い、評価の入力（規則の版、回答、影響の範囲の件数）を `change_risk_assessment` に残す。評価の後に入力が変わったら（CI の変更）、`reschedule` で評価し直す。
+- 評価は `request_assessment` の効果として同じトランザクションで行い、評価の入力（規則のバージョン、回答、影響の範囲の件数）を `change_risk_assessment` に残す。評価の後に入力が変わったら（CI の変更）、`reschedule` で評価し直す。
 - 機械学習によるリスクの予測は MVP に入れない（[intent.md](../intent.md) の「選定・計測で決めるもの」）。
 
 ### 8.4 変更のタスク
@@ -355,7 +355,7 @@ DT-CHG-002（種類 × リスク → 承認の段）：
 
 | # | 種類 | リスク | 段 1（`assess` で） | 段 2（`authorize` で） | 期限切れの動作 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 標準 | - | なし（雛形の版の承認） | なし | - |
+| 1 | 標準 | - | なし（雛形のバージョンの承認） | なし | - |
 | 2 | 通常 | 4（低） | CI の `support_group` の管理者（`any`） | `change_manager` のグループ（`any`） | 引き上げ（`escalate`） |
 | 3 | 通常 | 3（中） | CI の `support_group` の管理者（`any`） | `change_manager` のグループ（`any`） | 引き上げ |
 | 4 | 通常 | 2（高） | CI の `support_group` の管理者（`any`） | CAB（`percent(50)`）。`cab_required = true` | 却下 |
@@ -369,7 +369,7 @@ DT-CHG-002（種類 × リスク → 承認の段）：
 
 #### 8.5.1 テナントの設定の表（`change_approval_policy_rule`）
 
-組み込みのフロー `change_approval_policy` の版（`flow_version`。NULL の行）は、DT-CHG-002 を既定の値として持つ。テナントが変える値は、フローの版に書かず、この表のテナントの行に持つ。フローは段ごとに、この表の有効な行を読み、なければ既定を使う（2026-09-28 に決定。期限の既定も承認済み）。
+組み込みのフロー `change_approval_policy` のバージョン（`flow_version`。NULL の行）は、DT-CHG-002 を既定の値として持つ。テナントが変える値は、フローのバージョンに書かず、この表のテナントの行に持つ。フローは段ごとに、この表の有効な行を読み、なければ既定を使う（2026-09-28 に決定。期限の既定も承認済み）。
 
 | 列 | 意味 |
 | --- | --- |
@@ -388,7 +388,7 @@ DT-CHG-002（種類 × リスク → 承認の段）：
 - 一意：`(tenant_id, change_type, risk, stage)` の有効な行は 1 つ。具体的な `risk` の行は `*` の行に勝つ。
 - 書けるのは `change_manager` のロールだけ。設定のパッケージ（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 10 節）で移送できる。
 - 段の数と、段を置く状態（`assess`・`authorize`・`review`）はテナントが変えられない。変えられるのは、各段の承認者・規則・期限・期限切れの動作だけである。
-- 承認の依頼のとき、使った行の `id` と `version`（既定なら組み込みのフローの版）を `approval_set` の作成の記録に残す。進行中のまとまりは、後から行を変えても作成の時の値で進む。
+- 承認の依頼のとき、使った行の `id` と `version`（既定なら組み込みのフローのバージョン）を `approval_set` の作成の記録に残す。進行中のまとまりは、後から行を変えても作成の時の値で進む。
 
 DT-CHG-003（保存の時の検査）：
 
@@ -420,7 +420,7 @@ DT-CHG-003（保存の時の検査）：
 
 | 表 | 列 |
 | --- | --- |
-| `change_window` | `tenant_id`、`id`、`stable_key`、`kind`（`blackout` / `maintenance`）、`name`、`calendar_id`（区間の定義。[sla-and-calendars.md](sla-and-calendars.md) の 3 節のカレンダーの版を使う）、`ci_condition`（式。CI の条件）、`scope`（`ci` / `tenant_wide`）、`applies_to_types`（既定：通常・標準）、`active` |
+| `change_window` | `tenant_id`、`id`、`stable_key`、`kind`（`blackout` / `maintenance`）、`name`、`calendar_id`（区間の定義。[sla-and-calendars.md](sla-and-calendars.md) の 3 節のカレンダーのバージョンを使う）、`ci_condition`（式。CI の条件）、`scope`（`ci` / `tenant_wide`）、`applies_to_types`（既定：通常・標準）、`active` |
 
 - **区間はカレンダーと同じ表現にする。** 禁止期間は「閉じる」ではなく「この区間は変更を禁止する」の意味で、カレンダーの週の型と例外で区間を作る。区間の計算は [ADR-0019](../decisions/0019-business-calendar-and-pure-time-functions.md) の半開区間の関数を共有する。
 - **凍結期間**（年末年始、期末、大型のイベント）は、`scope = tenant_wide` の禁止期間として持つ。CI の条件を持たず、全 CI に効く。
@@ -481,8 +481,8 @@ DT-CONF-001（衝突の種類と重さ）：
 
 | 障害 | 振る舞い |
 | --- | --- |
-| 同じレコードの並行の遷移 | 版の条件で後のほうが 409。効果（承認の依頼・SLA の停止）は 1 回だけ |
-| 自動の完了のタイマーの発火と再オープンが同時 | 版の条件で先にコミットしたほうだけが効く |
+| 同じレコードの並行の遷移 | バージョンの条件で後のほうが 409。効果（承認の依頼・SLA の停止）は 1 回だけ |
+| 自動の完了のタイマーの発火と再オープンが同時 | バージョンの条件で先にコミットしたほうだけが効く |
 | 子への伝播の `bulk_job` の途中の停止 | `bulk_job` の続きから再開する。子は 1 件ずつのトランザクションなので、半端な子はない |
 | 衝突の非同期の計算し直しの遅れ | `conflict_checked_at` が古い変更は、画面に「確認の時刻」を出す。遷移の時は必ず同期で計算し直すので、遷移の判定は遅れの影響を受けない |
 | CMDB の走査が上限で打ち切られた | 影響の範囲に `truncated` を残し、リスクの規則で「影響の範囲の不明」を高リスクとして扱える |
@@ -507,7 +507,7 @@ DT-CONF-001（衝突の種類と重さ）：
 
 ### 12.2 性質ベーステスト（fast-check）
 
-- **PROP-CHG-001（承認なしに実施しない）**：任意の変更の種類と、任意の操作・承認の回答・期限の発火・予定の変更の列で、`implement` に入った変更は、その直前の `scheduled` への遷移の時点で、決着が `approved` の承認のまとまり（標準は承認済みの雛形の版）を持つ。
+- **PROP-CHG-001（承認なしに実施しない）**：任意の変更の種類と、任意の操作・承認の回答・期限の発火・予定の変更の列で、`implement` に入った変更は、その直前の `scheduled` への遷移の時点で、決着が `approved` の承認のまとまり（標準は承認済みの雛形のバージョン）を持つ。
 - **PROP-CHG-002（予定の固定）**：任意の列で、`implement` に入った変更の `planned_start`・`planned_end`・`ci_id` は、最後の承認の決着の時点の値と同じ。
 - **PROP-PRIO-001（優先度の導出）**：任意の影響度・緊急度・上書きの操作の列で、上書きがない間は `priority = matrix(impact, urgency)`。
 - **PROP-CONF-001（衝突の関数の対称と単調）**：任意の 2 つの変更で、`ci_overlap` は両方の側に出る（対称）。予定の区間を縮めても、衝突の集合は増えない（単調）。
@@ -579,7 +579,7 @@ DT-CONF-001（衝突の種類と重さ）：
 
 ### quality.md
 
-- 承認なしに `implement` に入った変更の件数：常に 0（本番の突き合わせのジョブで日次に数える。PROP-CHG-001 の本番の版）。
+- 承認なしに `implement` に入った変更の件数：常に 0（本番の突き合わせのジョブで日次に数える。PROP-CHG-001 の本番のバージョン）。
 - 緊急の変更の割合と、事後の CAB の承認の滞留（`review` の日数）。
 - 禁止期間の例外の承認の件数（月次）。
 - 変更の成功率（`resolution_code` 別）、標準の変更の雛形ごとの失敗の件数。
@@ -599,7 +599,7 @@ DT-CONF-001（衝突の種類と重さ）：
 
 | 置き場所 | 中身 |
 | --- | --- |
-| コードの版 | 状態のモデル（`incident`、`problem`、`change.*`、`generic_task`） |
+| コードのバージョン | 状態のモデル（`incident`、`problem`、`change.*`、`generic_task`） |
 | Aurora `task`（型付きの列の追加） | インシデント：`hold_reason`、`resolution_code`、`resolution_notes`、`resolved_by`、`reopen_count`、`auto_close_at`、`priority_computed`、`priority_override`、`priority_override_reason`、`major`、`major_manager_id`、`problem_id`、`duplicate_of_id`、`reopened_from_id`、`cancel_reason`。問題：`known_error`、`workaround`、`cause_notes`、`fix_notes`。変更：8.1 節の列 |
 | Aurora `priority_matrix` | 5.1 節。メタデータ |
 | Aurora `major_incident_candidate`、`major_incident_trigger` | 6.1 節 |
@@ -607,6 +607,6 @@ DT-CONF-001（衝突の種類と重さ）：
 | Aurora `risk_condition`、`risk_questionnaire`、`change_risk_assessment` | 8.3 節 |
 | Aurora `change_approval_policy_rule` | 8.5.1 節。テナントの承認の方針の値（メタデータ） |
 | Aurora `cab_definition`、`cab_meeting`、`cab_agenda_item` | 8.6 節 |
-| Aurora `change_window` | 9.1 節。区間はカレンダーの版 |
+| Aurora `change_window` | 9.1 節。区間はカレンダーのバージョン |
 | Aurora `change_conflict`（変更ごとの衝突の行）、`change_impact_snapshot` | 9.2〜9.4 節。`(tenant_id, change_id)`、`(tenant_id, ci_id, overlap)` |
 | Aurora `change_affected_ci` | 影響を受ける CI の一覧（変更 × CI） |

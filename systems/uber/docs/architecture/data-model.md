@@ -14,7 +14,7 @@
 | --- | --- | --- | --- |
 | [data-model/supply.md](data-model/supply.md) | 事業者・営業所・車両・ドライバー・書類・保険・事業者の利用者、出庫のセッション・点呼・端末の完全性、日本版ライドシェアの運行枠 | 18 | 2 |
 | [data-model/trips.md](data-model/trips.md) | 乗車、割り当て（オファー）、区間、遷移の記録、冪等、タイマー、outbox、食い違い、乗降の提供者の内容、ETA、軌跡の索引、ナビ、断った需要、商品と車両 | 15 | 1 |
-| [data-model/pricing.md](data-model/pricing.md) | 運賃ブロック、版つきの運賃の規則、事業者の割り当てと価格の群、料金の規則、見積もり、推計走行距離、変動運賃の水準、メーターの額 | 15 | 1 |
+| [data-model/pricing.md](data-model/pricing.md) | 運賃ブロック、バージョンつきの運賃の規則、事業者の割り当てと価格の群、料金の規則、見積もり、推計走行距離、変動運賃の水準、メーターの額 | 15 | 1 |
 | [data-model/payments.md](data-model/payments.md) | 決済の方法、支払いと PSP の操作、Webhook、訂正と返金、未払い、台帳、振込先・締め・振込、照合（Aurora `money`） | 16 | 2 |
 | [data-model/maps-and-areas.md](data-model/maps-and-areas.md) | 区域の多角形と格子の写し、乗降の地点、地図の上書きと誤りの候補、保存した場所 | 6 | 1 |
 | [data-model/safety-and-communications.md](data-model/safety-and-communications.md) | 共有、緊急の通報と位置、報告、書き出し、顔の照合、評価、拒否の組、PIN、番号の中継、メッセージ、不正 | 15 | 1 |
@@ -144,8 +144,8 @@ DB のロール：
 ### 3.5 区域の参照
 
 - **区域は `service_areas` だけが持つ。** 営業区域・交通圏・日本版ライドシェアの区域・運賃の区域・待機場・空港の多角形の唯一の正本（[maps-and-geodata.md](maps-and-geodata.md) の 9 節）。他の領域は多角形の写しを持たない。
-- 区域を指す列は `service_areas.area_id`（`text`）を持ち、名前を `*area_id` で終える（`service_area_id`、`fare_area_id`、`pickup_area_ids`）。版を固定して指すときは `<area_id>@<version>` の文字列（`trips.pickup_area_ids`）。
-- 区域は版つきで PK が `(area_id, version)` なので、外部キーを張れない。参照する列には制約トリガー `check_area_ref(column, allowed_kinds[])` を付け、`area_id` の版が 1 つ以上あり、`kind` が許した種類であることを確かめる。
+- 区域を指す列は `service_areas.area_id`（`text`）を持ち、名前を `*area_id` で終える（`service_area_id`、`fare_area_id`、`pickup_area_ids`）。バージョンを固定して指すときは `<area_id>@<version>` の文字列（`trips.pickup_area_ids`）。
+- 区域はバージョンつきで PK が `(area_id, version)` なので、外部キーを張れない。参照する列には制約トリガー `check_area_ref(column, allowed_kinds[])` を付け、`area_id` のバージョンが 1 つ以上あり、`kind` が許した種類であることを確かめる。
 - 判定は `Contains`（`street` の写しで絞り、境目は多角形で確かめる）だけ。運賃や営業区域の最終の判定にセルだけを使うコードを差し戻す（ADR-0002 の Confirmation）。
 
 ### 3.6 時刻
@@ -178,7 +178,7 @@ DB のロール：
 - 取り消しは `revoked_at`（`share_links`・`driver_attestations`・`legal_gate_records`・`jit_grants` など）。記録を消さずに効力だけを止める。
 - **個人の情報の除去**：保持の期限の後、個人の情報の列を NULL にして `redacted_at` を入れる。ID・金額・日時は残す（`trips` は `rider_id` とピンを NULL にし `street` のセルだけを残す。`drivers` は電話番号と表示名）。
 - アカウントの削除は 30 日の猶予の後、ログインの情報・電話番号・保存した場所・端末のトークンを消す。乗車・運賃・台帳は ID を残したまま、上の期間まで持つ（[security.md](security.md) の 7.2 節）。
-- 削除のジョブは消す前に `legal_holds` を引く。削除は東京と大阪の両方で行う（S3 の版を指定した削除は複製で伝わらない）。
+- 削除のジョブは消す前に `legal_holds` を引く。削除は東京と大阪の両方で行う（S3 のバージョンを指定した削除は複製で伝わらない）。
 
 ### 3.10 命名と型
 
@@ -244,7 +244,7 @@ DB のロール：
 | 層 | キー | 表・制約 |
 | --- | --- | --- |
 | アプリ → Trips | `command_id`（送り手の UUID）、作成は `(rider_id, client_request_id)` | `trip_commands` の PK、`trips` の UK |
-| 事象の購読 | `outbox_events.event_id` | Trips は `command_id` として `trip_commands`。他の購読する側は版（stores の 7 節）で古い事象を捨てる |
+| 事象の購読 | `outbox_events.event_id` | Trips は `command_id` として `trip_commands`。他の購読する側はバージョン（stores の 7 節）で古い事象を捨てる |
 | PSP | `trip:{trip_id}:{kind}:{seq}` | `psp_operations.idempotency_key` の UK と部分一意索引 |
 | 台帳 | `capture:{trip_id}`・`fee:{trip_id}`・`refund:{trip_id}:{seq}`・`payout:{payout_id}:create`・`recon:{source}:{external_id}` | `ledger_entry_keys` の PK |
 | 振込 | `payout:{settlement_period_id}` | `operator_payouts.idempotency_key` |
@@ -420,7 +420,7 @@ erDiagram
 | **乗降の座標は乗客が確かめたピンだけ** | ドメイン型 `rider_pin`。提供者の内容は `trip_place_refs`（期限つき）だけ | [ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)、PROP-MAP-004 |
 | **白タクの経路がない**：事業者に属さないドライバー、審査の済まない事業者のドライバーは出庫できない | `drivers.operator_id NOT NULL` と `(id, operator_id)` の複合の外部キー（車両・セッション・割り当て・招待）。ドライバーのアプリのトークンのロールに供給の表への `INSERT` の権限がない。招待は事業者だけが作る。出庫の判定（DT-SUP-002）で事業者の `status = active` とライドシェアの許可（`operator_authorizations`）を確かめる。`trips` の CHECK で日本版ライドシェアの乗車は承諾・事前確定・アプリの決済・降車地ありに限る | [intent.md](../intent.md)、[ADR-0026](../decisions/0026-supply-registry-and-document-verification.md)、PROP-SUP-005 |
 | **法務の確認待ちの経路は記録の範囲の外で動かない** | legal のフラグの本番の値は、AppConfig の検証の関数が `legal_gate_records` の範囲（L 番号・事業者・交通圏・機能・期間）と突き合わせる。記録は `legal_counsel` だけが作り、消さない | [ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md) |
-| **運賃の規則は承認の後に変わらない** | `fare_rule_immutable` のトリガー、2 人の承認の CHECK、有効期間の排他制約。見積もりと乗車が版を指す | [ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)、PROP-FARE-006 |
+| **運賃の規則は承認の後に変わらない** | `fare_rule_immutable` のトリガー、2 人の承認の CHECK、有効期間の排他制約。見積もりと乗車がバージョンを指す | [ADR-0018](../decisions/0018-versioned-fare-rules-and-integer-yen.md)、PROP-FARE-006 |
 | **書き手と承認者は別の人。エージェントは承認しない** | `change_requests` の CHECK（`approver_id <> author_id`、`author_kind = agent` の行は承認に進まない） | [ADR-0032](../decisions/0032-ops-console-roles-limits-change-requests-and-audit.md)、PROP-OPS-001 |
 | **監査ログは操作と同じトランザクション、追記のみ** | `audit_events` に全ロールが `INSERT`・`SELECT` だけ。同じトランザクションで outbox に書き、log-archive の Object Lock へ | [ADR-0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md) |
 | **区域は `service_areas` だけ** | 区域を指す列は `*area_id` と `check_area_ref` のトリガー。多角形の写しの列を他の表に作らない | [ADR-0033](../decisions/0033-osm-import-and-service-area-polygons.md) |
@@ -517,16 +517,16 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | --- | --- | --- | --- |
 | 1 | 構成 | 列の正本をこの文書と `data-model/` の 9 つのファイルにした（Stripe・Slack の題材と同じ形） | 1,500 行を超えるため、領域ごとに分けた |
 | 2 | 乗降のピンの型 | 複合型 `geo_pin` とドメイン `rider_pin`（`origin = rider_confirmed_pin` だけ）。列の名前は `pickup_pin`・`dropoff_pin` のまま | PROP-MAP-004 を型で守る |
-| 3 | 乗車の版の列の名前 | 表の列は `trips.version`、事象と契約のフィールドは `trip_version` | trips-lifecycle の 14 節の表の定義に合わせた |
+| 3 | 乗車のバージョンの列の名前 | 表の列は `trips.version`、事象と契約のフィールドは `trip_version` | trips-lifecycle の 14 節の表の定義に合わせた |
 | 4 | 事業者の RLS の鍵を乗車に持つ | `trips.operator_id`（受諾で入れる）を足し、事業者はビュー `operator_trip_rows` で読む | 事業者の管理画面の乗車の履歴を RLS で閉じ、乗車の後はピンを丸めるため |
 | 5 | 価格の群の実体 | 最小の表 `pricing_groups` を足した。群は割り当てのトリガーが署名から作る | pricing の 5.3 節の `pricing_group_id` の参照先がなかった |
 | 6 | 振込先の口座の実体 | `money` に `operator_bank_accounts` を足した（`money` の鍵で列の暗号化） | payments の 11・14 節の `bank_account_id` の参照先がなかった |
 | 7 | 照合の行 | `recon_lines` を足した | ファイルの行ごとの突き合わせの単位が要る（Stripe の題材の `settlement_lines` と同じ役割） |
-| 8 | 商品と車両の対応 | `core` の版つきの表 `product_vehicle_map` にした | 配車（Go）と Trips の確かめ直し（TypeScript）が同じ版を読むため（DT-DISP-001） |
+| 8 | 商品と車両の対応 | `core` のバージョンつきの表 `product_vehicle_map` にした | 配車（Go）と Trips の確かめ直し（TypeScript）が同じバージョンを読むため（DT-DISP-001） |
 | 9 | `money` の outbox | `money` にも `outbox_events` を同じ形で置き、SNS `payments-events` へ中継する | 与信の結果を Trips に返し、クラスタをまたぐトランザクションを書かないため |
 | 10 | オファーの乗車地の運び方 | `driver.assignment_changed` から位置を外し、乗車地を運ぶ `offer.created` を別の事象にして `rt-fanout` だけに流す | 分析などの購読する側のキューに正確な位置を流さないため（NFR-009） |
 | 11 | 断った需要の持ち方 | `demand_rejections` は都市 × 分 × `block` × 理由の集計の行（API のタスクが 10 秒ごとに足す） | 嵐の日の 1 件ずつの書き込みで `core` を詰まらせないため（capacity の 4 節の「または S3 の集計」を Aurora の集計に決めた） |
-| 12 | 区域の参照の守り | 外部キーの代わりに制約トリガー `check_area_ref` | 区域は版つきで PK が `(area_id, version)` のため |
+| 12 | 区域の参照の守り | 外部キーの代わりに制約トリガー `check_area_ref` | 区域はバージョンつきで PK が `(area_id, version)` のため |
 | 13 | 法務の記録の範囲の NULL | `legal_gate_records.operator_id`・`fare_area_id` の NULL は「すべて」 | 乗車の共有など、事業者に依らない結論を 1 行で記録するため。範囲を狭めるときは行を分ける |
 | 14 | 鍵の書き分け | `core` の `audit_events` は `app`、写しが `audit` | Aurora の暗号化はクラスタごとのため |
 | 15 | S3 の接頭辞 | `face-checks/`・`incident-packets/`・`recon-raw/`・`ledger-archive/`・`demand-forecasts/` を決めた | 領域の文書が接頭辞を決めていなかった |

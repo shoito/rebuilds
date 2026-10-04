@@ -14,7 +14,7 @@
 - 扱う：
   - エディタの方式、文書のスキーマ（ノードと装飾）、Markdown のショートカット、スラッシュコマンド、貼り付け、Undo
   - 本文のモデル（`IssueDescription`）、CRDT の更新の送り方、サーバーでのまとめ、読み込み、手元の保存
-  - 本文の版（履歴）と戻し
+  - 本文のバージョン（履歴）と戻し
   - コメント（`Comment`）、スレッド、解決、リアクション
   - インラインのコメントのアンカー
   - メンションと参照
@@ -38,7 +38,7 @@
 | メンション | `@` で利用者・イシュー・プロジェクト・日付・ドキュメント・PR を参照できる。利用者のメンションは、その人のインボックスへ通知し、イシューを購読させる。`@ENG-123` の貼り付けで参照になる | 同上 |
 | 添付 | `/file`、`Cmd+Shift+U` で上げる。上限の大きさは書かれていない | 同上 |
 | 同時編集 | すべてのドキュメントとイシューの説明を、複数の人が同時に編集できる | [Editor improvements](https://linear.app/changelog/2023-12-06-editor-improvements)（2023-12-06） |
-| 本文の履歴 | コマンドメニューの「Issue description history」から前の版に戻せる | [Edit issues](https://linear.app/docs/editing-issues) |
+| 本文の履歴 | コマンドメニューの「Issue description history」から前のバージョンに戻せる | [Edit issues](https://linear.app/docs/editing-issues) |
 | コメント | スレッド、解決、リアクション。コメントを直せるのは作った人だけ。本文の範囲を選んで `Cmd+Option+M` でインラインのコメント | [Comments and reactions](https://linear.app/docs/comment-on-issues)、[Edit issues](https://linear.app/docs/editing-issues) |
 | API での上げ | ファイルの種類・名前・大きさを渡して、署名付きの上げの URL と資産の URL を受け、`PUT` で上げる。API の利用者の上げは、CSP のためサーバーから行う | [How to upload a file to Linear](https://linear.app/developers/how-to-upload-a-file-to-linear) |
 | メールの取り込み | メールからの作成は、添付を 25 MB まで | 検索の抜粋（Linear Docs）。本文は未確認 |
@@ -56,7 +56,7 @@
 | 相対位置 | 共有の型の中の要素に固定した位置。他の人の変更で動かない。消えた型を指すと `null` になる。`assoc` で前後どちらの要素に付くかを選ぶ | [Y.RelativePosition](https://docs.yjs.dev/api/relative-positions) |
 | clientID | 文書ごとに自動で振る。セッションをまたいで使い回してはいけない | [Y.Doc](https://docs.yjs.dev/api/y.doc) |
 | ProseMirror | y-prosemirror は ProseMirror を同時編集にし、共有の Undo も持つ。文書はスキーマに合うように保たれる。添字の位置は同時編集で正しく動かないので、コメントなどは相対位置で作ること | [y-prosemirror](https://docs.yjs.dev/ecosystem/editor-bindings/prosemirror) |
-| 版 | `yjs` 13.6.33、`y-prosemirror` 1.3.7（npm の最新。どちらも MIT） | npm のレジストリ |
+| バージョン | `yjs` 13.6.33、`y-prosemirror` 1.3.7（npm の最新。どちらも MIT） | npm のレジストリ |
 
 ## 3. エディタ
 
@@ -76,10 +76,10 @@
 
 - 表と埋め込み（YouTube・Loom・Figma）は MVP で持たない（本家との差異）。外部の `iframe` の安全の検討が要るため。
 - リンクの `href` は `https:`・`http:`・`mailto:` と、本システムの内部の URL だけ。他は装飾を外す。
-- y-prosemirror は、スキーマに合わない要素（知らないノード）を ProseMirror のノードにできないと、その要素を共有の Yjs の文書から消す（`createNodeFromYElement` の `catch` で `_item.delete`。[y-prosemirror 1.3.7 の sync-plugin.js](https://github.com/yjs/y-prosemirror/blob/master/src/plugins/sync-plugin.js)、2026-09-28 に確認）。消した更新は同期で全員に届くので、古いクライアントが 1 台開くだけで、新しい版で作った中身が全員から消える。
+- y-prosemirror は、スキーマに合わない要素（知らないノード）を ProseMirror のノードにできないと、その要素を共有の Yjs の文書から消す（`createNodeFromYElement` の `catch` で `_item.delete`。[y-prosemirror 1.3.7 の sync-plugin.js](https://github.com/yjs/y-prosemirror/blob/master/src/plugins/sync-plugin.js)、2026-09-28 に確認）。消した更新は同期で全員に届くので、古いクライアントが 1 台開くだけで、新しいバージョンで作った中身が全員から消える。
 - そこで、本文のスキーマにノード・装飾・属性を足すことを、破壊の変更として扱う（[data-model-and-schema.md](data-model-and-schema.md) の 6.2 節）。手順は次のとおり。
-  1. 足すノードを読める（描ける）だけの版を出す。作る操作はフラグ（`release.*`）の裏に置く。
-  2. Gateway の `min_build` を、その版まで上げる（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。古い版は接続を切られ、差分を受けない。Sync API の本文の読み込み（4.4 節）も `build < min_build` を断る。
+  1. 足すノードを読める（描ける）だけのバージョンを出す。作る操作はフラグ（`release.*`）の裏に置く。
+  2. Gateway の `min_build` を、そのバージョンまで上げる（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。古いバージョンは接続を切られ、差分を受けない。Sync API の本文の読み込み（4.4 節）も `build < min_build` を断る。
   3. フラグを開き、作れるようにする。
 - 「表示できない要素」の置き物で描く方式は採らない（上のとおり、y-prosemirror が要素を消すため）。
 
@@ -197,11 +197,11 @@ ADR-0014 が予約した `_doc_*` の名前で、次の store を持つ（構成
 - `Y.Doc` を作るたびに新しい clientID を振る（Yjs の既定）。同じ文書を 2 つのタブで開けば、別の clientID になる。
 - outbox に残った前のセッションの `append` は、前の clientID の更新のままで送る。新しいセッションは同じ clientID を使わないので、Yjs の注意（使い回しの禁止）に反しない。
 
-### 4.7 本文の版
+### 4.7 本文のバージョン
 
-- Worker のまとめが、前の版から 10 分以上経ち、`text_plain` が変わっていれば、`IssueDescriptionVersion`（`via` のグループ、`lazy`）を作る。中身は `state`、`text_plain`、`actor_ids`（その間に書いた人）、`at`（`created_at`）。1 つの本文で 100 版か 90 日まで持つ。`state` は `bytes` の型で、差分に載せず、版を ID で読み込んだ時だけ返す（最大 4 MiB で、Relay の 1 メッセージ 1 MiB に収まらないため）。`text_plain` はサーバーだけの列（[data-model/issues.md](data-model/issues.md)。2026-09-28 に決めた）。
-- 戻す：画面は版の `state` を別の `Y.Doc` に読み込み、ProseMirror の文書にし、今の本文をその内容に置き換える編集として当てる。結果は普通の `append` になる。戻しの間に他の人が書いた分は、置き換えの後に合わさる。
-- 版を消す：`owner`・`admin` は、1 つの版か、ある時刻より前の全部の版を消せる（`delete IssueDescriptionVersion`。DT-PERM-003）。消したつもりの秘密（トークンの貼り付け）を版から消すため。操作はワークスペースの監査に残す（[security.md](security.md) の 6 節）。今の本文の CRDT の状態（`doc_states`）には、ごみ集めの後は消した文字が残らない。security の領域の依頼を受けて、統合の工程で足した。
+- Worker のまとめが、前のバージョンから 10 分以上経ち、`text_plain` が変わっていれば、`IssueDescriptionVersion`（`via` のグループ、`lazy`）を作る。中身は `state`、`text_plain`、`actor_ids`（その間に書いた人）、`at`（`created_at`）。1 つの本文で 100 バージョンか 90 日まで持つ。`state` は `bytes` の型で、差分に載せず、バージョンを ID で読み込んだ時だけ返す（最大 4 MiB で、Relay の 1 メッセージ 1 MiB に収まらないため）。`text_plain` はサーバーだけの列（[data-model/issues.md](data-model/issues.md)。2026-09-28 に決めた）。
+- 戻す：画面はバージョンの `state` を別の `Y.Doc` に読み込み、ProseMirror の文書にし、今の本文をその内容に置き換える編集として当てる。結果は普通の `append` になる。戻しの間に他の人が書いた分は、置き換えの後に合わさる。
+- バージョンを消す：`owner`・`admin` は、1 つのバージョンか、ある時刻より前の全部のバージョンを消せる（`delete IssueDescriptionVersion`。DT-PERM-003）。消したつもりの秘密（トークンの貼り付け）をバージョンから消すため。操作はワークスペースの監査に残す（[security.md](security.md) の 6 節）。今の本文の CRDT の状態（`doc_states`）には、ごみ集めの後は消した文字が残らない。security の領域の依頼を受けて、統合の工程で足した。
 
 ### 4.8 上限
 
@@ -212,7 +212,7 @@ ADR-0014 が予約した `_doc_*` の名前で、次の store を持つ（構成
 | 本文の文字 | 20 万字（Worker が `text_len` で見て、超えたら画面が警告し、次の `append` を `too_large` にする） |
 | 画像のノード | 1 つの本文に 200 |
 | 送りのまとめ | 250ms |
-| 版 | 100 版か 90 日 |
+| バージョン | 100 バージョンか 90 日 |
 
 ## 5. コメント
 
@@ -365,7 +365,7 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 - 本文とコメントは、どちらも利用者の書いた中身（`pii: content`）。ログ・トレース・メトリクスには、大きさと ID だけを書く。
 - 描画は ProseMirror のスキーマを通したものだけ。HTML をそのまま差し込まない。リンクの `href` を 3.2 節の規則で絞る。
 - 本文の `append` は中身を検証できない（4.3 節）。悪意のある更新で本文を大きくすることは、大きさの上限で止める。壊れた更新（Yjs として読めない）は `invalid` で拒否し、ログに載せない。
-- 本文の版（4.7 節）には、消した文字も残る。消したつもりの秘密（トークンの貼り付け）は版から見える。`owner`・`admin` は版を消せる（4.7 節、DT-PERM-003）。
+- 本文のバージョン（4.7 節）には、消した文字も残る。消したつもりの秘密（トークンの貼り付け）はバージョンから見える。`owner`・`admin` はバージョンを消せる（4.7 節、DT-PERM-003）。
 - 添付は別のドメインから、短い期限の署名付きの URL で配る（8.3 節）。上げの URL は、大きさ・種類・SHA-256 を署名に含め、別の中身を上げられないようにする。
 - 非公開のチームの添付は、`/files/<id>` の `can()` で絞る。S3 と CloudFront はワークスペースのプレフィックスで分けるが、権限の判定はしない。
 - メンションの候補と通知は、見てよい人に絞る（6 節）。
@@ -381,20 +381,20 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 - 例示テスト：3.3 節の入力の規則、3.4 節の貼り付けの落とし方（`script`、`style`、`javascript:` のリンク）。
 - IME：[client-app.md](client-app.md) の 5.3 節の組み合わせ（OS × IME × ブラウザ）で、本文とコメントの入力、組み立て中の Enter、入力の規則の抑止を確かめる。
 - 結合テスト：上げの URL の署名の外の大きさ・種類の `PUT` が S3 で拒否される。期限切れの `upload_ref` が拒否される。見てよくない人の `/files/<id>` が 404。
-- 互換：3.2 節の手順の試験（`doc-schema-compat`）。(1) 1 つ前の版のスキーマで新しいノードを含む本文を開くと、y-prosemirror がそのノードを消すことを回帰テストに残す（前提が変わったら気づく）。(2) `min_build` より古いクライアントは、Gateway でも Sync API の本文の読み込みでも、新しいノードを含む本文を受けない。(3) フラグを開く前に、新しいノードを作る操作がない。
+- 互換：3.2 節の手順の試験（`doc-schema-compat`）。(1) 1 つ前のバージョンのスキーマで新しいノードを含む本文を開くと、y-prosemirror がそのノードを消すことを回帰テストに残す（前提が変わったら気づく）。(2) `min_build` より古いクライアントは、Gateway でも Sync API の本文の読み込みでも、新しいノードを含む本文を受けない。(3) フラグを開く前に、新しいノードを作る操作がない。
 
 ## 13. Story の候補
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E5 | `doc-package` | `packages/doc`（Yjs と y-prosemirror を閉じる API） |
-| E5 | `doc-schema-compat` | 3.2 節のノードの追加の手順（読める版 → `min_build` → 作成のフラグ）と、その試験 |
+| E5 | `doc-schema-compat` | 3.2 節のノードの追加の手順（読めるバージョン → `min_build` → 作成のフラグ）と、その試験 |
 | E5 | `description-editor` | 3.2〜3.5 節のスキーマ、入力の補助、貼り付け、Undo |
 | E5 | `description-append-sync` | 4.1・4.3 節の送り方と Writer の検証 |
 | E5 | `doc-compaction-worker` | 4.2 節のまとめ、テキストの抜き出し、保持のジョブとの連携 |
 | E5 | `description-lazy-load` | 4.4 節の読み込み（読んだ時点までを合わせる） |
 | E5 | `doc-local-store` | 4.5 節の `_doc_state`・`_doc_updates`、拒否の作り直し（client-store-and-offline と共同） |
-| E5 | `description-versions` | 4.7 節の版と戻し |
+| E5 | `description-versions` | 4.7 節のバージョンと戻し |
 | E5 | `comments-and-threads` | 5 節のコメント、スレッド、解決、削除 |
 | E5 | `reactions` | 5.1 節のリアクション |
 | E5 | `mentions` | 6 節の候補、描画、コメントの派生、本文の Worker の抜き出し |
@@ -428,15 +428,15 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 - **表と埋め込み**：MVP で持たない。
 - **添付の上限**：1 ファイル 100 MiB。種類は 8.2 節。
 - **マルウェアの検査**：MVP でしない。危ない種類は常にダウンロードにし、別のドメインから配る。
-- **本文の版**：10 分ごと、100 版か 90 日。
+- **本文のバージョン**：10 分ごと、100 バージョンか 90 日。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| Yjs の次の大きな版（更新の形の互換） | 版を固定し、上げる時に 1 つ前の版の更新との互換を試験してから ADR で決める |
+| Yjs の次の大きなバージョン（更新の形の互換） | バージョンを固定し、上げる時に 1 つ前のバージョンの更新との互換を試験してから ADR で決める |
 | カーソルと在席の表示 | 試用の声。入れるなら Gateway のプロトコルに一時のメッセージを足す ADR（sync-engine の領域と共同） |
-| 本文の版に残る消した秘密の扱い | security の領域と法務の L5 |
+| 本文のバージョンに残る消した秘密の扱い | security の領域と法務の L5 |
 | 本家の本文の CRDT の部品、添付の上限、インラインのコメントの保存の形 | 公式の資料で確かめられなかった（**未検証**のまま） |
 
 ## 15. quality.md・runbooks・data-model への項目
@@ -444,8 +444,8 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 ### quality.md
 
 - PROP-DOC-001〜005 を E5 のリリースの基準にする。
-- IME の手動の確認表（本文とコメント）を、ブラウザの大きな版の更新のたびに流す。
-- 本番：`append` の拒否の率（`too_large`・`invalid`）。`invalid` が出たら、クライアントの Yjs の版のずれを疑う。
+- IME の手動の確認表（本文とコメント）を、ブラウザの大きなバージョンの更新のたびに流す。
+- 本番：`append` の拒否の率（`too_large`・`invalid`）。`invalid` が出たら、クライアントの Yjs のバージョンのずれを疑う。
 - 本番：まとめの遅れ（最初のまとめていない `append` からの時間）の p95 と、`pending_bytes` の分布。
 - 本番：メンションの通知の遅れ（`append` の確定から通知の事象まで）の p95 10 秒。
 - 本番：添付の `failed` の率と、`pending` が 1 時間を超えた件数。
@@ -453,7 +453,7 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 ### runbooks
 
 - `doc-compaction-lag.md`：まとめの遅れの確かめ方（SQS の滞留、大きな文書、Worker の失敗）と、保持のジョブの待ちの確認。
-- `doc-corruption.md`：本文が開けない・描けない報告への対応（`doc_states` と `append` の取り出し、`packages/doc` での再生、版からの戻し）。
+- `doc-corruption.md`：本文が開けない・描けない報告への対応（`doc_states` と `append` の取り出し、`packages/doc` での再生、バージョンからの戻し）。
 - `attachment-url-leak.md`：署名付きの URL の漏えいの疑い（鍵の入れ替え、該当の中身の移動）。
 
 ### data-model（索引への追加の提案）
@@ -463,7 +463,7 @@ Worker：S3 の HEAD で大きさと SHA-256 を確かめ → state = ready（�
 | `issue_descriptions`（`IssueDescription`） | 本文の行（`text_len`、`state_size`） | 4.1 |
 | `doc_states` | まとめた Yjs の状態、`compacted_through`、`pending_bytes`、`text_plain` | 4.2 |
 | `sync_actions` の `append` | 本文の更新（base64） | 4.3 |
-| `issue_description_versions`（`IssueDescriptionVersion`） | 本文の版（`via`、`lazy`） | 4.7 |
+| `issue_description_versions`（`IssueDescriptionVersion`） | 本文のバージョン（`via`、`lazy`） | 4.7 |
 | `comments`・`reactions` | コメント（LWW の JSON、アンカー）、リアクション | 5.1、7 |
 | `doc_mentions`（サーバーだけ） | 本文のメンションの集合 | 6 |
 | `attachments` | 添付の行と状態 | 8.1 |

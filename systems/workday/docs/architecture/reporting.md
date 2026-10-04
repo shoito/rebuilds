@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0040](../decisions/0040-declarative-reports-and-analytics-store.md) | レポートは宣言の定義（データの元、列、条件、集計、時点の引数）で持ち、テナントに SQL を書かせない。実行は `scopeFilter`・`project` を通した SQL で行い、実行ごとに時点・定義の版・結果のハッシュを記録する。S1 は Aurora のレポート専用の reader、S2 は S3 の Iceberg の表と Athena に移す。分析用の基盤も、同じレポートのサービスからだけ読む |
+| [0040](../decisions/0040-declarative-reports-and-analytics-store.md) | レポートは宣言の定義（データの元、列、条件、集計、時点の引数）で持ち、テナントに SQL を書かせない。実行は `scopeFilter`・`project` を通した SQL で行い、実行ごとに時点・定義のバージョン・結果のハッシュを記録する。S1 は Aurora のレポート専用の reader、S2 は S3 の Iceberg の表と Athena に移す。分析用の基盤も、同じレポートのサービスからだけ読む |
 | [0041](../decisions/0041-small-cell-suppression-for-sensitive-aggregates.md) | 給与の額などの機微な値の集計は、個々の値を見る権限のない利用者に対して、人数 5 人未満の区分を伏せ、伏せた区分が合計から逆算できないよう 2 次の抑止をかける。集計の軸と条件を許可リストに限る |
 
 ## 1. 目的と範囲
@@ -33,7 +33,7 @@
 | `known_at` | 記録時刻。この時刻にシステムが知っていた内容で出す | 省く（現在の知識） | 加えて `audit` |
 
 - `known_at` は安定の境界（今 − 10 秒）以下に丸め、実行の記録に丸めた値を残す（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。
-- `known_at` を省いた実行も、開始の時刻を `resolved_known_at` として記録する。同じ定義の版・同じ引数・同じ `resolved_known_at` で出し直すと、同じ行が出る（PROP-RPT-001）。現在の知識の表で読んだ実行は、監査の画面で「再現」を押したとき、版の表で読み直して一致を確かめる。
+- `known_at` を省いた実行も、開始の時刻を `resolved_known_at` として記録する。同じ定義のバージョン・同じ引数・同じ `resolved_known_at` で出し直すと、同じ行が出る（PROP-RPT-001）。現在の知識の表で読んだ実行は、監査の画面で「再現」を押したとき、バージョンの表で読み直して一致を確かめる。
 - 期間の推移（例：4 月〜翌 3 月の月末ごとの人員）は、各点の `effective_on` を並べて評価する。1 回の実行で最大 60 点。
 - 組織の範囲の判定（`scopeFilter`）は、`effective_on` と今日の早いほうの時点の組織で行う（[security-model.md](security-model.md) の 4.2 節）。**レポートの時点の組織ではなく、権限の規則の時点で絞る。**
 
@@ -46,7 +46,7 @@
 | データの元 | 行の単位 | 主な列（ドメイン） |
 | --- | --- | --- |
 | `workers_as_of` | 雇用 × 主たる職務（時点） | 表示の名前・所属・職位（`worker.public`）、職務・等級・事業所（`worker.job`）、在籍・入社日・雇用区分（`worker.employment`）、基本給（`worker.compensation`） |
-| `job_history` | 職務の割り当ての版 | 異動・昇格の履歴（`worker.job`） |
+| `job_history` | 職務の割り当てのバージョン | 異動・昇格の履歴（`worker.job`） |
 | `org_tree_as_of` | 組織（時点） | 組織、親、上長、人数（`org.structure`） |
 | `positions_as_of` | ポジション | 空き、職務（`position.management`） |
 | `time_summaries` | 雇用 × 月 | 労働時間の区分、36 協定の値（`time.records`） |
@@ -55,7 +55,7 @@
 | `bp_cases` | 案件 | 種類、状態、期限、担当（業務プロセスの `view`） |
 
 - マイナンバー、口座番号、要配慮個人情報は、どのデータの元にも列を持たない。
-- 列の追加はデータの元の版の変更で、CI で「ドメインのない列」を拒む（[security-model.md](security-model.md) の 3.1 節と同じ規則）。
+- 列の追加はデータの元のバージョンの変更で、CI で「ドメインのない列」を拒む（[security-model.md](security-model.md) の 3.1 節と同じ規則）。
 
 ### 4.2 定義
 
@@ -73,7 +73,7 @@ type ReportDefinition = {
 };
 ```
 
-- 定義は `report_definitions`（版つき）。条件は業務プロセスの式の木（[ADR-0013](../decisions/0013-bp-definition-format-and-versions.md)）の核を使う。
+- 定義は `report_definitions`（バージョンつき）。条件は業務プロセスの式の木（[ADR-0013](../decisions/0013-bp-definition-format-and-versions.md)）の核を使う。
 - 標準のレポート（5 節）はシステムの定義で、テナントは写して変えられる。
 - 定義の保存のとき、列・条件・集計の型と、機微な値の集計の規則（7 節）を静的に検査する。
 
@@ -81,7 +81,7 @@ type ReportDefinition = {
 
 ```
 画面・API ─▶ report-service（API のプロセスの中のモジュール）
-   1. 定義の版と引数を決める（resolved_known_at を含む）
+   1. 定義のバージョンと引数を決める（resolved_known_at を含む）
    2. 列ごとに、利用者の権限で見られるかを project で判定し、見られない列を落とす
    3. scopeFilter の SQL の条件を足して、SQL を組み立てる（パラメーター化。文字列の連結はしない）
    4. 行数の見込みが 1,000 以下なら同期で返す。超えるなら非同期のジョブ（Worker）にする
@@ -92,7 +92,7 @@ type ReportDefinition = {
 - 同期の実行は `statement_timeout = 10s`。非同期は 15 分で打ち切る。
 - 非同期の結果は S3 の `report-outputs/{tenant}/{run_id}`（テナントのデータの鍵。[security.md](security.md) の 5 節）に置き、7 日で消す。取り出しは実行した本人だけ、15 分の 1 回限りの URL で、取り出しを記録する。
 - テナントごとの同時の非同期の実行は 5、利用者ごとは 2。支給日の前の 5 営業日は、給与の担当の実行を先にする（6 節）。
-- 実行の記録（`report_runs`）：定義の版、引数、`resolved_known_at`、利用者、落とした列、抑止した区分の数、行数、結果の SHA-256、所要時間。値は記録しない。
+- 実行の記録（`report_runs`）：定義のバージョン、引数、`resolved_known_at`、利用者、落とした列、抑止した区分の数、行数、結果の SHA-256、所要時間。値は記録しない。
 
 ### 4.4 出力の形式
 
@@ -101,7 +101,7 @@ type ReportDefinition = {
 | 画面の表 | 同期の実行 | 1,000 行まで |
 | CSV | 表計算への取り込み | UTF-8（BOM つきを選べる）。`=`・`+`・`-`・`@` で始まる値の先頭に `'` を足す（数式の注入を防ぐ） |
 | Excel（xlsx） | 同上 | 値は文字列か数で書き、式を書かない |
-| PDF | 法定の帳簿、組織図 | 実行の時刻と定義の版を欄外に出す |
+| PDF | 法定の帳簿、組織図 | 実行の時刻と定義のバージョンを欄外に出す |
 
 ## 5. 標準のレポート
 
@@ -135,7 +135,7 @@ type ReportDefinition = {
 
 - Aurora のレポート専用の reader を 1 台置き、カスタムエンドポイント（`reports`）で分ける。セルフサービスと給与の入力の固定は、別の reader を使う（[infrastructure.md](infrastructure.md) の 5 節）。
 - レポートの DB のロール `report_app` は、読み取りだけ・RLS の対象・`statement_timeout` を持つ。
-- `known_at` を指定した大きな一覧は、版の表の GiST の索引（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)）で引く。同期の画面では 1,000 行まで（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 7 節）。
+- `known_at` を指定した大きな一覧は、バージョンの表の GiST の索引（[ADR-0006](../decisions/0006-temporal-table-triplet-and-fold.md)）で引く。同期の画面では 1,000 行まで（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 7 節）。
 
 ### 6.2 S2：分析用の基盤
 
@@ -226,8 +226,8 @@ report-service ── 同じ定義・同じ scopeFilter・project の SQL を At
 
 | ID | 性質 |
 | --- | --- |
-| PROP-RPT-001 | 任意の定義・引数で、同じ定義の版・同じ引数・同じ `resolved_known_at` の 2 回の実行は、同じ行（同じハッシュ）を返す。その間に有効日付の書き込みがあっても変わらない |
-| PROP-RPT-002 | 任意の権限の割り当てで、レポートの行と列は、同じ対象への `can`・`project` の結果と一致する（PROP-SEC-001 のレポートの版）。画面・CSV・API で同じ |
+| PROP-RPT-001 | 任意の定義・引数で、同じ定義のバージョン・同じ引数・同じ `resolved_known_at` の 2 回の実行は、同じ行（同じハッシュ）を返す。その間に有効日付の書き込みがあっても変わらない |
+| PROP-RPT-002 | 任意の権限の割り当てで、レポートの行と列は、同じ対象への `can`・`project` の結果と一致する（PROP-SEC-001 のレポートのバージョン）。画面・CSV・API で同じ |
 | PROP-RPT-003 | 任意の機微な値の集計で、抑止の後の表から、`k` 未満の区分の値を、表に出た値の足し算・引き算で求められない |
 | PROP-RPT-004 | 任意の 2 テナントで、一方のレポートに他方の行が出ない（Aurora と分析用の基盤の両方） |
 
@@ -241,7 +241,7 @@ report-service ── 同じ定義・同じ scopeFilter・project の SQL を At
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
-| E12 | `report-sources-and-definitions` | 4.1・4.2 節。データの元の宣言、定義の版、静的な検査 |
+| E12 | `report-sources-and-definitions` | 4.1・4.2 節。データの元の宣言、定義のバージョン、静的な検査 |
 | E12 | `report-runner` | 4.3 節（PROP-RPT-001・002・004）。同期と非同期、実行の記録、出力 |
 | E12 | `report-point-in-time` | 3 節。`effective_on`・`known_at`・期間 |
 | E12 | `report-suppression` | 7 節（DT-RPT-002、PROP-RPT-003） |
@@ -288,7 +288,7 @@ report-service ── 同じ定義・同じ scopeFilter・project の SQL を At
 | 置き場所 | 中身 |
 | --- | --- |
 | Aurora（テナントの外）`report_sources` | 4.1 節。システムの定義 |
-| Aurora `report_definitions`（版） | 4.2 節 |
+| Aurora `report_definitions`（バージョン） | 4.2 節 |
 | Aurora `report_runs` | 4.3 節。値は持たない |
 | S3 `report-outputs/{tenant}/{run_id}` | 7 日で消す |
 | S3（S2）分析用の Iceberg の表 | 6.2 節。`tenant_id` でパーティション |

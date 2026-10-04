@@ -1,10 +1,10 @@
 # Data model: 運賃
 
-運賃ブロック、版つきの運賃の規則、事業者の割り当てと価格の群、料金の規則、事前確定運賃の停止、見積もりと推計走行距離、変動運賃の水準、メーターの額、影の計算の差。振る舞いの正本は [pricing-and-fares.md](../pricing-and-fares.md)、決定は [ADR-0018](../../decisions/0018-versioned-fare-rules-and-integer-yen.md)・[ADR-0019](../../decisions/0019-meter-fare-sources.md)・[ADR-0020](../../decisions/0020-dynamic-fares-within-authorized-bands.md)・[ADR-0017](../../decisions/0017-fare-distance-for-pre-fixed-fares.md)。規約は [data-model.md](../data-model.md) の 3 節。
+運賃ブロック、バージョンつきの運賃の規則、事業者の割り当てと価格の群、料金の規則、事前確定運賃の停止、見積もりと推計走行距離、変動運賃の水準、メーターの額、影の計算の差。振る舞いの正本は [pricing-and-fares.md](../pricing-and-fares.md)、決定は [ADR-0018](../../decisions/0018-versioned-fare-rules-and-integer-yen.md)・[ADR-0019](../../decisions/0019-meter-fare-sources.md)・[ADR-0020](../../decisions/0020-dynamic-fares-within-authorized-bands.md)・[ADR-0017](../../decisions/0017-fare-distance-for-pre-fixed-fares.md)。規約は [data-model.md](../data-model.md) の 3 節。
 
 - 置き場所はすべて Aurora `core`。
 - 区域の多角形は持たない。`fare_area_id` は `service_areas.area_id`（`kind` が `kotsuken` か `fare_zone`）を指す（[maps-and-areas.md](maps-and-areas.md)）。
-- **規則は承認の後に書き換えない。** 誤りは次の版で直す（PROP-FARE-006）。額・率・距離はすべて整数。係数は百分の一の整数（`_centi`）、倍率は百分率の整数（`_pct`）、手数料は基準点（`_bps`）。
+- **規則は承認の後に書き換えない。** 誤りは次のバージョンで直す（PROP-FARE-006）。額・率・距離はすべて整数。係数は百分の一の整数（`_centi`）、倍率は百分率の整数（`_pct`）、手数料は基準点（`_bps`）。
 
 ## 1. ER 図
 
@@ -144,7 +144,7 @@ erDiagram
 - CHECK：`status IN (...)`、`effective_to IS NULL OR effective_to > effective_from`、`status = 'draft' OR (approved_by_1 IS NOT NULL AND approved_by_2 IS NOT NULL AND approved_by_1 <> approved_by_2 AND approved_by_1 <> created_by)`、`release_flag IS NULL OR release_flag LIKE 'legal.%'`。
 - トリガー `fare_rule_immutable`：`status <> 'draft'` の行は、`status`（`approved` → `active` → `retired`）と `effective_to`（終わりを入れるだけ）以外の更新と削除を拒否する。
 - 排他：同じ鍵の `approved`・`active` の行の有効期間は重ならない（`EXCLUDE USING gist (... WITH =, tstzrange(effective_from, effective_to) WITH &&) WHERE (status IN ('approved','active'))`。`btree_gist` を使う）。
-- 保持：消さない（見積もりと乗車が版を指すため。10 年を超えて残す）。
+- 保持：消さない（見積もりと乗車がバージョンを指すため。10 年を超えて残す）。
 
 ## 3. テーブル
 
@@ -161,7 +161,7 @@ erDiagram
 
 ### 3.2 `fare_rule_sets`
 
-版つきの運賃の規則。定義元：pricing の 4.1・4.2 節。
+バージョンつきの運賃の規則。定義元：pricing の 4.1・4.2 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -179,7 +179,7 @@ erDiagram
 - キー：PK `(id)`。UK `(fare_area_id, scope, operator_id, service_kind, fare_vehicle_class, tier, version) NULLS NOT DISTINCT`。UK `(id, version)`（見積もりからの複合の参照）。
 - 排他の鍵：`(fare_area_id, scope, coalesce(operator_id, '00000000-0000-0000-0000-000000000000'), service_kind, fare_vehicle_class, tier)`。
 - CHECK：`(scope = 'operator') = (operator_id IS NOT NULL)`、`scope <> 'operator' OR status = 'draft' OR evidence_doc_id IS NOT NULL`。
-- 索引：`(fare_area_id, service_kind, fare_vehicle_class, effective_from DESC) WHERE status IN ('approved','active')` — 有効な版の読み込み（プロセスのメモリに版ごとに置く）。
+- 索引：`(fare_area_id, service_kind, fare_vehicle_class, effective_from DESC) WHERE status IN ('approved','active')` — 有効なバージョンの読み込み（プロセスのメモリにバージョンごとに置く）。
 - アクセス：事業者は自分の `scope = operator` の行と公示の行を読める（RLS の方針は `operator_id IS NULL OR operator_id = 現在の事業者`）。承認はできない。
 - S1 の量：数百〜数千行。
 
@@ -223,7 +223,7 @@ erDiagram
 | `fare_area_id` | `text` | NOT NULL | — | |
 | `service_kind` | `text` | NOT NULL | — | |
 | `fare_vehicle_class` | `text` | NOT NULL | — | |
-| `signature_sha256` | `bytea` | NOT NULL | — | 割り当ての組（規則の版の ID、事前確定の有無、変動の方針、迎車料金・キャンセル料の規則）の SHA-256 |
+| `signature_sha256` | `bytea` | NOT NULL | — | 割り当ての組（規則のバージョンの ID、事前確定の有無、変動の方針、迎車料金・キャンセル料の規則）の SHA-256 |
 | `label_ja` | `text` | NOT NULL | — | 乗客のアプリの選択肢の名前（例：「タクシー」「タクシー（変動運賃の事業者）」） |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 
@@ -354,7 +354,7 @@ erDiagram
 | `lines` | `jsonb` | NOT NULL | — | 内訳（運賃・割増・割引・迎車料金・手配料・有料道路の目安）。行ごとに整数の円 |
 | `total_yen` | `bigint` | NULL | — | 事前確定の総額（メーターは NULL） |
 | `range_low_yen`・`range_high_yen` | `bigint` | NULL | — | メーターの目安（100 円単位） |
-| `notices_version` | `text` | NULL | — | 示した注意事項の版 |
+| `notices_version` | `text` | NULL | — | 示した注意事項のバージョン |
 | `inputs_sha256` | `bytea` | NOT NULL | — | 入力の全体（位置を含む）のハッシュ |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 | `expires_at` | `timestamptz` | NOT NULL | — | 既定 作成 ＋ 5 分 |
@@ -444,7 +444,7 @@ erDiagram
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `quote_id` | `uuid` | NOT NULL | — | → `fare_quotes` |
-| `code_version` | `text` | NOT NULL | — | 新しい計算の版 |
+| `code_version` | `text` | NOT NULL | — | 新しい計算のバージョン |
 | `old_amount_yen`・`new_amount_yen` | `bigint` | NOT NULL | — | |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 

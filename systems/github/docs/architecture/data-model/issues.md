@@ -160,7 +160,7 @@ Issue と PR の共通の行。番号はリポジトリごとに共有する。�
 | `reaction_counts` | jsonb | NO | `'{}'` | `{"+1": 3, ...}` |
 | `closed_by_id` | bigint | YES | | |
 | `transfer_state` | text | YES | | 非同期の移動の途中は `transferring` |
-| `search_version` | bigint | NO | 0 | 行の更新ごとに増やす。OpenSearch の外部の版 |
+| `search_version` | bigint | NO | 0 | 行の更新ごとに増やす。OpenSearch の外部のバージョン |
 | `created_at` | timestamptz | NO | now() | |
 | `updated_at` | timestamptz | NO | now() | |
 | `closed_at` | timestamptz | YES | | |

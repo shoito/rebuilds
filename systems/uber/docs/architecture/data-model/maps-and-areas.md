@@ -80,7 +80,7 @@ erDiagram
     }
 ```
 
-- 区域は版つきなので、`operator_service_areas`・`fare_rule_sets` などから `service_areas` へ外部キーを張れない（図の関係は論理の参照）。参照は `check_area_ref` のトリガーで確かめる（[data-model.md](../data-model.md) の 3.5 節）。
+- 区域はバージョンつきなので、`operator_service_areas`・`fare_rule_sets` などから `service_areas` へ外部キーを張れない（図の関係は論理の参照）。参照は `check_area_ref` のトリガーで確かめる（[data-model.md](../data-model.md) の 3.5 節）。
 
 ## 2. テーブル
 
@@ -90,7 +90,7 @@ erDiagram
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `area_id` | `text` | NOT NULL | — | `<kind>:<slug>`（例：`kotsuken:tokyo-tokubetsuku-busan`）。版をまたいで変えない |
+| `area_id` | `text` | NOT NULL | — | `<kind>:<slug>`（例：`kotsuken:tokyo-tokubetsuku-busan`）。バージョンをまたいで変えない |
 | `version` | `int` | NOT NULL | — | |
 | `kind` | `text` | NOT NULL | — | `eigyo_kuiki`・`kotsuken`・`rideshare_zone`・`fare_zone`・`taxi_pool`・`airport` |
 | `name_ja` | `text` | NOT NULL | — | |
@@ -98,7 +98,7 @@ erDiagram
 | `member_municipality_codes` | `text[]` | NULL | — | 全国地方公共団体コード |
 | `geom` | `geometry(MultiPolygon, 4326)` | NOT NULL | — | 単純化は 5 m 以内 |
 | `source` | `text` | NOT NULL | — | `n03_union`・`manual` |
-| `source_ref` | `text` | NOT NULL | — | 公示の番号・URL、N03 の版 |
+| `source_ref` | `text` | NOT NULL | — | 公示の番号・URL、N03 のバージョン |
 | `effective_from` | `date` | NOT NULL | — | |
 | `effective_to` | `date` | NULL | — | NULL は現在も有効 |
 | `approved_by` | `uuid[]` | NOT NULL | — | 2 人の確認（`staff_users`） |
@@ -107,10 +107,10 @@ erDiagram
 
 - キー：PK `(area_id, version)`。
 - 排他：`EXCLUDE USING gist (area_id WITH =, daterange(effective_from, effective_to) WITH &&)`（PROP-MAP-002）。
-- 索引：`USING gist (geom)` — PostGIS での突き合わせ（版の作成の検査）。`(kind, effective_from)`。
+- 索引：`USING gist (geom)` — PostGIS での突き合わせ（バージョンの作成の検査）。`(kind, effective_from)`。
 - CHECK：`area_id LIKE kind || ':%'`、`cardinality(approved_by) >= 2`、`ST_IsValid(geom)`、`effective_to IS NULL OR effective_to > effective_from`。
-- 更新：作った版は書き換えない（`effective_to` を入れるだけ）。変更は新しい版で行う。
-- 保持：消さない（乗車の `pickup_area_ids` が版を指すため）。S1 の量：数百行。
+- 更新：作ったバージョンは書き換えない（`effective_to` を入れるだけ）。変更は新しいバージョンで行う。
+- 保持：消さない（乗車の `pickup_area_ids` がバージョンを指すため）。S1 の量：数百行。
 
 ### 2.2 `service_area_cells`
 
@@ -125,9 +125,9 @@ erDiagram
 
 - キー：PK `(area_id, version, street_cell)`。FK `(area_id, version)` → `service_areas`（`ON DELETE RESTRICT`）。
 - CHECK：`(street_cell >> 60) = 3`、`coverage IN ('inside','boundary')`。
-- 作り方：`geogrid.Cover(polygon, Street, Overlapping)` と `Full` で作り、同じ写しを PostGIS（`ST_Intersects`・`ST_CoveredBy`）で作り直して一致を確かめ、無作為の 10 万点で多角形の判定と一致してから `service_areas` の版を有効にする（maps の 9.3・10 節）。
-- 読み方：配車と API のプロセスは、有効な版の写しと単純化した多角形をメモリに持つ。PostGIS を毎回引かない。
-- S1 の量：東京の交通圏で 約 1 万セル × 区域の種類 × 版。数十万行。
+- 作り方：`geogrid.Cover(polygon, Street, Overlapping)` と `Full` で作り、同じ写しを PostGIS（`ST_Intersects`・`ST_CoveredBy`）で作り直して一致を確かめ、無作為の 10 万点で多角形の判定と一致してから `service_areas` のバージョンを有効にする（maps の 9.3・10 節）。
+- 読み方：配車と API のプロセスは、有効なバージョンの写しと単純化した多角形をメモリに持つ。PostGIS を毎回引かない。
+- S1 の量：東京の交通圏で 約 1 万セル × 区域の種類 × バージョン。数十万行。
 
 ### 2.3 `pickup_points`
 
@@ -152,7 +152,7 @@ erDiagram
 | `change_request_id` | `uuid` | NULL | — | |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` | |
 
-- キー：PK `(point_id)`。現在の版だけを持ち、変更の前後は `change_requests.payload` と `audit_events` に残す（乗車は `point_id` だけを指す）。
+- キー：PK `(point_id)`。現在のバージョンだけを持ち、変更の前後は `change_requests.payload` と `audit_events` に残す（乗車は `point_id` だけを指す）。
 - 索引：`USING gist (geom) WHERE status = 'active'` — ピンから 80 m 以内の検索。`(venue_id)`。
 - CHECK：`(spot_cell >> 60) = 4`、`heading_constraint BETWEEN 0 AND 359`、`status <> 'active' OR cardinality(approved_by) >= 2`、`allowed_services <@ ARRAY['taxi','rideshare']`。
 - 保持：消さない（`retired` にする）。S1 の量：数千行。
@@ -171,13 +171,13 @@ erDiagram
 | `reason` | `text` | NOT NULL | — | |
 | `valid_from`・`valid_to` | `timestamptz` | NOT NULL | — | |
 | `approved_by` | `uuid[]` | NOT NULL | — | 2 人の確認 |
-| `tile_version` | `text` | NULL | — | 反映した臨時のタイルの版 |
+| `tile_version` | `text` | NULL | — | 反映した臨時のタイルのバージョン |
 | `created_by` | `uuid` | NOT NULL | — | |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 
 - キー：PK `(override_id)`。索引：`(valid_to)`、`(way_id)`。
 - CHECK：`valid_to > valid_from`、`kind = 'closure'`、`cardinality(approved_by) >= 2`。
-- 保持：期限の後 90 日（タイルの版の再現と同じ）。S1 の量：数百行。
+- 保持：期限の後 90 日（タイルのバージョンの再現と同じ）。S1 の量：数百行。
 
 ### 2.5 `map_error_candidates`
 

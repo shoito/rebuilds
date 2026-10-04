@@ -47,7 +47,7 @@ Aurora Global Database の計画外のフェイルオーバーは、複製の遅
 
 | 副作用 | 扱い |
 | --- | --- |
-| 外部への iMIP の `SEQUENCE` | `dr_epoch_started_at` の後、外部の参加者のいる主催者の写しは、最初に外部へ送る `REQUEST`・`CANCEL` で、`SEQUENCE` を本来の値より 1 つ余分に上げる（予定オブジェクトに `seq_margin_epoch` を記録して 1 回だけ）。RFC 5546 は `SEQUENCE` が飛ぶことを禁じていない。本システムの中の参加者の写しは、`(SEQUENCE, 主催者の版)` で判定するので影響しない（[ADR-0014](0014-itip-state-transfer-and-sequence.md)） |
+| 外部への iMIP の `SEQUENCE` | `dr_epoch_started_at` の後、外部の参加者のいる主催者の写しは、最初に外部へ送る `REQUEST`・`CANCEL` で、`SEQUENCE` を本来の値より 1 つ余分に上げる（予定オブジェクトに `seq_margin_epoch` を記録して 1 回だけ）。RFC 5546 は `SEQUENCE` が飛ぶことを禁じていない。本システムの中の参加者の写しは、`(SEQUENCE, 主催者のバージョン)` で判定するので影響しない（[ADR-0014](0014-itip-state-transfer-and-sequence.md)） |
 | リマインダーの重複 | 大阪の `reminder-scheduler` は、通知の時刻が `dr_epoch_started_at − 2 分` より前の項目を送らずに数える（遅れすぎ）。その後の項目は送る。失った範囲で東京が送った分と重なるものは重複になりうる。重複の数を `dr_window` の印で数え、NFR-003 の重複の率から分けて報告する |
 | Webhook・Web Push・メールの通知 | 取り消さない。Webhook の受け手は `epoch` の 410 で取り直す。公開 API の文書に、DR の後に同じ変更の通知が 2 回届きうることを書く |
 | 外部からの iMIP の受信 | 東京の S3 にあって処理していないメールは、東京の回復の後、`imip-inbound` が S3 の一覧から拾い直す（同じ `Message-ID` は捨てる）。東京の障害の間に届くメールは、MX 20 の大阪が受ける |

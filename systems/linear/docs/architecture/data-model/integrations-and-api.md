@@ -364,7 +364,7 @@ Webhook の署名の秘密（`<brand>_whsec_…`）の暗号文。入れ替え�
 | `version` | `smallint` | NO | | 1 から増やす |
 | `ciphertext` | `bytea` | NO | | AES-256-GCM。AAD = `workspace_id ‖ webhook_id ‖ version` |
 | `dek_ciphertext` | `bytea` | NO | | KMS `<brand>-webhook-secrets` |
-| `retire_at` | `timestamptz` | YES | | 新しい版を作った時、古い版に 24 時間後を入れる |
+| `retire_at` | `timestamptz` | YES | | 新しいバージョンを作った時、古いバージョンに 24 時間後を入れる |
 | `created_at` | `timestamptz` | NO | `now()` | |
 
 - 主キー：`(workspace_id, webhook_id, version)`。外部キー：`(workspace_id, webhook_id)` → `webhooks`（`ON DELETE CASCADE`）。

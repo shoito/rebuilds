@@ -1,6 +1,6 @@
 # Data model: 自動化
 
-フローの定義と版、画面のフローの実行、予定の経路、非同期の経路、スケジュールのフロー、入力規則、積み上げ集計、承認のプロセスとロック。振る舞いは [automation-flows.md](../automation-flows.md)、決定は [ADR-0025](../../decisions/0025-flow-definition-and-bulk-engine.md)・[ADR-0026](../../decisions/0026-record-triggered-flow-order-and-recursion.md)・[ADR-0027](../../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md)・[ADR-0028](../../decisions/0028-approval-processes-and-record-locks.md) にある。規約は [data-model.md](../data-model.md) の 3 節。
+フローの定義とバージョン、画面のフローの実行、予定の経路、非同期の経路、スケジュールのフロー、入力規則、積み上げ集計、承認のプロセスとロック。振る舞いは [automation-flows.md](../automation-flows.md)、決定は [ADR-0025](../../decisions/0025-flow-definition-and-bulk-engine.md)・[ADR-0026](../../decisions/0026-record-triggered-flow-order-and-recursion.md)・[ADR-0027](../../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md)・[ADR-0028](../../decisions/0028-approval-processes-and-record-locks.md) にある。規約は [data-model.md](../data-model.md) の 3 節。
 
 ## 1. ER 図
 
@@ -156,8 +156,8 @@ erDiagram
 | `md_flows` | `org_id`、`flow_id`、`api_name`、`label`、`type`（`record_before_save`・`record_after_save`・`scheduled`・`screen`・`autolaunched`・`event_triggered`）、`object_id`（レコードの変更のフロー）、`event_type_id`（`event_triggered`）、`trigger_order`（1〜2,000）、`active_version_id`、`run_as`（`system`・`system_with_sharing`・`user`）、`run_as_user_id`（予定・スケジュールの実行する利用者）、`schedule`（`jsonb`、`scheduled` だけ） | PK `(org_id, flow_id)`。UK `(org_id, api_name)`。索引 `(org_id, object_id, type, trigger_order) WHERE active_version_id IS NOT NULL`（呼び出しの表） |
 | `md_flow_versions` | `org_id`、`version_id`、`flow_id`、`version_no`（`integer`）、`status`（`draft`・`active`・`obsolete`）、`definition`（`jsonb`。要素・変数・起動の条件・予定の経路。項目は `field_id`） | PK `(org_id, version_id)`。UK `(org_id, flow_id, version_no)`。部分一意 `(org_id, flow_id) WHERE status = 'active'` |
 
-- 有効化はメタデータの版を 1 つ上げる。画面のフロー・予定の経路が参照する版は `obsolete` でも消さない。種類 `meta`。
-- 上限：1 つの版の要素 500、1 つのフローの版 50、1 オブジェクト・1 手順の有効なフロー 50。
+- 有効化はメタデータのバージョンを 1 つ上げる。画面のフロー・予定の経路が参照するバージョンは `obsolete` でも消さない。種類 `meta`。
+- 上限：1 つのバージョンの要素 500、1 つのフローのバージョン 50、1 オブジェクト・1 手順の有効なフロー 50。
 
 ### 2.2 `flow_interviews`
 
@@ -167,7 +167,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `org_id`・`interview_id` | `uuid` | NOT NULL | — | |
 | `user_id` | `uuid` | NOT NULL | — | 本人だけが続けられる |
-| `version_id` | `uuid` | NOT NULL | — | 始めた時の版 |
+| `version_id` | `uuid` | NOT NULL | — | 始めた時のバージョン |
 | `state_enc` | `bytea` | NOT NULL | — | 変数の値。組織の `secrets` の DEK で暗号化（2026-09-28 に `state` から改名） |
 | `current_element` | `text` | NOT NULL | — | |
 | `last_dml_element` | `text` | NULL | — | 「戻る」の限り |
@@ -267,7 +267,7 @@ erDiagram
 
 ### 4.1 `md_approval_processes`・`md_approval_steps`
 
-定義は版を持ち、インスタンスは申請した時の版を最後まで使う。
+定義はバージョンを持ち、インスタンスは申請した時のバージョンを最後まで使う。
 
 | 表 | 列 | キー |
 | --- | --- | --- |

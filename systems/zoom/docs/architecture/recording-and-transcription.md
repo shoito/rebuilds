@@ -8,7 +8,7 @@
 | --- | --- |
 | [0025](../decisions/0025-recording-per-track-capture-and-offline-compose.md) | 録画は、見えない参加者として画面に入るボット（ヘッドレスのブラウザ）では取らない。Recorder が Media Node から PlainTransport（SRTP）で RTP を受け、producer ごとの生の RTP を 10 秒の区切りで S3 に書く。1 本の動画への合成は、会議の後に Composer がまとめて行う |
 | [0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) | 日本語の音声認識は、S1 では Amazon Transcribe のストリーミング（ja-JP、東京）を使う。参加者ごとの音声を別の流れで送り、話者の判定をエンジンに頼らない。エンジンは ASR Adapter の裏に置き、E8 の前に評価用の音声のセットで自前でホストする Whisper 系と比べる |
-| [0027](../decisions/0027-capture-consent-and-indicators.md) | 録画・文字起こしの状態は Actor が持ち、全員に表示する。動いている間は、本人が「同意して続ける」を押すまで、その人のマイク・カメラ・共有を Actor と Media Node で止める。表示の機能を持たない版のクライアントは入れない。E2EE の会議では、API・Actor・Media Node の 3 か所で開始を拒否する |
+| [0027](../decisions/0027-capture-consent-and-indicators.md) | 録画・文字起こしの状態は Actor が持ち、全員に表示する。動いている間は、本人が「同意して続ける」を押すまで、その人のマイク・カメラ・共有を Actor と Media Node で止める。表示の機能を持たないバージョンのクライアントは入れない。E2EE の会議では、API・Actor・Media Node の 3 か所で開始を拒否する |
 
 ## 1. 目的と範囲
 
@@ -291,7 +291,7 @@ ADR-0027。
 - 録画か文字起こしが `off` 以外のとき、クライアントは会議の画面の上端に、常に消せない表示を出す（「録画中」「一時停止中」「文字起こし中」）。
 - 待合室にいる人にも、会議が録画中であることを示す（`waiting` の画面に `meeting.status` の録画の項目だけを送る。参加者の一覧は送らない）。
 - 途中から入った人は、`welcome` のスナップショットで状態を受け、入ってすぐに表示する。
-- クライアントは、`hello` の `client.features` に `capture_indicator.v1` を入れる。入れていない版のクライアントは、録画か文字起こしが動いている会議に入れない（`err{code: upgrade_required}`）。動いていない会議に入っていて、後から録画が始まったら、その接続を閉じる（`you.removed{reason: client_unsupported}`。ban には入れない）。
+- クライアントは、`hello` の `client.features` に `capture_indicator.v1` を入れる。入れていないバージョンのクライアントは、録画か文字起こしが動いている会議に入れない（`err{code: upgrade_required}`）。動いていない会議に入っていて、後から録画が始まったら、その接続を閉じる（`you.removed{reason: client_unsupported}`。ban には入れない）。
 - 電話からの参加（MVP の後）では、音声の案内で知らせる（[telephony.md](telephony.md)）。
 
 ### 7.2 同意
@@ -301,7 +301,7 @@ ADR-0027。
   - 同意するまで、Actor はその人の `self.update{muted:false}`・`video:true`・`share.request` を `consent_required` で拒否する。Media Node の producer は `paused` のまま。見る・聞くことはできる。
   - Recorder・Transcriber の購読に、その人の producer を入れない。
 - 同意の単位は `(instance_id, participant_id, kind)`。`kind` は `recording`・`transcription`。録画の後から字幕が始まったら、改めて字幕の同意を求める。
-- 同意は、Aurora の `capture_consents` に書いてから配る（失ってはならない変更。[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md)）。表示した文言の版（`notice_version`）も残す。
+- 同意は、Aurora の `capture_consents` に書いてから配る（失ってはならない変更。[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md)）。表示した文言のバージョン（`notice_version`）も残す。
 - 主催者・共同主催者が録画を始めた場合、始めた本人の同意は、始めた操作で記録する。
 - 同意しない人の扱い（退出するしかないか）、通知の文言、社外の参加者への個人情報の利用目的の通知は、L3 の結論に従う。この設計は「同意するまで話せない」を既定にし、文言は差し替えられるようにする。
 
@@ -380,7 +380,7 @@ ADR-0026。
 
 ### 11.4 音声認識の評価
 
-- 8 節のセットで、エンジンの版を上げるたびに CER と遅れを測る。K7（CER 15% 以下、p95 2 秒）を下回ったら、版を上げない。
+- 8 節のセットで、エンジンのバージョンを上げるたびに CER と遅れを測る。K7（CER 15% 以下、p95 2 秒）を下回ったら、バージョンを上げない。
 
 ## 12. Story の候補
 
@@ -440,7 +440,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 - 会議の終了から `completed` までの時間 ÷ 録画の長さ（NFR-010 の 0.5 以下）。p50・p95。
 - 障害 1 回あたりに失った録画の長さ（`gap` の合計）。
 - 字幕の遅れ（発話から表示まで）の p95（NFR-010 の 2 秒）。本番は、Transcriber に入った時刻から、クライアントが表示した時刻までで測る。
-- CER（K7 の 15% 以下）。評価用の音声のセットで、エンジンの版ごとに測る。
+- CER（K7 の 15% 以下）。評価用の音声のセットで、エンジンのバージョンごとに測る。
 - 同意の画面から「同意して続ける」までの時間と、「退出」を選んだ割合。
 - E2EE の会議での録画・字幕の開始の試みの拒否の数（0 以外は正常。受けた数が 0 であること）。
 

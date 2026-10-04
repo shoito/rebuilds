@@ -48,7 +48,7 @@ date: 2026-09-27
 - 引き受けるコスト：
   - Electron のアプリは大きく、メモリを多く使う。
   - libwebrtc のビルドの基盤（iOS・Android の両方）と、2 か月ごとの追従を運用する。
-  - libmediasoupclient の対応する libwebrtc の版に縛られる。
+  - libmediasoupclient の対応する libwebrtc のバージョンに縛られる。
 
 ## Confirmation
 

@@ -2,7 +2,7 @@
 
 全文検索（組織の全体の検索、オブジェクトの中の検索、参照の項目の候補の検索）、日本語の解析、索引の遅れと作り直し、名前での代わりの検索、検索の結果の権限の絞り込みの設計。土台は [ADR-0001](../decisions/0001-platform-and-stack.md)（OpenSearch は全文検索の索引にだけ使う写しで、作り直せる）、[ADR-0004](../decisions/0004-record-access-model.md)（検索も同じ判定を通る）、[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)（名前のピボットと文字列の正規化）。この文書で決めたことは、次の 2 つの ADR にある。
 
-- 索引は OpenSearch の共有の索引（16 個）に組織の ID で振り分けて置き、全ての検索に組織の条件を必ず付ける。日本語は kuromoji の形態素と CJK の 2-gram の 2 つの部分の項目で持ち、NFKC・小文字・ひらがなとカタカナの統一をかける。索引は outbox から非同期に作り、`row_version` を外部の版にして古い書き込みで戻らないようにする。参照の項目の候補と OpenSearch の障害の時は、名前のピボットの前方一致で代わりに引く（[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)）。
+- 索引は OpenSearch の共有の索引（16 個）に組織の ID で振り分けて置き、全ての検索に組織の条件を必ず付ける。日本語は kuromoji の形態素と CJK の 2-gram の 2 つの部分の項目で持ち、NFKC・小文字・ひらがなとカタカナの統一をかける。索引は outbox から非同期に作り、`row_version` を外部のバージョンにして古い書き込みで戻らないようにする。参照の項目の候補と OpenSearch の障害の時は、名前のピボットの前方一致で代わりに引く（[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)）。
 - OpenSearch の結果は候補とだけ扱う。オブジェクトの権限と FLS は検索の前に条件として絞り、レコードの共有は、候補の ID をデータ層の問い合わせで絞り直してから返す（後の確かめ）。後の確かめは参照の評価器と同じ意味の判定で、本番の標本の照合の対象にする。索引に共有の情報を写さない。件数の合計を返さない。見えない一致の数が応答の時間に出ないよう、1 ページごとに固定の候補の束を取り、束の全てを確かめ、下限の時間まで待って返す（[ADR-0032](../decisions/0032-search-permission-post-filter.md)）。
 
 本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。本家の検索の言語（SOSL）との互換は持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
@@ -29,7 +29,7 @@
 | 検索の語 | 語、`"..."` の句、ワイルドカード、`AND`・`OR`・`AND NOT`。検索の語が 10,000 文字を超えると結果なし、4,000 文字を超えると論理の演算子を外して `OR` にする | SOSL、[Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（以下「Limits」） |
 | 日本語 | 空白で区切らない東アジアの言語は、形態素で区切る。「東京都」は「東京」「都」に分かれ、「京都」の検索に当たらない | SOSL の「FIND {SearchQuery}」 |
 | 検索の範囲 | `IN NAME FIELDS`（名前の項目）、`IN ALL FIELDS` など。システムのモードの Apex は `IN ALL FIELDS` の照合で FLS を無視する。利用者のモード（`WITH USER_MODE`）では FLS とオブジェクトの権限を守る | SOSL の「FIND Clauses in Apex」「WITH」 |
-| 結果の上限 | 合計 2,000（API の版 28.0 以降） | Limits |
+| 結果の上限 | 合計 2,000（API のバージョン 28.0 以降） | Limits |
 | 索引の遅れの目安 | 公開の資料に数値がない | — |
 
 本家の「見つけた 2,000 件を後で権限で絞る」形は、見る人の見られるレコードが少ない組織で、見られる一致が結果から落ちる。本システムは、同じ「後の確かめ」を採りつつ、候補を多め（1 ページ 3,000 件の固定の束）に取って落ちを減らす（6 節）。
@@ -76,10 +76,10 @@ POST /api/v1/search
 ### 4.1 置き場所と振り分け
 
 - Amazon OpenSearch Service の 1 つのドメイン（S1。東京の 3 AZ、専用のマスター 3、データのノード `r7g.2xlarge.search` × 6。台数は [capacity.md](capacity.md) の 7.1 節）。
-- 索引は、組織ごとではなく**共有の索引を 16 個**（`rec-v{版}-{00..15}`）持ち、`shard_no`（[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)）を 16 で割った余りで索引を決める。索引の中は `org_id` を routing にし、1 つの組織の文書は 1 つの OpenSearch のシャードに集まる。
+- 索引は、組織ごとではなく**共有の索引を 16 個**（`rec-v{バージョン}-{00..15}`）持ち、`shard_no`（[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)）を 16 で割った余りで索引を決める。索引の中は `org_id` を routing にし、1 つの組織の文書は 1 つの OpenSearch のシャードに集まる。
 - 組織ごとの索引にしないのは、S1 で 5,000、S3 で 50 万の組織を索引の数にすると、クラスタの状態（マッピングとシャード）が大きくなりすぎるため。
 - 大口の組織（`shard_no` 240〜255）は、S2 以降に専用の索引へ分けられる。
-- 索引の名前には版（`v{n}`）を付け、別名（alias）で指す。マッピングの変更は新しい版を作って作り直し、別名を切り替える（4.5 節）。
+- 索引の名前にはバージョン（`v{n}`）を付け、別名（alias）で指す。マッピングの変更は新しいバージョンを作って作り直し、別名を切り替える（4.5 節）。
 
 ### 4.2 文書の形
 
@@ -150,7 +150,7 @@ indexer（Worker）
 
 | 事象 | 索引への反映 |
 | --- | --- |
-| 作成・更新 | 文書を書く（`row_version` の外部の版） |
+| 作成・更新 | 文書を書く（`row_version` の外部のバージョン） |
 | 削除（ごみ箱へ） | 文書を消す。ごみ箱のレコードは検索に出さない（ごみ箱の画面は DB で引く） |
 | 戻す | 文書を書き直す |
 | 完全な削除・消去 | 文書を消す（ごみ箱で消してあるので、残りの確認だけ） |
@@ -166,7 +166,7 @@ indexer（Worker）
 ### 4.6 作り直しと整合の検査
 
 - **作り直しの仕事**（`search_reindex_jobs`）：組織・オブジェクトの単位で、`records` を ID の範囲（1 万件）ごとに読み、文書を書く。Worker の class `search_reindex`（[governor-limits.md](governor-limits.md) の 8.4 節）。範囲ごとに冪等。
-- マッピングの変更：新しい版の索引を作り、全ての組織を作り直してから別名を切り替える。作り直しの間の変更は、indexer が古い版と新しい版の両方に書く。
+- マッピングの変更：新しいバージョンの索引を作り、全ての組織を作り直してから別名を切り替える。作り直しの間の変更は、indexer が古いバージョンと新しいバージョンの両方に書く。
 - **整合の検査**：組織ごとに 7 日で一周する（[ADR-0012](../decisions/0012-derived-copies-consistency-and-projections.md) と同じ考え方）。ID の範囲ごとに、`records`（生きている行）の `(id, row_version)` と、索引の `(record_id, row_version)` を比べ、差のある文書だけを書き直す。直した件数を `search_drift_repaired_total` で数える。
 
 ## 5. 問い合わせの組み立て
@@ -199,7 +199,7 @@ indexer（Worker）
 ### 6.1 流れ
 
 ```
-要求（利用者 U、版 V に固定）
+要求（利用者 U、バージョン V に固定）
   1. 読めるオブジェクト O_U と、オブジェクトごとの読める searchable の項目 F_U,o を、権限の形からコンパイル
   2. OpenSearch：org_id ∧ object ∈ O_U ∧ （名前 ∨ texts.f ∈ F_U,o）で候補を取る
      （1 ページごとに固定の 3,000 件の束を 1 回だけ。ページの位置は search_after で持つ）
@@ -284,7 +284,7 @@ indexer（Worker）
 | indexer の遅れ | 遅れの p95 が 60 秒を 5 分超えたら警告。一括の索引の仕事を後回しにする |
 | 索引への書き込みの失敗が続く | dead letter から範囲の作り直しの仕事へ。整合の検査でも直る |
 | 索引と DB のずれ | 整合の検査で直して数える（4.6 節）。ずれの間、索引にない新しいレコードは見つからず、索引に残った消したレコードは後の確かめで落ちる（漏れない） |
-| 版の違う索引への切り替えの途中 | 両方に書き、読みは別名の指す方だけ |
+| バージョンの違う索引への切り替えの途中 | 両方に書き、読みは別名の指す方だけ |
 | 大口の組織の検索が 1 つのシャードに集中する | S2 で専用の索引へ。`search_latency_seconds{org_size}` を計測 |
 | 組織の移動（セルの間） | 移動先で作り直す。作り直しの間は `degraded` |
 
@@ -318,7 +318,7 @@ indexer（Worker）
 
 | ADR | 決定 |
 | --- | --- |
-| [0031](../decisions/0031-search-index-and-japanese-analysis.md) | 共有の 16 個の索引に組織の ID で振り分け、組織の条件を必ず付ける。日本語は kuromoji と CJK の 2-gram の 2 つで持つ。outbox から非同期に作り、`row_version` を外部の版にする。参照の候補と障害の時は名前のピボットで引く |
+| [0031](../decisions/0031-search-index-and-japanese-analysis.md) | 共有の 16 個の索引に組織の ID で振り分け、組織の条件を必ず付ける。日本語は kuromoji と CJK の 2-gram の 2 つで持つ。outbox から非同期に作り、`row_version` を外部のバージョンにする。参照の候補と障害の時は名前のピボットで引く |
 | [0032](../decisions/0032-search-permission-post-filter.md) | OpenSearch の結果は候補だけとし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。索引に共有を写さず、件数の合計を返さない。固定の候補の束、束の全ての確かめ、1 ページの下限の時間で、応答の時間をそろえる |
 
 他の領域への依頼：
@@ -334,7 +334,7 @@ indexer（Worker）
 | --- | --- |
 | E1 | OpenSearch のドメイン（VPC、暗号化、IAM）と、索引の別名の運用 |
 | E1 | CI：問い合わせを組み立てる関数の外での OpenSearch の問い合わせの禁止（lint） |
-| E3 | outbox から indexer への経路（SQS、まとめ、外部の版） |
+| E3 | outbox から indexer への経路（SQS、まとめ、外部のバージョン） |
 | E5 | 日本語の解析の PoC（kuromoji と Sudachi、2-gram）と評価のコーパス |
 | E5 | 索引の形（`texts` の nested、`_source` の最小化）と `md_fields.searchable` |
 | E5 | 検索の API と、後の確かめ（6.1 節）、`more_may_exist` |

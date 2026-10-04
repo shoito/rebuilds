@@ -26,7 +26,7 @@ ALB は gRPC を HTTP/2 のまま転送できる（[AWS の告知](https://aws.a
 
 1 を採用する。
 
-- 受け手 1 人に接続 1 本。`Connect(stream ClientFrame) returns (stream ServerFrame)`。最初に `Hello`（プロトコルの版、端末の ID、`resume_after_seq`、`stream_epoch`）を送り、`Ready` を受ける。
+- 受け手 1 人に接続 1 本。`Connect(stream ClientFrame) returns (stream ServerFrame)`。最初に `Hello`（プロトコルのバージョン、端末の ID、`resume_after_seq`、`stream_epoch`）を送り、`Ready` を受ける。
 - 認証はメタデータのアクセストークン。受け手の鍵はトークンから決める。
 - 心拍は両方向 20 秒、40 秒で切る。ALB の待ちの時間切れ（既定 60 秒）より短くする。
 - 同じ受け手の新しい接続が来たら、古い接続を `Goaway(replaced)` で閉じる。
@@ -44,7 +44,7 @@ ALB は gRPC を HTTP/2 のまま転送できる（[AWS の告知](https://aws.a
   - 型は Protocol Buffers の 1 つの定義から生成できる。
 - 引き受けるコスト：
   - Go のサービスが 1 つ増える（言語の運用の範囲は変わらない）。
-  - gRPC のモバイルのライブラリの版の追従と、ALB の HTTP/2 の上限（接続あたりの流れの数など）の確かめが要る。
+  - gRPC のモバイルのライブラリのバージョンの追従と、ALB の HTTP/2 の上限（接続あたりの流れの数など）の確かめが要る。
   - ALB は HTTP/2 の PING のフレームに対応せず、PING は待ちの時間切れ（既定 60 秒）を延ばさない（[Edit attributes for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-load-balancer-attributes.html)、2026-09-27 に確認）。そのため、アプリの層で心拍を送る。
   - ALB は、接続の開始から HTTP client keepalive duration（既定 3,600 秒、60 秒〜7 日）が過ぎると、HTTP/2 の接続に `GOAWAY` を送って閉じる（同じ文書）。`rt.<domain>` の ALB は 24 時間（86,400 秒）にし、それでも来る `GOAWAY` はアプリの再接続（配備のときと同じ扱い）で受ける。
 

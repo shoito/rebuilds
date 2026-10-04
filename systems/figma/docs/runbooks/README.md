@@ -91,18 +91,18 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 能力のチケットの署名の鍵と、再開のトークンの鍵の入れ替え（定期と漏洩のとき） | `ticket-signing-key-rotation.md`（security.md の 14 節） | E3 で作成 | `capability-tickets`、`gateway-resume-token` |
 | 受け口の停止（計測の欠け） | `telemetry-ingest-down.md`（observability.md の 10 節） | E2 で作成 | `telemetry-ingest` |
 | GPU の切り替えの急増（特定の GPU。ticket） | `gpu-blocklist.md`（rendering-engine.md の 19 節） | E2 で作成 | `gpu-backend-selection`、`render-telemetry-and-blocklist` |
-| ブラウザの新しい版での描画の崩れ | `browser-render-regression.md`（rendering-engine.md の 19 節） | E2 で作成 | `golden-image-harness` |
+| ブラウザの新しいバージョンでの描画の崩れ | `browser-render-regression.md`（rendering-engine.md の 19 節） | E2 で作成 | `golden-image-harness` |
 | 特定のファイルでタブが落ちる問い合わせ | `file-crashes-tab.md`（rendering-engine.md の 19 節） | E2 で作成 | `render-memory-budget` |
 | クライアントの異常終了の急増（新しいビルドで 2 倍。ticket） | `engine-panic-spike.md`（editor-and-tools.md の 20 節）、[deploy-and-rollback.md](deploy-and-rollback.md) | E2 で作成 | `wasm-error-reports` |
 | IME の不具合の報告、イベントの順序の食い違いの急増 | `ime-regression.md`（editor-and-tools.md の 20 節） | E4 で作成 | `text-editing`、`editor-telemetry` |
 | レイアウトの食い違い（`layout_divergence` ≥ 1。ticket） | `layout-divergence.md`（layout.md の 17 節） | E5 で作成 | `layout-repair`、`layout-telemetry` |
-| レイアウト・整形の部品の版の上げ | `layout-engine-upgrade.md`（layout.md の 17 節） | E5 で作成 | `taffy-differential-test` |
+| レイアウト・整形の部品のバージョンの上げ | `layout-engine-upgrade.md`（layout.md の 17 節） | E5 で作成 | `taffy-differential-test` |
 | 「見つからないコンポーネント」の問い合わせ、導出の上限に達したファイル | `missing-component-and-materialize-limit.md`（components-and-libraries.md の 12 節） | E6 で作成 | `incremental-materialize` |
 | 手放さずに残るファイル（1 日超。ticket） | `orphaned-file-recovery.md`（file-storage-and-history.md の 17 節） | E7 で作成 | `orphan-recovery-job` |
 | チェックポイントの停滞（30 分。ticket） | `checkpoint-stalled.md`（同上） | E7 で作成 | `checkpoint-writer` |
 | ジャーナルの飛び・チャンクの破損の直し方（PITR と日ごとのチェックポイント） | `journal-gap-or-corruption.md`（同上） | E7 で作成 | `journal-fencing-recovery` |
 | 完全な削除の依頼と、バックアップに残る期間の説明 | `file-purge-request.md`（同上。法務の L4 の後） | E7 で作成 | `trash-and-purge` |
-| サポートによる版の復元・複製 | `version-restore-support.md`（同上） | E7 で作成 | `version-restore` |
+| サポートによるバージョンの復元・複製 | `version-restore-support.md`（同上） | E7 で作成 | `version-restore` |
 | 通知・メールが届かない | `notification-delivery.md`（comments-and-notifications.md の 11 節） | E8 で作成 | `email-notifications`、`in-app-notifications` |
 | Realtime・通知の遅れ（p99 1 秒を 15 分。ticket）、edge の再起動と再接続の集中、トリガーの負荷 | `realtime-degraded.md`（同上） | E8 で作成 | `realtime-skeleton`、`in-app-notifications` |
 | 権限の取り消しの遅れ（p99 10 秒超。ticket）、「共有を外したのに見えている」 | `acl-revocation-lag.md`（multiplayer.md の 18 節、permissions-and-sharing.md の 16 節） | E9 で作成 | `acl-version-and-revalidation`、`acl-change-kick` |
@@ -164,7 +164,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | Fargate の退役の通知への対応（待つ期間 14 日の平日の昼にドレイン） | 通知のたび | `fargate-retirement.md`（E3） |
 | GPU のブロックリストの見直し（7 日で 1%・100 セッション以上の組） | 週次 | `gpu-blocklist.md`（E2） |
 | クライアントのビルドの段の判定 | 段ごと（24 時間） | [deploy-and-rollback.md](deploy-and-rollback.md) |
-| IME の組み合わせの確認（15 組） | ブラウザ・OS の大きな版の更新のたび（QA が実行） | [quality.md](../quality.md) の 2.2.1 節 |
+| IME の組み合わせの確認（15 組） | ブラウザ・OS の大きなバージョンの更新のたび（QA が実行） | [quality.md](../quality.md) の 2.2.1 節 |
 | 作り直しの影の検証・一致の抜き取りの結果の確認 | 日次 | [quality.md](../quality.md) の 4.2 節 |
 | 漏洩の監査 | 週次 | [quality.md](../quality.md) の 4.2 節 |
 | 外部の侵入試験 | GA の前（E12）、以後年 1 回、プラグインの公開の前 | [security.md](../architecture/security.md) の 11 節 |

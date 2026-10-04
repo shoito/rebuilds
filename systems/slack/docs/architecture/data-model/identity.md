@@ -167,7 +167,7 @@ erDiagram
 
 ## 2. テナントの外の表
 
-Better Auth のモデルを snake_case の表名・列名に写す。**Better Auth の版で列が増減する。** ここには、本システムが依存する列と、追加した列だけを書く。生成されるスキーマ（Better Auth の CLI）は、この表と差分を確かめてからマイグレーションにする。
+Better Auth のモデルを snake_case の表名・列名に写す。**Better Auth のバージョンで列が増減する。** ここには、本システムが依存する列と、追加した列だけを書く。生成されるスキーマ（Better Auth の CLI）は、この表と差分を確かめてからマイグレーションにする。
 
 どの表も RLS を持たない。触れてよいのは `apps/api/src/auth/` のモジュールだけ（lint で禁止する）。テナントの中の表は、これらを参照しない（ADR-0010。例外は `members.account_id`）。
 

@@ -441,7 +441,7 @@ RP(サーバー)
 | Valkey | 続く | 続く（セッションは DB から） | 続く | 続く | 続く | 続く |
 | Signer に届かない | 続く | ログインの画面までは続く。コードの発行は続く | 503 | 503 | 503 | 続く |
 | KMS | 続く | 続く | 続く（Signer はメモリーの鍵） | 続く | 続く | 続く |
-| 設定の DB が読めない | 続く | 最後の版のキャッシュで続く | 同左 | 同左 | 同左 | 同左 |
+| 設定の DB が読めない | 続く | 最後のバージョンのキャッシュで続く | 同左 | 同左 | 同左 | 同左 |
 
 - Signer の障害で、認可コードの発行は続くが交換で 503 になる。コードの有効期間（60 秒）を過ぎたら、RP はログインからやり直す。Signer の回復が 60 秒を超えるなら、コードの有効期間を延ばさずにやり直させる（決定：延ばさない）。
 - 失敗の形の一覧：
@@ -490,7 +490,7 @@ RFC 9700 の要求と、この文書での対応。security.md のチェック�
 
 ### 13.3 適合試験（OpenID Foundation conformance suite）
 
-CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱い）は delivery の領域の [ADR-0064](../decisions/0064-conformance-suite-in-ci.md) にある。ここでは対象を決める。
+CI での回し方（バージョンの固定、PR と夜間の分け方、`WARNING` の扱い）は delivery の領域の [ADR-0064](../decisions/0064-conformance-suite-in-ci.md) にある。ここでは対象を決める。
 
 | テストプラン | 対象 | 段階 |
 | --- | --- | --- |
@@ -502,7 +502,7 @@ CI での回し方（版の固定、PR と夜間の分け方、`WARNING` の扱�
 | Dynamic OP、Implicit・Hybrid OP、Front-Channel Logout、Session Management | 対象外（動的な登録と、暗黙・ハイブリッド・iframe の仕組みを持たない） | — |
 | FAPI 2.0 Security Profile | MVP の後 | PAR・DPoP の後 |
 
-- テストプランの名前は、適合試験のリポジトリの CI の設定（`.gitlab-ci/run-tests.sh`）で確かめた（2026-09-27 に master で確認）。E3 の着手時に、使う版の suite で改めて確かめる。
+- テストプランの名前は、適合試験のリポジトリの CI の設定（`.gitlab-ci/run-tests.sh`）で確かめた（2026-09-27 に master で確認）。E3 の着手時に、使うバージョンの suite で改めて確かめる。
 - 適合試験の実行には、PKCE を使わない機密のクライアント（`require_pkce=false`）を登録したテナントを使う。OIDC の OP の試験は PKCE を送らない（suite の `AbstractOIDCCServerTest` に PKCE の処理がない。2026-09-27 に master で確認）。
 - 差分テスト：同じ要求を node-oidc-provider に送り、状態コード・`error`・クレームの違いを一覧にする。違いは、この文書の決定に基づくものだけであることを CI で確かめる（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 

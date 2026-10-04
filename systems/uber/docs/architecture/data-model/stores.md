@@ -46,10 +46,10 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 | `speed-samples/` | `dt=<YYYY-MM-DD>/part-<n>.parquet` | 列：`way_id`・`direction`・`edge_id`・`week_bucket_5min`・`speed_kph`・`tile_version`。ID なし | `app` | 2 年 | しない | trail-builder／ETA の速度の表 |
 | `supply-heat/` | `dt=<YYYY-MM-DD>/part-<n>.parquet` | 列：`block_cell`・`bucket_5min`・`status`・`count`。ID なし | `app` | 2 年 | しない | geo-index の主／運用・分析・シミュレーション |
 | `dispatch-decisions/` | `zone=<zone>/dt=<YYYY-MM-DD>/hour=<HH>/<batch_id>.pb` | `DispatchBatchRecord`（[dispatch-and-matching.md](../dispatch-and-matching.md) の 9.1 節）。位置は `spot` のセル、乗客の個人の情報なし。Athena のテーブル | `location` | 180 日 | しない | Firehose／配車の担当・再生の仕組み |
-| `valhalla/tiles/` | `<tile_version>/tiles.tar` | Valhalla のタイル | `app` | 前の版を 24 時間 | する | タイルの作成／Valhalla |
-| `eta/bias-tables/` | `<version>.parquet` | 列：`district_cell`・`hour_of_week`・`bias_s`・`n` | `app` | 版ごと 90 日（L4） | しない | ETA |
-| `eta/speed-profiles/` | `<version>/*.csv` | Valhalla の速度の表 | `app` | 版ごと 90 日（L4） | しない | タイルの作成 |
-| `eta/golden-routes/` | `<version>.parquet` | 検査の経路の組 | `app` | 版ごと 90 日（L4） | しない | タイルの検査 |
+| `valhalla/tiles/` | `<tile_version>/tiles.tar` | Valhalla のタイル | `app` | 前のバージョンを 24 時間 | する | タイルの作成／Valhalla |
+| `eta/bias-tables/` | `<version>.parquet` | 列：`district_cell`・`hour_of_week`・`bias_s`・`n` | `app` | バージョンごと 90 日（L4） | しない | ETA |
+| `eta/speed-profiles/` | `<version>/*.csv` | Valhalla の速度の表 | `app` | バージョンごと 90 日（L4） | しない | タイルの作成 |
+| `eta/golden-routes/` | `<version>.parquet` | 検査の経路の組 | `app` | バージョンごと 90 日（L4） | しない | タイルの検査 |
 | `eta/accuracy/` | `dt=<YYYY-MM-DD>/part-<n>.parquet` | 乗車ごとの予測 `P`・実際 `A`・誤差 `e`。ID は乗車の ID だけ | `app` | 2 年（L4） | しない | ETA／品質 |
 | `osm/japan/` | `<date>/japan-latest.osm.pbf`・`.md5`・`checks.json` | OSM の抽出と量の検査の結果 | `app` | 90 日 | する | osm-import |
 | `places/poc/` | `ground-truth.parquet` | 住所の検索の PoC の正解（公開の場所だけ） | `app` | 選定の後 1 年 | しない | E4 の PoC |
@@ -89,11 +89,11 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 
 ### 3.2 `geo_shard_map`（S2 から）
 
-分割の表（版つき）。**置き場所（DynamoDB か Aurora）は E14 の前に決める**（持ち越し。[data-model.md](../data-model.md) の 9 節）。どちらでも次の形にする。
+分割の表（バージョンつき）。**置き場所（DynamoDB か Aurora）は E14 の前に決める**（持ち越し。[data-model.md](../data-model.md) の 9 節）。どちらでも次の形にする。
 
 | 属性・列 | 説明 |
 | --- | --- |
-| `version`（PK の一部） | 分割の表の版 |
+| `version`（PK の一部） | 分割の表のバージョン |
 | `shard_id`（PK の一部） | `geo/<city>/<shard>` |
 | `metro_cells` | 属する `metro` のセルの一覧 |
 | `halo_metro_cells` | 周りの 1 輪の `metro` のセル |
@@ -151,7 +151,7 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 | `push-requests` | SQS | プッシュの送信の要求 | push-sender |
 | `safety-incidents` | SQS | `SafetyIncident`（API が直接書く。outbox を経ない） | safety の受信、当番の呼び出しの直接の経路 |
 
-- どのキューも DLQ を持つ。届け方は少なくとも 1 回で、順序は保証しない。購読する側は 7 節の版で古い事象を捨てる。
+- どのキューも DLQ を持つ。届け方は少なくとも 1 回で、順序は保証しない。購読する側は 7 節のバージョンで古い事象を捨てる。
 - **`offer.created` は `rt-fanout` だけが購読する**（乗車地の正確な値を含むため。フィルターで他のキューに流さない）。
 
 ## 6. 常時の接続の封筒（要約）
@@ -178,7 +178,7 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 
 ### 7.1 `core` → SNS `trips-events`
 
-| `event_type` | 本文 | 版（古い事象を捨てる鍵） | 出す時 |
+| `event_type` | 本文 | バージョン（古い事象を捨てる鍵） | 出す時 |
 | --- | --- | --- | --- |
 | `trip.state_changed` | `TripStateChanged`：`trip_id`、`trip_version`、`region_gen`、`state`、`prev_state`、`TripSnapshot`（署名つき）、`operator_id`、`terminal_reason`、`cancellation_fee_yen` | `(trip_id, trip_version)` | すべての遷移 |
 | `driver.assignment_changed` | `DriverAssignmentChanged`：`driver_id`、`assignment_id`、`trip_id`、`rider_id`、`operator_id`、`region_gen`、`assignment_epoch`、`trip_version`、`TripAssignState`（`NONE`〜`ON_TRIP`） | `(driver_id, region_gen, assignment_epoch, trip_version)` の辞書順 | 割り当ての作成・進み・解放 |
@@ -193,7 +193,7 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 
 ### 7.2 `money` → SNS `payments-events`
 
-| `event_type` | 本文 | 版 | 出す時 |
+| `event_type` | 本文 | バージョン | 出す時 |
 | --- | --- | --- | --- |
 | `payment.authorization_succeeded` | `trip_id`、`trip_payment_id`、`authorized_yen`、`auth_expires_at` | `trip_payment_id` | 与信の成功 |
 | `payment.authorization_failed` | `trip_id`、`trip_payment_id`、`error_code` | `trip_payment_id` | 与信の失敗・時間切れ |
@@ -210,11 +210,11 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 | `release.*`・`ops.*`・`legal.*` | フラグ。legal は事業者 × 交通圏。本番の true は `legal_gate_records` の範囲だけ（検証の関数） | release：PM が判断し Ops／ops：オンコール／legal：PM と Ops（記録の範囲の中） | [delivery.md](../delivery.md) の 6 節、[ADR-0043](../../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md) |
 | `dispatch/<zone>`・`dispatch/synthetic` | 配車の周期・重み・上限・待機場の除外、合成の区域 | 変更の記録と再生の結果つき | dispatch の 15 節、observability の 12 節 |
 | `client_policy` | アプリ × OS の `recommended_min`・`required_min` | `release_manager`（変更の要求） | rider-and-driver-apps の 10.3 節 |
-| `nav_handoff_targets` | 引き継ぎ先、OS、最低の版、`upfront_allowed` | 同上 | rider-and-driver-apps の 6.2 節 |
+| `nav_handoff_targets` | 引き継ぎ先、OS、最低のバージョン、`upfront_allowed` | 同上 | rider-and-driver-apps の 6.2 節 |
 | `ops.region.writable`・`region_gen` | 書き込みを受けるリージョンと割り当ての世代 | DR の手順（人の判断） | infrastructure の 14 節、[ADR-0039](../../decisions/0039-city-cells-and-osaka-warm-standby.md) |
 | `capacity/<city>`・`prescale_events` | 受け入れの上限の係数、バッチの上限、予定の拡大 | Ops | capacity の 11 節 |
 | `ops_policies` | ロール × 操作 × 金額の上限 | 変更の要求（`ops_policy`） | support の 2.1 節 |
-| `eta_model`（S2） | 区域ごとのモデルの版と割合 | ML の展開 | ml-platform の 13 節 |
+| `eta_model`（S2） | 区域ごとのモデルのバージョンと割合 | ML の展開 | ml-platform の 13 節 |
 
 ## 9. 端末とリポジトリ
 
@@ -228,4 +228,4 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 | 開発リポジトリ `proto/` | 契約（Protocol Buffers） | — |
 | 開発リポジトリ `vectors/trip-app/`・`vectors/eligibility/` | 状態機械と候補の条件の共通のテストのベクター | — |
 | 開発リポジトリ `features/`（S2） | 特徴量の定義（YAML ＋ SQL） | — |
-| SageMaker Model Registry（S2） | モデルの版、データの版、評価、承認者 | — |
+| SageMaker Model Registry（S2） | モデルのバージョン、データのバージョン、評価、承認者 | — |

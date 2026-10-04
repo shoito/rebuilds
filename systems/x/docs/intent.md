@@ -46,7 +46,7 @@
 | --- | --- |
 | みんなで作る注記（本家の Community Notes に相当する、異なる立場の評価者の合意で付ける注記） | 評価者の合意を計算する仕組みと、悪用への備えが要る。T&S の基盤ができてから足す |
 | リスト、コミュニティ | タイムラインの別の源。fan-out とランキングの上に足す |
-| 投稿の編集（公開の後の 1 時間以内など） | 版の管理と、引用・検索・通知への影響が要る |
+| 投稿の編集（公開の後の 1 時間以内など） | バージョンの管理と、引用・検索・通知への影響が要る |
 | DM のエンドツーエンドの暗号化 | 鍵の管理とモデレーションの両立が要る（法務の L3） |
 | ML の重いランキング（S2 の学習済みのモデル、S3 の埋め込みでの取り出し） | S1 は規則と軽いモデルで始め、出来事のログが溜まってから足す（[ADR-0006](decisions/0006-ranking-boundary.md)） |
 | 長文の投稿、有料の購読、収益の分配 | 決済と税の扱いが要る |
@@ -143,7 +143,7 @@
 - X Developer Platform, [Media upload](https://docs.x.com/x-api/media/introduction)：画像 5 MB、GIF 15 MB、動画は既定 20 分・8 GB、DM の動画は既定 140 秒・512 MB、分割のアップロード
 - X Help Center, [View counts](https://help.x.com/en/using-x/view-counts)、[About X limits](https://help.x.com/en/rules-and-policies/x-limits)、[About following on X](https://help.x.com/en/using-x/x-follow-limit)：検索結果の抜粋で確認（本文は 403 で未確認）
 - X（Twitter）, [twitter/the-algorithm](https://github.com/twitter/the-algorithm)（AGPL-3.0）、xAI, [xai-org/x-algorithm](https://github.com/xai-org/x-algorithm)（Apache-2.0）：おすすめの構成の README。コードは使わない
-- Twitter, [snowflake（2010 年の版）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)：41 ビットの時刻、10 ビットの機械、12 ビットの連番
+- Twitter, [snowflake（2010 年のバージョン）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)：41 ビットの時刻、10 ビットの機械、12 ビットの連番
 - 総務省, [インターネット上の違法・有害情報に対する対応（情報流通プラットフォーム対処法）](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)：2025-04-30 に X Corp. を含む 5 社を大規模特定電気通信役務提供者に指定。2025-05-29・30 に 4 社を追加で指定
 - 申出から 7 日以内の判断と通知：施行規則（総務省令）の第 16 条によるとする第三者の解説（[契約ウォッチ](https://keiyaku-watch.jp/media/hourei/joho-platform-2024/) など）で確認した。省令の条文は**未検証**
 - 総務省・消費者庁, [特定電子メールの送信等に関するガイドライン](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/pdf/m_mail_081114_1.pdf)：特定電子メールの定義（営業の広告・宣伝のためのメール）、オプトインと表示の義務（L11）

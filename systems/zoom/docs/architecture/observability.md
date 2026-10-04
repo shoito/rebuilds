@@ -45,7 +45,7 @@
 
 | 群 | 項目（`getStats` の出所） |
 | --- | --- |
-| 共通 | `participant_id`、`instance_id`、窓の開始、`client_kind`、ブラウザの系統と版、`ice_path`（`udp_direct`・`tcp_direct`・`turn_udp`・`turn_tcp`・`turn_tls`）、`ip_family`、`media_generation` |
+| 共通 | `participant_id`、`instance_id`、窓の開始、`client_kind`、ブラウザの系統とバージョン、`ice_path`（`udp_direct`・`tcp_direct`・`turn_udp`・`turn_tcp`・`turn_tls`）、`ip_family`、`media_generation` |
 | 経路 | `candidate-pair` の `currentRoundTripTime`、`availableOutgoingBitrate`、`availableIncomingBitrate`（あれば） |
 | 受けた音声（流れごと、最大 3） | `inbound-rtp`：`packetsLost`・`packetsReceived` の増分、`jitter`、`concealedSamples`・`silentConcealedSamples`・`totalSamplesReceived`・`concealmentEvents` の増分、`jitterBufferDelay`・`jitterBufferEmittedCount` の増分。算出した `mos_est`（4 節） |
 | 受けた映像（流れごと、最大 25。上位 5 本を詳しく、残りは合計） | `inbound-rtp`：`framesDecoded`・`framesDropped` の増分、`frameHeight`、`framesPerSecond`、`freezeCount`・`totalFreezesDuration` の増分、`pliCount`・`nackCount` の増分 |
@@ -194,7 +194,7 @@ MOS  = 1 + 0.035 R + R (R − 60)(100 − R) × 7 × 10⁻⁶         (0 < R < 1
 | 監査ログのハッシュの連鎖の検証の失敗 | 日次のジョブ | 呼び出し（SEV2） | [incident-response.md](../runbooks/incident-response.md) |
 | DR の複製の遅延 | `AuroraGlobalDBRPOLag` が 60 秒を 5 分超える | 呼び出し | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
 | 大阪の待機の構成の異常 | 大阪の合成の監視の会議の失敗 | チケット（30 分で呼び出し） | [disaster-recovery.md](../runbooks/disaster-recovery.md) |
-| デプロイ中の自動の戻し、カナリアの不合格、Web の版の悪化 | [delivery.md](delivery.md) の 4・5 節 | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
+| デプロイ中の自動の戻し、カナリアの不合格、Web のバージョンの悪化 | [delivery.md](delivery.md) の 4・5 節 | 呼び出し | [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) |
 | K8 の超過 | 月の K8 が目標を超える | チケット（月次） | [capacity.md](capacity.md) の 6 節 |
 
 呼び出しのアラートは、SLO か、サーバーの側の原因を示す症状か、セキュリティ（DDoS、内容の出力、監査）に限る。
@@ -258,7 +258,7 @@ MOS  = 1 + 0.035 R + R (R − 60)(100 − R) × 7 × 10⁻⁶         (0 < R < 1
 
 ### quality.md
 
-- `mos_est` と ViSQOL の差（条件ごと）と、係数の版。
+- `mos_est` と ViSQOL の差（条件ごと）と、係数のバージョン。
 - 5 節の SLI の定義と、試験の環境での測り方（同じ定義を試験と本番で使う）。
 - 合成の監視の会議の成功率と、経路ごとの参加の時間。
 

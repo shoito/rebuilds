@@ -25,7 +25,7 @@ date: 2026-10-04
 
 1 を採用する。
 
-- `moderation_actions`：対象、種類、値（地域・期限・制限）、規約の区分と版、根拠（規約・法令の案件・照合・規則）、判断した主体（人か `rule:{id}@{version}`）、承認者、案件、状態。行は書き換えない。状態の変化は `moderation_action_events` に足す。
+- `moderation_actions`：対象、種類、値（地域・期限・制限）、規約の区分とバージョン、根拠（規約・法令の案件・照合・規則）、判断した主体（人か `rule:{id}@{version}`）、承認者、案件、状態。行は書き換えない。状態の変化は `moderation_action_events` に足す。
 - 種類：投稿は `label`・`reduce`・`geo_withhold`・`remove`、メディアは `remove_media`、アカウントは `label_account`・`reduce_account`・`read_only`・`suspend`、機能は `feature_limit`。判断までの一時の扱いは `interim_reduce`。
 - 措置を効かせるトランザクションで、行・要約（効いている行を全部畳み込んで計算し直す）・`state_version` の加算・outbox（`moderation` の流れ）を書く。確定の直後に `ps:`・`as:` の写しを書く。
 - 状態：`pending_approval → active → expired | reversed | superseded`。永久の凍結・法令の措置・`csem` は 2 人の承認。`csem` と `violent_threat` の緊急の `remove` は先に効かせ、24 時間以内に 2 人目が確かめる。

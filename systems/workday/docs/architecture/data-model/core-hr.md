@@ -2,7 +2,7 @@
 
 人・雇用・職務の割り当て、個人の情報、報酬、退職、組織（監督組織・会社・コストセンター・事業所）、階層の閉包、ポジション、職務、等級、組織のロール。振る舞いは [core-hr.md](../core-hr.md)、決定は [ADR-0010](../../decisions/0010-person-employment-job-assignment-model.md)〜[ADR-0012](../../decisions/0012-worker-lifecycle-events-and-legal-checks.md)。facet の 3 つの表の共通の列は [temporal.md](temporal.md) の 2 節、規約は [data-model.md](../data-model.md) の 3 節。
 
-- facet の節は **値の列** だけを書く。現在の表と版の表に型のある列として写すもの（外部キー・検索）には「写す」と書く。それ以外は版の `state` と差分の `delta` の中だけにある。
+- facet の節は **値の列** だけを書く。現在の表とバージョンの表に型のある列として写すもの（外部キー・検索）には「写す」と書く。それ以外はバージョンの `state` と差分の `delta` の中だけにある。
 - 保存（主体のデータの種類）：人・雇用・職務の表と facet は「労働者名簿」（退職の日から、既定 5 年）。退職者のどの規則にも当たらない facet（緊急連絡先など）も、最長の規則が終わるまで（[audit-and-retention.md](../audit-and-retention.md) の 5.2 節）。組織・ポジション・職務・等級はテナントの契約の間。
 
 ## 1. ER 図
@@ -624,7 +624,7 @@ erDiagram
 | `job_level` | `text` | NULL | 職位（表示） |
 
 - 現在の表の索引：GiST `(tenant_id, org_id, valid)` — 組織の全員の一覧、権限の対象の組織。GiST `(tenant_id, position_id, valid)` — ポジションに 1 人（PROP-HR-004 の検査）。GiST `(tenant_id, location_id, valid)` — 事業所ごとの 36 協定・賃金台帳。
-- 版の表の索引：GiST `(tenant_id, org_id, valid, known)` — `known_at` を指定した組織の一覧。
+- バージョンの表の索引：GiST `(tenant_id, org_id, valid, known)` — `known_at` を指定した組織の一覧。
 
 ### 3.10 `worker_compensation`（主体：`employments`、contiguous）
 
@@ -649,7 +649,7 @@ erDiagram
 
 - 現在の表の索引：GIN `(account_hmacs)` — 新しい口座が別の従業員の口座と同じかの警告（THR-022）。
 - CHECK（Zod と現在の表のトリガー）：口座 1〜3、`remainder` はちょうど 1 つ、`percent` の合計 ≦ 1。
-- 口座番号の平文は差分・版・現在のどれにも入らない。
+- 口座番号の平文は差分・バージョン・現在のどれにも入らない。
 
 ## 4. 組織の facet
 

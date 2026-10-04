@@ -361,7 +361,7 @@ PSP の Webhook の受信箱。署名を確かめてから保存する。定義�
 | `idempotency_key` | `text` | NOT NULL | — | `capture:{trip_id}`・`fee:{trip_id}`・`refund:{trip_id}:{seq}`・`payout:{payout_id}:create`・`recon:{source}:{external_id}` |
 | `effective_at` | `timestamptz` | NOT NULL | — | 会計の日時。締めの判定に使う |
 | `reverses_entry_id` | `uuid` | NULL | — | 逆の仕訳なら元の仕訳 |
-| `metadata` | `jsonb` | NOT NULL | `'{}'` | 手数料の規則の版（`platform_fee_rule_id`）、訂正の ID、承認者 |
+| `metadata` | `jsonb` | NOT NULL | `'{}'` | 手数料の規則のバージョン（`platform_fee_rule_id`）、訂正の ID、承認者 |
 
 - キー：PK `(created_at, id)`。冪等は `ledger_entry_keys`。
 - パーティション：`created_at` の月。13 か月より古いものは S3 の Parquet（Object Lock）に移し、10 年まで残す。

@@ -120,7 +120,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | E | TURN を踏み台に、VPC の中・メタデータ・任意の相手へ送る | 中継の相手を Media Node の範囲に限る。ループバック、プライベート、169.254.169.254 を拒否。TCP の中継を使わない |
 | D | 割り当ての枯渇、帯域の独占 | 1 人 4 つの割り当て、1 つ 10 Mbps。割り当ての数の監視と警報（[observability.md](observability.md) の 6 節） |
 | D | TLS 443 への洪水 | ADR-0045 の一時的な保護、台の追加。IP の範囲からの制限は WAF では掛けられない（UDP・TLS の直接の受け口のため） |
-| E | coturn の脆弱性 | 版の固定と監視、11 節の期限 |
+| E | coturn の脆弱性 | バージョンの固定と監視、11 節の期限 |
 
 ### 3.7 Recorder・Transcriber・Composer
 
@@ -138,7 +138,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | --- | --- | --- |
 | I | Aurora のバックアップ・スナップショットの持ち出し | `<brand>-data` の鍵、スナップショットの共有の禁止（SCP） |
 | T | CI/CD・Terraform の改ざんで、セキュリティグループや KMS のポリシーが緩む | plan のポリシー検査（[infrastructure.md](infrastructure.md) の 9 節）、`security:sensitive` の 2 人の承認（他の題材と同じ） |
-| T | 依存（mediasoup、coturn、OpenMLS、npm）への供給網の攻撃 | 版の固定、ハッシュの検証、SBOM、依存の更新は 1 PR ずつ |
+| T | 依存（mediasoup、coturn、OpenMLS、npm）への供給網の攻撃 | バージョンの固定、ハッシュの検証、SBOM、依存の更新は 1 PR ずつ |
 
 ## 4. 暗号化
 
@@ -168,7 +168,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 秘密・鍵 | 保存 | 入れ替え |
 | --- | --- | --- |
 | 参加のトークンの署名の鍵 | KMS（非対称。API のタスクが `Sign`） | 年 1 回と、漏えいの疑いのとき。新旧の公開鍵を 1 日並べて配る |
-| パスコードの HMAC の pepper | `<brand>-meeting-secrets` で暗号化し Secrets Manager | 漏えいの疑いのとき。版を付け、新しい会議から新しい版（[meeting-security.md](meeting-security.md)） |
+| パスコードの HMAC の pepper | `<brand>-meeting-secrets` で暗号化し Secrets Manager | 漏えいの疑いのとき。バージョンを付け、新しい会議から新しいバージョン（[meeting-security.md](meeting-security.md)） |
 | `ip_prefix_hash` の pepper | 同上 | 30 日。前の pepper を 30 日残し、照合は今と前の両方で行う（[meeting-security.md](meeting-security.md) の 10 節） |
 | TURN の静的な秘密 | Secrets Manager（今と次の 2 つ） | 90 日（[ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md)）。手順は network-traversal の runbook（`turn-secret-rotation.md`） |
 | E2EE の AS の中間 CA の鍵 | KMS（`<brand>-e2ee-as`） | [e2ee.md](e2ee.md) の決定に従う |
@@ -253,7 +253,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | 会議の中の状態（Valkey のスナップショット） | 24 時間（TTL） | 自動 | [signaling-and-meetings.md](signaling-and-meetings.md) |
 | チャット（会議の間） | 会議の終了から 24 時間 | 自動 | [chat-and-reactions.md](chat-and-reactions.md) |
 | チャット（`save_chat` のとき） | 組織の設定（既定 90 日） | 削除 | 同上 |
-| 録画・文字起こし | 組織の設定（既定 365 日）＋ごみ箱 30 日 | S3 から削除（版も） | [recording-and-transcription.md](recording-and-transcription.md) の 6.3 節 |
+| 録画・文字起こし | 組織の設定（既定 365 日）＋ごみ箱 30 日 | S3 から削除（バージョンも） | [recording-and-transcription.md](recording-and-transcription.md) の 6.3 節 |
 | 録画の生の区切り | 合成の成功から 7 日（失敗は 30 日） | 削除 | 同上 |
 | 報告（`abuse_reports`） | 1 年。報告に添えた生の IP の暗号文は 90 日 | 削除 | [meeting-security.md](meeting-security.md) |
 | 電話の通話の記録（`phone_calls`。MVP の後） | 12 か月。発信者の番号はハッシュと下 4 桁だけ | 削除 | [telephony.md](telephony.md) |

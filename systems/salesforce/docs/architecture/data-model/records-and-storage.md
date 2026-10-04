@@ -172,14 +172,14 @@ erDiagram
 | `created_by`・`updated_by` | `uuid` | NOT NULL | — | 利用者 |
 | `deleted_at` | `timestamptz` | NULL | — | ごみ箱 |
 | `delete_batch_id` | `uuid` | NULL | — | → `recycle_bin_batches` |
-| `row_version` | `bigint` | NOT NULL | `1` | 保存ごとに 1 上げる。`If-Match` と索引の外部の版 |
+| `row_version` | `bigint` | NOT NULL | `1` | 保存ごとに 1 上げる。`If-Match` と索引の外部のバージョン |
 
 - キー：PK `(org_id, object_id, id, shard_no)`。`PARTITION BY LIST (shard_no)`、`fillfactor = 85`。
 - 索引：
 
 | 索引 | 使う問い合わせ |
 | --- | --- |
-| PK | 1 件の読み、ID の範囲での走査（整合の検査、共有のルールの版、一括の問い合わせ） |
+| PK | 1 件の読み、ID の範囲での走査（整合の検査、共有のルールのバージョン、一括の問い合わせ） |
 | `(org_id, id)` | ID だけでの読み（`/api/v1/ui/records/{id}`、最近見たもの）。2026-09-28 に足した |
 | `(org_id, object_id, owner_id, id) WHERE deleted_at IS NULL` | 所有者での絞り込み、共有の条件（`owner_id IN G_me`）、計画 P2 |
 | `(org_id, object_id, updated_at, id) WHERE deleted_at IS NULL` | 更新の時刻での取り出し（連携の同期）、最近の更新の並び |

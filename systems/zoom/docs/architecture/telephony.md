@@ -96,7 +96,7 @@ ADR-0042。
 ```
 
 - 存在しない番号とパスコードの誤りは、同じ案内（「番号かパスコードが違います」）にする（[ADR-0033](../decisions/0033-join-rate-limits-and-enumeration-defense.md)）。
-- 同意の案内の文言は、Web の同意の画面と同じ版（`notice_version`）の音声を使う。同意は DTMF の `1` で記録する（ADR-0027）。
+- 同意の案内の文言は、Web の同意の画面と同じバージョン（`notice_version`）の音声を使う。同意は DTMF の `1` で記録する（ADR-0027）。
 - 案内は日本語。英語の案内は MVP の後。
 
 ### 4.3 会議の中の操作（DTMF）
@@ -241,7 +241,7 @@ ADR-0042。
 
 - `sip-trunk-outage.md`：事業者の SIP トランクが落ちたときの確かめ方（OPTIONS の死活、呼の失敗の率）と、別の接続点への切り替え。
 - `toll-fraud-response.md`：ダイヤルアウトの急増で組織を止めたときの確かめ方と、管理者への連絡、解除の手順。
-- `ivr-prompt-update.md`：同意の文言の版を変えたときの、IVR の音声の作り直しと配布。
+- `ivr-prompt-update.md`：同意の文言のバージョンを変えたときの、IVR の音声の作り直しと配布。
 - `phone-bridge-capacity.md`：同時の通話の数と、Phone Bridge・Call Controller のタスクの増やし方。
 
 ### data-model（索引への追加の提案）

@@ -83,7 +83,7 @@ rebuilds の他の題材（Slack、Linear、Uber など）で、次の基盤を�
 - 引き受けるコスト：
   - 本家が長年かけて磨いたランキングに比べ、S1 のおすすめの質は低い。K8 の基準（フォロー中の時刻の順より 20% 高い）で評価し、学習済みのモデルは S2 で足す。
   - 学習の Python と、推論の TypeScript（ONNX）の間で、特徴の作り方がずれうる。特徴の定義を 1 か所に置き、学習と推論で同じ値になることを試験する（ranking-and-recommendation の領域）。
-  - React Native のアプリの配布（ストアの審査、最低の版）を運用する。clients・delivery の領域で扱う。
+  - React Native のアプリの配布（ストアの審査、最低のバージョン）を運用する。clients・delivery の領域で扱う。
 
 ## Confirmation
 

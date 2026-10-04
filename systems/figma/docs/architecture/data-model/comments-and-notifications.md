@@ -282,7 +282,7 @@ erDiagram
 | `account_id` | `uuid` | NO | | 受け手 |
 | `kind` | `text` | NO | | `comment_mention`・`comment_reply`・`comment_on_file`・`invite`・`access_request`・`seat_request`・`library_update` |
 | `file_id` | `uuid` | YES | | `seat_request` などファイルのないものは NULL |
-| `subject_id` | `uuid` | NO | | コメント・招待・申請・ライブラリの版などの ID |
+| `subject_id` | `uuid` | NO | | コメント・招待・申請・ライブラリのバージョンなどの ID |
 | `actor_account_id` | `uuid` | YES | | きっかけの人（コメントを書いた人、招待した人）。表示の名前は読み直す |
 | `created_at` | `timestamptz` | NO | `now()` | |
 | `read_at` | `timestamptz` | YES | | |

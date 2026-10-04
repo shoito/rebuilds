@@ -8,7 +8,7 @@
 | --- | --- |
 | [0037](../decisions/0037-plugin-sandbox-quickjs-wasm.md) | プラグインのコードは、QuickJS を WASM にした専用のインスタンスで、メインスレッドで動かす。UI と通信は、別のオリジンの null origin の iframe に置く |
 | [0038](../decisions/0038-plugin-api-and-capabilities.md) | プラグインの API は、動かした人の権限の中で動き、manifest で宣言した能力と通信先だけを許す。書き込みは通常の変更（ChangeSet）になる |
-| [0039](../decisions/0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは審査する。すべての版を不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR |
+| [0039](../decisions/0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは審査する。すべてのバージョンを不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR |
 
 ## 1. 目的と範囲
 
@@ -90,9 +90,9 @@ ADR-0037。
 - 同期の実行の間、画面は止まる（本家と同じ。メインスレッドで動くため）。長い処理は、`await` で区切るよう文書で案内する。区切ると、ホストは描画のフレームを挟む。
 - 値はこの設計の決定。本家の上限は公開の資料にない（**未検証**。設計の判断には影響しない）。
 
-### 4.4 ES の版
+### 4.4 ES のバージョン
 
-- quickjs-ng は、仕様に入った新しい ES の機能を追う方針で、test262 の結果を公開している。ただし `Intl` は大きさの理由で持たない見込みと書く（[quickjs-ng の ECMAScript Features](https://quickjs-ng.github.io/quickjs/es_features)、2026-09-27 に確認）。本家は「ES2020 以降」と説明し、組み込みの一覧に `Intl` を挙げていない（[How Plugins Run](https://developers.figma.com/docs/plugins/how-plugins-run/)、2026-09-27 に確認）。対応する版の範囲（ES2023 の大半を見込む）は **未検証**（E14 の `quickjs-sandbox-poc` で test262 の結果を確かめる）。
+- quickjs-ng は、仕様に入った新しい ES の機能を追う方針で、test262 の結果を公開している。ただし `Intl` は大きさの理由で持たない見込みと書く（[quickjs-ng の ECMAScript Features](https://quickjs-ng.github.io/quickjs/es_features)、2026-09-27 に確認）。本家は「ES2020 以降」と説明し、組み込みの一覧に `Intl` を挙げていない（[How Plugins Run](https://developers.figma.com/docs/plugins/how-plugins-run/)、2026-09-27 に確認）。対応するバージョンの範囲（ES2023 の大半を見込む）は **未検証**（E14 の `quickjs-sandbox-poc` で test262 の結果を確かめる）。
 - `Intl`・`toLocaleString` の地域の書式は持たない。プラグインに要る場合は、ホストの `Intl` の結果を membrane の関数として渡すかを `quickjs-sandbox-poc` で決める。
 - `eval`・`Function` は QuickJS の中では使える（外に出られないため）。
 
@@ -106,7 +106,7 @@ ADR-0038。
 {
   "name": "…",                       // 最大 64 文字
   "id": "…",                          // 配布の時に振る。<brand> の中で一意
-  "api": "1.0.0",                     // API の版（5.5 節）
+  "api": "1.0.0",                     // API のバージョン（5.5 節）
   "main": "code.js",
   "ui": "ui.html",                    // 任意
   "editorType": ["design"],           // MVP の後のホワイトボードで "whiteboard" を足す
@@ -144,7 +144,7 @@ ADR-0038。
 - 1 回の同期の実行の中の書き込みは、1 つの Undo の単位にまとめる。`await` で区切られたら、そこで `ChangeSet` を閉じる。
 - 1 つの `ChangeSet` は 4 MiB 以下（[document-model.md](document-model.md) の 11 節）。超えたらホストが分ける。確定を待つ変更が 32 MiB を超えたら、ホストは次の `await` で確定を待ち、送る速さを抑える。
 - 打ち切り（4.3 節）のとき：その実行で作った変更は、打ち切りまでのものを 1 つの Undo の単位として残し、利用者に「取り消す」を出す。途中の状態は不変条件を破らない（変更は 1 つずつ検証済み）。
-- 変更に、どのプラグインが作ったかの印（`origin = Plugin { plugin_id, version_id }`。[document-model.md](document-model.md) の 7 節）を付け、ジャーナルに残す。版の履歴で「〇〇（プラグイン）による変更」と出す。
+- 変更に、どのプラグインが作ったかの印（`origin = Plugin { plugin_id, version_id }`。[document-model.md](document-model.md) の 7 節）を付け、ジャーナルに残す。バージョンの履歴で「〇〇（プラグイン）による変更」と出す。
 
 ### 5.4 plugin_data
 
@@ -153,7 +153,7 @@ ADR-0038。
 - 上限：鍵 100 バイト、値 100 KiB、1 ノード 1 プラグインで 1 MiB（この設計の値）。本家は 1 項目（プラグインの ID・鍵・値の合計）を 100 kB までにする（[setPluginData](https://developers.figma.com/docs/plugins/api/properties/nodes-setplugindata/)、2026-09-27 に確認）。1 ノードの合計の上限は本家の資料にない。
 - 全プラグインが読める共有の名前空間（本家の `sharedPluginData` に相当）は、後で別の ADR で決める。
 
-### 5.5 API の版
+### 5.5 API のバージョン
 
 - `api` は semver。1.x の中は追加だけ。ホストは 1 つの実装で、古い 1.x のプラグインも動かす。
 - API の型定義（TypeScript の `.d.ts`）は、プロパティの表（ADR-0006）から生成する部分と、手で書く部分に分ける。表の `public_plugin` の列が真のプロパティだけを API に出す（内部のプロパティ、`derived_layout` の書き込みを出さない）。
@@ -204,7 +204,7 @@ ADR-0037・0038。
 | 組織の中のプラグイン | 管理者が公開 | 組織の中の配布（ADR-0039） |
 
 - 判定は、プラグインを動かすときに API が返す「このファイルで動かせるプラグインの一覧」で行う。ホストはその一覧に無いプラグインを読み込まない。組織の方針はファイルを持つ組織のものを使う（ゲストが持ち込んだプラグインも、ファイルを持つ組織の方針に従う）。
-- プラグインの実行を、監査ログに残す（プラグインの ID・版・ファイルの ID・利用者。中身は残さない）。
+- プラグインの実行を、監査ログに残す（プラグインの ID・バージョン・ファイルの ID・利用者。中身は残さない）。
 
 ## 9. データの形
 
@@ -227,14 +227,14 @@ ADR-0039。
 
 | 段階 | 誰が使えるか | 審査 |
 | --- | --- | --- |
-| 開発中（`private_dev`） | 作った本人だけ | なし。manifest と ZIP を上げると、本人の開発用の版になる。デスクトップアプリがないので、ローカルのディレクトリを直接読む形は MVP の後の後 |
+| 開発中（`private_dev`） | 作った本人だけ | なし。manifest と ZIP を上げると、本人の開発用のバージョンになる。デスクトップアプリがないので、ローカルのディレクトリを直接読む形は MVP の後の後 |
 | 組織の中（`org`） | 組織のメンバー | 本家の OAuth の private のアプリと同じく、審査なし（[api-and-webhooks.md](api-and-webhooks.md) の 3 節）。組織の管理者が公開を承認する |
 | 公開（`public`） | 全員（組織の方針の許す範囲） | 初回は自動の検査＋人の審査。更新は自動の検査。権限・通信先が広がる更新は人の審査 |
 
 - 自動の検査：manifest の検証、`networkAccess` の必須と `reasoning`、コードの大きさ、難読化の度合いの目安（ミニファイは許す）、既知の悪意のあるコードの署名、禁止の API の使い方（例：UI の iframe でのログイン画面に似た入力欄とパスワードの型）。
 - 人の審査の目標：5 営業日（本家は 5〜10 営業日）。担当は Ops の配下の「プラットフォームの審査」（Slack の [ADR-0033](../../../slack/docs/decisions/0033-slack-aligned-platform-and-plan-decisions.md) と同じ置き方）。
 - **停止のスイッチ**：`plugin_blocklist` に入れると、Realtime で全クライアントに配られ、動いているプラグインはホストが閉じ、以後読み込まない。目標は入れてから 5 分以内に全クライアントで止まる。
-- 版は不変。利用者はいつも最新の承認済みの版を使う。組織の管理者は、許可リストで版を固定できる。
+- バージョンは不変。利用者はいつも最新の承認済みのバージョンを使う。組織の管理者は、許可リストでバージョンを固定できる。
 
 ## 11. 障害のときの振る舞い
 
@@ -277,18 +277,18 @@ ADR-0039。
 | --- | --- | --- |
 | E2 | `plugin-data-property-reserve` | プロパティ 90 の予約と、表の `public_plugin` の列（document-model と合わせる） |
 | E3 | `change-origin-tag` | `ChangeSet` の `origin` の印（document-model.md の 7 節に取り込んだ。multiplayer の同じ名前の Story と 1 つ） |
-| E14 | `quickjs-sandbox-poc` | QuickJS の WASM のインスタンス、上限、割り込み、ES の版の確認、性能の計測 |
+| E14 | `quickjs-sandbox-poc` | QuickJS の WASM のインスタンス、上限、割り込み、ES のバージョンの確認、性能の計測 |
 | E14 | `plugin-membrane` | ハンドルの表、値の写し、コールバック、fuzzing、脱出のテスト |
 | E14 | `plugin-api-read` | 読み取りの API、`dynamic-page` |
 | E14 | `plugin-api-write` | 書き込み、Undo の単位、送る速さの制御 |
 | E14 | `plugin-ui-iframe` | `plugin-ui` のドメイン、起動用のページ、CSP の生成、メッセージ |
 | E14 | `plugin-network-proxy` | サンドボックスの `fetch` の中継、宛先の照合 |
 | E14 | `plugin-storage` | `plugin_data`、`clientStorage` |
-| E14 | `plugin-dev-mode` | 開発中の版の読み込み、`devAllowedDomains`、コンソール |
+| E14 | `plugin-dev-mode` | 開発中のバージョンの読み込み、`devAllowedDomains`、コンソール |
 | E14 | `plugin-org-distribution` | 組織の中の配布、管理者の統制（8 節） |
 | E14 | `plugin-public-review` | 公開、自動の検査、人の審査の道具 |
 | E14 | `plugin-kill-switch` | `plugin_blocklist` と Realtime での配信 |
-| E14 | `plugin-types-codegen` | `.d.ts` の生成と API の版 |
+| E14 | `plugin-types-codegen` | `.d.ts` の生成と API のバージョン |
 
 ## 15. 未解決の問い
 
@@ -305,7 +305,7 @@ ADR-0039。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| quickjs-ng の ES の版、性能（本家は Realms より遅くなったと書く） | `quickjs-sandbox-poc` |
+| quickjs-ng の ES のバージョン、性能（本家は Realms より遅くなったと書く） | `quickjs-sandbox-poc` |
 | 画面を止めずに長い処理を動かす方法（Worker と `Atomics` の案） | PoC の性能を見て、別の ADR |
 | `sharedPluginData`、チームのライブラリの API | 利用者の声で、別の ADR |
 | ウィジェット | 13 節の方向で、別の ADR |
@@ -323,8 +323,8 @@ ADR-0039。
 
 ### runbooks
 
-- `plugin-kill-switch.md`：悪意のあるプラグイン（または版）を `plugin_blocklist` に入れ、到達を確かめ、利用者と組織の管理者に知らせる手順。
-- `plugin-sandbox-vulnerability.md`：QuickJS・membrane の脆弱性の報告を受けたとき、公開の審査を止め、全プラグインを止める ops フラグを入れ、修正の版を出し、再開する手順（本家の 2019 年の 11 日の対応を目安にする）。
+- `plugin-kill-switch.md`：悪意のあるプラグイン（またはバージョン）を `plugin_blocklist` に入れ、到達を確かめ、利用者と組織の管理者に知らせる手順。
+- `plugin-sandbox-vulnerability.md`：QuickJS・membrane の脆弱性の報告を受けたとき、公開の審査を止め、全プラグインを止める ops フラグを入れ、修正のバージョンを出し、再開する手順（本家の 2019 年の 11 日の対応を目安にする）。
 - `plugin-review-queue.md`：審査の滞留のときの扱い。
 
 ### data-model（索引への追加の提案）

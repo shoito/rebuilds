@@ -5,10 +5,10 @@
 | 関連 | 決定 |
 | --- | --- |
 | [ADR-0038](../decisions/0038-custom-domain-verification-and-certificates.md) | TXT で所有を確かめてから配信のテナントを作る。証明書は CloudFront の管理（HTTP の検証）。定期の再確認と停止 |
-| [ADR-0039](../decisions/0039-hostname-resolution-and-issuer.md) | ホスト名からテナントを、プロセスの中の版付きの対応表で解決する。外へ出す URL は登録したホスト名から作る |
+| [ADR-0039](../decisions/0039-hostname-resolution-and-issuer.md) | ホスト名からテナントを、プロセスの中のバージョン付きの対応表で解決する。外へ出す URL は登録したホスト名から作る |
 | [ADR-0058](../decisions/0058-edge-and-custom-domains.md) | エッジは CloudFront＋WAF。カスタムドメインは CloudFront のマルチテナントの配信の、配信のテナントとして受ける |
 | [ADR-0002](../decisions/0002-tenancy-and-isolation.md) | テナントの解決を DB を読む前に行う。S1 はカスタムドメインを 1 テナントに 1 つ |
-| [ADR-0005](../decisions/0005-authentication-path-availability.md) | テナントの設定（ホスト名の対応表を含む）は、DB が読めない間も最後の版で動く |
+| [ADR-0005](../decisions/0005-authentication-path-availability.md) | テナントの設定（ホスト名の対応表を含む）は、DB が読めない間も最後のバージョンで動く |
 
 `issuer` の決め方は [authentication-flows.md](authentication-flows.md) の 4 節、パスキーの RP ID とカスタムドメインは [mfa-and-passkeys.md](mfa-and-passkeys.md) の 5.2.1 節、セッションの Cookie は [sessions-and-sso.md](sessions-and-sso.md)、エッジの WAF と DR は [security.md](security.md) と [ADR-0060](../decisions/0060-disaster-recovery-and-stages.md) にある。
 
@@ -157,9 +157,9 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 
 [ADR-0039](../decisions/0039-hostname-resolution-and-issuer.md) のとおり。要点：
 
-- 各タスクのメモリーに、`tenant_hostnames` の全件を版付きで持つ。変更は outbox → SQS の通知で反映する。
+- 各タスクのメモリーに、`tenant_hostnames` の全件をバージョン付きで持つ。変更は outbox → SQS の通知で反映する。
 - 解決の順：`Host` を小文字にし、末尾のドットとポートを除く → 表を引く → なければ 404（DB を読まない）。
-- `ready` の直前に、全タスクの版がその変更を含むことを確かめる（最大 60 秒待つ）。これで「使えます」の通知の直後に 404 が出ない。
+- `ready` の直前に、全タスクのバージョンがその変更を含むことを確かめる（最大 60 秒待つ）。これで「使えます」の通知の直後に 404 が出ない。
 - オリジンは CloudFront からの要求だけを受ける。`X-Forwarded-Host` は読まない。
 
 ### 4.5 既存のテナントがドメインを足すとき
@@ -183,8 +183,8 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 | CloudFront の API の障害 | 新しいドメインの `provisioning` が止まる。既存のドメインは影響なし。Worker が再試行 |
 | 証明書の発行の遅れ | `provisioning` のまま最大 72 時間。24 時間で警告 |
 | 証明書の自動更新の失敗 | 期限の 30 日前から警告。テナントの DNS の変更（CNAME の削除）が原因なら、テナントに通知 |
-| DB が読めない | 解決は最後の版で続く。ドメインの追加・削除は止まる |
-| 通知（SQS）の遅れ | 新しいドメインの反映が遅れる。`ready` の前の全タスクの版の確認で、「使えます」の通知を遅らせる |
+| DB が読めない | 解決は最後のバージョンで続く。ドメインの追加・削除は止まる |
+| 通知（SQS）の遅れ | 新しいドメインの反映が遅れる。`ready` の前の全タスクのバージョンの確認で、「使えます」の通知を遅らせる |
 | テナントの DNS の誤り（CNAME の削除） | そのドメインの要求が届かない（本システムの側では検知だけ）。日次の確認で警告 |
 | 東京のリージョンの障害 | 配信のテナントのオリジンを大阪へ切り替える（[ADR-0060](../decisions/0060-disaster-recovery-and-stages.md)）。証明書は CloudFront にあるので影響なし |
 

@@ -25,7 +25,7 @@
   - フィルターの言語、グループ化、保存したビューの意味（[views-and-filters.md](views-and-filters.md)）
   - 本文のエディタ（[editor-and-descriptions.md](editor-and-descriptions.md)）
   - 通知の種類と既読（[notifications-and-inbox.md](notifications-and-inbox.md)）
-  - Electron の自動更新の配信・段階的な出し方・最低の版の強制（[delivery.md](delivery.md)）
+  - Electron の自動更新の配信・段階的な出し方・最低のバージョンの強制（[delivery.md](delivery.md)）
   - ログアウトと共有の端末での消去（[security.md](security.md)）
 
 ## 2. 本家の形と、使う Web の API（確かめたこと）
@@ -64,7 +64,7 @@
 | --- | --- |
 | Chrome・Edge・Firefox（デスクトップ） | 最新 2 メジャー |
 | Safari（macOS） | 17 以上（Slack・Notion の題材と同じ） |
-| デスクトップのアプリ | macOS（直近 3 版、Intel と Apple Silicon）、Windows 10・11（x64、arm64）。Linux は対象外（本家と同じ） |
+| デスクトップのアプリ | macOS（直近 3 バージョン、Intel と Apple Silicon）、Windows 10・11（x64、arm64）。Linux は対象外（本家と同じ） |
 | モバイルのブラウザ | 読むことだけを確かめる。操作の予算の対象外（モバイルのアプリは MVP の後） |
 
 ### 3.2 構成
@@ -270,7 +270,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 
 - 手元からの起動（NFR-003：p95 1.5 秒）とオフラインの起動のため、Service Worker がアプリの殻（HTML、ハッシュ付きの JS・CSS、フォント、アイコン）を前もってキャッシュする。
 - API・Sync API の応答は Service Worker でキャッシュしない（手元のデータは IndexedDB だけに持つ。Slack の題材の client.md の 6 節と同じ）。
-- 新しい版の殻は背景で取り、次の起動で使う。`min_build` より古い殻で `upgrade_required` を受けたら、「更新して再読み込み」を示す（[sync-engine.md](sync-engine.md) の 9.2 節）。移行の前の outbox のまとめは [client-store-and-offline.md](client-store-and-offline.md) の 6.2 節に従う。
+- 新しいバージョンの殻は背景で取り、次の起動で使う。`min_build` より古い殻で `upgrade_required` を受けたら、「更新して再読み込み」を示す（[sync-engine.md](sync-engine.md) の 9.2 節）。移行の前の outbox のまとめは [client-store-and-offline.md](client-store-and-offline.md) の 6.2 節に従う。
 
 ## 11. Electron のシェル
 
@@ -280,7 +280,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 - **ディープリンク**：`<brand>://<ws>/issue/<KEY>-<number>` の形。スキームの名前は [リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) に従い、開発リポジトリの作成の時に決める。main は URL を解析し、自分のルート（3.3 節）の形に合うものだけをレンダラーに渡す。macOS は `open-url` を `ready` の前に登録し、Windows は `requestSingleInstanceLock` と `second-instance` で受ける。
 - **通知**：Web の Notification API をレンダラーから使い、許可は `setPermissionRequestHandler` で決める。通知の文面に何を入れるか（タイトルを入れるか）は notifications-and-inbox の領域と法務の L4 で決める。
 - **複数のウィンドウ**：Web の複数のタブと同じに扱う。書き手の選出と通知（ADR-0015）がそのまま効く。
-- **自動更新**：`autoUpdater`（Squirrel）で、署名と公証（macOS）をした配布物を、S3・CloudFront の静的な置き場から配る。段階的な出し方と最低の版は delivery の領域で決める。
+- **自動更新**：`autoUpdater`（Squirrel）で、署名と公証（macOS）をした配布物を、S3・CloudFront の静的な置き場から配る。段階的な出し方と最低のバージョンは delivery の領域で決める。
 - Electron の新しいメジャーには、出てから 8 週以内に上げる（Notion の題材と同じ）。
 
 ## 12. アクセシビリティと国際化
@@ -369,7 +369,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 - **計測**：自前の印を正にし、Event Timing で抜けを見る（ADR-0018）。
 - **CI の機械**：型番を固定した自前のランナーと較正（ADR-0018）。
 - **Electron のレンダラー**：リモートのオリジン（`https://<brand>.<domain>`）から読み、Service Worker でオフラインの起動を支える。Notion の題材と同じ。
-- **Electron の ADR**：シェルの設定はチェックリストのとおりで、選択肢の比べ合いがないので ADR にしない。自動更新と最低の版の決定は delivery の領域の ADR（0055–0057）に任せる。
+- **Electron の ADR**：シェルの設定はチェックリストのとおりで、選択肢の比べ合いがないので ADR にしない。自動更新と最低のバージョンの決定は delivery の領域の ADR（0055–0057）に任せる。
 
 ### 持ち越し
 
@@ -387,7 +387,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 
 - NFR-001 の判定：9.4 節の CI のベンチマークの全場面の p99 ≤ 50ms を、E6 のリリースの基準と、以後の全 PR の必須のチェックにする。
 - 本番：Action の ID ごとの p50・p99、長い仕事の件数、Event Timing の 104ms を超えた操作の割合を、ブラウザ・Electron・ワークスペースの大きさの帯の別に日次で見る。
-- IME の手動の確認表（5.3 節の組み合わせ）を、ブラウザ・Electron の大きな版の更新のたびに流す。IME の重大な不具合（組み立て中の誤った実行）0 件を E6 のリリースの基準にする。
+- IME の手動の確認表（5.3 節の組み合わせ）を、ブラウザ・Electron の大きなバージョンの更新のたびに流す。IME の重大な不具合（組み立て中の誤った実行）0 件を E6 のリリースの基準にする。
 - a11y：axe の自動の検査で重大な違反 0 件。12 節の手動の確認。
 - Electron：`webPreferences` と fuses の検査を、配布物ごとに流す。
 
@@ -395,7 +395,7 @@ ADR-0018。NFR-001：入力から描画まで p99 50ms（基準の端末、イ�
 
 - `latency-regression.md`：RUM の p99 が 50ms を超えたときの確かめ方（どの Action、どのブラウザ、ワークスペースの大きさ、直前のリリース）と、フラグでの切り戻し。
 - `ime-regression.md`：ブラウザ・OS・IME の更新で組み立て中の誤った実行が報告されたときの、組み合わせの絞り込み、PoC の記録との比べ、5.3 節の規則 2 の切り替えのフラグ。
-- `electron-release-halt.md`（[runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の C にまとめた）：Electron の配布物に問題が出たときの、自動更新の停止と前の版への戻し（delivery の領域と共同）。
+- `electron-release-halt.md`（[runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md) の C にまとめた）：Electron の配布物に問題が出たときの、自動更新の停止と前のバージョンへの戻し（delivery の領域と共同）。
 
 ### data-model（索引への追加の提案）
 

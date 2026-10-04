@@ -6,7 +6,7 @@
 - サーバーの写しで、正本はサーバー。消えても API から取り直して動く。例外は `transaction_queue` と `failed_changes` で、消えると未送信の入力が失われる（画面で警告する）。
 - キーに `workspace_id` を含める。1 つのファイルに、アカウントが属する複数のワークスペースの写しが入る。
 - 独自の暗号化はしない（S1。[security.md](../security.md) の 11 節）。
-- スキーマの版は `meta` の `schema_version`。版が上がったら、写しの表は作り直し、`transaction_queue` と `failed_changes` だけを移す。
+- スキーマのバージョンは `meta` の `schema_version`。バージョンが上がったら、写しの表は作り直し、`transaction_queue` と `failed_changes` だけを移す。
 
 ## ER 図
 
@@ -27,7 +27,7 @@ erDiagram
     text id PK "レコードの ID"
     text page_id "属するページ"
     text value "JSON"
-    integer version "サーバーの版"
+    integer version "サーバーのバージョン"
     integer confirmed_seq "ページの確定した seq"
     integer last_used_at "LRU"
   }
@@ -181,7 +181,7 @@ SQLite の型は `TEXT`・`INTEGER`・`BLOB`。UUID は文字列、時刻は UNI
 
 | キー | 値 |
 | --- | --- |
-| `schema_version` | ローカルのスキーマの版 |
+| `schema_version` | ローカルのスキーマのバージョン |
 | `device_id` | この保存の `device_id`（UUIDv7。サーバーの `device_cursors` の鍵） |
 | `next_tx_counter` | 次に振る `tx_counter` |
 | `total_bytes` | 総量 |

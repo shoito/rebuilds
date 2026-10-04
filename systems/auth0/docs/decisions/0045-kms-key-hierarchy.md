@@ -32,8 +32,8 @@ pepper や署名鍵の KMS の鍵を失うと、全ユーザーのパスワー�
 | KMS の鍵 | 包むもの | 使える主体 | 暗号化の文脈 |
 | --- | --- | --- | --- |
 | `<brand>-signing-keys` | 署名鍵ごとの DEK、外部 IdP の鍵（接続ごと。[ADR-0047](0047-signer-api-and-jwks-publishing.md)）ごとの DEK | Signer のタスクのロールだけ（`GenerateDataKey`・`Decrypt`） | `purpose=signing-key`、`tenant_id`、`kid`。外部 IdP の鍵は `purpose=external-idp-key`、`tenant_id`、`connection_id` |
-| `<brand>-credentials` | テナント × 版の DEK | Auth・Management API・Worker（`Decrypt`）、Management API（`GenerateDataKey`） | `purpose=tenant-dek`、`tenant_id`、`version` |
-| `<brand>-pepper` | pepper（版ごと） | Auth・Management API（`Decrypt`） | `purpose=pepper`、`version` |
+| `<brand>-credentials` | テナント × バージョンの DEK | Auth・Management API・Worker（`Decrypt`）、Management API（`GenerateDataKey`） | `purpose=tenant-dek`、`tenant_id`、`version` |
+| `<brand>-pepper` | pepper（バージョンごと） | Auth・Management API（`Decrypt`） | `purpose=pepper`、`version` |
 | `<brand>-data` | Aurora・S3・SQS・Secrets Manager の保存 | 各 AWS のサービス（`kms:ViaService`） | サービスが付ける |
 
 - どれもマルチリージョンの鍵（primary は東京、replica は大阪）。自動のローテーション 365 日を有効にする。
@@ -51,7 +51,7 @@ pepper や署名鍵の KMS の鍵を失うと、全ユーザーのパスワー�
   - CloudTrail に、どのテナントの何の復号かが残る。
 - 引き受けるコスト：
   - KMS の鍵の数と、キーポリシーの管理が増える。
-  - テナントの DEK のローテーションと、古い版の書き直しのジョブが要る。
+  - テナントの DEK のローテーションと、古いバージョンの書き直しのジョブが要る。
 
 ## Confirmation
 

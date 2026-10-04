@@ -6,7 +6,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作る状態機械のテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低の版で行い、乗車の最中と緊急の入口は塞がない |
+| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作る状態機械のテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低のバージョンで行い、乗車の最中と緊急の入口は塞がない |
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の位置の許可で動かす。iOS は `allowsBackgroundLocationUpdates` と `CLBackgroundActivitySession`、Android は出庫の操作で始める `location` 型のフォアグラウンドサービスで、出庫の間だけ位置を取る。「常に」の許可と Android の `ACCESS_BACKGROUND_LOCATION` は求めない。取り方は状態ごとの表で決め、止まったら 60 秒でサーバーがプッシュ通知で知らせる |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには、選んだルートの主要経由地点を経由地として渡す（Google マップは Maps URLs の `waypoints`、Apple マップは統合の Maps URL の `waypoint`）。経由地を守らない引き継ぎ先は事前確定運賃の乗車で出さない。アプリの中でルートからの逸脱を知らせる |
 
@@ -155,7 +155,7 @@ Effect = SendCommand(TripCommand) | Persist(journal, snapshot) | Render(screen) 
 
 - 時計・乱数・通信は `Input` と `Effect` で外から入れる。reducer は同じ入力の列から必ず同じ出力を出す。
 - アプリは、サーバーの状態（最後に受けた `TripSnapshot`、`trip_version`）と、端末の journal（まだ確定していない操作）を分けて持ち、画面は「サーバーの状態に journal を重ねた見込みの状態」で描く。見込みの状態には「送信待ち」の印を出す。
-- `trip_version` が今より小さい事象は捨てる。同じ版は冪等に扱う。版の飛びは、`GET /v1/trips/{id}` で読み直す。
+- `trip_version` が今より小さい事象は捨てる。同じバージョンは冪等に扱う。バージョンの飛びは、`GET /v1/trips/{id}` で読み直す。
 - 乗車の状態は ADR-0003・0021 の名前をそのまま使い、アプリで独自の状態を作らない。画面の状態（どの画面か）は、乗車の状態からの純粋な関数で決める。
 
 ### 5.2 テストのベクター
@@ -185,9 +185,9 @@ Effect = SendCommand(TripCommand) | Persist(journal, snapshot) | Render(screen) 
 
 ### 5.3 Protocol Buffers の共有
 
-- 型は buf で Swift（swift-protobuf）と Kotlin（protobuf-kotlin lite）に生成する。生成したコードは各アプリのリポジトリに版つきのパッケージとして取り込み、手で直さない。
+- 型は buf で Swift（swift-protobuf）と Kotlin（protobuf-kotlin lite）に生成する。生成したコードは各アプリのリポジトリにバージョンつきのパッケージとして取り込み、手で直さない。
 - 互換の規則：`buf breaking` の `WIRE_JSON` を CI で守る。項目の番号を再利用しない。列挙には `*_UNSPECIFIED = 0` を置き、知らない値は「更新してください」の画面ではなく、既定の振る舞い（無視か読み直し）にする。
-- サーバーは、サポートする最も古いアプリの版（10.2 節）が送る・受ける形を、すべて受け付ける。
+- サーバーは、サポートする最も古いアプリのバージョン（10.2 節）が送る・受ける形を、すべて受け付ける。
 
 ## 6. 外部のナビへの引き継ぎ（[ADR-0008](../decisions/0008-navigation-handoff-with-waypoints.md)）
 
@@ -207,7 +207,7 @@ Effect = SendCommand(TripCommand) | Persist(journal, snapshot) | Render(screen) 
 - `avoid=tolls` は、見積もりで乗客が有料道路を使わないと選んだとき（`toll=AVOID_TOLLS`）だけ付ける。
 - **経由地の間引き**：`major_waypoints` が 8 を超えたら、有料道路の出入口を先に残し、残りは道のりで等間隔になるように選ぶ。`fare-distance` には、`major_waypoints` を 8 以下で返すよう申し送る（[eta-and-routing.md](eta-and-routing.md) の 7.1 節）。
 - **経由地を守るかの確認**：引き継ぎ先ごとに、E9 の試験で「経由地を渡した URL で、その順にルートが引かれ、案内が始まるか」を確かめる。Maps URLs は「経由地に対応しない製品では無視される」ため、確かめるまで **未検証** とする（E9 の `nav-handoff-waypoints` の 20 のルートの試験）。確かめられなかった引き継ぎ先は、事前確定運賃の乗車では出さない（アプリの中のルートの表示で走る）。
-- 引き継ぎ先の一覧は、アプリに埋めず、サーバーの設定（`nav_handoff_targets`：アプリ、OS、最低の版、事前確定で使えるか）で配る。ナビのアプリの更新で振る舞いが変わったら、アプリの配布なしに外せる。
+- 引き継ぎ先の一覧は、アプリに埋めず、サーバーの設定（`nav_handoff_targets`：アプリ、OS、最低のバージョン、事前確定で使えるか）で配る。ナビのアプリの更新で振る舞いが変わったら、アプリの配布なしに外せる。
 
 ### 6.3 引き継ぎの記録
 
@@ -254,8 +254,8 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | 常時の接続が切れる（トンネル・地下） | 状態の変化とオファーが届かない | 再接続と差分の取り直し（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 6 節）。オファーは 5 秒で取り下げられ、罰則にならない |
 | 位置の送信が止まる | 15 秒で配車の候補から外れる | 4.4 節 |
 | 外部のナビが経由地を無視する | 示したルートから外れる | 6.2 節の確認と、6.4 節の逸脱の知らせ |
-| アプリの不具合で状態を誤って表示 | ドライバーが誤った操作をする | 操作は Trips が検査して拒否する（ADR-0021）。状態の表示は `TripSnapshot` の版で常に読み直せる |
-| 新しい版で重大な不具合 | 多くの端末で同じ失敗 | 段階的な公開を止め、フラグで機能を切り、必要なら最低の版を上げる（10 節） |
+| アプリの不具合で状態を誤って表示 | ドライバーが誤った操作をする | 操作は Trips が検査して拒否する（ADR-0021）。状態の表示は `TripSnapshot` のバージョンで常に読み直せる |
+| 新しいバージョンで重大な不具合 | 多くの端末で同じ失敗 | 段階的な公開を止め、フラグで機能を切り、必要なら最低のバージョンを上げる（10 節） |
 | 時計のずれ | オファーの残り・待ち時間の表示がずれる | 端末の時刻を使わず、受け取ってからの経過で数える |
 | 端末の記憶域の不足 | journal を書けない | 出庫の前に 200 MB の空きを確かめる。書けなければ出庫させない |
 
@@ -281,13 +281,13 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | 金〜 | 公開。iOS は段階的な公開（7 日）、Android は段階的な公開（1% → 5% → 20% → 50% → 100%、各 1 日以上） |
 
 - 4 つのアプリ（乗客・ドライバー × iOS・Android）を同じ列車で出す。ドライバーのアプリは、週末の夜（金・土の 18 時〜翌 6 時）に広げない（段階を進めない）。乗務の最中の更新の失敗を避けるため。
-- 段階を進める基準：クラッシュのない利用者の率 99.8% 以上、ANR の率が前の版より悪くない、オファーの受信の確認までの時間の p95 が前の版より悪くない、出庫の失敗の率が前の版より悪くない。満たさなければ止める（runbook）。
-- 乗車の状態機械、位置の送信、オファー、緊急の機能を変える版は、変更単位の `quality.md` に端末の試験の結果を付ける（区分「安全」の変更は必須。[AGENTS.md](../../AGENTS.md)）。
+- 段階を進める基準：クラッシュのない利用者の率 99.8% 以上、ANR の率が前のバージョンより悪くない、オファーの受信の確認までの時間の p95 が前のバージョンより悪くない、出庫の失敗の率が前のバージョンより悪くない。満たさなければ止める（runbook）。
+- 乗車の状態機械、位置の送信、オファー、緊急の機能を変えるバージョンは、変更単位の `quality.md` に端末の試験の結果を付ける（区分「安全」の変更は必須。[AGENTS.md](../../AGENTS.md)）。
 
-### 10.2 サポートする版
+### 10.2 サポートするバージョン
 
-- サポートするのは、公開した最新の版から 8 つ前の列車の版まで（約 2 か月）。サーバーはその範囲のアプリの形を受け付ける（5.3 節）。
-- 版は、すべての要求のヘッダー `<Brand>-Client` に `<app>/<platform>/<version>/<build>` で載せる。
+- サポートするのは、公開した最新のバージョンから 8 つ前の列車のバージョンまで（約 2 か月）。サーバーはその範囲のアプリの形を受け付ける（5.3 節）。
+- バージョンは、すべての要求のヘッダー `<Brand>-Client` に `<app>/<platform>/<version>/<build>` で載せる。
 
 ### 10.3 強制の更新
 
@@ -295,8 +295,8 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 | 値 | 意味 | アプリの振る舞い |
 | --- | --- | --- |
-| `recommended_min` | これより古い版に更新を勧める | 起動のたびに閉じられる案内を出す |
-| `required_min` | これより古い版を止める | 下の表 |
+| `recommended_min` | これより古いバージョンに更新を勧める | 起動のたびに閉じられる案内を出す |
+| `required_min` | これより古いバージョンを止める | 下の表 |
 
 | 場面 | `required_min` より古いとき |
 | --- | --- |
@@ -316,7 +316,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 - 5.2 節のベクターを両方のアプリで通す（ADR-0001 の Confirmation）。
 - **PROP-APP-001（reducer の決定性）**：同じ入力の列から同じ状態と副作用が出る（Swift は swift-testing と独自の生成器、Kotlin は Kotest の property）。
-- **PROP-APP-002（版の単調性）**：任意の順序・重複で届く `TripStateChanged` の列で、画面の元になるサーバーの状態の `trip_version` は減らない。
+- **PROP-APP-002（バージョンの単調性）**：任意の順序・重複で届く `TripStateChanged` の列で、画面の元になるサーバーの状態の `trip_version` は減らない。
 - **PROP-APP-003（journal）**：通信の断と再接続を任意に挟んでも、journal の操作は `journal_seq` の順に 1 回ずつ送られ、確定したものだけが消える。
 
 ### 11.2 位置と電池
@@ -341,10 +341,10 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | --- | --- | --- |
 | E1 | `mobile-proto-codegen` | buf での Swift・Kotlin の生成、`buf breaking`、パッケージの配布（5.3 節） |
 | E1 | `mobile-release-train` | 10.1 節の列車の自動化（切る、配る、審査、段階の公開の監視） |
-| E1 | `client-version-policy` | 10.2・10.3 節の版のヘッダー、`client-config`、426 の拒否 |
+| E1 | `client-version-policy` | 10.2・10.3 節のバージョンのヘッダー、`client-config`、426 の拒否 |
 | E9 | `trip-app-test-vectors` | 5.2 節のベクターの生成と両方のアプリの CI（trips の Story と同じ 1 つ） |
 | E9 | `rider-request-flow` | 3.1 節の依頼までの画面（検索、ピン、見積もり、同意、依頼） |
-| E9 | `rider-trip-tracking` | 迎車中・乗車中の画面、車の位置、版による表示 |
+| E9 | `rider-trip-tracking` | 迎車中・乗車中の画面、車の位置、バージョンによる表示 |
 | E9 | `driver-session-and-onboarding` | 出庫の前の確認と出庫・入庫 |
 | E9 | `driver-background-location` | 4 節の許可、状態ごとの取り方、熱と電池、溜めと送り直し（location の Story と同じ 1 つ） |
 | E9 | `driver-location-recovery` | 4.4 節の検知と回復のプッシュ |
@@ -370,7 +370,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 - **ナビ**：Google マップは Maps URLs、Apple マップは統合の Maps URL。経由地は最大 8 つ。守ることを確かめた引き継ぎ先だけを事前確定運賃で出す。
 - **逸脱の知らせ**：200 m・30 秒。
 - **journal の置き場所**：SQLite（GRDB・Room）。
-- **列車**：週 1 回、月曜に切る。サポートは 8 つ前の版まで。
+- **列車**：週 1 回、月曜に切る。サポートは 8 つ前のバージョンまで。
 - **強制の更新**：乗車の最中と緊急の入口は塞がない。
 
 ### 持ち越し
@@ -391,17 +391,17 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 ### quality.md
 
 - 状態機械のベクターの本数と、両方のアプリでの通過の率（100% であること）。
-- 位置の送信の間隔の分布（端末の版・OS・機種ごと）、欠けた点の割合、止まったときの回復の件数と回復までの時間。
+- 位置の送信の間隔の分布（端末のバージョン・OS・機種ごと）、欠けた点の割合、止まったときの回復の件数と回復までの時間。
 - 給電なしの空車の 1 時間の電池の消費（基準の端末）。
 - オファーの受信から表示までの時間（端末の中）の p95。
 - ナビの引き継ぎの件数、経由地を渡した割合、逸脱の知らせの件数（事前確定の乗車 1,000 件あたり）。
 - journal の送信待ちの件数の分布、送信待ちの最長の時間。
-- クラッシュのない利用者の率、ANR の率（版ごと）、`required_min` より古い版の利用者の割合。
+- クラッシュのない利用者の率、ANR の率（バージョンごと）、`required_min` より古いバージョンの利用者の割合。
 
 ### runbooks
 
 - `mobile-release-halt.md`：段階的な公開を止める基準、止め方（App Store Connect・Play Console）、フラグで機能を切る手順、`required_min` を上げる判断と 2 人の承認。
-- `driver-location-stalls.md`：位置の送信が止まるドライバーが急に増えたとき（OS の更新、アプリの版、機種）の切り分けと、事業者への案内。
+- `driver-location-stalls.md`：位置の送信が止まるドライバーが急に増えたとき（OS の更新、アプリのバージョン、機種）の切り分けと、事業者への案内。
 - `nav-handoff-regression.md`：外部のナビの更新で経由地が守られなくなったときに、`nav_handoff_targets` から外す手順と、ドライバーへの案内。
 - `client-min-version-bump.md`：`required_min` を上げる前後の確かめ（乗車中の端末の数、426 の件数）。
 
@@ -411,7 +411,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | --- | --- |
 | Protocol Buffers `NavigationHandedOff`（`trip_id`、`target`、`waypoint_count`、`leg`、`at_elapsed_ms`）、`RouteDeviationObserved`（`trip_id`、`max_distance_m`、`duration_s`） | 6.3・6.4 節 |
 | AppConfig `client_policy`（アプリ × OS ごとの `recommended_min`・`required_min`） | 10.3 節 |
-| AppConfig `nav_handoff_targets`（引き継ぎ先、OS、最低の版、`upfront_allowed`） | 6.2 節 |
+| AppConfig `nav_handoff_targets`（引き継ぎ先、OS、最低のバージョン、`upfront_allowed`） | 6.2 節 |
 | Aurora `trip_nav_events`（`trip_id`、種類、引き継ぎ先、経由地の数、逸脱の距離と時間、`created_at`） | 乗車の記録と同じ保持 |
 | リポジトリ `vectors/trip-app/`（JSON） | 5.2 節のテストのベクター |
 | 端末の SQLite：`location_backlog`（暗号化、24 時間）、`trip_journal`（確定まで）、`trip_snapshot`（最新 1 件） | 4.3・7.1 節 |

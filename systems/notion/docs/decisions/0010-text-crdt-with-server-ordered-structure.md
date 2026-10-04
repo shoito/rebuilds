@@ -19,7 +19,7 @@ ADR-0005 は、変更をトランザクションで送り、サーバーがペ�
 
 ## Options
 
-1. **OT**：Google Docs（[Making collaboration fast](https://drive.googleblog.com/2010/09/whats-different-about-new-google-docs.html)）、ProseMirror の collab（[guide](https://prosemirror.net/docs/guide/#collab)）の方式。中央の権威が版を進め、クライアントは確定していない操作を変換して載せ直す
+1. **OT**：Google Docs（[Making collaboration fast](https://drive.googleblog.com/2010/09/whats-different-about-new-google-docs.html)）、ProseMirror の collab（[guide](https://prosemirror.net/docs/guide/#collab)）の方式。中央の権威がバージョンを進め、クライアントは確定していない操作を変換して載せ直す
 2. **ページ全体を 1 つの CRDT 文書にする**：Yjs、Automerge、Loro で、テキストとブロックの木とプロパティをすべて CRDT で持つ
 3. **サーバーの順序＋ブロック内テキストの CRDT**：構造とプロパティはサーバーが `seq` の順に当て、テキストだけを CRDT で持つ。
    - 3a：テキストの CRDT に既存のライブラリ（Loro、Yjs、Automerge）を使う
@@ -29,7 +29,7 @@ ADR-0005 は、変更をトランザクションで送り、サーバーがペ�
 
 3b を採用する。詳細は [collaboration.md](../architecture/collaboration.md) の 4〜6 節。
 
-- **1 を採らない理由**：オフラインの長い編集では、基にした版から後の全操作と変換する必要があり、ログを長く残し、統合が遅くなる（[Eg-walker](https://arxiv.org/abs/2409.14252) は、長く分岐した枝の統合で OT が遅いことを示している）。ProseMirror のガイドも、長い分岐を扱っていない。リッチテキストとブロックの木の変換関数の組み合わせは、Figma が OT を避けた理由と同じく、正しさを確かめにくい（[How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)）。
+- **1 を採らない理由**：オフラインの長い編集では、基にしたバージョンから後の全操作と変換する必要があり、ログを長く残し、統合が遅くなる（[Eg-walker](https://arxiv.org/abs/2409.14252) は、長く分岐した枝の統合で OT が遅いことを示している）。ProseMirror のガイドも、長い分岐を扱っていない。リッチテキストとブロックの木の変換関数の組み合わせは、Figma が OT を避けた理由と同じく、正しさを確かめにくい（[How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)）。
 - **2 を採らない理由**：CRDT は定義上どの操作も受け入れるので、サーバーが木の不変条件（循環がない）や権限に反する変更を拒否できない。ブロックを 1 行ずつ保存し、ブロック単位で権限・検索・同期を行う ADR-0002・0004 と合わない。ページ全体を 1 つの文書として読み書きする必要も出る。
 - **3 を採る理由**：構造とプロパティの競合は、サーバーの順序と決まった規則（ADR-0011、0012）で十分に決められ、サーバーで検証できる。テキストの入力だけは、どの順で届いても失わずに合わせる必要があり、CRDT がこれを保証する。本家の現在の方式とも同じ形である。
 - **列の CRDT に Fugue を使う**（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)）。本家の RGA は、同じ位置への同時の挿入で文が交ざる場合がある。Fugue はこれを最小にする性質を持ち、長いオフラインの編集で効く。
@@ -39,7 +39,7 @@ ADR-0005 は、変更をトランザクションで送り、サーバーがペ�
   - 分割・結合のために、文字の ID と範囲の索引をサーバーの表で扱う必要があり、ライブラリの内部の形式に依存したくない。
   - サーバーの検証と展開（検索・API 向けのリッチテキスト）を、クライアントと同じ TypeScript のコードで行える。WASM のライブラリをサーバーに持ち込まずに済む。
   - Loro は Fugue と Peritext 相当の書式を持ち（[Loro の rich text](https://loro.dev/blog/loro-richtext)）、最も近い選択肢である。自前の実装が性質ベーステストで収束を示せないときの代替として残す。
-- 墓標は消さない。中身の文字列は消し、ID の範囲だけを run で残す。何か月も前の版を基にした操作でも、アンカーが必ず見つかる。
+- 墓標は消さない。中身の文字列は消し、ID の範囲だけを run で残す。何か月も前のバージョンを基にした操作でも、アンカーが必ず見つかる。
 
 > 2026-09-27 の注記：Decision の「Fugue はこれを最小にする性質を持つ」は正確でない。交ざりを最小にする性質（maximal non-interleaving）が証明されているのは変種の FugueMax で、Fugue が保証するのは前向き（左から右へ）の連続した入力が交ざらないことである（[The Art of the Fugue](https://arxiv.org/abs/2305.00583)、2026-09-27 に確認）。通常の入力は前向きなので、Fugue を採る決定は変えない。Confirmation の「互いの文が交ざらない」は、前向きの連続した挿入についての性質と読む。本家の CRDT（RGA＋Peritext の書式、text slice / text instance、2025 年 7 月の導入）と Peritext・Loro の記述は、出典のとおりであることを確かめた（2026-09-27）。
 

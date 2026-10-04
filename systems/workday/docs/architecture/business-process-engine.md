@@ -1,19 +1,19 @@
 # Business process engine: Workday
 
-業務プロセスの定義と版、ステップの種類と条件、組織のロールによるルーティング、委任、案件の状態機械、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化を決める。
+業務プロセスの定義とバージョン、ステップの種類と条件、組織のロールによるルーティング、委任、案件の状態機械、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化を決める。
 
-前提の決定は、業務プロセスを版つきの定義と Aurora に永続する状態機械で自前に作ること（[ADR-0003](../decisions/0003-business-process-engine.md)）、人事のデータは完了のステップで有効日付の差分として書くこと（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）、権限と職務分掌（[ADR-0005](../decisions/0005-security-and-my-number.md)）。この文書で決めたことは次の ADR にある。
+前提の決定は、業務プロセスをバージョンつきの定義と Aurora に永続する状態機械で自前に作ること（[ADR-0003](../decisions/0003-business-process-engine.md)）、人事のデータは完了のステップで有効日付の差分として書くこと（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）、権限と職務分掌（[ADR-0005](../decisions/0005-security-and-my-number.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0013](../decisions/0013-bp-definition-format-and-versions.md) | 定義は JSON の宣言（ステップの一覧と、型のある式の木の条件）にする。定義は有効開始日つきの版を持ち、案件は起票の日に有効な版に固定する。子の案件は親の起票の日で版を選ぶ |
+| [0013](../decisions/0013-bp-definition-format-and-versions.md) | 定義は JSON の宣言（ステップの一覧と、型のある式の木の条件）にする。定義は有効開始日つきのバージョンを持ち、案件は起票の日に有効なバージョンに固定する。子の案件は親の起票の日でバージョンを選ぶ |
 | [0014](../decisions/0014-bp-routing-and-delegation.md) | 担当は、ステップに入った時点の組織のロールの割り当てと閉包で決め、起票者と対象の本人を除いて上へたどる。委任は期間と業務プロセスの種類で決め、期間中は未完了のタスクも代理人が操作できる。再委任はしない。権限は委任した人で、職務分掌は実際の操作者で判定する |
 | [0015](../decisions/0015-bp-deadlines-reminders-and-inbox.md) | 期限は営業日で決め、督促とエスカレーションを `bp_timers` で行う。受信箱は担当の割り当ての射影を同じトランザクションで保ち、委任は読むときに結ぶ。通知の本文に個人情報を入れない |
 | [0016](../decisions/0016-bp-definition-validation-and-activation.md) | 定義は保存のときに静的に検査し、模擬の実行で担当を確かめる。定義の変更は下書きと有効化に分け、有効化は別の人が行う |
 
 ## 1. 目的と範囲
 
-- 扱う：業務プロセスの種類と定義、定義の版と選び方、ステップの種類、条件の式、ルーティング、予備の担当、委任、案件とステップの状態と遷移、完了のトランザクション、キャンセル・取消・訂正・差し戻し・却下、親子の案件と一括、期限・督促・エスカレーション、受信箱、通知の依頼、定義の検証・模擬の実行・有効化。
+- 扱う：業務プロセスの種類と定義、定義のバージョンと選び方、ステップの種類、条件の式、ルーティング、予備の担当、委任、案件とステップの状態と遷移、完了のトランザクション、キャンセル・取消・訂正・差し戻し・却下、親子の案件と一括、期限・督促・エスカレーション、受信箱、通知の依頼、定義の検証・模擬の実行・有効化。
 - 扱わない：有効日付の差分の書き方（[object-model-and-effective-dating.md](object-model-and-effective-dating.md)）、事象ごとの業務の中身（[core-hr.md](core-hr.md)、[payroll-engine.md](payroll-engine.md) など）、権限の判定そのもの（[security-model.md](security-model.md)）、受信箱の画面（[self-service-ui.md](self-service-ui.md)）、通知の届け方。
 - **人事のデータを変える書き込みは、このエンジンの完了のステップだけが行う**（[AGENTS.md](../../AGENTS.md)）。
 
@@ -23,9 +23,9 @@
 
 | 本家の考え方 | 内容 | このシステムでの扱い |
 | --- | --- | --- |
-| 定義の有効日 | 定義の変更は有効日を持ち、その日から使える。業務プロセスの案件の有効日は別の意味（昇給の始まりの日など）（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)） | 定義の版に `effective_from` を持つ。案件の `effective_on` とは別 |
-| 進行中の案件 | 進行中の案件は、定義の変更を拾わない。新しく起票した案件だけが新しい定義を使う（検索の要約と講座の資料による。[Business Process Framework](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/business-process-framework.html)） | 同じ（[ADR-0003](../decisions/0003-business-process-engine.md)）。起票の時点の版に固定する |
-| 子のプロセス | 子のプロセスは既定で親の有効日を引き継ぐ（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)） | 子の案件は親の起票の日で定義の版を選び、親の `effective_on` を引き継ぐ |
+| 定義の有効日 | 定義の変更は有効日を持ち、その日から使える。業務プロセスの案件の有効日は別の意味（昇給の始まりの日など）（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)） | 定義のバージョンに `effective_from` を持つ。案件の `effective_on` とは別 |
+| 進行中の案件 | 進行中の案件は、定義の変更を拾わない。新しく起票した案件だけが新しい定義を使う（検索の要約と講座の資料による。[Business Process Framework](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/business-process-framework.html)） | 同じ（[ADR-0003](../decisions/0003-business-process-engine.md)）。起票の時点のバージョンに固定する |
+| 子のプロセス | 子のプロセスは既定で親の有効日を引き継ぐ（[Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html)） | 子の案件は親の起票の日で定義のバージョンを選び、親の `effective_on` を引き継ぐ |
 | 委任 | 開始日の 0 時から終了日の終わりまで、委任した人のタイムゾーンで効く。委任された人は、委任されたタスクを再委任できない。委任の履歴を本人と管理者が見られる（[Delegate My Tasks](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/delegate-business-processes/business-process-task-delegation/dan1370796482940.html)） | 同じ考え方。テナントの暦で日単位 |
 | 委任と進行中のタスク | 公式の文書は「委任した人に向かうはずのタスクを代理人が受ける」と書く。大学の案内は「委任の前に起票された案件は元の承認者に流れ続ける」と書く（[CCA の案内](https://portal.cca.edu/knowledge-base/workday/delegate-your-workday-inbox-or-tasks/)。二次資料） | 両者が食い違う（未検証）。本システムは、期間中は未完了のタスクも代理人が操作できるとした（[ADR-0014](../decisions/0014-bp-routing-and-delegation.md)） |
 | 取消・訂正・キャンセル | 取消は完了した案件、キャンセルは進行中の案件に使い、元に戻せない。訂正は承認に回らない（[Correct, Cancel, and Rescind](https://it.tamus.edu/workdayservices/training/job_aid/correct-cancel-and-rescind/)。二次資料） | 取消・訂正の承認は定義で決め、給与・口座の訂正は既定で承認（[ADR-0003](../decisions/0003-business-process-engine.md)） |
@@ -52,8 +52,8 @@
 | `time_correction`、`time_period_reopen`、`timesheet_approval` | 雇用・勤怠の締めの期間 | 打刻の訂正、締めた月の開き直し、上長の承認（[time-and-attendance.md](time-and-attendance.md) の 3.4・7.2 節） |
 | `overtime_agreement_change` | 事業所 | `overtime_agreements`（同 6.1 節） |
 | `time_off_request`、`annual_leave_designation`、`special_leave_grant`、`leave_balance_adjustment` | 雇用 | 休暇の申請、時季の指定、特別休暇の付与、残日数の調整（[absence-and-leave.md](absence-and-leave.md) の 3.1 節、[ADR-0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md)） |
-| `leave_policy_change` | テナント | 斉一的付与などの付与の方針の版（[absence-and-leave.md](absence-and-leave.md) の 4.4 節） |
-| `pay_item_change` | 給与のグループ | 項目と項目の組の版（[payroll-engine.md](payroll-engine.md) の 6.1 節） |
+| `leave_policy_change` | テナント | 斉一的付与などの付与の方針のバージョン（[absence-and-leave.md](absence-and-leave.md) の 4.4 節） |
+| `pay_item_change` | 給与のグループ | 項目と項目の組のバージョン（[payroll-engine.md](payroll-engine.md) の 6.1 節） |
 | `bonus_entry` | 給与の実行（賞与） | 賞与の支給額の入力（同 8 節） |
 | `resident_tax_notice` | 雇用 | 住民税の特別徴収の通知（`resident_tax_notices`。一括の取り込みの雛形で入れる。[payroll-jp-rules.md](payroll-jp-rules.md) の 6.2 節） |
 | `si_grade_change` | 雇用 | `worker_social_insurance` の等級の決定（随時改定・定時決定・保険者決定。[payroll-jp-rules.md](payroll-jp-rules.md) の 4.6・4.7 節） |
@@ -61,8 +61,8 @@
 | `mn_handler_designation` | 人 | 事務取扱担当者の指定（完了の事象を保管庫へ送る。[my-number-vault.md](my-number-vault.md) の 6.3 節） |
 | `bulk_import` | テナント | 一括の取り込みの親の案件。行ごとに子の案件を作る（[integrations-and-bulk.md](integrations-and-bulk.md) の 3 節） |
 | `migration` | 人・雇用・組織 | 移行の差分。テナントが `implementing` の間か、本番を始める前の雇用にだけ使える（同 4.2 節） |
-| `security_policy_activation` | テナント | 権限の版（[security-model.md](security-model.md) の 8 節） |
-| `bp_definition_activation` | テナント | 定義の版（11 節） |
+| `security_policy_activation` | テナント | 権限のバージョン（[security-model.md](security-model.md) の 8 節） |
+| `bp_definition_activation` | テナント | 定義のバージョン（11 節） |
 
 - 上の一覧は、統合の工程で各領域の文書が足した種類を集めたもの。種類を足すときは、この表と、種類ごとの payload のスキーマと、既定の定義を同じ変更で足す。
 - 業務プロセスの種類によらない権限に、`retro_override`（90 日より前の過去日付の変更の起票。業務プロセスの操作）と `payroll.retro_override`（給与の遡及の窓を 24 か月から 36 か月に広げる）がある（[security-model.md](security-model.md) の 4.3 節）。
@@ -102,7 +102,7 @@
 - 式の上限：深さ 10、節 200。評価は副作用なし。
 - `subject.*` は、案件の `effective_on` の時点の、現在の知識で読む。
 
-### 3.3 版と選び方
+### 3.3 バージョンと選び方
 
 ```sql
 bp_definitions (tenant_id, id, process_type, version int,
@@ -115,11 +115,11 @@ bp_definitions (tenant_id, id, process_type, version int,
                 UNIQUE (tenant_id, process_type, version))
 ```
 
-- 案件の起票のとき、`status = active` で `effective_from ≤ 起票の日（テナントの暦）` のうち、`effective_from` が最も新しい版を選び、案件に `definition_id` を固定する。
+- 案件の起票のとき、`status = active` で `effective_from ≤ 起票の日（テナントの暦）` のうち、`effective_from` が最も新しいバージョンを選び、案件に `definition_id` を固定する。
 - 案件の `effective_on`（発令の日）では選ばない。3 月に 4 月 1 日付の発令を起票したら、3 月に有効な定義で進む。
-- 子の案件は、親の案件の起票の日で版を選ぶ。親子で定義の世代が混ざらない。
-- 有効化した版は書き換えない。直すときは新しい版を作る。元に戻すときは、古い版の中身を写した新しい版を有効化する。
-- システムの既定の定義の新しい版（本システムのリリース）は、テナントの写しを上書きしない。テナントの管理者に「既定の定義が変わった」ことと差分を知らせる。法令の要件に関わる既定のステップ（例：退職の後の手続き）の変更は、リリースノートで示す。
+- 子の案件は、親の案件の起票の日でバージョンを選ぶ。親子で定義の世代が混ざらない。
+- 有効化したバージョンは書き換えない。直すときは新しいバージョンを作る。元に戻すときは、古いバージョンの中身を写した新しいバージョンを有効化する。
+- システムの既定の定義の新しいバージョン（本システムのリリース）は、テナントの写しを上書きしない。テナントの管理者に「既定の定義が変わった」ことと差分を知らせる。法令の要件に関わる既定のステップ（例：退職の後の手続き）の変更は、リリースノートで示す。
 
 ## 4. ステップの種類
 
@@ -245,7 +245,7 @@ bp_timers   (tenant_id, id, case_id, step_id, kind, fire_at, fired_at, state)   
 最後のステップが終わったトランザクションの中で、次を行う（[ADR-0003](../decisions/0003-business-process-engine.md)）。
 
 1. 案件の行を `FOR UPDATE` でロックする。
-2. **見ていた版の確認**：`based_on_version_ids` のうち、案件が書く facet の版が、現在の知識で置き換えられていないか確かめる。置き換えられていて、案件の項目と重なるなら、完了しない。起票者に `resubmit` の `action` のステップを開き、差（何が誰の案件で変わったか）を示す（`STALE_BASIS`）。重ならなければ、版の ID を新しいものに更新して進める。
+2. **見ていたバージョンの確認**：`based_on_version_ids` のうち、案件が書く facet のバージョンが、現在の知識で置き換えられていないか確かめる。置き換えられていて、案件の項目と重なるなら、完了しない。起票者に `resubmit` の `action` のステップを開き、差（何が誰の案件で変わったか）を示す（`STALE_BASIS`）。重ならなければ、バージョンの ID を新しいものに更新して進める。
 3. 職務分掌を確かめ直す（起票者と承認者、[security-model.md](security-model.md) の 5 節）。
 4. `packages/temporal` で差分を書く（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 5 節）。DT-TEMP-001〜004 の拒否は、案件を完了させず、起票者への `action` のステップにする。
 5. 案件を `completed` にし、`bp_events` と outbox（`bp.case_completed`）を書く。
@@ -296,7 +296,7 @@ bp_delegations (tenant_id, id, delegator_id, delegate_id, alternate_id,
 ### 8.2 訂正（correct）
 
 - 訂正は、元の案件の子として訂正の案件を作る。訂正の案件の payload は元の payload の修正で、差分は `kind = correction`（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 6.2 節）。
-- 訂正の案件の承認の流れは、**今** 有効な定義の `correct` の方針で決める（元の案件の版ではない）。訂正の方針を厳しくした変更が、過去の案件の訂正にも効くようにする。
+- 訂正の案件の承認の流れは、**今** 有効な定義の `correct` の方針で決める（元の案件のバージョンではない）。訂正の方針を厳しくした変更が、過去の案件の訂正にも効くようにする。
 - 給与（`worker_compensation`）・口座（`worker_payment_election`）・雇用の日付（入社日・退職日）に触れる訂正は、既定で承認に回す。承認なしの訂正は、テナントが定義で明示したときだけ許し、監査の報告に出す。
 
 ### 8.3 取消・訂正を受ける条件（DT-BP-003）
@@ -308,7 +308,7 @@ bp_delegations (tenant_id, id, delegator_id, delegate_id, alternate_id,
 | 3 | `rescind` | `terminate` | - | 雇用の後に同じ人の再雇用がある | 拒む（先に再雇用を取り消す） |
 | 4 | `rescind`・`correct` | 何でも | はい | - | 受ける。遡及の候補を給与の担当に示す（`temporal.retro_detected`） |
 | 5 | `rescind`・`correct` | `payroll_finalize` | - | - | 拒む。給与の実行の取消は `payroll_cancel` の業務プロセス（[payroll-engine.md](payroll-engine.md)） |
-| 6 | `rescind`・`correct` | `security_policy_activation`・`bp_definition_activation` | - | - | 拒む。前の版を有効化し直す |
+| 6 | `rescind`・`correct` | `security_policy_activation`・`bp_definition_activation` | - | - | 拒む。前のバージョンを有効化し直す |
 | 7 | `correct` | 何でも | - | 訂正で有効日を動かす | DT-TEMP-003 に従う |
 | 8 | `rescind`・`correct` | それ以外 | いいえ | - | 受ける |
 
@@ -394,8 +394,8 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 ### 11.3 有効化
 
 - 定義の変更は `draft` で保存し、`bp_definition_activation` の業務プロセスで有効化する。起票者（編集者）と有効化の承認者は別の人にする（職務分掌の規則表の既定の行。[security-model.md](security-model.md) の 5 節）。
-- 有効化で `status = active` にし、`effective_from` の日から新しい起票に使われる。前の版は、次の版の `effective_from` の前日まで使われ、その後 `retired` になる。
-- 有効化は監査に残す（誰が、いつ、どの版を、どの差分で）。
+- 有効化で `status = active` にし、`effective_from` の日から新しい起票に使われる。前のバージョンは、次のバージョンの `effective_from` の前日まで使われ、その後 `retired` になる。
+- 有効化は監査に残す（誰が、いつ、どのバージョンを、どの差分で）。
 
 ## 12. 規模
 
@@ -414,7 +414,7 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 | サービスのステップの失敗 | 指数の待ちで 5 回まで再試行。続けて失敗すれば予備の担当に `action` を差し込む |
 | BP Worker の停止 | 操作（承認など）は API で受け、状態は進む。タイマーとサービスのステップだけが遅れる。タイマーの遅れ 5 分で警告 |
 | SQS の重複の配信 | 冪等キー（案件 ID＋ステップ＋`attempt`）で 2 回目は何もしない |
-| 定義の誤り（有効化の後に分かった） | 前の版の中身で新しい版を作り、有効化する。進行中の案件は誤った版で進むので、人事が `reassign` かキャンセルで扱う。影響を受けた案件の一覧を出す |
+| 定義の誤り（有効化の後に分かった） | 前のバージョンの中身で新しいバージョンを作り、有効化する。進行中の案件は誤ったバージョンで進むので、人事が `reassign` かキャンセルで扱う。影響を受けた案件の一覧を出す |
 
 ## 14. セキュリティとプライバシー
 
@@ -440,7 +440,7 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 | PROP-BP-002 | 完了した案件の数と、差分を書いた案件の数が一致する（完了していない案件の差分はない） |
 | PROP-BP-003 | どの完了した案件でも、起票者（実際の操作者と、代理で起票された人の両方）と承認者（同）が一致しない |
 | PROP-BP-004 | 任意の操作を 2 回ずつ送り直した列でも、最後の状態と `bp_events` は同じ（冪等） |
-| PROP-BP-005 | 案件は、起票の日に有効だった定義の版で最後まで進む（途中の定義の有効化に影響されない） |
+| PROP-BP-005 | 案件は、起票の日に有効だった定義のバージョンで最後まで進む（途中の定義の有効化に影響されない） |
 | PROP-BP-006 | 開いたステップごとに、`due` のタイマーはちょうど 1 つあり、閉じたステップには発火していないタイマーがない |
 | PROP-BP-007 | 受信箱の開いた項目は、開いたステップの担当とちょうど一致する（委任を結んだ後の見え方も、今日の委任から一意に決まる） |
 | PROP-BP-008 | 静的な検査を通った任意の定義（生成した定義）で、任意の条件の値の組に対し、案件は `completion` か終端の状態に有限のステップで着く |
@@ -456,9 +456,9 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E4 | `bp-definition-schema` | 3 節の定義の形、式の木と評価器、種類ごとの payload のスキーマ |
-| E4 | `bp-definition-versions` | 3.3 節の版と選び方（PROP-BP-005） |
+| E4 | `bp-definition-versions` | 3.3 節のバージョンと選び方（PROP-BP-005） |
 | E4 | `bp-case-state-machine` | 6 節の表、遷移、冪等、楽観ロック（DT-BP-001、PROP-BP-001・004） |
-| E4 | `bp-completion-transaction` | 6.3 節。見ていた版の確認、差分の書き込み（PROP-BP-002） |
+| E4 | `bp-completion-transaction` | 6.3 節。見ていたバージョンの確認、差分の書き込み（PROP-BP-002） |
 | E4 | `bp-routing` | 5 節。担当の決め方、予備の担当、除外（DT-BP-002、PROP-BP-003） |
 | E4 | `bp-delegation` | 7 節（DT-BP-005） |
 | E4 | `bp-rescind-and-correct` | 8 節（DT-BP-003）。遡及の候補の通知 |
@@ -475,7 +475,7 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 ### 決定
 
 - **定義は JSON の宣言と式の木**。任意のグラフと任意のコードは書かせない。
-- **案件は起票の日に有効な定義の版に固定する。子の案件は親の起票の日で選ぶ**。発令の日（`effective_on`）では選ばない。
+- **案件は起票の日に有効な定義のバージョンに固定する。子の案件は親の起票の日で選ぶ**。発令の日（`effective_on`）では選ばない。
 - **訂正の案件の承認の流れは、今有効な定義の方針で決める**。
 - **委任の期間中は、期間の前から開いているタスクも代理人が操作できる**。本家の資料の食い違い（2 節）は未検証のまま、この決定で進める。
 - **権限は委任した人で、職務分掌と本人の除外は実際の操作者と委任した人の両方で判定する**。
@@ -502,14 +502,14 @@ CREATE INDEX ON inbox_items (tenant_id, worker_id, state, due_at);
 - `ROUTING_FALLBACK`・`stuck`・`STALE_BASIS` の件数（定義と組織の設定の質の指標）。
 - 承認なしの訂正の件数（監査の報告）。
 - 委任による操作の割合。
-- 定義の有効化の件数と、有効化の後に前の版に戻した件数。
+- 定義の有効化の件数と、有効化の後に前のバージョンに戻した件数。
 - 完了の案件と差分の件数の突き合わせの不一致（目標 0）。
 
 ### runbooks
 
 - `bp-stuck-steps.md`：`stuck` のステップの確かめ方（組織のロールの空き、予備のグループ）と、`reassign` の手順。
 - `bp-timer-lag.md`：タイマーの遅れの確かめ方と BP Worker の増やし方。
-- `bp-bad-definition-rollback.md`：誤った定義を有効化したときの、前の版への戻し方と、影響を受けた案件の一覧。
+- `bp-bad-definition-rollback.md`：誤った定義を有効化したときの、前のバージョンへの戻し方と、影響を受けた案件の一覧。
 - `bp-partial-bulk.md`：一括の親の案件が `partially_applied` のときの対応。
 
 ### data-model（索引への追加の提案）

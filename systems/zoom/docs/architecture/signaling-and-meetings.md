@@ -8,7 +8,7 @@
 | --- | --- |
 | [0006](../decisions/0006-meeting-id-and-join-url.md) | 会議の ID は CSPRNG で作る 11 桁の数字で、秘密として扱わない。URL は `https://<brand>.<domain>/j/<meeting-id>#k=<join-key>` とし、128 ビットの参加の鍵をフラグメントに置く。参加の鍵はパスコードの入力を省くだけで、待合室は省かない |
 | [0007](../decisions/0007-meeting-actor-lease-and-epoch.md) | Meeting Actor の持ち主は Valkey のリース（TTL 6 秒、2 秒ごとに更新）で決め、取るたびに `epoch` を 1 つ上げる。持ち主は 4.5 秒更新できなければ自分で止まる。退出させた記録・ロック・役割の変更は、配る前に Aurora に書く |
-| [0008](../decisions/0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、Zod のスキーマから型を作る。版は WebSocket のサブプロトコル（`<brand>.sig.v1`）で決め、1 つ前の版まで受ける。状態は `(epoch, seq)` 付きのスナップショットと差分で配り、`epoch` が変わったら必ずスナップショットを送り直す。話者の音量などの一時的なイベントは `seq` を付けずに配る |
+| [0008](../decisions/0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、Zod のスキーマから型を作る。バージョンは WebSocket のサブプロトコル（`<brand>.sig.v1`）で決め、1 つ前のバージョンまで受ける。状態は `(epoch, seq)` 付きのスナップショットと差分で配り、`epoch` が変わったら必ずスナップショットを送り直す。話者の音量などの一時的なイベントは `seq` を付けずに配る |
 | [0009](../decisions/0009-host-controls-enforcement.md) | 主催者の操作は Meeting Actor が決定表で判定し、メディアに関わる操作（ミュート、ビデオの停止、共有の停止）は Media Node で producer を止めて強制する。ミュートの解除とビデオの開始は、本人の同意なしにはしない |
 
 ## 1. 目的と範囲
@@ -204,7 +204,7 @@ ADR-0008。
 ### 6.1 フレームと封筒
 
 - WebSocket のテキストのフレーム。1 フレームに 1 メッセージ。UTF-8 の JSON。
-- サブプロトコル：`Sec-WebSocket-Protocol: <brand>.sig.v1`（版ごとに 1 つ）。クライアントは対応する版をすべて並べ、Gateway は受ける最新の版を選ぶ。
+- サブプロトコル：`Sec-WebSocket-Protocol: <brand>.sig.v1`（バージョンごとに 1 つ）。クライアントは対応するバージョンをすべて並べ、Gateway は受ける最新のバージョンを選ぶ。
 - WebSocket の圧縮（permessage-deflate）は使わない。メッセージは小さく、接続ごとの圧縮の辞書のメモリに見合わない。
 
 ```jsonc
@@ -285,11 +285,11 @@ ADR-0008。
 | `ping` | クライアントが 5 秒ごと | 15 秒 `pong` がなければ、クライアントは接続を張り直す。Gateway は 15 秒何も受けなければ閉じる |
 | 1 会議の参加者 | S1 100 人（NFR-006） | 101 人目は `Rejected(full)` |
 
-### 6.4 版の扱い
+### 6.4 バージョンの扱い
 
-- サーバーは、Web には今と 1 つ前の版（N−1）を、ネイティブのアプリ（MVP の後）には 2 つ前の版（N−2）までを受ける（[ADR-0005](../decisions/0005-meeting-state-and-signaling.md)、[ADR-0008](../decisions/0008-signaling-protocol.md) の注記）。版を上げる PR では、受ける版のクライアントの契約の試験を通す。
-- 版の中での変更は、項目を足すことだけにする。クライアントは知らない `name` の `evt` と知らない項目を無視する。
-- 受ける版より古いか、最低の版（`min_client_version`。Web は `client-config`、アプリは `client_releases`）より古いクライアントの `hello` には、`err{code: upgrade_required}` を返して閉じる（強制の更新）。Web クライアントは読み込み直し、アプリは更新の画面を出す。
+- サーバーは、Web には今と 1 つ前のバージョン（N−1）を、ネイティブのアプリ（MVP の後）には 2 つ前のバージョン（N−2）までを受ける（[ADR-0005](../decisions/0005-meeting-state-and-signaling.md)、[ADR-0008](../decisions/0008-signaling-protocol.md) の注記）。バージョンを上げる PR では、受けるバージョンのクライアントの契約の試験を通す。
+- バージョンの中での変更は、項目を足すことだけにする。クライアントは知らない `name` の `evt` と知らない項目を無視する。
+- 受けるバージョンより古いか、最低のバージョン（`min_client_version`。Web は `client-config`、アプリは `client_releases`）より古いクライアントの `hello` には、`err{code: upgrade_required}` を返して閉じる（強制の更新）。Web クライアントは読み込み直し、アプリは更新の画面を出す。
 
 ## 7. 状態の配信と再同期
 

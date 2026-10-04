@@ -161,7 +161,7 @@
       <li>要求の状態は自分では持たず、子の要求の品目の状態から導く。</li>
       <li>申請の前に、入力に合うナレッジの記事を見せて自分で解決してもらう（<a class="t" href="#g-deflection">自己解決</a>）。その割合が K8 の指標。</li>
     </ul>
-    <p>ナレッジの記事は版を持ち、レビューと承認を経て公開します。承認者が見た本文と公開する本文を同じにするため、レビューに出した版の本文は変えません。</p>
+    <p>ナレッジの記事はバージョンを持ち、レビューと承認を経て公開します。承認者が見た本文と公開する本文を同じにするため、レビューに出したバージョンの本文は変えません。</p>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/service-catalog-and-requests.md">service-catalog-and-requests.md</a> の 5 節（DT-REQ-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0029-request-item-task-model.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/knowledge.md">knowledge.md</a> の 3・7 節。</div>
   </section>
 
@@ -317,7 +317,7 @@
       <li><a class="t" href="#g-sod">職務の分離</a>：依頼した本人は承認できない。変更のテーブルでは外せない。</li>
       <li>メールの返信での承認は受けない（差出人の本人性を保証できないため）。</li>
     </ul>
-    <div class="callout key"><span class="label">「ちょうど 1 回」</span>2 人が同時に最後の承認を押しても、SLA の違反のタイマーが障害の後に再実行されても、状態は 1 回だけ進みます。遷移・タイマー・outbox を 1 つのトランザクションで書き、行の版で守ります（NFR-004、K3）。</div>
+    <div class="callout key"><span class="label">「ちょうど 1 回」</span>2 人が同時に最後の承認を押しても、SLA の違反のタイマーが障害の後に再実行されても、状態は 1 回だけ進みます。遷移・タイマー・outbox を 1 つのトランザクションで書き、行のバージョンで守ります（NFR-004、K3）。</div>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/workflow-engine.md">workflow-engine.md</a> の 3・5・7 節（DT-APR-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0004-workflow-and-sla-engine.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0015-flow-execution-and-timers.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0016-approvals.md">ADR-0016</a>。</div>
   </section>
 
@@ -387,7 +387,7 @@
     text state
   }</pre>
     <ul>
-      <li><strong>版を固定する</strong>：計時の行は、開始の時の SLA の定義の版とカレンダーの版を指す。フローの実行もフローの版に固定する。後から定義を変えても、動いているものは変わらない。</li>
+      <li><strong>バージョンを固定する</strong>：計時の行は、開始の時の SLA の定義のバージョンとカレンダーのバージョンを指す。フローの実行もフローのバージョンに固定する。後から定義を変えても、動いているものは変わらない。</li>
       <li><code>version</code> は保存ごとに増え、同時の更新の衝突（409）と、タイマーの古さの判定に使う。</li>
       <li><code>tenant_id</code> が NULL の行は、全テナント共通の組み込みのデータ（辞書・ロール・国民の祝日など）。</li>
     </ul>
@@ -399,7 +399,7 @@
     <table>
       <tr><th>点</th><th>本家</th><th>再構築</th></tr>
       <tr><td>拡張</td><td>サーバー・画面のスクリプトを書ける</td><td>ノーコードの設定だけ。スクリプトの API と互換にしない</td></tr>
-      <tr><td>版</td><td>顧客ごとのインスタンスで版を選べる</td><td>全テナントが同じ版。振る舞いの変更はフラグで段階的に</td></tr>
+      <tr><td>バージョン</td><td>顧客ごとのインスタンスでバージョンを選べる</td><td>全テナントが同じバージョン。振る舞いの変更はフラグで段階的に</td></tr>
       <tr><td>ACL の既定</td><td>規則がなければ許可（設定で拒否）</td><td>常に既定の拒否</td></tr>
       <tr><td>SLA の更新</td><td>定期のジョブで計時を更新</td><td>期限の時刻をタイマーに登録</td></tr>
       <tr><td>CI の複数の一致</td><td>最も古い CI を選ぶとされる</td><td>選ばず保留にし、人が統合</td></tr>
@@ -447,10 +447,10 @@
       <dt id="g-reconciliation">調整</dt><dd>複数の取り込み元の値が食い違うとき、属性ごとにどの値を採るかを決めること。</dd>
       <dt id="g-staleness">鮮度</dt><dd>取り込み元の観測が「まだ有効」とみなせる期間。古くなった強い取り込み元より、新しい弱い取り込み元の値を採る。</dd>
       <dt id="g-dictionary">データ辞書</dt><dd>テーブル・フィールド・型・選択肢・参照の定義を持つメタデータ。</dd>
-      <dt id="g-metadata">メタデータ</dt><dd>振る舞いを決める設定のデータ（辞書・ACL・フロー・SLA・フォームの配置など）。テナントごとに版を持つ。</dd>
+      <dt id="g-metadata">メタデータ</dt><dd>振る舞いを決める設定のデータ（辞書・ACL・フロー・SLA・フォームの配置など）。テナントごとにバージョンを持つ。</dd>
       <dt id="g-class">クラス</dt><dd>継承の階層の中のテーブル。例：<code>task</code> の子の <code>incident</code>。</dd>
       <dt id="g-acl">ACL</dt><dd>Access Control List。テーブル・行・フィールドごとに、誰が何の操作をできるかの規則。</dd>
-      <dt id="g-flow">フロー</dt><dd>きっかけ・条件・承認・タスク・通知・待ちを組み合わせたノーコードの業務の流れ。公開すると不変の版になる。</dd>
+      <dt id="g-flow">フロー</dt><dd>きっかけ・条件・承認・タスク・通知・待ちを組み合わせたノーコードの業務の流れ。公開すると不変のバージョンになる。</dd>
       <dt id="g-delegation">代理</dt><dd>期間を決めて、本人の代わりに承認や申請をする人を指定すること。</dd>
       <dt id="g-sod">職務の分離</dt><dd>依頼した人と承認する人を分け、1 人で不正を完結できないようにする内部統制の原則。</dd>
       <dt id="g-watermark">参照の印</dt><dd>送ったメールに入れる推測できない文字列。返信を元のチケットに結ぶ手がかりで、権限ではない。</dd>

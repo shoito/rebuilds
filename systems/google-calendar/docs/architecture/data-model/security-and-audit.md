@@ -117,7 +117,7 @@ erDiagram
 
 ### 2.2 `ops.platform_audit_events`
 
-運用者の JIT のアクセス、break-glass、テナントをまたぐ関数の呼び出しの集計、tzdb の版の採用、`sync_epoch` の更新、データの直接の修正、テナントの削除、送信の上限の変更。
+運用者の JIT のアクセス、break-glass、テナントをまたぐ関数の呼び出しの集計、tzdb のバージョンの採用、`sync_epoch` の更新、データの直接の修正、テナントの削除、送信の上限の変更。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -166,7 +166,7 @@ erDiagram
 | `store` | `text` | NOT NULL | — | `aurora`・`s3`・`cloudwatch`・`client` |
 | `period_days` | `integer` | NULL | — | NULL は「決めるまで消さない」（`booking_pii`） |
 | `basis` | `text` | NOT NULL | — | 根拠（ADR、法務の結論） |
-| `l5_version` | `text` | NULL | — | 法務の L5 の結論の版（それまで NULL で、既定の値） |
+| `l5_version` | `text` | NULL | — | 法務の L5 の結論のバージョン（それまで NULL で、既定の値） |
 | `updated_at` | `timestamptz` | NOT NULL | `now()` | |
 
 - キー：PK `data_kind`。

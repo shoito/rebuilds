@@ -209,7 +209,7 @@ CREATE TABLE records (
 - **形**：`proj_<projection_id>`（`org_id`、`id`、`owner_id`、`record_type_id`、`updated_at`、選んだ項目を型付きの列で最大 100 列）。他のオブジェクトの項目は持たない。`org_id` と RLS を持つ。索引は選んだ項目に Ops が張る。
 - **同期**：保存の手順 6 で、`records` と同じトランザクションで書く。非同期にすると、レポートの値と共有の判定が正本とずれるため。
 - **使う時**：問い合わせの計画（[query-language-and-api.md](query-language-and-api.md) の 4 節）が、参照する全ての項目が射影にある時だけ使う。
-- **メタデータとの関係**：`projections(org_id, object_id, projection_id, field_nos, state, built_version)`。射影に入っている項目の型の変換・削除があると、同じ版で `state = stale` にし、計画が使わなくなる。Worker が作り直して `active` に戻す。
+- **メタデータとの関係**：`projections(org_id, object_id, projection_id, field_nos, state, built_version)`。射影に入っている項目の型の変換・削除があると、同じバージョンで `state = stale` にし、計画が使わなくなる。Worker が作り直して `active` に戻す。
 - **DDL**：射影の表の作成は、マイグレーションの外の DDL になる。専用の DB のロールを持つ Worker だけが、許可リストの形（`proj_` の接頭辞）で行う。DDL の lint（ADR-0002）の例外として許可リストに書く。
 - **数の上限**：1 つの組織で 3 つ、1 つのクラスタで 500 まで（PostgreSQL のカタログを膨らませないため）。
 - 本家の skinny table は 200 列までだが（LDV）、本システムは 100 列で始める。行の幅を抑え、写しの書き込みの費用を小さくするため。

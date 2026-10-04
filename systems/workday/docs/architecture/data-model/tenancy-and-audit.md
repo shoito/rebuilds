@@ -272,7 +272,7 @@ erDiagram
 
 ### 5.1 `retention_rules`
 
-保存の期間の規則表（テナントの外。版の表）。定義元：[audit-and-retention.md](../audit-and-retention.md) の 5.1・5.2 節、[ADR-0049](../../decisions/0049-retention-rules-table-and-legal-hold.md)。
+保存の期間の規則表（テナントの外。バージョンの表）。定義元：[audit-and-retention.md](../audit-and-retention.md) の 5.1・5.2 節、[ADR-0049](../../decisions/0049-retention-rules-table-and-legal-hold.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -291,7 +291,7 @@ erDiagram
 | `reviewed_by` | `text` | NULL | — | 確認した専門家の区分 |
 | `published_at` | `timestamptz` | NULL | — | |
 
-- キー：PK `(rule_id, version)`。使う版は、`rule_id` ごとに公開の済んだ版のうち `version` が最大のもの（削除のジョブが実行の記録に版を残す）。
+- キー：PK `(rule_id, version)`。使うバージョンは、`rule_id` ごとに公開の済んだバージョンのうち `version` が最大のもの（削除のジョブが実行の記録にバージョンを残す）。
 - CHECK：`status <> 'pending_review' OR candidates IS NOT NULL`。
 - 運用：RLS なし。書くのは `platform`（取り込み・確認・公開の手順）。
 

@@ -147,7 +147,7 @@ BIN の表（ブランド・funding・発行国）。コネクタかカードブ
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
-| `version` | `integer` | NOT NULL | — | 取り込みの版。切り替えは版の単位で行う |
+| `version` | `integer` | NOT NULL | — | 取り込みのバージョン。切り替えはバージョンの単位で行う |
 | `range_start`・`range_end` | `bigint` | NOT NULL | — | BIN の範囲（桁を揃えた数値） |
 | `pan_length` | `smallint` | NULL | — | |
 | `brand` | `text` | NOT NULL | — | |
@@ -158,7 +158,7 @@ BIN の表（ブランド・funding・発行国）。コネクタかカードブ
 | `loaded_at` | `timestamptz` | NOT NULL | — | |
 
 - キー：PK `(version, range_start)`。索引：`(version, range_start, range_end)` の GiST（範囲の検索）。
-- 保持：直近 3 版。S1 の量：数十万行。
+- 保持：直近 3 バージョン。S1 の量：数十万行。
 
 ### 3.4 `vault_test_cards`
 

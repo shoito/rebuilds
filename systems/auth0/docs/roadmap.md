@@ -48,7 +48,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `aurora-and-rls` | 主の Aurora、RLS と `SET LOCAL app.tenant_id`、DB のロール、テナントの外の表の許可リスト（[data-model.md](architecture/data-model.md) の 2・3 節、[ADR-0002](decisions/0002-tenancy-and-isolation.md)） |
 | `log-aurora-cluster` | ログの専用の Aurora のクラスタ、日ごとのパーティション、RLS（[ADR-0043](decisions/0043-log-storage-and-search.md)） |
 | `kms-key-hierarchy` | 4 つの KMS の鍵、キーポリシー、SCP、CloudTrail の通知、IAM の静的検査（[ADR-0045](decisions/0045-kms-key-hierarchy.md)） |
-| `pepper-bootstrap` | pepper の生成、Secrets Manager とアーカイブ、起動時の読み込み、版 |
+| `pepper-bootstrap` | pepper の生成、Secrets Manager とアーカイブ、起動時の読み込み、バージョン |
 | `tenant-data-keys` | テナントの DEK の作成・キャッシュ・ローテーション、AAD |
 | `signer-sign-api` | Signer の署名の API（`/v1/sign`、`sign-batch`）と検査（[keys-and-secrets.md](architecture/keys-and-secrets.md) の 6.1 節） |
 | `outbox-and-relay` | `outbox`（RLS の外）、Relay、SQS、`trace_context`（[data-model/operations.md](architecture/data-model/operations.md) の 3 節） |
@@ -74,7 +74,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- |
 | `tenant-lifecycle` | テナントの作成（アカウントから）、環境と昇格、状態（`active`・`suspended`・`deleting`）（[ADR-0030](decisions/0030-accounts-tenants-and-members.md)） |
 | `tenant-hostnames-resolution` | `tenant_hostnames`、プロセスの中の対応表、変更の通知、DB を読まない 404（[ADR-0039](decisions/0039-hostname-resolution-and-issuer.md)） |
-| `tenant-config-snapshot` | 設定のスナップショット、版、pub/sub とポーリング、LRU と起動時の先読み、`hostname_ready_by`（[ADR-0032](decisions/0032-tenant-config-cache.md)） |
+| `tenant-config-snapshot` | 設定のスナップショット、バージョン、pub/sub とポーリング、LRU と起動時の先読み、`hostname_ready_by`（[ADR-0032](decisions/0032-tenant-config-cache.md)） |
 | `mgmt-api-skeleton` | Management API のルーター、OpenAPI、エラーの形、相関 ID、`fields` |
 | `mgmt-api-authz` | M2M のトークンの検証、要求ごとの許可の確認、スコープの判定（既定で拒否）、権限の昇格の防止（[ADR-0034](decisions/0034-management-api-authorization.md)） |
 | `mgmt-pagination` | オフセットと、暗号化したチェックポイント（24 時間） |
@@ -293,7 +293,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `actions-poc` | Lambda のテナントの隔離のモードで、コールドスタート・温まった実行の遅延と、費用を計る（着手の最初） |
 | `actions-degradation-review` | ADR-0005 の縮退の表の「Actions の実行の基盤」の行のレビュー（PoC の結果で。spec の承認の前提） |
 | `actions-account` | `actions` のアカウント、`actions-egress` の VPC と NAT、Lambda の同時実行の引き上げ、実行ロールの SCP |
-| `actions-build` | Action と版の Management API、ビルド（CodeBuild、npm のプロキシ、照合、esbuild） |
+| `actions-build` | Action とバージョンの Management API、ビルド（CodeBuild、npm のプロキシ、照合、esbuild） |
 | `actions-runner` | 実行器（束の取得と照合、`commands` の記録、ログの収集と伏せ字） |
 | `actions-invoker` | 秘密の復号、署名付き URL、テナントの同時実行、時限、`on_platform_error` |
 | `actions-post-login-and-m2m` | `post-login` と `credentials-exchange` の `api`（クレーム、`deny`、MFA の有効化、メタデータ） |
@@ -334,7 +334,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 MVP の後に検討する。着手するときに `intent.md` から起票する（[intent.md](intent.md) の「MVP の後の Epic で扱う」と Non-goals）。E13・E14 に入れなかったもの。
 
 - **ユーザーの一括のインポート・エクスポート**（移行の Epic）：非同期のジョブ、PBKDF2 などのハッシュの取り込み、`user_id` の指定（[users-and-profiles.md](architecture/users-and-profiles.md) の 8 節）。本家の `auth0|...` の `user_id` は顧客のデータとしてそのまま受ける。
-- **SCIM 2.0 の受け入れ**：E14 の後（[users-and-profiles.md](architecture/users-and-profiles.md) の 9 節）。最初の版は `Users` だけで、`Groups` は組織のロールの後。
+- **SCIM 2.0 の受け入れ**：E14 の後（[users-and-profiles.md](architecture/users-and-profiles.md) の 9 節）。最初のバージョンは `Users` だけで、`Groups` は組織のロールの後。
 - **PAR・DPoP・トークン交換・mTLS**、FAPI 2.0 の適合（[ADR-0010](decisions/0010-staged-protocol-extensions.md)、[authentication-flows.md](architecture/authentication-flows.md) の 10 節）。`resource`（RFC 8707）はトークン交換と一緒に受け、`audience` と同じ意味に扱う（[authentication-flows.md](architecture/authentication-flows.md) の 14 節）。
 - **イントロスペクション（RFC 7662）**：持たないと決めた（[authentication-flows.md](architecture/authentication-flows.md) の 14 節）。需要が出たら新しい ADR で足す。
 - **MFA の API**（`/mfa/challenge` など、埋め込み・ネイティブ向け）：[mfa-and-passkeys.md](architecture/mfa-and-passkeys.md) の 8.1 節。

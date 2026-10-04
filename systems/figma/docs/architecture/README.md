@@ -43,7 +43,7 @@
 | --- | --- |
 | UI の殻 | React のパネルと画面。エンジンとは生成した型のコマンドと、フレームに 1 回の話題ごとのスナップショットでやり取りする（[ADR-0016](../decisions/0016-shell-engine-boundary.md)）。キャンバスの描画はしない |
 | エンジン（WASM） | ドキュメントのモデル、変更の適用と合わせ直し（rebase）、レイアウト、ヒットテスト、描画。サーバーと同じ `doc-model` の crate を使う |
-| API | 認証、組織・チーム・プロジェクト・ファイルのメタデータ、判定関数と能力のチケットの発行（[ADR-0030](../decisions/0030-single-policy-engine-and-signed-capabilities.md)）、共有、コメント、版の一覧 |
+| API | 認証、組織・チーム・プロジェクト・ファイルのメタデータ、判定関数と能力のチケットの発行（[ADR-0030](../decisions/0030-single-policy-engine-and-signed-capabilities.md)）、共有、コメント、バージョンの一覧 |
 | Realtime | ファイルの一覧・コメント・権限などメタデータの変更を購読で配る（本家の LiveGraph に相当。[LiveGraph](https://www.figma.com/blog/livegraph-real-time-data-fetching-at-figma/)、2021-10-14。[ADR-0028](../decisions/0028-realtime-metadata-subscriptions.md)） |
 | Multiplayer Gateway | WebSocket の終端、能力のチケットの検証、Router に問い合わせて Document Server へ中継、Gateway ごとに 1 回届く配信を接続へ分ける（[ADR-0009](../decisions/0009-multiplayer-wire-protocol.md)、[ADR-0011](../decisions/0011-presence-and-fan-out.md)） |
 | Document Server | 1 ファイルを 1 つのタスク（file actor）がメモリに持ち、変更に `seq` を振り、検証し、ジャーナルに書き、配る（[ADR-0002](../decisions/0002-central-authoritative-multiplayer.md)、[ADR-0003](../decisions/0003-journal-and-checkpoints.md)） |
@@ -57,7 +57,7 @@
 - **ファイルごとに持ち主は 1 つ。** 1 つのファイルの変更の順序は、そのファイルを持つ Document Server だけが決める。CRDT は使わない（[ADR-0002](../decisions/0002-central-authoritative-multiplayer.md)）。
 - **確定の前に永続化する。** 変更は、ジャーナルに書いてから確定を返し、配る（[ADR-0003](../decisions/0003-journal-and-checkpoints.md)）。
 - **同じ規則を 1 つのコードで。** 変更の適用・検証・レイアウト・描画は Rust の crate にまとめ、ブラウザ（WASM）とサーバー（ネイティブ）で同じコードを使う。一致は CI で確かめる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md)）。
-- **ファイルの中身とメタデータを分ける。** ファイルの中身（ノードの木）はマルチプレイヤーの経路で扱い、Aurora には置かない。Aurora はメタデータ（組織、権限、コメント、版の一覧）の正本で、RLS で組織を分ける（[ADR-0005](../decisions/0005-tenancy-and-document-routing.md)）。本家も、ファイルの中の同時編集はマルチプレイヤー、ファイルをまたぐデータは LiveGraph と Postgres に分けている（同上の LiveGraph の記事）。
+- **ファイルの中身とメタデータを分ける。** ファイルの中身（ノードの木）はマルチプレイヤーの経路で扱い、Aurora には置かない。Aurora はメタデータ（組織、権限、コメント、バージョンの一覧）の正本で、RLS で組織を分ける（[ADR-0005](../decisions/0005-tenancy-and-document-routing.md)）。本家も、ファイルの中の同時編集はマルチプレイヤー、ファイルをまたぐデータは LiveGraph と Postgres に分けている（同上の LiveGraph の記事）。
 
 ## 2. 主要フロー
 
@@ -108,7 +108,7 @@
 | NFR-006 | 耐久性 | 確定を返した編集は失わない（プロセス・ホスト・AZ の障害）。確定の前に失われうる範囲は、送り直しで回復する | 本家の目標は「失うのは 1 秒未満」（同上の Making multiplayer more reliable） |
 | NFR-007 | Document Server の障害からの回復 | 持ち主のプロセスが落ちてから、別の持ち主で編集を再開できるまで p95 15 秒以内 | 内訳は infrastructure.md の 5.4 節 |
 | NFR-008 | 可用性 | 編集（ファイルを開き、変更が確定する）の月間 99.95%。メタデータの API は 99.9% | SLI は [ADR-0050](../decisions/0050-editing-slis-and-slos.md)、値の正本は [runbooks/README.md](../runbooks/README.md) |
-| NFR-009 | 復旧（リージョンの障害） | RPO 1 分以内、RTO 1 時間以内（大阪） | リージョンの喪失では NFR-006 の例外として 1 分までの損失を許す。失った範囲は版として取り戻す（[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md)） |
+| NFR-009 | 復旧（リージョンの障害） | RPO 1 分以内、RTO 1 時間以内（大阪） | リージョンの喪失では NFR-006 の例外として 1 分までの損失を許す。失った範囲はバージョンとして取り戻す（[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md)） |
 | NFR-010 | テナント分離 | 他の組織のファイル・メタデータ、権限のないファイルの中身（サムネイルを含む）が見える事象は 0 件 | 経路の一覧は [permissions-and-sharing.md](permissions-and-sharing.md) の 11 節 |
 
 ## 5. 技術スタック
@@ -161,7 +161,7 @@
 | [0023](../decisions/0023-library-snapshots-imported-into-files.md) | ライブラリは公開の時点の不変のスナップショットで配り、使う側のファイルに写しを取り込む。ファイルをまたぐ生の参照はしない |
 | [0024](../decisions/0024-journal-items-and-fencing.md) | ジャーナルは `seq` の範囲の group commit で、フェンスの `epoch` を確かめる `TransactWriteItems` と `ClientRequestToken` で書く。大きな変更は S3 に置き、TTL の漏れは回復のジョブで拾う |
 | [0025](../decisions/0025-content-addressed-checkpoints-and-loading.md) | チェックポイントはマニフェストと中身のハッシュで名付けたページのチャンクにし、変わったページだけを書く。クライアントは署名付き URL で CloudFront からチャンクを読んで端末にキャッシュし、その後の変更だけを Document Server から受け取る |
-| [0026](../decisions/0026-version-history-restore-and-deletion.md) | 版はチェックポイントに印を付けたもので、復元は差分を 1 つの変更として当てて履歴を消さない。削除はゴミ箱と完全な削除の 2 段で、完全な削除はジョブで S3・ジャーナル・版を消す |
+| [0026](../decisions/0026-version-history-restore-and-deletion.md) | バージョンはチェックポイントに印を付けたもので、復元は差分を 1 つの変更として当てて履歴を消さない。削除はゴミ箱と完全な削除の 2 段で、完全な削除はジョブで S3・ジャーナル・バージョンを消す |
 | [0027](../decisions/0027-comments-anchored-to-nodes-in-metadata.md) | コメントは Aurora に置き、ノードの ID と相対の位置で固定する。通知は送る時点で受け手を判定し直し、メールは受け手とファイルごとにまとめる |
 | [0028](../decisions/0028-realtime-metadata-subscriptions.md) | メタデータのリアルタイムの更新は、トリガーで書く無効化の outbox と、単純な問い合わせへの分解・再取得の購読層で配る |
 | [0029](../decisions/0029-hierarchy-roles-seats-and-link-access.md) | 階層は組織・チーム・プロジェクト・ファイル。水準は全順序で、上位で与えた水準を下位で下げない。ファイルの「招待した人だけ」は上位の一般アクセスを遮る。シートは上限として重ねる |
@@ -174,10 +174,10 @@
 | [0036](../decisions/0036-font-sources-and-licensing.md) | フォントの出どころは同梱のオープンなフォント・組織のフォント・端末のフォントの 3 つにし、サーバーの描画と PDF への埋め込みはライセンスの確かなものに限る |
 | [0037](../decisions/0037-plugin-sandbox-quickjs-wasm.md) | プラグインのコードは QuickJS を WASM にした専用のインスタンスでメインスレッドに動かし、UI と通信は別のオリジンの null origin の iframe に置く |
 | [0038](../decisions/0038-plugin-api-and-capabilities.md) | プラグインの API は動かした人の権限の中で動き、manifest で宣言した能力と通信先だけを許し、書き込みは通常の変更（ChangeSet）にする |
-| [0039](../decisions/0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは初回と権限の拡大で人が審査する。版は不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR にする |
+| [0039](../decisions/0039-plugin-distribution-and-review.md) | 組織の中のプラグインは審査なしで配り、公開のプラグインは初回と権限の拡大で人が審査する。バージョンは不変に保存し、停止のスイッチを持つ。ウィジェットは別の ADR にする |
 | [0040](../decisions/0040-public-rest-api-surface.md) | 公開 API は別のサービスにし、利用者の権限とスコープの積で動かす。ファイルの中身は Rust の読み取り専用のサービスが返し、中身の書き込みは出さない。トークンは PKCE 必須の OAuth 2.1 と期限必須の個人のトークン |
 | [0041](../decisions/0041-webhook-delivery.md) | Webhook は中身を含まない HMAC で署名したイベントを、配送の時点の権限で判定し、隔離した egress から少なくとも 1 回送る |
-| [0042](../decisions/0042-api-versioning-and-rate-limits.md) | 公開 API の版は URL の大きな版にし、ノードの JSON はプロパティの表から生成して表の列で公開を決める。レート制限は操作の重さの tier と画素の予算で数える |
+| [0042](../decisions/0042-api-versioning-and-rate-limits.md) | 公開 API のバージョンは URL の大きなバージョンにし、ノードの JSON はプロパティの表から生成して表の列で公開を決める。レート制限は操作の重さの tier と画素の予算で数える |
 | [0043](../decisions/0043-authentication-sessions-and-org-sso.md) | 認証とセッションは Slack の ADR-0012 を引き継ぎ、組織の SAML SSO はメンバーにだけかける。長く続く接続は、セッションの取り消しでも切る |
 | [0044](../decisions/0044-encryption-keys-and-client-cache.md) | 保存時の暗号化はデータの種類ごとの KMS の鍵（マルチリージョン）で行い、組織ごとの鍵は MVP で持たない。端末のキャッシュは暗号化せず、組織の方針で止められるようにする |
 | [0045](../decisions/0045-audit-log-and-data-lifecycle.md) | 監査ログは操作と同じトランザクションで書いて改ざんできない保管へ送り、組織の管理者に見せる。削除は東京と大阪の両方で、バックアップの期限を最終の期限にする |
@@ -188,7 +188,7 @@
 | [0050](../decisions/0050-editing-slis-and-slos.md) | 編集の SLO は「開ける」と「確定する」の 2 つのイベントの SLI で数え、反映の遅延は合成のボットで、回復の時間は Router の記録で測る |
 | [0051](../decisions/0051-document-server-memory-admission.md) | Document Server は、ファイルごとのメモリを見積もって受け入れを決め、タスクのメモリの 75% を上限にする。大きなファイルは別の群れに置く |
 | [0052](../decisions/0052-journal-throughput-and-hot-file-budget.md) | ジャーナルの表はオンデマンドで事前に温め、1 ファイルの書き込みは予算で抑える。予算を超えそうなファイルは、まとめの間隔を段階的に広げる |
-| [0053](../decisions/0053-client-server-version-skew.md) | クライアントとサーバーの版は、送受信の形式の版・スキーマの互換の一覧・最低のビルドの 3 つで照合する。再読み込みは、穏やかなものと強いものを分ける |
+| [0053](../decisions/0053-client-server-version-skew.md) | クライアントとサーバーのバージョンは、送受信の形式のバージョン・スキーマの互換の一覧・最低のビルドの 3 つで照合する。再読み込みは、穏やかなものと強いものを分ける |
 | [0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md) | WASM とネイティブの一致を、同じ入力の列から作った正準形のバイト列で PR ごとに確かめ、WASM の大きさと描画の性能に予算を置いて CI で止める |
 | [0055](../decisions/0055-staged-rollout-and-schema-changes.md) | クライアントのビルドは組織の割合で段階的に出し、適用の規則を変えるフラグはファイルごとに Document Server が決めて配る。プロパティの表の変更は「サーバー → クライアント → 書き込みの解禁」の 3 段で出す |
 
@@ -199,15 +199,15 @@
 品質の面のリスクの順位と対策は [quality.md](../quality.md) の 1 節にある。ここは設計の面のリスクを書く。
 
 - **巨大なファイル**：10 万ノードを超えるファイルでの、開く時間・メモリ・フレームレート。WASM の 32 ビットのメモリ空間（最大 4 GB。Safari が memory64 に対応していない）の中で収める。ページ単位の読み込み、画像の縮小版、キャッシュの追い出しと安全な描画の状態で抑える。HAMT の読み取りの速さと 1 ノードあたりのメモリは E2 の前の PoC で確かめる（NFR-003〜005）。
-- **収束の破れ**：クライアントとサーバーで同じ変更の結果が違うと、画面が収束しない。`doc-model`・`layout` の一致の CI（[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md)）、レイアウトの決定性の規則（[ADR-0020](../decisions/0020-deterministic-layout-arithmetic.md)）、版の照合（[ADR-0053](../decisions/0053-client-server-version-skew.md)）、ファイルごとの文書のフラグ（[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md)）で抑える。
+- **収束の破れ**：クライアントとサーバーで同じ変更の結果が違うと、画面が収束しない。`doc-model`・`layout` の一致の CI（[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md)）、レイアウトの決定性の規則（[ADR-0020](../decisions/0020-deterministic-layout-arithmetic.md)）、バージョンの照合（[ADR-0053](../decisions/0053-client-server-version-skew.md)）、ファイルごとの文書のフラグ（[ADR-0055](../decisions/0055-staged-rollout-and-schema-changes.md)）で抑える。
 - **二重の持ち主と確定の損失**：ネットワークの分断や停止で、2 つの Document Server が同じファイルを持つと、変更が分かれうる。割り当ての `epoch` とジャーナルのフェンス（[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)）で片方だけが確定できるようにする。回復のジョブが止まると、ジャーナルの TTL（30 日）で編集を失う危険がある。見張りとアラームで守る。
 - **Document Server のホットスポット**：1 つのファイルに数百人が同時に入ると、1 つのプロセスとジャーナルの 1 つのパーティションに集中する。参加の上限（500 人・編集 200 人。[ADR-0011](../decisions/0011-presence-and-fan-out.md)）、Gateway ごとに 1 回の配信、書き込みの予算の段（[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)）、チャンクの CDN での配信（ADR-0025）で抑える。500 人を超える需要は S2 の前に配信の木を ADR にする。
 - **WebGPU と WebGL2 の両立**：wgpu の「両方を有効にすると WebGL に戻らない」不具合（[gfx-rs/wgpu#6166](https://github.com/gfx-rs/wgpu/issues/6166)）は [gfx-rs/wgpu#6371](https://github.com/gfx-rs/wgpu/pull/6371) で解決した（2026-09-27 に確認）。キャンバスを作り直しての切り替えの時間、両方を入れた WASM の大きさ（5 MB）、wgpu の WebGL2 の経路で R16F の加算のブレンドが使えるか（WebGL2 の仕様では `EXT_color_buffer_float` で使える。[rendering-engine.md](rendering-engine.md) の 7 節）は **未検証** で、E2 の前の `gpu-backend-poc` で確かめる。満たさなければ 2 つのビルドを配る（[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md) の退路）。
 - **サーバーの描画の性能**：Fargate に GPU がないので、Render Worker は CPU の lavapipe で描く。10 万ノードのサムネイルを p95 10 秒で描けるかは **未検証**（E10 の `render-worker-core` の PoC）。lavapipe は Vulkan 1.3 の適合を得ている（rendering-engine.md の 12 節）。足りなければ GPU のインスタンスを別の ADR で検討する。
 - **キャンバスの上の日本語の入力**：自前で描画するため、IME の変換中の表示と候補の窓の位置を、隠した `textarea` で扱う（[ADR-0017](../decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方と、ブラウザ・IME ごとのイベントの順序は E4 の前の PoC で確かめる。
 - **フォント**：和文のフォントは大きく（1 書体で数 MB）、読み込みの時間とメモリに効く。ライセンスは法務の確認待ち（[intent.md](../intent.md) の L1）。
-- **クライアントとサーバーの版の食い違い**：エンジンの WASM はタブに何時間も残る。接続時に 3 つの版（`protocol_version`、`schema_hash` の互換の一覧、`min_client_build`）で照合し、互換の外だけ強い再読み込みにする（[ADR-0053](../decisions/0053-client-server-version-skew.md)）。
-- **大阪への切り替え**：グローバルテーブルは非同期で項目ごとに最後の書き込みが勝つ。切り替えのたびに世代を上げてキーを分け、失った範囲を版として取り戻す（[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md)）。RTO の内訳と、障害中に東京のレプリカを外せるかは DR の訓練で確かめる。
+- **クライアントとサーバーのバージョンの食い違い**：エンジンの WASM はタブに何時間も残る。接続時に 3 つのバージョン（`protocol_version`、`schema_hash` の互換の一覧、`min_client_build`）で照合し、互換の外だけ強い再読み込みにする（[ADR-0053](../decisions/0053-client-server-version-skew.md)）。
+- **大阪への切り替え**：グローバルテーブルは非同期で項目ごとに最後の書き込みが勝つ。切り替えのたびに世代を上げてキーを分け、失った範囲をバージョンとして取り戻す（[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md)）。RTO の内訳と、障害中に東京のレプリカを外せるかは DR の訓練で確かめる。
 - **法務**：フォント、権利侵害の申し立て、公開のリンク、削除の期間、漏洩の報告、本家への寄せ方は、法務の確認待ち（[intent.md](../intent.md) の L1〜L6）。結論が出るまで、該当する Story の spec を承認しない。
 
 ### 決定（2026-09-27、既定案）
@@ -225,8 +225,8 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 - **メモリ**：10 万ノードの `Doc` は 200 MiB（document-model.md の 10 節を正とし、rendering-engine.md の 11 節の単位を揃えた）。
 - **CDN の署名**：署名はキャッシュの鍵に含めない。署名付き URL は取得を許すもので、キャッシュのオブジェクトは中身のハッシュで名付け、パスに組織（`images/{org_id}/…`）かファイル（`files/{file_id}/…`）を含むので、組織をまたいで共有されない（permissions-and-sharing.md の 11 節を直した）。
 - **S3 の削除**：削除とライフサイクルは大阪へ複製されないので、完全な削除・掃除・画像の mark-and-sweep を東京と大阪の両方で行う（ADR-0045。file-storage-and-history.md の 11.2 節、export-and-assets.md の 6.5 節を直した）。
-- **版の照合**：`schema_hash` の不一致で再読み込みにする規則を、ADR-0053 の 3 つの版の照合に置き換えた（document-model.md の 8.4 節、multiplayer.md の 4.3 節）。
-- **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻した版は `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 9.2 節）。
+- **バージョンの照合**：`schema_hash` の不一致で再読み込みにする規則を、ADR-0053 の 3 つのバージョンの照合に置き換えた（document-model.md の 8.4 節、multiplayer.md の 4.3 節）。
+- **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻したバージョンは `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 9.2 節）。
 - **領域の間の提案**：`thumbnail_node`、`cjk_fallback_font`、レイアウトのプロパティ、`component_prop_values` などのコンポーネントのプロパティ、表の列 `public_api`・`api_name`・`api_since`・`public_plugin`、`ChangeSet` の `origin`、マニフェストの `features`、`Hello.protocol_version`、再接続の最初の 0〜5 秒の乱数の待ち、`file_versions.kind = dr_salvaged`、ファイルの `maintenance` の状態を取り込んだ（data-model.md の 9.2 節、[data-model/document.md](data-model/document.md)）。
 - **呼び名**：本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名している。本システムは「プロジェクト」のまま進め、表とコードも `project` にする。画面の呼び名は下の「決定（2026-09-27、推奨案で確定）」で決めた（permissions-and-sharing.md の 15 節）。
 - **Epic**：E1〜E12 が MVP、E13 ライブラリ、E14 プラグイン、E15 公開 API と Webhook。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。領域の文書の仮の Epic の番号を roadmap.md に揃えた（rendering-engine.md と editor-and-tools.md の E8・E9 の入れ替わり、「後」「後-P」「後-A」の置き換え）。組織の SAML SSO は ADR-0043 のとおり E12 に作るが、MVP の範囲の外で GA の判定に含めない。
@@ -267,7 +267,7 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 | Gateway の再開のトークンの設計を承認 | 再接続の殺到で API のチケットの発行が律速になるのを避ける | [permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節、[ADR-0030](../decisions/0030-single-policy-engine-and-signed-capabilities.md) |
 | 匿名の閲覧者にコメントを見せない | 「リンクを知っている全員」のファイルで、社内のやり取りを外に出さない | [comments-and-notifications.md](comments-and-notifications.md) の 10 節 |
 | アプリで読んだコメントは、メールのまとめから除く | メールの数を減らす | 同上 |
-| 無料のプランの版の履歴は 30 日。過ぎた版は消す | 本家の Starter と同じ | [intent.md](../intent.md)、[file-storage-and-history.md](file-storage-and-history.md) の 8.4 節、[ADR-0026](../decisions/0026-version-history-restore-and-deletion.md) |
+| 無料のプランのバージョンの履歴は 30 日。過ぎたバージョンは消す | 本家の Starter と同じ | [intent.md](../intent.md)、[file-storage-and-history.md](file-storage-and-history.md) の 8.4 節、[ADR-0026](../decisions/0026-version-history-restore-and-deletion.md) |
 | 画面の呼び名は、S1 は「プロジェクト」のまま。利用者の調査で混乱が見えたら見直す | 表とコードの名前と揃い、改名の費用がかからない | [permissions-and-sharing.md](permissions-and-sharing.md) の 15 節、[intent.md](../intent.md) |
 | NFR-004 を CPU の側 1.5 GB と GPU の側 720 MB に分ける | GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う | 4 節、[quality.md](../quality.md) の 2.2 節、[rendering-engine.md](rendering-engine.md) の 11 節、[observability.md](observability.md) |
 | 書き込みの予算の段に入ったファイルは NFR-001 の対象の外にし、反映の p99 1 秒を別に見る | 予算の段は、わざと反映を遅らせて編集を続ける仕組みだから | 4 節、[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) |
@@ -315,7 +315,7 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 | [editor-and-tools.md](editor-and-tools.md) | UI の殻とエンジンの境界、選択・変形・スナップ、ペンとベクターネットワーク、ブール演算、テキストの編集と IME、ショートカット、アクセシビリティ | 0016〜0018 | QA | E2、E4 |
 | [layout.md](layout.md) | 制約、オートレイアウト、テキストの折り返し、結果の保存と修復、決定性、増分の再計算 | 0019〜0020 | QA | E5 |
 | [components-and-libraries.md](components-and-libraries.md) | コンポーネント、インスタンスと上書き、バリアント、プロパティ。ライブラリ（E13） | 0021〜0023 | QA | E6、E13 |
-| [file-storage-and-history.md](file-storage-and-history.md) | ジャーナル、チェックポイント、読み込み、回復、版の履歴、復元、複製、削除 | 0024〜0026 | QA、Ops | E7 |
+| [file-storage-and-history.md](file-storage-and-history.md) | ジャーナル、チェックポイント、読み込み、回復、バージョンの履歴、復元、複製、削除 | 0024〜0026 | QA、Ops | E7 |
 | [comments-and-notifications.md](comments-and-notifications.md) | コメント、メンション、通知、Realtime | 0027〜0028 | QA | E8 |
 | [permissions-and-sharing.md](permissions-and-sharing.md) | 階層、役割、シート、招待、ゲスト、共有のリンク、判定関数、取り消し | 0029〜0031 | QA、セキュリティ | E9 |
 | [search.md](search.md) | 名前の検索。中身の検索（延期） | 0032〜0033 | QA | E11 |
@@ -326,7 +326,7 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 | [infrastructure.md](infrastructure.md) | AWS の構成、Gateway と Document Server の置き方、Router、冗長化と DR、段階の移行、費用 | 0046〜0048 | Ops | E1、E3、E12 |
 | [observability.md](observability.md) | ログ、メトリクス、トレース、クライアントの計測、SLI、アラート、合成の監視 | 0049〜0050 | Ops | E1〜E3、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター、負荷試験 L1〜L10 | 0051〜0052 | Ops | E3、E12 |
-| [delivery.md](delivery.md) | CI/CD、WASM とネイティブの一致、版の照合、段階的なリリース、プロパティの表の変更 | 0053〜0055 | QA、Ops | E1〜E3 |
+| [delivery.md](delivery.md) | CI/CD、WASM とネイティブの一致、バージョンの照合、段階的なリリース、プロパティの表の変更 | 0053〜0055 | QA、Ops | E1〜E3 |
 | [data-model.md](data-model.md) | データモデルの正本。規約、ER 図、表の索引、横断の不変条件。領域ごとの定義は [data-model/](data-model/identity.md) の下 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 
 ## 9. Epic
@@ -337,11 +337,11 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | --- | --- |
 | E1 基盤とビルド | AWS・Terraform・CI（Rust・WASM・一致・大きさ）、Aurora と RLS、DynamoDB と S3、GPU の抽象と参照画像の枠、殻とエンジンの橋、認証の骨格、可観測性 |
 | E2 描画エンジンと大きなファイル | シーングラフ、タイル、パスの描画、塗りと線、バックエンドの選択、画像、メモリ、性能の CI、キャンバスの入力と基本の図形 |
-| E3 ドキュメントのモデルとマルチプレイヤー | プロパティの表と生成、操作と検証、正準形、Gateway・Document Server・Router、確定と配信、合わせ直し、再接続、在席、Undo、版の照合、ドレイン |
+| E3 ドキュメントのモデルとマルチプレイヤー | プロパティの表と生成、操作と検証、正準形、Gateway・Document Server・Router、確定と配信、合わせ直し、再接続、在席、Undo、バージョンの照合、ドレイン |
 | E4 ベクターとテキストの編集 | ペンとベクターネットワーク、ブール演算、テキストの整形と編集、IME、エフェクト・ブレンド・マスク、パネル、ショートカット、クリップボード、画像のアップロード |
 | E5 フレームとオートレイアウト | 制約、オートレイアウト、`derived_layout` の保存と修復、増分の再計算、Taffy との差分のテスト |
 | E6 コンポーネントとバリアント | インスタンスの導出と上書き、入れ子と入れ替え、バリアント、コンポーネントのプロパティ、デタッチと反映 |
-| E7 保存と版の履歴 | ジャーナルと group commit、フェンスと回復、チェックポイント、読み込み、回復のジョブ、掃除、版の履歴、復元、複製、ゴミ箱と完全な削除 |
+| E7 保存とバージョンの履歴 | ジャーナルと group commit、フェンスと回復、チェックポイント、読み込み、回復のジョブ、掃除、バージョンの履歴、復元、複製、ゴミ箱と完全な削除 |
 | E8 コメントと通知 | コメントとスレッド、固定、メンション、アプリ内とメールの通知、Realtime の購読 |
 | E9 チーム・権限・共有 | 役割と継承、判定関数とポリシー、招待とゲスト、一般アクセスとリンク、シート、取り消し、監査ログ、漏洩のテスト |
 | E10 書き出しとアセット | 書き出し（PNG・JPG・SVG・PDF）、Render Worker、画像の取り込みと配信、フォント、サムネイル、外部の画像の取り込み |

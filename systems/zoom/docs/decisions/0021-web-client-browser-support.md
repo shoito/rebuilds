@@ -7,7 +7,7 @@ date: 2026-09-27
 
 ## Context
 
-MVP の主なクライアントは Web で、社外の参加者がインストールなしで入れることを重視する（[intent.md](../intent.md)）。[ADR-0003](0003-client-platform.md) は、Chrome・Edge・Firefox・Safari の最新 2 版で E2E の試験を回すと決めた。
+MVP の主なクライアントは Web で、社外の参加者がインストールなしで入れることを重視する（[intent.md](../intent.md)）。[ADR-0003](0003-client-platform.md) は、Chrome・Edge・Firefox・Safari の最新 2 バージョンで E2E の試験を回すと決めた。
 
 ブラウザの間で、会議に要る機能の対応が違う（いずれも 2026-09-27 に確認）。
 
@@ -33,7 +33,7 @@ MVP の主なクライアントは Web で、社外の参加者がインスト�
 - 対応の外のブラウザでも参加は止めず、「試験していない」と示す。
 - 対応表は [clients.md](../architecture/clients.md) の 2.2 節に持ち、ブラウザの新しいメジャーごとに見直す。
 - 2 は、社外の参加者の多くが Safari（iPhone）で入る場面で使えない。
-- 3 は、試験の組み合わせが増え、E2EE の API を持たない版も含んでしまう。
+- 3 は、試験の組み合わせが増え、E2EE の API を持たないバージョンも含んでしまう。
 
 ## Consequences
 

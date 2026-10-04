@@ -1,6 +1,6 @@
 # Observability: Google Calendar
 
-ログ・メトリクス・トレース、Web の画面の RUM、正しさの照合（展開の索引、写し、会議室の重なり、リマインダー、tzdb の版）と応答の監査、SLI の計測（リマインダーの遅れ、招待の伝播と配送の追跡、iMIP、差分の同期のトークンの健全さ）、アラートと runbook の対応、合成監視を決める。道具は他の題材と同じ（OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana）。
+ログ・メトリクス・トレース、Web の画面の RUM、正しさの照合（展開の索引、写し、会議室の重なり、リマインダー、tzdb のバージョン）と応答の監査、SLI の計測（リマインダーの遅れ、招待の伝播と配送の追跡、iMIP、差分の同期のトークンの健全さ）、アラートと runbook の対応、合成監視を決める。道具は他の題材と同じ（OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana）。
 
 **SLO の値とアラートの一覧の正本は [runbooks/README.md](../runbooks/README.md)** にある。この文書は、その定義の計測とアラートの条件の実装を書く。値を変えるときは runbooks/README.md を先に変え、ここを合わせる。
 
@@ -40,7 +40,7 @@ flowchart LR
 ### 2.1 中身を出さない
 
 - ログ・トレース・メトリクス・RUM・エラーの報告に、予定の中身（タイトル、場所、説明、参加者の名前とメールアドレス、コメント）、検索の語、ICS の秘密のアドレスの経路、iMIP の受け口の `token`、Web Push の `endpoint`、トークンを出さない（[quality.md](../quality.md) の 3 節の eval、[security.md](security.md) の 7 節）。
-- 出してよいもの：`tenant_id`、`calendar_id`、`event_object_id`、`recurrence_id`（壁時計の時刻＋TZID。中身ではない）、`msg_id`、`change_seq`、理由のコード、件数、大きさ、時間、版（`object_version`、`tzdata_version`、`SEQUENCE`）、クライアントの種類。
+- 出してよいもの：`tenant_id`、`calendar_id`、`event_object_id`、`recurrence_id`（壁時計の時刻＋TZID。中身ではない）、`msg_id`、`change_seq`、理由のコード、件数、大きさ、時間、バージョン（`object_version`、`tzdata_version`、`SEQUENCE`）、クライアントの種類。
 - アクセスのログは、経路の ID の部分を残し、問い合わせの部分を落とす。`ics.<brand>.<domain>` の秘密のアドレスの経路は残さない（[security.md](security.md) の 7 節）。
 - `Authorization`、クッキー、`<Brand>-Signature` は、どの層でも伏せる。
 - ログの秘密の形の走査（`<brand>_ap_` などの接頭辞、メールアドレスの形、VEVENT の行の形）を常時流し、見つけたら呼び出す。
@@ -55,7 +55,7 @@ flowchart LR
 
 - `tenant_id` と `calendar_id` はメトリクスの次元にしない（数が多い）。テナントの大きさの帯（`tenant_band`：S・M・L・XL）を使う。
 - カレンダーごとの値が要るもの（ロックの待ち、枠での拒否）は、上位 50 だけを 1 分ごとに別のメトリクス（`top_calendar_*`）に出し、残りはログの集計で見る。
-- クライアントの種類（`client_kind`）：`web`、`api`、`caldav:ios`・`caldav:macos`・`caldav:thunderbird`・`caldav:davx5`・`caldav:other`（User-Agent を寄せる。主の版だけを `client_major` に）。
+- クライアントの種類（`client_kind`）：`web`、`api`、`caldav:ios`・`caldav:macos`・`caldav:thunderbird`・`caldav:davx5`・`caldav:other`（User-Agent を寄せる。主のバージョンだけを `client_major` に）。
 
 ## 3. Web の画面の RUM
 
@@ -68,8 +68,8 @@ flowchart LR
 | 表示 | 週の表示の窓あり・なしの時間、配置の計算の時間 | 端末の 10% |
 | 伝播（NFR-002） | 合図の受信から差分の当てまで（サーバーの `committed_at` との差は時計の差を見積もって） | 端末の 10% |
 | 取り直し | 410 の理由ごとの回数、窓の取り直しの回数 | 全部 |
-| tzdata | 使っている版、取れなかった回数 | 全部 |
-| エラー | スタック（ソースマップで戻す）、操作の名前、資産の版 | 全部 |
+| tzdata | 使っているバージョン、取れなかった回数 | 全部 |
+| エラー | スタック（ソースマップで戻す）、操作の名前、資産のバージョン | 全部 |
 
 - RUM とトレースを結ばない（`traceparent` を送らない）。
 
@@ -80,8 +80,8 @@ flowchart LR
 | 照合 | 頻度 | 中身 | 指標 |
 | --- | --- | --- | --- |
 | 展開の索引 | 毎時、予定オブジェクト 10,000 件 | その場の `expand()` と索引の行を比べる（[events-and-recurrence.md](events-and-recurrence.md) の 9.5 節） | `occurrence_mismatch_total{reason}`（`missing_row`・`extra_row`・`time_mismatch`・`stale_tzdata`） |
-| 古い tzdb の版 | 5 分 | `active` と違う `tzdata_version` の索引の行の数（影響するゾーンだけ。分割ごとの集計） | `stale_tzdata_rows`、採用からの経過の時間 |
-| 写し | 毎日 | 本システムの中の参加者の写しの版と主催者の写しの版（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)） | `copy_drift_fixed_total`、写しの数に対する割合 |
+| 古い tzdb のバージョン | 5 分 | `active` と違う `tzdata_version` の索引の行の数（影響するゾーンだけ。分割ごとの集計） | `stale_tzdata_rows`、採用からの経過の時間 |
+| 写し | 毎日 | 本システムの中の参加者の写しのバージョンと主催者の写しのバージョン（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)） | `copy_drift_fixed_total`、写しの数に対する割合 |
 | 会議室の重なり | 毎時 | 自動で承諾する会議室の、承諾した予約の重なり（排他の制約の外で数え直す） | `room_overlap_total` |
 | リマインダー | 毎時 | 送るべきだった回と送信の記録（[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md)） | `reminder_missing_total`、`reminder_duplicate_total{dr_window}` |
 | 応答の監査 | 常時、応答の 0.1% | API・CalDAV・ICS・空き時間の応答を抜き取り、`redact()` に通し直して、項目の有無を比べる。中身は記録しない | `redact_audit_mismatch_total{route}` |
@@ -109,7 +109,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | 空き時間の探索 | 合成監視（50 人＋会議室 20、2 週間）を正本、`api` の候補の計算の時間を補い | 1 秒以内 | 30 日の p95 |
 | 会議室の二重予約 | 4 節の照合 | — | 件数 |
 | 権限の分離 | 4 節の応答の監査 | — | 件数 |
-| 展開の正しさ | 4 節の照合と古い tzdb の版 | — | 件数 |
+| 展開の正しさ | 4 節の照合と古い tzdb のバージョン | — | 件数 |
 | 差分の同期 | `sync_token_uses`（5.4 節） | 変更 1,000 件以下の差分が 1 秒以内 | 30 日の p99 |
 | iMIP | `imip_outbound_log`・`imip_inbound_log` | 送信 60 秒以内、受信 2 分以内 | 30 日の p95 |
 | Webhook | `push-sender` の送信の記録 | 変更から最初の送信まで 30 秒以内 | 30 日の p95 |
@@ -120,7 +120,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 
 ### 5.2 リマインダーの遅れ
 
-- `due_at` は、回の開始（展開の索引の `start_utc`）からリマインダーの分を引いた瞬間。予定が動いたら版が上がり、古い版の `due_at` は数えない。
+- `due_at` は、回の開始（展開の索引の `start_utc`）からリマインダーの分を引いた瞬間。予定が動いたらバージョンが上がり、古いバージョンの `due_at` は数えない。
 - `started_at` は `notifier` が配信のサービス・SES への要求を始めた時刻、`handed_off_at` は受け付けの応答を受けた時刻。
 - 悪いイベント：30 秒（メールは 2 分）を超えたもの、15 分を超えて送らなかったもの（計画の行の `skipped_late`）、照合の `missing`。
 - 分布は、`due_at` の秒（`:00` の前後）ごとにも出す。毎時 0 分・30 分の集中で遅れが偏るかを見る（[capacity.md](capacity.md) の 3 節）。
@@ -142,7 +142,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | `sync_token_age_seconds{client_kind}` | 使われたトークンの年齢の分布 | 30 日に近いものが増えたら、保持を超える前に取り直しが増える兆候 |
 | `sync_delta_size{client_kind}` | 差分の件数の分布 | 1,000 件を超える割合 |
 | `sync_full_resync_total{client_kind}` | 全件の取り直し（範囲の問い合わせの窓の取り直し、`sync-token` なしの `sync-collection`） | 平常の 3 倍でチケット |
-| `caldav_status_total{client_kind, client_major, status}` | CalDAV の応答の種類 | クライアントの版ごとの 4xx の急な上がり（`caldav-client-regression.md`） |
+| `caldav_status_total{client_kind, client_major, status}` | CalDAV の応答の種類 | クライアントのバージョンごとの 4xx の急な上がり（`caldav-client-regression.md`） |
 
 - `sync_token_uses` は、カレンダー × クライアントの種類 × 日の集計の表（行は日に 1 つ）。要求ごとの記録は持たない。
 
@@ -165,7 +165,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | 展開の索引の照合の不一致 | 1 件。施行まで 7 日を切った tzdb の改正の後は呼び出し | チケット・呼び出し | `occurrence-index-mismatch.md` |
 | 古い `tzdata_version` の行 | 採用から 24 時間の後に 1 行以上。施行まで 24 時間を切ったら SEV2 | チケット・呼び出し | `tzdb-update.md` |
 | tzdb の新しいリリースの未採用 | IANA のリリースから 7 日、または施行まで 14 日を切った | チケット | `tzdb-update.md` |
-| AppConfig の `tzdata.active_version` の不一致 | タスクの報告する版が 2 種類以上で 5 分、または東京と大阪で違う | 呼び出し | `tzdb-update.md` |
+| AppConfig の `tzdata.active_version` の不一致 | タスクの報告するバージョンが 2 種類以上で 5 分、または東京と大阪で違う | 呼び出し | `tzdb-update.md` |
 | 会議室の二重予約 | 1 件 | 呼び出し（SEV2 から） | `room-double-booking.md` |
 | 権限の漏れの疑い | 応答の監査の不一致 1 件 | 呼び出し（SEV1 の候補） | `access-leak-response.md` |
 | リマインダーの遅れ | 5 分の窓で 1% を超えて遅れた | 呼び出し | `reminder-delay.md` |
@@ -177,7 +177,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | 差分の同期の 410 の急増 | 5.4 節 | チケット | `sync-token-reset-spike.md` |
 | 変更のログの欠け | `change_seq_gap_total` 1 件 | 呼び出し（SEV2） | `incident-response.md` |
 | Realtime の再接続の殺到 | 1 分の新しい接続が平常の 10 倍 | チケット | `realtime-reconnect-storm.md` |
-| CalDAV の 4xx の急な上がり | クライアントの版ごとに平常の 3 倍を 30 分 | チケット | `caldav-client-regression.md` |
+| CalDAV の 4xx の急な上がり | クライアントのバージョンごとに平常の 3 倍を 30 分 | チケット | `caldav-client-regression.md` |
 | Webhook の送信の失敗の増加 | 失敗の率 20% を 30 分、最初の送信の p95 5 分 | チケット | `webhook-delivery.md` |
 | ICS の購読の取得の失敗の増加 | 失敗の率が平常の 3 倍 | チケット | `ics-subscription-failures.md` |
 | 予約ページのボットの急増 | WAF の拒否が平常の 10 倍 | チケット | `booking-abuse.md` |
@@ -191,7 +191,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | SLI の集計の欠け | `slo-aggregator` の出力が 5 分ない | 呼び出し | `incident-response.md` |
 
 - 呼び出しのアラートは、SLO か、分離・正しさ・秘密の症状に限る。原因の側の指標（CPU など）はチケットとダッシュボードにとどめる。
-- 新しく足したアラート（tzdb の未採用、AppConfig の版の不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャン）は、統合の工程で [runbooks/README.md](../runbooks/README.md) の 4 節に足した（2026-10-04）。
+- 新しく足したアラート（tzdb の未採用、AppConfig のバージョンの不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャン）は、統合の工程で [runbooks/README.md](../runbooks/README.md) の 4 節に足した（2026-10-04）。
 
 ## 6. 合成監視
 
@@ -216,9 +216,9 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | 予定と同期 | 書き込み/秒、範囲の読み出し、差分、410・400 の理由、クライアントの種類ごとの取り直し、Realtime の接続 |
 | 招待 | 伝播の帯ごとの p99、配送のキュー、捨てた古いメッセージ、写しの照合、iMIP の送受信、Bounce・Complaint、未確認の返事、自動の停止 |
 | リマインダー | `due_at` の秒ごとの遅れの分布、前倒しの量、送り漏れ、重複（DR の窓を分けて）、方法ごとの送信の数 |
-| 正しさ | 展開の索引の照合、古い tzdb の版の行、会議室の重なり、応答の監査、変更のログの欠け |
-| tzdb | `active` の版、タスクの報告する版、東京と大阪の一致、再計算の進み具合（`tz_recompute_runs`）、IANA の最新の版と施行までの日数 |
-| CalDAV | クライアントの種類と版ごとの要求・応答の種類・時間、認証の失敗 |
+| 正しさ | 展開の索引の照合、古い tzdb のバージョンの行、会議室の重なり、応答の監査、変更のログの欠け |
+| tzdb | `active` のバージョン、タスクの報告するバージョン、東京と大阪の一致、再計算の進み具合（`tz_recompute_runs`）、IANA の最新のバージョンと施行までの日数 |
+| CalDAV | クライアントの種類とバージョンごとの要求・応答の種類・時間、認証の失敗 |
 | 容量 | 段階を上げる指標（[infrastructure.md](infrastructure.md) の 10 節）、カレンダーの上位 50 のロックの待ちと枠の拒否 |
 | DR | 複製の遅延、大阪の合成監視、AppConfig の一致 |
 
@@ -236,7 +236,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 - **結合テスト**：200 人の招待で、`msg_id` から全受け手の `itip_deliveries` と、外部の参加者の `imip_outbound_log` が引ける。
 - **結合テスト**：応答の監査が、わざと削り忘れた応答（試験用の経路）を不一致に数える。
 - **ログの走査の試験**：合成の予定のタイトル・メールアドレス・秘密を含むログを流し、走査が見つける。CI で、ログを出すコードに予定オブジェクトをそのまま渡す呼び出しを禁止する（lint）。
-- **アラートの試験**：すべてのアラートに runbook の URL がある（CI）。staging で、主なアラート（伝播の遅れ、リマインダーの遅れ、古い tzdb の版）を障害の注入で起こして鳴ることを確かめる（E12）。
+- **アラートの試験**：すべてのアラートに runbook の URL がある（CI）。staging で、主なアラート（伝播の遅れ、リマインダーの遅れ、古い tzdb のバージョン）を障害の注入で起こして鳴ることを確かめる（E12）。
 
 ## 10. Story の候補
 
@@ -246,7 +246,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | E1 | `slo-dashboards-alerts` | 5 節、5.6 節のアラート、7 節のダッシュボード |
 | E1 | `slo-aggregator` | ADR-0046 の記録からの SLI の集計 |
 | E2 | `occurrence-reconciliation-metrics` | 4 節の展開の索引の照合の指標（events-and-recurrence と共同） |
-| E3 | `tzdata-version-telemetry` | 4 節の古い版の行、5.6 節の版の不一致（time-zones-and-holidays・delivery と共同） |
+| E3 | `tzdata-version-telemetry` | 4 節の古いバージョンの行、5.6 節のバージョンの不一致（time-zones-and-holidays・delivery と共同） |
 | E4 | `redact-response-audit` | 4 節の応答の監査（sharing-and-acl と共同） |
 | E5 | `itip-delivery-tracing` | 5.3 節の `msg_id` の運び、`itip_deliveries`、運用の画面「招待の追跡」 |
 | E5 | `ses-event-ingest` | SES の構成セットの事象の取り込み（`worker-imip-events`） |

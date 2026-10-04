@@ -1,6 +1,6 @@
 # Data model: ITSM のプロセス（優先度・メジャーインシデント・変更）
 
-[data-model.md](../data-model.md) の一部。優先度の表、メジャーインシデントの候補、標準の変更の雛形、リスクの評価、変更の承認の方針、CAB、変更の予定表・衝突・影響を受ける CI・影響の範囲の写しを定義する。インシデント・問題・変更の本体は `task` の型付きの列（[records-and-audit.md](records-and-audit.md) の 2.2 節）。状態のモデル（`incident`、`problem`、`change.*`、`generic_task`）はコードの版だけに持ち、表を持たない。振る舞いは [itsm-processes.md](../itsm-processes.md) を正とする。
+[data-model.md](../data-model.md) の一部。優先度の表、メジャーインシデントの候補、標準の変更の雛形、リスクの評価、変更の承認の方針、CAB、変更の予定表・衝突・影響を受ける CI・影響の範囲の写しを定義する。インシデント・問題・変更の本体は `task` の型付きの列（[records-and-audit.md](records-and-audit.md) の 2.2 節）。状態のモデル（`incident`、`problem`、`change.*`、`generic_task`）はコードのバージョンだけに持ち、表を持たない。振る舞いは [itsm-processes.md](../itsm-processes.md) を正とする。
 
 ## 1. ER 図
 
@@ -159,7 +159,7 @@ erDiagram
 
 ### 2.1 `priority_matrix`
 
-影響度 × 緊急度 → 優先度（テーブルごと）。既定（DT-PRIO-001）はコードの版だけに持ち、テナントは行で上書きする。定義元：[itsm-processes.md](../itsm-processes.md) の 5.1 節、[ADR-0023](../../decisions/0023-priority-matrix-and-major-incident.md)。
+影響度 × 緊急度 → 優先度（テーブルごと）。既定（DT-PRIO-001）はコードのバージョンだけに持ち、テナントは行で上書きする。定義元：[itsm-processes.md](../itsm-processes.md) の 5.1 節、[ADR-0023](../../decisions/0023-priority-matrix-and-major-incident.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -219,16 +219,16 @@ erDiagram
 
 ### 3.1 `std_change_template`・`std_change_template_version`
 
-標準の変更の雛形と版。版の承認が、個々の標準の変更の承認の証跡になる。定義元：同じ文書の 8.2 節。
+標準の変更の雛形とバージョン。バージョンの承認が、個々の標準の変更の承認の証跡になる。定義元：同じ文書の 8.2 節。
 
 | 表 | 列 |
 | --- | --- |
-| `std_change_template` | `tenant_id`、`id`、`name`、`category`、`active_version_id`（→ 版）、`owner_group_id`（→ `group`）、メタデータの共通の列 |
+| `std_change_template` | `tenant_id`、`id`、`name`、`category`、`active_version_id`（→ バージョン）、`owner_group_id`（→ `group`）、メタデータの共通の列 |
 | `std_change_template_version` | `tenant_id`、`id`、`template_id`、`version_no`、`field_values`（`jsonb`：作る変更の既定値）、`allowed_ci_condition`（`jsonb`）、`max_duration`（`bigint` 秒）、`state`（`proposed`・`approved`・`rejected`・`retired`）、`approved_set_id`（→ `approval_set`）、`content_hash`、`created_at`、`created_by`、`approved_at` |
 
-- キー：`std_change_template` PK `(tenant_id, id)`、UK `(tenant_id, stable_key)`。版 PK `(tenant_id, id)`、UK `(tenant_id, template_id, version_no)`、FK `(tenant_id, approved_set_id)` → `approval_set`。
-- CHECK：`(state = 'approved') = (approved_set_id IS NOT NULL AND approved_at IS NOT NULL)`、`max_duration > 0`。`approved` の版の内容の列は更新のトリガーで変えさせない（`retired` への変更だけ許す）。
-- 保持：版を消さない。S1 の量：1 テナント 数百行。
+- キー：`std_change_template` PK `(tenant_id, id)`、UK `(tenant_id, stable_key)`。バージョン PK `(tenant_id, id)`、UK `(tenant_id, template_id, version_no)`、FK `(tenant_id, approved_set_id)` → `approval_set`。
+- CHECK：`(state = 'approved') = (approved_set_id IS NOT NULL AND approved_at IS NOT NULL)`、`max_duration > 0`。`approved` のバージョンの内容の列は更新のトリガーで変えさせない（`retired` への変更だけ許す）。
+- 保持：バージョンを消さない。S1 の量：1 テナント 数百行。
 
 ### 3.2 `risk_condition`・`risk_questionnaire`・`risk_questionnaire_response`
 
@@ -286,7 +286,7 @@ erDiagram
 | `on_due` | `text` | NOT NULL | — | `escalate`・`reject` |
 | `escalate_to_group_id` | `uuid` | NULL | — | |
 | `active` | `boolean` | NOT NULL | `true` | |
-| `version` | `bigint` | NOT NULL | `1` | 承認のまとまりに使った版を残す |
+| `version` | `bigint` | NOT NULL | `1` | 承認のまとまりに使ったバージョンを残す |
 | メタデータの共通の列 | | | | |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, change_type, risk, stage) WHERE active AND deleted_at IS NULL`。FK `approver_group_id`・`escalate_to_group_id` → `group`、`approver_user_id` → `user`。
@@ -312,7 +312,7 @@ CAB の定義・会議・議題。会議の決定は各承認者の回答とし�
 
 ### 4.1 `change_window`
 
-禁止期間・保守の時間帯・凍結期間。区間はカレンダーの版で表す（[sla-and-calendars.md](sla-and-calendars.md) の 2 節の `calendar`。`purpose = change_window`）。定義元：同じ文書の 9.1 節、[ADR-0025](../../decisions/0025-change-schedule-and-conflict-detection.md)。
+禁止期間・保守の時間帯・凍結期間。区間はカレンダーのバージョンで表す（[sla-and-calendars.md](sla-and-calendars.md) の 2 節の `calendar`。`purpose = change_window`）。定義元：同じ文書の 9.1 節、[ADR-0025](../../decisions/0025-change-schedule-and-conflict-detection.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

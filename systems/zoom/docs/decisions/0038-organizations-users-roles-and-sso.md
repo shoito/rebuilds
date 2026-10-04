@@ -36,7 +36,7 @@ rebuilds の他の題材の決定：
 
 - ユーザーは 1 つの組織だけに属する。個人で登録した人にも 1 人の組織を作る。別の組織の人を招待したら、本人の承諾で移す。
 - ロールは `owner`（1 人）・`admin`・`member` に固定する。判定は `authorize` の 1 つの関数に集める。
-- 認証は Better Auth（メールの OTP、Google、Microsoft、パスキー、`@better-auth/sso` の OIDC と SAML）。パスワードは持たない。Slack の題材の使い方の規則（管理系の操作はサーバーの側で権限を確かめてから呼ぶ、版の固定、`organization` のプラグインを使わない）を引き継ぐ。
+- 認証は Better Auth（メールの OTP、Google、Microsoft、パスキー、`@better-auth/sso` の OIDC と SAML）。パスワードは持たない。Slack の題材の使い方の規則（管理系の操作はサーバーの側で権限を確かめてから呼ぶ、バージョンの固定、`organization` のプラグインを使わない）を引き継ぐ。
 - 組織の SSO は `off`・`optional`・`required`。`required` でも、`owner` と指名した 2 人までの `admin` は例外として別の手段で入れる。既存のユーザーを SSO の身元に結び付けるのは、組織がそのドメインを確かめている場合だけ。
 - `identity` のモジュールの外には `user_id`・`org_id`・`auth_context` だけを出し、Better Auth の型とテーブルを外から参照しない。外部の IdP に替えるときは、本システムを OIDC の RP にし、このモジュールの中だけを差し替える。
 - 2 を採らない理由：会議の作成・録画・設定・SSO のすべてで「今どの組織として操作しているか」を持つ必要があり、ビデオ会議の使い方に対して重い。他の組織の会議には、ゲストか招待で入れる。

@@ -127,7 +127,7 @@ erDiagram
 
 - 全部が運用の表（RLS の外）。`ts` のロールが書き、`ts_reader` が案件の ID を理由にして読む（[ADR-0052](../../decisions/0052-audit-and-operator-access.md)）。`report_evidence`・`legal_cases`・`legal_holds`・`disclosure_exports` は T&S と法務のロールだけが読める。読み出しは `audit_events` に理由（案件の ID）とともに残す。
 - 利用者や通報者に見せる情報（措置の知らせ、異議の画面）は、`app-api` が本人の分だけを `SECURITY DEFINER` の関数（`ts_my_actions(user_id)`、`ts_my_reports(user_id)`）で読む。
-- 時刻の期限（`due_at`）は `packages/legal-deadline` の 1 つの関数で計算し、規則の版を `deadline_rule_version` に残す。
+- 時刻の期限（`due_at`）は `packages/legal-deadline` の 1 つの関数で計算し、規則のバージョンを `deadline_rule_version` に残す。
 
 ## 3. 措置
 
@@ -305,7 +305,7 @@ erDiagram
 
 ### 5.3 `ts_rules`
 
-行動の規則と自動の措置の規則。版で管理する。
+行動の規則と自動の措置の規則。バージョンで管理する。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

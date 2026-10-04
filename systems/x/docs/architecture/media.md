@@ -30,7 +30,7 @@
 | 本家のアップロードの形 | 画像・GIF・動画の分割のアップロードを勧める（INIT・APPEND・FINALIZE）（同上） | 形は寄せるが、本体はクライアントから S3 へ直接（ADR-0032） |
 | 本家の代替のテキスト | 1,000 文字まで付けられるとされる | 公式の文書で確かめておらず**未検証**。この設計は 1,000 文字（7.1 節） |
 | CloudFront KeyValueStore | CloudFront Functions から読める、エッジの低遅延のキーと値の保存。1 つの保存は 5 MB まで、キー 512 バイト、値 1 KB まで、1 回の更新の API は 50 キーか 3 MB まで（[KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、[Quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)）。更新は数秒ですべてのエッジに広がるとされる（[AWS のブログ](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)） | 措置の拒否の一覧に使う（8.4 節） |
-| CloudFront の無効化 | 無効化と、版つきのファイル名の 2 つの方法がある。無効化しても、利用者の端末や途中のキャッシュには古いものが残りうる（[Invalidate files](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html)） | 無効化だけに頼らない。完了までの時間は文書に書かれておらず**未検証**（`media-delivery-and-takedown` で測る） |
+| CloudFront の無効化 | 無効化と、バージョンつきのファイル名の 2 つの方法がある。無効化しても、利用者の端末や途中のキャッシュには古いものが残りうる（[Invalidate files](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html)） | 無効化だけに頼らない。完了までの時間は文書に書かれておらず**未検証**（`media-delivery-and-takedown` で測る） |
 
 ## 3. 要件
 
@@ -127,9 +127,9 @@ stateDiagram-v2
 - Media Worker（ECS、`sharp`）が SQS の仕事で処理する。
 - 処理：
   1. 向き（EXIF の Orientation）を当ててから、**EXIF・XMP・IPTC を全部消す**。色のプロファイルは sRGB に変換してから消す。
-  2. 大きさごとの版を作る。
+  2. 大きさごとのバージョンを作る。
 
-| 版 | 長い辺 | 用途 |
+| バージョン | 長い辺 | 用途 |
 | --- | --- | --- |
 | `orig` | 4,096 まで（元が小さければ元の大きさ） | 拡大の表示、保存 |
 | `large` | 2,048 | タブレット・Web の大きな表示 |
@@ -141,7 +141,7 @@ stateDiagram-v2
   4. ぼかしの下絵（BlurHash、4×3）と、主な色を作り、メディアの行に持つ。
   5. 知覚ハッシュ（PDQ）と SHA-256 を記録する（9 節）。
 - GIF：繰り返しの MP4（H.264、音声なし、元の大きさ、長い辺 1,280 まで）と、最初のフレームの JPEG にする。配るのは MP4。
-- アイコンとヘッダー：アイコンは 400 の正方形と 48・96・200 の版、ヘッダーは 1,500×500。
+- アイコンとヘッダー：アイコンは 400 の正方形と 48・96・200 のバージョン、ヘッダーは 1,500×500。
 - 時間の予算（p95 3 秒）：完了の要求 → 仕事の受け取り 300ms、照合 800ms、変換 1.5 秒、状態の書き込み 100ms、余裕 300ms。
 
 ## 6. 動画
@@ -201,7 +201,7 @@ stateDiagram-v2
 
 ### 8.2 キャッシュとヒットの率
 
-- 公開のメディアは版ごとに URL が変わらないので、1 年キャッシュする。ヒットの率 95%（NFR-013）は、Origin Shield（東京）を置き、版の数を 8.1 節の固定の組に限ることで狙う。
+- 公開のメディアはバージョンごとに URL が変わらないので、1 年キャッシュする。ヒットの率 95%（NFR-013）は、Origin Shield（東京）を置き、バージョンの数を 8.1 節の固定の組に限ることで狙う。
 - HLS の区切りは同じ前置きで、プレイリストは 1 年（変換の後は変わらないため）。
 
 ### 8.3 鍵の切り替え
@@ -288,7 +288,7 @@ type MatchResult =
 | 照合の誤一致 | 正当な画像が投稿できない | 投稿者は T&S の窓口から問い合わせられる。誤一致は自前の一覧の閾値の見直しに使う |
 | KeyValueStore の更新の失敗 | 措置の配信の停止が遅れる | 再試行。60 秒で効かなければ無効化を先に出し、`takedown-propagation.md` の手順（[runbooks/README.md](../runbooks/README.md) の 4 節） |
 | KeyValueStore の容量の逼迫 | 拒否を書けない | 80% でアラート。24 時間より古い項目を先に外す（無効化が済んでいるもの） |
-| 元の置き場の誤削除 | メディアを失う | S3 の版の管理（30 日）で戻す |
+| 元の置き場の誤削除 | メディアを失う | S3 のバージョンの管理（30 日）で戻す |
 
 ## 12. 上限
 
@@ -314,11 +314,11 @@ type MatchResult =
 | --- | --- | --- |
 | Aurora `media`（`media_id`（`tid`）、`owner_id`、`purpose`、`kind`（`image`・`gif`・`video`）、`state`、`state_version`、`media_key`、`access`（`public`・`private`）、`bytes`、`width`、`height`、`duration_ms`、`sha256`、`pdq`、`blurhash`、`alt_text`、`sensitive_labels`、`attached_to_kind`（`post`・`dm`・`profile`）、`attached_to_id`、`created_at`、`ready_at`、`withheld_at`）。主キー `media_id`、一意 `media_key`、索引 `(owner_id, created_at)`・`(state, created_at)` | メディアの正本 | 4.2 |
 | Aurora `media_upload_sessions`（`media_id`、`s3_upload_id`、`parts_expected`、`expires_at`） | 分割のアップロード | 4.1 |
-| Aurora `media_variants`（`media_id`、`variant`、`format`、`s3_key`、`bytes`、`width`、`height`） | 版 | 5、6 |
+| Aurora `media_variants`（`media_id`、`variant`、`format`、`s3_key`、`bytes`、`width`、`height`） | バージョン | 5、6 |
 | Aurora `media_hash_blocklist`（`pdq`、`source_media_id`、`moderation_action_id`、`created_at`） | 自前の一覧 | 9.1 |
 | Aurora `media_match_results`（`id`（UUIDv7）、`media_id`、`provider`、`kind`、`match_ref`、`checked_at`）。T&S のロールだけが読める | 照合の結果 | 9.2 |
 | Aurora `media_takedowns`（`media_id`、`moderation_action_id`、`kvs_written_at`、`quarantined_at`、`invalidation_id`、`invalidated_at`、`kvs_removed_at`） | 配信の停止の進み | 8.4 |
-| S3 `uploads`（元。版の管理 30 日）、`public`（変換の後）、`private`（鍵・DM）、`quarantine`（隔離。別の KMS の鍵） | 置き場 | 8、10 |
+| S3 `uploads`（元。バージョンの管理 30 日）、`public`（変換の後）、`private`（鍵・DM）、`quarantine`（隔離。別の KMS の鍵） | 置き場 | 8、10 |
 | CloudFront KeyValueStore `media-deny`（`m:{media_key}` → `{"kind":"removed"|"legal","regions":[…]}`） | 拒否の一覧 | 8.4 |
 | `legal_holds`（[trust-and-safety.md](trust-and-safety.md) の表）を、保持のジョブが読む | 保全 | 10 |
 
@@ -327,7 +327,7 @@ type MatchResult =
 | ID | 性質・試験 |
 | --- | --- |
 | PROP-MEDIA-001 | 任意のアップロードと状態の変化の列で、`ready` でないメディアは投稿・DM に付かない。照合が `none` でない公開のメディアは `ready` にならない |
-| PROP-MEDIA-002 | 任意の画像（EXIF・XMP の GPS を含む合成の画像）について、配る版のすべてに位置の情報が残らない |
+| PROP-MEDIA-002 | 任意の画像（EXIF・XMP の GPS を含む合成の画像）について、配るバージョンのすべてに位置の情報が残らない |
 | PROP-MEDIA-003 | 任意の措置・取り消しの列で、`withheld` のメディアの `media_key` は、反映の後に拒否の一覧にあるか、元が隔離されている（どちらかが常に成り立つ） |
 | PROP-MEDIA-004 | 鍵アカウントと DM のメディアについて、App API の応答に `/m/` の URL が現れない |
 | 結合 | 漏れの経路の表の「メディアの配信」の行：措置から 60 秒で CDN が 404・451 を返す（合成監視と同じシナリオ。[quality.md](../quality.md) の 2.2.1 節） |
@@ -341,7 +341,7 @@ type MatchResult =
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E7 | `media-upload` | 分割のアップロード、署名付きの URL、状態、`tid`（4 節） |
-| E7 | `image-processing` | 検査、EXIF の除去、版、BlurHash、PDQ、代替のテキスト（4.3・5・7.1 節） |
+| E7 | `image-processing` | 検査、EXIF の除去、バージョン、BlurHash、PDQ、代替のテキスト（4.3・5・7.1 節） |
 | E7 | `video-transcode` | MediaConvert、HLS、MP4、表紙、照合のフレーム、時間の計測（6 節） |
 | E7 | `media-delivery-and-takedown` | 配信のドメイン、`/m/` と `/p/`、KeyValueStore、隔離、無効化、鍵の切り替え（8 節） |
 | E7 | `sensitive-media` | 印、分類、`visible()` との連携。法務：L5 |

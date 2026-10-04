@@ -23,12 +23,12 @@ Notion の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0016](0016-relation-edges-as-single-source.md) | リレーションは 1 本の辺を正本にして、両側の値を導く | accepted |
 | [0017](0017-rollups-over-readable-rows-only.md) | ロールアップとリレーションをたどる数式は、見る人が読める行だけで計算する | accepted |
 | [0018](0018-permission-levels-and-inheritance.md) | 権限の水準を本家に合わせ、ACL は設定したページで継承を置き換える | accepted |
-| [0019](0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限の版（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションで版を上げる | accepted |
+| [0019](0019-workspace-acl-version-cache.md) | 実効権限は、ワークスペースの権限のバージョン（acl_version）をキーにキャッシュし、権限の変更と同じトランザクションでバージョンを上げる | accepted |
 | [0020](0020-published-pages-isolation.md) | 公開ページは別の登録可能ドメインで、専用の描画サービスから配り、既定で検索エンジンに載せない | accepted |
 | [0021](0021-accounts-members-guests-and-teamspaces.md) | アカウントとメンバーを分け、ゲスト・連携もメンバーの行にし、チームスペースを最上位の暗黙の ACL にする | accepted |
 | [0022](0022-trash-history-and-deletion-retention.md) | ゴミ箱は 30 日、完全に削除した後も 30 日戻せ、ページの履歴はプランの日数で消す。バックアップの期限を削除の最終的な期限にする | accepted |
 | [0023](0023-search-engine-and-permission-filtering.md) | 検索は S1 から OpenSearch でページ単位に索引し、権限キーと読み直しの二重で権限を効かせる | accepted |
-| [0024](0024-integration-access-model.md) | 公開 API は本家の形と日付の版に寄せ、連携は明示的に共有されたページだけを読む | accepted |
+| [0024](0024-integration-access-model.md) | 公開 API は本家の形と日付のバージョンに寄せ、連携は明示的に共有されたページだけを読む | accepted |
 | [0025](0025-webhook-delivery.md) | Webhook は中身を含まない署名付きのイベントを、配送の時点の権限で、隔離した egress から送る | accepted |
 | [0026](0026-remote-mcp-server.md) | AI エージェント向けに、利用者の委任で動くリモートの MCP サーバーを提供する | accepted |
 | [0027](0027-shard-router.md) | 論理シャードを PostgreSQL のスキーマで持ち、アプリの中のルーターで物理クラスタへ振り分ける | accepted |

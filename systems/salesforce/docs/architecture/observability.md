@@ -53,7 +53,7 @@ S1 の本番の組織が対象。Sandbox・試用は SLO の外（計測はす�
 | 問い合わせ | 選択的な条件の p95 | 500ms | NFR-002 |
 | メタデータの記述 | p95 | 100ms | NFR-002 |
 | メタデータの反映（K2） | カスタム項目の追加から、別のタスクで使えるまでの p95 | 5 秒 | [ADR-0007](../decisions/0007-segmented-metadata-snapshots.md) |
-| メタデータの確定の止まり | 版を上げる排他のロックの間の書き込みの待ちの p99 | 1 秒 | NFR-004 |
+| メタデータの確定の止まり | バージョンを上げる排他のロックの間の書き込みの待ちの p99 | 1 秒 | NFR-004 |
 | 変更のイベントの遅れ | 確定から購読者に届くまでの p95（合成監視） | 5 秒 | NFR-010 |
 | 項目の変更の履歴の写しの遅れ | 確定から `history` のクラスタに入るまでの p95 | 5 秒 | [ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) の注記 |
 | Webhook の配信 | 確定から最初の送信までの p95 | 30 秒 | [events-and-integrations.md](events-and-integrations.md) |

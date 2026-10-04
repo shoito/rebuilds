@@ -141,7 +141,7 @@ CREATE TABLE user_tombstones (
   - `app_metadata` の最上位に、予約の名前（`user_id`、`email`、`email_verified`、`identities`、`blocked`、`created_at`、`updated_at`、`last_login`、`logins_count`、`__tenant`）を使えない。
 - 更新の規則：
   - `PATCH` は最上位の名前ごとに併合する。値が `null` の名前は消す。2 段目より下は、送った値で置き換える。空のオブジェクトで全体を消す（本家と同じ。2 節）。
-  - 同時の更新は `version` で守る。`If-Match` を送った要求は、版が違えば 412 を返す。送らない要求は後勝ちにする。
+  - 同時の更新は `version` で守る。`If-Match` を送った要求は、バージョンが違えば 412 を返す。送らない要求は後勝ちにする。
 - **秘密と機微な個人情報を入れないよう、ダッシュボードと文書で示す。** 本システムは中身を検査しない。ただし、既知のトークンの形（`<brand>_rt_` など）を含む書き込みは、秘密の漏れの兆候として 400 で拒否する（[ADR-0004](../decisions/0004-credential-storage.md) のログの走査と同じ検出器）。
 - トークンへの載せ方：MVP ではメタデータを ID トークン・アクセストークン・userinfo に自動では載せない。テナントが載せたいものは、Actions に相当する拡張（E13）で名前空間付きのクレームとして足す（[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)）。
 - 更新の監査：メタデータの変更は、変わった最上位の名前だけをログに残す。値はログに出さない。
@@ -313,7 +313,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 | 1 ジョブの件数 | 最大 100 万件（本家はファイル 500 KB まで。移行の手間を減らすため大きくする） | テナントの全件。項目を選べる |
 | 同時のジョブ | テナントごとに 2 つ（本家と同じ） | テナントごとに 2 つ |
 | 重複 | `upsert: false`（既定）なら、既存のユーザー（同じ接続の同じメールアドレス、または同じ `user_id`）は失敗の行として報告する。`true` なら更新する。メタデータは併合せず上書きする（本家と同じ） | — |
-| パスワード | `password_hash` を PHC 形式で受け取る。MVP の後の最初の版は bcrypt と Argon2id。PBKDF2 などはこの Epic で足す（[ADR-0004](../decisions/0004-credential-storage.md)） | ハッシュは出さない |
+| パスワード | `password_hash` を PHC 形式で受け取る。MVP の後の最初のバージョンは bcrypt と Argon2id。PBKDF2 などはこの Epic で足す（[ADR-0004](../decisions/0004-credential-storage.md)） | ハッシュは出さない |
 | MFA | TOTP の種を受け取れる（暗号化して保存）。パスキーは受け取らない（RP ID が変わると使えないため） | 出さない |
 | 結果 | 行ごとの成功・失敗の要約。失敗の理由（行番号、コード）を別のファイルで返す。個人の値は結果に書かない | — |
 
@@ -472,7 +472,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 
 - **仮名の `sub`（pairwise）**：持たない。本家にもない。需要が出たら新しい ADR で足す。
 - **本人のメタデータの更新（アカウントの画面、My Account の API）**：MVP の後（[roadmap.md](../roadmap.md) の「後回し」）。
-- **SCIM の `Groups`**：SCIM の最初の版は `Users` だけにする。`Groups` は組織のロール（E14）の後に足す。
+- **SCIM の `Groups`**：SCIM の最初のバージョンは `Users` だけにする。`Groups` は組織のロール（E14）の後に足す。
 
 持ち越し：
 

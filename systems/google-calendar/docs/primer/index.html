@@ -121,9 +121,9 @@ RDATE;TZID=Asia/Tokyo:20270630T100000</code></pre>
         <button>表示が少し遅くなるだけ</button>
         <button>ある国の夏時間の規則が変わると、その国の未来の予定が現地の時刻で 1 時間ずれる</button>
       </div>
-      <p class="why">主催者が意図したのは「現地の 09:00」です。UTC だけを持つと、規則が変わった後も古いオフセットで計算した瞬間が残ります。そこで壁時計の時刻＋TZID を正にし、UTC を版つきの派生にします（ADR-0002）。</p>
+      <p class="why">主催者が意図したのは「現地の 09:00」です。UTC だけを持つと、規則が変わった後も古いオフセットで計算した瞬間が残ります。そこで壁時計の時刻＋TZID を正にし、UTC をバージョンつきの派生にします（ADR-0002）。</p>
     </div>
-    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0002-time-representation.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> の 4〜6 節（tzdb の版と更新の流れ）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/tzdb-update.md">runbooks/tzdb-update.md</a>。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0002-time-representation.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> の 4〜6 節（tzdb のバージョンと更新の流れ）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/tzdb-update.md">runbooks/tzdb-update.md</a>。</div>
   </section>
 
   <section class="s" id="dst">
@@ -283,8 +283,8 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
   S-->>C: 204 または 412（他で変わっていた）</pre>
     <ul>
       <li><a class="t" href="#g-propfind"><code>PROPFIND</code></a> はプロパティを読む、<a class="t" href="#g-report"><code>REPORT</code></a> は条件で問い合わせる WebDAV の拡張の方法です。</li>
-      <li><a class="t" href="#g-etag">ETag</a> はリソースの版です。<code>If-Match</code> で「自分が見た版のときだけ書く」を求め、違えば 412 にします。</li>
-      <li><a class="t" href="#g-ctag">CTag</a> はコレクション全体の版（標準の外の拡張）。<a class="t" href="#g-sync-collection">sync-collection</a>（RFC 6578）は前回からの差分を返します。</li>
+      <li><a class="t" href="#g-etag">ETag</a> はリソースのバージョンです。<code>If-Match</code> で「自分が見たバージョンのときだけ書く」を求め、違えば 412 にします。</li>
+      <li><a class="t" href="#g-ctag">CTag</a> はコレクション全体のバージョン（標準の外の拡張）。<a class="t" href="#g-sync-collection">sync-collection</a>（RFC 6578）は前回からの差分を返します。</li>
     </ul>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sync-and-caldav.md">sync-and-caldav.md</a> の 6・7 節（PUT の判定 DT-DAV-001、暗黙のスケジュール）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0023-caldav-resource-model-and-conditional-writes.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0024-caldav-implicit-scheduling.md">ADR-0024</a>。</div>
   </section>
@@ -356,7 +356,7 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
 
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
-    <p>中心は<a class="t" href="#g-eventobject">予定オブジェクト</a>（<code>event_objects</code>）です。1 つの UID が 1 行で、マスターと、<code>recurrence_id</code> ごとの上書きを 1 つのまとまりとして版を持ちます。iCalendar・CalDAV の単位と同じです。記号の読み方は<a href="../../../../docs/primer/index.html#er">共通の資料</a>にあります。</p>
+    <p>中心は<a class="t" href="#g-eventobject">予定オブジェクト</a>（<code>event_objects</code>）です。1 つの UID が 1 行で、マスターと、<code>recurrence_id</code> ごとの上書きを 1 つのまとまりとしてバージョンを持ちます。iCalendar・CalDAV の単位と同じです。記号の読み方は<a href="../../../../docs/primer/index.html#er">共通の資料</a>にあります。</p>
     <pre class="mermaid">erDiagram
   calendars ||--o{ event_objects : "holds"
   event_objects ||--o{ event_overrides : "overrides"
@@ -400,9 +400,9 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
       <li data-frag><strong>マスター・上書き・回</strong>：マスターと上書きが正本です。<a class="t" href="#g-occurrence">回</a>は <code>expand()</code> の結果で、<code>occurrences</code>（<a class="t" href="#g-occindex">展開の索引</a>）は過去 31 日から未来 548 日の回の写しです。捨てて作り直せます。範囲の外は、その場で同じ関数で展開します。</li>
       <li data-frag><strong>回の名前</strong>：回は <code>(event_object_id, recurrence_id)</code> で特定します。<code>recurrence_id</code> は UTC ではなく壁時計の時刻で、系列の全体は <code>''</code> です。</li>
       <li data-frag><strong>写し</strong>：<code>copy_role</code> が主催者の写しか参加者の写しかを示します。参加者の写しは、テナントをまたいで主催者の写しを論理の参照で指します。</li>
-      <li data-frag><strong>版が 2 つ</strong>：<code>version</code> はどの変更でも上がる保存の版（ETag の元）、<code>sequence</code> は iTIP の版です。</li>
+      <li data-frag><strong>バージョンが 2 つ</strong>：<code>version</code> はどの変更でも上がる保存のバージョン（ETag の元）、<code>sequence</code> は iTIP のバージョンです。</li>
     </ul>
-    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/data-model.md">data-model.md</a> の 2.4〜2.6 節（時刻の列、iCalendar の往復、版）と 3 節（全体の ER 図）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/google-calendar/docs/architecture/data-model">data-model/</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0003-recurrence-storage-and-expansion.md">ADR-0003</a>。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/data-model.md">data-model.md</a> の 2.4〜2.6 節（時刻の列、iCalendar の往復、バージョン）と 3 節（全体の ER 図）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/google-calendar/docs/architecture/data-model">data-model/</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0003-recurrence-storage-and-expansion.md">ADR-0003</a>。</div>
   </section>
 
   <section class="s" id="glossary">
@@ -432,7 +432,7 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
       <dt id="g-imip">iMIP</dt><dd>RFC 6047。iTIP のメッセージをメールで運ぶ方法。<code>text/calendar</code> の部分に <code>method</code> を付ける。</dd>
       <dt id="g-organizer">主催者</dt><dd>ORGANIZER。予定を作り、参加者を招き、変更する人。主催者の写しが正になる。</dd>
       <dt id="g-partstat">PARTSTAT</dt><dd>参加者の出欠。<code>NEEDS-ACTION</code>・<code>ACCEPTED</code>・<code>TENTATIVE</code>・<code>DECLINED</code> など。</dd>
-      <dt id="g-sequence">SEQUENCE</dt><dd>予定の iTIP の版の番号。主催者が日時などの大事な項目を変えるたびに上げる。</dd>
+      <dt id="g-sequence">SEQUENCE</dt><dd>予定の iTIP のバージョンの番号。主催者が日時などの大事な項目を変えるたびに上げる。</dd>
       <dt id="g-dtstamp">DTSTAMP</dt><dd>iTIP のメッセージを作った時刻。同じ SEQUENCE の新旧を決めるのに使う。</dd>
       <dt id="g-dkim">DKIM</dt><dd>送信のドメインがメールに電子署名を付け、受け手が DNS の公開鍵で確かめる仕組み。SPF は送信元の IP をドメインの DNS の一覧で確かめる仕組み。</dd>
       <dt id="g-freebusy">空き時間</dt><dd>free/busy。予定の中身を除き、塞がっている区間とその種類だけを示す情報。</dd>
@@ -442,9 +442,9 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
       <dt id="g-redact">redact()</dt><dd>見る人のロールと公開範囲から、返す形（全体・参加者を除く・区間だけ・返さない）を決めて中身を削る、本システムの 1 つの関数。</dd>
       <dt id="g-caldav">CalDAV</dt><dd>RFC 4791。WebDAV の上でカレンダーを読み書きする標準。OS の標準のカレンダーが使う。</dd>
       <dt id="g-webdav">WebDAV</dt><dd>HTTP を拡張し、サーバーの上のファイルとフォルダを読み書き・問い合わせする標準（RFC 4918）。</dd>
-      <dt id="g-propfind">PROPFIND</dt><dd>WebDAV の方法。リソースやコレクションのプロパティ（名前、版、子の一覧）を読む。</dd>
+      <dt id="g-propfind">PROPFIND</dt><dd>WebDAV の方法。リソースやコレクションのプロパティ（名前、バージョン、子の一覧）を読む。</dd>
       <dt id="g-report">REPORT</dt><dd>WebDAV の拡張の方法。期間で絞る <code>calendar-query</code>、差分の <code>sync-collection</code> などの問い合わせに使う。</dd>
-      <dt id="g-etag">ETag</dt><dd>HTTP のリソースの版の印。<code>If-Match</code> で、見た版のときだけ書く条件つきの更新に使う。</dd>
+      <dt id="g-etag">ETag</dt><dd>HTTP のリソースのバージョンの印。<code>If-Match</code> で、見たバージョンのときだけ書く条件つきの更新に使う。</dd>
       <dt id="g-ctag">CTag</dt><dd>コレクションの中身のどれかが変われば変わる印。RFC ではなく、広く使われる拡張（<code>getctag</code>）。</dd>
       <dt id="g-sync-collection">sync-collection</dt><dd>RFC 6578 の REPORT。前回のトークンを渡すと、その後に変わったリソースと消えたリソースを返す。</dd>
       <dt id="g-synctoken">同期のトークン</dt><dd>「どこまで見たか」を表す不透明な値。次の要求で渡すと、その後の差分だけが返る。</dd>

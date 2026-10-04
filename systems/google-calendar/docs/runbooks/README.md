@@ -51,25 +51,25 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | ICS の購読 | 6 時間ごと（`REFRESH-INTERVAL` で 1〜24 時間）、10 MiB・5 万件 | [ADR-0025](../decisions/0025-ics-subscriptions-both-directions.md) | `ops.ics_fetch_interval_min`（延ばすだけ） |
 | リマインダーの遅れすぎ | 15 分を超えたら送らずに数える（`skipped_late`）。計画は 7 日先まで | [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md) | — |
 | tzdb の再計算の速さ | 全体 5,000 件/秒、1 テナント 500 件/秒。会議室の予約の行を先に、施行の近い順。採用から 24 時間以内に終える | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) | `ops.tzdata_recompute_rate` |
-| tzdb の版 | AppConfig の `tzdata.active_version`（イメージの中の版だけを受ける） | [ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | Ops の承認で切り替える（[tzdb-update.md](tzdb-update.md)） |
+| tzdb のバージョン | AppConfig の `tzdata.active_version`（イメージの中のバージョンだけを受ける） | [ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | Ops の承認で切り替える（[tzdb-update.md](tzdb-update.md)） |
 | 書き込みの全体の停止 | `ops.writes_enabled` | [ADR-0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md) | DR とインシデントだけ |
 
 ## 3. リリースとロールバック
 
 - **デプロイとリリースを分ける。** デプロイは Ops が承認し、リリース（フラグを広げる）は PM が判断する。未完成の振る舞いは `release.*` のフラグの裏に置く。`release.*` は 100% の後 30 日で消す（例外は下の「長く残すフラグ」の一覧だけ）。
-- **展開・時刻・権限の規則をフラグにしない。** `expand()`・`resolve()`・`can()`・`redact()` の振る舞いの変更は、コードの版として出し、本番の照合の指標で見る。フラグで経路ごとに違う規則が動く状態を作らない。不具合は前のイメージへ戻して直す（展開の索引は `expander` が作り直す）。漏れている経路を止めるのは `ops.*` で行う。
+- **展開・時刻・権限の規則をフラグにしない。** `expand()`・`resolve()`・`can()`・`redact()` の振る舞いの変更は、コードのバージョンとして出し、本番の照合の指標で見る。フラグで経路ごとに違う規則が動く状態を作らない。不具合は前のイメージへ戻して直す（展開の索引は `expander` が作り直す）。漏れている経路を止めるのは `ops.*` で行う。
 - **サーバーのデプロイの順**：マイグレーション（広げる段だけ）→ API・CalDAV・Booking・Auth（ローリング）→ Relay → Worker → Realtime（1 タスクずつ逃がす）→ Web の資産（置くだけ）。自動のロールバックの条件は、5xx、書き込みの p99、4xx の率の急な上がり、展開の索引の照合の不一致、CalDAV の 4xx の急な上がり。`worker-reminder-scheduler` と `worker-notifier` は、毎時 05〜15 分と 35〜45 分にだけ始める。手順は [deploy-and-rollback.md](deploy-and-rollback.md)。
 - **Web のクライアント**：段階的に 1% → 10% → 50% → 100%、各段 4 時間以上。止める条件：JavaScript のエラーの率が 2 倍、範囲の読み出しの p95 が 10% 以上遅い、ドラッグの p95 が 10% 以上遅い、書き込みの 4xx の率が 2 倍、窓の取り直しの率が 2 倍（[delivery.md](../architecture/delivery.md) の 5.1 節）。
-- **tzdb の版の採用**（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)。手順の正本は [tzdb-update.md](tzdb-update.md)）：
-  1. `tzdata-watch` が新しい tzdb のリリースを見つけ、GPG の署名を確かめて、`packages/tzdata` に版を足す PR を作る。差分の報告（変わるゾーンと区間、施行までの日数、影響する予定の見積もり、外部への `REQUEST` の見積もり）を Dev と Ops が見て、採用を決める。
-  2. マージし、`/tzdata/<version>/` を S3 に置き、新旧の版を含むイメージをデプロイする（`active` は旧のまま）。Web のクライアントは資産の版に関係なく API の `tzdata_version` のゾーンを取るので、Web の資産の段階を速める必要はない。
-  3. AppConfig の `tzdata.active_version` を新しい版にする（東京と大阪。Ops の承認）。全タスクが新しい版を 2 分続けて報告したら、`expander` が計算し直しを始める。会議室の予約の行と予約ページの区間を先に直し、切り替えの窓（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）を短くする。古い `tzdata_version` の行が 0 になるまで見る。
+- **tzdb のバージョンの採用**（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)。手順の正本は [tzdb-update.md](tzdb-update.md)）：
+  1. `tzdata-watch` が新しい tzdb のリリースを見つけ、GPG の署名を確かめて、`packages/tzdata` にバージョンを足す PR を作る。差分の報告（変わるゾーンと区間、施行までの日数、影響する予定の見積もり、外部への `REQUEST` の見積もり）を Dev と Ops が見て、採用を決める。
+  2. マージし、`/tzdata/<version>/` を S3 に置き、新旧のバージョンを含むイメージをデプロイする（`active` は旧のまま）。Web のクライアントは資産のバージョンに関係なく API の `tzdata_version` のゾーンを取るので、Web の資産の段階を速める必要はない。
+  3. AppConfig の `tzdata.active_version` を新しいバージョンにする（東京と大阪。Ops の承認）。全タスクが新しいバージョンを 2 分続けて報告したら、`expander` が計算し直しを始める。会議室の予約の行と予約ページの区間を先に直し、切り替えの窓（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）を短くする。古い `tzdata_version` の行が 0 になるまで見る。
   4. 施行の日まで 7 日を切った改正は、凍結の期間でも急ぎの採用として扱う。
-  5. 戻すときは、`tzdata.active_version` を前の版に戻す。行ごとに `tzdata_version` を持つので、計算し直しがどちらの方向にも収束する（デプロイは要らない）。
-- **ロールバック**：まずフラグで戻す（`release.*`・`ops.*`）。次に 1 つ前のイメージ（マイグレーションは広げる段だけなので、前の版が今の DB で動く）。縮める段の後は前へ戻さない。
+  5. 戻すときは、`tzdata.active_version` を前のバージョンに戻す。行ごとに `tzdata_version` を持つので、計算し直しがどちらの方向にも収束する（デプロイは要らない）。
+- **ロールバック**：まずフラグで戻す（`release.*`・`ops.*`）。次に 1 つ前のイメージ（マイグレーションは広げる段だけなので、前のバージョンが今の DB で動く）。縮める段の後は前へ戻さない。
 - 本番へのデプロイは Ops が承認する（作成者と別の人）。
 
-> 2026-10-04 の注記（統合の工程）：tzdb の採用の手順の 2（「サーバーと Web のクライアントを同じ版で出し、Web の段階をすぐに 100% まで進める」）と 5（「前の版を新しい版として同じ手順で出す」）を、AppConfig の切り替え（ADR-0049）に合わせて書き直した。
+> 2026-10-04 の注記（統合の工程）：tzdb の採用の手順の 2（「サーバーと Web のクライアントを同じバージョンで出し、Web の段階をすぐに 100% まで進める」）と 5（「前のバージョンを新しいバージョンとして同じ手順で出す」）を、AppConfig の切り替え（ADR-0049）に合わせて書き直した。
 
 ### 3.1 デプロイの時間帯と凍結
 
@@ -77,7 +77,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | --- | --- | --- |
 | サーバー、Web のクライアント | 平日 10〜17 時 | 金曜 15 時以降、日本の祝日の前日、年末年始、年度の始め（4 月の第 1 週）、エラーバジェットを使い切っている間 |
 | マイグレーション（縮める・消す段） | 計画作業として平日 10〜15 時 | 同上 |
-| tzdb の版の採用（デプロイと AppConfig の切り替え） | 平日 10〜15 時 | 施行の日まで 7 日を切った改正は凍結を受けない |
+| tzdb のバージョンの採用（デプロイと AppConfig の切り替え） | 平日 10〜15 時 | 施行の日まで 7 日を切った改正は凍結を受けない |
 | Terraform（ネットワーク、データ） | 平日 10〜16 時。Ops の承認 | 同上 |
 
 - 上の時間帯と凍結は本システムの既定である。年度の始めは、組織の異動と会議の設定が集中し、カレンダーの利用が増えると見込んだ（本システムの想定）。本家の運用の値ではない。
@@ -91,7 +91,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | `release.admin-event-access` | 管理者による従業員の予定の閲覧。法務の L8 の結論まで本番で有効にしない（[ADR-0037](../decisions/0037-admin-roles-delegation-and-event-access.md)） | L8 の結論。持つと決まれば、組織の方針（`admin_event_access_*`）へ移してフラグを消す。持たないと決まれば、コードと一緒に消す | PM（法務） |
 | `release.cross-tenant-shared-writes` | 共有のカレンダーへのテナントをまたぐ書き込み（[ADR-0004](../decisions/0004-tenancy-and-rls.md) の X4、[ADR-0021](../decisions/0021-effective-role-and-redact-table.md)） | テックリードの確認。認めれば 100% の後 30 日で消す。認めなければ、上限を `reader` にしてコードと一緒に消す | Dev（テックリード） |
 
-- `ops.*` は運用の止め・絞りで、寿命の規則の対象ではない。`tzdata.active_version` はデータの版の固定で、フラグではない。
+- `ops.*` は運用の止め・絞りで、寿命の規則の対象ではない。`tzdata.active_version` はデータのバージョンの固定で、フラグではない。
 
 ## 4. アラートと手順
 
@@ -106,7 +106,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 展開の索引の照合の不一致（ticket。施行の近い tzdb の改正の後は page）、範囲の端のジョブの停止 | `occurrence-index-mismatch.md`（`expander-advance-stalled` の手順を含む） | `occurrence-index` |
 | 古い `tzdata_version` の行が残る、再計算のジョブの遅れ、切り替えの窓が長い | [tzdb-update.md](tzdb-update.md) | `tzdata-recompute-job`、`tzdata-update-drill` |
 | **tzdb の新しいリリースの未採用**（IANA のリリースから 7 日、または施行まで 14 日を切った。ticket） | [tzdb-update.md](tzdb-update.md) | `tzdata-watch-and-rollout` |
-| **AppConfig の `tzdata.active_version` の不一致**（タスクの報告する版が 2 種類以上で 5 分、または東京と大阪で違う。page） | [tzdb-update.md](tzdb-update.md) | `tzdata-runtime-switch`、`tzdata-version-telemetry` |
+| **AppConfig の `tzdata.active_version` の不一致**（タスクの報告するバージョンが 2 種類以上で 5 分、または東京と大阪で違う。page） | [tzdb-update.md](tzdb-update.md) | `tzdata-runtime-switch`、`tzdata-version-telemetry` |
 | 会議室の二重予約（page、SEV2 から） | `room-double-booking.md` | `room-booking-exclusion` |
 | 権限の漏れの疑い（応答の監査。page、SEV1 の候補） | `access-leak-response.md` | `leak-path-tests`、`redact-response-audit` |
 | リマインダーの遅れ（page）、送り漏れ（ticket・page）、scheduler の停止（page） | `reminder-delay.md`（送り漏れの照合の調べ方を含む） | `reminder-timer-wheel`、`reminder-delivery-ledger`、`reminder-sli` |
@@ -115,7 +115,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 差分の同期の 410 の急増 | `sync-token-reset-spike.md` | `sync-tokens` |
 | **変更のログの欠け**（`change_seq_gap_total` 1 件。page、SEV2） | [incident-response.md](incident-response.md) | `writer-and-change-log-skeleton` |
 | Realtime の再接続の殺到 | `realtime-reconnect-storm.md` | `realtime-gateway` |
-| CalDAV の 4xx の急な上がり（クライアントの版の変化）、CalDAV の認証の失敗の急増 | `caldav-client-regression.md` | `caldav-reports-and-sync`、`caldav-client-lab` |
+| CalDAV の 4xx の急な上がり（クライアントのバージョンの変化）、CalDAV の認証の失敗の急増 | `caldav-client-regression.md` | `caldav-reports-and-sync`、`caldav-client-lab` |
 | Webhook の送信の失敗の増加 | `webhook-delivery.md` | `webhook-channels` |
 | ICS の購読の取得の失敗の増加 | `ics-subscription-failures.md` | `ics-subscribe` |
 | 予約ページのボットの急増 | `booking-abuse.md` | `booking-bot-protection` |
@@ -150,6 +150,6 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | [incident-response.md](incident-response.md) | 共通の進め方（重さ、IC、告知、調べ方）と、個別の手順のないアラートの最初の切り分け（書き込みの遅れ、変更のログの欠け、SLI の集計の欠け、秘密の出力、監査の連鎖） |
 | [deploy-and-rollback.md](deploy-and-rollback.md) | サーバーのデプロイの順、自動のロールバック、前のイメージへの戻し、Web の段階の止め方、リリースの前の確認 |
 | [disaster-recovery.md](disaster-recovery.md) | 大阪への切り替えのワークフロー、`sync_epoch`、失った範囲の副作用、東京へ戻す、訓練の合格基準 |
-| [tzdb-update.md](tzdb-update.md) | tzdb の版の採用（署名、差分の報告、デプロイ、AppConfig の切り替え）、計算し直しと切り替えの窓の監視、急ぎの採用、戻し、遅れたときの再実行 |
+| [tzdb-update.md](tzdb-update.md) | tzdb のバージョンの採用（署名、差分の報告、デプロイ、AppConfig の切り替え）、計算し直しと切り替えの窓の監視、急ぎの採用、戻し、遅れたときの再実行 |
 
 計画の runbook（4・5 節のリンクのないもの）：`calendar-lock-contention.md`、`itip-delivery-lag.md`、`attendee-copy-drift.md`、`occurrence-index-mismatch.md`、`room-double-booking.md`、`room-needs-review-backlog.md`、`access-leak-response.md`、`org-policy-change.md`、`reminder-delay.md`、`email-delivery.md`、`invite-abuse.md`、`sync-token-reset-spike.md`、`realtime-reconnect-storm.md`、`caldav-client-regression.md`、`credential-compromise.md`、`webhook-delivery.md`、`api-abuse.md`、`ics-subscription-failures.md`、`booking-abuse.md`、`search-index-lag.md`、`freebusy-slow.md`、`sso-outage.md`、`tenant-move-failure.md`、`ses-inbound-failover.md`、`holidays-annual-update.md`、`capacity-review.md`、`tenant-purge.md`、`schema-expand-contract.md`。

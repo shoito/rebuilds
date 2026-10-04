@@ -9,7 +9,7 @@ date: 2026-09-28
 
 ## Context
 
-[ADR-0002](0002-effective-dated-data-model.md) は、人事のデータを facet ごとの差分・版・現在の 3 つのテーブルで持ち、差分を有効日の順に畳み込むと決めた。細部は次のとおり残っている。
+[ADR-0002](0002-effective-dated-data-model.md) は、人事のデータを facet ごとの差分・バージョン・現在の 3 つのテーブルで持ち、差分を有効日の順に畳み込むと決めた。細部は次のとおり残っている。
 
 - テーブルと制約を、facet ごとに手で書くか。facet は 10 以上あり、書き漏れ（`WITHOUT OVERLAPS` の付け忘れ、RLS の付け忘れ）が起きやすい。
 - PostgreSQL 18 の時間の制約をどう使うか。`WITHOUT OVERLAPS` の列は範囲型で、他の列を GiST に載せるには `btree_gist` が要る。`PERIOD` の外部キーは参照の動作が `NO ACTION` だけ（[CREATE TABLE](https://www.postgresql.org/docs/18/sql-createtable.html)、2026-09-28 に確認）。
@@ -39,7 +39,7 @@ date: 2026-09-28
 1、a、i を採用する。
 
 - `FacetSpec`（項目の Zod のスキーマ、隙間の方針、coverage の親、`seq` の表、依存の規則）から、`<facet>_changes`・`<facet>_versions`・`<facet>` を生成する。現在のテーブルは `PRIMARY KEY (tenant_id, subject_id, valid WITHOUT OVERLAPS)` と、coverage と参照の `PERIOD` の外部キーを持つ。`btree_gist` を入れる。
-- 版は `known tstzrange`（`recorded_at`〜`superseded_at` の生成列）を持ち、`(tenant_id, subject_id, valid, known)` の GiST の索引で時点の問い合わせを引く。
+- バージョンは `known tstzrange`（`recorded_at`〜`superseded_at` の生成列）を持ち、`(tenant_id, subject_id, valid, known)` の GiST の索引で時点の問い合わせを引く。
 - 差分は `(effective_on, seq)` の順に畳み込む。`seq` は事象の種類の優先度（入社 100、職務の変更 300、給与の変更 400、休職 500、個人の情報 600、退職 900 など）。同じ `(effective_on, seq)` で触れる項目が重なる差分は `SAME_DAY_CONFLICT` で拒む（DT-TEMP-001）。訂正は元の差分と同じ `seq` にする。
 - 隙間の方針（`contiguous`・`gapped`）と終わりの差分の扱いは DT-TEMP-002 で決める。
 - 現在のテーブルの行の差し替えと、`superseded_*`・`rescinded_*` の埋め込みは、書き込みの専用の経路（関数か専用のロール。方式は E1 の PoC で決める）だけが行う。アプリのロールは `INSERT`・`SELECT` と、その経路の実行だけを持つ。
@@ -64,4 +64,4 @@ date: 2026-09-28
 - CI：有効日付の facet が、3 つのテーブル・時間の制約・RLS・追記のみのトリガーを持たないマイグレーションを失敗させる。
 - 決定表のテスト：DT-TEMP-001・002。
 - 性質ベーステスト：PROP-TEMP-001（重ならない）、PROP-TEMP-002（現在 = 畳み込み）、PROP-TEMP-004（同じ `seq` の順序によらない）、PROP-TEMP-006（coverage）。
-- DB の権限の検査：アプリのロールで現在のテーブルへの `INSERT`・`DELETE` と、版・差分への `UPDATE` が失敗する。
+- DB の権限の検査：アプリのロールで現在のテーブルへの `INSERT`・`DELETE` と、バージョン・差分への `UPDATE` が失敗する。

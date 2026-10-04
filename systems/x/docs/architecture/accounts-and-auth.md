@@ -85,7 +85,7 @@ ADR-0043。
 | 組織（organization） | 使わない | この題材に組織はない |
 
 - `auth` のサービスは Hono の上に Better Auth を載せ、`https://<brand>.<domain>/api/auth/*` で受ける。表は Aurora の `auth` スキーマ。他のサービスは `auth` スキーマを読まない。
-- Better Auth の型と関数を `packages/auth` の外から直接使わない（lint）。版は固定し、patch だけを自動で上げる。High 以上の告知は 7 日以内に上げるか回避を入れる（[security.md](security.md) の 10 節）。
+- Better Auth の型と関数を `packages/auth` の外から直接使わない（lint）。バージョンは固定し、patch だけを自動で上げる。High 以上の告知は 7 日以内に上げるか回避を入れる（[security.md](security.md) の 10 節）。
 - 利用者の ID は `tid`（ADR-0002）。Better Auth の `user.id` に、登録の時に `packages/tid` で振った 10 進の文字列を渡す（生成の関数を設定で差し替える）。`auth.user.id` と `users.id`（公開の利用者の表）は同じ値にする。
 
 ## 4. 登録
@@ -300,7 +300,7 @@ ADR-0044。**最低の年齢、確かめの方法、未成年への制限の中�
 | 表・置き場所 | 中身 | 種類 |
 | --- | --- | --- |
 | `auth.user`・`auth.session`・`auth.account`・`auth.verification`・`auth.passkey` | Better Auth の表。`auth` スキーマ、`auth` のロールだけ。`user.email`・`user.phone_number` には平文でなく HMAC の値を入れ、`session` に IP を残さない（統合の後の決定） | RLS の外 |
-| `users` | `id`（`tid`）、`handle`、`state`、`protected`、`login_policy`、`age_band`、`account_mod`・`account_mod_detail`（アカウントの措置の要約。[trust-and-safety.md](trust-and-safety.md) の 4.2 節）、`state_version`（作者の状態の写し `as:` の版）、`graph_version`（閲覧者の集合の版。[follow-graph.md](follow-graph.md) の 6 節）、`fanout_mode`・`fanout_mode_changed_at`（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）、`pinned_post_id`（[timeline-fanout.md](timeline-fanout.md) の 9.1 節）、`flags`（`synthetic` など。[observability.md](observability.md) の 4.2 節）、`created_at`、`state_changed_at`、`deleted_at` | 公開の表。他の領域が求めた列も、この表の持ち主の Accounts が足す。`account_mod` は T&S、`graph_version` は Graph、`fanout_mode` は Graph の数の消費者が書く |
+| `users` | `id`（`tid`）、`handle`、`state`、`protected`、`login_policy`、`age_band`、`account_mod`・`account_mod_detail`（アカウントの措置の要約。[trust-and-safety.md](trust-and-safety.md) の 4.2 節）、`state_version`（作者の状態の写し `as:` のバージョン）、`graph_version`（閲覧者の集合のバージョン。[follow-graph.md](follow-graph.md) の 6 節）、`fanout_mode`・`fanout_mode_changed_at`（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）、`pinned_post_id`（[timeline-fanout.md](timeline-fanout.md) の 9.1 節）、`flags`（`synthetic` など。[observability.md](observability.md) の 4.2 節）、`created_at`、`state_changed_at`、`deleted_at` | 公開の表。他の領域が求めた列も、この表の持ち主の Accounts が足す。`account_mod` は T&S、`graph_version` は Graph、`fanout_mode` は Graph の数の消費者が書く |
 | `profiles` | 表示名、自己紹介、アイコン・ヘッダーのメディアの ID、場所、URL | 公開の表 |
 | `user_contacts` | `(owner_id, kind, slot, value_ct, contact_hmac, hmac_kid, verified_at, pending_until)`。`slot` は `current`・`pending`（保留の間の新しい連絡先） | 本人だけの表（RLS） |
 | `user_birthdates` | `(owner_id, birthdate_ct)` | 本人だけの表（RLS）。Accounts だけが読む |

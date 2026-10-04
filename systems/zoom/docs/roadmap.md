@@ -66,7 +66,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `netem-lab-namespaces` | ラボ（名前空間、netem・tbf・ifb、条件の宣言、測り方）（delivery の 3 節。codecs の `netem-harness` と 1 つにした） |
 | `pr-media-report-bot` | PR の品質の報告と `main` の基準（delivery の 2.2 節。codecs の `media-quality-metrics` と 1 つにした） |
 | `client-e2e-harness` | E2E の基盤。偽の端末、ブラウザの組み合わせ、実機の Safari（clients の 12 節） |
-| `web-release-percentage` | 版の資産、`client-config`、割合、版ごとの SLI（delivery の 5.1 節） |
+| `web-release-percentage` | バージョンの資産、`client-config`、割合、バージョンごとの SLI（delivery の 5.1 節） |
 | `meeting-scoped-flags` | フラグの種類、`effective_flags`、ops のフラグの配り直し（delivery の 6 節） |
 | `cost-dashboard-k8` | K8 を請求と送ったバイトから毎月計算する（infrastructure の 12 節） |
 
@@ -78,7 +78,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `org-user-model` | 組織、ユーザー、ロール、`authorize`（accounts-and-admin の 3 節。E2 のベータの主催者のログインに要るので E6 から前に出した） |
 | `identity-better-auth` | OTP、Google、Microsoft、パスキー、セッション（accounts-and-admin の 4.1 節。同上） |
-| `signaling-schema-package` | 6.2 節の Zod のスキーマと JSON Schema の生成。受ける版（N−1・N−2）と `min_client_version` |
+| `signaling-schema-package` | 6.2 節の Zod のスキーマと JSON Schema の生成。受けるバージョン（N−1・N−2）と `min_client_version` |
 | `meeting-create-instant` | 会議の番号、参加の鍵、URL（signaling の 4.2 節） |
 | `join-token-issue` | Ed25519 のトークン、`jti`（4.3 節） |
 | `signaling-gateway-connect` | サブプロトコル、`Origin`、`hello`・`welcome` |
@@ -191,7 +191,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `org-sso-saml` | SAML、`InResponseTo`、証明書の期限の通知 |
 | `scheduled-meeting-crud` | 作成・更新・取り消し、`idempotency_key` |
 | `recurrence-rrule-subset` | 回の計算、例外 |
-| `timezone-handling` | 現地の時刻、tzdata の版の固定と洗い出し |
+| `timezone-handling` | 現地の時刻、tzdata のバージョンの固定と洗い出し |
 | `invite-email-ics` | 招待のメールと iCalendar |
 | `pmi` | 割り当て、作り直し、待合室の強化 |
 | `google-calendar-oauth-write` | 本システムの画面から Google に書く |

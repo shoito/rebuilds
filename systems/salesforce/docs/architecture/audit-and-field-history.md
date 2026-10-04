@@ -1,6 +1,6 @@
 # Audit and field history: Salesforce
 
-設定の変更の履歴（Setup の監査）、データの大きな操作の監査、ログインの履歴、項目の変更の履歴、保持と削除（法務の L5）、改ざんの防止の設計。土台は [ADR-0003](../decisions/0003-metadata-driven-runtime.md)（メタデータの変更は版ごとの差分 `md_changes` を残す）、[ADR-0008](../decisions/0008-dml-order-of-execution.md)（保存の手順 9 で項目の変更の履歴を書く）、intent の「設定の変更、権限の変更、データの一括の削除は、監査のログに残る」。この文書で決めたことは、次の 2 つの ADR にある。
+設定の変更の履歴（Setup の監査）、データの大きな操作の監査、ログインの履歴、項目の変更の履歴、保持と削除（法務の L5）、改ざんの防止の設計。土台は [ADR-0003](../decisions/0003-metadata-driven-runtime.md)（メタデータの変更はバージョンごとの差分 `md_changes` を残す）、[ADR-0008](../decisions/0008-dml-order-of-execution.md)（保存の手順 9 で項目の変更の履歴を書く）、intent の「設定の変更、権限の変更、データの一括の削除は、監査のログに残る」。この文書で決めたことは、次の 2 つの ADR にある。
 
 - 監査のイベントは、変更と同じトランザクションで `audit_events` に書く追記だけの表にする。組織ごとにハッシュの鎖でつなぎ、1 日ごとに鎖の先頭を S3 の Object Lock（改ざんできない置き場所）に書く。画面と API では 180 日を見せ、外部の保管は 1 年（既定案。法務の L5）。ログインの履歴は別の表に書き、180 日保つ（[ADR-0046](../decisions/0046-setup-audit-trail-and-login-history.md)）。
 - 項目の変更の履歴は、オブジェクトで有効にし、1 オブジェクト 20 項目まで、保存の手順 9（最上位で 1 回）で同じトランザクションの outbox に書き、Relay が別のクラスタ（`history`）の月ごとの分割へ写す。18 か月で分割ごと消す（2026-09-28 に S1 から別のクラスタに置くと改めた）。読みは、そのレコードを読めて、その項目を読める人にだけ返す。本人の請求では、履歴の値を消せる（[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md)）。
@@ -11,7 +11,7 @@
 
 | 範囲に含む | 範囲に含まない（担当の領域） |
 | --- | --- |
-| 設定の変更の履歴（メタデータ、権限、利用者、共有、認証、連携、Sandbox、デプロイ） | メタデータの版と差分の本体（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.1 節） |
+| 設定の変更の履歴（メタデータ、権限、利用者、共有、認証、連携、Sandbox、デプロイ） | メタデータのバージョンと差分の本体（[metadata-and-runtime.md](metadata-and-runtime.md) の 4.1 節） |
 | データの大きな操作の監査（一括の削除、完全な削除、エクスポート、ロックを越えた更新、重複の規則の `bypass`） | 変更のイベント（[events-and-integrations.md](events-and-integrations.md)。本家も監査に使うことを勧めない） |
 | ログインの履歴 | ログインの判定（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6 節） |
 | 項目の変更の履歴（設定、書き方、読み、保持、消し方） | 商談の履歴（`opportunity_history`。[sales-objects.md](sales-objects.md) の 3.5 節）の中身。保持はこの文書で決める |
@@ -35,10 +35,10 @@
 
 | 分類 | 出どころ | 例 |
 | --- | --- | --- |
-| `metadata` | メタデータの版（`md_versions`・`md_changes`） | オブジェクト・項目・レイアウト・フロー・入力規則・承認・レポートの型・イベントの型の追加・変更・削除、フローの有効化。1 つの版に 1 件、部品の一覧を持つ |
-| `permission` | 権限セットの割り当て（データの変更で版を上げない） | 割り当て・外し・期限、権限セットのグループの構成 |
+| `metadata` | メタデータのバージョン（`md_versions`・`md_changes`） | オブジェクト・項目・レイアウト・フロー・入力規則・承認・レポートの型・イベントの型の追加・変更・削除、フローの有効化。1 つのバージョンに 1 件、部品の一覧を持つ |
+| `permission` | 権限セットの割り当て（データの変更でバージョンを上げない） | 割り当て・外し・期限、権限セットのグループの構成 |
 | `user` | 利用者の管理 | 作成、招待、無効化、凍結、匿名化、プロファイル・ロールの変更、パスワードの再設定、MFA の解除 |
-| `sharing` | 共有 | OWD、共有ルール（版で記録されるものに加えて、ジョブの開始・切り替え・保留） |
+| `sharing` | 共有 | OWD、共有ルール（バージョンで記録されるものに加えて、ジョブの開始・切り替え・保留） |
 | `auth` | 認証の設定 | SSO の接続、MFA の方針、セッションの期限、ログインの制限、`sso_bypass` |
 | `integration` | 連携 | OAuth のクライアント、Webhook・外向きの呼び出しの宛先、秘密の入れ替え、カーソルの巻き戻し |
 | `deploy` | デプロイと Sandbox | 検証、適用、戻し、Sandbox の作成・再作成・削除、マスキングの設定 |
@@ -68,7 +68,7 @@ audit_events(org_id, seq, event_id, at, category, action, actor_user_id, actor_k
 | `prev_hash`・`hash` | ハッシュの鎖（3.3 節） |
 
 - `details` は、種類ごとの Zod のスキーマの許可リストで作る。秘密（Webhook の秘密、OAuth の秘密、SSO の鍵、パスワード）はスキーマに存在しない。
-- メタデータの差分の中身（`md_changes.before`・`after`）は監査に写さず、`md_versions` の版の番号を `details.version` に持つ。版の差分は、メタデータの表から版で読める（保持の間）。
+- メタデータの差分の中身（`md_changes.before`・`after`）は監査に写さず、`md_versions` のバージョンの番号を `details.version` に持つ。バージョンの差分は、メタデータの表からバージョンで読める（保持の間）。
 - 記録は、変更と**同じトランザクション**で書く。変更が巻き戻れば記録も消え、記録が書けなければ変更も失敗する（監査の漏れを作らない）。
 - `seq` は、組織の行（`audit_heads(org_id, last_seq, last_hash)`）を `FOR UPDATE` で読んで採番する。設定の変更は多くないので、この行の待ちは小さい。ただし、`data_override` のように保存の経路から書くイベントは、`audit_pending`（同じトランザクションで書く）に入れ、Worker が 1 秒ごとに `audit_events` へ採番して移す（保存の経路が組織の 1 行を奪い合わないため）。
 
@@ -94,7 +94,7 @@ audit_events(org_id, seq, event_id, at, category, action, actor_user_id, actor_k
 
 ### 3.5 画面
 
-- Setup の「設定の変更の履歴」：分類・利用者・期間で絞り、`summary` を新しい順に並べる。項目の追加などは、メタデータの版の差分の画面へのリンクを持つ。
+- Setup の「設定の変更の履歴」：分類・利用者・期間で絞り、`summary` を新しい順に並べる。項目の追加などは、メタデータのバージョンの差分の画面へのリンクを持つ。
 - 利用者の画面に、その利用者への管理の操作を並べる。
 
 ## 4. ログインの履歴（ADR-0046）
@@ -122,7 +122,7 @@ login_events(org_id, id, at, user_id, username_hash, result, reason, method, mfa
 
 ### 5.1 設定
 
-- オブジェクトで有効にする（`md_objects.field_history_enabled`）。項目ごとに `md_fields.track_history` を選ぶ。**1 オブジェクト 20 項目まで**（本家と同じ。FAT）。メタデータの変更として版を上げる。
+- オブジェクトで有効にする（`md_objects.field_history_enabled`）。項目ごとに `md_fields.track_history` を選ぶ。**1 オブジェクト 20 項目まで**（本家と同じ。FAT）。メタデータの変更としてバージョンを上げる。
 - 選べる型：`rich_text`・数式・積み上げ集計・自動採番以外の全て。`long_text` は、値を持たず「変わった」だけを記録する（本家も 255 文字を超える長いテキストを同じに扱う。2 節。[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md) と揃えた）。数式は保存しないので選べない。積み上げ集計は親の値の変化として選べる（子の変化の積み重ねで行が多くなるので警告する）。
 - 所有者（`owner_id`）とレコードタイプも選べる（システムの列）。作成と削除・戻すは、有効にした全てのオブジェクトで常に 1 行書く（`created`・`deleted`・`restored`）。
 

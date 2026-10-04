@@ -102,7 +102,7 @@ erDiagram
 
 ### 3.3 `ranking_models`
 
-モデルの登録（S2 から使う。S1 は規則と軽いスコアの重みの版を登録する）。運用の表。
+モデルの登録（S2 から使う。S1 は規則と軽いスコアの重みのバージョンを登録する）。運用の表。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -110,7 +110,7 @@ erDiagram
 | `kind` | `text` | NOT NULL | — | `light`・`heavy` |
 | `version` | `text` | NOT NULL | — | |
 | `s3_uri` | `text` | NOT NULL | — | ONNX のファイルか重みの JSON |
-| `feature_spec_version` | `text` | NOT NULL | — | `feature-spec.json` の版 |
+| `feature_spec_version` | `text` | NOT NULL | — | `feature-spec.json` のバージョン |
 | `status` | `text` | NOT NULL | `'registered'` | `registered`・`approved`・`retired` |
 | `approved_by` | `text` | NULL | — | 承認した人（人だけ。エージェントは承認しない） |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |

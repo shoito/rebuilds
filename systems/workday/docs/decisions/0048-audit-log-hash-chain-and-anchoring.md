@@ -10,7 +10,7 @@ date: 2026-09-28
 ## Context
 
 - NFR-010 は、人事・給与・権限のすべての変更に変更者・時刻・前後の値・案件を残し、監査ログの改ざんを検知できることを求める。
-- 変更の前後の値は、有効日付の差分と版（[ADR-0002](0002-effective-dated-data-model.md)）と業務プロセスのイベント（[ADR-0003](0003-business-process-engine.md)）に残る。権限・閲覧・出力・認証の事象は、それとは別に記録が要る（[ADR-0020](0020-sensitive-read-audit-and-access-explanations.md)）。
+- 変更の前後の値は、有効日付の差分とバージョン（[ADR-0002](0002-effective-dated-data-model.md)）と業務プロセスのイベント（[ADR-0003](0003-business-process-engine.md)）に残る。権限・閲覧・出力・認証の事象は、それとは別に記録が要る（[ADR-0020](0020-sensitive-read-audit-and-access-explanations.md)）。
 - 他の題材（Slack、Stripe、Auth0 の ADR-0054）は、操作と同じトランザクションで監査の表に書き、log-archive の Object Lock へハッシュの連鎖で送る。
 - 連鎖を書き込みの時点で作ると、テナントの全書き込みが 1 つの直列の点を通る（[ADR-0008](0008-point-in-time-queries-and-activation-timers.md) の 2 を採らなかった理由と同じ）。
 - 改ざんの検知の専用の台帳のサービス（Amazon QLDB）は、2025 年 7 月 31 日にサポートが終わった（[AWS のブログ](https://aws.amazon.com/jp/blogs/news/migration-from-amazon-qldb/)、2026-09-28 に検索の要約で確認）。

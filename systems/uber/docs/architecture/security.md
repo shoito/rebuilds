@@ -267,7 +267,7 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | 位置の閲覧の許可 | 監査ログと同じ | — | 5.2 節 |
 | 監査ログ | 1 年（Aurora）、7 年（アーカイブ） | パーティションの削除、Object Lock の期限 | 7.1 節 |
 | アプリのログ | 30 日（CloudWatch Logs）、1 年（log-archive） | 保持の期間 | [observability.md](observability.md) の 4 節 |
-| ETA の補正・速度・検査の組（S3 `eta/bias-tables/`・`eta/speed-profiles/`・`eta/golden-routes/`） | 版ごと 90 日（既定。**法務の確認待ち（L4）**）。根拠：戻しと再計算には直近の数版があれば足りる。`district`〜`spot` の集計で ID を持たない | S3 のライフサイクル | [eta-and-routing.md](eta-and-routing.md) の 14 節 |
+| ETA の補正・速度・検査の組（S3 `eta/bias-tables/`・`eta/speed-profiles/`・`eta/golden-routes/`） | バージョンごと 90 日（既定。**法務の確認待ち（L4）**）。根拠：戻しと再計算には直近の数バージョンがあれば足りる。`district`〜`spot` の集計で ID を持たない | S3 のライフサイクル | [eta-and-routing.md](eta-and-routing.md) の 14 節 |
 | ETA の精度の記録（S3 `eta/accuracy/`、乗車の ID だけ） | 2 年（既定。**法務の確認待ち（L4）**）。根拠：前の年の同じ季節と比べるため。乗車の記録より短い | S3 のライフサイクル | 同上 |
 | 再生の結果（S3 `ci/replay-results/<pr>/`、`spot`） | 1 年（既定。**法務の確認待ち（L4）**）。根拠：変更の後の問題を、元の PR の関門の結果まで遡って調べる期間。元の判断の記録（180 日）から作るが、PR ごとの集計と差だけを持つ | S3 のライフサイクル | [delivery.md](delivery.md) の 11 節 |
 | 配信の時の特徴量と予測（S3 `feature-logs/`、E13 から） | 90 日（既定。**法務の確認待ち（L4）**）。根拠：学習の窓（直近 8 週）と影の実行の比べに足りる期間。元の位置のデータの保持を超えない | S3 のライフサイクル | [ml-platform.md](ml-platform.md) の 5.3 節 |
@@ -280,7 +280,7 @@ trail-viewer（location の鍵を使える唯一の人の窓口）── 範囲�
 | 一時の権限（`jit_grants`）、不正の処置 | 監査ログと同じ | — | 同上 |
 
 - **アカウントの削除**：乗客・ドライバーの依頼で、ログインの情報、電話番号、保存した場所、端末のトークンを 30 日の猶予の後に消す。乗車・運賃・台帳の記録は、上の期間まで、ID を切り離した形で残す（帳簿と事業者の記録の義務のため）。軌跡を保持の期間の前に消すかは法務の確認待ち（L4）。
-- **削除は東京と大阪の両方で行う。** S3 の版を指定した削除とライフサイクルの動作は、複製で伝わらない（Figma の [security.md](../../../figma/docs/architecture/security.md) の 7 節と同じ事実）。
+- **削除は東京と大阪の両方で行う。** S3 のバージョンを指定した削除とライフサイクルの動作は、複製で伝わらない（Figma の [security.md](../../../figma/docs/architecture/security.md) の 7 節と同じ事実）。
 - **リーガルホールド**：事故・訴訟の対象の乗車・人の削除を止める印を持つ。使う条件は法務の確認待ち。
 
 ## 8. 秘密情報・サプライチェーン・運用者のアクセス

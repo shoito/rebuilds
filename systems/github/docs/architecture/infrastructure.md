@@ -23,7 +23,7 @@ Slack と同じ基盤のアカウント（management・security・log-archive・
 | アカウント | OU | 中身 |
 | --- | --- | --- |
 | dev | Workloads/NonProd | 開発環境 |
-| staging | Workloads/NonProd | 本番と同じ構成を小さくしたもの。負荷試験、障害注入、Git の版の先行の確認 |
+| staging | Workloads/NonProd | 本番と同じ構成を小さくしたもの。負荷試験、障害注入、Git のバージョンの先行の確認 |
 | prod | Workloads/Prod | 本番。東京と大阪（災害復旧）。Git のストレージ、フロントエンド、Web・API、Worker、Aurora、S3 |
 | actions-runners-prod | Workloads/Untrusted | Actions の実行環境（信頼できないコードを実行する）。prod とネットワークでつながない |
 | actions-runners-staging | Workloads/Untrusted | 同上の staging |
@@ -162,7 +162,7 @@ Slack の仕組み（GitHub Actions、OIDC、1 回ビルドして昇格、Enviro
 | 成果物 | 形 | 配り方 |
 | --- | --- | --- |
 | Web・API・Worker、Git フロントエンド | コンテナイメージ（ECR） | ECS のデプロイ |
-| Git のストレージのサービス | Go のバイナリと、固定した版の Git の本体を 1 つにした署名付きの tar（S3） | 独自のデプロイの仕組みが、SSM Run Command で 1 台ずつ入れ替える（ADR-0033） |
+| Git のストレージのサービス | Go のバイナリと、固定したバージョンの Git の本体を 1 つにした署名付きの tar（S3） | 独自のデプロイの仕組みが、SSM Run Command で 1 台ずつ入れ替える（ADR-0033） |
 | ストレージのノードの AMI | EC2 Image Builder で月 1 回作る | ノードの入れ替え（退避を伴う。ADR-0033） |
 | 実行環境のホストの AMI、microVM のイメージ | Image Builder。microVM のイメージは週 1 回 | 実行環境のアカウントへ共有し、ホストを順に入れ替える |
 

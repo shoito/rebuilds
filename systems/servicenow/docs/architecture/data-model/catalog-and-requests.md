@@ -1,8 +1,8 @@
 # Data model: サービスカタログと要求
 
-[data-model.md](../data-model.md) の一部。カタログ・カテゴリ・品目と不変の版・変数のまとまり・利用できる人（`audience`）・回答の索引を定義する。要求・要求の品目・実行のタスクは `task` のクラス（[records-and-audit.md](records-and-audit.md) の 2.2 節）。振る舞い（公開の検証 DT-CAT-001、回答の正規化 DT-VAR-001、申請の冪等、依頼者の ACL）は [service-catalog-and-requests.md](../service-catalog-and-requests.md) を正とする。
+[data-model.md](../data-model.md) の一部。カタログ・カテゴリ・品目と不変のバージョン・変数のまとまり・利用できる人（`audience`）・回答の索引を定義する。要求・要求の品目・実行のタスクは `task` のクラス（[records-and-audit.md](records-and-audit.md) の 2.2 節）。振る舞い（公開の検証 DT-CAT-001、回答の正規化 DT-VAR-001、申請の冪等、依頼者の ACL）は [service-catalog-and-requests.md](../service-catalog-and-requests.md) を正とする。
 
-- **品目は公開で不変の版になる。** 申請は申請の時点の版を要求の品目に固定する（`task.item_version_id`）。変数のまとまりは、品目の公開の時に中身を品目の版へ写す（参照しない）。
+- **品目は公開で不変のバージョンになる。** 申請は申請の時点のバージョンを要求の品目に固定する（`task.item_version_id`）。変数のまとまりは、品目の公開の時に中身を品目のバージョンへ写す（参照しない）。
 - `audience` は、ナレッジベースの読める人・書ける人にも使う（[knowledge.md](knowledge.md)）。
 
 ## 1. ER 図
@@ -119,7 +119,7 @@ erDiagram
 
 ### 2.3 `catalog_item_version`
 
-公開した不変の版。`UPDATE` を与えない。定義元：同じ文書の 3.1〜3.4 節、[ADR-0028](../../decisions/0028-catalog-items-and-variables.md)。
+公開した不変のバージョン。`UPDATE` を与えない。定義元：同じ文書の 3.1〜3.4 節、[ADR-0028](../../decisions/0028-catalog-items-and-variables.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -130,13 +130,13 @@ erDiagram
 | `definition` | `jsonb` | NOT NULL | — | `ItemDefinition`（変数 150、UI の規則 100、選択肢 1,000 まで。変数のまとまりの中身を写したもの） |
 | `audience_id` | `uuid` | NOT NULL | — | 定義から写す（見える品目の集合の計算の索引のため） |
 | `allow_request_for_others` | `boolean` | NOT NULL | `false` | 定義から写す |
-| `fulfillment_flow_version_id` | `uuid` | NULL | — | `request_item` のとき。公開の時に有効な版に固定（→ `flow_version`） |
+| `fulfillment_flow_version_id` | `uuid` | NULL | — | `request_item` のとき。公開の時に有効なバージョンに固定（→ `flow_version`） |
 | `content_hash` | `bytea` | NOT NULL | — | |
 | `published_at`・`published_by` | | | | |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, item_id, version_no)`。FK `(tenant_id, item_id)` → `catalog_item`、`(tenant_id, audience_id)` → `audience`、`fulfillment_flow_version_id` → `flow_version(id)`（`check_shared_ref()`。組み込みの雛形は NULL の行）。
 - 索引：`(tenant_id, audience_id)` — 主体ごとの見える品目の計算。
-- 保持：版を消さない（要求の品目が指すため）。S1 の量：1 テナント 年 数千行、1 版 平均 30 KB。
+- 保持：バージョンを消さない（要求の品目が指すため）。S1 の量：1 テナント 年 数千行、1 バージョン 平均 30 KB。
 
 ### 2.4 `catalog_item_category`
 
@@ -154,7 +154,7 @@ erDiagram
 
 ### 2.5 `variable_set`
 
-複数の品目で使い回す変数のまとまり。版は `rev`（メタデータの共通の列）で数える。直したら、使っている品目を公開し直す。
+複数の品目で使い回す変数のまとまり。バージョンは `rev`（メタデータの共通の列）で数える。直したら、使っている品目を公開し直す。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

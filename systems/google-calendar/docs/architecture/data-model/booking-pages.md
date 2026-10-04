@@ -247,7 +247,7 @@ erDiagram
 | `span` | `tstzrange` | NOT NULL | — | `[開始, 終わり + 間の時間)` |
 | `status` | `text` | NOT NULL | — | `held`・`confirmed`・`released` |
 | `hold_expires_at` | `timestamptz` | NULL | — | `held` の 10 分の期限 |
-| `tzdata_version` | `text` | NOT NULL | — | 区間を計算した版（切り替えの窓） |
+| `tzdata_version` | `text` | NOT NULL | — | 区間を計算したバージョン（切り替えの窓） |
 | `created_at`・`updated_at` | `timestamptz` | NOT NULL | `now()` | |
 
 ```sql

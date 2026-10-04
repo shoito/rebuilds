@@ -15,7 +15,7 @@
 
 ## 1. 目標と前提
 
-- **OWASP ASVS 5.0 の Level 2 を全体の目標にする**（[OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)。最新の版が 5.0.0 であることは 2026-09-28 に確認。章と要件の番号の照合は E1 `sec-checklist-traceability-ci` で行う（未検証））。他の題材（Slack、Stripe）と同じ段にする。
+- **OWASP ASVS 5.0 の Level 2 を全体の目標にする**（[OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/)。最新のバージョンが 5.0.0 であることは 2026-09-28 に確認。章と要件の番号の照合は E1 `sec-checklist-traceability-ci` で行う（未検証））。他の題材（Slack、Stripe）と同じ段にする。
 - 最も重い障害は 5 つ。
   1. **テナントをまたいだデータの漏えい**（NFR-009）。
   2. **ACL で読めない値の漏えい**（NFR-010、K6）。出口が 16 あり、1 つの抜けで漏れる（[access-control.md](access-control.md) の 6.2 節）。
@@ -85,7 +85,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 | 種類 | 脅威 | 対策 |
 | --- | --- | --- |
-| T | 承認の二重の反映、承認なしの実施 | 承認のまとまりのロックと版の条件、`implement` への遷移の条件、日次の突き合わせ（SEC-050） |
+| T | 承認の二重の反映、承認なしの実施 | 承認のまとまりのロックとバージョンの条件、`implement` への遷移の条件、日次の突き合わせ（SEC-050） |
 | R | 承認者が承認を否認する | 承認の行（誰に依頼し、誰が、誰の代理で答えたか）と監査の履歴、ハッシュの鎖（SEC-051） |
 | T | 監査の履歴の書き換え・削除 | アプリのロールに `UPDATE`・`DELETE` を与えない。日次のハッシュの鎖を S3 Object Lock に置く（SEC-052） |
 | E | フローの `system_declared` で ACL を迂回する | `tenant_admin` と `acl_admin` の両方の承認、書き込むテーブルの宣言（[workflow-engine.md](workflow-engine.md) の 5.4 節）（SEC-053） |
@@ -231,7 +231,7 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 | レコードの監査の履歴（`record_change`、`journal_entry`） | テナントのレコードの変更、作業メモ・コメント | Aurora（追記だけ、月ごとのパーティション）。日次のハッシュの鎖を S3 Object Lock（[ADR-0009](../decisions/0009-record-audit-history-and-journal.md)） |
 | メタデータの変更（`meta_change`） | 辞書・ACL・フロー・SLA・配置などの変更 | Aurora。監査の履歴と同じ保持 |
 | テナントの監査ログ（`tenant_audit_event`） | ログイン、SSO の失敗、`break_glass`、成り代わり、ロールの付け外し、API のクライアントと秘密の発行・失効、エクスポート、パッケージの適用、サポートの参照の許可 | Aurora → log-archive |
-| プラットフォームの監査（`platform_audit_event`） | 運用者の本番へのアクセス、サポートの参照、テナントの作成・停止・移動・削除、国民の祝日の版の承認、保持の期間を過ぎたパーティションの削除、リーガルホールド | log-archive（Object Lock、compliance モード） |
+| プラットフォームの監査（`platform_audit_event`） | 運用者の本番へのアクセス、サポートの参照、テナントの作成・停止・移動・削除、国民の祝日のバージョンの承認、保持の期間を過ぎたパーティションの削除、リーガルホールド | log-archive（Object Lock、compliance モード） |
 | AWS の操作 | CloudTrail（組織の証跡。KMS の操作を含む） | log-archive |
 
 - テナントの管理者と `auditor` は、自分のテナントのテナントの監査ログと、自分のテナントに関わるプラットフォームの監査（サポートの参照）を見られる。
@@ -281,7 +281,7 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 | CMDB の統合の前の状態（`ci_merge_log`） | 監査の履歴と同じ（7 年） | パーティションを外して消す | L4 |
 | 当番の呼び出し（`page`・`page_attempt`） | 監査の履歴と同じ（7 年） | 同上（`page` はパーティションを持たないので保守のジョブが消す） | L4 |
 | 成り代わり（`impersonation_session`）、サポートの参照の許可（`support_access_grant`）、テナントの削除の記録（`tenant_deletion_run`） | 監査の履歴と同じ（7 年） | 削除 | L4・L5 |
-| 変更のリスクの評価・CAB・影響の写し（`change_risk_assessment`、`cab_*`、`change_impact_snapshot`）、ナレッジの版 | 監査の履歴と同じ（7 年）。変更・記事が残る間は残す | 削除 | L4 |
+| 変更のリスクの評価・CAB・影響の写し（`change_risk_assessment`、`cab_*`、`change_impact_snapshot`）、ナレッジのバージョン | 監査の履歴と同じ（7 年）。変更・記事が残る間は残す | 削除 | L4 |
 | リーガルホールド（`legal_hold`） | 解除の後 7 年 | 削除 | L4・L5 |
 | API のクライアントのシークレット・トークン（ハッシュ）（`api_client_secret`、`oauth_token`、`oauth_refresh_family`） | 失効・期限切れの後 30 日 | 削除 | — |
 | フローの外への呼び出しの結果（`webhook_result`） | 90 日（フローの実行と同じ） | 削除 | — |
@@ -339,17 +339,17 @@ KMS の鍵は、セルごと・用途ごとに持ち、どれもマルチリー�
 
 | 表 | NULL の行の中身 | 誰が書くか | 許す理由 | 定義の場所 |
 | --- | --- | --- | --- | --- |
-| `dict_table`、`dict_field` | 組み込みのクラスとフィールド（`task`、`incident`、`ci` と CI のクラスなど） | 起動の時の読み込み（`catalog_loader` のロール。コードの版の定義から） | 全テナントで同じで、コードと一緒にリリースする（[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）。機密でない。テナントの行（`c_` のフィールド、上書き）の参照の先として DB に要る | [data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 3.2 節 |
+| `dict_table`、`dict_field` | 組み込みのクラスとフィールド（`task`、`incident`、`ci` と CI のクラスなど） | 起動の時の読み込み（`catalog_loader` のロール。コードのバージョンの定義から） | 全テナントで同じで、コードと一緒にリリースする（[ADR-0006](../decisions/0006-data-dictionary-and-field-types.md)）。機密でない。テナントの行（`c_` のフィールド、上書き）の参照の先として DB に要る | [data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 3.2 節 |
 | `dict_choice_set`、`dict_choice` | 組み込みの選択肢（状態、影響度、緊急度など） | 同上 | 同上 | 同上 |
 | `role` | 組み込みのロール（`requester`、`agent`、`acl_admin` など） | 同上 | 同上。`group_role`・`user_role` がテナントの行から参照する | [access-control.md](access-control.md) の 3.3 節 |
 | `acl_rule` | 組み込みの ACL の規則（組み込みの `deny_unless` を含む） | 同上 | 同上。テナントは無効にする行（`deny_unless` 以外）と追加の規則を自分の行で持つ。組み込みの行は変えられない | [access-control.md](access-control.md) の 4.1 節 |
-| `holiday_set`、`holiday_set_version`、`holiday` | 国民の祝日（内閣府の CSV から取り込んだ版） | 祝日の取り込みのジョブ（`catalog_loader`）と、運用者 2 人の承認の後の公開 | 全テナントで同じ公の暦で、機密でない。テナントのカレンダーの版が参照する（[ADR-0020](../decisions/0020-japanese-holiday-data.md)） | [sla-and-calendars.md](sla-and-calendars.md) の 5 節 |
+| `holiday_set`、`holiday_set_version`、`holiday` | 国民の祝日（内閣府の CSV から取り込んだバージョン） | 祝日の取り込みのジョブ（`catalog_loader`）と、運用者 2 人の承認の後の公開 | 全テナントで同じ公の暦で、機密でない。テナントのカレンダーのバージョンが参照する（[ADR-0020](../decisions/0020-japanese-holiday-data.md)） | [sla-and-calendars.md](sla-and-calendars.md) の 5 節 |
 | `number_def` | 組み込みの番号の定義（`INC`、`CHG` など） | 同上 | 組み込みの辞書の `number_def_id` とテナントの `number_counter` が参照する。テナントの接頭辞の変更は、同じテーブルのテナントの行で上書きする | [data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 8 節 |
 | `ci_relation_type` | 組み込みの関係の型（`depends_on` など） | 同上 | テナントの `ci_relation` が参照する | [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 7.1 節 |
 | `ci_attribute`、`ci_identification_rule` | 組み込みの CI の属性（`multi` の印を含む）と識別の規則 | 同上 | テナントの `ci_precedence`・`ci_identifier` が参照する。テナントの同じクラスの規則は、組み込みの行に勝つ | 同上の 3.2・4.1 節 |
-| `flow_def`、`flow_version` | 組み込みのフロー（`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | 同上。コードの新しい版は新しい `flow_version` の行にし、前の版を変えない | テナントの `flow_run` が版を参照する（実行は開始の時の版に固定） | [workflow-engine.md](workflow-engine.md) の 3.4 節 |
+| `flow_def`、`flow_version` | 組み込みのフロー（`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | 同上。コードの新しいバージョンは新しい `flow_version` の行にし、前のバージョンを変えない | テナントの `flow_run` がバージョンを参照する（実行は開始の時のバージョンに固定） | [workflow-engine.md](workflow-engine.md) の 3.4 節 |
 
-- 統合で候補を決めた（2026-09-28。[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md) の注記）。規則は「テナントの行が外部キーで参照する、またはテナントの行と同じ一意の空間で照合する組み込みのデータだけを NULL の行にする」。`priority_matrix`・配置・画面の規則・状態のモデル・通知の規則とテンプレート・組み込みのレポートはコードの版だけに持ち、テナントは自分の行で上書き・無効・複製をする。既定のカレンダー・組み込みの SLA の定義などは、テナントの作成の時にテナントの行として作る。全体の一覧は [data-model.md](data-model.md) の 3.1 節。
+- 統合で候補を決めた（2026-09-28。[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md) の注記）。規則は「テナントの行が外部キーで参照する、またはテナントの行と同じ一意の空間で照合する組み込みのデータだけを NULL の行にする」。`priority_matrix`・配置・画面の規則・状態のモデル・通知の規則とテンプレート・組み込みのレポートはコードのバージョンだけに持ち、テナントは自分の行で上書き・無効・複製をする。既定のカレンダー・組み込みの SLA の定義などは、テナントの作成の時にテナントの行として作る。全体の一覧は [data-model.md](data-model.md) の 3.1 節。
 
 ### 10.3 RLS のポリシー
 
@@ -490,7 +490,7 @@ CREATE POLICY tenant_only ON task
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `tenant_dek`（テナントの DEK の暗号文と版） | 5.2 節 |
+| Aurora `tenant_dek`（テナントの DEK の暗号文とバージョン） | 5.2 節 |
 | Aurora `attachment`（S3 のキー、検査の状態、隔離の印） | 5.3 節 |
 | Aurora `tenant_audit_event` | 6 節。1 年、log-archive へ |
 | log-archive `platform_audit_event` | 6 節。7 年、Object Lock |

@@ -52,7 +52,7 @@ date: 2026-10-04
 ### 差分の同期の健全さ
 
 - 410 を理由で分ける：`floor_seq`（保持の外）、`view_hash`（見え方の変更）、`epoch`（DR・復元）、`token_invalid`（署名の誤り）。`filter_hash` の違いは 400 で別に数える。
-- クライアントの種類：`web`、`api:<client_id の帯>`、`caldav:<家族>`（User-Agent を `ios`・`macos`・`thunderbird`・`davx5`・`other` に寄せる。版は主の版だけ）。
+- クライアントの種類：`web`、`api:<client_id の帯>`、`caldav:<家族>`（User-Agent を `ios`・`macos`・`thunderbird`・`davx5`・`other` に寄せる。バージョンは主のバージョンだけ）。
 - 取り直しの量（全件の範囲の問い合わせ、CalDAV の `sync-token` なしの `sync-collection`）を、クライアントの種類ごとに数え、平常の 3 倍で見る。
 
 ### 他の案を選ばなかった理由
@@ -60,7 +60,7 @@ date: 2026-10-04
 - **2（トレースで全件）**：X-Ray とストレージの費用が要求の数に比例して大きい。リマインダーの送り漏れのような、起きなかったことは数えられない。
 - **3（ログの集計）**：ログの欠けと遅れがそのまま SLI の誤りになる。ログに中身を書かない規則（[observability.md](../architecture/observability.md) の 2 節）の下で、結びつける鍵が足りない。
 
-> 2026-10-04 の注記：起票の時は、送信の記録の鍵を最初の設計の `(reminder_id, occurrence_start, method, version)` で書いていた。統合の工程で [ADR-0030](0030-reminder-planning-horizon-and-replan.md) の鍵（版を入れない）に揃え、遅れすぎの名前を計画の行の状態 `skipped_late` に揃えた。
+> 2026-10-04 の注記：起票の時は、送信の記録の鍵を最初の設計の `(reminder_id, occurrence_start, method, version)` で書いていた。統合の工程で [ADR-0030](0030-reminder-planning-horizon-and-replan.md) の鍵（バージョンを入れない）に揃え、遅れすぎの名前を計画の行の状態 `skipped_late` に揃えた。
 
 ## Consequences
 

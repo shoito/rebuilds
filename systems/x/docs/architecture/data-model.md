@@ -18,7 +18,7 @@
 | [data-model/timelines-and-ranking.md](data-model/timelines-and-ranking.md) | 作者の方式の記録、おすすめへの操作、モデル、実験。写しと正本の対応 | 4 |
 | [data-model/notifications.md](data-model/notifications.md) | 通知、まとめの開いている行、行為者、既読、設定、プッシュの端末と送信 | 7 |
 | [data-model/search-and-trends.md](data-model/search-and-trends.md) | 索引の作業、トレンドの記録・基準・除外 | 4 |
-| [data-model/media.md](data-model/media.md) | メディア、アップロード、版、PDQ の一覧、照合の結果、配信の停止 | 6 |
+| [data-model/media.md](data-model/media.md) | メディア、アップロード、バージョン、PDQ の一覧、照合の結果、配信の停止 | 6 |
 | [data-model/dm.md](data-model/dm.md) | 会話、参加者、メッセージ、非表示、申請、設定 | 6 |
 | [data-model/trust-and-safety.md](data-model/trust-and-safety.md) | 措置、通報、証拠、案件、異議、危険の点、規則、法令の案件、保全、開示 | 12 |
 | [data-model/api-and-apps.md](data-model/api-and-apps.md) | 開発者、アプリ、秘密、認可、トークン、計量 | 6 |
@@ -163,10 +163,10 @@ RLS の前に他人の行を引く必要がある処理は、`SECURITY DEFINER` 
 
 - 要約は、対象に効いている `moderation_actions` の行を全部畳み込んで計算し直す（一番新しい行だけを見ない）。措置のサービスの外で書かない（lint）。
 
-### 3.6 状態の版と写し
+### 3.6 状態のバージョンと写し
 
-- **状態の版**：`posts.state_version`・`media.state_version`・`users.state_version`（作者の状態）は、状態か措置の要約を変えるたびに 1 上げる。トリガーで、上げない更新と下げる更新を拒む。写し（`ps:`・`as:`、OpenSearch の外部の版）は版の新しいものだけを書く（[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)）。
-- **関係の版**：`users.graph_version` は、関わる辺を変えるたびに上げる。閲覧者の集合の写しは版の新しいものだけを書く（[ADR-0012](../decisions/0012-viewer-sets-cache.md)）。
+- **状態のバージョン**：`posts.state_version`・`media.state_version`・`users.state_version`（作者の状態）は、状態か措置の要約を変えるたびに 1 上げる。トリガーで、上げない更新と下げる更新を拒む。写し（`ps:`・`as:`、OpenSearch の外部のバージョン）はバージョンの新しいものだけを書く（[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)）。
+- **関係のバージョン**：`users.graph_version` は、関わる辺を変えるたびに上げる。閲覧者の集合の写しはバージョンの新しいものだけを書く（[ADR-0012](../decisions/0012-viewer-sets-cache.md)）。
 - **写しは正本にしない**：Valkey・OpenSearch・数の表（`post_counters`・`user_counters`）は写しで、正本から作り直せる（[data-model/timelines-and-ranking.md](data-model/timelines-and-ranking.md) の 2 節）。写しを直接 `UPDATE` で直さない（照合の経路だけ）。
 
 ### 3.7 時刻
@@ -424,15 +424,15 @@ erDiagram
 | **`tid` は重ならず、生成器ごとに単調に増える**：同じ生成器の番号の持ち主の時刻の範囲が重ならない | 貸し出しの `FOR UPDATE SKIP LOCKED` と、前の持ち主の `expires_at` より後からしか振らない規則。時計が戻ったら振らない。`posts`・`users`・`media` の主キー、`dm_messages.message_id`・`short_links.link_id` の一意で重複を検出してアラート | [ADR-0002](../decisions/0002-post-ids-and-ordering.md)、PROP-TID-001 |
 | **リージョンで生成器の範囲が分かれる**：東京 0〜511、大阪 512〜1023 | `tid_generator_leases` の CHECK | [ADR-0056](../decisions/0056-disaster-recovery-osaka.md) |
 | **確定した変更と出来事は食い違わない** | 変更と `outbox` を同じトランザクションで書く。書き込みのサービスから Kinesis へ直接書かない（lint、IAM） | [ADR-0005](../decisions/0005-event-log-and-outbox.md)、PROP-POST-002 |
-| **消費者は冪等** | DB は結果の表の主キーか `processed_events`、Valkey の数は `sub` ごとの連番（`cnt_apply`）、写しは版（`ps_put`・`vs_apply`・外部の版）、fan-out は `tl_insert` の重複の除去 | ADR-0005、[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md) |
+| **消費者は冪等** | DB は結果の表の主キーか `processed_events`、Valkey の数は `sub` ごとの連番（`cnt_apply`）、写しはバージョン（`ps_put`・`vs_apply`・外部のバージョン）、fan-out は `tl_insert` の重複の除去 | ADR-0005、[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md) |
 | **投稿の再送は 1 件**：同じ `(author_id, client_request_id)` から確定する投稿は 1 つ | `post_requests` の主キーを投稿と同じトランザクションで書く | [ADR-0008](../decisions/0008-post-write-path-and-idempotency.md)、PROP-POST-001 |
 | **`following` と `followers`（`blocks` と `blocked_by`）は互いの逆** | S1 は同じトランザクションで書く。S2 は正本を先に書き、逆向きを出来事から冪等に作る。照合のジョブで差を測る | [ADR-0007](../decisions/0007-follow-graph-storage.md)、[ADR-0013](../decisions/0013-graph-partitioning.md)、PROP-GRAPH-001 |
 | **`likes` と `user_likes` は互いの逆** | 同じトランザクション（S1）。出来事は行を足した・消したときだけ | [ADR-0022](../decisions/0022-engagement-relations-and-writes.md)、PROP-CNT-005 |
 | **ブロックがあれば、両向きのフォローの辺（`active`・`pending`）がない** | 組の勧告ロックの中で、ブロックと両向きの辺の削除を同じトランザクションで書く。S2 は消費者が正本の `blocks` を確かめる | [ADR-0011](../decisions/0011-graph-edge-state-machine-and-locking.md)、PROP-GRAPH-002 |
 | **数の写しは正本に収束する**：写しは関係の表の数え直しと一致する | 写しの直接の `UPDATE` を禁止（`counter_writer`・`counter_reconciler` だけ）。書き戻しは絶対の値。照合で `cnt_set` と `counter_reconcile_log` | ADR-0005、ADR-0023、PROP-CNT-001・002 |
 | **閲覧の数は減らず、数えすぎない** | 位置を先に記録してから足す。`views = GREATEST(...)`。補正は上にだけ | [ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)、PROP-CNT-004 |
-| **削除・ブロック・鍵・措置の内容はどの経路にも出ない** | 全部の読み出しが `visible()` を通る（`Visible<T>` の型と lint）。DB に「見える」の結果を持たない。写しは版の新しいものだけ。`ps:`・`as:` の寿命 45 秒。検索は粗い絞り込みの後に `visible()` を当て直す。メディアは拒否の一覧 | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md)、[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)、[ADR-0033](../decisions/0033-media-delivery-and-takedown.md)、NFR-009 |
-| **状態の版は単調に増える** | `state_version`・`graph_version` のトリガー（上げない更新・下げる更新を拒む）。`ps_put`・`vs_apply`・OpenSearch の `external_gte` | ADR-0009、[ADR-0012](../decisions/0012-viewer-sets-cache.md)、PROP-POST-003 |
+| **削除・ブロック・鍵・措置の内容はどの経路にも出ない** | 全部の読み出しが `visible()` を通る（`Visible<T>` の型と lint）。DB に「見える」の結果を持たない。写しはバージョンの新しいものだけ。`ps:`・`as:` の寿命 45 秒。検索は粗い絞り込みの後に `visible()` を当て直す。メディアは拒否の一覧 | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md)、[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)、[ADR-0033](../decisions/0033-media-delivery-and-takedown.md)、NFR-009 |
+| **状態のバージョンは単調に増える** | `state_version`・`graph_version` のトリガー（上げない更新・下げる更新を拒む）。`ps_put`・`vs_apply`・OpenSearch の `external_gte` | ADR-0009、[ADR-0012](../decisions/0012-viewer-sets-cache.md)、PROP-POST-003 |
 | **措置は記録してから効かせる**：要約（`mod_flags`・`account_mod`）は効いている措置の行の畳み込みと一致する | `moderation_actions`・`moderation_action_events`・要約・`state_version`・`outbox` を同じトランザクション。要約の列は `ts` のロールだけが書ける。措置の内容の列は書き換えない（トリガー） | [ADR-0038](../decisions/0038-moderation-action-model.md)、PROP-TS-001 |
 | **保全の対象は物理の削除をされない** | 削除のジョブは `is_held()` を毎回通す。`legal_holds` の削除の権限を与えない | [ADR-0041](../decisions/0041-legal-requests-and-transparency.md)、[ADR-0053](../decisions/0053-data-lifecycle-and-retention.md)、PROP-TS-004、PROP-SEC-001 |
 | **監査は追記だけ** | `audit_events` の `UPDATE`・`DELETE` をトリガーで拒む。outbox の `audit` から log-archive（Object Lock）へ | [ADR-0052](../decisions/0052-audit-and-operator-access.md)、PROP-SEC-002 |
@@ -459,6 +459,6 @@ erDiagram
 | 行数・容量の見積もり、パーティションの粒度（とくに `notifications` の 1 日 3,000 万行、`dm_messages` の年 1.6 TB） | E14 の負荷試験、E8・E12 の Story |
 | 法定の保存期間（`purged` の時期、DM、連絡先、ログインの記録、投稿の時の IP、措置・通報、監査） | 法務の確認（[intent.md](../intent.md) の L2・L8） |
 | S2 で同じトランザクションを保てない書き込み：(1) フォローと `users.graph_version`（関係と利用者が別のクラスタ）、(2) 措置と `posts.mod_flags`・`users.account_mod`（T&S と対象が別のクラスタ）、(3) 投稿と `media` の `attached` への遷移（投稿とメディアが別の分割） | S2 の着手の時に ADR を書く。推奨は [README.md](README.md) の 6 節 |
-| `auth.user` に連絡先の HMAC を入れる扱いが Better Auth の版で動くか | E2 の `auth-signup-login` |
+| `auth.user` に連絡先の HMAC を入れる扱いが Better Auth のバージョンで動くか | E2 の `auth-signup-login` |
 | `seen:` の Bloom の型を ElastiCache の Valkey で使えるか | E1 の着手の時 |
 | `media_hash_blocklist` の近さの照合の索引（10 万件を超えたら） | E11 の `media-hash-matching` |

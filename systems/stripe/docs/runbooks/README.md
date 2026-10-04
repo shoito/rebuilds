@@ -82,7 +82,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | Webhook の配信の遅れ・滞留 | `webhook-delivery-backlog.md` | E5 で作成 |
 | エンドポイントの一斉の無効化 | `endpoint-mass-disable.md`（キルスイッチと再予定） | E5 で作成 |
 | 不正の急増、カードテスティングの兆候 | `fraud-spike.md`（プラットフォームのルールの一時的な強化、WAF の Challenge） | E9 で作成 |
-| 決済ページの改ざんの検知（SEV1） | `payment-page-tamper.md`（目録にないスクリプトの配信の停止、前の版への戻し、影響の範囲の調査） | E6 で作成 |
+| 決済ページの改ざんの検知（SEV1） | `payment-page-tamper.md`（目録にないスクリプトの配信の停止、前のバージョンへの戻し、影響の範囲の調査） | E6 で作成 |
 | Dispute の証拠を送れないまま期限が近い | `dispute-submission.md`（コネクタの管理画面からの手動の提出、加盟店への連絡） | E9 で作成 |
 | PAN の形の検出、カード番号の漏洩の疑い | `card-data-exposure.md`（報告の要否は法務：[intent.md](../intent.md) の L4） | E10 で作成 |
 | 鍵の削除の予約・無効化・ポリシーの変更、ローテーションの失敗、漏洩の疑い | `key-rotation.md`（`ReEncrypt`、HMAC 鍵の入れ替え） | E10 で作成 |

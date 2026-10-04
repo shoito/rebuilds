@@ -3,7 +3,7 @@
 データモデルの正本。置き場所、規約、全体の ER 図、テナントが定義するテーブルの物理の配置、横断の不変条件をここに置き、領域ごとのテーブルの定義（列・制約・索引・保持・量）と ER 図を [data-model/](data-model/) に置く。
 
 - **列・制約・索引の正本は、このファイルと `data-model/` の各ファイル**である。領域の文書（[data-dictionary-and-tables.md](data-dictionary-and-tables.md) など）は振る舞いの正本で、各文書の末尾の「data-model への項目」は提案の記録である。両者が食い違ったら、このデータモデルに合わせて領域の文書を直す。
-- 方針の元は [ADR-0002](../decisions/0002-tenancy-and-isolation.md)（テナントとセル）、[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)（テーブルの階層と拡張）、[ADR-0007](../decisions/0007-physical-layout-and-extension-index.md)（物理の配置と索引）、[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)（メタデータの版）、[ADR-0053](../decisions/0053-data-retention-and-deletion.md)（保持）、[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md)（NULL の行とテナントをまたぐロール）。
+- 方針の元は [ADR-0002](../decisions/0002-tenancy-and-isolation.md)（テナントとセル）、[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md)（テーブルの階層と拡張）、[ADR-0007](../decisions/0007-physical-layout-and-extension-index.md)（物理の配置と索引）、[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)（メタデータのバージョン）、[ADR-0053](../decisions/0053-data-retention-and-deletion.md)（保持）、[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md)（NULL の行とテナントをまたぐロール）。
 - 実装の変更（開発リポジトリの `changes/`）でマイグレーションを書くときは、同じ PR でここと `data-model/` を更新する。
 - 行数・容量の「S1 の量」は [capacity.md](capacity.md) の 1 節からの**初期見積もり**である。E2 の計測と E12 の負荷試験で置き換える。
 
@@ -11,15 +11,15 @@
 
 | ファイル | 領域 | テーブルの数 |
 | --- | --- | --- |
-| [data-model/platform-metadata.md](data-model/platform-metadata.md) | テナントの設定、メタデータの版、データ辞書、番号、設定のパッケージ | 13 |
+| [data-model/platform-metadata.md](data-model/platform-metadata.md) | テナントの設定、メタデータのバージョン、データ辞書、番号、設定のパッケージ | 13 |
 | [data-model/records-and-audit.md](data-model/records-and-audit.md) | `task`（全クラスの列）、`custom_record`、`ext_index`、監査の履歴・作業メモ・ハッシュの鎖、添付 | 7 |
 | [data-model/identity-and-access.md](data-model/identity-and-access.md) | 利用者・組織・グループ・ロール、ACL の規則、成り代わり、SSO、パスワード・MFA・セッション | 19 |
-| [data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) | フローの定義と版、実行、共有のタイマー、承認と代理、レコードのルール、外への呼び出し | 15 |
-| [data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) | カレンダー、祝日、SLA の定義と版、計時の行と事象 | 9 |
+| [data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) | フローの定義とバージョン、実行、共有のタイマー、承認と代理、レコードのルール、外への呼び出し | 15 |
+| [data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) | カレンダー、祝日、SLA の定義とバージョン、計時の行と事象 | 9 |
 | [data-model/assignment-and-on-call.md](data-model/assignment-and-on-call.md) | 割り当ての規則、スキル、当番表、エスカレーション、呼び出し | 11 |
 | [data-model/itsm-processes.md](data-model/itsm-processes.md) | 優先度、メジャーインシデント、標準の変更、リスク、承認の方針、CAB、予定表と衝突、影響の範囲 | 17 |
-| [data-model/catalog-and-requests.md](data-model/catalog-and-requests.md) | カタログ、品目と版、変数のまとまり、`audience`、回答の索引 | 8 |
-| [data-model/knowledge.md](data-model/knowledge.md) | ナレッジベース、記事と版、評価と旗、自己解決の計測 | 8 |
+| [data-model/catalog-and-requests.md](data-model/catalog-and-requests.md) | カタログ、品目とバージョン、変数のまとまり、`audience`、回答の索引 | 8 |
+| [data-model/knowledge.md](data-model/knowledge.md) | ナレッジベース、記事とバージョン、評価と旗、自己解決の計測 | 8 |
 | [data-model/notifications-and-email.md](data-model/notifications-and-email.md) | 通知の規則・テンプレート・1 通、Web Push、送信・受信のメール | 13 |
 | [data-model/cmdb.md](data-model/cmdb.md) | `ci`、属性と識別の規則、識別の値、取り込み元と調整、取り込み、保留と統合、関係 | 18 |
 | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) | 配置と画面の規則、ポータル、翻訳、検索、レポート、エクスポート、日次の事実 | 18 |
@@ -42,7 +42,7 @@
 | log-archive の S3（Object Lock） | 監査の日次のハッシュの鎖、テナントの監査ログの写し、プラットフォームの監査、CloudTrail、アプリのログ | セル・テナントの接頭辞 |
 | CloudFront KeyValueStore | ホスト名 → セル（制御の面の写し） | — |
 | SQS | outbox の中継、メールの受信、SES の事象、CMDB の取り込み、Webhook の再試行 | セルごと。メッセージに `tenant_id` |
-| コードの版 | 組み込みの定義の正本（辞書・ACL の規則・ロール・状態のモデル・配置・文言の辞書・組み込みのレポートなど）。DB の NULL の行へ読み込むもの、コードの中だけに持つもの、テナントの作成の時に行を作るものの 3 つに分ける（3.1 節） | — |
+| コードのバージョン | 組み込みの定義の正本（辞書・ACL の規則・ロール・状態のモデル・配置・文言の辞書・組み込みのレポートなど）。DB の NULL の行へ読み込むもの、コードの中だけに持つもの、テナントの作成の時に行を作るものの 3 つに分ける（3.1 節） | — |
 
 - DB 以外の置き場所のキー・パス・本文の形は [data-model/stores.md](data-model/stores.md) にある。
 - **ドメインの分離（1 つのテナントの中で会社ごとにデータを分ける仕組み）は持たない。** 子会社ごとに分けたいときは別のテナント（同じ顧客・同じセル）にするか、`company` と ACL の条件で絞る（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
@@ -53,32 +53,32 @@
 
 正本は [security.md](security.md) の 10.2 節（[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md) と注記、[ADR-0002](../decisions/0002-tenancy-and-isolation.md) の注記）。マイグレーションの CI の許可の一覧と一致させる。
 
-**規則**：組み込みのデータの定義の正本はコードの版にある。そのうち、テナントの行が外部キーで参照するもの、またはテナントの行と同じ一意の空間で照合するものだけを、起動の時に DB の NULL の行へ読み込む（`catalog_loader`）。テナントが自由に変える既定の設定は、テナントの作成の時にテナントの行として作る。それ以外はコードの中だけに持ち、テナントは自分の行で上書き・無効・複製をして、組み込みのものを `stable_key` で指す（外部キーにしない）。
+**規則**：組み込みのデータの定義の正本はコードのバージョンにある。そのうち、テナントの行が外部キーで参照するもの、またはテナントの行と同じ一意の空間で照合するものだけを、起動の時に DB の NULL の行へ読み込む（`catalog_loader`）。テナントが自由に変える既定の設定は、テナントの作成の時にテナントの行として作る。それ以外はコードの中だけに持ち、テナントは自分の行で上書き・無効・複製をして、組み込みのものを `stable_key` で指す（外部キーにしない）。
 
 | 組み込みのデータ | 置き場所 | 理由・テナントの変え方 | 定義の場所 |
 | --- | --- | --- | --- |
 | 辞書（`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`） | **NULL の行** | テナントの `c_` のフィールド・上書き・子のクラスが参照する | [data-model/platform-metadata.md](data-model/platform-metadata.md) の 3 節 |
 | ロール（`role`） | **NULL の行** | `group_role`・`user_role` が参照する | [data-model/identity-and-access.md](data-model/identity-and-access.md) の 3.3 節 |
 | ACL の規則（`acl_rule`） | **NULL の行** | テナントの無効の印（`disables_rule_id`）が参照する。組み込みの `deny_unless` は無効にできない | 同上の 4 節 |
-| 国民の祝日（`holiday_set`、`holiday_set_version`、`holiday`） | **NULL の行**（運用者 2 人の承認の後に公開） | テナントのカレンダーの版が参照する | [data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) の 3 節 |
+| 国民の祝日（`holiday_set`、`holiday_set_version`、`holiday`） | **NULL の行**（運用者 2 人の承認の後に公開） | テナントのカレンダーのバージョンが参照する | [data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) の 3 節 |
 | 番号の定義（`number_def`） | **NULL の行** | 組み込みの辞書の `number_def_id` と、テナントの `number_counter` が参照する。接頭辞・桁の変更は、同じテーブルのテナントの行で上書きする | [data-model/platform-metadata.md](data-model/platform-metadata.md) の 4 節 |
 | CI の関係の型（`ci_relation_type`） | **NULL の行** | テナントの `ci_relation` が参照する。テナントは型を足せる | [data-model/cmdb.md](data-model/cmdb.md) の 6.1 節 |
 | CI の属性と識別の規則（`ci_attribute`、`ci_identification_rule`） | **NULL の行** | テナントの `ci_precedence`・`ci_identifier` が参照する。テナントの同じクラスの規則は組み込みの行に勝つ | 同上の 3 節 |
-| 組み込みのフロー（`flow_def`、`flow_version`：`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | **NULL の行** | テナントの `flow_run` が版を参照する。コードの新しい版は新しい `flow_version` の行にし、前の版を変えない。テナントが変える値（承認者・規則）は、フローの入力となるテナントの行に持つ（`change_approval_policy` は `change_approval_policy_rule`） | [data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) の 2 節 |
-| 優先度の表の既定（`priority_matrix`） | コードの版だけ | テナントはテーブルごとの行で上書きする。行がなければ親のクラス、最後はコードの既定 | [data-model/itsm-processes.md](data-model/itsm-processes.md) の 2.1 節 |
-| 配置と画面の規則の既定（`form_layout`、`list_layout`、`view_rule`、`ui_rule`） | コードの版だけ | テナントは `view` を足すか、既定を上書きする | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) の 2 節 |
-| 状態のモデル、組み込みのレコードのルール | コードの版だけ | テナントは条件と保留の理由だけを足す | [itsm-processes.md](itsm-processes.md) の 3 節、[workflow-engine.md](workflow-engine.md) の 6 節 |
-| 通知の規則とテンプレートの既定（`notification_rule`、`notification_template`） | コードの版だけ | テナントは `stable_key` で無効にし（`disables_builtin_key`）、自分の行で規則とテンプレートを足す（組み込みのテンプレートを使うときは複製する） | [data-model/notifications-and-email.md](data-model/notifications-and-email.md) の 2 節 |
-| 組み込みのレポートとダッシュボード（`report_def`、`dashboard`） | コードの版だけ | テナントは複製して変える | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) の 4 節 |
-| 画面の文言の辞書（`ja.json`・`en.json`） | コードの版だけ | テナントの文言は `translation` | [portal-and-ui.md](portal-and-ui.md) の 7.2 節 |
-| 取り込み元の優先度とデータ源の規則の既定（`ci_precedence`、`ci_source_rule`）、無効の値の一覧、廃止の候補の日数 | コードの版だけ | テナントの行が既定に勝つ（`ci_invalid_value`・`ci_class_policy` はテナントの追加） | [data-model/cmdb.md](data-model/cmdb.md) の 3.4・3.5・4 節 |
+| 組み込みのフロー（`flow_def`、`flow_version`：`change_approval_policy`、`incident_auto_close`、`kb_publish_approval`、`major_incident_response`、カタログの雛形） | **NULL の行** | テナントの `flow_run` がバージョンを参照する。コードの新しいバージョンは新しい `flow_version` の行にし、前のバージョンを変えない。テナントが変える値（承認者・規則）は、フローの入力となるテナントの行に持つ（`change_approval_policy` は `change_approval_policy_rule`） | [data-model/workflow-and-approvals.md](data-model/workflow-and-approvals.md) の 2 節 |
+| 優先度の表の既定（`priority_matrix`） | コードのバージョンだけ | テナントはテーブルごとの行で上書きする。行がなければ親のクラス、最後はコードの既定 | [data-model/itsm-processes.md](data-model/itsm-processes.md) の 2.1 節 |
+| 配置と画面の規則の既定（`form_layout`、`list_layout`、`view_rule`、`ui_rule`） | コードのバージョンだけ | テナントは `view` を足すか、既定を上書きする | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) の 2 節 |
+| 状態のモデル、組み込みのレコードのルール | コードのバージョンだけ | テナントは条件と保留の理由だけを足す | [itsm-processes.md](itsm-processes.md) の 3 節、[workflow-engine.md](workflow-engine.md) の 6 節 |
+| 通知の規則とテンプレートの既定（`notification_rule`、`notification_template`） | コードのバージョンだけ | テナントは `stable_key` で無効にし（`disables_builtin_key`）、自分の行で規則とテンプレートを足す（組み込みのテンプレートを使うときは複製する） | [data-model/notifications-and-email.md](data-model/notifications-and-email.md) の 2 節 |
+| 組み込みのレポートとダッシュボード（`report_def`、`dashboard`） | コードのバージョンだけ | テナントは複製して変える | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) の 4 節 |
+| 画面の文言の辞書（`ja.json`・`en.json`） | コードのバージョンだけ | テナントの文言は `translation` | [portal-and-ui.md](portal-and-ui.md) の 7.2 節 |
+| 取り込み元の優先度とデータ源の規則の既定（`ci_precedence`、`ci_source_rule`）、無効の値の一覧、廃止の候補の日数 | コードのバージョンだけ | テナントの行が既定に勝つ（`ci_invalid_value`・`ci_class_policy` はテナントの追加） | [data-model/cmdb.md](data-model/cmdb.md) の 3.4・3.5・4 節 |
 | 既定のカレンダー（`calendar`、`calendar_version`） | テナントの作成の時のテナントの行 | テナントが自由に変える | [data-model/sla-and-calendars.md](data-model/sla-and-calendars.md) の 2 節 |
-| 組み込みの SLA の定義（インシデントの応答・解決、OLA。`sla_def`・`sla_def_version`） | テナントの作成の時のテナントの行 | テナントが変える。`sla_clock` はテナントの版の行を参照する | 同上の 4 節 |
+| 組み込みの SLA の定義（インシデントの応答・解決、OLA。`sla_def`・`sla_def_version`） | テナントの作成の時のテナントの行 | テナントが変える。`sla_clock` はテナントのバージョンの行を参照する | 同上の 4 節 |
 | 既定のポータルとテーマ（`portal`、`portal_theme`）、既知のエラーのナレッジベース（`kb_base`） | テナントの作成の時のテナントの行 | テナントが変える | [data-model/ui-search-and-reports.md](data-model/ui-search-and-reports.md) の 2.4 節、[data-model/knowledge.md](data-model/knowledge.md) の 2.1 節 |
 | 組み込みの取り込み元（`ci_source` の `manual`・`system_group`）、連携の主体（`user` の `email_intake`）、テナントの設定（`tenant_setting`、`tenant_meta`、`tenant_auth_policy`、`tenant_dek`） | テナントの作成の時のテナントの行 | 連携の主体（利用者の行）を持つので、テナントごとに要る | [data-model/cmdb.md](data-model/cmdb.md) の 4.1 節、[data-model/platform-metadata.md](data-model/platform-metadata.md) の 2 節 |
 
 - NULL の行は、アプリのロールから読み取りだけ。書くのは `catalog_loader` だけ。NULL の行はテナントの行を参照しない。
-- テナントの作成の時に作る行は、コードの新しい版で書き換えない（既定の変更は新しいテナントにだけ効く）。既存のテナントに効かせたいときは、変更の Story で移行のジョブを作る（[delivery.md](delivery.md) の 4 節）。
+- テナントの作成の時に作る行は、コードの新しいバージョンで書き換えない（既定の変更は新しいテナントにだけ効く）。既存のテナントに効かせたいときは、変更の Story で移行のジョブを作る（[delivery.md](delivery.md) の 4 節）。
 - **NULL の行を持つ表の許可の一覧**：`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`role`、`acl_rule`、`holiday_set`、`holiday_set_version`、`holiday`、`number_def`、`ci_relation_type`、`ci_attribute`、`ci_identification_rule`、`flow_def`、`flow_version`。ここにない表の `tenant_id` は NOT NULL。
 
 ### 3.2 セルの DB の外に置く表（制御の面）
@@ -123,7 +123,7 @@ RLS を外す・テナントをまたいで読むのは次だけ。**この表�
 
 - DB の ID は `uuid` 型の **UUIDv7**（PostgreSQL 18 の `uuidv7()`）。API・画面は UUID の文字列をそのまま出す（接頭辞を付けない）。例外：Webhook の配達の ID は `whd_` ＋ base62 で外に出す（[api-and-integrations.md](api-and-integrations.md) の 6.2 節）。
 - **人が話す番号は `number`**（`INC0001234`、`KB0001234`）。テナント・番号の定義ごとに一意で増えるが、欠番のないことは約束しない（[ADR-0008](../decisions/0008-record-numbering.md)）。
-- 組み込みの行（NULL の行、コードの版の定義）は、コードの版で固定の UUID を持つ（起動の時の読み込みが冪等になる）。
+- 組み込みの行（NULL の行、コードのバージョンの定義）は、コードのバージョンで固定の UUID を持つ（起動の時の読み込みが冪等になる）。
 - **設定のパッケージで移したメタデータは、移送先でも同じ `id` を使う**（主キーが `(tenant_id, id)` なので衝突しない。[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 10.2 節）。
 - 秘密・トークンの接頭辞は `<brand>_at_`・`<brand>_cs_`・`<brand>_whsec_`（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
@@ -173,9 +173,9 @@ RLS を外す・テナントをまたいで読むのは次だけ。**この表�
 | メタデータの共通の列 | `stable_key text NOT NULL`（辞書は `field:<table>.<field>`、ほかは `id` と同じ値）、`rev integer NOT NULL DEFAULT 1`、`content_hash bytea NOT NULL`、`updated_in_version bigint NOT NULL`（変えた時の `meta_version`）、`deleted_at timestamptz NULL`、`created_at`、`created_by`、`updated_at`、`updated_by` | 辞書、ACL の規則、フロー、ルール、SLA、カレンダー、配置、通知の規則、カタログの定義、割り当ての規則など（[ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)） |
 | レコードの共通の列 | `version bigint NOT NULL DEFAULT 1`、`created_at`、`created_by`、`updated_at`、`updated_by` | `task`、`ci`、`custom_record`、専用の表（`user`、`group`、`kb_article` など） |
 
-- **行は `version` を持ち、更新は版の条件付き**（`WHERE version = $expected`）。一致しなければ 409 `record_changed`。API の `ETag`・`If-Match` は `"v<version>"`。
+- **行は `version` を持ち、更新はバージョンの条件付き**（`WHERE version = $expected`）。一致しなければ 409 `record_changed`。API の `ETag`・`If-Match` は `"v<version>"`。
 - メタデータの変更は、オブジェクトの行、`tenant_meta.meta_version += 1`、`meta_change`、outbox（`meta.changed`）を 1 つのトランザクションで書く。
-- 版付きのメタデータは「定義の表 ＋ 不変の版の表」の 2 つにする（`flow_def`・`flow_version`、`sla_def`・`sla_def_version`、`calendar`・`calendar_version`、`catalog_item`・`catalog_item_version`、`transform_map`・`transform_map_version`、`std_change_template`・`std_change_template_version`、`on_call_schedule`・`on_call_schedule_version`、`escalation_policy`・`escalation_policy_version`）。**版の表には `UPDATE` を与えない。** 動いている実行・計時・要求は、開始の時の版を指す。
+- バージョン付きのメタデータは「定義の表 ＋ 不変のバージョンの表」の 2 つにする（`flow_def`・`flow_version`、`sla_def`・`sla_def_version`、`calendar`・`calendar_version`、`catalog_item`・`catalog_item_version`、`transform_map`・`transform_map_version`、`std_change_template`・`std_change_template_version`、`on_call_schedule`・`on_call_schedule_version`、`escalation_policy`・`escalation_policy_version`）。**バージョンの表には `UPDATE` を与えない。** 動いている実行・計時・要求は、開始の時のバージョンを指す。
 
 ### 3.10 論理削除と個人情報の除去
 
@@ -195,14 +195,14 @@ RLS を外す・テナントをまたいで読むのは次だけ。**この表�
 | 設定のパッケージの署名、一覧の `cursor` の HMAC | 署名 | `<brand>-<cell>-signing` |
 | 監査のハッシュの鎖、プラットフォームの監査 | Object Lock（compliance） | `<brand>-audit`（log-archive） |
 
-- 暗号文の列は `bytea`、`*_ciphertext` の名前にし、`dek_version` で `tenant_dek` の版を指す。ハッシュの列は `*_hash`。
+- 暗号文の列は `bytea`、`*_ciphertext` の名前にし、`dek_version` で `tenant_dek` のバージョンを指す。ハッシュの列は `*_hash`。
 
 ### 3.12 DB のロール
 
 | ロール | 権限 | 使う処理 |
 | --- | --- | --- |
 | `migrator` | 所有者。DDL | マイグレーション |
-| アプリのロール | テナントテーブルの読み書き（RLS の対象。`BYPASSRLS` なし）。追記だけの表（`record_change`、`journal_entry`、`sla_clock_event`、`meta_change`、`tenant_audit_event`、`ci_merge_log`、`audit_digest`）と版の表は `INSERT`・`SELECT` だけ | App・Engine・Ingest・Notifier・Indexer |
+| アプリのロール | テナントテーブルの読み書き（RLS の対象。`BYPASSRLS` なし）。追記だけの表（`record_change`、`journal_entry`、`sla_clock_event`、`meta_change`、`tenant_audit_event`、`ci_merge_log`、`audit_digest`）とバージョンの表は `INSERT`・`SELECT` だけ | App・Engine・Ingest・Notifier・Indexer |
 | `catalog_loader` | NULL の行の `INSERT`・`UPDATE` だけ | 起動の時の組み込みの定義の読み込み、祝日の取り込み |
 | `engine_scheduler` | `claim_due_timers` の実行だけ | タイマーの候補の取得 |
 | `relay` | `outbox` の `SELECT` と `published_at` の `UPDATE` | outbox の中継 |
@@ -534,19 +534,19 @@ erDiagram
 | **テナントの分離**：あるテナントのコンテキストで、別のテナントの行・索引の文書・S3 のオブジェクト・キャッシュのキーに届かない | 3.3 節の FORCE RLS と複合の外部キー、NULL の行の許可の一覧と `check_shared_ref()`、3.4 節の例外の一覧、マイグレーションの CI（`tenant_id` と方針のない表を拒む） | [ADR-0002](../decisions/0002-tenancy-and-isolation.md)、[ADR-0054](../decisions/0054-shared-reference-rows-and-cross-tenant-roles.md) |
 | **遷移はちょうど 1 回**：レコード・フローの実行・承認・計時の行・呼び出しの状態の遷移と、タイマーの消化・登録、outbox を 1 つのトランザクションで書く | 行の `version` の条件付きの更新、`FOR UPDATE`、タイマーの `target_version` の照合 | [ADR-0004](../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../decisions/0015-flow-execution-and-timers.md) |
 | **終わっていない実行は、今すぐのタイマーか待ちのどちらか 1 つをちょうど持つ**（INV-FLOW-001） | 遷移の関数（1 か所）、毎分の回収の検査 | [workflow-engine.md](workflow-engine.md) の 5.2・5.6 節 |
-| **承認のまとまりの決着は 1 回**：同じ承認への 2 つの回答は 1 つだけ効く | `approval_set` の行のロックの下での評価、`approval` の版の条件、UK `(set_id, approver_id)` | [ADR-0016](../decisions/0016-approvals.md) |
+| **承認のまとまりの決着は 1 回**：同じ承認への 2 つの回答は 1 つだけ効く | `approval_set` の行のロックの下での評価、`approval` のバージョンの条件、UK `(set_id, approver_id)` | [ADR-0016](../decisions/0016-approvals.md) |
 | **変更は承認なしに実施へ進まない** | 遷移の表（`scheduled` の前に `approved`）、`requires_explicit_approval` のテーブルで `on_due = approve` を拒むトリガー、日次の突き合わせ | [ADR-0024](../decisions/0024-change-models-risk-and-cab.md)、PROP-CHG-001 |
 | **監査の履歴の完全**：コミットした保存と `record_change` の行が 1 対 1。追記だけ | 同じトランザクション、アプリのロールに `UPDATE`・`DELETE` なし、日次のハッシュの鎖（S3 Object Lock） | [ADR-0009](../decisions/0009-record-audit-history-and-journal.md)、PROP-DICT-003 |
 | **`ext_index` と `ext` は常に一致する** | Record Service が同じトランザクションで書く、`num_nonnulls = 1` の CHECK、日次の抜き取り | [ADR-0007](../decisions/0007-physical-layout-and-extension-index.md)、PROP-DICT-002 |
 | **番号は一意で増える**（欠番は許す） | `(tenant_id, number)` の一意、別の短いトランザクションの `UPDATE ... RETURNING`、`next` を減らす更新を拒むトリガー | [ADR-0008](../decisions/0008-record-numbering.md)、PROP-DICT-004 |
-| **メタデータの版は単調に増え、変更と同じトランザクションで上がる** | `tenant_meta` の行のロック、減る値を拒むトリガー | [ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)、[ADR-0011](../decisions/0011-roles-groups-and-acl-evaluation.md) |
-| **公開した版は変えない**（フロー・品目・SLA・カレンダー・祝日・変換の対応・当番表・方針・雛形の承認済みの版、記事の `review`・`published` の本文） | 版の表に `UPDATE` を与えない、更新を拒むトリガー | [ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)、[ADR-0021](../decisions/0021-sla-definitions-and-timers.md)、[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) |
+| **メタデータのバージョンは単調に増え、変更と同じトランザクションで上がる** | `tenant_meta` の行のロック、減る値を拒むトリガー | [ADR-0010](../decisions/0010-metadata-versions-and-config-packages.md)、[ADR-0011](../decisions/0011-roles-groups-and-acl-evaluation.md) |
+| **公開したバージョンは変えない**（フロー・品目・SLA・カレンダー・祝日・変換の対応・当番表・方針・雛形の承認済みのバージョン、記事の `review`・`published` の本文） | バージョンの表に `UPDATE` を与えない、更新を拒むトリガー | [ADR-0014](../decisions/0014-flow-dsl-and-versioning.md)、[ADR-0021](../decisions/0021-sla-definitions-and-timers.md)、[ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) |
 | **1 つのタスク・SLA の定義に動いている計時の行は高々 1 つ。違反の事実は取り消さない** | 部分一意索引、`breached` を偽に戻す更新を拒むトリガー | [ADR-0021](../decisions/0021-sla-definitions-and-timers.md)、[ADR-0047](../decisions/0047-sla-attainment-and-breach-disputed.md) |
 | **CI の重複を作らない**：同じ識別の値は 1 つの CI だけが持つ。CI は入口だけが書く | `ci_identifier` の主キー、一意の違反で巻き戻して識別からやり直す | [ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)、[ADR-0037](../decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md) |
 | **調整は到着の順序によらない** | `ci_source_state`・`ci_relation_source_state` の max の結合、`choose` の純粋な関数 | [ADR-0038](../decisions/0038-attribute-reconciliation-per-source-state.md) |
 | **通知・配達・受信は 1 回だけ作る** | `notification_message` の UK `(event_id, rule_key, recipient_key, channel)`、`webhook_delivery` の UK `(event_id, subscription_id)`、`inbound_email` の UK `(ses_message_id)`（いずれもパーティションのキーを含む） | [ADR-0033](../decisions/0033-notification-rules-and-outbound-email.md)、[ADR-0034](../decisions/0034-inbound-email-threading-and-sender-trust.md)、[ADR-0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) |
-| **事象と Webhook の本文に値を入れない**（ID と版だけ） | outbox の topic ごとの Zod スキーマ、Webhook の本文のスキーマ | [ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)、[ADR-0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) |
-| **1 つの記事に公開中の版・編集中の版はそれぞれ高々 1 つ** | 部分一意索引 2 つ | [ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) |
+| **事象と Webhook の本文に値を入れない**（ID とバージョンだけ） | outbox の topic ごとの Zod スキーマ、Webhook の本文のスキーマ | [ADR-0012](../decisions/0012-acl-enforcement-at-every-exit.md)、[ADR-0050](../decisions/0050-signed-webhooks-and-tenant-rate-limits.md) |
+| **1 つの記事に公開中のバージョン・編集中のバージョンはそれぞれ高々 1 つ** | 部分一意索引 2 つ | [ADR-0031](../decisions/0031-knowledge-articles-versions-and-publishing.md) |
 | **開いている呼び出しは (タスク, グループ) に 1 つ** | 部分一意索引 | [ADR-0027](../decisions/0027-on-call-rotations-and-escalation.md) |
 | **秘密は平文で持たない** | ハッシュか DEK の暗号文の列だけ（3.11 節）、列の名前の lint | [ADR-0052](../decisions/0052-keys-encryption-and-operator-access.md) |
 
@@ -556,7 +556,7 @@ erDiagram
 
 | # | 点 | 決定 | 直した文書 |
 | --- | --- | --- | --- |
-| 1 | 3.1 節の候補の表（組み込みの行を DB に NULL の行として持つか、コードの中だけにするか） | 3 つに分けた（NULL の行、コードの版だけ、テナントの作成の時の行）。NULL の行はテナントの行が外部キーで参照するか同じ一意の空間で照合するものだけ。`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を許可の一覧に足した | この文書の 3.1 節、security の 10.2 節、ADR-0054・ADR-0002 の注記、AGENTS.md |
+| 1 | 3.1 節の候補の表（組み込みの行を DB に NULL の行として持つか、コードの中だけにするか） | 3 つに分けた（NULL の行、コードのバージョンだけ、テナントの作成の時の行）。NULL の行はテナントの行が外部キーで参照するか同じ一意の空間で照合するものだけ。`number_def`・`ci_relation_type`・`ci_attribute`・`ci_identification_rule`・`flow_def`・`flow_version` を許可の一覧に足した | この文書の 3.1 節、security の 10.2 節、ADR-0054・ADR-0002 の注記、AGENTS.md |
 | 2 | `sla_clock.breach_disputed_at` の列の追加 | 足す。計算し直しのジョブが `breach_disputed` の事象と同じトランザクションで入れる | sla-and-calendars の 6.2・8 節、reports の 8.2 節、ADR-0047 の注記 |
 | 3 | `timer` の取得の SQL がテナントをまたいで読む | `engine_scheduler` の関数 `claim_due_timers` に置き換え、識別子だけを返す | workflow-engine の 5.3・8.3 節、security の 10.4 節、ADR-0004・0015・0018 の注記 |
 | 4 | 受信のメールの経路と、解決できない受け手のバウンス | infrastructure の形（mail-ingress の共有の入口と `mail-router`）に揃え、バウンスしない（後方散乱を避ける） | notifications-and-email-ingest の 5.1 節、infrastructure の 2.3 節、ADR-0034・0035 の注記 |
@@ -564,9 +564,9 @@ erDiagram
 | 6 | レポートの定義・翻訳・画面の配置をパッケージの対象に入れるか | 配置・`view_rule`・画面の規則・翻訳は入れる。レポートとダッシュボードは `packaged` の印の付いたものだけ | data-dictionary-and-tables の 10.1 節、reports の 3 節 |
 | 7 | 監査の保持の案（「（案）」と書いたもの） | security の 9 節の表に一本化した | security の 9 節、この文書の 3.6 節 |
 | 8 | 組み込みのロールに `problem_manager`・`major_incident_manager` があるか | 組み込みのロールに足す（どちらも `agent` を含む）。あわせて、`requester` がポータルから自分のインシデントを作る組み込みの規則を足す | access-control の 3.3 節、itsm-processes の 11 節 |
-| 9 | 組み込みのフロー `change_approval_policy` のテナントが変える値の置き場所 | テナントの設定の表 `change_approval_policy_rule` に持つ。フローの版には既定だけを持ち、段の数は変えさせない。保存の時の検査は DT-CHG-003 | itsm-processes の 8.5・8.5.1 節、roadmap の `change-approval-policy-flows` |
+| 9 | 組み込みのフロー `change_approval_policy` のテナントが変える値の置き場所 | テナントの設定の表 `change_approval_policy_rule` に持つ。フローのバージョンには既定だけを持ち、段の数は変えさせない。保存の時の検査は DT-CHG-003 | itsm-processes の 8.5・8.5.1 節、roadmap の `change-approval-policy-flows` |
 | 10 | データモデルの正本の置き場所 | この文書と `data-model/` を列・制約・索引の正本にした（索引から昇格）。領域の文書は振る舞いの正本で、末尾の「data-model への項目」は提案の記録 | この文書、architecture/README の 7 節 |
-| 11 | 版付きのメタデータの表の形（`sla_def`・`escalation_policy`・`transform_map` の「版付き」の意味） | `flow_def`・`flow_version` と同じ「定義の表 ＋ 不変の版の表」にし、`sla_def_version`・`escalation_policy_version`・`transform_map_version` を足した（`sla_clock.sla_def_version_id`・`page.policy_version_id` の参照先） | sla-and-calendars の 6.1・14 節、assignment-and-on-call の 12 節、api-and-integrations の 5.2・13 節 |
+| 11 | バージョン付きのメタデータの表の形（`sla_def`・`escalation_policy`・`transform_map` の「バージョン付き」の意味） | `flow_def`・`flow_version` と同じ「定義の表 ＋ 不変のバージョンの表」にし、`sla_def_version`・`escalation_policy_version`・`transform_map_version` を足した（`sla_clock.sla_def_version_id`・`page.policy_version_id` の参照先） | sla-and-calendars の 6.1・14 節、assignment-and-on-call の 12 節、api-and-integrations の 5.2・13 節 |
 | 12 | メタデータの共通の列の論理削除（`deleted` と `deleted_at` の食い違い） | `deleted_at timestamptz` にそろえた | data-dictionary-and-tables の 9.1 節 |
 | 13 | 参照の列の名前（`duplicate_of`・`reopened_from` と `_id` の混在） | 列は `<name>_id`、辞書のフィールドの名前は `_id` を除いた名前（3.8 節） | itsm-processes の 15 節 |
 | 14 | セッションの正本（Valkey と書いた箇所がある） | Aurora の `user_session` を正本にし、Valkey は写しのキャッシュにする（当番の端末のセッションが 14 日続き、SEC-092 の「Valkey を判定の正本にしない」に合わせる）。パスワード・MFA の表（`user_credential`・`user_mfa_factor`）も定義した | architecture/README の 1.2 節 |

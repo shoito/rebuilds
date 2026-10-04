@@ -1,6 +1,6 @@
 # Data model: 権限
 
-権限の方針の版、セキュリティグループと所属、所属の版、利用者ごとの権限の表、職務分掌の違反、代理のログイン、サポートの参照の許可。振る舞いは [security-model.md](../security-model.md) と [security.md](../security.md) の 7 節、決定は [ADR-0017](../../decisions/0017-authorization-evaluator.md)〜[ADR-0020](../../decisions/0020-sensitive-read-audit-and-access-explanations.md)、[ADR-0053](../../decisions/0053-operator-access-and-vault-break-glass.md)。規約は [data-model.md](../data-model.md) の 3 節。
+権限の方針のバージョン、セキュリティグループと所属、所属のバージョン、利用者ごとの権限の表、職務分掌の違反、代理のログイン、サポートの参照の許可。振る舞いは [security-model.md](../security-model.md) と [security.md](../security.md) の 7 節、決定は [ADR-0017](../../decisions/0017-authorization-evaluator.md)〜[ADR-0020](../../decisions/0020-sensitive-read-audit-and-access-explanations.md)、[ADR-0053](../../decisions/0053-operator-access-and-vault-break-glass.md)。規約は [data-model.md](../data-model.md) の 3 節。
 
 - ドメインと操作の一覧はシステムの定数（コード）で、表に持たない（[security-model.md](../security-model.md) の 3.1・3.2 節）。
 - 職務分掌の規則は、システムの規則（S1〜S8）がコードの定数、テナントの規則が `security_policy_versions.body.sod_rules`。表 `sod_rules` は持たない（[data-model.md](../data-model.md) の 6 節）。
@@ -98,7 +98,7 @@ erDiagram
 
 ### 2.1 `security_policy_versions`
 
-権限の方針の版（版の表）。定義元：[security-model.md](../security-model.md) の 7.2・8 節。
+権限の方針のバージョン（バージョンの表）。定義元：[security-model.md](../security-model.md) の 7.2・8 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -107,8 +107,8 @@ erDiagram
 | `status` | `text` | NOT NULL | `'draft'` | `draft`・`pending_activation`・`active`・`superseded`・`rejected` |
 | `body` | `jsonb` | NOT NULL | — | `grants`：`[{group_id, domain \| process_type, ops[]}]`、`sod_rules`：テナントの規則 `[{code, a, b, scope, strength}]`、`special`：`payroll.retro_override` などの特別の権限 |
 | `body_sha256` | `bytea` | NOT NULL | — | |
-| `based_on_version` | `int` | NULL | — | 戻しは前の版の中身を写した新しい版 |
-| `diff_summary` | `jsonb` | NULL | — | 有効化の前に作る、前の版との差（権限を得る・失う人数。人の ID は持たない） |
+| `based_on_version` | `int` | NULL | — | 戻しは前のバージョンの中身を写した新しいバージョン |
+| `diff_summary` | `jsonb` | NULL | — | 有効化の前に作る、前のバージョンとの差（権限を得る・失う人数。人の ID は持たない） |
 | `created_by` | `uuid` | NOT NULL | — | 編集者（`security.config`） |
 | `activated_by` | `uuid` | NULL | — | 承認者（`security.activation`） |
 | `activated_at` | `timestamptz` | NULL | — | |
@@ -117,11 +117,11 @@ erDiagram
 | `lock_version` | `int` | NOT NULL | `0` | 下書きの編集の楽観ロック |
 
 - キー：PK `(tenant_id, version)`。
-- 一意：`(tenant_id) WHERE status = 'active'`（有効な版は 1 つ）、`(tenant_id) WHERE status = 'draft'`（下書きは 1 つ）。
+- 一意：`(tenant_id) WHERE status = 'active'`（有効なバージョンは 1 つ）、`(tenant_id) WHERE status = 'draft'`（下書きは 1 つ）。
 - CHECK：`status IN (...)`、`status NOT IN ('active','superseded') OR (activated_by IS NOT NULL AND activated_by <> created_by)`（S3）。
 - 更新：`active` の後は `superseded` への変更だけ（トリガー）。
 - 運用：RLS。保存は監査ログ（既定 10 年）。
-- S1 の量：テナントあたり年 数十版。
+- S1 の量：テナントあたり年 数十バージョン。
 
 ### 2.2 `security_groups`
 
@@ -171,7 +171,7 @@ erDiagram
 
 ### 2.4 `security_membership_versions`
 
-人ごとの所属の版（権限のキャッシュのキー）。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。定義元：[security-model.md](../security-model.md) の 7.3 節。
+人ごとの所属のバージョン（権限のキャッシュのキー）。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。定義元：[security-model.md](../security-model.md) の 7.3 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -204,7 +204,7 @@ erDiagram
 
 - キー：PK `(tenant_id, worker_id, policy_version, membership_version, domain_or_bp, op, scope_kind, include_sub)`。
 - 索引：`(tenant_id, policy_version, domain_or_bp, op)` — 「この項目を誰が見られるか」の報告。
-- 更新：方針の有効化・所属の変更・発効で、影響を受けた人の行を作り直す。古い版の行は、次の版の作り直しの後に消す。
+- 更新：方針の有効化・所属の変更・発効で、影響を受けた人の行を作り直す。古いバージョンの行は、次のバージョンの作り直しの後に消す。
 - キャッシュ：Valkey の `authz:{tenant}:{worker}:{policy_version}:{membership_version}`（[stores.md](stores.md)）。
 - 運用：RLS。派生なので保存の対象外（作り直せる）。
 - S1 の量：約 300 万行（`self` 以外の権限を持つ 15% × 平均 20 行）。

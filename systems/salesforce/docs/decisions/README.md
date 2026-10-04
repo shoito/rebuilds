@@ -7,7 +7,7 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、メタデータの実行基盤を自前で作る。本家の言語との互換は持たない | accepted |
 | [0002](0002-custom-object-storage.md) | レコードを共有の records の表（システムの列＋JSONB）に入れ、型付きのピボットの表で引く | accepted |
-| [0003](0003-metadata-driven-runtime.md) | メタデータを版の付いた不変のスナップショットにコンパイルし、要求を 1 つの版に固定して AST から SQL を作る | accepted |
+| [0003](0003-metadata-driven-runtime.md) | メタデータをバージョンの付いた不変のスナップショットにコンパイルし、要求を 1 つのバージョンに固定して AST から SQL を作る | accepted |
 | [0004](0004-record-access-model.md) | 共有を事前計算し、所有者とロール階層は閉包の表と結ぶ。設定の変更の再計算は影の世代で切り替える | accepted |
 | [0005](0005-tenancy-and-governor-limits.md) | 組織を共有スキーマと RLS で分け、論理シャードとセルで広げる。上限は実行基盤のデータ層で強制する | accepted |
 | [0006](0006-data-dictionary-and-field-lifecycle.md) | データ辞書は field_id と再利用しない field_no を分けて持ち、型の変換は新しい field_no へ写して切り替え、削除は 15 日保つ | accepted |
@@ -20,7 +20,7 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0013](0013-permission-sets-and-field-level-security.md) | 権限は権限セットで与えて和で合わせ、プロファイルは既定値と基本の権限セットの入れ物にする。読めない項目は存在しない項目と同じに扱う | accepted |
 | [0014](0014-owd-roles-groups-and-closure.md) | OWD の変更は述語の切り替えだけにし、利用者本人とキューもグループとして、ロール階層を含む閉包を 1 つの表にまとめる | accepted |
 | [0015](0015-sharing-reasons-and-where-they-live.md) | 所有者の条件のルールと暗黙の子は問い合わせの時に、レコードの条件のルール・手動・チーム・暗黙の親は行に持つ。暗黙の親は子ごとの行にする | accepted |
-| [0016](0016-recalculation-rule-versions-and-skew.md) | 再計算の単位をレコードの条件のルールの版と閉包の世代にし、切り替えの前に標本で照合する。スキューは 1 万件で警告する | accepted |
+| [0016](0016-recalculation-rule-versions-and-skew.md) | 再計算の単位をレコードの条件のルールのバージョンと閉包の世代にし、切り替えの前に標本で照合する。スキューは 1 万件で警告する | accepted |
 | [0017](0017-reference-access-evaluator.md) | 参照の評価器を決定表をそのまま書いた純粋な関数にし、性質ベーステストと本番の標本の照合に使う。多く見せる食い違いはセキュリティの呼び出しにする | accepted |
 | [0018](0018-record-query-language.md) | 問い合わせの言語は SQL に寄せた独自の言語にし、親へのドットと 1 段の子の副問い合わせでたどり、3 値の論理と正規化した文字列の比較にする | accepted |
 | [0019](0019-selectivity-statistics-and-planning.md) | 組織ごとの自前の統計と本家に寄せた閾値で駆動の条件を選び、実体化した CTE で順を固定し、見積もりが外れたら 1 回だけ計画し直す | accepted |
@@ -29,13 +29,13 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0022](0022-duplicate-rules-and-japanese-matching.md) | 重複の照合は同じトランザクションで書く正規化した照合の鍵で候補を引き、評価器で判定する。日本語は表で正規化し、見えないレコードとの重複は既定で知らせない | accepted |
 | [0023](0023-layouts-and-record-page-composition.md) | レイアウトを部品にコンパイルし、レコードのページを 1 回の要求で組み立てる。レイアウトは狭めるだけで、画面の保存にだけ効く | accepted |
 | [0024](0024-list-views-as-filter-ast.md) | リストビューを条件の AST で保存し、見る人の権限で毎回コンパイルする。共有は定義だけで、読めない項目を条件に持つビューは開けない | accepted |
-| [0025](0025-flow-definition-and-bulk-engine.md) | フローは版を持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える | accepted |
+| [0025](0025-flow-definition-and-bulk-engine.md) | フローはバージョンを持つ JSON のグラフにし、塊の実行を足並みをそろえて進める解釈器で動かす。要素の実行は足並みの 1 歩で数える | accepted |
 | [0026](0026-record-triggered-flow-order-and-recursion.md) | レコードの変更で動くフローを DML の手順 3a・7b・13 と予定の経路に置き、実行の順の番号で並べ、同じフローは同じレコードに 1 トランザクションで 1 回だけ動かす | accepted |
 | [0027](0027-roll-up-summaries-incremental-with-reconciliation.md) | 積み上げ集計は子の変更から差分で直し、最小・最大が外れた時だけ集計し直す。整合の検査で差を 0 に保ち、集計する子の項目も読める人にだけ返す | accepted |
-| [0028](0028-approval-processes-and-record-locks.md) | 承認はプロセスの版・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない | accepted |
+| [0028](0028-approval-processes-and-record-locks.md) | 承認はプロセスのバージョン・インスタンス・作業の項目の状態で持ち、応答ごとに 1 トランザクションにする。申請中はロックの表で守り、承認者にアクセスを与えない | accepted |
 | [0029](0029-report-execution-on-reader-per-viewer.md) | レポートは見る人の権限で毎回コンパイルし、結ぶ全てのオブジェクトに共有の条件と FLS をかけて reader で集計する。見る人をまたぐ事前の集計を持たない | accepted |
 | [0030](0030-dashboards-viewer-intersection-and-subscriptions.md) | ダッシュボードは見る人の権限で集計し、部下の視点は部下と見る人の権限の共通部分にする。指定した実行ユーザーの形は持たず、定期の配信は受け取る人ごとに実行する | accepted |
-| [0031](0031-search-index-and-japanese-analysis.md) | 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部の版にして作る | accepted |
+| [0031](0031-search-index-and-japanese-analysis.md) | 検索の索引は共有の 16 個の索引に組織で振り分け、日本語は形態素と 2-gram の 2 つで持ち、outbox から row_version を外部のバージョンにして作る | accepted |
 | [0032](0032-search-permission-post-filter.md) | 検索の結果は候補とし、オブジェクトの権限と FLS は前に絞り、レコードの共有はデータ層の問い合わせで後に確かめる。件数の合計を返さず、応答の時間を固定の束と下限の時間でそろえる | accepted |
 | [0033](0033-change-event-log-and-replay.md) | 変更のイベントは outbox からイベントの専用の Aurora に書き、論理シャードの唯一の書き手が確定の順の replay_id を付けて 3 日保つ | accepted |
 | [0034](0034-event-subscription-access-and-org-events.md) | 変更のイベントの購読はオブジェクトの view_all を要し、共有で絞らず FLS を配信の時にかける。組織が定義するイベントは型の権限で守り、既定で確定の後に発行する | accepted |
@@ -44,7 +44,7 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0037](0037-import-wizard-upsert-and-duplicate-matching.md) | インポートのウィザードは一括のジョブの上の画面にし、upsert と照合での既存の更新は同じ鍵の行を同じ部分に集めて順に処理し、見えない一致は無いものとして扱う | accepted |
 | [0038](0038-sandbox-types-and-masked-copy.md) | Sandbox は 4 種類にし、ID をそのまま新しい org_id へ写し、個人データは複製の経路の中で Sandbox ごとの鍵の偽の値に置き換える | accepted |
 | [0039](0039-metadata-package-format.md) | メタデータのパッケージは部品ごとの YAML と目録の zip にし、参照は API の名前だけで書き、書き出しを正規化する | accepted |
-| [0040](0040-deploy-validation-and-rollback.md) | デプロイは計画を作る検証と 1 つの版で当てる適用に分け、ロックの中は版の確かめと書き込みだけにし、戻しは逆の差分の新しいデプロイにする | accepted |
+| [0040](0040-deploy-validation-and-rollback.md) | デプロイは計画を作る検証と 1 つのバージョンで当てる適用に分け、ロックの中はバージョンの確かめと書き込みだけにし、戻しは逆の差分の新しいデプロイにする | accepted |
 | [0041](0041-limits-registry-and-counting-rules.md) | 上限の正本を 1 つの登録簿にし、フローは足並みの 1 歩で、積み上げ集計の集計し直しは取得の行の外で数え、レポート・一括の問い合わせ・検索は別の予算で抑える | accepted |
 | [0042](0042-org-allocations-fair-queuing-and-limit-info.md) | 割り当ては 24 時間の移動の窓で数えて有料の本番だけ 110% まで通し、Worker は組織の仮想時刻で公平に回し、上限の情報は見出しと /limits で返す | accepted |
 | [0043](0043-orgs-editions-licenses-and-users.md) | 組織は種類と状態を持って 30 日の猶予の後に消し、エディションは割り当てと機能だけを変え、ライセンスを権限の上限にし、利用者は消さずに無効にする | accepted |

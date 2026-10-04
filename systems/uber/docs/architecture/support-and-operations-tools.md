@@ -66,7 +66,7 @@
 | --- | --- | --- |
 | 時系列 | 状態の遷移（発生の時刻と記録の時刻の両方）、オファーの履歴、journal の送り直し、`restored` の印 | `trip_events`、`trip_commands`（[trips-lifecycle.md](trips-lifecycle.md)） |
 | 場所 | 乗車地・降車地（`street` に丸めた点と名前）。正確な値は軌跡の閲覧（3.3 節）で | `trips` |
-| 運賃 | 見積もりの内訳、選んだルート（距離・経由地点の名前・提供者・地図の版）、メーターの額と出どころ、照合の結果、訂正 | `fare_quotes`、`meter_readings`、`fare_adjustments`（[pricing-and-fares.md](pricing-and-fares.md)） |
+| 運賃 | 見積もりの内訳、選んだルート（距離・経由地点の名前・提供者・地図のバージョン）、メーターの額と出どころ、照合の結果、訂正 | `fare_quotes`、`meter_readings`、`fare_adjustments`（[pricing-and-fares.md](pricing-and-fares.md)） |
 | 支払い | 与信・確定・返金の状態、PSP の参照、台帳の仕訳の一覧（読み取りだけ） | [payments-and-payouts.md](payments-and-payouts.md) |
 | ナビ | 引き継ぎの記録、逸脱の知らせ、当てはめの逸脱の距離 | `trip_nav_events`、`trip_trails` |
 | 安全 | 共有の有無、インシデント、報告、評価（一時の権限で本文） | [safety-and-trust.md](safety-and-trust.md) |
@@ -126,7 +126,7 @@ change_requests (id, kind, target_ref,
 - `correction_up`（増額）は、事業者の確認が要る。事業者の管理画面に確認の依頼を出し、事業者の `operator_admin` が確かめる。
 - 事業者は、自社の乗車の訂正を**申請**できる（管理画面）。この基盤の運用が承認する。
 - 同じ乗車の訂正は `seq` で順に扱い、二重に作らない（チケットの ID と種類で重複を検査）。
-- **自動の処置**：S1 で自動で返金するのは、キャンセル料の免除の規則（ドライバーの迎車の到着が、受諾の時点の ETA より 5 分以上遅れていた乗車の、乗客の取り消し）だけにする。規則は版つきのデータで、release フラグの裏に置く。
+- **自動の処置**：S1 で自動で返金するのは、キャンセル料の免除の規則（ドライバーの迎車の到着が、受諾の時点の ETA より 5 分以上遅れていた乗車の、乗客の取り消し）だけにする。規則はバージョンつきのデータで、release フラグの裏に置く。
 
 ## 6. 問い合わせとアプリの中のヘルプ
 
@@ -269,4 +269,4 @@ change_requests (id, kind, target_ref,
 | Aurora `change_requests` | 4 節 |
 | Aurora `support_tickets`（`id`、`requester_kind`、`requester_id`、`trip_id`、`category`、`status`、`queue`、`assigned_to`、`created_at`、`first_response_at`、`resolved_at`）、`support_ticket_messages` | 6 節 |
 | Aurora `audit_events` と log-archive の S3（ADR-0036） | 8 節。この領域は `action` の値の一覧を足す |
-| Aurora `auto_refund_rules`（版、条件、有効期間） | 5 節 |
+| Aurora `auto_refund_rules`（バージョン、条件、有効期間） | 5 節 |

@@ -205,7 +205,7 @@ readable(u) = { 公開のリポジトリ }
 | `parent_issue_id`、`review_state`、`review_requested_ids`、`reviewed_by_ids` | sub-issue、レビュー |
 | `created_at`、`updated_at`、`closed_at`、`merged_at` | 日時 |
 | `comments_count`、`reactions_count` | 並べ替え |
-| `search_version` | 版。`issues` の行の更新ごとに増える値 |
+| `search_version` | バージョン。`issues` の行の更新ごとに増える値 |
 
 **repos**
 
@@ -225,7 +225,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 ```
 
 - indexer はイベントを「きっかけ」として扱い、Issue の現在の状態を DB（reader）から読んで文書を作る。コメントのイベントも、Issue の文書全体を作り直す。
-- 書き込みは `search_version` を外部の版として書き、古い版で新しい版を上書きしない。
+- 書き込みは `search_version` を外部のバージョンとして書き、古いバージョンで新しいバージョンを上書きしない。
 - 削除は tombstone にし、7 日後に消す（Slack と同じ理由）。
 - 同じ Issue へのイベントを 1 秒の間まとめ、数件をまとめて書く（最大 100 件、または 500 ms）。
 - `refresh_interval` は 1 秒。
@@ -286,7 +286,7 @@ API ─tx─▶ outbox ─▶ Relay ─▶ SQS search-index ─▶ search-indexe
 
 - 漏洩テスト（経路ごと）：非公開のリポジトリ、コラボレーターから外した直後、公開 → 非公開の直後、別の Organization へ移した直後、削除の直後に、コード検索・Issue の検索・リポジトリの検索の結果・件数・ハイライトのどれにも出ない。
 - 性質ベーステスト：`accessPredicate` と `can` の一致（4.1 節）、組み立てた要求が常に権限の条件を含む（5.4 節）、除外の表の行がある間はそのリポジトリが出ない。
-- 版の比較：任意の順序・重複のイベントを indexer に与えても、最終的な文書が DB の最新の状態と一致する。コードの索引は、任意の push の列の後で、`indexed_commit` がデフォルトブランチの ref と一致する（処理が追いついた後）。
+- バージョンの比較：任意の順序・重複のイベントを indexer に与えても、最終的な文書が DB の最新の状態と一致する。コードの索引は、任意の push の列の後で、`indexed_commit` がデフォルトブランチの ref と一致する（処理が追いついた後）。
 - 索引の対象の規則（3.1 節）：350 KiB、長い行、バイナリ、UTF-8 以外、vendored。
 - 構文：3.5 節と 5.4 節の各行。リテラルのない正規表現の拒否。
 

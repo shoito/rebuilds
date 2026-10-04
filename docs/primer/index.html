@@ -151,7 +151,7 @@ CREATE POLICY tenant_isolation ON items
     <h2>ID：UUIDv7</h2>
     <p>主キーは多くの題材で <a class="t" href="#g-uuidv7">UUIDv7</a> です（GitHub のように <code>bigint</code> の連番を使う題材もあります。各題材の data-model の規約を見てください）。先頭 48 ビットが作った時刻（ミリ秒）なので、<strong>ほぼ作った順に並びます</strong>。</p>
     <pre><code>0192 3e4f-8a1b-7c3d-9e2f-1a2b3c4d5e6f
-└── 時刻(48bit) ─┘ └ 版=7 ┘ └── ランダム ──┘</code></pre>
+└── 時刻(48bit) ─┘ └ バージョン=7 ┘ └── ランダム ──┘</code></pre>
     <ul>
       <li>B-tree の索引の末尾に追記されるので、ランダムな UUIDv4 より書き込みが速い。</li>
       <li>ID の範囲で時刻の範囲を表せるので、ID でパーティションを切れる。</li>

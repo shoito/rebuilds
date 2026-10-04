@@ -8,7 +8,7 @@
   - E3 の前：IndexedDB の一括の書き込みと部分のブートストラップの時間（基準の端末で p95 10 秒。だめなら SQLite の WASM の ADR）と、Aurora の reader での 10 秒の `REPEATABLE READ` の読み取り（`bootstrap-poc`）、全体と部分の閾値（`bootstrap-kind-threshold`）。
   - E6 の前：IME のイベントの順序と `Process` のキー（`ime-shortcut-poc`）。
   - E8 の前：OpenSearch の費用・索引の大きさ・p99（`search-poc`）。
-- **規則は 1 つのコードに。** 競合の規則・`applyOp`・`derive`・検証はスキーマの定義から生成した共有のパッケージ、権限は `packages/policy`、フィルターは `packages/filter` にだけ書く。同期の意味（競合の規則、同期グループの規則、トランザクションの形）はフラグにせず、スキーマの版で変える（[ADR-0056](decisions/0056-flags-client-distribution-and-min-build.md)）。
+- **規則は 1 つのコードに。** 競合の規則・`applyOp`・`derive`・検証はスキーマの定義から生成した共有のパッケージ、権限は `packages/policy`、フィルターは `packages/filter` にだけ書く。同期の意味（競合の規則、同期グループの規則、トランザクションの形）はフラグにせず、スキーマのバージョンで変える（[ADR-0056](decisions/0056-flags-client-distribution-and-min-build.md)）。
 - **契約を先に固定する。** スキーマの定義（`packages/schema`）、Gateway のプロトコル、ブートストラップのストリームの形、`sync_actions` の形、権限の決定表は、人間がレビューして確定する。エージェントは勝手に変えない。破壊の変更は広げる・移る・縮める・消すの順（[ADR-0057](decisions/0057-schema-change-ordering.md)）で、Dev のテックリードの承認を要する。
 - **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L8）。下の表で「法務：L*」と書いた Story が当たる。
 - **1 変更 1 PR を目安に、差分を小さくする。** Gateway の入れ替えは 1 タスクずつ逃がし、Web と Electron は端末の桶で段階的に出す（[delivery.md](architecture/delivery.md) の 4〜6 節）。
@@ -193,7 +193,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 | Story | 内容 |
 | --- | --- |
-| `doc-schema-compat` | 本文のスキーマの追加の手順（読める版 → `min_build` → 作成のフラグ）と試験（editor-and-descriptions.md の 3.2 節。y-prosemirror が知らないノードを消すことは 2026-09-28 に確かめた） |
+| `doc-schema-compat` | 本文のスキーマの追加の手順（読めるバージョン → `min_build` → 作成のフラグ）と試験（editor-and-descriptions.md の 3.2 節。y-prosemirror が知らないノードを消すことは 2026-09-28 に確かめた） |
 | `workflow-states` | 状態、種類、最低の数、Duplicate の自動の作成 |
 | `state-timestamps-derive` | DT-ISSUE-001 と派生の仕組み（ADR-0025） |
 | `issue-core-fields` | フィールド、優先度、担当、購読の派生 |
@@ -218,7 +218,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `doc-compaction-worker` | まとめ、テキストの抜き出し、保持のジョブとの連携 |
 | `description-lazy-load` | 本文の読み込み（読んだ時点までを合わせる） |
 | `doc-local-store` | `_doc_state`・`_doc_updates`、拒否の作り直し（client-store-and-offline と共同） |
-| `description-versions` | 本文の版、戻し、管理者の版の削除 |
+| `description-versions` | 本文のバージョン、戻し、管理者のバージョンの削除 |
 | `comments-and-threads` | コメント、スレッド、解決、削除。**公開は法務：L2** |
 | `reactions` | リアクション |
 | `mentions` | メンションの候補、描画、コメントの派生、本文の Worker の抜き出し |
@@ -302,7 +302,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `view-url-share` | URL と共有 |
 | `opensearch-domain` | OpenSearch のドメイン、VPC、IAM、スナップショットの大阪への写し（infrastructure と共同） |
 | `search-index-mapping` | 索引、フィールド、アナライザー、正規化 |
-| `search-indexer` | 索引の Worker、外部の版、墓標 |
+| `search-indexer` | 索引の Worker、外部のバージョン、墓標 |
 | `search-query-and-rehydrate` | `buildSearchRequest`、読み直し、抜粋、PROP-SEARCH-001・002 |
 | `search-api` | 検索の API、識別子の解決、上限 |
 | `search-local-merge` | 手元とサーバーの組み合わせ（client-app と共同） |
@@ -394,7 +394,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `notification-load-test` | 繰り越し・一括の編集・大きな購読者での通知係の負荷。`notifier` の枠と受け手ごとのまとめ（notifications-and-inbox.md の 5.5 節） |
 | `offline-endurance` | 7 日のオフラインの耐久試験 |
 | `sync-fault-injection` | 障害注入（Writer・Aurora・Valkey・Relay・Gateway・reader） |
-| `schema-compat-drill` | 1 つ前の版のクライアントとの往復の試験をリリースの前の必須に |
+| `schema-compat-drill` | 1 つ前のバージョンのクライアントとの往復の試験をリリースの前の必須に |
 | `schema-expand-contract-tooling` | 広げる・縮めるの段の確かめ（古い `schema_hash` の接続の数、`fv` の報告） |
 | `min-build-enforcement` | `min_build` の殻とレンダラーの組の比べ |
 | `sync-epoch-dr` | `sync_epoch` と、直近の確定の送り直し |
@@ -435,7 +435,7 @@ Story は、着手するときに `intent.md` から起票する。領域の文�
 
 - **契約（スキーマの定義、Gateway のプロトコル、ブートストラップのストリームの形、`sync_actions` の形、権限の決定表、公開 API の形）の確定**：クライアントに配った後や、ログに書いた後に変えるコストが最も高い。
 - **遅延の予算・シミュレーターの回数・較正の基準の変更**：値は QA が決め、Dev が承認する。
-- **破壊のスキーマの変更、手元の DB の版の引き上げ、`min_build` の引き上げ、`groups` の規則の変更**：Dev のテックリードと Ops が判断する。
+- **破壊のスキーマの変更、手元の DB のバージョンの引き上げ、`min_build` の引き上げ、`groups` の規則の変更**：Dev のテックリードと Ops が判断する。
 - **大阪への切り替えの判断、`sync_epoch` の引き上げ、狭める操作のやり直しの結果の扱い**：IC と Ops の責任者（[runbooks/disaster-recovery.md](runbooks/disaster-recovery.md)）。
 - **法務の判断**（L1〜L8）。
 - **負荷試験・PoC の結果の解釈**：数字は出せるが、上限・閾値・退路（楽観的な検証、SQLite の WASM、`pg_bigm`）の採否は Dev と PM の判断。

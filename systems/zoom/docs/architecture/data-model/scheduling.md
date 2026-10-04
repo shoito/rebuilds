@@ -159,7 +159,7 @@ erDiagram
 | `waiting_room` | `boolean` | NO | `true` | 解決した値（会議の階層） |
 | `passcode_ciphertext` | `bytea` | YES | | パスコードの暗号文（主催者と管理者の表示用） |
 | `passcode_hmac` | `bytea` | YES | | `HMAC-SHA256(pepper, meeting_id ‖ passcode)`。照合用 |
-| `passcode_pepper_version` | `smallint` | YES | | `passcode_hmac` の pepper の版 |
+| `passcode_pepper_version` | `smallint` | YES | | `passcode_hmac` の pepper のバージョン |
 | `phone_passcode_ciphertext`、`phone_passcode_hmac` | `bytea` | YES | | 英数字のパスコードの会議の、電話用の数字のパスコード（[telephony.md](../telephony.md) の 4.2 節） |
 | `join_before_host` | `boolean` | NO | `false` | 主催者の前に入れる。待合室が無効な会議でだけ真にできる |
 | `bypass` | `jsonb` | NO | `'{}'` | 待合室を省く条件（`org`・`domains`・`invitees`）。解決した値 |

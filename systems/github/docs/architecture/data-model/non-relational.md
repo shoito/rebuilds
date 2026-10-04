@@ -98,7 +98,7 @@
 
 ### 4.1 OpenSearch の `issues`（別名。実体は `issues-v1`）
 
-Issue と PR を 1 つのインデックスに置く。ルーティングのキーは `repo_id`。書き込みは `search_version` を外部の版にする。
+Issue と PR を 1 つのインデックスに置く。ルーティングのキーは `repo_id`。書き込みは `search_version` を外部のバージョンにする。
 
 | 項目 | 型 | 備考 |
 | --- | --- | --- |
@@ -178,5 +178,5 @@ outbox の行（[platform.md](platform.md)）が Relay で SQS のメッセー�
 ### 5.3 Webhook の要求
 
 - ヘッダー：`X-<Brand>-Event`、`X-<Brand>-Delivery`（`webhook_deliveries.guid`）、`X-<Brand>-Hook-ID`、`X-<Brand>-Hook-Installation-Target-Type`・`-ID`、`X-<Brand>-Signature-256`（`sha256=` ＋ HMAC-SHA256 の 16 進）、`User-Agent`、`Content-Type`（[api-and-webhooks.md](../api-and-webhooks.md) の 9.2 節）。
-- 本文：事象ごとの形は本家に寄せる。共通の最上位の項目は `action`、`sender`、`repository`、`organization`、`installation`。Webhook に固定した REST の版（`webhooks.api_version`）の変換を受ける。
+- 本文：事象ごとの形は本家に寄せる。共通の最上位の項目は `action`、`sender`、`repository`、`organization`、`installation`。Webhook に固定した REST のバージョン（`webhooks.api_version`）の変換を受ける。
 - 本文は事象の時点の写し。送る直前の権限の確認（[api-and-webhooks.md](../api-and-webhooks.md) の 9.4 節）で満たさなければ送らず、`skipped` と記録する。

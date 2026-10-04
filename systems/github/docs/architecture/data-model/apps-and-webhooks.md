@@ -415,7 +415,7 @@ Organization の OAuth アプリの利用の承認。
 | `secret_dek` | bytea | NO | | |
 | `key_version` | integer | NO | 1 | |
 | `events` | text[] | NO | `'{push}'` | |
-| `api_version` | text | NO | | 作成時の最新の REST の版に固定 |
+| `api_version` | text | NO | | 作成時の最新の REST のバージョンに固定 |
 | `active` | boolean | NO | true | |
 | `created_at` | timestamptz | NO | now() | |
 | `updated_at` | timestamptz | NO | now() | |

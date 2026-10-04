@@ -36,7 +36,7 @@ NFR-004 は、受け付けたステップ・承認・タイマーを失わず、
 
 - 保存の流れ（data-dictionary-and-tables の 5 節）の中で、トリガーの条件を評価し、合えば `flow_run` と今すぐの `run_step` のタイマーを同じトランザクションで作る。
 - `wait_condition` は `flow_wait` の行を持ち、そのレコードの保存のトランザクションの中で条件を評価し、真なら今すぐのタイマーを作る。期限のタイマーを必ず持つ。
-- ワーカーは `FOR UPDATE SKIP LOCKED` でタイマーを 1 件ずつ取り、同じトランザクションで実行の行をロックし、版を確かめ、ノードを動かし、`flow_step`・実行の版・次のタイマー・outbox を書き、タイマーを消す。
+- ワーカーは `FOR UPDATE SKIP LOCKED` でタイマーを 1 件ずつ取り、同じトランザクションで実行の行をロックし、バージョンを確かめ、ノードを動かし、`flow_step`・実行のバージョン・次のタイマー・outbox を書き、タイマーを消す。
   - 2026-09-28 の注記：期限の来たタイマーの候補は、`engine_scheduler` のロールの関数 `claim_due_timers(shards, limit)` から識別子（`timer_id`、`tenant_id`）だけで受け取る。ワーカーは候補ごとにアプリのロールで `SET LOCAL app.tenant_id` をしてから、上のトランザクションでタイマーを取り直す。テナントをまたいで表の本文を読まない（[ADR-0054](0054-shared-reference-rows-and-cross-tenant-roles.md)、[workflow-engine.md](../architecture/workflow-engine.md) の 5.3 節）。
 - 実行の状態は `pending`・`running`・`waiting`・`completed`・`failed`・`cancelled`（DT-FLOW-002）。
 - 不変条件 INV-FLOW-001（終わっていない実行は、タイマーか待ちの行をちょうど 1 つ持つ）を、1 分ごとの検査で確かめ、反する実行を戻す。

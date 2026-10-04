@@ -48,7 +48,7 @@
 
 1. GitHub の `prod` の Environment で、Ops が承認する（作成者と別の人）。
 2. マイグレーションのタスクの成功を確かめる。失敗したら、アプリのデプロイは自動で止まる。
-3. relay、workers、webhook-router・sender・scheduler、connectors がローリングで入れ替わる。webhook-egress の Lambda は新しい版の別名に切り替わる。
+3. relay、workers、webhook-router・sender・scheduler、connectors がローリングで入れ替わる。webhook-egress の Lambda は新しいバージョンの別名に切り替わる。
 4. api：blue/green のカナリア（10%）。5xx、オーソリの技術的な成功率、結果不明の発生率のアラームが鳴らなければ 100% に切り替わる。
 5. dashboard、checkout：blue/green。
 6. 「デプロイの後」の表を 15 分見る。

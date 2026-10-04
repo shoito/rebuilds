@@ -7,7 +7,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0011](../decisions/0011-graph-edge-state-machine-and-locking.md) | フォロー・申請・ブロックの辺を 1 つの状態機械で扱い、2 人の組ごとの勧告ロックで直列にする。ブロックは同じトランザクションで両向きのフォローと申請を外す。鍵を外したら、待っている申請をすべて承認する |
-| [0012](../decisions/0012-viewer-sets-cache.md) | 閲覧者の集合（ブロックの両向き、ミュート、承認済みの鍵アカウントのフォロー先、ミュートの語）を Valkey に版つきの写しで持つ。書き込みの確定の直後に更新し、出来事の消費者が補い、寿命は 1 時間。版の古い読み込みで新しい写しを壊さない |
+| [0012](../decisions/0012-viewer-sets-cache.md) | 閲覧者の集合（ブロックの両向き、ミュート、承認済みの鍵アカウントのフォロー先、ミュートの語）を Valkey にバージョンつきの写しで持つ。書き込みの確定の直後に更新し、出来事の消費者が補い、寿命は 1 時間。バージョンの古い読み込みで新しい写しを壊さない |
 | [0013](../decisions/0013-graph-partitioning.md) | 関係の表を利用者の ID のハッシュで 1,024 の論理の分割に分け、物理のクラスタへの対応表で置く。S2 は 4 クラスタから。分割の後は `following` と `blocks` を正本にし、逆向きの表は出来事から作る |
 
 ## 1. 目的と範囲
@@ -127,7 +127,7 @@ stateDiagram-v2
   - 検索の正規化（`normalizeForSearch`、[ADR-0025](../decisions/0025-search-engine-and-japanese-analysis.md)）とは、ひらがなとカタカナの扱いが違う。これは意図した違いである。ミュートは見たくないものを隠すための機能なので、表記の揺れを広く当てる側に寄せる。検索は、索引と問い合わせに同じ変換をかける必要があり、変換を増やすと差の源になるので寄せない。ミュートの照合は投稿を読み出す時に行い、索引を使わないので、この違いで差は生まれない。
   - 照合：正規化した本文・ハッシュタグ・作者の表示名に対して行う。語にラテン文字・数字だけを含む場合は語の境で照合し、それ以外（日本語を含む）は部分一致で照合する。
   - 範囲（`scope`）：`home`・`notifications`・`all`。
-  - 閲覧者ごとに、語の一覧を Aho–Corasick の照合器に組み立て、閲覧者の集合の写しと同じ版で持つ（6 節）。
+  - 閲覧者ごとに、語の一覧を Aho–Corasick の照合器に組み立て、閲覧者の集合の写しと同じバージョンで持つ（6 節）。
 - `visible()` は、`ViewerContext.surface`（`home`・`notifications`・`profile`・`search`・`conversation`・`api` など）を見て、ミュートを当てるかを決める。ブロック・鍵・削除・措置は、面に関わらず同じ。
 
 ## 5. 流れ
@@ -167,7 +167,7 @@ sequenceDiagram
     G->>DB: BEGIN 組の勧告ロック A,B
     G->>DB: blocks と blocked_by に書く, 両向きの following と followers を消す
     G->>DB: A と B の graph_version を上げる, outbox に block.created と消した辺の follow.deleted COMMIT
-    G->>V: vs_apply A と B のブロックの集合に相手を足す 新しい版
+    G->>V: vs_apply A と B のブロックの集合に相手を足す 新しいバージョン
     alt Valkey に書けない
         G->>G: 3 回まで再試行, だめなら修復の仕事を SQS へ
     end
@@ -181,7 +181,7 @@ sequenceDiagram
 
 - フォロー中・フォロワーの一覧は `(created_at DESC, 相手の ID DESC)` の順。カーソルは、この 2 つを詰めた不透明な文字列。
 - 1 ページ 20 件（画面）、API は最大 1,000 件（[api-and-rate-limits.md](api-and-rate-limits.md)）。
-- 一覧の各行は `visible()` の利用者の版（プロフィールの見える範囲）で絞る。ブロックした・された相手は出さない。
+- 一覧の各行は `visible()` の利用者のバージョン（プロフィールの見える範囲）で絞る。ブロックした・された相手は出さない。
 - 鍵アカウントの一覧は、本人と承認したフォロワーだけが読める。
 - 本人以外が読めるフォロワーの一覧は、新しい順に 50,000 件まで（大量の取得の抑止。`ops.graph.max_list_depth`）。本人は全件。
 
@@ -195,10 +195,10 @@ sequenceDiagram
 | `vm:{viewer_id}` | ミュートしているアカウント（期限つき） | `mutes` |
 | `vp:{viewer_id}` | `active` でフォローしている鍵アカウント | `following` と利用者の鍵の状態 |
 | `vw:{viewer_id}` | 組み立てたミュートの語の照合器（直列化したもの） | `muted_words` |
-| `vv:{viewer_id}` | 上の 4 つの版（`users.graph_version`） | |
+| `vv:{viewer_id}` | 上の 4 つのバージョン（`users.graph_version`） | |
 
 - 集合は Valkey の Set で、ページの全件を `SMISMEMBER` で一度に確かめる。5 つの鍵は `{viewer_id}` のハッシュタグで同じスロットに置き、1 回の Function で読む。
-- **版の規則**：辺を変える全てのトランザクションは、関わる利用者の `users.graph_version` を上げる。確定の直後に `vs_apply(viewer, version, 差分)` で写しを更新する（写しがなければ何もしない）。正本から読み込むときは、読み込んだ版が `vv:` 以上のときだけ書く。reader の版が `vv:` より古ければ writer から読み直す。
+- **バージョンの規則**：辺を変える全てのトランザクションは、関わる利用者の `users.graph_version` を上げる。確定の直後に `vs_apply(viewer, version, 差分)` で写しを更新する（写しがなければ何もしない）。正本から読み込むときは、読み込んだバージョンが `vv:` 以上のときだけ書く。reader のバージョンが `vv:` より古ければ writer から読み直す。
 - **寿命**：1 時間（読み出しで延ばさない）。出来事の経路と修復の仕事がどちらも止まっても、写しの古さは 1 時間で上限になる。この上限は NFR-009 の 60 秒より長いので、修復の仕事の遅れ（SQS の最も古い仕事の年齢）を 30 秒でアラートにし、修復の仕事が止まったら閲覧者の集合を読み出しの時に Aurora から読む（劣化の運転、`ops.graph.viewer_sets_bypass`）。
 - 大きな集合：ブロックを数万件持つ利用者も、Set に全件を持つ（10 万件で数 MB）。読み込みは single flight（`vl:{viewer_id}` の `SET NX`）で 1 回にまとめる。10 万件を超える利用者は 1% 未満と見込み、計測で確かめる。
 - 写しがない利用者の最初の読み出しは、5 つを 1 回の問い合わせ（reader）で読み込む。S1 の想定で 1 時間に 1 回、アクティブな利用者 100 万人で毎秒 300 回前後。
@@ -262,7 +262,7 @@ flowchart LR
 | `blocks`・`blocked_by` | 4.1 節 | 索引 `(src_id, created_at DESC)` |
 | `mutes` | `(owner_id, target_id) PK`、`expires_at` | 本人だけの表、FORCE RLS |
 | `muted_words` | `(owner_id, id) PK`、`phrase`、`phrase_norm`、`scope`、`expires_at` | 本人だけの表、FORCE RLS |
-| `users.graph_version` | `bigint` | 閲覧者の集合の版（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
+| `users.graph_version` | `bigint` | 閲覧者の集合のバージョン（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
 | `users.fanout_mode`、`users.fanout_mode_changed_at` | `push`・`pull` | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)。統合の工程で `users` の列に決めた（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
 | `user_counters` | `user_id PK`、`followers`、`following`、`posts`、`updated_at` | 写し。[engagement-and-counters.md](engagement-and-counters.md) |
 | `graph_shard_map`（S2） | `logical_partition smallint PK`、`cluster`、`state`、`moved_at` | |
@@ -296,7 +296,7 @@ flowchart LR
 | E4 | `follow-tables` | 4.1 節の表、組の勧告ロック、outbox（ADR-0011） |
 | E4 | `follow-requests` | 申請・承認・拒否・取り消し、鍵の切り替えの一括の承認 |
 | E4 | `blocks-and-mutes` | ブロック・ミュート・ミュートの語、`DT-GRAPH-002` |
-| E4 | `viewer-sets-cache` | 6 節の写し、版の規則、修復の仕事（ADR-0012） |
+| E4 | `viewer-sets-cache` | 6 節の写し、バージョンの規則、修復の仕事（ADR-0012） |
 | E4 | `follow-counters` | 7 節の数の写しと作者の方式の更新（E6 の `counter-aggregator` と共同） |
 | E4 | `follow-limits` | 4.4 節の上限、8 節の信号 |
 | E4 | `follow-lists` | 5.3 節のページング |

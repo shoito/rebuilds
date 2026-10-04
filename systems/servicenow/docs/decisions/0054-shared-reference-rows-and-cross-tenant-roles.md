@@ -38,22 +38,22 @@ date: 2026-09-28
 1 と a を採用する。
 
 - NULL の行を持つ表：`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`role`、`acl_rule`、`holiday_set`、`holiday_set_version`、`holiday`。候補（関係の型、識別の規則、番号の定義、優先度の表、配置、通知のテンプレート、組み込みのレポート）は、DB の行にするなら統合でこの一覧に足す。
-- 許す理由：全テナントで同じで、コードの版と一緒に（祝日は運用者 2 人の承認で）出し、機密でない。テナントの行（`c_` のフィールド、上書き、ロールの付与、カレンダーの版）の参照の先として DB に要る。
+- 許す理由：全テナントで同じで、コードのバージョンと一緒に（祝日は運用者 2 人の承認で）出し、機密でない。テナントの行（`c_` のフィールド、上書き、ロールの付与、カレンダーのバージョン）の参照の先として DB に要る。
 - RLS：この表だけ `SELECT` の `USING` に `OR tenant_id IS NULL`。書き込みのポリシーは `tenant_id = current` だけで、アプリのロールは NULL の行を書けない。NULL の行は `catalog_loader` のロール（NULL の行だけを読み書きできる）が書く。
 - NULL の行はテナントの行を参照しない。テナントは NULL の行を書き換えず、自分の行（上書き、無効の印）を足す。
 - テナントをまたぐロール：`engine_scheduler`（`claim_due_timers` の関数で `(timer_id, tenant_id)` だけ）、`relay`（outbox だけ）、`indexer_scan`（`(tenant_id, id, version)` だけ）、`platform`（`BYPASSRLS`、期限付き、プラットフォームの監査）、`maintenance`（パーティションの操作だけ）、`catalog_loader`。
 - マイグレーションの CI の許可の一覧は、この ADR の表の一覧と一致させる。
 
 > 2026-09-28 の注記（統合で候補を決めた）：判断の規則は「テナントの行が外部キーで参照する組み込みのデータ、またはテナントの行と同じ一意の空間で照合する組み込みのデータだけを NULL の行にする」。これで、許可の一覧は次のとおりになる。
-> - **NULL の行にする**：`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`role`、`acl_rule`、`holiday_set`、`holiday_set_version`、`holiday`（ここまで元の一覧）、`number_def`（組み込みの辞書の `number_def_id` と、テナントの `number_counter` が参照する）、`ci_relation_type`（テナントの `ci_relation` が参照する）、`ci_attribute`・`ci_identification_rule`（テナントの `ci_precedence`・`ci_identifier` が参照する）、`flow_def`・`flow_version`（組み込みのフロー。テナントの `flow_run` が版を参照する。版は変えず、コードの新しい版は新しい `flow_version` の行にする）。
-> - **コードの版だけに持つ（DB に行を作らない）**：`priority_matrix` の既定、`form_layout`・`list_layout`・`view_rule`・`ui_rule` の既定、状態のモデル、組み込みのレコードのルール、`notification_rule`・`notification_template` の既定、`report_def`・`dashboard` の組み込み、組み込みの文言の辞書、`ci_precedence`・`ci_source_rule` の既定。テナントは自分の行で上書き・無効・複製をし、組み込みのものを `stable_key` で指す（外部キーにしない）。
-> - **テナントの作成の時にテナントの行として作る（既定の設定）**：既定のカレンダー、組み込みの SLA の定義（インシデントの応答・解決と OLA）、既定のポータルとテーマ、既知のエラーのナレッジベース、組み込みの取り込み元（`manual`・`system_group`）、組み込みの連携の主体（`email_intake`）。テナントが自由に変える設定なので、共通の行にしない。コードの新しい版は、既存のテナントの行を書き換えない。
+> - **NULL の行にする**：`dict_table`、`dict_field`、`dict_choice_set`、`dict_choice`、`role`、`acl_rule`、`holiday_set`、`holiday_set_version`、`holiday`（ここまで元の一覧）、`number_def`（組み込みの辞書の `number_def_id` と、テナントの `number_counter` が参照する）、`ci_relation_type`（テナントの `ci_relation` が参照する）、`ci_attribute`・`ci_identification_rule`（テナントの `ci_precedence`・`ci_identifier` が参照する）、`flow_def`・`flow_version`（組み込みのフロー。テナントの `flow_run` がバージョンを参照する。バージョンは変えず、コードの新しいバージョンは新しい `flow_version` の行にする）。
+> - **コードのバージョンだけに持つ（DB に行を作らない）**：`priority_matrix` の既定、`form_layout`・`list_layout`・`view_rule`・`ui_rule` の既定、状態のモデル、組み込みのレコードのルール、`notification_rule`・`notification_template` の既定、`report_def`・`dashboard` の組み込み、組み込みの文言の辞書、`ci_precedence`・`ci_source_rule` の既定。テナントは自分の行で上書き・無効・複製をし、組み込みのものを `stable_key` で指す（外部キーにしない）。
+> - **テナントの作成の時にテナントの行として作る（既定の設定）**：既定のカレンダー、組み込みの SLA の定義（インシデントの応答・解決と OLA）、既定のポータルとテーマ、既知のエラーのナレッジベース、組み込みの取り込み元（`manual`・`system_group`）、組み込みの連携の主体（`email_intake`）。テナントが自由に変える設定なので、共通の行にしない。コードの新しいバージョンは、既存のテナントの行を書き換えない。
 >
 > 一覧の正本は [data-model.md](../architecture/data-model.md) の 3 節と [security.md](../architecture/security.md) の 10.2 節で、マイグレーションの CI の許可の一覧もこれと一致させる。タイマーの取得の SQL は、workflow-engine の 5.3・8.3 節で `claim_due_timers` の関数に置き換えた。
 
-2 を採らない理由：組み込みの定義の変更のたびに、全テナントの行を書き換えるマイグレーションが要る（[ADR-0006](0006-data-dictionary-and-field-types.md) が 2 を採らなかった理由と同じ）。祝日の版の公開も、全テナントへの写しになる。
+2 を採らない理由：組み込みの定義の変更のたびに、全テナントの行を書き換えるマイグレーションが要る（[ADR-0006](0006-data-dictionary-and-field-types.md) が 2 を採らなかった理由と同じ）。祝日のバージョンの公開も、全テナントへの写しになる。
 
-3 を採らない理由：テナントの行（上書き、ロールの付与、カレンダーの版の祝日の集合）が、組み込みのものを外部キーで参照できない。参照の整合をアプリだけで守ることになる。
+3 を採らない理由：テナントの行（上書き、ロールの付与、カレンダーのバージョンの祝日の集合）が、組み込みのものを外部キーで参照できない。参照の整合をアプリだけで守ることになる。
 
 b を採らない理由：タイマーの取得のたびに、全テナントの表の本文を読める接続を持つことになる。取得の SQL の誤りが、テナントをまたいだ読み取りになる。識別子だけを返す関数なら、本文はテナントのコンテキスト（RLS の下）でしか読めない。
 

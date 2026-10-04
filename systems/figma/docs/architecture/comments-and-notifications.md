@@ -64,7 +64,7 @@
 | `comment_read_states` | `org_id`、`account_id`、`thread_id`、`file_id`、`last_read_comment_id` |
 | `file_comment_subscriptions` | `org_id`、`account_id`、`file_id`、`level`（`all` / `mentions_replies` / `none`）、`source`（`owner_default` / `auto_two_comments` / `explicit`） |
 
-- コメントは、ファイルの中身（ノードの木、ジャーナル、チェックポイント）に入れない。版の履歴で過去の版を開いても、コメントは今のものを出す。
+- コメントは、ファイルの中身（ノードの木、ジャーナル、チェックポイント）に入れない。バージョンの履歴で過去のバージョンを開いても、コメントは今のものを出す。
 - 本文は、書いた時点の文字列をそのまま保存する。メンションは `{type: "mention", account_id}` の要素で持ち、表示のたびに名前を解決する。
 - Realtime の問い合わせは 1 つの表への等価の条件だけなので、`file_id` で絞る表（リアクション・既読など）は `file_id` を自分で持つ（非正規化）。削除は墓標（`deleted_at` を設定し、本文を空にする）。列の定義は [data-model/comments-and-notifications.md](data-model/comments-and-notifications.md)。
 
@@ -86,7 +86,7 @@
       位置 = abs。「固定先が消えた」印を付ける
 ```
 
-- サーバーは、ノードの移動を追わない。位置はクライアントがファイルの中身から計算する。Undo や版の復元でノードが戻れば、コメントも元の位置に戻る。
+- サーバーは、ノードの移動を追わない。位置はクライアントがファイルの中身から計算する。Undo やバージョンの復元でノードが戻れば、コメントも元の位置に戻る。
 - インスタンスの中の導出したノードには固定しない。最上位のノード（インスタンスの根を含む）にだけ固定する（本家の「入れ子には付かない」と同じ）。
 - メールのプレビューと通知の画面の位置は、Worker が最新のチェックポイント（とジャーナル）から同じ計算をする。
 
@@ -202,7 +202,7 @@ Worker：due_at を過ぎた (account_id, file_id) をまとめる
 | 通知の一覧・未読の数 | `myNotifications(org_id)` |
 | ファイルブラウザ（最近・プロジェクト・チーム） | `projectFiles(project_id)`、`recentFiles()`、`teamProjects(team_id)` |
 | 共有の画面 | `fileAccess(file_id)`：役割、一般アクセス、申請 |
-| 版の一覧 | `fileVersions(file_id)` |
+| バージョンの一覧 | `fileVersions(file_id)` |
 | ライブラリの更新の印（MVP の後） | `fileLibraryUpdates(file_id)` |
 
 ファイルの中身（ノード）と在席は、Realtime ではなくマルチプレイヤーの経路で配る（[multiplayer.md](multiplayer.md)）。
@@ -241,7 +241,7 @@ Aurora：購読の対象の表に AFTER INSERT/UPDATE/DELETE のトリガー
 
 | 項目 | 保証 |
 | --- | --- |
-| 順序 | 1 つの購読の中では、ビューの版（単調に増える番号）の順に届く。古い版の差分は捨てる |
+| 順序 | 1 つの購読の中では、ビューのバージョン（単調に増える番号）の順に届く。古いバージョンの差分は捨てる |
 | 取りこぼし | 無効化を取りこぼしても、edge は 60 秒ごとに購読中の問い合わせのキャッシュを期限切れにし、取り直す。切断の後の再接続では、ビューを全部取り直す |
 | 一貫性 | 結果整合。書いた本人の画面は、API の応答で先に反映する（楽観的な更新） |
 | 遅れ | 目標：コミットから購読者の画面まで p99 1 秒（同じリージョン） |

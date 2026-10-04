@@ -67,8 +67,8 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 - **配車と運賃の関門**（[ADR-0042](../decisions/0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)）：配車の計算は直近 7 日の再生・縮小のシミュレーション・影の実行 1 週間を経て、区域の release フラグで 1 区域の 10% のバッチ → 100% → 他の区域。運賃のコードは `fare-replay`（直近 30 日の差 0）と影の計算 3 日を経て、Pricing のカナリア。
 - **デプロイの順**：マイグレーション（expand）→ 購読する側 → trips・pricing・supply → Go の熱い経路（loc-ingest → geo-index → dispatch → eta）→ rt-gateway → api → アプリ（列車）→ release フラグ。geo-index・dispatch は待機を先に入れ替え、リースを 1 回だけ渡す。
 - **都市の波（S2 から）**：配備と設定の変更は、都市のセルの単位で、小さな都市 → 中の都市 → 東京の順に出す。各波の後 30 分、その都市の `dispatch_decision`・`offer_delivery`・成立率を見る（delivery の 4.3 節）。
-- **アプリの列車**（[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)）：月曜 11 時に切り、月〜水に社内の配布と回帰、木曜に審査、金曜から段階的に公開する（iOS は 7 日の段階、Android は 1% → 5% → 20% → 50% → 100%、各 1 日以上）。段を進める基準：クラッシュのない利用者 99.8% 以上、ANR の率・オファーの受信の確認までの時間の p95・出庫の失敗の率が前の版より悪くない。ドライバーのアプリは金・土の 18 時〜翌 6 時に段を進めない。`required_min` を上げるのは Dev と Ops の 2 人の承認で、乗車の最中と緊急の入口は塞がない。
-- **ロールバック**：まずフラグで戻す（配車は `ops.dispatch.algo_pin.<zone>`、設定は AppConfig の前の版）。次に 1 つ前のイメージ。アプリは段階の公開を止め、必要なら `required_min` を上げる。マイグレーションは戻さない。確定した見積もりの額は変えない。
+- **アプリの列車**（[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)）：月曜 11 時に切り、月〜水に社内の配布と回帰、木曜に審査、金曜から段階的に公開する（iOS は 7 日の段階、Android は 1% → 5% → 20% → 50% → 100%、各 1 日以上）。段を進める基準：クラッシュのない利用者 99.8% 以上、ANR の率・オファーの受信の確認までの時間の p95・出庫の失敗の率が前のバージョンより悪くない。ドライバーのアプリは金・土の 18 時〜翌 6 時に段を進めない。`required_min` を上げるのは Dev と Ops の 2 人の承認で、乗車の最中と緊急の入口は塞がない。
+- **ロールバック**：まずフラグで戻す（配車は `ops.dispatch.algo_pin.<zone>`、設定は AppConfig の前のバージョン）。次に 1 つ前のイメージ。アプリは段階の公開を止め、必要なら `required_min` を上げる。マイグレーションは戻さない。確定した見積もりの額は変えない。
 - 本番へのデプロイは Ops が承認する（作成者と別の人）。
 
 ### 3.1 デプロイの時間帯と凍結
@@ -134,7 +134,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 偽装・不正の候補の確認（日次） | `location-spoof-review.md`（location-ingestion の 17 節）、`fraud-review.md`（security の 14 節） | E10 で作成 | `fraud-signal-scoring` |
 | ETA の精度の悪化（`eta_accuracy` が 2 日続けて外れる。ticket） | `eta-accuracy-regression.md`（eta の 14 節） | E4 で作成 | `eta-accuracy-metrics` |
 | Valhalla の劣化（`disp_eta_fallback_ratio` が 10% を 10 分。page） | `valhalla-capacity.md`（eta の 14 節、infrastructure の 14 節） | E4 で作成 | `valhalla-serving` |
-| タイルの版の切り替えと戻し（週次） | `valhalla-tile-rollout.md`（eta の 14 節） | E4 で作成 | `valhalla-tile-pipeline` |
+| タイルのバージョンの切り替えと戻し（週次） | `valhalla-tile-rollout.md`（eta の 14 節） | E4 で作成 | `valhalla-tile-pipeline` |
 | 推計走行距離の提供者の障害（失敗の率 20% を 5 分。page） | `fare-distance-provider-outage.md`（eta の 14 節） | E4 で作成 | `fare-distance-provider-adapter` |
 | 住所の検索の提供者の障害（ticket） | `geocoding-provider-outage.md`（maps の 15 節） | E4 で作成 | `places-service-api` |
 | OSM の取り込みの検査の失敗（2 週続いたら ticket） | `osm-import-failed.md`（maps の 15 節） | E4 で作成 | `osm-import-weekly` |
@@ -159,7 +159,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 位置の漏洩・個人情報の漏洩の疑い（SEV1） | [incident-response.md](incident-response.md) の「位置の漏洩」、`personal-data-breach.md`（security の 14 節） | 作成済み（個別は E1 で作成） | `audit-events-core` |
 | ログの緯度経度（日次の検査で 1 件。ticket・SEV3） | [incident-response.md](incident-response.md) | 作成済み | `location-log-lint` |
 | legal のフラグの有効化、月次の点検の食い違い | `legal-gate-enable.md`（delivery の 11 節） | E1 で作成 | `legal-gate-records` |
-| デプロイの後の悪化（配備の後 30 分の SLO の悪化、新しいアプリの版のクラッシュ。page） | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | `deploy-pipelines` |
+| デプロイの後の悪化（配備の後 30 分の SLO の悪化、新しいアプリのバージョンのクラッシュ。page） | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | `deploy-pipelines` |
 | アプリの段階的な公開を止める | `mobile-release-halt.md`（apps・delivery） | E1 で作成 | `mobile-release-train` |
 | `required_min` を上げる | `client-min-version-bump.md`（apps の 14 節） | E1 で作成 | `client-version-policy` |
 | 位置の送信が止まるドライバーの急増（ticket） | `driver-location-stalls.md`（apps の 14 節） | E9 で作成 | `driver-location-recovery` |

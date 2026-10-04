@@ -293,7 +293,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 - jailer で、VM ごとに cgroup・namespace・chroot を分け、権限を落とす。Firecracker の seccomp のフィルタを有効にする。
 - SMT を無効にする。Kernel Samepage Merging を無効にする。スワップを無効にする（サイドチャネルと、別の VM のメモリの残りの読み取りへの対策）。
 - VM ごとに CPU・メモリ・ディスクの I/O・ネットワークの帯域の上限を付ける（うるさい隣人への対策）。
-- ホストの OS とカーネル、Firecracker の版を固定し、全台に同じものを行き渡らせる。
+- ホストの OS とカーネル、Firecracker のバージョンを固定し、全台に同じものを行き渡らせる。
 
 ### 8.3 ネットワークの外向きの方針
 
@@ -377,7 +377,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 
 - **範囲はリポジトリと ref の組。** 実行は、自分の ref とデフォルトブランチのキャッシュを読める。PR の実行は、加えてベースのブランチのものを読める。PR の実行が作るキャッシュは、マージの ref（`refs/pull/N/merge`）の範囲になり、ベースのブランチや他の PR からは読めない。
 - **書き込みは、自分の ref の範囲だけ。** 読める範囲と書ける範囲は、ジョブトークンに入れて Cache service が照合する。ランナーの申告を信じない。
-- **エントリは不変。** 同じキー・同じ版のものは作り直せない。版は、`path` と圧縮の方式から作る（本家と同じ）。
+- **エントリは不変。** 同じキー・同じバージョンのものは作り直せない。バージョンは、`path` と圧縮の方式から作る（本家と同じ）。
 - 容量はリポジトリあたり 10 GB。超えたら、最後に使った時刻の古い順に消す。7 日使われないものは消す（本家と同じ）。
 - 流量の上限（本家と同じ）：アップロード 200 件/分、ダウンロード 1,500 件/分、削除 400 件/分（リポジトリあたり）。
 - **汚染への備え**：デフォルトブランチの範囲に書けるのは、デフォルトブランチの上で動く実行（`push`、`schedule`、`pull_request_target`、`workflow_run` など）である。これらが PR のコードを実行すると、デフォルトブランチのキャッシュが汚染され、後のすべての実行に効く。範囲の規則は本家と同じにし、6.4 節の既定の遮断で経路を減らす。キャッシュのエントリに、書いた実行の `run_id`・イベント・コミットを記録し、汚染の調査で辿れるようにする。
@@ -413,7 +413,7 @@ Firecracker の本番のホストの推奨（[prod-host-setup.md](https://github
 - ポリシー（本家に合わせる。[2025-08 の変更](https://github.blog/changelog/2025-08-15-github-actions-policy-now-supports-blocking-and-sha-pinning-actions/)）：
   - 使えるアクション：すべて / 持ち主のものだけ / 許可の一覧。遮断の一覧も持てる。
   - **完全な SHA での固定を必須にする設定。** 有効にすると、タグやブランチで参照したアクションのジョブは失敗させる（再利用可能なワークフローはタグで参照してよい）。
-- 本家も、完全な SHA での固定だけが、アクションを不変の版として使う方法だとしている（[Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)）。ドキュメントと、ワークフローの画面の警告で推奨する。
+- 本家も、完全な SHA での固定だけが、アクションを不変のバージョンとして使う方法だとしている（[Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)）。ドキュメントと、ワークフローの画面の警告で推奨する。
 - Marketplace（アクションの一覧・公開の仕組み）は MVP の外（[intent.md](../intent.md)）。公開リポジトリのアクションは、Marketplace なしで参照できる。
 - Docker のコンテナのアクションは、外部のレジストリから取る（Packages は MVP の外）。取得の帯域を抑えるため、レジストリの取得のキャッシュ（pull-through）を S2 で検討する。
 

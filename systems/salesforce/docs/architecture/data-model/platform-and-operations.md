@@ -1,6 +1,6 @@
 # Data model: 基盤と運用
 
-論理シャードと物理のクラスタ、組織の置き場所の上書き、組織の移動、組織の DEK、運用者のアクセス、API の版、影の実行。振る舞いは [infrastructure.md](../infrastructure.md)・[security.md](../security.md)・[delivery.md](../delivery.md)、決定は [ADR-0052](../../decisions/0052-key-hierarchy-and-per-org-data-keys.md)・[ADR-0053](../../decisions/0053-operator-access-and-data-lifecycle.md)・[ADR-0055](../../decisions/0055-shard-placement-and-stage-criteria.md)・[ADR-0056](../../decisions/0056-org-migration-by-row-filtered-logical-replication.md)・[ADR-0063](../../decisions/0063-org-staged-release-and-shadow-evaluation.md) にある。規約は [data-model.md](../data-model.md) の 3 節。
+論理シャードと物理のクラスタ、組織の置き場所の上書き、組織の移動、組織の DEK、運用者のアクセス、API のバージョン、影の実行。振る舞いは [infrastructure.md](../infrastructure.md)・[security.md](../security.md)・[delivery.md](../delivery.md)、決定は [ADR-0052](../../decisions/0052-key-hierarchy-and-per-org-data-keys.md)・[ADR-0053](../../decisions/0053-operator-access-and-data-lifecycle.md)・[ADR-0055](../../decisions/0055-shard-placement-and-stage-criteria.md)・[ADR-0056](../../decisions/0056-org-migration-by-row-filtered-logical-replication.md)・[ADR-0063](../../decisions/0063-org-staged-release-and-shadow-evaluation.md) にある。規約は [data-model.md](../data-model.md) の 3 節。
 
 組織の置き場所の決め方：
 
@@ -149,13 +149,13 @@ erDiagram
 
 ### 3.1 `org_keys`（`control`）
 
-組織 × 用途 × 版の包んだ DEK。
+組織 × 用途 × バージョンの包んだ DEK。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `org_id` | `uuid` | NOT NULL | — | |
 | `purpose` | `text` | NOT NULL | — | `files`・`audit`・`secrets` |
-| `key_version` | `integer` | NOT NULL | — | 1 年ごとに新しい版 |
+| `key_version` | `integer` | NOT NULL | — | 1 年ごとに新しいバージョン |
 | `wrapped_dek` | `bytea` | NULL | — | KMS で包んだ DEK。組織の消去の最後に消す |
 | `kms_key_arn` | `text` | NOT NULL | — | `s3-org`・`app-secrets`・`audit-archive` |
 | `state` | `text` | NOT NULL | `'active'` | `active`・`retired`（復号だけ）・`destroyed` |

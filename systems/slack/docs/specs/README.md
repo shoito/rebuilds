@@ -25,7 +25,7 @@
 | identity | `AUTH` | 認証、セッション、SSO、トークン（[identity-and-access.md](../architecture/identity-and-access.md)） |
 | notifications | `NOTIF` | 通知の計画と配送、通知の設定（[read-state-and-notifications.md](../architecture/read-state-and-notifications.md)） |
 | mcp | `MCP` | リモート MCP サーバー（[mcp.md](../architecture/mcp.md)） |
-| public-api | `API` | 版付きの公開 API（[public-api.md](../architecture/public-api.md)） |
+| public-api | `API` | バージョン付きの公開 API（[public-api.md](../architecture/public-api.md)） |
 | apps | `APP` | アプリの基盤（[apps.md](../architecture/apps.md)） |
 | plans | `PLAN` | プランと entitlement（ADR-0032、0033） |
 | rate-limiting | `RL` | レート制限の共通の仕組み（[rate-limiting.md](../architecture/rate-limiting.md)） |

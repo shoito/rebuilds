@@ -18,7 +18,7 @@ Valkey のキー、S3 の配置、SQS、outbox の事象、Webhook、取り込�
 | `dl:{token_sha256}` | 1 回限りの取り出しの URL（テナント、S3 のキー、操作者、目的） | 15 分。`GETDEL` で 1 回だけ | 振込ファイル・レポート・明細の取り出し | 取り出しを出し直す |
 | `rpt:diff:{tenant}:{worker}:{source}:{column}` | 直近 24 時間の集計の実行ごとの対象の集合（雇用の ID をテナントの HMAC にした値の集合）。差分の攻撃の検知（DT-RPT-002 の #6） | 24 時間 | report-service | 検知が 24 時間弱くなる（監視に出す） |
 
-- 権限の表のキャッシュは版がキーに入るので、無効化の操作は要らない（版を上げれば古いキーは使われない）。
+- 権限の表のキャッシュはバージョンがキーに入るので、無効化の操作は要らない（バージョンを上げれば古いキーは使われない）。
 
 ## 2. S3 の配置
 
@@ -37,8 +37,8 @@ Valkey のキー、S3 の配置、SQS、outbox の事象、Webhook、取り込�
 | 同上 | `import-files/{tenant}/{batch_id}`、`import-results/{tenant}/{batch_id}.csv` | 一括の取り込みのファイルと結果 | 同上 | 30 日 | なし |
 | 同上 | `migration-files/{tenant}/{migration_run_id}/...` | 移行のファイル（現行のシステムの本番のデータ） | 同上 | 取り込みの完了から 30 日 | なし |
 | 同上 | `attachments/{tenant}/{attachment_id}` | 添付（`attachments`） | 同上 | 目的のデータの種類 | 大阪 |
-| `<brand>-prod-bank-files` | `bank-files/{tenant}/{file_id}` | 振込ファイル（7.1 節。口座番号の平文を含む） | `<brand>-bank-files` | 振込ファイル（既定 5 年。Object Lock なし、版の管理） | 大阪（支給日の DR） |
-| `<brand>-web-assets` | `web-assets/{version}/...` | SPA の静的な資産 | `<brand>-platform-data` | 版ごと（前の版を戻しのために残す） | CloudFront |
+| `<brand>-prod-bank-files` | `bank-files/{tenant}/{file_id}` | 振込ファイル（7.1 節。口座番号の平文を含む） | `<brand>-bank-files` | 振込ファイル（既定 5 年。Object Lock なし、バージョンの管理） | 大阪（支給日の DR） |
+| `<brand>-web-assets` | `web-assets/{version}/...` | SPA の静的な資産 | `<brand>-platform-data` | バージョンごと（前のバージョンを戻しのために残す） | CloudFront |
 
 - テナントの物体は SSE-KMS（バケットキー）。暗号の文脈 `{"tenant_id": "..."}`。S2 からはテナントの DEK によるアプリの側のエンベロープ暗号化（[security.md](../security.md) の 5.3 節）。
 - 振込ファイル・明細・レポートの取り出しは、署名つき URL を直接渡さず、`dl:` の 1 回限りの URL を経る（取り出しを記録する）。
@@ -66,7 +66,7 @@ Valkey のキー、S3 の配置、SQS、outbox の事象、Webhook、取り込�
 | 同上 | `verification-images/{tenant}/{verification_id}/{n}` | 本人確認の画像（P4） | 同上 | 確認の後 30 日（L44） |
 | 同上 | `migration-uploads/{tenant}/{upload_id}` | 現行のシステムの番号の移行のファイル | 同上 | 取り込みの後に消す |
 
-- 版の管理を有効にし、消した版は 1 日で完全に消えるライフサイクル（期限の前に消せるよう Object Lock を使わない）。
+- バージョンの管理を有効にし、消したバージョンは 1 日で完全に消えるライフサイクル（期限の前に消せるよう Object Lock を使わない）。
 
 ## 3. SQS
 

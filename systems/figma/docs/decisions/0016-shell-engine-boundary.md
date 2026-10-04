@@ -30,7 +30,7 @@ date: 2026-09-27
 
 やり取り：
 
-- a. **殻 → エンジンは生成した型のコマンドの同期の呼び出し。エンジン → 殻は、フレームに 1 回、変わった話題の版を上げ、殻が必要な分だけ読む**
+- a. **殻 → エンジンは生成した型のコマンドの同期の呼び出し。エンジン → 殻は、フレームに 1 回、変わった話題のバージョンを上げ、殻が必要な分だけ読む**
 - b. エンジンが変更のたびにイベントを発行し、殻が自分の状態（Redux など）に写す
 - c. 殻もドキュメントのモデル（JS の写し）を持つ
 
@@ -40,7 +40,7 @@ date: 2026-09-27
 
 - エンジンは `<canvas>` を持ち、キャンバスの上の pointer・wheel のイベントを直接受ける（React を通さない）。入力は列に積み、`requestAnimationFrame` の最初にまとめて処理する。
 - 殻 → エンジン：`Command`（`SetTool`、`SetProps`、`RunAction`、`SelectNodes`、`LayerRowsRequest`、`Undo`、`Paste` など）。型は Rust で定義し、TypeScript の型を生成する。値はコンパクトな二値で渡す。
-- エンジン → 殻：描画の後、フレームに 1 回、変わった話題（`selection`、`selection_props`、`layer_rows`、`tool`、`viewport`、`text_edit`、`status`）の版を上げる。殻は `useSyncExternalStore` で話題ごとに購読し、版が上がった部品だけ再描画する。
+- エンジン → 殻：描画の後、フレームに 1 回、変わった話題（`selection`、`selection_props`、`layer_rows`、`tool`、`viewport`、`text_edit`、`status`）のバージョンを上げる。殻は `useSyncExternalStore` で話題ごとに購読し、バージョンが上がった部品だけ再描画する。
 - レイヤーのパネルは仮想化し、見える範囲の行だけをエンジンに求める。
 - 殻はドキュメントのモデルを持たない。
 - 予算：React の再描画は 1 フレームで 3 ms 以内。超える部品は、話題を細かく分けるか、次のフレームに回す。

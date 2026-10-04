@@ -129,7 +129,7 @@ Web の画面の構成、コードの閲覧（ツリー、ファイル、blame�
    - 外部の画像の `src` を、画像のプロキシの URL に書き換える（4.4 節）。
    - コードのブロックを色付けする。`mermaid`・`geojson`・`stl`・`math` のブロックは、描画の隔離の iframe の置き場所にする。
    - 相対リンク・相対の画像を、リポジトリの ref とパスで解決する。
-5. **キャッシュ**：閲覧者に依らない部分（1〜4 の参照の解決を除く）を、`(内容のハッシュ, 文脈のリポジトリ, 描画器の版)` でキャッシュする。参照の解決は、閲覧者ごとに要求の時点で行う。
+5. **キャッシュ**：閲覧者に依らない部分（1〜4 の参照の解決を除く）を、`(内容のハッシュ, 文脈のリポジトリ, 描画器のバージョン)` でキャッシュする。参照の解決は、閲覧者ごとに要求の時点で行う。
 
 - 無害化は、描画の Worker の 1 か所で行う。無害化された HTML は、型（`SanitizedHtml`）で区別し、`dangerouslySetInnerHTML` にはこの型だけを渡せるようにする（lint で禁止し、例外はこの 1 か所）。
 - 数式（`$...$`）は、MVP ではサーバーで MathML に変換してから無害化を通す（MathML の要素を許可リストに入れる）。本家は MathJax（ブラウザの JavaScript）で描く（[Writing mathematical expressions](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/writing-mathematical-expressions)、2026-09-26 に確認）。ここはアプリの origin で利用者の内容から JavaScript を動かさないために、サーバーで変換する（**本家との違い**。12 節の決定）。

@@ -105,8 +105,8 @@
     <ul>
       <li data-frag><strong>名前の決まり</strong>：標準は接頭辞なしの小文字のスネーク（<code>account</code>、<code>close_date</code>）、カスタムは <code>x_</code> の接頭辞（<code>x_region</code>）。本家の <code>__c</code> は使いません。</li>
       <li data-frag><strong>項目の型</strong>：テキスト、数値、通貨、日付、<a class="t" href="#g-picklist">選択リスト</a>、<a class="t" href="#g-lookup">参照</a>、<a class="t" href="#g-md">主従</a>、<a class="t" href="#g-formula">数式</a>、<a class="t" href="#g-rollup">積み上げ集計</a>など。</li>
-      <li data-frag><strong>版</strong>：メタデータを変えるたびに組織の版（<code>metadata_version</code>）が 1 つ上がる。1 つの要求は 1 つの版に固定して動く。</li>
-      <li data-frag><strong>コンパイル</strong>：版ごとのメタデータを部品に分けてコンパイルし、キャッシュする。問い合わせや保存は、それを使って SQL を作る。</li>
+      <li data-frag><strong>バージョン</strong>：メタデータを変えるたびに組織のバージョン（<code>metadata_version</code>）が 1 つ上がる。1 つの要求は 1 つのバージョンに固定して動く。</li>
+      <li data-frag><strong>コンパイル</strong>：バージョンごとのメタデータを部品に分けてコンパイルし、キャッシュする。問い合わせや保存は、それを使って SQL を作る。</li>
     </ul>
     <p>目標は「カスタム項目を足してから、画面と API で使えるまで p95 5 秒」で、他の組織を遅くしないことです（K2）。</p>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0003-metadata-driven-runtime.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0007-segmented-metadata-snapshots.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/metadata-and-runtime.md">metadata-and-runtime.md</a> の 3〜4 節。</div>
@@ -124,7 +124,7 @@
     <div class="quiz" data-answer="1">
       <p class="q">ある組織が、取引先にカスタム項目 <code>x_region</code> を足しました。DB では何が起きますか？</p>
       <div class="opts">
-        <button>メタデータの表に行が増え、版が上がる。<code>ALTER TABLE</code> は走らない</button>
+        <button>メタデータの表に行が増え、バージョンが上がる。<code>ALTER TABLE</code> は走らない</button>
         <button><code>records</code> に列が 1 つ増える</button>
         <button>その組織専用の表が作られる</button>
       </div>
@@ -225,9 +225,9 @@
     <p>読むたびに共有を全て計算すると、ページの表示の目安 300ms に収まりません。本家も、設定が変わった時に計算して保存しています。この設計は、何を行に持ち、何を問い合わせの時に結ぶかを分けています。</p>
     <div class="cards">
       <div class="card" data-frag><h3>行に持つ（事前計算）</h3><p>レコードの条件の共有ルール・手動・チームは <code>record_shares</code> に、暗黙の親は子ごとの行に持つ。条件のルールの追加は、全レコードを評価し直す<a class="t" href="#g-recalc">再計算</a>になる。</p></div>
-      <div class="card" data-frag><h3>問い合わせの時に結ぶ</h3><p>所有者・ロール階層・所有者の条件のルール・OWD は、<code>owner_id</code> と<a class="t" href="#g-closure">閉包</a>の表を結んで判定する。OWD の変更は版の切り替えだけで、行を書き直さない。</p></div>
+      <div class="card" data-frag><h3>問い合わせの時に結ぶ</h3><p>所有者・ロール階層・所有者の条件のルール・OWD は、<code>owner_id</code> と<a class="t" href="#g-closure">閉包</a>の表を結んで判定する。OWD の変更はバージョンの切り替えだけで、行を書き直さない。</p></div>
     </div>
-    <p>再計算の間は、古い構成で判定し続け、できたら版を 1 つ上げて一度に切り替えます（新しいルールの版、閉包の新しい世代）。「古い設定と新しい設定が混ざった判定をしない」は intent の約束です。また、1 人が 1 万件を超えて所有する、1 つの親に 1 万件を超える子を置く、という<a class="t" href="#g-skew">スキュー</a>は、本家も避けるよう勧めており、この設計でも警告します。</p>
+    <p>再計算の間は、古い構成で判定し続け、できたらバージョンを 1 つ上げて一度に切り替えます（新しいルールのバージョン、閉包の新しい世代）。「古い設定と新しい設定が混ざった判定をしない」は intent の約束です。また、1 人が 1 万件を超えて所有する、1 つの親に 1 万件を超える子を置く、という<a class="t" href="#g-skew">スキュー</a>は、本家も避けるよう勧めており、この設計でも警告します。</p>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0004-record-access-model.md">ADR-0004</a>（注記を必ず読む）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0016-recalculation-rule-versions-and-skew.md">ADR-0016</a>、sharing-and-record-access.md の 7〜8 節、NFR-005。</div>
   </section>
 
@@ -290,8 +290,8 @@
     </table>
     <ul>
       <li data-frag><strong>検証だけの実行</strong>：本番を一切変えずに、差分・型・依存・データへの影響を調べて計画を作る。</li>
-      <li data-frag><strong>全部か無しか</strong>：計画を 1 つの版で当てる。途中で失敗すれば何も変わらない。</li>
-      <li data-frag><strong>戻し</strong>：版を巻き戻さず、逆の差分を新しいデプロイとして当てる。</li>
+      <li data-frag><strong>全部か無しか</strong>：計画を 1 つのバージョンで当てる。途中で失敗すれば何も変わらない。</li>
+      <li data-frag><strong>戻し</strong>：バージョンを巻き戻さず、逆の差分を新しいデプロイとして当てる。</li>
     </ul>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/sandboxes-and-deploy.md">sandboxes-and-deploy.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0038-sandbox-types-and-masked-copy.md">ADR-0038</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0040-deploy-validation-and-rollback.md">ADR-0040</a>、NFR-004。</div>
   </section>
@@ -392,7 +392,7 @@
       <dt id="g-forecast">売上予測の分類</dt><dd>商談を売上予測でどう数えるか（パイプライン、最善、確約、完了、除外）。フェーズから決まる。</dd>
       <dt id="g-convert">リードの変換</dt><dd>リードから取引先・取引先責任者・商談を作る（または既存に合わせる）操作。変換したリードは読むだけになる。</dd>
       <dt id="g-duprule">重複の規則</dt><dd>作成・更新の時に、照合の規則で重複の候補を探し、知らせるか止めるかを決める設定。</dd>
-      <dt id="g-metadata">メタデータ</dt><dd>オブジェクト・項目・画面・自動化・権限などの「設定」。本システムでは版を持ち、コンパイルして使う。</dd>
+      <dt id="g-metadata">メタデータ</dt><dd>オブジェクト・項目・画面・自動化・権限などの「設定」。本システムではバージョンを持ち、コンパイルして使う。</dd>
       <dt id="g-customobj">カスタムオブジェクト</dt><dd>組織が自分で足すオブジェクト。API の名前は <code>x_</code> で始まる。</dd>
       <dt id="g-picklist">選択リスト</dt><dd>決まった値から選ぶ項目。値は ID で持ち、ラベルを変えてもレコードを書き換えない。</dd>
       <dt id="g-lookup">参照</dt><dd>他のレコードを指す項目（lookup）。親を消しても子は残せる。</dd>

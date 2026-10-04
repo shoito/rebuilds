@@ -27,7 +27,7 @@
 | 検索エンジン | Elasticsearch（[Rebuilding Notion's lexical search reindexer](https://www.notion.com/blog/rebuilding-notions-lexical-search-reindexer)、2026-08） | Amazon OpenSearch Service |
 | 文書の単位 | ブロック単位（同上） | **ページ単位**（3 節） |
 | 権限 | 文書の生成時に、文書ごとの権限を解決して入れる（同上。詳細は非公開） | 権限キーを文書に入れ、読み直しで判定関数を通す（5 節） |
-| 版の管理 | 外部バージョン（`version_type: external`）で新しい書き込みを優先（同上） | 同じ |
+| バージョンの管理 | 外部バージョン（`version_type: external`）で新しい書き込みを優先（同上） | 同じ |
 | 並べ替え | 最もよく一致（最近の編集とタイトルを優先）、最終編集、作成（[Search](https://www.notion.com/help/search)） | 同じ |
 | 絞り込み | タイトルだけ、作成者、チームスペース、ページの中、日付 | 同じ |
 
@@ -48,7 +48,7 @@
 | `title` | text | タイトル（`normalizeForSearch` 済み） |
 | `body` | text | 本文のブロックのテキストを、木の順に改行で連結したもの。先頭から 1 MB で切る |
 | `index_version` | long | ページの `seq`（ADR-0005）。外部バージョンとして使う |
-| `acl_version` | long | 権限キーを計算した時点の、ワークスペースの権限の版（5.3 節） |
+| `acl_version` | long | 権限キーを計算した時点の、ワークスペースの権限のバージョン（5.3 節） |
 
 - 1 MB を超えるページの残りは検索にかからない（既知の制限）。超えたページの数を指標にし、多ければ上限を見直す。
 - 正規化（NFKC・小文字化）は、アナライザーではなくアプリの `normalizeForSearch` で行い、索引とクエリの両方にかける（Slack の search.md と同じ）。
@@ -63,7 +63,7 @@ Slack の S2 の設計（Slack の search.md の 5.2 節）をそのまま使う
 | `title`、`body` | Sudachi（形態素解析、表記の揺れの正規化） | **関連度のスコア**。`should` にだけ使う |
 | `title.prefix` | edge N-gram（1〜20 文字） | クイック検索の前方一致（7 節） |
 
-- Amazon OpenSearch Service は Sudachi を任意のプラグインとして提供する（[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)、2026-09-27 に確認）。プラグインのパッケージは OpenSearch の版ごとに関連付け、辞書はバイナリの形だけを受け付ける。辞書の差し替えは blue/green のデプロイで反映される。すぐに反映したいときは、新しいパッケージで索引を作り直し、別名を切り替える。
+- Amazon OpenSearch Service は Sudachi を任意のプラグインとして提供する（[プラグインの一覧](https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-plugins.html)、2026-09-27 に確認）。プラグインのパッケージは OpenSearch のバージョンごとに関連付け、辞書はバイナリの形だけを受け付ける。辞書の差し替えは blue/green のデプロイで反映される。すぐに反映したいときは、新しいパッケージで索引を作り直し、別名を切り替える。
 - 英語などの空白で区切る言語も、同じ N-gram の判定で扱う。語幹の処理（英語の複数形など）は S1 では行わない。
 - ひらがなとカタカナは同一視しない（Slack と同じ判断）。
 - 1 文字の N-gram による索引の増え方は、代表的なワークスペースで測る（未検証）。
@@ -113,7 +113,7 @@ Slack の S2 の設計（Slack の search.md の 5.2 節）をそのまま使う
 - ACL の変更のトランザクションで、outbox に `acl.changed { page_id, acl_version }` を積む。専用のキュー `search-acl` に流し、本文の更新（`search-index`）に待たされないようにする。
 - 目標：権限の変更から、検索のクエリの条件に反映されるまで p99 10 秒。それまでの間は 5.2 節の読み直しで守る。取り消しは即時に効き、付与は最大 10 秒遅れる。
 - 部分木が大きい移動（1 万ページ超）は、分けて処理する。処理中も読み直しで守られる。
-- 文書の `acl_version` と、ワークスペースの現在の権限の版を定期的に突き合わせ、古い文書を再計算する（取りこぼしの回収。1 時間ごと）。
+- 文書の `acl_version` と、ワークスペースの現在の権限のバージョンを定期的に突き合わせ、古い文書を再計算する（取りこぼしの回収。1 時間ごと）。
 
 ### 5.4 クエリの組み立て
 
@@ -198,7 +198,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 
 - indexer はイベントを「きっかけ」として扱い、ページの現在の状態を DB（reader）から読んで文書を作る。テナントのコンテキストを設定してから読む。
 - 同じページの編集は、5 秒の窓でまとめる（入力中の連続した変更で、同じ文書を何度も作らない）。
-- 書き込みは `index_version` を外部バージョンにし、古い版で新しい版を上書きしない（本家と同じ）。
+- 書き込みは `index_version` を外部バージョンにし、古いバージョンで新しいバージョンを上書きしない（本家と同じ）。
 - ページの完全な削除は tombstone（本文を空にし `deleted`）で書き、7 日後に消す。ゴミ箱への移動と復元は `in_trash` の更新で、文書は消さない。
 - 失敗は SQS の再試行、5 回で DLQ とアラート。
 
@@ -226,7 +226,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 - 論理シャード（480。ADR-0003）の範囲ごとに、検索のドメインを分ける。`logical_shard → search_cluster` の割り当ての表を、DB の物理の割り当てと別に持つ。
 - ワークスペースを別の検索のドメインへ移すときは、新しいドメインへの二重書き込み、バックフィル、読み出しの切り替えの順で行う（Slack の search.md の 5.4 節と同じ手順）。
 - 非常に大きいワークスペースは、専用の索引にする。
-- マッピングの変更による全体の再索引は、本家と同じく、DB のスナップショット（データレイク）から一括で文書を作り、その間の変更を二重書き込みで受ける。版の比較で新しい書き込みを優先する（[Rebuilding Notion's lexical search reindexer](https://www.notion.com/blog/rebuilding-notions-lexical-search-reindexer)）。
+- マッピングの変更による全体の再索引は、本家と同じく、DB のスナップショット（データレイク）から一括で文書を作り、その間の変更を二重書き込みで受ける。バージョンの比較で新しい書き込みを優先する（[Rebuilding Notion's lexical search reindexer](https://www.notion.com/blog/rebuilding-notions-lexical-search-reindexer)）。
 
 ### 9.3 S3
 
@@ -246,7 +246,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 - 漏洩テスト（経路ごと）：別のワークスペース、共有されていないページ、共有を外した直後のページ、アクセス権のない親の下に移したページ、ゲストが共有されていない兄弟のページ、脱退した直後のチームスペース。いずれも検索の結果・件数・ハイライト・パンくずに出ない。
 - 性質ベーステスト：任意の木・ACL・移動の列の後、indexer が落ち着いた状態で、各文書の `access_keys` を使った判定が、判定関数 `can` の結果と一致する。
 - 性質ベーステスト：任意の木・ACL・移動の列の途中（indexer が遅れている状態を含む）で、検索の応答に含まれるページは、すべて `can(actor, read, page)` が真である。
-- 版の比較：同じページのイベントを任意の順序・重複で indexer に与えても、最終的な文書が DB の最新の状態と一致する。
+- バージョンの比較：同じページのイベントを任意の順序・重複で indexer に与えても、最終的な文書が DB の最新の状態と一致する。
 
 ## 12. 決定と持ち越し
 

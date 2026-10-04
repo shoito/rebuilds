@@ -59,7 +59,7 @@ date: 2026-10-04
   - `tenant-move` は、他のテナントの写しの参照の付け替えと、古い参照の回しを要する大きな処理である。E4 で試験を厚くする（PROP-ACCT-002）。
   - 同意しない人は、組織のドメインのメールアドレスのまま個人で残り、SSO を使えない。
   - SCIM は SSO より後になり、それまで利用者の作成は JIT と管理者の招待に頼る。SCIM は MVP に含め、E4 の最後に出す（[intent.md](../intent.md)、[roadmap.md](../roadmap.md)）。
-  - 部品の告知を追う。`@better-auth/scim` には、1.5.0〜1.7.0-beta.3 に、別の利用者の SCIM の提供者を乗っ取れる告知があり、1.7.0 で直っている（[GHSA-j8v8-g9cx-5qf4](https://github.com/better-auth/better-auth/security/advisories/GHSA-j8v8-g9cx-5qf4)、2026-10-04 に確認）。版は E4 の着手で確かめ直す。
+  - 部品の告知を追う。`@better-auth/scim` には、1.5.0〜1.7.0-beta.3 に、別の利用者の SCIM の提供者を乗っ取れる告知があり、1.7.0 で直っている（[GHSA-j8v8-g9cx-5qf4](https://github.com/better-auth/better-auth/security/advisories/GHSA-j8v8-g9cx-5qf4)、2026-10-04 に確認）。バージョンは E4 の着手で確かめ直す。
 
 ## Confirmation
 

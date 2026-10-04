@@ -116,7 +116,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | --- | --- | --- | --- |
 | P1 | T | Web の資産のすり替え（S3・CloudFront） | 資産のバケットへの書き込みは CI のロールだけ、ハッシュ付きの名前、`index.html` の SRI は同じオリジンなので使わない（CSP の `'self'` で足りる） |
 | P2 | T | Electron の更新の配信のすり替え | macOS は署名と公証、Windows はコード署名。Squirrel は配布物の署名を確かめる（macOS は必須。[Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)、2026-09-28 に確認）。更新の案内（フィード）を返す入口は TLS で、署名の鍵は HSM（クラウドの署名の仕組み）に置く（[delivery.md](delivery.md) の 6 節） |
-| P3 | T | 依存の乗っ取り（npm） | lockfile、`npm audit`、新しい版の取り込みの遅延（公開から 7 日）、SBOM |
+| P3 | T | 依存の乗っ取り（npm） | lockfile、`npm audit`、新しいバージョンの取り込みの遅延（公開から 7 日）、SBOM |
 | P4 | E | AI エージェントが本番に触れる | 本番の資格情報を開発環境に置かない（他の題材と同じ） |
 
 ## 4. 端末に残るデータ
@@ -129,7 +129,7 @@ ADR-0046。
 | --- | --- | --- |
 | IndexedDB（ワークスペースの DB） | 見てよいモデルの行、outbox（未送信の変更の中身）、拒否の記録、オフラインの添付 | ログアウト、除外、遠隔の消去、やり直し（モデルだけ）、ブラウザの消去 |
 | IndexedDB（登録） | DB の一覧（アカウントとワークスペースの ID、件数） | 最後の DB を消した時 |
-| Service Worker のキャッシュ | アプリの殻だけ（データなし） | 版の更新 |
+| Service Worker のキャッシュ | アプリの殻だけ（データなし） | バージョンの更新 |
 | `localStorage` | 最後に開いたビュー（ID）、一覧とボードの別、パネルの幅 | ログアウト |
 | HTTP のキャッシュ | 添付の画像（`private, max-age=300`） | ブラウザの規則 |
 | クッキー | セッション、端末の ID（`<brand>_cid`） | ログアウト（セッション）。端末の ID は残す（[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節） |
@@ -161,7 +161,7 @@ ADR-0046。
 ### 4.4 Electron のクラッシュの記録
 
 - `crashReporter` のミニダンプ（メモリーの中身を含みうる）を外へ送らない（`uploadToServer: false`）。
-- JavaScript のエラーの報告は、自前の収集の口へ、スタックと Action の ID と版だけを送る（[observability.md](observability.md) の 2 節）。
+- JavaScript のエラーの報告は、自前の収集の口へ、スタックと Action の ID とバージョンだけを送る（[observability.md](observability.md) の 2 節）。
 
 ### 4.5 共有の端末
 
@@ -235,7 +235,7 @@ ADR-0048。**期間はすべて既定案で、法務の確認（L5・L7）で確
 | データ | 保持（既定案） | 期限後 |
 | --- | --- | --- |
 | イシュー・コメント・プロジェクトなどのモデル | ワークスペースが消すまで。アーカイブは期限なし | ゴミ箱の 30 日の後に物理削除（[issues-and-workflow.md](issues-and-workflow.md) の 4.5 節） |
-| 本文の版（`issue_description_versions`） | イシューがある間 | イシューと一緒に。管理者の「版を消す」（消した秘密の対策。[editor-and-descriptions.md](editor-and-descriptions.md) の 11 節の依頼）は MVP で持つ |
+| 本文のバージョン（`issue_description_versions`） | イシューがある間 | イシューと一緒に。管理者の「バージョンを消す」（消した秘密の対策。[editor-and-descriptions.md](editor-and-descriptions.md) の 11 節の依頼）は MVP で持つ |
 | `IssueHistory` | イシューがある間 | イシューと一緒に |
 | 添付の中身（S3） | 行がある間 | 行の削除から 30 日 |
 | `sync_actions` | 30 日（ADR-0013） | パーティションを落とす |
@@ -409,7 +409,7 @@ ADR-0048。**期間はすべて既定案で、法務の確認（L5・L7）で確
 | `workspace_support_grants` | サポートの参照の許し | 8 |
 | `workspaces.status` に `pending_deletion`、`deletion_requested_at` | 削除の猶予 | 9.1 |
 | accounts-and-auth への依頼（反映済み） | セッションに `wipe_requested`、チケットの発行の決定表（DT-AUTH-002）に `401 wipe_required` の行（[accounts-and-auth.md](accounts-and-auth.md) の 6.3 節） | 4.3 |
-| editor-and-descriptions への依頼（反映済み） | 本文の版を消す管理者の操作（[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節） | 9 |
+| editor-and-descriptions への依頼（反映済み） | 本文のバージョンを消す管理者の操作（[editor-and-descriptions.md](editor-and-descriptions.md) の 4.7 節） | 9 |
 | S3 のバケットの一覧 | 添付、段置き、書き出し、log-archive の鍵と期限 | 5.2、9 |
 
 ## 出典

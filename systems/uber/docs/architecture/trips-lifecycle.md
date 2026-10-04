@@ -101,7 +101,7 @@
 | 24 | `arrived` | `mark_no_show` | `no_show_eligible` が過ぎ、ドライバーが乗車地の 200 m 以内 | `no_show` | 割り当てを解放、DT-TRIP-002 で無断キャンセルの料金 |
 | 25 | `arrived` | `mark_no_show` | それ以外 | 変わらない | 理由を返す |
 | 26 | 終端以外 | `system_cancel` | | `cancelled_by_system` | 割り当てがあれば解放、料金なし、与信の取り消し |
-| 27 | 何でも | `timer_fired(k)` | 設定した時の `trip_version` と今の版が違う、または状態が k に関係しない | 変わらない | タイマーを `fired` にするだけ |
+| 27 | 何でも | `timer_fired(k)` | 設定した時の `trip_version` と今のバージョンが違う、または状態が k に関係しない | 変わらない | タイマーを `fired` にするだけ |
 | 28 | 終端 | 何でも | | 変わらない | 遅れて届いたドライバーの操作は 8.4 節 |
 
 - `on_trip` の乗車は、乗客の取り消しで終えない。運用が `system_cancel` で終える（事故・トラブル）。
@@ -172,7 +172,7 @@ CREATE UNIQUE INDEX one_active_assignment_per_trip ON driver_assignments (trip_i
 
 1 つのトランザクションで、次をこの順に行う。
 
-1. 乗車の行を `FOR UPDATE` で取る。状態が `requested` で、提案の `trip_version` が今の版と一致すること。
+1. 乗車の行を `FOR UPDATE` で取る。状態が `requested` で、提案の `trip_version` が今のバージョンと一致すること。
 2. ドライバーの `driver_dispatch_state` を `FOR UPDATE` で取る。`(region_gen, assignment_epoch)` が提案の値と一致し、`active_assignment_id` が NULL であること。
 3. ドライバーが、この乗車で辞退・時間切れ・取り下げになっていないこと（`driver_assignments` の終わった行から求める）。
 4. 供給の条件（同じ Aurora の表を読む）：
@@ -183,7 +183,7 @@ CREATE UNIQUE INDEX one_active_assignment_per_trip ON driver_assignments (trip_i
    - `service_kind = rideshare` なら、乗客が日本版ライドシェアを承諾し、運賃が事前確定で、決済が `app` で、降車地が決まっていて、オファーの時刻と迎車の到着の見込みがともに事業者の運行枠の中にある（[supply-and-operators.md](supply-and-operators.md) の 6 節、[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節の E1・E5）。
 5. 割り当てを `offered` で作り、epoch を 1 増やし、`active_assignment_id` を入れ、乗車を `offered` にし、タイマーを入れ、outbox に書く。
 
-- 配車の側も同じ条件で候補を絞る（[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節）。**Trips は提案の時に、供給・営業区域・運行枠の条件を確かめ直す**（2026-09-27 の決定。[architecture/README.md](README.md) の 7 節）。ここでの検査は、索引の写しの古さに対する最後の確かめである。条件の判定は、配車（Go）と Trips（TypeScript）で同じ版のデータを読み、共通の決定表のテストのベクター（dispatch の 12.2 節の DT-DISP-001。`vectors/eligibility/`）を両方の CI で通して、2 つの実装の食い違いを防ぐ。条件の正本は配車の関数とし（[ADR-0014](../decisions/0014-dispatch-eligibility-and-street-hails.md)）、Trips の確かめ直しは防御である。
+- 配車の側も同じ条件で候補を絞る（[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節）。**Trips は提案の時に、供給・営業区域・運行枠の条件を確かめ直す**（2026-09-27 の決定。[architecture/README.md](README.md) の 7 節）。ここでの検査は、索引の写しの古さに対する最後の確かめである。条件の判定は、配車（Go）と Trips（TypeScript）で同じバージョンのデータを読み、共通の決定表のテストのベクター（dispatch の 12.2 節の DT-DISP-001。`vectors/eligibility/`）を両方の CI で通して、2 つの実装の食い違いを防ぐ。条件の正本は配車の関数とし（[ADR-0014](../decisions/0014-dispatch-eligibility-and-street-hails.md)）、Trips の確かめ直しは防御である。
 - 検査に落ちた提案は、`ProposeOfferResponse.rejected`（`EPOCH_MISMATCH`、`TRIP_STATE_CHANGED`、`DRIVER_NOT_AVAILABLE`、`NOT_ELIGIBLE`、`CONSTRAINT_VIOLATION`）で配車に返す。供給・営業区域・運行枠の条件に落ちたときが `NOT_ELIGIBLE` である。配車はそのドライバーを次のバッチから除くか、索引の更新を待つ。
 
 ### 4.4 ロックの順序
@@ -318,7 +318,7 @@ outbox_events (id bigserial PRIMARY KEY,
 - 状態の変化は、同じトランザクションで outbox に書く。Slack の題材の [ADR-0002](../../../slack/docs/decisions/0002-db-as-source-of-truth-with-outbox.md) と同じ考え方。
 - 中継のタスク（2 つ以上）は、未配信の行を `ORDER BY id FOR UPDATE SKIP LOCKED` で取り、SNS の標準のトピック `trips-events` に書き、`published_at` を入れる。コミットの通知（`LISTEN/NOTIFY`）で起き、通知がなくても 50 ms ごとに見る。
 - SNS から、購読する側ごとの SQS に配る：索引（[geospatial-index.md](geospatial-index.md)）、配車、Payments、リアルタイムの配信、運賃の水準の集計、分析。
-- **届け方は少なくとも 1 回で、順序は保証しない。** 購読する側は、版で古い事象を捨てる。
+- **届け方は少なくとも 1 回で、順序は保証しない。** 購読する側は、バージョンで古い事象を捨てる。
   - `trip.state_changed`：`(trip_id, trip_version)`
   - `driver.assignment_changed`：`(driver_id, region_gen, assignment_epoch, trip_version)` と、索引が使う `TripAssignState`（`NONE`・`OFFERED`・`ACCEPTED`・`ARRIVING`・`ARRIVED`・`ON_TRIP`）
 - 配信済みの行は 3 日で消す。未配信の最古の行の経過時間を監視する（2 秒を超えたら警告。NFR-008 の予算を食うため）。
@@ -380,7 +380,7 @@ message TripCommand {
 
 - リージョンの障害で大阪へ切り替えると、直近（RPO 1 分以内、NFR-007）のコミットが失われうる。
 - 復元：ドライバーのアプリは、つながった先のサーバーに最新の `TripSnapshot` と、要約より後の journal を送る。
-  - 乗車の行があり、版が要約より古い：journal を 8.3 節のとおりに適用する。足りない遷移（要約にあって DB にない）は、要約の署名を確かめてから、`restored` の印を付けて記録する。
+  - 乗車の行があり、バージョンが要約より古い：journal を 8.3 節のとおりに適用する。足りない遷移（要約にあって DB にない）は、要約の署名を確かめてから、`restored` の印を付けて記録する。
   - 乗車の行がない：要約の署名を確かめ、`restored` の印を付けて乗車と割り当てを作り直す。与信は Payments が PSP に照会して結び直す（[payments-and-payouts.md](payments-and-payouts.md) の 9 節）。
   - どちらの場合も、割り当ては今の `region_gen` で epoch を 1 増やして結び直し（4.2 節）、新しい `(region_gen, assignment_epoch)` を応答で返す。要約の古い世代の epoch を持つ操作は、以後すべて拒否される。
   - 結び直すドライバーに、今の世代で別の有効な割り当てがあれば（切り替えの後に新しいオファーを受けた）、部分一意索引で結び直しが失敗する。その乗車は `trip_conflicts` に記録し、運用が確かめる（二重の割り当てを作らない）。
@@ -393,7 +393,7 @@ message TripCommand {
 | --- | --- |
 | Aurora の writer のフェイルオーバー（AZ の障害） | 数十秒、遷移が失敗する。アプリは同じ `command_id` で送り直す。タイマーの期限が過ぎたものは、復旧の後に順に処理する。オファーの時間切れは `accept` の検査でも止まる |
 | 中継のタスクが止まる | outbox に溜まる。状態は失われない。アプリはポーリング（`GET /trips/{id}`）で今の状態を読める |
-| SQS の購読する側が遅れる | 版で古い事象を捨てるので、追いついた後の結果は同じ |
+| SQS の購読する側が遅れる | バージョンで古い事象を捨てるので、追いついた後の結果は同じ |
 | タイマーの処理が止まる | 監視で SEV2。オファーは `accept` の検査で守られるが、再配車が遅れる |
 | 配車が止まる | `requested` の乗車は `dispatch_deadline` で `no_driver_found` になり、与信を取り消す |
 | Payments が遅い | `payment_pending` が 30 秒で `payment_failed` になる。乗客のアプリは再試行を促す（同じ見積もりで、新しい `client_request_id`） |
@@ -436,7 +436,7 @@ message TripCommand {
 | E6 | `trip-state-machine-core` | 3 節の状態と遷移の表、`decide` と `apply`、`trip_events`、冪等（DT-TRIP-001、PROP-TRIP-003・004） |
 | E6 | `assignment-fencing` | 4 節の表と部分一意索引、epoch、提案の検査、ロックの順序（PROP-TRIP-001・002） |
 | E6 | `trip-timers` | 6 節の表と処理、遅れの監視 |
-| E6 | `trip-outbox-relay` | 8.1 節、SNS・SQS、版による捨て方（PROP-TRIP-005）。E3 の索引と一緒に |
+| E6 | `trip-outbox-relay` | 8.1 節、SNS・SQS、バージョンによる捨て方（PROP-TRIP-005）。E3 の索引と一緒に |
 | E6 | `rider-cancellation-and-no-show` | 7 節（DT-TRIP-002・003）。料金の請求は E8 |
 | E6 | `driver-journal-and-replay` | 8.3・8.4 節（DT-TRIP-004、PROP-TRIP-006）。E9 と一緒に |
 | E6 | `trip-snapshot-and-restore` | 8.2・8.5 節の要約の署名と復元。E12 の大阪の訓練（`dr-drill`）で確かめる |
@@ -457,7 +457,7 @@ message TripCommand {
 - **ドライバーの取り消しは再配車に戻す**：安全・迷惑行為の理由のときだけ終端にする。
 - **キャンセル料の猶予と待ち**：受諾から 120 秒、到着から 300 秒。事業者の規則で変えられる。
 - **通信が切れたときに進められる操作**：到着・乗車の開始・区間の分割・降車。受諾と無断キャンセルは進めない。
-- **配信**：SNS の標準のトピックと購読する側ごとの SQS。順序は版で扱う。リアルタイムの配信も S1 は SNS を経る（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 5.1 節）。
+- **配信**：SNS の標準のトピックと購読する側ごとの SQS。順序はバージョンで扱う。リアルタイムの配信も S1 は SNS を経る（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 5.1 節）。
 - **提案の時の確かめ直し**：Trips は供給・営業区域・運行枠を確かめ直し、落ちたら `NOT_ELIGIBLE`。判定は配車と共通の決定表のベクターで揃える（4.3 節）。
 - **世代**：割り当ての比較は `(region_gen, assignment_epoch)`（4.2 節、ADR-0039）。
 - **位置の判定**：到着・無断キャンセルの位置は `GetDriverLocation` で読む。
@@ -498,7 +498,7 @@ message TripCommand {
 
 | 置き場所 | 中身 |
 | --- | --- |
-| Aurora `trips` | `id`（UUID v7）、`city_id`、`rider_id`、`client_request_id`、`state`、`version`、`service_request`（`taxi`・`taxi_or_rideshare`・`rideshare`）、`pricing_group_id`、`fare_quote_id`、`fare_type`、乗車地・降車地（乗客が確かめたピンだけ：`pickup_pin`・`dropoff_pin`（`lat_e7`・`lng_e7`、`origin=rider_confirmed_pin`）、`pickup_point_id`、乗降の地点を含む区域の `pickup_area_ids`・`dropoff_area_ids`（`service_areas.area_id` と版）。提供者の内容（`place_ref`、提供者の表示の名前・座標）は `trips` に置かず、提供者ごとの保存の期限を持つ `trip_place_refs`（[maps-and-geodata.md](maps-and-geodata.md) の 7.3 節、[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)）に置く）、`rideshare_consented_at`、`upfront_notice_version`・`upfront_consented_at`、`payment_mode`、`payment_id`、`current_assignment_id`、各時刻、`terminal_reason`、`final_fare_yen`。一意：`(rider_id, client_request_id)`、5.3 節の部分一意索引 |
+| Aurora `trips` | `id`（UUID v7）、`city_id`、`rider_id`、`client_request_id`、`state`、`version`、`service_request`（`taxi`・`taxi_or_rideshare`・`rideshare`）、`pricing_group_id`、`fare_quote_id`、`fare_type`、乗車地・降車地（乗客が確かめたピンだけ：`pickup_pin`・`dropoff_pin`（`lat_e7`・`lng_e7`、`origin=rider_confirmed_pin`）、`pickup_point_id`、乗降の地点を含む区域の `pickup_area_ids`・`dropoff_area_ids`（`service_areas.area_id` とバージョン）。提供者の内容（`place_ref`、提供者の表示の名前・座標）は `trips` に置かず、提供者ごとの保存の期限を持つ `trip_place_refs`（[maps-and-geodata.md](maps-and-geodata.md) の 7.3 節、[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)）に置く）、`rideshare_consented_at`、`upfront_notice_version`・`upfront_consented_at`、`payment_mode`、`payment_id`、`current_assignment_id`、各時刻、`terminal_reason`、`final_fare_yen`。一意：`(rider_id, client_request_id)`、5.3 節の部分一意索引 |
 | Aurora `driver_dispatch_state`、`driver_assignments` | 4.1 節 |
 | Aurora `trip_segments`（`trip_id`、`segment_no`、`fare_type`、開始・終了の時刻と位置） | 3.3 節の行 15 |
 | Aurora `trip_events`（`trip_id`、`version`、`from_state`、`to_state`、`event_type`、`actor`、`occurred_at`、`recorded_at`、`command_id`、`restored`） | 追記のみ。月ごとのパーティション |

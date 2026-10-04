@@ -6,16 +6,16 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) | tzdb の版の採用の後、`expander` が会議室の予約の行を先に、次に施行の近い順に予定オブジェクトを計算し直す。計算し直しは版を上げて変更のログに載せるが、`SEQUENCE` は上げない。外部の参加者には、施行の後に回がある予定だけ、同じ `SEQUENCE` の `REQUEST` を新しい VTIMEZONE つきで送る。会議室の重なりは「要確認」にする |
+| [0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) | tzdb のバージョンの採用の後、`expander` が会議室の予約の行を先に、次に施行の近い順に予定オブジェクトを計算し直す。計算し直しはバージョンを上げて変更のログに載せるが、`SEQUENCE` は上げない。外部の参加者には、施行の後に回がある予定だけ、同じ `SEQUENCE` の `REQUEST` を新しい VTIMEZONE つきで送る。会議室の重なりは「要確認」にする |
 | [0013](../decisions/0013-external-timezone-definitions.md) | 外から来た TZID は、tzdb の正規の名前、別名、製品の接頭辞、Windows のゾーン名（Unicode CLDR の対応表）、VTIMEZONE の遷移の照合の順で IANA のゾーンに解く。解けなければ近いものに寄せて印を付ける。知っている TZID の VTIMEZONE の定義は使わず、本システムの tzdb で解く。書き出す VTIMEZONE は本システムの tzdb から作る |
 
 ## 1. 目的と範囲
 
 - 扱う：
-  - `packages/tzdata` の形と版、`packages/tz` の `resolve`・`toLocal`・`offsetAt`
+  - `packages/tzdata` の形とバージョン、`packages/tz` の `resolve`・`toLocal`・`offsetAt`
   - 存在しない時刻・2 回ある時刻、浮動の時刻、終日の派生の値
   - カレンダーのタイムゾーンの変更での作り直し
-  - tzdb の版の差分の報告、採用、計算し直し、外部への知らせ
+  - tzdb のバージョンの差分の報告、採用、計算し直し、外部への知らせ
   - TZID の別名、Windows のゾーン名、製品ごとの TZID、VTIMEZONE の取り込みと書き出し
   - 日本の祝日のカレンダー（生成、照合、配信）、和暦の表示
 - 扱わない：
@@ -23,14 +23,14 @@
   - 会議室の「要確認」の後の扱い（[rooms-and-resources.md](rooms-and-resources.md)）
   - リマインダーの桶の付け替え（reminders-and-notifications.md）
   - 画面の表示のタイムゾーン、2 つ目のタイムゾーン、ゾーンの選び方（clients.md）
-  - tzdb の版を上げる CI の流れ（delivery.md）
+  - tzdb のバージョンを上げる CI の流れ（delivery.md）
 
 ## 2. 要件
 
 | 要件 | 目標 | NFR |
 | --- | --- | --- |
 | 時刻の一致 | 同じ予定の同じ回が、画面・API・CalDAV・空き時間・会議室・リマインダーで同じ UTC の瞬間になる | NFR-009、[intent.md](../intent.md) の「守るべき振る舞い」 |
-| tzdb の追従 | 版の採用から 24 時間以内に、影響する未来の回を計算し直す。施行の 7 日以上前に公表された変更で、施行の後の誤り 0 件 | NFR-009、K2 |
+| tzdb の追従 | バージョンの採用から 24 時間以内に、影響する未来の回を計算し直す。施行の 7 日以上前に公表された変更で、施行の後の誤り 0 件 | NFR-009、K2 |
 | 壁時計の時刻の保存 | 計算し直しで `start_local`・`start_tzid` を変えない | [ADR-0002](../decisions/0002-time-representation.md) |
 | 終日 | 見る人のタイムゾーンに関係なく同じ日付 | [intent.md](../intent.md) |
 | 祝日 | 生成した祝日が内閣府の CSV の全年と一致する | [quality.md](../quality.md) の 5 節の E3 |
@@ -62,16 +62,16 @@ RFC 5545 の要点：
 
 ### 4.1 形
 
-- IANA の tzdb のリリース（例：`2026b`）を zic で遷移の表にし、本システムの版の名前を `2026b-1`（末尾は本システムの組み立ての番号）にする。
+- IANA の tzdb のリリース（例：`2026b`）を zic で遷移の表にし、本システムのバージョンの名前を `2026b-1`（末尾は本システムの組み立ての番号）にする。
 - ゾーンごとに、遷移の列 `[(utc_instant, utc_offset_s, is_dst, abbrev)]` を 1900 年から 2100 年まで持ち、2100 年より先は zic の POSIX の TZ の文字列（末尾の規則）で求める。
-- 別名（tzdb の `backward` のリンク）と、Windows のゾーン名の対応表（Unicode CLDR の `windowsZones`）を、同じ版に含める。CLDR の版は版の名前と一緒に記録する。
+- 別名（tzdb の `backward` のリンク）と、Windows のゾーン名の対応表（Unicode CLDR の `windowsZones`）を、同じバージョンに含める。CLDR のバージョンはバージョンの名前と一緒に記録する。
 - サーバーは全ゾーンをメモリーに持つ（約 600 ゾーン、数 MiB）。Web のクライアントは、使うゾーンのデータだけを遅延で読む（1 ゾーン 5 KiB 以下）。
 
-### 4.2 版の扱い
+### 4.2 バージョンの扱い
 
 - 予定の行と展開の索引の行は、派生の値と一緒に `tzdata_version` を持つ（[ADR-0002](../decisions/0002-time-representation.md)）。
-- 本番の全サービスと Worker は、AppConfig の `tzdata.active_version` が示す同じ版で動く。イメージには `active` とその前後の版を入れ、切り替えは全サービスで一度に行う（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。新旧の版が混ざるのは、ポーリングの間（約 15 秒）と、6.4 節の切り替えの窓だけである。
-- API の応答は `tzdata_version` を返す。Web のクライアントの版が古ければ、サーバーの派生の値で表示し、自分で計算し直さない。
+- 本番の全サービスと Worker は、AppConfig の `tzdata.active_version` が示す同じバージョンで動く。イメージには `active` とその前後のバージョンを入れ、切り替えは全サービスで一度に行う（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。新旧のバージョンが混ざるのは、ポーリングの間（約 15 秒）と、6.4 節の切り替えの窓だけである。
+- API の応答は `tzdata_version` を返す。Web のクライアントのバージョンが古ければ、サーバーの派生の値で表示し、自分で計算し直さない。
 
 ## 5. 時刻の解き方
 
@@ -117,7 +117,7 @@ toLocal(utc: Instant, tzid: string, tz: TzData): { local: LocalDateTime; offsetS
 ### 5.3 カレンダーのタイムゾーンの変更
 
 1. 利用者がカレンダーのタイムゾーンを変える。`packages/writer` がカレンダーの属性を変え、`calendar_changes` に `kind=calendar` を載せる。
-2. `expander` が、そのカレンダーの `floating`・`date` の予定オブジェクトを 1,000 件ずつ計算し直す。それぞれ版を上げて変更のログに載せる（壁時計の時刻と日付は変えない）。
+2. `expander` が、そのカレンダーの `floating`・`date` の予定オブジェクトを 1,000 件ずつ計算し直す。それぞれバージョンを上げて変更のログに載せる（壁時計の時刻と日付は変えない）。
 3. `zoned` の予定は変えない。
 
 ## 6. tzdb の更新
@@ -132,12 +132,12 @@ sequenceDiagram
   participant D as デプロイ
   participant E as expander（tz-recompute）
   participant X as itip-delivery（外部への REQUEST）
-  I->>CI: 新しい版を検知
+  I->>CI: 新しいバージョンを検知
   CI->>CI: 遷移の差分（今日から 10 年）と影響の見積もり
   CI->>H: PR と差分の報告
-  H->>D: 採用を判断し、マージして新旧の版を含むイメージをデプロイ（active は旧）
-  H->>D: AppConfig の tzdata.active_version を新しい版に（Ops の承認）
-  D->>E: 全タスクが新しい版を 2 分続けて報告（切り替えの完了）
+  H->>D: 採用を判断し、マージして新旧のバージョンを含むイメージをデプロイ（active は旧）
+  H->>D: AppConfig の tzdata.active_version を新しいバージョンに（Ops の承認）
+  D->>E: 全タスクが新しいバージョンを 2 分続けて報告（切り替えの完了）
   E->>E: 1. 会議室の予約の行（影響するゾーン）
   E->>E: 2. 予定オブジェクト（施行の近い順）
   E->>X: 外部の参加者のいる予定の REQUEST（SEQUENCE は同じ）
@@ -163,17 +163,17 @@ ADR-0012。
    - `zoned`：`start_tzid` か `end_tzid` が変わったゾーンで、回が `changed_from` より後にあるもの（単発は `end_utc > changed_from`、繰り返しは `series_end_utc` が NULL か `changed_from` より後）。
    - `floating`・`date`：持ち主のカレンダーのタイムゾーンが変わったゾーンのもの。
 2. **順序。** まず会議室の予約の行（`resource_bookings`）を持つ予定オブジェクト、次に `changed_from` の近い順、同じなら組織のテナントを先にする。
-3. **1 件の処理。** `packages/writer` で、予定オブジェクトの派生の値と `tzdata_version` を直し、版を上げ、展開の索引の差分、会議室の予約の行、リマインダーの付け替え（outbox）、`calendar_changes` を書く。`start_local`・`start_tzid` は変えない。`SEQUENCE` は上げない。
+3. **1 件の処理。** `packages/writer` で、予定オブジェクトの派生の値と `tzdata_version` を直し、バージョンを上げ、展開の索引の差分、会議室の予約の行、リマインダーの付け替え（outbox）、`calendar_changes` を書く。`start_local`・`start_tzid` は変えない。`SEQUENCE` は上げない。
 4. **速さ。** 全体で 5,000 件/秒、1 テナント 500 件/秒を上限にする。1 つのカレンダーの書き込みの上限（1 秒 50 件、[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）を超えないよう、カレンダーごとに順に流す。
-5. **完了の確認。** 影響するゾーンの、古い版の索引の行の数が 0 になったら完了とする。採用から 24 時間を過ぎて残っていれば警報（[quality.md](../quality.md) の 4.1 節）。
+5. **完了の確認。** 影響するゾーンの、古いバージョンの索引の行の数が 0 になったら完了とする。採用から 24 時間を過ぎて残っていれば警報（[quality.md](../quality.md) の 4.1 節）。
 
 見積もり（S1）：あるゾーンを使う予定オブジェクトが全体の 1%（300 万件）なら、5,000 件/秒で 10 分。`Asia/Tokyo` の規則が変わる最悪の場合（3 億件の大半）は、施行の後に回があるものに絞っても約 2 億件で 11 時間。24 時間に収まるが、変更のログとクライアントの取り直しが集中する（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md) の Consequences）。
 
-### 6.4 版の混ざる間（切り替えの窓）
+### 6.4 バージョンの混ざる間（切り替えの窓）
 
-- AppConfig のポーリングの間（約 15 秒）は、新しい書き込みが新旧どちらの版で計算されるかが決まらない。`tzdata_version` の古い行は、計算し直しのジョブが拾う（版の比べで対象にする）。
-- 計算し直しが終わるまで、影響するゾーンの未来の回は、索引で古い版の値を持つ。空き時間と範囲の表示は、その値をそのまま使う。
-- **会議室・予約の区間**：切り替えの完了から、影響するゾーンの会議室の予約の行と予約ページの区間の計算し直しが終わるまでを「切り替えの窓」と呼ぶ。窓の中では、排他の制約が新旧の版の区間を比べる。これを [ADR-0002](../decisions/0002-time-representation.md) の原則の唯一の例外として引き受け、扱いを [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の「切り替えの窓」で決めた：重なりは後から承諾したほうを「要確認」にし、旧の版の区間とだけ重なって辞退した予約（`conflict_tz_pending`）は、窓の終わりに判定し直す。
+- AppConfig のポーリングの間（約 15 秒）は、新しい書き込みが新旧どちらのバージョンで計算されるかが決まらない。`tzdata_version` の古い行は、計算し直しのジョブが拾う（バージョンの比べで対象にする）。
+- 計算し直しが終わるまで、影響するゾーンの未来の回は、索引で古いバージョンの値を持つ。空き時間と範囲の表示は、その値をそのまま使う。
+- **会議室・予約の区間**：切り替えの完了から、影響するゾーンの会議室の予約の行と予約ページの区間の計算し直しが終わるまでを「切り替えの窓」と呼ぶ。窓の中では、排他の制約が新旧のバージョンの区間を比べる。これを [ADR-0002](../decisions/0002-time-representation.md) の原則の唯一の例外として引き受け、扱いを [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の「切り替えの窓」で決めた：重なりは後から承諾したほうを「要確認」にし、旧のバージョンの区間とだけ重なって辞退した予約（`conflict_tz_pending`）は、窓の終わりに判定し直す。
 - 窓を短くするため、会議室の予約の行と予約ページの区間を最初に直す。窓の長さは `tz_room_window_seconds` で見る。
 
 ### 6.5 外部への知らせ
@@ -211,7 +211,7 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 | 6 | 段 5 で一致なし | 一致する遷移が最も多いゾーン（DTSTART の時点のオフセットが同じものに限る）に寄せ、`tz_approximated` の印を付けて利用者に示す |
 | 7 | 段 6 でもなし | DTSTART の時点のオフセットが整数の時間なら `Etc/GMT±N`、それ以外は `utc` の時刻に変える。印を付ける |
 
-- 段 5 の照合の表（ゾーンごと・年ごとの遷移の指紋）は、`packages/tzdata` の版と一緒に作る。
+- 段 5 の照合の表（ゾーンごと・年ごとの遷移の指紋）は、`packages/tzdata` のバージョンと一緒に作る。
 - 段 3〜7 で解いたときは、元の TZID の文字列を `x_props` の `X-<BRAND>-ORIGINAL-TZID` に残す。
 - TZID のない UTC オフセットだけの時刻は、[ADR-0002](../decisions/0002-time-representation.md) の規則（カレンダーの既定のタイムゾーンでオフセットが合えば `zoned`）に従う。
 
@@ -232,7 +232,7 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 - iCalendar のオブジェクト（CalDAV、iMIP、ICS）に、使う TZID ごとに VTIMEZONE を 1 つ付ける（RFC 5545 の 3.6.5 節。RFC 7809 は持たない。[ADR-0007](../decisions/0007-interop-standards-scope.md)）。
 - 範囲：予定オブジェクトの最初の回（DTSTART、RDATE、`RECURRENCE-ID` の最小）の前の遷移から、最後の回まで。終わりのない系列は、今の規則（tzdb の末尾の規則）を `RRULE` つきの `STANDARD`・`DAYLIGHT` で書く。
 - 過去の規則の時代ごとに下位の構成要素を作る。遷移が 1 回だけの時代は `RDATE` なしの 1 つの構成要素にする。
-- `TZID` は IANA の正規の名前。`X-<BRAND>-TZDATA-VERSION` に版を書く。
+- `TZID` は IANA の正規の名前。`X-<BRAND>-TZDATA-VERSION` にバージョンを書く。
 - 1 つのゾーンの VTIMEZONE は 4 KiB を目安にし、超えるときは範囲を予定の回に合わせて縮める。
 
 ## 9. 日本の祝日のカレンダー
@@ -253,7 +253,7 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 | 振替休日 | 祝日が日曜日に当たれば、その後の最も近い「国民の祝日」でない日 | 生成の規則 |
 | 国民の休日 | 前日と翌日が祝日である日（祝日でない日に限る） | 生成の規則 |
 
-- 名前と日付の変遷（祝日の名前の変更、日付の移動）は、有効の年の範囲で持つ。規則の表は、`packages/holidays-jp`（データ）として版を持ち、変更は PR で行う。
+- 名前と日付の変遷（祝日の名前の変更、日付の移動）は、有効の年の範囲で持つ。規則の表は、`packages/holidays-jp`（データ）としてバージョンを持ち、変更は PR で行う。
 - 例外の表の各行には、根拠（法令の名前と公布の日）を書く。
 
 ### 9.3 生成の手順
@@ -297,7 +297,7 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 | 事象 | 起きること | 備え |
 | --- | --- | --- |
 | 計算し直しのジョブが遅れる | 施行の後の回が古いオフセットのまま | 施行の近い順に流す。採用から 24 時間で残りがあれば警報。施行まで 24 時間を切ったら SEV2 |
-| 計算し直しの途中で版を戻した（`tzdata.active_version` を前の版に） | 新しい版で直した行と、古い版の行が混ざる | 戻した版を「採用」とみなし、ジョブが版の比べで残りを直す（行ごとに `tzdata_version` を持つので、どちらの方向にも収束する。PROP-TZ-004） |
+| 計算し直しの途中でバージョンを戻した（`tzdata.active_version` を前のバージョンに） | 新しいバージョンで直した行と、古いバージョンの行が混ざる | 戻したバージョンを「採用」とみなし、ジョブがバージョンの比べで残りを直す（行ごとに `tzdata_version` を持つので、どちらの方向にも収束する。PROP-TZ-004） |
 | 施行の直前の公表（7 日未満） | 採用が施行に間に合わない | 差分の報告に「急ぎ」の印。runbook の急ぎの採用の手順。K2 の対象外だが、施行の後の誤りの数を数える |
 | 外部への `REQUEST` が多すぎる | iMIP の送信の上限に当たる | 10 万通を超える見積もりは Ops の承認。施行の近い順に流す |
 | `windowsZones` の対応がない Windows の名前 | TZID が解けない | 段 5〜7 に落ちる。件数を監視し、表の更新を PR にする |
@@ -319,14 +319,14 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 
 性質ベーステスト：
 
-- **PROP-TZ-001（往復）**：任意の壁時計の時刻・TZID・版で、`toLocal(resolve(x))` は `gap` 以外で `x` に戻る。
-- **PROP-TZ-002（変わらないゾーン）**：任意の 2 つの版で、遷移が変わらないゾーンの予定は、計算し直しの前後で派生の値が変わらず、変更のログに載らない。
-- **PROP-TZ-003（壁時計の保存）**：任意の予定と任意の版の組で、計算し直しの後、`start_local`・`start_tzid`・`recurrence_id` が変わらず、`start_utc` が新しい版の `resolve` に等しい。
-- **PROP-TZ-004（版の収束）**：任意の順序で版の採用と戻しを繰り返した後、ジョブが静かになると、すべての行が最後の版の値になる。
+- **PROP-TZ-001（往復）**：任意の壁時計の時刻・TZID・バージョンで、`toLocal(resolve(x))` は `gap` 以外で `x` に戻る。
+- **PROP-TZ-002（変わらないゾーン）**：任意の 2 つのバージョンで、遷移が変わらないゾーンの予定は、計算し直しの前後で派生の値が変わらず、変更のログに載らない。
+- **PROP-TZ-003（壁時計の保存）**：任意の予定と任意のバージョンの組で、計算し直しの後、`start_local`・`start_tzid`・`recurrence_id` が変わらず、`start_utc` が新しいバージョンの `resolve` に等しい。
+- **PROP-TZ-004（バージョンの収束）**：任意の順序でバージョンの採用と戻しを繰り返した後、ジョブが静かになると、すべての行が最後のバージョンの値になる。
 - **PROP-TZ-005（VTIMEZONE の往復）**：任意のゾーンと範囲で、書き出した VTIMEZONE を `normalizeTzid` の段 5 に通すと、元のゾーン（または同じ遷移のゾーン）に解ける。
 - **PROP-TZ-006（祝日）**：1955 年から 2027 年の各年で、生成した祝日と休日の集合が CSV と一致する。2028 年から 2100 年の各年で、振替休日は日曜日の祝日の後の最初の祝日でない日で、国民の休日は 2 つの祝日に挟まれた日である。
 
-tzdb の版の差分の試験（[quality.md](../quality.md) の 2.2.1 節 B）：過去の改正の集まり、合成の改正（6.6 節の例、施行の 2 日前の公表、計算し直しの途中の施行）、版の混在。
+tzdb のバージョンの差分の試験（[quality.md](../quality.md) の 2.2.1 節 B）：過去の改正の集まり、合成の改正（6.6 節の例、施行の 2 日前の公表、計算し直しの途中の施行）、バージョンの混在。
 
 例示テスト：5.1 節の表、9.3 節の表、和暦の元年の表示。
 
@@ -373,7 +373,7 @@ tzdb の版の差分の試験（[quality.md](../quality.md) の 2.2.1 節 B）�
 
 ### quality.md
 
-- DT-TZ-001・002、PROP-TZ-001〜006 と、tzdb の版の差分の試験を E3 のリリースの基準にする。
+- DT-TZ-001・002、PROP-TZ-001〜006 と、tzdb のバージョンの差分の試験を E3 のリリースの基準にする。
 - 本番：古い `tzdata_version` の行の数（採用から 24 時間の後 0）、`tz_approximated`・`vtimezone_mismatch` の件数、計算し直しの進み具合。
 
 ### runbooks
@@ -385,7 +385,7 @@ tzdb の版の差分の試験（[quality.md](../quality.md) の 2.2.1 節 B）�
 
 | 表・データ | 中身 | 節 |
 | --- | --- | --- |
-| `packages/tzdata`（データ） | 版、ゾーンごとの遷移、末尾の規則、別名、`windowsZones`、遷移の指紋 | 4、7.1 |
+| `packages/tzdata`（データ） | バージョン、ゾーンごとの遷移、末尾の規則、別名、`windowsZones`、遷移の指紋 | 4、7.1 |
 | `tenant_tz_usage`（保守用のスキーマ、RLS の外） | `(tenant_id, tzid)` を主キー、`first_seen_at` | 7.3 |
 | `tz_recompute_runs` | 採用ごとの `(from_version, to_version, zone, changed_from, 対象の数, 済みの数, 状態)` | 6.3 |
 | `calendars` に足す列 | `timezone`（既定のタイムゾーン、`floating`・`date` の解き方） | 5.2 |

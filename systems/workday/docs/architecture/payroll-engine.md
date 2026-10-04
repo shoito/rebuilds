@@ -2,11 +2,11 @@
 
 給与計算の実行（準備、入力の固定、計算、確認、確定、支払、取消）、入力のスナップショット（`known_at` とハッシュ）、支給・控除の項目の依存のグラフ、テナントが定義する式、再現性、遡及の差額、賞与と臨時の実行、並行稼働の比較、Payroll Compute の分割、営業日の暦を決める。
 
-前提の決定は、給与計算を入力のスナップショット・規則表の版・エンジンの版から決まる純粋な計算にし、遡及は差額として次の計算に出すこと（[ADR-0004](../decisions/0004-payroll-engine.md)）、お金は整数の円と固定小数点で扱い、丸めは名前付きの関数だけで行うこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、`known_at` は安定の境界より前に限ること（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。日本の法定の計算の中身は [payroll-jp-rules.md](payroll-jp-rules.md)、振込・明細・仕訳は [payments-and-accounting.md](payments-and-accounting.md) にある。この文書で決めたことは次の ADR にある。
+前提の決定は、給与計算を入力のスナップショット・規則表のバージョン・エンジンのバージョンから決まる純粋な計算にし、遡及は差額として次の計算に出すこと（[ADR-0004](../decisions/0004-payroll-engine.md)）、お金は整数の円と固定小数点で扱い、丸めは名前付きの関数だけで行うこと（[ADR-0001](../decisions/0001-platform-and-stack.md)）、`known_at` は安定の境界より前に限ること（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。日本の法定の計算の中身は [payroll-jp-rules.md](payroll-jp-rules.md)、振込・明細・仕訳は [payments-and-accounting.md](payments-and-accounting.md) にある。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行は給与のグループ × 期間 × 種類ごとの状態機械で、段の移動は業務プロセスで行う。入力の固定は、1 人ずつの入力の文書を JSON の正規の形（RFC 8785）にして SHA-256 を取り、S3 に内容のアドレスで置く。結果は入力のハッシュ・規則表の版・エンジンのダイジェスト・設定の版とともに追記する |
+| [0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行は給与のグループ × 期間 × 種類ごとの状態機械で、段の移動は業務プロセスで行う。入力の固定は、1 人ずつの入力の文書を JSON の正規の形（RFC 8785）にして SHA-256 を取り、S3 に内容のアドレスで置く。結果は入力のハッシュ・規則表のバージョン・エンジンのダイジェスト・設定のバージョンとともに追記する |
 | [0027](../decisions/0027-pay-item-graph-and-formula-language.md) | 項目は段（支給、控除の前、社会保険、税、控除、差引）を持つ依存のグラフで、保存のときに循環を拒む。テナントの式は型のある式の木（業務プロセスの式と同じ核）で、円と 10 進と分の型を区別し、円への変換は名前付きの丸めだけ。割り算は按分と時間単価の関数だけ。法定の項目はシステムが持ち、テナントは変えられない |
 | [0028](../decisions/0028-retro-deltas-and-bonus-runs.md) | 遡及は、確定した期間を新しい `known_at` の入力と、その期間の規則表で計算し直し、元の結果（と前の差額）との差を項目ごとに当期の差額の行として出す。元の入力をいまのエンジンで計算して一致しなければ止める。既定の窓は 24 か月。賞与は別の種類の実行で、前月の月次の確定を前提にする |
 | [0029](../decisions/0029-parallel-run-and-compute-partitioning.md) | 計算は、従業員の ID の順の決まった束（既定 250 人）ごとに ECS のタスクで行い、束の結果をファイルにしてから DB に 1 トランザクションで入れる。並行稼働は現行のシステムの結果を項目の対応表で取り込み、従業員 × 項目 × 月の差を分類する。3 か月（賞与の月を含む）続けて説明のない差が 0 件で切り替える |
@@ -84,8 +84,8 @@ pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cu
 1. `known_at` ＝ 固定の開始の時刻 − 10 秒。読み始める前に 10 秒待つ（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。
 2. 対象の雇用を、期間のどこかで給与のグループに属し、`employee` の雇用であるもの（`contingent` は除く。[ADR-0010](../decisions/0010-person-employment-job-assignment-model.md)）として選ぶ。
 3. 1 人ずつ、期間の各日の有効日付のデータを `known_at` の知識で読み、値の変わる区切りごとの区間の列にする。
-4. 勤怠の集計の版（[time-and-attendance.md](time-and-attendance.md) の 7.3 節）、休暇の取得、個別の調整の入力、住民税の月割額、前の実行の結果から要る値（賞与の税率の表を引く前月の給与、健康保険の標準賞与額の年度の累計など）を加える。
-5. 規則表の版の ID の一覧と、テナントの計算の設定の版を加える。
+4. 勤怠の集計のバージョン（[time-and-attendance.md](time-and-attendance.md) の 7.3 節）、休暇の取得、個別の調整の入力、住民税の月割額、前の実行の結果から要る値（賞与の税率の表を引く前月の給与、健康保険の標準賞与額の年度の累計など）を加える。
+5. 規則表のバージョンの ID の一覧と、テナントの計算の設定のバージョンを加える。
 6. 正規の形にしてハッシュを取り、保存する。
 
 ### 5.2 文書の形
@@ -121,7 +121,7 @@ pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cu
 
 ### 5.3 再現性
 
-- 結果の行は、入力のハッシュ、規則表の版の一覧のハッシュ、エンジンのイメージのダイジェスト、設定の版を持つ（[ADR-0004](../decisions/0004-payroll-engine.md)）。
+- 結果の行は、入力のハッシュ、規則表のバージョンの一覧のハッシュ、エンジンのイメージのダイジェスト、設定のバージョンを持つ（[ADR-0004](../decisions/0004-payroll-engine.md)）。
 - 同じ 4 つで計算し直すと、1 円も違わない。夜間に、確定した結果の 1% を記録したエンジンのイメージで計算し直して比べる。不一致は SEV1。
 - エンジンのイメージは、結果の保存の期間の間 ECR に残す（ライフサイクルの規則で消さない。保存の期間は [intent.md](../intent.md) の L5）。
 
@@ -146,7 +146,7 @@ pay_item_sets (tenant_id, pay_group_id, version, item_refs jsonb, activated_at, 
 ```
 
 - 法定の項目（源泉所得税、社会保険料、雇用保険料、住民税、割増賃金の最低、非課税の通勤手当の上限の判定）は `owner = system`。テナントは式を変えられない。システムの行は `tenant_id` が空で、全テナントが読むだけの RLS の部分の例外にし、コードに `jp.` の接頭辞を付ける（[data-model.md](data-model.md) の 3.3.1 節）。割増の率は法定より高くだけできる（[payroll-jp-rules.md](payroll-jp-rules.md) の 7 節）。
-- フラグは、どの法定の計算の基礎に入るかを決める。例：通勤手当は `si_remuneration`・`ei_wage` を持ち、`taxable` は持たない（非課税の上限を超える分はシステムの項目が課税に移す）。フラグの誤りは税と保険の誤りになるので、項目の版の有効化に給与の担当の承認を要する（`pay_item_change` の業務プロセス）。
+- フラグは、どの法定の計算の基礎に入るかを決める。例：通勤手当は `si_remuneration`・`ei_wage` を持ち、`taxable` は持たない（非課税の上限を超える分はシステムの項目が課税に移す）。フラグの誤りは税と保険の誤りになるので、項目のバージョンの有効化に給与の担当の承認を要する（`pay_item_change` の業務プロセス）。
 - 法定外の控除（組合費、社宅の費用など）は `requires_art24_agreement` を持ち、労使協定の記録（24 条 1 項ただし書）がテナントになければ有効化を拒む。
 
 ### 6.2 評価の順序
@@ -220,7 +220,7 @@ payroll_result_lines (tenant_id, result_id, pay_date, seq, item_code, item_versi
 | 有効日付の過去日付の変更・訂正・取消 | `temporal.retro_detected`（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 6.4 節） |
 | 勤怠の締めた後の訂正 | `time.summary_superseded` |
 | 休暇の過去の取得・取消 | `absence.retro_changed` |
-| 規則表の訂正（同じ適用の期間の新しい版） | `rule_table.corrected`（[payroll-jp-rules.md](payroll-jp-rules.md) の 2 節） |
+| 規則表の訂正（同じ適用の期間の新しいバージョン） | `rule_table.corrected`（[payroll-jp-rules.md](payroll-jp-rules.md) の 2 節） |
 | 個別の調整の過去の期間への入力 | `payroll.adjustment_retro` |
 
 - 候補（`retro_candidates`：雇用、期間、元、検知の時刻）を、確定した期間（`finalized` か `released`）と突き合わせて作る。まだ確定していない期間は、その期間の実行がふつうに拾う。
@@ -230,8 +230,8 @@ payroll_result_lines (tenant_id, result_id, pay_date, seq, item_code, item_versi
 
 次の実行の入力の固定のとき、候補の各期間 P について：
 
-1. **再現の確認**：P の元の入力の文書と元の規則表の版を、いまのエンジンで計算し、元の結果と比べる。違えば `ENGINE_DRIFT` で実行を止める（エンジンの変更による差を、データの遡及として払わない）。
-2. **計算し直し**：P の入力を、今回の `known_at` で作り直し、P の期間に有効な最新の規則表の版で計算する。
+1. **再現の確認**：P の元の入力の文書と元の規則表のバージョンを、いまのエンジンで計算し、元の結果と比べる。違えば `ENGINE_DRIFT` で実行を止める（エンジンの変更による差を、データの遡及として払わない）。
+2. **計算し直し**：P の入力を、今回の `known_at` で作り直し、P の期間に有効な最新の規則表のバージョンで計算する。
 3. **差**：項目ごとに、新しい値 −（元の結果 ＋ P に対する前の差額の合計）。
 4. **当期の行**：差が 0 でない項目を、当期の結果に `retro_period = P` の行として足す。税・保険の扱いは項目の種類ごとの決定表（DT-PAY-003）で決める。
 
@@ -265,7 +265,7 @@ freeze ─▶ inputs (S3, per employee) ─▶ chunk manifest (employment_id ord
 ```
 
 - 束は、雇用の ID の順に 250 人ずつ（既定。E12 の負荷試験で決める）。束の中身は `payroll_chunks (run_id, chunk_no, employment_ids, manifest_hash)` に記録し、再試行でも変えない。
-- タスクは S3 から入力を読み、規則表の版をメモリーに持ち、結果の束のファイルを書く。DB は読まない（[ADR-0004](../decisions/0004-payroll-engine.md)）。
+- タスクは S3 から入力を読み、規則表のバージョンをメモリーに持ち、結果の束のファイルを書く。DB は読まない（[ADR-0004](../decisions/0004-payroll-engine.md)）。
 - 取り込み（Loader）は、束のファイルのハッシュを確かめ、1 束を 1 トランザクションで入れる。`(run_id, employment_id)` の一意で、再試行の二重の取り込みは何もしない。
 - 1 人の計算の例外は、その人を `error` にするだけで、束は成功にする。タスクの異常終了は束ごとに 3 回まで再試行し、それでも失敗すれば束を `failed` にして担当に出す。
 - 同時に動くタスクは、テナントごとに上限（既定 20）と全体の上限を持つ。支給日の近い実行を先にする。
@@ -310,7 +310,7 @@ DT-PAY-004（`in_review` で全員に行う。当たる行をすべて出す）�
 | 入力の固定の途中で失敗 | 実行を `draft` に戻し、固定し直す。書きかけの `payroll_inputs` は `run_id` ごとに捨てる（S3 の文書は内容のアドレスなので残してよい） |
 | Payroll Compute のタスクの異常終了 | 束ごとの再試行（9 節）。同じ束を 2 回計算しても、結果は同じで、取り込みは 1 回 |
 | Loader の途中で失敗 | 束のトランザクションが戻る。再実行で同じ束を入れ直す |
-| 再現の不一致（夜間の抜き取り、遡及の `ENGINE_DRIFT`） | SEV1。新しい確定を止め、原因（エンジンの非決定性、規則表の版の誤り）を調べる。runbooks の手順 |
+| 再現の不一致（夜間の抜き取り、遡及の `ENGINE_DRIFT`） | SEV1。新しい確定を止め、原因（エンジンの非決定性、規則表のバージョンの誤り）を調べる。runbooks の手順 |
 | 支給日の前にリージョンが落ちる | 大阪の DR で、確定済みの実行の振込ファイルを作れる（NFR-006）。入力の文書と結果は S3 のリージョン間の複製で持つ |
 | 確定の後に誤りが見つかる（支払の前） | `payroll_cancel` で取り消し、作り直す。支払の後なら次の実行の差額か `off_cycle` |
 
@@ -327,7 +327,7 @@ DT-PAY-004（`in_review` で全員に行う。当たる行をすべて出す）�
 
 ### 15.1 ゴールデンデータセット
 
-- 置き場所：開発リポジトリの `golden/payroll/<case_id>/`。`input.json`（5.2 節の形）、`rules.lock`（規則表の版）、`expected.json`（項目ごとの額）、`provenance.md`（確かめた人・方法・日付）。
+- 置き場所：開発リポジトリの `golden/payroll/<case_id>/`。`input.json`（5.2 節の形）、`rules.lock`（規則表のバージョン）、`expected.json`（項目ごとの額）、`provenance.md`（確かめた人・方法・日付）。
 - 例の軸（[ADR-0004](../decisions/0004-payroll-engine.md) を具体にしたもの）：甲欄の扶養 0〜7 人と 8 人以上、乙欄、月額表と電算機特例、賞与（前月の給与なし、前月の 10 倍超）、年齢の境界（40・65・70・75 歳の誕生日の前日の月）、協会けんぽの都道府県と健康保険組合、等級の境界（上限・下限）、子ども・子育て支援金の始まりの月（令和 8 年 4 月分）、雇用保険の料率の改定の締日の前後、月の途中の入社・退職（末日の退職で 2 か月の控除）、休職（産休・育休の免除）、欠勤・遅刻、月 60 時間の前後、深夜と休日の重なり、遡及の昇給、住民税の 6 月と退職の一括徴収、通勤手当の非課税の上限。
 - 全件一致を CI の必須のチェックにする。期待値の変更は QA の承認と、法令の解釈に関わるものは社労士・税理士の確認の記録を要する（[AGENTS.md](../../AGENTS.md)）。
 
@@ -432,7 +432,7 @@ DT-PAY-004（`in_review` で全員に行う。当たる行をすべて出す）�
 | --- | --- |
 | Aurora `pay_groups`、`pay_periods`、facet `employment_pay_group`、`business_calendars` | 3 節 |
 | Aurora `payroll_runs`、`payroll_inputs`、`payroll_chunks` | 4・5・9 節 |
-| Aurora `pay_items`、`pay_item_sets`（版） | 6.1 節 |
+| Aurora `pay_items`、`pay_item_sets`（バージョン） | 6.1 節 |
 | Aurora `payroll_results`、`payroll_result_lines` | 6.4 節。確定の後は書き換えない。月ごとのパーティション |
 | Aurora `retro_candidates` | 7.1 節 |
 | Aurora `legacy_payroll_results`、`legacy_item_map`、`parallel_diffs`、`parallel_run_gates` | 10 節 |

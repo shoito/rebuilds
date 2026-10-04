@@ -233,12 +233,12 @@ erDiagram
 | `thread_root_id` | `uuid` | YES | | 返信なら親。スレッドは 1 段だけ |
 | `also_send_to_channel` | `boolean` | NO | `false` | 返信をチャンネルの一覧にも出す。投稿時にだけ決める |
 | `body` | `jsonb` | NO | | 本文の AST（ADR-0006）。削除で `{"v":1,"blocks":[]}` にする |
-| `body_format` | `smallint` | NO | `1` | AST の版 |
+| `body_format` | `smallint` | NO | `1` | AST のバージョン |
 | `ui_blocks` | `jsonb` | YES | | アプリの UI ブロック（[apps.md](../apps.md) の 10 節）。削除で NULL |
 | `installation_id` | `uuid` | YES | | アプリから送ったとき、そのインストール |
 | `client_msg_id` | `uuid` | NO | | 冪等キー（I-5） |
 | `broadcast_mention` | `text` | NO | `'none'` | `none` / `here` / `channel` / `everyone` |
-| `content_seq` | `bigint` | NO | | 本文を最後に変えたイベントの `seq`。作成時は `seq` と同じ（検索の版。I-12） |
+| `content_seq` | `bigint` | NO | | 本文を最後に変えたイベントの `seq`。作成時は `seq` と同じ（検索のバージョン。I-12） |
 | `reply_count` | `integer` | NO | `0` | 親に非正規化 |
 | `reply_member_ids` | `uuid[]` | NO | `'{}'` | 返信した人の先頭 5 人 |
 | `last_reply_at` | `timestamptz` | YES | | |

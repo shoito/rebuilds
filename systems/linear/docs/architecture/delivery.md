@@ -1,11 +1,11 @@
 # Delivery: Linear
 
-CI/CD、同期エンジンに固有の関門（遅延の予算、収束のシミュレーター、オフラインと再送、IME）、フラグ、サーバーのデプロイ、Web のクライアントの配布、Electron の自動更新と最低の版、サーバーとクライアントのスキーマの変更の順序（広げる・移る・縮める）を決める。他の題材（Slack・Auth0 の delivery.md）の形を引き継ぐ（GitHub Actions、OIDC、1 回ビルドして同じ成果物を昇格、prod は Ops の承認）。
+CI/CD、同期エンジンに固有の関門（遅延の予算、収束のシミュレーター、オフラインと再送、IME）、フラグ、サーバーのデプロイ、Web のクライアントの配布、Electron の自動更新と最低のバージョン、サーバーとクライアントのスキーマの変更の順序（広げる・移る・縮める）を決める。他の題材（Slack・Auth0 の delivery.md）の形を引き継ぐ（GitHub Actions、OIDC、1 回ビルドして同じ成果物を昇格、prod は Ops の承認）。
 
 | ADR | 決定 |
 | --- | --- |
 | [0055](../decisions/0055-ci-gates-latency-convergence-ime.md) | PR の必須の関門に、遅延の予算のベンチマーク（固定の機械、Chrome、p99 50ms）、収束のシミュレーター（2,000 の列、同期の核に触れる PR は 20 万）と回帰の種、オフラインと再送の 3 つの場面、IME の決定表と合成の組み立てのテスト、生成とマイグレーションの検査を入れる。変更のパスで関門を足し、関門を外すラベルを持たない。シミュレーターの失敗を再実行で緑にしない |
-| [0056](../decisions/0056-flags-client-distribution-and-min-build.md) | サーバーのフラグは AppConfig、クライアントのフラグはサーバーが評価して握手で配り、手元に持つ。Web は `index.html` を端末の組（コホート）ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返して段階的に出す。最低の版は Gateway の `min_build` で強制し、手元の読み書きは止めない。手元の DB の版を上げるリリースは戻せないので、別のリリースにして長く見る |
+| [0056](../decisions/0056-flags-client-distribution-and-min-build.md) | サーバーのフラグは AppConfig、クライアントのフラグはサーバーが評価して握手で配り、手元に持つ。Web は `index.html` を端末の組（コホート）ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返して段階的に出す。最低のバージョンは Gateway の `min_build` で強制し、手元の読み書きは止めない。手元の DB のバージョンを上げるリリースは戻せないので、別のリリースにして長く見る |
 | [0057](../decisions/0057-schema-change-ordering.md) | スキーマの変更は、サーバーの DB を広げる → サーバーが古い形と新しい形の両方を受ける → クライアントを移す → 古い `schema_hash` の接続が 1% 未満かつ 30 日の後に縮める、の順にする。1 つのデプロイで、DB の破壊の変更と、それを読むコードの変更を一緒に出さない |
 
 ## 1. 変更からマージまで
@@ -35,7 +35,7 @@ ADR-0055。
 | マイグレーションの比較 | 空の DB に全マイグレーションを当て、望む形と比べる。新しい表の `workspace_id` と FORCE RLS、RLS の外の表の許可リスト（[data-model.md](data-model.md) の 5 節）、秘密の列の型 | 3 分 |
 | 収束のシミュレーター | 2,000 の列（各 200 の出来事、クライアント 2〜6）と、`sim/regressions/` の全部の種（[sync-engine.md](sync-engine.md) の 12.1 節）。同期の核の区分は 20 万の列（並列で 20 分以内） | 5〜20 分 |
 | 結合 | Testcontainers（PostgreSQL、Valkey、OpenSearch）で Writer・Gateway・Sync API・Relay | 10 分 |
-| オフラインと再送 | Playwright（Chromium・Firefox・WebKit）で、オフラインのまま再起動、送信の途中で落ちる、1 つ前の版の outbox を今の版で送る（[client-store-and-offline.md](client-store-and-offline.md) の 11.1 節）。手元の保存・同期の核の区分で必須 | 15 分 |
+| オフラインと再送 | Playwright（Chromium・Firefox・WebKit）で、オフラインのまま再起動、送信の途中で落ちる、1 つ前のバージョンの outbox を今のバージョンで送る（[client-store-and-offline.md](client-store-and-offline.md) の 11.1 節）。手元の保存・同期の核の区分で必須 | 15 分 |
 | 遅延の予算 | 固定の機械のランナー（2.3 節）、Chrome、[client-app.md](client-app.md) の 9.4 節の場面の各 300 回。どれかの p99 が 50ms を超えたら失敗、main の中央値から 10% 遅くなったら警告 | 15 分 |
 | IME | DT-APP-001 の表駆動、PROP-APP-001、Playwright の合成の組み立てのイベント（`compositionstart`〜`compositionend` と `keydown` の順序のブラウザごとの違い）を 3 つのブラウザで | 5 分 |
 | E2E | 主要な流れ（ログイン、作成、状態の変更、2 つのクライアントの同期、非公開への切り替え） | 10 分 |
@@ -73,7 +73,7 @@ ADR-0056。
 | クライアントのフラグ | サーバーが評価し、`welcome.flags` と Sync API の `GET /sync/flags` で配る | 端末は `_meta.flags` に持ち、オフラインでも同じ値を使う | `release.new_board_ui` |
 
 - クライアントのフラグは、握手のたびと 5 分ごとに取り直す。値が変わったら、次の画面の切り替えで効かせる（入力の途中で画面を変えない）。
-- **同期の意味を変えるものをフラグにしない。** 競合の規則、`applyOp`、`derive`、同期グループの規則、トランザクションの形は、クライアントとサーバーで同じでなければ収束しない。これらはスキーマの版（`schema_hash`・`fv`）で変える（ADR-0057）。フラグは画面と、サーバーだけで完結する振る舞い（通知、連携、Webhook）に使う。
+- **同期の意味を変えるものをフラグにしない。** 競合の規則、`applyOp`、`derive`、同期グループの規則、トランザクションの形は、クライアントとサーバーで同じでなければ収束しない。これらはスキーマのバージョン（`schema_hash`・`fv`）で変える（ADR-0057）。フラグは画面と、サーバーだけで完結する振る舞い（通知、連携、Webhook）に使う。
 - `release.*` は 100% にしてから 30 日以内に消す。消し忘れを週次で一覧にする。
 
 ## 4. サーバーのデプロイ
@@ -91,27 +91,27 @@ ADR-0056。
 
 - ECS のデプロイのサーキットブレーカーと、アラームでの自動のロールバック（5xx、拒否の率の急な上がり、送信から ack の p99、Relay の遅れ）。
 - Gateway：新しいタスクが健全になった後、古いタスクの接続を `kick: server_shutdown`（`retry_after_ms` は 0〜60 秒の乱数）で 10 分かけて逃がす。登録解除の遅延は 15 分。全 Gateway の入れ替えに約 1 時間（20 タスク、3 並び）。
-- サーバーの版の更新で、クライアントのやり直し（ブートストラップ）を起こさない（ADR-0003）。
-- Writer と Gateway は、1 つ前の版と混在しても動く（混在の間の `submit` の形、Relay のメッセージの形は、前後の版で読める）。
+- サーバーのバージョンの更新で、クライアントのやり直し（ブートストラップ）を起こさない（ADR-0003）。
+- Writer と Gateway は、1 つ前のバージョンと混在しても動く（混在の間の `submit` の形、Relay のメッセージの形は、前後のバージョンで読める）。
 
 ### 4.2 ロールバック
 
-- サーバーのコードは、1 つ前の版へいつでも戻せる。マイグレーションは広げる段だけなので、1 つ前の版が今の DB で動く（ADR-0057）。
-- 縮める段のマイグレーション（列の削除）は、それを読まないコードを出して 1 リリース以上たってから、単独で出す。縮める段の後は、その前の版へ戻さない。
+- サーバーのコードは、1 つ前のバージョンへいつでも戻せる。マイグレーションは広げる段だけなので、1 つ前のバージョンが今の DB で動く（ADR-0057）。
+- 縮める段のマイグレーション（列の削除）は、それを読まないコードを出して 1 リリース以上たってから、単独で出す。縮める段の後は、その前のバージョンへ戻さない。
 - 手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
 
 ## 5. Web のクライアントの配布
 
 ADR-0056。
 
-- 成果物（ハッシュ付きの JS・CSS、Service Worker、`index.html`）を、版ごとの接頭辞で S3 に置く。古い版の資産は 90 日残す（開いたままのタブと、Service Worker の殻が読む）。
-- **段階的な切り替え**：CloudFront Functions が、クッキー `<brand>_cid`（端末の ID。[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節）のハッシュの桶と、KeyValueStore の「版ごとの割合」から、`index.html` の版を選ぶ。1% → 10% → 50% → 100% を、各段で 4 時間以上、RUM の指標（5.1 節）を見て進める。
+- 成果物（ハッシュ付きの JS・CSS、Service Worker、`index.html`）を、バージョンごとの接頭辞で S3 に置く。古いバージョンの資産は 90 日残す（開いたままのタブと、Service Worker の殻が読む）。
+- **段階的な切り替え**：CloudFront Functions が、クッキー `<brand>_cid`（端末の ID。[client-store-and-offline.md](client-store-and-offline.md) の 9.3 節）のハッシュの桶と、KeyValueStore の「バージョンごとの割合」から、`index.html` のバージョンを選ぶ。1% → 10% → 50% → 100% を、各段で 4 時間以上、RUM の指標（5.1 節）を見て進める。
 - 新しい殻は Service Worker が背景で取り、次の起動で使う（[client-app.md](client-app.md) の 10 節）。
-- **戻し**：KeyValueStore の割合を前の版に戻す。KeyValueStore の変更は数秒で全部のエッジに届く（[Introducing Amazon CloudFront KeyValueStore](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)、2026-09-28 に確認）。すでに新しい版を開いた端末は、次の起動で前の版に戻る。ただし、**手元の DB の版（`schema_version`）を上げたリリースは戻せない**（前の版のコードは新しい DB を開けず、再読み込みを促すだけになる。[client-store-and-offline.md](client-store-and-offline.md) の 6.4 節）。そこで、DB の版を上げる変更は機能の変更と別のリリースにし（同 6 節の依頼）、1% で 48 時間見てから進め、問題は前へ直す（修正の版を出す）。
+- **戻し**：KeyValueStore の割合を前のバージョンに戻す。KeyValueStore の変更は数秒で全部のエッジに届く（[Introducing Amazon CloudFront KeyValueStore](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)、2026-09-28 に確認）。すでに新しいバージョンを開いた端末は、次の起動で前のバージョンに戻る。ただし、**手元の DB のバージョン（`schema_version`）を上げたリリースは戻せない**（前のバージョンのコードは新しい DB を開けず、再読み込みを促すだけになる。[client-store-and-offline.md](client-store-and-offline.md) の 6.4 節）。そこで、DB のバージョンを上げる変更は機能の変更と別のリリースにし（同 6 節の依頼）、1% で 48 時間見てから進め、問題は前へ直す（修正のバージョンを出す）。
 
 ### 5.1 段階を進める条件
 
-| 指標 | 新しい版と古い版の比べ | 止める条件 |
+| 指標 | 新しいバージョンと古いバージョンの比べ | 止める条件 |
 | --- | --- | --- |
 | 主要な Action の遅延の p99 | 同じ帯・ブラウザで | 10% 以上遅い |
 | 起動の p95 | 同上 | 10% 以上遅い |
@@ -120,27 +120,27 @@ ADR-0056。
 | JavaScript のエラーの率 | 同上 | 2 倍 |
 | 収束の監査の `unexplained` | — | 1 件 |
 
-## 6. Electron の自動更新と最低の版
+## 6. Electron の自動更新と最低のバージョン
 
 ADR-0056。
 
-- Electron の殻（main、preload、ネイティブの部分）の版と、レンダラー（Web の成果物。リモートから読む。[client-app.md](client-app.md) の 11 節）の版を分けて持つ。レンダラーは 5 節の Web と同じに更新される。殻の更新は `autoUpdater` で行う。
+- Electron の殻（main、preload、ネイティブの部分）のバージョンと、レンダラー（Web の成果物。リモートから読む。[client-app.md](client-app.md) の 11 節）のバージョンを分けて持つ。レンダラーは 5 節の Web と同じに更新される。殻の更新は `autoUpdater` で行う。
 - `autoUpdater` は macOS と Windows だけで、macOS は署名が必須（[Electron autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)、2026-09-28 に確認）。Windows は Squirrel.Windows か MSIX で、どちらにするかは E6 で決める（同じ文書では MSIX の更新も扱える）。
-- **更新の案内**：`https://update.<brand>.<domain>/<platform>/<arch>/<channel>?v=<今の版>&b=<桶>` を `public-api` が返す（Squirrel.Mac の JSON の形、Windows は選んだ形）。`b` は端末の ID のハッシュの桶（0〜99）で、案内は「その版の出す割合 > b」の端末にだけ新しい版を返す。配布物は S3 と CloudFront。
-- **段階**：1%（24 時間）→ 10%（24 時間）→ 50% → 100%。各段で、殻の版ごとのクラッシュの率、起動の失敗、RUM の指標を見る。Chromium の High 以上の修正を含む版は、24 時間で 100% まで進める（[security.md](security.md) の 11 節の 7 日の期限）。
-- **止める**：割合を 0 にする。まだ取っていない端末は取らない。**戻す**：前のコードで版の番号を上げた版を出す（Squirrel は版を下げられない）。手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
+- **更新の案内**：`https://update.<brand>.<domain>/<platform>/<arch>/<channel>?v=<今のバージョン>&b=<桶>` を `public-api` が返す（Squirrel.Mac の JSON の形、Windows は選んだ形）。`b` は端末の ID のハッシュの桶（0〜99）で、案内は「そのバージョンの出す割合 > b」の端末にだけ新しいバージョンを返す。配布物は S3 と CloudFront。
+- **段階**：1%（24 時間）→ 10%（24 時間）→ 50% → 100%。各段で、殻のバージョンごとのクラッシュの率、起動の失敗、RUM の指標を見る。Chromium の High 以上の修正を含むバージョンは、24 時間で 100% まで進める（[security.md](security.md) の 11 節の 7 日の期限）。
+- **止める**：割合を 0 にする。まだ取っていない端末は取らない。**戻す**：前のコードでバージョンの番号を上げたバージョンを出す（Squirrel はバージョンを下げられない）。手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
 - **署名**：macOS は Developer ID の署名と公証、Windows はコード署名。署名の鍵はクラウドの HSM（shared のアカウント）に置き、CI の署名のジョブだけが使う（`security:sensitive`）。更新の案内は TLS で、配布物の署名を `autoUpdater` が確かめる（macOS。Squirrel.Mac は署名を必須にする）。Electron の文書は Windows の Squirrel.Windows の署名の確かめに触れない（[autoUpdater](https://www.electronjs.org/docs/latest/api/auto-updater)、2026-09-28 に確認）。Windows で配布物の署名が確かめられるかは**未検証**で、E6 の `electron-auto-update` で確かめる。確かめられなければ、更新の案内の応答に配布物の SHA-256 を入れ、殻が入れる前に照らす。
-- **最低の版**：Gateway の `min_build`（AppConfig）は、`build` を「殻の版＋レンダラーの版」の組で比べる（`hello` の `build` の形は `shell@x.y.z+web@<hash>`。[sync-engine.md](sync-engine.md) の 9.2 節）。`min_build` より古いと `kick: upgrade_required` で送信を止めるが、手元の読み書きと outbox への保存は続ける（ADR-0005）。上げる理由は、プロトコル・互換の一覧の外れ（30 日）・セキュリティ（殻の脆弱性）に限る。
-- 殻の版の支え：直近 90 日の殻は動く。それより古い殻には更新を促す表示を出し、セキュリティの理由があれば `min_build` で止める。
+- **最低のバージョン**：Gateway の `min_build`（AppConfig）は、`build` を「殻のバージョン＋レンダラーのバージョン」の組で比べる（`hello` の `build` の形は `shell@x.y.z+web@<hash>`。[sync-engine.md](sync-engine.md) の 9.2 節）。`min_build` より古いと `kick: upgrade_required` で送信を止めるが、手元の読み書きと outbox への保存は続ける（ADR-0005）。上げる理由は、プロトコル・互換の一覧の外れ（30 日）・セキュリティ（殻の脆弱性）に限る。
+- 殻のバージョンの支え：直近 90 日の殻は動く。それより古い殻には更新を促す表示を出し、セキュリティの理由があれば `min_build` で止める。
 
 ## 7. スキーマの変更の順序
 
-ADR-0057。3 つの版（DB の形、モデルの `schema_hash`・`fv`、手元の DB の `schema_version`）の関係は [data-model-and-schema.md](data-model-and-schema.md) の 6 節。
+ADR-0057。3 つのバージョン（DB の形、モデルの `schema_hash`・`fv`、手元の DB の `schema_version`）の関係は [data-model-and-schema.md](data-model-and-schema.md) の 6 節。
 
 | 段 | リリース | サーバー | クライアント | 条件 |
 | --- | --- | --- | --- | --- |
 | 1. 広げる | N | マイグレーションで新しい列・表を足す（`NOT NULL` は既定値つき、索引は `CONCURRENTLY`）。Writer の `derive` で古い操作を新しい列にも写す。既存の行は Worker が埋める（`origin = worker`、枠の中。ADR-0054）。Gateway の互換の一覧に、次のリリースの `schema_hash` を先に足せるようにする | 変わらない | — |
-| 2. 移る | N+1 | Writer は古い形（`fv` の 1 つ前）と新しい形の両方を受ける | 新しい列を使う。`upcast` で古い形の outbox を変換。手元の DB の版を上げるなら、機能の変更と別のリリース | 段 1 の埋めが終わった |
+| 2. 移る | N+1 | Writer は古い形（`fv` の 1 つ前）と新しい形の両方を受ける | 新しい列を使う。`upcast` で古い形の outbox を変換。手元の DB のバージョンを上げるなら、機能の変更と別のリリース | 段 1 の埋めが終わった |
 | 3. 縮める | N+2 以降 | 古い形を受けるのをやめる（互換の一覧から外す）。古い列を読まないコードを出す | — | 古い `schema_hash` の接続が 1% 未満、かつ段 2 から 30 日、かつ古い `fv` の outbox の報告（`hello` の `pending`）が 0 に近い |
 | 4. 消す | 段 3 の次 | 古い列を消すマイグレーションを単独で出す | — | 段 3 のコードが 1 リリース以上動いた |
 
@@ -208,7 +208,7 @@ ADR-0057。3 つの版（DB の形、モデルの `schema_hash`・`fv`、手元�
 
 - 2.1 節の必須の関門を、E1 から全 PR の必須のチェックにする（遅延は E6 から全場面）。
 - 5.1 節の段階を進める条件を、クライアントのリリースの判定にする。
-- 本番：デプロイの失敗の率、自動のロールバックの回数、殻の版ごとのクラッシュの率。
+- 本番：デプロイの失敗の率、自動のロールバックの回数、殻のバージョンごとのクラッシュの率。
 
 ### runbooks
 
@@ -221,6 +221,6 @@ ADR-0057。3 つの版（DB の形、モデルの `schema_hash`・`fv`、手元�
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | AppConfig | `release.*`、`ops.*`、`min_build`、互換の一覧 | 3、6 |
-| CloudFront KeyValueStore | Web の版ごとの割合、Electron の版ごとの割合 | 5、6 |
+| CloudFront KeyValueStore | Web のバージョンごとの割合、Electron のバージョンごとの割合 | 5、6 |
 | 手元の `_meta.flags` | クライアントのフラグ | 3 |
-| S3（Web の資産、Electron の配布物） | 版ごと、90 日 | 5、6 |
+| S3（Web の資産、Electron の配布物） | バージョンごと、90 日 | 5、6 |

@@ -62,7 +62,7 @@
 | 項目 | この設計 | Replicache | Zero |
 | --- | --- | --- | --- |
 | 未確定の変更 | outbox の列。確定を差分で確かめてから消す | 保留の mutation の列。`lastMutationID` 以下を消す | 同じ系統（Replicache の後継） |
-| 載せ直し | 確定した状態に差分を当て、未確定の列を当て直す | 確定した版まで戻し、差分を当て、保留を再生する | — |
+| 載せ直し | 確定した状態に差分を当て、未確定の列を当て直す | 確定したバージョンまで戻し、差分を当て、保留を再生する | — |
 | サーバーの順序 | ワークスペースの `sync_id` | クッキー（サーバーの状態を表す不透明な値） | — |
 | 配る単位 | 同期グループ（権限と同じ単位） | クライアントの見え方（Client View） | 画面の問い合わせ |
 
@@ -132,7 +132,7 @@
 | フィールド | 意味 |
 | --- | --- |
 | `id` | `client_tx_id`。クライアントが UUIDv7 で振る。冪等性の鍵 |
-| `fv` | トランザクションの形の版。サーバーは今の版と 1 つ前の版を、リリースから 30 日受ける（ADR-0005） |
+| `fv` | トランザクションの形のバージョン。サーバーは今のバージョンと 1 つ前のバージョンを、リリースから 30 日受ける（ADR-0005） |
 | `base` | 作った時点で手元にあった `last_sync_id`。上書きの検出に使う（8.4 節） |
 | `at` | クライアントの時刻。表示と調査のためだけに使い、順序には使わない |
 | `ops` | 操作の列。意図で書く（位置は添字でなく、ID と並びの鍵で指す）。古い `base` の上で作った操作も、今の状態にそのまま当てられる |
@@ -209,7 +209,7 @@ COMMIT;
 
 | # | 条件 | 結果 | コード |
 | --- | --- | --- | --- |
-| 1 | `fv` が受け付ける版にない | 全体を拒否しない。`submit` 全体に `upgrade_required` | — |
+| 1 | `fv` が受け付けるバージョンにない | 全体を拒否しない。`submit` 全体に `upgrade_required` | — |
 | 2 | 同じ `client_tx_id` の結果がある | 前の結果を返す（適用しない） | 前の結果 |
 | 3 | トランザクションが上限（4.3 節）を超える | 拒否 | `too_large` |
 | 4 | 対象のモデルが存在しない（`create` 以外） | 拒否 | `not_found` |
@@ -488,7 +488,7 @@ ADR-0009。接続のライフサイクル（心拍、デプロイの時の穏や
 
 | `t` | 中身 |
 | --- | --- |
-| `hello` | `v`（プロトコルの版）、`ticket`、`client_id`、`build`（殻とレンダラーの組 `shell@x.y.z+web@<hash>`。Web は `shell` を省く。[delivery.md](delivery.md) の 6 節）、`schema_hash`、`fv`（送る形の版）、`workspace_id`、`last_sync_id`、`sync_epoch`、`groups_hash`、`pending: {count, oldest_at, oldest_fv}` |
+| `hello` | `v`（プロトコルのバージョン）、`ticket`、`client_id`、`build`（殻とレンダラーの組 `shell@x.y.z+web@<hash>`。Web は `shell` を省く。[delivery.md](delivery.md) の 6 節）、`schema_hash`、`fv`（送る形のバージョン）、`workspace_id`、`last_sync_id`、`sync_epoch`、`groups_hash`、`pending: {count, oldest_at, oldest_fv}` |
 | `submit` | `req`（接続の中の連番）、`txs`（4.2 節の列） |
 | `ping` | `ts`（画面が見えている間、30 秒ごと） |
 
@@ -549,7 +549,7 @@ Client                    Sync API                Gateway                     Au
 | 7 | それ以外 | `resume` | — |
 
 - `groups_hash` が `welcome.groups` と違えば、どの `mode` でも、クライアントは先に購読の差を処理する（外れたグループの消去、加わったグループの部分のブートストラップ。[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 7.5 節）。
-- `fv` が受け付ける版にないときは、`welcome.send = upgrade_required` にする。差分は受けるが、送らない（ADR-0005）。
+- `fv` が受け付けるバージョンにないときは、`welcome.send = upgrade_required` にする。差分は受けるが、送らない（ADR-0005）。
 - 行 5 の 50,000 は ADR-0003 の仮の値。E3 の PoC で、取り戻しとやり直しの時間を比べて決める。
 
 ### 9.5 取り戻し（Sync API）
@@ -594,7 +594,7 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
 | Aurora のフェイルオーバー（AZ） | 書き込みが数十秒止まる | Writer は `retry` を返す。クライアントは outbox に貯める（NFR-006） |
 | リージョンの切り替え（DR） | 最後の 1 分ほどの確定を失いうる（NFR-007） | `sync_epoch` を上げる。全クライアントがやり直し、outbox を送り直す。失った範囲のトランザクションは `tx_results` にないので、1 回だけ効く（[bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) の 8.3 節） |
 | 1 ワークスペースの書き込みの集中 | ロックの待ちが伸びる | `lock_timeout` で `retry`。流量の上限。インポートの束を小さくする |
-| クライアントとサーバーの規則の版の違い | 画面の `view` とサーバーの結果がずれる | 差分の行の全体で `confirmed` が正される。`schema_hash` の互換の一覧の外は `upgrade_required` |
+| クライアントとサーバーの規則のバージョンの違い | 画面の `view` とサーバーの結果がずれる | 差分の行の全体で `confirmed` が正される。`schema_hash` の互換の一覧の外は `upgrade_required` |
 
 ## 11. セキュリティ
 
@@ -616,7 +616,7 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
   - Gateway の絞り込み、範囲の証明、欠けの埋め。
   - Sync API の取り戻しとブートストラップ。
 - 乱数はシードから作る。時刻は仮想の時計。ネットワークは経路ごとの待ち行列で、接続の中の順序は保ち、経路の間（ack と差分）の順序は揺らす。
-- 起こす出来事：操作、切断、再接続、クライアントの落ち（メモリーを失い、コミットした IndexedDB は残る）、Writer の ack の前の落ち、Valkey のメッセージの喪失・重複、Relay の遅れ、reader の遅れ、Gateway の落ち、グループの参加・脱退・移動・非公開への切り替え、保持の外への押し出し、DR の切り替え（最後の k 件を失い `sync_epoch` を上げる）、クライアントの版の更新（1 つ前の形の outbox）。
+- 起こす出来事：操作、切断、再接続、クライアントの落ち（メモリーを失い、コミットした IndexedDB は残る）、Writer の ack の前の落ち、Valkey のメッセージの喪失・重複、Relay の遅れ、reader の遅れ、Gateway の落ち、グループの参加・脱退・移動・非公開への切り替え、保持の外への押し出し、DR の切り替え（最後の k 件を失い `sync_epoch` を上げる）、クライアントのバージョンの更新（1 つ前の形の outbox）。
 - fast-check でシードと出来事の列を作り、失敗したら縮める。縮めた列は `sim/regressions/<日付>-<短い名前>.json` に残し、毎回の CI で再生する。
 - 回数：PR ごとに 2,000 の列（各 200 の出来事、クライアント 2〜6）。夜間に 20 万の列。同期エンジン・競合の規則・ブートストラップに触れる PR は、夜間と同じ回数を必須にする。
 
@@ -642,7 +642,7 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
 
 ### 12.4 オフラインと再送
 
-[client-store-and-offline.md](client-store-and-offline.md) の 11 節の 3 つの場面（オフラインのまま再起動、送信の途中で落ちる、古い版の outbox を新しい版で送る）を、この領域の変更にも必須にする。
+[client-store-and-offline.md](client-store-and-offline.md) の 11 節の 3 つの場面（オフラインのまま再起動、送信の途中で落ちる、古いバージョンの outbox を新しいバージョンで送る）を、この領域の変更にも必須にする。
 
 ## 13. Story の候補
 
@@ -726,6 +726,6 @@ GET /sync/deltas?workspace=…&after=L&until=H&limit=5000
 | `sync_actions` | 変更のログ（日ごとのパーティション） | 7.1 |
 | `sync_outbox` | Relay への範囲 | 7.1 |
 | `tx_results` | 冪等の記録（90 日） | 5.4 |
-| モデルの行の `updated_sync_id`・`sync_groups`・`field_sync_ids` | 行の版、同期グループ、上書きの検出 | 7.1、8.4 |
+| モデルの行の `updated_sync_id`・`sync_groups`・`field_sync_ids` | 行のバージョン、同期グループ、上書きの検出 | 7.1、8.4 |
 | Valkey の `sync:<workspace_id>` | 絞る前の差分の配信 | 7.3 |
 | Valkey のチケット（SHA-256、60 秒） | WebSocket の認証 | 9.3 |

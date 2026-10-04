@@ -30,7 +30,7 @@ date: 2026-10-04
 
 1 と a を採用する。詳細は [accounts-and-orgs.md](../architecture/accounts-and-orgs.md) の 4・5・9 節。
 
-- Better Auth を `packages/auth` で包み、Auth のサービスで動かす。使う部品は、Email OTP・Magic link・パスキー・Google（OIDC）・セッション・SSO（[ADR-0036](0036-org-domains-sso-and-scim.md)）・SCIM（同）。組織の部品と OAuth の提供者の部品は使わない（組織は自前のモデル、OAuth の認可サーバーは [ADR-0027](0027-oauth-apps-scopes-and-rate-limits.md) で自前）。版と告知は E4 の着手で確かめ直す。
+- Better Auth を `packages/auth` で包み、Auth のサービスで動かす。使う部品は、Email OTP・Magic link・パスキー・Google（OIDC）・セッション・SSO（[ADR-0036](0036-org-domains-sso-and-scim.md)）・SCIM（同）。組織の部品と OAuth の提供者の部品は使わない（組織は自前のモデル、OAuth の認可サーバーは [ADR-0027](0027-oauth-apps-scopes-and-rate-limits.md) で自前）。バージョンと告知は E4 の着手で確かめ直す。
 - アカウントは `auth` スキーマ（RLS の外）に置き、テナントの `users` の行に `account_id`（一意）で結ぶ。個人のテナント・利用者・主のカレンダーは、アカウントの作成と同じトランザクションで作る。
 - ログインの手段：メールのコード（6 桁・10 分）とリンク（10 分・1 回）、パスキー、Google（`email_verified` が真）、組織の SSO。パスワードは持たない。
 - セッション：HttpOnly・`Secure`・`SameSite=Lax` のクッキー。使わないまま 30 日で切れ、組織が 1〜30 日に絞れる。取り消しと停止は Valkey の取り消しの一覧で、API・CalDAV・Realtime が要求ごとに確かめる。停止から全部の資格の失効まで 60 秒以内。

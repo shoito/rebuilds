@@ -325,7 +325,7 @@ Actor、偽の Media Node、クライアント N 個（`core-e2ee` を直接呼�
 | 対象 | ベクトル |
 | --- | --- |
 | SFrame | RFC 9605 の付録 C の試験のベクトル（[sframe-wg/sframe の test-vectors.json](https://github.com/sframe-wg/sframe/blob/025d568/test-vectors/test-vectors.json)）を `core-e2ee` の SFrame に通す |
-| MLS | MLS の作業部会の公開の試験のベクトル（[mlswg/mls-implementations](https://github.com/mlswg/mls-implementations)）を OpenMLS の版を上げるたびに通す |
+| MLS | MLS の作業部会の公開の試験のベクトル（[mlswg/mls-implementations](https://github.com/mlswg/mls-implementations)）を OpenMLS のバージョンを上げるたびに通す |
 | MLS の相互運用 | 別の実装（例：AWS の mls-rs）で作ったグループに、OpenMLS の参加者が外部コミットで入り、同じ `epoch_authenticator` になる |
 | KID とセキュリティのコード | 7.1 節の KID と 10 節のコードの計算を、固定の入力と出力のベクトルにして、Web（WASM）とネイティブで同じ結果になる |
 
@@ -392,14 +392,14 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 - NFR-008 の測り方（9 節の区間、Media Node での KID の切り替わりの観測）と、100 人・300 人の条件。
 - 性質ベーステスト PROP-E2EE-001〜006 と、列の数。
-- 14.2 節の試験のベクトルと、OpenMLS の版を上げるときの必須の試験。
+- 14.2 節の試験のベクトルと、OpenMLS のバージョンを上げるときの必須の試験。
 - E2EE と非 E2EE の会議の品質の差（MOS の推定、フリーズの率、参加の時間）の許容の範囲。
 - 暗号文の確認の試験（14.3 節）を、E2EE に触れる PR で必須にする。
 
 ### runbooks
 
 - `e2ee-rekey-slow.md`：`e2ee.rekey_slow` が増えたときの切り分け（担当者の無応答、Actor の遅れ、端末の遅さ）。
-- `e2ee-decrypt-failures.md`：復号の失敗の報告が増えたときの切り分け（ブラウザの版、KID のずれ、resync の嵐）。
+- `e2ee-decrypt-failures.md`：復号の失敗の報告が増えたときの切り分け（ブラウザのバージョン、KID のずれ、resync の嵐）。
 - `e2ee-as-key-compromise.md`：AS の中間 CA の鍵が漏れたときの失効と入れ替えの手順。
 - `e2ee-external-sender-key-rotation.md`：外部の送り手の鍵の月ごとの入れ替え。
 

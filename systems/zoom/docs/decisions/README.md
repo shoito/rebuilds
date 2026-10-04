@@ -12,7 +12,7 @@ Zoom の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | [0005](0005-meeting-state-and-signaling.md) | 会議の状態は会議ごとに 1 つの Meeting Actor が持ち、WebSocket のシグナリングと、会議を Media Node に割り当てるサービスで動かす | accepted |
 | [0006](0006-meeting-id-and-join-url.md) | 会議の ID は秘密にしない 11 桁の乱数にし、URL のフラグメントに 128 ビットの参加の鍵を置く | accepted |
 | [0007](0007-meeting-actor-lease-and-epoch.md) | Meeting Actor の持ち主は Valkey のリース（TTL 6 秒）で決め、取るたびに epoch を上げる。失ってはならない変更は配る前に Aurora に書く | accepted |
-| [0008](0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、版はサブプロトコルで決め、状態は (epoch, seq) 付きのスナップショットと差分で配る | accepted |
+| [0008](0008-signaling-protocol.md) | シグナリングは WebSocket の上の JSON で、バージョンはサブプロトコルで決め、状態は (epoch, seq) 付きのスナップショットと差分で配る | accepted |
 | [0009](0009-host-controls-enforcement.md) | 主催者の操作は Meeting Actor が決定表で判定し、メディアの操作は Media Node で強制する。ミュートの解除とビデオの開始は本人の同意なしにしない | accepted |
 | [0010](0010-media-node-process-layout.md) | Media Node は vCPU−2 個の mediasoup の worker を持ち、worker ごとの WebRtcServer で固定のポートを共有し、会議を worker の間で pipeToRouter でつなぐ | accepted |
 | [0011](0011-forwarding-and-layer-selection.md) | 何を誰に送るかは Meeting Actor が決め、帯域の中での層は Media Node が選ぶ。音声は受け手ごとに最大 3 本にし、キーフレームの要求はまとめる | accepted |

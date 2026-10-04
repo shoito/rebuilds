@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0064: DB は expand・移行・contract の 3 段、組み込みの定義はコードの版で変え、フローの意味は `engine_schema` で分ける。デプロイの前に、各セルの中で新しいコードが全テナントの今のメタデータをコンパイルできることを確かめる
+# ADR-0064: DB は expand・移行・contract の 3 段、組み込みの定義はコードのバージョンで変え、フローの意味は `engine_schema` で分ける。デプロイの前に、各セルの中で新しいコードが全テナントの今のメタデータをコンパイルできることを確かめる
 
 詳細は [delivery.md](../architecture/delivery.md) の 4 節。
 
@@ -13,9 +13,9 @@ date: 2026-09-28
 
 - ACL の規則のコンパイルの失敗で、そのテーブルの全操作が拒否になる（SEV2。[access-control.md](../architecture/access-control.md) の 10 節は「リリースの前の全テナントの規則のコンパイルの検査（`delivery.md`）で防ぐ」とした）。
 - 画面の配置が既定に戻る（[portal-and-ui.md](../architecture/portal-and-ui.md) の 9 節）。
-- フローの公開の検証に通らない版が動き続ける。
+- フローの公開の検証に通らないバージョンが動き続ける。
 
-組み込みの定義はコードの版に持つ（[ADR-0006](0006-data-dictionary-and-field-types.md)）。フローの意味の変更は `engine_schema` で分ける（[ADR-0014](0014-flow-dsl-and-versioning.md)）。本番のデータを本番のアカウントの外に出さない（[infrastructure.md](../architecture/infrastructure.md) の 8 節）。
+組み込みの定義はコードのバージョンに持つ（[ADR-0006](0006-data-dictionary-and-field-types.md)）。フローの意味の変更は `engine_schema` で分ける（[ADR-0014](0014-flow-dsl-and-versioning.md)）。本番のデータを本番のアカウントの外に出さない（[infrastructure.md](../architecture/infrastructure.md) の 8 節）。
 
 ## Options
 
@@ -33,7 +33,7 @@ date: 2026-09-28
 - 失敗が 1 件でもあれば、そのセルのデプロイを止める。意図した非互換は、移行のジョブをリリースに含めるか、古い意味を残す（`engine_schema` と同じ考え）。
 - DB のマイグレーションは expand → 移行 → contract。大きな表の列の追加は既定値のない NULL の列、索引は `CONCURRENTLY`、埋め戻しは `bulk_job` でテナントごと。
 - 組み込みのフィールドは削除・型の変更をしない（新しいフィールドと非表示）。状態のモデルの辺の削除は、その辺を通る動いているレコードがないことを確かめてから。
-- 古い `engine_schema` のコードは、その版の実行が 0 になるまで残す。
+- 古い `engine_schema` のコードは、そのバージョンの実行が 0 になるまで残す。
 
 2 を採らない理由：本番のメタデータ（テナントのフィールドの名前、ACL の条件の中の値、通知のテンプレートの文面）はテナントの設定の情報で、本番の外に出さない方針に反する。
 
@@ -50,5 +50,5 @@ date: 2026-09-28
 ## Confirmation
 
 - デプロイのワークフロー：検査のタスクの成功が、マイグレーションの前の条件。
-- 結合テスト：意図的に壊した ACL の規則・フローの版を持つテナントで、検査が失敗し、デプロイが止まる。
+- 結合テスト：意図的に壊した ACL の規則・フローのバージョンを持つテナントで、検査が失敗し、デプロイが止まる。
 - マイグレーションの CI（[delivery.md](../architecture/delivery.md) の 2.1 節）。

@@ -273,7 +273,7 @@ evaluate(repo, ref, operation, actor, context) -> { allowed, violations[], bypas
 | PR のマージ・merge queue | API がマージの前に呼び、ストレージの RPC の直前に Git の現在の SHA で再評価する | push の規則 ＋ PR の規則 |
 
 - **判定の材料が読めないときは拒否する（fail closed）。** ruleset を DB から読めない、チェックの結果を読めない場合、保護の対象かどうかにかかわらず、その push とマージを拒否する。保護のない変更を通すより、書き込みを止める方を選ぶ（[intent.md](../intent.md) の「守るべき振る舞い」）。
-- ruleset はリポジトリごとに版を持ち、Git のフロントエンドは版でキャッシュする。ruleset の変更は outbox で知らせ、キャッシュを捨てる。
+- ruleset はリポジトリごとにバージョンを持ち、Git のフロントエンドはバージョンでキャッシュする。ruleset の変更は outbox で知らせ、キャッシュを捨てる。
 - 拒否の理由は、push では `remote:` の行で、API では違反の一覧で返す。読み取り権限のある人は、有効な ruleset を見られる（本家と同じ）。
 
 ### 5.4 必須のステータスチェック
@@ -287,7 +287,7 @@ evaluate(repo, ref, operation, actor, context) -> { allowed, violations[], bypas
 ### 5.5 署名されたコミット
 
 - push の評価では、ref の更新で新たに到達できるようになったコミット（旧 SHA から到達できないもの）の署名をすべて検証する。GPG・SSH の署名を扱い、登録された鍵と照合する（[identity-and-permissions.md](identity-and-permissions.md)）。
-- 検証の結果は、コミットの SHA と鍵の状態の版でキャッシュする。
+- 検証の結果は、コミットの SHA と鍵の状態のバージョンでキャッシュする。
 - サーバーが作るコミット（merge、squash、提案の適用、Web での編集）は、プラットフォームの鍵で署名する。本家も Web で作るコミットを署名し、squash の最後のコミットも署名する（[About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)、[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)）。
 - **rebase で作り直したコミットは署名しない。** 本家は、rebase のマージのコミットは利用者の鍵を持たないので署名できないとしている（同上）。本家に合わせ、署名の必須が掛かった base では rebase の方式を選べなくする。
 - squash でも、PR の中に署名のないコミットがあると拒否される場合があると本家は述べている（同上）。本家は、テストのマージが持ち込む全てのコミット（head のコミットを含む）を検証し、署名のない head のコミットは、最後の squash のコミットを GitHub が署名する場合でも squash を妨げうるとしている（[About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、2026-09-26 に確認）。ここでは、squash と merge は「base に新たに入るコミット」だけを検証の対象にする。merge の方式では head のコミットも base に入るので、それらの署名も要る。squash では、プラットフォームが署名した 1 つのコミットだけが入るので、PR の中のコミットの署名は問わない（**本家との違い**。base の履歴に入るコミットの署名を守るという規則の目的は満たし、外部の貢献者の署名のないコミットを squash で取り込めるようにする）。

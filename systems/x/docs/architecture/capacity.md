@@ -77,7 +77,7 @@
 | フォローしているプルの作者の一覧（`pl:`） | `vk-timeline` | 1 |
 | プルの作者の `ar:` | `vk-timeline` | 平均 5（多い人で数百。パイプライン） |
 | 投稿の状態の写し | `vk-cache` | 1（MGET、30 件） |
-| 閲覧者の集合（ブロック・ミュート・承認済みの鍵・語・版） | `vk-cache` | 1（5 つの鍵を 1 回の Function で。[follow-graph.md](follow-graph.md) の 6 節） |
+| 閲覧者の集合（ブロック・ミュート・承認済みの鍵・語・バージョン） | `vk-cache` | 1（5 つの鍵を 1 回の Function で。[follow-graph.md](follow-graph.md) の 6 節） |
 | 数 | `vk-counters` | 1（MGET） |
 
 - S1 のピーク（1 万件/秒）：`vk-timeline` 7 万命令/秒、`vk-cache` 2 万命令/秒、`vk-counters` 1 万命令/秒。

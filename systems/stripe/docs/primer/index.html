@@ -98,7 +98,7 @@
   succeeded --> [*]
   canceled --> [*]</pre>
     <div class="tabs">
-      <div data-tab="automatic_async"><p>オーソリの承認で <code>succeeded</code> を返し、キャプチャは後ろで行う。本家の最新の版の既定で、最初の版の既定もこれ。</p></div>
+      <div data-tab="automatic_async"><p>オーソリの承認で <code>succeeded</code> を返し、キャプチャは後ろで行う。本家の最新のバージョンの既定で、最初のバージョンの既定もこれ。</p></div>
       <div data-tab="automatic"><p>承認に続けて同じ要求の中でキャプチャし、<code>succeeded</code> を返す。</p></div>
       <div data-tab="manual"><p>オーソリだけで <code>requires_capture</code> に止め、加盟店が後で capture する（在庫を確かめてから請求する、など）。</p></div>
     </div>
@@ -157,7 +157,7 @@
     <div class="tabs">
       <div data-tab="API キー"><p>公開可能キー（ブラウザーに置いてよい）、秘密キー（全権限）、制限付きキー（権限を絞る）の 3 種類。接頭辞で本番とテストを分けます：<code>&lt;brand&gt;_sk_live_</code>・<code>&lt;brand&gt;_sk_test_</code>。本番とテスト（サンドボックス）は DB のクラスタごと分かれます。</p></div>
       <div data-tab="冪等キー"><p>POST に <code>Idempotency-Key</code> を付けると、同じキーの再送には最初の結果（500 を含む）を 24 時間返します。仕組みは<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。設計は API・内部（仕訳）・コネクタ（参照番号）の 3 層で冪等にします。</p></div>
-      <div data-tab="日付の版"><p>版は <code>YYYY-MM-DD.&lt;名前&gt;</code>。最初の要求の時点の版がアカウントに固定され、互換性を壊す変更は新しい版にだけ入ります。古い版の形は「変更モジュール」で最新の形から変換して作ります。</p></div>
+      <div data-tab="日付のバージョン"><p>バージョンは <code>YYYY-MM-DD.&lt;名前&gt;</code>。最初の要求の時点のバージョンがアカウントに固定され、互換性を壊す変更は新しいバージョンにだけ入ります。古いバージョンの形は「変更モジュール」で最新の形から変換して作ります。</p></div>
     </div>
     <div class="callout"><span class="label">金額の表し方</span>金額は通貨ごとの最小単位の整数（<code>bigint</code>）と <a class="t" href="#g-iso4217">ISO 4217</a> の通貨コードで持ちます。JPY は小数がないので 1,000 円は <code>1000</code>、USD は 10.00 ドルが <code>1000</code> です。浮動小数点は使いません。</div>
     <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/api.md">api.md</a> の 6・7・11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0004-idempotency.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0007-date-based-api-versions.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0008-api-keys-and-dashboard-access.md">ADR-0008</a>。</small></p>
@@ -363,7 +363,7 @@
       <tr><td><code>Stripe-Version</code>・<code>Stripe-Signature</code></td><td><code>&lt;Brand&gt;-Version</code>・<code>&lt;Brand&gt;-Signature</code></td></tr>
       <tr><td><code>sk_live_</code>・<code>pk_test_</code>・<code>whsec_</code></td><td><code>&lt;brand&gt;_sk_live_</code>・<code>&lt;brand&gt;_pk_test_</code>・<code>&lt;brand&gt;_whsec_</code></td></tr>
       <tr><td><code>next_action.type = use_stripe_sdk</code></td><td><code>use_&lt;brand&gt;_sdk</code></td></tr>
-      <tr><td>版の名前（acacia・basil など）</td><td>別の木の名前（本家の版と互換と誤解させない）</td></tr>
+      <tr><td>バージョンの名前（acacia・basil など）</td><td>別の木の名前（本家のバージョンと互換と誤解させない）</td></tr>
     </table>
     <p>範囲の違い：Connect・Billing・Radar の機械学習・Terminal などは範囲外です。<code>POST /v1/charges</code> は作らず、Charge は PaymentIntent の中の試行としてだけ存在します。本番の秘密キーは作成時の 1 回だけ表示します。</p>
     <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/README.md">architecture/README.md</a> の 6 節の「決定」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>。</small></p>

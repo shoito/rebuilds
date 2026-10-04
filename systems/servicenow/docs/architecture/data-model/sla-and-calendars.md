@@ -1,10 +1,10 @@
 # Data model: カレンダー・祝日・SLA
 
-[data-model.md](../data-model.md) の一部。業務カレンダーと版、祝日の集合と版（国民の祝日は NULL の行）、SLA の定義と版、計時の行と事象を定義する。振る舞い（業務時間の区間、計時の関数、保存の時の評価 DT-SLA-001、警告と違反、計算し直し）は [sla-and-calendars.md](../sla-and-calendars.md) を正とする。
+[data-model.md](../data-model.md) の一部。業務カレンダーとバージョン、祝日の集合とバージョン（国民の祝日は NULL の行）、SLA の定義とバージョン、計時の行と事象を定義する。振る舞い（業務時間の区間、計時の関数、保存の時の評価 DT-SLA-001、警告と違反、計算し直し）は [sla-and-calendars.md](../sla-and-calendars.md) を正とする。
 
-- 計時の行は、定義の版・カレンダーの版・タイムゾーンを開始の時に固定する（[ADR-0021](../../decisions/0021-sla-definitions-and-timers.md)）。カレンダー・祝日の新しい版は、計算し直しのジョブで明示的に反映する。
+- 計時の行は、定義のバージョン・カレンダーのバージョン・タイムゾーンを開始の時に固定する（[ADR-0021](../../decisions/0021-sla-definitions-and-timers.md)）。カレンダー・祝日の新しいバージョンは、計算し直しのジョブで明示的に反映する。
 - `holiday_set`・`holiday_set_version`・`holiday` は NULL の行（国民の祝日）を持つ。主キーは `id`（`holiday` は `(set_version_id, date)`）。
-- **祝日の日付をコードに埋め込まない。** 内閣府の CSV の原本を S3 に置き、版の `source_sha256` で対応させる（[stores.md](stores.md) の 2 節）。
+- **祝日の日付をコードに埋め込まない。** 内閣府の CSV の原本を S3 に置き、バージョンの `source_sha256` で対応させる（[stores.md](stores.md) の 2 節）。
 
 ## 1. ER 図
 
@@ -118,7 +118,7 @@ erDiagram
 
 ### 2.2 `calendar_version`
 
-公開ごとに不変の版。`latest` の祝日の集合は公開の時点の具体的な版に解いて持つ。定義元：同じ文書の 3.1・8 節。
+公開ごとに不変のバージョン。`latest` の祝日の集合は公開の時点の具体的なバージョンに解いて持つ。定義元：同じ文書の 3.1・8 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -129,12 +129,12 @@ erDiagram
 | `definition` | `jsonb` | NOT NULL | — | `Calendar { time_zone, weekly, holiday_sets, company_holidays, exceptions }` |
 | `resolved_holiday_versions` | `jsonb` | NOT NULL | — | `[{set_id, set_version_id}]`（`latest` を解いたもの） |
 | `content_hash` | `bytea` | NOT NULL | — | |
-| `published_at`・`published_by` | | | | 祝日の新しい版による自動の作成は `published_by` が NULL |
+| `published_at`・`published_by` | | | | 祝日の新しいバージョンによる自動の作成は `published_by` が NULL |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, calendar_id, version_no)`。FK `(tenant_id, calendar_id)` → `calendar`。
-- 索引：`USING gin (resolved_holiday_versions jsonb_path_ops)` — 祝日の新しい版の公開で、`latest` を参照するカレンダーを探す。
+- 索引：`USING gin (resolved_holiday_versions jsonb_path_ops)` — 祝日の新しいバージョンの公開で、`latest` を参照するカレンダーを探す。
 - CHECK：`definition` の形は Zod で検証する（保存の時の検証は同じ文書の 4.4 節）。
-- `UPDATE` を与えない。保持：版を消さない（固定の版を指す計時の行があるため）。S1 の量：1 テナント 年 数十行。
+- `UPDATE` を与えない。保持：バージョンを消さない（固定のバージョンを指す計時の行があるため）。S1 の量：1 テナント 年 数十行。
 
 ## 3. 祝日
 
@@ -156,7 +156,7 @@ erDiagram
 
 ### 3.2 `holiday_set_version`
 
-祝日の集合の版。国民の祝日は取り込みのジョブが草案を作り、運用者 2 人の承認で公開する。テナントの集合はテナントの `sla_admin` が承認する。定義元：同じ文書の 5.1〜5.4 節。
+祝日の集合のバージョン。国民の祝日は取り込みのジョブが草案を作り、運用者 2 人の承認で公開する。テナントの集合はテナントの `sla_admin` が承認する。定義元：同じ文書の 5.1〜5.4 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -169,30 +169,30 @@ erDiagram
 | `source_sha256` | `bytea` | NULL | — | CSV の原本（S3）のハッシュ |
 | `fetched_at` | `timestamptz` | NULL | — | |
 | `validation` | `jsonb` | NOT NULL | `'{}'` | DT-HOL-001 の結果（`rule_mismatch`、`past_changed` など） |
-| `diff_summary` | `jsonb` | NULL | — | 前の版との差分 |
+| `diff_summary` | `jsonb` | NULL | — | 前のバージョンとの差分 |
 | `approved_by` | `uuid[]` | NOT NULL | `'{}'` | 承認した人（国民の祝日は運用者、`past_changed` は 2 人目が要る） |
 | `published_at` | `timestamptz` | NULL | — | |
 
 - キー：PK `(id)`。UK `(set_id, version_no)`。UK `(set_id) WHERE status = 'draft'`（草案は 1 つ）。FK `set_id` → `holiday_set(id)`。
 - CHECK：`(status = 'published') = (published_at IS NOT NULL)`、`covers_from <= covers_to`。
-- 公開した版は変えない（前の版も `retired` にしない）。承認と公開はプラットフォームの監査に残す。
-- 保持：版を消さない。S1 の量：年 数十行。
+- 公開したバージョンは変えない（前のバージョンも `retired` にしない）。承認と公開はプラットフォームの監査に残す。
+- 保持：バージョンを消さない。S1 の量：年 数十行。
 
 ### 3.3 `holiday`
 
-版ごとの祝日の日付。定義元：同じ文書の 3.1・5.2 節。
+バージョンごとの祝日の日付。定義元：同じ文書の 3.1・5.2 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `set_version_id` | `uuid` | NOT NULL | — | |
 | `date` | `date` | NOT NULL | — | 暦の日（タイムゾーンなし） |
-| `tenant_id` | `uuid` | NULL | — | 版と同じ |
+| `tenant_id` | `uuid` | NULL | — | バージョンと同じ |
 | `name` | `text` | NOT NULL | — | |
 | `kind` | `text` | NOT NULL | — | `national`・`substitute`・`citizens`・`tenant`（計時は使わない。表示とテストの生成のため） |
 
 - キー：PK `(set_version_id, date)`。FK `set_version_id` → `holiday_set_version(id)`。
-- 版の公開の後は変えない（`draft` の間だけ書ける）。
-- 保持：版に従う。S1 の量：国民の祝日は 1 版 約 1,050 日（1955 年から）。
+- バージョンの公開の後は変えない（`draft` の間だけ書ける）。
+- 保持：バージョンに従う。S1 の量：国民の祝日は 1 バージョン 約 1,050 日（1955 年から）。
 
 ## 4. SLA の定義
 
@@ -205,7 +205,7 @@ SLA・OLA・UC の定義の同一性。組み込みの定義（インシデン�
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `name` | `text` | NOT NULL | — | |
-| `table_id` | `uuid` | NOT NULL | — | 対象のクラス（有効な版から写す。子のクラスにも効く） |
+| `table_id` | `uuid` | NOT NULL | — | 対象のクラス（有効なバージョンから写す。子のクラスにも効く） |
 | `active_version_id` | `uuid` | NULL | — | → `sla_def_version` |
 | `active` | `boolean` | NOT NULL | `true` | 無効にしたら動いている行を `cancelled`（`definition_deactivated`。管理者が選べば続ける） |
 | メタデータの共通の列 | | | | |
@@ -216,7 +216,7 @@ SLA・OLA・UC の定義の同一性。組み込みの定義（インシデン�
 
 ### 4.2 `sla_def_version`
 
-定義の不変の版。2026-09-28 の統合で、`flow_def`・`flow_version` と同じ形に分けた（計時の行の `sla_def_version_id` の参照先）。定義元：同じ文書の 6.1 節。
+定義の不変のバージョン。2026-09-28 の統合で、`flow_def`・`flow_version` と同じ形に分けた（計時の行の `sla_def_version_id` の参照先）。定義元：同じ文書の 6.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -244,7 +244,7 @@ SLA・OLA・UC の定義の同一性。組み込みの定義（インシデン�
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, sla_def_id, version_no)`。FK `(tenant_id, sla_def_id)` → `sla_def`、`(tenant_id, calendar_id)` → `calendar`。
 - CHECK：`duration > 0`、`warn_at <@ ARRAY[1..99]`（1〜99 の値だけ）、`(cancel_when = 'cancel_condition') = (cancel_condition IS NOT NULL)`、`(resume_when = 'resume_condition') = (resume_condition IS NOT NULL)`、`schedule_source <> 'definition' OR calendar_id IS NOT NULL`。一時停止の条件が監査から外したフィールドを使い `retroactive_pause` のときは、保存の時に 422。
-- `UPDATE` を与えない。保持：版を消さない（計時の行が指すため）。S1 の量：1 テナント 年 数百行。
+- `UPDATE` を与えない。保持：バージョンを消さない（計時の行が指すため）。S1 の量：1 テナント 年 数百行。
 
 ## 5. 計時
 
@@ -257,14 +257,14 @@ SLA・OLA・UC の定義の同一性。組み込みの定義（インシデン�
 | `tenant_id` | `uuid` | NOT NULL | — | |
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `task_id` | `uuid` | NOT NULL | — | |
-| `sla_def_id` | `uuid` | NOT NULL | — | 版の定義の写し（部分一意索引のため） |
+| `sla_def_id` | `uuid` | NOT NULL | — | バージョンの定義の写し（部分一意索引のため） |
 | `sla_def_version_id` | `uuid` | NOT NULL | — | 開始の時に固定 |
 | `stage` | `text` | NOT NULL | — | `in_progress`・`paused`・`completed`・`cancelled` |
 | `version` | `bigint` | NOT NULL | `1` | タイマーの `target_version` と比べる |
 | `calendar_version_id` | `uuid` | NULL | — | NULL は 24 時間 365 日。開始の時に固定（計算し直しで替わる） |
 | `time_zone` | `text` | NOT NULL | — | 開始の時に解いて固定 |
 | `start_at` | `timestamptz` | NOT NULL | — | 秒に切り捨て |
-| `duration` | `bigint` | NOT NULL | — | 版の値の写し（秒） |
+| `duration` | `bigint` | NOT NULL | — | バージョンの値の写し（秒） |
 | `pause_since` | `timestamptz` | NULL | — | `paused` のとき |
 | `paused_business`・`paused_wall` | `bigint` | NOT NULL | `0` | 一時停止の累計（秒） |
 | `planned_end` | `timestamptz` | NULL | — | 期限。`paused` のときは NULL |

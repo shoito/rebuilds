@@ -3,7 +3,7 @@
 ## 進め方の原則
 
 - **最初に walking skeleton を通す。** E1 で、テスト環境のアカウント・API キー・PaymentIntent・模擬のアクワイアラ・台帳の仕訳・Event を端から端まで貫いてから、機能を広げる。お金の正しさ（台帳の制約と性質ベーステスト）と CDE の境界は、E1 から本物の形で作る。後から足すと直せないため。
-- **契約を先に固定する。** 公開 API の形・ID・エラー・版（[ADR-0006](decisions/0006-api-shape.md)、[ADR-0007](decisions/0007-date-based-api-versions.md)）と、本体と CDE の間の API（PrivateLink の呼び出しと `connector-results` のメッセージ）は、人間がレビューして確定する。エージェントは勝手に変えない。
+- **契約を先に固定する。** 公開 API の形・ID・エラー・バージョン（[ADR-0006](decisions/0006-api-shape.md)、[ADR-0007](decisions/0007-date-based-api-versions.md)）と、本体と CDE の間の API（PrivateLink の呼び出しと `connector-results` のメッセージ）は、人間がレビューして確定する。エージェントは勝手に変えない。
 - **お金を動かす変更は、区分 A として扱う。** `plan.md` に影の実行の計画を書き、加盟店単位のカナリアで広げる（[ADR-0032](decisions/0032-release-safety-for-money-moving-code.md)）。
 - **法務の確認待ちの Epic は、spec を承認しない。** 設計と、法務に依らない Story（基盤、模擬の接続先）は進めてよい（[intent.md](intent.md) の「法務の確認待ち」）。
 - **接続先を選んでから、その接続先に依る Story に着手する。** それまでは模擬のアクワイアラ・模擬の銀行で進める。
@@ -50,7 +50,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `api-keys-basic` | `<brand>_{pk|sk}_{live|test}_` のキー、接頭辞でのクラスタの選択、`auth_resolve_api_key`（ADR-0008） |
 | `api-foundation` | `/v1`、JSON の本文、ID の形、エラーの形、`Request-Id`、OpenAPI の生成（ADR-0006） |
 | `idempotency-layer` | `Idempotency-Key` の保存と決定表（[api.md](architecture/api.md) の 7 節、ADR-0004） |
-| `api-versioning-core` | 版の決まり方、変更モジュールの仕組み、最初の版（ADR-0007） |
+| `api-versioning-core` | バージョンの決まり方、変更モジュールの仕組み、最初のバージョン（ADR-0007） |
 | `ledger-core` | 仕訳・明細・冪等キー、釣り合いの遅延制約、追記のみの強制、スロットの集計（ADR-0003・0015・0016） |
 | `vault-skeleton` | cde-test の vault-ingest・vault-core とテスト用の番号だけの受け取り、本体との 2 経路（PrivateLink・`connector-results`）（[card-vault.md](architecture/card-vault.md)） |
 | `mock-acquirer` | 模擬のアクワイアラ（本家のテスト用のカード番号、結果不明を起こす番号、遅延と失敗の注入） |
@@ -134,7 +134,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `webhook-egress-vpc` | 専用の egress VPC、Elastic IP 付きの NAT、webhook-egress の Lambda、IP の公開 |
 | `webhook-delivery` | router・sender・scheduler、公平さと背圧 |
 | `webhook-retry-and-disable` | 3 日の再試行、失敗の通知、自動の無効化、キルスイッチ |
-| `event-rendering-by-version` | エンドポイントの版での描画とスナップショットテスト |
+| `event-rendering-by-version` | エンドポイントのバージョンでの描画とスナップショットテスト |
 | `event-retention` | `events` 31 日、`event_summaries` 13 か月 |
 | `webhook-delivery-logs-and-resend` | 配信ログと手動の再送 |
 
@@ -170,7 +170,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `report-exports` | CSV の書き出しのジョブ |
 | `fraud-rules-and-reviews-ui` | ルールとリストの編集、試験、レビューのキュー |
 | `first-party-analytics` | 自前の計測（S3・Athena） |
-| `api-usage-insights` | 版ごと・キーごとの利用、冪等キーのない要求の割合、429 の件数 |
+| `api-usage-insights` | バージョンごと・キーごとの利用、冪等キーのない要求の割合、429 の件数 |
 
 ### E8 日本の決済手段
 
@@ -254,7 +254,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ## エージェントに任せないこと
 
-- **契約（公開 API・版の変換・本体と CDE の API）の確定**：公開した後に変えるコストが最も高い。
+- **契約（公開 API・バージョンの変換・本体と CDE の API）の確定**：公開した後に変えるコストが最も高い。
 - **お金の区分 A の承認と、影の実行の結果の判断**：お金のオーナーと QA が行う（ADR-0032）。
 - **CDE の承認と、CDE の本番への経路**：エージェントは CDE の PR を作れるが、承認と本番の権限を持たない（ADR-0020・0033）。
 - **法務の判断と、接続先の選定**。

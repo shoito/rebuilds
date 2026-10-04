@@ -30,10 +30,10 @@ date: 2026-09-28
 - KMS の鍵（顧客管理、マルチリージョンの鍵で大阪に写す）：`aurora`（主のクラスタ・`events` のクラスタの保存時の暗号化）、`s3-org`（組織の DEK を包む）、`app-secrets`（Webhook・外向きの呼び出し・OAuth のクライアントの秘密の DEK を包む）、`cursor`（カーソルの鍵を包む）、`audit-archive`（監査のアカウントの鍵。組織の監査の DEK を包む）、`backup`（AWS Backup の保管庫）。
   > 2026-09-28 の注記：`aurora` の鍵は、項目の変更の履歴の `history` のクラスタ（[ADR-0047](0047-field-history-tracking-and-retention.md) の注記）の保存時の暗号化にも使う。
 - 組織の DEK：`org_keys(org_id, purpose, key_version, wrapped_dek, state, created_at, destroyed_at)`。`purpose` は `files`（S3 の一括・レポート・エクスポート・添付）、`audit`（外部の保管）、`secrets`（組織の秘密）。暗号は AES-256-GCM、AAD に `org_id`・`purpose`・対象の ID を入れ、別の組織の暗号文を差し込めないようにする。
-- DEK は 1 年ごとに新しい版を作る。古い版は、それで暗号化したものが消えるまで残す。平文の DEK は Runtime・Worker のプロセスの中に 5 分だけ置く。
+- DEK は 1 年ごとに新しいバージョンを作る。古いバージョンは、それで暗号化したものが消えるまで残す。平文の DEK は Runtime・Worker のプロセスの中に 5 分だけ置く。
 - レコード（`records`・ピボット・共有の表・履歴）はアプリで暗号化しない。Aurora の保存時の暗号化と、RLS と、データ層の外からの SQL の禁止で守る。項目ごとの暗号化（本家の Shield に相当）は MVP の後の課題にする。
 - 組織の削除：行と S3 のファイルを消した後（[ADR-0043](0043-orgs-editions-licenses-and-users.md) の 7 日）、全ての `org_keys` の `wrapped_dek` を消し、`destroyed_at` を残す。Object Lock の監査の保管と、S3 のバージョンの残りは、鍵がないので読めない。Aurora のバックアップ（35 日）の中の行は、バックアップの期限で消える（[ADR-0053](0053-operator-access-and-data-lifecycle.md)）。
-- 2 は、S3 で 50 万の鍵になり、既定の上限を超え、鍵の費用（東京で顧客管理の鍵の版 1 つにつき月 1 USD）が組織の数に比例する。既定の上限はリージョンで 10 万鍵（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/awskms/current/ap-northeast-1/index.json)、[AWS KMS の resource quotas](https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html)、2026-09-28 に確認）。3 は、組織の単位で暗号学的に消せない。
+- 2 は、S3 で 50 万の鍵になり、既定の上限を超え、鍵の費用（東京で顧客管理の鍵のバージョン 1 つにつき月 1 USD）が組織の数に比例する。既定の上限はリージョンで 10 万鍵（[AWS Price List API](https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/awskms/current/ap-northeast-1/index.json)、[AWS KMS の resource quotas](https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html)、2026-09-28 に確認）。3 は、組織の単位で暗号学的に消せない。
 
 ## Consequences
 

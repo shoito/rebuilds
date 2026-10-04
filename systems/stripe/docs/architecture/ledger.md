@@ -95,7 +95,7 @@ journal_entries (id, account_id,           -- 業務上の持ち主の加盟店�
                  effective_at,              -- 会計上の日時。created_at より前にしない
                  reverses_entry_id,         -- 取り消しの仕訳なら元の仕訳
                  fx_quote_id,               -- 換算があれば（10 節）
-                 metadata,                  -- 適用した料金表の版など（7.1 節）
+                 metadata,                  -- 適用した料金表のバージョンなど（7.1 節）
                  created_at,
                  PRIMARY KEY (created_at, id)) PARTITION BY RANGE (created_at)
 
@@ -237,12 +237,12 @@ balance_transactions (id,                    -- txn_...
 ### 7.1 計算
 
 - 手数料は **料率（basis point）＋固定額**、必要なら最低額を持つ。例：国内カード 3.6%、コンビニ払い 3.6%（最低 120 円）、銀行振込 1.5%、Dispute 1 件 1,500 円、通貨の換算 +2%（[Stripe 料金](https://stripe.com/jp/pricing)）。
-- 料金表は `fee_schedules (id, account_id NULL, payment_method_type, card_region, rate_bps, fixed_amount, min_amount, currency, effective_from)` に版として持つ。加盟店ごとの個別の料金は `account_id` を持つ行で上書きする。
+- 料金表は `fee_schedules (id, account_id NULL, payment_method_type, card_region, rate_bps, fixed_amount, min_amount, currency, effective_from)` にバージョンとして持つ。加盟店ごとの個別の料金は `account_id` を持つ行で上書きする。
 - 計算は `packages/money` の関数 `computeFee(amount, schedule)` だけで行う。
   - `rate_part = amount × rate_bps / 10000` を有理数で計算し、通貨の最小単位に **四捨五入（half-up）** で丸める。JPY は円単位、USD はセント単位。
   - `fee = max(rate_part + fixed_amount, min_amount)`。手数料が金額を超えるときは金額で頭打ちにする。
   - 本家の丸めの規則は未確認。E4 の `fee-schedules` の Story で、本家のテスト環境で端数の出る金額を決済し、BT の `fee` を比べて揃える（持ち越し）。
-- 適用した料金表の版を仕訳の `metadata` に残す。料金表を変えても、過去の手数料は変わらない。
+- 適用した料金表のバージョンを仕訳の `metadata` に残す。料金表を変えても、過去の手数料は変わらない。
 - 手数料は、決済の確定の仕訳の中で `merchant_pending` から差し引く（2.3 節）。別の BT（`<brand>_fee`）にはしない。月額の料金など、決済に結び付かない手数料だけを `<brand>_fee` の BT にする。
 
 ### 7.2 性質

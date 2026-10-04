@@ -120,10 +120,10 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | `capture_method` | 振る舞い | 本家 |
 | --- | --- | --- |
 | `automatic` | オーソリの承認に続けて同じ要求の中でキャプチャし、`succeeded` を返す | [PaymentIntent object](https://docs.stripe.com/api/payment_intents/object) |
-| `automatic_async` | オーソリの承認で `succeeded` を返し、キャプチャは後ろで行う。応答の時点では `balance_transaction` が `null` でよい | 最新の版の既定（[非同期キャプチャー](https://docs.stripe.com/payments/payment-intents/asynchronous-capture)） |
+| `automatic_async` | オーソリの承認で `succeeded` を返し、キャプチャは後ろで行う。応答の時点では `balance_transaction` が `null` でよい | 最新のバージョンの既定（[非同期キャプチャー](https://docs.stripe.com/payments/payment-intents/asynchronous-capture)） |
 | `manual` | オーソリだけ行い `requires_capture` で止める。加盟店が後で capture する | [支払い方法を保留する](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method) |
 
-- 既定値は API の版で決める（[api.md](api.md)）。最初の版では、本家の最新と同じ `automatic_async` にする。
+- 既定値は API のバージョンで決める（[api.md](api.md)）。最初のバージョンでは、本家の最新と同じ `automatic_async` にする。
 - コネクタが「オーソリとキャプチャを 1 回で行う」要求（即時売上）を持つなら、`automatic` はそれを使う。持たなければ、オーソリの直後にキャプチャを送る。どちらかはコネクタの能力で決まる（[payment-methods.md](payment-methods.md)）。
 - `automatic_async` のキャプチャは、キュー（SQS）のワーカーが内部の冪等キー `capture:{charge_id}` で送る。失敗したら再試行し、オーソリの期限の 24 時間前になっても成功しなければ SEV2 とする。`succeeded` を返した後なので、失敗を加盟店に返す道がない。
 - コンビニ・銀行振込は手動キャプチャに対応しない（本家と同じ）。
@@ -164,7 +164,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | 加盟店起点の取引（MIT、`off_session = true`）で、事前に SetupIntent か `setup_future_usage` で認証済み | 要求しない。免除としてオーソリする |
 | MIT で、発行会社が認証を要求した | `requires_payment_method`（`authentication_required`）で返す。加盟店は顧客を呼び戻して on-session で確定し直す |
 
-- 現行のガイドラインは [クレジットカード・セキュリティガイドライン【6.1 版】](https://www.j-credit.or.jp/security/pdf/Creditcardsecurityguidelines_6.1_published.pdf)（2026 年 3 月。[資料の一覧](https://www.j-credit.or.jp/security/document/index.html)にこれより新しい版はない。2026-09-27 に確認）。3DS は「5-2-2-2 不正利用対策 ① EC 加盟店の指針対策」にあり、EC 加盟店は EMV 3-D セキュアを導入し、原則として決済の都度に認証する。ただし、他の対策に応じて、カード番号の登録時だけの認証や、加盟店のリスクの判断による認証も認められ、導入しなくてよい取引は附属文書 14 で定める。「2025 年 3 月末までに原則すべての EC 加盟店に導入」という期限は 5.0 版の記述で、6.1 版では常設の指針対策である。本システムへの法的な当てはめは法務の確認（[intent.md](../intent.md)）。
+- 現行のガイドラインは [クレジットカード・セキュリティガイドライン【6.1 版】](https://www.j-credit.or.jp/security/pdf/Creditcardsecurityguidelines_6.1_published.pdf)（2026 年 3 月。[資料の一覧](https://www.j-credit.or.jp/security/document/index.html)にこれより新しいバージョンはない。2026-09-27 に確認）。3DS は「5-2-2-2 不正利用対策 ① EC 加盟店の指針対策」にあり、EC 加盟店は EMV 3-D セキュアを導入し、原則として決済の都度に認証する。ただし、他の対策に応じて、カード番号の登録時だけの認証や、加盟店のリスクの判断による認証も認められ、導入しなくてよい取引は附属文書 14 で定める。「2025 年 3 月末までに原則すべての EC 加盟店に導入」という期限は 5.0 版の記述で、6.1 版では常設の指針対策である。本システムへの法的な当てはめは法務の確認（[intent.md](../intent.md)）。
 - 加盟店が API で 3DS を無効にすることはできない（本家と同じ）。
 
 ### 6.2 流れ
@@ -366,7 +366,7 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | --- | --- |
 | オーソリの失効で付く `cancellation_reason` の値（既定案は `automatic`） | E3 の `auth-expiry` の Story で、本家のテスト環境で `capture_before` を過ぎた PaymentIntent を観察する |
 | 日本の JPY 取引で 30 日のオーソリを、接続するアクワイアラが許すか | E3 の接続先の選定（契約・仕様書） |
-| 日本のクレジットカード・セキュリティガイドラインの版と、3DS を求める範囲 | 解消。現行は 6.1 版で、範囲は ADR-0012 のまま確定した（ADR-0012 の 2026-09-27・2026-09-28 の注記）。法的な位置づけは [intent.md](../intent.md) の「法務の確認待ち」（L2） |
+| 日本のクレジットカード・セキュリティガイドラインのバージョンと、3DS を求める範囲 | 解消。現行は 6.1 版で、範囲は ADR-0012 のまま確定した（ADR-0012 の 2026-09-27・2026-09-28 の注記）。法的な位置づけは [intent.md](../intent.md) の「法務の確認待ち」（L2） |
 | 銀行振込の最大額（既定案は 99,999,999 円） | E8 の提携銀行の選定 |
 | コネクタの照会 API の整合性の時間 | E3 の接続先の選定と、テスト環境での計測 |
 | 返金の保留の期限（`refund.balance_hold_max`、既定 30 日）が本家と大きく違わないか | E3 の `refunds` の Story で、本家のテスト環境の振る舞いを観察する。違っても本システムの値を使う |

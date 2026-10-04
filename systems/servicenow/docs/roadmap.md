@@ -16,14 +16,14 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Epic | 目的 | 状態 |
 | --- | --- | --- |
 | E1 基盤 | AWS のアカウントとセル、ルーター（CloudFront Functions と KeyValueStore）、制御の面、mail-ingress、Aurora と RLS・NULL の行、鍵、CI（仕様から動く CI）、フラグ、可観測性 | 設計中 |
-| E2 記録の基盤 | データ辞書、クラスの継承、カスタムのフィールドとテーブル、保存の流れ、状態のモデルの仕組み、番号、監査の履歴、メタデータの版、設定のパッケージ、画面のモデルとフォーム・リスト | 未着手（監査の履歴は法務：L1・L4） |
+| E2 記録の基盤 | データ辞書、クラスの継承、カスタムのフィールドとテーブル、保存の流れ、状態のモデルの仕組み、番号、監査の履歴、メタデータのバージョン、設定のパッケージ、画面のモデルとフォーム・リスト | 未着手（監査の履歴は法務：L1・L4） |
 | E3 アクセス制御 | 利用者・グループ・ロール、ACL と判定の関数、16 の出口、キャッシュ、成り代わり、テナントの SSO、API のクライアント、運用者のアクセス、人事の取り込み | 未着手（人事の取り込みは法務：L1） |
-| E4 ワークフローと承認 | フローの DSL と版、実行とタイマー、承認と代理、レコードのルール、上限と公平性、障害注入 | 未着手 |
+| E4 ワークフローと承認 | フローの DSL とバージョン、実行とタイマー、承認と代理、レコードのルール、上限と公平性、障害注入 | 未着手 |
 | E5 SLA・割り当て・オンコール | 業務カレンダーと日本の祝日、SLA の計時、割り当ての規則、当番表と呼び出し（メールの経路から） | 未着手（祝日の取り込みは法務：L9） |
 | E6 インシデントと問題、メール | インシデント・問題の状態、優先度、メジャーインシデント、作業の画面、通知、メールからのチケット | 未着手（メールの受信は法務：L2。画面の文言は L6） |
 | E7 変更 | 種類、リスクの評価、承認の方針と CAB、予定表と衝突、凍結期間 | 未着手（承認の証跡は法務：L4） |
 | E8 カタログとポータル | カタログと品目、変数、要求・要求の品目・実行のタスク、依頼者の範囲、ポータル、Web Push | 未着手 |
-| E9 ナレッジと検索 | 記事と版、公開の流れ、評価と自己解決、OpenSearch の索引、ACL を効かせた検索、解析器の評価 | 未着手 |
+| E9 ナレッジと検索 | 記事とバージョン、公開の流れ、評価と自己解決、OpenSearch の索引、ACL を効かせた検索、解析器の評価 | 未着手 |
 | E10 CMDB | CI のクラスと識別、1 つの入口、調整、保留と統合、関係と影響の範囲、サービスのモデル、取り込みの API | 未着手 |
 | E11 レポートと API | レポートとダッシュボード、SLA の達成率、定期の配信、REST のテーブルの API、取り込み、Webhook、レート制限 | 未着手 |
 | E12 本番の準備 | 負荷試験（9 時の山）、DR とセルの移動の訓練、外部のペンテスト、保持と削除、SLO の確定、GA の判定 | 未着手（GA の判定は法務：L1・L3・L5） |
@@ -89,7 +89,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `metadata-compile-check-task` | リリースの前の全テナントのメタデータのコンパイルの検査（[ADR-0064](decisions/0064-migrations-and-metadata-compatibility-check.md)） |
 | `builtin-definition-checks` | `builtin/` の検査（ACL の規則のコンパイル、`deny_unless` の消失、文言のキー） |
 | `ui-model-api` | 画面のモデル、キャッシュ（PROP-UI-002） |
-| `form-and-list-layouts` | 配置、`view_rule`、組み込みの既定（コードの版） |
+| `form-and-list-layouts` | 配置、`view_rule`、組み込みの既定（コードのバージョン） |
 | `ui-rules-shared-evaluator` | 画面の規則の共有の評価器、DT-UI-001（PROP-UI-001） |
 | `list-keyset-paging-and-capped-count` | キーセットのページ送りと上限付きの件数（PROP-UI-003） |
 | `form-conflict-merge` | 409 の画面 |
@@ -129,7 +129,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `flow-dsl-schema-and-validation` | フローの文書と DT-FLOW-001 |
-| `flow-versioning-and-publish` | 版と公開、組み込みのフローの NULL の行（PROP-FLOW-004） |
+| `flow-versioning-and-publish` | バージョンと公開、組み込みのフローの NULL の行（PROP-FLOW-004） |
 | `record-triggers-in-save-tx` | 保存のトランザクションの中のトリガー、原因の連鎖（PROP-FLOW-002） |
 | `flow-runner-and-timers` | 実行とタイマー、`claim_due_timers` からの取得、DT-FLOW-002（PROP-FLOW-001） |
 | `flow-wait-condition` | `flow_wait` と保存の時の照合、期限 |
@@ -153,11 +153,11 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `business-time-functions` | 業務時間の区間と計時の関数、参照の実装（PROP-SLA-001〜008）と CI の比較 |
-| `calendar-model-and-versions` | カレンダーの版、DT-CAL-001、既定のカレンダー（テナントの作成の時の行） |
+| `calendar-model-and-versions` | カレンダーのバージョン、DT-CAL-001、既定のカレンダー（テナントの作成の時の行） |
 | `jp-holiday-import` | 内閣府の CSV の取り込み、DT-HOL-001（PROP-HOL-001）、承認の画面（法務：L9） |
 | `tenant-holiday-sets` | テナントの祝日の集合 |
 | `holiday-coverage-monitor` | 収録の範囲の監視 |
-| `sla-definition-model` | SLA の定義と版 |
+| `sla-definition-model` | SLA の定義とバージョン |
 | `sla-clock-evaluation-in-save` | 保存の時の評価、DT-SLA-001（PROP-SLA-009） |
 | `sla-retroactive-pause` | さかのぼりの一時停止 |
 | `sla-timers-and-notifications` | 警告と違反のタイマー、DT-SLA-002 |
@@ -232,7 +232,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `catalog-and-categories` | カタログ、カテゴリ、`audience` |
-| `catalog-item-versions` | 品目の版、DT-CAT-001（PROP-VAR-003） |
+| `catalog-item-versions` | 品目のバージョン、DT-CAT-001（PROP-VAR-003） |
 | `catalog-variables-and-ui-rules` | 変数と UI の規則、DT-VAR-001（PROP-VAR-001・002） |
 | `request-submission` | 申請と `submission_key`（PROP-REQ-001） |
 | `request-item-stages-and-rollup` | 状態の導出、DT-REQ-001（PROP-REQ-002） |
@@ -254,7 +254,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | Story | 内容 |
 | --- | --- |
 | `kb-bases-and-categories` | ナレッジベースとカテゴリ（既知のエラーのナレッジベースはテナントの作成の時の行） |
-| `kb-articles-and-versions` | 記事と版、DT-KB-001（PROP-KB-001） |
+| `kb-articles-and-versions` | 記事とバージョン、DT-KB-001（PROP-KB-001） |
 | `kb-markdown-rendering` | 制限付きの Markdown とサニタイズ |
 | `kb-publish-approval` | 公開の流れ（PROP-KB-002） |
 | `kb-validity-and-review` | 有効の期限と見直し |
@@ -321,7 +321,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `table-api-dictionary-driven` | テーブルの API（PROP-API-002） |
 | `api-query-language-and-cursor` | `q`・`cursor`・`count=capped` |
 | `api-idempotency-and-etag` | 冪等と `If-Match`、DT-API-001（PROP-API-001） |
-| `api-problem-details-and-versions` | エラーと API の版 |
+| `api-problem-details-and-versions` | エラーと API のバージョン |
 | `tenant-openapi` | テナントの OpenAPI |
 | `import-runs-and-transform-maps` | 取り込み、DT-IMP-001（PROP-IMP-001・002） |
 | `webhook-subscriptions-and-delivery` | Webhook、DT-WH-001（PROP-WH-002） |
@@ -388,7 +388,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 - **契約（保存の流れの順序、16 の出口、フローの DSL、REST API と Webhook の形）の確定**。
 - **`security:sensitive` の承認**：Dev のテックリードとセキュリティの担当の 2 人が行う。
-- **国民の祝日の版の公開の承認**：運用者 2 人（[ADR-0020](decisions/0020-japanese-holiday-data.md)）。
+- **国民の祝日のバージョンの公開の承認**：運用者 2 人（[ADR-0020](decisions/0020-japanese-holiday-data.md)）。
 - **CMDB の統合**：`cmdb_admin` の人だけ（[ADR-0037](decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md)）。
 - **リージョンの切り替えの判断**：インシデントの指揮者と Ops の責任者。
 - **法務の判断**（L1〜L9）。

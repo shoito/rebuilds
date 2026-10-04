@@ -28,7 +28,7 @@ WAF のルールの初期値は [infrastructure.md](infrastructure.md) の 4.3 �
 | ブルートフォース | 1 つの IP から 1 つのユーザーの識別子への失敗が既定 10 回（1〜100 で設定）で、その IP からその識別子へのログインを止める。任意で、そのユーザーへのすべてのログインを止めるロックもある。解除は、最後の失敗から 30 日、通知のメールの解除のリンク、パスワードの変更、管理者の API。通知のメールは一意の IP ごとに 1 時間に 1 通。IP の許可リスト（CIDR）。応答の設定をすべて外すと「監視」のモードになり、ログにだけ残す | [Brute-Force Protection](https://auth0.com/docs/secure/attack-protection/brute-force-protection) |
 | 不審な IP の抑制 | 既定で有効。ログインは 1 つの IP から 1 日の失敗の上限と、24 時間で均等に補う速度。サインアップは試行の上限と補う速度。超えると 429。許可リストは 100 件まで。管理者へのメール | [Suspicious IP Throttling](https://auth0.com/docs/secure/attack-protection/suspicious-ip-throttling) |
 | 同・既定値 | ログイン：1 IP 1 日 100 回、補う速度 864,000 ms（1 日 100 回）。サインアップ：50 回、補う速度 1,200 ms（下の食い違いを見よ） | Management API の OpenAPI の `SuspiciousIPThrottlingPreLoginStage`（`max_attempts` 既定 100、`rate` 既定 864,000、最小 34,560）、[Custom Token Exchange の攻撃の防御](https://auth0.com/docs/authenticate/custom-token-exchange/cte-attack-protection) の既定の応答の例（サインアップ 50・1,200 ms）、[Support の記事](https://support.auth0.com/center/s/article/Default-values-for-Suspicious-IP-Throttling)。2026-09-27 に確認 |
-| 漏えいしたパスワード | サインアップ・ログイン・再設定で働く。サインアップでは組を拒否、ログインではアカウントを止める。利用者と管理者に通知。標準の検知は公開の漏えいを走査し、反映まで 7〜13 か月。上位の版（Credential Guard）は 12〜36 時間。応答を外すと監視のモード。ログのコードは `signup_pwd_leak`・`pwd_leak`・`reset_pwd_leak`。通知は利用者ごと・IP ごとに 1 時間に 1 通 | [Breached Password Detection](https://auth0.com/docs/secure/attack-protection/breached-password-detection) |
+| 漏えいしたパスワード | サインアップ・ログイン・再設定で働く。サインアップでは組を拒否、ログインではアカウントを止める。利用者と管理者に通知。標準の検知は公開の漏えいを走査し、反映まで 7〜13 か月。上位のバージョン（Credential Guard）は 12〜36 時間。応答を外すと監視のモード。ログのコードは `signup_pwd_leak`・`pwd_leak`・`reset_pwd_leak`。通知は利用者ごと・IP ごとに 1 時間に 1 通 | [Breached Password Detection](https://auth0.com/docs/secure/attack-protection/breached-password-detection) |
 | ボットの検知 | 統計のモデルで、ログイン・サインアップ・再設定のボットらしい集中を見つける。CAPTCHA は「なし」「危険なときだけ」「常に」。危険の水準は低・中（既定）・高。提供者は本家の Auth Challenge（既定、JavaScript が要る）、Simple CAPTCHA（JavaScript が要らない）、第三者。応答を外すと監視のモード | [Bot Detection](https://auth0.com/docs/secure/attack-protection/bot-detection) |
 
 - 食い違い：サインアップの補う速度の既定が、OpenAPI の `SuspiciousIPThrottlingPreUserRegistrationStage`（`rate` の既定 1,728,000 ms ＝ 1 日 50 回、最小 1,200 ms）と、資料の既定の応答の例（1,200 ms）で違う（未検証）。以前に食い違いとしていた CLI の 34,560 ms は、ログインの `rate` の最小値だった。上限の単位も、本家の資料（「1 分の試行の上限」）とサポートの記事（「1 日 50 回」）で違う。補う速度 1,200 ms（1 日 72,000 回）と合わせると、資料の「1 分」の読みが合う。本システムは 1 分の単位で読む（4.2 節）。
@@ -168,10 +168,10 @@ CREATE TABLE brute_force_blocks (
 
 | 案 | 中身 | 条件 |
 | --- | --- | --- |
-| 第一（ADR-0004 の決定） | Worker が毎月、公式の downloader と同じ方法で全範囲（16^5 = 1,048,576 個）を取得し、S3 に `pwned/v<版>/<接頭辞>.txt` で置く。Auth は S3 の VPC エンドポイントから範囲を読む。範囲はタスクのメモリーに LRU で持つ（256 MiB） | データセットを自前で保存して、商用のサービスの中で使ってよいことを確かめる（5.3） |
+| 第一（ADR-0004 の決定） | Worker が毎月、公式の downloader と同じ方法で全範囲（16^5 = 1,048,576 個）を取得し、S3 に `pwned/v<バージョン>/<接頭辞>.txt` で置く。Auth は S3 の VPC エンドポイントから範囲を読む。範囲はタスクのメモリーに LRU で持つ（256 MiB） | データセットを自前で保存して、商用のサービスの中で使ってよいことを確かめる（5.3） |
 | 予備 | Auth が公式の range API（`Add-Padding: true`）を直接呼ぶ。範囲の応答を 24 時間、Valkey とメモリーに持つ | 5.3 の確認が取れないとき。外部への同期の依存を認証の経路に足すので、[ADR-0005](../decisions/0005-authentication-path-availability.md) の縮退の表に行を足した（2026-09-27） |
 
-- 版の切り替え：新しい版の取り込みを終え、件数と抜き取りの照合を確かめてから、現在の版の番号を切り替える。最新と 1 つ前の版だけを残す（[security.md](security.md) のデータの表）。
+- バージョンの切り替え：新しいバージョンの取り込みを終え、件数と抜き取りの照合を確かめてから、現在のバージョンの番号を切り替える。最新と 1 つ前のバージョンだけを残す（[security.md](security.md) のデータの表）。
 - S3 のアクセスのログには、キー（先頭 5 文字）だけが残る。
 
 ### 5.3 利用の条件（2026-09-27 に確認）
@@ -246,7 +246,7 @@ CREATE TABLE brute_force_blocks (
 
 | 提供者 | 条件（2026-09-27 に確認） | 本システムでの論点 |
 | --- | --- | --- |
-| Cloudflare Turnstile | 無料の版は 20 個のウィジェット、ウィジェットごとに 10 個のホスト名まで。任意のホスト名で使うのは Enterprise の機能。トークンは 300 秒有効で 1 回だけ検証できる。サーバーで siteverify を呼ぶ。WCAG 2.2 に準拠とする（[Plans](https://developers.cloudflare.com/turnstile/plans/)、[Server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)、[Overview](https://developers.cloudflare.com/turnstile/)） | テナントのカスタムドメインの数だけホスト名が要り、無料の版では足りない。テナントが自分のキーを持ち込む形にする |
+| Cloudflare Turnstile | 無料のバージョンは 20 個のウィジェット、ウィジェットごとに 10 個のホスト名まで。任意のホスト名で使うのは Enterprise の機能。トークンは 300 秒有効で 1 回だけ検証できる。サーバーで siteverify を呼ぶ。WCAG 2.2 に準拠とする（[Plans](https://developers.cloudflare.com/turnstile/plans/)、[Server-side validation](https://developers.cloudflare.com/turnstile/get-started/server-side-validation/)、[Overview](https://developers.cloudflare.com/turnstile/)） | テナントのカスタムドメインの数だけホスト名が要り、無料のバージョンでは足りない。テナントが自分のキーを持ち込む形にする |
 | Google reCAPTCHA | 組織ごとに月 10,000 回の評価まで無料。Premium は 100,000 回を超えると 1,000 回ごとに 1 USD（[Compare tiers](https://docs.cloud.google.com/recaptcha/docs/compare-tiers)） | 同じ（持ち込み）。データの国外への送信（L1・L2） |
 | hCaptcha | Pro は年払いで月 99 USD、月 10 万回の評価、超えると 1,000 回ごとに 0.99 USD。受動のモードは Pro 以上（[hCaptcha Pro](https://www.hcaptcha.com/pro)） | 同じ |
 
@@ -327,7 +327,7 @@ type AttackProtection = {
 | Aurora の writer のフェイルオーバー | ブロックの行を書けない。Valkey の数だけで判定し、上限に達した識別子 × IP は、書けるまで 429 にする |
 | Aurora の reader の遅れ | ブロックの行の読み込みは writer から（まれなので） |
 | 漏えいしたパスワードのデータ（S3）・API の障害 | 5.4 の表。サインアップと変更は 503、ログインは続ける |
-| 取り込みのジョブの失敗 | 前の版を使い続ける。版が 45 日を超えて古くなったら呼び出す |
+| 取り込みのジョブの失敗 | 前のバージョンを使い続ける。バージョンが 45 日を超えて古くなったら呼び出す |
 | WAF のラベルが来ない | そのシグナルなしで点数を計算する（点数は下がる方向） |
 | 誤検知の大量の発生（CGNAT、イベントの集中） | 監視の指標（11 節）で見つけ、runbook の手順でテナントを `monitor` に切り替える |
 | 攻撃による Argon2id の枯渇 | 段 1〜3 がハッシュの前で落とす。それでも同時実行の上限に達したら 503（ADR-0004） |
@@ -339,7 +339,7 @@ type AttackProtection = {
 | 防御ごとの `block`・`challenge` の件数（テナント別、プラットフォーム全体） | 攻撃の検知 | 平常の 10 倍 |
 | 既知の端末の Cookie を持つ要求の `block` の割合 | 誤ブロック（K5 の 0.1%） | 0.1% 超 |
 | チャレンジの成功率・解くまでの時間（p95） | 正規の利用者の負担 | 成功率 95% 未満、p95 3 秒超 |
-| 漏えいしたパスワードの照合の時限切れ・飛ばした件数、データの版の古さ | 照合の健全さ | 時限切れ 1% 超、版 45 日超 |
+| 漏えいしたパスワードの照合の時限切れ・飛ばした件数、データのバージョンの古さ | 照合の健全さ | 時限切れ 1% 超、バージョン 45 日超 |
 | Valkey の縮退で判定した件数 | fail の頻度 | 1 件でも |
 | Argon2id の同時実行の上限による 503 | 防御の漏れ | 1 分に 10 件 |
 
@@ -434,10 +434,10 @@ type AttackProtection = {
 - [runbooks/](../runbooks/README.md) に入れる候補：
   - クレデンシャルスタッフィングの波（検知、テナントの `always` への切り替え、WAF の Challenge への切り替え、プラットフォームのバケツの一時の引き締め）。[runbooks/incident-response.md](../runbooks/incident-response.md) の「クレデンシャルスタッフィングの波」から呼ぶ。
   - 誤ブロックの大量の発生（特定の携帯の回線、イベントの集中）：`monitor` への切り替え、一括の解除、閾値の見直し。
-  - 漏えいしたパスワードのデータの取り込みの失敗と、古い版での運転。
+  - 漏えいしたパスワードのデータの取り込みの失敗と、古いバージョンでの運転。
   - Valkey の障害中の防御の縮退の確認。
   - ユーザーから「ブロックされた」の問い合わせを受けたテナントへの案内（解除の手段）。
-- [data-model.md](data-model.md) の索引に入れる候補：`brute_force_blocks`、テナントの設定の `attack_protection`、`breached_password_versions`（プラットフォームの表。版、件数、取り込みの日時、状態）、`password_credentials.breach_detected_at`（connections の表への追加の提案）、Valkey のキー（4.3。正本ではない）、既知の端末の Cookie の形。
+- [data-model.md](data-model.md) の索引に入れる候補：`brute_force_blocks`、テナントの設定の `attack_protection`、`breached_password_versions`（プラットフォームの表。バージョン、件数、取り込みの日時、状態）、`password_credentials.breach_detected_at`（connections の表への追加の提案）、Valkey のキー（4.3。正本ではない）、既知の端末の Cookie の形。
 
 ## 17. 未解決の問い
 

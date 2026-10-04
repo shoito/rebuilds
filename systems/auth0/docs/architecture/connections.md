@@ -220,7 +220,7 @@ interface RedirectStrategy {
 
 - 識別子の画面の後、アカウントの有無によらずパスワードの画面へ進む（Identifier First）。
 - パスワードの照合：攻撃の防御の判定 → `database_identifiers` で引く → ある：Argon2id（＋pepper）で照合／ない：ダミーのハッシュで同じ計算 → 結果。
-- 照合に成功したら：古いパラメーター・bcrypt・古い pepper の版なら作り直す（[ADR-0004](../decisions/0004-credential-storage.md)）。漏えいの照合をログインの後に行い、該当ならテナントの設定（再設定を求める・通知する）に従う。
+- 照合に成功したら：古いパラメーター・bcrypt・古い pepper のバージョンなら作り直す（[ADR-0004](../decisions/0004-credential-storage.md)）。漏えいの照合をログインの後に行い、該当ならテナントの設定（再設定を求める・通知する）に従う。
 - `email_verified=false` のユーザーのログインを許すかは、テナントの設定（既定は許す。アプリはトークンの `email_verified` で判断する。本家と同じ）。
 
 ### 4.5 パスワードの再設定
@@ -432,7 +432,7 @@ E1・E3・E5・E7・E10・E13 には、この領域の Story はない（E5 の�
   - IdP の仕様の変更（JWKS の `alg` の変更、エンドポイントの廃止）への緊急の対応。
   - テナントの Apple の `.p8` の失効・漏えい：新しい鍵の登録と、クライアントシークレットのキャッシュの破棄。
   - pepper の鍵のローテーション（keys-and-secrets と一緒に）と、作り直しの進みの確認。
-  - 漏えいしたパスワードのデータセットの更新の失敗（サインアップの 503 を避けるための、前の版での継続）。
+  - 漏えいしたパスワードのデータセットの更新の失敗（サインアップの 503 を避けるための、前のバージョンでの継続）。
 - [data-model.md](data-model.md) の索引に入れる候補：`connections`、`connection_clients`、`password_credentials`、`password_history`、`database_identifiers`、`credential_tickets`、`idp_tokens`（この領域が持つ）。`user_identities` は users-and-profiles と共有。MVP の後：`saml_assertion_replay`、`ldap_connectors`、`connection_domains`。IdP 向けの秘密鍵は `external_idp_keys`（keys-and-secrets の領域が持つ）。
 
 ## 13. 未解決の問い
@@ -457,7 +457,7 @@ E1・E3・E5・E7・E10・E13 には、この領域の Story はない（E5 の�
 ### 決定（2026-09-27、推奨案で確定）
 
 - **K3 の測り方**：データベース接続だけで測る。開発者キーを提供しないので、ソーシャル接続は K3 の対象にしない。
-- **よく使われるパスワードの一覧**：本家と同じく SecLists の 1 万件を使う（[Password Options](https://auth0.com/docs/authenticate/database-connections/password-options)）。使う版を E4 の着手時に固定し、ライセンスの表記を確かめて、リポジトリに置く。
+- **よく使われるパスワードの一覧**：本家と同じく SecLists の 1 万件を使う（[Password Options](https://auth0.com/docs/authenticate/database-connections/password-options)）。使うバージョンを E4 の着手時に固定し、ライセンスの表記を確かめて、リポジトリに置く。
 - **SAML のライブラリ**：第一候補を `@node-saml/node-saml` にする。E14 の着手前に [ADR-0017](../decisions/0017-enterprise-connections.md) の条件（XSW の試験、署名した要素だけを取り出す API、XXE を読まない、保守）で確かめる。
 - **列挙の時間の差の合格の基準**：中央値の差 5% 以内、かつ p90 の差 10% 以内（[quality.md](../quality.md) の 2.2.1 節）。統合で足した p90 の条件を受け入れた。
 - **パスワードの変更（4.7 節）**：再設定と同じく、他のセッションとリフレッシュトークンの系列を既定で失効させる。今のセッションは残す（[sessions-and-sso.md](sessions-and-sso.md) の 13 節）。

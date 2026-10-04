@@ -45,7 +45,7 @@ S1 の Media Node の台数は、ピークで 27 台の見込み（[capacity.md]
   - 16xlarge にするのは、1 台の障害で付け替える参加者の数（S1 の見込みで最大約 2,500 人）を抑えるため。48xlarge なら 3 倍になり、予備の Node の容量と付け替えの集中が大きくなる。
   - **E7 の負荷試験で、c8g.16xlarge（30 Gbps、約 3 割安い）とも比べる。** 1 台の上限が CPU か consumer で決まり、送出が 1 台 10 Gbps に届かないなら、c8g.16xlarge に替える（インターネットへの上限は 15 Gbps。[capacity.md](../architecture/capacity.md) の 3 節）。
   - 大阪（ap-northeast-3）は、c7gn・c8gn がないので c6gn.16xlarge（64 vCPU、100 Gbps）を使う。
-- **mediasoup の worker は arm64 で動かす。** 版を上げるときは、arm64 の上で回線の劣化の試験を通す。
+- **mediasoup の worker は arm64 で動かす。** バージョンを上げるときは、arm64 の上で回線の劣化の試験を通す。
 - **アドレス**：
   - IPv4 は BYOIP にする。東京に /24 を 1 つ、大阪に /24 を 1 つ、将来の Edge のために /24 を 1 つ以上持つ。1 つの ROA で大きな範囲を持ち、/24 ずつリージョンに置く。
   - 範囲の入手（IPv4 の移転の市場での取得、JPNIC・APNIC の手続き）は、E1 の前に Ops が始める。時間と費用は**未検証**（E1 の `byoip-onboarding` の前に Ops が確かめる）。BYOIP で持ち込んだ IPv4 には公開の IPv4 の料金がかからず、そのプールから取った EIP は EIP の数の上限に数えない（[VPC の料金](https://aws.amazon.com/vpc/pricing/)、[Elastic IP addresses](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)、2026-09-27 に確認）。間に合わなければ、b（/28 を 4 つ、上限の引き上げを申請）で始め、BYOIP に移るときに顧客へ 30 日前に知らせる（[ADR-0016](0016-media-edge-addressing-and-security-groups.md)）。

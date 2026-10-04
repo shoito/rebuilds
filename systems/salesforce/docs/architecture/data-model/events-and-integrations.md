@@ -158,7 +158,7 @@ erDiagram
 | `tx_key` | `uuid` | NOT NULL | — | 最上位のトランザクション |
 | `tx_seq` | `integer` | NOT NULL | — | |
 | `commit_ts` | `timestamptz` | NOT NULL | — | |
-| `body` | `jsonb` | NOT NULL | — | 見出しと項目の値。項目は `field_no` をキーに持ち、配信の時の版で API の名前に直す。256KB まで |
+| `body` | `jsonb` | NOT NULL | — | 見出しと項目の値。項目は `field_no` をキーに持ち、配信の時のバージョンで API の名前に直す。256KB まで |
 
 - キー：PK `(org_id, event_id)`。`PARTITION BY RANGE (event_id)`、日ごと（UTC の日の頭の UUIDv7 の下限で区切る）。索引 `(org_id, replay_id)` — 取り出し・SSE・Webhook の読み。`(org_id, object_id, replay_id)` — `/changes/<object>`。`replay_id` の一意は Relay の採番で守る（分割の鍵を含まない一意の制約は張れない）。
 - RLS。書くのは `relay` のロールだけ。保持：3 日（4 日目の分割を `DROP`）。組織の削除では分割の `DROP` を待たずに `DELETE`。

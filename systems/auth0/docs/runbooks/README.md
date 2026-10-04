@@ -85,7 +85,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | AZ・リージョンの障害、`AuroraGlobalDBRPOLag` の超過、大阪の待機の構成の異常、論理的な破損 | [disaster-recovery.md](disaster-recovery.md) | 作成済み | E12 `dr-drills` |
 | outbox の最古の行が 30 秒超 | `relay-backlog.md` | E1 で作成 | E1 `outbox-and-relay` |
 | KMS の障害（Signer・Auth を縮小しないことの確認、キャッシュにない鍵のテナントの一覧） | `kms-outage.md` | E1 で作成 | E1 `kms-key-hierarchy` |
-| pepper の暗号文の喪失、pepper の漏えいの疑い（版の切り替え） | `pepper-recovery.md` | E1 で作成 | E1 `pepper-bootstrap` |
+| pepper の暗号文の喪失、pepper の漏えいの疑い（バージョンの切り替え） | `pepper-recovery.md` | E1 で作成 | E1 `pepper-bootstrap` |
 | `main` の適合試験の失敗 | `conformance-regression.md`（切り分けと戻し方） | E1 で作成 | E1 `conformance-suite-ci` |
 | 設定の反映の遅れ（15 秒超）、設定の組み立ての失敗 | `config-propagation-lag.md` | E2 で作成 | E2 `tenant-config-snapshot` |
 | クライアントシークレットの漏えい（シークレットスキャンの通報、テナントの報告） | `leaked-client-secret.md`（失効、アプリの一時的な無効化、連絡） | E2 で作成 | E2 `app-registration-and-credentials` |
@@ -98,7 +98,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | メールの送信の失敗・遅れ、SES のアカウントの審査・停止、コードが届かない問い合わせ | `email-delivery-failure.md`（予備のアカウント・大阪への切り替えを含む） | E4 で作成 | E4 `email-outbox-and-sender` |
 | バウンス率・苦情率の警報、特定のメールの事業者での迷惑メール | `email-reputation.md` | E4 で作成 | E4 `email-deliverability-monitoring` |
 | CSP の違反の急増、`invalid_transaction` の急増 | `login-page-anomaly.md`（リリースの誤りか攻撃か、Cookie の属性、エッジのキャッシュ） | E4 で作成 | E4 `identifier-and-password-screens` |
-| テナントのテーマ・文言の誤りで画面が使えない、規約の新しい版で再同意が大量に出た | `tenant-branding-rollback.md` | E4 で作成 | E4 `branding-and-locales` |
+| テナントのテーマ・文言の誤りで画面が使えない、規約の新しいバージョンで再同意が大量に出た | `tenant-branding-rollback.md` | E4 で作成 | E4 `branding-and-locales` |
 | リフレッシュトークンの再利用の急増 | `refresh-reuse-spike.md`（SDK の並行の誤検知と盗用の見分け） | E5 で作成 | E5 `refresh-token-grant` |
 | Back-Channel Logout の待ち行列の滞留 | `backchannel-logout-backlog.md` | E5 で作成 | E5 `backchannel-logout-delivery` |
 | テナント・ユーザーの全セッションの緊急の取り消し | `mass-session-revocation.md` | E5 で作成 | E5 `session-management-api` |
@@ -108,7 +108,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 誤ったリンクの復旧の依頼 | `wrong-link-recovery.md` | E6 で作成 | E6 `account-linking-api` |
 | MFA を失った利用者の回復（テナントの管理者向けの本人確認の雛形）、MFA の失敗率の急増、`webauthn.sign_count_regression` の急増、カスタムドメインの変更でパスキーが使えない | `mfa-recovery-and-anomalies.md` | E7 で作成 | E7 `authenticators-and-policy` |
 | 誤ブロックの大量の発生（特定の携帯の回線、イベントの集中）、利用者からの「ブロックされた」の問い合わせ | `false-block-surge.md`（`monitor` への切り替え、一括の解除、閾値の見直し） | E8 で作成 | E8 `monitor-mode-and-notifications` |
-| 漏えいしたパスワードの照合の時限切れ・飛ばした件数の増加、データの取り込みの失敗・版が 45 日を超えて古い | `breached-password-check.md`（公式の range API の障害と、自前のホストの前の版での運転） | E8 で作成 | E8 `breached-password-on-login` |
+| 漏えいしたパスワードの照合の時限切れ・飛ばした件数の増加、データの取り込みの失敗・バージョンが 45 日を超えて古い | `breached-password-check.md`（公式の range API の障害と、自前のホストの前のバージョンでの運転） | E8 で作成 | E8 `breached-password-on-login` |
 | 大口のテナントの検索が reader を圧迫 | `search-overload.md`（検索の枠の一時的な引き下げ） | E9 で作成 | E9 `user-search-language` |
 | 管理用のテナントのログインの失敗の急増 | `dashboard-break-glass.md`（非常用のトークンの発行、2 人の承認） | E9 で作成（E12 で訓練） | E9 `dashboard-token-and-roles`、E12 `break-glass-cli` |
 | 管理用のテナントの設定の変更 | `admin-tenant-change.md`（IaC と 2 人のレビュー） | E1 で作成 | E1 `admin-tenant-iac` |
@@ -124,7 +124,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 特定のテナントの上限の変更（緩和・引き締め）の申請 | `rate-limit-override.md` | E12 で作成 | E12 `rate-limit-overrides-and-review` |
 | エンドユーザーからの削除・開示の請求（テナントへの案内、運用者が代わりに行う場合） | `data-subject-requests.md`（法務の L7 の後） | E12 で作成 | E12 `disclosure-api-and-l7` |
 | Actions の基盤のスロットリング・エラーの急増 | `actions-platform-degraded.md`（`deny` のテナントへの影響、上限の引き上げ） | E13 で作成 | E13 `actions-invoker` |
-| 悪性のパッケージの発見 | `actions-malicious-package.md`（該当の版のテナントの特定と配備の停止） | E13 で作成 | E13 `actions-build` |
+| 悪性のパッケージの発見 | `actions-malicious-package.md`（該当のバージョンのテナントの特定と配備の停止） | E13 で作成 | E13 `actions-build` |
 | 1 テナントの Action が同時実行を使い切る | `actions-tenant-runaway.md` | E13 で作成 | E13 `actions-invoker` |
 | 誤ったメンバーシップの付与（自動の付与の設定の誤り） | `organization-membership-incident.md` | E14 で作成 | E14 `organization-connections` |
 | LDAP のコネクタの全停止（接続の失敗の急増） | `ldap-connector-outage.md` | E14 で作成 | E14 `ldap-connector` |

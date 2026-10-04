@@ -235,7 +235,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | --- | --- | --- |
 | 署名の秘密鍵 | Signer の中で生成し、`signing` の鍵でエンベロープ暗号化（ADR-0003） | テナントの操作、緊急の操作（[runbooks/emergency-key-rotation.md](../runbooks/emergency-key-rotation.md)）。定期の自動は keys-and-secrets の領域 |
 | 外部 IdP の秘密鍵（Apple の `.p8`、OIDC の `private_key_jwt`・SAML の SP の鍵） | Signer の中で暗号化（`signing` の鍵。`external_idp_keys`）。Auth・Management API は平文を持たない（ADR-0047） | テナントの操作（接続の鍵の入れ替え） |
-| pepper の鍵 | `pepper` の鍵で暗号化し、Secrets Manager に暗号文 | 版を付け、ログインの成功時に作り直す（ADR-0004）。漏えいの疑いで入れ替える |
+| pepper の鍵 | `pepper` の鍵で暗号化し、Secrets Manager に暗号文 | バージョンを付け、ログインの成功時に作り直す（ADR-0004）。漏えいの疑いで入れ替える |
 | クライアントシークレット、リフレッシュトークン、認可コード | SHA-256 だけ（ADR-0004） | テナント・利用者の操作 |
 | 接続のシークレット（ソーシャル IdP）、ログストリームの資格情報、TOTP の種 | `credentials` のエンベロープ暗号化 | テナントの操作 |
 | DB の認証情報、内部の API キー、外部の提供者（メール、ボットの検知）の鍵 | Secrets Manager | 自動のローテーション（他の題材と同じ）。外部は 90 日か提供者の上限 |
@@ -272,7 +272,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | メールの送信の記録（`email_messages`。本文なし） | 30 日（[email-delivery.md](email-delivery.md) の 8 節） | 削除 |
 | 規約への同意の記録（`consent_records`） | 法務の L5・L8 の結論まで消さない（[ADR-0013](../decisions/0013-consent-records.md)） | 結論で決める |
 | Action の実行の記録（MVP の後） | 10 日（[extensibility.md](extensibility.md) の 8 節） | パーティションを `DROP` |
-| 漏えいしたパスワードのデータ（Pwned Passwords の取り込み。自前のホストは法務の確認の後。[ADR-0025](../decisions/0025-breached-password-detection.md)） | 最新の版と 1 つ前の版 | 古い版を削除 |
+| 漏えいしたパスワードのデータ（Pwned Passwords の取り込み。自前のホストは法務の確認の後。[ADR-0025](../decisions/0025-breached-password-detection.md)） | 最新のバージョンと 1 つ前のバージョン | 古いバージョンを削除 |
 | テナント | 削除の操作の後 30 日（復元できる） | 全行と鍵の暗号文を物理削除 |
 | バックアップ | 35 日 | 期限で消える（削除の最終の期限） |
 

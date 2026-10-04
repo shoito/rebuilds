@@ -251,15 +251,15 @@ erDiagram
 
 ### 2.5 `work_rules`
 
-勤務の規則（版の表）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 4.1 節。
+勤務の規則（バージョンの表）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 4.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | NOT NULL | — | |
-| `id` | `uuid` | NOT NULL | `uuidv7()` | 版の ID（日の結果が記録する） |
+| `id` | `uuid` | NOT NULL | `uuidv7()` | バージョンの ID（日の結果が記録する） |
 | `code` | `text` | NOT NULL | — | facet が指す安定したコード |
 | `version` | `int` | NOT NULL | — | |
-| `valid` | `daterange` | NOT NULL | — | この版を使う期間 |
+| `valid` | `daterange` | NOT NULL | — | このバージョンを使う期間 |
 | `type` | `text` | NOT NULL | — | `fixed`・`shift`・`flex`・`monthly_variable` |
 | `schedule` | `jsonb` | NOT NULL | — | 固定の始業・終業・休憩、半日の区切り |
 | `scheduled_minutes_per_day` | `int` | NULL | — | |
@@ -275,7 +275,7 @@ erDiagram
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, code, version)`。
 - 排他：`EXCLUDE USING gist (tenant_id WITH =, code WITH =, valid WITH &&) WHERE (status = 'active')`。
 - CHECK：`type IN (...)`、`type <> 'flex' OR flex IS NOT NULL`、`type <> 'monthly_variable' OR variable_period IS NOT NULL`。
-- 運用：RLS。保存はテナントの契約の間（日の結果が版を指す）。
+- 運用：RLS。保存はテナントの契約の間（日の結果がバージョンを指す）。
 
 ### 2.6 `employment_work_rule`（facet。主体：`employments`、contiguous）
 
@@ -307,7 +307,7 @@ erDiagram
 
 ### 2.8 `shift_assignments`
 
-日ごとのシフトの割り当て（公開の後の変更は版を足す）。
+日ごとのシフトの割り当て（公開の後の変更はバージョンを足す）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -321,7 +321,7 @@ erDiagram
 | `is_legal_holiday` | `boolean` | NOT NULL | `false` | |
 | `published_at` | `timestamptz` | NULL | — | 月の単位で公開 |
 | `change_reason` | `text` | NULL | — | 公開の後の変更の理由（変形の期間の途中の変更は警告） |
-| `superseded_at` | `timestamptz` | NULL | — | 次の版で置き換えた時刻 |
+| `superseded_at` | `timestamptz` | NULL | — | 次のバージョンで置き換えた時刻 |
 
 - キー：PK `(tenant_id, id)`。UK `(tenant_id, employment_id, work_date, version)`。
 - 一意：`(tenant_id, employment_id, work_date) WHERE superseded_at IS NULL`。
@@ -330,7 +330,7 @@ erDiagram
 
 ### 2.9 `work_day_results`
 
-日の計算の結果（版の追記）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 5.8 節。
+日の計算の結果（バージョンの追記）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 5.8 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -339,7 +339,7 @@ erDiagram
 | `employment_id` | `uuid` | NOT NULL | — | |
 | `work_date` | `date` | NOT NULL | — | |
 | `version` | `int` | NOT NULL | — | |
-| `input_hash` | `bytea` | NOT NULL | — | 打刻・訂正・休暇・シフト・規則の入力の SHA-256。前の版と同じなら書かない |
+| `input_hash` | `bytea` | NOT NULL | — | 打刻・訂正・休暇・シフト・規則の入力の SHA-256。前のバージョンと同じなら書かない |
 | `calc_engine_version` | `text` | NOT NULL | — | |
 | `work_rule_version_id` | `uuid` | NOT NULL | — | → `work_rules` |
 | `minutes` | `jsonb` | NOT NULL | — | `{scheduled_worked, non_statutory_ot, statutory_ot, statutory_ot_over_60, legal_holiday_work, rest_day_work, night, leave_paid_minutes, absence_minutes}`。P2 |
@@ -427,7 +427,7 @@ erDiagram
 
 ### 2.13 `time_period_summaries`
 
-締めの集計の版（給与の入力）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 7.3 節。
+締めの集計のバージョン（給与の入力）。定義元：[time-and-attendance.md](../time-and-attendance.md) の 7.3 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -438,14 +438,14 @@ erDiagram
 | `version` | `int` | NOT NULL | — | |
 | `minutes` | `jsonb` | NOT NULL | — | 区分ごとの期間の合計。P2 |
 | `days` | `jsonb` | NOT NULL | — | `scheduled_days`・`worked_days`・`absence_days`・`paid_leave_days` など。P2 |
-| `day_result_ids` | `uuid[]` | NOT NULL | — | 使った日の結果の版 |
+| `day_result_ids` | `uuid[]` | NOT NULL | — | 使った日の結果のバージョン |
 | `summary_hash` | `bytea` | NOT NULL | — | SHA-256 |
 | `locked_at`・`locked_by` | `timestamptz`・`uuid` | NOT NULL | — | |
-| `superseded_at` | `timestamptz` | NULL | — | 締めた後の訂正で新しい版を作ったとき |
+| `superseded_at` | `timestamptz` | NULL | — | 締めた後の訂正で新しいバージョンを作ったとき |
 
 - キー：PK `(tenant_id, period_id, employment_id, version)`。UK `(tenant_id, id)`。
 - 一意：`(tenant_id, period_id, employment_id) WHERE superseded_at IS NULL`。
-- 更新：`superseded_at` の埋め込みだけ。新しい版は outbox の `time.summary_superseded` を書く。
+- 更新：`superseded_at` の埋め込みだけ。新しいバージョンは outbox の `time.summary_superseded` を書く。
 - 運用：RLS。保存は既定 5 年。S1 の量：月 100 万行。
 
 ### 2.14 `clock_terminals`

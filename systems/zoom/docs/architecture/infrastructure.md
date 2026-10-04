@@ -108,7 +108,7 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 
 ### 3.2 AMI
 
-- EC2 Image Builder で作る。中身：Amazon Linux（arm64）、ENA のドライバ（`conntrack_allowance_available` のため 2.8.1 以上）、Node Agent（Node.js）、mediasoup の worker（本システムのフォークの版を固定）、`nftables` の規則、CloudWatch エージェント（ENA の指標）、ADOT Collector。
+- EC2 Image Builder で作る。中身：Amazon Linux（arm64）、ENA のドライバ（`conntrack_allowance_available` のため 2.8.1 以上）、Node Agent（Node.js）、mediasoup の worker（本システムのフォークのバージョンを固定）、`nftables` の規則、CloudWatch エージェント（ENA の指標）、ADOT Collector。
 - worker を CPU のコアに固定する設定、カーネルの UDP の受信の緩衝の大きさ、IRQ の割り当てを AMI に入れる（値は**未検証**。E7 の `load-l0-l2` で決める）。
 - Node の上に人の SSH の鍵を置かない。入るのは SSM Session Manager だけ（[security.md](security.md) の 7 節）。
 - 同じ定義から、コロケーション向けのベアメタルのイメージも作れる形にしておく（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。
@@ -209,9 +209,9 @@ AWS の上の構成。アカウントとネットワーク、メディアのリ�
 | --- | --- | --- |
 | Aurora | 自動バックアップ（PITR）、日次のスナップショットを大阪へコピー | 35 日 |
 | Valkey | 取らない（失ってよい。会議の状態はクライアントの申告と Aurora から戻す。[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md)） | — |
-| 録画（`final/`） | S3 の版管理。大阪への複製は S1 ではしない（[recording-and-transcription.md](recording-and-transcription.md) の 6.1 節） | 組織の保持に従う |
+| 録画（`final/`） | S3 のバージョン管理。大阪への複製は S1 ではしない（[recording-and-transcription.md](recording-and-transcription.md) の 6.1 節） | 組織の保持に従う |
 | log-archive | Object Lock、大阪へ複製 | 7 年 |
-| Terraform の状態 | shared のバケット（版管理、大阪へ複製） | 90 日 |
+| Terraform の状態 | shared のバケット（バージョン管理、大阪へ複製） | 90 日 |
 | BYOIP の範囲 | 範囲そのものはバックアップできない。IPAM とプールの削除を SCP で禁止する | — |
 
 ### 8.2 AZ の障害（NFR-004）

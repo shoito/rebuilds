@@ -54,6 +54,6 @@ MVP の主なクライアントは Web である。社外の参加者が、イ�
 
 ## Confirmation
 
-- E2E の試験：Chrome・Edge・Firefox・Safari の最新 2 版で、参加、音声・映像・画面共有、帯域の低下の試験を、CI で回す（Playwright と、偽のカメラ・マイクの入力）。
+- E2E の試験：Chrome・Edge・Firefox・Safari の最新 2 バージョンで、参加、音声・映像・画面共有、帯域の低下の試験を、CI で回す（Playwright と、偽のカメラ・マイクの入力）。
 - ネットワークの劣化の試験：`tc netem` で損失・揺らぎ・帯域を変え、NFR-001〜003・NFR-009 を満たすことを確かめる。
 - 共通の試験のベクトル：シグナリングの状態機械の TypeScript 版と Rust 版が、同じベクトルで同じ状態になる（ネイティブのアプリを作る Epic から）。

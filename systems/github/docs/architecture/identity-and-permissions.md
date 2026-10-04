@@ -56,7 +56,7 @@ REST・GraphQL ─ Bearer トークン ─────────┴─▶ 主�
 
 ### 3.1 Web のログイン（Better Auth）
 
-Slack の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md) と同じく、Better Auth を自前でホストする。使い方の規則（Better Auth は「だれか」だけを持つ、`organization` プラグインは使わない、公開するエンドポイントを絞る、版を固定する）も同じにする（[ADR-0019](../decisions/0019-authentication-and-token-model.md)）。
+Slack の [ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md) と同じく、Better Auth を自前でホストする。使い方の規則（Better Auth は「だれか」だけを持つ、`organization` プラグインは使わない、公開するエンドポイントを絞る、バージョンを固定する）も同じにする（[ADR-0019](../decisions/0019-authentication-and-token-model.md)）。
 
 | 手段 | S1 | 備考 |
 | --- | --- | --- |

@@ -258,7 +258,7 @@ erDiagram
 | `snapshot` | `jsonb` | NULL | — | `delete` のときだけ、削除の前の全体の値 |
 
 - キー：PK `(tenant_id, id, changed_at)`。
-- 索引：`(tenant_id, table_id, record_id, changed_at)` — フィールドの履歴の画面、通知の「事象の時点の版」の組み立て、SLA のさかのぼりの一時停止（1,000 件まで読む）。`(tenant_id, record_id, record_version)` — 版の値の組み立て。
+- 索引：`(tenant_id, table_id, record_id, changed_at)` — フィールドの履歴の画面、通知の「事象の時点のバージョン」の組み立て、SLA のさかのぼりの一時停止（1,000 件まで読む）。`(tenant_id, record_id, record_version)` — バージョンの値の組み立て。
 - CHECK：`op IN (...)`、`(op = 'delete') = (snapshot IS NOT NULL)`。
 - アプリのロールは `INSERT`・`SELECT` だけ。保守のロールがパーティションを `DETACH`・`DROP` する（行を消さない）。
 - パーティション：`changed_at` の月。pg_partman で 3 か月先まで作る。

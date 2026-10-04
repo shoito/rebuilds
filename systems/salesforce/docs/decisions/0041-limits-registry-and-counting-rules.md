@@ -19,7 +19,7 @@ date: 2026-09-28
 
 上限の値が領域ごとの表に散ると、同じ上限に 2 つの値が生まれ、試験と実装がずれる。
 
-本家は、フローが Apex の上限に従い、超えるとトランザクション全体を巻き戻すとする（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。フローの要素の数の上限は、API の版 57.0 でなくした（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。積み上げ集計の読みの数え方は、公開の資料に書かれていない（未検証。E6 の `flow-limit-counting` で試用の組織で確かめる）。本家の上限は、組織の割り当てが [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf) に、1 トランザクションの上限が [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf) の「Execution Governors and Limits」にある（どちらも Winter '27 版、2026-09-28 に確認）。
+本家は、フローが Apex の上限に従い、超えるとトランザクション全体を巻き戻すとする（[Per-Transaction Flow Limits](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit_transaction.htm&type=5)、2026-09-28 に確認）。フローの要素の数の上限は、API のバージョン 57.0 でなくした（[Flow Limits per Org](https://help.salesforce.com/s/articleView?id=platform.flow_considerations_limit.htm&type=5)、2026-09-28 に確認）。積み上げ集計の読みの数え方は、公開の資料に書かれていない（未検証。E6 の `flow-limit-counting` で試用の組織で確かめる）。本家の上限は、組織の割り当てが [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf) に、1 トランザクションの上限が [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf) の「Execution Governors and Limits」にある（どちらも Winter '27 版、2026-09-28 に確認）。
 
 ## Options
 

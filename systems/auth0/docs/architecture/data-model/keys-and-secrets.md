@@ -74,7 +74,7 @@ erDiagram
     }
 ```
 
-`pepper_versions` はテナントの外の表。`password_credentials.pepper_version` などから版の番号で参照される（外部キーは張らない）。
+`pepper_versions` はテナントの外の表。`password_credentials.pepper_version` などからバージョンの番号で参照される（外部キーは張らない）。
 
 ## 2. Signer が読む表
 
@@ -112,7 +112,7 @@ Signer の DB のロール `signer` は、`signing_keys`・`signing_key_state_ve
 
 ### signing_key_state_versions
 
-Signer のポーリング（2 秒）の版。遷移のトランザクションが 1 増やす。**テナントの外の表**（2026-09-28 に決めた。[data-model.md](../data-model.md) の 3 節）。Signer は全テナントの版を 1 回の問い合わせで読む必要があり、行は版と時刻だけで鍵の中身を持たないため（`tenant_config_versions` と同じ理由）。
+Signer のポーリング（2 秒）のバージョン。遷移のトランザクションが 1 増やす。**テナントの外の表**（2026-09-28 に決めた。[data-model.md](../data-model.md) の 3 節）。Signer は全テナントのバージョンを 1 回の問い合わせで読む必要があり、行はバージョンと時刻だけで鍵の中身を持たないため（`tenant_config_versions` と同じ理由）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -215,7 +215,7 @@ JWKS と discovery の書き出しと確かめの記録。
 
 ### tenant_data_keys
 
-テナントごとの DEK（版つき。ADR-0045）。戻す必要のある秘密（TOTP の種、接続の秘密、ログストリーム・メールの資格情報、Action の秘密、`email_outbox` の秘密の変数）を包む。
+テナントごとの DEK（バージョンつき。ADR-0045）。戻す必要のある秘密（TOTP の種、接続の秘密、ログストリーム・メールの資格情報、Action の秘密、`email_outbox` の秘密の変数）を包む。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -227,7 +227,7 @@ JWKS と discovery の書き出しと確かめの記録。
 | `retired_at` | `timestamptz` | YES | | 参照する行が 0 になった時刻 |
 
 - 主キー：`(tenant_id, version)`。一意：`(tenant_id) WHERE state = 'current'`。
-- ローテーションは年 1 回。古い版の暗号文は読んだときに書き直す。
+- ローテーションは年 1 回。古いバージョンの暗号文は読んだときに書き直す。
 - 保持：`retired` の行は消す。テナントの削除で全行を消す（暗号の消去）。
 - S1 の規模：約 1 万〜3 万行。
 
@@ -235,7 +235,7 @@ JWKS と discovery の書き出しと確かめの記録。
 
 ### pepper_versions
 
-pepper の版（[keys-and-secrets.md](../keys-and-secrets.md) の 4 節）。pepper そのものは DB に置かない（暗号文は Secrets Manager）。
+pepper のバージョン（[keys-and-secrets.md](../keys-and-secrets.md) の 4 節）。pepper そのものは DB に置かない（暗号文は Secrets Manager）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -243,7 +243,7 @@ pepper の版（[keys-and-secrets.md](../keys-and-secrets.md) の 4 節）。pep
 | `secret_name` | `text` | NO | | `<brand>/pepper/v{n}` |
 | `state` | `text` | NO | | `current`・`active`・`retired` |
 | `created_at` | `timestamptz` | NO | `now()` | |
-| `hash_count` | `bigint` | YES | | この版のハッシュの数（日次で数える） |
+| `hash_count` | `bigint` | YES | | このバージョンのハッシュの数（日次で数える） |
 | `counted_at` | `timestamptz` | YES | | |
 
 - 主キー：`(version)`。一意：`(state) WHERE state = 'current'`。

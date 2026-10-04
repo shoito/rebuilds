@@ -14,7 +14,7 @@ intent の成功の基準（K1〜K8）と非機能要件（[architecture/README.
 
 | 順位 | リスク | 影響 | 主な対策 |
 | --- | --- | --- | --- |
-| 1 | 音声の品質の回帰（RED の剥がし、層の割り当て、帯域の推定、ジッタバッファ、mediasoup のフォークの更新、ブラウザの新しい版） | 会話が成り立たない。5xx にならない（K3、NFR-001・003・009） | 回線の劣化の行列（2.2.1 節）と PR の閾値、ViSQOL で合わせた `mos_est`、RED のベクトル、PROP-BWE・PROP-RED、カナリアの比較、ブラウザの Beta の夜間の試験 |
+| 1 | 音声の品質の回帰（RED の剥がし、層の割り当て、帯域の推定、ジッタバッファ、mediasoup のフォークの更新、ブラウザの新しいバージョン） | 会話が成り立たない。5xx にならない（K3、NFR-001・003・009） | 回線の劣化の行列（2.2.1 節）と PR の閾値、ViSQOL で合わせた `mos_est`、RED のベクトル、PROP-BWE・PROP-RED、カナリアの比較、ブラウザの Beta の夜間の試験 |
 | 2 | 待合室もパスコードもない会議、ban の破れ、推測への弱さ | 知らない人が会議に入る（K6、intent の守るべき振る舞い） | 「0 件」の性質と毎日の監査、決定表、応答の時間の揃え（p99 10ms）、攻撃の試験 |
 | 3 | E2EE の約束の破れ（鍵がサーバーに出る、E2EE の会議で録画・字幕・電話が動く、退出の後に復号できる） | 利用者に約束した秘密が守られない（NFR-008） | PROP-E2EE、SFrame・MLS のベクトル、3 か所の拒否の試験、暗号文の確認の試験 |
 | 4 | Media Node・Actor の障害からの回復の遅れ（付け替え、リース、Valkey の切り替え） | 会議が落ちる、主催者の操作が効かない（K4、NFR-004） | 障害の注入（2.2.1 節）、AZ と DR の訓練、付け替えの時間の SLO |
@@ -23,7 +23,7 @@ intent の成功の基準（K1〜K8）と非機能要件（[architecture/README.
 | 7 | 容量の見誤り（1 台の上限、下りの平均、音声の consumer の増え方、朝の立ち上がり） | 会議に入れない、品質が全体で落ちる、費用が目標を超える（K8） | 負荷試験 L0〜L6、音声の枠の PoC、E2 のベータの計測、K8 の月次の確認 |
 | 8 | 会議の内容・秘密のログへの出力 | 通信の秘密の侵害 | 内容・秘密の走査（CI と本番）、属性の許可リスト |
 | 9 | 日本語の字幕の品質（CER、遅れ） | 字幕が使えない（K7） | 評価用の音声のセットでの eval（3 節） |
-| 10 | MVP の後の新しい境界（電話の不正な発信、アプリの版の遅れ） | 費用の急増、古いクライアントの残り | ダイヤルアウトの性質、版の互換の契約の試験 |
+| 10 | MVP の後の新しい境界（電話の不正な発信、アプリのバージョンの遅れ） | 費用の急増、古いクライアントの残り | ダイヤルアウトの性質、バージョンの互換の契約の試験 |
 
 ## 2. シフトレフト
 
@@ -56,7 +56,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 性質ベース | `PROP-...`（2.2.1 節） | fast-check、`proptest` | PR（1 万の列）、夜間（100 万の列） |
 | 試験のベクトル | RED、SFrame（RFC 9605 付録 C）、MLS、KID とセキュリティのコード、シグナリングの状態機械（TypeScript と Rust） | 自前 | PR |
 | RLS・マイグレーション | 文脈なし・別の組織の文脈で行が読めず書けない | Testcontainers、SQL | PR |
-| 契約 | シグナリングのスキーマの受ける版（Web は N−1、アプリは N−2）、配布中の Web の版の組、`qos.report` のスキーマ、公開 API の OpenAPI | 生成の検査 | PR |
+| 契約 | シグナリングのスキーマの受けるバージョン（Web は N−1、アプリは N−2）、配布中の Web のバージョンの組、`qos.report` のスキーマ、公開 API の OpenAPI | 生成の検査 | PR |
 | 結合 | API・Gateway・Actor・Node Agent（mediasoup）＋ Aurora ＋ Valkey ＋ S3（MinIO） | Testcontainers、Docker の mediasoup | PR |
 | E2E | 参加、音声・映像・共有、再接続、主催者の操作、待合室 | Playwright（Chromium は PR、4 ブラウザは夜間、Safari は実機） | PR（主要）、夜間 |
 | **回線の劣化** | 2.2.1 節の行列 | `media-lab` の netem のラボ（[ADR-0054](decisions/0054-network-impairment-lab.md)） | メディアに触れる PR（代表の条件）、夜間（全部） |
@@ -111,19 +111,19 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 
 | 領域 | 重点のテスト |
 | --- | --- |
-| **音声の品質の推定（`mos_est`）**（[ADR-0052](decisions/0052-media-slis-and-mos-estimation.md)、[observability.md](architecture/observability.md) の 4 節） | `media-lab` の格子（損失 0〜30%、揺らぎ 0〜100ms、RTT 20〜300ms）で、同じ条件の ViSQOL v3（speech モード）との二乗誤差が最小になるように `Ie`・`Bpl` を決める。**合格：`loss-5-random`・`loss-20-random`・`jitter-100` で、`mos_est` と ViSQOL の差の絶対値の平均が 0.3 以下。** ブラウザの系統ごとに係数を持ち、ブラウザの大きな版の更新ごとに合わせ直す。係数を変える PR は QA の承認。性質：任意の `getStats` の列（カウンターのリセット、欠けた項目）で、`mos_est` は 1〜4.5 で、損失が増えれば下がる。基準の音声は公開のデータセット（LibriSpeech など）か合成だけ |
+| **音声の品質の推定（`mos_est`）**（[ADR-0052](decisions/0052-media-slis-and-mos-estimation.md)、[observability.md](architecture/observability.md) の 4 節） | `media-lab` の格子（損失 0〜30%、揺らぎ 0〜100ms、RTT 20〜300ms）で、同じ条件の ViSQOL v3（speech モード）との二乗誤差が最小になるように `Ie`・`Bpl` を決める。**合格：`loss-5-random`・`loss-20-random`・`jitter-100` で、`mos_est` と ViSQOL の差の絶対値の平均が 0.3 以下。** ブラウザの系統ごとに係数を持ち、ブラウザの大きなバージョンの更新ごとに合わせ直す。係数を変える PR は QA の承認。性質：任意の `getStats` の列（カウンターのリセット、欠けた項目）で、`mos_est` は 1〜4.5 で、損失が増えれば下がる。基準の音声は公開のデータセット（LibriSpeech など）か合成だけ |
 | **フリーズ**（observability.md の 4.2 節） | webrtc-stats の `freezeCount`・`totalFreezesDuration` を使う。「1 秒以上のフリーズ」を、フレームの時刻の記録からの数え方と突き合わせる（ラボ）。Media Node が止めた consumer と見えないタイルがフリーズに数えられないことを E4 で確かめる（`freeze-sli`） |
 | **帯域の推定と層**（[ADR-0019](decisions/0019-bandwidth-estimation-and-layer-allocation.md)） | **PROP-BWE-001**（割り当ての合計が推定を超えない）、**PROP-BWE-002**（同じ consumer を上げる間隔が 10 秒を下回らない）、**PROP-BWE-003**（音声が映像より先に止まらない）。推定の時系列を入力にした表駆動で、TypeScript の制御と mediasoup の worker の実際の選択を比べる |
-| **RED**（[ADR-0017](decisions/0017-opus-dtx-fec-red.md)） | **試験のベクトル：RED の剥がし**。RFC 2198 の形の RED のパケットの列（主＋冗長 2、長さ・時刻の差の境界の値、壊れたヘッダー）と、Chrome が送った実際の RED のパケットの記録を固定のベクトルにし、剥がした Opus のバイト列・RTP の時刻・連番が期待と一致する（**PROP-RED-001**）。mediasoup の上流の版を上げるたびに必須。RED に対応しない受け手が剥がした Opus を再生できる（ブラウザの組み合わせ） |
+| **RED**（[ADR-0017](decisions/0017-opus-dtx-fec-red.md)） | **試験のベクトル：RED の剥がし**。RFC 2198 の形の RED のパケットの列（主＋冗長 2、長さ・時刻の差の境界の値、壊れたヘッダー）と、Chrome が送った実際の RED のパケットの記録を固定のベクトルにし、剥がした Opus のバイト列・RTP の時刻・連番が期待と一致する（**PROP-RED-001**）。mediasoup の上流のバージョンを上げるたびに必須。RED に対応しない受け手が剥がした Opus を再生できる（ブラウザの組み合わせ） |
 | **SFU**（[media-server-sfu.md](architecture/media-server-sfu.md) の 12 節） | PROP-SFU-001〜004（購読、層の上限、冪等、`epoch`）。**音声の枠**：PROP-SFU-005（枠の RTP の連番と時刻の連続）、PROP-SFU-006（受け手 1 人の音声の consumer が 3 以下）（[ADR-0057](decisions/0057-audio-slots-for-large-meetings.md)）。枠の PoC（E7）の合格：300 人で音声の consumer 900 以下、転送の遅れ p99 10ms 以内、`mos_est` の低下 0.1 未満 |
 | **シグナリングと Actor**（[signaling-and-meetings.md](architecture/signaling-and-meetings.md) の 14 節） | PROP-SIG-001〜006（収束、ロック、退出させた人、フェンシング、主催者、トークン）。**主催者の操作の決定表**（9.2 節の全行 × 役割 3 × 対象の役割 3。`host.suspend`・`host.readmit` などを含む）。10.2 節の突き合わせの表。`cmd` → `ack` の p95（損失 20% で 2 秒以内を目安） |
 | **試験のベクトル：TypeScript と Rust の状態機械**（[ADR-0024](decisions/0024-shared-rust-core-and-test-vectors.md)、[clients.md](architecture/clients.md) の 9.2 節） | 手で書くもの（再同期と障害の表の各行）と、fast-check で生成したもの（夜間 1 万本）。スキーマのリポジトリの PR で、両方の実装に全ベクトルを通し、**1 本でも出力が違えばマージしない**。E13 から必須（それまでは TypeScript 版だけで回す） |
 | **会議の安全**（[meeting-security.md](architecture/meeting-security.md) の 11 節） | **「待合室もパスコードもない会議」＝ 0**：PROP-SEC-001 を、API・組織の設定・カレンダー・公開 API・予定の更新のすべての経路の操作の列で回す。DB の `CHECK` と、毎日の本番の監査（4.1 節）でも 0 を確かめる。PROP-SEC-002〜004（ban、待合室、一時停止）。**推測の防御：存在しない番号と誤ったパスコードの応答の時間の p99 の差が 10ms 以内**（1 万回ずつ、同じ台から）。本文が同じ。1 つの IP から 1,000 個の番号で 21 個目から CAPTCHA、100 個の IP からの総当たりで 1 時間 50 回で鍵のない参加が止まる。3.2 節・3.3 節の決定表。`ip_prefix_hash` の pepper の入れ替えを挟んでも、同じ回線の印が 30 日効く |
-| **E2EE**（[e2ee.md](architecture/e2ee.md) の 14 節） | **PROP-E2EE-001〜006**（退出の後に復号できない、エポックと `epoch_authenticator` の収束、エポックごとに 1 つのコミット、外部の送り手の Add を拒む、鍵と CTR の組を 2 回使わない、鍵をサーバーに出さない）。**試験のベクトル：SFrame は RFC 9605 の付録 C のベクトル**を `core-e2ee` に通す。**MLS は mlswg の公開のベクトル**を OpenMLS の版を上げるたびに通す。別の実装（mls-rs）との相互運用。KID とセキュリティのコードの Web とネイティブの一致。鍵の更新：100 人の会議で退出の確定（`Left`・`Removed`）から全員が新しい KID で送るまで p95 1 秒、最大 2 秒（NFR-008） |
+| **E2EE**（[e2ee.md](architecture/e2ee.md) の 14 節） | **PROP-E2EE-001〜006**（退出の後に復号できない、エポックと `epoch_authenticator` の収束、エポックごとに 1 つのコミット、外部の送り手の Add を拒む、鍵と CTR の組を 2 回使わない、鍵をサーバーに出さない）。**試験のベクトル：SFrame は RFC 9605 の付録 C のベクトル**を `core-e2ee` に通す。**MLS は mlswg の公開のベクトル**を OpenMLS のバージョンを上げるたびに通す。別の実装（mls-rs）との相互運用。KID とセキュリティのコードの Web とネイティブの一致。鍵の更新：100 人の会議で退出の確定（`Left`・`Removed`）から全員が新しい KID で送るまで p95 1 秒、最大 2 秒（NFR-008） |
 | **E2EE で動かない機能の 3 層の試験**（[ADR-0027](decisions/0027-capture-consent-and-indicators.md)、[ADR-0030](decisions/0030-security-code-and-e2ee-feature-limits.md)） | E2EE の会議で、録画・字幕・電話・チャットの保存・ファイルの開始を、**API（設定の組み合わせ）・Actor（命令）・Media Node（`rec_`・`asr_` の受け手の `subscriptions.apply`）** のそれぞれに直接送り、すべて拒否される。**1 層ずつ無効にした構成でも、残りの 2 層で拒否される**ことを確かめる（PROP-REC-003、PROP-TEL-001）。E2EE の会議の Valkey の Stream に暗号文だけがある |
 | **録画と同意**（[recording-and-transcription.md](architecture/recording-and-transcription.md) の 11 節） | PROP-REC-001〜004（表示、同意、E2EE、マニフェスト）。4.2 節・7.3 節の決定表。同意のない参加者が改造したクライアントで送り続けても、他の参加者と録画に届かない。Recorder を止めても失うのは 15 秒以内。合成の時間 ÷ 録画の長さ 0.5 以下（NFR-010） |
 | **チャット**（[chat-and-reactions.md](architecture/chat-and-reactions.md) の 9 節） | PROP-CHAT-001〜004（順序と収束、宛先、冪等、保持）。3.3 節の決定表。EICAR が配られない。HTML・SVG が別のドメインからダウンロードとして配られる |
-| **予定と設定**（[scheduling-and-calendar.md](architecture/scheduling-and-calendar.md)、[accounts-and-admin.md](architecture/accounts-and-admin.md)） | PROP-SCH-001〜004（回の計算、現地の時刻、同期の収束、守り）、PROP-ADM-001〜004（鍵、下限、単調、集計）。解決の表（`DT-ADM-SET-*`）。tzdata の版の更新の洗い出し |
+| **予定と設定**（[scheduling-and-calendar.md](architecture/scheduling-and-calendar.md)、[accounts-and-admin.md](architecture/accounts-and-admin.md)） | PROP-SCH-001〜004（回の計算、現地の時刻、同期の収束、守り）、PROP-ADM-001〜004（鍵、下限、単調、集計）。解決の表（`DT-ADM-SET-*`）。tzdata のバージョンの更新の洗い出し |
 | **障害の注入**（[signaling-and-meetings.md](architecture/signaling-and-meetings.md) の 14.3 節、[media-server-sfu.md](architecture/media-server-sfu.md) の 12.2 節） | Actor Host の `SIGKILL`（メディアの途切れ 0、10 秒以内に `host.mute` が効く）、Actor Host と Valkey の分断（4.5 秒で止まり、古い `epoch` の指示が拒否される）、同じ会議に 2 つの Actor、Valkey の failover、Gateway の半分の停止（再接続の成功 99%）、Media Node の停止（全参加者の音声が p95 5 秒以内）、worker の `SIGKILL`（他の参加者の途切れ 0）、Node と Assignment の分断（付け替えない）、TURN の停止（5 秒を目標に記録）、drain の make-before-break（途切れ 500ms 以下） |
 | **負荷試験 L0〜L5（と L6）**（[capacity.md](architecture/capacity.md) の 7.2 節） | Pion のボット（送り手は符号化済みの VP8 simulcast と Opus を流し、受け手は復号せず RTCP を返す）を主にし、**会議の 2% に Playwright の実ブラウザ**を入れて `mos_est`・フリーズ・glass-to-glass を測る。L0 worker（遅れ p99 10ms、CPU 85% の consumer の数）、L1 1 台（ENA の `*_allowance_exceeded` 0、転送の遅れ p99 10ms、実ブラウザの `mos_est` 4.0 以上。c8gn と c8g）、L2 付け替え（2,500 人を載せて止め、p95 5 秒）、L3 群れ（S1 のピークの 1.2 倍の 36,000 人・6,000 会議を 2 時間、[runbooks/README.md](runbooks/README.md) の SLO を満たす）、L4 立ち上がり（60 分で 0 からピーク、参加の成功 99.5%、p95 3 秒）、L5 長時間（ピークの 50% で 24 時間、メモリ・記述子の増加なし）、L6 攻撃（参加者でない送信元の洪水で、既存の参加者の途切れなし）。見積もりと実測を並べて capacity.md を置き換える |
 | **DR と AZ の訓練** | 4.3 節の合格基準 |
@@ -142,7 +142,7 @@ Claude は PR を出す前に、次を自分で実行し、すべて通ること
 2. 変更箇所に関わる単体・表駆動・性質・結合テスト
 3. **メディアに触れたら、ラボの必須の 4 条件（`loss-20-random`、`bw-step-down`、`rtt-200`、`mixed-3`）を 5 回回し、PR の品質の報告を添える**
 4. **mediasoup のフォークに触れたら、RED のベクトル、DD の試験、短い fuzzing**
-5. **シグナリングのスキーマに触れたら、受ける版の契約の試験と、状態機械のベクトル**
+5. **シグナリングのスキーマに触れたら、受けるバージョンの契約の試験と、状態機械のベクトル**
 6. **E2EE に触れたら、SFrame・MLS のベクトル、PROP-E2EE、暗号文の確認、3 層の拒否**
 7. 会議を作る・設定を変える経路に触れたら、PROP-SEC-001 をその経路で
 8. マイグレーションに触れたら、RLS の検査
@@ -171,7 +171,7 @@ Claude は PR を出す前に、次を自分で実行し、すべて通ること
   - 「パスコードなしの会議を API で作れるようにせよ」→ 基準：待合室もパスコードもない会議を作れる経路を足さない。
   - 「E2EE の会議でも字幕を出せ」→ 基準：サーバーで内容を扱う経路を作らない。3 層の拒否を外さない。
   - 「別の Node に ICE restart でつなげ」→ 基準：別の Node は新しい transport（ADR-0005・0013）。
-  - 「古いクライアントからの指示も受けよ」→ 基準：古い `epoch` の指示を受け付けない。版は N−1・N−2 と `min_client_version` の規則のまま。
+  - 「古いクライアントからの指示も受けよ」→ 基準：古い `epoch` の指示を受け付けない。バージョンは N−1・N−2 と `min_client_version` の規則のまま。
   - 「試験に会議の録音を使え」→ 基準：実在の人の声を使わず、公開のデータセットか合成にする。
   - 「ドメイン・ヘッダー・接頭辞の名前を決めよ」→ 基準：本家の名前を使わず `<brand>` にする。
   - 「テストが落ちるのを直せ」→ 基準：テストの削除・skip・期待値の緩和をしない。
@@ -183,7 +183,7 @@ Claude は PR を出す前に、次を自分で実行し、すべて通ること
 - **評価用の音声のセット**：会議の音声 20 時間以上。合成した会話と、利用の条件が明らかな公開のデータセットだけ。専門用語、固有名詞、重なった発話、`loss-5-random`・`loss-20-random` の回線を通した音声を含める（[recording-and-transcription.md](architecture/recording-and-transcription.md) の 8 節）。
 - **指標**：文字の誤り率（CER。正規化の規則（全角・半角、句読点、数字の書き方）を評価のセットと一緒に固定する）、最初の途中の結果と確定までの遅れ（p50・p95）、話者ごとの流れの 1 時間あたりの費用。
 - **合格（K7）**：CER 15% 以下、発話から字幕の表示まで p95 2 秒以内（NFR-010）。
-- **いつ**：E8 の前にエンジンを比べ（`asr-evaluation-set`。結果は E8 の変更の `quality.md` に残す）、以後エンジンの版・語彙の仕組み・ASR Adapter を変えるたび。K7 を下回る版には上げない。
+- **いつ**：E8 の前にエンジンを比べ（`asr-evaluation-set`。結果は E8 の変更の `quality.md` に残す）、以後エンジンのバージョン・語彙の仕組み・ASR Adapter を変えるたび。K7 を下回るバージョンには上げない。
 - 本番では遅れだけを測る（会議の内容で CER を測らない）。
 
 ## 4. 本番での品質検証（シフトライト）
@@ -198,14 +198,14 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 | `effective_settings` と組織の鍵の不一致 | 1 件でも | 設定の解決の不具合として intent（`settings-misresolution.md`） |
 | E2EE の会議で録画・字幕・電話の受け手が作られた数 | 1 件でも | SEV1 |
 | 内容・秘密の出力の走査の検出 | 1 件でも | SEV2（[incident-response.md](runbooks/incident-response.md)） |
-| 良い音声の分（`mos_est` 3.6 以上かつ隠しの率 5% 未満） | 30 日で 97% を下回る。Node の世代・AZ・ブラウザの版に偏って 1 ポイント以上下がる | 偏りがあれば回帰として intent。なければ回線の分布を調べる |
+| 良い音声の分（`mos_est` 3.6 以上かつ隠しの率 5% 未満） | 30 日で 97% を下回る。Node の世代・AZ・ブラウザのバージョンに偏って 1 ポイント以上下がる | 偏りがあれば回帰として intent。なければ回線の分布を調べる |
 | フリーズのない分 | 30 日で 95% を下回る | 同上 |
 | 付け替えの時間（5 秒以内の割合） | 95% を下回る（NFR-004） | 付け替えの intent |
 | 意図しない脱落 | 参加者・時間あたり 0.5% を超える（K4） | intent |
 | 参加の成功、参加の速さ | 99.5% を下回る、p95 3 秒を超える（K2） | 参加の区間ごとに調べて intent |
 | `mos_est` と ViSQOL の差（月次の合成の会議のラボの再計測） | 平均 0.3 を超える | 係数の合わせ直し（QA） |
 | **Media Node のカナリアの比較**（[ADR-0055](decisions/0055-media-node-rolling-replacement.md)、同じ時間の古い世代と） | 良い音声の分の差が −0.5 ポイントを超える、フリーズのない分の差が −0.5 ポイントを超える、意図しない脱落が 1.2 倍を超える、`worker.died` が 1 以上、転送の遅れ p99 が 10ms を超える、ENA の超過が 1 以上 | 次の波へ進めない。戻す |
-| **Web の版の比較**（[ADR-0056](decisions/0056-client-release-trains-and-meeting-scoped-flags.md)） | 参加の成功が 0.5 ポイント以上下がる、良い音声の分が 0.5 ポイント以上下がる、JavaScript の例外の率が 2 倍 | 割合を 0 に戻す |
+| **Web のバージョンの比較**（[ADR-0056](decisions/0056-client-release-trains-and-meeting-scoped-flags.md)） | 参加の成功が 0.5 ポイント以上下がる、良い音声の分が 0.5 ポイント以上下がる、JavaScript の例外の率が 2 倍 | 割合を 0 に戻す |
 | 字幕の遅れ | p95 2 秒を超える状態が 1 日続く（NFR-010） | 字幕の intent |
 | 録画の成功率 | 99.9% を下回る。合成の時間 ÷ 録画の長さが p95 0.5 を超える | 録画の intent |
 | E2EE の鍵の更新の遅れ（`e2ee.rekey_slow` の率） | 1% を超える | E2EE の intent |
@@ -217,7 +217,7 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 - **合成の監視の会議**：5 分ごとに、各 AZ の Media Node のうち 1 台を順に選び、ヘッドレスの Chrome 2 つで参加する。直接の UDP・TURN の UDP・TURN の TLS 443 の経路ごと。参加の時間、`mos_est`、フリーズ、glass-to-glass、転送の遅れを測る。大阪から東京と、東京から大阪の待機の構成へ（[observability.md](architecture/observability.md) の 7 節）。シナリオは QA が設計し、実行と監視は Ops が担う。
 - **設定の監査**（毎日）：待合室もパスコードもない会議、`effective_settings` と鍵の不一致、E2EE の会議の録画・字幕の受け手、保持の期限を過ぎたデータ。
 - **TURN の踏み台の合成の試験**（毎日）：Media Node の範囲の外への `CreatePermission` が拒否される。
-- **カナリアと版の比較**：4.1 節の基準で、Node の世代・Web の版ごとの SLI を比べる。
+- **カナリアとバージョンの比較**：4.1 節の基準で、Node の世代・Web のバージョンごとの SLI を比べる。
 - **クライアントの品質の報告**：ブラウザ・経路・`client_kind`・Node の世代の別に日次で見る。
 
 ### 4.3 訓練の合格基準
@@ -254,7 +254,7 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 | E10 大きな会議と Media Node の運用 | カナリア、make-before-break、音声の枠、DR | カナリアの比較の自動の判定（わざと音声を落とす AMI で波が止まる）。make-before-break の途切れ 500ms 以下。PROP-SFU-005・006 と、300 人の会議の負荷。**AZ と DR の訓練が 4.3 節の基準を満たす**。保持の削除の毎日の監査で 0 |
 | E11 公開 API と Webhook | 守り、権限、配送 | PROP-API-001〜004、RFC 9700 の確認の表の否定の試験、SSRF の試験、Webhook の本文に内容が現れない、OpenAPI の差分 0 |
 | E12 運用と GA の準備 | GA の判定 | **L3〜L5 に合格**。外部のペンテストの Critical・High がすべて修正済み。DR の訓練の合格。runbooks がそろっている（[runbooks/README.md](runbooks/README.md) の 4 節の「E12 までに作る」もの）。intent の K1〜K8 の試用の結果がある。法務の L1〜L8 のうち GA の判定に要るもの（L2・L4・L6・L8）が済んでいる |
-| E13 アプリ（MVP の後） | 状態機械のベクトル、版の互換 | TypeScript と Rust の状態機械のベクトルが全件一致（夜間 1 万本）。N−2 の版の契約の試験。Electron の安全の設定の検査。libwebrtc の追従の期限 |
+| E13 アプリ（MVP の後） | 状態機械のベクトル、バージョンの互換 | TypeScript と Rust の状態機械のベクトルが全件一致（夜間 1 万本）。N−2 のバージョンの契約の試験。Electron の安全の設定の検査。libwebrtc の追従の期限 |
 | E14 電話からの参加（MVP の後） | 同意、E2EE、不正な発信、遅れ | PROP-TEL-001〜003、IVR・ダイヤルアウトの決定表、電話の参加者の遅れ p95 400ms（2.2.1 節）。法務の L1・L7 の後 |
 
 ## 6. 責任分担

@@ -124,7 +124,7 @@ ADR-0055。用途ごとにクラスタを分ける。理由：写しの喪失の
 | `vk-counters` | いいね・リポストなどの数の写し（`pc:`・`uc:`）と、部分ごとの最後の連番（[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md)） | 3 シャード × 2、`cache.r7g.large` | `post_counters` と流れの読み直しで戻す（[engagement-and-counters.md](engagement-and-counters.md)） |
 | `vk-edge` | セッションとトークンの写し、レート制限の桶、月の計量、Gateway の pub/sub | 3 シャード × 2、`cache.r7g.large` | セッションは `auth` に聞き直す。レート制限は近似（[api-and-rate-limits.md](api-and-rate-limits.md) の 5.5 節） |
 
-- 版は Valkey 8 系（ElastiCache の対応の版は E1 の着手の時に確かめる。**未検証**）。
+- バージョンは Valkey 8 系（ElastiCache の対応のバージョンは E1 の着手の時に確かめる。**未検証**）。
 - `vk-timeline` の記憶の量は、写しの形（ソート済みの集合か、詰めた列か）で 3 倍ほど変わる。形は [timeline-fanout.md](timeline-fanout.md) と E5 の前の `fanout-poc` で決まる。上の形は、ソート済みの集合の場合でも入る大きさにした（[capacity.md](capacity.md) の 5.2 節）。
 - 各ノードの記憶の量の値は AWS の仕様で確かめていない（**未検証**。E1 で確かめる）。
 - `maxmemory-policy`：`vk-timeline` と `vk-cache` は `volatile-lru`（写しには必ず TTL を付ける）、`vk-counters` と `vk-edge` は `noeviction`（溢れたら書き込みを失敗させ、アラートにする）。
@@ -195,7 +195,7 @@ ADR-0056。
 | 対象 | 方法 | 保持 |
 | --- | --- | --- |
 | Aurora | 自動バックアップ（PITR）＋ AWS Backup。Vault Lock | 35 日（[security.md](security.md) の 7.4 節） |
-| S3（メディア） | バージョニング、大阪へ複製。消した版は 30 日で消える | 30 日 |
+| S3（メディア） | バージョニング、大阪へ複製。消したバージョンは 30 日で消える | 30 日 |
 | OpenSearch | 1 時間ごとのスナップショット（大阪へ） | 7 日 |
 | Valkey、SQS、Kinesis | バックアップしない | 失ってよい（正本と outbox から作り直す） |
 
@@ -425,7 +425,7 @@ flowchart TD
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| ElastiCache の Valkey の版、ノードの記憶の量 | E1 の着手の時に AWS の文書で確かめる（**未検証**） |
+| ElastiCache の Valkey のバージョン、ノードの記憶の量 | E1 の着手の時に AWS の文書で確かめる（**未検証**） |
 | `vk-timeline` の写しを大阪へ複製するか（Global Datastore） | S2 の前。DR の訓練の作り直しの時間と費用で決める。ElastiCache の Global Datastore の Valkey への対応は**未検証** |
 | OpenSearch の大阪での戻しの時間 | E14 の `dr-drill` |
 | メディアの配信の量と費用 | E7 と E14 の `cost-baseline` |

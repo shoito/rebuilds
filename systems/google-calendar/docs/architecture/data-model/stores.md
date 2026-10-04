@@ -46,7 +46,7 @@
 | `<brand>-ics-cache`：`fetch/<url_hash>/body` | 購読の取得の本文（同じ URL の購読でまとめる） | `s3-ingest` | 6 時間 | 同 8.1 節 |
 | `<brand>-ingest`：`t/<tenant_id>/itip/<msg_id>.json` | 256 KiB を超える iTIP の本文 | `s3-ingest` | 7 日 | [invitations-and-itip.md](../invitations-and-itip.md) の 5.1 節（接頭辞はこの文書） |
 | `<brand>-ingest`：`t/<tenant_id>/pending-invites/<id>.ics` | 保留の招待の正規化した本文 | `s3-ingest` | 30 日 | 同 4.3 節（接頭辞はこの文書） |
-| `<brand>-assets`：`web/<build_hash>/…`、`tzdata/<version>/<tzid>.bin` | Web の資産、tzdata のゾーンのデータ | `s3-assets` | 資産は版ごと 30 日、tzdata は残す | [delivery.md](../delivery.md) の 5・6 節 |
+| `<brand>-assets`：`web/<build_hash>/…`、`tzdata/<version>/<tzid>.bin` | Web の資産、tzdata のゾーンのデータ | `s3-assets` | 資産はバージョンごと 30 日、tzdata は残す | [delivery.md](../delivery.md) の 5・6 節 |
 | log-archive のアカウント：`audit/<tenant_id>/<yyyy>/<mm>/<dd>/<hh>.ndjson.gz`、`audit-chain/<tenant_id>/<yyyy-mm-dd>.json`、`platform-audit/<yyyy>/<mm>/<dd>/<hh>.ndjson.gz` | 監査ログの写しと日の終わりの連鎖の値。Object Lock（コンプライアンスモード） | `audit-archive` | 3 年・5 年 | [ADR-0042](../../decisions/0042-audit-log-and-data-lifecycle.md) |
 
 - **添付のファイルは持たない。** 予定の添付は URL だけ（`event_objects.attachments`）。
@@ -128,7 +128,7 @@ mac     = HMAC-SHA256(鍵 k, payload) の先頭 16 バイト
 | `s` | 差分の最後の `seq`（`tokensOnly` は今の `change_seq`） | `s < floor_seq` → 410 `floor_seq` |
 | `e` | `platform_state.sync_epoch` | 古い → 410 `epoch` |
 | `f` | `SHA-256(正規化した条件)` の先頭 8 バイト（`showDeleted`、`eventTypes`） | 違う条件 → 400 |
-| `h` | `SHA-256(実際のロール ‖ 効いた方針の版 ‖ redact の段)` の先頭 16 バイト | 違う → 410 `view_hash` |
+| `h` | `SHA-256(実際のロール ‖ 効いた方針のバージョン ‖ redact の段)` の先頭 16 バイト | 違う → 410 `view_hash` |
 | `p` | ページの途中の `seq`（`nextPageToken`、CalDAV の 507 の続き） | — |
 
 - 公開 API は `syncToken`・`nextSyncToken`、Web の画面は `POST /v1/sync` のトークン、CalDAV は `https://dav.<brand>.<domain>/ns/sync/<token>`。同じ形。
@@ -201,7 +201,7 @@ mac     = HMAC-SHA256(鍵 k, payload) の先頭 16 バイト
 | `recurrence_id` | 内部の `REQUEST`・`CANCEL` は系列の全体（`''`）。回だけの参加者にはその回 |
 | `payload` | 受け手に見せてよい形の予定オブジェクトの全体（`can_see_other_guests = false` なら参加者は主催者と受け手だけ）。256 KiB を超えたら `payload_s3_key`（2 節） |
 | `reply` | `REPLY` だけ |
-| `base_organizer_version` | `X-MODIFY` の基の版（違えば拒否。DT-ITIP-001 の行 13） |
+| `base_organizer_version` | `X-MODIFY` の基のバージョン（違えば拒否。DT-ITIP-001 の行 13） |
 | `recipients` | バッチ（20 人、`itip-bulk` は 100 人）。`committed_at` は SLI の `organizer_committed_at` |
 
 - 外部への iMIP は、同じ封筒から `packages/ical` が `METHOD` つきの VCALENDAR を作る。ORGANIZER は `imip_addresses` の `o-<token>`、`PRODID` は `-//<Brand>//Calendar//JA`、使う TZID ごとに本システムの tzdb の VTIMEZONE を付ける（[ADR-0013](../../decisions/0013-external-timezone-definitions.md)）。
@@ -212,14 +212,14 @@ mac     = HMAC-SHA256(鍵 k, payload) の先頭 16 バイト
 | --- | --- | --- | --- |
 | AppConfig | `release.<kebab-case>` | 未完成の振る舞いのフラグ（`release.cross-tenant-shared-writes`、`release.admin-event-access`、`release.scim` など） | [delivery.md](../delivery.md) の 3 節 |
 | AppConfig | `ops.<snake_case>` | 運用の切り替え（`ops.writes_enabled`、`ops.calendar_write_budget.<origin>`） | 同上、[capacity.md](../capacity.md) の 2.2 節 |
-| AppConfig | `tzdata.active_version` | 全サービスが使う tzdb の版 | [ADR-0049](../../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) |
-| CloudFront KeyValueStore | `web_version_weights` | Web の版ごとの割合 | [delivery.md](../delivery.md) の 5 節 |
+| AppConfig | `tzdata.active_version` | 全サービスが使う tzdb のバージョン | [ADR-0049](../../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) |
+| CloudFront KeyValueStore | `web_version_weights` | Web のバージョンごとの割合 | [delivery.md](../delivery.md) の 5 節 |
 | `packages/tzdata`・`packages/holidays-jp` | — | [time-zones.md](time-zones.md) の 4 節 | — |
 | Terraform | `scaling_schedules` | 業務の時間・月曜の朝・祝日・年度の始めのタスクの下限 | [capacity.md](../capacity.md) の 8 節 |
 
 ## 10. Web の手元の DB（IndexedDB）
 
-DB の名前は `cal-<account_id>`（[ADR-0039](../../decisions/0039-offline-read-cache-and-local-data.md)、[clients.md](../clients.md) の 10 節）。捨ててよい写しで、書き込みを持たない。`_meta.cache_schema` が今のコードの版と違えば、移行せずに消して取り直す。
+DB の名前は `cal-<account_id>`（[ADR-0039](../../decisions/0039-offline-read-cache-and-local-data.md)、[clients.md](../clients.md) の 10 節）。捨ててよい写しで、書き込みを持たない。`_meta.cache_schema` が今のコードのバージョンと違えば、移行せずに消して取り直す。
 
 ```mermaid
 erDiagram

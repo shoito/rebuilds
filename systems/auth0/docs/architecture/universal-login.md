@@ -6,7 +6,7 @@
 | --- | --- |
 | [ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md) | 画面はサーバーで描く HTML。ログインの途中の状態は DB のトランザクションに持ち、URL の `state` と `__Host-<brand>_tx` の Cookie の両方で参照する。strict CSP と `frame-ancestors 'none'` |
 | [ADR-0012](../decisions/0012-branding-and-templates.md) | ブランディングはテーマの変数と文言の上書きに限る。テナントの任意の HTML・JavaScript は入れない |
-| [ADR-0013](../decisions/0013-consent-records.md) | 規約への同意は、文書の版ごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする |
+| [ADR-0013](../decisions/0013-consent-records.md) | 規約への同意は、文書のバージョンごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする |
 | [ADR-0005](../decisions/0005-authentication-path-availability.md) | 画面は認証の経路。静的な資産は CloudFront から配る |
 | [ADR-0015](../decisions/0015-database-connection-password-and-enumeration.md) | 画面の文言と応答で、アカウントの有無を明かさない |
 
@@ -89,11 +89,11 @@
 | → `first_factor_done` | パスワードの照合、ソーシャルの `VerifiedIdentity`、パスキーの検証のどれか | `amr` の候補、接続、`user_id` |
 | → `mfa_required` | テナント・アプリの MFA の方針、`acr_values`、step-up（[mfa-and-passkeys.md](mfa-and-passkeys.md)） | — |
 | → `link_proposed` | リンクの提案の表（[users-and-profiles.md](users-and-profiles.md) の 5.3 節） | — |
-| → `consent_required` | 第三者のアプリで `grants` にないスコープ、`prompt=consent`、規約の新しい版の再同意 | — |
+| → `consent_required` | 第三者のアプリで `grants` にないスコープ、`prompt=consent`、規約の新しいバージョンの再同意 | — |
 | → `completed` | すべて済んだ | セッションを作る（[sessions-and-sso.md](sessions-and-sso.md)）。トランザクションを使用済みにする |
 
 - 状態は `login_transactions.step` に持ち、画面の `POST` は、その状態で許された操作だけを受ける。許されない操作（例：`password` の状態で `mfa` の送信）は 409 にして、今の状態の画面へ送る。
-- 同じトランザクションの `POST` は、行の版（楽観ロック）で直列にする。2 つのタブからの同時の送信で、状態が飛ばない。
+- 同じトランザクションの `POST` は、行のバージョン（楽観ロック）で直列にする。2 つのタブからの同時の送信で、状態が飛ばない。
 
 ### 3.3 全体の流れ（パスワード、MFA なし）
 
@@ -235,7 +235,7 @@ CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: par
 | 画面の JavaScript（パスキーの画面） | 20 KB 以内（gzip） |
 | LCP（中位の Android、4G 相当） | p75 1.5 秒以内 |
 
-- CSS・書体・ロゴは CloudFront から、版付きの URL で配る。オリジンが落ちても配れる。
+- CSS・書体・ロゴは CloudFront から、バージョン付きの URL で配る。オリジンが落ちても配れる。
 - DB の writer が使えない間（フェイルオーバー）は、トランザクションを作れないので、`/authorize` は 503 と `Retry-After` を返す（[ADR-0005](../decisions/0005-authentication-path-availability.md)）。
 
 ## 11. 障害時の振る舞い
@@ -244,7 +244,7 @@ CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: par
 | --- | --- |
 | Aurora の writer のフェイルオーバー | 新しいログインは 503 の画面と再試行。途中のトランザクションは DB にあるので、回復後に続けられる |
 | Valkey の停止 | 画面は影響なし（トランザクションを Valkey に置かない）。攻撃の防御の数はタスクの近似になる |
-| テナントの設定を読めない | 最後の版のテーマ・文言で描く |
+| テナントの設定を読めない | 最後のバージョンのテーマ・文言で描く |
 | 資産の配信（CloudFront）の障害 | HTML に最小のインラインの CSS（nonce 付き）を持ち、ロゴなしでも操作できる |
 | メールの送信の遅れ | サインアップの確認のコードの画面に「届かないときは再送」を 60 秒後に出す。再送の上限は 3 回 |
 | ソーシャル IdP の障害 | その接続のボタンのエラーだけを出し、他の方法を案内する |
@@ -312,7 +312,7 @@ CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: par
 | --- | --- | --- |
 | [0011](../decisions/0011-universal-login-rendering-and-transaction.md) | Universal Login はサーバーで描く HTML にし、ログインの途中の状態はサーバーのトランザクションに持って、ブラウザの Cookie に結び付ける | accepted |
 | [0012](../decisions/0012-branding-and-templates.md) | ブランディングはテーマの変数と文言の上書きに限り、テナントの任意の HTML・JavaScript は画面に入れない | accepted |
-| [0013](../decisions/0013-consent-records.md) | 規約への同意は、文書の版ごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする | accepted |
+| [0013](../decisions/0013-consent-records.md) | 規約への同意は、文書のバージョンごとに追記だけの表に記録し、記録の成功をサインアップの完了の条件にする | accepted |
 
 ## 15. Story の候補
 
@@ -343,14 +343,14 @@ E2・E5・E10・E13 には、この領域の Story はない（E5 のログア�
 - [quality.md](../quality.md) に入れる候補：
   - リスク：画面の XSS とクリックジャッキング（上位のリスク）。13.3 の描画の性質ベーステストと、ヘッダーの自動テストを E4 のリリースの基準にする。
   - 13.1 の決定表を E4 の必須のテストにする。
-  - E2E のブラウザの組み合わせ（Chrome、Safari、Firefox、Edge の最新 2 版、iOS・Android）と、JavaScript を無効にした実行。
+  - E2E のブラウザの組み合わせ（Chrome、Safari、Firefox、Edge の最新 2 バージョン、iOS・Android）と、JavaScript を無効にした実行。
   - WCAG 2.2 AA の検査（自動と手動）を GA の基準にする。
   - 本番での検証：画面ごとの離脱の率、CSP の違反の件数、`invalid_transaction` の件数（急増はトランザクションの不具合か攻撃）を日次で見る。
 - [runbooks/](../runbooks/README.md) に入れる候補：
   - CSP の違反の急増（リリースの誤りか攻撃か）の切り分けと、リリースの戻し。
   - `invalid_transaction` の急増（Cookie の属性の誤り、ブラウザの変更、エッジのキャッシュの誤り）の切り分け。
-  - テナントのテーマ・文言の誤った変更で画面が使えないとの問い合わせ：テナントの設定の版を戻す手順（監査ログから）。
-  - 規約の新しい版の発効で、再同意の画面が大量に出たときの案内。
+  - テナントのテーマ・文言の誤った変更で画面が使えないとの問い合わせ：テナントの設定のバージョンを戻す手順（監査ログから）。
+  - 規約の新しいバージョンの発効で、再同意の画面が大量に出たときの案内。
 - [data-model.md](data-model.md) の索引に入れる候補：`login_transactions`（この領域が持つ。欄の一部は authentication-flows）、`branding_themes`、`branding_texts`、`legal_documents`、`consent_records`。
 
 ## 17. 未解決の問い

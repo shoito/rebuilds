@@ -146,7 +146,7 @@ DB ロール（ADR-0009 の表に、各 ADR と領域の文書で足したもの
 
 | 列 | 方式 | 理由 |
 | --- | --- | --- |
-| `two_factors.secret`、`two_factors.backup_codes` | Better Auth の暗号化（`secrets` の版付きの鍵） | 復号して照合する必要がある |
+| `two_factors.secret`、`two_factors.backup_codes` | Better Auth の暗号化（`secrets` のバージョン付きの鍵） | 復号して照合する必要がある |
 | `auth_identities` の OAuth のトークン | Better Auth の `encryptOAuthTokens` | IdP のトークンを平文で持たない |
 | `jwks.private_key` | Better Auth の JWT プラグインの暗号化 | |
 | `app_credentials.signing_secret_enc` ほか | KMS の `apps` キーでエンベロープ暗号化 | HMAC の署名に使うので復号が要る（[apps.md](apps.md) の 8 節） |
@@ -362,7 +362,7 @@ erDiagram
 | I-9 | スキャンが済んでいないファイルは配らない | `files.status = 'ready'` のときだけ URL を発行する。S3 のタグによる制御と二重 | ADR-0015 |
 | I-10 | 既読の位置は後退しない | `GREATEST(last_read_seq, :seq)` | [read-state-and-notifications.md](read-state-and-notifications.md) の 1 節 |
 | I-11 | 1 つのメッセージで、1 人への通知は最大 1 回 | `notification_log` の主キーと `INSERT ... ON CONFLICT DO NOTHING` | ADR-0014 |
-| I-12 | 検索の文書は、古い版で新しい版を上書きしない | `content_seq` の比較 | [search.md](search.md) の 2.3 節 |
+| I-12 | 検索の文書は、古いバージョンで新しいバージョンを上書きしない | `content_seq` の比較 | [search.md](search.md) の 2.3 節 |
 | I-13 | 監査ログは追記だけ | `app` に `UPDATE`・`DELETE` を与えない。トリガーでも拒否する | ADR-0018 |
 | I-14 | 監査の対象の操作が成功したら、同じトランザクションに監査ログが 1 件ある | 表駆動の結合テスト | ADR-0018 |
 | I-15 | リーガルホールドの対象は、どの経路でも物理削除しない | 物理削除を保持の Worker と `deleteFile` に集め、ホールドを確かめる | ADR-0019 |

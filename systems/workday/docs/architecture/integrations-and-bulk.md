@@ -136,7 +136,7 @@
 
 ### 6.1 API
 
-- 公開の API は `https://<tenant>.<brand>.<domain>/api/v1/...`。Hono＋Zod から OpenAPI を出す。画面の API と同じ実装で、公開の版を固定する（破壊的な変更は `v2`）。
+- 公開の API は `https://<tenant>.<brand>.<domain>/api/v1/...`。Hono＋Zod から OpenAPI を出す。画面の API と同じ実装で、公開のバージョンを固定する（破壊的な変更は `v2`）。
 - 読み取り（`GET`）は `effective_on`・`known_at` を受ける（`known_at` は `audit` の権限）。一覧はカーソルで分け、1 ページ 200 件まで。
 - 書き込みは業務プロセスの起票だけ（`POST /api/v1/business-processes/{process_type}`）。`Idempotency-Key` の見出しを必須にし、24 時間同じ応答を返す。直接の更新の API はない。
 - 金額は整数の円（JSON の数値）、率は 10 進の文字列（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
@@ -220,7 +220,7 @@
 - 口座番号の列は、取り込みの解析のときにエンベロープ暗号化して、平文をログ・予覧に出さない（予覧は末尾 4 桁）。
 - API の応答も、画面と同じ射影を通す。
 - Webhook の本文に個人情報を入れない。
-- SSO の SAML の検証（署名、`InResponseTo`、IdP 起点の拒否、時刻）は Better Auth の SSO の部品に任せ、版を固定し、結合テストで確かめる（Slack の ADR-0012 と同じ）。
+- SSO の SAML の検証（署名、`InResponseTo`、IdP 起点の拒否、時刻）は Better Auth の SSO の部品に任せ、バージョンを固定し、結合テストで確かめる（Slack の ADR-0012 と同じ）。
 - 打刻機の鍵・API の利用者の秘密・Webhook の秘密は、どれも 1 回だけ表示し、ハッシュか暗号文で保存する。
 
 ## 12. テスト
@@ -239,7 +239,7 @@
 | PROP-INT-001 | 任意のファイルを任意の回数・任意の途中の停止で取り込んでも、完了した子の案件の集合は、1 回で通しで取り込んだときと同じ |
 | PROP-INT-002 | 任意のファイルで、同じ主体の差分は有効日と `seq` の順に適用され、主体の間の並列の順序によらず、現在の知識が同じになる |
 | PROP-INT-003 | 任意の打刻機の再送・同じファイルの再取り込みで、打刻の件数が変わらない |
-| PROP-INT-004 | 任意の API の要求で、応答は同じ利用者の画面の API の応答と同じ行・列になる（PROP-SEC-001 の API の版） |
+| PROP-INT-004 | 任意の API の要求で、応答は同じ利用者の画面の API の応答と同じ行・列になる（PROP-SEC-001 の API のバージョン） |
 
 ### 12.3 結合
 

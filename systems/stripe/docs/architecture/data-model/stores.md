@@ -111,7 +111,7 @@ Valkey のキー、S3 の配置、outbox の topic と SQS のメッセージ、
 
 ### 4.1 Event（API と Webhook の本文）
 
-`events.data` の正規形を、エンドポイント（なければ Event）の版で描画する（[ADR-0026](../../decisions/0026-snapshot-event-model.md)）。
+`events.data` の正規形を、エンドポイント（なければ Event）のバージョンで描画する（[ADR-0026](../../decisions/0026-snapshot-event-model.md)）。
 
 ```json
 {
@@ -140,7 +140,7 @@ User-Agent: <Brand>/1.0 (+https://<domain>/docs/webhooks)
 <4.1 節の JSON>
 ```
 
-- 再試行ごとに `t` と署名を作り直す（[ADR-0025](../../decisions/0025-webhook-signing-and-isolated-delivery.md)）。本文は描画の結果で、同じ版なら同じ本文になる。
+- 再試行ごとに `t` と署名を作り直す（[ADR-0025](../../decisions/0025-webhook-signing-and-isolated-delivery.md)）。本文は描画の結果で、同じバージョンなら同じ本文になる。
 
 ## 5. 仕訳の種類と冪等キー
 

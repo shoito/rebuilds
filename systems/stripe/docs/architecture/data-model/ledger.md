@@ -166,7 +166,7 @@ erDiagram
 | `effective_at` | `timestamptz` | NOT NULL | — | 会計上の日時 |
 | `reverses_entry_id` | `uuid` | NULL | — | 取り消しの仕訳なら元の仕訳 |
 | `fx_quote_id` | `uuid` | NULL | — | 換算があれば（S2） |
-| `metadata` | `jsonb` | NOT NULL | `'{}'` | 適用した料金表の版（`fee_schedule_id`）、訂正の ID と承認者など |
+| `metadata` | `jsonb` | NOT NULL | `'{}'` | 適用した料金表のバージョン（`fee_schedule_id`）、訂正の ID と承認者など |
 
 - キー：PK `(created_at, id)`。仕訳の冪等は `ledger_entry_keys`。
 - 索引：`(account_id, created_at)` — 加盟店ごとの読み取りと再計算。`(account_id, source_type, source_id)` — オブジェクトからの追跡（`source_id` は UUIDv7 なので、時刻からパーティションを絞れる）。`(reverses_entry_id) WHERE reverses_entry_id IS NOT NULL`。
@@ -343,7 +343,7 @@ Balance API の `source_types` の小さな集計（加盟店 × 通貨 × 残�
 
 ### 3.11 `fee_schedules`
 
-料金表（版で持つ。追記のみ）。定義元：[ledger.md](../ledger.md) の 7 節。
+料金表（バージョンで持つ。追記のみ）。定義元：[ledger.md](../ledger.md) の 7 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -361,9 +361,9 @@ Balance API の `source_types` の小さな集計（加盟店 × 通貨 × 残�
 | `created_at` | `timestamptz` | NOT NULL | — | |
 
 - キー：PK `(id)`。UK `(account_id, fee_kind, payment_method_type, card_region, currency, effective_from) NULLS NOT DISTINCT`。
-- 索引：`(account_id, fee_kind, payment_method_type, currency, effective_from DESC)` — 決済の時点で有効な版を引く（加盟店の行を先に、なければ既定の行）。
+- 索引：`(account_id, fee_kind, payment_method_type, currency, effective_from DESC)` — 決済の時点で有効なバージョンを引く（加盟店の行を先に、なければ既定の行）。
 - CHECK：`rate_bps BETWEEN 0 AND 10000`、`fixed_amount >= 0`、`min_amount >= 0`。
-- 更新：追記のみ。適用した版の `id` を仕訳の `metadata.fee_schedule_id` に残す。
+- 更新：追記のみ。適用したバージョンの `id` を仕訳の `metadata.fee_schedule_id` に残す。
 - テナント・RLS：`account_id IS NULL` の行は読み取りだけ（[data-model.md](../data-model.md) の 3.3 節）。S1 の量：数百行。
 
 ### 3.12 `fx_quotes`

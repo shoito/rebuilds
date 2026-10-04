@@ -118,7 +118,7 @@ report_type（api_name、label、category、deployed）
 
 ```
 レポートの定義（AST）
-  │ 見る人の版・権限の形で
+  │ 見る人のバージョン・権限の形で
   ▼
 束縛 → 型の検査 → FLS（DT-RPT-001）→ オブジェクトごとの共有の条件 → 計画 → SQL（reader）
 ```
@@ -174,7 +174,7 @@ report_type（api_name、label、category、deployed）
 - 実行は Aurora の reader で行う。書き込みの経路（writer）の資源を使わない（architecture の 6 節の「JSONB の本体での集計の遅さ」）。
 - 結果に `as_of`（reader が反映した時刻）を付けて返す。保存の直後に実行すると、数秒前の状態を返しうる。画面に時点を出す。
 - reader の遅れが 30 秒を超えたら、結果に警告を付ける。5 分を超えたら Ops に知らせ、同期の実行を止めて非同期に回す（非同期も reader の遅れが戻るまで待つ）。
-- 共有の条件の閉包の世代・ルールの集合は、要求を固定した版のもの（ADR-0003）を使う。reader が版の変更をまだ反映していない時は、版の表で待つ（最大 5 秒）か、`METADATA_CHANGED` にする。
+- 共有の条件の閉包の世代・ルールの集合は、要求を固定したバージョンのもの（ADR-0003）を使う。reader がバージョンの変更をまだ反映していない時は、バージョンの表で待つ（最大 5 秒）か、`METADATA_CHANGED` にする。
 
 ### 5.5 結果の保存とキャッシュ
 
@@ -202,7 +202,7 @@ report_type（api_name、label、category、deployed）
 ### 7.1 形
 
 ```
-dashboard（folder、版、layout）
+dashboard（folder、バージョン、layout）
  ├─ view_mode：viewer（既定）| team_member
  ├─ filters（5 まで、各 50 の値）：部品のレポートの項目への条件
  └─ components（20 まで）
@@ -397,7 +397,7 @@ dashboard（folder、版、layout）
 | --- | --- | --- |
 | `md_report_types` | `org_id`、`report_type_id`、`api_name`、`base_object_id`、`joins`（JSONB）、`sections`、`is_standard`、`deployed` | メタデータ |
 | `report_folders`、`report_folder_shares` | `org_id`、`folder_id`、`kind`（`report`・`dashboard`）、`owner_id`、`grantee_group_id`、`access`（`view`・`edit`・`manage`） | |
-| `reports` | `org_id`、`report_id`、`folder_id`、`report_type_id`、`definition`（JSONB）、`version`、`owner_id` | 利用者の作るものなので、データとして持つ（版を上げない）。デプロイの対象にはする |
+| `reports` | `org_id`、`report_id`、`folder_id`、`report_type_id`、`definition`（JSONB）、`version`、`owner_id` | 利用者の作るものなので、データとして持つ（バージョンを上げない）。デプロイの対象にはする |
 | `report_runs` | `org_id`、`run_id`、`report_id`、`user_id`、`view_as_user_id`、`mode`（`sync`・`async`）、`state`、`as_of`、`s3_key`、`rows`、`db_ms`、`expires_at` | 非同期の結果は 24 時間 |
 | `dashboards`、`dashboard_components` | `org_id`、`dashboard_id`、`folder_id`、`view_mode`、`filters`、`component_id`、`source_report_id`、`kind`、`settings` | |
 | `report_subscriptions`、`report_subscription_recipients` | `org_id`、`subscription_id`、`target_kind`、`target_id`、`owner_id`、`schedule`、`condition`、`recipient_kind`、`recipient_id` | 受け取る人ごとに実行 |

@@ -1,6 +1,6 @@
 # API and webhooks: Figma
 
-公開の REST API、OAuth のアプリと個人のアクセストークン、レート制限、Webhook、版と廃止。**MVP の後に作る**（[intent.md](../intent.md) の「MVP の後に扱う」。内部の API とドキュメントのモデルが安定してから公開する）。
+公開の REST API、OAuth のアプリと個人のアクセストークン、レート制限、Webhook、バージョンと廃止。**MVP の後に作る**（[intent.md](../intent.md) の「MVP の後に扱う」。内部の API とドキュメントのモデルが安定してから公開する）。
 
 本家の API の形（リソース、スコープ、tier の制限、Webhook の文脈と種類）に寄せる。名前・ヘッダー・接頭辞・ドメインは本家のものを使わない（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。本家の SDK との互換は目的にしない。
 
@@ -10,7 +10,7 @@
 | --- | --- |
 | [0040](../decisions/0040-public-rest-api-surface.md) | 公開 API は `api.<domain>` の別のサービスにし、利用者の権限とスコープの積で動く。ファイルの中身は Rust の読み取り専用のサービスが返し、中身の書き込みは API に出さない。トークンは OAuth 2.1（PKCE 必須、短い期限）と期限必須の個人のアクセストークン |
 | [0041](../decisions/0041-webhook-delivery.md) | Webhook は中身を含まない、HMAC で署名したイベントを、配送の時点の権限で判定し、隔離した egress から少なくとも 1 回送る |
-| [0042](../decisions/0042-api-versioning-and-rate-limits.md) | 版は URL の大きな版（`/v1`）。ノードの JSON はプロパティの表から生成し、表の列で公開を決める。レート制限は操作の重さで tier に分けた利用者×アプリのトークンバケット |
+| [0042](../decisions/0042-api-versioning-and-rate-limits.md) | バージョンは URL の大きなバージョン（`/v1`）。ノードの JSON はプロパティの表から生成し、表の列で公開を決める。レート制限は操作の重さで tier に分けた利用者×アプリのトークンバケット |
 
 ## 1. 位置づけ
 
@@ -33,7 +33,7 @@ CloudFront + WAF ─▶ ALB ─▶ public-api（TypeScript・Hono。ECS Fargate�
    │ 2. レート制限（利用者×アプリ、tier。ADR-0042）
    │ 3. ハンドラー → サービス関数 → can(user, action, file)
    │
-   ├─▶ Aurora（メタデータ・コメント・版の一覧。RLS）
+   ├─▶ Aurora（メタデータ・コメント・バージョンの一覧。RLS）
    ├─▶ file-read（Rust。ファイルの中身を JSON にする。読むだけ）
    │      └─ S3 のチェックポイント＋Journal（DynamoDB）
    └─▶ SQS render-export ─▶ Render Worker（/images。export-and-assets.md の 5 節）
@@ -74,7 +74,7 @@ ADR-0040。
 | `current_user:read` | 名前、メールアドレス、アイコン |
 | `file_content:read` | ファイルの中身（ノード）、`/images`、画像の塗り |
 | `file_metadata:read` | ファイルのメタデータ |
-| `file_versions:read` | 版の一覧 |
+| `file_versions:read` | バージョンの一覧 |
 | `file_comments:read` / `file_comments:write` | コメントの読み取り / 投稿・削除・リアクション |
 | `projects:read` | チームのプロジェクトと、プロジェクトの中のファイルの一覧 |
 | `webhooks:read` / `webhooks:write` | Webhook の読み取り / 作成・変更・削除 |
@@ -103,12 +103,12 @@ ADR-0040・0042。ID の形：ファイルは `file_key`（128 ビットの乱�
 
 | リソース | 内容 | スコープ | tier |
 | --- | --- | --- | --- |
-| `GET /v1/files/{file_key}` | ドキュメントの木。`ids`（ノードとその祖先・子孫だけ）、`depth`、`version`（版の ID）、`geometry=paths` | `file_content:read` | 1 |
+| `GET /v1/files/{file_key}` | ドキュメントの木。`ids`（ノードとその祖先・子孫だけ）、`depth`、`version`（バージョンの ID）、`geometry=paths` | `file_content:read` | 1 |
 | `GET /v1/files/{file_key}/nodes?ids=` | 指定のノードとその子孫。見つからないノードは `null` | `file_content:read` | 1 |
 | `GET /v1/files/{file_key}/meta` | 名前、最終の更新、サムネイルの URL、持ち主の組織、リンクの共有の水準 | `file_metadata:read` | 3 |
 | `GET /v1/images/{file_key}?ids=&scale=&format=` | ノードを描いた画像の URL。`format` は `png`・`jpg`・`svg`・`pdf`、`scale` は 0.01〜4。SVG の選択肢（`svg_outline_text` など）と `contents_only`・`use_absolute_bounds`・`version` | `file_content:read` | 1 |
 | `GET /v1/files/{file_key}/images` | 画像の塗りの `image_hash` と URL（24 時間） | `file_content:read` | 2 |
-| `GET /v1/files/{file_key}/versions` | 版の一覧（ページング） | `file_versions:read` | 2 |
+| `GET /v1/files/{file_key}/versions` | バージョンの一覧（ページング） | `file_versions:read` | 2 |
 | `GET` / `POST /v1/files/{file_key}/comments`、`DELETE .../comments/{id}`、`POST` / `DELETE .../comments/{id}/reactions` | コメント（comments-and-notifications.md のモデルを使う） | `file_comments:*` | 2 |
 | `GET /v1/me` | トークンの利用者 | `current_user:read` | 3 |
 | `GET /v1/teams/{team_id}/projects`、`GET /v1/projects/{project_id}/files` | 一覧（読めるものだけ） | `projects:read` | 2 |
@@ -127,7 +127,7 @@ ADR-0040・0042。ID の形：ファイルは `file_key`（128 ビットの乱�
 | --- | --- |
 | `public_api: bool` | 公開 API に出すか。既定は偽。真にするのは、形が固まったプロパティだけ |
 | `api_name: String` | JSON の鍵（`camelCase`。本家の JSON の見た目に寄せる） |
-| `api_since: String` | 出した API の版（`v1` など） |
+| `api_since: String` | 出した API のバージョン（`v1` など） |
 
 - `derived_layout` は、`absoluteBoundingBox`・`size` として読むだけで出す。`plugin_data` は出さない（本家の `pluginData` の出し方は後で決める）。
 - 表の中の値の型から JSON の型への対応（`f32` → 数、`NodeId` → 文字列、`Paint` → オブジェクト）は 1 か所の変換関数に置く。
@@ -142,7 +142,7 @@ ADR-0042。本家の tier の形に合わせる（[Rate limits](https://develope
 | tier | 本家の対象 | Starter | Professional | Organization | Enterprise | View・Collab の席 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | ファイル、ノード、画像 | 月に最大 20 | 10 | 15 | 20 | 月に最大 20 |
-| 2 | コメント、画像の塗り、プロジェクト、版、Webhook など | 5 | 25 | 50 | 100 | 5 |
+| 2 | コメント、画像の塗り、プロジェクト、バージョン、Webhook など | 5 | 25 | 50 | 100 | 5 |
 | 3 | ファイルのメタデータ、コンポーネント、利用者など | 10 | 50 | 100 | 150 | 10 |
 
 - 本家は、OAuth のアプリは「利用者×プラン×アプリ」、個人のトークンは「利用者×プラン」で数える。429 に `Retry-After`（秒）と、プランと制限の種類を示すヘッダーを付ける。
@@ -183,7 +183,7 @@ ADR-0041。本家の Webhook の V2 に寄せる（[Webhooks](https://developers
 | --- | --- | --- |
 | `ping` | 作ったとき（`status` を `paused` で作ると送らない） | `PING` |
 | `file.updated` | ファイルの編集が 5 分止まったとき | `FILE_UPDATE`（30 分止まったとき） |
-| `file.version_created` | 名前付きの版を作ったとき | `FILE_VERSION_UPDATE` |
+| `file.version_created` | 名前付きのバージョンを作ったとき | `FILE_VERSION_UPDATE` |
 | `file.deleted` | ファイルを消したとき | `FILE_DELETE` |
 | `file.comment_created` | コメントが付いたとき | `FILE_COMMENT` |
 | `library.published` | ライブラリの公開（ライブラリが MVP の後のため、その後） | `LIBRARY_PUBLISH` |
@@ -215,12 +215,12 @@ ADR-0041。本家の Webhook の V2 に寄せる（[Webhooks](https://developers
 - 送信元の IP は固定しない。署名での検証を求める（Slack と同じ判断）。
 - Webhook ごとの同時に送る数の上限（10）を Valkey で数え、遅い受け手が他の配送を待たせない。
 
-## 7. 版と廃止
+## 7. バージョンと廃止
 
 ADR-0042。
 
-- **URL の大きな版（`/v1`）。** `/v1` の中では追加だけを行う（エンドポイント、任意の引数、応答の鍵、列挙の値の追加）。本家も URL の版を使う（`/v1`・Webhook の `/v2`）。
-- 互換性を壊す変更は `/v2` として出し、古い版を最低 12 か月動かす。廃止は `Deprecation`（RFC 9745）・`Sunset`（RFC 8594）のヘッダー、開発者のメール、変更の記録で告知する（Slack の ADR-0030 と同じ）。
+- **URL の大きなバージョン（`/v1`）。** `/v1` の中では追加だけを行う（エンドポイント、任意の引数、応答の鍵、列挙の値の追加）。本家も URL のバージョンを使う（`/v1`・Webhook の `/v2`）。
+- 互換性を壊す変更は `/v2` として出し、古いバージョンを最低 12 か月動かす。廃止は `Deprecation`（RFC 9745）・`Sunset`（RFC 8594）のヘッダー、開発者のメール、変更の記録で告知する（Slack の ADR-0030 と同じ）。
 - 応答の列挙に知らない値が来ても壊れないよう、SDK と文書で求める（追加は互換の範囲）。
 - ノードの JSON は表から生成するので、表の変更が API を壊さないよう、CI で「`public_api` のプロパティの JSON の形のスナップショット」を比べる。消す・型を変えるには `/v2` が要る。
 - 契約は OpenAPI 3.1 で出す（Hono の zod-openapi）。公式の SDK は TypeScript だけ。
@@ -278,7 +278,7 @@ ADR-0042。
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E2 | `property-table-api-columns` | 表に `public_api`・`api_name`・`api_since` の列を足す（document-model と合わせる） |
-| E7 | `file-change-events` | ファイルの編集が止まったこと・版の作成・削除を outbox に出す（Webhook と通知で使う。file-storage-and-history と合わせる） |
+| E7 | `file-change-events` | ファイルの編集が止まったこと・バージョンの作成・削除を outbox に出す（Webhook と通知で使う。file-storage-and-history と合わせる） |
 | E15 | `public-api-service` | `api.<domain>` のサービス、RFC 9457、ページング、`Idempotency-Key`、OpenAPI |
 | E15 | `file-read-service` | file-read（Rust）、JSON の生成、LRU、100 MiB の上限 |
 | E15 | `personal-access-tokens` | 個人のアクセストークン、スコープ、期限、シークレットスキャンの登録 |
@@ -286,7 +286,7 @@ ADR-0042。
 | E15 | `oauth-app-review` | public のアプリの審査の道具（プラグインの審査と同じ担当） |
 | E15 | `api-files-and-nodes` | `/files`・`/nodes`・`/meta` |
 | E15 | `api-images` | `/images`（Render Worker、`202` と `image_jobs`、画素の予算）、`/files/{id}/images` |
-| E15 | `api-comments-versions-projects` | コメント・版・プロジェクトの一覧 |
+| E15 | `api-comments-versions-projects` | コメント・バージョン・プロジェクトの一覧 |
 | E15 | `api-rate-limits` | tier のトークンバケット、組織の合計、429 のヘッダー |
 | E15 | `webhooks-v1` | Webhook の作成・一覧・変更・削除、`ping`、署名、配送、記録 |
 | E15 | `webhook-egress` | `webhook-egress` の Lambda と宛先の検査 |

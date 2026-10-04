@@ -132,7 +132,7 @@ GET https://book.<brand>.<domain>/api/pages/{slug}/slots?from=2026-11-02&to=2026
 ```
 
 - `from`・`to` は日付で、差は 31 日まで。`tz` は表示の日の境にだけ使う（計算はページのタイムゾーン）。
-- 結果は 30 秒、`(slug, 空きを確かめるカレンダーの change_seq の組, 持ち主の予約の版)` を鍵に Valkey に持つ。予約の版は持ち主の主のカレンダーの `calendars.booking_seq` で、予約の区間を書くトランザクションで上げる（[data-model.md](data-model.md) の D-19）。
+- 結果は 30 秒、`(slug, 空きを確かめるカレンダーの change_seq の組, 持ち主の予約のバージョン)` を鍵に Valkey に持つ。予約のバージョンは持ち主の主のカレンダーの `calendars.booking_seq` で、予約の区間を書くトランザクションで上げる（[data-model.md](data-model.md) の D-19）。
 - 1 IP 1 分に 60 回。超えたら `429`。
 - 予定ありの区間、予定の数、予約の数を返さない。枠がないことは示すが、理由（予定・予約・上限）は示さない。
 

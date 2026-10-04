@@ -22,7 +22,7 @@ Web クライアントとデスクトップアプリ、エディタの設計。�
 | --- | --- |
 | Chrome / Edge / Firefox（デスクトップ） | 最新 2 メジャー（Firefox は ESR も） |
 | Safari（macOS、iOS / iPadOS） | 17 以上。Slack の下限と同じ |
-| デスクトップアプリ | macOS（直近 3 版）、Windows 10 / 11（x64、arm64） |
+| デスクトップアプリ | macOS（直近 3 バージョン）、Windows 10 / 11（x64、arm64） |
 
 - Safari 17 を下限にするのは、Slack と揃えることに加え、SQLite の `opfs-sahpool` が Safari 16.4 以上で動くためである（[sqlite.org の persistence の文書](https://sqlite.org/wasm/doc/trunk/persistence.md)）。
 - デスクトップの Linux 版は MVP に含めない。本家の公式のダウンロードも Mac と Windows である（[Download Notion for desktop](https://www.notion.com/desktop)）。
@@ -128,7 +128,7 @@ NFR-002（1,000 ブロックのページを、キャッシュなしで p75 1.5 �
 
 ### 4.1 読み込み
 
-- ページを開いたら、まず RecordCache（SQLite）から読んで描く。同時に API の読み込みを始め、版の新しいものだけを差し替える。本家は、遅い端末では SQLite と API の速い方を使う（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）。これに倣う。
+- ページを開いたら、まず RecordCache（SQLite）から読んで描く。同時に API の読み込みを始め、バージョンの新しいものだけを差し替える。本家は、遅い端末では SQLite と API の速い方を使う（[How we sped up Notion in the browser with WASM SQLite](https://www.notion.com/blog/how-we-sped-up-notion-in-the-browser-with-wasm-sqlite)）。これに倣う。
 - API は、ページの中のブロックを文書の順（深さ優先）に区切って返す。最初の区切りは、画面の最初の表示に要る 100 ブロック程度にし、残りを続けて取る。本家の `loadPageChunk` にあたる（[The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)、2026-09-27 に確認）。
 - 描画は、最初の区切りが届いた時点で始める。読み込み中の後ろの部分は、高さの見積もりの分だけ場所を取っておく。
 
@@ -255,7 +255,7 @@ HTML の無害化の方針：
 | `text_states` | `(workspace_id, block_id, field)` | ブロックのテキストの CRDT の状態（[collaboration.md](collaboration.md) の 5 節） |
 | `failed_changes` | `(workspace_id, id)` | 送れなかった変更（本人が入力したテキストと作ったブロック。30 日。[collaboration.md](collaboration.md) の 10.1 節） |
 | `recent_pages` | `(workspace_id, page_id)` | 最近開いたページと時刻（クイック検索、検索の加点、オフラインの理由「最近開いた」） |
-| `meta` | 固定 | スキーマの版、総量、`device_id`、次の `tx_counter` |
+| `meta` | 固定 | スキーマのバージョン、総量、`device_id`、次の `tx_counter` |
 
 列・索引の正は [data-model/client.md](data-model/client.md)。
 
@@ -267,7 +267,7 @@ HTML の無害化の方針：
   - Chrome のシークレットでは開けるが、メモリの上にあり、セッションの終わりに消える（[Chromium の FileSystem の README](https://chromium.googlesource.com/chromium/src/+/main/storage/browser/file_system/README.md)）。オフラインの機能は動くが、ウィンドウを閉じると未確定のトランザクションも消える。これは受け入れ、未確定のトランザクションがあるときは閉じる前に警告する。
   - Firefox のプライベートウィンドウでは `getDirectory()` が `SecurityError` になる（[MDN の getDirectory](https://developer.mozilla.org/en-US/docs/Web/API/StorageManager/getDirectory)、[Bug 1975760](https://bugzilla.mozilla.org/show_bug.cgi?id=1975760)。対応は進行中）。
   - Safari のプライベートブラウズでは使えない（[The File System Access API with Origin Private File System](https://webkit.org/blog/12257/the-file-system-access-api-with-origin-private-file-system/)、2022 年の記事。より新しい公式の記述は見つからなかった）。
-  - 実際の挙動は E4 の前の `opfs-poc` で各ブラウザの現行版で確かめる。
+  - 実際の挙動は E4 の前の `opfs-poc` で各ブラウザの現行バージョンで確かめる。
 - Safari は、ホーム画面に追加していないサイトのスクリプトが書いたデータを、操作のない 7 日の後に消す（[WebKit の Tracking Prevention](https://webkit.org/tracking-prevention/)）。Safari 17 の保存の方針は、File System（OPFS）も対象にし、操作のない期間による追い出しを含む（[Updates to Storage Policy](https://webkit.org/blog/14403/updates-to-storage-policy/)、2026-09-27 に確認）。OPFS も消えるものとして扱い、消えても API から取り直して動くようにする。未確定のトランザクションが消えうることは、オフラインの設定の画面で知らせる。
 
 ## 11. デスクトップアプリ

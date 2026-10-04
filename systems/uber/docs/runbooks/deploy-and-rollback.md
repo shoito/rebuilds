@@ -1,7 +1,7 @@
 # Runbook: デプロイとロールバック
 
 - Owner: Ops
-- 対応するアラート: blue/green の自動の戻し、デプロイの後 30 分の SLO の悪化（`dispatch_decision`・`trip_transition`・`offer_delivery`）、リースの持ち主がいない状態（配備の中）、新しいアプリの版のクラッシュの急増
+- 対応するアラート: blue/green の自動の戻し、デプロイの後 30 分の SLO の悪化（`dispatch_decision`・`trip_transition`・`offer_delivery`）、リースの持ち主がいない状態（配備の中）、新しいアプリのバージョンのクラッシュの急増
 - 最終確認日: 2026-09-27
 
 流れは [delivery.md](../architecture/delivery.md)、配車と運賃の関門は [ADR-0042](../decisions/0042-replay-and-shadow-gates-for-dispatch-and-pricing.md)、フラグの種類は [ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)、アプリの列車は [ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) にある。
@@ -74,11 +74,11 @@
 
 ### 運賃の規則を有効にする
 
-1. 規則の版が `approved`（2 人の承認）で、有効の日時が正しい（地域の時刻の 0 時）。
+1. 規則のバージョンが `approved`（2 人の承認）で、有効の日時が正しい（地域の時刻の 0 時）。
 2. 見本の乗車 100 件の試算を、公示の例と突き合わせてある。
 3. 法務の確認待ちの規則は、legal のフラグの範囲の記録がある。
-4. 有効の日時の後 30 分、見積もりの失敗の率と、新しい版の見積もりの件数を見る。
-5. 誤りがあれば、次の版で直す（承認の後の版は書き換えない）。直すまでは、`ops.upfront.suspend.<region>` でその区域の事前確定運賃を止めることを検討する。
+4. 有効の日時の後 30 分、見積もりの失敗の率と、新しいバージョンの見積もりの件数を見る。
+5. 誤りがあれば、次のバージョンで直す（承認の後のバージョンは書き換えない）。直すまでは、`ops.upfront.suspend.<region>` でその区域の事前確定運賃を止めることを検討する。
 
 ### legal のフラグを有効にする
 
@@ -95,7 +95,7 @@
 
 ### 悪化したとき
 
-1. **フラグで戻す。** 新しい機能の release フラグを切る。配車の計算は `ops.dispatch.algo_pin.<zone>` で前の版に固定する。設定は AppConfig の前の版に戻す。
+1. **フラグで戻す。** 新しい機能の release フラグを切る。配車の計算は `ops.dispatch.algo_pin.<zone>` で前のバージョンに固定する。設定は AppConfig の前のバージョンに戻す。
 2. **サーバーが原因なら**、1 つ前のイメージの digest で再デプロイする（「前のリリースを再デプロイ」のワークフロー）。geo-index・dispatch は、待機を先に戻す同じ手順で戻す。
 3. **運賃のコードが原因なら**、前のイメージで戻す。すでに確定した見積もりの額は変えない。誤った額で確定した乗車は、運賃の訂正の手順で直す（`fare_adjustments`、2 人の承認）。
 4. **アプリが原因なら**、段階的な公開を止める。安全の機能・支払いの誤りなら、`required_min` を上げる判断を Dev と Ops の 2 人で行う（乗車の最中と緊急の入口は塞がない）。

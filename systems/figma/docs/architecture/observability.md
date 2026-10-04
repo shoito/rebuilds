@@ -42,7 +42,7 @@ Grafana（shared）：横断のダッシュボード
 | --- | --- | --- | --- |
 | gateway | `gw_connections`（`state`） | gauge | 容量、偏り |
 | gateway | `gw_open_total`（`result`）、`gw_open_seconds` | counter、histogram | SLI `edit_open` |
-| gateway | `gw_kick_total`（`reason`） | counter | 再接続の殺到、版の食い違い |
+| gateway | `gw_kick_total`（`reason`） | counter | 再接続の殺到、バージョンの食い違い |
 | gateway | `gw_send_queue_bytes` | histogram | 遅い読み手 |
 | gateway | `gw_reconnect_total`（`result`：`resumed`・`reload`、`auth`：`ticket`・`resume_token`・`ticket_required`） | counter | 再接続の結果と、再開のトークンで API を通らなかった割合 |
 | ds | `ds_commit_total`（`result`）、`ds_commit_seconds`（`Changes` の受信 → `Ack`） | counter、histogram | SLI `edit_commit`、NFR-001 の予算の区間（[multiplayer.md](multiplayer.md) の 8 節） |
@@ -102,7 +102,7 @@ Grafana（shared）：横断のダッシュボード
 ### 3.2 送り方
 
 - 60 秒ごと（タブを隠したとき、閉じるときも）に、対数の区間のヒストグラムにまとめて `sendBeacon` で送る。
-- ラベル（許可の一覧）：ビルドの ID、ブラウザの種類と大きな版、OS の種類、GPU のバックエンド、GPU の区分（ベンダーを丸めたもの）、ファイルの大きさの区分（ノードの数を 5 段）、組織のプラン。
+- ラベル（許可の一覧）：ビルドの ID、ブラウザの種類と大きなバージョン、OS の種類、GPU のバックエンド、GPU の区分（ベンダーを丸めたもの）、ファイルの大きさの区分（ノードの数を 5 段）、組織のプラン。
 - 受け口は、許可の一覧にないラベルと長さの上限を超える値を捨て、OTel のメトリクスに変えて AMP へ送る。
 - 本家は、本番の端末の計測の仕組みを公開していない（**未検証**）。PR ごとの性能の CI は本家に倣う（[delivery.md](delivery.md) の 3 節）。
 

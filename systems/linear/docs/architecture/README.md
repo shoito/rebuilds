@@ -84,7 +84,7 @@
 | --- | --- | --- |
 | 技術 | React、MobX、TypeScript、Node.js、PostgreSQL と、自作の同期 | Tuomas Artman の X への投稿（2019-04 頃。検索結果の抜粋で確認し、本文は未確認） |
 | 手元の保存 | IndexedDB に大部分のデータを持ち、変更を WebSocket で受ける | [Reverse engineering Linear's sync magic](https://marknotfound.com/posts/reverse-engineering-linears-sync-magic/)（第三者の解析） |
-| 順序 | `lastSyncId` という 1 つの整数で、手元の版を表す。全ワークスペースで共通の 1 つの数である（自分のワークスペースの続く 2 つの変更の間で数が飛ぶことからの推定） | 同上、[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)（第三者の解析だけで確認。本家の保証ではない） |
+| 順序 | `lastSyncId` という 1 つの整数で、手元のバージョンを表す。全ワークスペースで共通の 1 つの数である（自分のワークスペースの続く 2 つの変更の間で数が飛ぶことからの推定） | 同上、[reverse-linear-sync-engine](https://github.com/wzhudev/reverse-linear-sync-engine)（第三者の解析だけで確認。本家の保証ではない） |
 | ブートストラップ | `type=full` と `type=partial` の 2 種。部分は同期グループを指定する。遅延の読み込みは部分の索引で重複を避ける | 同上（第三者の解析） |
 | 差分 | 操作の種類 I（挿入）・U（更新）・A（アーカイブ）・D（削除）・V（アーカイブの解除）・C（依存の読み込み）・G/S（同期グループの変化） | 同上（第三者の解析） |
 | 変更 | トランザクション（作成・更新・削除・アーカイブ・解除）を GraphQL の mutation にまとめて送る。確定の `lastSyncId` を受け、差分が届くまで保持して載せ直す | 同上（第三者の解析） |
@@ -156,7 +156,7 @@
 | [0002](../decisions/0002-sync-model.md) | ワークスペースごとに、サーバーが全順序を決める変更のログと単調な `sync_id` を持つ。クライアントは楽観的に当て、差分の上に載せ直す。競合はフィールドの型ごとの規則で解く |
 | [0003](../decisions/0003-bootstrap-and-partial-sync.md) | 小さなワークスペースは全体のブートストラップ、大きなワークスペースは部分のブートストラップと遅延の読み込み。差分は同期グループで絞って配る |
 | [0004](../decisions/0004-tenancy-and-permissions.md) | ワークスペースをテナントにし、FORCE RLS で分ける。チームを権限の範囲にし、非公開のチームは同期グループで差分から外す |
-| [0005](../decisions/0005-client-persistence-and-offline.md) | ワークスペースごとの IndexedDB に、モデルと、送る前に保存する outbox を持つ。スキーマの版ごとに移行し、outbox は移行で消さない |
+| [0005](../decisions/0005-client-persistence-and-offline.md) | ワークスペースごとの IndexedDB に、モデルと、送る前に保存する outbox を持つ。スキーマのバージョンごとに移行し、outbox は移行で消さない |
 | [0006](../decisions/0006-transactions-writer-and-idempotency.md) | トランザクションは意図の操作の列で、全体が確定か拒否。Writer はワークスペースの行を最初にロックし、1 つの DB のトランザクションで書き、結果を 90 日持って再送に同じ結果を返す |
 | [0007](../decisions/0007-sync-actions-and-range-proof-deltas.md) | `sync_id` は変更ごとに振って欠けなく続け、差分は範囲の証明つきのパケットで送る。Gateway は絞る前の列の連続を確かめてから範囲を名乗り、`update` は変更後の行の全体を運ぶ |
 | [0008](../decisions/0008-conflict-rules-and-fractional-keys.md) | 競合の規則はスキーマの `conflict` に 1 か所で書く。並びの鍵は範囲ごとに一意な base-62 の分数インデックスで、重なりは Writer が振り直し、長くなったら近くの窓だけを振り直す。上書きはフィールドごとの最後の `sync_id` で見つける |
@@ -181,8 +181,8 @@
 | [0027](../decisions/0027-progress-stats-per-team-via-derive.md) | 進捗は `(対象, チーム)` ごとの `ProgressStat` の行に `counter` で持ち、イシューの変更の `derive` が増減を出す。行はチームの同期グループに属す。イニシアチブの進捗は保存せず画面で足し、1 日 1 回 SQL で数え直す |
 | [0028](../decisions/0028-filter-language-and-shared-evaluation.md) | フィルターは型の付いた JSON の木で持ち、共有のパッケージの 1 つの定義から、クライアントの評価の関数と SQL の生成を作る。空の値・文字の正規化・並びの比較を言語の側で決め、共有のテストの例の集まりと差分テストで一致を確かめる |
 | [0029](../decisions/0029-view-coverage-planner-and-server-query.md) | ビューは計画の関数が被覆の鍵から「手元だけ」「手元とサーバー」「サーバー」を決める。サーバーの問い合わせは同期グループで絞った行を返し、クライアントはそれを候補として手元に足して同じ関数で評価する。保存したビューは範囲ごとの同期グループに属し、フィルターが参照する ID はビューの読み手全員が見てよいものに限る |
-| [0030](../decisions/0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で、行ごとの文書にする。一致は 1〜2 文字の N-gram、関連度は同梱の kuromoji、正規化はアプリの共有の関数。版は行の `sync_id` で外部の版にする。Aurora の `pg_bigm` は使えることを確かめたうえで代案とする |
-| [0031](../decisions/0031-search-permission-by-sync-groups.md) | 検索の権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索のたびに呼んだ人の購読を条件にし、結果を Aurora で読み直して今の `sync_groups` と削除で落とす。抜粋は版が同じときだけ返す。画面は手元の検索を先に出し、サーバーの結果を後から足す |
+| [0030](../decisions/0030-search-engine-opensearch.md) | 検索は S1 から Amazon OpenSearch Service で、行ごとの文書にする。一致は 1〜2 文字の N-gram、関連度は同梱の kuromoji、正規化はアプリの共有の関数。バージョンは行の `sync_id` で外部のバージョンにする。Aurora の `pg_bigm` は使えることを確かめたうえで代案とする |
+| [0031](../decisions/0031-search-permission-by-sync-groups.md) | 検索の権限は同期グループで効かせる。文書に行の `sync_groups` を入れ、検索のたびに呼んだ人の購読を条件にし、結果を Aurora で読み直して今の `sync_groups` と削除で落とす。抜粋はバージョンが同じときだけ返す。画面は手元の検索を先に出し、サーバーの結果を後から足す |
 | [0032](../decisions/0032-single-policy-module-and-group-mapping.md) | 権限は `packages/policy` の純粋な関数 `can()` と `groupsFor()` にまとめ、全部の経路とクライアントが同じコードを使う。読む権限は「行の同期グループと購読が交わる」と同じ意味にし、書く権限と管理の権限は決定表で決める |
 | [0033](../decisions/0033-team-visibility-changes-and-guests.md) | 同期グループに `members`（ゲストを除くメンバー）を足し、ゲストに届けないワークスペースの行をそこに置く。チームの行は公開なら `workspace`、非公開なら `team:<id>` と `role:admin`。非公開への切り替えは、同期に加えて、担当・購読者・通知・ビューの後始末を行う。管理者は非公開のチームに自分で参加でき、監査に残す |
 | [0034](../decisions/0034-accounts-with-better-auth.md) | 認証は Better Auth を `packages/auth` で包んで使う。メールの OTP・Google・パスキー・セッション・複数のセッションの部品を使い、組織の部品は使わない。アカウントは RLS の外の `auth` スキーマ、ワークスペースの中の人は同期するモデルにし、`account_id` で結ぶ |
@@ -207,7 +207,7 @@
 | [0053](../decisions/0053-convergence-audit.md) | 収束の監査は、抜き取った端末が IndexedDB の確定した行のハッシュを桶ごとに `(L, sync_epoch)` と送り、サーバーは今の行と `sync_actions` から `L` の時点の状態を作り直して比べる。合わない桶は 2 段目で行を特定し、説明のつかない不一致を K5 に数える |
 | [0054](../decisions/0054-per-workspace-write-admission.md) | 1 ワークスペースの書き込みを `origin` ごとの枠で割り当てる。`client` を最優先にして数えず、`api`・`worker`・`notifier`・`import` を Writer がロックの前に数え、ロックの待ちが伸びたら `client` 以外を半分にする |
 | [0055](../decisions/0055-ci-gates-latency-convergence-ime.md) | PR の必須の関門に、遅延の予算（固定の機械）、収束のシミュレーターと回帰の種、オフラインと再送の 3 つの場面、IME のテスト、生成とマイグレーションの検査を入れ、変更のパスで重さを足す。関門を外すラベルを持たず、シミュレーターの失敗を再実行で緑にしない |
-| [0056](../decisions/0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低の版は Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない |
+| [0056](../decisions/0056-flags-client-distribution-and-min-build.md) | クライアントのフラグはサーバーが評価して握手で配り、同期の意味はフラグにしない。Web は `index.html` を端末の桶ごとに段階的に切り替え、Electron は更新の案内を端末の桶で返す。最低のバージョンは Gateway の `min_build` で殻とレンダラーの組で強制し、手元の読み書きは止めない |
 | [0057](../decisions/0057-schema-change-ordering.md) | スキーマの変更は、サーバーの DB を広げる → サーバーが古い形と新しい形の両方を受ける → クライアントを移す → 古い `schema_hash` の接続が 1% 未満かつ 30 日の後に縮める → 古い列を単独で消す、の順にする。1 つのデプロイで、DB の破壊の変更とそれを読むコードを一緒に出さない |
 | [0058](../decisions/0058-dr-permission-narrowing-journal.md) | 権限を狭める操作は、Aurora に加えて、東京の中で同期して複製する追記だけの記録にも書き、大阪へ送る。大阪への昇格では、書き込みを受ける前に、失った範囲の記録をやり直す |
 
@@ -223,7 +223,7 @@
 - **1 ワークスペースの書き込みの直列化**：`sync_id` を振る行のロックが、大きなワークスペースの書き込みの上限（1 秒 300 変更の見込み）になる。`origin` ごとの枠（[ADR-0054](../decisions/0054-per-workspace-write-admission.md)）で、利用者の書き込みを優先する。E2 の PoC で上限を測り、届かなければ楽観的な検証か group commit の ADR を書く。
 - **大きなワークスペースのメモリーと起動**：イシュー 50 万件を手元に持つと、ブラウザのメモリーと IndexedDB の読み込みが重い。部分のブートストラップと遅延の読み込み（[ADR-0003](../decisions/0003-bootstrap-and-partial-sync.md)）、メモリーの 3 層（[ADR-0016](../decisions/0016-memory-tiers-quota-and-offline-ux.md)）で抑える。基準の端末での計測を CI に入れる（[ADR-0055](../decisions/0055-ci-gates-latency-convergence-ime.md)）。IndexedDB の一括の書き込みが NFR-003 に間に合うかは未検証で、E3 の前の `bootstrap-poc` で測る。
 - **長いオフラインの上書き**：オフラインの間の変更は、確定の順で LWW になり、他の人の新しい変更を上書きしうる（本家の文書と同じ性質）。上書きを履歴に残し、本人に知らせる（[ADR-0008](../decisions/0008-conflict-rules-and-fractional-keys.md)）。イシューとプロジェクトの説明は CRDT で合わせる（[ADR-0021](../decisions/0021-description-crdt-yjs-in-sync-log.md)）。コメントは作った人だけが書くので LWW にする（[ADR-0022](../decisions/0022-comments-anchors-mentions-attachments.md)）。
-- **クライアントの版の混在**：古い版のクライアントが、新しいスキーマのサーバーへ outbox を送る。トランザクションの形の版と `upcast` を持ち、サーバーが 1 つ前の版を 30 日受ける。スキーマの変更は広げる・移る・縮める・消すの順（[ADR-0057](../decisions/0057-schema-change-ordering.md)）。手元の DB の版を上げるリリースは戻せないので、機能の変更と別にする（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。
+- **クライアントのバージョンの混在**：古いバージョンのクライアントが、新しいスキーマのサーバーへ outbox を送る。トランザクションの形のバージョンと `upcast` を持ち、サーバーが 1 つ前のバージョンを 30 日受ける。スキーマの変更は広げる・移る・縮める・消すの順（[ADR-0057](../decisions/0057-schema-change-ordering.md)）。手元の DB のバージョンを上げるリリースは戻せないので、機能の変更と別にする（[ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md)）。
 - **ブラウザの保存の消去**：ブラウザが IndexedDB を消すと、未送信の outbox が失われる。永続の保存の許可を求め、Electron を勧め、失った件数をサーバーのクッキーの端末の ID で示す（[ADR-0016](../decisions/0016-memory-tiers-quota-and-offline-ux.md)）。
 - **データ転送の費用**：差分の送信が圧縮なしで月に約 230 TB と見積もられ、費用の最大の不確かさである。差分の流れに permessage-deflate を使い（[ADR-0009](../decisions/0009-sync-gateway-protocol.md) の注記）、E12 で測る（[infrastructure.md](infrastructure.md) の 11 節）。
 - **IME**：日本語の変換の途中の `Enter`・`Esc` でショートカットが動くと、意図しない変更が送られる。DT-APP-001 と OS × IME × ブラウザの手動の確認で抑える（[ADR-0017](../decisions/0017-keymap-command-menu-and-ime.md)）。
@@ -284,7 +284,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [bootstrap-and-partial-sync.md](bootstrap-and-partial-sync.md) | 全体・部分・手元からのブートストラップ、ストリームの形、遅延の読み込みと部分の索引、同期グループの一覧と変化（参加・脱退・非公開への切り替え）、権限を失ったときの手元の消去、ログの保持の外に出たときのやり直し、`sync_epoch` | 0011–0013 | QA、セキュリティ | E3 |
 | [client-store-and-offline.md](client-store-and-offline.md) | IndexedDB の構成、outbox、複数のタブ（書くタブの選出と、タブの間の通知）、手元の DB のスキーマの移行、保存の消去への備え、メモリーの上限とモデルの遅延の復元、オフラインの表示 | 0014–0016 | QA | E3 |
 | [client-app.md](client-app.md) | React の画面、キーボードのショートカットとコマンドメニュー、IME、大きな一覧の仮想化、遅延の予算の計測、Electron のシェル（通知、ディープリンク） | 0017–0018 | QA | E6 |
-| [data-model-and-schema.md](data-model-and-schema.md) | モデルの定義の言語（フィールドの型、参照、競合の種類、読み込みの方針、同期グループ）、そこからの生成（DB、クライアント、GraphQL、検証）、スキーマの版と後方互換、ID と識別子（`ENG-123`） | 0019–0020 | QA | E1、E2 |
+| [data-model-and-schema.md](data-model-and-schema.md) | モデルの定義の言語（フィールドの型、参照、競合の種類、読み込みの方針、同期グループ）、そこからの生成（DB、クライアント、GraphQL、検証）、スキーマのバージョンと後方互換、ID と識別子（`ENG-123`） | 0019–0020 | QA | E1、E2 |
 | [editor-and-descriptions.md](editor-and-descriptions.md) | リッチテキストのエディタ、本文の CRDT、同期のログとの載せ方、コメント、メンションと参照、添付ファイルの保存、インラインのコメント | 0021–0022 | QA | E5 |
 | [issues-and-workflow.md](issues-and-workflow.md) | イシュー、ワークフローの状態と種類、優先度、ラベルとグループ、見積もりの尺度、担当、親子と関連、重複、Triage、自動で閉じる・アーカイブする、テンプレート、履歴、派生の変更 | 0023–0025 | QA | E5 |
 | [cycles-and-projects.md](cycles-and-projects.md) | サイクル（期間、クールダウン、繰り越し、自動の追加、タイムゾーン）、プロジェクト（状態、マイルストーン、進捗の更新）、イニシアチブ、進捗の集計 | 0026–0027 | QA | E7 |
@@ -301,7 +301,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、Sync Gateway の配置と再接続の殺到への備え、冗長化、DR（`sync_epoch` と狭める操作のやり直し）、段階を上げる基準、S2 のワークスペースのシャード、S3 のセルとリージョン、コスト | 0049–0051、0058（統合の工程で足した） | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、クライアントの RUM（遅延の予算）、同期の伝播の計測、収束の監査、配信の監査、SLI | 0052–0053 | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル（接続、書き込み、ブートストラップ）、1 ワークスペースの書き込みの上限と割り当て、部品ごとの必要量、負荷試験 L1〜L9 | 0054 | Ops | E12 |
-| [delivery.md](delivery.md) | CI/CD、遅延の予算と収束のテストを CI に入れる、フラグ、Web のクライアントの配布、Electron の自動更新と最低の版、サーバーとクライアントのスキーマの変更の順序 | 0055–0057 | QA、Ops | E1、E12 |
+| [delivery.md](delivery.md) | CI/CD、遅延の予算と収束のテストを CI に入れる、フラグ、Web のクライアントの配布、Electron の自動更新と最低のバージョン、サーバーとクライアントのスキーマの変更の順序 | 0055–0057 | QA、Ops | E1、E12 |
 
 - 次に採番する ADR は 0059。統合の後に足す ADR は、関わる領域の行に番号を書き足す。
 

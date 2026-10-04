@@ -25,7 +25,7 @@
 | `vk-auth` | `fetch:{acct\|org}:{id}` | string | 1 分 | `asset-fetch` の回数（利用者 30・組織 300） | API | [export-and-assets.md](../export-and-assets.md) の 9 節 |
 | `vk-auth` | `opened:{org_id}:{account_id}:{file_id}` | string | 1 時間 | 監査ログの `file.opened` の間引きの印 | API | [security.md](../security.md) の 6 節 |
 | `vk-cache` | `owner:{file_id}` | hash | 30 秒 | `{task_id, addr, epoch}`。持ち主のキャッシュ | Router / Gateway | [infrastructure.md](../infrastructure.md) の 5.2 節 |
-| `vk-cache` | `rtq:{sha256(正規形)}` | string | 60 秒（無効化で消す） | Realtime の単純な問い合わせの結果（行の ID と版）。正規形は表・`org_id`・等価の条件 | Realtime edge | [comments-and-notifications.md](../comments-and-notifications.md) の 5.2 節 |
+| `vk-cache` | `rtq:{sha256(正規形)}` | string | 60 秒（無効化で消す） | Realtime の単純な問い合わせの結果（行の ID とバージョン）。正規形は表・`org_id`・等価の条件 | Realtime edge | [comments-and-notifications.md](../comments-and-notifications.md) の 5.2 節 |
 
 - 正本ではない。失っても DB と DynamoDB から作り直せる（data-model.md の I-12）。`vk-auth` が止まったら、新しい接続を拒み、再開のトークンを使わない（安全側。[permissions-and-sharing.md](../permissions-and-sharing.md) の 10 節）。
 - `rtq:` の値に行の中身を持つか ID だけにするかは、Realtime の edge の実装で決める。中身を持つときも、同じ組織の購読にだけ返す（キーの正規形に `org_id` を含む）。
@@ -48,16 +48,16 @@
 
 | バケット | キー | 中身 | 鍵（KMS） | 保持 | 定めた場所 |
 | --- | --- | --- | --- | --- | --- |
-| files | `files/{file_id}/…` | チェックポイント・チャンク・大きな変更・取り戻した版 | `files` | [file-storage.md](file-storage.md) の 5・6 節 | ADR-0003、ADR-0025、ADR-0048 |
+| files | `files/{file_id}/…` | チェックポイント・チャンク・大きな変更・取り戻したバージョン | `files` | [file-storage.md](file-storage.md) の 5・6 節 | ADR-0003、ADR-0025、ADR-0048 |
 | assets | `images/{org_id}/{sha256}` | 画像（正規化の後）。`Content-Type` は登録の値 | `assets` | mark-and-sweep で消す | ADR-0035 |
 | assets | `images/{org_id}/{sha256}/w{2048,512,128}.webp` | 縮小版 | `assets` | 元と同時 | 同上 |
-| assets | `fonts/catalog/{sha256}` | 同梱のフォント（署名なし、`immutable`） | `assets` | 版を外すまで | ADR-0036 |
+| assets | `fonts/catalog/{sha256}` | 同梱のフォント（署名なし、`immutable`） | `assets` | バージョンを外すまで | ADR-0036 |
 | assets | `fonts/{org_id}/{sha256}` | 組織のフォント | `assets` | 削除から 7 日 | 同上 |
 | assets | `exports/{org_id}/{job_id}/{node_id}.{ext}`、`exports/{org_id}/{job_id}/bundle.zip` | サーバーの書き出しの結果（`Content-Disposition: attachment`） | `assets` | 14 日（ライフサイクル） | ADR-0034 |
-| assets | `thumbnails/{org_id}/{file_id}/{seq}-{960,320}.webp` | サムネイル | `assets` | 置き換えから 7 日。版のものは版と同じ | [export-and-assets.md](../export-and-assets.md) の 8 節 |
+| assets | `thumbnails/{org_id}/{file_id}/{seq}-{960,320}.webp` | サムネイル | `assets` | 置き換えから 7 日。バージョンのものはバージョンと同じ | [export-and-assets.md](../export-and-assets.md) の 8 節 |
 | assets | `comment-attachments/{org_id}/{file_id}/{asset_id}` | コメントの添付 | `assets` | コメントの削除・ファイルの完全な削除。行のないものは 24 時間 | [comments-and-notifications.md](../comments-and-notifications.md) の 11 節 |
-| assets | `libraries/{org_id}/{library_id}/assets/{asset_key}/{content_hash}` | ライブラリの資産の blob（E13） | `assets` | 版を参照するファイルがある間 | [components-and-libraries.md](../components-and-libraries.md) の 12 節 |
-| assets | `plugins/{plugin_id}/{version_id}/{sha256}` | プラグインのコード（不変。E14） | `assets` | 版がある間 | [plugins.md](../plugins.md) の 9 節 |
+| assets | `libraries/{org_id}/{library_id}/assets/{asset_key}/{content_hash}` | ライブラリの資産の blob（E13） | `assets` | バージョンを参照するファイルがある間 | [components-and-libraries.md](../components-and-libraries.md) の 12 節 |
+| assets | `plugins/{plugin_id}/{version_id}/{sha256}` | プラグインのコード（不変。E14） | `assets` | バージョンがある間 | [plugins.md](../plugins.md) の 9 節 |
 | log-archive（別のアカウント） | `audit/{org_id}/{yyyy}/{mm}/{dd}/{batch_id}.jsonl.gz` | 監査ログのバッチ（前のバッチのハッシュを含む） | `logs` | Object Lock（コンプライアンスモード）7 年（既定案。L4） | [security.md](../security.md) の 6 節 |
 | log-archive | `operator/{yyyy}/{mm}/{dd}/{batch_id}.jsonl.gz` | 運用者の操作のバッチ | `logs` | 同上 | 同上 |
 | shared | `wasm-symbols/{build_id}/…` | ビルドごとの関数の名前の表 | `logs` | ビルドを配っている間＋90 日 | [observability.md](../observability.md) の 10 節 |
@@ -75,7 +75,7 @@
 | `image-ingest` | S3 のイベント（`images/` の PUT） | S3 のイベントの形（キーから `org_id`・`sha256`） | Worker（`asset-inspect`） |
 | `font-ingest` | S3 のイベント（`fonts/{org_id}/` の PUT） | 同上（`org_fonts.id` はオブジェクトのタグ） | Worker |
 | `render-export` | API | `{org_id, job_id, file_id, seq}`（設定は `export_jobs.params` を読む） | Render Worker |
-| `render-thumbnail` | Document Server、API（版）、通知の Worker（プレビュー） | `{org_id, file_id, seq, kind: current\|version\|comment_preview, version_id?, comment_id?}` | Render Worker |
+| `render-thumbnail` | Document Server、API（バージョン）、通知の Worker（プレビュー） | `{org_id, file_id, seq, kind: current\|version\|comment_preview, version_id?, comment_id?}` | Render Worker |
 | `notify` | Relay（`comment.created`・`access_request.created`・`seat_request.created`・`invitation.created`・`library.version_published`） | outbox の出来事（5 節） | 通知の Worker |
 | `email` | 通知の Worker（`email_digest_queue` のまとめ） | `{org_id, account_id, file_id, comment_ids[]}` | メールの Worker（SES） |
 | `search-index`（延期） | Relay（`file.checkpointed`・`file.moved`・`acl.changed`） | outbox の出来事。`file_id` で 30 分に 1 回へ間引く | 索引の Worker |
@@ -84,7 +84,7 @@
 
 ## 5. outbox の出来事
 
-`outbox.payload`・`global_outbox.payload` の形。`v` は形の版（追加だけ）。
+`outbox.payload`・`global_outbox.payload` の形。`v` は形のバージョン（追加だけ）。
 
 | `event_type` | 表 | 中身 | 書く場所 | 送り先 |
 | --- | --- | --- | --- | --- |
@@ -95,7 +95,7 @@
 | `file.maintenance` | outbox | `{v, org_id, file_id, reason}` | `maintenance` の出入り | `ctl:org` |
 | `file.checkpointed` | outbox | `{v, org_id, file_id, seq}` | Document Server のチェックポイントの `files` の更新 | `search-index`（延期） |
 | `file.edit_idle` | outbox | `{v, org_id, file_id, seq}` | Document Server（編集が 5 分止まった。1 ファイル 30 分に 1 回） | `webhook-delivery`（`file.updated`） |
-| `file.version_created` | outbox | `{v, org_id, file_id, version_id}` | 名前付きの版 | `webhook-delivery` |
+| `file.version_created` | outbox | `{v, org_id, file_id, version_id}` | 名前付きのバージョン | `webhook-delivery` |
 | `comment.created` | outbox | `{v, org_id, file_id, thread_id, comment_id}` | コメントの書き込み | `notify`、`webhook-delivery` |
 | `invitation.created`・`access_request.created`・`seat_request.created` | outbox | `{v, org_id, id}` | 招待・申請 | `notify` |
 | `library.version_published` | outbox | `{v, org_id, library_id, version}` | ライブラリの公開（E13） | `notify`、`webhook-delivery` |
@@ -127,7 +127,7 @@
 
 ## 7. OpenSearch（MVP の後）
 
-索引 `file_pages`（`routing = org_id`）。文書の ID は `{file_id}:{page_id}`、外部の版は `seq`。フィールドは [search.md](../search.md) の 4.2 節（`org_id`・`team_id`・`project_id`・`file_id`・`page_id`・`drafts_owner_id`・`general_access_org`・`in_trash`・`node_names`・`texts`・`seq`・`indexed_at`）。ファイルの名前・ページの名前は持たない。
+索引 `file_pages`（`routing = org_id`）。文書の ID は `{file_id}:{page_id}`、外部のバージョンは `seq`。フィールドは [search.md](../search.md) の 4.2 節（`org_id`・`team_id`・`project_id`・`file_id`・`page_id`・`drafts_owner_id`・`general_access_org`・`in_trash`・`node_names`・`texts`・`seq`・`indexed_at`）。ファイルの名前・ページの名前は持たない。
 
 ## 8. AppConfig
 
@@ -137,8 +137,8 @@
 | `schema.<prop>.write` | プロパティの書き込みの解禁 | ADR-0055 |
 | `ops.*` | 運用のスイッチ（`ops.multiplayer_read_only`、公開 API の停止、CDN の迂回など） | [runbooks/README.md](../../runbooks/README.md) |
 | `region.writable`・`region.gen` | 書き込みを受けるリージョンと世代 | ADR-0048 |
-| `min_client_build`・`client_build_channels` | クライアントの版の照合と段階のリリース | ADR-0053 |
-| `gpu.blocklist` | アダプターとブラウザの版の組 → 使うバックエンド | [rendering-engine.md](../rendering-engine.md) の 19 節 |
+| `min_client_build`・`client_build_channels` | クライアントのバージョンの照合と段階のリリース | ADR-0053 |
+| `gpu.blocklist` | アダプターとブラウザのバージョンの組 → 使うバックエンド | [rendering-engine.md](../rendering-engine.md) の 19 節 |
 
 ## 9. ブラウザ
 
@@ -146,7 +146,7 @@
 
 ### 9.1 IndexedDB
 
-データベースは利用者ごとに分ける：`<brand>-{account_id}`。ログアウトで削除する。版は `1`。
+データベースは利用者ごとに分ける：`<brand>-{account_id}`。ログアウトで削除する。バージョンは `1`。
 
 | object store | 鍵 | 値 | 索引 | 規則 |
 | --- | --- | --- | --- | --- |
@@ -179,4 +179,4 @@
 | --- | --- | --- |
 | `schema/properties.toml` | プロパティの表（[document.md](document.md) の 3 節と一致させる） | ADR-0006 |
 | `schema/history.json` | `schema_hash` の履歴と差分の種類 | [delivery.md](../delivery.md) の 4.2 節 |
-| `fonts/catalog.toml` | 同梱のフォントの一覧・版・ライセンス・出典 | [export-and-assets.md](../export-and-assets.md) の 7.2 節 |
+| `fonts/catalog.toml` | 同梱のフォントの一覧・バージョン・ライセンス・出典 | [export-and-assets.md](../export-and-assets.md) の 7.2 節 |

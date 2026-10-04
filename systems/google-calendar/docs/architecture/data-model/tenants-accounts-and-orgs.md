@@ -240,7 +240,7 @@ erDiagram
 
 ### 2.3 `auth.session`・`auth.account`・`auth.verification`・`auth.passkey`
 
-Better Auth の既定の表。列は部品の版の既定に従い、ここでは本システムの規則だけを書く。
+Better Auth の既定の表。列は部品のバージョンの既定に従い、ここでは本システムの規則だけを書く。
 
 | 表 | 中身 | 本システムの規則 |
 | --- | --- | --- |

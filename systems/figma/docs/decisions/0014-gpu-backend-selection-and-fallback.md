@@ -41,7 +41,7 @@ date: 2026-09-27
 
 - `wgpu` を `webgpu` と `webgl` の両方の機能で 1 つのビルドにする。
 - 起動時：
-  1. サーバーから配るブロックリストに今の端末（`GPUAdapterInfo` の vendor・architecture・description と、ブラウザの版）が載っていれば WebGL2。
+  1. サーバーから配るブロックリストに今の端末（`GPUAdapterInfo` の vendor・architecture・description と、ブラウザのバージョン）が載っていれば WebGL2。
   2. 前のセッションで WebGL2 に戻っていれば（`localStorage` の記録、7 日で失効）WebGL2。
   3. それ以外は `new_instance_with_webgpu_detection` で WebGPU を試し、アダプターかデバイスを得られなければ WebGL2。
 - 起動の後、アイドルの時間に互換性のテストを走らせる：参照の小さな場面（パスの被覆率、ブレンド、ぼかし、テキスト）を描き、読み戻して、既知の画素と比べる。読み戻しで起動を止めない。

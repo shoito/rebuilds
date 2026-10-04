@@ -459,7 +459,7 @@ changes ─┬─▶ slack-static ─┐
 
 - トリガーは `pull_request` と `merge_group`。`concurrency` を PR ごとにし、古い実行を取り消す（REQ-DLV-012）。
 - `changes` は、DT-DLV-001 を実装した `tools/spec-checks/src/changes.ts` で、対象のジョブの一覧を出力する。起点は、`pull_request` なら `github.event.pull_request.base.sha`、`merge_group` なら `github.event.merge_group.base_sha`。
-- Slack の各ジョブは `turbo run <tasks> --affected` を使い、`TURBO_SCM_BASE` に起点を渡す。Turborepo の `--affected` と `TURBO_SCM_BASE` の挙動（どの版から使えるか、グローバルな依存の扱い）は **未検証**。使えなければ、`turbo run --filter=...[<base>]` で同じことをする。
+- Slack の各ジョブは `turbo run <tasks> --affected` を使い、`TURBO_SCM_BASE` に起点を渡す。Turborepo の `--affected` と `TURBO_SCM_BASE` の挙動（どのバージョンから使えるか、グローバルな依存の扱い）は **未検証**。使えなければ、`turbo run --filter=...[<base>]` で同じことをする。
 - キャッシュは、pnpm のストアと Turborepo のローカルのキャッシュを `actions/cache` で持つ。Turborepo のリモートキャッシュ（外部のサービス）は使わない（ビルドの成果物を社外に置かないため）。
 - 結合テストは、GitHub のホスト型ランナーの Docker で Testcontainers を動かす。
 - PR のタイトルの検査は、タイトルの編集でも走るよう `title.yml`（`pull_request` の `opened`・`edited`・`synchronize`）に分ける。merge queue では、`ci.yml` の `spec-checks` の中で、キューの PR 番号から PR のタイトルを API で読み直して同じ検査をする（merge queue のコミットメッセージが PR のタイトルになることは **未検証**）。

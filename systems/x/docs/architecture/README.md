@@ -94,7 +94,7 @@
 | 項目 | 本家 | 出典 |
 | --- | --- | --- |
 | 投稿の文字数 | 重み付きで 280。日本語・中国語・韓国語の文字は 2、URL は 23 と数える | [Counting characters](https://docs.x.com/fundamentals/counting-characters)（公式） |
-| ID | 64 ビット。41 ビットのミリ秒の時刻（独自の起点）、10 ビットの機械の番号、12 ビットの連番。調整なしで振り、おおむね時刻の順（k-sorted）。時計が戻ったら振らない | [snowflake（2010 年の版）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)（公式のリポジトリ。今の実装は未検証） |
+| ID | 64 ビット。41 ビットのミリ秒の時刻（独自の起点）、10 ビットの機械の番号、12 ビットの連番。調整なしで振り、おおむね時刻の順（k-sorted）。時計が戻ったら振らない | [snowflake（2010 年のバージョン）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)（公式のリポジトリ。今の実装は未検証） |
 | ホームのタイムライン | 書くときにフォロワーのメモリーの中のタイムラインへ配り、フォロワーの多い作者は読むときに合わせる | 2012 年の講演 [Timelines at Scale](https://www.infoq.com/presentations/Twitter-Timeline-Scalability)（本家の技術者の講演。具体の数値は本文で確かめておらず**未検証**） |
 | おすすめ | 候補の源（フォロー中の投稿の索引、関係のグラフの辿り、埋め込みの近さ）→ 軽いランク → 重いランク（ニューラルネットワーク）→ 見える範囲の絞り込み → 混ぜ合わせ。フォロー中とそれ以外は平均で半々 | [twitter/the-algorithm](https://github.com/twitter/the-algorithm)（公式の README、2023 年） |
 | おすすめ（今） | Home Mixer が全体を回し、Thunder がフォロー中の最近の投稿をメモリーに持ち、Phoenix が取り出しとランクを行い、SimClusters でフォロー外の候補を探す。行動ごとの確率を重みで足し（Σ 重み × 確率）、作者の 2 件目以降に下限のある減衰を掛け、フォロー外を割り引き、新しい作者を押し上げる | [xai-org/x-algorithm](https://github.com/xai-org/x-algorithm)（公式の README。2026-10-04 に取得し直して確かめた） |
@@ -174,10 +174,10 @@
 | [0006](../decisions/0006-ranking-boundary.md) | おすすめは自前の段のパイプラインにし、ML はスコアと取り出しだけに使う。安全と法令の判定を上書きしない |
 | [0007](../decisions/0007-follow-graph-storage.md) | フォローの関係は、向きの違う 2 つの隣接の表を正本にし、同じトランザクションで書く。グラフ DB を使わない |
 | [0008](../decisions/0008-post-write-path-and-idempotency.md) | 投稿の書き込みは、検証の後に `tid` を振り、投稿の行・抜き出した要素・冪等の記録・outbox を 1 つの DB のトランザクションで確定する。再送は `(author_id, client_request_id)` で同じ投稿を返す |
-| [0009](../decisions/0009-post-state-tombstones-and-state-cache.md) | 削除と措置は行を消さずに状態と `state_version` を変える。投稿の状態の写しは版の新しいものだけを書き、寿命を 45 秒にして、出来事が止まっても 60 秒の中で正本に戻る |
+| [0009](../decisions/0009-post-state-tombstones-and-state-cache.md) | 削除と措置は行を消さずに状態と `state_version` を変える。投稿の状態の写しはバージョンの新しいものだけを書き、寿命を 45 秒にして、出来事が止まっても 60 秒の中で正本に戻る |
 | [0010](../decisions/0010-post-table-partitioning-s2.md) | S2 で投稿の表を投稿の ID のハッシュで分割する。作者・会話ごとの一覧は、出来事から作る別の索引の表に、それぞれ作者・会話の ID で分割して持つ |
 | [0011](../decisions/0011-graph-edge-state-machine-and-locking.md) | フォロー・申請・ブロックの辺を 1 つの状態機械で扱い、2 人の組ごとの勧告ロックで直列にする。ブロックは同じトランザクションで両向きのフォローと申請を外し、鍵を外したら待っている申請をすべて承認する |
-| [0012](../decisions/0012-viewer-sets-cache.md) | 閲覧者の集合（ブロックの両向き、ミュート、承認済みの鍵アカウントのフォロー先、ミュートの語）を Valkey に版つきの写しで持ち、書き込みの確定の直後に更新する。寿命は 1 時間。ミュートは逆向きの表を持たない |
+| [0012](../decisions/0012-viewer-sets-cache.md) | 閲覧者の集合（ブロックの両向き、ミュート、承認済みの鍵アカウントのフォロー先、ミュートの語）を Valkey にバージョンつきの写しで持ち、書き込みの確定の直後に更新する。寿命は 1 時間。ミュートは逆向きの表を持たない |
 | [0013](../decisions/0013-graph-partitioning.md) | 関係の表を利用者の ID のハッシュで 1,024 の論理の分割に分け、物理のクラスタへの対応表で置く。S2 は 4 クラスタから。分割の後は `following` と `blocks` を正本にし、逆向きの表は出来事から作る |
 | [0014](../decisions/0014-home-timeline-replica-format.md) | ホームの写しは、32 バイトの項目を ID の降順に詰めた Valkey の文字列にし、挿入・合わせ・除去を Valkey Functions で行う。返信の項目は 4 つ目の欄に返信先の利用者を入れる |
 | [0015](../decisions/0015-fanout-pipeline-and-burst-control.md) | 振り分け役は全作者の最近の投稿の写しを先に書いてから、フォロワーのページの仕事を作者の大きさで 2 つの待ち行列に分けて作る。瞬間のピークでは閾値を一時的に下げ、プルに回した作者を 7 日間プルの合わせの対象に入れる |
@@ -190,12 +190,12 @@
 | [0023](../decisions/0023-counter-aggregation-and-reconciliation.md) | `engagement` の流れの鍵を「投稿の ID と利用者の ID の下 3 ビット」にし、数の写しは Valkey の投稿ごとのハッシュに部分ごとの最後の連番を持って Function で冪等に足す。返信・引用の数も投稿の書き込みが `engagement` の流れへ出す。書き戻しは 60 秒、照合は静かな投稿で数え直す |
 | [0024](../decisions/0024-view-counts-ingest-and-approximation.md) | 閲覧は「画面に投稿の 50% 以上が 500ms 以上出た」こと。Ingest はクライアントの束を閲覧者のセッションで分けた鍵で `views` の流れへ入れ、集計は位置を先に記録してから足して数えすぎない。データレイクとの日ごとの補正で上にだけ直し、表示は減らない |
 | [0025](../decisions/0025-search-engine-and-japanese-analysis.md) | 検索は OpenSearch で、一致の判定は 1〜2 文字の N-gram、関連度の点は kuromoji で付ける。正規化は 1 つの関数で索引と問い合わせにかける |
-| [0026](../decisions/0026-search-index-layout-and-visibility.md) | 投稿の索引は月ごとに分けて `tid` の時刻で書き先を決め、`state_version` を外部の版にする。問い合わせは 1 つの組み立て関数で見える範囲の条件を必ず含め、返す前に `visible()` で判定し直す |
+| [0026](../decisions/0026-search-index-layout-and-visibility.md) | 投稿の索引は月ごとに分けて `tid` の時刻で書き先を決め、`state_version` を外部のバージョンにする。問い合わせは 1 つの組み立て関数で見える範囲の条件を必ず含め、返す前に `visible()` で判定し直す |
 | [0027](../decisions/0027-trends-burst-detection.md) | トレンドは地域ごとに 5 分の区切りで「重み付きの一意の投稿者の数」を数え、基準との差をポアソンの揺れで割った点で急上昇を決める |
 | [0029](../decisions/0029-notification-rows-and-grouping.md) | 通知の行は受け手の本人だけの表に書き、いいね・リポスト・フォローは対象ごとに 1 行にまとめて、開いている間は行為者を足す。殺到を受けている受け手は、行為者の集合を Valkey で数えて 60 秒ごとに書き戻す |
 | [0030](../decisions/0030-push-and-email-delivery.md) | プッシュは送る直前に見える範囲・設定・送る量の上限を確かめる。本文を載せない形を既定にし、端末が API で中身を取る。まとめの通知は collapse の鍵で上書きする。メールは日ごとの要約だけ |
 | [0031](../decisions/0031-read-state-and-visibility-rechecks.md) | 通知の既読は受け手ごとの 1 本の位置で持ち、未読の数は Valkey の写しで数えて Realtime Gateway で届ける。見える範囲は、作る時・送る時・読む時の 3 回判定する |
-| [0032](../decisions/0032-media-upload-and-processing.md) | メディアはクライアントから S3 へ分割で直接上げ、検査とハッシュの照合を通るまで公開しない。画像は位置の情報を消して決まった版に、動画は MediaConvert で HLS にする |
+| [0032](../decisions/0032-media-upload-and-processing.md) | メディアはクライアントから S3 へ分割で直接上げ、検査とハッシュの照合を通るまで公開しない。画像は位置の情報を消して決まったバージョンに、動画は MediaConvert で HLS にする |
 | [0033](../decisions/0033-media-delivery-and-takedown.md) | 公開のメディアは推測できないキーの URL で 1 年キャッシュして配り、鍵アカウントと DM のメディアは署名付きの URL で配る。措置では CloudFront KeyValueStore の拒否の一覧で数秒で止め、元を隔離して無効にする |
 | [0034](../decisions/0034-media-hash-matching.md) | 有害なメディアのハッシュの照合は差し替えられる口の後ろに置き、公開のメディアは照合を通るまで公開しない。自前で措置したメディアの PDQ の一覧も持つ。DM のメディアは L3 の確認まで照合しない |
 | [0035](../decisions/0035-dm-conversation-model-and-storage.md) | DM は会話ごとの連番で並べ、参加者の FORCE RLS と会話ごとの鍵の列の暗号化で守る。配信は ID だけを流して受け手の権限で読み直す |
@@ -222,8 +222,8 @@
 | [0059](../decisions/0059-guardrail-and-audit-metrics.md) | ランキングのガードレールは 5 分ごとの近似で自動に止め、データレイクの日ごとの値で広げる判断をする。見える範囲の抜き取りの監査は 5 秒後に正本で判定し直し、説明のつく不一致を除いて数える |
 | [0060](../decisions/0060-capacity-headroom-and-load-shedding.md) | 各部品は AZ を 1 つ失っても S1 のピークをさばける大きさにし、fan-out は瞬間のピークの 2/3 を続けて書ける大きさにする。超えるときに削る順を決め、投稿の書き込みと `visible()` は削らない |
 | [0061](../decisions/0061-ci-gates.md) | PR の必須の関門に、漏れの経路の表、`visible()` の決定表、fan-out の性質、出来事の再生、本人だけの表の RLS、ランキングのオフラインの評価、本家の実装の検査、契約の互換を入れ、変更のパスで足す。外すラベルを持たない |
-| [0062](../decisions/0062-mobile-release-and-min-version.md) | アプリは週 1 回の列車でストアに出し、iOS は 7 日の段階的リリース、Android は段階的公開で広げる。JS だけの修正は自前の Expo Updates の形のサーバーから署名した束で配る。最低の版は `426` で強制し、支える版は 12 週 |
-| [0063](../decisions/0063-contract-change-ordering.md) | 契約の変更は、広げる → 読む側を新旧に対応 → 書く側を移す → 縮める、の順にする。DB の縮めは別のリリース、出来事は共通の頭と版を持ち、公開 API は同じ版の中で足すだけ、画面の API は 12 週前のアプリが読める形を保つ |
+| [0062](../decisions/0062-mobile-release-and-min-version.md) | アプリは週 1 回の列車でストアに出し、iOS は 7 日の段階的リリース、Android は段階的公開で広げる。JS だけの修正は自前の Expo Updates の形のサーバーから署名した束で配る。最低のバージョンは `426` で強制し、支えるバージョンは 12 週 |
+| [0063](../decisions/0063-contract-change-ordering.md) | 契約の変更は、広げる → 読む側を新旧に対応 → 書く側を移す → 縮める、の順にする。DB の縮めは別のリリース、出来事は共通の頭とバージョンを持ち、公開 API は同じバージョンの中で足すだけ、画面の API は 12 週前のアプリが読める形を保つ |
 
 領域ごとの ADR は、7 節の番号の範囲で起票する。リポジトリ共通の決定（開発プロセス、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)、本家の実装を核に使わない規則の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 
@@ -289,16 +289,16 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 - **正本の移動**：列・鍵・索引の正本を [data-model.md](data-model.md) と [data-model/](data-model/) に移した。領域の文書の「data-model への項目」は要点で、食い違ったらデータモデルに合わせて直す。
 - **措置の要約の形**：`posts.mod_flags` をビット（`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED`）と地域の列 `posts.mod_geo` にし、`users.account_mod` もビットと `account_mod_detail` にした（[data-model.md](data-model.md) の 3.5 節）。[posts-and-ids.md](posts-and-ids.md) の `restricted`・`age_gated`・`geo_withheld` と [trust-and-safety.md](trust-and-safety.md) の `label`・`reduce`・`removed`・`geo` の食い違いを、この名前に揃えた。
-- **作者の状態の版**：`as:` の版として `users.state_version` を足した（[posts-and-ids.md](posts-and-ids.md) の 6 節が求めていたが、`users` の表になかった）。
-- **本人だけの表の列**：`owner_id` に揃えた（`user_contacts`・`user_birthdates`・`dm_message_hidden`・`oauth_grants` の `user_id` を直した）。`user_contacts` に変更の保留の `slot`（`current`・`pending`）と HMAC の鍵の版を足した。
-- **`auth` スキーマ**：`auth.user.email`・`phone_number` に平文でなく HMAC の値を入れ、`auth.session` に IP を残さない（[security.md](security.md) の 5.3 節の「平文の列を持たない」を Better Auth の表にも当てる）。Better Auth の版で動くかは E2 の `auth-signup-login` で確かめる。
+- **作者の状態のバージョン**：`as:` のバージョンとして `users.state_version` を足した（[posts-and-ids.md](posts-and-ids.md) の 6 節が求めていたが、`users` の表になかった）。
+- **本人だけの表の列**：`owner_id` に揃えた（`user_contacts`・`user_birthdates`・`dm_message_hidden`・`oauth_grants` の `user_id` を直した）。`user_contacts` に変更の保留の `slot`（`current`・`pending`）と HMAC の鍵のバージョンを足した。
+- **`auth` スキーマ**：`auth.user.email`・`phone_number` に平文でなく HMAC の値を入れ、`auth.session` に IP を残さない（[security.md](security.md) の 5.3 節の「平文の列を持たない」を Better Auth の表にも当てる）。Better Auth のバージョンで動くかは E2 の `auth-signup-login` で確かめる。
 - **通知のまとめ**：日ごとに分けた `notifications` には、領域の文書の部分の一意の索引 `(owner_id, group_key) WHERE is_open` を張れない（分ける鍵を含まないため）。開いている行を `notification_open_groups` の主キーで 1 つにし、まとめない種類の冪等は分ける鍵 `bucket_on`（元の投稿の `tid` の日）を含めた一意にした。
 - **出来事の名前**：鍵の切り替えは `accounts` の流れの `accounts.protected_changed` に揃えた（[follow-graph.md](follow-graph.md) の `graph` の流れの `account.protected_changed` を直した）。投稿の措置は `moderation.action_applied` と `post.state_changed` を同じトランザクションで書く。
 - **Relay の区画**：`relay_partitions` は表にせず、Valkey の `relay:lease:{n}`（なければ勧告的ロック）にした（[infrastructure.md](infrastructure.md) の 14 節を直した）。
 - **足した表**：`notification_open_groups`、`processed_events`（DB に書く消費者の重複の記録）、`post_shard_map`・`engagement_shard_map`（S2。`graph_shard_map` と同じ形）。`legal_holds` の `from`・`to` は SQL の予約語を避けて `period_from`・`period_to` にした。
 - **DB のロールと S2 のクラスタ**：サービスごとの DB のロールと列の単位の書き込みの権限（[data-model.md](data-model.md) の 3.3 節）、S2 のクラスタへの表の割り当て（S1 の `main` を `core` として残す。3.12 節）を決めた。
 - **S2 で同じトランザクションを保てない書き込み（推奨。S2 の着手の時に ADR で確定する）**：
-  - フォローと `users.graph_version`：版を関係のクラスタの表（`graph_versions(user_id, version)`、`user_id` の分割）に移す。
+  - フォローと `users.graph_version`：バージョンを関係のクラスタの表（`graph_versions(user_id, version)`、`user_id` の分割）に移す。
   - 措置と要約：`moderation_actions`・`moderation_action_events` を対象と同じクラスタ・分割に置き（投稿・メディアは `posts`、アカウントは `accounts`）、案件・通報・法令の表は `core` に残す。ADR-0038 の「同じトランザクション」を保つ。
   - 投稿と `media` の `attached`：付け先の正本を `post_media`・`dm_messages.media_id` にし、`media.state` の `attached` は出来事から冪等に書く。付ける前の確かめ（`ready` で同じ作者）は書き込みの時に読む。
 
@@ -315,7 +315,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 有害なメディアのハッシュの照合の提供者 | E11 の `media-hash-matching`（法務の L4・L7 とあわせる） |
 | 「見えなくなった」の知らせ（`hidden`）を誰に送るか | E5（[clients.md](clients.md) の 4.4 節） |
 | MediaConvert で 1 分の動画 p95 60 秒を守れるか、CloudFront の無効化の時間 | E7 の `video-transcode`・`media-delivery-and-takedown` |
-| ElastiCache の Valkey の版とノードの記憶、Global Datastore、KMS の要求のクォータ、サーバーの時計のずれ | E1 の着手の時 |
+| ElastiCache の Valkey のバージョンとノードの記憶、Global Datastore、KMS の要求のクォータ、サーバーの時計のずれ | E1 の着手の時 |
 | S2 で同じトランザクションを保てない書き込み（[data-model.md](data-model.md) の 7 節。推奨は上の「データモデル」の決定） | S2 の着手の時に ADR を書く |
 | 本家の振る舞いで未確認のもの（ヘルプセンターの値、6,800 万人、2012 年の講演の数値） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
@@ -337,14 +337,14 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [direct-messages.md](direct-messages.md) | 会話と参加者、`seq` の順と冪等、参加者の RLS と列の暗号化、申請と同意、ブロックとミュート、Gateway での配信と同期、DM のメディア、削除、中身を読まない迷惑の抑止、通報、エンドツーエンドの暗号化への備え | 0035–0037（範囲 0035–0037） | セキュリティ、QA | E12、E18 |
 | [trust-and-safety.md](trust-and-safety.md) | 規約の区分と措置の種類、措置の記録と効かせ方、利用者への通知、通報と案件と待ち行列、作業の画面、自動の措置、異議、スパムとボット（層、規則、危険の点）、照合の一致の扱い、法令の窓口（申出、開示、法執行）、運用の状況の公表 | 0038–0041（範囲 0038–0042） | セキュリティ、PM、法務の確認 | E11 |
 | [accounts-and-auth.md](accounts-and-auth.md) | 登録、ログイン、強いログイン、セッションと取り消し、連絡先の変更の保留、ログインの記録、ハンドルとプロフィール、アカウントの状態と削除、年齢の枠組み、認可の画面。`users`・`user_settings` の表の持ち主 | 0043–0044（範囲 0043–0045） | セキュリティ | E2 |
-| [api-and-rate-limits.md](api-and-rate-limits.md) | 公開 API の形と版、ページングとエラー、開発者とアプリ、OAuth 2.0（PKCE）とトークンの形（`<brand>_`）、レート制限（トークンバケット、画面と API の共通の桶、`RateLimit` のヘッダー）、計量とプラン、後の Webhook | 0046–0048（範囲 0046–0048） | QA、Ops | E2、E13 |
+| [api-and-rate-limits.md](api-and-rate-limits.md) | 公開 API の形とバージョン、ページングとエラー、開発者とアプリ、OAuth 2.0（PKCE）とトークンの形（`<brand>_`）、レート制限（トークンバケット、画面と API の共通の桶、`RateLimit` のヘッダー）、計量とプラン、後の Webhook | 0046–0048（範囲 0046–0048） | QA、Ops | E2、E13 |
 | [clients.md](clients.md) | 共通のパッケージ、Web（React、PWA）とアプリ（React Native）、データの層と手元の保存、オフライン、タイムラインの描画、投稿の作成と日本語の入力、閲覧の出来事の送り方、プッシュの受け方と深いリンク、公開の URL の HTML、アクセシビリティ | 0049–0050（範囲 0049–0050） | QA | E2〜E13 |
 | [security.md](security.md) | 信頼境界と脅威モデル、端末に残るデータ、暗号化と鍵、監査と運用者のアクセス、データのライフサイクルと保全、乗っ取りへの対応、ログに出さないもの、脆弱性の管理、インシデント | 0051–0053（範囲 0051–0053） | セキュリティ | E1、E11、E14 |
 | [data-model.md](data-model.md)・[data-model/](data-model/) | データモデルの正本：規約（ID、RLS、DB のロール、`visible()` に渡す列、暗号化、分割と保持、S2 のクラスタ）、全体と領域ごとの ER 図、95 表の定義、DB の外の置き場所の形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、ホスト名と CloudFront、サービスと配置、Valkey の 4 クラスタ、Kinesis の 8 つの流れと消費者、バックアップと DR（`tid` の範囲、outbox の送り直し、`ar:` の先の作成）、段階を上げる基準、S2・S3、Terraform、コスト | 0054–0056（範囲 0054–0057） | Ops | E1、E14 |
 | [observability.md](observability.md) | 中身を出さない計装、トレース、RUM、届く速さの計測（合成監視、区間、読み出しの抜き取り）、SLI の計測、出来事・写し・カウンターの指標、見える範囲の抜き取りの監査、ランキングのガードレールの指標、ダッシュボード | 0058–0059（範囲 0058–0059） | Ops | E1、E5、E10、E14 |
 | [capacity.md](capacity.md) | 負荷のモデル（投稿、読み出し、fan-out、エンゲージメント、閲覧、瞬間のピーク）、部品ごとの必要量、データの量、クォータ、余裕と削る順、負荷試験 L1〜L10 | 0060（範囲 0060） | Ops | E14 |
-| [delivery.md](delivery.md) | CI の関門、フラグと設定の名前空間、サーバーのデプロイの順、アプリのリリースの列車とストアの段階の配布、OTA の更新、最低の版、スキーマと契約の変更の順序、ランキングの変更の出し方 | 0061–0063（範囲 0061–0063） | QA、Ops | E1、E2、E14 |
+| [delivery.md](delivery.md) | CI の関門、フラグと設定の名前空間、サーバーのデプロイの順、アプリのリリースの列車とストアの段階の配布、OTA の更新、最低のバージョン、スキーマと契約の変更の順序、ランキングの変更の出し方 | 0061–0063（範囲 0061–0063） | QA、Ops | E1、E2、E14 |
 
 - 次に採番する ADR は 0064。統合の後に足す ADR は、関わる領域の行に番号を書き足す。
 

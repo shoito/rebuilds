@@ -32,7 +32,7 @@ Media Node の中の作りと振る舞い。mediasoup v3 の worker・router・W
 | 符号 | simulcast は VP8・H.264、SVC は VP9（full SVC と K-SVC）。AV1 と Dependency Descriptor の拡張も対応の一覧にある（[RTP Parameters and Capabilities](https://mediasoup.org/documentation/v3/mediasoup/rtp-parameters-and-capabilities/)、[supportedRtpCapabilities.ts](https://github.com/versatica/mediasoup/blob/v3/node/src/supportedRtpCapabilities.ts)） | 層の作り方は codecs-and-bandwidth-adaptation.md |
 | 暗号化したヘッダー拡張 | 対応しない（RTP Parameters and Capabilities） | E2EE でも拡張は平文で送る（[ADR-0004](../decisions/0004-encryption-and-e2ee.md) と合う） |
 | worker の異常終了 | `worker.on("died")`。「起きてはならない。起きたら不具合」（API） | 9.2 節 |
-| 版 | 3.27.x（[CHANGELOG](https://github.com/versatica/mediasoup/blob/v3/CHANGELOG.md)） | 開発の開始時の最新の 3.x に固定し、上げるときは回線の劣化の試験を通す |
+| バージョン | 3.27.x（[CHANGELOG](https://github.com/versatica/mediasoup/blob/v3/CHANGELOG.md)） | 開発の開始時の最新の 3.x に固定し、上げるときは回線の劣化の試験を通す |
 
 いずれも 2026-09-27 に確認。
 
@@ -385,7 +385,7 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 
 ### runbooks
 
-- `media-node-failure.md`：Node が落ちたときの確かめ方（心拍、`media.reattach` の数、戻るまでの時間）と、同じ種類の Node が続けて落ちるとき（AMI、mediasoup の版）の切り戻し。
+- `media-node-failure.md`：Node が落ちたときの確かめ方（心拍、`media.reattach` の数、戻るまでの時間）と、同じ種類の Node が続けて落ちるとき（AMI、mediasoup のバージョン）の切り戻し。
 - `media-node-allowance-exceeded.md`：ENA の `pps_allowance_exceeded` などが増えたときの確かめ方と、その Node の drain、`*_limit` の見直し。
 - `mediasoup-worker-died.md`：worker の異常終了の調べ方（`trace` のイベント、コアダンプを取らない前提での再現）と、上流への報告。
 - `keyframe-storm.md`：1 人の送り手の送出がキーフレームで膨らむときの確かめ方と、`keyFrameRequestDelay` の引き上げ。

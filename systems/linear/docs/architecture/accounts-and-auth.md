@@ -52,7 +52,7 @@
 
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
-| 版とライセンス | `better-auth` 1.7.6、MIT。`@better-auth/passkey`・`@better-auth/sso`・`@better-auth/scim` も 1.7.6 | npm のレジストリ（`registry.npmjs.org`） |
+| バージョンとライセンス | `better-auth` 1.7.6、MIT。`@better-auth/passkey`・`@better-auth/sso`・`@better-auth/scim` も 1.7.6 | npm のレジストリ（`registry.npmjs.org`） |
 | Hono | `app.all("/api/auth/*", c => auth.handler(c.req.raw))` で載る。Web 標準の API で、アダプターが要らない | [Hono integration](https://www.better-auth.com/docs/integrations/hono) |
 | PostgreSQL | `pg` の Pool と Kysely。`database.schemaName` で `public` 以外のスキーマに置ける。CLI でマイグレーションを生成できる | [PostgreSQL](https://www.better-auth.com/docs/adapters/postgresql) |
 | セッション | 既定 7 日。`updateAge`（既定 1 日）ごとに期限を延ばす。`freshAge`（既定 1 日）で、重い操作に最近のログインを求める。一覧、個別・他の全部・全部の取り消し。二次の保存（Redis など）に置ける | [Session management](https://www.better-auth.com/docs/concepts/session-management) |
@@ -65,7 +65,7 @@
 | 組織 | 組織・メンバー・ロール・招待（既定 48 時間）・チーム | [Organization](https://www.better-auth.com/docs/plugins/organization) |
 
 - 本体の表（`user`・`session`・`account`・`verification`）の名前と列の名前は、設定の `modelName` と `fields` で変えられる。部品の表は部品の `schema` で変える。コードの型は元の名前のまま（[Database](https://www.better-auth.com/docs/concepts/database)、2026-09-28 に確認）。
-- 公開された脆弱性の告知（GitHub Security Advisories）は 32 件（2024-12〜2026-08。Critical 2 件は SSO と SCIM の部品、High は本体・パスキー・OAuth の提供者の部品にもある）（[better-auth の Security Advisories](https://github.com/better-auth/better-auth/security/advisories)、2026-09-28 に確認）。告知から修正の版までの速さは、この確認では測っていない（3.4 節の手順で見る）。
+- 公開された脆弱性の告知（GitHub Security Advisories）は 32 件（2024-12〜2026-08。Critical 2 件は SSO と SCIM の部品、High は本体・パスキー・OAuth の提供者の部品にもある）（[better-auth の Security Advisories](https://github.com/better-auth/better-auth/security/advisories)、2026-09-28 に確認）。告知から修正のバージョンまでの速さは、この確認では測っていない（3.4 節の手順で見る）。
 
 ## 3. Better Auth の評価と使い方
 
@@ -79,7 +79,7 @@ ADR-0034。
 | 技術の合い方 | TypeScript、Hono、PostgreSQL（Kysely）。同じ Aurora の別スキーマに置ける | 同じ | 別のサービス。ユーザーの表が外にある |
 | 後の SAML・SCIM | 部品がある（samlify、SCIM 2.0） | 大きな作業 | ある |
 | データの所在（法務の L4） | 自分の Aurora（東京） | 同じ | リージョンを選べる |
-| 危うさ | 若いライブラリ。認証の核を外に頼る。版の上げで挙動が変わりうる | 自分で書いた誤り | 製品の制約。移行が難しい |
+| 危うさ | 若いライブラリ。認証の核を外に頼る。バージョンの上げで挙動が変わりうる | 自分で書いた誤り | 製品の制約。移行が難しい |
 | 本家の実装との関係 | 本家と無関係の第三者の汎用の部品（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md) で使ってよい） | — | — |
 
 - 採用：Better Auth。ただし、`packages/auth` で包み、画面と他のサービスは包みの API だけを使う。Better Auth の型・関数を他のパッケージから直接使わない（lint）。置き換えるときの範囲を包みの中に閉じるため。
@@ -114,9 +114,9 @@ ADR-0034。
 
 - 表の名前は Better Auth の既定のままにする。`modelName` で変えられるが、コードの型は元の名前のままなので、名前が 2 つになり、読み違いを招くため。この文書では「アカウント」と書く。
 
-### 3.4 版と脆弱性
+### 3.4 バージョンと脆弱性
 
-- 版は固定し（`1.7.x` の範囲で、自動の更新は patch だけ）、minor 以上の上げは、6 節の結合テストとログインの E2E を通してから行う。
+- バージョンは固定し（`1.7.x` の範囲で、自動の更新は patch だけ）、minor 以上の上げは、6 節の結合テストとログインの E2E を通してから行う。
 - GitHub の Security Advisories と、npm の監査を CI で見る。認証の部品の High 以上の告知は、7 日以内に上げるか、回避を入れる（security の領域の脆弱性の対応に入れる）。
 - 告知は多い（2.2 節。2026-09-28 までに 32 件）。部品は使うまで依存に入れない（組織・OAuth の提供者・stripe は使わない。SSO・SCIM は Enterprise の Epic で入れる）。告知の対象を、依存に入れた部品だけに絞る。
 
@@ -350,7 +350,7 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 | メールの送信事業者が遅れる・落ちる | OTP が届かない | Google とパスキーで入れる。送信の失敗は画面に「メールが届かない場合は…」を出す。送信の事業者を 2 つにするかは notifications-and-inbox と決める |
 | Valkey の写しが落ちた | セッションの確かめが内部の API に集まる | 内部の API を横に増やす。写しは失われてよい |
 | 取り消しの知らせが落ちた | 取り消したセッションの接続が残る | 5 分ごとの確かめ（6.4 節） |
-| Better Auth の版の上げで挙動が変わる | ログインが壊れる | 6 節の結合テストとログインの E2E を上げる前の必須にする。段階的なリリース |
+| Better Auth のバージョンの上げで挙動が変わる | ログインが壊れる | 6 節の結合テストとログインの E2E を上げる前の必須にする。段階的なリリース |
 | Google の障害 | Google でログインできない | メールの OTP とパスキー |
 
 ## 11. セキュリティ
@@ -363,7 +363,7 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 - **アカウントの乗っ取り**：メールアドレスの変更とパスキーの登録に、最近のログインを求め、古いアドレスへ知らせる。新しい端末でのログインを、メールで知らせる（設定で止められる）。
 - **許可したドメイン**：DNS での確認を必須にし、公開のメールのドメインを許さない（7.4 節）。
 - **ワークスペースの手段の制限**：チケットの発行で強制する。ログインの画面だけの制限にしない。
-- **第三者の部品**：Better Auth の版の固定と、告知への対応の期限（3.4 節）。認証の核を外の部品に頼る危うさを、包み（`packages/auth`）と結合テストで抑える。
+- **第三者の部品**：Better Auth のバージョンの固定と、告知への対応の期限（3.4 節）。認証の核を外の部品に頼る危うさを、包み（`packages/auth`）と結合テストで抑える。
 - **データの所在（法務の L4）**：アカウントの表は東京の Aurora。メールの送信事業者に渡るのは、メールアドレスと OTP だけ。
 - **テストのデータ**：実在の人のメールアドレスを使わない（AGENTS.md）。`example.com` などの予約のドメインを使う。
 
@@ -429,7 +429,7 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | クッキーの接頭辞の設定の名前 | E4 の `auth-service-skeleton` |
-| Better Auth の告知への対応の速さ（告知から修正の版まで） | E4 の着手の前に、セキュリティのレビューで調べる |
+| Better Auth の告知への対応の速さ（告知から修正のバージョンまで） | E4 の着手の前に、セキュリティのレビューで調べる |
 | メールの送信事業者（SES か、別の事業者か）と、2 つ持つか | notifications-and-inbox と法務の L1 の後 |
 | SAML の IdP の属性でロールを決めるか、SCIM の Groups をチームに写すか | Enterprise の Epic（E13 以降） |
 | 本家のコード・招待の期限、ドメインの確認 | 公式の資料では確かめられなかった（**未検証**のまま） |
@@ -439,7 +439,7 @@ DT-AUTH-003。ログインしたアカウントが、ワークスペースに入
 ### quality.md
 
 - DT-AUTH-001〜003 の表駆動テスト、12 節の結合テスト、PROP-AUTH-001・002 を E4 のリリースの基準にする。
-- Better Auth の版を上げる PR には、ログインの E2E（メール、Google の模擬、パスキー、Electron）を必須にする。
+- Better Auth のバージョンを上げる PR には、ログインの E2E（メール、Google の模擬、パスキー、Electron）を必須にする。
 - 本番：ログインの成功率（手段ごと）、OTP の送信から検証までの時間の p95、流量の制限に当たった数。
 - 本番：取り消し・停止から切断までの p99 5 秒、5 分の確かめで切った数（知らせの取りこぼしの目安）。
 - E12 の外部のペンテストに、12 節の項目を入れる。

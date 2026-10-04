@@ -56,7 +56,7 @@ erDiagram
     int logical_shard PK "0 から 479"
     text cluster_id "物理クラスタ"
     text state "active frozen fenced"
-    bigint version "割り当ての版"
+    bigint version "割り当てのバージョン"
   }
   shard_groups {
     int logical_shard PK "0 から 479"

@@ -138,7 +138,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 
 ### 6.1 部品
 
-- **Better Auth を自前でホストする。** Slack・GitHub・Notion の再構築と同じ部品と使い方の規則にする（[slack の ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md)、[github の ADR-0019](../../../github/docs/decisions/0019-authentication-and-token-model.md)）：Better Auth は「だれか」（認証の手段、セッション、パスキー、MFA、SSO の接続）だけを持つ。組織・利用者・権限は自前の表で持つ。`organization` プラグインは使わない。公開するエンドポイントは許可したものだけ。版を固定する。
+- **Better Auth を自前でホストする。** Slack・GitHub・Notion の再構築と同じ部品と使い方の規則にする（[slack の ADR-0012](../../../slack/docs/decisions/0012-self-hosted-auth-with-better-auth.md)、[github の ADR-0019](../../../github/docs/decisions/0019-authentication-and-token-model.md)）：Better Auth は「だれか」（認証の手段、セッション、パスキー、MFA、SSO の接続）だけを持つ。組織・利用者・権限は自前の表で持つ。`organization` プラグインは使わない。公開するエンドポイントは許可したものだけ。バージョンを固定する。
 - **rebuilds の Auth0 の題材を、本システムの IdP にはしない。** 設計の記録だけで動く製品がまだなく、2 つの作りかけの題材を結ぶと、片方の遅れがもう片方を止める。組織が Auth0（本家）や他の IdP を使うなら、普通の OIDC・SAML の SSO としてつなげる（6.4 節）。
 - Better Auth の表（`identity` のスキーマ：`auth_users`、`auth_accounts`、`auth_sessions`、`passkeys`、`two_factors`、`sso_providers`）は、組織の解決の前に使うので RLS の外に置き、認証のサービスのロールだけが読み書きする。各行は `org_id` の列を持ち、組織の利用者（`users.auth_subject_id`）と 1 対 1 に結ぶ。1 人の人が 2 つの組織の利用者なら、認証の主体も 2 つ（別の `username`）。
 
@@ -311,7 +311,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 | 事象 | 振る舞い |
 | --- | --- |
 | 組織の IdP の障害 | `sso_bypass` の管理者がパスワード＋ハードウェアのセキュリティキーで入る。他の利用者は IdP の復旧を待つ |
-| Better Auth の不具合・脆弱性 | 版を固定している。勧告を監視し、PR で上げる。認証の結合テストと DT-AUTH-* を通す |
+| Better Auth の不具合・脆弱性 | バージョンを固定している。勧告を監視し、PR で上げる。認証の結合テストと DT-AUTH-* を通す |
 | セッションの DB の障害 | Aurora の切り替え（RTO 5 分）。短い Cookie のキャッシュで、既にログインした人の読みを続ける（最大 60 秒） |
 | 組織の作成の途中の失敗 | 1 つのトランザクションなので巻き戻る。部品のコンパイルは後から作り直せる |
 | 削除の消去の遅れ | 7 日を超えたら警告 |
@@ -335,7 +335,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
   - `PROP-AUTH-002`（草案）：任意の操作の列の後で、有効な「管理者」（`customize_application`・`manage_users`・`modify_all_data`）が組織に 1 人以上いる。
   - 権限の依存の表：任意の権限セットの保存で、依存を満たさない組は断られる。
 - 結合テスト：未知のホスト名・トークンで DB を読まずに 404（ADR-0005）。無効化でトークンとセッションが即時に失効する。SAML の IdP 起点のログインを断る。画面の API が OAuth のトークンで通らない。
-- 結合テスト：Better Auth の版を上げる PR で、ログイン・MFA・SSO・セッションの全ての経路を通す。
+- 結合テスト：Better Auth のバージョンを上げる PR で、ログイン・MFA・SSO・セッションの全ての経路を通す。
 - 結合テスト（SSO の MFA）：`amr`・`AuthnContextClassRef` がない・一覧にない・一覧にある SSO の応答で、2 つ目の要素を求める・求めないが DT-AUTH-001 の行 5〜8 どおりになる。理由のない無効化が断られ、無効化が監査に残り管理者に知らされる。
 - 結合テスト（特権とパスキー）：特権を持つ利用者の TOTP・回復の番号を断る。特権を得た利用者のセッションが切れ、次のログインでパスキーの登録を求める。`sso_bypass` は、ハードウェアのキーを 2 つ登録するまで与えられない。
 - 性質ベーステスト：`PROP-AUTH-003`（草案）：任意の利用者・権限の付与・SSO の設定・主張の列で、特権を持つ利用者のセッションは、パスキーかフィッシングに強い主張でだけ作られる。
@@ -359,7 +359,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 
 | Epic | Story の候補 |
 | --- | --- |
-| E1 | CI：`DT-AUTH-*` の表駆動テストと `PROP-AUTH-*` の枠。Better Auth の版の固定と勧告の監視 |
+| E1 | CI：`DT-AUTH-*` の表駆動テストと `PROP-AUTH-*` の枠。Better Auth のバージョンの固定と勧告の監視 |
 | E1 | 組織の解決（ホスト名、トークンの表）を DB の前に行う入口 |
 | E2 | 申し込みと組織の作成（種、最初の管理者、部品の事前のコンパイル） |
 | E2 | エディションと機能の組、エディションの上げ下げ |
@@ -414,7 +414,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 
 - `org-idp-outage`：組織の IdP の障害で利用者が入れない。`sso_bypass` の案内。
 - `login-attack`：1 つの組織・IP でのログインの失敗の急増。WAF のレートの制限と、組織への知らせ。
-- `better-auth-advisory`：Better Auth の勧告への対応（版の上げ、影響の確認）。
+- `better-auth-advisory`：Better Auth の勧告への対応（バージョンの上げ、影響の確認）。
 - `last-admin-recovery`：最後の管理者を失った組織の復旧（2 人の承認）。
 - `org-purge-overdue`：組織の消去が 7 日を超えた。
 - SLI の追加の依頼（Ops へ）：ログインの p95、ログインの失敗の率、SSO の失敗の率（IdP ごと）、トークンの発行の数、組織の作成の時間。

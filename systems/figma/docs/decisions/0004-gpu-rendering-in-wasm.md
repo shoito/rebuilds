@@ -46,7 +46,7 @@ GPU の抽象の実装の候補：
   - CanvasKit は C++ の Skia で、WASM のバイナリが大きい。エンジンの他の部分（Rust）との間で、境界をまたぐ呼び出しが増える。
   - Vello は Rust で有望で、Vello GPU（旧 `vello_hybrid`）は WebGL2 にも対応した。ただし、マスクの層・複雑なフィルター・非分離のブレンドの一部は未対応で panic し、WebGL2 では wgpu を通らない独自の経路を使う（[vello_gpu の README](https://github.com/linebender/vello/tree/main/vello_gpu)、2026-09-27 に確認）。GPU の抽象（下の a）とバックエンドの切り替えの外に出るので採らない。比較の参照の実装には使う（[ADR-0013](0013-scene-graph-and-tile-rendering.md)）。
   - どちらも、タイルのキャッシュとカリングを、描画のライブラリの外で自前に持つ必要は残る。
-- 4 を採らない理由：WebGPU を使えない端末とブラウザの版が残る。Chrome・Edge は 113 から ChromeOS・macOS・Windows で、144 から Linux（Intel の Gen12 以降の GPU だけ）で使える。Firefox は 141 から Windows で、macOS は Apple シリコンだけ（Intel の Mac と Linux は未対応）。Safari は 26 から（MDN の browser-compat-data の `api/GPU.json`、2026-09-27 に確認）。日本の企業の管理された端末での割合は **未検証**（E2 の `client-frame-telemetry` で、使ったバックエンドの割合を数える）。
+- 4 を採らない理由：WebGPU を使えない端末とブラウザのバージョンが残る。Chrome・Edge は 113 から ChromeOS・macOS・Windows で、144 から Linux（Intel の Gen12 以降の GPU だけ）で使える。Firefox は 141 から Windows で、macOS は Apple シリコンだけ（Intel の Mac と Linux は未対応）。Safari は 26 から（MDN の browser-compat-data の `api/GPU.json`、2026-09-27 に確認）。日本の企業の管理された端末での割合は **未検証**（E2 の `client-frame-telemetry` で、使ったバックエンドの割合を数える）。
 - b を採らない理由：シェーダーを 2 つの言語（GLSL と WGSL）で持つか、本家のように変換の仕組みを自前で持つことになる。wgpu は、その変換（naga）を含む。
 
 ## Consequences

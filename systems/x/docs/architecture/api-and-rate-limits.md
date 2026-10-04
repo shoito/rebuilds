@@ -1,10 +1,10 @@
 # API and Rate Limits: X
 
-公開 API の形（REST、版、`tid` でのページング、エラー）、OAuth 2.0 とアプリ、トークンの形、レート制限（利用者・アプリ・エンドポイント・IP、画面と API の共通の桶、IETF の `RateLimit` のヘッダー）、使った量の計量とプラン、後の Webhook を決める。画面向けの App API も、利用者の上限（投稿・フォロー・DM の 1 日の数）は同じ桶を使う。
+公開 API の形（REST、バージョン、`tid` でのページング、エラー）、OAuth 2.0 とアプリ、トークンの形、レート制限（利用者・アプリ・エンドポイント・IP、画面と API の共通の桶、IETF の `RateLimit` のヘッダー）、使った量の計量とプラン、後の Webhook を決める。画面向けの App API も、利用者の上限（投稿・フォロー・DM の 1 日の数）は同じ桶を使う。
 
 | ADR | 決定 |
 | --- | --- |
-| [0046](../decisions/0046-public-api-shape-and-oauth.md) | 公開 API は `https://api.<brand>.<domain>/v1/` の REST（JSON）。ID は 10 進の文字列。一覧は `tid` の範囲（`since_id`・`until_id`）と、署名した不透明な `next_token` で送る。認証は OAuth 2.0 の認可コード＋PKCE（S256 必須）と、公開の読み出しだけのアプリのトークン。トークンは `<brand>_` の接頭辞とチェックサムを持ち、SHA-256 で保存する。版はパスの主の番号で、壊す変更は新しい版にし、古い版は 12 か月の告知の後に止める |
+| [0046](../decisions/0046-public-api-shape-and-oauth.md) | 公開 API は `https://api.<brand>.<domain>/v1/` の REST（JSON）。ID は 10 進の文字列。一覧は `tid` の範囲（`since_id`・`until_id`）と、署名した不透明な `next_token` で送る。認証は OAuth 2.0 の認可コード＋PKCE（S256 必須）と、公開の読み出しだけのアプリのトークン。トークンは `<brand>_` の接頭辞とチェックサムを持ち、SHA-256 で保存する。バージョンはパスの主の番号で、壊す変更は新しいバージョンにし、古いバージョンは 12 か月の告知の後に止める |
 | [0047](../decisions/0047-rate-limit-token-buckets.md) | レート制限は、Valkey の上のトークンバケットを Valkey Functions で原子的に引く。桶は利用者・アプリ・利用者×アプリ・エンドポイント・IP の組で、1 つの要求が複数の桶を同時に引く（全部に余りがあるときだけ通す）。利用者の行動の上限（投稿・フォロー・DM・いいね）は画面と API で共通の桶にする。応答は IETF の `RateLimit-Policy`・`RateLimit`（draft-11）と `Retry-After`。Valkey が落ちたら、読み出しはタスクの中の近似の桶で続け、SMS の送信は止める |
 | [0048](../decisions/0048-usage-plans-and-metering.md) | 公開 API は使った量で数える。数える単位は「返した投稿・利用者の件数」と「書き込みの回数」。計量は要求の処理の後に出来事として Firehose へ流し、日ごとに集計する。プランの月の上限は Valkey の数で強制する。MVP は計量と上限まで行い、請求の連携は MVP の後。Webhook（活動の API）も MVP の後 |
 
@@ -13,7 +13,7 @@
 ## 1. 目的と範囲
 
 - 扱う：
-  - 公開 API の形、資源、ページング、エラー、版と廃止
+  - 公開 API の形、資源、ページング、エラー、バージョンと廃止
   - 開発者のアカウント、アプリ、OAuth 2.0（PKCE）、アプリのトークン、トークンの形
   - レート制限：公開 API と、画面（App API）の利用者の行動の上限、認証の入口の上限
   - 使った量の計量、プランの上限
@@ -39,7 +39,7 @@
 | ページング | 応答の `meta.next_token` を次の要求の `pagination_token` に入れる。1 ページの件数は `max_results`。新しいものを取るときは `since_id` を使う | [Pagination](https://docs.x.com/x-api/fundamentals/pagination)（2026-10-04 に確認） |
 | レート制限 | 15 分か 24 時間の窓。アプリのトークンはアプリごと、利用者のトークンは利用者ごと。ヘッダーは `x-rate-limit-limit`・`x-rate-limit-remaining`・`x-rate-limit-reset`。例：投稿の作成はアプリごとに 24 時間 10,000、利用者ごとに 15 分 100 | [Rate limits](https://docs.x.com/x-api/fundamentals/rate-limits)（2026-10-04 に確認） |
 | 課金 | 使った量に応じた課金、月 300 万件の投稿の読み出しの上限 | [intent.md](../intent.md) の出典 |
-| 版 | パスに `/2/` を持つ | 同上（Pagination の例の URL） |
+| バージョン | パスに `/2/` を持つ | 同上（Pagination の例の URL） |
 
 - 本家の `x-rate-limit-*` の形は採らない。IETF の `RateLimit` の形を使う（[architecture/README.md](README.md) の 6 節の決定、5.4 節）。本家の SDK とそのまま互換にすることは目標にしない（[intent.md](../intent.md) の Non-goals）。
 
@@ -100,10 +100,10 @@ ADR-0046。
 - 主な `code`：`invalid_request`（400）、`unauthorized`（401）、`insufficient_scope`（403）、`not_found`（404）、`conflict`（409。重複の投稿など）、`payload_too_large`（413）、`rate_limited`（429）、`usage_cap_reached`（429。6 節）、`client_too_old`（426。画面の API だけ。[delivery.md](delivery.md) の 6 節）、`internal`（500）、`unavailable`（503）。
 - 書き込みは `Idempotency-Key`（UUID）を受ける。同じアプリ・同じ利用者・同じキーの 24 時間の中の再送は、前の結果を返す（投稿の二重の作成を防ぐ。[posts-and-ids.md](posts-and-ids.md)）。
 
-### 3.6 版と廃止
+### 3.6 バージョンと廃止
 
-- パスの主の番号（`/v1/`）。同じ版の中では、足す変更（新しい資源、新しいフィールド、新しい引数）だけを行う。クライアントは知らないフィールドを無視することを文書に書く。
-- 壊す変更（フィールドの削除・意味の変更、既定の変更）は `/v2/` にする。古い版は **12 か月** の告知の後に止める。告知の間は、応答に `Deprecation`（RFC 9745）と `Sunset`（RFC 8594）のヘッダーを付け、開発者のメールで知らせる。
+- パスの主の番号（`/v1/`）。同じバージョンの中では、足す変更（新しい資源、新しいフィールド、新しい引数）だけを行う。クライアントは知らないフィールドを無視することを文書に書く。
+- 壊す変更（フィールドの削除・意味の変更、既定の変更）は `/v2/` にする。古いバージョンは **12 か月** の告知の後に止める。告知の間は、応答に `Deprecation`（RFC 9745）と `Sunset`（RFC 8594）のヘッダーを付け、開発者のメールで知らせる。
 - 個別のエンドポイントの廃止も同じ 12 か月の告知にする。
 - 契約の検査は CI で OpenAPI の差分を比べて行う（[delivery.md](delivery.md) の 7 節）。
 
@@ -229,7 +229,7 @@ RateLimit: "user-app-read";r=812;t=640
 - `RateLimit-Policy` は、その要求に当たった桶の方針を全部並べる。`RateLimit` は、**最も余りの少ない桶** だけを返す（`r` は残り、`t` は満杯までの秒）。
 - `pk`（分ける鍵）は付けない。利用者・アプリの ID をヘッダーに出さないため。
 - `429` には `Retry-After`（秒）を付ける。
-- 草案の版が進んで形が変わったら、`/v2/` を待たずに追う（足す変更として扱う。古い形は 6 か月並べて出す）。草案の名前のヘッダーを使う危うさは 12 節の持ち越し。
+- 草案のバージョンが進んで形が変わったら、`/v2/` を待たずに追う（足す変更として扱う。古い形は 6 か月並べて出す）。草案の名前のヘッダーを使う危うさは 12 節の持ち越し。
 - 画面（App API）にもヘッダーを付ける。クライアントは、残りが 0 の行動のボタンを、`t` の秒まで押せなくする（[clients.md](clients.md)）。
 
 ### 5.5 障害と精度

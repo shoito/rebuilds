@@ -71,10 +71,10 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 認証と権限（[identity-and-access.md](architecture/identity-and-access.md)） | 権限の決定表の表駆動テスト。Better Auth の許可リスト外のパス（例：`/api/auth/sso/register`）が 404 になる。セッションの取り消しが WebSocket に届くまでの時間。SAML の外部ペンテスト |
 | リアルタイム（[realtime.md](architecture/realtime.md)） | 退出の直後のメッセージが外された人に届かない。Valkey のフェイルオーバーと `resync`、再接続の殺到の障害注入 |
 | 通知（[read-state-and-notifications.md](architecture/read-state-and-notifications.md)） | 1 人に最大 1 回の性質。通知の適用順序の表駆動テスト。SQS の送信失敗の障害注入。メンション数の突合 |
-| 検索（[search.md](architecture/search.md)） | TypeScript の判定関数と SQL の `readable_channel_ids()` が同じ集合を返す性質。検索の関数が他テナントの ID を返さない性質（ADR-0027）。読み直しで権限が理由で落ちた件数が 0。インデックスの版の比較 |
+| 検索（[search.md](architecture/search.md)） | TypeScript の判定関数と SQL の `readable_channel_ids()` が同じ集合を返す性質。検索の関数が他テナントの ID を返さない性質（ADR-0027）。読み直しで権限が理由で落ちた件数が 0。インデックスのバージョンの比較 |
 | ファイル・プレビュー（[files.md](architecture/files.md)、ADR-0016） | EICAR のテストファイルでのスキャンと隔離。SSRF のテスト（内部の IP、DNS の再バインド、リダイレクト） |
 | クライアント（[client.md](architecture/client.md)） | 同期エンジンの性質ベーステスト（SharedWorker とタブ単体の両方）。送信キューの性質（`client_msg_id` ごとに 1 件）。3 エンジンの E2E（3 タブで WebSocket が 1 本、送信中の再読み込み、IME）。axe で違反 0。見た目の回帰。性能の予算 |
-| MCP（[mcp.md](architecture/mcp.md)） | MCP が返すデータは、同じメンバーが API で読めるデータの部分集合である性質。`aud`・ワークスペース・取り消しの検証。仕様の適合（Protected Resource Metadata、401、古い版への 405） |
+| MCP（[mcp.md](architecture/mcp.md)） | MCP が返すデータは、同じメンバーが API で読めるデータの部分集合である性質。`aud`・ワークスペース・取り消しの検証。仕様の適合（Protected Resource Metadata、401、古いバージョンへの 405） |
 | 公開 API・アプリ（[public-api.md](architecture/public-api.md)、[apps.md](architecture/apps.md)） | 配信がボットの読める範囲の部分集合である性質。`ui_blocks` を任意に生成しても XSS にならない性質。署名のテストベクター。配信先の SSRF。インストールの判定の決定表。OpenAPI の破壊的変更の検査 |
 | レート制限（[rate-limiting.md](architecture/rate-limiting.md)） | 許可された件数が上限を超えない性質。Valkey の停止中の振る舞い（一般は通す、認証は止める） |
 | 利用状況の計測（ADR-0025） | 送信されるリクエストに本文・名前・ID が含まれない。計測を無効にしたワークスペースで gtag.js が読み込まれない |

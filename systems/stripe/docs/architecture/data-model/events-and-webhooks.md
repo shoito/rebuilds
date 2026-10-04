@@ -114,10 +114,10 @@ Event（作成の時点のスナップショット、不変）。定義元：[ev
 | `id` | `uuid` | NOT NULL | `uuidv7()` | `evt_` |
 | `created_at` | `timestamptz` | NOT NULL | — | ID の時刻 |
 | `type` | `text` | NOT NULL | — | `payment_intent.succeeded` など（[events-and-webhooks.md](../events-and-webhooks.md) の 3.3 節） |
-| `api_version` | `text` | NOT NULL | — | 作成の時点のアカウントの既定の版 |
+| `api_version` | `text` | NOT NULL | — | 作成の時点のアカウントの既定のバージョン |
 | `object_type` | `text` | NOT NULL | — | `payment_intent` など |
 | `object_id` | `uuid` | NOT NULL | — | |
-| `data` | `jsonb` | NOT NULL | — | リソースの正規形（内部の最新の型）。版ごとの描画は保存しない。lz4 で圧縮 |
+| `data` | `jsonb` | NOT NULL | — | リソースの正規形（内部の最新の型）。バージョンごとの描画は保存しない。lz4 で圧縮 |
 | `previous_attributes` | `jsonb` | NULL | — | |
 | `request_id` | `uuid` | NULL | — | Event を起こした API の要求（`req_`）。自動の処理は NULL |
 | `idempotency_key` | `text` | NULL | — | その要求の `Idempotency-Key`（Event の `request.idempotency_key`） |
@@ -156,7 +156,7 @@ Webhook の送信先。定義元：[events-and-webhooks.md](../events-and-webhoo
 | `id` | `uuid` | NOT NULL | `uuidv7()` | `we_` |
 | `url` | `text` | NOT NULL | — | `https`、ポート 443 |
 | `enabled_events` | `text[]` | NOT NULL | — | `{"*"}` はすべて |
-| `api_version` | `text` | NULL | — | NULL はアカウントの既定（Event の版） |
+| `api_version` | `text` | NULL | — | NULL はアカウントの既定（Event のバージョン） |
 | `status` | `text` | NOT NULL | `'enabled'` | `enabled`・`disabled` |
 | `disabled_reason` | `text` | NULL | — | `manual`・`auto_failing`（3 日失敗が続いた） |
 | `failing_since` | `timestamptz` | NULL | — | 成功のないまま失敗が続いた最初の時刻 |
@@ -169,7 +169,7 @@ Webhook の送信先。定義元：[events-and-webhooks.md](../events-and-webhoo
 - キー：PK `(account_id, id)`。
 - 索引：`(account_id) WHERE status = 'enabled' AND deleted_at IS NULL` — webhook-router が Event ごとに対象を引く（アカウントごとに最大 16 件なので、`enabled_events` の照合はアプリで行う）。
 - CHECK：`url LIKE 'https://%'`、`status IN (...)`、`cardinality(enabled_events) >= 1`。
-- 上限（アカウント・環境ごとに 16 個、異なる版は 3 種類）は、作成のときに `accounts` の行を `FOR UPDATE` で取ってから数えて守る。
+- 上限（アカウント・環境ごとに 16 個、異なるバージョンは 3 種類）は、作成のときに `accounts` の行を `FOR UPDATE` で取ってから数えて守る。
 - S1 の量：約 2 万行。
 
 ### 2.5 `webhook_endpoint_secrets`

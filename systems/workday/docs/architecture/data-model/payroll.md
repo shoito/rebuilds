@@ -1,6 +1,6 @@
 # Data model: 給与の計算
 
-給与のグループと期間、営業日の暦、実行と里程標、設定の版、入力の固定、束、項目、個別の調整、結果、遡及の候補、並行稼働、移行の期首の値。日本の法令の規則表と給与の facet は [payroll-jp.md](payroll-jp.md)、支払・明細・仕訳は [payments.md](payments.md)。振る舞いは [payroll-engine.md](../payroll-engine.md)、決定は [ADR-0004](../../decisions/0004-payroll-engine.md)、[ADR-0026](../../decisions/0026-payroll-run-stages-and-input-snapshot.md)〜[ADR-0029](../../decisions/0029-parallel-run-and-compute-partitioning.md)、[ADR-0043](../../decisions/0043-migration-history-and-parallel-run-inputs.md)、[ADR-0059](../../decisions/0059-payroll-run-slo-and-synthetic-run.md)、[ADR-0063](../../decisions/0063-payroll-flags-pinning-and-freeze-windows.md)。規約は [data-model.md](../data-model.md) の 3 節。
+給与のグループと期間、営業日の暦、実行と里程標、設定のバージョン、入力の固定、束、項目、個別の調整、結果、遡及の候補、並行稼働、移行の期首の値。日本の法令の規則表と給与の facet は [payroll-jp.md](payroll-jp.md)、支払・明細・仕訳は [payments.md](payments.md)。振る舞いは [payroll-engine.md](../payroll-engine.md)、決定は [ADR-0004](../../decisions/0004-payroll-engine.md)、[ADR-0026](../../decisions/0026-payroll-run-stages-and-input-snapshot.md)〜[ADR-0029](../../decisions/0029-parallel-run-and-compute-partitioning.md)、[ADR-0043](../../decisions/0043-migration-history-and-parallel-run-inputs.md)、[ADR-0059](../../decisions/0059-payroll-run-slo-and-synthetic-run.md)、[ADR-0063](../../decisions/0063-payroll-flags-pinning-and-freeze-windows.md)。規約は [data-model.md](../data-model.md) の 3 節。
 
 - 保存：実行・入力・結果・調整・遡及は「給与の実行の入力の文書・結果・エンジンのイメージ」（支給日から、既定 7 年）。並行稼働は DM-4。
 - 金額は円の `bigint`、率は 10 進の文字列（[data-model.md](../data-model.md) の 3.6 節）。
@@ -358,7 +358,7 @@ erDiagram
 
 ### 3.2 `payroll_config_snapshots`
 
-実行の「設定の版」（内容のアドレス）。テナントの計算の設定（`company_payroll_settings` の版）、項目の組の版、給与に効くフラグの値をまとめて固定する。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。定義元：[payroll-engine.md](../payroll-engine.md) の 5.1 節、[delivery.md](../delivery.md) の 8 節。
+実行の「設定のバージョン」（内容のアドレス）。テナントの計算の設定（`company_payroll_settings` のバージョン）、項目の組のバージョン、給与に効くフラグの値をまとめて固定する。[data-model.md](../data-model.md) の 6 節の DM-14 で定義した。定義元：[payroll-engine.md](../payroll-engine.md) の 5.1 節、[delivery.md](../delivery.md) の 8 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -401,7 +401,7 @@ erDiagram
 | `input_hash` | `bytea` | NOT NULL | — | 正規の形（RFC 8785）の SHA-256 |
 | `known_at` | `timestamptz` | NOT NULL | — | 1 人の再計算は新しい `known_at` |
 | `s3_key` | `text` | NOT NULL | — | `payroll-inputs/{tenant}/{sha256}.json` |
-| `time_summary_id` | `uuid` | NULL | — | 使った勤怠の集計の版 |
+| `time_summary_id` | `uuid` | NULL | — | 使った勤怠の集計のバージョン |
 | `created_at` | `timestamptz` | NOT NULL | `now()` | |
 | `superseded_at` | `timestamptz` | NULL | — | 1 人の再計算で置き換えた |
 
@@ -434,7 +434,7 @@ erDiagram
 
 ### 4.1 `pay_items`
 
-支給・控除・中間の項目（版の表）。システムの行（`tenant_id IS NULL`）は RLS の部分の例外（[data-model.md](../data-model.md) の 3.3.1 節）。定義元：[payroll-engine.md](../payroll-engine.md) の 6.1〜6.3 節、[ADR-0027](../../decisions/0027-pay-item-graph-and-formula-language.md)。
+支給・控除・中間の項目（バージョンの表）。システムの行（`tenant_id IS NULL`）は RLS の部分の例外（[data-model.md](../data-model.md) の 3.3.1 節）。定義元：[payroll-engine.md](../payroll-engine.md) の 6.1〜6.3 節、[ADR-0027](../../decisions/0027-pay-item-graph-and-formula-language.md)。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -459,12 +459,12 @@ erDiagram
 - キー：PK `(id)`。一意：`UNIQUE NULLS NOT DISTINCT (tenant_id, code, version)`。
 - 排他：`EXCLUDE USING gist (coalesce(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) WITH =, code WITH =, valid WITH &&) WHERE (status = 'active')`。
 - CHECK：`(tenant_id IS NULL) = (owner = 'system')`、`(tenant_id IS NULL) = (code LIKE 'jp.%')`、`phase BETWEEN 0 AND 9`、`kind IN (...)`。`requires_art24_agreement` の項目は、`company_payroll_settings` に労使協定の記録がなければ有効化を拒む（トリガー）。
-- 運用：部分の RLS（3.3.1 節）。保存はテナントの契約の間（結果が版を指す）。
+- 運用：部分の RLS（3.3.1 節）。保存はテナントの契約の間（結果がバージョンを指す）。
 - S1 の量：システム 100 行ほど、テナントあたり数百行。
 
 ### 4.2 `pay_item_sets`
 
-給与のグループが使う項目の組の版。定義元：[payroll-engine.md](../payroll-engine.md) の 6.1 節。
+給与のグループが使う項目の組のバージョン。定義元：[payroll-engine.md](../payroll-engine.md) の 6.1 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

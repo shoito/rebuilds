@@ -73,9 +73,9 @@ merge queue ─▶ squash で main へ
 ### 2.2 夜間の CI
 
 - ゴールデンデータセットの全件（依存の判定によらず）と、次の年・次の年度の規則表の下書きでの試し（規則表の改正の準備。6 節）。
-- 性質ベーステストの長い版（有効日付は 1 性質 20,000 回）。
+- 性質ベーステストの長いバージョン（有効日付は 1 性質 20,000 回）。
 - 前のリリースのエンジンのイメージで、ゴールデンデータの入力を計算し、今のエンジンと一致することを確かめる（一致しない差は、意図した修正かを QA が確かめる。本番の `ENGINE_DRIFT` の前ぶれを見つける。[ADR-0028](../decisions/0028-retro-deltas-and-bonus-runs.md)）。
-- E2E の全件、DAST、負荷試験の短い版、障害の注入（Aurora の writer、Valkey、SQS、保管庫への到達不能）。
+- E2E の全件、DAST、負荷試験の短いバージョン、障害の注入（Aurora の writer、Valkey、SQS、保管庫への到達不能）。
 
 夜間の CI が 2 日続けて失敗している間は、release フラグを広げない。
 
@@ -112,7 +112,7 @@ golden/
 
 ### 4.2 実行
 
-- 各事例を、今のエンジンと、事例が指す規則表の版で計算し、`expected.json` と項目ごとに比べる。許容の幅はない（1 円でも違えば失敗。[ADR-0029](../decisions/0029-parallel-run-and-compute-partitioning.md) の b を採らない理由と同じ）。
+- 各事例を、今のエンジンと、事例が指す規則表のバージョンで計算し、`expected.json` と項目ごとに比べる。許容の幅はない（1 円でも違えば失敗。[ADR-0029](../decisions/0029-parallel-run-and-compute-partitioning.md) の b を採らない理由と同じ）。
 - 差の報告：事例、項目、期待値、実際の値、差。合成の人なので値を出してよい。
 - 計算は純粋なので、並列に走らせる。数千件で数分を目標にする。
 
@@ -184,12 +184,12 @@ prod に公開（rules.publish。Ops の承認。コードのデプロイとは�
 
 - 暦の正本は Ops の runbook（`statutory-rate-calendar.md`。[payroll-jp-rules.md](payroll-jp-rules.md) の 16 節）。この表は、リリースの仕組みの前提として書く。
 - 公開の遅れ（適用の 5 営業日前に `published` でない）は、2 営業日前で呼び出す（[observability.md](observability.md) の 5.2 節）。
-- 公開の後に誤りが分かったら、訂正の版を同じ流れで出し、遡及の候補を作る（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)）。
+- 公開の後に誤りが分かったら、訂正のバージョンを同じ流れで出し、遡及の候補を作る（[ADR-0030](../decisions/0030-rule-table-ingestion-and-verification.md)）。
 
 ## 7. リリースごとの概要書と操作説明書
 
-- 電子帳簿保存法の要件に当たる「システムの概要書・操作説明書」（[audit-and-retention.md](audit-and-retention.md) の 7 節、[ADR-0050](../decisions/0050-electronic-books-act-readiness.md)）を、リリースごとに公開し、版を残す。
-- 概要書は、給与の計算と記録の流れ（入力の固定、計算、確定、仕訳、訂正の方法）、エンジンの版、規則表の版の一覧。変更がなければ前の版を引き継ぐ。
+- 電子帳簿保存法の要件に当たる「システムの概要書・操作説明書」（[audit-and-retention.md](audit-and-retention.md) の 7 節、[ADR-0050](../decisions/0050-electronic-books-act-readiness.md)）を、リリースごとに公開し、バージョンを残す。
+- 概要書は、給与の計算と記録の流れ（入力の固定、計算、確定、仕訳、訂正の方法）、エンジンのバージョン、規則表のバージョンの一覧。変更がなければ前のバージョンを引き継ぐ。
 - リリースのチェックリストに「概要書・操作説明書の更新の有無」を入れる。
 
 ## 8. フラグ（[ADR-0063](../decisions/0063-payroll-flags-pinning-and-freeze-windows.md)）
@@ -201,7 +201,7 @@ prod に公開（rules.publish。Ops の承認。コードのデプロイとは�
 | ops | 縮退（レポートの非同期の停止、一括の取り込みの停止、読み取りだけの状態 `ops.read_only_mode`、給与の確定の保留 `ops.payroll_finalize_hold`、給与・人事の担当の経路だけを受ける `ops.payroll_first`） | Ops（給与の確定の保留は IC） |
 | permission | テナントごとの機能の有効化（契約） | 支援の担当 |
 
-- **給与に効くフラグは、実行の入力の固定のときに値を記録し、その実行の最後まで固定する。** フラグの値は、実行の「設定の版」（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）に含め、結果の再現に使う。実行の途中でフラグを切り替えても、進行中の実行の結果は変わらない。
+- **給与に効くフラグは、実行の入力の固定のときに値を記録し、その実行の最後まで固定する。** フラグの値は、実行の「設定のバージョン」（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）に含め、結果の再現に使う。実行の途中でフラグを切り替えても、進行中の実行の結果は変わらない。
 - 給与に効くフラグを、あるテナントで有効にする前に、そのテナントの直近の確定した期間を、フラグあり・なしで計算し直し（`parallel` の実行、確定しない）、差を給与の担当と QA が確かめる（影の比較）。差が説明できなければ有効にしない。
 - テナントのカナリア：`hash(flag_name + tenant_id) mod 100`。社内の監視用のテナント → sandbox のテナント → 本番の 1% → 10% → 50% → 100%。給与に効くフラグは、各段で最低 1 回の支給を経る。
 - ガード（フラグの有効なテナントと無効なテナントを比べ、差が続いたら AppConfig のアラームでフラグを自動で切る）：5xx の率、業務プロセスの完了の失敗、打刻の失敗、給与の確認の検査の警告の件数（1 人あたり）、合成の給与の実行の不一致（即時）。

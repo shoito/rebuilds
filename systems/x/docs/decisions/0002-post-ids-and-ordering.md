@@ -15,7 +15,7 @@ date: 2026-10-04
 - **書き込みの速さ**：瞬間のピークで S3 は 1 秒 15 万件の投稿を受ける（[architecture/README.md](../architecture/README.md) の 2 節）。ID の採番に、1 か所の DB の連番を通すと、そこが詰まる。
 - 共通の基盤は ID を UUIDv7 にしている。UUIDv7 も時刻の順に並ぶが、128 ビットである。
 
-本家は、41 ビットのミリ秒の時刻、10 ビットの機械の番号、12 ビットの連番の 64 ビットの ID を、調整なしで振る方式を 2010 年に公開した（[snowflake（2010 年の版）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)、2026-10-04 に確認）。今の実装は未検証。
+本家は、41 ビットのミリ秒の時刻、10 ビットの機械の番号、12 ビットの連番の 64 ビットの ID を、調整なしで振る方式を 2010 年に公開した（[snowflake（2010 年のバージョン）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)、2026-10-04 に確認）。今の実装は未検証。
 
 ## Options
 

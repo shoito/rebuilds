@@ -73,7 +73,7 @@
 
 原則は 6 つ。
 
-- **保存の単位は予定オブジェクトである。** 1 つの UID の系列のマスターと、`RECURRENCE-ID` ごとの上書きを 1 つのまとまりとして版を持つ。iCalendar・CalDAV の単位と同じにする（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）。
+- **保存の単位は予定オブジェクトである。** 1 つの UID の系列のマスターと、`RECURRENCE-ID` ごとの上書きを 1 つのまとまりとしてバージョンを持つ。iCalendar・CalDAV の単位と同じにする（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）。
 - **壁時計の時刻＋TZID が正、UTC は派生である。** UTC の瞬間は `tzdata_version` つきの派生の値で、tzdb が変われば作り直す（[ADR-0002](../decisions/0002-time-representation.md)）。
 - **展開は 1 つの関数、索引は捨てて作り直せる写しである。** 範囲の中の回を展開の索引（`occurrences`）に写し、空き時間・会議室・リマインダー・範囲の表示が読む。範囲の外は、その場で同じ関数で展開する（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）。
 - **主催者の写しが正である。** 参加者ごとに写しを持ち、共有の項目は主催者の写しから iTIP の意味のメッセージで配る。本システムの中の参加者と外部の参加者を、同じ意味で扱う（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）。
@@ -90,17 +90,17 @@
 4. `itip-delivery` が、本システムの中の参加者ごとに、相手のテナントのコンテキストで参加者の写しを書く（それぞれのカレンダーの `change_seq` を振る）。外部の参加者には、iMIP の `REQUEST` を SES で送る（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）。
 5. 参加者の写しの `reminders` から、`reminder.replan` でリマインダーの計画の行が作られる（[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。
 
-**B. tzdb の版を上げる**
+**B. tzdb のバージョンを上げる**
 
-1. `tzdata-watch` が新しい tzdb のリリースを見つけ、署名を確かめて、`packages/tzdata` に版を足す PR を作る。CI が、未来の遷移が変わるゾーンと区間の差分の報告を作る。
-2. Dev と Ops が採用を決め、新旧の版を含むイメージをデプロイする（`active` は旧のまま）。AppConfig の `tzdata.active_version` を新しい版に切り替え、全サービスが同時に新しい版で計算する（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。
-3. 全タスクが新しい版を報告したら、`expander` が会議室の予約の行を先に、次に施行の近い順に予定オブジェクトを計算し直す。壁時計の時刻を保ち、展開の索引、リマインダーの計画を直し、変わった予定を `calendar_changes` に載せる（[ADR-0002](../decisions/0002-time-representation.md)、[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。
+1. `tzdata-watch` が新しい tzdb のリリースを見つけ、署名を確かめて、`packages/tzdata` にバージョンを足す PR を作る。CI が、未来の遷移が変わるゾーンと区間の差分の報告を作る。
+2. Dev と Ops が採用を決め、新旧のバージョンを含むイメージをデプロイする（`active` は旧のまま）。AppConfig の `tzdata.active_version` を新しいバージョンに切り替え、全サービスが同時に新しいバージョンで計算する（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。
+3. 全タスクが新しいバージョンを報告したら、`expander` が会議室の予約の行を先に、次に施行の近い順に予定オブジェクトを計算し直す。壁時計の時刻を保ち、展開の索引、リマインダーの計画を直し、変わった予定を `calendar_changes` に載せる（[ADR-0002](../decisions/0002-time-representation.md)、[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。
 4. 会議室の予約が重なったら、後から承諾した予約を「要確認」にして知らせる（自動で辞退しない。[ADR-0020](../decisions/0020-room-approval-and-needs-review.md)）。切り替えの窓の扱いは ADR-0012。手順は [runbooks/tzdb-update.md](../runbooks/tzdb-update.md)。
 
 **C. リマインダーを送る**
 
 1. `reminder-scheduler` が、計画の表（7 日先まで、256 のシャード）から次の 5 分の行を読み、メモリーのタイマーホイールに載せる（[ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)）。
-2. 時刻が来たら、計画の行を claim し、（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）の鍵を送信の記録に挿入して、挿入できたものだけを notifier へ渡す。同じ鍵の 2 回目は捨てる。版は鍵に入れない（[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。
+2. 時刻が来たら、計画の行を claim し、（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）の鍵を送信の記録に挿入して、挿入できたものだけを notifier へ渡す。同じ鍵の 2 回目は捨てる。バージョンは鍵に入れない（[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。
 3. 予定が動いたり消えたりすれば、`reminder.replan` で計画の行を作り直す。notifier は送る時に回の開始が今と同じかを確かめ、古い時刻の項目を捨てる。
 
 ### 1.4 本家の形（確かめたこと）
@@ -162,7 +162,7 @@
 | NFR-006 | 可用性 | 予定の読み書き（Web・API・CalDAV）月間 99.9%。リマインダーの時刻どおりの送信 月間 99.9%。予約ページ 月間 99.9% | 本家の Workspace の SLA は Calendar を含め月間 99.9%（[Google Workspace SLA](https://workspace.google.com/terms/sla/)、2026-10-04 に確認） |
 | NFR-007 | 耐久性と障害 | 確定を返した変更を失わない。AZ の障害で RPO 0・RTO 5 分以内。リージョンの障害で RPO 1 分以内・RTO 1 時間以内 | リージョンの切り替えでは `sync_epoch` を上げ、全クライアントに差分の取り直しを求める（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)） |
 | NFR-008 | テナントと権限の分離 | 他のテナントの予定、空き時間だけの共有の予定の中身、`private` の予定の中身が、画面・API・CalDAV・ICS・検索・通知・Webhook に届いた事象 0 件 | [ADR-0004](../decisions/0004-tenancy-and-rls.md) |
-| NFR-009 | 時刻の正しさ | 繰り返しの展開で、参照の実装との説明のつかない食い違い 0 件。tzdb の版の採用から 24 時間以内に、影響する未来の回を計算し直す。施行の 7 日以上前に公表された変更で、施行の後の時刻の誤り 0 件 | [ADR-0002](../decisions/0002-time-representation.md)、[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[quality.md](../quality.md) |
+| NFR-009 | 時刻の正しさ | 繰り返しの展開で、参照の実装との説明のつかない食い違い 0 件。tzdb のバージョンの採用から 24 時間以内に、影響する未来の回を計算し直す。施行の 7 日以上前に公表された変更で、施行の後の時刻の誤り 0 件 | [ADR-0002](../decisions/0002-time-representation.md)、[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[quality.md](../quality.md) |
 | NFR-010 | 差分の同期 | 変更 1,000 件以下の差分の応答 p99 1 秒。同期のトークンは最後の利用から 30 日は使える。取り直しの要求（410）は、トークンの期限切れ・ACL の変更・`sync_epoch` の更新のときだけ | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)。本家のトークンの有効の期間は未検証 |
 | NFR-011 | iMIP | 外部への招待のメールの送信事業者への引き渡し p95 60 秒。外部からの返事の取り込み p95 2 分 | [invitations-and-itip.md](invitations-and-itip.md) |
 | NFR-012 | Webhook と検索 | Webhook の通知の最初の送信 p95 30 秒、少なくとも 1 回届ける。変更から検索に出るまで p95 30 秒、検索の応答 p99 1 秒。日本語の部分一致で取りこぼさない | [api-and-push.md](api-and-push.md)、[search.md](search.md) |
@@ -177,7 +177,7 @@
 | CalDAV | Hono の上に WebDAV のメソッド（`PROPFIND`・`REPORT`・`PUT`・`DELETE` など）を自前で書く。XML は第三者の汎用のパーサー | [ADR-0007](../decisions/0007-interop-standards-scope.md) |
 | iCalendar | 自前のパーサーと書き出し（`packages/ical`）。行の折り返し、エスケープ、VTIMEZONE を含む | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0007](../decisions/0007-interop-standards-scope.md) |
 | 繰り返しの展開 | 自前（`packages/recurrence`）。参照の実装（libical を第一の候補）はテストにだけ使う | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) |
-| タイムゾーン | 自前の変換（`packages/tz`）と、版を固定した tzdb のデータ（`packages/tzdata`。IANA の tzdb を zic で遷移の表にしたもの）。サーバーとクライアントで同じ版 | [ADR-0002](../decisions/0002-time-representation.md) |
+| タイムゾーン | 自前の変換（`packages/tz`）と、バージョンを固定した tzdb のデータ（`packages/tzdata`。IANA の tzdb を zic で遷移の表にしたもの）。サーバーとクライアントで同じバージョン | [ADR-0002](../decisions/0002-time-representation.md) |
 | Web クライアント | React、TanStack Router・Query、IndexedDB（最近の範囲のキャッシュ） | [ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) |
 | DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7。拡張は `btree_gist`（会議室の排他の制約）、`pg_bigm`（日本語の検索）、`pg_partman`（展開の索引と変更のログの分割） | [ADR-0004](../decisions/0004-tenancy-and-rls.md)。拡張が Aurora PostgreSQL 18 で使えることは確かめた（[Extension versions](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-10-04） |
 | キャッシュ・合図 | ElastiCache Valkey（pub/sub、空き時間のキャッシュ、レート制限、1 カレンダーの書き込みの枠） | 他の題材と同じ。失ってよい部品 |
@@ -197,7 +197,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤の上に、繰り返しの展開・タイムゾーン・iCalendar・CalDAV・招待の整合を自前で作る。クライアントは Web の SPA で、モバイルは MVP では CalDAV で覆う |
-| [0002](../decisions/0002-time-representation.md) | 時刻つきの予定は壁時計の時刻＋TZID を正にし、UTC の瞬間は `tzdata_version` つきの派生の値にする。終日は日付、浮動は浮動のまま持つ。tzdb は版を固定してサーバーとクライアントに配る |
+| [0002](../decisions/0002-time-representation.md) | 時刻つきの予定は壁時計の時刻＋TZID を正にし、UTC の瞬間は `tzdata_version` つきの派生の値にする。終日は日付、浮動は浮動のまま持つ。tzdb はバージョンを固定してサーバーとクライアントに配る |
 | [0003](../decisions/0003-recurrence-storage-and-expansion.md) | 予定オブジェクト（マスター＋`RECURRENCE-ID` の上書き）を保存の単位にし、範囲（過去 31 日から未来 548 日）の回を展開の索引に写す。「これ以降」は系列を `UNTIL` で切って新しい UID に分ける |
 | [0004](../decisions/0004-tenancy-and-rls.md) | 組織と個人をテナントにし、FORCE RLS で分ける。カレンダーの ACL と予定の公開範囲を `can()`・`redact()` の 1 つのモジュールで判定する |
 | [0005](../decisions/0005-change-log-and-sync-tokens.md) | カレンダーごとに単調な `change_seq` と変更のログを持ち、Web・公開 API・CalDAV・Webhook の差分の同期の背骨にする。トークンは署名つきで、30 日を過ぎたら取り直しを求める |
@@ -205,11 +205,11 @@
 | [0007](../decisions/0007-interop-standards-scope.md) | iCalendar・iTIP・iMIP・CalDAV・WebDAV の同期の対応の範囲を決める。`free-busy-query`・`MKCALENDAR`・VTODO・`RSCALE`・`COUNTER` は MVP で持たない |
 | [0008](../decisions/0008-recurrence-expansion-semantics.md) | `expand()` は規則を壁時計の時刻で求め、無効な日付は捨てる。存在しない時刻は捨てずに RFC 5545 の 3.3.5 節でずらす。DTSTART は最初の回として `COUNT` に数え、長さは DTEND なら正確な長さ、DURATION なら名目の長さで当てる |
 | [0009](../decisions/0009-series-edit-and-override-rebasing.md) | 上書きは「マスターから切り離した項目」の印を持ち、系列の全体の変更では印のない項目だけを追従させる。開始・規則が変わったら、上書きと EXDATE を同じ日付の回へ付け替え、行き先のないものは捨てて示す |
-| [0010](../decisions/0010-occurrence-index-maintenance.md) | 展開の索引は予定オブジェクトごとに `indexed_through` を持ち、`expander` が毎日、端を進めた分だけ足す。書き込みでは回の集合の差分だけを書き、行の `object_version` は行が最後に変わった版にする。照合は毎時の抜き取りで、不一致は索引だけを作り直す |
+| [0010](../decisions/0010-occurrence-index-maintenance.md) | 展開の索引は予定オブジェクトごとに `indexed_through` を持ち、`expander` が毎日、端を進めた分だけ足す。書き込みでは回の集合の差分だけを書き、行の `object_version` は行が最後に変わったバージョンにする。照合は毎時の抜き取りで、不一致は索引だけを作り直す |
 | [0011](../decisions/0011-inbound-recurrence-normalization.md) | 対応しない繰り返しの入力は経路で扱いを分ける。API と CalDAV の `PUT` は拒否し、ICS の取り込み・購読と iMIP の受信は `HOURLY` 以下の規則を範囲の中の RDATE に変えて UID を保つ。`RANGE=THISANDFUTURE` は 1 回分の上書きとして当てて利用者に示す |
-| [0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) | tzdb の版の採用の後、会議室の予約の行を先に、次に施行の近い順に予定を計算し直す。版を上げて変更のログに載せるが `SEQUENCE` は上げない。外部の参加者には施行の後に回がある予定だけ同じ `SEQUENCE` の `REQUEST` を送り、会議室の重なりは「要確認」にする |
+| [0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) | tzdb のバージョンの採用の後、会議室の予約の行を先に、次に施行の近い順に予定を計算し直す。バージョンを上げて変更のログに載せるが `SEQUENCE` は上げない。外部の参加者には施行の後に回がある予定だけ同じ `SEQUENCE` の `REQUEST` を送り、会議室の重なりは「要確認」にする |
 | [0013](../decisions/0013-external-timezone-definitions.md) | 外から来た TZID は、正規の名前、別名、製品の接頭辞、Windows のゾーン名、VTIMEZONE の遷移の照合の順で IANA のゾーンに解き、解けなければ近いものに寄せて印を付ける。知っている TZID の VTIMEZONE は使わず、書き出す VTIMEZONE は本システムの tzdb から作る |
-| [0014](../decisions/0014-itip-state-transfer-and-sequence.md) | 内部の iTIP のメッセージは受け手に見せてよい形の予定オブジェクトの全体を運び、新旧を `(SEQUENCE, 主催者の版)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に場所と参加者の削除を足して上げ、日時が変わったら出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる |
+| [0014](../decisions/0014-itip-state-transfer-and-sequence.md) | 内部の iTIP のメッセージは受け手に見せてよい形の予定オブジェクトの全体を運び、新旧を `(SEQUENCE, 主催者のバージョン)` で決める。`SEQUENCE` は RFC 5546 の 2.1.4 節の項目に場所と参加者の削除を足して上げ、日時が変わったら出欠を `needs_action` に戻し、戻す前の `SEQUENCE` への返事は捨てる |
 | [0015](../decisions/0015-imip-addressing-and-trust.md) | 外部への招待の ORGANIZER は予定ごとの受け口のアドレスにして返事を本システムで受け、人の返事は Reply-To で主催者へ向ける。受信は From と ATTENDEE・ORGANIZER の一致と DKIM か SPF の揃いで確かめ、満たさないものは当てない。外部からの招待は転送の受け口で受け、知らない送信元は保留にする |
 | [0016](../decisions/0016-group-invitation-expansion.md) | グループの招待は、主催者の写しにグループの項目と展開したメンバーを持ち、メンバーの変化は今より後に回がある予定にだけ 15 分ごとのジョブで当てる。入れ子は 10 段、展開は 1 予定 10,000 人まで。200 人を超える予定の配送はバッチにして p99 60 秒にする |
 | [0017](../decisions/0017-freebusy-source-and-cache.md) | 空き時間は、人は展開の索引から、会議室は予約の行から求める。キャッシュは Valkey にカレンダーと UTC の週ごとの区間の一覧を、計算した時の `change_seq`（会議室は `booking_seq`）と一緒に置き、読む時に番号を比べて確かめる。テナントをまたぐ照会は相手のテナントの関数 `freebusy_for` を区間だけ返す形で呼ぶ |
@@ -218,14 +218,14 @@
 | [0020](../decisions/0020-room-approval-and-needs-review.md) | 承認の要る会議室の予約は「承認の待ち」の行にして制約の外に置き、管理者の承認で承諾の行に変える。tzdb の計算し直しで承諾どうしが重なったら、後から承諾したほうを「要確認」にして制約の外に出し、主催者と管理者に知らせて自動では辞退しない |
 | [0021](../decisions/0021-effective-role-and-redact-table.md) | 実際のロールは持ち主、ACL の行と暗黙の行の最大、組織の外への上限の最小の順で求める。`redact()` は「全体・参加者を除く全体・区間だけ・返さない」の 4 段で返し、区間だけの形は時刻の構造と見る人ごとの不透明な ID だけを持つ。公開範囲はマスターだけが持ち、テナントをまたぐ共有のカレンダーへの書き込みはカレンダーのテナントで `packages/writer` を通す |
 | [0022](../decisions/0022-delegation-and-acting-on-behalf.md) | 代理の人は主のカレンダーに `writer` 以上を持つ人とし、持ち主の名前で予定を作り出欠を返せる。iTIP では `SENT-BY` に代理の人を入れ、監査ログに操作した人と代わりに操作した相手を残す。代理の人は持ち主の `private` の予定の中身も見られる |
-| [0023](../decisions/0023-caldav-resource-model-and-conditional-writes.md) | CalDAV は主体・ホーム・コレクション・リソースの 4 層で出し、共有のカレンダーは見る人のホームに同じ ID で出す。ETag は版と見え方の記号、正規化したら `PUT` に ETag を返さない。`sync-collection` は 1,000 件で切って 507 で続ける。空き時間だけのカレンダーは出さない |
+| [0023](../decisions/0023-caldav-resource-model-and-conditional-writes.md) | CalDAV は主体・ホーム・コレクション・リソースの 4 層で出し、共有のカレンダーは見る人のホームに同じ ID で出す。ETag はバージョンと見え方の記号、正規化したら `PUT` に ETag を返さない。`sync-collection` は 1,000 件で切って 507 で続ける。空き時間だけのカレンダーは出さない |
 | [0024](../decisions/0024-caldav-implicit-scheduling.md) | CalDAV の `PUT` は、主催者の写しなら暗黙のスケジュールで配り、参加者の写しなら旧と新の差を取って自分の項目だけを受ける。`SCHEDULE-AGENT=CLIENT` は外部の参加者にだけ従う。参加者の写しに `Schedule-Tag` を出し、受信箱・送信箱は空にする |
 | [0025](../decisions/0025-ics-subscriptions-both-directions.md) | 取り込む ICS の購読は購読ごとの読み出し専用のカレンダーに写し、egress の経路で条件つきに取り、内容のハッシュで差分だけを書く。公開する ICS は持ち主が出す秘密のアドレスで、見え方は全体か空き時間だけ、組織の方針で止められ、作り直すと古いアドレスは 404 になる |
 | [0026](../decisions/0026-public-rest-api-shape.md) | 公開の REST API は本家の API の振る舞いに寄せた JSON で `/v1` に出し、自社の画面も同じものを使う。予定オブジェクトを単位に、繰り返しは RFC 5545 の行、回は壁時計の `recurrence_id` の ID で表す。`syncToken` は予定オブジェクトの単位で絞りと一緒に使えない。書き込みは `If-Match` と `Idempotency-Key` を受ける |
 | [0027](../decisions/0027-oauth-apps-scopes-and-rate-limits.md) | OAuth 2.0 は認可コードと PKCE（S256 を必須）で、アクセストークン 1 時間、リフレッシュトークンは使うたびに入れ替えて再利用で一式を取り消す。範囲は 4 つ。組織はアプリの認可を絞れる。レート制限は（アプリ, 利用者）1 分 600・（アプリ, テナント）1 分 10,000・利用者の書き込み 1 分 120 で、超えたら 429 |
 | [0028](../decisions/0028-push-channels-signed-webhooks.md) | Webhook は `watch` で作る通知の経路で、期限は既定 7 日・最大 30 日、自動の更新はしない。本文のない `POST` に `<Brand>-*` のヘッダーと経路ごとの秘密の HMAC の署名を付け、経路ごとに 1 秒 1 回にまとめ、24 時間失敗し続けたら止める。送る前に権限を確かめ、見られなくなったら `not_exists` を送って止める |
 | [0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md) | リマインダーの時計は、Aurora の分の桶の表（256 のシャード）と、シャードを借りたタスクのメモリーのタイマーホイールの組み合わせにする。発火は計画の行の claim と送信の記録への一意の鍵の挿入で行い、挿入できたものだけを送る。15 分を超えて遅れたものは送らずに数える |
-| [0030](../decisions/0030-reminder-planning-horizon-and-replan.md) | リマインダーは 7 日先までの回だけを計画し、毎時に端を進める。予定・出欠・設定・タイムゾーン・tzdb の変更は `reminder.replan` で（利用者, 予定オブジェクト）の待ちの行を作り直す。終日と浮動の予定は壁時計で分を引く。送信の記録の鍵は（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）で、版は鍵に入れない |
+| [0030](../decisions/0030-reminder-planning-horizon-and-replan.md) | リマインダーは 7 日先までの回だけを計画し、毎時に端を進める。予定・出欠・設定・タイムゾーン・tzdb の変更は `reminder.replan` で（利用者, 予定オブジェクト）の待ちの行を作り直す。終日と浮動の予定は壁時計で分を引く。送信の記録の鍵は（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）で、バージョンは鍵に入れない |
 | [0031](../decisions/0031-notification-channels-and-content.md) | 通知は画面・Web Push・メールの 3 つの経路で、送る時に `redact()` と出欠を確かめ直す。Web Push の本文は通知の ID だけにし、Service Worker が中身を本システムから取る。予定の事象の通知は受け手と予定ごとに 2 分まとめ、毎朝の一覧は利用者のタイムゾーンの 06:00 に計画の表から送る |
 | [0032](../decisions/0032-booking-slot-computation.md) | 予約ページの枠は、持ち主のタイムゾーンの壁時計の受け付けの時間から、受け付けの期間・最短の予告・1 日の上限で絞り、空き時間の部品の予定あり（仮の予定を含む）と既存の予約の区間を引いて求める。間の時間は 1 つの値で前後に要る。応答は枠の UTC だけ |
 | [0033](../decisions/0033-booking-creation-and-exclusion.md) | 予約は持ち主の主のカレンダーの行をロックする 1 つのトランザクションで確かめ直して作り、`booking_reservations` の持ち主と区間の排他の制約で予約どうしの重なりを DB で 0 にする。メールの確認は 10 分の仮押さえで塞ぐ。予約者は外部の参加者として ICS つきのメールを受ける。ボットの対策は AWS WAF |
@@ -233,8 +233,8 @@
 | [0035](../decisions/0035-accounts-auth-library-and-credentials.md) | 認証の部品に Better Auth を使い `packages/auth` で包む。アカウントは RLS の外に置き、1 つのアカウントを 1 つのテナントの利用者に結ぶ。ログインはメールのコードとリンク・パスキー・Google・組織の SSO で、パスワードを持たない。CalDAV は `<brand>_ap_` のアプリ用のパスワードで、CalDAV だけの範囲・最長 1 年 |
 | [0036](../decisions/0036-org-domains-sso-and-scim.md) | 組織のドメインは DNS の TXT で確かめて毎日確かめ直す。SSO はドメインごとに SAML 2.0 か OIDC の IdP を 1 つ持ち、SP 起点だけ・署名を必須にし、必須にしても特権の管理者はパスキーで入れる。確認したドメインの個人のアカウントは本人の同意で組織へ移す。SCIM 2.0 は SSO の後に足す |
 | [0037](../decisions/0037-admin-roles-delegation-and-event-access.md) | 管理の役割を 6 つにし、`super_admin` 以外はグループの範囲に委任できる。役割は予定の中身を見る権限を含まない。管理者による従業員の予定の閲覧は、法務の L8 の結論までフラグの裏に置き、理由と期間を書いた閲覧の許可・`can()` の入力・監査ログの記録の仕組みだけを作る |
-| [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) | Web の画面は、予定オブジェクトを窓つきの差分の同期で持ち、回は手元の `expand()` で作る。tzdb はサーバーの版のゾーンのデータを版つきの URL から取る。重なる予定は、日ごとの重なりの塊に貪欲に列を割り当てて右へ広げる決定的な配置で描く |
-| [0039](../decisions/0039-offline-read-cache-and-local-data.md) | Web の画面のオフラインは読み出しだけにし、アカウントごとの IndexedDB に前後 4 週の予定オブジェクトとトークンとゾーンのデータを持つ。手元の DB は捨ててよい写しとし、版が変われば作り直す。ログアウト・セッションの取り消し・30 日の不使用で消し、共有の端末では保存しない |
+| [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) | Web の画面は、予定オブジェクトを窓つきの差分の同期で持ち、回は手元の `expand()` で作る。tzdb はサーバーのバージョンのゾーンのデータをバージョンつきの URL から取る。重なる予定は、日ごとの重なりの塊に貪欲に列を割り当てて右へ広げる決定的な配置で描く |
+| [0039](../decisions/0039-offline-read-cache-and-local-data.md) | Web の画面のオフラインは読み出しだけにし、アカウントごとの IndexedDB に前後 4 週の予定オブジェクトとトークンとゾーンのデータを持つ。手元の DB は捨ててよい写しとし、バージョンが変われば作り直す。ログアウト・セッションの取り消し・30 日の不使用で消し、共有の端末では保存しない |
 | [0040](../decisions/0040-untrusted-calendar-input-gate.md) | 外から来る iCalendar・メール・URL は、経路ごとの上限の表を解析の前に当て、時間とメモリーを切った隔離の worker thread で `packages/ical` を動かし、正規化した形だけを `packages/writer` に渡す。外へ出す iCalendar とメールのヘッダーは、利用者の文字を必ずエスケープして作る |
 | [0041](../decisions/0041-encryption-keys-and-secret-storage.md) | 保存時の暗号化は、データの種類ごとの KMS の鍵（マルチリージョン）で行い、テナントごとの鍵と予定の項目の暗号化は持たない。本システムの秘密は、受け取って照らすだけのもの（アプリ用のパスワード、トークン、ICS の秘密のアドレス）を SHA-256 の照合の値で、平文が要るもの（Webhook の署名の秘密、同期のトークンの鍵、VAPID の鍵）を封筒の暗号化で持ち、平文で DB に置かない |
 | [0042](../decisions/0042-audit-log-and-data-lifecycle.md) | 監査ログは、テナントの監査（Aurora、既定 1 年）とプラットフォームの監査に分け、どちらも log-archive へハッシュの連鎖つきで写す。変更のログを監査ログの代わりにしない。保持の期間を 1 つの表（`retention_policies`）で持ち、時間で消えるものは分割を落とし、テナントの解約は 30 日の猶予の後に `tenant_id` で消す。値は法務の L5 の後に確定する |
@@ -243,8 +243,8 @@
 | [0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | 段階を上げる判断は、ピークの書き込みと読み出し、Aurora の writer の CPU、配送の遅れ、リマインダーの集中の指標で行う。S2 はテナントを単位に Aurora のクラスタへ分け、テナントの外のディレクトリ（テナント → クラスタ、メールアドレス → アカウント）を小さなクラスタに置く。テナントをまたぐ処理は、内部の iTIP を SQS、空き時間を内部の RPC にする。S3 はスタックをセルにし、テナントをセルとリージョンに固定する |
 | [0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) | 正しさと遅れの SLI は、トレースの抜き取りではなく、業務の記録（リマインダーの送信の記録、配送の記録、iMIP の送信の記録、トークンの使用の記録）から全件で数える。リマインダーの遅れは「回の通知の時刻」から「送信の開始」までにし、送らなかったものと遅れすぎたものを悪いイベントに数える。招待は `msg_id` を主催者のコミットから参加者の写し・iMIP・SES の事象まで運んで結ぶ |
 | [0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) | 負荷のモデルは時刻の形（月曜の朝、毎時 0 分・30 分の前後、年度の始め）を持ち、反応のオートスケールに頼らず、時刻で先に広げる。リマインダーは数分前に送る準備を済ませて時刻に放つ。1 カレンダーの書き込みは `origin` ごとの枠で割り当て、利用者の書き込みを最優先にし、tzdb の再計算・配送・取り込みを後にする |
-| [0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md) | CI の関門は変更のパスで足し、外すラベルを持たない。展開と参照の性質ベーステスト、tzdb の版の差分、`redact()` の経路の性質、記録した CalDAV・iMIP の通信の再生を PR の必須にする。CalDAV のクライアントとの互換は、PR の再生、夜間の実物のクライアントの試験場（macOS・iOS のシミュレーター・Android のエミュレーター）、リリースの前の手動の表の 3 段で確かめる |
-| [0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しい版は、前の版と一緒にイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` を全サービスで一度に切り替えて採用する。Web のクライアントは版つきの URL からゾーンのデータを取るので、資産のデプロイを待たない。スキーマの変更は、広げる・移る・縮める・消すの順にし、展開の索引のような作り直せる表は、影の表を作って入れ替える |
+| [0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md) | CI の関門は変更のパスで足し、外すラベルを持たない。展開と参照の性質ベーステスト、tzdb のバージョンの差分、`redact()` の経路の性質、記録した CalDAV・iMIP の通信の再生を PR の必須にする。CalDAV のクライアントとの互換は、PR の再生、夜間の実物のクライアントの試験場（macOS・iOS のシミュレーター・Android のエミュレーター）、リリースの前の手動の表の 3 段で確かめる |
+| [0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しいバージョンは、前のバージョンと一緒にイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` を全サービスで一度に切り替えて採用する。Web のクライアントはバージョンつきの URL からゾーンのデータを取るので、資産のデプロイを待たない。スキーマの変更は、広げる・移る・縮める・消すの順にし、展開の索引のような作り直せる表は、影の表を作って入れ替える |
 
 領域ごとの ADR は、7 節の番号の範囲で起票した。リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)、本家の実装を核に使わない規則の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 
@@ -253,8 +253,8 @@
 品質の面のリスクの順位と対策は [quality.md](../quality.md) の 1 節にある。ここは設計の面のリスクを書く。
 
 - **展開の誤り**：RRULE の組み合わせ（`BYSETPOS`、`BYWEEKNO`、月末の `BYMONTHDAY=-1`、`WKST`、閏年の 2 月 29 日）、例外との重なり、夏時間の切り替えの存在しない時刻・2 回ある時刻で、回が増える・欠ける・ずれる。展開の意味を決め（[ADR-0008](../decisions/0008-recurrence-expansion-semantics.md)）、参照の実装との性質ベーステストと、展開の索引とその場の展開の本番の照合で抑える（[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)、[quality.md](../quality.md)）。誤りは前のイメージへ戻して直す（フラグにしない）。
-- **tzdb の更新の取り違え**：本システムの中は AppConfig の 1 つの値で版を揃える（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。外部（CalDAV のクライアント、iMIP の相手）は自分の tzdb を使うので、ずれは残る。VTIMEZONE を本システムの tzdb から作って付け（[ADR-0013](../decisions/0013-external-timezone-definitions.md)）、施行の後に回がある予定の外部の参加者へ同じ `SEQUENCE` の `REQUEST` を送る（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。切り替えの窓では、会議室の排他の制約が新旧の版の区間を比べる（ADR-0012 の「切り替えの窓」）。
-- **招待の写しの食い違い**：配送の遅れ・順序の入れ替わり・重複で、参加者の写しが古い版のまま残る。状態の転送と `(SEQUENCE, 主催者の版)` で古いメッセージを捨て（[ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md)）、毎日の照合のジョブで直す（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）。
+- **tzdb の更新の取り違え**：本システムの中は AppConfig の 1 つの値でバージョンを揃える（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。外部（CalDAV のクライアント、iMIP の相手）は自分の tzdb を使うので、ずれは残る。VTIMEZONE を本システムの tzdb から作って付け（[ADR-0013](../decisions/0013-external-timezone-definitions.md)）、施行の後に回がある予定の外部の参加者へ同じ `SEQUENCE` の `REQUEST` を送る（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）。切り替えの窓では、会議室の排他の制約が新旧のバージョンの区間を比べる（ADR-0012 の「切り替えの窓」）。
+- **招待の写しの食い違い**：配送の遅れ・順序の入れ替わり・重複で、参加者の写しが古いバージョンのまま残る。状態の転送と `(SEQUENCE, 主催者のバージョン)` で古いメッセージを捨て（[ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md)）、毎日の照合のジョブで直す（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）。
 - **大きな招待の配送**：グループの招待で参加者が数千人になると、1 回の変更で数千の写しを書く。200 人を超える予定は `itip-bulk` のバッチにし、p99 60 秒にした。グループの展開の上限は MVP で 10,000 人（本家は 100,000 人。[ADR-0016](../decisions/0016-group-invitation-expansion.md)）。
 - **会議室の二重予約と繰り返し**：排他の制約は、展開の索引の範囲の中の回にしか効かない。範囲の外の会議室の予約を受けない（未来 548 日まで）。範囲の端のジョブが止まったら `indexed_through` より先の予約を受けない（[ADR-0019](../decisions/0019-room-booking-rows-and-recurring-acceptance.md)）。
 - **リマインダーの集中**：毎時 50 分 00 秒の 1 秒に約 12 万件が来る（[capacity.md](capacity.md) の 3 節）。時刻で先に広げ（[ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md)）、送信の記録の一意の鍵で重複を消す（[ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。
@@ -287,16 +287,16 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。
 
 - **テナントをまたぐ経路**：[ADR-0004](../decisions/0004-tenancy-and-rls.md) に、経路の許可リスト（X1 iTIP の配送、X2 空き時間、X3 共有のカレンダーの読み出し、X4 共有のカレンダーへの書き込み、X5 リマインダーの時計、X6 入口の解決、X7 tzdb の影響の探し、X8 個人から組織への移り、X9 SLI の集計、X10 Relay の outbox の読み出し、X11 ICS の購読の取得の予定）と、RLS の外の表の一覧を置いた。題材の `AGENTS.md` も同じ一覧を指す。CI は、`tenant_id` と FORCE RLS のない表、`BYPASSRLS` のロール、`SECURITY DEFINER` の関数を、この一覧と照らす。X4 は `release.cross-tenant-shared-writes` の裏で、有効にするのはテックリードの確認の後。
-- **`SEQUENCE` を上げる変更**：RFC 5546 の 2.1.4 節の項目（DTSTART・DTEND・DURATION・RRULE・RDATE・EXDATE・STATUS）と TZID に、場所と参加者の削除を足したもの。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧を [ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md) に揃え、内部の新旧の鍵を `(SEQUENCE, 主催者の版)` と書き直した。
+- **`SEQUENCE` を上げる変更**：RFC 5546 の 2.1.4 節の項目（DTSTART・DTEND・DURATION・RRULE・RDATE・EXDATE・STATUS）と TZID に、場所と参加者の削除を足したもの。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧を [ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md) に揃え、内部の新旧の鍵を `(SEQUENCE, 主催者のバージョン)` と書き直した。
 - **RFC との意図した違い**：[ADR-0007](../decisions/0007-interop-standards-scope.md) の 1 つの表（D1〜D6）にまとめた。存在しない時刻をずらす（RFC 5545 の 3.3.10 節と違う）、S/MIME を必須にしない（RFC 6047 の 2.2.2 節と違う）、`RANGE=THISANDFUTURE` を 1 回分にする、`SCHEDULE-AGENT=CLIENT` を中の参加者に当てない、DTSTART を最初の回にする、参加者の EXDATE を辞退にする。本家との意図した違いは 1.4 節の表。
-- **tzdb の切り替えと会議室**：採用は AppConfig の `tzdata.active_version` の一度の切り替え（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。切り替えの完了から、影響するゾーンの会議室の予約の行と予約ページの区間の計算し直しの完了までを「切り替えの窓」とし、窓の中で排他の制約が新旧の版の区間を比べることを [ADR-0002](../decisions/0002-time-representation.md) の原則の唯一の例外にした。重なりは後から承諾したほうを「要確認」、旧の版の区間とだけ重なった辞退は窓の終わりに判定し直す（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の注記）。runbooks の採用の手順の 2・5 を書き直し、[tzdb-update.md](../runbooks/tzdb-update.md) にした。
-- **`object_version` の意味**：展開の索引の行の `object_version` は「その行が最後に変わった予定オブジェクトの版」で、照合は版でなくその場の展開との比べで行う（[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)）。[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) に反映し、索引の書き込みを「差分だけ」に直した。予定オブジェクトの版は `SEQUENCE` の元ではない。
+- **tzdb の切り替えと会議室**：採用は AppConfig の `tzdata.active_version` の一度の切り替え（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。切り替えの完了から、影響するゾーンの会議室の予約の行と予約ページの区間の計算し直しの完了までを「切り替えの窓」とし、窓の中で排他の制約が新旧のバージョンの区間を比べることを [ADR-0002](../decisions/0002-time-representation.md) の原則の唯一の例外にした。重なりは後から承諾したほうを「要確認」、旧のバージョンの区間とだけ重なった辞退は窓の終わりに判定し直す（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の注記）。runbooks の採用の手順の 2・5 を書き直し、[tzdb-update.md](../runbooks/tzdb-update.md) にした。
+- **`object_version` の意味**：展開の索引の行の `object_version` は「その行が最後に変わった予定オブジェクトのバージョン」で、照合はバージョンでなくその場の展開との比べで行う（[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)）。[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) に反映し、索引の書き込みを「差分だけ」に直した。予定オブジェクトのバージョンは `SEQUENCE` の元ではない。
 - **1.2 節の絵**：CalDAV を CloudFront の後ろから外し、WAF つきの ALB（`alb-dav`）にした（[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)）。
 - **展開・権限の不具合の戻し**：`release.recurrence-*`（events-and-recurrence の 10 節）と `release.policy-*`（sharing-and-acl の 11 節）の案をやめ、前のイメージへのロールバックにした。展開・時刻・権限の規則はフラグにしない（[runbooks/README.md](../runbooks/README.md) の 3 節、`AGENTS.md`）。
 - **トークンだけを取る口**：`POST /v1/sync` に `tokensOnly` を足した。Web の画面はトークンを先に取り、次に窓の範囲の問い合わせをする（[api-and-push.md](api-and-push.md) の 4.6 節、[ADR-0026](../decisions/0026-public-rest-api-shape.md)・[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) の注記）。
 - **CalDAV の認証の失敗**：アカウントの全体を止めない。形の合わないものは数えず、取り消した・期限切れのアプリ用のパスワードはパスワードごと、合わないものは（IP, アカウント）の組ごと、全体は IP ごとに数え、超えた単位だけを止める（[sync-and-caldav.md](sync-and-caldav.md) の 6.7 節、[security.md](security.md) の CD2、[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md) の注記）。
-- **アラート**：tzdb の未採用、AppConfig の版の不一致（タスクの間と東京・大阪）、変更のログの欠け、SLI の集計の欠け、シークレットスキャンの通知を [runbooks/README.md](../runbooks/README.md) の 4 節に足した。
-- **リマインダーの送信の記録の鍵**：（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）。版は鍵に入れない（[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。1.3 節 C、`AGENTS.md`、[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) を揃えた。保持は 35 日（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md)）に揃えた。発火は `reminder-scheduler` が行い、notifier は送るだけ（[capacity.md](capacity.md) の 3.3 節と [ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) を [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md) に揃えた）。
+- **アラート**：tzdb の未採用、AppConfig のバージョンの不一致（タスクの間と東京・大阪）、変更のログの欠け、SLI の集計の欠け、シークレットスキャンの通知を [runbooks/README.md](../runbooks/README.md) の 4 節に足した。
+- **リマインダーの送信の記録の鍵**：（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）。バージョンは鍵に入れない（[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。1.3 節 C、`AGENTS.md`、[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) を揃えた。保持は 35 日（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md)）に揃えた。発火は `reminder-scheduler` が行い、notifier は送るだけ（[capacity.md](capacity.md) の 3.3 節と [ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) を [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md) に揃えた）。
 - **SCIM**：MVP に含め、E4 の最後の Story として SSO の後に `release.scim` の裏で出し、GA の前に消す（[intent.md](../intent.md)、[roadmap.md](../roadmap.md)、[accounts-and-orgs.md](accounts-and-orgs.md) の 12 節、[ADR-0036](../decisions/0036-org-domains-sso-and-scim.md)）。
 - **CalDAV の Basic 認証**：本家は受けない。本システムは CalDAV だけのアプリ用のパスワードで受ける。本家との意図した違いとして 1.4 節と [ADR-0035](../decisions/0035-accounts-auth-library-and-credentials.md) に書いた。
 - **長く残すフラグ**：`release.*` は 100% の後 30 日で消す規則の例外を、[runbooks/README.md](../runbooks/README.md) の 3 節の一覧にした（`release.admin-event-access` は法務の L8 の結論まで、`release.cross-tenant-shared-writes` はテックリードの確認まで）。フラグの名前は `release.*` を kebab-case、`ops.*` を snake_case にした。
@@ -371,18 +371,18 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [rooms-and-resources.md](rooms-and-resources.md) | 建物・階・定員・設備の属性、会議室のカレンダー、予約の行と排他の制約、自動の承諾と繰り返しの一部の辞退、管理者の承認、要確認、会議室の検索と提案 | [0019](../decisions/0019-room-booking-rows-and-recurring-acceptance.md)、[0020](../decisions/0020-room-approval-and-needs-review.md) | QA | E6 |
 | [sharing-and-acl.md](sharing-and-acl.md) | カレンダーの種類と ACL、実際のロールの求め方、組織の共有の方針、予定の公開範囲、`can()`・`redact()` の決定表、変化の効き方、委任（代理の人）、管理者による閲覧の枠 | [0021](../decisions/0021-effective-role-and-redact-table.md)、[0022](../decisions/0022-delegation-and-acting-on-behalf.md) | セキュリティ | E4 |
 | [sync-and-caldav.md](sync-and-caldav.md) | 変更のログの保持と墓標、差分の組み立て、Web のクライアントの差分の取り方、CalDAV（発見、リソースの形、ETag・CTag、`PUT` の判定、REPORT、`sync-collection`、認証と失敗の上限）、暗黙のスケジュール、ICS の購読と公開、ICS の取り込みと書き出し | [0023](../decisions/0023-caldav-resource-model-and-conditional-writes.md)、[0024](../decisions/0024-caldav-implicit-scheduling.md)、[0025](../decisions/0025-ics-subscriptions-both-directions.md) | QA | E8 |
-| [api-and-push.md](api-and-push.md) | 公開の REST API（リソース、予定の形、回の識別子、ページング、差分の同期と `POST /v1/sync`、条件つきの更新、冪等、エラー、版）、OAuth 2.0 のアプリと範囲、レート制限、Webhook の通知 | [0026](../decisions/0026-public-rest-api-shape.md)、[0027](../decisions/0027-oauth-apps-scopes-and-rate-limits.md)、[0028](../decisions/0028-push-channels-signed-webhooks.md) | QA、Ops | E8 |
+| [api-and-push.md](api-and-push.md) | 公開の REST API（リソース、予定の形、回の識別子、ページング、差分の同期と `POST /v1/sync`、条件つきの更新、冪等、エラー、バージョン）、OAuth 2.0 のアプリと範囲、レート制限、Webhook の通知 | [0026](../decisions/0026-public-rest-api-shape.md)、[0027](../decisions/0027-oauth-apps-scopes-and-rate-limits.md)、[0028](../decisions/0028-push-channels-signed-webhooks.md) | QA、Ops | E8 |
 | [reminders-and-notifications.md](reminders-and-notifications.md) | リマインダーの設定と対象、計画（7 日、付け替え）、時計（シャード、タイマーホイール）、送信の記録と重複の除去、送る時の確かめ、画面の通知・Web Push・メール、予定の事象の通知、毎朝の一覧、送り漏れの照合 | [0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[0030](../decisions/0030-reminder-planning-horizon-and-replan.md)、[0031](../decisions/0031-notification-channels-and-content.md) | QA、Ops | E9 |
 | [booking-pages.md](booking-pages.md) | 予約ページの設定と組織の方針、枠の計算、予約の作成と排他の制約、仮押さえとメールの確認、取り消しと変更、予約者へのメール、ボットの対策、予約者の個人情報の枠（法務の L6） | [0032](../decisions/0032-booking-slot-computation.md)、[0033](../decisions/0033-booking-creation-and-exclusion.md) | QA、セキュリティ | E10 |
 | [search.md](search.md) | 検索の表と `pg_bigm` の索引、正規化、権限の写し方（`searchScope`）、問い合わせと並べ方、更新、S2 の基準 | [0034](../decisions/0034-search-pg-bigm-acl-aware.md) | QA、Ops | E11 |
 | [accounts-and-orgs.md](accounts-and-orgs.md) | アカウントとテナント、ログインとセッション、組織とドメインの確認、個人から組織への移り、SSO、アプリ用のパスワードとトークンの形、組織の認証の方針、ディレクトリとメールアドレスの解決、SCIM、管理の役割と委任、管理者による閲覧の枠、停止・削除と引き継ぎ | [0035](../decisions/0035-accounts-auth-library-and-credentials.md)、[0036](../decisions/0036-org-domains-sso-and-scim.md)、[0037](../decisions/0037-admin-roles-delegation-and-event-access.md) | セキュリティ | E4、E11 |
 | [clients.md](clients.md) | Web の SPA の骨格、データの流れ（窓、差分、手元の展開、tzdata）、日・週・月・予定リストの表示と重なりの配置、タイムゾーンと夏時間の表示、操作、キーボードと IME、速さの予算、オフラインと手元のデータ、PWA と Web Push の登録 | [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[0039](../decisions/0039-offline-read-cache-and-local-data.md) | QA | E7 |
 | [security.md](security.md) | 信頼境界、脅威モデル（迷惑な招待、解析の攻撃、CalDAV の資格情報、漏れ、SSRF）、入力の検査、暗号化と鍵、秘密、監査ログ、運用者のアクセス、データのライフサイクル、試験、法務の論点の整理 | [0040](../decisions/0040-untrusted-calendar-input-gate.md)、[0041](../decisions/0041-encryption-keys-and-secret-storage.md)、[0042](../decisions/0042-audit-log-and-data-lifecycle.md) | セキュリティ | E1、E11、E12 |
-| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約（ID、テナンシー、時刻の列、iCalendar の往復、版、分割、保持、命名、秘密）、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、RLS の外の表と DB のロール、DB の外のストアの形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、入口とホスト名、外への送信、サービスと配置、データの置き場所、台数、バックアップと DR（`sync_epoch`）、tzdb の版の配り方、段階を上げる基準、S2・S3、Terraform、コスト | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)、[0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md)、[0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | Ops | E1、E12 |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約（ID、テナンシー、時刻の列、iCalendar の往復、バージョン、分割、保持、命名、秘密）、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、RLS の外の表と DB のロール、DB の外のストアの形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、入口とホスト名、外への送信、サービスと配置、データの置き場所、台数、バックアップと DR（`sync_epoch`）、tzdb のバージョンの配り方、段階を上げる基準、S2・S3、Terraform、コスト | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)、[0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md)、[0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | Ops | E1、E12 |
 | [observability.md](observability.md) | 中身を出さない計装、トレース、RUM、正しさの照合と応答の監査、SLI の計測（業務の記録から）、アラートの条件、合成監視、ダッシュボード | [0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル（時刻の形）、1 カレンダーの書き込みの上限と割り当て、リマインダーの集中、大きな会議の空き時間、部品ごとの必要量、取り直しの殺到、台数、負荷試験 L1〜L10 | [0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) | Ops | E12 |
-| [delivery.md](delivery.md) | CI の関門、CalDAV のクライアントとの互換の 3 段、フラグ、サーバーのデプロイ、Web のクライアントの配布、tzdb の版の採用、スキーマの変更の順序 | [0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md)、[0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | QA、Ops | E1、E3、E12 |
+| [delivery.md](delivery.md) | CI の関門、CalDAV のクライアントとの互換の 3 段、フラグ、サーバーのデプロイ、Web のクライアントの配布、tzdb のバージョンの採用、スキーマの変更の順序 | [0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md)、[0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | QA、Ops | E1、E3、E12 |
 
 - 次に採番する ADR は 0050。統合の後に足す ADR は、関わる領域の行に番号を書き足す。
 

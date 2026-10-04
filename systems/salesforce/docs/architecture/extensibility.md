@@ -26,7 +26,7 @@
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
 | 本家のトリガーの位置 | 保存の前のフロー → before トリガー → 検証 → 保存（未確定）→ after トリガー → …… → 保存の後のフロー。API の要求は 200 件の塊でトリガーを動かす | [ADR-0008](../decisions/0008-dml-order-of-execution.md) に写した [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版） |
-| 本家のコードの文脈 | API の版 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS）と `with sharing` で動く。トリガー自体は共有を外した文脈だが、その中の問い合わせと DML は明示しなければ利用者のモード。66.0 以前はシステムの文脈が既定で、共有はクラスの宣言で選んだ（SOQL and SOSL Reference の同じ版は、まだシステムのモードが既定と書き、資料どうしが食い違う） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版、2026-09-28 に確認） |
+| 本家のコードの文脈 | API のバージョン 67.0 以降の Apex は、既定で利用者のモード（オブジェクトの権限と FLS）と `with sharing` で動く。トリガー自体は共有を外した文脈だが、その中の問い合わせと DML は明示しなければ利用者のモード。66.0 以前はシステムの文脈が既定で、共有はクラスの宣言で選んだ（SOQL and SOSL Reference の同じバージョンは、まだシステムのモードが既定と書き、資料どうしが食い違う） | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版、2026-09-28 に確認） |
 | 本家の CPU の上限 | 同期 10,000ms、非同期 60,000ms。壁時計の CPU 時間で数える | [ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
 | 本家の管理パッケージ | 名前空間の接頭辞と `__` の区切り。セキュリティのレビューを通った認定の管理パッケージは、1 トランザクションの上限の多くを名前空間ごとに別に持ち、全ての名前空間の合計は 11 倍まで。CPU 時間などは全体で共有する | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版の「Per-Transaction Certified Managed Package Limits」、2026-09-28 に確認） |
 | Wasmtime の燃料 | 生成したコードで燃料を減らし、同じ初期状態なら同じ量で止まる（決定的）。epoch の中断は 2〜3 倍速いことがあるが、決定的ではない | [Wasmtime `Config`](https://docs.wasmtime.dev/api/wasmtime/struct.Config.html) |
@@ -47,7 +47,7 @@
 | 1 回の実体化の費用 | 小さい見込み | 大きい見込み | 小さい見込み |
 | 外への API | 持たない（殻で決める） | fetch・Streams を持つ（外したい） | `Javy.IO` など道具の API |
 | 燃料との相性 | 良い（インタープリタのループが WASM の命令になる） | 同じく数えられる | 同じ |
-| 版の安定 | エンジンの版だけ追う | WASI 0.2 とコンポーネントの変化を追う | 道具の API の変化（8.x・9.x）を追う |
+| バージョンの安定 | エンジンのバージョンだけ追う | WASI 0.2 とコンポーネントの変化を追う | 道具の API の変化（8.x・9.x）を追う |
 | 速さ | インタープリタ | インタープリタ（WASM では JIT なしと見込む。未検証。E13 の `code-engine-poc` で測る） | インタープリタ |
 | 本家の実装か | 違う（第三者の汎用の部品） | 違う | 違う |
 
@@ -82,7 +82,7 @@ Runtime のタスク（ECS Fargate）
 
 ```
 手順 3b・7a・13 で、有効なトリガーがある
-  1. Runtime：塊（new・old のレコード、200 件まで）を JSON にし、燃料の残り・メモリーの上限・トリガーの版とともに送る
+  1. Runtime：塊（new・old のレコード、200 件まで）を JSON にし、燃料の残り・メモリーの上限・トリガーのバージョンとともに送る
   2. code-runner：事前に初期化したモジュールを実体化（線形メモリーを上限の大きさで確保）
        → トリガーのバイトコードを読み込む → `handler(ctx, records)` を呼ぶ
   3. 利用者のコードがホストの API を呼ぶ → ソケットで Runtime へ → データ層で実行し、上限を数える → 結果を返す
@@ -109,8 +109,8 @@ Runtime のタスク（ECS Fargate）
 ### 4.4 ビルド
 
 - 利用者は TypeScript で書く。型は、組織のメタデータから作った型の定義（オブジェクトと項目）と、ホストの API の型を配る。
-- デプロイの時（メタデータの版を上げる前の検証。[ADR-0040](../decisions/0040-deploy-validation-and-rollback.md)）に、TypeScript を JS にし、QuickJS-ng のバイトコードにして保存する。型の誤り・構文の誤りは検証の失敗にする。
-- バイトコードは `md_code_versions` に、元のコードとハッシュとともに持つ。エンジンの版を上げる時は、全てのバイトコードを作り直す。QuickJS-ng はバイトコードに形の版（`BC_VERSION`）を書き、読み込みの時に違えば断るので、版を上げると互換は保たれない（[quickjs.c](https://github.com/quickjs-ng/quickjs/blob/master/quickjs.c)、2026-09-28 に確認）。
+- デプロイの時（メタデータのバージョンを上げる前の検証。[ADR-0040](../decisions/0040-deploy-validation-and-rollback.md)）に、TypeScript を JS にし、QuickJS-ng のバイトコードにして保存する。型の誤り・構文の誤りは検証の失敗にする。
+- バイトコードは `md_code_versions` に、元のコードとハッシュとともに持つ。エンジンのバージョンを上げる時は、全てのバイトコードを作り直す。QuickJS-ng はバイトコードに形のバージョン（`BC_VERSION`）を書き、読み込みの時に違えば断るので、バージョンを上げると互換は保たれない（[quickjs.c](https://github.com/quickjs-ng/quickjs/blob/master/quickjs.c)、2026-09-28 に確認）。
 
 ## 5. トリガーと DML の順（ADR-0049）
 
@@ -182,14 +182,14 @@ Runtime のタスク（ECS Fargate）
 ### 8.2 パッケージの形
 
 - [ADR-0039](../decisions/0039-metadata-package-format.md) の形に、`package.yaml` の `namespace`・`version`（semver）・`min_platform_version`・`requires`（権限・オブジェクト・宛先）・`locked`（インストール先で変えてはならない部品）・`signature` を足す。
-- コードの部品は、TypeScript の元と、ビルドの道具の版と、バイトコードのハッシュを持つ。インストール先はビルドし直してハッシュを比べる。
+- コードの部品は、TypeScript の元と、ビルドの道具のバージョンと、バイトコードのハッシュを持つ。インストール先はビルドし直してハッシュを比べる。
 - 署名は Ed25519。配布者は自分の秘密鍵で目録に署名し、公開鍵を本システムに登録する。本システムは秘密鍵を預からない。
 
-### 8.3 インストールと版の上げ
+### 8.3 インストールとバージョンの上げ
 
 ```
-インストール：署名の検証 → ビルドのし直しとハッシュの比べ → requires を管理者に見せる → 検証（ADR-0040）→ 適用（1 つの版）
-版の上げ：同じ流れで、差分だけを当てる。locked の部品の差分は常に当たる。インストール先が変えた部品（locked でない）は、変えた方を残す
+インストール：署名の検証 → ビルドのし直しとハッシュの比べ → requires を管理者に見せる → 検証（ADR-0040）→ 適用（1 つのバージョン）
+バージョンの上げ：同じ流れで、差分だけを当てる。locked の部品の差分は常に当たる。インストール先が変えた部品（locked でない）は、変えた方を残す
 削除：パッケージの部品を消す。データのある項目は、通常の削除と同じく 15 日戻せる
 ```
 
@@ -221,7 +221,7 @@ Runtime のタスク（ECS Fargate）
 | トリガーの中の例外 | そのトランザクションを失敗にし、トリガーの名前と行を返す（値を入れない） |
 | after_commit のトリガーが 3 回失敗 | 止めて管理者に知らせる。起動した保存は確定のまま |
 | 1 つのトリガーの失敗が急に増える | `code_trigger_errors_total{trigger}` を計測し、runbook `code-trigger-errors-spike` で組織に知らせる。本システムがトリガーを勝手に無効にしない |
-| Wasmtime・QuickJS-ng の脆弱性 | 版を上げ、全てのバイトコードを作り直すジョブを流す。作り直しが済むまで、そのトリガーを古い版で動かす |
+| Wasmtime・QuickJS-ng の脆弱性 | バージョンを上げ、全てのバイトコードを作り直すジョブを流す。作り直しが済むまで、そのトリガーを古いバージョンで動かす |
 
 ## 11. テスト
 
@@ -263,7 +263,7 @@ Runtime のタスク（ECS Fargate）
 | E13 | 上限（燃料・メモリー・呼び出し）と計測 |
 | E13 | 実行の文脈（`user`・`system_with_sharing`）と承認・監査 |
 | E13 | デバッグのログ（7 日）と Setup の画面 |
-| E14 | パッケージ：名前空間の登録、署名、インストール、版の上げ、`locked`、名前空間ごとの上限の内訳（2026-09-28 に E13 から分けた） |
+| E14 | パッケージ：名前空間の登録、署名、インストール、バージョンの上げ、`locked`、名前空間ごとの上限の内訳（2026-09-28 に E13 から分けた） |
 | E13 | 外部のペンテスト（砂場の脱出、組織をまたぐ状態） |
 
 ## 14. 未解決の問い
@@ -271,7 +271,7 @@ Runtime のタスク（ECS Fargate）
 - 共有も外す文脈（本家の `without sharing` に相当）を持つか。
 - 独自の API（利用者のコードで REST の口を作る）を持つか。持つなら、割り当てと認証をどう数えるか。
 - スケジュールで動く利用者のコード（本家の Batch・Schedulable に相当）を持つか。
-- QuickJS-ng のバイトコードの互換が、エンジンの版の上げで保たれるか。 → 保たれない（`BC_VERSION` が違えば読み込みを断る。4.4 節）。
+- QuickJS-ng のバイトコードの互換が、エンジンのバージョンの上げで保たれるか。 → 保たれない（`BC_VERSION` が違えば読み込みを断る。4.4 節）。
 - 燃料と CPU 時間の換算の係数を、どの負荷で決めるか。
 - 公開の一覧（マーケットプレイス）と、配布者のセキュリティの審査をいつ作るか。
 - 認定のパッケージに別の上限を与えるか（本家は与える。2 節）。
@@ -283,7 +283,7 @@ Runtime のタスク（ECS Fargate）
 - 共有を外す文脈は持たない。全てのレコードを見る処理は、`view_all` の権限を持つ連携の利用者の文脈で動かす運用で代える。要望が多ければ、監査と承認を条件に別の ADR で検討する。
 - 独自の API は E13 の後。入れる時は、API の割り当てに数え、OAuth のスコープで守る。
 - スケジュールのコードは E13 の後。スケジュールのフローから、after_commit のトリガーを起こす形で代える。
-- バイトコードは、エンジンの版を上げるたびに作り直す前提で作る（互換を当てにしない）。
+- バイトコードは、エンジンのバージョンを上げるたびに作り直す前提で作る（互換を当てにしない）。
 - 換算の係数は、E13 の PoC で、生成した利用者のコードの組（文字列の処理、数値の計算、問い合わせの多いもの）で測って決める。
 - 公開の一覧と審査は E13 の後。
 - 認定のパッケージにも別の上限を与えない（ADR-0050）。
@@ -302,7 +302,7 @@ Runtime のタスク（ECS Fargate）
 
 - `code-runner-crash-loop`：`code-runner` のコンテナが繰り返し落ちる。直前のデプロイ、特定の組織のトリガーを調べる。
 - `code-trigger-errors-spike`：あるトリガーのエラーが急に増えた。組織の管理者に知らせる。
-- `wasm-runtime-advisory`：Wasmtime・QuickJS-ng の勧告への対応（版の上げ、バイトコードの作り直し）。
+- `wasm-runtime-advisory`：Wasmtime・QuickJS-ng の勧告への対応（バージョンの上げ、バイトコードの作り直し）。
 - `package-signing-key-revoked`：配布者の鍵の失効と、インストールの停止。
 - SLI の追加の依頼（Ops へ）：砂場の呼び出しの p95、実体化の時間、燃料の使用量の p99、`code_trigger_errors_total`、`code-runner` の再起動の数。
 
@@ -311,7 +311,7 @@ Runtime のタスク（ECS Fargate）
 | テーブル | 主な列 | 備考 |
 | --- | --- | --- |
 | `md_code_units` | `org_id`、`code_id`、`api_name`、`namespace`、`kind`（`trigger`）、`object_id`、`events`（`before_save`・`after_save`・`after_commit`・`before_delete`・`after_delete`）、`trigger_order`、`run_as`（`user`・`system_with_sharing`）、`active_version_id` | メタデータ |
-| `md_code_versions` | `org_id`、`version_id`、`code_id`、`source`（TypeScript）、`bytecode`、`bytecode_hash`、`engine_version`、`built_at` | メタデータ。エンジンの版の上げで作り直す |
+| `md_code_versions` | `org_id`、`version_id`、`code_id`、`source`（TypeScript）、`bytecode`、`bytecode_hash`、`engine_version`、`built_at` | メタデータ。エンジンのバージョンの上げで作り直す |
 | `code_async_runs` | `org_id`、`version_id`、`record_id`、`origin_tx_id`、`attempts`、`state`、`ran_at` | 一意。7 日で消す |
 | `code_debug_logs` | `org_id`、`id`、`code_id`、`tx_id`、`user_id`、`lines`、`created_at` | 7 日で消す |
 | `namespaces` | `namespace`、`owner_org_id`、`registered_at` | RLS の外（全組織で一意） |

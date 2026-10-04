@@ -257,7 +257,7 @@
   <!-- 12 -->
   <section class="s" id="api-webhooks">
     <h2>API と Webhook</h2>
-    <p>外部のツールと AI エージェントは、REST と GraphQL の API で操作します。REST は<strong>日付の版</strong>をヘッダー <code>X-&lt;Brand&gt;-Api-Version</code> で選びます。互換を壊す変更は新しい版だけに入れ、追加は全ての版に入れます。</p>
+    <p>外部のツールと AI エージェントは、REST と GraphQL の API で操作します。REST は<strong>日付のバージョン</strong>をヘッダー <code>X-&lt;Brand&gt;-Api-Version</code> で選びます。互換を壊す変更は新しいバージョンだけに入れ、追加は全てのバージョンに入れます。</p>
     <p><a class="t" href="#g-webhook">Webhook</a> は逆向きで、事象が起きたらサーバーが相手の URL へ POST します。受け手は、次の順で確かめます。</p>
     <div class="stepper">
       <ol>
@@ -418,7 +418,7 @@
       <dt id="g-sha">SHA</dt><dd>オブジェクトの名前に使うハッシュ。多くのリポジトリは SHA-1（20 バイト）で、SHA-256 のリポジトリもある。</dd>
       <dt id="g-ref">ref</dt><dd>名前からコミットの SHA への対応。ブランチ（<code>refs/heads/*</code>）やタグ（<code>refs/tags/*</code>）。</dd>
       <dt id="g-packfile">packfile</dt><dd>多数のオブジェクトを差分で圧縮して 1 つにまとめたファイル。転送と保存に使う。</dd>
-      <dt id="g-v2">プロトコル v2</dt><dd>Git の通信の新しい版。<code>ls-refs</code> で要る ref だけを聞き、<code>fetch</code> で pack を取る。</dd>
+      <dt id="g-v2">プロトコル v2</dt><dd>Git の通信の新しいバージョン。<code>ls-refs</code> で要る ref だけを聞き、<code>fetch</code> で pack を取る。</dd>
       <dt id="g-quarantine">検疫</dt><dd>push で届いたオブジェクトを、検査が終わるまで本体と分けて置く領域。</dd>
       <dt id="g-ff">fast-forward</dt><dd>新しいコミットが旧いコミットの子孫で、ref を前に進めるだけで済む更新。</dd>
       <dt id="g-checksum">チェックサム</dt><dd>この設計では、全 ref の「名前と値」のハッシュの XOR。複製が同期しているかの判定に使う。</dd>

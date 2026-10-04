@@ -151,8 +151,8 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `org_id`・`id` | `uuid` | NO | | 主キー。API の `job_id` |
 | `file_id` | `uuid` | NO | | |
-| `seq` | `bigint` | NO | | 描く版（確定した `seq`） |
-| `version_id` | `uuid` | YES | | 版を指定したとき |
+| `seq` | `bigint` | NO | | 描くバージョン（確定した `seq`） |
+| `version_id` | `uuid` | YES | | バージョンを指定したとき |
 | `requested_by` | `uuid` | NO | | 利用者 |
 | `api_token_id` | `uuid` | YES | | `source = api` のとき（`global.api_tokens.id`） |
 | `source` | `text` | NO | | `ui`・`api` |
@@ -175,7 +175,7 @@ erDiagram
 
 ### file_thumbnails
 
-ファイルと版のサムネイル。
+ファイルとバージョンのサムネイル。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
@@ -192,5 +192,5 @@ erDiagram
 - 一意：`UNIQUE (org_id, file_id) WHERE kind = 'current'`、`UNIQUE (org_id, version_id) WHERE kind = 'version'`。
 - CHECK：`(kind = 'version') = (version_id IS NOT NULL)`。
 - 索引：一意索引（ファイルの一覧の API が、判定の後に署名付き URL を付ける）。
-- 更新：`current` の行を新しい `seq` で置き換え、古いオブジェクトを 7 日後に消す（`file_storage_jobs` の `gc` の手順で消す）。版の行は版と同じ期間残す。
-- S1 の規模：約 300 万行（`current`）＋名前付きの版の数。
+- 更新：`current` の行を新しい `seq` で置き換え、古いオブジェクトを 7 日後に消す（`file_storage_jobs` の `gc` の手順で消す）。バージョンの行はバージョンと同じ期間残す。
+- S1 の規模：約 300 万行（`current`）＋名前付きのバージョンの数。

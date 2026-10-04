@@ -26,7 +26,7 @@ date: 2026-09-27
 
 1 を採用する。
 
-- **スイートの版を固定する。** コンテナのイメージを digest で固定し、Renovate で更新する。更新の PR では、全プロファイルを走らせる。
+- **スイートのバージョンを固定する。** コンテナのイメージを digest で固定し、Renovate で更新する。更新の PR では、全プロファイルを走らせる。
 - **試験の設定（テストプランの JSON、ブラウザの操作）を開発リポジトリの `conformance/` に置く。** 試験用のテナント、クライアント、ユーザーは、試験の開始時に Management API で作る（シードの秘密は試験の中で生成する）。
 - **PR の CI**：`packages/oidc`・`services/auth`・`services/signer`・`packages/jose-*` など認証の経路のパッケージを変える PR で、Basic・Config・Form Post のプロファイルを走らせる。セッション・ログアウトを変える PR では、RP-Initiated Logout と Back-Channel Logout も走らせる。対応は `conformance/plans.yaml` の表で持つ。目標は 15 分以内。
 - **`main` へのマージの後と夜間**：対象のすべてのプロファイルと、将来の対象（FAPI 2.0 などの候補）を「参考」として走らせる。参考の失敗は、必須のチェックにしない。

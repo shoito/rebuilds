@@ -1,6 +1,6 @@
 # Data model: メタデータ（データ辞書）
 
-オブジェクト、項目、関係、選択リスト、レコードタイプ、依存、版と差分、翻訳、自動採番、型の変換、消去。振る舞いは [metadata-and-runtime.md](../metadata-and-runtime.md)、決定は [ADR-0003](../../decisions/0003-metadata-driven-runtime.md)・[ADR-0006](../../decisions/0006-data-dictionary-and-field-lifecycle.md)・[ADR-0007](../../decisions/0007-segmented-metadata-snapshots.md) にある。規約は [data-model.md](../data-model.md) の 3 節（特に 3.1 節の `field_id`・`field_no` と 3.11 節の版）。
+オブジェクト、項目、関係、選択リスト、レコードタイプ、依存、バージョンと差分、翻訳、自動採番、型の変換、消去。振る舞いは [metadata-and-runtime.md](../metadata-and-runtime.md)、決定は [ADR-0003](../../decisions/0003-metadata-driven-runtime.md)・[ADR-0006](../../decisions/0006-data-dictionary-and-field-lifecycle.md)・[ADR-0007](../../decisions/0007-segmented-metadata-snapshots.md) にある。規約は [data-model.md](../data-model.md) の 3 節（特に 3.1 節の `field_id`・`field_no` と 3.11 節のバージョン）。
 
 ## 1. ER 図
 
@@ -136,7 +136,7 @@ erDiagram
 ```
 
 - 全ての `md_*` の表は種類 `meta`。変更は `orgs.metadata_version` を 1 つ上げる 1 つのトランザクションで行い、行は `created_version`・`updated_version`（`bigint NOT NULL`）を持つ（[data-model.md](../data-model.md) の 3.11 節。下の列の表では省く）。
-- `autonumber_counters`・`field_conversions`・`purge_jobs` は種類 `data`（版を上げない）。
+- `autonumber_counters`・`field_conversions`・`purge_jobs` は種類 `data`（バージョンを上げない）。
 - 外部キーは組織の中の複合キー（`(org_id, object_id)` など）で張る。
 - 部品（`object:<object_id>` など）への入り方は [metadata-and-runtime.md](../metadata-and-runtime.md) の 4.2 節。
 
@@ -255,16 +255,16 @@ erDiagram
 
 ### 2.7 `md_versions`・`md_changes`
 
-版ごとの 1 行と、版の差分。直前の版へ戻すデプロイは、差分を逆に当てた新しい版として作る。
+バージョンごとの 1 行と、バージョンの差分。直前のバージョンへ戻すデプロイは、差分を逆に当てた新しいバージョンとして作る。
 
 | 表 | 列 |
 | --- | --- |
 | `md_versions` | `org_id`、`version`（`bigint`）、`created_at`、`actor_id`（`uuid`、利用者か空）、`source`（`setup`・`deploy`・`system`）、`deploy_id`（`uuid`、`source = deploy` の時）、`summary`（`text`） |
-| `md_changes` | `org_id`、`version`、`seq`（`integer`、版の中の順）、`entity_kind`（`object`・`field`・`layout`・`flow` など）、`entity_id`、`op`（`add`・`update`・`delete`・`restore`）、`before`・`after`（`jsonb`。秘密を含めない） |
+| `md_changes` | `org_id`、`version`、`seq`（`integer`、バージョンの中の順）、`entity_kind`（`object`・`field`・`layout`・`flow` など）、`entity_id`、`op`（`add`・`update`・`delete`・`restore`）、`before`・`after`（`jsonb`。秘密を含めない） |
 
 - キー：`md_versions` の PK `(org_id, version)`。`md_changes` の PK `(org_id, version, seq)`、FK `(org_id, version)` → `md_versions`。索引 `(org_id, entity_kind, entity_id, version DESC)` — 要素の履歴、戻しの衝突の確かめ（[sandboxes-and-deploy.md](../sandboxes-and-deploy.md) の 6.5 節）。
-- 保持：無期限（設定の変更は少ない）。Sandbox の作成では写さない（今の版を 1 つの版として作る）。監査は `details.version` でここを指す（[audit-and-history.md](audit-and-history.md)）。
-- 上限：1 つの版で変える要素 10,000。
+- 保持：無期限（設定の変更は少ない）。Sandbox の作成では写さない（今のバージョンを 1 つのバージョンとして作る）。監査は `details.version` でここを指す（[audit-and-history.md](audit-and-history.md)）。
+- 上限：1 つのバージョンで変える要素 10,000。
 
 ### 2.8 `md_translations`
 

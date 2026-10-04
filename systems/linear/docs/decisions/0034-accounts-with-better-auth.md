@@ -13,7 +13,7 @@ date: 2026-09-28
 
 認証の部品の候補として、Better Auth を評価した（いずれも 2026-09-28 に確認）。
 
-- `better-auth` 1.7.6、MIT。`@better-auth/passkey`（SimpleWebAuthn）・`@better-auth/sso`（OIDC・SAML、samlify）・`@better-auth/scim`（SCIM 2.0）も同じ版（npm のレジストリ）。
+- `better-auth` 1.7.6、MIT。`@better-auth/passkey`（SimpleWebAuthn）・`@better-auth/sso`（OIDC・SAML、samlify）・`@better-auth/scim`（SCIM 2.0）も同じバージョン（npm のレジストリ）。
 - Hono に Web 標準の API でそのまま載る（[Hono integration](https://www.better-auth.com/docs/integrations/hono)）。
 - PostgreSQL（Kysely）で、`database.schemaName` で別のスキーマに置ける（[PostgreSQL](https://www.better-auth.com/docs/adapters/postgresql)）。
 - メールの OTP は 6 桁・既定 5 分・3 回、保存をハッシュにできる（[Email OTP](https://www.better-auth.com/docs/plugins/email-otp)）。
@@ -34,7 +34,7 @@ date: 2026-09-28
 - 使う部品：核（アカウント、セッション）、`email-otp`（1 通のメールにコードとリンク。リンクの中身は URL のフラグメント）、Google、`@better-auth/passkey`、`multi-session`。`magic-link` とパスワードは使わない。
 - 組織の部品は使わない。ワークスペース・`User`・`TeamMembership`・`Invitation` は同期するモデルで、参加は認証のサービスが Writer にシステムのトランザクションを送って書く。
 - アカウントとワークスペースの中の人（`User`）は `account_id` で結ぶ。入り口の一覧（`auth.workspace_directory`）は写しで、権限の判定には使わない。
-- 他のパッケージから Better Auth を直接使うことを lint で禁止し、`packages/auth` の API だけを使う。版は固定し、minor 以上の上げはログインの E2E を通してから。
+- 他のパッケージから Better Auth を直接使うことを lint で禁止し、`packages/auth` の API だけを使う。バージョンは固定し、minor 以上の上げはログインの E2E を通してから。
 - SAML・SCIM は、MVP の後に同じライブラリの部品で足す（別の ADR）。
 - Better Auth は本家と無関係の第三者の汎用の部品で、[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md) に反しない。
 - 2 を採らない理由：メンバーシップの正本が Better Auth の表と同期するモデルの 2 つになり、購読の計算（Writer のトランザクション）の外でメンバーシップが変わりうる。
@@ -48,7 +48,7 @@ date: 2026-09-28
   - アカウントが自分の Aurora（東京）に残る（法務の L4）。
   - メンバーシップの正本が 1 つで、購読の計算と一致する。
 - 引き受けるコスト：
-  - 認証の核を若い第三者のライブラリに頼る。版の固定、告知の監視、包みと結合テストで抑える。
+  - 認証の核を若い第三者のライブラリに頼る。バージョンの固定、告知の監視、包みと結合テストで抑える。
   - Better Auth の言葉（`user`・`account`）と、この題材の言葉（アカウント・ログインの手段）がずれる。表の名前は `modelName` で変えられるが、コードの型は元の名前のままなので、既定の名前を使う（[Database](https://www.better-auth.com/docs/concepts/database)、2026-09-28 に確認）。
   - 参加の書き込みが、認証のサービスから Writer への呼び出しになる。
 

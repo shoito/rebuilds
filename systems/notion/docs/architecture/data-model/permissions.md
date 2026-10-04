@@ -23,7 +23,7 @@ erDiagram
   members ||--o{ invitations : "招待した人"
   members ||--o{ guest_requests : "申請した人"
   blocks ||--o{ published_sites : "公開したページ"
-  workspace_acl_versions ||--o{ page_acls : "変更で版を上げる"
+  workspace_acl_versions ||--o{ page_acls : "変更でバージョンを上げる"
   workspace_settings ||--o{ members : "招待の方針"
   workspace_security_policies ||--o{ published_sites : "公開の禁止"
 
@@ -69,7 +69,7 @@ erDiagram
   page_acls {
     uuid workspace_id PK "テナント"
     uuid page_id PK "ACL を持つページ"
-    bigint version "ACL の版"
+    bigint version "ACL のバージョン"
   }
   page_acl_entries {
     uuid workspace_id PK "テナント"
@@ -87,7 +87,7 @@ erDiagram
   }
   workspace_acl_versions {
     uuid workspace_id PK "テナント"
-    bigint acl_version "権限の版"
+    bigint acl_version "権限のバージョン"
   }
   workspace_settings {
     uuid workspace_id PK "テナント"
@@ -316,7 +316,7 @@ erDiagram
 | --- | --- | --- | --- | --- |
 | `workspace_id` | uuid | NO | | |
 | `page_id` | uuid | NO | | `blocks.id`（`type = page`） |
-| `version` | bigint | NO | `1` | このページの ACL の版。項目の変更ごとに 1 増やす |
+| `version` | bigint | NO | `1` | このページの ACL のバージョン。項目の変更ごとに 1 増やす |
 | `created_at` / `created_by` | timestamptz / uuid | NO | | |
 | `updated_at` / `updated_by` | timestamptz / uuid | NO | | |
 
@@ -326,7 +326,7 @@ erDiagram
 
 - 目的：ACL の項目（主体と水準）。
 - 正：同上
-- acl_version：追加・削除・水準の変更で上げる。期限切れの項目は判定で無視し、日次で消す（消すときは版を上げない。判定の結果は変わらないため）。
+- acl_version：追加・削除・水準の変更で上げる。期限切れの項目は判定で無視し、日次で消す（消すときはバージョンを上げない。判定の結果は変わらないため）。
 - 規模（S1）：約 1,500 万行
 
 | 列 | 型 | NULL | 既定 | 説明 |
@@ -366,7 +366,7 @@ erDiagram
 
 ## workspace_acl_versions
 
-- 目的：ワークスペースの権限の版。権限の変更の直列化と、判定のキャッシュ・検索の文書の鍵（[ADR-0019](../../decisions/0019-workspace-acl-version-cache.md)）。
+- 目的：ワークスペースの権限のバージョン。権限の変更の直列化と、判定のキャッシュ・検索の文書の鍵（[ADR-0019](../../decisions/0019-workspace-acl-version-cache.md)）。
 - 正：[permissions-and-sharing.md](../permissions-and-sharing.md) の 5 節
 - 規模：ワークスペースごとに 1 行
 

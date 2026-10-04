@@ -126,7 +126,7 @@ erDiagram
 | `amount` | `bigint` | NOT NULL | — | 最小単位 |
 | `currency` | `text` | NOT NULL | — | MVP は `jpy` |
 | `status` | `text` | NOT NULL | — | `requires_payment_method`・`requires_confirmation`・`requires_action`・`processing`・`requires_capture`・`succeeded`・`canceled` |
-| `capture_method` | `text` | NOT NULL | 版で決まる | `automatic`・`automatic_async`・`manual` |
+| `capture_method` | `text` | NOT NULL | バージョンで決まる | `automatic`・`automatic_async`・`manual` |
 | `confirmation_method` | `text` | NOT NULL | `'automatic'` | MVP は `automatic` だけ |
 | `customer_id` | `uuid` | NULL | — | → `customers` |
 | `payment_method_id` | `uuid` | NULL | — | → `payment_methods` |
@@ -183,7 +183,7 @@ erDiagram
 | `capture_before` | `timestamptz` | NULL | — | オーソリの有効期限 |
 | `captured_at` | `timestamptz` | NULL | — | 1 回だけ設定する |
 | `balance_transaction_id` | `uuid` | NULL | — | キャプチャの BT |
-| `three_d_secure` | `jsonb` | NULL | — | 結果、流れ（frictionless / challenge）、ECI、版 |
+| `three_d_secure` | `jsonb` | NULL | — | 結果、流れ（frictionless / challenge）、ECI、バージョン |
 | `payment_method_details` | `jsonb` | NOT NULL | — | 試行の時点の `card_display` と `checks`（`cvc_check` など） |
 | `outcome` | `jsonb` | NULL | — | `network_status`・`type`（`authorized`・`issuer_declined`・`blocked`）・`reason`・`risk_level`・`rule` |
 | `failure_code`・`decline_code`・`network_decline_code` | `text` | NULL | — | 正規化した拒否コードと生のコード |
