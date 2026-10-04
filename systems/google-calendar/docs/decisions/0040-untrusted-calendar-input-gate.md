@@ -37,7 +37,7 @@ iCalendar の解析は、壊れやすい入力の典型である。行の折り�
 
 | 項目 | CalDAV の `PUT` | ICS の取り込み | ICS の購読 | iMIP の受信 |
 | --- | --- | --- | --- | --- |
-| 本文の大きさ | 2 MiB | 10 MiB | 10 MiB（[architecture/README.md](../architecture/README.md) の 6 節） | メール 10 MiB、`text/calendar` 1 MiB（[invitations-and-itip.md](../architecture/invitations-and-itip.md) の 11.3 節） |
+| 本文の大きさ | 1 MiB（`CALDAV:max-resource-size`。`PROPFIND`・`REPORT` の XML の本文は 2 MiB） | 10 MiB | 10 MiB（[architecture/README.md](../architecture/README.md) の 6 節） | メール 10 MiB、`text/calendar` 1 MiB（[invitations-and-itip.md](../architecture/invitations-and-itip.md) の 11.3 節） |
 | VEVENT の数 | 1,001（マスター＋上書き 1,000） | 50,000 | 50,000 | 1,000 |
 | 折り返しを戻した 1 行 | 128 KiB | 同じ | 同じ | 同じ |
 | 1 つの構成要素のプロパティ | 500 | 同じ | 同じ | 同じ |
@@ -51,6 +51,8 @@ iCalendar の解析は、壊れやすい入力の典型である。行の折り�
 | 文字コード | UTF-8 だけ（BOM は外す）。不正な列は拒否 | UTF-8。不正な列は置き換えて件数を示す | 同左 | MIME の `charset` を UTF-8 に直す。直せなければ拒否 |
 
 - 値は本システムの既定で、変えるときはこの表と各領域の文書を同じ PR で直す。
+
+> 2026-10-04 の注記：起票の時は CalDAV の `PUT` の本文を 2 MiB としたが、[sync-and-caldav.md](../architecture/sync-and-caldav.md) が出す `CALDAV:max-resource-size` は 1 MiB である。統合の工程で 1 MiB に揃え、2 MiB は XML の要求の本文（と ALB の WAF の本文の上限）にした。
 - 大きさは、本文を読みながら数える（全部を読んでから比べない）。HTTP の `Content-Length` だけを信じない。
 
 ### 隔離の解析

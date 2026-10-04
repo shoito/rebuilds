@@ -53,7 +53,7 @@
 | 資源の状態 | `sync`（チャネルを作った）、`exists`（作成・変更・削除）、`not_exists`（資源がもうない） | 同上 |
 | チャネル | 期限は要求か内部の上限の厳しいほう。自動の更新はない。受け口は HTTPS で、正しい証明書が要る（自己署名などは不可）。トークンは 256 文字まで、秘密を入れない | 同上 |
 | 通知の応答 | `200`・`201`・`202`・`204`・`102` を成功とする。`500`・`502`・`503`・`504` で指数の後退の再試行 | 同上 |
-| 割り当て | プロジェクトごと 1 分 10,000、利用者ごと・プロジェクトごと 1 分 600。超えると 403 か 429（`usageLimits`）。切り詰めた指数の後退を勧める | [Manage quotas](https://developers.google.com/workspace/calendar/api/guides/quota) |
+| 割り当て | プロジェクトごと 1 分 10,000、利用者ごと・プロジェクトごと 1 分 600。超えると 403 か 429（`usageLimits`）。切り詰めた指数の後退を勧める。この値は 2026-05-01 から新しいプロジェクトに当たり、2025-11〜2026-04 に使ったプロジェクトは前の値を保つ | [Manage quotas](https://developers.google.com/workspace/calendar/api/guides/quota) |
 
 - 本家のチャネルの期限の既定と最大の値は、上の文書に書かれていない（**未検証**）。本システムは既定 7 日・最大 30 日にする（[architecture/README.md](README.md) の 6 節の決定）。
 - 本家の Push の通知に署名があるかは、上の文書にない（**未検証**）。本システムは署名を付ける。
@@ -97,7 +97,7 @@ ADR-0026。
   "id": "0192f0c4-6f1e-7c3a-9b1d-2f6c1a7e9d01",
   "calendarId": "0192f0c4-…",
   "uid": "0192f0c4-…@<brand>.<domain>",
-  "etag": "\"17\"",
+  "etag": "\"17-f\"",
   "status": "confirmed",
   "eventType": "default",
   "summary": "週次の定例",
@@ -189,6 +189,7 @@ POST /v1/sync
 ```
 
 - カレンダーごとに独立に処理する。1 つの 410 が他を止めない。
+- **トークンだけを取る形**：`{ "calendars": [ { "calendarId": "…" }, … ], "tokensOnly": true }` は、予定を返さずに、各カレンダーの今の `change_seq` のトークン（`nextSyncToken`）だけを返す。トークンを `timeMin`・`timeMax` と一緒に使えないので、Web の画面は窓を取り直す前にこれで今のトークンを取り、次に範囲の問い合わせで予定オブジェクトを取る。間の変更は次の差分で重ねて届き、版の比べで捨てる（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[ADR-0026](../decisions/0026-public-rest-api-shape.md) の注記）。カレンダーを読む権限（`calendar.read`）を確かめ、トークンには今の `view_hash` を入れる。公開 API の利用者も使える。
 - 1 回の応答の合計は 2,000 件まで。超えたカレンダーは `nextPageToken` を返し、クライアントは同じ入口で続ける。
 - 変わっていないカレンダー（トークンの `seq` がカレンダーの `change_seq` と同じ）は、予定を読まずに同じトークンを返す。
 
@@ -326,7 +327,7 @@ Content-Length: 0
 User-Agent: <Brand>-Push/1
 <Brand>-Channel-Id: my-channel-01
 <Brand>-Channel-Token: target=team-a
-<Brand>-Channel-Expiration: Tue, 11 Oct 2026 01:02:03 GMT
+<Brand>-Channel-Expiration: Sun, 11 Oct 2026 01:02:03 GMT
 <Brand>-Resource-Id: rsc_…
 <Brand>-Resource-Uri: https://api.<brand>.<domain>/v1/calendars/…/events
 <Brand>-Resource-State: exists
@@ -452,7 +453,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | E2 | `events-rest-basic` | 4.2〜4.5 節の予定の作成・取得・変更・削除・範囲（招待なし。events-and-recurrence と共同） |
 | E8 | `public-rest-api` | 4 節の全体、エラー、`X-Read-After`、OpenAPI（ADR-0026。PROP-API-001〜003） |
-| E8 | `api-sync-endpoints` | 4.6 節の `syncToken` と `POST /v1/sync`（DT-API-002） |
+| E8 | `api-sync-endpoints` | 4.6 節の `syncToken` と `POST /v1/sync`（`tokensOnly` を含む。DT-API-002） |
 | E8 | `api-idempotency` | 4.7 節の `Idempotency-Key`（PROP-API-002） |
 | E8 | `oauth-apps-and-scopes` | 6 節（ADR-0027。DT-API-001） |
 | E8 | `api-rate-limits` | 5 節 |
@@ -494,9 +495,11 @@ stateDiagram-v2
 
 ### runbooks
 
-- `webhook-[delivery.md](delivery.md)`：送りの失敗の増加の切り分け（受け手の障害、egress の NAT、証明書）と、送り係の増やし方。
+- `webhook-delivery.md`：送りの失敗の増加の切り分け（受け手の障害、egress の NAT、証明書）と、送り係の増やし方。
 - `api-abuse.md`：1 つのアプリ・テナントが枠を占めるときの確かめ方と、枠の一時の引き下げ、アプリのトークンの取り消し。
-- `leaked-token-response.md`：OAuth のトークン・クライアントの秘密・Webhook の秘密の漏えい（シークレットスキャンの通報を含む）の取り消しと連絡。
+- `credential-compromise.md`：OAuth のトークン・クライアントの秘密・Webhook の秘密の漏えい（シークレットスキャンの通報を含む）の取り消しと連絡（統合の工程で、提案の `leaked-token-response.md` を 1 つにまとめた）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

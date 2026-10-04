@@ -37,8 +37,12 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **写し**：招待に触れる要件は、本システムの中の参加者・外部の参加者・会議室・グループの 4 つの場合を覆い、写しの収束の性質を書いている。
 - **差分の同期**：書き込みを足す要件は、変更のログに載ることを受け入れ基準に含めている。
 - **上限**：外から入るものを受ける要件は、大きさ・件数・展開の回数の上限と、超えたときの応答を書いている。
-- **本家の振る舞い**：本家に寄せる要件は、出典と確認日、または「未検証」を書いている。
+- **本家の振る舞い**：本家に寄せる要件は、出典と確認日、または「未検証」を書いている。本家と違う振る舞い・RFC と違う振る舞いは、[architecture/README.md](architecture/README.md) の 1.4 節か [ADR-0007](decisions/0007-interop-standards-scope.md) の「RFC との意図した違い」の行を指している。
+- **テナントの外**：新しい表・テナントをまたぐ経路を足す要件は、[ADR-0004](decisions/0004-tenancy-and-rls.md) の許可リストの行を指している（行がなければ、先に ADR を直す）。
+- **フラグ**：展開・時刻・権限の規則を `release.*` の裏に置いていない（[runbooks/README.md](runbooks/README.md) の 3 節）。
 - **法務**：法務の確認待ち（[intent.md](intent.md) の L1〜L10）に当たる Story は、確認が済むまで承認しない。
+
+> 2026-10-04 の注記（統合の工程）：各領域の文書の「quality.md への項目」を、2.1 節（関門）、2.2.1 節 B・D（tzdb の切り替えの窓、漏れの経路の行）、2.2.2 節（Epic ごとの決定表と性質）、2.4 節（DR・tzdb の訓練の合格基準）、4.1 節（判定基準）、5 節（E4・E12）に反映した。
 
 ### 2.2 テストのレベル構成
 
@@ -79,7 +83,9 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
   - 遷移が変わらないゾーンの予定は、何も変わらない。
 - **過去の改正の集まり**：tzdb の NEWS に記録された過去の改正の種類（夏時間の廃止、恒久的なオフセットの変更、日付の飛び越し、宗教の行事の期間の夏時間の停止など）を、旧・新の版の組として集める。使う前に、各改正を tzdb の NEWS で確かめ、版の番号を記録する。
 - **合成の改正**：tzdb のソースを試験のために書き換えた版（「来週から夏時間を廃止」「施行の 2 日前に公表」）を作り、施行の直前の更新、再計算の途中の施行の場面を確かめる。
-- **版の混在**：サーバーが新の版、Web のクライアントが旧の版のとき、クライアントがサーバーの派生の値で表示し、自分で計算し直さないことを確かめる（[ADR-0002](decisions/0002-time-representation.md)）。
+- **版の混在**：サーバーが新の版、Web のクライアントが旧の版のとき、クライアントがサーバーの派生の値で表示し、自分で計算し直さないことを確かめる（[ADR-0002](decisions/0002-time-representation.md)）。AppConfig の `tzdata.active_version` の切り替えで、全サービスの `resolve` と API の `tzdata_version` が 15 秒以内に揃い、`expander` が切り替えの完了の後にだけ始めることを確かめる（[ADR-0049](decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。
+- **切り替えの窓**：会議室の予約の行が旧の版のまま、新の版で新しい予約を入れる場面で、(1) 新の版で重なる 2 つは計算し直しで後から承諾したほうが要確認になる、(2) 旧の版の区間とだけ重なって辞退した予約（`conflict_tz_pending`）は窓の終わりに判定し直されて承諾に戻る、(3) 承諾どうしの重なりは常に 0、を確かめる（[ADR-0012](decisions/0012-tzdb-update-recompute-and-propagation.md)）。
+- **戻し**：版の採用と戻しを任意の順に繰り返した後、すべての行が最後の版の値になる（PROP-TZ-004）。
 - **差分の報告**：`packages/tzdata` を変える PR で、CI が差分の報告（変わるゾーンと区間、影響する予定の見積もり）を出すことを確かめる。
 
 **C. 招待の配送のシミュレーター**
@@ -101,8 +107,16 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 通知（メール、Web Push、画面）、毎朝の一覧 | 結合テスト（送る本文の検査） |
 | Webhook | 通知に中身を入れないこと |
 | Realtime の合図 | カレンダーの ID と番号だけであること |
-| 予約ページ | 枠の計算が、主催者の予定の中身を返さないこと |
-| 管理の画面、監査ログ | 管理者の閲覧の範囲（法務の L8 の後に決める） |
+| 予約ページ | 枠の計算が、主催者の予定の中身を返さないこと（PROP-BOOK-004） |
+| 管理の画面、監査ログ | 管理者の閲覧は閲覧の許可の範囲の中だけで、読んだ予定の ID がすべて監査ログに残る（PROP-ACCT-004。`release.admin-event-access` を有効にした試験の環境で。本番の範囲は法務の L8 の後）。監査ログに中身を書かない |
+| CalDAV の `BUSY` の VEVENT | `SUMMARY` が「予定あり」の固定の文字で、他のプロパティがない。リソースの名前と UID が見る人ごとの不透明な ID（PROP-DAV-001、PROP-ACL-004） |
+| CalDAV の `text-match` | 中身の語で `private` の予定が当たらない（PROP-DAV-001） |
+| ICS の秘密のアドレス | `free_busy` の見え方で中身が出ない。`full` でも ATTENDEE を出さない。経路の `token` がログに残らない |
+| iMIP の本文 | `can_see_other_guests=false` の受け手に、主催者と受け手以外の参加者が出ない（PROP-ITIP-005） |
+| 保留の招待の通知 | 件数だけで、送信元と中身を出さない |
+| 不透明な ID | `BUSY` の ID が、経路をまたいで本当の ID・他の見る人の ID と結び付かない（PROP-ACL-004） |
+| Web の画面の手元の DB | 今の ACL で見てはいけないカレンダーの予定オブジェクトが手元に残らない（PROP-CLI-003）。ログアウト・`wipe`・30 日で消える |
+| Web Push の通知の本文 | 本文が通知の ID だけ（PROP-REM-005） |
 
 **E. 会議室の並行の予約**
 
@@ -135,6 +149,26 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - iMIP の偽の返事（照合の鍵のない返事、別の人の返事、送信元の認証の失敗）が当たらないこと。
 - ICS の購読の URL で、内部のアドレス・リダイレクトでの内部への誘導が拒否されること。
 
+### 2.2.2 Epic ごとの決定表と性質
+
+領域の文書で定めた決定表（`DT-*`）と性質（`PROP-*`）を、リリースの基準に結ぶ。表は spec から読み込み、表駆動テストにする。
+
+| Epic | 決定表 | 性質 | 文書 |
+| --- | --- | --- | --- |
+| E2 | DT-REC-001〜003、DT-SEC-001 | PROP-REC-001〜008、PROP-SEC-001・002 | [events-and-recurrence.md](architecture/events-and-recurrence.md)、[ADR-0040](decisions/0040-untrusted-calendar-input-gate.md) |
+| E3 | DT-TZ-001・002 | PROP-TZ-001〜006、PROP-ROOM-004 | [time-zones-and-holidays.md](architecture/time-zones-and-holidays.md) |
+| E4 | DT-ACL-001〜003、DT-ACCT-001・004 | PROP-ACL-001〜005、PROP-ACCT-001・002 | [sharing-and-acl.md](architecture/sharing-and-acl.md)、[accounts-and-orgs.md](architecture/accounts-and-orgs.md) |
+| E5 | DT-ITIP-001〜004 | PROP-ITIP-001〜006 | [invitations-and-itip.md](architecture/invitations-and-itip.md) |
+| E6 | DT-FB-001・002、DT-ROOM-001〜003 | PROP-FB-001〜005、PROP-ROOM-001〜003 | [free-busy-and-scheduling.md](architecture/free-busy-and-scheduling.md)、[rooms-and-resources.md](architecture/rooms-and-resources.md) |
+| E7 | DT-CLI-001 | PROP-CLI-001〜004 | [clients.md](architecture/clients.md) |
+| E8 | DT-DAV-001〜003、DT-SYNC-001、DT-ICS-001、DT-API-001〜003、DT-HOOK-001 | PROP-SYNC-001・002、PROP-DAV-001〜003、PROP-ICS-001、PROP-API-001〜003、PROP-HOOK-001〜003 | [sync-and-caldav.md](architecture/sync-and-caldav.md)、[api-and-push.md](architecture/api-and-push.md) |
+| E9 | DT-REM-001〜003、DT-NOTIF-001 | PROP-REM-001〜005 | [reminders-and-notifications.md](architecture/reminders-and-notifications.md) |
+| E10 | DT-BOOK-001〜003 | PROP-BOOK-001〜005 | [booking-pages.md](architecture/booking-pages.md) |
+| E11 | DT-SRCH-001・002、DT-ACCT-002・003 | PROP-SRCH-001〜004、PROP-ACCT-003・004 | [search.md](architecture/search.md)、[accounts-and-orgs.md](architecture/accounts-and-orgs.md) |
+
+- 参照との食い違いの許可リストの最初の理由は 2 つ（存在しない時刻の 3.3.10 節と 3.3.5 節の違い、DTSTART が規則に合わない）に限る。それ以外の追加は QA の承認を要する（[ADR-0008](decisions/0008-recurrence-expansion-semantics.md)）。
+- CalDAV の認証の失敗の上限は、「他人の失敗で、正しいアプリ用のパスワードの端末が止まらない」ことを結合テストに入れる（[sync-and-caldav.md](architecture/sync-and-caldav.md) の 6.7 節）。
+
 ### 2.3 エージェントの確認ループ
 
 Claude が PR を出す前に、開発リポジトリで次を回す。
@@ -156,7 +190,9 @@ pnpm test:interop --replay             # CalDAV・iMIP に触れたときだけ
 - **時計とタイムゾーンの固定**：テストの実行環境の `TZ` は `UTC` と `Asia/Tokyo` と `America/New_York` の 3 つで回し、結果が変わらないことを確かめる（実行環境のタイムゾーンに依存するコードを見つけるため）。時計は差し替えられる形で注入する。
 - **tzdb の版**：試験に使う版の組を `packages/tzdata/fixtures/` に固定する。
 - **合成のデータ**：テナント、利用者、グループ、会議室、予定は生成する。実在の人のメールアドレス・予定、本家から書き出した ICS を使わない。メールアドレスは予約済みのドメイン（`example.com` など）にする。
-- **負荷のデータ**：S1 の想定（利用者 60 万、予定オブジェクト 3 億、展開の索引 4 億）を、生成器で作る。リマインダーの集中の試験は、毎時 0 分の会議の割合を変えて作る。
+- **負荷のデータ**：S1 の想定（利用者 60 万、予定オブジェクト 3 億、展開の索引 4 億）を、生成器で作る。リマインダーの集中の試験は、毎時 0 分の会議の割合を変えて作る。負荷試験の場面と合格の基準は [capacity.md](architecture/capacity.md) の 7 節（L1〜L10）。
+- **DR の訓練の合格基準**（staging、四半期）：RPO 1 分以内、RTO 1 時間以内。切り替えの後、合成監視のクライアント（Web の API と CalDAV）が 410 から取り直して全件と一致する。外部への次の iMIP の `SEQUENCE` に余白が 1 つ付く。リマインダーの重複は `dr_window` に数えられ、送り漏れ 0（[runbooks/disaster-recovery.md](runbooks/disaster-recovery.md)）。
+- **tzdb の更新の訓練の合格基準**（E12、その後は半年 1 回）：`Asia/Tokyo` の合成の改正で、採用から 24 時間以内に古い版の行が 0 になり、切り替えの窓の長さを記録し、承諾どうしの会議室の重なり 0（[runbooks/tzdb-update.md](runbooks/tzdb-update.md)）。
 
 ## 3. AI 自体の品質
 
@@ -197,6 +233,12 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | 伝播（主催者 → 参加者の写し）の p99 | 5 秒以内 | runbooks の手順 |
 | 差分の同期の 410 の率 | 平常の 3 倍以内（DR・tzdb の更新の直後を除く） | ログの保持・`view_hash` の誤りを調べる |
 | 相互運用の受け入れ試験 | K9 の場面の 100% | リリースを止める |
+| 展開の計算の上限（`expansion_budget_exceeded`） | 0 件 | 展開の不具合として Intent を起票する |
+| 取り込みの印（`orphan`・`range_ignored`・`rdate_materialized`・`tz_approximated`・`vtimezone_mismatch`） | 推移を見る（急な増加は相互運用の変化の兆候） | 相互運用の試験の記録を取り直す |
+| 応答の検索の確かめ直しで落とした数（`policy_mismatch`） | 0 に近い | 検索の索引の遅れ・権限の写し方を調べる |
+| 予約と予定ありの重なり（予約ページ） | 週ごとの数を見る | E10 の後の持ち越しの判断に使う |
+| 会議室の要確認（`needs_review`）の数と解けるまでの時間 | tzdb の採用の後に増え、72 時間で減る | 主催者・管理者への知らせを見直す |
+| CalDAV の認証の失敗（種類ごと） | 平常の 3 倍以内 | `caldav-client-regression.md`、`credential-compromise.md` |
 
 ### 4.2 本番での検証
 
@@ -219,7 +261,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | E1 基盤 | RLS の検査、`packages/writer` の骨格、変更のログを通らない書き込みの禁止、テストの実行環境の 3 つの `TZ` | RLS の性質ベーステスト、CI の検査が動く |
 | E2 予定と繰り返しの核 | 参照との性質ベーステスト（A）、索引との一致、「これ以降」、iCalendar の往復 | 夜間 200,000 試行が 7 日続けて緑。許可リストの全件に QA の承認 |
 | E3 タイムゾーンと祝日 | tzdb の版の差分の試験（B）、存在しない時刻・2 回ある時刻、終日・浮動、祝日の生成と内閣府の CSV の照合 | 過去の改正の集まりと合成の改正がすべて通る。祝日の生成が CSV の全年と一致する（法務の L7 の後に公開） |
-| E4 アカウント・組織・共有 | `redact()`・`can()` の決定表、漏れの経路の表（D）、方針の変更 | 決定表の全行、経路の表の全行が緑 |
+| E4 アカウント・組織・共有 | `redact()`・`can()` の決定表、漏れの経路の表（D）、方針の変更、個人から組織への移り、SCIM（E4 の最後） | 決定表の全行、経路の表の全行が緑。PROP-ACCT-002 が夜間 7 日続けて緑 |
 | E5 招待と出欠 | 配送のシミュレーター（C）、iMIP の相互運用（H）、偽の返事（I） | 夜間のシミュレーターが 7 日続けて緑。外部の 3 つのカレンダーとの往復の場面が 100% |
 | E6 空き時間と会議室 | 並行の予約（E）、空き時間の探索の速さ、空き時間だけの共有の漏れ | 重なり 0、NFR-004 を負荷試験で満たす |
 | E7 Web の画面 | 3 つの `TZ` での表示、ドラッグ、IME、オフラインの閲覧 | 主な流れの E2E が緑、IME の手動の確認の表が全部通る |
@@ -227,7 +269,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | E9 リマインダーと通知 | 時計の試験と障害の注入（F）、集中の負荷 | 重複 0.01% 未満、漏れ 0、集中の負荷で NFR-003 |
 | E10 予約ページ | 枠の計算の正しさ、並行の予約、ボットの対策 | 並行の予約で二重の予約 0 |
 | E11 検索・管理・監査 | 検索の漏れ（D）、日本語の部分一致、監査ログの欠け | 漏れ 0、取りこぼしの例の集まりが全部当たる |
-| E12 本番の準備 | 負荷試験、tzdb の更新の訓練、DR の訓練、外部のペンテスト | runbooks の SLO を負荷試験で満たす。DR の訓練で RPO・RTO を満たす。ペンテストの High 以上が 0 |
+| E12 本番の準備 | 負荷試験（L1〜L10）、tzdb の更新の訓練、DR の訓練、外部のペンテスト、作成済みの runbook の訓練 | runbooks の SLO を負荷試験で満たす。DR の訓練と tzdb の更新の訓練が 2.4 節の合格基準を満たす。ペンテストの High 以上が 0。`release.*` のうち長く残すフラグの一覧（[runbooks/README.md](runbooks/README.md) の 3.2 節）の外のものが残っていない |
 
 ## 6. 責任分担
 

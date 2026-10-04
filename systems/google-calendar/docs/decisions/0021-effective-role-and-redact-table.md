@@ -39,7 +39,9 @@ date: 2026-10-04
 - `redact()` の決定表 DT-ACL-001（9 行）：`none` → `NONE`。持ち主以外が見る `hidden`・`cancelled` の写し → `NONE`。参加者 → `FULL`（参加者を隠す設定なら `FULL_NO_GUESTS`）。`owner`・`writer` → `FULL`。`reader` は `public` で `FULL`、`private` で `BUSY`。`free_busy_reader` は `transparent` で `NONE`、`opaque` で `BUSY`。管理者による閲覧は法務の L8 の後。
 - `BUSY` は、開始・終了・TZID、RRULE・RDATE・EXDATE、上書きの時刻、`status` と、`HMAC(key, viewer_id || event_object_id)` の不透明な ID だけを持つ。
 - 公開範囲は予定オブジェクトのマスターだけが持つ。1 回分への変更は系列に当てる。参加者の写しは自分の公開範囲を持てる。
-- 外の主体が `writer` 以上を持つカレンダーへの書き込みは、カレンダーのテナントのコンテキストで、専用の DB のロール `shared_calendar_access` から `packages/writer` を通して行い、変更のログと outbox をカレンダーのテナントに書く。これは [ADR-0004](0004-tenancy-and-rls.md) の 3 つ目の処理（共有されたカレンダーの読み出し）を書き込みに広げる追補で、題材の `AGENTS.md` の規則（テナントをまたぐのは iTIP の配送と空き時間の照会だけ）の例外になる。テックリードの確認まで、`release.cross-tenant-shared-writes` のフラグの裏に置き、確認が得られなければ b に切り替える。
+- 外の主体が `writer` 以上を持つカレンダーへの書き込みは、カレンダーのテナントのコンテキストで、専用の DB のロール `shared_calendar_access` から `packages/writer` を通して行い、変更のログと outbox をカレンダーのテナントに書く。これは [ADR-0004](0004-tenancy-and-rls.md) の共有されたカレンダーの読み出しを書き込みに広げるもので、ADR-0004 の許可リストの X4 にした。テックリードの確認まで、`release.cross-tenant-shared-writes` のフラグの裏に置き、確認が得られなければ b に切り替える。
+
+> 2026-10-04 の注記：起票の時は、題材の `AGENTS.md` の規則（テナントをまたぐのは iTIP の配送と空き時間の照会だけ）との食い違いを残した。統合の工程で、ADR-0004 にテナントをまたぐ経路の許可リストを置き、`AGENTS.md` も同じ一覧を指すようにした。フラグとテックリードの確認は残る。
 
 ### 他の案を選ばなかった理由
 
@@ -56,7 +58,7 @@ date: 2026-10-04
   - 個人のアカウントどうしの共有の書き込みができる。
 - 引き受けるコスト：
   - `BUSY` で時刻の構造（RRULE）を返すので、系列の型から中身を推測される危険が残る。
-  - テナントをまたぐ処理が 1 つ増え、監査の対象が広がる。[ADR-0004](0004-tenancy-and-rls.md) と題材の `AGENTS.md` との食い違いを、テックリードが確認するまで残す。
+  - テナントをまたぐ処理が 1 つ増え、監査の対象が広がる。許可リスト（[ADR-0004](0004-tenancy-and-rls.md) の X4）には入れたが、有効にするのはテックリードの確認の後である。
   - 組織の外への上限の既定を「空き時間だけ」にしたので、組織の外の人と予定を見せ合うには、管理者が方針を広げる必要がある。
 
 ## Confirmation

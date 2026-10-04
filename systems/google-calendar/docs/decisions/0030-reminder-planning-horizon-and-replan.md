@@ -11,8 +11,8 @@ date: 2026-10-04
 
 - 予定の回は無限にありうる。リマインダーは最大 40,320 分（28 日）前（[Events resource](https://developers.google.com/workspace/calendar/api/v3/reference/events)、2026-10-04 に確認）。
 - 予定の移動・取り消し、出欠の辞退、リマインダーの変更、カレンダーのタイムゾーンの変更、tzdb の再計算（[ADR-0012](0012-tzdb-update-recompute-and-propagation.md)）は、送る時刻を変える。題材の `AGENTS.md` は「予定が動いたら版を上げ、古い版の時刻の送信を捨てる」と決めた。
-- 終日の予定の「前日 09:00」は、夏時間の切り替えの日に UTC で 900 分を引くとずれる。
-- [architecture/README.md](../architecture/README.md) の 1.3 節は、送信の記録の鍵を `(reminder_id, occurrence_start, method, version)` と書いた。版がタイトルだけの変更でも上がる（[ADR-0003](0003-recurrence-storage-and-expansion.md)）と、遅れて作り直した行が同じ回をもう一度送りうる。
+- 終日の予定の「前々日の 09:00」のような分は、夏時間の切り替えをまたぐと、UTC で分を引いたときに壁時計の時刻がずれる。
+- 最初の設計の [architecture/README.md](../architecture/README.md) の 1.3 節は、送信の記録の鍵を `(reminder_id, occurrence_start, method, version)` と書いた。版がタイトルだけの変更でも上がる（[ADR-0003](0003-recurrence-storage-and-expansion.md)）と、遅れて作り直した行が同じ回をもう一度送りうる。
 
 ## Options
 
@@ -48,10 +48,10 @@ date: 2026-10-04
 - 良くなること：
   - 計画の行の数が 7 日分で済む（S1 で約 2,100 万行）。
   - 付け替えが（利用者, 予定オブジェクト）の単位の 1 トランザクションで、順序の入れ替わりと重複に強い。
-  - 終日の予定の「前日 09:00」が夏時間の日もずれない。
+  - 終日の予定の分が、夏時間の切り替えをまたいでもずれない。
   - タイトルだけの変更で重複しない。
 - 引き受けるコスト：
-  - [architecture/README.md](../architecture/README.md) の 1.3 節と題材の `AGENTS.md` の鍵の書き方と、文字どおりには違う。読み方（`reminder_id` の中身、版の役目）を 2 つの文書に合わせて直す必要がある（統合の工程で扱う）。
+  - 最初の設計の鍵の書き方と違う。統合の工程で、[architecture/README.md](../architecture/README.md) の 1.3 節、題材の `AGENTS.md`、[ADR-0046](0046-sli-from-ledgers-and-delivery-tracing.md) をこの ADR の鍵に直した（2026-10-04）。
   - 毎時の端の進めが止まると、7 日先の端の回が計画されない。止まった時間を監視する。
   - 付け替えの遅れ（p99 10 秒）より近い先のリマインダーは、古い行のまま発火しうる。notifier の確かめで捨てるが、新しい時刻の行が遅れて作られるまでの間は送られない。
 

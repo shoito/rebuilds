@@ -242,13 +242,13 @@ ADR-0035。
 
 ## 12. SCIM
 
-ADR-0036。SSO の後に足す（E4 の最後の Story。`release.scim` のフラグの裏で出す）。
+ADR-0036。SCIM は MVP に含める（[intent.md](../intent.md)）。SSO の後に、E4 の最後の Story（`scim-provisioning`）として `release.scim` のフラグの裏で足し、GA の判定（E12）の前に 100% にしてフラグを消す。
 
 | 項目 | 決定 |
 | --- | --- |
 | 入口 | `https://auth.<brand>.<domain>/scim/v2/<org_id>/`。`Users`・`Groups`・`ServiceProviderConfig`・`Schemas`・`ResourceTypes` |
 | 認証 | `Authorization: Bearer <brand>_scim_…`（9 節） |
-| 部品 | `@better-auth/scim` を評価して使う。受けた操作は、本システムのディレクトリの書き込み（`packages/directory`）に写し、監査ログに残す |
+| 部品 | `@better-auth/scim` を評価して使う。受けた操作は、本システムのディレクトリの書き込み（`packages/directory`）に写し、監査ログに残す。1.5.0〜1.7.0-beta.3 に、別の利用者の SCIM の提供者を乗っ取れる告知があり 1.7.0 で直っている（[GHSA-j8v8-g9cx-5qf4](https://github.com/better-auth/better-auth/security/advisories/GHSA-j8v8-g9cx-5qf4)、2026-10-04 に確認）。1.7.0 より前を使わない |
 | Users の作成 | 利用者を作る（確認したドメインのメールアドレスだけ）。同じメールアドレスの個人のアカウントがあれば、7 節の案内を出し、移るまで `pending` |
 | `active=false` | 利用者の停止（15 節） |
 | 削除 | 停止にする。削除（15 節の引き継ぎ）は管理者が画面で行う |
@@ -378,7 +378,7 @@ sequenceDiagram
 | E4 | `sso-saml-oidc` | 8 節（DT-ACCT-001） |
 | E4 | `org-auth-policy` | 10 節 |
 | E4 | `directory-users-groups` | 11 節 |
-| E4 | `scim-provisioning` | 12 節（`release.scim` の裏。SSO の後） |
+| E4 | `scim-provisioning` | 12 節（MVP。E4 の最後、SSO の後。`release.scim` の裏で出し、GA の前に消す） |
 | E8 | `caldav-app-passwords` | 9 節（sync-and-caldav と共同） |
 | E11 | `admin-console` | 13 節の役割と委任（ADR-0037。DT-ACCT-002、PROP-ACCT-003） |
 | E11 | `admin-event-access` | 14 節の枠（PROP-ACCT-004）。法務：L8 |
@@ -396,7 +396,7 @@ sequenceDiagram
 - **ドメインの確認**：DNS の TXT、毎日確かめる（ADR-0036）。
 - **SSO**：SP 起点だけ、ドメインに 1 つの IdP、必須にしても特権の管理者はパスキー（ADR-0036）。
 - **個人から組織へ**：本人の同意で移す（ADR-0036）。
-- **SCIM**：SSO の後に、フラグの裏で（ADR-0036）。
+- **SCIM**：MVP に含め、E4 の最後に SSO の後でフラグの裏から出す（ADR-0036。統合の工程で intent・roadmap と揃えた）。
 - **管理の役割**：6 つ、グループの範囲で委任（ADR-0037）。
 - **管理者の閲覧**：仕組みだけ、フラグの裏（ADR-0037）。
 
@@ -422,9 +422,11 @@ sequenceDiagram
 
 ### runbooks
 
-- `sso-outage.md`：IdP の障害・証明書の期限切れのときの確かめ方と、`super_admin` のパスキーでの入り方、SSO の必須の一時の解除（記録つき）。
-- `tenant-move-failure.md`：移しの途中の失敗の調べ方と、やり直し。
-- `credential-revocation.md`：利用者・組織の資格の一括の取り消し（漏えいの疑い）。
+- `sso-outage.md`（予定）：IdP の障害・証明書の期限切れのときの確かめ方と、`super_admin` のパスキーでの入り方、SSO の必須の一時の解除（記録つき）。
+- `tenant-move-failure.md`（予定）：移しの途中の失敗の調べ方と、やり直し。
+- `credential-compromise.md`（予定）：利用者・組織の資格の一括の取り消し（漏えいの疑い。提案の `credential-revocation.md` をまとめた）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

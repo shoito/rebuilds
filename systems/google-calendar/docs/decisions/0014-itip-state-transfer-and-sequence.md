@@ -54,7 +54,7 @@ date: 2026-10-04
 - 引き受けるコスト：
   - 大きな系列（上書きが多い）のメッセージが大きい。S3 に置く分の遅れがある。
   - 日時の変更のたびに、参加者に返事のやり直しを求める。画面で「前は承諾していた」を示して、返事を軽くする（clients.md）。
-  - STATUS と DURATION を `SEQUENCE` の対象に足したので、[ADR-0006](0006-organizer-and-attendee-copies.md) の一覧より広い。
+  - STATUS と DURATION を `SEQUENCE` の対象に足した。統合の工程で [ADR-0006](0006-organizer-and-attendee-copies.md) の一覧もこの ADR に揃えた（2026-10-04）。
 
 ## Confirmation
 

@@ -126,9 +126,10 @@ flowchart LR
 ## 5. Web のクライアントの差分の取り方
 
 - 表示するカレンダーごとにトークンを IndexedDB に持ち、`POST /v1/sync`（[api-and-push.md](api-and-push.md) の 4.6 節）に最大 50 のトークンを束ねて送る。応答はカレンダーごとの差分と次のトークン。
+- 窓を取り直すときは、先に `POST /v1/sync` の `tokensOnly` で今のトークンだけを取り、次に範囲の問い合わせで予定オブジェクトを取る（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)）。
 - 合図：Realtime から「`calendar_id`、`seq`」を受けたら、手元のトークンの `seq` より大きければ差分を取る。合図を 300 ms まとめてから取る（同じ変更の参加者の写しの合図が続けて来るため）。
 - 取り戻し：WebSocket の再接続の後と、5 分ごとに全部のトークンで差分を取る（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。
-- 410：そのカレンダーの手元の予定を捨て、範囲を絞った全件の取り直し（表示の範囲の前後 4 週）と、新しいトークンの取得を行う。
+- 410：そのカレンダーの手元の予定を捨て、新しいトークンの取得（`tokensOnly`）と、範囲を絞った全件の取り直し（表示の範囲の前後 4 週）をこの順に行う。
 - 範囲の表示：差分は予定オブジェクトで届き、回は手元の `packages/recurrence` で展開する。手元の `tzdata_version` がサーバーより古ければ、範囲の問い合わせ（`GET /v1/calendars/{id}/events?singleEvents=true`）の派生の値で表示する（[ADR-0002](../decisions/0002-time-representation.md)）。
 
 ## 6. CalDAV
@@ -279,7 +280,19 @@ DT-DAV-001。`PUT` の判定。上の行から当てる。
 | ログインのパスワード、セッションのクッキー | 受けない | — |
 
 - `401` の応答は `WWW-Authenticate: Basic realm="<Brand> CalDAV", Bearer` の 2 つを出す。
-- 失敗の上限：アカウントごとに 10 分で 20 回、IP ごとに 10 分で 200 回。超えたら 15 分 `429`。OS のカレンダーは誤ったパスワードで繰り返し要求するので、上限は厳しめにし、利用者の画面に「CalDAV のアプリ用のパスワードの失敗が続いています」を出す。
+- **失敗の上限（アカウントの全体を止めない）**：アプリ用のパスワードは 120 ビットの乱数（[ADR-0035](../decisions/0035-accounts-auth-library-and-credentials.md)）で、総当たりは成り立たない。アカウントの単位で止めても守りにならず、他人がわざと失敗してその人の CalDAV を止める（締め出し）のに使える。そこで、失敗を次の単位で数え、アカウントの全体の締め出しをしない。
+
+| 失敗の種類 | 数える単位 | 上限 | 超えたとき |
+| --- | --- | --- | --- |
+| 形（接頭辞・長さ・チェックサム）が合わない | 数えない（照合の計算もしない） | — | すぐ 401 |
+| 形は合い、取り消した・期限の切れたアプリ用のパスワードのハッシュに一致する（古いパスワードを送り続ける端末） | そのアプリ用のパスワード | 10 分で 20 回 | そのパスワードの要求だけを 15 分 `429`。他のパスワードと端末に影響しない |
+| 形は合うが、どのアプリ用のパスワードにも一致しない | （送信元の IP（IPv6 は /64）, アカウント）の組 | 10 分で 20 回 | その組だけを 15 分 `429`。同じアカウントの他の IP の端末は止めない |
+| すべての失敗 | 送信元の IP（IPv6 は /64） | 10 分で 200 回 | その IP を `alb-dav` の WAF の IP の集合へ 15 分載せ、エッジで止める（[infrastructure.md](infrastructure.md) の 2.2 節） |
+
+- 利用者には、失敗の種類ごとの数と、最後の失敗の IP の帯・クライアントの種類を設定の画面に出し、「取り消したアプリ用のパスワードを使い続けている端末があります」などと示す。止めるのではなく知らせる。
+- 正しいアプリ用のパスワードの要求は、上の上限に当たっていても通す（同じ IP の組が上限を超えていても、一致した要求は数えずに通す）。
+
+> 2026-10-04 の注記：領域の工程では「アカウントごとに 10 分で 20 回、超えたら 15 分 `429`」とした。統合の工程で、他人による締め出しを防ぐため上の形に直した（[security.md](security.md) の 3.3 節の CD2）。
 - 組織の管理者がアプリ用のパスワードを禁止したら、既存のパスワードは 5 分以内に効かなくなる（[accounts-and-orgs.md](accounts-and-orgs.md) の 10 節）。
 
 ## 7. 暗黙のスケジュール
@@ -456,7 +469,7 @@ stateDiagram-v2
 ## 11. セキュリティ
 
 - **見え方**：CalDAV・ICS の公開・差分の中身は、すべて `redact()` を通す。`text-match` も `redact()` の後で当てる（6.5 節）。空き時間だけのカレンダーを CalDAV に出さない（6.1 節）。
-- **認証**：CalDAV にログインのパスワードを使わない。アプリ用のパスワードは CalDAV だけの範囲で、組織が禁止できる。失敗の上限（6.7 節）。
+- **認証**：CalDAV にログインのパスワードを使わない。アプリ用のパスワードは CalDAV だけの範囲で、組織が禁止できる。失敗の上限はアカウントの全体を止めない形（6.7 節）。本家の CalDAV は Basic 認証を受けない（3 節）ので、これは本家との意図した違いである（[architecture/README.md](README.md) の 1.4 節）。
 - **SSRF**：ICS の購読の取得は egress の経路と宛先の検査（8.1 節）。応答の本文は `packages/ical` の上限の検査を先に通す。
 - **秘密のアドレス**：160 ビットの乱数、ハッシュだけを保存、作り直し、要求の上限、`noindex`。ATTENDEE を出さない。
 - **XML**：CalDAV の XML のパーサーは、外部の実体と DTD を無効にする（XXE）。1 回の要求の本文は 2 MiB まで、入れ子は 32 段まで。
@@ -540,6 +553,9 @@ stateDiagram-v2
 ### runbooks
 
 - `sync-token-reset-spike.md`：410 の急増の切り分け（DR、tzdb の再計算、方針の変更、`view_hash` の誤り）。
+- `credential-compromise.md`：CalDAV の認証の失敗の急増（6.7 節の種類ごと）と、アプリ用のパスワードの一括の取り消し。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 - `caldav-client-regression.md`：クライアントの新しい版での 4xx の急増の調べ方（`User-Agent` の大分類、記録した通信の取り直し）。
 - `ics-subscription-failures.md`：取得の失敗の急増の切り分け（egress の NAT、相手の障害、宛先の検査の拒否）と、取得を止める `ops.ics_fetch_interval_min`。
 
@@ -548,10 +564,10 @@ stateDiagram-v2
 | 表 | 中身 | 節 |
 | --- | --- | --- |
 | `calendar_changes` | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md) の行。日の分割 | 4.1 |
-| `calendars` に足す列 | `floor_seq`、`kind`（`standard`・`subscription`・`system`） | 4.1、8.1 |
+| `calendars` に足す列 | `floor_seq`、`kind`（`primary`・`secondary`・`shared`・`resource`・`subscription`・`system`。[data-model.md](data-model.md) の 5 節で揃えた） | 4.1、8.1 |
 | `deleted_event_objects` | `(tenant_id, calendar_id, event_object_id)` を主キーに、`uid`、`href_name`、`deleted_seq`、`deleted_at`。30 日 | 4.1 |
 | `caldav_hrefs` | `(tenant_id, calendar_id, href_name)` を主キーに `event_object_id`。一意 `(tenant_id, event_object_id)` | 6.3 |
-| `caldav_auth_failures`（Valkey） | アカウント・IP ごとの失敗の数 | 6.7 |
+| `caldav_auth_failures`（Valkey） | アプリ用のパスワードごと、（IP, アカウント）の組ごと、IP ごとの失敗の数（6.7 節の表） | 6.7 |
 | `ics_subscriptions` | `(tenant_id, id)`、`user_id`、`calendar_id`、`url_ciphertext`、`url_hash`、`state`、`etag`、`last_modified`、`next_fetch_at`、`failure_count`、`last_error_code`、`uid_hashes`（UID → 内容のハッシュ。S3 に置き、鍵を持つ） | 8.1 |
 | `ics_fetch_cache`（S3） | 正規化した URL のハッシュごとの最後の本文、6 時間 | 8.1 |
 | `ics_publish_tokens` | `(tenant_id, calendar_id)` を主キーに、`token_hash`、`view`（`full`・`free_busy`）、`created_by`、`created_at`、`last_used_at`、`revoked_at`。解決のためにテナントの外の保守用のスキーマへ `token_hash → (tenant_id, calendar_id)` を写す | 8.2 |

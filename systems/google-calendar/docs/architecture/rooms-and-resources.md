@@ -57,7 +57,7 @@
 | `resources` | `id`、`calendar_id`（会議室のカレンダー）、`building_id`、`floor_name`、`floor_section`、`name`、`display_name`（「東京本社-12F-会議室A（8）」の形で自動で作る）、`category`（`room`・`other`）、`resource_type`（設備の種類）、`capacity`、`description`、`address_token`（`r-<token>@resource.<brand>.<domain>`） |
 | `resource_features`・`resource_feature_instances` | 設備の属性（ディスプレイ、ビデオ会議の機器、ホワイトボード、車いす） |
 | `resource_policies` | `mode`（`auto_accept`・`approval`）、`max_duration`（既定 24 時間、15 分〜7 日）、`horizon_days`（既定 548、1〜548）、`allowed_bookers`（主体の一覧。既定は組織の全員）、`managers`（利用者・グループ） |
-| `rooms` の行 | `booking_seq`（予約の行が変わるたびに上げる。[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)） |
+| `resources` の列 | `booking_seq`（予約の行が変わるたびに上げる。[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)） |
 
 - 会議室と設備は組織のテナントにだけある。個人のテナントは持たない。
 - 予約できるのは、会議室と同じテナントの主催者だけ（MVP）。他の組織の人が主催する予定に会議室を付ける要求は、権限の理由で辞退する。
@@ -204,7 +204,7 @@ stateDiagram-v2
 
 ADR-0020。
 
-- tzdb の計算し直し（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）で、行の `during` を直す `UPDATE` が排他の制約に当たったら、次をする。
+- tzdb の計算し直し（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）で、行の `during` を直す `UPDATE` が排他の制約に当たったら、次をする。切り替えの窓（新旧の版の区間が比べられる間）の扱いは ADR-0012 の「切り替えの窓」。
   1. 当たった相手の行と、`accepted_at` を比べる。
   2. 後から承諾したほうを `needs_review` にする（自分なら自分を、相手なら相手を `needs_review` にしてから自分の `UPDATE` をやり直す）。
   3. 主催者と会議室の管理者に、重なった 2 つの予定を知らせる。
@@ -302,8 +302,10 @@ ADR-0020。
 
 ### runbooks
 
-- `room-overlap-detected.md`：重なりの検査が 1 件以上のときの確かめ方（行、`tzdata_version`、ロックを通らない書き込み）と、主催者への連絡。データの直接の書き換えはしない（[roadmap.md](../roadmap.md) の「エージェントに任せないこと」）。
-- `room-needs-review-backlog.md`：要確認が溜まったときの、管理者への連絡と一覧の出し方。
+- `room-double-booking.md`（提案の `room-overlap-detected.md` をこの名前に揃えた）：重なりの検査が 1 件以上のときの確かめ方（行、`tzdata_version`、ロックを通らない書き込み）と、主催者への連絡。データの直接の書き換えはしない（[roadmap.md](../roadmap.md) の「エージェントに任せないこと」）。
+- `room-needs-review-backlog.md`（予定）：要確認が溜まったときの、管理者への連絡と一覧の出し方。切り替えの窓での偽の辞退（`conflict_tz_pending`）の判定し直しの確かめ方も入れる。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

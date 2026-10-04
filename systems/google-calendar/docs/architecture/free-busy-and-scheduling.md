@@ -311,14 +311,16 @@ flowchart LR
 
 ### runbooks
 
-- `freebusy-slow.md`：照会が遅いときの確かめ方（キャッシュの当たり、テナントごとの時間、索引の読み出し）と、範囲を縮める退避。
+- `freebusy-slow.md`（予定）：照会が遅いときの確かめ方（キャッシュの当たり、テナントごとの時間、索引の読み出し）と、範囲を縮める退避。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 
 | 表・鍵 | 中身 | 節 |
 | --- | --- | --- |
 | `occurrences` の列（[events-and-recurrence.md](events-and-recurrence.md)） | `attendee_partstat`、`event_type` を空き時間の判定に使う | 4.2 |
-| `rooms` に足す列 | `booking_seq`（予約の行と同じトランザクションで上げる） | 5.1 |
+| `resources` に足す列（[rooms-and-resources.md](rooms-and-resources.md) の 4.1 節） | `booking_seq`（予約の行と同じトランザクションで上げる） | 5.1 |
 | Valkey の `fb:*`・`fbr:*` | 5.1 節の値 | 5.1 |
 | `working_hours` | `(tenant_id, user_id)` を主キーに、曜日ごとの範囲、タイムゾーン、祝日を休みにするか | 6.3 |
 | DB の関数 `freebusy_for` | 専用のロール `freebusy` だけが実行できる | 4.5 |

@@ -554,9 +554,10 @@ RFC 6047 の 2.2.2 節は S/MIME での認証を求める（MUST）。本シス�
 
 ### runbooks
 
-- `itip-delivery-backlog.md`：配送の滞留の確かめ方（キューの深さ、テナントごとの遅れ）、`itip-bulk` の絞り方。
-- `imip-inbound-failures.md`：受信の失敗・未確認の返事の急増の調べ方（送信元のドメイン、DKIM の結果）、受け口のアドレスの作り直し。
-- `imip-sending-limits.md`：送信の上限の引き上げの依頼の扱い、抑止の一覧の解除。
+- `itip-delivery-lag.md`：配送の滞留の確かめ方（キューの深さ、テナントごとの遅れ）、`itip-bulk` の絞り方（統合の工程で、提案の `itip-delivery-backlog.md` をこの名前に揃えた）。
+- `email-delivery.md`：受信の失敗・未確認の返事の急増の調べ方（送信元のドメイン、DKIM の結果）、受け口のアドレスの作り直し、送信の上限の引き上げの依頼、抑止の一覧の解除（提案の `imip-inbound-failures.md`・`imip-sending-limits.md` をまとめた）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

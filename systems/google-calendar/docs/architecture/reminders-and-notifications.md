@@ -122,7 +122,7 @@ ADR-0030。
 
 - 索引：`(shard, fire_at) WHERE status = 'pending'`、`(tenant_id, user_id, event_object_id)`。
 - 分の桶：同じ分の行は `fire_at` の索引で隣り合う。時計は分ごとにまとめて読む（6.2 節）。「分の桶」は表の分け方ではなく、読み方の単位である。
-- 保守用のスキーマに置くのは、時計が全部のテナントの行を読むためである。テナントの行（予定の中身）は、notifier がテナントのコンテキスト（`SET LOCAL`）で読む。[time-zones-and-holidays.md](time-zones-and-holidays.md) の `tenant_tz_usage` と同じ置き方で、[ADR-0004](../decisions/0004-tenancy-and-rls.md) のテナントをまたぐ 3 つの処理に、中身を持たない時計の表の読み出しを足す。
+- 保守用のスキーマに置くのは、時計が全部のテナントの行を読むためである。テナントの行（予定の中身）は、notifier がテナントのコンテキスト（`SET LOCAL`）で読む。[time-zones-and-holidays.md](time-zones-and-holidays.md) の `tenant_tz_usage` と同じ置き方で、[ADR-0004](../decisions/0004-tenancy-and-rls.md) のテナントをまたぐ経路の許可リストの X5 と、RLS の外の表の一覧に入れた（統合の工程）。
 
 ### 5.2 計画の範囲
 
@@ -167,7 +167,7 @@ DT-REM-002。outbox の `reminder.replan { tenant_id, user_id?, calendar_id, eve
 
 - `resolve` は `packages/tz` の 1 つの関数（存在しない時刻はずらす。[ADR-0002](../decisions/0002-time-representation.md)）。
 - **例 1（時刻つき）**：毎週火曜 10:00 `America/New_York` の会議、10 分前。2027-03-16（火、EDT）の回は 14:00Z 開始、`fire_at` は 13:50Z。
-- **例 2（終日、夏時間をまたぐ）**：2027-03-15（月）の終日の予定、持ち主のカレンダーは `America/New_York`、`minutes = 900`（前日の 09:00）。前日 2027-03-14 は 02:00 に夏時間に入る日で、24 時間ではない。壁時計で引くので、3 月 14 日 09:00 EDT（13:00Z）に送る。UTC で 900 分を引くと 08:00 EDT になり、意図とずれる。
+- **例 2（終日、夏時間をまたぐ）**：2027-03-15（月）の終日の予定、持ち主のカレンダーは `America/New_York`、`minutes = 2340`（前々日の 09:00）。2027-03-14 の 02:00 に夏時間に入るので、03-13 の 09:00 から 03-15 の 00:00 までは 38 時間しかない。壁時計で引くので、3 月 13 日 09:00 EST（14:00Z）に送る。03-15 の 00:00 EDT（04:00Z）から UTC で 2340 分を引くと 03-13 の 13:00Z、つまり 08:00 EST になり、意図とずれる（統合の工程で例を直した。前の例の「前日の 09:00」は切り替えをまたがず、ずれが出ない）。
 
 ## 6. 時計
 
@@ -213,7 +213,7 @@ sequenceDiagram
 ```
 
 - 送信の記録の一意の鍵：`(tenant_id, user_id, event_object_id, recurrence_id, method, minutes, occurrence_start_utc)`（ADR-0030）。
-  - [architecture/README.md](README.md) の 1.3 節と題材の `AGENTS.md` は `(reminder_id, occurrence_start, method, version)` と書く。本システムでは `reminder_id` を（利用者, 予定オブジェクト, `recurrence_id`, 分）と読み、`version` を鍵から外して列に持つ。版を鍵に入れると、タイトルだけの変更（版が上がる）の後に、遅れて作り直した行がもう一度送られるためである。古い版の行を送らない役目は、付け替えでの行の削除と、notifier の確かめ（7.1 節）が持つ。
+  - 版（`plan_version`）は鍵に入れず、列に持つ。版を鍵に入れると、タイトルだけの変更（版が上がる）の後に、遅れて作り直した行がもう一度送られるためである。古い時刻の行を送らない役目は、付け替えでの行の削除と、notifier の確かめ（7.1 節）が持つ。最初の設計の `(reminder_id, occurrence_start, method, version)` の書き方は、統合の工程で [architecture/README.md](README.md) の 1.3 節・題材の `AGENTS.md`・[ADR-0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) とも、この鍵に揃えた（2026-10-04）。
 - 1 つの刻みの行は 5,000 件まで 1 回の更新にする。超えたら分けて続けて行う。
 - 時計の時刻は、タスクの時計（NTP で同期した ECS の時計）を使う。DB の `now()` と比べない。
 
@@ -444,7 +444,9 @@ notifier は、送信の記録 1 件ごとに、テナントのコンテキス�
 ### runbooks
 
 - `reminder-delay.md`：遅れの切り分け（借りの偏り、claim の遅さ、SQS の深さ、notifier の数、SES・Web Push の止まり）、シャードの手での付け替え、集中の前の手での増強。
-- `reminder-missed.md`：送り漏れの照合の結果の調べ方（`no_plan` は付け替えの誤り、`late` は時計の止まり）と、取り戻しの判断（15 分を超えたものは送らない）。
+- 送り漏れの照合の結果の調べ方（`no_plan` は付け替えの誤り、`late` は時計の止まり）と、取り戻しの判断（15 分を超えたものは送らない）は、`reminder-delay.md` に含める（統合の工程で、提案の `reminder-missed.md` をまとめた）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 
@@ -453,7 +455,7 @@ notifier は、送信の記録 1 件ごとに、テナントのコンテキス�
 | `reminder_plans`（保守用のスキーマ） | 5.1 節の列。`fire_day` の分割、索引 `(shard, fire_at) WHERE status='pending'`・`(tenant_id, user_id, event_object_id)` | 5.1 |
 | `reminder_plan_heads`（保守用のスキーマ） | `(tenant_id, user_id, event_object_id)` を主キーに `version` | 5.3 |
 | `reminder_shard_leases` | `shard` を主キーに `owner`、`lease_until` | 6.1 |
-| `reminder_deliveries`（保守用のスキーマ） | `id`、一意の鍵（6.3 節）、`plan_version`、`status`（`queued`・`sending`・`sent`・`dropped`）、理由のコード、`created_on` の日の分割。30 日 | 6.3 |
+| `reminder_deliveries`（保守用のスキーマ） | `id`、一意の鍵（6.3 節）、`plan_version`、`status`（`queued`・`sending`・`sent`・`dropped`）、理由のコード、`created_on` の日の分割。35 日（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md) の保持の表に揃えた） | 6.3 |
 | `event_objects`・`event_overrides` の列 | `reminders`（`use_default`、上書き 5 件） | 4.1 |
 | `calendar_list_entries` に足す列 | `default_reminders`、`default_all_day_reminders` | 4.1 |
 | `calendar_list_reminder_subscribers` | 共有のカレンダーに既定のリマインダーを持つ利用者 | 5.3 |

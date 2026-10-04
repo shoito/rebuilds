@@ -27,7 +27,7 @@
 
 ### MVP（S1）に含める
 
-- **アカウントと組織**：個人のアカウントと、組織（ドメインを持つテナント）。組織の利用者・グループ・会議室のディレクトリ、SSO（SAML・OIDC）と SCIM での利用者の同期
+- **アカウントと組織**：個人のアカウントと、組織（ドメインを持つテナント）。組織の利用者・グループ・会議室のディレクトリ、SSO（SAML・OIDC）と SCIM での利用者の同期（SCIM は E4 の最後に、SSO の後で出す。[roadmap.md](roadmap.md)）
 - **カレンダー**：主のカレンダー（1 人に 1 つ）、追加のカレンダー、組織の共有のカレンダー、会議室・設備のカレンダー、日本の祝日のカレンダー
 - **予定**：
   - 時刻つき（TZID つき）、終日（複数日を含む）、浮動の時刻（ICS・CalDAV からの取り込みで往復させる）
@@ -143,9 +143,9 @@
 
 - 展開の索引の範囲（過去 31 日から未来 548 日）：E2 の PoC で、行の数と書き込みの量を測って確かめる（[ADR-0003](decisions/0003-recurrence-storage-and-expansion.md)）。
 - 繰り返しの展開の参照の実装（libical を第一の候補にする）：E2 の着手前に、参照の候補どうしの食い違いを調べて決める（[ADR-0001](decisions/0001-platform-and-stack.md)）。
-- 日本語の検索の方式：S1 は Aurora の `pg_bigm`（Aurora PostgreSQL 18 で使える。[Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-10-04 に確認）を既定案にする。S2 で専用の検索の基盤が要るかは search の領域で決める。
-- 会議室の二重予約の防止：`btree_gist` の排他の制約を既定案にする（Aurora PostgreSQL 18 で使える。同上）。E6 の前の PoC で、繰り返しの予約の書き込みの速さを確かめる。
-- 本家の差分の同期のトークンの有効の期間、ICS の購読の更新の間隔、CalDAV の利用の上限：公式の資料に値がない（**未検証**）。本システムの値を決める（[ADR-0005](decisions/0005-change-log-and-sync-tokens.md)、sync-and-caldav の領域）。
+- 日本語の検索の方式：S1 は Aurora の `pg_bigm`（Aurora PostgreSQL 18 で使える。[Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-10-04 に確認）にした（[ADR-0034](decisions/0034-search-pg-bigm-acl-aware.md)）。索引の大きさは E11 の前の `search-bigm-poc` で、S2 で専用の基盤へ移すかは search.md の 8 節の基準で決める。
+- 会議室の二重予約の防止：`btree_gist` の排他の制約にした（Aurora PostgreSQL 18 で使える。同上。[ADR-0019](decisions/0019-room-booking-rows-and-recurring-acceptance.md)）。E6 の前の `room-exclusion-poc` で、繰り返しの予約の書き込みの速さを確かめる。
+- 本家の差分の同期のトークンの有効の期間、ICS の購読の更新の間隔：公式の資料に値がない（**未検証**）。本システムの値は [ADR-0005](decisions/0005-change-log-and-sync-tokens.md)（30 日）と [ADR-0025](decisions/0025-ics-subscriptions-both-directions.md)（6 時間）。本家の CalDAV の上限は Calendar API と同じ割り当てとされる（[CalDAV API developer's guide](https://developers.google.com/workspace/calendar/caldav/v2/guide)、2026-10-04 に確認）。
 - 本家の繰り返しの予定の 1 系列あたりの回の上限：公式の資料で確かめられなかった（**未検証**）。本システムの上限は [ADR-0003](decisions/0003-recurrence-storage-and-expansion.md)。
 
 ## 出典
@@ -158,11 +158,13 @@
 - Google for Developers, [Recurring events](https://developers.google.com/workspace/calendar/api/guides/recurringevents)：回は `recurringEventId` と `originalStartTime` で特定する。系列の全体や「これ以降」を変えるために回を 1 つずつ変えないよう勧めている
 - Google for Developers, [Freebusy: query](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query)：`calendarExpansionMax` は最大 50、`groupExpansionMax` は最大 100
 - Google for Developers, [CalDAV API developer's guide](https://developers.google.com/workspace/calendar/caldav/v2/guide)：OAuth 2.0 だけで認証する。RFC 4791 の `free-busy-query` の REPORT、`MKCALENDAR` を持たない。VTODO・VJOURNAL を持たない。RFC 6578 の同期を使う。RFC 6638 は一部
-- Google Workspace Admin Help, [Avoid Calendar use limits](https://knowledge.workspace.google.com/admin/calendar/avoid-calendar-use-limits)：組織の外への招待は短い期間に 10,000 件、予定の作成は 100,000 件、外部の参加者へのメールは約 2,000 件（24 時間で回復）、カレンダーの作成は 60 件、共有は 750 件
+- Google Workspace Admin Help, [Avoid Calendar use limits](https://knowledge.workspace.google.com/admin/calendar/avoid-calendar-use-limits)：組織の外への招待は短い期間に 10,000 件、予定の作成は 100,000 件、「参加者にメール」の機能での外部の参加者へのメールは約 2,000 件（24 時間で回復）、カレンダーの作成は 60 件、共有は 750 件
 - Google Calendar Help, [Invite groups to calendar events](https://support.google.com/calendar/answer/172013)：グループの招待で参加者は最大 100,000 人。参加者の一覧はグループの変更に合わせて未来の予定で更新され、200 人を超える予定では 24 時間以内に反映される
 - Google Workspace Admin Help, [Approve or deny Calendar room & resource bookings](https://knowledge.workspace.google.com/admin/calendar/approve-or-deny-calendar-room-and-resource-bookings)：会議室の「重ならない招待だけを自動で承諾する」と「すべてを追加する」、繰り返しの予約で一部の回だけ重なるときの扱い、会議室の管理者
 - Google Calendar Help, [Learn about appointment schedules](https://support.google.com/calendar/answer/11608416)、[Create an appointment schedule](https://support.google.com/calendar/answer/10729749)：予約ページ、間の時間、1 日の上限。一部の機能は有料のプラン
 - Google Workspace, [Google Workspace Service Level Agreement](https://workspace.google.com/terms/sla/)：Google Calendar を含む対象のサービスで、月間の稼働率 99.9% 以上
 - IANA, [Time zone and daylight saving time data](https://data.iana.org/time-zones/tz-link.html)：tzdb のリリースに決まった予定はなく、ふつう数か月ごと。規則は短い予告で変わることがある
 - 内閣府, [「国民の祝日」について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)：祝日と休日の一覧（1955 年から 2027 年）の CSV、振替休日と国民の休日の規定
-- AWS, [Amazon Simple Email Service endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)：東京リージョン（`ap-northeast-1`）でメールの受信を使える
+- AWS, [Amazon Simple Email Service endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)：東京（`ap-northeast-1`）と大阪（`ap-northeast-3`）でメールの受信を使える
+- AWS, [Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)：Aurora PostgreSQL 18（18.3・18.4・18.6）に `btree_gist` 1.6、`pg_bigm` 1.2、`pg_partman` 5.x がある
+- Google for Developers, [Manage quotas](https://developers.google.com/workspace/calendar/api/guides/quota)：プロジェクトごと 1 分 10,000、利用者ごと 1 分 600（2026-05-01 から新しいプロジェクトに適用）

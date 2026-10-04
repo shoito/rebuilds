@@ -6,7 +6,7 @@ AWS のアカウントとネットワーク、入口（画面・API・予約ペ�
 | --- | --- |
 | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md) | アカウントとネットワークは他の題材の形。画面・API・予約ページは CloudFront、CalDAV は WebDAV のメソッドを通すため WAF つきの ALB で受ける。iMIP は東京の SES の受信を主、大阪を副の MX にする。利用者の決める宛先は egress の経路から、Web Push は配信のサービスの許可リストだけへ出す |
 | [0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md) | 大阪のウォームスタンバイへ人の判断で切り替え、書き込みを止めてから昇格し、`sync_epoch` を上げる。外部への iMIP の次の送信で `SEQUENCE` を 1 つ余分に上げ、リマインダーの重複は数えて SLO から分ける |
-| [0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | 段階を上げる基準。S2 はテナントを単位に Aurora のクラスタへ分け、ディレクトリを小さなクラスタに置く。テナントをまたぐのは SQS の内部の iTIP と、空き時間の内部の RPC。S3 はセルとリージョン |
+| [0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | 段階を上げる基準。S2 はテナントを単位に Aurora のクラスタへ分け、ディレクトリを小さなクラスタに置く。テナントをまたぐ主な経路は SQS の内部の iTIP と、空き時間の内部の RPC。保守用の表はクラスタごと。S3 はセルとリージョン |
 | [0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しい版はイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` で全サービスを一度に切り替える（delivery の領域） |
 | IaC、デプロイの方式、可観測性の道具 | 他の題材を引き継ぐ（Terraform、GitHub Actions と OIDC、ADOT・AMP・X-Ray・CloudWatch Logs・Managed Grafana） |
 
@@ -61,7 +61,7 @@ ADR-0043。他の題材と同じ形にする。
 | `imip.<brand>.<domain>` | MX：`inbound-smtp.ap-northeast-1.amazonaws.com`（10）、`inbound-smtp.ap-northeast-3.amazonaws.com`（20） | SES の受信の規則 | S3 → SNS → SQS → `imip-inbound` |
 | `mail.<brand>.<domain>`、`bounce.mail.<brand>.<domain>` | SES の送信（DKIM、MAIL FROM） | — | — |
 
-- **CalDAV は CloudFront を通さない**（ADR-0043）。CloudFront の許すメソッドの組に `PROPFIND`・`REPORT` がないため（[Cache behavior settings](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesCacheBehavior.html)、2026-10-04 に確認）。ALB の規則は独自のメソッドを条件に書ける（[Condition types for listener rules](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html)、2026-10-04 に確認）。`alb-dav` は 443 だけを聞き、TLS 1.2 以上。WAF の規則：IP ごと 5 分 3,000 要求の粗い上限、本文 2 MiB（WAF の本文の検査の上限を超える部分はアプリで数える）。Basic 認証の失敗の上限（アカウントごと 10 分 20 回、IP ごと 10 分 200 回）は `caldav` が数える（[sync-and-caldav.md](sync-and-caldav.md) の 6.7 節）。上限を超えた IP は `caldav` が WAF の IP の集合へ 15 分載せ、エッジで止める。
+- **CalDAV は CloudFront を通さない**（ADR-0043）。CloudFront の許すメソッドの組に `PROPFIND`・`REPORT` がないため（[Cache behavior settings](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesCacheBehavior.html)、2026-10-04 に確認）。ALB の規則は独自のメソッドを条件に書ける（[Condition types for listener rules](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html)、2026-10-04 に確認）。`alb-dav` は 443 だけを聞き、TLS 1.2 以上。WAF の規則：IP ごと 5 分 3,000 要求の粗い上限、本文 2 MiB（WAF の本文の検査の上限を超える部分はアプリで数える）。Basic 認証の失敗は `caldav` が数える（アカウントの全体では止めない。パスワードごと・（IP, アカウント）の組ごと・IP ごと。[sync-and-caldav.md](sync-and-caldav.md) の 6.7 節）。IP ごとの上限（10 分 200 回）を超えた IP だけを、`caldav` が WAF の IP の集合へ 15 分載せ、エッジで止める。
 - **CalDAV の発見**：DNS の SRV `_caldavs._tcp.<brand>.<domain>`（`dav.<brand>.<domain>`、443）と TXT（`path=/dav/`）、`/.well-known/caldav` のリダイレクト（RFC 6764）。
 - **WebSocket**（`/rt`）：CloudFront → `alb-app` → `realtime`。CloudFront の WebSocket の扱い（10 分流れない接続を切る、など）は Linear の infrastructure.md の 2.2 節で 2026-09-28 に確かめた事実を引き継ぐ。`realtime` は 30 秒ごとに ping を送る。ALB のアイドルの時間切れは 120 秒。
 - WAF（CloudFront）：共通のルール、IP の評判、IP ごとのレート制限（`auth` の送信は 5 分 300、`api` は 5 分 30,000、`book` の予約の送信は 5 分 30）。値は E4・E10・E12 で調整する。
@@ -173,7 +173,7 @@ ADR-0044。
 
 ### 6.3 リージョンの障害（NFR-007：RPO 1 分、RTO 1 時間）
 
-ADR-0044。切り替えは人の判断で行い、手順はワークフローで自動化する。手順は `disaster-recovery.md`（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）。
+ADR-0044。切り替えは人の判断で行い、手順はワークフローで自動化する。手順は [runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md)。
 
 ```mermaid
 sequenceDiagram
@@ -352,7 +352,7 @@ ADR-0045。
 
 2026-10-04 の既定案。E1 と E12 で覆りうる。
 
-- **CalDAV の入口**：CloudFront を通さず、WAF つきの ALB（ADR-0043）。[architecture/README.md](README.md) の 1.2 節の絵（CloudFront の後ろに CalDAV）を、この決定で直す。
+- **CalDAV の入口**：CloudFront を通さず、WAF つきの ALB（ADR-0043）。[architecture/README.md](README.md) の 1.2 節の絵は、統合の工程でこの決定に合わせて直した。
 - **iMIP の受信**：東京を主、大阪を副の MX（ADR-0043）。
 - **DR**：ウォームスタンバイ、`sync_epoch` を上げる、iMIP の `SEQUENCE` の余白、リマインダーの重複の計数（ADR-0044）。
 - **S2・S3**：テナントを単位のクラスタ、ディレクトリ、セル（ADR-0045）。
@@ -378,8 +378,8 @@ ADR-0045。
 
 ### runbooks
 
-- `disaster-recovery.md`（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）：6.3 節のワークフロー、`dr_epoch_started_at`、失った範囲の副作用の確かめ方。
-- `ses-inbound-failover.md`（新規の提案）：東京の SES の受信の停止の確かめ方と、大阪の受信からの転送の監視。
+- [disaster-recovery.md](../runbooks/disaster-recovery.md)：6.3 節のワークフロー、`dr_epoch_started_at`、失った範囲の副作用の確かめ方（統合の工程で作った）。
+- `ses-inbound-failover.md`：東京の SES の受信の停止の確かめ方と、大阪の受信からの転送の監視（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）。
 
 ### data-model（索引への追加の提案）
 
@@ -398,7 +398,7 @@ ADR-0045。
 
 - AWS, [Cache behavior settings（Amazon CloudFront）](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesCacheBehavior.html)：許すメソッドは 3 つの組から選ぶ
 - AWS, [Condition types for listener rules（Application Load Balancer）](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/rule-condition-types.html)：標準と独自の HTTP のメソッドを条件に書ける
-- AWS, [Amazon Simple Email Service endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)：東京と大阪でメールの受信を使える。送信の既定のクォータ（24 時間 200 通、1 秒 1 通）は引き上げられる
+- AWS, [Amazon Simple Email Service endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)：東京（`inbound-smtp.ap-northeast-1.amazonaws.com`）と大阪（`inbound-smtp.ap-northeast-3.amazonaws.com`）でメールの受信を使える。送信の既定のクォータ（24 時間 200 通、1 秒 1 通）は引き上げられる
 - AWS, [Deliver to S3 bucket action](https://docs.aws.amazon.com/ses/latest/dg/receiving-email-action-s3.html)：S3 への保存の既定の上限 40 MB
 - AWS, [Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)（Linear の infrastructure.md で 2026-09-28 に確認）
 - IETF, [RFC 6764: Locating Services for Calendaring Extensions to WebDAV (CalDAV) and vCard Extensions to WebDAV (CardDAV)](https://www.rfc-editor.org/rfc/rfc6764)

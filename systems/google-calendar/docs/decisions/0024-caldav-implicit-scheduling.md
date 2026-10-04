@@ -58,6 +58,7 @@ CalDAV のクライアントは、予定を 1 つの iCalendar の本文とし�
   - 主催者の更新の直後でも、出欠の変更が `Schedule-Tag` で通る。
 - 引き受けるコスト：
   - 差を取る処理を CalDAV のサービスに持つ。VEVENT の項目の比べの規則を `packages/ical` に置き、試験する。
+  - `SCHEDULE-AGENT=CLIENT` を本システムの中の参加者に当てないことと、EXDATE を辞退に変えることは、RFC 6638 と違う（[ADR-0007](0007-interop-standards-scope.md) の「RFC との意図した違い」の D4・D6）。
   - `guestsCanModify` の参加者も、OS のカレンダーからは共有の項目を変えられない（画面か API で変える）。
   - `Schedule-Tag` を使わないクライアントは、主催者の更新の直後の出欠の変更で 412 になり、取り直してから送る。
 

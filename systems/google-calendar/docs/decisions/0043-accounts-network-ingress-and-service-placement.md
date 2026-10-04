@@ -55,7 +55,9 @@ iMIP の受信：
 | `imip.<brand>.<domain>` | MX：東京の SES の受信（10）、大阪の SES の受信（20） | S3 → SNS → SQS → `imip-inbound` |
 | `mail.<brand>.<domain>` | SES の送信（DKIM）、MAIL FROM は `bounce.mail.<brand>.<domain>` | — |
 
-- `alb-dav` は public のサブネットに置き、TLS 1.2 以上の方針、HTTP/1.1。WAF は IP ごとのレート制限、Basic 認証の失敗の数の規則（[security.md](../architecture/security.md) の 3.3 節）、本文の大きさ（2 MiB）を持つ。
+- `alb-dav` は public のサブネットに置き、TLS 1.2 以上の方針、HTTP/1.1。WAF は IP ごとのレート制限、`caldav` が認証の失敗の多い IP を載せる IP の集合（[sync-and-caldav.md](../architecture/sync-and-caldav.md) の 6.7 節）、本文の大きさ（2 MiB）を持つ。アカウントの単位で止める規則は持たない（他人が締め出しに使えるため）。
+
+> 2026-10-04 の注記：起票の時は「Basic 認証の失敗の数の規則」とした。統合の工程で、CalDAV の認証の失敗の上限をアカウントの全体で止めない形に直したので（sync-and-caldav の 6.7 節）、WAF は IP の単位だけにした。
 - DNS の SRV（`_caldavs._tcp.<brand>.<domain>` → `dav.<brand>.<domain>:443`）と TXT（`path=/dav/`）を置く（RFC 6764）。
 - DR では、`dav.<brand>.<domain>` の Route 53 のレコードを大阪の `alb-dav` へ切り替える（CloudFront の配信のオリジンの切り替えと同じ手順の中で行う）。
 

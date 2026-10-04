@@ -42,6 +42,23 @@ MVP の対象のクライアントは、iOS・macOS のカレンダー、Thunder
 | 空き時間の公開（RFC 7953 VAVAILABILITY） | 持たない | 勤務の時間は本システムの設定で持つ |
 | JSCalendar（RFC 8984） | 公開 API の形にしない | 公開 API は本家の API の振る舞いに寄せた JSON にする（api-and-push の領域） |
 
+### RFC との意図した違い
+
+本システムが RFC の文言と違う振る舞いを選んだものを、ここに 1 つにまとめる。新しい違いを足すときは、この表に行を足し、根拠の ADR を書く。相互運用の試験（[quality.md](../quality.md) の 2.2.1 節 H）で、相手の振る舞いを記録する。
+
+> 2026-10-04 の注記：統合の工程で、各 ADR に散っていた RFC との違いをこの表にまとめた。
+
+| # | RFC と節 | RFC の要求 | 本システム | 根拠 |
+| --- | --- | --- | --- | --- |
+| D1 | RFC 5545 の 3.3.10 | 規則が存在しない現地の時刻を生んだら、その回を捨て、数えない | 捨てずに、3.3.5 節の解き方（切り替えの前のオフセット）でずらして残す。毎週の会議が夏時間の始まりの週だけ黙って消えないようにする | [ADR-0008](0008-recurrence-expansion-semantics.md) |
+| D2 | RFC 6047 の 2.2.2 | iMIP の認証は S/MIME で行う（MUST） | S/MIME を必須にしない。From と ATTENDEE・ORGANIZER の一致と、DKIM か SPF の From のドメインへの揃いで確かめる。S/MIME の署名が付いて正しければ、それも通る | [ADR-0015](0015-imip-addressing-and-trust.md) |
+| D3 | RFC 5545 の 3.8.4.4（`RANGE=THISANDFUTURE`） | その回と以降の回への変更 | 取り込みと iMIP では 1 回分の上書きとして当て、`range_ignored` の印で利用者に示す。CalDAV の `PUT` は拒否する | [ADR-0011](0011-inbound-recurrence-normalization.md) |
+| D4 | RFC 6638 の 7.1（`SCHEDULE-AGENT=CLIENT`・`NONE`） | サーバーはその参加者へスケジュールのメッセージを送らない | 外部の参加者にだけ従う。本システムの中の参加者には常に写しを作り、`SCHEDULE-STATUS:2.3` を付ける | [ADR-0024](0024-caldav-implicit-scheduling.md) |
+| D5 | RFC 5545 の 3.8.5.3（DTSTART が規則に合わない） | 回の集合は未定義 | DTSTART を最初の回として含め、`COUNT` に数える。新しい作成では 422 | [ADR-0008](0008-recurrence-expansion-semantics.md) |
+| D6 | RFC 6638 の 3.2.2.1（参加者の EXDATE） | 参加者は EXDATE を足してよい | 足した EXDATE を、その回の辞退の `REPLY` に変える（写しに EXDATE を残さない） | [ADR-0024](0024-caldav-implicit-scheduling.md) |
+
+- RFC が求める以上のことをするもの（`SEQUENCE` を場所の変更と参加者の削除でも上げる。[ADR-0014](0014-itip-state-transfer-and-sequence.md)。DR の後に `SEQUENCE` を 1 つ余分に上げる。[ADR-0044](0044-disaster-recovery-and-calendar-side-effects.md)）は、RFC の範囲の中なので、この表に入れない。
+
 ### 表の外の入力
 
 - CalDAV の `PUT`、ICS の取り込み、iMIP の受信で、表の外の構成要素（VTODO など）は、CalDAV では `CALDAV:supported-calendar-component` の前提の違反で拒否する。取り込みでは、その構成要素を飛ばし、飛ばした件数を利用者に示す。

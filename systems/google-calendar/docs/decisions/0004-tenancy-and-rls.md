@@ -46,11 +46,40 @@ date: 2026-10-04
 - 分け方は他の題材（Slack の ADR-0009、Linear の ADR-0004）に倣う。
   - テナントのテーブルに `tenant_id` を持たせ、主キーとインデックスの先頭に置く。ID は UUIDv7。
   - `FORCE ROW LEVEL SECURITY` を設定し、トランザクションごとに `SET LOCAL app.tenant_id` を設定する。
-- **テナントをまたぐ処理は 3 つに限り、専用の DB のロールと関数を通す。**
-  - 内部の iTIP の配送：主催者のテナントから、参加者のテナントへ、メッセージとして渡す。受け手のテナントのコンテキストで、受け手の写しを書く（[ADR-0006](0006-organizer-and-attendee-copies.md)）。他のテナントの行を直接読み書きしない。
-  - 空き時間の照会：相手のテナントの関数 `freebusy_for(principal, window)` を、相手の方針で絞った結果（区間だけ）を返す形で呼ぶ（free-busy-and-scheduling の領域）。
-  - 共有されたカレンダーの読み出し：ACL の行を持つ側（カレンダーのテナント）のコンテキストで読み、`redact()` を通してから返す。
+- **テナントをまたぐ処理は、下の許可リストの経路に限り、専用の DB のロールと関数を通す。**
 - **アカウントとメールアドレスの解決はテナントの外に置く。** メールアドレスから、本システムのアカウント（とそのテナント）か、外部の人かを決める。RLS の外の別のスキーマに置き、認証と配送のロールだけが読む。
+
+> 2026-10-04 の注記：最初の設計では、テナントをまたぐ処理を 3 つ（内部の iTIP の配送、空き時間の照会、共有されたカレンダーの読み出し）とした。領域の工程で、共有のカレンダーへの書き込み（[ADR-0021](0021-effective-role-and-redact-table.md)）、リマインダーの時計の表（[ADR-0029](0029-reminder-clock-buckets-and-timer-wheel.md)）、予約ページ・ICS の公開・iMIP の受け口の解決の表、tzdb の影響の見積もりの表、個人から組織への移り（[ADR-0036](0036-org-domains-sso-and-scim.md)）が足された。統合の工程で、これらを 1 つの許可リストにまとめ、題材の `AGENTS.md` と同じ一覧にした。許可リストにない経路を作るときは、この ADR を直す（最初の設計の後は新しい ADR）。
+
+### テナントをまたぐ経路の許可リスト
+
+| # | 経路 | DB のロール・関数 | 読み書き | 根拠 |
+| --- | --- | --- | --- | --- |
+| X1 | 内部の iTIP の配送（`REQUEST`・`CANCEL`・`REPLY`・`REFRESH`・`X-MODIFY`）。受け手のテナントのコンテキストで、受け手の写しを書く | `itip_delivery` | 受け手のテナントへ書く | [ADR-0006](0006-organizer-and-attendee-copies.md)、[ADR-0014](0014-itip-state-transfer-and-sequence.md) |
+| X2 | 空き時間の照会。相手のテナントの方針で絞った区間と種類だけを返す | `freebusy`、関数 `freebusy_for(requester, calendar_ids[], window)` | 読む（区間だけ） | [ADR-0017](0017-freebusy-source-and-cache.md) |
+| X3 | 共有されたカレンダーの読み出し。カレンダーのテナントのコンテキストで読み、`redact()` を通す | `shared_calendar_access` | 読む | この ADR、[ADR-0021](0021-effective-role-and-redact-table.md) |
+| X4 | 共有されたカレンダーへの書き込み（外の主体が `writer` 以上）。カレンダーのテナントのコンテキストで `packages/writer` を通す。`release.cross-tenant-shared-writes` の裏 | `shared_calendar_access` | カレンダーのテナントへ書く | [ADR-0021](0021-effective-role-and-redact-table.md) |
+| X5 | リマインダーの時計。全テナントの計画の行（ID と時刻だけ）を読み、中身は notifier がテナントのコンテキストで読む | `reminder_clock` | 保守用の表を読み書き | [ADR-0029](0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](0030-reminder-planning-horizon-and-replan.md) |
+| X6 | 匿名・外からの入口の解決（予約ページの `slug`、ICS の秘密のアドレス、iMIP の受け口、OAuth の `client_id`、メールアドレス）。解決の後はテナントのコンテキストで処理する | `resolver`（入口ごとに関数を分ける） | 解決の表を読む | [ADR-0015](0015-imip-addressing-and-trust.md)、[ADR-0025](0025-ics-subscriptions-both-directions.md)、[ADR-0033](0033-booking-creation-and-exclusion.md)、[ADR-0035](0035-accounts-auth-library-and-credentials.md) |
+| X7 | tzdb の影響の見積もりと再計算の対象の探し（`tenant_tz_usage`）。再計算はテナントごとのコンテキストで行う | `tz_maintenance` | 保守用の表を読む | [ADR-0012](0012-tzdb-update-recompute-and-propagation.md) |
+| X8 | 個人から組織への移り（`tenant-move`）。カレンダーごとのトランザクションで `tenant_id` を変える | `tenant_move` | 2 つのテナントを書く | [ADR-0036](0036-org-domains-sso-and-scim.md) |
+| X9 | SLI の集計。業務の記録（ID・時刻・結果だけ）を全テナントで数える | `slo_aggregator` | 保守用の表を読む | [ADR-0046](0046-sli-from-ledgers-and-delivery-tracing.md) |
+
+- 全テナントを順に回す保守のジョブ（範囲の端の維持、照合、削除の期限など）は、許可リストに入れない。`tenants` からテナントの ID を読み、テナントごとに `SET LOCAL` して処理する。
+- 運用者の JIT のアクセスと break-glass は、プラットフォームの監査に残す別の経路で、アプリの DB のロールを使わない（security の領域）。
+
+### RLS の外の表の許可リスト
+
+| スキーマ | 表 | 中身の制限 |
+| --- | --- | --- |
+| `auth` | Better Auth の表（アカウント、セッション、パスキー、外部のアカウント、検証の値）、`app_passwords` | ログインの主体だけ。予定の中身を持たない |
+| 保守用（`ops`） | `tenants`、`principal_directory`、`platform_state`、`platform_audit_events`、`retention_policies`、`legal_holds` | テナントの属性・解決・監査。予定の中身を持たない |
+| 保守用（`ops`） | 解決の表：`booking_slug_directory`、`ics_publish_token_directory`、`imip_address_directory`、`oauth_client_directory`、`moved_event_objects` | 鍵（ハッシュ）→ `tenant_id` と ID だけ |
+| 保守用（`ops`） | リマインダー：`reminder_plans`、`reminder_plan_heads`、`reminder_deliveries`、`reminder_shard_leases` | ID・時刻・方法・状態だけ |
+| 保守用（`ops`） | tzdb：`tenant_tz_usage`、`tz_recompute_runs` | TZID と数だけ |
+| 保守用（`ops`） | SLI の記録：`itip_deliveries`、`itip_fanout_progress`、`imip_outbound_log`、`imip_inbound_log`、`sync_token_uses`、`reconciliation_findings` | ID・時刻・結果・理由のコードだけ |
+
+- **CI の規則**：マイグレーションの検査は、`tenant_id` と FORCE RLS のない表を、上の一覧の表だけに許す。一覧の表に、予定の中身の列（タイトル、場所、説明、参加者の名前、コメント）を足すマイグレーションを失敗させる（メールアドレスを持てるのは `auth` と `principal_directory` だけ）。`BYPASSRLS` のロール、`SECURITY DEFINER` の関数、テナントをまたぐロールへの `GRANT` は、経路の一覧（X1〜X9）の名前と照らし、一覧にないものを失敗させる。一覧の正本はこの ADR で、開発リポジトリの許可リストのファイルと CI が比べる。
 - 2 は、S3 で 1,500 万の個人のテナントに対して、スキーマの数とマイグレーションが重い。3 は、S1 でも運用が重い。大きな組織は、S2 でテナントを単位に専用のクラスタへ移す（infrastructure の領域）。
 
 ### 権限の判定
@@ -79,7 +108,7 @@ date: 2026-10-04
 - 良くなること：
   - テナントの分離を、アプリのコードだけに頼らない。
   - 予定の中身を返すかの判定が、すべての経路で同じ関数・同じ決定表になる。
-  - テナントをまたぐ処理が 3 つに限られ、監査しやすい。
+  - テナントをまたぐ処理が許可リストの経路に限られ、監査しやすい。
 - 引き受けるコスト：
   - 個人のテナントの数が多い（S1 で 30 万）。テナントごとの設定の行と、テナントの作成の処理を軽くする必要がある。
   - 共有されたカレンダーの読み出しは、カレンダーのテナントのコンテキストに切り替える。1 つの画面で複数のテナントのカレンダーを重ねると、テナントの数だけ問い合わせる。
@@ -91,6 +120,6 @@ date: 2026-10-04
 - 性質ベーステスト：任意の 2 テナントで、一方のコンテキストで他方の行が読めない。
 - 表駆動テスト：`redact()` の決定表（sharing-and-acl の領域で spec に書く）を spec から読み込み、全行を確かめる。
 - 性質ベーステスト：任意の ACL・公開範囲・参加者・方針の組み合わせで、`free_busy_reader` と `private` の非参加者の応答に、タイトル・場所・説明・参加者・添付・会議の URL が含まれない。経路（API、CalDAV、ICS、検索、通知のメール、Webhook）ごとに同じ性質を確かめる。
-- CI：新しいテーブルに `tenant_id` と RLS のポリシーがないマイグレーションを失敗させる（例外は許可リストで管理する）。
+- CI：新しいテーブルに `tenant_id` と RLS のポリシーがないマイグレーションを失敗させる（例外は上の「RLS の外の表の許可リスト」だけ）。テナントをまたぐロールと関数を、経路の許可リストと照らす。
 - lint：`packages/policy` の外で、`role ===`・`visibility ===` などの権限の条件を書くことを禁止する。
 - 本番：応答の監査（抜き取りの応答を `redact()` に通し直して比べる）で、不一致 0 件（NFR-008）。

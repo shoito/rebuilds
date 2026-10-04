@@ -30,7 +30,7 @@
 | 候補の計算（find a time） | 50 件/秒 | 50 人＋会議室 20 を最悪に |
 | CalDAV | 2,000 件/秒 | 利用者の 30% が 5 つのカレンダーを 15 分ごとに確かめる（同 2 節。OS の間隔は**未検証**） |
 | Webhook の送信 | 500 件/秒 | |
-| ICS の購読の取得 | 14 件/秒 | 30 万の購読を 6 時間ごと |
+| ICS の購読の取得 | 8 件/秒 | 約 17 万の URL を 6 時間ごと（利用者の 20% が平均 2 つ、URL の重なりで 3 割減。[sync-and-caldav.md](sync-and-caldav.md) の 8.1 節） |
 | 検索 | 200 件/秒 | |
 | tzdb の再計算 | 5,000 件/秒（走っている間） | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) |
 
@@ -111,18 +111,19 @@ sequenceDiagram
   participant S as reminder-scheduler（256 シャード、ADR-0029）
   participant N as notifier
   participant P as 配信のサービス・SES
-  Note over B,S: hh:45 まで
-  S->>B: hh:50 の桶を読む（版つき）
+  Note over B,S: hh:45 まで（5 分先まで）
+  S->>B: hh:50 の行を読む（10 秒ごとの読み直し）
   S->>S: タイマーホイールに載せる
-  Note over S,N: hh:48 まで
-  S->>N: 送る項目を先に渡す（Web Push の本文（通知の ID）の暗号化、接続の用意）
-  Note over N,P: hh:50:00
-  N->>N: 送信の記録の鍵を書く（100 件ずつ 1 トランザクション）
-  N->>P: 送る（HTTP/2 の接続を使い回す）
-  N->>N: 版が上がっていた項目は捨てる
+  Note over N,P: hh:48 まで
+  N->>P: 台数を広げ、配信のサービスへの HTTP/2 の接続を開いておく
+  Note over S,N: hh:50:00
+  S->>B: claim と送信の記録の鍵の挿入（5,000 件ずつ 1 回の SQL）
+  S->>N: SQS notify（delivery_id）
+  N->>N: 送る時の確かめ（回の開始が今と同じか、redact()）、Web Push の本文の暗号化
+  N->>P: 送る
 ```
 
-- 送信の記録の鍵の書き込みは、100 件ずつまとめる（4,100 件/秒で 41 トランザクション/秒）。
+- 発火は [ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md) のとおり `reminder-scheduler` が行う。claim と送信の記録の鍵の挿入は 1 秒分を 5,000 件ずつの SQL にする（`hh:50:00` の 12.3 万件で約 25 回。シャードを借りた 8 タスクに分かれる）。統合の工程で、notifier が鍵を書くとしていた前の図を ADR-0029 に揃えた（2026-10-04）。
 - Web Push の 1 回の送信は、暗号化（RFC 8291）の CPU が 1 件 0.3ms 前後、配信のサービスの応答が 50〜200ms と見込む（**未検証**。E9 の `reminder-burst-poc` で測る）。4,100 件/秒 × 0.15 秒 ≒ 620 の同時の要求。`notifier` 1 タスク（1 vCPU）で同時 50 として、**13 タスク**（余裕で 16）。
 - 業務の時間は `notifier` をピークの台数のままにする（ADR-0047）。Web Push の本文は通知の ID だけで、Service Worker が表示のときに中身を取る（[ADR-0031](../decisions/0031-notification-channels-and-content.md)）。その取得（`GET /v1/notifications/<id>`）が、送信の速さ（約 4,100 件/秒）と同じ形の山で `api` に来る。`api` の業務の時間の下限に含め、L3 で測る。
 
@@ -145,7 +146,7 @@ sequenceDiagram
 | 項目 | 見積もり |
 | --- | --- |
 | 書き込みの行（ピーク） | 予定オブジェクトの書き込み 1,500 × 13 行（予定オブジェクト、参加者 3、索引 6、変更のログ、outbox、リマインダー、監査）≒ 2 万行/秒 ＋ 写しの書き込み 6,000 × 9 行（予定オブジェクト、索引 4、変更のログ、リマインダー、配送の記録、重複の除去）≒ 5.4 万行/秒 ＋ リマインダーの送信の記録 ≒ **約 8 万行/秒** |
-| コミット | 予定オブジェクト 1,500 ＋ 写し 6,000（同じ受け手のテナントへの配送は 10 件まで 1 トランザクションにまとめると 約 1,500）＋ リマインダー 41 ≒ **3,000〜7,500 件/秒** |
+| コミット | 予定オブジェクト 1,500 ＋ 写し 6,000（同じ受け手のテナントへの配送は 10 件まで 1 トランザクションにまとめると 約 1,500）＋ リマインダーの発火（集中の秒に約 25 回の大きな SQL）≒ **3,000〜7,500 件/秒** |
 | writer | `db.r8g.12xlarge`（48 vCPU、384 GiB）。CPU 50% 以下を目標。E2 の PoC で行の数が少なければ `8xlarge` に下げる |
 | reader | 同型 × 2。範囲の問い合わせ、差分、CalDAV、空き時間の外れ、照合のジョブ |
 | 予定オブジェクト | 3 億 × 2.5 KB ≒ 750 GB |
@@ -166,7 +167,7 @@ sequenceDiagram
 | 空き時間のキャッシュ | 約 400 MB（[free-busy-and-scheduling.md](free-busy-and-scheduling.md) の 5.1 節） |
 | 合図の pub/sub | 変更 7,500 件/秒 × 100 B。購読する `realtime` のタスクに複製 |
 | 書き込みの枠（`cw:<calendar_id>:<origin>`）、レート制限 | 数百万の鍵（期限つき） |
-| アプリ用のパスワードの照合の写し（5 分） | 18 万 × 100 B |
+| アプリ用のパスワードの照合の写し（60 秒。[ADR-0041](../decisions/0041-encryption-keys-and-secret-storage.md)） | 18 万 × 100 B |
 | シャードの担当、送信の上限の数 | 小さい |
 
 - S1 は `cache.r7g.large` のクラスタモード 3 シャード × （プライマリ 1＋レプリカ 1）。pub/sub は S2 で sharded pub/sub にする。失ってよい。
@@ -300,7 +301,9 @@ E12 の `load-tests`・`reminder-burst-load` と、段階を上げる前に行�
 
 - `calendar-lock-contention.md`（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）：上位のカレンダーの枠の拒否とロックの待ちの見方、`origin` ごとの枠の一時の変更（`ops.calendar_write_budget.<origin>`）。
 - `reminder-delay.md`：業務の時間の下限の台数と、`notifier` を手で広げる手順。
-- `capacity-review.md`（新規の提案）：8 節の月次のレビューの手順。
+- `capacity-review.md`：8 節の月次のレビューの手順（[runbooks/README.md](../runbooks/README.md) の 5 節の予定）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

@@ -56,7 +56,7 @@ sequenceDiagram
   A->>S: 15 秒のポーリングで切り替え
   S->>S: 各タスクが active の版を 30 秒ごとに報告
   S-->>E: 全タスクが新の版を 2 分続けて報告したら「切り替えの完了」
-  E->>E: 計算し直し（ADR-0012）
+  E->>E: 計算し直し（ADR-0012。会議室の予約の行を先に。切り替えの窓）
 ```
 
 - `tzdata-watch`（毎日）が IANA のリリースを確かめ、新しい版があれば `packages/tzdata` に版を足す PR を作る。PR には差分の報告（[time-zones-and-holidays.md](../architecture/time-zones-and-holidays.md) の 6.2 節）を付ける。
@@ -96,7 +96,7 @@ sequenceDiagram
   - 展開の索引の形の変更が、本番の照合で確かめてから切り替えられる。
 - 引き受けるコスト：
   - イメージに複数の版の tzdb を持つ（数 MiB）。
-  - [runbooks/README.md](../runbooks/README.md) の 3 節の採用の手順の 2・5 を、この流れに合わせて書き直す必要がある（Ops への依頼）。
+  - [runbooks/README.md](../runbooks/README.md) の 3 節の採用の手順の 2・5 を、この流れに合わせて書き直した（2026-10-04、統合の工程。手順の正本は [runbooks/tzdb-update.md](../runbooks/tzdb-update.md)）。
   - AppConfig の値の誤った変更で、全体の版が変わりうる。値の変更は Ops の承認とし、許す値をイメージの中の版に限る（検証の関数）。
   - 影の表の間、展開の索引の書き込みが 2 倍になる。
 

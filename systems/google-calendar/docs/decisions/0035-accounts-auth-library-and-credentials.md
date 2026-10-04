@@ -52,11 +52,13 @@ date: 2026-10-04
 - 引き受けるコスト：
   - Better Auth の告知を追い続ける運用が要る。
   - 複数の組織に属する人は、組織ごとに別のアカウント（別のメールアドレス）を持つ。
-  - アプリ用のパスワードは Basic 認証で毎回送られる。漏れたら CalDAV の読み書きができる（範囲と期限と取り消しで抑える）。本家は Basic 認証を受けない。
+  - アプリ用のパスワードは Basic 認証で毎回送られる。漏れたら CalDAV の読み書きができる（範囲と期限と取り消しで抑える）。
+  - **本家との意図した違い**：本家の CalDAV は OAuth 2.0 だけで認証し、Basic 認証は 401 になる（[CalDAV API developer's guide](https://developers.google.com/workspace/calendar/caldav/v2/guide)、2026-10-04 に確認）。本システムは OS の標準のカレンダーのために、CalDAV だけのアプリ用のパスワードの Basic 認証を受ける（[architecture/README.md](../architecture/README.md) の 1.4 節の「本家との意図した違い」）。
+  - 認証の失敗の上限は、アカウントの全体で止めない（他人が締め出しに使えるため。[sync-and-caldav.md](../architecture/sync-and-caldav.md) の 6.7 節）。
 
 ## Confirmation
 
 - 依存の検査（CI）：`better-auth` の組織の部品と OAuth の提供者の部品を本番の依存で禁止する。
 - 性質ベーステスト：PROP-ACCT-001（停止から 60 秒の後の全部の要求の拒否）。
-- 結合テスト：アプリ用のパスワードの Basic 認証（期限、取り消し、組織の禁止）、CalDAV の認証の失敗の上限、セッションの取り消しで Realtime が切れる。
+- 結合テスト：アプリ用のパスワードの Basic 認証（期限、取り消し、組織の禁止）、CalDAV の認証の失敗の上限（他人の失敗で正しいパスワードの端末が止まらないこと）、セッションの取り消しで Realtime が切れる。
 - シークレットスキャン：`<brand>_ap_` の形を登録し、試験の値で検出されることを確かめる。

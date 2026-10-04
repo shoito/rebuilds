@@ -119,14 +119,14 @@ ADR-0038。
 
 - 窓は `[表示の始まり − 4 週, 表示の終わり + 4 週]`（表示のタイムゾーンの日付を、`resolve` で UTC の区間にしたもの）。
 - 表示を開くと、見えるカレンダーごとに、まず今のトークンを取り、次に範囲の問い合わせで窓に回が触れる予定オブジェクトを取る。トークンを先に取るので、間の変更は次の差分で重ねて届き、版の比べで捨てる。差分の同期のトークンを `timeMin`・`timeMax` と一緒に使わない（[ADR-0026](../decisions/0026-public-rest-api-shape.md)）。
-- 差分は `POST /v1/sync` に最大 50 のカレンダーのトークンを束ねて取る（[api-and-push.md](api-and-push.md) の 4.6 節、[sync-and-caldav.md](sync-and-caldav.md) の 5 節）。予定を返さずに今のトークンだけを返す形は、api-and-push の領域への依頼である（18 節）。
+- 差分は `POST /v1/sync` に最大 50 のカレンダーのトークンを束ねて取る（[api-and-push.md](api-and-push.md) の 4.6 節、[sync-and-caldav.md](sync-and-caldav.md) の 5 節）。予定を返さずに今のトークンだけを返す形は、`POST /v1/sync` の `tokensOnly`（[api-and-push.md](api-and-push.md) の 4.6 節。統合の工程で足した）。
 
 ### 5.2 差分
 
 - Realtime の WebSocket の合図（「カレンダー C が `seq` S になった」）を受け、手元のトークンが古ければ差分を取る（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。合図は 300ms まとめてから取りに行く。
 - 合図が落ちたときのため、5 分ごとと、タブが前面に戻ったとき（`visibilitychange`）に確かめる。
 - 差分のうち、窓に回が触れない予定オブジェクトは捨てる。1 回の差分が 1,000 件を超えたら、差分を捨てて窓を取り直す。
-- 410 は窓を取り直す。400（条件の違い）はクライアントの誤りとしてエラーの報告に出し、窓を取り直す。
+- 410 は窓を取り直す（先に `tokensOnly` でトークンを取り、次に範囲の問い合わせ）。400（条件の違い）はクライアントの誤りとしてエラーの報告に出し、窓を取り直す。
 
 ### 5.3 回を作る
 
@@ -416,7 +416,7 @@ E2E（Playwright、時計とタイムゾーンを固定、3 つの `TZ`）：
 
 ### 他の領域への依頼
 
-- [api-and-push.md](api-and-push.md)：`POST /v1/sync` に、予定を返さずに今のトークンだけを返す形（窓の取り直しの前にトークンを取るため）を足す。
+- [api-and-push.md](api-and-push.md)：`POST /v1/sync` に、予定を返さずに今のトークンだけを返す形を足す（統合の工程で `tokensOnly` として足した。2026-10-04）。
 - [accounts-and-orgs.md](accounts-and-orgs.md)：ログインの「この端末に保存しない」、組織の方針で強いる形、401 の `wipe` の理由。
 
 ### data-model（索引への追加の提案）

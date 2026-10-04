@@ -122,7 +122,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 
 - `due_at` は、回の開始（展開の索引の `start_utc`）からリマインダーの分を引いた瞬間。予定が動いたら版が上がり、古い版の `due_at` は数えない。
 - `started_at` は `notifier` が配信のサービス・SES への要求を始めた時刻、`handed_off_at` は受け付けの応答を受けた時刻。
-- 悪いイベント：30 秒（メールは 2 分）を超えたもの、15 分を超えて送らなかったもの（`too_late`）、照合の `missing`。
+- 悪いイベント：30 秒（メールは 2 分）を超えたもの、15 分を超えて送らなかったもの（計画の行の `skipped_late`）、照合の `missing`。
 - 分布は、`due_at` の秒（`:00` の前後）ごとにも出す。毎時 0 分・30 分の集中で遅れが偏るかを見る（[capacity.md](capacity.md) の 3 節）。
 - 内訳：`due_at` → タイマーホイールに載った時刻（前倒しの量）→ `started_at` → `handed_off_at`。前倒しの量が 2 分を切ったら、scheduler の遅れの兆候として見る。
 
@@ -163,9 +163,9 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | 配送の滞留 | SQS の最古 60 秒 | 呼び出し | `itip-delivery-lag.md` |
 | 写しの照合の食い違いの増加 | 直した数が 1 日 0.01% 以上 | チケット | `attendee-copy-drift.md` |
 | 展開の索引の照合の不一致 | 1 件。施行まで 7 日を切った tzdb の改正の後は呼び出し | チケット・呼び出し | `occurrence-index-mismatch.md` |
-| 古い `tzdata_version` の行 | 採用から 24 時間の後に 1 行以上。施行まで 24 時間を切ったら SEV2 | チケット・呼び出し | `tzdata-update.md` |
-| tzdb の新しいリリースの未採用 | IANA のリリースから 7 日、または施行まで 14 日を切った | チケット | `tzdata-update.md` |
-| AppConfig の `tzdata.active_version` の不一致 | タスクの報告する版が 2 種類以上で 5 分、または東京と大阪で違う | 呼び出し | `tzdata-update.md` |
+| 古い `tzdata_version` の行 | 採用から 24 時間の後に 1 行以上。施行まで 24 時間を切ったら SEV2 | チケット・呼び出し | `tzdb-update.md` |
+| tzdb の新しいリリースの未採用 | IANA のリリースから 7 日、または施行まで 14 日を切った | チケット | `tzdb-update.md` |
+| AppConfig の `tzdata.active_version` の不一致 | タスクの報告する版が 2 種類以上で 5 分、または東京と大阪で違う | 呼び出し | `tzdb-update.md` |
 | 会議室の二重予約 | 1 件 | 呼び出し（SEV2 から） | `room-double-booking.md` |
 | 権限の漏れの疑い | 応答の監査の不一致 1 件 | 呼び出し（SEV1 の候補） | `access-leak-response.md` |
 | リマインダーの遅れ | 5 分の窓で 1% を超えて遅れた | 呼び出し | `reminder-delay.md` |
@@ -186,12 +186,12 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 | DR の複製の遅延 | `AuroraGlobalDBRPOLag` 10 秒を 5 分 | 呼び出し | `disaster-recovery.md` |
 | 大阪の待機の構成の異常 | [infrastructure.md](infrastructure.md) の 6.5 節の確認の失敗 | チケット（30 分で呼び出し） | `disaster-recovery.md` |
 | 秘密の出力の検出 | 2.1 節の走査で 1 件以上 | 呼び出し（SEV2） | `incident-response.md` |
-| シークレットスキャンの通知 | 本システムの接頭辞の秘密の公開の検知 | 呼び出し | `caldav-credential-compromise.md`（[security.md](security.md) の 16 節の提案） |
+| シークレットスキャンの通知 | 本システムの接頭辞の秘密の公開の検知 | 呼び出し | `credential-compromise.md` |
 | 監査ログのハッシュの連鎖の検証の失敗 | 日次のジョブ | 呼び出し（SEV2） | `incident-response.md` |
 | SLI の集計の欠け | `slo-aggregator` の出力が 5 分ない | 呼び出し | `incident-response.md` |
 
 - 呼び出しのアラートは、SLO か、分離・正しさ・秘密の症状に限る。原因の側の指標（CPU など）はチケットとダッシュボードにとどめる。
-- 新しく足したアラート（tzdb の未採用、AppConfig の版の不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャン）は、[runbooks/README.md](../runbooks/README.md) の 4 節への追加を Ops に依頼する（13 節）。
+- 新しく足したアラート（tzdb の未採用、AppConfig の版の不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャン）は、統合の工程で [runbooks/README.md](../runbooks/README.md) の 4 節に足した（2026-10-04）。
 
 ## 6. 合成監視
 
@@ -286,7 +286,7 @@ ADR-0046。定義は [runbooks/README.md](../runbooks/README.md) の 1 節。こ
 
 ### runbooks
 
-- [runbooks/README.md](../runbooks/README.md) の 4 節に、次のアラートの追加を Ops に依頼する：tzdb の新しいリリースの未採用、AppConfig の `tzdata.active_version` の不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャンの通知（手順は `tzdata-update.md`、`incident-response.md`、`caldav-credential-compromise.md`）。
+- [runbooks/README.md](../runbooks/README.md) の 4 節に、次のアラートを足した（統合の工程、2026-10-04）：tzdb の新しいリリースの未採用、AppConfig の `tzdata.active_version` の不一致、変更のログの欠け、SLI の集計の欠け、シークレットスキャンの通知（手順は `tzdb-update.md`、`incident-response.md`、`credential-compromise.md`）。
 - `reminder-delay.md` に、5.2 節の内訳（前倒しの量、`started_at`、`handed_off_at`）の読み方を入れる。
 
 ### data-model（索引への追加の提案）

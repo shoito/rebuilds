@@ -43,7 +43,9 @@ API の形：
 - `redact()` が `BUSY` にした予定（[ADR-0021](0021-effective-role-and-redact-table.md)）は、見る人ごとの不透明な ID と時刻と状態だけを返し、`redacted: true` を付ける。
 - 回の ID は `<eventId>_<YYYYMMDDTHHMMSS>`（終日は `<YYYYMMDD>`）。回の応答は `recurringEventId` と `originalStartTime` を持つ。「これ以降」は `scope=thisAndFollowing`。
 - 一覧：`singleEvents=true` は回に展開し、`timeMin`・`timeMax` を必須（差は 366 日まで）にする。`maxResults` は既定 250・最大 2,500。
-- 差分：`syncToken` は予定オブジェクトの単位。`singleEvents=true`・`timeMin`・`timeMax`・`orderBy`・`q` と一緒に使えば 400。410 で取り直し。1 ページ 1,000 件。画面のために、50 のカレンダーのトークンを束ねる `POST /v1/sync` を持つ。
+- 差分：`syncToken` は予定オブジェクトの単位。`singleEvents=true`・`timeMin`・`timeMax`・`orderBy`・`q` と一緒に使えば 400。410 で取り直し。1 ページ 1,000 件。画面のために、50 のカレンダーのトークンを束ねる `POST /v1/sync` を持つ。予定を返さずに今のトークンだけを返す形（`tokensOnly`）も持つ。
+
+> 2026-10-04 の注記：Web の画面は、窓の範囲の問い合わせの前にトークンを取る（[ADR-0038](0038-web-calendar-rendering-and-local-expansion.md)）。トークンと `timeMin` を一緒に使えないので、統合の工程でトークンだけを返す形を足した（[api-and-push.md](../architecture/api-and-push.md) の 4.6 節）。
 - 書き込み：`If-Match`（412）、`POST` の `Idempotency-Key`（24 時間）、`sendUpdates`（`all` が既定・`externalOnly`・`none`。本システムの中の写しはどれでも作る）。`PATCH` は JSON Merge Patch。
 - 参加者の写しの共有の項目は、`guestsCanModify` が偽なら 403、真なら主催者への依頼（`X-MODIFY`）にして 202。
 - 書き込みの直後の読み出しのため、`X-Read-After` を返して受ける。

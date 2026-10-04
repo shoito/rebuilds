@@ -56,4 +56,4 @@ Google Calendar の再構築に関する決定。リポジトリ共通の決定�
 | [0049](0049-tzdata-rollout-and-schema-change-ordering.md) | tzdb の新しい版は、前の版と一緒にイメージに入れて先にデプロイし、AppConfig の `tzdata.active_version` を全サービスで一度に切り替えて採用する。Web のクライアントは版つきの URL からゾーンのデータを取るので、資産のデプロイを待たない。スキーマの変更は、広げる・移る・縮める・消すの順にし、展開の索引のような作り直せる表は、影の表を作って入れ替える | accepted |
 <!-- adr-index:end -->
 
-この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。
+この一覧は、各 ADR の frontmatter と見出しから生成したもの（統合の工程で 2026-10-04 に全 49 件から生成し直した）。ADR を追加・更新したら生成し直す。統合の工程で直した ADR と、決定を覆した注記の一覧は [architecture/README.md](../architecture/README.md) の 5・6 節にある。

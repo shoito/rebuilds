@@ -31,8 +31,8 @@ date: 2026-10-04
 
 | SLI | 記録（書く場所） | 良いイベント | 悪いイベント |
 | --- | --- | --- | --- |
-| リマインダーの時刻どおりの送信（NFR-003・006） | `reminder_deliveries`（`reminder-delivery-ledger`。鍵 `(reminder_id, occurrence_start, method, version)`、`due_at`、`started_at`、`handed_off_at`、`outcome`） | 画面・Web Push：`started_at − due_at ≤ 30 秒`。メール：`handed_off_at − due_at ≤ 2 分` | 超えたもの、`outcome = too_late`（15 分を超えて送らなかったもの）、照合で見つかった送り漏れ |
-| リマインダーの送り漏れ（K6） | 照合のジョブ（毎時）が、1 時間前から 15 分前までの `due_at` の回を、展開の索引とリマインダーの設定から作り、`reminder_deliveries` と比べる | — | 記録のない回・方法（`missing`）。予定の変更で版が上がった古い版は除く |
+| リマインダーの時刻どおりの送信（NFR-003・006） | `reminder_deliveries`（`reminder-delivery-ledger`。鍵は [ADR-0030](0030-reminder-planning-horizon-and-replan.md) の（利用者, 予定オブジェクト, `recurrence_id`, 方法, 分, 回の開始）、`due_at`、`started_at`、`handed_off_at`、`outcome`） | 画面・Web Push：`started_at − due_at ≤ 30 秒`。メール：`handed_off_at − due_at ≤ 2 分` | 超えたもの、計画の行の `skipped_late`（15 分を超えて送らなかったもの）、照合で見つかった送り漏れ（`missing`） |
+| リマインダーの送り漏れ（K6） | 照合のジョブ（毎時）が、1 時間前から 15 分前までの `due_at` の回を、展開の索引とリマインダーの設定から作り、`reminder_deliveries` と比べる | — | 記録のない回・方法（`missing`）。付け替えで消えた古い時刻の計画は除く |
 | 伝播（主催者 → 参加者の写し）（NFR-002） | `itip_deliveries`（`msg_id`、受け手、`organizer_committed_at`、`applied_at`、`outcome`、受け手の数の帯 `≤200`・`>200`） | `applied_at − organizer_committed_at` が 5 秒以内（200 人まで）、60 秒以内（超える分） | 超えたもの、`outcome = failed` |
 | iMIP の送信（NFR-011） | `imip_outbound_log`（`msg_id`、`ses_message_id`、`queued_at`、`handed_off_at`）と、SES の構成セットの事象（Send・Delivery・Bounce・Complaint） | `handed_off_at − queued_at ≤ 60 秒` | 超えたもの、送信の失敗。Bounce・Complaint は別の指標 |
 | iMIP の受信（NFR-011） | `imip_inbound_log`（S3 の保存の時刻、当てた時刻） | 2 分以内に判定（通る・未確認・捨てた）まで進んだ | 超えたもの |
@@ -59,6 +59,8 @@ date: 2026-10-04
 
 - **2（トレースで全件）**：X-Ray とストレージの費用が要求の数に比例して大きい。リマインダーの送り漏れのような、起きなかったことは数えられない。
 - **3（ログの集計）**：ログの欠けと遅れがそのまま SLI の誤りになる。ログに中身を書かない規則（[observability.md](../architecture/observability.md) の 2 節）の下で、結びつける鍵が足りない。
+
+> 2026-10-04 の注記：起票の時は、送信の記録の鍵を最初の設計の `(reminder_id, occurrence_start, method, version)` で書いていた。統合の工程で [ADR-0030](0030-reminder-planning-horizon-and-replan.md) の鍵（版を入れない）に揃え、遅れすぎの名前を計画の行の状態 `skipped_late` に揃えた。
 
 ## Consequences
 

@@ -89,14 +89,14 @@ ADR-0048 の 3 段。
 
 | 種類 | 置き場所 | 評価 | 例 |
 | --- | --- | --- | --- |
-| `release.*`（未完成の振る舞いを隠す） | AppConfig | テナント・利用者の ID のハッシュの割合 | `release.booking_pages`、`release.find_a_time_v2` |
-| `ops.*`（運用の止め・絞り） | AppConfig（60 秒のポーリング） | サーバー | `ops.writes_enabled`、`ops.imip_outbound`（`.<tenant>`）、`ops.web_push`、`ops.webhooks_enabled`、`ops.ics_fetch_interval_min`、`ops.itip_delivery_concurrency`、`ops.tzdata_recompute_rate`、`ops.calendar_write_budget.<origin>`、`ops.search_enabled` |
+| `release.*`（未完成の振る舞いを隠す。名前は kebab-case） | AppConfig | テナント・利用者の ID のハッシュの割合 | `release.booking-pages`、`release.scim`、`release.cross-tenant-shared-writes`、`release.admin-event-access` |
+| `ops.*`（運用の止め・絞り。名前は snake_case） | AppConfig（60 秒のポーリング） | サーバー | `ops.writes_enabled`、`ops.imip_outbound`（`.<tenant>`）、`ops.web_push`、`ops.webhooks_enabled`、`ops.ics_fetch_interval_min`、`ops.itip_delivery_concurrency`、`ops.tzdata_recompute_rate`、`ops.calendar_write_budget.<origin>`、`ops.search_enabled` |
 | データの版の固定 | AppConfig（15 秒のポーリング） | 全サービスが同じ値。割合・テナントの別を持たない | `tzdata.active_version`（6 節） |
 | Web のクライアントのフラグ | サーバーが評価して `GET /v1/flags` で配る | 端末はメモリーと手元の DB に持つ | `release.*` の画面の部分 |
 
 - **展開・時刻・権限の規則をフラグにしない**（[runbooks/README.md](../runbooks/README.md) の 3 節）。`expand()`・`resolve()`・`redact()`・`can()` の振る舞いの変更は、コードの版として出し、戻すときは前のイメージへのロールバックで行う。展開の索引は、前の版の `expand()` で `expander` が作り直す。
 - `tzdata.active_version` は、すべての経路が同じ値を読むデータの版の固定で、経路ごとに違う規則が動く状態を作らない（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。
-- `release.*` は 100% にしてから 30 日以内に消す。消し忘れを週次で一覧にする。
+- `release.*` は 100% にしてから 30 日以内に消す。消し忘れを週次で一覧にする。例外（長く残すフラグ）は [runbooks/README.md](../runbooks/README.md) の 3 節の一覧だけで、一覧の外のフラグが 30 日を超えたら CI の週次の検査が Issue を作る。
 - AppConfig の構成は東京と大阪に同じものを持ち、変更は両方に当てる（[infrastructure.md](infrastructure.md) の 4 節）。
 
 ## 4. サーバーのデプロイ
@@ -123,7 +123,7 @@ ADR-0048 の 3 段。
 - まずフラグで戻す（`release.*`、`ops.*`）。次に 1 つ前のイメージ。マイグレーションは広げる段だけなので、1 つ前の版が今の DB で動く。
 - 縮める段のマイグレーションの後は、その前の版へ戻さない。
 - 展開・時刻・権限の規則の不具合は、前のイメージへ戻し、展開の索引を `expander` で作り直す（3 節）。
-- 手順は `deploy-and-rollback.md`（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）。
+- 手順は [runbooks/deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)。
 
 ## 5. Web のクライアントの配布
 
@@ -151,7 +151,7 @@ ADR-0049。流れの図は ADR にある。
 
 | # | 手順 | だれ | 確かめ |
 | --- | --- | --- | --- |
-| 1 | `tzdata-watch`（毎日）が IANA の新しいリリースを見つけ、`packages/tzdata` に版を足す PR を作る | 自動 | リリースの署名（確かめ方は E3。[security.md](security.md) の 3.7 節）。CLDR の `windowsZones` の版も記録 |
+| 1 | `tzdata-watch`（毎日）が IANA の新しいリリースを見つけ、`packages/tzdata` に版を足す PR を作る | 自動 | リリースのファイルの GPG の署名（`.asc`）を確かめる（[security.md](security.md) の 3.7 節の OP1）。CLDR の `windowsZones` の版も記録 |
 | 2 | CI が差分の報告（変わるゾーンと区間、施行までの日数、影響の見積もり、外部への `REQUEST` の見積もり）と、版の差分の試験を出す | 自動 | 施行まで 7 日未満なら「急ぎ」の印と Ops への知らせ |
 | 3 | Dev と Ops が差分の報告を見て採用を判断する | Dev・Ops | エージェントは判断しない（[roadmap.md](../roadmap.md) の「エージェントに任せないこと」） |
 | 4 | マージする。`/tzdata/<version>/` を S3 に置く。新旧の版を含むイメージをデプロイする（`active` は旧のまま） | Ops の承認 | 全サービスが新しいイメージで健全 |
@@ -164,11 +164,10 @@ ADR-0049。流れの図は ADR にある。
 - **戻す**：`tzdata.active_version` を前の版に戻す。行ごとに `tzdata_version` を持つので、計算し直しがどちらの方向にも収束する（PROP-TZ-004）。[runbooks/README.md](../runbooks/README.md) の 3 節の「前の版を新しい版として出す」と同じ結果を、デプロイなしで得る。
 - **Web のクライアント**：API の応答の `tzdata_version` で、その版のゾーンを取る（[ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)）。資産のデプロイも段階の速めも要らない。
 
-### 6.2 [runbooks/README.md](../runbooks/README.md) の 3 節との違い
+### 6.2 runbooks との関係
 
-- runbooks の手順の 2（「サーバーと Web のクライアントを同じ版で出す。Web のクライアントの段階を、サーバーの採用の後すぐに 100% まで進める」）は、この流れでは要らない。Web のクライアントは資産の版に関係なく、サーバーの `active` の版のゾーンを取る。
-- runbooks の手順の 5（「戻すときは、前の版を新しい版として同じ手順で出す」）は、`tzdata.active_version` の切り替えで同じ結果になる。
-- 2 つの直しを Ops に依頼する（13 節）。
+- 統合の工程（2026-10-04）で、[runbooks/README.md](../runbooks/README.md) の 3 節の採用の手順の 2（Web のクライアントを同じ版で出す）と 5（前の版を新しい版として出す）を、この流れ（AppConfig の切り替え）に書き直した。手順の正本は [runbooks/tzdb-update.md](../runbooks/tzdb-update.md)。
+- 切り替えの窓での会議室・予約の区間の扱いは [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の「切り替えの窓」。
 
 ## 7. スキーマの変更の順序
 
@@ -223,7 +222,7 @@ ADR-0049。段（広げる・埋めて移る・縮める・消す）と、展開
 - **関門**：パスで足し、外すラベルなし、性質ベーステストの再実行を認めない（ADR-0048）。
 - **CalDAV の互換**：再生・試験場・手動の 3 段（ADR-0048）。
 - **tzdb の採用**：イメージに複数の版、AppConfig で全サービスを一度に切り替え（ADR-0049）。
-- **規則の戻し**：フラグでなく前のイメージへ（3 節）。
+- **規則の戻し**：フラグでなく前のイメージへ（3 節）。統合の工程で、events-and-recurrence の `release.recurrence-*` と sharing-and-acl の `release.policy-*` の案を、前のイメージへのロールバックに直した。
 - **スキーマ**：広げる・移る・縮める・消す、展開の索引は影の表（ADR-0049）。
 
 ### 持ち越し
@@ -232,8 +231,7 @@ ADR-0049。段（広げる・埋めて移る・縮める・消す）と、展開
 | --- | --- |
 | macOS・iOS のシミュレーターでの CalDAV のアカウントの自動の追加と同期の起こし方 | E8 の `caldav-client-lab`（**未検証**） |
 | Thunderbird の自動化の方法 | E8 の `caldav-client-lab`（**未検証**） |
-| tzdb のリリースの署名の確かめ方 | E3 の `tzdata-watch-and-rollout`（**未検証**） |
-| [events-and-recurrence.md](events-and-recurrence.md) の 10 節の `release.recurrence-*` のフラグでの展開の戻し | 3 節の規則（フラグにしない）と食い違う。統合の工程で events-and-recurrence の側を「前のイメージへのロールバック」に直すかを Dev が決める |
+| 信頼する tzdb の署名の鍵の指紋 | E3 の `tzdata-watch-and-rollout` |
 
 ## 12. 指標の置き場所
 
@@ -249,10 +247,10 @@ ADR-0049。段（広げる・埋めて移る・縮める・消す）と、展開
 
 ### runbooks
 
-- [runbooks/README.md](../runbooks/README.md) の 3 節の tzdb の採用の手順の 2・5 を、6 節の流れ（AppConfig の切り替え）に合わせて直すことを Ops に依頼する。
-- `deploy-and-rollback.md`（予定）：4 節の順序、自動のロールバックの条件、リマインダーの集中を避ける時間帯、Web の段階の止め方。
-- `tzdata-update.md`（予定）：6.1 節の手順、急ぎの採用、戻し。
-- `schema-expand-contract.md`（新規の提案）：7 節の段の確かめ方と、影の表の切り替え。
+- [runbooks/README.md](../runbooks/README.md) の 3 節の tzdb の採用の手順の 2・5 を、6 節の流れ（AppConfig の切り替え）に合わせて直した（統合の工程）。
+- [deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)：4 節の順序、自動のロールバックの条件、リマインダーの集中を避ける時間帯、Web の段階の止め方（統合の工程で作った）。
+- [tzdb-update.md](../runbooks/tzdb-update.md)：6.1 節の手順、急ぎの採用、戻し（統合の工程で作った。提案の名前 `tzdata-update.md` を `tzdb-update.md` に改めた）。
+- `schema-expand-contract.md`：7 節の段の確かめ方と、影の表の切り替え（[runbooks/README.md](../runbooks/README.md) の 5 節の予定）。
 
 ### data-model（索引への追加の提案）
 

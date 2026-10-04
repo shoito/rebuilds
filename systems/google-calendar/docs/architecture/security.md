@@ -58,7 +58,7 @@ flowchart TB
 | --- | --- | --- |
 | B1 エッジ | 画面・API・予約ページの要求、WebSocket | TLS 1.2 以上、HSTS、WAF、Shield Standard。オリジンは CloudFront からだけ |
 | B1' CalDAV の入口 | CalDAV の要求（WebDAV のメソッド） | ALB に付けた WAF、Basic 認証の失敗の規則、本文の大きさ（[infrastructure.md](infrastructure.md) の 2.2 節、[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)） |
-| B2 テナント | サービスから DB | `SET LOCAL app.tenant_id`、FORCE RLS。テナントをまたぐのは 3 つの処理と専用のロールだけ（[ADR-0004](../decisions/0004-tenancy-and-rls.md)） |
+| B2 テナント | サービスから DB | `SET LOCAL app.tenant_id`、FORCE RLS。テナントをまたぐのは ADR-0004 の許可リストの経路（X1〜X9）と専用のロールだけ。RLS の外の表も一覧の表だけ（[ADR-0004](../decisions/0004-tenancy-and-rls.md)） |
 | B3 見え方 | 予定から各経路 | `packages/policy` の `can()`・`redact()` だけ。応答の監査（[observability.md](observability.md) の 4 節） |
 | B4 管理プレーン | デプロイ、AppConfig、運用者 | OIDC の短命な認証情報、2 人の承認、JIT（8 節） |
 | B5 外向きの送信 | 利用者の決める宛先 | egress の専用の経路、名前解決の後の IP の検査（[ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md)） |
@@ -102,7 +102,7 @@ CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用の
 | # | 種類 | 脅威 | 対策 |
 | --- | --- | --- | --- |
 | CD1 | S | アプリ用のパスワードの漏えい（端末の設定の書き出し、画面の写し、構成プロファイルの共有） | 120 ビットの乱数で人が選ばない（ADR-0035）。接頭辞 `<brand>_ap_`（[ADR-0035](../decisions/0035-accounts-auth-library-and-credentials.md)）をシークレットスキャンに載せる。作ったときだけ見せる。最後に使った時刻・IP の帯・クライアントの種類を設定の画面に出し、利用者が取り消せる。期限の既定 1 年 |
-| CD2 | S | パスワードの総当たり・リスト型の攻撃 | ログインはパスワードを持たない（ADR-0035）。アプリ用のパスワードは高いエントロピーで、総当たりは成り立たない。失敗の上限はアカウントごと 10 分 20 回・IP ごと 10 分 200 回（[sync-and-caldav.md](sync-and-caldav.md) の 6.7 節）。アカウントごとの上限は、他人がわざと失敗してその人の CalDAV を 15 分止める（締め出し）のに使えるので、15 節の持ち越しにする |
+| CD2 | S | パスワードの総当たり・リスト型の攻撃 | ログインはパスワードを持たない（ADR-0035）。アプリ用のパスワードは高いエントロピーで、総当たりは成り立たない。失敗はアカウントの全体では数えず、アプリ用のパスワードごと（取り消した・期限切れのものを送り続ける端末）、（IP, アカウント）の組ごと、IP ごとに数え、超えた単位だけを止める（[sync-and-caldav.md](sync-and-caldav.md) の 6.7 節）。他人がわざと失敗しても、正しいパスワードの端末は止まらない（締め出しの防止） |
 | CD3 | E | 漏れたアプリ用のパスワードで、CalDAV の外（API・画面）を使う | スコープは CalDAV だけ（読み出しだけの種類も選べる）。API・画面は受け付けない |
 | CD4 | I | 照合の値（DB）の漏えいからパスワードを求める | 高いエントロピーの乱数の SHA-256 で、総当たりで求められない（[ADR-0041](../decisions/0041-encryption-keys-and-secret-storage.md)） |
 | CD5 | S | 退職者・停止した利用者のパスワードが使われ続ける | 停止・組織からの除外・SSO の取り消しで、その人のアプリ用のパスワードとトークンを 60 秒以内にすべて取り消す（[accounts-and-orgs.md](accounts-and-orgs.md) の要件）。Valkey の照合の結果の写しは 60 秒で切れ、取り消しのときに消す |
@@ -132,7 +132,7 @@ CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用の
 | SS1 | I・E | ICS の購読の URL で内部のアドレス・メタデータのアドレスを取らせる | egress の経路、名前解決の後の IP の検査、リダイレクトの毎回の検査（[ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md)） |
 | SS2 | I・E | Webhook の宛先で同じ | 同上 |
 | SS3 | I・E | Web Push の `endpoint` に任意の URL を登録させ、`notifier` から送らせる | 配信のサービスのホスト名の許可リスト。private の Network Firewall の許可リストでも止める（[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)） |
-| SS4 | D | 遅い応答・巨大な応答で `ics-fetcher` を止める | 1 回 10 秒・10 MiB、宛先のホストごとの同時の数 4 |
+| SS4 | D | 遅い応答・巨大な応答で `ics-fetcher` を止める | 取得は接続 5 秒・全体 30 秒・10 MiB（[sync-and-caldav.md](sync-and-caldav.md) の 8.1 節）、解析は 10 秒（[ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md)）、宛先のホストごとの同時の数 4 |
 
 ### 3.6 Web の画面・公開 API・ICS の公開
 
@@ -149,7 +149,7 @@ CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用の
 
 | # | 種類 | 脅威 | 対策 |
 | --- | --- | --- | --- |
-| OP1 | T | `packages/tzdata` の PR に細工したデータを入れる（全利用者の時刻をずらす） | IANA の公開の署名（tzdb のリリースの PGP の署名）を CI で確かめる（確かめ方は E3 で決める。**未検証**）。差分の報告を Dev と Ops が見る（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)） |
+| OP1 | T | `packages/tzdata` の PR に細工したデータを入れる（全利用者の時刻をずらす） | IANA のリリースのファイルには、URL の末尾に `.asc` を付けた GPG の署名がある（tz-announce のリリースの告知、2026-10-04 に確認）。`tzdata-watch` が署名を `gpg --verify` で確かめ、通らなければ PR を作らない。信頼する鍵の指紋は E3 の `tzdata-package` で固定する。差分の報告を Dev と Ops が見る（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)） |
 | OP2 | T | AppConfig の `tzdata.active_version` の誤った変更 | Ops の承認、許す値をイメージの中の版に限る（同上） |
 | OP3 | E | 運用者の本番のデータへの直接のアクセス | JIT、2 人の承認、プラットフォームの監査（8 節） |
 | OP4 | T | データの直接の修正で変更のログを迂回する | DB のロールで `event_objects` への直接の `UPDATE` を拒否（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。修正は `packages/writer` の保守の経路 |
@@ -242,9 +242,9 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 | --- | --- | --- |
 | 権限の漏れの疑い（応答の監査の不一致） | 該当の経路を `ops.*` のフラグで止める（検索、ICS の公開、Webhook など）。`redact()` を直すのはコードの版として | `access-leak-response.md` |
 | 迷惑な招待の急増 | 該当の主催者・テナントの外部への送信を止める（`ops.imip_outbound.<tenant>`） | `invite-abuse.md` |
-| アプリ用のパスワードの大量の漏えいの疑い | 該当の利用者・組織のアプリ用のパスワードを一括で取り消す | `caldav-credential-compromise.md`（新規の提案） |
+| アプリ用のパスワードの大量の漏えいの疑い | 該当の利用者・組織のアプリ用のパスワードを一括で取り消す | `credential-compromise.md` |
 | ICS の秘密のアドレスの漏えい | 利用者に作り直しを促す。組織の全部の秘密のアドレスを一括で作り直す操作 | 同上の手順に含める |
-| 偽の iMIP の急増 | 受け口・送信元のドメインの受信の上限を下げる | `imip-inbound-failures.md`（[invitations-and-itip.md](invitations-and-itip.md) の 17 節） |
+| 偽の iMIP の急増 | 受け口・送信元のドメインの受信の上限を下げる | `email-delivery.md` |
 
 - 漏えい等の報告（個人情報保護法）の要否と手順は、法務の L1 の結論で決める。手順の文書は、報告の要否を判断する人と期限の枠だけを先に置く。
 
@@ -290,6 +290,7 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 - **秘密**：照らすだけのものは SHA-256 の照合の値、平文が要るものは封筒の暗号化（ADR-0041）。
 - **監査とライフサイクル**：2 つの監査、1 つの保持の表、30 日の猶予（ADR-0042）。
 - **迷惑な招待**：Complaint の率 0.1% で外部への送信を自動で止める（3.1 節）。
+- **CalDAV の認証の失敗**：アカウントの全体を止めない。パスワードごと・（IP, アカウント）の組ごと・IP ごとに数える（3.3 節の CD2。統合の工程で決めた）。
 
 ### 持ち越し
 
@@ -300,11 +301,10 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 | 迷惑な招待の報告の中身を人が読めるか | **法務の確認待ち：L2** |
 | 外国にある第三者への提供（SES、Web Push、iMIP）と漏えい等の報告 | **法務の確認待ち：L1・L4** |
 | DPA とサブプロセッサー、開示・削除の請求の窓口 | **法務の確認待ち：L9** |
-| tzdb のリリースの署名の確かめ方 | E3 の `tzdata-package`（**未検証**） |
+| 信頼する tzdb の署名の鍵の指紋 | E3 の `tzdata-package` |
 | CloudFront の標準のログで URI の経路を外せるか | E8 の `ics-publish`（**未検証**） |
 | SES の送信で TLS を必須にするか | E5 の `imip-outbound` |
 | 組織の自分の鍵（BYOK） | 大口の契約の求めが出たら別の ADR |
-| CalDAV の認証の失敗のアカウントごとの上限（10 分 20 回で 15 分の `429`）を、他人が締め出しに使える問題。IP とアカウントの組で数える形にするか | sync-and-caldav の領域（Dev）。E8 の `caldav-credential-hardening` の前 |
 
 ## 16. quality.md・runbooks・data-model への項目
 
@@ -317,8 +317,10 @@ ADR-0042。保持の期間の既定の表、テナントの解約と削除の手
 ### runbooks
 
 - `access-leak-response.md`、`invite-abuse.md`（[runbooks/README.md](../runbooks/README.md) の 4 節の予定）。
-- `caldav-credential-compromise.md`（新規の提案）：アプリ用のパスワード・ICS の秘密のアドレスの一括の取り消しと作り直し。
-- `tenant-purge.md`（新規の提案）：解約したテナントの削除の確かめと、法的な保全の扱い。
+- `credential-compromise.md`：アプリ用のパスワード・OAuth のトークン・Webhook の秘密・ICS の秘密のアドレスの一括の取り消しと作り直し、シークレットスキャンの通知への対応（統合の工程で、提案の `caldav-credential-compromise.md`・`leaked-token-response.md`・`credential-revocation.md` を 1 つにした）。
+- `tenant-purge.md`：解約したテナントの削除の確かめと、法的な保全の扱い（[runbooks/README.md](../runbooks/README.md) の 5 節の予定）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

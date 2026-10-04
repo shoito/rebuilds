@@ -468,7 +468,7 @@ flowchart LR
 
 | 事象 | 起きること | 備え |
 | --- | --- | --- |
-| `expand()` の誤り（新しい版で回が増える・欠ける） | 画面・空き時間・会議室・リマインダーで回が違う | 参照との性質ベーステスト（PR・夜間）。本番の照合で検知し、`release.recurrence-*` のフラグで前の版の展開に戻す。索引を作り直す |
+| `expand()` の誤り（新しい版で回が増える・欠ける） | 画面・空き時間・会議室・リマインダーで回が違う | 参照との性質ベーステスト（PR・夜間）。本番の照合で検知し、前のイメージへロールバックする。展開の規則はフラグにしない（[runbooks/README.md](../runbooks/README.md) の 3 節、[delivery.md](delivery.md) の 3 節）。戻した後、`expander` が前の版の `expand()` で、新しい版で書いた期間の索引を作り直す |
 | `expander.advance` が止まった | 範囲の端の先の回が索引にない | その場の展開で読み出しは正しい。会議室の予約の行が足りず、範囲の端で二重予約の判定ができない → 会議室の新しい予約を、`indexed_through` の手前までに制限する（rooms-and-resources.md）。止まった日数を監視する |
 | 大きな系列の書き込みでロックが長い | 同じカレンダーの書き込みが待つ | 1 予定オブジェクトの索引の差分は最大 5,000 行。1 トランザクションの上限を超えるものはない |
 | 計算の量の上限に当たった | 回が途中まで | 応答に印を付け、照合の警報の対象にする |
@@ -553,8 +553,10 @@ flowchart LR
 
 ### runbooks
 
-- `occurrence-index-mismatch.md`：照合の不一致の調べ方（理由のコード、`object_version`、`tzdata_version`）、1 予定オブジェクト・1 カレンダーの索引の作り直し、展開のフラグの戻し方。
-- `expander-advance-stalled.md`：範囲の端のジョブが止まったときの確かめ方と、手で 1 日分を進める方法。
+- `occurrence-index-mismatch.md`：照合の不一致の調べ方（理由のコード、`object_version`、`tzdata_version`）、1 予定オブジェクト・1 カレンダーの索引の作り直し、前のイメージへのロールバックの判断（[runbooks/README.md](../runbooks/README.md) の 4 節に載せた。予定）。
+- `expander-advance-stalled.md`：範囲の端のジョブが止まったときの確かめ方と、手で 1 日分を進める方法（同じく予定）。
+
+統合の工程（2026-10-04）で、上の項目を [quality.md](../quality.md) と [runbooks/README.md](../runbooks/README.md) に反映した。
 
 ### data-model（索引への追加の提案）
 

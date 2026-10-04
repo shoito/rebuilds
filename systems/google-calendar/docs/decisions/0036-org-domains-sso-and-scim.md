@@ -40,7 +40,7 @@ date: 2026-10-04
 - **SSO**：`@better-auth/sso`（SAML は samlify）。ドメインごとに IdP を 1 つ。SAML は SP 起点だけ、応答か主張の署名を必須、`InResponseTo`・`Audience`・`NotOnOrAfter`（ずれ 3 分）・`Destination`。OIDC は PKCE と `nonce`、`email_verified`。確認したドメインのメールアドレスだけ。IdP の属性で管理の役割を決めない。Single Logout は持たない。
 - **ログインの規則**（DT-ACCT-001）：SSO を必須にしたら他の手段を拒むが、`super_admin` はパスキーで入れる（監査ログに残す）。JIT は既定で有効。
 - **個人から組織へ**：組織がドメインを確認したら、同じドメインの個人のアカウントに「移るか、メールアドレスを変えるか」を案内する。同意したら `tenant-move` のジョブが、カレンダーごとのトランザクションで `tenant_id` を変え（ID は変えない）、そのカレンダーのトークンを 410 にする。他のテナントの参加者の写しへ新しい `organizer_ref` の `REQUEST`（`SEQUENCE` は上げない）を送り、古い参照への `REPLY` を 90 日回す。共有の ACL に組織の方針を当て直す。
-- **SCIM**：SSO の後に、`release.scim` のフラグの裏で足す。`/scim/v2/<org_id>/` の Users・Groups、`<brand>_scim_` の Bearer。`active=false` は利用者の停止、削除も停止にする（引き継ぎは管理者が画面で）。1 回の要求で組織の 10% を超える停止は管理者の確認まで保留にする。
+- **SCIM**：MVP に含め、E4 の最後の Story として SSO の後に、`release.scim` のフラグの裏で足す（GA の前に 100% にしてフラグを消す）。`/scim/v2/<org_id>/` の Users・Groups、`<brand>_scim_` の Bearer。`active=false` は利用者の停止、削除も停止にする（引き継ぎは管理者が画面で）。1 回の要求で組織の 10% を超える停止は管理者の確認まで保留にする。
 
 ### 他の案を選ばなかった理由
 
@@ -58,8 +58,8 @@ date: 2026-10-04
 - 引き受けるコスト：
   - `tenant-move` は、他のテナントの写しの参照の付け替えと、古い参照の回しを要する大きな処理である。E4 で試験を厚くする（PROP-ACCT-002）。
   - 同意しない人は、組織のドメインのメールアドレスのまま個人で残り、SSO を使えない。
-  - SCIM は SSO より後になり、それまで利用者の作成は JIT と管理者の招待に頼る（[intent.md](../intent.md) は SCIM を MVP に含める。MVP の中の後段で出す）。
-  - 部品の告知（SSO・SCIM の部品に Critical の告知があった。Linear の accounts-and-auth.md の 2.2 節）を追う。
+  - SCIM は SSO より後になり、それまで利用者の作成は JIT と管理者の招待に頼る。SCIM は MVP に含め、E4 の最後に出す（[intent.md](../intent.md)、[roadmap.md](../roadmap.md)）。
+  - 部品の告知を追う。`@better-auth/scim` には、1.5.0〜1.7.0-beta.3 に、別の利用者の SCIM の提供者を乗っ取れる告知があり、1.7.0 で直っている（[GHSA-j8v8-g9cx-5qf4](https://github.com/better-auth/better-auth/security/advisories/GHSA-j8v8-g9cx-5qf4)、2026-10-04 に確認）。版は E4 の着手で確かめ直す。
 
 ## Confirmation
 

@@ -43,9 +43,11 @@ date: 2026-10-04
 ### 内部の iTIP のメッセージ
 
 - 主催者の写しの変更は、`packages/writer` が、変更と同じトランザクションで、受け手ごとのメッセージ（`REQUEST`・`CANCEL`）を outbox に書く。参加者の返事は `REPLY` を書く。
-- `SEQUENCE` は、RFC 5546 の意味で重要な変更（開始・終了・繰り返しの規則・RDATE・EXDATE・場所の変更、参加者の削除）で上げる。出欠の変更だけでは上げない。
+- `SEQUENCE` は、RFC 5546 の 2.1.4 節が求める項目（DTSTART・DTEND・DURATION・RRULE・RDATE・EXDATE・STATUS。本システムでは TZID の変更も含める）に、場所の変更と参加者の削除を足した変更で上げる。出欠の変更だけでは上げない（一覧の正本は [ADR-0014](0014-itip-state-transfer-and-sequence.md)）。
+
+> 2026-10-04 の注記：最初の設計の一覧は、RFC 5546 の 2.1.4 節が MUST とする DURATION と STATUS を欠いていた。[ADR-0014](0014-itip-state-transfer-and-sequence.md) に合わせて足した。
 - `itip-delivery` が、受け手のテナントのコンテキストで、受け手の写しに当てる。当てる規則は iTIP と同じ。
-  - `(SEQUENCE, DTSTAMP)` が手元の写しより古いメッセージは捨てる。重複は同じ規則で 1 回だけ効く。
+  - 手元の写しより古いメッセージは捨てる。重複は同じ規則で 1 回だけ効く。新旧の鍵は、内部では `(SEQUENCE, 主催者の版)`、外部（iMIP）では RFC 5546 の 2.1.5 節の `(SEQUENCE, DTSTAMP)` にする（[ADR-0014](0014-itip-state-transfer-and-sequence.md)。時計のずれで同点・逆転が起きないよう、内部は主催者の版で決める）。
   - `REQUEST` は、回の単位（`RECURRENCE-ID` つき）と系列の単位の両方を受ける。
   - `REPLY` は、主催者の写しの、その参加者の `PARTSTAT` だけを変える。返事の `DTSTAMP` が手元より古ければ捨てる。
 - 他の参加者の出欠の一覧は、主催者の写しが変わるたびではなく、受け手ごとに 30 秒にまとめて配る。出欠の一覧の遅れは NFR-002 の対象にしない。

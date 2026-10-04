@@ -29,7 +29,7 @@ NFR-003 は、通知の時刻から送信の開始まで p99 30 秒、重複 0.0
 
 1 を採用する。詳細は [reminders-and-notifications.md](../architecture/reminders-and-notifications.md) の 5・6 節。
 
-- 計画の表 `reminder_plans` は保守用のスキーマ（RLS の外）に置き、ID と時刻だけを持つ。中身は notifier がテナントのコンテキストで読む。[ADR-0004](0004-tenancy-and-rls.md) のテナントをまたぐ処理に、中身を持たない時計の表の読み出しを足す。
+- 計画の表 `reminder_plans` は保守用のスキーマ（RLS の外）に置き、ID と時刻だけを持つ。中身は notifier がテナントのコンテキストで読む。[ADR-0004](0004-tenancy-and-rls.md) のテナントをまたぐ経路の許可リストの X5 にした（2026-10-04、統合の工程）。
 - 送る時刻の日で分割し、`(shard, fire_at) WHERE status = 'pending'` の索引を持つ。「分の桶」は、同じ分の行を索引の隣り合いとしてまとめて読むことを指す。
 - `reminder-scheduler` のタスクは、シャードを 30 秒の期限で借り（10 秒ごとに延ばす）、10 秒ごとに 5 分先までの行を読み、1 秒の刻み × 300 の枠のタイマーホイールに載せる。
 - 発火：1 秒分の行を `UPDATE … SET status = 'claimed' WHERE id = ANY(…) AND status = 'pending' RETURNING` で取り、送信の記録 `reminder_deliveries` に一意の鍵で `INSERT … ON CONFLICT DO NOTHING RETURNING` し、返った記録だけを SQS の `notify` に入れ、行を `done` にする。

@@ -31,6 +31,7 @@
 | [ServiceNow](systems/servicenow/) | IT サービス管理 | 継承するテーブル、ワークフローと SLA、CMDB の識別と照合 | 設計済み |
 | [Workday](systems/workday/) | 人事・給与 | 有効日付のデータ、業務プロセス、日本の給与計算、マイナンバーの保護 | 設計済み |
 | [X](systems/x/) | SNS | タイムラインのファンアウト、フォローのグラフ、おすすめの順位付け、検索とトレンド、モデレーション | 設計済み |
+| [Google Calendar](systems/google-calendar/) | 予定管理 | 繰り返しの予定とタイムゾーン、招待（iTIP / iMIP）、空き時間と会議室、CalDAV と差分同期、リマインダー | 設計済み |
 
 「設計済み」は、intent・アーキテクチャ・ADR・quality・runbooks・roadmap がそろい、公式の資料での事実の確認と、文書の間の整合の見直しを終えた状態を指す。法務の確認待ちの事項と、PoC・計測で確かめる事項は、各題材の文書に残している。
 

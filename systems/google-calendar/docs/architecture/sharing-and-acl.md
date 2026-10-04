@@ -119,7 +119,7 @@ flowchart TD
 
 - 共有されたカレンダーの読み出しは、カレンダーのテナントのコンテキストで行い、`redact()` を通してから返す（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）。
 - 外の主体が `writer` 以上を持つときの書き込み（家族の個人のアカウントどうしの共有、組織の方針で外の人に変更を許した場合）は、読み出しと同じく、カレンダーのテナントのコンテキストで、専用の DB のロール（`shared_calendar_access`）から `packages/writer` を通して行う。変更のログと outbox は、カレンダーのテナントに書く（ADR-0021）。
-- これは [ADR-0004](../decisions/0004-tenancy-and-rls.md) の「テナントをまたぐ処理は 3 つ」の 3 つ目（共有されたカレンダーの読み出し）を、書き込みに広げる追補である。題材の `AGENTS.md` の「テナントをまたぐのは、内部の iTIP の配送と空き時間の照会だけ」とも食い違う。テックリードの確認を要する（15 節）。確認まで `release.cross-tenant-shared-writes` のフラグの裏に置き、認められなければ、組織の外・個人のテナントどうしの上限を `reader` にする。
+- これは共有されたカレンダーの読み出しを書き込みに広げるもので、統合の工程で [ADR-0004](../decisions/0004-tenancy-and-rls.md) のテナントをまたぐ経路の許可リストの X4 にした。題材の `AGENTS.md` も同じ一覧を指す。有効にするのはテックリードの確認の後で（15 節）、それまで `release.cross-tenant-shared-writes` のフラグの裏に置く。認められなければ、組織の外・個人のテナントどうしの上限を `reader` にする。
 
 ## 5. 予定の公開範囲
 
@@ -166,7 +166,7 @@ DT-ACL-001。上の行から順に当てる。`R` は実際のロール、`V` �
 | 6 | `R = reader`、`V = private` | `BUSY` |
 | 7 | `R = free_busy_reader`、`T = transparent` | `NONE` |
 | 8 | `R = free_busy_reader`、`T = opaque` | `BUSY`（空き時間の経路では区間と種類だけ） |
-| 9 | 管理者による閲覧 | **法務の確認待ち：L8**。結論まで、この経路を作らない |
+| 9 | 管理者が、生きている閲覧の許可（`admin_access_grants`）の範囲の中で読む | `FULL`。`private` の予定は、許可が `private` を含むときだけ `FULL`、含まなければ `BUSY`。`release.admin-event-access` の裏で、**法務の確認待ち：L8** の結論まで本番で有効にしない（[ADR-0037](../decisions/0037-admin-roles-delegation-and-event-access.md)） |
 
 - 行 6 は、本家の `reader` の説明（`private` の予定は見えるが詳細は隠す）に合わせた（3 節）。
 - 行 4 の `writer` が `private` の中身を見られるのは、本家の `writer` と同じ（3 節）。
@@ -230,11 +230,13 @@ ADR-0022。
 
 ## 10. 管理者による閲覧
 
-- 組織の管理者・監査の担当が、従業員の予定（`private` を含む）を見られる範囲は、**法務の確認待ち：L8**。結論まで、管理者が予定の中身を見る経路を作らない（DT-ACL-001 の行 9）。E11 の `admin-event-access` の spec を承認しない。
+- 組織の管理者・監査の担当が、従業員の予定（`private` を含む）を見られる範囲は、**法務の確認待ち：L8**。仕組みは [ADR-0037](../decisions/0037-admin-roles-delegation-and-event-access.md) のとおり `release.admin-event-access` の裏に作り、L8 の結論まで本番で有効にしない。E11 の `admin-event-access` の spec は L8 の結論まで承認しない。
 - 設計の枠：
-  - 閲覧は `redact()` の特別な主体（`org_admin_audit`）として決定表に行を足す形にし、経路を別に作らない。
-  - 閲覧のたびに、監査ログに理由と範囲を書く。
-  - 閲覧された従業員に知らせるかは、L8 の結論で決める。
+  - 閲覧は、`admin_access_grants`（理由・期間・範囲）を `redact()` の入力にし、決定表の行 9 で返す。経路を別に作らない。
+  - 許可と、読んだ予定の ID を、監査ログに必ず書く（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md)）。
+  - 閲覧された従業員に知らせるかは、方針 `admin_event_access_notify` で持ち、既定は L8 の結論で決める（[accounts-and-orgs.md](accounts-and-orgs.md) の 14 節）。
+
+> 2026-10-04 の注記：領域の工程では、この節は「結論まで経路を作らない」とし、[ADR-0037](../decisions/0037-admin-roles-delegation-and-event-access.md)（フラグの裏に仕組みを作る）と食い違っていた。統合の工程で ADR-0037 に揃え、主体の名前 `org_admin_audit` を `admin_access_grants` に揃えた。
 - 管理者は、ACL の行と方針の設定、会議室の管理はできる（中身を見ない操作）。
 
 ## 11. 障害のときの振る舞い
@@ -244,7 +246,7 @@ ADR-0022。
 | RLS のコンテキストの設定漏れ | 予定が「ない」に見え、同期で「消えた」に見える | 結合テストで全経路のコンテキストを確かめる（[ADR-0004](../decisions/0004-tenancy-and-rls.md)） |
 | ディレクトリの写しが遅れる | グループのメンバーのロールが古い | 写しの版を `view_hash` に含め、遅れの間はロールが古いことを受け入れる。遅れ（SCIM から写しまで）p99 1 分を監視（accounts-and-orgs.md） |
 | 方針の変更で大量の ACL の無効化 | 多くのクライアントの取り直し | 無効化を 1,000 行ずつ流す。取り直しの集中は [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md) のとおり引き受ける |
-| `redact()` の誤り（新しい版） | 中身の漏れ | 応答の監査（抜き取りを `redact()` に通し直して比べる）で検知。`release.policy-*` のフラグで前の版へ戻す。SEV1 の候補 |
+| `redact()` の誤り（新しい版） | 中身の漏れ | 応答の監査（抜き取りを `redact()` に通し直して比べる）で検知。漏れている経路を `ops.*` のフラグで止め（検索、ICS の公開、Webhook など。[security.md](security.md) の 12 節）、前のイメージへロールバックする。権限の規則はフラグにしない（[runbooks/README.md](../runbooks/README.md) の 3 節）。SEV1 の候補 |
 
 ## 12. セキュリティ
 
@@ -295,7 +297,7 @@ ADR-0022。
 - **`redact()` の段**：4 段。`BUSY` は時刻の構造だけ、ID は見る人ごとに不透明（ADR-0021）。
 - **公開範囲**：マスターだけ（本家と同じ）。
 - **組織の外への上限の既定**：空き時間だけ。
-- **テナントをまたぐ書き込み**：カレンダーのテナントのコンテキストで `packages/writer` を通す（ADR-0021。テックリードの確認待ち）。
+- **テナントをまたぐ書き込み**：カレンダーのテナントのコンテキストで `packages/writer` を通す（ADR-0021。ADR-0004 の許可リストの X4。有効にするのはテックリードの確認の後）。
 - **委任**：`writer` 以上を代理とし、`SENT-BY` と監査ログ（ADR-0022）。
 - **`writerWithoutPrivateAccess`**：MVP で持たない。
 
@@ -304,7 +306,7 @@ ADR-0022。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 管理者による閲覧の範囲、従業員への周知、閲覧の記録 | **法務の確認待ち：L8** |
-| テナントをまたぐ書き込みを [ADR-0004](../decisions/0004-tenancy-and-rls.md) と題材の `AGENTS.md` の例外に足すか | テックリード（Dev）の確認。認めなければ、組織の外・個人のテナントどうしの共有の上限を `reader` にする |
+| テナントをまたぐ書き込み（[ADR-0004](../decisions/0004-tenancy-and-rls.md) の X4）を有効にするか | テックリード（Dev）の確認。それまで `release.cross-tenant-shared-writes` の裏。認めなければ、組織の外・個人のテナントどうしの共有の上限を `reader` にする |
 | `BUSY` で RRULE を返すことの是非 | E4 のセキュリティのレビュー |
 | 本家の委任の細部、組織の方針の既定の値 | 公式の資料で確かめられなかった（**未検証**のまま） |
 
@@ -317,18 +319,18 @@ ADR-0022。
 
 ### runbooks
 
-- `policy-leak-suspected.md`：応答の監査の不一致・漏れの報告のときの確かめ方（経路、主体、決定表の行）、`release.policy-*` のフラグでの戻し、影響の範囲の見積もり（ID と数だけ）。
-- `org-policy-change.md`：大きな組織の方針の変更の前の見積もり（無効になる行の数、取り直しのクライアントの数）と、流す速さ。
+- `access-leak-response.md`：応答の監査の不一致・漏れの報告のときの確かめ方（経路、主体、決定表の行）、経路の `ops.*` での停止と前のイメージへの戻し、影響の範囲の見積もり（ID と数だけ）（統合の工程で、提案の `policy-leak-suspected.md` をこの名前に揃えた）。
+- `org-policy-change.md`（予定）：大きな組織の方針の変更の前の見積もり（無効になる行の数、取り直しのクライアントの数）と、流す速さ。
 
 ### data-model（索引への追加の提案）
 
 | 表 | 中身 | 節 |
 | --- | --- | --- |
-| `calendars` に足す列 | `kind`（主・追加・共有・会議室・システム）、`owner_principal`、`default_visibility` | 4.1、5.1 |
+| `calendars` に足す列 | `kind`（`primary`・`secondary`・`shared`・`resource`・`subscription`・`system`。[data-model.md](data-model.md) の 5 節で揃えた）、`owner_principal`、`default_visibility` | 4.1、5.1 |
 | `calendar_acl` | 4.2 節。主キー `(tenant_id, calendar_id, scope_type, scope_value)` | 4.2 |
 | `org_sharing_policies` | 4.4 節の設定 | 4.4 |
 | `event_objects` の列 | `visibility`（マスターだけ）。参加者の写しの自分の公開範囲 | 5.1 |
-| `audit_log` に足す列（security.md） | `actor_id`、`on_behalf_of` | 9 |
+| `tenant_audit_events` に足す列（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md)） | `actor_id`、`on_behalf_of` | 9 |
 | DB のロール | `shared_calendar_access`（テナントをまたぐ共有のカレンダーの読み書き） | 4.5 |
 
 ## 出典
