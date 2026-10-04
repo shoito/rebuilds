@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google Calendar の前提知識</title>
+<meta name="description" content="Google Calendar の再構築の設計の文書を読む前に知っておくとよい、iCalendar・繰り返し・タイムゾーン・招待・同期の前提知識。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Google Calendar · 前提知識</p>
+    <h1>Google Calendar の設計を読む前に</h1>
+    <p class="lead">カレンダーは「予定を保存して表に並べる」だけに見えますが、繰り返し・タイムゾーン・招待・同期のそれぞれに、標準（RFC）と分野に固有の決まりがあります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7、ER 図の記号など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Google Calendar · 前提知識</p>
+    <h2>Google Calendar の設計を読む前に</h2>
+    <p class="lead">iCalendar・繰り返し・タイムゾーン・招待・同期の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Google Calendar は何をするサービスか</h2>
+    <p>個人と組織が、会議・面談・休暇・会議室の予定を管理し、他の人と調整するためのカレンダーです。主な使い手は、日本の中堅・大企業の社員です。社内の会議に人と会議室を招き、空きを探し、出欠を集めます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>個人</h3><p>自分の予定、家族との共有、祝日。OS の標準のカレンダーやスマートフォンからも見る。</p></div>
+      <div class="card" data-frag><h3>組織</h3><p>部署やグループへの招待、会議室の予約、空き時間の共有。管理者が共有の方針と SSO を決める。</p></div>
+      <div class="card" data-frag><h3>外部</h3><p>取引先へメールで招待を送る。予約ページで、アカウントのない人から面談の予約を受ける。</p></div>
+    </div>
+    <p>再構築の intent が掲げる価値は 4 つです。時刻を間違えない、招待が食い違わない、空きをすぐ見つけて二重に取らない、どこからでも差分で同期する。規模は S1 で月間 60 万人、予定オブジェクト 3 億件を見込みます。識別子に本家の名前は使わず、<code>calendar.&lt;brand&gt;.&lt;domain&gt;</code> のように書きます（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/intent.md">intent.md</a> の「Proposed outcome」と「守るべき振る舞い」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="icalendar">
+    <h2>iCalendar の基本：VEVENT・UID・DTSTART</h2>
+    <p>カレンダーの世界の共通語は <a class="t" href="#g-icalendar">iCalendar</a>（RFC 5545）です。テキストの形式で、メールの招待・CalDAV・ICS のファイルのどれもこの形で予定を運びます。</p>
+    <pre><code>BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//&lt;Brand&gt;//Calendar//JA
+BEGIN:VEVENT
+UID:0192e4f0-…@&lt;brand&gt;.&lt;domain&gt;
+DTSTAMP:20261004T010000Z
+DTSTART;TZID=Asia/Tokyo:20261006T100000
+DTEND;TZID=Asia/Tokyo:20261006T110000
+RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=10
+SUMMARY:週次の定例
+SEQUENCE:0
+END:VEVENT
+END:VCALENDAR</code></pre>
+    <ul>
+      <li data-frag><a class="t" href="#g-vevent">VEVENT</a> が予定 1 つ。<a class="t" href="#g-uid">UID</a> が世界で一意の名前で、繰り返しの全回と例外は同じ UID を持ちます。</li>
+      <li data-frag><a class="t" href="#g-dtstart">DTSTART</a> は開始。<code>TZID=Asia/Tokyo</code> つきの<a class="t" href="#g-wallclock">壁時計の時刻</a>で書けます（本来は同じファイルに <a class="t" href="#g-vtimezone">VTIMEZONE</a> も付けます）。</li>
+      <li data-frag>長さは <code>DTEND</code> か <code>DURATION</code> のどちらかで書きます。DTEND は<strong>正確な長さ</strong>、<code>DURATION:P1D</code> のような日の単位は<strong>名目の長さ</strong>です。夏時間をまたぐと、P1D は 23 時間にも 25 時間にもなります。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/data-model.md">data-model.md</a> の 2.5 節（iCalendar の往復）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/events-and-recurrence.md">events-and-recurrence.md</a> の 4.5 節（長さ）。</div>
+  </section>
+
+  <section class="s" id="recurrence">
+    <h2>繰り返し：RRULE・RDATE・EXDATE</h2>
+    <p>繰り返しの予定は、回を 1 件ずつ保存せず、<strong>規則</strong>で持ちます。回の集合は「DTSTART ∪ <a class="t" href="#g-rrule">RRULE</a> の回 ∪ <a class="t" href="#g-rdate">RDATE</a>」から <a class="t" href="#g-exdate">EXDATE</a> を引いたものです（RFC 5545 の 3.8.5 節）。規則から回を作る処理を「展開」と呼びます。次の例で 1 段ずつ見ます。</p>
+    <pre><code>DTSTART;TZID=Asia/Tokyo:20270131T100000
+RRULE:FREQ=MONTHLY;BYMONTHDAY=31;COUNT=4
+EXDATE;TZID=Asia/Tokyo:20270531T100000
+RDATE;TZID=Asia/Tokyo:20270630T100000</code></pre>
+    <div class="stepper">
+      <ol>
+        <li><strong>周期ごとに候補を作る</strong>：月ごとに 31 日。1/31、2/31、3/31、4/31、5/31、6/31、7/31 …（まだ壁時計の時刻のまま）</li>
+        <li><strong>無効な日付を捨てる</strong>：2/31、4/31、6/31 は存在しないので捨て、<code>COUNT</code> に数えない。</li>
+        <li><strong>COUNT を当てる</strong>：残った 4 回 → 1/31、3/31、5/31、7/31。DTSTART は最初の回として数える。</li>
+        <li><strong>TZID で UTC の瞬間にする</strong>：<code>Asia/Tokyo</code> の 10:00 → 01:00Z。</li>
+        <li><strong>RDATE を足す</strong>：6/30 を足す。</li>
+        <li><strong>EXDATE を引く</strong>：5/31 を引く。結果は 1/31、3/31、6/30、7/31 の 4 回。</li>
+      </ol>
+    </div>
+    <p>設計では、MVP の <code>FREQ</code> を <code>DAILY</code> 以上に限り、RRULE は 1 本だけ受けます。<code>BYSETPOS</code>・<code>WKST</code>・2 月 29 日のような壊れやすい規則は、参照の実装（libical が第一の候補）との性質ベーステストで確かめます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/events-and-recurrence.md">events-and-recurrence.md</a> の 3.4 節（受け付けの検査）と 4 節（<code>expand()</code> の手順）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0008-recurrence-expansion-semantics.md">ADR-0008</a>。</div>
+  </section>
+
+  <section class="s" id="exceptions">
+    <h2>例外：RECURRENCE-ID と「これ以降」</h2>
+    <p>繰り返しの 1 回だけを変えるときは、同じ UID の VEVENT をもう 1 つ作り、<a class="t" href="#g-recurrence-id">RECURRENCE-ID</a> に「元の回の開始」を書きます。これが<a class="t" href="#g-override">上書き</a>です。規則を持つ VEVENT を<a class="t" href="#g-master">マスター</a>と呼びます。</p>
+    <pre class="mermaid">flowchart TD
+  A["回 R を変える"] --> B{"範囲"}
+  B -->|この予定だけ| C["R の上書きを作る<br/>RECURRENCE-ID = R の元の開始"]
+  B -->|これ以降| D["系列を UNTIL で切り<br/>新しい UID の系列を作る"]
+  B -->|すべて| E["マスターを変える<br/>上書きを付け替える"]</pre>
+    <ul>
+      <li data-frag><strong>「これ以降」</strong>：元の系列に <code>UNTIL</code>（または <code>COUNT</code>）を付けて終わらせ、R から先を新しい UID の系列にします。<code>RELATED-TO</code> で元を指します。標準の <code>RANGE=THISANDFUTURE</code> は使わず、外から届いたら 1 回分の上書きとして扱います（RFC との意図した違い）。</li>
+      <li data-frag><strong>回の取り消し</strong>：マスターの EXDATE に足す方法と、<code>STATUS:CANCELLED</code> の上書きを作る方法の 2 つが世の中にあります。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">外のクライアントから、<code>RECURRENCE-ID</code> つきの <code>STATUS:CANCELLED</code> の上書きが届きました。本システムはどう保存しますか？</p>
+      <div class="opts">
+        <button>届いた形のまま、取り消した上書きとして持つ</button>
+        <button>その回を EXDATE に移し、上書きは持たない</button>
+        <button>系列の全体を取り消す</button>
+      </div>
+      <p class="why">意味は同じ「その回がない」なので、保存の形を EXDATE の 1 つに揃えます。参加者へは <code>CANCEL</code>＋<code>RECURRENCE-ID</code> を送ります。なお参加者が自分の写しで回を消したときは、EXDATE にせず、その回の辞退にします。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/events-and-recurrence.md">events-and-recurrence.md</a> の 5〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0009-series-edit-and-override-rebasing.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0011-inbound-recurrence-normalization.md">ADR-0011</a>。</div>
+  </section>
+
+  <section class="s" id="timezones">
+    <h2>タイムゾーン：壁時計の時刻と UTC の瞬間</h2>
+    <p>「東京の 10:00」と「2026-10-06T01:00Z」は、今日は同じ瞬間でも、意味が違います。前者は人が決めた<a class="t" href="#g-wallclock">壁時計の時刻</a>、後者は世界で 1 つの瞬間です。両者を結ぶのが、各地のオフセットと夏時間の規則を集めた <a class="t" href="#g-tzdb">IANA の tzdb</a> です。</p>
+    <p>tzdb のリリース（<code>2026b</code> のような名前）に決まった予定はなく、ふつう数か月ごとに出ます。国が夏時間をやめる・始めるときは、短い予告で規則が変わります。規則が変われば、<strong>未来の予定の UTC の瞬間</strong>が変わります。</p>
+    <div class="tabs">
+      <div data-tab="zoned"><p>TZID つきの時刻。「東京の 10:00」。正本は壁時計の時刻と <a class="t" href="#g-tzid">TZID</a>。UTC は <code>tzdata_version</code> つきの派生の値で、tzdb が変われば作り直す。</p></div>
+      <div data-tab="utc"><p>UTC の瞬間だけ。TZID のないオフセットつきの時刻で、カレンダーの既定のゾーンと合わないもの。</p></div>
+      <div data-tab="floating"><p><a class="t" href="#g-floating">浮動の時刻</a>。TZID がなく、「どこにいてもその土地の 7:00」。ICS や CalDAV の取り込みで現れる。持ち主のカレンダーのゾーンで解く。</p></div>
+      <div data-tab="date"><p><a class="t" href="#g-allday">終日</a>の予定。「2026-11-03」という日付で、終わりの日付を含まない。見る人のゾーンに関係なく同じ日付に出す。</p></div>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">「時刻はすべて UTC で保存し、表示の時だけ変換すればよい」。この設計で何が起きますか？</p>
+      <div class="opts">
+        <button>何も起きない。UTC は変わらないので最も安全</button>
+        <button>表示が少し遅くなるだけ</button>
+        <button>ある国の夏時間の規則が変わると、その国の未来の予定が現地の時刻で 1 時間ずれる</button>
+      </div>
+      <p class="why">主催者が意図したのは「現地の 09:00」です。UTC だけを持つと、規則が変わった後も古いオフセットで計算した瞬間が残ります。そこで壁時計の時刻＋TZID を正にし、UTC を版つきの派生にします（ADR-0002）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0002-time-representation.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> の 4〜6 節（tzdb の版と更新の流れ）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/tzdb-update.md">runbooks/tzdb-update.md</a>。</div>
+  </section>
+
+  <section class="s" id="dst">
+    <h2>夏時間：存在しない時刻と 2 回ある時刻</h2>
+    <p>日本に<a class="t" href="#g-dst">夏時間</a>はありませんが、海外の拠点や参加者の予定で必ず出会います。切り替えの日には、壁時計の時刻が UTC の 1 つの瞬間に決まらないことがあります。例は <code>America/New_York</code> です。</p>
+    <table>
+      <tr><th>日</th><th>起きること</th><th>02:30 や 01:30 は？</th></tr>
+      <tr><td>2027-03-14（日）</td><td>02:00 に 03:00 へ進む（ギャップ）</td><td>02:30 は<strong>存在しない</strong></td></tr>
+      <tr><td>2027-11-07（日）</td><td>02:00 に 01:00 へ戻る（重なり）</td><td>01:30 が <strong>2 回ある</strong></td></tr>
+    </table>
+    <p>毎週日曜 02:30 の予定を展開すると、次のようになります。</p>
+    <table>
+      <tr><th>回</th><th>解いた時刻</th><th>UTC</th></tr>
+      <tr><td>03-07 02:30</td><td>02:30 EST（−05:00）</td><td>07:30Z</td></tr>
+      <tr data-frag><td>03-14 02:30</td><td>存在しない。切り替えの前のオフセット −05:00 で解き、<strong>03:30 EDT</strong></td><td>07:30Z</td></tr>
+      <tr data-frag><td>03-21 02:30</td><td>02:30 EDT（−04:00）</td><td>06:30Z</td></tr>
+    </table>
+    <p>2 回ある時刻は、先の回（切り替えの前のオフセット）にします。11-07 の 01:30 は EDT の 05:30Z です。どちらも RFC 5545 の 3.3.5 節の解き方で、展開・空き時間・リマインダー・画面が同じ関数 <code>resolve</code> を使います。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">上の 03-14 の回について、RFC 5545 の 3.3.10 節（繰り返しの規則）は「存在しない時刻の回は捨て、数えない」としています。本システムは？</p>
+      <div class="opts">
+        <button>捨てずに 03:30 EDT へずらして残す</button>
+        <button>RFC のとおり捨てる</button>
+        <button>02:30 EDT として 1 時間前に置く</button>
+      </div>
+      <p class="why">毎週の会議が夏時間の始まりの週だけ黙って消えると、利用者は欠けに気づけません。ずれた時刻で残せば気づいて直せます。これは RFC との意図した違い（ADR-0007 の D1）です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> の 5.1 節（<code>resolve</code>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/events-and-recurrence.md">events-and-recurrence.md</a> の 4.4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0007-interop-standards-scope.md">ADR-0007</a> の D1〜D6。</div>
+  </section>
+
+  <section class="s" id="holidays">
+    <h2>日本の祝日と和暦</h2>
+    <p>日本の利用者は、祝日のカレンダーを重ねて使います。祝日は「国民の祝日に関する法律」で決まり、内閣府が 1955 年から 2027 年の一覧の CSV を公開しています。単純な固定の日付の表では表せない規則があります。</p>
+    <table>
+      <tr><th>種類</th><th>例</th></tr>
+      <tr><td>日付の固定</td><td>元日 1/1、建国記念の日 2/11、天皇誕生日 2/23</td></tr>
+      <tr><td>第 n 月曜</td><td>成人の日（1 月の第 2 月曜）、海の日、敬老の日、スポーツの日</td></tr>
+      <tr><td>春分の日・秋分の日</td><td>法で日付を決めず、国立天文台が毎年 2 月に翌年の日を公表する</td></tr>
+      <tr><td>振替休日</td><td>祝日が日曜なら、その後の最も近い祝日でない日。2026 年は 5/3 が日曜で、5/6 が休日</td></tr>
+      <tr><td>国民の休日</td><td>前日と翌日が祝日の日。2026 年の 9/22（敬老の日と秋分の日の間）</td></tr>
+    </table>
+    <p>設計では、規則の表からの生成を正本にし、内閣府の CSV は照合に使います。祝日は 1 日ずつ単発の終日の予定にし、<code>transparent</code>（空き時間を塞がない）にします。和暦（令和 8 年）は表示の書式だけで、保存は西暦のままです。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち（L7）</span>内閣府の CSV を取り込んで配信するときの利用の条件は、法務の確認待ちです。結論まで、祝日のカレンダーの公開の spec を承認しません。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> の 9・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/free-busy-and-scheduling.md">free-busy-and-scheduling.md</a> の 6.3 節（祝日を休みにする）。</div>
+  </section>
+
+  <section class="s" id="itip">
+    <h2>招待：主催者の写しと iTIP</h2>
+    <p>会議の予定は、主催者だけのものではありません。参加者それぞれのカレンダーにも同じ予定が載り、参加者は自分の出欠・リマインダー・色を持ちます。そこで<strong>参加者ごとに写し</strong>を持ち、<a class="t" href="#g-organizer">主催者</a>の写しを正にします。写しどうしを揃えるやりとりの意味を決めた標準が <a class="t" href="#g-itip">iTIP</a>（RFC 5546）です。</p>
+    <pre class="mermaid">flowchart LR
+  O["主催者の写し（正）"] -->|"内部の iTIP REQUEST"| A1["参加者 A の写し"]
+  O -->|"内部の iTIP REQUEST"| A2["参加者 B の写し（別の組織）"]
+  O -->|"iMIP（メール）"| X["外部の参加者のカレンダー"]
+  A1 -->|"REPLY（出欠）"| O
+  X -->|"REPLY（メール）"| O</pre>
+    <table>
+      <tr><th>方法</th><th>送り手 → 受け手</th><th>意味</th></tr>
+      <tr><td><code>REQUEST</code></td><td>主催者 → 参加者</td><td>招待、または変更（予定の全体を送る）</td></tr>
+      <tr><td><code>REPLY</code></td><td>参加者 → 主催者</td><td>出欠（<a class="t" href="#g-partstat">PARTSTAT</a>：承諾・仮承諾・辞退）とコメント</td></tr>
+      <tr><td><code>CANCEL</code></td><td>主催者 → 参加者</td><td>取り消し。<code>RECURRENCE-ID</code> を付ければ 1 回分</td></tr>
+      <tr><td><code>COUNTER</code></td><td>参加者 → 主催者</td><td>別の時刻の提案。MVP は主催者に知らせるだけで、写しを変えない</td></tr>
+    </table>
+    <p>本システムの中の参加者にも、外部と同じ意味のメッセージ（内部の iTIP）で配ります。参加者は写しの共有の項目（時刻・場所など）を直接書かず、変更は主催者の側への依頼として送ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0006-organizer-and-attendee-copies.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/invitations-and-itip.md">invitations-and-itip.md</a> の 4・5 節（写しのモデルと当て方の決定表 DT-ITIP-001）。</div>
+  </section>
+
+  <section class="s" id="imip">
+    <h2>SEQUENCE と iMIP：メールで招待を運ぶ</h2>
+    <p>写しには新旧があります。どのメッセージが新しいかを決めるのが <a class="t" href="#g-sequence">SEQUENCE</a> です。主催者が日時・規則・状態などを変えたら 1 つ上げます。同じ SEQUENCE なら <a class="t" href="#g-dtstamp">DTSTAMP</a> の新しいほうが勝ちます。外部へは、iTIP を <a class="t" href="#g-imip">iMIP</a>（RFC 6047）でメールに載せて運びます。</p>
+    <div class="stepper">
+      <ol>
+        <li>主催者が 10:00 の会議に A（外部）を招く。<code>Content-Type: text/calendar; method=REQUEST</code> のメールが届く。<code>SEQUENCE:0</code>。</li>
+        <li>A が承諾する。A のカレンダーは <code>REPLY</code> を、<code>ORGANIZER</code> に書かれたアドレスへメールで返す。</li>
+        <li>主催者が 11:00 に動かす。<code>SEQUENCE:1</code> の <code>REQUEST</code> を送り、A の出欠を「未回答」に戻す。</li>
+        <li>メールの遅れで、A の古い返事（<code>SEQUENCE:0</code> への辞退）が今ごろ届く。前の日時への返事なので捨て、A に最新の <code>REQUEST</code> を送り直す。</li>
+        <li>主催者が会議を取り消す。<code>CANCEL</code> を送り、<code>SEQUENCE</code> を上げる。</li>
+      </ol>
+    </div>
+    <p>返事は ORGANIZER のアドレスへ届くので、設計では ORGANIZER を予定ごとの受け口のアドレス（<code>o-&lt;token&gt;@imip.&lt;brand&gt;.&lt;domain&gt;</code>）にします。RFC 6047 は送り手の認証に S/MIME を求めますが、設計は <a class="t" href="#g-dkim">DKIM</a> か SPF の揃いと From の一致で確かめます（RFC との意図した違い）。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">主催者が会議の<strong>タイトルだけ</strong>を変えました。参加者の出欠はどうなりますか？</p>
+      <div class="opts">
+        <button>SEQUENCE が上がり、全員が「未回答」に戻る</button>
+        <button>SEQUENCE は上がらず、出欠はそのまま。同じ SEQUENCE の更新として届く</button>
+        <button>参加者には何も届かない</button>
+      </div>
+      <p class="why">SEQUENCE を上げるのは日時・規則・EXDATE・状態と、設計で足した場所・参加者の削除です。出欠を戻すのは日時と規則の変更だけです。タイトル・説明は同じ SEQUENCE の更新です（RFC 5546 の 2.1.4・3.2.2.2 節）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0014-itip-state-transfer-and-sequence.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0015-imip-addressing-and-trust.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/invitations-and-itip.md">invitations-and-itip.md</a> の 5.3 節・6 節・11 節。</div>
+  </section>
+
+  <section class="s" id="freebusy">
+    <h2>空き時間と日程の調整</h2>
+    <p><a class="t" href="#g-freebusy">空き時間</a>（free/busy）は、予定の中身を見せずに「この時間は塞がっている」だけを返す仕組みです。同僚の予定の中身は見られなくても、空きは探せます。区間には種類があります（RFC 5545 の <code>FBTYPE</code>）。</p>
+    <table>
+      <tr><th>予定</th><th>空き時間での扱い</th></tr>
+      <tr><td><code>transparency = transparent</code>（「空き」と表示する予定）、辞退した招待</td><td>塞がない</td></tr>
+      <tr><td>不在（<code>out_of_office</code>）</td><td><code>busy_unavailable</code></td></tr>
+      <tr><td>仮承諾・未回答の招待、<code>tentative</code> の予定</td><td><code>busy_tentative</code></td></tr>
+      <tr><td>それ以外</td><td><code>busy</code></td></tr>
+    </table>
+    <p>「日程の調整」（find a time）は、必須の人・任意の人・会議室の空きを重ねて候補を出す機能です。設計では範囲を 5 分刻みのビットの列にし、累積の和で「この区間に予定があるか」を一定の時間で答えます。目標は 50 人＋会議室 20、2 週間で p95 1 秒です。勤務の時間と祝日は候補の並べ方にだけ使い、空き時間の結果には出しません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/free-busy-and-scheduling.md">free-busy-and-scheduling.md</a> の 4.2 節（DT-FB-001）と 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0017-freebusy-source-and-cache.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0018-find-a-time-algorithm.md">ADR-0018</a>。</div>
+  </section>
+
+  <section class="s" id="rooms">
+    <h2>会議室：二重予約を DB で防ぐ</h2>
+    <p>会議室や設備は、予定の「参加者」として招きます。会議室は自動で出欠を返します。設定は「重ならなければ自動で承諾」か「管理者の承認」です。自動で承諾する会議室の二重予約は 0 件が目標です。</p>
+    <p>アプリで「重なりを探してから入れる」だけでは、同時の 2 つの要求が両方とも「空いている」と判断しえます。そこで PostgreSQL の<a class="t" href="#g-exclusion">排他の制約</a>で、DB 自身に重なりを拒ませます。</p>
+    <pre><code>-- resource_bookings：範囲の中の回ごとに 1 行
+during tstzrange  -- [start_utc, end_utc)
+EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
+  WHERE (status = 'accepted')</code></pre>
+    <p><code>&amp;&amp;</code> は「区間が重なる」、<code>=</code> は「同じ会議室」です。<code>=</code> と区間を 1 つの GiST の索引に入れるため、<a class="t" href="#g-btreegist"><code>btree_gist</code></a> の拡張を使います。繰り返しの予約は、重なる回が半分以下かつ 8 回以下なら系列を承諾してその回だけ辞退し、超えれば全体を辞退します（本家の説明に寄せた値）。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">排他の制約は、範囲（未来 548 日）の中の回の行にしか効きません。終わりのない毎週の予約は、どう守りますか？</p>
+      <div class="opts">
+        <button>最初に全部の回の行を作る</button>
+        <button>重なりはアプリの確かめだけで防ぐ</button>
+        <button>範囲の端が進むたびに新しい回の行を足し、重なった回だけ辞退する。548 日より先の予約は受けない</button>
+      </div>
+      <p class="why">終わりのない系列の全回は作れません。範囲の端を進めるジョブが行を足し、端のジョブが止まった間は端より先の予約を受けません（ADR-0019）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/rooms-and-resources.md">rooms-and-resources.md</a> の 4.2 節と 6.2 節（DT-ROOM-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0019-room-booking-rows-and-recurring-acceptance.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0020-room-approval-and-needs-review.md">ADR-0020</a>。</div>
+  </section>
+
+  <section class="s" id="sharing">
+    <h2>共有の段階と、中身を削る redact</h2>
+    <p>カレンダーは、人・グループ・組織・公開の単位で共有します。ロールは 4 つの段で、上ほど強くなります。</p>
+    <table>
+      <tr><th>ロール</th><th>できること</th></tr>
+      <tr><td><code>free_busy_reader</code></td><td>空き時間だけ見る（タイトルは見えない）</td></tr>
+      <tr><td><code>reader</code></td><td>予定の中身を見る。ただし <code>private</code> の予定は区間だけ</td></tr>
+      <tr><td><code>writer</code></td><td>予定を作る・変える。<code>private</code> の中身も見える（秘書・代理）</td></tr>
+      <tr><td><code>owner</code></td><td>共有の設定を変える</td></tr>
+    </table>
+    <p>予定ごとにも<a class="t" href="#g-visibility">公開範囲</a>（<code>default</code>・<code>public</code>・<code>private</code>・<code>confidential</code>）があります。見る人のロールと公開範囲から、返す形を 4 段で決めます：全体（<code>FULL</code>）、参加者を除く全体、区間だけ（<code>BUSY</code>）、返さない（<code>NONE</code>）。この削る処理が <a class="t" href="#g-redact"><code>redact()</code></a> です。</p>
+    <div class="callout warn"><span class="label">漏れは経路の数だけある</span>画面だけでなく、API・CalDAV・ICS・検索・通知・Webhook のどれからも中身が漏れえます。だから「返す前に 1 つの関数で削る」を全経路に通します。組織の既定は「組織の中も外も空き時間だけ」です。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sharing-and-acl.md">sharing-and-acl.md</a> の 4〜7 節（決定表 DT-ACL-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0021-effective-role-and-redact-table.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0004-tenancy-and-rls.md">ADR-0004</a>（テナントは<a href="../../../../docs/primer/index.html#tenancy">共通の資料の RLS</a>）。</div>
+  </section>
+
+  <section class="s" id="caldav">
+    <h2>CalDAV の基本</h2>
+    <p>iPhone・Mac のカレンダーや Thunderbird は、<a class="t" href="#g-caldav">CalDAV</a>（RFC 4791）でサーバーの予定を読み書きします。CalDAV は <a class="t" href="#g-webdav">WebDAV</a> の上の規約で、カレンダーは「コレクション（フォルダ）」、予定 1 つ（UID 1 つ）は「リソース（<code>.ics</code> のファイル）」です。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as CalDAV のクライアント
+  participant S as サーバー
+  C->>S: GET /.well-known/caldav
+  S-->>C: 301 → /dav/
+  C->>S: PROPFIND（自分の主体はどこ？）
+  S-->>C: 207 主体の URL
+  C->>S: PROPFIND Depth 1（カレンダーの一覧、CTag、sync-token）
+  S-->>C: 207 コレクションの一覧
+  C->>S: REPORT sync-collection（前回のトークン）
+  S-->>C: 207 変わった href と ETag、新しいトークン
+  C->>S: PUT 予定.ics（If-Match: ETag）
+  S-->>C: 204 または 412（他で変わっていた）</pre>
+    <ul>
+      <li><a class="t" href="#g-propfind"><code>PROPFIND</code></a> はプロパティを読む、<a class="t" href="#g-report"><code>REPORT</code></a> は条件で問い合わせる WebDAV の拡張の方法です。</li>
+      <li><a class="t" href="#g-etag">ETag</a> はリソースの版です。<code>If-Match</code> で「自分が見た版のときだけ書く」を求め、違えば 412 にします。</li>
+      <li><a class="t" href="#g-ctag">CTag</a> はコレクション全体の版（標準の外の拡張）。<a class="t" href="#g-sync-collection">sync-collection</a>（RFC 6578）は前回からの差分を返します。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sync-and-caldav.md">sync-and-caldav.md</a> の 6・7 節（PUT の判定 DT-DAV-001、暗黙のスケジュール）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0023-caldav-resource-model-and-conditional-writes.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0024-caldav-implicit-scheduling.md">ADR-0024</a>。</div>
+  </section>
+
+  <section class="s" id="sync">
+    <h2>差分の同期：トークン・410・Webhook・ICS</h2>
+    <p>端末は、毎回全件を取り直さず、前回からの差分だけを取ります。そのための目印が<a class="t" href="#g-synctoken">同期のトークン</a>です。設計では、カレンダーごとに単調に増える番号 <code>change_seq</code> と変更のログを持ち、Web・公開 API・CalDAV・Webhook の共通の背骨にします。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>トークン</h3><p>「このカレンダーの seq N まで見た」。次の要求で N より後の変更（削除を含む）だけを返す。</p></div>
+      <div class="card" data-frag><h3>410 Gone</h3><p>トークンが使えない（30 日の期限切れ、共有の変化、DR の切り替え）。黙って欠けた差分を返さず、全件の取り直しを求める。CalDAV では 403 と <code>valid-sync-token</code>。</p></div>
+      <div class="card" data-frag><h3>Webhook</h3><p>「変わった」とだけ知らせる。本文はなく、受け手は差分の同期で中身を取る。期限（既定 7 日、最大 30 日）で切れ、自動で更新しない。</p></div>
+      <div class="card" data-frag><h3>ICS の購読</h3><p>外の URL の <code>.ics</code> を定期的に取り込む（既定 6 時間）。逆に、秘密のアドレスで自分のカレンダーを読み出し専用で公開もできる。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">受け手のサーバーが落ちていて、Webhook の通知を 3 回取りこぼしました。変更は失われますか？</p>
+      <div class="opts">
+        <button>失われる。Webhook は少なくとも 1 回届けるので、取りこぼしは起きない前提</button>
+        <button>失われない。次に差分の同期をすれば、取りこぼした間の変更が全部返る</button>
+        <button>失われない。Webhook の本文に変更の一覧が入っているので、再送で届く</button>
+      </div>
+      <p class="why">通知は「合図」で、正しさは変更のログとトークンが持ちます。「配信はベストエフォート、取り戻しは確実に」が設計の原則です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0005-change-log-and-sync-tokens.md">ADR-0005</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/api-and-push.md">api-and-push.md</a> の 4.6 節と 7 節（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0028-push-channels-signed-webhooks.md">ADR-0028</a>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sync-and-caldav.md">sync-and-caldav.md</a> の 4 節と 8 節（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0025-ics-subscriptions-both-directions.md">ADR-0025</a>）。</div>
+  </section>
+
+  <section class="s" id="reminders">
+    <h2>リマインダーの規模：毎時 0 分の集中</h2>
+    <p>会議は 10:00・10:30 のような切りのよい時刻に集まり、リマインダーは「10 分前」「5 分前」に集まります。S1 の最悪で、<strong>毎時 50 分 00 秒の 1 秒に約 12 万件</strong>が来ます。平均ではなく、この瞬間の量で設計します。</p>
+    <pre class="mermaid">flowchart LR
+  P["計画の表<br/>7 日先まで・256 のシャード"] -->|"10 秒ごとに次の 5 分を読む"| W["タイマーホイール<br/>1 秒 × 300 の枠"]
+  W -->|"刻みが来た"| C["計画の行を claim"]
+  C --> D["送信の記録に一意の鍵で挿入"]
+  D -->|"入ったものだけ"| N["notifier<br/>画面・Web Push・メール"]</pre>
+    <ul>
+      <li data-frag><a class="t" href="#g-timerwheel">タイマーホイール</a>は、時刻の枠を輪に並べ、1 秒ごとに針を進めて、その枠の仕事をまとめて出す仕組みです。何十万の個別のタイマーを持たずに済みます。</li>
+      <li data-frag>送信の記録の一意の鍵（利用者、予定、回、方法、分、回の開始）で重複を捨てます。予定が動いたら計画を作り直し、送る直前に回の開始を確かめて古い時刻のものを捨てます。</li>
+      <li data-frag>15 分を超えて遅れたものは送らずに数えます。混む前（毎時 55 分・25 分）に、時刻で先に台数を増やします。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/reminders-and-notifications.md">reminders-and-notifications.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0029-reminder-clock-buckets-and-timer-wheel.md">ADR-0029</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0030-reminder-planning-horizon-and-replan.md">0030</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/capacity.md">capacity.md</a> の 3 節。</div>
+  </section>
+
+  <section class="s" id="booking">
+    <h2>予約ページ</h2>
+    <p><a class="t" href="#g-bookingpage">予約ページ</a>は、自分の空いている枠を URL で外部に見せ、アカウントのない人（顧客・応募者）から面談の予約を受ける機能です。MVP は無料の予約だけです。</p>
+    <div class="stepper">
+      <ol>
+        <li>持ち主が設定する：長さ 30 分、受け付けは平日 10:00〜12:00（自分のタイムゾーンの壁時計）、間の時間 15 分、最短の予告 4 時間。</li>
+        <li>予約者がページを開く。受け付けの時間から、持ち主の予定あり（仮を含む）と既存の予約を前後の間の時間ごと引いて、枠を UTC で返す。予定の中身や理由は返さない。</li>
+        <li>予約者が枠を選び、名前とメールアドレスを送る（<code>Idempotency-Key</code> つき）。</li>
+        <li>1 つのトランザクションで確かめ直し、予約の区間を書く。区間の排他の制約で、同じ持ち主の予約どうしの重なりを 0 にする。</li>
+        <li>予約者は外部の参加者として、ICS つきの確認のメールを受ける。</li>
+      </ol>
+    </div>
+    <p>会議室と同じ「区間の排他の制約」の考え方ですが、塞ぐのは予約どうしだけです。持ち主の普通の予定は重なってよいものなので、制約に入れず、確定の時に確かめ直します。<a href="../../../../docs/primer/index.html#idempotency">冪等</a>のキーは二重送信を防ぎます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/booking-pages.md">booking-pages.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0032-booking-slot-computation.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0033-booking-creation-and-exclusion.md">0033</a>。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み</h2>
+    <p>ここは枠組みの説明だけです。設計の文書でも、次の論点はすべて<strong>法務の確認待ち</strong>で、結論を出していません。結論が出るまで、関係する Epic の spec を PM・QA が承認しません。</p>
+    <div class="tabs">
+      <div data-tab="個人情報"><p><strong>L1</strong>：予定のデータ（参加者の名前・メールアドレス、場所、説明）を組織からの委託として扱うか。外国にある第三者（メールの送信、Web Push の配信のサービス、外部の参加者への iMIP）への提供の扱い。漏えい等の報告の手順。<strong>L4</strong>：データを国外に出さないとどこまで約束するか。<strong>L5</strong>：変更のログ・受信したメール・監査ログなどの保持の期間。</p></div>
+      <div data-tab="通信・メール"><p><strong>L2</strong>：招待・コメント・予約の連絡の媒介が、電気通信事業法の届出の要る事業に当たるか。当たる場合の通信の秘密（迷惑な招待の検査など）。Web の画面の外部送信規律。<strong>L3</strong>：招待・リマインダーのメールが、特定電子メール法の広告宣伝のメールに当たらないことの整理と、迷惑な招待の大量の送信への責任。</p></div>
+      <div data-tab="予約・祝日・その他"><p><strong>L6</strong>：予約ページの予約者の個人情報の取得の通知・公表。<strong>L7</strong>：内閣府の祝日の CSV の利用の条件。<strong>L8</strong>：管理者が従業員の予定（<code>private</code> を含む）を見られる範囲。<strong>L9</strong>：委託の契約（DPA）とサブプロセッサー。<strong>L10</strong>：画面を本家に寄せる範囲（不正競争防止法・著作権）。</p></div>
+    </div>
+    <p>設計は、どの結論にも合わせられる形にしています。たとえば管理者による閲覧は、仕組みだけを作ってフラグの裏に置き、L8 の結論まで本番で有効にしません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/security.md">security.md</a> の法務の論点の整理、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0037-admin-roles-delegation-and-event-access.md">ADR-0037</a>。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>中心は<a class="t" href="#g-eventobject">予定オブジェクト</a>（<code>event_objects</code>）です。1 つの UID が 1 行で、マスターと、<code>recurrence_id</code> ごとの上書きを 1 つのまとまりとして版を持ちます。iCalendar・CalDAV の単位と同じです。記号の読み方は<a href="../../../../docs/primer/index.html#er">共通の資料</a>にあります。</p>
+    <pre class="mermaid">erDiagram
+  calendars ||--o{ event_objects : "holds"
+  event_objects ||--o{ event_overrides : "overrides"
+  event_objects ||--o{ event_attendees : "attendees"
+  event_objects ||--o{ occurrences : "expanded into"
+  calendars ||--o{ calendar_changes : "change log"
+  event_objects ||--o{ resource_bookings : "books rooms"
+  calendars {
+    uuid id PK
+    bigint change_seq
+  }
+  event_objects {
+    uuid id PK
+    uuid calendar_id FK
+    text uid "per calendar"
+    text time_kind "zoned utc floating date"
+    text rrule
+    text copy_role "organizer attendee standalone"
+    bigint version
+    integer sequence
+  }
+  event_overrides {
+    uuid event_object_id FK
+    text recurrence_id "wall clock"
+  }
+  occurrences {
+    uuid event_object_id FK
+    text recurrence_id
+    timestamptz start_utc "derived"
+    text tzdata_version
+  }
+  calendar_changes {
+    uuid calendar_id FK
+    bigint seq
+  }
+  resource_bookings {
+    uuid room_id FK
+    tstzrange during "exclusion"
+  }</pre>
+    <ul>
+      <li data-frag><strong>マスター・上書き・回</strong>：マスターと上書きが正本です。<a class="t" href="#g-occurrence">回</a>は <code>expand()</code> の結果で、<code>occurrences</code>（<a class="t" href="#g-occindex">展開の索引</a>）は過去 31 日から未来 548 日の回の写しです。捨てて作り直せます。範囲の外は、その場で同じ関数で展開します。</li>
+      <li data-frag><strong>回の名前</strong>：回は <code>(event_object_id, recurrence_id)</code> で特定します。<code>recurrence_id</code> は UTC ではなく壁時計の時刻で、系列の全体は <code>''</code> です。</li>
+      <li data-frag><strong>写し</strong>：<code>copy_role</code> が主催者の写しか参加者の写しかを示します。参加者の写しは、テナントをまたいで主催者の写しを論理の参照で指します。</li>
+      <li data-frag><strong>版が 2 つ</strong>：<code>version</code> はどの変更でも上がる保存の版（ETag の元）、<code>sequence</code> は iTIP の版です。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/data-model.md">data-model.md</a> の 2.4〜2.6 節（時刻の列、iCalendar の往復、版）と 3 節（全体の ER 図）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/google-calendar/docs/architecture/data-model">data-model/</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0003-recurrence-storage-and-expansion.md">ADR-0003</a>。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-icalendar">iCalendar</dt><dd>RFC 5545。予定を運ぶテキストの形式。<code>BEGIN:VCALENDAR</code> から始まり、<code>.ics</code> のファイルやメールの添付になる。</dd>
+      <dt id="g-vevent">VEVENT</dt><dd>iCalendar の中の、予定 1 つを表す構成要素。</dd>
+      <dt id="g-uid">UID</dt><dd>予定の世界で一意の名前。繰り返しの全回と上書きは同じ UID を持つ。</dd>
+      <dt id="g-dtstart">DTSTART</dt><dd>予定の開始。UTC・TZID つき・浮動・日付のどれかの形で書く。繰り返しでは最初の回になる。</dd>
+      <dt id="g-rrule">RRULE</dt><dd>繰り返しの規則。<code>FREQ=WEEKLY;BYDAY=TU;COUNT=10</code> のように書く。</dd>
+      <dt id="g-rdate">RDATE</dt><dd>規則の外に足す回の日時の一覧。</dd>
+      <dt id="g-exdate">EXDATE</dt><dd>回の集合から引く日時の一覧。回の取り消しに使う。</dd>
+      <dt id="g-recurrence-id">RECURRENCE-ID</dt><dd>上書きが、どの回（規則で決まる元の開始）を置き換えるかを示すプロパティ。</dd>
+      <dt id="g-master">マスター</dt><dd>繰り返しの系列の規則と既定の中身を持つ VEVENT。</dd>
+      <dt id="g-override">上書き</dt><dd>1 回分だけ時刻や中身を変えた VEVENT。同じ UID と RECURRENCE-ID を持つ。</dd>
+      <dt id="g-occurrence">回</dt><dd>繰り返しの規則から展開した 1 回分の予定。インスタンスとも呼ぶ。</dd>
+      <dt id="g-eventobject">予定オブジェクト</dt><dd>本システムの保存の単位。1 つの UID のマスターと上書きのまとまり。</dd>
+      <dt id="g-occindex">展開の索引</dt><dd>一定の範囲の回を UTC の区間で写した表（<code>occurrences</code>）。範囲の表示・空き時間・会議室・リマインダーが読む。作り直せる写し。</dd>
+      <dt id="g-wallclock">壁時計の時刻</dt><dd>タイムゾーンのない「10:00」のような現地の時刻。TZID と組んで初めて瞬間が決まる。</dd>
+      <dt id="g-tzdb">tzdb</dt><dd>IANA が配る、世界のタイムゾーンのオフセットと夏時間の規則のデータベース。不定期に更新される。</dd>
+      <dt id="g-tzid">TZID</dt><dd>タイムゾーンの名前。<code>Asia/Tokyo</code> のような tzdb の名前が多いが、iCalendar は形を決めていない。</dd>
+      <dt id="g-vtimezone">VTIMEZONE</dt><dd>iCalendar の中に書くタイムゾーンの定義（オフセットと切り替えの規則）。</dd>
+      <dt id="g-dst">夏時間</dt><dd>DST（Daylight Saving Time）。季節で時計を 1 時間（地域により 30 分）進める制度。切り替えの日に時刻のギャップと重なりができる。</dd>
+      <dt id="g-floating">浮動の時刻</dt><dd>TZID も UTC の印もない時刻。見る場所のタイムゾーンで解く。</dd>
+      <dt id="g-allday">終日</dt><dd>時刻を持たず日付だけを持つ予定。終わりの日付は含まない。</dd>
+      <dt id="g-itip">iTIP</dt><dd>RFC 5546。招待・返事・取り消しなど、カレンダーどうしのやりとりの意味（方法）を決めた標準。</dd>
+      <dt id="g-imip">iMIP</dt><dd>RFC 6047。iTIP のメッセージをメールで運ぶ方法。<code>text/calendar</code> の部分に <code>method</code> を付ける。</dd>
+      <dt id="g-organizer">主催者</dt><dd>ORGANIZER。予定を作り、参加者を招き、変更する人。主催者の写しが正になる。</dd>
+      <dt id="g-partstat">PARTSTAT</dt><dd>参加者の出欠。<code>NEEDS-ACTION</code>・<code>ACCEPTED</code>・<code>TENTATIVE</code>・<code>DECLINED</code> など。</dd>
+      <dt id="g-sequence">SEQUENCE</dt><dd>予定の iTIP の版の番号。主催者が日時などの大事な項目を変えるたびに上げる。</dd>
+      <dt id="g-dtstamp">DTSTAMP</dt><dd>iTIP のメッセージを作った時刻。同じ SEQUENCE の新旧を決めるのに使う。</dd>
+      <dt id="g-dkim">DKIM</dt><dd>送信のドメインがメールに電子署名を付け、受け手が DNS の公開鍵で確かめる仕組み。SPF は送信元の IP をドメインの DNS の一覧で確かめる仕組み。</dd>
+      <dt id="g-freebusy">空き時間</dt><dd>free/busy。予定の中身を除き、塞がっている区間とその種類だけを示す情報。</dd>
+      <dt id="g-exclusion">排他の制約</dt><dd>PostgreSQL の <code>EXCLUDE</code> 制約。指定した演算子（区間の重なり <code>&amp;&amp;</code> など）で衝突する 2 行の共存を、DB が拒む。</dd>
+      <dt id="g-btreegist">btree_gist</dt><dd>PostgreSQL の拡張。<code>=</code> で比べる普通の列を GiST の索引に入れられるようにし、「同じ会議室で、区間が重なる」の制約を作れる。</dd>
+      <dt id="g-visibility">公開範囲</dt><dd>予定ごとの見せ方。<code>private</code> なら、参加者と <code>writer</code> 以上以外には区間だけを見せる。</dd>
+      <dt id="g-redact">redact()</dt><dd>見る人のロールと公開範囲から、返す形（全体・参加者を除く・区間だけ・返さない）を決めて中身を削る、本システムの 1 つの関数。</dd>
+      <dt id="g-caldav">CalDAV</dt><dd>RFC 4791。WebDAV の上でカレンダーを読み書きする標準。OS の標準のカレンダーが使う。</dd>
+      <dt id="g-webdav">WebDAV</dt><dd>HTTP を拡張し、サーバーの上のファイルとフォルダを読み書き・問い合わせする標準（RFC 4918）。</dd>
+      <dt id="g-propfind">PROPFIND</dt><dd>WebDAV の方法。リソースやコレクションのプロパティ（名前、版、子の一覧）を読む。</dd>
+      <dt id="g-report">REPORT</dt><dd>WebDAV の拡張の方法。期間で絞る <code>calendar-query</code>、差分の <code>sync-collection</code> などの問い合わせに使う。</dd>
+      <dt id="g-etag">ETag</dt><dd>HTTP のリソースの版の印。<code>If-Match</code> で、見た版のときだけ書く条件つきの更新に使う。</dd>
+      <dt id="g-ctag">CTag</dt><dd>コレクションの中身のどれかが変われば変わる印。RFC ではなく、広く使われる拡張（<code>getctag</code>）。</dd>
+      <dt id="g-sync-collection">sync-collection</dt><dd>RFC 6578 の REPORT。前回のトークンを渡すと、その後に変わったリソースと消えたリソースを返す。</dd>
+      <dt id="g-synctoken">同期のトークン</dt><dd>「どこまで見たか」を表す不透明な値。次の要求で渡すと、その後の差分だけが返る。</dd>
+      <dt id="g-timerwheel">タイマーホイール</dt><dd>時刻の枠を輪に並べ、針を一定の刻みで進めて、その枠に入れた仕事をまとめて発火させる仕組み。</dd>
+      <dt id="g-bookingpage">予約ページ</dt><dd>空いている枠を外部の人に示し、予約を受けるページ。本家の appointment schedules にあたる。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、Non-goals、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、6 つの原則、規模の段階、NFR、主な決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0002-time-representation.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0003-recurrence-storage-and-expansion.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0005-change-log-and-sync-tokens.md">0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0006-organizer-and-attendee-copies.md">0006</a> <span>— 時刻、保存の単位、同期、写しの 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0007-interop-standards-scope.md">ADR-0007</a> <span>— 標準の対応の範囲と、RFC との意図した違い（D1〜D6）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/events-and-recurrence.md">events-and-recurrence.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/time-zones-and-holidays.md">time-zones-and-holidays.md</a> <span>— 展開、例外、tzdb、祝日</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/invitations-and-itip.md">invitations-and-itip.md</a> <span>— 写し、内部の iTIP、出欠、iMIP</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/free-busy-and-scheduling.md">free-busy-and-scheduling.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/rooms-and-resources.md">rooms-and-resources.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/booking-pages.md">booking-pages.md</a> <span>— 空き時間、会議室、予約</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sharing-and-acl.md">sharing-and-acl.md</a> <span>— ロール、公開範囲、<code>redact()</code></span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/sync-and-caldav.md">sync-and-caldav.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/api-and-push.md">api-and-push.md</a> <span>— 変更のログ、CalDAV、ICS、REST API、Webhook</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/reminders-and-notifications.md">reminders-and-notifications.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/capacity.md">capacity.md</a> <span>— リマインダーの時計と、時刻の形の負荷</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本、規約、不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/google-calendar/docs/decisions">decisions/</a> <span>— 残りの ADR（アカウント、セキュリティ、基盤、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

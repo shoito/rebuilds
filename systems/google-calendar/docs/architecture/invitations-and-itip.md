@@ -155,7 +155,7 @@ RFC の要点：
 | 出欠の変化（返事） | 上げない | — | RFC 5546 の 2.1.4 節 |
 | tzdb の計算し直し | 上げない | — | [ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) |
 
-- RFC 5546 の 2.1.4 節は STATUS と DURATION も挙げる。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧はこれらを書いていないが、RFC の MUST に従って足す。
+- RFC 5546 の 2.1.4 節は STATUS と DURATION も挙げる。RFC の MUST に従って足す（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧にも、統合の工程の 2026-10-04 の注記で足した）。
 - 1 回分の変更でも、予定オブジェクトの `SEQUENCE` は 1 つで上げる（UID に 1 つの版）。外部へは、変えた回の上書きと、上がった `SEQUENCE` を送る。
 
 ### 5.4 当て方の決定表
