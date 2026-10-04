@@ -54,7 +54,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `caldav-ingress` | `alb-dav` と ALB の WAF（IP の集合）、SRV・TXT、`/.well-known/caldav`（ADR-0043） |
 | `ecs-services-skeleton` | API・CalDAV・Realtime・Booking・Auth・Relay・Worker のサービスとロール |
 | `terraform-root-modules` | ルートモジュールとポリシーの検査 |
-| `aurora-rls-baseline` | テナントの RLS、`SET LOCAL`、RLS の検査、テナントをまたぐ経路の許可リスト（X1〜X9）と RLS の外の表の一覧の CI の照合（ADR-0004） |
+| `aurora-rls-baseline` | テナントの RLS、`SET LOCAL`、RLS の検査、テナントをまたぐ経路の許可リスト（X1〜X11）と RLS の外の表の一覧の CI の照合（ADR-0004） |
 | `writer-and-change-log-skeleton` | `packages/writer`、カレンダーの `change_seq`、`calendar_changes`、outbox、ログを通らない書き込みの DB の権限での禁止、番号の欠けの監視（ADR-0005） |
 | `ci-pipeline-baseline` | PR の関門、パスでの関門の追加、3 つの `TZ`、性質ベーステストの枠、テストの緩和の検出、本番の依存の禁止の一覧（ADR-0001、ADR-0048） |
 | `flags-appconfig` | `release.*`（kebab-case）・`ops.*`（snake_case）、`tzdata.active_version` の検証の関数、東京と大阪、長く残すフラグの週次の検査 |

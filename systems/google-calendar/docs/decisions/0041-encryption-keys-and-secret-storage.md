@@ -68,11 +68,14 @@ DR の大阪で、同じ鍵で読めなければならない（NFR-007）。
 | Webhook の署名の秘密、OAuth のクライアントの秘密 | 256 ビットの乱数 | 封筒の暗号化（送るとき・確かめるときに平文が要る） | Webhook の秘密は作ったときだけ。作り直せる |
 | 同期のトークンの HMAC の鍵 | 256 ビット | Secrets Manager。90 日ごとに替え、前の鍵は 30 日（トークンの有効の期間）残す | — |
 | VAPID の秘密鍵 | P-256 | `app-secrets` で包んで保存（大阪へレプリカ）。入れ替えの手順は reminders-and-notifications の領域（[reminders-and-notifications.md](../architecture/reminders-and-notifications.md)） | — |
+| 予約者の個人情報（名前、メールアドレス、答え） | 予約者が入れた値 | 封筒の暗号化。鍵の鍵は `app-secrets`、暗号化のコンテキストは `{"purpose":"booking-pii","tenant_id":…}`。照合は `booker_email_hash`（SHA-256）。予約ページのサービスと notifier のロールだけが復号できる（[booking-pages.md](../architecture/booking-pages.md) の 10 節） | 持ち主の画面に出す。期間の後に伏せる（法務の L5・L6） |
 | iMIP の受け口の `token` | 128 ビット | 照合の値（`imip_addresses.token_hash`） | 予定の ORGANIZER として送るので、送るたびに封筒の暗号化から作る |
 
 - 高いエントロピーの秘密（120 ビット以上の乱数）には、遅いハッシュもペッパーも要らない。SHA-256 の照合の値から秘密を総当たりで求めることはできない。ログインはパスワードを持たない（ADR-0035）。
 - 接頭辞（`<brand>_ap_` など）は、公開のリポジトリでの秘密の検出（シークレットスキャン）に載せる。
 - ログ・トレース・エラーの報告に、秘密と ICS の秘密のアドレスの経路を出さない（[observability.md](../architecture/observability.md) の 2 節）。
+
+> 2026-10-04 の注記：データモデルの工程で、予約者の個人情報の暗号文の鍵が表になかったので、推奨の案（`app-secrets` に暗号化のコンテキスト `booking-pii`）で足した。新しい KMS の鍵は作らない。予定の項目のアプリの層の暗号化を持たない決定（下の「持たないもの」）は変えない。予約者の情報は予定の項目ではなく、予約の行の列である。
 
 ### 持たないもの
 

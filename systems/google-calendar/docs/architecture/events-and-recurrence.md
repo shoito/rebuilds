@@ -422,7 +422,7 @@ ADR-0011。経路ごとに扱いを分ける。
 | `attendee_partstat` | 参加者の写しでの自分の出欠（空き時間の判定のため。[free-busy-and-scheduling.md](free-busy-and-scheduling.md)） |
 | `flags` | 存在しない時刻でずらした、`orphan` など |
 
-主キーは `(tenant_id, calendar_id, start_utc, event_object_id, recurrence_id)`。月で分割する。`(tenant_id, event_object_id, recurrence_id)` に一意の索引を持つ。
+主キーは `(tenant_id, calendar_id, start_utc, event_object_id, recurrence_id)`。月で分割する。`(tenant_id, event_object_id)` に索引を持つ。`(tenant_id, event_object_id, recurrence_id)` の一意は、分割の鍵を含まないので DB で強制せず、カレンダーのロックの中の差分の書き込みと 9.5 節の照合で守る（[data-model.md](data-model.md) の D-3）。`copy_state` が `active` でない写しと、取り消した予定は行を持たない（同 D-4）。
 
 ### 9.2 書き込み
 

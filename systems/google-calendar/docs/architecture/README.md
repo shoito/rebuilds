@@ -260,7 +260,7 @@
 - **リマインダーの集中**：毎時 50 分 00 秒の 1 秒に約 12 万件が来る（[capacity.md](capacity.md) の 3 節）。時刻で先に広げ（[ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md)）、送信の記録の一意の鍵で重複を消す（[ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](../decisions/0030-reminder-planning-horizon-and-replan.md)）。
 - **差分の同期の欠け**：ログに載らない書き込みがあると、クライアントは変化に気づかない。すべての書き込みを `packages/writer` に通し、DB のロールで直接の `UPDATE` を拒む（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。番号の欠けを監視する（[runbooks/README.md](../runbooks/README.md) の 4 節）。
 - **権限の漏れ**：経路（CalDAV の `calendar-data`・`text-match`、ICS の公開、検索、通知、Webhook、Web の手元の DB）ごとに漏れうる。`redact()` を 4 段の 1 つの決定表にし（[ADR-0021](../decisions/0021-effective-role-and-redact-table.md)）、漏れの経路の表と応答の監査で確かめる。
-- **テナントをまたぐ経路の増加**：領域の工程で経路が増えた。[ADR-0004](../decisions/0004-tenancy-and-rls.md) の許可リスト（X1〜X9）と RLS の外の表の一覧に限り、CI で照らす。
+- **テナントをまたぐ経路の増加**：領域の工程で経路が増えた。[ADR-0004](../decisions/0004-tenancy-and-rls.md) の許可リスト（X1〜X11）と RLS の外の表の一覧に限り、CI で照らす。
 - **外からの入力**：iMIP の偽の返事、迷惑な招待、巨大な ICS、展開の爆発、SSRF。上限の表と隔離の解析（[ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md)）、送信元の確かめ（[ADR-0015](../decisions/0015-imip-addressing-and-trust.md)）、egress の専用の経路（[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)）で抑える。
 - **CalDAV のクライアントの差**：OS ごとに、繰り返しの例外の送り方、VTIMEZONE の有無、`If-Match` の扱いが違う。再生・試験場・手動の 3 段で確かめる（[ADR-0048](../decisions/0048-ci-gates-and-caldav-client-compatibility.md)）。
 - **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L10）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
@@ -286,7 +286,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。
 
-- **テナントをまたぐ経路**：[ADR-0004](../decisions/0004-tenancy-and-rls.md) に、経路の許可リスト（X1 iTIP の配送、X2 空き時間、X3 共有のカレンダーの読み出し、X4 共有のカレンダーへの書き込み、X5 リマインダーの時計、X6 入口の解決、X7 tzdb の影響の探し、X8 個人から組織への移り、X9 SLI の集計）と、RLS の外の表の一覧を置いた。題材の `AGENTS.md` も同じ一覧を指す。CI は、`tenant_id` と FORCE RLS のない表、`BYPASSRLS` のロール、`SECURITY DEFINER` の関数を、この一覧と照らす。X4 は `release.cross-tenant-shared-writes` の裏で、有効にするのはテックリードの確認の後。
+- **テナントをまたぐ経路**：[ADR-0004](../decisions/0004-tenancy-and-rls.md) に、経路の許可リスト（X1 iTIP の配送、X2 空き時間、X3 共有のカレンダーの読み出し、X4 共有のカレンダーへの書き込み、X5 リマインダーの時計、X6 入口の解決、X7 tzdb の影響の探し、X8 個人から組織への移り、X9 SLI の集計、X10 Relay の outbox の読み出し、X11 ICS の購読の取得の予定）と、RLS の外の表の一覧を置いた。題材の `AGENTS.md` も同じ一覧を指す。CI は、`tenant_id` と FORCE RLS のない表、`BYPASSRLS` のロール、`SECURITY DEFINER` の関数を、この一覧と照らす。X4 は `release.cross-tenant-shared-writes` の裏で、有効にするのはテックリードの確認の後。
 - **`SEQUENCE` を上げる変更**：RFC 5546 の 2.1.4 節の項目（DTSTART・DTEND・DURATION・RRULE・RDATE・EXDATE・STATUS）と TZID に、場所と参加者の削除を足したもの。[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md) の一覧を [ADR-0014](../decisions/0014-itip-state-transfer-and-sequence.md) に揃え、内部の新旧の鍵を `(SEQUENCE, 主催者の版)` と書き直した。
 - **RFC との意図した違い**：[ADR-0007](../decisions/0007-interop-standards-scope.md) の 1 つの表（D1〜D6）にまとめた。存在しない時刻をずらす（RFC 5545 の 3.3.10 節と違う）、S/MIME を必須にしない（RFC 6047 の 2.2.2 節と違う）、`RANGE=THISANDFUTURE` を 1 回分にする、`SCHEDULE-AGENT=CLIENT` を中の参加者に当てない、DTSTART を最初の回にする、参加者の EXDATE を辞退にする。本家との意図した違いは 1.4 節の表。
 - **tzdb の切り替えと会議室**：採用は AppConfig の `tzdata.active_version` の一度の切り替え（[ADR-0049](../decisions/0049-tzdata-rollout-and-schema-change-ordering.md)）。切り替えの完了から、影響するゾーンの会議室の予約の行と予約ページの区間の計算し直しの完了までを「切り替えの窓」とし、窓の中で排他の制約が新旧の版の区間を比べることを [ADR-0002](../decisions/0002-time-representation.md) の原則の唯一の例外にした。重なりは後から承諾したほうを「要確認」、旧の版の区間とだけ重なった辞退は窓の終わりに判定し直す（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md) の注記）。runbooks の採用の手順の 2・5 を書き直し、[tzdb-update.md](../runbooks/tzdb-update.md) にした。
@@ -306,6 +306,31 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。保持の期間は [ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md) の表。負荷のモデルは [capacity.md](capacity.md) の 1 節。表と置き場所は [data-model.md](data-model.md)。
 - **検証の工程での直し（2026-10-04）**：公式の資料を取得し直して、次を確かめ・直した。SES の受信は東京（`ap-northeast-1`）と大阪（`ap-northeast-3`）の両方にある。CloudFront の許すメソッドは 3 つの組から選び、`PROPFIND`・`REPORT` を含まない。ALB の規則は独自の HTTP のメソッドを条件に書ける。Aurora PostgreSQL 18（18.3・18.4・18.6）に `btree_gist` 1.6・`pg_bigm` 1.2・`pg_partman` 5.x がある。SES の受信の S3 への保存は 40 MB まで、Object Lock の既定の保持のあるバケットに書けない。本家の CalDAV は Basic 認証を 401 にする。本家の API の割り当て（1 分 10,000・600）は 2026-05-01 から新しいプロジェクトに当たる。本家の外部への約 2,000 件は「参加者にメール」の機能の数で、外部への招待は短い期間に 10,000 件（ADR-0015 の書き方を直した）。会議室の繰り返しの「半分以上・8 回以下」、グループの招待の 100,000 人と 200 人で 24 時間、予約ページの最短の予告 4 時間、Workspace の SLA の 99.9%、空き時間の照会の 50・100、RFC 5546 の 2.1.4・2.1.5 節、RFC 6047 の 2.2.2 節（S/MIME が MUST）を確かめた。tzdb のリリースには GPG の署名（`.asc`）がある（未検証を外した）。内閣府の CSV は 1955〜2027 年で、ページに利用の条件の記載はない（法務の L7 のまま）。`@better-auth/scim` の告知（1.7.0 で修正）を足した。リマインダーの終日の例（夏時間をまたがない例になっていた）を直した。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-04、データモデル）
+
+データモデルの完全版を [data-model.md](data-model.md) と [data-model/](data-model/) に作り、形（表・列・キー・索引・分割・保持）の正本をそこへ移した。領域の文書の「data-model への項目」は提案の記録として残す。名前と列の食い違いの解き方は [data-model.md](data-model.md) の 7 節（D-1〜D-32）にある。ADR の決定は変えていない。主なものは次のとおり。
+
+- **回の識別子と系列**：`recurrence_id` は壁時計の時刻の文字列で、系列の全体は `''`（主キーに入れるため NULL にしない）。
+- **展開の索引**：`(event_object_id, recurrence_id)` の一意は、月の分割の表なので DB で強制せず、カレンダーのロックの中の差分の書き込みと照合で守る。`hidden`・`cancelled` の写しと取り消した予定は行を持たない。
+- **排他の制約の表は分割しない**：`resource_bookings`・`booking_reservations` は、時刻の区間の排他の制約を分割した表に作れないので、過去の行を毎日のジョブで消す。
+- **リマインダーの送信の記録**：回の開始の日（`occurrence_on`）で分割し、日をまたぐ重複も一意の鍵で捨てる。受け手は利用者か予約（`recipient_id`）。
+- **`sync_epoch`**：全体の 1 つの値（`platform_state`）だけ。テナントの移りは、カレンダーの `floor_seq` を上げて古いトークンを 410 にする。
+- **アカウント**：Better Auth の既定の名前（`auth.user` ほか）。`auth.user` にテナントと利用者の ID を足す。確認したドメインは `principal_directory` に `@<domain>` で入れ、ログインの入口で SSO の組織を決める。
+
+### 決定（2026-10-04、データモデルの工程で見つけたテナントをまたぐ経路）
+
+[ADR-0004](../decisions/0004-tenancy-and-rls.md) の許可リスト（当時 X1〜X9）にない、テナントをまたぐ処理が 4 つ見つかった。PM の方針（法務の判断が要らないものは推奨の案で進める）により、推奨の案で決め、ADR-0004 に注記つきで反映した。題材の `AGENTS.md`、[security.md](security.md)、[data-model.md](data-model.md) の 5 節も揃えた。
+
+| # | 処理 | 決定 | 採らなかった案 |
+| --- | --- | --- | --- |
+| 1 | Relay が全テナントの `outbox` を読む | 経路 X10。`relay` のロールにだけ、`outbox` の `SELECT`・`DELETE` を全テナントで許す専用の RLS のポリシーを付ける。`outbox` は iTIP の本文（予定の中身）を持つので RLS の外の表にしない | `outbox` を `ops` に置き、本文を S3 に出して行を ID だけにする（書き込みが S3 を待つ） |
+| 2 | OAuth のトークン（API・CalDAV の Bearer）と予約の管理のリンク（`/m/<token>`）からテナントを決める | X6 の入口に足し、解決の表 `ops.oauth_token_directory`（`token_hash` → `tenant_id`、期限）と `ops.booking_manage_directory`（`manage_token_hash` → `tenant_id`・`booking_id`）を足す | トークンの形にテナントを埋める、管理のリンクを `/p/<slug>/m/<token>` にする |
+| 3 | ICS の購読の取得の予定（`next_fetch_at`）を全テナントから探す | 経路 X11。X5 と同じ形の `ops.ics_fetch_schedule`（購読の ID・テナント・次の取得の時刻・状態だけ）を足し、`ics_scheduler` のロールで読む | 全テナントを順に回す保守のジョブで 5 分ごとに回す（30 万テナントで重い） |
+| 4 | テナントをまたぐ共有のカレンダーの既定のリマインダーの購読者（`calendar_list_reminder_subscribers`）を、カレンダーのテナントに書く | 経路を足さず、X4（`shared_calendar_access`）で書く。`release.cross-tenant-shared-writes` が無効の間は、テナントをまたぐ共有のカレンダーの既定のリマインダーを計画しない | 購読者を見る人のテナントに置き、計画のジョブが毎時に X3 で読みに行く |
+
+- あわせて、S2 のディレクトリのクラスタの表（`tenant_directory`、`account_directory`）を ADR-0004 の RLS の外の表の一覧に載せた（S1 では作らない）。
+- 予約者の個人情報の暗号文の鍵は、[ADR-0041](../decisions/0041-encryption-keys-and-secret-storage.md) の秘密の持ち方の表に足した（`app-secrets`、暗号化のコンテキスト `booking-pii`）。
 
 持ち越し（法務、計測・PoC・選定・確認で決めるもの）：
 
@@ -330,7 +355,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 予約ページで空きを確かめる他のカレンダーとの同時の書き込み、WAF だけでボットを止められるか | E10 の後の計測 |
 | `RANGE=THISANDFUTURE` を受け付けるか | `range_ignored` の件数を見て、MVP の後に決める |
 | S2 のテナントの移動の方式、S3 で CalDAV のクライアントがリダイレクトを覚えるか | S2・S3 の着手の前に別の ADR（**未検証**） |
-| データモデルの完全版（ER 図、列の型と索引の正本、横断の不変条件） | 後の工程（[data-model.md](data-model.md) は索引だけ） |
+| データモデルの持ち越し（[data-model.md](data-model.md) の 8 節） | テックリードとセキュリティの担当。E1・E4・E10 の spec の前 |
 | 本家の振る舞いで未確認のもの（「これ以降」の表し方、同期のトークンの有効の期間、ICS の購読の間隔、繰り返しの回の上限、存在しない時刻の扱い、チャネルの期限、内部の保存の形） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 ## 7. 領域の文書
@@ -353,7 +378,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [accounts-and-orgs.md](accounts-and-orgs.md) | アカウントとテナント、ログインとセッション、組織とドメインの確認、個人から組織への移り、SSO、アプリ用のパスワードとトークンの形、組織の認証の方針、ディレクトリとメールアドレスの解決、SCIM、管理の役割と委任、管理者による閲覧の枠、停止・削除と引き継ぎ | [0035](../decisions/0035-accounts-auth-library-and-credentials.md)、[0036](../decisions/0036-org-domains-sso-and-scim.md)、[0037](../decisions/0037-admin-roles-delegation-and-event-access.md) | セキュリティ | E4、E11 |
 | [clients.md](clients.md) | Web の SPA の骨格、データの流れ（窓、差分、手元の展開、tzdata）、日・週・月・予定リストの表示と重なりの配置、タイムゾーンと夏時間の表示、操作、キーボードと IME、速さの予算、オフラインと手元のデータ、PWA と Web Push の登録 | [0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md)、[0039](../decisions/0039-offline-read-cache-and-local-data.md) | QA | E7 |
 | [security.md](security.md) | 信頼境界、脅威モデル（迷惑な招待、解析の攻撃、CalDAV の資格情報、漏れ、SSRF）、入力の検査、暗号化と鍵、秘密、監査ログ、運用者のアクセス、データのライフサイクル、試験、法務の論点の整理 | [0040](../decisions/0040-untrusted-calendar-input-gate.md)、[0041](../decisions/0041-encryption-keys-and-secret-storage.md)、[0042](../decisions/0042-audit-log-and-data-lifecycle.md) | セキュリティ | E1、E11、E12 |
-| [data-model.md](data-model.md) | 表と置き場所の索引（領域ごと）、テナントの外の表、ID と版の種類。完全版（ER 図、列の型）は後の工程 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約（ID、テナンシー、時刻の列、iCalendar の往復、版、分割、保持、命名、秘密）、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、RLS の外の表と DB のロール、DB の外のストアの形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、入口とホスト名、外への送信、サービスと配置、データの置き場所、台数、バックアップと DR（`sync_epoch`）、tzdb の版の配り方、段階を上げる基準、S2・S3、Terraform、コスト | [0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)、[0044](../decisions/0044-disaster-recovery-and-calendar-side-effects.md)、[0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md) | Ops | E1、E12 |
 | [observability.md](observability.md) | 中身を出さない計装、トレース、RUM、正しさの照合と応答の監査、SLI の計測（業務の記録から）、アラートの条件、合成監視、ダッシュボード | [0046](../decisions/0046-sli-from-ledgers-and-delivery-tracing.md) | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル（時刻の形）、1 カレンダーの書き込みの上限と割り当て、リマインダーの集中、大きな会議の空き時間、部品ごとの必要量、取り直しの殺到、台数、負荷試験 L1〜L10 | [0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) | Ops | E12 |

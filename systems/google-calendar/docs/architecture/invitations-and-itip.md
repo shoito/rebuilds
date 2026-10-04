@@ -79,7 +79,7 @@ RFC の要点：
 
 | 列 | 意味 |
 | --- | --- |
-| `event_object_id`・`recurrence_id` | 系列の参加者は `recurrence_id` が NULL。回だけの参加者・回ごとの出欠は上書きの `recurrence_id` |
+| `event_object_id`・`recurrence_id` | 系列の参加者は `recurrence_id` が `''`（空の文字列。主キーに入れるため NULL にしない。[data-model.md](data-model.md) の D-2）。回だけの参加者・回ごとの出欠は上書きの `recurrence_id` |
 | `attendee_key` | 本システムのアカウントの ID、またはメールアドレス（正規化した小文字） |
 | `kind` | `internal`（本システムの中の人）・`external`・`room`・`resource`・`group` |
 | `cutype`・`role` | RFC 5545 の `CUTYPE`（3.2.3 節）・`ROLE`（3.2.16 節）。任意の参加は `OPT-PARTICIPANT` |

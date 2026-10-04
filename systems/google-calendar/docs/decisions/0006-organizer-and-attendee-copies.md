@@ -37,7 +37,7 @@ date: 2026-10-04
 - **参加者の写し**：参加者の主のカレンダー（会議室なら会議室のカレンダー）の、同じ UID の別の予定オブジェクト。参加者のテナントに置く。
   - 共有の項目は、主催者の写しから届いたメッセージでだけ変える。参加者の写しに、共有の項目を直接書く API・CalDAV の要求は拒否する（403。CalDAV では RFC 6638 の `CALDAV:allowed-attendee-scheduling-object-change` の前提の違反として返す。sync-and-caldav の領域）。
   - 自分だけの項目（自分の出欠、リマインダー、色、`transparency`、自分から見た公開範囲）は、参加者が書ける。
-  - 主催者の写しの版（`organizer_sequence`、`organizer_dtstamp`）を持つ。
+  - 主催者の写しの版（`organizer_sequence`、`organizer_version`）を持つ。
 - **同じテナントの中でも写しを分ける。** 主催者と参加者が同じ組織でも、経路を 1 つにして、テナントをまたぐときと同じ処理で確かめる。
 
 ### 内部の iTIP のメッセージ

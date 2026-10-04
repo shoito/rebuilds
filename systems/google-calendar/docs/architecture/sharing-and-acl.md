@@ -326,7 +326,7 @@ ADR-0022。
 
 | 表 | 中身 | 節 |
 | --- | --- | --- |
-| `calendars` に足す列 | `kind`（`primary`・`secondary`・`shared`・`resource`・`subscription`・`system`。[data-model.md](data-model.md) の 5 節で揃えた）、`owner_principal`、`default_visibility` | 4.1、5.1 |
+| `calendars` に足す列 | `kind`（`primary`・`secondary`・`shared`・`resource`・`subscription`・`system`。[data-model.md](data-model.md) の 5 節で揃えた）、`owner_user_id`（持ち主。組織・システムのカレンダーは NULL。[data-model.md](data-model.md) の D-18）、`default_visibility` | 4.1、5.1 |
 | `calendar_acl` | 4.2 節。主キー `(tenant_id, calendar_id, scope_type, scope_value)` | 4.2 |
 | `org_sharing_policies` | 4.4 節の設定 | 4.4 |
 | `event_objects` の列 | `visibility`（マスターだけ）。参加者の写しの自分の公開範囲 | 5.1 |

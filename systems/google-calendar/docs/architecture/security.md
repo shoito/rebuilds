@@ -58,7 +58,7 @@ flowchart TB
 | --- | --- | --- |
 | B1 エッジ | 画面・API・予約ページの要求、WebSocket | TLS 1.2 以上、HSTS、WAF、Shield Standard。オリジンは CloudFront からだけ |
 | B1' CalDAV の入口 | CalDAV の要求（WebDAV のメソッド） | ALB に付けた WAF、Basic 認証の失敗の規則、本文の大きさ（[infrastructure.md](infrastructure.md) の 2.2 節、[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md)） |
-| B2 テナント | サービスから DB | `SET LOCAL app.tenant_id`、FORCE RLS。テナントをまたぐのは ADR-0004 の許可リストの経路（X1〜X9）と専用のロールだけ。RLS の外の表も一覧の表だけ（[ADR-0004](../decisions/0004-tenancy-and-rls.md)） |
+| B2 テナント | サービスから DB | `SET LOCAL app.tenant_id`、FORCE RLS。テナントをまたぐのは ADR-0004 の許可リストの経路（X1〜X11。X10 は Relay の `outbox` の読み出しと削除だけ、X11 は ICS の購読の取得の予定の読み出し。OAuth のトークンと予約の管理のリンクの解決は X6）と専用のロールだけ。RLS の外の表も一覧の表だけ（[ADR-0004](../decisions/0004-tenancy-and-rls.md)） |
 | B3 見え方 | 予定から各経路 | `packages/policy` の `can()`・`redact()` だけ。応答の監査（[observability.md](observability.md) の 4 節） |
 | B4 管理プレーン | デプロイ、AppConfig、運用者 | OIDC の短命な認証情報、2 人の承認、JIT（8 節） |
 | B5 外向きの送信 | 利用者の決める宛先 | egress の専用の経路、名前解決の後の IP の検査（[ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md)） |

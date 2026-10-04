@@ -92,10 +92,11 @@ ADR-0043。すべて Fargate（ARM64）。サービスごとにタスク定義�
 | `worker-imip-inbound` | iMIP の受信の解析と照合 | なし（結果を SQS で `worker-itip-apply` へ） | 同上 |
 | `worker-itip-apply` | iMIP の受信の結果を当てる | `app` | 同上 |
 | `worker-expander` | 展開の範囲の端の維持、tzdb の再計算 | `app`（`maintenance` の枠） | ジョブの残り |
-| `worker-reminder-scheduler` | 分の桶とタイマーホイール | `app`（読み出し）、送信の記録 | 時刻（集中の前に 4 → 8。[ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)） |
-| `worker-notifier` | Web Push・メール・画面の通知 | 送信の記録 | 業務の時間の下限、キューの年齢 |
+| `worker-reminder-scheduler` | 分の桶とタイマーホイール | `reminder_clock`（計画の行と送信の記録。[ADR-0004](../decisions/0004-tenancy-and-rls.md) の X5） | 時刻（集中の前に 4 → 8。[ADR-0029](../decisions/0029-reminder-clock-buckets-and-timer-wheel.md)） |
+| `worker-notifier` | Web Push・メール・画面の通知 | `reminder_clock`（送信の記録）、`app`（中身をテナントのコンテキストで読む） | 業務の時間の下限、キューの年齢 |
 | `push-sender`（egress） | Webhook の送信 | なし | 同時の送信の数 |
 | `ics-fetcher`（egress） | ICS の購読の取得と解析 | なし（結果を SQS で `worker-ics-apply` へ） | キューの年齢 |
+| `worker-ics-apply` | 取得した ICS の差分を購読のカレンダーへ書く。取得の予定を探して `ics-fetcher` へ送る | `app`（テナントのコンテキストで書く）、`ics_scheduler`（`ops.ics_fetch_schedule` の読み出し。[ADR-0004](../decisions/0004-tenancy-and-rls.md) の X11） | キューの年齢 |
 | `worker-*`（その他） | `ics-apply`、`indexer`、`auditor`、`lifecycle`、`imip-events`、`slo-aggregator`、`copy-reconciliation` | 用途ごと | キューの年齢 |
 
 - `packages/writer` はサービスではなくライブラリで、`api`・`caldav`・`booking`・`worker-*` の中で動く（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
@@ -184,7 +185,7 @@ sequenceDiagram
   IC->>WF: 切り替えを決める
   WF->>TK: 入口を止める、ops.writes_enabled = false
   WF->>OS: Aurora の計画外のフェイルオーバー（大阪を昇格）
-  WF->>OS: 全カレンダーの sync_epoch を上げる、dr_epoch_started_at を記録
+  WF->>OS: 全体の sync_epoch を上げる、dr_epoch_started_at を記録
   WF->>OS: サービスを広げる（api・caldav・realtime）
   WF->>OS: ops.writes_enabled = true
   WF->>WF: CloudFront のオリジン、dav の DNS、AppConfig の確認

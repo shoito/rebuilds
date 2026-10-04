@@ -60,13 +60,17 @@ date: 2026-10-04
 | X3 | 共有されたカレンダーの読み出し。カレンダーのテナントのコンテキストで読み、`redact()` を通す | `shared_calendar_access` | 読む | この ADR、[ADR-0021](0021-effective-role-and-redact-table.md) |
 | X4 | 共有されたカレンダーへの書き込み（外の主体が `writer` 以上）。カレンダーのテナントのコンテキストで `packages/writer` を通す。`release.cross-tenant-shared-writes` の裏 | `shared_calendar_access` | カレンダーのテナントへ書く | [ADR-0021](0021-effective-role-and-redact-table.md) |
 | X5 | リマインダーの時計。全テナントの計画の行（ID と時刻だけ）を読み、中身は notifier がテナントのコンテキストで読む | `reminder_clock` | 保守用の表を読み書き | [ADR-0029](0029-reminder-clock-buckets-and-timer-wheel.md)、[ADR-0030](0030-reminder-planning-horizon-and-replan.md) |
-| X6 | 匿名・外からの入口の解決（予約ページの `slug`、ICS の秘密のアドレス、iMIP の受け口、OAuth の `client_id`、メールアドレス）。解決の後はテナントのコンテキストで処理する | `resolver`（入口ごとに関数を分ける） | 解決の表を読む | [ADR-0015](0015-imip-addressing-and-trust.md)、[ADR-0025](0025-ics-subscriptions-both-directions.md)、[ADR-0033](0033-booking-creation-and-exclusion.md)、[ADR-0035](0035-accounts-auth-library-and-credentials.md) |
+| X6 | 匿名・外からの入口の解決（予約ページの `slug`、予約の管理のリンク、ICS の秘密のアドレス、iMIP の受け口、OAuth の `client_id`、OAuth のトークン、メールアドレス）。解決の後はテナントのコンテキストで処理する | `resolver`（入口ごとに関数を分ける） | 解決の表を読む | [ADR-0015](0015-imip-addressing-and-trust.md)、[ADR-0025](0025-ics-subscriptions-both-directions.md)、[ADR-0033](0033-booking-creation-and-exclusion.md)、[ADR-0035](0035-accounts-auth-library-and-credentials.md) |
 | X7 | tzdb の影響の見積もりと再計算の対象の探し（`tenant_tz_usage`）。再計算はテナントごとのコンテキストで行う | `tz_maintenance` | 保守用の表を読む | [ADR-0012](0012-tzdb-update-recompute-and-propagation.md) |
 | X8 | 個人から組織への移り（`tenant-move`）。カレンダーごとのトランザクションで `tenant_id` を変える | `tenant_move` | 2 つのテナントを書く | [ADR-0036](0036-org-domains-sso-and-scim.md) |
 | X9 | SLI の集計。業務の記録（ID・時刻・結果だけ）を全テナントで数える | `slo_aggregator` | 保守用の表を読む | [ADR-0046](0046-sli-from-ledgers-and-delivery-tracing.md) |
+| X10 | Relay の `outbox` の読み出し。確定した変更のメッセージを全テナントにまたがって `id` の順に読み、送った行を消す。他の表は読まない | `relay`（`outbox` だけの専用の RLS のポリシー。`SELECT`・`DELETE` だけ） | `outbox` を読む・消す | [ADR-0005](0005-change-log-and-sync-tokens.md) |
+| X11 | ICS の購読の取得の予定。全テナントの `ics_fetch_schedule`（購読の ID・テナント・次の取得の時刻だけ）を読み、取得の依頼を出す。取得の結果はテナントのコンテキストで書く | `ics_scheduler`（`worker-ics-apply` の予定のジョブ） | 保守用の表を読み書き | [ADR-0025](0025-ics-subscriptions-both-directions.md) |
 
 - 全テナントを順に回す保守のジョブ（範囲の端の維持、照合、削除の期限など）は、許可リストに入れない。`tenants` からテナントの ID を読み、テナントごとに `SET LOCAL` して処理する。
 - 運用者の JIT のアクセスと break-glass は、プラットフォームの監査に残す別の経路で、アプリの DB のロールを使わない（security の領域）。
+
+> 2026-10-04 の注記：データモデルの工程で、許可リストにないテナントをまたぐ処理が 4 つ見つかった（[architecture/README.md](../architecture/README.md) の 6 節）。推奨の案で決め、この ADR を直した。(1) Relay の `outbox` の読み出しを X10 にした。`outbox` は iTIP の本文（予定の中身）を持つので RLS の外の表にせず、`relay` のロールにだけ `outbox` の `SELECT`・`DELETE` を全テナントで許すポリシーを付ける。(2) X6 の入口に OAuth のトークン（API・CalDAV の Bearer）と予約の管理のリンク（`/m/<token>`）を足し、解決の表 `oauth_token_directory`・`booking_manage_directory` を足した。(3) ICS の購読の取得の予定を探す表 `ics_fetch_schedule` を足し、X11 にした（X5 と同じ形。ID と時刻だけ）。(4) テナントをまたぐ共有のカレンダーの既定のリマインダーの購読者は X4 の経路で書き、X4 が無効の間は計画しない（経路は足さない）。あわせて、S2 のディレクトリのクラスタの表（`tenant_directory`、`account_directory`）を一覧に載せた。
 
 ### RLS の外の表の許可リスト
 
@@ -74,12 +78,14 @@ date: 2026-10-04
 | --- | --- | --- |
 | `auth` | Better Auth の表（アカウント、セッション、パスキー、外部のアカウント、検証の値）、`app_passwords` | ログインの主体だけ。予定の中身を持たない |
 | 保守用（`ops`） | `tenants`、`principal_directory`、`platform_state`、`platform_audit_events`、`retention_policies`、`legal_holds` | テナントの属性・解決・監査。予定の中身を持たない |
-| 保守用（`ops`） | 解決の表：`booking_slug_directory`、`ics_publish_token_directory`、`imip_address_directory`、`oauth_client_directory`、`moved_event_objects` | 鍵（ハッシュ）→ `tenant_id` と ID だけ |
+| 保守用（`ops`） | 解決の表：`booking_slug_directory`、`booking_manage_directory`、`ics_publish_token_directory`、`imip_address_directory`、`oauth_client_directory`、`oauth_token_directory`、`moved_event_objects` | 鍵（ハッシュ）→ `tenant_id` と ID だけ |
 | 保守用（`ops`） | リマインダー：`reminder_plans`、`reminder_plan_heads`、`reminder_deliveries`、`reminder_shard_leases` | ID・時刻・方法・状態だけ |
 | 保守用（`ops`） | tzdb：`tenant_tz_usage`、`tz_recompute_runs` | TZID と数だけ |
+| 保守用（`ops`） | ICS の購読の取得の予定：`ics_fetch_schedule` | 購読の ID・テナント・時刻・状態だけ（URL を持たない） |
 | 保守用（`ops`） | SLI の記録：`itip_deliveries`、`itip_fanout_progress`、`imip_outbound_log`、`imip_inbound_log`、`sync_token_uses`、`reconciliation_findings` | ID・時刻・結果・理由のコードだけ |
+| ディレクトリのクラスタ（S2 から） | `tenant_directory`、`account_directory`（S2 で `imip_address_directory` もここへ移す） | テナント → クラスタ、メールアドレスのハッシュ → アカウント・テナント。S1 では作らない（[ADR-0045](0045-stage-up-criteria-tenant-sharding-and-cells.md)） |
 
-- **CI の規則**：マイグレーションの検査は、`tenant_id` と FORCE RLS のない表を、上の一覧の表だけに許す。一覧の表に、予定の中身の列（タイトル、場所、説明、参加者の名前、コメント）を足すマイグレーションを失敗させる（メールアドレスを持てるのは `auth` と `principal_directory` だけ）。`BYPASSRLS` のロール、`SECURITY DEFINER` の関数、テナントをまたぐロールへの `GRANT` は、経路の一覧（X1〜X9）の名前と照らし、一覧にないものを失敗させる。一覧の正本はこの ADR で、開発リポジトリの許可リストのファイルと CI が比べる。
+- **CI の規則**：マイグレーションの検査は、`tenant_id` と FORCE RLS のない表を、上の一覧の表だけに許す。一覧の表に、予定の中身の列（タイトル、場所、説明、参加者の名前、コメント）を足すマイグレーションを失敗させる（メールアドレスを持てるのは `auth` と `principal_directory` だけ）。`BYPASSRLS` のロール、`SECURITY DEFINER` の関数、テナントをまたぐロールへの `GRANT` は、経路の一覧（X1〜X11）の名前と照らし、一覧にないものを失敗させる。一覧の正本はこの ADR で、開発リポジトリの許可リストのファイルと CI が比べる。
 - 2 は、S3 で 1,500 万の個人のテナントに対して、スキーマの数とマイグレーションが重い。3 は、S1 でも運用が重い。大きな組織は、S2 でテナントを単位に専用のクラスタへ移す（infrastructure の領域）。
 
 ### 権限の判定

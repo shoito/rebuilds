@@ -453,14 +453,14 @@ notifier は、送信の記録 1 件ごとに、テナントのコンテキス�
 | 表 | 中身 | 節 |
 | --- | --- | --- |
 | `reminder_plans`（保守用のスキーマ） | 5.1 節の列。`fire_day` の分割、索引 `(shard, fire_at) WHERE status='pending'`・`(tenant_id, user_id, event_object_id)` | 5.1 |
-| `reminder_plan_heads`（保守用のスキーマ） | `(tenant_id, user_id, event_object_id)` を主キーに `version` | 5.3 |
+| `reminder_plan_heads`（保守用のスキーマ） | `(tenant_id, recipient_id, event_object_id)` を主キーに `version`（`recipient_id` は利用者か予約。[data-model.md](data-model.md) の D-6） | 5.3 |
 | `reminder_shard_leases` | `shard` を主キーに `owner`、`lease_until` | 6.1 |
-| `reminder_deliveries`（保守用のスキーマ） | `id`、一意の鍵（6.3 節）、`plan_version`、`status`（`queued`・`sending`・`sent`・`dropped`）、理由のコード、`created_on` の日の分割。35 日（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md) の保持の表に揃えた） | 6.3 |
+| `reminder_deliveries`（保守用のスキーマ） | `id`、一意の鍵（6.3 節）、`plan_version`、`status`（`queued`・`sending`・`sent`・`dropped`）、理由のコード、`occurrence_on`（回の開始の UTC の日）の分割（[data-model.md](data-model.md) の D-6）。35 日（[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md) の保持の表に揃えた） | 6.3 |
 | `event_objects`・`event_overrides` の列 | `reminders`（`use_default`、上書き 5 件） | 4.1 |
 | `calendar_list_entries` に足す列 | `default_reminders`、`default_all_day_reminders` | 4.1 |
 | `calendar_list_reminder_subscribers` | 共有のカレンダーに既定のリマインダーを持つ利用者 | 5.3 |
 | `notifications` | 受け手のテナント。`(tenant_id, user_id, id)`、種類、対象、まとめの鍵、既読、30 日 | 7.2、8 |
-| `push_subscriptions` | `(tenant_id, user_id, id)`、端点の暗号文、`p256dh`、`auth`、作った時刻、最後の成功 | 7.3 |
+| `push_subscriptions` | `(tenant_id, user_id, id)`、端点の暗号文、`p256dh`、`auth` の暗号文（`auth_ciphertext`。[data-model.md](data-model.md) の D-20）、作った時刻、最後の成功 | 7.3 |
 | `notification_settings` | 経路ごとの有効・無効、種類ごとのメール、毎朝の一覧 | 4.1、8、9 |
 | `email_suppressions` | 利用者のメールアドレスのハッシュ、理由、期限 | 7.4 |
 

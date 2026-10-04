@@ -83,7 +83,7 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &&)
 
 - 辞退した回は行を持たない。辞退は主催者の写しの会議室の参加者の行（回ごとの `partstat`）に書く。
 - `pending` と `needs_review` は制約の外。空き時間では `pending` を `busy_tentative`、`needs_review` を `busy` にする（[free-busy-and-scheduling.md](free-busy-and-scheduling.md) の 4.2 節）。
-- 行を持つのは、展開の索引の範囲の中で、今より後に終わる回だけ。過去の回の行は、索引の分割と一緒に落とす。
+- 行を持つのは、展開の索引の範囲の中で、今より後に終わる回だけ。過去の回の行は、`lifecycle` が毎日消す（排他の制約を持つので分割しない。[data-model.md](data-model.md) の D-5）。
 
 ## 5. 予約の流れ
 

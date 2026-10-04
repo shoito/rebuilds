@@ -74,8 +74,8 @@ flowchart LR
 
 | 表 | 置き場所 | 中身 |
 | --- | --- | --- |
-| `accounts` | `auth` スキーマ（RLS の外） | ログインの主体。主のメールアドレス、名前、ロケール、状態、Better Auth の表（セッション、パスキー、外部のアカウント、検証の値） |
-| `tenants` | 保守用のスキーマ | `kind`（`personal`・`org`）、名前、地域、状態、作成の時刻 |
+| `auth.user`（アカウント） | `auth` スキーマ（RLS の外） | ログインの主体（Better Auth の `user` の表。[data-model.md](data-model.md) の D-8）。主のメールアドレス、名前、ロケール、状態、Better Auth の表（セッション、パスキー、外部のアカウント、検証の値） |
+| `tenants` | 保守用のスキーマ | `kind`（`personal`・`org`・`system`。`system` は日本の祝日のカレンダーを持つ 1 つ。[data-model.md](data-model.md) の D-10）、名前、地域、状態、作成の時刻 |
 | `users` | テナントの表（RLS） | `(tenant_id, id)`、`account_id`、表示の名前、名前の読み（カナ）、メールアドレスと別名、タイムゾーン、ロケール、状態（`active`・`suspended`・`deleted`）、SCIM の外部の ID |
 | `groups`・`group_members` | テナントの表 | グループ、グループのメールアドレス、メンバー（利用者・入れ子のグループ） |
 | `org_domains` | テナントの表 | ドメイン、確認のトークン、状態、最後に確かめた時刻 |
@@ -161,7 +161,7 @@ sequenceDiagram
 ### 7.1 データの移し方
 
 - `tenant-move` のジョブが、個人のテナントのカレンダー・予定オブジェクト・リマインダーの設定・購読を、組織のテナントへ移す。ID（UUIDv7）は変えず、`tenant_id` を変える。
-- 移しは、カレンダーごとに 1 つのトランザクションで、`packages/writer` の移しの操作として行い、カレンダーの `sync_epoch` に当たる値を上げる（そのカレンダーの古いトークンは 410。[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。CalDAV の URL は `user_id` と `calendar_id` だけを含むので変わらない（[sync-and-caldav.md](sync-and-caldav.md) の 6.1 節）。
+- 移しは、カレンダーごとに 1 つのトランザクションで、`packages/writer` の移しの操作として行い、カレンダーの `floor_seq` を `change_seq + 1` に上げる（そのカレンダーの古いトークンは 410。[data-model.md](data-model.md) の D-11。[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。CalDAV の URL は `user_id` と `calendar_id` だけを含むので変わらない（[sync-and-caldav.md](sync-and-caldav.md) の 6.1 節）。
 - 他のテナントにある参加者の写しは、主催者の写し（`organizer_ref` の `tenant_id`）を古いテナントで指している。移しの後、移した予定オブジェクトの全員へ、新しい `organizer_ref` の内部の `REQUEST` を送る（`SEQUENCE` は上げない）。古い参照に届く `REPLY` は、`moved_event_objects`（古い `(tenant_id, event_object_id)` → 新しい）で 90 日、新しいテナントへ回す。
 - 外部の参加者へ送った iMIP の ORGANIZER（受け口のアドレス）は、予定ごとの `token` なので変えない（[ADR-0015](../decisions/0015-imip-addressing-and-trust.md)）。
 - 共有の ACL（個人のカレンダーを他の人へ共有していた行）は、組織の共有の方針（組織の外への共有の上限）を当て直し、方針を超える行を無効にする（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）。
@@ -432,12 +432,12 @@ sequenceDiagram
 
 | 表 | 中身 | 節 |
 | --- | --- | --- |
-| `auth.accounts` ほか Better Auth の表 | アカウント、セッション、パスキー、外部のアカウント、検証の値 | 4、5 |
+| `auth.user` ほか Better Auth の表 | アカウント、セッション、パスキー、外部のアカウント、検証の値 | 4、5 |
 | `tenants`（保守用のスキーマ） | `kind`、名前、状態 | 4 |
 | `users` | `(tenant_id, id)`、`account_id`（一意）、名前、読み、メールアドレス、別名、タイムゾーン、状態、`scim_external_id` | 4 |
 | `groups`・`group_members` | `(tenant_id, id)`、メールアドレス、メンバー | 11 |
 | `principal_directory`（保守用のスキーマ） | 正規化したメールアドレスを主キーに `(tenant_id, kind, id)` | 4、11 |
-| `org_domains` | `(tenant_id, domain)`、`token`、状態、`last_checked_at`。一意 `domain WHERE status = 'verified'` | 6.2 |
+| `org_domains` | `(tenant_id, domain)`、`token`、状態、`last_checked_at`。一意 `domain WHERE status IN ('verified','at_risk')`（[data-model.md](data-model.md) の D-23） | 6.2 |
 | `sso_connections` | `(tenant_id, id)`、ドメイン、種類、IdP の設定、証明書 2 つ、JWKS の写し | 8 |
 | `app_passwords` | `(account_id, id)`、名前、`secret_hash`、末尾 4 文字、期限、最後の利用、取り消し | 9 |
 | `scim_tokens` | `(tenant_id, id)`、`token_hash`、作った人、期限 | 12 |
