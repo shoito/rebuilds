@@ -11,7 +11,7 @@
 | [roadmap.md](roadmap.md) | Epic と Story、延期の一覧 | PM |
 | [runbooks/](runbooks/README.md) | SLO、アラートと手順、リリース、訓練 | Ops |
 
-領域ごとの設計は [architecture/](architecture/README.md) の 7 節に、表と置き場所の索引は [architecture/data-model.md](architecture/data-model.md) にある。
+領域ごとの設計は [architecture/](architecture/README.md) の 7 節に、データモデルの正本（表の定義、ER 図、横断の不変条件）は [architecture/data-model.md](architecture/data-model.md) にある。
 
 これから作る文書：
 

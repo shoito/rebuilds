@@ -373,12 +373,14 @@ flowchart TD
 
 ## 14. data-model への項目
 
+列・鍵・索引の正本は [data-model/platform-and-audit.md](data-model/platform-and-audit.md)、DB の外の置き場所は [data-model/stores.md](data-model/stores.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | `stream_leases` | シャードの担当、親のシャード | 6.4 |
 | `stream_checkpoints` | DB に書く消費者の読み終わりの位置 | 6.4 |
 | `outbox.sent_at`、1 時間ごとの区画 | 送った行を 1 時間残す | 7.5 |
-| `relay_partitions` | Relay の区画の担当（Valkey の期限つきの鍵。Valkey がなければ勧告的ロック） | 3.1 |
+| Valkey `relay:lease:{n}` | Relay の区画の担当（期限つきの鍵。Valkey がなければ勧告的ロック。表は持たない） | 3.1 |
 | `tid_generator_leases.region` | 東京 0〜511、大阪 512〜1023 の検査の制約 | 7.4 |
 | Kinesis `audit` の流れ | 監査の写し | 6.1 |
 

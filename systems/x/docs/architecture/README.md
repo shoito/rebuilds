@@ -1,6 +1,6 @@
 # Architecture: X
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節、表と置き場所の索引は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節、データモデルの正本（表の定義、ER 図、横断の不変条件）は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -144,7 +144,7 @@
 | 言語 | TypeScript（サービス、Web、アプリ）。学習と評価だけ Python（オフライン） | 他の題材と同じ。学習の道具は Python が厚い。推論は ONNX の形で TypeScript のサービスに載せる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-ranking-boundary.md)） |
 | HTTP・検証 | Hono＋Zod | 他の題材と同じ |
 | ID | 投稿・利用者・DM のメッセージは 64 ビットの `tid`（`packages/tid`）。その他は UUIDv7 | 共通の UUIDv7 から外れる。理由は [ADR-0002](../decisions/0002-post-ids-and-ordering.md) |
-| DB | Aurora PostgreSQL 18。テナントの RLS はなく、本人だけが読む表（DM、ブックマーク、下書き、通知、設定など。一覧は [data-model.md](data-model.md) の 3 節）に FORCE RLS と `SET LOCAL app.actor_id` | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) |
+| DB | Aurora PostgreSQL 18。テナントの RLS はなく、本人だけが読む表（DM、ブックマーク、下書き、通知、設定など。一覧は [data-model.md](data-model.md) の 3.2 節）に FORCE RLS と `SET LOCAL app.actor_id` | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) |
 | 写し | ElastiCache（Valkey）の 4 クラスタ：`vk-timeline`（ホームの写し、作者の最近の投稿）、`vk-cache`（投稿の状態、閲覧者の集合、特徴）、`vk-counters`（数）、`vk-edge`（セッション、レート制限） | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)、[ADR-0055](../decisions/0055-kinesis-consumers-and-valkey-clusters.md) |
 | 出来事のログ | transactional outbox → Relay → Kinesis Data Streams。仕事の待ち行列は SQS | 共通の SQS・SNS に加えて Kinesis を使う。理由は [ADR-0005](../decisions/0005-event-log-and-outbox.md) |
 | 検索 | Amazon OpenSearch Service。一致の判定は 1〜2 文字の N-gram、関連度は kuromoji | [ADR-0025](../decisions/0025-search-engine-and-japanese-analysis.md)。Sudachi は `search-poc` で比べる |
@@ -283,6 +283,25 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **検証の工程での直し（2026-10-04）**：公式の資料を取得し直して、次を確かめ・直した。おすすめの今の構成（SimClusters、作者の減衰の下限、新しい作者の押し上げ。1.3 節）、Chat の鍵の預け方（Juicebox。公式の文書で確かめ、未検証を外した）、情報流通プラットフォーム対処法の指定（2025-04-30 の 5 社の後、5 月に 4 社を追加）、申出から 7 日の期限（第三者の解説で確認、省令の条文は未検証）、CloudFront KeyValueStore の上限と、CloudFront Functions で国の見出しを読めること（[media.md](media.md)）、App Store の段階的リリースの割合、Kinesis の上限、IETF の `RateLimit` の草案（draft-11、まだ RFC でない）、公開 API の課金と上限、メディアの上限。help.x.com と blog.x.com は再び 403 で、そこにしかない値は未検証のまま残した。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
+### 決定（2026-10-04、データモデル）
+
+データモデルの完全版（[data-model.md](data-model.md) と [data-model/](data-model/)）を作る工程で、領域の文書と ADR の間の名前と列の食い違いを次のとおり解いた。ADR の決定は変えていない。
+
+- **正本の移動**：列・鍵・索引の正本を [data-model.md](data-model.md) と [data-model/](data-model/) に移した。領域の文書の「data-model への項目」は要点で、食い違ったらデータモデルに合わせて直す。
+- **措置の要約の形**：`posts.mod_flags` をビット（`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED`）と地域の列 `posts.mod_geo` にし、`users.account_mod` もビットと `account_mod_detail` にした（[data-model.md](data-model.md) の 3.5 節）。[posts-and-ids.md](posts-and-ids.md) の `restricted`・`age_gated`・`geo_withheld` と [trust-and-safety.md](trust-and-safety.md) の `label`・`reduce`・`removed`・`geo` の食い違いを、この名前に揃えた。
+- **作者の状態の版**：`as:` の版として `users.state_version` を足した（[posts-and-ids.md](posts-and-ids.md) の 6 節が求めていたが、`users` の表になかった）。
+- **本人だけの表の列**：`owner_id` に揃えた（`user_contacts`・`user_birthdates`・`dm_message_hidden`・`oauth_grants` の `user_id` を直した）。`user_contacts` に変更の保留の `slot`（`current`・`pending`）と HMAC の鍵の版を足した。
+- **`auth` スキーマ**：`auth.user.email`・`phone_number` に平文でなく HMAC の値を入れ、`auth.session` に IP を残さない（[security.md](security.md) の 5.3 節の「平文の列を持たない」を Better Auth の表にも当てる）。Better Auth の版で動くかは E2 の `auth-signup-login` で確かめる。
+- **通知のまとめ**：日ごとに分けた `notifications` には、領域の文書の部分の一意の索引 `(owner_id, group_key) WHERE is_open` を張れない（分ける鍵を含まないため）。開いている行を `notification_open_groups` の主キーで 1 つにし、まとめない種類の冪等は分ける鍵 `bucket_on`（元の投稿の `tid` の日）を含めた一意にした。
+- **出来事の名前**：鍵の切り替えは `accounts` の流れの `accounts.protected_changed` に揃えた（[follow-graph.md](follow-graph.md) の `graph` の流れの `account.protected_changed` を直した）。投稿の措置は `moderation.action_applied` と `post.state_changed` を同じトランザクションで書く。
+- **Relay の区画**：`relay_partitions` は表にせず、Valkey の `relay:lease:{n}`（なければ勧告的ロック）にした（[infrastructure.md](infrastructure.md) の 14 節を直した）。
+- **足した表**：`notification_open_groups`、`processed_events`（DB に書く消費者の重複の記録）、`post_shard_map`・`engagement_shard_map`（S2。`graph_shard_map` と同じ形）。`legal_holds` の `from`・`to` は SQL の予約語を避けて `period_from`・`period_to` にした。
+- **DB のロールと S2 のクラスタ**：サービスごとの DB のロールと列の単位の書き込みの権限（[data-model.md](data-model.md) の 3.3 節）、S2 のクラスタへの表の割り当て（S1 の `main` を `core` として残す。3.12 節）を決めた。
+- **S2 で同じトランザクションを保てない書き込み（推奨。S2 の着手の時に ADR で確定する）**：
+  - フォローと `users.graph_version`：版を関係のクラスタの表（`graph_versions(user_id, version)`、`user_id` の分割）に移す。
+  - 措置と要約：`moderation_actions`・`moderation_action_events` を対象と同じクラスタ・分割に置き（投稿・メディアは `posts`、アカウントは `accounts`）、案件・通報・法令の表は `core` に残す。ADR-0038 の「同じトランザクション」を保つ。
+  - 投稿と `media` の `attached`：付け先の正本を `post_media`・`dm_messages.media_id` にし、`media.state` の `attached` は出来事から冪等に書く。付ける前の確かめ（`ready` で同じ作者）は書き込みの時に読む。
+
 持ち越し（法務、計測・PoC・選定で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
@@ -297,7 +316,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 「見えなくなった」の知らせ（`hidden`）を誰に送るか | E5（[clients.md](clients.md) の 4.4 節） |
 | MediaConvert で 1 分の動画 p95 60 秒を守れるか、CloudFront の無効化の時間 | E7 の `video-transcode`・`media-delivery-and-takedown` |
 | ElastiCache の Valkey の版とノードの記憶、Global Datastore、KMS の要求のクォータ、サーバーの時計のずれ | E1 の着手の時 |
-| データモデルの完全版（ER 図、列の型と索引の正本、横断の不変条件） | 後の工程（[data-model.md](data-model.md) は索引だけ） |
+| S2 で同じトランザクションを保てない書き込み（[data-model.md](data-model.md) の 7 節。推奨は上の「データモデル」の決定） | S2 の着手の時に ADR を書く |
 | 本家の振る舞いで未確認のもの（ヘルプセンターの値、6,800 万人、2012 年の講演の数値） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 
@@ -321,7 +340,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [api-and-rate-limits.md](api-and-rate-limits.md) | 公開 API の形と版、ページングとエラー、開発者とアプリ、OAuth 2.0（PKCE）とトークンの形（`<brand>_`）、レート制限（トークンバケット、画面と API の共通の桶、`RateLimit` のヘッダー）、計量とプラン、後の Webhook | 0046–0048（範囲 0046–0048） | QA、Ops | E2、E13 |
 | [clients.md](clients.md) | 共通のパッケージ、Web（React、PWA）とアプリ（React Native）、データの層と手元の保存、オフライン、タイムラインの描画、投稿の作成と日本語の入力、閲覧の出来事の送り方、プッシュの受け方と深いリンク、公開の URL の HTML、アクセシビリティ | 0049–0050（範囲 0049–0050） | QA | E2〜E13 |
 | [security.md](security.md) | 信頼境界と脅威モデル、端末に残るデータ、暗号化と鍵、監査と運用者のアクセス、データのライフサイクルと保全、乗っ取りへの対応、ログに出さないもの、脆弱性の管理、インシデント | 0051–0053（範囲 0051–0053） | セキュリティ | E1、E11、E14 |
-| [data-model.md](data-model.md) | 表と置き場所の索引（領域ごと）、本人だけの表の一覧、ID の種類。完全版（ER 図、列の型）は後の工程 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)・[data-model/](data-model/) | データモデルの正本：規約（ID、RLS、DB のロール、`visible()` に渡す列、暗号化、分割と保持、S2 のクラスタ）、全体と領域ごとの ER 図、95 表の定義、DB の外の置き場所の形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、ホスト名と CloudFront、サービスと配置、Valkey の 4 クラスタ、Kinesis の 8 つの流れと消費者、バックアップと DR（`tid` の範囲、outbox の送り直し、`ar:` の先の作成）、段階を上げる基準、S2・S3、Terraform、コスト | 0054–0056（範囲 0054–0057） | Ops | E1、E14 |
 | [observability.md](observability.md) | 中身を出さない計装、トレース、RUM、届く速さの計測（合成監視、区間、読み出しの抜き取り）、SLI の計測、出来事・写し・カウンターの指標、見える範囲の抜き取りの監査、ランキングのガードレールの指標、ダッシュボード | 0058–0059（範囲 0058–0059） | Ops | E1、E5、E10、E14 |
 | [capacity.md](capacity.md) | 負荷のモデル（投稿、読み出し、fan-out、エンゲージメント、閲覧、瞬間のピーク）、部品ごとの必要量、データの量、クォータ、余裕と削る順、負荷試験 L1〜L10 | 0060（範囲 0060） | Ops | E14 |

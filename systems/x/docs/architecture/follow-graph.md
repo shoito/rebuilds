@@ -252,6 +252,8 @@ flowchart LR
 
 ## 11. data-model への項目
 
+列・鍵・索引の正本は [data-model/graph.md](data-model/graph.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
 | `following` | `(src_id, dst_id) PK`、`state`、`created_at`、`updated_at` | 索引 `(src_id, created_at DESC, dst_id DESC)`、`(src_id) WHERE state = 'pending'` |
@@ -263,7 +265,7 @@ flowchart LR
 | `users.fanout_mode`、`users.fanout_mode_changed_at` | `push`・`pull` | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)。統合の工程で `users` の列に決めた（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
 | `user_counters` | `user_id PK`、`followers`、`following`、`posts`、`updated_at` | 写し。[engagement-and-counters.md](engagement-and-counters.md) |
 | `graph_shard_map`（S2） | `logical_partition smallint PK`、`cluster`、`state`、`moved_at` | |
-| outbox の出来事 | `graph` の流れ：`follow.created`・`follow.requested`・`follow.approved`・`follow.deleted`（理由：解除・拒否・取り消し・削除・ブロック）・`block.created`・`block.deleted`・`mute.created`・`mute.deleted`・`author.fanout_mode_changed`・`account.protected_changed` | 鍵は `src_id`（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）。ミュートの出来事は相手の ID を含むが、データレイクに写すときは本人だけの出来事として扱う |
+| outbox の出来事 | `graph` の流れ：`follow.created`・`follow.requested`・`follow.approved`・`follow.deleted`（理由：解除・拒否・取り消し・削除・ブロック）・`block.created`・`block.deleted`・`mute.created`・`mute.deleted`・`author.fanout_mode_changed`。鍵の切り替えは Accounts が `accounts` の流れに `accounts.protected_changed` を書く | 鍵は `src_id`（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）。ミュートの出来事は相手の ID を含むが、データレイクに写すときは本人だけの出来事として扱う |
 | Valkey `vb:`・`vm:`・`vp:`・`vw:`・`vv:`・`vl:` | 6 節 | 寿命 1 時間 |
 | Valkey の信号の桶 | `gs:{user_id}:{signal}:{minute}` | 寿命 25 時間 |
 | SQS `graph-cache-repair` | 閲覧者の集合の修復の仕事 | |

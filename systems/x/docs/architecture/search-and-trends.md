@@ -348,6 +348,8 @@ z   = (c − e) / sqrt(e + β)          β = 5
 
 ## 11. data-model への項目
 
+列・鍵・索引の正本は [data-model/search-and-trends.md](data-model/search-and-trends.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | OpenSearch `posts-YYYYMM`（別名 `posts-read`） | 投稿の文書（7.1 節） | 7 |

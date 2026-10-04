@@ -345,6 +345,8 @@ sequenceDiagram
 
 ## 13. data-model への項目
 
+列・鍵・索引の正本は [data-model/platform-and-audit.md](data-model/platform-and-audit.md)、暗号化の列は [data-model.md](data-model.md) の 3.9 節にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・置き場所 | 中身 | 種類 |
 | --- | --- | --- |
 | `audit_events` | 6.1 節 | 運用の表（追記だけ） |

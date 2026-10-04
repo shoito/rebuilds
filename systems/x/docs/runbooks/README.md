@@ -111,7 +111,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 瞬間のピークの負荷試験（年が変わる 0 時の形） | 年 1 回（12 月の前）と、fan-out の大きな変更の後 | NFR-002 の p99 30 秒、NFR-003 |
 | 法令の申出の合成の案件での訓練 | 四半期 | 期限の超過 0、手順の抜け 0 |
 | 生成器の貸し出しと時計の監視の確かめ | 月 1 回 | 貸し出しの重なり 0 |
-| 本人だけの表の RLS の監査 | 四半期 | [data-model.md](../architecture/data-model.md) の 3 節の一覧と、DB の FORCE RLS の設定が一致 |
+| 本人だけの表の RLS の監査 | 四半期 | [data-model.md](../architecture/data-model.md) の 3.2 節の一覧と、DB の FORCE RLS の設定が一致 |
 | Valkey の数のクラスタの喪失の訓練 | 半年（staging） | [quality.md](../quality.md) の 2.4 節 |
 | AZ の障害の訓練 | 半年（staging） | 同上 |
 | 大阪の待機の確かめ（合成監視、Terraform の差分、複製） | 1 分〜月 1 回 | [infrastructure.md](../architecture/infrastructure.md) の 7.7 節 |

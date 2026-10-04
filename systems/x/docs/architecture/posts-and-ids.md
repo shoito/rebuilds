@@ -225,7 +225,7 @@ stateDiagram-v2
     purged --> [*]
 ```
 
-- `posts.state` は `active`・`deleted`・`purged`。措置は `moderation_actions` が正本で、`posts` には効いている措置の要約（`mod_flags`：`restricted`・`removed`・`age_gated`・`geo_withheld` と地域の一覧）を写す（[trust-and-safety.md](trust-and-safety.md)）。図の `restricted`・`removed` は、この要約を表す。
+- `posts.state` は `active`・`deleted`・`purged`。措置は `moderation_actions` が正本で、`posts` には効いている措置の要約（`mod_flags` のビット：`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED`、地域の一覧は `mod_geo`。[data-model.md](data-model.md) の 3.5 節）を写す（[trust-and-safety.md](trust-and-safety.md)）。図の `restricted` は `LABEL`・`REDUCE` などの制限、`removed` は `REMOVED` を表す。
 - 状態が変わるたびに `state_version` を 1 つ上げる。`state_version` は投稿の状態の写しの版になる（6 節）。
 - `deleted` は作者が戻せない。`removed` は異議で戻りうる。
 - `purged` は、本文・抜き出し・メディアの参照を消し、行の骨（ID・作者・状態）だけを残す。保持の期間は法務の L8 の後に決める。開示の請求のための保全（L2）がかかった投稿は、保全が解けるまで `purged` にしない。
@@ -381,10 +381,12 @@ flowchart LR
 
 ## 12. data-model への項目
 
+列・鍵・索引の正本は [data-model/posts.md](data-model/posts.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
-| `posts` | `id bigint PK`（`tid`）、`author_id bigint`、`kind`、`text`（NFC）、`lang`、`in_reply_to_post_id`、`in_reply_to_user_id`、`conversation_id`、`quoted_post_id`、`repost_of_id`、`reply_policy`、`sensitive`、`has_media`、`region_code`（作成の時に決めた地方。[search-and-trends.md](search-and-trends.md) の 9.2 節。L4 の確認待ち）、`state`、`mod_flags`、`state_version bigint`、`created_at`、`deleted_at` | 公開の表（RLS なし）。S1 は `id` の範囲で月ごとのパーティション。索引：`(author_id, id DESC)`、`(author_id, id DESC) WHERE has_media`、`(conversation_id, id)`、`(in_reply_to_post_id, id)`、`(in_reply_to_post_id, author_id)`、`(quoted_post_id, id)`（[timeline-fanout.md](timeline-fanout.md) の 13 節） |
-| `post_requests` | `(author_id, client_request_id) PK`、`post_id`、`created_at` | 冪等の記録。24 時間。投稿者だけが使うが、書き込みの経路の内部の表なので RLS の対象にしない（API に出さない） |
+| `posts` | `id bigint PK`（`tid`）、`author_id bigint`、`kind`、`text`（NFC）、`lang`、`in_reply_to_post_id`、`in_reply_to_user_id`、`conversation_id`、`quoted_post_id`、`repost_of_id`、`reply_policy`、`sensitive`、`has_media`、`region_code`（作成の時に決めた地方。[search-and-trends.md](search-and-trends.md) の 9.2 節。L4 の確認待ち）、`state`、`mod_flags`、`mod_geo`、`state_version bigint`、`created_at`、`deleted_at`、`purged_at` | 公開の表（RLS なし）。S1 は `id` の範囲で月ごとのパーティション。索引：`(author_id, id DESC)`、`(author_id, id DESC) WHERE has_media`、`(conversation_id, id)`、`(in_reply_to_post_id, id)`、`(in_reply_to_post_id, author_id)`、`(quoted_post_id, id)`（[timeline-fanout.md](timeline-fanout.md) の 13 節） |
+| `post_requests` | `(author_id, client_request_id) PK`、`post_id`、`state`（S2 の `reserved`）、`created_at` | 冪等の記録。24 時間。投稿者だけが使うが、書き込みの経路の内部の表なので RLS の対象にしない（API に出さない） |
 | `post_mentions` | `(post_id, user_id) PK`、`position` | 索引 `(user_id, post_id DESC)`（メンションの一覧） |
 | `post_hashtags` | `(post_id, tag_norm) PK`、`position` | 検索とトレンドは出来事から作る |
 | `post_urls` | `(post_id, position) PK`、`short_code`、`expanded_url` | |

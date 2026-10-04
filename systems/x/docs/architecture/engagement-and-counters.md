@@ -248,6 +248,8 @@ S3（1 日 600 億件）の量と費用は [capacity.md](capacity.md) で見積�
 
 ## 9. data-model への項目
 
+列・鍵・索引の正本は [data-model/engagement.md](data-model/engagement.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
 | `likes` | `(post_id, user_id) PK`、`created_at` | S2 はエンゲージメントのクラスタで `post_id` の論理の分割 |

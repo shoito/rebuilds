@@ -242,9 +242,11 @@ Push Sender は、送る直前に次を確かめる。spec の `DT-NOTIF-002` �
 
 ## 11. data-model への項目
 
+列・鍵・索引の正本は [data-model/notifications.md](data-model/notifications.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
-| `notifications` | `owner_id`、`id`（UUIDv7）、`type`、`group_key`、`target_post_id`、`source_post_id`、`recent_actor_ids bigint[]`、`actor_count`、`latest_at`、`created_at`、`state`（`active`・`hidden`）、`is_open`、`open_until` | 本人だけの表、FORCE RLS。主キー `(owner_id, id)`。部分の一意の索引 `(owner_id, group_key) WHERE is_open`（開いている行は 1 つ。既読の位置か `open_until` を越えたら Worker が `is_open = false` にする）。一意 `(owner_id, type, source_post_id)`（まとめない種類の冪等）。索引 `(owner_id, latest_at DESC, id DESC)`。日ごとのパーティション、90 日で落とす |
+| `notifications` | `owner_id`、`id`（UUIDv7）、`type`、`group_key`、`target_post_id`、`source_post_id`、`recent_actor_ids bigint[]`、`actor_count`、`latest_at`、`created_at`、`state`（`active`・`hidden`）、`is_open`、`open_until` | 本人だけの表、FORCE RLS。主キー `(owner_id, id, bucket_on)`。開いている行は `notification_open_groups(owner_id, group_key)` の主キーで 1 つにする（日ごとに分けた表に部分の一意の索引を張れないため。既読の位置か `open_until` を越えたら Worker が `is_open = false` にし、その行を消す）。一意 `(owner_id, type, source_post_id, bucket_on)`（まとめない種類の冪等。`bucket_on` は `source_post_id` の日）。索引 `(owner_id, latest_at DESC, id DESC)`。`bucket_on` の日ごとのパーティション、90 日で落とす |
 | `notification_actors` | `(owner_id, notification_id, actor_id) PK`、`created_at` | 本人だけの表。殺到の状態では書かない |
 | `notification_cursors` | `owner_id PK`、`last_seen_at`、`updated_at` | 本人だけの表 |
 | `notification_settings` | `owner_id PK`、種類ごとの可否（`jsonb`）、品質のフィルター、相手の絞り込み、静かな時間、メールの要約 | 本人だけの表 |

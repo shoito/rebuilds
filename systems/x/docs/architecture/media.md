@@ -308,6 +308,8 @@ type MatchResult =
 
 ## 13. data-model への項目
 
+列・鍵・索引の正本は [data-model/media.md](data-model/media.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora `media`（`media_id`（`tid`）、`owner_id`、`purpose`、`kind`（`image`・`gif`・`video`）、`state`、`state_version`、`media_key`、`access`（`public`・`private`）、`bytes`、`width`、`height`、`duration_ms`、`sha256`、`pdq`、`blurhash`、`alt_text`、`sensitive_labels`、`attached_to_kind`（`post`・`dm`・`profile`）、`attached_to_id`、`created_at`、`ready_at`、`withheld_at`）。主キー `media_id`、一意 `media_key`、索引 `(owner_id, created_at)`・`(state, created_at)` | メディアの正本 | 4.2 |

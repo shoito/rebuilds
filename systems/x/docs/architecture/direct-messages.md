@@ -52,7 +52,7 @@ DM。1 対 1 とグループ（50 人まで）の会話、メッセージの ID 
 | `dm_conversations` | `conversation_id`（UUIDv7） | `kind`（`direct`・`group`）、`direct_key`（1 対 1 のとき `min(a,b):max(a,b)`、一意）、`title`、`created_by`、`last_seq`、`last_message_at`、`dek_wrapped`、`enc_scheme` |
 | `dm_participants` | `(conversation_id, user_id)` | `role`（`owner`・`member`）、`state`（`active`・`request`・`left`・`removed`）、`joined_seq`、`last_read_seq`、`muted`、`folder`（`inbox`・`requests`）、`updated_at` |
 | `dm_messages` | `(conversation_id, seq)` | `message_id`（`tid`、一意）、`sender_id`、`kind`（`text`・`media`・`post_share`・`system`）、`body_ct`（暗号文）、`media_id`、`shared_post_id`、`client_msg_id`、`created_at` |
-| `dm_message_hidden` | `(user_id, conversation_id, seq)` | 本人の側だけで消したメッセージ |
+| `dm_message_hidden` | `(owner_id, conversation_id, seq)` | 本人の側だけで消したメッセージ |
 
 - `direct_key` の一意の制約で、同じ 2 人の 1 対 1 の会話は 1 つだけにする。
 - グループの会話は 50 人まで（`active` と `request` の合計）。
@@ -266,6 +266,8 @@ sequenceDiagram
 | 申請の期限 | 30 日 | 自前 |
 
 ## 14. data-model への項目
+
+列・鍵・索引の正本は [data-model/dm.md](data-model/dm.md)にある。下の表は、この領域が求めた項目の要点である。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |

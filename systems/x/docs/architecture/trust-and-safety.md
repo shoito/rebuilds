@@ -83,7 +83,7 @@
 | アカウント | `suspend` | プロフィールと投稿を全員に `hide`（本人は異議のためにログインできる）。期限つきか永久 |
 | 機能 | `feature_limit` | 特定の機能の制限（DM の申請、メディアの投稿、ライブの機能）。値つき |
 
-- `visible()` は、投稿の `mod_flags`（`label`・`reduce`・`removed`・`geo`）と、作者の措置の要約（`as:{user_id}` の `account_mod`）だけを読む（[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)）。措置の正本は `moderation_actions`。
+- `visible()` は、投稿の `mod_flags`（`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED` のビットと地域の `mod_geo`。[data-model.md](data-model.md) の 3.5 節）と、作者の措置の要約（`as:{user_id}` の `account_mod`）だけを読む（[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)）。措置の正本は `moderation_actions`。
 - 表駆動テストの決定表（`DT-TS-001`）は、上の表の「種類 × 閲覧者の関係（本人・フォロワー・その他・ログインしていない人）× 経路（フォロー中・おすすめ・検索・トレンド・通知・プロフィール・公開 API・メディア）」で書く。
 
 ## 5. 措置の記録と効かせ方
@@ -372,6 +372,8 @@ flowchart TB
 
 ## 14. data-model への項目
 
+列・鍵・索引の正本は [data-model/trust-and-safety.md](data-model/trust-and-safety.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora `moderation_actions`（`action_id`（UUIDv7）、`target_kind`（`post`・`media`・`account`・`feature`）、`target_id`、`kind`、`params`（JSON：地域、期限、制限の値）、`policy_code`、`policy_version`、`basis_kind`（`policy`・`legal_case`・`hash_match`・`rule`）、`basis_ref`、`decided_by_kind`（`human`・`rule`）、`decided_by`、`approved_by`、`case_id`、`state`、`created_at`、`expires_at`）。追記だけ。索引 `(target_kind, target_id, state)` | 措置の正本 | 5 |
@@ -384,7 +386,7 @@ flowchart TB
 | Aurora `account_risk`（`user_id`、`risk_score`、`model_version`、`signals`（JSON：規則の ID と値）、`updated_at`）、`rate_multipliers`（`user_id`、`multiplier`、`reason`、`expires_at`） | 危険の点 | 8.3 |
 | Aurora `ts_rules`（`rule_id`、`version`、`definition`、`allowed_actions`、`precision_checked_at`、`enabled`） | 規則 | 6.4、8.2 |
 | Aurora `legal_cases`（`case_id`、`kind`（`takedown`・`disclosure_order`・`provision_order`・`erasure_prohibition`・`voluntary_disclosure`・`law_enforcement`・`copyright`）、`requester`（暗号化）、`targets`、`received_at`、`due_at`、`deadline_rule_version`、`state`、`decision`、`decided_at`、`notifications`（JSON：送り先・型・時刻）） | 法令の案件 | 10 |
-| Aurora `legal_holds`（`hold_id`、`case_id`、`subject_kind`（`user`・`post`・`media`・`dm_conversation`）、`subject_id`、`scope`、`from`、`to`、`expires_at`、`released_at`） | 保全 | 10.2 |
+| Aurora `legal_holds`（`hold_id`、`case_id`、`subject_kind`（`user`・`post`・`media`・`dm_conversation`）、`subject_id`、`scope`、`period_from`、`period_to`、`expires_at`、`released_at`） | 保全 | 10.2 |
 | Aurora `disclosure_exports`（`export_id`、`case_id`、`fields`、`requested_by`、`approved_by`、`s3_key`、`delivered_at`、`expires_at`） | 開示の取り出し | 10.2 |
 | Valkey `ts:rl:{rule_id}:{user_id}`（滑る窓） | 行動の規則 | 8.2 |
 | S3（Iceberg）`ts_actions_daily`、`ts_reports_daily`、`ts_legal_daily` | 公表の集計 | 11 |

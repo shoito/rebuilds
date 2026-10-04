@@ -295,13 +295,15 @@ ADR-0044。**最低の年齢、確かめの方法、未成年への制限の中�
 
 ## 12. data-model への項目
 
+列・鍵・索引の正本は [data-model/users-and-accounts.md](data-model/users-and-accounts.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・置き場所 | 中身 | 種類 |
 | --- | --- | --- |
-| `auth.user`・`auth.session`・`auth.account`・`auth.verification`・`auth.passkey` | Better Auth の表。`auth` スキーマ、`auth` のロールだけ | RLS の外 |
-| `users` | `id`（`tid`）、`handle`、`state`、`protected`、`login_policy`、`age_band`、`account_mod`（アカウントの措置の要約。[trust-and-safety.md](trust-and-safety.md) の 4.2 節）、`graph_version`（閲覧者の集合の版。[follow-graph.md](follow-graph.md) の 6 節）、`fanout_mode`・`fanout_mode_changed_at`（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）、`pinned_post_id`（[timeline-fanout.md](timeline-fanout.md) の 9.1 節）、`flags`（`synthetic` など。[observability.md](observability.md) の 4.2 節）、`created_at`、`state_changed_at` | 公開の表。他の領域が求めた列も、この表の持ち主の Accounts が足す。`account_mod` は T&S、`graph_version` は Graph、`fanout_mode` は Graph の数の消費者が書く |
+| `auth.user`・`auth.session`・`auth.account`・`auth.verification`・`auth.passkey` | Better Auth の表。`auth` スキーマ、`auth` のロールだけ。`user.email`・`user.phone_number` には平文でなく HMAC の値を入れ、`session` に IP を残さない（統合の後の決定） | RLS の外 |
+| `users` | `id`（`tid`）、`handle`、`state`、`protected`、`login_policy`、`age_band`、`account_mod`・`account_mod_detail`（アカウントの措置の要約。[trust-and-safety.md](trust-and-safety.md) の 4.2 節）、`state_version`（作者の状態の写し `as:` の版）、`graph_version`（閲覧者の集合の版。[follow-graph.md](follow-graph.md) の 6 節）、`fanout_mode`・`fanout_mode_changed_at`（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）、`pinned_post_id`（[timeline-fanout.md](timeline-fanout.md) の 9.1 節）、`flags`（`synthetic` など。[observability.md](observability.md) の 4.2 節）、`created_at`、`state_changed_at`、`deleted_at` | 公開の表。他の領域が求めた列も、この表の持ち主の Accounts が足す。`account_mod` は T&S、`graph_version` は Graph、`fanout_mode` は Graph の数の消費者が書く |
 | `profiles` | 表示名、自己紹介、アイコン・ヘッダーのメディアの ID、場所、URL | 公開の表 |
-| `user_contacts` | `(user_id, kind, value_ct, contact_hmac, verified_at, pending_until)` | 本人だけの表（RLS） |
-| `user_birthdates` | `(user_id, birthdate_ct)` | 本人だけの表（RLS）。Accounts だけが読む |
+| `user_contacts` | `(owner_id, kind, slot, value_ct, contact_hmac, hmac_kid, verified_at, pending_until)`。`slot` は `current`・`pending`（保留の間の新しい連絡先） | 本人だけの表（RLS） |
+| `user_birthdates` | `(owner_id, birthdate_ct)` | 本人だけの表（RLS）。Accounts だけが読む |
 | `user_settings` | `owner_id PK`、`region`（地方。[search-and-trends.md](search-and-trends.md) の 9.2 節）、`personalized_ranking`・`home_default_tab`（[ranking-and-recommendation.md](ranking-and-recommendation.md) の 12.2 節）、`sensitive_media`（センシティブなメディアを出すか）、`locale`、`updated_at` | 本人だけの表（RLS）。通知の設定は `notification_settings`、DM の設定は `dm_settings` に分ける |
 | `data_export_requests` | `(id, owner_id, state, requested_at, ready_at, s3_key, expires_at)` | 本人だけの表（RLS）。データの書き出し（5.4 節） |
 | `handle_holds` | `(handle_lower, user_id, reason, until)` | 公開の表（書くのは Accounts だけ） |

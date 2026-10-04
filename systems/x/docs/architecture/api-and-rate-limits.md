@@ -304,12 +304,14 @@ ADR-0048 で MVP の後にした。形だけを決めておく。
 
 ## 10. data-model への項目
 
+列・鍵・索引の正本は [data-model/api-and-apps.md](data-model/api-and-apps.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・置き場所 | 中身 | 種類 |
 | --- | --- | --- |
 | `developer_accounts` | `(id, user_id, purpose, state, created_at)` | 運用の表 |
 | `apps` | `(id, developer_id, name, kind, redirect_uris, scopes, plan, state, created_at)` | 運用の表 |
 | `app_credentials` | クライアントの秘密・アプリのトークンのハッシュ、末尾 4 文字 | 運用の表 |
-| `oauth_grants` | `(id, app_id, user_id, scopes, family_id, created_at, revoked_at)` | 本人だけの表（RLS。本人は自分の認可を見る） |
+| `oauth_grants` | `(owner_id, id, app_id, scopes, family_id, created_at, revoked_at)` | 本人だけの表（RLS。本人は自分の認可を見る） |
 | `oauth_tokens` | `(token_hash, grant_id, kind, expires_at, revoked_at)` | `public-api` のロールだけ |
 | `api_usage_daily` | 6.1 節 | 運用の表 |
 | Valkey `rl:{…}` | 桶（5.2 節） | 写し（失ってよい） |

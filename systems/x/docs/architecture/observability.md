@@ -214,6 +214,8 @@ ADR-0059。[ADR-0006](../decisions/0006-ranking-boundary.md) のガードレー�
 
 ## 11. data-model への項目
 
+列・鍵・索引の正本は [data-model/platform-and-audit.md](data-model/platform-and-audit.md)にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・置き場所 | 中身 |
 | --- | --- |
 | outbox の出来事の中身に `committed_at`・`traceparent` | 4.1 節、2.2 節。出来事の形の共通の頭（[delivery.md](delivery.md) の 7.2 節） |

@@ -327,6 +327,8 @@ sequenceDiagram
 
 ## 13. data-model への項目
 
+列・鍵・索引の正本は [data-model/timelines-and-ranking.md](data-model/timelines-and-ranking.md)、Valkey の鍵は [data-model/stores.md](data-model/stores.md) の 1 節にある。下の表は、この領域が求めた項目の要点である。
+
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
 | `posts` の索引 | `(author_id, id DESC)`、`(author_id, id DESC) WHERE has_media`、`(in_reply_to_post_id, id)`、`(in_reply_to_post_id, author_id)`、`(conversation_id, id)` | 表は [posts-and-ids.md](posts-and-ids.md) |

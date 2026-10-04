@@ -364,6 +364,8 @@ S2:
 
 ## 16. data-model への項目
 
+列・鍵・索引の正本は [data-model/timelines-and-ranking.md](data-model/timelines-and-ranking.md)、Valkey の鍵は [data-model/stores.md](data-model/stores.md) の 1 節にある。下の表は、この領域が求めた項目の要点である。
+
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Valkey `pf:{post_id}`（ハッシュ、48 時間） | 投稿の特徴（数、率、速さ、メディア、言語） | 7.1 |
