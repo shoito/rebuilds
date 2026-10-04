@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X の前提知識</title>
+<meta name="description" content="X の再構築の設計の文書を読む前に知っておくとよい、公開型の SNS の分野の概念・用語・業界の決まり・法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · X · 前提知識</p>
+    <h1>X の設計を読む前に</h1>
+    <p class="lead">公開型の SNS は「短い文を保存して見せる」だけに見えますが、届ける・選ぶ・数える・守るのそれぞれに、分野に固有の考え方があります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7、ER 図の記号など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · X · 前提知識</p>
+    <h2>X の設計を読む前に</h2>
+    <p class="lead">届ける・選ぶ・数える・守るの前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>X は何をするサービスか</h2>
+    <p>X（旧 Twitter）は、誰でも短い文を投稿し、誰でもそれを読める公開型の SNS です。宛先を選んで送るのではなく、自分の投稿を公開し、<strong>自分をフォローしている人</strong>のホームに届きます。ニュースの速報、災害の情報、テレビの実況が、同じ流れの上で起きます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>おすすめ（For you）</h3><p>フォローしていない人の投稿も含めて、1 人ひとりに合わせて並べ替えたホーム。<a class="t" href="#g-ranking">ランキング</a>で作ります。</p></div>
+      <div class="card" data-frag><h3>フォロー中（Following）</h3><p>フォローしている人の投稿だけを、新しい順に並べたホーム。順は時刻だけで決まります。</p></div>
+      <div class="card" data-frag><h3>読む人が圧倒的に多い</h3><p>多くの利用者は読むだけです。S1 でもタイムラインの読み出しのピークは 1 万件/秒で、投稿の 300 件/秒の 30 倍以上です。</p></div>
+    </div>
+    <p>再構築の intent は、難しさを 4 つに絞っています。<strong>届ける</strong>（数千万人のフォロワーに数秒で）、<strong>選ぶ</strong>（おすすめ）、<strong>数える</strong>（いいね・表示の数）、<strong>守る</strong>（スパム・違法な情報・日本の法令の期限）です。この資料も、この 4 つに沿って進みます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a> の Problem と「成功の基準」（K1〜K8）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
+  </section>
+
+  <section class="s" id="posts">
+    <h2>投稿・返信・引用・リポスト</h2>
+    <p>X の「投稿」には 4 つの種類があります。設計では、どれも <code>posts</code> の 1 行で、<code>kind</code> の列で区別します。</p>
+    <table>
+      <tr><th><code>kind</code></th><th>何か</th><th>本文</th><th>指す先の列</th></tr>
+      <tr><td><code>post</code></td><td>ふつうの投稿</td><td>あり</td><td>—</td></tr>
+      <tr><td><code>reply</code></td><td><a class="t" href="#g-reply">返信</a>。会話にぶら下がる</td><td>あり</td><td><code>in_reply_to_post_id</code>、<code>conversation_id</code></td></tr>
+      <tr><td><code>quote</code></td><td><a class="t" href="#g-quote">引用</a>。元の投稿を埋め込んでコメントする</td><td>あり（空でもよい）</td><td><code>quoted_post_id</code></td></tr>
+      <tr><td><code>repost</code></td><td><a class="t" href="#g-repost">リポスト</a>。元の投稿を自分のフォロワーにそのまま広める</td><td>なし</td><td><code>repost_of_id</code></td></tr>
+    </table>
+    <ul>
+      <li><strong>会話</strong>は返信の木です。<code>conversation_id</code> は根の投稿の ID で、返信は親の値を写します。</li>
+      <li><strong>スレッド</strong>は、作者が自分の投稿に続けた返信の列です。別の表はありません。</li>
+      <li>文字数は「重み付きで 280」です。日本語・中国語・韓国語の文字は 2 と数えるので、全角だけなら 140 文字です。URL は短縮して 23 と数えます。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/posts-and-ids.md">posts-and-ids.md</a> の 4 節（種類、文字数、引用とリポストの規則）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0008-post-write-path-and-idempotency.md">ADR-0008</a>（書き込みの経路）。</div>
+  </section>
+
+  <section class="s" id="graph">
+    <h2>フォロー・鍵アカウント・ブロック・ミュート</h2>
+    <p>フォローは<strong>片向き</strong>の関係です。相手の承認は要りません。ただし、相手が<a class="t" href="#g-protected">鍵アカウント</a>なら申請になり、承認されるまで投稿は読めません。</p>
+    <div class="tabs">
+      <div data-tab="フォロー"><p>する側からの辺です。相手が公開なら <code>active</code>、鍵アカウントなら <code>pending</code> で始まります。設計は、する側から引く <code>following</code> と、される側から引く <code>followers</code> の 2 つの向きの表を、同じトランザクションで書きます。</p></div>
+      <div data-tab="鍵アカウント"><p>承認したフォロワーと本人だけが投稿を読めます。<strong>リポストはできません</strong>（本人も）。承認したフォロワーの外に広がるためです。引用は書けますが、引用の中の元の投稿は、見えない人には「表示できません」になります。</p></div>
+      <div data-tab="ブロック"><p>相手は自分の投稿を読めず、フォロー・返信・DM ができません。ブロックした瞬間に、両向きのフォローと申請が外れます。</p></div>
+      <div data-tab="ミュート"><p>自分のホーム・通知から相手の投稿を消すだけです。<strong>相手には知られません</strong>。そのため、ミュートした人を、された側から引く逆向きの表を持ちません。語のミュートもあります。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/follow-graph.md">follow-graph.md</a> の 4 節（辺の状態と決定表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0007-follow-graph-storage.md">ADR-0007</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0011-graph-edge-state-machine-and-locking.md">ADR-0011</a>。</div>
+  </section>
+
+  <section class="s" id="visibility">
+    <h2>見える範囲は「読む時に」決める</h2>
+    <p>この題材は、Slack のようなテナントの壁を持ちません。全員が 1 つの空間にいて、投稿は原則として公開です。そのかわり、<strong>誰に見せてはいけないか</strong>が、投稿と閲覧者の組ごとに変わります。</p>
+    <ul>
+      <li>ブロックの関係、鍵アカウント、削除、法的な措置、規約の措置、年齢の制限、地域の制限。</li>
+      <li>これらは、投稿の後にも変わります（あとからブロックする、措置が入る）。</li>
+    </ul>
+    <p>そこで設計は、見える範囲を<strong>読み出しの時に、1 つの関数</strong> <code><a class="t" href="#g-visible">visible(viewer, post)</a></code> で決めます。タイムライン・検索・通知・API・埋め込み・メディアの配信のどの経路も、この関数を通ります。配った時の判断を、読む時の判定の代わりにしません。</p>
+    <div class="compare">
+      <div class="bad"><h3>配る時に決める</h3><p>配った後にブロックや削除が起きると、写しに古い判断が残り、見えてはいけない人に出る。</p></div>
+      <div class="good"><h3>読む時に決める</h3><p>写しには ID だけを持ち、読むたびに最新の状態で判定する。措置から 60 秒以内に全経路で消える（NFR-009）。</p></div>
+    </div>
+    <p>テナントがないので、共通の資料の<a href="../../../../docs/primer/index.html#tenancy">テナントの RLS</a> は使いません。RLS は DM・通知・ブックマークなど「本人だけの表」にだけ張ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0004-single-tenant-and-visibility.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> の 3.2 節（本人だけの表）と 3.5 節（<code>visible()</code> に渡す列）。</div>
+  </section>
+
+  <section class="s" id="fanout">
+    <h2>fan-out：書く時に配るか、読む時に集めるか</h2>
+    <p>「フォロー中」のホームは、フォローしている全員の投稿を新しい順に並べたものです。作り方は大きく 2 つあります。</p>
+    <div class="tabs">
+      <div data-tab="書く時に配る（プッシュ）"><p>投稿したら、フォロワー 1 人ひとりのホームの写し（受信箱）に ID を書き込みます（<a class="t" href="#g-fanout">fan-out on write</a>）。読む時は自分の写しを読むだけなので、<strong>読み出しが速い</strong>。かわりに、フォロワーが 100 万人なら 1 件の投稿で 100 万回の書き込みになります。</p></div>
+      <div data-tab="読む時に集める（プル）"><p>読む時に、フォローしている人の最近の投稿をそれぞれ取ってきて、合わせて並べます（fan-out on read）。書き込みは 1 回で済みます。かわりに、500 人をフォローしている人は、読むたびに 500 人分を合わせることになり、<strong>読み出しが重い</strong>。</p></div>
+    </div>
+    <pre class="mermaid">flowchart LR
+  P[投稿] --> L[(出来事のログ)]
+  L --> F[Fanout Worker]
+  F -- "フォロワーごとに書く" --> T1[(A のホームの写し)]
+  F --> T2[(B のホームの写し)]
+  F --> T3[(C のホームの写し)]
+  R[A が読む] --> T1</pre>
+    <p>読み出しは書き込みの 30 倍以上あるので、基本はプッシュが有利です。設計では、写しを Valkey に持ち、<strong>最近 30 日に読んだ人（アクティブな人）にだけ</strong>配ります。写しは正本ではなく、投稿とフォローの表から作り直せます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0003-timeline-fanout-hybrid.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/timeline-fanout.md">timeline-fanout.md</a> の 4〜6 節（写しの形、fan-out の流れ、読み出し）。</div>
+  </section>
+
+  <section class="s" id="celebrity">
+    <h2>セレブリティの問題と組み合わせの方式</h2>
+    <p>フォロワーが数百万〜数千万人いる人（芸能人、報道機関、自治体）が投稿すると、プッシュでは 1 件で何千万回もの書き込みになり、キューが詰まります。これを<a class="t" href="#g-celebrity">セレブリティの問題</a>と呼びます。本家も、2012 年の講演で「書く時に配り、フォロワーの多い作者は読む時に合わせる」形を説明しています。</p>
+    <div class="stepper">
+      <ol>
+        <li>作者のフォロワーが閾値 <code>T</code> 未満なら<strong>プッシュ</strong>。S1 の既定は <code>T = 10,000</code>（<code>ops.fanout.pull_threshold</code>）。</li>
+        <li><code>T</code> 以上の作者は<strong>プル</strong>。投稿は作者ごとの最近の投稿の写し（<code>ar:</code>）にだけ入れる。</li>
+        <li>読む人は、自分の写し（<code>tl:</code>）と、フォローしているプルの作者の <code>ar:</code> を、ID の順に合わせる。重複は ID で落とす。</li>
+        <li>地震の直後のような<a class="t" href="#g-burst">瞬間のピーク</a>では、キューの遅れを見て閾値を一時的に下げ、より多くの作者をプルに回す（<code>burst</code> の状態）。</li>
+        <li>写しが消えても（Valkey の障害、久しぶりの利用者）、正本から作り直す。作り直しは利用者ごとに 1 回にまとめる（single flight）。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">フォロワー 1,000 万人の作者が投稿しました。この設計で、フォロワーのホームにはどう届きますか？</p>
+      <div class="opts">
+        <button>1,000 万人全員の写しに、順に書き込む</button>
+        <button>アクティブなフォロワーにだけ、すぐ書き込む</button>
+        <button>写しには書かず、各フォロワーが読む時に作者の最近の投稿を合わせる</button>
+      </div>
+      <p class="why">閾値（既定 1 万）以上の作者はプルです。書き込みの量は閾値とアクティブなフォロワーの数で上限が決まり、大きな作者の投稿で爆発しません。それでも p95 5 秒（NFR-002）は守ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0015-fanout-pipeline-and-burst-control.md">ADR-0015</a>（瞬間のピーク）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0016-timeline-rebuild-single-flight.md">ADR-0016</a>（作り直し）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/timeline-fanout.md">timeline-fanout.md</a> の 5.4・5.5・7 節。</div>
+  </section>
+
+  <section class="s" id="tid">
+    <h2>時刻の順に並ぶ 64 ビットの ID</h2>
+    <p>共通の資料の <a href="../../../../docs/primer/index.html#ids">UUIDv7</a> と同じく「ID の大小が時刻の順」になる ID ですが、この題材は <strong>64 ビット</strong>の <a class="t" href="#g-tid"><code>tid</code></a> を使います。本家が 2010 年に公開した方式（<a class="t" href="#g-snowflake">Snowflake</a>）と同じ考え方で、コードは自前で書きます。</p>
+    <pre><code> 0 | ミリ秒 41 ビット（起点 2026-01-01） | 生成器 10 ビット | 連番 12 ビット
+符号  └── 約 69 年もつ ──────────────┘   └ 0〜1023 ─┘   └ 1 ms に 4096 ─┘</code></pre>
+    <ul>
+      <li data-frag><strong>なぜ 64 ビットか</strong>：ホームの写しは 1 項目に ID を 3 つ持ちます。UUIDv7（128 ビット）だと写しの記憶が倍になります。</li>
+      <li data-frag><strong>調整なしで振れる</strong>：生成器の番号さえ重ならなければ、DB の連番を通さずに各サーバーで振れます。番号は DB で貸し出し、東京は 0〜511、大阪は 512〜1023 です。</li>
+      <li data-frag><strong>おおむね</strong>時刻の順（<a class="t" href="#g-ksorted">k-sorted</a>）：生成器の時計のずれの分、後で振った ID が小さいことがあります。新着の読み出しは 10 秒ぶん重ねて読みます。</li>
+      <li data-frag><strong>時計が戻ったら振らない</strong>：5ms までは待ち、それ以上は失敗させます。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">API の JSON で、<code>tid</code> を数値ではなく文字列で返すのはなぜ？</p>
+      <div class="opts">
+        <button>文字列の方が JSON が小さくなるから</button>
+        <button>JavaScript の <code>number</code> は 53 ビットまでしか整数を正確に持てないから</button>
+        <button>ID から作成の時刻を読まれないようにするため</button>
+      </div>
+      <p class="why"><code>number</code> は倍精度の浮動小数点数で、2<sup>53</sup> を超える整数は丸められ、別の投稿の ID になってしまいます。TypeScript の中では <code>bigint</code> かブランド型の文字列で持ちます。作成の時刻は公開の情報なので、隠しません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0002-post-ids-and-ordering.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/posts-and-ids.md">posts-and-ids.md</a> の 8 節（生成器の貸し出しと時計）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> の 3.1 節（どの表が <code>tid</code> か）。</div>
+  </section>
+
+  <section class="s" id="recsys">
+    <h2>推薦のパイプラインの基本</h2>
+    <p>「おすすめ」は、全部の投稿に点を付けるのではなく、<strong>段を踏んで数を絞る</strong>のが業界の定石です。本家も公開の README で、候補を集めて軽いランク・重いランクで並べ、絞り込んで混ぜる構成を説明しています。</p>
+    <pre class="mermaid">flowchart LR
+  S["候補の源 5 つ"] -- "800 件" --> PF["前の絞り込み"]
+  PF --> LR["軽いランク"]
+  LR -- "200 件" --> HR["重いランク"]
+  HR --> QF["後の絞り込み"]
+  QF --> MX["混ぜ合わせ"]
+  MX -- "20 件" --> U["画面"]</pre>
+    <table>
+      <tr><th>段</th><th>何をするか</th></tr>
+      <tr><td><a class="t" href="#g-candidate">候補の取り出し</a></td><td>フォロー中、フォロー中の人のいいね、2 歩先の作者、話題、人気、の 5 つの源から集める</td></tr>
+      <tr><td>軽いランク</td><td>手元にある値だけで安く点を付け、800 件を 200 件に減らす</td></tr>
+      <tr><td>重いランク</td><td>行動（いいね・返信など）ごとの確率 × 重みの和。S1 は式、S2 から学習済みのモデル</td></tr>
+      <tr><td>後の絞り込み</td><td><code>visible()</code> をもう一度通し、スパムや表示の制限を落とす。<strong>時間が足りなくても飛ばさない</strong></td></tr>
+      <tr><td><a class="t" href="#g-mixer">混ぜ合わせ</a></td><td>同じ作者を続けない、<a class="t" href="#g-oon">フォロー外</a>は半分まで、などの並びの規則</td></tr>
+    </table>
+    <div class="callout key"><span class="label">境界</span>ML の出力は「並べる順」にだけ使います。ブロック・鍵アカウント・法的な措置・年齢の制限を、スコアで上書きしません。スコアの部品が落ちたら、時刻の順の並びに戻します。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0006-ranking-boundary.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0018-ranking-candidates-and-two-stage-scoring.md">ADR-0018</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/ranking-and-recommendation.md">ranking-and-recommendation.md</a> の 4〜11 節。</div>
+  </section>
+
+  <section class="s" id="abtest">
+    <h2>A/B テストとガードレール</h2>
+    <p>推薦の良し悪しは、コードを読んでも分かりません。<strong>実際の利用者の行動で比べる</strong>しかありません。そのための道具が <a class="t" href="#g-ab">A/B テスト</a>と<a class="t" href="#g-guardrail">ガードレール</a>です。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>オフラインの評価</strong>：過去の配信と行動の記録を再生し、新しい版で並べ直して比べる（NDCG など）。CI の足切りに使う。</li>
+        <li><strong>割り当て</strong>：利用者の ID のハッシュで、新旧のどちらを見せるかを固定する。同じ人は毎回同じ側になる。</li>
+        <li><strong>少しずつ広げる</strong>：1% → 5% → 50% → 100%。各段 7 日以上（曜日の偏りを除く）。</li>
+        <li><strong>主な指標</strong>で良くなったかを見る：1 回の訪問の中のいいね・返信・リポストの率（K8）、7 日の再訪の率。</li>
+        <li><strong>ガードレール</strong>で悪くなっていないかを見る：通報・ミュート・ブロックの率、スパムの表示、遅延。悪化が出たら広げずに止める。</li>
+      </ol>
+    </div>
+    <p>主な指標が上がっても、通報が増えていれば採用しません。「伸ばしたい数」と「悪化させてはいけない数」を分けて持つのが、ガードレールの考え方です。100% に広げる判断は人（PM）が行います。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">新しい重みで、いいねの率が 8% 上がりました。ただし通報の率も 6% 上がりました（信頼区間の上端で）。どうしますか？</p>
+      <div class="opts">
+        <button>広げずに止め、原因を調べる</button>
+        <button>主な指標が上がったので 100% に広げる</button>
+        <button>通報の率は推薦と関係ないので無視する</button>
+      </div>
+      <p class="why">設計では、ガードレールの指標が信頼区間の上端で 5% 以上悪化したら止めます。主な指標の改善と引き換えにしません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0020-ranking-evaluation-experiments-and-transparency.md">ADR-0020</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0059-guardrail-and-audit-metrics.md">ADR-0059</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/ranking-and-recommendation.md">ranking-and-recommendation.md</a> の 12.3 節。フラグは共通の資料の<a href="../../../../docs/primer/index.html#flags">デプロイとリリースを分ける</a>。</div>
+  </section>
+
+  <section class="s" id="counters">
+    <h2>大規模なカウンターと結果整合</h2>
+    <p>人気の投稿には、1 秒に何千ものいいねが付きます。全員が同じ行の <code>like_count</code> を <code>+1</code> すると、その行のロックに行列ができます。そこで、<strong>正本</strong>と<strong>表示の数</strong>を分けます。</p>
+    <div class="stepper">
+      <ol>
+        <li>いいねは <code>likes(post_id, user_id)</code> に 1 行を足す。主キーが利用者ごとなので、行の取り合いがない。同じトランザクションで outbox に出来事を書く。</li>
+        <li>Relay が出来事を <a class="t" href="#g-kinesis">Kinesis</a> の <code>engagement</code> の流れへ送る。</li>
+        <li>Counter Aggregator が 1 秒ぶんを投稿ごとにまとめ、Valkey の写し（<code>pc:{post_id}</code>）に 1 回で足す。同じ出来事を 2 回足さないよう、連番を覚えておく。</li>
+        <li>60 秒ごとに、写しの値を DB の <code>post_counters</code> へ書き戻す。</li>
+        <li>静かになった投稿を、<code>likes</code> の行を数え直して<a class="t" href="#g-reconcile">照合</a>する。差があれば正本の値で直す。</li>
+      </ol>
+    </div>
+    <p>表示の数は、確定から p95 5 秒遅れて追いつきます。この「いずれ正本に揃う」性質を<a class="t" href="#g-eventual">結果整合</a>と呼びます。自分の操作だけは、画面が楽観的に ±1 して見せます。<a class="t" href="#g-view">表示の数</a>（閲覧）は桁が大きいので、Aurora を通さずに受け、概算で数え、減らない形で見せます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">いいねの数の写し（Valkey）と <code>post_counters</code> が食い違いました。正しい値はどれですか？</p>
+      <div class="opts">
+        <button>Valkey の値（最新の出来事を反映しているから）</button>
+        <button><code>post_counters</code> の値（DB にあるから）</button>
+        <button><code>likes</code> の行を数え直した値</button>
+      </div>
+      <p class="why">正本は関係の表（<code>likes</code>・<code>reposts</code>・<code>followers</code>）で、表示の数はどちらも写しです。写しを直接 <code>UPDATE</code> で直さず、照合の経路だけが正本の値で上書きします。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0023-counter-aggregation-and-reconciliation.md">ADR-0023</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0024-view-counts-ingest-and-approximation.md">ADR-0024</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/engagement-and-counters.md">engagement-and-counters.md</a> の 4・5 節。outbox は<a href="../../../../docs/primer/index.html#outbox">共通の資料</a>。</div>
+  </section>
+
+  <section class="s" id="trends">
+    <h2>トレンドと急上昇の検出</h2>
+    <p>トレンドは「いま、いつもより急に多く語られている語」です。<strong>多く語られている語</strong>ではありません。「おはよう」は毎朝多いですが、トレンドではありません。だから、基準（ふだんの量）との差で決めます。</p>
+    <div class="stepper">
+      <ol>
+        <li>投稿からハッシュタグと名詞の並びを、1 件あたり最大 10 語取り出す。</li>
+        <li>5 分の区切りごとに、語ごとの数を数える。<strong>1 人の作者は 1 つの語を区切りに 1 回だけ</strong>数える（連投で水増しできない）。</li>
+        <li>作者に重みを付ける。登録 7 日未満、スパムの点の高い人、未確認の人は 0。</li>
+        <li>直近 15 分の数 <code>c</code> と、ふだんの量 <code>e</code>（指数移動平均）を比べ、<code>z = (c − e) / √(e + β)</code> の大きい語を出す。</li>
+        <li>ボットの群れ・同じ文の貼り付けが多い語は出さず、T&amp;S の待ち行列へ送る。</li>
+      </ol>
+    </div>
+    <p>4 の式は、数がポアソン分布で揺れるとき、揺れの大きさが平均の平方根になることを使っています。ふだん 100 の語が 120 になっても珍しくありませんが、ふだん 1 の語が 21 になるのは珍しい、という判断を 1 つの式で表します。このような検出を<a class="t" href="#g-burst-detect">バースト検出</a>と呼びます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0027-trends-burst-detection.md">ADR-0027</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/search-and-trends.md">search-and-trends.md</a> の 9 節（数え方、急上昇の検出、操作への強さ）。</div>
+  </section>
+
+  <section class="s" id="search">
+    <h2>日本語の全文検索：N-gram と形態素解析</h2>
+    <p>英語は空白で語が区切れますが、日本語は区切れません。「東京都庁に行く」を語に分ける方法が 2 つあります。</p>
+    <div class="tabs">
+      <div data-tab="N-gram"><p>文字列を機械的に N 文字ずつずらして切ります（<a class="t" href="#g-ngram">N-gram</a>）。2 文字なら「東京・京都・都庁・庁に…」。辞書が要らないので、新語・固有名詞・語の途中でも<strong>取りこぼしません</strong>。かわりに「京都」で「東京都」が当たるような誤りが出て、索引も大きくなります。</p></div>
+      <div data-tab="形態素解析"><p>辞書を使って意味のある語に分けます（<a class="t" href="#g-morph">形態素解析</a>。kuromoji・Sudachi など）。「東京都庁 / に / 行く」。誤りが少なく、<strong>関連度の点</strong>を付けやすい。かわりに、辞書にない新語やネットの言い回しを、分け方の違いで取りこぼします。</p></div>
+    </div>
+    <p>設計は 2 つを組み合わせます。<strong>当たるかどうかは 1〜2 文字の N-gram</strong> で判定し、<strong>並べる順の点は kuromoji</strong> で付けます。英字は語の単位で当てます。索引と問い合わせには、同じ正規化の関数（NFKC、小文字、長音の揃え）をかけます。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">昨日生まれたばかりのネットの流行語で検索しました。取りこぼしにくいのはどちら？</p>
+      <div class="opts">
+        <button>形態素解析だけの索引</button>
+        <button>N-gram で一致を判定する索引</button>
+        <button>どちらも同じ</button>
+      </div>
+      <p class="why">形態素解析は辞書にない語を予想外の位置で分け、問い合わせ側と本文側で分け方が食い違うことがあります。N-gram は文字の並びだけを見るので、新語でも部分一致で当たります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0025-search-engine-and-japanese-analysis.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0026-search-index-layout-and-visibility.md">ADR-0026</a>（索引にも <code>visible()</code>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/search-and-trends.md">search-and-trends.md</a> の 5・6 節。</div>
+  </section>
+
+  <section class="s" id="media">
+    <h2>メディアの配信：HLS と CDN</h2>
+    <p>動画を 1 本の大きなファイルで配ると、回線の遅い人は再生が止まります。そこで動画は <a class="t" href="#g-hls">HLS</a> で配ります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>短く切る</h3><p>動画を 6 秒ずつの区切り（セグメント）に分ける。</p></div>
+      <div class="card" data-frag><h3>画質を何段も作る</h3><p>240p〜1080p の 5 段を作り、一覧（<code>master.m3u8</code>）に並べる。</p></div>
+      <div class="card" data-frag><h3>端末が選ぶ</h3><p>再生する側が回線の速さを見て、区切りごとに段を切り替える（<a class="t" href="#g-abr">ABR</a>）。</p></div>
+    </div>
+    <p>画像も動画も、<a class="t" href="#g-cdn">CDN</a>（CloudFront）の端のサーバーから配ります。公開のメディアは推測できない 128 ビットのキーの URL にし、中身が変わらないので 1 年キャッシュします。鍵アカウントと DM のメディアは、<code>visible()</code> を通った人にだけ、15 分で切れる署名付きの URL を出します。</p>
+    <div class="callout warn"><span class="label">キャッシュと削除</span>1 年キャッシュしたものを、措置で数秒のうちに止める必要があります。設計は、CDN の端で読める拒否の一覧（CloudFront KeyValueStore）にキーを書き、<code>451</code> か <code>404</code> を返させます。キャッシュの無効化と、元のファイルの隔離も重ねます。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0032-media-upload-and-processing.md">ADR-0032</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0033-media-delivery-and-takedown.md">ADR-0033</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/media.md">media.md</a> の 6・8 節。</div>
+  </section>
+
+  <section class="s" id="ts">
+    <h2>モデレーションと T&amp;S</h2>
+    <p><a class="t" href="#g-ts">T&amp;S</a>（Trust &amp; Safety）は、スパム・ボット・誹謗中傷・違法な情報から利用者を守る仕事と仕組みの総称です。公開型の SNS では、ここが製品の中心の 1 つです。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>見つける</strong>：利用者の<a class="t" href="#g-report">通報</a>、スパムの規則と危険の点、既知の違法な画像の<a class="t" href="#g-hashmatch">ハッシュの照合</a>、法令の申出。</li>
+        <li><strong>まとめて並べる</strong>：同じ対象への通報を 1 つの案件にし、重さ・広がり・速さで P0〜P3 の待ち行列に入れる。命に関わるものは P0 で当番を呼ぶ。</li>
+        <li><strong>判断して記録する</strong>：<a class="t" href="#g-moderation">措置</a>を、根拠（規約の条項か法令）と判断した人と一緒に、追記だけの表に書く。</li>
+        <li><strong>効かせる</strong>：措置の要約（<code>mod_flags</code>）と状態の版を上げ、<code>visible()</code> が 60 秒以内に全経路で隠す。</li>
+        <li><strong>知らせる・覆す</strong>：措置を受けた人に、根拠と<a class="t" href="#g-appeal">異議の申立て</a>の方法を示す。異議は別の担当が見る。</li>
+      </ol>
+    </div>
+    <p>措置は「消す」だけではありません。ラベル（注意の印）、表示の制限（フォロワーには出すが、検索・おすすめ・トレンドから外す）、地域の制限、メディアだけの停止、アカウントの読み取りだけ・凍結、と段階があります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0038-moderation-action-model.md">ADR-0038</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0040-spam-and-bot-defense.md">0040</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> の 4〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> の 3.5 節（<code>mod_flags</code> のビット）。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み</h2>
+    <p>ここは枠組みの説明だけです。具体の期限・基準・手順は、設計の文書でも<strong>法務の確認待ち</strong>で、結論を出していません。</p>
+    <div class="tabs">
+      <div data-tab="情報流通プラットフォーム対処法"><p>プロバイダ責任制限法を改正・改称した法律で、2025-04-01 に施行されました。利用者の多い SNS などを総務大臣が<a class="t" href="#g-large-provider">大規模特定電気通信役務提供者</a>に指定し、削除の申出の窓口、申出への判断と通知、削除の基準の公表、運用の状況の公表などを求めます。2025-04-30 に本家の運営の会社を含む 5 社が指定されました。判断と通知の期限は「7 日」とされますが、省令の条文は未検証で、設計は仮置きです。</p><p><strong>法務の確認待ち（L1）</strong>：どの規模で指定に当たるか、指定の前から同じ水準で対応するか、期限の数え方、通知の具体。</p></div>
+      <div data-tab="発信者情報の開示"><p>匿名の投稿で権利を侵害された人が、裁判所の手続きで、投稿した人を特定する情報（IP アドレス、時刻、電話番号など）の開示を求める仕組みです。開示の命令のほか、別の事業者の情報を得るための提供の命令、ログを消させない消去の禁止の命令があります。だから、<strong>投稿・ログインの時の IP アドレスなどを、決めた期間だけ持つ</strong>必要があります。</p><p><strong>法務の確認待ち（L2）</strong>：何を何日持つか、意見の照会の手順。確認まで、該当のログは物理の削除を止めています。</p></div>
+      <div data-tab="通信の秘密ほか"><p>DM は電気通信事業法の「通信の秘密」に当たりうるため、スパムの判定などで DM の中身を機械で読むかは<strong>法務の確認待ち（L3）</strong>です。確認まで作りません。ほかに、推薦と個人情報（L4）、青少年の保護（L5）、著作権（L6）、捜査機関への対応（L7）、保持の期間（L8）、選挙（L9）が確認待ちです。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">削除の申出への判断の期限「7 日」は、設計でどう扱われていますか？</p>
+      <div class="opts">
+        <button>法令で確定した値として、コードに定数で書く</button>
+        <button>仮置きの値として設定（<code>legal.*</code>）に持ち、法務の確認の後に確定する</button>
+        <button>指定を受けるまで期限は管理しない</button>
+      </div>
+      <p class="why">受け付けの時刻から期限を計算して案件に持ち、期限の前に警告を出す仕組みは先に作ります。値と数え方は L1 の確認の後に決め、AppConfig の <code>legal.l1.takedown_deadline</code> に入れます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L11）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0041-legal-requests-and-transparency.md">ADR-0041</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> の 10・11 節。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>中心は <code>users</code> と <code>posts</code> です。関係（フォロー・いいね・リポスト）は、2 人（または人と投稿）の組を主キーにした表で、<strong>行があること＝関係があること</strong>です。記号の読み方は<a href="../../../../docs/primer/index.html#er">共通の資料</a>にあります。</p>
+    <pre class="mermaid">erDiagram
+  users ||--o{ posts : "writes"
+  posts ||--o{ posts : "reply, quote, repost of"
+  users ||--o{ following : "follows"
+  users ||--o{ followers : "followed by"
+  posts ||--o{ likes : "liked"
+  posts ||--o{ reposts : "reposted"
+  posts ||--o| post_counters : "counted by"
+  posts ||--o{ moderation_actions : "acted on"
+  users {
+    bigint id PK "tid"
+    text handle_lower UK
+    boolean protected
+    text state
+  }
+  posts {
+    bigint id PK "tid"
+    bigint author_id FK
+    text kind "post, reply, quote, repost"
+    bigint conversation_id
+    smallint mod_flags
+    bigint state_version
+  }
+  following {
+    bigint src_id PK
+    bigint dst_id PK
+    text state "active, pending"
+  }
+  followers {
+    bigint dst_id PK
+    bigint src_id PK
+    text state
+  }
+  likes {
+    bigint post_id PK
+    bigint user_id PK
+  }
+  reposts {
+    bigint post_id PK
+    bigint user_id PK
+  }
+  post_counters {
+    bigint post_id PK
+    bigint likes "copy of likes rows"
+    bigint views "approx"
+  }
+  moderation_actions {
+    uuid action_id PK
+    text target_kind "post, media, account"
+    bigint target_id
+    text kind
+    text basis_kind
+  }</pre>
+    <ul>
+      <li><code>following</code> と <code>followers</code> は同じ辺の 2 つの向きです。「A がフォローしている人」と「B のフォロワー」をどちらも主キーの範囲で速く引くためです。</li>
+      <li><code>post_counters</code> は写しです。正本は <code>likes</code>・<code>reposts</code> です（<code>views</code> だけは正本の表がなく、概算です）。</li>
+      <li><code>moderation_actions</code> は対象を <code>target_kind</code> と <code>target_id</code> で指す論理の参照で、DB の外部キーではありません。</li>
+      <li>投稿は消さずに状態を変えます（墓石）。<code>state_version</code> は写しが古い状態で上書きしないための版です。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> の 3 節（規約）と 4 節（全体の ER 図）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/x/docs/architecture/data-model">data-model/</a> の領域ごとのファイル。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、作り方と範囲は自前で決めています。</p>
+    <table>
+      <tr><th>項目</th><th>この設計</th></tr>
+      <tr><td>アルゴリズムのコード</td><td>本家が公開したコード（<code>twitter/the-algorithm</code>、<code>xai-org/x-algorithm</code>）・重み・モデルを使わない。考え方だけを参考にし、出典を書く</td></tr>
+      <tr><td>ID・文字数</td><td>Snowflake のコードと <code>twitter-text</code> を使わず、<code>packages/tid</code>・<code>packages/text</code> を自前で書く</td></tr>
+      <tr><td>おすすめ</td><td>本家と同じ並びは目標にしない。フォロー中より行動の率が 20% 高いか（K8）で評価する</td></tr>
+      <tr><td>範囲</td><td>MVP の後：注記（Community Notes 相当）、編集、DM のエンドツーエンドの暗号化、広告。対象外：分散型の SNS との連合、AI のアシスタント、決済</td></tr>
+      <tr><td>置き場所</td><td>日本（東京、DR は大阪）。日本の利用者と日本の法令を前提にする</td></tr>
+    </table>
+    <p>ドメイン・ヘッダー・トークンの接頭辞・アプリのバンドル ID には本家の名前を使わず、<code>&lt;brand&gt;.&lt;domain&gt;</code>、<code>&lt;brand&gt;_</code> のように書きます。投稿・リポスト・フォローのような一般の語はそのまま使います。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a> の Constraints と Non-goals、<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0001-platform-and-stack.md">ADR-0001</a>、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0007-no-reuse-of-original-implementation.md">ADR-0007</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-reply">返信</dt><dd>ある投稿への応答の投稿。返信の木が会話になる。</dd>
+      <dt id="g-quote">引用</dt><dd>元の投稿を埋め込み、自分のコメントを付けた投稿。</dd>
+      <dt id="g-repost">リポスト</dt><dd>元の投稿を、本文を付けずに自分のフォロワーへ広める操作。旧称はリツイート。</dd>
+      <dt id="g-protected">鍵アカウント</dt><dd>承認したフォロワーと本人だけが投稿を読めるアカウント。フォローは申請と承認になる。</dd>
+      <dt id="g-visible">visible()</dt><dd>閲覧者と投稿の組から、見せるか・隠すか・警告を挟むかを決める 1 つの関数。全部の読み出しの経路が通る。</dd>
+      <dt id="g-fanout">fan-out</dt><dd>1 件の投稿を、フォロワーごとのホームの写しへ複製して配ること。書く時に配る（プッシュ）と読む時に集める（プル）がある。</dd>
+      <dt id="g-celebrity">セレブリティの問題</dt><dd>フォロワーの非常に多い作者の投稿で、プッシュの書き込みの量が爆発する問題。</dd>
+      <dt id="g-burst">瞬間のピーク</dt><dd>年明けの 0 時、番組の山場、地震の直後などに、数秒〜数分だけ投稿が集中すること。設計ではピークの 10 倍と置く。</dd>
+      <dt id="g-tid">tid</dt><dd>この設計の 64 ビットの ID。ミリ秒の時刻・生成器の番号・連番からなり、ID の大小がおおむね作られた順になる。</dd>
+      <dt id="g-snowflake">Snowflake</dt><dd>本家が 2010 年に公開した、調整なしで時刻の順の 64 ビットの ID を振る方式。この設計はコードを使わない。</dd>
+      <dt id="g-ksorted">k-sorted</dt><dd>完全ではないが、ずれが一定の幅に収まる並び。tid は時計のずれの分だけ順が入れ替わりうる。</dd>
+      <dt id="g-ranking">ランキング</dt><dd>候補の投稿に点を付け、並べる順を決めること。この設計では見える範囲の判定には使わない。</dd>
+      <dt id="g-candidate">候補の取り出し</dt><dd>推薦の最初の段。膨大な投稿から、点を付ける価値のありそうな数百件を、いくつかの源から集める。</dd>
+      <dt id="g-mixer">混ぜ合わせ</dt><dd>点の順に並べた後、作者の偏りやフォロー外の割合などの規則で、1 ページの並びを整える段。</dd>
+      <dt id="g-oon">フォロー外</dt><dd>閲覧者がフォローしていない作者の投稿。英語では out-of-network。</dd>
+      <dt id="g-ab">A/B テスト</dt><dd>利用者を無作為に分け、新旧の版を同じ期間に見せて、指標の差で採否を決める実験。</dd>
+      <dt id="g-guardrail">ガードレール</dt><dd>実験で「悪化させてはいけない」指標。通報・ブロックの率や遅延など。悪化したら止める。</dd>
+      <dt id="g-kinesis">Kinesis Data Streams</dt><dd>AWS の出来事のログ。複数の消費者が同じ流れを独立に読み、読み直せる。</dd>
+      <dt id="g-eventual">結果整合</dt><dd>更新の直後は写しが古いことがあるが、時間がたてば正本と同じ値に揃う性質。</dd>
+      <dt id="g-reconcile">照合</dt><dd>写しの数と、正本の関係の表を数え直した値を比べ、差を正本の値で直すジョブ。</dd>
+      <dt id="g-view">表示の数</dt><dd>投稿が画面に出た回数。この設計では投稿の 50% 以上が 500ms 以上出たら 1 回。概算で、減らない。</dd>
+      <dt id="g-burst-detect">バースト検出</dt><dd>ある語の出現が、ふだんの量に比べて統計的に珍しいほど増えたことを見つける処理。</dd>
+      <dt id="g-ngram">N-gram</dt><dd>文字列を N 文字ずつずらして切った断片。1 文字なら unigram、2 文字なら bigram。</dd>
+      <dt id="g-morph">形態素解析</dt><dd>辞書を使って文を意味のある最小の語に区切る処理。kuromoji・Sudachi など。</dd>
+      <dt id="g-hls">HLS</dt><dd>HTTP Live Streaming。動画を短い区切りと画質の段に分け、プレイリスト（<code>.m3u8</code>）で配る方式。</dd>
+      <dt id="g-abr">ABR</dt><dd>Adaptive Bitrate。再生する側が回線の速さに合わせて、画質の段を切り替えること。</dd>
+      <dt id="g-cdn">CDN</dt><dd>利用者に近い端のサーバーにコンテンツを置いて配る仕組み。この設計では CloudFront。</dd>
+      <dt id="g-ts">T&amp;S</dt><dd>Trust &amp; Safety。プラットフォームの安全と信頼を守る仕事と仕組み。モデレーション、スパム対策、法令の対応を含む。</dd>
+      <dt id="g-report">通報</dt><dd>利用者が、規約の違反と思う投稿・アカウントを知らせること。法令の「申出」とは別の経路で扱う。</dd>
+      <dt id="g-moderation">措置</dt><dd>規約や法令に基づく、削除・表示の制限・凍結などの対応。根拠と判断した人を記録してから効かせる。</dd>
+      <dt id="g-appeal">異議の申立て</dt><dd>措置を受けた人が、判断の見直しを求めること。</dd>
+      <dt id="g-hashmatch">ハッシュの照合</dt><dd>画像の知覚ハッシュ（PDQ など）を、既知の違法な画像の一覧と比べる仕組み。少し加工した画像も当たる。</dd>
+      <dt id="g-large-provider">大規模特定電気通信役務提供者</dt><dd>情報流通プラットフォーム対処法で、利用者の規模などから総務大臣が指定し、削除の申出への迅速な対応などの義務を負う事業者。</dd>
+      <dt>発信者情報の開示</dt><dd>権利を侵害された人が、投稿した人を特定する情報の開示を、裁判所の手続きなどで求める仕組み。</dd>
+      <dt>墓石</dt><dd>tombstone。行を消さずに「削除済み」の状態だけを残すこと。物理の削除は保持の期間の後のジョブが行う。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。4 つの難しさ、MVP、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、規模の段階、NFR、主な決定の一覧</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0002-post-ids-and-ordering.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0003-timeline-fanout-hybrid.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0004-single-tenant-and-visibility.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0006-ranking-boundary.md">0006</a> <span>— ID、fan-out、見える範囲、ランキングの境界の 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/posts-and-ids.md">posts-and-ids.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/follow-graph.md">follow-graph.md</a> <span>— 投稿の種類と書き込み、フォローの辺</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/timeline-fanout.md">timeline-fanout.md</a> <span>— 写し、プッシュとプル、瞬間のピーク、作り直し</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/ranking-and-recommendation.md">ranking-and-recommendation.md</a> <span>— おすすめの段、評価と A/B</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/engagement-and-counters.md">engagement-and-counters.md</a> <span>— 関係の表、数の写し、照合、表示の数</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/search-and-trends.md">search-and-trends.md</a> <span>— 日本語の検索とトレンド</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/media.md">media.md</a> <span>— アップロード、HLS、配信と停止</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> <span>— 措置、通報、スパム、法令の窓口</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本、規約、ER 図</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/x/docs/decisions">decisions/</a> <span>— 残りの ADR（通知、DM、API、基盤、運用）</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
