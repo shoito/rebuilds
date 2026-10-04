@@ -46,24 +46,27 @@ date: 2026-10-04
 ### 出来事のログ
 
 - **outbox**：書き込みのサービス（Post、Graph、Engagement、T&S、Accounts）は、変更と同じ DB のトランザクションで `outbox` の表に出来事を書く。行は `(seq, event_id, stream, partition_key, type, payload, created_at)`。`event_id` は UUIDv7。
-- **Relay**：`outbox` を `seq` の順に読み（`FOR UPDATE SKIP LOCKED` で担当を分ける）、Kinesis へ `PutRecords` で束ねて送り、送れたら行を消す。Relay は少なくとも 1 回届ける。
+- **Relay**：`outbox` を `seq` の順に読み（`FOR UPDATE SKIP LOCKED` で担当を分ける）、Kinesis へ `PutRecords` で束ねて送る。送れた行には `sent_at` を立て、1 時間残してから 1 時間ごとの区画で落とす。DR で大阪の Relay が送り直すため（[ADR-0056](0056-disaster-recovery-osaka.md)）。Relay は少なくとも 1 回届ける。
 - **流れ（stream）と分ける鍵**：
 
   | 流れ | 鍵 | 主な出来事 |
   | --- | --- | --- |
   | `posts` | 作者の ID | 作成、削除、措置の反映 |
   | `graph` | フォローする側の ID | フォロー、解除、申請、承認、ブロック、ミュート |
-  | `engagement` | 投稿の ID | いいね、取り消し、リポスト、ブックマーク |
+  | `engagement` | `"{post_id}:{user_id mod 8}"`（[ADR-0023](0023-counter-aggregation-and-reconciliation.md)） | いいね、取り消し、リポスト、ブックマーク、返信・引用の数の出来事 |
   | `moderation` | 対象の ID | 措置、取り消し、異議の結果 |
   | `accounts` | 利用者の ID | 登録、鍵の切り替え、削除、凍結 |
-  | `views` | 投稿の ID | 閲覧（Ingest から。下の「閲覧の数」） |
+  | `views` | 閲覧者のセッションのハッシュ（[ADR-0024](0024-view-counts-ingest-and-approximation.md)） | 閲覧の束（Ingest から。下の「閲覧の数」） |
+  | `dm` | 会話の ID | DM の出来事。ID だけを運び、本文を含めない。Firehose でデータレイクへ写さない（[ADR-0035](0035-dm-conversation-model-and-storage.md)） |
+  | `audit` | 対象の ID | 監査の出来事。消費者は log-archive へ写す `audit-sink` だけ（[ADR-0052](0052-audit-and-operator-access.md)） |
 
   同じ鍵の出来事は、同じシャードの中で順に並ぶ。鍵をまたぐ順序は保証しない。
+- **Firehose へ直接書く記録**：確定した変更ではなく、失ってよい分析の記録は、Kinesis Data Streams を通さず、Firehose でデータレイクへ直接書く。ランキングの配信の記録（`ranking-served`、[ADR-0020](0020-ranking-evaluation-experiments-and-transparency.md)）、公開 API の計量（`api-usage`、[ADR-0048](0048-usage-plans-and-metering.md)）、見える範囲の抜き取りの監査（`visibility-audit`、[ADR-0059](0059-guardrail-and-audit-metrics.md)）、RUM（`rum`）が当たる。下の lint は Kinesis Data Streams への直接の書き込みを禁じるもので、これらには当たらない。
 - **保持**：Kinesis は 7 日。長く持つ分は Firehose で S3 のデータレイクへ写す（保持の期間は法務の L8 の後に決める）。
 - **消費者**：消費者ごとに、シャードごとの読み終わりの位置を持つ。消費者は **冪等** にする。
   - 結果を DB に書く消費者は、`event_id` の一意の制約で重複を落とす。
-  - 結果を Valkey に書く消費者（カウンター）は、結果と、シャードの読み終わりの位置を同じ `MULTI` で書く。再起動では Valkey の位置から読み直すので、同じ出来事を 2 回足さない。
-  - 消費の部品（KCL か自前の読み手か）は infrastructure の領域で決める。
+  - 結果を Valkey に書く消費者（カウンター）は、投稿ごとの写しに、分ける鍵の部分ごとの最後に当てた連番を持ち、連番が新しいときだけ足す（[ADR-0023](0023-counter-aggregation-and-reconciliation.md)）。シャードの読み終わりの位置は、足し終えた後に Aurora の `stream_checkpoints` に書く。再起動で読み直しても、連番の比較で同じ出来事を 2 回足さない。
+  - 消費の部品は自前の TypeScript の読み手（`packages/stream-consumer`）にする（[ADR-0055](0055-kinesis-consumers-and-valkey-clusters.md)）。
 - **仕事の待ち行列は SQS**：1 つの出来事から多くの仕事が生まれるもの（fan-out のフォロワーのページ、プッシュの送信、メディアの変換）は、消費者が SQS に仕事を作り、Worker が処理する。仕事は再試行と死んだ仕事の行き先（DLQ）を持つ。
 
 ### カウンター（いいね・リポスト・返信・引用・ブックマーク）
@@ -72,7 +75,7 @@ date: 2026-10-04
 - **数は写し**：Counter Aggregator が `engagement`・`posts` の流れを読み、投稿ごとの数を Valkey に持つ。1 秒ぶんの増減を投稿ごとにまとめてから書く（人気の投稿の書き込みを減らす）。
 - **書き戻し**：変わった投稿の数を、60 秒ごとに Aurora の `post_counters` へ書き戻す。Valkey を失ったら、`post_counters` と、その時点からの流れの読み直しで戻す。
 - **照合**：照合のジョブが、抜き取りの投稿（と、数の大きい投稿）で関係の表を数え直し、写しとの差を記録して正本の値で上書きする（NFR-006）。
-- 方式の細部（桁ごとの数、殺到する投稿の分割）は engagement-and-counters の領域で決める。
+- 方式の細部（投稿ごとの写しの形、殺到する投稿の分割）は engagement-and-counters の領域で決めた（[ADR-0023](0023-counter-aggregation-and-reconciliation.md)）。
 
 ### 閲覧の数
 
@@ -102,5 +105,14 @@ date: 2026-10-04
 
 - 結合テスト：変更のトランザクションを途中で失敗させたとき、出来事が流れない。Relay を途中で止めて再起動したとき、出来事が欠けない（重複はよい）。
 - 性質ベーステスト：任意の重複・再起動・順の入れ替えのある出来事の列に対して、カウンターの写しが、関係の表の数え直しと一致する。
-- lint：書き込みのサービスから Kinesis の `PutRecord(s)` を直接呼ぶことを禁止する（Relay と Ingest だけ）。
+- lint：書き込みのサービスから Kinesis Data Streams の `PutRecord(s)` を直接呼ぶことを禁止する（Relay と Ingest だけ）。
 - 本番：outbox の最も古い行の年齢、消費者ごとの遅れ（`IteratorAge`）、照合のジョブの差、閲覧の取り込みの欠け（Ingest の受け付けと集計の差）を計測し、アラートにする。
+
+## 注記
+
+> 2026-10-04 の注記：統合の工程で次を直した（[process.md](../../../../docs/process.md) の 9 節の例外）。
+>
+> - 「結果を Valkey に書く消費者は、結果とシャードの位置を同じ `MULTI` で書く」を取り消した。Valkey のクラスタでは `MULTI` は同じスロットの鍵にしか使えず、投稿ごとの数とシャードの位置は別のスロットにあるため。代わりに、投稿ごとの写しに部分ごとの最後の連番を持つ形にした（[ADR-0023](0023-counter-aggregation-and-reconciliation.md)）。位置は Aurora の `stream_checkpoints` に持つ（[ADR-0055](0055-kinesis-consumers-and-valkey-clusters.md)）。
+> - 流れの表を直した。`engagement` の鍵を `"{post_id}:{user_id mod 8}"`（ADR-0023）、`views` の鍵を閲覧者のセッションのハッシュ（[ADR-0024](0024-view-counts-ingest-and-approximation.md)）にした。`dm`（ID だけ、データレイクへ写さない。[ADR-0035](0035-dm-conversation-model-and-storage.md)）と `audit`（[ADR-0052](0052-audit-and-operator-access.md)）の流れを足した。
+> - Firehose へ直接書く記録（ランキングの配信の記録、公開 API の計量、見える範囲の抜き取りの監査、RUM）を足した。
+> - 「送れたら行を消す」を、送った行を 1 時間残す形に変えた（[ADR-0056](0056-disaster-recovery-osaka.md)）。

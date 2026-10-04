@@ -18,7 +18,7 @@ date: 2026-10-04
 | フォロワーの数・フォローの数 | 両方 | 表示のたび |
 | おすすめの特徴（相互フォロー、2 歩先） | 両方 | ランキングのたび |
 
-辺の数は、S1 で 6,000 万、S3 で 100 億（[architecture/README.md](../architecture/README.md) の 2 節）。ブロックとミュートも、同じ形の辺である。
+辺の数は、S1 で 6,000 万、S3 で 100 億（[architecture/README.md](../architecture/README.md) の 2 節）。ブロックとミュートも辺である。
 
 本家は、フォローの関係を専用のグラフの保存の仕組みで持ってきた（具体は公式の資料で確かめておらず未検証）。
 
@@ -37,7 +37,7 @@ date: 2026-10-04
 
 - `following(src_id, dst_id, state, created_at)`：主キー `(src_id, dst_id)`。する側から見た辺。
 - `followers(dst_id, src_id, state, created_at)`：主キー `(dst_id, src_id)`。される側から見た辺。
-- `state` は `active`・`pending`（鍵アカウントへの申請）。ブロックとミュートは別の表（`blocks`・`mutes`）で同じ 2 つの向きを持つ（ミュートは本人だけの表。[ADR-0004](0004-single-tenant-and-visibility.md)）。
+- `state` は `active`・`pending`（鍵アカウントへの申請）。ブロックは別の表で同じ 2 つの向きを持つ（`blocks(src_id, dst_id)` と `blocked_by(dst_id, src_id)`）。ミュートは本人だけの表（`mutes`。[ADR-0004](0004-single-tenant-and-visibility.md)）で、ミュートした側の向きだけを持つ。逆向きの表は、ミュートされた側から「誰にミュートされているか」を引く形を作るため持たない（[ADR-0012](0012-viewer-sets-cache.md)）。
 - **2 つの表を同じトランザクションで書く**（S2 で分割した後は下の「分割」）。outbox にも同じトランザクションで出来事を書く（[ADR-0005](0005-event-log-and-outbox.md)）。
 - 一覧は `(src_id, created_at DESC)`・`(dst_id, created_at DESC)` の順でページを送る。
 - **数は写し**：`user_counters(user_id, followers, following)` を出来事から集計して持つ。照合のジョブで数え直す（カウンターと同じ扱い）。
@@ -51,7 +51,7 @@ date: 2026-10-04
 
 - `following` は `src_id`、`followers` は `dst_id` で分割する。どちらの向きの読み出しも、1 つの分割で済む。
 - 分割の後は、2 つの表が別の DB にありうる。書き込みは、**`following` を正本** にして先に書き（outbox を含む）、`followers` は出来事から非同期に作る。`followers` は遅れうるが、fan-out の遅れ（NFR-002）の中に収める。照合のジョブで 2 つの表の差を測る。
-- 分割の数と方式は follow-graph の領域で、S1 の計測の後に決める。
+- 分割の数と方式は follow-graph の領域で決めた（1,024 の論理の分割、S2 は 4 クラスタから。[ADR-0013](0013-graph-partitioning.md)）。分割の後は `blocks` も正本にし、`blocked_by` を出来事から作る。
 
 ### 他の案を選ばなかった理由
 
@@ -74,3 +74,7 @@ date: 2026-10-04
 - 性質ベーステスト：任意のフォロー・解除・申請・承認・ブロックの列の後、`following` と `followers` が互いの逆になる（S2 の非同期の後は、出来事を全部当てた後に）。
 - 結合テスト：同じ 2 人の間の同時のフォローと解除で、辺が 1 本か 0 本に定まる。
 - 本番：照合のジョブで、2 つの表の差と、数の写しの差を測る。
+
+## 注記
+
+> 2026-10-04 の注記：統合の工程で、「ブロックとミュートは同じ 2 つの向きを持つ」を直した。ミュートは逆向きの表を持たない（[ADR-0012](0012-viewer-sets-cache.md)）。2 つの向きはブロックだけに当てる（`blocks`・`blocked_by`）。数の写しの表は `user_counters`（[engagement-and-counters.md](../architecture/engagement-and-counters.md)）。

@@ -21,11 +21,11 @@
   - 上限、一覧のページング、大量のフォロー・解除の検出の信号
   - S2・S3 の分割
 - 扱わない：
-  - `visible()` の決定表の全体（`trust-and-safety.md`。この文書は、関係が `ViewerContext` に何を渡すかを書く）
+  - `visible()` の決定表の全体（[trust-and-safety.md](trust-and-safety.md)。この文書は、関係が `ViewerContext` に何を渡すかを書く）
   - fan-out の写しの後始末と補充（[timeline-fanout.md](timeline-fanout.md)）
-  - 1 日のフォローの数のレート制限（`api-and-rate-limits.md`）
-  - 大量のフォローへの措置の判断（`trust-and-safety.md`。この文書は信号を出すまで）
-  - おすすめの 2 歩先の候補の集計（`ranking-and-recommendation.md`）
+  - 1 日のフォローの数のレート制限（[api-and-rate-limits.md](api-and-rate-limits.md)）
+  - 大量のフォローへの措置の判断（[trust-and-safety.md](trust-and-safety.md)。この文書は信号を出すまで）
+  - おすすめの 2 歩先の候補の集計（[ranking-and-recommendation.md](ranking-and-recommendation.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -99,7 +99,7 @@ stateDiagram-v2
 | A → B の `active`・`pending` | 消す |
 | B → A の `active`・`pending` | 消す |
 | A の B へのミュート | 残す（ブロックを外した後に戻るため） |
-| B の投稿・返信・DM | `visible()` で互いに見えない。DM の扱いは `direct-messages.md` |
+| B の投稿・返信・DM | `visible()` で互いに見えない。DM の扱いは [direct-messages.md](direct-messages.md) |
 | ブロックの出来事 | `graph` の流れに `block.created`。写しの後始末（[timeline-fanout.md](timeline-fanout.md)）、通知の取り消し（[notifications.md](notifications.md)）、数の写しの更新 |
 
 - ブロックを外しても、消したフォローは戻らない。
@@ -114,13 +114,13 @@ stateDiagram-v2
 | ブロック | 上限なし（閲覧者の集合の写しの大きさは 6 節） | — |
 | ミュート（アカウント） | 10,000 | `ops.graph.max_mutes` |
 | ミュートの語 | 200 件、1 件 100 文字まで | `ops.graph.max_muted_words` |
-| 1 日のフォローの数 | `api-and-rate-limits.md` | — |
+| 1 日のフォローの数 | [api-and-rate-limits.md](api-and-rate-limits.md) | — |
 
 - 上限の判定は、書き込みの時に `user_counters` の写しで行う。写しは数秒遅れうるので、上限の付近では少しの超過を許す（正本で数え直さない）。超過は照合のジョブで測る。
 
 ### 4.5 ミュート
 
-- **アカウントのミュート**：ホーム（フォロー中・おすすめ）、通知、会話の返信の並び（下に畳む）から、その人の投稿とリポストを除く。プロフィールを直接開いたとき、検索で名前を指定したときは見える。期限（24 時間、7 日、30 日、なし）を選べる。
+- **アカウントのミュート**：ホーム（フォロー中・おすすめ）、通知、会話の返信の並び（下に畳む）から、その人の投稿とリポストを除く。プロフィールを直接開いたとき、検索で `from:@handle` などで作者を指定したときは見える（[search-and-trends.md](search-and-trends.md) の 6.3 節）。期限（24 時間、7 日、30 日、なし）を選べる。
 - ミュートは相手に知られない。逆向きの表を持たないのは、ミュートした人を、された側から引く経路を作らないため（[ADR-0007](../decisions/0007-follow-graph-storage.md) の「同じ 2 つの向き」から外れる。理由は ADR-0012）。
 - **ミュートの語**：
   - 正規化：NFKC → 小文字 → カタカナをひらがなに寄せる → 連続する空白を 1 つに。
@@ -179,7 +179,7 @@ sequenceDiagram
 ### 5.3 一覧のページング
 
 - フォロー中・フォロワーの一覧は `(created_at DESC, 相手の ID DESC)` の順。カーソルは、この 2 つを詰めた不透明な文字列。
-- 1 ページ 20 件（画面）、API は最大 1,000 件（`api-and-rate-limits.md`）。
+- 1 ページ 20 件（画面）、API は最大 1,000 件（[api-and-rate-limits.md](api-and-rate-limits.md)）。
 - 一覧の各行は `visible()` の利用者の版（プロフィールの見える範囲）で絞る。ブロックした・された相手は出さない。
 - 鍵アカウントの一覧は、本人と承認したフォロワーだけが読める。
 - 本人以外が読めるフォロワーの一覧は、新しい順に 50,000 件まで（大量の取得の抑止。`ops.graph.max_list_depth`）。本人は全件。
@@ -205,12 +205,12 @@ sequenceDiagram
 ## 7. 数の写しと作者の方式
 
 - `user_counters(user_id, followers, following, ...)` は、`graph` の流れから Counter Aggregator が作る（集計・書き戻し・照合の仕組みは [engagement-and-counters.md](engagement-and-counters.md)）。正本は `followers`・`following` の `active` の行の数。
-- **作者の fan-out の方式**（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）：Graph の数の消費者が、フォロワーの数が `ops.fanout.pull_threshold`（既定 10,000）以上になったら `authors.fanout_mode = pull`、`0.8 ×` 閾値を下回ったら `push` に書き、`author.fanout_mode_changed` を出す。閾値の一時の引き下げ（瞬間のピーク）は [timeline-fanout.md](timeline-fanout.md) の ADR-0015。
+- **作者の fan-out の方式**（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）：Graph の数の消費者が、フォロワーの数が `ops.fanout.pull_threshold`（既定 10,000）以上になったら `users.fanout_mode = pull`、`0.8 ×` 閾値を下回ったら `push` に書き、`author.fanout_mode_changed` を出す。閾値の一時の引き下げ（瞬間のピーク）は [timeline-fanout.md](timeline-fanout.md) の ADR-0015。
 - 数の表示では、鍵アカウントの承認のない人にも数は見せる（本家の現在の扱いは**未検証**。数は公開のプロフィールの一部とする）。
 
 ## 8. 大量のフォロー・解除の検出
 
-T&S への信号だけを出す。措置の判断は `trust-and-safety.md`。
+T&S への信号だけを出す。措置の判断は [trust-and-safety.md](trust-and-safety.md)。
 
 | 信号 | 条件（既定） | 窓 |
 | --- | --- | --- |
@@ -259,8 +259,8 @@ flowchart LR
 | `blocks`・`blocked_by` | 4.1 節 | 索引 `(src_id, created_at DESC)` |
 | `mutes` | `(owner_id, target_id) PK`、`expires_at` | 本人だけの表、FORCE RLS |
 | `muted_words` | `(owner_id, id) PK`、`phrase`、`phrase_norm`、`scope`、`expires_at` | 本人だけの表、FORCE RLS |
-| `users.graph_version` | `bigint` | 閲覧者の集合の版 |
-| `authors.fanout_mode` | `push`・`pull`、`changed_at` | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)。`users` の列でもよい（data-model の領域で決める） |
+| `users.graph_version` | `bigint` | 閲覧者の集合の版（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
+| `users.fanout_mode`、`users.fanout_mode_changed_at` | `push`・`pull` | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)。統合の工程で `users` の列に決めた（表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節） |
 | `user_counters` | `user_id PK`、`followers`、`following`、`posts`、`updated_at` | 写し。[engagement-and-counters.md](engagement-and-counters.md) |
 | `graph_shard_map`（S2） | `logical_partition smallint PK`、`cluster`、`state`、`moved_at` | |
 | outbox の出来事 | `graph` の流れ：`follow.created`・`follow.requested`・`follow.approved`・`follow.deleted`（理由：解除・拒否・取り消し・削除・ブロック）・`block.created`・`block.deleted`・`mute.created`・`mute.deleted`・`author.fanout_mode_changed`・`account.protected_changed` | 鍵は `src_id`（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）。ミュートの出来事は相手の ID を含むが、データレイクに写すときは本人だけの出来事として扱う |
@@ -316,11 +316,11 @@ flowchart LR
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| フォローの上限の比（1.1）と絶対の上限が、スパムの抑止と普通の利用に合うか | E4 の後の計測と、T&S の評価（`trust-and-safety.md`） |
+| フォローの上限の比（1.1）と絶対の上限が、スパムの抑止と普通の利用に合うか | E4 の後の計測と、T&S の評価（[trust-and-safety.md](trust-and-safety.md)） |
 | ブロックが 10 万件を超える利用者の割合と、写しの大きさ | E4 の計測 |
-| 本人以外のフォロワーの一覧の深さ（50,000 件）の妥当さ | E13 の公開 API の設計と合わせて決める（`api-and-rate-limits.md`） |
+| 本人以外のフォロワーの一覧の深さ（50,000 件）の妥当さ | E13 の公開 API の設計と合わせて決める（[api-and-rate-limits.md](api-and-rate-limits.md)） |
 | ブロック・ミュートの記録の保持の期間 | 法務の L8 |
-| 未成年の利用者へのフォローの申請・DM の制限 | 法務の L5（`accounts-and-auth.md`・`trust-and-safety.md`） |
+| 未成年の利用者へのフォローの申請・DM の制限 | 法務の L5（[accounts-and-auth.md](accounts-and-auth.md)・[trust-and-safety.md](trust-and-safety.md)） |
 
 ## 15. quality.md・runbooks への項目
 

@@ -9,7 +9,7 @@
   - E9 の前：日本語の検索（`search-poc`。kuromoji と N-gram、索引の大きさ、p99）。
 - **規則は 1 つのコードに。** 見える範囲は `packages/visibility`、文字数は `packages/text`、ID は `packages/tid`、ランキングの段は `packages/ranking` にだけ書く。
 - **契約を先に固定する。** 出来事の形（流れと鍵）、`tid` の形、`visible()` の決定表、公開 API の形は、人間がレビューして確定する。エージェントは勝手に変えない。
-- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L10）。下の表で「法務：L*」と書いた Story が当たる。
+- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L11）。下の表で「法務：L*」と書いた Story が当たる。
 - **1 変更 1 PR を目安に、差分を小さくする。** アプリは段階的に配布し、ランキングの変更は A/B で広げる。
 
 ## Epic
@@ -25,7 +25,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E5 ホームのタイムライン | fan-out、プル、写しの作り直し、プロフィールの一覧、会話の表示 | 未着手（前に fan-out の PoC） |
 | E6 エンゲージメントとカウンター | いいね・リポスト・ブックマーク、数の写しと照合、閲覧の数 | 未着手（前に閲覧の数の PoC） |
 | E7 メディア | アップロード、画像・動画の変換、配信、センシティブの印、措置での配信の停止 | 未着手（著作権の申出は法務：L6） |
-| E8 通知 | 通知の行、まとめ、既読、設定、プッシュ、メール | 未着手（プッシュの事業者は法務：L4） |
+| E8 通知 | 通知の行、まとめ、既読、設定、プッシュ、メール | 未着手（プッシュの事業者は法務：L4、要約のメールは法務：L11） |
 | E9 検索とトレンド | 日本語の全文検索、利用者の検索、ハッシュタグ、トレンド | 未着手（前に検索の PoC） |
 | E10 おすすめ | パイプライン、候補の源、規則のスコア、固い絞り込み、混ぜ合わせ、代わりの並び、オフラインの評価と A/B | 未着手（履歴の利用は法務：L4） |
 | E11 トラスト＆セーフティ | 通報、措置、作業の画面、スパムとボット、ハッシュの照合、異議、申出の窓口と期限、開示、法執行の窓口 | 未着手（法務：L1・L2・L7・L9） |
@@ -43,7 +43,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。領域の文書を書く工程で、各領域の「Story の候補」から見直す。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。統合の工程で、各領域の文書の「Story の候補」をこの表に集めた。中身の詳細は、各行の領域の文書にある。
 
 ### E1 基盤
 
@@ -58,10 +58,19 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `tid-generator` | `packages/tid`、生成器の貸し出し、リージョンの範囲、時計の監視（[ADR-0002](decisions/0002-post-ids-and-ordering.md)） |
 | `outbox-relay-kinesis` | outbox の表、Relay、Kinesis の流れと鍵、消費者の位置（[ADR-0005](decisions/0005-event-log-and-outbox.md)） |
 | `ci-pipeline-baseline` | PR の関門、テストの緩和の検出、本家の実装の依存の検査 |
-| `flags-appconfig` | `release.*`・`ops.*`・`experiment.*` |
+| `flags-appconfig` | フラグ `release.*`・`ops.*`・`experiment.*` と、決めた値 `policy.*`・`retention.*`・`legal.*`・`ts.*`（[delivery.md](architecture/delivery.md) の 3 節） |
 | `otel-baseline` | 計装、中身を出さない規則と走査 |
 | `audit-log` | 監査ログ（運用者のアクセス、T&S の読み出しの理由） |
 | `osaka-warm-standby` | 大阪の骨格、Global Database |
+| `quota-requests` | 6 節の確かめと申請（[capacity.md](architecture/capacity.md)） |
+| `kinesis-warm-throughput` | 5.3 節の温めた量（[capacity.md](architecture/capacity.md)） |
+| `original-impl-guard` | 2.1 節の本家の実装の検査（[delivery.md](architecture/delivery.md)） |
+| `event-contracts` | 7.2 節の共通の頭と互換の検査（`outbox-relay-kinesis` と共同）（[delivery.md](architecture/delivery.md)） |
+| `valkey-clusters` | 5 節の 4 クラスタ（[infrastructure.md](architecture/infrastructure.md)） |
+| `stream-consumer-lib` | 6.4 節の `packages/stream-consumer`（`outbox-relay-kinesis` の後）（[infrastructure.md](architecture/infrastructure.md)） |
+| `log-redaction` | 2.1 節の走査（security と共同）（[observability.md](architecture/observability.md)） |
+| `kms-key-layout` | 5.2 節の鍵とキーポリシー（[security.md](architecture/security.md)） |
+| `pii-field-encryption` | 5.3 節（`packages/crypto`）。E2 の前（[security.md](architecture/security.md)） |
 
 ### E2 アカウントとプロフィール
 
@@ -73,6 +82,14 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `protected-account` | 鍵アカウントの切り替え |
 | `web-app-shell` | Web（React、PWA）の骨格 |
 | `mobile-app-shell` | iOS・Android（React Native）の骨格、配布 |
+| `contact-change-hold` | 6.3 節の保留と取り消しのリンク（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
+| `account-states` | 8 節の状態と遷移、`deactivated` の猶予（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
+| `age-band` | 9 節の枠組み。法務：L5（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
+| `user-action-limits` | 5.3 節の利用者の行動の桶を App API に先に入れる（E3・E4 の書き込みの前）（[api-and-rate-limits.md](architecture/api-and-rate-limits.md)） |
+| `mobile-release-train` | 4.2・4.3 節、Maestro の E2E（[delivery.md](architecture/delivery.md)） |
+| `ota-update-server` | 5 節。署名の鍵（[delivery.md](architecture/delivery.md)） |
+| `min-client-version` | 6 節（[delivery.md](architecture/delivery.md)） |
+| `rum-ingest` | 3 節（[observability.md](architecture/observability.md)） |
 
 ### E3 投稿
 
@@ -86,6 +103,11 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `reply-restrictions` | 返信できる人の制限 |
 | `post-delete-cleanup` | 削除と後始末（写し、索引、メディア）。保持は法務：L8 |
 | `short-links` | 短縮 URL（`<brand>.<short-tld>`）と、リンクの安全の確かめ |
+| `composer` | 6 節：文字数、IME、メディアの添付、ALT（[clients.md](architecture/clients.md)） |
+| `offline-post-queue` | 4.3 節（posts-and-ids の冪等の受け口と共同）（[clients.md](architecture/clients.md)） |
+| `public-url-ssr-lite` | 9 節（[clients.md](architecture/clients.md)） |
+| `reply-quote-count-events` | 返信・引用の数の出来事を投稿の書き込みに足す（[posts-and-ids.md](architecture/posts-and-ids.md) と共同）（[engagement-and-counters.md](architecture/engagement-and-counters.md)） |
+| `post-state-cache` | 6 節の `ps:`・`as:`、`ps_put` の Function（[posts-and-ids.md](architecture/posts-and-ids.md)） |
 
 ### E4 フォローの関係
 
@@ -97,6 +119,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `follow-counters` | フォロー・フォロワーの数の写しと照合 |
 | `follow-limits` | フォローの上限、大量のフォロー・解除の検出 |
 | `follow-lists` | 一覧のページング |
+| `viewer-sets-cache` | 6 節の写し、版の規則、修復の仕事（ADR-0012）（[follow-graph.md](architecture/follow-graph.md)） |
 
 ### E5 ホームのタイムライン
 
@@ -111,6 +134,12 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `profile-timeline` | プロフィールの投稿の一覧 |
 | `conversation-view` | 会話の表示、返信の並べ方 |
 | `fanout-synthetic-monitor` | 合成監視の組（プッシュ・プルの作者、監視用のフォロワー） |
+| `home-client-cache` | 3.2・4 節：ホームの手元の写し、新着、オフラインの表示（[clients.md](architecture/clients.md)） |
+| `timeline-list-rendering` | 5 節、固定の端末での計測（ADR-0050）（[clients.md](architecture/clients.md)） |
+| `freshness-metrics` | 4.1・4.3 節（[observability.md](architecture/observability.md)） |
+| `timeline-replica-functions` | 4.1 節の形と Functions（ADR-0014）（[timeline-fanout.md](architecture/timeline-fanout.md)） |
+| `fanout-burst-control` | 5.4 節の瞬間のピーク（[timeline-fanout.md](architecture/timeline-fanout.md)） |
+| `fanout-simulator` | 14.2 節の決定的な模擬と PROP-TL-001〜005（[timeline-fanout.md](architecture/timeline-fanout.md)） |
 
 ### E6 エンゲージメントとカウンター
 
@@ -118,9 +147,11 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `view-count-poc` | PoC：閲覧の取り込みの費用と誤差。E6 の前 |
 | `likes-reposts-bookmarks` | 関係の表と書き込み |
-| `counter-aggregator` | 数の写し、シャードの位置と同じ `MULTI` |
+| `counter-aggregator` | 数の写し、`engagement` の鍵の部分ごとの連番で冪等に足す（[ADR-0023](decisions/0023-counter-aggregation-and-reconciliation.md)） |
 | `counter-writeback-reconcile` | 書き戻しと照合のジョブ |
 | `view-ingest` | Ingest、閲覧の流れ、集計、減らない表示 |
+| `view-event-client` | 7 節（engagement-and-counters の閲覧の規則と共同）（[clients.md](architecture/clients.md)） |
+| `count-format` | 6 節の `formatCount` と楽観の表示（[engagement-and-counters.md](architecture/engagement-and-counters.md)） |
 
 ### E7 メディア
 
@@ -138,8 +169,10 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `notification-rows` | 出来事から通知の行、まとめ、既読 |
 | `push-delivery` | APNs・FCM。法務：L4 |
-| `email-delivery` | メールの送信 |
+| `email-delivery` | メールの要約。法務：L11 |
 | `notification-settings` | 設定、品質のフィルター |
+| `push-client` | 8 節（notifications と共同）。法務：L4（[clients.md](architecture/clients.md)） |
+| `notification-read-state` | 7 節の既読、未読の数、Gateway への配信（ADR-0031）（[notifications.md](architecture/notifications.md)） |
 
 ### E9 検索とトレンド
 
@@ -150,6 +183,10 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `post-search` | 投稿の検索、返す前の `visible()` |
 | `user-search` | 利用者の検索 |
 | `trends` | 窓ごとの数、急上昇の検出、スパムと措置の除外 |
+| `search-normalization` | `normalizeForSearch` と例の集まり（5.1 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
+| `search-reindex` | 版を変える作り直しの手順（7.5 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
+| `trends-manipulation-defense` | 重み、群れと貼り付けの検出、`trend_overrides`、T&S の待ち行列（9.5 節）（[search-and-trends.md](architecture/search-and-trends.md)） |
+| `trends-regional` | 地方の地域。法務：L4（IP アドレスからの推定）（[search-and-trends.md](architecture/search-and-trends.md)） |
 
 ### E10 おすすめ
 
@@ -162,6 +199,9 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ranking-offline-eval` | データレイクでの再生の評価と CI |
 | `ranking-ab` | A/B の割り当てと集計 |
 | `ranking-reasons` | 理由の記録と表示。法務：L4 |
+| `ranking-features-s1` | 特徴の定義、写し、平滑化、関係の強さ（7 節）（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
+| `ranking-mixer-and-paging` | 混ぜ合わせ、`rk:` の並び、続きのページ（4.2・10 節）（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
+| `ranking-user-controls` | 「興味がない」などの操作、個人化しない設定。法務：L4（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
 
 ### E11 トラスト＆セーフティ
 
@@ -177,6 +217,10 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `disclosure-requests` | 発信者情報の開示の請求への対応、保全。法務：L2 |
 | `law-enforcement-portal` | 法執行の窓口。法務：L7 |
 | `transparency-report` | 運用の状況の公表と報告の集計。法務：L1 |
+| `ts-reader-access` | 6.3 節の理由の必須と範囲（`moderation-console` と共同）（[security.md](architecture/security.md)） |
+| `legal-holds` | 7.3 節。法務：L2・L7（[security.md](architecture/security.md)） |
+| `automated-enforcement` | 規則の措置、`interim_reduce`、規則の版（6.4 節）（[trust-and-safety.md](architecture/trust-and-safety.md)） |
+| `account-risk-score` | 危険の点、点による扱い、測り方（8.3・8.4 節）（[trust-and-safety.md](architecture/trust-and-safety.md)） |
 
 ### E12 DM
 
@@ -187,6 +231,8 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `dm-requests-and-blocks` | 申請、ブロックとの関係 |
 | `realtime-gateway` | WebSocket、配信 |
 | `dm-media` | DM のメディア。照合は法務：L3 |
+| `dm-reports` | 通報と証拠の写し（10 節）。法務：L3（[direct-messages.md](architecture/direct-messages.md)） |
+| `dm-abuse-signals` | 中身を使わない迷惑の抑止（9 節）。法務：L3（[direct-messages.md](architecture/direct-messages.md)） |
 
 ### E13 公開 API とレート制限
 
@@ -196,6 +242,8 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `public-api-v1` | 投稿・利用者・タイムライン・検索・DM の API |
 | `rate-limits` | 利用者・アプリ・IP の桶、ヘッダー |
 | `usage-metering` | 使った量の計量 |
+| `oauth-consent-screen` | 10 節（api-and-rate-limits の `oauth-apps` と共同）（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
+| `openapi-and-sdk` | 3.1 節の OpenAPI の生成と TypeScript の SDK（[api-and-rate-limits.md](architecture/api-and-rate-limits.md)） |
 
 ### E14 本番の準備と GA の判定
 
@@ -210,10 +258,26 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `data-lifecycle` | 保持のジョブ、アカウントの削除。法務：L8 |
 | `external-pentest` | 外部のペンテスト |
 | `ga-readiness-review` | GA の判定（[quality.md](quality.md) の 5 節の E14 の行） |
+| `account-deletion-pipeline` | 8.2 節から security の 7.2 節へ（security の `data-lifecycle` と共同）。法務：L8（[accounts-and-auth.md](architecture/accounts-and-auth.md)） |
+| `load-shedding-controls` | 7 節の削る順の仕組みと自動の規則（[capacity.md](architecture/capacity.md)） |
+| `accessibility-audit` | 10 節の手動の確かめ（[clients.md](architecture/clients.md)） |
+| `compat-nightly` | 2.2 節の 12 週前の版との互換（[delivery.md](architecture/delivery.md)） |
+| `dr-failover-workflow` | 7.3 節のワークフロー、outbox の送り直し、`ar:` の先の作成（[infrastructure.md](architecture/infrastructure.md)） |
+| `cost-baseline` | 13 節の確定（[infrastructure.md](architecture/infrastructure.md)） |
+| `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後）（[security.md](architecture/security.md)） |
 
 ### E15〜E20（MVP の後）
 
 Story は、着手するときに `intent.md` から起票する。
+
+領域の文書が挙げた候補：
+
+| Epic | Story | 内容 |
+| --- | --- | --- |
+| E18 | `dm-e2ee` | エンドツーエンドの暗号化（11 節）。法務：L3（[direct-messages.md](architecture/direct-messages.md)） |
+| E19 | `embedding-retrieval` | 2 つの塔と近傍の探索（S3）（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
+| E19 | `ranking-gbdt-heavy` | 行動ごとの勾配ブースティングと ONNX の推論（8.3 節）（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
+| E19 | `ranking-training-platform` | SageMaker、Step Functions、モデルの登録、特徴の一致の試験、PSI（13 節）（[ranking-and-recommendation.md](architecture/ranking-and-recommendation.md)） |
 
 ## エージェントに任せないこと
 
@@ -222,12 +286,15 @@ Story は、着手するときに `intent.md` から起票する。
 - **ランキングの変更を 100% に広げる判断**：PM が A/B の結果で決める。
 - **T&S の個別の措置の判断と、法令の申出への回答**：人が判断する。エージェントは整理と草案まで。
 - **DR の切り替えの判断**：IC と Ops の責任者。
-- **法務の判断**（L1〜L10）。
+- **法務の判断**（L1〜L11）。
 
 ## 延期の一覧
 
 MVP の後に検討する。E15〜E20 に入れなかったもの。
 
 - 分散型の SNS のプロトコルとの連合（[intent.md](intent.md) の Non-goals）。
+- 予約の投稿（下書きは MVP に含める）。
+- Web のプッシュ（[clients.md](architecture/clients.md) の 15 節）。
+- DM の送信の取り消し（[direct-messages.md](architecture/direct-messages.md) の 17 節）。
 - 海外の利用者向けの拡大（多言語、海外のリージョン）。S3 で検討する。
 - S2 の構成（Aurora の機能ごとの分割と鍵での分割）と S3 の構成（写しの記憶の階層、東京と大阪の両方での読み出し）。infrastructure の領域で計画する。

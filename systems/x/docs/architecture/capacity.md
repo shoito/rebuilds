@@ -74,14 +74,14 @@
 | --- | --- | --- |
 | セッション | `vk-edge` | 1 |
 | 写し（`tl:`） | `vk-timeline` | 1 |
-| フォローしているプルの作者の一覧 | `vk-cache` | 1 |
+| フォローしているプルの作者の一覧（`pl:`） | `vk-timeline` | 1 |
 | プルの作者の `ar:` | `vk-timeline` | 平均 5（多い人で数百。パイプライン） |
 | 投稿の状態の写し | `vk-cache` | 1（MGET、30 件） |
-| 閲覧者の集合（ブロック・ミュート・承認済みの鍵） | `vk-cache` | 3 |
+| 閲覧者の集合（ブロック・ミュート・承認済みの鍵・語・版） | `vk-cache` | 1（5 つの鍵を 1 回の Function で。[follow-graph.md](follow-graph.md) の 6 節） |
 | 数 | `vk-counters` | 1（MGET） |
 
-- S1 のピーク（1 万件/秒）：`vk-timeline` 6 万命令/秒、`vk-cache` 5 万命令/秒、`vk-counters` 1 万命令/秒。
-- `burst` の間（2.3 節）、1 人がフォローするプルの作者が平均 5 から 15 に増えると見込み、`vk-timeline` の読み出しは 16 万命令/秒になる。瞬間の間だけなので、6 シャードで受ける。
+- S1 のピーク（1 万件/秒）：`vk-timeline` 7 万命令/秒、`vk-cache` 2 万命令/秒、`vk-counters` 1 万命令/秒。
+- `burst` の間（2.3 節）、1 人がフォローするプルの作者が平均 5 から 15 に増えると見込み、`vk-timeline` の読み出しは 17 万命令/秒になる。瞬間の間だけなので、6 シャードで受ける。
 - 投稿の状態の写しに外れたものは Aurora の reader から引く。外れの率 5% で 1 万 × 30 × 5% = 1.5 万行/秒。
 
 ### 3.2 作り直し
@@ -92,7 +92,7 @@
 
 ### 3.3 おすすめ
 
-- 1 回の候補は 500〜1,500 件（[ranking-and-recommendation.md](ranking-and-recommendation.md) で決める）。特徴の読み出しが `vk-cache` に集まる。S1 でおすすめの読み出しをホームの 50% と置くと、5,000 回/秒 × 1,000 件の特徴 ＝ 500 万キー/秒。特徴を投稿ごとに 1 つのキーにまとめ、MGET で 100 件ずつ引く前提で、5 万命令/秒。
+- 1 回の候補は S1 で 800 件、S3 で 1,500 件（[ranking-and-recommendation.md](ranking-and-recommendation.md) の 5 節）。特徴の付加は軽いランクの後の 200 件だけに行う（同 8.1 節）。S1 でおすすめの読み出しをホームの 50% と置くと、5,000 回/秒 × 200 件 ＝ 100 万キー/秒。特徴を投稿ごとに 1 つのキー（`pf:`）にまとめ、パイプラインで 100 件ずつ引く前提で、1 万命令/秒。候補の取り出し（`tl:`・`ar:`・`ae:`・`th:`・`tp:`・`pop:jp`）が別に 1 回あたり 10〜20 命令ある。
 - スコアの段は S1 は式だけで、CPU は `ranking` のタスクの 1 回 約 30 ms。5,000 回/秒で 150 vCPU。`ranking` の最大 30 タスク × 2 vCPU では足りないので、ピークでは代わりの並び（[ADR-0006](../decisions/0006-ranking-boundary.md)）になる割合が増える。**E10 の負荷試験で、候補の数とタスクの数を合わせる**（12 節の持ち越し）。
 
 ## 4. サービスの必要量（S1）
@@ -103,7 +103,7 @@
 | `timeline` | 1 万読み出し/秒 ＋ 作り直し | 600 読み出し/秒 | 25（殺到で 80） |
 | `ranking` | 5,000 回/秒 | 3.3 節の計算で不足。初期は 30 | 30（E10 で見直す） |
 | `post` | 3,000 件/秒（瞬間） | 200 件/秒（検証、文字数、`tid`、書き込み） | 20 |
-| `ingest` | 2 万閲覧/秒（束で 400 要求/秒） | 200 要求/秒 | 6 |
+| `ingest` | 2 万閲覧/秒（束で 800 要求/秒） | 200 要求/秒 | 6 |
 | `gateway` | 同時の接続 6 万（DAU 30 万の 20%） | 1 万接続 | 9 |
 | `auth` | セッションの確かめの写しの外れ（平常 500/秒、`vk-edge` の喪失で 3 万/秒） | 2,000 確かめ/秒 | 平常 3、`vk-edge` の喪失で 15〜20（3 倍以上に広げる） |
 | `public-api` | 2,000 要求/秒 | 500 要求/秒 | 6 |
@@ -145,7 +145,7 @@
 | `posts` | 300 件/秒 × 2 KB ＝ 0.6 MB/秒 | 6 MB/秒 | オンデマンドの新しい流れは書き込み 4 MB/秒から広がる。瞬間に間に合わないので、**温めた量（warm throughput）を 20 MB/秒にしておく**（`UpdateStreamWarmThroughput`。[Quotas and limits](https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html)、2026-10-04 に確認） |
 | `engagement` | 2,000 × 0.5 KB ＝ 1 MB/秒 | 3 MB/秒 | — |
 | `graph` | 200 × 0.5 KB | — | — |
-| `views` | 束（平均 25 件）で 800 レコード/秒 × 0.5 KB ＝ 0.4 MB/秒（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)） | 1.2 MB/秒 | S3 は 210 万件/秒 ÷ 25 × 0.5 KB ≒ 42 MB/秒で、東京の上限 200 MB/秒の中。束の平均の件数が下がると増えるので、S2 で測る |
+| `views` | 束（平均 25 件）で 800 レコード/秒 × 2 KB ＝ 1.6 MB/秒（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)、[engagement-and-counters.md](engagement-and-counters.md) の 5.3 節） | 4.8 MB/秒 | 瞬間は作った時の 4 MB/秒を超えるので、`posts` と同じく温めた量を 20 MB/秒にする。S3 は 210 万件/秒 ÷ 25 × 2 KB ≒ 170 MB/秒で、東京の上限 200 MB/秒の 8 割を超える。S2 の間に上限の引き上げ（10 GB/秒まで、申請）を済ませる。束の平均の件数が下がると増えるので、S2 で測る |
 | `dm` | 500 × 0.2 KB（ID だけ） | — | — |
 | `moderation`、`accounts`、`audit` | 小さい | — | — |
 
@@ -164,7 +164,7 @@
 | --- | --- | --- |
 | Kinesis オンデマンドの書き込み（東京） | 1 つの流れ 200 MB/秒まで自動 | 確認済み（5.3 節の出典） |
 | Kinesis の拡張ファンアウトの消費者 | 1 つの流れ 20 | 確認済み |
-| Kinesis オンデマンドの流れの数 | 50（既定） | 確認済み。7 つで足りる |
+| Kinesis オンデマンドの流れの数 | 50（既定） | 確認済み。8 つで足りる |
 | KMS の暗号の要求（東京、アカウントごと） | **未検証**。E1 で Service Quotas を見る | 封筒の暗号化は、データキーをタスクのメモリーに 1 時間持ち、包んだデータキーの指紋でキャッシュするので、`Decrypt` は 1 秒に数十〜数百回の見込み（[security.md](security.md) の 5.3 節） |
 | Fargate の vCPU（東京・大阪） | ピークの台数 ＋ 殺到の分（約 600 vCPU） | E1 で申請 |
 | ElastiCache のノードの数 | 4 クラスタ × 最大 12 シャード × 2 | E1 |
@@ -183,7 +183,7 @@ ADR-0060。
 | --- | --- | --- | --- |
 | 1 | 閲覧の取り込み | `ingest` が過負荷で束を捨てる（`503` を返し、クライアントは再送しない） | 表示の数の欠け（概算の誤差に含める） |
 | 2 | おすすめ | `ops.ranking.fallback` で代わりの並びに固定 | おすすめが時刻の順に近くなる |
-| 3 | 作り直しの範囲 | `ops.timeline.rebuild_window` を狭める | 久しぶりの利用者のホームが短い |
+| 3 | 作り直しの範囲 | `ops.timeline.rebuild_rate` を下げ、超えた分を 24 時間・200 件の `partial` で返す（[ADR-0016](../decisions/0016-timeline-rebuild-single-flight.md)） | 久しぶりの利用者のホームが短い |
 | 4 | 公開 API | `ops.ratelimit.global.*` で全体の天井を下げる | 開発者のアプリが `429` |
 | 5 | fan-out の量 | `burst`（[ADR-0015](../decisions/0015-fanout-pipeline-and-burst-control.md)）。足りなければ `ops.fanout.pull_threshold` を一時に下げる | 読み出しの合わせが増える（遅延はわずかに増える） |
 | — | 削らない | 投稿の書き込み、`visible()`、措置の反映、法令の期限の処理 | — |
@@ -236,7 +236,7 @@ staging を本番と同じ台数に広げ、合成のソーシャルグラフ（
 - **平常のピークで 2/3 以下、AZ を 1 つ失っても受ける**（ADR-0060）。
 - **fan-out は瞬間の 2/3（S1 で 20 万件/秒）を続けて書け、残りは均す。足りなければ閾値を一時に下げる**。
 - **削る順は 閲覧 → おすすめ → 作り直しの範囲 → 公開 API → fan-out の量**。投稿の書き込みと `visible()` は削らない。
-- **`posts` の流れは温めた量 20 MB/秒**。
+- **`posts` と `views` の流れは温めた量 20 MB/秒**。
 
 ### 持ち越し
 
@@ -257,7 +257,7 @@ staging を本番と同じ台数に広げ、合成のソーシャルグラフ（
 
 ### runbooks
 
-- 2 節の「上限と容量のパラメーター」に、`ops.ranking.fallback`・`ops.timeline.rebuild_window`・`ops.ratelimit.global.*`・`ops.fanout.pull_threshold` の削る順（7 節）を書き足す。
+- 2 節の「上限と容量のパラメーター」に、`ops.ranking.fallback`・`ops.timeline.rebuild_rate`・`ops.ratelimit.global.*`・`ops.fanout.pull_threshold` の削る順（7 節）を書き足す（統合の工程で反映した）。
 - `load-shedding.md`：7 節の順と、それぞれを戻す条件。
 
 ## 出典

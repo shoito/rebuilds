@@ -1,6 +1,6 @@
 # Notifications: X
 
-通知。通知の種類、出来事から通知の行を作る規則、まとめ（「他 99 人がいいね」）、大きなアカウントへの殺到、既読と未読の数、設定、プッシュ（APNs・FCM）とメール、見える範囲の再確認を決める。DM の通知は `direct-messages.md`、アカウントの安全に関わるメール（ログインの通知など）は `accounts-and-auth.md` が持つ。
+通知。通知の種類、出来事から通知の行を作る規則、まとめ（「他 99 人がいいね」）、大きなアカウントへの殺到、既読と未読の数、設定、プッシュ（APNs・FCM）とメール、見える範囲の再確認を決める。DM の通知は [direct-messages.md](direct-messages.md)、アカウントの安全に関わるメール（ログインの通知など）は [accounts-and-auth.md](accounts-and-auth.md) が持つ。
 
 前提となる決定は、本人だけの表の FORCE RLS と `visible()`（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)）、outbox と Kinesis と SQS（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）、投稿の出来事とメンション（[ADR-0008](../decisions/0008-post-write-path-and-idempotency.md)）、閲覧者の集合（[ADR-0012](../decisions/0012-viewer-sets-cache.md)）、いいね・リポストの出来事（[ADR-0022](../decisions/0022-engagement-relations-and-writes.md)）。この文書で決めたことは次の ADR にある。
 
@@ -21,11 +21,11 @@
   - メールの要約
   - 見える範囲の再確認
 - 扱わない：
-  - DM の通知（`direct-messages.md`）
-  - ログイン・パスワード・アカウントの安全のメール（`accounts-and-auth.md`）
-  - 措置の通知の文面と根拠の示し方（`trust-and-safety.md`。この文書は、措置の通知を一覧とプッシュに載せる経路だけを書く）
-  - WebSocket の接続と配信（Realtime Gateway。`direct-messages.md` と `infrastructure.md`）
-  - アプリの通知の画面（`clients.md`）
+  - DM の通知（[direct-messages.md](direct-messages.md)）
+  - ログイン・パスワード・アカウントの安全のメール（[accounts-and-auth.md](accounts-and-auth.md)）
+  - 措置の通知の文面と根拠の示し方（[trust-and-safety.md](trust-and-safety.md)。この文書は、措置の通知を一覧とプッシュに載せる経路だけを書く）
+  - WebSocket の接続と配信（Realtime Gateway。[direct-messages.md](direct-messages.md) と [infrastructure.md](infrastructure.md)）
+  - アプリの通知の画面（[clients.md](clients.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -152,7 +152,7 @@ stateDiagram-v2
 | 相手の絞り込み：フォローしていない人・フォローされていない人・新しいアカウント（30 日未満）・電話番号を確かめていない人・プロフィールの画像がない人 | すべてオフ | 同上 |
 | 静かな時間（プッシュを送らない時間帯。日本時間） | なし | 同上 |
 
-- メールの要約の既定（オンかオフか）は、法務の確認の後に決める（12 節の持ち越し）。
+- メールの要約の既定（オンかオフか）は、法務の L11 の後に決める（14 節の持ち越し）。
 
 ## 6. プッシュ（ADR-0030）
 
@@ -214,7 +214,7 @@ Push Sender は、送る直前に次を確かめる。spec の `DT-NOTIF-002` �
 - **要約のメール**：未読の通知が 24 時間以上たち、受け手が 72 時間以上アプリを開いていないとき、1 日 1 通まで、未読の上位 10 件の要約を送る。送る直前に 7 節と同じ判定をする。
 - 送信は Amazon SES（東京）。送信の記録には、受け手の ID・種類・結果だけを書き、メールアドレス・本文を書かない。
 - 一括の配信の停止（ワンクリックの停止のヘッダー）と、本文の中の停止のリンクを付ける。
-- 要約のメールが広告・宣伝のメールに当たるか、同意の取り方と表示の義務は、法務の確認待ち（12 節）。
+- 要約のメールが広告・宣伝のメール（特定電子メール法の特定電子メール）に当たるか、同意の取り方と表示の義務は、法務の確認待ち（L11。14 節の持ち越し）。
 
 ## 9. 障害と振る舞い
 
@@ -298,7 +298,7 @@ Push Sender は、送る直前に次を確かめる。spec の `DT-NOTIF-002` �
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | プッシュの事業者（外国にある第三者）へ渡してよい中身、本人への説明 | 法務の L4。結論まで `release.push.rich_payload` を有効にしない |
-| 要約のメールが広告・宣伝のメールに当たるか、同意の取り方と既定 | 法務の確認。[intent.md](../intent.md) の「法務の確認待ち」に項目がないため、L11 として足すことを PM に提案する |
+| 要約のメールが広告・宣伝のメールに当たるか、同意の取り方と既定 | 法務の L11（統合の工程で [intent.md](../intent.md) に足した）。E8 の `email-delivery` の spec の承認の前 |
 | 未成年の利用者へのプッシュ（深夜の時間帯など） | 法務の L5 |
 | 通知の行・送信の記録の保持の期間 | 法務の L8 |
 | APNs・FCM の応答のコードと上限の値 | E8 の `push-delivery` で公式の文書を確かめる |

@@ -29,7 +29,7 @@
 | 本家の大きさの上限 | 画像 5 MB（JPG、PNG、GIF、WEBP）、GIF 15 MB。動画は既定のアカウントで 20 分・8 GB、有料のアカウントで 125 分・16 GB。DM の動画は既定で 140 秒・512 MB。最短 0.5 秒。投稿には画像 4 枚、GIF 1 つ、動画 1 つのどれか（[Media upload](https://docs.x.com/x-api/media/introduction)、公式） | 添付の組み合わせは同じ。S1 の動画は 10 分・2 GB に絞る（費用。12 節） |
 | 本家のアップロードの形 | 画像・GIF・動画の分割のアップロードを勧める（INIT・APPEND・FINALIZE）（同上） | 形は寄せるが、本体はクライアントから S3 へ直接（ADR-0032） |
 | 本家の代替のテキスト | 1,000 文字まで付けられるとされる | 公式の文書で確かめておらず**未検証**。この設計は 1,000 文字（7.1 節） |
-| CloudFront KeyValueStore | CloudFront Functions から読める、エッジの低遅延のキーと値の保存。1 つの保存は 5 MB まで、キー 512 バイト、値 1 KB まで。更新は数秒ですべてのエッジに広がる（[KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、[AWS のブログ](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)） | 措置の拒否の一覧に使う（8.4 節） |
+| CloudFront KeyValueStore | CloudFront Functions から読める、エッジの低遅延のキーと値の保存。1 つの保存は 5 MB まで、キー 512 バイト、値 1 KB まで、1 回の更新の API は 50 キーか 3 MB まで（[KeyValueStore](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html)、[Quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html)）。更新は数秒ですべてのエッジに広がるとされる（[AWS のブログ](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)） | 措置の拒否の一覧に使う（8.4 節） |
 | CloudFront の無効化 | 無効化と、版つきのファイル名の 2 つの方法がある。無効化しても、利用者の端末や途中のキャッシュには古いものが残りうる（[Invalidate files](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/Invalidation.html)） | 無効化だけに頼らない。完了までの時間は文書に書かれておらず**未検証**（`media-delivery-and-takedown` で測る） |
 
 ## 3. 要件
@@ -108,7 +108,7 @@ stateDiagram-v2
 
 - `media.state` が正本。状態を変えるたびに `state_version` を上げる（投稿と同じ規則。[ADR-0009](../decisions/0009-post-state-tombstones-and-state-cache.md)）。
 - `ready` にならないメディアは、投稿にも DM にも付けられない。投稿の API は `ready` で、同じ作者のメディアだけを受け付ける。
-- `blocked` は照合の一致。投稿者には「このメディアは投稿できません」とだけ返し、一致の種類を示さない（11 節）。
+- `blocked` は照合の一致。投稿者には「このメディアは投稿できません」とだけ返し、一致の種類を示さない（9 節、11 節）。
 - `withheld` は配信の停止。投稿の削除・措置（`moderation`）、作者の凍結で入る。取り消しで `attached` に戻る。
 - 1 つのメディアは 1 つの投稿か DM にだけ付く。同じ画像を別の投稿に使うときは、もう一度上げる（参照の数え上げを持たないため、削除と措置が単純になる）。
 
@@ -120,7 +120,7 @@ stateDiagram-v2
 | 大きさ | 申告の大きさと実際の大きさが合わなければ `failed` |
 | 画像の展開の上限 | 一辺 8,192 ピクセル、全体 4,000 万ピクセルまで（展開の爆弾を防ぐ）。`sharp` の `limitInputPixels` で止める |
 | 動画 | 長さ 0.5 秒〜上限、解像度 4K まで、フレームの率 60 まで。音声だけ・映像のない MP4 は拒む |
-| ハッシュの照合 | 11 節。公開の投稿・プロフィールのメディアは一致しないことを確かめてから `processing` に進む |
+| ハッシュの照合 | 9 節。公開の投稿・プロフィールのメディアは一致しないことを確かめてから `processing` に進む |
 
 ## 5. 画像
 
@@ -139,7 +139,7 @@ stateDiagram-v2
 
   3. 形式は JPEG（品質 82、プログレッシブ）と WebP（品質 80）。透過のある画像は PNG と WebP。AVIF は S2 で検討する。
   4. ぼかしの下絵（BlurHash、4×3）と、主な色を作り、メディアの行に持つ。
-  5. 知覚ハッシュ（PDQ）と SHA-256 を記録する（11 節）。
+  5. 知覚ハッシュ（PDQ）と SHA-256 を記録する（9 節）。
 - GIF：繰り返しの MP4（H.264、音声なし、元の大きさ、長い辺 1,280 まで）と、最初のフレームの JPEG にする。配るのは MP4。
 - アイコンとヘッダー：アイコンは 400 の正方形と 48・96・200 の版、ヘッダーは 1,500×500。
 - 時間の予算（p95 3 秒）：完了の要求 → 仕事の受け取り 300ms、照合 800ms、変換 1.5 秒、状態の書き込み 100ms、余裕 300ms。
@@ -207,7 +207,7 @@ stateDiagram-v2
 ### 8.3 鍵の切り替え
 
 - 作者が公開から鍵アカウントに切り替えたら、作者のメディアのキーを `/m/` から `/p/` へ移す仕事を作る。仕事の間は、作者の `media_key` の一覧を KeyValueStore の拒否の一覧に入れ（8.4 節）、`/m/` の道を止める。移し終えたら拒否を外す。
-- 作者のメディアが多く、拒否の一覧の容量（5 MB）を超えるときは、`media_key` の前に作者ごとの前置き（`/m/{author_key}/{media_key}`）を持たせる案に替える。S1 は `media_key` ごとの拒否で始め、容量を監視する（14 節の持ち越し）。
+- 作者のメディアが多く、拒否の一覧の容量（5 MB）を超えるときは、`media_key` の前に作者ごとの前置き（`/m/{author_key}/{media_key}`）を持たせる案に替える。S1 は `media_key` ごとの拒否で始め、容量を監視する（16 節の持ち越し）。
 - 鍵アカウントから公開に戻したら、逆に `/p/` から `/m/` へ移す。
 
 ### 8.4 措置・削除での配信の停止
@@ -224,13 +224,13 @@ flowchart LR
 ```
 
 1. **拒否の一覧**：CloudFront KeyValueStore に `m:{media_key}` を書く。ビューアーの要求の CloudFront Function が、前置きの `media_key` を取り出して一覧を引き、あれば `451`（法令の措置）か `404`（削除・規約の措置）を返す。更新は数秒で全エッジに広がる（2 節）。
-2. **元の隔離**：`uploads`・`public` の置き場から、隔離の置き場（`quarantine`、別の KMS の鍵、T&S と法務のロールだけが読める）へオブジェクトを移す。異議の申立てで戻せるようにし、保全（L2）の対象にもする。
+2. **元の隔離**：`uploads`・`public` の置き場から、隔離の置き場（`quarantine`、KMS の鍵 `ts-evidence`、T&S と法務のロールだけが読める。[ADR-0051](../decisions/0051-encryption-and-key-layout.md)）へオブジェクトを移す。異議の申立てで戻せるようにし、保全（L2）の対象にもする。
 3. **無効化**：`/m/{media_key}/*` を無効にする。
 4. **状態**：`media.state = withheld`。
 5. 無効化の完了から 24 時間たったら、拒否の一覧から外す（元がないので、キャッシュが切れた後は 404 になる）。
 
 - 1 と 4 は、出来事の受け取りから 5 秒以内。60 秒の目標（NFR-009）は、1 で守る。2・3 が遅れても、1 が効いている。
-- 地域での非表示（法令の措置が日本の中だけなど）は、拒否の値に地域の一覧を書き、CloudFront Function が閲覧者の国の見出しと比べる。国の見出しを CloudFront Function で読めることは `media-delivery-and-takedown` で確かめる（**未検証**）。
+- 地域での非表示（法令の措置が日本の中だけなど）は、拒否の値に地域の一覧を書き、CloudFront Function が閲覧者の国の見出し（`CloudFront-Viewer-Country`）と比べる。ビューアーの要求の CloudFront Function でこの見出しを読めることは AWS の文書で確かめた（[Route requests based on country](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example_cloudfront_functions_select_origin_based_on_country_section.html)、2026-10-04）。見出しを足す設定（オリジンの要求の方針）は `media-delivery-and-takedown` で確かめる。
 - 利用者の端末に残ったキャッシュは消せない（2 節）。アプリは、投稿の取得で `withheld` を受けたら、端末のキャッシュから消す。
 - 措置の取り消しは逆の順で戻す（隔離から戻し、拒否を外す）。無効化は要らない。
 
@@ -369,5 +369,5 @@ type MatchResult =
 | 著作権の申出と送信防止の措置（L6） | 法務の確認待ち。[trust-and-safety.md](trust-and-safety.md) の 10.4 節 |
 | 保持の期間（L8） | 法務の確認待ち |
 | 1 分の動画 p95 60 秒を MediaConvert で守れるか | `video-transcode` で測る |
-| CloudFront の無効化の完了までの時間、CloudFront Function での国の見出し | `media-delivery-and-takedown` で測る |
+| CloudFront の無効化の完了までの時間、国の見出しを足す設定 | `media-delivery-and-takedown` で測る |
 | 鍵の切り替えで KeyValueStore の容量が足りるか（作者ごとの前置きに替えるか） | S1 の運用で容量を監視して決める |

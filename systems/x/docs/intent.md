@@ -11,7 +11,7 @@
 この種のサービスを作り直すとき、難しいのは画面ではなく、次の 4 つである。
 
 - **届ける**：1 件の投稿を、数十人から数千万人のフォロワーのホームへ、数秒で届ける。フォロワーの多い利用者の投稿で、書き込みの量が爆発する（いわゆるセレブリティの問題）。
-- **選ぶ**：毎日の膨大な投稿から、1 人ひとりに見る価値のあるものを選んで並べる。本家は、1 回の「おすすめ」のために約 1,500 件の候補を集め、約 4,800 万のパラメーターのニューラルネットワークで並べると説明している（2023 年の本家の発表を伝える第三者の解説。本家のブログには到達できず**未検証**）。
+- **選ぶ**：毎日の膨大な投稿から、1 人ひとりに見る価値のあるものを選んで並べる。本家は、1 回の「おすすめ」のために約 1,500 件の候補を集め、約 4,800 万のパラメーターのニューラルネットワークで並べると説明している（2023 年の本家のブログを引用する第三者の記事で確かめた。本家のブログには到達できず、一次資料は**未検証**）。
 - **数える**：いいね・リポスト・表示の数を、毎秒何万件の更新の中で、速く、おおむね正しく見せる。
 - **守る**：スパムとボット、誹謗中傷、違法な情報への対応を、日本の法令（情報流通プラットフォーム対処法、発信者情報の開示）の手続きに沿って、期限の中で行う。
 
@@ -91,7 +91,7 @@
 - 実行基盤と技術は、rebuilds の他の題材の決定（AWS 東京・大阪、TypeScript、Aurora PostgreSQL、Valkey、S3、SQS・SNS、ECS Fargate、Terraform、OpenTelemetry、AppConfig）を引き継ぐ。外れるもの（64 ビットの ID、Kinesis Data Streams、学習の Python）は ADR に理由を書く（[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - 本家の名前は識別子に使わない。ドメインは `<brand>.<domain>`、短縮 URL は `<brand>.<short-tld>` の形で書く（[リポジトリ共通の ADR-0006](../../../docs/decisions/0006-brand-neutral-identifiers.md)）。本家の API・SDK とそのまま互換にすることは目標にしない。
 - データは日本（東京、DR は大阪）に置く。
-- 日本の法令（情報流通プラットフォーム対処法、電気通信事業法、個人情報保護法、青少年インターネット環境整備法、著作権法）への対応は、法務の確認を前提に設計する。結論は出さない（下の「法務の確認待ち」）。
+- 日本の法令（情報流通プラットフォーム対処法、電気通信事業法、個人情報保護法、青少年インターネット環境整備法、著作権法、特定電子メール法）への対応は、法務の確認を前提に設計する。結論は出さない（下の「法務の確認待ち」）。
 - 規模は段階的に広げる（[architecture/](architecture/README.md) の「規模の段階」）。
 
 ## Non-goals
@@ -112,7 +112,7 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 情報流通プラットフォーム対処法：どの規模で「大規模特定電気通信役務提供者」の指定の要件（平均月間発信者数など）に当たるか。指定の前から同じ水準の対応をするか。削除の申出の窓口・判断と通知の期限（7 日）・削除の基準の公表・発信者への通知・運用の状況の公表の具体の運用。「申出」と「通報」の区別 | trust-and-safety の領域 | E11 の申出の窓口と期限の管理、GA の判定 |
+| L1 | 情報流通プラットフォーム対処法：どの規模で「大規模特定電気通信役務提供者」の指定の要件（平均月間発信者数など）に当たるか。指定の前から同じ水準の対応をするか。削除の申出の窓口・判断と通知の期限（7 日とされる。下の出典）・削除の基準の公表・発信者への通知・運用の状況の公表の具体の運用。「申出」と「通報」の区別 | trust-and-safety の領域 | E11 の申出の窓口と期限の管理、GA の判定 |
 | L2 | 発信者情報の開示：開示の命令・提供の命令・消去の禁止の命令への対応の手順。開示に使うログ（投稿・ログインの時の IP アドレス、ポート、時刻、電話番号、メールアドレス）を、何を、何日持つか。発信者への意見の照会の手順 | trust-and-safety、accounts-and-auth、security の各領域 | E11 の開示の対応、E2 のログインの記録の保持 |
 | L3 | 電気通信事業法：DM が「通信の秘密」に当たる場合、スパムの判定・有害なメディアの照合・モデレーションのために DM の中身を機械で解析・人が読むことの扱いと、必要な同意の取り方。届出・登録の要否。外部送信規律の公表 | direct-messages、trust-and-safety、clients の各領域 | E12 の DM のスパム対策、DM のメディアの照合 |
 | L4 | 個人情報保護法：推薦に使う閲覧の履歴・行動の特徴の扱いと、本人への説明。要配慮個人情報を推定しうる特徴の扱い。外国にある第三者（プッシュ通知の事業者、ハッシュの照合の提供者）への提供。漏えい等の報告 | ranking-and-recommendation、notifications、security の各領域 | E10 のおすすめ、E8 のプッシュ通知 |
@@ -122,27 +122,30 @@
 | L8 | 保持の期間：削除した投稿・DM・凍結したアカウントのデータ、モデレーションの記録、通報の記録、出来事のログ（閲覧の履歴を含む）を何日持つか | security、trust-and-safety の各領域 | E3 の削除の後始末、E14 の GA の判定 |
 | L9 | 選挙の期間の扱い：公職選挙法のもとでの選挙運動の投稿、なりすまし、虚偽の情報への対応の範囲 | trust-and-safety の領域 | E11 の規約の公開 |
 | L10 | 画面の見た目と操作を本家に寄せる範囲：不正競争防止法（商品等表示、形態の模倣）と著作権の観点で、どこまで似せてよいか | clients の領域 | E2 以降の画面の Story |
+| L11 | 特定電子メール法：通知の要約のメール（未読の通知の日ごとの要約）が「特定電子メール」（営業の広告・宣伝のためのメール）に当たるか。当たる場合の同意（オプトイン）の取り方、表示の義務、配信の停止の扱い。要約のメールの既定（オンかオフか） | notifications の領域（8 節） | E8 の `email-delivery` |
 
 ### 選定・計測で決めるもの（法務以外）
 
 - fan-out の閾値（プッシュとプルを分けるフォロワーの数）：S1 の既定は 1 万。E5 の PoC で、書き込みの量と読み出しの遅れの釣り合いを測って決める（[ADR-0003](decisions/0003-timeline-fanout-hybrid.md)）。
-- 閲覧の数の取り込みの方式と誤差：E6 の PoC で、Kinesis Data Streams の費用と、Valkey の HyperLogLog・桁ごとの数の誤差を測る（[ADR-0005](decisions/0005-event-log-and-outbox.md)）。
-- 日本語の全文検索の方式：OpenSearch（kuromoji と N-gram）を第一の候補にする。E9 の PoC で、索引の大きさと p99 を測る。
-- S2 で投稿の表を分ける鍵（投稿の ID か、作者か）：posts-and-ids の領域で、S1 の計測を見て決める（[ADR-0002](decisions/0002-post-ids-and-ordering.md)）。
-- スパムの判定の部品（自前の規則と、第三者の分類のサービスの組み合わせ）と、有害なメディアのハッシュの照合の提供者：trust-and-safety の領域で選ぶ。
-- 本家の現在の投稿の上限（1 日の投稿の数）：本家の文書は、1 日 2,400 件（30 分ごとの区切りあり）、DM 1 日 500 件、フォロー 1 日 400 件と書いている（[About X limits](https://help.x.com/en/rules-and-policies/x-limits)。検索結果の抜粋で確認し、本文は 403 で未確認。2026-10-04）。2026 年 5 月に認証のないアカウントの投稿を 1 日 50 件・返信 200 件に絞ったと報じられている（第三者の報道。**未検証**）。本システムの値は api-and-rate-limits の領域で決める。
+- 閲覧の数の取り込みの費用と誤差：E6 の前の `view-count-poc` で、Kinesis Data Streams の費用と、投稿ごとの数の写し（Valkey のハッシュ `pc:{post_id}` の `view`）とデータレイクの集計の差を測る。方式は決めた（束をセッションの鍵で流し、数えすぎない側に倒す。[ADR-0024](decisions/0024-view-counts-ingest-and-approximation.md)）。
+- 日本語の全文検索：OpenSearch で、一致の判定は N-gram、関連度は kuromoji に決めた（[ADR-0025](decisions/0025-search-engine-and-japanese-analysis.md)）。E9 の前の `search-poc` で、索引の大きさと p99、Sudachi との比較を測る。
+- S2 で投稿の表を分ける鍵：投稿の ID のハッシュに決めた。作者・会話の一覧は別の索引の表にする（[ADR-0010](decisions/0010-post-table-partitioning-s2.md)）。S1 の計測で作者の一覧の読み出しが多ければ見直す。
+- スパムの判定の部品：S1 は自前の規則と線形の危険の点で始め、第三者の分類のサービスは買わない（[ADR-0040](decisions/0040-spam-and-bot-defense.md)）。有害なメディアのハッシュの照合の提供者は、口（`HashMatcher`）の後ろに置いて E11 の `media-hash-matching` で選ぶ（[ADR-0034](decisions/0034-media-hash-matching.md)）。
+- 本家の現在の投稿の上限（1 日の投稿の数）：本家の文書は、1 日 2,400 件（30 分ごとの区切りあり）、DM 1 日 500 件、フォロー 1 日 400 件と書いている（[About X limits](https://help.x.com/en/rules-and-policies/x-limits)。検索結果の抜粋で確認し、本文は 403 で**未検証**。2026-10-04 に取得を再び試みて 403）。2026 年 5 月に認証のないアカウントの投稿を 1 日 50 件・返信 200 件に絞ったと報じられている（第三者の報道。**未検証**）。本システムの値は投稿 1 日 1,000 件（電話の確認のないアカウントは 50 件）に決めた（[api-and-rate-limits.md](architecture/api-and-rate-limits.md) の 5.3 節）。
 
 ## 出典
 
-いずれも 2026-10-04 に確認。
+いずれも 2026-10-04 に確認（統合の工程で、公式の資料を取得し直して確かめた）。
 
 - X Developer Platform, [Counting characters](https://docs.x.com/fundamentals/counting-characters)：上限 280、日本語・中国語・韓国語の文字は 2 と数える、URL は 23 と数える
 - X Developer Platform, [Rate limits](https://docs.x.com/x-api/fundamentals/rate-limits)：15 分と 24 時間の窓、アプリごとと利用者ごとの上限、429
-- X Developer Platform, [Pricing](https://docs.x.com/x-api/getting-started/pricing)：使った量に応じた課金、月 300 万件の投稿の読み出しの上限
-- X Developer Platform, [Media upload](https://docs.x.com/x-api/media/introduction)：画像 5 MB、GIF 15 MB、分割のアップロード
+- X Developer Platform, [Pricing](https://docs.x.com/x-api/getting-started/pricing)：使った量に応じた課金（投稿の読み出し 1 件 $0.005）、月 300 万件の投稿の読み出しの上限
+- X Developer Platform, [Media upload](https://docs.x.com/x-api/media/introduction)：画像 5 MB、GIF 15 MB、動画は既定 20 分・8 GB、DM の動画は既定 140 秒・512 MB、分割のアップロード
 - X Help Center, [View counts](https://help.x.com/en/using-x/view-counts)、[About X limits](https://help.x.com/en/rules-and-policies/x-limits)、[About following on X](https://help.x.com/en/using-x/x-follow-limit)：検索結果の抜粋で確認（本文は 403 で未確認）
 - X（Twitter）, [twitter/the-algorithm](https://github.com/twitter/the-algorithm)（AGPL-3.0）、xAI, [xai-org/x-algorithm](https://github.com/xai-org/x-algorithm)（Apache-2.0）：おすすめの構成の README。コードは使わない
 - Twitter, [snowflake（2010 年の版）](https://github.com/twitter-archive/snowflake/tree/snowflake-2010)：41 ビットの時刻、10 ビットの機械、12 ビットの連番
-- 総務省, [インターネット上の違法・有害情報に対する対応（情報流通プラットフォーム対処法）](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)：2025-04-01 施行、2025-04-30 に X Corp. を含む 5 社を大規模特定電気通信役務提供者に指定
-- 総務省, [令和 7 年版 情報通信白書：情報流通プラットフォーム対処法の施行](https://www.soumu.go.jp/johotsusintokei/whitepaper/ja/r07/html/nd123210.html)
-- 第三者：月間 6,800 万人（2025 年 5 月の講演を伝える記事。[SNS ユーザー数のまとめ](https://gaiax-socialmedialab.jp/socialmedia/435) など）、おすすめの 1,500 件の候補と 4,800 万のパラメーター（[TechCrunch, 2023-03-31](https://techcrunch.com/2023/03/31/twitter-reveals-some-of-its-source-code-including-its-recommendation-algorithm/)）
+- 総務省, [インターネット上の違法・有害情報に対する対応（情報流通プラットフォーム対処法）](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)：2025-04-30 に X Corp. を含む 5 社を大規模特定電気通信役務提供者に指定。2025-05-29・30 に 4 社を追加で指定
+- 申出から 7 日以内の判断と通知：施行規則（総務省令）の第 16 条によるとする第三者の解説（[契約ウォッチ](https://keiyaku-watch.jp/media/hourei/joho-platform-2024/) など）で確認した。省令の条文は**未検証**
+- 総務省・消費者庁, [特定電子メールの送信等に関するガイドライン](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/pdf/m_mail_081114_1.pdf)：特定電子メールの定義（営業の広告・宣伝のためのメール）、オプトインと表示の義務（L11）
+- 総務省, [令和 7 年版 情報通信白書：情報流通プラットフォーム対処法の施行](https://www.soumu.go.jp/johotsusintokei/whitepaper/ja/r07/html/nd123210.html)：2025-04-01 に施行
+- 第三者：月間 6,800 万人（2025 年 5 月の講演を伝える記事。[SNS ユーザー数のまとめ](https://gaiax-socialmedialab.jp/socialmedia/435) など。一次資料は**未検証**）、おすすめの 1,500 件の候補と約 4,800 万のパラメーター（[TechCrunch, 2023-03-31](https://techcrunch.com/2023/03/31/twitter-reveals-some-of-its-source-code-including-its-recommendation-algorithm/)。記事が本家のブログを引用していることを確かめた。本家のブログは 403 で**未検証**）

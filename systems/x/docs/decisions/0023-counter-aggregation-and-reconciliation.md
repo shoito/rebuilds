@@ -43,7 +43,7 @@ date: 2026-10-04
   - 数の出来事がすべて 1 つの流れ（`engagement`）にそろう。
 - 引き受けるコスト：
   - Relay の重複（まれ）は照合まで残る。K4 の「照合の後、差 0」は満たすが、照合の前は一時的に多い。
-  - ADR-0005 の鍵の表と「同じ `MULTI`」の記述から外れる。ADR-0005 の更新は Dev（テックリード）の判断に回す。
+  - ADR-0005 の鍵の表と「同じ `MULTI`」の記述から外れる。統合の工程で ADR-0005 を直した（ADR-0005 の注記）。シャードの位置は Aurora の `stream_checkpoints` に持つ（[ADR-0055](0055-kinesis-consumers-and-valkey-clusters.md)）。
   - シャードの分割の後の連番の扱いに、KCL の順への依存が入る（AWS の保証の書き方は未検証）。
 
 ## Confirmation

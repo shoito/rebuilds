@@ -49,5 +49,5 @@ date: 2026-10-04
 
 - 性質ベーステスト：PROP-MEDIA-001（照合が `none` でない公開のメディアは `ready` にならない）。
 - 結合テスト：提供者の模擬（試験用のハッシュ）で `known_illegal`・`known_policy`・障害・時間切れの各場合。
-- lint：DM の `purpose` のメディアの処理から `HashMatcher` を呼ぶ道を、L3 のフラグ（`legal.l3.dm_media_matching`）の外で作らない。
+- lint：DM の `purpose` のメディアの処理から `HashMatcher` を呼ぶ道を、L3 のフラグ（`release.dm_media_matching`）の外で作らない。
 - 本番：照合の待ちの件数と時間、一致の件数、自前の一覧の誤一致の申し立ての件数。

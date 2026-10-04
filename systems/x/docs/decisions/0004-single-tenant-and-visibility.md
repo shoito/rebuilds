@@ -48,8 +48,16 @@ rebuilds の他の題材は、ワークスペースやテナントを契約と�
 ### 本人だけの表：FORCE RLS
 
 - **本人だけが読む表** に `owner_id` を持たせ、`FORCE ROW LEVEL SECURITY` を設定する。トランザクションごとに `SET LOCAL app.actor_id = '<利用者の tid>'` を設定し、ポリシーは `owner_id = current_setting('app.actor_id')::bigint` にする。
-  - 対象：ブックマーク、下書き、予約の投稿、通知、ミュートの語、設定、ログインの記録、データの書き出しの依頼。
-  - DM：会話の参加者の表を通して、参加者だけが読めるポリシーにする（`EXISTS` で `dm_participants` を引く）。
+  - 対象（統合の工程で領域の文書から集めた一覧。正本は [data-model.md](../architecture/data-model.md) の 3 節）：
+    - 投稿の領域：`drafts`
+    - 関係の領域：`mutes`、`muted_words`
+    - エンゲージメントの領域：`bookmarks`
+    - 通知の領域：`notifications`、`notification_actors`、`notification_cursors`、`notification_settings`、`push_devices`、`push_deliveries`
+    - アカウントの領域：`user_settings`、`user_contacts`、`user_birthdates`、`login_events`、`data_export_requests`
+    - ランキングの領域：`ranking_feedback`
+    - 公開 API の領域：`oauth_grants`
+    - DM の領域：`dm_message_hidden`、`dm_settings`
+  - DM：会話の参加者の表を通して、参加者だけが読めるポリシーにする（`EXISTS` で `dm_participants` を引く）。`dm_conversations`・`dm_participants`・`dm_messages` が当たる。`dm_requests` は送り手と受け手の 2 人が読めるポリシーにする（[direct-messages.md](../architecture/direct-messages.md) の 4.3 節）。
 - **運用と T&S の読み出し** は、別の DB のロール（`ts_reader` など）で行い、RLS を通さない代わりに、読み出しの理由（案件の ID）を必ず記録する。DM の中身を人が読む手順は、法務の確認（L3）が済むまで作らない。
 - バッチとストリームの処理（fan-out、集計、索引）は、本人だけの表を読まない。読む必要がある処理（通知の送信）は、受け手ごとに `SET LOCAL` して読む。
 
@@ -62,8 +70,9 @@ rebuilds の他の題材は、ワークスペースやテナントを契約と�
   // Visibility = { kind: "show" } | { kind: "hide", reason } | { kind: "interstitial", reason }
   ```
 
-  - `ViewerContext`：閲覧者の ID（ログインしていなければ匿名）、ブロックした・された集合、ミュートの集合と語、承認されているフォロー先の鍵アカウント、年齢の区分、センシティブの設定、地域。
-  - `PostState`：作者、作者の鍵の状態、削除、措置（種類、範囲、地域）、センシティブの印、返信の制限。
+  - `ViewerContext`：閲覧者の ID（ログインしていなければ匿名）、ブロックした・された集合、ミュートの集合と語、承認されているフォロー先の鍵アカウント、年齢の区分、センシティブの設定、地域、**読み出しの面 `surface`**（`home`・`for_you`・`profile`・`conversation`・`search`・`notifications`・`api`・`embed`・`dm_share`・`export`）。
+  - `surface` は、ミュートとミュートの語を当てるか、`interstitial` を出すか落とすか（おすすめでは落とす）だけを変える。ブロック・鍵アカウント・削除・措置の判定は、面に関わらず同じ（[follow-graph.md](../architecture/follow-graph.md) の 4.5 節）。
+  - `PostState`：作者、作者の鍵の状態と措置の要約（`users.account_mod`）、削除、措置の要約（`posts.mod_flags`：種類、範囲、地域）、センシティブの印、返信の制限、リポスト・引用の元の状態（[posts-and-ids.md](../architecture/posts-and-ids.md) の 6 節）。
 - **全経路がこの関数を通る。** タイムライン（フォロー中・おすすめ）、プロフィール、会話、検索、トレンドの例、通知、公開 API、埋め込み、メディアの配信の確認、DM の中の投稿の共有、データの書き出し。この関数を通らない読み出しの経路を作らない。
 - **読み出しの時に毎回判定する。** fan-out の時や、検索の索引に入れた時の判定を、読み出しの判定の代わりにしない（[ADR-0003](0003-timeline-fanout-hybrid.md)）。写しに入った後に、ブロック・削除・措置が起きるため。
   - 費用は、投稿の状態の写し（Valkey）と、閲覧者の集合の写し（ブロック・ミュート・承認済みの鍵アカウント）で抑える。集合は変更の出来事で無効にする。
@@ -90,3 +99,7 @@ rebuilds の他の題材は、ワークスペースやテナントを契約と�
 - CI：本人だけの表の一覧にある表に、`owner_id`（DM は参加者のポリシー）と FORCE RLS がないマイグレーションを失敗させる。
 - lint：投稿・プロフィール・メディアを返す API の処理で、`visible()` を通さずに応答へ投稿を入れるコードを検出する（応答の型を `Visible<Post>` にし、`visible()` だけがその型を作れるようにする）。
 - 本番：読み出しの抜き取りの監査（返した投稿を、その時点の正本で `visible()` し直し、`hide` の件数を数える。0 であるべき）。
+
+## 注記
+
+> 2026-10-04 の注記：統合の工程で次を直した。`ViewerContext` に読み出しの面 `surface` を足した（ミュートの当て方とおすすめの `interstitial` のため。[follow-graph.md](../architecture/follow-graph.md) の 4.5 節、[ranking-and-recommendation.md](../architecture/ranking-and-recommendation.md) の 6 節）。本人だけの表の一覧を、領域の文書が足した表（`ranking_feedback`、`dm_message_hidden`、`dm_requests`、`dm_settings`、`user_settings`、通知の表、`oauth_grants` など）で更新した。予約の投稿は MVP に含めないので一覧から外した（[roadmap.md](../roadmap.md) の延期の一覧）。

@@ -218,7 +218,7 @@ ADR-0059。[ADR-0006](../decisions/0006-ranking-boundary.md) のガードレー�
 | --- | --- |
 | outbox の出来事の中身に `committed_at`・`traceparent` | 4.1 節、2.2 節。出来事の形の共通の頭（[delivery.md](delivery.md) の 7.2 節） |
 | `users.flags.synthetic` | 合成監視のアカウントの印 |
-| Firehose `visibility-audit`、`ranking-reasons`、`rum` | 7・8・3 節 |
+| Firehose `visibility-audit`、`ranking-served`（[ranking-and-recommendation.md](ranking-and-recommendation.md) の 12.1 節の配信の記録。群の割り当てを含む）、`rum` | 7・8・3 節 |
 | Valkey（`vk-cache`）`rr:{request_id}` | 理由の記録の 1 時間の写し（8 節） |
 | `visibility_audit_findings` | 説明のつかない `hide` の記録（経路、理由のコード、ID） |
 

@@ -22,7 +22,7 @@ date: 2026-10-04
 
 1 を採用する。詳細は [security.md](../architecture/security.md) の 5 節。
 
-- 鍵（マルチリージョンの鍵、大阪に複製）：`aurora`、`pii`、`pii-logs`、`dm-content`、`media`、`lake`、`audit`、`secrets`、`stream`、`cache`。鍵ごとに使えるロールを決め、Terraform のポリシー検査で強制する。
+- 鍵（マルチリージョンの鍵、大阪に複製）：`aurora`、`pii`、`pii-logs`、`dm-content`、`media`、`lake`、`audit`、`secrets`、`stream`、`cache`、`ts-evidence`（通報の証拠の写しと、メディアの隔離の置き場。T&S と法務のロールだけ）。鍵ごとに使えるロールを決め、Terraform のポリシー検査で強制する。
 - 項目の暗号化：AES-256-GCM。データキーは KMS で作り、1 時間ごとに作り直してタスクのメモリーにだけ置く。暗号文と包んだデータキーを同じ列（`*_ct`）に持つ。
 - 等しさの検索（重複の判定、ログイン）は、正規化した値の HMAC-SHA256 の列（`contact_hmac`）で行う。HMAC の鍵は `kid` で 2 つ並べて入れ替える。
 - 投稿の時の IP は投稿の行に持たず、`post_origin_logs` に `pii-logs` の鍵で持つ。
@@ -45,3 +45,7 @@ date: 2026-10-04
 - 結合テスト：封筒の暗号化の往復、HMAC での重複の判定、鍵の入れ替えの後の読み出し。
 - Terraform のポリシー検査：`pii`・`pii-logs`・`dm-content` の `kms:Decrypt` を決めたロール以外に与えない。
 - マイグレーションの検査：連絡先・生年月日・IP の平文の列を作らない。
+
+## 注記
+
+> 2026-10-04 の注記：統合の工程で、`ts-evidence` の鍵を足した。通報の証拠の写し（[trust-and-safety.md](../architecture/trust-and-safety.md) の 6.1 節、[direct-messages.md](../architecture/direct-messages.md) の 10 節）と、措置したメディアの隔離の置き場（[media.md](../architecture/media.md) の 8.4 節）が別の鍵を求めていたため。

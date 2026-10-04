@@ -22,10 +22,10 @@
   - プロフィールの投稿の一覧、会話の表示
   - fan-out の合成監視
 - 扱わない：
-  - おすすめ（`ranking-and-recommendation.md`。フォロー中の写しを候補の源として渡す）
+  - おすすめ（[ranking-and-recommendation.md](ranking-and-recommendation.md)。フォロー中の写しを候補の源として渡す）
   - 閾値をまたいだ作者の方式の更新の仕組み（[follow-graph.md](follow-graph.md) の 7 節。この文書は方式の使い方を書く）
-  - Valkey のクラスタの構成、S3 の記憶の階層（`infrastructure.md`）、必要な台数（`capacity.md`）
-  - `visible()` の決定表（`trust-and-safety.md`）
+  - Valkey のクラスタの構成、S3 の記憶の階層（[infrastructure.md](infrastructure.md)）、必要な台数（[capacity.md](capacity.md)）
+  - `visible()` の決定表（[trust-and-safety.md](trust-and-safety.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -55,7 +55,7 @@
 | `tl:{viewer_id}` | 文字列（ADR-0014） | 頭（16 バイト）＋項目（32 バイト）× 最大 800。ID の降順 | 最後の読み出しから 30 日 |
 | `ar:{author_id}` | 文字列（同じ項目の形） | 作者の直近 7 日・最大 200 件（返信・リポストを含む） | 最後の投稿から 7 日 |
 | `pl:{viewer_id}` | Set | フォローしている作者のうち、フォロワー 1,000 人以上の人 | 10 分。閲覧者のフォローの変化で消す |
-| `fanout:pull_any` | Sorted Set | プルの合わせの対象の作者（値は「いつまで」。今プルの作者は無限大） | なし（正本は `authors.fanout_mode` と 6.3 節の記録） |
+| `fanout:pull_any` | Sorted Set | プルの合わせの対象の作者（値は「いつまで」。今プルの作者は無限大） | なし（正本は `users.fanout_mode` と 6.3 節の記録） |
 | `tlb:{viewer_id}` | 文字列 | 作り直しの single flight の鍵 | 5 秒 |
 
 ### 4.1 項目の形（ADR-0014）
@@ -71,7 +71,7 @@
 
 - 頭（16 バイト）：形の版（1）、状態（`ready`・`building`・`partial`）、項目の数（2）、作った時刻（ミリ秒、6）、予備。
 - Functions：`tl_insert(key, items...)`（鍵があるときだけ。位置を二分探索で決めて挿入し、800 件に切り詰める。同じ `post_id` は 1 つ）、`tl_begin(key)`（なければ `building` の頭だけで作る）、`tl_merge(key, items..., state)`（和を取り、状態を書く）、`tl_remove(key, post_ids...)`、`tl_remove_author(key, author_id)`、`tl_read(key, max_id, n)`。
-- S1 の記憶の量：アクティブな利用者 100 万人 × 25.6 KB ≒ 26 GB（Valkey の上乗せを除く）。S3 は `infrastructure.md` で記憶の階層を決める。
+- S1 の記憶の量：アクティブな利用者 100 万人 × 25.6 KB ≒ 26 GB（Valkey の上乗せを除く）。S3 は [infrastructure.md](infrastructure.md) で記憶の階層を決める。
 
 ## 5. fan-out の流れ（ADR-0015）
 
@@ -146,7 +146,7 @@ stateDiagram-v2
 
 ### 5.5 閾値をまたぐ作者
 
-- 方式は `authors.fanout_mode`（[follow-graph.md](follow-graph.md) の 7 節）。プッシュ → プル：振り分け役は以後プッシュしない。`fanout:pull_any` に無限大で足す。
+- 方式は `users.fanout_mode`（[follow-graph.md](follow-graph.md) の 7 節）。プッシュ → プル：振り分け役は以後プッシュしない。`fanout:pull_any` に無限大で足す。
 - プル → プッシュ：以後プッシュする。`fanout:pull_any` の値を「今から 7 日」に変える。プルの間の投稿は、7 日の間 `ar:` から見つかる。
 - どちらの向きでも、過去の投稿を配り直さない・消さない。読み出しは写しと `ar:` を合わせ、`post_id` で重複を落とす。
 - `fanout:pull_any` は、全ての読み出しが引く熱い鍵になる。Timeline のタスクは、これを手元のメモリーに持ち、1 秒ごとに版を見て読み直す。
@@ -330,9 +330,9 @@ sequenceDiagram
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
 | `posts` の索引 | `(author_id, id DESC)`、`(author_id, id DESC) WHERE has_media`、`(in_reply_to_post_id, id)`、`(in_reply_to_post_id, author_id)`、`(conversation_id, id)` | 表は [posts-and-ids.md](posts-and-ids.md) |
-| `authors.fanout_mode` | [follow-graph.md](follow-graph.md) | |
+| `users.fanout_mode` | [follow-graph.md](follow-graph.md) | |
 | `fanout_mode_log` | `author_id`、`from`、`to`、`reason`（閾値・瞬間のピーク）、`until`、`changed_at` | `fanout:pull_any` の作り直しの元と、記録 |
-| `users.pinned_post_id` | `bigint` | |
+| `users.pinned_post_id` | `bigint` | 表は [accounts-and-auth.md](accounts-and-auth.md) の 12 節 |
 | Valkey `tl:`・`ar:`・`pl:`・`tlb:`・`fanout:pull_any`・`cv:` | 4 節、9.2 節 | すべて写し。正本から作り直せる |
 | SQS `fanout-small`・`fanout-large`（と DLQ） | ページの仕事 `(post_id, item, after_src_id)` | |
 | AppConfig | `ops.fanout.*`・`ops.timeline.*`・`ops.conversation.*`・`experiment.conversation.*` | 閾値をコードに書かない（AGENTS.md） |
@@ -395,7 +395,7 @@ sequenceDiagram
 | 閾値 `T`（既定 1 万）、`T_burst`、`ar:` の件数 | `fanout-poc` と E5 の負荷試験 |
 | アクティブの印をビット列で持つか | `fanout-poc` で、非アクティブな人への呼び出しの割合を測る |
 | 新着の窓（10 秒） | `fanout-poc` で確定の順と ID の順のずれを測る |
-| S3 の写しの記憶の階層 | `infrastructure.md` |
+| S3 の写しの記憶の階層 | [infrastructure.md](infrastructure.md) |
 | ADR-0003 の案 4（大きな作者を、とくにアクティブなフォロワーへ遅れてプッシュ） | S2 の前に、プルの合わせの費用を見て決める |
 
 ## 17. quality.md・runbooks への項目

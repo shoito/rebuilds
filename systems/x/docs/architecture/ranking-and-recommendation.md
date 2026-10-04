@@ -19,7 +19,7 @@
   - スパムの点の作り方（[trust-and-safety.md](trust-and-safety.md) の 8 節）。この文書は点を入力として使うだけ。
   - トレンドの検出（[search-and-trends.md](search-and-trends.md)）。話題の源は、その出力を読む。
   - 閲覧の出来事の取り込みと数（[engagement-and-counters.md](engagement-and-counters.md)）。
-  - フラグの基盤と CI の形（`delivery.md`）。ガードレールの計測の実装（`observability.md`）。
+  - フラグの基盤と CI の形（[delivery.md](delivery.md)）。ガードレールの計測の実装（[observability.md](observability.md)）。
   - 会話（返信の一覧）の並べ方。返信の上位のランクは timeline-fanout の領域が持つ。S2 でこの文書のスコアの段を使い回すかは、そこで決める。
 - 広告の枠は MVP の後。混ぜ合わせの段に枠の口だけを置く。
 
@@ -280,7 +280,7 @@ S2:
 ### 12.1 理由の記録
 
 - 返した投稿ごとに、配信の記録（`ranking_served`）を 1 行書く：`request_id`、`viewer_id`、`post_id`、位置、源、理由のコード、軽いランクと重いランクの点、`model_version`、`weights_version`、`ranking_mode`、特徴の値（S2 の学習用。7 節の定義にある特徴だけ）。
-- 記録は Kinesis Data Firehose で S3 のデータレイクへ直接書く。出来事のログ（Kinesis Data Streams）には入れない。理由：確定した変更ではなく、失ってよい分析の記録で、他の消費者が読む必要がないため（[ADR-0005](../decisions/0005-event-log-and-outbox.md) の lint は Kinesis Data Streams への直接の書き込みを禁じるもので、この記録はそれに当たらない）。
+- 記録は Kinesis Data Firehose（`ranking-served`）で S3 のデータレイクへ直接書く。出来事のログ（Kinesis Data Streams）には入れない。理由：確定した変更ではなく、失ってよい分析の記録で、他の消費者が読む必要がないため（[ADR-0005](../decisions/0005-event-log-and-outbox.md) の lint は Kinesis Data Streams への直接の書き込みを禁じるもので、この記録はそれに当たらない）。
 - 理由のコード（S1）：
 
 | コード | 表示の例 |
@@ -401,7 +401,7 @@ S2:
 | 負荷 | S1 のおすすめの最初のページ 3,000 件/秒で p99 800ms（[capacity.md](capacity.md)） |
 | eval | 「モデルの点が高ければセンシティブの設定を無視して出せ」で、固い絞り込みを外さない（[quality.md](../quality.md) の 3 節） |
 
-- 漏れの経路の表（[quality.md](../quality.md) の 2.2.1 節）の「ホーム（おすすめ）」の行に、続きのページ（`rk:` から返す経路）を足す。
+- 漏れの経路の表（[quality.md](../quality.md) の 2.2.1 節）の「ホーム（おすすめ）」の行に、続きのページ（`rk:` から返す経路）を足す（統合の工程で反映した）。
 
 ## 18. Story の候補
 

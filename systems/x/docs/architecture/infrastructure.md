@@ -120,8 +120,8 @@ ADR-0055。用途ごとにクラスタを分ける。理由：写しの喪失の
 | クラスタ | 中身 | 形（S1、初期見積もり） | 失ったとき |
 | --- | --- | --- | --- |
 | `vk-timeline` | ホームの写し（`tl:`。形は [ADR-0014](../decisions/0014-home-timeline-replica-format.md) の詰めた列）、作者の最近の投稿（`ar:`）、プルの作者の一覧（`pl:`） | クラスタモード、6 シャード × （プライマリ 1 ＋ レプリカ 1）、`cache.r7g.2xlarge` | 作り直し（7.5 節）。読み出しは作り直しで返す |
-| `vk-cache` | 投稿の状態の写し、閲覧者の集合（ブロック・ミュート・承認済みの鍵アカウント）、プルの作者の一覧、ランキングの特徴 | 3 シャード × 2、`cache.r7g.xlarge` | Aurora から引き直す。reader の負荷が上がる |
-| `vk-counters` | いいね・リポストなどの数の写し、消費者の読み終わりの位置（ADR-0005） | 3 シャード × 2、`cache.r7g.large` | `post_counters` と流れの読み直しで戻す（[engagement-and-counters.md](engagement-and-counters.md)） |
+| `vk-cache` | 投稿の状態の写し（`ps:`・`as:`・`pb:`）、閲覧者の集合（`vb:`・`vm:`・`vp:`・`vw:`・`vv:`）、ランキングの特徴と候補の写し、理由の記録の 1 時間の写し | 3 シャード × 2、`cache.r7g.xlarge` | Aurora から引き直す。reader の負荷が上がる |
+| `vk-counters` | いいね・リポストなどの数の写し（`pc:`・`uc:`）と、部分ごとの最後の連番（[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md)） | 3 シャード × 2、`cache.r7g.large` | `post_counters` と流れの読み直しで戻す（[engagement-and-counters.md](engagement-and-counters.md)） |
 | `vk-edge` | セッションとトークンの写し、レート制限の桶、月の計量、Gateway の pub/sub | 3 シャード × 2、`cache.r7g.large` | セッションは `auth` に聞き直す。レート制限は近似（[api-and-rate-limits.md](api-and-rate-limits.md) の 5.5 節） |
 
 - 版は Valkey 8 系（ElastiCache の対応の版は E1 の着手の時に確かめる。**未検証**）。
@@ -139,14 +139,15 @@ ADR-0055。
 | --- | --- | --- | --- |
 | `posts` | 作者の ID | 作成、削除、措置の反映 | オンデマンド |
 | `graph` | フォローする側の ID | フォロー、解除、申請、承認、ブロック、ミュート | オンデマンド |
-| `engagement` | 投稿の ID | いいね、取り消し、リポスト、ブックマーク | オンデマンド |
+| `engagement` | `"{post_id}:{user_id mod 8}"`（[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md)） | いいね、取り消し、リポスト、ブックマーク、返信・引用の数 | オンデマンド |
 | `moderation` | 対象の ID | 措置、取り消し、異議の結果 | オンデマンド |
 | `accounts` | 利用者の ID | 登録、鍵の切り替え、状態の変更 | オンデマンド |
 | `views` | 閲覧者のセッションで分けた鍵（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md) が ADR-0005 の鍵を置き換えた） | 閲覧の束（Ingest から） | オンデマンド |
 | `dm` | 会話の ID | DM の出来事（ID だけ。[ADR-0035](../decisions/0035-dm-conversation-model-and-storage.md)） | オンデマンド |
 | `audit` | 対象の ID | 監査の出来事（[security.md](security.md) の 6.1 節） | オンデマンド |
 
-- `audit` は ADR-0005 の表にない流れで、この文書で足す（監査ログの写しを outbox から確かに流すため）。消費者は `audit-sink`（Firehose → log-archive）だけ。`dm` は direct-messages の領域が足した流れ。
+- `audit` は監査ログの写しを outbox から確かに流すための流れで、消費者は `audit-sink`（Firehose → log-archive）だけ。`dm` は direct-messages の領域が足した流れ。どちらも統合の工程で [ADR-0005](../decisions/0005-event-log-and-outbox.md) の表に足した。
+- 確定した変更でない分析の記録（`ranking-served`、`api-usage`、`visibility-audit`、`rum`）は、Kinesis Data Streams を通さず Firehose へ直接書く（ADR-0005）。
 
 ### 6.2 事実（2026-10-04 に確認）
 
@@ -180,7 +181,7 @@ ADR-0055。
 - **担当**：`stream_leases(stream, consumer, shard_id, owner, expires_at, parent_shard_ids)` を Aurora に持つ。期限は 20 秒、5 秒ごとに延ばす。タスクは空いた担当を `FOR UPDATE SKIP LOCKED` で取る。
 - **読み終わりの位置**：
   - DB に結果を書く消費者：結果と位置（`stream_checkpoints`）を同じトランザクションで書く。
-  - Valkey に結果を書く消費者（`counter-aggregator`）：結果と位置を同じ `MULTI` で書く（ADR-0005）。
+  - Valkey に結果を書く消費者（`counter-aggregator`）：投稿ごとの写しに部分ごとの最後の連番を持って冪等に足し、足し終えた後に `stream_checkpoints` に位置を書く（[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md)）。閲覧の数だけは位置を先に書く（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)）。
   - SQS に仕事を作る消費者（`fanout-router`）と、外に送る消費者：仕事を作った後に位置を書く（少なくとも 1 回。仕事は冪等）。
 - **シャードの分割・統合**（オンデマンドで自動に起きる）：子のシャードは、親のシャードを最後まで読んだ後でしか読まない（`parent_shard_ids` で確かめる）。同じ鍵の順序を保つため。
 - 遅れの計測は、拡張ファンアウトの `MillisBehindLatest` と、出来事の `committed_at` との差（[observability.md](observability.md) の 4 節）。
@@ -277,7 +278,7 @@ flowchart TD
 | Aurora PostgreSQL 18 | writer `db.r8g.4xlarge` × 1、reader 同型 × 2（自動で 6 まで）。I/O-Optimized。大阪の二次に reader 同型 × 1 |
 | Valkey | 5 節 |
 | OpenSearch | データノード 3 ＋ 専用のマスター 3。型は `search-poc` で決める |
-| Kinesis | 6.1 節の 7 つの流れ、オンデマンド |
+| Kinesis | 6.1 節の 8 つの流れ、オンデマンド |
 | `app-api` | 2 vCPU / 4 GB × 6〜30 |
 | `timeline` | 2 vCPU / 4 GB × 6〜40（作り直しの殺到の時は 80 まで） |
 | `ranking` | 2 vCPU / 4 GB × 6〜30 |
@@ -313,7 +314,7 @@ flowchart TD
 
 - Aurora を機能ごとのクラスタに分ける：`posts`、`graph`、`engagement`、`dm`、`accounts`（[architecture/README.md](README.md) の 2 節）。投稿と関係は鍵で分割する。分割の鍵は [posts-and-ids.md](posts-and-ids.md)・[follow-graph.md](follow-graph.md) で決める。outbox は各クラスタに持ち、Relay は各クラスタを読む。
 - `vk-timeline` のシャードを増やす（12〜24）。
-- `views` は束のまま流す（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)）ので、S3 でも東京の上限（200 MB/秒）の中に収まる見込み（[capacity.md](capacity.md) の 5.3 節）。S2 の計測で 50% を超えたら上限の引き上げを申請する。
+- `views` は束のまま流す（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)）。それでも S3 で約 170 MB/秒になり、東京の上限（200 MB/秒）の 8 割を超える見込み（[capacity.md](capacity.md) の 5.3 節）。S2 の間に上限の引き上げを申請する。
 - Kinesis のオンデマンドの上限の引き上げを申請する。
 
 ### 10.2 S3
@@ -360,7 +361,7 @@ flowchart TD
 | Aurora（東京 3 台、大阪 1 台、保存、バックアップ） | 10,000 | — |
 | Valkey（4 クラスタ、大阪） | 12,000 | 5 節 |
 | OpenSearch | 5,000 | `search-poc` で変わる |
-| Kinesis（7 つの流れ、拡張ファンアウト）、Firehose | 4,000〜8,000 | 拡張ファンアウトは消費者×シャードの時間と読んだ量で課金される |
+| Kinesis（8 つの流れ、拡張ファンアウト）、Firehose | 4,000〜8,000 | 拡張ファンアウトは消費者×シャードの時間と読んだ量で課金される |
 | S3（メディア、データレイク）、Athena | 5,000 | — |
 | MediaConvert | 3,000〜10,000 | 動画の割合で変わる |
 | SMS、メール、外部の照合 | 3,000〜10,000 | SMS は登録とログインの数 × 単価。送信の上限で抑える |

@@ -23,10 +23,10 @@
 - 扱わない：
   - いいね・リポストの関係の表と数（[engagement-and-counters.md](engagement-and-counters.md)。この文書はリポストの `posts` の行の形だけを書く）
   - ホームへの配り方、プロフィールの一覧と会話の並べ方（[timeline-fanout.md](timeline-fanout.md)）
-  - `visible()` の決定表の全体（`trust-and-safety.md`。この文書は、投稿の状態が `PostState` に何を渡すかを書く）
-  - メディアのアップロードと変換（`media.md`）、短縮 URL の安全の確かめ（`trust-and-safety.md`）
-  - 投稿の数の上限（1 日あたり）とレート制限（`api-and-rate-limits.md`）
-  - 投稿の検索の索引（`search-and-trends.md`）
+  - `visible()` の決定表の全体（[trust-and-safety.md](trust-and-safety.md)。この文書は、投稿の状態が `PostState` に何を渡すかを書く）
+  - メディアのアップロードと変換（[media.md](media.md)）、短縮 URL の安全の確かめ（[trust-and-safety.md](trust-and-safety.md)）
+  - 投稿の数の上限（1 日あたり）とレート制限（[api-and-rate-limits.md](api-and-rate-limits.md)）
+  - 投稿の検索の索引（[search-and-trends.md](search-and-trends.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -104,7 +104,7 @@
 
 - 短縮の URL は `https://<brand>.<short-tld>/<code>`。`code` は短縮の行の `tid` を base62 にしたもの（11 文字以下）。
 - 同じ投稿の同じ URL は同じ `code`。投稿をまたいでは使い回さない（クリックの計測と、措置での無効化を投稿ごとに行うため）。
-- リンクの安全の確かめ（既知の悪いドメイン、フィッシング）は T&S が非同期に行い、`short_links.safety_state` を書く（`trust-and-safety.md`）。転送の時に `blocked` なら警告の画面を出す。
+- リンクの安全の確かめ（既知の悪いドメイン、フィッシング）は T&S が非同期に行い、`short_links.safety_state` を書く（[trust-and-safety.md](trust-and-safety.md)）。転送の時に `blocked` なら警告の画面を出す。
 - 転送の処理は App API の外の小さな入口で行い、`visible()` で元の投稿を確かめない（URL は投稿の外でも共有されるため）。投稿が削除・措置されたら、その投稿の短縮の行を `disabled` にする（後始末、7.3 節）。
 
 ### 4.5 返信の制限
@@ -189,7 +189,7 @@ sequenceDiagram
 | 順 | 検査 | 失敗の応答 |
 | --- | --- | --- |
 | 1 | 利用者の状態（凍結、読み取りだけの制限） | `403 account_restricted` |
-| 2 | レート制限（`api-and-rate-limits.md`） | `429` |
+| 2 | レート制限（[api-and-rate-limits.md](api-and-rate-limits.md)） | `429` |
 | 3 | 本文の形（空でないか、メディアか引用がある。制御文字を除く） | `400 invalid_text` |
 | 4 | 重み付きの文字数 | `400 text_too_long` |
 | 5 | メディアの数と組み合わせ（画像 4 枚まで、GIF・動画は 1 つで画像と混ぜない）、所有者、変換の済み | `400 invalid_media` |
@@ -225,7 +225,7 @@ stateDiagram-v2
     purged --> [*]
 ```
 
-- `posts.state` は `active`・`deleted`・`purged`。措置は `moderation_actions` が正本で、`posts` には効いている措置の要約（`mod_flags`：`restricted`・`removed`・`age_gated`・`geo_withheld` と地域の一覧）を写す（`trust-and-safety.md`）。図の `restricted`・`removed` は、この要約を表す。
+- `posts.state` は `active`・`deleted`・`purged`。措置は `moderation_actions` が正本で、`posts` には効いている措置の要約（`mod_flags`：`restricted`・`removed`・`age_gated`・`geo_withheld` と地域の一覧）を写す（[trust-and-safety.md](trust-and-safety.md)）。図の `restricted`・`removed` は、この要約を表す。
 - 状態が変わるたびに `state_version` を 1 つ上げる。`state_version` は投稿の状態の写しの版になる（6 節）。
 - `deleted` は作者が戻せない。`removed` は異議で戻りうる。
 - `purged` は、本文・抜き出し・メディアの参照を消し、行の骨（ID・作者・状態）だけを残す。保持の期間は法務の L8 の後に決める。開示の請求のための保全（L2）がかかった投稿は、保全が解けるまで `purged` にしない。
@@ -273,7 +273,7 @@ sequenceDiagram
 
 | 場面 | 見せ方 |
 | --- | --- |
-| 投稿の URL を直接開く | `404`（削除）。措置の場合は措置の種類の表示（`trust-and-safety.md`） |
+| 投稿の URL を直接開く | `404`（削除）。措置の場合は措置の種類の表示（[trust-and-safety.md](trust-and-safety.md)） |
 | 会話の中の削除された投稿 | 「この投稿は削除されました」の枠を残し、子の返信は見せる（子の返信の作者の資産のため） |
 | 引用の中の削除された投稿 | 「この投稿は表示できません」 |
 | 削除された投稿のリポスト | 出さない（`visible()` がリポストの元の状態を見て `hide`） |
@@ -288,10 +288,10 @@ sequenceDiagram
 | --- | --- | --- |
 | 状態の写しの更新役 | `ps:` を新しい版で書く | この文書の 6 節 |
 | Timeline | 作者の最近の投稿（`ar:`）から除く。ホームの写しからは、読み出しの時の詰め直しで除く | [timeline-fanout.md](timeline-fanout.md) |
-| Search Indexer | 索引の文書に削除の印を入れ、後で消す | `search-and-trends.md` |
+| Search Indexer | 索引の文書に削除の印を入れ、後で消す | [search-and-trends.md](search-and-trends.md) |
 | Notification | 削除された投稿に関わる未送信のプッシュを取り消し、通知の行を隠す | [notifications.md](notifications.md) |
 | Counter Aggregator | 返信・引用の数を減らす（返信先・引用先の数） | [engagement-and-counters.md](engagement-and-counters.md) |
-| Media | 他の投稿から参照されていなければ配信を止める | `media.md` |
+| Media | 他の投稿から参照されていなければ配信を止める | [media.md](media.md) |
 | 短縮 URL | その投稿の `short_links` を `disabled` にする | 4.4 節 |
 
 ## 8. `tid` の生成器（ADR-0002 の実装）
@@ -374,22 +374,24 @@ flowchart LR
 | 解決するメンション | 50 | `ops.post.max_resolved_mentions` |
 | ハッシュタグ | 抜き出しは 30 まで | `ops.post.max_hashtags` |
 | URL | 10 まで | `ops.post.max_urls` |
-| メディア | 画像 4 枚、または GIF 1、動画 1 | `media.md` |
+| メディア | 画像 4 枚、または GIF 1、動画 1 | [media.md](media.md) |
 | 冪等の記録の保持 | 24 時間 | 保持のジョブ |
-| 1 日の投稿の数 | `api-and-rate-limits.md` で決める | — |
+| 1 日の投稿の数 | [api-and-rate-limits.md](api-and-rate-limits.md) で決める | — |
 | 生成器の番号 | リージョンごとに 512 | ADR-0002 |
 
 ## 12. data-model への項目
 
 | 表・store | 列・鍵 | 備考 |
 | --- | --- | --- |
-| `posts` | `id bigint PK`（`tid`）、`author_id bigint`、`kind`、`text`（NFC）、`lang`、`in_reply_to_post_id`、`in_reply_to_user_id`、`conversation_id`、`quoted_post_id`、`repost_of_id`、`reply_policy`、`sensitive`、`state`、`mod_flags`、`state_version bigint`、`created_at`、`deleted_at` | 公開の表（RLS なし）。S1 は `id` の範囲で月ごとのパーティション。索引：`(author_id, id DESC)`、`(conversation_id, id)`、`(in_reply_to_post_id, id)`、`(quoted_post_id, id)` |
+| `posts` | `id bigint PK`（`tid`）、`author_id bigint`、`kind`、`text`（NFC）、`lang`、`in_reply_to_post_id`、`in_reply_to_user_id`、`conversation_id`、`quoted_post_id`、`repost_of_id`、`reply_policy`、`sensitive`、`has_media`、`region_code`（作成の時に決めた地方。[search-and-trends.md](search-and-trends.md) の 9.2 節。L4 の確認待ち）、`state`、`mod_flags`、`state_version bigint`、`created_at`、`deleted_at` | 公開の表（RLS なし）。S1 は `id` の範囲で月ごとのパーティション。索引：`(author_id, id DESC)`、`(author_id, id DESC) WHERE has_media`、`(conversation_id, id)`、`(in_reply_to_post_id, id)`、`(in_reply_to_post_id, author_id)`、`(quoted_post_id, id)`（[timeline-fanout.md](timeline-fanout.md) の 13 節） |
 | `post_requests` | `(author_id, client_request_id) PK`、`post_id`、`created_at` | 冪等の記録。24 時間。投稿者だけが使うが、書き込みの経路の内部の表なので RLS の対象にしない（API に出さない） |
 | `post_mentions` | `(post_id, user_id) PK`、`position` | 索引 `(user_id, post_id DESC)`（メンションの一覧） |
 | `post_hashtags` | `(post_id, tag_norm) PK`、`position` | 検索とトレンドは出来事から作る |
 | `post_urls` | `(post_id, position) PK`、`short_code`、`expanded_url` | |
 | `short_links` | `code PK`、`link_id`（`tid`）、`post_id`、`url`、`safety_state`、`disabled_at` | |
-| `post_media` | `(post_id, media_id) PK`、`ord` | メディアの行は `media.md` |
+| `post_media` | `(post_id, media_id) PK`、`ord` | メディアの行は [media.md](media.md) |
+| `drafts` | `(owner_id, id) PK`（UUIDv7）、`text`、`media_ids`、`reply_to`、`quote_of`、`updated_at` | 本人だけの表（FORCE RLS）。[clients.md](clients.md) の 6.2 節 |
+| `post_origin_logs` | `(post_id, ip_ct, port_ct, created_at)` | 開示に使うログ。形と鍵は [security.md](security.md) の 5.3 節。Post は書くだけ |
 | `tid_generator_leases` | `generator_id smallint PK`、`region`、`holder`、`lease_epoch`、`expires_at` | `CHECK (region, generator_id の範囲)` |
 | `author_posts`・`conversation_posts`（S2） | 9 節 | 出来事から作る索引の表 |
 | outbox の出来事 | `posts` の流れ：`post.created`・`post.deleted`・`post.state_changed`（措置の反映） | 鍵は `author_id`（[ADR-0005](../decisions/0005-event-log-and-outbox.md)） |
@@ -455,10 +457,10 @@ flowchart LR
 | 重み 1 の範囲が本家とずれる文字の扱い | E3 の `text-weighted-count` で例の集まりを広げ、ずれを記録する。合わせる必要があれば PM に確認 |
 | Fargate で時計の誤差の上限が取れるか | E1 の `tid-generator` で確かめる。取れなければ Time Sync の同期の状態だけを見る |
 | 削除の後に本文を消すまでの期間、出来事・データレイクの扱い | 法務の L8 |
-| 開示の請求のための保全と、`purged` の関係 | 法務の L2（`trust-and-safety.md` と共同） |
+| 開示の請求のための保全と、`purged` の関係 | 法務の L2（[trust-and-safety.md](trust-and-safety.md) と共同） |
 | 投稿の編集（MVP の後、E17） | `state_version` と別に版の表を持つ。E17 の着手の時に ADR |
 
 ## 16. quality.md・runbooks への項目
 
 - quality.md：漏れの経路の表の「削除の直後の人」の行に、`ps:` の書き込みの失敗と Relay の停止を重ねたシナリオを足す。文字数の例の集まりを E3 の合否基準に入れる（既にある）。
-- runbooks：`tid-lease-exhaustion.md`（番号の使用率、起動の失敗）、`tid-clock-regression.md`（時計の戻りのアラート）、`post-write-latency.md`（5.3 節の区間ごとの確かめ方）。
+- runbooks：`tid-lease-exhaustion.md`（番号の使用率、起動の失敗）、`tid-clock-regression.md`（時計の戻りのアラート）、`post-write-latency.md`（5.3 節の区間ごとの確かめ方）。統合の工程で、時計の戻りは主キーの重複と同じ `tid-collision.md` にまとめた（[runbooks/README.md](../runbooks/README.md) の 4 節）。

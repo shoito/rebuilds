@@ -32,8 +32,8 @@ Valkey：
 
 - 拡張ファンアウトで読むのは、NFR-002・NFR-008・NFR-009 に関わる消費者（`fanout-router`、`author-recent`、`notification-builder`、`counter-aggregator`、`search-indexer`、`timeline-maint`、`ts-stream`）。1 つの流れで最大 7 で、上限 20 の中。
 - 担当は `stream_leases`（期限 20 秒、5 秒ごとに延ばす、`FOR UPDATE SKIP LOCKED`）。子のシャードは親のシャードを読み終えてから読む。
-- 位置：DB に書く消費者は結果と同じトランザクション、Valkey に書く消費者は結果と同じ `MULTI`（ADR-0005）、SQS に仕事を作る消費者は仕事を作った後。
-- Valkey：`vk-timeline`（写し、`ar:`、`pl:`）、`vk-cache`（投稿の状態、閲覧者の集合、特徴）、`vk-counters`（数と位置）、`vk-edge`（セッション、トークン、レート制限、pub/sub）。写しの 2 つは `volatile-lru`、数と edge は `noeviction`。
+- 位置：すべて Aurora の `stream_checkpoints` に持つ。DB に書く消費者は結果と同じトランザクション。Valkey に書く消費者（`counter-aggregator`）は、投稿ごとの写しに部分ごとの最後の連番を持って冪等に足し（[ADR-0023](0023-counter-aggregation-and-reconciliation.md)）、足し終えた後に位置を書く。閲覧の数だけは、数えすぎないよう位置を先に書く（[ADR-0024](0024-view-counts-ingest-and-approximation.md)）。SQS に仕事を作る消費者は仕事を作った後。
+- Valkey：`vk-timeline`（写し、`ar:`、`pl:`）、`vk-cache`（投稿の状態、閲覧者の集合、特徴）、`vk-counters`（数の写しと部分ごとの最後の連番）、`vk-edge`（セッション、トークン、レート制限、pub/sub）。写しの 2 つは `volatile-lru`、数と edge は `noeviction`。
 - 2 を採らない理由：Java のプロセスを各タスクに同居させ、TypeScript との間の通信の手順を運用することになる。位置の保存を結果と同じトランザクションにできない。
 - 3 を採らない理由：Valkey と Aurora の接続を同時の実行の数だけ持つ。結果と位置を同じ原子の書き込みにできない。
 - b を採らない理由：fan-out の書き込みの殺到が、セッションの確かめとレート制限を遅らせる。写しの喪失の訓練を、用途ごとに分けて行えない。
@@ -54,3 +54,7 @@ Valkey：
 - 性質ベーステスト：PROP-INFRA-001（シャードの分割・統合と再起動で、同じ鍵の出来事を確定の順に処理する）。
 - 結合テスト：2 タスクでの担当の奪い合いと期限切れ、位置と結果の原子性。
 - 障害の注入：各 Valkey のクラスタの喪失。
+
+## 注記
+
+> 2026-10-04 の注記：統合の工程で、Valkey に書く消費者の位置を「結果と同じ `MULTI`」から、Aurora の `stream_checkpoints` と投稿ごとの連番の形に直した。Valkey のクラスタでは別のスロットの鍵を 1 つの `MULTI` で書けないため（[ADR-0005](0005-event-log-and-outbox.md) の注記、[ADR-0023](0023-counter-aggregation-and-reconciliation.md)）。Consequences の「結果と位置を同じ原子の書き込み」は、DB に書く消費者についての記述として読む。

@@ -22,10 +22,10 @@
 - 扱わない：
   - リポストの `posts` の行の形（[posts-and-ids.md](posts-and-ids.md)）
   - フォローの辺（[follow-graph.md](follow-graph.md)。数の写しは、ここの仕組みを使う）
-  - いいね・閲覧をおすすめの特徴にする方法（`ranking-and-recommendation.md`）
+  - いいね・閲覧をおすすめの特徴にする方法（[ranking-and-recommendation.md](ranking-and-recommendation.md)）
   - いいね・リポストの通知（[notifications.md](notifications.md)）
-  - 閲覧の出来事の送信の画面の実装（`clients.md`）
-  - レート制限（`api-and-rate-limits.md`）
+  - 閲覧の出来事の送信の画面の実装（[clients.md](clients.md)）
+  - レート制限（[api-and-rate-limits.md](api-and-rate-limits.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -135,7 +135,7 @@ flowchart LR
 ```
 
 - Aggregator は、シャードの出来事を 1 秒ぶん手元で投稿と `sub` ごとにまとめ（`seq` はまとめた中の最大）、`cnt_apply` を呼ぶ。人気の投稿でも、1 秒に `sub` ごと 1 回の書き込みになる。
-- 全部の `cnt_apply` が済んでから、シャードの読み終わりの位置を記録する。
+- 全部の `cnt_apply` が済んでから、シャードの読み終わりの位置を Aurora の `stream_checkpoints` に記録する（[ADR-0055](../decisions/0055-kinesis-consumers-and-valkey-clusters.md)）。
 - 数は 0 を下回らない（`cnt_apply` が 0 で止め、止めた回数をメトリクスに数える。順の入れ替えで取り消しが先に来た場合）。
 
 ### 4.4 書き戻し
@@ -181,7 +181,7 @@ sequenceDiagram
     participant K as Kinesis views
     participant A as Counter Aggregator 閲覧
     participant S as Firehose と S3
-    C->>I: POST /ingest/views batch_id, items
+    C->>I: POST /i/views batch_id, items
     I->>I: セッションを確かめる, 機械の送信を落とす
     I->>V: SET NX vbatch:batch_id 10 分
     alt 既に受けた
@@ -213,7 +213,7 @@ sequenceDiagram
 | Kinesis の書き込み | ピーク約 1.6 MB/秒（オンデマンドの既定 4 MB/秒の中） |
 | Valkey の書き込み | 5 秒ごとに、変わった投稿の数（ピークで数万件）の `HINCRBY` |
 
-S3（1 日 600 億件）の量と費用は `capacity.md` で見積もる。
+S3（1 日 600 億件）の量と費用は [capacity.md](capacity.md) で見積もる。
 
 ## 6. 数の見せ方
 
@@ -310,12 +310,12 @@ S3（1 日 600 億件）の量と費用は `capacity.md` で見積もる。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | Kinesis のシャードの分割の後、同じ分ける鍵の連番が増え続けるか | E6 の `counter-aggregator` で AWS の文書と試験で確かめる。保証がなければ、シャードの系譜で比べる（4.2 節の扱いのまま） |
-| 閲覧の取り込みの費用（S3 の 1 日 600 億件） | `view-count-poc` と `capacity.md` |
-| 閲覧の履歴をおすすめの特徴に使う範囲と説明 | 法務の L4（`ranking-and-recommendation.md`） |
+| 閲覧の取り込みの費用（S3 の 1 日 600 億件） | `view-count-poc` と [capacity.md](capacity.md) |
+| 閲覧の履歴をおすすめの特徴に使う範囲と説明 | 法務の L4（[ranking-and-recommendation.md](ranking-and-recommendation.md)） |
 | いいね・閲覧の出来事のデータレイクでの保持 | 法務の L8 |
 | 広告主向けの計測の正確さ（MVP の後） | E20 の着手の時 |
 
 ## 13. quality.md・runbooks への項目
 
 - quality.md：E6 の合否基準に PROP-CNT-002（照合で戻る）と、Valkey の喪失からの戻しの試験を足す。
-- runbooks：`counter-lag.md`（Aggregator の遅れ、殺到する投稿、outbox の流れごとの溜まり）、`counter-reconcile-diff.md`（照合の差が続くときの調べ方）、`view-ingest-loss.md`（Ingest の受け付けと集計の差、日ごとの補正の確かめ）。
+- runbooks：`counter-lag.md`（Aggregator の遅れ、殺到する投稿、outbox の流れごとの溜まり）、`counter-reconcile-diff.md`（照合の差が続くときの調べ方）、`view-ingest-loss.md`（Ingest の受け付けと集計の差、日ごとの補正の確かめ）。統合の工程で、前の 2 つは `counter-drift.md` にまとめた（[runbooks/README.md](../runbooks/README.md) の 4 節）。

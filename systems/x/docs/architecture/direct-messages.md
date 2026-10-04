@@ -200,7 +200,7 @@ sequenceDiagram
 
 - 本人の側からの削除：`dm_message_hidden` に行を足す。相手には残る。
 - 会話を消す：本人の `dm_participants` を `left` にし、本人の側のメッセージを全部隠す。全員が抜けた会話は、保持の期間（L8）の後に、DEK を消して（暗号の削除）から行を消す。
-- 送信の取り消し（相手からも消す）は MVP の外。導入するかと期限は 16 節の持ち越し。
+- 送信の取り消し（相手からも消す）は MVP の外。導入するかと期限は 17 節の持ち越し。
 - アカウントの削除：猶予の後、本人が送ったメッセージは相手の側に残すか消すかを L8 の結論で決める。設計は両方に対応する（送り手の ID を「削除したアカウント」に置き換える／本人のメッセージを墓石にする）。
 
 ## 9. 迷惑の抑止（中身を読まずに）
@@ -231,7 +231,7 @@ sequenceDiagram
 - 送る前に、同意の画面で「選んだメッセージが運営に送られ、確認に使われます」と示す。
 - DM のサービスが、通報する人の権限（RLS）で選んだメッセージを読み、T&S の `report_evidence` に写す。写しは T&S の KMS の鍵で暗号化する。モデレーターは写しだけを見る。会話そのものを読む道はない。
 - 写しの保持は、案件の保持（L8）に従う。
-- 参加者の一方の同意で写すことが、通信の秘密の扱いとして足りるかは L3 の確認待ち。確認まで `legal.l3.dm_report_evidence` の裏に置き、確認までは「メッセージを写さず、会話と相手のアカウントだけを通報する」形で動かす。
+- 参加者の一方の同意で写すことが、通信の秘密の扱いとして足りるかは L3 の確認待ち。確認まで `release.dm_report_evidence` の裏に置き、確認までは「メッセージを写さず、会話と相手のアカウントだけを通報する」形で動かす。
 
 ## 11. エンドツーエンドの暗号化への備え（MVP の後）
 
@@ -271,15 +271,15 @@ sequenceDiagram
 | --- | --- | --- |
 | Aurora `dm_conversations`、`dm_participants`、`dm_messages`、`dm_message_hidden` | 4.1 節。すべて参加者・本人の FORCE RLS。主キーと一意の制約（`direct_key`、`message_id`、`(conversation_id, sender_id, client_msg_id)`）。索引 `dm_participants (user_id, folder, updated_at DESC)` | 4 |
 | Aurora `dm_requests`（`conversation_id`、`sender_id`、`recipient_id`、`state`（`pending`・`accepted`・`declined`・`reported`・`expired`）、`messages_sent`、`created_at`、`decided_at`）。受け手と送り手の RLS | 申請 | 5.2 |
-| Aurora `dm_settings`（`owner_id`、`allow_from`（`everyone`・`following`・`none`）、`read_receipts`）。本人だけの表。または `user_settings` の列 | 設定 | 5.1、6.2 |
+| Aurora `dm_settings`（`owner_id`、`allow_from`（`everyone`・`following`・`none`）、`read_receipts`）。本人だけの表 | 設定 | 5.1、6.2 |
 | Aurora `report_evidence`（[trust-and-safety.md](trust-and-safety.md) の表）の `kind = dm_messages` | 通報の写し | 10 |
 | KMS の鍵 `dm-content`（DEK を包む）、`ts-evidence`（証拠） | 暗号化 | 4.4、10 |
 | Valkey pub/sub `dm:{user_id}` | 配信の通知（ID だけ） | 6 |
 | Kinesis Data Streams `dm`（鍵：会話の ID。ID だけ。Firehose に写さない） | 出来事 | 6 |
 | Valkey `dmrq:{sender_id}`（7 日の申請の反応の数） | 迷惑の抑止 | 9 |
 
-- [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) の本人だけの表の一覧に、`dm_message_hidden`、`dm_requests`、`dm_settings` を足す。
-- [ADR-0005](../decisions/0005-event-log-and-outbox.md) の流れの表に `dm` を足す。
+- [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) の本人だけの表の一覧に、`dm_message_hidden`、`dm_requests`、`dm_settings` を足す（統合の工程で反映した）。`dm_settings` は `user_settings` の列にせず、別の表にする（統合の決定）。
+- [ADR-0005](../decisions/0005-event-log-and-outbox.md) の流れの表に `dm` を足す（統合の工程で反映した）。
 
 ## 15. テストと性質
 
@@ -327,7 +327,7 @@ sequenceDiagram
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | DM の中身・付随の情報を、迷惑の判定・照合・モデレーションに使うことと、同意の取り方、届出・登録の要否（L3） | 法務の確認待ち。E12 の `dm-abuse-signals`・`dm-media`・`dm-reports` の spec の承認の前 |
-| 通報で参加者の一方の同意によってメッセージを写すことの扱い（L3） | 同上。確認まで `legal.l3.dm_report_evidence` の裏 |
+| 通報で参加者の一方の同意によってメッセージを写すことの扱い（L3） | 同上。確認まで `release.dm_report_evidence` の裏 |
 | 未成年の DM の制限（L5） | 法務の確認待ち。E12 の `dm-requests-and-blocks` の spec の承認の前 |
 | 削除したアカウントのメッセージ、全員が抜けた会話の保持（L8） | 法務の確認待ち |
 | 送信の取り消し（相手からも消す）を入れるか、期限 | E12 の後に PM が決める |

@@ -71,10 +71,10 @@ AppConfig（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 | 種類 | 評価 | 例 |
 | --- | --- | --- |
-| `release.*`（未完成の振る舞いを隠す） | サーバーが利用者の ID のハッシュの割合で評価 | `release.dm_groups`、`release.public_api_v1` |
-| `ops.*`（運用の止め・絞り） | サーバー（即時、60 秒のポーリング） | `ops.writes_enabled`、`ops.fanout.pull_threshold`、`ops.timeline.rebuild_window`、`ops.ranking.fallback`、`ops.ratelimit.*`、`ops.auth.*` |
+| `release.*`（未完成の振る舞い、法務の確認待ちの振る舞いを隠す） | サーバーが利用者の ID のハッシュの割合で評価 | `release.dm_groups`、`release.public_api_v1`、`release.push.rich_payload`（L4）、`release.dm_report_evidence`（L3）、`release.ranking_reasons`（L4） |
+| `ops.*`（運用の止め・絞り） | サーバー（即時、60 秒のポーリング） | `ops.writes_enabled`、`ops.fanout.pull_threshold`、`ops.timeline.rebuild_rate`、`ops.ranking.fallback`、`ops.ratelimit.*`、`ops.auth.*` |
 | `experiment.*`（A/B） | サーバーが利用者の ID のハッシュで群を割り当てる | `experiment.ranking.*` |
-| `policy.*`（決めた値） | サーバー | `policy.ratelimit.*`、`policy.age.*`、`retention.*` |
+| 決めた値の設定：`policy.*`（製品の規則）、`retention.*`（保持）、`legal.*`（法令の期限と基準）、`ts.*`（T&S の閾値） | サーバー。フラグではなく、変更は記録と承認を通す（`legal.*` は法務、`ts.*` は Dev と QA） | `policy.ratelimit.*`、`policy.age.*`、`retention.login_events`、`legal.l1.takedown_deadline`、`ts.risk.*` |
 | クライアントのフラグ | サーバーが評価し、App API の `GET /api/config` で配る。手元に持ち、オフラインでも同じ値を使う | 画面の新しい部品 |
 
 - `release.*` は 100% にしてから 30 日以内に消す。消し忘れを週ごとに一覧にする。
@@ -109,7 +109,7 @@ ADR-0062。
 
 - iOS：App Store の段階的リリース。7 日で 1% → 2% → 5% → 10% → 20% → 50% → 100% と自動で広がる。止めるのは合計 30 日まで（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)、2026-10-04 に確認）。
 - Android：Google Play の段階的公開。1% → 10% → 50% → 100%（各段 1 日以上）。
-- [runbooks/README.md](../runbooks/README.md) の 3 節は両方を「1% → 10% → 50% → 100%」と書いているが、iOS の段階的リリースは割合を選べない。iOS は上の 7 日の形にする（runbooks の書き換えを提案する。13 節）。
+- iOS の段階的リリースは割合を選べないので、iOS は上の 7 日の形にする。統合の工程で [runbooks/README.md](../runbooks/README.md) の 3 節を同じ形に直した。
 
 ### 4.3 止める条件
 
@@ -245,7 +245,7 @@ ADR-0063。
 
 ### runbooks
 
-- 3 節の「アプリ」の段階を、iOS は App Store の 7 日の段階的リリース、Android は 1% → 10% → 50% → 100% に書き換えることを提案する（4.2 節）。
+- 3 節の「アプリ」の段階を、iOS は App Store の 7 日の段階的リリース、Android は 1% → 10% → 50% → 100% に書き換える（4.2 節。統合の工程で反映した）。
 - `deploy-and-rollback.md`：4 節。
 - `ota-rollback.md`：5 節の 1 つ前の束への戻し方。
 
