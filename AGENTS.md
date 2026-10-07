@@ -29,6 +29,7 @@
 - テスト名には、対応する要件 ID（`REQ-...` / `PROP-...`）を含める。
 - アーキテクチャに影響する選択をしたら ADR を起票する。既存の ADR に反する実装はしない。
 - 同じ間違いを 2 回したら、該当する `AGENTS.md` に規則として追記する。
+- 公開する HTML（`index.html`、`docs/primer/`、`systems/*/docs/primer/`）を新しく作ったら、既存の HTML と同じ Google アナリティクスのタグ（`G-LRH3HT8NDH`）を `<head>` の直後に入れる。
 
 ## 言語
 
