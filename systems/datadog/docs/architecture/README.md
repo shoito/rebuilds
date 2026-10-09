@@ -110,7 +110,7 @@ flowchart TB
 | `<brand>-agent` | 利用者のホストで動く。ホスト・プロセス・コンテナ（Docker・containerd・Kubernetes の kubelet）のメトリクス、ファイルとコンテナのログの追跡、StatsD（タグの拡張）と OTLP の受け口。送れないときはディスクの待ち行列（既定 2 GB）に溜め、待って送り直す。Rust の 1 つのバイナリ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 | `intake-gateway` | キーの確認、OTLP・StatsD・本システムの API の形式を内部の形式（Protobuf）に変換、タグの正規化と系列の鍵の計算、受け付けの窓の確認、テナントの割り当て、MSK への書き込みの確定の後に 202。状態を持たない（[ADR-0002](../decisions/0002-intake-log-on-msk.md)、[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)） |
 | MSK | 取り込みのログ。信号ごとのトピック、テナントごとのパーティションの組（シャッフルシャーディング）。保持 24 時間。データの面の WAL（[ADR-0002](../decisions/0002-intake-log-on-msk.md)） |
-| `metrics-ingester` | パーティションを受け持ち、直近 2 時間をメモリーのヘッドに持つ。系列の索引、カーディナリティの上限、1 時間のブロックを S3 へ書き出し、1 分・1 時間のロールアップを同時に作る。シャードごとに 2 つの写し（[ADR-0004](../decisions/0004-tsdb-storage-engine.md)、[ADR-0006](../decisions/0006-cardinality-policy.md)） |
+| `metrics-ingester` | パーティションを受け持ち、直近約 2 時間（ブロックの書き出しまで最大で約 2 時間 15 分）をメモリーのヘッドに持つ。系列の索引、カーディナリティの上限、1 時間のブロックを S3 へ書き出し、1 分・1 時間のロールアップを同時に作る。シャードごとに 2 つの写し（[ADR-0004](../decisions/0004-tsdb-storage-engine.md)、[ADR-0006](../decisions/0006-cardinality-policy.md)） |
 | `log-processor` | パイプライン（解析、付け替え、PII のマスク）、索引への振り分け（除外のフィルター、1 日の上限）、ログから作るメトリクス。結果を `logs` のトピックへ |
 | `log-indexer` | 処理したログを列指向のセグメントにして S3 に置き、カタログ（Aurora）に載せる。セグメントごとにブルームフィルターと列の統計を持つ。アーカイブにも書く（[ADR-0005](../decisions/0005-log-storage-columnar-with-bloom.md)） |
 | `trace-assembler` | `trace_id` でパーティションを分けたスパンを、トレースごとにまとめ、テールサンプリングで残すものを決める。残したトレースを S3 へ。すべてのスパンから RED メトリクスとサービスマップの辺を作り、`metrics` のトピックへ（traces-and-sampling の領域） |

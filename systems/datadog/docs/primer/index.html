@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Datadog の前提知識</title>
+<meta name="description" content="Datadog の再構築の設計の文書を読む前に知っておくとよい、可観測性・時系列のデータモデルとカーディナリティ・圧縮・TSDB・遅れたデータと水位・パーセンタイルとスケッチ・ログの検索・トレースとサンプリング・モニターと SLO・Kafka・マルチテナントの前提知識。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Datadog · 前提知識</p>
+    <h1>Datadog の設計を読む前に</h1>
+    <p class="lead">可観測性の SaaS は「数字を貯めてグラフにする」だけに見えますが、タグの組み合わせで爆発する系列の数、遅れて届く点、平均できないパーセンタイル、日本語のログの検索、間引いたトレースからの正しい数、鳴りすぎ・鳴らなすぎのアラート、監視が止まったときの監視と、どこにも落とし穴があります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7、ER 図の記号、規模の段階など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Datadog · 前提知識</p>
+    <h2>Datadog の設計を読む前に</h2>
+    <p class="lead">時系列・カーディナリティ・TSDB・水位・スケッチ・ログの検索・トレース・モニターと SLO・Kafka の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Datadog は何をするサービスか</h2>
+    <p>自社のシステムの状態を外から読み取れるようにする、<a class="t" href="#g-observability">可観測性</a>の SaaS です。利用者のホスト・コンテナ・アプリが送る<a class="t" href="#g-telemetry">テレメトリー</a>を 1 か所に集め、調べ、異常を知らせます。主な利用者は、日本の中堅・大企業の運用の担当者（SRE）と開発者です。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>メトリクス</h3><p>数の時系列。CPU の使用率、要求の数、所要時間。安く長く持てる。「何かおかしい」に気づく道具。</p></div>
+      <div class="card" data-frag><h3>ログ</h3><p>出来事の 1 行ずつの記録。量が多く高い。「何が起きたか」を本文で確かめる道具。</p></div>
+      <div class="card" data-frag><h3>トレース</h3><p>1 つの要求がサービスをまたいで通った道筋。「どこで遅いか・どこで失敗したか」を示す道具。</p></div>
+      <div class="card" data-frag><h3>モニターとダッシュボード</h3><p>モニターは条件を見張って人を呼ぶ。ダッシュボードは複数のグラフを並べて調べる。SLO とインシデントの管理もここに乗る。</p></div>
+    </div>
+    <p><a class="t" href="#g-oncall">オンコール</a>の担当は、次の流れで使います。</p>
+    <div class="stepper">
+      <ol>
+        <li>モニターが閾値を越えたのを見つけ、オンコールのサービス（PagerDuty など）経由で担当を呼び出す。</li>
+        <li>担当がダッシュボードを開き、どのサービス・どのホストで、いつから悪いかをメトリクスで絞る。</li>
+        <li>遅い・失敗した要求のトレースを開き、どの呼び出しが原因かを見る。</li>
+        <li>そのスパンに結び付いたログで、例外の本文や入力を確かめる。</li>
+        <li>直したら、回復の通知を確かめ、インシデントのタイムラインから振り返りを書く。</li>
+      </ol>
+    </div>
+    <p>S1 では 1,000 組織・5 万ホスト・有効な系列 1 億・平均 500 万点/秒・ログ 50 TB/日を見込みます。識別子に本家の名前は使わず、<code>&lt;brand&gt;-agent</code>、<code>&lt;Brand&gt;-Api-Key</code> のように書きます（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a> の Problem・5 つの価値・守るべき振る舞い、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/README.md">architecture/README.md</a> の 1.3 節（主要な流れ A〜E）・1.4 節（本家の形と意図した違い）・2 節（規模）。</div>
+  </section>
+
+  <section class="s" id="series">
+    <h2>メトリクスの形：指標の名前・タグ・系列</h2>
+    <p>メトリクスの 1 つの点は「指標の名前、<a class="t" href="#g-tag">タグ</a>の組、時刻、値」です。名前とタグの組が同じ点の並びを、1 本の<a class="t" href="#g-series">系列</a>と呼びます。</p>
+    <pre><code>system.cpu.user{host:web-1, env:prod, cpu:0}   12:00:00 → 12.0
+system.cpu.user{host:web-1, env:prod, cpu:0}   12:00:15 → 12.5   ← 同じ系列
+system.cpu.user{host:web-2, env:prod, cpu:0}   12:00:00 → 40.1   ← 別の系列</code></pre>
+    <p>系列の数を<a class="t" href="#g-cardinality">カーディナリティ</a>と呼びます。系列の数は、タグの値の数の<strong>掛け算</strong>で増えます。</p>
+    <table>
+      <tr><th>指標 <code>http.requests</code> のタグ</th><th>値の数</th><th>系列の数（最大）</th></tr>
+      <tr data-frag><td><code>host</code></td><td>100</td><td>100</td></tr>
+      <tr data-frag><td>＋ <code>endpoint</code></td><td>50</td><td>5,000</td></tr>
+      <tr data-frag><td>＋ <code>status</code></td><td>5</td><td>25,000</td></tr>
+      <tr data-frag><td>＋ <code>request_id</code></td><td>要求ごとに新しい値（1 秒 2,000）</td><td>1 時間で 720 万の新しい系列</td></tr>
+    </table>
+    <p>系列ごとに、メモリーの索引と圧縮の文脈が要ります。そこで設計は、組織と指標ごとの<a class="t" href="#g-active-series">有効な系列</a>の上限（指標あたり既定 10 万）と、新しい系列の作成の速さの上限を持ちます。超えた点は捨てず、<a class="t" href="#g-overflow">溢れの系列</a>（<code>&lt;brand&gt;.cardinality_overflow:true</code>）に足し、合計の値を保ちます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">「タグは付ければ付けるほど後で絞れて便利。タダだから全部付けよう」。何が問題ですか？</p>
+      <div class="opts">
+        <button>何も問題ない。タグは点の属性なので、系列の数は変わらない</button>
+        <button>タグの文字列が長くなり、点 1 つが少し大きくなるだけ</button>
+        <button>系列の数がタグの値の数の掛け算で増え、メモリー・保存・クエリの費用とカスタムメトリクスの課金が増える</button>
+      </div>
+      <p class="why">本家もカスタムメトリクスを「指標の名前とタグの値の組」で 1 つと数えます。要求 ID のような値の種類の多いタグは、ログかトレースの属性に入れます。系列を減らしたいときは、クエリに残すタグを選んで合わせます（ADR-0018）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0006-cardinality-policy.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0017-cardinality-admission-via-control-records.md">ADR-0017</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0018-tag-selection-preaggregation.md">ADR-0018</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/metrics-model-and-cardinality.md">metrics-model-and-cardinality.md</a> の 5 節（系列の鍵）と 7.6 節（<code>request_id</code> の爆発の例）。</div>
+  </section>
+
+  <section class="s" id="types">
+    <h2>指標の型と、差分・累積</h2>
+    <p>同じ「数」でも、点の意味が違います。意味を取り違えると、足してはいけないものを足します。</p>
+    <table>
+      <tr><th>型</th><th>点の意味</th><th>例</th><th>時間で畳むと</th></tr>
+      <tr><td><a class="t" href="#g-gauge">gauge</a></td><td>その時刻の値</td><td>CPU の使用率、キューの長さ</td><td>平均（足すと意味がない）</td></tr>
+      <tr><td><a class="t" href="#g-count">count</a></td><td>直前からの増分</td><td>要求の数、エラーの数</td><td>合計</td></tr>
+      <tr><td>rate</td><td>間隔あたりの量</td><td>1 秒あたりの要求</td><td>取り込みで count（値 × 間隔）に直して合計</td></tr>
+      <tr><td><a class="t" href="#g-distribution">分布</a></td><td>値の散らばり（ヒストグラム）</td><td>要求の所要時間</td><td>ヒストグラムを合わせ、パーセンタイルを出す</td></tr>
+    </table>
+    <p>カウンターの送り方には、2 つの<a class="t" href="#g-temporality">テンポラリティ</a>があります。</p>
+    <div class="compare">
+      <div data-frag><h3>差分（delta）</h3><p>前回からの増分を送る。StatsD はこちら。足せばそのまま合計になる。1 回欠けると、その分は戻らない。</p></div>
+      <div data-frag><h3>累積（cumulative）</h3><p>始まりの時刻 <code>start</code> からの累計を送る。OTLP の既定はこちら。欠けても次の点で取り戻せる。プロセスの再起動で 0 に戻る（リセット）。</p></div>
+    </div>
+    <p>設計は累積の点を <code>(ts, start, v)</code> のまま持ち、<strong>時刻の順に並べてから</strong>差を求めます。届いた順で求めると、読み直しや写しで答えが変わるからです。</p>
+    <table>
+      <tr><th>点</th><th><code>ts</code></th><th><code>start</code></th><th><code>v</code></th><th>差</th></tr>
+      <tr><td>1</td><td>10:00:15</td><td>10:00:00</td><td>5</td><td>5（始まって 5 分以内）</td></tr>
+      <tr><td>2</td><td>10:00:30</td><td>10:00:00</td><td>12</td><td>7</td></tr>
+      <tr><td>3</td><td>10:00:45</td><td>10:00:40</td><td>3</td><td>3（<code>start</code> が変わった＝再起動）</td></tr>
+      <tr><td>4</td><td>10:01:00</td><td>10:00:40</td><td>9</td><td>6</td></tr>
+    </table>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0016-metric-types-and-cumulative-conversion.md">ADR-0016</a>（型の固定と DT-MET-001）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/metrics-model-and-cardinality.md">metrics-model-and-cardinality.md</a> の 4.2 節・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0014-otlp-mapping-and-resource-attributes.md">ADR-0014</a>（OTLP の写し方）。</div>
+  </section>
+
+  <section class="s" id="compression">
+    <h2>時系列の圧縮：差分の差分と XOR</h2>
+    <p>時刻と浮動小数点の値の組は、そのままだと 1 点 16 バイトです。時系列には「間隔がほぼ一定」「値がゆっくり変わる」という癖があり、Facebook の Gorilla の論文（2015）はそれを使って 1 点およそ 1〜2 バイトに縮めました。設計の <code>codec_id</code> 1 はこの形に倣います（ミリ秒の時刻に合わせて区間の幅を決め直しています）。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>1 点目</strong>：時刻と値をそのまま 64 ビットずつ書く。</li>
+        <li><strong>2 点目</strong>：時刻は 1 点目との差（32 ビット）。値は前の値との XOR。</li>
+        <li><strong>3 点目から、時刻</strong>：<a class="t" href="#g-dod">差分の差分</a> <code>D = (t<sub>n</sub> − t<sub>n−1</sub>) − (t<sub>n−1</sub> − t<sub>n−2</sub>)</code> を書く。15 秒ごとの一定の間隔なら D = 0 で、1 ビット。</li>
+        <li><strong>値</strong>：前の値とビットの <a class="t" href="#g-xor">XOR</a> を取る。同じ値なら 0 で、1 ビット。違えば、XOR の先頭と末尾の 0 を省いた「意味のあるビット」だけを書く。</li>
+        <li><strong>可逆</strong>：浮動小数点をビットのまま扱うので、NaN・−0.0・無限大も同じビットに戻る。丸めない。</li>
+      </ol>
+    </div>
+    <p>設計の例（5 点、3 つ目だけ 2ms 遅れ）：</p>
+    <table>
+      <tr><th>点</th><th>時刻の差</th><th>D</th><th>時刻のビット</th><th>値</th><th>XOR</th><th>値のビット</th></tr>
+      <tr><td>1</td><td>—</td><td>—</td><td>64</td><td>12.0</td><td>—</td><td>64</td></tr>
+      <tr><td>2</td><td>15,000</td><td>—</td><td>32</td><td>12.0</td><td>0</td><td>1</td></tr>
+      <tr><td>3</td><td>15,000</td><td>0</td><td>1</td><td>12.5</td><td><code>0001…</code>（意味 1 ビット）</td><td>15</td></tr>
+      <tr><td>4</td><td>15,002</td><td>2</td><td>9</td><td>12.5</td><td>0</td><td>1</td></tr>
+      <tr><td>5</td><td>14,998</td><td>−4</td><td>9</td><td>13.0</td><td><code>0003…</code>（意味 2 ビット）</td><td>16</td></tr>
+    </table>
+    <p>合計 212 ビット（頭を足して 31 バイト）で、生の 80 バイトの約 39% です。120 点の一定のチャンクなら 1 点約 0.42 バイトまで縮みます。12.0 と 12.5 の浮動小数点のビットは <code>4028…</code> と <code>4029…</code> で、上位の数ビットしか違わないことが効いています。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tsdb-storage-engine.md">tsdb-storage-engine.md</a> の 5 節（符号化の表と 5 点の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0004-tsdb-storage-engine.md">ADR-0004</a> のコーデック、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0021-block-format-v1.md">ADR-0021</a>（<code>codec_id</code> の番号の割り当て）。</div>
+  </section>
+
+  <section class="s" id="tsdb">
+    <h2>TSDB の基本：ヘッド・WAL・ブロック・ロールアップ</h2>
+    <p>多くの時系列データベース（Prometheus の TSDB など）は、次の部品でできています。</p>
+    <ul>
+      <li data-frag><strong><a class="t" href="#g-head">ヘッド</a></strong>：直近のデータをメモリーに持ち、点を足していく。すぐにクエリに出る。</li>
+      <li data-frag><strong><a class="t" href="#g-wal">WAL</a></strong>：落ちてもヘッドを作り直せるよう、先に書く追記のログ。</li>
+      <li data-frag><strong><a class="t" href="#g-block">ブロック</a></strong>：時間で区切った不変のファイル。書いた後は変えない。</li>
+      <li data-frag><strong><a class="t" href="#g-compaction">合わせ</a></strong>：小さなブロックを大きなものにまとめ直す。</li>
+      <li data-frag><strong><a class="t" href="#g-rollup">ロールアップ</a></strong>：1 分・1 時間ごとに要約した粗い層。長い期間のグラフを速く安く出す（ダウンサンプリング）。</li>
+    </ul>
+    <p>設計では、<strong>MSK（Kafka）が WAL の役</strong>をします。インジェスターは直近 約 2 時間をヘッドに持ち、1 時間ごとのブロックを S3 に書きます。ロールアップは合計・個数・最小・最大・最後の値だけを持ち、平均は合計 ÷ 個数で出します。</p>
+    <table>
+      <tr><th>層</th><th>ホット</th><th>ウォーム（S3 Standard）</th><th>コールド（Glacier IR）</th></tr>
+      <tr><td>生の点</td><td>ヘッド、NVMe（48 時間）</td><td>15 日</td><td>—</td></tr>
+      <tr><td>1 分のロールアップ</td><td>NVMe</td><td>63 日</td><td>—</td></tr>
+      <tr><td>1 時間のロールアップ</td><td>—</td><td>63 日</td><td>15 か月まで</td></tr>
+    </table>
+    <div class="quiz" data-answer="2">
+      <p class="q">1 分のロールアップに「平均」の列だけを持っていました。1 時間の平均を出すには？</p>
+      <div class="opts">
+        <button>60 個の 1 分の平均を平均すればよい</button>
+        <button>正しく出せない。点の数が分ごとに違うと、平均の平均は全体の平均にならない。合計と個数を持つ</button>
+        <button>最大と最小の中間を取ればよい</button>
+      </div>
+      <p class="why">ある分に 1 点、別の分に 100 点あれば、単純な平均の平均は 1 点の分を 100 倍重く数えます。設計が「生の点から決まる値だけ」を持ち、ロールアップどうしを平均しないのはこのためです（ADR-0004）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0004-tsdb-storage-engine.md">ADR-0004</a>（ヘッドとブロック）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0009-retention-tiers-on-s3.md">ADR-0009</a>（保持の層）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0020-block-flush-commit-and-replay.md">ADR-0020</a>（書き出しの確定）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0022-compaction-and-rollup-tiers.md">ADR-0022</a>（日のファイル）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tsdb-storage-engine.md">tsdb-storage-engine.md</a> の 4・6・9 節。</div>
+  </section>
+
+  <section class="s" id="late">
+    <h2>遅れたデータと水位</h2>
+    <p>点はいつも時刻の順には来ません。エージェントの送り直し、ネットワークの詰まり、ホストの時計のずれで、数分前の点が後から届きます。そこで設計は<strong>受け付けの窓</strong>を決めます。</p>
+    <ul>
+      <li>メトリクス：取り込みの時刻 <code>t_in</code> から見て、過去 60 分・未来 10 分の点だけを受ける。ログは過去 18 時間。</li>
+      <li>窓の外は拒み、拒んだ数を利用者の指標と 202 の本文に出す。<strong>黙って捨てない</strong>。</li>
+      <li>時間 <code>[H, H+1h)</code> のブロックは、取り込みの時刻が <code>H + 2 時間 10 分</code>（＋0〜5 分のずらし）に届いたら閉じる。窓の決まりから、それより後にその時間の点は来ない。閉じたブロックに点を足さない。</li>
+    </ul>
+    <p>では、「12:00 までのデータはそろった」とどう知るか。これが<a class="t" href="#g-watermark">水位</a>（ウォーターマーク）です。</p>
+    <div class="stepper">
+      <ol>
+        <li>各ゲートウェイは、パーティションごとに取り込みの時刻を単調に増やして書く。1 秒書かなかったパーティションには <code>Tick</code> のレコードを書く。</li>
+        <li>パーティションの水位 <code>F_p</code> は、生きているゲートウェイの最後の <code>t_in</code> の最小。どのゲートウェイも、これより古い時刻のレコードをもう書かない。</li>
+        <li>組織の水位 <code>F</code> は、組織のパーティションのすべての水位の最小（反映済みのもの）。</li>
+        <li>モニターは <code>F ≥ t − d</code> になるまで評価を待つ。本システムの遅れは評価を遅らせるだけで、結果を変えない。</li>
+        <li>5 分待っても届かなければ「不完全」として評価し、データなしと回復には遷移しない。</li>
+      </ol>
+    </div>
+    <p>水位は壁の時計ではなく、ストリームの中身だけから決まります。そのため、読み直しても同じ判断になります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0011-intake-gateway-pipeline-and-watermark-ticks.md">ADR-0011</a>（<code>Tick</code> と <code>F_p</code>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0008-monitor-evaluation-model.md">ADR-0008</a> の「取り込みの水位」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tsdb-storage-engine.md">tsdb-storage-engine.md</a> の 8 節（窓の中・外・閉じた時間の例）。</div>
+  </section>
+
+  <section class="s" id="query">
+    <h2>クエリ：時間の集計とタグをまたぐ集計</h2>
+    <p><code>avg:system.cpu.user{env:prod} by {host}</code> は、2 段の集計です。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>絞る</strong>：<code>{env:prod}</code> の条件で系列を選ぶ（系列の索引）。</li>
+        <li><strong><a class="t" href="#g-time-agg">時間の集計</a></strong>：系列ごとに、点を区間（例：60 秒）に畳む。既定は gauge なら平均、count なら合計。</li>
+        <li><strong><a class="t" href="#g-space-agg">空間の集計</a></strong>：同じ <code>host</code> の値の系列を、区間ごとに 1 本へまとめる（<code>avg</code>）。<code>by</code> がなければ全体で 1 本。</li>
+        <li><strong>関数と式</strong>：<code>.as_rate()</code>、<code>timeshift</code>、<code>a / b</code> などを当てる。</li>
+      </ol>
+    </div>
+    <p>区間の長さは窓から決まります。点が多すぎると描けないので、窓を約 300 の区間に分ける長さを一覧から選びます。1 時間の窓なら 15 秒、1 日なら 300 秒です。長い窓は 1 分・1 時間のロールアップの層から読みます。</p>
+    <p>2 段に分けるのは、点の多い系列が平均を支配しないためです。15 秒ごとに送るホストと 60 秒ごとに送るホストを 1 段で平均すると、前者が 4 倍重く数えられます。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">2 台のホストがそれぞれ 100 件の要求を受けました。A は全部 10ms（p99 = 10ms）。B は 98 件が 10ms、2 件が 1,000ms（p99 = 1,000ms）。全体の p99 は？</p>
+      <div class="opts">
+        <button>10ms。200 件を並べると 198 番目が 10ms</button>
+        <button>505ms。2 つの p99 の平均</button>
+        <button>1,000ms。p99 の最大</button>
+      </div>
+      <p class="why">全体の p99 は、200 件の 99% の位置（198 番目）の値で 10ms です。p99 の平均（505ms）も最大（1,000ms）も、全体の p99 ではありません。パーセンタイルは平均も合計もできず、元の分布を合わせてから求めるしかありません。これが次の節のヒストグラムの理由です。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0007-query-language.md">ADR-0007</a>（言語と IR）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0024-query-ir-default-semantics.md">ADR-0024</a>（既定の意味、区間の一覧、補間なし）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/metrics-query-engine.md">metrics-query-engine.md</a> の 4.3 節（DT-QRY-001）と 5.3 節（計画の例）。</div>
+  </section>
+
+  <section class="s" id="sketches">
+    <h2>ヒストグラムとスケッチ：合わせられるパーセンタイル</h2>
+    <p>全部の値を持てば正確なパーセンタイルが出ますが、要求の数だけ保存が要ります。そこで、値を区間に数えた<a class="t" href="#g-histogram">ヒストグラム</a>を持ちます。区間ごとの個数は足せるので、ホストをまたいでも、時間をまたいでも合わせられます。</p>
+    <p>区間の幅を等間隔にすると、1ms と 60 秒を同じ精度で持てません。<a class="t" href="#g-exphist">指数のヒストグラム</a>（OpenTelemetry の形）は、区間の境界を底 <code>base = 2^(2^−scale)</code> の累乗にし、どの大きさの値にも<strong>同じ相対誤差</strong>を保証します。</p>
+    <table>
+      <tr><th><a class="t" href="#g-scale">スケール</a></th><th>底</th><th>誤差の上限 <code>√base − 1</code></th><th>512 区間で持てる最大÷最小</th></tr>
+      <tr><td>5</td><td>1.0219</td><td>1.089%</td><td>2<sup>16</sup>（約 6.5 万倍。1ms〜60 秒が入る）</td></tr>
+      <tr><td>4</td><td>1.0443</td><td>2.190%</td><td>2<sup>32</sup></td></tr>
+      <tr><td>3</td><td>1.0905</td><td>4.427%</td><td>2<sup>64</sup></td></tr>
+    </table>
+    <ul>
+      <li data-frag><strong>見積もり</strong>：順位が届いた区間の両端の幾何平均を答える。本当の値も同じ区間にあるので、相対誤差は上の上限に収まる。</li>
+      <li data-frag><strong>合わせ</strong>：スケールの違うものは、細かいほうを <code>i &gt;&gt; d</code>（番号の右のシフト）で粗いほうに揃えてから区間ごとに足す。シフトは正確で、合わせる順序に依らない。</li>
+      <li data-frag><strong>正確に持つ値</strong>：個数・合計・最小・最大はヒストグラムの外に持つ。p0 と p100 は正確になる。</li>
+    </ul>
+    <p>本家は同じ性質（相対誤差の保証、合わせられる）を持つ DDSketch を使います。設計は OTLP の分布をそのまま受けるため、指数のヒストグラムを選びました。送り手がスケール 4 で送れば上限は 2.19% になり、応答の <code>meta</code> に示します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0028-exponential-histogram-storage-and-percentiles.md">ADR-0028</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0029-distribution-ingest-conversions.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/distributions-and-sketches.md">distributions-and-sketches.md</a> の 4・5 節（スケール 5 と 4 の合わせの例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a> の NFR-010 の確かめ方。</div>
+  </section>
+
+  <section class="s" id="logs">
+    <h2>ログのパイプライン：解析・マスク・索引とアーカイブ</h2>
+    <p>ログは文字列で届きます。検索や集計に使うには、まず属性に分けます。本家と同じく、組織が並べた<a class="t" href="#g-pipeline">パイプライン</a>の処理器で、1 件ずつ処理します。</p>
+    <pre><code>203.0.113.7 - alice@example.com [09/Oct/2026:12:00:00 +0900] "GET /api/orders?id=42 HTTP/1.1" 504 …
+   ↓ grok_parser
+network.client.ip=203.0.113.7  usr.id=alice@example.com  http.method=GET  http.status_code=504 …
+   ↓ PII のマスク
+usr.id=[REDACTED:email]  …</code></pre>
+    <ul>
+      <li><strong>解析</strong>：JSON の展開、<a class="t" href="#g-grok">grok</a> の形の規則、<code>key=value</code>。予約の属性（時刻、<code>status</code>、<code>service</code>、<code>trace_id</code>）を決め直す。</li>
+      <li><strong><a class="t" href="#g-pii">PII</a> のマスク</strong>：メールアドレス、電話番号、カード番号、マイナンバー、IP アドレス、鍵を検出して伏せる。<strong>索引・保存・アーカイブ・ライブテールの前</strong>に行い、マスクの前の値は <code>logs-raw</code>（24 時間）とプロセスのメモリーの外へ出さない。</li>
+    </ul>
+    <p>次に、ログを<a class="t" href="#g-index">索引</a>に入れるかを決めます。</p>
+    <div class="compare">
+      <div data-frag><h3>索引（高い・速い）</h3><p>すぐに検索できる。除外のフィルター（サンプリングの率つき）、1 日の上限、保持（3・7・15・30 日）を持つ。ログのモニターは索引に入ったログだけを見る。</p></div>
+      <div data-frag><h3><a class="t" href="#g-archive">アーカイブ</a>（安い・遅い）</h3><p>除外・上限で索引に入らなかったものも含めて、すべてのログを 1 年持つ。調べたいときに期間とクエリを選んで<a class="t" href="#g-rehydrate">再水和</a>する。</p></div>
+    </div>
+    <p>ログから作るメトリクスは、索引に入れるかに関わらず全件から数えます。「索引は 20% だけ、件数のグラフは全件」が両立します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/logs-pipeline.md">logs-pipeline.md</a> の 7 節（処理器と grok の例）・8 節（マスク）・9 節（振り分け）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0030-log-pipeline-execution-model.md">ADR-0030</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0031-pii-scrubbing-before-routing.md">ADR-0031</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0032-index-routing-and-derived-metrics.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0035-log-rehydration-jobs.md">ADR-0035</a>。</div>
+  </section>
+
+  <section class="s" id="logsearch">
+    <h2>ログの検索：転置索引か、列指向とブルームフィルターか</h2>
+    <div class="compare">
+      <div class="bad"><h3><a class="t" href="#g-inverted">転置索引</a>（OpenSearch など）</h3><p>語 → その語を含む行の一覧。どんな語でも速く引ける。ただし書き込みのたびに語ごとの一覧を更新し、合わせ直すので、取り込みの量と同じくらいの索引が要り、GB あたりが高い。</p></div>
+      <div class="good"><h3>列指向＋ブルームフィルター（設計の選択）</h3><p>ログを時刻で並べた<a class="t" href="#g-columnar">列指向</a>のセグメントにし、語の<a class="t" href="#g-bloom">ブルームフィルター</a>だけを添える。書き込みは軽い。検索の多くは短い時間の範囲なので、時刻で絞った後の走査で足りる。</p></div>
+    </div>
+    <div class="stepper">
+      <ol>
+        <li>カタログ（Aurora の <code>log_segments</code>）で、時刻の範囲と索引に合うセグメントを選ぶ。</li>
+        <li>各セグメントのブルームフィルターに、検索の語を問う。「ない」と答えたセグメントは読まない。</li>
+        <li>残ったセグメントの、要る列だけを S3 の範囲の GET で読む（NVMe にキャッシュ）。</li>
+        <li>条件を当てて答えを決める。ブルームフィルターの誤検出（約 1%）は読む量を増やすだけで、答えを変えない。</li>
+      </ol>
+    </div>
+    <p><strong>日本語の語の分け方</strong>：日本語は空白で語が区切られません。形態素の解析は辞書に頼るので、辞書の更新で分け方が変わると、古いセグメントの語と食い違い、<strong>偽陰性</strong>（あるのに「ない」）を生みます。そこで設計は、NFKC で正規化した後、CJK の文字の連なりを <a class="t" href="#g-ngram">1-gram と 2-gram</a> に分けます。</p>
+    <pre><code>決済に失敗しました → 2-gram：決済 済に に失 失敗 敗し しま した
+検索「失敗」         → 2-gram「失敗」をブルームフィルターに問い、候補のセグメントの本文で確かめる</code></pre>
+    <p>分け方は <code>tokenizer_version</code> として各セグメントに記録し、引く側はそのバージョンの関数で語を作ります。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0005-log-storage-columnar-with-bloom.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0033-log-segment-format-and-tokenizer.md">ADR-0033</a>（3-gram と形態素を退けた理由）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0034-log-search-execution-plan.md">ADR-0034</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/log-storage-and-search.md">log-storage-and-search.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/data-model/log-segment-format.md">data-model/log-segment-format.md</a>。</div>
+  </section>
+
+  <section class="s" id="traces">
+    <h2>トレース：スパン・traceparent・サンプリング・RED</h2>
+    <p>1 つの要求の処理を、サービスごと・呼び出しごとの<a class="t" href="#g-span">スパン</a>に分けて記録します。スパンは <code>trace_id</code>（要求の全体で共通）、<code>span_id</code>、親の <code>span_id</code>、開始と所要時間、属性を持ち、親子でつないだ木が 1 つの<a class="t" href="#g-trace">トレース</a>です。</p>
+    <p>サービスをまたいで同じ <code>trace_id</code> を運ぶのが、W3C Trace Context の <a class="t" href="#g-traceparent"><code>traceparent</code></a> ヘッダーです。</p>
+    <pre><code>traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+             バージョン-trace_id（128 ビット）-親の span_id-フラグ（01 = 採った）</code></pre>
+    <p>スパンは量が多いので、間引きます。間引き方は 2 つです。</p>
+    <div class="tabs">
+      <div data-tab="ヘッドサンプリング"><p>要求の入口で、SDK が確率で「採る・採らない」を決め、<code>traceparent</code> のフラグで下流に伝える。安く、トレースの全体が揃う。ただし決める時点では結果が分からず、エラーや遅い要求も同じ確率で捨てる。採った確率は <code>tracestate</code> の <code>ot=th</code> で運べ、重み（例：1% なら 100）として数え直せる。</p></div>
+      <div data-tab="テールサンプリング"><p>スパンを全部受けて、トレースが完成してから残すかを決める。設計は最後のスパンから 30 秒（最大 5 分）で完成とみなし、エラー → 組織の規則 → 遅いもの（直近 60 分の p99 以上）→ まれな組 → 予算の中の確率、の順で決める。結果を見て選べるが、完成を待つ間のメモリーが要る。</p></div>
+      <div data-tab="RED メトリクス"><p>サービスごとの要求の数（Rate）・エラー（Errors）・所要時間（Duration）。設計は<strong>間引く前のすべてのスパン</strong>から、ヘッドの重みを掛けて数える。<code>&lt;brand&gt;.apm.requests</code> などの系列になる。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">テールサンプリングで残したトレースから、サービスのエラーの率を計算しました。どうなりますか？</p>
+      <div class="opts">
+        <button>残した割合で割り戻せば正しい値になる</button>
+        <button>エラーのトレースは全部残すので、エラーの率が過大になる。重みでも直せない</button>
+        <button>ランダムに残すので、平均では正しい</button>
+      </div>
+      <p class="why">テールの規則は結果を見て偏って選びます。だから RED メトリクスは、テールサンプリングの前に、すべてのスパンから数えます（ADR-0039）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/traces-and-sampling.md">traces-and-sampling.md</a> の 5 節（伝搬と重み）・6 節（組み立て）・8 節（規則）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0037-trace-assembly-and-completion.md">ADR-0037</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0038-tail-sampling-rules-and-consistency.md">ADR-0038</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0039-red-metrics-and-service-map-before-sampling.md">ADR-0039</a>。</div>
+  </section>
+
+  <section class="s" id="monitors">
+    <h2>モニター：評価の窓・データなし・フラッピング・マルチアラート</h2>
+    <p><code>avg(last_5m):avg:system.cpu.user{env:prod} by {host} &gt; 90</code> は、「直近 5 分（<a class="t" href="#g-eval-window">評価の窓</a>）の平均が 90 を超えたら」を、1 分ごとに確かめるモニターです。</p>
+    <ul>
+      <li data-frag><strong><a class="t" href="#g-multialert">マルチアラート</a></strong>：<code>by {host}</code> で、ホストごとに別の状態を持つ。web-1 が鳴っても web-2 は OK のまま。</li>
+      <li data-frag><strong>回復の閾値</strong>：90 で鳴ったら、85 以下まで下がるまで戻さない（<a class="t" href="#g-hysteresis">ヒステリシス</a>）。閾値の周りの揺れで鳴ったり戻ったりしない。</li>
+      <li data-frag><strong>続けての回数</strong>：<code>trigger_after 2</code> なら 2 回続けて超えたときだけ鳴らす。</li>
+      <li data-frag><strong><a class="t" href="#g-flapping">フラッピング</a></strong>：それでも 30 分に 6 回を超えて遷移したら、通知を 1 回にまとめ、落ち着くまで黙る。</li>
+      <li data-frag><strong><a class="t" href="#g-nodata">データなし</a></strong>：値が来ない時間が <code>max(2 × 窓, 10 分)</code> を超えたら、方針（通知・0 とみなす・保つ・OK とみなす）に従う。</li>
+    </ul>
+    <pre class="mermaid">stateDiagram-v2
+    [*] --> OK
+    OK --> ALERT: critical を超えた（trigger_after 回）
+    OK --> WARN: warning を超えた
+    WARN --> ALERT: critical を超えた
+    ALERT --> WARN: critical_recovery 以下
+    ALERT --> OK: 回復（完全な評価だけ）
+    WARN --> OK: warning_recovery 以下
+    OK --> NO_DATA: 値なしが続いた（完全な評価だけ）
+    ALERT --> NO_DATA: 値なしが続いた
+    NO_DATA --> OK: 値が戻った（完全な評価だけ）</pre>
+    <div class="quiz" data-answer="3">
+      <p class="q">エラーの数のモニターが、ある時から値を受け取らなくなりました。どう扱うべきですか？</p>
+      <div class="opts">
+        <button>エラーが 0 件なので、健全として OK にする</button>
+        <button>直ちに「データなし」で呼び出す</button>
+        <button>本システムの取り込みが遅れていないか（水位）を先に確かめ、そろっていて来ないときだけデータなしとして扱う</button>
+      </div>
+      <p class="why">データが来ないのは「送り手が止まった」かもしれず、健全の印ではありません。一方で、本システムの遅れをデータなしと誤ると、夜中に誤って呼び出します。設計は水位を待ち、不完全な評価ではデータなしにも回復にも遷移しません（ADR-0008、ADR-0041）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/monitors-and-alerting.md">monitors-and-alerting.md</a> の 4.2 節（定義の既定）・7 節（状態の機械と例）・8 節（フラッピング）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0041-monitor-state-machine.md">ADR-0041</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0042-flapping-and-renotify.md">ADR-0042</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0043-downtimes-as-evaluation-input.md">ADR-0043</a>。</div>
+  </section>
+
+  <section class="s" id="slo">
+    <h2>SLO・エラーバジェット・バーンレート</h2>
+    <p><a class="t" href="#g-sli">SLI</a> は「良い要求 ÷ 全体の要求」のような割合、<a class="t" href="#g-slo">SLO</a> はその目標です（共通の資料の <a href="../../../../docs/primer/index.html#slo">SLO と復旧の目標</a>）。30 日で 99.9% なら、0.1% は失敗してよい。これが<a class="t" href="#g-error-budget">エラーバジェット</a>で、時間で言えば 30 日の 43.2 分です。</p>
+    <p>「エラーの率が 0.1% を超えたら呼ぶ」では、短い揺れで鳴りすぎ、ゆっくりの悪化には気づけません。そこで、バジェットを使う速さ＝<a class="t" href="#g-burn-rate">バーンレート</a>で見ます。</p>
+    <pre><code>burn(窓) = その窓のエラーの率 ÷ (1 − 目標)
+burn = 1    → 30 日のちょうど終わりにバジェットを使い切る
+burn = 14.4 → 1 時間で 30 日のバジェットの 2% を使う（14.4 × 1 ÷ 720）</code></pre>
+    <p>設計は、長い窓 <code>L</code> と短い窓 <code>S</code>（既定 <code>L ÷ 12</code>）の<strong>両方</strong>が閾値を超えたら鳴らします（<code>min(burn(L), burn(S)) ≥ X</code>）。長い窓で「本当に多く使った」、短い窓で「今も続いている」を確かめます。</p>
+    <table>
+      <tr><th>時刻</th><th>burn(1 時間)</th><th>burn(5 分)</th><th>状態（閾値 14.4）</th></tr>
+      <tr data-frag><td>10:20</td><td>10</td><td>30</td><td>OK（急に増えたが、長い窓が届かない）</td></tr>
+      <tr data-frag><td>10:35</td><td>20</td><td>16</td><td><strong>ALERT</strong></td></tr>
+      <tr data-frag><td>10:50</td><td>22</td><td>0.5</td><td><strong>OK</strong>（直した後、短い窓で早く戻る）</td></tr>
+    </table>
+    <p>30 日の SLO には、14.4（1 時間・5 分）、6（6 時間・30 分）、3（24 時間・2 時間）の組を提案します。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0049-slo-computation-and-burn-rate.md">ADR-0049</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/slos-and-incidents.md">slos-and-incidents.md</a> の 5 節（時の行と確定）・6 節（既定の組と例）、本システム自身の SLO は <a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/README.md">runbooks/README.md</a> の 1 節。</div>
+  </section>
+
+  <section class="s" id="kafka">
+    <h2>Kafka の基本：取り込みのログ</h2>
+    <p>設計は、受け取ったデータを Amazon MSK（マネージドの Kafka）に書いてから 202 を返します。Kafka の言葉を押さえます。</p>
+    <ul>
+      <li><a class="t" href="#g-topic">トピック</a>：信号ごとのログ（<code>metrics</code>、<code>logs-raw</code>、<code>logs</code>、<code>spans</code>、<code>usage</code>）。</li>
+      <li><a class="t" href="#g-partition">パーティション</a>：トピックを分けた追記だけの列。<strong>順序はパーティションの中だけ</strong>で保たれる。同じ系列の点は同じパーティションに入れるので、「後に取り込んだものが勝つ」がオフセットの順で決まる。</li>
+      <li><a class="t" href="#g-offset">オフセット</a>：パーティションの中の番号。消費者は「どこまで読んだか」をオフセットで持つ。</li>
+      <li><a class="t" href="#g-consumer-group">消費者のグループ</a>：同じグループの消費者でパーティションを分け合う。別のグループは、同じデータを独立した位置で読む。</li>
+      <li>確定：<code>acks=all</code>、複製 3、<code>min.insync.replicas=2</code>。2 つの AZ に書けてから成功とする。保持は 24 時間。</li>
+    </ul>
+    <pre class="mermaid">flowchart LR
+  GW["intake-gateway"] -->|"acks=all"| P0[("metrics p0")]
+  GW --> P1[("metrics p1")]
+  GW --> P2[("metrics p2")]
+  P0 --> IA["グループ ingester（写し A）"]
+  P1 --> IA
+  P2 --> IA
+  P0 --> UA["グループ usage-aggregator"]
+  P1 --> UA
+  P2 --> UA</pre>
+    <p>消費者が「処理してからオフセットを進める」と、間で落ちたときに同じレコードをもう一度処理します（<a class="t" href="#g-at-least-once">少なくとも 1 回</a>）。逆の順だと失います。設計は、出力（S3 のブロック、Aurora のカタログ）とオフセットを<strong>同じ記録に、前の位置を条件に</strong>書き、読み直しで同じ結果にします。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">「Kafka は exactly-once だから、消費者は重複を気にしなくてよい」。正しいですか？</p>
+      <div class="opts">
+        <button>正しい。Kafka は既定で、どの消費者にも 1 回だけ届ける</button>
+        <button>正しくない。既定は少なくとも 1 回で、トランザクションも Kafka の中で閉じる「読む・処理する・書く」だけを 1 回にする。S3 や DB への出力は自分で冪等にする</button>
+        <button>正しくない。Kafka は最大 1 回しか保証しないので、データを失う</button>
+      </div>
+      <p class="why">冪等のプロデューサーは送り直しの重なりを防ぎ、トランザクションは Kafka のトピックへの出力とオフセットをまとめます。設計でトランザクションを使うのは、出力が MSK のトピックの <code>log-processor</code> だけです（ADR-0030）。他は出力とオフセットを一緒に確定し、出どころのオフセットで重複を除きます。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0002-intake-log-on-msk.md">ADR-0002</a>（トピックと注記の「1 回だけ」の方針）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/README.md">architecture/README.md</a> の 6 節「決定（統合）」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0060-msk-express-and-ec2-fleets.md">ADR-0060</a>（MSK Express）。冪等の考え方は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。</div>
+  </section>
+
+  <section class="s" id="tenancy">
+    <h2>マルチテナント：うるさい隣人を抑える</h2>
+    <p>障害のときこそ、テレメトリーは急増します。1 つの組織の急増で取り込みの基盤が詰まると、関係のない組織の監視まで止まります。これが<a class="t" href="#g-noisy">うるさい隣人</a>の問題です。設計は、すべての段に抑えを置きます。</p>
+    <table>
+      <tr><th>段</th><th>仕組み</th></tr>
+      <tr><td>取り込み</td><td>組織ごとの<a class="t" href="#g-token-bucket">トークンバケット</a>（点/秒、バイト/秒）。超えたら MSK に書かずに 429 と <code>Retry-After</code>。エージェントはディスクに溜めて待つ</td></tr>
+      <tr><td>MSK</td><td><a class="t" href="#g-shuffle">シャッフルシャーディング</a>：組織ごとに k 個（最小 4）のパーティションの組をハッシュで選ぶ</td></tr>
+      <tr><td>保存</td><td>組織ごとの系列の数と作成の速さの上限（カーディナリティ）</td></tr>
+      <tr><td>クエリ</td><td>組織ごとの待ち行列を<a class="t" href="#g-drr">赤字ラウンドロビン</a>で取り出す。費用を見積もって重すぎれば粗い層へ落とすか拒む</td></tr>
+      <tr><td>評価</td><td>モニターの評価は、ダッシュボードと別の読み手の組で実行する</td></tr>
+    </table>
+    <p>シャッフルシャーディングの効き：1,024 のパーティションから 4 つずつ選ぶと、2 つの組織の組が全部重なる確率は 1 / C(1024, 4)、約 455 億分の 1 です。隣が暴れても、自分の組のうち重なった一部だけが混みます。</p>
+    <p>さらに大きな単位として<a class="t" href="#g-cell">セル</a>（MSK・データの面・S3 の接頭辞・Valkey の一式）を持ちます。S1 は 1 つ、S2 で 4〜8 つに分け、大きな組織は専用のセルに置きます。データの鍵の先頭には必ず <code>tenant_id</code> を置き、認証の文脈からだけ入れます（<a href="../../../../docs/primer/index.html#tenancy">RLS は共通の資料</a>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0003-tenancy-cells-and-isolation.md">ADR-0003</a>（各段の抑えの表、RLS の外の表）・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0012-intake-quota-coordination.md">ADR-0012</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0026-query-cache-and-admission.md">ADR-0026</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tenancy-and-rbac.md">tenancy-and-rbac.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/noisy-neighbor.md">runbooks/noisy-neighbor.md</a>。</div>
+  </section>
+
+  <section class="s" id="selfmon">
+    <h2>自己監視：監視する仕組みを、何で監視するか</h2>
+    <p>可観測性の SaaS が自分の障害を自分のモニターで見張ると、循環します。取り込みが止まれば、自分のモニターも「データが来ない」まま、通知の経路ごと黙ります。最も要るときに気づけません。</p>
+    <div class="compare">
+      <div class="bad"><h3>循環する形</h3><p>本番のメトリクスを本番の TSDB に送り、本番のモニターと <code>notifier</code> で呼び出す。東京の障害・アカウントの権限の誤り・DNS の障害で、監視も一緒に止まる。</p></div>
+      <div class="good"><h3>設計の形</h3><p>別の AWS アカウント（大阪）の selfmon に、AMP・CloudWatch・Grafana を置く。呼び出しは SNS からオンコールのサービスへ直接。DNS・秘密・認証も本番と分ける。</p></div>
+    </div>
+    <p>「何も鳴らない」が「正常」なのか「監視が死んだ」のかを区別するため、<a class="t" href="#g-deadman">デッドマンスイッチ</a>を 3 段に置きます。</p>
+    <div class="stepper">
+      <ol>
+        <li><a class="t" href="#g-canary">canary</a> が毎分、見張りの系列とログを本番に送り、読めることを確かめて心拍を書く。心拍が欠けたら鳴る。</li>
+        <li>常に鳴っている Watchdog のアラートを、オンコールのサービスの心拍の受け口へ 1 分ごとに送る。途切れたら、オンコールのサービスの側が呼び出す。</li>
+        <li>AMP の側で「指標が来ていない」「書き込みの数が 0」を見張る。</li>
+      </ol>
+    </div>
+    <p>本システムでの社内の利用（ドッグフーディング）は調査のためだけに使い、呼び出しには使いません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0062-independent-self-monitoring-path.md">ADR-0062</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/observability.md">observability.md</a> の 3〜5 節（見張り、デッドマンスイッチ、循環の依存の表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/self-monitoring-path-failure.md">runbooks/self-monitoring-path-failure.md</a>。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み</h2>
+    <p>ここは枠組みの説明だけです。設計の文書は、次のどれにも<strong>結論を出していません（法務の確認待ち）</strong>。結論まで、関係する Epic の spec を承認しません。</p>
+    <div class="tabs">
+      <div data-tab="個人情報保護法"><p>利用者が送るログ・トレース・タグには、利用者の顧客のメールアドレス・電話番号・IP アドレスが混ざります。本システムがこれを利用者からの<strong>委託</strong>として扱うか、委託先の安全管理措置、再委託（サブプロセッサー）、漏えい等の報告の手順、PII のマスクを既定で有効にするか（L1）。不変のブロック・セグメントから削除の請求にどう応えるか（L5）。<strong>法務の確認待ち</strong>。設計はマスクの既定を 3 つの案のどれでも動く形にしています。</p></div>
+      <div data-tab="データの所在"><p>「日本のデータを国外に出さない」をどこまで約束するか。DR（大阪は国内）、国外からのサポートの参照、国外のチャットやオンコールのサービスへ、ログの抜粋を含むアラートを送ること（L2）。<strong>法務の確認待ち</strong>。</p></div>
+      <div data-tab="電気通信事業法"><p>テレメトリーを受けて保存し、組織の中で共有させることが届出の要る電気通信事業に当たるか。ログに他人の通信の中身が含まれるとき、マスク・索引のために機械で読むことが<strong>通信の秘密</strong>に触れるか（L3）。2023-06-16 施行の<strong>外部送信規律</strong>は、本システムの画面の計測（L3）と、MVP の後の RUM のブラウザの SDK（L4）に関わります。電話・SMS の通知（L8）も。<strong>法務の確認待ち</strong>。</p></div>
+      <div data-tab="監査・契約ほか"><p>監査ログの保持と、開示の請求・捜査機関の照会への対応（L6）。委託の契約（DPA）、SLA の文言、FISC 安全対策基準・ISMAP への対応をうたうか（L7）。画面とクエリの言語を本家に寄せる範囲（不正競争防止法・著作権、L9）。どれも<strong>法務の確認待ち</strong>です。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L9 と承認を止める spec）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/security.md">security.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/logs-pipeline.md">logs-pipeline.md</a> の 8.5 節（マスクの既定）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0036-personal-data-deletion-tombstones.md">ADR-0036</a>（墓標による削除）。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>データは置き場所が 2 つに分かれます。<strong>テレメトリーの中身</strong>は S3 の不変のファイル（ブロック・セグメント）に、<strong>管理の正本とカタログ</strong>は Aurora に置きます。Aurora の表は「どのファイルがあり、どこまで読んだか」を持ち、中身そのものは持ちません。</p>
+    <pre class="mermaid">erDiagram
+  tenants ||--o{ metric_metadata : "names"
+  tenants ||--o{ metric_blocks : "stores"
+  tenants ||--o{ log_indexes : "routes"
+  log_indexes ||--o{ log_segments : "contains"
+  tenants ||--o{ monitors : "defines"
+  monitors ||--|{ monitor_versions : "versioned"
+  monitors ||--o{ monitor_transitions : "transitions"
+  tenants ||--o{ slos : "defines"
+  slos ||--o{ slo_hourly : "hours"
+  tenants {
+    uuid tenant_id PK
+    text lifecycle_state
+  }
+  metric_metadata {
+    uuid tenant_id PK
+    text metric_name PK
+    text type "fixed by first point"
+  }
+  metric_blocks {
+    uuid tenant_id PK
+    bytea block_id PK
+    timestamptz time_start PK
+    text kind "hourly raw r1m r1h"
+    text state "active superseded deleting"
+  }
+  log_indexes {
+    uuid tenant_id PK
+    uuid index_id PK
+  }
+  log_segments {
+    uuid tenant_id PK
+    bytea segment_id PK
+    timestamptz hour PK
+  }
+  monitors {
+    uuid tenant_id PK
+    uuid monitor_id PK
+  }
+  monitor_versions {
+    uuid tenant_id PK
+    uuid monitor_id PK
+    integer version PK
+  }
+  monitor_transitions {
+    uuid tenant_id PK
+    uuid monitor_id PK
+    bytea group_hash PK
+    bigint seq PK
+    boolean complete
+  }
+  slos {
+    uuid tenant_id PK
+    uuid slo_id PK
+  }
+  slo_hourly {
+    uuid tenant_id PK
+    uuid slo_id PK
+    timestamptz hour PK
+    float8 good
+    float8 total
+  }</pre>
+    <p>メトリクスの 1 つの点は、次の道筋で S3 の層まで進みます。</p>
+    <pre class="mermaid">flowchart TB
+  A["agent（ディスクの待ち行列）"] -->|"HTTPS"| G["intake-gateway：キー、窓、系列の鍵"]
+  G -->|"acks=all の後に 202"| K[("MSK metrics（WAL、24 時間）")]
+  K --> H["ingester の写し A・B：ヘッド"]
+  H -->|"区切りから 70〜75 分"| L0[("S3 の時間のブロック h-3d")]
+  H -->|"同じトランザクション"| DB[("Aurora：metric_blocks と ingest_checkpoints")]
+  L0 --> C["compactor：数・合計・ハッシュを確かめる"]
+  C --> RAW[("raw-15d")]
+  C --> R1M[("r1m-63d")]
+  C --> R1H[("r1h-15mo → 63 日後に Glacier IR")]</pre>
+    <ul>
+      <li data-frag><strong>主キーの先頭は <code>tenant_id</code></strong>：どの表も組織で始まる。S3 のキーも <code>&lt;cell&gt;/&lt;tenant_id&gt;/…</code>。</li>
+      <li data-frag><strong>カタログの状態</strong>：<code>active</code> → <code>superseded</code>（合わせで置き換わった）→ <code>deleting</code> → <code>deleted</code>。カタログを先に変え、クエリの計画から外してから S3 を消す。</li>
+      <li data-frag><strong>再生のための記録</strong>：<code>monitor_transitions</code> は遷移ごとに <code>seq</code> と評価の完全さを持ち、通知を重ねない鍵にもなる。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/data-model.md">data-model.md</a> の 2 節（置き場所）・4 節（全体の ER 図）・5 節（点の道筋）・6 節（横断の不変条件）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/datadog/docs/architecture/data-model">data-model/</a>（<code>tsdb-formats.md</code> はブロックのバイトの並び）。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-observability">可観測性</dt><dd>observability。システムの外に出した信号（メトリクス・ログ・トレース）から、中で何が起きているかを推し量れる度合い。</dd>
+      <dt id="g-telemetry">テレメトリー</dt><dd>システムが外へ送る計測のデータの総称。メトリクス・ログ・トレース。</dd>
+      <dt id="g-oncall">オンコール</dt><dd>当番の時間に、アラートで呼び出されたら対応する役。呼び出しは PagerDuty・Opsgenie などのオンコールのサービスが担う。</dd>
+      <dt id="g-tag">タグ</dt><dd>点に付ける <code>鍵:値</code> の組（<code>host:web-1</code>）。絞り込みとグループ分けに使う。</dd>
+      <dt id="g-series">系列</dt><dd>指標の名前とタグの組が同じ点の並び。設計は <code>tenant_id</code>・名前・並べたタグの 128 ビットのハッシュを系列の鍵にする。</dd>
+      <dt id="g-cardinality">カーディナリティ</dt><dd>系列の数。タグの値の数の掛け算で増える。</dd>
+      <dt id="g-active-series">有効な系列</dt><dd>直近 1 時間に点のあった系列。上限と課金の数え方の単位。</dd>
+      <dt id="g-overflow">溢れの系列</dt><dd>上限を超えた点を足す、指標ごとの 1 本の系列（<code>&lt;brand&gt;.cardinality_overflow:true</code>）。合計の値を保つ。</dd>
+      <dt id="g-gauge">gauge</dt><dd>その時刻の値を表す指標の型。時間で畳むと平均。</dd>
+      <dt id="g-count">count</dt><dd>直前からの増分を表す指標の型。時間で畳むと合計。</dd>
+      <dt id="g-distribution">分布</dt><dd>値の散らばりを持つ指標の型。設計では指数のヒストグラムで持つ。</dd>
+      <dt id="g-temporality">テンポラリティ</dt><dd>カウンターの送り方。差分（delta）は前回からの増分、累積（cumulative）は始まりからの累計。</dd>
+      <dt id="g-dod">差分の差分</dt><dd>delta-of-delta。隣の点との時刻の差の、さらに前の差との差。一定の間隔なら 0 になる。</dd>
+      <dt id="g-xor">XOR の符号化</dt><dd>前の値とビットの排他的論理和を取り、0 でないビットの範囲だけを書く浮動小数点の圧縮。</dd>
+      <dt id="g-head">ヘッド</dt><dd>TSDB で、直近のデータをメモリーに持つ部分。設計では約 2 時間 15 分まで。</dd>
+      <dt id="g-wal">WAL</dt><dd>Write-Ahead Log。変更を先に追記のログへ書き、落ちても作り直せるようにする仕組み。設計では MSK がこの役。</dd>
+      <dt id="g-block">ブロック</dt><dd>時間で区切った不変のファイル。設計では組織・時間・パーティションごとの 1 時間のブロック（<code>TSB1</code>）。</dd>
+      <dt id="g-compaction">合わせ</dt><dd>compaction。小さなファイルを大きなファイルにまとめ直すこと。設計では時間のブロックを日のファイルに。</dd>
+      <dt id="g-rollup">ロールアップ</dt><dd>1 分・1 時間などの区間ごとに要約した値（合計・個数・最小・最大・最後）。ダウンサンプリングした層。</dd>
+      <dt id="g-watermark">水位</dt><dd>watermark。「この時刻までのデータは反映済み」を表す時刻。設計ではゲートウェイの <code>Tick</code> から決まる。</dd>
+      <dt id="g-time-agg">時間の集計</dt><dd>1 本の系列の点を、区間ごとに 1 つの値に畳むこと。</dd>
+      <dt id="g-space-agg">空間の集計</dt><dd>タグをまたいで、複数の系列を区間ごとに 1 本にまとめること。<code>by</code> でグループを残す。</dd>
+      <dt id="g-histogram">ヒストグラム</dt><dd>値の範囲を区間に分け、区間ごとの個数を数えたもの。区間ごとに足せば合わせられる。</dd>
+      <dt id="g-exphist">指数のヒストグラム</dt><dd>OpenTelemetry の分布の形。区間の境界が底の累乗で、どの値にも同じ相対誤差の上限を持つ。</dd>
+      <dt id="g-scale">スケール</dt><dd>指数のヒストグラムの細かさ。底は <code>2^(2^−scale)</code>。1 下げると区間の幅が 2 倍になる。</dd>
+      <dt id="g-pipeline">パイプライン</dt><dd>ログを順に処理する処理器の並び。組織が定義する。</dd>
+      <dt id="g-grok">grok</dt><dd>名前付きのパターンで文字列を属性に分ける書き方。Logstash で広まった。</dd>
+      <dt id="g-pii">PII</dt><dd>個人を特定できる情報。メールアドレス、電話番号、IP アドレス、カード番号など。</dd>
+      <dt id="g-index">索引（ログ）</dt><dd>すぐに検索できる状態でログを持つ区分。フィルター・除外・1 日の上限・保持を持つ。</dd>
+      <dt id="g-archive">アーカイブ</dt><dd>すべてのログを安い層に長く持つ区分。設計では Glacier Instant Retrieval に 1 年。</dd>
+      <dt id="g-rehydrate">再水和</dt><dd>rehydration。アーカイブから期間とクエリで選んだログを、期限つきで検索できる形に戻すこと。</dd>
+      <dt id="g-inverted">転置索引</dt><dd>語から、その語を含む文書の一覧を引く索引。全文検索のエンジンの基本の形。</dd>
+      <dt id="g-columnar">列指向</dt><dd>行ごとではなく列ごとにまとめて持つ形。要る列だけを読め、同じ種類の値が並ぶので圧縮が効く。</dd>
+      <dt id="g-bloom">ブルームフィルター</dt><dd>「その語は確実にない」か「あるかもしれない」を小さなビット列で答える確率的なデータ構造。偽陰性はない。</dd>
+      <dt id="g-ngram">n-gram</dt><dd>文字列を n 文字ずつずらして切り出したもの。2-gram は連続する 2 文字。辞書なしで部分一致を引ける。</dd>
+      <dt id="g-span">スパン</dt><dd>トレースの中の 1 つの処理の単位。開始・所要時間・属性・親のスパンを持つ。</dd>
+      <dt id="g-trace">トレース</dt><dd>1 つの要求に属するスパンの木。<code>trace_id</code> で束ねる。</dd>
+      <dt id="g-traceparent">traceparent</dt><dd>W3C Trace Context の HTTP ヘッダー。バージョン・<code>trace_id</code>・親の <code>span_id</code>・フラグを運ぶ。</dd>
+      <dt id="g-monitor">モニター</dt><dd>クエリの結果を決まった間隔で評価し、条件で状態を変えて通知する定義。</dd>
+      <dt id="g-eval-window">評価の窓</dt><dd>モニターが 1 回の評価で見るデータの時間の幅（例：直近 5 分）。</dd>
+      <dt id="g-multialert">マルチアラート</dt><dd>タグの値ごと（<code>by {host}</code>）に別の状態と通知を持つモニター。</dd>
+      <dt id="g-hysteresis">ヒステリシス</dt><dd>上がるときと下がるときで閾値を変えること。回復の閾値で、閾値の周りの揺れによる行き来を防ぐ。</dd>
+      <dt id="g-flapping">フラッピング</dt><dd>アラートが短い間に鳴ったり戻ったりを繰り返すこと。設計では 30 分に 6 回を超える遷移。</dd>
+      <dt id="g-nodata">データなし</dt><dd>モニターの対象の値が一定の時間来ない状態（<code>NO_DATA</code>）。健全とは限らない。</dd>
+      <dt id="g-sli">SLI</dt><dd>Service Level Indicator。信頼性を測る指標。良い数 ÷ 全体の数など。</dd>
+      <dt id="g-slo">SLO</dt><dd>Service Level Objective。SLI の目標（例：30 日で 99.9%）。</dd>
+      <dt id="g-error-budget">エラーバジェット</dt><dd>SLO の窓で失敗してよい量。<code>(1 − 目標) × 全体</code>。</dd>
+      <dt id="g-burn-rate">バーンレート</dt><dd>エラーバジェットを使う速さ。1 なら窓のちょうど終わりに使い切る。</dd>
+      <dt id="g-topic">トピック</dt><dd>Kafka の、名前を付けたレコードの流れ。パーティションに分かれる。</dd>
+      <dt id="g-partition">パーティション</dt><dd>トピックを分けた追記だけの列。順序はこの中だけで保たれる。</dd>
+      <dt id="g-offset">オフセット</dt><dd>パーティションの中のレコードの通し番号。読んだ位置を表す。</dd>
+      <dt id="g-consumer-group">消費者のグループ</dt><dd>パーティションを分け合って読む消費者の組。グループごとに読んだ位置を持つ。</dd>
+      <dt id="g-at-least-once">少なくとも 1 回</dt><dd>at-least-once。失わないが、重複して届きうる配信の保証。受け手が重複を除く。</dd>
+      <dt id="g-noisy">うるさい隣人</dt><dd>noisy neighbor。共有の基盤で、1 つのテナントの負荷が他のテナントの性能を落とすこと。</dd>
+      <dt id="g-token-bucket">トークンバケット</dt><dd>一定の速さで補充されるトークンを使って要求を通す、量の制限の方式。短い急増は溜めた分だけ許す。</dd>
+      <dt id="g-shuffle">シャッフルシャーディング</dt><dd>テナントごとに、全体からハッシュで選んだ少数の資源の組を割り当てる方式。組が全部重なるテナントはほとんどない。</dd>
+      <dt id="g-drr">赤字ラウンドロビン</dt><dd>Deficit Round Robin。待ち行列を順に回り、重みに応じた量だけ取り出す公平なスケジューリング。</dd>
+      <dt id="g-cell">セル</dt><dd>MSK・データの面・S3 の接頭辞・Valkey の一式。組織をセルに割り当て、障害の範囲を閉じ込める。</dd>
+      <dt id="g-deadman">デッドマンスイッチ</dt><dd>「正常なら常に届く信号」が途切れたことで異常を知る仕組み。監視の経路の死を見つける。</dd>
+      <dt id="g-canary">canary</dt><dd>見張りの組織として、本番に合成のデータを送り、読めることを確かめ続ける部品。</dd>
+      <dt>OTLP</dt><dd>OpenTelemetry Protocol。メトリクス・ログ・トレースを送る標準の形式（gRPC・HTTP）。</dd>
+      <dt>StatsD</dt><dd>アプリが UDP で <code>名前:値|型</code> を送る軽い形式。タグの拡張を含めて受ける。</dd>
+      <dt>IR</dt><dd>中間表現。設計では、画面・API・モニター・SLO のクエリを同じ型付きの IR にコンパイルし、1 つのエンジンで実行する。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。5 つの価値、MVP、Non-goals、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、6 つの原則、主要な流れ A〜E、本家との違い、規模、NFR、統合の決定</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0002-intake-log-on-msk.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0003-tenancy-cells-and-isolation.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0004-tsdb-storage-engine.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0005-log-storage-columnar-with-bloom.md">0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0006-cardinality-policy.md">0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0008-monitor-evaluation-model.md">0008</a> <span>— 取り込みのログ、テナント、TSDB、ログの保存、カーディナリティ、モニターの評価の柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/intake-and-agent.md">intake-and-agent.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/otlp-and-api-keys.md">otlp-and-api-keys.md</a> <span>— エージェント、ゲートウェイの処理の順序、OTLP の写し方、キー</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/metrics-model-and-cardinality.md">metrics-model-and-cardinality.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tsdb-storage-engine.md">tsdb-storage-engine.md</a> <span>— 型と累積、系列の鍵、上限、コーデック、ブロック、遅れたデータ、ロールアップ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/metrics-query-engine.md">metrics-query-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/distributions-and-sketches.md">distributions-and-sketches.md</a> <span>— IR と既定の意味、計画、キャッシュと公平、指数のヒストグラム</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/logs-pipeline.md">logs-pipeline.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/log-storage-and-search.md">log-storage-and-search.md</a> <span>— 解析、マスク、振り分け、セグメント、語の分け方、再水和、削除</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/traces-and-sampling.md">traces-and-sampling.md</a> <span>— 伝搬、組み立て、RED、テールサンプリング、ID での引き</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/monitors-and-alerting.md">monitors-and-alerting.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/notifications-and-integrations.md">notifications-and-integrations.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/slos-and-incidents.md">slos-and-incidents.md</a> <span>— 状態の機械、フラッピング、通知、SLO とバーンレート、インシデント</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/dashboards.md">dashboards.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/tenancy-and-rbac.md">tenancy-and-rbac.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/security.md">security.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/usage-and-billing.md">usage-and-billing.md</a> <span>— ダッシュボード、権限とデータのアクセスの制限、脅威モデル、利用量の計測</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/infrastructure.md">infrastructure.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/capacity.md">capacity.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/observability.md">observability.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/delivery.md">delivery.md</a> <span>— 構成と DR、負荷と費用、自己監視、デプロイ</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/data-model.md">data-model.md</a> <span>— 置き場所、規約、ER 図、点の道筋、横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>・<a href="https://github.com/shoito/rebuilds/tree/main/systems/datadog/docs/runbooks">runbooks/</a>・<a href="https://github.com/shoito/rebuilds/tree/main/systems/datadog/docs/decisions">decisions/</a> <span>— 参照の実装と再生の試験、SLO と手順、残りの ADR</span></li>
+      </ol>
+    </div>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

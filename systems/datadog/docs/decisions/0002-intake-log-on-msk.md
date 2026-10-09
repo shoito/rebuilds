@@ -33,6 +33,8 @@ date: 2026-10-09
 
 - `intake-gateway` は、MSK のプロデューサーの `acks=all` で、`min.insync.replicas=2`（複製 3、3 AZ）の確定を受けてから 202 を返す。
 - 確定できない（時間切れ、ブローカーの障害）ときは 503 と `Retry-After` を返す。部分の成功は返さない（1 つの要求の点を 1 つのバッチで書く）。
+
+> 2026-10-09 の注記：「1 つの要求の点を 1 つのバッチで書く」は採らなかった。ゲートウェイは点をパーティションごとに 1 レコードへ分けて書き、1 つでも確定できなければ 503 を返す。書けたレコードは残るが、メトリクスは後勝ちで冪等なので、エージェントが同じ `<Brand>-Request-Id` で送り直しても結果は変わらない（[ADR-0011](0011-intake-gateway-pipeline-and-watermark-ticks.md)、[data-model.md](../architecture/data-model.md) の 6 節）。
 - 割り当ての超過は MSK に書かずに 429 を返す（[ADR-0003](0003-tenancy-cells-and-isolation.md)）。
 - エージェントは 429・503 でディスクの待ち行列に溜め、指数の待ちとゆらぎで送り直す（intake-and-agent の領域）。
 
