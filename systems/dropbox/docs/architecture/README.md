@@ -363,7 +363,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **`node_versions` の分割**：月ではなく `ns_id` のハッシュで 64（今のバージョンが期限で消えないため。D-5）。
 - **足した表**：`outbox`（D-10）、`export_jobs`（`files/export/status` のため。D-11）、`block_packs`（S2 の詰め直しの判定。D-12）。Better Auth の表の名前を `external_identities`・`verifications`・`passkeys` に決めた。
 - **ジャーナルの列**：`on_behalf_of` を足した（管理者のアクセス。D-9）。
-- **テナントをまたぐ読み出しの関数**：ログインの入口のドメインの解決 `auth_resolve_domain()`（ADR-0004 の「メールアドレスからアカウントの解決」に含める）、共有の招待の受け入れの `ns_invite_resolve()`（X5 に含める）、受け手のテナントへの通知の行の作成（X3 に含める）を決めた（D-20〜D-22）。ADR-0004 の一覧に注記するかはテックリードの持ち越し。
+- **テナントをまたぐ読み出しの関数**：ログインの入口のドメインの解決 `auth_resolve_domain()`（ADR-0004 の「メールアドレスからアカウントの解決」に含める）、共有の招待の受け入れの `ns_invite_resolve()`（X5 に含める）、受け手のテナントへの通知の行の作成（X3 に含める）を決めた（D-20〜D-22）。ADR-0004 の一覧に 2026-10-09 の注記として足した（経路は増やしていない）。
 - **S2 のディレクトリのクラスタ**：ADR-0049 の一覧に加えて、`oauth_*`・`webhook_deliveries`・`abuse_reports`・`plan_features`・`retention_policies`・`tenants` を置く（D-23）。
 - **名前の揃え**：グループは入れ子にしない（namespaces-and-sharing を直した。D-17）。共有フォルダーの招待のトークンも `<brand>_inv_`（D-18）。端末の列は `client_version`（desktop-client を直した。D-19）。テナント・名前空間の表の主キーの先頭に `tenant_id`（`locked_subtrees`・`rewind_skips` を直した。D-14）。
 - 直した領域の文書の一覧は [data-model.md](data-model.md) の 7 節にある。
@@ -387,7 +387,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 層の割合、CloudFront の個別の価格 | E13 の `cost-baseline` |
 | 巻き戻しをすべてのプランに出すか（本家は Basic で使えない） | PM（価格と合わせて） |
 | S2 のテナントの移し方 | S2 の着手の前に別の ADR |
-| データモデルの持ち越し（`node_versions` の量、`delivery_samples` の抜き取りの率、抽出したテキストの 90 日の後、`abuse_reports` の連絡先、D-20〜D-22 の ADR-0004 への注記） | [data-model.md](data-model.md) の 9 節。Dev・Ops・法務（L2・L3） |
+| データモデルの持ち越し（`node_versions` の量、`delivery_samples` の抜き取りの率、抽出したテキストの 90 日の後、`abuse_reports` の連絡先） | [data-model.md](data-model.md) の 9 節。Dev・Ops・法務（L2・L3） |
 | 本家の振る舞いで未確認のもの（重複排除の範囲、共有フォルダーの容量の数え方と入れ子、SLA、API のアップロードのセッションの上限、フォルダーの ZIP の上限、内部のジャーナル） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 ## 7. 領域の文書
