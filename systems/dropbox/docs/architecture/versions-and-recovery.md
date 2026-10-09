@@ -327,11 +327,11 @@ flowchart LR
 
 | 表 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| `node_versions` | `tenant_id`、`ns_id`、`node_id`、`node_ver`、`parent_id`、`name`、`name_key`、`is_folder`、`deleted`、`rev_id`、`valid_from_seq`・`valid_from_at`、`valid_to_seq`・`valid_to_at`、`actor_id`、`device_id`、`job_id` | 主キー `(tenant_id, ns_id, node_id, valid_from_seq)`。索引 `(ns_id, valid_from_at)`・`(ns_id, valid_to_at)`（期限の処理）。月の分割 | 4.1、6.1 |
+| `node_versions` | `tenant_id`、`ns_id`、`node_id`、`node_ver`、`parent_id`、`name`、`name_key`、`kind`（`is_folder` は生成の列）、`deleted`、`rev_id`、`valid_from_seq`・`valid_from_at`、`valid_to_seq`・`valid_to_at`、`actor_id`、`device_id`、`job_id` | 主キー `(tenant_id, ns_id, node_id, valid_from_seq)`。索引 `(ns_id, valid_from_at)`・`(ns_id, valid_to_at)`（期限の処理）。`ns_id` のハッシュで 64 に分割（今のバージョンは期限で消えず、月の分割を落とせないため。[data-model.md](data-model.md) の D-5） | 4.1、6.1 |
 | `revisions` に足す列 | `superseded_at`、`restored_from_rev_id` | 索引 `(ns_id, superseded_at)` | 4.1、5.1 |
 | `nodes` に足す列 | `deleted_reason`（`rewind` を含む） | 索引 `(ns_id, deleted_at)` | 5.2 |
 | `rewind_jobs` | `job_id`、`kind`（`rewind`・`folder_restore`）、`ns_id`、`root_node_id`、`target_seq`、`before_seq`、`filters`、`state`、`progress_node_id`、`applied`、`skipped`、`requested_by` | 主キー `(tenant_id, job_id)` | 6.3 |
-| `rewind_skips` | `job_id`、`node_id`、理由のコード | 主キー `(job_id, node_id)` | 6.3 |
+| `rewind_skips` | `job_id`、`node_id`、理由のコード | 主キー `(tenant_id, job_id, node_id)` | 6.3 |
 | `tenant_retention_settings` | テナント（プラン）ごとのバージョンの保持の期間、短縮の効く日（データの種類ごとの保持の正本 `retention_policies` は [security.md](security.md) の 8.1 節。名前がぶつかるので分けた） | 主キー `tenant_id` | 4.2 |
 | `mass_change_events` | `ns_id`、`device_id`、窓、信号ごとの数、水準、通知の時刻 | 主キー `(tenant_id, event_id)` | 7 |
 | outbox のイベント `commit_summary` | 7.1 節の要約（名前・中身なし） | — | 7.1 |

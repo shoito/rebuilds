@@ -5,7 +5,8 @@
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
 | [intent.md](intent.md) | 本質、MVP の範囲、守るべき振る舞い、成功の基準、やらないこと、法務の確認待ち | PM |
-| [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、主な決定、統合の決定、19 の領域の文書、表と置き場所の索引 | Dev |
+| [architecture/](architecture/README.md) | 全体像、規模の段階、非機能要件、技術スタック、主な決定、統合の決定、19 の領域の文書 | Dev |
+| [architecture/data-model.md](architecture/data-model.md)、[architecture/data-model/](architecture/data-model/) | データモデルの正本：規約、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、DB の外の置き場所、端末の SQLite、横断の不変条件 | Dev |
 | [decisions/](decisions/README.md) | ADR の一覧 | Dev |
 | [quality.md](quality.md) | 品質戦略、リスク、決定的な同期のシミュレーター、ファイルシステムの端の場合の試験、耐久性の確かめ、テスト計画 | QA |
 | [roadmap.md](roadmap.md) | Epic と Story、延期の一覧 | PM |
@@ -15,6 +16,5 @@
 
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
-| `architecture/data-model/` | データモデルの完全版（ER、列、索引、分割、保持）。今は [architecture/data-model.md](architecture/data-model.md) の索引だけ | Dev |
 | `runbooks/` の残りの手順 | [runbooks/README.md](runbooks/README.md) の 6 節の「計画の runbook」 | Ops |
 | `primer/index.html` | 前提知識の資料（内容で区切る分割、3 つの木の同期、File Provider と Cloud Files API、Unicode の正規化）（[リポジトリ共通の ADR-0008](../../../docs/decisions/0008-primers-on-github-pages.md)） | Dev |

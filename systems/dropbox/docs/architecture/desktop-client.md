@@ -321,7 +321,7 @@ sequenceDiagram
 
 | 表 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| `devices`（[ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)・[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) の表） | この領域から足す列：`app_version`、`os`、`last_seen_at`、消去の結果（消した数・消せなかった数） | [accounts-and-teams.md](accounts-and-teams.md) の索引に従う | 7 |
+| `devices`（[ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)・[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) の表） | この領域から足す列：`client_version`、`os`、`last_seen_at`、消去の結果（消した数・消せなかった数） | [accounts-and-teams.md](accounts-and-teams.md) の索引に従う | 7 |
 | S3 の更新の目録（[delivery.md](delivery.md) の置き場所） | 9 節の目録 | — | 9 |
 
 端末の側（[sync-engine.md](sync-engine.md) の 18 節の DB に足す）：

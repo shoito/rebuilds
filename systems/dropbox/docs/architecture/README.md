@@ -1,6 +1,6 @@
 # Architecture: Dropbox
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。表と置き場所の索引は [data-model.md](data-model.md)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。データモデルの正本（規約、ER 図、表の目録、DB の外の置き場所、横断の不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -353,6 +353,21 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - 表と置き場所は [data-model.md](data-model.md)。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
+### 決定（2026-10-09、データモデル）
+
+データモデルの完全版を [data-model.md](data-model.md) と [data-model/](data-model/) に作り、形（表・列・キー・索引・分割・保持）の正本をそこへ移した。領域の文書の「data-model への項目」は提案の記録として残す。名前・列・置き場所の決まっていなかったところは、推奨の案で決めた（[data-model.md](data-model.md) の 7 節の D-1〜D-27）。ADR の決定は変えていない。主なものは次のとおり。
+
+- **スキーマ**：`public`（名前空間の表、テナントの表、RLS の外の登録簿）、`auth`（Better Auth と端末）、`maint`（保守、SLI、照合、テナントの消去の進み）の 3 つ（D-1・D-13）。
+- **ノードの種類**：正本は `nodes.kind`。`is_folder` は生成の列にし、ジャーナルと置き場所のバージョンにも `kind`・`mount_ns_id` を持つ。`ns_mounts` は `nodes` のビュー（D-2・D-3。前の索引で持ち越していた 2 つを解いた）。
+- **`name_key_next` の埋め**：ジャーナルに載せない。`committer_maint` のロールがこの列だけを書く。ぶつかる名前の解き方は普通の commit で載せる（D-4。[delivery.md](delivery.md) の 6.3 節の持ち越しを解いた）。
+- **`node_versions` の分割**：月ではなく `ns_id` のハッシュで 64（今のバージョンが期限で消えないため。D-5）。
+- **足した表**：`outbox`（D-10）、`export_jobs`（`files/export/status` のため。D-11）、`block_packs`（S2 の詰め直しの判定。D-12）。Better Auth の表の名前を `external_identities`・`verifications`・`passkeys` に決めた。
+- **ジャーナルの列**：`on_behalf_of` を足した（管理者のアクセス。D-9）。
+- **テナントをまたぐ読み出しの関数**：ログインの入口のドメインの解決 `auth_resolve_domain()`（ADR-0004 の「メールアドレスからアカウントの解決」に含める）、共有の招待の受け入れの `ns_invite_resolve()`（X5 に含める）、受け手のテナントへの通知の行の作成（X3 に含める）を決めた（D-20〜D-22）。ADR-0004 の一覧に注記するかはテックリードの持ち越し。
+- **S2 のディレクトリのクラスタ**：ADR-0049 の一覧に加えて、`oauth_*`・`webhook_deliveries`・`abuse_reports`・`plan_features`・`retention_policies`・`tenants` を置く（D-23）。
+- **名前の揃え**：グループは入れ子にしない（namespaces-and-sharing を直した。D-17）。共有フォルダーの招待のトークンも `<brand>_inv_`（D-18）。端末の列は `client_version`（desktop-client を直した。D-19）。テナント・名前空間の表の主キーの先頭に `tenant_id`（`locked_subtrees`・`rewind_skips` を直した。D-14）。
+- 直した領域の文書の一覧は [data-model.md](data-model.md) の 7 節にある。
+
 持ち越し（法務、計測・PoC・選定・確認で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
@@ -372,6 +387,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 層の割合、CloudFront の個別の価格 | E13 の `cost-baseline` |
 | 巻き戻しをすべてのプランに出すか（本家は Basic で使えない） | PM（価格と合わせて） |
 | S2 のテナントの移し方 | S2 の着手の前に別の ADR |
+| データモデルの持ち越し（`node_versions` の量、`delivery_samples` の抜き取りの率、抽出したテキストの 90 日の後、`abuse_reports` の連絡先、D-20〜D-22 の ADR-0004 への注記） | [data-model.md](data-model.md) の 9 節。Dev・Ops・法務（L2・L3） |
 | 本家の振る舞いで未確認のもの（重複排除の範囲、共有フォルダーの容量の数え方と入れ子、SLA、API のアップロードのセッションの上限、フォルダーの ZIP の上限、内部のジャーナル） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 ## 7. 領域の文書
@@ -394,7 +410,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [api-and-webhooks.md](api-and-webhooks.md) | 公開の REST API、OAuth 2.0 のアプリとスコープ、レート制限、カーソルと long-poll、WebSocket の合図、Webhook（登録の確かめ、署名、再試行、停止）、サーバーで組み立てるダウンロード | [0038](../decisions/0038-public-api-shape-and-change-feeds.md)、[0039](../decisions/0039-oauth-apps-scopes-and-rate-limits.md)、[0040](../decisions/0040-signed-webhooks-delivery.md)、[0054](../decisions/0054-server-assembled-downloads.md)（統合） | QA、Ops | E11 |
 | [accounts-and-teams.md](accounts-and-teams.md) | 個人のアカウント、プランと容量、チーム、SSO・SCIM、管理の役割、端末の管理、チームの外への共有の方針の管理、監査ログの画面、管理者のアクセス（法務の L7） | [0041](../decisions/0041-accounts-auth-and-device-credentials.md)、[0042](../decisions/0042-teams-sso-scim-and-plans.md)、[0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) | セキュリティ | E12 |
 | [security.md](security.md) | 脅威モデル、利用者の中身のドメイン、暗号化と鍵、マルウェアと悪用の対策、違法なコンテンツの通報と開示の請求の手順（法務の L1〜L3）、監査ログ、データのライフサイクル（削除、解約） | [0044](../decisions/0044-encryption-keys-and-secrets.md)、[0045](../decisions/0045-audit-log-and-data-lifecycle.md)、[0046](../decisions/0046-content-scanning-framework.md) | セキュリティ | E1、E12、E13 |
-| [data-model.md](data-model.md) | 表と置き場所の索引（領域ごと）。完全版の ER は後で作る | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約（ID、テナントと RLS、名前と `name_key`、ハッシュ、番号、分割、保持、暗号化、クラスタ）、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、DB の外の置き場所、端末の SQLite、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、エッジ（CloudFront の配信とエッジの所在）、egress の経路、DR（大阪、中身の送り直しの依頼、`epoch`）、段階を上げる基準、S2 のシャード、S3 のセル | [0047](../decisions/0047-accounts-network-ingress-and-service-placement.md)、[0048](../decisions/0048-disaster-recovery-and-content-pending.md)、[0049](../decisions/0049-stage-up-criteria-sharding-and-cells.md) | Ops | E1、E13 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、クライアントの匿名の計測、伝播と同期の健全さの計測、ブロックの参照の監査、SLI | [0050](../decisions/0050-sli-from-ledgers-synthetics-and-client-telemetry.md) | Ops | E1、E13 |
 | [capacity.md](capacity.md) | 負荷のモデル（commit、合図、ブロックの送受信、プレビュー、索引）、費用のモデル（TB あたり）、部品ごとの必要量、負荷試験 | [0051](../decisions/0051-load-shaping-uploads-signals-and-reconnects.md) | Ops | E13 |

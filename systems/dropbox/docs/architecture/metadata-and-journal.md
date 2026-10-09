@@ -161,6 +161,8 @@ commit に冪等のキーを持たせない。応答が届かずに送り直す�
 | `subtree_listing` | 真なら「このフォルダーの子孫を一覧で読め」（6 節） |
 | `batch_id` | バッチの操作の行。利用者に返さない行の印（6・7 節） |
 | `job_id` | 復元・巻き戻しの行（[versions-and-recovery.md](versions-and-recovery.md)） |
+| `kind`・`mount_ns_id` | ノードの種類（`file`・`folder`・`mount`）と載せる名前空間。`is_folder` は `kind` から作る（[data-model.md](data-model.md) の D-2） |
+| `on_behalf_of` | 管理者のアクセスの対象のメンバー（[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md)、[data-model.md](data-model.md) の D-9） |
 
 `op` の値：`upsert`・`delete`・`mount`・`unmount`（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）に、`purge` を足す。`purge` は保持の期限・名前空間をまたぐ移動の後始末で行を消したことを表し、`list/continue` は返さない（[ADR-0021](../decisions/0021-committer-operations-and-conditions.md)）。
 
@@ -363,7 +365,7 @@ stateDiagram-v2
 | `revisions` | `rev_id`（UUIDv7）、`node_id`、`size`、`content_sha256`、`blocklist_hash`、`chunker_version`、`blocklist`（1,024 ブロックまで）か S3 の番地、`exec_bit`、`client_modified_at`、`actor_id`、`device_id`、`created_seq`、`created_at`、`superseded_at`、`restored_from_rev_id` | 主キー `(tenant_id, ns_id, rev_id)`。索引 `(ns_id, node_id, created_seq)` | 4 |
 | `ns_journal` | [ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の列に、5.1 節の列。`op` に `purge` | 主キー `(tenant_id, ns_id, seq)`。日の分割 | 5 |
 | `ns_batches` | `batch_id`、`kind`（`cross_ns_move`・`cross_ns_copy`）、`src_ns`、`dst_ns`、`root_node_id`、`dst_parent_id`、`name`、`snapshot_seq`、`state`、`progress_node_id`、`hidden_root_id`、`created_by`、`deadline_at` | 主キー `(tenant_id, batch_id)`。RLS は両方の名前空間 | 6 |
-| `locked_subtrees` | `ns_id`、`root_node_id`、`batch_id` | 主キー `(ns_id, root_node_id)` | 6.2 |
+| `locked_subtrees` | `ns_id`、`root_node_id`、`batch_id` | 主キー `(tenant_id, ns_id, root_node_id)` | 6.2 |
 | Valkey `path:{ns_id}:{parent_id}:{name_key}` | パスの解決のキャッシュ（60 秒） | — | 7.3 |
 
 ## 出典

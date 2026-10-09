@@ -191,7 +191,7 @@ ADR-0053。
   2. サーバーの `nodes` に影の列 `name_key_next` を足し、保守の枠で埋める。新しい鍵でぶつかる名前を数え、扱い（名前の変更で解く。`packages/committer` を通してジャーナルに載せる）を Dev と QA で決める。
   3. 一意の索引を新しい鍵に切り替え、`names_version` を上げる。サーバーは `GET /v1/config` で今の `names_version` を知らせる。
   4. 古い `names_version` のクライアントも同期を続けられる（サーバーが一意の判定を持ち、ぶつかれば 409 になる）。最低のバージョンを、新しい `names_version` を持つリリースへ 90 日以内に上げる。
-- 影の列の埋め（名前の見え方が変わらない）をジャーナルに載せるかは、[metadata-and-journal.md](metadata-and-journal.md) の判断に従う（持ち越し）。
+- 影の列の埋め（名前の見え方が変わらない）はジャーナルに載せない。`committer_maint` のロールが `name_key_next` だけを書く。新しい鍵でぶつかる名前を解く名前の変更は、普通の commit でジャーナルに載せる（[data-model.md](data-model.md) の D-4）。
 
 ### 6.4 カーソルとジャーナルの形
 
@@ -276,7 +276,6 @@ ADR-0053。
 | Apple の公証の要件（hardened runtime、時刻の印） | E5 の `desktop-distribution`（**未検証**） |
 | Windows のコード署名の方式と、SmartScreen の評判の扱い | E5（**未検証**） |
 | Tauri の updater の部品を使うか、自前の受け取りか | E5、[desktop-client.md](desktop-client.md) |
-| `names_version` の影の列の埋めをジャーナルに載せるか | [metadata-and-journal.md](metadata-and-journal.md) |
 | 画面の見た目を本家に寄せる範囲 | **法務の確認待ち：L10**（デスクトップ・Web の画面の Story） |
 
 ## 12. quality.md・runbooks・data-model への項目
