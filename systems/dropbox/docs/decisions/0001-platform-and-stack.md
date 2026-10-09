@@ -16,7 +16,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 
 この題材の主な論点は、デスクトップのクライアントの同期エンジン、内容の番地のブロックの保存、名前空間のメタデータとジャーナル、共有、バージョンと復元である（[intent.md](../intent.md)）。他の題材と違い、**核の大部分が利用者の端末で動く**。次の条件がある。
 
-- クライアントは、OS のファイルシステムの API（FSEvents、ReadDirectoryChangesW、inode・File ID）、macOS の File Provider、Windows の Cloud Files API（Win32 の C の API）を直接呼ぶ。
+- クライアントは、OS のファイルシステムの API（ReadDirectoryChangesW、inode・File ID）、macOS の File Provider、Windows の Cloud Files API（Win32 の C の API）を直接呼ぶ。macOS の同期の領域の中の変化は File Provider の呼び出しで受け、FSEvents は使わない（[ADR-0015](0015-local-change-observation-and-move-detection.md)）。
 - 100 万ファイルを持つ端末で、静かなときの CPU 1% 未満・メモリー 300 MB 以下（NFR-008）。常駐し、利用者の PC の資源を使い続ける。
 - 同期の誤りは利用者のファイルを消す。決定的な試験（同じシードで同じ結果）が組めることが要る（[quality.md](../quality.md)）。
 - 分割の規則は、デスクトップ・モバイル・Web のアップロードで同じでなければ、重複排除と差分の送信が効かない（[ADR-0002](0002-chunking-and-block-addressing.md)）。
@@ -49,6 +49,8 @@ rebuilds の他の題材で、次の基盤を決めている。
 - API、Notify、Link、Auth、Relay、Worker（`block-verifier`・`block-gc`・`preview-renderer`・`text-extractor`・`indexer`・`restore-runner`・`mass-change-detector`・`webhook-sender` など）を別の ECS のサービスにする（[architecture/README.md](../architecture/README.md) の 1.2 節）。
 - 書き込みは、サービスではなくライブラリ `packages/committer` に集める。API と Worker のどこから来た書き込みも、ここで条件の確認、ジャーナル、ブロックの参照、outbox を 1 つの DB のトランザクションで書く（[ADR-0005](0005-namespace-journal-and-cursors.md)）。
 - ブロックの中身はサーバーの ECS を通さない。クライアントは署名つきの URL で S3 に直接送り、CloudFront から直接受ける（[ADR-0007](0007-block-storage-layout-on-s3.md)）。
+
+> 2026-10-09 の注記：統合の工程で、フォルダーの ZIP と 1 つの URL のダウンロードを [ADR-0054](0054-server-assembled-downloads.md) で足した。この原則は「要求を受けるサービス（API・Link・Notify・Auth）は中身を通さない。中身を読むのは決めた Worker（`block-verifier` の写し、`export-builder`、隔離した変換）だけ」と読む。
 
 ### クライアント
 

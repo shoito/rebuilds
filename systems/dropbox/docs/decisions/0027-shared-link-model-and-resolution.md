@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-09
 ---
 
-# ADR-0027: リンクは名前空間とノードの ID を指し、見せる相手（`anyone`・`team`・`members`）、パスワード、期限、ダウンロードの可否を持つ。トークンは `<brand>sl_` の接頭辞、190 ビットの乱数、6 文字の検査の値で、ハッシュだけを持つ。解決のたびに、リンクの状態・今の方針・見せる相手・パスワード・ノードの今の場所を確かめ、使えない理由を利用者に区別して見せない
+# ADR-0027: リンクは名前空間とノードの ID を指し、見せる相手（`anyone`・`team`・`members`）、パスワード、期限、ダウンロードの可否を持つ。トークンは `<brand>_sl_` の接頭辞、190 ビットの乱数、6 文字の検査の値で、ハッシュだけを持つ。解決のたびに、リンクの状態・今の方針・見せる相手・パスワード・ノードの今の場所を確かめ、使えない理由を利用者に区別して見せない
 
 ## Context
 
@@ -42,7 +42,9 @@ date: 2026-10-09
 
 - `shared_links(tenant_id, ns_id, link_id, node_id, audience, password_hash, expires_at, download_allowed, state, …)` を名前空間の表に置く。ノードが同じ名前空間の中で動いても使え、別の名前空間へ移ったら使えない。
 - 見せる相手は `anyone`・`team`（持ち主のチームのメンバー）・`members`（その名前空間を既に読める人）。`members` は本家にない。
-- トークンは `<brand>sl_` ＋ 32 文字の base62（約 190 ビット）＋ 6 文字の base62 の CRC32。`link_tokens` に SHA-256 を持ち、`shared_links` に KMS で暗号化した値を持つ。URL は `www.<brand>.<domain>/s/<token>` で、名前を含めない。
+- トークンは `<brand>_sl_` ＋ 32 文字の base62（約 190 ビット）＋ 6 文字の base62 の CRC32。`link_tokens` に SHA-256 を持ち、`shared_links` に KMS で暗号化した値を持つ。URL は `www.<brand>.<domain>/s/<token>` で、名前を含めない。
+> 2026-10-09 の注記：最初の起票の接頭辞は `<brand>sl_` だった。統合の工程で、他のトークン（`<brand>_at_`・`<brand>_rt_`・`<brand>_whsec_` など）と同じ形の `<brand>_sl_` に揃えた。
+
 - パスワードは Argon2id。確かめた印は `password_version` 付きの署名つきの Cookie（12 時間）。
 - 解決のたびに `can()` に、状態、期限、今の方針（キャッシュ 60 秒）、見せる相手とログインの主体、パスワードの印、ノードの今の場所、中身の検査の結果（[ADR-0046](0046-content-scanning-framework.md) の `scan_state`）を渡す。方針を広げても、無効にしたリンクを戻さない。
 - 拒否は、理由に関わらず同じ 404 の画面にする。理由はアクセスの記録にだけ残す。

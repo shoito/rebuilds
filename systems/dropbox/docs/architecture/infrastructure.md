@@ -1,6 +1,6 @@
 # Infrastructure: Dropbox
 
-AWS のアカウントとネットワーク、入口（Web・API・認証・合図・共有リンク・利用者の中身・クライアントの配布）、S3 への直接の送受信、外への送信、サービスの分け方と配置、データの置き場所、バックアップと災害復旧（大阪、`epoch`、中身の待ちと送り直しの依頼）、段階を上げる基準、S2 のシャード、S3 のセル、Terraform、保存 1 TB と配信 1 TB の費用を決める。他の題材（Google Calendar・Linear の infrastructure.md）を土台にし、この題材に固有の事情だけを変える（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+AWS のアカウントとネットワーク、入口（Web・API・認証・合図・共有リンク・利用者の中身・クライアントの配布）、S3 への直接の送受信、外への送信、サービスの分け方と配置、データの置き場所、バックアップと災害復旧（大阪、`epoch`、中身の待ちと送り直しの依頼）、段階を上げる基準、S2 のシャード、S3 のセル、Terraform、保存 1 TB と配信 1 TB の費用を決める。他の題材（Google Calendar・Linear の [infrastructure.md](infrastructure.md)）を土台にし、この題材に固有の事情だけを変える（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 | ADR | 決定 |
 | --- | --- |
@@ -44,7 +44,7 @@ ADR-0047。
 | isolated | Aurora、ElastiCache（Valkey）、OpenSearch | なし |
 
 - VPC エンドポイント（private）：S3、SQS、SNS、KMS、Secrets Manager、AppConfig、CloudWatch Logs、X-Ray、ECR、STS、SES（API）、Firehose。
-- sandbox のタスクのロールは、イメージの取得、ログの出力、ジョブの 2 つのキューの受信と削除だけ。S3・DB・KMS の権限を持たない。入出力はジョブごとの署名つき URL で行う（[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)、[security.md](security.md) の 3.4 節）。SQS のエンドポイントの方針も、その 2 つのキューの受信と削除に絞る。
+- sandbox のタスクのロールは、イメージの取得、ログの出力、自分のジョブのキュー（`preview-renderer` は `preview-jobs-interactive`・`preview-jobs`、`text-extractor` は `text-extract-jobs`、`content-scanner` は `scan-jobs`）の受信・削除・見えない時間の変更と、結果のキュー `sandbox-results` への送信だけ。S3・DB・KMS の権限を持たない。入出力はジョブごとの署名つき URL で行う（[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)、[security.md](security.md) の 3.4 節）。SQS のエンドポイントの方針も、同じ範囲に絞る。
 - セキュリティグループはサービスごとに入る側と出る側を明示する。
 
 ### 2.2 入口とホスト名
@@ -56,12 +56,12 @@ ADR-0047。
 | `api.<brand>.<domain>` | CloudFront＋WAF | `/v1/*`（公開 API と自社のクライアントの API は同じ） | `alb-app` → `api` |
 | `auth.<brand>.<domain>` | CloudFront＋WAF | ログイン、SSO、SCIM（`/scim/v2/*`）、OAuth、端末の登録 | `alb-app` → `auth` |
 | `notify.<brand>.<domain>` | CloudFront＋WAF | WebSocket | `alb-notify` → `notify` |
-| `content.<brand>usercontent.<domain>` | CloudFront（署名つき URL、クッキーなし） | `/b/*`（ブロック）、`/p/*`（プレビュー） | OAC で S3 `blocks`・`previews`（東京）。`/b/*` は大阪の写しを第 2 のオリジンにする（6.3 節） |
+| `content.<brand>usercontent.<domain>` | CloudFront（署名つき URL、クッキーなし） | `/b/*`（ブロック）、`/p/*`（プレビュー）、`/x/*`（組み立てたダウンロード。[ADR-0054](../decisions/0054-server-assembled-downloads.md)）、`/l/*`（共有リンクから出す中身。国外のエッジの扱いを分けるための接頭辞。[shared-links.md](shared-links.md) の 11 節） | OAC で S3 `blocks`・`previews`・`exports`（東京）。`/b/*` は大阪の写しを第 2 のオリジンにする（6.3 節）。OAC は SSE-KMS のオブジェクトを読める（鍵の方針で CloudFront の配信に復号を許す。[Restrict access to an Amazon S3 origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)、2026-10-09 に確認） |
 | `dl.<brand>.<domain>` | CloudFront（release のアカウント） | インストーラー、更新の目録と成果物 | S3（release） |
 | `<brand>-incoming-apne1.s3.ap-northeast-1.amazonaws.com` | S3 のリージョンのエンドポイント（直接） | 署名つきの PUT（`incoming` だけ） | — |
 
 - **アップロードは CloudFront を通さない。** クライアントは署名つきの PUT で S3 の東京のエンドポイントへ直接送る（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。利用者は日本にいて、Transfer Acceleration の利得は小さいと見込む（E2 の `presigned-upload-poc` で測る）。バケットの方針で `aws:SecureTransport` を必須にする。
-- **WebSocket**（`notify`）：CloudFront → `alb-notify` → `notify`。CloudFront の WebSocket の扱い（流れない接続を切る時間など）は、Linear の infrastructure.md の 2.2 節で 2026-09-28 に確かめた事実を、Google Calendar の題材を通じて引き継ぐ。`notify` は 30 秒ごとに ping を送る。ALB のアイドルの時間切れは 120 秒。
+- **WebSocket**（`notify`）：CloudFront → `alb-notify` → `notify`。CloudFront の WebSocket の扱い（流れない接続を切る時間など）は、Linear の [infrastructure.md](infrastructure.md) の 2.2 節で 2026-09-28 に確かめた事実を、Google Calendar の題材を通じて引き継ぐ。`notify` は 30 秒ごとに ping を送る。ALB のアイドルの時間切れは 120 秒。
 - **WAF**（CloudFront）：共通のルール、IP の評判、IP ごとのレート制限。会社の NAT の後ろに 1,000 台の端末がいる前提で、IP ごとの上限は粗くし、細かい上限はアプリでトークンごとに数える。
 
 | 入口 | IP ごとの上限（5 分） |
@@ -100,10 +100,11 @@ ADR-0047。すべて Fargate（ARM64）。サービスごとにタスク定義�
 | `worker-restore-runner` | 復元と巻き戻しのバッチ | `app` | ジョブの残り |
 | `worker-mass-change-detector` | 一斉の変更の検知 | `app` | キューの年齢 |
 | `webhook-sender`（egress） | Webhook の送信 | なし | 同時の送信の数 |
+| `worker-export-builder` | フォルダーの ZIP と 1 つの URL のダウンロードの組み立て（[ADR-0054](../decisions/0054-server-assembled-downloads.md)）。`blocks`・`blocklists` の読み出しと `exports` の書き込みだけ | なし | キューの年齢 |
 | `worker-*`（その他） | `mailer`、`mobile-push`、`quota`、`activity-exporter`、`lifecycle`、`tenant-purge`、`slo-aggregator`、`dr-content-check` | 用途ごと | キューの年齢 |
 
 - `packages/committer` はサービスではなくライブラリで、`api` と `worker-restore-runner`・`lifecycle`・`tenant-purge` の中で動く（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
-- 中身はサーバーの ECS を通らない。`worker-block-verifier` は S3 の中の写しと属性の読み出しだけを行う（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。
+- 要求を受けるサービス（`api`・`link`・`auth`・`notify`）は中身を通さない。`worker-block-verifier` は S3 の中の写しと属性の読み出しだけを行う（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。中身を読むのは、sandbox の変換と `worker-export-builder`（解釈せずにつなぐだけ）に限る（[ADR-0054](../decisions/0054-server-assembled-downloads.md)）。
 
 ### 3.1 AZ の障害への備え
 
@@ -118,6 +119,7 @@ ADR-0047。すべて Fargate（ARM64）。サービスごとにタスク定義�
 | S3 `blocks`・`blocklists` | ブロックの中身、大きな一覧 | バージョニング、大阪へ CRR（Replication Time Control） |
 | S3 `incoming` | 送られたばかりのブロック | 東京・大阪のそれぞれに置く。写さない（2 日で消える） |
 | S3 `previews` | プレビューのキャッシュ | 写さない（作り直せる） |
+| S3 `exports` | 組み立てたダウンロード（1 日） | 写さない |
 | S3 `audit` | 監査の写し、活動の事象 | Object Lock、大阪へ CRR |
 | OpenSearch | 名前と本文の索引 | 3 AZ。大阪への写し方は [search.md](search.md) で決める（作り直せる写し） |
 | ElastiCache（Valkey） | 合図の pub/sub、レート制限、取り消しの一覧、キャッシュ | クラスタモード、レプリカ。失ってよい（取り消しの一覧は DB にもある） |
@@ -157,7 +159,7 @@ ADR-0048。
 | 部品 | 動き | 目安 |
 | --- | --- | --- |
 | Aurora | 別の AZ の reader へ自動でフェイルオーバー。コミット済みを失わない | 通常 60 秒未満（他の題材で確認） |
-| フェイルオーバーの間 | `api` は 503 と `Retry-After`。クライアントは commit を指数の後退で送り直す（commit は冪等。[metadata-and-journal.md](metadata-and-journal.md) の 4.6 節） | 数十秒 |
+| フェイルオーバーの間 | `api` は 503 と `Retry-After`。クライアントは差分を読んでから commit を送り直す（commit は冪等のキーを持たないが、条件つきなので二重に確定しない。[metadata-and-journal.md](metadata-and-journal.md) の 4.6 節） | 数十秒 |
 | `notify` | その AZ の接続が切れ、残る AZ へ再接続 | 数十秒 |
 | S3・CloudFront | AZ の障害の影響を受けない前提（リージョンのサービス） | — |
 | ECS | 残る AZ でタスクを起動し直す | 数分 |
@@ -183,7 +185,7 @@ sequenceDiagram
   OS-->>IC: 合成監視の結果
 ```
 
-- **Aurora**：Global Database の計画外のフェイルオーバーで、複製の遅れの分を失いうる。古い一次の書き込みを止める仕組みは最善努力である。これらの事実は Linear の infrastructure.md の 6.3 節で 2026-09-28 に確かめたもの（[Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)）を、Google Calendar の題材を通じて引き継ぐ。`AuroraGlobalDBRPOLag` が 10 秒を 5 分超えたら呼び出す（[runbooks/README.md](../runbooks/README.md) の 4 節）。
+- **Aurora**：Global Database の計画外のフェイルオーバーで、複製の遅れの分を失いうる。古い一次の書き込みを止める仕組みは最善努力である。これらの事実は Linear の [infrastructure.md](infrastructure.md) の 6.3 節で 2026-09-28 に確かめたもの（[Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)）を、Google Calendar の題材を通じて引き継ぐ。`AuroraGlobalDBRPOLag` が 10 秒を 5 分超えたら呼び出す（[runbooks/README.md](../runbooks/README.md) の 4 節）。
 - **`epoch` を必ず上げる**（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）。失った commit の番号が、大阪で別の操作に振り直されるため。古い `epoch` のカーソルはすべて 409 `reset` になり、端末は木を読み直して Synced と比べる。手元の変更は失わない（[ADR-0006](../decisions/0006-sync-conflict-model.md)）。取り直しの殺到の広げ方は [capacity.md](capacity.md) の 3.3 節。
 - **outbox**：大阪の `relay` は、昇格した DB の outbox の未送信の行から流し直す。Worker と Webhook は重複を受けても同じ結果になる（冪等）。
 - **中身**：6.4 節。
@@ -201,7 +203,7 @@ sequenceDiagram
 5. 東京が戻ったら、東京の `blocks` から残りを写す（CRR が終わるのを待つか、写しのジョブ）。
 6. 東京を失い、どの端末も持たない中身は失われる。そのリビジョンは `lost` にし、前のリビジョンを残したまま持ち主に知らせる。数を SEV1 の報告に入れる（NFR-005 の中身の RPO 15 分を超えたものを数える）。
 
-- 確かめの量：S1 の 1 時間の新しいブロックは、送信の平均 450 MB/秒（[capacity.md](capacity.md) の 1 節）で約 40 万個。HeadObject を 1,000 並行で、約 10 分。
+- 確かめの量：S1 の 1 時間の新しいデータは、送信の平均 450 MB/秒（[capacity.md](capacity.md) の 1 節）で約 1.6 TB、ブロックの平均を 4 MiB〜1 MiB として約 40 万〜160 万個。HeadObject を 1,000 並行（1 回 50ms と見て 1 秒 2 万）で、数十秒〜2 分（本システムの見込み。E13 の `dr-failover-drill` で測る）。
 
 ### 6.5 論理的な破損と、テナントの戻し
 
@@ -287,10 +289,11 @@ main へのマージ ─▶ ビルド ─▶ shared の ECR ─▶ dev ─▶ st
 
 - plan のポリシー検査（OPA・Checkov）で、次を拒否する。
   - isolated・sandbox のサブネットの経路表に NAT・IGW
-  - sandbox のタスクのロールに S3・DB・KMS の権限、決めた 2 つのキューの受信と削除より広い SQS の権限
+  - sandbox のタスクのロールに S3・DB・KMS の権限、自分のジョブのキューの受信・削除・見えない時間の変更と `sandbox-results` への送信より広い SQS の権限
   - sandbox の S3 のゲートウェイのエンドポイントの方針が、決めたバケットと操作より広い
   - egress のサブネットから VPC エンドポイント・isolated への経路
   - クライアントへの署名の役割が `incoming` の PUT より広い（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）
+  - `worker-export-builder` のロールが `blocks`・`blocklists` の `GetObject` と `exports` の `PutObject` より広い、`exports` のライフサイクルが 1 日より長い（[ADR-0054](../decisions/0054-server-assembled-downloads.md)）
   - `blocks`・`blocklists` のバージョニングの停止、古いバージョンのライフサイクルが 30 日未満
   - 人のロールに `blocks` の `GetObject`・`kms-blocks` の復号（[security.md](security.md) の 9 節）
   - Aurora のパラメーターに `rds.global_db_rpo` を置く（他の題材と同じ）
@@ -398,4 +401,4 @@ main へのマージ ─▶ ビルド ─▶ shared の ECR ─▶ dev ─▶ st
 - AWS Price List API（[Using the bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-the-aws-price-list-bulk-api.html)）の `AmazonS3`（ap-northeast-1・ap-northeast-3）、`AWSDataTransfer`（ap-northeast-1）、`AmazonCloudFront`、`AmazonRDS`（ap-northeast-1）、`AmazonECS`（ap-northeast-1）の公開の価格
 - AWS, [Quotas and constraints for Amazon Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_Limits.html)：Aurora PostgreSQL 17.5 以降のクラスタの上限 256 TiB、PostgreSQL の表の上限 32 TiB
 - AWS, [Best practices design patterns: optimizing Amazon S3 performance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html)：接頭辞ごとに 1 秒 3,500 の PUT・COPY・POST・DELETE、5,500 の GET・HEAD。広がる間は 503 が出る
-- AWS, [Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)（Linear の infrastructure.md で 2026-09-28 に確認）
+- AWS, [Using switchover or failover in Amazon Aurora Global Database](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-disaster-recovery.html)（Linear の [infrastructure.md](infrastructure.md) で 2026-09-28 に確認）

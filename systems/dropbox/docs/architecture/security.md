@@ -73,7 +73,7 @@ flowchart LR
 | 脅威 | 対策 |
 | --- | --- |
 | 端末のランサムウェアが同期のフォルダーを暗号化し、全端末とサーバーへ広がる | 変更は新しいリビジョンで、古いリビジョンは保持の期間の中で残る。`mass-change-detector` が一斉の変更を検知し p95 5 分で知らせる（NFR-009）。時点を選んで巻き戻す（[versions-and-recovery.md](versions-and-recovery.md)） |
-| ランサムウェアが手元のファイルを消し、削除が同期で広がる | 消しすぎの止め（1 回の計画で 1,000 ファイルか木の 10%。[ADR-0006](../decisions/0006-sync-conflict-model.md)）。削除したファイルは保持の期間の中で戻せる |
+| ランサムウェアが手元のファイルを消し、削除が同期で広がる | 消しすぎの止め（5 分の窓で 1,000 ファイルか木の 10%。[ADR-0006](../decisions/0006-sync-conflict-model.md)、[sync-engine.md](sync-engine.md) の 10 節）。削除したファイルは保持の期間の中で戻せる |
 | 乗っ取った資格情報でバージョン履歴まで消す | 完全な削除は再認証を求め、24 時間の後に実行し、その間は取り消せる。知らせを送る（8.3 節、[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md)） |
 | 共有フォルダーに置いたマルウェアが、他のメンバーの端末に届く | 本システムは中身を実行しない。検査の枠（6 節）は法務の L1 の後。受けたファイルに OS の「インターネットから来た」の印（macOS の quarantine の拡張属性、Windows の Mark of the Web）を付けるかは [file-system-integration.md](file-system-integration.md) で決める（持ち越し） |
 
@@ -100,9 +100,9 @@ flowchart LR
 プレビュー・サムネイル・本文の抽出・中身の検査は、第三者の汎用の部品（画像の変換、PDF の描画、Office の文書の変換、動画の最初の画面）で利用者のファイルを開く。部品の脆弱性を突かれる前提で、次の要件を置く。部品と上限の値は [previews-and-thumbnails.md](previews-and-thumbnails.md) で決める。
 
 - **ネットワークを持たない**：sandbox のサブネットは、インターネットと他のサブネットへの経路を持たない。置くのは、S3 のゲートウェイのエンドポイント（方針で `blocks`・`blocklists` の GET と `previews` の PUT に限る）と、ECR・CloudWatch Logs・ジョブの SQS のインターフェースのエンドポイントだけ（[infrastructure.md](infrastructure.md) の 2.1 節）。
-- **権限を持たない**：タスクのロールは、イメージの取得、ログの出力、ジョブのキューの受信と削除だけ。S3・DB・KMS の権限を持たない。入力と出力は、オーケストレーター（private の Worker）がジョブごとに作る、期限 10 分の署名つき URL だけで行う（[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)）。
-- **上限**：1 つの変換を新しいプロセスで行い、CPU の時間、メモリー、出力の大きさ、展開の比率に上限を付ける。プロセスは root でなく、ルートのファイルシステムを読み取り専用にし、一時の領域は変換ごとに消す。タスクは 100 回の変換か 1 時間で入れ替える。
-- **出力を信用しない**：出力は画像・PDF・テキストの決めた形式だけにし、オーケストレーターが形式を確かめてからキャッシュに入れる。
+- **権限を持たない**：タスクのロールは、イメージの取得、ログの出力、自分のジョブのキューの受信・削除・見えない時間の変更と、結果のキュー `sandbox-results` への送信だけ。S3・DB・KMS の権限を持たない。入力と出力は、オーケストレーター（private の Worker `worker-preview-orchestrator`）がジョブごとに作る、期限 10 分の署名つき URL だけで行う（[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)）。
+- **上限**：1 つの変換を新しいプロセスで行い、CPU の時間、メモリー、出力の大きさ、展開の比率に上限を付ける。プロセスは root でなく、ルートのファイルシステムを読み取り専用にし、一時の領域は変換ごとに消す。タスクは 50 回の変換か 10 分で入れ替える（新しいタスクが受け始めてから古いタスクを止め、サムネイルの速さを保つ）。
+- **出力を信用しない**：出力は WebP の画像と検査した UTF-8 のテキストだけにする。sandbox の中の監督が、変換の出力をメモリー安全な復号器で読み直して作り直してから置く。オーケストレーターは中身を開かず、大きさ・種類・SHA-256 が結果と合うことだけを確かめてからキャッシュの行を `ready` にする（信頼しないバイトを private のサブネットで開かない）。
 - **利用者の中身のドメイン**から返す（4 節）。
 
 ### 3.5 重複排除の横の漏れ
@@ -167,7 +167,7 @@ ADR-0044。
 
 | 対象 | 鍵 | 注記 |
 | --- | --- | --- |
-| S3 `incoming`・`blocks`・`blocklists` | `kms-blocks`（リージョンごと） | SSE-KMS とバケットキー（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)） |
+| S3 `incoming`・`blocks`・`blocklists`・`exports` | `kms-blocks`（リージョンごと） | SSE-KMS とバケットキー（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)、[ADR-0054](../decisions/0054-server-assembled-downloads.md)） |
 | S3 `previews` | `kms-previews` | 作り直せる |
 | S3 `audit`、活動の事象 | `kms-audit` | Object Lock |
 | Aurora | `kms-aurora` | 大阪の二次は大阪の鍵 |
@@ -203,12 +203,13 @@ ADR-0046。法務の L1（中身を機械で読むことと通信の秘密）と
 | 検査 | 方法 | 範囲の候補 |
 | --- | --- | --- |
 | マルウェア | 第三者の汎用の検査の部品を `content-scanner`（sandbox）で動かす。定義の更新は毎日イメージを作り直して入れる（タスクはネットワークを持たない） | `link_public`：共有リンクで外の人へ配るファイル。`all_uploads`：すべての新しいリビジョン |
-| 違法なコンテンツのハッシュの照合 | 指定の機関から受けたハッシュの一覧と、リビジョンの `content_sha256` を突き合わせる（中身を読まない）。知覚的なハッシュ（似た画像）は、部品と許諾を決めてから足す | 同上 |
+| 違法なコンテンツのハッシュの照合 | 指定の機関から受けたハッシュの一覧と、`content-scanner` が sandbox の中でブロックをつないで計算したファイル全体の SHA-256（`verified_sha256`）を突き合わせる。クライアントの申告の `content_sha256` は使わない（偽れるため）。申告と違えば `integrity_mismatch`。範囲に入る経路は、検査の前に配らない。知覚的なハッシュ（似た画像）は、部品と許諾を決めてから足す | 同上 |
 
 - 範囲は AppConfig の構成 `content_scan_policy`（検査ごとに `none`・`link_public`・`all_uploads`）で決める。法務の結論まで本番は `none`。構成の変更は監査ログに残す。
-- **見つけても中身を消さない・変えない。** リビジョンに `scan_state`（`clean`・`malicious`・`hash_match`）を付け、次だけを止める：
+- **見つけても中身を消さない・変えない。** リビジョンに `scan_state`（`pending`・`clean`・`malicious`・`hash_match`・`integrity_mismatch`）を付け、次だけを止める：
   - `malicious`：共有リンクでの配信とプレビューを止め、持ち主に知らせる。持ち主と名前空間のメンバーのダウンロードは警告つきで続ける。
-  - `hash_match`：そのリビジョンの共有リンク・プレビュー・共有の追加を止め、人（信頼と安全の担当）の確認へ回す。届出・保全・アカウントの扱いは法務の L2 の手順で決める。
+  - `hash_match`・`integrity_mismatch`：そのリビジョンの共有リンク・プレビュー・共有の追加を止め、人（信頼と安全の担当）の確認へ回す。届出・保全・アカウントの扱いは法務の L2 の手順で決める。
+  - `pending`：範囲に入る経路（`link_public` なら `anyone` の共有リンク）でだけ、検査が済むまで配らない。
 - 同期の経路は止めない（止めると端末の木が食い違う）。持ち主の同期を止める必要があるかは L2 で決める。
 - 利用者からの通報の入口は [shared-links.md](shared-links.md)。runbook は `abuse-and-takedown.md`（法務の L2 の後）。
 
@@ -350,7 +351,7 @@ flowchart LR
 - **監査ログ**：3 つの種類、名前を持たない、連鎖（ADR-0045）。
 - **消去**：猶予の後に `tenant_id` で消し、ブロックは GC の経路。完全な削除は 24 時間の後（ADR-0045）。
 - **中身の検査**：枠だけを作り、範囲は空（ADR-0046）。
-- **sandbox**：外への経路も S3・DB・KMS の権限も持たず、ジョブごとの署名つき URL だけ（3.4 節）。
+- **sandbox**：外への経路も S3・DB・KMS の権限も持たず、ジョブごとの署名つき URL だけ。50 回か 10 分で入れ替え、出力の作り直しは sandbox の中（3.4 節、[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)）。
 
 ### 持ち越し
 
@@ -393,7 +394,7 @@ flowchart LR
 | `tenants.status` に `purging`、`tenant_purge_jobs` | 消す処理の進み具合 | 8.2 |
 | `pending_purges`（名前空間の表） | 完全な削除の予約（実行の時刻、取り消し） | 8.3 |
 | `legal_holds`（テナントの表） | 保全の対象と期間（法務の L6 の後） | 8.4 |
-| `revisions` に足す列 | `scan_state`、`scanned_at`、`scan_engine_version` | 6 |
+| `revisions` に足す列 | `scan_state`、`scanned_at`、`scan_engine_version`、`verified_sha256` | 6 |
 | AppConfig | `content_scan_policy`、`ops.preview_formats_enabled` | 6、11 |
 
 ## 出典

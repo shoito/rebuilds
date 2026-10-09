@@ -31,21 +31,26 @@ date: 2026-10-09
 
 | バケット（東京） | キー | 中身 | 設定 |
 | --- | --- | --- | --- |
-| `<brand>-incoming-apne1` | `u/<upload_id>/<n>` | 送られたばかりのブロック | 2 日で消す。クライアントの書き込みは、ここだけ |
+| `<brand>-incoming-apne1` | `u/<upload_id>/<n>`（`upload_id` は 128 ビットの乱数） | 送られたばかりのブロック | 2 日で消す。クライアントの書き込みは、ここだけ |
 | `<brand>-blocks-apne1` | `b/<sc>/<h[0:4]>/<tenant_id>/<hash>` | 確かめたブロック。`sc` は `s`（128 KiB 未満）か `l` | バージョニング、Intelligent-Tiering（`l`）、大阪へ CRR |
 | `<brand>-blocklists-apne1` | `bl/<h[0:4]>/<tenant_id>/<blocklist_hash>` | 大きなファイルのブロックの一覧 | 同上（Standard） |
 | `<brand>-previews-apne1` | `p/<tenant_id>/<rev_id>/<kind>` | プレビュー・サムネイルのキャッシュ | 作り直せる。90 日で消す |
 | `<brand>-audit-apne1` | 日ごと | 監査ログの写し | Object Lock（期間は法務の L3・L6 の後） |
+| `<brand>-exports-apne1` | `x/<tenant_id>/<export_id>` | サーバーが組み立てたダウンロード（フォルダーの ZIP、1 つの URL のファイル）。[ADR-0054](0054-server-assembled-downloads.md) | 1 日で消す。写さない |
 
-- キーの先頭に近い位置にハッシュの 4 文字を置き、S3 の接頭辞ごとの要求の上限に偏りを作らない。キーにテナントを含め、重複排除をテナントの中に閉じる（[ADR-0003](0003-dedupe-scope-and-privacy.md)）。
+- キーの先頭に近い位置にハッシュの 4 文字を置き、S3 の接頭辞ごとの要求の上限に偏りを作らない。`incoming` のキーは `upload_id` を 128 ビットの乱数（UUIDv7 にしない）にして、同じ時刻のアップロードが同じ接頭辞に集まらないようにする。
+
+> 2026-10-09 の注記：capacity の領域が、`upload_id` が UUIDv7 なら時刻が先頭に来て `incoming` の接頭辞が偏ると指摘した。block-storage の領域が `upload_id` を 128 ビットの乱数にしたので、キーの形 `u/<upload_id>/<n>` は変えない。キーにテナントを含め、重複排除をテナントの中に閉じる（[ADR-0003](0003-dedupe-scope-and-privacy.md)）。
 - ブロックは書き換えない。同じキーへの 2 回目の書き込みは、同じ中身である。
 
 ### アップロード
 
-1. commit で「送れ」と答えたブロックに、サーバーが `incoming` のキーへの署名つきの PUT の URL（期限 15 分）を返す。URL は SHA-256 のチェックサムの指定を含む。ブロックは最大 16 MiB なので、マルチパートは使わない。
+1. commit で「送れ」と答えたブロックに、サーバーが `incoming` のキーへの署名つきの PUT の URL（期限 15 分）を返す。モバイルの背景の送信で 15 分が足りるかは持ち越し（`mobile-background-upload-poc` で切れる頻度を測り、多ければモバイルの背景の URL だけ期限を延ばす。[mobile-and-camera-upload.md](../architecture/mobile-and-camera-upload.md) の 8.1 節）。URL は SHA-256 のチェックサムの指定を含む。ブロックは最大 16 MiB なので、マルチパートは使わない。
 2. クライアントが PUT する。S3 はチェックサムを計算し直し、合わなければ拒む（[Checking object integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html)、2026-10-09 に確認）。署名でチェックサムの指定を強制できるかは `presigned-upload-poc` で確かめる。強制できなくても、次の 3 で確かめるので正しさは変わらない。
-3. `block-verifier` が、S3 の持つ SHA-256 を読み、番地のハッシュと大きさを確かめる。合えば、正規のキーへ S3 の中で写し（「ないときだけ書く」の条件つき。既にあれば写さない）、`incoming` を消し、ブロックの索引に `live` で入れる。合わなければ `incoming` を消して、commit に失敗を返す。
-4. commit は、一覧のすべてのブロックが索引で `live` であることを、同じトランザクションで確かめる（[ADR-0005](0005-namespace-journal-and-cursors.md)）。
+3. `block-verifier` が、S3 の持つ SHA-256 を読み、番地のハッシュと大きさを確かめる。合えば、正規のキーへ S3 の中で写し（「ないときだけ書く」の条件つき。CopyObject は 2025-10-29 から `If-None-Match` の条件を受ける。[Amazon S3 adds conditional write functionality to copy operations](https://aws.amazon.com/about-aws/whats-new/2025/10/amazon-s3-conditional-write-functionality-copy-operations)、2026-10-09 に確認。既にあれば写さない）、`incoming` を消し、ブロックの索引に `live` で入れる。合わなければ `incoming` を消して、commit に失敗を返す。
+4. commit は、一覧のすべてのブロックが、要求した主体にとって `have`（読める名前空間の参照にある）・`copy`（読める他のテナントの参照から写した）・`granted`（この主体が送って検証された許可がある）のどれかで、索引で `live` か `orphaned`（`deleting` でない）であることを、同じトランザクションで確かめる（[ADR-0018](0018-upload-sessions-and-block-grants.md)）。
+
+> 2026-10-09 の注記：最初の起票は「索引で `live` なら受ける」だった。これでは、読めない名前空間のブロックのハッシュを知るだけで、送らずに commit して他人の中身を自分のファイルにできる。ADR-0018 が受ける条件を `have`・`copy`・`granted` に絞り、この穴を塞いだ。
 
 - クライアントは正規のキーに書けない。IAM の方針で、クライアントに渡す署名の役割の書き込みを `incoming` に限る。
 - 中身はサーバーの ECS を通らない（`block-verifier` は S3 の中の写しと属性の読み出しだけ）。
@@ -80,7 +85,7 @@ date: 2026-10-09
 
 ### DR
 
-- `blocks` と `blocklists` を、大阪へ CRR（Replication Time Control を有効にし、15 分を目標）で写す。削除のマーカーも写し、大阪でも古いバージョンを 30 日で消す。大阪の写しは、`sc=l` を Glacier Instant Retrieval、`sc=s` を Standard に置く。
+- `blocks` と `blocklists` を、大阪へ CRR（Replication Time Control を有効にし、15 分を目標）で写す。RTC は多くのオブジェクトを数秒で、99.9% を 15 分以内に写す。転送が既定の 1 Gbps の割り当てを超える間と、要求の上限を超える間は、RTC の SLA が当たらない（[Meeting compliance requirements with S3 Replication Time Control](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)、2026-10-09 に確認）。S1 の新しいデータは平均 450 MB/秒（約 3.6 Gbps）なので、割り当ての引き上げを E1 の `s3-buckets-baseline` で申請する。削除のマーカーも写し、大阪でも古いバージョンを 30 日で消す。大阪の写しは、`sc=l` を Glacier Instant Retrieval、`sc=s` を Standard に置く。
 - メタデータは Aurora Global Database で写す（RPO 1 分）。大阪へ切り替えたとき、大阪にまだ届いていないブロックを参照するリビジョンは「中身の待ち」にし、そのファイルを手元に持つ端末へ送り直しを求める（NFR-005 の中身の RPO 15 分。infrastructure の領域）。
 
 ### 他の案を選ばなかった理由

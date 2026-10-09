@@ -30,11 +30,11 @@
   - 費用のモデル
 - 扱わない：
   - 分割の規則そのもの（[ADR-0002](../decisions/0002-chunking-and-block-addressing.md)）
-  - commit の操作と条件、ジャーナル（`metadata-and-journal.md`）
-  - いつ上げるか・いつ受けるかの計画（`sync-engine.md`）
-  - リビジョンの保持の期限（`versions-and-recovery.md`）。この文書は期限切れで参照が減った後を扱う
-  - DR の切り替えと中身の待ち（`infrastructure.md`）
-  - 単価（`capacity.md`）
+  - commit の操作と条件、ジャーナル（[metadata-and-journal.md](metadata-and-journal.md)）
+  - いつ上げるか・いつ受けるかの計画（[sync-engine.md](sync-engine.md)）
+  - リビジョンの保持の期限（[versions-and-recovery.md](versions-and-recovery.md)）。この文書は期限切れで参照が減った後を扱う
+  - DR の切り替えと中身の待ち（[infrastructure.md](infrastructure.md)）
+  - 単価（[capacity.md](capacity.md)）
 
 ## 2. 要件
 
@@ -67,7 +67,7 @@
 
 ### 4.1 commit の答え
 
-クライアントは commit（`metadata-and-journal.md`）にブロックの一覧（大きさと SHA-256 の並び）を付ける。`packages/committer` は、名前空間の行をロックする前に、`packages/blocks` の `classify()` で各ブロックを分ける。
+クライアントは commit（[metadata-and-journal.md](metadata-and-journal.md)）にブロックの一覧（大きさと SHA-256 の並び）を付ける。`packages/committer` は、名前空間の行をロックする前に、`packages/blocks` の `classify()` で各ブロックを分ける。
 
 | 区分 | 条件（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md) の表） | commit での扱い |
 | --- | --- | --- |
@@ -109,7 +109,7 @@ sequenceDiagram
     A-->>C: committed(rev_id)
 ```
 
-1. API はアップロードの行 `uploads` と、ブロックごとの `upload_blocks(upload_id, n, hash, size, state=awaiting)` を作り、`incoming` の署名つきの PUT の URL を返す。URL は `x-amz-checksum-sha256`（番地のハッシュの base64）と `Content-Length` を署名に含める。期限は 15 分（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。`upload_id` は 128 ビットの乱数にする（UUIDv7 にしない）。`incoming` のキー `u/<upload_id>/<n>` の先頭が時刻で偏り、S3 の接頭辞ごとの要求の上限に当たるのを避けるため（`capacity.md` の指摘。キーの形は ADR-0007 のまま）。
+1. API はアップロードの行 `uploads` と、ブロックごとの `upload_blocks(upload_id, n, hash, size, state=awaiting)` を作り、`incoming` の署名つきの PUT の URL を返す。URL は `x-amz-checksum-sha256`（番地のハッシュの base64）と `Content-Length` を署名に含める。期限は 15 分（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。`upload_id` は 128 ビットの乱数にする（UUIDv7 にしない）。`incoming` のキー `u/<upload_id>/<n>` の先頭が時刻で偏り、S3 の接頭辞ごとの要求の上限に当たるのを避けるため（[capacity.md](capacity.md) の指摘。キーの形は ADR-0007 のまま）。
 2. クライアントはブロックを並行に PUT する。既定は 8 本で、`ops.client_upload_concurrency` で配る。回線の速さを測り、1 本あたり 50 Mbps に満たなければ 16 本まで広げる。
 3. S3 のイベント（`incoming` の ObjectCreated）を SQS に流し、`block-verifier` が受ける。`block-verifier` の処理は `packages/blocks` の `verify(upload_id, n)` にあり、commit も呼べる（4.3 節）。
 4. `verify` は、HeadObject で S3 の持つ SHA-256 と大きさを読み、`upload_blocks` の値と比べる。合わなければ `incoming` を消し、`upload_blocks.state=rejected`（理由のコード `checksum_mismatch`・`size_mismatch`）にする。
@@ -118,7 +118,7 @@ sequenceDiagram
 7. クライアントは commit を `upload_id` 付きで送り直す。
 
 - `verify` は冪等にする。同じ `(upload_id, n)` を何度流しても結果は同じ。
-- CopyObject の `If-None-Match` の対応は `presigned-upload-poc` で確かめる（**未検証**）。使えれば 5 の HeadObject を省く。
+- CopyObject は 2025-10-29 から `If-None-Match`（写し先がないときだけ書く）を受ける（[Amazon S3 adds conditional write functionality to copy operations](https://aws.amazon.com/about-aws/whats-new/2025/10/amazon-s3-conditional-write-functionality-copy-operations)、2026-10-09 に確認）。これを使い、5 の HeadObject を省く。バケットの方針での強制の振る舞いは `presigned-upload-poc` で確かめる。
 
 ### 4.3 検証の待ちと速い道
 
@@ -144,7 +144,7 @@ sequenceDiagram
 
 ### 4.5 公開 API の分け方
 
-- 公開 API の利用者は、内容で区切る分割を実装しなくてよい。`chunker_version` 0 は「4 MiB の固定の大きさ、最後だけ短い」とする。セッションの使い方は同じ（[ADR-0018](../decisions/0018-upload-sessions-and-block-grants.md)、`api-and-webhooks.md` を参照）。
+- 公開 API の利用者は、内容で区切る分割を実装しなくてよい。`chunker_version` 0 は「4 MiB の固定の大きさ、最後だけ短い」とする。セッションの使い方は同じ（[ADR-0018](../decisions/0018-upload-sessions-and-block-grants.md)、[api-and-webhooks.md](api-and-webhooks.md) を参照）。
 - 0 で分けたブロックも同じ索引と重複排除に入る。CDC のブロックと境界が合わないので、重ならないだけである。
 - 公式の SDK（TypeScript、Python）は `sync-core` の WASM で `chunker_version` 1 を使う。
 
@@ -168,7 +168,7 @@ stateDiagram-v2
 ### 4.7 クライアントの再開
 
 - `sync-core` は、ローカルの状態の DB に `(file の識別, chunker_version, blocklist_hash, upload_id, 検証済みの番号)` を持つ。再起動の後、`upload_session/status`（小さなファイルは commit の送り直し）で、サーバーの検証済みに合わせる。
-- 手元のファイルが計画の時から変わっていたら（大きさ・更新の時刻・ファイルの ID）、アップロードを捨てて分割し直す（`sync-engine.md`）。
+- 手元のファイルが計画の時から変わっていたら（大きさ・更新の時刻・ファイルの ID）、アップロードを捨てて分割し直す（[sync-engine.md](sync-engine.md)）。
 - URL の期限切れ（403）は、その番号の URL を取り直すだけにする。
 
 ## 5. ブロックの索引と参照
@@ -189,7 +189,7 @@ stateDiagram-v2
 - 検証したばかりのブロックは参照がないので `orphaned` で入れ、`pin_until` をアップロードの期限にする。commit で最初の参照ができたら `live` にする。
 - `ns_ref_count` は「そのブロックを参照する名前空間の数」。`ns_block_refs(tenant_id, ns_id, hash, ref_count)` の行が作られたとき +1、消えたとき −1 する。行の中の `ref_count` の増減（同じ名前空間の中の参照の数）は `blocks` の行に触れない。よく使われるブロックの行のロックを避けるため。
 - ロックの順：名前空間の行 → `ns_block_refs` → `blocks`（ハッシュの順）。デッドロックを避ける。
-- `ns_block_refs.ref_count` は、そのブロックを一覧に持つ、保持の期間の中のリビジョンの数。リビジョンの作成で +1、保持の期限切れの削除で −1（`versions-and-recovery.md`）。名前空間の削除・テナントの削除では、`packages/committer` がまとめて行を消し、`ns_ref_count` を減らす。
+- `ns_block_refs.ref_count` は、そのブロックを一覧に持つ、保持の期間の中のリビジョンの数。リビジョンの作成で +1、保持の期限切れの削除で −1（[versions-and-recovery.md](versions-and-recovery.md)）。名前空間の削除・テナントの削除では、`packages/committer` がまとめて行を消し、`ns_ref_count` を減らす。
 
 ### 5.2 GC
 
@@ -210,7 +210,7 @@ stateDiagram-v2
 ### 5.3 ピン
 
 - `pin_until` は、アップロードとセッションが生きている間、検証済みのブロックを GC から守る。セッションの活動のたびに、そのセッションのブロックの `pin_until` をまとめて延ばす（1 時間に 1 回まで）。
-- 復元・巻き戻しの作業（`versions-and-recovery.md`）で、期限切れの直前のリビジョンを戻すときも、作業の間ピンを付ける。
+- 復元・巻き戻しの作業（[versions-and-recovery.md](versions-and-recovery.md)）で、期限切れの直前のリビジョンを戻すときも、作業の間ピンを付ける。
 
 ### 5.4 失敗と戻し
 
@@ -218,7 +218,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | `verify` の写しの途中の停止 | `incoming` に残る。索引にない | SQS の再配信で冪等にやり直す。`incoming` は 2 日で消える |
 | GC の 2 と 3 の間の停止 | `deleting` の行が残る | 1 時間後にやり直す |
-| 参照の数の誤り（実装の不具合） | 参照のあるブロックが `orphaned` になる | 7 日の猶予の間に、毎日の参照の監査（6 節）で見つけ、`ns_ref_count` を数え直す。見つける前に消えたら、`block_gc_log` のバージョン ID で S3 から戻す（runbook `block-restore`） |
+| 参照の数の誤り（実装の不具合） | 参照のあるブロックが `orphaned` になる | 7 日の猶予の間に、毎日の参照の監査（6 節）で見つけ、`ns_ref_count` を数え直す。見つける前に消えたら、`block_gc_log` のバージョン ID で S3 から戻す（runbook `block-integrity-incident.md`） |
 | S3 の 503（要求の上限） | PUT・写しの失敗 | キーの先頭のハッシュで接頭辞を分ける（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。クライアントは指数の後退（0.5 秒から 30 秒、±20%） |
 | `incoming` の放置 | 置かれたが commit されない | 2 日で消える。許可は 7 日で切れる |
 
@@ -235,7 +235,7 @@ stateDiagram-v2
 | 在庫の突き合わせ | 毎週 | S3 Inventory と索引。索引にないオブジェクトは GC の候補（7 日の後）、オブジェクトのない索引の行は SEV の候補 | 同上 |
 | `content_sha256` の抜き取り | 毎日 | 0.01% のリビジョンのブロックを読んで全体の SHA-256 を計算し、リビジョンの値と比べる | クライアントのバージョンごとに数え、チケット |
 
-- `content_sha256` はクライアントの申告である。サーバーは中身を読まないので、commit では確かめない。抜き取りで、誤ったクライアントのバージョンを見つける。
+- `content_sha256` はクライアントの申告である。サーバーは中身を読まないので、commit では確かめない。抜き取りで、誤ったクライアントのバージョンを見つける。各ブロックの SHA-256 は `verify` で確かめているので信用できる。ハッシュの照合（違法なコンテンツ）は申告を使わず、`content-scanner` が計算した `verified_sha256` を使う（[ADR-0046](../decisions/0046-content-scanning-framework.md)）。
 - 照合の読み出しは `X3` の経路で、テナントを 1 つずつ文脈に設定して行う。名前と中身はログに出さない（ID と数だけ）。
 
 ## 7. ダウンロード
@@ -267,7 +267,7 @@ ADR-0020。S1 では使わない。S2 の前に `small-block-pack-poc` で、オ
 
 ## 9. 費用のモデル
 
-[architecture/README.md](README.md) の 2.1 節の式を、要求の数で具体にする。単価は `capacity.md` で入れる。
+[architecture/README.md](README.md) の 2.1 節の式を、要求の数で具体にする。単価は [capacity.md](capacity.md) で入れる。
 
 | 項目 | 1 TiB の新しいデータ（平均 4 MiB のブロック、262,144 個） | 1 TiB の小さなファイル（平均 100 KiB、約 1,070 万個） |
 | --- | --- | --- |
@@ -302,14 +302,14 @@ ADR-0020。S1 では使わない。S2 の前に `small-block-pack-poc` で、オ
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `blocks`（テナントの表）に足す列 | `ns_ref_count`、`state`（`live`・`orphaned`・`deleting`）、`orphaned_at`、`pin_until`、`deleting_at`、`chunker_hint`（0 か 1）、S2 で `pack_id`・`pack_offset` | `(tenant_id, hash)`。部分索引 `(tenant_id, orphaned_at) WHERE state='orphaned'`、`(deleting_at) WHERE state='deleting'` | 5.1、5.2、8 |
+| `blocks`（テナントの表）に足す列 | `block_id`（ログ・照合でハッシュの代わりに指す内部の ID。[observability.md](observability.md) の 2.1 節）、`ns_ref_count`、`state`（`live`・`orphaned`・`deleting`）、`orphaned_at`、`pin_until`、`deleting_at`、`chunker_hint`（0 か 1）、S2 で `pack_id`・`pack_offset` | `(tenant_id, hash)`。部分索引 `(tenant_id, orphaned_at) WHERE state='orphaned'`、`(deleting_at) WHERE state='deleting'` | 5.1、5.2、8 |
 | `ns_block_refs`（名前空間の表） | `ref_count` | `(tenant_id, ns_id, hash)`。照会用に `(tenant_id, hash, ns_id)` | 4.1、5.1 |
 | `uploads`（テナントの表） | `upload_id`、`actor_id`、`device_id`、`ns_id`、`kind`（`commit`・`session`）、`chunker_version`、`expected_size`、`state`、`created_at`、`last_activity_at`、`expires_at` | `(tenant_id, upload_id)` | 4.2、4.6 |
 | `upload_blocks` | `(upload_id, n)`、`hash`、`size`、`state`（`awaiting`・`verified`・`rejected`）、`reason` | `(tenant_id, upload_id, n)` | 4.2 |
 | `upload_session_entries` | `idx`、`hash`、`size` | `(tenant_id, upload_id, idx)` | 4.4 |
 | `block_grants` | `actor_id`、`upload_id`、`hash`、`expires_at` | `(tenant_id, actor_id, hash, upload_id)` | 4.1 |
 | `block_gc_log` | `hash`、`deleted_at`、`s3_version_id`。37 日で消す | `(tenant_id, deleted_at, hash)` | 5.2 |
-| `blocks_audit_runs`（RLS の外、集計だけ） | 照合の種類、件数、不一致の数 | `(run_id)` | 6 |
+| `integrity_audit_runs`（保守用のスキーマ、集計だけ） | 照合の種類、件数、不一致の数、`block_id` の一覧 | `(run_id)` | 6 |
 | S3 | `incoming`・`blocks`・`blocklists`（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）、S2 で `pk/` | — | 4、8 |
 | SQS | `block-verify`（`incoming` の ObjectCreated）、遅れの戻しに 60 秒 | — | 4.2 |
 | Valkey | 配信の URL のキャッシュ `dlurl:<tenant>:<hash>` | 期限 30 分 | 7.1 |
@@ -372,12 +372,12 @@ ADR-0020。S1 では使わない。S2 の前に `small-block-pack-poc` で、オ
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 署名でのチェックサムの強制、CopyObject の条件の書き込み | `presigned-upload-poc` |
+| 署名でのチェックサムの強制（AWS の公式の資料で確かめられなかった。**未検証**） | `presigned-upload-poc` |
 | モバイルのバックグラウンドの送信で、15 分の URL が切れる頻度 | `mobile-background-upload-poc`（[mobile-and-camera-upload.md](mobile-and-camera-upload.md)）。頻度が高ければ、モバイルの URL の期限を延ばす ADR を起票する（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) の値の変更） |
 | CloudFront の署名と CloudFront Functions の順序（パックの範囲の配信） | `small-block-pack-poc` |
 | 解約・削除の後の最後のバイトの消去の期限（7＋30 日と写し、エッジの 1 日） | **法務の確認待ち：L6** |
 | 国外のエッジでのブロックのキャッシュ | **法務の確認待ち：L5** |
-| `content_sha256` の申告を、サーバーで確かめる範囲を広げるか | 抜き取りの結果を E13 で見て決める |
+| `content_sha256` の申告を、サーバーで確かめる範囲を広げるか | ハッシュの照合の範囲では、サーバーが計算する（ADR-0046）。それ以外は抜き取りの結果を E13 で見て決める |
 
 ## 出典
 

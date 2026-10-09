@@ -54,7 +54,8 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 実の S3 | 署名つき URL、チェックサム、写し、バージョニング、CRR | 検証の AWS のアカウント | 夜間、`presigned-upload-poc` |
 | ファイルシステムの端の場合 | 実の macOS・Windows での名前・保存のしかた・監視・プレースホルダー（2.2.1 節 B） | CI の実機（macOS と Windows の機械）、自前の場面の記述 | PR（主な場面）、夜間（全部）、OS のベータ |
 | E2E | Web の画面、デスクトップの UI の主な流れ | Playwright、デスクトップの UI の自動の操作 | PR（主な流れ）、夜間（全部） |
-| 負荷 | commit、合図、ブロックの送受信、`list/continue`、プレビュー、索引 | k6 と自前の生成器 | E13、段階を上げる前 |
+| 負荷 | commit、合図、ブロックの送受信、`list/continue`、プレビュー、索引、DR の後の取り直し | k6 と自前の端末の群れ（`device-swarm`。[capacity.md](architecture/capacity.md) の 8 節） | E13、段階を上げる前 |
+| 互換 | 2 つ前までのクライアントのリリースの API の呼び出しの記録の再生 | 自前の再生の枠 | PR（[delivery.md](architecture/delivery.md) の 6.1 節） |
 | 端末の資源 | 100 万ファイルの走査、静かなときの CPU とメモリー | 自前の計測の枠 | 夜間、リリースの前 |
 
 ### 2.2.1 領域ごとの重点
@@ -108,7 +109,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **検証の漏れ**：チェックサムの合わないブロック、大きさの違うブロック、`incoming` に置かずに commit を試すクライアントが、索引に入らないことを確かめる。
 - **障害の注入**：`block-verifier` の写しの途中の停止、GC の消す途中の停止、S3 の 503 の多発。
 - **戻しの訓練**：GC が誤って消したことにしたブロックを、S3 の古いバージョンから戻す手順を、検証の環境で毎月、E13 で本番と同じ構成で行う。
-- **DR の訓練**：大阪へ切り替え、CRR の遅れで届いていないブロックを参照するリビジョンが「中身の待ち」になり、端末からの送り直しで埋まることを確かめる。
+- **DR の訓練**：大阪へ切り替え、CRR の遅れで届いていないブロックを参照するリビジョンが「中身の待ち」になり、端末からの送り直しで埋まることを確かめる。合格基準は [runbooks/disaster-recovery.md](runbooks/disaster-recovery.md) の「訓練の合格基準」（メタデータ RPO 1 分・RTO 1 時間、CRR を止めた間のブロックの数と `pending` の数の一致、`lost` 0、読み直しの間の commit の p99 2 秒以内、switchover で `epoch` が変わらない）。
 
 **E. ジャーナルとカーソル**
 
@@ -118,7 +119,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 
 **F. 権限の漏れの経路の表**
 
-ファイルの名前・中身・有無が出ていく経路ごとに、主体（外されたメンバー、閲覧の役割、他のテナントの人、チームの中の読めないフォルダーの非メンバー、期限切れ・無効の共有リンクを持つ人、管理者の役割）を変えて、出ないことを確かめる。表は QA が持ち、経路を足す変更で行を足す。
+ファイルの名前・中身・有無が出ていく経路ごとに、主体（外されたメンバー、閲覧の役割、他のテナントの人、チームの中の読めないフォルダーの非メンバー、期限切れ・無効の共有リンクを持つ人、管理者の役割、停止した主体、切り離した端末、期限の切れた管理者の許可）を変えて、出ないことを確かめる。表は QA が持ち、経路を足す変更で行を足す。
 
 | 経路 | 確かめ方 |
 | --- | --- |
@@ -131,11 +132,17 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 検索（結果、件数、抜粋） | OpenSearch の結果を `can()` で確かめ直すこと。件数から有無を推測できないこと |
 | Webhook、通知（メール、モバイル） | 中身・名前を入れないこと |
 | Notify の合図 | 名前空間の ID と番号だけであること |
-| 監査ログ、管理の画面 | 管理者の見られる範囲（法務の L7 の後に決める） |
+| 監査ログ、管理の画面 | 管理者の見られる範囲（法務の L7 の後に決める）。名前の解決が `can()` の範囲に限られること |
+| 管理者のアクセスの許可 | 期限の切れた許可で読めないこと。他のテナントの名前空間が許可の範囲に入らないこと（[ADR-0043](decisions/0043-admin-roles-device-wipe-and-member-access.md)） |
+| 組み立てたダウンロード（`files/export`、フォルダーの ZIP） | 目録に読めないノードが入らないこと。ダウンロードの禁止のリンクで作らないこと（[ADR-0054](decisions/0054-server-assembled-downloads.md)） |
+| 中身の検査の結果 | `malicious`・`hash_match`・`integrity_mismatch` のリビジョンを共有リンクとプレビューで配らないこと。検査の範囲の `pending` を `anyone` のリンクで配らないこと（[ADR-0046](decisions/0046-content-scanning-framework.md)） |
+| 切り離した端末の資格、停止した主体 | 60 秒の後に、どの経路（API、同期、Notify、Link、SCIM）でも 401・拒否になること（PROP-DESK-002、[accounts-and-teams.md](architecture/accounts-and-teams.md) の 15 節） |
+| アプリのフォルダーのトークン | その名前空間の外を返さないこと（PROP-API-003） |
 
 **G. 重複排除の 2 つの世界の比べ**
 
-- 利用者 A から読めない名前空間の中身だけが違う 2 つの世界を作り、A の同じ操作の列への応答（commit の答え、URL の形、エラーの種類、容量の表示）が一致することを確かめる（[ADR-0003](decisions/0003-dedupe-scope-and-privacy.md)）。応答の時間の差は、負荷試験の環境で分布を比べる。
+- 利用者 A から読めない名前空間の中身だけが違う 2 つの世界を作り、A の同じ操作の列への応答（commit の答え、URL の形、エラーの種類、容量の表示、プレビューの `202` か URL か）が一致することを確かめる（[ADR-0003](decisions/0003-dedupe-scope-and-privacy.md)、PROP-BLK-004、PROP-PREV-002）。
+- 応答の時間の差（送信の後の「確かめの完了」まで）は、負荷試験の環境で 2 つの世界の分布を 1 万の試行で比べる。KS 検定で p < 0.01 なら、ブロックの大きさから見込んだ写しの時間まで完了を待たせる（[security.md](architecture/security.md) の 3.5 節）。
 
 **H. バージョンと復元**
 
@@ -152,6 +159,27 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 **J. 端末の資源**
 
 - 100 万ファイル（深さと大きさの分布を変える）を持つ端末で、最初の走査の時間、静かなときの CPU とメモリー、ローカルの状態の DB の大きさを、リリースごとに測る（NFR-008、K9）。前のリリースより 10% 以上悪くなったら止める。
+
+### 2.2.2 Epic ごとの決定表と性質
+
+領域の文書で定めた決定表（`DT-*`）と性質（`PROP-*`）を、リリースの基準に結ぶ。表は spec から読み込み、表駆動テストにする。テスト名に、この ID を含める。
+
+| Epic | 決定表 | 性質 | 文書 |
+| --- | --- | --- | --- |
+| E2 | DT-BLK-001・002 | PROP-BLK-001〜005 | [block-storage.md](architecture/block-storage.md) |
+| E3 | DT-META-001〜003 | PROP-META-001〜006 | [metadata-and-journal.md](architecture/metadata-and-journal.md) |
+| E4 | DT-SYNC-001〜003 | PROP-SYNC-001〜009 | [sync-engine.md](architecture/sync-engine.md) |
+| E5 | DT-FS-001〜003、DT-DESK-001・002 | PROP-FS-001〜004、PROP-DESK-001・002 | [file-system-integration.md](architecture/file-system-integration.md)、[desktop-client.md](architecture/desktop-client.md) |
+| E6 | DT-NS-001〜003、DT-LINK-001・002 | PROP-NS-001〜005、PROP-LINK-001〜004 | [namespaces-and-sharing.md](architecture/namespaces-and-sharing.md)、[shared-links.md](architecture/shared-links.md) |
+| E8 | DT-VER-001〜003 | PROP-VER-001〜006 | [versions-and-recovery.md](architecture/versions-and-recovery.md) |
+| E9 | 中身の検査の `scan_state` と経路の表（[ADR-0046](decisions/0046-content-scanning-framework.md)） | PROP-PREV-001〜003、PROP-SRCH-001〜003 | [previews-and-thumbnails.md](architecture/previews-and-thumbnails.md)、[search.md](architecture/search.md) |
+| E10 | DT-CAM-001 | PROP-CAM-001・002 | [mobile-and-camera-upload.md](architecture/mobile-and-camera-upload.md) |
+| E11 | DT-API-001・002、DT-HOOK-001 | PROP-API-001〜003、PROP-HOOK-001〜003 | [api-and-webhooks.md](architecture/api-and-webhooks.md) |
+| E12 | 再認証の要否、役割と操作、プランと機能、端末の状態の機械（`REQ-ACCT-*`） | 停止の 60 秒、更新トークンの再使用（`PROP-ACCT-*`） | [accounts-and-teams.md](architecture/accounts-and-teams.md) の 15 節 |
+
+- シミュレーターのサーバーの模型に、ファイルの削除の `base_rev`、フォルダーの削除の `base_seq`、2 段の置き場所、名前空間をまたぐ移動の保留を入れ、本物の `packages/committer` と契約の試験で比べる（[metadata-and-journal.md](architecture/metadata-and-journal.md) の 13 節）。
+- シミュレーターの操作の生成器に、名前の入れ替え、名前空間をまたぐ移動とコピー、`pending_commits` の残った再起動、フォルダーの削除と中への追加の競争を足す（[sync-engine.md](architecture/sync-engine.md) の 18 節）。
+- 端末の計測の送信の本文に、試験の木の名前・パス・ハッシュ・ノードの ID が含まれないことを確かめる（[observability.md](architecture/observability.md) の 10 節）。
 
 ### 2.3 エージェントの確認ループ
 
@@ -212,7 +240,9 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | 競合のコピーの作成の率（端末・日） | リリースの前の 2 倍以内 | クライアントのリリースを止める |
 | 消しすぎの止めの率、走査し直しの率 | リリースの前の 2 倍以内 | 同上 |
 | クライアントのクラッシュの率 | 起動 1,000 回あたり 1 回未満 | 段階の配布を止める |
-| 伝播（確定から他の端末の受け取り）の p99 | 5 秒以内 | runbooks の手順 |
+| 伝播（確定から他の端末の受け取り）の p99 | 5 秒以内（合成監視が正本。サーバーの時計の受け渡しの遅れを並べて見る。[observability.md](architecture/observability.md) の 3.1 節） | runbooks の手順 |
+| `stuck` のノードの数、409 の後の計画し直しの回数 | リリースの前の 2 倍以内 | クライアントのリリースを止める |
+| 監査ログの連鎖の検証、活動の事象の欠けの照合 | 0 件 | 呼び出し（[security.md](architecture/security.md) の 7 節） |
 
 ### 4.2 本番での検証
 
@@ -230,19 +260,19 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 
 | Epic | 重点 | リリースの合否基準 |
 | --- | --- | --- |
-| E1 基盤 | RLS の検査、`packages/committer` の骨格、ジャーナルを通らない書き込みの禁止、CI の実機の機械 | RLS の性質ベーステスト、CI の検査が動く |
+| E1 基盤 | RLS の検査、`packages/committer` の骨格、ジャーナルを通らない書き込みの禁止、CI の実機の機械、IAM・バケット・サブネットの方針の検査 | RLS の性質ベーステスト、CI の検査が動く。[infrastructure.md](architecture/infrastructure.md) の 9.2 節の拒否の一覧が CI で動く |
 | E2 ブロックの保存 | 分割の試験のベクトル（C）、検証と GC の並行（D）、大きなファイルの再開（C） | 試験のベクトルが全環境で一致。GC の性質が夜間 7 日続けて緑 |
-| E3 メタデータとジャーナル | 差分と全件の一致（E）、`name_key` の試験のベクトル、条件つきの書き込み | 性質ベーステストが緑、書き込みの上限の PoC の結果が記録済み |
+| E3 メタデータとジャーナル | 差分と全件の一致（E）、`name_key` の試験のベクトル、条件つきの書き込み、名前空間をまたぐ移動 | PROP-META-001〜006 が緑、書き込みの上限の PoC の結果が記録済み。10 万ファイルの名前空間をまたぐ移動が p95 10 分 |
 | E4 同期エンジン | 決定的な同期のシミュレーター（A）、衝突の決定表 | 夜間 1,000 万の場面が 7 日続けて緑。決定表の全行に到達 |
-| E5 デスクトップのクライアント | ファイルシステムの端の場合（B）、端末の資源（J）、配布 | 場面の全部が両 OS で緑。NFR-008 を満たす |
+| E5 デスクトップのクライアント | ファイルシステムの端の場合（B）、端末の資源（J）、配布、切り離しと消去 | 場面の全部が両 OS で緑。NFR-008 を満たす。PROP-FS-001〜004 が緑。段階の配布の止める基準を、ダッシュボードで新旧のバージョンを並べて判定できる |
 | E6 共有 | `can()` の決定表、漏れの経路の表（F）、重複排除の 2 つの世界（G）、共有リンク | 決定表の全行、経路の表の全行が緑 |
 | E7 Web の画面 | アップロード（WASM の分割）、IME、主な流れ | 主な流れの E2E が緑 |
 | E8 バージョンと復元 | 巻き戻しの性質、復元の速さ、一斉の変更の検知（H） | NFR-009 を負荷試験で満たす。検知の率と誤検知の率が基準の中 |
 | E9 プレビューと検索 | ファジングと隔離（I）、検索の漏れ（F）、日本語の部分一致 | 隔離の検査が全部緑、漏れ 0、取りこぼしの例の集まりが全部当たる |
 | E10 モバイルとカメラのアップロード | 写真の重ねない取り込み、バックグラウンドの制約、回線の条件 | 合成の写真のライブラリで重複 0・漏れ 0 |
 | E11 公開 API と Webhook | カーソルの性質、Webhook の署名と再試行、条件つきの書き込み | 性質ベーステストが緑 |
-| E12 アカウント・チーム・管理・監査 | SSO・SCIM、方針の変更の反映、監査ログの欠け | 方針の変更の後の漏れ 0、監査ログの欠け 0 |
-| E13 本番の準備 | 負荷試験、DR の訓練、ブロックの戻しの訓練、復元の訓練、外部のペンテスト | runbooks の SLO を負荷試験で満たす。DR の訓練で RPO・RTO を満たす。ペンテストの High 以上が 0 |
+| E12 アカウント・チーム・管理・監査 | SSO・SCIM、方針の変更の反映、監査ログの欠け、停止の伝わり方 | 方針の変更の後の漏れ 0、監査ログの欠け 0。停止から 60 秒以内の取り消しの性質が緑。プランを下げた後・容量の超過の後に中身が消えない |
+| E13 本番の準備 | 負荷試験（[capacity.md](architecture/capacity.md) の 8 節の 7 つ）、DR の訓練、ブロックの戻しの訓練、巻き戻しの訓練、外部のペンテスト、作成済みの runbook の訓練 | runbooks の SLO を負荷試験で満たす。DR の訓練が [runbooks/disaster-recovery.md](runbooks/disaster-recovery.md) の合格基準を満たす。IAM・バケット・鍵・サブネットの方針の検査が緑。監査ログの連鎖と欠けの照合が 7 日続けて 0。ペンテストの High 以上が 0。長く残すフラグの一覧（[runbooks/README.md](runbooks/README.md) の 3.2 節）の外の `release.*` が残っていない |
 
 ## 6. 責任分担
 

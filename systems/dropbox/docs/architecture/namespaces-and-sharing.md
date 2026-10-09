@@ -29,10 +29,10 @@
   - 名前空間と共有の `can()` の決定表
 - 扱わない：
   - 共有リンク（[shared-links.md](shared-links.md)）
-  - 名前空間をまたぐ移動・コピーのバッチの仕組み（`metadata-and-journal.md`）。この文書はいつ使うかを決める
-  - 外されたときの手元のファイルの扱い（`sync-engine.md`。[ADR-0006](../decisions/0006-sync-conflict-model.md) の行 12）
-  - チーム・グループ・SCIM・管理の役割（`accounts-and-teams.md`）
-  - 監査ログの形（`security.md`）
+  - 名前空間をまたぐ移動・コピーのバッチの仕組み（[metadata-and-journal.md](metadata-and-journal.md)）。この文書はいつ使うかを決める
+  - 外されたときの手元のファイルの扱い（[sync-engine.md](sync-engine.md)。[ADR-0006](../decisions/0006-sync-conflict-model.md) の行 12）
+  - チーム・グループ・SCIM・管理の役割（[accounts-and-teams.md](accounts-and-teams.md)）
+  - 監査ログの形（[security.md](security.md)）
 
 ## 2. 要件
 
@@ -149,7 +149,7 @@ DT-NS-001。`R` は 5.2 節の役割（`none` を含む）。上の行から当�
 | `read`（一覧、中身、プレビュー、検索の結果） | `R ≥ viewer` |
 | `write`（作成・変更・移動・名前の変更・削除） | `R ≥ editor`。`team_space` の最上位は管理者だけ |
 | `restore`（ファイル・フォルダーの復元） | `R ≥ editor` |
-| `rewind`（名前空間・フォルダーの巻き戻し） | `user_root`・`shared_folder`：`R = owner`。`team_folder`：`R ≥ editor` とチームの管理者（`versions-and-recovery.md` と揃えた） |
+| `rewind`（名前空間・フォルダーの巻き戻し） | `user_root`・`shared_folder`：`R = owner`。`team_folder`：`R ≥ editor` とチームの管理者（[versions-and-recovery.md](versions-and-recovery.md) と揃えた） |
 | `invite`（利用者・グループを足す） | `shared_folder`：`R ≥ editor` かつ名前空間の方針 `members_can_invite`（既定 `editor`）。`team_folder`：管理者 |
 | `change_role`・`remove_member` | `shared_folder`：`R = owner`、または `editor` で方針 `editors_can_manage`（既定 なし）。`team_folder`：管理者 |
 | `unshare`（共有の解除） | `R = owner` |
@@ -175,7 +175,7 @@ ADR-0025。`team_policies` に持つ。値は本システムの既定。
 - 「外の人」は、主体のテナントが名前空間の持ち主のテナントと違うこと。チームのメンバーでない個人のアカウントは外の人。
 - **狭めたとき**：上限を超える `ns_grants` の行を `disabled_reason='external_policy'` にし、7 節の「外す」と同じ手順で `unmount` を書く。1,000 行ずつ流す。参加できなくなったメンバーの、外の共有フォルダーのマウントも同じく外す。
 - **広げたとき**：無効にした行を自動で戻さない。持ち主が付け直す。黙って広がることを避けるため。
-- 方針の変更は監査ログに書く（`security.md`）。
+- 方針の変更は監査ログに書く（[security.md](security.md)）。
 
 ## 7. 参加・退出・外し
 
@@ -200,7 +200,7 @@ stateDiagram-v2
 
 ### 7.2 自分で抜ける・外される・共有の解除
 
-| 操作 | 権限の順 | 手元（`sync-engine.md`） | 写し |
+| 操作 | 権限の順 | 手元（[sync-engine.md](sync-engine.md)） | 写し |
 | --- | --- | --- | --- |
 | 自分で抜ける（`leave`） | 本人の付与を消す → `access_version` を上げる → 本人のルートに `unmount` | 変えていないファイルは消す。手元で変えたファイルは「`<Brand>` に保存できなかった変更」へ（[ADR-0006](../decisions/0006-sync-conflict-model.md) の行 12） | 本人が「写しを残す」を選び、方針（`allow_keep_copy`。個人の名前空間は常に可）が許せば、抜けた時点の写しを本人のルートに作る |
 | 外される（`remove_member`） | 付与を消す → `access_version` → `unmount`（X5） | 同上 | 持ち主が外すときに「写しを残すことを許す」（既定 なし）を選び、方針が許したときだけ |
@@ -208,9 +208,9 @@ stateDiagram-v2
 | 方針で無効 | 6 節 | 同上 | 作らない |
 
 - **読めなくするのを先にする。** 写しは、読めなくした後に、`restore-runner` がシステムの作業として作る。外した時点の `ns_seq`（S）を記録し、S の時点の木を写す。写しの作業は、持ち主の許可を監査ログに残す。
-- 写しは、名前空間をまたぐコピーのバッチ（`metadata-and-journal.md`）で作る。ブロックは、写し先のテナントが違えば X1 で写す（写しの時点で読めていた中身なので漏れない）。写しは写し先の容量に数える（8 節）。
+- 写しは、名前空間をまたぐコピーのバッチ（[metadata-and-journal.md](metadata-and-journal.md)）で作る。ブロックは、写し先のテナントが違えば X1 で写す（写しの時点で読めていた中身なので漏れない）。写しは写し先の容量に数える（8 節）。
 - 写しを作らないとき、外された人の手元の変えていないファイルは消える。変えたファイルだけが残る。
-- 持ち主は抜けられない。持ち主のアカウントの削除は、共有の解除と同じに扱う（メンバーへの写しは作らない）。チームのメンバーの退職は `accounts-and-teams.md` で扱い、本人のフォルダーはチームに残る。
+- 持ち主は抜けられない。持ち主のアカウントの削除は、共有の解除と同じに扱う（メンバーへの写しは作らない）。チームのメンバーの退職は [accounts-and-teams.md](accounts-and-teams.md) で扱い、本人のフォルダーはチームに残る。
 
 ## 8. 容量
 
@@ -233,18 +233,18 @@ ADR-0026。
 - 名前空間の持ち主のテナントは、作ってから変えない。テナントの行（ブロックの S3 のキー、RLS の `tenant_id`）を書き換えないため。
 - `transfer_owner` は、同じテナントの中の `editor` へだけ行う（個人のテナントは 1 人なので、個人の共有フォルダーは移せない）。
 - テナントをまたいで持ち主を変えたいとき（個人から会社のチームへ移す）は、新しい名前空間への写し（7.2 節の写しと同じバッチ）を作り、メンバーを付け直し、古い名前空間を解除する。画面では「移し替え（写しを作る）」として示す。
-- 個人のアカウントからチームへの移り（`accounts-and-teams.md`）では、本人の `user_root` と本人が持つ共有フォルダーを、この写しで移す。
+- 個人のアカウントからチームへの移り（[accounts-and-teams.md](accounts-and-teams.md)）では、本人の `user_root` と本人が持つ共有フォルダーを、この写しで移す。
 
 ## 10. 既存のフォルダーの共有
 
 ADR-0024。
 
 1. 利用者が自分のルートのフォルダー F を共有する。`can(actor, invite)` と 4.2 節の入れ子の規則を確かめる。
-2. 新しい `shared_folder` の名前空間 N を作り、F の子孫を N へ移す。名前空間をまたぐ移動のバッチ（`metadata-and-journal.md`）を使い、`node_id` を保つ（[ADR-0008](../decisions/0008-node-identity-and-names.md)）。
+2. 新しい `shared_folder` の名前空間 N を作り、F の子孫を N へ移す。名前空間をまたぐ移動のバッチ（[metadata-and-journal.md](metadata-and-journal.md)）を使い、`node_id` を保つ（[ADR-0008](../decisions/0008-node-identity-and-names.md)）。
 3. F の場所にマウントのノードを置き、F のノードを消す（同じ `name_key` のため、同じトランザクションで入れ替える）。
 4. 招待を送る。
 
-- 10 万ファイルのフォルダーの共有は数分かかる。途中の状態を端末に見せない形は `metadata-and-journal.md` で決める。共有の操作の状態（`preparing`・`ready`・`failed`）を画面に出す。
+- 10 万ファイルのフォルダーの共有は数分かかる。途中の状態を端末に見せない形は [metadata-and-journal.md](metadata-and-journal.md) で決める。共有の操作の状態（`preparing`・`ready`・`failed`）を画面に出す。
 - 共有の解除は逆にしない（N の中身を F へ戻さない）。持ち主のルートのマウントのノードは残し、メンバーだけを外す。
 
 ## 11. 障害のときの振る舞い
@@ -253,7 +253,7 @@ ADR-0024。
 | --- | --- | --- |
 | `access_version` の更新とキャッシュのずれ | 外した人の要求が最大 10 分通る | `access_version` を要求ごとに DB（reader）から引き、キャッシュのキーに含める。引けないときは閉じる側に倒す（503） |
 | X5 の `unmount` の書き込みの失敗 | 外された人の端末の木に、読めないマウントが残る | 付与を消した時点で読めない（`list/continue` は読めない名前空間を返さない）。`unmount` は outbox で再試行する |
-| グループの写しの遅れ（SCIM） | グループのメンバーの役割が古い | `accounts-and-teams.md` の遅れの監視。`access_version` は写しの更新でも上げる |
+| グループの写しの遅れ（SCIM） | グループのメンバーの役割が古い | [accounts-and-teams.md](accounts-and-teams.md) の遅れの監視。`access_version` は写しの更新でも上げる |
 | 写しの作業の失敗 | 外された人に写しができない | `restore-runner` の再試行。権限は既に外しているので、漏れではない |
 | 方針の変更で大量の無効化 | 多くの端末の取り直し | 1,000 行ずつ流す。取り直しの集中は [ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) のとおり引き受ける |
 | `can()` の誤り（新しいバージョン） | 漏れ | 応答の監査で見つけ、前のイメージへ戻す。規則はフラグにしない（[runbooks](../runbooks/README.md) の 3 節）。SEV1 の候補 |
@@ -335,9 +335,9 @@ ADR-0024。
 | --- | --- |
 | 本家の容量の数え方、入れ子の規則、退出の時のコピー | 公式の資料で確かめられなかった（**未検証**）。本家と違うと分かれば 1.4 節に行を足す |
 | 容量を持ち主だけに数えると、無料の利用者が大きな共有フォルダーに書ける | 悪用の計測を E6 の試用で見る。多ければ、書いた人の容量にも数える案を ADR で検討 |
-| 管理者がメンバーの本人のフォルダーを見る | **法務の確認待ち：L7**（`accounts-and-teams.md`） |
-| 退職したメンバーの本人のフォルダーの扱い | `accounts-and-teams.md` |
-| 大きなフォルダーの共有の途中の見せ方 | `metadata-and-journal.md` |
+| 管理者がメンバーの本人のフォルダーを見る | **法務の確認待ち：L7**（[accounts-and-teams.md](accounts-and-teams.md)） |
+| 退職したメンバーの本人のフォルダーの扱い | [accounts-and-teams.md](accounts-and-teams.md) |
+| 大きなフォルダーの共有の途中の見せ方 | [metadata-and-journal.md](metadata-and-journal.md) |
 
 ## 出典
 

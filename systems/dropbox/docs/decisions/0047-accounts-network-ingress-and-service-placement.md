@@ -32,7 +32,9 @@ date: 2026-10-09
 1 と a を採用する。
 
 - アカウントは他の題材の形（management、security、log-archive、shared、edge、dev、staging、synthetics、prod）に、`release` を足す。`release` はクライアントの署名の鍵（HSM か書き出せない署名のサービス）、更新の目録と成果物のバケット、`dl.<brand>.<domain>` の CloudFront を持つ。
-- サブネットは public・private・egress・isolated に `sandbox` を足す。`sandbox` は NAT・IGW への経路を持たず、S3 のゲートウェイのエンドポイント（方針で `blocks`・`blocklists` の GET と `previews` の PUT だけ）と、ECR・CloudWatch Logs・ジョブの SQS のインターフェースのエンドポイントだけを持つ。タスクのロールはイメージの取得、ログの出力、ジョブのキューの受信と削除だけ（[ADR-0032](0032-sandboxed-preview-pipeline.md)）。
+- サブネットは public・private・egress・isolated に `sandbox` を足す。`sandbox` は NAT・IGW への経路を持たず、S3 のゲートウェイのエンドポイント（方針で `blocks`・`blocklists` の GET と `previews` の PUT だけ）と、ECR・CloudWatch Logs・ジョブの SQS のインターフェースのエンドポイントだけを持つ。タスクのロールはイメージの取得、ログの出力、自分のジョブのキューの受信・削除・見えない時間の変更と、結果のキュー `sandbox-results` への送信だけ（[ADR-0032](0032-sandboxed-preview-pipeline.md)）。
+
+> 2026-10-09 の注記：結果を返す経路がなかったので、統合の工程で `sandbox-results` への送信を足した。結果の本文は ID・状態・理由のコード・大きさ・SHA-256 だけ。
 - 入口：`www`（殻と `/s/*` の `link`）、`api`、`auth`、`notify`（WebSocket）を CloudFront＋WAF で受ける。`content.<brand>usercontent.<domain>` は CloudFront の署名つき URL で `blocks`・`previews` を OAC で読み、クッキーを使わない。
 - アップロードは、署名つきの PUT で `<brand>-incoming-apne1` の東京のリージョンのエンドポイントへ直接送る。`aws:SecureTransport` を必須にする。
 - Webhook の送信は egress のサブネットの専用の NAT から出し、送信の直前に名前を引いて私的なアドレスを拒む。IdP のメタデータ、APNs・FCM は Network Firewall の許可リストを通す。
@@ -52,11 +54,11 @@ date: 2026-10-09
   - 変換の部品が乗っ取られても、外へ出せず、他のジョブの中身にも DB にも届かない。
   - 署名の鍵が本番の作業の権限から離れる。
 - 引き受けるコスト：
-  - SQS のエンドポイントの方針を、ジョブのキューの受信と削除だけに絞り続ける検査が要る。
+  - SQS のエンドポイントの方針を、ジョブのキューの受信・削除と結果のキューへの送信だけに絞り続ける検査が要る。
   - アップロードの経路（S3）とダウンロードの経路（CloudFront）で、監視と障害の見分けが 2 つになる。
 
 ## Confirmation
 
-- Terraform の plan の検査：sandbox・isolated の経路表に NAT・IGW がない。sandbox のタスクのロールに S3・DB・KMS の権限がなく、SQS はジョブのキューの受信と削除だけ。sandbox の S3 のエンドポイントの方針が決めた範囲より広くない。egress から VPC エンドポイント・isolated への経路がない。
+- Terraform の plan の検査：sandbox・isolated の経路表に NAT・IGW がない。sandbox のタスクのロールに S3・DB・KMS の権限がなく、SQS は自分のジョブのキューの受信・削除・見えない時間の変更と `sandbox-results` への送信だけ。sandbox の S3 のエンドポイントの方針が決めた範囲より広くない。egress から VPC エンドポイント・isolated への経路がない。
 - 夜間の隔離の検査：sandbox のタスクから外への通信が失敗する。
 - 結合テスト：`content` の応答にクッキーがない。本体のドメインから利用者の中身が返らない。

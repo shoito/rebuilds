@@ -25,9 +25,9 @@
   - OS の監視・移動の検出・プレースホルダー・手元の名前の対応（[file-system-integration.md](file-system-integration.md)）
   - プロセスの形・UI・資源の上限の配り方・端末の登録（[desktop-client.md](desktop-client.md)）
   - commit の受け付け・ジャーナル・カーソルのサーバーの側（[metadata-and-journal.md](metadata-and-journal.md)）
-  - ブロックの送受信・ローカルのブロックの索引・ダウンロードの組み立て（block-storage.md）
+  - ブロックの送受信・ローカルのブロックの索引・ダウンロードの組み立て（[block-storage.md](block-storage.md)）
   - バージョンと復元・巻き戻し（[versions-and-recovery.md](versions-and-recovery.md)）
-  - WebSocket の合図と long-poll の形（api-and-webhooks.md）
+  - WebSocket の合図と long-poll の形（[api-and-webhooks.md](api-and-webhooks.md)）
 
 ## 2. 本家の形（確かめたこと）
 

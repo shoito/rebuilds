@@ -31,7 +31,7 @@
   - 本文の抽出の隔離（[previews-and-thumbnails.md](previews-and-thumbnails.md)）
   - 読める名前空間の集合の求め方（[namespaces-and-sharing.md](namespaces-and-sharing.md) の 5.2 節）
   - 検索の入力の IME（E7 の `web-ime`）
-  - OpenSearch のクラスタの構成と運用（`infrastructure.md`、`capacity.md`）
+  - OpenSearch のクラスタの構成と運用（[infrastructure.md](infrastructure.md)、[capacity.md](capacity.md)）
 
 ## 2. 要件
 
@@ -140,7 +140,7 @@ sequenceDiagram
 - 索引の上位 100 件を Aurora（reader）で 1 回に引き、次を確かめる：ノードがある・削除されていない・`ns_id` が同じ・`can(actor, read, node)`。名前と場所は Aurora の今の値で返す（索引の遅れで古い名前を返さない）。
 - 落ちた結果は返さず、次の 100 件を引き足す（最大 3 回）。
 - 抜粋（本文の一致の周り 120 文字）は、確かめ直しが通った結果だけについて、S3 の抽出のテキスト（`extracted_texts`）から作る。照会の語の位置は、同じ解析で探す。
-- 表示のパスは、親をたどって作る（[ADR-0008](../decisions/0008-node-identity-and-names.md)。パスの解決のキャッシュは `metadata-and-journal.md`）。主体の木の中のパス（マウントの場所から）で返す。
+- 表示のパスは、親をたどって作る（[ADR-0008](../decisions/0008-node-identity-and-names.md)。パスの解決のキャッシュは [metadata-and-journal.md](metadata-and-journal.md)）。主体の木の中のパス（マウントの場所から）で返す。
 
 ## 6. 索引の更新
 

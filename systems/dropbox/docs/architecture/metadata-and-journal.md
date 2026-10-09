@@ -19,11 +19,12 @@
   - 名前空間をまたぐ移動とコピー
   - 木の一覧（同期の最初、`mount`、取り直し）と、フォルダーの子の一覧のページング、パスの解決
   - ジャーナルの分割と保持、`floor_seq`、カーソルの取り直し
+  - マウントのノード（`kind='mount'`、`mount_ns_id`）は普通のノードと同じ `name_key` の一意と移動の規則に従う。載せる・外すの意味と権限は [namespaces-and-sharing.md](namespaces-and-sharing.md) の 4.2 節（[ADR-0024](../decisions/0024-shared-folder-mounts-and-grants.md)）。
 - 扱わない：
   - 時点の木と復元・巻き戻し・保持の期限（[versions-and-recovery.md](versions-and-recovery.md)。`node_versions` の表はそちら）
-  - ブロックの参照・索引・必要なブロックの答え（block-storage.md、[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)）
-  - `can()` と載せる・外すの権限（namespaces-and-sharing.md）
-  - 合図・long-poll・公開 API の形（api-and-webhooks.md）
+  - ブロックの参照・索引・必要なブロックの答え（[block-storage.md](block-storage.md)、[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)）
+  - `can()` と載せる・外すの権限（[namespaces-and-sharing.md](namespaces-and-sharing.md)）
+  - 合図・long-poll・公開 API の形（[api-and-webhooks.md](api-and-webhooks.md)）
   - クライアントの計画（[sync-engine.md](sync-engine.md)）
 
 ## 2. 本家の形（確かめたこと）
@@ -44,7 +45,7 @@
 | NFR-001 | 1 フォルダー 1,000 件までの読み出し p99 300ms。操作 100 件までの commit p99 500ms |
 | NFR-002 | 確定から合図まで（outbox → Relay → Notify）p99 2 秒（伝播の 5 秒の内訳） |
 | NFR-004 | 条件なしの上書きを持たない。削除が後から確定した変更を巻き込まない |
-| NFR-010 | 変更 2,000 件以下の `list/continue` p99 1 秒。カーソルは最後の利用から 90 日。取り直しは期限切れ・見え方の変更・`epoch` の更新だけ |
+| NFR-010 | 変更 2,000 件以下の `list/continue` p99 1 秒。カーソルは最後の利用から 90 日。取り直しは期限切れ・`floor_seq` より古い・`epoch` の更新だけ（載せた名前空間の変更では取り直しにしない） |
 | NFR-009 | 名前空間をまたぐ 10 万ファイルの移動 p95 10 分（この領域の目標。復元の 10 分にそろえる） |
 
 ## 4. `packages/committer`
@@ -66,7 +67,7 @@ commit {
 ```
 
 - `parent_id` は、同じ commit の `create` の `temp_id` を指してよい。
-- `blocklist` は、ブロックの一覧（1,024 ブロック以下）か、アップロードのセッションの ID（大きなファイル。block-storage.md）。
+- `blocklist` は、ブロックの一覧（1,024 ブロック以下）か、アップロードのセッションの ID（大きなファイル。[block-storage.md](block-storage.md)）。
 
 ### 4.2 条件
 
@@ -118,7 +119,7 @@ sequenceDiagram
 - 1 つの commit は全部が通るか全部が通らない（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）。
 - **2 段の置き場所**：1 段目で、動くノード（`move`・`delete`・`undelete`）の `name_key` を `'\x00' || node_id`（NUL は名前に使えないので、他の名前とぶつからない）にし、2 段目で最後の値にする。一意の索引（`(ns_id, parent_id, name_key) WHERE deleted_at IS NULL`）は、どの時点でも満たされる。名前の入れ替え（A↔B）や輪の形の移動を 1 つの commit で受けられる。
 - **循環の検査**：動くフォルダーについて、行き先の親から祖先をたどり、自分に当たれば `cycle`。2 段目の後の状態で調べる。
-- 足りないブロックがあれば、確定せずに「送れ」の一覧と署名つき URL を返す（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)、block-storage.md）。名前空間の行のロックは、この判定の前に取らない（ブロックの照会を先に行い、ロックの時間を短くする）。
+- 足りないブロックがあれば、確定せずに「送れ」の一覧と署名つき URL を返す（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)、[block-storage.md](block-storage.md)）。名前空間の行のロックは、この判定の前に取らない（ブロックの照会を先に行い、ロックの時間を短くする）。
 
 ### 4.5 応答
 
@@ -132,7 +133,7 @@ sequenceDiagram
 
 ### 4.6 冪等
 
-commit に冪等のキーを持たせない。応答が届かずに送り直すと、条件が合わずに 409 になるか（変更・移動・削除）、`name_exists` になる（作成）。クライアントは差分を読んでから計画し直し、決定表の「そろった」の行で吸収する（[ADR-0010](../decisions/0010-local-state-db-and-intent-log.md)）。公開 API の利用者向けの冪等のキーが要るかは、api-and-webhooks.md で決める。
+commit に冪等のキーを持たせない。応答が届かずに送り直すと、条件が合わずに 409 になるか（変更・移動・削除）、`name_exists` になる（作成）。クライアントは差分を読んでから計画し直し、決定表の「そろった」の行で吸収する（[ADR-0010](../decisions/0010-local-state-db-and-intent-log.md)）。公開 API の利用者向けの冪等のキーが要るかは、[api-and-webhooks.md](api-and-webhooks.md) で決める。
 
 ### 4.7 上限
 
@@ -196,7 +197,7 @@ stateDiagram-v2
 
 1. **受け付け**：API が `can()` で、元の名前空間の書き込みと、移動先の名前空間の書き込みを確かめる。移動先の親と名前を確かめる（ここでは予約しない）。`ns_batches` に行を作り、元の名前空間の `locked_subtrees` に根の `node_id` を入れる（元の名前空間の commit で書く）。以後、元の部分木への commit は `subtree_locked` になる。
 2. **写す**：元の部分木を `node_id` の順に 2,000 ノードずつ読み、移動先の名前空間の隠した入れ物（`hidden_batch_id` を持つフォルダーの行。木に出ない）の下に、同じ `node_id` で行を書く。保持の期間の中のリビジョンも写し、移動先の `ns_block_refs` を足す。1 回のトランザクションで移動先の名前空間の行のロックを取り、`batch_id` つきのジャーナルの行を書く（ジャーナルを通らない書き込みを作らない。利用者には返さない）。
-3. **ブロック**：元と移動先のテナントが違えば、ブロックを移動先のテナントへ写す（[ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md) の X1、block-storage.md）。すべてが `live` になるまで待つ。
+3. **ブロック**：元と移動先のテナントが違えば、ブロックを移動先のテナントへ写す（[ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md) の X1、[block-storage.md](block-storage.md)）。すべてが `live` になるまで待つ。
 4. **出す**（1 トランザクション。2 つの名前空間の行を `ns_id` の順にロックする）：
    - 移動先：根を隠した入れ物から行き先の親へ移す。名前がふさがっていれば ` 2`・` 3` を足す。ジャーナルに `upsert`（`subtree_listing`、`moved_from_ns`）を 1 行。
    - 元：根を `delete`（`deleted_reason = moved`、`moved_to_ns`、`moved_to_seq`）。ジャーナルに 1 行。`locked_subtrees` から外す。
@@ -337,7 +338,7 @@ stateDiagram-v2
 | 1 名前空間の書き込みの上限 | E3 の前の `namespace-write-throughput-poc` |
 | 名前空間をまたぐ移動の間、元の部分木を待たせる時間（最大 30 分）が利用者に受け入れられるか | E3 の負荷試験と社内の試用。長ければ、写しの後に差分を追いかける形を検討する |
 | フォルダーの削除の `subtree_changed` の調べの上限（10,000 行） | E3 の負荷試験 |
-| 公開 API の冪等のキー | api-and-webhooks.md |
+| 公開 API の冪等のキー | [api-and-webhooks.md](api-and-webhooks.md) |
 | ジャーナルの保持の期間 | 法務の L6 |
 | 本家の内部のジャーナルとカーソル | 公開の資料にない（**未検証**のまま） |
 
@@ -357,8 +358,8 @@ stateDiagram-v2
 
 | 表 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| `namespaces` | `tenant_id`、`ns_id`、`kind`、`root_node_id`、`ns_seq`、`floor_seq`、`epoch` | 主キー `(tenant_id, ns_id)` | 4、8 |
-| `nodes` | [ADR-0008](../decisions/0008-node-identity-and-names.md) の列に、`deleted_reason`、`hidden_batch_id`、`exec_bit`、`size`・`content_sha256`（今のリビジョンの写し）、`created_at` | 主キー `(tenant_id, ns_id, node_id)`。一意 `(ns_id, parent_id, name_key) WHERE deleted_at IS NULL`。索引 `(ns_id, node_id) WHERE deleted_at IS NULL AND hidden_batch_id IS NULL` | 4.3、7 |
+| `namespaces` | `tenant_id`、`ns_id`、`kind`、`root_node_id`、`ns_seq`、`floor_seq`（`epoch` は名前空間に持たず、全体の 1 つの値を `platform_state` に持つ。[infrastructure.md](infrastructure.md) の 13 節） | 主キー `(tenant_id, ns_id)` | 4、8 |
+| `nodes` | [ADR-0008](../decisions/0008-node-identity-and-names.md) の列に、`kind`（`file`・`folder`・`mount`）、`mount_ns_id`（`kind='mount'` のとき載せる名前空間。[ADR-0024](../decisions/0024-shared-folder-mounts-and-grants.md)）、`deleted_reason`、`hidden_batch_id`、`exec_bit`、`size`・`content_sha256`（今のリビジョンの写し）、`created_at`。`is_folder` は `kind` から求める | 主キー `(tenant_id, ns_id, node_id)`。一意 `(ns_id, parent_id, name_key) WHERE deleted_at IS NULL`。索引 `(ns_id, node_id) WHERE deleted_at IS NULL AND hidden_batch_id IS NULL` | 4.3、7 |
 | `revisions` | `rev_id`（UUIDv7）、`node_id`、`size`、`content_sha256`、`blocklist_hash`、`chunker_version`、`blocklist`（1,024 ブロックまで）か S3 の番地、`exec_bit`、`client_modified_at`、`actor_id`、`device_id`、`created_seq`、`created_at`、`superseded_at`、`restored_from_rev_id` | 主キー `(tenant_id, ns_id, rev_id)`。索引 `(ns_id, node_id, created_seq)` | 4 |
 | `ns_journal` | [ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の列に、5.1 節の列。`op` に `purge` | 主キー `(tenant_id, ns_id, seq)`。日の分割 | 5 |
 | `ns_batches` | `batch_id`、`kind`（`cross_ns_move`・`cross_ns_copy`）、`src_ns`、`dst_ns`、`root_node_id`、`dst_parent_id`、`name`、`snapshot_seq`、`state`、`progress_node_id`、`hidden_root_id`、`created_by`、`deadline_at` | 主キー `(tenant_id, batch_id)`。RLS は両方の名前空間 | 6 |

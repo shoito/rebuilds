@@ -1,6 +1,6 @@
 # Delivery: Dropbox
 
-CI/CD、この題材に固有の関門（決定的な同期のシミュレーター、実の macOS・Windows でのファイルシステムの端の場合の試験、分割と `name_key` の試験のベクトル、重複排除の 2 つの世界、漏れの経路、GC の並行）、フラグ、サーバーのデプロイ、デスクトップのクライアントの署名・公証・自動の更新・段階の配布・最低のバージョン、モバイルのリリース、Web の資産、`chunker_version`・`names_version`・カーソルの形とプロトコルの互換の規則、スキーマの変更の順序を決める。他の題材（Google Calendar・Linear の delivery.md）の形を引き継ぐ（GitHub Actions、OIDC、1 回ビルドして同じ成果物を昇格、prod は Ops の承認）。
+CI/CD、この題材に固有の関門（決定的な同期のシミュレーター、実の macOS・Windows でのファイルシステムの端の場合の試験、分割と `name_key` の試験のベクトル、重複排除の 2 つの世界、漏れの経路、GC の並行）、フラグ、サーバーのデプロイ、デスクトップのクライアントの署名・公証・自動の更新・段階の配布・最低のバージョン、モバイルのリリース、Web の資産、`chunker_version`・`names_version`・カーソルの形とプロトコルの互換の規則、スキーマの変更の順序を決める。他の題材（Google Calendar・Linear の [delivery.md](delivery.md)）の形を引き継ぐ（GitHub Actions、OIDC、1 回ビルドして同じ成果物を昇格、prod は Ops の承認）。
 
 | ADR | 決定 |
 | --- | --- |

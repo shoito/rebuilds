@@ -14,7 +14,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0027](../decisions/0027-shared-link-model-and-resolution.md) | リンクは名前空間とノードの ID を指し、見せる相手（`anyone`・`team`・`members`）、パスワード、期限、ダウンロードの可否を持つ。トークンは `<brand>sl_` の接頭辞、190 ビットの乱数、6 文字の検査の値で、ハッシュだけを持つ。解決のたびに、リンクの状態・今の方針・見せる相手・パスワード・ノードの今の場所を確かめ、使えない理由を利用者に区別して見せない |
+| [0027](../decisions/0027-shared-link-model-and-resolution.md) | リンクは名前空間とノードの ID を指し、見せる相手（`anyone`・`team`・`members`）、パスワード、期限、ダウンロードの可否を持つ。トークンは `<brand>_sl_` の接頭辞、190 ビットの乱数、6 文字の検査の値で、ハッシュだけを持つ。解決のたびに、リンクの状態・今の方針・見せる相手・パスワード・ノードの今の場所を確かめ、使えない理由を利用者に区別して見せない |
 | [0028](../decisions/0028-shared-link-abuse-controls.md) | リンクの悪用は、IP とリンクごとのレート制限、パスワードの試行の上限、リンクごとの 1 日の帯域の上限、作成の上限で抑える。通報はリンクの画面とフォームから受け、`suspended`（戻せる）と `removed`（戻さない）の 2 つの状態で止める。違法なコンテンツの判断・期限・照合の範囲は法務の結論まで決めず、`anyone` のリンクの公開を `release.shared-links-public` の裏に置く |
 
 ## 1. 範囲
@@ -28,9 +28,9 @@
   - 悪用の対策、通報の入口と止め方
 - 扱わない：
   - プレビューの作り方（[previews-and-thumbnails.md](previews-and-thumbnails.md)）。この文書はリンクから使う条件を決める
-  - ブラウザでのダウンロードの組み立て、フォルダーの ZIP（E7 の `web-download`）
-  - WAF とボットの対策の構成（`security.md`、`infrastructure.md`）
-  - 違法なコンテンツの対応の手順と開示の請求（`security.md`。法務の L2・L3）
+  - フォルダーの ZIP の組み立ての仕組み（[ADR-0054](../decisions/0054-server-assembled-downloads.md)）
+  - WAF とボットの対策の構成（[security.md](security.md)、[infrastructure.md](infrastructure.md)）
+  - 違法なコンテンツの対応の手順と開示の請求（[security.md](security.md)。法務の L2・L3）
 
 ## 2. 要件
 
@@ -51,7 +51,7 @@
 | フォルダーのリンクの制限 | フォルダーの設定で、メンバーでない人がリンクを開くと、アクセスの依頼を求められる | 同上 |
 | トークンの形、帯域の上限、レート制限 | 公式の資料で確かめられなかった（**未検証**） | — |
 
-- 本システムは、本家の 2 つの見せる相手に `members`（その名前空間を既に読める人だけ）を足す。リンクを「場所を伝える」ためだけに使う場面（チームの中でのファイルの指し示し）で、権限を広げないため。本家との違いとして、統合の工程で [architecture/README.md](README.md) の 1.4 節に行を足すことを提案する。
+- 本システムは、本家の 2 つの見せる相手に `members`（その名前空間を既に読める人だけ）を足す。リンクを「場所を伝える」ためだけに使う場面（チームの中でのファイルの指し示し）で、権限を広げないため。本家との意図した違いとして [architecture/README.md](README.md) の 1.4 節に載せた。
 - 「アクセスの依頼」は MVP で持たない（16 節）。
 
 ## 4. リンクの形
@@ -62,7 +62,7 @@ ADR-0027。
 
 - `shared_links(tenant_id, ns_id, link_id, node_id, created_by, audience, password_hash, expires_at, download_allowed, state, state_reason, created_at, updated_at)`。名前空間の表（RLS は `ns_id`）。
 - `link_tokens(token_hash, link_id, ns_id, tenant_id)`。RLS の外の表で、Link のロールだけが読む（[ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md)）。
-- トークン：`<brand>sl_` ＋ 32 文字の base62 の乱数（約 190 ビット）＋ 6 文字の base62 の CRC32。CRC32 で、打ち間違いと、シークレットの走査での誤検知を DB を引かずに弾く（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) の接頭辞と検査の値の形）。
+- トークン：`<brand>_sl_` ＋ 32 文字の base62 の乱数（約 190 ビット）＋ 6 文字の base62 の CRC32。CRC32 で、打ち間違いと、シークレットの走査での誤検知を DB を引かずに弾く（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) の接頭辞と検査の値の形）。
 - URL：`https://www.<brand>.<domain>/s/<token>`。ファイルの名前を URL に入れない（リンクを渡された先のログに名前を残さない）。
 - 解決の索引に持つのは `SHA-256(token)` だけ。持ち主の画面でリンクを何度でも写せるよう、トークンを KMS で暗号化した列（`token_ciphertext`）を `shared_links` に持つ。復号は持ち主か管理者の要求の時だけ、`can(actor, manage_link)` の後に行う。
 - 1 つのノードに、作った人ごとに有効なリンクは 1 つ（同じ人がもう一度作ると、今のリンクを返す）。ノードあたりの有効なリンクは 50 まで。
@@ -76,7 +76,7 @@ ADR-0027。
 | 期限 | 1 時間〜方針の上限。時刻で持つ | なし | あり |
 | ダウンロード | 許す・禁ずる | 許す | 選べる |
 
-- プランの区分は、本家の確かめた区分（3 節）に寄せる。区分の名前は `accounts-and-teams.md` のプランに合わせる。
+- プランの区分は、本家の確かめた区分（3 節）に寄せる。区分の名前は [accounts-and-teams.md](accounts-and-teams.md) のプランに合わせる。
 - プランを下げたら、有料の設定を持つリンクは消さずに、解決のときに有料の設定を「より厳しい側」で扱う（パスワードと期限は効かせ続ける。ダウンロードの禁止も効かせ続ける）。黙って広げないため。
 
 ### 4.3 `team` と `members`
@@ -118,7 +118,7 @@ sequenceDiagram
     L-)DB: link_access_events (async, outbox)
 ```
 
-- `can()` の入力：リンクの状態、期限、今の方針（6 節）、見せる相手、パスワードの確かめの有無、ログインした主体、ノードが今も名前空間 `ns_id` の中にあり、削除されていないこと、今のリビジョンの中身の検査の結果（`scan_state` が `malicious`・`hash_match` なら配信とプレビューを止める。`security.md` の 6 節、[ADR-0046](../decisions/0046-content-scanning-framework.md)）。
+- `can()` の入力：リンクの状態、期限、今の方針（6 節）、見せる相手、パスワードの確かめの有無、ログインした主体、ノードが今も名前空間 `ns_id` の中にあり、削除されていないこと、今のリビジョンの中身の検査の結果（`scan_state` が `malicious`・`hash_match`・`integrity_mismatch` なら配信とプレビューを止める。`pending` は検査の範囲に入る `anyone` のリンクでだけ「確認中」にする。[security.md](security.md) の 6 節、[ADR-0046](../decisions/0046-content-scanning-framework.md)）。
 - 拒否の理由（ない・無効・期限切れ・方針・ノードがない）を訪れた人に区別して見せない。理由はアクセスの記録にだけ残す。パスワードの入力の画面だけは、有効なリンクで出る（避けられない）。
 - パスワードの確かめの印は、`lk_<link_id>` の署名つきの Cookie（12 時間、`HttpOnly`、`Secure`、`SameSite=Lax`、`www` のドメイン）に、リンクの `password_version` を入れる。パスワードを変えたら、古い印は効かない。
 - 中身の URL（プレビュー 5 分、ダウンロードの計画のブロックの URL 15 分）は、確かめた後にだけ出す。無効化の後も、出した URL は最長 15 分使える（2 節）。
@@ -127,7 +127,7 @@ sequenceDiagram
 
 - **ファイルのリンク**：名前、大きさ、更新の時刻、プレビュー、（許すなら）ダウンロード。最新のリビジョンを見せる。リンクを作った時点のリビジョンに固定しない。
 - **フォルダーのリンク**：そのフォルダーの子孫だけを見せる。パスはリンクのフォルダーからの相対で、上の階層の名前を返さない。中のマウントのノード（制限したフォルダー、[namespaces-and-sharing.md](namespaces-and-sharing.md) の 4.4 節）は、リンクの名前空間と違うので、名前ごと返さない。
-- 一覧はページつき（1 ページ 200 件）。フォルダーの全体のダウンロード（ZIP）は E7 の `web-download` の仕組みを使い、10,000 ファイル・20 GiB まで。
+- 一覧はページつき（1 ページ 200 件）。フォルダーの全体のダウンロード（ZIP）は `export-builder` が組み立てる（[ADR-0054](../decisions/0054-server-assembled-downloads.md)。E7 の `web-download` と同じ仕組み）。10,000 ファイル・20 GiB まで。組み立てた ZIP の URL は 15 分で、ダウンロードの禁止のリンクでは作らない。
 - ノードが同じ名前空間の中で移動・名前の変更をしても、リンクは使える（ID で指すため）。別の名前空間へ移ったら、`ns_id` が合わないので使えない（その時点の名前空間の権限の文脈が変わるため）。削除の後に復元したら、また使える。
 
 ### 5.3 ダウンロードの禁止
@@ -175,7 +175,7 @@ stateDiagram-v2
 - `expired` は時刻で決まり、解決のたびに比べる（行の書き換えは後で Worker が行う）。
 - `revoked`・`removed`・`disabled_by_policy` は戻さない。持ち主は新しいリンクを作る（`removed` のノードには作れない。0028）。
 - ノードの削除は状態を変えない（5.2 節）。名前空間の共有の解除・持ち主のアカウントの停止は、解決のときの `can()` で止まる。
-- 状態の変化は監査ログに書く（`security.md`）。
+- 状態の変化は監査ログに書く（[security.md](security.md)）。
 
 ## 8. アクセスの記録
 
@@ -216,9 +216,9 @@ flowchart LR
   D -->|当たらない| A["active に戻す"]
 ```
 
-- 止めるのはリンクだけで、持ち主のアカウントのファイルは消さない。アカウントへの措置は `security.md` と法務の判断。
+- 止めるのはリンクだけで、持ち主のアカウントのファイルは消さない。アカウントへの措置は [security.md](security.md) と法務の判断。
 - 持ち主への知らせの要否と時期、通報者への回答、記録の保持は L2・L3 の結論で決める。
-- 既知の違法なコンテンツのハッシュの照合とマルウェアの検査は、`security.md` の中身の検査の枠（[ADR-0046](../decisions/0046-content-scanning-framework.md)。`content_scan_policy` の `link_public`）を使い、この文書では別に作らない。結果（`scan_state`）を解決の `can()` の入力にする（5.1 節）。範囲は**法務の確認待ち：L1・L2**で、結論まで空。
+- 既知の違法なコンテンツのハッシュの照合とマルウェアの検査は、[security.md](security.md) の中身の検査の枠（[ADR-0046](../decisions/0046-content-scanning-framework.md)。`content_scan_policy` の `link_public`）を使い、この文書では別に作らない。結果（`scan_state`）を解決の `can()` の入力にする（5.1 節）。範囲は**法務の確認待ち：L1・L2**で、結論まで空。
 - **`anyone` のリンクの公開は、L1・L2・L5 の結論まで `release.shared-links-public` の裏に置く。** `team`・`members` のリンクは先に出してよい（不特定の人に公開しないため）。ただし公開の判断は PM と法務が行う。
 
 ## 11. 国外のエッジ
@@ -281,7 +281,7 @@ flowchart LR
 2026-10-09 の既定案。
 
 - **見せる相手**：`anyone`・`team`・`members`（ADR-0027）。
-- **トークン**：`<brand>sl_`、190 ビット、CRC32、ハッシュで持つ（ADR-0027）。
+- **トークン**：`<brand>_sl_`、190 ビット、CRC32、ハッシュで持つ（ADR-0027）。
 - **拒否の理由**：訪問者に区別して見せない（ADR-0027）。
 - **方針**：解決のたびに今の値で評価する。広げても戻さない（ADR-0027）。
 - **悪用の対策**：9 節の値（ADR-0028）。
@@ -296,8 +296,7 @@ flowchart LR
 | 国外のエッジのキャッシュ | **法務の確認待ち：L5** |
 | フォルダーのリンクの「アクセスの依頼」 | 本家にはある（3 節）。MVP の後に、E6 の試用で求めが多ければ足す |
 | 編集のリンク、リンクの中への書き込み | 持たない（[roadmap.md](../roadmap.md) の延期の一覧） |
-| 帯域の上限の値 | E13 の負荷試験と費用のモデル（`capacity.md`）で見直す |
-| `members` の見せる相手を本家との違いとして 1.4 節に足すこと | 統合の工程 |
+| 帯域の上限の値 | E13 の負荷試験と費用のモデル（[capacity.md](capacity.md)）で見直す |
 
 ## 出典
 

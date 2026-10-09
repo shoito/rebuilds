@@ -84,7 +84,7 @@
 - **チームの管理者**：メンバー、共有の方針、端末、監査ログ、復元の依頼を扱う。
 - **共有リンクを受け取る外部の人**：アカウントを持たないことがある。
 - **外部のシステム**：公開 API と Webhook の利用者（バックアップ、業務のシステム、ワークフロー）、IdP（Microsoft Entra ID、Okta など）、メールの送信、モバイルの OS の通知。
-- **OS**：macOS（File Provider、FSEvents）、Windows（Cloud Files API、ReadDirectoryChangesW）、iOS・Android（写真のライブラリ、バックグラウンドの制約）。
+- **OS**：macOS（File Provider。同期の領域の中の変化も File Provider の呼び出しで受け、FSEvents は使わない）、Windows（Cloud Files API、ReadDirectoryChangesW）、iOS・Android（写真のライブラリ、バックグラウンドの制約）。
 - **社内の運用**：サポート、障害の対応、違法なコンテンツの通報と開示の請求への対応、データの復元の依頼。
 
 ## Constraints
@@ -131,12 +131,12 @@
 ### 選定・計測で決めるもの（法務以外）
 
 - 分割の母数（最小 1 MiB・平均 4 MiB・最大 16 MiB）：E2 の前の `chunking-dedupe-poc` で、合成と提供を受けた試験のデータの重複の率・ブロックの数・分割の速さを測って確かめる（[ADR-0002](decisions/0002-chunking-and-block-addressing.md)）。
-- S3 の事前署名の URL で、SHA-256 のチェックサムを署名に含めて強制できるか：E2 の前の `presigned-upload-poc` で確かめる。できなくても、置いた後に S3 が計算したチェックサムを確かめてから正規のキーへ移すので、正しさは変わらない（[ADR-0007](decisions/0007-block-storage-layout-on-s3.md)）。
+- S3 の事前署名の URL で、SHA-256 のチェックサムを署名に含めて強制できるか：AWS の公式の資料で確かめられなかった（**未検証**）。E2 の前の `presigned-upload-poc` で確かめる。できなくても、置いた後に S3 が計算したチェックサムを確かめてから正規のキーへ移すので、正しさは変わらない（[ADR-0007](decisions/0007-block-storage-layout-on-s3.md)）。
 - 1 つの名前空間の書き込みの上限（1 秒 200 件）：E3 の前の `namespace-write-throughput-poc`（[ADR-0005](decisions/0005-namespace-journal-and-cursors.md)）。
 - 検索の基盤の大きさ（S1 で 25 億ノードの名前の索引）：E9 の前の `search-sizing-poc`（[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - macOS の File Provider と Windows の Cloud Files API の振る舞いの差（取り出し・追い出し・名前の制限）：E5 の前の `placeholder-platform-survey`。Apple の公式の資料で確かめられなかった点は**未検証**として扱う。
 - 本家の API のアップロードのセッションの上限：公式の資料の写しに 350 GB とあり、本家の職員の投稿は 2 TiB に上げたとする。公式の文書の本文で確かめられなかった（**未検証**）。本システムの上限は 2 TiB（[ADR-0002](decisions/0002-chunking-and-block-addressing.md)）。
-- 本家の共有フォルダーの容量の数え方（メンバー全員の容量に数えるか）、共有フォルダーのメンバーの上限、本家のサービスの SLA：公式の資料で確かめられなかった（**未検証**）。本システムの値は namespaces-and-sharing の領域で決める。
+- 本家の共有フォルダーの容量の数え方（メンバー全員の容量に数えるか）、共有フォルダーのメンバーの上限、本家のサービスの SLA：公式の資料で確かめられなかった（**未検証**）。本システムは、容量を持ち主のテナントだけに数え、直接のメンバーを 5,000 までにした（[architecture/namespaces-and-sharing.md](architecture/namespaces-and-sharing.md) の 8・12 節）。
 
 ## 出典
 
@@ -147,11 +147,11 @@
 - Dropbox Help Center, [Recover deleted files](https://help.dropbox.com/delete-restore/recover-deleted-files-folders)：削除したファイルの復元の期間は上と同じ区分。大量の変更には Rewind を勧める
 - Dropbox Help Center, [Rewind](https://help.dropbox.com/delete-restore/rewind)：アカウント全体かフォルダーを、バージョン履歴の範囲の中の時点へ戻す。活動のグラフで日を選び、細かく変更を選ぶ。チームのフォルダーは別に巻き戻す
 - Dropbox Help Center, [Conflicted copy](https://help.dropbox.com/organize/conflicted-copy)：同じファイルが食い違って編集されると、編集した人の名前、「conflicted copy」、日付を名前に付けたコピーを作る。後に保存されたほうがコピーになる
-- Dropbox Help Center, [LAN sync overview](https://help.dropbox.com/sync/lan-sync-overview)：同じネットワークの端末の間で中身を直接送る。UDP のブロードキャストで見つけ、暗号化した HTTPS で送る。中身だけを送り、名前・木・権限は送らない。macOS の File Provider 版では使えない
+- Dropbox Help Center, [LAN sync overview](https://help.dropbox.com/sync/lan-sync-overview)：同じネットワークの端末の間で中身を直接送る。UDP のブロードキャストで見つけ、暗号化した HTTPS の直接の接続で送る。中身だけを送り、名前・木・権限は送らない。macOS の File Provider 版では使えない
 - Dropbox Help Center, [Dropbox on File Provider](https://help.dropbox.com/installs/dropbox-for-macos-support)：macOS の File Provider を使うバージョンは macOS 12.5 以降が要る。オンラインのみのファイルを他のアプリで開く問題を直すためのもの
 - Dropbox Help Center, [Where is my data stored](https://help.dropbox.com/accounts-billing/security/physical-location-data-storage)：保存の主な場所は米国のデータセンター。条件を満たす利用者は、オーストラリア・EU・日本・英国に置ける。チームの移行は Standard 以上・10 ライセンス以上・年払いなどが条件
 - Dropbox Developers, [Content hash](https://docs.dropboxapi.com/dropbox-api/docs/technical-reference/content-hash)：ファイルを 4 MB（4,194,304 バイト）の固定のブロックに分け、各ブロックの SHA-256 をつなげて、さらに SHA-256 を取る
-- Dropbox Developers, [Webhooks](https://docs.dropboxapi.com/dropbox-api/docs/webhooks)：登録の確かめは `challenge` の値を返す。通知は本文に変更のあったアカウントの一覧だけを持ち、アプリの秘密の HMAC-SHA256 の署名をヘッダーに付ける。10 秒で応答し、失敗は約 10 分の指数の再試行。失敗が多いと止める
+- Dropbox Developers, [Webhooks](https://docs.dropboxapi.com/dropbox-api/docs/webhooks)：登録の確かめは `challenge` の値を返す。通知は本文に変更のあったアカウントの一覧だけを持ち、アプリの秘密の HMAC-SHA256 の署名をヘッダーに付ける。10 秒で応答し、失敗は約 10 分の指数の再試行。10 分に 35 回を超えて失敗し、失敗の率が 4.5% を超えると止める
 - Dropbox Developers, [HTTP API documentation](https://www.dropbox.com/developers/documentation/http/documentation) の「Path formats」：パスは大文字小文字を区別しない。名前の大文字小文字はできるだけ保つ。ID は大文字小文字を区別する
 - dropbox.tech, [Rewriting the heart of our sync engine](https://dropbox.tech/infrastructure/rewriting-the-heart-of-our-sync-engine)（2020-03-09）：同期エンジン Nucleus を Rust で書き直した。大部分を 1 つの決定的な制御のスレッドで動かし、疑似乱数のシミュレーションで試す
 - dropbox.tech, [Testing our new sync engine](https://dropbox.tech/infrastructure/-testing-our-new-sync-engine)（2020-04-20）：Remote・Local・Synced の 3 つの木。Synced はマージの基準。計画の乱択の試験（CanopyCheck）と、ファイルシステム・ネットワーク・時計を模した全体の乱択の試験（Trinity）。シードから再現する
@@ -160,3 +160,7 @@
 - AWS, [Amazon S3 storage classes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html)：どのクラスも 99.999999999% の耐久性の設計。Standard-IA と Glacier Instant Retrieval は 128 KB の最小の課金の大きさと、30 日・90 日の最小の保存の期間。Intelligent-Tiering は 128 KB 未満を監視しない
 - AWS, [Checking object integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity.html)：SHA-256 を含むチェックサムを指定してアップロードでき、S3 が計算し直して一致を確かめてから保存する
 - AWS, [Amazon S3 multipart upload limits](https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html)：1 オブジェクト最大 48.8 TiB、部品 10,000、部品の大きさ 5 MiB〜5 GiB
+- AWS, [Meeting compliance requirements with S3 Replication Time Control](https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html)：多くのオブジェクトを数秒で、99.9% を 15 分以内に写す。転送が既定の 1 Gbps の割り当てを超える間は SLA が当たらない
+- AWS, [How S3 Intelligent-Tiering works](https://docs.aws.amazon.com/AmazonS3/latest/userguide/intelligent-tiering-overview.html)：128 KB 未満のオブジェクトは監視せず、常に高頻度の層に置く。30 日で低頻度、90 日でアーカイブの即時の層へ自動で移る。非同期の 2 つのアーカイブの層は選んで有効にする
+- 総務省, [インターネット上の違法・有害情報に対する対応（情報流通プラットフォーム対処法）](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)：旧プロバイダ責任制限法を改めた法律で、2025-04-01 に施行。総務大臣が指定する大規模特定電気通信役務提供者に、削除の対応の迅速化と運用の透明化を求める。本システムが対象に当たるかは法務の L2
+- 総務省, [外部送信規律](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/gaibusoushin_kiritsu.html)：電気通信事業法の改正（令和 4 年法律第 70 号）で、2023-06-16 に施行。利用者の端末から外部へ情報を送らせる場合に、送る情報の内容などを通知・公表する。本システムの端末の計測と Web の画面が当たるかは法務の L1

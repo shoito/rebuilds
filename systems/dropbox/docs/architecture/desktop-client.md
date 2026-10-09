@@ -17,15 +17,15 @@
   - 資源の使い方の上限（CPU・メモリー・ディスク・ネットワーク）と計測
   - プロキシ、TLS、ネットワークの変化
   - 端末の登録、資格の保管、遠隔の切り離しと消去
-  - 自動の更新の受け取り（配布の流れそのものは delivery.md）
+  - 自動の更新の受け取り（配布の流れそのものは [delivery.md](delivery.md)）
   - LAN 同期の将来の置き場所（E14）
 - 扱わない：
   - 計画・衝突・意図の記録（[sync-engine.md](sync-engine.md)）
   - 監視・プレースホルダー・名前（[file-system-integration.md](file-system-integration.md)）
-  - 署名・公証・段階の配布の流れ（delivery.md）
-  - 端末の一覧と管理の画面、管理者の方針（accounts-and-teams.md）
-  - OAuth の認可サーバーとトークンの形（accounts-and-teams.md、api-and-webhooks.md）
-  - 匿名の計測の受け口と集計（observability.md）
+  - 署名・公証・段階の配布の流れ（[delivery.md](delivery.md)）
+  - 端末の一覧と管理の画面、管理者の方針（[accounts-and-teams.md](accounts-and-teams.md)）
+  - OAuth の認可サーバーとトークンの形（[accounts-and-teams.md](accounts-and-teams.md)、[api-and-webhooks.md](api-and-webhooks.md)）
+  - 匿名の計測の受け口と集計（[observability.md](observability.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -181,7 +181,7 @@ flowchart LR
 
 ## 7. 端末の登録と切り離し
 
-端末の資格（登録、端末の鍵、回転する更新トークン、取り消し）は [ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)、切り離しと消去の状態の機械と消すものは [ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) が決める（accounts-and-teams.md）。この節は、デスクトップのクライアントの側の手順を決める（[ADR-0014](../decisions/0014-desktop-unlink-and-wipe-execution.md)）。
+端末の資格（登録、端末の鍵、回転する更新トークン、取り消し）は [ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)、切り離しと消去の状態の機械と消すものは [ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) が決める（[accounts-and-teams.md](accounts-and-teams.md)）。この節は、デスクトップのクライアントの側の手順を決める（[ADR-0014](../decisions/0014-desktop-unlink-and-wipe-execution.md)）。
 
 ### 7.1 登録
 
@@ -209,7 +209,7 @@ sequenceDiagram
 | `wipe` | ① `wiping` を報告 ② 同期のルートの登録を外す（OS の取り出しを止める）③ 同期のフォルダーの中を、意図の記録を通して 1,000 件ずつ、子から親の順に消す（OS のゴミ箱を通さない。パスが同期のルートの下にあることを毎回確かめ、リンクをたどらない）④ staging・ローカルのブロックの索引・キャッシュ・ログを消す ⑤ 消した数・消せなかった数を報告 ⑥ 資格と鍵を消し、最後に DB を消す |
 
 - 消去の途中で落ちたら、起動で `wipe_in_progress` を見て ③ から続ける。
-- 消去は上げていない手元の変更も消す（[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md)）。管理の画面での警告は accounts-and-teams.md。
+- 消去は上げていない手元の変更も消す（[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md)）。管理の画面での警告は [accounts-and-teams.md](accounts-and-teams.md)。
 - 端末がオフラインのままなら何も起きない。管理者による消去の可否と周知は**法務の確認待ち**（L7。[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md)）。
 
 ### 7.3 例：消去の途中の電源断
@@ -238,7 +238,7 @@ sequenceDiagram
 - 6 時間ごとに、署名つきの更新の目録（バージョン、OS、アーキテクチャ、段階の割合、ダウンロードの URL、SHA-256）を取る。目録の署名を、アプリに入れた公開鍵（Ed25519）で確かめる。
 - 段階の配布は、`device_id` のハッシュを 0〜99 に分けた値と、目録の割合で決める（社内 → 1% → 10% → 50% → 100%。[runbooks/README.md](../runbooks/README.md) の 3 節）。
 - 更新の適用は、同期が静かなときに、ホストを止めて入れ替える。DB のスキーマの変更は、新しいバージョンが起動のときに行い、前のバージョンへ戻すときのために、変更の前の DB を 1 つ残す。
-- 署名・公証・ストアの審査・目録の作り方は delivery.md。
+- 署名・公証・ストアの審査・目録の作り方は [delivery.md](delivery.md)。
 
 ## 10. LAN 同期の将来の置き場所（E14）
 
@@ -300,7 +300,7 @@ sequenceDiagram
 | macOS の同期のフォルダーの場所（File Provider の領域） | 同上 |
 | 管理者による消去の可否と周知 | 法務の L7（ADR-0043） |
 | 画面の見た目と操作の寄せ方 | 法務の L10 |
-| 匿名の計測の範囲（外部送信規律） | 法務の L1（observability.md） |
+| 匿名の計測の範囲（外部送信規律） | 法務の L1（[observability.md](observability.md)） |
 | 本家のプロセスの形・資源の使い方 | 公式の資料で確かめなかった（**未検証**のまま） |
 
 ## 15. quality.md・runbooks・data-model への項目
@@ -321,8 +321,8 @@ sequenceDiagram
 
 | 表 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| `devices`（[ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)・[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) の表） | この領域から足す列：`app_version`、`os`、`last_seen_at`、消去の結果（消した数・消せなかった数） | accounts-and-teams.md の索引に従う | 7 |
-| S3 の更新の目録（delivery.md の置き場所） | 9 節の目録 | — | 9 |
+| `devices`（[ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)・[ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) の表） | この領域から足す列：`app_version`、`os`、`last_seen_at`、消去の結果（消した数・消せなかった数） | [accounts-and-teams.md](accounts-and-teams.md) の索引に従う | 7 |
+| S3 の更新の目録（[delivery.md](delivery.md) の置き場所） | 9 節の目録 | — | 9 |
 
 端末の側（[sync-engine.md](sync-engine.md) の 18 節の DB に足す）：
 

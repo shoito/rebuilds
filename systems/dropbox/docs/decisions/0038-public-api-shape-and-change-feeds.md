@@ -45,6 +45,8 @@ date: 2026-10-09
 - 変更：`files/list_folder`（2,000 件まで）、`continue`（取り直しは 409 `reset`）、`get_latest_cursor`、`notify` の `longpoll`（30〜480 秒、`backoff`）。
 - WebSocket（`notify.<brand>.<domain>/v1/stream`）は自社のクライアントだけ。トークンは最初のメッセージで、カーソルから名前空間を購読し、`{ns_id, seq}` だけを送る。
 - アップロードは commit の `need_blocks` とアップロードのセッション（[ADR-0018](0018-upload-sessions-and-block-grants.md)）。ダウンロードは `download_plan` のブロックの URL。API は中身を通さない。
+
+> 2026-10-09 の注記：「1 つの URL で大きなファイルを取る」呼び出しは持たないとしていたが、統合の工程で `files/export`（Worker が S3 の中で組み立て、署名つき URL で返す。10,000 ファイル・20 GiB まで）を [ADR-0054](0054-server-assembled-downloads.md) で足した。API が中身を通さないことは変えない。
 - ファイルの同一性は `content_sha256` を返す。本家の `content_hash` と互換の値は出さない。
 - 互換を壊す変更は `/v2/` にし、`/v1/` を 12 か月以上残す。
 
@@ -62,7 +64,7 @@ date: 2026-10-09
   - 書き込みの経路が 1 つ（条件つきの commit）にまとまる。
   - 中身がサーバーを通らない。
 - 引き受けるコスト：
-  - 大きなファイルを 1 つの URL で取れない。利用者は SDK か自分で組み立てる。
+  - 20 GiB を超えるファイルは 1 つの URL で取れない。利用者は SDK か自分で組み立てる（20 GiB までは ADR-0054 の `files/export`）。
   - `overwrite` を選んだ利用者の同時の編集は、片方が古いリビジョンになる（中身は履歴に残る）。
 
 ## Confirmation

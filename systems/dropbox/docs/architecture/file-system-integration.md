@@ -22,7 +22,7 @@
   - 計画・衝突・意図の記録（[sync-engine.md](sync-engine.md)）
   - プロセスの形と資源の配り方（[desktop-client.md](desktop-client.md)）
   - `name_key` の作り方そのもの（[ADR-0008](../decisions/0008-node-identity-and-names.md)）
-  - ブロックの取り出しと組み立て（block-storage.md）
+  - ブロックの取り出しと組み立て（[block-storage.md](block-storage.md)）
 
 ## 2. 本家と OS の形（確かめたこと）
 
@@ -39,7 +39,6 @@
 
 - **未検証**（`placeholder-platform-survey` で確かめる）：
   - File Provider の replicated の拡張の呼び出しの形（作成・変更・削除の呼び出し、`baseVersion`、変化の列挙と合図、取り出しと追い出し）、拡張のメモリーの上限、拡張が落ちたときに OS が未通知の変化を呼び直すか。Apple の文書の本文を、この文書の時点で取得できなかった。
-  - FSEvents の溢れの印（走査し直しを求める印）の正確な意味。
   - Cloud Files API でプレースホルダーを同期のルートの外へ移したときの振る舞い、長いパスの扱い。
 - 本家の無視するファイルの一覧、シンボリックリンク・拡張属性の扱いは、公式の資料で確かめなかった（**未検証**）。
 

@@ -19,6 +19,7 @@
 | [0038](../decisions/0038-public-api-shape-and-change-feeds.md) | 公開 API は `api.<brand>.<domain>/v1/` の、JSON の本文を持つ `POST` の呼び出しの形にする。ノードはパス・`id:`・`ns:` で指し、書き込みは `add`・`update`・`overwrite` の 3 つの方式を、すべて条件つきの commit に直す。変更は `list_folder`・`continue`・`get_latest_cursor` と、`notify.<brand>.<domain>` の long-poll で取る。WebSocket の合図は自社のクライアントだけ。中身の送受信はブロックの URL の計画で行い、API は中身を通さない。互換の `content_hash` は出さない |
 | [0039](../decisions/0039-oauth-apps-scopes-and-rate-limits.md) | OAuth 2.0 は認可コードと PKCE（S256）だけで、秘密を持つアプリにも PKCE を求める。アクセストークン `<brand>_at_`（4 時間）とリフレッシュトークン `<brand>_rt_`（使うたびに替え、再使用を検知したら系列ごと無効）。スコープは対象と読み書きで分ける。アプリのフォルダーのアプリは、専用の名前空間だけに届くトークンを持つ。レート制限は（アプリ, アカウント）・アプリ・アカウント・名前空間の 4 つの桶 |
 | [0040](../decisions/0040-signed-webhooks-delivery.md) | Webhook はアプリごとの 1 つの URL に、変更のあったアカウントの一覧だけを送る。登録は `challenge` の応答で確かめる。署名は Webhook 専用の秘密で `<Brand>-Signature: t=<秒>,v1=<hex>`（時刻と本文の HMAC-SHA256）。1 秒ごとにまとめ、再試行で未送のアカウントを合わせ、24 時間失敗し続けたら止める。送る前にアプリの認可を確かめる |
+| [0054](../decisions/0054-server-assembled-downloads.md) | （統合の工程）フォルダーの ZIP と 1 つの URL のダウンロードは、Worker の `export-builder` が S3 から S3 の `exports` へ組み立て、署名つき URL で返す。API は中身を通さない。10,000 ファイル・20 GiB まで |
 
 ## 1. 範囲
 
@@ -30,11 +31,11 @@
   - レート制限
   - Webhook
 - 扱わない：
-  - commit の中身と条件の検査（`metadata-and-journal.md`）
+  - commit の中身と条件の検査（[metadata-and-journal.md](metadata-and-journal.md)）
   - ブロックの検証と許可（[block-storage.md](block-storage.md)）
   - 共有・リンク・検索の意味（[namespaces-and-sharing.md](namespaces-and-sharing.md)、[shared-links.md](shared-links.md)、[search.md](search.md)）。この文書は入口の形だけ
-  - ログイン、SSO、端末の登録（`accounts-and-teams.md`）
-  - egress の経路の構成（`infrastructure.md`）
+  - ログイン、SSO、端末の登録（[accounts-and-teams.md](accounts-and-teams.md)）
+  - egress の経路の構成（[infrastructure.md](infrastructure.md)）
 
 ## 2. 要件
 
@@ -61,7 +62,7 @@
 
 本家に寄せるのは振る舞い（RPC の形、カーソル、long-poll、Webhook の本文）で、名前と識別子は独自にする。本家の SDK との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
 
-**本家との違い**（統合の工程で [architecture/README.md](README.md) の 1.4 節に足すことを提案する）：
+**本家との違い**（[architecture/README.md](README.md) の 1.4 節に載せた）：
 
 | 項目 | 本家 | 本システム | 理由 |
 | --- | --- | --- | --- |
@@ -98,8 +99,9 @@ ADR-0038。
 | `files/create_folder`・`move`・`copy`・`delete` | 1 つの操作の簡単な形。中で `files/commit` に直す | `files.metadata.write` |
 | `files/upload_session/start`・`blocks`・`status`・`finish` | [block-storage.md](block-storage.md) の 4.4 節 | `files.content.write` |
 | `files/download_plan` | `{rev_id | path, first_block?, limit ≤ 1024}` → ブロックの一覧と URL | `files.content.read` |
+| `files/export`・`files/export/status` | `{paths | ids, format: zip | file}` → `202 {export_id}`、できたら署名つき URL（[ADR-0054](../decisions/0054-server-assembled-downloads.md)） | `files.content.read` |
 | `files/get_thumbnail`・`get_preview` | 署名つき URL | `files.content.read` |
-| `files/list_revisions`・`restore` | バージョンと復元（`versions-and-recovery.md`） | 読み・`files.content.write` |
+| `files/list_revisions`・`restore` | バージョンと復元（[versions-and-recovery.md](versions-and-recovery.md)） | 読み・`files.content.write` |
 | `files/search` | [search.md](search.md) | `files.metadata.read`（本文の抜粋は `files.content.read` も） |
 | `sharing/*`、`links/*` | 共有フォルダー、共有リンク | `sharing.read`・`sharing.write` |
 | `users/get_current_account`、`users/get_space_usage` | アカウント、容量 | `account.read` |
@@ -132,7 +134,7 @@ ADR-0038。
 - **大きなファイル**：アップロードのセッション（同 4.4 節）。
 - 公開 API の利用者は `chunker_version` 0（4 MiB の固定）を使ってよい。公式の SDK（TypeScript、Python）は `sync-core` の WASM で 1 を使う。
 - **ダウンロード**：`files/download_plan` でブロックの URL を受け、利用者が組み立てる。1 ブロックのファイル（多くの 1 MiB 以下のファイル）は URL が 1 つで、そのまま GET すればよい。公式の SDK が組み立てを持つ。
-- API のサーバーは中身を通さない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。そのため「1 つの URL で大きなファイルを取る」呼び出しは持たない（17 節）。
+- API のサーバーは中身を通さない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。「1 つの URL で大きなファイルを取る」とフォルダーの ZIP は、`files/export` で Worker の `export-builder` が S3 の中で組み立て、`202` と `export_id` を返し、できたら署名つき URL（1 時間）を返す。10,000 ファイル・20 GiB まで（[ADR-0054](../decisions/0054-server-assembled-downloads.md)）。
 - ファイルの同一性の値は `content_sha256` を返す。本家の `content_hash` と互換の値は出さない（ADR-0038）。
 
 ### 4.6 エラー
@@ -230,7 +232,7 @@ ADR-0039。
 | アプリのフォルダー | 利用者のルートの `アプリ/<アプリの名前>` の専用の名前空間だけ |
 
 - アプリのフォルダーは `shared_folder` の名前空間（利用者だけが `owner`、`app_folder=true`）として作り、利用者のルートの `アプリ` フォルダーの下に載せる。トークンは `root_ns` をこの名前空間に固定し、`app.ns_ids` はこの 1 つだけになる。共有と共有リンクの作成は許さない。名前空間の種類を増やさずに、RLS で範囲を閉じるため（[ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md)）。
-- チームの管理者は、アプリを「許す・止める」で管理でき、止めたアプリのチームのメンバーのトークンを無効にする（`accounts-and-teams.md` の管理の画面）。
+- チームの管理者は、アプリを「許す・止める」で管理でき、止めたアプリのチームのメンバーのトークンを無効にする（[accounts-and-teams.md](accounts-and-teams.md) の管理の画面）。
 
 ## 8. レート制限
 
@@ -364,6 +366,7 @@ stateDiagram-v2
 | E3 | `notify-gateway` | 6 節（WebSocket） |
 | E11 | `webhooks` | 9 節（ADR-0040。DT-HOOK-001、PROP-HOOK-001〜003） |
 | E11 | `sdk-typescript-python` | 4.5 節の組み立てと分割を持つ公式の SDK（新しい Story の提案） |
+| E11 | `files-export` | 4.5 節の `files/export` と、E7 の `web-download`・共有リンクのフォルダーの ZIP の組み立て（ADR-0054） |
 
 ## 14. 未解決の問い
 
@@ -378,14 +381,13 @@ stateDiagram-v2
 - **OAuth**：すべてのアプリに PKCE（S256）、トークンの形と期限（ADR-0039）。
 - **アプリのフォルダー**：専用の名前空間（ADR-0039）。
 - **Webhook**：専用の秘密、24 時間の再試行（ADR-0040）。
+- **1 つの URL のダウンロードとフォルダーの ZIP**：Worker が S3 の中で組み立てる（統合の工程の ADR-0054）。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 1 つの URL で大きなファイルを取る呼び出し（ブラウザや単純な HTTP の道具向け） | API が中身を通さない原則（[ADR-0001](../decisions/0001-platform-and-stack.md)）と合わない。E7 の `web-download`（フォルダーの ZIP）と合わせて、中身を組み立てる経路を持つかを Dev（テックリード）が判断する |
 | スコープの名前、レート制限、トークンの期限の本家の値 | 公式の資料で確かめられなかった（**未検証**） |
-| 本家との違い（3 節の表）を 1.4 節に足すこと | 統合の工程 |
 | 公開 API に WebSocket を出すか | E11 の後、利用者の求めで |
 
 ## 出典

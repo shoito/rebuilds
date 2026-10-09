@@ -36,10 +36,15 @@ date: 2026-10-09
 
 - `namespaces` の行に `ns_seq` を持つ。`packages/committer` は、書き込みのトランザクションの最初に名前空間の行をロックし（`UPDATE ... SET ns_seq = ns_seq + n RETURNING`）、操作ごとに番号を振る。
 - 番号を振った操作を `ns_journal(tenant_id, ns_id, seq, op, node_id, parent_id, name, rev_id, is_folder, size, content_sha256, actor_id, device_id, committed_at)` に、ノードとリビジョンの変更と outbox と同じトランザクションで書く。行は「操作の後のノードの状態」を持ち、読む側は前の状態を知らなくても当てられる。
-- `op` は `upsert`（作成・変更・移動・名前の変更）、`delete`、`mount`（名前空間を載せた）、`unmount`（外した）。
+- `op` は `upsert`（作成・変更・移動・名前の変更）、`delete`、`mount`（名前空間を載せた）、`unmount`（外した）、`purge`（保持の期限・名前空間をまたぐ移動の後始末で行を消した。利用者に返さない）。
+- 行には、`node_ver`、`deleted_reason`、`moved_to_ns`・`moved_to_seq`・`moved_from_ns`、`subtree_listing`、`batch_id`（利用者に返さない行の印）、`job_id`（復元・巻き戻し）も持つ（[metadata-and-journal.md](../architecture/metadata-and-journal.md) の 5.1 節）。
+
+> 2026-10-09 の注記：統合の工程で、`op` に `purge` を足し、ジャーナルの列に `batch_id`・`moved_to_ns`・`subtree_listing`・`job_id` などを足した（[ADR-0021](0021-committer-operations-and-conditions.md)・[ADR-0022](0022-cross-namespace-batch-move-and-copy.md)・[ADR-0030](0030-restore-and-rewind-as-journaled-batches.md)）。
 - **1 回の commit は 1 つの名前空間への最大 1,000 の操作で、全部が通るか全部が通らない。** 操作の条件（`base_rev`、名前の一意）は [ADR-0006](0006-sync-conflict-model.md)・[ADR-0008](0008-node-identity-and-names.md) にある。
 - **ジャーナルを通らない書き込みを作らない。** 復元、巻き戻し、管理者の操作、保持の期限での削除、一括の修正も、`packages/committer` を通して番号を振る。
-- ジャーナルは日で分割し（`pg_partman`）、90 日を過ぎた分割を落とす（保持の期間は法務の L6 の後に確定する）。名前空間ごとに、保持の下限の番号（`floor_seq`）を持つ。
+- ジャーナルは日で分割し（`pg_partman`）、92 日を過ぎた分割を落とす。カーソルは最後の利用から 90 日で取り直しにする。`list/continue` のたびに位置を今の `ns_seq` まで進めたカーソルを出し直すので、90 日以内に使ったカーソルの続きは必ず 92 日の分割の中にある。名前空間ごとの保持の下限の番号（`floor_seq`）は、行を落とす特別な場合（テナントの削除、名前空間の作り直し、手での修復）だけに上げる（[ADR-0023](0023-tree-listing-snapshot-and-journal-retention.md)）。保持の期間は法務の L6 の後に確定する。
+
+> 2026-10-09 の注記：最初の起票は「90 日を過ぎた分割を落とし、`floor_seq` で下限を持つ」だった。統合の工程で、カーソルの最後の利用から 90 日・分割 92 日・`floor_seq` は特別な場合だけ、に改めた（ADR-0023）。
 - 1 つの名前空間の書き込みは、行のロックで直列になる。1 名前空間 1 秒 200 件の commit を上限と見込み、E3 の前の `namespace-write-throughput-poc` で確かめる。上限を超えたら 429 と `Retry-After` を返す。チームのスペースは、チームのフォルダーをそれぞれ別の名前空間にして、ロックを分ける。
 
 ### 載せる・外す
@@ -52,7 +57,9 @@ date: 2026-10-09
 - カーソルは不透明な文字列で、中身は `{v, account_id, root_ns, positions: {ns_id → seq}, mount_hash, epoch}` を圧縮して HMAC の署名を付けたもの。利用者が他人の名前空間の位置を作れない。要求の本文で送り、URL に入れない。
   - `positions`：載せた各名前空間の、読み終えた番号。
   - `mount_hash`：カーソルを出した時点の載せた名前空間の集合と役割。`list/continue` の時点の集合と違えば、足された名前空間は番号 0 から、外された名前空間は `unmount` として返す。
-  - `epoch`：DR の切り替え、時点への復元で上げる。古い `epoch` のカーソルは取り直し（409 `reset`）。
+  - `epoch`：全体の 1 つの値（`platform_state`）。DR の切り替え（Global Database の計画外のフェイルオーバー）と、運用者が DB を時点へ戻す操作（PITR からの戻し）でだけ上げる。利用者の復元と巻き戻しはジャーナルの普通の行で流すので上げない（[ADR-0030](0030-restore-and-rewind-as-journaled-batches.md)）。古い `epoch` のカーソルは取り直し（409 `reset`）。
+
+> 2026-10-09 の注記：最初の起票の「時点への復元で上げる」は、利用者の巻き戻しを含むように読めた。統合の工程で、運用者の DB の時点への戻しだけを指すと決めた。DR の後に「失った commit を見た端末だけ」を取り直しにする改良は、テックリードの判断に残した（[architecture/README.md](../architecture/README.md) の 6 節の持ち越し）。
 - `list/continue` は、各名前空間の `seq` より後の操作を読み、載せた場所のパスに直して返す。同じノードが何度変わっても、最後の状態の 1 件にまとめる。名前空間の中の順序は保つ。名前空間をまたぐ順序は保証しない。件数が多ければページに分け、最後のページで新しいカーソルを返す。
 - `seq` がその名前空間の `floor_seq` より古ければ、取り直しを求める。最後の利用から 90 日は使える（NFR-010）。取り直しでは、クライアントは木の全体を読み直し、Synced の木と比べて差を当てる。Synced があるので、取り直しで手元の変更を失わない（[ADR-0006](0006-sync-conflict-model.md)）。
 - 開いているフォルダーだけを見る Web とモバイルは、そのフォルダーの名前空間だけの位置を持つカーソルを使う。

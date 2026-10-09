@@ -19,12 +19,12 @@
   - 巻き戻し（名前空間の単位とフォルダーの単位）、時点の選び方、実行、取り消し
   - 一斉の変更の検知と通知
 - 扱わない：
-  - ブロックの GC・照合・S3 のバージョニングからの戻し（block-storage.md、[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）
+  - ブロックの GC・照合・S3 のバージョニングからの戻し（[block-storage.md](block-storage.md)、[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）
   - commit の手順と条件（[metadata-and-journal.md](metadata-and-journal.md)）
   - クライアントの消しすぎの止め（[sync-engine.md](sync-engine.md) の 10 節）
-  - 復元・巻き戻しの権限の決定表（namespaces-and-sharing.md の `can()`）
-  - 画面（E7 の `web-restore-ui`）、通知の配信（api-and-webhooks.md、mobile-and-camera-upload.md）
-  - リーガルホールド・解約の後の消去（security.md、accounts-and-teams.md）
+  - 復元・巻き戻しの権限の決定表（[namespaces-and-sharing.md](namespaces-and-sharing.md) の `can()`）
+  - 画面（E7 の `web-restore-ui`）、通知の配信（[api-and-webhooks.md](api-and-webhooks.md)、[mobile-and-camera-upload.md](mobile-and-camera-upload.md)）
+  - リーガルホールド・解約の後の消去（[security.md](security.md)、[accounts-and-teams.md](accounts-and-teams.md)）
 
 ## 2. 本家の形（確かめたこと）
 
@@ -167,7 +167,7 @@ stateDiagram-v2
 チーム T のチームのフォルダー `経理`（名前空間 N、1.2 万ファイル）で、10 月 9 日 14:05 に、ある端末がランサムウェアに感染した。14:05〜14:20 に 8,000 ファイルの中身が変わり、拡張子が `.locked` に変わった。14:30 に別のメンバーが、無事な `予算.xlsx` を保存した。
 
 1. 14:12 に一斉の変更の検知（7 節）が `alert` を出し、14:15 に管理者へ通知する。示す時点は 14:00（窓の始まり 14:05 の 5 分前）。
-2. 管理者が端末を切り離し（accounts-and-teams.md）、`経理` を 14:00 へ巻き戻す。S_t は 14:00 の時点の番号。
+2. 管理者が端末を切り離し（[accounts-and-teams.md](accounts-and-teams.md)）、`経理` を 14:00 へ巻き戻す。S_t は 14:00 の時点の番号。
 3. 差：
    - 名前の変わった 8,000 ファイル（`請求書.pdf` → `請求書.pdf.locked`）：T_t では `請求書.pdf`、今は `.locked` の名前と違う中身。操作 B（`move` で名前を戻す）と C（`update` で 14:00 の中身）。
    - 感染した端末が足した `README_DECRYPT.txt`（各フォルダーに 1 つ、200 個）：T_t にない → A（`delete`）。
@@ -185,7 +185,7 @@ stateDiagram-v2
 | フォルダー | そのフォルダーの子孫（時点の木の子孫と今の子孫の和） |
 | 変更の絞り込み | 時点の後の変更を、端末・人・拡張子で絞って対象から外す |
 
-- 巻き戻しの権限は `can(actor, rewind, ns)`。個人のルートは持ち主、チームのフォルダーは編集の役割以上と管理者（namespaces-and-sharing.md の決定表）。
+- 巻き戻しの権限は `can(actor, rewind, ns)`。個人のルートは持ち主、チームのフォルダーは編集の役割以上と管理者（[namespaces-and-sharing.md](namespaces-and-sharing.md) の決定表）。
 
 ## 7. 一斉の変更の検知
 
@@ -217,7 +217,7 @@ stateDiagram-v2
 | `notice` | 監査ログに記録する。利用者の画面の活動に出す |
 | `alert` | 名前空間の持ち主（チームは管理者と、その端末の利用者）へ、メール・デスクトップの通知・Web の帯で知らせる。p95 5 分（NFR-009）。巻き戻しの時点の候補（窓の始まりの 5 分前）と、対象の端末を示す |
 
-- 自動で同期を止めない・巻き戻さない。誤検知で利用者の作業を止めないため。管理者は端末の切り離し（accounts-and-teams.md）と巻き戻しを 1 つの画面で行える。
+- 自動で同期を止めない・巻き戻さない。誤検知で利用者の作業を止めないため。管理者は端末の切り離し（[accounts-and-teams.md](accounts-and-teams.md)）と巻き戻しを 1 つの画面で行える。
 - 同じ名前空間 × 端末の `alert` は、1 時間に 1 回までにまとめる。
 - 検知の率と誤検知の率は、合成の「暗号化らしい変更」と通常の大量の変更で測る（[quality.md](../quality.md) の 2.2.1 節 H）。閾値は E8 の試験と本番の分布で直す。
 
@@ -306,7 +306,7 @@ flowchart LR
 | 検知の閾値 | E8 の合成の試験と本番の分布 |
 | 中身を読む検知（エントロピー） | 法務の L1 の後。端末で計算して数だけ送る形を検討する |
 | 自動で同期を止める選択肢（管理者の方針） | 誤検知の率を見てから |
-| `node_versions` の行の数と費用（S1 で 25 億ノード × バージョンの数） | E8 の前に、バージョンの数の分布を合成で測る（capacity.md） |
+| `node_versions` の行の数と費用（S1 で 25 億ノード × バージョンの数） | E8 の前に、バージョンの数の分布を合成で測る（[capacity.md](capacity.md)） |
 | 本家の Rewind の内部と検知の規則 | 公式の資料で確かめられなかった（**未検証**のまま） |
 
 ## 13. quality.md・runbooks・data-model への項目
@@ -332,7 +332,7 @@ flowchart LR
 | `nodes` に足す列 | `deleted_reason`（`rewind` を含む） | 索引 `(ns_id, deleted_at)` | 5.2 |
 | `rewind_jobs` | `job_id`、`kind`（`rewind`・`folder_restore`）、`ns_id`、`root_node_id`、`target_seq`、`before_seq`、`filters`、`state`、`progress_node_id`、`applied`、`skipped`、`requested_by` | 主キー `(tenant_id, job_id)` | 6.3 |
 | `rewind_skips` | `job_id`、`node_id`、理由のコード | 主キー `(job_id, node_id)` | 6.3 |
-| `retention_policies` | テナント（プラン）ごとの期間、短縮の効く日 | 主キー `tenant_id` | 4.2 |
+| `tenant_retention_settings` | テナント（プラン）ごとのバージョンの保持の期間、短縮の効く日（データの種類ごとの保持の正本 `retention_policies` は [security.md](security.md) の 8.1 節。名前がぶつかるので分けた） | 主キー `tenant_id` | 4.2 |
 | `mass_change_events` | `ns_id`、`device_id`、窓、信号ごとの数、水準、通知の時刻 | 主キー `(tenant_id, event_id)` | 7 |
 | outbox のイベント `commit_summary` | 7.1 節の要約（名前・中身なし） | — | 7.1 |
 

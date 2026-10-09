@@ -52,7 +52,7 @@ xychart-beta
 
 - commit の 1 件の書き込みの行（初期見積もり）：名前空間の行の更新 1、ノード 3、リビジョン 2、`ns_journal` 3、`ns_block_refs` 2.5、ブロックの行の参照の数 0.5、outbox 1、アップロードの行 2 = 約 15 行。ピークで 1 秒 約 7.5 万行、索引を含めて 20 万の索引の更新。
 - 1 名前空間の上限は 1 秒 200 件（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）。E3 の前の `namespace-write-throughput-poc` で確かめる。上限に当たる名前空間（自動の同期の道具、大きなチームのフォルダー）は 429 と `Retry-After` で待たせ、チームのフォルダーを分ける案内を出す。
-- 名前空間をまたぐ大きな移動・コピーは、バッチの非同期の操作で、1 バッチ 1,000 の操作に分ける（[metadata-and-journal.md](metadata-and-journal.md) の 6 節）。復元・巻き戻しのバッチは、`maintenance` の枠（全体の commit の 10% まで）で流し、利用者の commit を押しのけない。
+- 名前空間をまたぐ大きな移動・コピーは、バッチの非同期の操作で、2,000 ノードずつのトランザクションに分ける（[metadata-and-journal.md](metadata-and-journal.md) の 6 節）。復元・巻き戻しのバッチは、`maintenance` の枠（全体の commit の 10% まで）で流し、利用者の commit を押しのけない。
 
 ## 3. 合図と再接続
 
@@ -94,7 +94,7 @@ flowchart LR
 - **サーバーが待ちの時間を割り当てる**：`reset` の応答に `retry_after` を付け、端末の ID のハッシュで 2 時間の窓に散らす。1 秒 約 55 万ノード。木の一覧は 1 ページ 1,000 件で、1 秒 約 550 ページ。
 - 大阪の Aurora は、切り替えの後に reader を 3 台に広げる（[infrastructure.md](infrastructure.md) の 6.3 節のワークフロー）。木の一覧は reader の専用のエンドポイントで読み、commit と取り合わない。
 - 全端末の読み直しの完了の目標は 4 時間（本システムの想定）。RTO 1 時間はメタデータの API が使えるようになるまでで、読み直しの間も端末は手元のファイルを使える。
-- **改良の提案**：失った commit を見た端末（カーソルの位置が切り替えの時の `ns_seq` を超える名前空間を持つ端末）だけを取り直しにすれば、殺到をほぼ消せる。[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の「古い `epoch` のカーソルは取り直し」を変えるので、Dev のテックリードの判断に回す（10 節の持ち越し）。
+- **改良の案（持ち越し）**：失った commit を見た端末（カーソルの位置が切り替えの時の `ns_seq` を超える名前空間を持つ端末）だけを取り直しにすれば、殺到をほぼ消せる。統合の工程では採らず、テックリードの判断に残した。カーソルの位置だけでは足りないためである：失った commit を自分で確定した端末は、`list/continue` で読む前に Synced をその `rev` へ進めている（[sync-engine.md](sync-engine.md) の 5.2 節）。その端末のカーソルの位置が切り替えの番号以下でも、取り直しをしないと、Remote の古い `rev` との差を「サーバーの変化」と読み、手元の中身を古い中身で置き換えうる。commit の応答の番号を端末が申告する形と、名前空間ごとの取り直しの形をシミュレーターで確かめてから決める（[architecture/README.md](README.md) の 6 節の持ち越し）。
 
 ## 4. ブロックの送受信
 
@@ -102,10 +102,11 @@ ADR-0051。
 
 ### 4.1 S3 の要求とブロックの検証
 
-- ピークの送信 2 GB/秒。小さなファイルを含めた平均のオブジェクトを 1 MiB と見て、1 秒 約 2,000 ブロック。
+- ピークの送信 2 GB/秒。新しく送られるブロックは小さなファイルが多いと見て、平均を保存の平均（2 MiB、5.1 節）より小さい 1 MiB と保守的に置き、1 秒 約 2,000 ブロック。
 - 1 ブロックに `incoming` の PUT 1、HeadObject 2、CopyObject 1、DeleteObject 1（[block-storage.md](block-storage.md) の 9 節）。S3 の要求は 1 秒 約 1 万。
 - S3 は接頭辞ごとに 1 秒 3,500 の書き込みと 5,500 の読み出しを受け、広がる間は 503 が出る（[optimizing Amazon S3 performance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html)、2026-10-09 に確認）。`blocks` のキーはハッシュの 4 文字で 65,536 の接頭辞に散る（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。
-- **`incoming` のキーの偏り**：`incoming` のキー `u/<upload_id>/<n>` は、`upload_id` が UUIDv7（時刻が先頭）なら、同じ時刻のアップロードが同じ接頭辞に集まる。キーの先頭にハッシュを置く形（例 `u/<hash[0:4]>/<upload_id>/<n>`）にするよう、block-storage の領域に求める（10 節の持ち越し。[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) のキーの変更になる）。
+- **`incoming` のキーの偏り**：`incoming` のキー `u/<upload_id>/<n>` は、`upload_id` が UUIDv7（時刻が先頭）なら、同じ時刻のアップロードが同じ接頭辞に集まる。block-storage の領域が `upload_id` を 128 ビットの乱数にしたので、キーの形を変えずに偏りを避ける（[block-storage.md](block-storage.md) の 4.2 節、[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) の注記）。
+- **CRR の転送の割り当て**：Replication Time Control の SLA は、転送が既定の 1 Gbps の割り当てを超える間は当たらない。S1 の新しいデータは平均 450 MB/秒（約 3.6 Gbps）、ピーク 2 GB/秒なので、割り当てを 20 Gbps へ上げる申請を E1 で行う（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。
 - `block-verifier`：写しの時間を 0.3 秒と見て、同時に 600 の写し。1 タスク 64 の並行で 10 タスク、AZ の余裕で 15 タスク（初期見積もり）。
 - 503 の扱い：クライアントと `block-verifier` は指数の後退（[block-storage.md](block-storage.md) の 5.4 節）。新しいバケットの最初の広がりを負荷試験で確かめる。
 
@@ -212,6 +213,7 @@ ADR-0051。
 | GuardDuty、Security Hub、Inspector、Config、CloudTrail、WAF、KMS | 5,000 | 単価は**未検証** |
 | **本番の合計（OpenSearch を除く）** | **約 79 万** | |
 
+- 規模の前提は [architecture/README.md](README.md) の 2 節の S1（アカウント 50 万、物理 13 PB）と同じ。保存の単価 32 USD/TB は README の 2.1 節の仮の予算（30〜45 USD）の中にある。
 - 保存と配信で 89% を占める。費用の打ち手は、Intelligent-Tiering の層の割合、大阪の写しの範囲（法務の L5 と NFR-005）、CloudFront の個別の価格、小さなブロックのパックである。
 - 1 アカウントあたり 月 約 1.6 USD（50 万アカウント）。
 
@@ -262,8 +264,8 @@ ADR-0051。
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | Aurora の writer の大きさ（`16xlarge` か `24xlarge`） | E3 の前の `namespace-write-throughput-poc`、E13 |
-| `incoming` のキーの先頭にハッシュを置く | block-storage の領域（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) のキーの変更） |
-| DR の取り直しを、失った commit を見た端末だけに絞る | Dev のテックリード（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の変更） |
+| DR の取り直しを、失った commit を見た端末だけに絞る | Dev のテックリード。3.3 節の理由で統合の工程では採らなかった。E13 の `dr-reset-slotting` の前にシミュレーターで確かめる（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の変更） |
+| CRR の転送の割り当ての引き上げ（20 Gbps） | E1 の `s3-buckets-baseline` で申請する |
 | Valkey のシャードの pub/sub | E3 の `notify-gateway` |
 | プレビューの作る時（すぐか、初めて見たときか）と量 | [previews-and-thumbnails.md](previews-and-thumbnails.md) |
 | OpenSearch の大きさと費用 | E9 の `search-sizing-poc` |

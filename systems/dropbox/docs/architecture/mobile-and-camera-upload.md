@@ -27,8 +27,8 @@
 - 扱わない：
   - ブロックの送り方そのもの（[block-storage.md](block-storage.md)）
   - プレビューの作り方（[previews-and-thumbnails.md](previews-and-thumbnails.md)）。HEIC の表示はここで作ったプレビューを使う
-  - 端末の登録と遠隔の切り離し（`desktop-client.md` の端末の登録と `accounts-and-teams.md`）
-  - ストアの審査と配布（`delivery.md`）
+  - 端末の登録と遠隔の切り離し（[desktop-client.md](desktop-client.md) の端末の登録と [accounts-and-teams.md](accounts-and-teams.md)）
+  - ストアの審査と配布（[delivery.md](delivery.md)）
   - iOS の Files アプリとの統合（File Provider）。MVP で持たない（13 節）
 
 ## 2. 要件
@@ -169,7 +169,7 @@ stateDiagram-v2
     failed_permanent --> [*]
 ```
 
-- 状態は `camera_assets` に持ち、状態の遷移の前に書く（意図の記録。`sync-engine.md` と同じ考え方）。アプリが落ちても、再起動で状態から続ける。
+- 状態は `camera_assets` に持ち、状態の遷移の前に書く（意図の記録。[sync-engine.md](sync-engine.md) と同じ考え方）。アプリが落ちても、再起動で状態から続ける。
 - 書き出したファイルとブロックのファイルは、アプリの一時の領域に置き、`done` か `failed_permanent` で消す。一時の領域の上限は 2 GB（それを超える動画は、ブロックを順に書き出して送り、送ったものから消す）。
 - 再開：`upload_id` と検証済みの番号を `camera_assets` に持ち、`upload_session/status`（[block-storage.md](block-storage.md) の 4.4 節）で合わせる。
 - `failed_retryable` の後退：1 分、5 分、15 分、1 時間、以後 6 時間ごと。7 日続いたら利用者に知らせる。
@@ -182,7 +182,7 @@ ADR-0037。
 - APNs・FCM に渡すのは `{type, event_id}` だけ（例：`share_invite`、`event_id` は不透明な ID）。名前、メールアドレス、ファイルの名前を入れない。
 - iOS：通知の拡張（Notification Service Extension）が、端末のトークンで API の `notifications/get { event_id }` を呼び、文を組み立てる。取れなければ「新しいお知らせがあります」とだけ出す。
 - Android：データのメッセージで受け、アプリが同じく API から取って通知を作る。
-- 通知の種類（MVP）：共有フォルダーへの招待、共有リンクの帯域の上限、カメラのアップロードの停止（容量、長い失敗）、一斉の変更の検知（`versions-and-recovery.md`）。
+- 通知の種類（MVP）：共有フォルダーへの招待、共有リンクの帯域の上限、カメラのアップロードの停止（容量、長い失敗）、一斉の変更の検知（[versions-and-recovery.md](versions-and-recovery.md)）。
 - APNs・FCM へ端末のトークンと不透明な ID を渡すこと自体が、外国にある第三者への提供に当たるかは**法務の確認待ち：L4**。結論まで `release.mobile-push` の裏に置き、アプリの中の通知の一覧（開いたときに取る）だけを出す。
 
 ## 11. オフラインの保存

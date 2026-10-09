@@ -43,7 +43,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。領域の文書（[architecture/README.md](architecture/README.md) の 7 節）を書くときに、各領域の「Story の候補」で直す。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。領域の文書（[architecture/README.md](architecture/README.md) の 7 節）の「Story の候補」を、統合の工程（2026-10-09）でここに反映した。
 
 ### E1 基盤
 
@@ -62,6 +62,10 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `otel-baseline` | ADOT、AMP、X-Ray、ログの形、名前・パスをログに出さない規則と走査 |
 | `audit-log-table-and-archive` | 監査ログの表と、S3 の Object Lock への写し。保持は法務：L3・L6 |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、CRR の遅れの監視 |
+| `ci-real-os-runners` | 実機の macOS・Windows の CI の機械と使い捨てのボリューム（delivery の 2.3 節） |
+| `schema-migration-gates` | スキーマの変更の段と CI の比較（ADR-0053） |
+| `kms-keys-and-secrets` | KMS の鍵、鍵の方針、秘密の回し方（ADR-0044） |
+| `operator-access-baseline` | 運用者の JIT、人のロールの中身の拒否、名前を読めないビュー（security の 9 節） |
 
 ### E2 ブロックの保存
 
@@ -78,6 +82,9 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `block-gc` | 参照 0 から 7 日の猶予、行のロックでの commit との並行、S3 のバージョニング |
 | `block-scrubber-and-audit` | チェックサムの照合、参照の監査、S3 Inventory との突き合わせ |
 | `dedupe-two-worlds-tests` | 重複排除の 2 つの世界の比べ（quality.md の 2.2.1 節 G） |
+| `upload-admission` | アップロードの受け入れのトークンバケットと優先度（ADR-0051） |
+| `upload-sli` | アップロードの SLI（observability の 3.2 節） |
+| `chunker-version-negotiation` | `GET /v1/config` と `chunker_version` の切り替え（ADR-0053） |
 
 ### E3 メタデータとジャーナル
 
@@ -86,13 +93,16 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `namespace-write-throughput-poc` | PoC：1 名前空間 1 秒 200 件の commit、ロックの待ちの p99 |
 | `names-and-name-key` | `name_key`（Rust と TypeScript）、名前の受け付け、`names_version`、試験のベクトル（ADR-0008） |
 | `nodes-and-revisions` | ノード・リビジョンの表、`node_ver`、一意の索引 |
-| `commit-conditional-ops` | commit の操作（作成・変更・移動・名前の変更・削除）と条件（`base_rev`・`base_node_ver`・作成）、循環の検査（ADR-0006） |
+| `commit-conditional-ops` | commit の操作（`create`・`update`・`move`・`delete`・`undelete`）と条件（`base_rev`・`base_node_ver`・ファイルの削除の `base_rev`・フォルダーの削除の `base_seq`・作成）、2 段の置き場所、循環の検査（ADR-0006、ADR-0021） |
 | `list-folder-and-cursor` | 木の一覧（ページつき）、カーソル、`list/continue`、取り直し（ADR-0005） |
 | `mount-unmount` | 名前空間を載せる・外す、番号 0 からの読み出し |
 | `notify-gateway` | Notify の WebSocket、Valkey の pub/sub、合図 |
 | `cross-namespace-move` | 名前空間をまたぐ移動とコピー（バッチの非同期の操作） |
 | `journal-retention` | ジャーナルの分割と保持、`floor_seq`。保持は法務：L6 |
 | `journal-diff-prop-tests` | 差分と全件の一致の性質（quality.md の 2.2.1 節 E） |
+| `journal-tail-cache` | 購読の多い名前空間のジャーナルの末尾のキャッシュ（ADR-0051） |
+| `path-resolution-cache` | パスの解決のキャッシュ（metadata-and-journal の 7.3 節） |
+| `propagation-sli` | 受け渡しの遅れの SLI（ADR-0050） |
 
 ### E4 同期エンジン
 
@@ -107,13 +117,14 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `conflicted-copy-naming` | 競合のコピーの名前（日本語・英語）。文言は法務：L10 |
 | `sync-simulator` | 決定的な同期のシミュレーター、サーバーの模型、契約の試験（quality.md の 2.2.1 節 A） |
 | `planner-randomized-tests` | 計画の層の乱択の試験と縮め |
+| `transfer-scheduler` | 並行・優先度・帯域・再試行（sync-engine の 8 節） |
 
 ### E5 デスクトップのクライアント
 
 | Story | 内容 |
 | --- | --- |
 | `placeholder-platform-survey` | 調査：File Provider と Cloud Files API の取り出し・追い出し・名前の制限・OS のバージョンの差 |
-| `fs-watcher-macos` | FSEvents、ファイルの ID、移動の検出 |
+| `fs-observer-macos` | File Provider の拡張の呼び出しから Local を直す、項目の ID での移動の検出（FSEvents は使わない。ADR-0015） |
 | `fs-watcher-windows` | ReadDirectoryChangesW、File ID、移動の検出 |
 | `macos-file-provider` | File Provider の拡張（Swift）と `sync-core` の結び付け、オンラインのみのファイル |
 | `windows-cloud-files` | Cloud Files API の同期のルート、プレースホルダー、取り出し |
@@ -124,6 +135,13 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `fs-edge-case-suite` | ファイルシステムの端の場合の場面と実機の CI（quality.md の 2.2.1 節 B） |
 | `client-resource-bench` | 100 万ファイルの端末の計測（quality.md の 2.2.1 節 J） |
 | `desktop-distribution` | 署名・公証、段階の配布、自動の更新 |
+| `desktop-host-process` | ホストのプロセスの形、起動と停止（ADR-0013） |
+| `save-pattern-detection` | アプリの保存のしかたの扱い（file-system-integration の 5 節） |
+| `device-unlink-and-wipe` | 端末の側の切り離しと消去（ADR-0014）。消去は法務：L7 |
+| `client-network-proxy` | プロキシ、TLS、ネットワークの変化 |
+| `client-auto-update` | 自動の更新の受け取り |
+| `client-telemetry` | 端末の匿名の計測（ADR-0050）。範囲は法務：L1 |
+| `release-account-and-distribution` | `release` のアカウント、`dl.<brand>.<domain>`、署名の鍵の置き場所 |
 
 ### E6 共有
 
@@ -137,6 +155,11 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `shared-links` | 共有リンク（閲覧）、パスワード、期限、ダウンロードの禁止、無効化、アクセスの記録。公開は法務：L1・L2・L5 |
 | `link-abuse-report` | 違法なコンテンツの通報の入口と送信防止の手順。法務：L2 |
 | `leak-path-tests` | 漏れの経路の表の結合テスト（quality.md の 2.2.1 節 F） |
+| `link-abuse-controls` | 共有リンクのレート制限・帯域・作成の上限（ADR-0028） |
+| `ownership-transfer` | 持ち主の移し替え（ADR-0026） |
+| `unmount-and-role-change-client` | 外された・閲覧に下がったときの手元の扱い（ADR-0011） |
+| `usercontent-domain-headers` | 利用者の中身のドメインとヘッダー（security の 4 節） |
+| `response-audit` | 応答の監査（observability の 5 節） |
 
 ### E7 Web の画面
 
@@ -144,7 +167,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `web-browse` | 一覧、並べ替え、パンくず、選択 |
 | `web-upload-wasm` | フォルダーごとのアップロード、`sync-core` の分割の WASM、再開 |
-| `web-download` | ダウンロード、フォルダーの ZIP |
+| `web-download` | ダウンロード、フォルダーの ZIP（`export-builder` で組み立てる。ADR-0054。10,000 ファイル・20 GiB まで） |
 | `web-share-ui` | 共有フォルダーと共有リンクの画面 |
 | `web-restore-ui` | バージョン履歴、削除したファイル、巻き戻しの画面 |
 | `web-ime` | 名前の変更・検索の入力の IME |
@@ -158,6 +181,8 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `namespace-rewind` | 名前空間の巻き戻し（時点の選び方、バッチの実行、さらに巻き戻せること） |
 | `mass-change-detector` | 一斉の変更の検知と通知 |
 | `restore-prop-tests` | 巻き戻しの性質（quality.md の 2.2.1 節 H） |
+| `node-versions-history` | `node_versions` を `packages/committer` で書く（ADR-0029） |
+| `version-history-restore` | ファイルのバージョンの一覧と復元 |
 
 ### E9 プレビューと検索
 
@@ -169,6 +194,8 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `document-previews` | PDF・Office の文書・テキストのプレビュー |
 | `search-names` | 名前の索引と検索、`can()` での確かめ直し |
 | `search-fulltext-team` | チームのプランの本文の索引。法務：L1 |
+| `text-extraction` | 本文の抽出（隔離の変換）。法務：L1 |
+| `search-reindex` | 検索の索引の作り直し |
 
 ### E10 モバイルとカメラのアップロード
 
@@ -179,6 +206,8 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `mobile-offline-files` | 指定したファイルのオフラインの保存 |
 | `camera-upload` | 写真のライブラリの取り込み、重ねない、バックグラウンドの制約、回線の条件 |
 | `mobile-notifications` | 共有・コメントなどの通知。法務：L4 |
+| `mobile-background-upload-poc` | PoC：背景の送信の OS の振る舞いと、署名つき URL（15 分）が切れる頻度 |
+| `mobile-release-pipeline` | モバイルのリリースの流れ（delivery の 5.5 節） |
 
 ### E11 公開 API と Webhook
 
@@ -189,6 +218,9 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `rate-limits` | レート制限 |
 | `api-longpoll` | long-poll |
 | `webhooks` | Webhook の登録の確かめ、`<Brand>-Signature`、再試行、停止 |
+| `api-compat-replay` | 2 つ前までのクライアントの呼び出しの再生（ADR-0053） |
+| `sdk-typescript-python` | 組み立てと分割を持つ公式の SDK |
+| `files-export` | `files/export`・フォルダーの ZIP の組み立て（`export-builder`、ADR-0054） |
 
 ### E12 アカウント・チーム・管理・監査
 
@@ -202,6 +234,11 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `admin-member-access` | 管理者のメンバーのフォルダーへのアクセス。法務：L7 |
 | `audit-log-ui-export` | 監査ログの画面と書き出し |
 | `data-lifecycle` | 解約・アカウントの削除の後のデータとブロックの消去。保持は法務：L6 |
+| `session-revocation` | 取り消しの伝わり方と Notify の切断（ADR-0041） |
+| `step-up-auth` | 危ない操作の再認証 |
+| `remote-unlink-and-wipe` | 切り離しと消去の状態の機械（ADR-0043） |
+| `activity-events-pipeline` | ファイルの活動の事象（Firehose、Athena、欠けの照合） |
+| `content-scanner-framework` | 中身の検査の枠、`content_scan_policy`、`scan_state`、`verified_sha256`（ADR-0046）。法務：L1・L2 |
 
 ### E13 本番の準備と GA の判定
 
@@ -215,6 +252,17 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e13` | 個別の手順の作成と確認 |
 | `ga-readiness` | GA の判定。法務：L2・L3・L4・L5・L6・L9 |
+| `device-swarm` | 頭のない端末の群れ（capacity の 8 節） |
+| `dr-failover-workflow` | 切り替えのワークフロー、`epoch`、`dr-content-check`（ADR-0048） |
+| `dr-reset-slotting` | DR の後の取り直しの待ちの割り当て（ADR-0051） |
+| `synthetic-devices` | 合成監視の端末（observability の 7 節） |
+| `cost-baseline` | 層の割合と単価を請求の実績で置き換える |
+
+### E15 OCR の検索（MVP の後）
+
+| Story | 内容 |
+| --- | --- |
+| `ocr-evaluation` | OCR の誤りの率と費用の計測（ADR-0035） |
 
 ## エージェントに任せないこと
 
@@ -233,6 +281,6 @@ MVP の後に検討する。E14〜E19 に入れなかったもの。着手する
 
 - **電子署名、文書の共同編集、ファイルの依頼（他人からの受け取り）**（intent.md）。
 - **編集の共有リンク、フォルダーの共有リンクの中への書き込み**（[architecture/README.md](architecture/README.md) の 6 節）。
-- **小さなブロックのパック**（[ADR-0007](decisions/0007-block-storage-layout-on-s3.md)。S2 の前に測って決める）。
+- **小さなブロックのパック**（[ADR-0020](decisions/0020-small-block-packing-for-s2.md)。S2 の前の `small-block-pack-poc` で測って決める）。
 - **S2 の構成**（名前空間の持ち主のテナントでのシャード、検索の分け方）と **S3 のセル構成**（infrastructure の領域）。
 - **リーガルホールドと eDiscovery**（法務の L6 の結論で前に出しうる）。

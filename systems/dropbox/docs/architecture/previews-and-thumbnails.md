@@ -30,8 +30,8 @@
 - 扱わない：
   - 索引と検索（[search.md](search.md)）
   - 共有リンクの解決とダウンロードの禁止の意味（[shared-links.md](shared-links.md)）
-  - マルウェアの検査、違法なコンテンツの照合（`security.md`）
-  - ネットワークの区画と egress の構成の全体（`infrastructure.md`）
+  - マルウェアの検査、違法なコンテンツの照合（[security.md](security.md)）
+  - ネットワークの区画と egress の構成の全体（[infrastructure.md](infrastructure.md)）
   - 動画のストリーミングの変換（[intent.md](../intent.md) の Non-goals）
 
 ## 2. 要件
@@ -99,7 +99,7 @@ ADR-0032。
 
 ```mermaid
 flowchart TB
-  subgraph AZ["Isolated subnet (no NAT, no IGW)"]
+  subgraph AZ["Sandbox subnet (no NAT, no IGW)"]
     subgraph T["Fargate task: preview-renderer"]
       SUP["supervisor (trusted, Rust)<br/>pulls job, fetches blocks via presigned GET,<br/>verifies SHA-256, writes input file"]
       CONV["converter process (untrusted)<br/>libvips / PDFium / LibreOffice / FFmpeg<br/>new process per job, separate UID,<br/>no credentials, rlimits"]
@@ -112,12 +112,12 @@ flowchart TB
   SUP --> EP
 ```
 
-- **ネットワーク**：タスクは `infrastructure.md` の sandbox の区画（NAT もインターネットのゲートウェイもない）に置く。セキュリティグループの外向きは、S3 のゲートウェイのエンドポイントの接頭辞の一覧、ECR と CloudWatch Logs のインターフェイスのエンドポイント、ジョブの受け取りの SQS のインターフェイスのエンドポイントだけ。SQS のエンドポイントの方針で、2 つのジョブの待ち行列の受信と削除だけを許す（`infrastructure.md` の 2 節の選択肢のうち、SQS で受ける形を選ぶ。RunTask の上書きの引数で渡す形は、タスクの起動の時間でサムネイルの速さを満たせないため）。S3 のエンドポイントの方針で、本システムのアカウントの `blocks`・`blocklists` の読み出しと `previews` の書き込みだけを許す（他のアカウントのバケットへの書き出しを止める）。
-- **資格情報**：タスクのロールは、イメージの取得、ログの出力、2 つのジョブの待ち行列の受信と削除だけを持ち、S3・DB・KMS の権限を持たない。ジョブを出す側（private の Worker `preview-orchestrator`）が、そのジョブのブロックの GET の署名つき URL と、出力のキーの PUT の署名つき URL（どちらも 10 分。`security.md` の 3.4 節）をジョブに入れる。
+- **ネットワーク**：タスクは [infrastructure.md](infrastructure.md) の sandbox の区画（NAT もインターネットのゲートウェイもない）に置く。セキュリティグループの外向きは、S3 のゲートウェイのエンドポイントの接頭辞の一覧、ECR と CloudWatch Logs のインターフェイスのエンドポイント、ジョブの受け取りの SQS のインターフェイスのエンドポイントだけ。SQS のエンドポイントの方針で、自分のジョブの待ち行列の受信・削除・見えない時間の変更と、結果の待ち行列 `sandbox-results` への送信だけを許す（[infrastructure.md](infrastructure.md) の 2 節の選択肢のうち、SQS で受ける形を選ぶ。RunTask の上書きの引数で渡す形は、タスクの起動の時間でサムネイルの速さを満たせないため）。S3 のエンドポイントの方針で、本システムのアカウントの `blocks`・`blocklists` の読み出しと `previews` の書き込みだけを許す（他のアカウントのバケットへの書き出しを止める）。
+- **資格情報**：タスクのロールは、イメージの取得、ログの出力、自分のジョブの待ち行列の受信・削除・見えない時間の変更と `sandbox-results` への送信だけを持ち、S3・DB・KMS の権限を持たない。結果（ジョブの ID、状態、理由のコード、出力の大きさと SHA-256）は `sandbox-results` で返し、オーケストレーターが HeadObject で大きさと SHA-256 を確かめてから `preview_entries` を `ready` にする。ジョブを出す側（private の Worker `preview-orchestrator`）が、そのジョブのブロックの GET の署名つき URL と、出力のキーの PUT の署名つき URL（どちらも 10 分。[security.md](security.md) の 3.4 節）をジョブに入れる。
 - **プロセス**：監督は信頼するコード（自前、Rust）で、ジョブを取り、ブロックを取り、SHA-256 を確かめて入力のファイルを作る。変換のプロセスは、ジョブごとに新しく起こし、別の利用者 ID、読み取り専用のルートのファイルシステム、ジョブごとの tmpfs、資源の上限（7 節）で動かす。変換のプロセスは URL も資格情報も見ない（環境の変数を空にして起こす）。
 - **出力の検査**：監督は、変換の出力を、メモリー安全な復号器（Rust の画像の部品）で読み直し、大きさを確かめ、WebP に作り直してから PUT する。変換のプロセスが出したバイトをそのまま配らない（多言語のファイル、壊れた画像で受け手を突く攻撃を避ける）。テキストは UTF-8 として検査し、制御文字を除く。
-- **作り直し**：タスクは 50 ジョブか 10 分で終え（`security.md` の 3.4 節の 100 回か 1 時間より短くする）、新しいタスクに替える。変換のプロセスが上限で落ちたら、その時点でタスクを終える。乗っ取られた変換のプロセスが、次のジョブを見る時間を短くするため。
-- **混ぜない**：1 つのタスクで同時に 1 ジョブだけを動かす。テナントは混ざりうる（タスクをテナントごとにしない）。混ざる危険は、上の作り直しと、資格情報を持たないことで抑える。より強い隔離（ジョブごとの microVM）は `security.md` の持ち越し（13 節）。
+- **作り直し**：タスクは 50 ジョブか 10 分で終え（[security.md](security.md) の 3.4 節と揃えた）、新しいタスクに替える。新しいタスクが受け始めてから古いタスクを止め（最小の健全な割合 100%）、待ち行列の長さに対して 20% の余裕の台数を持って、サムネイルの p95 2 秒を保つ。変換のプロセスが上限で落ちたら、その時点でタスクを終える。乗っ取られた変換のプロセスが、次のジョブを見る時間を短くするため。
+- **混ぜない**：1 つのタスクで同時に 1 ジョブだけを動かす。テナントは混ざりうる（タスクをテナントごとにしない）。混ざる危険は、上の作り直しと、資格情報を持たないことで抑える。より強い隔離（ジョブごとの microVM）は [security.md](security.md) の持ち越し（13 節）。
 
 ### 6.2 ジョブ
 
@@ -145,12 +145,12 @@ flowchart TB
 ADR-0033。
 
 - キー：`p/<tenant_id>/<rev_id>/<kind>`（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)）。`kind` は `thumb256.r3.webp`、`page0001.r3.webp` のように、大きさ・頁と `renderer_version` を含める。変換器を直したら `renderer_version` を上げ、古いキーは 90 日で消える。
-- **使い回さない**：`preview_entries(tenant_id, ns_id, rev_id, kind, renderer_version, state)` を名前空間の表に置き、リビジョンごとに作る。同じ `content_sha256` の別のリビジョン（コピー、カメラのアップロードの重複）でも作り直す。作り直しの有無と速さから、読めない名前空間に同じ中身があることを推測させないため（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)、`security.md` の 3.5 節）。費用は、先に作るのが 256 px のサムネイルだけなので小さい。
+- **使い回さない**：`preview_entries(tenant_id, ns_id, rev_id, kind, renderer_version, state)` を名前空間の表に置き、リビジョンごとに作る。同じ `content_sha256` の別のリビジョン（コピー、カメラのアップロードの重複）でも作り直す。作り直しの有無と速さから、読めない名前空間に同じ中身があることを推測させないため（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)、[security.md](security.md) の 3.5 節）。費用は、先に作るのが 256 px のサムネイルだけなので小さい。
 - 無効化：リビジョンは不変なので、中身が変われば新しい `rev_id` のキーになる。無効化は要らない。リビジョンの保持の期限が切れたら `preview_entries` を消し、S3 は 90 日で消える。テナントの削除では接頭辞 `p/<tenant_id>/` を消す。
 
 ## 9. 配信
 
-- API の `get_thumbnail { rev_id | node_id, size }`・`get_preview { rev_id, page }` は、`can(actor, read, rev)` とリビジョンの中身の検査の結果（`scan_state` が `hash_match` なら返さない。`security.md` の 6 節）を確かめてから、`content.<brand>usercontent.<domain>/p/...` の CloudFront の署名つき URL（10 分）を返す。
+- API の `get_thumbnail { rev_id | node_id, size }`・`get_preview { rev_id, page }` は、`can(actor, read, rev)` とリビジョンの中身の検査の結果（`scan_state` が `malicious`・`hash_match`・`integrity_mismatch` なら返さない。[security.md](security.md) の 6 節）を確かめてから、`content.<brand>usercontent.<domain>/p/...` の CloudFront の署名つき URL（10 分）を返す。
 - 共有リンクは Link が `can()` の後に署名する（5 分）。リンクの URL は [shared-links.md](shared-links.md) の 11 節の別の接頭辞にする。
 - 応答のヘッダー：`Content-Type: image/webp` か `text/plain; charset=utf-8` に固定、`X-Content-Type-Options: nosniff`、`Content-Security-Policy: sandbox; default-src 'none'`、`Content-Disposition: inline`、`Cache-Control: private, max-age=600`（ブラウザ）。エッジでは 1 日。
 - 画面のグリッドで 100 枚のサムネイルを出すとき、署名は 100 回。同じ `(rev_id, kind)` の URL は Valkey に 5 分持つ。
@@ -177,7 +177,7 @@ stateDiagram-v2
 
 | 事象 | 起きること | 備え |
 | --- | --- | --- |
-| 変換の部品の脆弱性 | 変換のプロセスの乗っ取り | 6 節の隔離。部品の更新は `renderer_version` を上げて出す。重大な脆弱性では、その形式の変換を `ops.preview_formats_enabled` で止める（`security.md` の AppConfig の項目） |
+| 変換の部品の脆弱性 | 変換のプロセスの乗っ取り | 6 節の隔離。部品の更新は `renderer_version` を上げて出す。重大な脆弱性では、その形式の変換を `ops.preview_formats_enabled` で止める（[security.md](security.md) の AppConfig の項目） |
 | 対話の待ち行列の詰まり | サムネイルが出ない | 背景の取り出しを止める。タスクを自動で増やす（待ちの長さで、最大 200 タスク） |
 | 悪いファイルの繰り返し | 同じファイルで何度も落ちる | `failed` を同じバージョンで作り直さない |
 | S3 のエンドポイントの方針の誤り | 変換が入力を読めない | 結合テストで、許す・拒むの両方を確かめる |
@@ -191,7 +191,7 @@ stateDiagram-v2
 | `revisions` に足す列 | `mime_hint`（クライアントの申告と先頭のバイトの判定） | — | 6.2 |
 | `extracted_texts`（名前空間の表） | `rev_id`、`extractor_version`、`text_key`（S3）、`chars`、`state` | `(tenant_id, ns_id, rev_id)` | 5、[search.md](search.md) |
 | S3 | `previews` の `p/<tenant_id>/<rev_id>/<kind>`。抽出したテキストは `p/<tenant_id>/<rev_id>/text.e<version>.txt` | 90 日 | 8 |
-| SQS | `preview-jobs-interactive`、`preview-jobs`、`text-extract-jobs` | 見えない時間 2 分 | 5 |
+| SQS | `preview-jobs-interactive`、`preview-jobs`、`text-extract-jobs`、`scan-jobs`、`sandbox-results` | 見えない時間 2 分 | 5、6 |
 | Valkey | 署名つき URL のキャッシュ | 5 分 | 9 |
 
 ## 13. テスト
@@ -222,7 +222,7 @@ stateDiagram-v2
 - **隔離**：監督と変換のプロセスに分け、変換は資格情報を持たない（ADR-0032）。
 - **出力**：監督が作り直した WebP とテキストだけ（ADR-0032）。
 - **作る時**：画像・動画・PDF の 1 頁目のサムネイルだけを先に（ADR-0033）。
-- **使い回し**：しない。リビジョンごとに作る（ADR-0033、`security.md` の 3.5 節）。
+- **使い回し**：しない。リビジョンごとに作る（ADR-0033、[security.md](security.md) の 3.5 節）。
 - **文書のプレビュー**：頁の画像。ブラウザで利用者の PDF を開かない。
 - **動画**：最初の画面だけ。
 
@@ -232,7 +232,7 @@ stateDiagram-v2
 | --- | --- |
 | 中身を機械で読む処理（先に作るサムネイル、本文の抽出）の同意と範囲 | **法務の確認待ち：L1** |
 | 国外のエッジでのキャッシュ | **法務の確認待ち：L5** |
-| ジョブごとの microVM など、より強い隔離 | `security.md` の脅威モデルと、外部のペンテスト（E13）の結果で決める |
+| ジョブごとの microVM など、より強い隔離 | [security.md](security.md) の脅威モデルと、外部のペンテスト（E13）の結果で決める |
 | 動画の短い低い画質の再生 | MVP の後。費用を測ってから |
 | RAW・PSD・CAD のプレビュー | MVP の後。チームの業種（設計・映像・建設）の求めで順を決める |
 | 本家の対応する形式と大きさ | 公式の資料で確かめなかった（**未検証**） |
