@@ -218,7 +218,7 @@ positive: offset zigzag-varint, len varint, counts varint x len
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `metric_metadata` の `source` の値 | `native_exponential`、`statsd`、`explicit_buckets`、`summary` を足す | [metrics-model-and-cardinality.md](metrics-model-and-cardinality.md) の 11 節 | 6.4、6.5 |
+| `metric_metadata` の `conversion` の列 | `none`・`native_exponential`・`statsd_values`・`api_values`・`explicit_buckets`・`summary`（送り手の `source` とは別の列。[data-model.md](data-model.md) の D-8） | [metrics-model-and-cardinality.md](metrics-model-and-cardinality.md) の 11 節 | 6.4、6.5 |
 | ブロックの分布のチャンク | `codec_id` 16（7 節） | [tsdb-storage-engine.md](tsdb-storage-engine.md) の 7 節 | 7 |
 | ブロックのロールアップの列 | 分布の系列は 1 分・1 時間のヒストグラムの列 | 同上 | 8 |
 | MSK `metrics` のレコード | `hist: [(ts_ms, ExpHistogram)]`（[intake-and-agent.md](intake-and-agent.md) の 5.4 節） | — | 6 |

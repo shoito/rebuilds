@@ -288,7 +288,7 @@ flowchart TD
 ### 9.2 1 日の上限
 
 - 索引ごとに 1 日の件数の上限を持てる。日の区切りは、索引ごとに時刻と時間帯を選べる（既定は `Asia/Tokyo` の 0 時）。
-- 数え方：`log-processor` のパーティションの流れが、Valkey の索引の日の数え（`quota:{tenant}:{index}:{day}`）から 1,000 件ずつの予算を前借り（`INCRBY 1000`）し、手元の予算から 1 件ずつ使う。前借りの結果が上限を超えたら、以後その日はその索引に入れない。
+- 数え方：`log-processor` のパーティションの流れが、Valkey の索引の日の数え（`idxq:{tenant}:{index}:{day}`）から 1,000 件ずつの予算を前借り（`INCRBY 1000`）し、手元の予算から 1 件ずつ使う。前借りの結果が上限を超えたら、以後その日はその索引に入れない。
 - 上限を超える量は、最大で「前借りの単位 × その組織のパーティションの流れの数」。組織の組が 8 パーティションなら 8,000 件まで超えうる。画面には「上限の付近では数千件を超えることがある」と示す。
 - 読み直し：上限の判断は `logs` のメッセージに書いてあり、Kafka のトランザクションで 1 回だけ確定する（[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）。確定の前に落ちたバッチは、前借りした予算を手元から失う（数が上限に向かって多めに進むだけで、索引に入れすぎることはない）。
 - Valkey が落ちたとき：手元の予算を使い切ったら、上限を `上限 ÷ 組織のパーティションの数` として流れごとに数える。Valkey が戻ったら、手元の数を足し戻す。
@@ -404,11 +404,11 @@ sequenceDiagram
 | `log_indexes`（組織の表） | 並び、フィルター、1 日の上限、日の区切りの時刻と時間帯、保持の期間 | `(tenant_id, index_id)` | 9 |
 | `log_exclusion_filters`（組織の表） | 索引、並び、条件、率 | `(tenant_id, index_id, position)` | 9.1 |
 | `log_metrics`（組織の表） | 名前、条件、集計、グループのタグ | `(tenant_id, metric_id)`、`(tenant_id, name)` 一意 | 10 |
-| `processor_batches`（Kafka のトランザクションの補助、S3） | パーティション、オフセットの範囲、使った設定のバージョン | `(partition, start_offset)` | 7.4 |
+| `processor_batches`（Kafka のトランザクションの補助、S3） | パーティション、オフセットの範囲、使った設定のバージョン。組の版が変わったときだけ書く（[data-model.md](data-model.md) の D-25） | キー `<cell>/log-processor/batches/p<partition>/<start_offset>.bin` | 7.4 |
 | MSK のトピック `derived-partials` | 系列の鍵、桶の時刻、部分の値、出どころ（`logs`・`spans`） | パーティションの鍵は系列の鍵。保持 24 時間 | 10.2 |
 | MSK の `logs` のメッセージに足す項目 | `log_id`、`route`、`pipeline_config_version`、`scrub_rules_version`、`pipeline.errors` | — | 6、9 |
-| Valkey | `quota:{tenant}:{index}:{day}` | 失ってよい | 9.2 |
-| S3 | `<cell>/<tenant_id>/config/pipelines/v<N>.bin`、`<cell>/derived-metrics/checkpoints/...` | — | 7.4、10.2 |
+| Valkey | `idxq:{tenant}:{index}:{day}` | 失ってよい | 9.2 |
+| S3 | `<cell>/<tenant_id>/config/pipelines/v<N>.bin`（区分 `config`）、`<cell>/<tenant_id>/derived-metrics/checkpoints/...`（組織ごと。D-39） | — | 7.4、10.2 |
 
 ## 15. テスト
 

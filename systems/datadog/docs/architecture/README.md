@@ -1,6 +1,6 @@
 # Architecture: Datadog
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節、表と置き場所の索引は [data-model.md](data-model.md)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。データモデルの正本（規約、ER 図、表の目録、ファイルの形式、Aurora の外の置き場所、横断の不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -392,6 +392,21 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - 負荷と費用のモデルは [capacity.md](capacity.md)、単価と単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節と出典。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
 
+### 決定（2026-10-09、データモデル）
+
+データモデルの完全版を [data-model.md](data-model.md) と [data-model/](data-model/) に作り、形（表・列・キー・索引・分割・保持・ファイルのバイトの並び）の正本をそこへ移した。領域の文書の「data-model への項目」は提案の記録として残す。名前・列・置き場所の決まっていなかったところは、推奨の案で決めた（[data-model.md](data-model.md) の 7 節の D-1〜D-41）。ADR の決定は変えていない。主なものは次のとおり。
+
+- **スキーマと RLS の外の表**：`public`（テナントの表 79 と、登録簿 `users`・`user_mfa_factors`・`sessions`・`tenant_cells`・`intake_keys_index`）と `maint`（15 表）。解約の消去の記録 `maint.tenant_purge_runs` を足した（組織の行を消した後も残す）。ADR-0003 に注記した。経路（X1〜X4）は増やしていない（D-1・D-27）。
+- **列の名前の揃え**：セルは `cell_id`、カタログの状態は `active`・`superseded`・`deleting`・`deleted`、保持の区分は `class`（S3 のタグと同じ）、ブロックの種類は `kind`（D-2・D-5・D-6）。権限は `logs.data.delete`・`dashboards.read`・`dashboards.write`（D-24。ADR-0036・ADR-0048 に注記）。索引の 1 日の上限の鍵は `idxq:`（D-23。ADR-0032 に注記）。
+- **冪等の鍵**：不変のファイルのカタログの ID は決まった入力の xxh3_128（D-3）。分割した表の主キーは分割の鍵を含める（D-4）。通知の依頼は `dedup_key`、送信の行の分割の鍵は依頼の作成の時刻（D-14）。
+- **作らない表**：`metric_block_stats` は作らず、費用の見積もりはブロックの統計の区画を読む（D-7。ADR-0026 に注記）。`processor_batches` は S3 のオブジェクトで、バージョンの組が変わったときだけ書く（D-25）。
+- **足した表**：`tenant_settings`（各領域の「足す列」を集めた）、`cardinality_limit_overrides`、`log_lookup_tables`、`outbox`、`maint.tenant_purge_runs`（D-9・D-16・D-27・D-34・D-37）。
+- **組織のデータは `<cell>/<tenant_id>/` の下だけ**：評価のスナップショット、集め直しの段のチェックポイント、写しの食い違いの調べのキーを直した。S3 の区分に `config` を足した（D-39・D-40。ADR-0009 に注記）。
+- **評価の主体**：`eval_principal_type`（`roles`・`team`・`service_account`）と、保存した時点の役割の写し（D-12）。ダウンタイムと複合の子はバージョンの行にし、再生で同じ定義を使う（D-13）。
+- **保持**：`monitor_transitions` 90 日（D-11）、`slo_hourly` 92 日（90 日の窓の端の時の行。D-28）。
+- **ファイルの形式**：リトルエンディアン、`TSB1` の頭・区画の表・末尾、`codec_id` 16 のチャンクは 65,535 バイトでも閉じる、`TSC1`・`LSEG`・`LTMB`・`tidx`・`THBF`・`EVR1` の頭（D-29・D-30）。読み手はファイルの頭の `tenant_id` を確かめる（D-31）。
+- 直した領域の文書の一覧は [data-model.md](data-model.md) の 7 節にある。
+
 持ち越し（法務、計測・PoC・選定・確認で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
@@ -410,7 +425,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 未検証の単価（Aurora、ネットワーク、自己監視、S3 の要求の数、`r7gd.2xlarge`） | E13 の `cost-baseline` |
 | 売りすぎの比（1.5 倍） | PM と Ops。E13 の後 |
 | S2 のセルの分け方、カタログの Aurora の分け方 | S2 の前に別の ADR |
-| データモデルの完全版（ER 図、列、索引、分割） | 後の工程。今は [data-model.md](data-model.md) が索引 |
+| `monitor_transitions` の量（90 日で 約 13 億行）と Aurora の容量、ブロックの統計の区画の範囲の GET の遅れ、ファイルの形式の大きさの効き | E3・E4・E5・E7 の PoC と負荷試験（[data-model.md](data-model.md) の 9 節） |
 | 本家の振る舞いで未確認のもの（テールサンプリング、SLA、内部のクエリの計画、上限の超過の振る舞い、ログの取り込みのバイトの数え方、Webhook の署名と再試行、重なるデータセットの合わせ方、インシデントの状態） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 ## 7. 領域の文書（計画）
@@ -435,7 +450,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [tenancy-and-rbac.md](tenancy-and-rbac.md) | 組織、利用者、チーム、役割と権限、独自の役割、SSO・SCIM、データのアクセスの制限、監査ログ、サービスのアカウント | 0051–0053 | セキュリティ | E11 |
 | [usage-and-billing.md](usage-and-billing.md) | 利用量の単位と数え方（ホスト、カスタムメトリクス、ログ、スパン）、計測の経路、時間ごとの集計、上限と通知、課金のシステムへの受け渡し | 0054–0055 | QA、PM | E12 |
 | [security.md](security.md) | 脅威モデル、キーと秘密、暗号化と鍵、PII の扱い、通信の制限、監査、開示の請求の手順（法務の L1・L5・L6） | 0056–0058 | セキュリティ | E1、E11、E13 |
-| [data-model.md](data-model.md) | データモデルの索引（管理の DB の表、S3 のパス、MSK のトピックとメッセージ）。完全版（ER 図、列）は後の工程 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約、ER 図、表の目録（列・キー・索引・CHECK・RLS・分割・保持・量）、ファイルの形式（`TSB1`・`codec_id` 1・16・`TSC1`・`LSEG`・`tidx`）、Aurora の外の置き場所、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、セルの構成と割り当て、EC2 のキャパシティー、MSK の構成、egress、DR（大阪）、段階を上げる基準 | 0059–0061 | Ops | E1、E13 |
 | [observability.md](observability.md) | 自己監視（別のアカウントの経路、見張りの系列とモニター、水位の計測）、SLI、ドッグフーディングの範囲 | 0062–0063 | Ops | E1、E13 |
 | [capacity.md](capacity.md) | 負荷のモデル（点・ログ・スパン・クエリ・評価）、部品ごとの必要量、費用のモデル、負荷試験 | 0064 | Ops | E13 |

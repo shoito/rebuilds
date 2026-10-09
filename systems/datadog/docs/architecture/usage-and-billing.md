@@ -278,7 +278,7 @@ ADR-0055。
 | --- | --- | --- |
 | `usage_hourly` | `(tenant_id, hour, unit, class)`、`quantity`、`state`（`provisional`・`final`） | 5 |
 | `usage_hosts_hourly` | `(tenant_id, hour, host_key)` の一意の行 | 5.1 |
-| `usage_offsets`（RLS の外。X2 の経路） | `(consumer, topic, partition)`、`next_offset` | 5.1 |
+| `usage_offsets`（RLS の外。X2 の経路） | `(cell_id, consumer, topic, partition)`、`next_offset`、`src_positions`（出どころの位置。[data-model.md](data-model.md) の D-26） | 5.1 |
 | `usage_ingested_objects` | 取り込んだブロック・セグメントの ID | 5.2 |
 | `usage_adjustments` | 確定の後の調整の行 | 5.3 |
 | `usage_monthly` | 月の確定の値。親の組織の行に子の ID | 5.3、6 |

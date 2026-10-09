@@ -105,7 +105,7 @@ stateDiagram-v2
 
 ### 5.4 大きさ
 
-- S1 で組織あたり SLO 50 を見込むと、5 万の SLO。時の行は 3 日分（72 行）で 360 万行、日の行は 400 日で 2,000 万行。Aurora の組織の表に置き、月ごとに分ける。
+- S1 で組織あたり SLO 50 を見込むと、5 万の SLO。時の行は 92 日分（窓の始まりが時の単位に揃うので、90 日の窓の端の時の行が要る。[data-model.md](data-model.md) の D-28）で 約 1.1 億行、日の行は 400 日で 2,000 万行。日の行への畳みは確定から 3 日。Aurora の組織の表に置き、月ごとに分ける。
 
 ## 6. バーンレートのアラート
 
@@ -230,7 +230,7 @@ stateDiagram-v2
 | --- | --- | --- | --- |
 | `slos`（組織の表） | 種類、クエリ（IR）、モニターとグループ、目標、窓、時間帯、データなしの扱い、作った人の役割、バージョン | `(tenant_id, slo_id)` | 4 |
 | `slo_corrections`（組織の表） | 1 回か RRULE、時間帯、理由 | `(tenant_id, slo_id, correction_id)` | 4、5.1 |
-| `slo_hourly`（組織の表、月ごと） | 時、`good`、`total`、状態（暫定・確定）、計算の時刻 | `(tenant_id, slo_id, hour)` | 5.1 |
+| `slo_hourly`（組織の表、月ごと） | 時、`good`、`total`、状態（暫定・確定）、計算の時刻。保持 92 日（D-28） | `(tenant_id, slo_id, hour)` | 5.1 |
 | `slo_daily`（組織の表、年ごと） | 日、`good`、`total` | `(tenant_id, slo_id, day)` | 5.2 |
 | `incidents`（組織の表） | 7.1 節の項目、状態 | `(tenant_id, incident_id)`、`(tenant_id, number)` 一意 | 7 |
 | `incident_counters`（組織の表） | 次の番号 | `(tenant_id)` | 7.1 |

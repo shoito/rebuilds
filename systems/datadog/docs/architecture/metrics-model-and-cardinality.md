@@ -255,9 +255,9 @@ stateDiagram-v2
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `metric_metadata`（テナントの表） | `metric_name`、`type`（`gauge`・`count`・`rate`・`distribution`）、`interval_s`、`monotonic`、`unit`、`unit_history`、`otel_name`、`description`、`first_seen_at`、`source`（`statsd`・`otlp`・`api`、分布の精度の印は [distributions-and-sketches.md](distributions-and-sketches.md) の 10 節） | `(tenant_id, metric_name)` | 4.2、4.3 |
-| `cardinality_limits`（テナントの表） | 組織の上限 `L`、作成の速さ `R`、指標ごとの上限の上書き、変更者と理由 | `(tenant_id)`、`(tenant_id, metric_name)` | 7.2 |
-| `cardinality_overflow_events`（テナントの表） | 分の時刻、`metric_name`、溢れた点の数、新しい系列の試みの数、タグの鍵の上位 3 つと推定の数、パーティション | `(tenant_id, metric_name, minute)`。月ごとに分け、90 日で消す | 7.5 |
+| `metric_metadata`（テナントの表） | `metric_name`、`type`（`gauge`・`count`・`rate`・`distribution`）、`interval_s`、`monotonic`、`unit`、`unit_history`、`otel_name`、`description`、`first_seen_at`、`source`（`statsd`・`otlp`・`api`・`derived`）、`conversion`（分布の取り込みの変換。[distributions-and-sketches.md](distributions-and-sketches.md) の 10 節。[data-model.md](data-model.md) の D-8） | `(tenant_id, metric_name)` | 4.2、4.3 |
+| `cardinality_limits`・`cardinality_limit_overrides`（テナントの表） | 組織の上限 `L`、作成の速さ `R`、`epoch`、変更者と理由。指標ごとの上限の上書きは別の表（D-9） | `(tenant_id)`、`(tenant_id, metric_name)` | 7.2 |
+| `cardinality_overflow_events`（テナントの表） | 分の時刻、`metric_name`、溢れた点の数、新しい系列の試みの数、タグの鍵の上位 3 つと推定の数、パーティション | `(tenant_id, metric_name, minute, partition)`（D-10）。月ごとに分け、90 日で消す | 7.5 |
 | `metric_tag_selections`（テナントの表） | `metric_name`、`keep_keys`、`effective_hour`、変更者 | `(tenant_id, metric_name, effective_hour)` | 8 |
 | MSK `metrics` の制御のレコード | `LimitUpdate`、`TagSelectionUpdate` | パーティションの鍵は組織のパーティションのすべて | 7.2、8 |
 | Valkey | `card:{cell}:{tenant}:{partition}`（1 分ごとの有効な系列と溢れの数）、期限 5 分 | — | 7.2 |

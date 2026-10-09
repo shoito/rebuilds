@@ -24,6 +24,8 @@ date: 2026-10-09
 1 を採用する。詳細は [dashboards.md](../architecture/dashboards.md) の 8 節。
 
 - 組織の中で `dashboards_read` を持つ人が見られる。データは見る人の役割の制限で描く。
+
+> 2026-10-09 の注記（データモデル）：権限の名前を [ADR-0051](0051-roles-permissions-and-data-access-restrictions.md) の形に揃え、`dashboards.read` と読む（[data-model.md](../architecture/data-model.md) の D-24）。
 - 共有のリンクは `/s/<短い ID>`（128 ビットの乱数の base62）。状態（時間の範囲、変数の値、選んだウィジェット）は `dashboard_share_links` に置く。開くには組織へのログインが要り、セッションの組織で引く。作成から 1 年で失効（延長できる）。
 - 公開（認証なし）・招待（組織の外のアドレス）・埋め込みは MVP に入れない。**法務の確認待ち：L1・L2・L7・L9** の後に別の ADR で決める。そのときの候補は、ダッシュボードに結んだ読み取りのサービスのアカウントの権限、期限の既定 30 日、窓の選び方の制限、ログの一覧のウィジェットを出さないこと。
 

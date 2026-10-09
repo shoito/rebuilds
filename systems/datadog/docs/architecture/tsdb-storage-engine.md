@@ -197,7 +197,7 @@ sequenceDiagram
     B->>B: drop hour H from head after match
 ```
 
-- **貸し出し**：`ingest_shard_leases(cell, partition, holder, epoch, expires_at)`。期限 30 秒、10 秒ごとに延ばす。持ち主が落ちたら、もう一方が `epoch + 1` で取る。確定のトランザクションで `epoch` を確かめ、古い持ち主の確定を拒む（フェンシング）。
+- **貸し出し**：`maint.ingest_shard_leases(cell_id, partition, holder, epoch, expires_at)`。期限 30 秒、10 秒ごとに延ばす。持ち主が落ちたら、もう一方が `epoch + 1` で取る。確定のトランザクションで `epoch` を確かめ、古い持ち主の確定を拒む（フェンシング）。
 - **条件つきの PUT**：キーは決定的（`.../<hh>/p<partition>.blk`）。すでにあれば（412）、置かれたもののチェックサムを読んで比べる。同じなら確定へ進み、違えば 6.5 節。
 - **1 つのトランザクション**：`metric_blocks` の行（組織ごと）と `ingest_checkpoints` の行を同時に書く。オフセットを先に進めない（[ADR-0002](../decisions/0002-intake-log-on-msk.md)）。`metric_blocks` はテナントの表なので、X2 の経路で組織ごとに `SET LOCAL app.tenant_id` を切り替えて書く。
 - 確定の後、両方の写しがその時間をヘッドから外す。ただし、もう一方の写しは比べが一致してから外す。
@@ -223,7 +223,7 @@ sequenceDiagram
 ### 6.5 写しの食い違い
 
 - もう一方の写しのチェックサムが違えば、`metric_block_verifications` に `mismatch` を書き、そのパーティションの `ingest_checkpoints.halted = true` にする。書き出しを止め、呼び出す（runbooks の「ブロックの写しの一致」、SEV2 から）。
-- 止めている間も、両方の写しはヘッドを持ち続け、クエリに答える。確定済みのブロックはそのまま読める。食い違ったブロックの写しは、調べるために `quarantine/` の接頭辞に置く。
+- 止めている間も、両方の写しはヘッドを持ち続け、クエリに答える。確定済みのブロックはそのまま読める。食い違ったブロックの写しは、調べるために組織の接頭辞の下の `…/h-3d/<yyyy>/<mm>/<dd>/<hh>/quarantine/p<partition>-<replica>.blk` に置く（[data-model.md](data-model.md) の D-39）。
 - 3 つ目の作り直し（新しいインジェスターが `replay_from` の前の確定の行から読み直す）で、どちらが正しいかを決める。MSK の 24 時間の保持の中で決めれば、データは失わない。
 - 止めている間はヘッドが大きくなる（1 時間あたり約 0.5 倍）。メモリーの余裕は infrastructure.md で、止める長さの上限は 6 時間（それを超えたら、多数の一致したほうで確定する手順を runbook に書く）。
 
@@ -383,12 +383,12 @@ stateDiagram-v2
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `metric_blocks`（テナントの表） | `block_id`、区分（`hourly`・`raw`・`r1m`・`r1h`・`r1h_month`）、時刻の始めと終わり、`partition`（時間のブロック）、`series_range`、S3 のキー、大きさ、系列の数、点の数、全体の xxh3_128、形式のバージョン、`codec_id`、状態（`active`・`superseded`・`deleting`）、`superseded_by`、作成の時刻 | `(tenant_id, block_id)`。索引 `(tenant_id, class, time_start) WHERE state='active'`。月ごとに分ける | 6.3、9.2 |
-| `ingest_checkpoints`（組織を持たない運用の表） | `cell`、`partition`、`flushed_hour`、`replay_from_offset`、`halted`、更新の時刻 | `(cell, partition)` | 6.3〜6.5 |
-| `ingest_shard_leases`（同上） | `cell`、`partition`、`holder`、`epoch`、`expires_at` | `(cell, partition)` | 6.3 |
-| `metric_block_verifications`（同上） | `cell`、`partition`、`hour`、写し、チェックサム、一致・不一致、時刻 | `(cell, partition, hour, replica)` | 6.3、6.5 |
+| `metric_blocks`（テナントの表） | `block_id`、区分（`hourly`・`raw`・`r1m`・`r1h`・`r1h_month`）、時刻の始めと終わり、`partition`（時間のブロック）、`series_range`、S3 のキー、大きさ、系列の数、点の数、全体の xxh3_128、形式のバージョン、`codec_id`、状態（`active`・`superseded`・`deleting`・`deleted`）、`compaction_run_id`・`superseded_at`（`superseded_by` の代わり。D-5）、作成の時刻。種類の列は `kind`、保持の区分は `class` | `(tenant_id, block_id, time_start)`。索引 `(tenant_id, kind, time_start) WHERE state='active'`。月ごとに分ける（[data-model/tsdb-formats.md](data-model/tsdb-formats.md) の 2.1 節） | 6.3、9.2 |
+| `ingest_checkpoints`（組織を持たない運用の表） | `cell_id`、`partition`、`flushed_hour`、`replay_from_offset`、`halted`、更新の時刻 | `(cell_id, partition)` | 6.3〜6.5 |
+| `ingest_shard_leases`（同上） | `cell_id`、`partition`、`holder`、`epoch`、`expires_at` | `(cell_id, partition)` | 6.3 |
+| `metric_block_verifications`（同上） | `cell_id`、`partition`、`hour`、写し、チェックサム、一致・不一致、時刻 | `(cell_id, partition, hour, replica)` | 6.3、6.5 |
 | `partition_set_changes`（テナントの表） | `k`、`effective_hour`、理由 | `(tenant_id, effective_hour)` | 3.2 |
-| S3 | 7.2 節のキー。`quarantine/`（食い違いの調べ） | — | 7.2、6.5 |
+| S3 | 7.2 節のキー。食い違いの調べは `…/h-3d/…/quarantine/`（組織の接頭辞の下。D-39） | — | 7.2、6.5 |
 | MSK `metrics` | 点のレコード、`Tick`、制御のレコード | — | 4.2 |
 
 - `ingest_checkpoints`・`ingest_shard_leases`・`metric_block_verifications` は組織を持たない運用の表で、統合の工程で [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の RLS の外の表の一覧に、保守のスキーマ `maint` の表として足した。

@@ -26,6 +26,8 @@ date: 2026-10-09
 1 を採用する。詳細は [log-storage-and-search.md](../architecture/log-storage-and-search.md) の 10 節。
 
 - 請求：管理者が条件・期間・範囲を出す。権限 `logs_delete_data`。既定で別の管理者の承認を求める。条件は暗号化して持つ。
+
+> 2026-10-09 の注記（データモデル）：権限の名前を [ADR-0051](0051-roles-permissions-and-data-access-restrictions.md) の `<領域>.<対象>.<操作>` に揃え、`logs.data.delete` と読む（[data-model.md](../architecture/data-model.md) の D-24）。
 - 隠す：範囲のセグメント・アーカイブのファイルに検索を当て、当たった行の番号を、セグメントごとの累積の墓標（Roaring bitmap、`.tomb-<gen>`）に書き、カタログの `tombstone_gen` を上げる。読み手は条件の評価の前に墓標の行を除く。辞書の件数による近道を使わない。結果のキャッシュの世代を上げる。
 - 消す：`compactor` が墓標のあるセグメントを優先して書き直し、古いオブジェクトを消す。アーカイブも書き直す。組織の法的な保全（[ADR-0057](0057-data-lifecycle-and-deletion-framework.md)）の間は、墓標は付けるが書き直しを止める。
 - S3 の古いバージョンを `versionId` で明示に消す手段を用意し、使うかは L5 の後に決める。

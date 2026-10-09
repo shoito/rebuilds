@@ -33,6 +33,8 @@ date: 2026-10-09
 
 - 振り分け：索引の並びで最初にフィルターに合った索引。除外は最初に合った除外のフィルターの率 `r` で、`xxh3_64(tenant_id ‖ index_id ‖ rule_id ‖ log_id) / 2^64 < r` なら残す。結果（`indexed`・`excluded`・`over_quota`・`unrouted`）を `logs` のメッセージに書く。どの結果でもアーカイブとライブテールに流れる。
 - 1 日の上限：Valkey の `quota:{tenant}:{index}:{day}` から 1,000 件ずつ前借りする。日の区切りの時刻と時間帯は索引ごと（既定 `Asia/Tokyo` の 0 時）。超過は最大で「1,000 × 組織のパーティションの流れの数」。Valkey が落ちたら、上限をパーティションの数で割って流れごとに数える。
+
+> 2026-10-09 の注記（データモデル）：取り込みの割り当ての `quota:{cell}:{tenant}:{window}` と紛れないように、鍵の名前を `idxq:{tenant}:{index}:{day}` にした（[data-model.md](../architecture/data-model.md) の D-23）。決定は変えていない。
 - ログから作るメトリクス：マスクの後・振り分けの前のすべてのログから、10 秒の桶の部分の値を作り、`derived-partials`（パーティションの鍵は系列の鍵、保持 24 時間）へ書く。`derived-metrics-aggregator` が桶の終わり＋20 秒で合計を `metrics` へ書き、遅れた部分の値が来たら同じ系列・同じ時刻の点を新しい合計で書き直す。桶の状態は 65 分持つ。
 - `derived-partials` と `derived-metrics-aggregator` は、スパンから作る RED メトリクスとサービスマップの辺でも使う（[ADR-0039](0039-red-metrics-and-service-map-before-sampling.md)）。
 

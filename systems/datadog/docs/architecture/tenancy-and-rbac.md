@@ -57,7 +57,7 @@ erDiagram
     data_access_datasets ||--o{ dataset_grants : "役割かチーム"
     tenants ||--o{ service_accounts : ""
     tenants ||--o{ application_keys : "持ち主は利用者かサービスのアカウント"
-    tenants ||--|| tenant_cells : ""
+    tenants ||--|{ tenant_cells : "区切りごと"
 ```
 
 - **組織（`tenants`）**：テナントの単位。`parent_tenant_id` で親を持てる（1 段だけ。孫は作らない）。
@@ -77,7 +77,7 @@ ADR-0051。
 | 領域 | 権限 |
 | --- | --- |
 | メトリクス | `metrics.data.read`、`metrics.metadata.write`（単位・説明）、`metrics.tag_config.write`（クエリに残すタグ、[ADR-0006](../decisions/0006-cardinality-policy.md)） |
-| ログ | `logs.data.read`、`logs.live_tail.read`、`logs.pipelines.write`、`logs.indexes.write`、`logs.rehydrate.write`、`logs.archive.read` |
+| ログ | `logs.data.read`、`logs.live_tail.read`、`logs.pipelines.write`、`logs.indexes.write`、`logs.rehydrate.write`、`logs.archive.read`、`logs.data.delete`（削除の請求） |
 | トレース | `apm.data.read`、`apm.retention.write`（テールサンプリングの規則） |
 | モニター | `monitors.read`、`monitors.write`、`monitors.downtime.write` |
 | ダッシュボード・SLO・インシデント | `dashboards.read`、`dashboards.write`、`dashboards.share`、`slos.read`、`slos.write`、`incidents.read`、`incidents.write` |
@@ -366,9 +366,9 @@ sequenceDiagram
 | `dataset_grants` | データセット → 役割かチーム | 6.1 |
 | `data_access_outside_policy` | 信号ごとの `visible`・`restricted` | 6.1 |
 | `service_accounts` | 主体、役割 | 4、7.3 |
-| `application_keys` に足す列 | `owner_type`（`user`・`service_account`。列の正本は [otlp-and-api-keys.md](otlp-and-api-keys.md) の 12 節）、`scopes`、`expires_at`、`allowed_cidrs` | 7.3 |
+| `application_keys` に足す列 | `owner_type`（`user`・`service_account`。列の正本は [otlp-and-api-keys.md](otlp-and-api-keys.md) の 12 節）、`scopes`、`expires_at`。送り元の範囲は組織ごとの `tenant_settings.app_key_allowed_cidrs`（[data-model.md](data-model.md) の D-16） | 7.3 |
 | `sso_configs`・`sso_group_mappings`・`scim_tokens` | SSO の設定、グループの対応、SCIM のトークンのハッシュ | 7.2 |
-| `tenant_cells` に足す列 | `cell_id`、`from_ts`（区切り `H`）、`move_state` | 10.2 |
+| `tenant_cells` に足す列 | `cell_id`、`from_ts`（区切り `H`）、`move_state`。主キーは `(tenant_id, from_ts)`（D-17） | 10.2 |
 | `cell_moves` | 移し替えの記録と、写しの確かめの結果 | 10.2 |
 | MSK の `audit` トピック | 監査の事象（`tenant_id`、種類、主体、対象の ID、数） | 8 |
 | S3 `<cell>/<tenant_id>/logs/audit-<日数>/...` | `audit` の索引のセグメント | 8.2 |

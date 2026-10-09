@@ -341,7 +341,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | `trace_segments`（組織の表、月ごと） | `log_segments` と同じ列 | `(tenant_id, segment_id)`、`(tenant_id, t_max)` | 9.1 |
 | `trace_hours`（組織の表） | 時、`tidx` と時のブルームフィルターの S3 のキー、トレースの数 | `(tenant_id, hour)` | 9.2 |
-| `assembler_offsets` | パーティション、確定の位置 | `(cell, partition)` | 9.1 |
+| `assembler_offsets` | パーティション、確定の位置 | `(cell_id, partition)`（`maint`。[data-model.md](data-model.md) の D-2） | 9.1 |
 | `trace_retention_rules`（組織の表） | 規則（条件、率）、並び | `(tenant_id, rule_id)` | 8.1 |
 | `tenant_settings` に足す列 | `trace_retention_budget`（既定 0.10）、組み立てのメモリーの割り当て | — | 6.4、8.2 |
 | S3 | `<cell>/<tenant_id>/traces/raw-15d/...`、`tidx`・時のブルームフィルター | — | 9 |

@@ -350,13 +350,13 @@ target(prev, v):
 | --- | --- | --- | --- |
 | `monitors`（組織の表） | 名前、種類、今のバージョン、持ち主、評価の主体、タグ、作成・削除 | `(tenant_id, monitor_id)` | 4 |
 | `monitor_versions`（組織の表） | 4.2 節の定義（JSON）、IR のハッシュ | `(tenant_id, monitor_id, version)` | 4.2 |
-| `monitor_transitions`（組織の表、月ごと） | 11 節の列 | `(tenant_id, monitor_id, group_key, seq, kind, renotify_n)`、`(tenant_id, t)` | 7、8、11 |
-| `eval_shard_leases`（RLS の外、X2 の経路） | シャード、持ち主のタスク、期限 | `(cell, shard)` | 5.1 |
+| `monitor_transitions`（組織の表、月ごと） | 11 節の列 | `(tenant_id, monitor_id, group_hash, seq, kind, renotify_n, t)`（グループは `group_hash`、分割の鍵 `t` を含める。[data-model.md](data-model.md) の D-11）、`(tenant_id, t)` | 7、8、11 |
+| `eval_shard_leases`（RLS の外、X2 の経路） | シャード、持ち主のタスク、期限 | `(cell_id, shard)`（`maint`。D-2） | 5.1 |
 | `downtimes`（組織の表） | 9.1 節の定義、バージョン | `(tenant_id, downtime_id)` | 9 |
 | `downtime_set_versions`（組織の表） | 組織のダウンタイムの集まりのバージョン | `(tenant_id, version)` | 9.2 |
 | `composite_children`（組織の表） | 複合と子、ラベル | `(tenant_id, composite_id, label)` | 10 |
 | Valkey | `wm:{tenant}:{signal}`（水位）、`evaluated_through:{tenant}:{monitor}` | 失ってよい | 5.3、10 |
-| S3 | `<cell>/<tenant_id>/evals/eval-30d/...`（入力の写し）、`<cell>/evals/snapshots/<shard>/...` | — | 11 |
+| S3 | `<cell>/<tenant_id>/evals/eval-30d/...`（入力の写し）、`<cell>/<tenant_id>/evals/snapshots/<shard>/...`（組織ごと。D-39） | — | 11 |
 
 - `eval_shard_leases` は組織をまたぐので、統合の工程で [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の RLS の外の表の一覧（保守のスキーマ `maint`）に足した。
 

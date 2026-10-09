@@ -146,14 +146,14 @@ sequenceDiagram
 
 ### 5.2 カタログ
 
-- `log_segments`：`tenant_id`、`segment_id`、`index_id`、`class`（`idx-7d` など）、`t_min`・`t_max`、`hour`、`s3_key`、`bytes`、`rows`、`format_version`、`tokenizer_version`、`state`（`active`・`replaced`・`deleting`・`deleted`）、`tombstone_gen`、`offset_ranges`、`created_at`、`replaced_at`。月ごとに分ける。FORCE RLS。
+- `log_segments`：`tenant_id`、`segment_id`、`index_id`、`class`（`idx-7d` など）、`t_min`・`t_max`、`hour`、`s3_key`、`bytes`、`rows`、`format_version`、`tokenizer_version`、`state`（`active`・`superseded`・`deleting`・`deleted`）、`tombstone_gen`、`offset_ranges`、`created_at`、`superseded_at`。月ごとに分ける。FORCE RLS。
 - 検索の計画は `(tenant_id, index_id, t_max)` の索引で、`t_max ≥ from` かつ `t_min < to` かつ `state = active` の行を引く。
 - 行の数の見込み（S1）：小さなセグメント（10 秒）は合わせで 2 時間以内に置き換わるので、同時にあるのは 組織 1,000 × 索引 2 × 360/時 × 2 時間 ＝ 約 144 万行。合わせた後は 1 日あたり、大きな組織の 512 MiB のセグメントと、小さな組織の時ごとのセグメントで 5 万行ほど。30 日で 150 万行。
 
 ### 5.3 合わせ
 
 - `compactor` が、（組織、索引、時）ごとに、時の終わりから 20 分たった後と、遅れたログで小さなセグメントが 8 個以上たまったときに合わせる。目標は 1 つ 512 MiB（圧縮の前）。
-- 合わせは新しいセグメントを書き、カタログの 1 つのトランザクションで新しい行を `active`、古い行を `replaced` にする。古いオブジェクトは 1 時間後に消す（走っている検索のため）。
+- 合わせは新しいセグメントを書き、カタログの 1 つのトランザクションで新しい行を `active`、古い行を `superseded` にする。古いオブジェクトは 1 時間後に消す（走っている検索のため）。
 - 墓標のある行は、合わせで落とす（10 節）。合わせの前後で、落とした行を除いた行の数と `log_id` の集まりのハッシュが一致することを確かめてから置き換える。
 
 ### 5.4 置き方（NVMe と S3）
@@ -166,7 +166,7 @@ sequenceDiagram
 | 読み手のメモリー | フッターの解いた形（LRU） | 1 台あたり 8 GiB |
 
 - S3 のキー：`<cell>/<tenant_id>/logs/<class>/<yyyy>/<mm>/<dd>/<hh>/<segment_id>.lseg`（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）。墓標は同じキーに `.tomb-<gen>` を足す。
-- NVMe のキャッシュの鍵は `tenant_id` と `segment_id` とページの番号。セグメントは不変なので無効化しない。`replaced`・`deleted` の通知（カタログの変更の outbox）で捨てる。最長 24 時間で捨てる。
+- NVMe のキャッシュの鍵は `tenant_id` と `segment_id` とページの番号。セグメントは不変なので無効化しない。`superseded`・`deleted` の通知（カタログの変更の outbox）で捨てる。最長 24 時間で捨てる。
 
 ## 6. 検索の実行
 
@@ -316,7 +316,7 @@ stateDiagram-v2
     rejected --> [*]
 ```
 
-- 請求は組織の管理者が API か画面で出す：検索の条件（例：`@usr.email:alice@example.com`。マスクの `hash` を使っていれば `[HMAC:...]` の値）、期間、範囲（索引・アーカイブ・再水和・すべて）、理由のコード。権限 `logs_delete_data` が要る。別の管理者の承認を既定で求める（1 人の組織は承認なしにできる設定）。
+- 請求は組織の管理者が API か画面で出す：検索の条件（例：`@usr.email:alice@example.com`。マスクの `hash` を使っていれば `[HMAC:...]` の値）、期間、範囲（索引・アーカイブ・再水和・すべて）、理由のコード。権限 `logs.data.delete` が要る。別の管理者の承認を既定で求める（1 人の組織は承認なしにできる設定）。
 - 請求の条件の文字列は個人のデータを含むので、請求の行に暗号化して持ち、完了の 30 日後に消す（期間は L5 の後に決める）。
 
 ### 10.2 隠す（墓標）
@@ -385,7 +385,7 @@ stateDiagram-v2
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `log_segments`（組織の表、月ごとに分ける） | 5.2 節の列 | `(tenant_id, segment_id)`、`(tenant_id, index_id, t_max)` | 5.2 |
-| `indexer_offsets` | パーティション、確定の位置、役割（索引・アーカイブ） | `(cell, role, partition)` | 5.1 |
+| `indexer_offsets` | パーティション、確定の位置、役割（索引・アーカイブ） | `(cell_id, role, topic, partition)`（`maint`。[data-model.md](data-model.md) の D-2） | 5.1 |
 | `log_archive_files`（組織の表） | 時、S3 のキー、行の数、バイト、`t_min`・`t_max`、`tombstone_gen`、状態 | `(tenant_id, file_id)`、`(tenant_id, hour)` | 8.1 |
 | `log_facets`（組織の表） | 属性の道、型、表示の名前 | `(tenant_id, path)` | 7 |
 | `log_id_attributes`（組織の表） | ID の属性の道 | `(tenant_id, path)` | 4.2 |

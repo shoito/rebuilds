@@ -219,7 +219,7 @@ flowchart LR
 
 ### 7.1 費用の見積もり
 
-- 計画のときに、区切りごとに、カタログの統計（`metric_blocks` の指標ごとの系列の数）から、系列の数の上の見積もり（フィルターの絞りを 1 とみなす）× 区切りの層の点の数 と、読むバイトを求める。
+- 計画のときに、区切りごとに、ブロックの統計の区画（指標ごとの系列の数。区画の表から範囲の GET で読み、キャッシュする。読めなければ `metric_blocks.series_count`。[data-model.md](data-model.md) の D-7）から、系列の数の上の見積もり（フィルターの絞りを 1 とみなす）× 区切りの層の点の数 と、読むバイトを求める。
 - 上限：系列 100 万、生の点 10 億（[ADR-0007](../decisions/0007-query-language.md)）。見積もりが生の層で超えるなら、区間を広げて粗い層に落とす（`interval_adjusted`）。落としても超えるなら 422 `query_too_expensive`（理由：系列か点か、見積もりの値）。
 - 実行の中でも、読み手が実際の系列の数を数え、上限を超えたら止めて `series_limit` の不完全にする（見積もりは上からなので、ふつうは起きない）。
 
@@ -268,7 +268,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `tenants` に足す列 | `query_cache_generation`（bigint） | — | 6 |
 | `query_tenant_limits`（テナントの表） | 重み、並行の上限（組ごと）、一時の引き下げと理由 | `(tenant_id)` | 7.2 |
-| `metric_blocks` の統計の列 | 指標ごとの系列の数（見積もり用。JSON か別の表 `metric_block_stats(tenant_id, block_id, metric_name, series_count)`） | `(tenant_id, block_id, metric_name)` | 7.1 |
+| ブロックの統計の区画 | 指標ごとの系列の数（見積もり用）。Aurora の表にしない（D-7。`metric_block_stats` は作らない） | — | 7.1 |
 | Valkey | `qc:...`（6 節）、`qgen:{tenant_id}` | 期限 24 時間・7 日 | 6 |
 
 ## 11. テスト
