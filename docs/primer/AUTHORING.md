@@ -14,13 +14,23 @@
 ## ファイルの形
 
 - 1 つの HTML ファイルに書く。CSS と JS は共通のもの（`docs/primer/assets/`）を相対パスで読む。
-- 外部から読むのは、共通の JS が読む Mermaid（jsdelivr）だけにする。画像は使わず、図は Mermaid かインラインの SVG にする。
+- `<head>` の直後に、既存のページと同じ Google アナリティクスのタグ（`G-LRH3HT8NDH`）を入れる（ルートの AGENTS.md）。
+- 外部から読むのは、このタグと、共通の JS が読む Mermaid（jsdelivr）だけにする。画像は使わず、図は Mermaid かインラインの SVG にする。
 - 本文は日本語で書く。短い文で、です・ます調にする。識別子とコードはそのまま。
 
 ```html
 <!doctype html>
 <html lang="ja">
 <head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slack の前提知識</title>
