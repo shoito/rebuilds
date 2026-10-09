@@ -1,6 +1,6 @@
 # Architecture: Datadog
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（まだない。計画は 7 節）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節、表と置き場所の索引は [data-model.md](data-model.md)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -43,6 +43,7 @@ flowchart TB
         tl[("logs-raw → logs")]
         ts[("spans")]
         tu[("usage")]
+        td[("derived-partials")]
     end
 
     subgraph dataplane["データの面（Rust、EC2 の NVMe のインスタンスの ECS）"]
@@ -52,7 +53,8 @@ flowchart TB
         ta["trace-assembler<br/>組み立て、テールサンプリング、<br/>RED メトリクス、サービスマップの辺"]
         comp["compactor<br/>ブロック・セグメントの合わせ、<br/>ロールアップの層、保持"]
         q["query-engine<br/>計画、扇形の展開、部分の集計、合わせ"]
-        ev["monitor-evaluator<br/>評価のシャード、状態の機械、水位"]
+        ev["monitor-evaluator（slo-calculator）<br/>評価のシャード、状態の機械、水位"]
+        dm["derived-metrics-aggregator<br/>ログ・スパンから作る指標を<br/>1 系列 1 書き手で集め直す"]
     end
 
     subgraph control["管理の面（TypeScript・Hono、Fargate）"]
@@ -79,8 +81,10 @@ flowchart TB
     lp --> tl
     tl --> li
     ts --> ta
-    ta --> tm
-    lp --> tm
+    ta --> td
+    lp --> td
+    td --> dm
+    dm --> tm
     ing --> s3
     li --> s3
     ta --> s3
@@ -112,7 +116,9 @@ flowchart TB
 | `trace-assembler` | `trace_id` でパーティションを分けたスパンを、トレースごとにまとめ、テールサンプリングで残すものを決める。残したトレースを S3 へ。すべてのスパンから RED メトリクスとサービスマップの辺を作り、`metrics` のトピックへ（traces-and-sampling の領域） |
 | `compactor` | 小さなセグメントとブロックの合わせ、保持の層の移し（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）、保持の期限の削除 |
 | `query-engine` | クエリの IR の計画、時間とシャードへの扇形の展開、保存の側での部分の集計、合わせ、結果のキャッシュ。テナントごとの公平なキュー（[ADR-0007](../decisions/0007-query-language.md)） |
-| `monitor-evaluator` | モニターをシャードに分け、評価の時刻ごとに、取り込みの水位を待ってクエリを実行し、グループごとの状態を遷移させる。遷移を Aurora と outbox に書く（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)） |
+| `monitor-evaluator` | モニターをシャードに分け、評価の時刻ごとに、取り込みの水位を待ってクエリを実行し、グループごとの状態を遷移させる。遷移を Aurora と outbox に書く（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)）。同じバイナリ・同じシャードで `slo-calculator` が SLO の時の行を作る（[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)） |
+| `derived-metrics-aggregator` | ログから作るメトリクス、RED メトリクス、サービスマップの辺の部分の値を `derived-partials` から系列ごとに集め直し、1 系列を 1 つの書き手で `metrics` へ書く（[ADR-0032](../decisions/0032-index-routing-and-derived-metrics.md)、[ADR-0039](../decisions/0039-red-metrics-and-service-map-before-sampling.md)） |
+| `live-tail`、`rehydrator`、`deletion-worker`、`limits-coordinator` | ライブテール（`logs` から画面へ）、アーカイブからの再水和、削除の請求と解約の消去、カーディナリティの持ち分の配り直し（[logs-pipeline.md](logs-pipeline.md)、[ADR-0035](../decisions/0035-log-rehydration-jobs.md)、[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)、[ADR-0017](../decisions/0017-cardinality-admission-via-control-records.md)） |
 | `api`・`web-bff` | 管理の面。組織、利用者、役割、キー、モニター・ダッシュボード・SLO・インシデントの定義、利用量の表示。TypeScript・Hono |
 | `relay`・`notifier` | outbox を読み、通知（メール、チャット、Webhook、オンコールのサービス）を専用の egress から送る。重ねずに少なくとも 1 回 |
 | `usage-aggregator` | 取り込みの段の利用量を時間ごとにまとめる（usage-and-billing の領域） |
@@ -138,7 +144,7 @@ flowchart TB
 3. テナントのトークンバケットで量を確かめる。超えたら 429 と `Retry-After` を返す（エージェントはディスクに溜めて待つ）。
 4. テナントのパーティションの組から、系列の鍵のハッシュでパーティションを選び、MSK に書く。`acks=all` の確定の後に 202 を返す（[ADR-0002](../decisions/0002-intake-log-on-msk.md)）。
 5. `metrics-ingester`（2 つの写し）がパーティションを読み、系列の索引を引く。新しい系列ならカーディナリティの上限を確かめる（[ADR-0006](../decisions/0006-cardinality-policy.md)）。点をヘッドのチャンクに圧縮して足す。この時点でクエリに出る。
-6. 1 時間の区切りから 70 分たつと（遅れの窓 60 分＋猶予 10 分）、写しの片方（貸し出しの持ち主）がその時間のブロック（生の点、1 分・1 時間のロールアップ、系列の索引）を S3 に書き、ブロックの一覧（マニフェスト）とオフセットを確定する（[ADR-0004](../decisions/0004-tsdb-storage-engine.md)）。
+6. 1 時間の区切りから 70 分たつと（遅れの窓 60 分＋猶予 10 分。パーティションごとに 0〜5 分ずらす）、写しの片方（貸し出しの持ち主）がその時間のブロック（生の点、1 分・1 時間のロールアップ、系列の索引）を S3 に書き、ブロックの一覧（マニフェスト）とオフセットを確定する（[ADR-0004](../decisions/0004-tsdb-storage-engine.md)）。
 
 **B. ダッシュボードのクエリ**
 
@@ -180,7 +186,12 @@ flowchart TB
 | トレースのサンプリング | エージェントのヘッドサンプリング（1 秒 10 トレース）、エラーとまれなもののサンプラー。APM のメトリクスはサンプリングの前から | [Ingestion Mechanisms](https://docs.datadoghq.com/tracing/trace_pipeline/ingestion_mechanisms/)、[Ingestion Controls](https://docs.datadoghq.com/tracing/trace_pipeline/ingestion_controls/) |
 | モニター | 評価の窓、評価の遅らせ（最大 24 時間）、データなしの扱いの選択肢、マルチアラート、回復の閾値 | [Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/) |
 | キー | API キーは組織の単位、既定 50 本。アプリケーションキーは利用者に属しスコープを持つ | [API and Application Keys](https://docs.datadoghq.com/account_management/api-app-keys/) |
-| テールサンプリング、ホストの数え方、SLA、内部のクエリの計画の形 | 公式の資料で確かめられなかった（**未検証**） | — |
+| ログのモニター | 索引に入ったログだけを評価する（本システムも同じ。違いではない） | [Log Monitor](https://docs.datadoghq.com/monitors/types/log/) |
+| 共有のダッシュボード | 公開・招待・埋め込みの共有。見る人に作った人の権限でデータを見せる | [Shared Dashboards](https://docs.datadoghq.com/dashboards/sharing/shared_dashboards/) |
+| 複合モニター | 子 10 まで。マルチアラートの子は共通のグループを、タグの鍵ではなく値で合わせる | [Composite Monitor](https://docs.datadoghq.com/monitors/types/composite/) |
+| トレースの保持 | 保持のフィルターで残したスパンは 15 日、多様性のサンプリングで残したものは 30 日 | [Trace Retention](https://docs.datadoghq.com/tracing/trace_pipeline/trace_retention/) |
+| ホストの数え方 | 時間ごとに数え、月の時間の上位 1% を除いた中の最大で請求する | [Billing](https://docs.datadoghq.com/account_management/billing/) |
+| テールサンプリング、SLA、内部のクエリの計画の形 | 公式の資料で確かめられなかった（**未検証**） | — |
 
 いずれも 2026-10-09 に確認。この設計は振る舞いを参考にするが、本家のコード・エージェント・内部の形式は使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 
@@ -194,6 +205,13 @@ flowchart TB
 | アーカイブの置き場所 | 利用者のクラウドのバケット | MVP は本システムの S3（東京）。利用者のバケットは MVP の後 | 書き込みの権限の設計を後にする。データの所在を国内に固める（法務の L2） |
 | データの所在 | AP1 は日本。他のサイトもある | すべて日本（東京、DR は大阪） | 日本を最初の市場にする |
 | ヘッダーとキー | 本家の名前を含む | `<Brand>-Api-Key`、`<brand>_ik_` | リポジトリ共通の ADR-0006 |
+| 分布のカスタムメトリクスの数え方 | 組ごとに 5。パーセンタイルを有効にするとさらに 5 | 1 系列を 5 と数え、パーセンタイルで足さない | 指数のヒストグラム 1 つで全パーセンタイルが出て、原価が変わらない（[ADR-0054](../decisions/0054-metering-units-and-host-counting.md)） |
+| StatsD の `h`・`ms` | エージェントで集計し、平均・個数・最大・中央値・95 パーセンタイルの gauge にする | 分布（指数のヒストグラム）にする | サーバーで任意のパーセンタイルを正しく合わせられる。本家の形は [Metric Types](https://docs.datadoghq.com/metrics/types/)（[ADR-0029](../decisions/0029-distribution-ingest-conversions.md)、[intake-and-agent.md](intake-and-agent.md) の 4.3 節） |
+| 公開のダッシュボードの共有 | 公開・招待・埋め込みを持つ | 持たない。組織の中のリンクだけ | 法務の L1・L2・L7・L9 の後に別の ADR で決める（[ADR-0048](../decisions/0048-dashboard-sharing-scope.md)） |
+| ダッシュボードを描く権限 | 共有のダッシュボードは作った人の権限で見せる | 見る人の権限（データのアクセスの制限）で描く | 制限を回り込む経路を作らない（[ADR-0048](../decisions/0048-dashboard-sharing-scope.md)） |
+| 複合モニターのグループの合わせ | タグの値で合わせる | タグの鍵と値の組で合わせる | 違う意味のタグの値が偶然一致して誤って合わさるのを防ぐ（[ADR-0044](../decisions/0044-composite-monitors.md)） |
+| トレースの保持 | 15 日（保持のフィルター）と 30 日（多様性のサンプリング） | 15 日の 1 つ | サーバーのテールサンプリングで残すものを決めるので、保持を分けない（[traces-and-sampling.md](traces-and-sampling.md) の 17 節） |
+| エージェントでのスパンの間引き | エージェントがヘッドサンプリングで間引く | MVP では間引かない。SDK のヘッドサンプリング（`ot=th`）とサーバーのテールサンプリングだけ | RED メトリクスをサンプリングの前のすべてのスパンから数える（[ADR-0039](../decisions/0039-red-metrics-and-service-map-before-sampling.md)） |
 
 ## 2. 規模の段階
 
@@ -207,8 +225,8 @@ flowchart TB
 - 点の量は、ホストあたり 1,500 系列（システム、コンテナ、統合のメトリクス）を 15 秒ごと、カスタムメトリクスと RED メトリクスを足して見込んだ。有効な系列は、直近 1 時間に点のあった系列。
 - ログは組織あたり平均 50 GB/日、索引に入れる割合を 20% と見込んだ。スパンは要求あたり 20 スパンの平均。
 - モニターは組織あたり 500、グループは 1 モニターあたり平均 20。
-- S1 の保存（S3）は、メトリクスの生の点 1 点あたり平均 1.5 バイト（`tsdb-codec-poc` で確かめる）で 1 日 0.65 TB、ログのセグメント（圧縮で 1/8）で 1 日 6 TB の索引と 6 TB のアーカイブを見込む。
-- 段階を上げる基準は infrastructure の領域、負荷と費用のモデルは capacity の領域で決める。
+- S1 の保存（S3）は、メトリクスの生の点 1 点あたり平均 1.5 バイト（`tsdb-codec-poc` で確かめる）で 1 日 0.65 TB、ログのセグメント（圧縮で 1/8）で 1 日 1.25 TB の索引と 6.25 TB のアーカイブを見込む。
+- 段階を上げる基準は [infrastructure.md](infrastructure.md) の 10 節、負荷と費用のモデルは [capacity.md](capacity.md) にある。
 
 ### 2.1 費用のモデル
 
@@ -224,7 +242,9 @@ flowchart TB
 ```
 
 - 最も大きいのは、インジェスターのメモリー（有効な系列に比例）と MSK（取り込みの量に比例）と見込む。系列の上限（[ADR-0006](../decisions/0006-cardinality-policy.md)）と、ログの索引の選び方が、原価の制御の主な手段になる。
-- S1 の予算の仮の値（本システムの想定）は、カスタムメトリクス 100 系列・月あたり 0.5 USD、ログの取り込み 1 GB あたり 0.03 USD、索引 100 万件・15 日あたり 0.4 USD。capacity の領域で、PoC の計測と公開の価格で置き換える。
+- S1 の予算の仮の値（本システムの想定）は、カスタムメトリクス 100 系列・月あたり 0.5 USD、ログの取り込み 1 GB あたり 0.10 USD、索引 100 万件・15 日あたり 0.4 USD。PoC の計測と公開の価格で置き換える。
+- ログの取り込みは、最初の仮の値 0.03 USD に対し、公開の価格で見積もった原価が 0.100 USD（[usage-and-billing.md](usage-and-billing.md) の 9 節）だった。下げる手の全部を採っても 0.06〜0.07 USD にとどまる。統合の工程で、設計を変えずに予算を 0.10 USD に仮に上げた（PM の判断待ち。6 節の「決定（2026-10-09、統合）」）。
+- 月の原価の見積もり（S1、本番）は約 36.9 万 USD（±50%。[capacity.md](capacity.md) の 6 節）。
 
 ## 3. 非機能要件
 
@@ -262,14 +282,14 @@ flowchart TB
 | 実行基盤 | 管理の面と状態を持たない部品は ECS Fargate。状態を持つデータの面（インジェスター、インデクサー、組み立て、クエリの読み手）は ECS の EC2 のキャパシティープロバイダー（NVMe を持つインスタンス） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
 | オブジェクトストレージ | S3（SSE-KMS とバケットキー、保持の層、大阪への CRR） | [ADR-0009](../decisions/0009-retention-tiers-on-s3.md) |
 | IaC | Terraform | 他の題材と同じ |
-| 自己監視 | OpenTelemetry（ADOT）→ 別の AWS アカウントの AMP・CloudWatch・Managed Grafana。呼び出しは CloudWatch のアラームとオンコールのサービスの直接の連携 | [runbooks/](../runbooks/README.md) の 5 節。observability の領域 |
+| 自己監視 | OpenTelemetry（ADOT）→ 別の AWS アカウント（大阪）の AMP・CloudWatch・Grafana（OSS を Fargate で。Amazon Managed Grafana は大阪にない）。呼び出しは AMP・CloudWatch のアラームとオンコールのサービスの直接の連携 | [runbooks/](../runbooks/README.md) の 5 節、[observability.md](observability.md)、[ADR-0062](../decisions/0062-independent-self-monitoring-path.md) |
 | フラグ | AWS AppConfig | 他の題材と同じ |
 | Web の画面 | React（TypeScript）、グラフは Canvas の自前の描画 | dashboards の領域 |
 | テスト | Rust の `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、自前の参照の実装と再生の枠、自前の負荷の生成器、Testcontainers（PostgreSQL 18、Valkey、Kafka）、LocalStack、Playwright | [quality.md](../quality.md) |
 
 ## 5. 主な決定
 
-どれも `accepted`。0001〜0009 は最初の設計の起票。状態の一覧は [decisions/README.md](../decisions/README.md)。
+どれも `accepted`。0001〜0009 は最初の設計の起票で、下の表に置く。0010〜0066 は領域の文書の工程で起票した（0013・0023・0027 は空き）。各領域の ADR は 7 節の各文書の頭の表にあり、状態の一覧は [decisions/README.md](../decisions/README.md)。統合の工程で、決定を覆した・具体にした ADR に日付付きの注記を足した（6 節の「決定（2026-10-09、統合）」）。
 
 | ADR | 決定 |
 | --- | --- |
@@ -319,23 +339,83 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **自己監視**：別の AWS アカウントの AMP・CloudWatch と、外からの見張り（見張りの系列が出ること、見張りのモニターが鳴ること）で行う。本システムのモニターで本システムを呼び出さない（[runbooks/](../runbooks/README.md) の 5 節）。
 - **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
 
-持ち越し（法務、計測・PoC・選定で決めるもの）：
+### 決定（2026-10-09、統合）
+
+領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。最初の設計の ADR は直接直し、決定を覆した・具体にしたところに日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
+
+- **MSK の上での「1 回だけ」**（[ADR-0002](../decisions/0002-intake-log-on-msk.md) の注記）：領域の ADR で作り方が分かれていたので、1 つの方針に揃えた。
+  - 取り込みは Kafka のトランザクションを使わない（[ADR-0011](../decisions/0011-intake-gateway-pipeline-and-watermark-ticks.md)）。一部の失敗は 503、メトリクスは後勝ちで冪等。
+  - 出力が S3・Aurora の消費者は、出力とオフセットを同じ記録に、前の位置を条件に書く（ADR-0004、ADR-0005、[ADR-0020](../decisions/0020-block-flush-commit-and-replay.md)、[ADR-0040](../decisions/0040-trace-storage-and-id-lookup.md)、[ADR-0055](../decisions/0055-exactly-once-usage-aggregation-and-overage.md)）。
+  - 出力が MSK のトピックの `log-processor` だけがトランザクションを使う（[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）。MSK の Express はトランザクションの設定とラックを意識した読み出しの設定（`replica.selector.class`）を持つことを AWS の資料で確かめた（[ADR-0060](../decisions/0060-msk-express-and-ec2-fleets.md) の注記）。残るのは S1 の量での遅れと費用で、`msk-throughput-poc` で測る。
+  - 下流は出どころ（`src_partition`、`src_offset`）でも重複を除く。トランザクションが量に合わなければ、冪等のプロデューサーに切り替えても下流は変わらない。
+- **RLS の外の表**：領域の文書が足した組織を持たない運用の表（`ingest_checkpoints`、`ingest_shard_leases`、`metric_block_verifications`、`eval_shard_leases`、`indexer_offsets`、`assembler_offsets`、`usage_offsets` と、保守の表）を、保守のスキーマ `maint` として [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の一覧に足した。
+- **保持の区分と S3 の規則**（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md) の注記）：区分に `h-3d`・`rehyd-<N>d`・`audit-<N>d`・`eval-30d`・`ckpt-24h` を足した。ライフサイクルと複製の規則は、キーの接頭辞ではなくオブジェクトのタグ（`class`、`tier=l0|l1`）で絞る（[ADR-0061](../decisions/0061-dr-stage-up-and-cell-expansion.md)）。合わせの前の小さなオブジェクト（`l0`）は大阪の Standard に 2 日。タグで絞った複製では削除マーカーが写らないので、保持の削除・削除の請求・解約の消去は大阪の写しも明示に消す（[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) の注記）。
+- **層の一致**（[quality.md](../quality.md) の 2.2.1 節 C）：浮動小数点の合計は層で足す順序が違うので、`sum` は `差 ≤ 1e-12 × Σ|x_i|` を許容にした。`min`・`max`・`count`・最後の値は完全に一致のまま。同じ層の中は完全に一致のまま（同 B）。
+- **本家との意図した違い**（1.4 節）：分布の数え方（1 系列 5、パーセンタイルで足さない）、StatsD の `h`・`ms` を分布に、公開のダッシュボードの共有を持たない、ダッシュボードを見る人の権限で描く、複合モニターのグループをタグの鍵と値の組で合わせる、トレースの保持 15 日の 1 つ、エージェントでスパンを間引かない、を足した。ログのモニターが索引に入ったログだけを見ることは、本家も同じと確かめたので「確かめたこと」に置いた。
+- **足りなかった部品**：`derived-metrics-aggregator`（`fleet-derive`、`r7gd.2xlarge` × 3）、`live-tail`・`rehydrator`・`deletion-worker`・`limits-coordinator`（Fargate）を [infrastructure.md](infrastructure.md) の 3 節と [capacity.md](capacity.md) の 4・6 節に足した。`slo-calculator` は `monitor-evaluator` と同じバイナリで `fleet-eval` に載る（[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)、[ADR-0060](../decisions/0060-msk-express-and-ec2-fleets.md) の注記）。月の原価は約 36.5 万から約 36.9 万 USD になった。
+- **RED メトリクスの名前**：`<brand>.apm.*`（[ADR-0039](../decisions/0039-red-metrics-and-service-map-before-sampling.md)）に揃えた。usage-and-billing の `trace.*` を直した（[ADR-0054](../decisions/0054-metering-units-and-host-counting.md) の注記）。
+- **ログの取り込みの原価**（PM の判断待ち。[usage-and-billing.md](usage-and-billing.md) の 9 節）：公開の価格での原価は 1 GB 0.100 USD で、最初の仮の予算 0.03 USD の約 3 倍。選択肢と 1 GB あたりの原価は次のとおり。
+  - A. 予算を上げる：0.100（値段の下限 0.33）
+  - B. 値段をアーカイブと分ける：取り込み 0.069＋アーカイブ 0.031
+  - C. MSK の余裕を 2 倍から 1.5 倍へ（12 → 9 台）：0.094
+  - D. アーカイブを DR から外す：0.080
+  - E. 下げる手の全部：0.06〜0.07
+  - **推奨の既定（仮）は A**。予算を 0.10 USD に上げ、MSK の余裕とアーカイブの DR は変えない。C は最大のリスク（取り込みの崩壊）の守りを削り、D は NFR-005 を変え、どちらも効きが小さい。**残る問い**：ログの取り込みの値段（粗利 70% なら 0.33 USD 以上）、アーカイブを別の単位にするか、アーカイブの DR を組織が選べる設定にするか。
+- **カーディナリティの配り直し**：[ADR-0006](../decisions/0006-cardinality-policy.md) の「1 分ごとに配り直す」は、MSK の制御のレコードを同じオフセットで写しに届ける形に具体にした（[ADR-0017](../decisions/0017-cardinality-admission-via-control-records.md)。ADR-0006 の注記）。
+- **セルの移し替え**：[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の「二重の書き込み」は、点の時刻の 1 時間の区切り `H` で書き込み先を分ける形に具体にした（[ADR-0053](../decisions/0053-child-orgs-and-tenant-cell-moves.md)。ADR-0003 の注記）。
+- **TSDB への提案**：
+  - ブロックの書き出しのずらし 0〜5 分を**採った**。閉じる条件を `H + 2 時間 10 分 + s_p`（`s_p` はパーティションのハッシュから）にし、写しと読み直しで変わらない（[ADR-0020](../decisions/0020-block-flush-commit-and-replay.md) の注記）。書き出しは区切りから 70〜75 分、ヘッドは最大 約 2 時間 15 分。
+  - ヘッドの要約（オフセットで揃えた要約）を**採った**。5 分の区切りのオフセットで 2 つの写しが同じ値を作り、入れ替えの影の比べと写しの静かな食い違いの検出に使う（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.7 節、[ADR-0065](../decisions/0065-stateful-rollout-with-replica-handoff.md) の注記）。系列の抜き取りの比べは置き換えず、足す。
+- **自己監視**：Amazon Managed Grafana は大阪にないので、selfmon の Grafana は OSS を大阪の Fargate で動かす（AMP は大阪にある）。runbooks の 1 節に SLI「監査の読み出しの記録の欠け」「自己監視の経路の健全」「ヘッドの要約の一致」を足した。
+- **名前の揃え**：アプリケーションキーの表は `application_keys`（列 `owner_type`）。自己監視の手順は `self-monitoring-path-failure.md`。エージェントの廃止は「下限より古いものも受けてヘッダーで知らせ、6 か月の予告の後に 426」（[ADR-0066](../decisions/0066-format-versioning-and-compatibility-windows.md)、[intake-and-agent.md](intake-and-agent.md) の 4.8 節）。
+- **検証の工程での直し（2026-10-09）**：公式の資料を取得し直して、次を確かめ・直した。
+  - 本家の評価の窓は 1 分〜48 時間（メトリクスは 1 か月）。5 分からと書いていたのを直した（intent、ADR-0008、monitors-and-alerting）。評価の頻度は 24 時間未満 1 分、48 時間未満 10 分、それ以上 30 分。
+  - 本家のサイトは 9 つで AP1 は日本、API キーは組織ごとに既定 50 本、分布は組ごとに 5・パーセンタイルでさらに 5、Rust の時系列の保存の記事は 2025-08-04、Husky の記事は 2022-05-17（確認のみ）。
+  - 本家の StatsD の `h`・`ms` はエージェントで平均・個数・中央値・95 パーセンタイル・最大に集計される（intake-and-agent の未検証を外した）。
+  - MSK Express のトランザクションの設定とラックを意識した読み出しの設定（未検証を外した。量での遅れと費用は PoC）。
+  - NLB の TLS のリスナーは ALPN の方針（`HTTP2Only`・`HTTP2Preferred` など）を持つ（未検証を外した。gRPC の端から端までは E1 で確かめる）。
+  - S3 の複製はタグで絞れるが、タグの規則では削除マーカーが写らない（ADR-0057 の未検証を外し、明示の削除に改めた）。
+  - Amazon Managed Grafana は大阪で提供されていない。AMP は大阪で提供されている。
+  - `C7g`・`C7gd`・`R7gd`・`I4i` は大阪（ap-northeast-3）でも提供されている（AZ ごとの容量は未検証のまま）。
+  - OpenTelemetry の `ot=th` の仕様（TraceState: Probability Sampling）は Development のまま。`R ≥ T` で採り、重みは `2^56 / (2^56 − T)`。
+  - 電気通信事業法の外部送信規律の施行は 2023-06-16（確認のみ。結論は法務の L3・L4）。
+- **品質と運用**：
+  - 各領域の文書の「quality.md・runbooks・data-model への項目」を反映した。
+  - [quality.md](../quality.md) に、漏れの経路の表の 6 行、負荷の場面 3 つ、状態を持つ部品の入れ替えの試験、DR の訓練の失った範囲、デッドマンスイッチの段 2・3 の訓練、判定基準 3 行、Epic の合否基準を足した。
+  - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[self-monitoring-path-failure.md](../runbooks/self-monitoring-path-failure.md)、[noisy-neighbor.md](../runbooks/noisy-neighbor.md)）と計画のものに分けて一覧にした。
+  - 表と置き場所の索引は [data-model.md](data-model.md)。
+- **数値の正本**：
+  - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。
+  - 上限は各 ADR と runbooks の 2 節。
+  - 受け付けの窓は ADR-0004（メトリクス 過去 1 時間・未来 10 分）と ADR-0005（ログ 過去 18 時間）。ブロックは区切りから 70 分（`H + 2 時間 10 分`）＋ずらし 0〜5 分で閉じる（ADR-0020）。
+  - 保持は [ADR-0009](../decisions/0009-retention-tiers-on-s3.md) と [security.md](security.md) の 5.1 節の `retention_policies`。
+  - 負荷と費用のモデルは [capacity.md](capacity.md)、単価と単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節と出典。
+- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+持ち越し（法務、計測・PoC・選定・確認で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 法務の確認待ち（L1〜L9） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
-| MSK のブローカーの構成、パーティションの数、費用 | E2 の前の `msk-throughput-poc` |
-| 時系列のコーデックの比べ（Gorilla の形と ALP など） | E3 の前の `tsdb-codec-poc` |
-| インジェスターの系列あたりのメモリー | E3 の前の `ingester-memory-poc` |
-| ブルームフィルターの誤検出の率、日本語の 2-gram | E5 の前の `log-bloom-poc` |
+| 法務の確認待ち（L1〜L9） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない。PII のマスクの既定は L1、通知の本文のログの抜粋と国外の宛先は L2、ログの機械の読み取りは L3、削除の期限は L5、監査ログの保持は L6、SLA・超過の文言は L7、公開の共有と画面の寄せ方は L1・L2・L7・L9 |
+| ログの取り込みの値段と単位、アーカイブの DR を選べる設定にするか | PM。E13 の `cost-baseline` の前（上の「ログの取り込みの原価」） |
+| MSK のブローカーの構成、パーティションの数、Express のトランザクションとラックを意識した読み出しの量での遅れと費用 | E2 の前の `msk-throughput-poc` |
+| 時系列のコーデックの比べ（Gorilla の形と ALP など）、`codec_id` 16 の大きさ | E3 の前の `tsdb-codec-poc` |
+| インジェスターの系列あたりのメモリー、ヘッドの要約の CPU | E3 の前の `ingester-memory-poc` |
+| ブルームフィルターの誤検出の率、日本語の 2-gram、アーカイブの圧縮の率 | E5 の前の `log-bloom-poc` |
 | テールサンプリングの待ちとメモリー | E6 の前の `tail-sampling-memory-poc` |
-| S2 のセルの分け方、大きな組織の専用のセルの基準 | infrastructure の領域 |
-| 費用の単価（MSK、EC2、S3） | capacity の領域。公開の価格で入れる |
-| 本家の振る舞いで未確認のもの（テールサンプリング、ホストの数え方、ログの保持の選択肢、SLA） | 各領域の文書で公式の資料で確かめる。確かめられなければ未検証のまま、本システムの値を使う |
+| NLB の TLS のリスナーを通した gRPC の端から端まで | E1 の `edge-and-intake-endpoints`（**未検証**） |
+| タグで絞った S3 の複製と保存クラス、大阪の明示の削除 | E1 の `s3-buckets-baseline`（実の S3 で確かめる） |
+| 大阪で EC2 の群れを起こせる容量（AZ ごと、予約の要否） | E1 の `osaka-warm-standby`（**未検証**） |
+| オンコールのサービスの選定と心拍の機能、大阪でのトレースの置き場所、AMP の保持と単価 | E1 の `self-monitoring-baseline`（**未検証**） |
+| 未検証の単価（Aurora、ネットワーク、自己監視、S3 の要求の数、`r7gd.2xlarge`） | E13 の `cost-baseline` |
+| 売りすぎの比（1.5 倍） | PM と Ops。E13 の後 |
+| S2 のセルの分け方、カタログの Aurora の分け方 | S2 の前に別の ADR |
+| データモデルの完全版（ER 図、列、索引、分割） | 後の工程。今は [data-model.md](data-model.md) が索引 |
+| 本家の振る舞いで未確認のもの（テールサンプリング、SLA、内部のクエリの計画、上限の超過の振る舞い、ログの取り込みのバイトの数え方、Webhook の署名と再試行、重なるデータセットの合わせ方、インシデントの状態） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
 ## 7. 領域の文書（計画）
 
-各領域の文書は、まだない。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
+各領域の文書は 2026-10-09 にそろい、統合の工程で食い違いを解いた。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
@@ -355,7 +435,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [tenancy-and-rbac.md](tenancy-and-rbac.md) | 組織、利用者、チーム、役割と権限、独自の役割、SSO・SCIM、データのアクセスの制限、監査ログ、サービスのアカウント | 0051–0053 | セキュリティ | E11 |
 | [usage-and-billing.md](usage-and-billing.md) | 利用量の単位と数え方（ホスト、カスタムメトリクス、ログ、スパン）、計測の経路、時間ごとの集計、上限と通知、課金のシステムへの受け渡し | 0054–0055 | QA、PM | E12 |
 | [security.md](security.md) | 脅威モデル、キーと秘密、暗号化と鍵、PII の扱い、通信の制限、監査、開示の請求の手順（法務の L1・L5・L6） | 0056–0058 | セキュリティ | E1、E11、E13 |
-| `data-model.md` | データモデルの索引（管理の DB の表、S3 のパス、MSK のトピックとメッセージ） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの索引（管理の DB の表、S3 のパス、MSK のトピックとメッセージ）。完全版（ER 図、列）は後の工程 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、セルの構成と割り当て、EC2 のキャパシティー、MSK の構成、egress、DR（大阪）、段階を上げる基準 | 0059–0061 | Ops | E1、E13 |
 | [observability.md](observability.md) | 自己監視（別のアカウントの経路、見張りの系列とモニター、水位の計測）、SLI、ドッグフーディングの範囲 | 0062–0063 | Ops | E1、E13 |
 | [capacity.md](capacity.md) | 負荷のモデル（点・ログ・スパン・クエリ・評価）、部品ごとの必要量、費用のモデル、負荷試験 | 0064 | Ops | E13 |

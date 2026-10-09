@@ -51,7 +51,7 @@
 
 ## 3. 本家の形（確かめたこと）
 
-- 評価の窓（5 分〜48 時間、メトリクスは 1 か月まで）、評価の頻度（24 時間未満の窓は 1 分）、評価の遅らせ（最大 86,400 秒）、データなしの扱いの選択肢、マルチアラート、グループの保持（既定 24 時間）、回復の閾値（[Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)、2026-10-09 に確認）。
+- 評価の窓（1 分〜48 時間、メトリクスは 1 か月まで）、評価の頻度（24 時間未満の窓は 1 分、48 時間未満は 10 分、それ以上は 30 分）、評価の遅らせ（最大 86,400 秒）、データなしの扱いの選択肢、マルチアラート、グループの保持（既定 24 時間）、回復の閾値（[Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)、2026-10-09 に確認）。
 - 再通知は、間隔と、対象の状態（`alert`・`no data`・`warn`）と、回数の上限を選べる。`{{#is_renotify}}` の節の文を元の本文に足す（[Notifications](https://docs.datadoghq.com/monitors/notify/)、2026-10-09 に確認）。
 - ダウンタイムは、モニターの選び方とグループの範囲（タグの条件）を持ち、繰り返しは iCalendar の RRULE。ダウンタイムの間も状態は変わり、通知だけを抑える。終わったときに通知の要る状態（ALERT・WARNING・NO DATA）なら既定で知らせる。ダウンタイムの前に鳴って間に回復したら、最初の回復の通知は既定で送る（[Downtimes](https://docs.datadoghq.com/monitors/downtimes/)、2026-10-09 に確認）。
 - 複合モニターは 10 までの子（複合は含めない）を `&&`・`||`・`!` で組む。データなしの子は、`!A` もデータなしになる。マルチアラートの子は、共通のグループだけを評価し、合わせはタグの鍵ではなく値で行う（[Composite Monitor](https://docs.datadoghq.com/monitors/types/composite/)、2026-10-09 に確認）。
@@ -358,7 +358,7 @@ target(prev, v):
 | Valkey | `wm:{tenant}:{signal}`（水位）、`evaluated_through:{tenant}:{monitor}` | 失ってよい | 5.3、10 |
 | S3 | `<cell>/<tenant_id>/evals/eval-30d/...`（入力の写し）、`<cell>/evals/snapshots/<shard>/...` | — | 11 |
 
-- `eval_shard_leases` は組織をまたぐので、[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の RLS の外の表の一覧に足す必要がある（X2：システムの作業）。tenancy-and-rbac の領域と ADR-0003 の持ち主に確かめる（17 節）。
+- `eval_shard_leases` は組織をまたぐので、統合の工程で [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) の RLS の外の表の一覧（保守のスキーマ `maint`）に足した。
 
 ## 16. テスト
 
@@ -406,9 +406,8 @@ target(prev, v):
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| `eval_shard_leases` を RLS の外の表に足すこと | ADR-0003 の持ち主（Dev のテックリード）と tenancy-and-rbac の領域に確かめる |
 | 同じクエリのまとめの効き（シャードの中だけで足りるか） | E7 の負荷試験で測る |
 | 再生の CI への持ち込みの範囲（本番の値） | security の領域で決める |
-| 本家との違い（複合のグループを鍵と値の組で合わせる、ログのモニターは索引だけ） | architecture/README.md の 1.4 節に行を足すことを提案する（この文書の持ち主の範囲の外） |
+| 本家との違い（複合のグループを鍵と値の組で合わせる、ログのモニターは索引だけ） | 統合の工程で、複合の合わせ方を 1.4 節の「意図した違い」に足した。ログのモニターは本家も索引に入ったログだけを評価する（[Log Monitor](https://docs.datadoghq.com/monitors/types/log/)、2026-10-09 に確認）ので、違いではない。1.4 節の「確かめたこと」に足した |
 | 本家のフラッピングの判定、グループの上限、再通知の間隔の選択肢 | 公式の資料で確かめなかった（**未検証**） |
 | 異常検知・予測のモニター | MVP の後（intent） |

@@ -61,6 +61,12 @@ date: 2026-10-09
 - 消費者は、自分の出力（S3 のブロック・セグメント、Aurora のカタログ）を確定した後でだけ、オフセットを進める。出力とオフセットを同じ記録（ブロックのマニフェスト、カタログの行）に書き、読み直したときに同じ出力を作るか、既にあるものを見て飛ばす。
 - 消費者の遅れは利用者への応答を遅らせない。遅れは水位（取り込みの時刻で表した「ここまで反映した」）として計測し、モニターの評価が使う（[ADR-0008](0008-monitor-evaluation-model.md)）。
 
+> 2026-10-09 の注記：領域の ADR で「1 回だけ」の作り方が分かれていたので、統合の工程で次の 1 つの方針に揃えた。
+> - 取り込み（ゲートウェイ → MSK）は Kafka のトランザクションを使わない。冪等のプロデューサーと要求の ID で書き、一部の失敗は 503 にする。メトリクスは後勝ちで冪等、ログ・スパンの重なりは要求の ID で除く（[ADR-0011](0011-intake-gateway-pipeline-and-watermark-ticks.md)）。
+> - 出力が S3・Aurora の消費者は、出力とオフセットを同じ記録に、前の位置を条件に書く（ADR-0004、ADR-0005、[ADR-0020](0020-block-flush-commit-and-replay.md)、[ADR-0040](0040-trace-storage-and-id-lookup.md)、[ADR-0055](0055-exactly-once-usage-aggregation-and-overage.md)）。
+> - 出力が MSK のトピックの消費者（`log-processor` の `logs`・`derived-partials`）だけが Kafka のトランザクションを使う（[ADR-0030](0030-log-pipeline-execution-model.md)）。MSK の Express のブローカーはトランザクションの設定（`transaction.state.log.min.isr` 2、`transaction.max.timeout.ms`・`transactional.id.expiration.ms` の変更）を持つ（[Express broker configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-write.html)、2026-10-09 に確認）。量と遅れは `msk-throughput-poc` で測る。
+> - 下流の正しさはトランザクションだけに頼らない。MSK に書く出力は出どころ（`src_partition`、`src_offset`）を持ち、下流は出どころのパーティションごとに折り込み済みの最大のオフセットを、自分の確定の記録と一緒に持って、それ以下を飛ばす。PoC でトランザクションが量に合わなければ、冪等のプロデューサーと出どころでの除去に切り替えても、下流の設計は変わらない（`trace-assembler` は最初からこの形。[ADR-0039](0039-red-metrics-and-service-map-before-sampling.md)）。
+
 ### 他の案を選ばなかった理由
 
 - **2（Kinesis）**：1 シャードの書き込みの上限（1 MB/秒）で、S1 のピークに数千のシャードが要る。GB/秒の量での費用、保持の延長の費用、消費者の数の扱いが MSK より重い。

@@ -31,6 +31,9 @@ EC2：
 1 と a を採用する。
 
 - MSK：`express.m7g.8xlarge` × 12（AZ ごとに 4）。12 台で書き込み 3.0 GB/秒、AZ を失って 2.0 GB/秒。パーティションは写しを含めて 約 8,200（ブローカーあたり 約 690、勧めの値 12,000）。組織のパーティションの組の大きさ `k` は、組織の割り当て ÷ 5 MB/秒 以上にする。消費者は `client.rack` で同じ AZ の写しから読む。Kafka のトランザクションとラックを意識した読み出しが Express で動くことを `msk-throughput-poc` で確かめ、動かなければこの ADR を見直す。
+
+> 2026-10-09 の注記：統合の工程で AWS の資料を確かめた。Express のブローカーは、トランザクションの状態のトピックの `min.insync.replicas` を 2 に固定し、`transaction.max.timeout.ms`・`transactional.id.expiration.ms` を変えられる。`replica.selector.class` に `RackAwareReplicaSelector` を設定でき、`broker.rack` は AZ の ID（[Express broker configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-write.html)、[read-only configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-only.html)、2026-10-09 に確認）。どちらも設定として使えるので、「動くか」は未検証から外した。PoC で確かめるのは、S1 の量での遅れと費用だけにする。トランザクションを使うのは `log-processor` だけ（[ADR-0002](0002-intake-log-on-msk.md) の注記）。
+
 - EC2 の群れ（S1、初期見積もり）：
 
 | 群れ | 部品 | インスタンス | 台数 |
@@ -41,6 +44,8 @@ EC2：
 | `fleet-lsearch` | ログとトレースの `log-searcher` | `i4i.8xlarge` | 12 |
 | `fleet-index` | `log-indexer`、`compactor` | `c7gd.8xlarge` | 6＋4 |
 | `fleet-eval` | `monitor-evaluator` | `c7g.4xlarge` | 6 |
+
+> 2026-10-09 の注記：統合の工程で、`derived-metrics-aggregator`（[ADR-0032](0032-index-routing-and-derived-metrics.md)。系列ごとの桶を 65 分持つ状態の部品）の群れ `fleet-derive`（`r7gd.2xlarge` × 3、AZ ごとに 1）を足した。`slo-calculator` は `fleet-eval` の中で動く（[ADR-0049](0049-slo-computation-and-burn-rate.md)）。状態を持たない `live-tail`・`rehydrator`・`deletion-worker`・`limits-coordinator` は Fargate に置く（[infrastructure.md](../architecture/infrastructure.md) の 3 節、[capacity.md](../architecture/capacity.md) の 4 節）。
 
 - どの群れも AZ ごとに予備を 1 台持つ。インジェスターの組 `g` の写し A は AZ `g mod 3`、B は `(g+1) mod 3`。組の中のパーティションごとのシャード（1 スレッド）は [tsdb-storage-engine.md](../architecture/tsdb-storage-engine.md) の 3.3 節。
 - インジェスターは、系列あたり 3 KB（見込み）で 1 インスタンスあたり 625 万系列 ≈ 19 GB を持つ。`ingester-memory-poc` で系列あたりが 10 KB になっても、128 GiB の 60% に収まる大きさを選んだ。

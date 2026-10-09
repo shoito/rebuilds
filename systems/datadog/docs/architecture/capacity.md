@@ -4,7 +4,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0064](../decisions/0064-capacity-headroom-and-load-test-gates.md) | 部品ごとにピークの使用率の上限を 60% にし、AZ を 1 つ失っても 90% に収める。MSK だけは書き込みをピークの 2 倍（AZ を失って 1.5 倍以上）にする。急増は割り当てとエージェントの待ち行列で受け、容量で受けきろうとしない。負荷試験とうるさい隣人の試験を、夜間（縮めた規模）、段階を上げる前、E13（S1 のピークの 2 倍）の 3 つの関門にし、他の組織の SLI が SLO の中であることを合否にする |
+| [0064](../decisions/0064-capacity-headroom-and-load-test-gates.md) | 部品ごとにピークの使用率の上限を 60% にし、AZ を 1 つ失っても 90% に収める。MSK だけは書き込みをピークの 2 倍以上にする（S1 は 2.7 倍、AZ を失って 1.8 倍）。急増は割り当てとエージェントの待ち行列で受け、容量で受けきろうとしない。負荷試験とうるさい隣人の試験を、夜間（縮めた規模）、段階を上げる前、E13（S1 のピークの 2 倍）の 3 つの関門にし、他の組織の SLI が SLO の中であることを合否にする |
 
 台数とインスタンスの種類は [infrastructure.md](infrastructure.md) の 3・4 節、単位あたりの原価は同 9 節、製品ごとの粗利は [usage-and-billing.md](usage-and-billing.md) の 9 節にある。数値はすべて「初期見積もり」で、PoC（`msk-throughput-poc`、`ingester-memory-poc`、`tsdb-codec-poc`、`log-bloom-poc`、`tail-sampling-memory-poc`）と E13 の負荷試験で置き換える。
 
@@ -66,7 +66,7 @@
 
 ### 2.4 時間の区切り
 
-- **ブロックの書き出し**：すべてのパーティションが、時間の区切りから 70 分（`H + 2 時間 10 分` の水位）でほぼ同時にブロックを書く。1,024 パーティション × 組織の数のブロックの PUT、ロールアップの計算、Aurora の確定が数分に集まる。パーティションごとに 0〜5 分のずらしを入れることを [tsdb-storage-engine.md](tsdb-storage-engine.md) に提案する（13 節の持ち越し）。
+- **ブロックの書き出し**：すべてのパーティションが、時間の区切りから 70 分（`H + 2 時間 10 分` の水位）でほぼ同時にブロックを書く。1,024 パーティション × 組織の数のブロックの PUT、ロールアップの計算、Aurora の確定が数分に集まる。統合の工程で、パーティションごとに 0〜5 分のずらしを入れることにした（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.1 節、[ADR-0020](../decisions/0020-block-flush-commit-and-replay.md) の注記）。書き出しは区切りから 70〜75 分に散る。
 - **モニターの評価**：毎分の評価は、モニターの ID のハッシュでずらす（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)）。
 - **合わせ**：日のブロックへの合わせ（0 時の後）を、組織のハッシュで 0〜6 時にばらす。
 
@@ -85,9 +85,15 @@
 | `metrics-ingester` | `r7gd.4xlarge` × 32（16 の組 × 2） | 組あたり 625 万系列、ピーク 62.5 万点/秒。系列あたり 1.1〜1.5 KB（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 4.1 節）で 約 9 GB、3 KB で 19 GB、10 KB でも 62 GB（128 GiB の 60% の中）。書き出しの止め 6 時間（ヘッドが 4 倍）でも 1.5 KB なら 37 GB。CPU は取り込み 約 4 vCPU、残りをヘッドへのクエリと書き出しに |
 | `log-processor` | 平均 60 vCPU、ピーク 120 vCPU（Fargate） | 1 vCPU あたり 20 MB/秒（解析と PII のマスクの正規表現。本システムの想定） |
 | `log-indexer` | `c7gd.8xlarge` × 6 | 索引とアーカイブのセグメントの符号化と zstd。1 vCPU あたり 150 MB/秒で、ピーク 1.5 GB/秒（アーカイブ）＋0.3 GB/秒（索引）に 12 vCPU、余裕を足して 96 vCPU |
-| `trace-assembler` | `r7gd.4xlarge` × 6 | ピーク 400 万スパン/秒、1 vCPU あたり 10 万（本システムの想定）で 40 vCPU。完成の待ち 30 秒 × 400 万 × メモリーで 1 KB = 120 GB（`tail-sampling-memory-poc`） |
+| `trace-assembler` | `r7gd.4xlarge` × 6 | ピーク 400 万スパン/秒、1 vCPU あたり 10 万（本システムの想定）で 40 vCPU。メモリーは 1 スパン 600 バイト × 滞在 31 秒で、平均 200 万/秒で 約 37 GB、ピーク 400 万/秒で 約 74 GB（[traces-and-sampling.md](traces-and-sampling.md) の 6.4 節。`tail-sampling-memory-poc`）。6 台の 768 GiB の 10% 前後 |
 | `compactor` | `c7gd.8xlarge` × 4 | 日のブロック（メトリクス 1.1 TB/日）、ログの索引の小さなセグメントの合わせ（1.25 TB/日）、トレース（0.86 TB/日） |
 | `monitor-evaluator` | `c7g.4xlarge` × 6 | 1,000 万グループ/分 = 17 万グループ/秒の状態の機械。クエリの実行は評価の組の読み手 |
+| `slo-calculator` | `monitor-evaluator` と同じバイナリ・同じ台数（[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)） | SLO 5 万（組織あたり 50 の想定）× 開いた時の行を 5 分ごとに計算し直す ＝ 1 秒 約 170 のクエリ（評価の組の読み手）。状態の機械に比べて CPU は数 % |
+| `derived-metrics-aggregator` | `r7gd.2xlarge` × 3（AZ ごとに 1、予備 3） | RED・サービスマップの辺・ログから作るメトリクスの系列 約 300 万（本システムの想定）× 10 秒の桶を 65 分（390 個）× 1 桶 約 48 バイト ＝ 約 56 GB。分布の桶は大きいので、3 台の 192 GiB に収める。入力は `derived-partials`（平均 4 MB/秒）で CPU は小さい |
+| `live-tail` | 平均 16 vCPU、ピーク 32 vCPU（Fargate） | セッションのある組織の `logs` だけを読む。同時 2,000 セッション（ピーク 5,000）で `logs` の 3 割、展開と絞り込みを 1 vCPU あたり 50 MB/秒（本システムの想定） |
+| `rehydrator` | 平均 16 vCPU、上限 128 vCPU（Fargate、作業者 1 つ 2 vCPU） | 作業者あたり 200 MB/秒（圧縮の後。[log-storage-and-search.md](log-storage-and-search.md) の 8.2 節）。組織あたり同時 2 作業、1 作業 16 作業者まで。セルの上限を超えた作業は待たせる |
+| `deletion-worker` | 平均 4 vCPU（Fargate） | 削除の請求の墓標を付ける検索（請求ごとに範囲のセグメントを走査）と解約の消去。書き直しは `compactor` の容量（4 台）の中で、墓標のあるセグメントを優先する |
+| `limits-coordinator` | 1 vCPU × 2（Fargate） | 1 分ごとの偏りの確かめと制御のレコードの書き込み |
 
 ## 5. クエリの部品
 
@@ -117,8 +123,8 @@
 | 項目 | 月額（USD、概算） | 前提 |
 | --- | --- | --- |
 | MSK | 97,800 | `express.m7g.8xlarge` 8.432 USD/時 × 12 × 730 時間 = 73,900、書き込み 平均 0.48 GB/秒 × 0.015 USD/GB = 18,900、保存 24 時間分 41 TB × 0.12 USD/GB・月 = 5,000（写しを数えるかは**未検証**。数えない前提） |
-| EC2 の群れ | 122,900 | 3.2 節の台数（予備 18 台を含む）× On-Demand の時間の単価 |
-| Fargate | 9,400 | 平均 260 vCPU・520 GB。ARM の vCPU 0.04045 USD/時、メモリー 0.00442 USD/GB・時（Dropbox の [capacity.md](../../../dropbox/docs/architecture/capacity.md) の 6 節で 2026-10-09 に取得した単価を引き継ぐ） |
+| EC2 の群れ | 125,800 | [infrastructure.md](infrastructure.md) の 3.2 節の台数（予備 21 台を含む）× On-Demand の時間の単価。`fleet-derive`（`r7gd.2xlarge` 6 台）2,900 を含む |
+| Fargate | 10,800 | 平均 300 vCPU・600 GB（`live-tail`・`rehydrator`・`deletion-worker`・`limits-coordinator` の 約 40 vCPU を含む）。ARM の vCPU 0.04045 USD/時、メモリー 0.00442 USD/GB・時（Dropbox の [capacity.md](../../../dropbox/docs/architecture/capacity.md) の 6 節で 2026-10-09 に取得した単価を引き継ぐ） |
 | S3 の保存（東京） | 13,400 | ウォーム 77 TB（Standard の階段の単価）1,900、コールド 2.3 PB（ログのアーカイブ 2.28 PB、1 時間のロールアップ 19 TB）× 0.005 = 11,500 |
 | S3 の大阪の写し | 11,900 | 2.38 PB × 0.005（Glacier Instant Retrieval。`l0` の Standard の 2 日分は小さい） |
 | S3 の CRR の転送 | 30,500 | 新しいデータ 約 9.7 TB/日 × 30 日 × （0.09＋0.015）USD/GB。うちログのアーカイブ 19,700 |
@@ -128,9 +134,10 @@
 | ElastiCache、NAT、NLB、ALB、CloudFront・WAF、KMS、GuardDuty など | 15,000 | 単価は**未検証** |
 | 自己監視のアカウント（AMP、CloudWatch、Grafana、`canary`） | 10,000 | 単価は**未検証**（[observability.md](observability.md) の 7 節） |
 | 大阪の待機 | 7,000 | MSK `express.m7g.large` × 3（1,200）、`fleet-ingest` の予備 3 台（2,900）、管理の面の最小の構成 |
-| **本番の合計** | **約 36.5 万** | |
+| **本番の合計** | **約 36.9 万** | |
 
 - 内訳の大きい順：EC2 の群れ 34%、MSK 27%、S3（保存・写し・転送・要求）18%、AZ をまたぐ転送 7%。
+- 統合の工程で、領域の文書が足した部品（`derived-metrics-aggregator`、`live-tail`、`rehydrator`、`deletion-worker`、`limits-coordinator`。`slo-calculator` は `fleet-eval` の中）を足した（月 約 4,300 USD）。信号ごとの内訳と単位あたりの原価は、足す前の 36.5 万で割り振ったまま（差は 1% 強で、±50% の幅の中）。
 - 信号ごと：メトリクス 約 10.5 万、ログ 約 18.5 万（取り込みとアーカイブ 15.1 万、索引 3.4 万）、スパン 約 7.5 万（割り振りの規則は [usage-and-billing.md](usage-and-billing.md) の 9 節）。
 - **費用の打ち手**：Savings Plans・予約（EC2 と Aurora で 30〜40% 下がる見込み。**未検証**）、予備の台数（群れごとに 3 台 = 月 2.4 万）、MSK の余裕（2 倍 → 1.5 倍）、アーカイブの大阪への写しの扱い（NFR-005 の範囲）、ラックを意識した読み出し。
 
@@ -146,7 +153,7 @@ S1 のセルの形を、量に合わせて増やす（[infrastructure.md](infras
 | インジェスター | 32 | セルあたり 32〜48（系列 10 億を 8 セル） | 系列 60 億を数十のセル |
 | ログの読み手 | 12 | セルあたり 15〜20 | — |
 | Aurora | 1 クラスタ | リージョンで 1＋カタログをセルごとに分ける（別の ADR） | リージョンごと |
-| 月の費用 | 約 36.5 万 USD | 約 300 万 USD（単位あたり 15% 下がる見込み） | — |
+| 月の費用 | 約 36.9 万 USD | 約 300 万 USD（単位あたり 15% 下がる見込み） | — |
 
 ## 8. 容量の余裕の方針
 
@@ -213,6 +220,7 @@ ADR-0064。[quality.md](../quality.md) の 2.2.1 節 E の場面を、次の 3 �
 - **余裕**：ピーク 60%、AZ を失って 90%。MSK は書き込みをピークの 2 倍以上（ADR-0064）。
 - **急増**：割り当てとエージェントの待ち行列で受ける（ADR-0064）。
 - **関門**：夜間・段階の前・E13 の 3 つ（ADR-0064）。
+- **統合の工程（2026-10-09）**：ブロックの書き出しのずらし（0〜5 分）を採った（2.4 節）。足りなかった部品を 4・6 節に足した。ログの取り込みの原価は、予算を仮に 1 GB 0.10 USD に上げ、PM の判断を待つ（[architecture/README.md](README.md) の 6 節）。
 
 ### 持ち越し
 
@@ -221,7 +229,6 @@ ADR-0064。[quality.md](../quality.md) の 2.2.1 節 E の場面を、次の 3 �
 | 1 点・1 件・1 スパンの MSK のバイト | E2 の `msk-throughput-poc` |
 | 系列あたりのメモリー | E3 の `ingester-memory-poc` |
 | 1 vCPU あたりの処理の量（ゲートウェイ、パイプライン、組み立て、走査） | 各 PoC と E13 |
-| ブロックの書き出しのずらし（0〜5 分） | [tsdb-storage-engine.md](tsdb-storage-engine.md) の担当に提案する。Dev のテックリード |
 | 売りすぎの比（1.5 倍） | PM と Ops。E13 の後 |
 | 未検証の単価（Aurora、ネットワーク、自己監視、S3 の要求の数） | E13 の `cost-baseline` |
 

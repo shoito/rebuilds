@@ -41,7 +41,9 @@ date: 2026-10-09
 - 引き受けるコスト：
   - 解約の消去は、古いバージョンの 7 日を待つので、猶予の後さらに 7 日以上かかる。
   - アーカイブの削除の請求は、Glacier Instant Retrieval の取り出しの費用がかかる。
-  - 大阪の写しが削除マーカーの写しで消えるかを確かめる必要がある（**未検証**）。
+  - 大阪の写しは、東京の削除では消えない。
+
+> 2026-10-09 の注記：最初の起票は「大阪の写しが削除マーカーの写しで消えるか」を未検証としていた。統合の工程で AWS の資料を確かめた。タグで絞った複製の規則（[ADR-0061](0061-dr-stage-up-and-cell-expansion.md)）では、削除マーカーは写らない（[Replicating delete markers](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-marker-replication.html)、2026-10-09 に確認）。そこで、保持の期限・削除の請求の書き直し・解約の消去は、どれも大阪の写しを明示に消し、大阪の接頭辞の一覧が空であることを確かめる。
 
 ## Confirmation
 

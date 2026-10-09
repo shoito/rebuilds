@@ -56,7 +56,7 @@ erDiagram
     tenants ||--o{ data_access_datasets : ""
     data_access_datasets ||--o{ dataset_grants : "役割かチーム"
     tenants ||--o{ service_accounts : ""
-    tenants ||--o{ app_keys : "持ち主は利用者かサービスのアカウント"
+    tenants ||--o{ application_keys : "持ち主は利用者かサービスのアカウント"
     tenants ||--|| tenant_cells : ""
 ```
 
@@ -366,7 +366,7 @@ sequenceDiagram
 | `dataset_grants` | データセット → 役割かチーム | 6.1 |
 | `data_access_outside_policy` | 信号ごとの `visible`・`restricted` | 6.1 |
 | `service_accounts` | 主体、役割 | 4、7.3 |
-| `app_keys` に足す列 | `owner_kind`（利用者・サービスのアカウント）、`scopes`、`expires_at`、`allowed_cidrs` | 7.3 |
+| `application_keys` に足す列 | `owner_type`（`user`・`service_account`。列の正本は [otlp-and-api-keys.md](otlp-and-api-keys.md) の 12 節）、`scopes`、`expires_at`、`allowed_cidrs` | 7.3 |
 | `sso_configs`・`sso_group_mappings`・`scim_tokens` | SSO の設定、グループの対応、SCIM のトークンのハッシュ | 7.2 |
 | `tenant_cells` に足す列 | `cell_id`、`from_ts`（区切り `H`）、`move_state` | 10.2 |
 | `cell_moves` | 移し替えの記録と、写しの確かめの結果 | 10.2 |

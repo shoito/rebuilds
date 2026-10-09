@@ -4,7 +4,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0062](../decisions/0062-independent-self-monitoring-path.md) | 自己監視は selfmon のアカウントの大阪のリージョンに置く（本番の東京と別のアカウント・別のリージョン）。本番のタスクの ADOT のコレクターが、別のアカウントのロールで AMP（メトリクス）と CloudWatch Logs（ログ）へ直接送る。アラートは AMP のルールと CloudWatch のアラームから SNS を経てオンコールのサービスへ直接送る。デッドマンスイッチは 3 段：`canary` の心拍のアラーム（データの欠けを異常とみなす）、AMP の常に鳴る Watchdog をオンコールのサービスの心拍へ、オンコールのサービスの側の心拍の途切れ |
+| [0062](../decisions/0062-independent-self-monitoring-path.md) | 自己監視は selfmon のアカウントの大阪のリージョンに置く（本番の東京と別のアカウント・別のリージョン）。本番のタスクの ADOT のコレクターが、VPC の中の `selfmon-relay` を経て、別のアカウントのロールで AMP（メトリクス）と CloudWatch Logs（ログ）へ送る。アラートは AMP のルールと CloudWatch のアラームから SNS を経てオンコールのサービスへ直接送る。デッドマンスイッチは 3 段：`canary` の心拍のアラーム（データの欠けを異常とみなす）、AMP の常に鳴る Watchdog をオンコールのサービスの心拍へ、オンコールのサービスの側の心拍の途切れ |
 | [0063](../decisions/0063-slis-from-canary-and-server-histograms.md) | 「取り込みからクエリに出るまで」「通知まで」の SLI は `canary` の端から端までの計測を正にし、クエリの速さと評価の遅れはサーバーのヒストグラムを正にする。組織ごとの「隣人の影響」は、パーティションの水位と取り込みの時刻の差を組織ごとに数える。バーンレートは 1 時間・6 時間・3 日の窓。`canary` の組織はセルごとに 1 つで、SLO と利用量から除く |
 
 前提：[runbooks/](../runbooks/README.md) の 1 節（SLI と SLO）、4 節（アラート）、5 節（自己監視と循環の回避）。selfmon のアカウントは [infrastructure.md](infrastructure.md) の 1 節、水位は [ADR-0008](../decisions/0008-monitor-evaluation-model.md) と [ADR-0011](../decisions/0011-intake-gateway-pipeline-and-watermark-ticks.md)。
@@ -25,7 +25,7 @@ flowchart LR
         xr[("トレース（1%）")]
         cw["CloudWatch のアラーム"]
         sns["SNS"]
-        graf["Grafana"]
+        graf["Grafana（OSS、Fargate）"]
         canary["canary<br/>（セルごとに送る・読む）"]
         rx["見張りの受け口<br/>（Webhook の受信）"]
     end
@@ -67,7 +67,7 @@ flowchart LR
 
 - 名前：`svc_<部品>_<量>_<単位>`（例：`svc_ingester_head_bytes`、`svc_gateway_accept_seconds`）。利用者の指標の名前空間 `<brand>.` と分ける。
 - 次元：`cell`、`az`、`service`、`task`。パーティションの次元は、水位と消費の遅れの指標だけに付ける（1,024 × 消費者の種類）。
-- `tenant_id` の次元は、5.3 節の組織ごとの SLI と、割り当て・溢れ・429 の数だけに付ける。S1 で 1,000、S2 で 1 万の組織。AMP の有効な系列の上限（既定 5,000 万。下の出典）に対し、自己監視の全体を 200 万系列以下に保つ（四半期ごとに見る）。
+- `tenant_id` の次元は、6.1 節の組織ごとの SLI と、割り当て・溢れ・429 の数だけに付ける。S1 で 1,000、S2 で 1 万の組織。AMP の有効な系列の上限（既定 5,000 万。下の出典）に対し、自己監視の全体を 200 万系列以下に保つ（四半期ごとに見る）。
 
 ### 2.3 トレース
 
@@ -148,12 +148,13 @@ ADR-0063。[runbooks/](../runbooks/README.md) の 1 節の SLI ごとに、正�
 | 不完全の評価 | `monitor-evaluator` の不完全の評価の割合 | 水位の待ちの上限に当たった数 |
 | 見張りの照合 | `canary` の不一致の数（3.1 節） | — |
 | ブロックの写しの一致 | `metric_block_verifications` の `mismatch` の数（[tsdb-storage-engine.md](tsdb-storage-engine.md)） | — |
+| ヘッドの要約の一致 | `svc_ingester_head_digest_mismatch_total`（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.7 節。統合の工程で足した） | — |
 | ストレージの突き合わせ | 毎週の S3 Inventory とカタログの突き合わせの結果 | — |
 | 分離 | 応答の監査の不一致の数（[ADR-0051](../decisions/0051-roles-permissions-and-data-access-restrictions.md)） | — |
 | 隣人の影響 | 組織ごとの「取り込みからクエリまで」の p99（6.1 節） | 組織ごとの 429・溢れ |
 | 利用量の遅れ | `usage_hourly` の暫定の値が出るまでの時間（[usage-and-billing.md](usage-and-billing.md) の 5.3 節） | `usage-aggregator` の消費の遅れ |
 
-この領域で足す SLI（runbooks の 1 節に行を足すことを Ops に提案する）：
+この領域で足した SLI（統合の工程で runbooks の 1 節に足した）：
 
 | SLI | 計測 | 目安 |
 | --- | --- | --- |
@@ -180,8 +181,8 @@ ADR-0063。[runbooks/](../runbooks/README.md) の 1 節の SLI ごとに、正�
 
 | アラート（重さ） | 条件 | 手順 |
 | --- | --- | --- |
-| 自己監視の経路の停止（page） | 4 節の段 1〜3 | `self-monitoring-outage.md` |
-| 自己の計測の送り手の沈黙（page） | `absent_over_time(svc_up[5m])`（セル・部品） | `self-monitoring-outage.md` |
+| 自己監視の経路の停止（page） | 4 節の段 1〜3 | [self-monitoring-path-failure.md](../runbooks/self-monitoring-path-failure.md) |
+| 自己の計測の送り手の沈黙（page） | `absent_over_time(svc_up[5m])`（セル・部品） | [self-monitoring-path-failure.md](../runbooks/self-monitoring-path-failure.md) |
 | 本システムのログの秘密の漏れ（page） | 2.1 節の走査で 1 件 | `pii-leak-response.md` |
 | `canary` と組織ごとの近似の差（ticket） | 6.1 節の差が 5 秒を 1 時間 | `consumer-lag.md` |
 
@@ -234,15 +235,15 @@ ADR-0063。[runbooks/](../runbooks/README.md) の 1 節の SLI ごとに、正�
 - **selfmon の置き場所**：別のアカウントの大阪（ADR-0062）。
 - **デッドマンスイッチ**：3 段（ADR-0062）。
 - **SLI の正**：`canary` の端から端まで、クエリと評価はサーバーのヒストグラム、組織ごとは水位の近似（ADR-0063）。
+- **統合の工程（2026-10-09）**：Amazon Managed Grafana は大阪で提供されていない（[Supported Regions](https://docs.aws.amazon.com/grafana/latest/userguide/what-is-Amazon-Managed-Service-Grafana.html)、2026-10-09 に確認）ので、Grafana（OSS）を selfmon の大阪の Fargate で動かす。AMP は大阪で提供されている（下の出典）。6 節の 2 つの SLI（監査の読み出しの記録の欠け、自己監視の経路の健全）を runbooks の 1 節に足した。
 
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | オンコールのサービスの選定と心拍の機能 | E1 の `self-monitoring-baseline`（**未検証**） |
-| 大阪での Managed Grafana とトレースの置き場所の提供 | E1 の `self-monitoring-baseline`（**未検証**。無ければ selfmon の Fargate で Grafana を動かす） |
+| 大阪でのトレースの置き場所の提供 | E1 の `self-monitoring-baseline`（**未検証**） |
 | AMP の保持と費用の単価 | E1（**未検証**） |
-| runbooks の 1 節に足す SLI（監査の欠け、自己監視の経路） | Ops が runbooks を直す |
 
 ## 13. quality.md・runbooks・data-model への項目
 
@@ -254,7 +255,7 @@ ADR-0063。[runbooks/](../runbooks/README.md) の 1 節の SLI ごとに、正�
 ### runbooks
 
 - 1 節の表に 6 節の 2 つの SLI を足す（Ops の判断）。
-- `self-monitoring-outage.md`：4 節の段ごとの見分け方、selfmon の大阪の障害のときに本番の最小のアラームで見る手順、本番を大阪へ切り替えたときに selfmon の最小の写しを東京に起こす手順。
+- [self-monitoring-path-failure.md](../runbooks/self-monitoring-path-failure.md)：4 節の段ごとの見分け方、selfmon の大阪の障害のときに本番の最小のアラームで見る手順、本番を大阪へ切り替えたときに selfmon の最小の写しを東京に起こす手順。
 
 ### data-model への項目
 

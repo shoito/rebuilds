@@ -38,6 +38,8 @@ date: 2026-10-09
 - S1 は東京に 1 つのセル。S2 で 4〜8 つに分け、新しい組織は空きのあるセルに置く。ホスト 2 万以上か有効な系列 1 億以上の組織は、専用のセルの候補にする（基準は infrastructure の領域）。
 - 組織のセルの移し替えは、新しいセルへの二重の書き込み、保持の期間の後の読み出しの切り替えで行う（infrastructure の領域）。
 
+> 2026-10-09 の注記：移し替えの形は [ADR-0053](0053-child-orgs-and-tenant-cell-moves.md) で具体にし、二重の書き込みをやめた。1 時間の区切り `H` を決め、点の時刻が `H` より前なら元のセル、以後なら新しいセルへ書く。クエリは `H` で 2 つのセルに分けて合わせる。過去のブロック・セグメントは写して確かめた後に元のセルから消す。保持の期間（15 か月）を待たず、費用も 2 倍にしない。
+
 ### 鍵とパス
 
 - **`tenant_id`（UUIDv7）を、次のすべての先頭に置く。** MSK のメッセージの頭、系列の鍵のハッシュの入力、系列の索引の鍵、S3 のパス（`<cell>/<tenant_id>/metrics/...`）、ログのセグメントのカタログの行、キャッシュの鍵、評価のシャードの鍵、クエリの IR。
@@ -53,6 +55,10 @@ date: 2026-10-09
   - `intake_keys_index`（キーのハッシュ → 組織。キーの確認の入口）
   - `users`、`sessions`、メールアドレスから利用者の解決（利用者は複数の組織に属しうる）
   - outbox の読み出しの位置、SLI の集計
+  - 組織を持たない運用の表（保守のスキーマ `maint`）：`ingest_checkpoints`、`ingest_shard_leases`、`metric_block_verifications`（[ADR-0020](0020-block-flush-commit-and-replay.md)）、`eval_shard_leases`（[ADR-0008](0008-monitor-evaluation-model.md)）、`indexer_offsets`（ログのインデクサー）、`assembler_offsets`（[ADR-0040](0040-trace-storage-and-id-lookup.md)）、`usage_offsets`（[ADR-0055](0055-exactly-once-usage-aggregation-and-overage.md)）、`cells`、`rollouts`、`format_versions`、`capacity_reviews`、`retention_policies`、`dr_events`、`operator_access_log`
+
+> 2026-10-09 の注記：領域の文書が、パーティション・シャード・セルの単位の運用の表を足した。どれも組織を持たないか（貸し出し、オフセット、照合）、組織をまたいで運用者が使う（`operator_access_log`）。統合の工程で上の一覧に足した。これらの表はテレメトリーの値・タグの値・ログの本文を持たず、組織の ID・オフセット・数・状態だけを持つ。書くのは X2・X4 の DB のロールだけ。
+
 - **組織をまたぐ処理は、次の経路だけにし、専用の DB のロールを通す。** 一覧にない経路を足すときは、先にこの ADR を直す。
   - X1：キーの確認（`intake_keys_index`）
   - X2：システムの作業（保持の期限、合わせ、利用量の集計）。組織を 1 つずつ文脈に設定して回す

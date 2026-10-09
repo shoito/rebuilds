@@ -59,7 +59,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `s3-buckets-baseline` | 保持の区分の接頭辞、ライフサイクル、バージョニング、SSE-KMS、大阪への CRR（ADR-0009） |
 | `ci-pipeline-baseline` | PR の関門、Rust と TypeScript、参照の実装の比べの枠、試験のベクトル、ファジングの夜間、テストの緩和の検出、依存の禁止の一覧（ADR-0001） |
 | `flags-appconfig` | `release.*`・`ops.*` のフラグ |
-| `self-monitoring-baseline` | 自己監視の別のアカウントの AMP・CloudWatch・Managed Grafana、呼び出しの直接の連携、外からの見張り（`canary`）の骨格（[runbooks/README.md](runbooks/README.md) の 5 節） |
+| `self-monitoring-baseline` | 自己監視の別のアカウント（大阪）の AMP・CloudWatch・Grafana（OSS、Fargate）、呼び出しの直接の連携、外からの見張り（`canary`）の骨格（[runbooks/README.md](runbooks/README.md) の 5 節） |
 | `audit-log-table-and-archive` | 監査ログの表と、S3 の Object Lock への写し。保持は法務：L6 |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、CRR の遅れの監視 |
 

@@ -30,6 +30,9 @@ date: 2026-10-09
 1 と a を採用する。
 
 - `usage-aggregator` はメッセージの頭（`tenant_id`、`host_key`、`raw_bytes`、件数、振り分けの結果）だけを読む。組織・時間・単位ごとの増分を溜め、10 秒か 10 万メッセージごとに、`usage_offsets` を `WHERE next_offset = $start` の条件で進めるのと同じトランザクションで `usage_hourly` に足す。条件に合わなければ捨てる（ゾンビのタスクの二重の加算を防ぐ）。
+
+> 2026-10-09 の注記：この「1 回だけ」は Aurora の条件つきの更新で作るもので、MSK の 1 回だけの読み出しには頼らない。`logs` は `read_committed` で読むが、`logs` のメッセージの出どころ（`src_partition`、`src_offset`）も `usage_offsets` と同じトランザクションで覚え、折り込み済みの位置以下を飛ばす。`log-processor` が Kafka のトランザクションをやめても（[ADR-0030](0030-log-pipeline-execution-model.md) の注記）、二重に数えない（[ADR-0002](0002-intake-log-on-msk.md) の注記）。
+
 - ホストは `(tenant_id, hour, host_key)` の一意の行の集合として足す。
 - 系列の数（`metric_blocks`、貸し出しの持ち主のマニフェスト、`origin = ingest`）とスパンの保持の件数（`trace_segments`）は、行の ID を一意の鍵で記録するのと同じトランザクションで足す。
 - 時間は `H + 3 時間` に、水位を確かめて確定する。確定の後に来た増分は `usage_adjustments` に入れる。暫定の値は区切りから 2 時間以内に見せる。月は翌月 1 日の 03:00 JST に確定する。
@@ -50,7 +53,7 @@ date: 2026-10-09
   - 契約の超過で監視が止まらない。
 - 引き受けるコスト：
   - `usage-aggregator` が、データのトピックのバッチを展開して読む（ブローカーからの読み出しと CPU）。
-  - 系列の数は区切りから 70 分たたないと出ない。確定を 3 時間にする。
+  - 系列の数は区切りから 70〜75 分（書き出しのずらしを含む）たたないと出ない。確定を 3 時間にする。
   - 超過の請求の驚きを、知らせで抑える必要がある。
 
 ## Confirmation

@@ -119,8 +119,8 @@ sequenceDiagram
 ```
 
 - **同時に止めるのは 1 つの写しだけ。** 組の写し A と B を同時に入れ替えない。A の AZ（`g mod 3`）の写しを全部入れ替え、次の書き出しで写しの一致（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.3・6.5 節）が通ってから、B の AZ へ進む。
-- **影の比べ**：新しいタスクが追いついた後、無作為の 1,000 系列と見張りの系列で、直近 2 時間のクエリを新しいタスクともう一方の写しに投げ、結果がビットで同じことを確かめる。違えば新しいタスクを止め、古いタスクを残し、入れ替えを止める（`ops.rollout_paused`）。
-- **書き出しの窓**：時間の区切りの書き出し（毎時 :10 前後。[ADR-0020](../decisions/0020-block-flush-commit-and-replay.md)）の前後、:08〜:20 は貸し出しの持ち主を止めない。
+- **影の比べ**：新しいタスクが追いついた後、無作為の 1,000 系列と見張りの系列で、直近 2 時間のクエリを新しいタスクともう一方の写しに投げ、結果がビットで同じことを確かめる。加えて、追いついた後の最初の 2 つの 5 分の区切りで、ヘッドの要約（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.7 節）がもう一方の写しと一致することを確かめる（統合の工程で採用）。違えば新しいタスクを止め、古いタスクを残し、入れ替えを止める（`ops.rollout_paused`）。
+- **書き出しの窓**：時間の区切りの書き出し（毎時 :10〜:15。パーティションごとに 0〜5 分ずらす。[ADR-0020](../decisions/0020-block-flush-commit-and-replay.md)）の前後、:08〜:20 は貸し出しの持ち主を止めない。
 - **追いつく時間**：チェックポイントは 5 分ごとなので、読み直すのは最大 5 分＋α。読み出しは取り込みの 10 倍の速さを見込み、1〜2 分で追いつく。チェックポイントの鎖が読めなければ `replay_from`（最大 約 2 時間 30 分前）から読み、15 分前後かかる。
 - **所要**：S1 の 32 タスクを 1 つずつ、1 タスク 約 5 分で、1 セル 約 3 時間。平日 10〜15 時の時間帯（[runbooks/](../runbooks/README.md) の 3.1 節）に収まる。
 - **予備がないとき**：入れ替えを始めない（予備の上で新しいタスクを先に起こすのが前提）。
@@ -131,7 +131,7 @@ sequenceDiagram
 | --- | --- |
 | `query-reader`・`log-searcher` | 1 つの AZ で 1 台ずつ。新しいタスクをランデブーハッシュの輪に入れ、古いタスクの担当を新しいタスクへ移してから止める。キャッシュは S3 から温まる（最初の数分はキャッシュの当たりが下がる） |
 | `log-indexer` | 消費者のグループの協調的な再割り当て（cooperative sticky）。止める前に、手元のバッファーを書き出して確定する。確定の前に落ちても、確定の位置から読み直して重ならない（[log-storage-and-search.md](log-storage-and-search.md) の 5.1 節） |
-| `log-processor` | Kafka のトランザクションで確定した位置から読み直す（[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）。Fargate のローリング |
+| `log-processor` | Kafka のトランザクションで確定した位置から読み直す（[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）。下流は出どころの位置でも重複を除く（[ADR-0002](../decisions/0002-intake-log-on-msk.md) の注記）。Fargate のローリング |
 | `trace-assembler` | パーティションを手放すときに開いているトレースを出さずに捨て、新しい持ち主が確定の位置（開いているバッファーの最も古いオフセットの手前）から読み直して同じ判断をする（[traces-and-sampling.md](traces-and-sampling.md)）。完成の待ち（30 秒〜5 分）分の読み直し |
 | `monitor-evaluator` | 評価のシャードを 1 つずつ移す。状態のスナップショットとその後の遷移を読んで続ける。抜けは 10 分まで追う（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)） |
 | `compactor` | 作業の単位（組織・日）の終わりで止める。途中で止めても、確かめの前に古いものを消さないので失わない |
@@ -281,7 +281,7 @@ sequenceDiagram
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 影の比べの系列の数（1,000）と、ヘッドのダイジェスト（オフセットで揃えた要約）で置き換えるか | E3 の `ingester-rolling-replace`。ダイジェストは [tsdb-storage-engine.md](tsdb-storage-engine.md) の担当に提案する |
+| 影の比べの系列の数（1,000）が足りるか | E3 の `ingester-rolling-replace`。ヘッドの要約は統合の工程で採り、系列の比べに足した（[tsdb-storage-engine.md](tsdb-storage-engine.md) の 6.7 節） |
 | `ir_version` の固定を許す期間（90 日） | PM と QA |
 | 公開のコンテナのレジストリの選定 | E2 の `agent-distribution` |
 | 合わせで古い `codec_id` を書き直すか | ADR-0004 のとおり別に決める |

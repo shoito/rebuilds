@@ -39,6 +39,8 @@ date: 2026-10-09
 - `logs-raw` を読み、`logs` と `derived-partials` に書き、オフセットを確定するまでを Kafka のトランザクションにする。下流は `read_committed` で読む。バッチで使った設定のバージョンを記録し、読み直しでは同じバージョンで処理する。
 - 同じログで 3 回落ちたら、本文なしで `poison` として流してオフセットを進める。
 
+> 2026-10-09 の注記：MSK の Express のブローカーでトランザクションが使えるかは、領域の工程では未検証だった。統合の工程で AWS の資料を確かめた。Express はトランザクションの状態のトピックの `min.insync.replicas`（2）を持ち、`transaction.max.timeout.ms`・`transactional.id.expiration.ms` を変えられる（[Express broker configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-write.html)、2026-10-09 に確認）。そこで a のまま進める。ただし、`logs`・`derived-partials` のメッセージに出どころ（`src_partition`、`src_offset`）を入れ、下流は出どころの位置でも重複を除く（[ADR-0002](0002-intake-log-on-msk.md) の注記）。S1 の量での費用と遅れが合わなければ、b（冪等のプロデューサーと出どころでの除去）に切り替え、この ADR を直す。
+
 ### 他の案を選ばなかった理由
 
 - **2（時間切れ）**：壁の時計で止めると、同じログが負荷によって違う結果になり、読み直しで同じにならない。バックトラックの正規表現は時間切れまで CPU を使い切る。

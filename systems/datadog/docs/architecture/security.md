@@ -200,7 +200,7 @@ ADR-0057。
 ### 5.2 保持の期限の削除
 
 - `compactor` がカタログ（`metric_blocks`、`log_segments` など）を見て、期限を過ぎた行を「削除中」にし、クエリの計画から外してから S3 のオブジェクトを消す。S3 のライフサイクル（保持＋1 日）は後ろの守り（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）。
-- S3 のバージョニングの古いバージョンは 7 日で消える。大阪の写しは、大阪のバケットのライフサイクルと、削除の写し（CRR の削除マーカーの写し）で消える。削除マーカーの写しの扱いは E1 の `s3-buckets-baseline` で確かめる（**未検証**）。
+- S3 のバージョニングの古いバージョンは 7 日で消える。大阪の写しは、`compactor` と `deletion-worker` が東京と同じ時に明示に消し、大阪のバケットのタグのライフサイクル（保持＋1 日）を後ろの守りにする。タグで絞った複製の規則では、削除マーカーは写らない（[Replicating delete markers](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-marker-replication.html)、2026-10-09 に確認。[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) の注記）。
 
 ### 5.3 解約と組織の削除
 
@@ -338,7 +338,7 @@ ADR-0058。
 | 削除の請求の期限、S3 の古いバージョン・大阪の写しの扱い、解約の猶予 | **法務の確認待ち：L5** |
 | 監査ログの保持、開示の請求・捜査機関への応答、法的な保全の範囲 | **法務の確認待ち：L6** |
 | 漏れたキーで生じた超過の扱い、消去の約束の文言 | **法務の確認待ち：L7** |
-| CRR の削除マーカーの写しで大阪の写しが消えるか | E1 の `s3-buckets-baseline`（**未検証**） |
+| 大阪の写しの明示の削除（タグの複製の規則では削除マーカーは写らないと確かめた。[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) の注記） | E1 の `s3-buckets-baseline` で実の S3 で確かめる |
 | BYOK | MVP の後 |
 
 ## 14. quality.md・runbooks・data-model への項目

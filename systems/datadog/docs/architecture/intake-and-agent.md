@@ -58,6 +58,7 @@
 | 収集の間隔 | エージェントのチェックは 15 秒 | [Data collection resolution](https://docs.datadoghq.com/developers/guide/data-collection-resolution/) |
 | API の本文 | 1 回 500 KB、展開して 5 MB 未満。時刻は未来 10 分・過去 1 時間。超えると 413、絞ると 429 | [Submit metrics](https://docs.datadoghq.com/api/latest/metrics/submit-metrics.md) |
 | エージェントの OTLP の受け口 | gRPC 4317、HTTP 4318 | [OTLP Ingestion by the Datadog Agent](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest_in_the_agent/) |
+| StatsD の `h`・`ms` | エージェントが `.avg`・`.count`・`.median`・`.95percentile`・`.max` に集計する。`ms` は `h` と同じ | [Metric Types](https://docs.datadoghq.com/metrics/types/) |
 | エージェントの送り直しの間隔、優先、StatsD の集計の窓 | 公式の資料で確かめられなかった（**未検証**） | — |
 
 本システムの値（待ち行列の大きさ、送り直しの間隔、10 秒の集計の窓）は自前で決めた。本家のエージェントのコードと設定の形式は使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
@@ -117,7 +118,7 @@ flowchart LR
 | `s` | 異なる値の数 | gauge |
 | `d`・`h`・`ms` | 値を指数のヒストグラム（スケール 5）に足す。重みは 1 ÷ 率 | 分布（[distributions-and-sketches.md](distributions-and-sketches.md) の 6 節） |
 
-- `h`・`ms` も分布として送る。本家がエージェントの中で `h`・`ms` をどう集計するかは、公式の資料で確かめなかった（**未検証**）。違う振る舞いになりうる。本システムは集計の正しさ（合わせられること）を優先する。[architecture/README.md](README.md) の 1.4 節への行の追加を、統合の工程に頼む（12 節の持ち越し）。
+- `h`・`ms` も分布として送る。本家のエージェントは `h` を `.avg`・`.count`・`.median`・`.95percentile`・`.max` の指標に集計し、`ms` は `h` と同じに扱う（[Metric Types](https://docs.datadoghq.com/metrics/types/)、2026-10-09 に確認）。本システムは集計の正しさ（ホストをまたいで合わせられること）を優先する。本家との意図した違いとして [architecture/README.md](README.md) の 1.4 節に足した。
 - 窓の鍵の数は 20 万まで（約 40 MiB）。超えた新しい鍵の点は捨てて数える。
 
 ### 4.4 ログの追跡
@@ -207,7 +208,7 @@ NFR-013 の 150 MB の内訳。リリースごとに負荷の生成器で測る�
 
 - パッケージ：deb・rpm（Linux、x86_64・arm64）、msi（Windows）、コンテナのイメージ、Kubernetes の DaemonSet の Helm チャート。署名とリポジトリは delivery.md。
 - **自動の更新は MVP に含めない。** 利用者のパッケージの管理（apt、yum、Helm）で更新する。エージェントは自分のバージョンを `<brand>.agent.running{version}` で送り、画面で古いバージョンを示す。
-- ゲートウェイは、エージェントのバージョンの下限を持つ。下限より古いバージョンの要求も受ける（データを失わせない）が、応答のヘッダー `<Brand>-Agent-Deprecated: 1` を返し、画面で知らせる。
+- ゲートウェイは、エージェントのバージョンの下限（`ops.agent_min_version`）を持つ。下限より古いバージョンの要求も受ける（データを失わせない）が、応答のヘッダー `<Brand>-Agent-Deprecated: 1` を返し、画面で知らせる。廃止は 6 か月前に知らせ、その後は 426 と更新の案内を返す（[ADR-0066](../decisions/0066-format-versioning-and-compatibility-windows.md)、[delivery.md](delivery.md) の 5.3 節。統合の工程で揃えた）。
 
 ## 5. 取り込みのゲートウェイ
 
@@ -450,7 +451,6 @@ Tick { gateway_id: u32, t_in_ms: i64, draining: bool }
 | `Tick` の量（S2 でゲートウェイ・パーティションが増えたとき） | S2 の前に capacity.md で見積もる。多ければ刻みの間隔を 2 秒に |
 | エージェントの CPU 2% の実測 | `agent-core` |
 | エージェントの側の PII のマスク | logs-pipeline.md と法務の L1 の結論の後 |
-| StatsD の `h`・`ms` を分布にする本家との違い | [architecture/README.md](README.md) の 1.4 節の「本家との意図した違い」への行の追加を、統合の工程で行う |
 | 本家のエージェントの送り直しの間隔と StatsD の集計の窓 | 公式の資料で確かめられなかった（**未検証**）。本システムの値を使う |
 
 ## 出典

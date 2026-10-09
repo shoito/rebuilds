@@ -37,6 +37,9 @@ date: 2026-10-09
 1、a、x を採用する。詳細は [tsdb-storage-engine.md](../architecture/tsdb-storage-engine.md) の 6 節。
 
 - 時間 `H` は、パーティションの最大の `t_in` が `H + 2 時間 10 分` 以上になったら閉じる。
+
+> 2026-10-09 の注記：capacity の領域の提案を受け、統合の工程で閉じる時刻をパーティションごとにずらすことにした。閉じる条件は「最大の `t_in` ≥ `H + 2 時間 10 分 + s_p`」、`s_p = xxh3_64(cell ‖ partition) mod 300` 秒（0〜5 分）。`s_p` はパーティションだけで決まるので、2 つの写しと読み直しで閉じるオフセットは変わらない。1,024 パーティションの PUT・ロールアップの計算・Aurora の確定が数分に集まるのを、5 分に散らす。ヘッドの最大の長さは約 2 時間 15 分になる。書き出しは区切りから 70〜75 分（[tsdb-storage-engine.md](../architecture/tsdb-storage-engine.md) の 6.1 節）。
+
 - 書き出しは、系列ごとに時刻の順・後勝ちの点の列を作り、120 点ごとの正規のチャンクに符号化し直し、ロールアップを生の点から作り、組織ごとに系列の鍵の順でブロックを組み立てる。
 - 貸し出し `ingest_shard_leases`（期限 30 秒、延長 10 秒ごと、`epoch`）の持ち主が、決定的なキーへ `If-None-Match` の PUT を行う。412 なら置かれたもののチェックサムと比べる。
 - 確定のトランザクション：`epoch` を `FOR UPDATE` で確かめ、`metric_blocks` を組織ごとに書き、`ingest_checkpoints` を `flushed_hour = H − 1` の条件で `H` と `replay_from` に進める。

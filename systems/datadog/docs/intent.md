@@ -131,7 +131,8 @@
 - インジェスターの 1 系列あたりのメモリー（ヘッドの 2 時間分と系列の索引）：E3 の前の `ingester-memory-poc`。S1 で有効な系列 1 億を見込む（[ADR-0004](decisions/0004-tsdb-storage-engine.md)）。
 - ログのセグメントのブルームフィルターの誤検出の率と大きさ、日本語の 2-gram の効き：E5 の前の `log-bloom-poc`（[ADR-0005](decisions/0005-log-storage-columnar-with-bloom.md)）。
 - テールサンプリングの待ちの窓（既定 30 秒）と、組み立てのメモリー：E6 の前の `tail-sampling-memory-poc`。
-- 本家の利用量の数え方のうち、ホストの数え方（時間ごとの最大の扱い）、ログの索引の保持の期間の選択肢、トレースの保持の規則、本家のサービスの SLA：公式の資料で確かめられなかった（**未検証**）。本システムの値は usage-and-billing、log-storage-and-search、traces-and-sampling の各領域で決める。
+- 本家の利用量の数え方のうち、ホストの数え方（月の時間の上位 1% を除いた最大）とトレースの保持の規則（15 日と 30 日）は、領域の工程で公式の資料で確かめた（[usage-and-billing.md](architecture/usage-and-billing.md) の 3 節、[traces-and-sampling.md](architecture/traces-and-sampling.md) の 3 節）。ログの索引の保持の期間の選択肢と、本家のサービスの SLA は確かめられなかった（**未検証**）。
+- ログの取り込みの原価と値段：公開の価格での原価は 1 GB 0.100 USD で、最初の仮の予算 0.03 USD の約 3 倍。統合の工程で予算を仮に 0.10 USD に上げた。値段と単位は PM が E13 の `cost-baseline` の前に決める（[architecture/README.md](architecture/README.md) の 6 節）。
 
 ## 出典
 
@@ -149,7 +150,7 @@
 - Datadog Docs, [Ingestion Mechanisms](https://docs.datadoghq.com/tracing/trace_pipeline/ingestion_mechanisms/)：エージェントのヘッドサンプリングは既定で 1 秒 10 トレースを目標にする。エラーのサンプラーは 1 秒 10、まれなもののサンプラーは 1 秒 5 トレースまで
 - Datadog Docs, [Ingestion Controls](https://docs.datadoghq.com/tracing/trace_pipeline/ingestion_controls/)：APM のメトリクスはサンプリングの前のすべてのトレースから計算する
 - Datadog Docs, [OTLP Ingestion by the Datadog Agent](https://docs.datadoghq.com/opentelemetry/setup/otlp_ingest_in_the_agent/)：エージェントの OTLP の受け口は gRPC 4317、HTTP 4318。トレースとメトリクスは既定で有効、ログは別に有効にする
-- Datadog Docs, [Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)：評価の窓（5 分〜48 時間、メトリクスは 1 か月まで）、評価の頻度（24 時間未満の窓は 1 分）、評価の遅らせ（最大 86,400 秒）、データなしの扱いの選択肢、マルチアラート、グループの保持（既定 24 時間）、回復の閾値
+- Datadog Docs, [Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)：評価の窓（1 分〜48 時間、メトリクスは 1 か月まで）、評価の頻度（24 時間未満の窓は 1 分、48 時間未満は 10 分、それ以上は 30 分）、評価の遅らせ（最大 86,400 秒）、データなしの扱いの選択肢、マルチアラート、グループの保持（既定 24 時間）、回復の閾値
 - Datadog Docs, [API and Application Keys](https://docs.datadoghq.com/account_management/api-app-keys/)：API キーは組織の単位で、エージェントの送信に使う。組織ごとに既定 50 本まで。アプリケーションキーは利用者に属し、スコープで権限を絞れる
 - Datadog Engineering, [Computing Accurate Percentiles with DDSketch](https://www.datadoghq.com/blog/engineering/computing-accurate-percentiles-with-ddsketch/)（2019-09-23）：相対誤差を保証し、カウンターの和で合わせられる分布のスケッチ
 - Datadog Engineering, [Introducing Husky](https://www.datadoghq.com/blog/engineering/introducing-husky/)（2022-05-17）：イベントの保存を、オブジェクトストレージの上の列指向の形式で、書き込み・圧縮・読み出しを分けて作った。Kafka から読む

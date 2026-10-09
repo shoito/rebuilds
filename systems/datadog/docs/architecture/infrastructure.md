@@ -40,13 +40,13 @@ ADR-0059。
 | --- | --- | --- |
 | public | `nlb-intake`、`nlb-otlp`、`alb-app`、NAT ゲートウェイ | Internet Gateway |
 | intake | `intake-gateway` | なし（受けるだけ）。MSK・Valkey・Aurora のリーダー（キーの引き）へ |
-| data | `metrics-ingester`、`log-processor`、`log-indexer`、`trace-assembler`、`compactor`、`query-reader`、`log-searcher`、`monitor-evaluator`、`query-frontend`、`usage-aggregator` | **なし。** S3 のゲートウェイのエンドポイントと、インターフェースのエンドポイント（KMS、STS、ECR、CloudWatch Logs、AppConfig、Secrets Manager） |
+| data | `metrics-ingester`、`log-processor`、`log-indexer`、`trace-assembler`、`derived-metrics-aggregator`、`compactor`、`deletion-worker`、`rehydrator`、`live-tail`、`limits-coordinator`、`query-reader`、`log-searcher`、`monitor-evaluator`（`slo-calculator` を含む）、`query-frontend`、`usage-aggregator` | **なし。** S3 のゲートウェイのエンドポイントと、インターフェースのエンドポイント（KMS、STS、ECR、CloudWatch Logs、AppConfig、Secrets Manager） |
 | control | `api`、`web-bff`、`relay`、SSO・SCIM | NAT → Network Firewall（IdP のメタデータ・JWKS の許可リストだけ） |
 | egress | `notifier` | 専用の NAT（Elastic IP を公開する）。VPC エンドポイントと isolated・data への経路を持たない |
 | isolated | MSK、Aurora、ElastiCache（Valkey） | なし |
 
 - データの面（`data`）は外への経路を持たない（[ADR-0058](../decisions/0058-untrusted-senders-egress-and-operator-access.md)）。依存の取得はビルドのときだけで、実行の時は ECR のエンドポイントから取る。
-- セキュリティグループはサービスごとに入る側と出る側を明示する。MSK への書き込みは `intake-gateway`・`log-processor`・`trace-assembler`・`relay`・`query-frontend`（監査）だけ、読み出しは消費者だけに許す。
+- セキュリティグループはサービスごとに入る側と出る側を明示する。MSK への書き込みは `intake-gateway`・`log-processor`・`trace-assembler`・`derived-metrics-aggregator`（`metrics` へ）・`limits-coordinator`（制御のレコード）・`relay`・`query-frontend`（監査）だけ、読み出しは消費者だけに許す。
 - セルごとに VPC を分ける。セルの間の通信は、`intake-router`（S2）と `query-frontend` のセルをまたぐ合わせ（移し替えの間。[tenancy-and-rbac.md](tenancy-and-rbac.md) の 10 節）だけで、PrivateLink（セルごとの内部の NLB）を通す。
 
 ### 2.2 入口とホスト名
@@ -61,7 +61,7 @@ ADR-0059。
 
 - **取り込みは CloudFront を通さない。** 量が多く（S1 のピーク 1.5 GB/秒を超える）、CloudFront の要求の料金と、WAF の検査の費用が大きい。送り手の多くは日本の中にいる。入口の守りは、ゲートウェイの上限と割り当て（[ADR-0011](../decisions/0011-intake-gateway-pipeline-and-watermark-ticks.md)、[ADR-0012](../decisions/0012-intake-quota-coordination.md)）と、NLB の前の AWS Shield Standard に任せる。
 - **NLB は AZ をまたいで配らない**（クロスゾーンの負荷分散を切る）。AZ をまたぐ転送の費用を避ける。DNS で 3 つの AZ の NLB のアドレスを返し、送り手が AZ にばらける。AZ の障害のときは、そのアドレスを DNS から外す（NLB の健康の確かめ）。
-- **TLS は NLB で終端**し、ゲートウェイまで VPC の中で TLS を張り直す（[security.md](security.md) の 4.1 節）。NLB の TLS のリスナーの ALPN（HTTP/2 の gRPC を通す）の設定は E1 の `edge-and-intake-endpoints` で確かめる（**未検証**）。
+- **TLS は NLB で終端**し、ゲートウェイまで VPC の中で TLS を張り直す（[security.md](security.md) の 4.1 節）。NLB の TLS のリスナーは ALPN の方針（`HTTP1Only`・`HTTP2Only`・`HTTP2Optional`・`HTTP2Preferred`・`None`）を持つ（[CreateListener](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_CreateListener.html)、2026-10-09 に確認）。`otlp` の 4317 は `HTTP2Only`、443 は `HTTP2Preferred` にする。NLB は gRPC を L4 で通すだけなので、gRPC の健康の確かめと、長く続く HTTP/2 の接続の偏りを E1 の `edge-and-intake-endpoints` で確かめる（gRPC を通した端から端までは**未検証**）。
 - 画面と API の WAF：共通のルール、IP の評判、IP ごとのレート制限（`api` は 5 分 10 万）。
 
 ### 2.3 外への送信
@@ -85,6 +85,10 @@ ADR-0059、ADR-0060。
 | `log-processor` | パイプライン、PII のマスク、振り分け（[logs-pipeline.md](logs-pipeline.md)） | 消費の遅れ（水位） |
 | `query-frontend` | クエリの計画と合わせ、監査の読み出しの記録 | CPU、待ち行列 |
 | `usage-aggregator` | 利用量（[usage-and-billing.md](usage-and-billing.md)） | 消費の遅れ |
+| `live-tail` | `logs` のトピックを、セッションのある組織のパーティションの組だけ読み、セッションの条件（制限を足した IR）で絞って、`web-bff` を経た Server-Sent Events で画面へ流す（[logs-pipeline.md](logs-pipeline.md) の 11 節） | セッションの数、消費の遅れ |
+| `rehydrator` | 再水和の作業者（[ADR-0035](../decisions/0035-log-rehydration-jobs.md)） | 作業の待ち行列 |
+| `deletion-worker` | 削除の請求の墓標を付ける検索（[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)）、解約の消去 `tenant-purge`（[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md)）。書き直しは `compactor` に頼む | 作業の待ち行列 |
+| `limits-coordinator` | カーディナリティの持ち分の配り直し（[ADR-0017](../decisions/0017-cardinality-admission-via-control-records.md)）。セルに 1 つ（予備 1） | — |
 | `api`、`web-bff`、`relay`、`notifier`、SSO・SCIM | 管理の面 | CPU、outbox の最古の年齢 |
 
 - すべて ARM64。管理の面は他の題材と同じ。
@@ -100,9 +104,10 @@ ADR-0060。台数は [capacity.md](capacity.md) の 5 節（S1、初期見積も
 | `fleet-mreader` | `query-reader`（メトリクスのブロック） | `r7gd.8xlarge`（32 vCPU、256 GiB、1.9 TB NVMe） | 9（ダッシュボードの組 6、評価の組 3）＋予備 3 | 組ごとに AZ ごと同じ数 |
 | `fleet-lsearch` | `log-searcher`（ログとトレースのセグメント） | `i4i.8xlarge`（32 vCPU、256 GiB、2 × 3.75 TB NVMe） | 12＋予備 3 | AZ ごとに 4 |
 | `fleet-index` | `log-indexer`、`compactor` | `c7gd.8xlarge`（32 vCPU、64 GiB、1.9 TB NVMe） | 10（インデクサー 6、合わせ 4）＋予備 3 | AZ ごと |
-| `fleet-eval` | `monitor-evaluator` | `c7g.4xlarge`（16 vCPU、32 GiB） | 6＋予備 3 | AZ ごとに 2 |
+| `fleet-eval` | `monitor-evaluator`（`slo-calculator` を同じバイナリ・同じシャードで動かす。[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)） | `c7g.4xlarge`（16 vCPU、32 GiB） | 6＋予備 3 | AZ ごとに 2 |
+| `fleet-derive` | `derived-metrics-aggregator`（[ADR-0032](../decisions/0032-index-routing-and-derived-metrics.md)。系列ごとの 10 秒の桶を 65 分持つ） | `r7gd.2xlarge`（8 vCPU、64 GiB、474 GB NVMe） | 3＋予備 3 | AZ ごとに 1。`derived-partials` の 64 パーティションを分けて持つ。状態は S3 のチェックポイントと `derived-partials`（24 時間）から作り直す |
 
-- インスタンスの種類は AWS の公開の価格表（`AmazonEC2`、ap-northeast-1、2026-10-08 の公開分、2026-10-09 に取得）で、東京で提供されていることを確かめた。
+- インスタンスの種類は AWS の公開の価格表（`AmazonEC2`、ap-northeast-1、2026-10-08 の公開分、2026-10-09 に取得）で、東京で提供されていることを確かめた。大阪（ap-northeast-3）でも `C7g`・`C7gd`・`R7gd`・`I4i` の型が提供されている（[Amazon EC2 instance types by Region](https://docs.aws.amazon.com/ec2/latest/instancetypes/ec2-instance-regions.html)、2026-10-09 に確認）。AZ ごとの提供と起こせる台数は**未検証**（6.4 節）。
 - 1 つのインスタンスに 1 つのタスク（インジェスターの組の写し、読み手）を置く。同じ群れの中で部品を混ぜない（メモリーと NVMe の見積もりを単純にする）。
 - **予備**：AZ ごとに 1 台を空けておき、デプロイ（[delivery.md](delivery.md) の 4 節の「新しいタスクを先に起こす」）とインスタンスの障害の置き換えに使う。
 - **AMI**：ECS に最適化した Amazon Linux 2023（ARM64）。月ごとに更新し、デプロイと同じ段階で入れ替える（[delivery.md](delivery.md) の 4.4 節）。
@@ -136,8 +141,8 @@ ADR-0060。
 
 - **Express を選ぶ理由**：Standard のブローカーより、ブローカーあたりの書き込みが大きく（`m7g.16xlarge` で 500 MB/秒 対 153.8 MB/秒）、ストレージの大きさの管理がなく、広げるのと再配置が速い（下の出典）。障害の日の急増と、S2 でのブローカーの追加に効く。
 - Express のブローカーは 3 AZ の構成だけで、Kafka のバージョンは 3.6・3.8・3.9・4.2（下の出典）。KStreams の全部は使えないが、本システムは使わない。
-- **Kafka のトランザクション**（[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）が Express のブローカーで期待どおり動くことを、`msk-throughput-poc` で確かめる（**未検証**）。
-- **ラックを意識した読み出し**：消費者に `client.rack` を AZ の ID で設定し、同じ AZ の写しから読む（Kafka の follower fetching）。AZ をまたぐ読み出しの転送の費用（0.01 USD/GB を両側で）を減らす。Express で有効にできるかは `msk-throughput-poc` で確かめる（**未検証**）。できなければ、AZ をまたぐ転送が月 約 4 万 USD 増える（[capacity.md](capacity.md) の 6 節）。
+- **Kafka のトランザクション**：使うのは `log-processor`（`logs-raw` → `logs`・`derived-partials`）だけ（[ADR-0002](../decisions/0002-intake-log-on-msk.md) の注記、[ADR-0030](../decisions/0030-log-pipeline-execution-model.md)）。Express のブローカーは、トランザクションの状態のトピックの `min.insync.replicas`（2）を固定で持ち、`transaction.max.timeout.ms`・`transactional.id.expiration.ms` を変えられる（下の出典）。S1 の量での遅れと費用は `msk-throughput-poc` で測る。合わなければ、冪等のプロデューサーと出どころの位置での重複の除去に切り替える（下流は変わらない）。
+- **ラックを意識した読み出し**：消費者に `client.rack` を AZ の ID で設定し、同じ AZ の写しから読む（Kafka の follower fetching）。AZ をまたぐ読み出しの転送の費用（0.01 USD/GB を両側で）を減らす。Express は `replica.selector.class` に `RackAwareReplicaSelector` を設定でき、`broker.rack` は AZ の ID（下の出典）。効き（読み出しの遅れ、AZ をまたぐ転送の減り）は `msk-throughput-poc` で測る。効かなければ、AZ をまたぐ転送が月 約 4 万 USD 増える（[capacity.md](capacity.md) の 6 節）。
 - インジェスターの 2 つの写しは、別の AZ から同じパーティションを読む。ラックを意識した読み出しでは、それぞれ自分の AZ の写しから読む。
 
 ### 4.2 運用の上限と見る指標
@@ -190,8 +195,9 @@ ADR-0061。
 | `tier=l1` のテレメトリー（合わせの後のブロック・セグメント、評価の記録） | Glacier Instant Retrieval | 東京と同じ区分の保持 |
 | アーカイブ | Glacier Instant Retrieval | 1 年 |
 
-- すべて Replication Time Control（15 分）つき。[ADR-0009](../decisions/0009-retention-tiers-on-s3.md) の「大阪の写しは Glacier Instant Retrieval（チェックポイントは Standard）」を、小さく短命なオブジェクトでは Standard にする形に具体にした。理由は、Glacier Instant Retrieval の 128 KB の最小の課金と 90 日の最小の保存の期間で、10 秒ごとの小さなセグメントを写すと、すぐ消すものに 90 日分を払うことになるため。
-- 複製の規則をタグで絞ること、規則ごとに送り先の保存クラスを決めることは、E1 の `s3-buckets-baseline` で確かめる（**未検証**）。
+- すべて Replication Time Control（15 分）つき。複製の規則はタグ（`And` の中の `Tag`）で絞り、規則ごとに送り先の保存クラスを決める（S3 の複製の設定の `Filter` と `Destination.StorageClass`）。
+- **削除マーカーは写らない**：タグで絞った複製の規則は、削除マーカーの複製を持てない（[Replicating delete markers](https://docs.aws.amazon.com/AmazonS3/latest/userguide/delete-marker-replication.html)、2026-10-09 に確認）。バージョンを指定した削除も写らない。そこで、`compactor`（保持の期限、合わせの後の古いファイル）と `deletion-worker`（削除の請求の書き直しの後、解約の消去）は、東京と大阪の両方のオブジェクトを明示に消す。大阪のバケットのタグのライフサイクル（保持＋1 日）を後ろの守りにする（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md) の注記、[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md)）。[ADR-0009](../decisions/0009-retention-tiers-on-s3.md) の「大阪の写しは Glacier Instant Retrieval（チェックポイントは Standard）」を、小さく短命なオブジェクトでは Standard にする形に具体にした。理由は、Glacier Instant Retrieval の 128 KB の最小の課金と 90 日の最小の保存の期間で、10 秒ごとの小さなセグメントを写すと、すぐ消すものに 90 日分を払うことになるため。
+- タグで絞った複製と送り先の保存クラス、大阪の明示の削除を、E1 の `s3-buckets-baseline` で実の S3 で確かめる。
 
 ### 6.3 リージョンの障害（NFR-005）
 
@@ -273,7 +279,7 @@ ADR-0061。
 
 ## 9. 単位あたりの原価
 
-[capacity.md](capacity.md) の 6 節の月の原価（S1、約 36 万 USD/月、±50%）を、信号ごとに割り振った値（割り振りの規則は [usage-and-billing.md](usage-and-billing.md) の 9 節）。
+[capacity.md](capacity.md) の 6 節の月の原価（S1、約 36.9 万 USD/月、±50%）を、信号ごとに割り振った値。統合の工程で足した部品（`fleet-derive`、`live-tail` など、月 約 4,300 USD）は 1% 強なので、下の単位あたりの原価は直していない（±50% の幅の中）（割り振りの規則は [usage-and-billing.md](usage-and-billing.md) の 9 節）。
 
 | 単位 | 原価（USD） | 大きい項目 |
 | --- | --- | --- |
@@ -284,7 +290,7 @@ ADR-0061。
 | スパン 100 万（取り込み） | 0.014 | MSK（43%）、組み立て（12%）、ゾーンをまたぐ転送（11%） |
 
 - 前提：S1 の量で、ログ 1 件 500 バイト、スパン 400 バイト、MSK の圧縮はメトリクス 1 点 12 バイト・ログとスパン 1/5（本システムの想定。`msk-throughput-poc` で測る）。
-- ログの取り込みは、[architecture/README.md](README.md) の 2.1 節の仮の予算（1 GB 0.03 USD）の約 3 倍。下げる手段は [usage-and-billing.md](usage-and-billing.md) の 9 節。
+- ログの取り込みは、[architecture/README.md](README.md) の 2.1 節の最初の仮の予算（1 GB 0.03 USD）の約 3 倍。統合の工程で予算を仮に 1 GB 0.10 USD に上げ、PM の判断を待つ。下げる手段と効きは [usage-and-billing.md](usage-and-billing.md) の 9 節。
 
 ## 10. 段階を上げる判断の基準
 
@@ -310,7 +316,7 @@ ADR-0061。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | E1 | `edge-and-intake-endpoints` | 2.2 節の NLB（TLS、ALPN の確かめ、クロスゾーンを切る）、CloudFront＋WAF |
 | E1 | `ecs-fargate-and-ec2-capacity` | 3 節の群れ、予備、AMI の更新の流れ、退避の知らせ |
 | E1 | `msk-cluster-baseline` | 4 節（Express、パーティション、IAM、ラックを意識した読み出しの確かめ） |
-| E1 | `s3-buckets-baseline` | 5.1 節のタグ、6.2 節の複製の規則、削除マーカーの写しの確かめ |
+| E1 | `s3-buckets-baseline` | 5.1 節のタグ、6.2 節の複製の規則、大阪の明示の削除 |
 | E1 | `osaka-warm-standby` | 6.1 節と 6.4 節 |
 | E2 | `msk-throughput-poc` | 4.1 節の書き込み・読み出し・トランザクション・ラックを意識した読み出しを Express で測る |
 | E13 | `dr-failover-drill` | 6.3 節のワークフローと訓練（半年ごと） |
@@ -334,11 +340,11 @@ ADR-0061。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | データの所在の約束（DR、運用者の参照） | **法務の確認待ち：L2** |
-| Express での Kafka のトランザクション、ラックを意識した読み出し | E2 の `msk-throughput-poc`（**未検証**） |
-| NLB の TLS のリスナーでの ALPN と gRPC | E1 の `edge-and-intake-endpoints`（**未検証**） |
-| S3 の複製の規則のタグでの絞りと保存クラス、削除マーカーの写し | E1 の `s3-buckets-baseline`（**未検証**） |
+| Express での Kafka のトランザクションとラックを意識した読み出しの、S1 の量での遅れと費用 | E2 の `msk-throughput-poc`（設定として使えることは確かめた） |
+| NLB の TLS のリスナーを通した gRPC の端から端まで（ALPN の方針は確かめた） | E1 の `edge-and-intake-endpoints`（**未検証**） |
+| S3 の複製の規則のタグでの絞りと保存クラス（設定として持てることは確かめた。削除マーカーは写らないので明示に消す） | E1 の `s3-buckets-baseline` で実の S3 で確かめる |
 | 大阪で EC2 の群れを起こせる容量（予約の要否） | E1 の `osaka-warm-standby`（**未検証**） |
-| ログの取り込みの原価（予算の約 3 倍） | PM（[usage-and-billing.md](usage-and-billing.md) の 13 節） |
+| ログの取り込みの原価（予算の約 3 倍） | 統合の工程で、予算を 1 GB 0.10 USD に仮に上げた（PM の判断待ち。[architecture/README.md](README.md) の 6 節の「決定（2026-10-09、統合）」） |
 | S2 のカタログの Aurora の分け方 | S2 の前に別の ADR |
 
 ## 13. quality.md・runbooks・data-model への項目
@@ -370,11 +376,12 @@ ADR-0061。月次のキャパシティのレビュー（[capacity.md](capacity.m
 
 - AWS, [Amazon MSK Express brokers](https://docs.aws.amazon.com/msk/latest/developerguide/msk-broker-types-express.html)：Standard の 3 倍までの書き込み（`m7g.16xlarge` で 500 MB/秒 対 153.8 MB/秒）、ストレージの管理なし、3 AZ の構成だけ、Kafka 3.6・3.8・3.9・4.2
 - AWS, [Amazon MSK quota](https://docs.aws.amazon.com/msk/latest/developerguide/limits.html)：アカウントあたりブローカー 90、クラスタあたり 60（KRaft）。Express の持続の書き込み・読み出し（`m7g.8xlarge` 250・500 MB/秒、`m7g.16xlarge` 500・1,000 MB/秒）、パーティションあたり最大 15 MB/秒、勧めのパーティションの数（`m7g.8xlarge` 12,000）、IAM の接続 3,000・作成 1 秒 100
+- AWS, [Express broker configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-write.html)・[read-only configurations](https://docs.aws.amazon.com/msk/latest/developerguide/msk-configuration-express-read-only.html)：`transaction.max.timeout.ms`・`transactional.id.expiration.ms`・`replica.selector.class` は変更可、`min.insync.replicas` と `transaction.state.log.min.isr` は 2 で固定、`broker.rack` は AZ の ID
 - AWS, [Best practices for Standard brokers](https://docs.aws.amazon.com/msk/latest/developerguide/bestpractices.html)：複製 3、`min.insync.replicas` は 2、CPU を 60% 未満に保つ
 - AWS, [Amazon MSK pricing](https://aws.amazon.com/msk/pricing/)：ブローカーの間の複製の転送は課金しない。クラスタの出入りは通常のデータ転送の料金
 - AWS Price List API（[Using the bulk API](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/using-the-aws-price-list-bulk-api.html)）の公開の価格（ap-northeast-1）：
   - `AmazonMSK`（2026-09-11 の公開分）：`express.m7g.8xlarge` 8.432 USD/時、`express.m7g.large` 0.527 USD/時、Express の書き込み 0.015 USD/GB、保存 0.12 USD/GB・月
-  - `AmazonEC2`（2026-10-08 の公開分。Linux、On-Demand）：`r7gd.4xlarge` 1.3154、`r7gd.8xlarge` 2.6309、`i4i.8xlarge` 3.221、`c7gd.8xlarge` 1.8448、`c7g.4xlarge` 0.7277 USD/時
+  - `AmazonEC2`（2026-10-08 の公開分。Linux、On-Demand）：`r7gd.2xlarge` 0.6577（`4xlarge` の半分として見積もった。**未検証**）、`r7gd.4xlarge` 1.3154、`r7gd.8xlarge` 2.6309、`i4i.8xlarge` 3.221、`c7gd.8xlarge` 1.8448、`c7g.4xlarge` 0.7277 USD/時
   - `AmazonS3`（2026-09-28 の公開分）：Standard 最初の 50 TB 0.025・次の 450 TB 0.024・500 TB を超える分 0.023 USD/GB・月、Glacier Instant Retrieval 0.005 USD/GB・月・取り出し 0.03 USD/GB・PUT 0.02 USD/1,000、Standard の PUT 0.0047 USD/1,000・GET 0.00037 USD/1,000、タグ 0.0065 USD/1 万タグ・月、Replication Time Control（東京 → 大阪）0.015 USD/GB
   - `AWSDataTransfer`（2026-09-16 の公開分）：東京 → 大阪 0.09 USD/GB、AZ の間 0.01 USD/GB
   - `AWSELB`（2026-09-11 の公開分）：NLB 0.0243 USD/時、0.006 USD/LCU・時
