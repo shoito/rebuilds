@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dropbox の前提知識</title>
+<meta name="description" content="Dropbox の再構築の設計の文書を読む前に知っておくとよい、ファイルシステム・プレースホルダー・双方向の同期・内容の番地とブロックの分割・ジャーナル・S3・復元の前提知識。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Dropbox · 前提知識</p>
+    <h1>Dropbox の設計を読む前に</h1>
+    <p class="lead">ファイルの同期は「フォルダーをサーバーに写す」だけに見えますが、OS ごとの名前の規則、2 台の編集の衝突、大きなファイルの差分、他人のファイルの有無の漏れ、一斉の暗号化からの復旧と、どこにも落とし穴があります。設計の文書が前提にしている知識を、ここで先に押さえます。共通の前提知識（RLS、outbox、冪等、UUIDv7、ER 図の記号など）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Dropbox · 前提知識</p>
+    <h2>Dropbox の設計を読む前に</h2>
+    <p class="lead">ファイルシステム・同期・内容の番地・ジャーナル・S3・復元の前提知識</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>Dropbox は何をするサービスか</h2>
+    <p>個人とチームが、仕事のファイルと写真を、複数の PC とスマートフォンで同じ木として使うためのストレージです。主な利用者は、日本の中小・中堅企業の社員です。設計・映像・建設のように、大きなファイルを社外の取引先と共有する業種を想定しています。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>同期のフォルダー</h3><p>PC の <code>~/&lt;Brand&gt;</code> に置いたファイルが、他の端末とサーバーへ自動でそろう。中身を手元に置かない「オンラインのみ」のファイルも選べる。</p></div>
+      <div class="card" data-frag><h3>共有フォルダー</h3><p>フォルダーに人やグループを招き、編集・閲覧の役割を付ける。招かれた人の木にもそのフォルダーが現れる。</p></div>
+      <div class="card" data-frag><h3>共有リンク</h3><p>URL を知る人に見せる。パスワード・期限・ダウンロードの禁止を付けられる。アカウントのない外部の人も開く。</p></div>
+      <div class="card" data-frag><h3>バージョン履歴と巻き戻し</h3><p>ファイルの前のバージョン、消したファイル、フォルダー全体を、プランの保持の期間の中で戻せる。</p></div>
+    </div>
+    <p>intent が掲げる価値は 4 つです。失わない・黙って上書きしない、すぐそろう、共有の範囲が分かる、戻せる。規模は S1 で 50 万アカウント、ノード 25 億、物理の保存 13 PB を見込みます。識別子に本家の名前は使わず、<code>&lt;brand&gt;.&lt;domain&gt;</code> のように書きます（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/intent.md">intent.md</a> の Problem・Proposed outcome・守るべき振る舞い、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）と 3 節（NFR）。</div>
+  </section>
+
+  <section class="s" id="filesystem">
+    <h2>ファイルシステムの基本：inode とパス</h2>
+    <p>Unix のファイルシステムでは、ファイルの実体は <a class="t" href="#g-inode">inode</a> で、フォルダーは「名前 → inode」の表です。パスは、ルートから名前をたどった道順にすぎません。Windows の NTFS では、同じ役目を File ID が担います。</p>
+    <ul>
+      <li data-frag><strong>名前の変更と移動</strong>：同じボリュームの中なら、フォルダーの表の行を書き換えるだけです。inode は変わらず、中身も動きません。10 万ファイルのフォルダーの名前を変えても一瞬で済みます。</li>
+      <li data-frag><strong>ボリュームをまたぐ移動</strong>：OS の中では「写して、元を消す」になります。同期のアプリからは「消えた」と「現れた」に見えます。</li>
+      <li data-frag><strong>アプリの保存のしかた</strong>：多くのアプリは、一時のファイルに書いてから元の名前へ置き換えます（<a class="t" href="#g-atomic-save">置き換えの保存</a>）。同じパスでも inode が新しくなります。</li>
+    </ul>
+    <p>設計は、ノードを UUIDv7 の ID で指し、親の ID と名前を持たせます。端末では inode・File ID でノードを結び、置き換えの保存は「同じノードの中身の変更」として扱います。こうしないと、バージョン履歴と共有リンクが切れます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">「ファイルはフルパスを主キーにすれば、ID の表が要らず単純だ」。この設計で何が起きますか？</p>
+      <div class="opts">
+        <button>何も起きない。パスは一意なので主キーに向いている</button>
+        <button>パスが長いと索引が少し大きくなるだけ</button>
+        <button>大きなフォルダーの名前の変更で子孫の行をすべて書き換え、履歴や共有リンクとの結び付きも切れる</button>
+      </div>
+      <p class="why">パスは「今の置き場所」で、移動のたびに変わります。ID で指せば、名前の変更は 1 行の変更です。パスは表示と、API の入口での解決のためだけに使います（ADR-0008）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0008-node-identity-and-names.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/file-system-integration.md">file-system-integration.md</a> の 4・5 節（移動の検出、アプリの保存のしかた）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0015-local-change-observation-and-move-detection.md">ADR-0015</a>。</div>
+  </section>
+
+  <section class="s" id="names">
+    <h2>名前の落とし穴：大文字小文字・正規化・予約の名前</h2>
+    <p>同じ名前に見えても、OS によって「同じ」の判定が違います。端末をまたぐと、1 つのファイルが 2 つに見えたり、消し合ったりします。</p>
+    <div class="tabs">
+      <div data-tab="macOS"><p>APFS の既定は、大文字小文字を<strong>区別しない</strong>（ただし保つ）。区別するボリュームも作れる。Unicode の正規化の形を保ったまま、形の違いを区別せずに引ける。古い HFS+ は <a class="t" href="#g-nfc">NFD</a> で持つ。アプリによって NFC と NFD のどちらの名前も現れる。</p></div>
+      <div data-tab="Windows"><p>NTFS の既定は、大文字小文字を区別しない（保つ）。<code>&lt;&gt;:"/\|?*</code> と制御文字が使えない。<code>CON</code>・<code>PRN</code>・<code>AUX</code>・<code>NUL</code>・<code>COM1</code>・<code>LPT1</code> などの<a class="t" href="#g-reserved">予約の名前</a>は、拡張子を付けても使えない。名前の末尾の空白とピリオドも使えない。</p></div>
+      <div data-tab="Linux"><p>ext4 などは大文字小文字を<strong>区別する</strong>。名前はただのバイト列で、正規化しない。<code>a.txt</code> と <code>A.txt</code> は別のファイルとして並ぶ。MVP は Linux のクライアントを持たないが、Web や API から同じ問題が入る。</p></div>
+      <div data-tab="日本語"><p>「が」は NFC で 1 文字（<code>E3 81 8C</code>）、NFD で「か」＋濁点の 2 文字（<code>E3 81 8B E3 82 99</code>）。見た目は同じでもバイト列が違う。全角の「カ」と半角の「ｶ」は NFC では別の文字で、NFKC では同じになる。</p></div>
+    </div>
+    <p>設計は、名前を NFC で持ち、同じフォルダーの中の一意を <a class="t" href="#g-namekey"><code>name_key</code></a>（NFC → Unicode の <a class="t" href="#g-casefold">case folding</a> → NFC）で決めます。全角と半角は区別します。OS で表せない名前は、サーバーの名前を変えず、その端末だけ「同期できない名前」として示します。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">macOS のアプリが <code>が.txt</code> を NFD の名前で保存しました。手元の名前を NFC に書き換えて揃えるべきですか？</p>
+      <div class="opts">
+        <button>書き換えない。手元のバイト列はそのまま持ち、<code>name_key</code> で比べる</button>
+        <button>書き換える。NFC に揃えればサーバーと一致する</button>
+        <button>NFD のまま、サーバーの名前も NFD に変える</button>
+      </div>
+      <p class="why">手元の名前を書き換えると、アプリが NFD で書き戻し、名前の変更が端末の間で往復し続けます。比べるのは <code>name_key</code> だけにし、OS や SQLite の照合に任せません（ADR-0008、ADR-0017）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0008-node-identity-and-names.md">ADR-0008</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0017-local-names-and-unsyncable-items.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/file-system-integration.md">file-system-integration.md</a> の 7・8 節（大文字小文字だけの変更、NFC・NFD、表せない名前の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/data-model.md">data-model.md</a> の 3.5 節。</div>
+  </section>
+
+  <section class="s" id="placeholders">
+    <h2>オンラインのみのファイル：File Provider と Cloud Files API</h2>
+    <p>チームのフォルダーが数百 GB あると、新しい PC にすべてを落とせません。そこで、名前・大きさ・日時だけを持ち、中身のない<a class="t" href="#g-placeholder">プレースホルダー</a>を置きます。アプリが開いた瞬間に、OS が同期のアプリへ中身を求めます。これが<a class="t" href="#g-hydrate">取り出し</a>です。</p>
+    <table>
+      <tr><th>OS</th><th>仕組み</th><th>押さえること</th></tr>
+      <tr><td>Windows</td><td><a class="t" href="#g-cfapi">Cloud Files API</a>（Windows 10 1709 から）</td><td>プレースホルダー・完全なファイル（OS が捨てうる）・固定した完全なファイルの 3 状態。中核のフィルターは NTFS だけ。取り出しの方針は「アプリと同期のアプリの大きいほう」</td></tr>
+      <tr><td>macOS</td><td><a class="t" href="#g-fileprovider">File Provider</a> の replicated の拡張</td><td>OS が領域の木を持ち、変化を拡張に知らせる。本家は File Provider を使うバージョンに macOS 12.5 以降を求める。API の細部は、設計の文書でも<strong>未検証</strong></td></tr>
+    </table>
+    <pre class="mermaid">stateDiagram-v2
+    [*] --> online_only: サーバーから受けた
+    online_only --> hydrating: アプリが開いた
+    hydrating --> local: 全体を受けて確かめた
+    hydrating --> online_only: 切断・ハッシュの不一致
+    local --> online_only: OS が追い出した
+    online_only --> pinned: オフラインで使う
+    local --> pinned: オフラインで使う
+    pinned --> local: 固定を外した</pre>
+    <p>設計の既定は、新しい端末ではオンラインのみです。取り出しはファイルの全体で、ハッシュを確かめてから OS に渡します。本システムから自動で追い出すことはしません。macOS では、同期の領域の中の変化も File Provider の呼び出しで受け、FSEvents は使いません。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0016-placeholders-and-hydration-policy.md">ADR-0016</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/file-system-integration.md">file-system-integration.md</a> の 6 節（状態・取り出し・追い出し・OS の違い）。</div>
+  </section>
+
+  <section class="s" id="sync">
+    <h2>双方向の同期と 3 つの木</h2>
+    <p>手元とサーバーの 2 つだけを比べると、「片方にだけあるファイル」が、片方で<em>作った</em>のか、もう片方で<em>消した</em>のか決められません。時刻で決めようにも、端末の時計はずれます。そこで、最後にそろった状態を<a class="t" href="#g-synced">共通の祖先</a>として持ち、<a class="t" href="#g-threeway">3 方向のマージ</a>をします。Git のマージと同じ考え方です。</p>
+    <ul>
+      <li><strong>Remote</strong>：サーバーから差分で受けた木。<strong>Local</strong>：監視と走査で観測した手元の木。<strong>Synced</strong>：最後に両者が一致したと確かめた木。</li>
+      <li>Synced → Remote の差が「サーバーの変化」、Synced → Local の差が「手元の変化」です。</li>
+    </ul>
+    <table>
+      <tr><th>ファイル</th><th>Synced</th><th>Local</th><th>Remote</th><th>判断</th></tr>
+      <tr data-frag><td><code>a.txt</code></td><td>r1</td><td>中身を変えた</td><td>r1</td><td>手元の変化 → 上げる</td></tr>
+      <tr data-frag><td><code>b.txt</code></td><td>r1</td><td>ない</td><td>r1</td><td>手元で消した → サーバーで消す</td></tr>
+      <tr data-frag><td><code>c.txt</code></td><td>r1</td><td>r1</td><td>r2</td><td>サーバーの変化 → 取る</td></tr>
+      <tr data-frag><td><code>d.txt</code></td><td>ない</td><td>ない</td><td>r1</td><td>サーバーで作った → 取る</td></tr>
+    </table>
+    <div class="compare">
+      <div class="bad"><strong>2 つの木だけ</strong><p><code>b.txt</code> と <code>d.txt</code> は、どちらも「サーバーにだけある」。消すべきか取るべきか分からない。誤れば、他の端末のファイルを消す。</p></div>
+      <div class="good"><strong>3 つの木</strong><p>Synced にあれば「手元で消した」、なければ「サーバーで作った」と決まる。監視の取りこぼしで手元を走査し直しても、Synced を残すので判断を誤らない。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0006-sync-conflict-model.md">ADR-0006</a> の「クライアントの 3 つの木」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/sync-engine.md">sync-engine.md</a> の 5 節（木の形と進め方）と 6 節（計画）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0010-local-state-db-and-intent-log.md">ADR-0010</a>（意図の記録）。</div>
+  </section>
+
+  <section class="s" id="conflicts">
+    <h2>衝突：競合のコピーと「削除より変更」</h2>
+    <p>サーバーは、元にした<a class="t" href="#g-baserev"><code>base_rev</code></a> などの条件つきの書き込みだけを受けます。先に届いた commit が通り、後の commit は 409 になります。後の側のクライアントが、決定表で次の手を決めます。</p>
+    <table>
+      <tr><th>手元</th><th>サーバー</th><th>結果</th></tr>
+      <tr><td>中身の変更</td><td>中身の変更（違う）</td><td>サーバーの中身を元の名前に、手元の中身を<a class="t" href="#g-conflict-copy">競合のコピー</a>に</td></tr>
+      <tr><td>中身の変更</td><td>削除</td><td>手元の中身を作り直す（親のフォルダーも）</td></tr>
+      <tr><td>削除</td><td>中身の変更</td><td>サーバーの中身を受ける。手元の削除を取り消す</td></tr>
+      <tr><td>フォルダーの中への追加</td><td>そのフォルダーの削除</td><td>フォルダーを作り直し、足したものだけを残す</td></tr>
+    </table>
+    <p>競合のコピーの名前は <code>見積 (A-PC の競合コピー 2026-10-09).xlsx</code> の形です。本家は編集した人の名前を入れますが、設計は端末の名前を入れます。同じ人の 2 台の衝突が多いからです。</p>
+    <p><strong><a class="t" href="#g-massdelete">消しすぎの止め</a></strong>：手元からサーバーへ出す削除が、直近 5 分で 1,000 ファイルか木の 10% を超えたら、送る前に止めて利用者に確かめます。フォルダーを外付けのディスクへドラッグしただけでも、OS は「削除」に見せるからです。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">端末 A がオフラインで <code>報告.docx</code> を編集している間に、端末 B が同じファイルを削除しました。A が戻ったら、どうなりますか？</p>
+      <div class="opts">
+        <button>削除が先に確定したので、A の編集も消える</button>
+        <button>A の中身で同じパスにファイルを作り直し、削除を取り消したことを知らせる</button>
+        <button>A の編集を競合のコピーにし、元のファイルは削除のまま</button>
+      </div>
+      <p class="why">迷ったら中身が残るほうを選びます（決定表の 3）。逆の順でも、B の削除は <code>base_rev</code> の条件で 409 になり、B が A の中身を受けます（決定表の 4）。消した側の意図は、バージョン履歴から戻せるので失われません。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0006-sync-conflict-model.md">ADR-0006</a> の衝突の決定表（1〜13 行）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/sync-engine.md">sync-engine.md</a> の 10 節（消しすぎの止め）と 11 節（競争の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0021-committer-operations-and-conditions.md">ADR-0021</a>（削除の条件）。</div>
+  </section>
+
+  <section class="s" id="cas">
+    <h2>内容の番地：ハッシュを住所にする</h2>
+    <p>中身の SHA-256 をそのまま保存の番地（キー）にする方式を、<a class="t" href="#g-cas">内容の番地</a>（content-addressed storage）と呼びます。Git のオブジェクトも同じ考え方です。</p>
+    <ul>
+      <li data-frag><strong>不変</strong>：中身が変われば番地も変わるので、ブロックは書き換えません。同じ番地への 2 回目の書き込みは、同じ中身です。</li>
+      <li data-frag><strong>確かめられる</strong>：受け取った中身のハッシュを計算し直せば、番地と一致するかが分かります。</li>
+      <li data-frag><strong>同じ中身は 1 回</strong>：同じブロックが何度出てきても、置くのは 1 つです（次の節の<a class="t" href="#g-dedupe">重複排除</a>）。</li>
+    </ul>
+    <p>ファイルの<a class="t" href="#g-revision">リビジョン</a>は、ブロックのハッシュの並び（<a class="t" href="#g-blocklist">ブロックの一覧</a>）を持つだけです。木の変更はメタデータの行の変更で、中身は動きません。アップロードは次の順です。</p>
+    <div class="stepper">
+      <ol>
+        <li>クライアントがファイルを分割し、ブロックのハッシュの一覧を作って <code>commit</code> を送る。</li>
+        <li>サーバーは確定せず、足りないブロックの一覧と、ブロックごとの<a class="t" href="#g-presigned">署名つき URL</a>（一時のキー <code>incoming</code> へ）を返す。</li>
+        <li>クライアントが S3 へ直接 PUT する。S3 は SHA-256 の<a class="t" href="#g-checksum">チェックサム</a>を計算し直す。</li>
+        <li><code>block-verifier</code> が番地と大きさを確かめてから、正規のキーへ写し、ブロックの索引に入れる。</li>
+        <li>クライアントが <code>commit</code> を送り直し、新しいリビジョンが確定する。中身はサーバーの ECS を通らない。</li>
+      </ol>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0002-chunking-and-block-addressing.md">ADR-0002</a> の「番地とハッシュ」（<code>content_sha256</code> と <code>blocklist_hash</code>）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">architecture/README.md</a> の 1.3 節 A、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0018-upload-sessions-and-block-grants.md">ADR-0018</a>。</div>
+  </section>
+
+  <section class="s" id="chunking">
+    <h2>分割：固定の大きさと、内容で区切る分割</h2>
+    <p>大きなファイルはブロックに分けます。4 MiB ごとの<strong>固定の分割</strong>は単純ですが、先頭に 1 バイト足すと、後ろの境界がすべて 1 バイトずれ、全部が新しいブロックになります。<a class="t" href="#g-cdc">内容で区切る分割</a>（CDC）は、境界を「位置」ではなく「中身」で決めるので、ずれが広がりません。</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 196" role="img" aria-label="先頭に挿入したとき、固定の分割は全ブロックが変わり、内容で区切る分割は最初のブロックだけが変わる">
+        <g style="font-size:13px;fill:var(--text)">
+          <text x="4" y="30">固定（元）</text>
+          <text x="4" y="72">固定（挿入後）</text>
+          <text x="4" y="122">CDC（元）</text>
+          <text x="4" y="164">CDC（挿入後）</text>
+        </g>
+        <g style="stroke:var(--border);stroke-width:1">
+          <rect x="130" y="12" width="120" height="28" style="fill:var(--surface-2)"/>
+          <rect x="250" y="12" width="120" height="28" style="fill:var(--surface-2)"/>
+          <rect x="370" y="12" width="120" height="28" style="fill:var(--surface-2)"/>
+          <rect x="490" y="12" width="120" height="28" style="fill:var(--surface-2)"/>
+          <rect x="130" y="54" width="120" height="28" style="fill:var(--ng-soft)"/>
+          <rect x="250" y="54" width="120" height="28" style="fill:var(--ng-soft)"/>
+          <rect x="370" y="54" width="120" height="28" style="fill:var(--ng-soft)"/>
+          <rect x="490" y="54" width="120" height="28" style="fill:var(--ng-soft)"/>
+          <rect x="130" y="104" width="90" height="28" style="fill:var(--surface-2)"/>
+          <rect x="220" y="104" width="160" height="28" style="fill:var(--surface-2)"/>
+          <rect x="380" y="104" width="110" height="28" style="fill:var(--surface-2)"/>
+          <rect x="490" y="104" width="120" height="28" style="fill:var(--surface-2)"/>
+          <rect x="130" y="146" width="96" height="28" style="fill:var(--ng-soft)"/>
+          <rect x="226" y="146" width="160" height="28" style="fill:var(--ok-soft)"/>
+          <rect x="386" y="146" width="110" height="28" style="fill:var(--ok-soft)"/>
+          <rect x="496" y="146" width="120" height="28" style="fill:var(--ok-soft)"/>
+        </g>
+        <g style="font-size:13px;fill:var(--text);font-family:var(--mono)" text-anchor="middle">
+          <text x="190" y="31">A</text><text x="310" y="31">B</text><text x="430" y="31">C</text><text x="550" y="31">D</text>
+          <text x="190" y="73">A'</text><text x="310" y="73">B'</text><text x="430" y="73">C'</text><text x="550" y="73">D'</text>
+          <text x="175" y="123">P</text><text x="300" y="123">Q</text><text x="435" y="123">R</text><text x="550" y="123">S</text>
+          <text x="178" y="165">P'</text><text x="306" y="165">Q</text><text x="441" y="165">R</text><text x="556" y="165">S</text>
+        </g>
+        <text x="130" y="192" style="font-size:12px;fill:var(--muted)">赤：新しいブロック（送る）　緑：前と同じブロック（送らない）</text>
+      </svg>
+      <figcaption>ファイルの先頭に数バイトを挿入したとき</figcaption>
+    </figure>
+    <p>境界は<a class="t" href="#g-rolling">回転のハッシュ</a>で探します。設計が使う<a class="t" href="#g-gear">ギアのハッシュ</a>を 1 段ずつ見ます。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>1 バイトずつ混ぜる</strong>：<code>h = (h &lt;&lt; 1) + G[byte]</code>。<code>G</code> は 256 個の 64 ビットの値の表（ギアの表）。</li>
+        <li><strong>古いバイトは押し出される</strong>：<code>h</code> は 64 ビットなので、左へ 64 回ずれたバイトの影響は消える。<code>h</code> は直近 64 バイトの中身だけで決まる（窓）。</li>
+        <li><strong>境界を決める</strong>：<code>h</code> の下位のビットがマスクに一致した位置で切る。一致する確率で、ブロックの平均の大きさが決まる。位置ではなく中身で決まる。</li>
+        <li><strong>大きさをそろえる</strong>：最小 1 MiB までは探さない。平均 4 MiB の前は厳しいマスク、後は緩いマスクで平均に寄せる。最大 16 MiB で必ず切る。</li>
+        <li><strong>挿入に強い</strong>：途中に 1 バイト足すと、その近くの境界だけが動く。挿入点から 64 バイト過ぎれば <code>h</code> は元と同じ値の列に戻り、たいてい次の境界から後ろは同じブロック、同じハッシュになる。</li>
+        <li><strong>規則はバージョンで固定</strong>：表と母数は <code>chunker_version</code> に結び付ける。同じバージョンなら、OS・CPU・ネイティブと WASM で同じ境界が出る。</li>
+      </ol>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0002-chunking-and-block-addressing.md">ADR-0002</a> の「分割の規則」と「他の案を選ばなかった理由」（rsync の差分を選ばない理由）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/block-storage.md">block-storage.md</a> の 4.5 節（公開 API の <code>chunker_version</code> 0）。</div>
+  </section>
+
+  <section class="s" id="dedupe">
+    <h2>重複排除と、その横の漏れ</h2>
+    <p>内容の番地なら、同じブロックは 1 回だけ置けます。さらに commit で「そのブロックはもうある」と答えれば、送る量も減ります。ところが、この答えは「<strong>誰かがその中身を持っている</strong>」ことを教えます。これが重複排除の<a class="t" href="#g-sidechannel">横の漏れ</a>（サイドチャネル）です。</p>
+    <div class="stepper">
+      <ol>
+        <li>攻撃者が、狙った中身（他社の文書の原稿、流出した名簿の候補）のファイルを作る。</li>
+        <li>アップロードを試す。送らずに済めば、誰かがそのファイルを持っていると分かる。</li>
+        <li>給与の額のように一部だけ違う候補を総当たりで試せば、中身まで推測できる。</li>
+        <li>答えそのものを隠しても、送信の時間・容量の増え方・エラーの違いから漏れうる。</li>
+      </ol>
+    </div>
+    <p>設計は、重複排除をテナントの中に閉じます。「送らなくてよい」と答えるのは、要求した人が<strong>既に読める名前空間</strong>がそのブロックを参照しているときだけです。それ以外は、テナントの中にあっても「送れ」と答え、受け取ってから保存だけを重ねます。容量は論理の大きさで数えます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">「全利用者で重複排除すれば、保存の量が最も減る。損はない」。何が問題ですか？</p>
+      <div class="opts">
+        <button>SHA-256 が衝突して、別のファイルの中身が混ざる</button>
+        <button>S3 のキーが長くなり、要求の費用が増える</button>
+        <button>他人のファイルの有無を確かめられる。さらに、ハッシュを知るだけで送らずに commit すると、他人の中身を自分のファイルにできうる</button>
+      </div>
+      <p class="why">設計は案 3（全体の重複排除）を退けました（ADR-0003）。後半の穴は、索引にあるだけのブロックを commit で受けないことで塞ぎます。受けるのは <code>have</code>・<code>copy</code>・<code>granted</code> のブロックだけです（ADR-0018）。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0003-dedupe-scope-and-privacy.md">ADR-0003</a> の commit の答えの表、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0018-upload-sessions-and-block-grants.md">ADR-0018</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/data-model.md">data-model.md</a> の 5.1 節の 2 つ目の図と 6 節（横断の不変条件）。</div>
+  </section>
+
+  <section class="s" id="gc">
+    <h2>参照の数と GC：共有したブロックを消すとき</h2>
+    <p>1 つのブロックは、多くのリビジョンから参照されます。ファイルを 1 つ消しても、ブロックを消してよいとは限りません。そこで<a class="t" href="#g-refcount">参照の数</a>を数え、0 になったものだけを後から消します（<a class="t" href="#g-gc">GC</a>）。</p>
+    <pre class="mermaid">stateDiagram-v2
+    [*] --> orphaned: 検証した（まだ参照なし）
+    orphaned --> live: 最初の参照ができた
+    live --> orphaned: 最後の参照が消えた
+    orphaned --> deleting: 7 日の猶予の後、まだ 0
+    deleting --> [*]: S3 から消して行を消す</pre>
+    <ul>
+      <li data-frag><strong>なぜ猶予か</strong>：アップロードの途中で、まだ commit に載っていないブロックがあります。参照が 0 になった直後に、同じブロックを使う commit が来ることもあります。7 日待ち、ロックの下で 0 を確かめ直してから消します。</li>
+      <li data-frag><strong>消した後も戻せる</strong>：S3 の<a class="t" href="#g-versioning">バージョニング</a>で、消したオブジェクトを 30 日戻せます。数え違いに気づいたときの最後の網です。</li>
+      <li data-frag><strong>数え方の工夫</strong>：参照は名前空間ごとの <code>ns_block_refs</code> に持ち、<code>blocks</code> には「参照する名前空間の数」だけを持ちます。よく使われるブロックの行のロックが集中しないためです。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0019-block-refcount-and-gc-protocol.md">ADR-0019</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0007-block-storage-layout-on-s3.md">ADR-0007</a> の「削除と GC」と「照合」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/block-storage.md">block-storage.md</a> の 5・6 節。</div>
+  </section>
+
+  <section class="s" id="journal">
+    <h2>ジャーナルとカーソル：差分で届ける</h2>
+    <p>他の端末へ変更を届けるには、「前回からの差分」が要ります。時刻（<code>updated_at</code>）で差分を取ると、同じ時刻の書き込みやコミットの順序の入れ替わりで欠け、削除も表せません。そこで、<a class="t" href="#g-namespace">名前空間</a>ごとに単調に増える番号 <a class="t" href="#g-nsseq"><code>ns_seq</code></a> を振り、操作を<a class="t" href="#g-journal">ジャーナル</a>に順に書きます。</p>
+    <pre class="mermaid">flowchart LR
+  C["commit"] -->|"1 tx: ノード + ns_journal + outbox"| DB[("Aurora")]
+  DB --> R["Relay"]
+  R -->|"ns_seq が S になった"| N["Notify (WebSocket)"]
+  N -->|"合図だけ"| D["端末"]
+  D -->|"list/continue + カーソル"| API["API"]
+  API -->|"seq より後の操作"| D</pre>
+    <ul>
+      <li data-frag><a class="t" href="#g-cursor">カーソル</a>は「載せた名前空間ごとの、読み終えた番号」の組を署名した不透明な文字列です。端末は <code>list/continue</code> で続きを受けます。</li>
+      <li data-frag>合図（WebSocket）が落ちても、端末は再接続のときと 60 秒ごとに確かめます。合図は速さのため、正しさはカーソルが担います。</li>
+      <li data-frag>ジャーナルは日で分割し 92 日で落とします。最後の利用から 90 日を過ぎたカーソル、DR の切り替えなどで <a class="t" href="#g-epoch"><code>epoch</code></a> が変わったカーソルには、黙って欠けた差分を返さず、<a class="t" href="#g-reset">取り直し</a>（409 <code>reset</code>）を求めます。取り直しでも Synced があるので手元の変更は失いません。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">利用者が新しい共有フォルダーに参加しました。端末のカーソルはどうなりますか？</p>
+      <div class="opts">
+        <button>載せた名前空間の集合が変わったので、木の全体を取り直す</button>
+        <button>取り直しにしない。足された名前空間は番号 0 から読み、木の今の状態の一覧を受ける</button>
+        <button>次の 90 日の期限まで、新しいフォルダーは見えない</button>
+      </div>
+      <p class="why">取り直しの理由は、期限切れ・<code>floor_seq</code> より古い・<code>epoch</code> の 3 つだけです（NFR-010）。参加は利用者のルートの名前空間に <code>mount</code> の操作として載り、外されたときは <code>unmount</code> として返ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0005-namespace-journal-and-cursors.md">ADR-0005</a>（「他の案を選ばなかった理由」に時刻・WAL・利用者ごとのフィードとの比較）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/metadata-and-journal.md">metadata-and-journal.md</a> の 5 節と 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0023-tree-listing-snapshot-and-journal-retention.md">ADR-0023</a>。共通の資料の <a href="../../../../docs/primer/index.html#outbox">outbox</a>。</div>
+  </section>
+
+  <section class="s" id="namespaces">
+    <h2>名前空間とマウント：共有フォルダーとチームのスペース</h2>
+    <p>名前空間は、ノードの木と、順序（<code>ns_seq</code>）と、権限をまとめた単位です。共有フォルダーは 1 つの名前空間で、参加した人それぞれの木に<a class="t" href="#g-mount">マウントのノード</a>として載ります。1 回の書き込みはその名前空間のジャーナルに 1 回だけ載り、メンバーが 1 万人でも書き込みは増えません。</p>
+    <table>
+      <tr><th>種類</th><th>中身</th></tr>
+      <tr><td><code>user_root</code></td><td>個人のルート。チームのメンバーでは「本人のフォルダー」</td></tr>
+      <tr><td><code>shared_folder</code></td><td>共有フォルダー。作った人のテナントが持つ。他のテナントの人も参加できる</td></tr>
+      <tr><td><code>team_space</code></td><td><a class="t" href="#g-teamspace">チームのスペース</a>。メンバーの端末の木のルート。最上位は管理者だけが変える</td></tr>
+      <tr><td><code>team_folder</code></td><td>チームのフォルダー。中の制限したフォルダーも別の名前空間（深さ 4 まで）</td></tr>
+    </table>
+    <pre class="mermaid">flowchart TD
+  TS["team_space: 全員 viewer"] --> H1["mount: 佐藤 (user_root)"]
+  TS --> F1["mount: 営業 (team_folder)"]
+  TS --> F2["mount: 全社共有 (team_folder)"]
+  F1 --> R1["mount: 人事評価 (team_folder, 継承しない)"]
+  H1 --> S1["mount: 取引先A (shared_folder, 他のテナント)"]</pre>
+    <p>共有フォルダーの中に共有フォルダーは作れません。名前空間の中の移動は 1 行の変更ですが、名前空間をまたぐ移動（自分のフォルダーから共有フォルダーへ）は、移動先に子孫の数だけノードを作るバッチになります。権限は名前空間の単位で付け、<code>can()</code> の 1 つの関数で判定します（RLS は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0004-tenancy-namespaces-and-rls.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0024-shared-folder-mounts-and-grants.md">ADR-0024</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0025-team-space-and-external-sharing-policy.md">ADR-0025</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/namespaces-and-sharing.md">namespaces-and-sharing.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0022-cross-namespace-batch-move-and-copy.md">ADR-0022</a>。</div>
+  </section>
+
+  <section class="s" id="s3">
+    <h2>オブジェクトストレージの基本：S3</h2>
+    <p>S3 は、キーで中身（オブジェクト）を置いて取る保存の場所です。フォルダーの木や名前の変更はなく、オブジェクトは丸ごと置き換えるだけです。不変のブロックとの相性がよい理由です。</p>
+    <table>
+      <tr><th>用語</th><th>意味と、設計での使い方</th></tr>
+      <tr><td><a class="t" href="#g-durability">耐久性</a></td><td>置いたものを失わない確率。どの保存のクラスも 99.999999999%（11 個の 9）の設計</td></tr>
+      <tr><td><a class="t" href="#g-availability">可用性</a></td><td>今取り出せる確率。耐久性とは別の数字で、クラスによって違う</td></tr>
+      <tr><td><a class="t" href="#g-storageclass">保存のクラス</a></td><td>128 KiB 以上のブロックは <a class="t" href="#g-it">Intelligent-Tiering</a>、未満は Standard（監視の外で、低頻度のクラスの最小の課金 128 KB に当たるため）</td></tr>
+      <tr><td><a class="t" href="#g-crr">CRR</a></td><td>別のリージョンへの非同期の複製。東京から大阪へ。RTC を使うと 99.9% を 15 分以内に写す</td></tr>
+      <tr><td>署名つき URL</td><td>期限つきで、特定のキーへの PUT・GET だけを許す URL。クライアントは一時のキー <code>incoming</code> にだけ書ける</td></tr>
+      <tr><td>チェックサム</td><td>PUT のときに SHA-256 を指定すると、S3 が計算し直して合わなければ拒む</td></tr>
+    </table>
+    <p>設計は、物理の耐久性（複製・消失訂正符号）を S3 に任せ、<strong>論理の耐久性</strong>（参照の数、削除の猶予、照合）を自分で持ちます。署名でチェックサムの指定を強制できるかは<strong>未検証</strong>で、PoC で確かめます。できなくても検証の工程で確かめるので、正しさは変わりません。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">「S3 の耐久性は 11 個の 9 なので、ブロックの配信も止まらない」。正しいですか？</p>
+      <div class="opts">
+        <button>正しくない。耐久性は失わない確率で、今取り出せるかは可用性。誤った削除も耐久性では守れない</button>
+        <button>正しい。耐久性が高ければ可用性も同じだけ高い</button>
+        <button>正しい。ただし大阪へ写したものに限る</button>
+      </div>
+      <p class="why">設計は NFR-005（耐久性）と NFR-006（可用性 月間 99.9%）を分けています。さらに、本システムの GC の誤りで消したものは S3 の耐久性の外なので、参照の数・7 日の猶予・バージョニングの 30 日で守ります。</p>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0007-block-storage-layout-on-s3.md">ADR-0007</a>（バケットとキー、保存のクラス、DR）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">architecture/README.md</a> の 2.1 節（保存の費用のモデル）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0048-disaster-recovery-and-content-pending.md">ADR-0048</a>（中身の待ち）。</div>
+  </section>
+
+  <section class="s" id="recovery">
+    <h2>バージョン・復元・ランサムウェアからの巻き戻し</h2>
+    <p>同期はバックアップではありません。手元で壊したものは、正しく全端末へ広がります。だから、サーバーに過去を持ち、戻せることが価値になります。</p>
+    <table>
+      <tr><th>戻すもの</th><th>やり方</th></tr>
+      <tr><td>ファイルの前のバージョン</td><td>古いリビジョンのブロックの一覧を写した、新しいリビジョンを作る</td></tr>
+      <tr><td>消したファイル・フォルダー</td><td><a class="t" href="#g-tombstone">墓石</a>（<code>deleted_at</code>）の行を戻す（<code>undelete</code>）</td></tr>
+      <tr><td>フォルダー・名前空間の全体</td><td><a class="t" href="#g-rewind">巻き戻し</a>：時点 t の木と今の木の差を、普通の操作に直して流す</td></tr>
+    </table>
+    <p>保持の期間は、無料と個人の有料で 30 日、チームの標準で 180 日、チームの上位で 365 日（本家の区分の既定）。<a class="t" href="#g-ransomware">ランサムウェア</a>の典型の流れを見ます。</p>
+    <div class="stepper">
+      <ol>
+        <li>端末がランサムウェアに感染し、同期のフォルダーの数万のファイルを暗号化して書き換える。拡張子が変わることも多い。</li>
+        <li>同期は正しく働き、暗号化した中身が新しいリビジョンとして上がり、他の端末へも届く。</li>
+        <li>サーバーの <code>mass-change-detector</code> が、名前空間 × 端末の 10 分の窓で、変更・削除の数、拡張子の変わった名前の変更の割合を数え、閾値を超えたら知らせる。中身は読まない。</li>
+        <li>通知は、巻き戻しの時点の候補（窓の始まりの 5 分前）と端末を示す。自動では止めない・巻き戻さない。</li>
+        <li>利用者や管理者が時点を選んで巻き戻す。1,000 操作ずつ commit し、途中で人が変えたファイルは条件で見つけて飛ばす。巻き戻しもまた巻き戻せる。</li>
+      </ol>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/versions-and-recovery.md">versions-and-recovery.md</a> の 4〜7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0029-revision-and-placement-retention.md">ADR-0029</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0030-restore-and-rewind-as-journaled-batches.md">ADR-0030</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0031-mass-change-detection.md">ADR-0031</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/runbooks/mass-change-response.md">runbooks/mass-change-response.md</a>。</div>
+  </section>
+
+  <section class="s" id="previews">
+    <h2>プレビュー：信用しないファイルを隔離して開く</h2>
+    <p>サムネイルやプレビューを作るには、利用者のファイルを画像・PDF・Office・動画の部品で開きます。これらの部品は複雑な形式を解釈するので、脆弱性が見つかり続けています。悪意のあるファイル 1 つで、変換の処理を乗っ取られうるということです。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>外へ出る道がない</h3><p>変換は NAT もインターネットのゲートウェイもない区画の <a class="t" href="#g-sandbox">sandbox</a> で動く。資格情報も URL も持たない。</p></div>
+      <div class="card" data-frag><h3>使い捨て</h3><p>変換のプロセスはジョブごとに作り直し、別の利用者 ID と資源の上限で動かす。タスクも 50 ジョブか 10 分で作り直す。</p></div>
+      <div class="card" data-frag><h3>出力を作り直す</h3><p>変換の出力をそのまま配らず、メモリー安全な復号器で読み直して WebP に作り直す。元の位置の情報も残さない。</p></div>
+      <div class="card" data-frag><h3>別のドメインで返す</h3><p>利用者の中身は <a class="t" href="#g-usercontent"><code>&lt;brand&gt;usercontent.&lt;domain&gt;</code></a> からだけ返す。本体のドメインの Cookie に届かせない。</p></div>
+    </div>
+    <p>プレビューはリビジョンごとに作り、同じ <code>content_sha256</code> でも別のリビジョンでは作り直します。<code>content_sha256</code> はクライアントの申告で、信用しないからです。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0032-sandboxed-preview-pipeline.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0033-preview-cache-and-delivery.md">ADR-0033</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/previews-and-thumbnails.md">previews-and-thumbnails.md</a> の 4・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/security.md">security.md</a> の 3.4 節。</div>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み</h2>
+    <p>ここは枠組みの説明だけです。設計の文書は、次のどれにも<strong>結論を出していません（法務の確認待ち）</strong>。結論まで、関係する Epic の spec を承認しません。</p>
+    <div class="tabs">
+      <div data-tab="電気通信事業法"><p>共有フォルダー・共有リンクで他人とやり取りする使い方が、届出の要る電気通信事業に当たるか。当たるなら、保存したファイルの中身が「通信の秘密」に当たり、プレビュー・本文の索引・マルウェアの検査のために中身を機械で読むことに同意が要るか。2023-06-16 に施行された外部送信規律（端末から外へ送る情報の通知・公表）が、端末の計測と Web の画面に当たるか。<strong>法務の確認待ち（L1）</strong>。一斉の変更の検知が中身を読まないのは、この論点のためです。</p></div>
+      <div data-tab="情報流通プラットフォーム対処法"><p>旧プロバイダ責任制限法を改めた法律で、2025-04-01 に施行。総務大臣が指定する大規模特定電気通信役務提供者に、削除の対応の迅速化と運用の透明化を求めます。本システムが対象に当たるか、共有リンクで公開されたファイルへの削除の請求の手順、違法な画像のハッシュの照合の範囲は<strong>法務の確認待ち（L2）</strong>。結論まで、<code>anyone</code> の共有リンクの公開はフラグの裏に置きます。</p></div>
+      <div data-tab="発信者情報開示"><p>権利を侵害された人が、裁判所の手続きで発信者を特定する情報の開示を求める仕組みです。アップロードや共有リンクの作成の IP アドレス・時刻を、何を何日持つかは<strong>法務の確認待ち（L3）</strong>。</p></div>
+      <div data-tab="個人情報・保持ほか"><p>ファイルの中身をチームからの委託として扱うか（L4）、データの所在と CDN の国外のエッジ（L5）、保持の期間と解約の後の消去・リーガルホールド（L6）、管理者がメンバーのファイルを見る機能（L7）、電子帳簿保存法の要件をうたうか（L8）、契約の雛形（L9）、画面と競合のコピーの文言を本家に寄せる範囲（L10）。どれも<strong>法務の確認待ち</strong>です。</p></div>
+    </div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10 と承認を止める spec）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/security.md">security.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0046-content-scanning-framework.md">ADR-0046</a>。</div>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>中心は「名前空間 → ノード → リビジョン → ブロック」の鎖です。ファイルは次のように中身を指します。</p>
+    <pre class="mermaid">flowchart LR
+  F["ファイル (利用者のパス)"] --> N["nodes (ns_id, node_id, name_key)"]
+  N -->|"今の rev_id"| R["revisions (content_sha256, blocklist_hash)"]
+  R --> L["ブロックの一覧 (1,024 まで行の中、超えたら S3)"]
+  L --> B["blocks (tenant_id, hash)"]
+  B --> O["S3 のオブジェクト"]</pre>
+    <pre class="mermaid">erDiagram
+  tenants ||--o{ namespaces : "owns"
+  namespaces ||--o{ ns_grants : "grants"
+  namespaces ||--|{ nodes : "contains"
+  namespaces ||--o{ ns_journal : "orders"
+  nodes ||--o{ revisions : "has"
+  revisions }o--o{ blocks : "lists"
+  namespaces ||--o{ ns_block_refs : "references"
+  blocks ||--|{ ns_block_refs : "counted by"
+  tenants ||--o{ blocks : "stores"
+  namespaces {
+    uuid ns_id PK
+    uuid tenant_id FK
+    text kind "user_root shared_folder team_space team_folder"
+    bigint ns_seq
+  }
+  nodes {
+    uuid ns_id PK
+    uuid node_id PK
+    uuid parent_id
+    text kind "file folder mount"
+    text name_key "unique per parent"
+    uuid rev_id FK
+    bigint node_ver
+    timestamptz deleted_at "tombstone"
+  }
+  revisions {
+    uuid ns_id PK
+    uuid rev_id PK
+    smallint chunker_version
+    bytea blocklist_hash
+    bytea content_sha256 "declared"
+  }
+  blocks {
+    uuid tenant_id PK
+    bytea hash PK
+    text state "live orphaned deleting"
+  }
+  ns_journal {
+    uuid ns_id FK
+    bigint seq
+    text op "upsert delete mount unmount purge"
+  }</pre>
+    <ul>
+      <li data-frag><strong>バージョンが 2 つ</strong>：<code>rev_id</code> は中身、<code>node_ver</code> は置き場所（親・名前・削除）。中身の変更と名前の変更を別々の条件で確かめるので、同時に起きても衝突にしません。</li>
+      <li data-frag><strong>ハッシュの信用</strong>：ブロックの <code>hash</code> と <code>blocklist_hash</code> はサーバーが確かめます。ファイル全体の <code>content_sha256</code> はクライアントの申告で、信用しません。</li>
+      <li data-frag><strong>名前を持つ列は限る</strong>：ファイルの名前・パスは <code>nodes</code>・<code>node_versions</code>・<code>ns_journal</code> などの決めた所だけに持ち、ログや監査に書きません。</li>
+    </ul>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/data-model.md">data-model.md</a> の 3 節（規約：ID、名前、ハッシュ、番号、墓石）・4 節（全体の ER 図）・5 節（中身の鎖）・6 節（横断の不変条件）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/dropbox/docs/architecture/data-model">data-model/</a>。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</div>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、同期エンジン・分割・ブロックの索引・ジャーナルは自前で作ります。本家の同期のプロトコルとコードは使いません。</p>
+    <table>
+      <tr><th>項目</th><th>本家</th><th>この設計</th></tr>
+      <tr><td>ブロックの区切り</td><td>4 MB の固定（API の <code>content_hash</code>）</td><td>内容で区切る（最小 1 MiB・平均 4 MiB・最大 16 MiB）</td></tr>
+      <tr><td>重複排除</td><td>範囲は未検証</td><td>テナントの中だけ。読める参照にあるときだけ「送らなくてよい」</td></tr>
+      <tr><td>保存の層</td><td>自社の Magic Pocket</td><td>S3（大阪へ CRR）</td></tr>
+      <tr><td>データの所在</td><td>主に米国、条件つきで日本</td><td>すべて日本（東京、DR は大阪）</td></tr>
+      <tr><td>LAN 同期</td><td>あり</td><td>MVP では持たない</td></tr>
+      <tr><td>競合のコピーの名前</td><td>編集した人の名前と日付</td><td>端末の名前と日付</td></tr>
+      <tr><td>巻き戻し</td><td>Basic（無料）では使えない</td><td>すべてのプランで使える（PM が価格と見直す）</td></tr>
+      <tr><td>共有リンクの見せる相手</td><td>全員、チームのメンバー</td><td>加えて <code>members</code>（既に読める人だけ）</td></tr>
+    </table>
+    <p>ドメイン・HTTP ヘッダー・トークンの接頭辞・デスクトップのフォルダーの名前は、<code>&lt;brand&gt;.&lt;domain&gt;</code>、<code>&lt;Brand&gt;-Signature</code>、<code>&lt;brand&gt;_sl_</code>、<code>~/&lt;Brand&gt;</code> のように書きます。</p>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">architecture/README.md</a> の 1.4 節（本家の形と、本家との意図した違い）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0001-platform-and-stack.md">ADR-0001</a>、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0007-no-reuse-of-original-implementation.md">ADR-0007</a>（リポジトリ共通）。</div>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-inode">inode・File ID</dt><dd>ファイルの実体を指す、ボリュームの中の番号。名前の変更・同じボリュームの中の移動では変わらない。Windows の NTFS では File ID。</dd>
+      <dt id="g-atomic-save">置き換えの保存</dt><dd>一時のファイルに書いてから元の名前へ置き換える保存のしかた。同じパスでも inode・File ID が新しくなる。</dd>
+      <dt id="g-nfc">NFC・NFD</dt><dd>Unicode の正規化の形。NFC は合成済みの文字（「が」1 文字）、NFD は分解した形（「か」＋濁点）。NFKC は互換の文字（全角と半角など）も同じにする。</dd>
+      <dt id="g-casefold">case folding</dt><dd>大文字小文字の違いを無くすための Unicode の変換。小文字にするだけでは扱えない文字（ドイツ語の ß など）も含めて畳み込む。</dd>
+      <dt id="g-namekey">name_key</dt><dd>本システムの名前の比べ方の鍵。NFC → case folding → NFC。同じフォルダーの中で一意にする。</dd>
+      <dt id="g-reserved">予約の名前</dt><dd>Windows がデバイスに使う名前（<code>CON</code>・<code>PRN</code>・<code>AUX</code>・<code>NUL</code>・<code>COM1</code>〜・<code>LPT1</code>〜）。拡張子を付けても、ファイルの名前に使えない。</dd>
+      <dt id="g-placeholder">プレースホルダー</dt><dd>名前・大きさ・日時だけを持ち、中身を手元に置かないファイル。開いたときに中身を取り出す。</dd>
+      <dt id="g-hydrate">取り出し</dt><dd>hydration。プレースホルダーの中身をサーバーから受けて手元に置くこと。逆に中身を捨ててプレースホルダーに戻すことを追い出しと呼ぶ。</dd>
+      <dt id="g-fileprovider">File Provider</dt><dd>macOS のクラウドのストレージのための OS の仕組み。同期のアプリは拡張として、OS からの呼び出しに応える。</dd>
+      <dt id="g-cfapi">Cloud Files API</dt><dd>Windows 10 1709 からの、プレースホルダーを使う同期のアプリのための API。中核のフィルターは NTFS だけで動く。</dd>
+      <dt id="g-synced">Synced の木</dt><dd>最後にサーバーと手元が一致したと確かめた木。3 方向のマージの共通の祖先になる。</dd>
+      <dt id="g-threeway">3 方向のマージ</dt><dd>共通の祖先と 2 つの側を比べて、どちらで何が変わったかを決める方法。Git のマージと同じ考え方。</dd>
+      <dt id="g-baserev">base_rev</dt><dd>書き込みの元にした中身のリビジョン。サーバーの今のリビジョンと違えば 409 で拒まれる。置き場所には <code>base_node_ver</code> を使う。</dd>
+      <dt id="g-conflict-copy">競合のコピー</dt><dd>2 つの編集がぶつかったとき、後に確定しようとした側の中身を残すために作る別の名前のファイル。</dd>
+      <dt id="g-massdelete">消しすぎの止め</dt><dd>手元からの削除が直近 5 分で 1,000 ファイルか木の 10% を超えたら、サーバーへ送る前に止めて利用者に確かめる仕組み。</dd>
+      <dt id="g-cas">内容の番地</dt><dd>content-addressed storage。中身のハッシュを保存のキーにする方式。中身が変われば番地も変わる。</dd>
+      <dt id="g-revision">リビジョン</dt><dd>ファイルの中身の 1 つのバージョン。ブロックの一覧とハッシュを持つ（<code>revisions</code>）。</dd>
+      <dt id="g-blocklist">ブロックの一覧</dt><dd>リビジョンの中身を表すブロックの（大きさ、SHA-256）の並び。1,024 ブロックまでは行の中、超えたら S3 に置く。</dd>
+      <dt id="g-cdc">内容で区切る分割</dt><dd>CDC（content-defined chunking）。ファイルの中身から境界を決める分割。挿入・削除で境界がずれにくい。</dd>
+      <dt id="g-rolling">回転のハッシュ</dt><dd>rolling hash。窓を 1 バイトずつ進めながら、少ない計算で窓の中身のハッシュを更新できるハッシュ。</dd>
+      <dt id="g-gear">ギアのハッシュ</dt><dd>バイトごとに表から 64 ビットの値を引き、左へずらして足す回転のハッシュ。直近 64 バイトだけで値が決まる。</dd>
+      <dt id="g-dedupe">重複排除</dt><dd>同じ中身のブロックを 1 回だけ保存すること。本システムではテナントの中だけで行う。</dd>
+      <dt id="g-sidechannel">横の漏れ</dt><dd>サイドチャネル。答え・時間・容量の変化など、本来の出力でない手がかりから情報が漏れること。</dd>
+      <dt id="g-refcount">参照の数</dt><dd>そのブロックを一覧に持つ、保持の期間の中のリビジョンの数。名前空間ごとに <code>ns_block_refs</code> に持つ。</dd>
+      <dt id="g-gc">GC</dt><dd>ガベージコレクション。参照のなくなったブロックを、猶予の後に消す処理（<code>block-gc</code>）。</dd>
+      <dt id="g-namespace">名前空間</dt><dd>ノードの木・<code>ns_seq</code>・権限をまとめた単位。利用者のルート、共有フォルダー、チームのスペース、チームのフォルダー。</dd>
+      <dt id="g-mount">マウントのノード</dt><dd>別の名前空間を、木のある場所に載せることを表すノード（<code>kind='mount'</code>）。名前は載せる側ごとに持つ。</dd>
+      <dt id="g-teamspace">チームのスペース</dt><dd>チームのメンバーの端末の木のルートになる名前空間。最上位にチームのフォルダーと本人のフォルダーが載る。</dd>
+      <dt id="g-nsseq">ns_seq</dt><dd>名前空間ごとに、欠けも重なりもなく単調に増える操作の番号。</dd>
+      <dt id="g-journal">ジャーナル</dt><dd>名前空間の操作を <code>ns_seq</code> の順に書いた追記だけの表（<code>ns_journal</code>）。差分の取得の元になる。</dd>
+      <dt id="g-cursor">カーソル</dt><dd>「どこまで読んだか」を表す署名つきの不透明な文字列。載せた名前空間ごとの番号の組を持つ。</dd>
+      <dt id="g-reset">取り直し</dt><dd>カーソルが使えないとき、木の全体を読み直すこと。409 <code>reset</code> で求める。</dd>
+      <dt id="g-epoch">epoch</dt><dd>全体の 1 つの番号。DR の切り替えと、運用者が DB を時点へ戻したときだけ上がり、古いカーソルを取り直しにする。</dd>
+      <dt id="g-durability">耐久性</dt><dd>置いたデータを失わない度合い。S3 は 99.999999999% の設計。</dd>
+      <dt id="g-availability">可用性</dt><dd>求めたときに使える度合い。耐久性とは別の指標。</dd>
+      <dt id="g-storageclass">保存のクラス</dt><dd>S3 の置き方の種類。取り出しの速さ・単価・最小の課金の大きさと期間が違う（Standard、Standard-IA、Glacier Instant Retrieval など）。</dd>
+      <dt id="g-it">Intelligent-Tiering</dt><dd>アクセスの頻度を見て、層を自動で移す S3 の保存のクラス。128 KB 未満のオブジェクトは監視せず、高頻度の層に置く。</dd>
+      <dt id="g-crr">CRR</dt><dd>Cross-Region Replication。S3 のオブジェクトを別のリージョンのバケットへ非同期に写す機能。RTC を有効にすると写す時間に目標が付く。</dd>
+      <dt id="g-presigned">署名つき URL</dt><dd>期限と対象を決めて署名した URL。持っている人は、資格情報なしでそのキーへの PUT や GET だけができる。</dd>
+      <dt id="g-checksum">チェックサム</dt><dd>中身から計算した短い値。S3 は指定された SHA-256 を計算し直し、合わなければ保存しない。</dd>
+      <dt id="g-versioning">バージョニング</dt><dd>S3 のバケットの設定。上書き・削除の前のバージョンを残す。本システムは古いバージョンを 30 日で消す。</dd>
+      <dt id="g-tombstone">墓石</dt><dd>行を消さずに「削除した」の印（<code>deleted_at</code>）を付けて残すこと。復元と差分の配信に使う。</dd>
+      <dt id="g-rewind">巻き戻し</dt><dd>フォルダーや名前空間の全体を、過去の時点の木へ戻す操作。本家の Rewind にあたる。</dd>
+      <dt id="g-ransomware">ランサムウェア</dt><dd>ファイルを暗号化して使えなくし、身代金を求める不正なプログラム。</dd>
+      <dt id="g-sandbox">sandbox</dt><dd>外へ出る道と権限を絞った隔離の環境。信用しない入力を処理する部品を閉じ込める。</dd>
+      <dt id="g-usercontent">利用者の中身のドメイン</dt><dd>本体と別の登録可能なドメイン（<code>&lt;brand&gt;usercontent.&lt;domain&gt;</code>）。利用者の中身を返し、本体の Cookie や画面に影響させない。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>この資料の順に、設計の文書を読むとつながります。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。MVP、Non-goals、法務の確認待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、6 つの原則、主要な流れ、本家との違い、規模の段階、NFR</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0002-chunking-and-block-addressing.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0005-namespace-journal-and-cursors.md">0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0006-sync-conflict-model.md">0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0007-block-storage-layout-on-s3.md">0007</a> <span>— 分割、ジャーナル、衝突、S3 の 4 本柱</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0003-dedupe-scope-and-privacy.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0004-tenancy-namespaces-and-rls.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0008-node-identity-and-names.md">0008</a> <span>— 重複排除の範囲、テナントと名前空間、ノードと名前</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/sync-engine.md">sync-engine.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/file-system-integration.md">file-system-integration.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/desktop-client.md">desktop-client.md</a> <span>— 3 つの木と計画、OS の観測、プレースホルダー、名前</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/block-storage.md">block-storage.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/metadata-and-journal.md">metadata-and-journal.md</a> <span>— アップロード、GC、commit、ジャーナル、名前空間をまたぐ移動</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/namespaces-and-sharing.md">namespaces-and-sharing.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/shared-links.md">shared-links.md</a> <span>— マウント、チームのスペース、<code>can()</code>、共有リンク</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/versions-and-recovery.md">versions-and-recovery.md</a> <span>— 保持、復元、巻き戻し、一斉の変更の検知</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/previews-and-thumbnails.md">previews-and-thumbnails.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/search.md">search.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/security.md">security.md</a> <span>— 隔離した変換、検索と権限、脅威モデル</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/mobile-and-camera-upload.md">mobile-and-camera-upload.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/api-and-webhooks.md">api-and-webhooks.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/accounts-and-teams.md">accounts-and-teams.md</a> <span>— モバイル、公開 API と Webhook、チームと管理</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/infrastructure.md">infrastructure.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/capacity.md">capacity.md</a> <span>— DR と中身の待ち、負荷と費用のモデル</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/data-model.md">data-model.md</a> <span>— 表の正本、規約、ER 図、横断の不変条件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a>・<a href="https://github.com/shoito/rebuilds/tree/main/systems/dropbox/docs/decisions">decisions/</a> <span>— 決定的な同期のシミュレーター、残りの ADR</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

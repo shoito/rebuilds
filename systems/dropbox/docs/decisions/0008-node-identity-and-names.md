@@ -40,6 +40,8 @@ date: 2026-10-09
 ### ノード
 
 - `nodes(tenant_id, ns_id, node_id, parent_id, name, name_key, is_folder, rev_id, node_ver, deleted_at)`。名前空間の最上位のノードは `parent_id` を持たない。
+
+> 2026-10-09 の注記：データモデルの工程で、ノードの種類の正本を `nodes.kind`（`file`・`folder`・`mount`）にし、`is_folder` は `kind` から作る生成の列にした（[data-model.md](../architecture/data-model.md) の D-2）。共有フォルダーのマウント（[ADR-0024](0024-shared-folder-mounts-and-grants.md)）を同じ表で表すためで、この ADR の決定（ID で指す、`name_key` で一意）は変えていない。
 - `node_id` は UUIDv7 で、全体で一意。名前空間の中の移動・名前の変更で変わらない。名前空間をまたぐ移動でも同じ `node_id` を保ち、元の名前空間の `delete` と、移動先の名前空間の `upsert` として載せる（[ADR-0005](0005-namespace-journal-and-cursors.md)）。クライアントは同じ `node_id` から移動と分かる。
 - 中身のリビジョン（`rev_id`）と、置き場所のバージョン（`node_ver`：親・名前・削除の状態が変わるたびに上がる）を分ける。中身の条件と置き場所の条件は別に確かめる（[ADR-0006](0006-sync-conflict-model.md)）。
 - 移動と名前の変更は、そのノードの行の `parent_id`・`name`・`name_key`・`node_ver` を変えるだけ。子孫の行を書き換えない。
