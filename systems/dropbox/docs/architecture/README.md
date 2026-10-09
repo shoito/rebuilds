@@ -297,25 +297,25 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
-| `sync-engine.md` | 3 つの木の形、計画（変化の求め方、操作の順序、依存）、衝突の決定表、意図の記録とクラッシュからの再開、選択型の同期、帯域と並行の制御、時計に頼らない判断 | 0009–0012 | QA（同期の性質） | E4 |
-| `desktop-client.md` | `sync-core` の組み込み、UI、状態の表示、設定、自動の更新と配布の経路、プロキシ、端末の登録と切り離し、資源の使い方の上限、LAN 同期の将来の置き場所 | 0013–0014 | QA、Ops | E5 |
-| `file-system-integration.md` | 監視（FSEvents、ReadDirectoryChangesW、イベントの溢れ）、移動の検出（inode・File ID）、macOS の File Provider と Windows の Cloud Files API、プレースホルダーと取り出し・追い出し、名前の対応（NFC・NFD、表せない名前）、無視するファイル、拡張属性とパーミッション、シンボリックリンク | 0015–0017 | QA | E5 |
-| `block-storage.md` | アップロードの流れと再開、署名つき URL、ブロックの検証、ローカルのブロックの索引、ダウンロードの組み立て、大きなファイルの一覧、GC と猶予、照合（スクラブ）、小さなブロックのパック | 0018–0020 | QA、Ops | E2 |
-| `metadata-and-journal.md` | ノード・リビジョン・ジャーナルの表、`packages/committer`、操作の種類、名前空間をまたぐ移動とコピー、大きな木の一覧のページング、ジャーナルの分割と保持、カーソルの取り直し | 0021–0023 | QA | E3 |
-| `namespaces-and-sharing.md` | 名前空間の種類、共有フォルダーの招待と参加と退出、載せる場所（マウント）、役割（持ち主・編集・閲覧）、チームのスペースとチームのフォルダー、容量の数え方、持ち主の移し替え、チームの外への共有の方針 | 0024–0026 | セキュリティ、QA | E6 |
-| `shared-links.md` | リンクのトークン、見え方、パスワード、期限、ダウンロードの禁止、チームの方針、アクセスの記録、無効化、悪用の対策、違法なコンテンツの通報の入口 | 0027–0028 | セキュリティ | E6 |
-| `versions-and-recovery.md` | リビジョンの保持、削除したファイル・フォルダーの復元、巻き戻し（時点の選び方、名前空間の単位）、一斉の変更の検知、保持の期間とプラン | 0029–0031 | QA、Ops | E8 |
-| `previews-and-thumbnails.md` | 対応する形式、隔離した変換、キャッシュと無効化、大きさの上限、動画の最初の画面、共有リンクのプレビュー | 0032–0033 | セキュリティ、Ops | E9 |
-| `search.md` | 名前と本文の索引、日本語の解析、権限の確かめ直し、更新の遅れ、OCR の将来、S2 の分け方 | 0034–0035 | QA、Ops | E9 |
-| `mobile-and-camera-upload.md` | モバイルのアプリの範囲、カメラのアップロード（重ねない、バックグラウンドの制約、回線の条件）、オフラインの保存、通知 | 0036–0037 | QA | E10 |
-| `api-and-webhooks.md` | 公開の REST API、OAuth 2.0 のアプリとスコープ、レート制限、カーソルと long-poll、WebSocket の合図、Webhook（登録の確かめ、署名、再試行、停止） | 0038–0040 | QA、Ops | E11 |
-| `accounts-and-teams.md` | 個人のアカウント、プランと容量、チーム、SSO・SCIM、管理の役割、端末の管理、チームの外への共有の方針の管理、監査ログの画面、管理者のアクセス（法務の L7） | 0041–0043 | セキュリティ | E12 |
-| `security.md` | 脅威モデル、利用者の中身のドメイン、暗号化と鍵、マルウェアと悪用の対策、違法なコンテンツの通報と開示の請求の手順（法務の L1〜L3）、監査ログ、データのライフサイクル（削除、解約） | 0044–0046 | セキュリティ | E1、E12、E13 |
+| [sync-engine.md](sync-engine.md) | 3 つの木の形、計画（変化の求め方、操作の順序、依存）、衝突の決定表、意図の記録とクラッシュからの再開、選択型の同期、帯域と並行の制御、時計に頼らない判断 | [0009](../decisions/0009-planner-dirty-set-and-ordering.md)、[0010](../decisions/0010-local-state-db-and-intent-log.md)、[0011](../decisions/0011-selective-sync-and-access-loss.md) | QA（同期の性質） | E4 |
+| [desktop-client.md](desktop-client.md) | `sync-core` の組み込み、UI、状態の表示、設定、自動の更新と配布の経路、プロキシ、端末の登録と切り離し、資源の使い方の上限、LAN 同期の将来の置き場所 | [0013](../decisions/0013-desktop-process-model-and-resource-budget.md)、[0014](../decisions/0014-desktop-unlink-and-wipe-execution.md) | QA、Ops | E5 |
+| [file-system-integration.md](file-system-integration.md) | 監視（FSEvents、ReadDirectoryChangesW、イベントの溢れ）、移動の検出（inode・File ID）、macOS の File Provider と Windows の Cloud Files API、プレースホルダーと取り出し・追い出し、名前の対応（NFC・NFD、表せない名前）、無視するファイル、拡張属性とパーミッション、シンボリックリンク | [0015](../decisions/0015-local-change-observation-and-move-detection.md)、[0016](../decisions/0016-placeholders-and-hydration-policy.md)、[0017](../decisions/0017-local-names-and-unsyncable-items.md) | QA | E5 |
+| [block-storage.md](block-storage.md) | アップロードの流れと再開、署名つき URL、ブロックの検証、ローカルのブロックの索引、ダウンロードの組み立て、大きなファイルの一覧、GC と猶予、照合（スクラブ）、小さなブロックのパック | [0018](../decisions/0018-upload-sessions-and-block-grants.md)、[0019](../decisions/0019-block-refcount-and-gc-protocol.md)、[0020](../decisions/0020-small-block-packing-for-s2.md) | QA、Ops | E2 |
+| [metadata-and-journal.md](metadata-and-journal.md) | ノード・リビジョン・ジャーナルの表、`packages/committer`、操作の種類、名前空間をまたぐ移動とコピー、大きな木の一覧のページング、ジャーナルの分割と保持、カーソルの取り直し | [0021](../decisions/0021-committer-operations-and-conditions.md)、[0022](../decisions/0022-cross-namespace-batch-move-and-copy.md)、[0023](../decisions/0023-tree-listing-snapshot-and-journal-retention.md) | QA | E3 |
+| [namespaces-and-sharing.md](namespaces-and-sharing.md) | 名前空間の種類、共有フォルダーの招待と参加と退出、載せる場所（マウント）、役割（持ち主・編集・閲覧）、チームのスペースとチームのフォルダー、容量の数え方、持ち主の移し替え、チームの外への共有の方針 | [0024](../decisions/0024-shared-folder-mounts-and-grants.md)、[0025](../decisions/0025-team-space-and-external-sharing-policy.md)、[0026](../decisions/0026-membership-lifecycle-and-quota.md) | セキュリティ、QA | E6 |
+| [shared-links.md](shared-links.md) | リンクのトークン、見え方、パスワード、期限、ダウンロードの禁止、チームの方針、アクセスの記録、無効化、悪用の対策、違法なコンテンツの通報の入口 | [0027](../decisions/0027-shared-link-model-and-resolution.md)、[0028](../decisions/0028-shared-link-abuse-controls.md) | セキュリティ | E6 |
+| [versions-and-recovery.md](versions-and-recovery.md) | リビジョンの保持、削除したファイル・フォルダーの復元、巻き戻し（時点の選び方、名前空間の単位）、一斉の変更の検知、保持の期間とプラン | [0029](../decisions/0029-revision-and-placement-retention.md)、[0030](../decisions/0030-restore-and-rewind-as-journaled-batches.md)、[0031](../decisions/0031-mass-change-detection.md) | QA、Ops | E8 |
+| [previews-and-thumbnails.md](previews-and-thumbnails.md) | 対応する形式、隔離した変換、キャッシュと無効化、大きさの上限、動画の最初の画面、共有リンクのプレビュー | [0032](../decisions/0032-sandboxed-preview-pipeline.md)、[0033](../decisions/0033-preview-cache-and-delivery.md) | セキュリティ、Ops | E9 |
+| [search.md](search.md) | 名前と本文の索引、日本語の解析、権限の確かめ直し、更新の遅れ、OCR の将来、S2 の分け方 | [0034](../decisions/0034-search-index-and-permission-filter.md)、[0035](../decisions/0035-ocr-deferred-to-e15.md) | QA、Ops | E9 |
+| [mobile-and-camera-upload.md](mobile-and-camera-upload.md) | モバイルのアプリの範囲、カメラのアップロード（重ねない、バックグラウンドの制約、回線の条件）、オフラインの保存、通知 | [0036](../decisions/0036-camera-upload-identity-and-background.md)、[0037](../decisions/0037-mobile-offline-files-and-content-free-push.md) | QA | E10 |
+| [api-and-webhooks.md](api-and-webhooks.md) | 公開の REST API、OAuth 2.0 のアプリとスコープ、レート制限、カーソルと long-poll、WebSocket の合図、Webhook（登録の確かめ、署名、再試行、停止） | [0038](../decisions/0038-public-api-shape-and-change-feeds.md)、[0039](../decisions/0039-oauth-apps-scopes-and-rate-limits.md)、[0040](../decisions/0040-signed-webhooks-delivery.md) | QA、Ops | E11 |
+| [accounts-and-teams.md](accounts-and-teams.md) | 個人のアカウント、プランと容量、チーム、SSO・SCIM、管理の役割、端末の管理、チームの外への共有の方針の管理、監査ログの画面、管理者のアクセス（法務の L7） | [0041](../decisions/0041-accounts-auth-and-device-credentials.md)、[0042](../decisions/0042-teams-sso-scim-and-plans.md)、[0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) | セキュリティ | E12 |
+| [security.md](security.md) | 脅威モデル、利用者の中身のドメイン、暗号化と鍵、マルウェアと悪用の対策、違法なコンテンツの通報と開示の請求の手順（法務の L1〜L3）、監査ログ、データのライフサイクル（削除、解約） | [0044](../decisions/0044-encryption-keys-and-secrets.md)、[0045](../decisions/0045-audit-log-and-data-lifecycle.md)、[0046](../decisions/0046-content-scanning-framework.md) | セキュリティ | E1、E12、E13 |
 | `data-model.md` | データモデルの索引 | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `infrastructure.md` | AWS のアカウントとネットワーク、サービスの分け方、エッジ（CloudFront の配信とエッジの所在）、egress の経路、DR（大阪、中身の送り直しの依頼、`epoch`）、段階を上げる基準、S2 のシャード、S3 のセル | 0047–0049 | Ops | E1、E13 |
-| `observability.md` | ログ・メトリクス・トレース、クライアントの匿名の計測、伝播と同期の健全さの計測、ブロックの参照の監査、SLI | 0050 | Ops | E1、E13 |
-| `capacity.md` | 負荷のモデル（commit、合図、ブロックの送受信、プレビュー、索引）、費用のモデル（TB あたり）、部品ごとの必要量、負荷試験 | 0051 | Ops | E13 |
-| `delivery.md` | CI/CD、決定的なシミュレーターとファイルシステムの試験を CI に入れる、クライアントの配布（署名、公証、ストアの審査、段階の配布、自動の更新）、フラグ、スキーマの変更の順序 | 0052–0053 | QA、Ops | E1、E5、E13 |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、エッジ（CloudFront の配信とエッジの所在）、egress の経路、DR（大阪、中身の送り直しの依頼、`epoch`）、段階を上げる基準、S2 のシャード、S3 のセル | [0047](../decisions/0047-accounts-network-ingress-and-service-placement.md)、[0048](../decisions/0048-disaster-recovery-and-content-pending.md)、[0049](../decisions/0049-stage-up-criteria-sharding-and-cells.md) | Ops | E1、E13 |
+| [observability.md](observability.md) | ログ・メトリクス・トレース、クライアントの匿名の計測、伝播と同期の健全さの計測、ブロックの参照の監査、SLI | [0050](../decisions/0050-sli-from-ledgers-synthetics-and-client-telemetry.md) | Ops | E1、E13 |
+| [capacity.md](capacity.md) | 負荷のモデル（commit、合図、ブロックの送受信、プレビュー、索引）、費用のモデル（TB あたり）、部品ごとの必要量、負荷試験 | [0051](../decisions/0051-load-shaping-uploads-signals-and-reconnects.md) | Ops | E13 |
+| [delivery.md](delivery.md) | CI/CD、決定的なシミュレーターとファイルシステムの試験を CI に入れる、クライアントの配布（署名、公証、ストアの審査、段階の配布、自動の更新）、フラグ、スキーマの変更の順序 | [0052](../decisions/0052-client-signing-staged-rollout-and-minimum-version.md)、[0053](../decisions/0053-protocol-compatibility-and-schema-change-ordering.md) | QA、Ops | E1、E5、E13 |
 
 - 次に採番する ADR は 0054。
 
