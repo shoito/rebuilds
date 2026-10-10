@@ -206,7 +206,7 @@ ADR-0077。大きさと台数は [capacity.md](capacity.md) の 4 節。
 | `pmstok:{hash}` | PMS のトークンの写し（60 秒） | `partner-api` | core の読み出しの写し |
 | `rl:*` | 速さの上限（API、PMS の `rl:pms:*`、コードの送信） | 各入口 | タスクごとの上限 |
 
-- 鍵の一覧の正本は [data-model.md](data-model.md) の 5 節。
+- 鍵の一覧の正本は [data-model/stores.md](data-model/stores.md) の 1 節。
 
 - クラスタモード、S1 は 2 シャード × 主 1・写し 1、転送中と保存の暗号化。正本にしない（失ってよい）。
 - 空室の写しはハッシュの鍵の `{listing_id}` でシャードに散る。ステージ 2 の 300 件の読み出しは、シャードごとにまとめたパイプラインで 1 往復にする（[capacity.md](capacity.md) の 2 節）。
@@ -217,7 +217,7 @@ ADR-0077。大きさと台数は [capacity.md](capacity.md) の 4 節。
 | 項目 | S1 |
 | --- | --- |
 | ドメイン | 1 つ、3 AZ、データのノード 3、専用のマスター 3、gp3 |
-| 索引 | `listings_v<n>`（ずらした位置、`stay_ranges`、条件、`price_bands`、言語ごとの文、`rank_features`。[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）、`places_v<n>`（地名。[location-and-geo.md](location-and-geo.md)） |
+| 索引 | `listings_v<n>`（ずらした位置、`stay_ranges`、条件、`price_bands`、言語ごとの文、順位の材料 `rank_*`。[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）、`places_v<n>`（地名。[location-and-geo.md](location-and-geo.md)） |
 | 書き手と読み手 | `search-indexer` は書き、`search-api` は読みだけ（細かいアクセス制御） |
 | 作り直し | 新しい名前の索引に全件を入れ、別名を切り替える。S1 の 10 万件は数分（初期見積もり） |
 | スナップショット | 1 時間ごとに S3（`opensearch-snapshots`）、大阪へ写す |
@@ -229,7 +229,7 @@ ADR-0077。大きさと台数は [capacity.md](capacity.md) の 4 節。
 | 部品 | S1 の構成 |
 | --- | --- |
 | SQS・SNS | outbox の話題（クラスタごと）と、消費者ごとのキュー。各キューに DLQ。`ical-fetch`・`webhook-send` は `untrusted-egress` のタスクが取るキュー、`ical-apply`（FIFO）は `ical-fetcher` が入れ `ical-sync` が取るキュー |
-| S3 | `photos-incoming`（元の写真。`kms-core`、変換の後 24 時間で消す）、`photos`（変換の後。SSE-S3、`img` の元）、`ical-export`（書き出し）、`registry`（旅券の画像。[security.md](security.md) の 5.3 節）、`bulk`（一括のジョブ。7 日）、`exports`（`kms-ops-exports`）、`opensearch-snapshots`、`ml-models`、`records`（inbox の本文、銀行の明細、全銀の形式のファイル） |
+| S3 | `photos-incoming`（元の写真。`kms-core`、変換の後 24 時間で消す）、`photos`（変換の後。SSE-S3、`img` の元）、`ical-exports`（書き出し）、`registry`（旅券の画像。[security.md](security.md) の 5.3 節）、`bulk`（一括のジョブ。7 日）、`exports`（`kms-ops-exports`）、`opensearch-snapshots`、`ml-models`、`records`（inbox の本文、銀行の明細、全銀の形式のファイル） |
 | ECS（Fargate、ARM64） | [capacity.md](capacity.md) の 4.2 節のサービスの一覧 |
 | ALB | 内部、`lb` のサブネット、VPC origin |
 | AppConfig | `release.*`・`ops.*`・`legal.*`（`legal` は別のアプリケーション。[delivery.md](delivery.md) の 3.3 節） |
@@ -276,7 +276,7 @@ ADR-0077。
 | ECS | サービスの定義とタスクの定義（イメージは ECR の写し）。タスクは 0 |
 | Valkey | 最小の空のクラスタ。空室の写しは切り替えの後に `availability-cache-writer` が core から作り直す（S1 の 10 万件で数分。初期見積もり） |
 | OpenSearch | なし。1 時間ごとのスナップショットを大阪へ写す |
-| S3 | `photos`、`registry`、`ical-export`、`opensearch-snapshots`、log-archive の写し（CRR）。`photos-incoming` は写さない |
+| S3 | `photos`、`registry`、`ical-exports`、`opensearch-snapshots`、log-archive の写し（CRR）。`photos-incoming` は写さない |
 | KMS | vault の用途の鍵と `kms-contact-pii`・`kms-pms-secrets` は複数のリージョンの鍵。他は大阪の鍵 |
 | ECR、AppConfig、Secrets Manager | 写し、同じ構成 |
 | egress | 大阪の 2 つの NAT の固定の IP。提供者・銀行と PMS の開発者の文書に、東京と大阪の両方の IP を載せる |

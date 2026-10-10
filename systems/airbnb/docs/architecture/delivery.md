@@ -118,7 +118,7 @@ flowchart LR
 
 - `legal.*` は AppConfig の別のアプリケーション `legal` に置く。本番の配信は Ops の役割だけで、一度にすべて（段階なし。値の食い違いを作らない）。
 - 値は `config/legal/<env>.json` に置き、JSON Schema（型、範囲、既定）で検査する。各値は `value`、`effective_from`、`approval_ref`（承認の記録の ID）を持つ。
-- **本番の禁じた値の検査**：次の値（`legal.*` の全部。一覧の正本は [data-model.md](data-model.md) の 6 節）を本番で既定から変える PR は、`approval_ref` が承認の記録（法務と財務の 2 人の署名、[intent.md](../intent.md) の L の番号）を指していなければ失敗にする。
+- **本番の禁じた値の検査**：次の値（`legal.*` の全部。一覧の正本は [data-model/stores.md](data-model/stores.md) の 9.2 節）を本番で既定から変える PR は、`approval_ref` が承認の記録（法務と財務の 2 人の署名、[intent.md](../intent.md) の L の番号）を指していなければ失敗にする。
 
 | 値 | 本番の既定 | L |
 | --- | --- | --- |

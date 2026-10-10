@@ -74,7 +74,7 @@
 | `facility_types` | 当たる施設の種類の集合（`minpaku`（住宅宿泊事業）、`tokku_minpaku`、`ryokan_hotel`、`kan_i_shukusho`）。リスティングの施設の種類は届出・許可の種類から決まる（regulatory-compliance-japan の領域） |
 | `calc_type` | `bracket_per_person_night`、`percent_per_person_night`、`flat_per_person_night` |
 | `brackets` | `[{from, to, amount}]`（`from` を含み `to` を含まない。円） |
-| `percent_bp`、`exempt_below` | 定率の率（万分率）と、課税しない 1 人 1 泊の標準の額の下限 |
+| `percent_bps`、`exempt_below` | 定率の率（万分率）と、課税しない 1 人 1 泊の標準の額の下限 |
 | `flat_amount` | 定額 |
 | `base_includes` | 課税の標準に含める滞在の料金：`cleaning_fee`、`pet_fee`、`extra_guest_fee` の集合。値が確かめられていない行は `unverified` の印を持ち、本番の表に入れない |
 | `person_rule` | 数える人：`adults_and_children`、`adults_only`、`age_from:N` |
@@ -127,7 +127,7 @@ output:
 5. 1 人 1 泊の標準 `b_n = (nightly_after_discount_n + extra_guest_fee_n（含むとき）+ 按分した滞在の料金_n) / k`。分子と分母の整数で持ち、段階の判定は有理数のまま比べる（円未満を丸めてから比べない）。
 6. 1 人 1 泊の税：
    - `bracket_per_person_night`：`b_n` が入る段階の額。
-   - `percent_per_person_night`：`b_n < exempt_below` なら 0、そうでなければ `rounding` に従って `b_n × percent_bp / 10,000`。
+   - `percent_per_person_night`：`b_n < exempt_below` なら 0、そうでなければ `rounding` に従って `b_n × percent_bps / 10,000`。
    - `flat_per_person_night`：`flat_amount`。
 7. 夜の税 = 1 人 1 泊の税 × `k`。管轄ごとに夜の税を足して明細の行にする。
 
@@ -225,7 +225,7 @@ output:
 | Aurora core `tax_rules`（4.2 節の欄、`table_version`） | 税の行 | 4.2 |
 | Aurora core `tax_zones`（`id`、`jurisdiction`、`geom`、`valid_from`） | 税の区域 | 4.1 |
 | Aurora core `quotes.tax_lines`、`quotes.tax_table_version`（見積もりの写しの列） | 明細と固定 | 5、6 |
-| Aurora core `reservation_tax_nights`（`reservation_id`、`date`、`jurisdiction`、`tax_kind`、`base_per_person`、`persons_counted`、`amount`、`table_version`） | 泊ごとの税（返金・明細・申告の資料） | 5.2、8 |
+| Aurora core `reservation_tax_nights`（`reservation_id`、`quote_id`、`night_date`、`jurisdiction`、`tax_kind`、`base_numerator`、`persons_counted`、`amount`、`table_version`） | 泊ごとの税（返金・明細・申告の資料） | 5.2、8 |
 | Aurora ledger の口座 `tax_payable:<jurisdiction>:<tax>`（`platform` のときだけ） | 預かり | 8 |
 | AppConfig `legal.lodging_tax_collector`、`legal.lodging_tax_collector.<jurisdiction>` | 型 | 8 |
 

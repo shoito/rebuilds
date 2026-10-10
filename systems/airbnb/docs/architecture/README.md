@@ -1,6 +1,6 @@
 # Architecture: Airbnb
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節。表と置き場所の索引は [data-model.md](data-model.md)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節。データモデルの正本は [data-model.md](data-model.md) と [data-model/](data-model/)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -482,7 +482,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - 日付の上書きの列は `calendar_days.nightly_price_override`、書いた主体は `set_by_type`（pricing-and-fees の `calendar_days.price`・`price_source` を直した）。
   - 正確な位置を読む関数は `readExactLocation(viewer, listing_id, purpose)`（security の `openExactLocation` を直した）。本人確認の結果の表は `identity_verifications`（security の `kyc_results` を直した）。
   - Valkey の鍵は `avail:`・`prc:`・`qs:`・`ss:`・`claim:`・`idem:`・`sess:`・`quote:`・`vel:`・`rl:*`・`pmstok:`（infrastructure の `qsum:` を直した）。為替の相場の取り込みは `payments` の `fx-rate-importer`（infrastructure の `ledger` を直した）。
-  - 設定の表は `service_fee_schedules`・`cancellation_policies`・`host_cancellation_fee_tables`・`tax_table_versions`・`municipal_rule_sets`・`fx_markup_versions`（delivery の `fee_schedules`・`cancellation_policy_versions` を直した）。`legal.*` の全部の一覧を [data-model.md](data-model.md) の 6 節に置き、[delivery.md](delivery.md) の 3.3 節の表に足りない値を足した。
+  - 設定の表は `service_fee_schedules`・`cancellation_policies`・`host_cancellation_fee_tables`・`tax_table_versions`・`municipal_rule_sets`・`fx_markup_versions`（delivery の `fee_schedules`・`cancellation_policy_versions` を直した）。`legal.*` の全部の一覧を [data-model/stores.md](data-model/stores.md) の 9.2 節に置き（データモデルの工程で移した）、[delivery.md](delivery.md) の 3.3 節の表に足りない値を足した。
   - runbooks の名前：`double-booking.md`・`calendar-double-booking.md` を [double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md)、`safety-incident-response.md` を [safety-incident.md](../runbooks/safety-incident.md)、`payout-delays.md` を [payout-failure.md](../runbooks/payout-failure.md) にした。
 - **数の揃え**：為替の上乗せは 200 bp（pricing-and-fees の 8.2 節の例の 2.5% を直し、額を 455.14 ドルに計算し直した）。相場の写しの古さの上限は 2 時間（pricing-and-fees の 6 時間を直した）。S1 の iCal の取得は約 33 件/秒（2 節の 35 を直した）。Valkey の `avail:` は平均 250 バイト（capacity・infrastructure の 0.5 KB を直した）。
 - **本家との意図した違い**（1.4 節）：共同ホストの管理を `owner` だけにすること、パスワードを持たないこと、予約の前にゲストの名前と顔の写真を見せないこと、PMS の API の審査、最長 27 泊、厳格の値（本家の厳格と同じと確かめた）、キャンセルの税の返し方、準備の日を含む iCal の書き出し、料金の上書きで無効にならない 15 分の見積もり、ホストだけの 15% のサービス料、位置のずらし方、15 分ごとの iCal の取り込み、`.ics` で終わらない取り込みのアドレス、リクエストの期限、新しいホストの送金の待ち、キャンセルの後のホストの取り分、ホストのキャンセルの罰、正確な住所を出す時期、レビューへの返答を足した。
@@ -494,22 +494,30 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **品質と運用**：
   - 各領域の「テストと性質」の ID の一覧を [quality.md](../quality.md) の 2.2.2 節に置き、漏れの経路の表（2.2.1 節 H）に見張りのリスティング、予約の前のゲストの名前、`hold` の予約、名簿の権限の行を足した。
   - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[peak-season-operations.md](../runbooks/peak-season-operations.md)、[double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md)、[safety-incident.md](../runbooks/safety-incident.md)、[payout-failure.md](../runbooks/payout-failure.md)）と、計画のものに分けた（[runbooks/README.md](../runbooks/README.md) の 4 節）。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。ER 図を含む正本は、データモデルの工程で書く。
+  - 表の目録と ER 図を持つデータモデルの正本は [data-model.md](data-model.md)（データモデルの工程で書いた。下の「決定（2026-10-10、データモデル）」）。
 - **数値の正本**：
   - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
   - 期限（仮押さえ 10 分、リクエスト 24 時間とチェックインの 2 時間前の早いほう、見積もり 15 分、T&S の `hold` 4 時間、送金の振り替え チェックイン + 24 時間）は [ADR-0035](../decisions/0035-booking-decision-table-and-deadlines.md) と [booking-and-holds.md](booking-and-holds.md) の 7.3 節。
   - お金（サービス料 15%、為替の上乗せ 200 bp、ホストのキャンセルの罰 10・25・50%、送金の束 銀行の営業日 09:30）は [ADR-0031](../decisions/0031-host-only-service-fee.md)・[ADR-0043](../decisions/0043-fx-rate-snapshots-markup-and-staleness.md)・[ADR-0040](../decisions/0040-host-and-ops-cancellations.md)・[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)。
-  - 法令（180 日、年度、外部の泊、名簿の 3 年）は [ADR-0065](../decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md)・[ADR-0067](../decisions/0067-guest-registry-in-vault.md) と `legal.*`（[data-model.md](data-model.md) の 6 節）。
+  - 法令（180 日、年度、外部の泊、名簿の 3 年）は [ADR-0065](../decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md)・[ADR-0067](../decisions/0067-guest-registry-in-vault.md) と `legal.*`（[data-model/stores.md](data-model/stores.md) の 9.2 節）。
   - 期間（レビュー 14 日、損害の請求 14 日、iCal 15 分）は [ADR-0055](../decisions/0055-review-pairs-and-simultaneous-reveal.md)・[ADR-0050](../decisions/0050-damage-claim-lifecycle-and-guest-charge.md)・[ADR-0021](../decisions/0021-ical-import-pipeline-and-safety.md)。
   - 速さの上限（PMS のアプリとホスト 1 秒 20・瞬間 100、アプリ 1 秒 500、検索 1 セッション 1 秒 10 回、IP ごと 1 分 120 件）は [ADR-0068](../decisions/0068-pms-oauth-apps-scopes-and-rate-limits.md)・[search-and-ranking.md](search-and-ranking.md) の 10 節・[security.md](security.md) の 3.3 節。
   - 負荷と費用のモデル（S1 で月 約 4.3 万 USD、予約 1 件 約 2 円（予約の経路）・約 36 円（全原価の按分））は [capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) の 9 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-10、データモデル）
+
+データモデルの工程で、索引だった [data-model.md](data-model.md) を、表の目録・ER 図・不変条件を持つ正本（[data-model/](data-model/) の 20 のファイル）に書き直した。名前・列・置き場所の食い違いは [data-model.md](data-model.md) の 7 節（D-1〜D-35）で決め、領域の文書を直した。ADR の決定は変えていない。アーキテクチャに関わるものは次の 1 つで、推奨の案で決めた。
+
+- **取り込む iCal のアドレスの暗号化**（D-30）：アドレスは相手の秘密の値を含むが、[ADR-0073](../decisions/0073-key-layout-and-vault-envelope-encryption.md) の用途の鍵に当たるものがなかった。案は (a) `kms-pms-secrets` に文脈 `purpose = ical-url` を足す、(b) 新しい用途の鍵 `kms-ical-secrets` を作る、(c) core の保存時の暗号化だけにする。**(a) を推奨し採った**。外部の連携の秘密（PMS の秘密、Webhook の秘密）と同じ性質で、鍵の数を増やさない。`ical-scheduler` は暗号文を SQS の `ical-fetch` に入れ、DB に接続しない `ical-fetcher` だけが復号する（`kms-pms-secrets` の鍵の政策に `ical-fetcher` の役割と文脈 `ical-url` を足す）。security の領域で ADR-0073 の後継か注記にする。
+- 他の決め事（`ledger_accounts` の名前、`_bps`、S3 のバケットの名前、`search_sample_checks`、Webhook の表を content に、`reservation_settlements` の主キー、通知の重複の鍵、最小の形で足した表など）は、データモデルの中の名前と形の決定で、[data-model.md](data-model.md) の 7 節にある。
 
 ### 残る未解決事項（2026-10-10）
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | 法務の確認待ち（L1〜L14） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
+| データモデルの量と分け方（`stay_claims` の外した行、`refresh_tokens`、`messages`、`journals`）、iCal のアドレスの鍵の ADR | [data-model.md](data-model.md) の 9 節。E2・E6・E9 の PoC と負荷試験、security の領域 |
 | 180 日の数え方の施行規則の本文、届出番号の形、名簿の ICT の本人確認、旅館業法の改正の条文の番号 | 法務の L1・L2・L3。国の資料で確かめるまで**未検証** |
 | ステージ 1 の候補の数、空きの区間の作り方、写しの大きさ、混入の率 | E7 の前の `availability-search-poc` |
 | 熱い日付の先着の印、セマフォ 4、`lock_timeout`、届出住宅のロックの待ち、GiST の書き込みの費用 | E9 の前の `hot-dates-booking-poc` |
@@ -548,7 +556,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [host-tools-and-api.md](host-tools-and-api.md) | 複数のリスティングの管理、一括の変更、共同ホストの役割、PMS の API（OAuth、範囲、速さの上限、冪等）、Webhook の署名と配信、API のバージョン | [0068](../decisions/0068-pms-oauth-apps-scopes-and-rate-limits.md)、[0069](../decisions/0069-pms-availability-and-price-push-and-bulk-operations.md)、[0070](../decisions/0070-webhooks-signing-delivery-and-ordering.md) | QA、セキュリティ | E19 |
 | [accounts.md](accounts.md) | ログイン（パスキー、一時コード、外部の ID）、セッション、端末、言語と通貨の設定、ホストのアカウントの作り方、退会とデータの削除（法務の L8）、アプリの形 | [0071](../decisions/0071-sign-in-sessions-devices-and-profiles.md)、[0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md) | セキュリティ | E2 |
 | [security.md](security.md) | 脅威モデル、vault と鍵、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、越境の移転（法務の L8） | [0073](../decisions/0073-key-layout-and-vault-envelope-encryption.md)、[0074](../decisions/0074-operator-access-reveal-and-audit-chain.md)、[0075](../decisions/0075-data-classes-and-retention.md) | セキュリティ | E1、E20 |
-| [data-model.md](data-model.md) | データモデルの索引（core・ledger・content・vault の表、S3 のパス、SNS・SQS の話題、OpenSearch の索引、Valkey の鍵、データレイクの形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本（規約、core・ledger・content・vault の 188 表の目録、ER 図、滞在の道筋、横断の不変条件）と [data-model/](data-model/) の領域ごとのファイル（Valkey の鍵と `avail:` の形、S3、SNS・SQS と封筒、OpenSearch の対応表、iCal、Webhook の本文、`legal.*` を含む AppConfig、データレイク） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、4 つの Aurora、OpenSearch、Valkey、egress（提供者、銀行、iCal の取得）、DR（大阪）、段階を上げる基準と分け方 | [0076](../decisions/0076-accounts-network-and-egress-with-ssrf-controls.md)、[0077](../decisions/0077-data-stores-layout-and-osaka-dr.md)、[0078](../decisions/0078-stage-up-criteria-split-plan-and-unit-cost.md) | Ops | E1、E20 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、検索の誤りの率の抜き取り、合成監視、照合の指標、外部送信規律（法務の L9） | [0079](../decisions/0079-sli-measurement-and-correctness-monitors.md)、[0080](../decisions/0080-telemetry-privacy-dashboards-and-app-telemetry.md) | Ops | E1、E20 |
 | [capacity.md](capacity.md) | 負荷のモデル（検索、ステージ 2、予約、熱い日付、iCal の取り込み、繁忙期）、部品ごとの必要量、費用のモデル、負荷試験 | [0081](../decisions/0081-sizing-tiers-and-holiday-prescaling.md) | Ops | E20 |

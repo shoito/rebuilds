@@ -198,8 +198,9 @@ SET LOCAL lock_timeout = '200ms';
 SET LOCAL statement_timeout = '2s';
 -- 1. regulated property first (if linked), then listing: same order on every path
 SELECT ... FROM regulated_properties WHERE id = $rp FOR UPDATE;      -- only if linked
-SELECT version, rules_version, cancellation_policy_version, time_zone, instant_book
-  FROM listings WHERE id = $listing FOR UPDATE;
+SELECT l.listing_version, l.cancellation_policy_code, l.time_zone, l.instant_book, r.rules_version
+  FROM listings l JOIN listing_rules r ON r.listing_id = l.id
+ WHERE l.id = $listing FOR UPDATE OF l;
 -- 2. checkStayRules in app code (pure), then expire stale holds for this listing
 UPDATE stay_claims SET status = 'released', released_reason = 'expired', released_at = now()
  WHERE listing_id = $listing AND status = 'active'
@@ -479,9 +480,9 @@ SELECT id FROM reservations
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `reservations`（core、2 者の RLS） | ゲスト、リスティング、ホストのアカウント、`quote_id`、`idempotency_key`、`request_hash`、状態、`version`、日付、人数、請求の通貨と総額、リスティングの通貨と総額、`cancellation_policy_version`、期限の 6 列、`arrival_info_at`、`next_deadline_at`、`accepted_at`、`inquiry_extensions`、`on_hold`、`payout_released_at`、`tzdata_version`、`cancel_reason`、`route`（`instant`・`request`・`request_by_ts`）、`ts_decision_id`、`ts_review_due_at`、`ts_cleared_at`、`ts_clear_cause` | `id`。一意 `quote_id`、一意 `(guest_id, idempotency_key)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(listing_id, check_in)`、`(guest_id, state)`、`(host_account_id, state, check_in)` | 5、6、7 |
+| `reservations`（core、2 者の RLS） | ゲスト、リスティング、ホストのアカウント、`quote_id`、`idempotency_key`、`request_hash`、状態、`version`、日付、人数、請求の通貨と総額、リスティングの通貨と総額、`cancellation_policy_code`・`cancellation_policy_version`、期限の 8 列（`arrival_info_at` を含む）、`current_quote_id`、`settlement_seq`、`next_deadline_at`、`accepted_at`、`inquiry_extensions`、`on_hold`、`payout_released_at`、`tzdata_version`、`cancel_reason`、`route`（`instant`・`request`・`request_by_ts`）、`ts_decision_id`、`ts_review_due_at`、`ts_cleared_at`、`ts_clear_cause` | `id`。一意 `quote_id`、一意 `(guest_id, idempotency_key)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(listing_id, check_in)`、`(guest_id, state)`、`(host_account_id, state, check_in)` | 5、6、7 |
 | `reservation_events`（core、2 者の RLS、追記だけ） | 事象、主体の種類と ID、理由のコード、前と後の状態、決定表の行、冪等キー、案件の ID | `(reservation_id, seq)`、一意 `(reservation_id, idempotency_key)` | 7.1 |
-| `quotes`（core、本人の RLS） | 5.1 節の写し | `id`、`(guest_id, created_at)`。期限の 7 日後に消す（予約に使った見積もりは残す） | 5.1 |
+| `quotes`（core、本人の RLS） | 5.1 節の写し | `id`、`(guest_id, created_at)`。使われなかった写しは 90 日で消す（予約に使った見積もりは残す。[pricing-and-fees.md](pricing-and-fees.md) の 6.2 節） | 5.1 |
 | `request_declines`（core、2 者の RLS） | 予約、理由のコード（9 節）、`other` の自由な文、主体、時刻。T&S の断りの率の見張りもこの表を読む（[trust-and-safety.md](trust-and-safety.md) の 11 節） | `reservation_id` | 9 |
 | `arrival_instructions`（vault、ホストのアカウントの RLS） | 入り方の文（封筒の暗号化） | `listing_id` | 10 |
 | Valkey | `claim:{listing_id}:{check_in}`（15 秒）、合流の `idem:{guest_id}:{key}`（60 秒） | 失ってよい | 8 |

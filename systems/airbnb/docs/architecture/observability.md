@@ -184,7 +184,7 @@ canary のアカウント（本番と別の資格情報）から、見張りの�
 
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| core：`search_samples` | 検索の混入の抜き取りの結果（リスティングの ID、検索の日付と人数、結果、理由のコード、時刻）。30 日 | 3 |
+| core：`search_sample_checks`（データレイクの `search_samples` の再判定の結果。[data-model.md](data-model.md) の D-11） | 検索の混入の抜き取りの結果（リスティングの ID、検索の日付と人数、結果、理由のコード、時刻）。30 日 | 3 |
 | core：`recon_runs` | 照合のジョブの実行（種類、始まり、終わり、不一致の数、結果）。最後の成功の元 | 3 |
 | core：`sentinel_accounts`、`listings.sentinel` の印 | 見張りの利用者とリスティング | 4 |
 | AMP | 3 節の指標 | 3 |

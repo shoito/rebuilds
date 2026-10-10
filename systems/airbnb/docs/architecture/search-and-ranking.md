@@ -385,7 +385,7 @@ L = 1（閲覧者の表示の言語の原文がある）、0（ない）
 | --- | --- | --- |
 | OpenSearch `listings_v<n>`（別名 `listings`） | 4.2 節の欄 | 4 |
 | Aurora core `listings` の列 `search_version`、`rank_q`・`rank_c`・`rank_h`・`rank_d`・`rank_m`（日次）、`rank_inputs_updated_at` | 外部のバージョンと順位の材料 | 4.4、7 |
-| Aurora core `listing_daily_stats`（`listing_id`、`date`、`views`、`bookings`）。データレイクから日次に集める | 転換の材料 | 7.1 |
+| Aurora core `listing_daily_stats`（`listing_id`、`day`、`views`、`bookings`）。データレイクから日次に集める | 転換の材料 | 7.1 |
 | Aurora core `area_stats`（`municipality_code`、`review_mean`、`conv_rate`、`updated_at`） | 区域の事前の値 | 7.1 |
 | Valkey `avail:{listing_id}`、`prc:{listing_id}`（期限なし）、`qs:{listing_id}:{ci}:{co}:{guests}:{pricing_version}`（10 分）、`ss:{search_id}`（10 分） | 写しとキャッシュ | 5.3、5.4 |
 | SQS `search-index`、`search-index-priority`、`availability-cache` | 事象 | 4.4 |

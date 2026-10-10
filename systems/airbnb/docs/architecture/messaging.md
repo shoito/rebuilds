@@ -310,7 +310,7 @@ flowchart LR
 | Aurora content `message_translations`（30 日） | 訳文 | 6 |
 | Aurora content `message_templates`、`scheduled_messages`、`scheduled_message_runs`（`reservation_id`、`scheduled_message_id`、`due_at`、`sent_at`。一意 `(reservation_id, scheduled_message_id)`） | 雛形 | 7 |
 | Aurora content `report_evidence` | 通報の証拠 | 8 |
-| Aurora content `notifications`（`id`、`kind`、`recipient`、`dedupe_key` 一意、`lane`、`payload_ref`、`created_at`）、`notification_deliveries`（`notification_id`、`channel`、`status`、`provider_ref`、`sent_at`、`opened_at`）、`notification_preferences` | 通知 | 9 |
+| Aurora content `notifications`（`id`、`kind`、`recipient_id`、主キー `(source_event_id, kind, recipient_id)` が重複の鍵（[data-model.md](data-model.md) の D-35）、`lane`、`args`、`created_at`）、`notification_deliveries`（`notification_id`、`channel`、`status`、`provider_ref`、`sent_at`、`opened_at`）、`notification_preferences` | 通知 | 9 |
 | S3 `message-attachments`（`a/<attachment_id>/<width>.<ext>`） | 添付 | 4.3 |
 | SQS `notify-critical`、`notify-transactional`、`notify-engagement`。outbox の話題 `message.created` | 事象 | 9.2 |
 | AppConfig `legal.message_scan_mode`、`legal.message_translation_enabled`、辞書（`filter.dictionaries.<lang>`） | 設定 | 5.6、6 |

@@ -150,10 +150,10 @@ flowchart TD
 
 | 項目 | 中身 |
 | --- | --- |
-| `quote_id`、`guest_id`、`listing_id`、`expires_at`（作成 + 15 分） | |
+| `id`（`quote_id`）、`guest_id`、`listing_id`、`expires_at`（作成 + 15 分） | |
 | `check_in`、`check_out`、`adults`、`children`、`infants`、`pets` | |
 | `listing_version`、`revision_id`、`pricing_version`、`cancellation_policy_version` | 古さの確かめ（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
-| `tax_table_versions`（税の種類ごと）、`service_fee_schedule_version`、`fx_snapshot_id` | 表の固定 |
+| `tax_table_version`（表全体に 1 つ。[taxes.md](taxes.md) の 4.2 節）、`service_fee_schedule_version`、`fx_snapshot_id` | 表の固定 |
 | `lines`（行の種類、夜（泊の行）、ホストの通貨の額、請求の通貨の額） | 明細 |
 | `listing_currency`、`accommodation_subtotal`、`tax_total`、`total` | ホストの通貨 |
 | `charge_currency`、`charge_total` | 請求の通貨 |
@@ -166,9 +166,9 @@ flowchart TD
 ## 7. サービス料（ADR-0031）
 
 - **ホストだけの型**。ゲストの総額にサービス料の行はない。ホストへの支払い = 宿泊の対価の小計 − サービス料（税の扱いは [taxes.md](taxes.md) の 7 節）。
-- サービス料 = `round_half_up(accommodation_subtotal × rate_bp / 10,000)`。既定 `rate_bp = 1500`（15%）。消費税を含む額で、うち消費税 = `floor(service_fee × 10 / 110)`（本システムが課税の事業者として出す。適格請求書と端数の扱いは法務の L4、[taxes.md](taxes.md) の 7 節）。
+- サービス料 = `round_half_up(accommodation_subtotal × rate_bps / 10,000)`。既定 `rate_bps = 1500`（15%）。消費税を含む額で、うち消費税 = `floor(service_fee × 10 / 110)`（本システムが課税の事業者として出す。適格請求書と端数の扱いは法務の L4、[taxes.md](taxes.md) の 7 節）。
 - 税（宿泊税・入湯税）にはサービス料を掛けない。
-- 率は `service_fee_schedules`（`version`、`rate_bp`、`effective_from`、`applies_to`（ホストのアカウントの区分。MVP は全部 1 つ））で持つ。見積もりは作成の時に有効なバージョンを写しに固定し、予約の後に率を変えても既存の予約は変わらない。
+- 率は `service_fee_schedules`（`version`、`rate_bps`、`effective_from`、`applies_to`（ホストのアカウントの区分。MVP は全部 1 つ））で持つ。見積もりは作成の時に有効なバージョンを写しに固定し、予約の後に率を変えても既存の予約は変わらない。
 - 本家の多くのホストの 15.5% と違う 15% は、本システムの既定値（[architecture/README.md](README.md) の 6 節）。値は設定で、変更は財務と PM の承認。
 
 ## 8. 総額の表示
@@ -261,8 +261,8 @@ flowchart TD
 | Aurora core `seasonal_rules`（`id`、`listing_id`、`date_from`、`date_to`、`nightly`、`weekend_nightly`、`priority`、`created_at`） | 季節 | 4.2 |
 | Aurora core `calendar_days.nightly_price_override`、`set_by_type`（`host`・`cohost`・`pms`・`pricing_suggestion`）（[availability-and-calendars.md](availability-and-calendars.md) の 7 節の表の列） | 日付の上書き | 4.2、10 |
 | Aurora core `quotes`（6.2 節の項目）。ゲスト本人の RLS | 見積もりの写し | 6.2 |
-| Aurora core `service_fee_schedules`（`version`、`rate_bp`、`effective_from`、`applies_to`） | サービス料の表 | 7 |
-| Aurora core `jp_holidays`（`date`、`name`、`source_version`） | 祝日 | 4.2 |
+| Aurora core `service_fee_schedules`（`version`、`rate_bps`、`effective_from`、`applies_to`） | サービス料の表 | 7 |
+| Aurora core `jp_holidays`（`day`、`name`、`source_version`。持ち主は [regulatory-compliance-japan.md](regulatory-compliance-japan.md)） | 祝日 | 4.2 |
 | Valkey `prc:{listing_id}`、`qs:…` | 写し | 5 |
 
 ## 14. テストと性質

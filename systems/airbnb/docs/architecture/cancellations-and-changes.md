@@ -352,7 +352,7 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | `cancellation_policies`（core） | `code`、`version`、規則（JSON）、`effective_from`、承認の記録 | `(code, version)` | 5.1 |
 | `host_cancellation_fee_tables`（core） | バージョン、境と割合 | `version` | 6.1 |
-| `reservation_settlements`（core、2 者の RLS、追記だけ） | 予約、`settlement_seq`、種類（`cancel`・`alter`）、行ごとの額（請求の通貨とリスティングの通貨）、サービス料、ホストの取り分、ポリシーのバージョン、DT-CXL-001・DT-ALT-001 の行、`after_release` | `(reservation_id, settlement_seq)` | 5.4、8 |
+| `reservation_settlements`（core、2 者の RLS、追記だけ） | 予約、`settlement_seq`、種類（`cancel`・`alter`）、行ごとの額（請求の通貨とリスティングの通貨）、サービス料、ホストの取り分、ポリシーのバージョン、DT-CXL-001・DT-ALT-001 の行、`after_release` | `(reservation_id, settlement_seq, kind)`（同じ番号に `alter` と `cancel` がありうる。[data-model.md](data-model.md) の D-34） | 5.4、8 |
 | `reservation_alterations`（core、2 者の RLS） | 予約、提案者、状態、新しい日付と人数、新しい `quote_id`、`Δ`（2 つの通貨）、`alteration_expires_at`、新しい `hold` の行の ID | `id`。部分一意 `(reservation_id) WHERE state IN ('pending_host','pending_guest','awaiting_payment')` | 7 |
 | `extenuating_events`（core） | 事象、地域（自治体のコード・多角形）、期間、作った運用者 | `id` | 6.2 |
 | `reservations` の列（[booking-and-holds.md](booking-and-holds.md)） | `cancellation_policy_version`、`settlement_seq`、`cancel_reason`、`alteration_expires_at` | — | 5、7 |

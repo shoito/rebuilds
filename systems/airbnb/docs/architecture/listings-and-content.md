@@ -338,7 +338,7 @@ sequenceDiagram
 | Aurora core `listing_texts`（`revision_id`、`field`、`lang`、`body`、`body_hash`） | 原文 | 5.1 |
 | Aurora core `listing_translations`（`listing_id`、`field`、`source_lang`、`target_lang`、`source_hash`、`body`、`provider`、`provider_model`、`created_at`） | 機械翻訳 | 5.2 |
 | Aurora core `listing_photos`（`id`、`listing_id`、`state`（`uploading`・`processing`・`ready`・`failed`）、`widths`、`phash`、`dhash`、`hash_degenerate`、`brightness`、`sharpness`、`caption`（言語ごと）） | 写真 | 6 |
-| S3 `listing-uploads`（1 日）、`listing-photos`（`p/<photo_id>/<width>.<ext>`） | 写真 | 6 |
+| S3 `photos-incoming`（1 日）、`photos`（`p/<photo_id>/<width>.<ext>`。名前は [data-model.md](data-model.md) の D-10） | 写真 | 6 |
 | OpenSearch `photo_hashes` | 使い回しの索引 | 6.3 |
 | SQS `media-processing`、`translation`。outbox の話題 `listing.state_changed`、`listing.revision_published`、`listing.photo_ready` | 事象 | 4、5、6 |
 

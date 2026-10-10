@@ -368,7 +368,7 @@ stateDiagram-v2
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| Aurora content `ts_rules`（`id`、`version`、`state`、`applies_to`、`when`、`then`）、`ts_rule_bundles`（`rules_version`、`approved_by`、`activated_at`）、`ts_rule_approvals` | 規則 | 5 |
+| Aurora content `ts_rules`（`id`、`version`、`state`、`decision_point`、`condition`（規則の `when`）、`outcome`（規則の `then`））、`ts_rule_bundles`（`rules_version`、`approved_by`、`activated_at`）、`ts_rule_approvals` | 規則 | 5 |
 | Aurora content `rule_evaluations`（`id`、`decision_point`、`subject`、`rules_version`、`matched`、`outcome`、`facts_snapshot`（ID・点・数だけ）、`at`） | 評価の記録 | 5 |
 | Aurora content `ts_cases`（`id`、`queue`、`subject_type`、`subject_id`、`priority`、`due_at`、`assignee`、`state`、`evidence_refs`） | 案件 | 5.4 |
 | Aurora content `moderation_actions`（`id`、`subject`、`kind`、`basis`（規則のバージョン、点、判定、基準のコード）、`reviewer`、`applied_at`、`reverted_by`） | 措置 | 5.5 |

@@ -61,7 +61,7 @@
 | --- | --- |
 | 数 | 1 リスティング 5 件まで |
 | 形 | `https`・`http`・`webcal`（`webcal` はまず `https`、だめなら `http`）。2,048 文字まで。`.ics` で終わらなくてもよい（本家は `.ics` で終わることを求める。相手が終わりに拡張子を付けないことがある。[README.md](README.md) の 1.4 節） |
-| 保存 | アドレスは相手の秘密の値を含むので、封筒の暗号化で持ち（security の領域）、画面では先頭と末尾だけを出す。ログには `feed_id` と、相手の名前解決の先のホスト名のハッシュだけを書く |
+| 保存 | アドレスは相手の秘密の値を含むので、`kms-pms-secrets` の文脈 `ical-url` で暗号化して持ち（[data-model.md](data-model.md) の D-30。`ical-fetcher` だけが復号する）、画面では先頭と末尾だけを出す。ログには `feed_id` と、相手の名前解決の先のホスト名のハッシュだけを書く |
 | 扱い（`treat_as`） | `blocked`（既定。準備の日なし）か `external_reservation`（リスティングの準備の日を `block_span` に足す。届出住宅の外部の泊の入力になる。7 節） |
 | 主体 | ホストのアカウントの `owner`・`full`・`calendar_and_reservations` の役割（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
 | 最初の取得 | 登録の直後に 1 回取る。読めなければ登録を `failing` で残し、画面に理由を出す |
@@ -364,7 +364,7 @@ END:VCALENDAR
 | `ical_feeds`（core、ホストのアカウントの RLS） | `listing_id`、暗号化したアドレス、`treat_as`、状態、`etag`、`last_modified`、`content_hash`、`pending_hash`、`next_fetch_at`、`last_success_at`、`consecutive_failures`、最後の失敗の理由のコード、`last_applied_fetched_at` | `id`。`(next_fetch_at) WHERE status IN ('pending','active','failing')`、`(listing_id)` | 4、5 |
 | `ical_intervals`（core、同） | `feed_id`、`listing_id`、`nights`、元の予定の鍵のハッシュの一覧、状態 | `id`。一意 `(feed_id, nights) WHERE active` | 5.5、6 |
 | `stay_claims` の列 | `ical_block` の片の `source_ref` = `ical_interval_id` | — | 6.3 |
-| `calendar_conflicts`（core、同） | `listing_id`、`feed_id`、`ical_interval_id`、重なりの区間、相手の `stay_claims` の ID と種類、予約の ID、深刻さ、状態、知らせた時刻、閉じた時刻と理由 | `id`。`(listing_id, status)`、`(status, severity, check_in)` | 6.4〜6.6 |
+| `calendar_conflicts`（core、同） | `listing_id`、`source_kind`（`ical`・`pms`）、`feed_id`・`ical_interval_id`（`ical` のとき）、`pms_app_id`・`pms_ref`（`pms` のとき）、重なりの区間、相手の `stay_claims` の ID と種類、予約の ID、深刻さ、状態、知らせた時刻、閉じた時刻と理由 | `id`。`(listing_id, status)`、`(status, severity, check_in)` | 6.4〜6.6 |
 | `ical_exports`（core、同） | `listing_id`、トークンのハッシュ、作成の時刻、無効の時刻、最後の利用の時刻、1 日の要求の数 | `listing_id`、一意 `token_hash` | 9.1 |
 | `external_stay_declarations`（core、同） | `listing_id`、区間、出どころ、主体 | `id`、`(listing_id, nights)` | 7 |
 | S3 | `ical-exports/<listing_id>/<calendar_version>.ics`（SSE-KMS、7 日で消す） | — | 9.2 |

@@ -5,6 +5,8 @@ date: 2026-10-10
 
 # ADR-0007: テナントは 1 つ。本人の表は本人、ホストの表はホストのアカウント（共同ホストの役割）、予約の表はゲストとホストのアカウントの 2 者の FORCE RLS にする。PMS は OAuth のアプリとしてホストのアカウントの範囲で動く。リスティングの見える範囲は `listingVisible()` の 1 つの関数で決める
 
+> 2026-10-10 の注記：データモデルの工程で、RLS の種類の表の例の名前を、領域の文書と [data-model.md](../architecture/data-model.md) の名前で読むことにした（`payment_method_refs` → `payment_methods`、`check_in_instructions` → vault の `arrival_instructions`、`saved_searches` は content に最小の形で足した）。`guest_registry_entries` の見える範囲は、後の [ADR-0067](0067-guest-registry-in-vault.md) のとおり、ホストのアカウントの `owner`・`full`・名簿の権限の成員（と、入力するゲストの関数）である（data-model.md の D-20）。3 種類の RLS の決定は変えていない。
+
 ## Context
 
 マーケットプレイスは 1 つの場で、事業者ごとのテナントはない。ただし、データの持ち主は分かれる。

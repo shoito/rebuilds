@@ -365,7 +365,7 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | vault：`subject_keys` | `purpose`（`location`・`registry`・`kyc`・`bank`・`business_address`）、`subject_type`、`subject_id`、`key_version`、`wrapped_key`、`kms_key_arn`、`created_at`、`destroyed_at`。持ち主のサービスの役割ごとの許可 | `(purpose, subject_type, subject_id, key_version)` | 5.3 |
 | core：`subject_keys` | 同上（`purpose = contact`。`identity`・`notifier`） | 同上 | 5.3 |
-| vault：`exact_locations`（[location-and-geo.md](location-and-geo.md) が持つ）、`guest_registry_entries`（[regulatory-compliance-japan.md](regulatory-compliance-japan.md) が持つ）、`payout_accounts`（[ledger-and-payouts.md](ledger-and-payouts.md) が持つ）、`identity_verifications`（[identity-verification.md](identity-verification.md) が持つ） | 暗号の列 `ciphertext`、`nonce`、`key_version`、`aad_version` は 5.3 節の形 | — | 5.3 |
+| vault：`exact_locations`（[location-and-geo.md](location-and-geo.md) が持つ）、`guest_registry_entries`（[regulatory-compliance-japan.md](regulatory-compliance-japan.md) が持つ）、`payout_accounts`（[ledger-and-payouts.md](ledger-and-payouts.md) が持つ）、`identity_verifications`（[identity-verification.md](identity-verification.md) が持つ）、`arrival_instructions`（[booking-and-holds.md](booking-and-holds.md) が持つ。位置の主体の鍵）、`host_business_details`（[accounts.md](accounts.md) が持つ。`business_address` の鍵） | 暗号の列 `ciphertext`、`nonce`、`key_version`、`aad_version` は 5.3 節の形 | — | 5.3 |
 | vault：`vault_access_log` | 読み出しの主体（利用者・運用者・サービス）、用途、目的のコード、対象、案件、時刻。月の区切り | `(target_type, target_id, created_at)` | 3.4、6.4 |
 | S3：`registry` | 旅券の画像（主体の鍵で包んだ本文、`kms-vault-storage` の SSE-KMS）。Object Lock なし | `<property_id>/<fiscal_year>/<entry_id>/<n>` | 5.3 |
 | 各クラスタ：`audit_events` | `id`、`stream`、`actor`、`action`、`target`、`case_id`、`reason_code`、`reason_ct`、`grant_id`、`created_at` | `(stream, id)` | 6.4 |

@@ -103,7 +103,7 @@
 | 4 | `settle` | `(reservation, id, k, settle)` | `guest_funds_held` 残高の全部 | `guest_refund_payable` 返金、`host_payable` ホストの取り分、`service_fee_revenue`、（`platform` なら）`tax_payable` | release の前のキャンセルの精算 |
 | 5 | `refund_full` | `(reservation, id, k, refund)` | `guest_funds_held` 残高の全部 | `guest_refund_payable` 同額 | 全額の返金（ホスト・運用のキャンセル） |
 | 6 | `alter_refund` | `(reservation, id, k, alter_refund)` | `guest_funds_held` 減額 | `guest_refund_payable` 同額 | 変更の減額（決着の前） |
-| 7 | `fx_conversion` | 決着の型と同じキーに `:fx:<ccy>` | 請求の通貨：`guest_funds_held` → `fx_clearing:<請求>`。リスティングの通貨：`fx_clearing:<リスティング>` → 決着の行き先 | 同左 | 請求の通貨とリスティングの通貨が違う決着（3・4） |
+| 7 | `fx_conversion` | 決着の型と同じキー（通貨で分けた 2 つの仕訳。`journals` の一意は `currency` を含む。[data-model.md](data-model.md) の D-14） | 請求の通貨：`guest_funds_held` → `fx_clearing:<請求>`。リスティングの通貨：`fx_clearing:<リスティング>` → 決着の行き先 | 同左 | 請求の通貨とリスティングの通貨が違う決着（3・4） |
 | 8 | `refund_paid` | `(refund, id, 0, paid)` | `guest_refund_payable` | `psp_receivable` | 返金の成功 |
 | 9 | `post_release_refund` | `(reservation, id, k, post_release_refund)` | `host_payable`（ホストの負担）、`service_fee_revenue`（戻す手数料）、足りなければ `host_receivable` | `guest_refund_payable`（請求の通貨。通貨が違えば型 7 と同じく `fx_clearing` を挟む） | release の後のキャンセル・返金 |
 | 10 | `host_cancellation_fee` | `(reservation, id, k, host_fee)` | `host_payable`、足りなければ `host_receivable` | `cancellation_fee_revenue` | ホストのキャンセルの罰 |
@@ -371,7 +371,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `accounts`（ledger） | 種類、持ち主、通貨、閉じた印 | `id`、一意 `(kind, owner_type, owner_id, currency)` | 4.1 |
+| `ledger_accounts`（ledger。[data-model.md](data-model.md) の D-1） | 種類、持ち主、通貨、閉じた印 | `id`、一意 `(kind, owner_type, owner_id, currency)` | 4.1 |
 | `journals`・`journal_lines`（ledger、追記だけ） | 4.3 節 | 4.3 節。`journal_lines` は月の分割 | 4.3 |
 | `account_balances`（ledger） | 口座ごとの残高の射影 | `account_id` | 4.3 |
 | `escrow_settlements`（ledger） | 予約 × 番号の決着 | `(reservation_id, settlement_seq)` | 5 |
