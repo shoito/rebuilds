@@ -103,7 +103,7 @@ canary のアカウント（本番と別の資格情報）から、見張りの�
 | PMS | 見張りの PMS のアプリが空室を書き、Webhook が 10 秒以内に見張りの受け口に届く | `canary_step_seconds{step=pms_roundtrip}` |
 | 通知 | 予約の通知が見張りの端末の受け手（APNs・FCM の試験の受け手）に届く | `canary_step_seconds{step=notify}` |
 
-- 見張りのリスティングは `listingVisible()` で見張りの利用者だけに見える（一般の検索の結果に出さない。[quality.md](../quality.md) の 4.2 節）。判定の行は [listings-and-content.md](listings-and-content.md) と合意する。
+- 見張りのリスティングは `listingVisible()` で見張りの利用者だけに見える（一般の検索の結果に出さない。[quality.md](../quality.md) の 4.2 節）。判定は DT-LST-VIS-001 の行 3a（[listings-and-content.md](listings-and-content.md) の 8 節。2026-10-10 の統合で足した）。
 - 見張りのリスティングは届出住宅に結ばない（180 日の数えに入れない）。見張りの予約は台帳の仕訳を書くが、`sentinel` の印で 3 者の照合と収益の集計から外す。
 - 2 回続けて失敗した段は呼び出し。提供者の試験の環境が落ちているときは `canary_dependency_up{dep}` で本番の障害と分ける。
 

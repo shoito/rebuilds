@@ -151,8 +151,10 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 検索・地図・リスティングの画面・共有のページ | 正確な位置・番地・部屋の番号が出ないこと。`approx_point` だけ |
 | 予約の確定の前のメッセージ | 自動の文に住所が入らないこと。ホストの書いた住所・電話番号を絞り込みが伏せること |
 | チェックインの案内 | 確定した予約のゲストとホストのアカウントだけ。キャンセルの後は見えない |
-| 予約の画面と API | 2 者だけ。ホストに、確定の前のゲストの顔の写真が出ないこと |
-| 宿泊者名簿・旅券 | ホストのアカウントの名簿の権限と、法令の照会の手順だけ。共同ホストの `messages_only` に出ないこと |
+| 予約の画面と API | 2 者だけ。ホストに、確定の前のゲストの顔の写真と名前が出ないこと（`legal.prebooking_guest_identity_display = none`） |
+| T&S の `hold` の予約 | ゲストへの知らせと画面に、T&S の規則・点・理由が出ないこと。ホストに「確認中」だけが出ること |
+| 見張りのリスティング | 見張りの利用者の外の検索・地図・おすすめ・共有のページに出ないこと（`listingVisible()` の行 3a） |
+| 宿泊者名簿・旅券 | ホストのアカウントの名簿の権限（`owner`・`full`、`registry` の権限を与えた共同ホスト）と、法令の照会の手順だけ。`registry` の権限のない `calendar_and_reservations` と `messages_only`、PMS（`legal.pms_registry_scope_enabled = false` の間）に出ないこと |
 | 送金の口座・明細 | ホストのアカウントの `owner` と `full` だけ |
 | 未公開のレビュー | 書いた本人だけ |
 | 通知（プッシュ、メール、SMS） | 本文に正確な住所・旅券の番号が入らないこと。宛先が正しい |
@@ -194,6 +196,39 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - 日本のリスティングの画面に、届出番号・許可番号が出ていること（法務の L1・L2）。
 - 確認の画面に、総額、キャンセルポリシー、法務の L7 で決める事項が出ていること。
 - 宿泊者名簿の項目の入力の画面（法務の L3）と、定期報告の書き出しの形（法務の L1）を試験のベクトルで確かめる。
+
+### 2.2.2 領域ごとの性質と決定表の ID
+
+各領域の文書の「テストと性質」の ID の一覧（2026-10-10 の統合で集めた）。テストの名前は、この ID を含める。性質と決定表の中身は各文書が正本で、変更の `spec.md` で確定する。
+
+| 領域 | 性質 | 決定表 |
+| --- | --- | --- |
+| [availability-and-calendars.md](architecture/availability-and-calendars.md) | PROP-AVL-001〜006 | DT-AVL-001（12 行） |
+| [calendar-sync.md](architecture/calendar-sync.md) | PROP-ICS-001〜006 | DT-ICS-001（7 行） |
+| [search-and-ranking.md](architecture/search-and-ranking.md) | PROP-SRCH-001〜009 | — |
+| [pricing-and-fees.md](architecture/pricing-and-fees.md) | PROP-PRC-001〜007 | — |
+| [taxes.md](architecture/taxes.md) | PROP-TAX-001〜007 | — |
+| [booking-and-holds.md](architecture/booking-and-holds.md) | PROP-BKG-001〜008 | DT-BKG-001（35 行） |
+| [cancellations-and-changes.md](architecture/cancellations-and-changes.md) | PROP-CXL-001〜006、PROP-ALT-001〜002 | DT-CXL-001（12 行）、DT-ALT-001（17 行） |
+| [payments-and-fx.md](architecture/payments-and-fx.md) | PROP-PAY-001〜003、PROP-FX-001〜003 | — |
+| [ledger-and-payouts.md](architecture/ledger-and-payouts.md) | PROP-LED-001〜006、PROP-PO-001 | — |
+| [deposits-and-claims.md](architecture/deposits-and-claims.md) | PROP-CLM-001〜003 | DT-CLM-001（19 行） |
+| [messaging.md](architecture/messaging.md) | PROP-MSG-001〜008 | — |
+| [reviews.md](architecture/reviews.md) | PROP-REV-001〜008 | — |
+| [trust-and-safety.md](architecture/trust-and-safety.md) | PROP-TS-001〜008 | — |
+| [identity-verification.md](architecture/identity-verification.md) | PROP-KYC-001〜005 | — |
+| [regulatory-compliance-japan.md](architecture/regulatory-compliance-japan.md) | PROP-REG-001〜007 | — |
+| [listings-and-content.md](architecture/listings-and-content.md) | PROP-LST-001〜007 | DT-LST-VIS-001（12 行。行 3a を含む） |
+| [location-and-geo.md](architecture/location-and-geo.md) | PROP-GEO-001〜006 | — |
+| [host-tools-and-api.md](architecture/host-tools-and-api.md) | PROP-HST-001〜004 | DT-HST-001（15 行） |
+| [accounts.md](architecture/accounts.md) | PROP-ACC-001〜006 | DT-ACC-001（11 行） |
+| [security.md](architecture/security.md) | PROP-SEC-001〜004 | — |
+| [infrastructure.md](architecture/infrastructure.md) | PROP-INF-001 | — |
+| [observability.md](architecture/observability.md) | PROP-OBS-001〜002 | — |
+| [delivery.md](architecture/delivery.md) | PROP-DEL-001 | — |
+
+- 2.2.1 節の重点と ID の対応：A は PROP-AVL-001・PROP-BKG-001・PROP-ALT-001・PROP-HST-003、B は PROP-REG-001〜006、C は PROP-CXL-*・PROP-LED-*・PROP-PRC-*・PROP-FX-*・PROP-TAX-*、D は PROP-AVL-005・006・PROP-BKG-004・PROP-REV-006、E は PROP-SRCH-*・PROP-GEO-003、F は PROP-REV-001〜005、G は PROP-ICS-*・PROP-INF-001、H は PROP-LST-003・PROP-GEO-004・PROP-BKG-008・PROP-MSG-004・005・PROP-KYC-003・PROP-REG-007・PROP-HST-001・PROP-TS-007・PROP-OBS-001、I は PROP-TS-004・005。
+- 2026-10-10 の統合で足した決定表の行（DT-BKG-001 の 13a・21a・21b・21c、DT-LST-VIS-001 の 3a）は、表駆動テストの到達の対象に含める。
 
 ### 2.3 エージェントの確認ループ
 

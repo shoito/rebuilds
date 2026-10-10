@@ -59,20 +59,20 @@
 | 基本の料金 | `pricing_rules.base_nightly` | 1 泊の料金 |
 | 週末の料金 | `pricing_rules.weekend_nightly`、`weekend_nights`（曜日の集合。既定は金曜と土曜）、`holiday_eve_as_weekend`（bool） | 週末の夜の 1 泊の料金 |
 | 季節の規則 | `seasonal_rules`（`date_from`、`date_to`（含む）、`nightly`、`weekend_nightly`（任意）、`priority`、`min_nights`（任意。滞在の規則に渡す）） | 期間の 1 泊の料金 |
-| 日付の上書き | `calendar_days.price`（availability-and-calendars の領域の泊ごとの設定） | その夜の料金 |
+| 日付の上書き | `calendar_days.nightly_price_override`（availability-and-calendars の領域の泊ごとの設定） | その夜の料金 |
 | 追加のゲスト | `pricing_rules.guests_included`、`extra_guest_fee`（泊ごと・人ごと） | 定員の中で、含む人数を超えた人の料金 |
 | 清掃料 | `pricing_rules.cleaning_fee` | 滞在に 1 回 |
 | ペット | `pricing_rules.pet_fee` | 滞在に 1 回（ペットの数に依らない） |
 | 長期の割引 | `pricing_rules.weekly_discount_pct`（7 泊以上）、`monthly_discount_pct`（28 泊以上） | 泊の料金の和への割合 |
 
 - 「夜」はチェックインの日を含む泊の日（物件の現地の日付）。2026-11-27（金）の夜は、11-27 に泊まって 11-28 に出る夜。
-- 規則の変更は `pricing_version`（リスティングごと）と `listing_version` を上げる（[listings-and-content.md](listings-and-content.md) の 4.4 節）。見積もりは `pricing_version` を写しに固定する。
+- 料金の変更（`pricing_rules`、`seasonal_rules`、日付の上書き）は `pricing_version`（リスティングごと）と `search_version` を上げ、`listing_version` を上げない（[listings-and-content.md](listings-and-content.md) の 4.4 節）。見積もりは `pricing_version` を写しに記録するが、料金の変化では見積もりを無効にしない。15 分の間は見積もりの額で予約できる（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)）。
 
 ### 4.2 優先の順（`resolveNightlyPrice`）
 
 泊ごとに、上から最初に当たった値を使う。
 
-1. 日付の上書き（`calendar_days.price`）。料金の提案の書き込みもここに入る（10 節）。
+1. 日付の上書き（`calendar_days.nightly_price_override`）。料金の提案の書き込みもここに入る（10 節）。
 2. 季節の規則：その夜を含む規則のうち、`priority` の大きいもの。同じなら期間の短いもの。なお同じなら新しく作ったもの。その夜が週末の夜で、規則に `weekend_nightly` があればそれ、なければ `nightly`。
 3. 週末の料金：その夜の曜日が `weekend_nights` に入る、または `holiday_eve_as_weekend` が真で翌日が祝日なら `weekend_nightly`（設定があれば）。
 4. 基本の料金。
@@ -186,7 +186,7 @@ flowchart TD
 
 ### 8.2 例：京都の 3 泊、3 人、米ドルで払う
 
-4.2 節のリスティング。2026-11-27〜11-30（3 泊）、大人 3 人、`guests_included = 2`、追加のゲストの料金 2,000、清掃料 6,000、ペットなし、長期の割引なし。京都市の宿泊税の表（[taxes.md](taxes.md) の 5.3 節）。表示の通貨は米ドル、相場の写しは仲値 150.00 円/ドル、上乗せ 2.5%。
+4.2 節のリスティング。2026-11-27〜11-30（3 泊）、大人 3 人、`guests_included = 2`、追加のゲストの料金 2,000、清掃料 6,000、ペットなし、長期の割引なし。京都市の宿泊税の表（[taxes.md](taxes.md) の 5.3 節）。表示の通貨は米ドル、相場の写しは仲値 0.006700 ドル/円、上乗せ 200 bp（2%）。
 
 | 行 | 計算 | 円 |
 | --- | --- | --- |
@@ -198,17 +198,17 @@ flowchart TD
 | 宿泊税（京都市） | 夜ごと・人ごとに 400 円 × 3 泊 × 3 人（[taxes.md](taxes.md) の 5.3 節） | 3,600 |
 | **総額** | | **66,600** |
 
-換算（合計だけ 1 回）：請求の相場 = 150.00 × (1 − 0.025) = 146.25 円/ドル。66,600 ÷ 146.25 = 455.3846… → **455.38 ドル**（セントで四捨五入）。
+換算（合計だけ 1 回）：適用の相場 = 0.006700 × (1 + 0.02) = 0.006834 ドル/円（[payments-and-fx.md](payments-and-fx.md) の 8.1 節の `applied_rate`）。66,600 × 0.006834 = 455.1444 → **455.14 ドル**（セントで四捨五入）。
 
 行への按分（切り捨ての後、残りを大きい行から 1 セントずつ）：
 
-| 行 | 円 ÷ 146.25 | 切り捨て | 残りの割り振り | ドル |
+| 行 | 円 × 45,514 ÷ 66,600（セント） | 切り捨て | 残りの割り振り | ドル |
 | --- | --- | --- | --- | --- |
-| 泊の和 | 348.7179 | 348.71 | +0.01 | 348.72 |
-| 追加のゲスト | 41.0256 | 41.02 | +0.01（同じ額の行は表の順） | 41.03 |
-| 清掃料 | 41.0256 | 41.02 | | 41.02 |
-| 宿泊税 | 24.6154 | 24.61 | | 24.61 |
-| 和 | | 455.36 | +0.02 | **455.38** |
+| 泊の和 | 34,853.06 | 34,853 | +1（最も大きい行） | 348.54 |
+| 追加のゲスト | 4,100.36 | 4,100 | | 41.00 |
+| 清掃料 | 4,100.36 | 4,100 | | 41.00 |
+| 宿泊税 | 2,460.22 | 2,460 | | 24.60 |
+| 和 | | 45,513 | +1 | **455.14** |
 
 ホストの側（ゲストには出さない）：
 
@@ -229,8 +229,8 @@ flowchart TD
 
 ## 10. 料金の提案の書き込みの境界
 
-- 料金の提案は、ホストが有効にし（`pricing_suggestion_enabled`）、最低と最高（`suggestion_min`・`suggestion_max`）を決めたときだけ、`calendar_days.price` を書く。主体は `pricing_suggestion`、書き込みは通常のカレンダーの書き込みの関数（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）。
-- `pricing` は、主体が `pricing_suggestion` の書き込みで、値が `[suggestion_min, suggestion_max]` の外なら拒む。ホストが手で書いた日付の上書きは、料金の提案で上書きしない（`calendar_days.price_source = 'host'` の日は書かない）。
+- 料金の提案は、ホストが有効にし（`pricing_suggestion_enabled`）、最低と最高（`suggestion_min`・`suggestion_max`）を決めたときだけ、`calendar_days.nightly_price_override` を書く。主体は `pricing_suggestion`、書き込みは通常のカレンダーの書き込みの関数（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）。
+- `pricing` は、主体が `pricing_suggestion` の書き込みで、値が `[suggestion_min, suggestion_max]` の外なら拒む。ホストが手で書いた日付の上書きは、料金の提案で上書きしない（`calendar_days.set_by_type` が `host`・`cohost`・`pms` の日は書かない）。
 - 有効にしていないホストには、提案の値をカレンダーの画面に出すだけ。
 - 料金の提案は、サービス料・税・キャンセルの精算の計算に入らない（書いた料金が、ふつうの日付の上書きとして使われるだけ）。
 
@@ -239,7 +239,7 @@ flowchart TD
 | 事象 | 影響 | 扱い |
 | --- | --- | --- |
 | 見積もりの期限切れ・バージョンの変化 | 予約の要求が古い | 409 `quote_expired` と新しい見積もり（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
-| 相場の写しの取り込みの停止 | 換算が古い | 相場の写しが 6 時間より古ければ、ゲストの通貨での見積もりを止め、ホストの通貨で出す（payments-and-fx の領域） |
+| 相場の写しの取り込みの停止 | 換算が古い | 相場の写しが 2 時間より古ければ、ゲストの通貨での見積もりを止め、ホストの通貨で出す（[payments-and-fx.md](payments-and-fx.md) の 8.1 節、[ADR-0043](../decisions/0043-fx-rate-snapshots-markup-and-staleness.md)） |
 | 税の表の読み込みの失敗 | 税が出せない | 見積もりを作らない（503）。税のない総額を出さない |
 | 料金の写し `prc:` の遅れ | 検索の目安の額が古い | 確認の画面の見積もりが正。検索の目安と見積もりの違いの率を見張る（違いが 1% 超の件の率） |
 | 規則の誤り（ホストの入力の誤り：1 泊 1,000 円のつもりが 100,000 円） | 予約が入らない・安く売れる | 前回の値の 5 倍・5 分の 1 を超える変更に確認の画面を出す。予約の後の救済はキャンセルの手順 |
@@ -259,7 +259,7 @@ flowchart TD
 | --- | --- | --- |
 | Aurora core `pricing_rules`（`listing_id`、`pricing_version`、`currency`、`base_nightly`、`weekend_nightly`、`weekend_nights`、`holiday_eve_as_weekend`、`guests_included`、`extra_guest_fee`、`cleaning_fee`、`pet_fee`、`weekly_discount_pct`、`monthly_discount_pct`、`pricing_suggestion_enabled`、`suggestion_min`、`suggestion_max`）。ホストのアカウントの RLS | 規則 | 4、10 |
 | Aurora core `seasonal_rules`（`id`、`listing_id`、`date_from`、`date_to`、`nightly`、`weekend_nightly`、`priority`、`created_at`） | 季節 | 4.2 |
-| Aurora core `calendar_days.price`、`price_source`（`host`・`pricing_suggestion`・`api`）（availability-and-calendars の表の列） | 日付の上書き | 4.2、10 |
+| Aurora core `calendar_days.nightly_price_override`、`set_by_type`（`host`・`cohost`・`pms`・`pricing_suggestion`）（[availability-and-calendars.md](availability-and-calendars.md) の 7 節の表の列） | 日付の上書き | 4.2、10 |
 | Aurora core `quotes`（6.2 節の項目）。ゲスト本人の RLS | 見積もりの写し | 6.2 |
 | Aurora core `service_fee_schedules`（`version`、`rate_bp`、`effective_from`、`applies_to`） | サービス料の表 | 7 |
 | Aurora core `jp_holidays`（`date`、`name`、`source_version`） | 祝日 | 4.2 |
@@ -271,12 +271,12 @@ flowchart TD
 | --- | --- |
 | PROP-PRC-001 | 任意の規則・日付・人数で、`priceStay` の結果は `price-ref`（優先の順と割合を文のとおりに書いた素直な実装）と 1 円も違わない（[quality.md](../quality.md) の 2.2.1 節 C） |
 | PROP-PRC-002 | 任意の行の額・通貨・相場で、表示の行の和 = 表示の総額。換算は 1 回だけ（`convert` の呼び出しの数） |
-| PROP-PRC-003 | 予約で請求する額は、見積もりの写しの `charge_total` と通貨を含めて一致する。写しのバージョンのどれかが変わると予約は 409 |
+| PROP-PRC-003 | 予約で請求する額は、見積もりの写しの `charge_total` と通貨を含めて一致する。`listing_version`・`rules_version`・`cancellation_policy_version` のどれかが変わると予約は 409。`pricing_version` の変化（料金の上書き）では 409 にしない（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)） |
 | PROP-PRC-004 | 長期の割引は 1 つだけ当たり、泊数について単調（泊を足して 1 泊あたりの割引の後の料金が上がることはない。同じ料金の夜を足すとき） |
-| PROP-PRC-005 | 主体 `pricing_suggestion` の書き込みは、範囲の外の値で必ず拒まれ、`price_source = 'host'` の日を書き換えない |
+| PROP-PRC-005 | 主体 `pricing_suggestion` の書き込みは、範囲の外の値で必ず拒まれ、`set_by_type` が `host`・`cohost`・`pms` の日を書き換えない |
 | PROP-PRC-006 | サービス料は税の行に掛からず、`accommodation_subtotal` の 15% の四捨五入と一致する。ゲストの総額はサービス料の率に依らない |
 | PROP-PRC-007 | `quoteSummary` と `quoteStay` は、同じ規則・同じ相場の写しなら同じ総額を出す |
-| 試験のベクトル | 4.2 節の解決の表、4.3 節の割引、8.2 節の例（66,600 円、455.38 ドル、按分、57,150 円）、通貨ごとの小数の桁 |
+| 試験のベクトル | 4.2 節の解決の表、4.3 節の割引、8.2 節の例（66,600 円、455.14 ドル、按分、57,150 円）、通貨ごとの小数の桁 |
 | 仮想の時計 | 見積もりの 15 分の境（14:59 は使える、15:00 は 409） |
 
 ## 15. Story の候補

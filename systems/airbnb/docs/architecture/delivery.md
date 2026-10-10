@@ -118,19 +118,23 @@ flowchart LR
 
 - `legal.*` は AppConfig の別のアプリケーション `legal` に置く。本番の配信は Ops の役割だけで、一度にすべて（段階なし。値の食い違いを作らない）。
 - 値は `config/legal/<env>.json` に置き、JSON Schema（型、範囲、既定）で検査する。各値は `value`、`effective_from`、`approval_ref`（承認の記録の ID）を持つ。
-- **本番の禁じた値の検査**：次の値を本番で既定から変える PR は、`approval_ref` が承認の記録（法務と財務の 2 人の署名、[intent.md](../intent.md) の L の番号）を指していなければ失敗にする。
+- **本番の禁じた値の検査**：次の値（`legal.*` の全部。一覧の正本は [data-model.md](data-model.md) の 6 節）を本番で既定から変える PR は、`approval_ref` が承認の記録（法務と財務の 2 人の署名、[intent.md](../intent.md) の L の番号）を指していなければ失敗にする。
 
 | 値 | 本番の既定 | L |
 | --- | --- | --- |
 | `legal.minpaku_count_external_nights` | `none` | L1 |
-| `legal.minpaku_day_boundary_rule` | 1 泊 1 日 | L1 |
-| `legal.message_scan_mode` | 送る時の決定的な検査だけ | L9 |
+| `legal.minpaku_day_boundary_rule` | `one_per_night`（1 泊 1 日） | L1 |
+| `legal.message_scan_mode` | `send_time_pattern`（送る時の決定的な検査だけ） | L9 |
 | `legal.registry_auto_delete_enabled`、`legal.guest_registry_retention_days` | `false`、1,095 | L3 |
 | `legal.kyc_*` | 消さない | L3・L8 |
 | `legal.pms_registry_scope_enabled` | `false` | L3・L8 |
 | `legal.pms_cross_border_guest_data` | `deny` | L8 |
 | `legal.prebooking_guest_identity_display` | `none` | L11 |
-| `legal.lodging_tax_collector`（[taxes.md](taxes.md)）、`legal.funds_holding_model`・`legal.max_holding_days`（[ledger-and-payouts.md](ledger-and-payouts.md)）、`legal.sanctions_screening_owner`（[payments-and-fx.md](payments-and-fx.md)）、`legal.message_translation_enabled`（[messaging.md](messaging.md)） | 各文書の既定（ホストが納める、収納代行など） | L4・L5・L6・L9 |
+| `legal.registry_gate_arrival_info`、`legal.guest_registry_fields`、`legal.registry_identity_method` | 開発・検証は `true`・観光庁の資料の項目・`mrz_nfc`。本番の値は L3 の後 | L3 |
+| `legal.request_decline_mode_ryokan` | `unrestricted`（本番で無効の印） | L2・L11 |
+| `legal.person_key_enabled`、`legal.kyc_result_retention_days` | `false`、消さない | L8 |
+| `legal.claim_merchant_initiated_enabled`、`legal.claim_evidence_retention_days` | `false`、1,095 | L8・L12 |
+| `legal.lodging_tax_collector`・`legal.lodging_tax_collector.<jurisdiction>`（[taxes.md](taxes.md)）、`legal.funds_holding_model`・`legal.max_holding_days`（[ledger-and-payouts.md](ledger-and-payouts.md)）、`legal.sanctions_screening_owner`（[payments-and-fx.md](payments-and-fx.md)）、`legal.message_translation_enabled`（[messaging.md](messaging.md)） | 各文書の既定（ホストが納める、収納代行など） | L4・L5・L6・L9 |
 
 - 適用は平日の 10〜15 時（[runbooks/](../runbooks/README.md) の 3 節）。適用の前と後で、予約と台帳の照合、台帳の不変条件、180 日の照合を回す。
 - 予約・見積もり・仕訳・`regulated_nights` の数えは、そのとき使った `legal` の構成のバージョンを記録する。値を戻しても、過去の記録は書き換えない。
@@ -333,7 +337,7 @@ flowchart LR
 | 各クラスタ：`schema_migrations` | マイグレーションの ID、段（広げる・移す・縮める）、守る物に触れたか、承認者、当てた時刻 | 5 |
 | core：`app_versions` | プラットフォーム、バージョン、ビルド、列車、公開の日、段階の割合、止めた時刻と理由 | 6 |
 | core：`legal_config_changes` | キー、前と後の値、`effective_from`、`approval_ref`、適用の時刻、適用した人 | 3.3 |
-| core：`config_versions` | 設定の表の種類、バージョン、`effective_from`、内容のハッシュ、承認者、入れた時刻。各表の中身は持ち主の領域の表（`fee_schedules`、`cancellation_policy_versions`、`tax_table_versions`、`municipal_rule_sets`、`fx_markup_versions`） | 3.4 |
+| core：`config_versions` | 設定の表の種類、バージョン、`effective_from`、内容のハッシュ、承認者、入れた時刻。各表の中身は持ち主の領域の表（`service_fee_schedules`、`cancellation_policies`（`(code, version)`）、`host_cancellation_fee_tables`、`tax_table_versions`・`tax_rules`、`municipal_rule_sets`、`fx_markup_versions`（為替の上乗せ `fx_markup_bps` の組ごとの値）。一覧は [data-model.md](data-model.md)） | 3.4 |
 | core：`partner_api_versions` | バージョン、公開の日、止める予定の日、止めた日、延ばした記録 | 7 |
 | core：`pms_apps` に足す列 | `default_api_version` | 7 |
 | 予約・見積もり・仕訳・`regulated_nights` に足す列 | `legal_config_version`、使った設定の表のバージョンの ID（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md) の見積もりの写しと同じ） | 3.3、3.4 |

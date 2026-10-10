@@ -1,6 +1,6 @@
 # Runbooks: Airbnb
 
-Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は observability の領域（まだない）で書く。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
+Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は [observability.md](../architecture/observability.md) にある。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
 
 この題材は、人が泊まる場所とお金を運ぶ。止まれば、予約が取れず、ホストにお金が届かない。同じ夜の二度の販売、届出住宅の上限の超過、お金の誤り、正確な住所の漏れは、止まるより悪い。安全の事故は、システムの障害と別に、24 時間の人の対応が要る。繁忙期の運用は 5 節、安全の事故への対応は 6 節にまとめる。
 
@@ -37,28 +37,30 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. 上限と容量のパラメーター
 
-値の正本は、各 ADR と領域の文書（まだないものは [architecture/README.md](../architecture/README.md) の 6 節の決定）にある。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
+値の正本は、各 ADR と領域の文書にある（数値の正本の一覧は [architecture/README.md](../architecture/README.md) の 6 節の「決定（2026-10-10、統合）」）。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
 
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
 | 仮押さえの期限 | 10 分 | [ADR-0004](../decisions/0004-booking-state-machine-and-holds.md) | — |
-| リクエストの期限 | 24 時間 | 同上 | — |
+| リクエストの期限 | 24 時間とチェックインの 2 時間前の早いほう | [ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md) | — |
+| T&S の `hold` の判定 | 4 時間（リクエストの期限を超えない。過ぎたらホストに任せる） | [ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md) | — |
 | 見積もりの期限 | 15 分 | 同上 | — |
-| 熱い日付の先着の印 | 15 秒 | 同上（`hot-dates-booking-poc` で見直す） | — |
-| リスティングごとの予約の同時実行（Valkey の停止の時） | 4 | 同上 | — |
+| 熱い日付の先着の印 | 15 秒 | [ADR-0036](../decisions/0036-hot-date-admission-and-hold-limits.md)（`hot-dates-booking-poc` で見直す） | — |
+| リスティングごとの予約の同時実行（Valkey の停止の時） | 4（`booking` のタスクの最大 12 で 1 リスティング 48 件まで） | 同上 | — |
 | 期限の処理 | 1 分ごと、100 件ずつ | 同上 | 並列の数 |
 | 準備の日 | 0〜2 泊（ホストが選ぶ） | [ADR-0002](../decisions/0002-availability-representation-and-double-booking.md) | — |
 | 検索のステージ 1 の件数 | 300 | [ADR-0003](../decisions/0003-search-for-date-range-availability.md) | `ops.search_stage1_limit`（150〜600。負荷の時に下げる） |
 | 料金の要約の写し | 10 分 | 同上 | — |
-| iCal の取り込みの間隔 | 15 分、2 年先まで、1 リスティング 5 件 | calendar-sync の領域 | `ops.ical_poll_minutes`（伸ばすだけ。最大 60） |
+| iCal の取り込みの間隔 | 15 分、2 年先まで、1 リスティング 5 件 | [ADR-0021](../decisions/0021-ical-import-pipeline-and-safety.md) | `ops.ical_poll_minutes`（伸ばすだけ。最大 60） |
 | 送金の振り替えの時刻 | チェックインの予定の時刻 + 24 時間 | [ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md) | — |
-| 送金の束 | 毎営業日、提携銀行の締めの前 | ledger-and-payouts の領域 | 束の時刻（締めの中で） |
+| 送金の束 | 銀行の営業日の 09:00 に作り 09:30 に依頼 | [ADR-0048](../decisions/0048-release-payout-batching-and-holds.md) | 束の時刻（締めの中で） |
+| 送金の待ち | 送金の口座・連絡先の変更、回復の後 72 時間。新しいホストの最初の 3 件は各予約のチェックアウトの後 24 時間まで | [ADR-0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md)、[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md) | — |
 | 予約と台帳の照合 | 5 分ごと。欠けは 15 分でアラート | [ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md) | 繁忙期は 1 分ごと |
 | 相場の写しの取り込み | 1 時間ごと | [ADR-0008](../decisions/0008-multi-currency-and-fx.md) | — |
 | サービス料の表、料金の表、キャンセルポリシーの表、税の表、自治体の規則の表 | バージョンの付いた設定 | 各領域 | — （変更は PM・財務・法務の承認） |
 | 180 日の数え方、他の掲載先の泊、名簿の保存の期間、預かりの型 | 本番は無効・既定 | [ADR-0006](../decisions/0006-regulatory-night-cap-enforcement.md)、[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md) | — （`legal.*`。法務・財務の承認） |
-| レビューの期間 | チェックアウトから 14 日 | reviews の領域 | — |
-| 損害の請求の期間 | チェックアウトから 14 日 | deposits-and-claims の領域 | — |
+| レビューの期間 | チェックアウトから 14 日 | [ADR-0055](../decisions/0055-review-pairs-and-simultaneous-reveal.md) | — |
+| 損害の請求の期間 | チェックアウトから 14 日。ゲストの応答 24 時間。運用の判断の目安 7 日 | [ADR-0050](../decisions/0050-damage-claim-lifecycle-and-guest-charge.md) | — |
 | 予約の受け付け | — | — | `ops.booking_enabled`（全体・地域・リスティング・届出住宅ごとに止めるだけ） |
 | 送金の実行 | — | — | `ops.payouts_enabled`（止めるだけ） |
 | iCal の取り込み | — | — | `ops.ical_import_enabled`（全体・相手のドメインごとに止めるだけ。止めても既存の `ical_block` は残す） |
@@ -90,31 +92,42 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-個別の手順は、まだない。各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。「作る Story」の列は、そのアラートの計測と手順を作る [roadmap.md](../roadmap.md) の Story である。手順の文書は、その Story の完了の条件に含める（E20 の `runbooks-e20` でまとめて確かめる）。
+手順の文書は [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。統合の工程（2026-10-10）で、主な手順を作った。残りは計画で、「作る Story」の列の [roadmap.md](../roadmap.md) の Story の完了の条件に含める（E20 の `runbooks-e20` でまとめて確かめる）。
+
+**作ったもの**
+
+| アラート（重さ） | 手順 |
+| --- | --- |
+| すべての障害の一般の手順、SEV の決め方、連絡 | [incident-response.md](incident-response.md) |
+| デプロイ中の自動ロールバック、手のロールバック | [deploy-and-rollback.md](deploy-and-rollback.md) |
+| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | [disaster-recovery.md](disaster-recovery.md) |
+| 予定した繁忙期・大きな催しの準備と当日、熱い日付の検知 | [peak-season-operations.md](peak-season-operations.md) |
+| 二重の予約（page、SEV1 の候補）、外部の食い違いの確定した予約との重なり、法令の上限の照合の不一致・上限の超過（page、SEV1 の候補） | [double-booking-or-cap-violation.md](double-booking-or-cap-violation.md) |
+| 安全の事故（緊急）、安全の窓口の応答の遅れ（page、安全の責任者） | [safety-incident.md](safety-incident.md) |
+| 送金の遅れ（`payout_release_at` から p99 30 分超）、送金の失敗の急増、銀行の障害、組戻し | [payout-failure.md](payout-failure.md) |
+
+**計画のもの**
 
 | アラート（重さ） | 手順（予定のファイル名） | 作る Story |
 | --- | --- | --- |
-| 予約の SLO のバーンレート、予約の遅れ（page） | `booking-degraded.md`（地域・リスティングごとの予約の停止を含む） | `reserve-stay`、`slo-dashboards-alerts` |
-| 二重の予約（page、SEV1 の候補） | `double-booking.md`（リスティングの予約の停止、どちらの予約を守るかの判断、代わりの宿の手配、利用者への連絡） | `stay-claims-and-exclusion` |
-| 外部の食い違いの増加、iCal の取り込みの失敗 | `calendar-sync-issues.md`（相手のドメインごとの停止、ホストへの知らせ） | `ical-import`、`calendar-conflicts` |
-| 法令の上限の照合の不一致（page、SEV1 の候補） | `regulatory-cap-mismatch.md`（届出住宅の予約の停止、数え直し、法務への連絡） | `night-cap-counting` |
-| 決着の重複・早い release（page、SEV1 の候補）、欠け | `ledger-settlement-mismatch.md`（送金の停止、打ち消しの仕訳の承認の手順） | `reconciliation` |
+| 予約の SLO のバーンレート、予約の遅れ（page） | `booking-degraded.md`（地域・リスティングごとの予約の停止を含む。熱い日付は [peak-season-operations.md](peak-season-operations.md)） | `reserve-stay`、`slo-dashboards-alerts` |
+| iCal の取り込みの失敗、外部の食い違いの増加 | `calendar-sync-issues.md`（相手のドメインごとの停止、ホストへの知らせ。確定した予約との重なりは [double-booking-or-cap-violation.md](double-booking-or-cap-violation.md)） | `ical-import`、`calendar-conflicts` |
+| 決着の重複・早い release（page、SEV1 の候補）、欠け | `ledger-reconciliation-mismatch.md`（送金の停止、打ち消しの仕訳の承認の手順。それまでは [payout-failure.md](payout-failure.md) の「全体を止める」と [incident-response.md](incident-response.md)） | `reconciliation` |
 | 台帳の不変条件の違反（page、SEV1 の候補） | `ledger-invariant-breach.md`（送金の停止） | `ledger-core` |
 | 3 者の照合の差（ticket） | `three-way-reconciliation.md`（仮勘定の確かめ、財務への引き継ぎ） | `reconciliation` |
-| 送金の遅れ・失敗の急増、銀行の障害 | `payout-delays.md`（再実行、ホストへの知らせ） | `release-after-check-in`、`payout-accounts-and-execution` |
-| 期限の処理の遅れ（page） | `deadline-runner-lag.md`（再開、溜まった予約の確認） | `booking-state-machine` |
+| 期限の処理の遅れ（`deadline_lag_seconds` の p99 10 分。page） | `deadline-runner-lag.md`（再開、溜まった予約の確認） | `booking-state-machine` |
 | 決済の提供者の障害（page） | `payment-provider-outage.md`（手段の一時の非表示、照会の確認、仮押さえの延長の判断） | `payment-adapter-contract` |
 | 検索の遅れ・混入の率の上昇、索引の遅れ | `search-freshness.md`（索引と写しの作り直し、ステージ 1 の件数の調整） | `search-index-and-indexer`、`availability-cache` |
 | 見える範囲・住所・名簿の漏れの疑い（page、SEV1 の候補） | `privacy-leak-response.md`（経路の停止、影響の範囲、漏えい等の報告の判断は法務：L8） | `address-and-exact-location`、`guest-registry` |
-| 安全の事故（緊急）、安全の窓口の応答の遅れ（page、安全の責任者） | `safety-incident-response.md`（6 節） | `safety-incidents-and-24x7-line` |
-| 不正・乗っ取り・偽のリスティングの急増 | `fraud-surge.md`（`step_up` の強化、送金の保留の規則） | `risk-scores`、`fake-listing-detection` |
+| 乗っ取りの兆しの急増、「これは私ではない」 | `account-takeover.md`（`ops.payouts_enabled` を含む） | `account-takeover-signals` |
+| 不正・偽のリスティングの急増、`booking_hold` の待ち行列の溢れ | `fraud-surge.md`（`step_up` の強化、審査の人の追加、期限の 80% の警告） | `risk-scores`、`fake-listing-detection` |
 | パーティーの苦情の急増 | `party-surge.md`（地域と期間の規則の強化） | `party-prevention` |
-| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | `disaster-recovery.md` | `osaka-warm-standby`、`dr-failover-drill` |
+| 損害の請求の運用の判断の遅れ（`ops_review` が 7 日を超える。ticket） | `damage-claims-backlog.md` | `claim-decisions-and-charges` |
+| PMS のアプリの悪用の疑い、Webhook の `disabled` の急増 | `pms-app-abuse.md`（`ops.partner_api_enabled.<app>`） | `pms-oauth-apps`、`webhooks` |
 | 行政・警察からの照会、開示の請求 | `legal-request.md`（法務の L1・L3・L14 の後に確定） | `guest-registry`、`disclosure-and-takedown-requests` |
-| デプロイ中の自動ロールバック | `deploy-and-rollback.md` | `ci-pipeline-baseline` |
 
-- すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する）。
-- 手順を作るまでは、`incident-response.md`（E1 で最初に作る）の一般の手順で対応する。利用者への障害の知らせは、お知らせと状況のページで行う（文言は法務の確認の後）。
+- すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する。[ADR-0079](../decisions/0079-sli-measurement-and-correctness-monitors.md)）。
+- 計画の手順を作るまでは、[incident-response.md](incident-response.md) の一般の手順で対応する。利用者への障害の知らせは、お知らせと状況のページで行う（文言は法務の確認の後）。
 - お金の障害（決着、台帳、送金）は、財務の担当を必ず呼ぶ。手の仕訳は、財務の承認と 2 人の確認の後に、打ち消しの仕訳だけで行う。
 - 二重の予約・上限の超過は、CS と安全の担当を呼ぶ。ゲストが泊まる所を失う前に、代わりの宿を手配する。
 
@@ -127,7 +140,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 - **見つけ方**：1 つのリスティングの同じチェックインの日への先着の印の取り合い（`SET NX` の失敗）が 1 秒 20 を超えたもの、1 つの都市の同じ日付への見積もりが 1 分 1,000 を超えたものを「熱い日付」として記録する。
 - **自動の守り**：熱い日付のリスティングの空室の写しの更新を優先し、負けの応答を写しから返す。DB の接続の使用率が 70% を超えたら、リスティングごとの同時実行の上限で絞る（既定 4）。
 - **見るもの**：予約の p99、負けの応答の p99、DB の接続の使用率と行のロックの待ち、`stay_claims` の照合（熱い日付は 1 分ごと）、決済の失敗の後の仮押さえの戻しの数。
-- **止める条件**：`stay_claims` の照合の不一致が 1 件でも出たら、`ops.booking_enabled` でそのリスティングの予約を止め、`double-booking.md` に従う。
+- **止める条件**：`stay_claims` の照合の不一致が 1 件でも出たら、`ops.booking_enabled` でそのリスティングの予約を止め、[double-booking-or-cap-violation.md](double-booking-or-cap-violation.md) に従う。手順の全体は [peak-season-operations.md](peak-season-operations.md)。
 - **ボット**：同じ端末・カード・ゲストからの仮押さえの連打は、WAF の規則と T&S の規則で絞る。
 
 ### 5.2 予定した繁忙期
@@ -165,7 +178,7 @@ flowchart LR
 
 ## 6. 安全の事故への対応
 
-安全の事故は、ゲストやホストの身の安全に関わる事象（けが、病気、暴力、隠しカメラ、不法な侵入、火事、災害、パーティーによる危険）である。システムの障害の手順（4 節）と別に、24 時間 365 日の安全の担当が対応する。手順の詳細は `safety-incident-response.md`（E16 の `safety-incidents-and-24x7-line` で作る）に書く。ここは枠組みを書く。
+安全の事故は、ゲストやホストの身の安全に関わる事象（けが、病気、暴力、隠しカメラ、不法な侵入、火事、災害、パーティーによる危険）である。システムの障害の手順（4 節）と別に、24 時間 365 日の安全の担当が対応する。手順は [safety-incident.md](safety-incident.md) に書く。ここは枠組みを書く。
 
 | 段 | 内容 | 目標 |
 | --- | --- | --- |
@@ -174,7 +187,7 @@ flowchart LR
 | 保護の措置 | 予約の停止、ゲストの退去の支援と代わりの宿の手配の記録、ホストの他の予約の停止、ホストの送金の保留、相手のアカウントの一時の制限（規則と人の判断。記録を先に書く） | 緊急は p95 30 分 |
 | 調査 | メッセージ・予約・本人確認の記録を、JIT の権限と理由の入力で見る（本文の閲覧の条件は法務の L9） | 急ぎは 24 時間 |
 | 措置と知らせ | 措置の記録、相手への知らせ、異議の経路 | — |
-| 行政・警察との連携 | 照会への提出（宿泊者名簿を含む）は `legal-request.md` の手順で、法務の確認の後 | — |
+| 行政・警察との連携 | 照会への提出（宿泊者名簿を含む）は `legal-request.md`（計画）の手順で、法務の確認の後 | — |
 | 事後 | 振り返り、規則・手順の更新、必要なら Intent の起票 | 7 日 |
 
 - 安全の担当は、システムの障害の IC と別の当番にする。大きな災害（地震、台風）は、地域の予約の一括の扱い（運用のキャンセル、全額の返金）を安全の責任者と PM が判断する（cancellations-and-changes の領域）。
@@ -198,5 +211,5 @@ flowchart LR
 | tz データベースの新しいバージョンの確認と適用 | 毎月 | Ops、Dev |
 | 依存・OpenSearch・ML の枠組みのセキュリティの更新の確認 | 毎週 | Ops、Dev |
 | DR の訓練（大阪への切り替え） | 半年ごと | Ops |
-| 安全の窓口の訓練 | 四半期ごと | 安全の責任者 |
+| 安全の窓口の S1 の訓練 | 毎月（[trust-and-safety.md](../architecture/trust-and-safety.md) の 17 節） | 安全の責任者 |
 | 費用の見直し（予約あたり・検索あたりの原価、索引と写しの大きさ、翻訳の量） | 毎月 | Ops、PM |

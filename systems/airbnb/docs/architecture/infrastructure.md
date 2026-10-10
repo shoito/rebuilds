@@ -110,7 +110,7 @@ flowchart TB
 | 宛先 | 送るサービス | 経路 | 備考 |
 | --- | --- | --- | --- |
 | 決済の提供者の API | `payments` | Network Firewall（SNI の許可の一覧）→ NAT（AZ ごとの固定の IP） | 提供者が IP の登録を求めれば固定の IP を渡す |
-| 為替の相場の提供者 | `ledger` の `fx-rate-importer` | 同上 | 1 時間ごと（[ADR-0008](../decisions/0008-multi-currency-and-fx.md)） |
+| 為替の相場の提供者 | `payments` の `fx-rate-importer`（`packages/fx` の `ingestSnapshot`。写しは core の `fx_rate_snapshots`） | 同上 | 1 時間ごと（[ADR-0043](../decisions/0043-fx-rate-snapshots-markup-and-staleness.md)） |
 | 提携銀行の API・全銀の形式のファイル | `payouts` | 同上＋mTLS。閉じた網を求められたら shared の Site-to-Site VPN | 銀行の接続の方式は**未検証**（E12 の選定） |
 | eKYC の提供者 | `identity` | 同上 | 旅券の画像の受け渡しの方式は [identity-verification.md](identity-verification.md) |
 | 翻訳の提供者 | `listings`、`messaging` | 同上 | 送る前に連絡先の形を伏せる（[security.md](security.md) の 7.4 節） |
@@ -196,12 +196,17 @@ ADR-0077。大きさと台数は [capacity.md](capacity.md) の 4 節。
 
 | 鍵 | 中身 | 書き手 | 失ったとき |
 | --- | --- | --- | --- |
-| `avail:{listing_id}` | 空室の写し：基準の日からの最大 761 泊のビット列（約 96 バイト）、準備の日、最短・最長の泊数と上書きの差分、曜日、締め切り、予約できる期間、タイムゾーン、`calendar_version`。1 件 0.5 KB 前後（初期見積もり） | `availability-cache-writer`（Lua でバージョンの大きいときだけ書く。[ADR-0003](../decisions/0003-search-for-date-range-availability.md)） | ステージ 2 を core の読み出しの写しへ迂回する |
-| `qsum:{listing_id}:{dates}:{guests}:{ver}` | 料金の要約の写し（10 分） | `search-api` | 計算し直す |
+| `avail:{listing_id}` | 空室の写し：見出し 32 バイト、768 ビットの泊のビット列（96 バイト）、チェックインの日ごとの上書き。平均 250 バイト（[ADR-0025](../decisions/0025-availability-snapshot-layout.md)） | `availability-cache-writer`（Lua でバージョンの大きいときだけ書く） | ステージ 2 を core の読み出しの写しへ迂回する |
+| `prc:{listing_id}` | 料金の写し：泊ごとに解決した料金と料金の要約の材料。約 3.1 KB（ADR-0025） | `availability-cache-writer` | 同上 |
+| `qs:{listing_id}:{ci}:{co}:{guests}:{pricing_version}`、`ss:{search_id}` | 料金の要約の写し、検索の結果の列（10 分） | `search-api` | 計算し直す |
 | `quote:{quote_id}` | 見積もりの写し（15 分。正本は core の `quotes`） | `pricing` | core から読む |
 | `sess:{token_hash}` | セッションの写し（15 分） | `identity` | core の読み出しの写し |
-| `claim:{listing_id}:{check_in}` | 熱い日付の先着の印（15 秒） | `booking` | リスティングごとの同時実行の上限 4 で DB へ（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
-| `rl:*` | 速さの上限（API、PMS、コードの送信） | 各入口 | タスクごとの上限 |
+| `claim:{listing_id}:{check_in}`、`idem:{guest_id}:{key}` | 熱い日付の先着の印（15 秒）、同じ冪等キーの合流（60 秒） | `booking` | リスティングごとの同時実行の上限 4 で DB へ（[ADR-0036](../decisions/0036-hot-date-admission-and-hold-limits.md)） |
+| `vel:{kind}:{key}` | T&S の速さの数 | `trust-safety`、`booking` | 数え直す（速さの信号が一時に弱まる） |
+| `pmstok:{hash}` | PMS のトークンの写し（60 秒） | `partner-api` | core の読み出しの写し |
+| `rl:*` | 速さの上限（API、PMS の `rl:pms:*`、コードの送信） | 各入口 | タスクごとの上限 |
+
+- 鍵の一覧の正本は [data-model.md](data-model.md) の 5 節。
 
 - クラスタモード、S1 は 2 シャード × 主 1・写し 1、転送中と保存の暗号化。正本にしない（失ってよい）。
 - 空室の写しはハッシュの鍵の `{listing_id}` でシャードに散る。ステージ 2 の 300 件の読み出しは、シャードごとにまとめたパイプラインで 1 往復にする（[capacity.md](capacity.md) の 2 節）。

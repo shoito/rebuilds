@@ -5,6 +5,8 @@ date: 2026-10-10
 
 # ADR-0048: release は措置の保留がなければ `host_payable`、あれば `host_payable_hold` に振り替える。決まった待ち（口座の変更の後 72 時間は ledger の `payout_holds` の `wait`、連絡先の変更などは core の `payout_waits`）は仕訳を動かさず、送金の束から外すだけ。送金は銀行の営業日の 09:30（日本時間）に、それまでの `host_payable` を束にして提携銀行の API で依頼し、使えなければ全銀の形式のファイルにする。最低の額はない。`host_receivable` は release の時に先に相殺する
 
+> 2026-10-10 の注記：統合の工程で、新しいホストの待ちを ADR-0059 の規則（最初の 3 件、チェックアウトの後 24 時間まで）に揃え、理由を `new_host_first_stays` の 1 つにした（最初の予約の release から 72 時間の `new_host_first_payout` はやめた）。持ち主は `payouts`、置き場所は ledger の `payout_holds`（`kind = 'wait'`）。
+
 ## Context
 
 - `payout_release_at` = `check_in_at` + 24 時間に release し、次の銀行の締めで送る。保留のホストは `host_payable_hold`（[ADR-0005](0005-payments-hold-capture-and-ledger.md)）。release から提携銀行への依頼まで、次の銀行の締め（営業日）以内（NFR-008）。
@@ -23,7 +25,7 @@ date: 2026-10-10
 1 を採用する。詳細は [ledger-and-payouts.md](../architecture/ledger-and-payouts.md) の 6・7 節。
 
 - release：措置の保留（`payout_holds.kind = 'hold'`：`fraud_suspected`・`kyc_incomplete`・`kyc_mismatch`・`bank_returned`・`ops_case`）があれば `host_payable_hold`。なければ `host_payable` に入れ、`host_receivable` を型 23 で相殺する。
-- 決まった待ち（ledger の `payout_holds.kind = 'wait'`：`payout_account_changed`・`new_host_first_payout` の 72 時間。core の `payout_waits`：ADR-0072 の他の理由）は仕訳を動かさない。`payout-batcher` が束の前に両方を読み、待ちのホストを外す。
+- 決まった待ち（ledger の `payout_holds.kind = 'wait'`：`payout_account_changed` の 72 時間と、`new_host_first_stays`（最初の 3 件の予約の各 `check_out_at` + 24 時間まで。[ADR-0059](0059-fake-listing-signals-and-new-host-holds.md)）。core の `payout_waits`：ADR-0072 の他の理由）は仕訳を動かさない。`payout-batcher` が束の前に両方を読み、待ちのホストを外す。
 - 束：銀行の営業日（`bank_calendar`）の 09:00 に作り、09:30 に提携銀行の API で依頼（冪等キー `payout_id`）。API が 30 分使えなければ全銀の形式のファイル。最低の額なし。振込の手数料は本システム（`bank_fee_expense`）。
 - 送金の状態は `pending` → `submitted` → `paid`・`failed`・`returned`。組戻しは型 16 で `bank_returned` の保留。
 

@@ -3,7 +3,9 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0034: 預かりと納付の型は `legal.lodging_tax_collector`（`host`・`platform`）で持ち、本番の値は法務の L4 の後。`host` では税を総額に含めて受け、release でホストへの支払いに含め、管轄・月ごとの明細をホストに出す。`platform` では `tax_payable:<jurisdiction>:<tax>` に振り替える。チェックインの前のキャンセルでは、ポリシーに依らず税の全額を返す
+# ADR-0034: 預かりと納付の型は `legal.lodging_tax_collector`（`host`・`platform`）で持ち、本番の値は法務の L4 の後。`host` では税を総額に含めて受け、release でホストへの支払いに含め、管轄・月ごとの明細をホストに出す。`platform` では `tax_payable:<jurisdiction>:<tax>` に振り替える。キャンセルの税の返し方は ADR-0039 の DT-CXL-001 に従う
+
+> 2026-10-10 の注記：統合の工程で、キャンセルの税の返し方の規則を [ADR-0039](0039-cancellation-policy-table-and-refund-decision-table.md) に移した（2 つの ADR に同じ規則が別の書き方であったため）。規則の中身は変えていない。
 
 詳細は [taxes.md](../architecture/taxes.md) の 8 節。
 
@@ -27,7 +29,7 @@ date: 2026-10-10
 - `legal.lodging_tax_collector` と `legal.lodging_tax_collector.<jurisdiction>`。既定 `host`。本番の値は法務の L4 の後。
 - `host`：税は総額に含めて受け、release で `host_payable` に含める。ホストに月ごと・管轄ごと・税の種類ごとの泊数・人数・標準・税の額を出す。
 - `platform`：release で税の額を `tax_payable:<jurisdiction>:<tax>` に振り替え、納付の資料を作る。
-- チェックインの前のキャンセルは、税の行をポリシーに依らず全額返す。滞在中のキャンセルは、泊まらない夜の税を返す。この既定を cancellations-and-changes の領域の決定表に渡す。
+- キャンセルの税の返し方（使わなかった泊の分を返す。チェックインの前は全額）は [ADR-0039](0039-cancellation-policy-table-and-refund-decision-table.md) と DT-CXL-001 が正本で、この ADR は返した税・残した税を `host`・`platform` のどちらの型で扱うかだけを持つ（法務の確認待ち：L4）。
 
 ### 他の案を選ばなかった理由
 

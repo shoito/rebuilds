@@ -53,8 +53,10 @@
 
 - 住宅宿泊事業は届出で行い、年間の提供日数は 180 日以内。条例で実施の期間を制限できる。宿泊者名簿の作成・保存の義務がある（観光庁の [住宅宿泊事業法の概要](https://www.mlit.go.jp/kankocho/minpaku/overview/minpaku/index.html)）。
 - 宿泊者名簿は本人確認のうえ作り、作成日から 3 年保存する。氏名・住所・職業・宿泊日、日本に住所のない外国人は国籍と旅券の番号。2・4・6・8・10・12 月の 15 日までに、前 2 か月の宿泊日数・宿泊者数・延べ宿泊者数・国籍別の内訳を報告する（観光庁の [住宅宿泊事業者の義務](https://www.mlit.go.jp/kankocho/minpaku/business/host/index.html)）。
-- 毎年 4 月 1 日の正午から翌年 4 月 1 日の正午までの期間で、正午から翌日の正午までを 1 日と数える（埼玉県の [住宅宿泊事業法の概要](https://www.pref.saitama.lg.jp/a0806/minpaku/jutaku-shukuhaku01.html)。施行規則の条文は e-Gov で取得できなかった）。
+- 毎年 4 月 1 日の正午から翌年 4 月 1 日の正午までの期間で、正午から翌日の正午までを 1 日と数える（埼玉県の [住宅宿泊事業法の概要](https://www.pref.saitama.lg.jp/a0806/minpaku/jutaku-shukuhaku01.html)。施行規則第 3 条の条文は 2026-10-10 にも取得できず**未検証**。観光庁の概要のページには数え方の記載がない）。
 - 住宅宿泊仲介業は観光庁長官の登録を受けて営む（観光庁の [住宅宿泊仲介業者の登録](https://www.mlit.go.jp/kankocho/minpaku/business/mediation/registration.html)）。
+- 仲介業者は、掲載の前に事業者の名称、届出住宅の所在地、届出番号を確かめ、確かめられない物件を掲載しない。掲載物件に届出番号等を表示する。掲載している届出物件を 6 か月ごとに観光庁へ報告する。違法な物件・自治体の受理の情報と食い違う物件は、観光庁の求めに応じて速やかに削除する（観光庁の [違法物件の掲載の防止について](https://www.mlit.go.jp/kankocho/minpaku/business/mediation/prevention.html)）。
+- 日本に住所のない外国人の旅券の写しを名簿と一緒に保管することは、厚生労働省・国土交通省の指導として自治体が案内している（[intent.md](../intent.md) の出典。ICT の本人確認の要件の本文は**未検証**）。旅館業の宿泊者名簿は令和 5 年の改正で職業を削り連絡先を足した（同。住宅宿泊事業の名簿は職業を含む）。
 - 本家は日本のリスティングに届出番号・許可番号の表示を求め、確かめの書類を上げさせる（[ヘルプの記事 2177](https://www.airbnb.com/help/article/2177)、[ヘルプの記事 2274](https://www.airbnb.com/help/article/2274)）。
 - 届出番号の形：佐賀県の住宅宿泊事業者の一覧に「M410000109」のような「M + 9 桁」の番号が並ぶ（[佐賀県の一覧の PDF](https://www.pref.saga.lg.jp/kiji00362234/3_62234_398949_up_tbonvujr.pdf)）。品川区・岐阜県の標識の様式は「第 M 号」の欄を持つ（[品川区](https://www.city.shinagawa.tokyo.jp/contentshozon/hyousikiteisei.pdf)、[岐阜県](https://www.pref.gifu.lg.jp/uploaded/attachment/506671.pdf)）。どれも 2026-10-10 に Web の検索の結果の要約で確かめ、PDF の本文は開いていない。桁の数と、M の後の 2 桁が都道府県のコードであることを定めた国の資料は確かめられなかった（**未検証**）。
 - 本家の 180 日の数え方、自治体の規則の扱い、名簿の持ち方は公開されていない（**未検証**）。
@@ -306,7 +308,7 @@ sequenceDiagram
 | 項目 | 決定 |
 | --- | --- |
 | 置き場 | Aurora vault の `guest_registry_entries`。主体の鍵は（届出住宅、年度）ごとで、KMS の `kms-vault-registry` で包む（[ADR-0073](../decisions/0073-key-layout-and-vault-envelope-encryption.md)）。旅券の画像は S3 の `registry/<property_id>/<fiscal_year>/<entry_id>`（同じ主体の鍵で封筒の暗号化。Object Lock なし） |
-| 読める主体 | ホストのアカウントの `owner`・`full`、`registry` の権限を与えた共同ホスト（`messages_only`・`calendar` には出さない）。運用者は法令の照会の手順（照会の書類の記録、JIT の権限、2 人の承認）だけ |
+| 読める主体 | ホストのアカウントの `owner`・`full`、`registry` の権限を与えた共同ホスト（`registry` の権限のない `calendar_and_reservations` と `messages_only` には出さない）。運用者は法令の照会の手順（照会の書類の記録、JIT の権限、2 人の承認）だけ |
 | 監査 | 読み出しごとに、主体、名簿の行の ID、目的のコードを監査ログに書く（内容は書かない） |
 | ログ | 氏名・住所・旅券の番号・画像の参照を書かない（[AGENTS.md](../../AGENTS.md)） |
 | 保存の期間 | `legal.guest_registry_retention_days`。開発・検証の既定 1,095 日（作成から 3 年。観光庁の資料の値で、[ADR-0075](../decisions/0075-data-classes-and-retention.md) の下限）。本番の値は L3・L8 の後 |
@@ -326,7 +328,7 @@ sequenceDiagram
 | 違法な物件・番号の不正な物件の削除の要請 | 運用が要請の書類を記録し、届出住宅を `suspended`、リスティングを非公開にする。既存の予約は 4.4 節。期限と報告は L1 |
 | 物件の情報の照会 | 法務と Ops が照会の書類を確かめ、届出住宅・予約の泊の数を出す。名簿は 8.3 節の手順 |
 | 警察からの名簿の照会 | 同上（L3） |
-| 定期の報告の求め（仲介業者として） | L1。報告の項目に合わせて書き出しを足す |
+| 掲載している届出物件の報告（仲介業者として、6 か月ごと。3 節） | 届出住宅の一覧（届出番号、所在地の自治体、掲載の状態）の書き出しを作る。報告の形と本システムへの当てはめは L1 |
 
 - 要請への応答は法務と Ops が行う（[roadmap.md](../roadmap.md) の「エージェントに任せないこと」）。
 

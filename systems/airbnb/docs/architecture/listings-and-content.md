@@ -134,11 +134,12 @@ stateDiagram-v2
 
 | 数 | 上がる時 | 使い道 |
 | --- | --- | --- |
-| `listing_version` | 改訂の入れ替え、チェックインの時刻、即時予約、キャンセルポリシー、料金の規則のバージョンの変更 | 見積もりの確かめ（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)。違えば 409 `quote_expired`） |
+| `listing_version` | 改訂の入れ替え、チェックインの時刻、即時予約、キャンセルポリシー | 見積もりの確かめ（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)。違えば 409 `quote_expired`） |
+| `pricing_version` | 料金の規則・季節の規則・日付の上書きの変化 | 料金の写しと見積もりの記録。見積もりを無効にしない（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)、[pricing-and-fees.md](pricing-and-fees.md) の 4.1 節） |
 | `calendar_version` | `stay_claims`・カレンダーの設定の変化 | 空室の写し（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)） |
-| `search_version` | 上の 2 つのどちらかが上がる時と、状態・順位の材料の変化 | 検索の文書の外部のバージョン（[search-and-ranking.md](search-and-ranking.md) の 4.2 節） |
+| `search_version` | 上のどれかが上がる時と、状態・順位の材料の変化 | 検索の文書の外部のバージョン（[search-and-ranking.md](search-and-ranking.md) の 4.2 節） |
 
-- 3 つとも core の `listings` の列で、変化と同じトランザクションで上げる。
+- 4 つとも core の `listings` の列（`pricing_version` は `pricing_rules` の列）で、変化と同じトランザクションで上げる。
 
 ## 5. 多言語の内容と機械翻訳（ADR-0012）
 
@@ -276,6 +277,7 @@ sequenceDiagram
 | 1 | 閲覧者がホストのアカウントの成員 | `owner_view`（全部の状態で見える。編集中の改訂を含む） |
 | 2 | 閲覧者が権限のある運用者 | `ops_view` |
 | 3 | 状態が `draft`・`in_review` | `hidden` |
+| 3a | 見張りのリスティング（`listings.sentinel`）で、閲覧者が見張りの利用者（`sentinel_accounts`）でない | `hidden`（2026-10-10 の統合で足した。[observability.md](observability.md) の 4 節） |
 | 4 | 閲覧者とホストの間にブロックがある | `hidden` |
 | 5 | 状態が `suspended`・`archived`、閲覧者がそのリスティングの予約のゲスト | `reservation_view`（予約の時の改訂。予約の操作なし） |
 | 6 | 状態が `suspended`・`archived` | `hidden` |
@@ -285,6 +287,7 @@ sequenceDiagram
 | 10 | 状態が `snoozed` | `visible_readonly`（検索・おすすめに出さない。直リンクだけ） |
 | 11 | 状態が `listed` | `visible` |
 
+- 見張りのリスティングは索引に入れるが、検索の結果を返す前に、見張りの利用者の外の閲覧者には行 3a で落とす。
 - 検索の索引には、行 3〜9 で `hidden` になるリスティングを入れない（`listing.state_changed`・措置・届出の変化の事象で消す）。行 4（ブロック）は閲覧者ごとなので、検索の結果を返す前に閲覧者のブロックの一覧で落とす（[search-and-ranking.md](search-and-ranking.md) の 5.4 節）。
 - 行 8 は、届出の失効から検索の結果に出なくなるまで p99 60 秒（NFR-006）。
 

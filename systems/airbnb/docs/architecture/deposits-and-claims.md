@@ -116,7 +116,7 @@ stateDiagram-v2
 | `next_charge_at` | 失敗から 1・3・7 日 | 行 14・15 |
 
 - 期限は `deadline-runner` が 1 分ごとに拾う（[booking-and-holds.md](booking-and-holds.md) の 7.4 節と同じ形。表は `damage_claims`）。
-- 運用の判断の目安は 7 日（`ops_review` の SLA。runbooks に足す提案）。
+- 運用の判断の目安は 7 日（`ops_review` の SLA。[runbooks/](../runbooks/README.md) の 2・4 節）。
 
 ## 6. 証拠
 

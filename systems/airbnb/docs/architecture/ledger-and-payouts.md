@@ -8,7 +8,7 @@
 - 1 つの仕訳は 1 つの通貨に閉じる。決着の時に見積もりの相場で請求の通貨からリスティングの通貨に換え、差は `fx_clearing` に残す（[ADR-0008](../decisions/0008-multi-currency-and-fx.md)）
 - `payout_release_at` = `check_in_at` + 24 時間。release の後、次の銀行の締めで送る（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)、[booking-and-holds.md](booking-and-holds.md) の DT-BKG-001 の行 28）
 - キャンセル・変更の額は `packages/cancellation` が決め、`ledger` は計算し直さない（[cancellations-and-changes.md](cancellations-and-changes.md) の 8 節）
-- 台帳の形は Stripe の題材（[ADR-0003](../../../stripe/docs/decisions/0003-double-entry-ledger.md)、[ADR-0015](../../../stripe/docs/decisions/0015-chart-of-accounts-and-balance-transactions.md)、[ADR-0017](../../../stripe/docs/decisions/0017-three-way-reconciliation-with-suspense.md)、[ADR-0018](../../../stripe/docs/decisions/0018-payout-execution-via-banking-partner.md)）と Mercari の題材の [ledger-and-proceeds.md](../../../mercari/docs/architecture/ledger-and-proceeds.md)・[payouts-and-points.md](../../../mercari/docs/architecture/payouts-and-points.md) の考え方を参照し、宿泊の預かりに合わせて自前で書く
+- 台帳の形は Stripe の題材（[payouts-and-reconciliation.md](../../../stripe/docs/architecture/payouts-and-reconciliation.md)、[ADR-0003](../../../stripe/docs/decisions/0003-double-entry-ledger.md)、[ADR-0015](../../../stripe/docs/decisions/0015-chart-of-accounts-and-balance-transactions.md)、[ADR-0017](../../../stripe/docs/decisions/0017-three-way-reconciliation-with-suspense.md)、[ADR-0018](../../../stripe/docs/decisions/0018-payout-execution-via-banking-partner.md)）と Mercari の題材の [ledger-and-proceeds.md](../../../mercari/docs/architecture/ledger-and-proceeds.md)・[payouts-and-points.md](../../../mercari/docs/architecture/payouts-and-points.md) の考え方を参照し、宿泊の預かりに合わせて自前で書く
 
 この文書で決めたことは次の ADR にある。
 
@@ -51,7 +51,7 @@
 
 ## 3. 本家の形（確かめたこと）
 
-- 本家は、送金をチェックインの予定の時刻から約 24 時間の後に出すとされる。英語の本文では確かめられなかった（**未検証**。[ヘルプの記事 425](https://www.airbnb.com/help/article/425)、2026-10-10 に確認。[intent.md](../intent.md) の出典）。不正の審査では、チェックインから最長 45 日遅れることがある（同）。
+- 本家は、送金をゲストのチェックインの約 24 時間の後に出す（[ヘルプの記事 3133](https://www.airbnb.com/help/article/3133)、2026-10-10 の統合の工程で確かめた。地域のヘルプは「チェックインの予定の時刻から 24 時間」と書く）。審査では、チェックインから最長 45 日遅れることがある（[ヘルプの記事 425](https://www.airbnb.com/help/article/425)。[intent.md](../intent.md) の出典）。
 - 本家の勘定科目、送金の束の作り方、口座の変更の後の待ち、ホストへの罰の差し引き方は、公式の資料で確かめられなかった（**未検証**）。本システムの値を使う。
 - 日本の銀行の休業日（土日、祝日、12 月 31 日〜1 月 3 日）は一般の知識として使い、出典の条文で確かめていない（**未検証**。銀行の営業日の表 `bank_calendar` は提携銀行の値で入れる）。
 
@@ -292,7 +292,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 | 種類 | 理由 | 始める所 | 解く所 | 仕訳 |
 | --- | --- | --- | --- | --- |
 | `wait`（決まった待ち） | `payout_account_changed` | `payouts`（口座の変更。[ADR-0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md)） | 自動（72 時間） | 動かさない。束から外すだけ |
-| `wait` | `new_host_first_payout` | 最初の予約の release | 自動（release から 72 時間） | 同上 |
+| `wait` | `new_host_first_stays` | `payouts`：ホストのアカウントの最初の 3 件の予約の release の時（`ledger.released` を数える） | 自動（その予約の `check_out_at` + 24 時間。3 件の中で最も遅い終わり） | 同上 |
 | `hold`（措置の保留） | `fraud_suspected` | trust-and-safety の措置（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)） | T&S の審査（本家は最長 45 日。**未検証**） | 型 17・18 |
 | `hold` | `kyc_incomplete`・`kyc_mismatch` | identity-verification | 確認の完了 | 型 17・18 |
 | `hold` | `bank_returned` | 組戻し（型 16） | ホストが口座を直す | 型 16・18 |
@@ -300,6 +300,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 
 - `hold` の間の release は `host_payable_hold` へ、`hold` を始めた時の `host_payable` の残高は型 17 で移す。すべての `hold` が解けたら型 18 で戻す。
 - `wait`（と core の `payout_waits`）の間は仕訳を動かさず、release は `host_payable` に溜まり、待ちの後の束で送る。待ちは措置の記録・異議の経路の対象ではないので、口座を分けない（ADR-0072 の理由）。7.1 節と同じ規則である。
+- **新しいホストの最初の 3 件**（規則の正本はこの節。[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)、[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)）：ホストのアカウントの最初の 3 件の予約（release の順）は、release を時刻どおり（`check_in_at` + 24 時間）に `host_payable` へ行い、`payouts` が同じ事象で `payout_holds` に `kind = 'wait'`・理由 `new_host_first_stays`・終わり = その予約の `check_out_at` + 24 時間の行を書く（既にあれば遅いほうへ延ばす）。待ちの間はそのホストのアカウントの送金を束から外す（送金は口座ごとの 1 つの残高なので、他の予約の分も待つ）。待ちの間に「存在しない・内容が違う」の通報が来たら、T&S が措置の保留（`kind = 'hold'`、`fraud_suspected`）をかける。持ち主は `payouts` だけで、T&S は待ちを書かない。
 - `hold` の判断と解除は Ops・財務・T&S の手順（[roadmap.md](../roadmap.md) の「エージェントに任せないこと」）。自動で解くのは `wait` の時間だけ。
 
 ### 7.4 ホストからの未収
@@ -352,7 +353,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 | ledger の Aurora の交代 | 書き込みが戻る | 事象の再配送で同じ仕訳を書く（冪等） |
 | 提携銀行の API の停止 | 送金が遅れる | 30 分で全銀の形式のファイルへ。NFR-008 の「次の締め」を守る |
 | 組戻し | 送金が戻る | 型 16、保留 `bank_returned`、ホストに知らせる |
-| 照合の外れ | 正しさの疑い | R5・R6 は送金を止める（`ops.payouts_enabled = false`）。runbooks の `ledger-invariant-break.md` |
+| 照合の外れ | 正しさの疑い | R5・R6 は送金を止める（`ops.payouts_enabled = false`）。[payout-failure.md](../runbooks/payout-failure.md) と [incident-response.md](../runbooks/incident-response.md)（`ledger-invariant-breach.md` は計画。[runbooks/](../runbooks/README.md) の 4 節） |
 
 ## 12. 上限
 
@@ -361,7 +362,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 | 送金の束 | 銀行の営業日 1 回（09:00 に作り 09:30 に依頼）、1 回 1 万件 |
 | 最低の送金の額 | なし |
 | 口座の変更の後の待ち（ledger の `payout_holds`）・連絡先の変更などの後の待ち（core の `payout_waits`） | 72 時間（[ADR-0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md)） |
-| 新しいホストの最初の送金の待ち | 72 時間 |
+| 新しいホストの最初の 3 件の待ち | 各予約の `check_out_at` + 24 時間まで |
 | `suspense` の解消 | 3 営業日 |
 | `host_receivable` の運用への回付 | 90 日 |
 | 1 予約の `settlement_seq` | 20（変更の上限 10 回と、release の後の動き） |
@@ -420,7 +421,7 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 - **勘定科目**：22 の口座の種類、31 の仕訳の型（ADR-0046）。
 - **`settlement_seq`**：開いている決着の番号。番号ごとに決着は 1 つ（ADR-0047）。
 - **キャンセルの後のホストの取り分**：チェックインを待たずに次の送金で送る（ADR-0047）。
-- **送金**：銀行の営業日 09:30、最低の額なし。口座の変更の後と新しいホストの最初は 72 時間の待ちで、仕訳を動かさない（ADR-0048、ADR-0072）。
+- **送金**：銀行の営業日 09:30、最低の額なし。口座の変更の後は 72 時間、新しいホストの最初の 3 件は各予約のチェックアウトの後 24 時間までの待ちで、仕訳を動かさない（ADR-0048、ADR-0059、ADR-0072。新しいホストの規則は 2026-10-10 の統合で 1 つにした）。
 - **照合**：3 段、`suspense` は 3 営業日（ADR-0049）。
 - **税**：既定はホストが納め、明細に分けて書く（ADR-0049、ADR-0034）。
 
@@ -437,4 +438,4 @@ ledger の `payout_holds` は 2 種類を持つ。連絡先の変更・回復・
 
 ## 出典
 
-- Airbnb, [ヘルプの記事 425（送金の時期）](https://www.airbnb.com/help/article/425)：[intent.md](../intent.md) の出典のとおり（2026-10-10 に確認。本文の時期は**未検証**）
+- Airbnb, [ヘルプの記事 3133](https://www.airbnb.com/help/article/3133)、[ヘルプの記事 425（送金の時期）](https://www.airbnb.com/help/article/425)：[intent.md](../intent.md) の出典のとおり（2026-10-10 に確認）

@@ -60,10 +60,10 @@
 | 項目 | 決定 |
 | --- | --- |
 | 数 | 1 リスティング 5 件まで |
-| 形 | `https`・`http`・`webcal`（`webcal` はまず `https`、だめなら `http`）。2,048 文字まで。`.ics` で終わらなくてもよい（本家と違う。相手が終わりに拡張子を付けないことがある） |
+| 形 | `https`・`http`・`webcal`（`webcal` はまず `https`、だめなら `http`）。2,048 文字まで。`.ics` で終わらなくてもよい（本家は `.ics` で終わることを求める。相手が終わりに拡張子を付けないことがある。[README.md](README.md) の 1.4 節） |
 | 保存 | アドレスは相手の秘密の値を含むので、封筒の暗号化で持ち（security の領域）、画面では先頭と末尾だけを出す。ログには `feed_id` と、相手の名前解決の先のホスト名のハッシュだけを書く |
 | 扱い（`treat_as`） | `blocked`（既定。準備の日なし）か `external_reservation`（リスティングの準備の日を `block_span` に足す。届出住宅の外部の泊の入力になる。7 節） |
-| 主体 | ホストのアカウントの `owner`・`full`・`calendar` の役割（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
+| 主体 | ホストのアカウントの `owner`・`full`・`calendar_and_reservations` の役割（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
 | 最初の取得 | 登録の直後に 1 回取る。読めなければ登録を `failing` で残し、画面に理由を出す |
 
 ### 4.2 状態
@@ -244,7 +244,7 @@ core の 1 つのトランザクションで次を行う（[ADR-0021](../decisio
 
 - 行 2 の知らせは、`calendar_conflicts` の挿入と同じトランザクションの outbox から notifier が送る。取り込みの書き込みの時刻から知らせの依頼まで p99 5 分を SLI にする（NFR-003）。
 - ゲストの予約を本システムが自動で取り消さない。どちらの予約が先かを本システムは知れず、外部の予約が誤り（古い予定）であることもある。ホストが外部で取り消すか、本システムの予約をホストのキャンセル（[cancellations-and-changes.md](cancellations-and-changes.md) の 6 節）で取り消す。
-- 運用の待ち行列の行 2 は、チェックインまでの時間で並べる。チェックインの 72 時間前を切っても開いていれば、CS がホストに電話で確かめる（runbooks の `calendar-double-booking.md` を足す提案）。
+- 運用の待ち行列の行 2 は、チェックインまでの時間で並べる。チェックインの 72 時間前を切っても開いていれば、CS がホストに電話で確かめる（[double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md) の外部との食い違いの節）。
 
 ### 6.6 食い違いの状態
 
@@ -287,7 +287,7 @@ stateDiagram-v2
 | --- | --- |
 | URL | `https://cal.<brand>.<domain>/l/<token>.ics`。`token` は 160 ビットの乱数を base32 にしたもの。DB にはハッシュ（SHA-256）だけを持つ |
 | 数 | リスティングに 1 つ。作り直すと古いアドレスは 404 |
-| 出す人 | ホストのアカウントの `owner`・`full`・`calendar` の役割 |
+| 出す人 | ホストのアカウントの `owner`・`full`・`calendar_and_reservations` の役割 |
 | 認証 | 付けない（他の掲載先の取り込みは認証に対応しないことが多い）。画面で「このアドレスを知る人はだれでも日付を見られます」を示す |
 | 速さの上限 | 1 つのアドレスに 1 時間 120 回。超えたら 429 |
 | ヘッダー | `Content-Type: text/calendar; charset=utf-8`、`ETag`（`calendar_version`）、`Cache-Control: private, max-age=60`、`X-Robots-Tag: noindex`。`If-None-Match` で 304 |

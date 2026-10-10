@@ -115,7 +115,7 @@ flowchart LR
 
 - ホストの本人確認を公開の前に必須にする（[identity-verification.md](identity-verification.md)）。日本の物件は届出番号・許可番号と確かめの書類（[ADR-0006](../decisions/0006-regulatory-night-cap-enforcement.md)）。
 - 写真の知覚ハッシュの一致（他のリスティング、確かめた偽のリスティングの集まり）、住所の検索の提供者での住所の確かめ、禁止の語、外の連絡先の検出を公開の審査で行う（[listings-and-content.md](listings-and-content.md)、[trust-and-safety.md](trust-and-safety.md)）。
-- 代金はチェックインの予定の時刻 + 24 時間まで預かる。偽のリスティングの被害は、チェックインの前に見つければ全額の返金で戻せる（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。新しいホストの初回の送金は保留の対象（同）。
+- 代金はチェックインの予定の時刻 + 24 時間まで預かる。偽のリスティングの被害は、チェックインの前に見つければ全額の返金で戻せる（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。新しいホストの最初の 3 件は、各予約のチェックアウトの後 24 時間まで送金を待たせる（[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)、[ledger-and-payouts.md](ledger-and-payouts.md) の 7.3 節）。
 
 ### 3.3 T3：位置のスクレイピングと割り出し
 
@@ -132,7 +132,7 @@ flowchart LR
 ### 3.4 T4：正確な住所の漏れ
 
 - 正確な住所と位置は vault の `exact_locations` にだけ置く。core・OpenSearch・Valkey・データレイク・通知の本文に置かない。
-- 読み出しは `listings` の `openExactLocation(viewer, listing, purpose)` の 1 つの関数で、`exactLocationVisible()`（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)）で判定し、同じトランザクションで `vault_access_log` を書く。目的のコードは `checkin_instructions`・`host_view`・`ops_reveal`・`legal_request`。
+- 読み出しは `listings` の `readExactLocation(viewer, listing_id, purpose)` の 1 つの関数（[location-and-geo.md](location-and-geo.md) の 4.5 節、[ADR-0016](../decisions/0016-geocoding-adapter-and-confirmed-pin.md)）で、`exactLocationVisible()`（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)）で判定し、同じトランザクションで `vault_access_log` を書く。目的のコードは `checkin_instructions`・`host_view`・`ops_reveal`・`legal_request`。
 - チェックインの案内は、予約が `cancelled` になった時点で見えなくなる。アプリの端末の中の写しも、次の同期で消す（[booking-and-holds.md](booking-and-holds.md)）。
 - 漏れの経路の表（[quality.md](../quality.md) の 2.2.1 節 H）を全経路で回す。iCal の書き出しと PMS の Webhook の本文は住所を含まない（[host-tools-and-api.md](host-tools-and-api.md) の 7.1 節）。
 
@@ -355,7 +355,7 @@ sequenceDiagram
 ## 10. インシデントへの対応
 
 - 種類：住所・名簿・旅券の漏れ（SEV1 の候補）、乗っ取りの波、PMS のアプリの悪用、鍵の漏えいの疑い、内部の者の不正、SSRF の兆し（信用しない宛先への egress の拒否の急増）。
-- 漏れの疑いは `privacy-leak-response.md`（[runbooks/](../runbooks/README.md) の 4 節）で、経路を止め、範囲を監査の事象と `vault_access_log` と漏れの経路の表で調べる。漏えい等の報告と本人への通知の要否と期限は法務の判断（**法務の確認待ち：L8**）。
+- 漏れの疑いは `privacy-leak-response.md`（計画。それまでは [incident-response.md](../runbooks/incident-response.md)。[runbooks/](../runbooks/README.md) の 4 節）で、経路を止め、範囲を監査の事象と `vault_access_log` と漏れの経路の表で調べる。漏えい等の報告と本人への通知の要否と期限は法務の判断（**法務の確認待ち：L8**）。
 - PMS のアプリの悪用の疑い：`ops.partner_api_enabled.<app>` で止め、同意を取り消すかを T&S とセキュリティの担当が決める。取り消したアプリの `api_block` の行は残し、ホストに知らせる。
 - 鍵の漏えいの疑い：持ち主のサービスの役割の資格を失効させ、タスクを入れ替える。用途の鍵の新しいバージョンで主体の鍵を包み直す。
 
@@ -365,7 +365,7 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | vault：`subject_keys` | `purpose`（`location`・`registry`・`kyc`・`bank`・`business_address`）、`subject_type`、`subject_id`、`key_version`、`wrapped_key`、`kms_key_arn`、`created_at`、`destroyed_at`。持ち主のサービスの役割ごとの許可 | `(purpose, subject_type, subject_id, key_version)` | 5.3 |
 | core：`subject_keys` | 同上（`purpose = contact`。`identity`・`notifier`） | 同上 | 5.3 |
-| vault：`exact_locations`（[location-and-geo.md](location-and-geo.md) が持つ）、`guest_registry_entries`（[regulatory-compliance-japan.md](regulatory-compliance-japan.md) が持つ）、`payout_accounts`（[ledger-and-payouts.md](ledger-and-payouts.md) が持つ）、`kyc_results`（[identity-verification.md](identity-verification.md) が持つ） | 暗号の列 `ciphertext`、`nonce`、`key_version`、`aad_version` は 5.3 節の形 | — | 5.3 |
+| vault：`exact_locations`（[location-and-geo.md](location-and-geo.md) が持つ）、`guest_registry_entries`（[regulatory-compliance-japan.md](regulatory-compliance-japan.md) が持つ）、`payout_accounts`（[ledger-and-payouts.md](ledger-and-payouts.md) が持つ）、`identity_verifications`（[identity-verification.md](identity-verification.md) が持つ） | 暗号の列 `ciphertext`、`nonce`、`key_version`、`aad_version` は 5.3 節の形 | — | 5.3 |
 | vault：`vault_access_log` | 読み出しの主体（利用者・運用者・サービス）、用途、目的のコード、対象、案件、時刻。月の区切り | `(target_type, target_id, created_at)` | 3.4、6.4 |
 | S3：`registry` | 旅券の画像（主体の鍵で包んだ本文、`kms-vault-storage` の SSE-KMS）。Object Lock なし | `<property_id>/<fiscal_year>/<entry_id>/<n>` | 5.3 |
 | 各クラスタ：`audit_events` | `id`、`stream`、`actor`、`action`、`target`、`case_id`、`reason_code`、`reason_ct`、`grant_id`、`created_at` | `(stream, id)` | 6.4 |

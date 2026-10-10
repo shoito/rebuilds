@@ -3,7 +3,9 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0002: 空室の正本を、予約・仮押さえ・リクエスト・ブロック・取り込みをまとめた `stay_claims` の泊の範囲の行にし、`(listing_id, block_span)` の排他の制約で重なりを DB で 0 にする。準備の日は各予約の後ろの範囲に含める。泊ごとの行はカレンダーの設定にだけ使う。日付は物件の現地の日付で持つ
+# ADR-0002: 空室の正本を、予約・仮押さえ・リクエスト・ブロック・取り込みをまとめた `stay_claims` の泊の範囲の行にし、`(listing_id =, claim_group <>, block_span &&)` の排他の制約で、異なる組の重なりを DB で 0 にする。準備の日は各予約の後ろの範囲に含める。泊ごとの行はカレンダーの設定にだけ使う。日付は物件の現地の日付で持つ
+
+> 2026-10-10 の注記：統合の工程で、見出しの排他の制約の書き方を表の形（`claim_group` を含む）に揃えた。S3 の分け方の鍵を ADR-0078 の置き場所の鍵に直した。決定の中身は変えていない。
 
 ## Context
 
@@ -84,7 +86,7 @@ CREATE TABLE stay_claims (
 | 締め切り | 「当日の HH:MM まで」か「N 日前まで」 | 物件の現地の今の時刻と比べる |
 | 予約できる期間 | 3・6・9・12・24 か月先まで | 物件の現地の今日から数える |
 | 定員 | リスティングの定員 | 人数 |
-| 泊ごとの空き | `calendar_days.closed`（ホストが閉じた日） | 閉じた日はブロックの行に直して `stay_claims` に入れる。規則の関数では見ない |
+| 泊ごとの空き | `stay_claims` の `host_block` の行（ホストが閉じた日。`calendar_days` に閉じる列を持たない） | 排他の制約が決める。規則の関数では見ない |
 
 - **泊ごとの行（`calendar_days`）は設定にだけ使う。** 料金の上書き、最短の泊数の上書き、メモ。空室の正本にしない。ホストが日を「閉じる」操作は、`calendar_days` ではなく `stay_claims` の `host_block` の行を作る。
 - 規則の判定の結果は、理由のコード（`min_nights`、`checkin_day`、`cutoff`、`booking_window`、`capacity`）で返す。
@@ -114,7 +116,7 @@ CREATE TABLE stay_claims (
   - 排他の制約の GiST の索引は、B-tree の一意の索引より書き込みが重い。S1 の量（1 秒 10 件の予約）では問題にならない見込みだが、熱い日付の負荷は `hot-dates-booking-poc` で確かめる。
   - 1 リスティングに複数の同じ部屋（ホテルの部屋の種類）を持つと、この制約は使えない（部屋ごとの行にするか、数の在庫にする）。S2 で availability-and-calendars の領域で決める。
   - 検索は「空いている区間」を必要とするので、`stay_claims` から空きの区間を計算し直す処理が要る（[ADR-0003](0003-search-for-date-range-availability.md)）。
-  - S3 で core を分けるとき、`stay_claims` はリスティングと同じ分け先に置く（分け方の鍵は `listing_id`）。
+  - S3 で core を分けるとき、`stay_claims` はリスティングと同じ分け先に置く（分け方の鍵は置き場所の鍵：届出住宅に結んだリスティングは届出住宅の ID、他はリスティングの ID。[ADR-0078](0078-stage-up-criteria-split-plan-and-unit-cost.md)）。
 
 ## Confirmation
 

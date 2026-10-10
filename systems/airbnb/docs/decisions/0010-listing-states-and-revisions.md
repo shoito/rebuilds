@@ -5,6 +5,8 @@ date: 2026-10-10
 
 # ADR-0010: リスティングは状態の機械（`draft`・`in_review`・`listed`・`snoozed`・`suspended`・`archived`）と、内容の改訂（`listing_revisions`）を分けて持つ。公開している改訂は 1 つで、重要な項目の編集は新しい改訂として審査を通ってから入れ替える。料金・カレンダー・規則は改訂に入れず、`listing_version` を上げる
 
+> 2026-10-10 の注記：統合の工程で、料金の規則の変化は `listing_version` でなく `pricing_version` を上げると直した（[ADR-0029](0029-nightly-price-rules-and-discounts.md)、[ADR-0037](0037-quote-binding-and-idempotency.md)）。
+
 詳細は [listings-and-content.md](../architecture/listings-and-content.md) の 4 節。
 
 ## Context
@@ -28,7 +30,7 @@ date: 2026-10-10
 - 内容は `listing_revisions` と `listing_texts` の行。`published_revision_id` が指す改訂は書き換えない。
 - 重要な項目（種類、定員、寝室とベッド、浴室、題名、説明、写真）を含む編集は、編集中の改訂を審査し、`allow` で入れ替える。審査の間は古い改訂を出し続ける。
 - 重要でない項目（設備、ハウスルール、他の文）は、同期の検査を通れば保存の時に入れ替える。
-- 料金の規則・カレンダー・滞在の規則・チェックインの時刻・即時予約・キャンセルポリシーは改訂に入れない。変化で `listing_version`（見積もりの確かめ）か `calendar_version`（空室）を上げる。両方の変化と状態の変化で `search_version` を上げ、検索の文書の外部のバージョンにする。
+- 料金の規則・カレンダー・滞在の規則・チェックインの時刻・即時予約・キャンセルポリシーは改訂に入れない。変化で `listing_version`（見積もりの確かめ）か `calendar_version`（空室）か `pricing_version`（料金。見積もりを無効にしない）を上げる。両方の変化と状態の変化で `search_version` を上げ、検索の文書の外部のバージョンにする。
 - 改訂は消さない。見積もりの写しに `revision_id` を入れる。
 
 ### 他の案を選ばなかった理由

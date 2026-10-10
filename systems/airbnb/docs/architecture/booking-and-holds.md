@@ -1,6 +1,6 @@
 # Booking and Holds: Airbnb
 
-予約を決める。見積もりの固定と 1 回の使用、冪等、`reserveStay` の手順、予約の状態と遷移の決定表 DT-BKG-001、仮押さえ（10 分）とリクエスト（24 時間）の期限、`deadline-runner`、熱い日付の受け入れ、仮押さえの乱用の上限、予約のリクエストの承認と断り、確認の画面の枠、チェックインの案内を出す時期、予約と `stay_claims` の照合を扱う。
+予約を決める。見積もりの固定と 1 回の使用、冪等、`reserveStay` の手順、予約の時の T&S の判定の結果の扱い、予約の状態と遷移の決定表 DT-BKG-001、仮押さえ（10 分）とリクエスト（24 時間）の期限、`deadline-runner`、熱い日付の受け入れ、仮押さえの乱用の上限、予約のリクエストの承認と断り、確認の画面の枠、チェックインの案内を出す時期、予約と `stay_claims` の照合を扱う。
 
 前提となる決定は次のとおり。
 
@@ -14,7 +14,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0035](../decisions/0035-booking-decision-table-and-deadlines.md) | DT-BKG-001 を 31 行で確定する。リクエストの承認は `accepted_at` を書いて売上の確定を待つ段を持ち、確定の結果で `confirmed` か `cancelled` にする。期限は 7 つの列と `next_deadline_at` で持ち、照会の結果が不明なら 2 分ずつ 3 回まで延ばす。運用の保留は送金の振り替えだけを止める |
+| [0035](../decisions/0035-booking-decision-table-and-deadlines.md) | DT-BKG-001 を 35 行で確定する（T&S の `hold` の 4 行を含む）。リクエストの承認は `accepted_at` を書いて売上の確定を待つ段を持ち、確定の結果で `confirmed` か `cancelled` にする。期限は 8 つの列と `next_deadline_at` で持ち、照会の結果が不明なら 2 分ずつ 3 回まで延ばす。運用の保留は送金の振り替えだけを止める |
 | [0036](../decisions/0036-hot-date-admission-and-hold-limits.md) | 熱い日付は、Valkey の空室の写しの確かめ → 先着の印 `claim:{listing_id}:{check_in}` → DB の順に絞る。印は予約の取り消しで比べて消す。Valkey がないときはリスティングごと・タスクごとの同時実行 4 と `lock_timeout` 200ms。1 人の有効な仮押さえは 2、リクエストは 5、同じリスティングで支払いの失敗が 24 時間に 3 回なら 24 時間そのリスティングを予約させない |
 | [0037](../decisions/0037-quote-binding-and-idempotency.md) | 見積もりは 15 分、1 回だけ、見積もりを作ったゲストだけが使える。料金の上書きの変化では見積もりを無効にせず、リスティング・規則・ポリシーのバージョンの変化で無効にする。`Idempotency-Key` は `(guest_id, key)` で一意、要求の本文のハッシュが違えば 422 |
 | [0038](../decisions/0038-booking-requests-and-arrival-info-release.md) | リクエストの期限は「作成から 24 時間」と「チェックインの時刻の 2 時間前」の早いほう。断りは決まった理由のコードで受け、保護される属性に関わる理由を選べない。正確な住所は確定の時、入り方（暗証番号など）はチェックインの 48 時間前から出す。届出住宅は宿泊者名簿の入力の後に入り方を出す（法務の確認待ち：L3） |
@@ -27,6 +27,7 @@
   - 予約の状態、事象、遷移の関数 `transition`、決定表 DT-BKG-001
   - 期限の列、`next_deadline_at`、`deadline-runner`、照会の不明のときの延長
   - 熱い日付の受け入れ（写し、先着の印、同時実行の上限）と仮押さえの乱用の上限
+  - 予約の時の T&S の判定の結果（`allow`・`step_up`・`review`・`hold`・`block`）の扱いと、`hold` のリクエストへの回し（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)）
   - 予約のリクエストの承認と断り（法務の確認待ち：L2・L11）
   - 確認の画面の枠（法務の確認待ち：L7）
   - チェックインの案内（正確な住所、入り方）を出す時期
@@ -37,7 +38,7 @@
   - 提供者の呼び出しと結果（[payments-and-fx.md](payments-and-fx.md)）
   - 見積もりの額の計算（pricing-and-fees、taxes の各領域）
   - 180 日の数えの中身（[regulatory-compliance-japan.md](regulatory-compliance-japan.md)）
-  - 不正の点・パーティーの危険の規則（trust-and-safety の領域）。ここは `reserveStay` が呼ぶ入口だけを決める
+  - 不正の点・パーティーの危険の規則（[trust-and-safety.md](trust-and-safety.md)）。ここは `reserveStay` が呼ぶ入口と、結果ごとの予約の振る舞いを決める
   - レビューの組の作成（reviews の領域）
 
 ## 2. 要件
@@ -66,13 +67,13 @@
 ```mermaid
 stateDiagram-v2
     [*] --> pending_payment: reserveStay（即時予約。hold 10 分）
-    [*] --> requested: reserveStay（リクエスト。request、オーソリ）
+    [*] --> requested: reserveStay（リクエスト、または T&S の hold で route=request。request、オーソリ）
     pending_payment --> confirmed: payment_succeeded・期限の照会で成功
     pending_payment --> cancelled: payment_failed・期限
     requested --> requested: host_accept（accepted_at、確定を待つ）
     requested --> confirmed: payment_succeeded（承認の後）
     requested --> cancelled: 確定の失敗・ゲストの取り下げ・オーソリの失敗
-    requested --> declined: host_decline
+    requested --> declined: host_decline・ts_decline
     requested --> expired: 期限（承認なし）
     confirmed --> in_stay: check_in_at
     confirmed --> cancelled: ゲスト・ホスト・運用のキャンセル
@@ -93,15 +94,16 @@ stateDiagram-v2
 | 事象 | 主体 | 出す所 | 引数 |
 | --- | --- | --- | --- |
 | `payment_succeeded`・`payment_failed`・`payment_action_required` | system | `payments`（照会で確かめた結果） | 試行の ID、種類（`authorize`・`capture`） |
-| `host_accept`・`host_decline` | ホスト・共同ホスト（`full`・`calendar`） | 画面・PMS の API | 断りの理由のコード |
+| `host_accept`・`host_decline` | ホスト・共同ホスト（`full`・`calendar_and_reservations`） | 画面・PMS の API | 断りの理由のコード |
 | `guest_withdraw` | ゲスト | 画面 | — |
 | `cancel` | ゲスト・ホスト・運用者 | 画面・PMS の API・`ops-api` | 理由のコード（[cancellations-and-changes.md](cancellations-and-changes.md) の 4 節） |
 | `deadline` | system | `deadline-runner` | 期限の列の名前 |
 | `alteration_propose`・`alteration_accept`・`alteration_decline`・`alteration_withdraw` | ゲスト・ホスト | 画面・PMS の API | 変更の ID |
-| `ops_hold`・`ops_release` | 運用者 | `ops-api` | 案件の ID、理由 |
+| `ops_hold`・`ops_release` | 運用者、T&S（措置の関数） | `ops-api`、`trust-safety` の `applyModerationAction` | 案件の ID、理由 |
+| `ts_clear`・`ts_decline` | T&S（審査員の判定の後、措置の関数） | `trust-safety` の `applyModerationAction`（`moderation_actions` を書いた後） | 案件の ID、措置の ID |
 | `chargeback_opened` | system | `payments` | チャージバックの ID |
 
-- 運用者の事象は、案件に結び付けた JIT の権限と理由のコードを持つ（security の領域）。運用の画面にも、遷移の関数を通らない予約の書き換えはない。
+- 運用者の事象は、案件に結び付けた JIT の権限と理由のコードを持つ（security の領域）。T&S の事象（`ops_hold`・`ts_clear`・`ts_decline`）は、措置の記録を先に書いてから送る（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)）。運用の画面にも、遷移の関数を通らない予約の書き換えはない。
 
 ## 5. 見積もりと冪等
 
@@ -173,7 +175,20 @@ sequenceDiagram
     B-->>G: 201 予約（3-D セキュアの案内を含みうる）
 ```
 
-- 予約の時の T&S の検査（不正の点、パーティーの危険の規則）は `trust-safety` の同期の入口で、結果は `allow`・`step_up`（本人確認を求める）・`block`。`step_up` は 403 `verification_required` で本人確認の画面へ進め、確認の後に同じ見積もりで再送させる（見積もりの期限の中で）。点そのものは決定ではない（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）。`trust-safety` が 150ms で応えなければ `allow` で進め、事後の審査に回す（予約の可用性を T&S の障害で落とさない）。
+### 6.1.1 予約の時の T&S の判定
+
+予約の時の T&S の検査（判定の点 `booking.create`。不正の点、パーティーの危険の規則）は `trust-safety` の同期の入口である。判定は確認の画面を開く時（見積もりの時）に 1 回行い、結果を見積もりに結ぶ（`ts_decision_id`）。`reserveStay` の直前は、見積もりからの事実の変化（支払いの手段の変更）があったときだけやり直す（[trust-and-safety.md](trust-and-safety.md) の 5.2 節）。点そのものは決定ではない（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）。
+
+| 結果 | `reserveStay` の振る舞い |
+| --- | --- |
+| `allow` | 進める（`route` は即時予約なら `instant`、リクエストのリスティングなら `request`） |
+| `step_up` | 403 `verification_required`。本人確認・3-D セキュア・ハウスルールの明示の同意の画面へ進め、済んだ後に同じ見積もりで再送させる（見積もりの期限の中で） |
+| `review` | 進める。確定の後に T&S が `ops_hold`（主体 T&S、案件の ID）を送り、ホストへの支払いの release を判定まで止める。判定で `ops_release` |
+| `hold` | 即時予約のリスティングでも、`kind = 'request'` の行と `requested` の予約を作る（`route = 'request_by_ts'`）。`payments` はオーソリだけを取る。T&S の案件（`booking_hold`）を開き、`ts_review_due_at` = 作成 + 4 時間（`request_expires_at` より後なら `request_expires_at`）を書く。ゲストには「ホストの確認が要る予約になりました」と出し、T&S の規則は示さない（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)） |
+| `block` | 403 `booking_not_allowed`（理由のコードは一般の文）。予約を作らない。決定的な一致の規則だけが `block` を出せる |
+
+- **150ms で応えないとき**（`trust-safety` の遅れ・停止）：`booking` のプロセスの中の写し（盗難のカードの指紋など、`block` の規則の一覧。1 分ごとにバージョンを確かめて読み直す）で決定的な一致だけを確かめる。当たれば `block`、当たらなければ `allow` として進める。予約の後に `trust-safety` が全部の規則で評価し直し、`allow` でなければ `review` と同じ扱い（`ops_hold` と案件）にする。予約の可用性を T&S の障害で落とさない。この規則は [trust-and-safety.md](trust-and-safety.md) の 14 節と同じ。
+- `hold` の予約は、T&S の判定（`ts_clear`）か `ts_review_due_at` の期限が来るまで、ホストの承認を受けない（DT-BKG-001 の行 13a）。ホストの断りとゲストの取り下げはいつでも受ける。T&S が断るときは `ts_decline`（行 21a）。期限までに判定が出なければ、T&S の断りをせず、ホストの判定に任せる（行 21c）。
 
 ### 6.2 トランザクション
 
@@ -246,6 +261,7 @@ transition(reservation_id, event, actor, expected_version?) -> {state, version, 
 | 11 | `pending_payment` | `deadline`（`hold_expires_at`） | 照会で失敗・未開始、または取り消しに成功 | `cancelled`（`payment_expired`） | 提供者に取り消しを依頼。戻す。印を消す |
 | 12 | `pending_payment`・`requested` | `deadline`（`hold_expires_at`） | 照会の結果が不明、`inquiry_extensions < 3` | そのまま | `hold_expires_at` と `stay_claims.hold_expires_at` を 2 分延ばす、`inquiry_extensions + 1` |
 | 13 | `pending_payment`・`requested` | `deadline`（`hold_expires_at`） | 照会の結果が不明、`inquiry_extensions = 3` | `cancelled`（`payment_unresolved`） | 戻す。後で成功が分かれば `payments` が返金する。チケット |
+| 13a | `requested` | `host_accept` | `route = 'request_by_ts'` かつ `ts_cleared_at IS NULL` | そのまま | 409 `ts_review_pending`（ホストの画面は「確認中」と出し、承認の操作を出さない） |
 | 14 | `requested` | `host_accept` | `accepted_at IS NULL`、`request_expires_at > now()`、オーソリが有効 | そのまま | `accepted_at = now()`、`hold_expires_at = now() + 10 分`（`stay_claims` も）、`request_expires_at = NULL`。売上の確定を依頼 |
 | 15 | `requested` | `host_accept` | オーソリが無効（期限・取り消し） | そのまま | 422 `authorization_invalid`。ゲストに支払いの方法の更新を求める |
 | 16 | `requested` | `payment_succeeded`（`capture`） | `accepted_at IS NOT NULL` | `confirmed` | 行 6 と同じ |
@@ -254,6 +270,9 @@ transition(reservation_id, event, actor, expected_version?) -> {state, version, 
 | 19 | `requested` | `deadline`（`hold_expires_at`） | `accepted_at IS NOT NULL`、照会で失敗 | `cancelled`（`payment_failed`） | 戻す |
 | 20 | `requested` | `payment_failed`（`authorize`） | `accepted_at IS NULL` | `cancelled`（`payment_failed`） | 戻す |
 | 21 | `requested` | `host_decline` | `accepted_at IS NULL`、理由のコードがある | `declined` | オーソリの取り消し。戻す。理由を記録（9 節） |
+| 21a | `requested` | `ts_decline` | `route = 'request_by_ts'`、`accepted_at IS NULL`、措置（`moderation_actions`）の ID がある | `declined`（`ts_declined`） | オーソリの取り消し。戻す。ゲストには一般の文で知らせる。ホストの応答の率に数えない |
+| 21b | `requested` | `ts_clear` | `route = 'request_by_ts'`、`ts_cleared_at IS NULL` | そのまま | `ts_cleared_at = now()`、`ts_clear_cause = 'reviewed'`。ホストに承認の依頼を知らせる |
+| 21c | `requested` | `deadline`（`ts_review_due_at`） | `ts_cleared_at IS NULL` | そのまま | `ts_cleared_at = now()`、`ts_clear_cause = 'timeout'`（T&S の断りをしない。ホストの判定に任せる） |
 | 22 | `requested` | `deadline`（`request_expires_at`） | `accepted_at IS NULL` | `expired` | オーソリの取り消し。戻す。ホストの応答の率に数える |
 | 23 | `requested` | `guest_withdraw` | `accepted_at IS NULL` | `cancelled`（`guest_withdrew`） | オーソリの取り消し。戻す |
 | 24 | `confirmed` | `cancel` | — | `cancelled` | DT-CXL-001 で精算（[cancellations-and-changes.md](cancellations-and-changes.md)）。戻す（未来の泊だけ） |
@@ -265,7 +284,7 @@ transition(reservation_id, event, actor, expected_version?) -> {state, version, 
 | 30 | 終わっていない | `chargeback_opened` | — | そのまま | 両者に知らせない（ゲストの不正の疑いがありうる）。運用の案件。[payments-and-fx.md](payments-and-fx.md) の 7 節 |
 | 31 | どれでも | 上のどれにも当たらない | — | そのまま | 422（理由のコード） |
 
-- [ADR-0004](../decisions/0004-booking-state-machine-and-holds.md) の草案の 16 行との対応：草案の行 1〜16 は、それぞれ上の行 1、2、6、8、9、11、14 と 16、17、21、22、23、24、25、26、27、31 に当たる。意味を変えた行はない。足したのは、保留、古い起動、3-D セキュア、照会の不明、仮押さえが外れた後の成功、承認の後の確定の待ち、オーソリの無効、送金の振り替え、日程の変更、チャージバックの行である。
+- [ADR-0004](../decisions/0004-booking-state-machine-and-holds.md) の草案の 16 行との対応：草案の行 1〜16 は、それぞれ上の行 1、2、6、8、9、11、14 と 16、17、21、22、23、24、25、26、27、31 に当たる。意味を変えた行はない。足したのは、保留、古い起動、3-D セキュア、照会の不明、仮押さえが外れた後の成功、承認の後の確定の待ち、オーソリの無効、送金の振り替え、日程の変更、チャージバックの行と、統合の工程（2026-10-10）で足した T&S の `hold` の行 13a・21a・21b・21c（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)）である。全部で 35 行。
 - 行 9・10：仮押さえの期限の後に支払いの成功が分かったとき、行はすでに外れていることがある（[availability-and-calendars.md](availability-and-calendars.md) の 4.6 節）。`claimStay` をやり直し、入れば確定し、他の予約が入っていれば取り消して全額を返す。照会の延長（行 12）があるので、10 分 + 最大 6 分の間はふつう行が残る。
 
 ### 7.3 期限の列
@@ -274,6 +293,7 @@ transition(reservation_id, event, actor, expected_version?) -> {state, version, 
 | --- | --- | --- | --- |
 | `hold_expires_at` | `pending_payment`、`requested` の承認（行 14） | 10 分（照会の不明で 2 分 × 3 回まで延長） | 行 9〜13、18・19 |
 | `request_expires_at` | `requested` | `min(作成 + 24 時間, check_in_at − 2 時間)`（[ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md)） | 行 22 |
+| `ts_review_due_at` | `requested`（`route = 'request_by_ts'`） | `min(作成 + 4 時間, request_expires_at)`（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)） | 行 21c |
 | `check_in_at` | `confirmed` | チェックインの日の物件の現地のチェックインの時刻（開始の時刻） | 行 25 |
 | `check_out_at` | `confirmed` | チェックアウトの日の物件の現地のチェックアウトの時刻 | 行 27 |
 | `payout_release_at` | `confirmed` | `check_in_at + 24 時間`（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)） | 行 28 |
@@ -285,7 +305,7 @@ transition(reservation_id, event, actor, expected_version?) -> {state, version, 
 ```
 next_deadline_at = min(その状態で生きている期限の列)
   pending_payment : hold_expires_at
-  requested       : accepted_at IS NULL ? request_expires_at : hold_expires_at
+  requested       : accepted_at IS NULL ? min(request_expires_at, (ts_cleared_at IS NULL ? ts_review_due_at : -)) : hold_expires_at
   confirmed       : check_in_at, alteration_expires_at, (on_hold ? - : payout_release_at)
   in_stay         : check_out_at, alteration_expires_at, (on_hold ? - : payout_release_at)
   completed       : (on_hold or released ? NULL : payout_release_at)
@@ -374,7 +394,7 @@ SELECT id FROM reservations
 
 [ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md) で決めた。
 
-- 即時予約でないリスティングでは、`reserveStay` が `kind = 'request'` の行と `requested` の予約を作り、`payments` がオーソリだけを取る。
+- 即時予約でないリスティング（`route = 'request'`）と、T&S の判定が `hold` の予約（`route = 'request_by_ts'`。6.1.1 節）では、`reserveStay` が `kind = 'request'` の行と `requested` の予約を作り、`payments` がオーソリだけを取る。
 - リクエストの期限は `min(作成 + 24 時間, check_in_at − 2 時間)`。チェックインが近いリクエストで、ホストが応える前にチェックインの時刻が来ることを防ぐ。締め切り（DT-AVL-001 の行 6）を通ったリクエストだけが作られるので、期限が作成より前になることはない（作成から 2 時間を切るリクエストは 422 `request_too_late` にして、即時予約できないことを示す）。
 - リクエストの間、その日付は他のゲストに空いて見えない（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)）。
 - ホストの承認（行 14）は売上の確定を待つ。確定の結果で `confirmed` か `cancelled` になる。承認の後の確定の失敗はゲストとホストの両方に知らせ、日付を戻す。
@@ -386,7 +406,9 @@ SELECT id FROM reservations
 | `group_size` | 人数・構成が合わない（ハウスルールの範囲） |
 | `house_rules_conflict` | ゲストの書いた予定がハウスルールに合わない（イベント、ペットなど） |
 | `maintenance` | 修繕・清掃の都合 |
-| `other` | その他（自由な文はゲストに送るメッセージに書く） |
+| `other` | その他（自由な文は `request_declines` に持ち、差別の語の辞書で調べる。ゲストに送るメッセージにも書ける） |
+
+- 理由のコードの一覧の正本はこの表（[ADR-0061](../decisions/0061-non-discrimination-enforcement.md) と [trust-and-safety.md](trust-and-safety.md) の 11 節はこれを参照する）。
 
 - 理由のコードに、ゲストの国籍・言語・氏名・写真など保護される属性とその代わりの値に関わるものを置かない。ホストの断りの率と理由の分布を、属性の代わりの値なしで見る（trust-and-safety の領域）。断りを本システムが制限することの法的な根拠と範囲は **法務の確認待ち（L11）**。
 - 旅館業の施設・特区民泊の施設では、宿泊の拒否の制限（旅館業法第 5 条）とリクエストの断りの関係が **法務の確認待ち（L2）**。結論まで、`legal.request_decline_mode_ryokan` を `unrestricted`（既定。本番で無効の印を付けて出さない）にし、該当のリスティングは即時予約だけにする案を既定にする（リクエストを受けない）。結論が「理由を限る」なら、理由のコードの許す集合を `legal.*` で持つ。
@@ -395,7 +417,7 @@ SELECT id FROM reservations
 
 | 情報 | 出す時 | 出す相手 | 関数 |
 | --- | --- | --- | --- |
-| 正確な住所と地図の位置 | `confirmed` から `check_out_at + 14 日` まで | 予約のゲストと共同の宿泊者、ホストのアカウント | `exactLocationVisible(viewer, listing)`（location-and-geo の領域） |
+| 正確な住所と地図の位置 | `confirmed` から `check_out_at + 7 日` まで（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） | 予約のゲストと共同の宿泊者、ホストのアカウント | `exactLocationVisible(viewer, listing)`（location-and-geo の領域） |
 | 入り方（暗証番号、鍵の場所、Wi-Fi） | `arrival_info_at`（`check_in_at − 48 時間`。ホストが 0〜7 日で変えられる）から `check_out_at` まで | 同上 | `arrivalInfoVisible(viewer, reservation)` |
 | ホストの電話番号 | `confirmed` から `check_out_at + 14 日` まで | 予約のゲスト | 同上 |
 
@@ -422,7 +444,7 @@ SELECT id FROM reservations
 | B5 | `next_deadline_at` が生きている期限の最小と一致 | ticket |
 | B6 | `payout_release_at` を 10 分過ぎて `payout_released_at` がない（保留を除く） | page（NFR-008） |
 
-- 直しは遷移の関数（運用の介入）でだけ行う。行を手で書き換えない（runbooks の `double-booking.md`）。
+- 直しは遷移の関数（運用の介入）でだけ行う。行を手で書き換えない（[double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md)）。
 
 ## 13. 障害のときの振る舞い
 
@@ -431,7 +453,7 @@ SELECT id FROM reservations
 | Valkey の停止 | 写しと印がない | セマフォ（4）と `lock_timeout` で DB を守る。二重の予約なし。負けの応答 p99 1 秒（8.2 節） |
 | Aurora の書き込みの交代 | `reserveStay`・遷移のトランザクションが戻る | 冪等キーで再送。コミット済みなら 5.2 節で返す |
 | `payments`・提供者の停止 | `pending_payment` から進まない | 10 分の期限で照会、不明なら 2 分 × 3 回延ばし、最後は `cancelled`（行 13）。成功が後で分かれば返金 |
-| `trust-safety` の遅れ | 予約の検査が遅れる | 150ms で `allow` にし、事後の審査へ（6.1 節） |
+| `trust-safety` の遅れ | 予約の検査が遅れる | 150ms を過ぎたら、プロセスの中の写しで決定的な一致だけを確かめ、当たらなければ進めて事後に評価する（6.1.1 節） |
 | `deadline-runner` の停止 | 期限が働かない | 再開で溜まった予約を全部拾う。遅れの SLI で page（p99 10 分）。送金の期限は B6 で見る |
 | `ledger` の消費者の停止 | お金の仕訳が遅れる | 予約の状態は進む。予約と台帳の照合が欠けを見つけ、事象を出し直す（[ledger-and-payouts.md](ledger-and-payouts.md) の 9 節） |
 | 長いトランザクション | リスティングの行のロックを持ち続ける | `statement_timeout` 2 秒、`idle_in_transaction_session_timeout` 5 秒 |
@@ -447,7 +469,8 @@ SELECT id FROM reservations
 | リスティングごと・タスクごとの同時実行（Valkey の停止の時） | 4（`hot-dates-booking-poc` で見直す） |
 | `booking` のタスクの最大 | 12 |
 | 予約のトランザクションの `lock_timeout`・`statement_timeout` | 200ms・2 秒 |
-| T&S の同期の検査 | 150ms（過ぎたら `allow` で事後の審査） |
+| T&S の同期の検査 | 150ms（過ぎたら決定的な一致だけで判定し、事後に評価。6.1.1 節） |
+| T&S の `hold` の判定 | 4 時間（`request_expires_at` を超えない） |
 | 仮押さえ・リクエストの数 | 8.3 節 |
 | `deadline-runner` | 1 分ごと、100 件ずつ、ワーカー 4 |
 | `Idempotency-Key` | `(guest_id, key)` で一意。予約の行と同じ期間残る |
@@ -456,10 +479,10 @@ SELECT id FROM reservations
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `reservations`（core、2 者の RLS） | ゲスト、リスティング、ホストのアカウント、`quote_id`、`idempotency_key`、`request_hash`、状態、`version`、日付、人数、請求の通貨と総額、リスティングの通貨と総額、`cancellation_policy_version`、期限の 6 列、`arrival_info_at`、`next_deadline_at`、`accepted_at`、`inquiry_extensions`、`on_hold`、`payout_released_at`、`tzdata_version`、`cancel_reason` | `id`。一意 `quote_id`、一意 `(guest_id, idempotency_key)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(listing_id, check_in)`、`(guest_id, state)`、`(host_account_id, state, check_in)` | 5、6、7 |
+| `reservations`（core、2 者の RLS） | ゲスト、リスティング、ホストのアカウント、`quote_id`、`idempotency_key`、`request_hash`、状態、`version`、日付、人数、請求の通貨と総額、リスティングの通貨と総額、`cancellation_policy_version`、期限の 6 列、`arrival_info_at`、`next_deadline_at`、`accepted_at`、`inquiry_extensions`、`on_hold`、`payout_released_at`、`tzdata_version`、`cancel_reason`、`route`（`instant`・`request`・`request_by_ts`）、`ts_decision_id`、`ts_review_due_at`、`ts_cleared_at`、`ts_clear_cause` | `id`。一意 `quote_id`、一意 `(guest_id, idempotency_key)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(listing_id, check_in)`、`(guest_id, state)`、`(host_account_id, state, check_in)` | 5、6、7 |
 | `reservation_events`（core、2 者の RLS、追記だけ） | 事象、主体の種類と ID、理由のコード、前と後の状態、決定表の行、冪等キー、案件の ID | `(reservation_id, seq)`、一意 `(reservation_id, idempotency_key)` | 7.1 |
 | `quotes`（core、本人の RLS） | 5.1 節の写し | `id`、`(guest_id, created_at)`。期限の 7 日後に消す（予約に使った見積もりは残す） | 5.1 |
-| `request_declines`（core、2 者の RLS） | 予約、理由のコード、主体、時刻 | `reservation_id` | 9 |
+| `request_declines`（core、2 者の RLS） | 予約、理由のコード（9 節）、`other` の自由な文、主体、時刻。T&S の断りの率の見張りもこの表を読む（[trust-and-safety.md](trust-and-safety.md) の 11 節） | `reservation_id` | 9 |
 | `arrival_instructions`（vault、ホストのアカウントの RLS） | 入り方の文（封筒の暗号化） | `listing_id` | 10 |
 | Valkey | `claim:{listing_id}:{check_in}`（15 秒）、合流の `idem:{guest_id}:{key}`（60 秒） | 失ってよい | 8 |
 | outbox の事象 | `reservation.*`（7.1 節の一覧） | — | 7.1 |
@@ -474,7 +497,7 @@ SELECT id FROM reservations
 - **PROP-BKG-006（チェックインの前の release なし）**：行 28 は `check_in_at + 24 時間` より前に起きない。
 - **PROP-BKG-007（参照との一致）**：`booking-ref`（1 つのロックで直列）に同じ操作の列を流したとき、成功する予約の数と最後の状態が一致する。
 - **PROP-BKG-008（住所の秘匿）**：任意の主体と予約の状態で、`exactLocationVisible`・`arrivalInfoVisible` は 10 節の表の通り（同 H）。
-- **表駆動**：DT-BKG-001 の全 31 行、5.1 節の確かめ、7.3 節の期限の表、8.3 節の上限、9 節の理由のコード。
+- **表駆動**：DT-BKG-001 の全 35 行、5.1 節の確かめ、7.3 節の期限の表、8.3 節の上限、9 節の理由のコード。
 - **仮想の時計**（`clock-sim`、同 D）：7.5 節の例、仮押さえの境、照会の延長、リクエストの期限（24 時間とチェックインの 2 時間前の早いほう）、送金の期限、`deadline-runner` の 2 時間の停止。
 - **負荷**：8.2 節の場面（50 件/秒の 1 リスティング・日付、Valkey あり・なし、決済の失敗 5%）で、二重の予約 0、負けの応答 p99 300ms（なしは 1 秒）、DB の接続 70% 以下（同 J）。
 
@@ -498,7 +521,8 @@ SELECT id FROM reservations
 
 2026-10-10 の既定案。
 
-- **決定表**：DT-BKG-001 を 31 行で確定（ADR-0035）。
+- **決定表**：DT-BKG-001 を 35 行で確定（ADR-0035。T&S の `hold` の 4 行を含む。ADR-0057）。
+- **T&S の判定**：`allow`・`step_up`・`review`・`hold`・`block` の扱い（6.1.1 節）。`hold` はリクエストに回し、4 時間で T&S が判定、期限を過ぎたらホストに任せる。150ms を過ぎたら決定的な一致だけで判定し、事後に評価する。
 - **承認の後の確定**：状態を増やさず、`accepted_at` と 10 分の確定の期限で待つ（ADR-0035）。
 - **照会の不明**：2 分 × 3 回延ばし、最後は取り消して後の成功を返金（ADR-0035）。
 - **熱い日付**：写し → 印 → DB。Valkey の停止の時はセマフォ 4（ADR-0036）。

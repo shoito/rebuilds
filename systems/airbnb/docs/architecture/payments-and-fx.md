@@ -315,6 +315,7 @@ stateDiagram-v2
 | `chargebacks`（core） | 予約、提供者の ID、理由、額、状態、期限、負担の判断、案件 | `id`、一意 `(provider, provider_chargeback_id)` | 7 |
 | `payment_anomalies`（core） | 矛盾した結果の記録 | `id` | 4.2 |
 | `fx_rate_snapshots`（core） | 8.1 節の列 | `id`、`(base, quote, fetched_at DESC) WHERE status = 'active'` | 8.1 |
+| `fx_markup_versions`（core） | 通貨の組ごとの上乗せ `fx_markup_bps`（既定 200）、`effective_from`、承認（財務）。変えられないバージョンの行（[delivery.md](delivery.md) の 3.4 節） | `(version)`、`(base, quote, effective_from)` | 8.1 |
 | `provider_capabilities`（設定） | 4.4 節の表 | — | 4.4 |
 | outbox の事象 | `payment.succeeded`・`payment.failed`・`payment.action_required`・`refund.succeeded`・`refund.failed`・`chargeback.opened`・`chargeback.closed` | — | 4、6、7 |
 

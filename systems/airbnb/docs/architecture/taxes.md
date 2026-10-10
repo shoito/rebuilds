@@ -15,7 +15,7 @@
 | --- | --- |
 | [0032](../decisions/0032-tax-rule-tables-by-jurisdiction.md) | 税は `tax_rules` の行（管轄、税の種類、適用の開始と終わり（泊の日）、施設の種類、計算の型、段階・率、課税の標準の定義、免除、端数、同時に集める他の管轄）で持ち、表全体にバージョンを付ける。計算の型は `bracket_per_person_night`・`percent_per_person_night`・`flat_per_person_night` の 3 つ。値は公式の資料から運用と法務が入れ、資料の URL と確認日を行に持つ |
 | [0033](../decisions/0033-stay-tax-computation.md) | 宿泊税・入湯税は泊ごと・人ごとに計算する。泊の課税の標準は、その夜の料金（長期の割引を夜に按分した後）と追加のゲストの料金に、表が含めると定めた滞在の料金（清掃料など）を夜に等しく按分して足し、課税の人数で割る。どの表を使うかは泊の日で決める。見積もりの後に税の表が変わっても、見積もりの額で請求する |
-| [0034](../decisions/0034-tax-collection-model.md) | 預かりと納付の型は `legal.lodging_tax_collector`（`host`・`platform`）で持ち、本番の値は法務の L4 の後。`host` では税を総額に含めて受け、release でホストへの支払いに含め、管轄・月ごとの明細をホストに出す。`platform` では `tax_payable:<jurisdiction>:<tax>` に振り替える。チェックインの前のキャンセルでは、ポリシーに依らず税の全額を返す |
+| [0034](../decisions/0034-tax-collection-model.md) | 預かりと納付の型は `legal.lodging_tax_collector`（`host`・`platform`）で持ち、本番の値は法務の L4 の後。`host` では税を総額に含めて受け、release でホストへの支払いに含め、管轄・月ごとの明細をホストに出す。`platform` では `tax_payable:<jurisdiction>:<tax>` に振り替える。キャンセルの税の返し方は ADR-0039 の DT-CXL-001 に従う |
 
 ## 1. 範囲
 
@@ -35,9 +35,9 @@
 | --- | --- | --- | --- |
 | 東京都（2027-03-31 の泊まで） | 宿泊税 | 1 人 1 泊の宿泊料金が 1 万円以上 1 万 5 千円未満 100 円、1 万 5 千円以上 200 円。1 万円未満は課税しない。対象は旅館・ホテル（簡易宿所・民泊は含まない）。宿泊料金は食事料金などを含まない素泊まりの料金 | [東京都主税局 宿泊税の見直し](https://www.tax.metro.tokyo.lg.jp/kazei/leisure/shuk/shuk_minaoshi)、[宿泊税](https://www.tax.metro.tokyo.lg.jp/kazei/leisure/shuk/2) |
 | 東京都（2027-04-01 の泊から） | 宿泊税 | 宿泊料金の 3%。1 人 1 泊 1 万 3 千円未満は課税を免除。対象に簡易宿所と民泊（住宅宿泊事業、特区民泊）を足す | 同上 |
-| 京都市（2026-03-01 の泊から） | 宿泊税 | 1 人 1 泊の宿泊料金が 6 千円未満 200 円、6 千円以上 2 万円未満 400 円、2 万円以上 5 万円未満 1,000 円、5 万円以上 10 万円未満 4,000 円、10 万円以上 10,000 円。全部の宿泊施設（住宅宿泊事業を含む）。宿泊料金は素泊まりの料金（室料とサービス料）で、食事代と消費税を除く。修学旅行などは課税しない。改正前の泊は 2 万円未満 200 円、2 万円以上 5 万円未満 500 円、5 万円以上 1,000 円 | [京都市 宿泊税について](https://www.city.kyoto.lg.jp/gyozai/page/0000236942.html)、[令和 8 年 3 月 1 日からの見直し](https://www.city.kyoto.lg.jp/gyozai/page/0000345893.html) |
+| 京都市（2026-03-01 の泊から） | 宿泊税 | 1 人 1 泊の宿泊料金が 6 千円未満 200 円、6 千円以上 2 万円未満 400 円、2 万円以上 5 万円未満 1,000 円、5 万円以上 10 万円未満 4,000 円、10 万円以上 10,000 円。全部の宿泊施設（住宅宿泊事業を含む）。宿泊料金は素泊まりの料金（室料とサービス料）で、食事代と消費税を除く。修学旅行などは課税しない。改正前の泊は 2 万円未満 200 円、2 万円以上 5 万円未満 500 円、5 万円以上 1,000 円（最初の草案の確認の値。2026-10-10 には資料を取得できず**未検証**） | [京都市 宿泊税について](https://www.city.kyoto.lg.jp/gyozai/page/0000236942.html)（見直しの告知のページは 2026-10-10 に取得できなかった。改正後の税率はこのページで確かめた。改正前の税率は**未検証**の写し） |
 | 大阪府（2025-09-01 の泊から） | 宿泊税 | 1 人 1 泊の宿泊料金が 5 千円未満は課税しない、5 千円以上 1 万 5 千円未満 200 円、1 万 5 千円以上 2 万円未満 400 円、2 万円以上 500 円。旅館・ホテル、簡易宿所、特区民泊、住宅宿泊事業。宿泊料金は民泊の清掃料などを含み、飲食代・税を含まない | [大阪府 宿泊税](https://www.pref.osaka.lg.jp/o050040/zei/alacarte/shukuhaku.html) |
-| 福岡市（福岡県の分を含む） | 宿泊税 | 1 人 1 泊の宿泊料金が 2 万円未満 200 円（市 150 円、県 50 円）、2 万円以上 500 円（市 450 円、県 50 円）。市が県の分と一括して集める。住宅宿泊事業を含む。免税点はない | [福岡市 宿泊税の概要](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syuku001.html)、[よくある質問](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syukuqa.html) |
+| 福岡市（福岡県の分を含む。2020-04-01 の施行） | 宿泊税 | 1 人 1 泊の宿泊料金が 2 万円未満 200 円（市 150 円、県 50 円）、2 万円以上 500 円（市 450 円、県 50 円）。市が県の分と一括して集める。住宅宿泊事業を含む。免税点はない | [福岡市 宿泊税の概要](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syuku001.html)、[よくある質問](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syukuqa.html) |
 | 市町村（鉱泉浴場の所在地） | 入湯税 | 入湯客 1 人 1 日 150 円を標準として、市町村が条例で定める（地方税法第 701 条の 2）。旅館などが特別徴収義務者として集める | [総務省 入湯税](https://www.soumu.go.jp/main_sosiki/jichi_zeisei/czaisei/czaisei_seido/149767_20.html) |
 | 国 | 消費税 | 標準の税率 10%。総額の表示と、適格請求書の端数処理は Shopify の題材で確かめた（[taxes-and-invoices.md](../../../shopify/docs/architecture/taxes-and-invoices.md) の 2 節） | 同左 |
 
@@ -95,8 +95,8 @@
 | 京都市 | 〜2026-02-28 | 全部 | `bracket_per_person_night` | [0, 20,000) 200、[20,000, 50,000) 500、[50,000, ∞) 1,000 | `unverified` |
 | 京都市 | 2026-03-01〜 | 全部 | `bracket_per_person_night` | [0, 6,000) 200、[6,000, 20,000) 400、[20,000, 50,000) 1,000、[50,000, 100,000) 4,000、[100,000, ∞) 10,000 | `unverified` |
 | 大阪府 | 2025-09-01〜 | 全部 | `bracket_per_person_night` | [0, 5,000) 0、[5,000, 15,000) 200、[15,000, 20,000) 400、[20,000, ∞) 500 | `cleaning_fee`（資料に「民泊の清掃料等を含む」） |
-| 福岡市 | （施行の日は資料で確かめる） | 全部 | `bracket_per_person_night` | [0, 20,000) 150、[20,000, ∞) 450。`collected_with` 福岡県（福岡市の区域） | `unverified` |
-| 福岡県（福岡市の区域） | 同上 | 全部 | `flat_per_person_night` | 50 | `unverified` |
+| 福岡市 | 2020-04-01〜 | 全部 | `bracket_per_person_night` | [0, 20,000) 150、[20,000, ∞) 450。`collected_with` 福岡県（福岡市の区域） | `unverified` |
+| 福岡県（福岡市の区域） | 2020-04-01〜 | 全部 | `flat_per_person_night` | 50 | `unverified` |
 
 - 東京都の改正前の行の開始の日（平成 14 年 10 月 1 日）は、主税局の資料の施行日。
 - `unverified` の行は、開発・検証の環境の試験には使い、本番の表には法務と運用の確かめの後に入れる。確かめが済むまで、その管轄のリスティングは税の行を「現地で支払い」の注で出す（9 節）。
@@ -195,9 +195,7 @@ output:
 | `platform` | 同上 | 税の額を `tax_payable:<jurisdiction>:<tax>` に振り替える | 本システムが納めた旨の明細 | 管轄ごとの申告と納付（特別徴収義務者の登録など。L4） |
 
 - 本番の値は法務の結論の後に決める。結論までは `host` で、管轄ごとに値を持てる形（`legal.lodging_tax_collector.<jurisdiction>`）にする。管轄ごとに本システムが集める協定がありうるため。
-- **キャンセルの税**（既定。cancellations-and-changes の領域の決定表に渡す）：
-  - チェックインの前のキャンセル：泊がないので、税の行は**キャンセルポリシーに依らず全額を返す**。ホストの取り分（違約金）に税を掛けない。違約金が課税の標準に当たらないことの確かめは L4。
-  - 滞在中のキャンセル：泊まった夜の税は返さず、泊まらない夜の税を返す（`per_night` の額を使う）。
+- **キャンセルの税**：返し方の正本は [cancellations-and-changes.md](cancellations-and-changes.md) の 5.3 節の DT-CXL-001（[ADR-0039](../decisions/0039-cancellation-policy-table-and-refund-decision-table.md)）。使わなかった泊の税を返し、チェックインの前は全額を返す。この文書は、泊ごとの額（`reservation_tax_nights`）を渡すことと、返した税・残した税を `host`・`platform` のどちらで扱うかを持つ。ホストの取り分（違約金）に税を掛けない。違約金が課税の標準に当たらないことの確かめは L4。
 - 日程・人数の変更：新しい見積もりで税を計算し直し、差額を `alter` の仕訳に入れる（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。
 
 ## 9. 失敗と回復
@@ -217,7 +215,7 @@ output:
 | 1 つの滞在に当たる管轄 | 4 |
 | 段階 | 1 行 10 |
 | 表のバージョン | 消さない |
-| 1 滞在の泊数 | 90（[search-and-ranking.md](search-and-ranking.md) の 10 節と同じ。28 泊以上の扱いは cancellations-and-changes・ledger-and-payouts の各領域） |
+| 1 滞在の泊数 | 27（MVP の上限。[availability-and-calendars.md](availability-and-calendars.md) の 6.3 節） |
 
 ## 11. data-model への項目
 
@@ -240,7 +238,7 @@ output:
 | PROP-TAX-003 | 改正の日をまたぐ滞在で、各夜の税は、その夜の日付で有効な行で計算される |
 | PROP-TAX-004 | 見積もりの後に表の新しいバージョンを出しても、その見積もりから作った予約の税の額は変わらない |
 | PROP-TAX-005 | `bracket_per_person_night` の税は、夜の料金について単調に増える（減らない） |
-| PROP-TAX-006 | チェックインの前のキャンセルの返金は、税の行の全額を含む。滞在中のキャンセルの返金の税は、泊まらない夜の `reservation_tax_nights` の和 |
+| PROP-TAX-006 | チェックインの前のキャンセルの返金は、税の行の全額を含む。滞在中のキャンセルの返金の税は、泊まらない夜の `reservation_tax_nights` の和（規則は DT-CXL-001） |
 | PROP-TAX-007 | `unverified` の欄を持つ行は、本番の表のバージョンに入らない（表の公開の検査） |
 | 試験のベクトル | 4.3 節の各行の段階の境（境の 1 円前・ちょうど・1 円後）、5.3 節の例（3,600、3,000、1,800、0、1,320、1,200） |
 | 仮想の時計 | 改正の日の 0 時をまたぐ泊、年度の境 |
@@ -253,7 +251,7 @@ output:
 | E8 | `stay-tax-computation` | `computeStayTaxes`、按分、夜ごとの判定、`tax-ref`（5 節） |
 | E8 | `tax-lines-and-statements` | 明細の行、ホストの月ごとの税の明細（6、8 節） |
 | E12 | `tax-collection-and-remittance` | `platform` の型の仕訳と納付の資料。法務：L4（8 節） |
-| E10 | （cancellations-and-changes の領域へ）キャンセルの税の既定 | 8 節の既定を返金の決定表に入れる |
+| E10 | （cancellations-and-changes の領域の `cancellation-policies`）キャンセルの税 | DT-CXL-001 の税の行（PROP-TAX-006） |
 
 ## 14. 未解決の問い
 
@@ -261,7 +259,7 @@ output:
 
 - **表の形**：管轄・泊の日・施設の種類・3 つの計算の型・標準の定義・資料の URL を持つ行と、表全体のバージョン（ADR-0032）。
 - **計算**：夜ごと・人ごとの判定、割引と滞在の料金の按分、有理数のままの段階の判定（ADR-0033）。
-- **型**：`legal.lodging_tax_collector` の既定 `host`、チェックインの前のキャンセルは税を全額返す（ADR-0034）。
+- **型**：`legal.lodging_tax_collector` の既定 `host`（ADR-0034）。キャンセルの税は DT-CXL-001（ADR-0039）。
 
 ### 持ち越し
 
@@ -279,7 +277,7 @@ output:
 いずれも 2026-10-10 に確認。
 
 - 東京都主税局, [宿泊税の見直し](https://www.tax.metro.tokyo.lg.jp/kazei/leisure/shuk/shuk_minaoshi)：改正前は 1 万円以上 1 万 5 千円未満 100 円、1 万 5 千円以上 200 円、旅館・ホテルだけ。令和 9 年 4 月 1 日から 3%、免除 1 万 3 千円未満、簡易宿所と民泊を対象に足す。宿泊料金は素泊まりの料金
-- 京都市, [宿泊税について](https://www.city.kyoto.lg.jp/gyozai/page/0000236942.html)、[令和 8 年 3 月 1 日からの宿泊税の見直しが正式決定](https://www.city.kyoto.lg.jp/gyozai/page/0000345893.html)：5 段階の税率、住宅宿泊事業を含む、素泊まりの料金（室料及びサービス料）
+- 京都市, [宿泊税について](https://www.city.kyoto.lg.jp/gyozai/page/0000236942.html)：5 段階の税率（令和 8 年 3 月 1 日から。見直しの告知のページは 2026-10-10 に 404 で、改正前の税率は最初の草案の確認の値のまま）、住宅宿泊事業を含む、素泊まりの料金（室料及びサービス料）
 - 大阪府, [宿泊税](https://www.pref.osaka.lg.jp/o050040/zei/alacarte/shukuhaku.html)：令和 7 年 9 月 1 日からの 3 段階、5 千円未満は課税しない、民泊の清掃料等を含む
-- 福岡市, [宿泊税の概要](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syuku001.html)、[宿泊税に関するよくある質問](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syukuqa.html)：2 万円未満 200 円（市 150、県 50）、2 万円以上 500 円（市 450、県 50）、民泊を含む
+- 福岡市, [宿泊税の概要](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syuku001.html)、[宿泊税に関するよくある質問](https://www.city.fukuoka.lg.jp/zaisei/zeisei/life/syukuqa.html)：2 万円未満 200 円（市 150、県 50）、2 万円以上 500 円（市 450、県 50）、民泊を含む。条例の施行は令和 2 年 4 月 1 日
 - 総務省, [入湯税](https://www.soumu.go.jp/main_sosiki/jichi_zeisei/czaisei/czaisei_seido/149767_20.html)：1 人 1 日 150 円を標準に市町村が定める目的税。旅館などが特別徴収する

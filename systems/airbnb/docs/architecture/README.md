@@ -1,6 +1,6 @@
 # Architecture: Airbnb
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（まだない。計画は 7 節）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節。表と置き場所の索引は [data-model.md](data-model.md)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -178,7 +178,7 @@ flowchart TB
 
 原則は 7 つ。
 
-- **同じ夜は 1 つの行の集まりで決める。** 予約・仮押さえ・リクエスト・ブロック・取り込みは、すべて `stay_claims` の行で、`(listing_id, claim_group, block_span)` の排他の制約が、異なる組の重なりを DB で拒む。検索・写し・PMS の書き込みのどれも、この制約を越えられない（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)）。
+- **同じ夜は 1 つの行の集まりで決める。** 予約・仮押さえ・リクエスト・ブロック・取り込みは、すべて `stay_claims` の行で、`(listing_id =, claim_group <>, block_span &&)` の排他の制約が、異なる組の重なりを DB で拒む。検索・写し・PMS の書き込みのどれも、この制約を越えられない（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)）。
 - **日付は現地の日付、瞬間は UTC。** 泊は物件の現地の日付の `daterange`、締め切り・期限・送金の時刻は物件のタイムゾーンで UTC に直した瞬間で持つ。直す関数は 1 か所（Google Calendar の題材の [ADR-0002](../../../google-calendar/docs/decisions/0002-time-representation.md) の考え方）。
 - **検索は候補を絞るだけ。** OpenSearch の空きの区間と Valkey の写しは遅れうる。正しさは予約の時の DB の確かめで守り、検索の誤りの率を SLI で見る（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）。
 - **予約の流れと、お金の正本を分ける。** 予約の状態は core、お金は ledger の追記だけの仕訳が正本である。2 つは outbox と冪等キーでつなぎ、照合で食い違いを必ず見つける（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。
@@ -221,13 +221,13 @@ flowchart TB
 
 **D. 予約のリクエスト**
 
-1. 即時予約でないリスティングでは、`reserveStay` が `stay_claims` を `kind = 'request'`、期限 24 時間で挿入し、届出住宅の泊も数える。予約は `requested`。
+1. 即時予約でないリスティングと、予約の時の T&S の判定が `hold` の予約（`route = 'request_by_ts'`。T&S が 4 時間以内に判定する。[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)）では、`reserveStay` が `stay_claims` を `kind = 'request'`、期限 `min(24 時間, チェックインの 2 時間前)` で挿入し、届出住宅の泊も数える。予約は `requested`（[ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md)）。
 2. `payments` はオーソリだけを取る（売上を確定しない）。ホストが 24 時間の間に承認すれば、`booking` が予約を `confirmed`、`stay_claims` を `reservation` にし、`payments` が売上を確定する。断り・期限切れなら、`stay_claims` と泊の数を戻し、オーソリを取り消す（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)、[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。
 3. リクエストの間、その日付は他のゲストに空いて見えない。本家の振る舞いは**未検証**で、本システムはホストの承認の後の食い違いをなくすほうを選んだ。
 
 **E. 外部のカレンダーの取り込みと食い違い**
 
-1. `ical-sync` が取り込むアドレスを 15 分ごとに、`If-None-Match`・`If-Modified-Since` つきで取る（取得は egress の経路で、私的なアドレスを拒む）。内容のハッシュが同じなら何もしない（Google Calendar の題材の [ADR-0025](../../../google-calendar/docs/decisions/0025-ics-subscriptions-both-directions.md) の考え方）。
+1. `ical-fetcher`（信用しない宛先の egress の経路の専用のタスク）が取り込むアドレスを 15 分ごとに、`If-None-Match`・`If-Modified-Since` つきで取る（取得は egress の経路で、私的なアドレスを拒む）。内容のハッシュが同じなら何もしない（Google Calendar の題材の [ADR-0025](../../../google-calendar/docs/decisions/0025-ics-subscriptions-both-directions.md) の考え方）。
 2. 予定を泊の範囲に直し（終日の `DTSTART;VALUE=DATE` はそのまま、時刻つきは物件のタイムゾーンで日付に直す）、前回の取り込みとの差分を `stay_claims` に `kind = 'ical_block'` で書く。
 3. 挿入が排他の制約に当たったら、外部と本システムで同じ夜が売れている。`calendar_conflicts` に記録し、5 分以内にホストに知らせ、運用の待ち行列に入れる。本システムの予約は自動で取り消さない（どちらの予約が先かを本システムは知れないため）。
 4. 書き出しは、`stay_claims` の変化の outbox から 1 分以内に作り直し、`cal.<brand>.<domain>` の秘密のアドレスで出す。相手の取得の間隔は相手が決めるので、相手側の遅れは本システムでは縮められない。PMS の API を使うホストは、Webhook で p95 10 秒で知る（NFR-003）。
@@ -236,7 +236,7 @@ flowchart TB
 
 1. 予約が `confirmed` になると、`booking` は `payout_release_at` = チェックインの日の物件の現地のチェックインの時刻 + 24 時間（UTC に直した瞬間）を書く。
 2. `deadline-runner` がその時刻を過ぎた予約を拾い、`ledger` に release を依頼する。仕訳は「借方 ゲストの預かり／貸方 ホストへの支払い（`host_payable`）・サービス料の収益・税の預かり」。冪等キーは `(reservation_id, settlement_seq, release)`。
-3. `payouts` は毎営業日の決めた時刻（提携銀行の締めの前）に、ホストごとの `host_payable` を束にして送金を依頼する。保留（不正の疑い、本人確認の未了、損害の請求の審査）のホストは除く（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。
+3. `payouts` は銀行の営業日の 09:30（日本時間）に、ホストごとの `host_payable` を束にして送金を依頼する。措置の保留（不正の疑い、本人確認の未了、運用の案件）と、決まった待ち（送金の口座などの変更の後 72 時間、新しいホストの最初の 3 件の予約のチェックアウトの後 24 時間まで）のホストは除く（[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)、[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)、[ADR-0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md)）。
 4. 照合が 5 分ごとに、`payout_release_at` を過ぎたのに release のない予約を探す。
 
 **G. キャンセルと返金**
@@ -257,30 +257,46 @@ flowchart TB
 | --- | --- | --- |
 | 規模 | ホスト 550 万人超、有効なリスティング 900 万件超、220 以上の国・地域 | [About us](https://news.airbnb.com/about-us/) |
 | 予約の量 | 2026 年第 2 四半期の Nights and Seats Booked 1 億 4,830 万、GBV 272 億ドル | [株主への手紙（Form 8-K の別紙 99.1）](https://www.sec.gov/Archives/edgar/data/0001559720/000119312526337928/d70413dex991.htm) |
-| サービス料 | 分担の型（ホスト 3%、ゲスト 14.1〜16.5%）と、ホストだけの型（多くは 15.5%）。分担の型はなくしていく途中 | [ヘルプの記事 1857](https://www.airbnb.com/help/article/1857) |
-| キャンセルポリシー | 柔軟・中程度・限定・厳格など。7 日以上前に確定した予約は確定から 24 時間は全額の返金 | [ヘルプの記事 475](https://www.airbnb.com/help/article/475) |
-| レビュー | チェックアウトから 14 日。両者が出すか期間の終わりの早いほうで公開 | [ヘルプの記事 13](https://www.airbnb.com/help/article/13) |
-| カレンダーの同期 | iCal。自動の更新は 3 時間ごと、2 年先まで取り込む | [ヘルプの記事 99](https://www.airbnb.com/help/article/99) |
+| サービス料 | 分担の型（多くのホスト 3%、ゲスト 14.1〜16.5%）と、ホストだけの型（多くは 15.5%、他は 14〜16%）。分担の型はなくしていく途中で、PMS を使うホストはホストだけの型が必須 | [ヘルプの記事 1857](https://www.airbnb.com/help/article/1857) |
+| キャンセルポリシー | 28 泊未満の標準は柔軟（24 時間前まで全額）、中程度（5 日前）、限定（14 日前。2025-10-01 以降の予約）、厳格（30 日前。7〜30 日前は 50%）、厳しい（招待だけ）。7 日以上前に確定した予約は確定から 24 時間は税を含めて全額の返金。税は柔軟・中程度のチェックインの後は割合で返し、限定・厳格・厳しいのチェックインの後は返さない | [ヘルプの記事 475](https://www.airbnb.com/help/article/475) |
+| 送金の時期 | チェックインの約 24 時間の後に送金を出す（地域のヘルプは「チェックインの予定の時刻から 24 時間」）。審査ではチェックインから最長 45 日遅れることがある | [ヘルプの記事 3133](https://www.airbnb.com/help/article/3133)、[ヘルプの記事 425](https://www.airbnb.com/help/article/425) |
+| レビュー | チェックアウトから 14 日。両者が出すか期間の終わりの早いほうで公開。公開の前は直せる | [ヘルプの記事 13](https://www.airbnb.com/help/article/13) |
+| カレンダーの同期 | iCal。取り込むアドレスは `.ics` で終わる。自動の更新は 3 時間ごと、2 年先まで取り込む | [ヘルプの記事 99](https://www.airbnb.com/help/article/99) |
+| 共同ホスト | 全部・カレンダーとメッセージ・カレンダーだけの 3 段。全部の権限の共同ホストは他の共同ホストを招待できる（全部の権限は足せない）。送金の方法と税の情報は見られない | [ヘルプの記事 1534](https://www.airbnb.com/help/article/1534) |
 | 位置 | 予約の確定の前はおおよその範囲。番地と部屋の番号は確定した予約のゲストだけ | [ヘルプの記事 2141](https://www.airbnb.com/help/article/2141) |
 | 予約のリクエスト | ホストの応答は 24 時間。過ぎると期限切れ | [Reservation requests](https://www.airbnb.com/help/topic/1340) |
 | 損害の請求 | チェックアウトから 14 日以内。ゲストは 24 時間で応じる | [ヘルプの記事 279](https://www.airbnb.com/help/article/279) |
 | 日本の届出番号 | 日本のリスティングは届出番号・許可番号の表示が必須。確かめの書類を上げる | [ヘルプの記事 2177](https://www.airbnb.com/help/article/2177)、[ヘルプの記事 2274](https://www.airbnb.com/help/article/2274) |
-| 送金の時期 | チェックインの予定の時刻から約 24 時間の後（各国語のヘルプの要約だけで確かめた） | **未検証**（[ヘルプの記事 425](https://www.airbnb.com/help/article/425)） |
 | 検索・空室の内部、順位付け、料金の提案の方式、パーティーの防止の方式、本家の SLA | 公式の資料で確かめられなかった | **未検証** |
 
-いずれも 2026-10-10 に確認。この設計は振る舞いを参考にするが、本家のコード・本家が公開したライブラリ・データ・モデルは使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+いずれも 2026-10-10 に確認（統合の工程で、記事 475・1857・3133・425・99・13・1534 を取得し直した）。この設計は振る舞いを参考にするが、本家のコード・本家が公開したライブラリ・データ・モデルは使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 
 **本家との意図した違い**：
 
 | 項目 | 本家 | 本システム | 理由・根拠 |
 | --- | --- | --- | --- |
-| iCal の取り込みの間隔 | 3 時間ごと | 15 分ごと（条件つきの取得） | 外部との食い違いの窓を縮める（NFR-003） |
+| iCal の取り込みの間隔 | 3 時間ごと | 15 分ごと（条件つきの取得） | 外部との食い違いの窓を縮める（NFR-003、[ADR-0021](../decisions/0021-ical-import-pipeline-and-safety.md)） |
+| 取り込むアドレスの形 | `.ics` で終わること | 終わらなくてよい（`https`・`http`・`webcal`） | 拡張子を付けない相手がある（[calendar-sync.md](calendar-sync.md) の 4.1 節） |
+| iCal の書き出し | **未検証** | 準備の日を含む `block_span` を終日の予定で出す | 他の掲載先で準備の日に予約を入れさせない（[ADR-0023](../decisions/0023-ical-export-secret-url-and-contents.md)） |
 | 予約のリクエストの間の日付 | **未検証** | 他のゲストに空いて見せない（仮押さえと同じ） | ホストの承認の後の食い違いをなくす（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
-| サービス料の型 | 分担の型とホストだけの型 | MVP はホストだけの型。ゲストに見せる額は総額 | 日本の総額の表示に合わせやすい（法務の L4） |
-| 保証金 | 預かりはない（損害の保護の仕組みで扱う。**未検証**の部分あり） | MVP は損害の請求だけ。保証金の預かりは MVP の後 | オーソリの期限と予約の長さが合わない（法務の L12） |
-| キャンセルポリシー | 6 つ以上 | MVP は柔軟・中程度・厳格の 3 つ | 決定表と性質を小さく保つ。他は表の行を足して出す |
-| 送金の時期 | 約 24 時間の後（**未検証**） | チェックインの予定の時刻 + 24 時間に振り替え、次の銀行の締めで送る | 本家に寄せた既定値。値は設定 |
-| 位置の秘匿 | おおよその範囲（方式は**未検証**） | 決まった点にずらし、検索の索引にも正確な位置を入れない | 範囲の問い合わせでの割り出しを防ぐ |
+| 予約のリクエストの期限 | 24 時間 | 24 時間とチェックインの 2 時間前の早いほう | ホストが応える前にチェックインが来ることを防ぐ（[ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md)） |
+| 見積もりと料金の上書き | **未検証** | 15 分の見積もりは、料金の上書き・料金の提案の書き込みで無効にしない | ゲストが確認の画面で見た額で払える（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)） |
+| サービス料 | 分担の型とホストだけの型。ホストだけの型は多くのホストで 15.5% | ホストだけの型だけ、既定 15%（消費税を含む）。ゲストに見せる額は総額 | 日本の総額の表示に合わせやすい（[ADR-0031](../decisions/0031-host-only-service-fee.md)、法務の L4） |
+| キャンセルポリシー | 6 つ以上（柔軟、中程度、限定、厳格、厳しいほか） | MVP は柔軟・中程度・厳格の 3 つ。厳格の値は本家の厳格と同じ | 決定表と性質を小さく保つ。他は表の行を足して出す（[ADR-0039](../decisions/0039-cancellation-policy-table-and-refund-decision-table.md)） |
+| キャンセルの税の返金 | 柔軟・中程度のチェックインの後は割合で返す。限定・厳格のチェックインの後は返さない | ポリシーに依らず、使わなかった泊の税を全部返す（チェックインの前は全額） | 宿泊税は泊まった泊に掛かる。返す・残すの扱いは法務の L4（[ADR-0039](../decisions/0039-cancellation-policy-table-and-refund-decision-table.md)） |
+| 最長の泊数 | 28 泊以上の月の滞在がある（上限は**未検証**） | MVP は 27 泊まで | 28 泊以上は月ごとの請求と送金、借地借家法の論点（法務の L7。[ADR-0017](../decisions/0017-stay-rules-decision-table.md)） |
+| 保証金 | 預かりはない（損害の保護の仕組みで扱う。**未検証**の部分あり） | MVP は損害の請求だけ。保証金の預かりは MVP の後 | オーソリの期限と予約の長さが合わない（法務の L12。[ADR-0051](../decisions/0051-security-deposits-deferred-shape.md)） |
+| 送金の時期 | チェックインの約 24 時間の後 | チェックインの予定の時刻 + 24 時間に振り替え、次の銀行の営業日の 09:30 に送る | 本家に寄せた既定値。値は設定（[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)） |
+| 新しいホストの送金 | 審査で最長 45 日遅れることがある（条件は**未検証**） | 最初の 3 件の予約は、各予約のチェックアウトの後 24 時間まで送金を待たせる | 偽のリスティングの前払いの詐欺を最初の滞在の確かめまで止める（[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)） |
+| キャンセルの後のホストの取り分 | **未検証** | チェックインを待たず、次の送金で送る | 泊まりが起きない（[ADR-0047](../decisions/0047-settlement-seq-and-escrow-settlement.md)） |
+| ホストのキャンセルの罰 | **未検証** | チェックインまでの時間で 10・25・50%、日付を閉じる | 本システムの値（[ADR-0040](../decisions/0040-host-and-ops-cancellations.md)） |
+| 位置の秘匿 | おおよその範囲（方式は**未検証**） | 密度の区分の輪（都市 300〜500 m、郊外 400〜650 m、地方 500〜800 m）の中の、秘密の鍵の HMAC で決めた点。40 m 以内の物件は同じ点。検索の索引にも正確な位置を入れない | 範囲の問い合わせと平均での割り出しを防ぐ（[ADR-0014](../decisions/0014-approximate-location-offset.md)） |
+| 正確な住所を出す時期 | 資料の間で食い違う（**未検証**） | 予約の確定の時からチェックアウトの後 7 日まで。入り方はチェックインの 48 時間前から | 確定の後にゲストが場所を確かめられる（[ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md)、[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
+| 予約の前のゲストの名前と顔の写真 | **未検証** | 予約の確定の前のホストに見せない（`legal.prebooking_guest_identity_display = none`） | 差別の防止（[ADR-0061](../decisions/0061-non-discrimination-enforcement.md)、[ADR-0071](../decisions/0071-sign-in-sessions-devices-and-profiles.md)。法務の L11） |
+| 共同ホストの管理 | 全部の権限の共同ホストが共同ホストを招待・外せる。「カレンダーだけ（閲覧）」の段がある | 共同ホストの招待・役割の変更・外す操作は `owner` だけ。役割は `full`・`calendar_and_reservations`・`messages_only` | 送金の乗っ取りの入口を `owner` に閉じる（[ADR-0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md)、[host-tools-and-api.md](host-tools-and-api.md) の 4.2 節） |
+| パスワード | パスワードでのログインがある（記事 3530。本文の細部は**未検証**） | 持たない。パスキー、メールと SMS の一時コード、外部の ID の提供者 | 使い回しと詐取を減らす（[ADR-0071](../decisions/0071-sign-in-sessions-devices-and-profiles.md)） |
+| PMS の API | 招待の提携先だけと第三者の記事が書く（**未検証**） | 登録と運用の審査で開く | 審査で範囲とデータの置き場所を確かめる（[ADR-0068](../decisions/0068-pms-oauth-apps-scopes-and-rate-limits.md)） |
+| レビューへの返答 | ゲストの返答の有無は**未検証** | ホストだけが 1 回返答できる | MVP を小さく保つ（[ADR-0055](../decisions/0055-review-pairs-and-simultaneous-reveal.md)） |
 | ヘッダー・ドメイン・iCal の `PRODID` | 本家の名前を含む | `<Brand>`・`<brand>` | リポジトリ共通の ADR-0006 |
 | データの所在 | **未検証** | すべて日本（東京、DR は大阪） | 日本を最初の市場にする（法務の L8） |
 
@@ -288,9 +304,9 @@ flowchart TB
 
 | 段階 | 有効なリスティング | 泊の予約 | 予約の件数 | 検索の最大 | 予約の最大（全体） | 人気の 1 リスティング・日付への予約の試み | 取り込む iCal | 構成 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1（MVP。日本） | 10 万 | 2 万泊/日 | 6,000 件/日 | 500 件/秒 | 10 件/秒 | 50 件/秒 | 3 万のアドレス（15 分ごと、約 35 件/秒） | 東京の 1 リージョン・3 AZ。Aurora は core・ledger・content・vault の 4 クラスタ。大阪に Aurora Global Database と S3 の写し |
+| S1（MVP。日本） | 10 万 | 2 万泊/日 | 6,000 件/日 | 500 件/秒 | 10 件/秒 | 50 件/秒 | 3 万のアドレス（15 分ごと、約 33 件/秒） | 東京の 1 リージョン・3 AZ。Aurora は core・ledger・content・vault の 4 クラスタ。大阪に Aurora Global Database と S3 の写し |
 | S2（日本とアジア） | 100 万 | 20 万泊/日 | 6 万件/日 | 5,000 件/秒 | 80 件/秒 | 300 件/秒 | 30 万（約 350 件/秒） | core の読み出しの写しを増やす。OpenSearch を地域ごとの索引に分ける。空室の写しを Valkey のクラスタで分ける。1 リスティングの複数の同じ部屋を足す |
-| S3（世界） | 1,000 万 | 160 万泊/日 | 45 万件/日 | 2 万件/秒 | 600 件/秒 | 1,000 件/秒 | 300 万（約 3,500 件/秒） | core を `listing_id` のハッシュで分ける（リスティング・stay_claims・予約・届出住宅を同じ分け先に置く）。ledger を口座の持ち主のハッシュで分ける |
+| S3（世界） | 1,000 万 | 160 万泊/日 | 45 万件/日 | 2 万件/秒 | 600 件/秒 | 1,000 件/秒 | 300 万（約 3,500 件/秒） | core を利用者の `core-accounts` と、置き場所の鍵（届出住宅に結んだリスティングは届出住宅の ID、他はリスティングの ID）のハッシュで 16 に分けた `core-stays` に分ける（リスティング・stay_claims・予約・届出住宅・`regulated_nights` を同じ分け先に置く。[ADR-0078](../decisions/0078-stage-up-criteria-split-plan-and-unit-cost.md)）。ledger を口座の持ち主のハッシュで分ける |
 
 - 数値は本システムの想定。S3 の泊は本家の 2026 年第 2 四半期の 1 億 4,830 万（91 日で 1 日あたり約 163 万。体験の席を含む）に、リスティングは本家の 900 万件超に合わせた（[出典](https://www.sec.gov/Archives/edgar/data/0001559720/000119312526337928/d70413dex991.htm)、[About us](https://news.airbnb.com/about-us/)）。検索・予約の最大の値は、本家の公式の値を確かめられなかった（**未検証**）ので、本システムの推定である。
 - 1 予約の平均を 3.5 泊と見込んだ（本システムの推定）。S3 の 45 万件/日は平均 5.2 件/秒である。
@@ -369,7 +385,7 @@ flowchart TB
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、ドメインごとのパッケージを持つ 1 つのコードベースを入口・Worker ごとのサービスで出す。Aurora は core・ledger・content・vault の 4 クラスタ。ML だけ Python。検索は OpenSearch を汎用の部品として使う |
-| [0002](../decisions/0002-availability-representation-and-double-booking.md) | 空室の正本を、予約・仮押さえ・リクエスト・ブロック・取り込みをまとめた `stay_claims` の泊の範囲の行にし、`(listing_id, block_span)` の排他の制約で重なりを DB で 0 にする。準備の日は各予約の後ろの範囲に含める。泊ごとの行はカレンダーの設定（料金、規則の上書き）にだけ使う。日付は物件の現地の日付 |
+| [0002](../decisions/0002-availability-representation-and-double-booking.md) | 空室の正本を、予約・仮押さえ・リクエスト・ブロック・取り込みをまとめた `stay_claims` の泊の範囲の行にし、`(listing_id =, claim_group <>, block_span &&)` の排他の制約で、異なる組の重なりを DB で 0 にする。準備の日は各予約の後ろの範囲に含める。泊ごとの行はカレンダーの設定（料金、規則の上書き）にだけ使う。日付は物件の現地の日付 |
 | [0003](../decisions/0003-search-for-date-range-availability.md) | 日付の範囲の検索は 2 段にする。OpenSearch に空きの区間を `date_range` の欄で入れて「範囲を含む区間がある」で候補を 300 件に絞り、Valkey の空室の写し（2 年分の泊のビット列と規則の要約）で滞在の規則を確かめる。価格は粗く絞り、料金の要約で正しく絞る。正しさは予約の時の DB で守る |
 | [0004](../decisions/0004-booking-state-machine-and-holds.md) | 予約を明示の状態の機械にし、作成を `reserveStay` の 1 つの関数と 1 つのトランザクション（見積もりの確かめ、規則、排他の制約、180 日の数え）に集める。仮押さえは 10 分、リクエストは 24 時間の期限つきの `stay_claims`。冪等キーと見積もりの一意で予約を 1 回に限る。日程の変更は同じ予約の組（`claim_group`）の行で、相手の受諾の時に入れ替える |
 | [0005](../decisions/0005-payments-hold-capture-and-ledger.md) | 決済は提供者に任せ、即時予約は確定の時に売上を確定する。リクエストはオーソリだけを取り、承認で確定する。お金は予約ごとの預かりの口座を持つ通貨ごとの複式簿記の台帳で持ち、チェックインの予定の時刻 + 24 時間にホストへの支払いへ振り替える。決着は冪等キーで 1 回 |
@@ -418,9 +434,9 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **検索**：OpenSearch の `date_range` の空きの区間と Valkey の空室の写しの 2 段。ステージ 1 の候補は 300 件（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）。
 - **仮押さえ**：確認の画面の支払いの間 10 分、リクエストは 24 時間。どちらも `stay_claims` の行で、期限の切れた行は次の挿入と 1 分ごとの処理で外す（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)）。
 - **売上の確定**：即時予約は確定の時。リクエストはオーソリを取り、承認で確定（24 時間はオーソリの期限の中）。分割払いは MVP の後（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）。
-- **送金の時期**：チェックインの予定の時刻 + 24 時間に release し、次の銀行の締めで送る（本家に寄せた既定値。本家は**未検証**）。28 泊以上の月ごとの送金は MVP の後。
+- **送金の時期**：チェックインの予定の時刻 + 24 時間に release し、次の銀行の締めで送る（本家に寄せた既定値。本家の「チェックインの約 24 時間の後」は統合の工程で記事 3133 で確かめた）。28 泊以上の月ごとの送金は MVP の後。
 - **サービス料**：ホストだけの型。既定 15%（本家の多くのホストは 15.5%。本システムの値は設定）。ゲストに見せる額は総額。
-- **キャンセルポリシー**：MVP は柔軟（チェックインの 24 時間前まで全額）、中程度（5 日前まで全額、以後は 50%）、厳格（30 日前まで全額、7〜30 日前は 50%、7 日未満は返金なし）と、7 日以上前に確定した予約の確定から 24 時間の全額の返金。本家の表（[ヘルプの記事 475](https://www.airbnb.com/help/article/475)）に寄せた。違約金の妥当さは法務の L7。
+- **キャンセルポリシー**：MVP は柔軟（チェックインの 24 時間前まで全額、以後は使った泊と追加の 1 泊を残す）、中程度（5 日前まで全額、以後は追加の 1 泊と残りの泊の 50% を残す）、厳格（30 日前まで全額、7〜30 日前は 50%、7 日未満は返金なし）と、7 日以上前に確定した予約の確定から 24 時間の全額の返金。本家の表（[ヘルプの記事 475](https://www.airbnb.com/help/article/475)）に寄せた。違約金の妥当さは法務の L7。
 - **レビュー**：チェックアウトから 14 日、同時の公開（本家に寄せる）。公開の前は直せる、公開の後は直せない。
 - **iCal**：取り込みは 15 分ごと、2 年先まで、1 リスティング 5 件まで。書き出しは秘密のアドレス（作り直すと古いアドレスは 404）。
 - **位置**：ずらした位置は半径 300〜800 m（人口の密度で変える）の中の決まった点。正確な住所はチェックインの 48 時間前ではなく、確定の時にゲストへ出す（本家の時期は**未検証**。予約の確定の後にゲストが場所を確かめられるほうを選んだ）。
@@ -446,9 +462,69 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | core を分ける時期と分け方の鍵、1 リスティングの複数の同じ部屋 | infrastructure・capacity・availability-and-calendars の各領域 |
 | 本家の振る舞いで未確認のもの（送金の時期、リクエストの間の日付、正確な住所の時期、料金の提案の方式） | 各領域の文書で公式の資料で確かめる。確かめられなければ未検証のまま、本システムの値を使う |
 
+### 決定（2026-10-10、統合）
+
+領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。最初の設計の ADR は直接直し、決定を覆した・具体にしたところに日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
+
+- **予約の時の T&S の `hold`**（[ADR-0057](../decisions/0057-ts-decision-points-and-outcomes.md)、[ADR-0035](../decisions/0035-booking-decision-table-and-deadlines.md) の注記）：予約の `hold` は即時予約をリクエストに回す（`route = 'request_by_ts'`）。T&S が 4 時間以内（`ts_review_due_at`、`request_expires_at` を超えない）に判定し、断りは事象 `ts_decline`、認めるのは `ts_clear`。判定の前のホストの承認は 409 `ts_review_pending`。期限までに判定が出なければホストに任せる。DT-BKG-001 に行 13a・21a・21b・21c を足し、35 行・期限の列 8 つにした（[booking-and-holds.md](booking-and-holds.md) の 6.1.1・7.2 節）。
+- **T&S の 150ms の超過**：booking-and-holds の領域は「`allow` で進めて事後の審査」、trust-and-safety の領域は「決定的な一致を確かめて `review`」と書いていた。「`booking` のプロセスの中の写しで決定的な一致（`block` の規則）だけを確かめ、当たれば `block`、当たらなければ進める。後から全部の規則で評価し、`allow` でなければ `review`（`ops_hold` と案件）」に揃え、両方の文書と ADR-0057 に書いた。
+- **リクエストの断りの理由**：理由のコードを `dates_not_available`・`group_size`・`house_rules_conflict`・`maintenance`・`other` に、表を `request_declines` に揃えた（正本は [booking-and-holds.md](booking-and-holds.md) の 9 節と [ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md)。trust-and-safety の領域の別のコードと `booking_decline_reasons` をやめた）。
+- **キャンセルの税**（[ADR-0039](../decisions/0039-cancellation-policy-table-and-refund-decision-table.md)・[ADR-0034](../decisions/0034-tax-collection-model.md) の注記）：「使わなかった泊の税を全部返す。ポリシーに依らない。チェックインの前は全額」を 1 つの規則にし、正本を DT-CXL-001（[cancellations-and-changes.md](cancellations-and-changes.md) の 5.3 節）に置いた。ADR-0034 と [taxes.md](taxes.md) は参照だけにした。返した税・残した税の扱いは法務の確認待ち（L4）。
+- **新しいホストの送金**（[ADR-0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)・[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)・[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md) の注記）：ledger の「最初の予約の release から 72 時間」と T&S の「最初の 3 件、チェックアウトの後 24 時間まで、`host_payable_hold`」を、「最初の 3 件の予約は、各予約の `check_out_at` + 24 時間まで、ledger の `payout_holds`（`kind = 'wait'`、理由 `new_host_first_stays`）でそのホストの送金を束から外す。release は時刻どおり、仕訳は動かさない。持ち主は `payouts`」の 1 つにした（[ledger-and-payouts.md](ledger-and-payouts.md) の 7.3 節）。報告があれば T&S が措置の保留をかける。
+- **排他の制約の書き方**（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md) の注記）：見出しと 5 節を `(listing_id =, claim_group <>, block_span &&)` に直した。ADR-0002 の S3 の分け方の鍵も、2 節と同じく置き場所の鍵に直した。
+- **S3 の core の分け方**（2 節）：「`listing_id` のハッシュ」を「置き場所の鍵（届出住宅に結んだリスティングは届出住宅の ID、他はリスティングの ID）のハッシュ」に直した（[ADR-0078](../decisions/0078-stage-up-criteria-split-plan-and-unit-cost.md)）。
+- **料金の変化と見積もり**（[ADR-0029](../decisions/0029-nightly-price-rules-and-discounts.md)・[ADR-0010](../decisions/0010-listing-states-and-revisions.md) の注記）：料金の規則・日付の上書きの変化は `pricing_version` だけを上げ、`listing_version` を上げない。見積もりは料金の変化で無効にならない（[ADR-0037](../decisions/0037-quote-binding-and-idempotency.md)）。PROP-PRC-003 を直した。
+- **正確な住所を出す期間**（[ADR-0038](../decisions/0038-booking-requests-and-arrival-info-release.md) の注記）：`check_out_at + 14 日` と `+ 7 日` が並んでいたので、ADR-0007 の 7 日に揃えた。
+- **泊数の上限**：検索の 1〜90 泊、日付を決めない検索の N = 28、税の 90 泊を、MVP の上限の 27 泊に揃えた（[ADR-0017](../decisions/0017-stay-rules-decision-table.md)）。
+- **見張りのリスティング**：observability の領域の提案を採り、`listingVisible()` の DT-LST-VIS-001 に行 3a（見張りの利用者だけに見せる）を足した（[listings-and-content.md](listings-and-content.md) の 8 節、[search-and-ranking.md](search-and-ranking.md) の 5.4 節）。
+- **名前の揃え**：
+  - 共同ホストの役割は `owner`・`full`・`calendar_and_reservations`・`messages_only`（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)。calendar-sync・regulatory-compliance-japan・booking-and-holds の `calendar` を直した）。
+  - 日付の上書きの列は `calendar_days.nightly_price_override`、書いた主体は `set_by_type`（pricing-and-fees の `calendar_days.price`・`price_source` を直した）。
+  - 正確な位置を読む関数は `readExactLocation(viewer, listing_id, purpose)`（security の `openExactLocation` を直した）。本人確認の結果の表は `identity_verifications`（security の `kyc_results` を直した）。
+  - Valkey の鍵は `avail:`・`prc:`・`qs:`・`ss:`・`claim:`・`idem:`・`sess:`・`quote:`・`vel:`・`rl:*`・`pmstok:`（infrastructure の `qsum:` を直した）。為替の相場の取り込みは `payments` の `fx-rate-importer`（infrastructure の `ledger` を直した）。
+  - 設定の表は `service_fee_schedules`・`cancellation_policies`・`host_cancellation_fee_tables`・`tax_table_versions`・`municipal_rule_sets`・`fx_markup_versions`（delivery の `fee_schedules`・`cancellation_policy_versions` を直した）。`legal.*` の全部の一覧を [data-model.md](data-model.md) の 6 節に置き、[delivery.md](delivery.md) の 3.3 節の表に足りない値を足した。
+  - runbooks の名前：`double-booking.md`・`calendar-double-booking.md` を [double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md)、`safety-incident-response.md` を [safety-incident.md](../runbooks/safety-incident.md)、`payout-delays.md` を [payout-failure.md](../runbooks/payout-failure.md) にした。
+- **数の揃え**：為替の上乗せは 200 bp（pricing-and-fees の 8.2 節の例の 2.5% を直し、額を 455.14 ドルに計算し直した）。相場の写しの古さの上限は 2 時間（pricing-and-fees の 6 時間を直した）。S1 の iCal の取得は約 33 件/秒（2 節の 35 を直した）。Valkey の `avail:` は平均 250 バイト（capacity・infrastructure の 0.5 KB を直した）。
+- **本家との意図した違い**（1.4 節）：共同ホストの管理を `owner` だけにすること、パスワードを持たないこと、予約の前にゲストの名前と顔の写真を見せないこと、PMS の API の審査、最長 27 泊、厳格の値（本家の厳格と同じと確かめた）、キャンセルの税の返し方、準備の日を含む iCal の書き出し、料金の上書きで無効にならない 15 分の見積もり、ホストだけの 15% のサービス料、位置のずらし方、15 分ごとの iCal の取り込み、`.ics` で終わらない取り込みのアドレス、リクエストの期限、新しいホストの送金の待ち、キャンセルの後のホストの取り分、ホストのキャンセルの罰、正確な住所を出す時期、レビューへの返答を足した。
+- **検証の工程での直し（2026-10-10）**：公式の資料を取得し直して、次を確かめ・直した。
+  - 本家：キャンセルポリシー（記事 475。本システムの厳格の値が本家の厳格と同じと確かめ、各ポリシーの税の返し方を足した）、サービス料（記事 1857。確認のみ）、送金の時期（記事 3133 で「チェックインの約 24 時間の後」を確かめ、**未検証**を外した。45 日は記事 425）、iCal（記事 99。3 時間、2 年、`.ics`。確認のみ）、レビュー（記事 13。確認のみ）、共同ホスト（記事 1534。確認のみ）。
+  - 日本の法令：仲介業者の義務（掲載の前の届出番号の確かめ、表示、6 か月ごとの観光庁への報告、削除の求め）を観光庁のページで確かめ、[regulatory-compliance-japan.md](regulatory-compliance-japan.md) の 3・10 節に足した。180 日の数え方の施行規則第 3 条の本文と、届出番号の形（M と数字）は取得できず**未検証**のまま。名簿の項目と 3 年の保存、定期報告（偶数月の 15 日）は観光庁のページのまま。外国人の旅券の写しの保管は、厚生労働省・国土交通省の指導として自治体の案内で確かめた（ICT の本人確認の要件は**未検証**）。旅館業法の令和 5 年の改正（特定要求行為、名簿の職業の削除と連絡先の追加）を自治体の解説で確かめ、L2 に足した（条文の番号は**未検証**）。
+  - 宿泊税：東京都（2027-04-01 から 3%、1 万 3 千円未満は免除、簡易宿所・民泊を足す）、大阪府（4 段階、民泊の清掃料を含む）、福岡市（市 150・450 円と県 50 円。条例の施行は 2020-04-01 と確かめて表に入れた）、京都市（2026-03-01 からの 5 段階）を確かめた。京都市の見直しの告知のページは 404 で、改正前の税率は**未検証**にした。
+  - AWS：`rds.global_db_rpo`（20 秒以上、全部の二次の遅れが値を超えると主の commit を止める、2 つのリージョンだけのときは二次のパラメーターを既定に）と、switchover の RPO 0 を確かめた（確認のみ）。
+- **品質と運用**：
+  - 各領域の「テストと性質」の ID の一覧を [quality.md](../quality.md) の 2.2.2 節に置き、漏れの経路の表（2.2.1 節 H）に見張りのリスティング、予約の前のゲストの名前、`hold` の予約、名簿の権限の行を足した。
+  - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[peak-season-operations.md](../runbooks/peak-season-operations.md)、[double-booking-or-cap-violation.md](../runbooks/double-booking-or-cap-violation.md)、[safety-incident.md](../runbooks/safety-incident.md)、[payout-failure.md](../runbooks/payout-failure.md)）と、計画のものに分けた（[runbooks/README.md](../runbooks/README.md) の 4 節）。
+  - 表と置き場所の索引は [data-model.md](data-model.md)。ER 図を含む正本は、データモデルの工程で書く。
+- **数値の正本**：
+  - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
+  - 期限（仮押さえ 10 分、リクエスト 24 時間とチェックインの 2 時間前の早いほう、見積もり 15 分、T&S の `hold` 4 時間、送金の振り替え チェックイン + 24 時間）は [ADR-0035](../decisions/0035-booking-decision-table-and-deadlines.md) と [booking-and-holds.md](booking-and-holds.md) の 7.3 節。
+  - お金（サービス料 15%、為替の上乗せ 200 bp、ホストのキャンセルの罰 10・25・50%、送金の束 銀行の営業日 09:30）は [ADR-0031](../decisions/0031-host-only-service-fee.md)・[ADR-0043](../decisions/0043-fx-rate-snapshots-markup-and-staleness.md)・[ADR-0040](../decisions/0040-host-and-ops-cancellations.md)・[ADR-0048](../decisions/0048-release-payout-batching-and-holds.md)。
+  - 法令（180 日、年度、外部の泊、名簿の 3 年）は [ADR-0065](../decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md)・[ADR-0067](../decisions/0067-guest-registry-in-vault.md) と `legal.*`（[data-model.md](data-model.md) の 6 節）。
+  - 期間（レビュー 14 日、損害の請求 14 日、iCal 15 分）は [ADR-0055](../decisions/0055-review-pairs-and-simultaneous-reveal.md)・[ADR-0050](../decisions/0050-damage-claim-lifecycle-and-guest-charge.md)・[ADR-0021](../decisions/0021-ical-import-pipeline-and-safety.md)。
+  - 速さの上限（PMS のアプリとホスト 1 秒 20・瞬間 100、アプリ 1 秒 500、検索 1 セッション 1 秒 10 回、IP ごと 1 分 120 件）は [ADR-0068](../decisions/0068-pms-oauth-apps-scopes-and-rate-limits.md)・[search-and-ranking.md](search-and-ranking.md) の 10 節・[security.md](security.md) の 3.3 節。
+  - 負荷と費用のモデル（S1 で月 約 4.3 万 USD、予約 1 件 約 2 円（予約の経路）・約 36 円（全原価の按分））は [capacity.md](capacity.md) と [infrastructure.md](infrastructure.md) の 9 節。
+- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 残る未解決事項（2026-10-10）
+
+| 項目 | いつ・どう決めるか |
+| --- | --- |
+| 法務の確認待ち（L1〜L14） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
+| 180 日の数え方の施行規則の本文、届出番号の形、名簿の ICT の本人確認、旅館業法の改正の条文の番号 | 法務の L1・L2・L3。国の資料で確かめるまで**未検証** |
+| ステージ 1 の候補の数、空きの区間の作り方、写しの大きさ、混入の率 | E7 の前の `availability-search-poc` |
+| 熱い日付の先着の印、セマフォ 4、`lock_timeout`、届出住宅のロックの待ち、GiST の書き込みの費用 | E9 の前の `hot-dates-booking-poc` |
+| 地名の辞書の出どころとライセンス、住所の検索の提供者 | E4 の前の `place-dictionary-poc` |
+| iCal の取り込みの量、相手の対応、急な消失の閾値、`UID` の戻し | E6 の前の `ical-import-poc` |
+| 決済の提供者（能力の表）、為替の相場の提供者、提携銀行、eKYC、翻訳、地図、SMS の選定 | E11・E12・E17・E3・E4・E2 の選定の Story（**未検証**） |
+| T&S の点の閾値、`booking_hold` の期限切れの既定（ホストに任せる）の見直し、審査の量 | E16 の `risk-scores` と S1 の運用の後に T&S と PM |
+| 新しいホストの最初の 3 件の待ちで、ホストの他の予約の送金も待つことの影響 | S1 の運用の 3 か月の後に PM・財務・T&S。必要なら予約ごとの保留の口座を考える |
+| `rds.global_db_rpo = 60` で平常の commit が止まる頻度 | E1 の後の計測で Dev と Ops |
+| 費用の実績（OpenSearch・ネットワーク・観測の単価は**未検証**） | E20 の `cost-baseline` |
+| 本家の振る舞いで未確認のもの（リクエストの間の日付、正確な住所の時期、最長の泊数、ホストのキャンセルの罰、料金の提案と順位付けの方式、SLA） | 公式の資料で確かめられなかった。本システムの値を使う |
+
 ## 7. 領域の文書（計画）
 
-各領域の文書は、まだない。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
+領域の文書は 2026-10-10 に書き、統合の工程で揃えた。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
@@ -469,16 +545,16 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [trust-and-safety.md](trust-and-safety.md) | 規則のエンジン、信号、審査の待ち行列、措置と異議、偽のリスティング、決済の不正、乗っ取り、パーティーの危険、安全の事故と 24 時間の窓口、差別の禁止（法務の L11）、開示の請求（法務の L14） | [0057](../decisions/0057-ts-decision-points-and-outcomes.md)、[0058](../decisions/0058-party-risk-score-and-bounded-ml.md)、[0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)、[0060](../decisions/0060-safety-incidents-and-24x7-line.md)、[0061](../decisions/0061-non-discrimination-enforcement.md) | QA、セキュリティ、法務 | E16 |
 | [identity-verification.md](identity-verification.md) | eKYC の提供者の連携、確認の水準、確認を求める規則、旅券の読み取り、書類の保存と削除（法務の L3・L8） | [0062](../decisions/0062-verification-levels-gates-and-provider-adapter.md)、[0063](../decisions/0063-passport-capture-for-guest-registry.md) | セキュリティ、法務 | E17 |
 | [regulatory-compliance-japan.md](regulatory-compliance-japan.md) | 届出住宅・許可・特定認定の型、番号の確かめと表示、`regulated_nights` と年度、自治体の規則の表、宿泊者名簿の電子の名簿、定期報告の書き出し、行政の要請への対応（法務の L1・L2・L3・L10） | [0064](../decisions/0064-registration-types-and-number-verification.md)、[0065](../decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md)、[0066](../decisions/0066-municipal-rule-sets.md)、[0067](../decisions/0067-guest-registry-in-vault.md) | QA、法務 | E18 |
-| [host-tools-and-api.md](host-tools-and-api.md) | 複数のリスティングの管理、一括の変更、共同ホストの役割、PMS の API（OAuth、範囲、速さの上限、冪等）、Webhook の署名と配信、API のバージョン | 0068–0070（使用：0068、0069、0070） | QA、セキュリティ | E19 |
-| [accounts.md](accounts.md) | ログイン（パスキー、一時コード、外部の ID）、セッション、端末、言語と通貨の設定、ホストのアカウントの作り方、退会とデータの削除（法務の L8）、アプリの形 | 0071–0072（使用：0071、0072） | セキュリティ | E2 |
-| [security.md](security.md) | 脅威モデル、vault と鍵、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、越境の移転（法務の L8） | 0073–0075（使用：0073、0074、0075） | セキュリティ | E1、E20 |
-| `data-model.md` | データモデルの索引（core・ledger・content・vault の表、S3 のパス、SNS・SQS の話題、OpenSearch の索引、Valkey の鍵、データレイクの形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、4 つの Aurora、OpenSearch、Valkey、egress（提供者、銀行、iCal の取得）、DR（大阪）、段階を上げる基準と分け方 | 0076–0078（使用：0076、0077、0078） | Ops | E1、E20 |
-| [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、検索の誤りの率の抜き取り、合成監視、照合の指標、外部送信規律（法務の L9） | 0079–0080（使用：0079、0080） | Ops | E1、E20 |
-| [capacity.md](capacity.md) | 負荷のモデル（検索、ステージ 2、予約、熱い日付、iCal の取り込み、繁忙期）、部品ごとの必要量、費用のモデル、負荷試験 | 0081（使用：0081） | Ops | E20 |
-| [delivery.md](delivery.md) | CI/CD、段階のデプロイ、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、料金・ポリシー・税・自治体の規則の表の出し方、アプリのリリースと最小のバージョン、ML のモデルの出し方 | 0082–0083（使用：0082、0083） | QA、Ops | E1、E20 |
+| [host-tools-and-api.md](host-tools-and-api.md) | 複数のリスティングの管理、一括の変更、共同ホストの役割、PMS の API（OAuth、範囲、速さの上限、冪等）、Webhook の署名と配信、API のバージョン | [0068](../decisions/0068-pms-oauth-apps-scopes-and-rate-limits.md)、[0069](../decisions/0069-pms-availability-and-price-push-and-bulk-operations.md)、[0070](../decisions/0070-webhooks-signing-delivery-and-ordering.md) | QA、セキュリティ | E19 |
+| [accounts.md](accounts.md) | ログイン（パスキー、一時コード、外部の ID）、セッション、端末、言語と通貨の設定、ホストのアカウントの作り方、退会とデータの削除（法務の L8）、アプリの形 | [0071](../decisions/0071-sign-in-sessions-devices-and-profiles.md)、[0072](../decisions/0072-sensitive-operations-payout-holds-and-account-deletion.md) | セキュリティ | E2 |
+| [security.md](security.md) | 脅威モデル、vault と鍵、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、越境の移転（法務の L8） | [0073](../decisions/0073-key-layout-and-vault-envelope-encryption.md)、[0074](../decisions/0074-operator-access-reveal-and-audit-chain.md)、[0075](../decisions/0075-data-classes-and-retention.md) | セキュリティ | E1、E20 |
+| [data-model.md](data-model.md) | データモデルの索引（core・ledger・content・vault の表、S3 のパス、SNS・SQS の話題、OpenSearch の索引、Valkey の鍵、データレイクの形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、4 つの Aurora、OpenSearch、Valkey、egress（提供者、銀行、iCal の取得）、DR（大阪）、段階を上げる基準と分け方 | [0076](../decisions/0076-accounts-network-and-egress-with-ssrf-controls.md)、[0077](../decisions/0077-data-stores-layout-and-osaka-dr.md)、[0078](../decisions/0078-stage-up-criteria-split-plan-and-unit-cost.md) | Ops | E1、E20 |
+| [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、検索の誤りの率の抜き取り、合成監視、照合の指標、外部送信規律（法務の L9） | [0079](../decisions/0079-sli-measurement-and-correctness-monitors.md)、[0080](../decisions/0080-telemetry-privacy-dashboards-and-app-telemetry.md) | Ops | E1、E20 |
+| [capacity.md](capacity.md) | 負荷のモデル（検索、ステージ 2、予約、熱い日付、iCal の取り込み、繁忙期）、部品ごとの必要量、費用のモデル、負荷試験 | [0081](../decisions/0081-sizing-tiers-and-holiday-prescaling.md) | Ops | E20 |
+| [delivery.md](delivery.md) | CI/CD、段階のデプロイ、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、料金・ポリシー・税・自治体の規則の表の出し方、アプリのリリースと最小のバージョン、ML のモデルの出し方 | [0082](../decisions/0082-pipeline-schema-ordering-and-config-governance.md)、[0083](../decisions/0083-app-releases-pms-api-versions-and-model-releases.md) | QA、Ops | E1、E20 |
 
-- 次に採番する ADR は 0084。
+- 次に採番する ADR は 0084。0013 と 0028 は範囲の中で使わなかった（欠番）。
 
 ## 8. Epic
 

@@ -15,13 +15,13 @@ T&S。判定の点（予約・公開・送金の口座の変更・ログイン�
 | --- | --- |
 | [0057](../decisions/0057-ts-decision-points-and-outcomes.md) | 規則のエンジンは判定の点ごとに結果の意味を決める。予約（`booking.create`）の `hold` は、即時予約をリクエストに回して T&S の案件を開き、審査の判定を 4 時間以内に出す（断りは予約の事象 `ts_decline`）。`block` は決定的な一致の規則だけ。措置は `moderation_actions` に根拠を書いてから、状態を変える関数を呼ぶ。異議は別の審査員が 72 時間以内に判定する |
 | [0058](../decisions/0058-party-risk-score-and-bounded-ml.md) | パーティーの危険の点 v1 は、許した特徴の一覧だけを使う加点の式（0〜1）で、0.50 以上は `step_up`（ハウスルールの明示の同意と本人確認）、催しの窓の中は 0.75 以上、外は 0.85 以上で `hold`。ML の点は影の評価の後に、式の点から ±0.20 の範囲でだけ動かせる。ゲストの住まいとの距離は `identity` が 3 つの区分に丸めて渡す |
-| [0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md) | 偽のリスティングは、写真の使い回し、禁止のハッシュ、位置の食い違い、届出番号の重複、相場から外れた価格、外部への誘導、到着の時の「存在しない」の報告を信号にする。新しいホストのアカウントの最初の 3 件の予約は、ホストへの支払いをチェックアウトの後 24 時間まで、内容の食い違いの報告がないことを確かめるまで保留する |
+| [0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md) | 偽のリスティングは、写真の使い回し、禁止のハッシュ、位置の食い違い、届出番号の重複、相場から外れた価格、外部への誘導、到着の時の「存在しない」の報告を信号にする。新しいホストのアカウントの最初の 3 件の予約は、ホストの送金をチェックアウトの後 24 時間まで待たせ（送金の待ち `new_host_first_stays`）、内容の食い違いの報告があれば措置の保留にする |
 | [0060](../decisions/0060-safety-incidents-and-24x7-line.md) | 安全の事故は `safety_incidents` の案件で、深刻度 S1（差し迫った危険）・S2（急ぎ）・S3 に分ける。S1 は人の応答 p90 2 分、保護の措置の開始 p95 30 分。緊急のボタンは先に 110・119 を示し、その後に安全の窓口へつなぐ。案件から予約の送金の保留、運用のキャンセル、代わりの宿の手配の記録、リスティングの停止の提案を操作する |
 | [0061](../decisions/0061-non-discrimination-enforcement.md) | 差別の禁止は、方針への同意（予約とホストの開始の条件）、確定の前の顔の写真の非表示、断りの理由のコードの必須、ホストの断りの率の見張り（同じ区域の中央値の 3 倍かつ 50% 超、90 日に 10 件以上で審査）、特徴の許可の一覧の CI の検査、利用者の段ごとの誤りの率の比 1.25 以下で行う |
 
 ## 1. 範囲
 
-- 扱う：判定の点、同期の検査の契約、信号の一覧、規則のエンジンの結果の意味と規則の初めの束、審査の待ち行列と期限、措置の種類と記録、異議、偽のリスティング、決済の不正、乗っ取りの信号の受け方、新しいホストの支払いの保留、パーティーの危険の点、安全の事故の案件と窓口、差別の禁止の仕組み、開示の請求と行政の要請の受け付けの枠組み、評価の集まりと公平さの評価の当て方。
+- 扱う：判定の点、同期の検査の契約、信号の一覧、規則のエンジンの結果の意味と規則の初めの束、審査の待ち行列と期限、措置の種類と記録、異議、偽のリスティング、決済の不正、乗っ取りの信号の受け方、新しいホストの送金の待ちと報告の後の保留、パーティーの危険の点、安全の事故の案件と窓口、差別の禁止の仕組み、開示の請求と行政の要請の受け付けの枠組み、評価の集まりと公平さの評価の当て方。
 - 扱わない：
   - 規則の言語の文法と影の評価の手順の細部（Mercari の題材の [ADR-0051](../../../mercari/docs/decisions/0051-rules-engine-declarative-tables.md) を参照し、同じ形を本システムのコードで書く）。
   - メッセージの絞り込み（[messaging.md](messaging.md) の 5 節）。この文書は信号を受ける。
@@ -102,8 +102,8 @@ flowchart TD
 | --- | --- | --- | --- |
 | `allow` | 進める | 公開・入れ替え | 変更する |
 | `step_up` | 本人確認（[identity-verification.md](identity-verification.md) の 5 節の水準）、3-D セキュアの要求、ハウスルールの明示の同意。済めば進める | 住所を確かめる書類、本人確認 | 再認証（パスキー）と、`owner` へのメール・SMS の確かめ |
-| `review` | 予約を進め、T&S の案件を開く（確定の後の審査）。ホストへの支払いの release を案件の判定まで止める | 公開・入れ替えを止めて審査（[listings-and-content.md](listings-and-content.md) の 4.3 節） | 変更し、案件を開く。送金は 72 時間の保留（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
-| `hold` | 即時予約のリスティングでも予約のリクエストに回す（`reserveStay` に `route=request` を渡す）。T&S の案件を開き、審査の判定を 4 時間以内に出す。審査が断るなら、予約の事象 `ts_decline` で `requested → declined`（booking-and-holds の領域の決定表に足す行）。認めるなら、ホストの承認を待つふつうのリクエストに戻す | 同上 | 変更を止めて審査 |
+| `review` | 予約を進め、T&S の案件を開く（確定の後の審査）。予約の事象 `ops_hold`（主体 T&S）でホストへの支払いの release を案件の判定まで止め、判定で `ops_release` | 公開・入れ替えを止めて審査（[listings-and-content.md](listings-and-content.md) の 4.3 節） | 変更し、案件を開く。送金は 72 時間の保留（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)） |
+| `hold` | 即時予約のリスティングでも予約のリクエストに回す（予約の `route = 'request_by_ts'`）。T&S の案件を開き、審査の判定を 4 時間以内に出す。審査が断るなら、措置を書いた後に予約の事象 `ts_decline` で `requested → declined`。認めるなら `ts_clear` で、ホストの承認を待つふつうのリクエストに戻す。期限を過ぎたらホストの判定に任せる（[booking-and-holds.md](booking-and-holds.md) の DT-BKG-001 の行 13a・21a・21b・21c） | 同上 | 変更を止めて審査 |
 | `block` | 予約を作らない（既知の盗難のカードの指紋の完全な一致など） | 公開しない（禁止のハッシュの完全な一致） | 変更しない |
 
 - `block` の規則は、`when` が完全な一致の事実（`signal.card_blocklist_exact`、`signal.photo_blocklist_exact`、`signal.term_exact_block`、`signal.registration_revoked`）だけでできていなければ束を作れない（Mercari の題材の束を作る時の検査と同じ）。
@@ -260,7 +260,7 @@ flowchart TD
 | 外部への誘導 | 説明の文・メッセージの `external_id`・`offplatform_payment` | 文は伏せる・止める（[messaging.md](messaging.md) の 5 節）、件数を信号に |
 | 到着して存在しない・入れない | 通報（`report`）、チェックインの日 | リスティングの `hold`、安全の窓口の S2、代わりの宿の手配 |
 
-- **新しいホストの最初の 3 件の予約**：ホストのアカウントの最初の 3 件の予約は、release をチェックアウトの後 24 時間まで延ばし、その間に「存在しない・内容が違う」の報告がなければ release する（`payout_hold` の理由 `new_host_first_stays`。ledger-and-payouts の領域の `host_payable_hold`）。前払いの詐欺で失うお金を、最初の滞在の確かめまで止める。
+- **新しいホストの最初の 3 件の予約**：ホストのアカウントの最初の 3 件の予約は、各予約のチェックアウトの後 24 時間まで、そのホストの送金を待たせる（送金の待ち `payout_holds.kind = 'wait'`、理由 `new_host_first_stays`。持ち主は `payouts`、規則の正本は [ledger-and-payouts.md](ledger-and-payouts.md) の 7.3 節）。release は時刻どおりで、仕訳を動かさない。待ちの間に「存在しない・内容が違う」の報告が来たら、T&S が措置の保留（`payout_hold`、`fraud_suspected`）をかける。前払いの詐欺で失うお金を、最初の滞在の確かめまで止める。
 - 偽のリスティングと判定したら、措置でリスティングを `suspended`、将来の予約を運用のキャンセル（全額の返金）にし、確定済みのゲストに代わりの宿の手配の連絡をする。写真のハッシュを禁止の一覧に足す（T&S の責任者の承認）。
 
 ## 9. 決済の不正と乗っ取り
@@ -316,7 +316,7 @@ stateDiagram-v2
 | --- | --- |
 | 方針への同意 | 全部の利用者が、最初の予約・最初のリスティングの前に、差別の禁止の方針（バージョンつき）に同意する。新しいバージョンは次の予約・公開の前に同意を求める |
 | 確定の前の顔の写真 | ホストに、予約の確定の前（リクエスト・問い合わせの間）にゲストの顔の写真を見せない。確定の後に出す。名前の出し方（名だけか）は L11 の後に決め、既定は名だけ |
-| 断りの理由 | 予約のリクエストを断るとき、理由のコード（`dates_no_longer_available`、`house_rules_mismatch`、`group_size`、`length_of_stay`、`listing_issue`、`other`）を必須にする。`other` の自由な文は差別の語の辞書で調べ、当たれば信号 |
+| 断りの理由 | 予約のリクエストを断るとき、理由のコード（`dates_not_available`、`group_size`、`house_rules_conflict`、`maintenance`、`other`。一覧の正本は [booking-and-holds.md](booking-and-holds.md) の 9 節）を必須にする。`other` の自由な文は差別の語の辞書で調べ、当たれば信号 |
 | 断りの率の見張り | ホストのアカウントごとの 90 日のリクエストの断りの率。リクエスト 10 件以上で、断りの率が同じ区域の中央値の 3 倍、かつ 50% を超えたら `discrimination` の案件。断りの直後（24 時間）に同じ日付で別のゲストを承認した件を数える |
 | 特徴の許可の一覧 | 順位付け・不正の点・パーティーの危険の点の特徴の一覧をバージョンで持ち、保護される属性とその代わりの値がないことを CI で確かめる（[quality.md](../quality.md) の 2.2.1 節 I） |
 | 公平さの評価 | 利用者の段（新しいアカウント、本人確認の有無、表示の言語、物件と同じ国か）ごとの `hold`・`block`・`step_up` の率と誤りの率。段の間の誤りの率の比が 1.25 を超える変更は出さない |
@@ -346,7 +346,7 @@ stateDiagram-v2
 
 | 事象 | 影響 | 扱い |
 | --- | --- | --- |
-| `trust-safety` の停止 | 判定ができない | `booking.create` は「点なしの既定の規則」（決定的な一致の確かめだけを `booking` のプロセスの中の写しで行う）で進め、後から評価して `review` に回す。`listing.publish` は待たせる |
+| `trust-safety` の停止・150ms の超過 | 判定ができない | `booking.create` は、`booking` のプロセスの中の写しで決定的な一致（`block` の規則）だけを確かめ、当たれば `block`、当たらなければ進める。後から全部の規則で評価し、`allow` でなければ `review` と同じ扱い（`ops_hold` と案件）にする（[booking-and-holds.md](booking-and-holds.md) の 6.1.1 節と同じ規則）。`listing.publish` は待たせる |
 | `ml-inference` の停止・遅れ | 点がない | 式の点だけで判定（7.2 節）。偽のリスティングの点は公開の後の審査 |
 | 審査の待ち行列の溢れ（繁忙期、事件） | 期限を超える | 期限の 80% で警告、Ops と応援の手順（runbooks）。`booking_hold` の期限切れの前に、判定が出なければホストの判定に任せる（T&S の断りをしない）ことを既定にする |
 | 安全の窓口の電話の障害 | S1 を受けられない | アプリの緊急のボタンは 110・119 を先に出すので、緊急の番号への案内は止まらない。予備の電話の提供者に切り替える（runbooks） |
@@ -357,12 +357,12 @@ stateDiagram-v2
 
 | 対象 | 値 |
 | --- | --- |
-| 予約の時の判定 | 150ms（超えたら決定的な規則だけで判定し、後から評価） |
+| 予約の時の判定 | 150ms（超えたら決定的な一致だけで判定し、後から評価して `allow` でなければ `review`） |
 | 同時の有効な仮押さえ | 1 ゲスト・1 端末・1 支払いの手段で 2 件 |
 | 規則 | 束に 500 本 |
 | 通報 | 1 人 1 日 20 件 |
 | 異議 | 1 つの措置に 1 回 |
-| 新しいホストの保留 | 最初の 3 件 |
+| 新しいホストの送金の待ち | 最初の 3 件、各予約のチェックアウトの後 24 時間まで（ledger-and-payouts の領域） |
 
 ## 16. data-model への項目
 
@@ -375,7 +375,7 @@ stateDiagram-v2
 | Aurora content `appeals`（`action_id` 一意、`body`、`reviewer`、`decision`、`decided_at`） | 異議 | 5.5 |
 | Aurora content `safety_incidents`（`id`、`severity`、`state`、`reservation_id`、`reporter`、`channel`、`acknowledged_at`、`mitigation_started_at`、`resolved_at`、`notes`）、`rebooking_records`。安全の担当の役割だけの RLS | 安全の事故 | 10 |
 | Aurora content `policy_acknowledgements`（`user_id`、`policy`、`policy_version`、`at`） | 方針への同意 | 11 |
-| Aurora core `reservations.ts_decision_id`、`reservations.route`（`instant`・`request`・`request_by_ts`）、`booking_decline_reasons`（`reservation_id`、`code`、`text`） | 予約の判定と断りの理由（booking-and-holds の表の列） | 5.2、11 |
+| Aurora core `reservations.ts_decision_id`・`route`（`instant`・`request`・`request_by_ts`）・`ts_review_due_at`・`ts_cleared_at`、`request_declines`（[booking-and-holds.md](booking-and-holds.md) が持つ） | 予約の判定と断りの理由 | 5.2、11 |
 | Valkey `vel:{kind}:{key}`（速さの数） | 速さ | 6 |
 | AppConfig `ts.event_windows`、`ts.party_features_v1`、`ts.thresholds` | 設定 | 7 |
 | データレイク `ts_eval_sets`（`evalset_version`） | 評価の集まり | 13 |
@@ -405,7 +405,7 @@ stateDiagram-v2
 | E16 | `risk-scores` | 不正・偽のリスティング・乗っ取りの点（規則の式から）、パーティーの危険の点 v1（6、7 節） |
 | E16 | `review-queues-and-actions` | 待ち行列、期限、`moderation_actions`、異議（5.4、5.5 節） |
 | E16 | `booking-hold-routing` | `hold` のリクエストへの回し、`ts_decline`（booking-and-holds の領域と合わせる。5.2 節） |
-| E16 | `fake-listing-detection` | 信号、新しいホストの保留（8 節） |
+| E16 | `fake-listing-detection` | 信号、報告の後の措置の保留（8 節。待ちは E12 の `payout-holds`） |
 | E16 | `party-prevention` | 点 v1、催しの窓、`step_up` の同意（7 節） |
 | E16 | `safety-incidents-and-24x7-line` | 緊急のボタン、案件、期限と上げ、代わりの宿の手配の記録（10 節） |
 | E16 | `non-discrimination-policy` | 同意、確定の前の写真の非表示、断りの理由、断りの率の見張り。法務：L11（11 節） |
@@ -416,9 +416,10 @@ stateDiagram-v2
 
 ### 決定（2026-10-10、既定案）
 
-- **結果の意味**：予約の `hold` はリクエストに回して 4 時間の審査、`block` は決定的な一致だけ（ADR-0057）。
+- **結果の意味**：予約の `hold` はリクエストに回して 4 時間の審査、`block` は決定的な一致だけ（ADR-0057）。DT-BKG-001 に行 13a・21a・21b・21c を足した（2026-10-10、統合）。
+- **150ms の超過**：決定的な一致だけで判定し、後から評価して `allow` でなければ `review`（booking-and-holds の領域と同じ規則。2026-10-10、統合）。
 - **パーティー**：許した特徴の加点の式、0.50・0.75・0.85、ML は ±0.20 まで（ADR-0058）。
-- **偽のリスティング**：信号と、新しいホストの最初の 3 件の保留（ADR-0059）。
+- **偽のリスティング**：信号と、新しいホストの最初の 3 件の送金の待ち（ADR-0059。2026-10-10 の統合で ledger の待ちと 1 つにした）。
 - **安全**：S1〜S3、S1 は p90 2 分・p95 30 分（ADR-0060）。
 - **差別の禁止**：同意、写真の非表示、断りの理由、断りの率の見張り（ADR-0061）。
 
@@ -432,4 +433,3 @@ stateDiagram-v2
 | 点の閾値と加点の値 | E16 の `risk-scores` で評価の集まりと影の評価から。T&S の責任者が承認 |
 | `booking_hold` の期限切れの既定（ホストに任せる） | S1 の運用の審査の量を見て T&S と PM が見直す |
 | 催しの窓の表の作り方（地域の祭り・花火大会） | T&S の運用が季節ごとに入れる |
-| 予約の事象 `ts_decline` と `route=request` | booking-and-holds の領域の決定表（DT-BKG-001）に行を足すことを、その領域の担当と合わせる |

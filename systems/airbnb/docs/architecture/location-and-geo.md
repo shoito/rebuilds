@@ -128,7 +128,7 @@ sequenceDiagram
 | 運用者 | 全部 | JIT の権限と vault の監査（security の領域） |
 | 検索・地図・リスティングの画面・共有のページ・通知・メッセージの自動の文・iCal の書き出し・データレイク | `approx_point`、市区町村の名前、近い地名だけ | 正確な位置を読む経路を持たない |
 
-- 正確な位置を読む関数は `readExactLocation(viewer, listing_id)` の 1 つ。中で `exactLocationVisible()` を呼び、vault の監査の行を同じトランザクションで書く。
+- 正確な位置を読む関数は `readExactLocation(viewer, listing_id, purpose)` の 1 つ（目的のコードは [security.md](security.md) の 3.4 節）。中で `exactLocationVisible()` を呼び、vault の監査の行を同じトランザクションで書く。
 - 地図のリスティングの画面の「最寄りの駅から徒歩 N 分」は、`approx_point` から求める（正確な位置から求めると、距離で位置が絞れる）。
 
 ## 5. ずらした位置（ADR-0014）

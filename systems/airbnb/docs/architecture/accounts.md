@@ -303,7 +303,7 @@ stateDiagram-v2
 | 外部の ID の提供者の障害 | その方式のログインができない | 他の方式。結び付けた方式だけのアカウントは、確認済みのメールのコードで入れる |
 | `identity` の障害 | 新しいログインと更新ができない | アクセスのトークンは Valkey の写しで 15 分は使える。アプリは後退して再試行 |
 | Valkey の障害 | セッションの写しがない | core の読み出しの写しで引く（遅れる） |
-| 乗っ取りの波 | 多くの送金の口座の変更 | 72 時間の待ちが効く。`account-takeover.md` の手順（E2 で作る）で、必要なら `ops.payouts_enabled` で送金を止める |
+| 乗っ取りの波 | 多くの送金の口座の変更 | 72 時間の待ちが効く。`account-takeover.md` の手順（計画。E2 の `account-takeover-signals` で作る。[runbooks/](../runbooks/README.md) の 4 節）で、必要なら `ops.payouts_enabled` で送金を止める |
 | 消去の処理の途中の失敗 | 一部だけ消えた | 段ごとの記録から再開する。`deleted` は全段の後に付ける |
 
 ## 12. 上限
@@ -320,7 +320,7 @@ stateDiagram-v2
 | 送金の待ち | 72 時間 | ADR-0072、[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md) |
 | 退会の取り消しの期間、予約の後の窓 | 30 日、チェックアウトから 14 日 | ADR-0072 |
 
-**本家との意図した違い**（[architecture/README.md](README.md) の 1.4 節に足す）：パスワードを持たない。予約の前のホストにゲストの名前と顔の写真を見せない（既定）。全部の権限の共同ホストは送金・成員に触れない（[host-tools-and-api.md](host-tools-and-api.md)）。
+**本家との意図した違い**（[architecture/README.md](README.md) の 1.4 節に足した。2026-10-10、統合）：パスワードを持たない。予約の前のホストにゲストの名前と顔の写真を見せない（既定）。全部の権限の共同ホストは送金・成員に触れない（[host-tools-and-api.md](host-tools-and-api.md)）。
 
 ## 13. data-model への項目
 
