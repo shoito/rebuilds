@@ -314,6 +314,8 @@ score  = p_play · watch · (1 + rel) · q · fresh
 
 ## 15. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `watch_history`（本人の表、FORCE RLS） | 11.1 節 | `(user_id, video_id)`。`(user_id, last_watched_at DESC)` | 11.1 |

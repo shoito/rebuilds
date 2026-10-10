@@ -70,8 +70,8 @@
 | `t_client` | 端末の時刻（ミリ秒）。順序の参考だけに使い、窓の判定には使わない |
 | `pos_ms` | 本編の位置 |
 | `iv` | 心拍と `end`：前の心拍からの再生した区間の列 `[[from_ms, to_ms], ...]`（最大 8 区間）。本編だけ。広告の時間を含めない |
-| `rate` | 再生の速さ（1.0、1.5 など） |
-| `vis`・`muted` | 心拍の区間で、画面に見えていた秒数と、音を消していた秒数 |
+| `rate` | 再生の速さの千分率の整数（1,000 が等速、1,500 が 1.5 倍。浮動小数点を使わない） |
+| `vis`・`muted` | 心拍の区間で、画面に見えていた時間と、音を消していた時間（ミリ秒の整数） |
 | `src` | `play_intent` だけ：流入の元（`home`・`next`・`search`・`subs`・`notif`・`channel`・`playlist`・`embed`・`external`・`other`） |
 | `ad` | 広告の出来事だけ：`imp_id`（VAST の要求に渡した表示の ID）、`break`（`pre`・`mid`・`post`） |
 
@@ -311,6 +311,8 @@ public(video) = Σ daily_final(d)          （d ≤ 最後に締めた日 D）
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | MSK `watch-events` | 4.1 節の封筒と受け口が足した欄 | 鍵 `video_id`（熱い動画は `video_id#bucket`） | 4 |
@@ -318,10 +320,11 @@ public(video) = Σ daily_final(d)          （d ≤ 最後に締めた日 D）
 | Iceberg `watch_events` | 4.4 節 | 分割 `event_date`・`hour` | 4.4 |
 | Iceberg `watch_sessions` | `sid`、`video_id`、`viewer_key`、`valid`、`engaged`、`watched_ms`、`reasons[]`、`ruleset_version`、切り口 | 分割 `event_date` | 7.2 |
 | Valkey | `vc:p:{video_id}:{hour}`（仮）、`vc:pub:{video_id}`（表示）、`vd:{video_id}:{viewer_key}`（S04・S05 の状態、24 時間）、`vh:{video_id}`（熱い印） | — | 4.3、5.2 |
-| `view_counts_hourly`・`view_counts_daily` | `video_id`、`hour`・`date`、`views`、`engaged_views`、`watch_ms`、`ruleset_version`、`computed_at` | `(video_id, hour)`・`(video_id, date)`。月ごとの分割 | 5.2 |
+| `view_counts_hourly`・`view_counts_daily` | `video_id`、`hour`・`day`、`views`、`engaged_views`、`watch_ms`、`ruleset_version`、`computed_at` | `(video_id, hour)`・`(video_id, day)`。月ごとの分割 | 5.2 |
+| `video_view_totals` | 締めた日までの 1 日の確定の和（`views_total`、`through_day`）。公開の数の組み立てで日ごとの行を足し直さないため | `(video_id)` | 5.3 |
 | `view_adjustments` | `video_id`、`period`、`stage`（`provisional_to_hourly`・`hourly_to_daily`・`recompute`）、`delta`、`rule_id`、`ruleset_version`、`created_at` | `(video_id, period, stage, rule_id)` | 5.5 |
-| `video_stats_daily` | 6・7 節の合計と維持率の覆い（`int4[]`） | `(video_id, date)` | 7.2 |
-| `channel_stats_daily_dim`（チャンネルの表、FORCE RLS） | `channel_id`、`date`、`dim`、`value`、指標 | `(channel_id, date, dim, value)` | 7.2 |
+| `video_stats_daily` | 6・7 節の合計と維持率の覆い（`int4[]`） | `(video_id, day)` | 7.2 |
+| `channel_stats_daily_dim`（チャンネルの表、FORCE RLS） | `channel_id`、`day`、`dim`、`value`、指標 | `(channel_id, day, dim, value)` | 7.2 |
 | 運用の一覧 | データセンターの ASN、ボットの `ua_class` | — | 5.1 |
 
 ## 12. テストと性質

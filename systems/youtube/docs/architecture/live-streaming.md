@@ -238,7 +238,7 @@ stateDiagram-v2
 - 配信ごとに、直近 60 秒の部分・セグメント・プレイリストの状態をメモリーに持つ Rust の部品。主のノードと、別の AZ の写しのノードの 2 つに、変換器が両方へ送る。
 - 要求の保留：`_HLS_msn`・`_HLS_part` が未来なら、その部分ができるまで待つ。6 秒（3 Target Duration）を超えたら 503（草案）。2 つ先より先の要求は 400。
 - 60 秒より古いセグメントは、DVR の S3 から `origin-cache` 経由で返す（[cdn-and-delivery.md](cdn-and-delivery.md) の 4 節の `/v/` のパス）。
-- パス：`/l/{stream_id}/{caps}/{rendition}/index.m3u8`、部分 `/l/{stream_id}/{rendition}/{msn}.{part}.m4s`、セグメント `/l/{stream_id}/{rendition}/{msn}.m4s`。
+- パス：`/l/{video_id}/{caps}/{rendition}/index.m3u8`、部分 `/l/{video_id}/{rendition}/{msn}.{part}.m4s`、セグメント `/l/{video_id}/{rendition}/{msn}.m4s`。ID は配信の動画の `video_id`（エッジのトークンの署名と拒否の鍵 `b:{video_id}` を効かせるため。[data-model.md](data-model.md) の D-30）。
 
 ## 7. DVR とアーカイブ（ADR-0031）
 
@@ -316,6 +316,8 @@ flowchart LR
 | 認証の失敗 | IP あたり 1 分 10 回 |
 
 ## 12. data-model への項目
+
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |

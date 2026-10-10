@@ -316,6 +316,8 @@ stateDiagram-v2
 
 ## 13. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `accounts`（本人だけの表） | `account_id`（UUIDv7）、`email_hmac`、`email_enc`、`password_hash`、`age_band`、`age_assurance`、`state`（`normal`・`suspected`・`locked`・`recovering`・`deleted`）、`mfa_required`、`created_at` | `(account_id)`、一意 `(email_hmac)` | 5、6 |
@@ -333,6 +335,8 @@ stateDiagram-v2
 | `account_standing`（チャンネルの表） | `channel_id`、`state`、`active_guidelines`、`active_copyright`、`restricted_until`、`termination_due_at` | `(channel_id)` | 9.3 |
 | `standing_appeals` | `appeal_id`、`channel_id`、`target`（`strike_id` か終了）、`state`、`decided_by`、`decided_at` | `(appeal_id)` | 9.3 |
 | `rights_owner_applications` | `application_id`、`org_name`、`org_verification`、`rights_kinds[]`、`state`（`submitted`・`probation`・`approved`・`suspended`・`rejected`）、`reviewed_by`、`probation_until` | `(application_id)` | 8 |
+| `rights_owners`・`rights_owner_members` | 権利者の組織（`public_name`、`state`、見習いの上限）と、アカウントに配る権利者の役割（`ro_admin`・`ro_analyst`）。`app.rights_owner_ids` の元 | `(rights_owner_id)`・`(rights_owner_id, account_id)` | 4.1、8 |
+| `external_identities` | 外部の IdP（OIDC）の結び付け：`issuer`、`subject`、`account_id` | `(issuer, subject)` | 5.1 |
 | `security_events`（本人だけの表） | `account_id`、`kind`（新しい端末、再確認、キーの表示、乗っ取りの疑い）、`at`、`asn` | `(account_id, at)` | 5 |
 | `safety_holds` | `channel_id`、`reason`、`opened_by`、`opened_at`、`closed_at` | `(channel_id) WHERE closed_at IS NULL` | 5.4 |
 | Valkey | `sess:{session_id}`（15 分）、`chm:{account_id}`（役割を持つチャンネルの一覧、60 秒） | — | 5.3、4.2 |

@@ -1,6 +1,6 @@
 # Architecture: YouTube
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。表と置き場所の索引は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。データモデルの正本（規約、表の目録、ER 図、置き場所、形式、不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -461,7 +461,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **品質と運用**：
   - 各領域の文書の「テスト」「quality.md・runbooks・data-model への項目」の提案を反映した。[quality.md](../quality.md) に、性質と決定表の一覧（2.2.2 節）、漏れの経路の表の行、DR・負荷・決定性の重点、Epic の合否基準を足した。
   - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[cdn-incident.md](../runbooks/cdn-incident.md)、[viral-spike.md](../runbooks/viral-spike.md)、[takedown-propagation.md](../runbooks/takedown-propagation.md)、[live-incident.md](../runbooks/live-incident.md)）と計画のものに分けて一覧にした。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。全部の ER は後で作る。
+  - データモデルの正本は [data-model.md](data-model.md)。全部の ER はデータモデルの工程で作った（下の「決定（2026-10-10、データモデル）」）。
   - 領域の文書が足した Story（約 50 件）を [roadmap.md](../roadmap.md) に足した。
 - **数値の正本**：
   - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
@@ -470,6 +470,18 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - 指紋の母数は [ADR-0043](../decisions/0043-fingerprint-v1-hash-formats.md)〜[0045](../decisions/0045-offset-voting-verification-and-distortion-variants.md)。
   - 負荷と費用のモデルは [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 11 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-10、データモデル）
+
+データモデルの工程（[data-model.md](data-model.md) の 7 節、D-1〜D-39）のうち、アーキテクチャに関わるものを推奨の案で決めた。ADR の決定は変えていない。どれも開発リポジトリの最初の spec の前に覆りうる。
+
+- **DB とロール**（D-1・D-4）：Aurora の DB は 1 つ（`app`）で、領域ごとの 12 のスキーマとサービスごとのロールにする。システムのロール（パイプライン、台帳、照合など）は `BYPASSRLS` を持たず、表ごとの `TO <role> USING (true)` のポリシーで全行を読む。運用者が RLS を外す役割は作らない（[ADR-0009](../decisions/0009-single-tenant-and-playable.md)、[ADR-0063](../decisions/0063-operator-access-audit-retention-and-legal-hold.md) の範囲の具体）。
+- **`videos` の RLS**（D-5）：「公開の行」（`state = 'published'`）と「持ち主のチャンネル」の 2 つのポリシーにし、見える範囲の細部は `playable()` が決める。ADR-0009 の「公開の動画の情報は RLS の外、未公開の動画の情報はチャンネルの表」を 1 つの表で満たす。
+- **ID の形**（D-3）：DB は `uuid`、S3・CDN・Valkey・KeyValueStore・トークンは 32 文字の 16 進（経路の形）、画面と API の URL は 22 文字の base64url（`/w/{vid}`・`/c/{cid}`・`/@{handle}`）。
+- **ライブの URL**（D-30）：`/l/{video_id}/…` にする（`stream_id` でなく）。エッジのトークンの署名と拒否の鍵 `b:{video_id}` をライブにも効かせるため。[live-streaming.md](live-streaming.md) の 6.7 節を直した。
+- **outbox**（D-15）：全領域で 1 つの `ops.outbox`（日の分割）。`relay` は SNS の `domain-events` に話題の属性つきで送り、消費者は `inbox_events` で重複を除く。封筒は `v` 1。
+- **ファイルとトークンの形**（D-11・D-12・D-13）：指紋 `FPA1`・`FPV1`、索引の世代 `FIX1`（リトルエンディアン）と `index_generations`、再生のトークンの文字列 `v1.{kid}.{payload}.{sig}`、アクセス・更新のトークンの接頭辞 `<brand>_at_`・`<brand>_rt_`（[data-model/formats.md](data-model/formats.md)）。
+- **置き場所**（D-25）：`<records-bucket>`（`kms-pii`）を足し、明細・台帳の写し・申し込みの資料・通報の証拠・法的な書き出しを置く（[infrastructure.md](infrastructure.md) の 6.1 節に行を足した）。
 
 ### 残る未解決事項（2026-10-10）
 
@@ -515,7 +527,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [monetization-and-payouts.md](monetization-and-payouts.md) | 収益化の条件、広告の枠と外部の広告サーバー、メンバーシップ、メンバー限定、台帳と分配、照合の収益の分け方、支払い（法務の L7） | 0055、0056、0057、0058 | QA、PM | E14 |
 | [accounts-and-safety.md](accounts-and-safety.md) | アカウント、認証、年齢、創作者の確認（長い動画のアップロード）、権利者の審査、不正なアカウント、侵害の繰り返しの措置（法務の L1・L3・L10） | 0059、0060、0061 | セキュリティ | E6、E9 |
 | [security.md](security.md) | 脅威モデル、ストリームキーと署名、暗号化と鍵、運用者の参照、開示の請求の手順（法務の L10）、外への送信 | 0062、0063 | セキュリティ | E1、E15 |
-| [data-model.md](data-model.md) | データモデルの索引（Aurora の表、S3 のパス、MSK のトピック、Valkey の鍵） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本：規約（ID、RLS、金額、バージョン、分割と保持、暗号化）、141 表の目録と ER 図（[data-model/](data-model/) の 14 本）、Aurora の外の置き場所と形式（[stores.md](data-model/stores.md)・[formats.md](data-model/formats.md)）、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、メディアの面のプール（CPU の Spot、GPU、NVMe）、MSK、CDN の構成、DR（大阪）、段階を上げる基準 | 0064、0065、0066 | Ops | E1、E15 |
 | [observability.md](observability.md) | 自己監視、QoE と CDN の指標、パイプラインの段の時刻、見張りの動画と見張りのライブ、SLI | 0067、0068 | Ops | E1、E15 |
 | [capacity.md](capacity.md) | 負荷のモデル（アップロード、符号化、配信、ライブ、出来事、照合）、部品ごとの必要量、費用のモデルの単価、負荷試験、急な人気の模型 | 0069 | Ops | E15 |

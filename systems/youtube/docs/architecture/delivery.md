@@ -324,6 +324,8 @@ sequenceDiagram
 
 ### data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `enc_builds` | `enc_build`、構成（バージョンとコミットの JSON）、命令セット、試験のベクトルのハッシュ、承認者、`created_at` | `(enc_build)` | 6.2 |

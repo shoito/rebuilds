@@ -288,6 +288,8 @@ strike の記録・数え方・効き目・アカウントの状態は [accounts
 
 ## 12. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `assets`（権利者の表、FORCE RLS） | `asset_id`、`rights_owner_id`、`type`、`title`、`policy_id` | `(asset_id)` | 4.1 |
@@ -295,11 +297,12 @@ strike の記録・数え方・効き目・アカウントの状態は [accounts
 | `owner_allowlists`（権利者の表） | `rights_owner_id`、`channel_id` | `(rights_owner_id, channel_id)` | 4.1 |
 | `claims`（権利者の表） | `claim_id`、`video_id`、`asset_id`、`rights_owner_id`、`segments`（JSON）、`state`、`respond_by`、`conflict`、`source`、`created_at` | `(claim_id)`。`(video_id)`。部分索引 `(respond_by) WHERE state IN ('disputed','appealed','reinstated')` | 4.2、7 |
 | `claim_effects` | `video_id`、`territory`、`result`（`none`・`track`・`monetize`・`block`）、`computed_at`、`claims_version` | `(video_id, territory)` | 4.4 |
-| `claim_transitions`（追記だけ） | `claim_id`、`from`、`to`、`actor`（`creator`・`owner`・`system`・`staff`）、`reason`、`at` | `(claim_id, at)` | 7.1 |
+| `claim_transitions`（追記だけ） | `claim_id`、`from_state`、`to_state`、`actor_kind`（`creator`・`owner`・`system`・`staff`）、`reason_code`、`at` | `(claim_id, at)` | 7.1 |
 | `claim_disputes` | `claim_id`、`kind`（`dispute`・`appeal`）、`reason`、`statement`、`filed_by`、`filed_at` | `(claim_id, kind)` | 7.4 |
 | `claim_notices`（チャンネルの表） | 5 節の写し | `(channel_id, video_id, claim_id)` | 5 |
-| `revenue_split_daily` | `video_id`、`date`、`party`（`creator`・`owner:{id}`・`escrow:{claim_id}`）、`weight_s` | `(video_id, date, party)` | 6 |
-| `copyright_cases` | `case_id`、`kind`（`takedown`・`counter`）、`video_id`、`requester`（暗号化）、`state`、`received_at`、`due_at`、`decided_at`、`decision` | `(case_id)`。`(state, due_at)` | 8 |
+| `revenue_split_daily` | `video_id`、`day`、`party`（`creator`・`owner:{id}`・`escrow:{claim_id}`）、`weight_units`（1 秒 ＝ 27,720 単位の整数） | `(video_id, day, party)` | 6 |
+| `copyright_cases` | `case_id`、`intake`（`owner_portal`・`public_form`）、`video_id`、`requester_enc`（暗号化）、`state`、`received_at`、`due_at`、`decided_at`、`decision` | `(case_id)`。`(state, due_at)` | 8 |
+| `counter_notices` | 反論の通知（ADR-0049。既定で無効）：`counter_id`、`case_id`、`statement_enc`、`state`、`wait_until` | `(counter_id)`。一意 `(case_id)` | 8.2 |
 | AppConfig | `legal.copyright.*`（期限、通知の文、反論の通知の有効と待ち） | — | 8 |
 | outbox | `claim_created`、`claim_policy_changed`、`claim_resolved`、`copyright_strike_requested`、`copyright_strike_retracted` | — | 4.3、8.3 |
 

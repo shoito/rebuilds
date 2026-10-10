@@ -405,12 +405,14 @@ s3://<media-bucket>/r/{video_id}/{stage}/{cfg}/{inp}/{chunk:05}.{ext}
 
 ## 15. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `pipeline_runs` | `run_id`、`video_id`、`state`、`gate_result`（`publish`・`block`・`hold`）、`created_at`、`gated_at`、`done_at` | `(run_id)`、一意 `(video_id)` | 3.2 |
-| `pipeline_tasks` | `task_id`、`run_id`、`stage`、`chunk`、`priority`、`state`、`deps_left`、`attempt`、`lease_token`、`lease_until`、`cfg_hash`、`inp_hash`、`output_key`、`output_crc`、`error_code`、`stage_times`（JSON） | `(task_id)`、`(run_id, stage, chunk)` 一意、部分索引 `(lease_until) WHERE state='leased'` | 3.3 |
+| `pipeline_runs` | `run_id`、`kind`（`video`・`reference`）、`video_id`・`reference_id`（どちらか 1 つ）、`state`、`gate_result`（`publish`・`block`・`hold`）、`created_at`、`gated_at`、`done_at` | `(run_id)`、一意 `(video_id)`・`(reference_id)` | 3.2 |
+| `pipeline_tasks` | `task_id`、`run_id`、`stage`、`chunk`、`priority`、`state`、`deps_left`、`attempt`、`lease_token`、`lease_until`、`cfg_hash`、`inp_hash`、`output_key`、`output_crc`、`error_code`、`stage_times`（JSON） | `(task_id)`、`(run_id, stage, chunk, cfg_hash)` 一意（作り直しを同じ run に足すため）、依存の辺は `pipeline_task_deps`、部分索引 `(lease_until) WHERE state='leased'` | 3.3 |
 | `ladders` | `video_id`、`ladder_version`、`codec`、`rungs`（JSON：解像度、CRF、`maxrate`、試しの VMAF）、`mobile_top`、`trial_points`（S3 のキー）、`fallback` | `(video_id, codec, ladder_version)` | 5 |
-| `renditions` | `video_id`、`rendition_id`、`codec`、`height`、`bitrate`、`ladder_version`、`generation`、`state` | `(video_id, rendition_id)` | 5、[packaging-and-drm.md](packaging-and-drm.md) |
+| `renditions` | `video_id`、`gen`、`name`、`codec`、`height`、`target_bps`、`ladder_version`、`state` | `(video_id, gen, name)` | 5、[packaging-and-drm.md](packaging-and-drm.md) |
 | `av1_promotions` | `video_id`、`reason`（`views_7d`・`spike`・`channel`・`hires`）、`triggered_by`（`confirmed`・`provisional`）、`requested_at`、`restore_started_at`、`done_at` | `(video_id)` | 6 |
 | `audio_loudness` | `video_id`、`integrated_lufs`、`true_peak_dbtp` | `(video_id)` | 7 |
 | `captions` | `video_id`、`lang`、`kind`（`manual`・`auto`）、`engine`、`s3_key`、`created_at` | `(video_id, lang, kind)` | 8 |

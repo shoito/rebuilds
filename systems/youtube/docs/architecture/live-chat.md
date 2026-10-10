@@ -141,7 +141,7 @@ flowchart LR
 | 1 接続のフレーム | 1 秒 10 フレーム、1 フレーム 4 KB | 切る |
 | 配信あたりの受け付け | 1 秒 5,000 件 | `busy` |
 
-- 速さの判定は Valkey の鍵（`rl:{user_id}`、`slow:{stream_id}:{user_id}`）で行う。Valkey が使えないときは、Gateway のノードの中だけの桶で判定する（緩くなるが、止めない）。
+- 速さの判定は Valkey の鍵（`chat:rl:{user_id}`、`chat:slow:{stream_id}:{user_id}`）で行う。Valkey が使えないときは、Gateway のノードの中だけの桶で判定する（緩くなるが、止めない）。
 
 ### 6.2 モード
 
@@ -204,15 +204,17 @@ flowchart LR
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | MSK `chat-in` | 検査を通った送信（配信の ID で分ける）。保持 1 日 | — | 5.1 |
 | MSK `chat-log` | 番号つきのメッセージとモデレーションの出来事。S3 の Parquet（Iceberg の表）へ。保持の期間は security の領域（**法務の確認待ち：L10**） | — | 5.2 |
-| Valkey | `chat:{stream_id}`（Stream、1,000 件）、`chat:{stream_id}:all`・`:top`・`:mod`（sharded pub/sub）、`rl:{user_id}`、`slow:{stream_id}:{user_id}`、`dup:{stream_id}:{user_id}:{hash}` | 期限つき | 5、6 |
+| Valkey | `chat:{stream_id}`（Stream、1,000 件）、`chat:{stream_id}:all`・`:top`・`:mod`（sharded pub/sub）、`chat:rl:{user_id}`、`chat:slow:{stream_id}:{user_id}`、`chat:dup:{stream_id}:{user_id}:{hash}`（チャットのクラスタに置くため `chat:` で始める） | 期限つき | 5、6 |
 | `chat_settings`（チャンネルの表） | `stream_id`、`mode`、`slow_seconds`、`auto_slow`、`links_held` | `(stream_id)` | 6.2 |
 | `chat_moderators`（チャンネルの表） | `channel_id`、`user_id`、`granted_by`、`granted_at` | `(channel_id, user_id)` | 6.3 |
-| `chat_bans`（チャンネルの表） | `channel_id`、`user_id`、`kind`（`timeout`・`ban`）、`until`、`by` | `(channel_id, user_id)` | 6.3 |
-| `chat_blocked_terms`（チャンネルの表と運用の表） | 語、正規化の形 | `(channel_id, term)` | 6.3 |
+| `chat_bans`（チャンネルの表） | `channel_id`、`user_id`、`kind`（`timeout`・`ban`）、`stream_id`（タイムアウトの配信）、`expires_at`、`banned_by` | `(channel_id, user_id)` | 6.3 |
+| `channel_blocked_terms`（チャンネルの表）・`system_blocked_terms`（運用の表） | コメントと共有の 1 つの一覧。チャンネルの語は暗号文と HMAC | `(channel_id, term_hmac)`・`(term_norm)` | 6.3 |
 | S3 | `p/{video_id}/chat/{n}.json.gz` | — | 8 |
 
 - チャットの本文は `chat-in`・`chat-log`・Valkey・リプレイのファイルにだけ置き、ログ・トレース・指標には出さない（AGENTS.md）。

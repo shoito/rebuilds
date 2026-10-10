@@ -235,6 +235,7 @@ ADR-0065。
 | `<fp-bucket>` | 指紋（アップロードと参照）、参照の索引のファイル | `kms-fp` | Standard（参照）、Intelligent-Tiering（アップロード） |
 | `<events-bucket>` | Iceberg の `watch_events`・`watch_sessions`、`chat-log` の Parquet | `kms-events` | Standard。保持は [security.md](security.md) の 6 節 |
 | `<logs-bucket>`（log-archive） | CDN の標準のログ、ALB・NLB のログ、監査の記録 | `kms-audit` | Object Lock（監査の記録だけ） |
+| `<records-bucket>` | 明細、25 か月を過ぎた台帳の写し、権利者の申し込みの資料、通報の証拠、法的な書き出し（[data-model/stores.md](data-model/stores.md) の 3 節） | `kms-pii` | Object Lock（台帳だけ）。保持は `retention_policies` |
 
 ### 6.2 層の移し
 
@@ -466,6 +467,8 @@ ADR-0066。[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) は S2 か�
 - `gpu-capacity.md`：ODCR の不足、AZ の停止のときの戻しの順。
 
 ### data-model への項目
+
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |

@@ -326,12 +326,14 @@ sequenceDiagram
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `comments` | `video_id`、`comment_id`、`channel_id`、`author_id`、`parent_id`、`reply_to_user_id`、`body`、`state`、`spam_score`、`tox_score`、`classifier_version`、`pinned`、`hearted`、`like_count`、`reply_count`、`edited_at`、`created_at` | `(video_id, comment_id)`。16 の分割。4.3 節の索引 | 4 |
 | `comment_likes` | `comment_id`、`user_id`、`created_at` | `(comment_id, user_id)` | 4.3 |
 | `comment_reviews`（チャンネルの表、FORCE RLS） | `channel_id`、`video_id`、`comment_id`、`state`、`reason`、`expires_at` | `(channel_id, state, comment_id)` | 6.6 |
-| `channel_comment_settings`（チャンネルの表） | 既定の有効、保留の段階、ブロックの語（暗号化）、リンクを保留 | `(channel_id)` | 6.6 |
+| `channel_comment_settings`（チャンネルの表） | 既定の有効、保留の段階、リンクを保留（ブロックの語は `channel_blocked_terms`（暗号文と HMAC）。ライブチャットと共有の 1 つの一覧） | `(channel_id)` | 6.6 |
 | `video_comment_settings` | 動画ごとの上書き | `(video_id)` | 6.6 |
 | `channel_user_lists`（チャンネルの表） | `channel_id`、`user_id`、`kind`（`approved`・`hidden`・`moderator`） | `(channel_id, kind, user_id)` | 6.6 |
 | `comment_moderation_log` | 判定の変化（後からの判定、承認、削除）、主体、理由のコード | `(comment_id, at)` | 6.5 |

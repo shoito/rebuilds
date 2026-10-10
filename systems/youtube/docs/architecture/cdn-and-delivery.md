@@ -310,9 +310,11 @@ sequenceDiagram
 
 ## 16. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `delivery_blocks` | `video_id`、`action_id`、`kind`（`takedown`・`claim_block`・`region`）、`decided_at`、`kvs_put_at`、`replica_at`、`origin_at`、`invalidation_id`、`invalidated_at`、`kvs_removed_at`、`lifted_at` | `(video_id, action_id)`、`(kvs_removed_at) WHERE kvs_removed_at IS NULL` | 10 |
+| `delivery_blocks` | `block_id`、`video_id`、`source_kind`・`source_id`（措置・削除の申出・申し立ての評価・アカウントの状態）、`kind`（`takedown`・`claim_block`・`region`・`channel_terminated`）、`decided_at`、`kvs_put_at`、`replica_at`、`origin_at`、`invalidation_id`、`invalidated_at`、`kvs_removed_at`、`lifted_at` | `(block_id)`、一意 `(source_kind, source_id, video_id)`、`(kvs_removed_at) WHERE kvs_removed_at IS NULL` | 10 |
 | KeyValueStore `edge-kv` | `k:{kid}` → HMAC の鍵、`b:{video_id}` → `{"a":"<action_kind>","t":<epoch>}` | — | 5、10 |
 | Valkey | `blocked:{video_id}`（`playable()` の写しの一部） | outbox で更新 | 10 |
 | SNS | `origin-deny`（`origin-cache` の拒否の集まりの更新） | — | 10 |

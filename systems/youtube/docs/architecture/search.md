@@ -221,6 +221,8 @@ score  = rel_n · pop · fresh · exact · sub
 
 ## 12. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 節 |
 | --- | --- | --- |
 | `videos` に足す列 | `search_version`（単調に増える） | 9.1 |

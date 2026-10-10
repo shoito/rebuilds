@@ -300,11 +300,13 @@ stateDiagram-v2
 
 ## 10. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `upload_sessions`（チャンネルの表、FORCE RLS） | `upload_id`（UUIDv7）、`video_id`、`channel_id`、`actor_id`、`size`、`part_size`、`part_count`、`s3_upload_id`、`crc64nvme`、`sha256`、`state`、`reject_count`、`created_at`、`expires_at`、`completed_at` | `(upload_id)`。`(state, expires_at)` | 4 |
+| `upload_sessions`（チャンネルか権利者の表、FORCE RLS） | `upload_id`（UUIDv7）、`video_id`、`channel_id`、`actor_id`、`purpose`（`video`・`reference`）、`rights_owner_id`・`reference_id`（参照の取り込み）、`size_bytes`、`part_size_bytes`、`part_count`、`s3_upload_id`、`crc64nvme`、`sha256`、`state`、`reject_count`、`created_at`、`expires_at`、`completed_at` | `(upload_id)`。`(state, expires_at)` | 4 |
 | `upload_parts` | `upload_id`、`part_no`、`md5`、`crc64nvme`、`etag`、`state`（`pending`・`received`）、`received_at` | `(upload_id, part_no)` | 4.2 |
-| `videos` に足す列 | `state`、`visibility`、`publish_at`、`published_at`、`duration_ms`、`source_size`、`source_s3_key` | 部分索引 `(publish_at) WHERE state='scheduled'` | 6 |
+| `videos` に足す列 | `kind`（`upload`・`live`）、`premiere`、`state`、`visibility`、`publish_at`、`published_at`、`duration_ms`、`source_size`、`source_s3_key`、`delete_requested_at`（創作者の削除の 30 日の猶予） | 部分索引 `(publish_at) WHERE state='scheduled'` | 6 |
 | `probe_results` | `video_id`、`container`、`tracks`（JSON）、`duration_ms`、`width`、`height`、`fps_num`・`fps_den`、`hdr`、`corrupt_ranges`、`scene_cuts`（S3 のキー）、`hash_match`（`none`・`matched`）、`probe_version` | `(video_id, probe_version)` | 5 |
 | `original_deletions` | `video_id`、`path`（`creator`・`retention`・`legal`）、`approved_by`、`requested_at`、`executed_at`、`s3_versions` | `(video_id, requested_at)` | 7.2 |
 | S3 | `orig/{video_id}/source`、`orig/{video_id}/probe.json`、隔離のバケット | — | 7.1 |

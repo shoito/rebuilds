@@ -245,6 +245,8 @@ ADR-0068。プレイヤーの出来事は [playback-and-abr.md](playback-and-abr
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | Iceberg `qoe_minute` | 1 分の桶：2.2 節の切り口、`intents`、`first_frames`、`start_ms_hist`（ヒストグラム）、`failures`、`play_ms`、`stall_ms`、`stalls`、`vmaf_weighted` | 分割 `event_date`・`hour` | 2.2 |

@@ -330,22 +330,25 @@ stateDiagram-v2
 
 ## 12. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `monetization_status`（チャンネルの表） | `channel_id`、`state`（`ineligible`・`eligible`・`reviewing`・`active`・`suspended`）、`share_bps_ads`、`share_bps_commerce`、`contract_version`、`updated_at` | `(channel_id)` | 3 |
-| `eligibility_daily` | `channel_id`、`date`、`subscribers_verified`、`public_watch_hours_12m` | `(channel_id, date)` | 3 |
-| `ad_impressions` | `imp_id`、`video_id`、`sid`、`break`、`requested_at`、`valid`、`billed_micro_jpy` | `(imp_id)`。`(video_id, date)` | 4 |
+| `eligibility_daily` | `channel_id`、`day`、`subscribers_verified`、`public_watch_ms_12m`、`meets` | `(channel_id, day)` | 3 |
+| `ad_impressions` | `imp_id`、`day`、`video_id`、`sid`、`ad_break`、`requested_at`、`valid`、`billed_micro_jpy`、`reconciled` | `(day, imp_id)`（日の分割）。`(video_id, day)` | 4 |
 | `ad_server_reports` | `report_date`、`imp_id`、`billed_micro_jpy`、`final` | `(report_date, imp_id)` | 4.4 |
-| `membership_tiers`（チャンネルの表） | `tier_id`、`channel_id`、`price_jpy`、`perks` | `(tier_id)` | 5.1 |
-| `memberships`（本人の表とチャンネルの表の写し） | `membership_id`、`user_id`、`channel_id`、`tier_id`、`state`、`valid_until`、`provider_subscription_id` | `(membership_id)`。一意 `(user_id, channel_id)` | 5.2 |
+| `membership_tiers`（公開の情報。書くのはチャンネルの役割） | `tier_id`、`channel_id`、`price_jpy`、`perks` | `(tier_id)` | 5.1 |
+| `memberships`（本人とチャンネルの両側のポリシーの 1 つの表） | `membership_id`、`user_id`、`channel_id`、`tier_id`、`state`、`valid_until`、`provider_subscription_id` | `(membership_id)`。一意 `(user_id, channel_id)` | 5.2 |
 | `provider_events` | 事業者の出来事の ID、種類、受けた時刻、処理の結果 | `(provider_event_id)` | 5.2 |
-| `ledger_entries`・`ledger_lines`（追記だけ） | 仕訳の ID、冪等の鍵、日付、行（勘定、借方・貸方、マイクロ円） | `(entry_id)`。一意 `(idempotency_key)` | 6、7 |
+| `ledger_entries`・`ledger_lines`（追記だけ） | 仕訳の ID、冪等の鍵、日付、行（勘定、借方・貸方、マイクロ円） | `(yyyymm, entry_id)`（月の分割）。一意 `(idempotency_key, yyyymm)` | 6、7 |
 | `closed_months` | `yyyymm`、`closed_at`、`closed_by` | `(yyyymm)` | 7.4 |
 | `payout_accounts` | `party`、`provider_account_id`、`state` | `(party)` | 8.1 |
 | `payouts` | `payout_id`、`party`、`yyyymm`、`gross_jpy`、`withholding_jpy`、`net_jpy`、`state`、`provider_transfer_id` | `(payout_id)`。一意 `(party, yyyymm)` | 8.2 |
 | `statements` | `party`、`yyyymm`、S3 のキー、`published_at` | `(party, yyyymm)` | 8.3 |
 | `tax_profiles`（本人・チャンネル・権利者の表） | 9 節（登録番号と住所は暗号化） | `(party)` | 9 |
 | `withholding_rules`（設定の表） | 区分、率、条件、有効の期間 | `(category, valid_from)` | 9 |
+| （共通） | `payout_accounts`・`payouts`・`statements`・`tax_profiles` は RLS のために `channel_id`・`rights_owner_id` のどちらか 1 つも持つ（`party` の文字列では RLS を書けない） | — | 8・9 |
 | Valkey | `mem:{user_id}:{channel_id}`（会員の写し）、`adcap:{viewer_key}`（頻度の上限） | — | 4.1、5.2 |
 | outbox | `membership_changed`、`payout_state_changed`、`month_closed` | — | 5、7、8 |
 

@@ -276,6 +276,8 @@ ADR-0007 の出来事に次を足す。どれも再生のトークンを付け�
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 節 |
 | --- | --- | --- |
 | MSK `watch-events` に足す型 | `play_intent`、`start_failure`、心拍の段ごとの秒数と捨てたバイト | 7.1 |

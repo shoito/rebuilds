@@ -328,18 +328,21 @@ stateDiagram-v2
 
 ## 14. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `references`（権利者の表、FORCE RLS） | `reference_id`、`rights_owner_id`、`asset_id`、`asset_type`、`match_kinds`、`live_match`、`state`、`fp_version`、`duration_ms`、`territories`（ISO の国の一覧） | `(reference_id)`。`(rights_owner_id, state)` | 9 |
+| `content_references`（権利者の表、FORCE RLS。`references` は SQL の予約語なので改めた） | `reference_id`、`ref_seq`（索引の中の番号）、`rights_owner_id`、`asset_id`、`asset_type`、`match_kinds`、`live_match`、`state`、`fp_version`、`duration_ms`、`territories`（ISO の国の一覧） | `(reference_id)`。`(rights_owner_id, state)` | 9 |
 | `reference_exclusions`（権利者の表） | `reference_id`、`r_start_ms`、`r_end_ms`、`reason`（`generic`・`owner`） | `(reference_id, r_start_ms)` | 9.2 |
 | `ownership_conflicts`（権利者の表。両方の権利者が読める） | `conflict_id`、`reference_a`、`reference_b`、区間、重なる地域、`state`、`opened_at`、`resolved_at`、`resolution` | `(conflict_id)` | 9.3 |
-| `fingerprints` | `subject_kind`（`video`・`reference`・`live_window`）、`subject_id`、`fp_version`、`audio_key`、`video_key`、`hash_count` | `(subject_kind, subject_id, fp_version)` | 5・6 |
-| `match_runs` | `video_id`、`fp_version`、`index_generation`、`state`（`done`・`unavailable`）、`started_at`、`finished_at`、`variant_hits` | `(video_id, fp_version, started_at)` | 4 |
+| `fingerprints` | `subject_kind`（`video`・`reference`・`live`。ライブは配信ごとに 1 行で、窓のファイルは接頭辞の下）、`subject_id`、`fp_version`、`audio_key`、`video_key`、`hash_count` | `(subject_kind, subject_id, fp_version)` | 5・6 |
+| `match_runs` | `match_run_id`、`video_id`、`fp_version`、`index_generations`（8 つの分片の世代）、`state`（`done`・`unavailable`）、`started_at`、`finished_at`、`variant_hits` | `(match_run_id)`。一意 `(video_id, fp_version, started_at)` | 4 |
+| `index_generations` | `shard`、`generation`、`s3_prefix`、`last_event_id`（含めた最後の参照の出来事）、`state`（`building`・`active`・`retired`） | `(shard, generation)`。一意 `(shard) WHERE state = 'active'` | 7.3 |
 | `matches`（権利者の表。創作者には [copyright-claims-and-disputes.md](copyright-claims-and-disputes.md) の通知の表で見せる） | `match_id`、`video_id`、`reference_id`、`rights_owner_id`、`q_start_ms`、`q_end_ms`、`r_start_ms`、`r_end_ms`、`kind`、`score`、`stretch`、`fp_version`、`source`（`upload`・`backscan`・`live`） | `(video_id, reference_id, q_start_ms)` | 8.2 |
 | S3 | `fp/video/{video_id}/v1.fpa`・`.fpv`、`fp/ref/{reference_id}/v1.fpa`・`.fpv`、`index/v1/{shard}/{generation}/` | — | 7.3 |
 | outbox | `reference_activated`、`reference_deactivated`、`match_completed` | — | 4、7.3 |
 
-- 指紋のファイルの形（頭、ハッシュの列、時刻）は試験のベクトルで固定する。
+- 指紋のファイルの形（頭、ハッシュの列、時刻）は試験のベクトルで固定する。配置は [data-model/formats.md](data-model/formats.md) の 2〜4 節（`FPA1`・`FPV1`・`FIX1`）。
 
 ## 15. テストと性質
 
@@ -347,7 +350,7 @@ stateDiagram-v2
 | --- | --- |
 | PROP-FP-001 | 同じ入力の音声・映像と同じ `fp_version` から、同じハッシュの列ができる（決定的） |
 | PROP-FP-002 | 問い合わせの時刻を一定の値 `c` だけずらしても、一致の `δ` が `c` だけ変わり、一致の区間の長さと点は変わらない |
-| PROP-FP-003 | 音声の帯を一様に `k`（|k| ≤ 4）だけずらした問い合わせで、錨の帯を `−k` した変種の鍵が、元の鍵と一致する（帯の差は変わらない） |
+| PROP-FP-003 | 音声の帯を一様に `k`（`\|k\|` ≤ 4。絶対値）だけずらした問い合わせで、錨の帯を `−k` した変種の鍵が、元の鍵と一致する（帯の差は変わらない） |
 | PROP-FP-004 | 任意の分片の答えの欠けで、照合の結果は `unavailable` で、`no_match` にならない |
 | PROP-FP-005 | 映像のブロックの引き：任意の 64 ビットの組でハミング距離 11 以下なら、4 つのブロックの半径 2 の引きで必ず候補になる |
 | PROP-FP-006 | 任意の参照の追加・無効化と世代のまとめの列で、まとめの前後の照合の結果が同じ |

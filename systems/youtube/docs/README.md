@@ -5,7 +5,7 @@
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
 | [intent.md](intent.md) | 問題、MVP の範囲、守るべき振る舞い、成功の基準、利用者、制約、やらないこと、法務の確認待ち（L1〜L10）、出典 | PM |
-| [architecture/](architecture/README.md) | 全体像、規模の段階（S1〜S3）、費用のモデル、非機能要件、技術スタック、主な決定、統合の決定、リスク、領域の文書 22 本、データモデルの索引（[data-model.md](architecture/data-model.md)）、Epic | Dev |
+| [architecture/](architecture/README.md) | 全体像、規模の段階（S1〜S3）、費用のモデル、非機能要件、技術スタック、主な決定、統合の決定、リスク、領域の文書 22 本、データモデルの正本（[data-model.md](architecture/data-model.md) と [data-model/](architecture/data-model/)。141 表の目録と ER 図、置き場所、形式）、Epic | Dev |
 | [decisions/](decisions/README.md) | ADR の一覧（0001〜0071） | Dev |
 | [quality.md](quality.md) | 品質戦略、リスク、黄金の動画の適合と VMAF、ABR のネットワークの記録での模擬、視聴回数の不正の試験、指紋の適合率と再現率、ライブの遅延の試験、耐久性の確かめ、性質と決定表の一覧、テスト計画 | QA |
 | [roadmap.md](roadmap.md) | Epic と Story、延期の一覧 | PM |
@@ -16,5 +16,4 @@
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
 | `runbooks/` の計画の手順 | [runbooks/README.md](runbooks/README.md) の 4 節の「計画」の行 | Ops |
-| `architecture/` の全部の ER | [data-model.md](architecture/data-model.md) の索引を元に、最初の spec の承認の前に作る | Dev |
 | `primer/index.html` | 前提知識の資料（コーデックとビットレートのラダー、VMAF、CMAF と HLS・DASH、ABR、CDN の多層のキャッシュ、LL-HLS、音声・映像の指紋）（[リポジトリ共通の ADR-0008](../../../docs/decisions/0008-primers-on-github-pages.md)） | Dev |

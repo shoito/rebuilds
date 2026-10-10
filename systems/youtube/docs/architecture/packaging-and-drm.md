@@ -337,12 +337,14 @@ sequenceDiagram
 
 ## 11. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `renditions` に足す列 | `gen`、`name`（`h1080-c24`）、`kind`（`video`・`audio`）、`encrypted`、`peak_bps`、`avg_bps`、`s3_key`、`index_key`、`seg_count` | `(video_id, gen, name)` | 4 |
 | `videos` に足す列 | `active_gen`、`drm_required` | — | 4.5、8.6 |
-| `drm_keys` | `video_id`、`kid`、`group`（`av`・`uhd`）、`wrapped_key`、`kms_key_id`、`created_at`、`revoked_at` | `(video_id, kid)` | 8.2 |
-| `drm_license_log`（集計だけ。利用者の ID はハッシュ） | `video_id`、`system`、`result`、`reason`、`at` | `(video_id, at)`、90 日で消す | 8.4 |
+| `drm_keys` | `video_id`、`kid`、`key_group`（`av`・`uhd`）、`wrapped_key`、`kms_key_id`、`created_at`、`revoked_at` | `(video_id, kid)` | 8.2 |
+| `drm_license_log`（1 時間ごとの集計だけ。利用者の識別子を持たない） | `video_id`、`hour`、`drm_system`、`result`、`reason`、`security_level`、`license_count` | `(video_id, hour, drm_system, result, reason, security_level)`、90 日で消す | 8.4 |
 | S3 | `p/{video_id}/{gen}/{rendition}.cmfv`・`.cmfa`・`.six`、字幕、シークの縮小の画像 | — | 4 |
 | Valkey | `rend:{video_id}`（世代と段の写し） | outbox で更新 | 5.5 |
 

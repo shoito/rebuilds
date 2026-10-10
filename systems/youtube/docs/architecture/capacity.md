@@ -253,6 +253,8 @@ ADR-0069。E15 の `load-tests` と `viral-spike-tests`、段階を上げる前�
 
 ### data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 節 |
 | --- | --- | --- |
 | `cost_daily`（運用の表） | 日付、項目（6 節）、量、原価、単位の原価 | 6 |

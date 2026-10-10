@@ -236,7 +236,7 @@ ADR-0063。
 | 運用者の操作 | JIT の権限の取得、措置の決定と取り消し、照合の方針の手動の上書き、権利者の審査、所有の衝突の解決、安全の保留、元のファイル・隔離のファイルの参照、法的な保全の付与と外し、開示の請求への応答 |
 | 自動の措置 | 配信の停止（`delivery_blocks`）、ストリームキーの自動の失効、アカウントの状態の変更 |
 
-- 記録は `audit_events`（Aurora、90 日）に書き、同じトランザクションの outbox から log-archive の S3（Object Lock のコンプライアンスのモード）へ写す。保持の期間は 6 節。
+- 記録は `audit_events`（Aurora、180 日。Studio で 180 日見せるため）に書き、同じトランザクションの outbox から log-archive の S3（Object Lock のコンプライアンスのモード）へ写す。保持の期間は 6 節。
 - 記録に入れるのは、主体の ID、操作、対象の ID、理由のコード、時刻、送り元の ASN。IP アドレスは別の表（`login_records`。6 節）に置き、監査の本文に入れない。
 - 創作者には、チャンネルの操作の記録（自分のチャンネルの創作者の操作と自動の措置）を Studio で 180 日見せる。運用者の操作のうち創作者に知らせるもの（措置）は通知で知らせる。
 
@@ -392,9 +392,11 @@ ADR-0063。
 
 ### data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `audit_events` | `event_id`（UUIDv7）、`actor_kind`（`user`・`operator`・`system`）、`actor_id`、`action`、`target_kind`、`target_id`、`reason_code`、`asn`、`at` | `(event_id)`、`(target_kind, target_id, at)`。90 日で Aurora から消す（S3 が正本） | 5 |
+| `audit_events` | `event_id`（UUIDv7）、`actor_kind`（`user`・`operator`・`system`）、`actor_id`、`action`、`target_kind`、`target_id`、`reason_code`、`asn`、`at` | `(event_id)`、`(target_kind, target_id, at)`。180 日で Aurora から消す（S3 が正本） | 5 |
 | `retention_policies` | `data_kind`、`retention`、`legal_ref`（L の番号）、`updated_by`、`updated_at` | `(data_kind)` | 6.1 |
 | `legal_holds` | `hold_id`、`target_kind`、`target_id`、`scope[]`、`reason`、`approved_by`、`created_at`、`released_at` | `(hold_id)`、`(target_kind, target_id) WHERE released_at IS NULL` | 6.4 |
 | `login_records`（本人だけの表の外。運用の表、FORCE RLS で `legal-response` だけ） | `account_id`、`ip_enc`、`asn`、`device_class`、`at` | `(account_id, at)`、180 日で消す | 6.1 |

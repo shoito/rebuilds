@@ -225,6 +225,8 @@ sequenceDiagram
 
 ## 10. data-model への項目
 
+列・キー・索引の正本は [data-model.md](data-model.md) と [data-model/](data-model/) の各ファイルである。この節は提案の記録として残す（2026-10-10 のデータモデルの工程）。
+
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `channels` に足す列（表は [accounts-and-safety.md](accounts-and-safety.md) の 13 節） | `handle`、`handle_norm`、`subscriber_count`、`made_for_kids_default` | 一意 `(handle_norm)` | 3 |
@@ -232,7 +234,7 @@ sequenceDiagram
 | `subscriptions`（本人の表、FORCE RLS） | 4.1 節 | `(user_id, channel_id)` | 4.1 |
 | `channel_subscribers`（専用の役割だけ） | 4.1 節 | `(channel_id, user_id)` | 4.1 |
 | `notify_jobs` | `event_id`、`channel_id`、`kind`、`total`、`pages_done`、`state`、`created_at` | `(event_id)` | 6.2 |
-| `notifications`（本人の表、月ごとの分割） | `user_id`、`notification_id`、`kind`、`subject_id`、`read_at`、`created_at` | `(user_id, notification_id DESC)` | 6.6 |
+| `notifications`（本人の表、月ごとの分割） | `user_id`、`notification_id`、`kind`、`subject_id`、`read_at`、`created_at` | `(user_id, notification_id, created_at)`（月の分割の鍵を含む。読み出しは `notification_id` の降順） | 6.6 |
 | `push_devices`（本人の表） | 6.7 節 | `(user_id, device_id)` | 6.7 |
 | `notification_settings`（本人の表） | 静かな時間、メールの頻度、種類ごとの有効 | `(user_id)` | 6.4 |
 | `playlists`・`playlist_items` | 7 節 | `(playlist_id)`・`(playlist_id, position_key)` | 7 |
