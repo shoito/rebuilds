@@ -22,11 +22,16 @@
   .masthead { padding: 4px 0 20px 18px; border-left: 6px solid var(--accent); border-bottom: 1px solid var(--border); margin-bottom: 28px; }
   .masthead h1 { font-size: 2em; margin: 0 0 .3em; color: var(--accent-strong); }
   .lead { color: var(--muted); margin: 0; }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  .actions .btn { text-decoration: none; }
+  .actions .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
   .card .genre { color: var(--muted); font-size: .78em; font-weight: 700; letter-spacing: .06em; }
   .card h3 a { color: var(--accent-strong); text-decoration: none; }
   .card h3 a:hover { text-decoration: underline; }
-  .card .links { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: .85em; display: flex; gap: 14px; }
+  .card { display: flex; flex-direction: column; }
+  .card > p { margin-bottom: 10px; }
+  .card .links { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); font-size: .85em; display: flex; gap: 14px; }
   .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 36px; padding: 14px 16px; background: var(--accent-soft); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); }
   .start p { margin: 0; flex: 1; min-width: 220px; }
   .start .btn { background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; }
@@ -36,9 +41,12 @@
 <body>
 <div class="wrap">
   <header class="masthead">
-  <p class="kicker">rebuilds</p>
-  <h1>前提知識の資料</h1>
-  <p class="lead">既存の SaaS を、AI のコーディングエージェントを主な作り手として再構築するなら、どう設計するか。その設計の文書を読む前に要る知識を、題材ごとにまとめました。どの資料も、右上のボタンか S キーで資料表示とスライド表示を切り替えられます。</p>
+  <h1>rebuilds</h1>
+  <p class="lead">既存の SaaS を、AI のコーディングエージェントを主な作り手として再構築するなら、どう設計し、どう作るか。その設計の文書を、題材ごとに GitHub のリポジトリに記録しています。このサイトには、設計の文書を読む前に要る知識を、題材ごとの資料にまとめました。</p>
+  <div class="actions">
+    <a class="btn primary" href="https://github.com/shoito/rebuilds">設計の文書を読む（GitHub）</a>
+    <a class="btn" href="https://github.com/shoito/rebuilds/blob/main/docs/process.md">開発の進め方</a>
+  </div>
   </header>
 
   <div class="start">
@@ -47,9 +55,8 @@
   </div>
 
   <h2>題材</h2>
+  <p class="hint" style="margin:-.4em 0 14px">「設計の文書」は GitHub で、「資料」と「スライド」はこのサイトで読めます。資料とスライドは、右上のボタンか S キーで切り替えられます。</p>
   <div class="grid" id="grid"></div>
-
-  <p class="hint" style="margin-top:32px">設計の文書の本体は <a href="https://github.com/shoito/rebuilds">GitHub のリポジトリ</a>にあります。</p>
 </div>
 <script>
   const subjects = [
