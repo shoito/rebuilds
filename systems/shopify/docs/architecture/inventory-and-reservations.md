@@ -285,7 +285,7 @@ flowchart TD
 | R4 | `Σslot.reserved` と、`state = 'reserved'` の引き当ての行の数の和 | ticket（掃除の取りこぼしの疑い） |
 
 - 照合は読み出しの写し（Aurora の読み取りのインスタンス）で、`REPEATABLE READ` の 1 つのスナップショットの中で行う。
-- 直しは調整の操作（理由 `reconciliation_fix`）だけ。直しの前に原因を調べる（[runbooks/](../runbooks/README.md) の `inventory-mismatch.md`）。
+- 直しは調整の操作（理由 `reconciliation_fix`）だけ。直しの前に原因を調べる（[oversell-or-paid-without-order.md](../runbooks/oversell-or-paid-without-order.md)）。
 
 ## 11. 表示の数（目安）
 
@@ -333,7 +333,7 @@ flowchart TD
 | `inventory_movements`（月ごとに分割） | 理由のコード、差分、参照、主体 | `(shop_id, created_at, movement_id)`、`(shop_id, inventory_item_id, created_at)` | 9 |
 | `inventory_daily_snapshots` | 日次の `on_hand` の写し | `(shop_id, snapshot_date, location_id, inventory_item_id)` | 10 |
 | `inventory_reconciliation_runs` | 照合の結果、不一致の行 | `(shop_id, run_id)` | 10 |
-| Valkey | `inv:avail:{shop}:{item}`（表示の数、5 秒）、`inv:rebalance:{pod}`（直しの依頼） | 失ってよい | 6.4、11 |
+| Valkey | `{<shop_id>}:inv:avail:<item>`（表示の数、5 秒）、`sys:inv:rebalance:<pod>`（直しの依頼。ポッドの単位の運用の鍵） | 失ってよい | 6.4、11 |
 
 ## 15. テスト
 
@@ -384,4 +384,3 @@ flowchart TD
 | 「残り N 個」の表示の既定 | 法務の確認待ち（L2） |
 | 移動の行の保持の期限 | 法務の確認待ち（L3）の後、security の領域 |
 | 本家の引き当ての時点と期限 | 公式の資料で確かめられなかった（**未検証**） |
-| [ADR-0004](../decisions/0004-inventory-reservation-model.md) の状態図の `fulfilled`・`restocked` を、引き当ての行ではなく注文の側で持つ点 | 意味の変更ではない。統合の工程で ADR-0004 の読み方として architecture/README.md に注記するかを決める |

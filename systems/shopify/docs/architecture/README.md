@@ -1,6 +1,6 @@
 # Architecture: Shopify
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（まだない。計画は 7 節）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節）。表と置き場所の索引は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -31,16 +31,19 @@ flowchart TB
     subgraph edge["エッジ（CloudFront）"]
         waf["AWS WAF<br/>Bot Control、速さの上限"]
         cff["CloudFront Functions<br/>ホスト → ショップ・ポッド、<br/>待合室の許可証、キャッシュの鍵"]
-        kvs[("KeyValueStore<br/>ショップの表、世代の番号")]
+        kvs[("KeyValueStore<br/>熱い集まり（4 MB まで）、世代の番号")]
         cache[("エッジのキャッシュ")]
     end
 
     subgraph global["全体の面（ポッドの外）"]
         dir["shop-directory<br/>ショップ → ポッド"]
+        er["edge-router<br/>熱い集まりにないホストの中継"]
         idn["identity<br/>スタッフのアカウント、SSO"]
-        appreg["app-registry<br/>アプリ、OAuth、課金"]
+        appreg["app-registry<br/>アプリ、OAuth、関数"]
+        bill["billing<br/>プランと請求"]
         wr["waiting-room<br/>待ちの列、許可証"]
         mover["shop-mover"]
+        wh["webhook-dispatcher<br/>本文を運ぶだけ（保存しない）"]
         gdb[("Aurora（全体）")]
         wrv[("Valkey（待合室）")]
     end
@@ -51,21 +54,17 @@ flowchart TB
         co["checkout<br/>状態の機械、価格・税・割引・送料"]
         admin["admin-api<br/>GraphQL、費用の上限"]
         fr["function-runner<br/>Wasmtime（Rust）"]
-        wk["workers<br/>引き当ての掃除、注文、配送"]
+        wk["workers<br/>引き当ての掃除、照合、注文、配送、<br/>Webhook の本文の作成"]
         relay["relay（outbox）"]
-        pdb[("Aurora PostgreSQL<br/>ショップのデータ、FORCE RLS")]
-        pv[("Valkey<br/>カート、費用のバケット")]
-    end
-
-    subgraph async["非同期（SNS・SQS）"]
-        wh["webhook-dispatcher"]
         purge["cache-invalidator"]
         idx["search-indexer"]
         notif["notifier"]
+        pdb[("Aurora PostgreSQL<br/>ショップのデータ、FORCE RLS")]
+        pv[("Valkey<br/>カート、費用のバケット")]
+        os[("OpenSearch<br/>商品の検索")]
     end
 
     s3[("S3<br/>メディア、テーマ、一括の操作の結果")]
-    os[("OpenSearch<br/>商品の検索")]
     psp["決済の提供者"]
     carrier["運送会社"]
     osaka[("大阪：Aurora Global Database、S3 の写し")]
@@ -74,6 +73,9 @@ flowchart TB
     cff --> kvs
     cff --> cache
     cff --> wr
+    cff -->|"熱い集まりにない"| er
+    er --> dir
+    er --> sf
     cache --> sf
     cache --> sfapi
     cff --> co
@@ -92,19 +94,22 @@ flowchart TB
     wk --> pdb
     wk --> carrier
     pdb --> relay
-    relay --> wh
+    relay --> wk
     relay --> purge
     relay --> idx
     relay --> notif
-    purge --> kvs
+    wk -->|"本文（暗号化した SQS）"| wh
+    purge --> dir
+    dir --> kvs
     idx --> os
     sfapi --> os
     wr --> wrv
     dir --> gdb
-    dir --> kvs
     mover --> pdb
     idn --> gdb
     appreg --> gdb
+    appreg -.->|"P5：定義の写し"| pdb
+    bill --> gdb
     sf --> s3
     pdb -.-> osaka
     gdb -.-> osaka
@@ -114,29 +119,33 @@ flowchart TB
 | コンテナ | 責務 |
 | --- | --- |
 | エッジ（CloudFront、AWS WAF、CloudFront Functions） | TLS の終端、ボットの絞り込み、ホスト名からショップとポッドを引く（KeyValueStore）、待合室の許可証の確かめ、キャッシュの鍵（ショップ・テーマ・通貨・言語・世代の番号）の組み立て、ポッドの入口（ALB）への振り分け（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)） |
-| `shop-directory` | ショップ・ドメイン → ポッドの正本。変更を KeyValueStore に配る。ショップの移し替えの切り替えの点 |
+| `shop-directory` | ショップ・ドメイン → ポッドの正本、ライフサイクル。熱い集まりと世代の番号を KeyValueStore に配る。ショップの移し替えの切り替えの点（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)、[ADR-0013](../decisions/0013-shop-lifecycle-and-data-deletion.md)） |
+| `edge-router` | 熱い集まりにないホストを `shop-directory` で引き、ポッドへ中継する（Fargate、VPC origin。[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)） |
+| `billing` | プラン、利用量、事業者への請求（[ADR-0065](../decisions/0065-merchant-billing-plans-and-usage.md)） |
 | `identity` | スタッフのアカウント（複数のショップに属しうる）、ログイン、2 段階の認証、SSO。ショップの中の権限は各ポッドが持つ（merchant-admin-and-staff の領域） |
-| `app-registry` | アプリの登録、OAuth 2.0 の認可、スコープ、アプリの課金の計画、関数のモジュールの登録と署名（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)） |
+| `app-registry` | アプリの登録、OAuth 2.0 の定義、スコープ、アプリの課金の計画、関数のモジュールの検査・翻訳・署名。アプリの定義をポッドへ写す（P5）（[ADR-0054](../decisions/0054-oauth-install-and-expiring-tokens.md)、[ADR-0059](../decisions/0059-function-publish-compile-and-distribution.md)） |
 | `waiting-room` | フラッシュセールの待ちの列、受け入れの速さの計算、署名つきの許可証の発行（flash-sales-and-queueing の領域） |
-| `shop-mover` | ショップの移し替え（コピー、変更の追いかけ、書き込みの短い停止、切り替え）（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)） |
+| `shop-mover` | ショップの移し替え（コピー、変更の追いかけ、書き込みの短い停止、切り替え、15 分の中継の窓）（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md)） |
 | `storefront-renderer` | テーマのテンプレートを、許可した値と上限の中で HTML にする（[ADR-0007](../decisions/0007-theme-language-design.md)） |
 | `storefront-api` | ヘッドレスの GraphQL。商品、コレクション、検索、カート。公開と秘密のトークン |
 | `checkout` | カートとチェックアウトの状態の機械、送料・税・割引の計算、在庫の引き当て、決済の提供者とのやり取り、注文の作成（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)、[ADR-0006](../decisions/0006-payments-via-providers.md)） |
 | `admin-api` | Admin API（GraphQL）と、管理画面の API。費用の計算とバケット、一括の操作（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)） |
 | `function-runner` | アプリの関数（WebAssembly）を、燃料とメモリーの上限を付けて動かす Rust のプロセス。`checkout` の隣のコンテナ（[ADR-0008](../decisions/0008-extension-sandbox-wasm.md)） |
-| `workers` | 引き当ての期限切れの掃除、決済と注文の照合、配送の指示、送り状、通知の依頼 |
+| `workers` | 引き当ての期限切れの掃除、決済と注文の照合、配送の指示、送り状、通知の依頼、Webhook の本文の作成（fanout） |
 | `relay` | outbox を読み、SNS へ流す |
-| `webhook-dispatcher` | アプリの Webhook を、署名を付けて少なくとも 1 回送る（webhooks の領域） |
-| `cache-invalidator` | カタログ・テーマの変更から、エッジのキャッシュの世代の番号を上げる（storefront-api-and-caching の領域） |
-| `search-indexer` | 商品の変更を OpenSearch の索引に入れる（search-and-recommendations の領域） |
+| `webhook-dispatcher` | 全体の面。ポッドが作った Webhook の本文を暗号化した SQS で受け、署名を付けて隔離した egress から少なくとも 1 回送る。本文を保存しない（[ADR-0062](../decisions/0062-webhook-egress-and-payload-custody.md)） |
+| `cache-invalidator` | ポッドの中。カタログ・テーマの変更から、エッジのキャッシュの世代の番号を上げる（[ADR-0050](../decisions/0050-edge-cache-keys-and-generations.md)） |
+| `search-indexer` | ポッドの中。商品の変更をポッドの OpenSearch の索引に入れる（[ADR-0052](../decisions/0052-search-index-per-pod-and-japanese-analysis.md)） |
+| `notifier` | ポッドの中。買い手へのメール（注文の確認、発送、返金）と事業者への通知 |
+| OpenSearch（ポッド） | 商品の検索の索引。ポッドごとのドメイン（[ADR-0052](../decisions/0052-search-index-per-pod-and-japanese-analysis.md)） |
 | Aurora（ポッド） | ショップのデータの正本（カタログ、在庫、チェックアウト、注文、スタッフの権限、アプリの導入）。FORCE RLS（[ADR-0003](../decisions/0003-tenancy-and-rls.md)） |
 | Aurora（全体） | ショップの表、スタッフのアカウント、アプリの登録、プランと請求。ショップのデータを持たない |
-| Valkey | カート、Admin API の費用のバケット、セッション、待合室の列。失ってよい（正本にしない） |
+| Valkey | ポッド：カート、Admin API の費用のバケット、入口の上限。全体：待合室の列、`identity` のセッション。失ってよい（正本にしない） |
 | S3 | 商品のメディア、テーマのファイル、一括の操作の結果、書き出し。大阪へ写す |
 
 原則は 6 つ。
 
-- **ショップを単位にポッドへ閉じる。** ポッドは、Aurora・Valkey・SQS・アプリのサービスを持つ完全なセルである。1 つの要求とジョブは 1 つのポッドだけに触れる。ポッドの外の全体の面は、ショップのデータを持たない（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）。
+- **ショップを単位にポッドへ閉じる。** ポッドは、Aurora・Valkey・SQS・OpenSearch・アプリのサービス（非同期の `cache-invalidator`・`search-indexer`・`notifier` を含む）を持つ完全なセルである。1 つの要求とジョブは 1 つのポッドだけに触れる。ポッドの外の全体の面は、ショップのデータを保存しない（`webhook-dispatcher` は本文を運ぶだけ）（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）。
 - **在庫と注文の正本は 1 つの DB のトランザクション。** 引き当て・確定・注文の作成・outbox は、ポッドの Aurora の同じトランザクションで書く。Valkey と待合室は流量を絞るだけで、正しさを担わない（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)）。
 - **流量はエッジで絞る。** フラッシュセールの急増は、WAF・待合室・許可証で、ポッドが受けられる速さに絞ってから入れる。ポッドの中で無制限に受けて落ちる形にしない。
 - **ストアフロントはキャッシュが先。** ページはショップごとの世代の番号を鍵に入れてエッジに置き、変更は世代を上げて無効にする。在庫の数や価格のような速く変わる値は、キャッシュしたページに焼き込まず、チェックアウトで必ず計算し直す。
@@ -147,11 +156,11 @@ flowchart TB
 
 **A. 商品のページを表示する**
 
-1. 買い手が `https://<shop>.<brand>.<domain>/products/blue-tee` を開く。CloudFront Functions がホスト名で KeyValueStore を引き、`shop_id`・`pod_id`・ショップの世代の番号を得る。
+1. 買い手が `https://<shop>.<brand>.<domain>/products/blue-tee` を開く。CloudFront Functions がホスト名で KeyValueStore（熱い集まり）を引き、`shop_id`・`pod_id`・ショップの世代の番号を得る。集まりにないホストは、`edge-router` が `shop-directory` で引いてポッドへ中継する（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)）。
 2. キャッシュの鍵を（ショップ、パス、テーマ、通貨、言語、世代の番号、端末の種類）で作る。当たればエッジから返す（TTFB p95 80ms の目標）。
 3. 外れれば、ポッドの `storefront-renderer` へ送る。レンダラーはテーマのテンプレート（コンパイル済み）を、商品の値（drop）と上限で HTML にし、`Cache-Control: s-maxage=300, stale-while-revalidate=60` を付けて返す。
 4. 在庫の有無と価格の最新の値は、ページの中の小さな部品が Storefront API から取る（短いキャッシュ）。カートに入れた後の価格は、チェックアウトで必ず計算し直す。
-5. 事業者が商品を変えると、outbox → `cache-invalidator` がショップ（大きなショップはコレクション・商品の単位）の世代の番号を上げ、KeyValueStore に書く。次の要求から新しい鍵になる（p95 10 秒の目標。`edge-cache-generation-poc` で確かめる）。
+5. 事業者が商品を変えると、outbox → `cache-invalidator` がショップ（大きなショップは商品のページの 64 の桶）の世代の番号を上げ、`shop-directory` が KeyValueStore に書く。次の要求から新しい鍵になる（p95 10 秒の目標。`edge-cache-generation-poc` で確かめる。[ADR-0050](../decisions/0050-edge-cache-keys-and-generations.md)）。
 
 **B. フラッシュセールで買う**
 
@@ -173,8 +182,8 @@ flowchart TB
 
 1. `shop-mover` が移す先のポッドに、ショップの行を一括でコピーする（ショップの `shop_id` で絞った読み出し）。
 2. 元のポッドの論理デコードで、そのショップの変更を追いかけて先へ当てる。遅れが 1 秒未満になるまで続ける。
-3. ショップを「移し替え中」にし、書き込みを止める（目標 10 秒以内。チェックアウトは 503 と `Retry-After` を返し、待合室を持つショップは受け入れを止める）。残りの変更を当て、行の数とチェックサムを比べる。
-4. `shop-directory` の行を新しいポッドに変え、KeyValueStore に配る。書き込みを再開し、元のポッドの行は 7 日の後に消す（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）。
+3. ショップの共有のアドバイザリーロックを排他で取って停止の印を書き、書き込みを止める（目標 p99 10 秒。書き込みは 503 と `Retry-After: 5`）。残りの変更を当て、変わった行だけを照合する（全量の照合は停止の前）。
+4. `shop-directory` の行を新しいポッドに変え、KeyValueStore に配る。書き込みを再開する。伝わる前に元のポッドへ来た要求は、元のポッドが 15 分（最大 24 時間）新しいポッドへ中継する。元のポッドの行は 7 日の後に消す（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md)）。
 
 **E. アプリの割引の関数を動かす**
 
@@ -191,8 +200,8 @@ flowchart TB
 | データの移し替え | MySQL の一部のデータを短い停止で移すライブラリ Ghostferry を公開 | [Ghostferry](https://github.com/Shopify/ghostferry) |
 | Admin API の上限 | 計算した費用のリーキーバケット。回復は 1 秒 100〜2,000（プランによる）。1 つのクエリの上限 1,000。オブジェクト 1、ミューテーション 10 | [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits) |
 | Storefront API | 買い手の通信に決まった上限なし。ボット・クローラーとチェックアウトの作成を絞る。買い手の IP アドレスのヘッダー | [Storefront API](https://shopify.dev/docs/api/storefront)、[API usage limits](https://shopify.dev/docs/api/usage/limits) |
-| Functions | WebAssembly。命令 1,100 万、メモリー 10,000 kB、モジュール 256 kB、入力 128 kB、出力 20 kB | [Shopify Functions](https://shopify.dev/docs/api/functions) |
-| Webhook | HMAC の署名、配信の ID で重複を除く、順序を保証しない。4 時間に 8 回の送り直し、失敗が続けば購読を消す | [Webhooks](https://shopify.dev/docs/apps/build/webhooks)、[Troubleshoot webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks) |
+| Functions | WebAssembly。命令 1,100 万、メモリー 10,000 kB、スタック 512 kB、モジュール 256 kB、入力 128 kB、出力 20 kB（200 行を超えると比例して広がる）、テーブル 4・要素 1 万。入力のクエリ 3,000 バイト・費用 30 | [Shopify Functions](https://shopify.dev/docs/api/functions) |
+| Webhook | HMAC の署名、配信の ID で重複を除く、順序を保証しない。応答は 5 秒以内。4 時間に 8 回の送り直し、失敗が続けば購読を消す | [Webhooks](https://shopify.dev/docs/apps/build/webhooks)、[Troubleshoot webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks) |
 | 在庫の状態 | on_hand は available・committed・reserved・damaged・safety_stock・quality_control の和 | [Inventory states](https://shopify.dev/docs/apps/build/orders-fulfillment/inventory-management-apps/manage-quantities-states) |
 | ボット対策 | フラッシュセールのチャレンジ（Plus）。500 商品まで、60 分まで | [Bot protection](https://help.shopify.com/en/manual/checkout-settings/bot-protection) |
 | テンプレートの言語 | Liquid（Ruby、MIT）。評価せず安全であることを目標にする | [Liquid](https://github.com/Shopify/liquid) |
@@ -212,12 +221,21 @@ flowchart TB
 | Admin API | GraphQL と REST | GraphQL だけ | 作る量を減らす。費用の上限を 1 つの形にする（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)） |
 | データの所在 | 未検証 | すべて日本（東京、DR は大阪） | 日本を最初の市場にする（法務の L3） |
 | ヘッダーと接頭辞 | 本家の名前を含む | `X-<Brand>-Access-Token`、`<brand>_at_` | リポジトリ共通の ADR-0006 |
+| 振り分け | ロードバランサーの Sorting Hat が規則で振る | エッジの KeyValueStore には要求の多いホストだけの「熱い集まり」（4 MB まで）を置き、集まりにないホストは全体の面の `edge-router` が引いて中継する | KeyValueStore の 1 つの保存は 5 MB で、全ホストが入らない（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)） |
+| 全体の定義の配り | 未検証 | 全体の面のアプリの定義・プランの上限・言語と通貨の表を、ポッドの DB の写しの表へ配る（経路 P5）。ポッドの要求は全体の DB を読まない | 1 つの要求が 1 つのポッドだけに触れる規則を保つ（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)） |
+| ショップの移し替え | Pod Mover でポッドを 1 分ほどで別のデータセンターへ。ショップの単位の停止の時間は未検証 | ショップの単位で移す。書き込みの停止 p99 10 秒。切り替えの後 15 分（最大 24 時間）は、元のポッドが新しいポッドへ要求を中継する | ブラウザは 421 で送り直さないので、伝わる前の要求を見えない中継で受ける（[ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md)） |
+| 売上の確定の時点 | チェックアウトで自動（既定）、注文の全体の配送で自動（Plus は配送ごと）、手動 | 注文の作成の後のジョブ（既定）、最初の発送で確定（`on_first_fulfillment`）、手動。期限の 24 時間前に自動で確定 | 一部の配送で売上を立てたい事業者に、全体の配送を待たせない（[ADR-0038](../decisions/0038-capture-timing-and-authorization-expiry.md)） |
+| 同じ行の複数の商品の割引 | Plus のショップだけ | MVP は持たない（1 行に商品の割引 1 つ） | 選び方と按分を単純にし、参照の実装で全組み合わせを確かめられる大きさにする（[ADR-0032](../decisions/0032-discount-classes-order-and-combination.md)） |
+| 別の行の商品の割引どうし | 組み合わせの設定に従う（未検証） | 常に両立 | 対象の行が重ならないので、組み合わせの印を見なくても金額が決まる（[ADR-0032](../decisions/0032-discount-classes-order-and-combination.md)） |
+| 割引の組み合わせの可否 | 一部はショップの条件による | すべてのショップで同じ決定表（DT-DSC-001） | 規則を 1 つにする（[ADR-0032](../decisions/0032-discount-classes-order-and-combination.md)） |
+| Webhook の失敗が続いた購読 | 購読を消す | 48 時間の連続の失敗で `disabled` にし、消さない。開発者が再開できる | 受け口の直しの後に、購読を作り直させない（[ADR-0061](../decisions/0061-webhook-delivery-and-signing.md)） |
+| Webhook の署名の秘密 | アプリの client secret | Webhook の専用の秘密（`<brand>_whsec_`）。24 時間の入れ替え | client secret と入れ替えを独立にする（[ADR-0061](../decisions/0061-webhook-delivery-and-signing.md)） |
 
 ## 2. 規模の段階
 
 | 段階 | ショップ（稼働） | 流通総額（GMV） | 注文 | 注文の最大（全体） | 注文の最大（1 ショップ） | ストアフロントの要求 | Admin API | ポッド | 構成 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1（MVP） | 5 万（登録 10 万） | 年 1,000 億円 | 月 100 万件 | 200 件/秒 | 100 件/秒 | エッジ 平均 1 万・最大 10 万 件/秒、元 最大 1 万 件/秒 | 最大 5,000 件/秒 | 4（＋フラッシュセールの隔離のポッド 1） | 東京の 1 リージョン・3 AZ。大阪に Aurora Global Database と S3 の写し |
+| S1（MVP） | 5 万（登録 10 万） | 年 1,000 億円 | 月 100 万件 | 200 件/秒 | 100 件/秒 | エッジ 平均 1 万・最大 10 万 件/秒、元 最大 1 万 件/秒 | 最大 5,000 件/秒 | 共有 4（`p01`〜`p04`）＋隔離 1（`x01`）＋見張り 1（`p00`、最小の大きさ） | 東京の 1 リージョン・3 AZ。大阪に Aurora Global Database と S3 の写し |
 | S2 | 50 万 | 年 1 兆円 | 月 1,000 万件 | 1,000 件/秒 | 500 件/秒 | エッジ 最大 100 万 件/秒、元 最大 8 万 件/秒 | 最大 5 万 件/秒 | 40 | 東京にポッドを増やす。大きなショップは専用のポッド |
 | S3 | 500 万 | 年 10 兆円 | 月 1 億件 | 5,000 件/秒 | 2,000 件/秒 | エッジ 最大 500 万 件/秒、元 最大 30 万 件/秒 | 最大 30 万 件/秒 | 300 | 東京に数百のポッド、ポッドの組ごとに全体の面の読み出しの写し。海外のリージョン（ショップをリージョンに固定） |
 
@@ -227,11 +245,11 @@ flowchart TB
 - エッジのキャッシュの当たりの割合を 90% と見込む（エッジ 10 万件/秒に対して元 1 万件/秒）。フラッシュセールの間は、在庫の部品の要求が増えるので、待合室で入れる数を絞る。
 - S1 のポッドあたりのショップは 1.25 万。商品のバリエーションは全体で 2,500 万、ポッドあたり 625 万を見込む。
 - フラッシュセールの待合室は、1 つのセールで 20 万人の待ちを S1 で受ける。
-- 段階を上げる基準とポッドの大きさは infrastructure の領域、負荷と費用のモデルは capacity の領域で決める。
+- 段階を上げる基準は [infrastructure.md](infrastructure.md) の 8 節、ポッドの大きさの段と負荷のモデルは [capacity.md](capacity.md) の 4・5 節にある。見張りのポッド `p00` は、デプロイの波 0 と見張りのショップのために置く（[ADR-0011](../decisions/0011-shop-placement-and-rebalancing.md)、[ADR-0075](../decisions/0075-pod-wave-rollout-and-cross-pod-migrations.md)）。
 
 ### 2.1 費用のモデル
 
-注文 1 件と、ストアフロントの要求 100 万件あたりの原価を、次の和で見る。単価は capacity の領域で、AWS の東京の公開の価格から入れる。
+注文 1 件と、ストアフロントの要求 100 万件あたりの原価を、次の和で見る。単価は AWS の東京の公開の価格で、値は [capacity.md](capacity.md) の 6 節と [infrastructure.md](infrastructure.md) の 9 節にある。
 
 ```
 注文あたりの原価 = チェックアウトの計算（Fargate、関数の実行）
@@ -243,8 +261,9 @@ flowchart TB
                     ＋ S3（メディア、テーマ）
 ```
 
-- 最も大きいのは、ストアフロントのエッジの転送と WAF の要求の単価、ポッドの Aurora の最小の構成（ポッドの数に比例）と見込む。キャッシュの当たりの割合と、ポッドあたりのショップの数が、原価の主な制御の手段になる。
-- ポッドの最小の構成（Aurora の書き込みと読み出しの 2 つ、Valkey、Fargate のサービス）を、S1 で 1 ポッド月 100 万円以下に収める（本システムの想定。capacity の領域で公開の価格に置き換える）。
+- S1 の本番の月の原価は約 18.7 万 USD（約 2,800 万円、±40%。オンデマンド、1 USD = 150 円）。最も大きいのはエッジの転送（43%）、CloudFront の要求（17%）、WAF（9%）で、ポッド（共有 4・隔離・見張り）は 15%（[capacity.md](capacity.md) の 6 節）。原価のほとんどはストアフロントのエッジで、要求の数と応答の大きさ（画像の変換と形式）、CloudFront の価格の交渉が主な手段になる。キャッシュの当たりの割合は、元の原価にだけ効く。
+- 共有のポッドの最小の構成（Aurora の書き込みと読み出し、Valkey、OpenSearch、Fargate のサービス、ALB）は 1 ポッド月 約 5,700 USD（約 85 万円）で、目標の「1 ポッド月 100 万円以下」に収まる。
+- 単位あたり：ストアフロントの 100 万要求 約 5.2 USD、注文 1 件 約 0.012 USD、稼働のショップ 1 つ 月 約 3.7 USD（[infrastructure.md](infrastructure.md) の 9 節）。
 
 ## 3. 非機能要件
 
@@ -289,16 +308,16 @@ flowchart TB
 
 ## 5. 主な決定
 
-どれも `accepted`。0001〜0009 は最初の設計の起票。状態の一覧は [decisions/README.md](../decisions/README.md)。
+どれも `accepted`。0001〜0009 は最初の設計の起票で、下の表に置く。0010〜0076 は領域の文書の工程で起票した（空きの番号はない）。各領域の ADR は 7 節の各文書の頭の表にあり、状態の一覧は [decisions/README.md](../decisions/README.md)。統合の工程で、決定を覆した・具体にした ADR に日付付きの注記を足した（6 節の「決定（2026-10-10、統合）」）。
 
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤（TypeScript・Hono、Aurora、Fargate、Valkey、SQS・SNS）を引き継ぎ、ドメインごとのパッケージを持つ 1 つのコードベースを入口ごとのサービスで出す。関数の砂場のホストだけ Rust。検索は OpenSearch、GraphQL の構文解析は graphql-js を汎用の部品として使う |
-| [0002](../decisions/0002-pods-and-shop-placement.md) | ショップを単位に、Aurora・Valkey・SQS・アプリのサービスを持つポッド（完全なセル）へ置く。エッジが KeyValueStore でショップ → ポッドを引く。ショップの移し替えは、コピー・論理デコードでの追いかけ・10 秒以内の書き込みの停止・ディレクトリの切り替えで行う |
+| [0002](../decisions/0002-pods-and-shop-placement.md) | ショップを単位に、Aurora・Valkey・SQS・アプリのサービスを持つポッド（完全なセル）へ置く。エッジが KeyValueStore でショップ → ポッドを引く。ショップの移し替えは、コピー・論理デコードでの追いかけ・10 秒以内の書き込みの停止・ディレクトリの切り替えで行う。ポッドをまたぐ経路は P1〜P5 だけ（統合の工程で、熱い集まりと `edge-router`、P5、15 分の中継の窓を注記した） |
 | [0003](../decisions/0003-tenancy-and-rls.md) | ショップをテナントにし、ポッドの DB の全表に `shop_id` と FORCE RLS を置く。`shop_id` はホスト名・トークン・セッションからだけ決める。ポッドの中で、ショップごとの同時実行と速さの上限を置く |
-| [0004](../decisions/0004-inventory-reservation-model.md) | 在庫は拠点ごとの行を Aurora の正本にし、支払いの開始で期限つきの引き当て、注文の作成で確定にする。「売り越さない」品目は CHECK 制約で守る。熱い品目は在庫を複数の枠の行に分ける |
+| [0004](../decisions/0004-inventory-reservation-model.md) | 在庫は拠点ごとの行を Aurora の正本にし、支払いの開始で期限つきの引き当て、注文の作成で確定にする。「売り越さない」品目は CHECK 制約で守る。熱い品目は在庫を複数の枠の行に分ける（`available`・`reserved`・`committed` は枠の行。ADR-0020 で具体にした） |
 | [0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md) | チェックアウトを明示の状態の機械にし、注文の作成を `completeCheckout` の 1 つの関数とトランザクションに集める。`orders.checkout_id` を一意にし、決済だけ済んだ状態を 1 分ごとの照合で解消する |
-| [0006](../decisions/0006-payments-via-providers.md) | 決済は外部の提供者に任せ、本システムはカード番号に触れない。提供者の差を吸収するアダプターの契約、冪等キー、Webhook の inbox を持つ。Stripe の題材は提供者の 1 つとして使い、設計し直さない |
+| [0006](../decisions/0006-payments-via-providers.md) | 決済は外部の提供者に任せ、本システムはカード番号に触れない。提供者の差を吸収するアダプターの契約（`findByReference` を含む）、冪等キー、Webhook の inbox を持つ。事業者の提供者の認証の情報は DB の封筒の暗号（ADR-0066）。Stripe の題材は提供者の 1 つとして使い、設計し直さない |
 | [0007](../decisions/0007-theme-language-design.md) | テーマの言語を自前で設計する（`{{ }}`・`{% %}` の形、副作用なし、既定で HTML をエスケープ、歩数・出力・ループ・入れ子・データの読み出しの上限）。中間表現に翻訳し、インタープリターで動かす。Liquid の実装は使わない |
 | [0008](../decisions/0008-extension-sandbox-wasm.md) | アプリの関数は WebAssembly のモジュールにし、`checkout` の隣の Rust のプロセスの Wasmtime で、燃料・メモリー・入出力の上限を付けて動かす。WASI を渡さない。失敗は種類ごとの「効果なし」 |
 | [0009](../decisions/0009-admin-api-graphql-and-cost-limits.md) | Admin API は GraphQL だけにし、日付のバージョン（`YYYY-MM`、四半期）を持つ。クエリの費用を実行の前に計算し、アプリとショップの組ごとのリーキーバケット（Valkey）で絞る。重い読み出しは一括の操作（S3 の JSONL） |
@@ -343,23 +362,67 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **運送会社**：MVP は 3 社の送り状の CSV（書き出しと追跡の番号の取り込み）と、選定した 1 社の API。
 - **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
 
-持ち越し（法務、計測・PoC・選定で決めるもの）：
+### 決定（2026-10-10、統合）
+
+領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。最初の設計の ADR は直接直し、決定を覆した・具体にしたところに日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
+
+- **振り分けと KeyValueStore**（[ADR-0002](../decisions/0002-pods-and-shop-placement.md) の注記）：KeyValueStore は 1 つの保存が 5 MB で、全ホストは入らない。要求の多いホストだけの「熱い集まり」（4 MB まで）と、集まりにないホストを中継する全体の `edge-router` にした（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)）。[storefront-api-and-caching.md](storefront-api-and-caching.md) の 4.1 節で、値のないホストは `edge-router` へ送る形に直した。
+- **ポッドをまたぐ経路 P5**（ADR-0002 の注記）：全体の面からポッドへの読み出しの写し（アプリの定義、プランの上限、言語と通貨の表）を P5 として足した。[app-platform-and-apis.md](app-platform-and-apis.md) の持ち越しはこれで閉じた。写しの表と移し替えの表を、[ADR-0003](../decisions/0003-tenancy-and-rls.md) の RLS の外の表の一覧に足した（ADR-0003 の注記）。
+- **移し替えの切り替え**（ADR-0002 の注記）：「伝わる前の要求は 421 で再送させる」を、[ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md) の 15 分（最大 24 時間）の中継の窓に置き換えた。`x-<brand>-pod-id` の不一致の 421 は残す。[quality.md](../quality.md) の 2.2.1 節 I と [roadmap.md](../roadmap.md) の `shop-directory-and-routing` も直した。
+- **Webhook の本文**（ADR-0002 の注記）：全体の `webhook-dispatcher` は本文を運ぶが保存しない（[ADR-0062](../decisions/0062-webhook-egress-and-payload-custody.md)）。「全体の面はショップのデータを持たない」は「保存しない」と読む。
+- **非同期の部品の置き場所**（1.2 節）：`cache-invalidator`・`search-indexer`・`notifier` はポッドの中に置き、`webhook-dispatcher` だけを全体の面に置く（[infrastructure.md](infrastructure.md) の 5 節）。1.2 節の図と表を直し、`edge-router`・`billing` を足した。
+- **在庫の数の置き場所**（[ADR-0004](../decisions/0004-inventory-reservation-model.md) の注記）：`available`・`reserved`・`committed` は枠の行、`on_hand`・`unavailable` は拠点の行（[ADR-0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md)）。図の `fulfilled`・`restocked` は引き当ての行の状態でなく、注文の側の状態として持つ。
+- **決済のアダプター**（[ADR-0006](../decisions/0006-payments-via-providers.md) の注記）：`findByReference` を必須の操作に足した（[ADR-0035](../decisions/0035-payment-attempt-states-and-result-normalization.md)）。事業者の提供者・運送会社の認証の情報は、Secrets Manager でなく、ポッドの DB の KMS の封筒の暗号に置く（[ADR-0066](../decisions/0066-encryption-and-key-layout.md)。ADR-0042 の注記、payments-integration・orders-and-fulfillment の表を直した）。
+- **S3 の置き場所**：ショップのデータの S3 のキーは、ポッドに依らない `shops/<shop_id>/…` に揃えた（メディア、テーマ、書き出し、一括の操作の結果、サイトマップ、送り状、監査ログの写しは `audit/shops/<shop_id>/…`）。移し替えで S3 を動かさない。
+- **Valkey の鍵**：ショップのデータの鍵は全部 `{<shop_id>}:<種類>:…` で始める（クラスタのハッシュタグ。[ADR-0028](../decisions/0028-cart-storage-in-valkey.md) の注記）。ポッドの運用の鍵は `sys:`、全体の待合室の鍵は `wr:{<sale_id>}:` で、ショップのデータの値を持たない。一覧は [data-model.md](data-model.md)。
+- **検索のシャード**（[ADR-0052](../decisions/0052-search-index-per-pod-and-japanese-analysis.md) の注記）：主のシャードを 12 から 3 にし、`routing_partition_size` を使わない。索引はポッドあたり 6 GB 前後で、12 では 1 シャード 0.5 GB ほどと小さすぎるため。
+- **返金の税の方式の名前**（[ADR-0017](../decisions/0017-consumption-tax-calculation-and-rounding.md)・[ADR-0043](../decisions/0043-refund-calculation-from-unit-allocations.md) の注記）：taxes-and-invoices の `difference` と returns-and-refunds の「差分（D）」が逆の中身を指していたので、`independent`（返す分だけで計算）と `recompute`（返品の後の注文の税額との差）に揃えた。どちらを使うかは法務の確認待ち（L4）のまま。
+- **関数の輸入**（[ADR-0008](../decisions/0008-extension-sandbox-wasm.md) の注記）：`proc_exit` を許す（[ADR-0058](../decisions/0058-function-io-contract.md)）。
+- **外貨の通貨（仮、PM の判断待ち）**：intent の MVP は「表示と支払いの通貨」を含むが、外貨のマーケットは海外への販売を伴い、越境の税（法務の L4）と E22 の設計が要る。MVP では仕組み（マーケット、固定の価格、換算と丸め、為替の写し）を作って試験し、外貨のマーケットの有効化は `release.markets-foreign-currency` の裏に置く。MVP で買い手が使える通貨は JPY だけ。[intent.md](../intent.md) と [roadmap.md](../roadmap.md) を同じ書き方に直した。**残る問い**：MVP の GA の判定に外貨の表示（支払いは JPY）だけを含めるか、E22 まで全部を止めるか。
+- **本家との意図した違い**（1.4 節）：振り分け、P5、移し替えの中継の窓、売上の確定の時点（最初の発送）、同じ行の複数の商品の割引を持たない、別の行の商品の割引は常に両立、組み合わせの規則を全ショップで同じに、Webhook の購読を消さずに止める、Webhook の専用の秘密を足した。
+- **見張りのポッド `p00`**：S1 のポッドは共有 4・隔離 1・見張り 1 になった（2 節、[ADR-0011](../decisions/0011-shop-placement-and-rebalancing.md)）。
+- **費用**（2.1 節）：S1 の本番の月の原価は約 18.7 万 USD、共有のポッド 1 つ 約 5,700 USD。capacity と infrastructure の 9 節の値に揃え、目標「1 ポッド月 100 万円以下」に収まることを確かめた。
+- **Story**：領域の文書が足した Story（`checkout-submit-idempotency`、`checkout-admission-limits`、`purchase-limits`、`surge-auto-queue`、`inventory-location-selection`、`inventory-movements`、`discount-function-merge`、`payment-inquiry-and-circuit-breaker` ほか 26 件）を [roadmap.md](../roadmap.md) に足し、E6 の `cart` を「Valkey が正本、ログインした買い手のカートだけ 30 分ごとに DB へ写す」に直した。
+- **検証の工程での直し（2026-10-10）**：公式の資料を取得し直して、次を確かめ・直した。
+  - CloudFront の KeyValueStore は鍵 512 バイト・値 1 KB・保存 5 MB・関数に 1 つ・1 回の更新 50 鍵か 3 MB・アカウントに 200。マルチテナントの配信のテナントはアカウントに 1 万（引き上げ可）、別名はテナントに 100、継続のデプロイは使えない。タグでの無効化（`CacheTagConfig`、1 オブジェクト 50 タグ）はテナントにも使える（確認のみ）。
+  - CloudFront の VPC origin のアカウントをまたぐ共有（AWS RAM）は 2025-11-06 の発表（確認のみ）。
+  - Aurora PostgreSQL 18 は 2026-06 に一般提供、2026-08 に 18.4（[infrastructure.md](infrastructure.md) の 4 節の未検証を外し、18 で始める）。
+  - Aurora の書き込みの交代の後の論理レプリケーションのスロットは、公式の文書に記述がない。AWS のブログは交代の後に作り直すと書く。**未検証**のまま、失う前提で設計した（[shops-and-pods.md](shops-and-pods.md) の 8.6 節）。
+  - Wasmtime の `consume_fuel` は決定的に止める仕組みで、燃料が尽きるとトラップ。`epoch_interruption` は決定的でない（確認のみ。ADR-0008 の使い分けのとおり）。
+  - 国税庁の Q&A（令和 8 年 5 月改訂）の問 57：一の適格請求書につき税率ごとに 1 回の端数処理、方法は任意、商品ごとの端数処理の合計は不可。[taxes-and-invoices.md](taxes-and-invoices.md) の未検証を外した。当てはめ（本システムが出すレシートへの適用）は法務の確認待ち（L4）のまま。
+  - 消費者庁の最終確認画面のガイドライン：令和 3 年の改正の第 12 条の 6 の考え方。意見募集（2021-11-24）の入口だけを確かめ、確定したガイドラインの本文は取得できなかった（**未検証**。intent の出典に書いた）。表示の事項の当てはめは法務の確認待ち（L1）。
+  - 本家の Functions の上限（命令 1,100 万、メモリー 10,000 kB、スタック 512 kB、テーブル 4・要素 1 万、入力 128 kB・出力 20 kB、200 行を超えると比例、入力のクエリ 3,000 バイト・費用 30）、Admin API の回復（100・200・1,000・2,000）と 1 クエリ 1,000、Webhook の 4 時間に 8 回と応答 5 秒（確認のみ）。Webhook の失敗が続いたときに消す購読の種類は文書に書いていないので、「Admin API で作った購読を消す」を「購読を消す」に直した。
+- **品質と運用**：
+  - 各領域の文書の「テスト」「data-model への項目」の提案を反映した。[quality.md](../quality.md) に、性質と決定表の一覧（2.2.2 節）、漏れの経路の表の行、判定基準、Epic の合否基準を足した。
+  - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[flash-sale-operations.md](../runbooks/flash-sale-operations.md)、[shop-move.md](../runbooks/shop-move.md)、[oversell-or-paid-without-order.md](../runbooks/oversell-or-paid-without-order.md)）と計画のものに分けて一覧にし、2 節に新しいフラグ（`ops.inventory_item_sales_enabled` ほか）を足した。
+  - 表と置き場所の索引は [data-model.md](data-model.md)。
+- **数値の正本**：
+  - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
+  - 引き当ての期限 15 分（フラッシュセールのショップ 10 分）と枠（既定 1、セール 32、1〜64）は [ADR-0004](../decisions/0004-inventory-reservation-model.md)・[ADR-0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md)。許可証 15 分は [ADR-0025](../decisions/0025-queue-pass-tokens.md)。
+  - 関数の上限（燃料 1,000 万、メモリー 10 MiB、入力 128 KiB、出力 20 KiB、1 段 50ms）は [ADR-0008](../decisions/0008-extension-sandbox-wasm.md)。Admin API の費用（1 クエリ 1,000、回復 100・200・1,000/秒、容量はその 10 倍）は [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)。Webhook の送り直し（4 時間に 8 回、1・4・10・20・30・45・60・70 分）は [ADR-0061](../decisions/0061-webhook-delivery-and-signing.md)。KeyValueStore の熱い集まり（4 MB、3.5 MB で外し始め、固定の枠 1 MB）は [ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)。
+  - 負荷と費用のモデルは [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節。
+- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 残る未解決事項（2026-10-10）
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | 法務の確認待ち（L1〜L10） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
-| 在庫の枠の数、1 行の更新の上限 | E5 の前の `inventory-hot-row-poc` |
-| ショップの移し替えの停止の時間、論理デコードの方法 | E2 の前の `shop-move-poc` |
+| 外貨の通貨を MVP の GA の範囲に含めるか（仮の決定は上） | PM |
+| 返金の税の方式（`independent`・`recompute`）、返還インボイスの記載 | 法務の確認待ち（L4） |
+| 在庫の枠の数（32）、1 行の更新の上限、共有のアドバイザリーロックの費用 | E5 の前の `inventory-hot-row-poc`、E2 の前の `shop-move-poc` |
+| ショップの移し替えの停止の時間、コピーの速さ、Aurora の交代でのスロットの扱い（**未検証**） | E2 の前の `shop-move-poc` |
+| KeyValueStore の伝わりの時間（**未検証**）、`s-maxage` を延ばすか、タグでの無効化に替えるか | E12 の前の `edge-cache-generation-poc` |
 | テンプレートの描画の速さ、歩数の上限の値 | E11 の前の `theme-renderer-poc` |
 | 関数の実体化と実行の時間、燃料の上限の値 | E15 の前の `wasm-function-poc` |
-| 世代の番号の伝わるまでの時間 | E12 の前の `edge-cache-generation-poc` |
-| 決済の提供者、運送会社の API、チャレンジの提供者 | E8・E9・E13 の選定の Story |
-| ポッドの大きさ、段階を上げる基準 | infrastructure・capacity の領域 |
-| 本家の振る舞いで未確認のもの（引き当ての時点、関数の失敗の扱い、待合室の並び、SLA） | 各領域の文書で公式の資料で確かめる。確かめられなければ未検証のまま、本システムの値を使う |
+| マルチテナントの配信のテナントの数の天井、配信あたりの要求の天井、Anycast の固定の IP の料金（**未検証**） | E2・S2 の前に AWS に確かめる |
+| 決済の提供者、運送会社の API、チャレンジの提供者、為替の提供者 | E3・E8・E9・E13 の選定の Story |
+| 1 要求・1 注文の CPU と DB の費用、Fargate の自動の拡大の速さ、可観測性とネットワークの費用（**未検証**） | E18 の負荷試験と、E1 の後の実績 |
+| 本家の振る舞いで未確認のもの（引き当ての時点、関数の失敗の扱い、待合室の並び、SLA、Webhook の送り直しの間隔） | 公式の資料で確かめられなかった。本システムの値を使う |
 
 ## 7. 領域の文書（計画）
 
-各領域の文書は、まだない。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
+各領域の文書は 2026-10-10 にそろい、統合の工程で食い違いを解いた。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
@@ -381,7 +444,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [webhooks.md](webhooks.md) | 話題、購読、配信（署名、送り直し、順序なし、重複）、隔離した egress、購読の停止、照合の勧め | [0061](../decisions/0061-webhook-delivery-and-signing.md)、[0062](../decisions/0062-webhook-egress-and-payload-custody.md) | セキュリティ、Ops | E14 |
 | [merchant-admin-and-staff.md](merchant-admin-and-staff.md) | 管理画面、スタッフのアカウントと招待、権限の一覧と役割、SSO、監査ログ、ショップの開設の審査（法務の L8・L10）、顧客のデータの削除（法務の L3） | [0063](../decisions/0063-staff-identity-2fa-sso-and-collaborators.md)、[0064](../decisions/0064-permissions-roles-and-audit-log.md)、[0065](../decisions/0065-merchant-billing-plans-and-usage.md) | セキュリティ | E17 |
 | [security.md](security.md) | 脅威モデル、トークンと秘密、暗号化と鍵、個人のデータの扱い、決済の範囲（法務の L7）、ボットと不正、監査、開示の請求の手順 | [0066](../decisions/0066-encryption-and-key-layout.md)、[0067](../decisions/0067-checkout-script-integrity-and-card-testing.md)、[0068](../decisions/0068-data-classes-retention-and-operator-access.md) | セキュリティ | E1、E17、E18 |
-| `data-model.md` | データモデルの索引（全体とポッドの DB の表、S3 のパス、SNS・SQS の話題） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの索引（領域ごとの表と置き場所、Valkey の鍵、S3 のパス、SNS・SQS の話題）。ER 図の全体は後で足す | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、ポッドの Terraform のモジュール、全体の面、エッジ、egress、DR（大阪）、段階を上げる基準 | [0069](../decisions/0069-accounts-network-and-pod-groups.md)、[0070](../decisions/0070-edge-distributions-waf-and-origin-selection.md)、[0071](../decisions/0071-osaka-dr-and-stage-up-criteria.md) | Ops | E1、E18 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、ショップとポッドのラベル、SLI の計測、合成監視、実ユーザーの計測 | [0072](../decisions/0072-telemetry-pipeline-and-shop-cardinality.md)、[0073](../decisions/0073-correctness-monitors-and-independent-canary.md) | Ops | E1、E18 |
 | [capacity.md](capacity.md) | 負荷のモデル（ストアフロント、チェックアウト、フラッシュセール、Admin API、Webhook）、部品ごとの必要量、ポッドの大きさ、費用のモデル、負荷試験 | [0074](../decisions/0074-pod-size-tiers-and-pre-scaling.md) | Ops | E18 |

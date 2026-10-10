@@ -138,7 +138,7 @@ ADR-0074。
 
 | 項目 | 内訳 | 月（USD） |
 | --- | --- | --- |
-| 共有のポッド × 4 | Aurora `db.r8g.2xlarge` I/O-Optimized × 2（1.732/時）＋保存 2,556、Valkey `cache.r7g.large` × 2（0.2104/時）307、OpenSearch 704、Fargate 1,700（平均 39 vCPU・78 GB と山の分）、ALB・ログ・SQS 420 → 1 ポッド 約 5,700 | 22,800 |
+| 共有のポッド × 4 | Aurora `db.r8g.2xlarge` I/O-Optimized × 2（1.732/時）と保存（初期 100 GB、0.27/GB）2,556、Valkey `cache.r7g.large` × 2（0.2104/時）307、OpenSearch 704、Fargate 1,700（平均 39 vCPU・78 GB と山の分）、ALB・ログ・SQS 420 → 1 ポッド 約 5,700 | 22,800 |
 | 隔離のポッド | `x-min` の月と `x-std` の 1/3 の月の平均 | 4,300 |
 | 見張りのポッド | `p-min` | 1,500 |
 | 全体の面 | Aurora `db.r8g.xlarge` × 2（0.866/時）1,264、Valkey 1,224、Fargate 1,100、egress・その他 1,700 | 5,300 |
@@ -153,7 +153,8 @@ ADR-0074。
 | その他（KMS、Secrets Manager、AppConfig、SES、SQS・SNS） | — | 2,500 |
 | 合計 | | 約 18.7 万（約 2,800 万円）、±40% |
 
-- 最も大きいのはエッジの転送（43%）と要求（17%）と WAF（9%）。ポッドは 15%。
+- 最も大きいのはエッジの転送（43%）と要求（17%）と WAF（9%）。ポッド（共有・隔離・見張り）は 15%。
+- 検索の索引は、ポッドあたり 6 GB 前後（商品 125 万 × 5 KB 前後）。主のシャードは 3（[ADR-0052](../decisions/0052-search-index-per-pod-and-japanese-analysis.md) の 2026-10-10 の注記）。
 - 下げる手段：画像の形式と大きさ（AVIF・WebP、表示の幅に合わせた変換）、Savings Plans（Fargate）とリザーブド（Aurora）、CloudFront の大口の価格（**未検証**）。
 - 本家の原価は確かめていない（**未検証**）。
 
@@ -212,7 +213,6 @@ ADR-0074。
 | Fargate の自動の拡大の速さ、ALB の容量の予約の要否 | E18（**未検証**） |
 | 大きな合成の負荷の届け出 | E18 の前（**未検証**） |
 | 可観測性・ネットワークの費用 | E1 の後の実績（**未検証**） |
-| [search-and-recommendations.md](search-and-recommendations.md) の主のシャード 12（1 シャード 0.5 GB ほどで、1 シャード 10〜30 GB の目安より小さい） | 主のシャードを 3 にすることを勧める。search-and-recommendations の担当が決める |
 
 ## 11. data-model への項目
 

@@ -299,7 +299,7 @@ sequenceDiagram
 - **中継の窓**：伝わる前に元のポッドへ届いた要求のために、元のポッドの入口のミドルウェアは、移し出したショップ（`shop_relocations` の行）の要求を、15 分の間、先のポッドの ALB へ中継する（`x-<brand>-relayed: 1` を付け、二度は中継しない）。データに触れるのは先のポッドだけなので、「1 つの要求は 1 つのポッドのデータだけ」は保たれる。[ADR-0002](../decisions/0002-pods-and-shop-placement.md) の「421 で再送させる」を、ブラウザに見えない中継に置き換えた。`x-<brand>-pod-id` が自分と違う要求の 421 はそのまま残す。
 - 元のポッドの行は、`shop_freeze` の印を残したまま 7 日置き（読み出しの専用）、その後にショップの単位の削除の作業（[ADR-0013](../decisions/0013-shop-lifecycle-and-data-deletion.md) と同じ作業）で消す。
 - 先のポッドの検索の索引は、コピーの段で作り、切り替えの後に「索引を作ってから変わった商品」を作り直す（outbox の事象を当てていないため）。作り直しは 5 分以内（[search-and-recommendations.md](search-and-recommendations.md)）。
-- S3 の置き場所はポッドに依らない（`shops/<shop_id>/…`）ので動かさない。[storefront-api-and-caching.md](storefront-api-and-caching.md) の 12 節のサイトマップの置き場所（`pods/<pod>/shops/<shop>/…`）は、移し替えの後に作り直す（作り直せるデータなので可）。
+- S3 の置き場所はポッドに依らない（`shops/<shop_id>/…`。メディア、テーマ、書き出し、一括の操作の結果、サイトマップ、送り状）ので動かさない。
 
 ### 8.6 失敗と戻し
 
@@ -309,7 +309,7 @@ sequenceDiagram
 | 停止の中（切り替えの前） | 印を消して元の書き込みを開ける（元の停止の時間は伸びる）。先の行を消す。移し替えを `failed` にし、Ops に知らせる |
 | 切り替えの後、7 日以内に問題 | 逆向きの移し替え（先 → 元）を、新しい移し替えとして最初からやり直す（元の行は古いので使わない）。緊急の時は Ops の判断で、同じ手順を優先で行う |
 | `shop-mover` のプロセスの停止 | 移し替えの状態（`shop_moves.phase`、最後に当てた LSN）から再開する。当ては LSN で冪等（先の `shop_move_progress` に当てた LSN を同じトランザクションで書く） |
-| 元のポッドの DB のフェイルオーバー | スロットはフェイルオーバーで失われうる（Aurora の論理レプリケーションのスロットの扱いは**未検証**）。失ったら移し替えを最初からやり直す |
+| 元のポッドの DB のフェイルオーバー | スロットはフェイルオーバーで失われうる。Aurora の論理レプリケーションの文書は、書き込みの交代の後にスロットが残るかを書いていない。AWS のブログ（Debezium の移行の記事）は、交代の後にスロットを作り直すと書き、PostgreSQL 17 の failover slots（`sync_replication_slots`）は Aurora で変えられないとする（**未検証**のまま、失う前提で設計する）。失ったら移し替えを最初からやり直す |
 
 ## 9. ショップのライフサイクル
 
@@ -396,7 +396,7 @@ stateDiagram-v2
 | KeyValueStore の更新の失敗 | 新しいショップ・移し替えが伝わらない | `shop-directory` が再試行し、10 分を超えたら呼び出し。移し替えは中継の窓を延ばす（最大 24 時間） |
 | 熱い集まりの 4 MB の超過 | 更新が拒まれる | 3.5 MB で外し始めるので起きない想定。起きたら固定の枠の外を要求の少ない順に外す |
 | ポッドの障害（DB のフェイルオーバー） | そのポッドのショップの書き込みが 30 秒ほど止まる | 他のポッドに影響しない。移し替え中ならやり直し（8.6 節） |
-| 移し替えの照合の不一致 | 切り替えない | 8.6 節。`shop-move-failure.md` の手順 |
+| 移し替えの照合の不一致 | 切り替えない | 8.6 節。[shop-move.md](../runbooks/shop-move.md) の手順 |
 | 証明書の更新の失敗 | 独自のドメインの TLS の期限切れ | 期限の 30 日前から日次で見て、事業者と Ops に知らせる。既定のドメインは止まらない |
 
 ## 13. 上限（まとめ）
@@ -483,11 +483,10 @@ stateDiagram-v2
 | --- | --- |
 | 配信のテナントの数の上限の天井（S2 で数十万） | E2 の前に AWS に確かめる（**未検証**）。足りなければ、独自のドメインの配信を複数のアカウントに分ける |
 | KeyValueStore の伝わりの時間 | `shop-move-poc`・`edge-cache-generation-poc`（**未検証**） |
-| Aurora のフェイルオーバーでの論理レプリケーションのスロットの扱い | `shop-move-poc`（**未検証**） |
+| Aurora のフェイルオーバーでの論理レプリケーションのスロットの扱い | `shop-move-poc`（**未検証**。公式の文書に記述がなく、失う前提で設計した。8.6 節） |
 | コピーの速さ、停止の段ごとの時間、PU の容量の値 | `shop-move-poc`、E18 の負荷試験 |
 | `frozen` の理由（規約の違反・法令の要請）の判断と手順、開設の審査 | **法務の確認待ち：L8・L10** |
 | 削除の期限、保持の範囲、バックアップに残る期間 | **法務の確認待ち：L3・L4** |
-| [ADR-0002](../decisions/0002-pods-and-shop-placement.md) の本文（P1〜P4、421 での再送）と、ADR-0010・0012 の足し・置き換え | ADR-0002 の持ち主（Dev）が、ADR-0002 の本文に P5 と中継の窓を反映するかを決める |
 
 ## 出典
 
@@ -499,3 +498,5 @@ stateDiagram-v2
 - AWS, [Understand how multi-tenant distributions work](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-config-options.html)、[Request certificates for your CloudFront distribution tenant](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/managed-cloudfront-certificates.html)：テナント、接続のグループ、HTTP の検証の証明書、自動の更新、ドメインは 1 つの資源にだけ結べる
 - AWS, [Helper methods for origin modification](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)：`selectRequestOriginById()`、VPC origin
 - PostgreSQL, [Row Filters](https://www.postgresql.org/docs/18/logical-replication-row-filter.html)：公開の行の絞り込みと、レプリカ識別の制約
+- AWS, [Overview of PostgreSQL logical replication with Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.html)：WAL は Aurora のストレージに置き、`pgoutput` で復号する。読み出しの写しからの論理デコードは Aurora で使えない。書き込みの交代の後のスロットの扱いは書いていない
+- AWS Database Blog, [Migrate Amazon Aurora PostgreSQL across major versions with active Debezium CDC connectors using native logical replication](https://aws.amazon.com/blogs/database/migrate-amazon-aurora-postgresql-across-major-versions-with-active-debezium-cdc-connectors-using-native-logical-replication/)：交代の後にスロットを作り直す運用

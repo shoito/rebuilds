@@ -157,7 +157,7 @@ ADR-0069。ポッドは Terraform のモジュール `pod` から作る（[ADR-0
 
 | 部品 | 構成 |
 | --- | --- |
-| Aurora PostgreSQL | 書き込み 1、読み出し 1 以上（別の AZ）。I/O-Optimized。`rds.logical_replication = 1`（移し替え）、`rds.force_ssl = 1`。Global Database で大阪へ。自動のバックアップ 35 日。Aurora PostgreSQL 18 の提供の時期は**未検証**（[ADR-0001](../decisions/0001-platform-and-stack.md) の前提。提供までは 17 で始め、メジャーの更新の手順で上げる） |
+| Aurora PostgreSQL | 書き込み 1、読み出し 1 以上（別の AZ）。I/O-Optimized。`rds.logical_replication = 1`（移し替え）、`rds.force_ssl = 1`。Global Database で大阪へ。自動のバックアップ 35 日。Aurora PostgreSQL 18 は 2026-06 に一般提供になり、2026-08 に 18.4 が出た（[What's New](https://aws.amazon.com/about-aws/whats-new/2026/08/amazon-aurora-postgresql-18-4-17-10-16-14-15-18-14-23/)、2026-10-10 に確認）。18 で始める |
 | ElastiCache（Valkey） | クラスタモード、主 1・写し 1 の 1 シャード（S1）。転送中と保存の暗号化 |
 | OpenSearch | ポッドに 1 つのドメイン、3 AZ、データのノード 3、専用のマスター 3（[search-and-recommendations.md](search-and-recommendations.md)） |
 | SQS・SNS | ポッドの話題とキュー（outbox の行き先、ジョブ、P3・P5）。ショップの公平のためのメッセージ グループ（[ADR-0003](../decisions/0003-tenancy-and-rls.md)） |
@@ -304,7 +304,6 @@ ADR-0071。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | Anycast の固定の IP の一覧の料金と、マルチテナントの配信での頂点のドメインの受け方 | E2 の `custom-domains-and-tls`（**未検証**） |
 | Network Firewall の料金と SNI の許可の一覧の振る舞い | E1 の `aws-accounts-and-network`（**未検証**） |
 | 大阪で ECS のタスクを起こせる量と時間 | `dr-failover-drill`（**未検証**） |
-| Aurora PostgreSQL 18 の提供の時期 | E1 の `aurora-rls-baseline`（**未検証**） |
 | CloudFront の大口の価格 | Ops と PM（**未検証**） |
 | データの所在の法令上の約束 | **法務の確認待ち：L3** |
 
@@ -327,3 +326,4 @@ ADR-0071。月次のキャパシティのレビュー（[capacity.md](capacity.m
 - AWS, [Helper methods for origin modification](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/helper-functions-origin-modification.html)
 - AWS, [Understand how multi-tenant distributions work](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-config-options.html)：接続のグループ、Anycast の固定の IP の一覧は接続のグループの設定
 - AWS Price List の公開の価格（ap-northeast-1）：単価は [capacity.md](capacity.md) の出典
+- AWS, [Amazon Aurora now supports PostgreSQL 18.4, 17.10, 16.14, 15.18, and 14.23](https://aws.amazon.com/about-aws/whats-new/2026/08/amazon-aurora-postgresql-18-4-17-10-16-14-15-18-14-23/)（2026-08）、[Amazon Aurora で PostgreSQL メジャーバージョン 18 のサポートを開始](https://aws.amazon.com/jp/about-aws/whats-new/2026/06/amazon-aurora-postgresql-major-version-18/)（2026-06）

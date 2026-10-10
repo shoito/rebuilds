@@ -100,10 +100,10 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **性質**：
   - 1 つの注文の税額は、税率ごとに税込みの対価の合計から計算し、税率ごとに 1 回だけ丸めた値に一致する（参照の実装 `tax-ref`）。品目ごとに丸めて足した値と比べない。
   - 税率ごとの対価の合計と税額の和が、注文の合計と一致する。
-  - 注文の単位の割引は、税率ごとの対価の比で按分し、按分の端数を決めた規則で割り振る。按分の後の税率ごとの対価の和は、割引の後の合計と一致する。
-  - 返品の後の税額は、元の注文の税額から返品の分を引いた値と、返品の後の注文を最初から計算した値の、決めた方の規則に一致する（どちらにするかは法務の L4 の後に spec で確定する）。
+  - 注文の単位の割引は、行の額（商品の割引の後）の比で按分し、按分の端数を決めた規則（額の大きい行から 1 円ずつ、同じなら行の ID の順）で割り振る。按分の後の税率ごとの対価の和は、割引の後の合計と一致する。
+  - 返品の後の税額は、`independent`（返す分の対価だけから計算）と `recompute`（返品の後の注文を最初から計算した税額との差）の、決めた方の規則に一致する（どちらにするかは法務の L4 の後に spec で確定する。[ADR-0043](decisions/0043-refund-calculation-from-unit-allocations.md)）。
   - レシートの記載（税率ごとの対価の合計、税額、登録番号）が、注文の値と一致する。
-- **試験のベクトル**：国税庁の資料の計算の例（法務の L4 の確認の後に、出典を付けて加える）。
+- **試験のベクトル**：国税庁の Q&A（令和 8 年 5 月改訂）の問 57 の計算の例（税込みの対価の合計 × 10/110・8/108 を税率ごとに 1 回）と、[taxes-and-invoices.md](architecture/taxes-and-invoices.md) の 5.3・6 節の例。当てはめは法務の L4 の確認の後に確定する。
 
 **E. テーマのエンジンの安全（ファジング）**
 
@@ -142,6 +142,12 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | メールの通知 | 宛先が注文の買い手・ショップのスタッフだけ |
 | エラーの応答 | 他のショップの ID・商品の有無を推測させないこと |
 | ジョブ | メッセージの `shop_id` 以外のショップに触れないこと（RLS） |
+| エッジの中継（`edge-router`） | 熱い集まりの経路と `edge-router` の経路で、同じホストが同じショップ・同じポッドに決まること（PROP-POD-001）。中継した応答のキャッシュの鍵にショップが入ること |
+| 移し替えの中継の窓 | 元のポッドが中継した要求が、先のポッドのそのショップのデータだけに触れること（PROP-MOVE-004） |
+| 全体の写し（P5） | `*_replica` の表がショップのデータの列を持たないこと（スキーマの検査） |
+| Webhook の本文の運び（全体） | `webhook-dispatcher` が本文を保存せず、ログに本文と URL のクエリを書かないこと（[ADR-0062](decisions/0062-webhook-egress-and-payload-custody.md)） |
+| サポートのアクセス・break-glass | 事業者の許可のないショップを運用者が見られないこと。break-glass の読み出しが RLS の中で 1 つのショップだけを見ること（[ADR-0068](decisions/0068-data-classes-retention-and-operator-access.md)） |
+| 監査ログ・書き出し | 監査ログの画面と S3 の写し（`audit/shops/<shop_id>/…`）に、他のショップの行が出ないこと |
 
 **H. フラッシュセールの負荷試験とうるさい隣人**
 
@@ -159,7 +165,8 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 
 - 書き込みの負荷（1 秒 100 件の注文と在庫の更新）をかけたまま、任意のショップを移す。移した後の表ごとの行の数・チェックサム・在庫の数・未完了のチェックアウトが一致し、停止が 10 秒以内（NFR-015）。
 - 任意の段（コピー、追いかけ、停止、切り替え）で `shop-mover` を止めて再開し、二重の書き込みと取りこぼしがないこと。
-- 切り替えの間に古いポッドへ来た要求が 421 で再送されること。
+- 切り替えの後、伝わる前に古いポッドへ来た要求が、15 分の中継の窓の間に新しいポッドで 1 回だけ処理され、中継が 1 段だけであること（PROP-MOVE-004。[ADR-0012](decisions/0012-shop-mover-logical-decoding-and-cutover.md)）。他のポッドの ID のヘッダーの要求は 421 で拒まれること。
+- 元のポッドの DB のフェイルオーバー（スロットを失う）で、移し替えが最初からやり直され、元のデータが変わらないこと。
 
 **J. キャッシュの正しさ**
 
@@ -183,6 +190,50 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 
 - 最終確認画面に、法務の L1 で決める事項（分量、価格、支払いの時期と方法、引き渡しの時期、申込みの期間、撤回と解除）が出ていることを、E2E の検査項目にする。関数・アプリが画面を変えても、これらが消えないこと。
 - レシートの記載の項目（法務の L4）を、試験のベクトルで確かめる。
+
+### 2.2.2 性質と決定表の一覧
+
+領域の文書が提案した性質（`PROP-*`）と決定表（`DT-*`）。ID は各 Story の `spec.md` で正式に振り直すときに、この一覧と重ならないことを確かめる。
+
+| 領域 | 性質・決定表 | 2.2.1 節の重点 |
+| --- | --- | --- |
+| [shops-and-pods.md](architecture/shops-and-pods.md) | PROP-POD-001・002、PROP-MOVE-001〜004、DT-SHOP-001 | G、I |
+| [catalog-and-pricing.md](architecture/catalog-and-pricing.md) | PROP-CAT-001〜004、DT-CAT-001 | C（通貨の丸め）、G |
+| [taxes-and-invoices.md](architecture/taxes-and-invoices.md) | PROP-TAX-001〜005、DT-TAX-001 | D |
+| [inventory-and-reservations.md](architecture/inventory-and-reservations.md) | PROP-INV-001〜007 | A |
+| [flash-sales-and-queueing.md](architecture/flash-sales-and-queueing.md) | PROP-FLS-001〜005 | A、H |
+| [cart-and-checkout.md](architecture/cart-and-checkout.md) | PROP-CHK-001〜005、DT-CHK-001 | B |
+| [discounts-engine.md](architecture/discounts-engine.md) | PROP-DSC-001〜006、DT-DSC-001 | C |
+| [payments-integration.md](architecture/payments-integration.md) | PROP-PAY-001〜004、DT-PAY-001（提供者ごと） | B |
+| [orders-and-fulfillment.md](architecture/orders-and-fulfillment.md) | PROP-ORD-001〜004、DT-ORD-001 | A、C |
+| [returns-and-refunds.md](architecture/returns-and-refunds.md) | PROP-RET-001〜005、DT-RET-001 | A、D |
+| [storefront-themes.md](architecture/storefront-themes.md) | PROP-LOOM-001〜006、DT-LOOM-001 | E |
+| [storefront-api-and-caching.md](architecture/storefront-api-and-caching.md) | PROP-EDGE-001〜004、PROP-SFAPI-001 | G、J、K |
+| [search-and-recommendations.md](architecture/search-and-recommendations.md) | PROP-SRCH-001〜004、PROP-REC-001 | G |
+| [app-platform-and-apis.md](architecture/app-platform-and-apis.md) | PROP-APP-001〜004、DT-APP-001・002 | G、K |
+| [functions-sandbox.md](architecture/functions-sandbox.md) | PROP-FN-001〜004、DT-FN-001 | F |
+| [webhooks.md](architecture/webhooks.md) | PROP-HOOK-001〜005、DT-HOOK-001 | G、L |
+| [merchant-admin-and-staff.md](architecture/merchant-admin-and-staff.md) | PROP-STAFF-001〜003、PROP-AUDIT-001・002、PROP-BILL-001、DT-PERM-001 | G、N |
+| [security.md](architecture/security.md) | PROP-SEC-001〜005 | F、G、O |
+| [observability.md](architecture/observability.md) | PROP-OBS-001・002 | — |
+| [delivery.md](architecture/delivery.md) | PROP-DLV-001〜003 | E、P |
+
+**N. 監査ログ**
+
+- 任意のミューテーションの列（失敗とロールバックを含む）で、コミットした変更と監査の行が 1 対 1（PROP-AUDIT-001）。
+- 任意の 1 行の書き換え・削除・挿入を、ハッシュの鎖の検証が見つける（PROP-AUDIT-002）。S3 の写しの欠けと重なりを日次で検査する。
+
+**O. チェックアウトのスクリプトとカード番号**
+
+- 任意のテーマとアプリの導入の組み合わせで、チェックアウトのページにテーマ・アプリの埋め込み・事業者の配信元のスクリプトが現れない（PROP-SEC-004）。`canary` が 5 分ごとにスクリプトの目録をリリースの目録と比べる。
+- カード番号の形の値を全経路に流し、ログ・トレース・DB・S3 の走査で Luhn を通る値が 0（PROP-SEC-001、夜間）。
+- カードテストの上限（チェックアウト 5 回、セッション・IP、ショップの自動のチャレンジ）を結合テストで確かめる。
+
+**P. デプロイと移行**
+
+- 任意の広げる段の移行の後、1 つ前のバージョンのサービスの全結合テストが緑（PROP-DLV-001）。
+- わざと壊したイメージで、波 0（`p00`）で止まり、戻る（staging の波の試験）。
+- Wasmtime の更新の候補で、全モジュールの記録した入力の出力の違いが 0。
 
 ### 2.3 エージェントの確認ループ
 
@@ -246,6 +297,9 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | 価格の写しと決済の金額の不一致 | 0 件 | SEV2 |
 | 応答とキャッシュの監査の不一致（ショップ） | 0 件 | SEV1 の候補 |
 | 関数の失敗の割合（本システムの原因） | 0.01% 未満 | runbooks の手順 |
+| チェックアウトのスクリプトの目録の不一致 | 0 件 | SEV1 の候補。該当のショップのチェックアウトを止める |
+| 監査ログの鎖の切れ・写しの欠け | 0 件 | 調査し、Intent を起票する |
+| 検索の結果から捨てた他のショップの件 | 0 件 | SEV1 の候補 |
 | テンプレートの上限の超過の急増 | リリースの前の 2 倍以内 | レンダラーのリリースを止める |
 
 ### 4.2 本番での検証
@@ -254,7 +308,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 - **決済と注文の照合**：1 分ごとの照合の処理の結果と、日次の提供者の取引の一覧との突き合わせ。
 - **税の再計算**：毎日、注文の抜き取り（1%）を `tax-ref` で計算し直して比べる。
 - **応答とキャッシュの監査**：エッジのキャッシュの応答と API の応答を抜き取り、ショップの ID と鍵を比べる。値は記録しない。
-- **外からの見張り**：別のアカウントの `canary` が、見張りのショップで 5 分ごとに購入（提供者の試験の環境）、ストアフロントの表示、価格の変更の反映、Webhook の受け取りを確かめる。
+- **外からの見張り**：大阪の別のアカウントの `canary` が、見張りのショップ（`p00`）で 5 分ごとに購入（提供者の試験の環境とコンビニ払いの模型）、ストアフロントの表示（1 分）、価格の変更の反映、Webhook の受け取り、分離（2 つの見張りのショップの隠した値）、チェックアウトのスクリプトの目録を確かめる（[ADR-0073](decisions/0073-correctness-monitors-and-independent-canary.md)）。
 
 ### 4.3 異常から intent へ
 
@@ -264,14 +318,14 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 
 | Epic | 重点 | リリースの合否基準 |
 | --- | --- | --- |
-| E1 基盤 | RLS の検査、ポッドのモジュール、CI の参照の実装の枠 | RLS の性質ベーステストが緑 |
-| E2 ショップとポッド | 振り分けと 421、移し替え（I） | 負荷の下の移し替えで不一致 0、停止 10 秒以内 |
+| E1 基盤 | RLS の検査、RLS の外の表の一覧、ポッドのモジュール、CI の参照の実装の枠、波のデプロイと移行（P）、列の暗号（PROP-SEC-002・003） | RLS の性質ベーステストが緑。波の試験で波 0 で止まる |
+| E2 ショップとポッド | 振り分け（熱い集まりと `edge-router` の一致、PROP-POD-001・002）、移し替え（I）、ライフサイクル（DT-SHOP-001） | 負荷の下の移し替えで不一致 0、停止 10 秒以内 |
 | E3 カタログと価格 | 通貨の丸め、比較の価格、CSV の取り込みのファジング | 性質ベーステストが緑 |
 | E4 税とインボイス | 税の端数（D）、レシートの記載 | 参照との比べが夜間 7 日続けて緑。法務の L4 の確認済み |
 | E5 在庫と引き当て | 売り越しなし（A） | 夜間（並行度 200）が 7 日続けて緑。`inventory-hot-row-poc` の結果が記録済み |
-| E6 カートとチェックアウト | 注文の一回性（B）、価格の写し、最終確認画面（M） | 夜間 100 万の場面が 7 日続けて緑。決定表の全行に到達。法務の L1 の確認済み |
+| E6 カートとチェックアウト | 注文の一回性（B）、送信の冪等（PROP-CHK-005）、価格の写し、最終確認画面（M）、チェックアウトのスクリプト（O） | 夜間 100 万の場面が 7 日続けて緑。決定表の全行に到達。法務の L1 の確認済み |
 | E7 割引のエンジン | 割引の決定性（C） | 性質ベーステストと決定表が緑 |
-| E8 決済の連携 | アダプターの契約の試験、カード番号の不在の検査 | 提供者ごとの契約の試験が緑 |
+| E8 決済の連携 | アダプターの契約の試験（`findByReference` を含む）、カード番号の不在の検査、カードテストの上限（O） | 提供者ごとの契約の試験が緑。法務の L7 の確認済み |
 | E9 注文と配送 | 注文のライフサイクルの決定表、送り状の CSV の試験のベクトル | 決定表が緑 |
 | E10 返品と返金 | 返金の額と税（D）、在庫への戻し（A） | 参照との比べが緑 |
 | E11 テーマ | テーマのエンジンのファジング（E）、試験のベクトル | 夜間のファジングで新しい失敗 0 が 7 日。`theme-renderer-poc` の結果で NFR-012 |
@@ -280,7 +334,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | E14 アプリの基盤 | 費用（K）、Webhook（L）、スコープの漏れ（G） | 性質と漏れの経路の表が緑 |
 | E15 関数の砂場 | 砂場の脱出の試験（F）、決定性 | 脱出の試験の全件が緑。`wasm-function-poc` の結果で NFR-012 |
 | E16 検索 | 漏れ（G）、索引の遅れ | NFR-014 |
-| E17 管理画面・スタッフ・監査 | 権限の決定表、監査ログの欠け | 決定表が緑、監査ログの欠け 0 |
+| E17 管理画面・スタッフ・監査 | 権限の決定表（DT-PERM-001）、監査ログ（N）、協力者と SSO の漏れの経路（G） | 決定表が緑、監査ログの欠け 0、鎖の検証が緑 |
 | E18 本番の準備 | 負荷試験（S1 のピークの 2 倍）、フラッシュセール（H）、DR の訓練、外部のペンテスト（テーマ、関数、API） | runbooks の SLO を負荷試験で満たす。DR の訓練で RPO・RTO を満たす。ペンテストの High 以上が 0 |
 
 ## 6. 責任分担

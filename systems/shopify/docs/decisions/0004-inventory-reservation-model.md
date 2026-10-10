@@ -49,7 +49,9 @@ date: 2026-10-10
 | `committed` | 注文に入った、未配送の数 | 確定（増える）、配送・キャンセル（減る） |
 | `unavailable` | 破損、検品中、安全在庫 | 調整 |
 
-- 不変条件：`on_hand = available + reserved + committed + unavailable`。表の行の更新は、この式を変えない操作の組だけで書く（`packages/inventory` の関数だけ）。
+> 2026-10-10 の注記：統合の工程で、置き場所を具体にした（[ADR-0020](0020-inventory-slot-counters-and-reservation-sweep.md)）。`available`・`reserved`・`committed` の 3 つは枠の行（`inventory_slots`）に持ち、拠点の行（`inventory_levels`）は `on_hand` と `unavailable` の内訳だけを持つ。外に見せる数は枠の和で読む。下の表の意味は変わらない。
+
+- 不変条件：`on_hand = available + reserved + committed + unavailable`（`available`・`reserved`・`committed` は枠の和）。表の行の更新は、この式を変えない操作の組だけで書く（`packages/inventory` の関数だけ）。
 - 「売り越さない」（`inventory_policy = deny`）の品目は、枠の行に `CHECK (available >= 0)` を置く。「在庫切れでも売る」（`continue`）の品目は CHECK を置かず、負を許す。在庫を数えない品目は行を持たない。
 
 ### 引き当て・確定・戻し
@@ -65,6 +67,8 @@ stateDiagram-v2
     fulfilled --> [*]
     restocked --> [*]
 ```
+
+> 2026-10-10 の注記：引き当ての行（`reservations`）の状態は `reserved`・`committed`・`released` の 3 つだけにした。上の図の `fulfilled`・`restocked` は、引き当ての行の状態ではなく、注文の行（`fulfilled_qty`・`cancelled_qty`・`returned_qty`）と在庫の数の動きとして持つ（[inventory-and-reservations.md](../architecture/inventory-and-reservations.md) の 5.1 節、[ADR-0039](0039-order-status-axes-and-edits.md)）。
 
 - **引き当て**は、チェックアウトの送信（支払いの開始）で行う。カートに入れた時点では行わない。行（`reservations`）は、チェックアウト・拠点・品目・数・期限（通常 15 分、フラッシュセールのショップは 10 分）・状態を持つ。
 - **確定**は、注文の作成と同じトランザクションで、引き当ての行を `committed` にし、`reserved` を減らして `committed` を増やす（[ADR-0005](0005-checkout-state-machine-and-exactly-once-orders.md)）。期限を過ぎていても、まだ戻していなければ確定してよい（決済が先に済んだ場合）。

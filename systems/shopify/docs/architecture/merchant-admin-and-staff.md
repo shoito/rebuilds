@@ -304,7 +304,7 @@ flowchart LR
 | `merchant_subscriptions`・`billing_usage`・`merchant_invoices`・`merchant_invoice_lines`（全体） | 購読、利用量（冪等キー）、請求と行 | `(shop_id, period)` | 8.2 |
 | `customer_sessions`（ポッド） | 買い手のセッションのハッシュ、期限 | `(shop_id, session_hash)` | 10 |
 | `redaction_policies`（全体）、`customer_data_requests`（ポッド） | 削除の範囲、請求と進み具合 | `(shop_id, request_id)` | 9 |
-| S3（log-archive） | `audit/<pod>/<shop_id>/<yyyy>/<mm>/<dd>/<hh>.jsonl`、日ごとの鎖の最後の値 | — | 7.2 |
+| S3（log-archive） | `audit/shops/<shop_id>/<yyyy>/<mm>/<dd>/<hh>.jsonl`（ポッドに依らない）、日ごとの鎖の最後の値 | — | 7.2 |
 
 ## 14. テストと性質
 

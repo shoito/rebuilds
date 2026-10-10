@@ -1,7 +1,7 @@
 # Intent: Shopify を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft
+- Status: draft（2026-10-10 に統合と検証を終えた。PM の受理を待つ）
 - Date: 2026-10-10
 
 ## Problem
@@ -32,7 +32,7 @@
 
 - **ショップと管理**：ショップの開設、プラン、ドメイン（既定のドメインと独自のドメイン、TLS の自動の発行）、スタッフと権限、監査ログ、管理画面（Web）
 - **カタログ**：商品、バリエーション（オプション 3 つまで）、コレクション（手動と条件）、メディア（画像、動画）、メタフィールド、販売の公開の設定、CSV の取り込みと書き出し
-- **価格と通貨**：税込みの価格（日本の総額表示）、比較の価格（通常の価格）、ショップの基本の通貨（JPY）、表示と支払いの通貨（マーケットごとの固定の価格か換算と丸めの規則）
+- **価格と通貨**：税込みの価格（日本の総額表示）、比較の価格（通常の価格）、ショップの基本の通貨（JPY）、表示と支払いの通貨の仕組み（マーケットごとの固定の価格か換算と丸めの規則）。**仮の決定（2026-10-10、PM の判断待ち）**：外貨のマーケットは海外への販売を伴い、越境の税（法務の L4）と E22 の設計が要る。MVP では仕組みを作って試験し、外貨のマーケットの有効化は `release.markets-foreign-currency` の裏に置く。MVP で買い手が使える通貨は JPY だけ（[architecture/README.md](architecture/README.md) の 6 節の「決定（2026-10-10、統合）」）
 - **税**：消費税の標準税率（10%）と軽減税率（8%）、品目ごとの税の区分、税率ごとの端数処理、適格簡易請求書（レシート）の発行、適格請求書発行事業者の登録番号の表示
 - **在庫**：拠点（倉庫、店舗）、拠点ごとの在庫の数と状態、「売り越さない」と「在庫切れでも売る」の設定、引き当てと確定、移動と調整の履歴
 - **フラッシュセール**：セールの予定の登録、待合室、購入の許可証、ボット対策（チャレンジ、速さの上限、1 人あたりの数の上限）、熱い品目の在庫の枠の分割
@@ -53,7 +53,7 @@
 | ギフトカード、ストアクレジット、ポイント | 前払式支払手段として資金決済法の扱いを、法務の L5 で確かめてから設計する |
 | 定期購入（サブスクリプション） | 特定商取引法の定期購入の表示の規則（法務の L1）と、繰り返しの決済の設計が要る |
 | 実店舗の POS | 端末と、店舗の在庫の即時の同期の設計が要る |
-| 海外への販売（越境）と海外のリージョン | 関税、海外の税、データの所在（法務の L3）の設計が要る |
+| 海外への販売（越境）、外貨のマーケットの有効化、海外のリージョン | 関税、海外の税（法務の L4）、データの所在（法務の L3）の設計が要る。外貨のマーケットの仕組みは MVP で作り、フラグの裏に置く |
 | B2B（卸の価格、掛け売り） | 価格の表と与信の設計が要る |
 | モール・SNS などの販売のチャネルの連携 | チャネルごとの在庫の配り方の設計が要る |
 | 機械学習のおすすめ | MVP は共起と人気の基本のおすすめ |
@@ -141,7 +141,7 @@
 - ショップの移し替えの書き込みの停止の時間（目標 10 秒以内）と、論理デコードでショップの変更を拾う方法：E2 の前の `shop-move-poc`（[ADR-0002](decisions/0002-pods-and-shop-placement.md)）。
 - テーマのレンダラーの速さ（1 ページあたりの CPU の時間、歩数の上限の値）：E11 の前の `theme-renderer-poc`（[ADR-0007](decisions/0007-theme-language-design.md)）。
 - 関数の実体化と実行の時間、燃料の上限の値：E15 の前の `wasm-function-poc`（[ADR-0008](decisions/0008-extension-sandbox-wasm.md)）。
-- エッジのキャッシュの世代の番号を CloudFront KeyValueStore で配るときの、伝わるまでの時間：E12 の前の `edge-cache-generation-poc`。
+- エッジのキャッシュの世代の番号と熱い集まりを CloudFront KeyValueStore で配るときの、伝わるまでの時間：E12 の前の `edge-cache-generation-poc`（[ADR-0010](decisions/0010-shop-routing-hot-set-and-custom-domains.md)、[ADR-0050](decisions/0050-edge-cache-keys-and-generations.md)）。
 - 決済の提供者、運送会社の API、ボット対策のチャレンジの提供者の選定：各 Epic の選定の Story。候補の名前は例で、能力は未確認である。
 - 本家の振る舞いのうち、チェックアウトで在庫を引き当てる時点、関数の失敗のときのチェックアウトの振る舞い、待合室の並びの規則、Webhook の再送の間隔は、公式の資料で確かめられなかった（**未検証**）。本システムの値を使う。
 
@@ -154,13 +154,14 @@
 - Shopify Dev, [GraphQL Admin API rate limits](https://shopify.dev/docs/apps/build/apis/graphql-admin/rate-limits)：計算した費用によるリーキーバケット。回復の速さはプランごとに 1 秒 100（Standard）・200（Advanced）・1,000（Plus）・2,000（Commerce Components）。1 つのクエリの費用の上限は 1,000。既定の費用は、スカラーと列挙 0、オブジェクト 1、コネクションは `first`・`last` で決まり、ミューテーション 10
 - Shopify Dev, [API usage limits](https://shopify.dev/docs/api/usage/limits)：配列の入力は 250 件まで。ページングは 25,000 件まで。買い手の Storefront API の通信には決まった上限がなく、ボットとクローラーとチェックアウトの作成を絞る
 - Shopify Dev, [Storefront API](https://shopify.dev/docs/api/storefront)：公開のトークンと秘密のトークン。買い手の IP アドレスをヘッダーで渡し、IP の単位でボットを絞る。1 分あたりのチェックアウトの作成の数を絞り、超えると `200 Throttled` を返す
-- Shopify Dev, [Shopify Functions](https://shopify.dev/docs/api/functions)：WebAssembly に翻訳できる言語で書く（Rust を推す）。上限は、モジュール 256 kB、線形メモリー 10,000 kB、スタック 512 kB、命令の数 1,100 万、入力 128 kB、出力 20 kB（カートの 200 行まで。それより多いと比例して広がる）。入力のクエリは 3,000 バイト・費用 30 まで。割引、配送のカスタマイズ、決済のカスタマイズ、カートの変換、カートとチェックアウトの検証などの API がある
+- Shopify Dev, [Shopify Functions](https://shopify.dev/docs/api/functions)：WebAssembly に翻訳できる言語で書く（Rust を推す）。上限は、モジュール 256 kB、線形メモリー 10,000 kB、スタック 512 kB、テーブル 4・要素 1 万、命令の数 1,100 万、入力 128 kB、出力 20 kB（カートの 200 行まで。それより多いと比例して広がる）。入力のクエリは 3,000 バイト・費用 30 まで。割引、配送のカスタマイズ、決済のカスタマイズ、カートの変換、カートとチェックアウトの検証などの API がある
 - Shopify Dev, [Webhooks](https://shopify.dev/docs/apps/build/webhooks)：HMAC の署名のヘッダー、配信の ID のヘッダーで重複を除く。同じ話題の中でも順序を保証しない。配信は保証されないので、照合のジョブを持つことを勧める
-- Shopify Dev, [Troubleshoot webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)：失敗した配信を 4 時間に 8 回まで送り直す。失敗が続くと、Admin API で作った購読を消す
+- Shopify Dev, [Troubleshoot webhooks](https://shopify.dev/docs/apps/build/webhooks/troubleshooting-webhooks)：失敗した配信を 4 時間に 8 回まで送り直し、間隔は回を追って伸びる（値は書いていない）。応答は 5 秒以内。失敗が続くと購読を消す（どの作り方の購読が対象かは書いていない）
 - Shopify Dev, [Manage inventory quantities and states](https://shopify.dev/docs/apps/build/orders-fulfillment/inventory-management-apps/manage-quantities-states)：手元の数（on_hand）は、available・committed・reserved・damaged・safety_stock・quality_control の和。committed は注文の作成と配送で本家が動かす
 - Shopify Help Center, [Bot protection](https://help.shopify.com/en/manual/checkout-settings/bot-protection)：フラッシュセールのボット対策は Plus の機能。対象は 500 商品まで、1 回 60 分まで、チャレンジ（reCAPTCHA・hCaptcha）を選べる
 - Shopify, [Liquid](https://github.com/Shopify/liquid)：本家のテンプレートの言語。MIT、Ruby。「評価せず、安全である」ことを目標にする。本システムは使わない
 - Shopify, [Shopify merchants generate record-breaking $14.6 billion in Black Friday Cyber Monday sales](https://www.shopify.com/news/bfcm-data-2025)（2025-12-02）：売上の最大は 1 分 510 万 USD。エッジの要求の最大は 1 分 4.89 億件、アプリのサーバーは 1 分 1.17 億件超
 - Shopify Engineering, [How we prepare Shopify for BFCM (2025)](https://shopify.engineering/bfcm-readiness-2025)：負荷試験で 1 分 8 万件超のチェックアウトを確かめた
-- 消費者庁, [通信販売の申込み段階における表示についてのガイドライン（案）の意見募集](https://www.caa.go.jp/notice/entry/026648/)（2021-11-24）：令和 3 年の特定商取引法の改正で新しく設けた第 12 条の 6 などの考え方を示すガイドライン
-- 国税庁, [インボイス制度特設サイト](https://www.nta.go.jp/taxes/shiraberu/zeimokubetsu/shohi/keigenzeiritsu/invoice.htm)：インボイス制度の資料の入口。税率ごとの端数処理の規則は、領域の工程で、国税庁の Q&A で確かめる（法務の確認待ち L4）
+- 消費者庁, [通信販売の申込み段階における表示についてのガイドライン（案）の意見募集](https://www.caa.go.jp/notice/entry/026648/)（2021-11-24）：令和 3 年の特定商取引法の改正で新しく設けた第 12 条の 6 などの考え方を示すガイドライン。確定したガイドラインの本文と日付は、この確認では取得できなかった（**未検証**。法務の L1 で確かめる）
+- 国税庁, [インボイス制度特設サイト](https://www.nta.go.jp/taxes/shiraberu/zeimokubetsu/shohi/keigenzeiritsu/invoice.htm)：インボイス制度の資料の入口
+- 国税庁, [消費税の仕入税額控除制度における適格請求書等保存方式に関するＱ＆Ａ](https://www.nta.go.jp/taxes/shiraberu/zeimokubetsu/shohi/keigenzeiritsu/pdf/qa/01-01.pdf)（令和 8 年 5 月改訂）の問 57：一の適格請求書につき、税率ごとに 1 回の端数処理を行う。切上げ・切捨て・四捨五入などの方法は任意。商品ごとに端数処理して合計する方法は認められない。本システムへの当てはめは法務の確認待ち（L4）

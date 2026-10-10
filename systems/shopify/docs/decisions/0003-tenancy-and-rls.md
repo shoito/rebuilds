@@ -32,6 +32,11 @@ date: 2026-10-10
   - `shop_freeze`（移し替えの停止の印）
   - outbox の読み出しの位置
   - スキーマの移行の記録
+
+> 2026-10-10 の注記：統合の工程で、RLS の外の表に次を足した。どれもショップのデータの列（商品・注文・買い手の値）を持たない。
+> - 移し替えの表：`shop_relocations`（中継の窓）、`shop_move_progress`（当てた LSN）（[ADR-0012](0012-shop-mover-logical-decoding-and-cutover.md)）
+> - 全体の写し（`*_replica`。`app_definitions_replica`、`plan_limits_replica`、言語・通貨の表）と、全体の参照のデータの写し（`tax_rates`、`postal_codes`、`carrier_profiles`、`product_categories`）（P5。[ADR-0010](0010-shop-routing-hot-set-and-custom-domains.md)）
+> - `data_keys`（列の暗号のデータの鍵。KMS で包んだもの）（[ADR-0066](0066-encryption-and-key-layout.md)）
 - 全体の Aurora は、ショップのデータを持たない。ショップの表（`shops`）、スタッフのアカウント、アプリの登録は、それぞれの所有者の条件で RLS を付ける（領域の文書で書く）。
 
 ### `shop_id` の決め方

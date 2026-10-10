@@ -270,7 +270,7 @@ ADR-0076。
 | `deployments`（全体） | デプロイ、波、ポッドごとの結果、ロールバック | 4 |
 | `api_versions`（全体） | バージョン、リリース・非推奨・支えを外す日 | 6.2 |
 | `theme_versions` に足す列 | 翻訳し直しの IR の S3 のキーと比べの結果 | 6.3 |
-| S3 | `functions/<app>/<version>/<wasmtime>/<module>.cwasm` | 6.4 |
+| S3 | `functions/<app>/<function>/<version>/<wasmtime>.cwasm`、`.sig`（[functions-sandbox.md](functions-sandbox.md) の 12 節） | 6.4 |
 
 ## 出典
 

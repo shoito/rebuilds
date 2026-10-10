@@ -399,8 +399,8 @@ sequenceDiagram
 | `shop_legal_settings` | 特定商取引法の表示の項目 | 8 |
 | `shop_script_allowlist` | 追加の配信元（20 まで） | 9 |
 | `app_embeds`（`app-registry`、全体） | アプリの埋め込みの配信元、種類、送信先と目的の宣言 | 9 |
-| S3 | `pods/<pod>/shops/<shop>/themes/<theme_version>/…`（ファイルと IR） | 7 |
-| Valkey | `<shop_id>:sec:<theme_version>:<section>:<hash>` | 6 |
+| S3 | `shops/<shop_id>/themes/<theme_version>/…`（ファイルと IR。ポッドに依らない） | 7 |
+| Valkey | `{<shop_id>}:sec:<theme_version>:<section>:<hash>` | 6 |
 
 ## 13. テストと性質
 

@@ -1,6 +1,6 @@
 # Runbooks: Shopify
 
-Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は observability の領域（まだない）で書く。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
+Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は [observability.md](../architecture/observability.md) にある。表と置き場所は [data-model.md](../architecture/data-model.md)。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
 
 この題材は、事業者の売上そのものを運ぶ。止まれば、その時間の売上が消える。フラッシュセールの数分の障害は、事業者の 1 年の山場を壊す。フラッシュセールの運用は 5 節にまとめる。
 
@@ -24,6 +24,10 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | Webhook の配信 | 事象から最初の配信の試みまで 10 秒以内 | **p95 10 秒**（NFR-010） | p95 が 2 分を 10 分超えたらチケット、10 分で呼び出し | |
 | 関数の実行 | 関数の実行のうち、本システムの原因（ホストの異常、epoch の安全網）の失敗でないもの | **99.99%**（NFR-012） | 1 時間で 0.1% を超えたら呼び出し | ○ |
 | 検索 | 検索が 200ms 以内 | **p95 200ms**（NFR-014） | 1 時間続けて超えたらチケット | |
+| チェックアウトのスクリプト | 見張りが読んだチェックアウトのページのスクリプトの目録と、リリースの目録の不一致（[ADR-0067](../decisions/0067-checkout-script-integrity-and-card-testing.md)） | **0** | 1 件で呼び出し。該当のショップのチェックアウトを止める | ○ |
+| 監査ログの鎖 | ハッシュの鎖の切れと、S3 の写しの欠け（[ADR-0064](../decisions/0064-permissions-roles-and-audit-log.md)） | **0** | 1 件でチケット、写しの 6 時間の遅れで呼び出し | ○ |
+| 売り越しの試み | `deny` の品目の CHECK の違反の数（DB で止まった数） | 急増なし | 直近 1 時間の 10 倍でチケット（SEV2 の候補） | ○ |
+| 外からの見張り | `canary` の購入の成功（[ADR-0073](../decisions/0073-correctness-monitors-and-independent-canary.md)） | 3 回続けての失敗 0 | 3 回続けて失敗したら、`canary` から直接呼び出す（デッドマンスイッチ） | |
 
 - SLO の窓は 30 日の移動の窓（報告は暦の月）。エラーバジェットを使い切ったら、信頼性の作業を機能より先にする。デプロイの前に残りを確かめる。
 - **数えないもの**：在庫切れ、待合室の待ち、提供者の拒否（カードの拒否）、`THROTTLED`、ボットとして拒んだ要求。ただし率の急な上がりは、本システムの食い違いの兆候として見る。見張りのショップは SLO の計算から除き、別に見る。
@@ -33,33 +37,45 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. 上限と容量のパラメーター
 
-値の正本は、各 ADR と領域の文書（まだないものは [architecture/README.md](../architecture/README.md) の 6 節の決定）にある。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
+値の正本は、各 ADR と領域の文書にある（数値の正本の一覧は [architecture/README.md](../architecture/README.md) の 6 節の「決定（2026-10-10、統合）」）。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
 
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
-| 引き当ての期限 | 通常 15 分、フラッシュセール 10 分 | [ADR-0004](../decisions/0004-inventory-reservation-model.md) | — |
-| 在庫の枠 | 既定 1、フラッシュセールの品目 32 | 同上 | セールごとの枠の数（1〜64） |
+| 引き当ての期限 | 通常 15 分、フラッシュセールのショップ 10 分 | [ADR-0004](../decisions/0004-inventory-reservation-model.md) | — |
+| 引き当ての掃除 | 1 分ごと、期限の 30 秒後から、500 行ずつ | [ADR-0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md) | — |
+| 在庫の枠 | 既定 1、フラッシュセールの品目 32 | [ADR-0004](../decisions/0004-inventory-reservation-model.md)、[ADR-0021](../decisions/0021-inventory-slot-probing-and-rebalance.md) | セールごとの枠の数（1〜64） |
+| 品目の販売 | — | [ADR-0023](../decisions/0023-inventory-movements-ledger-and-reconciliation.md) | `ops.inventory_item_sales_enabled`（品目ごとに止めるだけ。照合の不一致のとき） |
 | 照合の処理 | 1 分ごと。15 分超でアラート | [ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md) | — |
-| ショップごとのチェックアウトの同時実行 | 既定 50、隔離のポッド 500 | [ADR-0003](../decisions/0003-tenancy-and-rls.md) | ショップごとの一時の引き上げ・引き下げ |
+| ショップごとのチェックアウトの同時実行 | 既定 50（プラス 100）、隔離のポッド 500 | [ADR-0003](../decisions/0003-tenancy-and-rls.md)、[ADR-0031](../decisions/0031-checkout-admission-limits.md) | `ops.shop_limit_overrides`（ショップごとの一時の引き上げ・引き下げ。記録を残す） |
+| チェックアウトの作成の速さ | ショップ 20 件/秒・溜め 100（プラス 40・200）。セールの間は `rate_cap` × 1.2 | [ADR-0031](../decisions/0031-checkout-admission-limits.md)、[shops-and-pods.md](../architecture/shops-and-pods.md) の 11 節 | `ops.shop_limit_overrides` |
+| 自動の待合室 | 同時実行の上限の 80% を 30 秒で有効、30% を 10 分で解除 | [ADR-0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md) | — |
 | 待合室の受け入れ | 1 ショップ 100 件/秒（S1）を上限に、残りの在庫から計算 | flash-sales-and-queueing の領域 | `ops.waiting_room_admit_rate`（ショップごと、下げるのは即時、上げるのは事業者と合意） |
-| 許可証の期限 | 15 分、1 回だけ | 同上 | — |
-| テンプレートの上限 | 歩数 1 ページ 100 万、出力 2 MB、ループ 1,000、入れ子 10、データの読み出し 200 | [ADR-0007](../decisions/0007-theme-language-design.md) | — |
-| 関数の上限 | 燃料 1,000 万、メモリー 10 MB、入力 128 KB、出力 20 KB、1 段の合計 50ms | [ADR-0008](../decisions/0008-extension-sandbox-wasm.md) | — |
-| Admin API | 1 クエリ 1,000、回復 100・200・1,000/秒（プラン） | [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md) | `ops.admin_api_restore_factor`（下げるだけ） |
-| ショップの移し替えの停止 | 10 秒以内 | [ADR-0002](../decisions/0002-pods-and-shop-placement.md) | — |
-| Webhook の送り直し | 4 時間に 8 回 | webhooks の領域 | — |
+| 許可証の期限 | 15 分、1 回だけ。鍵は 7 日で回す | [ADR-0025](../decisions/0025-queue-pass-tokens.md) | — |
+| テンプレートの上限 | 歩数 1 ページ 100 万・1 セクション 20 万、出力 2 MB、ループ 1,000、入れ子 10、データの読み出し 200 | [ADR-0007](../decisions/0007-theme-language-design.md) | — |
+| 関数の上限 | 燃料 1,000 万、メモリー 10 MiB、入力 128 KiB、出力 20 KiB（200 行を超えると比例）、1 段の合計 50ms | [ADR-0008](../decisions/0008-extension-sandbox-wasm.md)、[ADR-0060](../decisions/0060-function-invocation-budget-and-failure-defaults.md) | `ops.functions_required_fail_open`（必須のカートの検証の関数を一時的に「通す」に倒す。ショップか全体、記録を残す） |
+| Admin API | 1 クエリ 1,000、回復 100・200・1,000/秒・容量 1,000・2,000・10,000（プラン）、ショップの全アプリの合計の回復はプランの 5 倍 | [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md) | `ops.admin_api_restore_factor`（下げるだけ。ポッドの DB の CPU 80% が 5 分で自動に 0.5） |
+| ショップの移し替え | 停止 p99 10 秒、停止の待ち 3 秒まで、中継の窓 15 分（最大 24 時間）、同時に元のポッドで 2・全体で 4、スロットの遅れ 20 GB で止める | [ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md) | 中継の窓の延長（KeyValueStore の更新の失敗のとき） |
+| KeyValueStore の熱い集まり | 4 MB まで、3.5 MB で外し始める、固定の枠 1 MB、入れる条件 5 分で 30 件 | [ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md) | `ops.hotset_pinned_hosts`（固定の枠へ手で足す） |
+| Webhook の送り直し | 4 時間に 8 回（1・4・10・20・30・45・60・70 分）、48 時間の連続の失敗で購読を止める | [ADR-0061](../decisions/0061-webhook-delivery-and-signing.md) | — |
+| 決済の照会と遮断器 | 照会 5 秒・30 秒・2 分・5 分・10 分・以後 30 分ごと、24 時間で page。遮断器は 1 分に 20 件以上かつ 50% 以上で開く | [ADR-0036](../decisions/0036-payment-webhook-inbox-and-inquiry-schedule.md) | — |
 | チェックアウトの受け付け | — | — | `ops.checkout_enabled`（ショップ・ポッドごとに止めるだけ） |
 | 関数の実行 | — | — | `ops.functions_enabled`（アプリごとに止めるだけ。止めると「効果なし」） |
 | Webhook の送信 | — | — | `ops.webhooks_enabled`（アプリごとに止めるだけ） |
+| 悪用したアプリ | — | [security.md](../architecture/security.md) の 3.2 節 | `ops.app_suspended`（アプリのトークン・Webhook・関数・埋め込みを全ショップで止める。5 分以内に効く） |
+| カードテスト | — | [ADR-0067](../decisions/0067-checkout-script-integrity-and-card-testing.md) | `ops.checkout_challenge`（ショップの支払いの送信に WAF のチャレンジを付ける。自動で 1 時間、Ops が延ばせる） |
+| 換算のマーケットのチェックアウト | — | [catalog-and-pricing.md](../architecture/catalog-and-pricing.md) の 13 節 | `ops.markets_converted_checkout`（為替の提供者の障害が 72 時間を超えたら止める） |
+| カタログの上限 | 1 商品 1,000 バリエーション、オプション 3 など | [ADR-0014](../decisions/0014-product-variant-option-model.md) | `ops.catalog_limits`（プランごとの引き上げ） |
+| 外貨のマーケット | — | [ADR-0015](../decisions/0015-markets-currencies-and-rounding.md) | `release.markets-foreign-currency`（仮の決定。PM の判断と法務の L4 まで有効にしない） |
+| 保護の顧客のデータの段階 2 | — | [ADR-0055](../decisions/0055-scopes-and-protected-customer-data.md) | `release.protected-data-level2`（法務の L3 まで有効にしない） |
 
 ## 3. リリースとロールバック
 
 - **デプロイとリリースを分ける。** デプロイは Ops が承認し、リリース（フラグを広げる）は PM が判断する。未完成の振る舞いは `release.*` のフラグの裏に置く。`release.*` は 100% の後 30 日で消す。
 - **お金・在庫・税の規則をフラグにしない。** 引き当ての遷移、チェックアウトの状態の機械、税の計算、割引の適用の順序の変更は、コードのバージョンとして出し、本番の照合の指標で見る。
 - **テーマの言語と関数の API のバージョン**：新しい振る舞いは新しい `loom_version`・関数の API のバージョンとして足し、古いバージョンを残す。既存のテーマと関数の振る舞いを、デプロイで変えない。
-- **ポッドごとの段階のデプロイ**：検証のポッド → 見張りのショップのポッド → 本番のポッドを 1 つ → 残りのポッド（25% ずつ）。各段で 30 分、自動のロールバックの条件を見る。
-- **自動のロールバックの条件**：チェックアウトの 5xx、確定の p99、在庫の照合の不一致、決済済みで注文なしの増加、ストアフロントの 5xx、テンプレートの上限の超過の急増、関数の失敗（本システムの原因）。
-- **デプロイの順**：マイグレーション（広げる段だけ）→ `workers`・`relay` → `checkout`・`admin-api`・`storefront-api` → `storefront-renderer` → エッジの関数 → 管理画面の資産。
+- **ポッドごとの段階のデプロイ**（[ADR-0075](../decisions/0075-pod-wave-rollout-and-cross-pod-migrations.md)）：全体の面 → staging → 見張りのポッド `p00`（60 分）→ 共有のポッド 1 つ → 残りのポッドを 25% ずつ（各 30 分）。隔離のポッドは最後で、予定したセールの前後 24 時間は外す。エッジの関数は見張りの配信 `mtd-canary` で 60 分見てから出す。手順は [deploy-and-rollback.md](deploy-and-rollback.md)。
+- **自動のロールバックの条件**：チェックアウトの 5xx、確定の p99、在庫の照合の不一致、決済済みで注文なしの増加、ストアフロントの 5xx、テンプレートの上限の超過の急増、関数の失敗（本システムの原因）、キャッシュの鍵の材料の不一致（判定の値は [delivery.md](../architecture/delivery.md) の 4.4 節）。
+- **デプロイの順**：全体の面の移行と全体の面のサービス → 各ポッドのマイグレーション（広げる段だけ）→ `workers`・`relay` → `checkout`・`admin-api`・`storefront-api` → `storefront-renderer` → エッジの関数 → 管理画面の資産。
 - **ロールバック**：まずフラグで戻す。次に 1 つ前のイメージ（マイグレーションは広げる段だけなので、前のバージョンが今の DB で動く）。縮める段の後は前へ戻さない。
 - 本番へのデプロイは Ops が承認する（作成者と別の人）。
 
@@ -76,33 +92,37 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-個別の手順は、まだない。各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。「作る Story」の列は、そのアラートの計測と手順を作る [roadmap.md](../roadmap.md) の Story である。手順の文書は、その Story の完了の条件に含める（E18 の `runbooks-e18` でまとめて確かめる）。
+手順は [templates/runbook.md](../../../../docs/templates/runbook.md) の形で書く。統合の工程（2026-10-10）で、核の 6 本の草案を作った（状態が「草案」のもの）。残りは「計画」で、「作る Story」の完了の条件に含める（E18 の `runbooks-e18` でまとめて確かめる）。
 
-| アラート（重さ） | 手順（予定のファイル名） | 作る Story |
-| --- | --- | --- |
-| チェックアウトの SLO のバーンレート（page・ticket）、確定の遅れ | `checkout-degraded.md`（ショップ・ポッドのチェックアウトの停止、待合室の有効化を含む） | `complete-checkout`、`slo-dashboards-alerts` |
-| 在庫の照合の不一致（page、SEV1 の候補） | `inventory-mismatch.md`（品目の販売の停止、照合のやり直し、事業者への連絡） | `inventory-reconciliation` |
-| 決済済みで注文なしの 15 分超、重複の注文（page） | `payment-order-mismatch.md`（照合の処理の確認、手動の返金の判断） | `checkout-reconciler`、`payment-reconciliation-daily` |
-| 決済の提供者の障害（失敗の率・時間切れの急増。page） | `payment-provider-outage.md`（決済の手段の一時の非表示を含む） | `payment-adapter-contract` |
-| ストアフロントの SLO、TTFB の悪化 | `storefront-degraded.md`（`stale-if-error`、キャッシュの延長を含む） | `edge-cache-keys`、`cache-invalidation` |
-| キャッシュの無効化の遅れ（page） | `cache-invalidation-lag.md` | `cache-invalidation` |
-| 分離の疑い（応答・キャッシュの監査。page、SEV1 の候補） | `tenant-leak-response.md`（エッジのキャッシュの全消去を含む） | `leak-path-tests` |
-| ポッドの DB の負荷・接続の上限への接近、隣人の影響 | `pod-pressure.md`（ショップごとの上限の引き下げ、ショップの移し替えを含む） | `per-shop-limits` |
-| ショップの移し替えの失敗・停止の超過 | `shop-move-failure.md` | `shop-mover` |
-| 関数の失敗の急増（本システムの原因）、`function-runner` の異常 | `function-runner-incident.md`（アプリの関数の停止を含む） | `function-runner` |
-| テンプレートの上限の超過の急増（リリースの後） | `theme-render-regression.md` | `loom-ir-and-interpreter` |
-| Webhook の配信の遅れ・失敗の増加 | `webhook-delivery.md` | `webhook-subscriptions-and-delivery` |
-| ボットの急増、待合室の異常 | `flash-sale-incident.md`（5 節） | `waiting-room`、`bot-defense` |
-| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | `disaster-recovery.md` | `osaka-warm-standby`、`dr-failover-drill` |
-| 開示の請求・捜査機関からの照会 | `legal-request.md`（法務の L3 の後に確定） | `customer-data-requests` |
-| デプロイ中の自動ロールバック | `deploy-and-rollback.md` | `ci-pipeline-baseline` |
+| アラート（重さ） | 手順 | 状態 | 作る Story |
+| --- | --- | --- | --- |
+| 全般（下の手順のないもの、SEV の判断、連絡） | [incident-response.md](incident-response.md) | 草案 | `observability-baseline`、`slo-dashboards-alerts` |
+| デプロイ中の自動ロールバック、波の停止 | [deploy-and-rollback.md](deploy-and-rollback.md) | 草案 | `pod-wave-deploy`、`pod-migrator` |
+| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | [disaster-recovery.md](disaster-recovery.md) | 草案 | `osaka-warm-standby`、`dr-failover-drill` |
+| ボットの急増、待合室の異常、セールの準備の失敗 | [flash-sale-operations.md](flash-sale-operations.md)（5 節の運用の手順） | 草案 | `waiting-room`、`bot-defense`、`flash-sale-scheduling` |
+| ショップの移し替えの失敗・停止の超過、中継の窓の延長 | [shop-move.md](shop-move.md) | 草案 | `shop-mover`、`isolation-pod-moves` |
+| 在庫の照合の不一致 `inventory-mismatch`（page、SEV1 の候補）、決済済みで注文なしの 15 分超・重複の注文 `payment-order-mismatch`（page） | [oversell-or-paid-without-order.md](oversell-or-paid-without-order.md) | 草案 | `inventory-reconciliation`、`checkout-reconciler`、`payment-reconciliation-daily` |
+| チェックアウトの SLO のバーンレート（page・ticket）、確定の遅れ | `checkout-degraded.md`（ショップ・ポッドのチェックアウトの停止、待合室の有効化を含む） | 計画 | `complete-checkout`、`checkout-admission-limits` |
+| 決済の提供者の障害（遮断器が開く。全手段が閉じたら page） | `payment-provider-outage.md`（決済の手段の一時の非表示を含む） | 計画 | `payment-inquiry-and-circuit-breaker` |
+| ストアフロントの SLO、TTFB の悪化、`edge-router` の停止 | `storefront-degraded.md`（`stale-if-error`、キャッシュの延長、熱い集まりの緊急の拡大を含む） | 計画 | `edge-cache-keys`、`shop-directory-and-routing` |
+| キャッシュの無効化の遅れ（page） | `cache-invalidation-lag.md` | 計画 | `cache-invalidation` |
+| 分離の疑い（応答・キャッシュ・検索の監査。page、SEV1 の候補） | `tenant-leak-response.md`（エッジのキャッシュの全消去を含む） | 計画 | `leak-path-tests` |
+| チェックアウトのスクリプトの目録の不一致（page） | `checkout-script-mismatch.md` | 計画 | `checkout-csp-and-script-integrity` |
+| カードテストの急増 | `card-testing.md` | 計画 | `card-testing-controls` |
+| ポッドの DB の負荷・接続の上限への接近、隣人の影響 | `pod-pressure.md`（ショップごとの上限の引き下げ、ショップの移し替えを含む） | 計画 | `per-shop-limits` |
+| 関数の失敗の急増（本システムの原因）、`function-runner` の異常 | `function-runner-incident.md`（アプリの関数の停止、必須の検証の `fail_open` を含む） | 計画 | `function-runner` |
+| テンプレートの上限の超過の急増（リリースの後） | `theme-render-regression.md` | 計画 | `loom-ir-and-interpreter` |
+| Webhook の配信の遅れ・失敗の増加 | `webhook-delivery.md` | 計画 | `webhook-subscriptions-and-delivery` |
+| 悪用したアプリ | `app-suspension.md` | 計画 | `app-abuse-controls` |
+| 監査ログの鎖の切れ・写しの遅れ | `audit-chain-break.md` | 計画 | `audit-chain-verification` |
+| 開示の請求・捜査機関からの照会 | `legal-request.md`（法務の L3 の後に確定） | 計画 | `customer-data-requests` |
 
 - すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する）。
-- 手順を作るまでは、`incident-response.md`（E1 で最初に作る）の一般の手順で対応する。事業者への障害の知らせは、状況のページで行う（文言は法務の確認の後）。
+- 計画の手順を作るまでは、[incident-response.md](incident-response.md) の一般の手順で対応する。事業者への障害の知らせは、状況のページで行う（文言は法務の確認の後）。
 
 ## 5. フラッシュセールの運用
 
-予定したフラッシュセールは、事業者の登録（セールの予定）から始め、次の段で運用する。予定にない急増（テレビでの紹介など）は、自動の判定で待合室を有効にし、同じ手順の「最中」から入る。
+予定したフラッシュセールは、事業者の登録（セールの予定）から始め、次の段で運用する。手順の細部は [flash-sale-operations.md](flash-sale-operations.md)、仕組みは [flash-sales-and-queueing.md](../architecture/flash-sales-and-queueing.md)。予定にない急増（テレビでの紹介など）は、自動の判定で待合室を有効にし、同じ手順の「最中」から入る。
 
 ```mermaid
 flowchart LR
@@ -121,8 +141,11 @@ flowchart LR
 | いつ | 作業 | 持ち主 |
 | --- | --- | --- |
 | 7 日前まで | 事業者がセールを登録する（開始の時刻、対象の商品・バリエーション、在庫、1 人あたりの上限、想定の来訪者）。想定の来訪者が 1 万人を超えるセールは、Ops が事業者と面談する | 事業者、Ops |
-| 3 日前まで | 対象のショップを隔離のポッドへ移す（`shop-mover`、平日の昼）。空きがなければ隔離のポッドを足す | Ops |
-| 24 時間前まで | 対象の品目の在庫を枠に分ける（既定 32）。待合室の設定（受け入れの上限、許可証の期限）。WAF の規則（対象のショップの速さの上限、チャレンジ）。商品のページのキャッシュを温める | Ops |
+| 4 日前まで | 隔離のポッドの大きさを上げる（Aurora の大きい型の読み出しを足してフェイルオーバー。[capacity.md](../architecture/capacity.md) の 5 節） | Ops |
+| 3 日前まで | 対象のショップを隔離のポッドへ移す（[shop-move.md](shop-move.md)、平日の昼）。空きがなければ隔離のポッド `x02` を足す | Ops |
+| 24 時間前まで | 対象の品目の在庫を枠に分ける（既定 32）、割引の使用の回数の枠（16）。待合室の設定（受け入れの上限、許可証の期限）。WAF の規則（対象のショップの速さの上限、チャレンジ）。関数の先読み | 段の機械（[ADR-0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md)）、Ops |
+| 1 時間前 | 商品のページと待合室のページのキャッシュを温める | 段の機械 |
+| 60 分前 | ECS の予定の拡大（[capacity.md](../architecture/capacity.md) の 5 節） | 自動 |
 | 1 時間前 | 見張りの購入（提供者の試験の環境）、待合室の試し、ダッシュボードの確認。担当の Ops と IC を決める | Ops |
 
 ### 5.2 最中

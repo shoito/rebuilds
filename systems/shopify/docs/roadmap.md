@@ -41,14 +41,14 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E19 ギフトカードとポイント（MVP の後） | ギフトカード、ストアクレジット、ポイント | 未着手（MVP の後。法務：L5） |
 | E20 定期購入（MVP の後） | 定期購入、繰り返しの決済 | 未着手（MVP の後。法務：L1） |
 | E21 POS（MVP の後） | 実店舗の販売、店舗の在庫の即時の同期 | 未着手（MVP の後） |
-| E22 越境と海外のリージョン（MVP の後） | 海外への販売、関税、海外のリージョン | 未着手（MVP の後。法務：L3） |
+| E22 越境と海外のリージョン（MVP の後） | 海外への販売、関税、外貨のマーケットの有効化（仕組みは E3 で作る）、海外のリージョン | 未着手（MVP の後。法務：L3・L4） |
 | E23 B2B と販売のチャネル（MVP の後） | 卸の価格、掛け売り、モール・SNS の連携 | 未着手（MVP の後） |
 
 E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この番号で書く。
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。領域の文書（[architecture/README.md](architecture/README.md) の 7 節）を書くときに、各領域の「Story の候補」で直す。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各領域の文書（[architecture/README.md](architecture/README.md) の 7 節）の「Story の候補」と、2026-10-10 の統合の工程で揃えた。「統合の工程で足した」は、領域の文書が提案した Story である。
 
 ### E1 基盤
 
@@ -66,6 +66,11 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `observability-baseline` | OpenTelemetry、ショップ・ポッドのラベル、ダッシュボードの骨格、`canary` の骨格 |
 | `audit-log-table-and-archive` | 監査ログの表と、S3 の Object Lock への写し |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、S3 の写し |
+| `kms-keys-and-column-encryption`（統合の工程で足した） | KMS の鍵の配置と列の封筒の暗号、HMAC の索引（ADR-0066） |
+| `retention-policies-and-legal-holds`（統合の工程で足した） | 保持の表と法的な保全の印（ADR-0068）。期間は法務：L3・L4 |
+| `operator-access-and-break-glass`（統合の工程で足した） | 運用者のアクセス、2 人の承認の break-glass（ADR-0068） |
+| `pod-wave-deploy`（統合の工程で足した） | ポッドの波のデプロイと自動のロールバック（ADR-0075） |
+| `pod-migrator`（統合の工程で足した） | 全ポッドのスキーマの移行（広げる・埋める・縮める）（ADR-0075） |
 
 ### E2 ショップとポッド
 
@@ -74,10 +79,12 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `shop-move-poc` | PoC：論理デコードでショップの変更を拾う方法、負荷の下の停止の時間 |
 | `shop-signup-and-plans` | ショップの開設、プラン、既定のドメイン。開設の審査は法務：L8・L10 |
 | `custom-domains-and-tls` | 独自のドメイン、DNS の確かめ、TLS の証明書の自動の発行と更新 |
-| `shop-directory-and-routing` | ディレクトリ、KeyValueStore への配り、エッジの振り分け、421（ADR-0002） |
+| `shop-directory-and-routing` | ディレクトリ、KeyValueStore の熱い集まりと `edge-router`、経路 P5、ポッドの ID の不一致の 421（ADR-0002、ADR-0010） |
 | `shop-placement` | 新しいショップのポッドの選び方 |
-| `shop-mover` | コピー、追いかけ、停止と照合、切り替え、7 日の後の削除（ADR-0002） |
+| `shop-mover` | コピー、追いかけ、停止と照合、切り替え、15 分の中継の窓、7 日の後の削除（ADR-0002、ADR-0012） |
 | `per-shop-limits` | ポッドの中のショップごとの同時実行・速さの上限（ADR-0003） |
+| `shop-lifecycle-and-deletion`（統合の工程で足した） | ショップのライフサイクルと削除の作業、保持の対象（ADR-0013）。保持の範囲は法務：L3・L4 |
+| `shop-onboarding-review`（統合の工程で足した） | ショップの開設の審査の枠。法務：L8・L10 |
 
 ### E3 カタログと価格
 
@@ -88,7 +95,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `media-and-images` | 画像・動画の受け取り、変換、CloudFront での配信 |
 | `metafields` | メタフィールドの定義と値 |
 | `publishing` | 販売の公開の設定、予約の公開 |
-| `markets-and-currencies` | マーケット、表示と支払いの通貨、固定の価格と換算・丸め |
+| `markets-and-currencies` | マーケット、表示と支払いの通貨の仕組み、固定の価格と換算・丸め（ADR-0015）。外貨のマーケットの有効化は `release.markets-foreign-currency` の裏（仮の決定、PM の判断待ち。E22 と法務：L4） |
 | `compare-at-price` | 比較の価格。表示の条件は法務：L2 |
 | `product-csv-import-export` | CSV の取り込みと書き出し（一括の操作） |
 | `product-categories-and-restrictions` | 商品の区分、扱いに許可の要る品目の印。範囲は法務：L10 |
@@ -115,12 +122,14 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `inventory-reference-and-props` | `inventory-ref` と並行の性質ベーステスト（quality.md の 2.2.1 節 A） |
 | `inventory-reconciliation` | 毎時の照合と、不一致の通知 |
 | `load-generator` | 負荷の生成器と、縮めた規模のフラッシュセールの夜間の場面（quality.md の 2.2.1 節 H） |
+| `inventory-location-selection`（統合の工程で足した） | 拠点の選び方とロックの順（ADR-0022） |
+| `inventory-movements`（統合の工程で足した） | 移動の履歴（追記の行）（ADR-0023） |
 
 ### E6 カートとチェックアウト
 
 | Story | 内容 |
 | --- | --- |
-| `cart` | カート（Valkey と DB）、行、数、カートの属性 |
+| `cart` | カート（Valkey が正本、14 日。ログインした買い手のカートだけ 30 分ごとに DB の `saved_carts` へ写す）、行、数、カートの属性（ADR-0028） |
 | `checkout-state-machine` | 状態と遷移、遷移の記録（ADR-0005） |
 | `shipping-address-and-methods` | 配送先（日本の住所の形、郵便番号からの補完）、配送の方法と送料の計算の呼び出し |
 | `price-snapshot` | 価格の写しと、表示・注文・決済の金額の一致 |
@@ -129,6 +138,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `checkout-reconciler` | 1 分ごとの照合、15 分超のアラート |
 | `checkout-simulator` | `psp-sim` と完了の性質ベーステスト（quality.md の 2.2.1 節 B） |
 | `order-confirmation-email` | 注文の確認のメール |
+| `checkout-submit-idempotency`（統合の工程で足した） | 送信の冪等キーと 24 時間の応答の保持 |
+| `checkout-admission-limits`（統合の工程で足した） | チェックアウトの入口の同時実行と作成の速さの上限（ADR-0031） |
+| `checkout-csp-and-script-integrity`（統合の工程で足した） | チェックアウトのページの CSP とスクリプトの目録（ADR-0067） |
+| `customer-accounts`（統合の工程で足した） | 買い手のアカウント（メールの 1 回だけのコード） |
 
 ### E7 割引のエンジン
 
@@ -139,6 +152,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `discount-combination-rules` | 組み合わせの決定表、適用の順序、按分と端数 |
 | `discount-reference-and-props` | `discount-ref` と決定性の性質（quality.md の 2.2.1 節 C） |
 | `discount-display` | 割引の表示。表示の条件は法務：L2 |
+| `discount-function-merge`（統合の工程で足した） | 関数の割引の提案の検証と合わせ（ADR-0008、ADR-0032） |
 
 ### E8 決済の連携
 
@@ -152,6 +166,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `carrier-billing-and-bnpl` | キャリア決済と後払い |
 | `refunds-and-voids` | 返金と取り消し、`refund_required` の処理 |
 | `payment-reconciliation-daily` | 提供者の取引の一覧との日次の突き合わせ |
+| `payment-inquiry-and-circuit-breaker`（統合の工程で足した） | 照会の予定と、手段ごとの遮断器（ADR-0036） |
+| `card-testing-controls`（統合の工程で足した） | カードテストの上限と自動のチャレンジ（ADR-0067） |
 
 ### E9 注文と配送
 
@@ -188,6 +204,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `default-themes` | 既定のテーマ 2 つ。在庫の残りの表示は法務：L2 |
 | `legal-pages` | 特定商取引法の表示のページ、プライバシーの方針のひな形。法務：L1・L3 |
 | `storefront-analytics` | ストアフロントの計測。外部送信規律は法務：L6 |
+| `loom-ir-retranslation`（統合の工程で足した） | IR のバージョンを上げるときの翻訳し直しと比べ（ADR-0076） |
 
 ### E12 Storefront API とキャッシュ
 
@@ -199,6 +216,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `cache-invalidation` | 世代の番号、`cache-invalidator` |
 | `dynamic-inventory-widget` | 在庫と価格の部品 |
 | `seo-basics` | サイトマップ、構造化データ、正規の URL、リダイレクト、`robots.txt` |
+| `edge-function-canary-distribution`（統合の工程で足した） | 見張りの配信 `mtd-canary` でのエッジの関数の先出し |
+| `rum-and-canary`（統合の工程で足した） | 実ユーザーの計測と外からの見張り（ADR-0073）。計測は法務：L6 |
 
 ### E13 フラッシュセール
 
@@ -210,6 +229,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `bot-defense` | WAF の Bot Control、チャレンジ、重複の検出。チャレンジの提供者の選定 |
 | `isolation-pod-moves` | 隔離のポッドへの前もっての移し替えの手順と自動化 |
 | `flash-sale-load-tests` | フラッシュセールの全場面（quality.md の 2.2.1 節 H） |
+| `purchase-limits`（統合の工程で足した） | 1 人あたりの上限（4 種の鍵、送信で引き当て）（ADR-0026） |
+| `surge-auto-queue`（統合の工程で足した） | 予定にない急増の自動の待合室（ADR-0027） |
+| `flash-sale-prescaling`（統合の工程で足した） | 隔離のポッドの前もっての拡大（ADR-0074） |
+| `flash-sale-dashboards`（統合の工程で足した） | セールのショップごとのダッシュボード |
 
 ### E14 アプリの基盤
 
@@ -223,6 +246,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `webhook-subscriptions-and-delivery` | 購読、配信、署名、送り直し、停止 |
 | `admin-embedding` | 管理画面への埋め込み、セッションのトークン |
 | `app-billing` | 定額と従量の課金、開発者への支払い。法務：L5 |
+| `webhook-egress`（統合の工程で足した） | Webhook の隔離した egress と固定の IP（ADR-0062） |
+| `compliance-webhooks`（統合の工程で足した） | 個人のデータの開示・削除の依頼の話題。法務：L3 |
+| `api-version-lifecycle`（統合の工程で足した） | API の四半期のバージョンの寿命と繰り上げ（ADR-0076） |
+| `app-abuse-controls`（統合の工程で足した） | 悪意のあるアプリの止め方と、保護のデータの読み出しの量の見張り |
 
 ### E15 関数の砂場
 
@@ -235,6 +262,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `function-input-queries` | 入力のクエリとスコープ |
 | `sandbox-escape-suite` | 脱出の試験（quality.md の 2.2.1 節 F） |
 | `function-dev-tooling` | Rust のひな形、入力の型の生成、ログの画面 |
+| `wasmtime-upgrade-pipeline`（統合の工程で足した） | Wasmtime の更新の流れ（全モジュールの翻訳し直しと記録した入力の比べ）（ADR-0076） |
 
 ### E16 検索とおすすめ
 
@@ -256,6 +284,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `audit-trail` | 監査ログの画面と書き出し |
 | `customer-data-requests` | 顧客のデータの開示・削除の請求。法務：L3 |
 | `leak-path-tests` | 漏れの経路の表のテスト（quality.md の 2.2.1 節 G） |
+| `collaborator-accounts`（統合の工程で足した） | 協力者（パートナー）のアカウント（ADR-0063） |
+| `merchant-billing`（統合の工程で足した） | 本システムから事業者への請求（ADR-0065）。本システムのインボイスは法務：L4 |
+| `support-access-grants`（統合の工程で足した） | 事業者の許可したサポートのアクセス（ADR-0068） |
+| `audit-chain-verification`（統合の工程で足した） | 監査ログのハッシュの鎖と写しの欠けの検査（ADR-0064） |
 
 ### E18 本番の準備と GA の判定
 
@@ -265,8 +297,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `dr-failover-drill` | 大阪への切り替えの訓練 |
 | `pentest-external` | 外部のペンテスト（テーマ、関数、API、チェックアウト） |
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
-| `runbooks-e18` | 個別の手順の作成と確認 |
+| `runbooks-e18` | 個別の手順の作成と確認。核の 6 本（[runbooks/](runbooks/README.md) の 4 節）は設計の工程で草案を作った。残りの計画の手順を作り、全部を訓練で確かめる |
 | `ga-readiness` | GA の判定。法務：L1・L3・L4・L7・L8 |
+| `cost-baseline`（統合の工程で足した） | 月の原価の見積もりを請求の実績で置き換える |
+| `pci-scope-review`（統合の工程で足した） | PCI DSS の範囲の確かめ。法務：L7、QSA |
 
 ## エージェントに任せないこと
 

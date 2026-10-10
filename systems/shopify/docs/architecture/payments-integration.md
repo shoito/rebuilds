@@ -318,8 +318,8 @@ sequenceDiagram
 | `payment_attempt_events` | 結果の適用の記録 | `(shop_id, attempt_id, seq)` | 5.3 |
 | `payment_webhook_inbox` | 提供者、イベントの ID、種類、参照、本文（個人のデータを除く）、`processed_at` | `(shop_id, provider, event_id)` 一意、部分索引 `(received_at) WHERE processed_at IS NULL` | 6 |
 | `payment_inquiries` | 試行・返金、次の時刻、回数 | `(shop_id, target_id)`、`(next_at)` | 7 |
-| `payment_circuit_states`（Valkey、失ってよい） | （ショップ、提供者、手段）の失敗の数と状態 | `pcb:{shop}:{provider}:{method}` | 7 |
-| `shop_payment_providers` | ショップの提供者の設定、Secrets Manager の参照、確定の方式、`capture_before_expiry` | `(shop_id, provider)` | 4、8 |
+| `payment_circuit_states`（Valkey、失ってよい） | （ショップ、提供者、手段）の失敗の数と状態 | `{<shop_id>}:pcb:<provider>:<method>` | 7 |
+| `shop_payment_providers` | ショップの提供者の設定、認証の情報（封筒の暗号。[ADR-0066](../decisions/0066-encryption-and-key-layout.md)）、確定の方式、`capture_before_expiry` | `(shop_id, provider)` | 4、8 |
 | `provider_capabilities`（コードの定数） | 4 節の能力の値 | — | 4 |
 | `payment_reconciliation_runs` | P1〜P4 の結果 | `(shop_id, run_date)` | 10 |
 
@@ -369,5 +369,3 @@ sequenceDiagram
 | コンビニ払いの手数料の税の区分 | 法務の確認待ち（L4）。`taxes-and-invoices.md` |
 | 提供者の候補の能力（冪等、照会、一部の確定、Webhook の再送） | E8 の `payment-provider-selection`（未検証） |
 | キャリア決済・後払いの期限と確定の規則 | 同上（未検証） |
-| 本家との違い：`on_first_fulfillment`（本家は全体の配送で確定） | 統合の工程で architecture/README.md の 1.4 節に足す |
-| [ADR-0006](../decisions/0006-payments-via-providers.md) のアダプターの契約への `findByReference` の追加 | ADR-0035 で決めた。ADR-0006 の表の読み方として、統合の工程で注記するかを決める |

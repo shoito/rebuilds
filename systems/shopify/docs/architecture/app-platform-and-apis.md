@@ -59,7 +59,7 @@ ADR-0054。
 - 開発者は開発者のアカウント（`identity` の利用者と別の組織）を作り、アプリを登録する。アプリは `app-registry`（全体の Aurora）に次を持つ：`client_id`、`client_secret` のハッシュ、Webhook の署名の秘密（KMS で包んだもの。[webhooks.md](webhooks.md)）、戻りの URL の一覧、求めるスコープ、保護のデータの段階、宣言の Webhook の購読、関数、アプリの埋め込み（[storefront-themes.md](storefront-themes.md) の 9 節）、課金の計画、配る範囲。
 - **配る範囲**：`custom`（1 つのショップだけ。事業者が自分で作るか、開発者が招待の URL で配る。審査なし）と `public`（一覧に載る。審査あり）。
 - アプリの定義の変更は「アプリのバージョン」（不変）として出し、導入したショップは最新のバージョンを使う。スコープを増やすバージョンは、事業者の再承認まで、増やしたスコープを効かせない。
-- アプリの定義（ショップのデータでない）は、全体の `app-registry` から各ポッドへ読み出しの写し（`app_definitions_replica`）として配る。ポッドの `admin-api` はトークンの発行とスコープの判定にこの写しを使う。これは全体の面からポッドへの配りの経路で、[ADR-0002](../decisions/0002-pods-and-shop-placement.md) の経路の一覧への追加が要る（13 節）。
+- アプリの定義（ショップのデータでない）は、全体の `app-registry` から各ポッドへ読み出しの写し（`app_definitions_replica`）として配る。ポッドの `admin-api` はトークンの発行とスコープの判定にこの写しを使う。これは全体の面からポッドへの配りの経路 P5（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)）である。
 
 ### 4.2 導入の流れ
 
@@ -213,14 +213,14 @@ query {
 | --- | --- |
 | `errors[]`（GraphQL の最上位） | 構文・検証の失敗、`MAX_COST_EXCEEDED`、`THROTTLED`、`ACCESS_DENIED`、`INTERNAL`。`extensions.code` に名前 |
 | `userErrors[]`（ミューテーションの結果） | 入力の検証、業務の規則の違反（`field` の道と `code`） |
-| HTTP | 401（トークン）、402（ショップの停止）、403（アプリの停止）、423（ショップの移し替え中。`Retry-After`）、5xx |
+| HTTP | 401（トークン）、402（ショップの停止）、403（アプリの停止）、503（ショップの移し替えの停止の間。`Retry-After: 5`）、5xx |
 
 - ミューテーションは `Idempotency-Key` のヘッダーを受け、24 時間、同じ鍵と同じ本文のハッシュに同じ結果を返す（本文が違えば `IDEMPOTENCY_CONFLICT`）。鍵は（導入、鍵）で持つ。
 - ショップの移し替えの停止の間（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）のミューテーションは 503 と `Retry-After: 5`。
 
 ### 5.5 一括の操作
 
-- 読み出し：`bulkOperationRunQuery(query)` は、費用の上限を外したクエリ（コネクションの入れ子 2 段まで、`first` は無視）を受け、ワーカーが読み出しの写しでページを辿り、JSONL（子の行は `__parentId` を持つ）を S3（`pods/<pod>/shops/<shop>/bulk/<id>.jsonl`）に書く。期限 7 日の署名つきの URL。完了で `bulk_operations/finish` の Webhook。
+- 読み出し：`bulkOperationRunQuery(query)` は、費用の上限を外したクエリ（コネクションの入れ子 2 段まで、`first` は無視）を受け、ワーカーが読み出しの写しでページを辿り、JSONL（子の行は `__parentId` を持つ）を S3（`shops/<shop_id>/bulk/<id>.jsonl`）に書く。期限 7 日の署名つきの URL。完了で `bulk_operations/finish` の Webhook。
 - 書き込み：`stagedUploadsCreate` で JSONL（100 MB まで）を上げ、`bulkOperationRunMutation(mutation, path)` で 1 行ずつ同じミューテーションを実行する。結果を JSONL で返す。行ごとのトランザクション。
 - 同時に 1 つ（アプリとショップの組ごとに読み出し 1・書き込み 1）。バケットの費用は使わないが、ショップのジョブの公平なキューで速さを絞る（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）。
 - 状態：`created` → `running` → `completed`・`failed`・`canceled`。24 時間で止める（`failed: TIMEOUT`）。
@@ -338,7 +338,7 @@ stateDiagram-v2
 | `bulk_operations`（ポッド） | `(shop_id, id)`、`installation_id`、`kind`、`state`、`query`、`s3_key`、`row_count`、`error` | 5.5 |
 | `app_subscriptions`・`app_usage_records`・`app_one_time_purchases`（ポッド） | 課金の行 | 8 |
 | `app_earnings`（全体） | `(developer_org_id, period, shop_id, app_id)`、`gross`、`fee`、`net`、`state` | 8 |
-| Valkey | `<shop_id>:tok:<hash>`（60 秒）、`<shop_id>:cost:<app_id>`（バケット） | 4.3、5.3 |
+| Valkey | `{<shop_id>}:tok:<hash>`（60 秒）、`{<shop_id>}:cost:<app_id>`（バケット） | 4.3、5.3 |
 
 ## 13. テストと性質
 
@@ -382,7 +382,6 @@ stateDiagram-v2
 | 代金の受け渡しと開発者への支払い | **法務の確認待ち：L5** |
 | Admin API の型の名前 | **法務の確認待ち：L9** |
 | アプリの課金の税の扱い | **法務の確認待ち：L4** |
-| `app-registry` からポッドへのアプリの定義の写しの経路 | [ADR-0002](../decisions/0002-pods-and-shop-placement.md) の経路の一覧（P1〜P4）に、全体の面からポッドへの読み出しの写しの経路を足す必要がある。`shops-and-pods.md` の担当と Dev（テックリード）に確認する |
 | 本家の OAuth・保護のデータ・ブリッジ・課金の形 | 公式の資料で確かめられなかった（**未検証**のまま） |
 
 ## 出典

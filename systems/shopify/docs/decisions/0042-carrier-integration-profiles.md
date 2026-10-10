@@ -24,7 +24,10 @@ date: 2026-10-10
 - 運送会社の型（`carrier_profiles`）：運送会社、バージョン、文字の符号化、改行、見出しの有無、列の一覧（列の名前、元の値の式、長さの上限、全角・半角の変換）、時間帯の一覧（値と表示の名前）、追跡の番号の取り込みの列。データとしてバージョンを足す。古いバージョンを消さない。
 - 書き出し：配送の指示の集まりから、型の式で行を作る。長さの上限を超える値は、書き出しの前の検査で事業者に示す（黙って切らない）。
 - 取り込み：追跡の番号の CSV を読み、配送の指示の番号で配送を作る（[ADR-0040](0040-fulfillment-orders-and-partial-fulfillment.md)）。同じ追跡の番号の再取り込みは何もしない。
-- API のアダプター（`carrier-adapters/<carrier>`）：`createLabel(fulfillment_order, idempotencyKey)`、`getTracking(trackingNumber)`。認証の情報は Secrets Manager の参照で持つ。外への通信は隔離した egress（infrastructure の領域）を通す。
+- API のアダプター（`carrier-adapters/<carrier>`）：`createLabel(fulfillment_order, idempotencyKey)`、`getTracking(trackingNumber)`。認証の情報はポッドの DB に KMS の封筒の暗号で持つ。
+
+> 2026-10-10 の注記：最初は「Secrets Manager の参照で持つ」としたが、[ADR-0066](0066-encryption-and-key-layout.md) の決定（事業者の提供者・運送会社の認証の情報は `kms-pod-<id>-secrets` の封筒の暗号でポッドの DB に置く）に揃えた。
+外への通信は隔離した egress（infrastructure の領域）を通す。
 - 配送の日時の指定：チェックアウトで、ショップの設定（準備の日数、指定できる日の範囲、既定 3〜14 日後）と、型の時間帯の一覧から選ばせる。指定の値は配送の指示に写す。
 
 ### 他の案を選ばなかった理由

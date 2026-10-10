@@ -248,7 +248,7 @@ for each プロファイル p（カートの行の集まり）:
 
 - 選定する 1 社の API の能力（冪等、追跡の通知）は E9 の `carrier-api-integration` で確かめる（**未検証**）。
 - 追跡の照会は、配達済みでない配送について 6 時間ごと、最大 14 日。配達済みで `shipments.delivered_at` を書き、通知を出す。
-- 外への通信は隔離した egress を通す（`infrastructure.md`）。認証の情報は Secrets Manager の参照。
+- 外への通信は隔離した egress を通す（`infrastructure.md`）。認証の情報はポッドの DB に KMS の封筒の暗号で置く（[ADR-0066](../decisions/0066-encryption-and-key-layout.md)）。
 
 ### 8.2 配送の日時の指定
 
@@ -309,8 +309,8 @@ for each プロファイル p（カートの行の集まり）:
 | `delivery_settings` | 8.2 節の設定 | `(shop_id)` | 8.2 |
 | `carrier_profiles`（全体の参照のデータ、ポッドに写す） | 7.1 節、バージョン | `(carrier, version)` | 7 |
 | `carrier_exports`・`carrier_imports` | 書き出し・取り込みの記録と結果 | `(shop_id, export_id)`、`(shop_id, import_id)` | 7.2 |
-| `shop_carrier_accounts` | API の連携の設定、Secrets Manager の参照 | `(shop_id, carrier)` | 8.1 |
-| S3 | `<pod>/<shop_id>/carrier-exports/<export_id>.csv`、`.../labels/<shipment_id>.pdf` | 期限つきの URL | 7.2、8.1 |
+| `shop_carrier_accounts` | API の連携の設定、認証の情報（封筒の暗号。[ADR-0066](../decisions/0066-encryption-and-key-layout.md)） | `(shop_id, carrier)` | 8.1 |
+| S3 | `shops/<shop_id>/carrier-exports/<export_id>.csv`、`shops/<shop_id>/labels/<shipment_id>.pdf`（ポッドに依らない） | 期限つきの URL | 7.2、8.1 |
 
 ## 12. テスト
 

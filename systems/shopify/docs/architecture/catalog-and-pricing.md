@@ -174,7 +174,7 @@ flowchart TB
 | 項目 | 決定 |
 | --- | --- |
 | 受け取り | 管理画面・Admin API が S3 の署名付きの URL（`stagedUploadsCreate`、15 分）を出し、事業者のブラウザ・アプリが直接上げる。本体は API のサーバーを通さない |
-| 置き場所 | `s3://<media-bucket>/pods/<pod_id>/shops/<shop_id>/media/<media_id>/original`。キーにショップを入れる |
+| 置き場所 | `s3://<media-bucket>/shops/<shop_id>/media/<media_id>/original`。キーにショップを入れる |
 | 検査 | 形式（JPEG、PNG、WebP、GIF、AVIF、HEIC、MP4、MOV）を中身の先頭のバイトで判定。画像 20 MB・2,500 万画素、動画 1 GB・10 分まで。EXIF の位置の情報を消す |
 | 画像の変換 | 自前の変換のサービス（sharp）。要求の時に `/<brand>-media/<shop_id>/<media_id>/<width>.<format>` を CloudFront の元として作り、S3 に置いて使い回す。幅は 16 段（100〜4,000）に丸める。形式は `Accept` で AVIF・WebP・JPEG を選ぶ |
 | 動画 | MediaConvert で HLS（3 段）と MP4 の 1 本。変換の完了まで商品のメディアは `processing` |
@@ -273,7 +273,7 @@ output: amount_minor（整数）, fx_rate_id
 
 ## 11. CSV の取り込みと書き出し
 
-- **書き出し**：一括の操作（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)）で JSONL を作り、CSV へ変換して S3（`pods/<pod>/shops/<shop>/exports/`）に置き、期限 7 日の URL を返す。1 行 1 バリエーション。
+- **書き出し**：一括の操作（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)）で JSONL を作り、CSV へ変換して S3（`shops/<shop_id>/exports/`）に置き、期限 7 日の URL を返す。1 行 1 バリエーション。
 - **取り込み**：S3 に上げた CSV（100 MB・10 万行まで、UTF-8 と BOM つきの UTF-8、Shift_JIS）を、ジョブが 500 行ずつ検証してから、商品ごとのミューテーションの関数で書く。行ごとの結果（成功、警告、エラー）を結果の CSV に書く。
 - 取り込みは、ショップごとに同時に 1 つ。DB の書き込みの速さは、ショップの Admin API のバケットとは別の、ジョブの公平なキュー（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）で絞る。
 - 列の形は本システムの独自の形。本家の CSV の形との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
@@ -326,7 +326,7 @@ ADR-0016。
 | `markets`・`market_regions`・`market_prices` | マーケット（通貨、言語、価格の決め方、調整の率、丸めの規則）、国・地域、固定の価格 `(shop_id, market_id, variant_id)` | 9.2 |
 | `fx_rates`（全体の Aurora） | `id`、`fetched_at`、`base`、`quote`、`rate numeric(20,10)`。ショップのデータでない | 9.3 |
 | `product_categories`（全体、読み出しの写しをポッドへ） | 区分の木、`regulated_kind`、推す税の区分 | 10 |
-| S3 | `pods/<pod>/shops/<shop>/media/…`、`…/exports/…`、`…/imports/…` | 6、11 |
+| S3 | `shops/<shop_id>/media/…`、`…/exports/…`、`…/imports/…`（ポッドに依らない） | 6、11 |
 
 ## 16. テストと性質
 

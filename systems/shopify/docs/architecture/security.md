@@ -368,14 +368,13 @@ ADR-0068。
 | チェックアウトのアプリの計測の外部送信の公表と同意 | **法務の確認待ち：L6** |
 | ショップごとの暗号化の鍵（顧客の持つ鍵） | MVP の後（[roadmap.md](../roadmap.md) の延期の一覧） |
 | 提供者の不正の検出と 3D セキュアの能力 | E8 の `payment-provider-selection` |
-| [ADR-0006](../decisions/0006-payments-via-providers.md) の「Secrets Manager の参照」と ADR-0066 の置き換え | ADR-0006 の持ち主（Dev）が本文を直すかを決める |
 
 ## 14. data-model への項目
 
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | `data_keys`（ポッド・全体） | `key_id`、用途、月、KMS で包んだデータの鍵、状態 | 5.3 |
-| 暗号化した列（ポッド） | `v1|<key_id>|<nonce>|<ciphertext>`、HMAC の索引の列（`email_hmac`、`phone_hmac`） | 5.3 |
+| 暗号化した列（ポッド） | `v1\|<key_id>\|<nonce>\|<ciphertext>`、HMAC の索引の列（`email_hmac`、`phone_hmac`） | 5.3 |
 | `retention_policies`（全体）・`legal_holds`（全体） | 区分・対象ごとの期間、保全の印 | 6.2 |
 | `support_access_grants`（ポッド） | ショップ、許可したスタッフ、期限、取り消し | 8 |
 | `operator_audit_events`（全体） | 運用者の操作 | 8 |

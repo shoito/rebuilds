@@ -61,7 +61,7 @@ ADR-0050。
 
 CloudFront Functions（要求の受け取り）が次を行う。
 
-1. ホスト名で KeyValueStore を引き、値 `v1|<shop_short>|<pod>|<state>|<gen>[|<pgen>|<桶の世代>]` を得る（7 節）。ない・`frozen` なら、決めたページを返す（`shops-and-pods.md`）。
+1. ホスト名で KeyValueStore を引き、値 `v1|<shop_short>|<pod>|<state>|<gen>[|<pgen>|<桶の世代>]` を得る（7 節）。値がない（熱い集まりの外の）ホストは、元を全体の面の `edge-router` に選び、`edge-router` が `shop-directory` で引いてポッドへ中継する（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)。中継した応答の `s-maxage` は 10 秒まで）。`state` が `f`・`c` なら決めたページを返す（[shops-and-pods.md](shops-and-pods.md) の 5.2 節）。
 2. パスとクエリを正規化する（4.2 節）。
 3. マーケットと言語を、パスの接頭辞（`/en-us/`）かマーケットの Cookie（`<brand>_market`）から決める。Cookie の値は許可の一覧（ショップの KVS の値には持てないので、形の検査だけ：`^[a-z]{2}(-[a-z]{2})?$`）で、元が正しくないと判断すれば主のマーケットで描き、`Vary` を使わずに正規化した値を鍵に入れる。
 4. 鍵の材料を、CloudFront のキャッシュのポリシーの鍵（ヘッダー）として付ける：`x-<brand>-ck: <shop_short>.<gen>.<market>.<lang>`（`fine` の型の商品のページは `<shop_short>.p<pgen>.<bucket_gen>.<market>.<lang>`）。テーマのバージョンは世代に含める（テーマの公開で世代を上げる）。
@@ -175,7 +175,7 @@ value : v1|<shop_short>|<pod>|<state>|<gen>[|<pgen>|<fine_bucket_gens>]
         fine_bucket_gens : fine の型だけ。64 × 3 文字
 ```
 
-- **大きさの問題**：1 つの KeyValueStore は 5 MB、1 つの関数に 1 つの保存しか結べない（2 節）。ホスト 1 つの値をおよそ 80 バイトとすると、6.5 万ホストで 5 MB に達し、S1 の登録 10 万ショップ（独自のドメインを含めるとホストはそれより多い）に足りない。保存を分ける形（配信を複数に分ける、ホストの頭文字で関数と保存を分ける）は `shops-and-pods.md` と `infrastructure.md` で決める必要がある。この文書の世代の欄は、どの分け方でも、ホストの値の中に入れる形で動く。
+- **大きさ**：1 つの KeyValueStore は 5 MB、1 つの関数に 1 つの保存しか結べない（2 節）。全ホストは入らないので、要求の多いホストだけを「熱い集まり」（4 MB まで）として置き、集まりにないホストは `edge-router` が中継する（[ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)、[shops-and-pods.md](shops-and-pods.md) の 5.1 節）。集まりにないホストの世代は `edge-router` が `shop_hosts.cache_gen` から読み、鍵の材料に入れる。
 
 ## 8. Storefront API
 
@@ -271,8 +271,8 @@ query CollectionPage($handle: String!) {
 | `storefront_tokens` | `(shop_id, id)`、`app_id`、`kind`（公開・秘密）、`token_hash`、`channel`、`allowed_origins`、`scopes`、`revoked_at` | 8.1 |
 | `persisted_queries` | `(shop_id, sha256)`、`query`、`cacheable`、`created_at` | 8.4 |
 | `url_redirects` | `(shop_id, path)`、`target`、`status` | 9 |
-| S3 | `pods/<pod>/shops/<shop>/sitemaps/…` | 9 |
-| Valkey | `<shop_id>:ci:window`（まとめの印）、`<shop_id>:sfrl:<ip_hash>`（費用のバケット）、`<shop_id>:redirects` | 5、8.2、9 |
+| S3 | `shops/<shop_id>/sitemaps/…`（ポッドに依らない） | 9 |
+| Valkey | `{<shop_id>}:ci:window`（まとめの印）、`{<shop_id>}:sfrl:<ip_hash>`（費用のバケット）、`{<shop_id>}:redirects` | 5、8.2、9 |
 | KeyValueStore | ホスト名 → 7 節の値 | 7 |
 
 ## 13. テストと性質
@@ -312,7 +312,6 @@ query CollectionPage($handle: String!) {
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| KeyValueStore の 5 MB の上限とホストの数（保存の分け方） | `shops-and-pods.md`・`infrastructure.md`。S1 の登録 10 万ショップで足りない見込み |
 | 世代の伝わりの時間、`s-maxage` を延ばすか、タグでの無効化に替えるか | `edge-cache-generation-poc` |
 | 在庫の島の「残りわずか」の表示 | **法務の確認待ち：L2** |
 | 本家のキャッシュの鍵・無効化の仕組み | 公式の資料で確かめられなかった（**未検証**のまま） |

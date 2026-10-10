@@ -43,10 +43,14 @@ date: 2026-10-10
 | `refund(providerRef, amount, idempotencyKey)` | 返金（一部を含む） |
 | `verifyWebhook(headers, body)` | Webhook の署名の検証と、イベントの ID・種類・参照の ID の取り出し |
 
+> 2026-10-10 の注記：`findByReference(merchantRef)`（加盟店の参照の番号＝試行の ID で照会し、`providerRef` と正規の結果を返す）を必須の操作に足した。`createSession` の時間切れで `providerRef` が分からないときに確定するため（[ADR-0035](0035-payment-attempt-states-and-result-normalization.md)）。照会の API は `providerRef` と加盟店の参照の番号の両方で引けることを、提供者の選定の条件にする。
+
 - **冪等キー**：`<checkout_id>:<attempt>:<op>`（返金は `<refund_id>:refund`）。提供者が冪等キーを受けない場合は、アダプターが参照の番号（加盟店の注文の番号）の重複の拒否で同じ効果を作る。どちらも持たない提供者は選ばない。
 - **照会の API を持たない提供者は選ばない。** 結果が不明のときに確定できないため（[ADR-0005](0005-checkout-state-machine-and-exactly-once-orders.md)）。
 - **Webhook の inbox**：提供者の Webhook は、署名を確かめ、（提供者、イベントの ID）を一意の鍵として `payment_webhook_inbox` に入れてから 200 を返す。処理は inbox を読むジョブが行い、照会の API で結果を確かめてから `completeCheckout` を呼ぶ。
-- 提供者のアダプターは、事業者ごとの認証の情報（API キー、加盟店の ID）を Secrets Manager の参照で持ち、DB に平文で置かない。
+- 提供者のアダプターは、事業者ごとの認証の情報（API キー、加盟店の ID）を、ポッドの DB に KMS の封筒の暗号（`kms-pod-<id>-secrets`）で置き、平文で置かない。
+
+> 2026-10-10 の注記：最初は「Secrets Manager の参照で持つ」としたが、ショップの数だけの秘密の月額の費用と取得の API の速さの上限のため、[ADR-0066](0066-encryption-and-key-layout.md) の DB の封筒の暗号に置き換えた。Secrets Manager はシステムの秘密（全体の DB の資格情報、提供者のプラットフォームの鍵など）だけに使う。
 
 ### 日本の決済手段
 

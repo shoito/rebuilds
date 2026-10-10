@@ -58,7 +58,7 @@
 
 ## 4. カート（[ADR-0028](../decisions/0028-cart-storage-in-valkey.md)）
 
-- 鍵 `cart:{shop_id}:{cart_token}`。`cart_token` は 128 ビットの乱数（cookie と Storefront API のカートの ID）。
+- 鍵 `{<shop_id>}:cart:<cart_token>`。`cart_token` は 128 ビットの乱数（cookie と Storefront API のカートの ID）。
 - 値：行（`variant_id`、`inventory_item_id`、数、行の属性）、カートの属性、割引のコード（最大 5＋送料 1）、買い手の ID（ログインしたとき）、通貨、言語、`version`。
 - 更新は Lua の比べて入れ替え（`version` が一致したときだけ書き、`version + 1`）。不一致は 409 で、呼び出しの側がもう一度読む。
 - カートの表示の価格は、カタログの最新の価格を読んだ目安。割引は「使える見込み」だけを示す。確定の計算はチェックアウトで行う。
@@ -333,7 +333,7 @@ completeCheckout(checkout_id, attempt, trigger):
 | `final_confirmation_fields`（ショップの設定） | 枠の値（L1 の確認の後に確定） | `(shop_id, field)` | 6.3 |
 | `saved_carts` | ログインした買い手のカートの写し | `(shop_id, customer_id)` | 4 |
 | `postal_codes`（全体の参照のデータ、ポッドに写す） | 郵便番号 → 都道府県・市区町村 | `(postal_code)` | 10 |
-| Valkey | `cart:{shop}:{token}`、`co:sem:{shop}`、`co:bucket:{shop}` | 失ってよい | 4、9 |
+| Valkey | `{<shop_id>}:cart:<token>`、`{<shop_id>}:co:sem`、`{<shop_id>}:co:bucket` | 失ってよい | 4、9 |
 
 - `orders.checkout_id` の一意の制約は [orders-and-fulfillment.md](orders-and-fulfillment.md) の 11 節。
 
