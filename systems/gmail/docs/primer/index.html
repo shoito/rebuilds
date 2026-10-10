@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gmail の前提知識</title>
+<meta name="description" content="Gmail の再構築の設計の文書を読む前に知っておくとよい、メールの通り道と SMTP、封筒とヘッダー、不達と再試行、STARTTLS と MTA-STS、SPF・DKIM・DMARC・ARC、送信の評判、迷惑メールの選別と通信の秘密、RFC 5322 と MIME と日本の文字コード、blob とメタデータ、ラベルとスレッド、IMAP と JMAP、日本語の検索、保持と eDiscovery。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Gmail · 前提知識</p>
+    <h1>メールのサービスの設計を読む前に</h1>
+    <p class="lead">メールが MTA から MTA へ渡る仕組み、封筒とヘッダーの違い、不達の通知と再試行、経路の暗号化、送信者の認証（SPF・DKIM・DMARC・ARC）、送信の評判、迷惑メールの選別と通信の秘密、メッセージの形と日本の文字コード、保存、ラベルとスレッド、同期のプロトコル、日本語の検索、保持と保留を、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Gmail · 前提知識</p>
+    <h2>メールのサービスの設計を読む前に</h2>
+    <p class="lead">受け付けたら失わず、なりすましを見抜き、どの端末でも同じに見える仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>メールのサービスは何をするか</h2>
+    <p>Gmail は、メールを受け取って保存し、探しやすく見せ、利用者の代わりに外へ送るサービスです。個人の無料のアカウントと、組織向けの Google Workspace があります。メールは、他社のサーバーと標準のプロトコルでつながる、開いた網の上で動きます。相手を選べないことが、迷惑メールとなりすましの根にあります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>個人の利用者</h3><p>スマートフォンが主です。通販・行政・金融のメールを受け、フィッシングに狙われます。</p></div>
+      <div class="card" data-frag><h3>組織の利用者と管理者</h3><p>自社のドメイン、別名とグループ、配送の規則、SSO、監査ログを使います。</p></div>
+      <div class="card" data-frag><h3>法務・監査の担当</h3><p>訴訟や監査のために、メールを保留し、横断して探し、書き出します。</p></div>
+      <div class="card" data-frag><h3>外部の送信者と MTA</h3><p>本システムへメールを送る事業者と、他社のメールのサーバーです。認証の設定を求められます。</p></div>
+    </div>
+    <p>設計の S1 は 100 万アカウント（個人 80 万、組織 2,000・20 万人）です。受け付けは 1 日 6,000 万通（ピーク 2,500 通/秒）で、申し出は 1.5 億通。その 6 割を SMTP の会話の中で断る見込みです。識別子は本家の名前を使わず、<code>&lt;brand&gt;.&lt;domain&gt;</code>・<code>X-&lt;Brand&gt;-...</code> のように書きます。</p>
+    <p class="doc-only"><small>設計で効くところ：6 つの価値（失わない、すぐ届く、守る、届く、見つかる、どの端末でも同じ）と法務の確認待ち（L1〜L10）は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/intent.md">intent.md</a>、規模の段階と本家との意図した違いは <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/README.md">architecture/README.md</a> の 1.4・2 節。</small></p>
+  </section>
+
+  <section class="s" id="path">
+    <h2>メールの通り道と SMTP の会話</h2>
+    <p>メールは、書く道具（<a class="t" href="#g-mua">MUA</a>）から投稿の受け口（<a class="t" href="#g-msa">MSA</a>）へ渡り、<a class="t" href="#g-mta">MTA</a> から相手の MTA へ <a class="t" href="#g-smtp">SMTP</a> で運ばれ、<a class="t" href="#g-mda">MDA</a> がメールボックスに入れます。送り手の MTA は、宛先のドメインの <a class="t" href="#g-mx">MX レコード</a>を引いて、相手の受け口を知ります。</p>
+    <pre class="mermaid">flowchart LR
+  A["MUA 送り手のアプリ"] -- "submission 587 465" --> B["MSA と送信の MTA"]
+  B -- "DNS で MX を引く" --> D[("DNS")]
+  B -- "SMTP 25" --> C["受信の MTA mx1 優先度 10"]
+  C --> E["MDA メールボックスへ"]
+  E --> F["MUA 受け手のアプリ IMAP JMAP"]</pre>
+    <div class="stepper">
+      <ol>
+        <li>送り手の MTA がポート 25 に TCP でつなぐ。受け手は <code>220 mx1.&lt;brand&gt;.&lt;domain&gt; ESMTP</code> と挨拶する。</li>
+        <li><code>EHLO</code> で名乗る。受け手は <code>250</code> と、使える拡張（<code>SIZE</code>・<code>STARTTLS</code>・<code>PIPELINING</code> など）を返す。</li>
+        <li><code>STARTTLS</code> で TLS に切り替え、もう一度 <code>EHLO</code> する。</li>
+        <li><code>MAIL FROM:&lt;bounce@shop.example&gt;</code>：<a class="t" href="#g-envelope">封筒</a>の送り手。受け手はここで SPF の評価を始める。</li>
+        <li><code>RCPT TO:&lt;taro@&lt;brand&gt;.&lt;domain&gt;&gt;</code>：宛先ごとに 1 回。ない宛先は <code>550 5.1.1</code>。</li>
+        <li><code>DATA</code> に <code>354</code>。ヘッダーと本文を送り、<code>&lt;CRLF&gt;.&lt;CRLF&gt;</code> で終える。</li>
+        <li>受け手が <code>250 2.0.0 OK</code>（受け付け）、<code>4xx</code>（後で送り直して）、<code>5xx</code>（恒久の拒否）のどれかを返す。<code>QUIT</code> で切る。</li>
+      </ol>
+    </div>
+    <p>応答の先頭の数字は、2 が成功、4 が一時の失敗、5 が恒久の失敗です。<code>5.1.1</code> のような拡張のコード（RFC 3463）が理由を細かく示します。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/inbound-smtp.md">inbound-smtp.md</a> の 4 節（mx1 と大阪の mx2）・5 節（状態の機械、出す拡張、時間切れ）、主要な流れ A・B は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/README.md">architecture/README.md</a> の 1.3 節。</small></p>
+  </section>
+
+  <section class="s" id="envelope">
+    <h2>封筒とヘッダー、受け付けと不達</h2>
+    <p>メールには送り手が 2 つあります。SMTP の <code>MAIL FROM</code>（封筒）と、本文の頭の <code>From:</code> ヘッダーです。利用者の画面に出るのは <code>From:</code> で、不達の通知が返るのは <code>MAIL FROM</code> です。2 つは違ってよく、メールの配信の事業者を使うと普通に違います。</p>
+    <div class="compare">
+      <div><h3>封筒（RFC 5321）</h3><p><code>MAIL FROM:&lt;bounce-8812@esp.example&gt;</code><br>不達の返し先。受け手は <code>Return-Path:</code> として残す。<a class="t" href="#g-spf">SPF</a> が確かめるのはこちら。</p></div>
+      <div><h3>ヘッダー（RFC 5322）</h3><p><code>From: お店 &lt;news@shop.example&gt;</code><br>画面に出る差出人。送り手が自由に書ける。<a class="t" href="#g-dmarc">DMARC</a> が守るのはこちら。</p></div>
+    </div>
+    <p data-frag><strong>受け付けた後</strong>：250 を返した受け手は、メールを届けるか、届けられないことを知らせる責任を負います（RFC 5321 の 6.1 節）。送り手の MTA は <code>4xx</code> なら<a class="t" href="#g-queue">待ち行列</a>に戻して間隔を広げて送り直し、<code>5xx</code> か期限切れなら <a class="t" href="#g-dsn">DSN</a>（不達の通知、RFC 3464）を <code>MAIL FROM</code> へ返します。DSN 自身は空の <code>MAIL FROM:&lt;&gt;</code> で送り、通知の通知の連鎖を防ぎます。</p>
+    <p data-frag>本システムの送信は、1 分・5 分・15 分・30 分・1 時間・2 時間、以後 4 時間ごとに送り直し、5 日で諦めます。24 時間で終わらなければ「遅れ」の DSN を 1 回出します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">相手の MX が <code>250 2.0.0 OK</code> を返しました。これで分かることは？</p>
+      <div class="opts">
+        <button>受け手の受信箱に届いた</button>
+        <button>受け手がメールを開いた</button>
+        <button>相手がメールを受け付け、届けるか不達を知らせる責任を引き継いだ。迷惑メールの箱に入ることもある</button>
+      </div>
+      <p class="why">250 は「受け付けた」の意味です。どの箱に入るかは、受け付けた後の選別で決まります。設計は、250 をスプール（S3）と配送の待ち行列（SQS）の両方に確定してからだけ返し、確定できなければ 451 を返して送り直させます（ADR-0002・ADR-0011）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：250 の意味と後方散乱の抑えは <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0002-accept-then-filter.md">ADR-0002</a>、再試行と DSN は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/outbound-smtp-and-reputation.md">outbound-smtp-and-reputation.md</a> の 7・8 節、確定と掃除は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0011-spool-commit-and-sweeper.md">ADR-0011</a>。カレンダーの招待をメールで運ぶ話は <a href="../../../google-calendar/docs/primer/index.html#imip">Google カレンダーの資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="tls">
+    <h2>経路の暗号化：STARTTLS・MTA-STS・TLS-RPT</h2>
+    <p>MTA の間の SMTP は、平文で始まり、<a class="t" href="#g-starttls">STARTTLS</a> で TLS に上がります。公開の MX は、TLS を求めてはいけません（RFC 3207 の 4 節）。そのため、途中の攻撃者が <code>STARTTLS</code> の表示を消すと、送り手は気づかず平文で送ります（格下げの攻撃）。</p>
+    <div class="tabs">
+      <div data-tab="MTA-STS"><p><a class="t" href="#g-mta-sts">MTA-STS</a>（RFC 8461）は、受け手のドメインが「TLS で、この名前の MX にだけ送って」と宣言する仕組みです。<code>_mta-sts.&lt;domain&gt;</code> の TXT で方針のバージョンの <code>id</code> を出し、<code>https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt</code> に <code>mode</code>（<code>testing</code>・<code>enforce</code>）、<code>mx</code>、<code>max_age</code> を置きます。送り手は方針を <code>max_age</code> の間覚え、<code>enforce</code> なら証明書の検証が通らない MX へ送りません。</p></div>
+      <div data-tab="TLS-RPT"><p><a class="t" href="#g-tls-rpt">TLS-RPT</a>（RFC 8460）は、送り手が「TLS で送れなかった件数と理由」を毎日まとめて受け手へ報告する仕組みです。<code>_smtp._tls.&lt;domain&gt;</code> の TXT に送り先（<code>rua</code>）を書きます。<code>enforce</code> に上げる前に、<code>testing</code> で失敗がないことを確かめる材料になります。</p></div>
+      <div data-tab="この設計"><p>受信は平文も受けます。本システムのドメインの MTA-STS は <code>testing</code>（<code>max_age</code> 1 日）から始め、TLS-RPT で失敗の率を見て <code>enforce</code>（7 日、14 日）へ上げます。MX を変えるときは、新しい MX を方針に足し、古い <code>max_age</code> が過ぎてから切り替えます。送信は相手の MTA-STS を守ります。DANE は MVP の後です。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0012-inbound-tls-mta-sts-and-tls-rpt.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/inbound-smtp.md">inbound-smtp.md</a> の 7 節、送信の側は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/outbound-smtp-and-reputation.md">outbound-smtp-and-reputation.md</a> の 6.3〜6.5 節。</small></p>
+  </section>
+
+  <section class="s" id="spf-dkim">
+    <h2>送信者の認証 1：SPF と DKIM</h2>
+    <p>SMTP には、送り手が本物かを確かめる仕組みがもともとありません。そこで DNS に送り手の情報を置き、受け手が照らします。<a class="t" href="#g-spf">SPF</a> は「どの IP から送ってよいか」、<a class="t" href="#g-dkim">DKIM</a> は「このドメインが署名した内容が変わっていないか」を確かめます。</p>
+    <div class="tabs">
+      <div data-tab="SPF"><p><code>MAIL FROM</code> のドメインの TXT（例：<code>v=spf1 include:_spf.esp.example mx -all</code>）に、送ってよい IP を書きます。受け手は接続元の IP を照らし、<code>pass</code>・<code>fail</code>・<code>softfail</code>・<code>neutral</code>・<code>none</code>・<code>permerror</code>・<code>temperror</code> を出します。</p><p>DNS を引く項（<code>include</code>・<code>a</code>・<code>mx</code>・<code>ptr</code>・<code>exists</code>・<code>redirect</code>）は合わせて <strong>10 回まで</strong>で、11 回目で <code>permerror</code> です（RFC 7208 の 4.6.4 節）。答えのない照会は 2 回までです。配信の事業者の <code>include</code> を重ねると、すぐ上限に当たります。</p></div>
+      <div data-tab="DKIM"><p>送り手の MTA が、ヘッダーと本文のハッシュに秘密の鍵で署名し、<code>DKIM-Signature</code> ヘッダーを足します。<code>d=</code> は署名したドメイン、<code>s=</code> はセレクター、<code>h=</code> は署名に含めたヘッダーの一覧です。受け手は <code>&lt;s&gt;._domainkey.&lt;d&gt;</code> の TXT から公開鍵を取って検証します（RFC 6376）。</p><p>経路の IP に依らないので、転送しても通ります。ただし件名や本文を書き換えると壊れます。<code>l=</code>（本文の長さ）付きの署名は、署名の外に文を足せるので、設計は DMARC の揃いに使いません。</p></div>
+      <div data-tab="この設計"><p>SPF の結果だけで SMTP の時点で拒みません。DKIM は 1 通あたり 5 つの署名まで検証し、<code>rsa-sha256</code> と <code>ed25519-sha256</code> を受け、<code>rsa-sha1</code> は <code>fail</code> にします。結果は <code>Authentication-Results</code>（RFC 8601）に書き、Web とアプリは本システムが付けたものだけを信じます。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/sender-authentication.md">sender-authentication.md</a> の 4 節（評価の順）・5.1〜5.2 節（10 回の上限の例）・5.5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0014-auth-evaluation-and-authentication-results.md">ADR-0014</a>、署名の鍵の交換は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0016-dkim-signing-keys-and-rotation.md">ADR-0016</a>。</small></p>
+  </section>
+
+  <section class="s" id="dmarc">
+    <h2>送信者の認証 2：DMARC の揃いと方針</h2>
+    <p>SPF も DKIM も、画面に出る <code>From:</code> を見ていません。<a class="t" href="#g-dmarc">DMARC</a> は、SPF か DKIM で確かめたドメインが From のドメインと<a class="t" href="#g-alignment">揃う</a>ことを求め、揃わないときの扱いを From のドメインの持ち主が <code>_dmarc.&lt;domain&gt;</code> の TXT で宣言します。</p>
+    <ul>
+      <li data-frag><strong>揃い</strong>：SPF が <code>pass</code> で <code>MAIL FROM</code> のドメインが From と揃うか、DKIM が <code>pass</code> で <code>d=</code> が From と揃うか。どちらか 1 つで DMARC は <code>pass</code>。既定（<code>r</code>）は同じ<a class="t" href="#g-org-domain">組織のドメイン</a>なら揃い、<code>s</code> は名前の完全な一致。</li>
+      <li data-frag><strong>方針</strong>：<code>p=none</code>（見るだけ）、<code>quarantine</code>（迷惑メールへ）、<code>reject</code>（拒む）。設計は <code>quarantine</code> の失敗を迷惑メールの箱へ、<code>reject</code> の失敗を、ARC で救えなければ SMTP の時点で <code>550 5.7.26</code> にします（決定表 DT-AUTH-001）。</li>
+      <li data-frag><strong>DMARCbis</strong>：設計の文書は、2026 年 5 月に RFC 9989 が出て RFC 7489 を置き換えたと確かめています（2026-10-10）。組織のドメインを公開接尾辞の一覧でなく DNS の木の歩き（最大 8 回の照会）で決め、<code>pct</code> を除き、<code>t</code>・<code>np</code>・<code>psd</code> を足しました。設計は <code>t=y</code> を 1 段弱く当て、古い <code>pct=0</code> を <code>t=y</code> とみなし、一覧での結果を 90 日のあいだ影で比べます。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">SPF が <code>pass</code> でした。画面の差出人（<code>From:</code>）は本物だと言えますか？</p>
+      <div class="opts">
+        <button>言える。SPF は差出人のドメインを確かめるので</button>
+        <button>言えない。SPF が確かめたのは封筒の <code>MAIL FROM</code> のドメイン。From と揃うかは DMARC が見る</button>
+        <button>言えない。SPF は IP の評判だけを見るので</button>
+      </div>
+      <p class="why">攻撃者は自分のドメインを <code>MAIL FROM</code> に使えば SPF を <code>pass</code> にでき、From には銀行の名前を書けます。From を守るのは、揃いを求める DMARC です。設計も、やりとりのある相手として甘く見るのは DMARC の <code>pass</code> のときだけです（ADR-0022）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0015-dmarc-policy-and-organizational-domain.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/sender-authentication.md">sender-authentication.md</a> の 3 節（標準の確認）・5.4 節（木の歩き、揃い、DT-AUTH-001）・8 節（集計の報告 RFC 9990 は法務の L1 の後に送る）。</small></p>
+  </section>
+
+  <section class="s" id="forwarding">
+    <h2>転送と ARC：SPF が落ちても DMARC は通る</h2>
+    <p>転送は、別の IP から送り直すので SPF を壊します。DMARC は SPF と DKIM のどちらかが揃えばよいので、本文が変わらなければ DKIM で通ります。次の例で確かめます。</p>
+    <div class="stepper">
+      <ol>
+        <li><code>shop.example</code>（DMARC <code>p=reject</code>）が <code>hanako@univ.example</code> へ送る。<code>MAIL FROM:&lt;bounce@shop.example&gt;</code>、<code>From: info@shop.example</code>、DKIM の <code>d=shop.example</code>。</li>
+        <li>大学のサーバーが、自分の IP <code>192.0.2.10</code> から本システムの <code>hanako@&lt;brand&gt;.&lt;domain&gt;</code> へ自動で転送する。本文と署名したヘッダーは変えない。</li>
+        <li>SPF：<code>shop.example</code> の記録に <code>192.0.2.10</code> はない → <code>fail</code>。大学が <a class="t" href="#g-srs">SRS</a> で <code>MAIL FROM</code> を自分のドメインに書き換えれば SPF は <code>pass</code> だが、<code>univ.example</code> は From と揃わない。</li>
+        <li>DKIM：署名した中身は同じ → <code>pass</code>（<code>d=shop.example</code>）。</li>
+        <li>DMARC：DKIM の <code>d=</code> が From と揃う → <code>pass</code>。普通に受信箱の候補になる（DT-AUTH-001 の 1 行）。</li>
+        <li>もしメーリングリストが件名に <code>[list]</code> を足していたら、DKIM も壊れて DMARC は <code>fail</code>、<code>p=reject</code> で拒む候補になる。ここで <a class="t" href="#g-arc">ARC</a> が効く。リストが受け取った時点の結果（<code>dmarc=pass</code>）を封印して渡し、本システムが信頼する封印者で連鎖が <code>cv=pass</code> なら、受け付けて「救い」の印を付ける（7 行）。</li>
+      </ol>
+    </div>
+    <div class="callout warn"><span class="label">ARC は誰でも付けられる</span>攻撃者も自分で封印できます。設計は、信頼の一覧（運用の一覧と組織ごとの一覧）の封印者の記録だけで救い、救ったメールが後で迷惑メールと報告される率が 30 日で 1% を超えた封印者は外す候補にします（ADR-0017）。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0017-arc-sealing-trusted-sealers-and-dmarc-reports.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/sender-authentication.md">sender-authentication.md</a> の 5.3・7 節、本システムが外へ転送するときの SRS は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/outbound-smtp-and-reputation.md">outbound-smtp-and-reputation.md</a> の 8.4 節、確認つきの転送は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0048-verified-forwarding.md">ADR-0048</a>。</small></p>
+  </section>
+
+  <section class="s" id="reputation">
+    <h2>送信の評判：IP・ブロックリスト・苦情・一括の配信停止</h2>
+    <p>受け手の事業者は、送り元の IP とドメインの過去の振る舞い（苦情、不達、迷惑メールの報告）から評判を付け、受け付けの速さと箱を決めます。評判の悪い IP からは、正規のメールも届かなくなります。だから本システムは、送信の IP と評判を自分で持ち、守ります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-warmup">ウォームアップ</a></h3><p>新しい IP は実績がなく疑われます。設計は 1 日目 500 通から 14 日目 5 万通まで段で上げ、苦情 0.1% 未満・不達 2% 未満・絞りの応答 5% 未満を満たした日だけ進めます。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-blocklist">ブロックリスト</a></h3><p>迷惑メールを出した IP を載せる公開の一覧（DNSBL）。多くの受け手が参照します。設計は送信のすべての IP を 5 分ごとに照会します。</p></div>
+      <div class="card" data-frag><h3><a class="t" href="#g-fbl">フィードバックループ</a></h3><p>受け手の利用者が「迷惑メール」を押すと、事業者が ARF（RFC 5965）の報告を送り手へ返します。苦情の率を、アカウント・組織・プール・IP ごとに数えます。</p></div>
+      <div class="card" data-frag><h3>大量の送信者の要件</h3><p>本家は 2024-02-01 から、全員に SPF か DKIM・逆引き・TLS・迷惑メールの率 0.3% 未満を、1 日 5,000 通を超える送信者に SPF と DKIM と DMARC・From の揃い・一括の配信停止を求めます。</p></div>
+    </div>
+    <p data-frag><a class="t" href="#g-one-click">一括の配信停止</a>（RFC 8058）は、<code>List-Unsubscribe: &lt;https://…&gt;</code> と <code>List-Unsubscribe-Post: List-Unsubscribe=One-Click</code> を付け、両方を DKIM の署名に含めます。受け手のメールのアプリは、ボタン 1 つでその URL に POST します。設計は、署名の <code>d=</code> が From と揃うときだけボタンを出し、利用者の代わりに URL を叩くことは<strong>法務の確認待ち（L2 の (d)）</strong>なのでフラグの裏に置きます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/outbound-smtp-and-reputation.md">outbound-smtp-and-reputation.md</a> の 5 節（プールとウォームアップ）・9 節（FBL とブロックリスト）・10〜11 節（送信の上限と乗っ取り）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0018-outbound-ip-pools-and-warmup.md">ADR-0018</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0020-bounces-dsn-srs-and-feedback-loops.md">0020</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0021-sending-limits-and-compromised-account-detection.md">0021</a>、配信停止のボタンは <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/sender-authentication.md">sender-authentication.md</a> の 10 節、運用は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/ip-blocklisted.md">runbooks/ip-blocklisted.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="filtering">
+    <h2>迷惑メールの選別：層と対数オッズ</h2>
+    <p>選別は 1 つの判定器ではなく、層の重ねです。規則（ヘッダーの形、認証の結果）、評判（IP・ドメイン・URL・添付のハッシュ）、内容の分類器、添付と URL の検査が、それぞれ証拠を出します。設計は各層の証拠を<a class="t" href="#g-log-odds">対数オッズ</a>の寄与 <code>w</code> にし、足して確率に戻します。</p>
+    <pre><code>S = b + Σ w        （b は事前。迷惑メール −3.0、フィッシング −5.0）
+p = 1 / (1 + e^(−S))</code></pre>
+    <p data-frag>独立した証拠は、オッズの掛け算、つまり対数オッズの足し算で合わさります。設計の例 1（宅配の不在を装うメール）は、フィッシングの頭で <code>−5.0 + 0.4 + 1.2 + 3.8 + 2.0 + 2.8 = 5.2</code>、<code>p ≈ 0.994</code> で、閾値 0.80 を超えて迷惑メールの箱へ入り、警告の帯が付きます。</p>
+    <div class="compare" data-frag>
+      <div class="bad"><h3><a class="t" href="#g-false-positive">偽陽性</a>（誤判定）</h3><p>取引先の請求書や本人の確認のメールが迷惑メールに入る。利用者は気づかず損をする。目標 0.05% 以下。</p></div>
+      <div class="bad"><h3>偽陰性（見逃し）</h3><p>フィッシングが受信箱に届く。1 通開くだけで被害になる。捕捉の目標 99.9% 以上。</p></div>
+    </div>
+    <div class="quiz" data-answer="1">
+      <p class="q">250 を返して受け付けた後、分類器が迷惑メールと判定しました。どうしますか？</p>
+      <div class="opts">
+        <button>迷惑メールの箱か組織の隔離に入れる。送り手へは返さない</button>
+        <button>DSN で送り手に「迷惑メールとして拒んだ」と返す</button>
+        <button>黙って捨てる</button>
+      </div>
+      <p class="why">迷惑メールの <code>MAIL FROM</code> の多くは偽で、DSN は無関係の第三者に届きます（<a class="t" href="#g-backscatter">後方散乱</a>）。捨てると誤判定を利用者が取り戻せません。拒むなら、SMTP の会話の中で、安く確かなものだけを 5xx で拒みます（ADR-0002）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/spam-and-abuse-filtering.md">spam-and-abuse-filtering.md</a> の 4 節（層と予算）・5 節（寄与の表、閾値 DT-FLT-002、例）・6 節（評判の数え）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0022-verdict-score-composition-and-overrides.md">ADR-0022</a>、添付と URL は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/attachment-and-url-scanning.md">attachment-and-url-scanning.md</a>。投稿のモデレーションと比べるなら <a href="../../../x/docs/primer/index.html#ts">X の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="secrecy">
+    <h2>通信の秘密と、機械が中身を読むこと</h2>
+    <p>電気通信事業法の第 4 条は<a class="t" href="#g-secrecy">通信の秘密</a>を守ります。本システムはメールの事業者として、これを守る立場にあると見込みます。通信の秘密は中身だけでなく、宛先・日時・接続元のような通信の構成の要素にも及ぶと説明されることが多いです。選別・索引・スレッド化は、機械で中身を読まないとできません。</p>
+    <ul>
+      <li data-frag>総務省の「同意取得の在り方に関する参照文書」は、2006 年の懇談会の整理を引き、迷惑メール等のフィルタリングは 5 つの条件（いつでも設定を変えられる、同意の有無で他の提供の条件を変えない、内容を明確に限る、通常の利用者なら同意すると合理的に推定できる、事前に十分に説明する）を満たせば、約款等による同意でも有効と考えられるとします。</li>
+      <li data-frag>総務省の「DMARC導入に関する法的な留意点」は、報告に本文と件名を含めないことなどを条件に挙げます。</li>
+      <li data-frag>本システムへの当てはめは、どれも<strong>法務の確認待ち（L1）</strong>です。結論まで、選別の既定の有効化・送信の内容の選別・索引の spec を承認しません。</li>
+    </ul>
+    <div class="callout key"><span class="label">設計の境界（ADR-0008）</span>データを C1（接続の情報）・C2（中身から作った戻せない特徴）・C3（中身そのもの）に分けます。C3 は選別の処理のメモリーの中だけで機械が読み、ログやメトリクスに出しません。人が中身を見るのは、利用者が同意して出した報告のサンプルだけです。学習は C2 と同意のあるサンプルで行い、選別を止める設定も持ちます。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0008-spam-pipeline-boundary-and-secrecy.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10。特定電子メール法は L2、個人情報保護法は L3、捜査機関への対応は L4、消去の期限は L6）と出典、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/spam-and-abuse-filtering.md">spam-and-abuse-filtering.md</a> の 4.4 節（区分の型）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0067-content-free-telemetry-schema.md">ADR-0067</a>。</small></p>
+  </section>
+
+  <section class="s" id="mime">
+    <h2>メッセージの形：RFC 5322・MIME・日本の文字コード</h2>
+    <p>メッセージは、ヘッダーの行の並び、空行、本文です（RFC 5322）。添付や HTML は <a class="t" href="#g-mime">MIME</a> で、本文をパートの木にして表します。日本のメールには、古い文字コードと <a class="t" href="#g-encoded-word">encoded-word</a> が今も多く残ります。</p>
+    <div class="tabs">
+      <div data-tab="生のメッセージ"><pre><code>From: =?ISO-2022-JP?B?GyRCOjRGIxsoQg==?= &lt;sato@example.co.jp&gt;
+To: taro@&lt;brand&gt;.&lt;domain&gt;
+Subject: =?ISO-2022-JP?B?GyRCOCtAUSRiJGokTiQ0ME1NahsoQg==?=
+Message-ID: &lt;a1b2c3@example.co.jp&gt;
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="b1"
+
+--b1
+Content-Type: multipart/alternative; boundary="b2"
+
+--b2
+Content-Type: text/plain; charset=ISO-2022-JP
+Content-Transfer-Encoding: 7bit
+
+(ESC $ B で切り替えた JIS の 7 ビットのバイト)
+--b2
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+
+&lt;p&gt;=E3=81=8A=E8=A6=8B=E7=A9=8D=E3=82=82=E3=82=8A&lt;/p&gt;
+--b2--
+--b1
+Content-Type: application/pdf
+Content-Disposition: attachment; filename*=UTF-8''%E8%A6%8B%E7%A9%8D%E6%9B%B8.pdf
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjcK...
+--b1--</code></pre></div>
+      <div data-tab="パートの木"><ul>
+        <li><code>multipart/mixed</code>：本文と添付を並べる。<code>boundary</code> の行で区切る。
+          <ul>
+            <li><code>multipart/alternative</code>：同じ内容の別の表し方。アプリは表示できる最後のもの（HTML）を選ぶ。
+              <ul><li><code>text/plain</code>（ISO-2022-JP、7bit）</li><li><code>text/html</code>（UTF-8、quoted-printable）</li></ul></li>
+            <li><code>application/pdf</code>：添付。名前は RFC 2231 の形で <code>見積書.pdf</code>。</li>
+          </ul></li>
+      </ul><p><code>Content-Transfer-Encoding</code> は、8 ビットのデータを 7 ビットの経路に通すための包み方です（<code>base64</code>・<code>quoted-printable</code>）。文字コード（<code>charset</code>）とは別の層です。</p></div>
+      <div data-tab="件名の復号"><p>ヘッダーは ASCII が原則なので、日本語は <code>=?文字コード?B か Q?中身?=</code> の encoded-word にします（RFC 2047）。上の件名は base64 を戻すと <code>ESC $ B</code> … <code>ESC ( B</code> の <a class="t" href="#g-iso2022jp">ISO-2022-JP</a> のバイトで、<code>見積もりのご依頼</code> になります。</p><p>RFC 2047 は 1 つの encoded-word で文字を分けることを禁じますが、守らないアプリがあります。<code>=?UTF-8?B?6KuL5g==?= =?UTF-8?B?sYLmm7g=?=</code> は、1 つずつでは <code>求</code> のバイトが途中で切れています。設計は同じ文字コードの隣をバイトで繋いでから復号し、<code>請求書</code> を得ます。</p></div>
+      <div data-tab="壊れ方"><ul>
+        <li><a class="t" href="#g-shiftjis">Shift_JIS</a> は実際には Windows の CP932 で、丸数字（①）や拡張の漢字を含みます。<code>ISO-2022-JP</code> と宣言して CP932 の文字や 8 ビットのバイトを送るアプリもあります。</li>
+        <li>波ダッシュ（〜 と ～）は、変換の表によって別の文字になります。検索では 1 つに畳みます。</li>
+        <li>携帯の事業者の古いアドレスには <code>taro..yamada@</code> のような RFC に合わないローカル部が残ります。捨てずに受け取った形のまま扱います。</li>
+      </ul></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/message-parsing-and-storage.md">message-parsing-and-storage.md</a> の 5 節（解析の上限）・6 節（ラベルの表、推定、encoded-word の結合、RFC 2231、携帯のアドレス）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0029-mime-parsing-limits-and-charsets.md">ADR-0029</a>。HTML を安全に見せる話は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0044-safe-html-rendering.md">ADR-0044</a>。</small></p>
+  </section>
+
+  <section class="s" id="storage">
+    <h2>保存：blob とメタデータ、同じ配送の中だけの共有</h2>
+    <p>受け取ったバイトは、そのまま返せる必要があります。DKIM の検証、IMAP の <code>BODY[]</code>、EML の書き出し、eDiscovery が同じバイトを求めるからです。設計は、生のメッセージを変わらない <a class="t" href="#g-blob">blob</a>（S3）に置き、頻繁に変わる状態（ラベル・既読・スレッド）をメタデータ（Aurora）に置きます。</p>
+    <div class="compare">
+      <div><h3>blob（S3）</h3><p>受け取ったヘッダーと本文。zstd で 256 KiB ごとに圧縮し、blob ごとの鍵で暗号化。1 日を過ぎた小さな blob は 64 MiB のパックに詰め直す。</p></div>
+      <div><h3>メタデータ（Aurora）</h3><p>受け手ごとの行。前置きのヘッダー（<code>Received</code>・<code>Authentication-Results</code>）、パートの木、件名、ラベル、旗、スレッド、<code>modseq</code>。</p></div>
+    </div>
+    <p data-frag><strong>重複排除の範囲</strong>：組織の全員へのメールは、同じ本文が数千人に届きます。設計は、同じ配送（1 つの SMTP のトランザクション、1 回の送信）の受け手の間でだけ blob を共有します。中身のハッシュでメッセージをまたいで共有すると、容量や消去の振る舞いから「同じ中身を誰かが持っている」ことが漏れうるからです。この論点は <a href="../../../dropbox/docs/primer/index.html#dedupe">Dropbox の資料</a>と同じです。</p>
+    <p data-frag><strong>消すとき</strong>：blob は、メールボックスの行・保留・送信の待ちの参照がすべて 0 になってから消します。鍵の破棄は 24 時間以内、物理の消去は 7 日の猶予の後です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0003-message-storage-layout-and-dedupe.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/message-parsing-and-storage.md">message-parsing-and-storage.md</a> の 4・7・8 節、形式は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0030-blob-format-v1-and-envelope-keys.md">ADR-0030</a>、参照と GC は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0031-blob-references-gc-and-quota.md">ADR-0031</a>、配る形は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0032-served-view-edits.md">ADR-0032</a>。</small></p>
+  </section>
+
+  <section class="s" id="labels">
+    <h2>ラベルとフォルダー</h2>
+    <p>多くのメールのアプリは<strong>フォルダー</strong>で整理します。メッセージは 1 つのフォルダーにだけ入ります。本家は<a class="t" href="#g-label">ラベル</a>を使い、1 つのメッセージに複数のラベルを付けられます。設計はラベルを正のモデルにし、フォルダーは「ラベルを 1 つだけ持つ」見せ方にします。</p>
+    <table>
+      <tr><th>操作</th><th>ラベルのモデルでの意味</th></tr>
+      <tr><td>受信箱・送信済み・迷惑メール・ゴミ箱</td><td>システムのラベル（<code>INBOX</code>・<code>SENT</code>・<code>SPAM</code>・<code>TRASH</code> など）。未読はラベルでなく旗</td></tr>
+      <tr><td>アーカイブ</td><td><code>INBOX</code> を外す。ラベルのないメッセージは「すべてのメール」にだけ見える</td></tr>
+      <tr><td>迷惑メール・ゴミ箱へ</td><td>互いに排他。付けると <code>INBOX</code> を外し、他のラベルの一覧から隠す</td></tr>
+      <tr><td>IMAP の <code>COPY</code>・<code>MOVE</code>・<code>EXPUNGE</code></td><td>ラベルを足す・付け替える・その箱のラベルを外す</td></tr>
+    </table>
+    <div class="quiz" data-answer="3">
+      <p class="q">IMAP のアプリで、受信箱のメールを「仕事」の箱へ <code>COPY</code> しました。サーバーでは何が起きますか？</p>
+      <div class="opts">
+        <button>メッセージの写しが 1 通増え、容量も 2 倍になる</button>
+        <button>受信箱から消えて「仕事」に移る</button>
+        <button>同じメッセージに「仕事」のラベルが足される。既読もスターも 1 つの状態のまま</button>
+      </div>
+      <p class="why">ラベルはフォルダーではありません。写しを作ると、既読・削除を写しの間でそろえる仕組みが要り、ずれの元になります。IMAP では同じメッセージが複数の箱に見えますが、<code>EMAILID</code>（RFC 8474）は同じです（ADR-0004）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0004-labels-as-primary-mailbox-model.md">ADR-0004</a>、操作の決定表は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0033-label-operations-decision-table.md">ADR-0033</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/mailbox-model-labels-and-threads.md">mailbox-model-labels-and-threads.md</a>、IMAP の箱の対応は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0040-imap-label-mailbox-mapping.md">ADR-0040</a>。</small></p>
+  </section>
+
+  <section class="s" id="threading">
+    <h2>スレッド化：参照のヘッダーと件名</h2>
+    <p>返信のメールは、元のメールの <a class="t" href="#g-message-id">Message-ID</a> を <code>In-Reply-To</code> と <code>References</code> に入れます。これを辿れば会話の木ができます。ただし返信が親より先に届く、参照を落とすアプリがある、攻撃者が他人の会話の ID を入れる、という問題があります。設計は参照のつながりと、<code>Re:</code>・<code>返信:</code>・<code>[list]</code> を外した件名の一致で合わせます。</p>
+    <div class="stepper">
+      <ol>
+        <li>m1 <code>&lt;a@x&gt;</code>「見積もりのご依頼」が届く。参照なし → 新しいスレッド T1。</li>
+        <li>返信の返信 m3 が先に届く。<code>References: &lt;a@x&gt; &lt;b@y&gt;</code>、件名「Re: 見積もりのご依頼」。<code>&lt;a@x&gt;</code> が T1 にあり件名が同じ → T1 へ。まだ届いていない <code>&lt;b@y&gt;</code> は仮の節として T1 に置く。</li>
+        <li>遅れて m2 <code>&lt;b@y&gt;</code>「RE: 見積もりのご依頼」が届く。T1 の仮の節で件名が同じ → T1 へ。届く順に依らず同じ形になる。</li>
+        <li>m4 は <code>&lt;a@x&gt;</code> を参照するが、件名が「請求書の件」→ 新しいスレッド T2（件名が変わると分かれる）。</li>
+        <li>参照のない自動の通知は、同じ差出人・同じ件名・7 日以内なら同じスレッドへ。100 通に達したら新しいスレッドを始める。</li>
+      </ol>
+    </div>
+    <p>一度同じスレッドにしたメッセージを、後から自動で分けることはしません。別々のスレッドが 1 つに合わさることはあります。認証に失敗し、そのスレッドに初めて出る差出人のドメインからのメッセージには「確かめられていない」の印を付け、会話の乗っ取りを見えるようにします。</p>
+    <p class="doc-only"><small>設計で効くところ：合わせの規則の表は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0005-threading-algorithm.md">ADR-0005</a>、合わせの実装は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0034-threading-implementation-and-merge.md">ADR-0034</a>、収束の性質ベーステストは <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a> の 2.2.1 節 D。</small></p>
+  </section>
+
+  <section class="s" id="sync">
+    <h2>同期：IMAP と JMAP</h2>
+    <p>Web・アプリ・既存のメールのアプリが同じ状態を見るには、差分の取り方が要ります。手元の状態からの変化だけを取らないと、数万通の箱を毎回読み直すことになります。</p>
+    <div class="tabs">
+      <div data-tab="IMAP"><p><a class="t" href="#g-imap">IMAP</a>（IMAP4rev2、RFC 9051）は箱ごとに <a class="t" href="#g-uid">UID</a> を振ります。UID は箱の中で増える一方で、再利用しません。<code>UIDVALIDITY</code> が変わったら、手元の UID はすべて捨てます。</p><p><a class="t" href="#g-condstore">CONDSTORE・QRESYNC</a>（RFC 7162）は各メッセージに <a class="t" href="#g-modseq">MODSEQ</a> を付けます。アプリが「<code>UIDVALIDITY</code> と、前に見た <code>MODSEQ</code>」を渡すと、サーバーは変わったメッセージと消えた UID（<code>VANISHED</code>）だけを返します。<code>IDLE</code> で変化を待ちます。</p></div>
+      <div data-tab="JMAP"><p><a class="t" href="#g-jmap">JMAP</a>（RFC 8620・8621）は HTTP の上の JSON の API です。型ごとの<a class="t" href="#g-state">状態の文字列</a>を持ち、<code>Email/changes</code> に <code>sinceState</code> を渡すと、<code>created</code>・<code>updated</code>・<code>destroyed</code> と <code>newState</code> が返ります。古すぎる状態には <code>cannotCalculateChanges</code> を返し、取り直させます。変化の合図は EventSource か WebSocket で届きます。</p><p>メッセージは <code>mailboxIds</code> の集合を持つので、ラベルをそのまま表せます。</p></div>
+      <div data-tab="この設計"><p>アカウントごとに 1 本の <code>modseq</code> を持ち、<code>mailstore</code> だけが、変更と同じトランザクションで 1 つ進めて change log に書きます。JMAP の状態の文字列も IMAP の <code>MODSEQ</code> もここから作ります。change log の保持は 30 日です。考え方は <a href="../../../linear/docs/primer/index.html#syncid">Linear の資料</a>の 1 本の順序と同じです。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">2 つのスレッドを 1 つに合わせます。移るメッセージの <code>threadId</code> はどう扱いますか？</p>
+      <div class="opts">
+        <button>新しいスレッドの ID に書き換え、<code>updated</code> として知らせる</button>
+        <button>書き換えない。メッセージを新しい Email の ID で作り直し、古い ID を <code>destroyed</code>、新しい ID を <code>created</code> として知らせる</button>
+        <button>合わせはクライアントに任せ、サーバーは何もしない</button>
+      </div>
+      <p class="why">RFC 8621 は <code>threadId</code> を変わらない性質とし、RFC 8474 も一度知らせた <code>THREADID</code> を変えないとします。クライアントは ID を鍵に手元を作るので、黙って変わると表示が崩れます。設計は <code>object_gen</code> を進めて作り直し、IMAP では古い UID の <code>VANISHED</code> と新しい UID で届けます（ADR-0005 の注記、ADR-0034）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0006-sync-protocol-jmap-imap-and-modseq.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/client-sync-and-protocols.md">client-sync-and-protocols.md</a> の 5 節（<code>Email/changes</code> の例）・7.4 節（複数のラベルを持つメッセージの UID の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0039-change-log-states-and-jmap-changes.md">ADR-0039</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0041-jmap-extensions-and-mailbox-mapping.md">0041</a>。</small></p>
+  </section>
+
+  <section class="s" id="search">
+    <h2>検索：日本語の 2-gram</h2>
+    <p>日本語は語の間に空白がないので、英語のように空白で語に分けられません。分け方は 2 つあります。辞書で語を切る形態素解析と、決まった長さの文字の並びで切る <a class="t" href="#g-ngram">N-gram</a> です。設計は、取りこぼしの少ない 2-gram を使います。</p>
+    <table>
+      <tr><th>本文の「2026年9月分の請求書を送付します」</th><th>索引に入る語（位置）</th></tr>
+      <tr><td><code>月分の請求書を送付します</code>（日本語の連なり）</td><td><code>月分</code>(3)、<code>分の</code>(4)、<code>の請</code>(5)、<code>請求</code>(6)、<code>求書</code>(7)、…、<code>ます</code>(13)、最後の 1 文字 <code>す</code>(14)</td></tr>
+      <tr><td>検索の「請求書」</td><td><code>請求</code>(p) と <code>求書</code>(p+1) が続けて現れる所 → 位置 6・7 で当たる</td></tr>
+    </table>
+    <ul>
+      <li data-frag>2-gram は辞書にない新語や社名も拾えますが、索引が大きくなり、「京都」で「東京都」にも当たる、のような誤りの当たりが出ます。形態素との併用は <code>search-index-poc</code> で決めます。</li>
+      <li data-frag>全角と半角は NFKC で揃え、波ダッシュの類は 1 つに畳みます。ひらがなとカタカナは揃えません。</li>
+      <li data-frag>索引はアカウントごとの変わらないセグメントです。ラベルや既読のように変わる状態は索引に入れず、change log から作るビットマップで当てます。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/search.md">search.md</a> の 4 節（正規化と CJK の分け方）・5 節（演算子と IR、フィルターと共有）・7 節（状態のビットマップ）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0009-search-index-design.md">ADR-0009</a>。N-gram と形態素の比べは <a href="../../../x/docs/primer/index.html#search">X の資料</a>にもあります。</small></p>
+  </section>
+
+  <section class="s" id="retention">
+    <h2>保持・保留・eDiscovery</h2>
+    <p>組織は、法令や社内の規程のために、メールを決めた期間残し、期間の後に消す必要があります。訴訟や監査が始まると、関係する人のメールを消さずに守り（<a class="t" href="#g-hold">保留</a>、リーガルホールド）、横断して探して書き出します（<a class="t" href="#g-ediscovery">eDiscovery</a>）。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>保持の規則</h3><p>範囲（組織・OU・アカウント）× ラベルの条件 × 受け付けからの日数。期間の後に消すか残すかを選ぶ。複数の規則は最も長いものが勝つ。</p></div>
+      <div class="card" data-frag><h3>保留</h3><p>案件（matter）の範囲で置く。規則より常に強い。利用者が完全に削除しても、保留が外れるまで消えない。利用者には見せない。</p></div>
+      <div class="card" data-frag><h3>eDiscovery</h3><p>担当は割り当てられた案件の範囲だけを検索する。閲覧と書き出しは別の権限で、すべての操作をハッシュの鎖の監査ログに残す。</p></div>
+    </div>
+    <p>設計は、保留を「消す時」に評価します。当たるメッセージは、メールボックスの行を <code>preserved_messages</code> に移し、blob に保留の参照を足します。保留を置く費用が範囲の大きさに依らない形です。消去の期限（L6）と捜査機関への対応（L4）は<strong>法務の確認待ち</strong>です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/retention-and-ediscovery.md">retention-and-ediscovery.md</a> の 4 節（規則と保留、決定表 DT-RET-001）・6〜7 節（案件、検索と書き出し）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0053-retention-rules-holds-and-preservation.md">ADR-0053</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0054-ediscovery-matters-search-export-and-audit.md">0054</a>、鍵の破棄との関係は <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0060-key-hierarchy-and-crypto-erasure.md">ADR-0060</a>。</small></p>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora は 3 種類あります。directory（テナント・アカウント・アドレス・規則。リージョンで 1 つ）、メールボックスのシャード（受け手ごとのメッセージの行・ラベル・スレッド・change log。アカウントで分ける）、blob の目録のシャード（blob の場所と鍵と参照）です。DB をまたぐ線は論理の参照で、外部キーを張りません。</p>
+    <pre class="mermaid">erDiagram
+  accounts_state ||--o{ changes : "change log"
+  threads ||--|{ messages : "groups"
+  messages ||--o{ message_labels : "member of"
+  labels ||--o{ message_labels : "contains"
+  blob_catalog ||--o{ messages : "body cross DB"
+  accounts_state {
+    uuid account_id PK
+    bigint modseq
+    integer epoch
+  }
+  messages {
+    uuid account_id PK
+    uuid message_id PK
+    integer object_gen
+    uuid thread_id FK
+    uuid blob_id
+    bigint modseq
+  }
+  labels {
+    uuid account_id PK
+    uuid label_id PK
+    text system_role
+    bigint uidnext
+    bigint highest_modseq
+  }
+  message_labels {
+    uuid account_id PK
+    uuid label_id PK
+    uuid message_id PK
+    bigint uid
+  }
+  threads {
+    uuid account_id PK
+    uuid thread_id PK
+    text subject_key
+  }
+  changes {
+    uuid account_id PK
+    bigint modseq PK
+    integer seq PK
+    text entity_type
+    uuid entity_id
+  }
+  blob_catalog {
+    uuid blob_id PK
+    bytea orig_sha256
+    text state
+  }</pre>
+    <p>受信のメッセージは、次の順に行になります。</p>
+    <pre class="mermaid">flowchart LR
+  S["SMTP の受け付け"] --> P["スプール S3 と SQS"]
+  P -->|"250"| F["選別 配送ごとに 1 回"]
+  F --> B["blob 配送ごとに 1 つ"]
+  B --> D["受け手ごとに 1 tx"]
+  D --> R["delivery_log modseq messages message_labels changes outbox"]
+  R --> X["索引 プッシュ 参照の追加"]</pre>
+    <ul>
+      <li data-frag><code>delivery_log</code> の主キーで、同じ配送を 2 回処理しても受け手ごとに 1 通にします。</li>
+      <li data-frag><code>message_labels.uid</code> が IMAP の UID、<code>object_gen</code> がスレッドの合わせや添付の止めで進む世代です。</li>
+      <li data-frag>件名・パートの木などの C3 の列は、メールボックスのシャードの決めた表にだけあります。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/data-model.md">data-model.md</a> の 2〜3 節（置き場所と規約）・4 節（全体の ER 図）・5 節（受信の道筋と段）・6 節（横断の不変条件）、<a href="https://github.com/shoito/rebuilds/tree/main/systems/gmail/docs/architecture/data-model">data-model/</a>。ER 図の記号と RLS は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-mua">MUA</dt><dd>Mail User Agent。利用者がメールを書き、読むアプリ（Web、スマートフォンのアプリ、Thunderbird など）。</dd>
+      <dt id="g-msa">MSA</dt><dd>Mail Submission Agent。利用者の投稿を、認証してから受け付ける口。ポート 587（STARTTLS）か 465（最初から TLS）。</dd>
+      <dt id="g-mta">MTA</dt><dd>Mail Transfer Agent。SMTP でメールを次の MTA へ運ぶサーバー。</dd>
+      <dt id="g-mda">MDA</dt><dd>Mail Delivery Agent。受け取ったメールを利用者のメールボックスに入れる役。設計では <code>mailstore.deliver</code> に当たる。</dd>
+      <dt id="g-mx">MX レコード</dt><dd>ドメインのメールを受ける MTA の名前と優先度を示す DNS のレコード。数の小さいほうを先に試す。</dd>
+      <dt id="g-smtp">SMTP</dt><dd>Simple Mail Transfer Protocol（RFC 5321）。MTA の間でメールを運ぶ、コマンドと応答のコードの会話。</dd>
+      <dt id="g-envelope">封筒</dt><dd>SMTP の <code>MAIL FROM</code> と <code>RCPT TO</code>。ヘッダーの From・To とは別で、配送と不達の返し先に使う。</dd>
+      <dt id="g-queue">待ち行列</dt><dd>送れなかったメールを置き、時間を置いて送り直すための列。間隔を広げながら再試行し、期限で諦める。</dd>
+      <dt id="g-dsn">DSN</dt><dd>Delivery Status Notification（RFC 3464）。届かなかった・遅れていることを送り手へ知らせるメール。空の <code>MAIL FROM</code> で送る。</dd>
+      <dt id="g-backscatter">後方散乱</dt><dd>偽の <code>MAIL FROM</code> へ返った不達の通知。無関係の第三者に届き、返した側が迷惑メールの送り手になる。</dd>
+      <dt id="g-starttls">STARTTLS</dt><dd>平文で始めた SMTP の接続を、途中から TLS に切り替えるコマンド（RFC 3207）。</dd>
+      <dt id="g-mta-sts">MTA-STS</dt><dd>受け手のドメインが、TLS と決めた MX への配送を求める方針を HTTPS で公開する仕組み（RFC 8461）。</dd>
+      <dt id="g-tls-rpt">TLS-RPT</dt><dd>送り手が TLS の失敗を受け手のドメインへ日ごとに報告する仕組み（RFC 8460）。</dd>
+      <dt id="g-spf">SPF</dt><dd>Sender Policy Framework（RFC 7208）。<code>MAIL FROM</code> のドメインが、送ってよい IP を DNS に書き、受け手が照らす。</dd>
+      <dt id="g-dkim">DKIM</dt><dd>DomainKeys Identified Mail（RFC 6376）。ドメインがヘッダーと本文に署名し、受け手が DNS の公開鍵で検証する。</dd>
+      <dt id="g-dmarc">DMARC</dt><dd>From のドメインの持ち主が、SPF・DKIM との揃いと、揃わないときの扱いを宣言する仕組み。設計は RFC 9989 に従う。</dd>
+      <dt id="g-alignment">揃い</dt><dd>alignment。SPF か DKIM で確かめたドメインが、From のドメインと同じ（または同じ組織のドメイン）であること。</dd>
+      <dt id="g-org-domain">組織のドメイン</dt><dd><code>mail.shop.example</code> に対する <code>shop.example</code> のような、登録の単位のドメイン。RFC 9989 は DNS の木の歩きで決める。</dd>
+      <dt id="g-arc">ARC</dt><dd>Authenticated Received Chain（RFC 8617）。転送やメーリングリストが、受け取った時点の認証の結果を封印して次へ渡す仕組み。</dd>
+      <dt id="g-srs">SRS</dt><dd>Sender Rewriting Scheme。転送の時に <code>MAIL FROM</code> を転送する側のドメインに書き換え、転送の先の SPF を通す方式。</dd>
+      <dt id="g-warmup">ウォームアップ</dt><dd>新しい送信の IP の量を、評判を見ながら日ごとに段で増やすこと。</dd>
+      <dt id="g-blocklist">ブロックリスト</dt><dd>迷惑メールを送った IP やドメインを載せる公開の一覧。多くの受け手が DNS で照会する（DNSBL）。</dd>
+      <dt id="g-fbl">フィードバックループ</dt><dd>FBL。受け手の利用者の迷惑メールの報告を、事業者が ARF（RFC 5965）の形で送り手へ返す仕組み。</dd>
+      <dt id="g-one-click">一括の配信停止</dt><dd>RFC 8058 の one-click unsubscribe。<code>List-Unsubscribe-Post</code> を付け、アプリのボタン 1 つで POST して配信を止める。</dd>
+      <dt id="g-log-odds">対数オッズ</dt><dd>確率 p を <code>log(p / (1 − p))</code> に直した値。独立した証拠の重みを足し算で合わせられる。</dd>
+      <dt id="g-false-positive">偽陽性</dt><dd>正規のメールを迷惑メールと誤って判定すること。その逆の見逃しが偽陰性。</dd>
+      <dt id="g-secrecy">通信の秘密</dt><dd>電気通信事業法の第 4 条などが守る、通信の中身と構成の要素の秘密。本システムへの当てはめは法務の確認待ち（L1）。</dd>
+      <dt id="g-mime">MIME</dt><dd>Multipurpose Internet Mail Extensions（RFC 2045〜2049）。メールに文字コード・添付・HTML・パートの木を持たせる決まり。</dd>
+      <dt id="g-encoded-word">encoded-word</dt><dd>ヘッダーに ASCII 以外の文字を入れる形 <code>=?charset?B?…?=</code>（RFC 2047）。</dd>
+      <dt id="g-iso2022jp">ISO-2022-JP</dt><dd>エスケープの列で ASCII と JIS の漢字を切り替える 7 ビットの文字コード（RFC 1468）。日本のメールの古い標準。</dd>
+      <dt id="g-shiftjis">Shift_JIS</dt><dd>8 ビットの日本語の文字コード。メールで使われるのは多くが Windows の拡張の CP932。</dd>
+      <dt id="g-blob">blob</dt><dd>受け取ったメッセージのバイトをそのまま、変えずに置いたオブジェクト。状態は持たない。</dd>
+      <dt id="g-label">ラベル</dt><dd>メッセージに複数付けられる印。受信箱や迷惑メールもシステムのラベルとして持つ。</dd>
+      <dt id="g-message-id">Message-ID</dt><dd>メッセージを一意に指すヘッダーの値。返信は <code>In-Reply-To</code>・<code>References</code> でこれを指す。</dd>
+      <dt id="g-imap">IMAP</dt><dd>Internet Message Access Protocol。サーバーのメールボックスを箱の単位で読み書きするプロトコル。現行は IMAP4rev2（RFC 9051）。</dd>
+      <dt id="g-uid">UID</dt><dd>IMAP の箱の中でメッセージに振る、増える一方の番号。<code>UIDVALIDITY</code> と組で意味を持つ。</dd>
+      <dt id="g-condstore">CONDSTORE・QRESYNC</dt><dd>IMAP の拡張（RFC 7162）。<code>MODSEQ</code> で変わったものだけを取り、消えた UID を <code>VANISHED</code> で返す。</dd>
+      <dt id="g-modseq">MODSEQ</dt><dd>変更のたびに増える番号。設計ではアカウントごとの <code>modseq</code> を、IMAP と JMAP の両方の差分の基にする。</dd>
+      <dt id="g-jmap">JMAP</dt><dd>JSON Meta Application Protocol（RFC 8620・8621）。HTTP の上で、メールの取得・変更・差分・送信・プッシュを扱う標準。</dd>
+      <dt id="g-state">状態の文字列</dt><dd>JMAP のサーバーが型ごとに返す、今の状態を表す不透明な文字列。<code>*/changes</code> にこれを渡して差分を取る。</dd>
+      <dt id="g-ngram">N-gram</dt><dd>文を決まった長さ N の文字の並びに切る方法。2-gram は隣り合う 2 文字ずつ。</dd>
+      <dt id="g-hold">保留</dt><dd>リーガルホールド。訴訟や調査のために、範囲のメールを利用者が消しても残すこと。</dd>
+      <dt id="g-ediscovery">eDiscovery</dt><dd>訴訟や監査のために、電子のデータを探し、保全し、書き出すこと。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次にメールが届く流れ（受信 → 認証 → 選別 → 保存）を、その後に送る流れと評判、最後にメールボックスと同期と検索を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち（L1〜L10）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要な流れ A〜E、本家の形と意図した違い、規模の段階</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/inbound-smtp.md">inbound-smtp.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/sender-authentication.md">sender-authentication.md</a> <span>— SMTP の会話、拒む表、TLS、SPF・DKIM・DMARC・ARC</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/spam-and-abuse-filtering.md">spam-and-abuse-filtering.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/attachment-and-url-scanning.md">attachment-and-url-scanning.md</a> <span>— 層、対数オッズ、閾値、区分 C1〜C3</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/message-parsing-and-storage.md">message-parsing-and-storage.md</a> <span>— MIME の上限、文字コード、blob とパック、参照と消去</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/outbound-smtp-and-reputation.md">outbound-smtp-and-reputation.md</a> <span>— 関門、IP プールとウォームアップ、再試行、DSN、FBL</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/mailbox-model-labels-and-threads.md">mailbox-model-labels-and-threads.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/client-sync-and-protocols.md">client-sync-and-protocols.md</a> <span>— ラベル、スレッド、modseq、JMAP と IMAP</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/search.md">search.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/retention-and-ediscovery.md">retention-and-ediscovery.md</a> <span>— 2-gram と IR、保持と保留と案件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/gmail/docs/decisions">decisions/</a> <span>— 特に 0002（受け付けてから選別）、0003（保存と重複排除）、0004（ラベル）、0005（スレッド）、0006（同期）、0008（選別の境界と通信の秘密）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/architecture/data-model.md">data-model.md</a> <span>— 置き場所、規約、ER 図、受信の道筋、横断の不変条件</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

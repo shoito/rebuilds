@@ -87,6 +87,8 @@ date: 2026-10-10
 - **3（すべてを受け付け、迷惑メールに DSN）**：後方散乱を作る。捨てる形は、誤判定の正規のメールを利用者が取り戻せない。
 - **b（グレーリスト）**：NFR-001 を満たせない。最近の迷惑メールの送り手の多くは再試行するので、効きも限られると見込む（**未検証**）。
 
+> 2026-10-10 の注記：上の表の 11 行には例外がある。受け手の組織が方針の組 `quarantine_on_reject` を選んでいるときは、`p=reject` の失敗でも SMTP の時点で拒まず、受け付けて隔離する（[ADR-0015](0015-dmarc-policy-and-organizational-domain.md)、[sender-authentication.md](../architecture/sender-authentication.md) の DT-AUTH-001 の 8 行、[inbound-smtp.md](../architecture/inbound-smtp.md) の 8.4 節）。
+
 ## Consequences
 
 - 良くなること：
