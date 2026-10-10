@@ -154,26 +154,27 @@ sequenceDiagram
 {
   "currency": "JPY",
   "lines": [
-    {"line_id": "L1", "qty": 2, "unit_price": 3300, "tax_rate": 10,
+    {"line_id": "L1", "qty": 2, "unit_price": 3300, "rate_bp": 1000,
      "units": [{"n": 1, "product_discount": 495, "order_discount": 254, "paid": 2551},
                {"n": 2, "product_discount": 495, "order_discount": 254, "paid": 2551}]},
-    {"line_id": "L2", "qty": 3, "unit_price": 1080, "tax_rate": 8,
+    {"line_id": "L2", "qty": 3, "unit_price": 1080, "rate_bp": 800,
      "units": [{"n": 1, "product_discount": 0, "order_discount": 98, "paid": 982},
                {"n": 2, "product_discount": 0, "order_discount": 98, "paid": 982},
                {"n": 3, "product_discount": 0, "order_discount": 97, "paid": 983}]},
-    {"line_id": "L3", "qty": 1, "unit_price": 2200, "tax_rate": 10,
+    {"line_id": "L3", "qty": 1, "unit_price": 2200, "rate_bp": 1000,
      "units": [{"n": 1, "product_discount": 0, "order_discount": 199, "paid": 2001}]}
   ],
-  "shipping": {"method": "standard", "amount": 880, "discount": 880, "tax_rate": 10},
+  "shipping": {"method": "standard", "amount": 880, "discount": 880, "rate_bp": 1000},
   "fees": [],
-  "tax_lines": [{"rate": 10, "consideration": 7103, "tax": 645},
-                {"rate": 8, "consideration": 2947, "tax": 218}],
+  "tax_lines": [{"rate_bp": 1000, "consideration": 7103, "tax": 645},
+                {"rate_bp": 800, "consideration": 2947, "tax": 218}],
   "total": 10050,
   "discounts": ["D1@v3", "D2@v1", "D4@v2"]
 }
 ```
 
 - `total = Σconsideration = 7,103 + 2,947 = 10,050`。送料は 880 円で、送料の割引 880 円で 0 円。
+- 上は読みやすくした抜き出し。保存とハッシュの正規の形（キーの順、`tax_category`、割引の ID とバージョン）は [data-model/stores.md](data-model/stores.md) の 6 節。
 
 ### 6.3 最終確認画面の枠（法務の確認待ち L1）
 

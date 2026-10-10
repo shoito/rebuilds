@@ -420,8 +420,8 @@ stateDiagram-v2
 
 | 表・置き場所 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `shops`（全体） | `shop_id`、`handle`（一意）、`pod_id`、`lifecycle`、`plan`、`owner_account_id`、`created_at`、`trial_ends_at`、`closed_at` | `shop_id`、`handle` 一意 | 5、9 |
-| `shop_hosts`（全体） | `host`（一意）、`shop_id`、`kind`（`default`・`custom`）、`is_primary`、`status`（`pending`・`active`・`failed`・`detached`）、`tenant_id`、`cert_status`、`in_hotset`、世代の欄（[storefront-api-and-caching.md](storefront-api-and-caching.md) の 12 節） | `host` | 5、6 |
+| `shops`（全体） | `shop_id`、`handle`（一意）、`pod_id`、`lifecycle_state`、`provisioning_state`（作成の失敗。[data-model.md](data-model.md) の D-38）、`plan`、`owner_account_id`、`created_at`、`trial_ends_at`、`closed_at` | `shop_id`、`handle` 一意 | 5、9 |
+| `shop_hosts`（全体） | `host`（一意）、`shop_id`、`kind`（`default`・`custom`）、`is_primary`、`status`（`pending`・`active`・`failed`・`detached`）、`cf_tenant_id`（CloudFront の配信のテナント。D-29）、`cert_status`、`in_hotset`、世代の欄（[storefront-api-and-caching.md](storefront-api-and-caching.md) の 12 節） | `host` | 5、6 |
 | `pods`（全体） | `pod_id`、`kind`（`shared`・`isolation`・`canary`・`dedicated`）、`status`（`accepting`・`full`・`draining`）、`size_tier`、`alb_origin_id`、`capacity_pu` | `pod_id` | 4 |
 | `shop_load`（全体） | 日次のショップの書き込み・要求・大きさと PU | `(shop_id, day)` | 4.2 |
 | `hotset_stats`（全体） | ホストごとの 5 分・14 日の要求の数 | `host` | 5.1 |

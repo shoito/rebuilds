@@ -265,7 +265,7 @@ flowchart LR
 | 表・保存 | 中身 | 節 |
 | --- | --- | --- |
 | `app_functions`（全体） | `(app_version_id, function_id)`、`kind`、`api_version`、`input_query`、`wasm_sha256`、`size`、`state`（検査中・可・拒否と理由） | 9 |
-| `function_artifacts`（全体） | `(function_id, wasmtime_version)`、`cwasm_s3_key`、`sig_s3_key`、`config_hash` | 9 |
+| `function_artifacts`（全体） | `(app_version_id, function_id, wasmtime_version)`（関数の ID はアプリのバージョンをまたいで同じ。[data-model.md](data-model.md) の D-30）、`cwasm_s3_key`、`sig_s3_key`、`config_hash` | 9 |
 | `function_configurations`（ポッド） | `(shop_id, id)`、`function_id`、`enabled`、`required`（検証だけ）、`config jsonb`、`created_at` | 4、8.3 |
 | `function_runs`（ポッド） | `(shop_id, function_id, run_at, id)`、`status`、`fuel`、`duration_us`、`input_hash`、`input`（同意のときだけ）、`output`、`log`。日の分割で 7 日 | 10 |
 | S3 | `functions/<app>/<function>/<version>/<wasmtime>.cwasm`、`.sig` | 9 |

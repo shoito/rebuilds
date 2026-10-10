@@ -59,6 +59,11 @@ date: 2026-10-10
 - X2：`relay` の outbox の読み出し
 - X3：`shop-mover` の読み出し（[ADR-0002](0002-pods-and-shop-placement.md)）
 
+> 2026-10-10 の注記：データモデルの工程で、X1 の作業が仕事のあるショップを見つけるための「発見の索引」を、「`shop_id` を索引の先頭に置く」の例外として許した（[data-model.md](../architecture/data-model.md) の 3.4 節、D-6）。
+> - 例外にする表と索引は次だけ：`reservations (expires_at) WHERE state = 'reserved'`、`checkouts (submitted_at) WHERE state IN ('payment_pending','refund_required')`、`payment_webhook_inbox (received_at) WHERE processed_at IS NULL`、`payment_inquiries (next_at)`、`product_publications (publish_at) WHERE publish_at > created_at`、`refunds (updated_at) WHERE state IN ('requested','unknown')`、`webhook_deliveries (enqueued_at) WHERE state = 'pending'`、`shipments (last_tracked_at) WHERE delivered_at IS NULL AND tracking_number IS NOT NULL`、`invoice_registrations (next_check_at)`、`flash_sales (starts_at) WHERE state IN ('registered','prepared','queueing')`、`checkout_submissions (expires_at)`、`reconcile_findings (state, found_at) WHERE state = 'open'`。
+> - これらの索引は、`sys` の `SECURITY DEFINER` の関数（持ち主は移行のロール、X1 のロールにだけ実行の権限）からだけ使う。関数はショップの ID の集まりだけを返し、行の中身を返さない。作業はショップごとに `SET LOCAL app.shop_id` して本体を読む。
+> - CI はこの一覧の外の `shop_id` を先頭にしない索引を拒む。表を足すときは、先にこの注記を直す。
+
 ### ポッドの中のうるさい隣人の抑え
 
 | 対象 | 仕組み |

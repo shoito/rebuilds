@@ -259,13 +259,13 @@ stateDiagram-v2
 
 | 表 | 中身 | 節 |
 | --- | --- | --- |
-| `tax_rates`（全体、ポッドへ写す） | `category`、`rate_bp`（基本点。1000 = 10%）、`effective_from` | 4 |
+| `tax_rates`（全体、ポッドへ写す） | `tax_category`、`rate_bp`（基本点。1000 = 10%）、`effective_from`、`tax_rules_version` | 4 |
 | `shop_tax_settings` | `(shop_id)`、`rounding_mode`、`shipping_tax_category`、`shipping_tax_mode`、`fee_tax_category`、`document_display_name`、`is_registered` | 4、5.2 |
 | `products.tax_category` | 商品の税の区分（[catalog-and-pricing.md](catalog-and-pricing.md)） | 4 |
 | `checkout_price_snapshots` に足す値 | 税率ごとの対価と税額、`tax_rules_version`、`rounding_mode` | 5.4 |
-| `order_tax_lines` | `(shop_id, order_id, rate_bp)`、`taxable_gross`、`tax_amount`、`tax_rules_version`、`rounding_mode` | 5.4 |
-| `refund_tax_lines` | `(shop_id, refund_id, rate_bp)`、`taxable_gross`、`tax_amount`、`method` | 6 |
-| `tax_documents` | `(shop_id, id)`、`kind`、`number`（一意 `(shop_id, number)`）、`order_id`、`refund_id`、`supersedes_id`、`issued_at`、`body jsonb`、`body_hash`、`renderer_version`、`retained_until`。`UPDATE` を拒むトリガー | 7.2 |
+| `order_tax_lines` | `(shop_id, order_id, tax_category)`、`rate_bp`（正の税率は一意）、`taxable_gross_amount`、`tax_amount`。`tax_rules_version`・`rounding_mode` は `orders` に持つ（[data-model.md](data-model.md) の D-5・D-17） | 5.4 |
+| `refund_tax_lines` | `(shop_id, refund_id, tax_category)`、`rate_bp`、`taxable_gross_amount`、`tax_independent_amount`、`tax_recompute_amount`、`method`、`tax_amount`（選んだ方） | 6 |
+| `tax_documents` | `(shop_id, id)`、`kind`、`number`（一意 `(shop_id, number)`）、`order_id`、`refund_id`、`supersedes_id`、`issued_at`、`body jsonb`（宛名を含めない）、`addressee_ciphertext`（宛名。列の暗号。D-36）、`body_hash`、`renderer_version`、`retained_until`。`UPDATE` を拒むトリガー | 7.2 |
 | `tax_document_sequences` | `(shop_id, kind, year)`、`next_value` | 7.2 |
 | `invoice_registrations` | `(shop_id)`、`number`、`state`、`registered_name`、`checked_at`、`source_response_hash` | 7.5 |
 

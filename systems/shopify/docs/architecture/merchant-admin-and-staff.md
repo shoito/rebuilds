@@ -293,12 +293,14 @@ flowchart LR
 | `account_credentials`（全体） | パスキー（公開鍵、署名の回数）、TOTP の秘密（KMS で包む）、回復のコードのハッシュ | `(account_id, credential_id)` | 4.1 |
 | `admin_sessions`（全体） | セッション、端末、作成、最後の利用、`amr` | `session_id`、`account_id` | 4.2 |
 | `account_shops`（全体、P4 の写し） | アカウント → ショップ ID・ハンドル | `(account_id, shop_id)` | 4.2 |
-| `organizations`・`organization_domains`・`sso_connections`（全体） | 組織、確かめたドメイン、IdP の設定 | `org_id` | 4.3 |
+| `organizations`・`organization_domains`・`organization_shops`・`sso_connections`（全体） | 組織、確かめたドメイン、結び付けたショップ、IdP の設定 | `organization_id` | 4.3 |
 | `partner_orgs`・`partner_members`（全体） | パートナーの組織とメンバー | `partner_id` | 4.4 |
 | `staff_members`（ポッド） | `(shop_id, account_id)`、`kind`（`owner`・`staff`・`collaborator`）、状態、期限、最後の利用 | `(shop_id, account_id)` | 4、5 |
+| `staff_invitations`（ポッド） | 招待のリンク（トークンのハッシュ、宛先の暗号文、役割、72 時間） | `(shop_id, invitation_id)` | 4.1 |
 | `roles`・`staff_member_roles`（ポッド） | 役割と権限の一覧、割り当て | `(shop_id, role_id)` | 5.2 |
 | `collaborator_requests`（ポッド） | 依頼、求めた権限、状態 | `(shop_id, request_id)` | 4.4 |
-| `audit_events`（ポッド、月の区分） | 7.1 節の行 | `(shop_id, event_id)`、`(shop_id, action, at)` | 7 |
+| `audit_events`（ポッド、月の区分） | 7.1 節の行 | `(shop_id, event_id, at)`、`(shop_id, action, at)` | 7 |
+| `audit_chain_heads`（ポッド） | ショップの鎖の頭（直列にする）と S3 への写しの位置 | `(shop_id)` | 7（[data-model.md](data-model.md) の D-39） |
 | `identity_audit_events`・`operator_audit_events`（全体） | アカウント・運用者の監査 | `event_id` | 7.1 |
 | `plan_limits`（全体）・`plan_limits_replica`（ポッド） | プランの上限 | `plan` | 8.1 |
 | `merchant_subscriptions`・`billing_usage`・`merchant_invoices`・`merchant_invoice_lines`（全体） | 購読、利用量（冪等キー）、請求と行 | `(shop_id, period)` | 8.2 |

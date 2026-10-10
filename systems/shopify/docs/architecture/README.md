@@ -1,6 +1,6 @@
 # Architecture: Shopify
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節）。表と置き場所の索引は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節）。データモデルの正本（規約、ER 図、表の目録、置き場所）は [data-model.md](data-model.md) と [data-model/](data-model/) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -395,13 +395,28 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **品質と運用**：
   - 各領域の文書の「テスト」「data-model への項目」の提案を反映した。[quality.md](../quality.md) に、性質と決定表の一覧（2.2.2 節）、漏れの経路の表の行、判定基準、Epic の合否基準を足した。
   - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[flash-sale-operations.md](../runbooks/flash-sale-operations.md)、[shop-move.md](../runbooks/shop-move.md)、[oversell-or-paid-without-order.md](../runbooks/oversell-or-paid-without-order.md)）と計画のものに分けて一覧にし、2 節に新しいフラグ（`ops.inventory_item_sales_enabled` ほか）を足した。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。
+  - 表と置き場所は [data-model.md](data-model.md)（その後のデータモデルの工程で正本にした。下の「決定（2026-10-10、データモデル）」）。
 - **数値の正本**：
   - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
   - 引き当ての期限 15 分（フラッシュセールのショップ 10 分）と枠（既定 1、セール 32、1〜64）は [ADR-0004](../decisions/0004-inventory-reservation-model.md)・[ADR-0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md)。許可証 15 分は [ADR-0025](../decisions/0025-queue-pass-tokens.md)。
   - 関数の上限（燃料 1,000 万、メモリー 10 MiB、入力 128 KiB、出力 20 KiB、1 段 50ms）は [ADR-0008](../decisions/0008-extension-sandbox-wasm.md)。Admin API の費用（1 クエリ 1,000、回復 100・200・1,000/秒、容量はその 10 倍）は [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)。Webhook の送り直し（4 時間に 8 回、1・4・10・20・30・45・60・70 分）は [ADR-0061](../decisions/0061-webhook-delivery-and-signing.md)。KeyValueStore の熱い集まり（4 MB、3.5 MB で外し始め、固定の枠 1 MB）は [ADR-0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)。
   - 負荷と費用のモデルは [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-10、データモデル）
+
+[data-model.md](data-model.md) を、索引からデータモデルの正本に書き直した。規約（ID、テナントと RLS、全体とポッド、金額、税、バージョン、分割・保持・削除、暗号化）、全体の ER 図とチェックアウトから配送までの道筋の図、[data-model/](data-model/) の 19 の領域のファイル（Aurora の 205 表の列・キー・索引・CHECK・RLS・分割・保持・S1 の量と、ER 図 20 個）と、Aurora の外の置き場所（[stores.md](data-model/stores.md)）を持つ。名前と列の食い違いは data-model の 7 節（D-1〜D-41）で決め、領域の文書を直した。ADR の決定は変えていない。
+
+アーキテクチャに関わる次の 2 つは、PM の方針（法務でない判断は推奨の案）により推奨の案で決め、ADR に注記した。
+
+- **ポッドから全体の待合室への受け渡し（D-16）**：待合室（全体の面）は、ポッドのセールの設定（開始・終わり、`rate_cap`、`k`・`q`）と在庫の予算の材料（`U = Σavailable`、`R = Σreserved`、5 秒ごと）を要るが、[flash-sales-and-queueing.md](flash-sales-and-queueing.md) の 5.4 節は「DB の読み出しの写しから」と書くだけで、経路が ADR-0002 の P1〜P5 にない。
+  - **決定：案 a（推奨）**。P3（各ポッドが SNS へ出したものを全体で集める）に含める。ポッドの `workers` が `sale/config`・`sale/budget` の事象を出し、`waiting-room` が全体の `waiting_room_sales` と Valkey の `wr:{<sale_id>}:budget` に当てる。値は ID と数だけで、全体の面はショップのデータを持たない。[ADR-0002](../decisions/0002-pods-and-shop-placement.md) の P3 に注記した。
+  - 案 b：P6 として新しい経路を足す（ADR-0002 を直す）。中身は案 a と同じで、名前だけが増える。
+  - 案 c：`waiting-room` がポッドの読み出しの写しを直接読む。「1 つの要求は 1 つのポッドだけ」と全体の面の分離に反するので外した。
+- **X1 の発見の索引（D-6）**：[ADR-0003](../decisions/0003-tenancy-and-rls.md) は「`shop_id` を主キーと索引の先頭に置く」とするが、領域の文書の引き当ての掃除・inbox・照会の予定は `shop_id` を先頭にしない部分索引（`(expires_at) WHERE state = 'reserved'` など）を置いていた。
+  - **決定：案 a（推奨）**。決めた表の部分索引だけを例外にし、その索引は `sys` の `SECURITY DEFINER` の関数（ショップの ID だけを返す）からだけ使う。作業はショップごとに `SET LOCAL` して本体を読む（data-model の 3.4 節の一覧）。[ADR-0003](../decisions/0003-tenancy-and-rls.md) の X1 に、表の一覧と規則を注記した。
+  - 案 b：例外を作らず、作業がショップを全部回す。1 秒ごとの作業（inbox、照会）でポッドの 1.25 万ショップを回すのは重い。
+- **写しの表を足した（D-8）**：P5 の写しに、為替・通貨・言語・署名の公開鍵・関数・保持と保全と削除の方針を足した。どれも ADR-0003 の注記の「全体の写し（`*_replica`）」の区分の中で、経路は P5 のまま。
 
 ### 残る未解決事項（2026-10-10）
 
@@ -444,7 +459,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [webhooks.md](webhooks.md) | 話題、購読、配信（署名、送り直し、順序なし、重複）、隔離した egress、購読の停止、照合の勧め | [0061](../decisions/0061-webhook-delivery-and-signing.md)、[0062](../decisions/0062-webhook-egress-and-payload-custody.md) | セキュリティ、Ops | E14 |
 | [merchant-admin-and-staff.md](merchant-admin-and-staff.md) | 管理画面、スタッフのアカウントと招待、権限の一覧と役割、SSO、監査ログ、ショップの開設の審査（法務の L8・L10）、顧客のデータの削除（法務の L3） | [0063](../decisions/0063-staff-identity-2fa-sso-and-collaborators.md)、[0064](../decisions/0064-permissions-roles-and-audit-log.md)、[0065](../decisions/0065-merchant-billing-plans-and-usage.md) | セキュリティ | E17 |
 | [security.md](security.md) | 脅威モデル、トークンと秘密、暗号化と鍵、個人のデータの扱い、決済の範囲（法務の L7）、ボットと不正、監査、開示の請求の手順 | [0066](../decisions/0066-encryption-and-key-layout.md)、[0067](../decisions/0067-checkout-script-integrity-and-card-testing.md)、[0068](../decisions/0068-data-classes-retention-and-operator-access.md) | セキュリティ | E1、E17、E18 |
-| [data-model.md](data-model.md) | データモデルの索引（領域ごとの表と置き場所、Valkey の鍵、S3 のパス、SNS・SQS の話題）。ER 図の全体は後で足す | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本：規約、全体の ER 図と道筋、横断の不変条件。[data-model/](data-model/) に領域ごとの表の目録と ER 図、Aurora の外の置き場所（Valkey の鍵、S3 のパス、SNS・SQS、Webhook の本文、関数の入出力、Loom の IR） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、ポッドの Terraform のモジュール、全体の面、エッジ、egress、DR（大阪）、段階を上げる基準 | [0069](../decisions/0069-accounts-network-and-pod-groups.md)、[0070](../decisions/0070-edge-distributions-waf-and-origin-selection.md)、[0071](../decisions/0071-osaka-dr-and-stage-up-criteria.md) | Ops | E1、E18 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、ショップとポッドのラベル、SLI の計測、合成監視、実ユーザーの計測 | [0072](../decisions/0072-telemetry-pipeline-and-shop-cardinality.md)、[0073](../decisions/0073-correctness-monitors-and-independent-canary.md) | Ops | E1、E18 |
 | [capacity.md](capacity.md) | 負荷のモデル（ストアフロント、チェックアウト、フラッシュセール、Admin API、Webhook）、部品ごとの必要量、ポッドの大きさ、費用のモデル、負荷試験 | [0074](../decisions/0074-pod-size-tiers-and-pre-scaling.md) | Ops | E18 |

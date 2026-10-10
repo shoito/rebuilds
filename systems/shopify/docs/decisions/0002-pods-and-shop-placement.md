@@ -54,6 +54,8 @@ S3 で 500 万のショップ、注文の最大 5,000 件/秒を見込む（[arc
 
 > 2026-10-10 の注記：統合の工程で P5 を足した（ADR-0010）。また、全体の `webhook-dispatcher` は、ポッドが作った Webhook の本文を暗号化した SQS で受けて送るが、本文を保存しない（SQS の保持の中だけ）。「全体の面はショップのデータを持たない」は「保存しない（運ぶだけ）」と読む（[ADR-0062](0062-webhook-egress-and-payload-custody.md)）。
 
+> 2026-10-10 の注記：データモデルの工程で、P3 に待合室への受け渡しを含めた。ポッドの `workers` は、フラッシュセールの設定（開始・終わり、`rate_cap`、`k`・`q`、許可証の期限）を `sale/config` の事象で、在庫の予算の材料（`U = Σavailable`、`R = Σreserved`）を `sale/budget` の事象で 5 秒ごとに SNS へ出す。全体の `waiting-room` は、それを全体の `waiting_room_sales` と Valkey の `wr:{<sale_id>}:budget` に当てる。運ぶ値はセール・ショップの ID と数だけで、全体の面はショップのデータを持たない。`waiting-room` はポッドの DB を直接読まない（[data-model.md](../architecture/data-model.md) の D-16）。
+
 ### ショップの移し替え
 
 1. **コピー**：移す先のポッドに、ショップの `shop_id` の行を表ごとにコピーする。コピーの開始の LSN を記録する。

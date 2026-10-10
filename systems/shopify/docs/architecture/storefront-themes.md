@@ -323,7 +323,7 @@ stateDiagram-v2
 ```
 
 - 保存は、テーマの全ファイルを検査・翻訳し、通れば不変の `theme_versions` の行（ファイルの内容のハッシュの一覧と IR）を作る。通らなければ保存しない（エラーの位置を返す）。
-- ショップは `published_theme_version_id` を 1 つ持つ。公開は、この列の 1 つの更新と outbox の `themes/publish` の事象（キャッシュの世代を上げる）で行う。公開の途中の状態はない。
+- ショップは `published_theme_version_id`（ポッドの `shop_settings` の列。[data-model.md](data-model.md) の D-3）を 1 つ持つ。公開は、この列の 1 つの更新と outbox の `themes/publish` の事象（キャッシュの世代を上げる）で行う。公開の途中の状態はない。
 - 公開中のテーマの編集は、新しいバージョンを作り、`published_theme_version_id` を進める（同じ公開の手順）。直前のバージョンへの戻しは、ID の書き戻しで行う。
 - 1 ショップ 20 テーマ、1 テーマ 100 バージョン（古いものから消す。公開中のものは消さない）。
 - 資産のファイルは内容のハッシュの URL（`/<brand>-assets/<shop_id>/<hash>/<name>`）で、`immutable` で配る。
@@ -395,7 +395,7 @@ sequenceDiagram
 | --- | --- | --- |
 | `themes` | `(shop_id, id)`、`name`、`role`（`draft`・`published`）、`source`（既定のテーマ、取り込み） | 7.2 |
 | `theme_versions` | `(shop_id, id)`、`theme_id`、`loom_version`、`loom_ir_version`、`files jsonb`（パス → 内容のハッシュ）、`ir_s3_key`、`script_hashes`、`created_by`、`created_at` | 7.2 |
-| `shops.published_theme_version_id` | 公開中のテーマのバージョン | 7.2 |
+| `shop_settings.published_theme_version_id`（ポッド） | 公開中のテーマのバージョン | 7.2 |
 | `shop_legal_settings` | 特定商取引法の表示の項目 | 8 |
 | `shop_script_allowlist` | 追加の配信元（20 まで） | 9 |
 | `app_embeds`（`app-registry`、全体） | アプリの埋め込みの配信元、種類、送信先と目的の宣言 | 9 |

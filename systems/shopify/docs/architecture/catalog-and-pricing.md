@@ -313,8 +313,8 @@ ADR-0016。
 | 表 | 中身 | 節 |
 | --- | --- | --- |
 | `products` | `(shop_id, id)`、`handle`（一意 `(shop_id, handle)`）、`title`、`body_html`、`product_type`、`vendor`、`tags text[]`、`status`、`tax_category`、`category_id`、`catalog_version bigint`、`created_at`、`updated_at` | 4.1 |
-| `product_options` | `(shop_id, product_id, position)`、`id`、`name`、`name_norm` | 4.1 |
-| `product_option_values` | `(shop_id, option_id, position)`、`id`、`value`、`value_norm` | 4.1 |
+| `product_options` | `(shop_id, option_id)`、一意 `(shop_id, product_id, position)`（遅延）、`name`、`name_norm`（[data-model.md](data-model.md) の D-31） | 4.1 |
+| `product_option_values` | `(shop_id, value_id)`、一意 `(shop_id, option_id, position)`（遅延）、`value`、`value_norm` | 4.1 |
 | `product_variants` | `(shop_id, id)`、`product_id`、`option_value_ids uuid[]`（一意 `(shop_id, product_id, option_value_ids)`）、`price_amount bigint`、`compare_at_amount bigint`、`compare_at_basis`、`sku`、`barcode`、`weight_g`、`requires_shipping`、`inventory_policy`、`inventory_item_id`、`position` | 4.1、9.1 |
 | `variant_price_history` | `(shop_id, variant_id, changed_at)`、`price_amount`、`compare_at_amount`。2 年 | 9.1 |
 | `product_media` | `(shop_id, id)`、`product_id`、`kind`、`s3_key`、`state`、`alt`、`width`、`height`、`position` | 6 |

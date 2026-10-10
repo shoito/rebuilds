@@ -294,9 +294,10 @@ flowchart LR
 | `flash_sale_items`（ポッド） | 対象の品目、枠の数、品目ごとの上限 | `(shop_id, sale_id, inventory_item_id)` | 4、8 |
 | `flash_sale_steps`（ポッド） | 段の作業と結果 | `(shop_id, sale_id, step)` | 4 |
 | `queue_pass_redemptions`（ポッド） | `jti`、チェックアウト、セッションのハッシュ、時刻 | `(shop_id, jti)` 一意 | 6 |
-| `purchase_limit_counters`（ポッド） | 鍵の種類、鍵のハッシュ、`reserved`、`used`、`overage` | `(shop_id, sale_id, key_type, key_hash)` | 8 |
+| `purchase_limit_counters`（ポッド） | 上限の範囲（`scope_id`：セールの全体か品目）、鍵の種類、鍵のハッシュ、`limit_qty`、`reserved`、`used`、`overage` | `(shop_id, sale_id, scope_id, key_type, key_hash)`（[data-model.md](data-model.md) の D-33） | 8 |
 | `purchase_limit_reservations`（ポッド） | チェックアウト、鍵、数、状態、期限 | `(shop_id, checkout_id, attempt, key_type)` | 8 |
 | `flash_sale_audit`（全体） | 種の約束のハッシュ、公開した種、並べ替えのハッシュ、受け入れの記録の要約 | `(sale_id)` | 5.3 |
+| `waiting_room_sales`（全体） | `waiting-room` が読むセールの設定と状態（ポッドの `flash_sales` の写し。ショップのデータを持たない） | `(sale_id)` | 5（[data-model.md](data-model.md) の D-16） |
 | Valkey（全体、待合室） | `wr:{sale}:sid:{sid_hash}`（券）、`wr:{sale}:seq`、`wr:{sale}:pre`（`v` の並び）、`wr:{sale}:admitted`、`wr:{sale}:used:{ticket_id}` | 失ってよい（閉じる側に倒す） | 5 |
 | KeyValueStore | 許可証の鍵（`kid` → 鍵）、セールの有効の印（ショップ → `sale_id`） | — | 6 |
 | S3 | 待合室のページ（静的） | — | 5.1 |

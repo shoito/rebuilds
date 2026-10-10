@@ -291,7 +291,7 @@ stateDiagram-v2
 | `discounts` | 種類、種別、方式、値、対象、条件、期間、状態、`combines_with`、上限、`version` | `(shop_id, discount_id)`、`(shop_id, status, starts_at)` | 4 |
 | `discount_versions` | 定義のバージョンの写し（写しが参照する） | `(shop_id, discount_id, version)` | 4.2 |
 | `discount_codes` | コード（正規化）、割引 | `(shop_id, code_normalized)` 一意 | 4.2 |
-| `discount_targets` | 対象の商品・バリエーション・コレクション | `(shop_id, discount_id, target_type, target_id)` | 4.1 |
+| `discount_targets` | 対象の商品・バリエーション・コレクションと役割（`applies`・`buy`・`get`） | `(shop_id, discount_id, role, target_type, target_id)`（[data-model.md](data-model.md) の D-14） | 4.1 |
 | `discount_usage_slots` | `remaining`、`reserved`、`used`、`overage` | `(shop_id, discount_id, slot_no)` | 9 |
 | `discount_customer_usage` | 買い手の鍵のハッシュ、`reserved`、`used` | `(shop_id, discount_id, customer_key_hash)` | 9 |
 | `checkout_discount_reservations` | チェックアウト、試行、割引、枠、状態、期限 | `(shop_id, checkout_id, attempt, discount_id)` | 9 |

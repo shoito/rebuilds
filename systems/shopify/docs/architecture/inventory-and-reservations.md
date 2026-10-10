@@ -326,9 +326,9 @@ flowchart TD
 | `locations` | 名前、住所の都道府県、種類（倉庫・店舗）、有効 | `(shop_id, location_id)` | 7 |
 | `location_priority` | 拠点の優先の順 | `(shop_id, position)` | 7 |
 | `location_region_rules` | 都道府県 → 使える拠点 | `(shop_id, prefecture_code, location_id)` | 7 |
-| `inventory_items` | 品目、方針（`deny`・`continue`）、`tracked`、重さ、`size_class` | `(shop_id, inventory_item_id)` | 8 |
+| `inventory_items` | 品目、バリエーション、`size_class`（方針と重さの正本はバリエーションの `inventory_policy`・`weight_g`。[data-model.md](data-model.md) の D-4） | `(shop_id, inventory_item_id)` | 8 |
 | `inventory_levels` | `on_hand`、`unavailable_*`、バージョン | `(shop_id, location_id, inventory_item_id)` | 4.1 |
-| `inventory_slots` | `available`、`reserved`、`committed`、CHECK | `(shop_id, location_id, inventory_item_id, slot_no)` | 4.1、6 |
+| `inventory_slots` | `available`、`reserved`、`committed`、`policy_deny`（方針の写し）、CHECK `NOT policy_deny OR available >= 0` | `(shop_id, location_id, inventory_item_id, slot_no)` | 4.1、6 |
 | `reservations` | チェックアウト、試行、拠点、品目、枠、数、状態、期限、注文 | `(shop_id, reservation_id)`、`(shop_id, checkout_id, attempt)`、部分索引 `(expires_at) WHERE state = 'reserved'` | 5 |
 | `inventory_movements`（月ごとに分割） | 理由のコード、差分、参照、主体 | `(shop_id, created_at, movement_id)`、`(shop_id, inventory_item_id, created_at)` | 9 |
 | `inventory_daily_snapshots` | 日次の `on_hand` の写し | `(shop_id, snapshot_date, location_id, inventory_item_id)` | 10 |

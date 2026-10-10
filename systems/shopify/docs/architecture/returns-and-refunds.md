@@ -209,7 +209,7 @@ stateDiagram-v2
 | `return_policies` | 受付の期間、対象外の品目の印、理由の一覧 | `(shop_id)` | 3 |
 | `refunds` | 起点（返品、取り消し、チェックアウト、入金）、額、送料の返金、返品の手数料、状態、冪等キー、`provider_ref`、`manual_settlement` | `(shop_id, refund_id)`、`(shop_id, order_id)`、`(shop_id, checkout_id)` | 7 |
 | `refund_lines` | 返す単位（行、単位の番号、`paid_amount`） | `(shop_id, refund_id, line_id, unit_no)` | 5 |
-| `refund_tax_lines` | 税率、返す対価、`independent` の税額、`recompute` の税額、選んだ方式 | `(shop_id, refund_id, tax_rate)` | 6 |
+| `refund_tax_lines` | 税の区分と税率（`rate_bp`）、返す対価、`independent` の税額、`recompute` の税額、選んだ方式 | `(shop_id, refund_id, tax_category)`（[data-model.md](data-model.md) の D-5） | 6 |
 | `refund_events` | 状態の遷移 | `(shop_id, refund_id, seq)` | 7.3 |
 
 ## 11. テスト

@@ -213,7 +213,7 @@ ADR-0062。
 | 表・保存 | 中身 | 節 |
 | --- | --- | --- |
 | `webhook_subscriptions`（ポッド） | `(shop_id, id)`、`installation_id`、`topic`、`address`、`api_version`、`filter`、`include_fields`、`source`（宣言・API）、`state`（`active`・`disabled`）、`failing_since`、`disabled_at` | 4.2、6.2 |
-| `webhook_deliveries`（ポッド） | `(shop_id, delivery_id)`、`subscription_id`、`event_id`、`topic`、`state`（`pending`・`delivered`・`failed`・`unknown`）、`attempts`、`last_status`、`last_latency_ms`、`created_at`。日の分割で 7 日 | 6.1、7 |
+| `webhook_deliveries`（ポッド） | `(shop_id, delivery_id, event_at)`、一意 `(shop_id, subscription_id, event_id, event_at)`、`subscription_id`、`event_id`、`topic`、`state`（`pending`・`delivered`・`failed`・`unknown`）、`attempts`、`last_status`、`last_latency_ms`、`created_at`。事象の時刻 `event_at` の日の分割で 7 日（[data-model.md](data-model.md) の D-34） | 6.1、7 |
 | `webhook_events_index`（ポッド） | `(shop_id, event_id)`、`topic`、`resource_gid`、`resource_version`、`occurred_at`。7 日（照合の一覧） | 7 |
 | `apps.webhook_secret_ciphertext[2]`（全体） | 署名の秘密（今と前） | 5.3 |
 | SQS | `webhook-fanout`（ポッド）、`webhook-send-00`〜`15`（全体、SSE-KMS）、結果の返り（ポッド） | 6.1 |

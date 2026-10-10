@@ -317,7 +317,7 @@ sequenceDiagram
 | `payment_attempts` | チェックアウト、`attempt`、提供者、手段、金額、通貨、状態、`merchant_ref`、`provider_ref`、正規の結果、理由のコード、`authorization_expires_at` | `(shop_id, attempt_id)`、`(shop_id, checkout_id, attempt)` 一意、`(shop_id, provider, provider_ref)` | 5 |
 | `payment_attempt_events` | 結果の適用の記録 | `(shop_id, attempt_id, seq)` | 5.3 |
 | `payment_webhook_inbox` | 提供者、イベントの ID、種類、参照、本文（個人のデータを除く）、`processed_at` | `(shop_id, provider, event_id)` 一意、部分索引 `(received_at) WHERE processed_at IS NULL` | 6 |
-| `payment_inquiries` | 試行・返金、次の時刻、回数 | `(shop_id, target_id)`、`(next_at)` | 7 |
+| `payment_inquiries` | 試行・返金・確定・取り消し、次の時刻、回数 | `(shop_id, target_type, target_id)`（[data-model.md](data-model.md) の D-18）、`(next_at)` | 7 |
 | `payment_circuit_states`（Valkey、失ってよい） | （ショップ、提供者、手段）の失敗の数と状態 | `{<shop_id>}:pcb:<provider>:<method>` | 7 |
 | `shop_payment_providers` | ショップの提供者の設定、認証の情報（封筒の暗号。[ADR-0066](../decisions/0066-encryption-and-key-layout.md)）、確定の方式、`capture_before_expiry` | `(shop_id, provider)` | 4、8 |
 | `provider_capabilities`（コードの定数） | 4 節の能力の値 | — | 4 |
