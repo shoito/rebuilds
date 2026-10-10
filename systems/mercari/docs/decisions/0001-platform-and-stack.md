@@ -14,7 +14,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 - Terraform、OpenTelemetry、AWS AppConfig のフィーチャーフラグ、トランクベース開発
 - FORCE RLS と `SET LOCAL`、UUIDv7、transactional outbox
 
-この題材の主な論点（[README.md](../../README.md)）は、一品の一回の購入、取引の状態の機械と期限、預かりと台帳、日本語の検索と保存した検索、匿名の配送、T&S のパイプラインである。性質は次のとおり。
+この題材の主な論点（[README.md](../../README.md)）は、一品の一回の購入、取引のステートマシンと期限、預かりと台帳、日本語の検索と保存した検索、匿名の配送、T&S のパイプラインである。性質は次のとおり。
 
 - ほとんどは業務のアプリケーション（出品、取引、メッセージ、運用の画面）で、他の題材と同じ形である。
 - お金の正本（台帳）は、出品・取引と書き込みの形が違う。追記だけで、照合と監査が要り、変更の手続きを厳しくしたい。
@@ -77,7 +77,7 @@ ML：
 
 | 用途 | 置き場所 | 理由 |
 | --- | --- | --- |
-| 購入と取引の状態の機械、期限 | `packages/transactions` | 題材の核（[ADR-0002](0002-transaction-state-machine-and-single-purchase.md)） |
+| 購入と取引のステートマシン、期限 | `packages/transactions` | 題材の核（[ADR-0002](0002-transaction-state-machine-and-single-purchase.md)） |
 | 台帳、手数料、売上金の型 | `packages/ledger`、`packages/fees` | 題材の核（[ADR-0003](0003-escrow-and-double-entry-ledger.md)、[ADR-0004](0004-proceeds-model-under-payment-services-act.md)） |
 | 検索の順位付け、保存した検索の照合 | `packages/search`、`services/saved-search-matcher` | 題材の核（[ADR-0008](0008-search-engine-and-index.md)） |
 | T&S の規則のエンジン、審査の待ち行列、分類器の学習と評価 | `packages/trust-safety`、`ml/` | 題材の核（[ADR-0009](0009-trust-and-safety-pipeline-boundary.md)） |

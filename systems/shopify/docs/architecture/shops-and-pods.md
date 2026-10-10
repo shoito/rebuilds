@@ -9,7 +9,7 @@
 | [0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md) | エッジの KeyValueStore は全ホストの表ではなく、要求の多いホストだけを持つ「熱い集まり」にし、4 MB を上限に `shop-directory` が入れ替える。集まりにないホストは、全体の面の `edge-router` が `shop-directory` で引いてポッドへ中継する。既定のドメインはワイルドカードの証明書、独自のドメインは CloudFront のマルチテナントの配信のテナントと、CloudFront が管理する証明書（HTTP の検証）で受ける。全体の面からポッドへの読み出しの写し（アプリの定義、プラン）を、ポッドをまたぐ経路 P5 として足す |
 | [0011](../decisions/0011-shop-placement-and-rebalancing.md) | ポッドは種類（共有・隔離・見張り・専用）を持ち、容量を「ポッドの単位」で数える。新しいショップは、受け入れ中の共有のポッドのうち使用率の最も低いものへ置く。使用率 70% で受け入れを止め、85% で偏りの直しの移し替えを計画する。隔離のポッドは、予定したフラッシュセールのショップだけを置き、セールの前に大きさを上げてから移す |
 | [0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md) | `shop-mover` は、ショップごとの行の絞り込みを持つ公開（`WHERE (shop_id = …)`）と専用の論理レプリケーションのスロットで変更を追いかける。停止は、全書き込みのトランザクションが取るショップの共有のアドバイザリーロックを、排他で取って印を書く形にする。照合は、停止の前の全量の照合と、停止の中の「変わった行だけ」の照合に分ける。切り替えの後の古いポッドは、15 分の間、そのショップの要求を新しいポッドへ中継する |
-| [0013](../decisions/0013-shop-lifecycle-and-data-deletion.md) | ショップのライフサイクルを `trial`・`active`・`frozen`・`closed`・`deleting`・`deleted` の状態の機械にし、`shop-directory` が正本を持つ。閉店から 90 日はデータを残して再開でき、その後に削除の作業（ポッドの行、S3、検索、Valkey、全体の行）を進める。法令で残す文書（領収書・注文の記録・監査ログ）は、`retained_until` まで、削除の対象から外す |
+| [0013](../decisions/0013-shop-lifecycle-and-data-deletion.md) | ショップのライフサイクルを `trial`・`active`・`frozen`・`closed`・`deleting`・`deleted` のステートマシンにし、`shop-directory` が正本を持つ。閉店から 90 日はデータを残して再開でき、その後に削除の作業（ポッドの行、S3、検索、Valkey、全体の行）を進める。法令で残す文書（領収書・注文の記録・監査ログ）は、`retained_until` まで、削除の対象から外す |
 
 運用の手順（隔離のポッドへの移し替えの段、移し替えの失敗）は [runbooks/](../runbooks/README.md) の 4・5 節、ポッドの大きさは [capacity.md](capacity.md)、ポッドの Terraform とネットワークは [infrastructure.md](infrastructure.md)、スタッフと請求は [merchant-admin-and-staff.md](merchant-admin-and-staff.md) にある。
 

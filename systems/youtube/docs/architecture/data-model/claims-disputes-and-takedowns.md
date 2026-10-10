@@ -1,6 +1,6 @@
 # Data model: 申し立て・異議・削除の申出
 
-[data-model.md](../data-model.md) の一部。規約はそちらの 3 節に従う。振る舞いは [copyright-claims-and-disputes.md](../copyright-claims-and-disputes.md)（4〜9 節）を正とする。決定は [ADR-0047](../../decisions/0047-claim-policies-territory-overlap-and-per-second-split.md)（方針、重なり、秒ごとの分け方）、[ADR-0048](../../decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md)（状態の機械と期限）、[ADR-0049](../../decisions/0049-takedown-cases-counter-notice-and-strikes.md)（削除の申出、反論の通知、strike）。削除の申出・反論の通知・strike の手続きは**法務の確認待ち（L1・L2）**で、この文書は枠組みの形だけを決める。
+[data-model.md](../data-model.md) の一部。規約はそちらの 3 節に従う。振る舞いは [copyright-claims-and-disputes.md](../copyright-claims-and-disputes.md)（4〜9 節）を正とする。決定は [ADR-0047](../../decisions/0047-claim-policies-territory-overlap-and-per-second-split.md)（方針、重なり、秒ごとの分け方）、[ADR-0048](../../decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md)（ステートマシンと期限）、[ADR-0049](../../decisions/0049-takedown-cases-counter-notice-and-strikes.md)（削除の申出、反論の通知、strike）。削除の申出・反論の通知・strike の手続きは**法務の確認待ち（L1・L2）**で、この文書は枠組みの形だけを決める。
 
 | 表 | スキーマ | 書く |
 | --- | --- | --- |

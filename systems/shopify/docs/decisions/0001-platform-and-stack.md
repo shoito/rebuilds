@@ -68,7 +68,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 | 用途 | 置き場所 | 理由 |
 | --- | --- | --- |
 | 在庫の引き当て | `packages/inventory` | 題材の核（[ADR-0004](0004-inventory-reservation-model.md)） |
-| チェックアウトの状態の機械と注文の作成 | `packages/checkout` | 題材の核（[ADR-0005](0005-checkout-state-machine-and-exactly-once-orders.md)） |
+| チェックアウトのステートマシンと注文の作成 | `packages/checkout` | 題材の核（[ADR-0005](0005-checkout-state-machine-and-exactly-once-orders.md)） |
 | 税と割引の計算 | `packages/tax`、`packages/discounts` | 題材の核 |
 | テーマの言語 | `packages/loom` | 題材の核（[ADR-0007](0007-theme-language-design.md)） |
 | 関数の砂場のホスト | `crates/function-runner` | 題材の核（[ADR-0008](0008-extension-sandbox-wasm.md)） |

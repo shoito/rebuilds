@@ -1,6 +1,6 @@
 # Data model: フロー・タイマー・承認・レコードのルール
 
-[data-model.md](../data-model.md) の一部。フローの定義と不変のバージョン、実行・ステップ・待ち、一括の処理、共有のタイマー、承認と代理、レコードのルール、外への呼び出しの結果と資格情報、抑えたトリガーを定義する。振る舞い（1 回の進み ＝ 1 トランザクション、実行の状態機械、承認の規則、上限と優先度）は [workflow-engine.md](../workflow-engine.md) を正とする。
+[data-model.md](../data-model.md) の一部。フローの定義と不変のバージョン、実行・ステップ・待ち、一括の処理、共有のタイマー、承認と代理、レコードのルール、外への呼び出しの結果と資格情報、抑えたトリガーを定義する。振る舞い（1 回の進み ＝ 1 トランザクション、実行のステートマシン、承認の規則、上限と優先度）は [workflow-engine.md](../workflow-engine.md) を正とする。
 
 - **ノードの効果・実行の状態・タイマーの消化と登録・outbox は 1 つのトランザクションで書く**（[ADR-0004](../../decisions/0004-workflow-and-sla-engine.md)、[ADR-0015](../../decisions/0015-flow-execution-and-timers.md)）。どの表も `version` の条件付きで更新する。
 - `flow_def`・`flow_version` は NULL の行（組み込みのフロー）を持つ。主キーは `id` だけ（[data-model.md](../data-model.md) の 3.3 節）。

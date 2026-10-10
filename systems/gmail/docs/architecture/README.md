@@ -273,7 +273,7 @@ flowchart TB
 | --- | --- | --- |
 | 管理の面の言語 | TypeScript（Hono＋Zod）：`jmap-api`、`push-*`、`accounts`、`admin-api`、`relay` | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 | メールの面と保存の言語 | Rust（Tokio）：`mx-edge`、`inbound-pipeline`、`spam-scorer`、`content-scanner`、`outbound-gate`、`mta-out`、`imap-server`、`mailstore`、`blob-packer`、`search-*` | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| SMTP・MIME | SMTP の状態の機械・待ち行列・配送は自前。コマンドの構文の層と MIME の解析は汎用のライブラリ（候補は PoC で選ぶ）を、自前の上限の層で包む | [ADR-0001](../decisions/0001-platform-and-stack.md) |
+| SMTP・MIME | SMTP のステートマシン・待ち行列・配送は自前。コマンドの構文の層と MIME の解析は汎用のライブラリ（候補は PoC で選ぶ）を、自前の上限の層で包む | [ADR-0001](../decisions/0001-platform-and-stack.md) |
 | 認証 | SPF・DKIM・DMARC・ARC の評価と署名は自前。暗号（RSA、Ed25519）と DNS の解決は汎用のライブラリ。DNSSEC を検証する再帰の解決は Route 53 Resolver | sender-authentication の領域 |
 | 選別 | 規則のエンジンと評判は自前。分類器の推論は ONNX Runtime（汎用の実行系）。学習は Python（オフライン、隔離したアカウント）。マルウェアの署名の検出は汎用のエンジン（ClamAV の類）と YARA の形の規則 | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) |
 | 配送の待ち行列 | S3 のスプール＋SQS（標準。受信は層で 2 つ）。送信は SQS の遅延と送り直し | 他の題材と同じ部品（[ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)） |

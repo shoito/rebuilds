@@ -9,7 +9,7 @@ date: 2026-09-27
 
 ## Context
 
-[ADR-0003](0003-trip-state-and-single-assignment.md) は、乗車の状態を Aurora の状態機械を正本にし、割り当てをドライバーごとの fencing token（`assignment_epoch`）と部分一意索引で 1 つに限ると決めた。細部（状態の一覧、epoch をいつ増やすか、ロックの順序、タイマーの形）は trips-lifecycle で決めるとした。
+[ADR-0003](0003-trip-state-and-single-assignment.md) は、乗車の状態を Aurora のステートマシンを正本にし、割り当てをドライバーごとの fencing token（`assignment_epoch`）と部分一意索引で 1 つに限ると決めた。細部（状態の一覧、epoch をいつ増やすか、ロックの順序、タイマーの形）は trips-lifecycle で決めるとした。
 
 決めることは次のとおり。
 

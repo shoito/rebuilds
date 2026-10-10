@@ -203,7 +203,7 @@ sequenceDiagram
 - 書き出しの作業は `ediscovery-exporter`（Fargate、X7 のロール）が、アカウントごとに文脈を設定して blob を読み、組み立てる。中身はタスクのメモリーと暗号化した一時のファイルだけで扱い、ログに出さない。
 - 書き出しの各ファイルの SHA-256 を目録に残し、`export.json` に担当と承認者を書く（証拠の連続性）。
 
-### 7.3 状態の機械（書き出し）
+### 7.3 ステートマシン（書き出し）
 
 ```mermaid
 stateDiagram-v2
@@ -288,7 +288,7 @@ stateDiagram-v2
 | directory `accounts.state` に `archived` を足す | 退職者 | 5 |
 | S3 `ediscovery/<tenant_id>/<matter_id>/results/<search_id>` | 検索の結果の `message_id` の一覧 | 7.1 |
 | directory `matter_searches` | 検索の記録（案件、担当、暗号化した IR、件数、状態）。2026-10-10 のデータモデルの工程で足した | 7.1 |
-| S3 `ediscovery-exports/<tenant_id>/<export_id>/…` と directory `exports` | 書き出しのファイル、目録、状態の機械 | 7.2、7.3 |
+| S3 `ediscovery-exports/<tenant_id>/<export_id>/…` と directory `exports` | 書き出しのファイル、目録、ステートマシン | 7.2、7.3 |
 | directory `legal_preservations` | 法務の手順の保全（テナントの外から掛ける）。法務の L4 の後に形を確定 | 8 |
 
 ## 13. テストと性質

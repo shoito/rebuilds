@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0010: リスティングは状態の機械（`draft`・`in_review`・`listed`・`snoozed`・`suspended`・`archived`）と、内容の改訂（`listing_revisions`）を分けて持つ。公開している改訂は 1 つで、重要な項目の編集は新しい改訂として審査を通ってから入れ替える。料金・カレンダー・規則は改訂に入れず、`listing_version` を上げる
+# ADR-0010: リスティングはステートマシン（`draft`・`in_review`・`listed`・`snoozed`・`suspended`・`archived`）と、内容の改訂（`listing_revisions`）を分けて持つ。公開している改訂は 1 つで、重要な項目の編集は新しい改訂として審査を通ってから入れ替える。料金・カレンダー・規則は改訂に入れず、`listing_version` を上げる
 
 > 2026-10-10 の注記：統合の工程で、料金の規則の変化は `listing_version` でなく `pricing_version` を上げると直した（[ADR-0029](0029-nightly-price-rules-and-discounts.md)、[ADR-0037](0037-quote-binding-and-idempotency.md)）。
 
@@ -18,7 +18,7 @@ date: 2026-10-10
 
 ## Options
 
-1. **状態の機械と改訂を分ける。重要な項目の編集は新しい改訂を審査してから入れ替え、他はすぐに入れ替える**
+1. **ステートマシンと改訂を分ける。重要な項目の編集は新しい改訂を審査してから入れ替え、他はすぐに入れ替える**
 2. 1 つの行を直接書き換え、変更のたびに公開の後の審査をかける
 3. 重要な項目の編集のたびに、リスティングを `in_review` に戻して検索から外す
 
@@ -50,4 +50,4 @@ date: 2026-10-10
 ## Confirmation
 
 - PROP-LST-001（公開の改訂は 1 つで書き換えない）、PROP-LST-002（審査の前の内容は出ない）、PROP-LST-007。
-- 状態の機械の遷移の全組の表駆動テスト。
+- ステートマシンの遷移の全組の表駆動テスト。

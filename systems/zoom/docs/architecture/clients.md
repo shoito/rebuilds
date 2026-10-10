@@ -19,7 +19,7 @@
 | [0021](../decisions/0021-web-client-browser-support.md) | 対応ブラウザは、Chrome・Edge・Firefox（と現行の ESR）・Safari（macOS・iOS・iPadOS）・Android の Chrome の最新 2 メジャー。機能の差は、参加の前に端末で調べて Actor に申告し、使えない機能を画面で示す |
 | [0022](../decisions/0022-on-device-media-processing.md) | 仮想背景とぼかしは MediaPipe の Selfie Segmenter を WebGPU（なければ WebGL）でワーカーの中で動かす。雑音の抑制はブラウザの既定を使い、「強い雑音の抑制」を選んだときだけ RNNoise（WASM）を AudioWorklet で動かす。端末の負荷を見て自動で下げる |
 | [0023](../decisions/0023-desktop-electron-mobile-native.md) | デスクトップは Electron で Web クライアントを包む。モバイルは Swift・Kotlin のネイティブで、自前でビルドした libwebrtc と libmediasoupclient、Rust の共通のコア（UniFFI）で作る |
-| [0024](../decisions/0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は、IO を持たないシグナリングの状態機械と、MLS・SFrame の鍵管理。Web は状態機械を TypeScript で持ち、鍵管理は同じ Rust を WASM で使う。2 つの状態機械は、同じ試験のベクトルを CI で通して揃える |
+| [0024](../decisions/0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は、IO を持たないシグナリングのステートマシンと、MLS・SFrame の鍵管理。Web はステートマシンを TypeScript で持ち、鍵管理は同じ Rust を WASM で使う。2 つのステートマシンは、同じ試験のベクトルを CI で通して揃える |
 
 ## 1. 目的と範囲
 
@@ -84,7 +84,7 @@
 ```
 main スレッド（React）
 ├─ UI：ギャラリー、話者、共有、チャット、参加者の一覧、主催者の操作
-├─ Signaling Client（TypeScript の状態機械。9 節）── WebSocket ──▶ Signaling Gateway
+├─ Signaling Client（TypeScript のステートマシン。9 節）── WebSocket ──▶ Signaling Gateway
 ├─ Media Layer（mediasoup-client の Device・Transport・Producer・Consumer）
 │    └─ RTCPeerConnection（ブラウザ）── UDP ──▶ Media Node
 ├─ Device Manager（マイク・カメラ・スピーカーの選択、切り替え、抜き差し）
@@ -219,13 +219,13 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 
 | crate | 中身 | Web | ネイティブ |
 | --- | --- | --- | --- |
-| `core-signaling` | シグナリングの状態機械（接続、`hello`・`resume`、`(epoch, seq)` の差分の適用、スナップショット、再接続の待ち）。IO を持たない | 使わない（TypeScript 版を使う） | 使う |
+| `core-signaling` | シグナリングのステートマシン（接続、`hello`・`resume`、`(epoch, seq)` の差分の適用、スナップショット、再接続の待ち）。IO を持たない | 使わない（TypeScript 版を使う） | 使う |
 | `core-e2ee` | OpenMLS（MLS のグループ、資格情報）と SFrame（[e2ee.md](e2ee.md)） | WASM にして `e2ee` のワーカーで使う | 使う |
 | `core-ffi` | UniFFI（[mozilla/uniffi-rs](https://github.com/mozilla/uniffi-rs)、0.32.2）で Swift・Kotlin の束縛を作る | — | 使う |
 | `core-wasm` | `wasm-bindgen` で `core-e2ee` を公開する | 使う | — |
 
-- 状態機械は「状態＋入力 → 新しい状態＋出力（送るメッセージ、タイマーの設定、UI への通知）」の純粋な関数にする。WebSocket、時計、乱数は外から入れる。同じ入力の列で、必ず同じ出力になる。
-- Web で状態機械を Rust にしないのは、UI（React）との結び付きが強く、WASM の境界を 1 メッセージごとに越える費用と、デバッグのしにくさに見合わないため。鍵管理は、暗号の実装を 1 つにするために Rust を使う（ADR-0003）。
+- ステートマシンは「状態＋入力 → 新しい状態＋出力（送るメッセージ、タイマーの設定、UI への通知）」の純粋な関数にする。WebSocket、時計、乱数は外から入れる。同じ入力の列で、必ず同じ出力になる。
+- Web でステートマシンを Rust にしないのは、UI（React）との結び付きが強く、WASM の境界を 1 メッセージごとに越える費用と、デバッグのしにくさに見合わないため。鍵管理は、暗号の実装を 1 つにするために Rust を使う（ADR-0003）。
 
 ### 9.2 試験のベクトル
 
@@ -236,7 +236,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 {
   "id": "resume-after-epoch-change-001",
   "schema_version": "v1",
-  "initial": { /* 状態機械の初期の状態（接続前） */ },
+  "initial": { /* ステートマシンの初期の状態（接続前） */ },
   "steps": [
     { "in": { "ws": "open" } },
     { "in": { "recv": { "t": "snap", "epoch": 7, "seq": 100, "body": { } } } },
@@ -253,7 +253,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 
 - ベクトルの作り方：
   - 手で書くもの：[signaling-and-meetings.md](signaling-and-meetings.md) の 7 節（再同期）と 12 節（障害）の各行。
-  - 生成するもの：TypeScript 版の状態機械を基準にし、fast-check で入力の列を作って期待値を記録する。夜間に 1 万本を作り、差が出たものを固定のベクトルに加える。
+  - 生成するもの：TypeScript 版のステートマシンを基準にし、fast-check で入力の列を作って期待値を記録する。夜間に 1 万本を作り、差が出たものを固定のベクトルに加える。
 - CI：スキーマのリポジトリの PR で、TypeScript 版と Rust 版の両方に全ベクトルを通す。どちらかが違う出力を出したら、マージしない。スキーマのバージョンを上げる PR は、1 つ前のバージョンのベクトルも通す。
 - 状態の比べ方は、要約（決めた項目だけ）で行う。実装の中の補助の状態は比べない。
 - E2EE のベクトル（RFC 9605 の試験のベクトル、MLS の試験のベクトル）は [e2ee.md](e2ee.md) の 14 節。
@@ -269,7 +269,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 | mediasoup-client と Media Node のバージョンの組み合わせの不一致 | 交渉に失敗する | バージョンの組み合わせを CI で固定する。Web は読み込み直しで新しいバージョンになる |
 | Electron の Chromium が古い | Web より機能が遅れる | Electron の安定版に 1 か月以内に追いつく |
 | libwebrtc の更新が遅れる（モバイル） | 脆弱性、ストアからの通知 | Chrome の milestone から 2 か月以内（8 節） |
-| TypeScript 版と Rust 版の状態機械の食い違い | 同じ会議でアプリだけ状態がずれる | 9.2 節のベクトル。本番では、再同期の回数をクライアントの種類ごとに監視する |
+| TypeScript 版と Rust 版のステートマシンの食い違い | 同じ会議でアプリだけ状態がずれる | 9.2 節のベクトル。本番では、再同期の回数をクライアントの種類ごとに監視する |
 
 ## 11. セキュリティ
 
@@ -284,9 +284,9 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 
 | レベル | 対象 | 道具 |
 | --- | --- | --- |
-| 単体 | 状態機械、端末の機能の判定、表示の大きさから層の上限、負荷の制御の規則 | Vitest、Rust の `cargo test` |
+| 単体 | ステートマシン、端末の機能の判定、表示の大きさから層の上限、負荷の制御の規則 | Vitest、Rust の `cargo test` |
 | 実装をまたぐ試験 | 9.2 節の試験のベクトル（TypeScript と Rust） | Vitest、`cargo test` |
-| 性質ベース | 任意の入力の列で、状態機械がスナップショットの後に `seq` を戻さない。どの列でも、最後の状態は Actor の `(epoch, seq)` の順の状態と一致する（signaling-and-meetings.md の PROP-SIG-001 のクライアントの側） | fast-check、`proptest` |
+| 性質ベース | 任意の入力の列で、ステートマシンがスナップショットの後に `seq` を戻さない。どの列でも、最後の状態は Actor の `(epoch, seq)` の順の状態と一致する（signaling-and-meetings.md の PROP-SIG-001 のクライアントの側） | fast-check、`proptest` |
 | E2E | 参加、音声・映像・共有、端末の切り替え、仮想背景、雑音の抑制、再接続 | Playwright（Chromium、Firefox、WebKit）と、実機の Safari（macOS の safaridriver、iOS の実機） |
 | ネットワークの劣化 | [codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 11.1 節 | `tc netem`、Playwright |
 | a11y | 6 節 | `@axe-core/playwright`、手動 |
@@ -313,7 +313,7 @@ Dedicated Worker「e2ee」：OpenMLS（WASM）＋ SFrame（WASM）。RTCRtpScrip
 | E5 | `a11y-meeting-ui` | 6 節 |
 | E13 | `desktop-electron-shell` | 7 節 |
 | E13 | `desktop-screen-share-audio` | 7 節のシステムの音声 |
-| E13 | `core-signaling-rust` | 9.1 節の状態機械の Rust 版 |
+| E13 | `core-signaling-rust` | 9.1 節のステートマシンの Rust 版 |
 | E13 | `signaling-test-vectors` | 9.2 節。ベクトルの形式、生成、CI |
 | E13 | `libwebrtc-build-pipeline` | 8 節。libwebrtc と libmediasoupclient のビルドと追従 |
 | E13 | `mobile-ios-app` ・ `mobile-android-app` | 8 節 |
@@ -332,7 +332,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 - **雑音の抑制**：既定はブラウザ。強い抑制で RNNoise（ADR-0022）。
 - **デスクトップ**：Electron（ADR-0023）。
 - **モバイル**：ネイティブ＋自前の libwebrtc＋libmediasoupclient＋Rust の共通のコア（ADR-0023）。
-- **Web の状態機械**：TypeScript のまま。Rust 版と試験のベクトルで揃える（ADR-0024）。
+- **Web のステートマシン**：TypeScript のまま。Rust 版と試験のベクトルで揃える（ADR-0024）。
 - **処理しない映像**：仮想背景が止まったら、処理しない映像を送らず、カメラを止める。
 - **仮想背景の基準の端末**：4 年前の中位のノート PC とする。E5 の着手で、この条件に合う機種を QA が 1 台選んで固定する。IoU の閾値 0.90 は QA が承認した値（[quality.md](../quality.md)）。
 - **デスクトップの Linux 版**：MVP では作らない（[roadmap.md](../roadmap.md) の延期の一覧）。
@@ -345,7 +345,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 | Chrome の worker での `MediaStreamTrackProcessor` の動作と、代わりの経路（Firefox は常に）の性能 | E5 の `virtual-background` で計測する。Firefox は持たず、Safari は 18 から持つ（2.2 節） |
 | RNNoise より新しい雑音の抑制のモデル（より大きい DNN）を使うか | E5 で、CPU と MOS の推定で比べる |
 | モバイルの仮想背景を OS の API にするか MediaPipe にするか | E13 の着手時 |
-| Web の状態機械も Rust（WASM）にするか | ベクトルの食い違いが続くなら見直す。E13 の後に判断する |
+| Web のステートマシンも Rust（WASM）にするか | ベクトルの食い違いが続くなら見直す。E13 の後に判断する |
 
 ## 15. quality.md・runbooks・data-model への項目
 
@@ -353,7 +353,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 - ブラウザの組み合わせの範囲（2.1 節）と、実機の Safari の試験の頻度。
 - 仮想背景の性能の予算（5.1 節）と、基準の端末。IoU の閾値。
-- 状態機械の試験のベクトルの数と、夜間の生成の本数（9.2 節）。
+- ステートマシンの試験のベクトルの数と、夜間の生成の本数（9.2 節）。
 - a11y の自動の検査の範囲と、手動の確認の時期。
 - 参加の速さのクライアントの区間（`Device.load`、モデルの読み込み）。
 

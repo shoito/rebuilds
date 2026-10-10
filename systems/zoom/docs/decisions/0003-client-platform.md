@@ -35,9 +35,9 @@ MVP の主なクライアントは Web である。社外の参加者が、イ�
   - 仮想背景とぼかし：カメラの映像を `MediaStreamTrackProcessor` などで取り出し、端末の上の分割のモデル（WebGPU・WebGL）で処理してから送る。映像はサーバーへ送る前に処理を終える。
   - E2EE：Encoded Transform（[WebRTC Encoded Transform](https://www.w3.org/TR/webrtc-encoded-transform/)、2026-09-27 に確認した時点で Working Draft）の `RTCRtpScriptTransform` で、符号化した後のフレームを SFrame で暗号化する（[ADR-0004](0004-encryption-and-e2ee.md)、[ADR-0028](0028-sframe-encoded-transform-and-dependency-descriptor.md)）。対応ブラウザの最新 2 メジャーは、すべて `RTCRtpScriptTransform` を持つ（[ADR-0021](0021-web-client-browser-support.md)）。
 - **ネイティブのアプリは、libwebrtc と、Rust の共通のコアで作る。**
-  - 共通のコアの範囲は、シグナリングのクライアントの状態機械と、E2EE の鍵管理（MLS）である。UI とメディアの経路は、プラットフォームごとに書く。
+  - 共通のコアの範囲は、シグナリングのクライアントのステートマシンと、E2EE の鍵管理（MLS）である。UI とメディアの経路は、プラットフォームごとに書く。
   - E2EE の鍵管理の実装（OpenMLS）は、Web でも WebAssembly にして同じものを使う。暗号の実装を 1 つにする。
-  - シグナリングの状態機械は、Web（TypeScript）とネイティブ（Rust）で 2 つになる。プロトコルのスキーマを 1 か所で定義して両方の型を生成し、同じ試験のベクトル（メッセージの列と、期待する状態）を両方に通す。
+  - シグナリングのステートマシンは、Web（TypeScript）とネイティブ（Rust）で 2 つになる。プロトコルのスキーマを 1 か所で定義して両方の型を生成し、同じ試験のベクトル（メッセージの列と、期待する状態）を両方に通す。
   - デスクトップは Electron で Web を包み、モバイルはネイティブにする（[ADR-0023](0023-desktop-electron-mobile-native.md)）。共通のコアと試験のベクトルの形は [ADR-0024](0024-shared-rust-core-and-test-vectors.md)。
 - 2 は、帯域の制御と符号器を自由にできる。ただし、エコーの除去・ジッタバッファ・帯域の推定を自分で作り、CPU の使用量が増え、E2E の試験の量も増える。標準の WebRTC の上で目標（NFR-001〜003）を満たせないと分かったときに、別の ADR で見直す。
 - 3 は、デスクトップでは有力だが、モバイルでは電池と OS のバックグラウンドの制約（通話の扱い）に合わない。
@@ -56,4 +56,4 @@ MVP の主なクライアントは Web である。社外の参加者が、イ�
 
 - E2E の試験：Chrome・Edge・Firefox・Safari の最新 2 バージョンで、参加、音声・映像・画面共有、帯域の低下の試験を、CI で回す（Playwright と、偽のカメラ・マイクの入力）。
 - ネットワークの劣化の試験：`tc netem` で損失・揺らぎ・帯域を変え、NFR-001〜003・NFR-009 を満たすことを確かめる。
-- 共通の試験のベクトル：シグナリングの状態機械の TypeScript 版と Rust 版が、同じベクトルで同じ状態になる（ネイティブのアプリを作る Epic から）。
+- 共通の試験のベクトル：シグナリングのステートマシンの TypeScript 版と Rust 版が、同じベクトルで同じ状態になる（ネイティブのアプリを作る Epic から）。

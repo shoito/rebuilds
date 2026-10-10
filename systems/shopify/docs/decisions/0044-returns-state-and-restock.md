@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0044: 返品は、受け付け → 承認 → 到着 → 検品 → 返金 の状態の機械で持つ。在庫への戻しは検品で行ごとに「戻す」「破損」「戻さない」を選び、戻すなら `on_hand` と `available` を、破損なら `on_hand` と `unavailable` を増やす。返金は返品と別の行（`refunds`）にし、冪等キー `<refund_id>:refund` で提供者に依頼する。`refund_required` のチェックアウトの返金も同じ行と処理を使う
+# ADR-0044: 返品は、受け付け → 承認 → 到着 → 検品 → 返金 のステートマシンで持つ。在庫への戻しは検品で行ごとに「戻す」「破損」「戻さない」を選び、戻すなら `on_hand` と `available` を、破損なら `on_hand` と `unavailable` を増やす。返金は返品と別の行（`refunds`）にし、冪等キー `<refund_id>:refund` で提供者に依頼する。`refund_required` のチェックアウトの返金も同じ行と処理を使う
 
 ## Context
 

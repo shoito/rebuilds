@@ -83,7 +83,7 @@
 | TURN | coturn（UDP・TCP 3478、TLS 443） | [ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md) |
 | Web クライアント | React＋ブラウザの WebRTC＋mediasoup-client | [ADR-0003](../decisions/0003-client-platform.md)、[ADR-0021](../decisions/0021-web-client-browser-support.md) |
 | E2EE | SFrame（RFC 9605）と MLS（RFC 9420）。MLS は OpenMLS（Rust）を WebAssembly にして使う | [ADR-0004](../decisions/0004-encryption-and-e2ee.md)、[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)〜[ADR-0030](../decisions/0030-security-code-and-e2ee-feature-limits.md) |
-| アプリ（MVP の後） | デスクトップは Electron、モバイルはネイティブ。共通のコアは Rust（シグナリングの状態機械と E2EE の鍵管理） | [ADR-0023](../decisions/0023-desktop-electron-mobile-native.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md) |
+| アプリ（MVP の後） | デスクトップは Electron、モバイルはネイティブ。共通のコアは Rust（シグナリングのステートマシンと E2EE の鍵管理） | [ADR-0023](../decisions/0023-desktop-electron-mobile-native.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md) |
 | 音声認識 | Amazon Transcribe streaming（ja-JP、東京）を ASR Adapter の裏で | [ADR-0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) |
 | 認証 | Better Auth を自前でホスト（Slack の題材と同じ） | [ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md) |
 | DB | Aurora PostgreSQL 18。組織に属する表は FORCE RLS | 他の題材と同じ（[ADR-0058](../decisions/0058-tenant-tables-with-force-rls.md)） |
@@ -121,7 +121,7 @@
 | [0021](../decisions/0021-web-client-browser-support.md) | 対応ブラウザは主要な 4 つの最新 2 メジャーにし、機能の差は参加の前に端末で調べて Meeting Actor に申告する |
 | [0022](../decisions/0022-on-device-media-processing.md) | 仮想背景は MediaPipe の Selfie Segmenter を WebGPU でワーカーの中で動かし、強い雑音の抑制は RNNoise を AudioWorklet で動かす |
 | [0023](../decisions/0023-desktop-electron-mobile-native.md) | デスクトップアプリは Electron で Web クライアントを包み、モバイルアプリはネイティブと自前の libwebrtc で作る |
-| [0024](../decisions/0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は IO を持たない状態機械と鍵管理にし、TypeScript の状態機械とは同じ試験のベクトルで揃える |
+| [0024](../decisions/0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は IO を持たないステートマシンと鍵管理にし、TypeScript のステートマシンとは同じ試験のベクトルで揃える |
 | [0025](../decisions/0025-recording-per-track-capture-and-offline-compose.md) | 録画は SFU から producer ごとの生の RTP を受けて書き、1 本の動画への合成は会議の後に行う |
 | [0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) | 日本語の音声認識は、S1 では Amazon Transcribe の ja-JP のストリーミングを話者ごとの流れで使い、エンジンは ASR Adapter の裏に置く |
 | [0027](../decisions/0027-capture-consent-and-indicators.md) | 録画・文字起こしの間は、本人が同意するまで話させない。表示できないクライアントは入れず、E2EE の会議では 3 か所で開始を拒否する |

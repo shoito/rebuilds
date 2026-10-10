@@ -14,7 +14,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0043](../decisions/0043-refund-calculation-from-unit-allocations.md) | 返金の額は返す単位の `paid_amount` の和＋送料の返金−返品の手数料。割引を取り戻さない。返金の税は独立と再計算の 2 方式を計算できる形にし、選択は法務の確認（L4）の後 |
-| [0044](../decisions/0044-returns-state-and-restock.md) | 返品は受け付け → 承認 → 到着 → 検品 → 閉じるの状態の機械。検品で行ごとに戻し方。返金は別の行で、冪等キーと照会で確定。`refund_required` も同じ処理 |
+| [0044](../decisions/0044-returns-state-and-restock.md) | 返品は受け付け → 承認 → 到着 → 検品 → 閉じるのステートマシン。検品で行ごとに戻し方。返金は別の行で、冪等キーと照会で確定。`refund_required` も同じ処理 |
 
 ## 1. 範囲
 

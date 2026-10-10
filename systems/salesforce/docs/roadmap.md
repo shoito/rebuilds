@@ -188,7 +188,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `record-triggered-flows` | 保存の前（3a）・後（7b）のフロー、実行の順、条件、`DT-FLW-001`、`$Origin`（[ADR-0026](decisions/0026-record-triggered-flow-order-and-recursion.md)） |
 | `scheduled-paths-and-async` | 予定の経路（行の書き込み、基準の項目の変更、条件の評価し直し）と非同期の経路（`flow_async_runs`） |
 | `rollup-summaries` | 積み上げ集計：差分の直し（`DT-RUS-001`）、集計し直し、`rollup_stale`、`building`、整合の検査、FLS（[ADR-0027](decisions/0027-roll-up-summaries-incremental-with-reconciliation.md)） |
-| `approval-processes` | 承認のプロセスの定義、申請・応答・取り消し・付け替え、状態機械（`DT-APR-001`）、ロック（`DT-APR-002`）、承認待ちの一覧（[ADR-0028](decisions/0028-approval-processes-and-record-locks.md)） |
+| `approval-processes` | 承認のプロセスの定義、申請・応答・取り消し・付け替え、ステートマシン（`DT-APR-001`）、ロック（`DT-APR-002`）、承認待ちの一覧（[ADR-0028](decisions/0028-approval-processes-and-record-locks.md)） |
 | `scheduled-flows` | スケジュールのフロー（予定、塊、24 時間の上限、再開） |
 | `screen-flows` | 画面のフロー（状態の保存と暗号化、戻る、期限）と、レイアウトの操作からの起動 |
 | `flow-builder-and-debug` | フローのビルダー（画面）とデバッグ（巻き戻す実行、足跡の伏せ方） |

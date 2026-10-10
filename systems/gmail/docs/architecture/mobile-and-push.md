@@ -59,7 +59,7 @@ iOS と Android のアプリと、モバイルへのプッシュを決める。�
 | 添付 | 開いたときだけ取り、7 日で捨てる |
 | 範囲の外 | 開いたときにサーバーから取る（オフラインでは「オフラインでは表示できない」） |
 
-- 同期の手順は Web と同じ（`*/changes`、待ち行列、載せ直し。[web-client.md](web-client.md) の 5 節、[ADR-0043](../decisions/0043-web-offline-cache-and-optimistic-updates.md)）。共通の部分は、仕様（状態の機械と性質）を共有し、各 OS で実装する。
+- 同期の手順は Web と同じ（`*/changes`、待ち行列、載せ直し。[web-client.md](web-client.md) の 5 節、[ADR-0043](../decisions/0043-web-offline-cache-and-optimistic-updates.md)）。共通の部分は、仕様（ステートマシンと性質）を共有し、各 OS で実装する。
 - 背景での同期：プッシュを受けたとき（6 節）と、OS の背景の更新の機会に `*/changes` を取る。前面に戻ったときは必ず取る。
 
 ### 4.2 端末の保存の守り

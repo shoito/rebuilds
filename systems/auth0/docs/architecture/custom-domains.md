@@ -64,7 +64,7 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 - `tenant_hostnames`（[ADR-0039](../decisions/0039-hostname-resolution-and-issuer.md)）は、`ready` のドメインと標準のホスト名だけを持つ、解決用の表。`custom_domains` の遷移で書く。
 - 同じホスト名を、`pending_verification` の間は複数のテナントが登録できる。先に TXT の確認を通したほうだけが `verified` になる（一意の索引で保つ）。
 
-### 3.2 状態機械
+### 3.2 ステートマシン
 
 ```
              POST /api/v2/custom-domains
@@ -259,7 +259,7 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 | E7 | カスタムドメインの登録の画面での、パスキーの RP ID への影響の表示（mfa-and-passkeys と一緒に） |
 | E9 | ダッシュボードのカスタムドメインの画面（TXT・CNAME の案内、状態、再確認） |
 | E10 | ドメインの状態の変化のログとログストリーム |
-| E11 | `custom_domains` の表と状態機械、TXT の確認（複数のリゾルバー）、配信のテナントと証明書、`/.well-known` の確認、`ready` の反映の待ち |
+| E11 | `custom_domains` の表とステートマシン、TXT の確認（複数のリゾルバー）、配信のテナントと証明書、`/.well-known` の確認、`ready` の反映の待ち |
 | E11 | 定期の確認（TXT・CNAME・証明書の期限）、警告、`suspended`、削除と 30 日の復活 |
 | E11 | ドメインの制約（4.3 節）と、IDN の混在の拒否 |
 | E12 | カスタムドメインの合成監視、配信のテナントの上限の見直し、DR の訓練でのオリジンの切り替え |

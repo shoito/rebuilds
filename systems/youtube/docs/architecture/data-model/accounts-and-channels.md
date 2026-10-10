@@ -351,7 +351,7 @@ erDiagram
 
 ### 2.10 `account_standing`
 
-チャンネルごとのアカウントの状態（ADR-0061 の状態の機械）。`can()` と `playable()`（`channel_terminated`）が読む。
+チャンネルごとのアカウントの状態（ADR-0061 のステートマシン）。`can()` と `playable()`（`channel_terminated`）が読む。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

@@ -67,7 +67,7 @@ CI/CD（TypeScript のサービスと Rust の `function-runner`）、成果物�
 
 - AWS AppConfig。`release.*`（kebab-case、未完成の振る舞い。100% の後 30 日で消す）と `ops.*`（snake_case、運用の止めるだけのスイッチ）。
 - `release.*` の対象の絞り込みは、ショップ・ポッド・プランの単位（AppConfig の設定の中のショップの一覧と割合）。割合はショップ ID のハッシュで決める（同じショップは同じ側）。
-- お金・在庫・税の規則（引き当ての遷移、チェックアウトの状態の機械、税の計算、割引の適用の順序）はフラグにしない（[AGENTS.md](../../AGENTS.md)）。コードのバージョンとして出し、正しさの見張り（[observability.md](observability.md) の 5 節）で見る。
+- お金・在庫・税の規則（引き当ての遷移、チェックアウトのステートマシン、税の計算、割引の適用の順序）はフラグにしない（[AGENTS.md](../../AGENTS.md)）。コードのバージョンとして出し、正しさの見張り（[observability.md](observability.md) の 5 節）で見る。
 - AppConfig の設定の変更も、波（4.1 節）と同じ順で出す（AppConfig のデプロイの方針：段階の割合と見張りのアラームでの戻し）。
 
 ## 4. デプロイ

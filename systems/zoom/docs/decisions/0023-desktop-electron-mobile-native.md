@@ -35,7 +35,7 @@ date: 2026-09-27
 - モバイル：
   - UI は Swift（iOS）と Kotlin（Android）。CallKit・`ConnectionService`、バックグラウンドの音声、ピクチャー・イン・ピクチャー。
   - libwebrtc は自分でビルドし、Chrome の安定版の milestone に 2 か月以内に追いつく。mediasoup との対応付けは libmediasoupclient。
-  - シグナリングの状態機械と E2EE の鍵管理は、Rust の共通のコアを UniFFI で呼ぶ（[ADR-0024](0024-shared-rust-core-and-test-vectors.md)）。
+  - シグナリングのステートマシンと E2EE の鍵管理は、Rust の共通のコアを UniFFI で呼ぶ（[ADR-0024](0024-shared-rust-core-and-test-vectors.md)）。
 - 2 は、デスクトップで UI とメディアの経路をもう 1 つ書くことになる。Web と振る舞いを揃える試験の量が増える。デスクトップの CPU とメモリの使用量が Electron で目標に届かないと分かったら見直す。
 - 3 は、メディアの経路と OS の通話の統合で、結局ネイティブのコードが要る。枠組みの WebRTC の束縛の追従も別に要る。
 - 4 は、ビルドの手間を省けるが、更新の時期と中身を自分で決められず、脆弱性の修正が遅れる恐れがある。

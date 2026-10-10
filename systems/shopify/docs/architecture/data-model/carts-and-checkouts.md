@@ -1,6 +1,6 @@
 # Data model: カートとチェックアウト
 
-[data-model.md](../data-model.md) の一部。規約はそちらの 3 節に従う。振る舞いは [cart-and-checkout.md](../cart-and-checkout.md)（4〜10 節）を正とする。決定は [ADR-0005](../../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)（状態の機械と 1 回の注文）、[ADR-0028](../../decisions/0028-cart-storage-in-valkey.md)（カートは Valkey）、[ADR-0029](../../decisions/0029-checkout-completion-decision-table.md)（完了の決定表）、[ADR-0030](../../decisions/0030-price-snapshot-and-final-confirmation.md)（価格の写し）、[ADR-0031](../../decisions/0031-checkout-admission-limits.md)（入口の上限）。カートの値（Valkey）と価格の写しの JSON の形は [stores.md](stores.md)。
+[data-model.md](../data-model.md) の一部。規約はそちらの 3 節に従う。振る舞いは [cart-and-checkout.md](../cart-and-checkout.md)（4〜10 節）を正とする。決定は [ADR-0005](../../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)（ステートマシンと 1 回の注文）、[ADR-0028](../../decisions/0028-cart-storage-in-valkey.md)（カートは Valkey）、[ADR-0029](../../decisions/0029-checkout-completion-decision-table.md)（完了の決定表）、[ADR-0030](../../decisions/0030-price-snapshot-and-final-confirmation.md)（価格の写し）、[ADR-0031](../../decisions/0031-checkout-admission-limits.md)（入口の上限）。カートの値（Valkey）と価格の写しの JSON の形は [stores.md](stores.md)。
 
 | 表 | 置き場所 | 書く |
 | --- | --- | --- |

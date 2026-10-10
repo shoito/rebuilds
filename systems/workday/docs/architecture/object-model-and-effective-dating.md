@@ -14,7 +14,7 @@
 ## 1. 目的と範囲
 
 - 扱う：有効日付の共通の型、facet の宣言、3 つのテーブルの形と DB の制約、差分の畳み込み、隙間の扱い、変更・訂正・取消の意味と依存の判定、遡及の検知の事象、時点の問い合わせの API、発効のタイマー、性質ベーステストと本番の整合の検査。
-- 扱わない：どの項目をどの facet にまとめるか（[core-hr.md](core-hr.md)）、業務プロセスの状態機械（[business-process-engine.md](business-process-engine.md)）、権限（[security-model.md](security-model.md)）、遡及の差額の計算（[payroll-engine.md](payroll-engine.md)）、監査ログの保管と改ざんの検知（[audit-and-retention.md](audit-and-retention.md)）。
+- 扱わない：どの項目をどの facet にまとめるか（[core-hr.md](core-hr.md)）、業務プロセスのステートマシン（[business-process-engine.md](business-process-engine.md)）、権限（[security-model.md](security-model.md)）、遡及の差額の計算（[payroll-engine.md](payroll-engine.md)）、監査ログの保管と改ざんの検知（[audit-and-retention.md](audit-and-retention.md)）。
 - **有効日付のテーブルに書くのは `packages/temporal` と、その下の DB の関数だけ**（[AGENTS.md](../../AGENTS.md)）。業務プロセスの完了のステップが、この API を呼ぶ。
 
 ## 2. 本家の形（確かめたこと）

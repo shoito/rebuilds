@@ -1,8 +1,8 @@
 # Trips lifecycle: Uber
 
-乗車の状態機械の正本。状態と事象、1 つの遷移関数、`assignment_epoch` による割り当ての確定、部分一意索引、取り消しとキャンセル料、Aurora の表で持つタイマー、outbox、通信が切れても乗車を続ける仕組みを決める。
+乗車のステートマシンの正本。状態と事象、1 つの遷移関数、`assignment_epoch` による割り当ての確定、部分一意索引、取り消しとキャンセル料、Aurora の表で持つタイマー、outbox、通信が切れても乗車を続ける仕組みを決める。
 
-前提となる決定は、乗車の状態は Aurora の状態機械を正本にし、割り当ては fencing token つきのトランザクションで 1 つに限ること（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）、配車はバッチで最適化しオファーは 1 人ずつ送ること（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)）。この文書で決めたことは次の ADR にある。
+前提となる決定は、乗車の状態は Aurora のステートマシンを正本にし、割り当ては fencing token つきのトランザクションで 1 つに限ること（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)）、配車はバッチで最適化しオファーは 1 人ずつ送ること（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -17,7 +17,7 @@
 
 ## 2. 本家の形（確かめたこと）
 
-- 本家の Fulfillment の基盤は、last-write-wins の可用性優先の構成で分断のときに状態が壊れたため、Spanner の強い一貫性のトランザクションと、階層的な状態機械へ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07、2026-09-27 に確認）。
+- 本家の Fulfillment の基盤は、last-write-wins の可用性優先の構成で分断のときに状態が壊れたため、Spanner の強い一貫性のトランザクションと、階層的なステートマシンへ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07、2026-09-27 に確認）。
 - 本家は、データセンターの切り替えのとき、ドライバーの端末に送っておいた状態の要約から乗車を戻していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015、2026-09-27 に確認）。
 - 本家の日本のヘルプは、ドライバーとのマッチングの前の取り消しは無料で、マッチングの後はキャンセル料がかかることがあると説明している（[Uber の配車をキャンセルする](https://help.uber.com/en/riders/article/uber-%E3%81%AE%E9%85%8D%E8%BB%8A%E3%82%92%E3%82%AD%E3%83%A3%E3%83%B3%E3%82%BB%E3%83%AB%E3%81%99%E3%82%8B?nodeId=56270015-1d1d-4c08-a460-3b94a090de23)、2026-09-27 に確認）。額と時間の条件は、そのページに書かれていない。この設計は本家の値に依らず、事業者の規則で持つ（pricing の 4.3 節）。
 

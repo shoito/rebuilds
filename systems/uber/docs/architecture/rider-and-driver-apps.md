@@ -1,19 +1,19 @@
 # Rider and driver apps: Uber
 
-乗客のアプリとドライバーのアプリ。画面の流れ、背景での位置の送信と電池、外部のナビへの引き継ぎ、通信が切れたときの乗車の継続、Swift・Kotlin の 2 つのコードベースで共有するもの（Protocol Buffers のモデルと状態機械のテストのベクター）、リリースの列車と強制の更新を決める。
+乗客のアプリとドライバーのアプリ。画面の流れ、背景での位置の送信と電池、外部のナビへの引き継ぎ、通信が切れたときの乗車の継続、Swift・Kotlin の 2 つのコードベースで共有するもの（Protocol Buffers のモデルとステートマシンのテストのベクター）、リリースの列車と強制の更新を決める。
 
-前提となる決定は、モバイルはネイティブで書き、共有は Protocol Buffers から生成するモデルと状態遷移の表のテストのベクターに留めること（[ADR-0001](../decisions/0001-platform-and-stack.md)）、位置は 4 秒ごとに HTTPS で送ること（[ADR-0009](../decisions/0009-location-upload-and-validation.md)）、乗車の状態機械と journal（[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)、[ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)）、オファーの表示 15 秒と受信の確認 5 秒（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、事前確定運賃のルートの提示（[ADR-0017](../decisions/0017-fare-distance-for-pre-fixed-fares.md)）、NFR-007（乗車の耐久性）と NFR-010（安全の機能）（[architecture/README.md](README.md) の 3 節）。この文書で決めたことは次の ADR にある。
+前提となる決定は、モバイルはネイティブで書き、共有は Protocol Buffers から生成するモデルと状態遷移の表のテストのベクターに留めること（[ADR-0001](../decisions/0001-platform-and-stack.md)）、位置は 4 秒ごとに HTTPS で送ること（[ADR-0009](../decisions/0009-location-upload-and-validation.md)）、乗車のステートマシンと journal（[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)、[ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)）、オファーの表示 15 秒と受信の確認 5 秒（[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）、事前確定運賃のルートの提示（[ADR-0017](../decisions/0017-fare-distance-for-pre-fixed-fares.md)）、NFR-007（乗車の耐久性）と NFR-010（安全の機能）（[architecture/README.md](README.md) の 3 節）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
-| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作る状態機械のテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低のバージョンで行い、乗車の最中と緊急の入口は塞がない |
+| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作るステートマシンのテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低のバージョンで行い、乗車の最中と緊急の入口は塞がない |
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の位置の許可で動かす。iOS は `allowsBackgroundLocationUpdates` と `CLBackgroundActivitySession`、Android は出庫の操作で始める `location` 型のフォアグラウンドサービスで、出庫の間だけ位置を取る。「常に」の許可と Android の `ACCESS_BACKGROUND_LOCATION` は求めない。取り方は状態ごとの表で決め、止まったら 60 秒でサーバーがプッシュ通知で知らせる |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには、選んだルートの主要経由地点を経由地として渡す（Google マップは Maps URLs の `waypoints`、Apple マップは統合の Maps URL の `waypoint`）。経由地を守らない引き継ぎ先は事前確定運賃の乗車で出さない。アプリの中でルートからの逸脱を知らせる |
 
 ## 1. 目的と範囲
 
 - 扱う：乗客とドライバーの画面の流れ、端末の側の位置の取り方・許可・電池、外部のナビへの引き継ぎ、アプリの中の乗車の状態の持ち方、通信が切れたときの振る舞い（端末の側）、2 つのコードベースで共有するもの、配布とリリース、強制の更新、画面の文言の方針。
-- 扱わない：位置の受信と検証（[location-ingestion.md](location-ingestion.md)）、乗車の状態機械の正本と journal の受け取り（[trips-lifecycle.md](trips-lifecycle.md)）、常時の接続とプッシュ通知（[notifications-and-realtime-push.md](notifications-and-realtime-push.md)）、緊急の通報・共有・通話の中身（[safety-and-trust.md](safety-and-trust.md)）、運賃の計算（[pricing-and-fares.md](pricing-and-fares.md)）、住所の検索と乗降の地点（[maps-and-geodata.md](maps-and-geodata.md)）、CI/CD とフラグの基盤（`delivery.md`）、端末の認証とトークン（`security.md`）。
+- 扱わない：位置の受信と検証（[location-ingestion.md](location-ingestion.md)）、乗車のステートマシンの正本と journal の受け取り（[trips-lifecycle.md](trips-lifecycle.md)）、常時の接続とプッシュ通知（[notifications-and-realtime-push.md](notifications-and-realtime-push.md)）、緊急の通報・共有・通話の中身（[safety-and-trust.md](safety-and-trust.md)）、運賃の計算（[pricing-and-fares.md](pricing-and-fares.md)）、住所の検索と乗降の地点（[maps-and-geodata.md](maps-and-geodata.md)）、CI/CD とフラグの基盤（`delivery.md`）、端末の認証とトークン（`security.md`）。
 - 事業者の管理画面とサポートのツールは Web で、[support-and-operations-tools.md](support-and-operations-tools.md) が扱う。
 
 ## 2. 事実（確かめたこと）
@@ -282,7 +282,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 - 4 つのアプリ（乗客・ドライバー × iOS・Android）を同じ列車で出す。ドライバーのアプリは、週末の夜（金・土の 18 時〜翌 6 時）に広げない（段階を進めない）。乗務の最中の更新の失敗を避けるため。
 - 段階を進める基準：クラッシュのない利用者の率 99.8% 以上、ANR の率が前のバージョンより悪くない、オファーの受信の確認までの時間の p95 が前のバージョンより悪くない、出庫の失敗の率が前のバージョンより悪くない。満たさなければ止める（runbook）。
-- 乗車の状態機械、位置の送信、オファー、緊急の機能を変えるバージョンは、変更単位の `quality.md` に端末の試験の結果を付ける（区分「安全」の変更は必須。[AGENTS.md](../../AGENTS.md)）。
+- 乗車のステートマシン、位置の送信、オファー、緊急の機能を変えるバージョンは、変更単位の `quality.md` に端末の試験の結果を付ける（区分「安全」の変更は必須。[AGENTS.md](../../AGENTS.md)）。
 
 ### 10.2 サポートするバージョン
 
@@ -312,7 +312,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 ## 11. テスト
 
-### 11.1 状態機械
+### 11.1 ステートマシン
 
 - 5.2 節のベクターを両方のアプリで通す（ADR-0001 の Confirmation）。
 - **PROP-APP-001（reducer の決定性）**：同じ入力の列から同じ状態と副作用が出る（Swift は swift-testing と独自の生成器、Kotlin は Kotest の property）。
@@ -390,7 +390,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 ### quality.md
 
-- 状態機械のベクターの本数と、両方のアプリでの通過の率（100% であること）。
+- ステートマシンのベクターの本数と、両方のアプリでの通過の率（100% であること）。
 - 位置の送信の間隔の分布（端末のバージョン・OS・機種ごと）、欠けた点の割合、止まったときの回復の件数と回復までの時間。
 - 給電なしの空車の 1 時間の電池の消費（基準の端末）。
 - オファーの受信から表示までの時間（端末の中）の p95。

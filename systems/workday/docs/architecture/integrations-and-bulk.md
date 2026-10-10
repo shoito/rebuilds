@@ -13,7 +13,7 @@
 ## 1. 目的と範囲
 
 - 扱う：一括の取り込みの雛形・検証・実行・結果、一括の出力、移行（人・組織・履歴・期首の値）、並行稼働の取り込み（結果と入力）、公開の API・Webhook、API の利用者の認証、利用者のログイン・SSO・セッション・再認証、打刻機の連携。
-- 扱わない：業務プロセスの状態機械（[business-process-engine.md](business-process-engine.md)）、並行稼働の差の分類と切り替えの判定（[payroll-engine.md](payroll-engine.md) の 10 節）、マイナンバーの取り込み（[my-number-vault.md](my-number-vault.md) の 8 節。保管庫が受ける）、打刻の計算（[time-and-attendance.md](time-and-attendance.md)）、振込ファイルと仕訳の出力（[payments-and-accounting.md](payments-and-accounting.md)）、電子申請（E14）。
+- 扱わない：業務プロセスのステートマシン（[business-process-engine.md](business-process-engine.md)）、並行稼働の差の分類と切り替えの判定（[payroll-engine.md](payroll-engine.md) の 10 節）、マイナンバーの取り込み（[my-number-vault.md](my-number-vault.md) の 8 節。保管庫が受ける）、打刻の計算（[time-and-attendance.md](time-and-attendance.md)）、振込ファイルと仕訳の出力（[payments-and-accounting.md](payments-and-accounting.md)）、電子申請（E14）。
 - **一括でも API でも、業務プロセスと権限の判定を迂回しない**（[AGENTS.md](../../AGENTS.md)）。
 
 ## 2. 本家の形（確かめたこと）

@@ -419,7 +419,7 @@ erDiagram
 
 - キー：PK `(tenant_id, address_hash)`。RLS：テナントの表。保持：1 年。S1 の量：数千行。
 
-## 3. 状態の機械の入力と出力（表にしない）
+## 3. ステートマシンの入力と出力（表にしない）
 
 ```
 step(monitor_version, prev_group_state, (value | none, complete), t) -> (next_group_state, events)

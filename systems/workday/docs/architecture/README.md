@@ -13,7 +13,7 @@
 | オブジェクトモデルとメタデータ | 業務の概念（Worker、Organization、Position など）をクラス・関係・属性・メソッドのメタデータとして定義し、実行時に解釈する。RDB（MySQL）は少数の汎用のテーブルで、Worker のようなテーブルはない（[ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)） | 採らない。型のある業務のテーブルを、有効日付の共通の型で作る（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
 | メモリーの中のデータ | テナントのデータとメタデータをメモリーに持ち、更新はテナントごとに 1 つの更新のサービス（OTS）が行う。DB が正本で、コミットの後に他のサービスへ変更の集合を配る。給与計算などの重い処理は別の計算のサービスで行う（同上） | 正本は Aurora。給与計算は別の計算の worker で、入力のスナップショットから行う（[ADR-0004](../decisions/0004-payroll-engine.md)） |
 | 有効日付と追記 | DB は追記のみで、有効日付と時点のレポートに使う（[DBMS2, 2010](https://www.dbms2.com/2010/08/22/workday-technology-stack/)。古い第三者の記事で、現在の実装は未検証）。変更は有効日と入力日を分けて持ち、前後の値・変更者・時刻を監査の記録に残す（[Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html)） | 有効時間と記録時間の 2 つの軸（bitemporal）で持つ（[ADR-0002](../decisions/0002-effective-dated-data-model.md)） |
-| 業務プロセス | 起票・承認・アクション・サービス・通知・完了のステップ。条件の規則、委任、取消（rescind）・訂正（correct）・キャンセル（[Approval Step](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-step-types/dan1370797855296.html)、[Delegation](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/delegate-business-processes/cxi1568047444210.html)） | 自前の永続の状態機械にする（[ADR-0003](../decisions/0003-business-process-engine.md)） |
+| 業務プロセス | 起票・承認・アクション・サービス・通知・完了のステップ。条件の規則、委任、取消（rescind）・訂正（correct）・キャンセル（[Approval Step](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-step-types/dan1370797855296.html)、[Delegation](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/delegate-business-processes/cxi1568047444210.html)） | 自前の永続のステートマシンにする（[ADR-0003](../decisions/0003-business-process-engine.md)） |
 | 権限 | 機能の領域（ドメイン）ごとの権限と、業務プロセスごとの権限。セキュリティグループ（ユーザー、ロール、職務、組織、集約、交差）。ロールは組織で絞れる。権限の変更は「有効化」まで保留され、編集と有効化を別の人にできる（[Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)） | 同じ考え方の権限のモデルを自前で作る（[ADR-0005](../decisions/0005-security-and-my-number.md)） |
 | 1 つのコードライン | 全顧客が 1 つのバージョンを使う（[Defining the Power of One](https://blog.workday.com/en-us/posts/2015/06/defining-the-power-of-one.html)）。機能のリリースは年 2 回（おおむね 3 月と 9 月）、週ごとに修正と小さな改善の更新（[Workday のリリースの名前と予定の変更](https://blog.workday.com/en-us/2019/workday-changes-product-release-naming-convention-and-schedule.html)、[Release Best Practices](https://forms.workday.com/content/dam/web/sg/documents/other/release-best-practices-guide-en-sg.pdf)、2026-09-28 に検索の要約で確認） | 採る。テナントごとの分岐を持たず、違いは設定と規則表で表す |
 
@@ -122,7 +122,7 @@
 | HTTP・検証 | Hono＋Zod。`@hono/zod-openapi` で OpenAPI を出す | 他の題材と同じ |
 | Web | React の SPA（Vite）。1 つのレスポンシブなアプリで、サーバーでの描画（SSR）は使わない。打刻の画面だけ Service Worker と IndexedDB でオフラインに耐える | [ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)。明細は保存した文書を画面で描き、PDF は確定のときに決定的に作るので SSR は要らない（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)） |
 | DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。有効日付は範囲型と、PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS`、`PERIOD` の外部キー） | [ADR-0002](../decisions/0002-effective-dated-data-model.md) |
-| 業務プロセス | 自前の状態機械（Aurora の案件とイベントのテーブル、SQS でステップを実行） | [ADR-0003](../decisions/0003-business-process-engine.md) |
+| 業務プロセス | 自前のステートマシン（Aurora の案件とイベントのテーブル、SQS でステップを実行） | [ADR-0003](../decisions/0003-business-process-engine.md) |
 | 給与計算 | 自前のエンジン（純粋関数）。ECS のタスクで並列に実行 | [ADR-0004](../decisions/0004-payroll-engine.md) |
 | キャッシュ | ElastiCache（Valkey） | 失われてもよい |
 | 非同期 | transactional outbox → SQS | 他の題材と同じ |
@@ -142,7 +142,7 @@
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、給与計算も TypeScript で書く。お金は整数の円と固定小数点で扱う |
 | [0002](../decisions/0002-effective-dated-data-model.md) | 人事のデータを有効時間と記録時間の 2 軸で持ち、変更の差分を有効日の順に畳み込む |
-| [0003](../decisions/0003-business-process-engine.md) | 業務プロセスを、バージョンつきの定義と Aurora に永続する状態機械で自前に作る |
+| [0003](../decisions/0003-business-process-engine.md) | 業務プロセスを、バージョンつきの定義と Aurora に永続するステートマシンで自前に作る |
 | [0004](../decisions/0004-payroll-engine.md) | 給与計算を、入力のスナップショットと規則表のバージョンから決まる純粋な計算にする |
 | [0005](../decisions/0005-security-and-my-number.md) | ドメインと業務プロセスの権限と職務分掌で守り、マイナンバーは別アカウントの保管庫に置く |
 | [0006](../decisions/0006-temporal-table-triplet-and-fold.md) | facet ごとの 3 つのテーブルを宣言から生成し、同じ日の差分の順序を事象の種類で決める |
@@ -165,7 +165,7 @@
 | [0023](../decisions/0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定を事業所ごとの設定で持ち、実績と見込みで段階的に警告し、月次の締めは集計のバージョンを給与に渡す |
 | [0024](../decisions/0024-annual-leave-grant-ledger.md) | 年休を付与と追記のみの台帳で持ち、斉一的付与は法定を下回らない検査を通した設定だけを受ける |
 | [0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md) | 休職は core-hr の雇用の状態が持ち、休暇の領域は日・半日・時間の単位の休暇と特別休暇を持つ |
-| [0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行を状態機械にし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く |
+| [0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行をステートマシンにし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く |
 | [0027](../decisions/0027-pay-item-graph-and-formula-language.md) | 項目を段つきの依存のグラフにし、テナントの式は円・10 進・分の型を分けた式の木で書く |
 | [0028](../decisions/0028-retro-deltas-and-bonus-runs.md) | 遡及は確定した期間の計算し直しとの差を当期の行にし、エンジンの違いによる差は止め、賞与は前月の確定を前提にする |
 | [0029](../decisions/0029-parallel-run-and-compute-partitioning.md) | 計算を決まった束ごとに ECS のタスクで行い、並行稼働は許容の幅なしで差を分類して切り替えを判定する |
@@ -267,7 +267,7 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 | --- | --- | --- | --- | --- |
 | [object-model-and-effective-dating.md](object-model-and-effective-dating.md) | 有効日付の共通の型（`packages/temporal`）、差分・バージョン・現在の 3 つのテーブル、同じ日の順序、変更・訂正・取消、時点の問い合わせ、発効のタイマー、参照のモデル | 0006〜0009 | QA | E1、E2、E3 |
 | [core-hr.md](core-hr.md) | 人・雇用・職務の割り当て、ポジションと職務、組織と階層の閉包、入社・異動・休職・復職・退職の事象と法令の警告、個人の情報、外部の人、組織の再編 | 0010〜0012 | QA、PM | E3 |
-| [business-process-engine.md](business-process-engine.md) | 業務プロセスの種類と定義とバージョン、ステップ、ルーティング、委任、状態機械、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化 | 0013〜0016 | QA | E4 |
+| [business-process-engine.md](business-process-engine.md) | 業務プロセスの種類と定義とバージョン、ステップ、ルーティング、委任、ステートマシン、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化 | 0013〜0016 | QA | E4 |
 | [security-model.md](security-model.md) | ドメインと操作（`aggregate` を含む）、業務プロセスの権限、セキュリティグループ、範囲の判定、職務分掌、方針のバージョンと有効化、判定の評価器、代理のログイン、閲覧の記録と説明の報告、運用者の規則表の権限 | 0017〜0020 | セキュリティ、QA | E4、E11 |
 | [time-and-attendance.md](time-and-attendance.md) | 打刻と取り込み、客観的な記録との乖離、勤務体系とシフト、労働時間の区分、36 協定の警告、月次の締め、給与への連携 | 0021〜0023 | QA、社労士の確認 | E6 |
 | [absence-and-leave.md](absence-and-leave.md) | 年休の付与と台帳、出勤率、斉一的付与、時効、半日・時間単位、年 5 日の義務、管理簿、特別休暇、休暇の申請。休職は読むだけ（持ち主は core-hr。[ADR-0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md)） | 0024〜0025 | QA、社労士の確認 | E7 |
@@ -297,7 +297,7 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | E1 基盤 | AWS・Terraform・CI、Aurora と RLS、フラグ、可観測性と個人情報の走査、監査ログの骨格、`packages/money`、時間の制約の PoC |
 | E2 オブジェクトモデルと有効日付 | `packages/temporal`、3 つのテーブルの生成、畳み込み、訂正と取消、時点の問い合わせ、発効のタイマー、夜間の整合の検査 |
 | E3 Core HR | 組織と階層、ポジションと職務、人・雇用・職務、入社・異動・休職・退職、個人の情報、組織の再編 |
-| E4 業務プロセスと権限 | 定義とバージョン、状態機械、ルーティング、委任、取消・訂正、受信箱、ドメインと業務プロセスの権限、職務分掌、方針の有効化 |
+| E4 業務プロセスと権限 | 定義とバージョン、ステートマシン、ルーティング、委任、取消・訂正、受信箱、ドメインと業務プロセスの権限、職務分掌、方針の有効化 |
 | E5 セルフサービスとログイン | 画面の殻、時点の見せ方、変更の申請、受信箱、マネージャーの画面、Better Auth と SSO |
 | E6 勤怠 | 打刻（オフライン、打刻機）、勤務体系、労働時間の計算、36 協定の警告、月次の締め |
 | E7 休暇 | 年休の付与と台帳、斉一的付与、年 5 日の義務、管理簿、特別休暇、休暇の申請 |

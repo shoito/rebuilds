@@ -83,7 +83,7 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | Story | 内容 |
 | --- | --- |
 | `mx-throughput-poc` | PoC：`mx-edge`・`mta-out` の 1 台あたりの接続とメッセージの数、BYOIP の手続きの時間 |
-| `smtp-server-core` | SMTP の状態の機械、EHLO・STARTTLS・PIPELINING・SIZE・8BITMIME・SMTPUTF8・CHUNKING、上限 |
+| `smtp-server-core` | SMTP のステートマシン、EHLO・STARTTLS・PIPELINING・SIZE・8BITMIME・SMTPUTF8・CHUNKING、上限 |
 | `connection-reputation-and-limits` | 接続の評判、IP・/24・ASN ごとの速さ、一時の絞り（ADR-0002） |
 | `recipient-validation` | 宛先の解決のキャッシュ、宛先がない・停止・容量の超過の応答 |
 | `end-of-data-checks` | DATA の終わりの同期の検査と予算、決定表（ADR-0002） |

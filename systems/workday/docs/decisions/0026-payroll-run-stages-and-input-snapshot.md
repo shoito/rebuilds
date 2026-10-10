@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-28
 ---
 
-# ADR-0026: 給与の実行を状態機械にし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く
+# ADR-0026: 給与の実行をステートマシンにし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く
 
 詳細は [payroll-engine.md](../architecture/payroll-engine.md) の 3〜5 節。
 

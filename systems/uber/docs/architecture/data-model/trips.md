@@ -1,6 +1,6 @@
 # Data model: 乗車と割り当て
 
-乗車の状態機械、ドライバーの割り当て（オファーを兼ねる）、区間、遷移の記録、冪等、タイマー、outbox、食い違い、乗降の提供者の内容、ETA の記録、軌跡の索引、ナビの記録、断った需要、商品と車両の対応。振る舞いの正本は [trips-lifecycle.md](../trips-lifecycle.md)、決定は [ADR-0003](../../decisions/0003-trip-state-and-single-assignment.md)・[ADR-0021](../../decisions/0021-trip-transition-function-and-assignment-fencing.md)・[ADR-0022](../../decisions/0022-trip-outbox-and-offline-continuation.md)・[ADR-0039](../../decisions/0039-city-cells-and-osaka-warm-standby.md)。規約は [data-model.md](../data-model.md) の 3 節。
+乗車のステートマシン、ドライバーの割り当て（オファーを兼ねる）、区間、遷移の記録、冪等、タイマー、outbox、食い違い、乗降の提供者の内容、ETA の記録、軌跡の索引、ナビの記録、断った需要、商品と車両の対応。振る舞いの正本は [trips-lifecycle.md](../trips-lifecycle.md)、決定は [ADR-0003](../../decisions/0003-trip-state-and-single-assignment.md)・[ADR-0021](../../decisions/0021-trip-transition-function-and-assignment-fencing.md)・[ADR-0022](../../decisions/0022-trip-outbox-and-offline-continuation.md)・[ADR-0039](../../decisions/0039-city-cells-and-osaka-warm-standby.md)。規約は [data-model.md](../data-model.md) の 3 節。
 
 - 置き場所はすべて Aurora `core`。
 - **状態を変える書き込みは Trips の遷移関数 `apply` だけ。** `trips.state`・`trips.version`・`driver_assignments.status`・`driver_dispatch_state` を更新できる DB のロールは `trips_svc` だけ（[ADR-0021](../../decisions/0021-trip-transition-function-and-assignment-fencing.md)）。
@@ -163,7 +163,7 @@ CREATE DOMAIN rider_pin AS geo_pin
 
 ### 3.1 `trips`
 
-乗車の状態機械の正本。定義元：[trips-lifecycle.md](../trips-lifecycle.md) の 3・5.3・14 節、[maps-and-geodata.md](../maps-and-geodata.md) の 7.3 節、[pricing-and-fares.md](../pricing-and-fares.md) の 4.1・5.6 節。
+乗車のステートマシンの正本。定義元：[trips-lifecycle.md](../trips-lifecycle.md) の 3・5.3・14 節、[maps-and-geodata.md](../maps-and-geodata.md) の 7.3 節、[pricing-and-fares.md](../pricing-and-fares.md) の 4.1・5.6 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

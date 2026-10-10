@@ -226,6 +226,6 @@ Kinesis の位置の流れ、S3 の配置、DynamoDB のリース、Valkey の�
 | 端末の Keychain・Keystore | トークン、端末の識別子 | ログアウトまで |
 | 端末の設定 | 最後に得た住所（緊急の画面用）、信頼できる連絡先（サーバーに送らない） | 端末の中だけ |
 | 開発リポジトリ `proto/` | 契約（Protocol Buffers） | — |
-| 開発リポジトリ `vectors/trip-app/`・`vectors/eligibility/` | 状態機械と候補の条件の共通のテストのベクター | — |
+| 開発リポジトリ `vectors/trip-app/`・`vectors/eligibility/` | ステートマシンと候補の条件の共通のテストのベクター | — |
 | 開発リポジトリ `features/`（S2） | 特徴量の定義（YAML ＋ SQL） | — |
 | SageMaker Model Registry（S2） | モデルのバージョン、データのバージョン、評価、承認者 | — |

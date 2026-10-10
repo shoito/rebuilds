@@ -1,10 +1,10 @@
 # Transcoding pipeline: YouTube
 
-アップロードの完了から、全部のレンディションがそろうまでを決める。段の状態の機械、作業の貸し出しとやり直し、冪等な出力、区切り（チャンク）と並列の符号化、継ぎ目の検査、動画ごとのラダー（per-title）と `ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル・シークの縮小の画像・チャプター、Spot の中断、時間と費用の予算を扱う。
+アップロードの完了から、全部のレンディションがそろうまでを決める。段のステートマシン、作業の貸し出しとやり直し、冪等な出力、区切り（チャンク）と並列の符号化、継ぎ目の検査、動画ごとのラダー（per-title）と `ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル・シークの縮小の画像・チャプター、Spot の中断、時間と費用の予算を扱う。
 
 前提となる決定は次のとおり。
 
-- 段の状態の機械は自前（Aurora の状態の行と SQS の作業の配り）。段は冪等。元のファイルを保持する（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）
+- 段のステートマシンは自前（Aurora の状態の行と SQS の作業の配り）。段は冪等。元のファイルを保持する（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）
 - H.264 を全動画、AV1 を人気の動画にだけ。VP9 なし。ラダーは試しの符号化と VMAF で動画ごとに決める。VOD は CPU の Spot、MediaConvert は使わない（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)）
 - VOD のセグメントは 4 秒、GOP 2 秒、全段でキーフレームを揃える（[ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md)）
 - 照合の結果が出るまで公開しない（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)）
@@ -50,7 +50,7 @@
 | 決定的なラダー | 同じ入力・同じ `ladder_version` から同じラダー | intent の「守るべき振る舞い」 |
 | 継ぎ目 | フレームの数・表示の時刻・音声のサンプルの数が元と一致。音声と映像のずれ 20 ms 以内 | [quality.md](../quality.md) の 2.2.1 節 A |
 
-## 3. 段の状態の機械（ADR-0014）
+## 3. 段のステートマシン（ADR-0014）
 
 ### 3.1 段と依存
 

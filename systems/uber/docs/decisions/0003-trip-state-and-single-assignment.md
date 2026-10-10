@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-27
 ---
 
-# ADR-0003: 乗車の状態は Aurora の状態機械を正本にし、割り当ては fencing token つきのトランザクションで 1 つに限る
+# ADR-0003: 乗車の状態は Aurora のステートマシンを正本にし、割り当ては fencing token つきのトランザクションで 1 つに限る
 
 ## Context
 
@@ -15,13 +15,13 @@ date: 2026-09-27
 - ドライバーが古いオファーを受諾する（時間切れの直後、通信の遅れ）。
 - 乗客の取り消しと、ドライバーの受諾が同時に届く。
 
-本家の事実（2026-09-27 に確認）：本家の Fulfillment の基盤は、当初、一貫性より可用性を優先し、last-write-wins の書き込みで、分断のときにデータが壊れることがあった。また、複数の実体への書き込みを RPC でつないでいたため、途中で矛盾した状態が残った。そこで、Spanner の強い一貫性のトランザクションと、階層的な状態機械（statechart）、複数の実体の遷移を 1 つのトランザクションで行う仕組みへ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07）。本家は、長く続くワークフローのために Cadence も作って公開している（[Cadence の概要](https://www.uber.com/us/en/blog/open-source-orchestration-tool-cadence-overview/)、2019-11）。
+本家の事実（2026-09-27 に確認）：本家の Fulfillment の基盤は、当初、一貫性より可用性を優先し、last-write-wins の書き込みで、分断のときにデータが壊れることがあった。また、複数の実体への書き込みを RPC でつないでいたため、途中で矛盾した状態が残った。そこで、Spanner の強い一貫性のトランザクションと、階層的なステートマシン（statechart）、複数の実体の遷移を 1 つのトランザクションで行う仕組みへ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07）。本家は、長く続くワークフローのために Cadence も作って公開している（[Cadence の概要](https://www.uber.com/us/en/blog/open-source-orchestration-tool-cadence-overview/)、2019-11）。
 
 ## Options
 
 ### 状態と時間の管理
 
-1. **Aurora に状態機械を置き、時間の管理（タイマー）も Aurora の表と SQS で自前で持つ**
+1. **Aurora にステートマシンを置き、時間の管理（タイマー）も Aurora の表と SQS で自前で持つ**
 2. **Temporal のワークフローに乗車を 1 つずつ載せる**
 3. **AWS Step Functions で乗車の流れを持つ**
 
@@ -35,7 +35,7 @@ date: 2026-09-27
 
 状態と時間の管理は 1、割り当ての一意性は 1 を採用する。
 
-### 状態機械
+### ステートマシン
 
 - 乗車（`trips`）の状態の遷移は、Trips のサービスの 1 つの遷移関数だけが行う。遷移関数は、（今の状態、事象）から（次の状態、副作用の一覧）を返す純粋な関数と、それを 1 つのトランザクションで書き込む部分に分ける。
 - 状態：`payment_pending` → `requested` → `offered` → `accepted` → `arriving` → `arrived` → `on_trip` →（`awaiting_fare` →）`completed`。途中から `cancelled_by_rider`・`cancelled_by_driver`・`cancelled_by_system`・`no_driver_found`・`no_show`・`payment_failed` に移れる（統合の工程で [ADR-0021](0021-trip-transition-function-and-assignment-fencing.md) の状態を取り込んだ）。
@@ -51,7 +51,7 @@ date: 2026-09-27
 
 - 時間で動く事象は、`trip_timers`（乗車 ID、種類、期限、`version`）の表に、状態の遷移と同じトランザクションで書く。
 - タイマーの処理は、期限の来た行を `FOR UPDATE SKIP LOCKED` で取り、遷移関数に「時間切れ」の事象として渡す。遷移関数は、状態がすでに先へ進んでいれば何もしない。
-- 2 は、長い流れ（予約の配車、精算の締め、書類の期限）には向く。ただし、乗車の流れは数十分で終わり、状態機械の正本を DB に持つほうが、割り当ての一意性の制約と同じトランザクションで扱える。Temporal を使うと、クラスタを自前で運用するか、外部の SaaS に乗車の状態を置くことになる。S2 で予約の配車や長い流れが増えたら、それらだけに 2 を使うかを見直す。 Cadence は本家が作った実装なので、候補にしない（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)。2026-09-28 に選択肢から外した）。
+- 2 は、長い流れ（予約の配車、精算の締め、書類の期限）には向く。ただし、乗車の流れは数十分で終わり、ステートマシンの正本を DB に持つほうが、割り当ての一意性の制約と同じトランザクションで扱える。Temporal を使うと、クラスタを自前で運用するか、外部の SaaS に乗車の状態を置くことになる。S2 で予約の配車や長い流れが増えたら、それらだけに 2 を使うかを見直す。 Cadence は本家が作った実装なので、候補にしない（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)。2026-09-28 に選択肢から外した）。
 - 3 は、1 つの遷移ごとに状態の遷移の料金がかかり、S3 の規模で費用が大きい。DB の制約と同じトランザクションにもできない。
 
 ### 割り当ての一意性

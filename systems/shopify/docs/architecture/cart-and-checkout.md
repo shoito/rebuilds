@@ -1,10 +1,10 @@
 # Cart and Checkout: Shopify
 
-カートとチェックアウトを決める。カートの置き場所、チェックアウトの状態の機械と段、送信と冪等、価格の写しと最終確認画面、`completeCheckout` と完了の決定表 DT-CHK-001、照合の処理、チェックアウトの入口の上限、配送先を扱う。
+カートとチェックアウトを決める。カートの置き場所、チェックアウトのステートマシンと段、送信と冪等、価格の写しと最終確認画面、`completeCheckout` と完了の決定表 DT-CHK-001、照合の処理、チェックアウトの入口の上限、配送先を扱う。
 
 前提となる決定は次のとおり。
 
-- チェックアウトは明示の状態の機械。送信で価格の写しを固定。注文の作成は `completeCheckout` の 1 つの関数・1 つのトランザクション。`orders.checkout_id` は一意。1 分ごとの照合（[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)）
+- チェックアウトは明示のステートマシン。送信で価格の写しを固定。注文の作成は `completeCheckout` の 1 つの関数・1 つのトランザクション。`orders.checkout_id` は一意。1 分ごとの照合（[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)）
 - 在庫は送信で引き当て、`completeCheckout` で確定（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[inventory-and-reservations.md](inventory-and-reservations.md)）
 - 決済は提供者のアダプターと冪等キー `<checkout_id>:<attempt>:<op>`、Webhook の inbox（[ADR-0006](../decisions/0006-payments-via-providers.md)、[payments-integration.md](payments-integration.md)）
 - 割引の計算は [discounts-engine.md](discounts-engine.md)、税は `taxes-and-invoices.md`、送料は [orders-and-fulfillment.md](orders-and-fulfillment.md) の 6 節、関数は `functions-sandbox.md`

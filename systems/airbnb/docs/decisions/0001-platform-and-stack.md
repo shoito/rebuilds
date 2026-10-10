@@ -14,7 +14,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 - Terraform、OpenTelemetry、AWS AppConfig のフィーチャーフラグ、トランクベース開発
 - FORCE RLS と `SET LOCAL`、UUIDv7、transactional outbox
 
-この題材の主な論点（[README.md](../../README.md)）は、泊の空室と二重の予約の防止、日付の範囲で絞る地図の検索、料金と税と通貨の見積もり、予約の状態の機械と仮押さえ、預かりとチェックインの後の送金、T&S、日本の法令の上限である。性質は次のとおり。
+この題材の主な論点（[README.md](../../README.md)）は、泊の空室と二重の予約の防止、日付の範囲で絞る地図の検索、料金と税と通貨の見積もり、予約のステートマシンと仮押さえ、預かりとチェックインの後の送金、T&S、日本の法令の上限である。性質は次のとおり。
 
 - ほとんどは業務のアプリケーション（リスティング、予約、メッセージ、運用の画面）で、他の題材と同じ形である。
 - 空室の正しさは、範囲の重なりの判定である。PostgreSQL の `btree_gist` の排他の制約が、この判定を DB の制約として持てる。Google Calendar の題材も会議室と予約ページでこれを使っている（[ADR-0033](../../../google-calendar/docs/decisions/0033-booking-creation-and-exclusion.md)）。
@@ -82,7 +82,7 @@ ML：
 | 空室の判定、滞在の規則、時刻の計算 | `packages/availability`、`packages/stay-time` | 題材の核（[ADR-0002](0002-availability-representation-and-double-booking.md)） |
 | 検索の候補の絞り込み、空室の写し、順位付け | `packages/search`、`services/availability-cache-writer` | 題材の核（[ADR-0003](0003-search-for-date-range-availability.md)） |
 | 料金・税・為替の計算 | `packages/pricing`、`packages/tax`、`packages/fx` | 題材の核（[ADR-0008](0008-multi-currency-and-fx.md)） |
-| 予約の状態の機械、仮押さえ、キャンセルの精算 | `packages/booking`、`packages/cancellation` | 題材の核（[ADR-0004](0004-booking-state-machine-and-holds.md)） |
+| 予約のステートマシン、仮押さえ、キャンセルの精算 | `packages/booking`、`packages/cancellation` | 題材の核（[ADR-0004](0004-booking-state-machine-and-holds.md)） |
 | 台帳、送金 | `packages/ledger`、`packages/payouts` | 題材の核（[ADR-0005](0005-payments-hold-capture-and-ledger.md)） |
 | T&S の規則のエンジン、審査、ML の学習と評価 | `packages/trust-safety`、`ml/` | 題材の核（[ADR-0009](0009-trust-and-safety-and-ml-boundary.md)） |
 | 法令の上限と名簿 | `packages/compliance-jp` | 題材の核（[ADR-0006](0006-regulatory-night-cap-enforcement.md)） |

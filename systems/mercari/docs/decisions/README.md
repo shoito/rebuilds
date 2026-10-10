@@ -6,7 +6,7 @@ Mercari の再構築に関する決定。リポジトリ共通の決定は [docs
 | ADR | 決定 | 状態 |
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、ドメインごとのパッケージを持つ 1 つのコードベースを入口・Worker ごとのサービスで出す。Aurora は core・ledger・content の 3 クラスタにする。ML だけ Python で書く。検索は OpenSearch を汎用の部品として使う | accepted |
-| [0002](0002-transaction-state-machine-and-single-purchase.md) | 取引を明示の状態の機械にし、購入を `purchaseListing` の 1 つの関数と 1 つのトランザクション（出品の条件つきの更新と、部分一意の索引）に集める。期限は DB の列と 1 分ごとの処理で動かし、紛争で止める | accepted |
+| [0002](0002-transaction-state-machine-and-single-purchase.md) | 取引を明示のステートマシンにし、購入を `purchaseListing` の 1 つの関数と 1 つのトランザクション（出品の条件つきの更新と、部分一意の索引）に集める。期限は DB の列と 1 分ごとの処理で動かし、紛争で止める | accepted |
 | [0003](0003-escrow-and-double-entry-ledger.md) | お金の正本を、取引ごとの預かりの口座を持つ追記だけの複式簿記の台帳にする。release と refund を冪等キーと一意の制約で 1 回に限り、取引と台帳を 5 分ごと、台帳と提供者・銀行を日次で照合する | accepted |
 | [0004](0004-proceeds-model-under-payment-services-act.md) | 売上金・残高・ポイントを別の口座の種類にし、期限・使い道・本人確認の要否・保全を `legal.*` の設定で決める。収納代行・資金移動業・前払式支払手段のどれに整理されても切り替えられる形にし、法務の L1 の結論まで本番の値を有効にしない | accepted |
 | [0005](0005-payments-via-providers-and-capture-at-purchase.md) | 決済は外部の提供者に任せ、本システムはカード番号に触れない。カードは購入の時に売上を確定し、預かりは本システムの台帳で持つ。冪等キー、Webhook の inbox、照会で結果を確かめる。Stripe の題材は提供者の 1 つとして使い、設計し直さない | accepted |
@@ -48,7 +48,7 @@ Mercari の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0052](0052-review-cases-queues-and-appeals.md) | 通報・規則の `review`・`hold` は対象と方針の組ごとに 1 つの案件にまとめ、重さ × 露出 × 確かさ × 待ち時間で並べる。偽ブランドの疑いの高い `hold` は p95 4 時間、他は p95 24 時間の待ち行列に分ける。アカウントの停止・売上金の保留・取引の取り消しは 2 人の承認。異議は 30 日以内、別の審査員が p95 7 日で判定する | accepted |
 | [0053](0053-counterfeit-detection-signals-and-brand-profiles.md) | 偽ブランドは、ブランドの危険の段と、文字の点・画像の点・価格の比・写真の使い回し・売り手の履歴の組み合わせを規則で判定する。危険の高いブランドの新しいアカウントの高額の出品は公開の前に分類器を待つ。権利者は確かめた窓口から通報と資料を出せるが、措置は審査員が決める。閾値は評価の集まりの基準を満たすように決める | accepted |
 | [0054](0054-photo-hash-block-list.md) | 禁止のハッシュの一覧は、審査員が措置で確かめた写真の pHash と dHash を、範囲と `block` の可否つきで登録する。同期の検査は一覧をメモリーに持ち、8 ビットずつ 8 つの帯の索引で距離 7 以下を必ず引く。両方の距離 0 かつ `block` 可の登録だけが `block`、pHash の距離 1〜6 は `hold` の信号にする | accepted |
-| [0056](0056-ekyc-provider-and-verification-levels.md) | eKYC は 4 つの口（セッションの作成、結果の取得、Webhook、データの削除）を持つ提供者のアダプターの裏に置き、方式ごとに提供者を替えられるようにする。確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は 1 つの関数で状態の機械を進める | accepted |
+| [0056](0056-ekyc-provider-and-verification-levels.md) | eKYC は 4 つの口（セッションの作成、結果の取得、Webhook、データの削除）を持つ提供者のアダプターの裏に置き、方式ごとに提供者を替えられるようにする。確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は 1 つの関数でステートマシンを進める | accepted |
 | [0057](0057-identity-data-minimization-and-retention.md) | 本システムは確認の結果・方式・提供者の参照・時刻と、確認した属性（氏名、カナ、生年月日、住所）を `identity` の鍵の封筒の暗号化で持つ。書類と顔の画像は本システムの S3 に置かない。同じ人の検出はカナの氏名と生年月日の秘密の鍵の HMAC の指紋で行う。保存の期間と削除は `legal.kyc_*` に置き、結論まで記録を消さない | accepted |
 | [0059](0059-dispute-cases-and-sla-timers.md) | 紛争を案件（`cases`）として持ち、6 つの状態と 6 種類の SLA の時計を DB の期限の列で動かす。時計の期限は案件の優先度を上げ、待ち行列の先頭に出すだけで、お金を自動では動かさない。結論は 4 つ（続ける、受取とみなす、一部の返金、返金）で、遷移の関数の `ops_resolve` だけを通す | accepted |
 | [0060](0060-ops-money-interventions-and-proceeds-hold.md) | 運用のお金の介入（返金、一部の返金、補償、売上金の保留と解除）は、決まった仕訳の型だけで行い、額の閾値（返金 3 万円、補償 3,000 円）を超えたら別の人の承認を要する。売上金の保留は `seller_proceeds_held` の口座への振り替えで持ち、90 日ごとに見直す | accepted |

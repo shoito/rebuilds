@@ -45,7 +45,7 @@ merge queue ─▶ squash で main へ
 | `services/trips` | 遷移関数、決定表（DT-TRIP） | Dev のテックリード＋ QA |
 | `services/pricing`、`packages/money` | 運賃の計算、金額の型 | 運賃の持ち主＋ QA |
 | `services/payments` | 支払い、台帳 | お金の持ち主（Stripe の題材の [ADR-0032](../../../stripe/docs/decisions/0032-release-safety-for-money-moving-code.md) の考え方） |
-| `vectors/` | 状態機械のテストのベクター（アプリと共有。ADR-0006） | Dev のテックリード |
+| `vectors/` | ステートマシンのテストのベクター（アプリと共有。ADR-0006） | Dev のテックリード |
 | `apps/rider-ios`、`apps/rider-android`、`apps/driver-ios`、`apps/driver-android` | アプリ | アプリの持ち主 |
 | `apps/*/safety` | 緊急の入口 | 安全の持ち主＋ QA |
 | `infra/` | Terraform（[infrastructure.md](infrastructure.md) の 10 節） | Ops |
@@ -62,7 +62,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 | --- | --- | --- |
 | Go の検査 | `go vet`、`staticcheck`、`govulncheck`、`-race` の単体 | 1 件でも |
 | 契約 | `buf lint`、`buf breaking`（main と比べ、サポートするアプリのバージョンの範囲で互換を壊さない） | 互換を壊す変更に `contract-breaking` のラベルと承認がない |
-| 状態機械のベクター | Trips の遷移の表から作ったベクターを、サーバーと 4 つのアプリの reducer で通す（ADR-0006） | 1 件でも |
+| ステートマシンのベクター | Trips の遷移の表から作ったベクターを、サーバーと 4 つのアプリの reducer で通す（ADR-0006） | 1 件でも |
 | 決定表 | DT-TRIP・DT-DISP・DT-FARE・DT-PAY・DT-SUP を `spec.md` から読む表駆動テスト | 1 件でも |
 | 性質ベーステスト | PROP-LOC・GEO・DISP・TRIP・FARE・PAY・SUP・SEC（PR ごとに 1 万の列） | 1 件でも |
 | 配車の再生・シミュレーション | 配車の計算・設定を変える PR だけ。3 節 | 二重の割り当て 1 件、または基準の外 |
@@ -168,7 +168,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 - **列車**：月曜に切り、木曜に審査、金曜から公開。4 つのアプリを同じ列車で出す。
 - **段階的な公開**：iOS の段階的な公開は、1 日目 1%、2 日目 2%、3 日目 5%、4 日目 10%、5 日目 20%、6 日目 50%、7 日目 100%。止められる期間は合計 30 日まで。段階的な公開の最中も、App Store から手で更新する人には届く（[Release a version update in phases](https://developer.apple.com/help/app-store-connect/update-your-app/release-a-version-update-in-phases/)、2026-09-27 に確認）。手で更新する人がいるので、段階の割合を「新しいバージョンの利用者の上限」として当てにしない。新しい機能は release フラグで守る。
 - Android は Play の段階的な公開（1% → 5% → 20% → 50% → 100%）。Play は割合を自動で上げないので、`mobile-release-train` が毎日上げる。利用者は公開ごとに無作為に選ばれ、止めた後に同じ割合で再開すれば同じ利用者の群に届く。止めても、すでに更新した利用者は戻らない。段階的な公開は更新だけに使え、最初の公開には使えない（[Release app updates with staged rollouts](https://support.google.com/googleplay/android-developer/answer/6346149)、2026-09-27 に確認）。
-- **サーバーの互換**：サーバーは、最新から 8 つ前の列車のバージョンまでの契約（Protocol Buffers、状態機械のベクター、ヘッダー `<Brand>-Client`）を受け付ける。`buf breaking` はその範囲で検査する。
+- **サーバーの互換**：サーバーは、最新から 8 つ前の列車のバージョンまでの契約（Protocol Buffers、ステートマシンのベクター、ヘッダー `<Brand>-Client`）を受け付ける。`buf breaking` はその範囲で検査する。
 - **強制の更新**：`required_min` を上げるのは、セキュリティの欠陥、支払いと運賃の誤り、サーバーの互換を保てない変更のときだけ。Dev と Ops の 2 人の承認。乗車の最中と緊急の入口は塞がない（rider-and-driver-apps の 10.3 節）。サーバーは `required_min` より古いバージョンの受諾と出庫を 426 で拒むが、乗車中の操作（journal）は拒まない。
 - **ドライバーのアプリ**は、週末の夜に段階を進めない。
 - **安全の区分**の変更（緊急の入口、乗車の共有）は、変更単位の `quality.md` に端末の試験の結果を付ける。フラグの取得を失敗させた状態でも入口が出ることを、列車ごとの UI の試験で確かめる（ADR-0043）。
@@ -245,7 +245,7 @@ Slack の delivery.md の 2.1 節の段（型、lint、単体、結合、migrati
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
-| E1 | `ci-go-and-contracts` | 2.1 節の Go の検査、`buf breaking`、状態機械のベクター |
+| E1 | `ci-go-and-contracts` | 2.1 節の Go の検査、`buf breaking`、ステートマシンのベクター |
 | E1 | `appconfig-flag-taxonomy` | 6.1 節の 3 種類、検証の関数 |
 | E1 | `legal-gate-records` | `legal_gate_records` と画面、AppConfig の検証の関数での照合 |
 | E1 | `deploy-pipelines` | 4.2 節の方式ごとのパイプライン、時間帯と凍結の検査 |

@@ -12,7 +12,7 @@
       ▼                                                              ▼
 ┌──── 本システム（フリマのアプリと API、運用の画面）──────────────────────────────┐
 │  アカウントと端末、出品と写真、カテゴリ・ブランド・価格の提案、検索、保存した検索、         │
-│  取引の状態の機械、決済と預かり、台帳と売上金、振込とポイント、配送、メッセージ、        │
+│  取引のステートマシン、決済と預かり、台帳と売上金、振込とポイント、配送、メッセージ、        │
 │  評価、T&S、本人確認、紛争と CS、通知                                                │
 └──────────────────────────────────────────────────────────────────────┘
    ▲ 運用の画面（ops.<brand>.<domain>）       │ 外向き
@@ -42,7 +42,7 @@ flowchart TB
         idn["identity<br/>アカウント、セッション、端末、eKYC"]
         lst["listings<br/>出品、写真、質の検査"]
         srch["search-api<br/>検索、集計、おすすめ"]
-        txn["transactions<br/>購入、状態の機械、期限"]
+        txn["transactions<br/>購入、ステートマシン、期限"]
         pay["payments<br/>提供者のアダプター、inbox"]
         led["ledger<br/>複式簿記、残高"]
         pout["payouts<br/>振込、ポイント"]
@@ -141,7 +141,7 @@ flowchart TB
 | `identity` | 電話番号の確認、ログイン、セッション、端末、退会、eKYC の提供者との連携と確認の状態（accounts-and-devices、identity-verification の各領域） |
 | `listings` | 出品の作成と編集、写真の受け付け、質の検査、カテゴリ・ブランド・状態、価格の提案の呼び出し、出品の状態（公開、停止、取引中、売り切れ）、`listingVisible()`（[ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md)） |
 | `search-api` | 検索、絞り込み、集計、売れた品の検索、おすすめ。結果を返す前に `listingVisible()` の写しで絞る（[ADR-0008](../decisions/0008-search-engine-and-index.md)） |
-| `transactions` | `purchaseListing`、取引の状態の機械、期限、キャンセル、紛争の保留、評価の受け付け（[ADR-0002](../decisions/0002-transaction-state-machine-and-single-purchase.md)） |
+| `transactions` | `purchaseListing`、取引のステートマシン、期限、キャンセル、紛争の保留、評価の受け付け（[ADR-0002](../decisions/0002-transaction-state-machine-and-single-purchase.md)） |
 | `payments` | 決済の提供者のアダプター、冪等キー、Webhook の inbox、照会、返金（[ADR-0005](../decisions/0005-payments-via-providers-and-capture-at-purchase.md)） |
 | `ledger` | 複式簿記の仕訳、口座と残高、預かり・手数料・売上金・ポイント・振込の型、冪等な記帳の API（[ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md)、[ADR-0004](../decisions/0004-proceeds-model-under-payment-services-act.md)） |
 | `payouts` | 口座の登録、振込の申請と実行（提携銀行）、振込の失敗の戻し、ポイントの付与と使用 |
@@ -293,7 +293,7 @@ flowchart TB
 取引 1 件と、MAU 1 人の月あたりの原価を、次の和で見る。単価は [capacity.md](capacity.md) の 6 節で、AWS の東京の公開の価格から入れた。
 
 ```
-取引あたりの原価 = 購入と状態の機械（Fargate、Aurora core の書き込み）
+取引あたりの原価 = 購入とステートマシン（Fargate、Aurora core の書き込み）
                 ＋ 台帳（仕訳 3〜4 件、Aurora ledger）
                 ＋ 配送の連携（運送会社の API の呼び出し、Webhook）
                 ＋ 通知（プッシュ 5〜10 通、メール 1〜2 通）
@@ -347,7 +347,7 @@ MAU あたりの原価 = 検索（OpenSearch のデータノード、索引の�
 | IaC | Terraform | infrastructure の領域 |
 | 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana | observability の領域 |
 | フラグ | AWS AppConfig（`release.*`、`ops.*`、`legal.*`） | 他の題材と同じ |
-| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（取引の状態の機械、台帳）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者と運送会社の模型、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) |
+| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（取引のステートマシン、台帳）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者と運送会社の模型、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) |
 
 ## 5. 主な決定
 
@@ -356,7 +356,7 @@ MAU あたりの原価 = 検索（OpenSearch のデータノード、索引の�
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、ドメインごとのパッケージを持つ 1 つのコードベースを入口・Worker ごとのサービスで出す。Aurora は core・ledger・content の 3 クラスタ。ML だけ Python。検索は OpenSearch を汎用の部品として使う |
-| [0002](../decisions/0002-transaction-state-machine-and-single-purchase.md) | 取引を明示の状態の機械にし、購入を `purchaseListing` の 1 つの関数と 1 つのトランザクション（出品の条件つきの更新と、部分一意の索引）に集める。期限は DB の列と 1 分ごとの処理で動かし、紛争で止める（統合の工程で、発送の後の取り消しで出品を `paused` に戻すこと、先着の印を取り消しで消すことの注記を足した。ADR-0026・0027） |
+| [0002](../decisions/0002-transaction-state-machine-and-single-purchase.md) | 取引を明示のステートマシンにし、購入を `purchaseListing` の 1 つの関数と 1 つのトランザクション（出品の条件つきの更新と、部分一意の索引）に集める。期限は DB の列と 1 分ごとの処理で動かし、紛争で止める（統合の工程で、発送の後の取り消しで出品を `paused` に戻すこと、先着の印を取り消しで消すことの注記を足した。ADR-0026・0027） |
 | [0003](../decisions/0003-escrow-and-double-entry-ledger.md) | お金の正本を、取引ごとの預かりの口座を持つ追記だけの複式簿記の台帳にする。release と refund を冪等キーと一意の制約で 1 回に限り、取引と台帳を 5 分ごと、台帳と提供者・銀行を日次で照合する（統合の工程で、残高の hold の冪等キーを `hold_balance` に分けた注記を足した。ADR-0040） |
 | [0004](../decisions/0004-proceeds-model-under-payment-services-act.md) | 売上金・残高・ポイントを別の口座の種類にし、期限・使い道・本人確認の要否・保全を `legal.*` の設定で決める。収納代行・資金移動業・前払式支払手段のどれに整理されても切り替えられる形にし、法務の L1 の結論まで本番の値を有効にしない |
 | [0005](../decisions/0005-payments-via-providers-and-capture-at-purchase.md) | 決済は外部の提供者に任せ、本システムはカード番号に触れない。カードは購入の時に売上を確定し、預かりは本システムの台帳で持つ。冪等キー、Webhook の inbox、照会で結果を確かめる。Stripe の題材は提供者の 1 つとして使い、設計し直さない |
@@ -528,7 +528,7 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | E4 | カテゴリ・ブランド・価格の提案 |
 | E5 | 検索と発見：索引、日本語、絞り込みと集計、売れた品、いいね、基本のおすすめ |
 | E6 | 保存した検索と新着の通知 |
-| E7 | 取引：`purchaseListing`、状態の機械、期限、キャンセル、受取評価、照合 |
+| E7 | 取引：`purchaseListing`、ステートマシン、期限、キャンセル、受取評価、照合 |
 | E8 | 決済と預かり：提供者の連携、カード・コンビニ払い、返金、チャージバック |
 | E9 | 台帳と売上金：仕訳、手数料、売上金の残高と明細、照合 |
 | E10 | 振込とポイント：口座、振込、ポイント、売上金・ポイントでの購入 |

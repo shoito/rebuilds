@@ -324,7 +324,7 @@ erDiagram
 
 ### 3.1 `payroll_runs`
 
-給与の実行（状態機械）。定義元：[payroll-engine.md](../payroll-engine.md) の 4・5 節（DT-PAY-001）。
+給与の実行（ステートマシン）。定義元：[payroll-engine.md](../payroll-engine.md) の 4・5 節（DT-PAY-001）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

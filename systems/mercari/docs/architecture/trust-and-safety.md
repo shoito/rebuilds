@@ -31,7 +31,7 @@
   - 不正の兆し（乗っ取り、偽の発送、チャージバック、売上金の現金化）と規則
   - 法令の案件（削除の申し出 L9、利用の停止等の要請 L7）の受け付けと期限の枠組み
 - 扱わない：
-  - 出品の状態の機械（[listings-and-photos.md](listings-and-photos.md)）、知覚ハッシュの計算と使い回しの索引（同 5.3・5.4 節）
+  - 出品のステートマシン（[listings-and-photos.md](listings-and-photos.md)）、知覚ハッシュの計算と使い回しの索引（同 5.3・5.4 節）
   - 取引の取り消し・返金・売上金の保留の実行（`transactions-and-state-machine.md`、`disputes-and-customer-support.md`、`ledger-and-proceeds.md`）
   - 開示の請求（L7 第 5 条）と捜査機関の照会（L6）の手順（`disputes-and-customer-support.md`）
   - 運用者の権限と監査ログの仕組み（`security.md`）、端末の兆しの記録（`accounts-and-devices.md`）

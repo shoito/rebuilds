@@ -97,7 +97,7 @@ erDiagram
 
 ### 2.1 `live_streams`
 
-配信（[live-streaming.md](../live-streaming.md) の 5 節の状態の機械）。チャンネルの表。
+配信（[live-streaming.md](../live-streaming.md) の 5 節のステートマシン）。チャンネルの表。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

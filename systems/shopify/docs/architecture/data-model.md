@@ -685,7 +685,7 @@ erDiagram
 | D-35 | `inventory_daily_snapshots` は 3 日だけ置く | R3 は直近の写しだけを使う。量（約 3,000 万行/日）を抑える |
 | D-36 | 適格請求書の宛名は `tax_documents.addressee_ciphertext`（列の暗号）に置き、`body` に入れない | 不変の文書でも D1 を平文で持たない |
 | D-37 | `orders.payment_attempt_id`（一意）と `refunds.payment_attempt_id` を足した | 注文と返金がどの決済に属するかを列で持つ |
-| D-38 | `shops.provisioning_state` を `lifecycle_state` と分けた | 作成の失敗（7.1 節の `provisioning_failed`）はライフサイクルの状態の機械（ADR-0013）にない |
+| D-38 | `shops.provisioning_state` を `lifecycle_state` と分けた | 作成の失敗（7.1 節の `provisioning_failed`）はライフサイクルのステートマシン（ADR-0013）にない |
 | D-39 | 監査の鎖は `audit_chain_heads` の行で直列にする | 共有のアドバイザリーロックは直列にしない。鎖の頭が要る |
 | D-40 | `inventory_levels.version` は熱くない操作と事象のまとめ（1 品目 1 秒 1 回）だけが上げる | 確定で拠点の行を書くと熱い行になる（ADR-0020） |
 | D-41 | `refunds` は `order_id` か `checkout_id` のどちらか 1 つ、DT-RET-001 の動作を `operation` に持つ | 注文のないチェックアウトの返金と、取り消し・減額を同じ表で扱う |

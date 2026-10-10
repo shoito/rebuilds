@@ -6,7 +6,7 @@
 | --- | --- |
 | [ADR-0018](../decisions/0018-user-identifier-and-profile-store.md) | ユーザーの ID（`sub`）は接続から独立した不透明な値にし、再利用しない。プロファイル・外部の ID・メタデータを別の列と表に分け、メタデータの大きさに固い上限を置く |
 | [ADR-0019](../decisions/0019-account-linking.md) | ID のリンクは、両方の ID で本人が認証したときだけ行う。メールアドレスの一致だけで自動にリンクしない |
-| [ADR-0020](../decisions/0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた問い合わせの言語で行い、結果は 1,000 件まで。ブロックと削除は状態機械で扱い、削除した `sub` は墓標で再利用を防ぐ |
+| [ADR-0020](../decisions/0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた問い合わせの言語で行い、結果は 1,000 件まで。ブロックと削除はステートマシンで扱い、削除した `sub` は墓標で再利用を防ぐ |
 | [ADR-0002](../decisions/0002-tenancy-and-isolation.md) | ユーザーはテナントに属し、テナントをまたがない。全テーブルに `tenant_id` と RLS |
 | [ADR-0004](../decisions/0004-credential-storage.md) | パスワードのハッシュ、取り込んだ bcrypt の照合と作り直し |
 | [ADR-0014](../decisions/0014-connection-abstraction.md) | 接続の部品は `VerifiedIdentity` を返すだけで、ユーザーの表を書かない。外部の ID は `(tenant_id, connection_id, provider_user_id)` で特定する |
@@ -247,7 +247,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 
 ## 7. ブロックと削除
 
-### 7.1 状態機械
+### 7.1 ステートマシン
 
 ```
              create
@@ -414,7 +414,7 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 | --- | --- | --- |
 | [0018](../decisions/0018-user-identifier-and-profile-store.md) | ユーザーの ID は接続から独立した不透明な値にし、再利用しない。メタデータに固い上限 | accepted |
 | [0019](../decisions/0019-account-linking.md) | ID のリンクは両方の ID での本人の認証を必須にし、メールアドレスの一致だけでは自動にリンクしない | accepted |
-| [0020](../decisions/0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた言語で行う。ブロックと削除は状態機械で扱い、削除した ID を墓標で守る | accepted |
+| [0020](../decisions/0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた言語で行う。ブロックと削除はステートマシンで扱い、削除した ID を墓標で守る | accepted |
 
 ## 14. Story の候補
 

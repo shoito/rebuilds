@@ -7,7 +7,7 @@ Workday の再構築に関する決定。リポジトリ共通の決定は [docs
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、給与計算も TypeScript で書く。お金は整数の円と固定小数点で扱う | accepted |
 | [0002](0002-effective-dated-data-model.md) | 人事のデータを有効時間と記録時間の 2 軸で持ち、変更の差分を有効日の順に畳み込む | accepted |
-| [0003](0003-business-process-engine.md) | 業務プロセスを、バージョンつきの定義と Aurora に永続する状態機械で自前に作る | accepted |
+| [0003](0003-business-process-engine.md) | 業務プロセスを、バージョンつきの定義と Aurora に永続するステートマシンで自前に作る | accepted |
 | [0004](0004-payroll-engine.md) | 給与計算を、入力のスナップショットと規則表のバージョンから決まる純粋な計算にする | accepted |
 | [0005](0005-security-and-my-number.md) | ドメインと業務プロセスの権限と職務分掌で守り、マイナンバーは別アカウントの保管庫に置く | accepted |
 | [0006](0006-temporal-table-triplet-and-fold.md) | facet ごとの 3 つのテーブルを宣言から生成し、同じ日の差分の順序を事象の種類で決める | accepted |
@@ -30,7 +30,7 @@ Workday の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0023](0023-overtime-agreement-monitoring-and-monthly-close.md) | 36 協定を事業所ごとの設定で持ち、実績と見込みで段階的に警告し、月次の締めは集計のバージョンを給与に渡す | accepted |
 | [0024](0024-annual-leave-grant-ledger.md) | 年休を付与と追記のみの台帳で持ち、斉一的付与は法定を下回らない検査を通した設定だけを受ける | accepted |
 | [0025](0025-special-leave-and-leave-of-absence-boundary.md) | 休職は core-hr の雇用の状態が持ち、休暇の領域は日・半日・時間の単位の休暇と特別休暇を持つ | accepted |
-| [0026](0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行を状態機械にし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く | accepted |
+| [0026](0026-payroll-run-stages-and-input-snapshot.md) | 給与の実行をステートマシンにし、入力を RFC 8785 の正規の形と SHA-256 で固定して内容のアドレスで置く | accepted |
 | [0027](0027-pay-item-graph-and-formula-language.md) | 項目を段つきの依存のグラフにし、テナントの式は円・10 進・分の型を分けた式の木で書く | accepted |
 | [0028](0028-retro-deltas-and-bonus-runs.md) | 遡及は確定した期間の計算し直しとの差を当期の行にし、エンジンの違いによる差は止め、賞与は前月の確定を前提にする | accepted |
 | [0029](0029-parallel-run-and-compute-partitioning.md) | 計算を決まった束ごとに ECS のタスクで行い、並行稼働は許容の幅なしで差を分類して切り替えを判定する | accepted |

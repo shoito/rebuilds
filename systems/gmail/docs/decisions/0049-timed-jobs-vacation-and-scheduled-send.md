@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0049: 時刻の仕事は、メールボックスのシャードの `timers` の表と、シャードごとの見張り（1 秒ごと、`SKIP LOCKED`）で動かす。送信の依頼は `pending → releasing → released`・`canceled` の状態の機械で、取り消しと解放は条件つきの更新で競う。予約の送信は 100 通・366 日まで。不在の返信は RFC 3834 に沿い、差出人のアドレスの HMAC ごとに 96 時間に 1 回だけ返し、設定の文を変えたら覚えを消す
+# ADR-0049: 時刻の仕事は、メールボックスのシャードの `timers` の表と、シャードごとの見張り（1 秒ごと、`SKIP LOCKED`）で動かす。送信の依頼は `pending → releasing → released`・`canceled` のステートマシンで、取り消しと解放は条件つきの更新で競う。予約の送信は 100 通・366 日まで。不在の返信は RFC 3834 に沿い、差出人のアドレスの HMAC ごとに 96 時間に 1 回だけ返し、設定の文を変えたら覚えを消す
 
 詳細は [filters-forwarding-and-automation.md](../architecture/filters-forwarding-and-automation.md) の 6・7 節。
 

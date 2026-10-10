@@ -236,7 +236,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `data-lifecycle` | 解約・アカウントの削除の後のデータとブロックの消去。保持は法務：L6 |
 | `session-revocation` | 取り消しの伝わり方と Notify の切断（ADR-0041） |
 | `step-up-auth` | 危ない操作の再認証 |
-| `remote-unlink-and-wipe` | 切り離しと消去の状態の機械（ADR-0043） |
+| `remote-unlink-and-wipe` | 切り離しと消去のステートマシン（ADR-0043） |
 | `activity-events-pipeline` | ファイルの活動の事象（Firehose、Athena、欠けの照合） |
 | `content-scanner-framework` | 中身の検査の枠、`content_scan_policy`、`scan_state`、`verified_sha256`（ADR-0046）。法務：L1・L2 |
 

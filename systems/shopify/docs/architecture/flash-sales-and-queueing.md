@@ -16,7 +16,7 @@
 | [0024](../decisions/0024-waiting-room-ordering-and-admission-rate.md) | 開始の前の到着は開始の時刻に暗号の乱数で並べ、以後は来た順。受け入れは 1 つの数を進め、速さは在庫の予算と p99 の AIMD で決める。買い手は 1 秒キャッシュした状態をエッジから読む |
 | [0025](../decisions/0025-queue-pass-tokens.md) | 許可証は HMAC-SHA256 の短い値（ショップ・セール・セッション・期限 15 分・一意の ID）。エッジは状態なしで確かめ、チェックアウトの作成で一意の ID を DB に記録する |
 | [0026](../decisions/0026-bot-defense-and-purchase-limits.md) | ボット対策は WAF・待合室の入口のチャレンジ・許可証・1 人あたりの上限の 4 層。上限は正規化した識別の値のハッシュごとの数え上げで、在庫と同じ引き当てと確定 |
-| [0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md) | セールの予定を状態の機械にし、準備の作業の起点にする。予定にない急増は、チェックアウトの同時実行が上限の 80% を 30 秒続けたら、来た順だけの待合室を自動で有効にする |
+| [0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md) | セールの予定をステートマシンにし、準備の作業の起点にする。予定にない急増は、チェックアウトの同時実行が上限の 80% を 30 秒続けたら、来た順だけの待合室を自動で有効にする |
 
 ## 1. 範囲
 
@@ -319,7 +319,7 @@ flowchart LR
 
 | Epic | Story | 中身 |
 | --- | --- | --- |
-| E13 | `flash-sale-scheduling` | 4 節（ADR-0027。状態の機械、準備の作業） |
+| E13 | `flash-sale-scheduling` | 4 節（ADR-0027。ステートマシン、準備の作業） |
 | E13 | `waiting-room` | 5 節（ADR-0024。PROP-FLS-001・002） |
 | E13 | `queue-pass-tokens` | 6 節（ADR-0025。PROP-FLS-003） |
 | E13 | `bot-defense` | 7 節（WAF、チャレンジ） |

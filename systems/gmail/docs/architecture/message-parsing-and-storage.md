@@ -335,7 +335,7 @@ blob の参照は、目録のシャードの `blob_refs` の行の集合で持�
 - `hold` の参照は、統合の工程で「保留を掛けた時に、案件の ID ＋メッセージの行の ID で足す」から直した。保留を掛けた時に範囲の全メッセージへ足すと、S1 の最大の組織で 54 億の行になるため（ADR-0053）。同じ保全の行に複数の保留が当たっても、参照は 1 つで、案件は `preserved_messages.hold_ids` に持つ。
 - 参照の行を外した結果、その blob の行が 0 になったら、`blob_catalog.zero_since` に時刻を書く。
 
-### 8.2 状態の機械
+### 8.2 ステートマシン
 
 ```mermaid
 stateDiagram-v2
@@ -451,7 +451,7 @@ stateDiagram-v2
 | E4 | `charset-decoding-jp` | ラベルの表、推定、encoded-word の結合、RFC 2231、携帯のアドレス（6 節） |
 | E4 | `blob-format-v1` | 形式、フレーム、暗号化、試験のベクトル（7.1 節） |
 | E4 | `tenant-kek-hierarchy` | KEK と KMS、AES-KW、キャッシュ（7.2 節） |
-| E4 | `blob-catalog-and-refcount` | 参照の行、lease、状態の機械、鍵の破棄（8 節）。物理の消去の期限は法務：L6 |
+| E4 | `blob-catalog-and-refcount` | 参照の行、lease、ステートマシン、鍵の破棄（8 節）。物理の消去の期限は法務：L6 |
 | E4 | `blob-packer` | パック、詰め直し、目次（7.3 節） |
 | E4 | `served-view-edits` | 配る形、編集の表、範囲の読み出しの写し、後からの編集の世代（7.5 節） |
 | E4 | `quota` | 数え方、段階、超過の写し（9 節） |

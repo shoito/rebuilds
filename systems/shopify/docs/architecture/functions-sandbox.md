@@ -24,7 +24,7 @@
 - 扱わない：
   - 割引の組み合わせの規則と按分（[discounts-engine.md](discounts-engine.md)）。この文書は関数の提案を検証して渡すところまで
   - 配送の方法と送料の計算（[orders-and-fulfillment.md](orders-and-fulfillment.md)）、決済の手段の一覧（[payments-integration.md](payments-integration.md)）
-  - チェックアウトの状態の機械（[cart-and-checkout.md](cart-and-checkout.md)）
+  - チェックアウトのステートマシン（[cart-and-checkout.md](cart-and-checkout.md)）
   - `function-runner` のコンテナの IAM・ネットワークの全体（`security.md`、`infrastructure.md`）
 
 ## 2. 本家の形（確かめたこと）

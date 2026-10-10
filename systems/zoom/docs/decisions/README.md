@@ -28,7 +28,7 @@ Zoom の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | [0021](0021-web-client-browser-support.md) | 対応ブラウザは主要な 4 つの最新 2 メジャーにし、機能の差は参加の前に端末で調べて Meeting Actor に申告する | accepted |
 | [0022](0022-on-device-media-processing.md) | 仮想背景は MediaPipe の Selfie Segmenter を WebGPU でワーカーの中で動かし、強い雑音の抑制は RNNoise を AudioWorklet で動かす | accepted |
 | [0023](0023-desktop-electron-mobile-native.md) | デスクトップアプリは Electron で Web クライアントを包み、モバイルアプリはネイティブと自前の libwebrtc で作る | accepted |
-| [0024](0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は IO を持たない状態機械と鍵管理にし、TypeScript の状態機械とは同じ試験のベクトルで揃える | accepted |
+| [0024](0024-shared-rust-core-and-test-vectors.md) | 共通のコア（Rust）は IO を持たないステートマシンと鍵管理にし、TypeScript のステートマシンとは同じ試験のベクトルで揃える | accepted |
 | [0025](0025-recording-per-track-capture-and-offline-compose.md) | 録画は SFU から producer ごとの生の RTP を受けて書き、1 本の動画への合成は会議の後に行う | accepted |
 | [0026](0026-asr-engine-amazon-transcribe-with-adapter.md) | 日本語の音声認識は、S1 では Amazon Transcribe の ja-JP のストリーミングを話者ごとの流れで使い、エンジンは ASR Adapter の裏に置く | accepted |
 | [0027](0027-capture-consent-and-indicators.md) | 録画・文字起こしの間は、本人が同意するまで話させない。表示できないクライアントは入れず、E2EE の会議では 3 か所で開始を拒否する | accepted |

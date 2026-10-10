@@ -390,7 +390,7 @@ flowchart TD
 | 参加者 | 取り込んだ ATTENDEE・ORGANIZER は表示の情報として残し、iTIP を送らない。出欠は持たない |
 | リマインダー | 既定で付けない。利用者がカレンダーの既定のリマインダーを付ければ付く |
 
-状態の機械：
+ステートマシン：
 
 ```mermaid
 stateDiagram-v2

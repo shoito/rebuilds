@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-[ADR-0008](0008-monitor-evaluation-model.md) は、グループごとの状態の機械で遷移を決め、決定表は monitors-and-alerting の領域で書くとした。
+[ADR-0008](0008-monitor-evaluation-model.md) は、グループごとのステートマシンで遷移を決め、決定表は monitors-and-alerting の領域で書くとした。
 
 - 閾値の周りで値がゆれると、OK と ALERT を行き来する。本家は回復の閾値を持つ（[Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)、2026-10-09 に確認）。
 - 一時の揺れで鳴らさないため、「N 回続けて」の条件が要る（[architecture/README.md](../architecture/README.md) の 6 節の決定、既定 1）。
@@ -17,7 +17,7 @@ date: 2026-10-09
 ## Options
 
 1. **1 つの純粋な関数と決定表。ヒステリシスと続けての回数を状態に持つ**
-2. 種類ごと（メトリクス、ログ、複合）に別の状態の機械
+2. 種類ごと（メトリクス、ログ、複合）に別のステートマシン
 3. 閾値の判断だけを関数にし、データなし・不完全は評価器の外で扱う
 
 ## Decision

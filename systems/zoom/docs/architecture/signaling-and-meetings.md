@@ -1,6 +1,6 @@
 # Signaling and Meetings: Zoom
 
-会議を作って入るまでの流れと、会議の中の状態を動かす仕組み。会議の ID と URL、参加のトークン、Meeting Actor の状態機械とリース・`epoch` によるフェンシング、シグナリングのプロトコル、主催者の操作、再同期、Actor の障害からの 10 秒以内の回復を決める。
+会議を作って入るまでの流れと、会議の中の状態を動かす仕組み。会議の ID と URL、参加のトークン、Meeting Actor のステートマシンとリース・`epoch` によるフェンシング、シグナリングのプロトコル、主催者の操作、再同期、Actor の障害からの 10 秒以内の回復を決める。
 
 前提となる決定は、会議ごとに 1 つの Meeting Actor が状態の正本になる形（[ADR-0005](../decisions/0005-meeting-state-and-signaling.md)）、SFU での中継（[ADR-0002](../decisions/0002-media-topology.md)）、ブラウザの WebRTC と mediasoup-client（[ADR-0003](../decisions/0003-client-platform.md)）、E2EE の会議での MLS の順序付け（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)）。この文書で決めたことは次の ADR にある。
 
@@ -13,7 +13,7 @@
 
 ## 1. 目的と範囲
 
-- 扱う：会議の作成（すぐの会議）、会議の ID と URL、参加のトークン、Signaling Gateway と Meeting Actor の接続、Meeting Actor の状態機械、リースとフェンシング、スナップショットと差分、再接続と再同期、主催者の操作の判定と強制、Actor の障害からの回復、メディアの交渉のメッセージ（Media Node へ中継するもの）。
+- 扱う：会議の作成（すぐの会議）、会議の ID と URL、参加のトークン、Signaling Gateway と Meeting Actor の接続、Meeting Actor のステートマシン、リースとフェンシング、スナップショットと差分、再接続と再同期、主催者の操作の判定と強制、Actor の障害からの回復、メディアの交渉のメッセージ（Media Node へ中継するもの）。
 - 扱わない：待合室・パスコード・ロックの規則の中身と、ID の推測への流量の制限（[meeting-security.md](meeting-security.md)）、予定の会議と個人の会議の ID（[scheduling-and-calendar.md](scheduling-and-calendar.md)）、チャットの本文と保持（[chat-and-reactions.md](chat-and-reactions.md)）、MLS のメッセージの中身（[e2ee.md](e2ee.md)）、Media Node の中の転送（[media-server-sfu.md](media-server-sfu.md)）、ICE と TURN（[network-traversal.md](network-traversal.md)）。
 
 ## 2. 本家の形（確かめたこと）
@@ -125,7 +125,7 @@ Client                Gateway                 Valkey             Actor Host（�
 
 ## 5. Meeting Actor
 
-### 5.1 会議の状態機械
+### 5.1 会議のステートマシン
 
 ```
              最初の join             主催者が入る・または「主催者の前に入れる」設定
@@ -150,7 +150,7 @@ Client                Gateway                 Valkey             Actor Host（�
 - 同じ `meetings` の行に対して、同時に動く開催（`meeting_instances`）は 1 つだけにする（部分一意の索引 `WHERE ended_at IS NULL`）。
 - 参加者が 0 人になっても、60 秒は Live のまま待つ（主催者の再接続のため）。その後 Ending にする。
 
-### 5.2 参加者の状態機械
+### 5.2 参加者のステートマシン
 
 ```
  Joining ──▶ Waiting ──admit──▶ Admitted ──media 接続──▶ InMeeting

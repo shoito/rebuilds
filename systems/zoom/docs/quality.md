@@ -54,7 +54,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | 単体 | Actor の判定、層の上限の計算、設定の解決、RRULE、`mos_est` の式、RED の剥がし | Vitest、`cargo test`、mediasoup のフォークの C++ の試験 | 保存時、PR |
 | 表駆動 | `DT-...`：`spec.md` の決定表を直接読み込む | Vitest | PR |
 | 性質ベース | `PROP-...`（2.2.1 節） | fast-check、`proptest` | PR（1 万の列）、夜間（100 万の列） |
-| 試験のベクトル | RED、SFrame（RFC 9605 付録 C）、MLS、KID とセキュリティのコード、シグナリングの状態機械（TypeScript と Rust） | 自前 | PR |
+| 試験のベクトル | RED、SFrame（RFC 9605 付録 C）、MLS、KID とセキュリティのコード、シグナリングのステートマシン（TypeScript と Rust） | 自前 | PR |
 | RLS・マイグレーション | 文脈なし・別の組織の文脈で行が読めず書けない | Testcontainers、SQL | PR |
 | 契約 | シグナリングのスキーマの受けるバージョン（Web は N−1、アプリは N−2）、配布中の Web のバージョンの組、`qos.report` のスキーマ、公開 API の OpenAPI | 生成の検査 | PR |
 | 結合 | API・Gateway・Actor・Node Agent（mediasoup）＋ Aurora ＋ Valkey ＋ S3（MinIO） | Testcontainers、Docker の mediasoup | PR |
@@ -117,7 +117,7 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | **RED**（[ADR-0017](decisions/0017-opus-dtx-fec-red.md)） | **試験のベクトル：RED の剥がし**。RFC 2198 の形の RED のパケットの列（主＋冗長 2、長さ・時刻の差の境界の値、壊れたヘッダー）と、Chrome が送った実際の RED のパケットの記録を固定のベクトルにし、剥がした Opus のバイト列・RTP の時刻・連番が期待と一致する（**PROP-RED-001**）。mediasoup の上流のバージョンを上げるたびに必須。RED に対応しない受け手が剥がした Opus を再生できる（ブラウザの組み合わせ） |
 | **SFU**（[media-server-sfu.md](architecture/media-server-sfu.md) の 12 節） | PROP-SFU-001〜004（購読、層の上限、冪等、`epoch`）。**音声の枠**：PROP-SFU-005（枠の RTP の連番と時刻の連続）、PROP-SFU-006（受け手 1 人の音声の consumer が 3 以下）（[ADR-0057](decisions/0057-audio-slots-for-large-meetings.md)）。枠の PoC（E7）の合格：300 人で音声の consumer 900 以下、転送の遅れ p99 10ms 以内、`mos_est` の低下 0.1 未満 |
 | **シグナリングと Actor**（[signaling-and-meetings.md](architecture/signaling-and-meetings.md) の 14 節） | PROP-SIG-001〜006（収束、ロック、退出させた人、フェンシング、主催者、トークン）。**主催者の操作の決定表**（9.2 節の全行 × 役割 3 × 対象の役割 3。`host.suspend`・`host.readmit` などを含む）。10.2 節の突き合わせの表。`cmd` → `ack` の p95（損失 20% で 2 秒以内を目安） |
-| **試験のベクトル：TypeScript と Rust の状態機械**（[ADR-0024](decisions/0024-shared-rust-core-and-test-vectors.md)、[clients.md](architecture/clients.md) の 9.2 節） | 手で書くもの（再同期と障害の表の各行）と、fast-check で生成したもの（夜間 1 万本）。スキーマのリポジトリの PR で、両方の実装に全ベクトルを通し、**1 本でも出力が違えばマージしない**。E13 から必須（それまでは TypeScript 版だけで回す） |
+| **試験のベクトル：TypeScript と Rust のステートマシン**（[ADR-0024](decisions/0024-shared-rust-core-and-test-vectors.md)、[clients.md](architecture/clients.md) の 9.2 節） | 手で書くもの（再同期と障害の表の各行）と、fast-check で生成したもの（夜間 1 万本）。スキーマのリポジトリの PR で、両方の実装に全ベクトルを通し、**1 本でも出力が違えばマージしない**。E13 から必須（それまでは TypeScript 版だけで回す） |
 | **会議の安全**（[meeting-security.md](architecture/meeting-security.md) の 11 節） | **「待合室もパスコードもない会議」＝ 0**：PROP-SEC-001 を、API・組織の設定・カレンダー・公開 API・予定の更新のすべての経路の操作の列で回す。DB の `CHECK` と、毎日の本番の監査（4.1 節）でも 0 を確かめる。PROP-SEC-002〜004（ban、待合室、一時停止）。**推測の防御：存在しない番号と誤ったパスコードの応答の時間の p99 の差が 10ms 以内**（1 万回ずつ、同じ台から）。本文が同じ。1 つの IP から 1,000 個の番号で 21 個目から CAPTCHA、100 個の IP からの総当たりで 1 時間 50 回で鍵のない参加が止まる。3.2 節・3.3 節の決定表。`ip_prefix_hash` の pepper の入れ替えを挟んでも、同じ回線の印が 30 日効く |
 | **E2EE**（[e2ee.md](architecture/e2ee.md) の 14 節） | **PROP-E2EE-001〜006**（退出の後に復号できない、エポックと `epoch_authenticator` の収束、エポックごとに 1 つのコミット、外部の送り手の Add を拒む、鍵と CTR の組を 2 回使わない、鍵をサーバーに出さない）。**試験のベクトル：SFrame は RFC 9605 の付録 C のベクトル**を `core-e2ee` に通す。**MLS は mlswg の公開のベクトル**を OpenMLS のバージョンを上げるたびに通す。別の実装（mls-rs）との相互運用。KID とセキュリティのコードの Web とネイティブの一致。鍵の更新：100 人の会議で退出の確定（`Left`・`Removed`）から全員が新しい KID で送るまで p95 1 秒、最大 2 秒（NFR-008） |
 | **E2EE で動かない機能の 3 層の試験**（[ADR-0027](decisions/0027-capture-consent-and-indicators.md)、[ADR-0030](decisions/0030-security-code-and-e2ee-feature-limits.md)） | E2EE の会議で、録画・字幕・電話・チャットの保存・ファイルの開始を、**API（設定の組み合わせ）・Actor（命令）・Media Node（`rec_`・`asr_` の受け手の `subscriptions.apply`）** のそれぞれに直接送り、すべて拒否される。**1 層ずつ無効にした構成でも、残りの 2 層で拒否される**ことを確かめる（PROP-REC-003、PROP-TEL-001）。E2EE の会議の Valkey の Stream に暗号文だけがある |
@@ -142,7 +142,7 @@ Claude は PR を出す前に、次を自分で実行し、すべて通ること
 2. 変更箇所に関わる単体・表駆動・性質・結合テスト
 3. **メディアに触れたら、ラボの必須の 4 条件（`loss-20-random`、`bw-step-down`、`rtt-200`、`mixed-3`）を 5 回回し、PR の品質の報告を添える**
 4. **mediasoup のフォークに触れたら、RED のベクトル、DD の試験、短い fuzzing**
-5. **シグナリングのスキーマに触れたら、受けるバージョンの契約の試験と、状態機械のベクトル**
+5. **シグナリングのスキーマに触れたら、受けるバージョンの契約の試験と、ステートマシンのベクトル**
 6. **E2EE に触れたら、SFrame・MLS のベクトル、PROP-E2EE、暗号文の確認、3 層の拒否**
 7. 会議を作る・設定を変える経路に触れたら、PROP-SEC-001 をその経路で
 8. マイグレーションに触れたら、RLS の検査
@@ -254,7 +254,7 @@ SLI・SLO・アラート・リリースとロールバックは、Ops の [runbo
 | E10 大きな会議と Media Node の運用 | カナリア、make-before-break、音声の枠、DR | カナリアの比較の自動の判定（わざと音声を落とす AMI で波が止まる）。make-before-break の途切れ 500ms 以下。PROP-SFU-005・006 と、300 人の会議の負荷。**AZ と DR の訓練が 4.3 節の基準を満たす**。保持の削除の毎日の監査で 0 |
 | E11 公開 API と Webhook | 守り、権限、配送 | PROP-API-001〜004、RFC 9700 の確認の表の否定の試験、SSRF の試験、Webhook の本文に内容が現れない、OpenAPI の差分 0 |
 | E12 運用と GA の準備 | GA の判定 | **L3〜L5 に合格**。外部のペンテストの Critical・High がすべて修正済み。DR の訓練の合格。runbooks がそろっている（[runbooks/README.md](runbooks/README.md) の 4 節の「E12 までに作る」もの）。intent の K1〜K8 の試用の結果がある。法務の L1〜L8 のうち GA の判定に要るもの（L2・L4・L6・L8）が済んでいる |
-| E13 アプリ（MVP の後） | 状態機械のベクトル、バージョンの互換 | TypeScript と Rust の状態機械のベクトルが全件一致（夜間 1 万本）。N−2 のバージョンの契約の試験。Electron の安全の設定の検査。libwebrtc の追従の期限 |
+| E13 アプリ（MVP の後） | ステートマシンのベクトル、バージョンの互換 | TypeScript と Rust のステートマシンのベクトルが全件一致（夜間 1 万本）。N−2 のバージョンの契約の試験。Electron の安全の設定の検査。libwebrtc の追従の期限 |
 | E14 電話からの参加（MVP の後） | 同意、E2EE、不正な発信、遅れ | PROP-TEL-001〜003、IVR・ダイヤルアウトの決定表、電話の参加者の遅れ p95 400ms（2.2.1 節）。法務の L1・L7 の後 |
 
 ## 6. 責任分担

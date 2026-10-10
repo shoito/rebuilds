@@ -19,4 +19,4 @@
 | --- | --- | --- |
 | `runbooks/` の計画の手順 | [runbooks/README.md](runbooks/README.md) の 4 節の「計画」の手順 | Ops |
 | [architecture/data-model/](architecture/data-model/) | 領域ごとの表の目録（列・制約・索引・分割・保持・量）と ER 図、Aurora の外の置き場所 | Dev |
-| `primer/index.html` | 前提知識の資料（ポッドとセル、在庫の引き当て、チェックアウトの状態の機械、テンプレートの言語の安全、WebAssembly の燃料、GraphQL の費用の計算、インボイス制度の端数処理）（[リポジトリ共通の ADR-0008](../../../docs/decisions/0008-primers-on-github-pages.md)） | Dev |
+| `primer/index.html` | 前提知識の資料（ポッドとセル、在庫の引き当て、チェックアウトのステートマシン、テンプレートの言語の安全、WebAssembly の燃料、GraphQL の費用の計算、インボイス制度の端数処理）（[リポジトリ共通の ADR-0008](../../../docs/decisions/0008-primers-on-github-pages.md)） | Dev |

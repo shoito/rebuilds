@@ -14,7 +14,7 @@
               │                           地理空間の索引（Go、メモリ、都市×格子で分割）
               │                                     ▲
               ▼                                     │ 候補の検索
-     Trips（状態機械・割り当ての確定）◀── 割り当ての提案 ── 配車（Go、バッチのマッチング）
+     Trips（ステートマシン・割り当ての確定）◀── 割り当ての提案 ── 配車（Go、バッチのマッチング）
          │   │    │                                 │
          │   │    └──▶ Pricing（運賃の規則）          └──▶ ETA・経路（Valhalla ＋ 商用の地図）
          │   └──▶ Payments（外部の PSP）──▶ 事業者への精算
@@ -30,7 +30,7 @@
 | 地理空間の索引 | オンラインのドライバーの最新の位置と状態を、格子のセルでメモリに持つ。正本ではない |
 | 配車 | 区域ごとに 2 秒のバッチで、依頼とドライバーの組を最適化し、割り当てを Trips に提案する |
 | ETA・経路 | 迎車と乗車の ETA、多対一の ETA の行列、推計走行距離 |
-| Trips | 乗車の状態機械の正本。割り当ての確定、オファーの時間切れ、取り消し、提案の時の条件の確かめ直し |
+| Trips | 乗車のステートマシンの正本。割り当ての確定、オファーの時間切れ、取り消し、提案の時の条件の確かめ直し |
 | Pricing | 地域と事業者の運賃の規則で、運賃の目安、事前確定運賃、変動運賃を計算する |
 | Payments | 外部の PSP での与信と売上の確定、返金。事業者への精算と照合 |
 | リアルタイムの配信 | gRPC の双方向ストリームで状態の変化とオファーと車の位置を届ける。届かないときはプッシュ通知 |
@@ -44,7 +44,7 @@
 - **配車は再生できる。** 配車の入力（依頼、位置、ETA、乱数の種）を記録し、同じ入力から同じ判断を再現できるようにする（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)、[ADR-0015](../decisions/0015-offer-protocol-decision-log-and-replay.md)）。
 - **法務の確認待ちは仕組みで止める。** 法務の確認待ちの経路は legal のフラグの裏に置き、法務の結論の記録がないと本番で有効にできない。緊急の入口はどのフラグでも止まらない（[ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md)）。
 
-本家の構成との対応（出典の確認は 2026-09-27）：本家は 2014 年の構成で、配車を供給・需要・DISCO（配車の最適化）・地理の索引に分け、Ringpop（一貫ハッシュとゴシップ）でアプリケーションの層を分割していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015）。その後、乗車などの状態を持つ Fulfillment の基盤を、可用性を優先した構成（last-write-wins）から、Spanner の強い一貫性のトランザクションと階層的な状態機械（statechart）へ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07）。この設計は、後者の教訓（状態は強い一貫性で、1 つの遷移の仕組みで持つ）を S1 から採る。
+本家の構成との対応（出典の確認は 2026-09-27）：本家は 2014 年の構成で、配車を供給・需要・DISCO（配車の最適化）・地理の索引に分け、Ringpop（一貫ハッシュとゴシップ）でアプリケーションの層を分割していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015）。その後、乗車などの状態を持つ Fulfillment の基盤を、可用性を優先した構成（last-write-wins）から、Spanner の強い一貫性のトランザクションと階層的なステートマシン（statechart）へ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07）。この設計は、後者の教訓（状態は強い一貫性で、1 つの遷移の仕組みで持つ）を S1 から採る。
 
 ## 2. 規模の段階
 
@@ -83,7 +83,7 @@
 | 言語（熱い経路） | Go の 6 つのサービス：`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`（付随の役：`trail-builder`、`dispatch-shadow`） | メモリ上の状態と高い並行度を、単純な書き方で扱える（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md)、[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)） |
 | サービス間の契約 | Protocol Buffers と gRPC（Go と TypeScript の間、アプリとの常時の接続） | 型を 1 か所から生成する |
 | API | Hono＋Zod | 他の題材と同じ |
-| モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、状態機械はテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） |
+| モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、ステートマシンはテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） |
 | 地理 | 自前の六角形の格子 `geogrid`（`metro`・`district`・`block`・`street`・`spot`。判断の記録は `spot`） | [ADR-0002](../decisions/0002-hex-grid-geospatial-model.md) |
 | DB | Aurora PostgreSQL 18 の `core`（乗車・供給・運賃・地図（PostGIS）・安全）と `money`（支払い・台帳） | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md) |
 | キャッシュ・一時の状態 | Valkey（ElastiCache）`rt` と `cache`。正本は置かない | ADR-0038 |
@@ -103,10 +103,10 @@
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、熱い経路の 6 つのサービスは Go で、モバイルはネイティブで書く |
 | [0002](../decisions/0002-hex-grid-geospatial-model.md) | 地理の単位は自前の六角形の格子（geogrid）にし、ドライバーの索引はメモリの上で都市とセルで分ける |
-| [0003](../decisions/0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora の状態機械を正本にし、割り当ては `(region_gen, assignment_epoch)` の fencing token つきのトランザクションで 1 つに限る |
+| [0003](../decisions/0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora のステートマシンを正本にし、割り当ては `(region_gen, assignment_epoch)` の fencing token つきのトランザクションで 1 つに限る |
 | [0004](../decisions/0004-batched-dispatch-and-offers.md) | 配車は区域ごとの短いバッチで最適化し、オファーは 1 人ずつ、表示 15 秒・サーバーの期限 16.5 秒で送る |
 | [0005](../decisions/0005-maps-and-routing.md) | 経路と ETA は OSM の上の Valhalla を自前で動かし、住所の検索と事前確定運賃の距離は商用の提供者を使う |
-| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | アプリは Swift と Kotlin で書き、共有は生成した型と状態機械のテストのベクターに限る。週 1 回の列車、強制の更新は乗車の最中と緊急の入口を塞がない |
+| [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | アプリは Swift と Kotlin で書き、共有は生成した型とステートマシンのテストのベクターに限る。週 1 回の列車、強制の更新は乗車の最中と緊急の入口を塞がない |
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の許可で、出庫の間だけ背景で位置を取る。止まったら 60 秒で知らせる |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには主要経由地点を経由地として渡し、守ると確かめた引き継ぎ先だけを事前確定運賃で使う |
 | [0009](../decisions/0009-location-upload-and-validation.md) | 位置は HTTP/2 の POST で 4 秒ごとにまとめて送り、無状態の取り込みで検証して Kinesis に流す |
@@ -271,7 +271,7 @@ PM の方針（判断が要るところは推奨案でよい）により、次�
 | [dispatch-and-matching.md](dispatch-and-matching.md) | バッチのマッチング、候補の条件、オファーと時間切れ、流しとの両立、判断の記録と再生 | 0013〜0015 | QA | E5、E6 |
 | [eta-and-routing.md](eta-and-routing.md) | ETA の種類、Valhalla の運用、速度の表、精度の計測、推計走行距離 | 0016〜0017 | QA | E4 |
 | [pricing-and-fares.md](pricing-and-fares.md) | メーターの運賃、事前確定運賃、迎車料金、変動運賃、バージョンつきの規則、端数 | 0018〜0020 | QA、法務の窓口 | E7 |
-| [trips-lifecycle.md](trips-lifecycle.md) | 状態機械、割り当ての確定、取り消し、タイマー、outbox、通信が切れたときの継続と復元 | 0021〜0022 | QA | E6 |
+| [trips-lifecycle.md](trips-lifecycle.md) | ステートマシン、割り当ての確定、取り消し、タイマー、outbox、通信が切れたときの継続と復元 | 0021〜0022 | QA | E6 |
 | [payments-and-payouts.md](payments-and-payouts.md) | PSP、与信と確定、返金、代金の受け取りの形、台帳、精算、照合 | 0023〜0025 | QA、お金の持ち主 | E8 |
 | [supply-and-operators.md](supply-and-operators.md) | 事業者・営業所・車両・ドライバー、書類、出庫の判定、管理画面、日本版ライドシェアの運行枠 | 0026〜0027 | QA | E2、E12 |
 | [safety-and-trust.md](safety-and-trust.md) | 乗車の共有、緊急の通報、本人の確認、評価、番号を隠した通話、事故の報告 | 0028〜0029 | QA、安全の持ち主 | E10 |
@@ -292,15 +292,15 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 
 | Epic | 中身 |
 | --- | --- |
-| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・状態機械のベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格、監査ログ、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車とバージョンの方針、SMS のワンタイムコード |
+| E1 基盤とビルド | AWS・Terraform・CI（Go・TypeScript・契約・ステートマシンのベクター）、Aurora `core`・`money`、KMS の 6 種類の鍵、認証の骨格、監査ログ、可観測性、フラグ（release・ops・legal）と `legal_gate_records`、アプリの列車とバージョンの方針、SMS のワンタイムコード |
 | E2 事業者と供給 | 事業者・営業所・車両・ドライバーの登録、書類の確認、出庫の判定とセッション、点呼、事業者の管理画面、振込先 |
 | E3 位置と索引 | 位置の取り込みと検証、Kinesis、軌跡と当てはめ、索引とリースと再構築、検索、需給の集計、位置の閲覧の許可、端末の完全性 |
 | E4 地図と ETA | Valhalla のタイルと配信、ETA と補正と精度、推計走行距離、OSM と ODbL、住所の検索と乗降の地点、区域の多角形 |
 | E5 配車 | バッチの周期とリース、候補の条件、最適化、提案、判断の記録、再生・市場のシミュレーション・影の実行、受け入れの上限 |
-| E6 乗車とリアルタイム | 状態機械、割り当ての確定、タイマー、outbox、取り消し、journal と復元、オファーの手順、常時の接続、車の位置、プッシュ通知、不変条件の検査 |
+| E6 乗車とリアルタイム | ステートマシン、割り当ての確定、タイマー、outbox、取り消し、journal と復元、オファーの手順、常時の接続、車の位置、プッシュ通知、不変条件の検査 |
 | E7 運賃 | バージョンつきの運賃の規則、金額の型、距離制と影の計算、事前確定運賃、価格の群、迎車料金、メーターの連携、変動運賃（legal のフラグ）、水準の報告、`fare-replay` |
 | E8 決済と精算 | PSP の包み、与信と確定、追加の請求、キャンセル料、台帳、締めと振込、照合、代金の受け取りの形（legal のフラグ） |
-| E9 アプリ | 乗客とドライバーの画面、背景の位置と電池、オファーの画面、ナビの引き継ぎ、journal、状態機械のベクター、流しの実車（タクシーだけ） |
+| E9 アプリ | 乗客とドライバーの画面、背景の位置と電池、オファーの画面、ナビの引き継ぎ、journal、ステートマシンのベクター、流しの実車（タクシーだけ） |
 | E10 安全と信頼 | 緊急の入口と受け付け、乗車の共有（`legal.l4.share_trip`）、PIN、番号を隠した通話、メッセージ、評価、顔の照合（`legal.l4.driver_face_check`）、報告と事故、異常の検知、不正の点数 |
 | E11 サポートと運用のツール | 運用の画面、ロールと上限、一時の権限、乗車の調べ、軌跡の監査つきの閲覧、変更の要求、訂正と返金、問い合わせ、監査の照合 |
 | E12 日本版ライドシェアと GA の準備 | 日本版ライドシェア（要件、運行枠、台数、拡大、運賃、配車の条件。legal のフラグ）と、GA の準備（負荷試験 L1〜L11、大阪と DR の訓練、予定の拡大、侵入試験、両リージョンの削除、費用） |

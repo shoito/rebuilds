@@ -26,7 +26,7 @@ Stripe の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0019](0019-vault-encryption-and-key-hierarchy.md) | カード番号は CDE 専用の KMS の鍵でエンベロープ暗号化し、鍵の操作を役割ごとに分ける | accepted |
 | [0020](0020-cde-access-model.md) | CDE へのアクセスは、人は期限つきの承認（JIT）だけとし、AI エージェントには与えない | accepted |
 | [0021](0021-fraud-rules-engine.md) | 不正検知は Radar に寄せたルールの言語を決済の経路の中で同期に評価し、外部のサービスはシグナルの 1 つにする | accepted |
-| [0022](0022-merchant-onboarding-and-kyc.md) | 加盟店の審査は自前の状態機械で持ち、確認・照合は外部の提供者を使い、機能は `requirements` と capability で開け閉めする | accepted |
+| [0022](0022-merchant-onboarding-and-kyc.md) | 加盟店の審査は自前のステートマシンで持ち、確認・照合は外部の提供者を使い、機能は `requirements` と capability で開け閉めする | accepted |
 | [0023](0023-audit-log.md) | 監査ログは Slack の方式を引き継ぎ、CDE の記録は別の系統で log-archive へ直接送る | accepted |
 | [0024](0024-data-retention-and-deletion.md) | 財務の記録は法定の期間まで残し、カード番号と個人情報は用が済んだら消す。期間は法務の確認で確定する | accepted |
 | [0025](0025-webhook-signing-and-isolated-delivery.md) | Webhook は本家の署名方式で署名し、固定の IP を持つ隔離された egress VPC から送る | accepted |

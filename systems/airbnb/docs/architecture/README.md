@@ -47,7 +47,7 @@ flowchart TB
         avl["availability<br/>stay_claims、滞在の規則、カレンダー"]
         srch["search-api<br/>候補、空室の確かめ、順位"]
         prc["pricing<br/>quoteStay、税、為替"]
-        bkg["booking<br/>reserveStay、状態の機械、期限"]
+        bkg["booking<br/>reserveStay、ステートマシン、期限"]
         pay["payments<br/>提供者のアダプター、inbox"]
         led["ledger<br/>複式簿記、決着"]
         pout["payouts<br/>送金、保留"]
@@ -151,7 +151,7 @@ flowchart TB
 | `availability` | `stay_claims`（予約・仮押さえ・リクエスト・ブロック・取り込み）、排他の制約、滞在の規則（`checkStayRules`）、カレンダーの設定、物件のタイムゾーン（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)） |
 | `search-api` | 地図・地名・日付・人数・価格の検索。OpenSearch の候補 → Valkey の空室の写しでの確かめ → 料金 → 順位（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)） |
 | `pricing` | `quoteStay`：泊ごとの料金、割引、料金、サービス料、税、為替。見積もりの写し（`quotes`）（pricing-and-fees、taxes の各領域、[ADR-0008](../decisions/0008-multi-currency-and-fx.md)） |
-| `booking` | `reserveStay`・`alterReservation`・`cancelReservation`、予約の状態の機械、期限（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
+| `booking` | `reserveStay`・`alterReservation`・`cancelReservation`、予約のステートマシン、期限（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)） |
 | `payments` | 決済の提供者のアダプター、冪等キー、Webhook の inbox、照会、返金、チャージバック（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)） |
 | `ledger` | 通貨ごとの複式簿記の仕訳、預かりと決着、手数料、税の預かり、為替の口座（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)） |
 | `payouts` | 送金の口座、振り替えの後の送金の束、提携銀行・国際送金の提供者、送金の保留と失敗の戻し |
@@ -387,7 +387,7 @@ flowchart TB
 | [0001](../decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、ドメインごとのパッケージを持つ 1 つのコードベースを入口・Worker ごとのサービスで出す。Aurora は core・ledger・content・vault の 4 クラスタ。ML だけ Python。検索は OpenSearch を汎用の部品として使う |
 | [0002](../decisions/0002-availability-representation-and-double-booking.md) | 空室の正本を、予約・仮押さえ・リクエスト・ブロック・取り込みをまとめた `stay_claims` の泊の範囲の行にし、`(listing_id =, claim_group <>, block_span &&)` の排他の制約で、異なる組の重なりを DB で 0 にする。準備の日は各予約の後ろの範囲に含める。泊ごとの行はカレンダーの設定（料金、規則の上書き）にだけ使う。日付は物件の現地の日付 |
 | [0003](../decisions/0003-search-for-date-range-availability.md) | 日付の範囲の検索は 2 段にする。OpenSearch に空きの区間を `date_range` の欄で入れて「範囲を含む区間がある」で候補を 300 件に絞り、Valkey の空室の写し（2 年分の泊のビット列と規則の要約）で滞在の規則を確かめる。価格は粗く絞り、料金の要約で正しく絞る。正しさは予約の時の DB で守る |
-| [0004](../decisions/0004-booking-state-machine-and-holds.md) | 予約を明示の状態の機械にし、作成を `reserveStay` の 1 つの関数と 1 つのトランザクション（見積もりの確かめ、規則、排他の制約、180 日の数え）に集める。仮押さえは 10 分、リクエストは 24 時間の期限つきの `stay_claims`。冪等キーと見積もりの一意で予約を 1 回に限る。日程の変更は同じ予約の組（`claim_group`）の行で、相手の受諾の時に入れ替える |
+| [0004](../decisions/0004-booking-state-machine-and-holds.md) | 予約を明示のステートマシンにし、作成を `reserveStay` の 1 つの関数と 1 つのトランザクション（見積もりの確かめ、規則、排他の制約、180 日の数え）に集める。仮押さえは 10 分、リクエストは 24 時間の期限つきの `stay_claims`。冪等キーと見積もりの一意で予約を 1 回に限る。日程の変更は同じ予約の組（`claim_group`）の行で、相手の受諾の時に入れ替える |
 | [0005](../decisions/0005-payments-hold-capture-and-ledger.md) | 決済は提供者に任せ、即時予約は確定の時に売上を確定する。リクエストはオーソリだけを取り、承認で確定する。お金は予約ごとの預かりの口座を持つ通貨ごとの複式簿記の台帳で持ち、チェックインの予定の時刻 + 24 時間にホストへの支払いへ振り替える。決着は冪等キーで 1 回 |
 | [0006](../decisions/0006-regulatory-night-cap-enforcement.md) | 届出住宅を `regulated_properties` として持ち、泊の日を `regulated_nights`（届出住宅 × 日）に予約と同じトランザクションで挿入し、年度の数を CHECK 制約で守る。自治体の規則はバージョンの付いた表。数え方の解釈と他の掲載先の泊の扱いは `legal.*` に置く |
 | [0007](../decisions/0007-tenancy-host-accounts-and-rls.md) | テナントは 1 つ。本人の表は本人、ホストの表はホストのアカウント（共同ホストの役割）、予約の表はゲストとホストのアカウントの 2 者の FORCE RLS にする。PMS は OAuth のアプリとしてホストのアカウントの範囲で動く。リスティングの見える範囲は `listingVisible()` の 1 つの関数 |
@@ -578,7 +578,7 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | E6 | カレンダーの同期：iCal の取り込みと書き出し、食い違いの検出 |
 | E7 | 検索と順位付け：索引、2 段の空室の絞り込み、価格、日付を決めない検索、順位の式 |
 | E8 | 料金・手数料・税：料金の規則、割引、料金、サービス料、税の表、`quoteStay` |
-| E9 | 予約と仮押さえ：`reserveStay`、状態の機械、即時予約、リクエスト、熱い日付、確認の画面 |
+| E9 | 予約と仮押さえ：`reserveStay`、ステートマシン、即時予約、リクエスト、熱い日付、確認の画面 |
 | E10 | キャンセルと変更：ポリシーの表、返金の計算、ホストのキャンセル、日程の変更 |
 | E11 | 決済と為替：提供者の連携、売上の確定、返金、チャージバック、相場の写し |
 | E12 | 台帳と送金：仕訳、預かりと決着、release、送金、保留、照合 |

@@ -1,6 +1,6 @@
 # Identity verification: Mercari
 
-本人確認（eKYC）。外部の eKYC の提供者との連携、確認の方式と水準、確認の状態の機械、確認で開く機能と上限、確認の記録の持ち方と削除、同じ人の複数のアカウントの検出、再確認、疑わしい取引の届出の枠組みを決める。法令の結論（方式の選び方、記録の保存、上限の値）は書かず、法務の確認待ち（L1・L2・L5）とする。
+本人確認（eKYC）。外部の eKYC の提供者との連携、確認の方式と水準、確認のステートマシン、確認で開く機能と上限、確認の記録の持ち方と削除、同じ人の複数のアカウントの検出、再確認、疑わしい取引の届出の枠組みを決める。法令の結論（方式の選び方、記録の保存、上限の値）は書かず、法務の確認待ち（L1・L2・L5）とする。
 
 前提となる決定は次のとおり。
 
@@ -14,7 +14,7 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0056](../decisions/0056-ekyc-provider-and-verification-levels.md) | eKYC は提供者のアダプター（セッションの作成、結果の取得、Webhook、データの削除の 4 つの口）の裏に置き、方式（`ic_chip`・`document_face`）ごとに提供者を替えられるようにする。利用者の確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は Webhook と照会のどちらから来ても 1 つの関数で状態の機械を進める |
+| [0056](../decisions/0056-ekyc-provider-and-verification-levels.md) | eKYC は提供者のアダプター（セッションの作成、結果の取得、Webhook、データの削除の 4 つの口）の裏に置き、方式（`ic_chip`・`document_face`）ごとに提供者を替えられるようにする。利用者の確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は Webhook と照会のどちらから来ても 1 つの関数でステートマシンを進める |
 | [0057](../decisions/0057-identity-data-minimization-and-retention.md) | 本システムは、確認の結果、方式、提供者の参照、確認の時刻と、確認した属性（氏名、カナ、生年月日、住所）を `kms-kyc` の鍵の封筒の暗号化で持つ。書類と顔の画像は本システムの S3 に置かない（提供者に置き、保存の期間は法務の結論で提供者の設定にする）。同じ人の検出は、カナの氏名と生年月日を秘密の鍵の HMAC にした指紋で行う。保存の期間・削除は `legal.kyc_*` に置き、結論まで記録を消さない |
 
 ## 1. 範囲
@@ -97,7 +97,7 @@ sequenceDiagram
     P-->>Q: Webhook（署名つき）結果の通知
     Q->>ID: inbox で重複を除く
     ID->>P: getResult（照会で確かめる）
-    ID->>ID: applyKycResult：属性の暗号化、指紋、重複の検査、状態の機械、outbox
+    ID->>ID: applyKycResult：属性の暗号化、指紋、重複の検査、ステートマシン、outbox
     ID-->>App: 結果（プッシュとアプリの画面）
 ```
 

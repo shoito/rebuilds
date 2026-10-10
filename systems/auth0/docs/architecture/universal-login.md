@@ -57,7 +57,7 @@
 - どの画面も、トランザクションの `state` がないか無効なら `/u/error`（`invalid_transaction`）へ送る。
 - 資格情報を含む `POST` の後のリダイレクトは 303 にする（[security.md](security.md) の SEC-015）。
 
-### 3.2 トランザクションの状態機械
+### 3.2 トランザクションのステートマシン
 
 ```
              /authorize の検証が通る
@@ -293,7 +293,7 @@ CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: par
 テスト名には要件 ID を含める（開発リポジトリで採番する）。
 
 - 任意の画面の操作の列（戻る、2 つのタブ、同時の送信、期限の経過を含む）で：
-  - 認可コードは、状態機械で `completed` に着いたトランザクションからだけ、1 回だけ出る。
+  - 認可コードは、ステートマシンで `completed` に着いたトランザクションからだけ、1 回だけ出る。
   - `mfa_required` を通るべきトランザクションが、MFA を経ずに `completed` にならない。
 - 任意のテーマ・文言の値（任意の Unicode、HTML、スクリプトの断片）で、描いた HTML を解析すると、本システムの nonce の付いた `<script>` 以外にスクリプトが実行されうる要素・属性がない。
 - 任意の `ui_locales` と `Accept-Language` で、13.2 の参照の実装と結果が一致する。
@@ -319,7 +319,7 @@ CREATE INDEX ON login_transactions (tenant_id, handle_hash);  -- not UNIQUE: par
 | Epic | Story の候補 |
 | --- | --- |
 | E1 | 画面の骨格：Hono の JSX、nonce の CSP のミドルウェア、ヘッダーの一式、ルートの一覧からのヘッダーのテスト |
-| E3 | `login_transactions` の表と、`/authorize` からの作成、`state` と Cookie の結び付け、状態機械の骨格（authentication-flows と一緒に） |
+| E3 | `login_transactions` の表と、`/authorize` からの作成、`state` と Cookie の結び付け、ステートマシンの骨格（authentication-flows と一緒に） |
 | E4 | 識別子・パスワードの画面（Identifier First）、CSRF の 3 つの検査、13.1 の決定表 |
 | E4 | サインアップ（verify-first）・再設定・メールアドレスの確認の画面（connections と一緒に） |
 | E4 | テーマと文言の上書き、`ja`・`en` の文言、言語の選び方（13.2） |

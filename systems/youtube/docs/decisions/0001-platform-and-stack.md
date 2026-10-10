@@ -72,7 +72,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 
 | 用途 | 自前（核） | 使う汎用の部品 |
 | --- | --- | --- |
-| パイプラインの指揮 | 段の状態の機械、区切りの分け方、作業の配り、やり直し（`crates/pipeline`） | SQS、Aurora |
+| パイプラインの指揮 | 段のステートマシン、区切りの分け方、作業の配り、やり直し（`crates/pipeline`） | SQS、Aurora |
 | ラダーの決め方 | 複雑さの試し、段の選び方、`ladder_version`（`crates/ladder`） | libvmaf |
 | 符号化 | 区切りの符号化の殻、継ぎ目の検査 | FFmpeg のライブラリ（LGPL の組み立て）、x264、SVT-AV1、NVENC |
 | パッケージ | CMAF の書き手、セグメントの索引、マニフェストの生成（`crates/cmaf`） | なし（形式は標準） |

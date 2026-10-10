@@ -74,7 +74,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `security-history` | `security_events` と画面（監査ログの一部） |
 | `request-logs` | `api_request_logs`（メタデータ 30 日） |
 | `audit-log-core` | `audit_events`・`platform_audit_events`、log-archive へのハッシュの連鎖（ADR-0023） |
-| `onboarding-requirements` | `requirements`・capability の状態機械、`evaluateAccountCapabilities`（ADR-0022。法務の確認待ち） |
+| `onboarding-requirements` | `requirements`・capability のステートマシン、`evaluateAccountCapabilities`（ADR-0022。法務の確認待ち） |
 | `kyc-kyb-providers` | eKYC、法人番号・登記、反社・制裁・PEP の照合、口座の名義の照合（法務の確認待ち） |
 | `risk-review-console` | 社内の審査の画面、判断の記録、書類の閲覧の理由（法務の確認待ち） |
 | `rejection-and-appeal` | 拒否・終了、残高の留保、異議（法務の確認待ち：L7） |

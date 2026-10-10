@@ -170,7 +170,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `skills` | スキルの表と画面 |
 | `on-call-schedules` | 当番表と当番の関数（PROP-ONC-001〜003） |
 | `on-call-overrides` | 差し替え |
-| `escalation-policies-and-paging` | 方針と呼び出しの状態機械、`page_escalation`、DT-PAGE-001（PROP-PAGE-001・002） |
+| `escalation-policies-and-paging` | 方針と呼び出しのステートマシン、`page_escalation`、DT-PAGE-001（PROP-PAGE-001・002） |
 | `pager-channel-interface` | 経路の差し込み口とメールの経路。プッシュの経路は E8 の `web-push-and-pwa` の後にフラグで有効にする |
 | `paging-ack-channels` | 受け付け（メールのリンクからのログイン。プッシュは E8 の後） |
 

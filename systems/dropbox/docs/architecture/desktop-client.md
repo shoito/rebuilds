@@ -7,7 +7,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0013](../decisions/0013-desktop-process-model-and-resource-budget.md) | デスクトップのクライアントは、`sync-core` を持つ 1 つの常駐のプロセス（Tauri のホスト）と、開いたときだけ作る UI の WebView と、macOS の File Provider の拡張（薄い中継）に分ける。核の判断はホストのプロセスだけが持つ。資源の予算（メモリー 300 MB の内訳、静かなときの起き方）を部品ごとに決め、リリースごとに測る |
-| [0014](../decisions/0014-desktop-unlink-and-wipe-execution.md) | 資格が効かなくなったら同期を止め、端末の鍵で状態を確かめる。切り離しでは手元のファイルと DB を残し、同じアカウントで入り直せば続きから同期する。消去では、同期のルートの登録を先に外し、意図の記録を通して同期のフォルダーの中だけを消し、DB を最後に消して報告する。資格と状態の機械はアカウントの側の ADR-0041・0043 |
+| [0014](../decisions/0014-desktop-unlink-and-wipe-execution.md) | 資格が効かなくなったら同期を止め、端末の鍵で状態を確かめる。切り離しでは手元のファイルと DB を残し、同じアカウントで入り直せば続きから同期する。消去では、同期のルートの登録を先に外し、意図の記録を通して同期のフォルダーの中だけを消し、DB を最後に消して報告する。資格とステートマシンはアカウントの側の ADR-0041・0043 |
 
 ## 1. 目的と範囲
 
@@ -181,7 +181,7 @@ flowchart LR
 
 ## 7. 端末の登録と切り離し
 
-端末の資格（登録、端末の鍵、回転する更新トークン、取り消し）は [ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)、切り離しと消去の状態の機械と消すものは [ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) が決める（[accounts-and-teams.md](accounts-and-teams.md)）。この節は、デスクトップのクライアントの側の手順を決める（[ADR-0014](../decisions/0014-desktop-unlink-and-wipe-execution.md)）。
+端末の資格（登録、端末の鍵、回転する更新トークン、取り消し）は [ADR-0041](../decisions/0041-accounts-auth-and-device-credentials.md)、切り離しと消去のステートマシンと消すものは [ADR-0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) が決める（[accounts-and-teams.md](accounts-and-teams.md)）。この節は、デスクトップのクライアントの側の手順を決める（[ADR-0014](../decisions/0014-desktop-unlink-and-wipe-execution.md)）。
 
 ### 7.1 登録
 

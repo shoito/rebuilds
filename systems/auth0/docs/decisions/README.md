@@ -24,7 +24,7 @@ Auth0 の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0017](0017-enterprise-connections.md) | エンタープライズ接続（MVP の後）は、SAML の SP を保守されたライブラリで作り、LDAP は外向きにだけつなぐコネクタで受ける | accepted |
 | [0018](0018-user-identifier-and-profile-store.md) | ユーザーの ID は接続から独立した不透明な値にし、再利用しない。メタデータに固い上限を置く | accepted |
 | [0019](0019-account-linking.md) | ID のリンクは両方の ID での本人の認証を必須にし、メールアドレスの一致だけでは自動にリンクしない | accepted |
-| [0020](0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた言語で行う。ブロックと削除は状態機械で扱い、削除した ID を墓標で守る | accepted |
+| [0020](0020-user-search-and-lifecycle.md) | ユーザーの検索は Aurora の reader の上の限られた言語で行う。ブロックと削除はステートマシンで扱い、削除した ID を墓標で守る | accepted |
 | [0021](0021-authenticator-model-and-assurance-levels.md) | MFA の要素を認証器の共通の型で持ち、達成した AAL を `acr` で返す。メールの OTP は AAL2 に数えない | accepted |
 | [0022](0022-webauthn-and-passkeys.md) | WebAuthn は保守されたライブラリで検証し、RP ID をテナントで固定する。UV 付きのパスキーは単独で MFA を満たす | accepted |
 | [0023](0023-otp-and-recovery-codes.md) | TOTP は RFC 6238 の既定で再利用を拒む。リカバリーコードは Argon2id、メールの OTP は鍵付きハッシュで保存し、どちらも試行の上限で守る | accepted |

@@ -4,7 +4,7 @@
 
 | 関連 | 決定 |
 | --- | --- |
-| [ADR-0022](../decisions/0022-merchant-onboarding-and-kyc.md) | 審査は自前の状態機械で持ち、本人確認・法人確認・反社・制裁の照合は外部の提供者を使う。機能は `requirements` と capability で開け閉めする |
+| [ADR-0022](../decisions/0022-merchant-onboarding-and-kyc.md) | 審査は自前のステートマシンで持ち、本人確認・法人確認・反社・制裁の照合は外部の提供者を使う。機能は `requirements` と capability で開け閉めする |
 | [ADR-0002](../decisions/0002-account-tenancy.md) | 加盟店のアカウントがテナント。テスト環境は審査なしで使える |
 | [ADR-0003](../decisions/0003-double-entry-ledger.md) | リザーブは台帳の口座で表す |
 | [ADR-0024](../decisions/0024-data-retention-and-deletion.md) | 本人確認の記録の保持 |
@@ -187,7 +187,7 @@ account_reserves         (account_id, id, kind, percent, window_days, fixed_amou
 | Epic | Story の候補 |
 | --- | --- |
 | E1 | 登録とテスト環境の即時の利用、`charges_enabled` の判定の骨格 |
-| E2 | `requirements` と capability の状態機械、個人事業主・法人の入力、eKYC・法人番号・反社・制裁の連携、口座の名義の照合、リスクの審査の管理画面、拒否と異議 |
+| E2 | `requirements` と capability のステートマシン、個人事業主・法人の入力、eKYC・法人番号・反社・制裁の連携、口座の名義の照合、リスクの審査の管理画面、拒否と異議 |
 | E4 | リザーブの仕訳と解放のジョブ、入金先の口座の変更時の停止 |
 | E7 | ダッシュボードの有効化のフォーム、要対応の表示 |
 | E8 | コンビニ払い・銀行振込の capability |

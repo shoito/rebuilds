@@ -175,7 +175,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | E9 | 中身の検査の `scan_state` と経路の表（[ADR-0046](decisions/0046-content-scanning-framework.md)） | PROP-PREV-001〜003、PROP-SRCH-001〜003 | [previews-and-thumbnails.md](architecture/previews-and-thumbnails.md)、[search.md](architecture/search.md) |
 | E10 | DT-CAM-001 | PROP-CAM-001・002 | [mobile-and-camera-upload.md](architecture/mobile-and-camera-upload.md) |
 | E11 | DT-API-001・002、DT-HOOK-001 | PROP-API-001〜003、PROP-HOOK-001〜003 | [api-and-webhooks.md](architecture/api-and-webhooks.md) |
-| E12 | 再認証の要否、役割と操作、プランと機能、端末の状態の機械（`REQ-ACCT-*`） | 停止の 60 秒、更新トークンの再使用（`PROP-ACCT-*`） | [accounts-and-teams.md](architecture/accounts-and-teams.md) の 15 節 |
+| E12 | 再認証の要否、役割と操作、プランと機能、端末のステートマシン（`REQ-ACCT-*`） | 停止の 60 秒、更新トークンの再使用（`PROP-ACCT-*`） | [accounts-and-teams.md](architecture/accounts-and-teams.md) の 15 節 |
 
 - シミュレーターのサーバーの模型に、ファイルの削除の `base_rev`、フォルダーの削除の `base_seq`、2 段の置き場所、名前空間をまたぐ移動の保留を入れ、本物の `packages/committer` と契約の試験で比べる（[metadata-and-journal.md](architecture/metadata-and-journal.md) の 13 節）。
 - シミュレーターの操作の生成器に、名前の入れ替え、名前空間をまたぐ移動とコピー、`pending_commits` の残った再起動、フォルダーの削除と中への追加の競争を足す（[sync-engine.md](architecture/sync-engine.md) の 18 節）。

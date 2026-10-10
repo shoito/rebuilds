@@ -580,7 +580,7 @@ erDiagram
 
 | 不変条件 | 守り方（DB・形式・試験） | 根拠 |
 | --- | --- | --- |
-| **250 はスプールと待ち行列の確定の後だけ** | `mx-edge` の状態の機械：PUT（`x-amz-checksum-sha256`）と SQS の送信の両方の成功の後に 250、確定の予算 5 秒で 451。submission も `mailstore` の確定の後に 250 | [ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) |
+| **250 はスプールと待ち行列の確定の後だけ** | `mx-edge` のステートマシン：PUT（`x-amz-checksum-sha256`）と SQS の送信の両方の成功の後に 250、確定の予算 5 秒で 451。submission も `mailstore` の確定の後に 250 | [ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) |
 | **受け付けたメッセージを失わない** | 掃除の役（5 分ごと、`spool/` と `spool-done`・`spool-rejected` の束の突き合わせ）、DLQ を消さない、毎時の突き合わせ（1 時間で印のないもの 1 件で SEV1 の候補）、隔離の写しの前に終わりの印を書かない、大阪での配り直し（失うより重複）。PROP-CAP-001 | [ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)、[ADR-0064](../decisions/0064-storage-classes-and-region-replication.md) |
 | **配送は受け手ごとに 1 回** | `delivery_log` の PK `(tenant_id, account_id, accept_day, delivery_id)` と `ON CONFLICT DO NOTHING`。`accept_day` は `delivery_id` から決まる。保持 90 日 ≥ スプールの寿命 | [ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0051](../decisions/0051-address-groups-expansion-and-loop-prevention.md) |
 | **受け付けた後に迷惑メールで送り返さない** | DSN を作るのは `delivery_log.result_code = dsn_created`（配送の不能）だけ。選別の判定から DSN の経路がない（PROP-FLT-003） | [ADR-0002](../decisions/0002-accept-then-filter.md) |

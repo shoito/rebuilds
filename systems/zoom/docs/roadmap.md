@@ -323,7 +323,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | Story | 内容 |
 | --- | --- |
 | `signaling-test-vectors` | ベクトルの形式、生成、CI（最初に行う） |
-| `core-signaling-rust` | 状態機械の Rust 版 |
+| `core-signaling-rust` | ステートマシンの Rust 版 |
 | `desktop-electron-shell` | Electron、安全の設定、自動更新 |
 | `desktop-screen-share-audio` | システムの音声 |
 | `libwebrtc-build-pipeline` | libwebrtc と libmediasoupclient のビルドと追従 |

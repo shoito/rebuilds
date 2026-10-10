@@ -6,7 +6,7 @@ SLO と軽いインシデント管理を決める。メトリクスの SLO と�
 
 - クエリは IR を通し、ダッシュボード・モニターと同じエンジンで実行する（[ADR-0007](../decisions/0007-query-language.md)）
 - メトリクスの受け付けの窓は過去 1 時間。ブロックの書き出しは区切りから 70 分（[ADR-0004](../decisions/0004-tsdb-storage-engine.md)）
-- モニターの評価、水位、状態の機械、遷移の記録（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)、[ADR-0041](../decisions/0041-monitor-state-machine.md)）。フラッピングは状態を変えない（[ADR-0042](../decisions/0042-flapping-and-renotify.md)）。ダウンタイムは状態を進め通知だけを抑える（[ADR-0043](../decisions/0043-downtimes-as-evaluation-input.md)）
+- モニターの評価、水位、ステートマシン、遷移の記録（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)、[ADR-0041](../decisions/0041-monitor-state-machine.md)）。フラッピングは状態を変えない（[ADR-0042](../decisions/0042-flapping-and-renotify.md)）。ダウンタイムは状態を進め通知だけを抑える（[ADR-0043](../decisions/0043-downtimes-as-evaluation-input.md)）
 - 通知は [notifications-and-integrations.md](notifications-and-integrations.md) の経路（[ADR-0045](../decisions/0045-notification-delivery-model.md)）
 - インシデント管理は MVP に軽いものを含める。オンコールの当番の表は持たず、外部のオンコールのサービスに渡す（[architecture/README.md](README.md) の 6 節の決定）
 

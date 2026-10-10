@@ -13,7 +13,7 @@
 ## 1. 目的と範囲
 
 - 扱う：区域とバッチの周期、配車のプロセスの持ち主、候補の絞り込み、コストと最適化、貪欲法への切り替え、Trips への提案、オファーの手順と時間切れ、流しとの両立、判断の記録、再生、シミュレーション、影の実行。
-- 扱わない：乗車の状態機械と割り当ての確定（`trips-lifecycle.md`。この文書は Trips に求める振る舞いだけを書く）、ETA の求め方（[eta-and-routing.md](eta-and-routing.md)）、運行枠と事業者の属性の登録（`supply-and-operators.md`）、オファーの端末への配信（`notifications-and-realtime-push.md`）、運賃（`pricing-and-fares.md`）、機能の展開のフラグと影の実行の基盤（`delivery.md`）。
+- 扱わない：乗車のステートマシンと割り当ての確定（`trips-lifecycle.md`。この文書は Trips に求める振る舞いだけを書く）、ETA の求め方（[eta-and-routing.md](eta-and-routing.md)）、運行枠と事業者の属性の登録（`supply-and-operators.md`）、オファーの端末への配信（`notifications-and-realtime-push.md`）、運賃（`pricing-and-fares.md`）、機能の展開のフラグと影の実行の基盤（`delivery.md`）。
 
 ## 2. 本家の形（確かめたこと）
 

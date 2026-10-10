@@ -4,7 +4,7 @@
 - 対応するアラート: 乗っ取りの大規模な発生（サインインの失敗の急増、転送の規則の大量の作成。page）、乗っ取りの疑いの送信の急増の一部
 - 最終確認日: 2026-10-10
 
-状態の機械と `locked` の動作は [accounts-and-security.md](../architecture/accounts-and-security.md) の 9 節（[ADR-0057](../decisions/0057-account-takeover-response.md)）、送信の点は [ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)、回復は [ADR-0056](../decisions/0056-sign-in-risk-and-account-recovery.md)。
+ステートマシンと `locked` の動作は [accounts-and-security.md](../architecture/accounts-and-security.md) の 9 節（[ADR-0057](../decisions/0057-account-takeover-response.md)）、送信の点は [ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)、回復は [ADR-0056](../decisions/0056-sign-in-risk-and-account-recovery.md)。
 
 ## 症状
 

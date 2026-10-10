@@ -51,7 +51,7 @@ flowchart TB
     subgraph pod["ポッド（N 個。同じ形）"]
         sf["storefront-renderer<br/>テーマの言語"]
         sfapi["storefront-api"]
-        co["checkout<br/>状態の機械、価格・税・割引・送料"]
+        co["checkout<br/>ステートマシン、価格・税・割引・送料"]
         admin["admin-api<br/>GraphQL、費用の上限"]
         fr["function-runner<br/>Wasmtime（Rust）"]
         wk["workers<br/>引き当ての掃除、照合、注文、配送、<br/>Webhook の本文の作成"]
@@ -128,7 +128,7 @@ flowchart TB
 | `shop-mover` | ショップの移し替え（コピー、変更の追いかけ、書き込みの短い停止、切り替え、15 分の中継の窓）（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md)） |
 | `storefront-renderer` | テーマのテンプレートを、許可した値と上限の中で HTML にする（[ADR-0007](../decisions/0007-theme-language-design.md)） |
 | `storefront-api` | ヘッドレスの GraphQL。商品、コレクション、検索、カート。公開と秘密のトークン |
-| `checkout` | カートとチェックアウトの状態の機械、送料・税・割引の計算、在庫の引き当て、決済の提供者とのやり取り、注文の作成（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)、[ADR-0006](../decisions/0006-payments-via-providers.md)） |
+| `checkout` | カートとチェックアウトのステートマシン、送料・税・割引の計算、在庫の引き当て、決済の提供者とのやり取り、注文の作成（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)、[ADR-0006](../decisions/0006-payments-via-providers.md)） |
 | `admin-api` | Admin API（GraphQL）と、管理画面の API。費用の計算とバケット、一括の操作（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)） |
 | `function-runner` | アプリの関数（WebAssembly）を、燃料とメモリーの上限を付けて動かす Rust のプロセス。`checkout` の隣のコンテナ（[ADR-0008](../decisions/0008-extension-sandbox-wasm.md)） |
 | `workers` | 引き当ての期限切れの掃除、決済と注文の照合、配送の指示、送り状、通知の依頼、Webhook の本文の作成（fanout） |
@@ -316,7 +316,7 @@ flowchart TB
 | [0002](../decisions/0002-pods-and-shop-placement.md) | ショップを単位に、Aurora・Valkey・SQS・アプリのサービスを持つポッド（完全なセル）へ置く。エッジが KeyValueStore でショップ → ポッドを引く。ショップの移し替えは、コピー・論理デコードでの追いかけ・10 秒以内の書き込みの停止・ディレクトリの切り替えで行う。ポッドをまたぐ経路は P1〜P5 だけ（統合の工程で、熱い集まりと `edge-router`、P5、15 分の中継の窓を注記した） |
 | [0003](../decisions/0003-tenancy-and-rls.md) | ショップをテナントにし、ポッドの DB の全表に `shop_id` と FORCE RLS を置く。`shop_id` はホスト名・トークン・セッションからだけ決める。ポッドの中で、ショップごとの同時実行と速さの上限を置く |
 | [0004](../decisions/0004-inventory-reservation-model.md) | 在庫は拠点ごとの行を Aurora の正本にし、支払いの開始で期限つきの引き当て、注文の作成で確定にする。「売り越さない」品目は CHECK 制約で守る。熱い品目は在庫を複数の枠の行に分ける（`available`・`reserved`・`committed` は枠の行。ADR-0020 で具体にした） |
-| [0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md) | チェックアウトを明示の状態の機械にし、注文の作成を `completeCheckout` の 1 つの関数とトランザクションに集める。`orders.checkout_id` を一意にし、決済だけ済んだ状態を 1 分ごとの照合で解消する |
+| [0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md) | チェックアウトを明示のステートマシンにし、注文の作成を `completeCheckout` の 1 つの関数とトランザクションに集める。`orders.checkout_id` を一意にし、決済だけ済んだ状態を 1 分ごとの照合で解消する |
 | [0006](../decisions/0006-payments-via-providers.md) | 決済は外部の提供者に任せ、本システムはカード番号に触れない。提供者の差を吸収するアダプターの契約（`findByReference` を含む）、冪等キー、Webhook の inbox を持つ。事業者の提供者の認証の情報は DB の封筒の暗号（ADR-0066）。Stripe の題材は提供者の 1 つとして使い、設計し直さない |
 | [0007](../decisions/0007-theme-language-design.md) | テーマの言語を自前で設計する（`{{ }}`・`{% %}` の形、副作用なし、既定で HTML をエスケープ、歩数・出力・ループ・入れ子・データの読み出しの上限）。中間表現に翻訳し、インタープリターで動かす。Liquid の実装は使わない |
 | [0008](../decisions/0008-extension-sandbox-wasm.md) | アプリの関数は WebAssembly のモジュールにし、`checkout` の隣の Rust のプロセスの Wasmtime で、燃料・メモリー・入出力の上限を付けて動かす。WASI を渡さない。失敗は種類ごとの「効果なし」 |
@@ -446,7 +446,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [taxes-and-invoices.md](taxes-and-invoices.md) | 消費税の区分（10%・8%・非課税）、総額表示、税率ごとの端数処理、割引・送料の税の按分、適格簡易請求書（レシート）、登録番号、返還インボイス（法務の L4） | [0017](../decisions/0017-consumption-tax-calculation-and-rounding.md)、[0018](../decisions/0018-invoice-documents-and-receipts.md)、[0019](../decisions/0019-invoice-registration-number-verification.md) | QA、法務 | E4、E10 |
 | [inventory-and-reservations.md](inventory-and-reservations.md) | 拠点、在庫の状態、引き当て・確定・戻し、期限と掃除、枠の行と移し替え、拠点の選び方、調整と移動の履歴、照合 | [0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md)、[0021](../decisions/0021-inventory-slot-probing-and-rebalance.md)、[0022](../decisions/0022-location-selection-and-lock-order.md)、[0023](../decisions/0023-inventory-movements-ledger-and-reconciliation.md) | QA、Ops | E5 |
 | [flash-sales-and-queueing.md](flash-sales-and-queueing.md) | セールの予定、待合室（並び、受け入れの速さ、許可証）、ボット対策（WAF、チャレンジ、1 人あたりの上限、重複の検出）、隔離のポッドへの前もっての移し替え | [0024](../decisions/0024-waiting-room-ordering-and-admission-rate.md)、[0025](../decisions/0025-queue-pass-tokens.md)、[0026](../decisions/0026-bot-defense-and-purchase-limits.md)、[0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md) | QA、Ops、セキュリティ | E13 |
-| [cart-and-checkout.md](cart-and-checkout.md) | カート、チェックアウトの状態の機械、配送先、最終確認画面（法務の L1）、完了の決定表、照合の処理、チェックアウトの作成の速さの上限 | [0028](../decisions/0028-cart-storage-in-valkey.md)、[0029](../decisions/0029-checkout-completion-decision-table.md)、[0030](../decisions/0030-price-snapshot-and-final-confirmation.md)、[0031](../decisions/0031-checkout-admission-limits.md) | QA、法務 | E6 |
+| [cart-and-checkout.md](cart-and-checkout.md) | カート、チェックアウトのステートマシン、配送先、最終確認画面（法務の L1）、完了の決定表、照合の処理、チェックアウトの作成の速さの上限 | [0028](../decisions/0028-cart-storage-in-valkey.md)、[0029](../decisions/0029-checkout-completion-decision-table.md)、[0030](../decisions/0030-price-snapshot-and-final-confirmation.md)、[0031](../decisions/0031-checkout-admission-limits.md) | QA、法務 | E6 |
 | [discounts-engine.md](discounts-engine.md) | 割引の種類、対象、組み合わせとスタックの規則、適用の順序、按分と端数、使用の回数の上限、自動の割引、関数の割引との合わせ | [0032](../decisions/0032-discount-classes-order-and-combination.md)、[0033](../decisions/0033-discount-allocation-and-rounding.md)、[0034](../decisions/0034-discount-usage-counters.md) | QA | E7 |
 | [payments-integration.md](payments-integration.md) | 提供者のアダプターの契約、リダイレクトとホストした入力部品、冪等キー、Webhook の inbox、結果の不明、オーソリと確定、返金、日本の決済手段（コンビニ払い、銀行振込、キャリア決済、後払い）、提供者の選定（法務の L7） | [0035](../decisions/0035-payment-attempt-states-and-result-normalization.md)、[0036](../decisions/0036-payment-webhook-inbox-and-inquiry-schedule.md)、[0037](../decisions/0037-async-payments-pending-orders.md)、[0038](../decisions/0038-capture-timing-and-authorization-expiry.md) | QA、セキュリティ | E8 |
 | [orders-and-fulfillment.md](orders-and-fulfillment.md) | 注文のライフサイクル、編集とキャンセル、配送の指示、拠点の振り分け、送料の表（都道府県、重さ・サイズ）、配送の日時の指定、送り状の CSV、運送会社の API、追跡 | [0039](../decisions/0039-order-status-axes-and-edits.md)、[0040](../decisions/0040-fulfillment-orders-and-partial-fulfillment.md)、[0041](../decisions/0041-shipping-rate-tables.md)、[0042](../decisions/0042-carrier-integration-profiles.md) | QA、Ops | E9 |
@@ -478,7 +478,7 @@ Epic と Story の計画は [roadmap.md](../roadmap.md) にある（PM が持つ
 | E3 | カタログと価格：商品、バリエーション、コレクション、メディア、マーケットと通貨 |
 | E4 | 税とインボイス：税の区分、端数処理、レシート、登録番号 |
 | E5 | 在庫と引き当て：拠点、状態、引き当て・確定・戻し、枠の行、照合 |
-| E6 | カートとチェックアウト：状態の機械、配送先、送料、最終確認画面、注文の作成、照合 |
+| E6 | カートとチェックアウト：ステートマシン、配送先、送料、最終確認画面、注文の作成、照合 |
 | E7 | 割引のエンジン：種類、組み合わせの規則、按分 |
 | E8 | 決済の連携：アダプター、提供者、日本の決済手段、返金 |
 | E9 | 注文と配送：ライフサイクル、配送の指示、送料の表、送り状、運送会社 |

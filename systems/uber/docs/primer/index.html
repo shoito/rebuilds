@@ -84,7 +84,7 @@
   </section>
 
   <section class="s" id="states">
-    <h2>乗車の状態機械</h2>
+    <h2>乗車のステートマシン</h2>
     <p>1 回の乗車は、決まった状態を順に進みます。設計の文書は、状態の名前をそのまま使って振る舞いを書くので、図を頭に入れておくと読みやすくなります。</p>
     <pre class="mermaid">stateDiagram-v2
   direction LR
@@ -423,7 +423,7 @@
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> <span>— 何を、なぜ作るか。日本での運営の形、日本の制度、法務の確認待ち（L1〜L9）</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、5 つの原則、規模の段階、NFR、主な決定</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0002-hex-grid-geospatial-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0003-trip-state-and-single-assignment.md">0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0004-batched-dispatch-and-offers.md">0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md">0043</a> <span>— 格子、乗車と割り当て、配車、法務の関門の 4 本柱</span></li>
-        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/trips-lifecycle.md">trips-lifecycle.md</a> <span>— 状態機械、epoch、取り消し、通信が切れたときの継続</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/trips-lifecycle.md">trips-lifecycle.md</a> <span>— ステートマシン、epoch、取り消し、通信が切れたときの継続</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/location-ingestion.md">location-ingestion.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/geospatial-index.md">geospatial-index.md</a> <span>— 位置の流れと索引</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/dispatch-and-matching.md">dispatch-and-matching.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/eta-and-routing.md">eta-and-routing.md</a> <span>— バッチ、候補の条件、オファー、ETA</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/pricing-and-fares.md">pricing-and-fares.md</a> <span>— 運賃の制度と計算、変動運賃</span></li>

@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-端末の資格（認可コード＋PKCE の登録、端末の鍵に結んだ回転する更新トークン）、取り消しの速さ（60 秒以内）は [ADR-0041](0041-accounts-auth-and-device-credentials.md) が決めた。切り離しと消去の状態の機械（`active` → `unlinked`、`wipe_pending` → `wiping` → `wiped`・`wipe_failed`）、消去で消すもの、`POST /device/status` での受け取りは [ADR-0043](0043-admin-roles-device-wipe-and-member-access.md) が決めた。本家は、切り離しのときに遠隔の消去を選べ、端末が次にオンラインになったときに行う（同 ADR の出典）。
+端末の資格（認可コード＋PKCE の登録、端末の鍵に結んだ回転する更新トークン）、取り消しの速さ（60 秒以内）は [ADR-0041](0041-accounts-auth-and-device-credentials.md) が決めた。切り離しと消去のステートマシン（`active` → `unlinked`、`wipe_pending` → `wiping` → `wiped`・`wipe_failed`）、消去で消すもの、`POST /device/status` での受け取りは [ADR-0043](0043-admin-roles-device-wipe-and-member-access.md) が決めた。本家は、切り離しのときに遠隔の消去を選べ、端末が次にオンラインになったときに行う（同 ADR の出典）。
 
 デスクトップのクライアントの側で、次が決まっていない。
 

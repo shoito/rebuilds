@@ -116,7 +116,7 @@
 
 ## 5. 独自のドメイン（ADR-0050）
 
-### 5.1 状態の機械
+### 5.1 ステートマシン
 
 ```mermaid
 stateDiagram-v2
@@ -369,7 +369,7 @@ flowchart TD
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E14 | `orgs-and-org-units` | 組織、OU の木、方針の継承と効く値、管理の役割と `authorize`（4 節） |
-| E14 | `custom-domains` | 状態の機械、確かめのトークン、DNS の案内と毎日の検査、移し、別名のドメイン（5 節） |
+| E14 | `custom-domains` | ステートマシン、確かめのトークン、DNS の案内と毎日の検査、移し、別名のドメイン（5 節） |
 | E14 | `aliases-and-groups` | 名前空間と正規化、グループの設定、展開とループの防ぎ、外のメンバー（7 節） |
 | E14 | `routing-rules` | 規則の段と決定表、分けた配送、送信のゲートウェイ、全受け、写しの宛先、フッター（8 節） |
 | E14 | `org-allow-block-lists-ui` | 許可・拒否の一覧の画面と API（9 節） |

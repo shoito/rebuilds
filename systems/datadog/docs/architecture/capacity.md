@@ -87,8 +87,8 @@
 | `log-indexer` | `c7gd.8xlarge` × 6 | 索引とアーカイブのセグメントの符号化と zstd。1 vCPU あたり 150 MB/秒で、ピーク 1.5 GB/秒（アーカイブ）＋0.3 GB/秒（索引）に 12 vCPU、余裕を足して 96 vCPU |
 | `trace-assembler` | `r7gd.4xlarge` × 6 | ピーク 400 万スパン/秒、1 vCPU あたり 10 万（本システムの想定）で 40 vCPU。メモリーは 1 スパン 600 バイト × 滞在 31 秒で、平均 200 万/秒で 約 37 GB、ピーク 400 万/秒で 約 74 GB（[traces-and-sampling.md](traces-and-sampling.md) の 6.4 節。`tail-sampling-memory-poc`）。6 台の 768 GiB の 10% 前後 |
 | `compactor` | `c7gd.8xlarge` × 4 | 日のブロック（メトリクス 1.1 TB/日）、ログの索引の小さなセグメントの合わせ（1.25 TB/日）、トレース（0.86 TB/日） |
-| `monitor-evaluator` | `c7g.4xlarge` × 6 | 1,000 万グループ/分 = 17 万グループ/秒の状態の機械。クエリの実行は評価の組の読み手 |
-| `slo-calculator` | `monitor-evaluator` と同じバイナリ・同じ台数（[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)） | SLO 5 万（組織あたり 50 の想定）× 開いた時の行を 5 分ごとに計算し直す ＝ 1 秒 約 170 のクエリ（評価の組の読み手）。状態の機械に比べて CPU は数 % |
+| `monitor-evaluator` | `c7g.4xlarge` × 6 | 1,000 万グループ/分 = 17 万グループ/秒のステートマシン。クエリの実行は評価の組の読み手 |
+| `slo-calculator` | `monitor-evaluator` と同じバイナリ・同じ台数（[ADR-0049](../decisions/0049-slo-computation-and-burn-rate.md)） | SLO 5 万（組織あたり 50 の想定）× 開いた時の行を 5 分ごとに計算し直す ＝ 1 秒 約 170 のクエリ（評価の組の読み手）。ステートマシンに比べて CPU は数 % |
 | `derived-metrics-aggregator` | `r7gd.2xlarge` × 3（AZ ごとに 1、予備 3） | RED・サービスマップの辺・ログから作るメトリクスの系列 約 300 万（本システムの想定）× 10 秒の桶を 65 分（390 個）× 1 桶 約 48 バイト ＝ 約 56 GB。分布の桶は大きいので、3 台の 192 GiB に収める。入力は `derived-partials`（平均 4 MB/秒）で CPU は小さい |
 | `live-tail` | 平均 16 vCPU、ピーク 32 vCPU（Fargate） | セッションのある組織の `logs` だけを読む。同時 2,000 セッション（ピーク 5,000）で `logs` の 3 割、展開と絞り込みを 1 vCPU あたり 50 MB/秒（本システムの想定） |
 | `rehydrator` | 平均 16 vCPU、上限 128 vCPU（Fargate、作業者 1 つ 2 vCPU） | 作業者あたり 200 MB/秒（圧縮の後。[log-storage-and-search.md](log-storage-and-search.md) の 8.2 節）。組織あたり同時 2 作業、1 作業 16 作業者まで。セルの上限を超えた作業は待たせる |

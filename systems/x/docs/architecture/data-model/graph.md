@@ -1,6 +1,6 @@
 # Data model: 関係（フォロー・ブロック・ミュート）
 
-フォローの 2 つの向きの表、ブロックの 2 つの向きの表、ミュート、ミュートの語、S2 の対応表。振る舞いは [follow-graph.md](../follow-graph.md)、決定は [ADR-0007](../../decisions/0007-follow-graph-storage.md)（2 つの隣接の表）、[ADR-0011](../../decisions/0011-graph-edge-state-machine-and-locking.md)（状態機械とロック）、[ADR-0012](../../decisions/0012-viewer-sets-cache.md)（閲覧者の集合）、[ADR-0013](../../decisions/0013-graph-partitioning.md)（分割）にある。数の写し（`user_counters`）は [engagement.md](engagement.md)、閲覧者の集合の Valkey の鍵は [stores.md](stores.md) の 1.2 節。規約は [data-model.md](../data-model.md) の 3 節。
+フォローの 2 つの向きの表、ブロックの 2 つの向きの表、ミュート、ミュートの語、S2 の対応表。振る舞いは [follow-graph.md](../follow-graph.md)、決定は [ADR-0007](../../decisions/0007-follow-graph-storage.md)（2 つの隣接の表）、[ADR-0011](../../decisions/0011-graph-edge-state-machine-and-locking.md)（ステートマシンとロック）、[ADR-0012](../../decisions/0012-viewer-sets-cache.md)（閲覧者の集合）、[ADR-0013](../../decisions/0013-graph-partitioning.md)（分割）にある。数の写し（`user_counters`）は [engagement.md](engagement.md)、閲覧者の集合の Valkey の鍵は [stores.md](stores.md) の 1.2 節。規約は [data-model.md](../data-model.md) の 3 節。
 
 ## 1. ER 図
 

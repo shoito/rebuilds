@@ -65,7 +65,7 @@
   </section>
 
   <section class="s" id="states">
-    <h2>取引の状態の機械</h2>
+    <h2>取引のステートマシン</h2>
     <p>取引は明示の状態を持ち、遷移は 1 つの遷移の関数と決定表（DT-TXN-001、38 行）だけが書きます。下の図は主な遷移だけを描いたものです。</p>
     <pre class="mermaid">stateDiagram-v2
     [*] --> created: 購入
@@ -87,7 +87,7 @@
     payment_expired --> [*]</pre>
     <ul>
       <li data-frag>状態には順位があります（<code>created</code> 0 &lt; <code>paid</code> 1 &lt; … &lt; <code>completed</code> 5）。遅れて届いた事象で、後ろに戻しません。</li>
-      <li data-frag>出品にも別の状態の機械があります（<code>on_sale</code> → <code>trading</code> → <code>sold</code> など 9 つ）。取引が取り消されると、発送の前なら <code>on_sale</code>、後なら <code>paused</code> に戻ります。</li>
+      <li data-frag>出品にも別のステートマシンがあります（<code>on_sale</code> → <code>trading</code> → <code>sold</code> など 9 つ）。取引が取り消されると、発送の前なら <code>on_sale</code>、後なら <code>paused</code> に戻ります。</li>
     </ul>
     <div class="quiz" data-answer="2">
       <p class="q">運送会社から「配達済み」の事象が届きました。取引を完了にして、売り手に売上金を渡してよいですか？</p>
@@ -374,7 +374,7 @@
     <dl class="glossary">
       <dt id="g-c2c">C2C</dt><dd>Consumer to Consumer。個人どうしの売買。運営は場を提供し、品を仕入れない。</dd>
       <dt id="g-listing">出品</dt><dd>売り手が出す 1 点の品。状態（販売中・取引中・売り切れなど）と、買い手に見える変更で上がる <code>version</code> を持つ。</dd>
-      <dt id="g-transaction">取引</dt><dd>1 つの購入から完了・取り消しまでの記録。状態の機械と期限の列を持つ。</dd>
+      <dt id="g-transaction">取引</dt><dd>1 つの購入から完了・取り消しまでの記録。ステートマシンと期限の列を持つ。</dd>
       <dt id="g-receipt">受取評価</dt><dd>買い手が品を受け取り、中身を確かめたことを示す操作。相手の評価を同時に付ける。</dd>
       <dt id="g-auto-complete">自動の完了</dt><dd>受取評価がないとき、期限（この設計は発送の 9 日後の 13:00）で受け取ったとみなすこと。</dd>
       <dt id="g-dispute">紛争</dt><dd>問題の報告やチャージバックで、運用の判断を待つ状態。期限は止まる。</dd>

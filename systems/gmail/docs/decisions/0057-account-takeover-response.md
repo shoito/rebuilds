@@ -16,7 +16,7 @@ date: 2026-10-10
 
 ## Options
 
-1. **1 つの状態の機械と `account_risk` の出来事。`locked` の動作は冪等な段の列**
+1. **1 つのステートマシンと `account_risk` の出来事。`locked` の動作は冪等な段の列**
 2. 部品ごとに対応する（`outbound-gate` は送信を止め、`accounts` はセッションを失効する）
 3. 疑いがあれば、アカウントを停止（`suspended`）にする
 

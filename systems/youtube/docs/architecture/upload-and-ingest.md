@@ -27,7 +27,7 @@
   - 動画の状態（下書き、処理中、予約、公開）と、予約の公開の時刻の扱い
   - 元のファイルの置き場、層の移し、消去の 3 つの経路
 - 扱わない：
-  - 段の状態の機械と符号化（[transcoding-pipeline.md](transcoding-pipeline.md)）
+  - 段のステートマシンと符号化（[transcoding-pipeline.md](transcoding-pipeline.md)）
   - 指紋と照合（copyright-matching の領域）。この文書は `publish_gate` の条件だけを使う
   - 長い動画を上げられる創作者の確認、権利者の審査（accounts-and-safety の領域）
   - 公開の範囲の判定そのもの（`playable()`、[ADR-0009](../decisions/0009-single-tenant-and-playable.md)）

@@ -15,7 +15,7 @@ X の再構築に関する決定。リポジトリ共通の決定は [docs/decis
 | [0008](0008-post-write-path-and-idempotency.md) | 投稿の書き込みは、検証の後に `tid` を振り、投稿の行・抜き出した要素・冪等の記録・outbox を 1 つの DB のトランザクションで確定する。再送は `(author_id, client_request_id)` で同じ投稿を返す | accepted |
 | [0009](0009-post-state-tombstones-and-state-cache.md) | 削除と措置は行を消さずに状態と `state_version` を変える。投稿の状態の写しはバージョンの新しいものだけを書き、寿命を 45 秒にして、出来事が止まっても 60 秒の中で正本に戻る | accepted |
 | [0010](0010-post-table-partitioning-s2.md) | S2 で投稿の表を投稿の ID のハッシュで分割する。作者・会話ごとの一覧は、出来事から作る別の索引の表に、それぞれ作者・会話の ID で分割して持つ | accepted |
-| [0011](0011-graph-edge-state-machine-and-locking.md) | フォロー・申請・ブロックの辺を 1 つの状態機械で扱い、2 人の組ごとの勧告ロックで直列にする。ブロックは同じトランザクションで両向きのフォローと申請を外し、鍵を外したら待っている申請をすべて承認する | accepted |
+| [0011](0011-graph-edge-state-machine-and-locking.md) | フォロー・申請・ブロックの辺を 1 つのステートマシンで扱い、2 人の組ごとの勧告ロックで直列にする。ブロックは同じトランザクションで両向きのフォローと申請を外し、鍵を外したら待っている申請をすべて承認する | accepted |
 | [0012](0012-viewer-sets-cache.md) | 閲覧者の集合（ブロックの両向き、ミュート、承認済みの鍵アカウントのフォロー先、ミュートの語）を Valkey にバージョンつきの写しで持ち、書き込みの確定の直後に更新する。寿命は 1 時間。ミュートは逆向きの表を持たない | accepted |
 | [0013](0013-graph-partitioning.md) | 関係の表を利用者の ID のハッシュで 1,024 の論理の分割に分け、物理のクラスタへの対応表で置く。S2 は 4 クラスタから。分割の後は `following` と `blocks` を正本にし、逆向きの表は出来事から作る | accepted |
 | [0014](0014-home-timeline-replica-format.md) | ホームの写しは、32 バイトの項目を ID の降順に詰めた Valkey の文字列にし、挿入・合わせ・除去を Valkey Functions で行う。返信の項目は 4 つ目の欄に返信先の利用者を入れる | accepted |

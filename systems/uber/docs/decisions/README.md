@@ -7,10 +7,10 @@ Uber の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 基盤は他の題材の決定を引き継ぎ、配車の熱い経路は Go で、モバイルはネイティブで書く | accepted |
 | [0002](0002-hex-grid-geospatial-model.md) | 地理の単位は自前の六角形の階層の格子（geogrid）にし、ドライバーの索引はメモリの上で都市とセルで分ける | accepted |
-| [0003](0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora の状態機械を正本にし、割り当ては fencing token つきのトランザクションで 1 つに限る | accepted |
+| [0003](0003-trip-state-and-single-assignment.md) | 乗車の状態は Aurora のステートマシンを正本にし、割り当ては fencing token つきのトランザクションで 1 つに限る | accepted |
 | [0004](0004-batched-dispatch-and-offers.md) | 配車は区域ごとの短いバッチで最適化し、オファーは 1 人ずつ時間切れつきで送る | accepted |
 | [0005](0005-maps-and-routing.md) | 経路と ETA は OSM の上の Valhalla を自前で動かし、住所の検索と事前確定運賃の距離は商用の提供者を使う | accepted |
-| [0006](0006-native-apps-contracts-vectors-and-release-train.md) | アプリは Swift と Kotlin で書き、共有は生成した型と状態機械のテストのベクターに限る。リリースは週 1 回の列車で、強制の更新は乗車の最中と緊急の入口を塞がない | accepted |
+| [0006](0006-native-apps-contracts-vectors-and-release-train.md) | アプリは Swift と Kotlin で書き、共有は生成した型とステートマシンのテストのベクターに限る。リリースは週 1 回の列車で、強制の更新は乗車の最中と緊急の入口を塞がない | accepted |
 | [0007](0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の許可で、出庫の間だけ背景で位置を取る。止まったらサーバーが 60 秒で知らせる | accepted |
 | [0008](0008-navigation-handoff-with-waypoints.md) | 外部のナビには選んだルートの主要経由地点を経由地として渡し、経由地を守ると確かめた引き継ぎ先だけを事前確定運賃で使う | accepted |
 | [0009](0009-location-upload-and-validation.md) | 位置は HTTP/2 の POST で 4 秒ごとにまとめて送り、無状態の取り込みで検証して Kinesis Data Streams に流す | accepted |

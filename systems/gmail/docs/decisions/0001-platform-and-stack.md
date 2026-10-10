@@ -30,7 +30,7 @@ rebuilds の他の題材で、次の基盤を決めている。
 
 MTA の土台：
 
-- a. **自前の MTA（SMTP の状態の機械、待ち行列、配送）を、BYOIP の IP を持つ EC2 で動かす**
+- a. **自前の MTA（SMTP のステートマシン、待ち行列、配送）を、BYOIP の IP を持つ EC2 で動かす**
 - b. Amazon SES で送受信する
 - c. 汎用の MTA（Postfix など）を動かし、周りに選別と保存を足す
 
@@ -56,7 +56,7 @@ MTA の土台：
 
 | 用途 | 置き場所 | 理由 |
 | --- | --- | --- |
-| SMTP の状態の機械、受信の判定、スプール、送信の待ち行列と配送、DSN | `crates/smtp-server`、`crates/mta-queue`、`crates/dsn` | 題材の核（[ADR-0002](0002-accept-then-filter.md)） |
+| SMTP のステートマシン、受信の判定、スプール、送信の待ち行列と配送、DSN | `crates/smtp-server`、`crates/mta-queue`、`crates/dsn` | 題材の核（[ADR-0002](0002-accept-then-filter.md)） |
 | SPF・DKIM・DMARC・ARC の評価、DKIM の署名、ARC の封印 | `crates/mailauth` | 題材の核（sender-authentication の領域） |
 | 選別の規則のエンジン、評判、特徴の作成、判定の合わせ | `crates/filter` | 題材の核（[ADR-0008](0008-spam-pipeline-boundary-and-secrecy.md)） |
 | メッセージの保存（blob、パック、参照の数え）、メールボックスの状態、change log | `crates/mailstore` | 題材の核（[ADR-0003](0003-message-storage-layout-and-dedupe.md)、[ADR-0006](0006-sync-protocol-jmap-imap-and-modseq.md)） |
@@ -68,7 +68,7 @@ MTA の土台：
 
 | 部品 | 範囲 | 条件 |
 | --- | --- | --- |
-| SMTP のコマンド・応答の構文のライブラリ | 行の解析と書式だけ | 状態の機械・判定・待ち行列は自前。使わずに自前で書いてもよい（小さいため） |
+| SMTP のコマンド・応答の構文のライブラリ | 行の解析と書式だけ | ステートマシン・判定・待ち行列は自前。使わずに自前で書いてもよい（小さいため） |
 | MIME の解析のライブラリ | RFC 5322 のヘッダーと MIME の木の解析、文字コードの変換 | 自前の上限の層（大きさ、深さ、パートの数、時間）で包む。E4 の前の `mime-parser-poc` で選ぶ |
 | 暗号（RSA、Ed25519、SHA-256）、TLS（rustls）、DNS の解決 | 署名と検証、TLS、DNS | DNSSEC の検証は Route 53 Resolver |
 | マルウェアの署名の検出のエンジン（ClamAV の類）と YARA の形の規則 | 添付の既知のマルウェアの検出 | 隔離したタスクで動かす。判定の合わせは自前（attachment-and-url-scanning の領域） |

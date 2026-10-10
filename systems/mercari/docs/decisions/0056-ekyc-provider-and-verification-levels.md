@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0056: eKYC は 4 つの口（セッションの作成、結果の取得、Webhook、データの削除）を持つ提供者のアダプターの裏に置き、方式ごとに提供者を替えられるようにする。確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は 1 つの関数で状態の機械を進める
+# ADR-0056: eKYC は 4 つの口（セッションの作成、結果の取得、Webhook、データの削除）を持つ提供者のアダプターの裏に置き、方式ごとに提供者を替えられるようにする。確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は 1 つの関数でステートマシンを進める
 
 詳細は [identity-verification.md](../architecture/identity-verification.md) の 4〜6・8 節。
 

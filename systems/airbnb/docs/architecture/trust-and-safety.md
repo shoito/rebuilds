@@ -27,7 +27,7 @@ T&S。判定の点（予約・公開・送金の口座の変更・ログイン�
   - メッセージの絞り込み（[messaging.md](messaging.md) の 5 節）。この文書は信号を受ける。
   - 本人確認の水準と提供者（[identity-verification.md](identity-verification.md)）。この文書は `step_up` で求める。
   - ログイン・セッション・端末の乗っ取りの検出（accounts・security の各領域）。この文書は信号を受け、送金の保留を決める。
-  - 予約の状態の機械（booking-and-holds の領域）。この文書は `hold` の時の経路と、T&S の断りの事象を求める。
+  - 予約のステートマシン（booking-and-holds の領域）。この文書は `hold` の時の経路と、T&S の断りの事象を求める。
   - 送金の保留の仕訳（ledger-and-payouts の領域）。
   - 届出番号の確かめと行政の削除の要請の手続き（regulatory-compliance-japan の領域）。
 

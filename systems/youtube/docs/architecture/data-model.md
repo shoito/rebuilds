@@ -682,7 +682,7 @@ erDiagram
 | D-19 | 置き場所のなかった表を最小の形で足した：`external_identities`、`rights_owners`、`rights_owner_members`、`video_categories`、`pipeline_task_deps`、`storyboards`、`video_view_totals`、`history_deletions`、`counter_notices`、`business_days`、`deletion_records`、`inbox_events` | 領域の文書の振る舞い（外部の IdP、権利者の役割、カテゴリの源、依存の解放、縮小の画像の `rev`、公開の数の和、消去の完了の見張り、反論の通知、営業日、消去の記録、重複の除き）が参照するが、表がなかった |
 | D-20 | 予約語と紛らわしい名前を直した：`claim_transitions` の `from`・`to`・`actor` → `from_state`・`to_state`・`actor_kind`、`drm_keys.group` → `key_group`、`chat_bans.until`・`by` → `expires_at`・`banned_by`、`ad_impressions.break` → `ad_break`、日の列 `date` → `day` | SQL の予約語・型の名前を列に使わない |
 | D-21 | `upload_sessions.size`・`part_size` → `size_bytes`・`part_size_bytes` | 単位を名前に付ける（3.6 節） |
-| D-22 | 創作者の削除の 30 日の猶予は `videos.delete_requested_at` で表し、状態を足さない。NULL でなければ `playable()` は `deny` | upload-and-ingest の状態の図に猶予の状態がなかった。状態の機械を変えずに戻せるようにする |
+| D-22 | 創作者の削除の 30 日の猶予は `videos.delete_requested_at` で表し、状態を足さない。NULL でなければ `playable()` は `deny` | upload-and-ingest の状態の図に猶予の状態がなかった。ステートマシンを変えずに戻せるようにする |
 | D-23 | `videos.kind`（`upload`・`live`）と `videos.premiere` を足した | ライブとプレミア公開の動画を同じ表で見分ける |
 | D-24 | 名前のなかった Valkey の鍵を決め、チャットの速さの鍵を `chat:rl:`・`chat:slow:`・`chat:dup:` に改めた（[stores.md](data-model/stores.md) の 1 節） | チャットの鍵をチャットのクラスタに寄せる |
 | D-25 | `<records-bucket>`（`kms-pii`）を足し、明細・台帳の写し・申し込みの資料・通報の証拠・法的な書き出しを置く。字幕・サムネイル・縮小の画像・場面の点・参照のファイル・ライブの窓の指紋の S3 のキーを決めた | 置き場所のないファイルがあった |

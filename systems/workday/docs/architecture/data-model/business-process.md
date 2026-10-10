@@ -141,7 +141,7 @@ erDiagram
 
 ### 2.2 `bp_cases`
 
-案件。状態機械の正本。定義元：[business-process-engine.md](../business-process-engine.md) の 6 節。
+案件。ステートマシンの正本。定義元：[business-process-engine.md](../business-process-engine.md) の 6 節。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

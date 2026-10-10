@@ -8,7 +8,7 @@
   - E5 の前：CDN の実効の単価と、急な人気でのオリジンの負荷（`cdn-cost-poc`）。
   - E8 の前：指紋の母数と索引のメモリー（`fingerprint-poc`）。
   - E12 の前：LL-HLS の部分セグメントと端末・CDN の対応、GPU 1 枚あたりの配信の数（`ll-hls-poc`）。
-- **規則は 1 つのコードに。** 段の状態の機械は `crates/pipeline`、ラダーは `crates/ladder`、パッケージは `crates/cmaf`、視聴の規則は `crates/view-rules`、指紋と照合は `crates/fingerprint`・`crates/match`、見える範囲は `packages/visibility` の `playable()` にだけ書く。
+- **規則は 1 つのコードに。** 段のステートマシンは `crates/pipeline`、ラダーは `crates/ladder`、パッケージは `crates/cmaf`、視聴の規則は `crates/view-rules`、指紋と照合は `crates/fingerprint`・`crates/match`、見える範囲は `packages/visibility` の `playable()` にだけ書く。
 - **契約を先に固定する。** アップロードのセッションの API、段の出力のキーの作り方、`ladder_version`、セグメントの索引とマニフェストの形、再生のトークン、視聴の出来事の形と数の定義、`fp_version`、照合の方針の重なりの決定表、`playable()` の決定表、ストリームキーの形とヘッダーは、人間がレビューして確定する。エージェントは勝手に変えない。
 - **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L10）。下の表で「法務：L*」と書いた Story が当たる。
 - **費用を毎週見る。** 配信 1 GB・保存 1 時間・変換 1 時間の原価を E1 から計測し、[architecture/README.md](architecture/README.md) の 2.1 節の予算と比べる。

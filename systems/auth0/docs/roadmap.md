@@ -97,7 +97,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `signing-key-lifecycle` | 署名鍵の操作（[keys-and-secrets.md](architecture/keys-and-secrets.md) の 5.2 節）、Management API、監査の事象（[ADR-0046](decisions/0046-signing-key-lifecycle.md)） |
 | `jwks-and-discovery-publishing` | Worker の書き出し、ホスト名ごとの `issuer`、S3 とオリジングループ、CloudFront の無効化、確かめ |
 | `discovery-and-metadata` | discovery と RFC 8414 のメタデータの生成 |
-| `login-transactions` | `login_transactions` の表、`/authorize` からの作成、handle と `__Host-<brand>_tx` の結び付け、状態機械の骨格 |
+| `login-transactions` | `login_transactions` の表、`/authorize` からの作成、handle と `__Host-<brand>_tx` の結び付け、ステートマシンの骨格 |
 | `authorize-endpoint` | `/authorize` のパラメーターの検証、`redirect_uri` の照合、エラーの画面 |
 | `authorization-code-grant` | コードの発行・消費・再利用の検知、PKCE、`iss` の応答 |
 | `client-authentication` | 4 つの方式、秘密の 2 つまでの並行、`private_key_jwt` の `jti` と `aud`（`issuer` だけ。互換のフラグ `legacy_token_endpoint_aud`） |
@@ -185,7 +185,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `authenticators-and-policy` | 認証器の表と状態機械、テナントの MFA の方針、MFA の画面の差し込み |
+| `authenticators-and-policy` | 認証器の表とステートマシン、テナントの MFA の方針、MFA の画面の差し込み |
 | `totp` | TOTP の登録と照合（再利用の拒否、±1 区間） |
 | `webauthn-second-factor` | WebAuthn の 2 つ目の要素（セキュリティキー、プラットフォーム） |
 | `passkeys-login` | パスキーの登録とパスキー優先のログイン（条件付きの UI、ボタン、パスワードなしのサインアップ、`authentication_methods` の `passkey`） |
@@ -256,7 +256,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Story | 内容 |
 | --- | --- |
-| `custom-domain-core` | `custom_domains` の表と状態機械、TXT の確認（複数のリゾルバー）、配信のテナントと証明書、`/.well-known` の確認、`ready` の反映の待ち（[ADR-0038](decisions/0038-custom-domain-verification-and-certificates.md)） |
+| `custom-domain-core` | `custom_domains` の表とステートマシン、TXT の確認（複数のリゾルバー）、配信のテナントと証明書、`/.well-known` の確認、`ready` の反映の待ち（[ADR-0038](decisions/0038-custom-domain-verification-and-certificates.md)） |
 | `custom-domain-monitoring` | 定期の確認（TXT・CNAME・証明書の期限）、警告、`suspended`、削除と 30 日の復活 |
 | `custom-domain-constraints` | ドメインの制約と、IDN の混在の拒否 |
 | `custom-domain-login-and-links` | カスタムドメインでの画面の表示（ホスト名ごとのトランザクションと Cookie）、確認・再設定のリンク |

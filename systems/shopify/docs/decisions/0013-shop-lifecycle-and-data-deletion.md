@@ -3,7 +3,7 @@ status: accepted
 date: 2026-10-10
 ---
 
-# ADR-0013: ショップのライフサイクルを `trial`・`active`・`frozen`・`closed`・`deleting`・`deleted` の状態の機械にし、`shop-directory` が正本を持つ。閉店から 90 日はデータを残して再開でき、その後に削除の作業を段ごとに進める。法令で残す文書は `retained_until` まで削除から外す
+# ADR-0013: ショップのライフサイクルを `trial`・`active`・`frozen`・`closed`・`deleting`・`deleted` のステートマシンにし、`shop-directory` が正本を持つ。閉店から 90 日はデータを残して再開でき、その後に削除の作業を段ごとに進める。法令で残す文書は `retained_until` まで削除から外す
 
 ## Context
 
@@ -14,7 +14,7 @@ date: 2026-10-10
 
 ## Options
 
-1. **ライフサイクルを独立の状態の機械にし、振り分けの値（KeyValueStore の `state`）はそこから作る。閉店の後の猶予の後に、段ごとの冪等な削除の作業**
+1. **ライフサイクルを独立のステートマシンにし、振り分けの値（KeyValueStore の `state`）はそこから作る。閉店の後の猶予の後に、段ごとの冪等な削除の作業**
 2. 閉店で即時に消す
 3. 消さずに、ショップを無効にするだけ
 

@@ -13,13 +13,13 @@
 
 | ADR | 決定 |
 | --- | --- |
-| [0010](../decisions/0010-listing-states-and-revisions.md) | リスティングは状態の機械（`draft`・`in_review`・`listed`・`snoozed`・`suspended`・`archived`）と、内容の改訂（`listing_revisions`）を分けて持つ。公開している改訂は 1 つで、重要な項目の編集は新しい改訂として審査を通ってから入れ替える。料金・カレンダー・規則は改訂に入れず、`listing_version` を上げる |
+| [0010](../decisions/0010-listing-states-and-revisions.md) | リスティングはステートマシン（`draft`・`in_review`・`listed`・`snoozed`・`suspended`・`archived`）と、内容の改訂（`listing_revisions`）を分けて持つ。公開している改訂は 1 つで、重要な項目の編集は新しい改訂として審査を通ってから入れ替える。料金・カレンダー・規則は改訂に入れず、`listing_version` を上げる |
 | [0011](../decisions/0011-photo-pipeline-and-hashes.md) | 写真は署名つきの URL で S3 に直接上げ、`media-processor` が sharp で検査・向きの補正・メタデータの全部の除去・4 つの幅の WebP と JPEG への変換を行い、出力を読み直して位置情報がないことを確かめてから使う。知覚ハッシュは 64 ビットの pHash と dHash。1 件 50 枚、公開には 5 枚 |
 | [0012](../decisions/0012-multilingual-content-and-machine-translation.md) | 説明の文はホストが書いた言語ごとの原文を正にし、機械翻訳は原文のハッシュを鍵にした別の行に置いて、画面と API で「機械翻訳」の印と原文への切り替えを必ず付ける。翻訳の提供者に送るのは公開の項目だけで、チェックインの案内・住所・メッセージは送らない |
 
 ## 1. 範囲
 
-- 扱う：リスティングの項目と上限、状態の機械、改訂とバージョン、下書き、編集、停止と再開、取り下げ、設備の一覧、ハウスルール、チェックインの方法（項目の形だけ）、写真の受け付けと変換と知覚ハッシュ、写真の使い回しの信号の出し方、多言語の内容と翻訳、公開の審査の呼び出し、`listingVisible()` の決定表、表示の規則の枠組み。
+- 扱う：リスティングの項目と上限、ステートマシン、改訂とバージョン、下書き、編集、停止と再開、取り下げ、設備の一覧、ハウスルール、チェックインの方法（項目の形だけ）、写真の受け付けと変換と知覚ハッシュ、写真の使い回しの信号の出し方、多言語の内容と翻訳、公開の審査の呼び出し、`listingVisible()` の決定表、表示の規則の枠組み。
 - 扱わない：
   - 住所・位置・ずらした位置（[location-and-geo.md](location-and-geo.md)）。
   - 料金の規則（[pricing-and-fees.md](pricing-and-fees.md)）、税の表（[taxes.md](taxes.md)）。
@@ -72,7 +72,7 @@
 - 「重要」の項目は、偽のリスティングの手口（公開の後に写真・題名・種類を差し替える）に使われる。公開の後の変更を審査に通す（4.3 節）。
 - チェックインの方法の中身（鍵の番号など）はこの表にない。予約の確定の後にだけ出す（booking-and-holds の領域）。
 
-### 4.2 状態の機械
+### 4.2 ステートマシン
 
 ```mermaid
 stateDiagram-v2
@@ -353,7 +353,7 @@ sequenceDiagram
 | PROP-LST-005 | 機械翻訳の文を返す API の応答は必ず `machine_translated: true` と `source_lang` を持つ。原文が変わった後、古い `source_hash` の訳文は返らない |
 | PROP-LST-006 | 翻訳の提供者への要求に、チェックインの案内・住所・届出番号・メッセージの項目が含まれない（送る関数の入力の型と、提供者の模型の記録で確かめる） |
 | PROP-LST-007 | 将来の予約のあるリスティングは `archived` にならない |
-| 表駆動 | DT-LST-VIS-001 の全行。状態の機械の遷移の全組（許されない遷移は 422） |
+| 表駆動 | DT-LST-VIS-001 の全行。ステートマシンの遷移の全組（許されない遷移は 422） |
 | 試験のベクトル | 知覚ハッシュの歪みの集まり（JPEG の品質 50〜95、縮小、切り抜き 0〜10%、明るさ ±20%）で、距離の表のとおりに判定される |
 | E2E | 作成 → 写真 → 審査 → 公開 → 検索に出る（60 秒以内）→ 写真の差し替え → 審査の間は古い写真 |
 
@@ -362,7 +362,7 @@ sequenceDiagram
 | Epic | Story | 中身 |
 | --- | --- | --- |
 | E3 | `photo-upload-and-processing` | 署名つきの URL、検査、変換、メタデータの確かめ、知覚ハッシュ、`photo_hashes`（6 節） |
-| E3 | `listings-crud-and-states` | 状態の機械、改訂、`listing_version`・`search_version`（4 節） |
+| E3 | `listings-crud-and-states` | ステートマシン、改訂、`listing_version`・`search_version`（4 節） |
 | E3 | `amenities-and-house-rules` | 設備の一覧、ハウスルール、チェックインの項目（4.1 節） |
 | E3 | `multilingual-content-and-translation` | 原文の行、翻訳の提供者の選定と連携、印、訳文の絞り込み（5 節） |
 | E3 | `listing-review-on-publish` | 公開の審査の呼び出し、重要な項目の編集の審査（4.3・7 節） |
@@ -373,7 +373,7 @@ sequenceDiagram
 
 ### 決定（2026-10-10、既定案）
 
-- **状態と改訂**：状態の機械と改訂を分け、重要な項目の編集は審査の後に入れ替える（ADR-0010）。
+- **状態と改訂**：ステートマシンと改訂を分け、重要な項目の編集は審査の後に入れ替える（ADR-0010）。
 - **写真**：50 枚、公開に 5 枚、4 つの幅、メタデータの確かめ、pHash と dHash（ADR-0011）。
 - **翻訳**：原文が正、訳文は `source_hash` の別の行、印と原文への切り替えを必ず付ける、送る項目を公開の項目に限る（ADR-0012）。
 - **書ける言語**：`ja`・`en`・`zh-Hans`・`zh-Hant`・`ko` の 5 つ。

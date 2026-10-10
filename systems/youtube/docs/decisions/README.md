@@ -6,7 +6,7 @@ YouTube の再構築に関する決定。リポジトリ共通の決定は [docs
 | ADR | 決定 | 状態 |
 | --- | --- | --- |
 | [0001](0001-platform-and-stack.md) | 管理の面は共通の基盤を引き継ぎ、メディアの面と視聴の計測は Rust で書く。メディアの面は ECS の EC2（CPU の Spot、GPU、NVMe）で動かし、視聴の出来事は MSK に流す | accepted |
-| [0002](0002-upload-and-pipeline-orchestration.md) | アップロードは S3 のマルチパートの上の自前の再開できるセッションにし、全体のハッシュが合ってから完了を返す。パイプラインは自前の段の状態の機械で、段は冪等にし、元のファイルを保持する | accepted |
+| [0002](0002-upload-and-pipeline-orchestration.md) | アップロードは S3 のマルチパートの上の自前の再開できるセッションにし、全体のハッシュが合ってから完了を返す。パイプラインは自前の段のステートマシンで、段は冪等にし、元のファイルを保持する | accepted |
 | [0003](0003-codecs-and-per-title-ladder.md) | H.264 を全動画に、AV1 を人気の動画にだけ作り、VP9 は作らない。ラダーは試しの符号化と VMAF で動画ごとに決める。VOD は CPU の Spot、ライブは GPU で符号化し、MediaConvert は使わない | accepted |
 | [0004](0004-cmaf-packaging-and-drm-scope.md) | CMAF の fMP4 で 1 回だけ保存し、HLS と DASH のマニフェストを要求の時に作る。VOD のセグメントは 4 秒。DRM はメンバー限定の動画だけにし、CENC の `cbcs` で暗号化する | accepted |
 | [0005](0005-cdn-and-origin-strategy.md) | S1 は CloudFront と Origin Shield と自前の中間のキャッシュで配り、S2 から複数の CDN と計測による振り分けを足す。セグメントは署名つきの URL で、措置は拒否の一覧で 60 秒以内に止める | accepted |
@@ -50,7 +50,7 @@ YouTube の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0045](0045-offset-voting-verification-and-distortion-variants.md) | 照合は 10 秒の窓で（参照、時刻のずれ）の票を数え、音声 12 票・映像 6 票を超えた組を、1 秒ごとの一致の割合の区間で確かめる。ピッチと速さの歪みは、問い合わせのハッシュの 20% で 22 の変種を引く 2 回目の探しで受ける | accepted |
 | [0046](0046-reference-ingestion-ownership-conflicts-and-backscan.md) | 参照は同じパイプラインで指紋を作り、長さ・汎用の素材・同じ権利者・他の権利者の検査を経て有効にする。所有の衝突は権利の地域が重なるときだけにし、新しい参照の遡りは 1 時間ごとにまとめて、公開から 90 日の動画と視聴の多い動画に当てる | accepted |
 | [0047](0047-claim-policies-territory-overlap-and-per-second-split.md) | 照合の方針は地域ごとに最初に当たる規則の列にし、動画の地域ごとの結果は決定表（衝突 → 許可 → ブロック → 収益化 → 追跡）で 1 つにする。収益化の一致は動画の 1 秒ごとに覆う権利者で等しく分け、異議の間の分け前は預かりの勘定に入れる | accepted |
-| [0048](0048-claim-dispute-appeal-state-machine-and-deadlines.md) | 申し立ては `active → disputed → reinstated → appealed` の状態の機械で持ち、権利者の応答の期限を異議 30 日・再審査 7 日にする。ブロックの申し立ては異議を飛ばして再審査に進め、期限は遷移の時刻に絶対の時刻で書いて 1 分ごとの作業で進める | accepted |
+| [0048](0048-claim-dispute-appeal-state-machine-and-deadlines.md) | 申し立ては `active → disputed → reinstated → appealed` のステートマシンで持ち、権利者の応答の期限を異議 30 日・再審査 7 日にする。ブロックの申し立ては異議を飛ばして再審査に進め、期限は遷移の時刻に絶対の時刻で書いて 1 分ごとの作業で進める | accepted |
 | [0049](0049-takedown-cases-counter-notice-and-strikes.md) | 削除の申出は `copyright_cases` で受け、期限・基準・通知の文は AppConfig の `legal.copyright.*` に置く。反論の通知と復元は設定で切り替えられる形で作って既定は無効にし、著作権の strike は削除した動画ごとに 1 つ出すよう accounts-and-safety の領域に頼む | accepted |
 | [0050](0050-comment-threads-storage-and-ranking.md) | コメントは最上位と返信の 2 段の木にし、Aurora の `comments` を `video_id` のハッシュで 16 に分ける。「評価順」は高評価・返信した人・創作者のハートと経過時間の式で付け、上位 2,000 の候補を Valkey に持つ | accepted |
 | [0051](0051-comment-posting-pipeline-spam-and-hold.md) | コメントの投稿は、上限 → 創作者の設定 → スパムの点 → 有害さの点 → 保留の段階の順に同期で判定し、結果を「公開・保留・スパムの疑い・作者だけに見える」の 4 つにする。保留とスパムの疑いは 60 日で消す | accepted |
@@ -63,7 +63,7 @@ YouTube の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0058](0058-payouts-via-provider-and-tax-profile.md) | 支払いは決済の事業者の接続アカウントへの送金で月 1 回（毎月 25 日、1,000 円未満は繰り越し）にし、冪等の鍵は `payout:{party}:{yyyymm}` にする。税の情報を相手ごとに持ち、源泉徴収の率と区分は設定の表に置いて法務の確認の後に値を入れる | accepted |
 | [0059](0059-accounts-channels-and-roles.md) | アカウント（人）とチャンネル（公開の主体）を分け、1 つのアカウントは 50 までのチャンネルを持てる。チャンネルの権限は 7 つの役割の決定表 `can(actor, channel, action)` で決め、所有者は 1 人で移せない | accepted |
 | [0060](0060-authentication-2fa-and-creator-sessions.md) | 認証はパスキーを主にし、TOTP を代わりにして、SMS は回復だけに使う。大きな・収益化・配信のチャンネルの所有者と管理者は 2 要素を必須にし、更新のトークンの回転と再利用の検出、重い操作の再確認と新しい端末の待ちで、セッションの盗み出しの被害を絞る | accepted |
-| [0061](0061-creator-tiers-strikes-and-account-standing.md) | 創作者の機能を標準・中間・上級の 3 つの段に分け、中間は電話の確認、上級はチャンネルの履歴か身元の確認で開く。違反は最初は警告、その後は 90 日で失効する strike にし、ガイドラインと著作権で別に数え、アカウントの状態の機械の効き目を `can()` と `playable()` に渡す | accepted |
+| [0061](0061-creator-tiers-strikes-and-account-standing.md) | 創作者の機能を標準・中間・上級の 3 つの段に分け、中間は電話の確認、上級はチャンネルの履歴か身元の確認で開く。違反は最初は警告、その後は 90 日で失効する strike にし、ガイドラインと著作権で別に数え、アカウントのステートマシンの効き目を `can()` と `playable()` に渡す | accepted |
 | [0062](0062-threat-mitigations-and-key-layout.md) | 信頼しない入力を復号する部品をすべて「信頼しないメディア」の実行の形で動かし、鍵はデータの種類ごと・リージョンごとの KMS の鍵にし、署名の鍵は 2 つを並べて 30 日で回す。悪用の分かったエッジのトークンは KeyValueStore の `t:` で個別に拒む | accepted |
 | [0063](0063-operator-access-audit-retention-and-legal-hold.md) | 運用者は日常の権限で元のファイル・隔離のファイル・生の IP アドレス・チャットの本文を読めず、読むときは JIT と 2 人の承認と監査を要る。監査の記録は outbox から Object Lock へ書き、保持の期間は `retention_policies` の 1 つの表に持ち、法的な保全はすべての消去の経路より先に効かせる | accepted |
 | [0064](0064-accounts-network-and-edge-distributions.md) | アカウントは他の題材の形に、大阪の自己監視 `selfmon` と、隔離のファイルの `media-quarantine` を足す。メディアの面のサブネットは外への経路を持たない。CloudFront は VOD・ライブ・画面と API のディストリビューションに分けて上限をそれぞれ申請し、オリジンは VPC オリジンの NLB にして `apne1-az3` を使わない | accepted |

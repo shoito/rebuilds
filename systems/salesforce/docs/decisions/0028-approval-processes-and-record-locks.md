@@ -40,7 +40,7 @@ intent の MVP は、承認のプロセスを含む。値引きの大きな商�
 
 1、a、x を採用する。
 
-- 状態機械は、インスタンス（`pending` → `approved`・`rejected`・`recalled`・`error`）と作業の項目（`pending` → `approved`・`rejected`・`reassigned`・`cancelled`）。段の応答の結果は `DT-APR-001` にする。
+- ステートマシンは、インスタンス（`pending` → `approved`・`rejected`・`recalled`・`error`）と作業の項目（`pending` → `approved`・`rejected`・`reassigned`・`cancelled`）。段の応答の結果は `DT-APR-001` にする。
 - 申請・応答は、インスタンスを `FOR UPDATE` で読み、作業の項目の `row_version` を比べる。2 回目の応答は 409 `WORK_ITEM_ALREADY_DECIDED`。1 つのレコードで `pending` のインスタンスは 1 つまで（一意の索引）。
 - 動作（項目の更新）は同じトランザクションの DML として、通常の保存の手順を通る。通知は確定の後に送る。
 - インスタンスは申請した時のプロセスのバージョンを最後まで使う。
@@ -65,6 +65,6 @@ intent の MVP は、承認のプロセスを含む。値引きの大きな商�
 ## Confirmation
 
 - 決定表：`DT-APR-001`（段の応答）と `DT-APR-002`（ロック）を表駆動テストにする。
-- 性質ベーステスト：任意の申請・承認・却下・取り消し・付け替え・並行の応答の列で、状態が状態機械の中にあり、`pending` のインスタンスがレコードごとに 1 つまで。
+- 性質ベーステスト：任意の申請・承認・却下・取り消し・付け替え・並行の応答の列で、状態がステートマシンの中にあり、`pending` のインスタンスがレコードごとに 1 つまで。
 - 上限の試験：段 30・承認者 25。
 - 結合テスト：ロックされたレコードの利用者の更新が 400 `RECORD_LOCKED`。承認者が読めない時に `error`。

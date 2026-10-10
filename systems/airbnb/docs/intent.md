@@ -109,7 +109,7 @@
 
 ## Constraints
 
-- **核を自前で設計する。** 空室の判定、検索の候補の絞り込みと順位付け、料金の計算、予約の状態の機械、台帳、T&S は自分で作る。本家のコード、本家が公開したライブラリ、本家から取り出したデータ・モデルは使わない。検索のエンジン（OpenSearch）、PostgreSQL の拡張、ML の枠組み、決済・為替・送金・eKYC・翻訳・地図の外部のサービスは、核の外の汎用の部品・外部のサービスとして、理由を ADR に書いて使う（[リポジトリ共通の ADR-0007](../../../docs/decisions/0007-no-reuse-of-original-implementation.md)、[ADR-0001](decisions/0001-platform-and-stack.md)）。
+- **核を自前で設計する。** 空室の判定、検索の候補の絞り込みと順位付け、料金の計算、予約のステートマシン、台帳、T&S は自分で作る。本家のコード、本家が公開したライブラリ、本家から取り出したデータ・モデルは使わない。検索のエンジン（OpenSearch）、PostgreSQL の拡張、ML の枠組み、決済・為替・送金・eKYC・翻訳・地図の外部のサービスは、核の外の汎用の部品・外部のサービスとして、理由を ADR に書いて使う（[リポジトリ共通の ADR-0007](../../../docs/decisions/0007-no-reuse-of-original-implementation.md)、[ADR-0001](decisions/0001-platform-and-stack.md)）。
 - 実行基盤と技術は、rebuilds の他の題材の決定（AWS 東京・大阪、TypeScript・Hono、Aurora PostgreSQL、Valkey、S3、SQS・SNS、ECS Fargate、Terraform、OpenTelemetry、AppConfig のフラグ、FORCE RLS と `SET LOCAL`、UUIDv7、outbox）を引き継ぐ。外れるところ（ML を Python で書くこと、検索のエンジン）は ADR に理由を書く。
 - **他の題材の設計を参照し、設計し直さない。** 地理の格子は Uber、空き時間・タイムゾーン・予約の排他の制約・ICS の購読は Google Calendar、預かり・台帳・T&S・評価は Mercari、決済・複数の通貨・送金は Stripe、熱い在庫と売上の確定の時期は Shopify にある。
 - **カード処理を設計し直さない。** カード情報の保管、アクワイアラへの接続は Stripe の題材の論点である（[ADR-0005](decisions/0005-payments-hold-capture-and-ledger.md)）。

@@ -46,7 +46,7 @@ flowchart TB
     end
 
     subgraph media["メディアの面（Rust、EC2）"]
-        orch["pipeline-orchestrator<br/>段の状態の機械、作業の配り"]
+        orch["pipeline-orchestrator<br/>段のステートマシン、作業の配り"]
         enc["encode-worker（CPU の Spot）<br/>区切りごとの符号化、VMAF"]
         pkg["packager・manifest-service<br/>CMAF、HLS・DASH、鍵"]
         origin["origin-cache<br/>NVMe の中間のキャッシュ"]
@@ -127,7 +127,7 @@ flowchart TB
 | コンテナ | 責務 |
 | --- | --- |
 | `upload-service` | 再開できるアップロードのセッション（作成、部分の受け取り、位置の問い合わせ、完了）。S3 のマルチパートのアップロードを裏に持ち、部分のチェックサムと全体の CRC64NVME を S3 に確かめさせてから完了を返す（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)、[ADR-0011](../decisions/0011-upload-session-protocol-and-checksums.md)） |
-| `pipeline-orchestrator` | 動画ごとのパイプラインの状態の機械（検査 → 解析 → 指紋 → 速い段の符号化 → 公開の判定 → 全段の符号化 → 字幕 → 人気での AV1）。段の作業を SQS で配り、結果を Aurora に記録する。指揮は自前（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)） |
+| `pipeline-orchestrator` | 動画ごとのパイプラインのステートマシン（検査 → 解析 → 指紋 → 速い段の符号化 → 公開の判定 → 全段の符号化 → 字幕 → 人気での AV1）。段の作業を SQS で配り、結果を Aurora に記録する。指揮は自前（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)） |
 | `encode-worker` | GOP に揃えた区切り（既定 20 秒）ごとの符号化。FFmpeg のライブラリと x264・SVT-AV1 を呼ぶ。試しの符号化と VMAF でラダーを決める。EC2 の Spot（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)） |
 | `packager`・`manifest-service` | 区切りを CMAF の fMP4 のセグメントにまとめ、レンディションごとに 1 つのファイルとセグメントの索引を S3 に置く。HLS・DASH のマニフェストは要求の時に索引から作る。DRM の対象は CENC（`cbcs`）で暗号化する（[ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md)） |
 | `origin-cache` | CDN と S3 の間の自前の中間のキャッシュ（NVMe）。ロングテールのセグメントの範囲の読み出しをまとめ、S3 の GET を減らす。措置の拒否の集まりを持つ（[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md)、[ADR-0026](../decisions/0026-origin-cache-routing-admission-and-coalescing.md)） |
@@ -153,7 +153,7 @@ flowchart TB
 
 原則は 6 つ。
 
-- **パイプラインは段の状態の機械にし、段は冪等にする。** 各段の出力のキーは入力のハッシュと設定のバージョンから決まる。どこで落ちても、その段からやり直せる（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）。
+- **パイプラインは段のステートマシンにし、段は冪等にする。** 各段の出力のキーは入力のハッシュと設定のバージョンから決まる。どこで落ちても、その段からやり直せる（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）。
 - **公開の前に照合する。** 指紋は速い段の符号化と並べて作り、照合の結果が出るまで公開にしない（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)）。
 - **符号化の費用は人気に合わせて使う。** すべての動画に H.264 の全段を作り、AV1 は人気が出た動画にだけ足す。配信の節約が符号化の費用を上回るところで切り替える（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)）。
 - **1 つの形式で保存し、マニフェストは要求の時に作る。** CMAF のセグメントを 1 回だけ保存し、HLS と DASH の両方で配る（[ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md)）。
@@ -366,7 +366,7 @@ CloudFront の公開の価格（月 27 PB で約 0.064 USD/GB）は予算 0.02 U
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 管理の面は共通の基盤を引き継ぎ、メディアの面と視聴の計測は Rust で書く。メディアの面は ECS の EC2（CPU の Spot、GPU、NVMe）で動かす。視聴の出来事は MSK に流す |
-| [0002](../decisions/0002-upload-and-pipeline-orchestration.md) | アップロードは自前の再開できるセッション（S3 のマルチパートの上）。全体の確かめは CRC64NVME の全体のチェックサム（ADR-0011 で具体にした）。パイプラインは自前の段の状態の機械で、段は冪等。元のファイルを保持する |
+| [0002](../decisions/0002-upload-and-pipeline-orchestration.md) | アップロードは自前の再開できるセッション（S3 のマルチパートの上）。全体の確かめは CRC64NVME の全体のチェックサム（ADR-0011 で具体にした）。パイプラインは自前の段のステートマシンで、段は冪等。元のファイルを保持する |
 | [0003](../decisions/0003-codecs-and-per-title-ladder.md) | H.264 を全動画、AV1 を人気の動画にだけ。VP9 は作らない。動画ごとのラダーを試しの符号化と VMAF で決める。VOD は CPU の Spot、ライブは GPU。MediaConvert は使わない（損益の計算を ADR-0016 で直した） |
 | [0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) | CMAF の fMP4 で 1 回だけ保存し、HLS と DASH のマニフェストを要求の時に作る。VOD のセグメント 4 秒。DRM はメンバー限定の動画だけ（CENC `cbcs`） |
 | [0005](../decisions/0005-cdn-and-origin-strategy.md) | S1 は CloudFront と Origin Shield と自前の中間のキャッシュ。S2 から複数の CDN と計測による振り分け。S3 で ISP の中のキャッシュを検討。配信の停止は拒否の一覧で 60 秒以内 |
@@ -398,7 +398,7 @@ CloudFront の公開の価格（月 27 PB で約 0.064 USD/GB）は予算 0.02 U
 
 PM の方針（本家に寄せ、判断が要るところは推奨の既定案で進める）により、最初の設計で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。どれも領域の文書の工程と E1〜E15 の PoC・試験で覆りうる。
 
-- **変換の指揮**：自前（Rust の段の状態の機械と SQS の作業の配り）。MediaConvert・Step Functions に任せない。指揮とラダーは題材の核である（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）。
+- **変換の指揮**：自前（Rust の段のステートマシンと SQS の作業の配り）。MediaConvert・Step Functions に任せない。指揮とラダーは題材の核である（[ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md)）。
 - **ラダー**：動画ごと（per-title）。複雑さの試しの符号化（区間 6 つ）と VMAF の目標で段を決める。場面ごと（per-shot）の最適化は MVP の後（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)）。
 - **コーデック**：H.264 と AV1。VP9 は作らない。AV1 は人気のしきい値の後（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)）。
 - **CPU と GPU**：VOD は CPU のソフトウェアの符号化（同じビットでの画質を優先）を Spot で。ライブは GPU（NVENC。遅延と密度を優先）（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)）。
@@ -511,7 +511,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
 | [upload-and-ingest.md](upload-and-ingest.md) | 再開できるアップロードのセッション（部分、位置、期限、ハッシュ）、アプリの背景のアップロード、検査（形式、長さ、壊れた区間、既知の違法なメディア）、下書きと予約の公開、元のファイルの保持 | 0011、0012、0013 | QA、セキュリティ | E2 |
-| [transcoding-pipeline.md](transcoding-pipeline.md) | 段の状態の機械、区切りと並列の符号化、継ぎ目、ラダーの決め方、`ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル、シークの縮小の画像、チャプター、Spot の中断、費用 | 0014、0015、0016、0017、0018 | QA、Ops | E3 |
+| [transcoding-pipeline.md](transcoding-pipeline.md) | 段のステートマシン、区切りと並列の符号化、継ぎ目、ラダーの決め方、`ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル、シークの縮小の画像、チャプター、Spot の中断、費用 | 0014、0015、0016、0017、0018 | QA、Ops | E3 |
 | [packaging-and-drm.md](packaging-and-drm.md) | CMAF の書き手、セグメントの索引、マニフェストの生成（HLS・DASH、端末ごとの段）、字幕のトラック、DRM の範囲、鍵の管理とライセンスの事業者 | 0019、0020、0021 | QA、セキュリティ | E4、E14 |
 | [playback-and-abr.md](playback-and-abr.md) | プレイヤー（Web・Android・iOS・テレビ）、ABR の方式、開始の段の選び方、再生の品質の計測（QoE）、再生の API と再生のトークン、広告の枠の挿入、プレイヤーの外部送信（法務の L6） | 0022、0023、0024 | QA | E4 |
 | [cdn-and-delivery.md](cdn-and-delivery.md) | CDN の構成、Origin Shield、中間のキャッシュ、署名の URL、要求の合流、事前の配置、複数の CDN と振り分け、拒否の一覧と無効化、配信の費用 | 0025、0026、0027 | Ops | E5 |

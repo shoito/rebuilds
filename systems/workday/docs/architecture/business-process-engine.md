@@ -1,8 +1,8 @@
 # Business process engine: Workday
 
-業務プロセスの定義とバージョン、ステップの種類と条件、組織のロールによるルーティング、委任、案件の状態機械、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化を決める。
+業務プロセスの定義とバージョン、ステップの種類と条件、組織のロールによるルーティング、委任、案件のステートマシン、取消・訂正・キャンセル、親子の案件、期限と督促、受信箱、定義の検証と有効化を決める。
 
-前提の決定は、業務プロセスをバージョンつきの定義と Aurora に永続する状態機械で自前に作ること（[ADR-0003](../decisions/0003-business-process-engine.md)）、人事のデータは完了のステップで有効日付の差分として書くこと（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）、権限と職務分掌（[ADR-0005](../decisions/0005-security-and-my-number.md)）。この文書で決めたことは次の ADR にある。
+前提の決定は、業務プロセスをバージョンつきの定義と Aurora に永続するステートマシンで自前に作ること（[ADR-0003](../decisions/0003-business-process-engine.md)）、人事のデータは完了のステップで有効日付の差分として書くこと（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）、権限と職務分掌（[ADR-0005](../decisions/0005-security-and-my-number.md)）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -186,7 +186,7 @@ bp_definitions (tenant_id, id, process_type, version int,
 - 除外で空になったら、`walk` に従って上へたどる（5.2 節の 5）。
 - 除外は、操作の時にもう一度確かめる（委任を経た実際の操作者で。7 節）。ルーティングのときの除外だけに頼らない。
 
-## 6. 案件の状態機械
+## 6. 案件のステートマシン
 
 ### 6.1 表
 
@@ -338,7 +338,7 @@ bp_delegations (tenant_id, id, delegator_id, delegate_id, alternate_id,
 
 - 営業日はテナントの暦（土日・祝日・テナントの休日）で数える。暦の表は給与の領域と共通にする。
 - 期限は、ステップが開いたとき、`bp_timers` に `due`・`remind`・`escalate` の行を同じトランザクションで作る。ステップが閉じたら、同じトランザクションで `cancelled` にする。
-- BP Worker が `fire_at` の来たタイマーを `FOR UPDATE SKIP LOCKED` で取り、`timer_fired` の操作として状態機械に渡す。ステップが既に閉じていれば何もしない。
+- BP Worker が `fire_at` の来たタイマーを `FOR UPDATE SKIP LOCKED` で取り、`timer_fired` の操作としてステートマシンに渡す。ステップが既に閉じていれば何もしない。
 - 業務の期限（例：給与の締め）は、定義の期限ではなく、給与の実行の予定から「この日までに完了しないと今月の給与に入らない」を受信箱に出す（[payroll-engine.md](payroll-engine.md)）。
 
 ### 10.2 受信箱
