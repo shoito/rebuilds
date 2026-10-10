@@ -373,16 +373,16 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [web-client.md](web-client.md) | 画面の構成、オフラインと楽観の更新、作成と下書き、元に戻す送信、HTML メールの安全な描画、配信停止のボタン、画面の計測（法務の L8） | [0043](../decisions/0043-web-offline-cache-and-optimistic-updates.md)、[0044](../decisions/0044-safe-html-rendering.md) | QA、セキュリティ | E9 |
 | [mobile-and-push.md](mobile-and-push.md) | iOS・Android のオフラインの DB と同期、プッシュの経路と中身（法務の L3）、通知のまとめ、端末の管理 | [0045](../decisions/0045-push-payload-without-content.md)、[0046](../decisions/0046-mobile-offline-scope-and-device-management.md) | QA、Ops | E8、E16 |
 | [filters-forwarding-and-automation.md](filters-forwarding-and-automation.md) | フィルターの条件（検索の IR）と動作、確認つきの転送、SRS と ARC、不在の返信、予約の送信、元に戻す送信、スヌーズ | [0047](../decisions/0047-user-filter-evaluation.md)、[0048](../decisions/0048-verified-forwarding.md)、[0049](../decisions/0049-timed-jobs-vacation-and-scheduled-send.md) | QA | E12 |
-| `organizations-domains-and-routing.md` | 組織と組織の単位、独自のドメインの確かめ、DNS の案内、別名とグループ、配送の規則（分けた配送、送信のゲートウェイ、全受け）、管理の役割、SSO | 0050–0052 | セキュリティ、PM | E14 |
-| `retention-and-ediscovery.md` | 保持の規則、保留、横断の検索と書き出し、担当の役割と監査、退職者のメールの扱い、捜査機関への対応の枠（法務の L4） | 0053–0054 | セキュリティ、PM | E15 |
-| `accounts-and-security.md` | アカウントの作成、サインイン（パスキー、2 段階）、危険度での確かめ、セッション、回復、乗っ取りの検知と対応、第三者のアプリの OAuth と同意、活動の表示 | 0055–0057 | セキュリティ | E13 |
-| `api-and-integrations.md` | 第三者向けの JMAP と IMAP の公開、OAuth のスコープ、速さの上限、アプリの確かめ、公開の REST API（MVP の後） | 0058–0059 | セキュリティ | E8、E11、E13 |
-| `security.md` | 脅威モデル、暗号化と鍵（blob ごとの鍵、KMS）、運用者のアクセスの禁止と例外、報告のサンプルの置き場所、監査、開示の請求（法務の L1・L4・L6） | 0060–0062 | セキュリティ | E1、E13、E17 |
+| [organizations-domains-and-routing.md](organizations-domains-and-routing.md) | 組織と組織の単位、独自のドメインの確かめ、DNS の案内、別名とグループ、配送の規則（分けた配送、送信のゲートウェイ、全受け）、管理の役割、SSO | [0050](../decisions/0050-custom-domain-verification-and-dns-checks.md)、[0051](../decisions/0051-address-groups-expansion-and-loop-prevention.md)、[0052](../decisions/0052-org-routing-rules-evaluation.md) | セキュリティ、PM | E14 |
+| [retention-and-ediscovery.md](retention-and-ediscovery.md) | 保持の規則、保留、横断の検索と書き出し、担当の役割と監査、退職者のメールの扱い、捜査機関への対応の枠（法務の L4） | [0053](../decisions/0053-retention-rules-holds-and-preservation.md)、[0054](../decisions/0054-ediscovery-matters-search-export-and-audit.md) | セキュリティ、PM | E15 |
+| [accounts-and-security.md](accounts-and-security.md) | アカウントの作成、サインイン（パスキー、2 段階）、危険度での確かめ、セッション、回復、乗っ取りの検知と対応、第三者のアプリの OAuth と同意、活動の表示 | [0055](../decisions/0055-sign-in-methods-sessions-and-protocol-auth.md)、[0056](../decisions/0056-sign-in-risk-and-account-recovery.md)、[0057](../decisions/0057-account-takeover-response.md) | セキュリティ | E13 |
+| [api-and-integrations.md](api-and-integrations.md) | 第三者向けの JMAP と IMAP の公開、OAuth のスコープ、速さの上限、アプリの確かめ、公開の REST API（MVP の後） | [0058](../decisions/0058-oauth-scopes-and-app-verification.md)、[0059](../decisions/0059-api-rate-limits-and-third-party-push.md) | セキュリティ | E8、E11、E13 |
+| [security.md](security.md) | 脅威モデル、暗号化と鍵（blob ごとの鍵、KMS）、運用者のアクセスの禁止と例外、報告のサンプルの置き場所、監査、開示の請求（法務の L1・L4・L6） | [0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)、[0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md)、[0062](../decisions/0062-generic-components-additions-and-supply-chain.md) | セキュリティ | E1、E13、E17 |
 | `data-model.md` | データモデルの索引（directory とメールボックスのシャードの表、S3 のパス、SQS のメッセージ、change log の形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `infrastructure.md` | AWS のアカウントとネットワーク、BYOIP と逆引き、ポート 25 の送信、EC2 のキャパシティー、シャードの配置と移し替え、DR（大阪の副 MX、切り替え）、段階を上げる基準 | 0063–0065 | Ops | E1、E17 |
-| `observability.md` | SLI の計測、見張りのメール（外部の見張りのアカウントとの送受）、到達性の監視（ブロックリスト、外部の受信箱への届き方）、利用者の中身を含めない計測の規則 | 0066–0067 | Ops | E1、E17 |
-| `capacity.md` | 負荷のモデル（受信の申し出、迷惑メールの割合、送信、同期、検索）、部品ごとの必要量、費用のモデル、負荷試験 | 0068 | Ops | E17 |
-| `delivery.md` | CI/CD、MTA の段階のデプロイ（接続の排出）、選別のモデルの段階の出し方（影の判定）、形式のバージョンの更新の順序、モバイルの配布、フラグ、スキーマの変更 | 0069–0070 | QA、Ops | E1、E6、E17 |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、BYOIP と逆引き、ポート 25 の送信、EC2 のキャパシティー、シャードの配置と移し替え、DR（大阪の副 MX、切り替え）、段階を上げる基準 | [0063](../decisions/0063-network-byoip-ranges-and-egress.md)、[0064](../decisions/0064-storage-classes-and-region-replication.md)、[0065](../decisions/0065-stage-up-criteria-and-cells.md) | Ops | E1、E17 |
+| [observability.md](observability.md) | SLI の計測、見張りのメール（外部の見張りのアカウントとの送受）、到達性の監視（ブロックリスト、外部の受信箱への届き方）、利用者の中身を含めない計測の規則 | [0066](../decisions/0066-sli-measurement-and-mail-canary.md)、[0067](../decisions/0067-content-free-telemetry-schema.md) | Ops | E1、E17 |
+| [capacity.md](capacity.md) | 負荷のモデル（受信の申し出、迷惑メールの割合、送信、同期、検索）、部品ごとの必要量、費用のモデル、負荷試験 | [0068](../decisions/0068-capacity-model-and-headroom.md) | Ops | E17 |
+| [delivery.md](delivery.md) | CI/CD、MTA の段階のデプロイ（接続の排出）、選別のモデルの段階の出し方（影の判定）、形式のバージョンの更新の順序、モバイルの配布、フラグ、スキーマの変更 | [0069](../decisions/0069-mta-drain-and-shard-schema-waves.md)、[0070](../decisions/0070-format-versions-and-model-rollout.md) | QA、Ops | E1、E6、E17 |
 
 - 次に採番する ADR は 0071。
 
