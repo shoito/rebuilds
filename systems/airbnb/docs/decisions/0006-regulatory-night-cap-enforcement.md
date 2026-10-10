@@ -112,6 +112,10 @@ CREATE TABLE regulated_nights (
 - **b（本システムの予約だけ）**：法務の結論が「他の掲載先も数える」なら作り直しになる。数える仕組みは先に作り、有効化を設定にする。
 - **c（取り込みをすべて数える）**：ホストのブロック（泊めていない日）まで数え、ホストの営業の日を不当に減らす。
 
+> 2026-10-10 の注記：
+> - 書き込みは `INSERT ... ON CONFLICT DO NOTHING` ではなく、`claim_count` を増やす `ON CONFLICT DO UPDATE` に改めた。同じ夜の 2 室の 1 室を取り消しても、残りの室の日が消えないようにするため（[ADR-0065](0065-regulated-nights-fiscal-year-and-external-overflow.md)、[regulatory-compliance-japan.md](../architecture/regulatory-compliance-japan.md) の 5.3 節）。
+> - 「同じ届出住宅の同じ夜の 2 室は 1 日と数える」は本システムの既定の解釈で、当てはめは法務の確認待ち（[intent.md](../intent.md) の L1）。L1 の結論が「室ごとに数える」なら、上限の CHECK を「`regulated_nights` の行の数」から「`claim_count` の和」に替える。表の形はどちらの数え方も持てるので、移行は CHECK と数えの関数の差し替えで済む。
+
 ## Consequences
 
 - 良くなること：

@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airbnb の前提知識</title>
+<meta name="description" content="Airbnb の再構築の設計の文書を読む前に知っておくとよい、宿泊のマーケットプレイスの登場人物、泊と日付の範囲、滞在の規則、二重の予約と排他の制約、iCal の同期、日付の範囲の検索、位置の秘匿、料金と総額、宿泊税・入湯税・消費税、キャンセルと返金、オーソリと売上の確定・為替・台帳・送金、同時に公開するレビュー、T&amp;S、住宅宿泊事業法・旅館業法・宿泊者名簿の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Airbnb · 前提知識</p>
+    <h1>宿泊のマーケットプレイスの設計を読む前に</h1>
+    <p class="lead">ゲスト・ホスト・共同ホストの関係、泊と日付の範囲、滞在の規則、二重の予約と排他の制約、iCal の同期の遅れ、日付の範囲の検索、ずらした位置、料金と総額、宿泊税・入湯税・消費税、キャンセルポリシーと返金、オーソリと売上の確定・為替・通貨ごとの台帳・チェックインの後の送金、同時に公開するレビュー、パーティーと偽のリスティング、住宅宿泊事業法・旅館業法・宿泊者名簿の枠組みを、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>に、タイムゾーンと iCalendar と会議室の排他の制約は <a href="../../../google-calendar/docs/primer/index.html">Google Calendar の資料</a>に、地理の索引は <a href="../../../uber/docs/primer/index.html">Uber の資料</a>に、カード決済と台帳は <a href="../../../stripe/docs/primer/index.html">Stripe の資料</a>に、預かり・T&amp;S・メッセージの絞り込みは <a href="../../../mercari/docs/primer/index.html">Mercari の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Airbnb · 前提知識</p>
+    <h2>宿泊のマーケットプレイスの設計を読む前に</h2>
+    <p class="lead">同じ夜を二度売らず、見せた総額で請求し、法令の上限を超えない仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>宿泊のマーケットプレイスは何をするサービスか</h2>
+    <p>Airbnb は、個人や事業者が住まいや部屋を貸し、旅行者が地図と日付で泊まる所を探して予約する場です。本家のホストは 550 万人を超え、有効な<a class="t" href="#g-listing">リスティング</a>は 900 万件を超えます。2026 年の第 2 四半期の予約の泊と席は 1 億 4,830 万でした。この設計は、日本を最初の市場にして、海外のゲストも受けます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>ゲスト</h3><p>家族や友人の数人で 2〜5 泊が中心です。海外の人は英語・中国語・韓国語で日本の地名を探し、自分の通貨で払いたいです。</p></div>
+      <div class="card" data-frag><h3>ホスト</h3><p>自宅の一部や空き家を貸す個人と、複数の物件を持つ事業者です。多くは他の掲載先にも同じ物件を出します。</p></div>
+      <div class="card" data-frag><h3>共同ホスト・PMS</h3><p><a class="t" href="#g-cohost">共同ホスト</a>は、ホストに代わってカレンダー・予約・メッセージを受け持ちます。<a class="t" href="#g-pms">PMS</a> は、複数の掲載先の空室と料金を 1 か所で管理するシステムです。</p></div>
+      <div class="card" data-frag><h3>運用・CS・安全</h3><p>問い合わせ、予約への介入、返金と補償、リスティングの審査、24 時間の安全の窓口、行政の照会への対応をします。</p></div>
+    </div>
+    <div class="compare">
+      <div class="bad"><h3>EC の在庫（Shopify など）</h3><p>同じ品を何個も持ち、数を減らして売ります。売った時点で取引は決まり、配送で終わります。</p></div>
+      <div class="good"><h3>宿泊の在庫</h3><p>1 つのリスティングは、夜ごとに 1 組にしか売れません。在庫は「数」でなく「日付の範囲」です。代金は数か月前に受け、泊まりが始まってからホストへ渡します。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/intent.md">intent.md</a> の Problem と 8 つの価値、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/README.md">architecture/README.md</a> の 1.1 節（コンテキスト）と 1.4 節（本家の形）。</small></p>
+  </section>
+
+  <section class="s" id="nights">
+    <h2>泊と日付の範囲：[check_in, check_out)</h2>
+    <p>宿泊は「夜」で数えます。2026-12-30 にチェックインし、2027-01-02 にチェックアウトする滞在は、12/30・12/31・1/1 の <strong>3 泊</strong>です。設計は、これを<strong>チェックインの日を含み、チェックアウトの日を含まない</strong>半開区間 <code>[2026-12-30, 2027-01-02)</code> で書きます。PostgreSQL の <a class="t" href="#g-daterange">daterange</a> も、既定で同じ形です。</p>
+    <pre><code>泊   12/30  12/31  1/1  │ 1/2
+     ■      ■      ■    │ □  ← チェックアウトの日は泊でない
+次の滞在は 1/2 にチェックインできる（[1/2, …)）</code></pre>
+    <ul>
+      <li><strong>日付は物件の現地の日付</strong>です。時刻もタイムゾーンも持ちません。東京の 12/30 の夜は、どの国のゲストから見ても 12/30 の夜です。</li>
+      <li><strong>瞬間は別に計算します。</strong>チェックインの時刻（例 15:00）、予約の締め切り、キャンセルの境、送金の時刻は、<a class="t" href="#g-property-tz">物件のタイムゾーン</a>で現地の時刻から UTC の瞬間に直します。計算は <code>packages/stay-time</code> の 1 か所です。</li>
+      <li>夏時間で存在しない時刻は後ろへ、2 回ある時刻は早いほうに寄せます（考え方は <a href="../../../google-calendar/docs/primer/index.html#dst">Google Calendar の資料の「夏時間」</a>）。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">12/30〜1/2 の予約がある部屋に、別のゲストが 1/2〜1/4 で予約しようとしています（準備の日は 0）。どうなりますか？</p>
+      <div class="opts">
+        <button>拒む。1/2 はチェックアウトの日で、前の予約の泊だから</button>
+        <button>受ける。1/2 は前の予約の泊に含まれない</button>
+        <button>受けるかは、チェックアウトの時刻とチェックインの時刻を比べて決める</button>
+      </div>
+      <p class="why">泊は <code>[check_in, check_out)</code> で、チェックアウトの日は含みません。<code>[12/30, 1/2)</code> と <code>[1/2, 1/4)</code> は重なりません。時刻で比べると、タイムゾーンと夏時間で判定がぶれます。日付どうしで比べるのが設計の決まりです。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/data-model.md">data-model.md</a> の 3.5 節（日付と時刻）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/availability-and-calendars.md">availability-and-calendars.md</a> の 4.4 節と 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0019-tzdb-update-and-time-zone-recompute.md">ADR-0019</a>（tz データベースの更新）。壁時計と UTC の基礎は <a href="../../../google-calendar/docs/primer/index.html#timezones">Google Calendar の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="stay-rules">
+    <h2>滞在の規則：泊数・曜日・締め切り・準備の日</h2>
+    <p>「その日付が空いている」だけでは泊まれません。ホストは、泊まり方の規則を決めます。空いているかは次の節の排他の制約が決め、規則は 1 つの純粋な関数 <code>checkStayRules</code> が決めます。</p>
+    <table>
+      <tr><th>規則</th><th>意味</th><th>この設計の既定と範囲</th></tr>
+      <tr><td>最短・最長の泊数</td><td>短すぎる・長すぎる滞在を断る。チェックインの日ごとに上書きできる（例：土曜は 3 泊から）</td><td>1 泊・27 泊。MVP の上限は 27 泊</td></tr>
+      <tr><td>チェックイン・チェックアウトの曜日</td><td>「日曜はチェックインできない」など</td><td>全部の曜日</td></tr>
+      <tr><td><a class="t" href="#g-cutoff">締め切り</a></td><td>「当日の 18:00 まで」「2 日前まで」</td><td>0 日前の 18:00（物件の現地の時刻）</td></tr>
+      <tr><td><a class="t" href="#g-window">予約できる期間</a></td><td>何か月先まで受けるか</td><td>12 か月（3・6・9・12・24）</td></tr>
+      <tr><td><a class="t" href="#g-prep">準備の日</a></td><td>予約と予約の間に空ける夜。清掃や点検のため</td><td>0 泊（0〜2）</td></tr>
+    </table>
+    <p>例：最短 2 泊、10 月の土曜は 3 泊から、日曜はチェックインできない、締め切り 18:00。今は 2026-10-10（土）17:30 です。</p>
+    <table>
+      <tr><th>要求</th><th>結果</th></tr>
+      <tr data-frag><td>10/10（土）〜10/12（月）、2 泊</td><td>拒む：土曜の上書き 3 泊に足りない（<code>min_nights</code>）</td></tr>
+      <tr data-frag><td>10/10（土）〜10/13（火）、3 泊</td><td>通す。ただし 18:00:00 に送れば <code>cutoff</code></td></tr>
+      <tr data-frag><td>10/11（日）〜10/13（火）</td><td>拒む：日曜のチェックイン（<code>checkin_day</code>）</td></tr>
+    </table>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/availability-and-calendars.md">availability-and-calendars.md</a> の 6 節（DT-AVL-001 の 12 行と例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0017-stay-rules-decision-table.md">ADR-0017</a>。同じ関数を検索のステージ 2 も呼びます（<a href="#search">日付の範囲の検索</a>の節）。</small></p>
+  </section>
+
+  <section class="s" id="double-booking">
+    <h2>二重の予約は、なぜ難しいか</h2>
+    <p>同じ夜を 2 組に売ると、片方のゲストは泊まる所を失います。難しいのは、日付を埋める入口がたくさんあり、どれも「少しの間だけ押さえる」状態を持つからです。</p>
+    <div class="tabs">
+      <div data-tab="即時予約"><p>ゲストは<a class="t" href="#g-instant-book">即時予約</a>でホストの承認を待たずに確定します。確認の画面で支払いを済ませる 10 分の間、日付を<a class="t" href="#g-hold">仮押さえ</a>します。支払いが失敗すれば外します。</p></div>
+      <div data-tab="リクエスト"><p><a class="t" href="#g-request">予約のリクエスト</a>は、ホストが 24 時間の中で承認か断りをします。その間、この設計は日付を他のゲストに空いて見せません（本家の振る舞いは未検証）。期限は「24 時間」と「チェックインの 2 時間前」の早いほうです。</p></div>
+      <div data-tab="外部のカレンダー"><p>ホストは同じ部屋を他の掲載先にも出し、<a class="t" href="#g-ical">iCal</a> で予定を取り込みます。取り込みは定期の取得なので、外で売れた夜が、しばらく本システムで空いて見えます。</p></div>
+      <div data-tab="その他"><p>ホストのブロック、PMS の API、日程の変更（古い日付と新しい日付を一時的に両方押さえる）、運用の代わりの予約。</p></div>
+    </div>
+    <pre class="mermaid">flowchart LR
+  IB["即時予約<br>hold 10 分"] --> SC[("stay_claims<br>1 つの排他の制約")]
+  RQ["リクエスト<br>request 24 時間"] --> SC
+  AL["日程の変更"] --> SC
+  HB["ホストのブロック"] --> SC
+  PMS["PMS の API"] --> SC
+  IC["iCal の取り込み"] --> SC</pre>
+    <p>この設計は、入口の数に依らず、全部を <code>stay_claims</code> という 1 つの表の行にし、重なりを DB に拒ませます（次の節）。ただし<strong>外の掲載先で先に売れた夜</strong>は、本システムが知る前に売れているので防げません。取り込んだ時に重なりを見つけて、5 分以内にホストへ知らせます。</p>
+    <div class="compare">
+      <div class="bad"><h3>アプリで確かめてから書く</h3><p>「空いているか <code>SELECT</code> → 空いていれば <code>INSERT</code>」は、間に別の要求が割り込めます。入口ごとに確かめの漏れも生まれます。</p></div>
+      <div class="good"><h3>DB の制約に拒ませる</h3><p>どの入口も同じ表に挿入し、重なりは制約が拒みます。アプリの確かめは、利用者に理由を返すためだけです。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0002-availability-representation-and-double-booking.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0004-booking-state-machine-and-holds.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/booking-and-holds.md">booking-and-holds.md</a> の 4 節（状態の図）・6 節（<code>reserveStay</code>）・8 節（熱い日付）。熱い行の考え方は <a href="../../../shopify/docs/primer/index.html#hot-rows">Shopify の資料</a>と <a href="../../../mercari/docs/primer/index.html#single-purchase">Mercari の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="exclusion">
+    <h2>排他の制約：重なる範囲を DB が拒む</h2>
+    <p>一意の制約は「同じ値」を拒みます。<a class="t" href="#g-exclusion">排他の制約</a>は「演算子が真になる 2 行」を拒みます。<code>&amp;&amp;</code>（範囲が重なる）を使えば、「同じリスティングで範囲が重なる 2 行」を DB が入れません。<code>=</code> と範囲を 1 つの索引で扱うため、<a class="t" href="#g-gist">GiST</a> と拡張の <code>btree_gist</code> を使います。</p>
+    <pre><code>EXCLUDE USING gist (
+  listing_id  WITH =,     -- same listing
+  claim_group WITH &lt;&gt;,    -- different reservation (same group may overlap during alteration)
+  block_span  WITH &amp;&amp;     -- overlapping [check_in, check_out + prep_nights)
+) WHERE (status = 'active')</code></pre>
+    <p>準備の日は、各予約の<strong>後ろ</strong>にだけ足します（<a class="t" href="#g-block-span">block_span</a>）。例：準備の日 1、確定した R1 が 10/13〜10/15（2 泊）。R1 の <code>block_span</code> は <code>[10/13, 10/16)</code> です。</p>
+    <table>
+      <tr><th>新しい行</th><th>泊</th><th>block_span</th><th>結果</th></tr>
+      <tr data-frag><td>A</td><td>[10/16, 10/18)</td><td>[10/16, 10/19)</td><td>入る。10/15 は R1 の準備の日で、A は 10/16 から</td></tr>
+      <tr data-frag><td>B</td><td>[10/15, 10/17)</td><td>[10/15, 10/18)</td><td>拒む。10/15 は R1 の準備の日</td></tr>
+      <tr data-frag><td>C</td><td>[10/11, 10/13)</td><td>[10/11, 10/14)</td><td>拒む。C の準備の日 10/13 が R1 の初日に重なる</td></tr>
+      <tr data-frag><td>D</td><td>[10/10, 10/12)</td><td>[10/10, 10/13)</td><td>入る。D の準備の日 10/12 の翌日に R1 が始まる</td></tr>
+      <tr data-frag><td>ホストのブロック E</td><td>[10/16, 10/20)</td><td>[10/16, 10/20)</td><td>入る。ブロックは準備の日を持たない</td></tr>
+    </table>
+    <div class="callout key"><span class="label">要点</span>後ろにだけ持てば、前後の両方の間が守られます。前の間は、前の予約の <code>block_span</code> が担うからです。行は消さず、外すときは <code>status = 'released'</code> にします。部分の制約なので、外した行は判定に入りません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/availability-and-calendars.md">availability-and-calendars.md</a> の 4 節（行の種類、列と制約、即時予約と iCal の競合の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0041-alterations-with-claim-group-and-delta-settlement.md">ADR-0041</a>（日程の変更と <code>claim_group</code>）。会議室で同じ形を使う例は <a href="../../../google-calendar/docs/primer/index.html#rooms">Google Calendar の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="ical">
+    <h2>iCal の同期：引くだけなので、遅れる</h2>
+    <p>多くの掲載先は、リスティングごとに「秘密のアドレス」で <code>.ics</code> のファイルを出します。他の掲載先は、そのアドレスを定期的に取りに来ます（取り込み）。相手に変化を押し付ける仕組みはありません。iCalendar の形は <a href="../../../google-calendar/docs/primer/index.html#icalendar">Google Calendar の資料</a>にあります。</p>
+    <ul>
+      <li><strong>終日の予定</strong>：<code>DTSTART;VALUE=DATE:20261230</code>、<code>DTEND;VALUE=DATE:20270102</code>。RFC 5545 の <code>DTEND</code> は終わりを含まないので、そのまま泊 <code>[12/30, 1/2)</code> になります。</li>
+      <li><strong>書き出し</strong>：この設計は準備の日を含む <code>block_span</code> を出し、氏名・金額・住所は出しません。<code>UID</code> は <code>&lt;claim_group&gt;@&lt;brand&gt;.&lt;domain&gt;</code> です。</li>
+      <li><strong>取り込み</strong>：本家は 3 時間ごと、この設計は 15 分ごとに条件つきの GET で取ります。</li>
+    </ul>
+    <p>外の掲載先で予約が入ってから、本システムで塞がるまでの遅れを足し合わせると次のようになります。</p>
+    <div class="stepper">
+      <ol>
+        <li>他の掲載先 X で 12/30〜1/2 が売れる。X の書き出しが作り直されるまでの時間は、X が決める（不明）。</li>
+        <li>本システムが次に X を取りに行くまで、最大 15 分（揺らぎと失敗の後の待ちで延びる）。</li>
+        <li>取得から <code>stay_claims</code> に効くまで p95 1 分。この間に本システムで同じ日付を予約したゲストがいれば、重なりになる。</li>
+        <li>重なった部分は <code>ical_block</code> に入れず、<a class="t" href="#g-conflict">食い違い</a>として記録し、5 分以内にホストへ知らせる。本システムの予約は自動で取り消さない（どちらが先に売れたか、本システムは知れない）。</li>
+      </ol>
+    </div>
+    <div class="callout warn"><span class="label">空の iCal に注意</span>相手の障害で、空のファイルが 200 で返ることがあります。そのまま反映すると、外で売れた夜が一斉に空いて見え、二重の予約を生みます。この設計は、未来の泊が一度に半分以上消える取得を、2 回続けて同じ内容を得るまで書きません。自分の書き出しが戻ってくる「こだま」も、<code>UID</code> の領域で捨てます。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/calendar-sync.md">calendar-sync.md</a> の 5 節（取得と泊への直し方）・6 節（切り取りと食い違い）・9 節（書き出し）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0021-ical-import-pipeline-and-safety.md">ADR-0021</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0023-ical-export-secret-url-and-contents.md">0023</a>。PMS を使うホストには、同期で効く API と Webhook を勧めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/host-tools-and-api.md">host-tools-and-api.md</a>）。ICS の購読の基礎は <a href="../../../google-calendar/docs/primer/index.html#sync">Google Calendar の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="search">
+    <h2>日付の範囲の検索：2 段で絞る</h2>
+    <p>「この地図の範囲で、12/30〜1/2 に、4 人で、1 泊 1〜3 万円」で探します。空きは日付の<strong>範囲</strong>の性質なので、チェックインとチェックアウトの組の全部を前もって索引に入れることはできません。最短の泊数はチェックインの日で変わり、準備の日もあり、総額は日付と人数で変わります。そこで、粗く速く絞ってから、正しく確かめます。</p>
+    <pre class="mermaid">flowchart LR
+  Q["地図・日付・人数・価格"] --> S1["ステージ 1：OpenSearch<br>ずらした位置・定員・条件<br>空きの区間が滞在を含むか<br>価格の帯で粗く"]
+  S1 -- "上位 300 件" --> S2["ステージ 2：Valkey の写し<br>泊のビット列と checkStayRules<br>料金の要約で正しく絞る"]
+  S2 -- "順位の式で 18 件" --> R["結果と地図の点"]
+  R -. "予約を押す" .-> DB[("DB の排他の制約<br>ここだけが正しさを守る")]</pre>
+    <p>ステージ 1 は、各リスティングの<a class="t" href="#g-stay-ranges">空きの区間</a>を、OpenSearch の <code>date_range</code> の欄に入れ、「滞在の範囲を<strong>含む</strong>区間がある」で引きます。ステージ 2 は、<a class="t" href="#g-snapshot">空室の写し</a>（2 年分の泊のビット列と規則の要約、平均 250 バイト）を 300 件まとめて取り、同じ <code>checkStayRules</code> で確かめます。</p>
+    <p><strong>鮮度</strong>：予約が入ってから、写しが直るまで約 2 秒、索引から消えるまで約 4 秒（目標 p95 10 秒）。その間は、もう泊まれないリスティングが結果に出ます。混ざる割合を 0.5% 未満にし、抜き取りで計ります。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">検索の結果に出たリスティングを予約するとき、正しい流れはどれですか？</p>
+      <div class="opts">
+        <button>検索の索引で空いていることを確かめ、空いていれば予約の行を書く</button>
+        <button>Valkey の空室の写しで確かめれば十分。索引より新しいから</button>
+        <button>検索の結果は候補にすぎない。予約のトランザクションで、滞在の規則と DB の排他の制約で確かめる</button>
+      </div>
+      <p class="why">索引と写しは outbox で非同期に直るので、数秒は古いことがあります。予約は必ず <code>reserveStay</code> の中で、ロック・<code>checkStayRules</code>・排他の制約で決めます。古い結果から押した予約は 409 <code>dates_unavailable</code> で、支払いの前に断ります（ADR-0003）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/search-and-ranking.md">search-and-ranking.md</a> の 4.3 節（<code>stay_ranges</code> の作り方と例）・5 節（2 段、年末の 3 泊の例、鮮度の表）・6 節（日付を決めない検索）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0003-search-for-date-range-availability.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0024-listing-index-layout-and-stay-ranges.md">0024</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0025-availability-snapshot-layout.md">0025</a>。</small></p>
+  </section>
+
+  <section class="s" id="location">
+    <h2>位置の秘匿：ずらした点を地図に出す</h2>
+    <p>予約の前に正確な住所を見せると、留守の家や一人の部屋が知られます。そこで検索・地図・リスティングの画面には、正確な位置から少し離れた<a class="t" href="#g-approx">ずらした位置</a>だけを出します。正確な位置は、確定した予約のゲストとホストにだけ出します。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>輪の中に置く</h3><p>都市 300〜500 m、郊外 400〜650 m、地方 500〜800 m の輪の中の点です。円でなく輪なので、点が正確な位置のすぐ近くに来ません。</p></div>
+      <div class="card" data-frag><h3>作り直さない</h3><p>点は秘密の鍵の HMAC で決め、毎回同じ点を出します。毎回違う点を出すと、多くの点の平均で真の位置を推せるからです。</p></div>
+      <div class="card" data-frag><h3>近い物件は同じ点</h3><p>40 m 以内の物件は同じ点を共有します。同じ建物の部屋の点を平均しても、絞れません。</p></div>
+    </div>
+    <p>地図は、点を中心に輪の外径の円（都市 500 m）を描きます。正確な位置は必ずその円の中にあります。検索の索引にも、正確な位置を入れません。「駅から徒歩 N 分」も、ずらした点から計算します。</p>
+    <table>
+      <tr><th>出すもの</th><th>いつから</th></tr>
+      <tr><td>正確な住所と地図の位置</td><td>予約の確定からチェックアウトの後 7 日まで（本家の時期は資料の間で食い違い、未検証）</td></tr>
+      <tr><td>入り方（暗証番号、鍵の場所）</td><td>チェックインの 48 時間前から</td></tr>
+    </table>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/location-and-geo.md">location-and-geo.md</a> の 4.5 節（出す経路）・5 節（決め方と計算の例、割り出しの防ぎ方）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0014-approximate-location-offset.md">ADR-0014</a>。位置のプライバシーの基礎は <a href="../../../uber/docs/primer/index.html#privacy-safety">Uber の資料</a>、地理の索引は <a href="../../../uber/docs/primer/index.html#geogrid">同じ資料の格子の節</a>。</small></p>
+  </section>
+
+  <section class="s" id="pricing">
+    <h2>料金と総額：京都の 3 泊の例</h2>
+    <p>1 泊の料金は、夜ごとに次の順で最初に当たった値です：日付の上書き → 季節の規則 → 週末の料金（既定は金・土の夜）→ 基本の料金。長期の割引（7 泊以上の週、28 泊以上の月）は大きいほう 1 つだけを泊の和に当てます。清掃料は滞在に 1 回、追加のゲストの料金は泊ごと・人ごとです。</p>
+    <p>例：基本 12,000 円、週末 15,000 円、季節の規則「紅葉」14,000 円（週末 17,000 円）、11/28 の上書き 20,000 円。11/27（金）〜11/30 の 3 泊、大人 3 人（2 人まで込み、追加 2,000 円）、清掃料 6,000 円。</p>
+    <table>
+      <tr><th>行</th><th>計算</th><th>円</th></tr>
+      <tr data-frag><td>泊の和</td><td>17,000（季節の週末）+ 20,000（上書き）+ 14,000（季節）</td><td>51,000</td></tr>
+      <tr data-frag><td>追加のゲスト</td><td>2,000 × 1 人 × 3 泊</td><td>6,000</td></tr>
+      <tr data-frag><td>清掃料</td><td></td><td>6,000</td></tr>
+      <tr data-frag><td>宿泊の対価の小計</td><td></td><td>63,000</td></tr>
+      <tr data-frag><td>宿泊税（京都市）</td><td>400 円 × 3 人 × 3 泊（次の節）</td><td>3,600</td></tr>
+      <tr data-frag><td><strong>ゲストの総額</strong></td><td></td><td><strong>66,600</strong></td></tr>
+    </table>
+    <p><a class="t" href="#g-service-fee">サービス料</a>は、この設計では<strong>ホストだけ</strong>が払います（63,000 × 15% = 9,450 円、消費税を含む）。ゲストの画面には総額だけが出ます。本家には、ゲストとホストで分ける型（ホスト 3%、ゲスト 14.1〜16.5%）と、ホストだけの型（多くは 15.5%）があります。</p>
+    <div class="callout key"><span class="label">見せた額で請求する</span>確認の画面を開くと、<a class="t" href="#g-quote">見積もり</a>（15 分）が料金の規則・税の表・為替の相場のバージョンと各行の額を固定します。予約はその <code>quote_id</code> を持ち、額が違えば予約を作りません。検索の結果の総額は目安です。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/pricing-and-fees.md">pricing-and-fees.md</a> の 4 節（規則と優先の順）・6 節（<code>quoteStay</code>）・7 節（サービス料）・8.2 節（米ドルで払う完全な例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0029-nightly-price-rules-and-discounts.md">ADR-0029</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0031-host-only-service-fee.md">0031</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0037-quote-binding-and-idempotency.md">ADR-0037</a>。</small></p>
+  </section>
+
+  <section class="s" id="taxes">
+    <h2>日本の税：宿泊税・入湯税・消費税</h2>
+    <p><a class="t" href="#g-lodging-tax">宿泊税</a>は、都道府県や市が条例で定める税です。自治体ごとに、額の決め方・対象の施設・免除・課税の標準が違い、改正も続いています。この設計は、税を表のデータで持ち、泊の日で使う表を決めます。</p>
+    <table>
+      <tr><th>管轄</th><th>1 人 1 泊の決め方（この設計の確認の時点）</th><th>民泊</th></tr>
+      <tr><td>京都市（2026-03-01 から）</td><td>宿泊料金で 5 段階：6 千円未満 200 円、2 万円未満 400 円、5 万円未満 1,000 円 …</td><td>対象</td></tr>
+      <tr><td>大阪府（2025-09-01 から）</td><td>5 千円未満は課税しない。200・400・500 円の段階。民泊は清掃料を含む</td><td>対象</td></tr>
+      <tr><td>福岡市</td><td>2 万円未満 200 円（市 150 円 + 県 50 円）、2 万円以上 500 円</td><td>対象</td></tr>
+      <tr><td>東京都</td><td>2027-03-31 までは定額で旅館・ホテルだけ。2027-04-01 から宿泊料金の 3%（1 万 3 千円未満は免除）</td><td>2027-04-01 から対象</td></tr>
+    </table>
+    <p><strong>課税の標準</strong>の定義で額が変わります。前の節の例で、京都市の標準に清掃料を含めると 3,600 円、含めないと 11/29 の夜が 1 人 5,333 円になり 3,000 円です。京都市が清掃料を含むかは未検証なので、確かめていない行は本番に入れません。</p>
+    <ul>
+      <li><a class="t" href="#g-bathing-tax">入湯税</a>：鉱泉浴場のある市町村が条例で定めます（入湯客 1 人 1 日 150 円が標準）。温泉の設備を持つリスティングだけで計算します。</li>
+      <li><strong>消費税</strong>：ホストの料金は消費税を含む額として扱い（総額の表示）、足しません。サービス料の消費税は <code>floor(サービス料 × 10 / 110)</code>（9,450 円なら 859 円）。</li>
+    </ul>
+    <div class="callout warn"><span class="label">法務の確認待ち（L4）</span>宿泊税・入湯税を本システムが<a class="t" href="#g-special-collector">特別徴収義務者</a>として預かって納めるか、ホストが納めるかは決まっていません。既定は「ホストが納める。本システムは額を出して明細に書く」で、<code>legal.lodging_tax_collector</code> を管轄ごとに持てる形にしています。領収書・適格請求書を誰の名前で出すかも L4 です。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/taxes.md">taxes.md</a> の 2 節（制度の形と出典）・5 節（計算と管轄ごとの例）・7〜8 節（消費税、預かりの型）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0032-tax-rule-tables-by-jurisdiction.md">ADR-0032</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0034-tax-collection-model.md">0034</a>。消費税の端数とインボイスは <a href="../../../shopify/docs/primer/index.html#tax">Shopify の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="cancellation">
+    <h2>キャンセルポリシーと返金の計算</h2>
+    <p>ホストは<a class="t" href="#g-cancel-policy">キャンセルポリシー</a>を選び、予約は見積もりの時のポリシーのバージョンを持ちます。後で表を変えても、既存の予約の計算は変わりません。この設計の MVP は 3 つです（本家の 28 泊未満の標準の表に寄せた値）。</p>
+    <table>
+      <tr><th>ポリシー</th><th>全額を返す期限</th><th>その後</th></tr>
+      <tr><td>柔軟</td><td>チェックインの 24 時間前まで</td><td>使った泊と、使わなかった泊の最初の 1 泊を残す</td></tr>
+      <tr><td>中程度</td><td>5 日前まで</td><td>最初の 1 泊を残し、残りの泊は 50% を残す</td></tr>
+      <tr><td>厳格</td><td>30 日前まで</td><td>7〜30 日前は泊の 50% を残す。7 日未満は泊を全部残す</td></tr>
+    </table>
+    <ul>
+      <li>どのポリシーでも、チェックインの 7 日以上前に確定した予約は、確定から 24 時間は全額を返します。</li>
+      <li>「5 日前」は暦の日ではなく、チェックインの瞬間から 120 時間を引いた瞬間です。</li>
+      <li>清掃料は、チェックインの前なら返します。税は、使わなかった泊の分を全部返します（本家はポリシーで扱いが違う）。</li>
+    </ul>
+    <p>例：12/30〜1/2 の 3 泊、泊 20,000 円 × 3、清掃料 8,000 円、税 1,200 円、総額 69,200 円。チェックインは 12/30 15:00。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">厳格のポリシーで、12/20 15:00（チェックインの 10 日前）にゲストがキャンセルしました。返金はいくらですか？</p>
+      <div class="opts">
+        <button>0 円。30 日を切っているので返さない</button>
+        <button>39,200 円。泊の 50%（30,000）と清掃料 8,000 と税 1,200 を返す</button>
+        <button>34,600 円。総額 69,200 円の 50%</button>
+      </div>
+      <p class="why">7〜30 日前の行（DT-CXL-001 の行 8）で、泊の行の 50% だけを残します。清掃料と税は、チェックインの前なので全部返します。ホストの取り分は残した 30,000 円からサービス料 4,500 円を引いた 25,500 円です。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/cancellations-and-changes.md">cancellations-and-changes.md</a> の 5.3 節（DT-CXL-001）・5.5〜5.6 節（円と米ドルの例）・6 節（ホストと運用のキャンセル）・7 節（日程の変更）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0039-cancellation-policy-table-and-refund-decision-table.md">ADR-0039</a>。違約金の妥当さ（消費者契約法）は法務の確認待ち（L7）。</small></p>
+  </section>
+
+  <section class="s" id="money">
+    <h2>お金の流れ：オーソリ、為替、台帳、送金</h2>
+    <p>ゲストは数か月前に払い、ホストは泊まりが始まってから受け取ります。その間、運営は代金を予約ごとの<a class="t" href="#g-escrow">預かり</a>の口座に置きます。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>見積もり</strong>：ゲストの通貨で払うなら、<a class="t" href="#g-fx-snapshot">相場の写し</a>（ID つき）で合計を 1 回だけ換算する。例：仲値 0.006700 ドル/円、<a class="t" href="#g-markup">上乗せ</a> 2% で 0.006834。2 時間より古い写しは使わない。</li>
+        <li><strong>支払い</strong>：即時予約は<a class="t" href="#g-auth">オーソリ</a>と<a class="t" href="#g-capture">売上の確定</a>を同時に行う。リクエストはオーソリだけを取り、ホストの承認で確定する（24 時間はオーソリの有効の期間の中）。</li>
+        <li><strong>預かり</strong>：確定で「借方 提供者への未収 ／ 貸方 <code>guest_funds_held:&lt;予約&gt;</code>」を、請求の通貨で書く。</li>
+        <li><strong>release</strong>：チェックインの予定の時刻 + 24 時間に、預かりをホストへの支払いとサービス料の収益へ振り替える。チェックインの前には振り替えない。</li>
+        <li><strong>送金</strong>：次の銀行の営業日の 09:30 に、ホストごとに束ねて円で振り込む。新しいホストの最初の 3 件は、各予約のチェックアウトの後 24 時間まで待たせる（偽のリスティングの前払いの詐欺を止める）。</li>
+      </ol>
+    </div>
+    <p><a class="t" href="#g-double-entry">複式簿記</a>の 1 つの仕訳は <strong>1 つの通貨</strong>に閉じます。通貨の間は <code>fx_clearing</code> の口座で結びます。472.91 ドル（= 69,200 円）の予約の release は次の 2 つの仕訳です。</p>
+    <table>
+      <tr><th>通貨</th><th>借方</th><th>貸方</th></tr>
+      <tr data-frag><td>USD</td><td><code>guest_funds_held:R</code> 47,291 セント</td><td><code>fx_clearing:USD</code> 47,291</td></tr>
+      <tr data-frag><td>JPY</td><td><code>fx_clearing:JPY</code> 69,200</td><td><code>host_payable:H</code> 59,000・<code>service_fee_revenue</code> 10,200</td></tr>
+    </table>
+    <p>提供者が実際に円へ換えた額（例 70,700 円）と見積もりの相場の差は、<code>fx_clearing</code> に残り、為替の損益に振り替えます。ホストの受け取りは見積もりの時の円で決まり、為替の動きを受けません。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち（L5・L6）</span>チェックインの後まで代金を預かってホストへ送ることが、収納代行として整理できるか、資金移動業の登録が要るかは決まっていません。外為法の報告と制裁の対象の確かめも L6 です。考え方は <a href="../../../mercari/docs/primer/index.html#payments-law">Mercari の資料の資金決済法の節</a>。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/payments-and-fx.md">payments-and-fx.md</a> の 5 節（時期）・8 節（為替）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/ledger-and-payouts.md">ledger-and-payouts.md</a> の 4〜7 節（口座 22・仕訳の型 31、<code>settlement_seq</code>、release、送金と保留）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0005-payments-hold-capture-and-ledger.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0008-multi-currency-and-fx.md">0008</a>。基礎は <a href="../../../stripe/docs/primer/index.html#card-flow">Stripe の資料（オーソリ・キャプチャ・精算）</a>、<a href="../../../stripe/docs/primer/index.html#ledger">複式簿記の台帳</a>、<a href="../../../mercari/docs/primer/index.html#escrow">Mercari の預かりの例</a>。</small></p>
+  </section>
+
+  <section class="s" id="reviews">
+    <h2>レビュー：両方そろうまで伏せ、同時に出す</h2>
+    <p>ゲストとホストは、チェックアウトから 14 日の間に互いのレビューを書けます。先に書いた側の中身が相手に見えると、後の側は仕返しやお返しの点を付けられます。そこで<a class="t" href="#g-reveal">同時の公開</a>にします。両方が出したとき、または 14 日が過ぎたときの早いほうで、両方を一度に公開します。</p>
+    <table>
+      <tr><th>時刻（日本時間）</th><th>起きること</th><th>見える範囲</th></tr>
+      <tr data-frag><td>12/03 10:00</td><td>チェックアウト。期限は 12/17 10:00</td><td>—</td></tr>
+      <tr data-frag><td>12/05 21:00</td><td>ゲストが出す（公開の前は直せる）</td><td>ゲストだけ。ホストには「書かれました」とだけ知らせる</td></tr>
+      <tr data-frag><td>12/09 15:00</td><td>ホストが出す → 同じトランザクションで公開</td><td>両方が全員に見える</td></tr>
+    </table>
+    <p>ホストが出さなければ、期限から 1 分以内にゲストのレビューだけを公開し、ホストはもう出せません。公開は 1 つの関数だけが行い、組の行のロックで 2 人の同時の提出も直列になります。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">ゲストがレビューを出しました。ホストはまだです。いつ、誰にゲストのレビューを見せますか？</p>
+      <div class="opts">
+        <button>ホストが出すか、チェックアウトから 14 日が過ぎるまで、ゲスト本人の外には見せない</button>
+        <button>すぐに全員へ見せる。新しいレビューは早く届けたほうがよい</button>
+        <button>ホストにだけ先に見せ、返答を書いてもらってから公開する</button>
+      </div>
+      <p class="why">先に見せると、後の側の評価が相手の中身に引きずられます。読み出しは <code>revealed_at IS NOT NULL</code> のビューだけを通します（NFR-009、ADR-0055）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/reviews.md">reviews.md</a> の 4.3 節（<code>reveal_pair</code> と夏時間の例）・5〜7 節（集計、操作の検出、削除の基準。L13）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0055-review-pairs-and-simultaneous-reveal.md">ADR-0055</a>。同じ考え方は <a href="../../../mercari/docs/primer/index.html#ratings">Mercari の資料の評価の節</a>。</small></p>
+  </section>
+
+  <section class="s" id="trust-safety">
+    <h2>T&amp;S：パーティー、偽のリスティング、本人確認</h2>
+    <p>ゲストは写真と違う部屋や前払いの詐欺を恐れ、ホストはパーティーや損害を恐れます。この設計の T&amp;S は、同期の検査・規則のエンジン・人の審査・措置の記録の段に分けます。ML の出力は<strong>信号</strong>で、停止や拒否は規則と人が根拠を記録してから効かせます。</p>
+    <div class="tabs">
+      <div data-tab="パーティー"><p>予約の時に<a class="t" href="#g-party-risk">パーティーの危険の点</a>を、許した特徴だけの加点の式で求めます。例：大晦日のチェックインで 1 泊、家全体、定員 8 に 8 人、10 日前に作ったアカウント、滞在の実績 0、住まいは 8 km、前日の予約。加点の和 1.15 を 1.00 に切り、催しの窓で 0.75 以上なので <code>hold</code>（リクエストに回し、T&amp;S が 4 時間以内に判定）。国籍・性別・年齢・氏名・顔の写真などは特徴に使いません。ML は、影の評価の後でも式の点を ±0.20 までしか動かせません。</p></div>
+      <div data-tab="偽のリスティング"><p>写真の使い回し（知覚ハッシュ）、存在しない住所、他人の届出番号、相場より極端に安い料金を信号にします。新しいホストの最初の 3 件の予約は、各予約のチェックアウトの後 24 時間まで送金を待たせ、「着いたら存在しない」の報告を待ちます。外部の支払いへの誘導は、メッセージの絞り込みで止めます（<a href="../../../mercari/docs/primer/index.html#messages">Mercari の資料</a>）。</p></div>
+      <div data-tab="本人確認"><p><a class="t" href="#g-ekyc">eKYC</a> の水準は <code>none</code>・<code>contact_verified</code>（メールと電話）・<code>id_verified</code>（書類と顔、マイナンバーカードの IC、旅券の IC）。ホストは公開の前に必須、ゲストは初めての予約・高額・危険の点などの規則で求めます。海外のゲストは旅券を使います。</p></div>
+      <div data-tab="差別の禁止"><p>予約の確定の前に、ホストへゲストの名前と顔の写真を見せません。リクエストの断りには理由のコードを必須にし、保護される属性に関わるコードを置きません。断りを制限する法的な根拠は法務の確認待ち（L11）です。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> の 5 節（規則のエンジン）・7 節（パーティーの点と ML の境界）・8 節（偽のリスティング）・10 節（24 時間の窓口）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/identity-verification.md">identity-verification.md</a> の 4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0009-trust-and-safety-and-ml-boundary.md">ADR-0009</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0058-party-risk-score-and-bounded-ml.md">0058</a>。eKYC の水準の考え方は <a href="../../../mercari/docs/primer/index.html#ekyc">Mercari の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="minpaku">
+    <h2>住宅宿泊事業法：180 日の上限（法務の確認待ち）</h2>
+    <p>日本で住宅を有料で人に泊めるには、主に 3 つの道があります。<a class="t" href="#g-minpaku">住宅宿泊事業</a>（届出。いわゆる民泊）、<a class="t" href="#g-ryokan">旅館業</a>（許可）、<a class="t" href="#g-tokku">特区民泊</a>（国家戦略特区の特定認定）です。住宅宿泊事業の<a class="t" href="#g-registered-property">届出住宅</a>は、人を泊める日数が年 180 日以内に限られ、条例で曜日・期間・区域をさらに絞れます。</p>
+    <ul>
+      <li><strong>数え方</strong>：毎年 4 月 1 日の正午から翌年 4 月 1 日の正午までの期間で、正午から翌日の正午までを 1 日と数えると自治体が案内しています（施行規則の本文は未検証）。この設計は泊の日 <code>night_date</code> を 1 日と数え、<a class="t" href="#g-fiscal-year">年度</a>は 4 月 1 日の泊からです。</li>
+      <li><strong>上限は届出住宅ごと</strong>：1 つの届出住宅に部屋（リスティング）が複数あっても、1 つの数を分け合います。</li>
+      <li><strong>届出番号</strong>：日本のリスティングは番号の表示が要ります。自治体の資料には「M + 9 桁」の形が並びますが、国の定めは未検証です。</li>
+      <li><strong>仲介業者の義務</strong>：<a class="t" href="#g-intermediary">住宅宿泊仲介業</a>は観光庁長官の登録制です。掲載の前に番号などを確かめ、表示し、6 か月ごとに観光庁へ報告し、違法な物件は求めに応じて削除します。</li>
+    </ul>
+    <p>例：2 室の届出住宅、2025 年度はすでに 178 日。</p>
+    <table>
+      <tr><th>操作</th><th>数え</th><th>結果</th></tr>
+      <tr data-frag><td>部屋 A：3/30〜4/2</td><td>3/30・3/31 は 2025 年度（→ 180）、4/1 は 2026 年度</td><td>入る</td></tr>
+      <tr data-frag><td>部屋 B：3/31〜4/1</td><td>3/31 はもう数えた日</td><td>入る（増えない）</td></tr>
+      <tr data-frag><td>部屋 B：3/29〜3/30</td><td>新しい日で 181</td><td>409 <code>regulatory_cap_reached</code></td></tr>
+    </table>
+    <div class="quiz" data-answer="2">
+      <p class="q">同じ届出住宅の部屋 A と部屋 B が、同じ夜にそれぞれ予約されました。180 日の数えはいくつ増えますか？</p>
+      <div class="opts">
+        <button>2 日。部屋ごとに 1 日</button>
+        <button>1 日。数えるのは届出住宅に人を泊めた日</button>
+        <button>0 日。数えるのはチェックアウトの後</button>
+      </div>
+      <p class="why">この設計は <code>regulated_nights</code>（届出住宅 × 日）の主キーで同じ日を 1 行にし、<code>claim_count</code> で部屋の数を持ちます。片方を取り消しても日は残ります。仮押さえとリクエストの泊も、予約と同じトランザクションで数えます。複数の部屋の数え方の当てはめは法務の確認待ち（L1）です。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/regulatory-compliance-japan.md">regulatory-compliance-japan.md</a> の 3 節（制度の形）・4 節（番号の確かめ）・5 節（数えの関数と例）・7 節（自治体の規則の表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0006-regulatory-night-cap-enforcement.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md">0065</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0066-municipal-rule-sets.md">0066</a>。他の掲載先の泊を数えるか（<code>legal.minpaku_count_external_nights</code>）は L1。</small></p>
+  </section>
+
+  <section class="s" id="ryokan-registry">
+    <h2>旅館業法の改正と宿泊者名簿（法務の確認待ち）</h2>
+    <table>
+      <tr><th>型（<code>regime</code>）</th><th>根拠</th><th>上限</th><th>番号</th></tr>
+      <tr><td><code>minpaku</code></td><td>住宅宿泊事業法の届出</td><td>年 180 日（条例でより少なく）</td><td>届出番号</td></tr>
+      <tr><td><code>ryokan</code></td><td>旅館業法の許可</td><td>なし</td><td>許可番号</td></tr>
+      <tr><td><code>tokku</code></td><td>国家戦略特区の特定認定</td><td>なし。最短の泊数（条例の値）</td><td>特定認定の番号</td></tr>
+    </table>
+    <p><strong>旅館業法の改正（令和 5 年 12 月 13 日施行）</strong>：宿泊を拒める事由に、実現の容易でない事項を繰り返し求める<a class="t" href="#g-tokutei">特定要求行為</a>を足しました。障害を理由とする社会的障壁の除去の求めは、これに当たりません。旅館業の名簿は「職業」を削り「連絡先」を足しました。旅館業の施設でのリクエストの断りと、宿泊の拒否の制限の関係は L2 です。</p>
+    <p><a class="t" href="#g-registry">宿泊者名簿</a>：住宅宿泊事業者は、本人確認のうえ名簿を作り、3 年保存します。</p>
+    <table>
+      <tr><th>項目</th><th>全員</th><th>日本に住所のない外国人</th></tr>
+      <tr><td>氏名・住所・職業・宿泊日</td><td>○</td><td>○</td></tr>
+      <tr><td>国籍・旅券の番号</td><td>—</td><td>○</td></tr>
+      <tr><td>旅券の写し</td><td>—</td><td>○（国の指導として自治体が案内）</td></tr>
+    </table>
+    <p>この設計は、ゲストがチェックインの 24 時間前までにアプリで名簿を入れ、旅券は <a class="t" href="#g-mrz">MRZ</a> と IC を読みます。名簿と旅券の画像は <a class="t" href="#g-vault">vault</a> に封筒の暗号化で置き、ホストの名簿の画面と法令の照会の手順からだけ読めます。入力が済むまで、入り方を出しません。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち（L2・L3）</span>本システムがホストに代わって電子の名簿を持つことの整理、対面の代わりの ICT の本人確認の要件、旅券の写しの保存、保存の期間は決まっていません。値は <code>legal.*</code> に置き、結論まで本番で有効にしません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/regulatory-compliance-japan.md">regulatory-compliance-japan.md</a> の 4.1 節（型）・8 節（名簿）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/identity-verification.md">identity-verification.md</a> の 6 節（旅券の読み取り）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0063-passport-capture-for-guest-registry.md">ADR-0063</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0067-guest-registry-in-vault.md">0067</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/intent.md">intent.md</a> の L1〜L3・L10・L11 と出典。</small></p>
+  </section>
+
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora は 4 つのクラスタに分かれます。core（アカウント・リスティング・<code>stay_claims</code>・見積もり・予約・届出住宅）、ledger（口座・仕訳・決着・送金）、content（メッセージ・レビュー・T&amp;S）、vault（正確な位置・名簿・旅券・送金の口座）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。</p>
+    <pre class="mermaid">erDiagram
+  listings ||--o{ stay_claims : "nights claimed"
+  listings ||--o{ quotes : "priced"
+  quotes ||--o| reservations : "used once"
+  reservations ||--|{ stay_claims : "claim_group"
+  regulated_properties ||--o{ listings : "registered as"
+  regulated_properties ||--o{ regulated_nights : "counted days"
+  reservations ||--o| escrow_settlements : "settled once per seq"
+  reservations ||--o| review_pairs : "revealed together"
+  listings {
+    uuid id PK
+    text time_zone
+    bigint calendar_version
+  }
+  stay_claims {
+    uuid id PK
+    text kind
+    daterange block_span
+    uuid claim_group
+  }
+  reservations {
+    uuid id PK
+    text state
+    timestamptz payout_release_at
+    int settlement_seq
+  }
+  regulated_nights {
+    uuid property_id PK
+    date night_date PK
+    smallint claim_count
+  }</pre>
+    <p>見積もりからレビューまでは、次のトランザクションの順に読みます（Q は見積もり、C は core、L は ledger、V は vault、N は content）。</p>
+    <pre class="mermaid">flowchart LR
+  Q1["Q1 見積もり<br>15 分、相場を固定"] --> C1["C1 reserveStay<br>hold と 180 日の数え"]
+  C1 --> C3["C2・C3 支払い<br>confirmed"]
+  C3 --> L1["L1 hold<br>預かりへ"]
+  C3 --> V1["V1 名簿<br>届出住宅だけ"]
+  C3 --> C4["C4 チェックイン + 24 時間"]
+  C4 --> L2["L2 release"]
+  L2 --> L4["L4・L5 送金"]
+  C4 --> N1["N1・N2 レビュー<br>同時の公開"]</pre>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/data-model.md">data-model.md</a> の 2〜3 節（置き場所と規約）、4 節（全体の ER 図）、5 節（滞在の道筋の表）、6 節（横断の不変条件）。領域ごとの図は <a href="https://github.com/shoito/rebuilds/tree/main/systems/airbnb/docs/architecture/data-model">data-model/</a>。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、値を変えたところがあります。設計の文書で数字が本家と違えば、まず次の表を疑ってください。</p>
+    <table>
+      <tr><th>項目</th><th>本家</th><th>この設計</th></tr>
+      <tr><td>iCal の取り込み</td><td>3 時間ごと、<code>.ics</code> で終わるアドレス</td><td>15 分ごと、拡張子を問わない</td></tr>
+      <tr><td>サービス料</td><td>分担の型とホストだけの型（多くは 15.5%）</td><td>ホストだけ、既定 15%</td></tr>
+      <tr><td>キャンセルポリシー</td><td>6 つ以上</td><td>柔軟・中程度・厳格の 3 つ</td></tr>
+      <tr><td>キャンセルの税</td><td>ポリシーで扱いが違う</td><td>使わなかった泊の税を全部返す</td></tr>
+      <tr><td>最長の泊数</td><td>28 泊以上の月の滞在がある</td><td>MVP は 27 泊まで（借地借家法の論点 L7）</td></tr>
+      <tr><td>リクエストの間の日付</td><td>未検証</td><td>他のゲストに空いて見せない</td></tr>
+      <tr><td>パスワード</td><td>ある</td><td>持たない（パスキー、一時コード、外部の ID）</td></tr>
+    </table>
+    <p>識別子に本家の名前を使いません（リポジトリ共通の ADR-0006）。ドメインは <code>&lt;brand&gt;.&lt;domain&gt;</code>、カレンダーの書き出しは <code>cal.&lt;brand&gt;.&lt;domain&gt;</code>、iCalendar の <code>PRODID</code> は <code>-//&lt;Brand&gt;//Calendar//EN</code>、PMS のトークンの接頭辞は <code>&lt;brand&gt;_pms_</code>、ヘッダーは <code>X-&lt;Brand&gt;-Client</code> です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/README.md">architecture/README.md</a> の 1.4 節（本家の形と「本家との意図した違い」の全部の行）と 6 節（既定案の決定）。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-listing">リスティング</dt><dd>貸し出す 1 つの住まい・部屋の掲載。物件の種類、定員、写真、ハウスルール、料金、カレンダーを持つ。</dd>
+      <dt id="g-cohost">共同ホスト</dt><dd>ホストに代わってカレンダー・予約・メッセージなどを受け持つ人。この設計の役割は <code>owner</code>・<code>full</code>・<code>calendar_and_reservations</code>・<code>messages_only</code>。</dd>
+      <dt id="g-pms">PMS</dt><dd>Property Management System。複数の掲載先の空室・料金・予約を 1 か所で管理するシステム。チャネルマネージャーとも重なる。API と Webhook でつなぐ。</dd>
+      <dt id="g-instant-book">即時予約</dt><dd>ホストの承認を待たずに、支払いの成功で確定する予約。</dd>
+      <dt id="g-request">予約のリクエスト</dt><dd>ホストの承認を待つ予約。この設計の期限は 24 時間とチェックインの 2 時間前の早いほう。オーソリだけを取り、承認で売上を確定する。</dd>
+      <dt id="g-hold">仮押さえ</dt><dd>支払いの間などに、期限つきで日付を押さえる <code>stay_claims</code> の行（<code>kind = 'hold'</code>、10 分）。</dd>
+      <dt id="g-daterange">daterange</dt><dd>PostgreSQL の日付の範囲の型。既定は <code>[下端, 上端)</code> の半開区間で、<code>&amp;&amp;</code>（重なる）などの演算子を持つ。</dd>
+      <dt id="g-property-tz">物件のタイムゾーン</dt><dd>リスティングの IANA のタイムゾーン（<code>Asia/Tokyo</code> など）。現地の時刻から UTC の瞬間を求める時に使う。</dd>
+      <dt id="g-cutoff">締め切り</dt><dd>チェックインの日の何日前の何時まで予約を受けるか。物件の現地の時刻で判定する。</dd>
+      <dt id="g-window">予約できる期間</dt><dd>今日から何か月先までのチェックアウトを受けるか。</dd>
+      <dt id="g-prep">準備の日</dt><dd>予約の後ろに空ける 0〜2 泊。清掃や点検のための夜。</dd>
+      <dt id="g-block-span">block_span</dt><dd>泊の範囲に後ろの準備の日を足した範囲 <code>[check_in, check_out + prep_nights)</code>。排他の制約はこの範囲の重なりを拒む。</dd>
+      <dt id="g-exclusion">排他の制約</dt><dd>PostgreSQL の <code>EXCLUDE</code>。指定した演算子が全部真になる 2 行を拒む。一意の制約を「等しい」以外へ広げたもの。</dd>
+      <dt id="g-gist">GiST</dt><dd>PostgreSQL の汎用の索引の型。範囲の重なりなどを扱える。<code>btree_gist</code> の拡張で、普通の列の <code>=</code> も同じ索引に入れられる。</dd>
+      <dt id="g-ical">iCal</dt><dd>iCalendar（RFC 5545）の形のカレンダーのファイル（<code>.ics</code>）。掲載先の間で予約の日付を受け渡すのに使う。</dd>
+      <dt id="g-conflict">食い違い</dt><dd>取り込んだ外部の予定と、本システムの行が重なった状態。<code>calendar_conflicts</code> に記録し、ホストへ知らせる。</dd>
+      <dt id="g-stay-ranges">空きの区間</dt><dd>リスティングの空いている日の範囲を、準備の日の分だけ終わりを縮めて索引に入れたもの（<code>stay_ranges</code>）。</dd>
+      <dt id="g-snapshot">空室の写し</dt><dd>Valkey の <code>avail:{listing_id}</code>。2 年分の泊のビット列と規則の要約。失ってよく、DB から作り直す。</dd>
+      <dt id="g-approx">ずらした位置</dt><dd>正確な位置から輪の中の決まった点へずらした位置（<code>approx_point</code>）。検索と地図はこれだけを使う。</dd>
+      <dt id="g-quote">見積もり</dt><dd>確認の画面で作る、各行の額と全部の表のバージョンを固定した写し。15 分有効で、予約は 1 つの見積もりを 1 回だけ使う。</dd>
+      <dt id="g-service-fee">サービス料</dt><dd>運営の手数料。この設計はホストだけが払う型で、既定は宿泊の対価の小計の 15%（消費税を含む）。</dd>
+      <dt id="g-lodging-tax">宿泊税</dt><dd>都道府県や市が条例で定める、宿泊に掛かる税。額の決め方と対象は自治体ごとに違う。</dd>
+      <dt id="g-bathing-tax">入湯税</dt><dd>鉱泉浴場での入湯に掛かる市町村の税。1 人 1 日 150 円を標準に、条例で定める。</dd>
+      <dt id="g-special-collector">特別徴収義務者</dt><dd>税を納める人（宿泊者）から税を預かり、自治体へ納める義務を負う者。宿泊税では宿の経営者などが当たる。</dd>
+      <dt id="g-cancel-policy">キャンセルポリシー</dt><dd>ゲストのキャンセルの時期ごとに、返す額とホストが受け取る額を決める表。予約の時のバージョンで計算する。</dd>
+      <dt id="g-auth">オーソリ</dt><dd>カードの利用枠を確保し、請求できることを確かめる操作。まだお金は動かない。</dd>
+      <dt id="g-capture">売上の確定</dt><dd>キャプチャ。オーソリした枠のうち請求する額を確定する。</dd>
+      <dt id="g-fx-snapshot">相場の写し</dt><dd>取り込んだ為替の相場を ID つきで保存したもの。見積もりがその ID を固定する。</dd>
+      <dt id="g-markup">上乗せ</dt><dd>仲値に足す為替の手数料の割合。この設計の既定は 200 bp（2%）。</dd>
+      <dt id="g-escrow">預かり</dt><dd>予約ごとの口座 <code>guest_funds_held</code> に、release・キャンセルの精算・返金まで代金を置くこと。決着は 1 回。</dd>
+      <dt id="g-double-entry">複式簿記</dt><dd>1 つの事象を借方と貸方の両方に書き、和を常に等しくする記帳の方法。この設計は通貨ごとに釣り合わせる。</dd>
+      <dt id="g-reveal">同時の公開</dt><dd>ゲストとホストのレビューを、両方の提出か期限の早いほうで、一度に公開すること。</dd>
+      <dt id="g-party-risk">パーティーの危険の点</dt><dd>予約の時に、許した特徴だけで求める 0〜1 の点。高ければ本人確認やハウスルールの同意を求め、T&amp;S の判定に回す。</dd>
+      <dt id="g-ekyc">eKYC</dt><dd>オンラインで完結する本人確認。書類と顔の撮影、IC の読み取りなど。</dd>
+      <dt id="g-minpaku">住宅宿泊事業</dt><dd>住宅宿泊事業法（平成 29 年法律第 65 号）の届出で、住宅に人を泊める事業。年 180 日以内。</dd>
+      <dt id="g-registered-property">届出住宅</dt><dd>住宅宿泊事業の届出をした住宅。この設計では <code>regulated_properties</code> の行で、180 日の数えの単位。</dd>
+      <dt id="g-intermediary">住宅宿泊仲介業</dt><dd>住宅宿泊事業の宿泊を仲介する事業。観光庁長官の登録制で、登録は 5 年ごとに更新する。</dd>
+      <dt id="g-ryokan">旅館業</dt><dd>旅館業法の許可を受けて、宿泊料を受けて人を泊める営業。ホテル・旅館・簡易宿所など。</dd>
+      <dt id="g-tokku">特区民泊</dt><dd>国家戦略特別区域法の特定認定を受けて行う、国家戦略特別区域外国人滞在施設経営事業。最短の泊数を条例で定める。</dd>
+      <dt id="g-tokutei">特定要求行為</dt><dd>令和 5 年の旅館業法の改正で、宿泊を拒める事由に足した、実現の容易でない事項を繰り返し求める行為。</dd>
+      <dt id="g-registry">宿泊者名簿</dt><dd>宿泊者の氏名・住所・職業・宿泊日（外国人は国籍と旅券の番号）の記録。住宅宿泊事業では作成から 3 年保存する。</dd>
+      <dt id="g-mrz">MRZ</dt><dd>Machine Readable Zone。旅券の下の 2 行の機械で読める欄。番号・生年月日・有効期限と検査の数字を持つ。</dd>
+      <dt id="g-fiscal-year">年度（180 日）</dt><dd>180 日を数える 1 年。この設計は 4 月 1 日の泊から翌年 3 月 31 日の泊まで。</dd>
+      <dt id="g-vault">vault</dt><dd>正確な位置・名簿・旅券・送金の口座などを、用途の鍵で封筒の暗号化をして置く Aurora のクラスタ。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「同じ夜を二度売らない」流れ（空室 → 予約 → 同期 → 検索）、次に「見せた額で請求し、お金が合う」流れ（料金 → 税 → キャンセル → 決済 → 台帳）、最後に日本の法令と T&amp;S を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち（L1〜L14）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要な流れ A〜H、本家の形と意図した違い、規模の段階、NFR</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/availability-and-calendars.md">availability-and-calendars.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/booking-and-holds.md">booking-and-holds.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/calendar-sync.md">calendar-sync.md</a> <span>— <code>stay_claims</code>、滞在の規則、<code>reserveStay</code>、iCal</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/search-and-ranking.md">search-and-ranking.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/location-and-geo.md">location-and-geo.md</a> <span>— 2 段の検索、鮮度、ずらした位置</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/pricing-and-fees.md">pricing-and-fees.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/taxes.md">taxes.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/cancellations-and-changes.md">cancellations-and-changes.md</a> <span>— 見積もり、税の表、返金の決定表</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/payments-and-fx.md">payments-and-fx.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/ledger-and-payouts.md">ledger-and-payouts.md</a> <span>— オーソリと確定、為替、仕訳、release と送金</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/regulatory-compliance-japan.md">regulatory-compliance-japan.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/identity-verification.md">identity-verification.md</a> <span>— 届出住宅、180 日、自治体の規則、名簿と旅券</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/reviews.md">reviews.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/messaging.md">messaging.md</a> <span>— 規則のエンジン、パーティー、同時の公開、連絡先の絞り込み</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/airbnb/docs/decisions">decisions/</a> <span>— 特に 0002（空室と排他の制約）、0003（検索）、0004（予約と仮押さえ）、0005（預かりと台帳）、0006（180 日）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/architecture/data-model.md">data-model.md</a> <span>— 規約、ER 図、滞在の道筋、横断の不変条件</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
