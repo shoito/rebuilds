@@ -383,28 +383,28 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
-| `upload-and-ingest.md` | 再開できるアップロードのセッション（部分、位置、期限、ハッシュ）、アプリの背景のアップロード、検査（形式、長さ、壊れた区間、既知の違法なメディア）、下書きと予約の公開、元のファイルの保持 | 0011–0013 | QA、セキュリティ | E2 |
-| `transcoding-pipeline.md` | 段の状態の機械、区切りと並列の符号化、継ぎ目、ラダーの決め方、`ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル、シークの縮小の画像、チャプター、Spot の中断、費用 | 0014–0018 | QA、Ops | E3 |
-| `packaging-and-drm.md` | CMAF の書き手、セグメントの索引、マニフェストの生成（HLS・DASH、端末ごとの段）、字幕のトラック、DRM の範囲、鍵の管理とライセンスの事業者 | 0019–0021 | QA、セキュリティ | E4、E14 |
-| `playback-and-abr.md` | プレイヤー（Web・Android・iOS・テレビ）、ABR の方式、開始の段の選び方、再生の品質の計測（QoE）、再生の API と再生のトークン、広告の枠の挿入、プレイヤーの外部送信（法務の L6） | 0022–0024 | QA | E4 |
-| `cdn-and-delivery.md` | CDN の構成、Origin Shield、中間のキャッシュ、署名の URL、要求の合流、事前の配置、複数の CDN と振り分け、拒否の一覧と無効化、配信の費用 | 0025–0027 | Ops | E5 |
-| `live-streaming.md` | 取り込み（RTMPS・SRT）、ストリームキー、GPU の変換、LL-HLS、DVR、予備の割り当て、ライブの照合、VOD への変換、プレミア公開 | 0028–0031 | QA、Ops | E12 |
-| `live-chat.md` | チャットの Gateway、配信ごとの扇形の配り、まとめての送信、低速モード、モデレーターとブロックの語、上位のチャット、リプレイ | 0032–0033 | QA | E13 |
-| `view-counting-and-analytics.md` | 出来事の形と署名、仮の数、確定の数、検証の規則、エンゲージ ビュー、総再生時間、維持率、創作者の分析、保持（法務の L5） | 0034–0037 | QA、セキュリティ | E7 |
-| `recommendations.md` | 候補の源、特徴、スコア、絞り込み、混ぜ合わせ、ホームと次の動画、視聴の履歴、個人化しない並び、オフラインの評価と A/B、学習（法務の L5・L8） | 0038–0040 | QA、PM | E11 |
-| `search.md` | 索引の形、日本語の解析、字幕の索引、順位、候補の補完、`playable()` での絞り込み | 0041–0042 | QA | E10 |
-| `copyright-matching.md` | 音声と映像の指紋、`fp_version`、参照の登録と所有の衝突、索引のシャード、照合と確かめ、ライブの照合、歪めた参照の評価 | 0043–0046 | QA | E8 |
-| `copyright-claims-and-disputes.md` | 方針（ブロック・収益化・追跡、地域）、重なりの決定表、収益の分け方、異議と再審査、削除の申出と反論の通知、繰り返しの侵害、権利者の誤りの監視（法務の L1・L2） | 0047–0049 | QA、PM | E8 |
-| `comments-and-moderation.md` | コメントと返信、高評価、通報、モデレーションの待ち行列、自動の分類、措置、年齢の制限、子ども向けの印、ステマの表示（法務の L3・L4・L6） | 0050–0052 | QA、PM | E9 |
-| `channels-subscriptions-and-notifications.md` | チャンネル、ハンドル、登録、新しい動画とライブの通知（扇形の配り、まとめ）、再生リスト | 0053–0054 | QA | E6 |
-| `monetization-and-payouts.md` | 収益化の条件、広告の枠と外部の広告サーバー、メンバーシップ、メンバー限定、台帳と分配、照合の収益の分け方、支払い（法務の L7） | 0055–0058 | QA、PM | E14 |
-| `accounts-and-safety.md` | アカウント、認証、年齢、創作者の確認（長い動画のアップロード）、権利者の審査、不正なアカウント、侵害の繰り返しの措置（法務の L1・L3・L10） | 0059–0061 | セキュリティ | E6、E9 |
-| `security.md` | 脅威モデル、ストリームキーと署名、暗号化と鍵、運用者の参照、開示の請求の手順（法務の L10）、外への送信 | 0062–0063 | セキュリティ | E1、E15 |
+| [upload-and-ingest.md](upload-and-ingest.md) | 再開できるアップロードのセッション（部分、位置、期限、ハッシュ）、アプリの背景のアップロード、検査（形式、長さ、壊れた区間、既知の違法なメディア）、下書きと予約の公開、元のファイルの保持 | 0011、0012、0013 | QA、セキュリティ | E2 |
+| [transcoding-pipeline.md](transcoding-pipeline.md) | 段の状態の機械、区切りと並列の符号化、継ぎ目、ラダーの決め方、`ladder_version`、AV1 への上げ、音声とラウドネス、字幕と ASR、サムネイル、シークの縮小の画像、チャプター、Spot の中断、費用 | 0014、0015、0016、0017、0018 | QA、Ops | E3 |
+| [packaging-and-drm.md](packaging-and-drm.md) | CMAF の書き手、セグメントの索引、マニフェストの生成（HLS・DASH、端末ごとの段）、字幕のトラック、DRM の範囲、鍵の管理とライセンスの事業者 | 0019、0020、0021 | QA、セキュリティ | E4、E14 |
+| [playback-and-abr.md](playback-and-abr.md) | プレイヤー（Web・Android・iOS・テレビ）、ABR の方式、開始の段の選び方、再生の品質の計測（QoE）、再生の API と再生のトークン、広告の枠の挿入、プレイヤーの外部送信（法務の L6） | 0022、0023、0024 | QA | E4 |
+| [cdn-and-delivery.md](cdn-and-delivery.md) | CDN の構成、Origin Shield、中間のキャッシュ、署名の URL、要求の合流、事前の配置、複数の CDN と振り分け、拒否の一覧と無効化、配信の費用 | 0025、0026、0027 | Ops | E5 |
+| [live-streaming.md](live-streaming.md) | 取り込み（RTMPS・SRT）、ストリームキー、GPU の変換、LL-HLS、DVR、予備の割り当て、ライブの照合、VOD への変換、プレミア公開 | 0028、0029、0030、0031 | QA、Ops | E12 |
+| [live-chat.md](live-chat.md) | チャットの Gateway、配信ごとの扇形の配り、まとめての送信、低速モード、モデレーターとブロックの語、上位のチャット、リプレイ | 0032、0033 | QA | E13 |
+| [view-counting-and-analytics.md](view-counting-and-analytics.md) | 出来事の形と署名、仮の数、確定の数、検証の規則、エンゲージ ビュー、総再生時間、維持率、創作者の分析、保持（法務の L5） | 0034、0035、0036 | QA、セキュリティ | E7 |
+| [recommendations.md](recommendations.md) | 候補の源、特徴、スコア、絞り込み、混ぜ合わせ、ホームと次の動画、視聴の履歴、個人化しない並び、オフラインの評価と A/B、学習（法務の L5・L8） | 0038、0039 | QA、PM | E11 |
+| [search.md](search.md) | 索引の形、日本語の解析、字幕の索引、順位、候補の補完、`playable()` での絞り込み | 0041、0042 | QA | E10 |
+| [copyright-matching.md](copyright-matching.md) | 音声と映像の指紋、`fp_version`、参照の登録と所有の衝突、索引のシャード、照合と確かめ、ライブの照合、歪めた参照の評価 | 0043、0044、0045、0046 | QA | E8 |
+| [copyright-claims-and-disputes.md](copyright-claims-and-disputes.md) | 方針（ブロック・収益化・追跡、地域）、重なりの決定表、収益の分け方、異議と再審査、削除の申出と反論の通知、繰り返しの侵害、権利者の誤りの監視（法務の L1・L2） | 0047、0048、0049 | QA、PM | E8 |
+| [comments-and-moderation.md](comments-and-moderation.md) | コメントと返信、高評価、通報、モデレーションの待ち行列、自動の分類、措置、年齢の制限、子ども向けの印、ステマの表示（法務の L3・L4・L6） | 0050、0051、0052 | QA、PM | E9 |
+| [channels-subscriptions-and-notifications.md](channels-subscriptions-and-notifications.md) | チャンネル、ハンドル、登録、新しい動画とライブの通知（扇形の配り、まとめ）、再生リスト | 0053、0054 | QA | E6 |
+| [monetization-and-payouts.md](monetization-and-payouts.md) | 収益化の条件、広告の枠と外部の広告サーバー、メンバーシップ、メンバー限定、台帳と分配、照合の収益の分け方、支払い（法務の L7） | 0055、0056、0057、0058 | QA、PM | E14 |
+| [accounts-and-safety.md](accounts-and-safety.md) | アカウント、認証、年齢、創作者の確認（長い動画のアップロード）、権利者の審査、不正なアカウント、侵害の繰り返しの措置（法務の L1・L3・L10） | 0059、0060、0061 | セキュリティ | E6、E9 |
+| [security.md](security.md) | 脅威モデル、ストリームキーと署名、暗号化と鍵、運用者の参照、開示の請求の手順（法務の L10）、外への送信 | 0062、0063 | セキュリティ | E1、E15 |
 | `data-model.md` | データモデルの索引（Aurora の表、S3 のパス、MSK のトピック、Valkey の鍵） | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `infrastructure.md` | AWS のアカウントとネットワーク、メディアの面のプール（CPU の Spot、GPU、NVMe）、MSK、CDN の構成、DR（大阪）、段階を上げる基準 | 0064–0066 | Ops | E1、E15 |
-| `observability.md` | 自己監視、QoE と CDN の指標、パイプラインの段の時刻、見張りの動画と見張りのライブ、SLI | 0067–0068 | Ops | E1、E15 |
-| `capacity.md` | 負荷のモデル（アップロード、符号化、配信、ライブ、出来事、照合）、部品ごとの必要量、費用のモデルの単価、負荷試験、急な人気の模型 | 0069 | Ops | E15 |
-| `delivery.md` | CI/CD、メディアの面のデプロイ（作業者のプールの入れ替え）、`ladder_version`・`fp_version` の更新の順序、プレイヤーとアプリの配布、フラグ、スキーマの変更 | 0070–0071 | QA、Ops | E1、E15 |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、メディアの面のプール（CPU の Spot、GPU、NVMe）、MSK、CDN の構成、DR（大阪）、段階を上げる基準 | 0064、0065、0066 | Ops | E1、E15 |
+| [observability.md](observability.md) | 自己監視、QoE と CDN の指標、パイプラインの段の時刻、見張りの動画と見張りのライブ、SLI | 0067、0068 | Ops | E1、E15 |
+| [capacity.md](capacity.md) | 負荷のモデル（アップロード、符号化、配信、ライブ、出来事、照合）、部品ごとの必要量、費用のモデルの単価、負荷試験、急な人気の模型 | 0069 | Ops | E15 |
+| [delivery.md](delivery.md) | CI/CD、メディアの面のデプロイ（作業者のプールの入れ替え）、`ladder_version`・`fp_version` の更新の順序、プレイヤーとアプリの配布、フラグ、スキーマの変更 | 0070、0071 | QA、Ops | E1、E15 |
 
 - 次に採番する ADR は 0072。
 
