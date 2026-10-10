@@ -316,8 +316,8 @@ stateDiagram-v2
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| メールボックスのシャード `filters` | `filter_id`、`position`、`query_text`（C3：利用者が書いた条件）、`ir`（Protobuf）、`analyzer_version`、`actions`（Protobuf）、`created_at`、`state` | 主キー `(tenant_id, account_id, filter_id)` | 4 |
-| `forward_targets` | `target_id`、`address`（C3）、`state`（`pending`・`verified`・`disabled`・`expired`・`removed`）、`token_hash`、`code_hash`、`verify_sent_count`、`verified_at`、`fail_count`、`first_fail_at`、`disabled_reason` | 主キー `(tenant_id, account_id, target_id)` | 5.1 |
+| メールボックスのシャード `filters` | `filter_id`、`position`、`query_text`（C3：利用者が書いた条件）、`ir`（Protobuf）、`analyzer_version`、`actions`（Protobuf）、`created_at`、`state`（`active`・`suspended_pending_review`） | 主キー `(tenant_id, account_id, filter_id)` | 4 |
+| `forward_targets` | `target_id`、`address`（C3）、`state`（`pending`・`verified`・`disabled`・`expired`・`removed`・`suspended_pending_review`）、`token_hash`、`code_hash`、`verify_sent_count`、`verified_at`、`fail_count`、`first_fail_at`、`disabled_reason` | 主キー `(tenant_id, account_id, target_id)` | 5.1 |
 | `account_settings` に足す列 | `forward_all_target_id`、`forward_keep`（`keep`・`read`・`archive`・`trash`）、`forward_notice_until` | — | 5.2 |
 | `vacation` | `is_enabled`、`from_date`、`to_date`、`subject`、`text_body`、`html_body`、`scope`（`all`・`contacts`・`org`）、`epoch`（覚えを消すため） | 主キー `(tenant_id, account_id)` | 6.1 |
 | `vacation_replies` | `sender_hmac`、`epoch`、`last_sent_at` | 主キー `(tenant_id, account_id, sender_hmac)` | 6.2 |

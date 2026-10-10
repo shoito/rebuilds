@@ -31,6 +31,8 @@ date: 2026-10-10
 - 漏えいの疑い：テナントの TRK を新しくし、KEK を包み直す（blob を書き直さない）。
 - BYOK は MVP の後。その組織の TRK を組織の KMS の鍵で包む形で足す。
 
+> 2026-10-10 の注記：データモデルの工程で、アドレスの鍵を足した。`mx-edge` は RCPT のたびに、テナントの鍵の HMAC で `address_index` を引く（[ADR-0013](0013-recipient-validation-and-transaction-splitting.md)）が、上の一覧は `mx-edge` に TRK の `Decrypt` を許さない。そこで、テナントごとのアドレスの鍵（256 ビット。`address_index`・`addr_hmac`・`msgid_hmac` などのアドレスの HMAC に使う）を作り、KMS の専用の `address-index` の鍵で包んで directory の `tenant_keys.addr_key_wrapped` に置く。`address-index` の `Decrypt` を許すのは `mx-edge`・`inbound-pipeline`・`accounts`・`admin-api`・`report-ingest` のタスクのロールで、`mx-edge` が持つ KMS の `Decrypt` はこの鍵だけ（`tenant-root` には与えない）。平文の鍵はテナントごとに 1 時間キャッシュする。アドレスの鍵は TRK の破棄と同時に消す。HMAC の値は中身に戻せないので、TRK の段の下に置かなくても消去の約束は変わらない（[data-model.md](../architecture/data-model.md) の D-21）。
+
 ### 他の案を選ばなかった理由
 
 - **2**：鍵の費用がテナントの数に比例して予算を超える。KMS の鍵の数の上限の引き上げも要る。

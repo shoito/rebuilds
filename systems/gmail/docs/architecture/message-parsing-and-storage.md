@@ -256,7 +256,7 @@ frame[i] = AES-256-GCM(key = blob_key,
 | --- | --- | --- | --- |
 | 0 | ヘッダー、本文の文字、base64 の始まり | 262,144 | 約 150,000（zstd） |
 | 1〜3 | base64（PDF） | 262,144 × 3 | 約 200,000 × 3（base64 の冗長が縮む） |
-| 頭 | 4 フレームの表 | — | 104 バイト |
+| 頭 | 4 フレームの表 | — | 108 バイト |
 
 合わせて約 0.72 MiB。添付の 2 ページ目だけを開くときも、フレーム 1〜3 の範囲だけを読む。
 
@@ -264,13 +264,14 @@ frame[i] = AES-256-GCM(key = blob_key,
 
 ```mermaid
 flowchart LR
-    kms["KMS のテナントの鍵<br/>（CMK、テナントごと）"] -->|"Encrypt（日に 1 回）"| kek["テナントの KEK<br/>（日ごと、256 ビット）"]
+    kms["KMS の tenant-root の鍵<br/>（用途・リージョンごと）"] -->|"Decrypt（テナントごとに 1 時間キャッシュ）"| trk["TRK<br/>（テナントごと。tenant_keys）"]
+    trk -->|"AES-KW（日に 1 回）"| kek["テナントの KEK<br/>（日ごと、256 ビット。tenant_keks）"]
     kek -->|"AES-KW（手元）"| wk["包んだ blob の鍵<br/>（目録の行）"]
     wk --> bk["blob の鍵<br/>（blob ごと、256 ビット）"]
     bk --> fr["フレーム（AES-256-GCM）"]
 ```
 
-- `mailstore` は、テナントの今日の KEK を、KMS で包んだ形で directory の `tenant_keks` に持ち、平文の KEK を 1 時間メモリーにキャッシュする。KMS の呼び出しは、テナント・日・台ごとに 1 回程度で済む（blob ごとに KMS を呼ぶと、S1 で 1 日 6,000 万回になる）。
+- `mailstore` は、テナントの今日の KEK を、TRK で包んだ形で directory の `tenant_keks` に持ち（TRK は KMS で包んで `tenant_keys`。[ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)）、平文の KEK を 1 時間メモリーにキャッシュする。KMS の呼び出しは、テナント・日・台ごとに 1 回程度で済む（blob ごとに KMS を呼ぶと、S1 で 1 日 6,000 万回になる）。
 - 1 つの blob を複数のテナントの受け手が参照するとき（同じ配送の組織の外の宛先）、目録はテナントごとに包んだ鍵を持つ（[ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md)）。
 - テナントの消去は、そのテナントの KEK をすべて消す。他のテナントの包んだ鍵は残る。
 - KEK を消しても、Aurora のバックアップ（PITR 35 日）に包んだ鍵が残る。暗号での消去が完全になるのは、バックアップの保持を過ぎた後である。期限の約束は法務の L6（**法務の確認待ち**）。
@@ -407,17 +408,17 @@ stateDiagram-v2
 
 ## 12. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
 | メールボックスのシャード `messages` に足す列 | `blob_id`、`prefix_headers`（前置き、bytea）、`view_edits`（編集の表。Protobuf：種類、blob の位置と長さ、置き換えのバイト）、`view_size`、`size_logical`、`part_tree`（Protobuf）、`parse_flags`、`preview`、`has_attachment`、`charset_flags` | 主キー `(tenant_id, account_id, message_id)` | 4、5.3 |
 | メールボックスのシャード `account_usage` | `bytes`、`messages`、`updated_modseq` | 主キー `(tenant_id, account_id)` | 9 |
-| blob の目録のシャード `blob_catalog` | `blob_id`、`format_version`、`location_kind`（`single`・`pack`）、`object_key`、`offset`、`stored_len`、`orig_len`、`orig_sha256`、`state`（`leased`・`live`・`zero`・`shredded`・`purged`）、`zero_since`、`created_at` | 主キー `blob_id`。索引 `(state, zero_since)`、`(location_kind, created_at)` | 7、8 |
+| blob の目録のシャード `blob_catalog` | `blob_id`、`format_version`、`location_kind`（`single`・`pack`）、`object_key`、`pack_id`、`stored_offset`、`stored_len`、`orig_len`、`orig_sha256`、`state`（`leased`・`live`・`zero`・`shredded`・`purged`）、`zero_since`、`shredded_at`、`created_at` | 主キー `blob_id`。索引 `(state, zero_since)`、`(location_kind, created_at)` | 7、8 |
 | blob の目録のシャード `blob_wrapped_keys` | `blob_id`、`tenant_id`、`kek_id`、`wrapped_key`（AES-KW、40 バイト） | 主キー `(blob_id, tenant_id)` | 7.2 |
-| blob の目録のシャード `blob_refs` | `blob_id`、`ref_kind`、`ref_id`、`account_id`（`mailbox` のとき）、`added_at` | 主キー `(blob_id, ref_kind, ref_id)` | 8.1 |
+| blob の目録のシャード `blob_refs` | `blob_id`、`ref_kind`、`ref_id`、`tenant_id`・`account_id`（`mailbox`・`hold` のとき）、`added_at` | 主キー `(blob_id, ref_kind, ref_id)` | 8.1 |
 | blob の目録のシャード `packs` | `pack_id`、`object_key`、`total_bytes`、`live_bytes`、`created_at` | 主キー `pack_id`。索引 `(live_bytes / total_bytes)` | 7.3 |
-| directory `tenant_keks` | `tenant_id`、`kek_id`（日付）、`kms_key_arn`、`kms_ciphertext`、`state`（`active`・`retired`・`destroyed`） | 主キー `(tenant_id, kek_id)` | 7.2 |
+| directory `tenant_keks` | 列は [security.md](security.md) の 13 節（`kek_id`、`day`、TRK で包んだ `kek_wrapped` ほか）が正本 | 主キー `(tenant_id, kek_id)` | 7.2 |
 | S3 `blobs/<shard>/<yyyy>/<mm>/<dd>/<blob_id>`、`packs/<shard>/<yyyy>/<mm>/<dd>/<pack_id>` | blob の形式 v1、パック（暗号文の並び＋目次） | — | 7.1、7.3 |
 | outbox の種類 | `blob.ref_added`、`blob.ref_removed`（`blob_id`、`ref_kind`、`ref_id`） | — | 8.1 |
 

@@ -451,12 +451,12 @@ stateDiagram-v2
 
 ## 15. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | メールボックスのシャード `submissions` に足す列：`gate_state`（`pending`・`released`・`held`・`rejected_limit`・`canceled`）、`gate_reason`、`pool`、`risk_score`、`outbound_verdict`、`released_at`、`signed_blob_prefix`（署名のヘッダー） | 送信の依頼の関門の状態（表の本体は client-sync-and-protocols.md と filters-forwarding-and-automation.md） | 4、10、11 |
-| メールボックスのシャード `submission_recipients`（`account_id`、`submission_id`、`recipient_hmac`、`recipient_domain`、`is_internal`、`state`（`queued`・`delivered`・`deferred`・`bounced`・`expired`・`canceled`）、`bounce_class`、`status_code`、`attempts`、`first_attempt_at`、`last_attempt_at`、`delayed_notified`）。宛先のアドレスは送信の blob にあり、この表には HMAC とドメインだけ | 宛先ごとの状態の正本 | 4.3、8 |
+| メールボックスのシャード `submission_recipients`（`account_id`、`submission_id`、`recipient_hmac`、`recipient_domain`、`is_internal`、`state`（`queued`・`delivered`・`deferred`・`bounced`・`expired`・`canceled`）、`bounce_class`、`status_code`、`attempts`、`first_attempt_at`、`last_attempt_at`、`delayed_notified`）。宛先のアドレスの平文は `submissions.envelope_enc`（列の暗号化）にあり、この表と `delivery_job` には HMAC とドメインだけ。`mta-out` は送る時に `mailstore` から読む | 宛先ごとの状態の正本 | 4.3、8 |
 | メールボックスのシャード `account_send_risk`（`account_id`、`score`、`model_version`、`signals`（理由のコードと値）、`band`、`updated_at`） | 乗っ取りの点 | 11 |
 | SQS `outbound-<pool>`（`delivery_job`：`submission_id`、`account_id`、`blob_id`、`mx_group`、`recipient_refs[]`、`attempt`、`first_attempt_at`、`pool`、`dkim_key_ids`） | 送信の待ち行列 | 4.3 |
 | Valkey `orl:{pool}:{group}`、`ogrp:{pool}:{group}`（`c`、`r`、止めの期限） | 組の速さと並行 | 6.2 |

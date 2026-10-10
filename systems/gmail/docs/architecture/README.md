@@ -1,6 +1,6 @@
 # Architecture: Gmail
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節の 22 本。2026-10-10 にそろい、統合の工程で食い違いを解いた）。表と置き場所の索引は [data-model.md](data-model.md)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節の 22 本。2026-10-10 にそろい、統合の工程で食い違いを解いた）。データモデルの正本（表の目録、ER 図、形式、不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -219,14 +219,14 @@ flowchart TB
 
 | 段階 | アカウント | 受信（受け付け） | 受信の申し出（SMTP の時点の拒否を含む） | 送信 | 保存（物理） | メタデータ | 同時の接続 | 構成 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| S1（MVP） | 100 万（個人 80 万、組織 2,000・20 万人） | 6,000 万通/日（平均 700/秒、ピーク 2,500/秒） | 1.5 億通/日 | 300 万通/日（ピーク 150/秒）。外へ 200 万 | 1.5 PB（3 年後。論理 2 PB） | メッセージの行 270 億、Aurora 8 シャード | IMAP 20 万、Web のプッシュ 10 万、モバイルの端末 150 万 | 東京の 1 リージョン・3 AZ。大阪に副 MX、S3 の写し、Aurora Global Database |
+| S1（MVP） | 100 万（個人 80 万、組織 2,000・20 万人） | 6,000 万通/日（平均 700/秒、ピーク 2,500/秒） | 1.5 億通/日 | 300 万通/日（ピーク 150/秒）。外へ 200 万 | 1.5 PB（3 年後。論理 2 PB） | メッセージの行 270 億（メタデータ 約 78 TB、3 年後）、Aurora 8 シャードで始める | IMAP 20 万、Web のプッシュ 10 万、モバイルの端末 150 万 | 東京の 1 リージョン・3 AZ。大阪に副 MX、S3 の写し、Aurora Global Database |
 | S2 | 1,000 万 | 6 億通/日（ピーク 2.5 万/秒） | 15 億通/日 | 3,000 万通/日 | 15 PB | 2,700 億、80 シャード | IMAP 200 万、プッシュ 100 万 | 東京でシャードとプールを増やす。送信の IP プールを /24 の単位で増やす |
 | S3 | 1 億 | 60 億通/日（ピーク 25 万/秒） | 150 億通/日 | 3 億通/日 | 150 PB | 2.7 兆、800 シャード | IMAP 2,000 万、プッシュ 1,000 万 | 複数のリージョン（アカウントをリージョンに固定）、セルの構成 |
 
 - 数値は本システムの想定。本家の利用者の数、送受信の量は、公開の資料で確かめなかった（**未検証**）。
 - アカウントあたり 1 日 60 通の受け付け（迷惑メールの箱に入るものを含む）、申し出の 6 割を SMTP の時点で拒むと見込んだ。送信は 1 日 3 通。
 - 保存は、アカウントあたり平均 2 GB（3 年後）、1 通あたり平均 75 KB で、1 アカウント 2.7 万通。圧縮で文字の部分が 1/3 になり、添付（もとから圧縮済み）は変わらないとして、物理は論理の 0.75 倍。同じ配送の受け手の間の共有は、個人では 5%、組織では 20% の節約と見込む（`blob-pack-poc` で確かめる）。
-- メッセージの行は、索引を含めて 1 行 600 バイトで 16 TB。1 つの Aurora のクラスタに 2 TB を目安に 8 シャード（`mailbox-shard-poc` で確かめる）。
+- メッセージの行は、データモデルの列から見積もって索引を含めて 1 行 約 2.3 KB。所属とスレッドの表を足して、3 年後のメタデータは 約 78 TB（1 シャード 約 10 TB）になる（[data-model.md](data-model.md) の D-22。最初の見積もりの「1 行 600 バイトで 16 TB」を直した）。8 シャードで始めると、段階を上げる準備の基準（1 シャード 2.5 TB、[ADR-0065](../decisions/0065-stage-up-criteria-and-cells.md)）を 1 年目の後半に超える。シャードの数と行を小さくする手段は未解決で、`mailbox-shard-poc` で測ってから決める（6 節の残る未解決事項）。
 - 検索の索引は、文字の部分の 3 割（1 アカウント 100 MB）で S1 は 100 TB。直近 30 日に使ったアカウント（2 割）を NVMe に置く。
 - 段階を上げる基準は infrastructure の領域、負荷と費用のモデルは capacity の領域で決める。
 
@@ -245,7 +245,7 @@ flowchart TB
 
 - 最も大きいのは、保存（アカウントの容量に比例）と、受信の選別（申し出の量に比例し、迷惑メールが多いほど増える）と見込む。SMTP の時点で安く拒むこと（[ADR-0002](../decisions/0002-accept-then-filter.md)）と、小さな blob のパック（[ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md)）が、原価の制御の主な手段になる。
 - S1 の仮の予算（本システムの想定）は、個人のアカウントあたり月 0.15 USD（容量 2 GB）。
-- capacity の領域の見積もり（AWS の東京の公開の価格）は、削減の前で 1 年目 0.19 USD・3 年目 0.21 USD（±40%）で、予算を 3〜4 割超えた。統合の工程で、下げる手段を数で比べ、推奨の既定案を A（S3 の PUT の削減）＋B（予約の割引）＋C（JMAP をエッジの外で受ける）にした。1 年目 約 0.135 USD、3 年目 約 0.156 USD になる。**仮の決定で、PM の判断待ち**（3 年目だけ予算を 0.16 USD に直すか、`cost-baseline` の実績を待つか）。数は [capacity.md](capacity.md) の 8.1 節。
+- capacity の領域の見積もり（AWS の東京の公開の価格）は、削減の前で 1 年目 0.19 USD・3 年目 0.21 USD（±40%）で、予算を 3〜4 割超えた。統合の工程で、下げる手段を数で比べ、推奨の既定案を A（S3 の PUT の削減）＋B（予約の割引）＋C（JMAP をエッジの外で受ける）にした（1 年目 約 0.135 USD、3 年目 約 0.156 USD）。その後のデータモデルの工程で、メタデータを 16 TB から 約 78 TB に見直し、Aurora の保存（東京と大阪）が 1 年目 月 約 1.3 万 USD、3 年目 月 約 3.3 万 USD 増えた。削減の前は 1 年目 0.20・3 年目 0.24 USD、A＋B＋C の後は 1 年目 約 0.148 USD・3 年目 約 0.189 USD になる。**仮の決定で、PM の判断待ち**（行を小さくする手段の効きを `mailbox-shard-poc` で測り、`cost-baseline` の実績と合わせて予算を直すかを決める）。数は [capacity.md](capacity.md) の 8・8.1 節。
 
 ## 3. 非機能要件
 
@@ -368,7 +368,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **`PRESERVED` と `preserved` の印**：足す。利用者は保留を見ないが、eDiscovery は利用者が消した保全のメッセージを同じ索引で探すので、墓標にして合わせで落とすと探せない。`search-node` の `PRESERVED` のビットマップ（[search.md](search.md) の 7 節）と、change log の `destroyed` の `preserved` の印・`preserved_purged`（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 4.1 節）を足した。JMAP・IMAP・プッシュには出さず、型ごとの `modseq` も進めない。
 - **配送の待ち行列の 2 つの層**：`inbound-delivery` と `inbound-delivery-low`（`unknown`・`suspicious` の層）に分け、前者を先に読む（[inbound-smtp.md](inbound-smtp.md) の 11.2 節、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）。
 - **S3 の PUT の削減**：`spool-done` の印をタスクごとに束ね（ADR-0011 の注記）、小さな索引のセグメントを S3 に書かずに `search-node` の組へ直接渡す（[ADR-0037](../decisions/0037-segment-format-and-query-execution.md) の注記）。PUT は 1 日 2.4 億から約 1.25 億になる。
-- **費用（仮。PM の判断待ち）**：S1 の見積もりは 1 年目 0.19・3 年目 0.21 USD/アカウント・月で、仮の予算 0.15 USD を超えた。手段は A（PUT の削減、月 約 1.6 万 USD）、B（予約の割引 3 割、約 2.1 万、割引の率は**未検証**）、C（JMAP をエッジの外で受ける、約 1.3 万）、D（迷惑メールの箱の blob を大阪へ写さない、約 0.2 万）。推奨の既定案は A＋B＋C で、1 年目 約 0.135 USD、3 年目 約 0.156 USD。D は採らない。C は E8 の前に Dev と Ops が構成を確かめてから 1.2 節の図を直す（[capacity.md](capacity.md) の 8.1 節、[ADR-0068](../decisions/0068-capacity-model-and-headroom.md) の注記）。
+- **費用（仮。PM の判断待ち）**：S1 の見積もりは 1 年目 0.19・3 年目 0.21 USD/アカウント・月で、仮の予算 0.15 USD を超えた。手段は A（PUT の削減、月 約 1.6 万 USD）、B（予約の割引 3 割、約 2.1 万、割引の率は**未検証**）、C（JMAP をエッジの外で受ける、約 1.3 万）、D（迷惑メールの箱の blob を大阪へ写さない、約 0.2 万）。推奨の既定案は A＋B＋C で、1 年目 約 0.135 USD、3 年目 約 0.156 USD（データモデルの工程のメタデータの見直しの後は 1 年目 約 0.148・3 年目 約 0.189 USD。下の「決定（2026-10-10、データモデル）」）。D は採らない。C は E8 の前に Dev と Ops が構成を確かめてから 1.2 節の図を直す（[capacity.md](capacity.md) の 8.1 節、[ADR-0068](../decisions/0068-capacity-model-and-headroom.md) の注記）。
 - **一括の配信停止のボタン**：既定案の条件に、DKIM の署名のドメインが From に揃うことを足した（[sender-authentication.md](sender-authentication.md) の 10.1 節）。
 - **本家との意図した違い**（1.4 節）：IMAP の読み出しの量、一括の配信停止の From の揃い、送信の上限で中の宛先を数えること、アプリ パスワードを作らないこと、SMS を使わないこと、パスキーの待ちを置かないこと、プッシュに中身を入れないこと、確かめの前の第三者のアプリの上限の行を足した。予約の送信の 100 通の未検証を外した。
 - **runbooks の名前**：`delivery-queue-backlog.md` を [mail-delivery-backlog.md](../runbooks/mail-delivery-backlog.md)、`account-takeover-wave.md` を [account-takeover.md](../runbooks/account-takeover.md) にそろえた（[runbooks/README.md](../runbooks/README.md) の 4 節）。
@@ -384,12 +384,21 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **品質と運用**：
   - 各領域の文書の「テストと性質」と「data-model への項目」を反映した。[quality.md](../quality.md) に性質と決定表の一覧（2.2.2 節）と、Epic の合否基準の補いを足した。
   - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[ip-blocklisted.md](../runbooks/ip-blocklisted.md)、[spam-wave.md](../runbooks/spam-wave.md)、[account-takeover.md](../runbooks/account-takeover.md)、[mail-delivery-backlog.md](../runbooks/mail-delivery-backlog.md)）と計画のものに分けて一覧にした。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。
+  - 表と置き場所の索引は [data-model.md](data-model.md)（その後のデータモデルの工程で正本に書き直した。下の「決定（2026-10-10、データモデル）」）。
 - **数値の正本**：
   - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
   - SMTP の上限（SIZE 50 MiB、宛先 100、検査の予算 10 秒、確定の予算 5 秒）は [ADR-0002](../decisions/0002-accept-then-filter.md)・[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)。MIME の上限（入れ子 32、パート 1,000、ヘッダーの部 256 KiB、2 秒、256 MiB）は [ADR-0029](../decisions/0029-mime-parsing-limits-and-charsets.md)。選別の閾値（`p_phish` 0.80・`p_spam` 0.90 ほか）は [ADR-0022](../decisions/0022-verdict-score-composition-and-overrides.md)。送信の再試行（1・5・15・30 分、1・2 時間、以後 4 時間、5 日、24 時間で遅れの通知）は [ADR-0019](../decisions/0019-mta-out-queues-throttling-and-retries.md)。元に戻す送信（5・10・20・30 秒、既定 5 秒）と不在の返信（96 時間）は [ADR-0049](../decisions/0049-timed-jobs-vacation-and-scheduled-send.md)。IP の範囲は [ADR-0063](../decisions/0063-network-byoip-ranges-and-egress.md)。
   - 負荷と費用のモデルは [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-10、データモデル）
+
+[data-model.md](data-model.md) を、索引から正本（規約、表の目録、ER 図、形式、不変条件）に書き直した。表の目録は [data-model/](data-model/) の 16 本。名前・列の食い違いを 31 件の決定（D-1〜D-31）で解き、領域の文書を直した（[data-model.md](data-model.md) の 7 節）。ADR の決定は変えていない。アーキテクチャに関わるのは次の 4 件で、どれも推奨の既定案。D-1・D-20・D-21 は決定、D-22 は数を直したうえで未解決に残す。
+
+- **配送の記録の置き場所**（D-1。残る未解決事項だったもの）：`delivery_log` を directory でなく、受け手のメールボックスのシャードに置き、`mailstore` が配送と同じトランザクションで書く。配送の冪等の鍵 `(spool_id, account_id)` の正本を兼ね、PK に `spool_id` の時刻から決まる日（分割の鍵）を含める。1 日約 7,200 万行（1 シャード約 900 万行）、90 日で約 1.3 TB。directory に 1.3 TB と書き込みを足さず、RLS の外の表も増やさない。保持の 90 日は法務の L1・L6 の確認待ち。[capacity.md](capacity.md) の 4 節に入れた。`mailbox-shard-poc` で書き込みの費用を確かめる。
+- **端末の認可を RLS の外に置く**（D-20。決定）：`device_authorizations` は承認の前にアカウントが決まらず、`tenant_id` の RLS に置けない。[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の RLS の外の一覧の「`sessions`、`oauth_tokens_index`（トークンのハッシュ → アカウント）」と同じ区分として扱い、ADR-0007 に 2026-10-10 の注記を足した。
+- **アドレスの HMAC の鍵**（D-21。決定）：`mx-edge` は RCPT のたびに「テナントの鍵の HMAC」で `address_index` を引く（[ADR-0013](../decisions/0013-recipient-validation-and-transaction-splitting.md)）が、TRK の `Decrypt` を持たない。テナントごとのアドレスの鍵を作り、KMS の専用の `address-index` の鍵で包んで `tenant_keys.addr_key_wrapped` に置く。`Decrypt` は `mx-edge`・`inbound-pipeline`・`accounts`・`admin-api`・`report-ingest` で、`mx-edge` が持つのはこの鍵の `Decrypt` だけ。TRK の破棄と同時に消す。[ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md) に 2026-10-10 の注記を足し、[security.md](security.md) の 5.4 節を合わせた。
+- **メッセージの行の大きさの見直し**（D-22）：列から見積もると、メッセージの行は索引を含めて約 2.3 KB で、所属とスレッドの表を足すと 3 年後のメタデータは約 78 TB（2 節の「1 行 600 バイトで 16 TB」の約 5 倍）。1 シャード約 10 TB で、段階を上げる準備の基準（2.5 TB、[ADR-0065](../decisions/0065-stage-up-criteria-and-cells.md)）を 1 年目の後半に超える。Aurora の保存の費用は、東京と大阪で 1 年目 月 約 1.3 万 USD、3 年目 月 約 3.3 万 USD 増え、1 アカウント・月の原価は削減の前で 0.20・0.24 USD、A＋B＋C の後で 約 0.148・0.189 USD になる。[capacity.md](capacity.md) と 2 節・2.1 節の数をこの値に直した。シャードの数（8 のままか、増やすか）と行を小さくする手段は、`mailbox-shard-poc` で測ってから決めるため、下の残る未解決事項に残す。
 
 ### 残る未解決事項（2026-10-10）
 
@@ -399,7 +408,8 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | スプールを 2 つのリージョンへ同期で確定するか（リージョンの喪失でも受け付けたメールを失わない。[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の変更になる） | E17 の DR の訓練の後に、250 の遅れと費用を測って Dev と PM が決める |
 | 費用の推奨の既定案（A＋B＋C）の採否、3 年目の予算（0.15 か 0.16 USD） | PM。`cost-baseline` の実績で数を置き換える |
 | JMAP をエッジの外で受ける構成（C）の確かめと、1.2 節の図の直し | E8 の前に Dev と Ops |
-| 配送の記録の表（directory、受け手ごと 1 日約 7,200 万行、90 日）の書き込みの量と置き場所 | `mailbox-shard-poc` と E1 で Dev と Ops。capacity.md の 4 節にまだ入っていない |
+| 配送の記録（`delivery_log`）の書き込みの費用（置き場所は受け手のシャードに決めた。D-1） | `mailbox-shard-poc` と E1 で Dev と Ops |
+| メタデータの量（3 年後 約 78 TB、1 シャード 約 10 TB。D-22。capacity.md と 2 節は直した）に対するシャードの数と行を小さくする手段 | E4 の前の `mailbox-shard-poc` で測り、Dev と Ops が減らす手段（抜粋を短く、前置きとヘッダーの要約をまとめて縮める）とシャードの数を決める。費用の差は PM へ |
 | 受信と送信の 1 台あたりの量、BYOIP の手続き、ポート 25 の申請（**未検証**） | E2 の前の `mx-throughput-poc`、E1 の `ip-ranges-and-byoip` |
 | MIME の解析のライブラリ、blob のパック、メールボックスのシャードの大きさ | E4 の前の `mime-parser-poc`・`blob-pack-poc`・`mailbox-shard-poc` |
 | 内容の分類器の形、選別の寄与と閾値の値 | E6 の前の `spam-classifier-poc` と、E6 の中の評価の集まりと影 |
@@ -432,7 +442,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [accounts-and-security.md](accounts-and-security.md) | アカウントの作成、サインイン（パスキー、2 段階）、危険度での確かめ、セッション、回復、乗っ取りの検知と対応、第三者のアプリの OAuth と同意、活動の表示 | [0055](../decisions/0055-sign-in-methods-sessions-and-protocol-auth.md)、[0056](../decisions/0056-sign-in-risk-and-account-recovery.md)、[0057](../decisions/0057-account-takeover-response.md) | セキュリティ | E13 |
 | [api-and-integrations.md](api-and-integrations.md) | 第三者向けの JMAP と IMAP の公開、OAuth のスコープ、速さの上限、アプリの確かめ、公開の REST API（MVP の後） | [0058](../decisions/0058-oauth-scopes-and-app-verification.md)、[0059](../decisions/0059-api-rate-limits-and-third-party-push.md) | セキュリティ | E8、E11、E13 |
 | [security.md](security.md) | 脅威モデル、暗号化と鍵（blob ごとの鍵、KMS）、運用者のアクセスの禁止と例外、報告のサンプルの置き場所、監査、開示の請求（法務の L1・L4・L6） | [0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)、[0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md)、[0062](../decisions/0062-generic-components-additions-and-supply-chain.md) | セキュリティ | E1、E13、E17 |
-| [data-model.md](data-model.md) | データモデルの索引（directory とメールボックスのシャードの表、S3 のパス、SQS のメッセージ、Valkey の鍵、change log の形）。ER 図の全体は後で足す | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの正本：規約（ID、テナントと RLS、X1〜X10、区分 C1〜C3、形式のバージョン、分割と保持、暗号化）、全体の ER 図、受信の道筋、横断の不変条件。表の目録と ER 図は [data-model/](data-model/) の 16 本（115 表、ER 図 17） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、BYOIP と逆引き、ポート 25 の送信、EC2 のキャパシティー、シャードの配置と移し替え、DR（大阪の副 MX、切り替え）、段階を上げる基準 | [0063](../decisions/0063-network-byoip-ranges-and-egress.md)、[0064](../decisions/0064-storage-classes-and-region-replication.md)、[0065](../decisions/0065-stage-up-criteria-and-cells.md) | Ops | E1、E17 |
 | [observability.md](observability.md) | SLI の計測、見張りのメール（外部の見張りのアカウントとの送受）、到達性の監視（ブロックリスト、外部の受信箱への届き方）、利用者の中身を含めない計測の規則 | [0066](../decisions/0066-sli-measurement-and-mail-canary.md)、[0067](../decisions/0067-content-free-telemetry-schema.md) | Ops | E1、E17 |
 | [capacity.md](capacity.md) | 負荷のモデル（受信の申し出、迷惑メールの割合、送信、同期、検索）、部品ごとの必要量、費用のモデル、負荷試験 | [0068](../decisions/0068-capacity-model-and-headroom.md) | Ops | E17 |

@@ -289,7 +289,7 @@ sequenceDiagram
 
 ## 11. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -300,8 +300,8 @@ sequenceDiagram
 | S3 `scanner/defs/<version>/`（署名つきの定義）、`scanner/malware-hashes/<version>`（ハッシュの一覧） | 定義と一覧 | 4.2、4.5 |
 | S3 `url-lists/<version>/`（悪い一覧の全体のハッシュと種類）、`url-lists/prefixes/<version>`、差分 | URL の悪い一覧 | 6.4 |
 | directory `confirmed_phish_urls`（`url_hash`、`url_domain`、`source`、`confirmed_by`、`confirmed_at`、`expires_at`）。URL の全体は持たない | 確かなフィッシングの URL | 6.3 |
-| directory `org_attachment_policy`（`tenant_id`、`encrypted_archive`（`block`・`warn`）、足す止める形式） | 組織の添付の方針 | 4.3 |
-| メールボックスのシャード `image_settings`（`account_id`、`external_images`（`show`・`ask`）） | 画像の設定 | 7 |
+| directory `org_attachment_policy`（`tenant_id`、足して止める形式 `extra_block_types`）。暗号化された書庫の扱いは OU の方針 `scan.encrypted_archive`（`ou_policies`） | 組織の添付の方針 | 4.3 |
+| メールボックスのシャード `account_settings.external_images`（`show`・`ask`。別の表を作らない） | 画像の設定 | 7 |
 | 画像の代理の鍵（`token` の署名、KMS で包む） | 7 | |
 
 ## 12. テストと性質

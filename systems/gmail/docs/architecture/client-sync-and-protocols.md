@@ -382,7 +382,7 @@ stateDiagram-v2
 | `labels` に足す列 | `uid_jump_floor` | — | 4.4 |
 | `all_mail_uids` | `message_id`、`uid`、`modseq`（`All Mail` の所属の UID） | 主キー `(tenant_id, account_id, message_id)`。一意 `(account_id, uid)` | 7.3 |
 | `message_keywords` | `message_id`、`keyword` | 主キー `(tenant_id, account_id, message_id, keyword)` | 6.4 |
-| `submissions`（本体） | `submission_id`、`email_id`、`identity_id`、`envelope`（HMAC と宛先の数）、`hold_kind`（`undo`・`scheduled`・`none`）、`release_at`、`undo_status`（`pending`・`final`・`canceled`）、`state`（[filters-forwarding-and-automation.md](filters-forwarding-and-automation.md) の 7.3 節）、`source`（`jmap`・`smtp`）、`created_modseq` | 主キー `(tenant_id, account_id, submission_id)`。索引 `(account_id, release_at) WHERE state='pending'` | 6.6 |
+| `submissions`（本体） | `submission_id`、`email_id`、`identity_id`、`envelope_enc`（封筒の平文。列の暗号化。宛先の HMAC と数は `submission_recipients`）、`hold_kind`（`undo`・`scheduled`・`none`）、`release_at`、`undo_status`（`pending`・`final`・`canceled`）、`state`（[filters-forwarding-and-automation.md](filters-forwarding-and-automation.md) の 7.3 節）、`source`（`jmap`・`smtp`）、`created_modseq` | 主キー `(tenant_id, account_id, submission_id)`。索引 `(account_id, release_at) WHERE state='pending'` | 6.6 |
 | `sent_dedupe` | `message_id_hdr_hash`、`message_id`、`expires_at`（24 時間） | 主キー `(tenant_id, account_id, message_id_hdr_hash)` | 7.6 |
 | outbox の種類 | `account.changed(account_id, modseq)` | — | 4.1 |
 

@@ -268,7 +268,7 @@ sequenceDiagram
 
 | 単位 | 原価 | 大きい項目 |
 | --- | --- | --- |
-| メールボックス 1 つ・月 | 約 0.19 USD（1 年目）、0.21 USD（3 年目） | S3 の要求、エッジ、Aurora、写し |
+| メールボックス 1 つ・月 | 約 0.20 USD（1 年目）、0.24 USD（3 年目）。メタデータの見直し（[capacity.md](capacity.md) の 1.3 節）の後 | Aurora、S3 の要求、エッジ、写し |
 | 保存 1 TB（物理）・月 | 約 11 USD（東京と大阪） | Glacier Instant Retrieval が主 |
 | 書き込み 1 TB（物理） | 約 110 USD（1 回） | 大阪への写し（0.09 USD/GB の転送と 0.015 USD/GB の RTC） |
 | 送信の IP 1 つ・月 | BYOIP の範囲は公開の IPv4 の時間の料金（0.005 USD/時）の対象外と見込む（**未検証**）。対象なら 1 つ月 3.65 USD | — |
@@ -300,7 +300,7 @@ sequenceDiagram
 
 ## 12. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |

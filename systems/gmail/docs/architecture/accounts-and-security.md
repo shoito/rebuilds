@@ -283,7 +283,7 @@ stateDiagram-v2
 
 ## 13. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -292,7 +292,7 @@ stateDiagram-v2
 | directory `credentials` | `tenant_id`、`account_id`、`kind`（`passkey`・`security_key`・`totp`・`password`・`recovery_codes`）、公開の鍵・暗号化した TOTP の種・Argon2id のハッシュと `hash_params`、`created_at`、`last_used_at` | 5 |
 | directory `sessions`（RLS の外） | `session_hash`、`account_id`、`tenant_id`、`kind`（`web`）、`created_at`、`last_seen_at`、`expires_at`、`device_id`、`revoked_at` | 5.3 |
 | directory `oauth_tokens_index`（RLS の外） | `token_hash`、`kind`（`access`・`refresh`）、`account_id`、`tenant_id`、`client_id`、`scopes`、`session_family`、`expires_at`、`revoked_at` | 5.4 |
-| directory `device_authorizations` | `user_code_hash`、`device_code_hash`、`client_id`、`scopes`、`expires_at`、`approved_account_id` | 5.5 |
+| directory `device_authorizations`（RLS の外。承認の前はアカウントが決まらないため。ADR-0007 の「トークンのハッシュ → アカウント」の区分として扱う（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の 2026-10-10 の注記）。[data-model.md](data-model.md) の D-20） | `user_code_hash`、`device_code_hash`、`client_id`、`scopes`、`expires_at`、`approved_account_id` | 5.5 |
 | directory `signin_events` | `tenant_id`、`account_id`、`at`、`ip`、`asn`、`country`、`device_summary`、`method`、`band`、`result`。180 日 | 6、8.2 |
 | directory `recovery_methods`・`recovery_requests` | 回復のメール（暗号化）、確かめの状態、回復の依頼と待ちの期限 | 7 |
 | directory `send_as_identities` | `tenant_id`、`account_id`、アドレス（暗号化）、確かめの状態、DMARC の検査の結果 | 8.1 |

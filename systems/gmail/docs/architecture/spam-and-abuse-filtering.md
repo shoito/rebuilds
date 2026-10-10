@@ -426,22 +426,22 @@ flowchart LR
 
 ## 18. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | メールボックスのシャードのメッセージの行に足す列（表の本体は message-parsing-and-storage.md）：`verdict`、`reason_codes`、`p_spam`、`p_phish`、`filter_version`、`feature_id`、`rescan_state` | 判定 | 5、8 |
-| メールボックスのシャード `sender_affinity`（`account_id`、`key_kind`（`domain`・`address_hmac`）、`key`、`not_spam`、`spam`、`updated_at`） | 利用者ごとの寄与 | 9.3 |
-| メールボックスのシャード `filter_settings`（`account_id`、`spam_filter_mode`（`on`・`off`）、`content_classifier`（`on`・`off`）、`sample_consent_default`、`locked_by_org`） | 選別の範囲の設定 | 5.5 |
+| メールボックスのシャード `sender_affinity`（`account_id`、`key_kind`（`domain`・`address_hmac`）、`sender_key`、`not_spam`、`spam`、`contacted`、`updated_at`） | 利用者ごとの寄与 | 9.3 |
+| メールボックスのシャード `filter_settings`（`account_id`、`spam_filter_mode`（`on`・`off`）、`content_classifier`（`on`・`off`）、`training_consent`、`sample_consent_default`、`locked_by_org`） | 選別の範囲の設定 | 5.5 |
 | 特徴のストア：S3 `features/<yyyy>/<mm>/<dd>/<hh>/<partition>.parquet`（`feature_id`、`direction`、`ConnInfo` の要約、`MessageFeatures`、判定、点、`filter_version`）と、`feature_id` で引く索引（Valkey、30 日） | 特徴の記録（C1・C2） | 9.2 |
 | Valkey（評判の専用のクラスタ）`rep:{kind}:{key}`（数えの組と時刻） | 評判 | 6 |
 | S3 `reputation/snapshots/<ts>`、`reputation/events/<yyyy>/<mm>/<dd>/<hh>/` | 評判の写しと出来事 | 6.4 |
 | SQS `filter-events`、`rescan` | 評判の出来事、後から選び直し | 4.3、9.1 |
 | 学習のアカウントの S3 `training/labels/`（`feature_id`、ラベル、重み、時刻、アカウントの HMAC の桶） | 学習の行 | 9.5 |
-| 報告のサンプルのアカウントの S3 `samples/<submission_id>`、`sample_index`（`submission_id`、種類、提出の時刻、取り消しの時刻、HMAC の桶） | 同意のある報告のサンプル（C3） | 9.4 |
+| 報告のサンプルのアカウントの S3 `samples/<submission_id>/message.eml.enc` と目録 `samples/<submission_id>/index.json`（`submission_id`、種類、提出の時刻、取り消しの時刻、HMAC の桶。DB にしない）。本人の取り消しの引きはシャードの `sample_submissions` | 同意のある報告のサンプル（C3） | 9.4 |
 | directory `quarantine_items`（`tenant_id`、`quarantine_id`（UUIDv7）、`spool_id`、`recipient_account_id`、`sender_domain`、`reason_codes`、`verdict`、`state`（`held`・`released`・`deleted`・`expired`）、`created_at`、`acted_by`、`acted_at`）。`tenant_id` で FORCE RLS | 組織の隔離 | 10 |
 | S3 `quarantine/<tenant_id>/…/<quarantine_id>`（テナントの隔離の鍵） | 隔離の写し | 10 |
-| directory `org_filter_lists`（`tenant_id`、`list`（`allow`・`block`）、`kind`（`domain`・`ip_range`・`attachment_type`）、`value`、`created_by`、`created_at`）、`org_filter_policy`（`tenant_id`、隔離に置き換える判定、受け手への知らせ） | 組織の一覧と方針 | 10、11 |
+| directory `org_filter_lists`（`tenant_id`、`list`（`allow`・`block`）、`kind`（`domain`・`ip_range`・`attachment_type`）、`value`、`created_by`、`created_at`）、`org_filter_policy`（`tenant_id`、受け手への知らせ `recipient_digest`）。隔離に置き換える判定は OU の方針 `filter.quarantine_map`（`ou_policies`） | 組織の一覧と方針 | 10、11 |
 | モデルの登録：S3 `models/<filter_version>/`（モデル、閾値、規則の束、特徴の作り方のバージョン、評価の結果、署名） | 選別のバージョン | 12 |
 | directory `emergency_rules`（`rule_id`、`definition`、`smtp_time`、`approved_by[]`、`eval_result`、`shadow_result`、`expires_at`） | 緊急の規則 | 12.3 |
 

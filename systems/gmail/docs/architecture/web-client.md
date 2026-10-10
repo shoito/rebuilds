@@ -268,7 +268,7 @@ sequenceDiagram
 | Valkey `render:{account_id}:{message_id}:{part_id}:{rules_version}` | 浄化した HTML（アカウントの鍵で暗号化） | 1 時間 | 7.1 |
 | ブラウザーの IndexedDB `url_prefixes` | 悪い一覧の先頭 32 ビットの集合（上位の分） | 30 分ごとに差分 | 7.5 |
 | メールボックスのシャード `account_settings` に足す列 | `undo_send_seconds`（5・10・20・30）、`external_images`（`show`・`ask`）、`offline_allowed`、`keyboard_shortcuts`、`time_zone` | 主キー `(tenant_id, account_id)` | 5.1、6.1、7.4 |
-| メールボックスのシャード `unsubscribe_actions` | `message_id`、`list_domain`、`requested_at`、`result` | 主キー `(tenant_id, account_id, message_id)` | 9 |
+| メールボックスのシャード `unsubscribe_actions` | 列は [sender-authentication.md](sender-authentication.md) の 14 節が正本（`message_id`、`sender_domain`（`List-Unsubscribe` の送り手のドメイン）、`method`、`result`、`created_at`）。[data-model/sender-auth-and-reports.md](data-model/sender-auth-and-reports.md) の 2.7 節 | 主キー `(tenant_id, account_id, message_id)` | 9 |
 
 ## 15. テストと性質
 

@@ -109,10 +109,10 @@
 
 ### 4.4 保全の行
 
-- `preserved_messages(tenant_id, account_id, message_id, blob_id, prefix, received_at, size, labels_at_delete, deleted_at, delete_reason, retain_until, hold_ids)` をメールボックスのシャードに置く（`tenant_id`・`account_id` で FORCE RLS）。行の中身はメッセージの行と同じ（件名を含む C3 のメタデータ）で、置き場所が別なだけ。
+- `preserved_messages(tenant_id, account_id, message_id, blob_id, prefix_headers, received_at, size_logical, labels_at_delete, deleted_at, delete_reason, retain_until, hold_ids, …)`（列の全体は [data-model/retention-holds-and-ediscovery.md](data-model/retention-holds-and-ediscovery.md) の 2.6 節） をメールボックスのシャードに置く（`tenant_id`・`account_id` で FORCE RLS）。行の中身はメッセージの行と同じ（件名を含む C3 のメタデータ）で、置き場所が別なだけ。
 - 同じトランザクションで、メッセージの行を消し、change log に `destroyed`（`flags_changed` に `preserved`）を書く。JMAP・IMAP の利用者には普通の削除に見える。
 - `search-node` は `preserved` の印のある `destroyed` を墓標にせず、状態のビットマップ `PRESERVED` に移す。利用者の検索は `PRESERVED` を常に除き、eDiscovery の検索だけが含める（[search.md](search.md) の 7 節への追加の依頼。11 節の持ち越し）。
-- 容量：保全の行は利用者の容量に数えない（[ADR-0031](../decisions/0031-blob-references-gc-and-quota.md) の `account_usage` から引く）。組織の保全の量 `org_preserved_bytes` として別に数え、管理の画面に出す。
+- 容量：保全の行は利用者の容量に数えない（[ADR-0031](../decisions/0031-blob-references-gc-and-quota.md) の `account_usage` から引く）。組織の保全の量 `org_usage.preserved_bytes` として別に数え、管理の画面に出す。
 - **保全を解く**：保留の削除・案件の終了・規則の変更の後、背景の作業（X4）が、影響する範囲の `preserved_messages` を評価し直す。どの保留にも規則にも当たらなくなった行は消し、`hold` の参照を外す（blob は [ADR-0031](../decisions/0031-blob-references-gc-and-quota.md) の流れで消える）。
 - 案件を閉じても、他の案件の保留に当たる行は残る（`hold_ids` から外すだけ）。
 
@@ -186,7 +186,7 @@ sequenceDiagram
 - 検索の要求は監査ログに先に書き、書けなければ検索しない（7.4 節）。
 - `search-node` は X7 の印のある要求だけ `PRESERVED` を含めて答える。印はアカウントの文脈と同じく署名つきの内部の資格（`admin-api` の X7 のロールが出す、案件と範囲と期限 10 分を含む）で、`search-node` が検証する。
 - 冷えたアカウント（NVMe にないアカウント）は S3 からセグメントを取る。1 万アカウントの案件は、受け持ちごとに並べて 16 本ずつ取り、最初の件数まで p95 60 秒を目標にする（2 節）。eDiscovery の検索は利用者の検索の容量を食わないよう、`search-node` の CPU の 20% までに絞る（[capacity.md](capacity.md) の 6 節）。
-- 結果の件数は正確に数える（利用者の検索の「1,000 以上」の扱いを当てない）。結果の保存は案件ごとの `matter_results`（`message_id` の一覧、S3）に置き、ページの送りはそこから読む。
+- 結果の件数は正確に数える（利用者の検索の「1,000 以上」の扱いを当てない）。結果の保存は案件ごとの S3 `ediscovery/<tenant_id>/<matter_id>/results/<search_id>`（`message_id` の一覧）と directory の `matter_searches`（検索の記録）に置き、ページの送りはそこから読む。
 - 本文の閲覧は `ediscovery.read_body` の権限で、1 通ずつ。閲覧は配る形（[ADR-0032](../decisions/0032-served-view-edits.md)）を `<brand>usercontent.<domain>` から描き、閲覧ごとに監査に残す。
 
 ### 7.2 書き出し
@@ -275,7 +275,7 @@ stateDiagram-v2
 
 ## 12. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -287,6 +287,7 @@ stateDiagram-v2
 | directory `org_usage` に足す列：`preserved_bytes` | 組織の保全の量 | 4.4 |
 | directory `accounts.state` に `archived` を足す | 退職者 | 5 |
 | S3 `ediscovery/<tenant_id>/<matter_id>/results/<search_id>` | 検索の結果の `message_id` の一覧 | 7.1 |
+| directory `matter_searches` | 検索の記録（案件、担当、暗号化した IR、件数、状態）。2026-10-10 のデータモデルの工程で足した | 7.1 |
 | S3 `ediscovery-exports/<tenant_id>/<export_id>/…` と directory `exports` | 書き出しのファイル、目録、状態の機械 | 7.2、7.3 |
 | directory `legal_preservations` | 法務の手順の保全（テナントの外から掛ける）。法務の L4 の後に形を確定 | 8 |
 

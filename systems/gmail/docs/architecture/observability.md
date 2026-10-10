@@ -187,7 +187,7 @@ sequenceDiagram
 | 種類 | 置き場所 | 保持 | 読める人 |
 | --- | --- | --- | --- |
 | 部品のログ | CloudWatch Logs（`mail-prod`） | 30 日（法務の L1・L6 で見直す） | Ops、Dev の当番 |
-| 配送の記録（`spool_id`、受け手の `account_id`、結果のコード） | directory の分割の表 | 90 日 | サポートの道具（[security.md](security.md) の 7.2 節） |
+| 配送の記録（`delivery_id`、受け手の `account_id`、結果のコード） | 受け手のメールボックスのシャードの分割の表（[data-model/inbound-spool-and-delivery.md](data-model/inbound-spool-and-delivery.md) の 3 節） | 90 日 | サポートの道具（[security.md](security.md) の 7.2 節） |
 | 指標 | AMP | 15 か月（集計） | Ops、Dev、PM |
 | トレース | X-Ray か AMP の Tempo の互換（選定は E1） | 7 日 | Ops、Dev の当番 |
 | 見張りの記録 | `mail-canary` の S3 | 1 年 | Ops、QA |
@@ -202,12 +202,12 @@ sequenceDiagram
 
 ## 11. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | `mail-canary` の S3 `canary/<経路>/<yyyy>/<mm>/<dd>.parquet` | 送った番号、時刻、受け手、届いた時刻、箱、認証の結果、各段の時刻 | 3 |
-| directory `delivery_log`（日の分割、90 日） | `spool_id`、`account_id`、`tenant_id`、`result_code`、`t_accept`、`t_commit`、`addr_hmac` | 3.3、9 |
+| メールボックスのシャード `delivery_log`（日の分割、90 日。2026-10-10 のデータモデルの工程で directory から移した） | `delivery_id`（`spool_id` か `submission_id`）、`account_id`、`tenant_id`、`result_code`、`t_accept`、`t_commit`、`addr_hmac`、`msgid_hmac` | 3.3、9 |
 | directory `provider_groups` | MX の名前の形 → 事業者の群 | 5 |
 | AMP の記録の規則 | 4 節の式、8 節のアラート | 4、8 |
 

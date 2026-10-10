@@ -143,7 +143,7 @@ flowchart LR
 ```mermaid
 flowchart TD
     kms_tr["KMS：tenant-root の鍵（用途ごと、リージョンごと）"]
-    kms_sp["KMS：spool、quarantine、exports、audit、dkim、secrets の鍵"]
+    kms_sp["KMS：spool、quarantine、exports、audit、dkim、secrets、address-index の鍵"]
     trk["テナントの根の鍵 TRK（256 ビット、テナントごと）<br/>KMS で包んで directory の tenant_keys に"]
     kek["日ごとの KEK（テナント × 日）<br/>TRK で AES-KW に包んで tenant_keks に"]
     bk["blob の鍵（blob ごと）<br/>KEK で AES-KW に包んで blob_wrapped_keys に"]
@@ -178,6 +178,7 @@ flowchart TD
 ### 5.4 鍵を扱う部品の守り
 
 - KMS の `Decrypt` を許すのは、`tenant-root` の鍵に対して `mailstore`・`search-indexer`・`search-node`・`ediscovery-exporter`・`accounts`（列の暗号化）のタスクのロールだけ。鍵の方針に条件（`aws:PrincipalArn` と VPC エンドポイント）を書く。
+- **アドレスの鍵**（[ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md) の 2026-10-10 の注記）：テナントごとのアドレスの HMAC の鍵を KMS の `address-index` の鍵で包み、`tenant_keys.addr_key_wrapped` に置く。`address-index` の `Decrypt` を許すのは `mx-edge`・`inbound-pipeline`・`accounts`・`admin-api`・`report-ingest` だけで、`mx-edge` が持つ `Decrypt` はこの鍵だけ（`tenant-root` には与えない）。平文の鍵はテナントごとに 1 時間キャッシュし、TRK の破棄と同時に消す。
 - 鍵を扱うタスクは：
   - コアダンプを禁じる（`RLIMIT_CORE=0`、`PR_SET_DUMPABLE=0`）。鍵の領域は `mlock` し、使い終わったら 0 で消す（`zeroize`）。
   - ECS Exec を無効にする（`enableExecuteCommand=false`）。Fargate の上で人が入る経路がない。EC2 の `search-node` は SSM のセッションを禁じ（IAM の拒否）、AMI に SSH を入れない。
@@ -312,14 +313,15 @@ flowchart TD
 
 ## 13. data-model への項目
 
-[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
+[data-model.md](data-model.md) へ出した項目の記録。列・制約・置き場所の正本は data-model.md と [data-model/](data-model/) の各ファイル（2026-10-10 のデータモデルの工程から）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| directory `tenant_keys` | `tenant_id`、`trk_wrapped`（KMS の暗号文）、`kms_key_arn`、`created_at`、`state`（`active`・`erasure_blocked`・`destroyed`）、`destroyed_at` | 5.2、5.3 |
+| directory `tenant_keys` | `tenant_id`、`trk_wrapped`（KMS の暗号文）、`kms_key_arn`、`trk_version`、`addr_key_wrapped`（アドレスの HMAC の鍵。KMS の `address-index` の鍵で包む。[data-model.md](data-model.md) の D-21、[ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md) の注記）、`created_at`、`state`（`active`・`erasure_blocked`・`destroyed`）、`destroyed_at` | 5.2、5.3 |
 | directory `tenant_keks` | `tenant_id`、`kek_id`、`day`、`kek_wrapped`（TRK で AES-KW）、`wrapped_key_count`、`destroyed_at` | 5.2、5.3 |
 | directory `account_index_keys` | `tenant_id`、`account_id`、`key_id`、`kek_id`、`key_wrapped`、`created_at` | 5.2 |
 | directory `audit_events` | 8.2 節の列。`(stream, tenant_id, seq)` で一意、`tenant_id` で FORCE RLS | 8 |
+| directory `audit_chain_heads` | 流れ × テナントの鎖の先頭（`last_seq`、`last_hash`）。書き手が `FOR UPDATE` で取って `seq` を直列にする（2026-10-10 のデータモデルの工程で足した） | 8.2 |
 | 監査のアカウントの S3 `audit/<stream>/<tenant_id>/<yyyy>/<mm>/<dd>/<hh>.jsonl.zst` と `heads/<hh>.sig` | 写しと鎖の先頭の署名。Object Lock | 8.2 |
 | directory `break_glass_sessions` | 依頼者、承認者、理由、インシデントの番号、開始、終わり、記録の場所 | 7.2 |
 | DB のロールの一覧（コードの中） | `sys_worker`・`report_lookup`・`lawful_access` などのロールと権限 | 6 |
