@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopify の前提知識</title>
+<meta name="description" content="Shopify の再構築の設計の文書を読む前に知っておくとよい、EC の基盤の登場人物、在庫の引き当てと売り越し、フラッシュセール、チェックアウトの一回性、割引と消費税の端数、インボイス、ポッド、テンプレートの言語、アプリの基盤と WebAssembly の砂場。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Shopify · 前提知識</p>
+    <h1>EC の基盤の設計を読む前に</h1>
+    <p class="lead">商品とバリエーション、在庫の引き当てと売り越し、フラッシュセールと待合室、チェックアウトと注文の一回性、割引の組み合わせと端数、消費税とインボイス、日本の決済手段、配送と返品、ポッドとショップの移し替え、テーマの言語とエッジのキャッシュ、アプリの基盤と WebAssembly の砂場を、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>に、カード決済の基礎は <a href="../../../stripe/docs/primer/index.html">Stripe の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Shopify · 前提知識</p>
+    <h2>EC の基盤の設計を読む前に</h2>
+    <p class="lead">売り越さず、注文はちょうど 1 回、税は 1 円も違わない仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="what">
+    <h2>EC の基盤は何をするサービスか</h2>
+    <p>Shopify は、事業者が自分のネットショップを開き、商品を並べ、売り、配送と返品までを 1 か所で回せる基盤です。モールと違い、ショップの見た目と顧客は事業者のものです。1 つの基盤の上に、数十万の独立したショップ（テナント）が載ります。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>事業者とスタッフ</h3><p>管理画面で商品・在庫・注文・配送を扱います。持ち主がスタッフに権限を与えます。</p></div>
+      <div class="card" data-frag><h3>買い手</h3><p>スマートフォンでストアフロントを見て、会員にならずに買う人が多いです。</p></div>
+      <div class="card" data-frag><h3>アプリの開発者</h3><p>Admin API・Webhook・関数で機能を足し、多くのショップに配ります。</p></div>
+      <div class="card" data-frag><h3>社内の運用</h3><p>フラッシュセールの準備、不正の対応、ショップの移し替えを行います。</p></div>
+    </div>
+    <p>規模は <a class="t" href="#g-gmv">GMV</a>（流通総額）で語ります。基盤の上で売れた額の合計で、基盤の売上ではありません。設計の S1 は GMV 年 1,000 億円・稼働のショップ 5 万・注文 月 100 万件、注文の最大は全体 200 件/秒・1 ショップ 100 件/秒です。</p>
+    <p class="doc-only"><small>設計で効くところ：6 つの価値（売り越さない、注文はちょうど 1 回、落ちない、速い、お金と税が合う、安全に拡張できる）は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/intent.md">intent.md</a>、規模の段階は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/README.md">architecture/README.md</a> の 2 節。</small></p>
+  </section>
+
+  <section class="s" id="catalog">
+    <h2>カタログ：商品・バリエーション・在庫の品目・拠点</h2>
+    <p>EC では「商品」と「実際に売り買いする単位」を分けます。T シャツという<strong>商品</strong>に、色とサイズという<a class="t" href="#g-option">オプション</a>があり、その値の組（白・M など）が<a class="t" href="#g-variant">バリエーション</a>です。価格・SKU・重さはバリエーションが持ちます。</p>
+    <div class="stepper">
+      <ol>
+        <li>商品「T シャツ」を作る。オプションは <code>色</code>（白・黒・紺）と <code>サイズ</code>（S・M・L・XL）。オプションは 1 商品 3 つまで。</li>
+        <li>全組み合わせで 3 × 4 = 12 のバリエーションができる。作らない組（紺・XL）は「選べない」で、在庫切れとは別です。</li>
+        <li>バリエーションごとに 1 つの<a class="t" href="#g-inventory-item">在庫の品目</a>ができる。在庫の数はこちらが持つ。</li>
+        <li>品目の数は<a class="t" href="#g-location">拠点</a>（倉庫・店舗）ごとに持つ。東京倉庫に 5、大阪店に 3、のように分かれる。</li>
+      </ol>
+    </div>
+    <p>価格は税込みの整数（円）が正本です。日本は<a class="t" href="#g-tax-inclusive">総額表示</a>なので、税抜きの価格から計算しません。</p>
+    <p class="doc-only"><small>設計で効くところ：商品・オプション・バリエーションの形と上限は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/catalog-and-pricing.md">catalog-and-pricing.md</a> の 4 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0014-product-variant-option-model.md">ADR-0014</a>、拠点の選び方は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0022-location-selection-and-lock-order.md">ADR-0022</a>。</small></p>
+  </section>
+
+  <section class="s" id="inventory">
+    <h2>在庫：引き当てと確定、売り越し</h2>
+    <p>在庫の数は 1 つではなく、状態ごとに分けて持ちます。拠点の手元の数 <code>on_hand</code> は、<a class="t" href="#g-available">available</a>（売れる）・<a class="t" href="#g-reserved">reserved</a>（支払いの途中で押さえた）・<a class="t" href="#g-committed">committed</a>（注文に入った、未発送）・unavailable（破損など）の和です。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>引き当て</strong>（支払いの開始）：<code>available −1</code>、<code>reserved +1</code>。期限つき（通常 15 分、セールは 10 分）。カートに入れた時点では押さえない。</li>
+        <li><strong>確定</strong>（注文の作成）：<code>reserved −1</code>、<code>committed +1</code>。</li>
+        <li><strong>戻し</strong>（期限切れ・放棄・決済の失敗）：<code>reserved −1</code>、<code>available +1</code>。1 分ごとの掃除が行う。</li>
+        <li><strong>配送</strong>：<code>committed −1</code>、<code>on_hand −1</code>。</li>
+      </ol>
+    </div>
+    <p><a class="t" href="#g-oversell">売り越し</a>は、確定した数が手元の数を超えることです。事業者は品目ごとに「在庫切れで売らない（<code>deny</code>）」か「在庫切れでも売る（<code>continue</code>、予約販売など）」を選びます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">「<code>SELECT available</code> で 1 以上を確かめてから、<code>UPDATE ... SET available = available - 1</code> で減らす」は、同時に買われても安全ですか？</p>
+      <div class="opts">
+        <button>安全。確かめてから減らしているので負にならない</button>
+        <button>安全。トランザクションの中なら必ず直列になる</button>
+        <button>安全でない。確かめた後に他の買い手が減らせる。条件つきの 1 文の更新と CHECK 制約で守る</button>
+      </div>
+      <p class="why">読み出しと更新の間に別のトランザクションが割り込みます（既定の READ COMMITTED では防げません）。設計は <code>WHERE available &gt;= n</code> の条件つきの更新で 0 行なら取れないとし、<code>available &gt;= 0</code> の CHECK 制約で最後に守ります（inventory-and-reservations.md の 5.2 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：数の持ち方と不変条件 (I1)〜(I3) は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/inventory-and-reservations.md">inventory-and-reservations.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0004-inventory-reservation-model.md">ADR-0004</a>。</small></p>
+  </section>
+
+  <section class="s" id="hot-rows">
+    <h2>熱い行と在庫の枠</h2>
+    <p>限定品の発売では、1 つの品目の在庫の行に、毎秒 100 件の引き当てが集まります。DB は 1 つの行の更新を行のロックで 1 件ずつ並べるので、ロックを 5ms 持つなら 1 行で 200 件/秒が上限です。引き当て・確定・戻しを合わせるとロックの使用は 85% を超え、待ちが急に伸びます。これが<a class="t" href="#g-hot-row">熱い行</a>です。</p>
+    <p>設計は、熱い品目の在庫を複数の<a class="t" href="#g-slot">枠</a>の行に分けます。各枠が <code>available</code>・<code>reserved</code>・<code>committed</code> を持ち、合計が品目の数です。</p>
+    <table>
+      <tr><th>在庫 3,000、100 件/秒</th><th>1 行</th><th>32 枠（1 枠あたり）</th></tr>
+      <tr><td>引き当て</td><td>100 件/秒</td><td>3.1 件/秒</td></tr>
+      <tr><td>ロックの使用（5ms）</td><td>85% 以上</td><td>3%</td></tr>
+      <tr><td>枠への配り方</td><td>—</td><td>枠 0〜23 が 94、枠 24〜31 が 93</td></tr>
+    </table>
+    <ul>
+      <li data-frag>買い手ごとに <code>hash(checkout_id) mod N</code> で最初の枠を決めます。空なら残りの多い枠を 3 つ試します。</li>
+      <li data-frag>代わりに払うもの：終盤に在庫が枠に散ると、和は足りるのに 1 つの枠で足りないことがあります。設計は「寄せ集め」と「直し」で埋めます。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：枠の選び方と例は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/inventory-and-reservations.md">inventory-and-reservations.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0020-inventory-slot-counters-and-reservation-sweep.md">ADR-0020</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0021-inventory-slot-probing-and-rebalance.md">ADR-0021</a>。枠の数の上限は <code>inventory-hot-row-poc</code> で測ります。</small></p>
+  </section>
+
+  <section class="s" id="flash-sale">
+    <h2>フラッシュセールと待合室</h2>
+    <p><a class="t" href="#g-flash-sale">フラッシュセール</a>は、決めた時刻に限定品を売り出すことです。在庫 3,000 に 20 万人が来ると、全員を通せばサイトが落ち、速い人（ボット）が勝ちます。そこで<a class="t" href="#g-waiting-room">待合室</a>で並ばせ、チェックアウトが受けられる速さで入れます。</p>
+    <div class="tabs">
+      <div data-tab="公平さ"><p>開始の前に来た人を「早く来た順」にすると、到着の速さの競争になります。設計は開始の時刻に公開する乱数の種で、開始前の券を並べ替えます。種のハッシュを先に公開し、後から種を変えていないことを示します。開始の後に来た人は来た順です。</p></div>
+      <div data-tab="受け入れの速さ"><p>1 秒あたりの受け入れは、上限（S1 で 100 人/秒）、残りの在庫から決めた予算、チェックアウトの p99 を見て増減する速さ、の最小です。売り切れが近づくと入れる人を絞り、離脱で在庫が戻れば再開します。</p></div>
+      <div data-tab="許可証"><p>受け入れた人には、署名つきの<a class="t" href="#g-queue-pass">許可証</a>（cookie、期限 15 分、セッションに結び付く）を出します。エッジが署名と期限を確かめ、許可証のない要求をチェックアウトに通しません。</p></div>
+      <div data-tab="ボット"><p>WAF の Bot Control と IP ごとの速さの上限、入口のチャレンジ（CAPTCHA など）、許可証、1 人あたりの数の上限の 4 層です。上限は、メール・配送先・電話番号を正規化して数えます（同じ番地の別の部屋も同じと数える）。</p></div>
+    </div>
+    <div class="callout key">待合室・Valkey・キャッシュの数は目安です。売れるかどうかは、最後に DB の引き当てだけで決まります。待合室が壊れても売り越しません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/flash-sales-and-queueing.md">flash-sales-and-queueing.md</a> の 5〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0024-waiting-room-ordering-and-admission-rate.md">ADR-0024</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0026-bot-defense-and-purchase-limits.md">0026</a>。運用は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/flash-sale-operations.md">runbooks/flash-sale-operations.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="checkout">
+    <h2>カートからチェックアウトへ、注文はちょうど 1 回</h2>
+    <p>カートは「買うつもりの品の一覧」で、価格も在庫も確定しません。<a class="t" href="#g-checkout">チェックアウト</a>は、連絡先・配送先・配送の方法・割引を決め、最終確認画面の金額を<a class="t" href="#g-snapshot">価格の写し</a>に固定し、支払いに進む手続きです。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> open : カートから作成
+  open --> payment_pending : 送信（写しの確認、引き当て）
+  payment_pending --> open : 決済の失敗・取り消し
+  payment_pending --> completed : completeCheckout（注文の作成）
+  payment_pending --> refund_required : 決済は成功、注文を作れない
+  refund_required --> refunded : 取り消し・返金
+  payment_pending --> expired : 60 分、支払いなし
+  open --> abandoned : 7 日の無操作</pre>
+    <p>決済の結果は、買い手のブラウザの<strong>リダイレクトの戻り</strong>と、提供者の <strong>Webhook</strong> の 2 つの経路で、ほぼ同時に届きます。両方が注文を作れば二重の注文、どちらも届かなければ「お金だけ取られて注文がない」になります。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">決済の提供者で支払いが成功したら、注文は必ずありますか？</p>
+      <div class="opts">
+        <button>ある。成功の Webhook を受けて注文を作るので</button>
+        <button>ないことがある。引き当ての期限切れで在庫を取り直せなければ注文を作らず返金する。届かない通知は照合が拾う</button>
+        <button>ない。注文はリダイレクトの戻りでだけ作る</button>
+      </div>
+      <p class="why">設計は両経路と 1 分ごとの照合が同じ <code>completeCheckout</code> を呼び、チェックアウトの行のロックと <code>orders.checkout_id</code> の一意で 1 つにします。作れないときは <code>refund_required</code> へ進み、15 分を超えて「注文も返金もない」状態を残しません（cart-and-checkout.md の 7 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：状態と完了の決定表 DT-CHK-001 は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/cart-and-checkout.md">cart-and-checkout.md</a> の 5・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0005-checkout-state-machine-and-exactly-once-orders.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0029-checkout-completion-decision-table.md">ADR-0029</a>。冪等の考え方は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="discounts">
+    <h2>割引：組み合わせ、順序、端数</h2>
+    <p>割引には 3 つの種別があり、<strong>商品 → 注文 → 送料</strong>の順に掛かります。注文の割引は、商品の割引の後の小計に掛かります。どの割引どうしを同時に使えるか（<a class="t" href="#g-stacking">組み合わせ</a>）は、割引ごとの印で決まります。両立する集まりのうち、買い手の割引の合計が最大のものを選びます。</p>
+    <p>例：T シャツ 3,300 円 × 2、焼き菓子 1,080 円 × 3、マグ 2,200 円 × 1（小計 12,040 円）、送料 880 円。</p>
+    <table>
+      <tr><th>割引</th><th>中身</th><th>この注文での額</th></tr>
+      <tr><td>D1 商品（自動）</td><td>T シャツ 15%</td><td><code>floor(6,600 × 0.15) = 990</code></td></tr>
+      <tr data-frag><td>D2 注文（コード）</td><td>1,000 円引き（10,000 円以上）</td><td>1,000（小計 11,050 に掛かる）</td></tr>
+      <tr data-frag><td>D3 注文（自動）</td><td>8% 引き。D2 と両立しない</td><td><code>floor(11,050 × 0.08) = 884</code></td></tr>
+      <tr data-frag><td>D4 送料（自動）</td><td>送料無料（10,000 円以上）</td><td>880</td></tr>
+    </table>
+    <p data-frag>{D1, D2, D4} が 2,870 円で最大なので選びます。注文の割引 1,000 円は行の額の比で<a class="t" href="#g-allocation">按分</a>し（507.69・293.21・199.09）、切り捨ての和 999 の残り 1 円を額の大きい行へ足します。率は行ごとでなく小計で 1 回だけ丸めます。行ごとに丸めると 883 円で、1 円ずれます。</p>
+    <p class="doc-only"><small>設計で効くところ：両立の決定表 DT-DSC-001、選び方、按分は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/discounts-engine.md">discounts-engine.md</a> の 5〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0032-discount-classes-order-and-combination.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0033-discount-allocation-and-rounding.md">ADR-0033</a>。按分の結果は単位ごとに残り、返金の額になります。</small></p>
+  </section>
+
+  <section class="s" id="tax">
+    <h2>消費税とインボイス：2 つの税率、1 回の丸め</h2>
+    <p>日本の<a class="t" href="#g-consumption-tax">消費税</a>は、標準税率 10% と<a class="t" href="#g-reduced-rate">軽減税率</a> 8% があります。8% は酒類と外食を除く飲食料品などです。1 つの注文に 2 つの税率が混ざります。価格は税込み（総額表示）なので、税額は税込みの額から <code>額 × 税率 ÷ (100 + 税率)</code> で逆算します。</p>
+    <div class="tabs">
+      <div data-tab="例：税率ごと">
+        <p>お茶の葉（8%）2,160 円、マグカップとコースター（10%）4,950 円、送料（10%）880 円。注文の割引 500 円を按分した後の対価は 8% が 2,009 円、10% が 5,481 円。</p>
+        <ul>
+          <li>8%：<code>2,009 × 8 / 108 = 148.81…</code> → 148 円</li>
+          <li>10%：<code>5,481 × 10 / 110 = 498.27…</code> → 498 円</li>
+        </ul>
+      </div>
+      <div data-tab="例：行ごとと比べる">
+        <p>10% の 160 円の品を 3 個。</p>
+        <ul>
+          <li>行（品目）ごとに丸めて足す：<code>160 × 10 / 110 = 14.54…</code> → 14 を 3 回で 42 円</li>
+          <li>税率ごとに 1 回：<code>480 × 10 / 110 = 43.63…</code> → 43 円</li>
+        </ul>
+        <p>設計は 43 円を出します。</p>
+      </div>
+      <div data-tab="丸めの方法"><p>切り捨て（既定）・四捨五入・切り上げをショップが選べます。途中の割り算は分数で持ち、最後に 1 回だけ丸めます。事業者が選べることの扱いは法務の確認待ち（L4）です。</p></div>
+      <div data-tab="インボイスの文書">
+        <p>2023 年 10 月から、買い手の事業者が仕入れの消費税を差し引くには、原則として<a class="t" href="#g-invoice">適格請求書</a>（インボイス）が要ります。出せるのは登録した事業者だけで、<a class="t" href="#g-registration-number">登録番号</a>（<code>T</code> ＋ 13 桁）を書きます。</p>
+        <ul>
+          <li>注文で<a class="t" href="#g-simplified-invoice">適格簡易請求書</a>（レシート）、返金で<a class="t" href="#g-return-invoice">返還インボイス</a>を作る。</li>
+          <li>文書は発行したら書き換えない。直しは訂正の文書を足す。番号はショップ・種類・年ごとの連番で抜けを作らない。</li>
+          <li>税額は注文の税の写しから取り、計算し直さない。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="quiz" data-answer="1">
+      <p class="q">インボイスに書く税額は、行ごとに税額を丸めて合計してよいですか？</p>
+      <div class="opts">
+        <button>よくない。1 つの適格請求書につき、税率ごとに 1 回だけ端数を処理する</button>
+        <button>よい。行ごとの税額の和が合計の税額になる</button>
+        <button>よい。ただし四捨五入に限る</button>
+      </div>
+      <p class="why">国税庁の Q&amp;A（問 57）は、商品ごとに端数処理して合計する方法を認めていません。設計は行ごとの税額の列を持たず、<code>order_tax_lines</code> に税率ごとの 1 行だけを持ちます。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/taxes-and-invoices.md">taxes-and-invoices.md</a> の 4・5・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0017-consumption-tax-calculation-and-rounding.md">ADR-0017</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0018-invoice-documents-and-receipts.md">ADR-0018</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0019-invoice-registration-number-verification.md">ADR-0019</a>。この領域の全 Story は法務の確認待ち（L4）です。</small></p>
+  </section>
+
+  <section class="s" id="payments">
+    <h2>決済：提供者に任せる、日本の支払い待ち</h2>
+    <p>この設計はカード番号に触れず、決済は外部の提供者（Stripe の題材の再構築したものや、日本の決済代行）に任せます。<a class="t" href="#g-auth">オーソリ</a>と<a class="t" href="#g-capture">売上の確定</a>の違い、3D セキュア、Webhook の基礎は <a href="../../../stripe/docs/primer/index.html#card-flow">Stripe の資料</a>にあります。</p>
+    <p>日本では、注文の時点でお金が動かない手段がよく使われます。</p>
+    <div class="stepper">
+      <ol>
+        <li>買い手が<a class="t" href="#g-konbini">コンビニ払い</a>か銀行振込を選んで送信する。在庫を引き当てる。</li>
+        <li>提供者が支払いの番号（振込なら<a class="t" href="#g-virtual-account">バーチャル口座</a>）と期限（既定 3 日）を出す。結果は <code>awaiting_payment</code>。</li>
+        <li>注文を作る。支払いの状態は <code>pending</code>、在庫は確定（<code>committed</code>）、配送の指示は保留（<code>on_hold</code>）。</li>
+        <li>入金の Webhook が来たら照会で確かめ、<code>paid</code> にして配送の指示を開ける。</li>
+        <li>期限を過ぎても入金がなければ、番号を取り消し、注文を取り消して在庫を戻す。後から入金が来たら、注文を戻さず全額を返金する。</li>
+      </ol>
+    </div>
+    <div class="callout warn">フラッシュセールの品目を含むチェックアウトでは、コンビニ払い・銀行振込を既定で出しません。3 日間、限定品の在庫を押さえ続けるからです。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/payments-integration.md">payments-integration.md</a> の 8・9 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0037-async-payments-pending-orders.md">ADR-0037</a>。日本の決済手段の一般の流れは <a href="../../../stripe/docs/primer/index.html#japan">Stripe の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="orders">
+    <h2>注文の後：配送の指示、一部の配送、返品と返金</h2>
+    <p>1 つの注文が 1 回で届くとは限りません。品目が別の拠点にあれば、拠点ごとに<a class="t" href="#g-fulfillment-order">配送の指示</a>（fulfillment order）を分け、それぞれから<a class="t" href="#g-shipment">配送</a>を作ります。</p>
+    <div class="tabs">
+      <div data-tab="一部の配送">
+        <p>T シャツ 2・焼き菓子 3 は東京倉庫、マグ 1 は大阪店。配送の指示は 2 つです。</p>
+        <ul>
+          <li>2 日目：焼き菓子 1 個が破損し、1 個を取り消す。売上の確定の前なので返金でなく、確定する額を 983 円減らす。</li>
+          <li>3 日目：東京から発送。最初の発送で 9,067 円を確定する（確定の方式 <code>on_first_fulfillment</code>）。注文は <code>partially_fulfilled</code>。</li>
+          <li>5 日目：大阪から発送して <code>fulfilled</code>。</li>
+        </ul>
+      </div>
+      <div data-tab="返金の額">
+        <p>注文の時に、割引を品の 1 個（単位）ごとに按分した支払いの額を残しておきます。返金は返す単位の額の和です。返品で割引の条件（最低の金額）を下回っても、割引を取り戻しません。</p>
+      </div>
+      <div data-tab="返金の税">
+        <p>T シャツ 1 枚（2,551 円、10%）と焼き菓子 1 個（983 円、8%）を返品。返金は 3,534 円。返す税額の出し方が 2 つあります。</p>
+        <ul>
+          <li>独立：返す対価から計算。10% 231 円、8% 72 円。</li>
+          <li>再計算：返品の後の注文を計算し直し、元との差。10% 232 円、8% 73 円。</li>
+        </ul>
+        <p>どちらにするかは法務の確認待ち（L4）です。</p>
+      </div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/orders-and-fulfillment.md">orders-and-fulfillment.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/returns-and-refunds.md">returns-and-refunds.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0040-fulfillment-orders-and-partial-fulfillment.md">ADR-0040</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0043-refund-calculation-from-unit-allocations.md">ADR-0043</a>。</small></p>
+  </section>
+
+  <section class="s" id="pods">
+    <h2>ポッド：ショップを単位に分けたセル、その移し替え</h2>
+    <p>数十万のショップを 1 つの DB に載せると、1 つのショップのセールが全員を遅くします。本家は、ショップの集まりごとにデータストアを分けた<a class="t" href="#g-pod">ポッド</a>を持ちます。この設計はさらに、アプリのサービスもポッドごとに持つ<a class="t" href="#g-cell">セル</a>にします。1 つの要求は 1 つのポッドのデータだけに触れます。S1 は共有 4・隔離 1（セールのショップ用）・見張り 1 です。</p>
+    <pre class="mermaid">flowchart LR
+  B["買い手"] --> CF["エッジ<br>CloudFront Functions"]
+  CF -- "熱い集まりにある" --> P1["ポッド p01<br>アプリ・Aurora・Valkey"]
+  CF -- "ない" --> ER["edge-router"]
+  ER --> DIR[("shop-directory<br>ショップ → ポッド")]
+  ER --> P2["ポッド p02"]</pre>
+    <p>エッジは、要求の多いホストだけを KeyValueStore（4 MB まで）に置いた<a class="t" href="#g-hot-set">熱い集まり</a>で行き先を引きます。ショップを別のポッドへ移すときは、PostgreSQL の<a class="t" href="#g-logical-decoding">論理デコード</a>で止めずに追いかけます。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>コピーと追いかけ</strong>：そのショップの行（<code>shop_id</code> で絞る）を写し、同じ位置から変更を追いかける。遅れが 1 秒未満になるまで続ける。</li>
+        <li><strong>停止</strong>：そのショップの書き込みを止め（目標 p99 10 秒、503 と <code>Retry-After: 5</code>）、残りを当て、変わった行を照合する。</li>
+        <li><strong>切り替え</strong>：ディレクトリを先のポッドに変え、エッジへ配り、書き込みを開ける。</li>
+        <li><strong>中継</strong>：伝わる前に元へ来た要求を 15 分の間、先へ中継する。元の行は 7 日の後に消す。</li>
+      </ol>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/shops-and-pods.md">shops-and-pods.md</a> の 4・5・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0002-pods-and-shop-placement.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0010-shop-routing-hot-set-and-custom-domains.md">ADR-0010</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0012-shop-mover-logical-decoding-and-cutover.md">ADR-0012</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/shop-move.md">runbooks/shop-move.md</a>。全表の主キーの先頭が <code>shop_id</code> なので、行も鍵も同じ名前のまま移せます。テナントと RLS は<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="themes">
+    <h2>テーマの言語は安全でなければならない</h2>
+    <p>ストアフロントの見た目は<a class="t" href="#g-theme">テーマ</a>が決めます。テーマは事業者やテーマの開発者が書くテンプレート（<code>{{ product.title }}</code>・<code>{% for %}</code> の形）で、基盤のサーバーの上で描かれます。他人のコードを自分のサーバーで動かすので、言語そのものに安全を組み込みます。設計の言語の名前は Loom です。</p>
+    <div class="compare">
+      <div class="bad"><p><strong>任意のコードが動く言語</strong></p><p>無限ループでサーバーを止める。DB や他のショップのデータを読む。<code>&lt;script&gt;</code> を埋め込む<a class="t" href="#g-xss">XSS</a>。</p></div>
+      <div class="good"><p><strong>この設計の言語</strong></p><p>副作用なし。読めるのは許した <a class="t" href="#g-drop">drop</a> だけ。歩数（1 ページ 100 万）・出力（2 MB）・ループ（1,000 要素）に上限。超えたらそのセクションを空にする。</p></div>
+    </div>
+    <p>出力は、置いた場所の文脈で<a class="t" href="#g-escape">エスケープ</a>します。本文なら <code>&lt;</code> を文字の参照に、URL の属性なら <code>javascript:</code> を拒み、<code>&lt;script&gt;</code> の中は <code>json</code> フィルターだけを許します。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">テーマのテンプレートに書いた処理は、サーバーで何でも実行できますか？</p>
+      <div class="opts">
+        <button>できる。サーバーで描くので JavaScript と同じ</button>
+        <button>できる。ただし事業者の承認が要る</button>
+        <button>できない。副作用がなく、許した値だけを読み、歩数などの上限の中で必ず終わる</button>
+      </div>
+      <p class="why">設計の言語は <code>eval</code> を使わない自前のインタープリターで動き、利用者の定義するフィルターも持ちません（storefront-themes.md の 4・6 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/storefront-themes.md">storefront-themes.md</a> の 4〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0007-theme-language-design.md">ADR-0007</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0045-loom-grammar-and-contextual-escaping.md">ADR-0045</a>。文法をどこまで本家に似せてよいかは法務の確認待ち（L9）です。</small></p>
+  </section>
+
+  <section class="s" id="caching">
+    <h2>エッジのキャッシュと世代の番号</h2>
+    <p>商品のページは多くの人が同じものを見るので、CDN のエッジに置きます。難しいのは消し方です。URL ごとに消す（purge）と、1 つの価格の変更で関係する全ページを探して消す必要があります。</p>
+    <p>設計は、ショップごとの<a class="t" href="#g-generation">世代の番号</a>をキャッシュの鍵に入れます。商品が変わったら世代を 1 上げるだけで、次の要求から鍵が変わり、古いページには当たらなくなります。</p>
+    <div class="stepper">
+      <ol>
+        <li>事業者が価格を 3,300 円から 2,980 円に変える。outbox に事象が出る。</li>
+        <li>2 秒の窓で、そのショップの事象を 1 回の上げにまとめる。</li>
+        <li>ディレクトリが世代を上げ、エッジの KeyValueStore に書く。</li>
+        <li>鍵が変わって外れ、元が新しい価格で描く。目標は表示まで p95 10 秒・p99 60 秒。</li>
+      </ol>
+    </div>
+    <ul>
+      <li>応答は <code>s-maxage=300, <a class="t" href="#g-swr">stale-while-revalidate</a>=60</code>。世代が伝わらなかったときの古さの上限になります。</li>
+      <li>在庫の数とカートはページに焼き込まず、小さな「島」が別に取ります。請求は常にチェックアウトの最新の価格です。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/storefront-api-and-caching.md">storefront-api-and-caching.md</a> の 4〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0050-edge-cache-keys-and-generations.md">ADR-0050</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0051-dynamic-islands-and-uncached-personal-data.md">ADR-0051</a>。</small></p>
+  </section>
+
+  <section class="s" id="apps">
+    <h2>アプリの基盤：OAuth、GraphQL の費用、Webhook</h2>
+    <div class="tabs">
+      <div data-tab="OAuth とスコープ">
+        <p>事業者がアプリを入れると、OAuth 2.0 の認可コードの流れで、アプリがショップのアクセストークン（1 時間）とリフレッシュトークン（90 日、使うたびに入れ替え）を得ます。事業者は<a class="t" href="#g-scope">スコープ</a>（<code>read_orders</code> など）を承認します。買い手の個人のデータは、スコープに加えて「保護のデータ」の承認が要ります。</p>
+      </div>
+      <div data-tab="GraphQL の費用">
+        <p>GraphQL は 1 回の要求で大量に読めるので、要求の数でなく<a class="t" href="#g-query-cost">クエリの費用</a>で絞ります。オブジェクト 1、コネクションは <code>2 + first × 子の費用</code>、ミューテーション 10。1 クエリの上限は 1,000 です。</p>
+        <p><code>products(first: 50) { variants(first: 20) {…} }</code> は子が 44 で <code>2 + 50 × 44 = 2,202</code>。超えるので実行しません。<code>first: 20</code> なら 882 で通ります。実際に 12 件しか返らなければ 170 で数え直し、差を<a class="t" href="#g-leaky-bucket">リーキーバケット</a>（ベーシックは容量 1,000、毎秒 100 回復）に返します。</p>
+      </div>
+      <div data-tab="Webhook">
+        <p>事象（<code>orders/create</code> など）をアプリのサーバーへ HTTP で送ります。<strong>少なくとも 1 回</strong>なので重複します。受け手は配信の ID で重複を除き、<a class="t" href="#g-hmac">HMAC</a> の署名を<strong>生の本文のバイト</strong>で確かめます。失敗は 4 時間に 8 回まで送り直します。順序は保証しないので、資源ごとのバージョンの番号（<code>&lt;brand&gt;_version</code>）の小さい本文を捨てます。</p>
+      </div>
+    </div>
+    <p>名前の置き換え：ヘッダーは <code>X-&lt;Brand&gt;-Access-Token</code>、トークンは <code>&lt;brand&gt;_at_</code> の形にし、本家の名前を識別子に使いません（リポジトリ共通の ADR-0006）。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/app-platform-and-apis.md">app-platform-and-apis.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/webhooks.md">webhooks.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0009-admin-api-graphql-and-cost-limits.md">ADR-0009</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0061-webhook-delivery-and-signing.md">ADR-0061</a>。</small></p>
+  </section>
+
+  <section class="s" id="wasm">
+    <h2>WebAssembly の砂場：燃料とメモリー</h2>
+    <p>アプリは、割引・送料・決済の手段の並べ替えなどのロジックを<a class="t" href="#g-function">関数</a>として、チェックアウトの中で動かせます。関数は <a class="t" href="#g-wasm">WebAssembly</a> のモジュールで、基盤の中の Wasmtime が動かします。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3><a class="t" href="#g-fuel">燃料</a> 1,000 万</h3><p>命令を実行するたびに減る数。尽きたら止まる。同じ入力なら必ず同じ所で止まるので、開発者が再現できる。</p></div>
+      <div class="card" data-frag><h3>メモリー 10 MiB</h3><p>線形メモリーの上限。スタック 512 KiB、入力 128 KiB、出力 20 KiB。</p></div>
+      <div class="card" data-frag><h3>外に出られない</h3><p><a class="t" href="#g-wasi">WASI</a> の時計・乱数・ファイル・ネットワークを渡さない。入力を読み、出力を書くだけ。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">アプリの割引の関数が燃料切れで止まったら、チェックアウトはどうなりますか？</p>
+      <div class="opts">
+        <button>エラーになり、買い手は購入できない</button>
+        <button>その関数の割引なしとして続く</button>
+        <button>燃料を足して成功するまで動かし直す</button>
+      </div>
+      <p class="why">失敗は種類ごとの「効果なし」です。決定的なので試し直しません。例外は、事業者が「必須」にしたカートの検証の関数で、その失敗は送信を止めます（functions-sandbox.md の 8.3 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/functions-sandbox.md">functions-sandbox.md</a> の 6〜8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0008-extension-sandbox-wasm.md">ADR-0008</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0060-function-invocation-budget-and-failure-defaults.md">ADR-0060</a>。燃料の値は <code>wasm-function-poc</code> で見直します。</small></p>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み（法務の確認待ち）</h2>
+    <p>ネットショップの画面と金額には、日本の法令の決まりが関わります。設計はどの結論にも合わせられる枠を用意し、結論は出していません。以下は<strong>すべて法務の確認待ち</strong>です。</p>
+    <table>
+      <tr><th>法令</th><th>枠組み</th><th>設計の論点</th></tr>
+      <tr><td><a class="t" href="#g-tokushoho">特定商取引法</a></td><td>通信販売の広告の表示。令和 3 年の改正で、申込みの直前の<strong>最終確認画面</strong>に分量・価格・支払いと引き渡しの時期・申込みの撤回と解除などを示すことを定めた（第 12 条の 6）</td><td>最終確認画面の枠、関数・アプリに変えさせない（L1）</td></tr>
+      <tr><td><a class="t" href="#g-keihyo">景品表示法</a></td><td>実際より有利に見せる表示の禁止。比較の価格（<a class="t" href="#g-double-price">二重価格表示</a>）、ステルスマーケティング、懸賞の上限</td><td>比較の価格の根拠、「残りわずか」の表示（L2）</td></tr>
+      <tr><td>消費税法（インボイス制度）</td><td>適格請求書の記載事項、税率ごとの端数処理</td><td>レシートの形、返金の税の方式（L4）</td></tr>
+      <tr><td><a class="t" href="#g-appi">個人情報保護法</a></td><td>委託と第三者提供の区別、外国にある第三者への提供、漏えい等の報告</td><td>アプリへの買い手のデータ、削除の請求（L3）</td></tr>
+    </table>
+    <div class="callout warn">ここに書いたのは法令の枠組みだけです。本システムへの当てはめは、設計の文書の L1〜L10 の確認が済むまで決まりません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10）、最終確認画面の枠は <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/cart-and-checkout.md">cart-and-checkout.md</a> の 6.3 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0030-price-snapshot-and-final-confirmation.md">ADR-0030</a>。</small></p>
+  </section>
+
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>ポッドの全表は主キーの先頭に <code>shop_id</code> を持ちます（図では省きます）。全体の面（ポッドの外）には、ショップ → ポッドのディレクトリなど、ショップのデータでない表だけを置きます。</p>
+    <pre class="mermaid">erDiagram
+  products ||--|{ product_variants : "has"
+  product_variants ||--o| inventory_items : "tracks"
+  inventory_items ||--o{ inventory_levels : "per location"
+  inventory_levels ||--|{ inventory_slots : "split into"
+  checkouts ||--o{ reservations : "reserves"
+  checkouts ||--o{ payment_attempts : "pays"
+  checkouts ||--o| orders : "completes into"
+  orders ||--|{ order_lines : "has"
+  orders ||--|{ order_tax_lines : "tax per rate"
+  orders ||--o{ fulfillment_orders : "per location"
+  fulfillment_orders ||--o{ shipments : "ships"
+  orders ||--o{ refunds : "refunded"
+  orders ||--o{ tax_documents : "documented"
+  inventory_slots {
+    smallint slot_no PK
+    integer available
+    integer reserved
+    integer committed
+  }
+  orders {
+    uuid order_id PK
+    uuid checkout_id UK
+    text financial_status
+  }</pre>
+    <p>チェックアウトから配送までは、次のトランザクションの順に読みます。</p>
+    <pre class="mermaid">flowchart LR
+  T0["T0 確認<br>価格の写し"] --> T1["T1 送信<br>引き当て・試行"]
+  T1 --> PSP["提供者<br>Webhook は inbox へ"]
+  PSP --> T2["T2 completeCheckout<br>注文・確定・outbox"]
+  T2 --> T3["T3 売上の確定"]
+  T2 --> T4["T4 配送<br>on_hand を減らす"]</pre>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/data-model.md">data-model.md</a> の 4 節（全体の ER 図）・5 節（道筋の表）・6 節（横断の不変条件）。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-gmv">GMV</dt><dd>Gross Merchandise Value。基盤の上で売れた商品の額の合計（流通総額）。基盤の売上ではない。</dd>
+      <dt id="g-option">オプション</dt><dd>商品の選べる軸（色・サイズなど）。1 商品 3 つまで。</dd>
+      <dt id="g-variant">バリエーション</dt><dd>オプションの値の組（白・M など）。価格・SKU・重さを持ち、売り買いの単位になる。</dd>
+      <dt id="g-inventory-item">在庫の品目</dt><dd>バリエーションと 1 対 1 の、在庫を数える対象。</dd>
+      <dt id="g-location">拠点</dt><dd>在庫を置く場所（倉庫・店舗）。在庫の数は拠点ごとに持つ。</dd>
+      <dt id="g-available">available</dt><dd>売れる数。引き当てで減る。</dd>
+      <dt id="g-reserved">reserved</dt><dd>支払いの途中のチェックアウトが、期限つきで押さえた数。</dd>
+      <dt id="g-committed">committed</dt><dd>注文に入り、まだ発送していない数。</dd>
+      <dt id="g-oversell">売り越し</dt><dd>確定した数が手元の在庫を超えること。謝罪と返金になる。</dd>
+      <dt id="g-hot-row">熱い行</dt><dd>更新が集中し、行のロックの待ちで処理が詰まる DB の行。</dd>
+      <dt id="g-slot">枠（slot）</dt><dd>熱い品目の在庫を複数の行に分けたもの。合計が品目の数。</dd>
+      <dt id="g-flash-sale">フラッシュセール</dt><dd>決めた時刻に限定品を売り出し、短い時間に注文が集中する販売。</dd>
+      <dt id="g-waiting-room">待合室</dt><dd>買い手を並ばせ、受けられる速さでチェックアウトへ入れる仕組み。</dd>
+      <dt id="g-queue-pass">許可証</dt><dd>待合室を通った買い手に出す、署名つき・期限つきの cookie。</dd>
+      <dt id="g-checkout">チェックアウト</dt><dd>カートから、配送先・支払いを決めて注文にするまでの手続きと、その状態を持つ行。</dd>
+      <dt id="g-snapshot">価格の写し</dt><dd>最終確認画面の金額（商品・送料・手数料・割引・税）を固定した記録。ハッシュで送信と照らす。</dd>
+      <dt id="g-stacking">組み合わせ</dt><dd>複数の割引を同じ注文に同時に使えるかの規則。</dd>
+      <dt id="g-allocation">按分</dt><dd>注文の単位の割引を、行や単位へ額の比で配ること。端数の配り方を決めておく。</dd>
+      <dt id="g-consumption-tax">消費税</dt><dd>商品・サービスの対価に掛かる税。標準税率 10%（地方消費税を含む）。</dd>
+      <dt id="g-reduced-rate">軽減税率</dt><dd>8% の税率。酒類・外食を除く飲食料品と、週 2 回以上発行の新聞の定期購読が対象。</dd>
+      <dt id="g-tax-inclusive">総額表示</dt><dd>消費者に示す価格を、消費税を含めた額で表示すること。</dd>
+      <dt id="g-invoice">適格請求書</dt><dd>インボイス。登録した事業者が出す、登録番号と税率ごとの税額を書いた請求書。</dd>
+      <dt id="g-simplified-invoice">適格簡易請求書</dt><dd>小売業などで出せる簡易なインボイス。宛名を省け、税率か税額の一方でよい。</dd>
+      <dt id="g-return-invoice">返還インボイス</dt><dd>適格返還請求書。返品・値引きで返す対価と税額を書く文書。</dd>
+      <dt id="g-registration-number">登録番号</dt><dd>適格請求書発行事業者の番号。<code>T</code> ＋ 13 桁。国税庁の公表サイトで確かめられる。</dd>
+      <dt id="g-auth">オーソリ</dt><dd>与信の確認。カードの利用枠を押さえるが、お金は動かない。</dd>
+      <dt id="g-capture">売上の確定</dt><dd>キャプチャ。オーソリした枠のうち請求する額を確定する。</dd>
+      <dt id="g-konbini">コンビニ払い</dt><dd>買い手が番号を持ってコンビニで払う手段。注文の後に入金を待つ。</dd>
+      <dt id="g-virtual-account">バーチャル口座</dt><dd>振込の受け取り専用に割り当てる口座番号。番号で振込人を特定する。</dd>
+      <dt id="g-fulfillment-order">配送の指示</dt><dd>fulfillment order。注文の行のうち、1 つの拠点から送る分の指示。</dd>
+      <dt id="g-shipment">配送</dt><dd>実際の発送 1 回。運送会社と追跡の番号を持つ。</dd>
+      <dt id="g-pod">ポッド</dt><dd>ショップの集まりを載せる、データストアを分けた単位。1 つの要求は 1 つのポッドだけに触れる。</dd>
+      <dt id="g-cell">セル</dt><dd>サービスのスタック一式の複製。障害と負荷を 1 つのセルに閉じ込める。この設計のポッドはセル。</dd>
+      <dt id="g-hot-set">熱い集まり</dt><dd>エッジの KeyValueStore に置く、要求の多いホスト → ショップ・ポッドの対応だけの集まり。</dd>
+      <dt id="g-logical-decoding">論理デコード</dt><dd>PostgreSQL の WAL から、行の変更を論理的な形で取り出す機能。論理レプリケーションの土台。</dd>
+      <dt id="g-theme">テーマ</dt><dd>ストアフロントの見た目を決める、テンプレート・設定・資産の一式。</dd>
+      <dt id="g-xss">XSS</dt><dd>クロスサイトスクリプティング。ページに他人のスクリプトを埋め込ませる攻撃。</dd>
+      <dt id="g-drop">drop</dt><dd>テンプレートに渡す、読める属性を決めたオブジェクト（商品・コレクションなど）。</dd>
+      <dt id="g-escape">文脈に応じたエスケープ</dt><dd>出力を置く場所（本文・属性・URL・スクリプト）ごとに、適したエスケープを自動で選ぶこと。</dd>
+      <dt id="g-generation">世代の番号</dt><dd>キャッシュの鍵に入れる、ショップごとに単調に増える数。上げると古いキャッシュに当たらなくなる。</dd>
+      <dt id="g-swr">stale-while-revalidate</dt><dd>期限切れのキャッシュを返しながら、裏で新しい応答を取りに行く HTTP の指定。</dd>
+      <dt id="g-scope">スコープ</dt><dd>アプリが読み書きできる範囲。事業者が導入の時に承認する。</dd>
+      <dt id="g-query-cost">クエリの費用</dt><dd>GraphQL の要求が読む量の見積もり。実行の前に計算し、上限と速さの制限に使う。</dd>
+      <dt id="g-leaky-bucket">リーキーバケット</dt><dd>一定の速さで回復する量を、要求ごとに引いて使う速さの制限の方式。</dd>
+      <dt id="g-hmac">HMAC</dt><dd>共有の秘密の鍵とハッシュ関数で作る、改ざん検知用の署名。</dd>
+      <dt id="g-function">関数</dt><dd>アプリがチェックアウトの決めた入口で動かす、WebAssembly のロジック（割引・送料など）。</dd>
+      <dt id="g-wasm">WebAssembly</dt><dd>ブラウザやサーバーで動く、移植できる命令の形式。メモリーが閉じていて砂場にしやすい。</dd>
+      <dt id="g-fuel">燃料</dt><dd>Wasmtime の、命令の実行ごとに減らす数。尽きると実行を止める。</dd>
+      <dt id="g-wasi">WASI</dt><dd>WebAssembly からファイル・時計・ネットワークなどを使うための標準の口。</dd>
+      <dt id="g-tokushoho">特定商取引法</dt><dd>通信販売などの取引の表示や契約の決まりを定める法律。</dd>
+      <dt id="g-keihyo">景品表示法</dt><dd>不当景品類及び不当表示防止法。誤認させる表示と過大な景品を規制する。</dd>
+      <dt id="g-double-price">二重価格表示</dt><dd>販売の価格と、それより高い比較の価格（通常の価格など）を並べて示すこと。</dd>
+      <dt id="g-appi">個人情報保護法</dt><dd>個人情報の取り扱いを定める法律。委託・第三者提供・漏えい等の報告などを決める。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「お金が合う」流れ（在庫 → チェックアウト → 割引と税 → 決済 → 注文）を読み、最後に分け方と拡張を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち（L1〜L10）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要な流れ A〜E、規模の段階、本家との違い</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/inventory-and-reservations.md">inventory-and-reservations.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/flash-sales-and-queueing.md">flash-sales-and-queueing.md</a> <span>— 引き当て、枠、待合室</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/cart-and-checkout.md">cart-and-checkout.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/payments-integration.md">payments-integration.md</a> <span>— 状態、完了の決定表、支払い待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/discounts-engine.md">discounts-engine.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/taxes-and-invoices.md">taxes-and-invoices.md</a> <span>— 按分、端数、インボイス</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/orders-and-fulfillment.md">orders-and-fulfillment.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/returns-and-refunds.md">returns-and-refunds.md</a> <span>— 配送の指示、返金の税</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/shops-and-pods.md">shops-and-pods.md</a> <span>— ポッド、振り分け、移し替え</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/storefront-themes.md">storefront-themes.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/storefront-api-and-caching.md">storefront-api-and-caching.md</a> <span>— テーマの言語、キャッシュの世代</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/app-platform-and-apis.md">app-platform-and-apis.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/webhooks.md">webhooks.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/functions-sandbox.md">functions-sandbox.md</a> <span>— 拡張の約束と上限</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/shopify/docs/decisions">decisions/</a> <span>— 特に 0002（ポッド）、0004（在庫）、0005（一回性）、0007（テーマ）、0008（砂場）、0017（税）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/architecture/data-model.md">data-model.md</a> <span>— 規約、ER 図、道筋、横断の不変条件</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
