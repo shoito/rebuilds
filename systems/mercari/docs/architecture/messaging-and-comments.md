@@ -170,7 +170,7 @@ flowchart TD
 | `send_time_pattern` | 送る時に、5.3 節の決定的な検査だけを、メモリーの中で行う。保存した本文を後から調べない。分類器に渡さない |
 | `send_time_pattern_and_classifier` | 上に加えて、文字の分類器の信号を T&S に渡す |
 
-- 本番の値は法務の結論の後に決める。結論までの既定は、[architecture/README.md](README.md) の 6 節の方針（規約の同意の範囲の検査だけ）に合わせ、`send_time_pattern` を規約の同意の文と一緒に用意する。ただし本番で有効にするのは L11 の確認の後（E12 の `abuse-filtering` の承認の条件）。
+- 本番の最終の値は法務の結論の後に決める。結論までは、[ADR-0047](../decisions/0047-send-time-abuse-filter-and-scan-modes.md) と [architecture/README.md](README.md) の 6 節の方針（規約の同意の範囲の検査だけ）のとおり、規約の同意の文と一緒に `send_time_pattern`（送る時の決定的な検査）で本番を始める。住所・電話番号の `block` を早くから効かせるため。分類器を足す `send_time_pattern_and_classifier` など、範囲を広げる値は L11 の確認の後に限る（E12 の `abuse-filtering` の承認の条件）。
 - 開発・検証の環境では `send_time_pattern_and_classifier` で試す。
 - どの値でも、住所・電話番号の `block`（NFR-014 の守り）を外す値を作らない。`none` を選ぶ結論になった場合は、住所の守りの方法（送る前の端末の中の検査など）を法務と再設計する（13 節）。
 

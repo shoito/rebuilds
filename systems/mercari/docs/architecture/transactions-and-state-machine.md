@@ -196,7 +196,7 @@ CREATE UNIQUE INDEX transactions_purchase_attempt
 
 ### 5.2 ロックの順
 
-- 出品の行と取引の行の両方に触れる関数（`purchaseListing`、取引の取り消し、完了）は、必ず **出品 → 取引** の順にロックする。遷移の関数は、取引の `listing_id`（変わらない）で先に `SELECT ... FROM listings WHERE id = $1 FOR UPDATE` を取ってから取引の行を取る。出品を書かない遷移（`paid` → `shipped` など）は取引の行だけを取る。
+- 出品の行と取引の行の両方に触れる関数（`purchaseListing`、取引の取り消し、完了）は、必ず **出品 → 取引** の順にロックする。遷移の関数は、取引の `listing_id`（変わらない）で先に `SELECT ... FROM listings WHERE listing_id = $1 FOR UPDATE` を取ってから取引の行を取る。出品を書かない遷移（`paid` → `shipped` など）は取引の行だけを取る。
 - 出品の編集（価格の変更、停止）は出品の行だけを取る。出品の編集と取引の遷移は、出品の行のロックで直列になる。デッドロックは順序で起きない。
 
 ### 5.3 例：1 つの出品に 5,000 件/秒
@@ -218,7 +218,7 @@ CREATE UNIQUE INDEX transactions_purchase_attempt
 
 ### 5.4 価格の変更と値下げ交渉
 
-- 売り手は `on_sale` の出品だけ価格を変えられる。変更は `UPDATE listings SET price = $new, version = version + 1 WHERE id = $1 AND status = 'on_sale' AND version = $v` で、outbox に `listing.price_changed`（下げたら `listing.price_dropped` も）を書く。
+- 売り手は `on_sale` の出品だけ価格を変えられる。変更は `UPDATE listings SET price = $new, version = version + 1 WHERE listing_id = $1 AND status = 'on_sale' AND version = $v` で、outbox に `listing.price_changed`（下げたら `listing.price_dropped` も）を書く。
 - 値下げ交渉は商品のコメントで行い、合意の後に売り手が価格を変える。本システムは交渉の合意を記録しない（MVP）。
 - 価格の変更と購入が同時に来たら、出品の行のロックで一方が先になる。
 

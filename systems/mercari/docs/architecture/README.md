@@ -188,7 +188,7 @@ flowchart TB
 
 1. 人気の出品が出た直後に、数千人が「購入」を押す。アプリは（`listing_id`、見た `price`、見た `listing_version`、支払いの方法、購入の試行の ID）を送る。
 2. `transactions` は Valkey の出品の写し（`listing:{id}:snap`）を読み、販売中でなければすぐに「売り切れ」を返す。販売中なら `SET purchase:{listing_id} <attempt_id> NX PX 15000` を試し、取れなければ「手続き中」を返す（p99 200ms）。Valkey が使えなければ、この段を飛ばし、出品ごと・タスクごとの同時実行 4（タスク 12 で DB に届くのは 1 出品 48 件まで）と `lock_timeout` 200ms で DB へ進む（正しさは DB が守る。[ADR-0026](../decisions/0026-hot-listing-purchase-admission.md)）。
-3. 印を取った要求は、core の 1 つのトランザクションで、`UPDATE listings SET status = 'trading', version = version + 1 WHERE id = $1 AND status = 'on_sale' AND version = $2 AND price = $3` を行う。1 行を更新できたら、取引の行（`state = 'created'`）を挿入する。取引の表の部分一意の索引（`listing_id` に、終わっていない状態の行は 1 つ）が、最後の守りになる。outbox に `transaction.created` を書く。
+3. 印を取った要求は、core の 1 つのトランザクションで、`UPDATE listings SET status = 'trading', version = version + 1 WHERE listing_id = $1 AND status = 'on_sale' AND version = $2 AND price = $3` を行う。1 行を更新できたら、取引の行（`state = 'created'`）を挿入する。取引の表の部分一意の索引（`listing_id` に、終わっていない状態の行は 1 つ）が、最後の守りになる。outbox に `transaction.created` を書く。
 4. 更新が 0 行なら、価格・バージョンの違い（409、新しい価格を返す）か、売り切れを返す。
 5. 支払いは C へ。支払いが失敗・期限切れなら、取引を `cancelled`・`payment_expired` にし、出品を `on_sale` に戻す（同じトランザクション。出品のバージョンを上げ、先着の印を比べて消す）。発送の後の取り消しでは、出品を `paused` に戻す（[ADR-0027](../decisions/0027-cancellation-rules-and-listing-restoration.md)、DT-LST-001 の行 7a）。
 

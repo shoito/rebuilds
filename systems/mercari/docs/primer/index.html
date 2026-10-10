@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mercari の前提知識</title>
+<meta name="description" content="Mercari の再構築の設計の文書を読む前に知っておくとよい、C2C のフリマの登場人物、取引の流れと期限、一品の一回の購入、預かりと複式簿記の台帳、売上金・ポイント・振込、資金決済法の枠組み、匿名の配送と住所の金庫、日本語の検索と保存した検索、価格の提案、T&amp;S、評価、本人確認、日本の法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Mercari · 前提知識</p>
+    <h1>フリマアプリの設計を読む前に</h1>
+    <p class="lead">個人どうしの売買（C2C）の登場人物、取引の流れと期限、「一品は一回だけ売る」の難しさ、代金の預かりと複式簿記の台帳、売上金・ポイント・振込、資金決済法の枠組み、匿名の配送と住所の金庫、日本語の検索と保存した検索、価格の提案、偽ブランドと写真の使い回しの検出、メッセージの悪用と通信の秘密、評価、本人確認、日本の法令の枠組みを、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>に、カード決済と台帳の基礎は <a href="../../../stripe/docs/primer/index.html">Stripe の資料</a>に、熱い行とコンビニ払いは <a href="../../../shopify/docs/primer/index.html">Shopify の資料</a>に、モデレーションの基礎は <a href="../../../x/docs/primer/index.html">X の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Mercari · 前提知識</p>
+    <h2>フリマアプリの設計を読む前に</h2>
+    <p class="lead">二人に売らず、預かったお金は 1 回だけ動き、住所を相手に見せない仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="product">
+    <h2>フリマアプリは何をするサービスか</h2>
+    <p>Mercari は、個人が家の使わない品をスマートフォンで出し、知らない個人に売る <a class="t" href="#g-c2c">C2C</a> のフリマです。本家の日本のマーケットプレイスの月間の利用者は 2,419 万人（2026 年 6 月期の第 4 四半期）です。運営は代金を預かり、取引が終わると、販売の手数料（10%）を引いて売り手に渡します。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>売り手</h3><p>写真を撮り、題名・状態・価格を決めて<a class="t" href="#g-listing">出品</a>します。初めて売る人が多く、相場がわかりません。</p></div>
+      <div class="card" data-frag><h3>買い手</h3><p>中古の品を安く探します。相場を調べる人、欲しい品の新着を待つ人がいます。</p></div>
+      <div class="card" data-frag><h3>運用者・CS</h3><p>問い合わせ、取引への介入（取り消し・返金・売上金の保留）、出品の審査、偽ブランドの確かめをします。</p></div>
+    </div>
+    <div class="compare">
+      <div class="bad"><h3>B2C の EC（Shopify など）</h3><p>事業者が在庫を数で持ち、同じ品を何個も売ります。売り手は事業者で、住所と名前を表示します。代金は事業者に入ります。</p></div>
+      <div class="good"><h3>C2C のフリマ</h3><p>1 つの出品は 1 点だけで、売れたら終わりです。売り手も買い手も個人で、互いに信用できず、住所も知られたくありません。だから運営が<strong>代金を預かり</strong>、<strong>配送を匿名にし</strong>、<strong>取引の状態と期限</strong>を管理します。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/intent.md">intent.md</a> の Problem と 7 つの価値、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/README.md">architecture/README.md</a> の 1.4 節（本家の形と、意図した違い）。</small></p>
+  </section>
+
+  <section class="s" id="lifecycle">
+    <h2>取引の流れと期限</h2>
+    <p>購入から完了まで、どの段にも期限があります。期限を過ぎると、システムが自動で次の状態に進めます。値はこの設計の既定で、本家に寄せたものと本システムの値があります。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>購入</strong>：買い手が「購入」を押し、<a class="t" href="#g-transaction">取引</a>ができます。出品は「取引中」になり、他の人は買えません。</li>
+        <li><strong>支払い</strong>：カードは購入の時に<a class="t" href="#g-capture">売上を確定</a>します（期限 30 分）。<a class="t" href="#g-konbini">コンビニ払い</a>は、購入日を含む 3 日目の 23:59:59 までに入金を待ちます（本家に寄せた値）。</li>
+        <li><strong>発送</strong>：売り手は選んだ「発送までの日数」（1〜2・2〜3・4〜7 日）の上限の翌日の 23:59:59 までに発送します。運送会社の引き受けで「発送済み」になります。</li>
+        <li><strong>配達</strong>：運送会社が「配達済み」を知らせます。ただし、これだけでは取引は進み切りません。</li>
+        <li><strong><a class="t" href="#g-receipt">受取評価</a></strong>：買い手が中身を確かめて「受け取った」と評価します。しなければ、発送の 9 日後の 13:00 に<a class="t" href="#g-auto-complete">自動の完了</a>が働きます。</li>
+        <li><strong>売り手の評価 → 完了</strong>：売り手が買い手を評価すると完了です。受取評価から 72 時間で、評価なしでも完了します（本システムの値）。完了で、預かった代金が売り手の<a class="t" href="#g-proceeds">売上金</a>になります。</li>
+      </ol>
+    </div>
+    <p>途中で問題が報告されると<a class="t" href="#g-dispute">紛争</a>になり、期限は止まります。運用の判断で再開すると、止めた時間だけ期限を後ろにずらします。期限はプロセスのタイマーでなく、DB の列と 1 分ごとの <a class="t" href="#g-deadline-runner"><code>deadline-runner</code></a> で動かします。</p>
+    <p class="doc-only"><small>設計で効くところ：期限の表と例は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/transactions-and-state-machine.md">transactions-and-state-machine.md</a> の 7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0025-transaction-decision-table-and-deadline-pause.md">ADR-0025</a>。キャンセルの規則は同じ文書の 8 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0027-cancellation-rules-and-listing-restoration.md">ADR-0027</a>。</small></p>
+  </section>
+
+  <section class="s" id="states">
+    <h2>取引の状態の機械</h2>
+    <p>取引は明示の状態を持ち、遷移は 1 つの遷移の関数と決定表（DT-TXN-001、38 行）だけが書きます。下の図は主な遷移だけを描いたものです。</p>
+    <pre class="mermaid">stateDiagram-v2
+    [*] --> created: 購入
+    created --> paid: 支払いの成功
+    created --> payment_expired: 支払いの期限
+    created --> cancelled: 支払いの失敗
+    paid --> shipped: 運送会社の引き受け
+    paid --> cancelled: 合意の取り消し
+    shipped --> delivered: 配達済み
+    shipped --> received: 受取評価・自動の完了
+    delivered --> received: 受取評価・自動の完了
+    received --> completed: 売り手の評価・期限
+    shipped --> disputed: 問題の報告
+    delivered --> disputed: 問題の報告
+    disputed --> shipped: 続ける
+    disputed --> cancelled: 返金
+    completed --> [*]
+    cancelled --> [*]
+    payment_expired --> [*]</pre>
+    <ul>
+      <li data-frag>状態には順位があります（<code>created</code> 0 &lt; <code>paid</code> 1 &lt; … &lt; <code>completed</code> 5）。遅れて届いた事象で、後ろに戻しません。</li>
+      <li data-frag>出品にも別の状態の機械があります（<code>on_sale</code> → <code>trading</code> → <code>sold</code> など 9 つ）。取引が取り消されると、発送の前なら <code>on_sale</code>、後なら <code>paused</code> に戻ります。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">運送会社から「配達済み」の事象が届きました。取引を完了にして、売り手に売上金を渡してよいですか？</p>
+      <div class="opts">
+        <button>よい。品は買い手に届いている</button>
+        <button>よくない。配達済みは受取評価の代わりにしない。買い手の受取評価か、発送の 9 日後の自動の完了を待つ</button>
+        <button>よい。ただし 24 時間待ってから</button>
+      </div>
+      <p class="why">届いた品が説明と違うことがあります。買い手が中身を確かめる時間を残すため、配達済みは受取評価を促すだけです（ADR-0002・ADR-0006、決定表の行 31・32）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/transactions-and-state-machine.md">transactions-and-state-machine.md</a> の 4 節（全部の遷移）と 6 節（決定表）、出品の状態は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0011-listing-state-machine-and-versions.md">ADR-0011</a>。</small></p>
+  </section>
+
+  <section class="s" id="single-purchase">
+    <h2>一品は一回だけ売る</h2>
+    <p>限定品が出た直後の 1 秒に、数千人が「購入」を押します。在庫が 1 個しかない<a class="t" href="#g-hot-listing">人気の出品</a>で、二人に売ると片方への謝罪と返金になります。この設計は 3 段で守ります。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong><a class="t" href="#g-first-come">先着の印</a></strong>（Valkey）：<code>SET purchase:{id} &lt;attempt&gt; NX PX 15000</code>。取れた 1 件だけを DB へ通し、残りにすぐ「手続き中」を返します。流量を絞るだけで、正本ではありません。</li>
+        <li><strong><a class="t" href="#g-conditional-update">条件つきの更新</a></strong>：<code>UPDATE listings SET status = 'trading' … WHERE status = 'on_sale' AND version = $seen AND price = $seen</code>。1 行を更新できた要求だけが、同じトランザクションで取引を挿入します。</li>
+        <li><strong><a class="t" href="#g-partial-unique">部分一意の索引</a></strong>：取引の表に「<code>listing_id</code> ごとに、終わっていない取引は 1 つ」の索引を張ります。最後の守りです。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">「<code>SELECT status</code> で <code>on_sale</code> を確かめてから、取引を挿入する」は、同時の購入に安全ですか？</p>
+      <div class="opts">
+        <button>安全。確かめてから挿入している</button>
+        <button>安全。Valkey の先着の印があるので DB は 1 件しか来ない</button>
+        <button>安全でない。確かめた後に別の要求が割り込める。条件つきの 1 文の更新と部分一意の索引で、DB が守る</button>
+      </div>
+      <p class="why">READ COMMITTED では、読んだ値は更新の時に変わっていることがあります。Valkey の印は障害や期限切れで失われうるので、正しさは DB だけが守ります（ADR-0002・ADR-0026、NFR-003）。</p>
+    </div>
+    <p>行のロックの待ちが詰まる仕組みは <a href="../../../shopify/docs/primer/index.html#hot-rows">Shopify の資料の「熱い行」</a>にあります。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/transactions-and-state-machine.md">transactions-and-state-machine.md</a> の 5 節（SQL と 5,000 件/秒の例）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0002-transaction-state-machine-and-single-purchase.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0026-hot-listing-purchase-admission.md">ADR-0026</a>。</small></p>
+  </section>
+
+  <section class="s" id="escrow">
+    <h2>預かりと複式簿記：3,000 円の例</h2>
+    <p>運営は、買い手の代金を取引ごとの<a class="t" href="#g-escrow">預かり</a>の口座（<code>escrow:&lt;取引&gt;</code>）に置きます。完了で売り手へ振り替え（<a class="t" href="#g-release">release</a>）、取り消しで買い手へ戻します（<a class="t" href="#g-refund">refund</a>）。どちらか一方が 1 回だけ起きます。お金は<a class="t" href="#g-double-entry">複式簿記</a>の<a class="t" href="#g-journal">仕訳</a>で動かします（考え方は <a href="../../../stripe/docs/primer/index.html#ledger">Stripe の資料</a>）。</p>
+    <p>例：価格 3,000 円、カード、販売の手数料 10%（1 円未満は切り捨て）、売り手の負担の送料 210 円。</p>
+    <table>
+      <tr><th>事象</th><th>借方</th><th>貸方</th></tr>
+      <tr data-frag><td>カードの確定（hold）</td><td><code>psp_receivable</code> 3,000</td><td><code>escrow:T1</code> 3,000</td></tr>
+      <tr data-frag><td>完了（release）</td><td><code>escrow:T1</code> 3,000</td><td><code>seller_proceeds</code> 2,490・<code>fee_revenue:sales</code> 300・<code>shipping_payable</code> 210</td></tr>
+      <tr data-frag><td>振込の申請</td><td><code>seller_proceeds</code> 2,490</td><td><code>payout_in_transit</code> 2,290・<code>fee_revenue:payout</code> 200</td></tr>
+    </table>
+    <p>どの仕訳も借方と貸方の和が等しく、預かりは決着で 0 になります。提供者の手数料（例 3.6% で 108 円）を引くと、運営の手元に 392 円が残ります。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">売上金はどう持つのがよいですか？</p>
+      <div class="opts">
+        <button><code>users.proceeds</code> の列を、完了で足し、振込で引く</button>
+        <button>取引の行に「売り手に渡した額」の列を持ち、その和を売上金とする</button>
+        <button>追記だけの仕訳の和として持ち、release は冪等キーと一意の制約で取引ごとに 1 回に限る</button>
+      </div>
+      <p class="why">列の書き換えは、再試行で二重に足したり、誰がいつ動かしたかを失ったりします。仕訳は <code>(source_type, source_id, event)</code> で一意、決着は <code>escrow_settlements</code> の 1 行で排他にします。売上金はさらに入った単位のロットで持ちます（次の節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：6 段の完全な例と口座 22・仕訳の型 30 は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/ledger-and-proceeds.md">ledger-and-proceeds.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0003-escrow-and-double-entry-ledger.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0034-chart-of-accounts-journal-types-and-fee-rounding.md">ADR-0034</a>。カードを購入の時に確定する理由は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0005-payments-via-providers-and-capture-at-purchase.md">ADR-0005</a>、コンビニ払いは <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0031-konbini-pending-payments-and-late-payments.md">ADR-0031</a>。</small></p>
+  </section>
+
+  <section class="s" id="proceeds">
+    <h2>売上金・ポイント・振込</h2>
+    <p>売り手のお金は 3 つの種類に分けて持ちます。売上金（<code>proceeds</code>）、期限のない<a class="t" href="#g-balance">残高</a>（<code>balance</code>）、<a class="t" href="#g-points">ポイント</a>（<code>points</code>）です。</p>
+    <div class="tabs">
+      <div data-tab="売上金と期限"><p>本家の売上金には、振込の申請の期限 180 日があります。本人確認を済ませると期限のない「残高」になります。期限の後は登録した口座へ自動で振り込み（1 回 200 円、2 回まで）、口座がないか 200 円以下なら失効します。</p><p>この設計は、売上金を入った単位の<a class="t" href="#g-lot">ロット</a>で持ち、期限の近い順に使います。期限・失効・残高への移し替えは <a class="t" href="#g-legal-config"><code>legal.*</code></a> の値で動かし、<strong>本番の既定はすべて無効</strong>です（法務の確認待ち L1）。</p></div>
+      <div data-tab="ポイントと使う順"><p>ポイントは付与ごとのロットで、売上金と別の口座です。MVP は運営が付けるポイントだけで、買えず、振り込めず、譲れません。</p><p>購入で使う順は固定です：ポイント（期限の近い順）→ 売上金 → 残高 → カード・コンビニ払い。期限の近いお金から使うので、失効が少なくなります。</p></div>
+      <div data-tab="振込"><p>振込は 1 回 200 円です。申請を銀行の営業日の 08:30〜14:30 に 30 分ごとにまとめ、提携銀行の総合振込の API で依頼します。API が 30 分使えなければ、<a class="t" href="#g-zengin">全銀の形式</a>（120 バイトの固定長）のファイルに切り替えます。</p><p>依頼の時点で口座に入れられなければ、手数料ごと戻します。完了の後の<a class="t" href="#g-kumimodoshi">組戻し</a>は、振り込んだ額だけを戻します。</p></div>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：ロットと 180 日の例は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/ledger-and-proceeds.md">ledger-and-proceeds.md</a> の 6 節と <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0035-proceeds-lots-expiry-and-kyc-conversion.md">ADR-0035</a>。振込とポイントは <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/payouts-and-points.md">payouts-and-points.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0038-payout-batching-execution-and-failure-handling.md">ADR-0038</a>〜<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0040-balance-spend-order-and-reservation.md">ADR-0040</a>。銀行への振込の一般は <a href="../../../stripe/docs/primer/index.html#payouts">Stripe の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="payments-law">
+    <h2>資金決済法の枠組み（法務の確認待ち）</h2>
+    <p>「代金を預かって売り手に渡す」「売上金を残しておき、次の買い物や振込に使う」「ポイントを付ける」は、資金決済法のどの枠組みに当たるかで、義務が大きく変わります。設計は結論を出さず、どの結論にも合わせられる口座の種類と <code>legal.*</code> の値を用意しています。以下は<strong>すべて法務の確認待ち（L1）</strong>です。</p>
+    <div class="tabs">
+      <div data-tab="収納代行"><p><a class="t" href="#g-shuno">収納代行</a>は、売り手（債権者）の代わりに代金を受け取り、売り手に渡す形です。売上金は売り手への支払いの債務になります。この形なら、売上金を長く持ち続けないこと（期限、自動の振込）が求められうる、と設計は見ています。</p></div>
+      <div data-tab="資金移動業"><p><a class="t" href="#g-shikin-ido">資金移動業</a>は、銀行以外が送金を業として行うための登録の制度です。利用者の資金の保全（供託・保証・信託）、送金の額の上限、<a class="t" href="#g-hanshu">犯罪収益移転防止法</a>の取引時確認が関わります。売上金を「送金・支払いに使える資金」として持つなら、この枠組みが候補になります。</p></div>
+      <div data-tab="前払式支払手段"><p><a class="t" href="#g-prepaid">前払式支払手段</a>は、先にお金を払って得る価値（買ったポイントなど）です。発行者の店だけで使える自家型と、他でも使える第三者型があります。基準日の未使用の残高が 1,000 万円を超えると、その半額以上を保全します。売上金からポイントへの交換がこれに当たるかが論点です。</p></div>
+      <div data-tab="2025 年の改正"><p>2025 年の資金決済法の改正で、<strong>国境を跨ぐ収納代行</strong>（自身が関与しない取引の決済のために国際送金を行う収納代行業者）に、資金移動業の規制を適用することになりました。国内の収納代行の一般の扱いは変えていません（金融庁の説明資料、2025 年 3 月）。施行の日は報道と解説でだけ確かめています（未検証）。</p></div>
+    </div>
+    <div class="callout warn">本家がどの会社のどの登録で売上金を持つかは、公式の資料で確かめられていません（未検証）。この節は枠組みだけで、本システムへの当てはめは決まっていません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0004-proceeds-model-under-payment-services-act.md">ADR-0004</a>（枠組みごとの設計への影響と、結論ごとの移し方）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/intent.md">intent.md</a> の L1 と出典。</small></p>
+  </section>
+
+  <section class="s" id="shipping">
+    <h2>匿名の配送と住所の金庫</h2>
+    <p>本家の専用の配送の商品（運送会社 2 社）では、売り手にも買い手にも相手の住所・氏名・電話番号が見えません。設計では <code>&lt;Brand&gt;便</code> と書きます。仕組みは、運送会社が<strong>運営から宛先を受け取り、売り手には QR だけを渡す</strong>ことです。</p>
+    <div class="stepper">
+      <ol>
+        <li>購入の時に、買い手の配送先と売り手の差出人を、配送ごとの写しにします。利用者ごとの鍵で<a class="t" href="#g-envelope">封筒の暗号化</a>をした<a class="t" href="#g-address-vault">住所の金庫</a>に置きます。</li>
+        <li>売り手がサイズを選んで発送の手続きをすると、<code>shipping</code> だけが住所を復号し、運送会社の API に匿名の配送の受け付けを依頼します。</li>
+        <li>運送会社は受け付けの番号と QR を返します。売り手の画面には QR だけを出し、配送先は出しません。</li>
+        <li>売り手は営業所・コンビニ・宅配ボックスで QR を読ませて差し出します。</li>
+        <li>買い手には、運送会社と追跡の番号だけを知らせます。</li>
+      </ol>
+    </div>
+    <p>復号は <code>openAddress(purpose, subject)</code> の 1 つの関数だけが、目的のコードを付けて行い、すべて監査に残します。CS の通常の権限では住所を見られません。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">匿名の配送で、売り手は発送のために買い手の住所を見ますか？</p>
+      <div class="opts">
+        <button>見ない。運営が運送会社の API に宛先を渡し、売り手は QR を読ませるだけ</button>
+        <button>見る。宛名を書くのに必要</button>
+        <button>都道府県だけ見る</button>
+      </div>
+      <p class="why">取引の画面・API・通知・メッセージのどこにも、相手の住所・氏名・電話番号・都道府県を出しません（NFR-014）。運送会社への渡し方（委託か第三者提供か）は法務の確認待ち（L5）です。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/shipping-integrations.md">shipping-integrations.md</a> の 6・7 節（QR の流れ、復号の目的、漏れの経路）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0044-address-vault-snapshots-and-access.md">ADR-0044</a>、鍵の形は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0069-key-layout-and-vault-envelope-encryption.md">ADR-0069</a>。</small></p>
+  </section>
+
+  <section class="s" id="carrier-events">
+    <h2>運送会社の事象は、順序どおりに届かない</h2>
+    <p>運送会社の Webhook は遅れ、重複し、順序が入れ替わります。設計は事象を 5 段の<a class="t" href="#g-carrier-rank">順位</a>に写し、配送の行の <code>max_rank</code> より高い事象だけで前に進めます。重複は <a class="t" href="#g-inbox">inbox</a> の一意の鍵で捨てます。</p>
+    <p><code>label_created</code> 0 &lt; <code>accepted</code> 1 &lt; <code>in_transit</code> 2 &lt; <code>out_for_delivery</code> 3 &lt; <code>delivered</code> 4。紛失・破損などの例外は順位の外で、運用の待ち行列に入れます。</p>
+    <table>
+      <tr><th>受け取り</th><th>事象（運送会社の時刻）</th><th>処理</th></tr>
+      <tr data-frag><td>10/13 09:10</td><td><code>in_transit</code>（10/13 08:00）</td><td>引き受けが欠けている。<code>accepted</code> を補って <code>shipped</code> にし、自動の完了を 10/22 13:00 にする</td></tr>
+      <tr data-frag><td>10/13 09:11</td><td><code>accepted</code>（10/12 17:40）</td><td>順位が低いので記録だけ。期限を前に動かさない</td></tr>
+      <tr data-frag><td>10/14 11:30</td><td><code>delivered</code></td><td>4 に進め、取引を <code>delivered</code> にする</td></tr>
+      <tr data-frag><td>10/14 11:31</td><td><code>delivered</code>（同じ）</td><td>inbox で重複として捨てる</td></tr>
+    </table>
+    <p>Webhook が来ないときに備え、引き受けの後 6 時間ごとと、自動の完了の 24 時間前に照会します。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/shipping-integrations.md">shipping-integrations.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0006-shipping-orchestration-via-carriers.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0042-carrier-event-ranking-and-implied-acceptance.md">ADR-0042</a>。</small></p>
+  </section>
+
+  <section class="s" id="search">
+    <h2>日本語の検索、売れた品、価格の提案</h2>
+    <p>日本語は単語の間に空白がないので、索引には分かち書きが要ります（N-gram と形態素解析の基礎は <a href="../../../x/docs/primer/index.html#search">X の資料</a>）。この設計は <a class="t" href="#g-sudachi">Sudachi</a> の 2 つの<a class="t" href="#g-split-mode">分割の単位</a>と、題名の <a class="t" href="#g-bigram">2-gram</a> を組み合わせます。</p>
+    <table>
+      <tr><th>欄</th><th>「ワイヤレスイヤホン」の分け方</th><th>効くとき</th></tr>
+      <tr><td>C の単位（長い）</td><td>ワイヤレスイヤホン（辞書による）</td><td>複合語のまま探す</td></tr>
+      <tr><td>B の単位（中くらい）</td><td>ワイヤレス／イヤホン</td><td>「イヤホン ワイヤレス」と順を変えて探す</td></tr>
+      <tr><td>2-gram（かなをカタカナに揃える）</td><td>ワイ／イヤ／ヤレ／…</td><td>「がんぷら」で「ガンプラ」を引く</td></tr>
+    </table>
+    <p>索引には販売中の品と、<a class="t" href="#g-sold-items">売れた品</a>（売れてから 365 日）を入れます。既定の検索は販売中だけで、売れた品は相場を調べるために使います。</p>
+    <p><a class="t" href="#g-price-suggestion">価格の提案</a>は、同じカテゴリ・ブランド・状態の直近 90 日の売れた価格の<a class="t" href="#g-percentile">四分位</a>です。20 件に満たなければ条件を外して広げます（4 段）。例：22 件を安い順に並べ、h = (n − 1)p + 1 で位置を出します。</p>
+    <ul>
+      <li data-frag>p25：h = 6.25 → 6 番目 2,400 円と 7 番目 2,480 円の間の 25% → 2,420 円</li>
+      <li data-frag>p50：h = 11.5 → 2,980 円と 3,000 円の中間 → 2,990 円</li>
+      <li data-frag>p75：h = 16.75 → 3,400 円と 3,600 円の間の 75% → 3,550 円</li>
+    </ul>
+    <p>1 人の売り手は 5 件までしか数えず、措置した出品を除きます。提案は参考で、価格を自動で変えません。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/search-and-discovery.md">search-and-discovery.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0018-search-index-layout-and-japanese-analysis.md">ADR-0018</a>。価格の提案は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/categories-brands-and-pricing-suggestions.md">categories-brands-and-pricing-suggestions.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0016-price-suggestion-from-sold-percentiles.md">ADR-0016</a>。</small></p>
+  </section>
+
+  <section class="s" id="saved-search">
+    <h2>保存した検索と逆索引</h2>
+    <p>買い手は検索の条件を保存し（1 人 30 件）、合う品が出たら通知を受けます。新しい出品は 1 日 30 万件、保存した検索は 2,000 万件（S1）です。出品ごとに全件を当てると、1 日 6 兆回になります。そこで、保存した検索を<a class="t" href="#g-match-key">照合の鍵</a>で引ける<a class="t" href="#g-inverted-index">逆索引</a>に入れます。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>保存の時</strong>：条件 s =（カテゴリ イヤホン 1203、ブランド 88・91、語「未開封」）。取りうる鍵の組は {<code>cb:1203:88</code>, <code>cb:1203:91</code>}（出品の流量 1 日 190 件）か {<code>t:未開封</code>}（4,000 件）。流量の少ない前者を選び、逆索引に入れます。</li>
+        <li><strong>出品の時</strong>：出品「【未開封】ワイヤレスイヤホン」（カテゴリ 7 &gt; 71 &gt; 1203、ブランド 88）は、祖先のカテゴリとブランドの鍵 <code>cb:1203:88</code>・<code>cb:71:88</code>・<code>b:88</code>・<code>c:1203</code> と、全欄の語の鍵 <code>t:…</code> を全部出します。</li>
+        <li><strong>候補を引く</strong>：鍵ごとに保存した検索を引くと、候補は約 2.7 万件です。s も <code>cb:1203:88</code> で引けます。</li>
+        <li><strong>全条件を当てる</strong>：価格・状態・語を当てて約 1,280 件の一致に絞ります（1 件 1.5µs）。</li>
+        <li><strong>まとめて送る</strong>：利用者ごとに 3 分の窓でまとめ、1 窓 1 通。1 人 1 日 20 通まで。送る前に、売り切れ・措置した出品を外します。</li>
+      </ol>
+    </div>
+    <p>出品は自分の取りうる鍵を全部出すので、保存した検索がどの鍵を選んでも取りこぼしません（PROP-SS-001）。鍵の選び方は速さだけを変えます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/saved-searches-and-alerts.md">saved-searches-and-alerts.md</a> の 5・6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0022-saved-search-match-keys-and-inverted-index.md">ADR-0022</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0023-saved-search-alert-windows-and-caps.md">ADR-0023</a>。</small></p>
+  </section>
+
+  <section class="s" id="trust-safety">
+    <h2>偽ブランド・禁止の品・盗品と、写真の使い回し</h2>
+    <p>C2C では、<a class="t" href="#g-counterfeit">偽ブランド</a>、法令で売れない品（医薬品・チケットの不正転売など）、盗品が混ざります。モデレーションの一般の段（報告・審査・措置）は <a href="../../../x/docs/primer/index.html#ts">X の資料</a>にあります。この設計の段は次のとおりです。</p>
+    <pre class="mermaid">flowchart LR
+  A["同期の検査<br>p95 2 秒"] --> B["非同期の分類器<br>点と理由のコード"]
+  B --> C["規則のエンジン<br>allow・review・hold・block"]
+  C --> D["人の審査"]
+  D --> E["措置の記録<br>moderation_actions"]
+  E --> F["60 秒以内に<br>検索・通知から消す"]</pre>
+    <p>分類器の点は信号で、決定ではありません。措置は規則と人が記録してから効かせます。</p>
+    <p>他人の写真を使い回す出品は、<a class="t" href="#g-phash">知覚ハッシュ</a>で見つけます。64 ビットの pHash は、縮小や再圧縮では数ビットしか変わりません。違うビットの数（<a class="t" href="#g-hamming">Hamming 距離</a>）が近さです。</p>
+    <ul>
+      <li data-frag>pHash を 16 ビットずつ 4 つの帯に分けて索引に入れ、どれかの帯が同じ写真を候補にします。</li>
+      <li data-frag>違うビットが 3 つ以下なら、変わる帯は 3 つ以下なので、少なくとも 1 つの帯は同じです（鳩の巣）。だから距離 3 以下は必ず見つかります。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> の 11 節（盗品は法務の確認待ち L6、禁止の品は L10）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0009-trust-and-safety-pipeline-boundary.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0053-counterfeit-detection-signals-and-brand-profiles.md">ADR-0053</a>、ハッシュは <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0012-photo-pipeline-and-perceptual-hashes.md">ADR-0012</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0013-photo-reuse-index.md">ADR-0013</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0054-photo-hash-block-list.md">ADR-0054</a>。</small></p>
+  </section>
+
+  <section class="s" id="messages">
+    <h2>メッセージの悪用と通信の秘密</h2>
+    <p>取引のメッセージやコメントで、「直接振り込んでくれれば安くします」と<a class="t" href="#g-off-platform">外部の取引に誘う</a>人がいます。預かりの外で払うと、品が届かなくても運営は返金できません。連絡先や住所の交換も、匿名の配送を壊します。</p>
+    <p>そこで送る時に、決定的な検査をメモリーの中で行います。検出の前に、すり抜けの書き方を正規化します。</p>
+    <div class="compare">
+      <div class="bad"><h3>送られた文</h3><p>「ぜろきゅうぜろ‐１２３４‐５６７８ に連絡を」「abc アットマーク example ドット com」</p></div>
+      <div class="good"><h3>正規化の後</h3><p>「09012345678」「abc@example.com」→ 電話・メールとして <code>block</code>。記録は理由のコードだけで、一致した文字は残しません。</p></div>
+    </div>
+    <p>ただし取引のメッセージは 2 者の間の通信で、機械で中身を調べることは<a class="t" href="#g-secrecy">通信の秘密</a>と関わります（考え方は <a href="../../../gmail/docs/primer/index.html#secrecy">Gmail の資料</a>）。調べてよい範囲・同意の取り方・運用者が本文を見る条件は<strong>法務の確認待ち（L11）</strong>です。設計は範囲を <code>legal.message_scan_mode</code>（<code>none</code>・<code>send_time_pattern</code>・<code>send_time_pattern_and_classifier</code>）で切り替えられるようにし、分類器は公開のコメントだけに当てます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/messaging-and-comments.md">messaging-and-comments.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0047-send-time-abuse-filter-and-scan-modes.md">ADR-0047</a>。</small></p>
+  </section>
+
+  <section class="s" id="ratings">
+    <h2>評価と信用：完了まで伏せる</h2>
+    <p>取引ごとに、買い手と売り手が互いを評価します（この設計は <code>good</code>・<code>normal</code>・<code>bad</code> の 3 段。本家は 2 段）。買い手の評価は受取評価と同時に付けます。どちらの評価も<a class="t" href="#g-sealed">伏せて</a>書き、完了の遷移と同じトランザクションで同時に公開します。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">買い手が付けた評価を、すぐ売り手に見せてよいですか？</p>
+      <div class="opts">
+        <button>よい。早く見せたほうが透明</button>
+        <button>よくない。先に相手の評価を見ると、仕返しの評価や評価を盾にした交渉が起きる。完了まで伏せて同時に公開する</button>
+        <button>よい。ただし <code>bad</code> だけ伏せる</button>
+      </div>
+      <p class="why">本家も、受取評価だけの間は中身を見られず、完了の時に互いの評価を同時に公開します（ADR-0049）。出した評価は直せず、外すのは T&amp;S の措置だけです。</p>
+    </div>
+    <p>画面に出すのは評価の数と本人確認の印だけです。内部の信用の点は、評価の少ない人が極端な値にならないよう、良い 95% を 10 件分足して平らにします：R = (Σ重み × 良さ + 10 × 0.95) / (Σ重み + 10)。例：完了の取引が 3 件未満の相手（重み 0.5）3 人から <code>good</code> を 1 件ずつなら R = (1.5 + 9.5) / 11.5 ≒ 0.957 です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/ratings-and-reputation.md">ratings-and-reputation.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0049-mutual-ratings-sealed-until-completion.md">ADR-0049</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0050-reputation-score-and-manipulation-review.md">ADR-0050</a>。評価の表示と景品表示法は法務の確認待ち（L4）。</small></p>
+  </section>
+
+  <section class="s" id="ekyc">
+    <h2>本人確認（eKYC）の水準</h2>
+    <p><a class="t" href="#g-ekyc">eKYC</a> は、スマートフォンだけで本人確認をすることです。この設計は外部の提供者を使い、結果と状態だけを持ちます。</p>
+    <table>
+      <tr><th>水準</th><th>方式</th><th>中身</th></tr>
+      <tr><td><code>unverified</code></td><td>—</td><td>電話番号の SMS の確認だけ</td></tr>
+      <tr><td><code>verified_document</code></td><td><code>document_face</code></td><td>本人確認の書類の撮影と、顔の撮影の照合</td></tr>
+      <tr><td><code>verified_ic</code></td><td><code>ic_chip</code></td><td>マイナンバーカードの IC の読み取り（公的個人認証）</td></tr>
+    </table>
+    <p>確認で開く機能（匿名でない配送、売上金を残高へ移すこと、振込の上限など）は、バージョンの付いた表 <code>kyc_gates</code> に置きます。法令に関わる値は <code>legal.*</code> を参照し、結論まで本番で無効です。</p>
+    <div class="callout warn"><span class="label">法務の確認待ち（L2）</span>犯罪収益移転防止法の施行規則の改正で、非対面の<a class="t" href="#g-ho">ホ方式</a>（書類の画像と容貌の画像を送る方式）は 2027 年 4 月 1 日から使えなくなり、IC チップの読み取りと公的個人認証が中心になると解説されています（法律事務所の解説でだけ確かめた。未検証）。<code>document_face</code> を取引時確認に使えるかは、結論で <code>kyc_gates</code> を替えます。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/identity-verification.md">identity-verification.md</a> の 4・5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0056-ekyc-provider-and-verification-levels.md">ADR-0056</a>、データの最小化は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0057-identity-data-minimization-and-retention.md">ADR-0057</a>。</small></p>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み（法務の確認待ち）</h2>
+    <p>個人どうしの売買の場には、売り手が事業者か、品が中古か、場が「取引デジタルプラットフォーム」か、で法令が関わります。以下は<strong>すべて法務の確認待ち</strong>で、設計は結論を出していません。</p>
+    <table>
+      <tr><th>法令</th><th>枠組み</th><th>設計の論点</th></tr>
+      <tr><td><a class="t" href="#g-tokushoho">特定商取引法</a></td><td>通信販売をする「販売業者」は、氏名・住所・電話番号などを表示する</td><td>数多く売る個人が販売業者に当たる基準、匿名の配送との両立（L3）</td></tr>
+      <tr><td><a class="t" href="#g-kobutsu">古物営業法</a></td><td>中古品の売買を業とする古物商は許可、競りの方法のサイトは古物競りあっせん業の届出。盗品の疑いへの対応</td><td>固定の価格のフリマは競りでないという整理でよいか、警察の照会・品触れ（L6）</td></tr>
+      <tr><td><a class="t" href="#g-dpf">取引 DPF 法</a></td><td>取引デジタルプラットフォーム消費者保護法。努力義務（第 3 条）、利用の停止等の要請（第 4 条）、販売業者等の情報の開示の請求（第 5 条）</td><td>個人の売り手への適用の範囲、開示の手順（L7）</td></tr>
+      <tr><td><a class="t" href="#g-appi">個人情報保護法</a></td><td>委託と第三者提供の区別、利用目的、漏えい等の報告</td><td>住所を運送会社に渡すこと、本人確認の書類の保存（L5）</td></tr>
+      <tr><td>景品表示法</td><td>誤認させる表示と過大な景品の規制</td><td>値下げの表示、価格の提案、評価の表示（L4）</td></tr>
+      <tr><td>情報流通プラットフォーム対処法</td><td>大規模な事業者の削除の申し出への対応と公表</td><td>コメント・説明の削除の申し出（L9）</td></tr>
+    </table>
+    <p>ほかに、インボイス（L8）、扱う品の制限（L10）、未成年（L12）、特定電子メール法（L13）が確認待ちです。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L13）と出典。事業者の印の枠は <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/listings-and-photos.md">listings-and-photos.md</a> の 7 節。</small></p>
+  </section>
+
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora は 3 つのクラスタに分かれます。core（アカウント・出品・取引・配送・評価）、ledger（口座・仕訳・ロット・振込）、content（保存した検索・メッセージ・T&amp;S・紛争）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。</p>
+    <pre class="mermaid">erDiagram
+  accounts ||--o{ listings : "sells"
+  listings ||--o{ transactions : "at most 1 active"
+  transactions ||--|{ transaction_events : "history"
+  transactions ||--o{ payment_attempts : "pays"
+  transactions ||--|{ shipment_addresses : "address snapshot"
+  transactions ||--o{ shipments : "ships"
+  transactions ||--o{ ratings : "sealed then published"
+  transactions ||--o| escrow_settlements : "release or refund once"
+  journals ||--|{ journal_lines : "lines sum to zero"
+  listings {
+    uuid listing_id PK
+    text status
+    bigint version
+    bigint price
+  }
+  transactions {
+    uuid id PK
+    uuid listing_id FK
+    text state
+    timestamptz next_deadline_at
+  }
+  escrow_settlements {
+    uuid transaction_id PK
+    text kind
+  }
+  journals {
+    uuid id PK
+    text type
+    text source_type UK "with source_id and event"
+  }</pre>
+    <p>購入から振込までは、次のトランザクションの順に読みます（C は core、L は ledger）。</p>
+    <pre class="mermaid">flowchart LR
+  C1["C1 購入<br>出品の条件つきの更新と取引"] --> C3["C3 支払いの成功<br>paid"]
+  C3 --> L1["L1 hold<br>預かりへ"]
+  C3 --> C6["C5・C6 発送と配送の事象"]
+  C6 --> C7["C7 受取評価<br>評価を伏せて書く"]
+  C7 --> C8["C8 完了<br>評価を公開"]
+  C8 --> L3["L3 release<br>売上金のロット"]
+  L3 --> L4["L4・L5 振込の申請とまとめ"]</pre>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/data-model.md">data-model.md</a> の 2〜3 節（置き場所と規約）、4 節（全体の ER 図）、5 節（道筋の表）、6 節（横断の不変条件）。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-c2c">C2C</dt><dd>Consumer to Consumer。個人どうしの売買。運営は場を提供し、品を仕入れない。</dd>
+      <dt id="g-listing">出品</dt><dd>売り手が出す 1 点の品。状態（販売中・取引中・売り切れなど）と、買い手に見える変更で上がる <code>version</code> を持つ。</dd>
+      <dt id="g-transaction">取引</dt><dd>1 つの購入から完了・取り消しまでの記録。状態の機械と期限の列を持つ。</dd>
+      <dt id="g-receipt">受取評価</dt><dd>買い手が品を受け取り、中身を確かめたことを示す操作。相手の評価を同時に付ける。</dd>
+      <dt id="g-auto-complete">自動の完了</dt><dd>受取評価がないとき、期限（この設計は発送の 9 日後の 13:00）で受け取ったとみなすこと。</dd>
+      <dt id="g-dispute">紛争</dt><dd>問題の報告やチャージバックで、運用の判断を待つ状態。期限は止まる。</dd>
+      <dt id="g-deadline-runner">deadline-runner</dt><dd>期限を過ぎた取引を 1 分ごとに拾い、遷移の関数を呼ぶ処理。</dd>
+      <dt id="g-capture">売上の確定</dt><dd>キャプチャ。カードの利用枠のうち請求する額を確定する。この設計は購入の時に確定する。</dd>
+      <dt id="g-konbini">コンビニ払い</dt><dd>買い手が番号を持ってコンビニで払う手段。購入の後に入金を待つ。</dd>
+      <dt id="g-hot-listing">人気の出品</dt><dd>出た直後に購入の押下が集中する出品。成功は 1 件だけ。</dd>
+      <dt id="g-first-come">先着の印</dt><dd>Valkey の <code>SET NX</code> で取る、出品ごとの購入の印。流量を絞るだけで、失ってよい。</dd>
+      <dt id="g-conditional-update">条件つきの更新</dt><dd>期待する状態・バージョン・価格を <code>WHERE</code> に入れた 1 文の更新。更新した行の数で勝ち負けが決まる。</dd>
+      <dt id="g-partial-unique">部分一意の索引</dt><dd><code>WHERE</code> で絞った行の範囲だけに張る一意の索引。「終わっていない取引は出品ごとに 1 つ」を DB が守る。</dd>
+      <dt id="g-escrow">預かり</dt><dd>取引の代金を、完了か取り消しまで運営の台帳の取引ごとの口座に置くこと。</dd>
+      <dt id="g-release">release</dt><dd>完了で、預かりを売上金・手数料・送料へ振り替える仕訳。</dd>
+      <dt id="g-refund">refund</dt><dd>取り消しで、預かりを買い手の払った手段へ戻す仕訳。</dd>
+      <dt id="g-double-entry">複式簿記</dt><dd>1 つの取引を借方と貸方の両方に書き、和を常に等しくする記帳の方法。</dd>
+      <dt id="g-journal">仕訳</dt><dd>1 つの事象で動いたお金の記録。2 行以上で、行の和は 0。追記だけ。</dd>
+      <dt id="g-proceeds">売上金</dt><dd>取引の完了で売り手に入るお金（代金 − 手数料 − 送料）。振込と次の購入に使う。</dd>
+      <dt id="g-balance">残高</dt><dd>この設計の、期限のない売上金の口座。本人確認の後に移す。使うかは法務の確認待ち。</dd>
+      <dt id="g-points">ポイント</dt><dd>運営が付ける、購入に使える価値。付与ごとのロットで持つ。</dd>
+      <dt id="g-lot">ロット</dt><dd>入った単位ごとの売上金・ポイントの塊。額・残り・期限を持ち、期限の近い順に使う。</dd>
+      <dt id="g-legal-config">legal.*</dt><dd>法務の結論を入れる設定の値。法務と財務の承認の記録を付けて変える。</dd>
+      <dt id="g-zengin">全銀の形式</dt><dd>全国銀行協会の決めた、総合振込などのファイルの形。120 バイトの固定長のレコード。</dd>
+      <dt id="g-kumimodoshi">組戻し</dt><dd>一度行った振込を取り消して、振込元へ戻す手続き。</dd>
+      <dt id="g-shuno">収納代行</dt><dd>債権者の代わりに代金を受け取り、債権者に渡す形。</dd>
+      <dt id="g-shikin-ido">資金移動業</dt><dd>銀行以外の事業者が送金（為替取引）を行うための、資金決済法の登録の制度。</dd>
+      <dt id="g-prepaid">前払式支払手段</dt><dd>先に対価を払って得る、支払いに使える価値（プリペイドカード、買ったポイントなど）。自家型と第三者型がある。</dd>
+      <dt id="g-hanshu">犯罪収益移転防止法</dt><dd>特定事業者に取引時確認・記録の保存・疑わしい取引の届出を求める法律。</dd>
+      <dt id="g-ho">ホ方式</dt><dd>犯罪収益移転防止法の施行規則の非対面の本人確認のうち、書類の画像と容貌の画像を送る方式。</dd>
+      <dt id="g-envelope">封筒の暗号化</dt><dd>データをデータの鍵で暗号化し、その鍵を KMS の鍵で包んで一緒に持つ方式。</dd>
+      <dt id="g-address-vault">住所の金庫</dt><dd>住所・氏名・電話番号を利用者ごとの鍵で暗号化して置く表。復号は目的のコードつきの 1 つの関数だけ。</dd>
+      <dt id="g-carrier-rank">事象の順位</dt><dd>運送会社の事象を 0〜4 の数に写したもの。今より高い順位の事象だけで進める。</dd>
+      <dt id="g-inbox">inbox</dt><dd>外から届いた Webhook を、一意の鍵で重複を除いて記録する表。</dd>
+      <dt id="g-sudachi">Sudachi</dt><dd>日本語の形態素解析器。A・B・C の 3 つの長さで語を分けられる。</dd>
+      <dt id="g-split-mode">分割の単位</dt><dd>Sudachi の語の長さ。A が最も短く、C が最も長い（複合語のまま）。</dd>
+      <dt id="g-bigram">2-gram</dt><dd>文字列を 2 文字ずつずらして切った断片。辞書に頼らず部分の一致を拾える。</dd>
+      <dt id="g-sold-items">売れた品</dt><dd>取引が完了した出品。相場の参考と価格の提案の標本になる。</dd>
+      <dt id="g-price-suggestion">価格の提案</dt><dd>出品の画面に出す参考の価格の幅。この設計は売れた品の四分位。</dd>
+      <dt id="g-percentile">四分位</dt><dd>値を順に並べて 4 つに分ける点。p25・p50（中央値）・p75。</dd>
+      <dt id="g-inverted-index">逆索引</dt><dd>鍵から、その鍵を持つ項目の一覧を引く索引。ここでは鍵 → 保存した検索。</dd>
+      <dt id="g-match-key">照合の鍵</dt><dd>保存した検索を逆索引に入れるための鍵（カテゴリ × ブランド、ブランド、カテゴリ、語）。</dd>
+      <dt id="g-counterfeit">偽ブランド</dt><dd>他人の商標を付けた偽物。商標法の侵害になる。</dd>
+      <dt id="g-phash">知覚ハッシュ</dt><dd>見た目が近い画像ほど近い値になるハッシュ。pHash（DCT による）と dHash（隣の画素の比べ）を使う。</dd>
+      <dt id="g-hamming">Hamming 距離</dt><dd>同じ長さのビット列で、違うビットの数。</dd>
+      <dt id="g-off-platform">外部の取引への誘導</dt><dd>預かりを通さず、直接の振込や他のサービスで払わせようとすること。</dd>
+      <dt id="g-secrecy">通信の秘密</dt><dd>電気通信事業法などが守る、通信の中身と構成の要素を他人に知られない権利。</dd>
+      <dt id="g-sealed">伏せた評価</dt><dd>書いたが、取引の完了まで相手と他の人に見せない評価（<code>sealed</code>）。</dd>
+      <dt id="g-ekyc">eKYC</dt><dd>オンラインで完結する本人確認。書類と顔の撮影、IC の読み取りなど。</dd>
+      <dt id="g-tokushoho">特定商取引法</dt><dd>通信販売などの表示や契約の決まりを定める法律。</dd>
+      <dt id="g-kobutsu">古物営業法</dt><dd>中古品の売買の営業を許可・届出の制にし、盗品の流通を防ぐ法律。</dd>
+      <dt id="g-dpf">取引 DPF 法</dt><dd>取引デジタルプラットフォームを利用する消費者の利益の保護に関する法律（令和 4 年 5 月 1 日施行）。</dd>
+      <dt id="g-appi">個人情報保護法</dt><dd>個人情報の取り扱いを定める法律。委託・第三者提供・漏えい等の報告などを決める。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「二人に売らない・お金が合う」流れ（取引 → 決済と預かり → 台帳 → 振込）を読み、最後に配送・検索・T&amp;S を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち（L1〜L13）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要な流れ A〜F、本家の形と意図した違い、規模の段階</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/transactions-and-state-machine.md">transactions-and-state-machine.md</a> <span>— 購入、決定表、期限、キャンセル</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/payments-and-escrow.md">payments-and-escrow.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/ledger-and-proceeds.md">ledger-and-proceeds.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/payouts-and-points.md">payouts-and-points.md</a> <span>— 預かり、仕訳の型、ロット、振込</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/shipping-integrations.md">shipping-integrations.md</a> <span>— 匿名の配送、事象の順位、住所の金庫</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/search-and-discovery.md">search-and-discovery.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/saved-searches-and-alerts.md">saved-searches-and-alerts.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/categories-brands-and-pricing-suggestions.md">categories-brands-and-pricing-suggestions.md</a> <span>— 日本語の解析、逆索引、価格の提案</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/trust-and-safety.md">trust-and-safety.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/messaging-and-comments.md">messaging-and-comments.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/ratings-and-reputation.md">ratings-and-reputation.md</a> <span>— 措置、悪用の絞り込み、評価</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/identity-verification.md">identity-verification.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/disputes-and-customer-support.md">disputes-and-customer-support.md</a> <span>— 本人確認の水準、紛争と運用の介入</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/mercari/docs/decisions">decisions/</a> <span>— 特に 0002（一品の一回）、0003（預かりと台帳）、0004（売上金と資金決済法）、0006（配送）、0009（T&amp;S の境界）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/architecture/data-model.md">data-model.md</a> <span>— 規約、ER 図、購入から振込までの道筋、横断の不変条件</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
