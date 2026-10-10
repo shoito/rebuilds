@@ -213,7 +213,7 @@ CREATE UNIQUE INDEX transactions_purchase_attempt
 
 - Valkey の操作は 1 件あたり 2 回（`GET` と `SET NX`）で、1 秒 1 万回ほど。1 つのシャードで足りる。
 - **決済の失敗（5%）の場合**：t=3 秒に `payment_failed` → `cancelled`。同じトランザクションで出品を `on_sale`、version 3 に戻す。コミットの後に、印を比べて消す（値が A のときだけ消す Lua）。写しを `on_sale v3` にする。画面に v1 を持つ買い手の再送は `409 price_changed`（バージョンの違い）になり、アプリは新しいバージョンを読んで出し直す。ここから 2 回目の取り合いになる。印を 15 秒の期限まで残すと、売れない 12 秒が生じるので、取り消しで消す（[ADR-0026](../decisions/0026-hot-listing-purchase-admission.md)）。
-- **Valkey の停止の場合**：写しと印を飛ばし、出品ごと・タスクごとのセマフォ（4）を通す。DB に同時に届くのは 12 × 4 = 48 件まで。セマフォを 100ms 待てない試行は 409 `busy`（`Retry-After: 1`）。48 件は出品の行のロックで並び、A のコミットの後に PostgreSQL が `WHERE` を最新の行で評価し直して 0 行になる。1 件の DB の時間は 5〜25ms。出品の行の処理はおよそ 2,000 件/秒で、その外は 409 `busy` になる。負けの応答は p99 1 秒以内、DB の接続は 48 本まで。二重の販売は索引が止める。
+- **Valkey の停止の場合**：写しと印を飛ばし、出品ごと・タスクごとのセマフォ（4）を通す。DB に同時に届くのは 12 × 4 = 48 件まで（`transactions` のタスクの最大を 12 にして、この上限を保つ。[capacity.md](capacity.md) の 4.2 節）。セマフォを 100ms 待てない試行は 409 `busy`（`Retry-After: 1`）。48 件は出品の行のロックで並び、A のコミットの後に PostgreSQL が `WHERE` を最新の行で評価し直して 0 行になる。1 件の DB の時間は 5〜25ms。出品の行の処理はおよそ 2,000 件/秒で、その外は 409 `busy` になる。負けの応答は p99 1 秒以内、DB の接続は 48 本まで。二重の販売は索引が止める。
 - **DB のフェイルオーバーの場合**：コミットの前の試行は失敗し、アプリは同じ `Idempotency-Key` で再送する。コミットの後で応答を失った試行は、再送で手順 1 が取引を見つけて返す。
 
 ### 5.4 価格の変更と値下げ交渉
@@ -309,7 +309,7 @@ transition(transaction_id, event, actor, expected_version?) -> {state, version, 
 | `cancelled`（発送の後。行 37） | `trading` → `paused`（version + 1）。品が売り手の手元にあるとは限らないので、売り手が確かめてから再開する（[ADR-0027](../decisions/0027-cancellation-rules-and-listing-restoration.md)） |
 | `completed` | `trading` → `sold` |
 
-- 発送の後の取り消しで `trading` → `paused` にする行は、DT-LST-001（[listings-and-photos.md](listings-and-photos.md) の 4.2 節）の草案にまだない（草案の行 7 は `trading` → `on_sale` だけ）。listings-and-photos の領域のレビューで、「取引の取り消し（発送の後）→ `paused`」の行を足す（[ADR-0027](../decisions/0027-cancellation-rules-and-listing-restoration.md)）。
+- 発送の後の取り消しで `trading` → `paused` にする行は、DT-LST-001（[listings-and-photos.md](listings-and-photos.md) の 4.2 節）の行 7a にある（[ADR-0027](../decisions/0027-cancellation-rules-and-listing-restoration.md)）。
 
 ## 7. 期限
 
@@ -324,7 +324,7 @@ transition(transaction_id, event, actor, expected_version?) -> {state, version, 
 | `auto_receive_at` | `shipped` | 発送の日（日本時間）の 9 日後の 13:00:00（本家に寄せる） | 行 32 |
 | `seller_rating_due_at` | `received` | 受取評価から 72 時間（本システムの値。本家は**未検証**） | 行 34 |
 
-- 発送までの日数の選択は `1-2`・`2-3`・`4-7`（日。listings-and-photos の領域）。上限はそれぞれ 2・3・7 日。
+- 発送までの日数の選択は `1_2`・`2_3`・`4_7`（日。listings-and-photos の領域）。上限はそれぞれ 2・3・7 日。
 - 「発送の日」は、運送会社の引き受けの事象の時刻（`occurred_at`）を使う。ただし、受け取った時刻より 48 時間を超えて前の時刻は受け取った時刻に置き換える（運送会社の時計の誤りと、遅れた事象で期限が早まりすぎないため）。
 - 期限の計算は `packages/transactions/deadlines` の 1 つの関数だけが行う。日本時間で計算し、UTC で保存する。
 
@@ -360,6 +360,7 @@ SELECT id FROM transactions
 - **止める**（行 3・20・21・29・30）：`paused_at = now()`、`next_deadline_at = NULL`。期限の列はそのまま残す。
 - **ずらす**（行 4・35）：`d = now() − paused_at`。生きている期限の列すべてに `d` を足し、`paused_seconds += d`、`paused_at = NULL`、`next_deadline_at` を計算し直す。
 - 期限を前に動かす変更はしない。遅れた事象（引き受けの時刻が前の時刻で届く）で `auto_receive_at` を早めない。
+- **DR の切り替え**：大阪への切り替えの間は `deadline-runner` を止める。切り替えを始めた時刻を全体の止める時刻として `dr_events` に書き、再開の前に、終わっていない取引の生きている期限を、止まった時間だけ後ろへずらす（1 万件ずつ。`paused_seconds` にも積む）。利用者の責任でない期限切れを作らない（統合の工程で [infrastructure.md](infrastructure.md) の 7.3 節の提案を採った。[ADR-0025](../decisions/0025-transaction-decision-table-and-deadline-pause.md) の注記）。
 - 紛争の中で `ops_hold` が来たら、`on_hold` を立てるだけで `paused_at` は紛争の時刻を保つ。両方が解けたとき（`disputed` を抜け、`on_hold = false`）に 1 回だけずらす。
 
 ### 7.4 例：コンビニ払いから自動の完了まで
@@ -367,7 +368,7 @@ SELECT id FROM transactions
 | 時刻（日本時間） | 事象 | 状態 | 期限 |
 | --- | --- | --- | --- |
 | 10/10（土）21:30 | 購入（コンビニ払い） | `created` | `payment_due_at` 10/12 23:59:59 |
-| 10/11 10:00 | 入金の Webhook → 照会で成功 | `paid` | 発送までの日数 `1-2` → `ship_due_at` 10/14 23:59:59（10/11 + 2 日の翌日） |
+| 10/11 10:00 | 入金の Webhook → 照会で成功 | `paid` | 発送までの日数 `1_2` → `ship_due_at` 10/14 23:59:59（10/11 + 2 日の翌日） |
 | 10/12 17:40 | 運送会社の引き受け | `shipped` | `auto_receive_at` 10/21 13:00:00 |
 | 10/18 09:00 | 買い手が問題の報告（届かない） | `disputed` | 止める（残り 3 日 4 時間） |
 | 10/20 15:00 | 運用の判断 `continue`（配達の遅れと確かめた） | `shipped` | `d` = 2 日 6 時間 → `auto_receive_at` 10/23 19:00:00 |
@@ -469,6 +470,7 @@ SELECT id FROM transactions
 - **PROP-TXN-005（後ろに戻らない）**：任意の事象の列で、状態の順位（4.1 節）は `disputed` からの `resume_state` への戻りを除いて単調に増える。
 - **PROP-TXN-006（期限は前に働かない）**：任意の事象と時刻の列で、期限の遷移は（ずらした後の）期限の時刻より前に起きない。`disputed`・`on_hold` の間に期限の遷移はない。
 - **PROP-TXN-007（受取評価を経る）**：`completed` の取引は必ず行 31 か 32 か 36 を経ている。`delivered` だけで `received` にならない。
+- **PROP-TXN-009（全体の停止）**：大阪への切り替えの全体の停止と再開で、期限の遷移は停止の間に起きず、終わっていない取引の生きている期限は止まった時間だけ延びる（統合の工程で足した。7.3 節）。
 - **PROP-TXN-008（参照との一致）**：`txn-ref`（1 つのロックで直列）に同じ操作の列を流したときと、成功する購入の数と最後の状態が一致する。
 - **表駆動**：DT-TXN-001 の全 38 行、7.1 節の期限の表、6.3 節の出品の表。
 - **仮想の時計**（`clock-sim`、同 C）：7.4 節の例、23:59:59 と 13:00 の境、月末・年末、紛争の停止と再開（3 日の紛争で期限が 3 日延びる）、保留と紛争の重なり、`deadline-runner` の 2 時間の停止。
@@ -512,5 +514,4 @@ SELECT id FROM transactions
 | 13:00 の山のワーカーの数と、出品の分け方（S3） | capacity の領域 |
 | 購入の確認の画面に出す事項 | 法務の確認待ち（L3） |
 | 取引の事象の保存の期間 | 法務の確認待ち（L7）と security の領域 |
-| 本家の発送の期限の規則、キャンセルの後の出品の扱い、売り手の評価の期限 | 公式の資料で確かめられなかった（**未検証**）。本システムの値を使う |
-| 本家との違い（取り消しの後の出品の停止、評価の期限 72 時間）を [README.md](README.md) の 1.4 節に足すこと | この領域の文書のレビューで Dev が足す |
+| 本家の発送の期限の規則、キャンセルの後の出品の扱い | 公式の資料で確かめられなかった（**未検証**）。本システムの値を使う。売り手の評価の期限（本家は受取評価の翌日以降に自動で完了）は統合の工程で確かめ、[README.md](README.md) の 1.4 節に本家との違い（72 時間、取り消しの後の停止）として足した |

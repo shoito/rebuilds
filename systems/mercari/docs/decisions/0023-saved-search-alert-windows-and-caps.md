@@ -34,6 +34,8 @@ date: 2026-10-10
 - 一致は上限で送らなかった分も `alert_matches` に全部記録する（取りこぼしの比べのため）。
 - 5 分を超えて遅れた一致は、プッシュに入れずアプリの中の一覧だけに入れる。
 
+> 2026-10-10 の注記：統合の工程で、[architecture/README.md](../architecture/README.md) の 1.3 節 E・3 節と [notifications.md](../architecture/notifications.md) をこの 3 分の窓に揃えた。NFR-008 は出品の公開・値下げの commit から数え、窓を含む。
+
 ### 他の案を選ばなかった理由
 
 - **2（15 分）**：NFR-008 の文のとおりに数えると守れない。窓の後から数えると、買い手の「出たらすぐ知りたい」に対して指標が実際の遅れを示さない。運用で伸ばす口（`ops.saved_search_digest_minutes`）は残す。

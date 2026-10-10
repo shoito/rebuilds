@@ -10,7 +10,7 @@ date: 2026-10-10
 - 利用者は、いいね・値下げ・保存した検索・案内を、経路（プッシュ、メール）ごとに切りたい。本家は、取引関連をプッシュかメールのどちらかで必ず受けさせ、事務局の個別の連絡は切れない（[ヘルプの記事 239](https://help.jp.mercari.com/guide/articles/239/)、2026-10-10 に確認）。
 - 端末とトークンは、ログイン・端末の取り消し・乗っ取りの対応と同じ時に変わる（[accounts-and-devices.md](../architecture/accounts-and-devices.md)）。2 か所で持つと、取り消した端末に通知が届く。
 - 案内のメールの苦情の率が高くなると、同じ送り元の取引のメールまで届きにくくなる。
-- 案内のメールの同意と表示の扱いは法令の判断が要る（特定電子メール法。**法務の確認待ち**。[intent.md](../intent.md) の L に当たる番号がない）。
+- 案内のメールの同意と表示の扱いは法令の判断が要る（特定電子メール法。**法務の確認待ち：L13**）。
 
 ## Options
 
@@ -40,6 +40,8 @@ date: 2026-10-10
 - トークンの正本は core の `devices`（`identity` が書く）。`identity` は `device.*` の事象を outbox に書き、`notifier` は Valkey の `ntf:devices:{user_id}`（期限 24 時間）を読む。APNs の 410・FCM の `UNREGISTERED` で `notifier-send` が `identity` の API でトークンを無効にする。
 - 送る先は、直近 180 日に起動し、OS の通知の許可がある端末だけ。
 - メールは SES：取引と安全は `mail.<brand>.<domain>`、案内は `news.<brand>.<domain>`。構成のセットを分け、SPF・DKIM・DMARC を置く（DMARC は 4 週の報告の後に `p=reject`）。送り返しと苦情は `email_suppressions` に入れて止める。
+
+> 2026-10-10 の注記：案内のメールの同意と表示は、特定電子メール法の法務の確認待ち **L13** として [intent.md](../intent.md) に足した。結論まで、案内（`announcement`）は同意の日時がある利用者だけに送る。
 
 ### 他の案を選ばなかった理由
 

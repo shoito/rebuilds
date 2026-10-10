@@ -41,7 +41,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **T&S**：措置に触れる要件は、措置の記録（`moderation_actions`）を先に書くこと、自動の措置の範囲、異議の経路を書いている。分類器を足す・替える要件は、評価の集まりと基準を書いている。
 - **上限**：外から入るもの（写真、題名・説明、コメント、メッセージ、保存した検索、運送会社・提供者の通知）の上限と、超えたときの応答を書いている。
 - **本家の振る舞い**：本家に寄せる要件は、出典と確認日、または「未検証」を書いている。
-- **法務**：法務の確認待ち（[intent.md](intent.md) の L1〜L11）に当たる Story は、確認が済むまで承認しない。
+- **法務**：法務の確認待ち（[intent.md](intent.md) の L1〜L13）に当たる Story は、確認が済むまで承認しない。
 
 ### 2.2 テストのレベル構成
 
@@ -103,7 +103,8 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **運送会社の模型**：`carrier-sim` が、受け付け・引き受け・輸送中・配達中・配達済み・例外の事象を、重複（0〜5 回）、遅れ（0〜48 時間）、順序の入れ替え、欠け（Webhook が来ない）、署名の誤り、未知の状態で生成する。照会の API の時間切れも混ぜる。
 - **性質**：
   - 配送の行の順位と取引の状態は単調に増える。古い事象で戻らない。
-  - 匿名の配送で、`accepted` の事象がない取引は `shipped` にならない。
+  - 匿名の配送で、順位 1 以上の運送会社の事象（引き受け。欠けたら輸送中・配達済みから補う）がない取引は `shipped` にならない。売り手の操作だけでは `shipped` にならない（[ADR-0042](decisions/0042-carrier-event-ranking-and-implied-acceptance.md)）。
+  - `delivered` の後の例外（`lost` など）は取引の状態を変えず、運用の待ち行列にだけ入る。
   - Webhook がすべて欠けても、照会で最後の状態に収束する（仮想の時計で 24 時間以内）。
   - 配達済みの事象だけで `received` にならない。
   - 署名の誤りの通知は inbox に入らない。
@@ -135,6 +136,8 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 配送のラベル・QR の画面 | 売り手に配送先が、買い手に差出人が見えないこと |
 | 通知（プッシュ、メール） | 本文に住所・相手の本名が入らないこと。宛先が正しい利用者の端末だけ |
 | 検索・おすすめ・保存した検索の通知 | 措置・停止・下書きの出品、ブロックした相手の出品が出ないこと |
+| 見張りの出品 | `sentinel` の出品が、見張りの利用者以外の検索・おすすめ・通知・購入に出ないこと（統合の工程で足した） |
+| 売れた品の検索 | ログインしていない要求に売れた品が出ないこと（統合の工程で足した） |
 | 公開のプロフィール | 売上金、本人確認の書類、住所、閲覧の履歴が出ないこと |
 | 売上金・明細・振込 | 本人だけ（ledger の API と RLS） |
 | 運用の画面 | 権限の種類ごとの範囲。住所・口座・本人確認は別の権限 |
@@ -169,6 +172,35 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - 購入の確認の画面に、法務の L3 で決める事項が出ていることを E2E の検査項目にする。
 - 手数料の明細と請求書の記載（法務の L8）を、試験のベクトルで確かめる。
 - 売上金の期限の通知（期限の 30 日・7 日・1 日前）の文言と時刻（法務の L1 の後）。
+
+### 2.2.2 性質と決定表の一覧
+
+各領域の文書の「テストと性質」の ID の一覧。中身の正本は各文書の表で、テストの名前にこの ID を入れる（ルートの AGENTS.md）。2026-10-10 の統合の工程で、各領域の提案から作った。
+
+| 領域 | ID | 正本 |
+| --- | --- | --- |
+| 出品と写真（E3） | PROP-LST-001〜006、DT-LST-001 | [listings-and-photos.md](architecture/listings-and-photos.md) の 11 節 |
+| カテゴリ・ブランド・価格の提案（E4） | PROP-CAT-001〜006 | [categories-brands-and-pricing-suggestions.md](architecture/categories-brands-and-pricing-suggestions.md) の 10 節 |
+| 検索と発見（E5） | PROP-SRCH-001〜007 | [search-and-discovery.md](architecture/search-and-discovery.md) の 11 節 |
+| 保存した検索（E6） | PROP-SS-001〜007 | [saved-searches-and-alerts.md](architecture/saved-searches-and-alerts.md) の 11 節 |
+| 取引（E7） | PROP-TXN-001〜009、DT-TXN-001 | [transactions-and-state-machine.md](architecture/transactions-and-state-machine.md) の 15 節 |
+| 決済と預かり（E8） | PROP-PAY-001〜005、DT-PAY-001、DT-CB-001 | [payments-and-escrow.md](architecture/payments-and-escrow.md) の 16 節 |
+| 台帳と売上金（E9） | PROP-LED-001〜007 | [ledger-and-proceeds.md](architecture/ledger-and-proceeds.md) の 14 節 |
+| 振込とポイント（E10） | PROP-PAYOUT-001〜005 | [payouts-and-points.md](architecture/payouts-and-points.md) の 14 節 |
+| 配送の連携（E11） | PROP-SHP-001〜006 | [shipping-integrations.md](architecture/shipping-integrations.md) の 14 節 |
+| メッセージとコメント（E12） | PROP-MSG-001〜006 | [messaging-and-comments.md](architecture/messaging-and-comments.md) の 10 節 |
+| 評価と信用（E13） | PROP-RAT-001〜005、DT-RAT-001 | [ratings-and-reputation.md](architecture/ratings-and-reputation.md) の 10 節 |
+| T&S（E14） | PROP-TS-001〜008 | [trust-and-safety.md](architecture/trust-and-safety.md) の 18 節 |
+| 本人確認（E15） | PROP-KYC-001〜005、DT-KYC-001 | [identity-verification.md](architecture/identity-verification.md) の 13 節 |
+| 紛争と CS（E16） | PROP-DSP-001〜005、DT-DSP-001 | [disputes-and-customer-support.md](architecture/disputes-and-customer-support.md) の 15 節 |
+| 通知（E17） | PROP-NTF-001〜004、DT-NTF-001 | [notifications.md](architecture/notifications.md) の 11 節 |
+| アカウントと端末（E2） | PROP-ACC-001〜005、DT-ACC-001 | [accounts-and-devices.md](architecture/accounts-and-devices.md) の 15 節 |
+| セキュリティ（E1、E18） | PROP-SEC-001〜003 | [security.md](architecture/security.md) の 12 節 |
+| 観測（E1、E18） | PROP-OBS-001 | [observability.md](architecture/observability.md) の 13 節 |
+
+- 横断の性質：二重の販売なし（2.2.1 節 A）は PROP-TXN-001・003・008 と PROP-LST-001、お金（同 B）は PROP-LED-001〜007・PROP-PAY-001〜005・PROP-PAYOUT-001〜005・PROP-DSP-002〜005、期限（同 C）は PROP-TXN-006・007・009・PROP-RAT-001・PROP-DSP-001、配送（同 D）は PROP-SHP-001〜006、検索と保存した検索（同 E）は PROP-SRCH-001〜007・PROP-SS-001〜007、漏れ（同 G）は PROP-MSG-001〜004・PROP-NTF-002〜003・PROP-KYC-002〜003・PROP-SEC-001〜002・PROP-OBS-001・PROP-SRCH-003・007。
+- 統合の工程で足したもの：PROP-SRCH-007（見張りの出品と、売れた品の検索のログイン）、PROP-TXN-009（大阪への切り替えの全体の停止での期限のずらし）。
+- 決定表の行の確定は、各 Story の spec で行う（DT-TXN-001 は 38 行で確定済み。[ADR-0025](decisions/0025-transaction-decision-table-and-deadline-pause.md)）。容量・デリバリーの試験は性質の ID を持たず、[capacity.md](architecture/capacity.md) の 7 節と [delivery.md](architecture/delivery.md) の 11 節の表で確かめる。
 
 ### 2.3 エージェントの確認ループ
 

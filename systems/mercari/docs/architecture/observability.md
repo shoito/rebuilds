@@ -96,7 +96,7 @@ canary のアカウント（本番と別の資格情報）から、見張りの�
 | 売上金 | 完了から 1 分で残高に出る | `canary_step_seconds{step=proceeds}` |
 | 通知 | 購入の通知が見張りの端末（ファームの実機ではなく、APNs・FCM の試験の受け手）に届く | `canary_step_seconds{step=notify}` |
 
-- 見張りの出品は `listingVisible()` で、見張りの利用者だけに見える（他の利用者の検索に出さない）。この判定の行は [search-and-discovery.md](search-and-discovery.md) と `listingVisible()` の決定表に足す提案にする。
+- 見張りの出品は `listingVisible()` で、見張りの利用者だけに見える（他の利用者の検索に出さない）。統合の工程で採り、判定の行を [search-and-discovery.md](search-and-discovery.md) の 5.4 節と [ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md) の注記に足した。
 - 2 回続けて失敗した段は呼び出し。各段の失敗は段の名前で手順へつなぐ。
 - 提供者・運送会社の試験の環境が落ちているときは、見張りの失敗を本番の障害と分ける（`canary_dependency_up{dep}`）。
 
@@ -174,7 +174,7 @@ canary のアカウント（本番と別の資格情報）から、見張りの�
 | --- | --- | --- |
 | 各クラスタ：`outbox` に足す列 | `trace_parent` | 2.3 |
 | core：`reconciliation_runs` | 照合の種類、始まり、終わり、見た件数、不一致の件数、結果（不一致の対象の ID は別の表へ） | 3 |
-| core・ledger：`reconciliation_findings` | 不一致の対象（出品、取引、仕訳）、種類、見つけた時刻、解決の時刻と主体 | 3 |
+| core：`reconciliation_findings` | 不一致の対象（出品、取引）、種類、見つけた時刻、解決の時刻と主体。ledger の照合は `recon_runs`・`recon_breaks`（[ledger-and-proceeds.md](ledger-and-proceeds.md) の 13 節）で同じ指標を出す | 3 |
 | core：`hot_listing_slots` | 熱い出品の枠と出品の対応（運用の画面だけ） | 2.2、5 |
 | core：`accounts`・`listings` に足す列 | `sentinel`（見張り） | 3、4 |
 | S3（data のアカウント） | 不正のダッシュボードの日次の集計 | 6 |
@@ -218,7 +218,6 @@ canary のアカウント（本番と別の資格情報）から、見張りの�
 | アプリの計測の公表の要否と形 | **法務の確認待ち：L11** |
 | ログの保持の期間 | **法務の確認待ち：L5** |
 | 観測の費用、AMP の保持の既定 | E1 の後の実績（**未検証**） |
-| 見張りの出品を `listingVisible()` で見張りだけに見せる行 | [search-and-discovery.md](search-and-discovery.md) と `listing-visible-snapshot` の Story で合意する |
 
 ## 出典
 

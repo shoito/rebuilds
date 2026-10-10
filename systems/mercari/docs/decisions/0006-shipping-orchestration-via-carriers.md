@@ -48,6 +48,8 @@ date: 2026-10-10
 - Webhook がないか遅いときは、照会のジョブが、受け付けの後 6 時間ごと、引き受けの後 6 時間ごとに `getTracking` を呼び、同じ処理に入れる。
 - **偽の発送の防止**：匿名の配送では、売り手の「発送の通知」だけでは `shipped` にしない。運送会社の `accepted` を条件にする。匿名でない配送では、追跡の番号の形の検査と照会で `accepted` を確かめられたら `shipped`、確かめられなければ `shipped` にして信用の印を付け、T&S の規則の入力にする。
 
+> 2026-10-10 の注記：「運送会社の `accepted` を条件にする」は、「順位 1 以上の運送会社の事象を条件にする」と読む。`accepted` の通知が欠けて `in_transit`・`delivered` が先に届いたら、`accepted` を補って（`implied`）から進める。売り手の操作だけでは補わない（[ADR-0042](0042-carrier-event-ranking-and-implied-acceptance.md)）。`delivered` の後の例外（`lost` など）は取引に渡さず、運用の待ち行列にだけ入れる。例外に `refused` を足した。下の Confirmation の「`accepted` のない匿名の配送」も同じに読む。
+
 ### 住所の金庫
 
 - 住所・氏名・電話番号は、core の `address_vault` の表に、KMS の鍵での封筒の暗号化の列で置く。行は利用者の FORCE RLS（[ADR-0007](0007-single-tenant-and-party-visibility.md)）。

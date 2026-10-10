@@ -173,7 +173,7 @@ flowchart TD
 | 送る前の確かめと依頼 | p95 2 秒 |
 | 計 | 最悪 197 秒、p95 3.3 分前後。NFR-008 の 5 分の中 |
 
-- 窓の 180 秒は、NFR-008 の 5 分を、出品の公開から数えても守れる範囲で最も長い値にした。[architecture/README.md](README.md) の 1.3 節 E と [notifications.md](notifications.md) は「既定 15 分の窓」とし、notifications.md は NFR-008 を窓の後から数える。この文書は 3 分を採り、どちらの数え方でも NFR-008 を満たす（13 節）。
+- 窓の 180 秒は、NFR-008 の 5 分を、出品の公開から数えても守れる範囲で最も長い値にした。統合の工程で、[architecture/README.md](README.md) の 1.3 節 E と [notifications.md](notifications.md) をこの 3 分に揃え、NFR-008 を出品の公開・値下げの commit から数えると決めた（README の 3 節）。
 - 依頼の後、`notifier` が静かな時間（既定 23:00〜9:00）と `engagement` の 1 人 1 日 30 通の上限を当てる（[ADR-0064](../decisions/0064-fanout-batching-quiet-hours-and-caps.md)）。静かな時間で止めた間は NFR-008 の数えから外す（notifications.md と同じ）。
 
 ### 6.2 上限
@@ -293,7 +293,6 @@ flowchart TD
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 窓の長さ：[architecture/README.md](README.md) の 1.3 節 E と [notifications.md](notifications.md) は「既定 15 分」で、notifications.md は NFR-008 を窓の後から数える。この文書は 3 分を採った | README・notifications.md・この文書のどれに揃えるかを Dev（テックリード）が決める。15 分にするなら、NFR-008 の数え方を [architecture/README.md](README.md) の 3 節に書き足す（PM） |
 | 1 日 20 通の上限と 180 秒の値 | E6 の前の `saved-search-matcher-poc` と、S1 の通知の解除の率を見て PM が見直す |
 | 候補の数・Valkey の量の見込み（平均 400 件/日の流量） | `saved-search-matcher-poc` で合成の分布を使って測る |
 | 2-gram の一致を保存した検索にも使うか（辞書にない語の取りこぼし） | S1 の運用で、検索では出るが保存した検索で当たらない出品の割合を見て決める |

@@ -64,7 +64,7 @@
 | `fee_class` | `standard`（既定） | 手数料の表の鍵（`ledger-and-proceeds.md`） |
 | `default_shipping_tiers` | `<Brand>便` のサイズの段の候補 | 配送の欄の初期値 |
 | `restriction` | 4.6 節 | 同期の検査 |
-| `min_seller_age`・`min_buyer_age` | 18 など（値は法務の確認待ち L10） | 出品の作成と `purchaseListing` が `ageOf()` で判定する（[accounts-and-devices.md](accounts-and-devices.md)、[ADR-0068](../decisions/0068-account-deletion-and-minors.md)） |
+| `min_seller_age`・`min_buyer_age` | 18 など（値は法務の確認待ち L10・L12） | 出品の作成と `purchaseListing` が `ageOf()` で判定する（[accounts-and-devices.md](accounts-and-devices.md)、[ADR-0068](../decisions/0068-account-deletion-and-minors.md)） |
 | `keywords` | 代表の語（Sudachi の正規化した形） | 題名とカテゴリの食い違いの警告、カテゴリの候補（4.4 節） |
 
 ### 4.3 状態の段

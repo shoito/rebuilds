@@ -25,6 +25,9 @@ date: 2026-10-10
 1 を採用する。詳細と例は [shipping-integrations.md](../architecture/shipping-integrations.md) の 5・6 節。
 
 - 順位は ADR-0006 のとおり。例外に `refused` を足した（5 つ）。例外は順位の外で、記録して運用の待ち行列に入れ、`shipped`・`delivered` の取引には `carrier_exception` を渡す。`delivered` の後の例外は記録だけにする。
+
+> 2026-10-10 の注記：統合の工程で、ADR-0006 の本文と Confirmation、[quality.md](../quality.md) の 2.2.1 節 D、[security.md](../architecture/security.md) の 3.2 節をこの読み方に揃えた。
+
 - `max_rank` が 0 のときに順位 2〜4 の事象が来たら、`accepted` を補い（`implied = true`、時刻はもとの事象の時刻）、取引に `carrier_accepted` を先に渡す。ADR-0006 の「`accepted` のない匿名の配送は `shipped` にならない」を「順位 1 以上の運送会社の事象のない配送は `shipped` にならない」と読む。売り手の操作だけでは補わない。
 - 後から届いた本物の `accepted` は記録し、画面の発送の日を直してよいが、`auto_receive_at` を前に動かさない（[ADR-0025](0025-transaction-decision-table-and-deadline-pause.md)）。
 - 照会：受け付けの後と引き受けの後 6 時間ごと。加えて、取引の `auto_receive_at` の 24 時間前に 1 回。引き受けから 30 日で止め、運用へ。Webhook のある運送会社は 12 時間まで伸ばせる。

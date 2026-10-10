@@ -54,8 +54,8 @@
 
 - **ドメイン**：東京の 3 AZ、専用のマスター 3。出品の索引と写真のハッシュの索引（[listings-and-photos.md](listings-and-photos.md) の 5.4 節）を同じドメインに置く。
 - **索引**：`listings_v<スキーマの番号>` と別名 `listings`。文書は出品ごとに 1 つ。ID は `listing_id`。
-- **件数の見込み（S1）**：販売中・取引中 3,000 万。売れた品は 10 万件/日 × 365 日 ≒ 3,650 万。計 7,000 万件前後。[architecture/README.md](README.md) の 2 節の 1.5 億は上限の見積もりとして、大きさの計画はそちらで取る。
-- **大きさの見込み**：文書あたり索引の後で 2 KB（2-gram の欄を含む）として、1.5 億件で 300 GB（主）。主シャード 8（1 シャード 40 GB 以下）、写し 1。`search-index-poc` で測って直す。
+- **件数の見込み（S1）**：販売中・取引中 3,000 万。売れた品は 10 万件/日 × 365 日 ≒ 3,650 万。計 7,000 万件前後（[architecture/README.md](README.md) の 2 節。統合の工程で README の 1.5 億をこの値に直した）。
+- **大きさの見込み**：文書あたり索引の後で 2 KB（2-gram の欄を含む）として、7,000 万件で 140 GB（主）。主シャード 8（1 シャード 18 GB 前後。40 GB 以下を保つ）、写し 1。S2 の 2.8 億件で 560 GB になり、販売中と売れた品の索引に分ける（[ADR-0074](../decisions/0074-stage-up-criteria-and-split-plan.md)）。`search-index-poc` で測って直す。
 - **振り分け**：`_routing` を使わない（検索は全出品をまたぐ）。
 - **S2**：販売中と売れた品を別の索引（`listings_active`、`listings_sold`）に分け、売れた品は写し 1・シャードを大きく持つ（ADR-0008）。別名の付け方は同じ。
 
@@ -219,6 +219,7 @@ flowchart LR
 - 索引の欄の `status`・`vis` で絞った後、返す前に各件を `vis:{listing_id}`（Valkey）で確かめ、`listingVisible()`（`packages/visibility`）を閲覧者と文脈 `search` で呼ぶ。`hidden` は捨て、捨てた数を数える（SLI。目標は索引の反映が追いついた後の 0）。
 - 捨てた分は 33 件の余りで埋める。余りでも足りないときは、そのページは 30 件より少なくてよい（次のページの開始は `search_after` で正しく続く）。
 - Valkey が使えないときは、索引の `vis` だけで返し、購入は core の状態で必ず確かめる（ADR-0007）。
+- **見張りの出品**：`sentinel` の印を持つ出品は、`sentinel` の印を持つ閲覧者のときだけ `visible` で、それ以外の閲覧者には `hidden`（`listingVisible()` の措置の行の次の行。索引の `vis` にも `sentinel` を写し、検索の段で外す）。統合の工程で [observability.md](observability.md) の 4 節の提案を採った（[ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md) の注記）。
 - ページの深さ：`newest`・価格・`likes` は `search_after` で 3,000 件（100 ページ）まで。`recommended` は 1,000 件まで。それより先は「条件を絞ってください」と出す。
 
 ### 5.5 順位の式 `ranking_v1`（ADR-0019）
@@ -259,6 +260,7 @@ photo  = 0.9 + 0.1 × photo_quality                          … 0.91〜1.0
 ### 5.6 売れた品の検索
 
 - 同じ索引で `status` を `trading`・`sold` にする。価格は売れた価格（出品の最後の価格）。並べ替えの既定は `sold_at` の降順。
+- ログインした利用者だけが使える。ログインしていない要求には 401 を返し、販売中の検索だけを出す。売れた品の価格の一覧は相場のデータとして持ち出しの価値が最も高く、電話番号で確かめたアカウントごとの速さの上限で絞る（統合の工程で [security.md](security.md) の 3.3 節の提案を採った。[ADR-0008](../decisions/0008-search-engine-and-index.md) の注記）。
 - 結果から購入の操作を出さない（`visible_readonly`）。
 - 価格の提案の標本も同じ文書を読む（[categories-brands-and-pricing-suggestions.md](categories-brands-and-pricing-suggestions.md) の 6 節）。
 
@@ -349,6 +351,7 @@ pop24    = min(1, ln(1 + 24 時間のいいねの増え) / ln(101))
 | PROP-SRCH-004 | `match_v1` の語の一致を満たす出品は、検索の結果（`newest`、深さの範囲の中）に必ず含まれる（参照の実装：語の集合での素直な判定） |
 | PROP-SRCH-005 | `ranking_v1` の点は、いいねの数・写真の質・売り手の段について単調に増え、年齢について単調に減る。同じ点の並びは `listing_id` の降順で決まる |
 | PROP-SRCH-006 | 並べ替えは絞り込みの結果を変えない（並べ替えの前と後の集合が同じ。ADR-0010 の部分集合の性質） |
+| PROP-SRCH-007 | 任意の閲覧者で、`sentinel` の出品は `sentinel` の閲覧者の結果にだけ出る。ログインしていない閲覧者の結果に `trading`・`sold` の出品が出ない（統合の工程で足した） |
 | 試験のベクトル | 全角・半角、かな・カナ、長音、ブランドの英字とカナ、旧字、絵文字を含む題名で、決めた語から決めた出品が引けること（QA が期待する値を持つ）。5.5 節の例の点 |
 | 負荷 | 検索 3,000 件/秒（S1）で p95 200ms・p99 500ms、出品 30 万件/日の反映を同時に（NFR-010） |
 | 外からの見張り | 公開から検索に出るまで、停止から消えるまで（NFR-001） |
@@ -382,7 +385,6 @@ pop24    = min(1, ln(1 + 24 時間のいいねの増え) / ln(101))
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | C の単位と B の単位の分割の結果、追加辞書の中身、2-gram の 75% の値 | E5 の前の `search-index-poc` で、試験のベクトルの取りこぼしと余計な一致を測って Dev と QA が決める |
-| 索引の件数と大きさ（[architecture/README.md](README.md) の 2 節の 1.5 億と、この文書の見込み 7,000 万の差） | `search-index-poc` と `capacity.md` で確かめ、README の見込みを直すかを Dev が決める |
 | 閲覧の履歴と検索の語をおすすめに使う範囲（L5） | 法務の確認待ち。E5 の `likes-and-history` の spec の承認の前 |
 | `ranking_v1` の重み（72 時間、0.15、段の係数） | S1 の運用の 1 か月で、影の評価とクリック・いいねの率を見て見直す（`ranking_v2`） |
 | 予測の入力に利用者の検索の語を使うか | 法務の L5 の後に PM が決める |

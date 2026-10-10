@@ -35,7 +35,10 @@ date: 2026-10-10
 - prod の VPC：`/16`、3 AZ、サブネット `lb`・`app`・`ml`・`data`・`egress`。VPC エンドポイント（S3、SQS、SNS、KMS、STS、ECR、Logs、AppConfig、Secrets Manager、SES）。
 - 外への送信：`payments`（提供者）、`payouts`（銀行）、`shipping`（運送会社）、`identity`（eKYC、SMS）、`notifier-send`（APNs、FCM）だけが `egress` への経路を持つ。Network Firewall で SNI の名前の許可の一覧を当て、AZ ごとの固定の IP の NAT で出る。銀行が閉じた網を求めたら shared の Site-to-Site VPN。東京と大阪の両方の固定の IP を相手に登録する。
 - Webhook：`hooks.<brand>.<domain>` の別の配信、WAF（本文 256 KB、公開されていれば送り元の IP）、`hooks` の ALB。
-- `ml-inference`：`ml` のサブネット。入るのは `trust-safety`・`listings`・`search-api` から。出るのは OpenSearch（読み）、Valkey（`price_stats:*` の書きだけ）、S3（写真とモデルの読み）。Aurora、金庫の KMS の鍵、外への経路を持たない。モデルは data のアカウントで学習し、署名して prod の `ml-models` に入れる。
+- `ml-inference`：`ml` のサブネット。入るのは `trust-safety`・`listings`・`search-api` から。出るのは OpenSearch（読み）、Valkey（`price:*` の書きだけ）、S3（写真とモデルの読み）。Aurora、金庫の KMS の鍵、外への経路を持たない。モデルは data のアカウントで学習し、署名して prod の `ml-models` に入れる。
+
+> 2026-10-10 の注記：Valkey の鍵の名前を、価格の提案の [ADR-0016](0016-price-suggestion-from-sold-percentiles.md) と [categories-brands-and-pricing-suggestions.md](../architecture/categories-brands-and-pricing-suggestions.md) の 6.4 節に合わせて `price:*` にした（最初は `price_stats:*`）。
+
 - plan のポリシー検査で、この形を外れる変更を拒む。
 
 ### 他の案を選ばなかった理由

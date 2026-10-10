@@ -162,7 +162,7 @@ ADR-0072。
 | 入力 | 出品の ID、題名・説明・ブランド・カテゴリ・価格、写真の S3 の鍵（変換の後の `photos` を `ml-inference` が読む）。住所・メッセージの本文・利用者の個人のデータは送らない |
 | 出力 | 点（0〜1）、理由のコード、モデルのバージョンだけ（[ADR-0009](../decisions/0009-trust-and-safety-pipeline-boundary.md)） |
 | 触れないもの | Aurora（3 つとも）、金庫の KMS の鍵、外への送信 |
-| 価格の統計 | 日次のジョブが OpenSearch の売れた品を読み、Valkey の `price_stats:*` に書く（[ADR-0010](../decisions/0010-ml-boundary-for-pricing-and-recommendations.md)）。Valkey の ACL で、この鍵の接頭辞だけを書ける |
+| 価格の統計 | 日次のジョブが OpenSearch の売れた品を読み、Valkey の `price:*` に書く（[ADR-0010](../decisions/0010-ml-boundary-for-pricing-and-recommendations.md)）。Valkey の ACL で、この鍵の接頭辞だけを書ける |
 | モデル | data のアカウントの学習のジョブが作り、署名して、prod の `ml-models` に入れる。出し方は [delivery.md](delivery.md) の 7 節 |
 | 止まったとき | 非同期の分類器が遅れる。出品の公開は止めない（同期の検査は `listings` と `trust-safety` の規則で行う）。公開の前に分類器を待つ規則の対象は「確認中」のまま待つ。60 秒を超えたら規則のエンジンの既定（`review`）に倒す（[trust-and-safety.md](trust-and-safety.md)） |
 
@@ -229,7 +229,7 @@ sequenceDiagram
 
 - **RTO 1 時間**：昇格（数分）、ECS の拡大（S1 で 200 前後のタスク。大阪の Fargate で起こせる量と時間は**未検証**。半年ごとの DR の訓練で測る）、照合。OpenSearch の戻しは待たない。
 - **検索の落ちた形**：OpenSearch を戻す間、検索は core の読み出しの写しからの「カテゴリの新着」だけを返す（[search-and-discovery.md](search-and-discovery.md) と合意する）。保存した検索の照合は OpenSearch を使わないので続く。
-- **期限**：切り替えの間、`deadline-runner` は止めたままにし、再開の時に、止まっていた間に期限の来た取引の期限を、止まった時間だけ延ばす案を [transactions-and-state-machine.md](transactions-and-state-machine.md) に出す（利用者の責任でない期限切れを作らない）。
+- **期限**：切り替えの間、`deadline-runner` は止めたままにする。再開の前に、終わっていない取引の生きている期限を、止まった時間だけ後ろへずらす（利用者の責任でない期限切れを作らない。統合の工程で採った。[transactions-and-state-machine.md](transactions-and-state-machine.md) の 7.3 節、[ADR-0025](../decisions/0025-transaction-decision-table-and-deadline-pause.md) の注記）。止めた時刻と戻した時刻は `dr_events` に書く。
 - 東京へ戻すのは計画作業で、Global Database の管理された切り替え（switchover。RPO 0）で行う（出典）。
 
 ### 7.4 部品の障害
@@ -237,7 +237,7 @@ sequenceDiagram
 | 障害 | 影響 | 扱い |
 | --- | --- | --- |
 | 1 つの AZ | 容量の 1/3 | 各サービスは 2 AZ で平常の山を受けられる最小のタスクの数を持つ（[capacity.md](capacity.md) の 4.2 節）。Aurora は別の AZ へ |
-| Valkey | 先着の印、セッションの写し、`listingVisible()` の写しがない | 購入は出品ごとの同時実行の上限で DB へ（[ADR-0002](../decisions/0002-transaction-state-machine-and-single-purchase.md)）。セッションは core の読み出しの写し |
+| Valkey | 先着の印、セッションの写し、`listingVisible()` の写しがない | 購入は出品ごと・タスクごとの同時実行 4 と `lock_timeout` 200ms で DB へ。`transactions` のタスクは最大 12 なので、1 出品の DB に同時に届く購入は 48 件まで（[ADR-0026](../decisions/0026-hot-listing-purchase-admission.md)、[capacity.md](capacity.md) の 4.2 節）。セッションは core の読み出しの写し |
 | OpenSearch | 検索ができない | 7.3 節の落ちた形。購入と取引は影響なし |
 | ledger の書き込み | 仕訳が書けない | 取引は進む（outbox に溜まる）。残高での購入と振込は止まる。売上金の反映が遅れる（NFR-006） |
 | Network Firewall・NAT | 外への送信ができない | 決済の提供者の照会が遅れる。AZ ごとに持ち、他の AZ の経路へ回す |
@@ -325,11 +325,11 @@ ADR-0074。月次のキャパシティのレビュー（[capacity.md](capacity.m
 
 | 表・置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| core：`dr_events` | 切り替えの記録、失った範囲（クラスタごとの時刻の範囲）、照合の結果 | 7.3 |
+| core：`dr_events` | 切り替えの記録、失った範囲（クラスタごとの時刻の範囲）、照合の結果、期限を止めた時刻と戻した時刻 | 7.3 |
 | core：`capacity_reviews` | 月次の 8 指標の値（[capacity.md](capacity.md) と共有） | 8 |
 | AppConfig | `ops.purchase_enabled`、`ops.payouts_enabled`、`ops.carrier_enabled.<carrier>`（[runbooks/](../runbooks/README.md) の 2 節）、`ops.search_degraded_mode` | 7.3 |
 | S3 | `opensearch-snapshots`、`ml-models`、`photos-incoming`、`photos`（後の 2 つは [listings-and-photos.md](listings-and-photos.md) が持つ） | 4.2、5 |
-| Valkey | `price_stats:*`（`ml-inference` だけが書ける） | 5 |
+| Valkey | `price:*`（`ml-inference` だけが書ける） | 5 |
 
 ## 出典
 

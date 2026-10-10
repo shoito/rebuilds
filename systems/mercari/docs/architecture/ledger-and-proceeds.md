@@ -170,7 +170,7 @@ escrow_amount = price + payment_fee
 
 ### 5.2 例：3,000 円の売買（販売の手数料 10%、送料を差し引く）
 
-前提：価格 3,000 円、カード、売り手の負担の `<Brand>便`（運送会社 A の小さいサイズ、送料 210 円。料金は [shipping-integrations.md](shipping-integrations.md) の 5.1 節の表）。提供者の手数料は例として 3.6%（本システムの仮の値。選定で決まる）。売り手は売上金の全額を振り込む。
+前提：価格 3,000 円、カード、売り手の負担の `<Brand>便`（運送会社 A の小さいサイズ、送料 210 円。料金の形は [shipping-integrations.md](shipping-integrations.md) の 4.2 節、値は例）。提供者の手数料は例として 3.6%（本システムの仮の値。選定で決まる）。売り手は売上金の全額を振り込む。
 
 | # | 事象 | 仕訳の型 | 借方 | 貸方 |
 | --- | --- | --- | --- | --- |
@@ -228,7 +228,7 @@ escrow_amount = price + payment_fee
 | `legal.proceeds_forfeit_enabled` | 失効の仕訳を書く | true | **false** |
 | `legal.proceeds_spendable` | 売上金で購入できる | true | **false**（L1 の後） |
 | `legal.balance_enabled` | 残高（`user_balance`）を使う | true | **false** |
-| `legal.balance_requires_kyc_level` | 残高に移す本人確認の水準 | `ekyc_verified` | — |
+| `legal.balance_requires_kyc_level` | 残高に移す本人確認の水準 | `verified_document` | — |
 | `legal.balance_max_yen` | 残高の上限 | 1,000,000（仮） | — |
 | `legal.proceeds_expiry_notice_days` | 期限の前の通知 | `[30, 7, 1]` | —（文言は L1 の後） |
 
@@ -259,7 +259,7 @@ escrow_amount = price + payment_fee
 | 同 | 扱い 3 = `forfeit`。`legal.proceeds_forfeit_enabled = true` なら型 20 で 1,290 円を失効 | 0 | 1,000 | 1,000 |
 
 - 180 日の数え方：2026-04-01 ＋ 180 日 = 2026-09-28。期限の時刻はその日の 23:59:59（日本時間）。
-- **本人確認の場合**：利用者が 2026-07-01 に `ekyc_verified` になり、`legal.balance_enabled = true` なら、その時にロット A（1,290）と B（1,000）を型 19 で `user_balance` 2,290 円に移す。以後の release も、release の直後に同じ型で移す。`user_balance` にロットと期限はない。`legal.balance_max_yen` を超える分は、ロットのまま（期限つき）残す。
+- **本人確認の場合**：利用者が 2026-07-01 に `verified_document` になり、`legal.balance_enabled = true` なら、その時にロット A（1,290）と B（1,000）を型 19 で `user_balance` 2,290 円に移す。以後の release も、release の直後に同じ型で移す。`user_balance` にロットと期限はない。`legal.balance_max_yen` を超える分は、ロットのまま（期限つき）残す。
 - **本番の既定**：期限・失効・移し替えはすべて無効。ロットは `expires_at = NULL` で作られ、期限の処理は動かない（ADR-0004）。
 
 ## 7. 残高と明細

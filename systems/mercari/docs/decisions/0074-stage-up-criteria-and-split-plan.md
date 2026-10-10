@@ -25,6 +25,9 @@ date: 2026-10-10
 
 - 指標：core の書き込みの CPU、core の書き込みの行、ledger の熱い口座のロックの待ち、content の書き込みの行、OpenSearch の件数とシャードの大きさ、Valkey のメモリー、期限の処理の 1 分の件数、アカウントの上限。各指標の上限の 60% で準備を始め、2 つが超えたら S2 の計画を始める。
 - S2：content を `content-social`・`content-notify`・`content-ts` に分ける。OpenSearch を販売中と売れた品の索引に分ける。ledger の熱い口座をスロットに分け、残高の行を持たない。
+
+> 2026-10-10 の注記：Context の roadmap の記述（ledger の分割は S2）は、統合の工程で roadmap を直し、S2 は熱い口座のスロット、S3 は口座の持ち主のハッシュでの分割に揃えた。
+
 - S3：core を `core-accounts`（利用者の ID で引く表）と `core-market`（出品・取引・取引の事象・配送。`listing_id` のハッシュで 16）に分ける。買い手の取引の一覧は content の読み出しの表で引く。ledger を口座の持ち主のハッシュで分け、`escrow` は売り手の分け先に置く。細部は S3 の準備を始める時に後継の ADR で決める。
 - 月次のキャパシティのレビューで指標を見る。
 

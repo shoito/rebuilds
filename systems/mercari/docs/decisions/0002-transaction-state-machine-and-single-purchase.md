@@ -53,6 +53,8 @@ date: 2026-10-10
 - 部分一意の索引：`CREATE UNIQUE INDEX ON transactions (listing_id) WHERE state NOT IN ('cancelled', 'payment_expired')`。条件つきの更新を誤って外しても、二重の取引は挿入できない。
 - Valkey の印は、取引の作成で消さず、期限（15 秒）で消える。印は正しさに関わらない。
 
+> 2026-10-10 の注記：印は取引の作成では消さないが、取引の取り消し（`cancelled`・`payment_expired`）のコミットの後に、値が自分の試行の ID のときだけ消す形にした。15 秒を待つと、決済の失敗の後に 12 秒ほど誰も買えないため（[ADR-0026](0026-hot-listing-purchase-admission.md)）。Valkey の前に出品の写しを読み、販売中でなければ印を試さない。Valkey がないときの同時実行 4 は、`lock_timeout` 200ms と、`transactions` のタスクの最大 12（1 出品 48 件まで）と組にした。
+
 ### 状態
 
 ```mermaid
@@ -86,6 +88,9 @@ stateDiagram-v2
 
 - 状態の遷移は `packages/transactions` の 1 つの遷移の関数 `transition(transaction_id, event, actor, expected_version)` だけが書く。行を `SELECT ... FOR UPDATE` で取り、決定表で遷移を決め、`transaction_events` に行（理由のコード、主体）を足し、outbox を書く。
 - `cancelled`・`payment_expired` への遷移は、同じトランザクションで出品を `on_sale` に戻す（出品が `removed` なら戻さない）。`completed` への遷移で出品を `sold` にする。
+
+> 2026-10-10 の注記：発送の後の取り消し（紛争の運用の判断）では、出品を `on_sale` でなく `paused` に戻す。品が売り手の手元にあるとは限らないため（[ADR-0027](0027-cancellation-rules-and-listing-restoration.md)）。出品の決定表 DT-LST-001 の行 7a で表す（[listings-and-photos.md](../architecture/listings-and-photos.md) の 4.2 節）。決定表 DT-TXN-001 は 38 行で確定した（[ADR-0025](0025-transaction-decision-table-and-deadline-pause.md)）。売り手の評価の期限（3 日 = 72 時間）は本システムの値で、本家は受取評価の翌日以降に自動で完了する（[ヘルプの記事 115](https://help.jp.mercari.com/guide/articles/115/)、2026-10-10 に確認。本家との意図した違い）。
+
 - 配達済み（`delivered`）は受取評価の代わりにしない。受取評価は買い手の操作か、自動の完了の期限だけで起きる。
 - お金は状態の遷移の outbox から `ledger` が動かす（[ADR-0003](0003-escrow-and-double-entry-ledger.md)）。`completed` は release、`cancelled` は refund の 1 回だけの仕訳になる。
 

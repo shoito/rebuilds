@@ -62,6 +62,9 @@ Stripe の題材は、加盟店の台帳を追記だけの複式簿記にし（[
 | --- | --- | --- |
 | カードの確定 `(transaction, <id>, hold)` | `psp_receivable` 代金 | `escrow:<id>` 代金 |
 | 残高での購入 `(transaction, <id>, hold)` | `balance_reserved:<buyer>` 代金 | `escrow:<id>` 代金 |
+
+> 2026-10-10 の注記：組み合わせの支払い（ポイント・売上金 ＋ カード）では 1 つの取引に hold が 2 つ要り、同じ冪等キーでは 2 つ目が書けない。残高の行の冪等キーを `(transaction, <id>, hold_balance)`（型 `hold_balance`）に分けた。カードの行は `(transaction, <id>, hold)`（型 `hold_psp`）のまま。冪等キーで 1 回に限る決定の意味は変えていない（[ADR-0040](0040-balance-spend-order-and-reservation.md)、[ADR-0034](0034-chart-of-accounts-journal-types-and-fee-rounding.md)）。
+
 | 完了 `(transaction, <id>, release)` | `escrow:<id>` 代金 | `seller_proceeds:<seller>` 代金 − 手数料 − 送料、`fee_revenue` 手数料、`shipping_payable:<carrier>` 送料 |
 | 取り消し `(transaction, <id>, refund)` | `escrow:<id>` 代金 | `psp_receivable` か `balance_reserved:<buyer>`（払った手段へ戻す） |
 | 運用の補償 `(compensation, <case_id>, grant)` | `compensation_expense` | `points:<user>` か `seller_proceeds:<user>` |

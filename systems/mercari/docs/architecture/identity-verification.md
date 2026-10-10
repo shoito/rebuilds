@@ -15,7 +15,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0056](../decisions/0056-ekyc-provider-and-verification-levels.md) | eKYC は提供者のアダプター（セッションの作成、結果の取得、Webhook、データの削除の 4 つの口）の裏に置き、方式（`ic_chip`・`document_face`）ごとに提供者を替えられるようにする。利用者の確認の水準は `unverified`・`verified_document`・`verified_ic` の 3 つ。確認で開く機能と上限はバージョンの付いた表 `kyc_gates` に置き、法令に関わる値は `legal.*` を参照する。結果は Webhook と照会のどちらから来ても 1 つの関数で状態の機械を進める |
-| [0057](../decisions/0057-identity-data-minimization-and-retention.md) | 本システムは、確認の結果、方式、提供者の参照、確認の時刻と、確認した属性（氏名、カナ、生年月日、住所）を `identity` の KMS の鍵の封筒の暗号化で持つ。書類と顔の画像は本システムの S3 に置かない（提供者に置き、保存の期間は法務の結論で提供者の設定にする）。同じ人の検出は、カナの氏名と生年月日を秘密の鍵の HMAC にした指紋で行う。保存の期間・削除は `legal.kyc_*` に置き、結論まで記録を消さない |
+| [0057](../decisions/0057-identity-data-minimization-and-retention.md) | 本システムは、確認の結果、方式、提供者の参照、確認の時刻と、確認した属性（氏名、カナ、生年月日、住所）を `kms-kyc` の鍵の封筒の暗号化で持つ。書類と顔の画像は本システムの S3 に置かない（提供者に置き、保存の期間は法務の結論で提供者の設定にする）。同じ人の検出は、カナの氏名と生年月日を秘密の鍵の HMAC にした指紋で行う。保存の期間・削除は `legal.kyc_*` に置き、結論まで記録を消さない |
 
 ## 1. 範囲
 
@@ -33,7 +33,7 @@
 | --- | --- | --- |
 | 本家の匿名でない配送と本人確認 | 2024 年 9 月から、専用でない配送の方法に変えるには本人確認が要る（[公式のコラム](https://jp-news.mercari.com/contents/954)、2026-02-17。[intent.md](../intent.md) の出典） | `kyc_gates` の `non_anonymous_shipping` を `verified_*` にする |
 | 本家の売上金と本人確認 | 本人確認を済ませると売上金が期限のない「残高」になる（[ヘルプの記事 96](https://help.jp.mercari.com/guide/articles/96/)。[intent.md](../intent.md) の出典） | `legal.balance_requires_kyc_level` に置き、L1 の後に有効にする |
-| eKYC の方式と法令の当てはめ | 犯罪収益移転防止法の取引時確認の方式（施行規則の「ホ」「ワ」など）と、本システムが特定事業者に当たるかは法務の確認待ち（L2） | 方式を `method` として持ち、水準との対応を設定にする |
+| eKYC の方式と法令の当てはめ | 犯罪収益移転防止法の取引時確認の方式（施行規則の「ホ」「ワ」など）と、本システムが特定事業者に当たるかは法務の確認待ち（L2）。施行規則の改正で、非対面の「ホ」方式（書類の画像と容貌の画像の送信）は 2027 年 4 月 1 日から使えなくなり、IC チップの読み取りと公的個人認証（「ワ」）が中心になる（法律事務所の解説で確かめた。改正命令の本文は**未検証**。[intent.md](../intent.md) の出典） | 方式を `method` として持ち、水準との対応を設定にする。`document_face` は「ホ」方式に当たりうるので、取引時確認に使う機能（振込の上限の引き上げ、残高）の条件に `verified_document` を入れるかは L2 の結論で決める |
 
 いずれも 2026-10-10 に確認。
 
@@ -165,13 +165,13 @@ stateDiagram-v2
 | 項目 | 置き場所 | 持つ期間 |
 | --- | --- | --- |
 | 確認の結果（水準、方式、提供者、提供者の参照、時刻、理由のコード） | Aurora core `kyc_records`（本人だけ。FORCE RLS） | 法務の確認待ち（L2・L5）。結論まで消さない |
-| 確認した属性（氏名、カナ、生年月日、住所、書類の種類） | 同じ行の `attributes_ct`（`identity` の KMS の鍵の封筒の暗号化） | 同上 |
+| 確認した属性（氏名、カナ、生年月日、住所、書類の種類） | 同じ行の `attributes_ct`（`kms-kyc` の鍵の封筒の暗号化） | 同上 |
 | 指紋 | `kyc_fingerprints` | 同上 |
 | 書類・顔の画像、IC の読み取りの中身 | 提供者だけ。本システムの S3 に置かない | 提供者の設定。値は法務の結論の後（`legal.kyc_provider_retention_days`） |
 | セッションの記録 | `kyc_sessions` | 1 年（本システムの値。結論で直す） |
 
 - **使い道**：属性は、振込の口座の名義の照合（`payouts-and-points.md` がカナの氏名の一致だけを `identity` に問い、`identity` が真偽を返す）、年齢の帯（18 歳未満か）、同じ人の検出にだけ使う。住所は、配送の住所の金庫と結ばない（配送先は利用者が別に登録する）。
-- **見せ方**：本人は自分の確認の状態と水準を見られる。属性は、本人が「登録した氏名」として一部（姓だけなど）を見られる。運用者は `kyc_viewer` の別の権限（JIT、理由、監査）でだけ見る（ADR-0007、`security.md`）。
+- **見せ方**：本人は自分の確認の状態と水準を見られる。属性は、本人が「登録した氏名」として一部（姓だけなど）を見られる。運用者は `kyc.view` の別の権限（JIT、理由、監査）でだけ見る（ADR-0007、`security.md`）。
 - **退会**：退会しても、法令の保存の期間がある記録は消さない。期間は法務の確認待ち（L2・L5）。期間の後に、属性・指紋を消し、提供者の削除の口（`deleteData`）を呼ぶ。
 - **ログ**：属性・指紋・提供者の参照をログに出さない。`session_id` と結果のコードだけ。
 
@@ -196,7 +196,7 @@ stateDiagram-v2
 | 振込の上限と確認の段 | L2 | 5 節の `legal.payout_limit_yen.{level}` |
 | 売上金の残高と本人確認 | L1 | 5 節の `legal.balance_requires_kyc_level` |
 | 書類と顔の画像の利用目的と保存の期間、退会の後の保持 | L5 | 7 節。結論まで消さず、画像は提供者だけに置く |
-| 未成年の扱い（確認の可否、機能の制限） | L2・L5 | 未成年の枠（申告の生年月日、保護者の同意の記録、`ageOf()`、上限の `legal.*`）は [ADR-0068](../decisions/0068-account-deletion-and-minors.md)。この文書は、確かめた生年月日を `ageOf()` の入力として渡す（`verified` の利用者は申告より確かめた値を使う）。未成年の確認の可否は結論の後 |
+| 未成年の扱い（確認の可否、機能の制限） | L2・L5・L12 | 未成年の枠（申告の生年月日、保護者の同意の記録、`ageOf()`、上限の `legal.*`）は [ADR-0068](../decisions/0068-account-deletion-and-minors.md)。この文書は、確かめた生年月日を `ageOf()` の入力として渡す（`verified` の利用者は申告より確かめた値を使う）。未成年の確認の可否は結論の後 |
 | 再確認の要否と間隔（書類の有効期限など） | L2 | `legal.kyc_reverify_days`。結論まで再確認を求めない |
 
 ## 10. 失敗と回復
@@ -207,7 +207,7 @@ stateDiagram-v2
 | Webhook の欠け | 結果が届かない | 10 分ごとの照会で拾う |
 | Webhook の重複・順序の入れ替え | 二重の反映 | inbox と DT-KYC-001 の 1 行（冪等） |
 | 提供者の結果の取り消し（後でなりすましと判明） | 誤った `verified` | 提供者の通知か T&S の審査で `revoked`。開いた機能を閉じ、進行中の振込は `payouts-and-points.md` の手順で止める |
-| `identity` の KMS の鍵の障害 | 属性が読めない | 水準の判定は属性を読まずにできる（`kyc_records` の水準の列）。名義の照合は止まり、振込の確かめは待つ |
+| `kms-kyc` の鍵の障害 | 属性が読めない | 水準の判定は属性を読まずにできる（`kyc_records` の水準の列）。名義の照合は止まり、振込の確かめは待つ |
 | 指紋の誤一致（同姓同名・同じ生年月日の別人） | 正しい利用者が `on_hold` | 審査員が書類の参照（提供者の画面）で判断し、例外として `verified` にする |
 
 ## 11. 上限
@@ -224,7 +224,7 @@ stateDiagram-v2
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora core `kyc_sessions`（`session_id`（UUIDv7）、`user_id`、`method`、`provider`、`provider_session_ref`、`state`、`result_code`、`created_at`、`submitted_at`、`decided_at`、`expires_at`）。FORCE RLS | セッション | 6 |
-| Aurora core `kyc_records`（`user_id`、`status`、`level`、`method`、`provider`、`provider_ref`、`verified_at`、`attributes_ct`、`attributes_key_id`、`age_band`、`revoked_by_action_id`、`updated_at`）。FORCE RLS。運用者は `kyc_viewer` の JIT | 確認の正本 | 6.2、7 |
+| Aurora core `kyc_records`（`user_id`、`status`、`level`、`method`、`provider`、`provider_ref`、`verified_at`、`attributes_ct`、`attributes_key_id`、`age_band`、`revoked_by_action_id`、`updated_at`）。FORCE RLS。運用者は `kyc.view` の JIT | 確認の正本 | 6.2、7 |
 | Aurora core `kyc_fingerprints`（`fingerprint`、`user_id`、`state`、`created_at`）。サービスの役割だけ | 同じ人の検出 | 6.3 |
 | Aurora core `kyc_inbox`（`provider`、`event_id`、`received_at`、`processed_at`） | Webhook の inbox | 6.1 |
 | 設定 `kyc_gates`（バージョンつき）、AppConfig `kyc.*`、`legal.balance_requires_kyc_level`、`legal.payout_limit_yen.*`、`legal.payout_monthly_limit_yen.*`、`legal.balance_spend_limit_yen.*`、`legal.kyc_*` | 開く機能と法令の値 | 5、9 |
@@ -235,7 +235,7 @@ stateDiagram-v2
 | ID | 性質・試験 |
 | --- | --- |
 | PROP-KYC-001 | 任意の提供者の事象（Webhook と照会の結果）の重複・順序の入れ替え・欠けで、利用者の水準は DT-KYC-001 の 5 行でだけ上がり、同じ結果を何度当てても変わらない |
-| PROP-KYC-002 | 任意の利用者と主体で、`kyc_records`・`kyc_sessions` の行は本人と `kyc_viewer` の権限の運用者だけが読める（RLS の性質ベーステスト） |
+| PROP-KYC-002 | 任意の利用者と主体で、`kyc_records`・`kyc_sessions` の行は本人と `kyc.view` の権限の運用者だけが読める（RLS の性質ベーステスト） |
 | PROP-KYC-003 | 属性・指紋・提供者の参照が、ログ・トレース・データレイク・通知に現れない（ログの検査。[quality.md](../quality.md) の 2.2.1 節 G） |
 | PROP-KYC-004 | `kyc_gates` のどのバージョンでも、条件を満たさない水準の利用者に、その機能が開かない（各サービスの判定の表駆動テスト） |
 | PROP-KYC-005 | `legal.*` の値が未設定（法務の結論の前）のとき、残高への移し替えと、水準による振込の上限の引き上げが本番で一度も効かない |
@@ -270,6 +270,6 @@ stateDiagram-v2
 | 特定事業者に当たるか、取引時確認の方式、記録の保存の期間、疑わしい取引の届出（L2） | 法務の確認待ち。E15 の全 Story の spec の承認の前 |
 | 振込・残高・購入の上限の値（L1・L2） | 法務の確認待ち。E10・E15 の spec の承認の前 |
 | 画像と属性の利用目的、退会の後の保持（L5） | 法務の確認待ち。E15 の `kyc-document-retention` の承認の前 |
-| 未成年の確認の可否 | 法務の確認待ち（L2・L5）。枠は [ADR-0068](../decisions/0068-account-deletion-and-minors.md) |
+| 未成年の確認の可否 | 法務の確認待ち（L2・L5・L12）。枠は [ADR-0068](../decisions/0068-account-deletion-and-minors.md) |
 | 提供者の選定（IC と書類の両方を 1 社にするか） | E15 の `ekyc-provider-selection` で、費用・合格の率・障害の実績を比べて PM と Dev が決める |
 | マイナンバーカードの IC で得る情報のうち、何を属性として持つか（電子証明書のシリアルの扱いを含む） | 法務の確認待ち（L2・L5）。結論まで、シリアルを本システムに持たない |

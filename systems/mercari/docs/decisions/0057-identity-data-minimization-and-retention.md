@@ -24,7 +24,10 @@ date: 2026-10-10
 
 1 を採用する。
 
-- `kyc_records`：水準、方式、提供者、提供者の参照、確認の時刻、`attributes_ct`（`identity` の KMS の鍵の封筒の暗号化）、`age_band`。FORCE RLS。運用者は `kyc_viewer` の JIT と監査で見る。
+- `kyc_records`：水準、方式、提供者、提供者の参照、確認の時刻、`attributes_ct`（`kms-kyc` の鍵の封筒の暗号化）、`age_band`。FORCE RLS。運用者は `kyc.view` の JIT と監査で見る。
+
+> 2026-10-10 の注記：鍵は `kms-kyc`（[ADR-0069](0069-key-layout-and-vault-envelope-encryption.md)）、運用者の閲覧の権限は `kyc.view`（[ADR-0070](0070-operator-access-vault-reveal-and-audit.md)）に名前を揃えた。最初は「`identity` の KMS の鍵」「`kyc_viewer`」と書いていた。
+
 - 画像と IC の読み取りの中身は、提供者の SDK と提供者のサーバーの間だけで流れ、本システムのサーバー・ログ・S3 を通らない。提供者の保存の期間は法務の結論の後に設定する（`legal.kyc_provider_retention_days`）。
 - 属性の使い道：口座の名義の照合（真偽だけを返す）、年齢、同じ人の検出。配送の住所と結ばない。
 - 指紋：`HMAC-SHA256(k_identity, normalize(カナの氏名) | 生年月日)`。鍵は `identity` だけが使う。データレイクに入れない。

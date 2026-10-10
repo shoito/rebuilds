@@ -10,7 +10,7 @@
   - E14 の前：偽ブランドの分類器の最初の評価（`counterfeit-classifier-poc`）。
 - **規則は 1 つのコードに。** 購入と取引の遷移と期限は `packages/transactions`、仕訳は `packages/ledger`、手数料と送料の計算は `packages/fees`、出品の見える範囲は `packages/visibility`、検索の組み立ては `packages/search`、住所の復号は `packages/shipping`、措置は `packages/trust-safety` にだけ書く。
 - **契約を先に固定する。** 取引の状態と遷移の決定表、期限の表、台帳の勘定科目と仕訳の型、`legal.*` の値の一覧、配送の事象の順位、`listingVisible()` の決定表、提供者・運送会社のアダプターの契約、規則のエンジンの言語は、人間がレビューして確定する。エージェントは勝手に変えない。
-- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L11）。下の表で「法務：L*」と書いた Story が当たる。
+- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L13）。下の表で「法務：L*」と書いた Story が当たる。
 - **人気の出品を早く試す。** 負荷の生成器を E7 で作り、縮めた規模の人気の出品の場面を、E7 から夜間に流し続ける。
 
 ## Epic
@@ -19,8 +19,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 | Epic | 目的 | 状態 |
 | --- | --- | --- |
-| E1 基盤 | AWS・Terraform・CI（TypeScript と Python、参照の実装の枠）、3 つの Aurora と RLS、outbox、フラグ（`release.*`・`ops.*`・`legal.*`）、監査ログ、運用の画面の骨格、大阪の骨格 | 設計中 |
-| E2 アカウントと端末 | 電話番号の確認、ログイン（パスキー、SMS）、セッション、端末、ブロック、退会 | 未着手（退会とデータの削除は法務：L5） |
+| E1 基盤 | AWS・Terraform・CI（TypeScript と Python、参照の実装の枠）、3 つの Aurora と RLS、outbox、フラグ（`release.*`・`ops.*`・`legal.*`）、監査ログ、運用の画面の骨格、大阪の骨格 | 未着手 |
+| E2 アカウントと端末 | 電話番号の確認、ログイン（パスキー、SMS）、セッション、端末、ブロック、退会 | 未着手（退会とデータの削除は法務：L5、未成年は法務：L12） |
 | E3 出品と写真 | 出品、写真の処理、質の検査、出品の状態、同期の検査の呼び出し | 未着手（事業者の印は法務：L3） |
 | E4 カテゴリ・ブランド・価格の提案 | カテゴリの木、状態、ブランドの辞書、カテゴリごとの制限、価格の提案 | 未着手（表示は法務：L4、制限は法務：L10） |
 | E5 検索と発見 | 索引、日本語の解析、絞り込みと集計、売れた品、いいね、閲覧の履歴、基本のおすすめ | 未着手（前に索引の PoC。閲覧の履歴の利用は法務：L5） |
@@ -35,7 +35,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E14 T&S | 同期の検査、分類器、規則のエンジン、審査の待ち行列と画面、措置と異議、通報、権利者の窓口、不正 | 未着手（前に分類器の PoC。法務：L6・L7・L9・L10） |
 | E15 本人確認 | eKYC の提供者の連携、確認の水準、確認で開く機能と上限、書類の扱い | 未着手（全 Story が法務：L2・L5） |
 | E16 紛争と CS | 問題の報告、紛争と期限の停止、運用の介入、補償、問い合わせ、開示の請求と照会 | 未着手（開示は法務：L7、照会は法務：L6） |
-| E17 通知 | プッシュ、メール、お知らせ、配信の設定、まとめ、値下げ・いいねの fan-out | 未着手（値下げの文言は法務：L4） |
+| E17 通知 | プッシュ、メール、お知らせ、配信の設定、まとめ、値下げ・いいねの fan-out | 未着手（値下げの文言は法務：L4、案内のメールは法務：L13） |
 | E18 本番の準備と GA の判定 | 負荷試験（人気の出品、大型の企画の日）、DR の訓練、外部のペンテスト、GA の判定 | 未着手（GA の判定は法務：L1・L2・L5・L7・L9） |
 | E19 オファー（MVP の後） | 決まった形の価格の提示、期限つきの承諾、取り置き | 未着手（MVP の後） |
 | E20 事業者の出品（MVP の後） | 事業者の登録、特定商取引法の表示、事業者向けの手数料 | 未着手（MVP の後。法務：L3・L8） |
@@ -47,13 +47,13 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。領域の文書（[architecture/README.md](architecture/README.md) の 7 節）を書くときに、各領域の「Story の候補」で直す。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各 Epic の表の後ろの行は、統合の工程（2026-10-10）で、領域の文書（[architecture/README.md](architecture/README.md) の 7 節）の「Story の候補」から足した。
 
 ### E1 基盤
 
 | Story | 内容 |
 | --- | --- |
-| `dev-repo-bootstrap` | Mercari の再構築の開発リポジトリを作り、`changes/`・`specs/`・開発向けの `AGENTS.md`、CODEOWNERS（`packages/transactions`・`ledger`・`fees`・`visibility`、`ml/` はテックリード）を置く（リポジトリ共通の ADR-0005） |
+| `dev-repo-bootstrap` | Mercari の再構築の開発リポジトリを作り、`changes/`・`specs/`・開発向けの `AGENTS.md`、CODEOWNERS（`packages/transactions`・`ledger`・`fees`・`visibility`、`ml/` はテックリード、`config/legal/` は法務と財務、`migrations/ledger/` はテックリードと財務）を置く（リポジトリ共通の ADR-0005） |
 | `aws-accounts-and-network` | アカウント（本番、検証、見張りの別のアカウント）、SCP、VPC、egress の経路（提供者、銀行、運送会社、eKYC、SMS、プッシュ） |
 | `aurora-clusters-and-rls` | core・ledger・content の 3 クラスタ、FORCE RLS、`SET LOCAL app.actor_id`、サービスの役割の許可リスト、RLS の検査（ADR-0001、ADR-0007） |
 | `outbox-and-relay` | outbox、`relay`、SNS・SQS の話題 |
@@ -63,6 +63,14 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `audit-log-and-ops-shell` | 監査ログの表と S3 の Object Lock への写し、運用の画面の骨格、JIT の権限 |
 | `data-lake-baseline` | outbox の事象の写し、仮名にする処理、個人のデータの除外の検査 |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、S3 の写し |
+| `terraform-size-tiers` | 部品の大きさの段（S1・S2・S3）の Terraform の変数（ADR-0077） |
+| `edge-baseline` | CloudFront・WAF・Bot Control、Webhook の別の配信（infrastructure.md の 3 節） |
+| `ml-serving-boundary` | `ml` のサブネット、`ml-inference` の境界（ADR-0072） |
+| `kms-key-layout` | 用途ごとの KMS の鍵、暗号化の文脈の条件、plan の検査（ADR-0069） |
+| `deploy-pipeline-and-rollback` | 段階のデプロイと自動のロールバック（delivery.md の 4 節） |
+| `migration-guardrails` | 広げる・移す・縮める、守る物の検査（ADR-0078） |
+| `canary-baseline` | 外からの見張りの骨格、見張りの出品（observability.md の 4 節） |
+| `app-telemetry` | アプリの計測の受け口。公表は法務：L11 |
 
 ### E2 アカウントと端末
 
@@ -75,6 +83,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `account-takeover-signals` | 新しい端末・電話番号の変更の再確認、兆しの記録（trust-and-safety へ渡す） |
 | `profiles-and-blocks` | 公開のプロフィール、ブロック |
 | `account-deletion` | 退会、データの削除と保持。法務：L5 |
+| `age-and-minor-consent` | 生年月日、保護者の同意の記録、`ageOf()`（ADR-0068）。法務：L12 |
+| `app-release-train` | アプリの列車、最小のバージョン（ADR-0079） |
 
 ### E3 出品と写真
 
@@ -86,6 +96,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `listing-quality-checks` | 必須の項目、写真の質、題名とカテゴリの食い違いの警告 |
 | `listing-sync-checks` | 同期の検査の呼び出し（禁止の語、禁止のハッシュ、アカウントの状態）（ADR-0009） |
 | `business-seller-flag` | 事業者に当たりうる売り手の印。基準は法務：L3 |
+| `photo-delivery-and-withdrawal` | 写真の配信の URL、停止と隔離 |
+| `photo-reuse-index` | 写真の使い回しの索引 `photo_hashes`（ADR-0013） |
 
 ### E4 カテゴリ・ブランド・価格の提案
 
@@ -96,6 +108,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `category-restrictions` | カテゴリごとの制限と禁止。範囲は法務：L10 |
 | `price-suggestion-stats` | 売れた品の四分位、広げ方、日次の計算（ADR-0010） |
 | `price-suggestion-display` | 出品の画面の表示。文言は法務：L4 |
+| `category-suggestions` | カテゴリの候補と、題名とカテゴリの食い違いの警告 |
 
 ### E5 検索と発見
 
@@ -118,6 +131,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `saved-searches` | 保存、正規化、1 人 30 件の上限 |
 | `saved-search-matcher` | 逆索引、照合の Worker、参照の実装（quality.md の 2.2.1 節 E） |
 | `saved-search-digests` | まとめの窓、1 日の上限、送る前の見える範囲 |
+| `saved-search-recall-audit` | 毎晩の取りこぼしの比べ、解析器の変更の手順 |
 
 ### E7 取引
 
@@ -162,6 +176,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `three-way-reconciliation` | 台帳と提供者・銀行の日次の照合、仮勘定 |
 | `ledger-reference-and-props` | `ledger-ref` と性質ベーステスト（quality.md の 2.2.1 節 B） |
 | `fee-invoices` | 手数料の請求書と明細。法務：L8 |
+| `customer-funds-daily` | 利用者の資金の日次の集計。保全は法務：L1 |
+| `ledger-migration-pipeline` | 台帳のマイグレーションの別の流れ（ADR-0078） |
 
 ### E10 振込とポイント
 
@@ -172,6 +188,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `payouts` | 振込の申請、手数料、実行、失敗の戻し。上限は法務：L2 |
 | `points` | ポイントの付与（キャンペーン、補償）と使用、期限。法務：L1・L4 |
 | `pay-with-balance` | 売上金・ポイントでの購入、引き当てと戻し。売上金の使用は法務：L1 |
+| `zengin-file-fallback` | 全銀の形式の総合振込のファイルへの切り替え（ADR-0038） |
 
 ### E11 配送の連携
 
@@ -194,6 +211,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `transaction-messages` | 取引のメッセージ（2 者） |
 | `abuse-filtering` | 禁止の語、連絡先・住所の書き込み、外部の取引への誘導の検出。範囲は法務：L11 |
 | `message-reports` | コメントとメッセージの通報 |
+| `message-scan-modes` | `legal.message_scan_mode` と同意の文。法務：L11 |
+| `message-retention` | 削除・措置の後の本文の保持の写し。法務：L5・L9・L11 |
 
 ### E13 評価と信用
 
@@ -219,6 +238,10 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `user-reports` | 出品・利用者の通報 |
 | `fraud-signals` | 乗っ取り、偽の発送、チャージバック、売上金の現金化の兆し |
 | `legal-notices-intake` | 削除の申し出・停止の要請の受け付けと期限。法務：L7・L9 |
+| `sync-screening` | `screenListing`、禁止の語、禁止のハッシュの一覧、公開の前に待つ（ADR-0054） |
+| `appeals` | 異議（ADR-0052） |
+| `fraud-dashboards` | 不正・お金のダッシュボード（ADR-0076） |
+| `model-and-rule-release` | モデルと規則の出し方（ADR-0079） |
 
 ### E15 本人確認
 
@@ -228,6 +251,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ekyc-integration` | 提供者の連携、確認の状態と水準。法務：L2・L5 |
 | `kyc-gated-features` | 確認で開く機能と上限（残高、匿名でない配送、振込の上限）。法務：L1・L2 |
 | `kyc-document-retention` | 書類と結果の保存と削除。法務：L2・L5 |
+| `kyc-duplicate-detection` | 同じ人の検出の指紋と `on_hold`（ADR-0057） |
 
 ### E16 紛争と CS
 
@@ -239,6 +263,9 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `support-inquiries` | 問い合わせの受け付けと案件 |
 | `disclosure-requests` | 販売業者等の情報の開示の請求。法務：L7 |
 | `law-enforcement-requests` | 捜査機関・行政の照会。法務：L6 |
+| `proceeds-holds` | 売上金の保留と解除（ADR-0060） |
+| `return-shipments` | 返送の流れ |
+| `ops-reveal-flows` | 住所・口座・本人確認の見せる操作（ADR-0070） |
 
 ### E17 通知
 
@@ -248,6 +275,9 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `transaction-notifications` | 取引の通知（NFR-008 の 10 秒） |
 | `price-drop-and-like-fanout` | 値下げ・いいねの fan-out、1 日の上限。文言は法務：L4 |
 | `notification-fanout-tests` | fan-out の試験（quality.md の 2.2.1 節 I） |
+| `quiet-hours-and-caps` | 静かな時間と上限（ADR-0064） |
+| `notification-prescaling` | 毎日 9 時の予定の拡大（ADR-0077） |
+| `notification-delay-sli` | 通知の遅れの SLI |
 
 ### E18 本番の準備と GA の判定
 
@@ -259,6 +289,9 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e18` | 個別の手順の作成と確認 |
 | `ga-readiness` | GA の判定。法務：L1・L2・L5・L7・L9 |
+| `campaign-prescaling` | 大型の企画の日の前もっての拡大（ADR-0077） |
+| `cost-baseline` | 費用のモデルを請求の実績で置き換える |
+| `retention-sweeper` | 保持の期間の消す処理（ADR-0071）。値は法務：L5 |
 
 ## エージェントに任せないこと
 
@@ -269,7 +302,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 - **`legal.*` の値の変更**：法務と財務。
 - **大阪への切り替えの判断**：IC と Ops の責任者。
 - **開示の請求・捜査機関からの照会への応答**：法務と Ops。
-- **法務の判断**（L1〜L11）。
+- **法務の判断**（L1〜L13）。
 - **負荷試験・PoC・評価の集まりの結果の解釈**：数字は出せるが、上限・構成・採否は Dev・QA・PM の判断。
 
 ## 延期の一覧
@@ -279,5 +312,5 @@ MVP の後に検討する。E19〜E23 に入れなかったもの。着手する
 - **オークションの形式、ライブの販売**（transactions-and-state-machine の領域）。
 - **梱包・集荷の代行、大型の品の配送**（shipping-integrations の領域）。
 - **取引のメッセージのエンドツーエンドの暗号化**（悪用の絞り込みと両立しない。法務の L11 の結論の後に検討する）。
-- **core の分割（S3）と ledger の分割（S2）**（infrastructure の領域。段階を上げる基準で起票する）。
+- **content の分割と ledger の熱い口座のスロット（S2）、core の分割と ledger の持ち主のハッシュでの分割（S3）**（[ADR-0074](decisions/0074-stage-up-criteria-and-split-plan.md)。段階を上げる基準で起票する）。
 - **自前の eKYC**（提供者で足りる間は作らない）。

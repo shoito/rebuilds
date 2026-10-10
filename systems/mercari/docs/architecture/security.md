@@ -107,7 +107,7 @@ flowchart LR
 ### 3.2 T2：偽の発送
 
 - 代金は受取評価（か自動の完了）まで預かる（[ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md)）。売り手に渡るのは取引の完了の後だけ。
-- 匿名の配送は、運送会社の `accepted` の事象がなければ `shipped` にならない（[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md)）。
+- 匿名の配送は、運送会社の順位 1 以上の事象（引き受け。欠けたら輸送中・配達済みから補う）がなければ `shipped` にならない（[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md)、[ADR-0042](../decisions/0042-carrier-event-ranking-and-implied-acceptance.md)）。売り手の操作だけでは補わない。
 - 匿名でない配送は、追跡の番号を照会で確かめられないとき、`shipped` に信用の印を付ける。印の付いた取引が自動の完了で売上金になる前に、T&S の規則が人の審査に回せるようにする（規則は [trust-and-safety.md](trust-and-safety.md)、期限の扱いは [transactions-and-state-machine.md](transactions-and-state-machine.md) と合意する）。
 - 運送会社の Webhook は署名を確かめ、運送会社が送り元の IP を公開していればエッジでも絞る（**未検証**：運送会社の API の能力は選定の Story で確かめる）。
 
@@ -115,7 +115,7 @@ flowchart LR
 
 | 経路 | 守り |
 | --- | --- |
-| 検索、売れた品の検索 | WAF の Bot Control（共通）、IP ごと 1 分 120 件、ログインの利用者ごと 1 分 120 件（[search-and-discovery.md](search-and-discovery.md) の上限と同じ）。売れた品の検索はログインを求める案を [search-and-discovery.md](search-and-discovery.md) に出す |
+| 検索、売れた品の検索 | WAF の Bot Control（共通）、IP ごと 1 分 120 件、ログインの利用者ごと 1 分 120 件（[search-and-discovery.md](search-and-discovery.md) の上限と同じ）。売れた品の検索はログインした利用者だけ（統合の工程で採った。[search-and-discovery.md](search-and-discovery.md) の 5.6 節） |
 | 出品の詳細、プロフィール | IP ごと 1 分 300 件。ID は UUIDv7 で、連番で辿れない |
 | 写真 | 公開の CDN。元の大きさの写真は配らない（[listings-and-photos.md](listings-and-photos.md)） |
 | API の全般 | `X-<Brand>-Client` と端末の証明の信号。ブラウザーでないクライアントの多い IP の種類（データセンター）にチャレンジ |
@@ -306,7 +306,7 @@ sequenceDiagram
 
 ### 7.2 消す処理
 
-- `retention-sweeper` のジョブが、区分ごとの規則を日次で当てる。大きな表（`notifications`、`notification_sends`、`browsing_history`、`transaction_messages`）は月の区切り（PostgreSQL の宣言の区切り）にし、区切りを落とす。
+- `retention-sweeper` のジョブが、区分ごとの規則を日次で当てる。大きな表（`notifications`、`notification_sends`、`view_history`、`transaction_messages`）は月の区切り（PostgreSQL の宣言の区切り）にし、区切りを落とす。
 - 消した件数と、期限を過ぎて残る件数を指標にする（[observability.md](observability.md) の 3 節）。期限の 7 日を過ぎた残りはチケット。
 - 法令の照会・紛争・措置の対象の行は「保全」の印を付け、印の間は消さない（印の付け外しは `legal.respond` の権限と監査）。
 
@@ -340,7 +340,7 @@ sequenceDiagram
 - 種類：住所・本人のデータの漏れ（SEV1 の候補）、乗っ取りの波、振込の不正、鍵の漏えいの疑い、内部の者の不正。
 - 住所の漏れの疑いは `privacy-leak-response.md`（[runbooks/](../runbooks/README.md) の 4 節）で、経路を止め、範囲を監査の事象と漏れの経路の表で調べる。漏えい等の報告と本人への通知の要否と期限は法務の判断（法務の確認待ち：L5）。
 - 鍵の漏えいの疑い：持ち主のサービスの役割の資格を失効させ、タスクを入れ替える。`kms-vault-*` の鍵の新しいバージョンで、利用者の鍵を包み直す（利用者の鍵そのものの交換は、全行の再暗号化が要るので、漏えいの範囲で判断する）。
-- 乗っ取りの波：`fraud-surge.md`。新しい口座への振込を止める判断は Ops の責任者と T&S の責任者。
+- 乗っ取りの波：[account-takeover.md](../runbooks/account-takeover.md)。新しい口座への振込を止める判断は Ops の責任者と T&S の責任者。
 
 ## 11. data-model への項目
 
@@ -392,7 +392,7 @@ sequenceDiagram
 - **運用者**：案件の JIT 2 時間、見せる操作の 2 人目の承認と 1 日 20 件、break-glass の読み出しだけ（ADR-0070）。
 - **監査**：同じトランザクションで書き、ハッシュの鎖で Object Lock へ（ADR-0070）。
 - **区分と保持**：9 区分、保持は既定値（ADR-0071）。
-- **スクレイピング**：WAF と速さの上限。売れた品の検索のログインは search-and-discovery の領域に提案。
+- **スクレイピング**：WAF と速さの上限。売れた品の検索はログインした利用者だけ（統合の工程で採った）。
 
 ### 持ち越し
 

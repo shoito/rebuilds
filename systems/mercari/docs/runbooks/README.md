@@ -1,6 +1,6 @@
 # Runbooks: Mercari
 
-Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は observability の領域（まだない）で書く。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
+Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は [observability.md](../architecture/observability.md) にある。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
 
 この題材は、利用者どうしのお金と品を運ぶ。止まれば、売れるはずの品が売れず、預かったお金が動かない。二重の販売と、お金の誤りは、止まるより悪い。人気の出品と大型の企画の日の運用は 5 節にまとめる。
 
@@ -13,7 +13,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 負けの応答の速さ | 人気の出品で負けた要求が 200ms 以内 | **p99 200ms**（NFR-002） | p99 が 1 秒を 5 分超えたらチケット | |
 | 検索と出品の可用性 | 検索・出品の要求のうち、5xx・時間切れでないもの | **月間 99.9%**（NFR-007） | バーンレート | |
 | 検索の速さ | 検索が 200ms 以内 | **p95 200ms**（NFR-010） | p95 が 500ms を 15 分超えたらチケット、1 秒で呼び出し | |
-| 出品から検索まで | 見張りの出品の公開から検索に出るまで | **p95 10 秒・p99 60 秒**（NFR-001） | p99 が 5 分を超えたら呼び出し | ○ |
+| 出品から検索まで | 出品の事象の commit から検索に出るまで（全件の時刻の差。見張りは可用性の確かめに使う。[ADR-0075](../decisions/0075-sli-measurement-and-correctness-monitors.md)） | **p95 10 秒・p99 60 秒**（NFR-001） | p99 が 5 分を超えたら呼び出し | ○ |
 | 二重の販売 | 出品と取引の照合の不一致 | **0**（NFR-003、K1） | 1 件で呼び出し（SEV1 の候補）。その出品の購入を止める | ○ |
 | 振り替えの一回性 | 取引と台帳の照合（重複、両方、15 分超の欠け） | **0**（NFR-005、K3） | 重複・両方は 1 件で呼び出し（SEV1 の候補）。欠けは 1 件でチケット、10 件で呼び出し | ○ |
 | 台帳の不変条件 | 釣り合い、和 0、決着した預かりの 0、残高の行と仕訳の和 | **0**（NFR-004、K2） | 1 件で呼び出し（SEV1 の候補）。振込を止める | ○ |
@@ -22,7 +22,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 期限の遅れ | 期限の時刻から遷移まで 1 分以内 | **p99 1 分**（NFR-012、K8） | p99 が 10 分を超えたら呼び出し | ○ |
 | 配送の状態の反映 | 運送会社の事象から取引の状態まで 60 秒以内 | **p95 60 秒**（NFR-013） | p95 が 10 分を 30 分超えたらチケット。運送会社ごとに見る | |
 | 取引の通知 | 事象からプッシュの依頼まで 10 秒以内 | **p95 10 秒**（NFR-008） | p95 が 1 分を 10 分超えたらチケット | |
-| 値下げ・新着の通知 | 事象から通知の依頼まで 5 分以内 | **p95 5 分**（NFR-008） | p95 が 30 分を超えたらチケット | |
+| 値下げ・新着の通知 | 出品の公開・値下げの commit から通知の依頼まで 5 分以内（保存した検索の 3 分の窓を含む。静かな時間で止めた時間は除く） | **p95 5 分**（NFR-008） | p95 が 30 分を超えたらチケット | |
 | 措置の反映 | 措置から検索・通知・購入の拒否まで 60 秒以内 | **p99 60 秒**（NFR-016） | p99 が 5 分を超えたら呼び出し | ○ |
 | 見える範囲 | 見える範囲の監査の不一致 | **0**（NFR-014、K7） | 1 件で呼び出し（SEV1 の候補） | ○ |
 | 審査の待ち時間 | 通報・保留から判定まで | **p95 24 時間（偽ブランドの疑いの高いもの 4 時間）**（NFR-009） | 待ち行列の古さが基準の 2 倍でチケット | ○ |
@@ -35,23 +35,27 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. 上限と容量のパラメーター
 
-値の正本は、各 ADR と領域の文書（まだないものは [architecture/README.md](../architecture/README.md) の 6 節の決定）にある。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
+値の正本は、各 ADR と領域の文書にある（一覧は [architecture/README.md](../architecture/README.md) の 6 節の「決定（2026-10-10、統合）」の「数値の正本」）。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
 
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
-| 購入の先着の印 | 15 秒 | [ADR-0002](../decisions/0002-transaction-state-machine-and-single-purchase.md) | — |
-| 出品ごとの購入の同時実行（Valkey の停止の時） | 4 | 同上（`hot-listing-purchase-poc` で見直す） | — |
-| 期限の既定値 | 支払い（コンビニ）3 日目の 23:59:59、自動の完了 発送の 9 日後 13:00、評価 3 日、キャンセルの応答 2 日 | 同上 | — |
+| 購入の先着の印 | 15 秒（取り消しで比べて消す） | [ADR-0026](../decisions/0026-hot-listing-purchase-admission.md) | — |
+| 出品ごと・タスクごとの購入の同時実行（Valkey の停止の時） | 4。`lock_timeout` 200ms。`transactions` のタスクは最大 12 で、1 出品の DB に届く購入は 48 件まで | 同上（`hot-listing-purchase-poc` で見直す） | — |
+| 期限の既定値 | 支払い（コンビニ）購入日を含む 3 日目の 23:59:59、カード 30 分、発送 選んだ日数の上限の翌日の 23:59:59、キャンセルの応答 48 時間、自動の完了 発送の 9 日後 13:00、売り手の評価 72 時間 | [ADR-0025](../decisions/0025-transaction-decision-table-and-deadline-pause.md) | — |
 | 期限の処理 | 1 分ごと、100 件ずつ | 同上 | 並列の数 |
 | 取引と台帳の照合 | 5 分ごと。欠けは 15 分でアラート | [ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md) | 大型の企画の日は 1 分ごと |
-| 手数料の表、送料の表 | バージョンの付いた設定（既定 10%） | [ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md)、[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md) | — （変更は PM・財務の承認） |
+| 手数料の表、送料の表 | バージョンの付いた設定（販売の手数料 既定 10%、コンビニ払いの手数料 100 円） | [ADR-0034](../decisions/0034-chart-of-accounts-journal-types-and-fee-rounding.md)、[ADR-0043](../decisions/0043-shipping-rate-tables-and-size-tiers.md)、[ADR-0031](../decisions/0031-konbini-pending-payments-and-late-payments.md) | — （変更は PM・財務の承認） |
 | 売上金の期限・失効・残高への移し替え・ポイントへの交換 | 本番は無効 | [ADR-0004](../decisions/0004-proceeds-model-under-payment-services-act.md) | — （`legal.*`。法務・財務の承認） |
-| 振込の手数料 | 1 回 200 円 | payouts-and-points の領域 | — |
+| 振込の手数料 | 1 回 200 円（依頼の時点の不能は戻す） | [ADR-0038](../decisions/0038-payout-batching-execution-and-failure-handling.md) | — |
+| 振込の待ち | 口座・電話番号・メールの変更、新しい端末の SMS のログイン、回復の後 72 時間 | [ADR-0067](../decisions/0067-account-takeover-step-up-and-payout-holds.md) | — |
+| 運用のお金の介入の 1 人の上限 | 返金・一部の返金 3 万円、補償 3,000 円（1 日 3 万円） | [ADR-0060](../decisions/0060-ops-money-interventions-and-proceeds-hold.md) | — （財務の承認） |
 | 提供者の照会の予定 | 5 秒、30 秒、2 分、5 分、30 分ごとに 24 時間 | [ADR-0005](../decisions/0005-payments-via-providers-and-capture-at-purchase.md) | — |
-| 運送会社の照会 | 受け付け・引き受けの後 6 時間ごと | [ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md) | 運送会社ごとの間隔（運送会社の上限の中で） |
+| 運送会社の照会 | 受け付け・引き受けの後 6 時間ごと、自動の完了の 24 時間前に 1 回 | [ADR-0042](../decisions/0042-carrier-event-ranking-and-implied-acceptance.md) | 運送会社ごとの間隔（運送会社の上限の中で） |
 | 非同期の分類器 | p95 60 秒 | [ADR-0009](../decisions/0009-trust-and-safety-pipeline-boundary.md) | 公開の前に待つ規則の対象（T&S の責任者と合意） |
-| 保存した検索 | 1 人 30 件、まとめの窓 15 分 | saved-searches-and-alerts の領域 | `ops.saved_search_digest_minutes`（伸ばすだけ） |
-| 値下げの通知 | 1 出品 24 時間に 1 回 | notifications の領域 | — |
+| 保存した検索 | 1 人 30 件、まとめの窓 3 分、プッシュ 1 人 1 日 20 通、同じ利用者と出品は 7 日に 1 回 | [ADR-0023](../decisions/0023-saved-search-alert-windows-and-caps.md) | `ops.saved_search_digest_minutes`（伸ばすだけ） |
+| 値下げの通知 | 100 円以上かつ 5% 以上、1 出品 24 時間に 1 回 | [ADR-0064](../decisions/0064-fanout-batching-quiet-hours-and-caps.md) | — |
+| `engagement` の通知 | 1 人 1 日 30 通、静かな時間 23:00〜9:00 | 同上 | — |
+| 出品 | 写真 10 枚・1 枚 20 MB、価格の変更 1 出品 1 日 10 回 | [ADR-0012](../decisions/0012-photo-pipeline-and-perceptual-hashes.md)、[listings-and-photos.md](../architecture/listings-and-photos.md) の 9 節 | — |
 | 購入の受け付け | — | — | `ops.purchase_enabled`（全体・カテゴリ・出品ごとに止めるだけ） |
 | 振込の実行 | — | — | `ops.payouts_enabled`（止めるだけ） |
 | 運送会社の受け付け | — | — | `ops.carrier_enabled.<carrier>`（運送会社ごとに止めるだけ。止めると、その配送の方法を出品・発送の画面から隠す） |
@@ -82,30 +86,40 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-個別の手順は、まだない。各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。「作る Story」の列は、そのアラートの計測と手順を作る [roadmap.md](../roadmap.md) の Story である。手順の文書は、その Story の完了の条件に含める（E18 の `runbooks-e18` でまとめて確かめる）。
+手順の文書は [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。統合の工程（2026-10-10）で、主な手順を作った。残りは計画で、「作る Story」の列の [roadmap.md](../roadmap.md) の Story の完了の条件に含める（E18 の `runbooks-e18` でまとめて確かめる）。
+
+**作ったもの**
+
+| アラート（重さ） | 手順 |
+| --- | --- |
+| すべての障害の一般の手順、SEV の決め方、連絡 | [incident-response.md](incident-response.md) |
+| デプロイ中の自動ロールバック、手のロールバック | [deploy-and-rollback.md](deploy-and-rollback.md) |
+| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | [disaster-recovery.md](disaster-recovery.md) |
+| 熱い出品の検知、購入の遅れ・負けの応答の遅れ、大型の企画の日 | [hot-listing-or-campaign-day.md](hot-listing-or-campaign-day.md) |
+| 振り替えの重複・両方（page、SEV1 の候補）、15 分を超えた欠け | [ledger-reconciliation-mismatch.md](ledger-reconciliation-mismatch.md) |
+| 振込の失敗の急増、銀行の障害、払出口座の不足 | [payout-failure.md](payout-failure.md) |
+| 乗っ取り・不正の兆しの急増、「これは私ではない」 | [account-takeover.md](account-takeover.md) |
+
+**計画のもの**
 
 | アラート（重さ） | 手順（予定のファイル名） | 作る Story |
 | --- | --- | --- |
-| 購入の SLO のバーンレート、購入の遅れ（page） | `purchase-degraded.md`（カテゴリ・出品ごとの購入の停止を含む） | `purchase-listing`、`slo-dashboards-alerts` |
+| 購入の SLO のバーンレート（page） | `purchase-degraded.md`（カテゴリ・出品ごとの購入の停止を含む。熱い出品は [hot-listing-or-campaign-day.md](hot-listing-or-campaign-day.md)） | `purchase-listing`、`slo-dashboards-alerts` |
 | 二重の販売（page、SEV1 の候補） | `double-sale.md`（出品の購入の停止、片方の取引の取り消しと返金の判断、利用者への連絡） | `listing-transaction-reconciler` |
-| 振り替えの重複・両方（page、SEV1 の候補）、欠け | `ledger-settlement-mismatch.md`（振込の停止、打ち消しの仕訳の承認の手順） | `txn-ledger-reconciler` |
 | 台帳の不変条件の違反（page、SEV1 の候補） | `ledger-invariant-breach.md`（振込と売上金での購入の停止） | `ledger-core` |
 | 3 者の照合の差（ticket） | `three-way-reconciliation.md`（仮勘定の確かめ、財務への引き継ぎ） | `three-way-reconciliation` |
 | 期限の遅れ（page） | `deadline-runner-lag.md`（期限の処理の再開、溜まった取引の確認） | `transaction-deadlines` |
 | 決済の提供者の障害（失敗の率・時間切れの急増。page） | `payment-provider-outage.md`（手段の一時の非表示、照会の確認） | `payment-adapter-contract` |
 | 運送会社の障害・状態の滞り | `carrier-outage.md`（配送の方法の一時の非表示、照会の間隔、期限の延長の判断） | `tracking-webhooks-and-polling` |
-| 振込の失敗の急増、銀行の障害 | `payout-failures.md` | `payouts` |
 | 措置の反映の遅れ、検索の索引の遅れ（page） | `moderation-propagation-lag.md`（索引の優先の待ち行列の確認、作り直し） | `moderation-actions`、`search-index-and-indexer` |
 | 見える範囲・住所の漏れの疑い（page、SEV1 の候補） | `privacy-leak-response.md`（経路の停止、影響の範囲、漏えい等の報告の判断は法務：L5） | `address-vault`、`listing-visible-snapshot` |
 | 偽ブランド・禁止の品の急増、審査の待ち行列の滞り | `ts-surge.md`（公開の前に待つ規則の対象を広げる、審査の人の追加） | `review-queues-and-console` |
-| 乗っ取り・不正の兆しの急増 | `fraud-surge.md`（再確認の強化、振込の保留の規則） | `fraud-signals` |
+| 不正の兆しの急増（乗っ取り以外：偽の発送、チャージバック、現金化） | `fraud-surge.md`（乗っ取りは [account-takeover.md](account-takeover.md)） | `fraud-signals` |
 | 通知の遅れ・失敗の増加 | `notification-delivery.md`（fan-out の停止を含む） | `notifier-and-preferences` |
-| Aurora Global Database の遅延（`AuroraGlobalDBRPOLag` 10 秒が 5 分。page）、リージョンの障害 | `disaster-recovery.md` | `osaka-warm-standby`、`dr-failover-drill` |
 | 開示の請求・捜査機関からの照会 | `legal-request.md`（法務の L6・L7 の後に確定） | `disclosure-requests`、`law-enforcement-requests` |
-| デプロイ中の自動ロールバック | `deploy-and-rollback.md` | `ci-pipeline-baseline` |
 
-- すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する）。
-- 手順を作るまでは、`incident-response.md`（E1 で最初に作る）の一般の手順で対応する。利用者への障害の知らせは、お知らせと状況のページで行う（文言は法務の確認の後）。
+- すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する。[ADR-0075](../decisions/0075-sli-measurement-and-correctness-monitors.md)）。
+- 計画の手順を作るまでは、[incident-response.md](incident-response.md) の一般の手順で対応する。利用者への障害の知らせは、お知らせと状況のページで行う（文言は法務の確認の後）。
 - お金の障害（二重の販売、振り替え、台帳）は、財務の担当を必ず呼ぶ。手の仕訳は、財務の承認と 2 人の確認の後に、打ち消しの仕訳だけで行う。
 
 ## 5. 人気の出品と大型の企画の日の運用
@@ -115,14 +129,14 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 限定品・人気のブランドの出品は、出た直後の 1 秒に購入が集まる。予定はできないので、自動で見つけて守る。
 
 - **見つけ方**：出品の詳細の閲覧が 1 分 1,000 を超えた出品、または購入の先着の印の取り合い（`SET NX` の失敗）が 1 秒 100 を超えた出品を「熱い出品」として記録する。
-- **自動の守り**：熱い出品の Valkey の出品の写しの更新を優先し、負けの応答を写しから返す。DB の接続の使用率が 70% を超えたら、熱い出品の購入の要求を出品ごとの同時実行の上限で絞る（既定 4）。
+- **自動の守り**：熱い出品の Valkey の出品の写しの更新を優先し、負けの応答を写しから返す。DB の接続の使用率が 70% を超えたら、熱い出品の購入の要求を出品ごと・タスクごとの同時実行の上限で絞る（既定 4、1 出品 48 件まで）。手順は [hot-listing-or-campaign-day.md](hot-listing-or-campaign-day.md)。
 - **見るもの**：購入の p99、負けの応答の p99、DB の接続の使用率と行のロックの待ち、出品と取引の照合（熱い出品は 1 分ごと）、決済の失敗の後の出品の戻しの数。
 - **止める条件**：出品と取引の照合の不一致が 1 件でも出たら、`ops.purchase_enabled` でその出品の購入を止め、`double-sale.md` に従う。
 - **転売・ボット**：同じ端末・電話番号・配送先からの連打、自動の購入の兆しは、WAF の規則と T&S の規則（`fraud-signals`）で絞る。
 
 ### 5.2 大型の企画の日
 
-ポイントの還元などの大型の企画は、予定して運用する。
+ポイントの還元などの大型の企画は、予定して運用する。手順は [hot-listing-or-campaign-day.md](hot-listing-or-campaign-day.md)、容量の作業は [capacity.md](../architecture/capacity.md) の 5 節。
 
 ```mermaid
 flowchart LR

@@ -91,7 +91,7 @@
 | 振り込める額 | `seller_proceeds` ＋ `user_balance` の残高。保留中（`seller_proceeds_held`）と引き当て中は除く | ADR-0003 |
 | 止める条件（申請は受け付けて実行を待つ） | `payoutHoldUntil(user)` の待ち、`chargeback_receivable` の残りがある、`payout_blocks` がある、`ops.payouts_enabled` が偽 | 4.2 節、10 節、ADR-0032、ADR-0067 |
 | 申請を受け付けない条件 | 口座がない・`unusable`、残高が足りない、強い確認がない | 4 節 |
-| 1 回の上限、本人確認の要る額 | `legal.payout_max_yen_per_request`、`legal.payout_kyc_required_over_yen` | **法務の確認待ち（L2）** |
+| 1 回・1 か月の上限（本人確認の水準ごと） | `legal.payout_limit_yen.{level}`、`legal.payout_monthly_limit_yen.{level}`（[identity-verification.md](identity-verification.md) の 5 節） | **法務の確認待ち（L2）** |
 
 - 申請の額は、売上金のロット（期限の近い順）→ `user_balance` の順に消す（[ADR-0035](../decisions/0035-proceeds-lots-expiry-and-kyc-conversion.md)）。
 - 申請で `payout_request` の仕訳（売上金 −申請の額、振込中 ＋振り込む額、手数料の収益 ＋200）を書く。冪等キーは `(payout, <id>, request)`。
@@ -126,7 +126,7 @@ stateDiagram-v2
 
 - `payout-batcher` は、銀行の営業日の 08:30〜14:30 に 30 分ごと（08:30、09:00、…、14:30）に動く。`requested` の申請を、払出口座ごとに 1,000 件ずつまとめ、`payout_batches` を作る（1,000 件は本システムの値。銀行の上限で選定の時に見直す）。
 - 14:30 の後と銀行の休業日の申請は、次の営業日の 08:30 にまとめる。銀行の営業日の暦（土日、祝日、12 月 31 日〜1 月 3 日）は `bank_calendar` の表で持ち、年 1 回取り込む。
-- まとめの前に、払出口座の残高（銀行の残高の照会）と、その回の振り込む額の合計を比べる。足りなければまとめず page（`payout-failures.md`）。資金の移動は人が行う。
+- まとめの前に、払出口座の残高（銀行の残高の照会）と、その回の振り込む額の合計を比べる。足りなければまとめず page（`payout-failure.md`）。資金の移動は人が行う。
 
 ### 6.2 依頼
 
