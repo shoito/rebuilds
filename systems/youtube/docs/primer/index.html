@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube の前提知識</title>
+<meta name="description" content="YouTube の再構築の設計の文書を読む前に知っておくとよい、動画の符号化の基礎、コーデックと費用、ラダーと VMAF、CMAF と HLS・DASH、DRM、ABR、CDN とロングテール、ライブと LL-HLS、チャットの配り、視聴回数の検証、音声と映像の指紋、申し立てと収益の分け方、日本の法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · YouTube · 前提知識</p>
+    <h1>動画の基盤の設計を読む前に</h1>
+    <p class="lead">フレームと GOP、コーデックの費用、ラダーと VMAF、CMAF と HLS・DASH、DRM、ABR と再生の品質、CDN とロングテール、ライブの取り込みと LL-HLS、ライブチャットの配り、視聴回数の検証、音声と映像の指紋、申し立てと収益の分け方、日本の法令の枠組みを、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>に、リアルタイムの映像と符号器の層は <a href="../../../zoom/docs/primer/index.html">Zoom の資料</a>に、おすすめと fan-out は <a href="../../../x/docs/primer/index.html">X の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · YouTube · 前提知識</p>
+    <h2>動画の基盤の設計を読む前に</h2>
+    <p class="lead">預かった動画を失わず、止まらずに配り、数と権利とお金を合わせる仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="what">
+    <h2>動画の基盤は何をするサービスか</h2>
+    <p>YouTube は、誰でも動画を上げ、誰でも見られる <a class="t" href="#g-ugc">UGC</a> の動画の基盤です。登場人物は大きく 3 者で、それぞれ欲しいものが違います。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>視聴者</h3><p>テレビ・スマートフォン・パソコンで、どの回線でも止まらずに見たい。ログインしない人も多い。</p></div>
+      <div class="card" data-frag><h3>創作者</h3><p>数 GB〜数十 GB の動画を確実に上げ、すぐ公開し、数と収益を信用したい。ライブで視聴者と話したい。</p></div>
+      <div class="card" data-frag><h3>権利者</h3><p>レコード会社・放送局など。自分の作品が無断で使われたら、止めるか、収益を受け取るか、追跡するかを決めたい。</p></div>
+    </div>
+    <p>規模の感覚は「書くより配るが桁違いに多い」です。設計の S1 は、視聴者 月 1,000 万、アップロード 1 時間/分、視聴 100 万時間/日、配信のピーク 0.3 Tbps（月 27 PB）です。原価の最大は配信の転送で、S1 の月の原価 約 103 万 USD のうち約 54 万 USD を占めると見込んでいます。</p>
+    <p class="doc-only"><small>設計で効くところ：6 つの価値と成功の基準 K1〜K10 は <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a>、規模の段階と費用のモデルは <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/README.md">architecture/README.md</a> の 2 節。</small></p>
+  </section>
+
+  <section class="s" id="video">
+    <h2>動画の基礎：フレーム・GOP・ビットレート</h2>
+    <p>動画は静止画（フレーム）の列です。圧縮しないと 1080p30 で毎秒約 0.75 Gbps（色を間引いた 8 ビットの形）になるので、前後のフレームとの差だけを送って圧縮します。差の取り方でフレームは 3 種類に分かれます。</p>
+    <table>
+      <tr><th>種類</th><th>中身</th><th>性質</th></tr>
+      <tr><td>I（<a class="t" href="#g-keyframe">キーフレーム</a>）</td><td>それだけで描ける絵</td><td>大きい。途中から再生・シークできるのはここから</td></tr>
+      <tr><td>P</td><td>前のフレームとの差</td><td>小さい</td></tr>
+      <tr><td>B</td><td>前と後ろの両方との差</td><td>最も小さいが、後ろを待つので遅れが増える</td></tr>
+    </table>
+    <p>キーフレームから次のキーフレームの前までを <a class="t" href="#g-gop">GOP</a> と呼びます。設計は全段で 2 秒の<a class="t" href="#g-closed-gop">閉じた GOP</a> にし、キーフレームの時刻を全段で揃えます。これで、どの段のセグメントの境でも段を切り替えられます。</p>
+    <p><strong>ビットレート</strong>は 1 秒あたりのビットの量、<strong>解像度</strong>は 1 枚の画素の数です。同じ 2 Mbps なら、1080p30 は 1 画素あたり約 0.03 ビット、720p30 は約 0.07 ビットしか使えません。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">同じビットレートなら、解像度は高いほど画質が良い？</p>
+      <div class="opts">
+        <button>はい。画素が多いほど細かく見える</button>
+        <button>はい。ただし 60fps のときだけ</button>
+        <button>いいえ。ビットが足りないと、低い解像度を拡大したほうがきれいなことがある</button>
+      </div>
+      <p class="why">画素あたりのビットが足りないと、ブロックのノイズやぼけが出ます。設計の例では、動きの多いゲームの実況の 1.1 Mbps は、480p より 720p のほうが VMAF が高く、1080p の低いビットレートの点は使われません（ラダーの節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：GOP 2 秒と段の上限は <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0003-codecs-and-per-title-ladder.md">ADR-0003</a>、ライブで B フレームを使わない理由は <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/live-streaming.md">live-streaming.md</a> の 6.4 節。</small></p>
+  </section>
+
+  <section class="s" id="codecs">
+    <h2>コーデック：H.264・VP9・AV1 と費用</h2>
+    <p><a class="t" href="#g-codec">コーデック</a>は圧縮の方式です。新しいものほど同じ画質を少ないビットで出せますが、符号化に多くの計算を使います。</p>
+    <table>
+      <tr><th>コーデック</th><th>出た年・ライセンス</th><th>強み</th><th>弱み</th></tr>
+      <tr><td>H.264（AVC）</td><td>2003 年。特許のプールあり</td><td>ほぼすべての端末が復号できる。符号化が軽い</td><td>同じ画質に要るビットが多い</td></tr>
+      <tr><td>VP9</td><td>2013 年。使用料なし</td><td>同じ解像度で H.264 より画質が良い</td><td>本家の公式のブログで、符号化に H.264 の 5 倍の計算</td></tr>
+      <tr><td>AV1</td><td>2018 年。使用料なし（AOMedia）</td><td>設計の見込みで、同じ VMAF で H.264 より約 35% 少ないビット（PoC で確かめる）</td><td>符号化が重い。古い端末は復号できない</td></tr>
+    </table>
+    <p>設計は H.264 を全動画に、AV1 を人気の動画にだけ作り、VP9 は作りません。理由は損益の分かれ目です。</p>
+    <ul>
+      <li data-frag>AV1 の費用は動画 1 時間あたり約 1.05 USD（符号化 0.80、試し 0.05、1 年の保存 0.20）。</li>
+      <li data-frag>節約は視聴 1 時間あたり約 0.0044 USD（0.9 GB × 35% × AV1 を復号できる割合 0.7 × 0.02 USD/GB）。</li>
+      <li data-frag>割ると、動画 1 時間あたり約 240 視聴時間で元が取れる。10 分の動画なら約 40 視聴時間、平均 5 分の視聴で約 480 回。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">AV1 は同じ画質で少ないビットになる。では、全動画を AV1 でも符号化すべき？</p>
+      <div class="opts">
+        <button>はい。配信の費用が必ず下がる</button>
+        <button>いいえ。ほとんど見られない動画では、符号化の費用を配信の節約で回収できない</button>
+        <button>いいえ。AV1 は 4K にしか使えない</button>
+      </div>
+      <p class="why">動画の多くはロングテールで、元が取れる視聴の数に届きません。設計は「7 日で確定の視聴 1,000 回」などの条件で AV1 に上げます（ADR-0016）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0003-codecs-and-per-title-ladder.md">ADR-0003</a>（コーデックの組）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0016-av1-promotion-rule-and-cost.md">ADR-0016</a>（上げる条件と損益）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/transcoding-pipeline.md">transcoding-pipeline.md</a> の 6 節。リアルタイムの会議での符号器の使い方は <a href="../../../zoom/docs/primer/index.html#video">Zoom の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="pipeline">
+    <h2>アップロードから公開までの段</h2>
+    <p>数十 GB のファイルは途中で切れます。そこで<a class="t" href="#g-resumable">再開できるアップロード</a>にします。部分（既定 16 MiB）を順に送り、切れたら受け取り済みの位置を問い合わせて続きから送ります。全部の部分が揃い、全体のチェックサムが合ってから完了を返します。</p>
+    <pre class="mermaid">flowchart LR
+  U["アップロード完了"] --> P["検査 probe"]
+  P --> F["fast_encode<br>H.264 360p・720p"]
+  P --> M["指紋と照合"]
+  P --> C["試しの符号化<br>ラダーを決める"]
+  F --> G{"publish_gate"}
+  M --> G
+  G -->|公開| FULL["full_encode<br>H.264 の全段"]
+  FULL --> AV1["人気なら AV1"]</pre>
+    <ul>
+      <li>符号化は 20 秒の<strong>区切り</strong>（GOP の境）ごとに並べて行います。安い <a class="t" href="#g-spot">Spot</a> のサーバーが途中で回収されても、失うのは区切り 1 つです。</li>
+      <li>各段の出力のキーは入力と設定から決まるので、やり直しても同じ中身になります（冪等）。</li>
+      <li>まず速い 2 段で公開し、残りの段は後から足します。10 分の 1080p は、完了から p95 3 分で再生できる目標です。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/upload-and-ingest.md">upload-and-ingest.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/transcoding-pipeline.md">transcoding-pipeline.md</a> の 3・4 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0011-upload-session-protocol-and-checksums.md">ADR-0011</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0014-pipeline-task-leases-and-idempotent-outputs.md">0014</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0018-encode-worker-pools-and-spot-interruption.md">0018</a>。冪等の考え方は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="ladder">
+    <h2>ラダー・VMAF・動画ごとのラダー</h2>
+    <p>1 本の動画を、解像度とビットレートの違う複数の段（<a class="t" href="#g-rendition">レンディション</a>）に符号化します。この段の組を<a class="t" href="#g-ladder">ラダー</a>と呼びます。画質は <a class="t" href="#g-vmaf">VMAF</a>（0〜100、人の評価に近づけた指標）で測ります。</p>
+    <p>静かなスライドの講座と激しいゲームの実況では、同じ画質に要るビットが何倍も違います。そこで動画ごとに試しに符号化し、（ビットレート、VMAF）の点の<a class="t" href="#g-convex-hull">凸包</a>から段を選びます（<a class="t" href="#g-per-title">per-title</a>）。下の図は設計の例 1（10 分のゲームの実況）です。</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 290" role="img" aria-label="試しの符号化の点と凸包。横はビットレート（対数）、縦は VMAF。選んだ段は 4.3 Mbps、2.3、1.1、0.56、0.33、0.17 Mbps">
+        <g style="stroke:var(--border);stroke-width:1">
+          <line x1="60" y1="250" x2="600" y2="250"/>
+          <line x1="60" y1="20" x2="60" y2="250"/>
+          <line x1="60" y1="35.7" x2="600" y2="35.7" style="stroke:var(--warn);stroke-dasharray:4 3"/>
+          <line x1="506.4" y1="20" x2="506.4" y2="250" style="stroke:var(--ng);stroke-dasharray:4 3"/>
+        </g>
+        <g style="font-size:11px;fill:var(--muted)" text-anchor="middle">
+          <text x="60" y="266">100</text><text x="188.8" y="266">300</text><text x="330" y="266">1,000</text><text x="458.8" y="266">3,000</text><text x="600" y="266">10,000 kbps</text>
+          <text x="330" y="284">ビットレート（対数の目盛り）</text>
+        </g>
+        <g style="font-size:11px;fill:var(--muted)" text-anchor="end">
+          <text x="54" y="212">40</text><text x="54" y="149">60</text><text x="54" y="86">80</text><text x="54" y="24">100</text>
+        </g>
+        <g style="font-size:11px">
+          <text x="64" y="32" style="fill:var(--warn)">VMAF 95</text>
+          <text x="510" y="245" style="fill:var(--ng)">1080p の上限 4.5 Mbps</text>
+        </g>
+        <polyline points="86.2,221.1 122.2,202.3 200,155.1 262,117.1 303.8,98.6 341.2,80 385.1,64.9 427.7,53.3 470,45.8 501,39.5 547.7,32.6 597.6,27.9" style="fill:none;stroke:var(--accent);stroke-width:1.5"/>
+        <g style="fill:var(--surface);stroke:var(--muted);stroke-width:1">
+          <circle cx="454.8" cy="49.5" r="3.5"/><circle cx="411.3" cy="63.4" r="3.5"/><circle cx="518.7" cy="40.1" r="3.5"/>
+          <circle cx="300.9" cy="97.9" r="3.5"/><circle cx="388.7" cy="70.3" r="3.5"/><circle cx="346.4" cy="84.1" r="3.5"/>
+          <circle cx="222.6" cy="136.9" r="3.5"/><circle cx="279.5" cy="119.9" r="3.5"/><circle cx="239" cy="136.3" r="3.5"/>
+          <circle cx="162.7" cy="176.2" r="3.5"/><circle cx="157.7" cy="183.1" r="3.5"/>
+        </g>
+        <g style="fill:var(--accent)">
+          <circle cx="86.2" cy="221.1" r="3.5"/><circle cx="303.8" cy="98.6" r="3.5"/><circle cx="385.1" cy="64.9" r="3.5"/>
+          <circle cx="470" cy="45.8" r="3.5"/><circle cx="547.7" cy="32.6" r="3.5"/><circle cx="597.6" cy="27.9" r="3.5"/>
+        </g>
+        <g style="fill:var(--ok);stroke:var(--surface);stroke-width:1.5">
+          <circle cx="122.2" cy="202.3" r="6"/><circle cx="200" cy="155.1" r="6"/><circle cx="262" cy="117.1" r="6"/>
+          <circle cx="341.2" cy="80" r="6"/><circle cx="427.7" cy="53.3" r="6"/><circle cx="501" cy="39.5" r="6"/>
+        </g>
+        <g style="font-size:11px;fill:var(--text)">
+          <text x="128" y="218">240p</text><text x="206" y="171">360p</text><text x="268" y="133">480p</text>
+          <text x="347" y="96">720p</text><text x="400" y="44">720p</text><text x="460" y="30">1080p</text>
+        </g>
+      </svg>
+      <figcaption>線が凸包。緑が選んだ段、青が凸包の上の他の点、白は凸包に載らない点（使わない）</figcaption>
+    </figure>
+    <div class="stepper">
+      <ol>
+        <li>6 つの区間をつないだ 60 秒を、{1080, 720, 480, 360, 240}p × <a class="t" href="#g-crf">CRF</a> 6 通りで速く符号化し、各点の VMAF を測る。</li>
+        <li>全点の上側の凸包を作る。凸包に載らない点は「同じくらいのビットで、別の解像度のほうが画質が高い」ので使わない。</li>
+        <li>上の段：VMAF 95 の最小は 6.4 Mbps で、1080p の上限 4.5 Mbps を超える。上限以下で VMAF 最大の 4.3 Mbps（93.8）を選ぶ。</li>
+        <li>次の段：直前の 1/1.5 以下のビット、かつ VMAF が 4 以上低い点のうち最高。2.3 Mbps（720p、89.4）→ 1.1 Mbps（720p、80.9）→ 560 kbps → 330 kbps → 170 kbps。</li>
+        <li>200 kbps 以下で止める。最下段 170 kbps は 150 kbps を超えるので、144p・100 kbps の固定の段を足す。</li>
+        <li>結果を <code>ladder_version</code> と一緒に記録する。同じ入力と同じ番号からは、同じラダーが出る。</li>
+      </ol>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/transcoding-pipeline.md">transcoding-pipeline.md</a> の 5 節（例 1・例 2）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0015-per-title-ladder-convex-hull.md">ADR-0015</a>。K5（固定のラダーより 20% 低い）は <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="packaging">
+    <h2>パッケージ：CMAF、HLS と DASH、DRM</h2>
+    <p>符号化した映像は、配れる形の小さな<a class="t" href="#g-segment">セグメント</a>に切って並べます。プレイヤーは「どの段に、どのセグメントがあるか」を書いた<a class="t" href="#g-manifest">マニフェスト</a>を読み、セグメントを順に取ります。</p>
+    <div class="tabs">
+      <div data-tab="CMAF">
+        <p><a class="t" href="#g-cmaf">CMAF</a> は、fMP4（断片に分けた MP4）でセグメントを作る標準です。最初に 1 回だけ取る <code>init</code>（復号の設定）と、<code>moof</code>（索引）＋ <code>mdat</code>（中身）のセグメントからなります。</p>
+        <p>同じセグメントを HLS と DASH の両方で使えるので、保存は 1 回で済みます。設計は VOD を 4 秒（2 秒の GOP × 2）、ライブを 2 秒にしています。</p>
+      </div>
+      <div data-tab="HLS">
+        <p><a class="t" href="#g-hls">HLS</a> は Apple が作り、RFC 8216 にまとまった方式です。テキストの再生リスト（<code>.m3u8</code>）を、段の一覧のマスターと、段ごとのメディアの 2 層で持ちます。iOS と Safari が標準で再生します。</p>
+        <pre><code>#EXT-X-STREAM-INF:BANDWIDTH=5980000,CODECS="avc1.640028,mp4a.40.2",RESOLUTION=1920x1080
+h1080-c24/index.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=3150000,CODECS="avc1.64001f,mp4a.40.2",RESOLUTION=1280x720
+h720-c24/index.m3u8</code></pre>
+      </div>
+      <div data-tab="DASH">
+        <p><a class="t" href="#g-dash">DASH</a>（MPEG-DASH）は国際標準の方式です。XML の MPD に、段（<code>Representation</code>）とセグメントの並び（<code>SegmentTimeline</code>）を書きます。Android とブラウザの MSE で使います。</p>
+        <pre><code>&lt;AdaptationSet contentType="video" segmentAlignment="true"&gt;
+  &lt;Representation id="h1080-c24" codecs="avc1.640028" bandwidth="5850000"/&gt;
+  &lt;Representation id="h720-c24" codecs="avc1.64001f" bandwidth="3020000"/&gt;
+&lt;/AdaptationSet&gt;</code></pre>
+      </div>
+      <div data-tab="DRM">
+        <p><a class="t" href="#g-drm">DRM</a> は、鍵を持つ端末だけが復号できるようにする仕組みです。端末によって方式が違います（Apple は FairPlay、Chrome と Android は Widevine、Windows は PlayReady）。</p>
+        <p><a class="t" href="#g-cenc">CENC</a> の <a class="t" href="#g-cbcs">cbcs</a> の形で 1 回暗号化すれば、3 つの方式に同じセグメントで配れます。鍵はライセンスのサーバーが、許された端末にだけ渡します。設計は DRM をメンバー限定の動画だけに使い、公開の動画は暗号化しません。</p>
+      </div>
+    </div>
+    <p>マニフェストは要求の時に作ります。端末が AV1 を復号できるか、画面が小さいかで、載せる段を変えるためです。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/packaging-and-drm.md">packaging-and-drm.md</a> の 4・5・8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0004-cmaf-packaging-and-drm-scope.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0019-cmaf-files-segment-index-and-url-layout.md">0019</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0020-manifest-generation-and-capability-classes.md">0020</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0021-drm-key-hierarchy-and-license-proxy.md">0021</a>。<code>cbcs</code> の 1:9 のパターンの細部は設計の文書でも<strong>未検証</strong>です。</small></p>
+  </section>
+
+  <section class="s" id="abr">
+    <h2>ABR：回線に合わせて段を選ぶ</h2>
+    <p><a class="t" href="#g-abr">ABR</a> は、プレイヤーがセグメントごとに段を選び直す仕組みです。選び方は大きく 2 つあります。</p>
+    <div class="tabs">
+      <div data-tab="回線の速さで選ぶ"><p>直前のセグメントを取った速さから帯域を推定し、その何割かに収まる段を選びます。反応は速いですが、推定は揺れます。トンネルの直前の高い推定で高い段を選び、トンネルの中で止まりがちです。</p></div>
+      <div data-tab="バッファの量で選ぶ"><p>手元に貯まった再生の秒数（<a class="t" href="#g-buffer">バッファ</a>）で段を決めます（<a class="t" href="#g-bba">バッファに基づく ABR</a>）。バッファが薄ければ低い段、厚ければ高い段。推定の揺れに引きずられません。設計はこちらを基本にし、開始と非常の時だけ推定を使います（ADR-0022）。</p></div>
+    </div>
+    <p>設計の写像は、バッファ 8 秒以下で最下段、8〜40 秒で最下段から最上段へ直線、40 秒以上で最上段です。設計の模擬の例（0〜30 秒 6 Mbps、30〜80 秒トンネル 0.6 Mbps、その後 5 Mbps）を追います。</p>
+    <div class="stepper">
+      <ol>
+        <li>0 秒：前回の推定がないので 1.5 Mbps とみなし、× 0.6 以下の 560 kbps で 1 セグメントだけ取って再生を始める。</li>
+        <li>推定が 6 Mbps になる。開始の間は × 0.7 ＝ 4.2 Mbps 以下の最上段 2.3 Mbps を取り、1 セグメントごとにバッファが 2.4 秒ずつ増える。</li>
+        <li>15 秒：バッファ 25.5 秒で写像が約 2.5 Mbps になり、今の段以上なので定常へ移る。</li>
+        <li>26 秒：バッファ 42 秒で写像が最上段に届き、4.5 Mbps に上がる。急いで上げず、先にバッファを貯める。</li>
+        <li>29 秒：トンネルに入る。4.5 Mbps のセグメントに 24.7 秒かかるが、バッファが 43 秒あるので捨てずに待つ。</li>
+        <li>56 秒：次の 2.3 Mbps の取得が間に合わないと予測し、2.1 秒で捨てて 330 kbps で取り直す（捨てる規則）。</li>
+        <li>80 秒：トンネルを出る。1.1 → 2.3 → 4.5 Mbps と戻る。50 秒のトンネルの間に再バッファは 0 回。</li>
+      </ol>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/playback-and-abr.md">playback-and-abr.md</a> の 5 節（値・規則・模擬の表）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0022-buffer-based-abr.md">ADR-0022</a>。iOS は OS の ABR を使うので、自前の ABR は Web と Android だけです。</small></p>
+  </section>
+
+  <section class="s" id="qoe">
+    <h2>再生の品質（QoE）の指標</h2>
+    <p>視聴者が離れる理由は「始まらない」「止まる」「画質が悪い」です。これをプレイヤーの計測（実ユーザーの値）で数えます。</p>
+    <table>
+      <tr><th>指標</th><th>定義</th><th>設計の目標</th></tr>
+      <tr><td><a class="t" href="#g-startup">開始の時間</a></td><td>再生の要求から最初のフレームまで（再生の前の広告を除く）</td><td>p50 1.0 秒・p95 2.5 秒</td></tr>
+      <tr><td>開始の失敗</td><td>最初のフレームまで行かなかった再生の割合</td><td>0.5% 以下</td></tr>
+      <tr><td><a class="t" href="#g-rebuffer">再バッファ</a>の割合</td><td>止まった時間 ÷（再生 ＋ 止まった時間）。開始とシークの待ちを除く</td><td>0.5% 以下</td></tr>
+      <tr><td>平均の VMAF</td><td>再生した秒ごとの段の VMAF の時間の加重平均</td><td>80 以上</td></tr>
+    </table>
+    <p>開始の速さは、ABR より手前の積み上げで決まります。設計の p50 の予算は、再生の API 80 ms、マニフェストと最初のセグメント 300 ms、復号と描画 100 ms、画面の準備 100 ms で、約 0.6 秒です。最初の段を低め（560 kbps 前後）にするのも、開始を速くするためです。</p>
+    <div class="callout key"><span class="label">指標どうしの引っ張り合い</span>高い段を急ぐと画質は上がりますが、開始の時間と再バッファが悪くなります。設計は開始と止まらないことを先に守ります。</div>
+    <p class="doc-only"><small>設計で効くところ：NFR-003・NFR-004（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/README.md">architecture/README.md</a> の 3 節）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/playback-and-abr.md">playback-and-abr.md</a> の 6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0023-playback-token-and-qoe-metrics.md">ADR-0023</a>。</small></p>
+  </section>
+
+  <section class="s" id="cdn">
+    <h2>CDN・ロングテール・転送の費用</h2>
+    <p>セグメントは <a class="t" href="#g-cdn">CDN</a> の<a class="t" href="#g-edge">エッジ</a>（視聴者の近くのキャッシュ）から配ります。外れた要求は層を順に下ります。<a class="t" href="#g-origin-shield">Origin Shield</a> は、各地のエッジの外れを 1 か所にまとめる層です。</p>
+    <pre class="mermaid">flowchart LR
+  V["プレイヤー"] --> E["CDN のエッジ"]
+  E -->|外れ| S["Origin Shield<br>東京 1 か所"]
+  S -->|外れ| O["origin-cache<br>自前・NVMe"]
+  O -->|外れ| B[("S3")]</pre>
+    <p>動画の人気は <a class="t" href="#g-zipf">Zipf の分布</a>に近いと仮定します。上位に視聴が集まりますが、尾（<a class="t" href="#g-long-tail">ロングテール</a>）が長いほど、キャッシュを大きくしてもヒットが伸びません。</p>
+    <table>
+      <tr><th>Zipf の α</th><th>上位 1% の動画の視聴の割合</th><th>ヒット 90% に要るキャッシュ</th><th>95%</th></tr>
+      <tr><td>0.8（尾が重い）</td><td>37%</td><td>326 TB</td><td>390 TB</td></tr>
+      <tr><td>1.0</td><td>70%</td><td>160 TB</td><td>273 TB</td></tr>
+    </table>
+    <p>費用は<a class="t" href="#g-egress">転送の量</a>（GB）で決まります。CloudFront の日本の公開の価格は月 27 PB で約 0.064 USD/GB、設計の予算は約定の値引きを前提に 0.02 USD/GB です（PM の判断待ち）。</p>
+    <div class="quiz" data-answer="1">
+      <p class="q">エッジのヒットの率を 90% から 95% に上げると、配信の費用は大きく下がる？</p>
+      <div class="opts">
+        <button>いいえ。転送の費用はエッジから視聴者へのバイトで決まり、ヒットでも外れでも同じ量</button>
+        <button>はい。外れが半分になるので費用も半分</button>
+        <button>はい。S3 の GET の費用が配信の費用の大半だから</button>
+      </div>
+      <p class="why">外れは開始の速さと、オリジンの負荷・要求の費用に効きます。転送の費用を下げる手段は、平均のビットレート（ラダー・AV1）と CDN の単価です。</p>
+    </div>
+    <div class="callout warn"><span class="label">一度配ったものは消せない</span>エッジのキャッシュは 1 年持ちます。措置で動画を止めるときは、キャッシュを消すのではなく、エッジの関数の拒否の一覧で 403 を返します（決定から 60 秒以内）。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/cdn-and-delivery.md">cdn-and-delivery.md</a> の 4・7・9・10 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0005-cdn-and-origin-strategy.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0026-origin-cache-routing-admission-and-coalescing.md">0026</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0027-takedown-deny-list-within-60s.md">0027</a>、配信の費用の選択肢は <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/README.md">architecture/README.md</a> の 2.1 節。</small></p>
+  </section>
+
+  <section class="s" id="live">
+    <h2>ライブ：取り込み・LL-HLS・DVR</h2>
+    <p>配信者は OBS などのソフトで映像を符号化し、本システムへ送ります。これを<a class="t" href="#g-ingest">取り込み</a>と呼びます。</p>
+    <div class="tabs">
+      <div data-tab="RTMPS"><p><a class="t" href="#g-rtmp">RTMP</a> は TCP の上の古くからの方式で、ほぼすべての配信のソフトが対応します。RTMPS はそれを TLS で包んだものです。設計は平文の RTMP を受けません。ストリームキーが平文で流れるためです。</p></div>
+      <div data-tab="SRT"><p><a class="t" href="#g-srt">SRT</a> は UDP の上で、失われたパケットだけを決めた遅れの中で送り直す方式です。揺れる回線に強く、AES の暗号を持ちます。遅れの設定（0.5〜1 秒）がそのまま遅延に入ります。</p></div>
+    </div>
+    <p>普通の HLS はセグメント（2 秒）ができてから配るので、遅れが大きくなります。<a class="t" href="#g-ll-hls">LL-HLS</a> はセグメントを 0.5 秒の<a class="t" href="#g-part">部分</a>に分け、できた部分から配ります。プレイヤーは次の部分を先に要求し、サーバーはできるまで応答を保留します。</p>
+    <pre><code>#EXT-X-SERVER-CONTROL:CAN-BLOCK-RELOAD=YES,PART-HOLD-BACK=1.5,HOLD-BACK=6
+#EXT-X-PART:DURATION=0.5,URI="1836.0.m4s",INDEPENDENT=YES
+#EXT-X-PART:DURATION=0.5,URI="1836.1.m4s"
+#EXT-X-PRELOAD-HINT:TYPE=PART,URI="1836.2.m4s"</code></pre>
+    <table>
+      <tr><th>遅延の予算（p50）</th><th>秒</th></tr>
+      <tr><td>配信者の符号化 ＋ 取り込みの転送</td><td>0.7</td></tr>
+      <tr><td>変換器への受け渡し ＋ GPU の変換 ＋ 部分の完成（0.5 秒の部分を作り切る）</td><td>0.7</td></tr>
+      <tr><td>オリジン ＋ CDN</td><td>0.15</td></tr>
+      <tr><td>プレイヤーの後ろの距離（<code>PART-HOLD-BACK</code>、部分の 3 倍）＋ 描画</td><td>1.6</td></tr>
+      <tr><td>合計（目標 p50 4 秒・p95 6 秒）</td><td>約 3.2</td></tr>
+    </table>
+    <p><a class="t" href="#g-dvr">DVR</a> は、ライブの途中で巻き戻して見る機能です。設計は全セグメントを S3 に書き、12 時間の窓を持ちます。配信の終わりには同じセグメントから VOD を作るので、アーカイブは DVR で見た範囲と同じ中身になります。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/live-streaming.md">live-streaming.md</a> の 4・6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0006-live-ingest-and-latency.md">ADR-0006</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0030-ll-hls-parameters-and-live-origin.md">0030</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0031-dvr-storage-and-live-to-vod.md">0031</a>。2 秒未満の超低遅延（WebRTC）は MVP の後で、<a href="../../../zoom/docs/primer/index.html#webrtc">Zoom の資料</a>の領域に近づきます。</small></p>
+  </section>
+
+  <section class="s" id="chat">
+    <h2>ライブチャットの配り（fan-out）</h2>
+    <p>20 万人が見る配信で、1 秒に 2,000 件のチャットが書かれるとします。全員に全件を 1 件ずつ送ると、1 秒に 4 億回の送信になります。人はそれを読めませんし、どんな基盤も持ちません。</p>
+    <div class="stepper">
+      <ol>
+        <li>送信を検査し（速さの上限、低速モード、ブロックの語）、配信の ID を鍵にして MSK に書く。</li>
+        <li>配信ごとに 1 つの順番付けが、戻らない番号 <code>seq</code> を振る。同じ配信の順番は 1 か所で決める。</li>
+        <li>1 秒（視聴 1,000 人未満は 250 ms）ぶんをまとめ、視聴者に見せるのは「すべて」で 20 件・「上位」で 8 件までに抜き出す。所有者とモデレーターの発言は必ず入れる。</li>
+        <li>まとめを Valkey の pub/sub に 1 回だけ流す。各 Gateway のノードは配信ごとに 1 回だけ購読する。</li>
+        <li>ノードは 1 回だけ直列化・圧縮したフレームを、手元の全接続に使い回す。視聴者 1 人には 1 秒に 1 フレーム。</li>
+        <li>配りはベストエフォート。番号の飛びに気づいたら、直近 1,000 件から取り直す。</li>
+      </ol>
+    </div>
+    <p>チャットの正本は MSK のログと S3 で、1 件ずつ DB には書きません。目標は 20 万人の配信で、送信から画面まで p95 2 秒です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/live-chat.md">live-chat.md</a> の 3〜6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0032-chat-sequencer-and-batched-fanout.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0033-chat-rate-limits-slow-mode-and-moderation.md">0033</a>。書く時に配るか読む時に集めるかの一般論は <a href="../../../x/docs/primer/index.html#fanout">X の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="views">
+    <h2>視聴回数：なぜ数えるのが難しいか</h2>
+    <p>視聴回数は、創作者の収益、広告の値段、おすすめの順位を決めます。だから水増しの動機があります。ボット、多数の端末を並べた<a class="t" href="#g-view-farm">視聴の工場</a>、自動の再読み込み、音を消した埋め込みの自動の再生です。</p>
+    <div class="quiz" data-answer="2">
+      <p class="q">視聴回数は「再生ボタンが押された回数」を数えればよい？</p>
+      <div class="opts">
+        <button>はい。押された回数が最も正確</button>
+        <button>いいえ。最初のフレームが描かれた再生のうち、検証の規則を通ったものだけを数える</button>
+        <button>いいえ。最後まで見た再生だけを数える</button>
+      </div>
+      <p class="why">押しただけで始まらない再生や、同じ人の繰り返し（設計は同じ組で 24 時間に 4 回まで）、ボットの型を除きます。収益には、さらに 30 秒以上見た<a class="t" href="#g-engaged-view">エンゲージ ビュー</a>を使います。</p>
+    </div>
+    <p>集団の不正（同じ回線から短い再生が大量、同じ型の端末が同じ動画の集合を見る）は、1 件ずつ見ても分かりません。1 時間や 1 日ぶんを集めて初めて見えます。そこで数を 2 段に分けます。</p>
+    <table>
+      <tr><th>層</th><th>いつ</th><th>使い道</th></tr>
+      <tr><td><a class="t" href="#g-provisional">仮の数</a></td><td>出来事を受けてすぐ（p95 60 秒）</td><td>公開の数の表示、急な人気の検知</td></tr>
+      <tr><td>1 時間の確定</td><td>時間の終わりから 70 分後</td><td>公開の数、分析の速報</td></tr>
+      <tr><td><a class="t" href="#g-confirmed">1 日の確定</a></td><td>翌日の JST 6:00</td><td>収益、収益化の条件、AV1 の時機、人気の順位</td></tr>
+    </table>
+    <p>公開の数は「確定 ＋ それより後の仮」なので、<strong>確定で減ることがあります</strong>。減った数と理由（規則の ID）を記録し、創作者に見せます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/view-counting-and-analytics.md">view-counting-and-analytics.md</a> の 5 節（規則 S01〜S08・B01〜B08）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0007-two-phase-view-counting.md">ADR-0007</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0035-view-rules-catalog-and-public-count-composition.md">0035</a>。大きなカウンターと結果整合の一般論は <a href="../../../x/docs/primer/index.html#counters">X の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="fingerprint">
+    <h2>音声と映像の指紋、時刻のずれの投票</h2>
+    <p><a class="t" href="#g-fingerprint">指紋</a>は、ファイルのバイトではなく「聞こえ方・見え方」を要約した値です。再符号化・音量・雑音・切り出しで変わりにくく作ります。</p>
+    <div class="tabs">
+      <div data-tab="音声：山の組"><p>音をスペクトログラム（時刻 × 周波数の強さ）にし、局所の山を選びます。山の配置は星座の図のようになります（<a class="t" href="#g-constellation">コンステレーション</a>）。各山（錨）を後ろの近い山 3 つと組にし、（錨の帯、帯の差、時刻の差）を 1 つのハッシュにします。値には錨の時刻を持ちます。強い山は再符号化や雑音でも残ります。</p></div>
+      <div data-tab="映像：知覚ハッシュ"><p>1 秒 2 枚のフレームを小さな濃淡の絵にし、DCT の低い周波数から 64 ビットの<a class="t" href="#g-phash">知覚ハッシュ</a>を作ります。似た絵は<a class="t" href="#g-hamming">ハミング距離</a>が小さくなります。64 ビットを 16 ビット × 4 に分けて引きます。距離 11 以下なら、どれか 1 つの塊の違いは 2 ビット以下になる（4 × 3 ＝ 12 &gt; 11 の鳩の巣の原理）ので、各塊を半径 2 で引けば漏れません。</p></div>
+    </div>
+    <p>ハッシュの一致は偶然も起きます。本物の一致は「参照の時刻 − 問い合わせの時刻」（ずれ）が揃うことで見分けます（<a class="t" href="#g-offset-vote">時刻のずれの投票</a>）。設計の例は、4 分のゲームの実況の 0:30〜1:10 に、参照の歌の 1:00〜1:40 が実況の声と重なって流れたものです。</p>
+    <div class="stepper">
+      <ol>
+        <li>問い合わせのハッシュを 10 秒の窓（5 秒ずらし）に分け、各ハッシュで参照の索引を引く。</li>
+        <li>当たった項目ごとに、ずれ δ ＝ 参照の時刻 − 問い合わせの時刻を作り、（参照、δ の箱）に 1 票を足す。</li>
+        <li>歌の重なる窓では、δ ＝ ＋30.0 秒の箱に 38〜52 票が集まる。偶然の組は 3 票を超えない。しきい値は 12 票。</li>
+        <li>候補の周りで <code>t_ref = a · t_query + c</code> を当てはめ、1 秒ごとに一致の割合を確かめる。<code>a</code> ＝ 1.000、<code>c</code> ＝ ＋30.0 秒。</li>
+        <li>10 秒以上続く区間を一致にする：問い合わせ 30〜70 秒 ↔ 参照 60〜100 秒、音声。10 秒未満の一致は出さない。</li>
+      </ol>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-matching.md">copyright-matching.md</a> の 5・6・8 節（速さ・ピッチの変種は 8.4 節）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0008-fingerprinting-and-match-engine.md">ADR-0008</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0043-fingerprint-v1-hash-formats.md">0043</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0045-offset-voting-verification-and-distortion-variants.md">0045</a>。</small></p>
+  </section>
+
+  <section class="s" id="claims">
+    <h2>申し立て・異議・方針</h2>
+    <p>権利者は<a class="t" href="#g-reference">参照のファイル</a>を登録し、一致したときの方針を地域ごとに決めます。一致から生まれる記録を<a class="t" href="#g-claim">申し立て</a>（claim）と呼びます。</p>
+    <div class="cards">
+      <div class="card" data-frag><h3>ブロック</h3><p>その地域で再生させない。複数の一致があれば最も強い。</p></div>
+      <div class="card" data-frag><h3>収益化</h3><p>広告を出し、収益を権利者へ分ける（次の節）。</p></div>
+      <div class="card" data-frag><h3>追跡</h3><p>再生は止めず、視聴の統計だけを権利者に見せる。</p></div>
+    </div>
+    <p>創作者は誤りだと思えば<a class="t" href="#g-dispute">異議</a>を出せます。権利者が期限（設計は 30 日、再審査は 7 日）までに応じなければ、申し立ては外れます。審査の間、争いの分の収益は<strong>預かり</strong>に入れ、結末で権利者か創作者へ移します。申し立て（照合の結果）と<a class="t" href="#g-takedown">削除の申出</a>（法的な手続き）は別物で、著作権の <a class="t" href="#g-strike">strike</a> は後者からだけ出ます。</p>
+    <div class="quiz" data-answer="3">
+      <p class="q">照合のエンジンが止まり、アップロードされた動画の照合が 30 分終わりません。どうする？</p>
+      <div class="opts">
+        <button>時間切れとして公開し、後で照合する</button>
+        <button>限定公開に切り替えて公開する</button>
+        <button>「照合待ち」のまま止め、創作者には「確認中」と見せ、Ops を呼ぶ</button>
+      </div>
+      <p class="why">時間で公開に倒すと、照合が壊れたときに権利者を守れません。設計は照合の結果（一致なし、または方針の適用）を公開の条件にし、DB のトリガーでも守ります（ADR-0008）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-claims-and-disputes.md">copyright-claims-and-disputes.md</a> の 4・7・8 節（決定表 DT-CLM-001・002）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0047-claim-policies-territory-overlap-and-per-second-split.md">ADR-0047</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md">0048</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0049-takedown-cases-counter-notice-and-strikes.md">0049</a>。</small></p>
+  </section>
+
+  <section class="s" id="revenue">
+    <h2>収益の分け方と整数の端数</h2>
+    <p>広告の収益 <code>R</code> のうち、創作者の側の取り分 <code>pool</code> は 55%（メンバーシップは 70%）です。照合の収益化の申し立てがあれば、<code>pool</code> を動画の<strong>秒ごと</strong>に分けます。秒 <code>t</code> を覆う申し立ての権利者で等しく分け、覆うものがなければ創作者の分です。</p>
+    <table>
+      <tr><th>600 秒の動画</th><th>A（0〜180 秒）</th><th>B（120〜240 秒）</th><th>創作者</th></tr>
+      <tr><td>0〜120 秒</td><td>120</td><td>—</td><td>—</td></tr>
+      <tr><td>120〜180 秒（重なり）</td><td>30</td><td>30</td><td>—</td></tr>
+      <tr><td>180〜240 秒</td><td>—</td><td>60</td><td>—</td></tr>
+      <tr><td>240〜600 秒</td><td>—</td><td>—</td><td>360</td></tr>
+      <tr><td>重み</td><td>150</td><td>90</td><td>360</td></tr>
+    </table>
+    <p>金額は<a class="t" href="#g-micro-yen">マイクロ円</a>の整数で持ちます。比で分けると端数が出るので、<a class="t" href="#g-largest-remainder">最大剰余</a>で配ります。</p>
+    <div class="stepper">
+      <ol>
+        <li><code>R</code> ＝ 12,345,678,901 マイクロ円。<code>pool</code> ＝ floor(R × 5,500 ÷ 10,000) ＝ 6,790,123,395。残りが本システムの分。</li>
+        <li>比で分ける：A ＝ 1,697,530,848.75、B ＝ 1,018,518,509.25、創作者 ＝ 4,074,074,037。</li>
+        <li>まず全員を切り捨てる。和は 6,790,123,394 で、<code>pool</code> より 1 足りない。</li>
+        <li>足りない 1 を、切り捨てた剰余の大きい順（A の 0.75）に配る。A ＝ 1,697,530,849。和が <code>pool</code> と一致する。</li>
+        <li>月の締めで、相手ごとに 1 回だけ円へ切り捨てる。A は 1,697 円を払い、530,849 マイクロ円を翌月へ繰り越す。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">月額 490 円のメンバーシップ 1,000 件。純収益 428 円の 70% を、1 件ごとに円で切り捨てても、月にまとめて丸めても同じ？</p>
+      <div class="opts">
+        <button>同じ。切り捨ては 1 円未満なので無視できる</button>
+        <button>違う。1 件ごとだと 299 円 × 1,000 ＝ 299,000 円、まとめると 299,600 円で、創作者が月に 600 円失う</button>
+        <button>違う。まとめるほうが創作者に不利になる</button>
+      </div>
+      <p class="why">428 × 0.7 ＝ 299.6 円の 0.6 円が 1,000 回捨てられます。設計はマイクロ円で積み、円への丸めを月に 1 回だけにします。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/monetization-and-payouts.md">monetization-and-payouts.md</a> の 6・7 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-claims-and-disputes.md">copyright-claims-and-disputes.md</a> の 6 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0057-revenue-ledger-share-calculation-and-rounding.md">ADR-0057</a>。重みの単位 27,720（1〜12 の最小公倍数）は 1/n を丸めずに持つためです。複式の台帳の考え方は <a href="../../../stripe/docs/primer/index.html">Stripe の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="legal">
+    <h2>日本の法令の枠組み（法務の確認待ち）</h2>
+    <p>動画の基盤は、著作権・削除の手続き・広告の表示・未成年の保護の決まりに関わります。設計はどの結論にも合わせられる枠を用意し、結論は出していません。以下は<strong>すべて法務の確認待ち</strong>です。</p>
+    <table>
+      <tr><th>法令</th><th>枠組み</th><th>設計の論点</th></tr>
+      <tr><td><a class="t" href="#g-copyright-act">著作権法</a></td><td>32 条（引用）。30 条の 4（思想又は感情の享受を目的としない利用。機械の学習の議論で引かれる）</td><td>異議の判断、動画・字幕を ASR やおすすめの学習に使う範囲（L1・L8）</td></tr>
+      <tr><td><a class="t" href="#g-platform-act">情報流通プラットフォーム対処法</a></td><td>旧プロバイダ責任制限法。改正法は 2025-04-01 施行。大規模な事業者に、削除の申出の窓口、侵害情報調査専門員、判断と通知の迅速化、運用の状況の公表を求める</td><td>どの規模から負うか、照合の自動のブロックとの関係、反論の通知を持つか（L1・L2）</td></tr>
+      <tr><td><a class="t" href="#g-stealth-marketing">ステマ規制</a></td><td>景品表示法の告示（2023-10-01 施行）。広告であることが分かりにくい表示を禁じる</td><td>タイアップの申告の欄と「プロモーションを含みます」の表示、本システムの責任の範囲（L4）</td></tr>
+      <tr><td>未成年の保護</td><td>青少年インターネット環境整備法のフィルタリング、児童の性的な画像の照合と報告。海外の視聴者には米国の COPPA に当たる規制</td><td>子ども向けの印、年齢の確かめ方、個人化・コメント・通知の止め方（L3）</td></tr>
+    </table>
+    <p>ほかに、視聴の履歴の扱い（個人情報保護法、L5）、プレイヤーの計測の外部送信規律（電気通信事業法、L6）、メンバーシップの代金の流れ（資金決済法、L7）も確認待ちです。</p>
+    <div class="callout warn">ここに書いたのは法令の枠組みだけです。本システムへの当てはめは、intent.md の L1〜L10 の確認が済むまで決まりません。止める spec も L ごとに決まっています。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-claims-and-disputes.md">copyright-claims-and-disputes.md</a> の 8 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/comments-and-moderation.md">comments-and-moderation.md</a> の 8 節。</small></p>
+  </section>
+
+  <section class="s" id="datamodel">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora の 141 表を、領域ごとの 14 のファイルに分けています。テナントは 1 つで、持ち主（本人・チャンネル・権利者）ごとに RLS をかけます。見える範囲は表ではなく <a class="t" href="#g-playable">playable()</a> の 1 つの関数で決めます。主な表のつながりは次のとおりです。</p>
+    <pre class="mermaid">erDiagram
+  channels ||--o{ videos : "publishes"
+  videos ||--o{ renditions : "per gen"
+  videos ||--o{ match_runs : "matched"
+  match_runs ||--o{ matches : "found"
+  content_references ||--o{ matches : "matched against"
+  assets ||--o{ claims : "claims"
+  videos ||--o{ claims : "claimed"
+  videos ||--o{ view_counts_daily : "confirmed views"
+  videos ||--o{ revenue_split_daily : "weights per day"
+  ledger_entries ||--|{ ledger_lines : "has lines"
+  videos {
+    uuid video_id PK
+    text state
+    integer active_gen
+  }
+  renditions {
+    uuid video_id PK
+    integer gen PK
+    text name PK
+  }
+  view_counts_daily {
+    uuid video_id PK
+    date day PK
+    text ruleset_version
+  }
+  ledger_lines {
+    integer yyyymm PK
+    uuid entry_id PK
+    smallint line_no PK
+    bigint debit_micro_jpy
+    bigint credit_micro_jpy
+  }</pre>
+    <p>data-model.md の 5 節は、1 本のアップロードが収益になるまでを P1〜P12 の段で追います。</p>
+    <pre class="mermaid">flowchart LR
+  P1["P1 アップロード"] --> P2["P2 パイプライン"]
+  P2 --> P3["P3 照合"]
+  P3 --> P4["P4 方針"]
+  P4 --> P5["P5 公開の門"]
+  P5 --> P6["P6 再生と配信"]
+  P6 --> P7["P7 出来事"]
+  P7 --> P8["P8 1 日の確定"]
+  P8 --> P10["P10 積み上げ"]
+  P10 --> P11["P11 月の締め"]
+  P11 --> P12["P12 支払い"]</pre>
+    <p>読むときの目印：<code>gen</code>（レンディションの世代。URL の中身を変えないために作り直しは世代を上げる）、<code>ladder_version</code>・<code>fp_version</code>・<code>ruleset_version</code>（形式と規則はコードのバージョンで、フラグにしない）、<code>*_micro_jpy</code>（マイクロ円）。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/data-model.md">data-model.md</a> の 3 節（規約）・4 節（全体の ER 図）・5 節（道筋）・6 節（横断の不変条件）。ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>。</small></p>
+  </section>
+
+  <section class="s" id="differences">
+    <h2>本家と違うところ、名前の置き換え</h2>
+    <p>振る舞いは本家に寄せますが、小さなチームで作るために意図して変えたところがあります。設計の文書で「本家と違う」と出てきたら、この表を思い出してください。</p>
+    <table>
+      <tr><th>項目</th><th>本家</th><th>本システム</th></tr>
+      <tr><td>コーデック</td><td>H.264・VP9・AV1</td><td>H.264 と AV1。VP9 を作らない</td></tr>
+      <tr><td>変換の基盤</td><td>専用のチップ（VCU）</td><td>汎用の CPU（Spot）とライブの GPU</td></tr>
+      <tr><td>ライブの取り込み</td><td>RTMP・RTMPS・HLS</td><td>RTMPS と SRT。平文の RTMP は受けない</td></tr>
+      <tr><td>超低遅延のライブ</td><td>あり（5 秒未満）</td><td>MVP は低遅延（p95 6 秒）まで</td></tr>
+      <tr><td>公開と照合</td><td>照合の後に公開するかは未検証</td><td>照合の結果が出るまで公開しない</td></tr>
+      <tr><td>DRM</td><td>有料の作品（範囲は未検証）</td><td>メンバー限定の動画だけ</td></tr>
+    </table>
+    <p>本家の名前は識別子に使いません（<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>）。ドメインは <code>&lt;brand&gt;.&lt;domain&gt;</code>、配信は <code>&lt;brand&gt;video.&lt;domain&gt;</code>、ストリームキーの接頭辞は <code>&lt;brand&gt;_sk_</code>、ヘッダーは <code>&lt;Brand&gt;-Playback-Token</code> と書きます。本家の Content ID に当たる仕組みも、文書では「照合」「申し立て」と呼びます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/README.md">architecture/README.md</a> の 1.4 節（本家の形と意図した違いの全行）。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-ugc">UGC</dt><dd>User Generated Content。利用者が作って上げる中身。</dd>
+      <dt id="g-keyframe">キーフレーム</dt><dd>I フレーム。他のフレームを参照せず、それだけで描けるフレーム。再生とシークの起点になる。</dd>
+      <dt id="g-gop">GOP</dt><dd>Group of Pictures。キーフレームから次のキーフレームの前までのフレームの組。</dd>
+      <dt id="g-closed-gop">閉じた GOP</dt><dd>GOP の外のフレームを参照しない GOP。境で切っても単独で復号できる。</dd>
+      <dt id="g-codec">コーデック</dt><dd>映像や音声の圧縮と復元の方式（H.264、VP9、AV1、AAC など）。</dd>
+      <dt id="g-crf">CRF</dt><dd>Constant Rate Factor。ビットレートではなく画質の目標で符号化する指定。数が小さいほど高画質で大きい。</dd>
+      <dt id="g-rendition">レンディション</dt><dd>同じ動画を、ある解像度・ビットレート・コーデックで符号化した 1 本。段とも呼ぶ。</dd>
+      <dt id="g-ladder">ラダー</dt><dd>1 本の動画に用意するレンディションの組。はしごの段に見立てた呼び名。</dd>
+      <dt id="g-vmaf">VMAF</dt><dd>Video Multimethod Assessment Fusion。Netflix が公開した、人の評価に近づけた画質の指標（0〜100）。</dd>
+      <dt id="g-convex-hull">凸包</dt><dd>点の集まりを外から包む凸な多角形。ここでは（ビットレート、VMAF）の点の上側の縁で、同じビットで最も画質の高い点の並び。</dd>
+      <dt id="g-per-title">per-title</dt><dd>動画ごとに中身の複雑さを測り、その動画に合わせたラダーを決める方式。</dd>
+      <dt id="g-resumable">再開できるアップロード</dt><dd>ファイルを部分に分けて送り、切れたら受け取り済みの位置から続けられるアップロード。</dd>
+      <dt id="g-spot">Spot</dt><dd>AWS の余ったサーバーを安く使う形。2 分前の予告で回収されることがある。</dd>
+      <dt id="g-segment">セグメント</dt><dd>動画を数秒ごとに切った、単独で取得・復号できる断片。</dd>
+      <dt id="g-manifest">マニフェスト</dt><dd>段とセグメントの一覧を書いたファイル。HLS の再生リスト、DASH の MPD。</dd>
+      <dt id="g-cmaf">CMAF</dt><dd>Common Media Application Format（ISO/IEC 23000-19）。HLS と DASH で共有できる fMP4 のセグメントの形。</dd>
+      <dt id="g-hls">HLS</dt><dd>HTTP Live Streaming。Apple が作った、<code>.m3u8</code> の再生リストで配る方式（RFC 8216）。</dd>
+      <dt id="g-dash">DASH</dt><dd>MPEG-DASH（ISO/IEC 23009-1）。XML の MPD で配る国際標準の方式。</dd>
+      <dt id="g-drm">DRM</dt><dd>Digital Rights Management。鍵を許された端末にだけ渡し、暗号化した中身を守る仕組み（Widevine、FairPlay、PlayReady）。</dd>
+      <dt id="g-cenc">CENC</dt><dd>Common Encryption（ISO/IEC 23001-7）。複数の DRM で同じ暗号化したファイルを使うための標準。</dd>
+      <dt id="g-cbcs">cbcs</dt><dd>CENC の方式の 1 つ。AES-CBC で、ブロックの一部だけを暗号化するパターンを使う。FairPlay を含む 3 つの DRM に共通で使える。</dd>
+      <dt id="g-abr">ABR</dt><dd>Adaptive Bitrate。プレイヤーが回線とバッファに合わせて、セグメントごとに段を選び直すこと。</dd>
+      <dt id="g-buffer">バッファ</dt><dd>取得済みで、まだ再生していない秒数。尽きると止まる。</dd>
+      <dt id="g-bba">バッファに基づく ABR</dt><dd>バッファの量から段を決める ABR。Huang らの論文（SIGCOMM 2014）で知られる。</dd>
+      <dt id="g-startup">開始の時間</dt><dd>再生の要求から最初のフレームが描かれるまでの時間。</dd>
+      <dt id="g-rebuffer">再バッファ</dt><dd>再生の途中でバッファが尽きて止まること。</dd>
+      <dt id="g-cdn">CDN</dt><dd>Content Delivery Network。世界中・国中のキャッシュのサーバーから中身を配る網。</dd>
+      <dt id="g-edge">エッジ</dt><dd>CDN のうち視聴者に近いキャッシュのサーバー。</dd>
+      <dt id="g-origin-shield">Origin Shield</dt><dd>CloudFront の機能。エッジの外れを 1 か所のキャッシュにまとめ、オリジンへの要求を減らす。</dd>
+      <dt id="g-zipf">Zipf の分布</dt><dd>順位 i のものの頻度が 1/i^α に比例する分布。人気が上位に集まり、尾が長く続く。</dd>
+      <dt id="g-long-tail">ロングテール</dt><dd>1 本ずつはほとんど見られないが、本数が非常に多い動画の集まり。</dd>
+      <dt id="g-egress">転送の量</dt><dd>CDN から視聴者へ出ていくバイト。CDN の主な課金の単位（USD/GB）。</dd>
+      <dt id="g-ingest">取り込み</dt><dd>ライブの配信者のソフトから、映像を本システムが受け取ること。</dd>
+      <dt id="g-rtmp">RTMP</dt><dd>Real-Time Messaging Protocol。TCP の上の配信の方式。RTMPS は TLS で包んだもの。</dd>
+      <dt id="g-srt">SRT</dt><dd>Secure Reliable Transport。UDP の上で、決めた遅れの中で送り直しと暗号を行う配信の方式。</dd>
+      <dt id="g-ll-hls">LL-HLS</dt><dd>Low-Latency HLS。部分セグメント、要求の保留、プリロードのヒントで遅れを縮めた HLS。</dd>
+      <dt id="g-part">部分</dt><dd>LL-HLS の部分セグメント。設計は 0.5 秒。でき次第に配る。</dd>
+      <dt id="g-dvr">DVR</dt><dd>ライブの途中で巻き戻して見る機能。設計の窓は 12 時間。</dd>
+      <dt id="g-view-farm">視聴の工場</dt><dd>多数の端末を並べて、決めた動画を自動で再生させ、視聴を水増しする仕組み。</dd>
+      <dt id="g-engaged-view">エンゲージ ビュー</dt><dd>有効な視聴のうち、30 秒以上（30 秒未満の動画は 90% 以上）再生したもの。設計の値。</dd>
+      <dt id="g-provisional">仮の数</dt><dd>流れの中の規則だけで数えた、すぐ出す視聴回数。後で減ることがある。</dd>
+      <dt id="g-confirmed">確定の数</dt><dd>集めた出来事に全部の規則を当てて数えた視聴回数。収益は 1 日の確定だけを使う。</dd>
+      <dt id="g-fingerprint">指紋</dt><dd>音声や映像の聞こえ方・見え方を要約した値。再符号化などの変化に強い。</dd>
+      <dt id="g-constellation">コンステレーション</dt><dd>スペクトログラムの山の配置を星座に見立てた呼び名。山の組をハッシュにする。</dd>
+      <dt id="g-phash">知覚ハッシュ</dt><dd>画像の大まかな構図から作るハッシュ。似た画像は近い値になる。</dd>
+      <dt id="g-hamming">ハミング距離</dt><dd>同じ長さの 2 つのビット列で、違うビットの数。</dd>
+      <dt id="g-offset-vote">時刻のずれの投票</dt><dd>一致したハッシュごとに参照と問い合わせの時刻の差を数え、差が揃う組を本物の一致とみなす方法。</dd>
+      <dt id="g-reference">参照のファイル</dt><dd>権利者が登録する、自分の作品の音声・映像。指紋を作って索引に入れる。</dd>
+      <dt id="g-claim">申し立て</dt><dd>照合の一致から作る、動画と権利者の資産の組の記録。方針（ブロック・収益化・追跡）を持つ。</dd>
+      <dt id="g-dispute">異議</dt><dd>創作者が申し立てを誤りだと争う手続き。権利者が期限までに応じなければ外れる。</dd>
+      <dt id="g-takedown">削除の申出</dt><dd>権利者が法的な手続きとして動画の削除を求めること。照合の申し立てとは別。</dd>
+      <dt id="g-strike">strike</dt><dd>違反の記録。90 日で失効し、90 日に 3 つでチャンネルが終了する（本家の規則）。</dd>
+      <dt id="g-micro-yen">マイクロ円</dt><dd>1 円の 100 万分の 1。積み上げの金額を整数で持つ単位。</dd>
+      <dt id="g-largest-remainder">最大剰余</dt><dd>比で分けて全員を切り捨て、足りない分を剰余の大きい順に 1 単位ずつ配る方法。和が元の値と一致する。</dd>
+      <dt id="g-playable">playable()</dt><dd>閲覧者・動画・地域から、再生してよいかを決める 1 つの関数。再生・検索・おすすめなどの全経路が通る。</dd>
+      <dt id="g-copyright-act">著作権法</dt><dd>著作物の権利と、引用（32 条）・非享受の利用（30 条の 4）などの制限を定める法律。</dd>
+      <dt id="g-platform-act">情報流通プラットフォーム対処法</dt><dd>特定電気通信による情報の流通によって発生する権利侵害等への対処に関する法律。旧プロバイダ責任制限法。</dd>
+      <dt id="g-stealth-marketing">ステマ規制</dt><dd>景品表示法の告示による、広告であることを隠した表示（ステルスマーケティング）の規制。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「動画が配られるまで」（アップロード → 変換 → パッケージ → 再生 → CDN）、続いてライブ、最後に「数と権利とお金」（視聴回数 → 照合 → 申し立て → 収益）を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ち（L1〜L10）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、主要な流れ A〜E、規模と費用、本家との違い</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/upload-and-ingest.md">upload-and-ingest.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/transcoding-pipeline.md">transcoding-pipeline.md</a> <span>— 再開できるアップロード、段の状態、ラダー、AV1</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/packaging-and-drm.md">packaging-and-drm.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/playback-and-abr.md">playback-and-abr.md</a> <span>— CMAF、マニフェスト、DRM、ABR、QoE</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/cdn-and-delivery.md">cdn-and-delivery.md</a> <span>— 層、ヒットの率、措置での停止</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/live-streaming.md">live-streaming.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/live-chat.md">live-chat.md</a> <span>— 取り込み、LL-HLS、DVR、チャットの配り</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/view-counting-and-analytics.md">view-counting-and-analytics.md</a> <span>— 規則、3 つの層、公開の数の組み立て</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-matching.md">copyright-matching.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/copyright-claims-and-disputes.md">copyright-claims-and-disputes.md</a> <span>— 指紋、投票、方針、異議、削除の申出</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/monetization-and-payouts.md">monetization-and-payouts.md</a> <span>— 広告、メンバーシップ、台帳、端数、支払い</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/comments-and-moderation.md">comments-and-moderation.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/recommendations.md">recommendations.md</a> <span>— 措置、子ども向け、タイアップ、おすすめの境界</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/youtube/docs/decisions">decisions/</a> <span>— 特に 0002（パイプライン）、0003（コーデックとラダー）、0007（視聴回数）、0008（指紋と照合）、0009（playable）、0010（おすすめの境界）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/architecture/data-model.md">data-model.md</a> <span>— 規約、ER 図、アップロードから収益までの道筋、横断の不変条件</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>
