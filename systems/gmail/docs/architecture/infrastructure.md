@@ -104,7 +104,7 @@ BYOIP の決まり（[BYOIP](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide
 | VPC エンドポイント | S3、SQS、KMS、Secrets Manager、ECR、CloudWatch | — | インターネットを通さない |
 | なし | `content-scanner`、`html-render` | — | ネットワークを持たない（[ADR-0026](../decisions/0026-static-attachment-scanning-sandbox.md)） |
 
-- AWS は EC2 からのポート 25 の送信を既定で制限している。`mail-prod` の制限の解除と、`out-*` の逆引きの設定を申請する（[ADR-0001](../decisions/0001-platform-and-stack.md)。申請の要否の詳しさは**未検証**）。
+- AWS は EC2 からのポート 25 の送信を既定で制限し、解除は Support への申請（Request to remove email sending restrictions）で行う（[Create a reverse DNS record for email on Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Elastic_Addressing_Reverse_DNS.html)、2026-10-10 に確認）。申請がリージョンごとに要ることと処理の時間は、AWS の re:Post の記事の本文を取得できず**未検証**。東京と大阪（`dr-out`）の両方で申請する前提にする（[ADR-0001](../decisions/0001-platform-and-stack.md)）。Elastic IP の逆引きは、正引き（A の記録）を先に置いてから設定でき、逆引きを置いた Elastic IP はアカウントに固定される（同じ文書）。
 - DNS の解決は Route 53 Resolver（DNSSEC の検証）。`mta-out` と `mailauth` は解決の結果を台の中で 60 秒まで持つ。
 
 ### 3.5 逆引きと名前
@@ -221,7 +221,7 @@ sequenceDiagram
 
 ### 7.3 切り替え（東京が使えないとき）
 
-判断は IC と Ops の責任者（[roadmap.md](../roadmap.md) のエージェントに任せないこと）。手順は `disaster-recovery.md`。
+判断は IC と Ops の責任者（[roadmap.md](../roadmap.md) のエージェントに任せないこと）。手順は [disaster-recovery.md](../runbooks/disaster-recovery.md)。
 
 1. **受信**：何もしない。`mx2` が受け続ける（送り手が `mx1` に届かず `mx2` へ回る）。大阪の `mx-edge` を 4 台から 12 台に増やす（[capacity.md](capacity.md) の 2 節の東京の受け付けの量）。
 2. **Aurora**：Global Database を大阪へ切り替える（東京が応えない場合は、切り離して大阪を書き手にする。メタデータ RPO 1 分）。
@@ -300,7 +300,7 @@ sequenceDiagram
 
 ## 12. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -349,7 +349,7 @@ data-model.md（まだない）に、次の項目を載せる。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| [inbound-smtp.md](inbound-smtp.md) の 4 節の `mx2` の IP（「同じ /24」）を、大阪の別の /24 に直す | inbound-smtp.md の持ち主（Dev） |
+| [inbound-smtp.md](inbound-smtp.md) の 4 節の `mx2` の IP（「同じ /24」）を、大阪の別の /24 に直す | 統合の工程で直した（[inbound-smtp.md](inbound-smtp.md) の 4 節は `in-osa`） |
 | リージョンの喪失でも受け付けたメールを失わない、2 つのリージョンへの同期のスプールの確定 | Dev と PM。[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の変更になる。E17 の DR の訓練の後に、250 の遅れと費用を測って決める |
 | BYOIP の範囲の取得の手段と時間、逆引きの設定の方法、ポート 25 の申請の詳しさ | `mx-throughput-poc`・`ip-ranges-and-byoip`（**未検証**） |
 | BYOIP の IPv4 の時間の料金の扱い | `cost-baseline`（**未検証**） |
@@ -362,3 +362,4 @@ data-model.md（まだない）に、次の項目を載せる。
 - AWS, [Bring your own IP addresses (BYOIP) to Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-byoip.html)（2026-10-10 に確認）：IPv4 は /24 が最も細かい、IPv6 は公開するものは /48、1 つの範囲は同時に 1 つのリージョン、リージョンあたり 5 つ（申請で増やせる）、他のアカウントへの共有は IPAM と Organizations の連携が要る
 - AWS Price List の公開の価格：[capacity.md](capacity.md) の出典と同じ（2026-10-10 に取得）。`AmazonVPC`（2026-09-17 の公開分）の公開の IPv4 0.005 USD/時
 - [RFC 5321](https://www.rfc-editor.org/rfc/rfc5321) の 5 節（MX の優先度と再試行）
+- AWS, [Create a reverse DNS record for email on Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Elastic_Addressing_Reverse_DNS.html)（2026-10-10 に確認）：送信に使う Elastic IP に逆引きを置くことを勧める。正引きが先に要る。逆引きのある Elastic IP は解放できない。ポート 25 の制限の解除は Support への申請

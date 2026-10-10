@@ -52,8 +52,8 @@
 | --- | --- | --- |
 | JMAP の Email の箱 | RFC 8621 の 2 節：IMAP との互換のため、Email は 1 つ以上の箱に属さなければならない（MUST） | 役 `all` の仮想の箱（6.2 節） |
 | JMAP の `threadId` | RFC 8621 の 3 節：変わらない。スレッドを合わせるときは、Email を消して新しい ID で入れ直す（MUST） | 合わせで新しい世代（[ADR-0034](../decisions/0034-threading-implementation-and-merge.md)） |
-| 箱の役 | RFC 8621 の 2 節：IANA の「IMAP Mailbox Name Attributes」の登録の名前。1 つの役は 1 つの箱 | `inbox`、`sent`、`drafts`、`junk`、`trash`、`all`、`important`、`scheduled`、`snoozed`。`scheduled`・`snoozed` が登録にあるかは確かめられなかった（**未検証**）。なければ `<brand>:scheduled` のような拡張の性質にする |
-| 送信の保留 | RFC 8621 の 7 節：`sendAt` はサーバーが決める。FUTURERELEASE（RFC 4865）を使えば解放の時刻。`undoStatus` が `pending` の間は `canceled` にできる | 6.6 節 |
+| 箱の役 | RFC 8621 の 2 節：IANA の「IMAP Mailbox Name Attributes」の登録の名前。1 つの役は 1 つの箱。`Scheduled`・`Snoozed` は RFC 9979（Informational）で登録された（[IANA の登録簿](https://www.iana.org/assignments/imap-mailbox-name-attributes/imap-mailbox-name-attributes.xhtml)、2026-10-10 に確認） | `inbox`、`sent`、`drafts`、`junk`、`trash`、`all`、`important`、`scheduled`、`snoozed`。どれも登録の名前なので、拡張の性質に変えない |
+| 送信の保留 | RFC 8621 の 7 節：`sendAt` はサーバーが決める。FUTURERELEASE（RFC 4865）を使えば解放の時刻、使わなければ作成の時刻（MUST）。`undoStatus` が `pending` の間は `canceled` にできる | 6.6 節 |
 | `onDestroyRemoveEmails` | RFC 8621 の 2.5 節：真なら箱のメールを箱から外し、他の箱になければ消す | 役 `all` があるので消えない（6.2 節） |
 | CONDSTORE・QRESYNC | RFC 7162。箱ごとに `MODSEQ` が単調に増える | 7.3 節 |
 | OBJECTID | RFC 8474：`EMAILID` は同じ（箱、`UIDVALIDITY`、UID）に同じ値。一度知らせた `THREADID` を変えない | 7.3 節、[ADR-0034](../decisions/0034-threading-implementation-and-merge.md) |
@@ -73,7 +73,8 @@ changes(
   kind        enum,       -- created, updated, destroyed, label_added, label_removed,
                           -- hidden, unhidden, thread_merged, thread_destroyed,
                           -- label_created, label_renamed, label_deleting, label_destroyed,
-                          -- submission_changed, vacation_changed, regenerated
+                          -- submission_changed, vacation_changed, regenerated,
+                          -- preserved_purged（中だけ。下の注）
   entity_type enum,       -- email, thread, mailbox, submission, vacation
   entity_id   uuid,
   object_gen  int,        -- email のとき（JMAP の ID の世代）
@@ -87,6 +88,7 @@ changes(
 - `mailstore` の 1 つの変更のトランザクションは、`accounts_state.modseq` を 1 つ進め、その `modseq` で 1 行以上を書く（[ADR-0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md)）。同じトランザクションで outbox に `account.changed(account_id, modseq)` を書く。
 - メッセージ・スレッド・ラベルの行は、最後に変わった `modseq` を持つ。
 - IMAP のための補助の表 `imap_vanished(account_id, label_id, uid, modseq)` を同じトランザクションで書く（見える所属を失った UID）。change log と同じ 30 日で消す。
+- **保全の印**（[ADR-0053](../decisions/0053-retention-rules-holds-and-preservation.md)）：保留か保持の規則でメッセージの行を `preserved_messages` へ移すときは、`destroyed` の `flags_changed` に `preserved` の印を立てる。保全の行を後で消すときは `preserved_purged` を書く。どちらも `search-node` だけが読む（[search.md](search.md) の 7 節）。JMAP・IMAP・プッシュには出さない：`preserved` の印のある `destroyed` は普通の削除として返し、`preserved_purged` は型ごとの `modseq`（4.2 節）も箱の `HIGHESTMODSEQ` も進めず、`push-gateway` の合図も出さない。利用者は保留の有無を、状態の文字列の変化からも知れない。
 
 ### 4.2 型ごとの最後の modseq
 
@@ -227,6 +229,7 @@ stateDiagram-v2
 | `<brand>:authWarning` | Email の性質 | 確かめられていない差出人・スレッドの乗っ取りの印（理由のコード） |
 | `<brand>:unsubscribe` | Email の性質 | 一括の配信停止のボタンを出せるか |
 | `<brand>:muted` | Thread の性質 | ミュート |
+| `<brand>:releaseAt` | EmailSubmission の性質（読み出しだけ） | 解放の時刻（元に戻す送信の窓の終わり、または予約の時刻）。6.6 節 |
 
 - 名前に `<Brand>`・`<brand>:` を付けるのは、標準の将来の名前とぶつからないためと、本家の名前を使わないため（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
@@ -234,7 +237,7 @@ stateDiagram-v2
 
 - `urn:ietf:params:jmap:submission` の能力で、`maxDelayedSend = 31622400`（366 日）、`submissionExtensions` に `FUTURERELEASE` を出す。
 - 予約の送信は、`envelope.mailFrom.parameters` の `HOLDUNTIL`（時刻）か `HOLDFOR`（秒）で表す（RFC 4865）。予約は 1 アカウント 100 通まで、1 年先まで（[filters-forwarding-and-automation.md](filters-forwarding-and-automation.md) の 7.3 節）。
-- 元に戻す送信の窓（5・10・20・30 秒）は、サーバーがアカウントの設定から足す。`HOLD*` がなければ `sendAt = 作成の時刻 + 窓`。
+- 元に戻す送信の窓（5・10・20・30 秒）は、サーバーがアカウントの設定から足す。`HOLD*` がなければ `sendAt` は作成の時刻（RFC 8621 の 7 節の MUST）で、窓の終わりは `<brand>:releaseAt` で返す。`HOLD*` があれば `sendAt` は解放の時刻。統合の検証で「`sendAt = 作成の時刻 + 窓`」から直した（[ADR-0041](../decisions/0041-jmap-extensions-and-mailbox-mapping.md) の注記）。
 - 作成の応答の後、`release_at` まで `undoStatus = pending`。メッセージは `DRAFT` を外して `SCHEDULED` を持つ（「送信済み」は持たない。[architecture/README.md](README.md) の 1.3 節 B）。`onSuccessUpdateEmail` で下書きの箱から送信済みの箱へ移す差分は、この保留の状態への移しとして当てる。
 - `undoStatus` を `canceled` にする更新は、まだ `pending` なら受け、メッセージを `DRAFT` に戻す。既に解放を始めていたら `cannotUnsend`（RFC 8621 の 7.5 節）。
 - 解放の後、`SCHEDULED` を外して `SENT` を付け、`undoStatus = final`。`deliveryStatus` は [outbound-smtp-and-reputation.md](outbound-smtp-and-reputation.md) の `submission_recipients` から作る。
@@ -432,13 +435,18 @@ stateDiagram-v2
 - **送信の保留**：FUTURERELEASE と、サーバーが足す窓。保留の間は `SCHEDULED`（ADR-0041）。
 - **返すバイト**：配る形。偽の `Authentication-Results` は名前を変え、止めた添付は知らせに置き換える。後から止めたら新しい世代（ADR-0032）。
 
+### 決定（2026-10-10、統合）
+
+- **保全の印**：change log の `destroyed` に `preserved` の印、保全の行の消去に `preserved_purged` を足す。どちらも `search-node` だけが読み、JMAP・IMAP・プッシュに出さない（4.1 節）。
+- **窓だけの送信の `sendAt`**：作成の時刻。窓の終わりは `<brand>:releaseAt`（6.6 節）。
+- **役 `scheduled`・`snoozed`**：RFC 9979 で IANA に登録済みと確かめた。役として出す（3 節）。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| IANA の登録に `scheduled`・`snoozed` の役があるか | `jmap-mailbox-mapping` の着手の時に登録簿で確かめる（**未検証**）。なければ拡張の性質に変える |
 | `VANISHED (EARLIER)` に知らない UID を含めることへの主なアプリの振る舞い | `imap-interop` |
-| IMAP の読み出しの量の上限の値 | api-and-integrations.md と E17 の負荷試験 |
+| IMAP の読み出しの量の上限の値 | api-and-integrations.md で 1 時間 2.5 GB・1 日 20 GB に決めた（[ADR-0059](../decisions/0059-api-rate-limits-and-third-party-push.md)）。E17 の負荷試験の後に見直す |
 | POP3 | MVP の後（[architecture/README.md](README.md) の 6 節） |
 | 本家の IMAP の `EXPUNGE` の既定の振る舞い | 公式の資料が出れば 3 節を直す（**未検証**） |
 

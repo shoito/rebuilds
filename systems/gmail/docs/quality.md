@@ -80,7 +80,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 
 **C. 認証の相互運用（SPF・DKIM・DMARC・ARC）**
 
-- **試験のベクトル**：RFC の例（RFC 6376、RFC 8463 の Ed25519、RFC 8617）、正規化（`relaxed`・`simple`）の境界（末尾の空白、空の本文、`l=` の付いた署名）、SPF の照会の上限（10 回、void の照会 2 回）、マクロ、`include` の循環、DMARC の揃い（組織のドメインの決め方、`sp=`、`pct=`）、ARC の連鎖（`i=` の欠け、`cv=fail` の後）。
+- **試験のベクトル**：RFC の例（RFC 6376、RFC 8463 の Ed25519、RFC 8617）、正規化（`relaxed`・`simple`）の境界（末尾の空白、空の本文、`l=` の付いた署名）、SPF の照会の上限（10 回、void の照会 2 回）、マクロ、`include` の循環、DMARC の揃い（RFC 9989 の DNS の木の歩きによる組織のドメインの決め方、`sp=`・`np=`、`t=`、古い記録の `pct=0`）、ARC の連鎖（`i=` の欠け、`cv=fail` の後）。
 - **相互の検証**：本システムの DKIM の署名と ARC の封印を、外部の独立した実装で検証し、外部の実装の署名を本システムで検証する。検証の環境に外部の実装を置き、夜間に回す。
 - **転送**：本システムの転送（SRS と ARC の封印）を経たメールが、外部の受け手で DMARC を通る（ARC を信じる受け手の模型）。メーリングリストで本文が変わった場合の ARC の扱い。
 - **DNS の失敗**：DNS の時間切れ・SERVFAIL での判定（`temperror`）が、拒否ではなく一時の扱いになることを確かめる。
@@ -158,6 +158,37 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 
 - 別の AWS アカウントの `mail-canary` が、外部の見張りのアカウント（他社のメールのサービスに持つ試験のアカウント）と本システムの見張りのアカウントの間で、1 分ごとにメールを送り合う。届くまでの時間、受信箱と迷惑メールの箱のどちらに入ったか、認証の結果を記録する。
 - 送ったメールに番号を入れ、届いた番号と照らす（欠けの検出）。
+
+### 2.2.2 性質と決定表の一覧
+
+各領域の文書の「テストと性質」の ID の一覧。中身の正本は各文書の表で、テストの名前にこの ID を入れる（ルートの AGENTS.md）。2026-10-10 の統合の工程で、各領域の提案から作った。
+
+| 領域 | ID | 正本 |
+| --- | --- | --- |
+| 受信の SMTP（E2） | PROP-MX-001、PROP-MX-002、PROP-MX-003、PROP-MX-004、PROP-MX-005、PROP-MX-006、DT-MX-001、DT-MX-002 | [inbound-smtp.md](architecture/inbound-smtp.md) の 17 節 |
+| 送信者の認証（E3） | PROP-AUTH-001、PROP-AUTH-002、PROP-AUTH-003、PROP-AUTH-004、PROP-AUTH-005、DT-AUTH-001、DT-AUTH-002 | [sender-authentication.md](architecture/sender-authentication.md) の 15 節 |
+| 送信と評判（E7） | PROP-OUT-001、PROP-OUT-002、PROP-OUT-003、PROP-OUT-004、PROP-OUT-005、PROP-OUT-006、DT-OUT-001、DT-OUT-002、DT-OUT-003、DT-OUT-004 | [outbound-smtp-and-reputation.md](architecture/outbound-smtp-and-reputation.md) の 16 節 |
+| 選別（E6） | PROP-FLT-001、PROP-FLT-002、PROP-FLT-003、PROP-FLT-004、PROP-FLT-005、PROP-FLT-006、PROP-FLT-007、DT-FLT-001、DT-FLT-002 | [spam-and-abuse-filtering.md](architecture/spam-and-abuse-filtering.md) の 19 節 |
+| 添付と URL（E6、E9） | PROP-SCAN-001、PROP-SCAN-002、PROP-SCAN-003、PROP-SCAN-004、PROP-SCAN-005、PROP-SCAN-006、PROP-SCAN-007、DT-SCAN-001 | [attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md) の 12 節 |
+| 解析と保存（E4） | PROP-MSG-001、PROP-MSG-002、PROP-MSG-008、PROP-MSG-009、PROP-MSG-003、PROP-MSG-004、PROP-MSG-005、PROP-MSG-006、PROP-MSG-007 | [message-parsing-and-storage.md](architecture/message-parsing-and-storage.md) の 13 節 |
+| ラベルとスレッド（E5） | DT-MBX-001、PROP-MBX-001、PROP-MBX-002、PROP-MBX-003、PROP-THR-001、PROP-THR-002、PROP-THR-003、PROP-THR-004、DT-THR-001 | [mailbox-model-labels-and-threads.md](architecture/mailbox-model-labels-and-threads.md) の 11 節 |
+| 検索（E10） | PROP-SRCH-001、PROP-SRCH-002、PROP-SRCH-003、PROP-SRCH-004、PROP-SRCH-005、PROP-SRCH-006、DT-SRCH-001 | [search.md](architecture/search.md) の 14 節 |
+| 同期とプロトコル（E8、E11） | PROP-SYNC-001、PROP-SYNC-002、PROP-SYNC-003、PROP-SYNC-004、PROP-SYNC-005、PROP-SYNC-006、PROP-SYNC-007、DT-SYNC-001、PROP-SYNC-008 | [client-sync-and-protocols.md](architecture/client-sync-and-protocols.md) の 13 節 |
+| Web（E9） | PROP-WEB-001、PROP-WEB-002、PROP-WEB-003、PROP-WEB-004、PROP-WEB-005 | [web-client.md](architecture/web-client.md) の 15 節 |
+| モバイルとプッシュ（E16） | PROP-PUSH-001、PROP-PUSH-002、PROP-PUSH-003、DT-PUSH-001 | [mobile-and-push.md](architecture/mobile-and-push.md) の 11 節 |
+| フィルター・転送・時刻の仕事（E12） | PROP-FILT-001、PROP-FILT-002、DT-FILT-001、PROP-FWD-001、PROP-FWD-002、PROP-VAC-001、DT-VAC-001、PROP-SUB-001 | [filters-forwarding-and-automation.md](architecture/filters-forwarding-and-automation.md) の 11 節 |
+| 組織（E14） | PROP-ORG-001、PROP-ORG-002、PROP-ORG-003、PROP-ORG-004、PROP-ORG-005、DT-ORG-001、DT-ORG-002、DT-ORG-003 | [organizations-domains-and-routing.md](architecture/organizations-domains-and-routing.md) の 14 節 |
+| 保持と eDiscovery（E15） | PROP-RET-001、PROP-RET-002、PROP-RET-003、PROP-RET-004、PROP-RET-005、PROP-RET-006、DT-RET-001、DT-RET-002 | [retention-and-ediscovery.md](architecture/retention-and-ediscovery.md) の 13 節 |
+| アカウントと安全（E13） | PROP-ACCT-001、PROP-ACCT-002、PROP-ACCT-003、PROP-ACCT-004、PROP-ACCT-005、DT-ACCT-001、DT-ACCT-002 | [accounts-and-security.md](architecture/accounts-and-security.md) の 14 節 |
+| API と第三者（E8、E11、E13） | PROP-API-001、PROP-API-002、PROP-API-003、PROP-API-004、DT-API-001、DT-API-002 | [api-and-integrations.md](architecture/api-and-integrations.md) の 13 節 |
+| セキュリティ（E1、E13、E17） | PROP-SEC-001、PROP-SEC-002、PROP-SEC-003、PROP-SEC-004、PROP-SEC-005 | [security.md](architecture/security.md) の 14 節 |
+| 基盤（E1、E17） | PROP-INFRA-001、PROP-INFRA-002 | [infrastructure.md](architecture/infrastructure.md) の 13 節 |
+| 観測（E1、E17） | PROP-OBS-001、PROP-OBS-002 | [observability.md](architecture/observability.md) の 12 節 |
+| 容量（E17） | PROP-CAP-001 | [capacity.md](architecture/capacity.md) の 13 節 |
+| デリバリー（E1、E6、E17） | PROP-DLV-001、PROP-DLV-002、PROP-DLV-003、PROP-DLV-004 | [delivery.md](architecture/delivery.md) の 9 節 |
+
+- 横断の性質：耐久性（2.2.1 節 F）は PROP-MX-001・002・PROP-MSG-*・PROP-CAP-001、分離（同 G）は PROP-SRCH-005・PROP-SRCH-006・PROP-RET-006・PROP-SEC-004・005、同期の収束（同 E）は PROP-SYNC-001〜008・PROP-WEB-001。
+- 統合の工程で足したもの：PROP-SRCH-006（保全のメッセージを利用者の検索に出さない）。PROP-SYNC-008（配る形のバイトが変わらない）と PROP-MSG-008・009（配る形の編集）は ADR-0032 に結び付けた。
 
 ### 2.3 エージェントの確認ループ
 
@@ -242,7 +273,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | Epic | 重点 | リリースの合否基準 |
 | --- | --- | --- |
 | E1 基盤 | RLS の検査、シャードの経路、見張りのメールの骨格、CI のファジングと模型の枠 | RLS の性質ベーステストが緑。見張りのメールの送受が動く |
-| E2 受信の SMTP | 確定の前に応えない（F）、SMTP の時点の判定の決定表（B）、SMTP のファジング（A）、TLS と MTA-STS | 障害の注入で 250 の後の消失 0。`smtp-peer-sim` の全場面が緑 |
+| E2 受信の SMTP | 確定の前に応えない（F）、SMTP の時点の判定の決定表（B）、SMTP のファジング（A）、TLS と MTA-STS | 障害の注入で 250 の後の消失 0（終わりの印の束の書き損じを含む）。`smtp-peer-sim` の全場面が緑。迷惑メールの波の模擬で `inbound-delivery` の古さが 30 秒以下 |
 | E3 送信者の認証 | 認証の試験のベクトルと相互運用（C） | ベクトルの全件と、外部の実装との相互の検証が緑 |
 | E4 メールの保存 | MIME のファジング（A）、blob の参照の数え（F）、文字コード | ファジング 7 日で新しい落ち 0。参照の性質が緑。`mime-parser-poc` と `blob-pack-poc` の結果が記録済み |
 | E5 ラベルとスレッド | ラベルの排他の決定表、スレッド化の性質（D） | 夜間の性質ベーステストが 7 日続けて緑 |
@@ -255,9 +286,9 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | E12 フィルター・転送・自動化 | フィルターと検索の IR の一致、転送の SRS と ARC（C）、不在の返信の決定表 | 決定表の全行が緑 |
 | E13 アカウントと安全 | サインインと回復、乗っ取りの検知、OAuth の同意 | 外部のペンテストの前の内部の試験で High 以上 0 |
 | E14 組織 | ドメインの確かめ、配送の規則の決定表、漏れの経路（G） | 漏れの経路の表の全行が緑 |
-| E15 保持と eDiscovery | 保持と保留の決定表、保留の中の消去 0（F）、監査の欠け 0 | 性質ベーステストが緑。監査の欠け 0 |
+| E15 保持と eDiscovery | 保持と保留の決定表、保留の中の消去 0（F）、監査の欠け 0 | 性質ベーステスト（PROP-RET-*、PROP-SRCH-006）が緑。監査の欠け 0 |
 | E16 モバイルのアプリ | オフラインの変更の収束（E）、プッシュ | 収束の場面が緑 |
-| E17 本番の準備 | 負荷試験（S1 のピークの 2 倍）、DR の訓練、到達性の試験、外部のペンテスト | runbooks の SLO を負荷試験で満たす。DR の訓練で RPO・RTO を満たす。ペンテストの High 以上が 0 |
+| E17 本番の準備 | 負荷試験（S1 のピークの 2 倍）、DR の訓練、到達性の試験、外部のペンテスト | runbooks の SLO を負荷試験で満たす。DR の訓練で RPO・RTO を満たす（結果はスプールの 2 つのリージョンへの同期の確定の判断に使う）。ペンテストの High 以上が 0。核の runbooks（[runbooks/README.md](runbooks/README.md) の 4 節）を訓練で通す |
 
 ## 6. 責任分担
 

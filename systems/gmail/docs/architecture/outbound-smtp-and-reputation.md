@@ -338,7 +338,7 @@ stateDiagram-v2
 | アカウント | 24 時間で外の宛先 100 以上、`hard_invalid_recipient` の率 10% 以上 | 乗っ取りの点の信号（宛先の一覧の購入・推測の疑い） |
 | 組織 | 7 日で苦情の率 0.2% 以上 | 組織の評判を `b` にし、管理者に知らせる |
 | プール | 1 日の苦情の率 0.1% 以上（NFR-012） | 到達性の担当にチケット。原因のアカウント・組織を探す |
-| IP | `policy_reputation` の率が 1 時間で 10% 以上 | その IP を一時に外し（`ops.outbound_delivery_enabled`）、`ip-blocklisted.md` |
+| IP | `policy_reputation` の率が 1 時間で 10% 以上 | その IP を一時に外し（`ops.outbound_delivery_enabled`）、[ip-blocklisted.md](../runbooks/ip-blocklisted.md) |
 
 ### 9.3 ブロックリストと外部の到達
 
@@ -451,7 +451,7 @@ stateDiagram-v2
 
 ## 15. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -466,7 +466,7 @@ data-model.md（まだない）に、次の項目を載せる。
 | directory `warmup_daily`（`ip`、`date`、`sent`、`complaint_rate`、`hard_bounce_rate`、`throttle_rate`、`canary_inbox`、`gate_result`） | ウォームアップの記録 | 5.3 |
 | directory `mx_groups`（`group`、`match`（MX の名前の型）、`c_max`、`r_max`、`ipv6_enabled`） | 手の一覧の組 | 6.1 |
 | directory `org_reputation`（`tenant_id`、`tier`（`a`・`b`）、`complaint_rate_30d`、`bounce_rate_30d`、`updated_at`） | 組織の評判 | 5.2 |
-| directory `fbl_trace`（`trace_token`、`submission_id`、`account_id`、`tenant_id`、`created_at`）。90 日。RLS の外に置かず、`tenant_id` で FORCE RLS とし、`report-ingest` は X6 に当たる専用のロールで引く（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の一覧を直す要否は 18 節） | 苦情の引き | 9.1 |
+| directory `fbl_trace`（`trace_token`、`submission_id`、`account_id`、`tenant_id`、`created_at`）。90 日。RLS の外に置かず、`tenant_id` で FORCE RLS とし、`report-ingest` は X9 の `report_lookup` のロールで `trace_token` の一致だけで引く（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)。統合の工程で決めた） | 苦情の引き | 9.1 |
 | 集計の表 `complaints_daily`、`bounces_daily`（プール、IP、組、組織、アカウントの HMAC、数） | 苦情と不達の率 | 9.2 |
 | S3 `reports/tlsrpt-out/<yyyy>/<mm>/<dd>/<domain>.json.gz` | 送った TLS-RPT | 6.5 |
 | 鍵：SRS の HMAC の鍵、`Feedback-ID` と `X-<Brand>-Trace` の HMAC の鍵（KMS で包む） | 8.4、9.1 | |
@@ -528,8 +528,8 @@ data-model.md（まだない）に、次の項目を載せる。
 | 送信の内容の選別の範囲（送信の中身を機械で読むこと） | 法務の確認待ち（L1） |
 | 迷惑な利用者（乗っ取りでない）の送信の停止の範囲と、特定電子メール法の違反のメールの扱い | 法務の確認待ち（L2 の (b)・(c)、L7） |
 | FBL の報告の中の元のメッセージを機械で読むこと | 法務の確認待ち（L1）。それまでは追跡のヘッダーだけを読む形で作る |
-| `fbl_trace` を引く `report-ingest` の経路を、[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) のテナントをまたぐ経路の一覧に足すか（X6 の読み出しに含めるか） | security.md と Dev（テックリード）が E7 の前に決める |
-| 本システムの中の宛先を送信の上限に数えること（本家の数え方は未検証） | E7 の spec で PM が確かめる |
+| `fbl_trace` を引く `report-ingest` の経路を、[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) のテナントをまたぐ経路の一覧に足すか（X6 の読み出しに含めるか） | 統合の工程で決めた：X6 に含めず、新しい経路 X9（`report_lookup` のロール）にした（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)、[ADR-0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md)） |
+| 本システムの中の宛先を送信の上限に数えること（本家の数え方は未検証） | 数える形で作る。本家と違いうるので、[architecture/README.md](README.md) の 1.4 節の「本家との意図した違い」に行を足した（本家の数え方は**未検証**）。E7 の spec で PM が確かめる |
 | 送信の DANE（RFC 7672） | E21 |
 | 本家の再試行の期間と遅れの通知 | 公式の資料が出れば 3 節を直す（**未検証**） |
 

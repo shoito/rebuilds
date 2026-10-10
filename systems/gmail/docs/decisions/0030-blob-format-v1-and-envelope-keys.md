@@ -33,8 +33,10 @@ date: 2026-10-10
 
 - 形式 v1：`magic "MBLB"`、`format_version = 1`、`blob_id`、`orig_len`、`orig_sha256`、`frame_size = 262144`、`frame_count`、フレームの表（暗号文の長さ、圧縮の有無）、頭のタグ。フレームは `AES-256-GCM(blob_key, nonce = 0^8 || u32(i), aad = blob_id || u32(i) || version)`。
 - 圧縮は zstd の水準 3、辞書なし。0.9 倍より縮まないフレームは生のまま。
-- テナントの KEK は日ごとに作り、KMS のテナントの鍵で包んで directory に持つ。`mailstore` は平文の KEK を 1 時間メモリーに置く。blob の鍵は AES-KW（RFC 3394）で包み、`blob_wrapped_keys` にテナントごとに持つ。
+- テナントの KEK は日ごとに作り、KMS のテナントの鍵（TRK。下の注記）で包んで directory に持つ。`mailstore` は平文の KEK を 1 時間メモリーに置く。blob の鍵は AES-KW（RFC 3394）で包み、`blob_wrapped_keys` にテナントごとに持つ。
 - `blob-packer` は暗号文を写し、目録の場所を書き換えるだけで、鍵に触れない。
+
+> 2026-10-10 の注記：この ADR の「KMS のテナントの鍵」は、[ADR-0060](0060-key-hierarchy-and-crypto-erasure.md) の 4 段の鍵の TRK（テナントの根の鍵）を指す。KMS の鍵はテナントごとに作らない（100 万のテナントで月 100 万 USD になるため）。段は、KMS の用途ごとの鍵 → TRK（KMS で包んで `tenant_keys`）→ 日ごとの KEK（TRK で AES-KW、`tenant_keks`）→ blob の鍵（KEK で AES-KW）。平文の TRK・KEK のメモリーの守りは ADR-0060 と [security.md](../architecture/security.md) の 5 節にある。
 
 ### 他の案を選ばなかった理由
 

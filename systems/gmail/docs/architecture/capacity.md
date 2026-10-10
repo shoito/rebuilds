@@ -65,7 +65,7 @@
 | `content-scanner`（Fargate、使い捨て） | 添付のあるメッセージ 3 割 × 1 通 CPU 150ms | ピークの 2 倍で 225 vCPU。平均 40 vCPU | [ADR-0026](../decisions/0026-static-attachment-scanning-sandbox.md)。書庫の多い波で伸びる |
 | `mailstore`（Fargate、1 タスク 4 vCPU） | 配送 400/秒・タスク | 6,000/秒 → 16 タスク | Aurora の書き込みで決まる（4 節） |
 
-- **波の扱い**：波の受け付けの増分（1,900 通/秒）は、`mx-edge` の受け付け（9 台 × 600 = 5,400 通/秒）に収まる。受け付けた後の選別は、SQS に溜めてよい。波の 1 時間に溜まる量は最大 700 万通で、30 タスクで 2 時間で追いつく。その間、正規のメールの受信の遅れ（NFR-001 の p95 10 秒）を守るため、配送の待ち行列を 2 つ（`inbound-delivery` と、`unknown`・`suspicious` の層から来た `inbound-delivery-low`）に分け、前者を先に読む（[inbound-smtp.md](inbound-smtp.md) の 11.2 節への追加の依頼。16 節の持ち越し）。
+- **波の扱い**：波の受け付けの増分（1,900 通/秒）は、`mx-edge` の受け付け（9 台 × 600 = 5,400 通/秒）に収まる。受け付けた後の選別は、SQS に溜めてよい。波の 1 時間に溜まる量は最大 700 万通で、30 タスクで 2 時間で追いつく。その間、正規のメールの受信の遅れ（NFR-001 の p95 10 秒）を守るため、配送の待ち行列を 2 つ（`inbound-delivery` と、`unknown`・`suspicious` の層から来た `inbound-delivery-low`）に分け、前者を先に読む（[inbound-smtp.md](inbound-smtp.md) の 11.2 節。統合の工程で足した）。
 
 ## 3. 送信の面
 
@@ -84,7 +84,7 @@
 | blob の目録 | 4 クラスタ × `db.r8g.xlarge` × 2 | 参照の行の増減 9,000/秒（配送と GC） |
 | Valkey | `cache.r7g.xlarge` × 6（3 シャード × 写し 1）。大阪 3 | 評判、上限、宛先のキャッシュ、トークン、重複の抑え |
 | S3 の blob | 3 年後 1.5 PB。30 日まで Standard、パックは 90 日で Glacier Instant Retrieval（[ADR-0064](../decisions/0064-storage-classes-and-region-replication.md)） | 1.3 節 |
-| S3 の PUT | 1 日 2.4 億（blob 6,000 万、スプール 6,000 万、`spool-done` 6,000 万、索引のセグメント 6,000 万） | 6 節の費用で最も大きい項目の 1 つ |
+| S3 の PUT | 削減の前は 1 日 2.4 億（blob 6,000 万、スプール 6,000 万、`spool-done` 6,000 万、索引のセグメント 6,000 万）。統合の工程の後は約 1.25 億（blob 6,000 万、スプール 6,000 万、`spool-done` の束 約 30 万、合わせたセグメント 400 万以下） | 8 節の費用で最も大きい項目の 1 つ。削減は [inbound-smtp.md](inbound-smtp.md) の 11.2 節と [search.md](search.md) の 6.2 節 |
 
 - 大きなアカウント（組織の共有の受信箱、数百万通）は、シャードの 5% を超えたら専用のシャードへ移す（[infrastructure.md](infrastructure.md) の 6 節）。
 
@@ -152,11 +152,26 @@
 - 1 アカウント・月：1 年目 0.19 USD、3 年目 0.21 USD。[architecture/README.md](README.md) の 2.1 節の仮の予算（0.15 USD）を 3〜4 割超える。1 USD = 150 円は本システムの想定。
 - 大きい項目：S3 の要求（17〜18%）、エッジ（15%）、Aurora（17〜21%）、写し（9〜10%）、`search-node`（8%）。
 - 下げる手段（効く順の見込み）：
-  1. **S3 の PUT を減らす**：`spool-done` の印を、配送の記録の表（Aurora）に置き換える、索引のセグメントをアカウントごとに 30 秒まとめる。PUT を 1 日 1.2 億に半分にすれば 17,000 USD 減（[inbound-smtp.md](inbound-smtp.md)・[search.md](search.md) の持ち主との調整。16 節）。
+  1. **S3 の PUT を減らす**：`spool-done` の印を束ねる、小さなセグメントを S3 に書かない。統合の工程で入れた（8.1 節の A）。
   2. **予約の割引**：Aurora のリザーブドと Compute Savings Plans（EC2・Fargate）。割引の率は**未検証**。3 割なら 2 万 USD 減。
   3. **JMAP をエッジの外に**：JMAP の API を CloudFront を通さず、リージョンの ALB と WAF で受ける。CloudFront の要求の費用 15,600 USD のうち大半が減る（Web の資産と usercontent は CloudFront に残す）。
   4. **写しの範囲**：迷惑メールの箱の blob（受け付けの 2 割、30 日で消える）を大阪へ写さない。写しの 1 割強が減るが、DR の後に迷惑メールの箱が欠ける。
 - 本家の原価は確かめていない（**未検証**）。
+
+### 8.1 下げる手段の数と推奨の既定案（統合、2026-10-10）
+
+上の表は削減の前の見積もり。手段ごとの月の削減（3 年目、USD）と、積み上げた 1 アカウント・月の原価は次のとおり。どれも ±40% の見積もりの中の数で、実績は `cost-baseline` で置き換える。
+
+| 手段 | 中身 | 月の削減（USD） | 積み上げ（1 年目 / 3 年目、USD） | 失うもの |
+| --- | --- | --- | --- | --- |
+| なし | 上の表 | — | 0.185 / 0.206 | — |
+| A. S3 の PUT の削減 | `spool-done` の印を束ねる（[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）、小さなセグメントを S3 に書かない（[ADR-0037](../decisions/0037-segment-format-and-query-execution.md) の注記）。PUT 1 日 2.4 億 → 約 1.25 億 | 約 16,300 | 0.169 / 0.190 | なし（束の書き損じは載せ直しで冪等に配る） |
+| B. 予約の割引 | Aurora のリザーブド、Compute Savings Plans（EC2・Fargate）、Valkey のリザーブド。割引の対象のインスタンスの費用 約 69,000 に 3 割（割引の率は**未検証**） | 約 20,700 | 0.148 / 0.169 | 1〜3 年の約束。S2 への伸びで余る・足りないの調整 |
+| C. JMAP をエッジの外で受ける | JMAP と EventSource を CloudFront を通さず、リージョンの ALB と WAF で受ける。CloudFront の要求の費用 15,600 の大半が減り、ALB の LCU が増える（量は**未検証**）。Web の資産と usercontent は CloudFront に残す | 約 13,000 | 0.135 / 0.156 | エッジでの DDoS の吸収と TLS の終端。日本の利用者は東京まで近く、遅れの差は小さい見込み |
+| D. 迷惑メールの箱の blob を大阪へ写さない | 受け付けの 2 割（30 日で消える）を CRR から外す | 約 2,000 | 0.133 / 0.154 | DR の後に迷惑メールの箱が欠ける |
+
+- **推奨の既定案（仮。PM の判断待ち）**：A＋B＋C。1 年目 約 0.135 USD で仮の予算（0.15 USD）に収まり、3 年目 約 0.156 USD で予算を 4% ほど超える。3 年目の差は見積もりの幅（±40%）より小さいので、予算を 3 年目だけ 0.16 USD に直すか、0.15 USD のまま `cost-baseline` の実績を待つかを PM が決める。D は失うもの（DR の後の迷惑メールの箱）に対して削減が小さいので採らない。
+- A は統合の工程で設計に入れた（[inbound-smtp.md](inbound-smtp.md) の 11.2 節、[search.md](search.md) の 6.2 節）。B は E17 の負荷試験と `cost-baseline` の後、使用の量が 6 か月安定してから買う。C は構成の変更（[architecture/README.md](README.md) の 1.2 節の図、[infrastructure.md](infrastructure.md) の 3.3 節）を伴うので、E8 の前に Dev と Ops が WAF の規則と DDoS の守り（Shield）を確かめてから図を直す。それまで図は今の形（CloudFront の後ろの JMAP）のまま。
 
 ## 9. 単位あたりの原価
 
@@ -220,12 +235,18 @@
 - **待ち行列の分け**：配送の待ち行列を、層で 2 つに分けて正規のメールを先にする。
 - **費用**：S1 で 1 アカウント月 0.19〜0.21 USD（±40%）。予算との差は 8 節の手段で埋め、採否は `cost-baseline` で決める。
 
+### 決定（2026-10-10、統合）
+
+- **待ち行列の分け**：[inbound-smtp.md](inbound-smtp.md) の 11.2 節に入れた（`inbound-delivery`・`inbound-delivery-low`）。
+- **PUT の削減**：`spool-done` の束と、小さなセグメントを S3 に書かない形を入れた。PUT は 1 日 2.4 億から約 1.25 億へ。
+- **費用の推奨の既定案（仮。PM の判断待ち）**：8.1 節の A＋B＋C。1 年目 約 0.135 USD、3 年目 約 0.156 USD。
+
 ### 持ち越し
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 配送の待ち行列を 2 つに分けること | [inbound-smtp.md](inbound-smtp.md) の持ち主（Dev）が E2 で足す |
-| `spool-done` の印と索引のセグメントの PUT の削減 | [inbound-smtp.md](inbound-smtp.md)・[search.md](search.md) の持ち主と `cost-baseline` |
+| 配送の待ち行列を 2 つに分けること | 統合の工程で決めた：`inbound-delivery` と `inbound-delivery-low` に分けた（[inbound-smtp.md](inbound-smtp.md) の 11.2 節） |
+| `spool-done` の印と索引のセグメントの PUT の削減 | 統合の工程で決めた：終わりの印の束（[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）と、小さなセグメントを S3 に書かない形（[ADR-0037](../decisions/0037-segment-format-and-query-execution.md) の注記）。PUT は 1 日 2.4 億から約 1.25 億へ（8 節）。実績は `cost-baseline` で確かめる |
 | JMAP をエッジの外で受けるか | E8 の前に Dev と Ops。[architecture/README.md](README.md) の 1.2 節の図が変わる |
 | 1 台・1 タスクの量の想定値 | `mx-throughput-poc`、`mailbox-shard-poc`、`search-index-poc` |
 | 大阪の S3 の単価、観測とネットワークの費用 | `cost-baseline`（**未検証**） |

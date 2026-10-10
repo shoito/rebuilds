@@ -141,7 +141,7 @@ stateDiagram-v2
 
 ### 6.1 元に戻す送信と予約の送信の画面
 
-- 送信を押すと、`EmailSubmission/set` を送り、画面の下に「送信しています… 元に戻す」と、窓の残り（5・10・20・30 秒）を出す。窓はサーバーの `sendAt` から数え、端末の時計のずれを `Date` の応答のヘッダーで補う。
+- 送信を押すと、`EmailSubmission/set` を送り、画面の下に「送信しています… 元に戻す」と、窓の残り（5・10・20・30 秒）を出す。窓は EmailSubmission の `<brand>:releaseAt` から数え、端末の時計のずれを `Date` の応答のヘッダーで補う。
 - 「元に戻す」は `undoStatus: canceled` の更新を送る。成功すれば作成の画面を元の内容で開く。`cannotUnsend` なら「送信を取り消せなかった」と出す。
 - 予約の送信は、日時の選び方（今日の夕方、明日の朝、月曜の朝、任意）と、アカウントの時間帯で `HOLDUNTIL` を作る（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 6.6 節）。予約の一覧は `in:scheduled`。100 通を超えたら作れないと出す。
 
@@ -313,7 +313,7 @@ sequenceDiagram
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| HTML5 の構文解析のライブラリを、[ADR-0001](../decisions/0001-platform-and-stack.md) の汎用の部品の一覧に足す | Dev（テックリード）が ADR-0001 を更新する。それまで `thread-view-and-safe-html` の spec を承認しない |
+| HTML5 の構文解析のライブラリを、[ADR-0001](../decisions/0001-platform-and-stack.md) の汎用の部品の一覧に足す | 統合の工程で済んだ：[ADR-0062](../decisions/0062-generic-components-additions-and-supply-chain.md) が一覧に足し、[ADR-0001](../decisions/0001-platform-and-stack.md) から参照した。`thread-view-and-safe-html` の spec の承認の止めは外れた |
 | 画面の配置とキーの割り当てをどこまで本家に寄せるか | 法務の確認待ち（L9） |
 | 配信停止のボタン | 法務の確認待ち（L2） |
 | 画面の計測の通知・公表 | 法務の確認待ち（L8） |

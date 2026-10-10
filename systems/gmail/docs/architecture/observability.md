@@ -167,7 +167,7 @@ sequenceDiagram
 | やりとりのある相手からの誤判定 | 連絡先・やりとりのある相手からのメールの `report_not_spam` | `FilterVersion` | NFR-009 の 0.005% の兆し |
 
 - 報告の数は利用者の行動で遅れて出る（届いて数時間〜数日）。段を進める判断は、届いてから 24 時間の報告で比べる（[spam-and-abuse-filtering.md](spam-and-abuse-filtering.md) の 12.2 節）。
-- 迷惑メールの波の検知：受信の申し出の率（層ごと）、新しい指紋の群の急増、SMTP の時点の拒否の率を 1 分ごとに見る（`spam-wave.md`）。
+- 迷惑メールの波の検知：受信の申し出の率（層ごと）、新しい指紋の群の急増、SMTP の時点の拒否の率を 1 分ごとに見る（[spam-wave.md](../runbooks/spam-wave.md)）。
 
 ## 7. 同期と検索
 
@@ -202,7 +202,7 @@ sequenceDiagram
 
 ## 11. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |

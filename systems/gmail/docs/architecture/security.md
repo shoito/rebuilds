@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - 選別のパイプラインのデータの区分（C1 接続の情報、C2 中身から作った特徴、C3 中身そのもの）と、人が中身を見る経路は同意のある報告と法務の手順だけ（[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md)）
-- テナントとアカウントの FORCE RLS、RLS の外の表と、テナントをまたぐ経路 X1〜X8（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)）
+- テナントとアカウントの FORCE RLS、RLS の外の表と、テナントをまたぐ経路 X1〜X10（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)）
 - blob の形式 v1 と、blob の鍵をテナントの日ごとの KEK で包む形（[ADR-0030](../decisions/0030-blob-format-v1-and-envelope-keys.md)）。参照 0 から 1 時間で鍵の破棄、7 日で物理の消去（[ADR-0031](../decisions/0031-blob-references-gc-and-quota.md)）
 - DKIM の鍵は KMS で包んで directory に置き、`outbound-gate` のメモリーで署名する（[ADR-0016](../decisions/0016-dkim-signing-keys-and-rotation.md)）
 - 汎用の部品は ADR-0001 の一覧の範囲で使う（[ADR-0001](../decisions/0001-platform-and-stack.md)）
@@ -187,7 +187,7 @@ flowchart TD
 
 ## 6. テナントをまたぐ経路（ADR-0061）
 
-[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の一覧（X1〜X8）を、この ADR で次のとおり補う。
+[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の一覧（最初は X1〜X8）を、この ADR で次のとおり補った。統合の工程で ADR-0007 の本文に書き足し、今は ADR-0007 の X1〜X10 が正本。
 
 | 経路 | 中身 | ロール | 条件 |
 | --- | --- | --- | --- |
@@ -312,7 +312,7 @@ flowchart TD
 
 ## 13. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -367,8 +367,8 @@ data-model.md（まだない）に、次の項目を載せる。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| ADR-0007 の X1〜X8 の一覧に、X4 の例と X9・X10 を書き足すこと | Dev（テックリード）。ADR-0061 を参照の先にする |
-| ADR-0001 の汎用の部品の一覧から ADR-0062 への参照 | Dev（テックリード） |
+| ADR-0007 の X1〜X8 の一覧に、X4 の例と X9・X10 を書き足すこと | 統合の工程で済んだ（ADR-0007 の本文に書き足し、注記を残した） |
+| ADR-0001 の汎用の部品の一覧から ADR-0062 への参照 | 統合の工程で済んだ（ADR-0001 に参照と注記を足した） |
 | 監査ログ、配送の記録、サインインの記録、バックアップの保持の期間 | **法務の確認待ち**（L1・L6・L7） |
 | 漏えいの報告の手順 | **法務の確認待ち**（L3） |
 | 捜査機関への対応（X10 を有効にするか、範囲） | **法務の確認待ち**（L4） |

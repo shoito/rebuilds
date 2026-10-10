@@ -275,7 +275,7 @@ stateDiagram-v2
 
 ## 12. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -330,11 +330,11 @@ data-model.md（まだない）に、次の項目を載せる。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| `search-node` の `PRESERVED` のビットマップと、change log の `preserved` の印 | [search.md](search.md) と [client-sync-and-protocols.md](client-sync-and-protocols.md) の持ち主（Dev）が E15 の前に足す |
+| `search-node` の `PRESERVED` のビットマップと、change log の `preserved` の印 | 統合の工程で足した（[search.md](search.md) の 7 節、[client-sync-and-protocols.md](client-sync-and-protocols.md) の 4.1 節）。利用者には出さず、eDiscovery の検索だけが使う |
 | 保全の期間・消去の期限・休眠のアカウント・解約の猶予の長さ、保留と削除の請求の衝突 | **法務の確認待ち**（L6） |
 | 保留を利用者に知らせるか、捜査機関への対応の範囲と通知、透明性の報告 | **法務の確認待ち**（L4） |
 | 組織との契約での保持と eDiscovery の約束（退職者のアカウントの課金を含む） | **法務の確認待ち**（L7） |
-| `hold` の参照の鍵を「保全の行ごとに 1 つ、消す時に足す」にしたこと（[message-parsing-and-storage.md](message-parsing-and-storage.md) の 8.1 節の表は「案件の ID ＋メッセージの行の ID、保留を掛けた時」） | message-parsing-and-storage.md の持ち主（Dev）が、この文書の 4.4 節に合わせて表を直す |
+| `hold` の参照の鍵を「保全の行ごとに 1 つ、消す時に足す」にしたこと（[message-parsing-and-storage.md](message-parsing-and-storage.md) の 8.1 節の表は「案件の ID ＋メッセージの行の ID、保留を掛けた時」） | 統合の工程で直した（[message-parsing-and-storage.md](message-parsing-and-storage.md) の 8.1 節） |
 | 書き出しの形に PST・MBOX を足すか | 組織の要望で E15 の後に PM が決める |
 | 委任による退職者のメールの引き継ぎ | 委任（MVP の後）の設計と一緒に |
 

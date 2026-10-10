@@ -227,7 +227,7 @@ stateDiagram-v2
     recovering --> locked: 待ちの間に取り消された
 ```
 
-- 状態は `accounts.risk_state` に持ち、変わるたびに `account_risk_events` に理由のコードとともに残す。状態を動かすのは `account_risk` の出来事だけで、出来事を出すのは `accounts`（サインイン）、`outbound-gate`（送信の点。[ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)）、`mailstore`（設定の変更）、運用の手順（`account-takeover-wave.md`）。
+- 状態は `accounts.risk_state` に持ち、変わるたびに `account_risk_events` に理由のコードとともに残す。状態を動かすのは `account_risk` の出来事だけで、出来事を出すのは `accounts`（サインイン）、`outbound-gate`（送信の点。[ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)）、`mailstore`（設定の変更）、運用の手順（[account-takeover.md](../runbooks/account-takeover.md)）。
 
 ### 9.2 `locked` の動作
 
@@ -244,7 +244,7 @@ stateDiagram-v2
 
 ### 9.3 大規模な乗っ取り
 
-- サインインの失敗の急増（IP の範囲をまたいだクレデンシャルスタッフィング）、転送の先の作成の急増は、`account-takeover-wave.md`（[runbooks/README.md](../runbooks/README.md) の 4 節）で扱う。手順は、危険度の閾値の一時の引き下げ（中の帯を広げる）、範囲ごとのサインインの一時の止め、影響のアカウントの `at_risk` への一括の移し。どれも記録つきで、`ops.*` のフラグではなく `risk_version` の緊急の出し方（影 1 時間、Dev と Ops の 2 人の承認、7 日で失効）で行う。
+- サインインの失敗の急増（IP の範囲をまたいだクレデンシャルスタッフィング）、転送の先の作成の急増は、[account-takeover.md](../runbooks/account-takeover.md) で扱う。手順は、危険度の閾値の一時の引き下げ（中の帯を広げる）、範囲ごとのサインインの一時の止め、影響のアカウントの `at_risk` への一括の移し。どれも記録つきで、`ops.*` のフラグではなく `risk_version` の緊急の出し方（影 1 時間、Dev と Ops の 2 人の承認、7 日で失効）で行う。
 
 ## 10. アカウントの消去
 
@@ -283,7 +283,7 @@ stateDiagram-v2
 
 ## 13. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |

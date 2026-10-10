@@ -1,6 +1,6 @@
 # Architecture: Gmail
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（まだない。計画は 7 節）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（7 節の 22 本。2026-10-10 にそろい、統合の工程で食い違いを解いた）。表と置き場所の索引は [data-model.md](data-model.md)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -60,7 +60,7 @@ flowchart TB
         relay["relay（outbox）"]
     end
 
-    spool[("S3 spool＋SQS<br/>配送の待ち行列")]
+    spool[("S3 spool＋SQS<br/>配送の待ち行列（2 つの層）")]
     blobs[("S3 blobs<br/>メッセージ、パック")]
     mbx[("Aurora メールボックスのシャード<br/>メッセージ、ラベル、スレッド、change log")]
     dir[("Aurora directory<br/>アカウント、組織、アドレス、規則")]
@@ -105,7 +105,7 @@ flowchart TB
 | コンテナ | 責務 |
 | --- | --- |
 | `mx-edge` | 受信の SMTP（25）。接続の評判と速さの上限、EHLO・STARTTLS、MAIL FROM の SPF の評価の開始、RCPT TO の宛先と容量の確認、DATA の終わりの同期の検査（DKIM・DMARC・ARC、既知のマルウェアのハッシュ、確信の高い規則）、スプールへの確定の後の 250（[ADR-0002](../decisions/0002-accept-then-filter.md)） |
-| S3 spool・SQS | 受け付けた生のメッセージ（S3）と、配送の依頼（SQS）。250 の前に両方を確定する。掃除の役が、依頼の欠けたスプールを拾い直す |
+| S3 spool・SQS | 受け付けた生のメッセージ（S3）と、配送の依頼（SQS。接続の層で `inbound-delivery` と `inbound-delivery-low` に分ける）。250 の前に両方を確定する。掃除の役が、依頼の欠けたスプールを拾い直す（[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)） |
 | `inbound-pipeline` | MIME の解析、選別の判定（`spam-scorer`・`content-scanner`）、受け手ごとの組織の規則・利用者のフィルター・転送・不在の返信、`mailstore` への配送。`(spool_id, recipient)` で冪等 |
 | `spam-scorer` | 規則、送信元の評判（IP、ドメイン、認証済みの識別子）、内容の分類器の推論。受信と送信の両方で使う（[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md)） |
 | `content-scanner` | 添付の静的な検査（署名とハッシュ、入れ子の書庫、マクロ、実行形式）と URL の取り出しと評判。ネットワークを持たない隔離したタスク |
@@ -136,11 +136,11 @@ flowchart TB
 
 **A. 外部からメールを受け取り、受信箱に出す**
 
-1. 送り手の MTA が `mx.<brand>.<domain>`（東京、優先度 10）へ接続する。`mx-edge` は、接続元の IP の評判（Valkey の数えと、評判のサービスの値）と、IP・/24・ASN ごとの接続の速さを確かめる。悪い評判は 554 で切り、評判の分からない IP の急な量は 421 で絞る。
+1. 送り手の MTA が `mx1.<brand>.<domain>`（東京、優先度 10。大阪の副 MX は `mx2`、優先度 20）へ接続する。`mx-edge` は、接続元の IP の評判（Valkey の数えと、評判のサービスの値）と、IP・/24・ASN ごとの接続の速さを確かめる。悪い評判は 554 で切り、評判の分からない IP の急な量は 421 で絞る。
 2. EHLO、STARTTLS（TLS 1.2 以上）。MAIL FROM を受けたら SPF の評価を非同期で始める（RFC 7208、DNS の照会は 10 回まで）。
 3. RCPT TO ごとに、アドレスを directory のキャッシュで解決する。ない宛先は 550 5.1.1、容量の超過は 452 4.2.2、停止したアカウントは 550 5.2.1。1 つのトランザクションの宛先は 100 まで。
 4. DATA を受ける（SIZE は 50 MiB）。終わりに同期の検査（予算 10 秒）：DKIM の署名の検証、DMARC の評価（`p=reject` で揃いがなければ 550 5.7.26 の候補）、ARC の検査、既知のマルウェアのハッシュ、確信の高い規則。ここで拒むものは、送り手に 5xx を返し、後方散乱を作らない。
-5. 生のメッセージと、封筒（MAIL FROM、宛先）、接続の情報、認証の結果を S3 のスプールに置き、SQS に配送の依頼を載せる。両方が確定したら `250 2.0.0 OK <spool_id>`。どちらかが失敗したら 451 4.3.0（[ADR-0002](../decisions/0002-accept-then-filter.md)）。
+5. 生のメッセージと、封筒（MAIL FROM、宛先）、接続の情報、認証の結果を S3 のスプールに置き、SQS に配送の依頼を載せる（評判の分からない・疑わしい層の接続は `inbound-delivery-low` へ）。両方が確定したら `250 2.0.0 OK <spool_id>`。どちらかが失敗したら 451 4.3.0（[ADR-0002](../decisions/0002-accept-then-filter.md)）。
 6. `inbound-pipeline` が依頼を受け、MIME を解析し、`spam-scorer`・`content-scanner` に判定を求める。判定は「受信箱」「迷惑メール」「隔離（組織）」「マルウェアとして添付を止める」のどれか。
 7. 受け手ごとに、組織の配送の規則、利用者のフィルター、転送、不在の返信を当て、`mailstore.deliver(spool_id, recipient, verdict, labels)` を呼ぶ。`mailstore` は blob を書き（同じ配送の受け手の間で 1 つ）、メタデータ・ラベル・スレッド・`modseq`・change log・outbox を受け手のシャードの 1 つのトランザクションで書く。`(spool_id, recipient)` が既にあれば何もしない。
 8. relay が outbox を読み、`push-gateway`（接続中のクライアントと IMAP の IDLE）、`push-notifier`（モバイル）、`search-indexer` へ流す。
@@ -178,6 +178,9 @@ flowchart TB
 | 送信者への要件 | 2024-02-01 から。全員に SPF か DKIM、PTR、TLS、迷惑メールの率 0.3% 未満。1 日 5,000 通超は SPF・DKIM・DMARC、From の揃い、一括の配信停止 | [Email sender guidelines](https://support.google.com/a/answer/81126) |
 | 添付の大きさ | 個人は 25 MB | [Attachment size limits](https://support.google.com/mail/answer/6584) |
 | 送信の上限 | 個人は 1 日 500 通・1 通の宛先 500。Workspace は 1 日 2,000 通、1 日の宛先 10,000、外部 3,000 | [Sending limits](https://support.google.com/mail/answer/22839)、[Workspace sending limits](https://knowledge.workspace.google.com/admin/gmail/gmail-sending-limits-in-google-workspace) |
+| 予約の送信 | 100 通まで | [Schedule emails](https://support.google.com/mail/answer/9214606) |
+| IMAP の量 | 1 日に読み出し 2,500 MB、書き込み 500 MB（Workspace） | [Gmail bandwidth limits](https://knowledge.workspace.google.com/admin/gmail/gmail-bandwidth-limits) |
+| サインイン | アプリ パスワードを持つ（2 段階の確認のアカウント。組織のアカウントなどでは出ない）。2 段階の確認の番号を SMS・電話で送れる。パスキーは使えるまで最大 7 日かかることがある | [App passwords](https://support.google.com/accounts/answer/185833)、[2-Step Verification](https://support.google.com/accounts/answer/185839)、[Passkeys](https://support.google.com/accounts/answer/13548313) |
 | 容量 | 無料は 15 GB を Drive・Photos と共有。迷惑メールとゴミ箱も数える | [How storage works](https://support.google.com/googleone/answer/9312312) |
 | 会話（スレッド） | 件名が変わると分かれる。100 通を超えると分かれる。自動の通知は 1 週間の中でまとめることがある | [Group emails into conversations](https://support.google.com/mail/answer/5900) |
 | ラベル | フォルダーと違い、本人にだけ見える | [Create labels](https://support.google.com/mail/answer/118708) |
@@ -188,7 +191,7 @@ flowchart TB
 | BIMI | VMC か CMC、DMARC の `quarantine` か `reject` と `pct=100` | [Set up BIMI](https://knowledge.workspace.google.com/admin/security/set-up-bimi) |
 | 機密モード | 期限、取り消し、転送の禁止、SMS の確認の番号。画面の写しは防げない | [Confidential mode](https://support.google.com/mail/answer/7674059) |
 | 選別の質 | 迷惑メール・フィッシング・マルウェアの 99.9% 超を止める（2020 年の記事） | [Google Cloud Blog](https://cloud.google.com/blog/products/identity-security/protecting-against-cyber-threats-during-covid-19-and-beyond) |
-| 内部の選別の仕組み、スレッド化の詳しい規則、受信の大きさの上限、保存の形式、同期の内部の API、予約の送信の上限、ゴミ箱の保持の日数、SLA | 公式の資料で確かめられなかった（**未検証**） | — |
+| 内部の選別の仕組み、スレッド化の詳しい規則、受信の大きさの上限、保存の形式、同期の内部の API、ゴミ箱の保持の日数、元に戻す送信の既定の秒数、SLA | 公式の資料で確かめられなかった（**未検証**） | — |
 
 いずれも 2026-10-10 に確認。この設計は振る舞いを参考にするが、本家のコード・内部の形式は使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 
@@ -200,7 +203,15 @@ flowchart TB
 | 容量 | 15 GB を他のサービスと共有 | 15 GB をメールだけで数える | 他のサービスを持たない |
 | 機密モード | ある | MVP では持たない | 画面の写しを防げず、誤った安心を与える。SMS の確認は法務の L3 |
 | URL の書き換え | 書き換えるかは**未検証** | 本文の URL を書き換えない。開くときに Web とアプリで評判を確かめる | 本文を変えると DKIM と転送が壊れ、通信の中身への介入が増える（法務の L1） |
-| 予約の送信の上限 | 100 通（**未検証**） | 100 通、1 年先まで | 本家の値に寄せる。1 年は本システムの既定 |
+| 予約の送信の上限 | 100 通（[Schedule emails](https://support.google.com/mail/answer/9214606)。統合の工程で公式の資料で確かめた） | 100 通、1 年先まで（JMAP の `maxDelayedSend` は 366 日） | 本家の値に寄せる。1 年は本システムの既定（[ADR-0049](../decisions/0049-timed-jobs-vacation-and-scheduled-send.md)） |
+| IMAP の読み出しの量 | 1 日 2,500 MB（Workspace） | 1 時間 2.5 GB・1 日 20 GB（書き込みは 1 時間 1 GB） | 初回の同期（平均 2 GB、大きなアカウント 15 GB）を 1 日で終えられるようにする。暴走は 1 時間の上限で抑える。E17 の負荷試験の後に見直す（[ADR-0059](../decisions/0059-api-rate-limits-and-third-party-push.md)） |
+| 一括の配信停止のボタン | ボタンを出す条件は**未検証** | `List-Unsubscribe-Post` があり、DKIM の署名がその欄を含んで通り、その DKIM のドメインが From に揃うときだけ出す | 揃いのない署名で、第三者の URL を利用者の代わりに叩かせない（[sender-authentication.md](sender-authentication.md) の 10 節。法務の L2 の (d)） |
+| 送信の上限の数え方 | 本システムの中の宛先を数えるかは**未検証** | 中の宛先も数える | 乗っ取られたアカウントの中への大量の送信も評判と負荷を壊す（[ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)。E7 の spec で PM が確かめる） |
+| IMAP・submission の認証 | アプリ パスワードを持つ | アプリ パスワードを作らない。OAuth（`OAUTHBEARER`・`XOAUTH2`）と、入力の限られた機器の端末の認可のフロー（RFC 8628）だけ | 長く使える秘密の値を作らず、失効と危険度の判定を効かせる（[ADR-0055](../decisions/0055-sign-in-methods-sessions-and-protocol-auth.md)） |
+| SMS・電話 | 2 段階の確認と回復に使える | 使わない（パスキー・セキュリティキー・TOTP・回復のコード・回復のメール） | SIM の乗っ取りに弱い。SMS の事業者は法務の L3（[ADR-0055](../decisions/0055-sign-in-methods-sessions-and-protocol-auth.md)、[ADR-0056](../decisions/0056-sign-in-risk-and-account-recovery.md)） |
+| パスキーが使えるまでの待ち | 最大 7 日かかることがある | 待ちを置かない | 登録の時に本人の確かめを済ませる（[accounts-and-security.md](accounts-and-security.md) の 5.1 節） |
+| プッシュの通知の中身 | 通知の中身の扱いは**未検証** | 差出人・件名を入れず、端末が取りに来て通知を作る | APNs・FCM は国外の事業者（法務の L3・L5。[ADR-0045](../decisions/0045-push-payload-without-content.md)） |
+| 第三者のアプリの確かめの前の上限 | 上限はあるが、数は資料にない | 100 人 | 本システムの値（[ADR-0058](../decisions/0058-oauth-scopes-and-app-verification.md)） |
 | データの所在 | 多くの国 | すべて日本（東京、DR は大阪） | 日本を最初の市場にする |
 | 識別子 | 本家の名前を含む | `<brand>`・`<Brand>` | リポジトリ共通の ADR-0006 |
 
@@ -233,7 +244,8 @@ flowchart TB
 ```
 
 - 最も大きいのは、保存（アカウントの容量に比例）と、受信の選別（申し出の量に比例し、迷惑メールが多いほど増える）と見込む。SMTP の時点で安く拒むこと（[ADR-0002](../decisions/0002-accept-then-filter.md)）と、小さな blob のパック（[ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md)）が、原価の制御の主な手段になる。
-- S1 の仮の予算（本システムの想定）は、個人のアカウントあたり月 0.15 USD（容量 2 GB）。capacity の領域で、PoC の計測と公開の価格で置き換える。
+- S1 の仮の予算（本システムの想定）は、個人のアカウントあたり月 0.15 USD（容量 2 GB）。
+- capacity の領域の見積もり（AWS の東京の公開の価格）は、削減の前で 1 年目 0.19 USD・3 年目 0.21 USD（±40%）で、予算を 3〜4 割超えた。統合の工程で、下げる手段を数で比べ、推奨の既定案を A（S3 の PUT の削減）＋B（予約の割引）＋C（JMAP をエッジの外で受ける）にした。1 年目 約 0.135 USD、3 年目 約 0.156 USD になる。**仮の決定で、PM の判断待ち**（3 年目だけ予算を 0.16 USD に直すか、`cost-baseline` の実績を待つか）。数は [capacity.md](capacity.md) の 8.1 節。
 
 ## 3. 非機能要件
 
@@ -264,7 +276,7 @@ flowchart TB
 | SMTP・MIME | SMTP の状態の機械・待ち行列・配送は自前。コマンドの構文の層と MIME の解析は汎用のライブラリ（候補は PoC で選ぶ）を、自前の上限の層で包む | [ADR-0001](../decisions/0001-platform-and-stack.md) |
 | 認証 | SPF・DKIM・DMARC・ARC の評価と署名は自前。暗号（RSA、Ed25519）と DNS の解決は汎用のライブラリ。DNSSEC を検証する再帰の解決は Route 53 Resolver | sender-authentication の領域 |
 | 選別 | 規則のエンジンと評判は自前。分類器の推論は ONNX Runtime（汎用の実行系）。学習は Python（オフライン、隔離したアカウント）。マルウェアの署名の検出は汎用のエンジン（ClamAV の類）と YARA の形の規則 | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) |
-| 配送の待ち行列 | S3 のスプール＋SQS（標準）。送信は SQS の遅延と送り直し | 他の題材と同じ部品（[ADR-0002](../decisions/0002-accept-then-filter.md)） |
+| 配送の待ち行列 | S3 のスプール＋SQS（標準。受信は層で 2 つ）。送信は SQS の遅延と送り直し | 他の題材と同じ部品（[ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)） |
 | メッセージの保存 | S3 の blob（zstd のフレーム、blob ごとのデータの鍵）と、パックのオブジェクト | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) |
 | メタデータ | Aurora PostgreSQL 18。directory は 1 つ、メールボックスはアカウントで分けたシャード。FORCE RLS と `SET LOCAL`、UUIDv7、outbox | [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) |
 | 検索 | 自前の索引（アカウントごとのセグメント、2-gram と語、doc values、状態のビットマップ）。S3 と NVMe のキャッシュ | [ADR-0009](../decisions/0009-search-index-design.md) |
@@ -283,17 +295,17 @@ flowchart TB
 
 ## 5. 主な決定
 
-どれも `accepted`。0001〜0009 は最初の設計の起票。状態の一覧は [decisions/README.md](../decisions/README.md)。
+どれも `accepted`。0001〜0009 は最初の設計の起票で、下の表に置く。0010〜0070 は領域の文書の工程で起票した（0035・0038・0042 は割り当ての範囲の空きで、使っていない）。各領域の ADR は 7 節の各文書の頭の表にあり、状態の一覧は [decisions/README.md](../decisions/README.md)。統合の工程で、決定を覆した・具体にした ADR に日付付きの注記を足した（6 節の「決定（2026-10-10、統合）」）。
 
 | ADR | 決定 |
 | --- | --- |
 | [0001](../decisions/0001-platform-and-stack.md) | 管理の面は共通の基盤（TypeScript・Hono、Aurora、Fargate）を引き継ぎ、MTA・選別・保存・検索・IMAP は Rust で書く。メールの送受信に SES を使わず、BYOIP の IP を持つ自前の MTA を EC2 で動かす。汎用の部品は一覧の範囲で使う |
 | [0002](../decisions/0002-accept-then-filter.md) | SMTP の時点では、接続の評判・宛先・容量・認証の失敗・既知のマルウェアのような安く確かなものだけを拒む。中身の選別は、スプールと待ち行列に確定して 250 を返した後に行い、迷惑メールの箱か隔離に入れる。受け付けた後に迷惑メールを送り返さない。グレーリストは使わない |
-| [0003](../decisions/0003-message-storage-layout-and-dedupe.md) | 生のメッセージを不変の blob として S3 に置き、状態はメタデータに置く。blob は同じ配送の受け手の間でだけ共有し、受け手ごとのヘッダーは別に持つ。zstd のフレームで圧縮し、blob ごとのデータの鍵で暗号化する。小さな blob は 1 日後にパックへ詰め直す。消去は鍵の破棄と参照の数え |
+| [0003](../decisions/0003-message-storage-layout-and-dedupe.md) | 生のメッセージを不変の blob として S3 に置き、状態はメタデータに置く。blob は同じ配送の受け手の間でだけ共有し、受け手ごとのヘッダーは別に持つ。zstd のフレームで圧縮し、blob ごとのデータの鍵で暗号化する。小さな blob は 1 日後にパックへ詰め直す。消去は鍵の破棄と参照の数え（統合の工程で、返すバイトを ADR-0032 の「配る形」に読み替える注記を足した） |
 | [0004](../decisions/0004-labels-as-primary-mailbox-model.md) | メールボックスのモデルはラベルを正とする。メッセージは複数のラベルを持ち、受信箱・送信済み・下書き・迷惑メール・ゴミ箱もシステムのラベルにする。迷惑メールとゴミ箱は他のラベルと排他にする。フォルダーは見せ方で、IMAP ではラベルを箱として見せる |
-| [0005](../decisions/0005-threading-algorithm.md) | スレッドはアカウントごとに作る。`References`・`In-Reply-To` の Message-ID のつながり（届いていない親を仮の節にした素集合）と、正規化した件名の一致で合わせる。参照のないメールは同じ差出人・同じ件名・7 日の中で合わせる。100 通で新しいスレッドにする。合わせはあるが、自動で分けない |
-| [0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) | Web・アプリ・第三者の API は JMAP（RFC 8620・8621）に本システムの拡張を足して使い、既存のアプリには IMAP4rev2（CONDSTORE・QRESYNC）を出す。独自の同期の API は作らない。両方を、アカウントごとの `modseq` と change log の上に作る |
-| [0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) | テナントは組織、個人のアカウントは 1 人の個人のテナントとする。メールボックスの表はアカウントの単位で Aurora のシャードに置き、`tenant_id`・`account_id` で FORCE RLS にする。配送は受け手の文脈で書く。テナントをまたぐ経路は一覧にして専用のロールを通す |
+| [0005](../decisions/0005-threading-algorithm.md) | スレッドはアカウントごとに作る。`References`・`In-Reply-To` の Message-ID のつながり（届いていない親を仮の節にした素集合）と、正規化した件名の一致で合わせる。参照のないメールは同じ差出人・同じ件名・7 日の中で合わせる。100 通で新しいスレッドにする。合わせはあるが、自動で分けない（統合の工程で、合わせで移るメッセージは JMAP で消して作り直す形にする注記を足した。ADR-0034） |
+| [0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) | Web・アプリ・第三者の API は JMAP（RFC 8620・8621）に本システムの拡張を足して使い、既存のアプリには IMAP4rev2（CONDSTORE・QRESYNC）を出す。独自の同期の API は作らない。両方を、アカウントごとの `modseq` と change log の上に作る（統合の工程で、役 `all` の仮想の箱と、FUTURERELEASE とサーバーが足す窓の注記を足した。ADR-0041） |
+| [0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) | テナントは組織、個人のアカウントは 1 人の個人のテナントとする。メールボックスの表はアカウントの単位で Aurora のシャードに置き、`tenant_id`・`account_id` で FORCE RLS にする。配送は受け手の文脈で書く。テナントをまたぐ経路は一覧にして専用のロールを通す（統合の工程で、X4 に時刻の仕事を含め、X9・X10 を足した。ADR-0061） |
 | [0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) | 選別のパイプラインは、接続の情報・中身から作った特徴・中身そのものを分け、中身そのものは選別の処理の中だけで機械が読む。人が中身を見るのは同意のある報告だけ。学習は特徴と同意のある報告で行う。選別は利用者の同意の仕組みの上で既定で有効にし、範囲と変え方を示す（法務の L1 の結論で調整する） |
 | [0009](../decisions/0009-search-index-design.md) | 検索の索引は自前で、アカウントごとの不変のセグメント（日本語は 2-gram、英語は語、NFKC と大文字小文字の畳み込み）を S3 に置き、`search-node` がアカウントの範囲を受け持って NVMe にキャッシュする。変わる状態（ラベル、既読）は索引に入れず、change log から追う状態のビットマップで当てる |
 
@@ -340,24 +352,66 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **外部の評判のデータ**：公開・商用のブロックリストを、判定の入力の 1 つとして使い、それだけで拒まない（自社の評判と組み合わせる）。照会に送るのは IP とドメインだけ（法務の L5・L10）。
 - **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
 
-持ち越し（法務、計測・PoC・選定で決めるもの）：
+### 決定（2026-10-10、統合）
+
+領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。最初の設計の ADR は直接直し、決定を覆した・具体にしたところに日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
+
+- **スレッドの合わせの見え方**（[ADR-0005](../decisions/0005-threading-algorithm.md) の注記）：「JMAP では `threadId` の変更として届く」は RFC 8621 の 3 節（`threadId` は変わらない。合わせは消して新しい ID で入れ直す、MUST）に反する。[ADR-0034](../decisions/0034-threading-implementation-and-merge.md) のとおり、移るメッセージを新しいオブジェクトの世代にし、JMAP は `destroyed` と `created`、IMAP は `VANISHED` と新しい UID で届ける。
+- **JMAP の箱と送信の保留**（[ADR-0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) の注記）：「`sendAt` で窓と予約を表す」は、`sendAt` がサーバーの決める性質なので成り立たない。予約は FUTURERELEASE（`HOLDUNTIL`・`HOLDFOR`）、窓はサーバーが足す（[ADR-0041](../decisions/0041-jmap-extensions-and-mailbox-mapping.md)）。役 `all` の仮想の箱を足し、IMAP の `[<Brand>]/All Mail` も同じ集合（`SPAM`・`TRASH`・`SCHEDULED` を除く）にした。
+- **窓だけの送信の `sendAt`**（[ADR-0041](../decisions/0041-jmap-extensions-and-mailbox-mapping.md) の注記）：RFC 8621 の 7 節は、FUTURERELEASE を使わない送信の `sendAt` を作成の時刻とする（MUST）。`sendAt = 作成の時刻 + 窓` をやめ、窓の終わりを拡張の性質 `<brand>:releaseAt` で返す（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 6.6 節、[web-client.md](web-client.md) の 6 節）。
+- **返すバイト**（[ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) の注記）：「前置き＋本文の blob」を、[ADR-0032](../decisions/0032-served-view-edits.md) の「配る形」（blob に編集の表を当てたもの）に置き換えた。編集は、偽の `Authentication-Results` の名前の変更と、止めた添付の置き換えの 2 つだけ。配った後に添付が止まったら新しい世代にする。sender-authentication・attachment-and-url-scanning の持ち越しはこれで閉じた。
+- **テナントをまたぐ経路**（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の本文と注記、[ADR-0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md) の注記）：X4 に時刻の仕事（予約の送信と元に戻す送信の解放、スヌーズの起こし、不在の返信の終わり）とドメインの検査を含めた。X9（`fbl_trace` の引き）と X10（法務の手順の保全と書き出し。法務の L4 まで無効）を本文の一覧に足した。
+- **汎用の部品**（[ADR-0001](../decisions/0001-platform-and-stack.md) の注記）：一覧から [ADR-0062](../decisions/0062-generic-components-additions-and-supply-chain.md) を参照した（HTML5 の構文解析、SAML、JWT、WebAuthn、Argon2id、地理の DB）。web-client の持ち越し（`thread-view-and-safe-html` の承認の止め）は外れた。
+- **鍵**（[ADR-0030](../decisions/0030-blob-format-v1-and-envelope-keys.md) の注記）：「KMS のテナントの鍵」は [ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md) の 4 段の鍵の TRK を指す。KMS の鍵はテナントごとに作らない。
+- **`mx2` の IP**：BYOIP の範囲は同時に 1 つのリージョンだけなので、`mx2` を大阪の別の /24（`in-osa`）に移した（[inbound-smtp.md](inbound-smtp.md) の 4 節、[ADR-0063](../decisions/0063-network-byoip-ranges-and-egress.md)）。
+- **`hold` の参照**：保留を掛けた時でなく、消す時に保全の行ごとに 1 つ足す（`hold:<tenant_id>:<message_id>`。[message-parsing-and-storage.md](message-parsing-and-storage.md) の 8.1 節を [ADR-0053](../decisions/0053-retention-rules-holds-and-preservation.md) に合わせた）。
+- **`PRESERVED` と `preserved` の印**：足す。利用者は保留を見ないが、eDiscovery は利用者が消した保全のメッセージを同じ索引で探すので、墓標にして合わせで落とすと探せない。`search-node` の `PRESERVED` のビットマップ（[search.md](search.md) の 7 節）と、change log の `destroyed` の `preserved` の印・`preserved_purged`（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 4.1 節）を足した。JMAP・IMAP・プッシュには出さず、型ごとの `modseq` も進めない。
+- **配送の待ち行列の 2 つの層**：`inbound-delivery` と `inbound-delivery-low`（`unknown`・`suspicious` の層）に分け、前者を先に読む（[inbound-smtp.md](inbound-smtp.md) の 11.2 節、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）。
+- **S3 の PUT の削減**：`spool-done` の印をタスクごとに束ね（ADR-0011 の注記）、小さな索引のセグメントを S3 に書かずに `search-node` の組へ直接渡す（[ADR-0037](../decisions/0037-segment-format-and-query-execution.md) の注記）。PUT は 1 日 2.4 億から約 1.25 億になる。
+- **費用（仮。PM の判断待ち）**：S1 の見積もりは 1 年目 0.19・3 年目 0.21 USD/アカウント・月で、仮の予算 0.15 USD を超えた。手段は A（PUT の削減、月 約 1.6 万 USD）、B（予約の割引 3 割、約 2.1 万、割引の率は**未検証**）、C（JMAP をエッジの外で受ける、約 1.3 万）、D（迷惑メールの箱の blob を大阪へ写さない、約 0.2 万）。推奨の既定案は A＋B＋C で、1 年目 約 0.135 USD、3 年目 約 0.156 USD。D は採らない。C は E8 の前に Dev と Ops が構成を確かめてから 1.2 節の図を直す（[capacity.md](capacity.md) の 8.1 節、[ADR-0068](../decisions/0068-capacity-model-and-headroom.md) の注記）。
+- **一括の配信停止のボタン**：既定案の条件に、DKIM の署名のドメインが From に揃うことを足した（[sender-authentication.md](sender-authentication.md) の 10.1 節）。
+- **本家との意図した違い**（1.4 節）：IMAP の読み出しの量、一括の配信停止の From の揃い、送信の上限で中の宛先を数えること、アプリ パスワードを作らないこと、SMS を使わないこと、パスキーの待ちを置かないこと、プッシュに中身を入れないこと、確かめの前の第三者のアプリの上限の行を足した。予約の送信の 100 通の未検証を外した。
+- **runbooks の名前**：`delivery-queue-backlog.md` を [mail-delivery-backlog.md](../runbooks/mail-delivery-backlog.md)、`account-takeover-wave.md` を [account-takeover.md](../runbooks/account-takeover.md) にそろえた（[runbooks/README.md](../runbooks/README.md) の 4 節）。
+- **検証の工程での直し（2026-10-10）**：公式の資料を取得し直して、次を確かめ・直した。
+  - DMARCbis：RFC 9989（DMARC、Proposed Standard、2026 年 5 月、RFC 7489 と RFC 9091 を置き換え、`pct` を除き `t` を持ち、DNS の木の歩きは 8 回まで）、RFC 9990（集計の報告）、RFC 9991（失敗の報告）を rfc-editor.org と datatracker で確かめた。group A の記述のまま（確認のみ）。
+  - RFC 8621：2 節（Email は 1 つ以上の箱に属する、MUST）、3 節（合わせは消して新しい ID で入れ直す、MUST）、7 節（`sendAt` はサーバーが決め、FUTURERELEASE がなければ作成の時刻、MUST）。7 節に合わせて `sendAt` を直した。
+  - RFC 5321 の 4.5.3.2.6 節は送り手が終わりの 250 を待つ 10 分で、DATA の塊の 3 分は 4.5.3.2.5 節。[inbound-smtp.md](inbound-smtp.md) の 5.3 節の根拠を直した。
+  - RFC 5322（2.1.1 節の 998）、RFC 7208（4.6.4 節の 10 回）、RFC 6376、RFC 8617、RFC 8461（`max_age` 最大 31,557,600）、RFC 8460、RFC 8058（4 節：DKIM の署名が 2 つの欄を覆う MUST、3.1 節：クッキーを送らない）、RFC 8601（5 節：自分の authserv-id を名乗る外からの欄を消すか隠す MUST）、RFC 8620、RFC 9051、RFC 7162、RFC 8628、RFC 8474（5.2 節：`THREADID` を変えない MUST）は、引いた節の中身を確かめた（確認のみ）。
+  - IANA の「IMAP Mailbox Name Attributes」に `Scheduled`・`Snoozed` が RFC 9979 で登録されていた。client-sync の未検証を外し、役として出す。
+  - 本家：予約の送信 100 通（公式のヘルプで確かめ、未検証を外した）、IMAP の読み出し 1 日 2,500 MB、アプリ パスワードと SMS の 2 段階の確認、送信者のガイドライン（2024-02-01、0.3%、5,000 通、1024 ビット）を確かめた。元に戻す送信の既定の秒数と、配信停止の反映の期限は公式の資料に書かれていない（**未検証**のまま）。
+  - AWS：BYOIP は IPv4 /24・公開の IPv6 /48 が最小、1 つの範囲は同時に 1 つのリージョン、リージョンあたり IPv4 と IPv6 で合わせて 5 つ（申請で増やせる）を確かめた（東京は S1 で 5 つを使い切る）。EC2 のポート 25 の制限の解除は Support への申請（逆引きの文書で確かめた）。リージョンごとの申請と処理の時間は re:Post の本文を取得できず**未検証**。
+  - 日本の法令：最初は総務省の懇談会の整理を報道だけで引き、条件を 3 つと書いていた。総務省の「同意取得の在り方に関する参照文書」で 5 つの条件（合理的な推定と事前の説明を含む）を確かめ、[intent.md](../intent.md)・[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) を直した。総務省の「DMARC導入に関する法的な留意点」（報告に本文と件名を含めないことなど）を出典に足した。当てはめはどれも**法務の確認待ち**（L1）。
+- **品質と運用**：
+  - 各領域の文書の「テストと性質」と「data-model への項目」を反映した。[quality.md](../quality.md) に性質と決定表の一覧（2.2.2 節）と、Epic の合否基準の補いを足した。
+  - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[ip-blocklisted.md](../runbooks/ip-blocklisted.md)、[spam-wave.md](../runbooks/spam-wave.md)、[account-takeover.md](../runbooks/account-takeover.md)、[mail-delivery-backlog.md](../runbooks/mail-delivery-backlog.md)）と計画のものに分けて一覧にした。
+  - 表と置き場所の索引は [data-model.md](data-model.md)。
+- **数値の正本**：
+  - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
+  - SMTP の上限（SIZE 50 MiB、宛先 100、検査の予算 10 秒、確定の予算 5 秒）は [ADR-0002](../decisions/0002-accept-then-filter.md)・[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)。MIME の上限（入れ子 32、パート 1,000、ヘッダーの部 256 KiB、2 秒、256 MiB）は [ADR-0029](../decisions/0029-mime-parsing-limits-and-charsets.md)。選別の閾値（`p_phish` 0.80・`p_spam` 0.90 ほか）は [ADR-0022](../decisions/0022-verdict-score-composition-and-overrides.md)。送信の再試行（1・5・15・30 分、1・2 時間、以後 4 時間、5 日、24 時間で遅れの通知）は [ADR-0019](../decisions/0019-mta-out-queues-throttling-and-retries.md)。元に戻す送信（5・10・20・30 秒、既定 5 秒）と不在の返信（96 時間）は [ADR-0049](../decisions/0049-timed-jobs-vacation-and-scheduled-send.md)。IP の範囲は [ADR-0063](../decisions/0063-network-byoip-ranges-and-egress.md)。
+  - 負荷と費用のモデルは [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節。
+- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 残る未解決事項（2026-10-10）
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
 | 法務の確認待ち（L1〜L10） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
-| 受信と送信の 1 台あたりの量、BYOIP の手続き | E2 の前の `mx-throughput-poc` |
-| MIME の解析のライブラリの選定 | E4 の前の `mime-parser-poc` |
-| blob のパックの大きさ、zstd の水準と辞書、S3 の要求の費用 | E4 の前の `blob-pack-poc` |
-| メールボックスのシャードの大きさ | E4 の前の `mailbox-shard-poc` |
-| 内容の分類器の形と推論の遅れ | E6 の前の `spam-classifier-poc` |
-| 日本語の索引（2-gram と形態素の併用）の効き | E10 の前の `search-index-poc` |
-| S2 以降のセルの構成、リージョンへのアカウントの固定 | infrastructure の領域 |
-| 費用の単価（S3、EC2、Aurora、IP） | capacity の領域。公開の価格で入れる |
-| 本家の振る舞いで未確認のもの（選別の仕組み、スレッド化の詳しい規則、受信の上限、ゴミ箱の日数、SLA） | 各領域の文書で公式の資料で確かめる。確かめられなければ未検証のまま、本システムの値を使う |
+| スプールを 2 つのリージョンへ同期で確定するか（リージョンの喪失でも受け付けたメールを失わない。[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の変更になる） | E17 の DR の訓練の後に、250 の遅れと費用を測って Dev と PM が決める |
+| 費用の推奨の既定案（A＋B＋C）の採否、3 年目の予算（0.15 か 0.16 USD） | PM。`cost-baseline` の実績で数を置き換える |
+| JMAP をエッジの外で受ける構成（C）の確かめと、1.2 節の図の直し | E8 の前に Dev と Ops |
+| 配送の記録の表（directory、受け手ごと 1 日約 7,200 万行、90 日）の書き込みの量と置き場所 | `mailbox-shard-poc` と E1 で Dev と Ops。capacity.md の 4 節にまだ入っていない |
+| 受信と送信の 1 台あたりの量、BYOIP の手続き、ポート 25 の申請（**未検証**） | E2 の前の `mx-throughput-poc`、E1 の `ip-ranges-and-byoip` |
+| MIME の解析のライブラリ、blob のパック、メールボックスのシャードの大きさ | E4 の前の `mime-parser-poc`・`blob-pack-poc`・`mailbox-shard-poc` |
+| 内容の分類器の形、選別の寄与と閾値の値 | E6 の前の `spam-classifier-poc` と、E6 の中の評価の集まりと影 |
+| 日本語の索引（2-gram と形態素の併用） | E10 の前の `search-index-poc` |
+| 送信の上限で中の宛先を数えること | E7 の spec で PM |
+| IMAP の読み出しの上限（本家より緩い） | E17 の負荷試験の後 |
+| 予約の割引の率、大阪の S3 の単価、観測とネットワークの費用（**未検証**） | `cost-baseline` |
+| 本家の振る舞いで未確認のもの（選別の仕組み、スレッド化の詳しい規則、受信の上限、ゴミ箱の日数、元に戻す送信の既定、SLA） | 公式の資料で確かめられなかった。本システムの値を使う |
 
 ## 7. 領域の文書（計画）
 
-各領域の文書は、まだない。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
+各領域の文書は 2026-10-10 にそろい、統合の工程で食い違いを解いた。領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
@@ -378,13 +432,13 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [accounts-and-security.md](accounts-and-security.md) | アカウントの作成、サインイン（パスキー、2 段階）、危険度での確かめ、セッション、回復、乗っ取りの検知と対応、第三者のアプリの OAuth と同意、活動の表示 | [0055](../decisions/0055-sign-in-methods-sessions-and-protocol-auth.md)、[0056](../decisions/0056-sign-in-risk-and-account-recovery.md)、[0057](../decisions/0057-account-takeover-response.md) | セキュリティ | E13 |
 | [api-and-integrations.md](api-and-integrations.md) | 第三者向けの JMAP と IMAP の公開、OAuth のスコープ、速さの上限、アプリの確かめ、公開の REST API（MVP の後） | [0058](../decisions/0058-oauth-scopes-and-app-verification.md)、[0059](../decisions/0059-api-rate-limits-and-third-party-push.md) | セキュリティ | E8、E11、E13 |
 | [security.md](security.md) | 脅威モデル、暗号化と鍵（blob ごとの鍵、KMS）、運用者のアクセスの禁止と例外、報告のサンプルの置き場所、監査、開示の請求（法務の L1・L4・L6） | [0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)、[0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md)、[0062](../decisions/0062-generic-components-additions-and-supply-chain.md) | セキュリティ | E1、E13、E17 |
-| `data-model.md` | データモデルの索引（directory とメールボックスのシャードの表、S3 のパス、SQS のメッセージ、change log の形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md) | データモデルの索引（directory とメールボックスのシャードの表、S3 のパス、SQS のメッセージ、Valkey の鍵、change log の形）。ER 図の全体は後で足す | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、BYOIP と逆引き、ポート 25 の送信、EC2 のキャパシティー、シャードの配置と移し替え、DR（大阪の副 MX、切り替え）、段階を上げる基準 | [0063](../decisions/0063-network-byoip-ranges-and-egress.md)、[0064](../decisions/0064-storage-classes-and-region-replication.md)、[0065](../decisions/0065-stage-up-criteria-and-cells.md) | Ops | E1、E17 |
 | [observability.md](observability.md) | SLI の計測、見張りのメール（外部の見張りのアカウントとの送受）、到達性の監視（ブロックリスト、外部の受信箱への届き方）、利用者の中身を含めない計測の規則 | [0066](../decisions/0066-sli-measurement-and-mail-canary.md)、[0067](../decisions/0067-content-free-telemetry-schema.md) | Ops | E1、E17 |
 | [capacity.md](capacity.md) | 負荷のモデル（受信の申し出、迷惑メールの割合、送信、同期、検索）、部品ごとの必要量、費用のモデル、負荷試験 | [0068](../decisions/0068-capacity-model-and-headroom.md) | Ops | E17 |
 | [delivery.md](delivery.md) | CI/CD、MTA の段階のデプロイ（接続の排出）、選別のモデルの段階の出し方（影の判定）、形式のバージョンの更新の順序、モバイルの配布、フラグ、スキーマの変更 | [0069](../decisions/0069-mta-drain-and-shard-schema-waves.md)、[0070](../decisions/0070-format-versions-and-model-rollout.md) | QA、Ops | E1、E6、E17 |
 
-- 次に採番する ADR は 0071。
+- 0035・0038・0042 は範囲の空きで、使っていない。次に採番する ADR は 0071。
 
 ## 8. Epic
 

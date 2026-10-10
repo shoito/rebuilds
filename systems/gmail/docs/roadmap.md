@@ -70,6 +70,13 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `observability-and-mail-canary` | 観測の経路、外部の見張りのアカウントとの送受の骨格（quality.md の 2.2.1 節 K） |
 | `audit-log-table-and-archive` | 監査ログの表と、S3 の Object Lock への写し |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、CRR の遅れの監視 |
+| `deploy-pipeline` | 関門、カナリア、自動のロールバック、大阪のバージョンの揃え（4.1、4.3 節）（[delivery.md](architecture/delivery.md)） |
+| `format-registry` | 形式の登録簿、試験のベクトル、読む側の行き渡りの関門（5.2 節）（[delivery.md](architecture/delivery.md)） |
+| `shard-migrator` | 波、バージョンの記録、オンラインの DDL、埋め戻し（5.3 節）（[delivery.md](architecture/delivery.md)） |
+| `telemetry-content-guard` | 属性の許可の一覧、ビルドの検査、ログの走査（2.1、2.4 節）（[observability.md](architecture/observability.md)） |
+| `kms-and-key-hierarchy` | KMS の用途ごとの鍵、TRK、日ごとの KEK、索引の鍵、鍵を扱うタスクの守り（5 節）（[security.md](architecture/security.md)） |
+| `iam-and-operator-access` | 人のロール、昇格の手順、DB のロールの一覧と CI の照合（6、7 節）（[security.md](architecture/security.md)） |
+| `supply-chain-baseline` | 依存の許可の一覧、SBOM、署名（10 節）（[security.md](architecture/security.md)） |
 
 ### E2 受信の SMTP
 
@@ -80,10 +87,13 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `connection-reputation-and-limits` | 接続の評判、IP・/24・ASN ごとの速さ、一時の絞り（ADR-0002） |
 | `recipient-validation` | 宛先の解決のキャッシュ、宛先がない・停止・容量の超過の応答 |
 | `end-of-data-checks` | DATA の終わりの同期の検査と予算、決定表（ADR-0002） |
-| `spool-and-delivery-queue` | スプールと SQS の確定の後の 250、掃除の役、重複の抑え（ADR-0002） |
+| `spool-and-delivery-queue` | スプールと SQS の確定の後の 250、配送の待ち行列の 2 つの層、終わりの印の束、掃除の役、重複の抑え（ADR-0002、ADR-0011） |
 | `mta-sts-and-tls-rpt-inbound` | 本システムのドメインの MTA-STS の公開、TLS-RPT の受け取り |
 | `osaka-secondary-mx` | 大阪の副 MX（受け付けて溜め、東京の再開の後に配る） |
 | `smtp-peer-sim` | SMTP の相手の模型と、受信の全場面（quality.md の 2.2.1 節 B） |
+| `mx-drain` | `mx-edge` のライフサイクルフックと排出（4.2 節）（[delivery.md](architecture/delivery.md)） |
+| `system-addresses-and-report-routing` | システムのあて先と DSN の解析の渡し（13 節）（[inbound-smtp.md](architecture/inbound-smtp.md)） |
+| `inbound-sli` | 受け付けと SMTP の応答の計測、欠けの検出（3.4、4 節）（[observability.md](architecture/observability.md)） |
 
 ### E3 送信者の認証
 
@@ -96,6 +106,7 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `dkim-signing-and-key-rotation` | 本システムのドメインと組織のドメインの DKIM の署名、鍵の作成と交換、セレクター |
 | `dmarc-reports` | DMARC の集計の報告の送信（受信の側）と受け取り（本システムと組織のドメイン） |
 | `auth-test-vectors-and-interop` | 試験のベクトルと、外部の実装との相互の検証（quality.md の 2.2.1 節 C） |
+| `bulk-sender-requirements` | 大量の送信者の数えと欠けの特徴（11 節）（[sender-authentication.md](architecture/sender-authentication.md)） |
 
 ### E4 メールの保存
 
@@ -111,6 +122,11 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `blob-packer` | 小さな blob の詰め直し、生きている割合の低いパックの詰め直し |
 | `quota` | 容量の数え、超過の応答、利用者への知らせ |
 | `mime-fuzzing` | MIME と文字コードのファジングと差分のファジング（quality.md の 2.2.1 節 A） |
+| `shard-mover` | 移し替え（6.2 節）（[infrastructure.md](architecture/infrastructure.md)） |
+| `charset-decoding-jp` | ラベルの表、推定、encoded-word の結合、RFC 2231、携帯のアドレス（6 節）（[message-parsing-and-storage.md](architecture/message-parsing-and-storage.md)） |
+| `tenant-kek-hierarchy` | KEK と KMS、AES-KW、キャッシュ（7.2 節）（[message-parsing-and-storage.md](architecture/message-parsing-and-storage.md)） |
+| `served-view-edits` | 配る形、編集の表、範囲の読み出しの写し、後からの編集の世代（7.5 節）（[message-parsing-and-storage.md](architecture/message-parsing-and-storage.md)） |
+| `crypto-erasure` | 鍵の破棄、KEK の破棄、TRK の破棄と `erasure_blocked`（5.3 節）（[security.md](architecture/security.md)） |
 
 ### E5 ラベルとスレッド
 
@@ -121,6 +137,8 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `threading-v1` | スレッド化の規則、件名の正規化、仮の節、合わせ（ADR-0005） |
 | `threading-property-tests` | スレッド化の性質ベーステスト（quality.md の 2.2.1 節 D） |
 | `trash-and-spam-expiry` | ゴミ箱と迷惑メールの箱の 30 日の期限 |
+| `label-rename-and-delete` | 名前の変更、背景の消去（5.5 節）（[mailbox-model-labels-and-threads.md](architecture/mailbox-model-labels-and-threads.md)） |
+| `label-and-thread-counts` | 件数の集計（7 節）（[mailbox-model-labels-and-threads.md](architecture/mailbox-model-labels-and-threads.md)） |
 
 ### E6 迷惑メールの選別
 
@@ -138,6 +156,10 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `org-quarantine` | 組織の隔離と、管理者の確かめと解除 |
 | `filter-eval-and-shadow` | 評価の枠と影の判定（quality.md の 2.2.1 節 H） |
 | `threat-intel-sharing` | 外部との脅威の情報の共有。法務：L10 |
+| `scanner-sandbox` | 監督と検査のプロセス、seccomp と rlimit、定義の更新の役（4.5 節）（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `malware-hash-list` | ハッシュの一覧の作成、`mx-edge` と `inbound-pipeline` への配り方（4.2 節）（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `post-delivery-remediation` | 添付と URL の索引、配った後の手当て（4.6・6.5 節）（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `filter-quality-monitoring` | 6 節の監視（[observability.md](architecture/observability.md)） |
 
 ### E7 送信の SMTP と評判
 
@@ -151,6 +173,9 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `outbound-content-filtering` | 送信の内容の選別。範囲は法務：L1 |
 | `compromised-account-detection` | 送信の異常の検知、保留、本人への確かめ。停止の範囲は法務：L2 |
 | `srs-for-forwarding` | 転送の SRS と、転送のプール |
+| `mta-out-drain` | `mta-out` の排出と IP の移し（4.2 節）（[delivery.md](architecture/delivery.md)） |
+| `deliverability-dashboard` | 5 節のダッシュボード（[observability.md](architecture/observability.md)） |
+| `sending-limits` | 移動の窓、新しいアカウントの段、短い時間の上限、超えたときの応答（10 節）（[outbound-smtp-and-reputation.md](architecture/outbound-smtp-and-reputation.md)） |
 
 ### E8 同期の API とプッシュ
 
@@ -158,11 +183,15 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `change-log-and-modseq` | change log の形と保持、`modseq`（ADR-0006） |
 | `jmap-core-and-mail` | JMAP の Core と Mail（`Email`・`Thread`・`Mailbox`・`*/changes`・`*/query`） |
-| `jmap-submission` | `EmailSubmission`、`sendAt`、取り消し |
+| `jmap-submission` | `EmailSubmission`、FUTURERELEASE（`HOLDUNTIL`・`HOLDFOR`）、サーバーが足す窓と `<brand>:releaseAt`、取り消し（ADR-0041） |
 | `jmap-extensions` | 本システムの拡張（スレッドへの操作、スヌーズ、ミュート、検索の文字列、配信停止） |
 | `push-gateway` | EventSource・WebSocket のプッシュ、IMAP の IDLE への合図 |
 | `mobile-push-pipeline` | APNs・FCM への送信の経路。本文の中身は法務：L3・L5 |
 | `sync-convergence-sim` | 同期の収束の模型（quality.md の 2.2.1 節 E） |
+| `jmap-scope-enforcement` | DT-API-001 の判定（6 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `api-rate-limits` | JMAP の単位と GCRA、429 の形（7.1 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `push-subscriptions-webhook` | `PushSubscription`、確かめ、署名、後退（8.2 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `jmap-mailbox-mapping` | 箱、役 `all`、隠した所属、キーワード（6.1〜6.4 節）（[client-sync-and-protocols.md](architecture/client-sync-and-protocols.md)） |
 
 ### E9 Web のクライアント
 
@@ -176,6 +205,11 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `one-click-unsubscribe-button` | 配信停止のボタン。法務：L2 |
 | `labels-and-settings-ui` | ラベル、設定、フォルダーの表示 |
 | `ui-analytics` | 画面の計測。法務：L8 |
+| `click-time-url-check` | `url-check` の API、先頭の集合の配り方、Web の警告の画面（6.4 節）（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `external-image-proxy` | 画像の代理、描き直し、キャッシュ、設定（7 節）。説明は法務：L8（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `one-click-unsubscribe` | 配信停止のボタンの条件と POST（10.1 節）。法務：L2（[sender-authentication.md](architecture/sender-authentication.md)） |
+| `web-offline-and-optimistic` | IndexedDB、待ち行列、載せ直し（5 節）（[web-client.md](architecture/web-client.md)） |
+| `click-time-link-check` | iframe の押下の受け渡しと、先頭のハッシュの確かめ（7.5 節。`url-check` は [attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)）（[web-client.md](architecture/web-client.md)） |
 
 ### E10 検索
 
@@ -187,6 +221,8 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `search-node-and-placement` | `search-node` の受け持ちと写し、NVMe のキャッシュ |
 | `state-bitmaps` | 状態のビットマップと change log の追いつき |
 | `search-reference-compare` | 参照の実装との一致（quality.md の 2.2.1 節 I） |
+| `search-analyzer-v1` | 正規化、CJK の 2-gram と 1-gram、アドレス（4 節）（[search.md](architecture/search.md)） |
+| `search-suggestions` | 候補（9 節）（[search.md](architecture/search.md)） |
 
 ### E11 IMAP と submission
 
@@ -198,6 +234,11 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `smtp-submission` | 465・587 の submission、送信の依頼への変換 |
 | `oauth-sasl` | `OAUTHBEARER`・`XOAUTH2` |
 | `imap-interop` | 主な IMAP のアプリとの相互運用の試験 |
+| `imap-bandwidth-limits` | IMAP の読み出し・書き込み・コマンドの上限（7.2 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `imap-append-sent-dedupe` | 7.6 節（[client-sync-and-protocols.md](architecture/client-sync-and-protocols.md)） |
+| `served-view-in-protocols` | 配る形の返し方と、後からの止めの世代の切り替え（7.8 節）（[client-sync-and-protocols.md](architecture/client-sync-and-protocols.md)） |
+| `imap-graceful-restart` | IMAP・submission の閉じ方（4.2 節）（[delivery.md](architecture/delivery.md)） |
+| `submission-commit` | submission の確定の時点と上限の応答（4.2 節）（[outbound-smtp-and-reputation.md](architecture/outbound-smtp-and-reputation.md)） |
 
 ### E12 フィルター・転送・自動化
 
@@ -219,6 +260,9 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `ato-detection-and-response` | 乗っ取りの検知、転送・フィルターの変更の通知、全セッションの失効 |
 | `oauth-authorization-server` | 第三者のアプリの OAuth、スコープ、同意、アプリの確かめ |
 | `account-activity` | 活動の表示（サインイン、接続中のアプリ） |
+| `password-hash-poc` | Argon2id の値、漏れた一覧の取り込みの条件（5.2 節）（[accounts-and-security.md](architecture/accounts-and-security.md)） |
+| `app-registration-and-verification` | 開発者の登録、クライアントの種類、確かめの級、審査の画面、組織のアプリの方針（5 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `pentest-internal` | 外部のペンテストの前の内部の試験（11 節）（[security.md](architecture/security.md)） |
 
 ### E14 組織
 
@@ -231,6 +275,8 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `admin-audit-log` | 管理の操作の監査ログ |
 | `sso-saml-oidc` | SAML・OIDC の SSO |
 | `org-contracts` | 契約の文書、サブプロセッサーの一覧。法務：L7 |
+| `admin-api` | 組織の管理の API と `admin.*`（4、6 節）（[api-and-integrations.md](architecture/api-and-integrations.md)） |
+| `org-allow-block-lists-ui` | 許可・拒否の一覧の画面と API（9 節）（[organizations-domains-and-routing.md](architecture/organizations-domains-and-routing.md)） |
 
 ### E15 保持と eDiscovery
 
@@ -240,6 +286,7 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `legal-holds` | 保留と、保留の中の消去の止め |
 | `ediscovery-search-and-export` | 横断の検索と書き出し、担当の役割、監査 |
 | `lawful-access-framework` | 捜査機関への対応の枠。法務：L4 |
+| `archived-users` | 退職者の状態と手順（5 節）（[retention-and-ediscovery.md](architecture/retention-and-ediscovery.md)） |
 
 ### E16 モバイルのアプリ
 
@@ -250,6 +297,8 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `mobile-notifications` | プッシュの受け取りと通知。本文は法務：L3 |
 | `mobile-release-pipeline` | 配布、段階のリリース |
 | `mobile-analytics` | アプリの計測。法務：L8 |
+| `click-time-url-check-mobile` | アプリのリンクの処理（6.4 節）（[attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)） |
+| `mobile-device-registration` | `<Brand>Device`、トークン、遠くからの消去（5 節）（[mobile-and-push.md](architecture/mobile-and-push.md)） |
 
 ### E17 本番の準備と GA の判定
 
@@ -262,6 +311,7 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e17` | 個別の手順の作成と確認 |
 | `ga-readiness` | GA の判定。法務：L1〜L7 |
+| `cost-baseline` | 本番の費用の計測と 8 節の見積もりの置き換え、下げる手段の採否（[capacity.md](architecture/capacity.md)） |
 
 ## エージェントに任せないこと
 

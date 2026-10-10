@@ -70,11 +70,12 @@
 | 名前 | 優先度 | 置き場所 | IP |
 | --- | --- | --- | --- |
 | `mx1.<brand>.<domain>` | 10 | 東京の NLB（3 AZ） | BYOIP の受信の /24 の中の 3 つ（AZ ごと）と、IPv6 の 3 つ |
-| `mx2.<brand>.<domain>` | 20 | 大阪の NLB（2 AZ） | 同じ /24 の別の 2 つと、IPv6 の 2 つ |
+| `mx2.<brand>.<domain>` | 20 | 大阪の NLB（2 AZ） | 大阪の BYOIP の受信の /24（`in-osa`）の中の 2 つと、大阪の IPv6 の /48 の 2 つ |
 
 - 本システムのドメイン（`<brand>.<domain>`）と組織のドメインの MX は、どちらもこの 2 つの名前を指す。組織のドメインの DNS の案内は organizations-domains-and-routing.md が持つ。
 - NLB はポート 25 の TCP を `mx-edge` の EC2 に渡す。プロキシプロトコル v2 で送り元の IP を受ける。NLB の健全性の検査は SMTP の 220 を待つ TCP の検査にする。
 - 受信の IP は送信のプール（[outbound-smtp-and-reputation.md](outbound-smtp-and-reputation.md)）と別の /24 に置く。受信の IP は外へ送らない。
+- `mx1` と `mx2` は別の /24 に置く。BYOIP の範囲は同時に 1 つのリージョンにしか置けないため（[ADR-0063](../decisions/0063-network-byoip-ranges-and-egress.md)、[infrastructure.md](infrastructure.md) の 3.2 節）。統合の工程で「同じ /24 の別の 2 つ」から直した。
 - S1 の台数の見込み：ピーク 2,500 通/秒の受け付けと、その 2.5 倍の申し出、1 台あたり同時の接続 2 万（`mx-throughput-poc` で確かめる）。東京 9 台（AZ ごと 3 台）、大阪 4 台。
 
 ## 5. SMTP のセッション
@@ -128,7 +129,7 @@ EHLO の応答で次を出す。
 | --- | --- | --- |
 | 挨拶まで | 0 ms（`suspicious` の層だけ 2 秒待ち、その間の送信を pre-greet として 554） | NFR-003 の p99 100ms は `suspicious` を除く |
 | コマンドを待つ | 5 分 | RFC 5321 の 4.5.3.2.7 節 |
-| DATA の塊を待つ | 3 分 | RFC 5321 の 4.5.3.2.6 節 |
+| DATA の塊を待つ | 3 分 | RFC 5321 の 4.5.3.2.5 節（送り手の 1 つの塊の送信の時間切れ 3 分）に合わせる。受け手の側の値は RFC にない。4.5.3.2.6 節の 10 分は、送り手が終わりの 250 を待つ時間で、確定の予算（5 秒）はこれより十分に短い |
 | 1 つのセッション | 30 分 | 本システムの既定 |
 | 遅い送り元 | DATA の受信が 60 秒の窓で平均 512 バイト/秒を下回り、3 つの窓続いたら 421 4.4.2 | 1 バイト/秒の相手（[quality.md](../quality.md) の 2.2.1 節 B）で資源を持たれない |
 | コマンドの行 | 2,048 オクテット。超えたら 500 5.5.2 | RFC は 512 と拡張の分 |
@@ -351,7 +352,7 @@ sequenceDiagram
 
 | 部分 | 中身 |
 | --- | --- |
-| 頭（長さつきの Protobuf `SpoolEnvelope`） | `spool_version`、`spool_id`（UUIDv7）、`received_at`、`mx_host`、`region`、送り元の IP と範囲と ASN、`helo`、TLS（版、暗号、SNI）、`mail_from`、宛先の一覧（正規化したアドレス、`account_id` かグループの ID、`tenant_id`、`smtp_policy_class`）、認証と検査の結果、`timed_out_checks`、大きさ、本文の SHA-256 |
+| 頭（長さつきの Protobuf `SpoolEnvelope`） | `spool_version`、`spool_id`（UUIDv7）、`received_at`、`mx_host`、`region`、送り元の IP と範囲と ASN、`helo`、TLS（バージョン、暗号、SNI）、`mail_from`、宛先の一覧（正規化したアドレス、`account_id` かグループの ID、`tenant_id`、`smtp_policy_class`）、認証と検査の結果、`timed_out_checks`、大きさ、本文の SHA-256 |
 | 本文 | ドットの透過を外した、受け取ったバイトそのもの |
 
 - `mail_from` と宛先のアドレスは C3 のローカル部を含む。スプールは C3 の置き場所として扱い、SSE-KMS（スプールの専用の鍵）で暗号化し、読めるのは `inbound-pipeline` と掃除の役だけにする。
@@ -370,14 +371,15 @@ sequenceDiagram
 ### 11.2 配送の依頼
 
 - SQS のメッセージ：`spool_id`、オブジェクトのキー、宛先の一覧（`account_id`・グループの ID）、検査の結果の要約、`attempt`。
-- 可視の時間切れは 5 分。`inbound-pipeline` は受け手ごとに `mailstore.deliver` を呼び、すべての受け手が終わったら（配送か、受け付けた後の配送の不能による DSN の依頼）`spool-done/<yyyy>/<mm>/<dd>/<hh>/<spool_id>` に空のオブジェクトを書き、SQS のメッセージを消す。
-- 10 回読まれても終わらない依頼は DLQ に移し、page のアラートにする（[runbooks/README.md](../runbooks/README.md) の `delivery-queue-backlog.md`）。DLQ の依頼は消さず、原因を直してから戻す。
+- 可視の時間切れは 5 分。`inbound-pipeline` は受け手ごとに `mailstore.deliver` を呼び、すべての受け手が終わったら（配送か、受け付けた後の配送の不能による DSN の依頼）その `spool_id` をタスクの中の束に足す。束は 10 秒か 1,000 件ごとに、1 つのオブジェクト `spool-done/<yyyy>/<mm>/<dd>/<hh>/<task_id>-<seq>`（`spool_id` の列）として書き、書けてから束の SQS のメッセージを消す（`DeleteMessageBatch`）。束を書く前にタスクが止まったら、その分は可視の時間切れで読み直されるか、掃除の役が載せ直す。配送は冪等なので重複しない（[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）。
+- **待ち行列を 2 つの層に分ける**：`inbound-delivery`（接続の層が `trusted`・`good`・`neutral`）と `inbound-delivery-low`（`unknown`・`suspicious`）。`mx-edge` は確定の時に層で送り先を選ぶ。`inbound-pipeline` は前者を先に読み、前者が空か 1 秒の間に 10 件未満のときだけ後者を読む。後者にも最低の取り分（読み出しの 1 割）を残し、平時に溜めない。迷惑メールの波（[capacity.md](capacity.md) の 1.2 節）の間も、正規のメールの受信の遅れ（NFR-001）を守る。
+- 10 回読まれても終わらない依頼は DLQ に移し、page のアラートにする（[runbooks/mail-delivery-backlog.md](../runbooks/mail-delivery-backlog.md)）。DLQ の依頼は消さず、原因を直してから戻す。
 
 ### 11.3 掃除の役
 
-- 5 分ごとに、`[今 − 2 時間, 今 − 10 分]` の時間の範囲の `spool/`、`spool-done/`、`spool-rejected/` の一覧を取る。キーは `spool_id`（UUIDv7）の順なので、3 つの一覧を並べて突き合わせる。
+- 5 分ごとに、`[今 − 2 時間, 今 − 10 分]` の時間の範囲の `spool/` の一覧と、`spool-done/`・`spool-rejected/` の束（範囲の時間と今まで）の中身を取る。読んだ束はメモリーに覚え、次の回は新しい束だけを読む。`mx-edge` の `spool-rejected/` の印も、台ごとに 10 秒か 1,000 件で束ねる。
 - `spool/` にあって、`spool-done/` にも `spool-rejected/` にもないものは、配送の依頼を載せ直す（`attempt` を足す）。配送は冪等なので、載せ直しで重複しない。
-- S1 の量（1 時間 250 万の受け付け）で、一覧の要求は 1 回の掃除で約 7,500（1 回 1,000 件）。費用は小さい。
+- S1 の量（1 時間 250 万の受け付け）で、`spool/` の一覧の要求は 1 回の掃除で約 5,000（1 回 1,000 件）。束は 1 日約 30 万（PUT と GET がそれぞれ）。1 通 1 つの印（1 日 6,000 万の PUT）と比べて小さい。
 - ライフサイクル：`spool/` は 7 日、`spool-done/`・`spool-rejected/` の印は 8 日、拒んだスプールの本体は `spool-rejected/` の印を見て掃除の役が 1 日後に消す。スプールの保持の日数は通信の内容の保持にあたり、**法務の確認待ち**（L6）。
 - 毎時の突き合わせ（[quality.md](../quality.md) の 4.2 節）：250 から 1 時間を過ぎて `spool-done/` のないものを数え、1 件でも SEV1 の候補にする。
 
@@ -422,7 +424,7 @@ sequenceDiagram
 | DNS の解決の遅れ | 認証の検査が予算を超える | 検査は「判定なし」で受け付ける。`temperror` は拒否にしない（[sender-authentication.md](sender-authentication.md)） |
 | 選別の部品（`spam-scorer`）の停止 | 受け付けた後の選別が遅れる | 受信の受け付けは止めない。SQS に溜まる（[ADR-0002](../decisions/0002-accept-then-filter.md)） |
 | 東京のリージョンの停止 | `mx1` が答えない | 送り手が `mx2` に回る。大阪に溜め、再開か切り替えで配る（12 節） |
-| 迷惑メールの急な波 | 受け付けと選別の量が増える | 一時の規則と接続の絞り（`spam-wave.md`）。`unknown` の層の上限を一時に半分にする |
+| 迷惑メールの急な波 | 受け付けと選別の量が増える | 一時の規則と接続の絞り（[spam-wave.md](../runbooks/spam-wave.md)）。`unknown` の層の上限を一時に半分にする |
 | 証明書の期限切れ | MTA-STS を覚えた送り手が送れない | 30 日前の入れ替えと、14 日前の page。期限切れの間は 7.2 節の段 1 へ戻す手順 |
 
 ## 15. 上限
@@ -447,13 +449,13 @@ sequenceDiagram
 
 ## 16. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | S3 `spool/<yyyy>/<mm>/<dd>/<hh>/<spool_id>`（東京と大阪の別のバケット、SSE-KMS のスプールの鍵） | `SpoolEnvelope`（`spool_version`、`spool_id`、`received_at`、`mx_host`、`region`、`peer_ip`、`peer_range`、`peer_asn`、`helo`、`tls`、`mail_from`、`rcpts[]`（`address_norm`、`account_id`・`group_id`、`tenant_id`、`smtp_policy_class`）、`auth_results`、`sync_checks`、`timed_out_checks`、`size`、`body_sha256`）＋生のメッセージ | 10 |
-| S3 `spool-done/…/<spool_id>`、`spool-rejected/…/<spool_id>` | 空のオブジェクト（印） | 11 |
-| SQS `inbound-delivery`（東京・大阪）と DLQ | `spool_id`、`object_key`、`rcpts[]`（`account_id`・`group_id`）、`checks_summary`、`attempt` | 11.2 |
+| S3 `spool-done/…/<task_id>-<seq>`、`spool-rejected/…/<host>-<seq>` | 終わった・拒んだ `spool_id` の列（束の印） | 11 |
+| SQS `inbound-delivery`・`inbound-delivery-low`（東京・大阪）と DLQ | `spool_id`、`object_key`、`rcpts[]`（`account_id`・`group_id`）、`checks_summary`、`attempt` | 11.2 |
 | Valkey `rep:ip:{ip}`、`rep:range:{range}` | 層、理由のコード、更新の時刻（評判のサービスが書く） | 6.1 |
 | Valkey `rl:{kind}:{key}` | GCRA の TAT | 6.3 |
 | Valkey `rcpt:{hmac}` | 宛先の状態（`active`・`suspended`・`over_quota`・`none`）、`account_id`、`smtp_policy_class` | 8.1 |
@@ -508,6 +510,13 @@ data-model.md（まだない）に、次の項目を載せる。
 - **宛先**：RCPT の時点で確かめ、探りを遅らせて切る。方針の組が違うときだけトランザクションを分ける（ADR-0013）。
 - **DSN の拡張**：出さない（5.2 節）。
 - **裸の LF**：受けて点にする。密輸の印だけ拒む（5.4 節）。
+
+### 決定（2026-10-10、統合）
+
+- **`mx2` の IP**：大阪の別の /24（`in-osa`）に置く（4 節。[ADR-0063](../decisions/0063-network-byoip-ranges-and-egress.md)）。
+- **配送の待ち行列の 2 つの層**：`inbound-delivery` と `inbound-delivery-low`（11.2 節。[capacity.md](capacity.md) の求め）。
+- **終わりの印の束**：1 通 1 つの印をやめ、タスクごとに 10 秒か 1,000 件で束ねる（11.2・11.3 節。[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md) の注記）。S3 の PUT が 1 日 6,000 万減る。
+- **2 つのリージョンへの同期の確定**：リージョンの喪失でも受け付けたメールを失わない形（250 の前に東京と大阪の両方に確定する）は、ADR-0011 の変更になる。E17 の DR の訓練の後に、250 の遅れと費用を測って Dev と PM が決める（[architecture/README.md](README.md) の 6 節の残る未解決事項）。
 
 ### 持ち越し
 

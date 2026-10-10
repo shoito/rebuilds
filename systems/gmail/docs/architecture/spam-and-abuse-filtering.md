@@ -357,7 +357,7 @@ flowchart LR
 
 ### 12.3 緊急の規則
 
-- 大きな迷惑メール・フィッシングの波（[runbooks/README.md](../runbooks/README.md) の `spam-wave.md`）では、波に当てる規則だけを速い道で出せる：
+- 大きな迷惑メール・フィッシングの波（[spam-wave.md](../runbooks/spam-wave.md)）では、波に当てる規則だけを速い道で出せる：
   1. 規則は「迷惑メール・フィッシングに寄せる」向きだけ（`inbox` に寄せる規則は速い道に載せない）。
   2. 評価の集まりの正規のメール（全件）で当たり 0 件。
   3. 影 1 時間で、影の当たりへの「迷惑メールではない」の報告 0 件。
@@ -426,7 +426,7 @@ flowchart LR
 
 ## 18. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -508,4 +508,4 @@ data-model.md（まだない）に、次の項目を載せる。
 
 - Google Cloud Blog, [Protecting businesses against cyber threats during COVID-19 and beyond](https://cloud.google.com/blog/products/identity-security/protecting-against-cyber-threats-during-covid-19-and-beyond)（2020-04-16。2026-10-10 に確認）
 - Google, [Email sender guidelines](https://support.google.com/a/answer/81126)（2026-10-10 に確認）
-- 総務省の懇談会の整理の報道（[intent.md](../intent.md) の出典。今の見解かは**未検証**）
+- 総務省, 同意取得の在り方に関する参照文書（2006 年の懇談会の整理の 5 つの条件を引く。[intent.md](../intent.md) の出典。当てはめは**法務の確認待ち**：L1）

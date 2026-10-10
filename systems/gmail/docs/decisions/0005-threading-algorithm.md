@@ -56,7 +56,10 @@ date: 2026-10-10
 ### 安定性と合わせ
 
 - 一度スレッドに入れたメッセージを、後から自動で別のスレッドへ分けない。
-- 規則 1 で 2 つのスレッドを合わせるときは、ID の小さいほう（UUIDv7 で古いほう）を残し、もう一方のメッセージの `thread_id` を書き換え、change log に「合わせ」として載せる。JMAP では、移ったメッセージの `threadId` の変更と、消えたスレッドの `destroyed` として届く。
+- 規則 1 で 2 つのスレッドを合わせるときは、ID の小さいほう（UUIDv7 で古いほう）を残し、もう一方のメッセージの `thread_id` を書き換え、change log に「合わせ」として載せる。移ったメッセージは新しいオブジェクトの世代にする。JMAP では、古い Email の ID の `destroyed` と新しい ID の `created`、消えたスレッドの `destroyed` として届く（[ADR-0034](0034-threading-implementation-and-merge.md)）。
+
+> 2026-10-10 の注記：最初は「JMAP では、移ったメッセージの `threadId` の変更として届く」とした。RFC 8621 の 3 節は `threadId` を変わらない性質とし、スレッドを合わせるときは Email を消して新しい ID で入れ直すことを求める（MUST）。RFC 8474 の 5.2 節も、一度知らせた `THREADID` を変えないとする。そこで [ADR-0034](0034-threading-implementation-and-merge.md) のとおり、移るメッセージの `object_gen` を進める。JMAP では消して作り直す形、IMAP では古い UID の `VANISHED` と新しい UID の形で届く。中の `message_id`・blob・ラベル・旗は変わらない。
+
 - 利用者が手でスレッドから外す操作は MVP の後（mailbox-model-labels-and-threads の領域）。
 
 ### 収束
@@ -76,7 +79,7 @@ date: 2026-10-10
   - 乗っ取りを、件名の条件と認証の印で抑える。
 - 引き受けるコスト：
   - 仮の節の表が、届かない親の分だけ増える（期限を決めて消す。mailbox-model-labels-and-threads の領域）。
-  - 合わせで `threadId` が変わる。クライアントは change log で追う必要がある。
+  - 合わせで、移ったメッセージの Email の ID が新しくなる（ADR-0034）。クライアントは change log で追う必要がある。
   - 件名の正規化の規則は、言語ごとの返信の印を足すたびに、既存のスレッドに遡らない。
 
 ## Confirmation

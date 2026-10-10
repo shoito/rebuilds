@@ -327,10 +327,11 @@ blob の参照は、目録のシャードの `blob_refs` の行の集合で持�
 | --- | --- | --- | --- |
 | `lease` | `spool_id` か `submission_id` | blob を作る時 | すべての受け手の参照が届いた後 |
 | `mailbox` | メッセージの行の ID | 配送・送信のコミットの outbox | 完全な削除・期限の消去のコミットの outbox |
-| `hold` | 保留の案件の ID ＋メッセージの行の ID | 保留を掛けた時（retention-and-ediscovery.md） | 保留を外した時 |
+| `hold` | 保全の行の鍵 `hold:<tenant_id>:<message_id>`（保全の行ごとに 1 つ。案件の ID を含めない） | 消す時に行を `preserved_messages` へ移すコミットの outbox（[ADR-0053](../decisions/0053-retention-rules-holds-and-preservation.md)、[retention-and-ediscovery.md](retention-and-ediscovery.md) の 4.4 節）。保留を掛けた時には足さない | 保全の行を消すコミットの outbox（どの保留にも規則にも当たらなくなった、規則の期間を過ぎた） |
 | `outbound` | 送信の依頼の ID | 外部への送信の依頼を作る時 | 送り終えた・DSN を作った時 |
 
 - 足す・外すは、行の挿入・削除で冪等になる（同じ outbox の 2 回目は何もしない）。
+- `hold` の参照は、統合の工程で「保留を掛けた時に、案件の ID ＋メッセージの行の ID で足す」から直した。保留を掛けた時に範囲の全メッセージへ足すと、S1 の最大の組織で 54 億の行になるため（ADR-0053）。同じ保全の行に複数の保留が当たっても、参照は 1 つで、案件は `preserved_messages.hold_ids` に持つ。
 - 参照の行を外した結果、その blob の行が 0 になったら、`blob_catalog.zero_since` に時刻を書く。
 
 ### 8.2 状態の機械
@@ -406,7 +407,7 @@ stateDiagram-v2
 
 ## 12. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |

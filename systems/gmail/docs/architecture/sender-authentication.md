@@ -268,7 +268,7 @@ stateDiagram-v2
 - `rua` の送り先のドメインが方針のドメインと違うときは、`<方針のドメイン>._report._dmarc.<送り先のドメイン>` の TXT で、受け取りの許しを確かめる。なければ送らない。
 - 1 通の大きさは 10 MiB まで。超える分は分けて送る。送り先は 1 つのドメインあたり 2 つまで。
 - 送信は本システムの通知のプール（[outbound-smtp-and-reputation.md](outbound-smtp-and-reputation.md) の 5 節）から、`dmarc-reports@<brand>.<domain>` の差出人で送る。
-- **送るのは法務の L1 の確認の後**。送信の IP と数は通信の構成の要素にあたりうる（**法務の確認待ち**）。それまでは集計だけを作り、送らない（`release.dmarc-aggregate-reports`）。
+- **送るのは法務の L1 の確認の後**。送信の IP と数は通信の構成の要素にあたりうる（**法務の確認待ち**）。それまでは集計だけを作り、送らない（`release.dmarc-aggregate-reports`）。総務省の「DMARC導入に関する法的な留意点」は、報告に本文と件名を含めないことなどを、包括の同意を有効とみなす条件に挙げる（[intent.md](../intent.md) の出典）。本システムの集計の報告は本文と件名を持たない形で作る。
 - 失敗の報告（RFC 9991、`ruf`）は送らない。メッセージの中身やヘッダーを第三者に送ることになるため。
 
 ### 8.2 集計の報告を受け取る
@@ -352,7 +352,7 @@ stateDiagram-v2
 
 ## 14. data-model への項目
 
-data-model.md（まだない）に、次の項目を載せる。
+[data-model.md](data-model.md) の索引に、次の項目を載せる（この表が列の正本）。
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
@@ -418,7 +418,7 @@ data-model.md（まだない）に、次の項目を載せる。
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| blob の中の偽の `Authentication-Results` を、IMAP で返すときに名前を変えるか（受け取ったバイトをそのまま返す決まりとぶつかる） | message-parsing-and-storage.md と client-sync-and-protocols.md で決める。それまで Web・アプリは前置きだけを信じる |
+| blob の中の偽の `Authentication-Results` を、IMAP で返すときに名前を変えるか（受け取ったバイトをそのまま返す決まりとぶつかる） | 統合の工程で決めた：名前を `X-<Brand>-Untrusted-Authentication-Results` に変えた「配る形」を、IMAP・JMAP・書き出しのすべてで返す（[ADR-0032](../decisions/0032-served-view-edits.md)） |
 | 大量の送信者の要件の欠けを、SMTP の時点で拒むか | E6 の後、評価の集まりと誤判定の率を見て Dev と QA が決める |
 | DMARC の集計の報告を送ること（送信の IP と数を第三者に出すこと） | 法務の確認待ち（L1） |
 | 配信停止の URL を本システムが叩くこと | 法務の確認待ち（L2 の (d)） |
@@ -435,3 +435,4 @@ data-model.md（まだない）に、次の項目を載せる。
 - [RFC 8601](https://www.rfc-editor.org/rfc/rfc8601)（Authentication-Results）、[RFC 2308](https://www.rfc-editor.org/rfc/rfc2308)（否定のキャッシュ）
 - [RFC 8058](https://www.rfc-editor.org/rfc/rfc8058)（一括の配信停止）
 - Google, [Email sender guidelines](https://support.google.com/a/answer/81126)、Google Workspace Admin Help, [Set up BIMI](https://knowledge.workspace.google.com/admin/security/set-up-bimi)（いずれも 2026-10-10 に確認）
+- 総務省 総合通信基盤局, [DMARC導入に関する法的な留意点](https://www.soumu.go.jp/main_content/000495390.pdf)（2026-10-10 に取得。当てはめは**法務の確認待ち**：L1）

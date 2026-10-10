@@ -75,6 +75,10 @@ MTA の土台：
 | ONNX Runtime | 分類器の推論 | モデルと特徴は自前 |
 | 文字コードの変換（ICU の類）、zstd、Protobuf・gRPC、AWS の SDK、OpenTelemetry | 汎用 | — |
 
+- この一覧の補いは [ADR-0062](0062-generic-components-additions-and-supply-chain.md) にある：HTML5 の構文解析、XML の解析と XML 署名（SAML）、JOSE・JWT、WebAuthn の検証、Argon2id、地理の DB の読み出し。どれも自前の上限の層で包む。
+
+> 2026-10-10 の注記：最初の一覧には、HTML のメールの浄化、SSO、パスキー、パスワード、サインインの危険度に要る部品がなかった。領域の文書の工程で [ADR-0062](0062-generic-components-additions-and-supply-chain.md) が 6 つを足した。本文の一覧は書き換えず、ADR-0062 を補いの正本とする。下の Confirmation の依存の検査は、両方の一覧を読む。
+
 - **核に使わないもの**：汎用の MTA（Postfix、Exim、Haraka、Stalwart など）、汎用のメールのサーバー（Dovecot、Cyrus など）、汎用の迷惑メールの判定の製品（Rspamd、SpamAssassin など）を判定の本体に使うこと、汎用の検索のエンジン（OpenSearch など）。本家のコード、本家の IMAP の拡張の実装。
 - 選別の規則のうち、公開の考え方（ヘッダーの形の異常など）を参考にするのはよい。規則の文書に出典を書く。
 

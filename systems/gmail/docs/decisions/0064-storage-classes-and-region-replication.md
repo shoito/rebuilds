@@ -36,7 +36,7 @@ date: 2026-10-10
 - バケット：`spool-tyo`・`spool-osa`（互いに CRR＋RTC）、`blobs-tyo` → `blobs-osa`（CRR＋RTC）、`quarantine-tyo` → 大阪。索引・特徴・書き出し・報告は写さない（作り直せるか、短命）。
 - 級：個別の blob は Standard。256 KiB 以上の個別の blob は 30 日で Standard-IA、90 日で Glacier Instant Retrieval。パックは作って 90 日で Glacier Instant Retrieval。
 - Aurora：すべてのクラスタを Global Database で大阪へ。二次は `db.r8g.large` を 1 つ。
-- 切り替え（`disaster-recovery.md`）：(1) 受信は `mx2` が受け続ける、(2) Aurora を大阪へ、(3) `epoch` を進める（[ADR-0039](0039-change-log-states-and-jmap-changes.md)）、(4) `spool-osa` に写った東京のスプールのうち、切り替えの前 2 時間で `spool-done` のないものを大阪で配り直す（冪等。Aurora の RPO の中で記録を失ったものは重複しうる。失うより重複を選ぶ）、(5) `blob_missing` は写ったスプールから blob を作り直し、作り直せないものは「一時的に読めない」と示す、(6) 送信は大阪の Elastic IP の小さなプール `dr-out`（平常から温める）で上限を 1/4 に、(7) 閲覧の名前を大阪へ。
+- 切り替え（[disaster-recovery.md](../runbooks/disaster-recovery.md)）：(1) 受信は `mx2` が受け続ける、(2) Aurora を大阪へ、(3) `epoch` を進める（[ADR-0039](0039-change-log-states-and-jmap-changes.md)）、(4) `spool-osa` に写った東京のスプールのうち、切り替えの前 2 時間で `spool-done` のないものを大阪で配り直す（冪等。Aurora の RPO の中で記録を失ったものは重複しうる。失うより重複を選ぶ）、(5) `blob_missing` は写ったスプールから blob を作り直し、作り直せないものは「一時的に読めない」と示す、(6) 送信は大阪の Elastic IP の小さなプール `dr-out`（平常から温める）で上限を 1/4 に、(7) 閲覧の名前を大阪へ。
 - 戻し：東京のスプールの残りを配り、Aurora を計画した切り替えで戻し、`epoch` をもう一度進める。
 - 失いうる範囲：AZ の障害とリージョンの一時の停止では失わない。東京のリージョンの喪失では、写る前のスプール（RTC の 15 分の中）を失いうる。2 つのリージョンへの同期の確定（2）は持ち越し。
 

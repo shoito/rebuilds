@@ -42,13 +42,20 @@ JMAP（RFC 8620 の Core、RFC 8621 の Mail）は、メッセージの複数の
 - `urn:ietf:params:jmap:core`、`:mail`、`:submission`、`:vacationresponse` と、WebSocket・EventSource のプッシュを出す。
 - 状態の文字列は、型ごとの最後の `modseq`（`Email`・`Thread`・`Mailbox`）を符号化したもの。`Email/changes` は change log をその `modseq` から読む。
 - JMAP の `Mailbox` に本システムのラベルを対応させる。システムのラベルは `role`（`inbox`、`sent`、`drafts`、`junk`、`trash`、`important`、`scheduled`、`snoozed`）を持つ。アーカイブは「受信箱のラベルを外す」ことなので、`archive` の役の箱は持たない。
+- 加えて、役 `all` の仮想の箱を出す。`SPAM`・`TRASH`・`SCHEDULED` のないすべてのメッセージを含み、`mailboxIds` の差分では足し外しできない（[ADR-0041](0041-jmap-extensions-and-mailbox-mapping.md)）。
+
+> 2026-10-10 の注記：最初の一覧には役 `all` がなかった。RFC 8621 の 2 節は、Email が 1 つ以上の箱に属することを求める（MUST）。ラベルのないアーカイブのメッセージでもこれを満たすため、[ADR-0041](0041-jmap-extensions-and-mailbox-mapping.md) で役 `all` の仮想の箱を足した。`archive` の役の箱を持たない決まりは変わらない。IMAP の `[<Brand>]/All Mail` も、同じ集合（`SPAM`・`TRASH`・`SCHEDULED` を除く）にそろえた。
+
 - 本システムの拡張は `urn:<brand>:params:jmap:mail` の能力の下に置く：スレッドへの一括の操作、スヌーズ、ミュート、検索の文法の文字列（`Email/query` の `filter` に、検索の IR の文字列を渡す）、配信停止のボタン、送信の取り消し。
-- `EmailSubmission/set` の `sendAt` で、元に戻す送信の窓と予約の送信を表す。窓の中の `EmailSubmission/set`（`undoStatus: canceled`）で取り消す。
+- 予約の送信は FUTURERELEASE（RFC 4865）の `HOLDUNTIL`・`HOLDFOR` で表す。元に戻す送信の窓は、サーバーがアカウントの設定から足す。窓・予約の間の `EmailSubmission/set`（`undoStatus: canceled`）で取り消す（[ADR-0041](0041-jmap-extensions-and-mailbox-mapping.md)）。
+
+> 2026-10-10 の注記：最初は「`EmailSubmission/set` の `sendAt` で、元に戻す送信の窓と予約の送信を表す」とした。RFC 8621 の 7 節では、`sendAt` はサーバーが決める変わらない性質で、クライアントは書けない。FUTURERELEASE を使えば解放の時刻、使わなければ作成の時刻でなければならない（MUST）。そこで [ADR-0041](0041-jmap-extensions-and-mailbox-mapping.md) のとおり、予約は FUTURERELEASE で表し、窓はサーバーが足す形にした。窓だけの送信の `sendAt` は作成の時刻で、窓の終わりは拡張の性質 `<brand>:releaseAt` で返す。
+
 
 ### IMAP
 
 - IMAP4rev2（RFC 9051）と、`CONDSTORE`・`QRESYNC`（RFC 7162）、`IDLE`、`MOVE`、`SPECIAL-USE`、`OBJECTID`（RFC 8474。`EMAILID`・`THREADID` を出す）、`UIDPLUS`、`LITERAL-`、`AUTH=OAUTHBEARER`・`AUTH=XOAUTH2`。
-- 各ラベルを箱として出す（[ADR-0004](0004-labels-as-primary-mailbox-model.md)）。`[<Brand>]/All Mail` は `SPAM`・`TRASH` 以外のすべて。
+- 各ラベルを箱として出す（[ADR-0004](0004-labels-as-primary-mailbox-model.md)）。`[<Brand>]/All Mail` は `SPAM`・`TRASH`・`SCHEDULED` 以外のすべて（JMAP の役 `all` と同じ集合）。
 - **UID**：箱（ラベル）ごとの UID の数えを持ち、メッセージがそのラベルを得るたびに新しい UID を振る（`message_labels.uid`）。ラベルを外して付け直したメッセージは新しい UID になる。UID は再利用しない。`UIDVALIDITY` はラベルの作成の時に決め、ラベルを消して同じ名前で作り直したときだけ変わる。
 - **MODSEQ**：アカウントの `modseq` をそのまま使う。箱の `HIGHESTMODSEQ` は、その箱の所属の変更とその箱のメッセージの変更の最大。アカウントで単調に増えるので、箱ごとに単調という RFC 7162 の条件を満たす。
 - 外したラベル（`EXPUNGE` に当たる）は、QRESYNC の `VANISHED` で返すため、change log から求める。

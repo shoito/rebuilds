@@ -28,9 +28,11 @@ date: 2026-10-10
 - 役 `all` の箱は、`SPAM`・`TRASH`・`SCHEDULED` のないすべてのメッセージを含む仮想の箱。`mailboxIds` の差分で足す・外す要求は `invalidProperties`。
 - `SPAM`・`TRASH` のメッセージの `mailboxIds` は `junk` か `trash` だけ。隠した所属は `<brand>:hiddenMailboxIds`（読み出しだけ）。
 - `STARRED` は `$flagged` で出し、箱にしない。`DRAFT` は箱と `$draft` の両方で出すが、`$draft` の直接の変更は拒む。
-- 予約の送信は `HOLDUNTIL`・`HOLDFOR` で表し、`maxDelayedSend` は 366 日。元に戻す送信の窓はアカウントの設定からサーバーが足す。`pending` の間はメッセージに `SCHEDULED` を付け、取り消しで `DRAFT` に戻し、解放で `SENT` にする。`onSuccessUpdateEmail` の下書き → 送信済みの移しは、この保留への移しとして当てる。
-- 拡張は `urn:<brand>:params:jmap:mail`：`<Brand>Thread/set`、`<Brand>Unsubscribe/set`、`<Brand>Device/set`、性質 `<brand>:inboxAt`・`hiddenMailboxIds`・`snoozeUntil`・`authWarning`・`unsubscribe`・`muted`、条件 `<brand>:query`。
-- 役 `scheduled`・`snoozed` が IANA の登録にないと分かったら、役を使わず `<brand>:role` の性質で表す。
+- 予約の送信は `HOLDUNTIL`・`HOLDFOR` で表し、`maxDelayedSend` は 366 日。元に戻す送信の窓はアカウントの設定からサーバーが足す。窓だけの送信の `sendAt` は作成の時刻にし、窓の終わりは `<brand>:releaseAt` で返す。`pending` の間はメッセージに `SCHEDULED` を付け、取り消しで `DRAFT` に戻し、解放で `SENT` にする。`onSuccessUpdateEmail` の下書き → 送信済みの移しは、この保留への移しとして当てる。
+- 拡張は `urn:<brand>:params:jmap:mail`：`<Brand>Thread/set`、`<Brand>Unsubscribe/set`、`<Brand>Device/set`、性質 `<brand>:inboxAt`・`hiddenMailboxIds`・`snoozeUntil`・`authWarning`・`unsubscribe`・`muted`・`releaseAt`、条件 `<brand>:query`。
+
+> 2026-10-10 の注記：統合の検証で、RFC 8621 の 7 節は、FUTURERELEASE を使わない送信の `sendAt` を作成の時刻とする（MUST）ことを確かめた。窓だけの送信で `sendAt = 作成の時刻 + 窓` とする最初の書き方はこれに反するので、`sendAt` は作成の時刻にし、窓の終わりは EmailSubmission の拡張の性質 `<brand>:releaseAt`（読み出しだけ）で返す形に直した。予約の送信（`HOLD*`）の `sendAt` は解放の時刻のまま。
+- 役 `scheduled`・`snoozed` が IANA の登録にないと分かったら、役を使わず `<brand>:role` の性質で表す（2026-10-10 に、RFC 9979 で登録済みと確かめた。役として出す）。
 
 ### 他の案を選ばなかった理由
 

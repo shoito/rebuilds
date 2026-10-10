@@ -214,7 +214,7 @@ And[
 | `tombstones` | 削除した `doc_no` の Roaring ビットマップ |
 
 - 各ファイルを 1 MiB の塊にし、アカウントの索引の鍵（[ADR-0030](../decisions/0030-blob-format-v1-and-envelope-keys.md) と同じ形で、テナントの KEK で包む）で AES-256-GCM にする。
-- 置き場所は `search/<account_id>/<segment_id>/<file>`。`doc_no` はアカウントの中の 32 ビットの連番（[ADR-0009](../decisions/0009-search-index-design.md)）。
+- S3 の置き場所は `search/<account_id>/<segment_id>` の 1 つのオブジェクトで、6 つのファイルを並べ、各ファイルの位置と長さを `meta` に持つ（範囲の GET で必要なファイルだけを読む）。S3 に置くのは合わせたセグメントだけ（6.2 節）。`doc_no` はアカウントの中の 32 ビットの連番（[ADR-0009](../decisions/0009-search-index-design.md)）。
 
 ### 6.2 作成と合わせ
 
@@ -222,16 +222,17 @@ And[
 flowchart LR
     ob["outbox<br/>message.delivered・destroyed"] --> ix["search-indexer"]
     ix -->|"part_tree と文字"| ms["mailstore"]
-    ix -->|"小さなセグメント"| s3[("S3 search/")]
-    ix -->|"知らせ"| sn["search-node（受け持ち）"]
-    sn -->|"取り込み"| mem["メモリーの小さなセグメント"]
+    ix -->|"小さなセグメント（直接）"| sn["search-node の組（受け持ち）"]
+    sn -->|"取り込み"| mem["メモリーと NVMe の小さなセグメント"]
     sn -->|"合わせ"| s3
     cl["change log"] --> sn
 ```
 
-- `search-indexer` は outbox の `message.delivered` を読み、`mailstore` からパートの木と取り出した文字を受け、アカウントごとに 2 秒か 200 通で小さなセグメントを作る。NFR-005 の p95 10 秒は、outbox の遅れ（p95 2 秒）＋集め（2 秒）＋作成と S3 の PUT（p95 2 秒）＋`search-node` の取り込み（1 秒）で見積もる。
+- `search-indexer` は outbox の `message.delivered` を読み、`mailstore` からパートの木と取り出した文字を受け、アカウントごとに 2 秒か 200 通で小さなセグメントを作る。小さなセグメントは S3 に書かず、受け持ちの `search-node` の組（2 台）へ直接渡す。2 台が NVMe に書いて答えてから、outbox の読み出しの位置を進める（1 台が落ちていれば 1 台の答えで進め、戻った台は相方から写す）。NFR-005 の p95 10 秒は、outbox の遅れ（p95 2 秒）＋集め（2 秒）＋作成と組への受け渡し（p95 1 秒）＋`search-node` の取り込み（1 秒）で見積もる。
+- `search-node` は、手元の小さなセグメントが 6 時間を過ぎたか 4 MiB を超えたとき、合わせて 1 つのセグメントにし、S3 に 1 つのオブジェクトで置く（6.1 節）。S3 に置いた後、そのアカウントの `search_accounts.segments[]` を書き換える。組の 2 台を失ったら、最後に S3 に置いたセグメントの `doc_no` より後のメッセージを `mailstore` から作り直す（10 節）。
+- S3 の PUT は、S1 で 1 日 400 万以下の見込み（動くアカウント 100 万 × 1 日 4 回まで）。小さなセグメントを S3 に置く形（1 日 6,000 万）より大きく減る（[capacity.md](capacity.md) の 8 節。統合の工程で直した）。
 - 完全な削除（`message.destroyed`）は、`search-node` が墓標のビットマップに足す（索引は書き直さない）。
-- 合わせは階層の形：同じ大きさの段のセグメントが 10 を超えたら 1 つに合わせる。合わせで墓標の文書を落とす。アカウントあたりのセグメントは 10 以下を目標にする（[ADR-0009](../decisions/0009-search-index-design.md)）。
+- 合わせは階層の形：同じ大きさの段のセグメントが 10 を超えたら 1 つに合わせる。合わせで墓標の文書を落とす（`PRESERVED` の文書は落とさない。7 節）。アカウントあたりのセグメントは 10 以下を目標にする（[ADR-0009](../decisions/0009-search-index-design.md)）。
 - 例：2.7 万通・索引 100 MB のアカウントに、1 日 60 通が届く。小さなセグメント（数十 KB）が 1 日数十できて、1 日 1 回の合わせで 1 つになり、月に 1 回、大きなセグメントと合わせる。
 
 ### 6.3 受け持ちと冷えたアカウント
@@ -242,7 +243,9 @@ flowchart LR
 
 ## 7. 状態のビットマップ（ADR-0037）
 
-- `search-node` は受け持つアカウントごとに、ラベルごと（見える所属だけ）・旗ごと（`seen`、`muted` のスレッド）・`hidden`・`SPAM`・`TRASH` の `doc_no` の Roaring ビットマップと、`applied_modseq` を持つ。
+- `search-node` は受け持つアカウントごとに、ラベルごと（見える所属だけ）・旗ごと（`seen`、`muted` のスレッド）・`hidden`・`SPAM`・`TRASH`・`PRESERVED` の `doc_no` の Roaring ビットマップと、`applied_modseq` を持つ。
+- **`PRESERVED`**：保留か保持の規則で保全したメッセージ（[ADR-0053](../decisions/0053-retention-rules-holds-and-preservation.md)）。change log の `destroyed` に `preserved` の印があれば、墓標にせず `PRESERVED` に移す。保全の行を消したときの `preserved_purged`（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 4.1 節）で、`PRESERVED` から外して墓標にする。利用者の検索・件数・候補は `PRESERVED` を常に引く。含めて答えるのは、X7 の署名つきの資格のある eDiscovery の検索だけ（[retention-and-ediscovery.md](retention-and-ediscovery.md) の 7 節）。
+- **要る理由**：利用者は保留を見ないので、利用者の検索だけなら墓標で足りる。しかし eDiscovery は、利用者が消した保全のメッセージも同じ索引で探す（[ADR-0054](../decisions/0054-ediscovery-matters-search-export-and-audit.md)）。墓標にすると合わせで文書が落ち、探せなくなる。そのため印とビットマップを足す（統合の工程の決定）。
 - change log（[client-sync-and-protocols.md](client-sync-and-protocols.md) の 4 節）を `modseq` の順に当てる。`message_id` → `doc_no` は `docmap` の逆の表（メモリー）で引く。まだ索引にない新しいメッセージの状態は、取り込みの時にビットマップへ足す。
 - 検索の要求は、クライアントの知る `modseq`（JMAP の状態の文字列から取る。なければ要求の時点のアカウントの `modseq`）を持つ。`applied_modseq` がそれ以上になるまで 1 秒待ち、超えたら遅い経路（候補の `message_id` の状態を `mailstore` から引いて当てる）に落とす。
 - ビットマップは 10 分ごとか 1 万の変更ごとに S3 にスナップショットし（`search/<account_id>/bitmaps/<modseq>`）、change log の保持（30 日）の中で作り直せるようにする。スナップショットが 30 日より古ければ、`mailstore` から全体を作り直す。
@@ -329,7 +332,7 @@ flowchart LR
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| S3 `search/<account_id>/<segment_id>/{meta,terms.fst,postings,docvalues,docmap,tombstones}` | セグメントの形式 v1 | — | 6.1 |
+| S3 `search/<account_id>/<segment_id>`（1 つのオブジェクトに `meta`・`terms.fst`・`postings`・`docvalues`・`docmap`・`tombstones` を並べる） | 合わせたセグメントの形式 v1 | — | 6.1 |
 | S3 `search/<account_id>/bitmaps/<modseq>` | 状態のビットマップのスナップショット | — | 7 |
 | directory `search_assignments` | ハッシュの区間、`search-node` の組、`epoch` | 主キー `(range_start)` | 6.3 |
 | メールボックスのシャード `search_accounts` | `account_id`、`analyzer_version`、`segments[]`（ID、`doc_no` の範囲、日付の範囲）、`next_doc_no`、`last_searched_at`、`rebuild_state` | 主キー `(tenant_id, account_id)` | 6、10 |
@@ -345,6 +348,7 @@ flowchart LR
 | PROP-SRCH-003 | 任意の CJK の文字列 s と、s の任意の部分の文字列 q（1 文字を含む）で、s を含む文書は q で見つかる（4.3 節の 1-gram の規則） |
 | PROP-SRCH-004 | 任意の検索の文字列で、ネイティブと WASM の `search-lang` が同じ IR を出す（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 | PROP-SRCH-005 | 2 つのアカウントの任意の中身で、A の検索の結果・件数・候補・誤りの応答に B の情報が出ない（[quality.md](../quality.md) の 2.2.1 節 G） |
+| PROP-SRCH-006 | 任意の保留・保全・消去の列で、利用者の検索・件数・候補に `PRESERVED` の文書が出ない。X7 の資格のある eDiscovery の検索は、保全の行と同じ集合を返す。合わせの後も `PRESERVED` の文書が残る（7 節） |
 | DT-SRCH-001 | 演算子の決定表（日付の境界と時間帯、`older_than` の月末、大きさの単位、否定だけの式、既定の除外） |
 | 試験のベクトル | 文法 → IR（演算子の全種、結合の強さ、誤り） |
 | ファジング | 検索の文法の解析器。夜間 1 時間 |
@@ -383,6 +387,11 @@ flowchart LR
 | 添付の中身の文字の索引 | MVP の後（[attachment-and-url-scanning.md](attachment-and-url-scanning.md) の抽出の隔離） |
 | 関係の強さの並べ方（新しい順の外） | MVP の後。中身を使う順位は法務の L1 |
 | 本家の日付の時間帯と単位 | 公式の資料が出れば 3 節を直す（**未検証**） |
+
+### 決定（2026-10-10、統合）
+
+- **`PRESERVED` のビットマップ**：足す（7 節）。利用者には出さないが、eDiscovery が保全のメッセージを探すために要る。
+- **索引の PUT の削減**：小さなセグメントは S3 に書かず、組へ直接渡す。S3 には合わせたセグメントを 1 つのオブジェクトで置く（6.1・6.2 節。[ADR-0037](../decisions/0037-segment-format-and-query-execution.md) の注記）。
 
 ## 出典
 

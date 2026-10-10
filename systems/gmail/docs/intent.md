@@ -126,7 +126,7 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 電気通信事業法と通信の秘密：本システムが登録か届出の要る電気通信事業に当たるか、その手続き。迷惑メール・フィッシング・マルウェアの選別、URL と添付の検査、検索の索引、スレッド化と分類（重要の印、受信箱の分け方）、送信の内容の選別（乗っ取りの検知）を、機械で中身を読んで行うことが通信の秘密に触れるか。触れるなら、どの同意の形（既定で有効にしてよい条件、いつでも変えられること、提供の条件を変えないこと、選別の範囲を限ること）で足りるか。2006 年の総務省の懇談会の整理（出典は末尾）が今も使えるか。宛先・日時・接続元の IP のような通信の構成の要素の記録と保持の期間 | spam-and-abuse-filtering、attachment-and-url-scanning、search、outbound-smtp-and-reputation、security の各領域、[ADR-0008](decisions/0008-spam-pipeline-boundary-and-secrecy.md) | E6 の選別の既定の有効化、E7 の送信の内容の選別、E10 の索引、E17 の GA の判定 |
+| L1 | 電気通信事業法と通信の秘密：本システムが登録か届出の要る電気通信事業に当たるか、その手続き。迷惑メール・フィッシング・マルウェアの選別、URL と添付の検査、検索の索引、スレッド化と分類（重要の印、受信箱の分け方）、送信の内容の選別（乗っ取りの検知）を、機械で中身を読んで行うことが通信の秘密に触れるか。触れるなら、どの同意の形（既定で有効にしてよい条件、いつでも変えられること、提供の条件を変えないこと、選別の範囲を限ること）で足りるか。総務省の「同意取得の在り方に関する参照文書」が引く 2006 年の懇談会の整理（既定で有効にする 5 つの条件。出典は末尾）を、本システムの選別・索引・送信の選別にどう当てるか。DMARC の集計の報告の送付（総務省の「DMARC導入に関する法的な留意点」の条件。出典は末尾）。宛先・日時・接続元の IP のような通信の構成の要素の記録と保持の期間 | spam-and-abuse-filtering、attachment-and-url-scanning、search、outbound-smtp-and-reputation、security の各領域、[ADR-0008](decisions/0008-spam-pipeline-boundary-and-secrecy.md) | E6 の選別の既定の有効化、E7 の送信の内容の選別、E10 の索引、E17 の GA の判定 |
 | L2 | 特定電子メール法：(a) 本システムが自ら利用者へ送るメール（お知らせ、案内）の同意と表示。(b) 利用者が本システムから広告宣伝のメールを送ったときの、本システムの責任と、電気通信事業者として送信を止める範囲。(c) 違反のメールの情報を、総務大臣や指定の機関へ提供する手続き。(d) 一括の配信停止（RFC 8058）を受信の側で送信者に求めること、本システムが配信停止の URL を利用者の代わりに叩くことの扱い | outbound-smtp-and-reputation、spam-and-abuse-filtering、web-client の各領域 | E7 の送信の上限と停止、E9 の配信停止のボタン、E17 の GA の判定 |
 | L3 | 個人情報保護法：メールの中身・連絡先・アカウントの情報の扱い。組織の利用者のデータを、本システムが組織からの委託として扱うか。個人の利用者のデータの利用目的の公表。漏えい等の報告の手順。外国にある第三者への提供（APNs・FCM に送るプッシュの本文に件名・差出人を入れるか、外部の評判のサービスに URL・ハッシュを照会すること）。SMS での本人の確認の事業者 | mobile-and-push、accounts-and-security、attachment-and-url-scanning、security の各領域 | E13 の回復の手段、E16 のプッシュの本文、E17 の GA の判定 |
 | L4 | 捜査機関等への対応：令状による差押え、刑事訴訟法の照会、通信履歴の保全の要請に応じる範囲と手順。応じる前に利用者へ知らせるか。透明性の報告を出すか。対応の操作の監査と、操作する人の限り方 | security、retention-and-ediscovery の各領域 | E15 の保全の仕組み、E17 の GA の判定 |
@@ -145,7 +145,7 @@
 - メールボックスのシャードの大きさ（1 つの Aurora のクラスタあたりのアカウントの数）：E4 の前の `mailbox-shard-poc`（[ADR-0007](decisions/0007-tenancy-accounts-orgs-and-rls.md)）。
 - 日本語の索引の 2-gram と形態素の併用の効き、索引の大きさ：E10 の前の `search-index-poc`（[ADR-0009](decisions/0009-search-index-design.md)）。
 - 内容の分類器の形（勾配ブースティングと小さな言語モデル）、推論の遅れ：E6 の前の `spam-classifier-poc`（[ADR-0008](decisions/0008-spam-pipeline-boundary-and-secrecy.md)）。
-- 本家の内部の選別の仕組み、スレッド化の詳しい規則、受信のメールの大きさの上限、予約の送信の上限の数、迷惑メールの率の実際の値：公式の資料で確かめられなかった（**未検証**）。本システムの値は各領域の文書で決める。
+- 本家の内部の選別の仕組み、スレッド化の詳しい規則、受信のメールの大きさの上限、予約の送信の上限の数、迷惑メールの率の実際の値：公式の資料で確かめられなかった（**未検証**）。予約の送信の上限（100 通）は、統合の工程で公式の資料で確かめた（出典）。本システムの値は各領域の文書で決める。
 
 ## 出典
 
@@ -166,11 +166,14 @@
 - Google for Developers, [IMAP Extensions](https://developers.google.com/workspace/gmail/imap/imap-extensions)：`X-GM-LABELS`（ラベルを箱として扱う）、`X-GM-MSGID`、`X-GM-THRID`、`X-GM-RAW`（Web の検索の文法）
 - Google Workspace Admin Help, [Set up BIMI](https://knowledge.workspace.google.com/admin/security/set-up-bimi)：BIMI には VMC か CMC、DMARC の `p=quarantine` か `reject`、`pct=100` が要る
 - Google Cloud Blog, [Protecting businesses against cyber threats during COVID-19 and beyond](https://cloud.google.com/blog/products/identity-security/protecting-against-cyber-threats-during-covid-19-and-beyond)（2020-04-16）：機械学習のモデルで、迷惑メール・フィッシング・マルウェアの 99.9% 超を止める。1 日 1 億通を超えるフィッシングを止める
-- 予約の送信の上限（100 通）は、本家の文書の引用とする第三者の記事でしか確かめられなかった（**未検証**）
+- Gmail Help, [Schedule emails to be sent later](https://support.google.com/mail/answer/9214606)：予約の送信は 100 通まで（最初の設計では第三者の記事でしか確かめられず未検証としていた。統合の工程で公式の資料で確かめた）
+- Google Workspace Admin Help, [Gmail bandwidth limits](https://knowledge.workspace.google.com/admin/gmail/gmail-bandwidth-limits)：IMAP の読み出しは 1 日 2,500 MB、書き込みは 1 日 500 MB
+- Google Account Help, [Sign in with app passwords](https://support.google.com/accounts/answer/185833)、[2-Step Verification](https://support.google.com/accounts/answer/185839)：アプリ パスワードは 2 段階の確認のアカウントで使える（組織のアカウントなどでは出ない）。2 段階の確認の番号は SMS か音声の電話でも受けられる
 
 日本の法令と行政の資料（法務の確認の手がかり。解釈はしない）：
 
 - e-Gov 法令検索, [電気通信事業法](https://laws.e-gov.go.jp/law/359AC0000000086)：第 4 条（通信の秘密の保護）、第 27 条の 12（外部送信規律）
 - e-Gov 法令検索, [特定電子メールの送信の適正化等に関する法律](https://laws.e-gov.go.jp/law/414AC0000000026)
 - e-Gov 法令検索, [個人情報の保護に関する法律](https://laws.e-gov.go.jp/law/415AC0000000057)
-- ScanNetSecurity, [総務省委員会、条件満たせばメールフィルタリングを初期設定でONも可能](https://scan.netsecurity.ne.jp/article/2006/02/21/18022.html)（2006-02-21）：総務省の懇談会が、利用者の同意があればサーバーでの選別は通信の秘密の侵害に当たらないとし、同意の条件（いつでも変えられる、同意の有無で他の提供の条件を変えない、選別の内容を明確に限る）を満たせば既定で有効にできると整理した、と報じた。報道であり、今の総務省の見解かは**未検証**（法務の L1）
+- 総務省, [同意取得の在り方に関する参照文書](https://www.soumu.go.jp/main_content/000735985.pdf)（PDF の作成の日付は 2021-02。2026-10-10 に取得）：通信の秘密の「有効な同意」は原則として個別具体的かつ明確な同意が要るとする。迷惑メール等のフィルタリングについては、注 34 で、2006 年の懇談会の整理（電気通信事業分野におけるプライバシー情報に関する懇談会 資料 18-1「フィルタリングと通信の秘密について」、2006-01-23）を引き、(1) 同意の後もいつでも設定を変えられる、(2) 同意の有無で他の提供の条件を変えない、(3) フィルタリングの内容を明確に限る、(4) 通常の利用者なら同意することがアンケート等で合理的に推定できる、(5) 事前に十分に説明する（法第 26 条の重要事項の説明に準じる）を満たせば、約款等の変更による同意でも有効と考えられる、とする。最初の設計は報道（ScanNetSecurity、2006-02-21）だけを出典にし、条件を 3 つと書いていた。統合の工程で、総務省の文書で 5 つに直した。本システムへの当てはめと、今もこの整理が使えるかは**法務の確認待ち**（L1）
+- 総務省 総合通信基盤局, [DMARC導入に関する法的な留意点](https://www.soumu.go.jp/main_content/000495390.pdf)（PDF の作成の日付は 2017-07。2026-10-10 に取得）：DMARC による遮断と報告は、外形的に通信の秘密の侵害に当たりうる。約款等の包括の同意でも、(1) 随時に設定を変えられる、(2) 同意の有無で他の提供の条件を変えない、(3) 同意の対象と範囲を明確にする、(4) 報告に本文と件名を含めない、(5) 事前に十分に説明する、を満たせば有効な同意とみなせる、とする。送信ドメインの認証そのものは、有効な同意に基づくフィルタリングのためなら正当業務行為に当たる、とする。本システムの DMARC の集計の報告の送付への当てはめは**法務の確認待ち**（L1）

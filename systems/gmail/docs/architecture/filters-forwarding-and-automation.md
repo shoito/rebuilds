@@ -366,7 +366,7 @@ stateDiagram-v2
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | Sieve の読み込みと書き出し | MVP の後（[roadmap.md](../roadmap.md) の延期の一覧） |
-| 見張りが X4 のロールでシャードの `timers` を引くこと | [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の X4 の例（保持の期限、ゴミ箱の期限、パック、GC）に、送信の解放とスヌーズの起こしを書き足すかを Dev（テックリード）が決める |
+| 見張りが X4 のロールでシャードの `timers` を引くこと | 統合の工程で決めた：X4 に含める。[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の X4 に、送信の解放・スヌーズの起こし・不在の返信の終わりを書き足した（[ADR-0061](../decisions/0061-operator-access-cross-tenant-paths-and-audit.md)） |
 | 本家のフィルターの数の上限・評価の順序、転送の先の数 | 公式の資料が出れば 3 節を直す（**未検証**） |
 | 組織の外への転送の既定（許すか） | organizations-domains-and-routing.md |
 

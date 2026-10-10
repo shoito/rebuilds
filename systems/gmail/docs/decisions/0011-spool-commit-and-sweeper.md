@@ -29,8 +29,11 @@ date: 2026-10-10
 - 8 MiB までは台のメモリーに持ち、超えたらマルチパートで流す。
 - 終わりの印の後、検査（予算 10 秒）と PUT の完了（`x-amz-checksum-sha256`、時間切れ 3 秒・再試行 1 回）を並べる。検査が拒まなければ SQS に送る（時間切れ 1 秒・再試行 2 回）。終わりの印から 5 秒で確定しなければ 451 4.3.0。
 - 検査が拒んだら 5xx を返し、`spool-rejected/` の印を書く。本体は 1 日後に消す。
-- `inbound-pipeline` は、すべての受け手を終えたら `spool-done/` の印を書いてから SQS のメッセージを消す。
-- 掃除の役は 5 分ごとに `[今 − 2 時間, 今 − 10 分]` の `spool/`・`spool-done/`・`spool-rejected/` の一覧を取り、キー（`spool_id` の UUIDv7）の順で突き合わせ、印のないものを載せ直す。
+- `inbound-pipeline` は、すべての受け手を終えた `spool_id` をタスクの中で束ね、10 秒か 1,000 件ごとに 1 つの束のオブジェクト（`spool-done/<yyyy>/<mm>/<dd>/<hh>/<task_id>-<seq>`、`spool_id` の列）を書く。書いてから、束の SQS のメッセージを消す。`mx-edge` の `spool-rejected/` の印も、台ごとに同じく束ねる。
+- 掃除の役は 5 分ごとに `[今 − 2 時間, 今 − 10 分]` の `spool/` の一覧と、`spool-done/`・`spool-rejected/` の束の中身（読んだ束は覚えておく）を取り、印のないものを載せ直す。
+- 配送の待ち行列は 2 つに分ける。`inbound-delivery`（`trusted`〜`neutral` の層）と `inbound-delivery-low`（`unknown`・`suspicious` の層）で、`inbound-pipeline` は前者を先に読む。迷惑メールの波の間も、正規のメールの受信の遅れを守る（[capacity.md](../architecture/capacity.md) の 2 節）。
+
+> 2026-10-10 の注記：最初は 1 通ごとに空の `spool-done/` の印を書くとした。S1 で 1 日 6,000 万の PUT（月 8,500 USD 前後）になるので、統合の工程で束にした（[capacity.md](../architecture/capacity.md) の 8 節）。束を書く前にタスクが止まったら、その分は SQS に残るか、掃除の役が載せ直す。配送は冪等なので重複しない。同じ工程で、配送の待ち行列を 2 つの層に分けた。2 つのリージョンへの同期の確定（リージョンの喪失でも失わない）は、E17 の DR の訓練の後に決める未解決の問いとして残す（[architecture/README.md](../architecture/README.md) の 6 節）。
 - 10 回読まれても終わらない依頼は DLQ に移し、消さない。
 - 毎時の突き合わせで、250 から 1 時間を過ぎて印のないものを数え、1 件で SEV1 の候補にする。
 

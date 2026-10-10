@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- S1 は申し出 1.5 億通/日、受け付け 6,000 万通/日（ピーク 2,500 通/秒）（[architecture/README.md](../architecture/README.md) の 2 節）。迷惑メールの波は予測できず、申し出が数倍になる（[runbooks/README.md](../runbooks/README.md) の `spam-wave.md`）。
+- S1 は申し出 1.5 億通/日、受け付け 6,000 万通/日（ピーク 2,500 通/秒）（[architecture/README.md](../architecture/README.md) の 2 節）。迷惑メールの波は予測できず、申し出が数倍になる（[spam-wave.md](../runbooks/spam-wave.md)）。
 - 受信の遅れ（NFR-001、p95 10 秒）と、受け付けの可用性（NFR-007、99.99%）を、波の間も守る必要がある。受け付けた後の選別は遅れてよいが、正規のメールの遅れは困る。
 - 費用の仮の予算は 1 アカウント月 0.15 USD（[architecture/README.md](../architecture/README.md) の 2.1 節）。最も大きいのは保存と受信の選別と見込んでいた。
 - E17 の負荷試験は S1 のピークの 2 倍を求める（[quality.md](../quality.md) の 5 節）。
@@ -28,6 +28,8 @@ date: 2026-10-10
 - 波：申し出 19,000 通/秒・1 時間。接続の層で絞り、受け付けに通る 1,900 通/秒は `mx-edge` の余り（5,400 通/秒）に収める。受け付けた後の選別は SQS に溜め、30 タスクで 2 時間で追いつく。配送の待ち行列を層で 2 つに分け、正規のメールを先に読む。
 - 運用：月次のレビューで使用の率 60% を超えた部品を次の四半期に増やす。EC2（固定の IP、NVMe）は手で増やし、Fargate は自動。
 - 費用：S1 で 1 アカウント月 0.19（1 年目）〜0.21 USD（3 年目）、±40%。大きいのは S3 の要求、エッジ、Aurora、写し。差は S3 の PUT の削減、予約の割引、JMAP をエッジの外で受けることで埋め、採否は `cost-baseline` で決める。
+
+> 2026-10-10 の注記：統合の工程で、配送の待ち行列の 2 つの層と S3 の PUT の削減を、受信と検索の領域に入れた（[ADR-0011](0011-spool-commit-and-sweeper.md)・[ADR-0037](0037-segment-format-and-query-execution.md) の注記）。費用の推奨の既定案（仮、PM の判断待ち）は、PUT の削減・予約の割引・JMAP をエッジの外で受けることの 3 つで、1 年目 約 0.135 USD、3 年目 約 0.156 USD（[capacity.md](../architecture/capacity.md) の 8.1 節）。迷惑メールの箱の blob を大阪へ写さない案は採らない。
 
 ### 他の案を選ばなかった理由
 
