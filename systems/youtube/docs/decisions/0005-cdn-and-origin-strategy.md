@@ -56,6 +56,9 @@ date: 2026-10-10
 - 1 つの CDN の障害で 5 分以内に他へ移す（NFR-008）。
 - 費用は CDN ごとの約定の量と単価で振り分けの上限を付ける。
 
+> 2026-10-10 の注記：S1 の CloudFront は VOD・ライブ・画面と API の 3 つのディストリビューションに分け、上限をそれぞれ申請する（[ADR-0064](0064-accounts-network-and-edge-distributions.md)）。2 つ目の CDN の時機は月 100 PB かピーク 1 Tbps の前（[ADR-0066](0066-osaka-dr-stage-up-and-multi-cdn-timing.md)）。配信の費用が約定の値引きで届かないときに S1 へ前倒しする選択肢は、[architecture/README.md](../architecture/README.md) の 2.1 節（PM の判断待ち）。
+
+
 ### ISP の中のキャッシュ（S3 で検討）
 
 - S3 の規模（ピーク 250 Tbps）では、ISP の網の中に自前のキャッシュの機器を置く形を検討する。人気の動画を夜間に先に置く。cdn-and-delivery の領域で、S2 の計測から判断の基準を決める。

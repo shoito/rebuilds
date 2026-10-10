@@ -65,6 +65,9 @@ rebuilds の他の題材で、次の基盤を決めている。
 
 - 管理の面とメディアの面は、SQS の作業の依頼と、Aurora の状態の行と、API の契約（JSON と Protobuf）でだけつながる。管理の面は符号化・照合・数の判定を行わない。
 
+> 2026-10-10 の注記：視聴の出来事の流れに Kinesis を選ばない決定は変えない。ただし CloudFront のリアルタイムのログの送り先は Kinesis Data Streams だけなので、この用途に限って Kinesis を使う（[ADR-0067](0067-sli-sources-and-computation.md)）。統合の工程で、`live-origin`・`license-proxy`・`delivery-blocker`・`chat-sequencer`・`ad-decision` を [architecture/README.md](../architecture/README.md) の 1.2 節に足した。
+
+
 ### 自前で作るもの（核）と、使う汎用の部品
 
 | 用途 | 自前（核） | 使う汎用の部品 |

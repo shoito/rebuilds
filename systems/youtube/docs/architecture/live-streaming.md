@@ -58,7 +58,7 @@
 | 本家の取り込み | RTMP・RTMPS（RTMPS を推奨）。HDR で RTMP のない符号化器には HLS。H.264・H.265・AV1。SRT はこのページにない（**未検証**） | [Choose live encoder settings](https://support.google.com/youtube/answer/2853702) |
 | 本家の遅延 | 通常・低遅延（多くの視聴者で 10 秒未満）・超低遅延（5 秒未満）。低遅延と超低遅延は 4K なし | [Live stream latency](https://support.google.com/youtube/answer/7444635) |
 | 本家の DVR とアーカイブ | 12 時間を超えると DVR が制限され、アーカイブされないことがある。配信の開始より前には戻れない | [Turn on DVR](https://support.google.com/youtube/answer/9296823)、[Archive live streams](https://support.google.com/youtube/answer/6247592) |
-| LL-HLS | draft-pantos-hls-rfc8216bis-22：`PART-HOLD-BACK` は `PART-TARGET` の 2 倍以上（3 倍以上が望ましい）。`HOLD-BACK` は Target Duration の 3 倍以上。`CAN-SKIP-UNTIL` は 6 倍以上。部分の長さは `PART-TARGET` 以下で、85% 以上。要求の保留は、3 Target Duration を超えて返せなければ 503。部分はプレイリストの端から 3 Target Duration を過ぎたら外してよく、外した後も 3 Target Duration は取れること | [draft-pantos-hls-rfc8216bis](https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis) |
+| LL-HLS | draft-pantos-hls-rfc8216bis-22（2026-05-01。独立の投稿の Internet-Draft で、RFC ではない。RFC 8216 は LL-HLS を含まない）：`PART-HOLD-BACK` は `PART-TARGET` の 2 倍以上（3 倍以上が望ましい）。`HOLD-BACK` は Target Duration の 3 倍以上。`CAN-SKIP-UNTIL` は 6 倍以上。部分の長さは `PART-TARGET` 以下で、85% 以上。要求の保留は、3 Target Duration を超えて返せなければ 503。部分はプレイリストの端から 3 Target Duration を過ぎたら外してよく、外した後も 3 Target Duration は取れること | [draft-pantos-hls-rfc8216bis](https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis) |
 | SRT | draft-sharabayko-srt-01（2021-09-07、失効した個人の草案、IETF の標準ではない）。ARQ の再送と、受け手の時刻に基づく送り出し（一定の遅れ）。暗号は AES-CTR の 128・192・256 ビット。Stream ID は 512 バイトまでの UTF-8 | [draft-sharabayko-srt](https://datatracker.ietf.org/doc/html/draft-sharabayko-srt) |
 | SRT の Stream ID の書き方（`#!::r=...,m=publish`）、SRT の既定の遅れの値 | 草案の確かめた範囲になかった（**未検証**。`ll-hls-poc` で配信のソフトの実際を確かめる） | — |
 | RTMP で H.265・AV1 を送る拡張 | 公式の仕様の確認をしていない（**未検証**） | — |
@@ -181,6 +181,7 @@ stateDiagram-v2
 #EXT-X-MEDIA-SEQUENCE:1820
 #EXT-X-MAP:URI="init.mp4"
 ...
+#EXT-X-PROGRAM-DATE-TIME:2026-10-10T12:00:30.000+09:00
 #EXTINF:2.000,
 1835.m4s
 #EXT-X-PART:DURATION=0.5,URI="1836.0.m4s",INDEPENDENT=YES
@@ -188,7 +189,8 @@ stateDiagram-v2
 #EXT-X-PRELOAD-HINT:TYPE=PART,URI="1836.2.m4s"
 ```
 
-- `EXT-X-VERSION` の値は、草案のどの機能にどのバージョンが要るかを `ll-hls-poc` で確かめて決める（ここの 9 は仮の値。**未検証**）。
+- `EXT-X-VERSION` の値は、草案のどの機能にどのバージョンが要るかを `ll-hls-poc` で確かめて決める（ここの 9 は仮の値。草案は 2026-10-10 に取得し直したが、LL-HLS のタグに要る値は確かめた範囲になかった。**未検証**）。
+- `EXT-X-PROGRAM-DATE-TIME` は入力の時刻（配信の開始の時刻 ＋ `msn` × 2 秒）から各セグメントに付ける。実ユーザーの遅延の推定（心拍の `lat_ms`、[observability.md](observability.md) の 2.3 節）に使う（[ADR-0030](../decisions/0030-ll-hls-parameters-and-live-origin.md) の 2026-10-10 の注記）。
 
 ### 6.4 遅延の予算（低遅延のモード）
 
@@ -216,15 +218,15 @@ stateDiagram-v2
 | --- | --- | --- |
 | 1 視聴者の要求 | 6 件/秒 | 1.5 件/秒 |
 | 20 万人の配信のエッジの要求 | 120 万件/秒 | 30 万件/秒 |
-| 1 視聴時間の要求の費用（1 万件あたり約 0.012 USD と仮定。**未検証**） | 約 0.026 USD | 約 0.006 USD |
+| 1 視聴時間の要求の費用（HTTPS の要求 1 万件 0.012 USD。`AmazonCloudFront` の価格表） | 約 0.026 USD | 約 0.006 USD |
 | 1 視聴時間の転送の費用（平均 3 Mbps、0.02 USD/GB） | 約 0.027 USD | 約 0.027 USD |
 
 - 低遅延のモードは、要求の費用が転送の費用と同じくらいになり、1 視聴時間の配信の原価が約 2 倍になる。ディストリビューションの要求の上限（既定 25 万件/秒。[cdn-and-delivery.md](cdn-and-delivery.md) の 3 節）も超える。
 - オリジンへの要求は、エッジと Origin Shield が同じ URL（`_HLS_msn`・`_HLS_part` が同じ）の保留の要求を合わせるので、配信の数 × 段の数に比例し、視聴者の数によらない。
 - 対応：
-  - E12 の前に、ディストリビューションの要求の上限を 200 万件/秒に引き上げる申請をする（`cdn-cost-poc`）。
+  - ライブを別のディストリビューション（`live`）にし、E12 の前に 1.2 Tbps・250 万件/秒への引き上げを申請する（`live-distribution-quota`。[ADR-0064](../decisions/0064-accounts-network-and-edge-distributions.md)）。
   - プレイリストの差分の更新（`_HLS_skip=YES`）で、12 時間の DVR のプレイリスト（約 21,600 セグメント）を毎回送らない。
-  - `ll-hls-poc` で、実際の要求の数と費用を測る。1 視聴時間の要求の費用が転送の費用を超えるなら、部分を 1 秒にする ADR（ADR-0006 の部分の長さを置き換える）を起票する。部分 1 秒なら `PART-HOLD-BACK` 3 秒で、遅延の予算は p95 約 7.3 秒になり、NFR-005 との調整が要る。
+  - `ll-hls-poc` で、実際の要求の数と費用を測る。1 視聴時間の要求の費用が転送の費用を超えるなら、部分を 1 秒にする ADR（ADR-0006 の部分の長さを置き換える）を起票する。部分 1 秒なら `PART-HOLD-BACK` 3 秒で、遅延の予算は p95 約 7.3 秒になり、NFR-005（p95 6 秒）を外れる。この ADR は PM の合意を条件にする（[architecture/README.md](README.md) の 6 節の残る未解決事項）。
 
 ### 6.6 通常のモード
 
@@ -269,7 +271,7 @@ flowchart LR
 1. 配信の終わりに DVR の索引を閉じ、プレイリストに `ENDLIST` を足す。DVR で見ていた視聴者はそのまま見続けられる。
 2. 照合：配信の間、各窓の指紋を全部の参照の索引でも後ろで照合しておく（ライブの照合の対象の参照だけでなく）。終わりには最後の窓だけが残り、公開の判定は数十秒で出る。
 3. 判定が通れば、DVR の索引をそのまま VOD の世代 1（2 秒のセグメント、ライブのラダー）として公開する。配信の終わりから p95 5 分（NFR-005）。
-4. 元の流れ（最後の 12 時間）から `pipeline` の run を作り、VOD のラダー（4 秒のセグメント、per-title）を作って世代 2 に切り替える（[transcoding-pipeline.md](transcoding-pipeline.md)、[packaging-and-drm.md](packaging-and-drm.md) の 4.5 節）。
+4. 次のどれかに当たったアーカイブだけ、元の流れ（最後の 12 時間）から `pipeline` の run を作り、VOD のラダー（4 秒のセグメント、per-title）を作って世代 2 に切り替える（[transcoding-pipeline.md](transcoding-pipeline.md)、[packaging-and-drm.md](packaging-and-drm.md) の 4.5 節）：配信の終わりから 7 日で確定の視聴が 100 回を超えた、登録者 10 万以上のチャンネル、AV1 の条件（[ADR-0016](../decisions/0016-av1-promotion-rule-and-cost.md)）。当たらないアーカイブは世代 1 のまま VOD にし、30 日の後に 720p・360p と音声のレンディションだけを残し、元の流れを消す（[ADR-0031](../decisions/0031-dvr-storage-and-live-to-vod.md) の 2026-10-10 の注記。仮、PM と Dev の判断待ち）。
 5. 配信が 12 時間を超えたら、アーカイブは最後の 12 時間にする。DVR で見られた範囲と VOD の中身が同じになる（intent の「守るべき振る舞い」）。
 
 ## 8. ライブの照合と差し替え
@@ -370,7 +372,8 @@ flowchart LR
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 低遅延のモードの要求の費用（1 視聴時間で転送と同じくらい）と、部分 1 秒への変更 | `ll-hls-poc` で実測。超えるなら ADR-0006 の部分の長さを置き換える ADR を起票し、NFR-005 の見直しを PM と相談する |
-| ディストリビューションの要求の上限の引き上げ（200 万件/秒） | `cdn-cost-poc`（E12 の前） |
+| ディストリビューションの要求の上限の引き上げ（`live` 250 万件/秒）の承認 | `live-distribution-quota`（E12 の前） |
+| アーカイブの作り直しの条件（7 日 100 回）と 30 日の後の間引き | PM と Dev（[ADR-0031](../decisions/0031-dvr-storage-and-live-to-vod.md) の注記） |
 | 2 つの変換器の SPS・PPS の一致（**未検証**） | `ll-hls-poc` |
 | SRT の Stream ID の書き方と既定の遅れ（**未検証**） | `ll-hls-poc` で配信のソフトの実際を確かめる |
 | RTMP での H.265・AV1（**未検証**） | E12 の後 |

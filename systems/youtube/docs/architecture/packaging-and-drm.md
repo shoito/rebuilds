@@ -14,7 +14,7 @@
 | ADR | 決定 |
 | --- | --- |
 | [0019](../decisions/0019-cmaf-files-segment-index-and-url-layout.md) | レンディションの fMP4 は `init` とセグメントを連ねた 1 つのファイルにし、索引 `SIX1`（32 バイトの頭と 1 セグメント 16 バイト）を別に置く。URL は `/v/{video_id}/{gen}/{rendition}/{seq}.m4s`。段の追加は同じ世代にレンディションを足し、作り直しは世代を上げる |
-| [0020](../decisions/0020-manifest-generation-and-capability-classes.md) | マニフェストは端末の対応を「能力の組」（コーデック × 段の上限 × 形式、最大 16 通り）に丸め、組ごとに CDN でキャッシュする。HLS は `EXT-X-VERSION:7`、DASH は `SegmentTemplate` と `SegmentTimeline`。段の帯域の値はセグメントの索引から計算する |
+| [0020](../decisions/0020-manifest-generation-and-capability-classes.md) | マニフェストは端末の対応を「能力の組」（コーデック × 段の上限 × DRM、形式ごと）に丸め、組ごとに CDN でキャッシュする。HLS は `EXT-X-VERSION:7`、DASH は `SegmentTemplate` と `SegmentTimeline`。段の帯域の値はセグメントの索引から計算する |
 | [0021](../decisions/0021-drm-key-hierarchy-and-license-proxy.md) | メンバー限定の動画は 2 つの内容の鍵（音声と 1080p まで、1440p 以上）を持ち、KMS で包んで Aurora に置く。ライセンスは自前の `license-proxy` が再生のトークンと `playable()` を確かめてから事業者に求め、鍵は要求ごとに渡す。ライセンスの期限 6 時間、持ち出し（オフライン）なし |
 
 ## 1. 範囲
@@ -48,9 +48,9 @@
 
 | 項目 | 内容 | 出典 |
 | --- | --- | --- |
-| HLS の改訂 | RFC 8216 の改訂の草案は draft-pantos-hls-rfc8216bis-22（2026-05-01）。プロトコルのバージョン 13 を記す | [draft-pantos-hls-rfc8216bis](https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis)、2026-10-10 に確認 |
+| HLS の改訂 | RFC 8216 の改訂の草案は draft-pantos-hls-rfc8216bis-22（2026-05-01）。IETF の独立の投稿の Internet-Draft（Informational を目指す）で、RFC ではない。プロトコルのバージョン 13 を記す | [draft-pantos-hls-rfc8216bis](https://datatracker.ietf.org/doc/html/draft-pantos-hls-rfc8216bis)、2026-10-10 に確認 |
 | `EXT-X-TARGETDURATION` | 各セグメントの長さを四捨五入した整数が、Target Duration 以下でなければならない。1 以上 | 同上 |
-| HLS の元の仕様 | RFC 8216（2017） | [RFC 8216](https://www.rfc-editor.org/rfc/rfc8216)、2026-10-10 に確認（本文の細部は改訂の草案に寄せる） |
+| HLS の元の仕様 | RFC 8216（2017、Informational。LL-HLS を含まない） | [RFC 8216](https://www.rfc-editor.org/rfc/rfc8216)、2026-10-10 に確認（本文の細部は改訂の草案に寄せる） |
 | CMAF | ISO/IEC 23000-19。規格の本文は有料で、確かめていない（**未検証**）。本文で使うのは、fMP4 の `init`（`ftyp`・`moov`）とセグメント（`styp`・`moof`・`mdat`）の構成だけ | — |
 | DASH | ISO/IEC 23009-1。規格の本文は確かめていない（**未検証**）。`SegmentTemplate`・`SegmentTimeline` の書き方は、`dash-conformance` の検査で確かめる | — |
 | CENC `cbcs` | ISO/IEC 23001-7。AES-CBC のパターンの暗号化（映像は 1 ブロック暗号化・9 ブロック素通し、固定の IV）と広く説明されるが、規格の本文は確かめていない（**未検証**。DRM の事業者の試験の資料と `drm-provider-poc` で確かめる） | — |
@@ -103,7 +103,7 @@ s3://<media-bucket>/p/{video_id}/{gen}/{rendition}.six    （セグメントの�
 
 - 150 セグメント、1 セグメント約 2.15 MB、ファイル約 323 MB。
 - 索引は 32 ＋ 150 × 16 = 2,432 バイト。12 時間の動画でも 10,800 × 16 ＋ 32 ≈ 173 KB。
-- `origin-cache` は索引をメモリーに持ち、`seq` → `(offset, size)` を引いて S3 の範囲の GET を 1 回出す（[cdn-and-delivery.md](cdn-and-delivery.md) の 4 節）。
+- `origin-cache` は索引をメモリーに持ち、`seq` → `(offset, size)` を引いて S3 の範囲の GET を 1 回出す（[cdn-and-delivery.md](cdn-and-delivery.md) の 6 節）。
 
 ### 4.4 URL の形
 
@@ -113,7 +113,7 @@ s3://<media-bucket>/p/{video_id}/{gen}/{rendition}.six    （セグメントの�
 | セグメント | `/v/{video_id}/{gen}/{rendition}/{seq}.m4s` |
 | 字幕 | `/v/{video_id}/cap/{lang}-{kind}-{rev}/{n}.vtt` |
 | シークの縮小の画像 | `/v/{video_id}/sb/{rev}/{n}.jpg` と `/v/{video_id}/sb/{rev}/index.vtt` |
-| マニフェスト | `/m/{video_id}/{caps}/master.m3u8`、`/m/{video_id}/{caps}/{rendition}/index.m3u8`、`/m/{video_id}/{caps}/manifest.mpd` |
+| マニフェスト | `/m/{mf}/{video_id}/{caps}/master.m3u8`、`/m/{mf}/{video_id}/{caps}/{rendition}/index.m3u8`、`/m/{mf}/{video_id}/{caps}/manifest.mpd`。`mf` はマニフェストの形式の番号（[ADR-0071](../decisions/0071-encoder-pinning-reencode-and-manifest-format-versions.md)、[ADR-0020](../decisions/0020-manifest-generation-and-capability-classes.md) の注記） |
 
 - `rendition` は `h1080-c24`（H.264・1080p・CRF 24）や `a-aac128` のような、段の中身から決まる名前。暗号化したものは末尾に `-cbcs` を付ける。
 - URL は中身が変わらない。同じ URL の中身を作り直さない。作り直すときは `gen` を上げる。
@@ -179,17 +179,17 @@ h144-f/index.m3u8
 #EXT-X-PLAYLIST-TYPE:VOD
 #EXT-X-MEDIA-SEQUENCE:0
 #EXT-X-INDEPENDENT-SEGMENTS
-#EXT-X-MAP:URI="../../../../v/0192.../2/h1080-c24/init.mp4"
+#EXT-X-MAP:URI="../../../../../v/0192.../2/h1080-c24/init.mp4"
 #EXTINF:4.004,
-../../../../v/0192.../2/h1080-c24/0.m4s
+../../../../../v/0192.../2/h1080-c24/0.m4s
 #EXTINF:4.004,
-../../../../v/0192.../2/h1080-c24/1.m4s
+../../../../../v/0192.../2/h1080-c24/1.m4s
 ...
 #EXT-X-ENDLIST
 ```
 
 - `BANDWIDTH` は、索引から求めた 1 セグメントの最大のビットレート（映像）＋音声。`AVERAGE-BANDWIDTH` は平均。マニフェストを作る時に索引から計算する。
-- セグメントの URI は相対のパス。プレイヤーはマニフェストの URL（`/t/{token}/m/...`）を基準に解決するので、`/t/{token}/v/...` になり、トークンが付く（[cdn-and-delivery.md](cdn-and-delivery.md) の 3 節）。マニフェストの本文には利用者ごとの値が入らず、CDN で共有できる。
+- セグメントの URI は相対のパス。プレイヤーはマニフェストの URL（`/t/{token}/m/{mf}/...`）を基準に解決するので、`/t/{token}/v/...` になり、トークンが付く（[cdn-and-delivery.md](cdn-and-delivery.md) の 5 節）。マニフェストの本文には利用者ごとの値が入らず、CDN で共有できる。
 - `EXTINF` には実際の長さ（4.004 など）を書く。四捨五入で 4 なので `TARGETDURATION:4` に収まる。
 - I フレームの再生リストは作らない。シークの縮小の画像で代える（MVP）。
 
@@ -200,8 +200,8 @@ h144-f/index.m3u8
      minBufferTime="PT4S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
   <Period id="0">
     <AdaptationSet contentType="video" segmentAlignment="true" startWithSAP="1">
-      <SegmentTemplate timescale="90000" initialization="../../../v/0192.../2/$RepresentationID$/init.mp4"
-                       media="../../../v/0192.../2/$RepresentationID$/$Number$.m4s" startNumber="0">
+      <SegmentTemplate timescale="90000" initialization="../../../../v/0192.../2/$RepresentationID$/init.mp4"
+                       media="../../../../v/0192.../2/$RepresentationID$/$Number$.m4s" startNumber="0">
         <SegmentTimeline><S t="0" d="360360" r="149"/></SegmentTimeline>
       </SegmentTemplate>
       <Representation id="h1080-c24" codecs="avc1.640028" width="1920" height="1080" bandwidth="5850000"/>
@@ -221,7 +221,7 @@ h144-f/index.m3u8
 | 対象 | CDN の期限 | 無効化 |
 | --- | --- | --- |
 | VOD のマスター・メディアの再生リスト、MPD | 1 時間 | 世代の切り替え、段の追加、措置で、動画の cache tag を無効にする |
-| `init`・セグメント | 1 年 | 措置のときだけ（[cdn-and-delivery.md](cdn-and-delivery.md) の 7 節） |
+| `init`・セグメント | 1 年 | 措置のときだけ（[cdn-and-delivery.md](cdn-and-delivery.md) の 10 節） |
 | 字幕・シークの縮小の画像 | 1 日（字幕は `rev` で変わる） | 措置 |
 
 - `manifest-service` は状態を持たない。`renditions`・`videos` の写し（Valkey、outbox で更新）と索引（`origin-cache` 経由）から作る。12 時間の動画のメディアの再生リストは約 10,800 行・約 650 KB（圧縮で約 60 KB）。
@@ -301,7 +301,7 @@ sequenceDiagram
 | 更新 | 期限の 10 分前にプレイヤーが再生のトークンを取り直し、ライセンスを求め直す |
 | `K_uhd` | ハードウェアの守りと HDCP 2.2 が要る |
 | 会員の終わり | 次の更新でライセンスが出ない。最大 6 時間は再生できる |
-| 措置 | `playable()` が `deny` を返したら、次の要求でライセンスが出ない。配信は拒否の一覧で止まる（[cdn-and-delivery.md](cdn-and-delivery.md) の 7 節） |
+| 措置 | `playable()` が `deny` を返したら、次の要求でライセンスが出ない。配信は拒否の一覧で止まる（[cdn-and-delivery.md](cdn-and-delivery.md) の 10 節） |
 
 ### 8.6 公開の範囲の切り替え
 

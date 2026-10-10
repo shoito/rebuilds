@@ -1,6 +1,6 @@
 # Runbooks: YouTube
 
-Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は observability の領域（まだない）で書く。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
+Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.md) の 4 節にある。SLI の計測とアラートの条件の実装は [observability.md](../architecture/observability.md) にある。表と置き場所は [data-model.md](../architecture/data-model.md)。**SLO の値とアラートの一覧の正本はこの文書** で、値を変えるときは、この文書を先に変える。
 
 この題材の運用は、2 つの量に支配される。CDN の配信（原価の大部分、視聴者の体験のすべて）と、変換・照合のパイプライン（公開までの時間、権利の守り）である。急な人気（バイラル）と CDN の障害は、どちらも数分で全視聴者に見える。
 
@@ -15,7 +15,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 再バッファ | 再バッファの時間 ÷ 総再生時間 | **0.5% 以下**（NFR-004） | 1% を 15 分超えたら呼び出し。ISP・CDN ごとにも見る | ○ |
 | キャッシュの外れ | オリジンへ来たバイト ÷ 配信したバイト | **5% 以下**（NFR-008） | 15% を 10 分超えたら呼び出し（急な人気・キャッシュの消えの兆し） | |
 | アップロードの可用性 | 部分の受け取りと完了の要求のうち、5xx でないもの | **月間 99.9%**（NFR-010） | バーンレート | |
-| 再生できるまで | 10 分の 1080p 相当に正規化した、完了から速い段の公開の判定まで（パイプラインの段の時刻） | **p95 3 分**（NFR-002、K2） | p95 が 10 分を 15 分超えたら呼び出し | ○ |
+| 再生できるまで | 長さ 8〜12 分・元の解像度 720p 以上の動画の帯の、完了から速い段の公開の判定まで（`pipeline_runs` の `completed_at` → `gated_at`）。1 時間の帯（50〜70 分）は p95 10 分として別に見る。式で正規化しない（[ADR-0067](../decisions/0067-sli-sources-and-computation.md)） | **p95 3 分**（NFR-002、K2） | p95 が 10 分を 15 分超えたら呼び出し | ○ |
 | 照合の待ち | 完了から照合の結果まで（1 時間以下の動画） | **p95 5 分**（NFR-007、K8） | p95 が 15 分を 10 分超えたら呼び出し。「照合待ち」の数が 30 分以上の動画を含んだら呼び出し | ○ |
 | ライブの取り込みの可用性 | 配信の分のうち、取り込みの側の原因で止まらなかったもの | **月間 99.95%**（NFR-010） | バーンレート | |
 | ライブの遅延 | 見張りの配信の撮影から画面まで（低遅延のモード） | **p50 4 秒・p95 6 秒**（NFR-005、K4） | p95 が 12 秒を 10 分超えたら呼び出し | ○ |
@@ -34,21 +34,25 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. 上限と容量のパラメーター
 
-値の正本は、各 ADR と領域の文書（まだないものは [architecture/README.md](../architecture/README.md) の 6 節の決定）にある。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
+値の正本は、各 ADR と領域の文書にある。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
 
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
 | アップロードの大きさ・長さ | 256 GB・12 時間（15 分を超えるのは確認済みの創作者） | [ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md) | — |
 | アップロードのセッション | 部分 8〜64 MiB、期限 7 日 | 同上 | — |
 | 符号化のプール | 急ぎの組・通常の組・後ろの組 | [ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md) | 組ごとの台数の上限、`ops.av1_encode_enabled`（止めるだけ） |
-| AV1 のしきい値 | 7 日で 1,000 回の確定の視聴 ほか | 同上 | — |
+| AV1 のしきい値 | 7 日で 1,000 回の確定の視聴 ほか。1 時間を超える動画は総再生時間の条件も | [ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)、[ADR-0016](../decisions/0016-av1-promotion-rule-and-cost.md) | — |
+| ライブのアーカイブの作り直し | 7 日で確定の視聴 100 回など。作り直さないものは 30 日の後に間引く（仮） | [ADR-0031](../decisions/0031-dvr-storage-and-live-to-vod.md) | — |
+| CloudFront の上限 | `vod` 0.6 Tbps・50 万件/秒、`live` 1.2 Tbps・250 万件/秒（申請の値） | [ADR-0064](../decisions/0064-accounts-network-and-edge-distributions.md) | 使用の割合の警報（60% でチケット、80% で呼び出し）。大きな配信の通常のモードへの切り替え |
+| 措置の拒否の鍵 | 7 日（置き場の 80% で 24 時間） | [ADR-0027](../decisions/0027-takedown-deny-list-within-60s.md) | 寿命の短縮 |
 | VOD のセグメント | 4 秒、GOP 2 秒 | [ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) | — |
 | 署名の期限 | 6 時間（ライブは配信の間） | [ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) | — |
 | ライブの部分セグメント | 0.5 秒、セグメント 2 秒、DVR 12 時間 | [ADR-0006](../decisions/0006-live-ingest-and-latency.md) | 配信ごとの通常のモードへの切り替え |
 | 視聴の数の上限 | 同じ視聴者と動画の組で 24 時間に 4 回、エンゲージ ビュー 30 秒 | [ADR-0007](../decisions/0007-two-phase-view-counting.md) | — |
 | 照合 | 最短の一致 10 秒、ライブの窓 30 秒 | [ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md) | — |
-| チャット | 低速モードの既定、1 利用者の送信の速さ | live-chat の領域 | 配信ごとの低速モードの強制 |
-| 受け付けの停止 | — | — | `ops.upload_enabled`、`ops.live_ingest_enabled`（止めるだけ） |
+| チャット | 1 利用者 1 秒 1 件（3 件まで貯まる）、自動の低速モード 5 秒、配信あたり 1 秒 5,000 件 | [ADR-0033](../decisions/0033-chat-rate-limits-slow-mode-and-moderation.md) | 配信ごとの低速モードの強制 |
+| 受け付けの停止 | — | — | `ops.upload_enabled`（リージョンごと）、`ops.live_ingest_enabled`（止めるだけ） |
+| おすすめ | — | — | `ops.recs.fallback`（代わりの並びに切り替える）、`ops.recs.mixer.*` |
 | 公開の判定 | — | — | `ops.publish_gate_enabled`（止めるだけ。止めると全動画が「照合待ち」のまま。公開に倒すスイッチは持たない） |
 | 消去の作業 | — | — | `ops.retention_delete_enabled`（止めるだけ） |
 | CDN の振り分け（S2） | 計測から 5 分ごと | [ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) | CDN ごとの重みの手動の上書き（障害の間） |
@@ -78,55 +82,44 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 4. アラートと手順
 
-個別の手順は、まだない。各 Epic の実装に合わせて [templates/runbook.md](../../../../docs/templates/runbook.md) から作る。「作る Story」の列は、そのアラートの計測と手順を作る [roadmap.md](../roadmap.md) の Story である。手順の文書は、その Story の完了の条件に含める（E15 の `runbooks-e15` でまとめて確かめる）。
+手順は [templates/runbook.md](../../../../docs/templates/runbook.md) の形で書く。「状態」が「作成済み」の手順はこのディレクトリにある。「計画」の手順は、「作る Story」の完了の条件に含め、E15 の `runbooks-e15` でまとめて確かめる。計画の手順ができるまでは [incident-response.md](incident-response.md) の一般の手順で対応する。
 
-| アラート（重さ） | 手順（予定のファイル名） | 作る Story |
-| --- | --- | --- |
-| 配信の可用性のバーンレート、CDN のエッジの 5xx の急増（page） | `cdn-incident.md`（下の 4.1 節） | `cloudfront-and-shield`、`slo-dashboards-alerts` |
-| キャッシュの外れの急増、オリジンの負荷（page） | `origin-overload.md`（要求の合流の確かめ、`origin-cache` の増設、キャッシュの規則の戻し） | `origin-cache` |
-| 急な人気（1 つの動画の同時の視聴の急な上がり、仮の数の急増） | `viral-spike.md`（下の 4.2 節） | `viral-prewarm`、`viral-spike-tests` |
-| 再生の開始・再バッファの悪化（ISP・CDN・端末ごと。page） | `playback-qoe-degraded.md` | `qoe-telemetry` |
-| 再生の API の 5xx（page） | `playback-api-degraded.md` | `playback-api-and-token` |
-| 再生できるまでの遅れ、符号化のプールの待ち行列の溜まり、Spot の大量の中断（page） | `pipeline-backlog.md`（急ぎの組の On-Demand への逃がし、後ろの組の停止を含む） | `pipeline-state-machine`、`segment-parallel-encode` |
-| 照合の待ち、`match-engine` の停止・索引の読み込みの失敗（page） | `matching-backlog.md`（公開に倒さない。創作者への表示、照合の増設） | `match-engine`、`publish-gate` |
-| 措置の停止の遅れ（page、SEV2 から） | `takedown-propagation.md`（拒否の一覧の確かめ、無効化の手動の発行） | `delivery-block-list` |
-| 漏れの監査の不一致（page、SEV1 の候補） | `visibility-leak-response.md` | `playback-api-and-token`、`search-ranking-and-filter` |
-| ストレージの突き合わせの不一致（page、SEV1 の候補） | `media-integrity-incident.md`（消去の作業の停止、S3 の古いバージョンからの戻しを含む） | `original-retention` |
-| ライブの取り込みの失敗の急増、GPU のプールの不足、ライブの遅延（page） | `live-incident.md`（予備への切り替え、通常のモードへの切り替えを含む） | `live-ingest`、`live-transcoder` |
-| チャットの遅れ、Gateway の接続の急減（page） | `live-chat-degraded.md`（大きな配信の低速モードの強制を含む） | `chat-gateway` |
-| 仮の数の遅れ、MSK の消費の遅れ | `view-counting-lag.md` | `provisional-view-counts` |
-| 確定と仮の差の急な変化、確定の遅れ | `view-verification-anomaly.md`（収益の締めの保留を含む） | `verified-view-counts` |
-| 異議の取り消しの率の急増、権利者ごとの一致の急増 | `claims-anomaly.md`（権利者の方針の一時の停止は運営の担当と法務の判断） | `claims-and-disputes` |
-| 削除の申出の期限の接近 | `takedown-request-sla.md`（期限と手続きは法務の L1 の後に確定） | `takedown-requests` |
-| CRR の遅れ（15 分を超える）、Aurora Global Database の遅延、リージョンの障害（page） | `disaster-recovery.md` | `osaka-warm-standby`、`dr-failover-drill` |
-| 開示の請求・捜査機関からの照会・ライブでの緊急の事態 | `legal-request.md`（法務の L10 の後に確定） | `accounts-and-auth` |
-| 費用の急増（配信 1 GB・変換 1 時間の原価が予算の 1.5 倍） | `cost-anomaly.md` | `cost-metering` |
-| デプロイ中の自動ロールバック | `deploy-and-rollback.md` | `ci-pipeline-baseline` |
+| アラート（重さ） | 手順 | 状態 | 作る Story |
+| --- | --- | --- | --- |
+| 個別の手順のないアラート、SEV の判断と連絡 | [incident-response.md](incident-response.md) | 作成済み | `slo-dashboards-alerts` |
+| デプロイ中の自動ロールバック | [deploy-and-rollback.md](deploy-and-rollback.md) | 作成済み | `ci-pipeline-baseline`、`deploy-and-rollback` |
+| CRR の遅れ（15 分を超える）、Aurora Global Database の遅延、リージョンの障害（page） | [disaster-recovery.md](disaster-recovery.md) | 作成済み | `osaka-warm-standby`、`dr-failover-drill` |
+| 配信の可用性のバーンレート、CDN のエッジの 5xx の急増（page） | [cdn-incident.md](cdn-incident.md) | 作成済み | `cloudfront-and-shield`、`slo-dashboards-alerts` |
+| 急な人気（1 つの動画の同時の視聴の急な上がり、仮の数の急増） | [viral-spike.md](viral-spike.md) | 作成済み | `viral-prewarm`、`viral-spike-tests` |
+| 措置の停止の遅れ（page、SEV2 から） | [takedown-propagation.md](takedown-propagation.md) | 作成済み | `delivery-block-list` |
+| ライブの取り込みの失敗の急増、GPU のプールの不足、ライブの遅延（page） | [live-incident.md](live-incident.md) | 作成済み | `live-ingest`、`live-transcoder` |
+| キャッシュの外れの急増、オリジンの負荷（page） | `origin-overload.md` | 計画 | `origin-cache` |
+| 再生の開始・再バッファの悪化（ISP・CDN・端末ごと。page） | `playback-qoe-degraded.md` | 計画 | `qoe-telemetry` |
+| 再生の API の 5xx（page） | `playback-api-degraded.md` | 計画 | `playback-api-and-token` |
+| 再生できるまでの遅れ、符号化のプールの待ち行列の溜まり、Spot の大量の中断（page） | `pipeline-backlog.md` | 計画 | `pipeline-state-machine`、`segment-parallel-encode` |
+| 照合の待ち、`match-engine` の停止・索引の読み込みの失敗（page） | `matching-backlog.md`（公開に倒さない） | 計画 | `match-engine`、`publish-gate` |
+| 漏れの監査の不一致（page、SEV1 の候補） | `visibility-leak-response.md` | 計画 | `playback-api-and-token`、`search-ranking-and-filter` |
+| ストレージの突き合わせの不一致（page、SEV1 の候補） | `media-integrity-incident.md` | 計画 | `original-retention` |
+| チャットの遅れ、Gateway の接続の急減（page） | `live-chat-degraded.md` | 計画 | `chat-gateway` |
+| 仮の数の遅れ、MSK の消費の遅れ | `view-counting-lag.md` | 計画 | `provisional-view-counts` |
+| 確定と仮の差の急な変化、確定の遅れ | `view-verification-anomaly.md`（収益の締めの保留を含む） | 計画 | `verified-view-counts` |
+| 異議の取り消しの率の急増、権利者ごとの一致の急増 | `claims-anomaly.md` | 計画 | `claims-and-disputes`、`rights-abuse-monitoring` |
+| 削除の申出の期限の接近 | `takedown-request-sla.md`（法務の L1 の後に確定） | 計画 | `takedown-requests` |
+| CloudFront の上限の使用の割合（60% でチケット、80% で呼び出し） | `cdn-quota.md` | 計画 | `edge-and-domains`、`live-distribution-quota` |
+| GPU のキャパシティの予約の不足、AZ の停止のときの戻しの順 | `gpu-capacity.md` | 計画 | `ecs-fargate-and-ec2-pools` |
+| 大きな催しの 2 週間前の確認 | `event-capacity-plan.md` | 計画 | `event-capacity-plan` |
+| 作り直しの始め方、Deep Archive の戻しの量 | `reencode-campaign.md` | 計画 | `reencode-campaigns` |
+| ストリームキーの漏えい | `stream-key-compromise.md` | 計画 | `stream-key-protection` |
+| チャンネルの乗っ取り | `channel-takeover.md` | 計画 | `account-recovery-and-takeover` |
+| エッジのトークンの悪用 | `token-abuse.md` | 計画 | `token-abuse-detection` |
+| 開示の請求・捜査機関からの照会・ライブでの緊急の事態 | `legal-request.md`（法務の L10 の後に確定） | 計画 | `legal-request-workflow` |
+| 費用の急増（配信 1 GB・変換 1 時間の原価が予算の 1.5 倍） | `cost-anomaly.md` | 計画 | `cost-metering` |
 
 - すべてのアラートは、対応する手順の URL を注釈に持つ（CI で検査する）。
-- 手順を作るまでは、`incident-response.md`（E1 で最初に作る）の一般の手順で対応する。
-
-### 4.1 CDN の障害（`cdn-incident.md` の骨子）
-
-1. **見分ける**：CDN のエッジの 5xx・時間切れが、(a) 全体か、(b) 特定の地域・ISP か、(c) 特定の動画・段か、(d) オリジンの 5xx の写しかを、CDN のログと `origin-cache` の指標で分ける。(d) なら `origin-overload.md` へ。
-2. **止血（S1、CDN が 1 つ）**：キャッシュの規則・エッジの関数の直前の変更を戻す。Origin Shield の障害なら、Shield を外してエッジから `origin-cache` へ直接に向ける（オリジンの負荷が増えるので、`origin-cache` を先に増やす）。事業者の障害なら、事業者に連絡し、公表のページで知らせる。
-3. **止血（S2 から、複数の CDN）**：振り分けの重みを手動で他の CDN へ寄せる（5 分以内。NFR-008）。寄せる先の CDN の約定の量の上限と、オリジンの負荷を確かめる。
-4. **署名の問題**：署名の鍵の回しの直後なら、前の鍵を戻す（2 つを並べて回すので、片方を戻せる）。
-5. **措置の拒否の一覧の問題**：拒否の一覧の誤りで正しい動画が 403 になっているなら、一覧の直前の更新を確かめる。措置の記録を消さずに、一覧だけを記録から作り直す。
-6. **事後**：視聴者への影響（開始の失敗、再バッファ）を ISP・端末ごとにまとめ、Intent を起票する。
-
-### 4.2 急な人気（`viral-spike.md` の骨子）
-
-1. **兆し**：1 つの動画の仮の数の 5 分の増え方が決まった倍率を超えた、同時の視聴が 5 万を超えた、外のサイトからの参照の急増。
-2. **自動の備え**（`viral-prewarm`）：最初の 30 秒のセグメントを全段で `origin-cache` と Origin Shield に先に読み込む。AV1 の `av1_encode` を後ろの組から急ぎの組に上げる（[ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md) の急な人気の条件）。
-3. **見る**：キャッシュの外れ、`origin-cache` の要求の合流の割合、S3 の GET の割合、開始の時間。
-4. **手で行うこと**：`origin-cache` の台数を増やす。オリジンが詰まりそうなら、その動画の最上段の段をマニフェストから一時に外す（画質を下げて配信を守る。`release.*` ではなく運用の記録つきの手順にする）。
-5. **ライブの急な人気**：チャットの低速モードを強制し、上位のチャットに切り替える。`live-transcoder` の予備を確かめる。
-6. **数**：急な人気は不正の場面と似ることがある。確定の段で正しい視聴を除いていないか、`view-verification-anomaly.md` の観点で 24 時間後に確かめる。
 
 ## 5. 自己監視
 
-- 本番のサービスの自己の計測（OpenTelemetry）は、別の AWS アカウントの AMP と CloudWatch に送る。アラートは CloudWatch のアラームから、オンコールのサービスへ直接送る。
+- 本番のサービスの自己の計測（OpenTelemetry）は、大阪の `selfmon` のアカウントの AMP と CloudWatch に送る（[ADR-0068](../decisions/0068-qoe-privacy-limits-cdn-logs-and-selfmon.md)）。東京のリージョンの障害の間も警報が動く。アラートは CloudWatch のアラームから、オンコールのサービスへ直接送る。
 - 外からの見張り（別のアカウントの `canary`）が、見張りの動画の再生（AZ と ISP の代表）、見張りのアップロード（アップロードから公開まで）、見張りのライブ（時刻の焼き込み）、見張りの措置（毎日）、見張りのチャットを続ける。決まった時間を超えたら、CloudWatch のアラームで呼び出す（デッドマンスイッチ）。
 - CDN の事業者の状態のページと、CDN のログの届きの遅れも見る（CDN のログが遅れると、配信の SLI が見えなくなる）。プレイヤーの出来事の QoE は、CDN のログと独立の経路として使う。
 
@@ -141,4 +134,6 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 費用の見直し（配信 1 GB、保存 1 時間、変換 1 時間、AV1 のしきい値の損益、Spot の中断の率） | 毎月 | Ops、PM |
 | CDN の約定の量と使用の確認 | 毎月 | Ops |
 | DR の訓練（大阪への切り替え） | 半年ごと | Ops |
+| 熱い集まりの大阪の写しの割合（98% 以上） | 毎日（自動）、毎週の確認 | Ops |
+| CloudFront の上限の申請と承認の記録（`cdn_quota_log`） | 申請のたび、毎月の確認 | Ops |
 | 大きな催しの前の準備（GPU のプールの確保、凍結、低速モードの方針） | 催しの 2 週間前 | Ops、PM |

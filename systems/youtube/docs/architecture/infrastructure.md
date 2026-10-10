@@ -23,7 +23,7 @@ AWS のアカウントとネットワーク、エッジ（CloudFront のディ�
 | リージョンの障害 | 管理の面 RPO 1 分・RTO 1 時間。元のファイルの写し RPO 15 分。再生の再開 RTO 2 時間（AV1 なしの段） | NFR-009 |
 | 配信の上限 | S1 のピーク（0.3 Tbps）と大きなライブ（20 万人の LL-HLS）を、CDN の上限の 60% 以下で受ける | NFR-008、NFR-005 |
 | 可用性 | 再生の API 99.95%、アップロード 99.9%、ライブの取り込み 99.95% | NFR-010 |
-| 費用 | 1 GB の配信 0.02 USD、1 時間の変換 約 0.20 USD、1 時間の保存 約 0.10 USD（最初の 30 日） | [README.md](README.md) の 2.1 節 |
+| 費用 | 1 GB の配信 0.02 USD（予算、仮）、1 時間の変換 約 0.27 USD、1 時間の保存 約 0.11 USD（最初の 30 日）。11 節の値を統合の工程で [README.md](README.md) の 2.1 節に揃えた | [README.md](README.md) の 2.1 節 |
 
 ## 2. AWS アカウントの構成
 
@@ -146,7 +146,7 @@ flowchart TB
 | `live` | 0.6 Tbps、120 万件/秒（20 万人の LL-HLS） | **1.2 Tbps、250 万件/秒** | 20 万 × 3 Mbps、1 人 6 件/秒（[live-streaming.md](live-streaming.md) の 6.5 節）。グループ A の 200 万件/秒に余裕を足した |
 | `app` | 約 1 万件/秒 | 既定のまま | 再生の API、画面、出来事の束 |
 
-- **S1 の表の不整合**：[README.md](README.md) の 2 節の S1 の配信のピーク 0.3 Tbps と、ライブの 1 配信の最大 20 万人（LL-HLS で 0.6 Tbps）は両立しない。20 万人の配信は、平常のピークに上乗せする「大きな催し」として扱い、催しの日の全体のピークを 0.9 Tbps と見込む（[capacity.md](capacity.md) の 2 節）。
+- **S1 の配信のピーク**：[README.md](README.md) の 2 節の 0.3 Tbps は平常のピーク。20 万人の配信（LL-HLS で 0.6 Tbps）は上乗せの「大きな催し」として扱い、催しの日の全体のピークを 0.9 Tbps と見込む（統合の工程で README の 2 節に書いた。[capacity.md](capacity.md) の 2 節）。
 - **申請の時機**：`vod` は E5 の前（`cdn-cost-poc`）、`live` は E12 の前。承認は数日かかり、部分の承認もありうる（MSK の例：[Amazon MSK quota](https://docs.aws.amazon.com/msk/latest/developerguide/limits.html)。CloudFront の承認の時間は**未検証**）。申請の結果を `cdn-quota-log`（運用の記録）に残す。
 - **承認が足りないとき**：`live` を 2 つのディストリビューション（`live-a`・`live-b`）に分け、再生の API が配信の ID のハッシュで振る。1 つの配信の 20 万人が 1 つのディストリビューションに乗るので、1 配信の上限は分けても上がらない。そのときは、大きな配信だけ通常のモード（要求 1.5 件/秒）へ切り替える運用の手順を `live-incident.md` に足す。
 - その他の上限（同じ出典）：ディストリビューションごとのオリジン 100、キャッシュの振る舞い 75、ステージングのディストリビューションはアカウントに 20（[delivery.md](delivery.md) の 5.4 節で使う）、CloudFront Functions はアカウントに 100・関数 10 KB、KeyValueStore は関数に 1 つ・5 MB。
@@ -181,10 +181,11 @@ ADR-0065。台数は [capacity.md](capacity.md) の 4 節（S1、初期見積も
 | `fleet-gpu-asr` | `asr-worker` | `g6.xlarge`（L4 × 1）1.167 USD/時間 | Spot 2〜6 台 | 失っても公開を止めない（[transcoding-pipeline.md](transcoding-pipeline.md) の 13 節） |
 | `fleet-origin` | `origin-cache` | `im4gn.4xlarge`（16 vCPU、64 GiB、NVMe 7.5 TB、25 Gbps）1.707 USD/時間 | 9（AZ ごとに 3）＋予備 3 | On-Demand。AZ ごとの輪（[ADR-0026](../decisions/0026-origin-cache-routing-admission-and-coalescing.md)） |
 | `fleet-live-origin` | `live-origin` | `r7g.4xlarge`（16 vCPU、128 GiB、最大 15 Gbps）1.034 USD/時間 | 12（AZ ごとに 4） | 配信ごとに 2 つの AZ（[ADR-0030](../decisions/0030-ll-hls-parameters-and-live-origin.md)） |
-| `fleet-match` | `match-engine` | `r7g.8xlarge`（32 vCPU、256 GiB）2.067 USD/時間 | 4（2 つの写し × 2 シャード）＋予備 1 | 写しは別の AZ（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)） |
+| `fleet-match` | `match-engine` | `r7g.8xlarge`（32 vCPU、256 GiB）2.067 USD/時間 | 4（8 つの論理の分片を 1 台に 4 つ、2 台 × 2 つの AZ）＋予備 1（[ADR-0044](../decisions/0044-reference-index-shards-and-generations.md) の注記） | 写しは別の AZ（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)） |
 | `fleet-chat` | `live-chat-gateway` | `c7gn.2xlarge`（8 vCPU、16 GiB、最大 50 Gbps）0.630 USD/時間 | 6（20 万人の配信を 1 ノード 5 万接続で 4 ＋ 余裕） | 3 AZ。大きな催しの前に 26 台まで（[live-chat.md](live-chat.md) の 5.4 節） |
 | `fleet-batch` | `view-verifier`、`fp-backscan`、分析の作り直し | `r7i.4xlarge` の Spot | 0〜20 台 | 時間の区切りで起こす |
 
+- **提供の確かめ（2026-10-10）**：`g6`（L4）は東京で提供されている（AWS の 2024-09 の発表）。`g6.2xlarge` は L4 × 1、8 vCPU、32 GiB（[Amazon EC2 G6 instances](https://aws.amazon.com/ec2/instance-types/g6/)）。`im4gn.4xlarge` は 16 vCPU、64 GiB、NVMe 7,500 GB、ネットワーク 25 Gbps（「最大」の付かない値）で、東京の公開の価格表に行がある。AZ ごとの提供と在庫は**未検証**で、E1 の `ecs-fargate-and-ec2-pools` で `describe-instance-type-offerings` を確かめる。
 - **`origin-cache` の型**：[cdn-and-delivery.md](cdn-and-delivery.md) の 6.4 節は「NVMe 約 7.5 TB・ネットワーク 25 Gbps 以上」を求めた。`im4gn.4xlarge` はどちらも満たし、`i4i.8xlarge`（7.5 TB、18.75 Gbps、3.221 USD/時間）の約半分の単価である。索引のメモリー 8 GB はメモリー 64 GiB に入る。1 ノードのピークの外れの転送は、AZ を 1 つ失っても 30 Gbps ÷ 6 = 5 Gbps で、帯域に余裕がある。Graviton2 の世代で、Rust の ARM64 の組み立てを使う。
 - **符号化を x86-64 にそろえる理由**：x264 と SVT-AV1 の出力は、命令セット（AVX2・AVX-512 と NEON）の経路で同じバイトになる保証を確かめていない（**未検証**）。同じ入力・同じ設定から同じラダーが出ること（[intent.md](../intent.md) の守るべき振る舞い）と、黄金の動画の VMAF の下限を、1 つの命令セットの群れで守る。命令セットは符号化の設定の一部として固定する（[delivery.md](delivery.md) の 6 節、[ADR-0071](../decisions/0071-encoder-pinning-reencode-and-manifest-format-versions.md)）。Graviton の Spot（`c8g` は `c7i` より約 11% 安い）は、`encoder-arch-poc` で VMAF と決定性を確かめた後に `enc_build` を分けて足す。
 - **GPU の確保**：`g6` の Spot は中断でライブが切れるので使わない。下限 60 台は、平常の夜のピークの配信（約 360 配信）を詰めて置ける数で、On-Demand のキャパシティの予約（ODCR）で東京の 3 AZ に 20 台ずつ持つ。予約の外の台数を起こせるか（AZ ごとの在庫）は**未検証**。大きな催しの 2 週間前に、催しの分を期間つきの予約で足す（[runbooks](../runbooks/README.md) の 6 節）。
@@ -357,7 +358,7 @@ ADR-0066。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | 視聴の出来事 | MSK の 3 ブローカーの持続の目安の 60% | 9.4 MB/秒（複製の前 約 3 MB/秒） | ブローカーの型を上げる、熱い動画の桶（[view-counting-and-analytics.md](view-counting-and-analytics.md) の 4.3 節） |
 | Aurora の writer | `db.r7g.4xlarge` の CPU | ピークの p95 50% が 4 週 | 型を上げ、`channel_stats_daily_dim` を分析の置き場へ |
 | 元のファイルの写しの転送 | RTC の承認の上限 | 承認の 60% | 上限の再申請、`dr-replication-poc` |
-| 参照の索引 | `match-engine` のメモリー（1 ノード 256 GiB） | 1 シャード 150 GiB | シャードを増やす（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)） |
+| 参照の索引 | `match-engine` のメモリー（1 ノード 256 GiB） | 1 台の分片の合計 150 GiB | 1 台あたりの分片を減らして台数を増やす（[ADR-0044](../decisions/0044-reference-index-shards-and-generations.md)） |
 
 ## 10. 複数の CDN（S2）の時機
 
@@ -381,7 +382,7 @@ ADR-0066。[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) は S2 か�
 | 90 日の後（見られない） | レンディション 3.2 × 0.005 ＝ 0.016、元のファイル 3 × 0.002 ＝ 0.006、大阪 3 × 0.002 ＝ 0.006 | **約 0.028 USD** |
 | AV1 のある動画 | ＋ 2.5 GB × 層の単価 | ＋0.0125〜0.0625 USD |
 
-- 2.1 節の仮の値（30 日まで 0.10、その後 0.02）に対し、大阪の写しの分が上がる。差は PM に報告する（12 節）。
+- 最初の 2.1 節の仮の値（30 日まで 0.10、その後 0.02）に対し、大阪の写しの分が上がる。統合の工程で 2.1 節をこの値に揃えた。
 
 ### 11.2 配信：1 GB
 
@@ -405,9 +406,9 @@ ADR-0066。[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) は S2 か�
 | H.264 の道（約 9.9 vCPU 時間） | 約 0.20 USD | Spot 約 0.02 USD/vCPU 時間（**未検証**）。On-Demand は `c7i.4xlarge` 0.899 USD/時間 ＝ 0.056 USD/vCPU 時間 |
 | 急ぎの組の On-Demand の分 | ＋約 0.04 USD | 急ぎの段（1.1 vCPU 時間）の 70% を On-Demand で受けると見込む |
 | ASR（GPU） | 約 0.03 USD | `g6.xlarge` 1.167 USD/時間 × 約 0.025 時間 |
-| 合計（H.264） | **約 0.27 USD** | 2.1 節の仮の値 0.20 USD より On-Demand の分だけ高い |
+| 合計（H.264） | **約 0.27 USD** | 最初の 2.1 節の仮の値 0.20 USD より On-Demand の分だけ高い。統合の工程で 2.1 節をこの値に揃えた |
 | AV1 を足す | ＋約 0.80 USD | 約 40 vCPU 時間 × Spot。On-Demand なら 2.2 USD |
-| ライブの変換：1 配信・1 時間 | 約 0.24 USD | `g6.2xlarge` 1.418 USD ÷ 6 配信（On-Demand、ODCR も同じ単価）。2.1 節の 0.20 USD より高い。Savings Plans の率は**未検証** |
+| ライブの変換：1 配信・1 時間 | 約 0.24 USD | `g6.2xlarge` 1.418 USD ÷ 6 配信（On-Demand、ODCR も同じ単価）。最初の 2.1 節の 0.20 USD より高い。統合の工程で 2.1 節をこの値に揃えた。Savings Plans の率は**未検証** |
 
 ## 12. 未解決の問い
 
@@ -425,9 +426,9 @@ ADR-0066。[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) は S2 か�
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| CloudFront の約定の値引きの率（公開の価格は予算の約 3.2 倍） | `cdn-cost-poc` と見積もり。届かなければ PM が予算か平均のビットレートの目標を見直す |
+| CloudFront の約定の値引きの率（公開の価格は予算の約 3.2 倍） | `cdn-cost-poc` と見積もり。選択肢と推奨の既定は [README.md](README.md) の 2.1 節（PM の判断待ち） |
 | CloudFront の上限の引き上げがどこまで認められるか、定額の計画の対象か | E5・E12 の前の申請（**未検証**） |
-| S1 の配信のピーク（0.3 Tbps）と 20 万人のライブ（0.6 Tbps）の整合 | PM と architecture の担当に [README.md](README.md) の 2 節の注記を提案する |
+| `im4gn`・`g6` の東京の AZ ごとの提供 | E1 の `ecs-fargate-and-ec2-pools`（**未検証**） |
 | `g6` の東京の AZ ごとの在庫、大阪で起こせる GPU | E12 の前に ODCR を試しに取る（**未検証**） |
 | Deep Archive の保存の東京・大阪の単価 | 価格表で行が見つからなかった（**未検証**）。請求の実績で置き換える |
 | Spot の実効の単価と中断の率（型ごと） | E3 の `segment-parallel-encode` の後、`cost-metering` で実測 |

@@ -89,7 +89,7 @@ sequenceDiagram
 | トークン | 中身 | 署名・期限 | 確かめる側 |
 | --- | --- | --- | --- |
 | 再生のトークン | `v`（`video_id`）、`u`（利用者の ID のハッシュ、匿名は端末の識別子のハッシュ）、`d`（端末の識別子のハッシュ）、`caps`、`rg`（地域）、`drm`、`sid`（再生のセッション）、`iat`、`exp` | Ed25519、10 時間（ADR-0007） | `event-collector`、`license-proxy`、`api` |
-| エッジのトークン | `video_id`、`caps`、許す地域、`exp`、鍵の番号 | HMAC-SHA256、6 時間（ADR-0005） | CDN のエッジの関数（[cdn-and-delivery.md](cdn-and-delivery.md) の 3 節） |
+| エッジのトークン | `video_id`、`caps`、許す地域、`exp`、鍵の番号 | HMAC-SHA256、6 時間（ADR-0005） | CDN のエッジの関数（[cdn-and-delivery.md](cdn-and-delivery.md) の 5 節） |
 
 - 2 つに分けるのは、エッジの関数で公開鍵の署名を確かめられる保証がないためである（**未検証**。`cdn-cost-poc` で確かめ、できれば 1 つにまとめる）。
 - エッジのトークンの期限の 10 分前に、プレイヤーは再生の API を呼び直す。`playable()` をもう一度通るので、措置と会員の終わりがここでも効く。
@@ -233,7 +233,7 @@ ADR-0007 の出来事に次を足す。どれも再生のトークンを付け�
 | 平均の VMAF | 再生した秒ごとの段の VMAF（`ladders` の値。電話はスマートフォンのモデル）の時間の加重平均 | 80 以上 |
 | 段の切り替え | 再生 1 分あたりの `quality_change` | 記録だけ |
 
-- 集計は、同じ `watch-events` から observability の領域が行う。CDN ごと・ISP（ASN）ごと・端末ごとに分ける。S2 の複数の CDN の振り分けは、この値を使う（[cdn-and-delivery.md](cdn-and-delivery.md) の 8 節）。
+- 集計は、同じ `watch-events` から observability の領域が行う。CDN ごと・ISP（ASN）ごと・端末ごとに分ける。S2 の複数の CDN の振り分けは、この値を使う（[cdn-and-delivery.md](cdn-and-delivery.md) の 12 節）。
 
 ## 8. 広告の枠（ADR-0024）
 
@@ -258,7 +258,7 @@ ADR-0007 の出来事に次を足す。どれも再生のトークンを付け�
 | --- | --- | --- |
 | 再生の API の失敗 | 開始できない | 指数の後退で 2 回やり直す。`start_failure` を送る |
 | マニフェストの 403（エッジのトークンの期限切れ） | 取得が止まる | 再生の API を呼び直し、新しい URL で続ける（位置は保つ） |
-| セグメントの 404・5xx | 取得の失敗 | 同じ段で 1 回、次に 1 つ下の段で取り直す。3 回続けば、S2 では別の CDN のホストへ（[cdn-and-delivery.md](cdn-and-delivery.md) の 8 節） |
+| セグメントの 404・5xx | 取得の失敗 | 同じ段で 1 回、次に 1 つ下の段で取り直す。3 回続けば、S2 では別の CDN のホストへ（[cdn-and-delivery.md](cdn-and-delivery.md) の 12 節） |
 | 復号のエラー | 再生が止まる | その段を候補から外し、下の段で続ける。`start_failure` か `rebuffer` に記録 |
 | AV1 の復号の遅れ（フレームの落ち 5% 超） | 画質が落ちる | そのセッションで `h` の組に切り替える（トークンを取り直す） |
 | ライセンスの失敗 | メンバー限定の動画が開始できない | 1 回やり直す。だめなら開始の失敗 |

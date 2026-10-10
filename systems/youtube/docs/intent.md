@@ -32,7 +32,7 @@
 ### MVP（S1）に含める
 
 - **アップロード**：Web とアプリからの再開できるアップロード（1 ファイル 256 GB・12 時間まで、本家に寄せる）、検査（形式、長さ、壊れたファイル、既知の違法なメディアのハッシュ）、下書き・予約の公開、公開の範囲（公開・限定公開・非公開・メンバー限定）
-- **変換**：自前の指揮のパイプライン（GOP に揃えた区切りでの並列の符号化）、動画ごとのラダー（per-title）、H.264 の全段と、人気になった動画の AV1、音声（AAC-LC、Opus）、字幕（WebVTT の手動の字幕、日本語と英語の自動の字幕）、サムネイル（自動の候補と手動）、シークの縮小の画像、説明の時刻からのチャプター
+- **変換**：自前の指揮のパイプライン（GOP に揃えた区切りでの並列の符号化）、動画ごとのラダー（per-title）、H.264 の全段と、人気になった動画の AV1、音声（AAC-LC、HE-AAC。Opus は MVP の後）、字幕（WebVTT の手動の字幕、日本語と英語の自動の字幕）、サムネイル（自動の候補と手動）、シークの縮小の画像、説明の時刻からのチャプター
 - **再生**：CMAF のセグメント、HLS と DASH のマニフェスト、Web・Android・iOS のプレイヤー、自前の ABR（Web と Android）、再生の品質の計測（開始の時間、再バッファ、画質の切り替え）
 - **配信**：CloudFront と Origin Shield、自前の中間のキャッシュ、署名つきの URL、措置での配信の停止
 - **ライブ**：RTMPS と SRT の取り込み、GPU の変換、通常と低遅延（LL-HLS）のモード、DVR（12 時間）、ライブからの VOD、ライブの照合（音声と映像、ブロックの方針）
@@ -142,7 +142,7 @@
 - 指紋の方式の母数（音声の山の組の密度、映像のハッシュの間隔）と、索引のメモリー：E8 の前の `fingerprint-poc`（[ADR-0008](decisions/0008-fingerprinting-and-match-engine.md)）。
 - 配信 1 GB あたりの CDN の実効の単価（約定の値引き、複数の CDN）：E5 の前の `cdn-cost-poc` と、CDN の事業者との見積もり。
 - LL-HLS の部分セグメントの長さと、プレイヤーの対応（iOS の AVPlayer、Web の MSE、Android の Media3）：E12 の前の `ll-hls-poc`。
-- 本家の数値で、公式の資料で確かめられなかったもの（1 分あたりのアップロードの時間、広告の収益の分配の率、Content ID の参照の規模、ライブの照合の方式、通常のモードの遅延）は**未検証**として扱い、本システムの値を使う。
+- 本家の数値で、公式の資料で確かめられなかったもの（1 分あたりのアップロードの時間、Content ID の参照の規模、ライブの照合の方式、通常のモードの遅延）は**未検証**として扱い、本システムの値を使う。収益の分配の率（広告 55%・メンバーシップ 70%）は公式の資料で確かめ、既定の契約の値にした（[ADR-0057](decisions/0057-revenue-ledger-share-calculation-and-rounding.md)）。
 
 ## 出典
 
@@ -158,8 +158,10 @@
 - YouTube Help, [Archive live streams](https://support.google.com/youtube/answer/6247592)：12 時間未満のライブは自動でアーカイブできる。12 時間を超えると記録されないことがある
 - YouTube Help, [Turn on DVR on live streams](https://support.google.com/youtube/answer/9296823)：12 時間を超える配信では DVR が制限されるか使えない。配信の開始より前には戻れない
 - YouTube Help, [Use automatic captioning](https://support.google.com/youtube/answer/6373554)：自動の字幕は日本語を含む多くの言語にある。ライブの自動の字幕は英語だけ。長すぎる動画には付かないことがある（上限の値は**未検証**）
-- YouTube Help, [YouTube Partner Program overview & eligibility](https://support.google.com/youtube/answer/72851)：長い動画の道は登録者 1,000 と直近 12 か月の公開の視聴時間 4,000 時間。広告の収益の分配の率はこのページに書かれていない（**未検証**）
+- YouTube Help, [YouTube Partner Program overview & eligibility](https://support.google.com/youtube/answer/72851)：長い動画の道は登録者 1,000 と直近 12 か月の公開の視聴時間 4,000 時間
+- YouTube Help, [YouTube Partner Program: Revenue shares](https://support.google.com/youtube/answer/72902)：視聴の画面の広告の純収益の 55%、メンバーシップなどの商取引の純収益の 70% を創作者へ
 - YouTube Official Blog, [Press](https://blog.youtube/press/)：1 日に平均 2,000 万本を超える動画が上がる。「1 分あたり 500 時間」の値は公式のページで確かめられなかった（**未検証**）
 - YouTube Official Blog, [Reimagining video infrastructure to empower YouTube](https://blog.youtube/inside-youtube/new-era-video-infrastructure/)（2021-04-21）：変換の専用のチップ（VCU）で、前の最適化した仕組みより計算の効率が最大 20〜33 倍。VP9 は H.264 より同じ解像度で画質が良いが、符号化に 5 倍の計算を使う。次のチップで AV1 を足す
 - 総務省, [インターネット上の違法・有害情報に対する対応（情報流通プラットフォーム対処法）](https://www.soumu.go.jp/main_sosiki/joho_tsusin/d_syohi/ihoyugai.html)：改正法は 2025-04-01 施行。大規模なプラットフォームの事業者に、対応の迅速化と運用の状況の透明化を求める
-- 総務省, [大規模特定電気通信役務提供者の指定](https://www.soumu.go.jp/menu_news/s-news/01ryutsu02_02000435.html)：2025-04-30 の報道資料で、Google LLC の YouTube を含む事業者を指定した
+- 総務省, [大規模特定電気通信役務提供者の指定](https://www.soumu.go.jp/menu_news/s-news/01ryutsu02_02000435.html)：2025-04-30 の報道資料で、法の 20 条 1 項により Google LLC の YouTube を含む事業者を指定した。指定の基準の数値は施行令と施行規則にあり、本システムへの当てはめは**法務の確認待ち**（L1）
+- e-Gov 法令検索, [著作権法](https://laws.e-gov.go.jp/law/345AC0000000048)（昭和 45 年法律第 48 号）：30 条の 4（著作物に表現された思想又は感情の享受を目的としない利用）、32 条（引用）。当てはめは**法務の確認待ち**（L1・L8）

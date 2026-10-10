@@ -64,7 +64,7 @@
 | S3 の要求の速さ | 分けた接頭辞ごとに GET・HEAD 5,500 件/秒以上。急に上げると 503 が出ることがある。小さなオブジェクトの最初のバイトまで 100〜200 ms | [Optimizing Amazon S3 performance](https://docs.aws.amazon.com/AmazonS3/latest/userguide/optimizing-performance.html) |
 | 本家の CDN の構成、ISP の中のキャッシュ | 本家の公式の資料で、本システムに使える数値は確かめられなかった（**未検証**） | — |
 
-- S1 のピーク 0.3 Tbps と、ライブの LL-HLS の要求（[live-streaming.md](live-streaming.md) の 6.5 節）は、既定の上限を超える。E5 の前に引き上げを申請する（`cdn-cost-poc`）。
+- S1 の配信の平常のピーク 0.3 Tbps（催しの日 0.9 Tbps）と、ライブの LL-HLS の要求（20 万人で 120 万件/秒。[live-streaming.md](live-streaming.md) の 6.5 節）は、既定の上限を超える。VOD・ライブ・画面と API の 3 つのディストリビューションに分け、上限をそれぞれ申請する（`vod` 0.6 Tbps・50 万件/秒は E5 の前、`live` 1.2 Tbps・250 万件/秒は E12 の前。[ADR-0064](../decisions/0064-accounts-network-and-edge-distributions.md)、[infrastructure.md](infrastructure.md) の 3.3 節）。
 
 ## 4. 層と流れ
 
@@ -84,7 +84,7 @@ flowchart LR
 | パス | `origin-cache` の扱い |
 | --- | --- |
 | `/v/...`（VOD のセグメント、`init`、字幕、縮小の画像） | 索引で範囲の GET に直す。NVMe に入れる |
-| `/m/...`（マニフェスト） | `manifest-service` へ。1 分だけメモリーに持つ |
+| `/m/{mf}/...`（マニフェスト。`mf` は形式の番号、[ADR-0071](../decisions/0071-encoder-pinning-reencode-and-manifest-format-versions.md)） | `manifest-service` へ。1 分だけメモリーに持つ |
 | `/l/...`（ライブのプレイリストと部分） | `live-origin` へそのまま渡す。要求の保留を切らない（[live-streaming.md](live-streaming.md)） |
 | `/v/...` のライブの DVR の古いセグメント | VOD と同じ（S3 から） |
 
@@ -160,7 +160,7 @@ https://<brand>video.<domain>/t/{kid}.{exp}.{caps}.{rg}.{sig}/v/{video_id}/{gen}
 | 項目 | 値 | 根拠 |
 | --- | --- | --- |
 | ピークの外れの転送 | 30 Gbps（0.3 Tbps × 10%） | エッジとリージョンのキャッシュのヒットを 90% と見込む（7 節） |
-| ノード | AZ ごとに 3（計 9）。NVMe 約 7.5 TB・ネットワーク 25 Gbps 以上の型（型と単価は capacity の領域。**未検証**） | 1 つの AZ の輪 約 22 TB。AZ を 1 つ失っても残りで 30 Gbps |
+| ノード | AZ ごとに 3（計 9）＋予備 3。`im4gn.4xlarge`（NVMe 7.5 TB、25 Gbps、1.707 USD/時間。[ADR-0065](../decisions/0065-media-fleets-msk-and-storage-tiers.md)） | 1 つの AZ の輪 約 22 TB。AZ を 1 つ失っても残りで 30 Gbps |
 | 外れの応答 | p95 50 ms（NVMe）、200 ms（S3） | S3 の最初のバイトまで 100〜200 ms（3 節） |
 
 ## 7. ヒットの率の計算（ロングテール）
@@ -211,8 +211,8 @@ https://<brand>video.<domain>/t/{kid}.{exp}.{caps}.{rg}.{sig}/v/{video_id}/{gen}
 
 | 項目 | 見込み | 前提 |
 | --- | --- | --- |
-| CDN の転送 | 約 54 万 USD | 27 PB × 0.02 USD（[architecture/README.md](README.md) の 2.1 節。約定の値引きは**未検証**） |
-| エッジの関数の実行 | 約 3,000 USD | セグメントの要求 約 270 億件/月 × 100 万件あたり約 0.1 USD（価格は**未検証**） |
+| CDN の転送 | 約 54 万 USD（公開の価格なら約 173 万 USD） | 27 PB × 0.02 USD（予算の単価。約 69% の約定の値引きが前提で、率は**未検証**。選択肢と推奨の既定は [architecture/README.md](README.md) の 2.1 節、PM の判断待ち） |
+| エッジの関数の実行 | 約 3,000 USD | セグメントの要求 約 270 億件/月 × 100 万回 0.10 USD（`AmazonCloudFront` の価格表、2026-10-03 の公開分） |
 | Origin Shield の要求 | 小さい（東京のリージョンのエッジキャッシュからの要求は通らない。3 節） | — |
 | `origin-cache` | 9 ノード（単価は capacity の領域） | 6.4 節 |
 | S3 の GET | 約 500 USD | 7.3 節 |
@@ -360,7 +360,7 @@ sequenceDiagram
 | 人気の分布（`α`）と CloudFront の実効のキャッシュ、NFR-008 の 5% に届くか | `cdn-cost-poc` |
 | KeyValueStore の伝わる速さ、無効化の完了の時間（**未検証**） | `delivery-block-list` で測る |
 | エッジの関数で Ed25519 を確かめられるか（**未検証**） | `cdn-cost-poc` |
-| 配信 1 GB の実効の単価、エッジの関数の価格（**未検証**） | 見積もりと capacity の領域 |
+| 配信 1 GB の実効の単価（約定の率は**未検証**） | `cdn-cost-poc` と見積もり、PM の判断（[architecture/README.md](README.md) の 2.1 節） |
 | 2 つ目の CDN の選定 | `multi-cdn-poc`（S2 の前） |
 | 日本の外の地域の扱い | S3 の段階（海外の地域） |
 

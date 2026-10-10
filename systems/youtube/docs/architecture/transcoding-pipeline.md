@@ -287,7 +287,7 @@ s3://<media-bucket>/r/{video_id}/{stage}/{cfg}/{inp}/{chunk:05}.{ext}
 
 - `K` ≈ 3.15 USD、`W` ≈ 716 視聴時間。7 日で 1,000 回・平均 20 分なら 333 視聴時間で、分かれ目の半分（358）に届かない。1 時間を超える動画に総再生時間の条件を足したのはこのためである。
 
-**[architecture/README.md](README.md) の 2.1 節との差**：2.1 節は「10 分の動画なら約 1,500 回」と書いたが、これは 1 時間の動画の費用（0.80 USD）を 10 分の動画に当てた値である。10 分の動画の符号化の費用は 1/6 で、分かれ目はそれより小さい。しきい値（1,000 回）は変えない。
+**[architecture/README.md](README.md) の 2.1 節との差**：2.1 節は「10 分の動画なら約 1,500 回」と書いていたが、これは 1 時間の動画の費用（0.80 USD）を 10 分の動画に当てた値だった。統合の工程で約 480 回に直した。しきい値（1,000 回）は変えない。
 
 ### 6.3 古い動画
 
@@ -327,13 +327,13 @@ s3://<media-bucket>/r/{video_id}/{stage}/{cfg}/{inp}/{chunk:05}.{ext}
 | シークの縮小の画像 | 1 時間以下は 2 秒ごと、3 時間以下は 5 秒ごと、それより長いと 10 秒ごとに 160×90 のフレーム。10×10 のスプライトの JPEG と、`#xywh` の WebVTT の索引 | `storyboard/` |
 | チャプター | 説明の行のうち `^((\d{1,2}):)?(\d{1,2}):(\d{2})\s+(.+)$` に合うもの。最初が 0:00、3 つ以上、各 10 秒以上のときだけ作る（本家の規則は**未検証**。本システムの値） | `chapters.json` |
 
-- サムネイルとシークの縮小の画像は、セグメントと同じく配信の停止の対象である（[cdn-and-delivery.md](cdn-and-delivery.md) の 7 節）。
+- サムネイルとシークの縮小の画像は、セグメントと同じく配信の停止の対象である（[cdn-and-delivery.md](cdn-and-delivery.md) の 10 節）。
 
 ## 10. 作業者のプールと Spot の中断（ADR-0018）
 
 | プール | 作業 | 容量 | インスタンス |
 | --- | --- | --- | --- |
-| 急ぎ | 急ぎの組 | On-Demand の下限（平常のピークの 30%）＋ Spot | 計算に強い 8〜16 vCPU の型、3 つ以上の型 |
+| 急ぎ | 急ぎの組 | On-Demand の下限（平常のピークの 30%。S1 は急増の最初の 5 分を受けるため 8 台）＋ Spot | x86 の計算に強い型を 6 つ以上（[infrastructure.md](infrastructure.md) の 4.2 節） |
 | 通常 | 通常の組 | Spot だけ、容量を優先する配分、6 つ以上の型 | 同上 |
 | 後ろ | 後ろの組 | Spot だけ。後ろの組の待ちが 24 時間を超えたら、通常のプールの空きも使う | AV1 に向く大きな型を含む |
 | 検査 | `probe` | 急ぎと同じ。ネットワークを持たないタスク（ADR-0012） | — |
@@ -372,7 +372,7 @@ s3://<media-bucket>/r/{video_id}/{stage}/{cfg}/{inp}/{chunk:05}.{ext}
 | `fingerprint` | 0.5 vCPU 時間 | ADR-0008 |
 | `audio_encode`、`thumbnails`、`storyboard` | 0.2 vCPU 時間 | — |
 | `captions` | GPU 約 0.03 USD | 8.2 節 |
-| 合計（H.264 の道） | 約 9.9 vCPU 時間 ≈ 0.20 USD＋ASR | Spot 約 0.02 USD/vCPU 時間（[architecture/README.md](README.md) の 2.1 節） |
+| 合計（H.264 の道） | 約 9.9 vCPU 時間 ≈ 0.20 USD、急ぎの段の On-Demand の分 約 0.04 USD、ASR 約 0.03 USD で約 0.27 USD | Spot 約 0.02 USD/vCPU 時間（**未検証**）。[infrastructure.md](infrastructure.md) の 11.3 節、[architecture/README.md](README.md) の 2.1 節 |
 
 - MediaConvert との比べ：MediaConvert の分あたりの価格は**未検証**のため、式だけを置く。`MediaConvert の 1 時間の費用 = 60 × 分あたりの価格 × 段の数の係数`。capacity の領域で、公開の価格を入れて比べる（ADR-0003 は使わないと決めた。比べは費用の確かめのため）。
 
@@ -470,7 +470,7 @@ s3://<media-bucket>/r/{video_id}/{stage}/{cfg}/{inp}/{chunk:05}.{ext}
 | AV1 を復号できる再生の割合、7 日と 1 年の視聴の比（**未検証**） | `av1-cost-poc` |
 | VMAF の目標（95・93）と、段の差（1/1.5・4） | `per-title-ladder-poc`。K5 に届かなければ `ladder_version` 2 |
 | ASR のエンジン | `asr-engine-poc` |
-| 古い動画の AV1 の 6 時間の数え方（戻しを除く） | NFR-002 の注記として architecture の担当に提案する |
+| 古い動画の AV1 の 6 時間の数え方（戻しを除く） | 統合の工程で NFR-002 に書いた（閉じた） |
 | 自動の字幕の学習への利用 | **法務の確認待ち：L8** |
 | MediaConvert との費用の比べ | capacity の領域（価格は**未検証**） |
 

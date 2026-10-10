@@ -304,7 +304,7 @@ sequenceDiagram
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| マニフェストの URL に `mf` を入れる形を、[packaging-and-drm.md](packaging-and-drm.md) の 4.4 節の URL の形へ反映するか | packaging-and-drm の担当に提案する（`manifest-format-versions`） |
+| マニフェストの URL に `mf` を入れる形 | 統合の工程で採り、[packaging-and-drm.md](packaging-and-drm.md) の 4.4 節に反映した（閉じた） |
 | x264・SVT-AV1 の出力が型の間で同じバイトになるか | 夜間の決定性の検査と `encoder-arch-poc`（**未検証**） |
 | OS のストアの段階の配布の割合と日数 | E4 の `player-rollout`（**未検証**） |
 | `enc_build` を上げるときの VMAF・ビットレートの許す差（±0.5、±2%） | QA が `golden-media-suite` で決める |

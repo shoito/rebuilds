@@ -238,7 +238,7 @@ stateDiagram-v2
 
 - `publish_at` を持つ動画は、`ready` になった後に `scheduled` で待つ。予約の実行は 10 秒ごとに `scheduled` かつ `publish_at ≤ now()` の行を `published` にする（`FOR UPDATE SKIP LOCKED`、1 回 500 行）。
 - `publish_at` に達しても `publish_gate` を通っていなければ、`processing` のまま待ち、通ったときに公開する。時間で公開に倒さない（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)）。創作者には「予約の時刻を過ぎたが確認中」と見せる。
-- 予約の公開から 5 分前に、AV1 の作成の対象（登録者 10 万以上のチャンネル）と、急な人気の事前の配置（[cdn-and-delivery.md](cdn-and-delivery.md) の 6 節）を始める。
+- 予約の公開から 5 分前に、AV1 の作成の対象（登録者 10 万以上のチャンネル）と、急な人気の事前の配置（[cdn-and-delivery.md](cdn-and-delivery.md) の 8 節）を始める。
 - プレミア公開（予約の公開を配信のように見せる）は [live-streaming.md](live-streaming.md) の 9 節で扱う。
 
 ## 7. 元のファイルの保持と消去（ADR-0013）
@@ -252,7 +252,7 @@ stateDiagram-v2
 | `s3://<quarantine-bucket>/orig/{video_id}/source` | 隔離した元のファイル | Standard、別の KMS の鍵 |
 
 - 元のファイルの層の移しは、S3 のライフサイクルの規則（タグ `published_at` の日付で振り分ける）で行う。
-- Deep Archive からの戻しは標準の取り出し（12 時間以内）にする。作り直しのバッチと、古い動画の AV1（[transcoding-pipeline.md](transcoding-pipeline.md) の 6.3 節）がこれを待つ。
+- Deep Archive からの戻しは、古い動画の AV1（[transcoding-pipeline.md](transcoding-pipeline.md) の 6.3 節）と DR は標準（12 時間以内）、作り直しのバッチは大量（48 時間以内）にする（[infrastructure.md](infrastructure.md) の 6.2 節）。
 - 大阪へは元のファイルだけを CRR で写す（ADR-0002）。
 
 ### 7.2 消去の 3 つの経路
@@ -356,7 +356,7 @@ stateDiagram-v2
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| 署名つきの URL に `Content-MD5` と CRC64NVME を両方含める形が通るか（**未検証**） | `presigned-part-checksum-poc`。通らなければ CRC64NVME だけにし、AGENTS.md の「部分ごとに `Content-MD5`」の言い回しを直す提案を Dev に出す |
+| 署名つきの URL に `Content-MD5` と CRC64NVME を両方含める形が通るか（**未検証**） | `presigned-part-checksum-poc`。通らなければ CRC64NVME だけにする。AGENTS.md の言い回しは統合の工程で ADR-0011 に合わせて直した |
 | 既知の違法なメディアのハッシュの提供者と、報告の手順 | **法務の確認待ち：L3** |
 | 法的な削除の期限と、保全との関係 | **法務の確認待ち：L1・L10** |
 | 1 日のアップロードの本数の上限 | 本家の値は**未検証**。E15 の負荷と悪用の計測で見直す |

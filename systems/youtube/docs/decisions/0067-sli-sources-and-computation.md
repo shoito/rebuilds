@@ -29,6 +29,9 @@ date: 2026-10-10
 - **見張り**：ライブの遅延（時刻の焼き込み）、視聴回数の遅れ、措置のエッジの 403（6 つの見張りの端末と東京・大阪から 5 秒ごと）は `canary` で SLO を測る。ライブの実ユーザーの推定は心拍の `lat_ms`（`EXT-X-PROGRAM-DATE-TIME` から）で警報と調べに使う。
 - 社内の見張りは SLO の母数から除く。
 
+> 2026-10-10 の注記：再生できるまでの SLI を動画の帯（8〜12 分・720p 以上）で測ることを、[runbooks/README.md](../runbooks/README.md) の 1 節の定義に書いた（値は変えない）。QA の合意は残る未解決事項。見張りの再生は仮の数に入れて確定で除く（[ADR-0035](0035-view-rules-catalog-and-public-count-composition.md) の B08）。`EXT-X-PROGRAM-DATE-TIME` は [ADR-0030](0030-ll-hls-parameters-and-live-origin.md) の注記で入れた。
+
+
 ### 他の案を選ばなかった理由
 
 - **2（CDN の全数だけ）**：開始の時間と再バッファは CDN のログから分からない。標準のログの遅れで警報が遅れる。

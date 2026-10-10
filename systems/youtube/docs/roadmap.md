@@ -65,6 +65,13 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `self-monitoring-baseline` | 自己監視の別のアカウント、`canary` の骨格（見張りの動画の再生） |
 | `cost-metering` | 配信 1 GB・保存 1 時間・変換 1 時間の原価の計測とダッシュボード |
 | `osaka-warm-standby` | 大阪の骨格、Aurora Global Database、CRR の遅れの監視 |
+| `logging-policy` | ログの欄の型の lint と本番のログの抜き取りの走査（[observability.md](architecture/observability.md) の 5 節） |
+| `kms-and-secrets-baseline` | データの種類ごと・リージョンごとの KMS の鍵、署名の鍵の 30 日の回し（ADR-0062） |
+| `untrusted-media-runtime` | 復号する部品の「信頼しないメディア」の実行の形と構成の検査（ADR-0062） |
+| `audit-trail` | `audit_events` と Object Lock への写し（ADR-0063） |
+| `retention-and-legal-hold` | `retention_policies` と `legal_holds`、保全を消去より先に効かせる（ADR-0063）。値は法務：L5・L10 |
+| `operator-access` | 運用者の JIT・2 人の承認・監査（ADR-0063） |
+| `deploy-and-rollback` | 部品ごとの「足してから抜く」入れ替えと自動のロールバック（ADR-0070） |
 
 ### E2 アップロードと検査
 
@@ -77,6 +84,7 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `known-illegal-media-hash` | 既知の違法なメディアのハッシュの照合の口（提供者は未定。法務：L3） |
 | `original-retention` | 元のファイルの保持、層の移し、消去の 3 つの経路 |
 | `video-metadata-and-visibility` | 題・説明・タグ・公開の範囲・予約の公開・下書き |
+| `presigned-part-checksum-poc` | PoC：署名に `Content-MD5` と CRC64NVME を含めた部分の PUT、`FULL_OBJECT` の完了、背景の転送での URL の期限切れ（ADR-0011） |
 
 ### E3 変換
 
@@ -89,12 +97,15 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `fast-encode-path` | 速い段（360p・720p）と、全段での置き換え |
 | `per-title-ladder` | 試しの符号化と VMAF、`ladder_version` 1 |
 | `av1-promotion` | 人気のしきい値の判定と `av1_encode` |
-| `audio-and-loudness` | AAC-LC・HE-AAC、ラウドネスの計測 |
+| `audio-and-loudness` | AAC-LC・HE-AAC、ラウドネスの計測（ADR-0017） |
 | `manual-captions` | SRT・WebVTT の読み込みと検証、字幕のトラック |
 | `auto-captions` | ASR Adapter と自動の字幕（日本語・英語、VOD）。学習の利用は法務：L8 |
 | `thumbnails-and-storyboard` | 自動の候補、手動のサムネイル、シークの縮小の画像 |
 | `chapters-from-description` | 説明の時刻の行からチャプター |
 | `golden-media-suite` | 黄金の動画の集まりと VMAF の下限（quality.md の 2.2.1 節 A） |
+| `enc-build-pinning` | `enc_build` の固定と設定のハッシュ（ADR-0071） |
+| `reencode-campaigns` | 作り直しの対象の選び方と Deep Archive の戻しの量の制御（ADR-0071） |
+| `live-archive-reencode` | ライブのアーカイブの作り直しの条件と、作り直さないアーカイブの段の間引き（ADR-0031 の 2026-10-10 の注記） |
 
 ### E4 パッケージと再生
 
@@ -109,6 +120,8 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `android-player` | Media3 と自前の ABR |
 | `ios-player` | AVPlayer と HLS、段の上限の制御 |
 | `qoe-telemetry` | 開始の時間・再バッファ・段の切り替えの出来事と集計。外部送信の公表は法務：L6 |
+| `manifest-format-versions` | マニフェストの URL の `mf` と 2 つ前までの生成（ADR-0071） |
+| `player-rollout` | Web のプレイヤーの段の配布と、アプリの `min_supported`（ADR-0070） |
 
 ### E5 配信
 
@@ -117,9 +130,14 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `cdn-cost-poc` | PoC：CDN の実効の単価、急な人気でのオリジンの負荷 |
 | `cloudfront-and-shield` | CloudFront、Origin Shield、キャッシュの規則（ADR-0005） |
 | `origin-cache` | 範囲の読み出し、NVMe のキャッシュ、要求の合流 |
-| `signed-delivery` | 署名つきの URL と cookie、鍵の回し |
+| `signed-delivery` | パスの頭のエッジのトークン、HMAC の鍵の回し（ADR-0025） |
 | `delivery-block-list` | 拒否の一覧（エッジの関数）、無効化、60 秒の停止（NFR-014） |
 | `viral-prewarm` | 急な人気の兆しでの事前の配置 |
+| `edge-function-staging` | エッジの関数をステージングのディストリビューションで確かめてから出す |
+| `cdn-logs` | CDN のリアルタイムのログと標準のログ（ADR-0067・0068） |
+| `canary-probes` | 見張りの端末と見張りの措置 |
+| `token-abuse-detection` | 悪用のトークンの検出と `t:` の拒否（ADR-0062） |
+| `cdn-commit-negotiation` | CloudFront の約定の値引きの見積もりと判断（2.1 節の配信の費用の決定。PM の判断待ち） |
 
 ### E6 アカウント・チャンネル・登録・通知
 
@@ -127,10 +145,14 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `accounts-and-auth` | アカウント、認証、年齢の入力。記録の保持は法務：L10 |
 | `creator-verification` | 15 分を超える動画のアップロードのための確認 |
-| `channels-and-roles` | チャンネル、ハンドル、所有者と管理者の役割（ADR-0009） |
+| `channels-and-roles` | チャンネル、ハンドル、7 つの役割と `can()`（ADR-0059） |
 | `subscriptions` | 登録と登録の一覧 |
 | `notifications` | 新しい動画とライブの通知（プッシュ・メール）、まとめ、扇形の配り |
 | `playlists` | 再生リスト、後で見る |
+| `account-recovery-and-takeover` | 回復と乗っ取りへの対応（ADR-0060） |
+| `channel-handles` | ハンドル（ADR-0053） |
+| `subscription-feed` | 登録のフィード（ADR-0053） |
+| `push-devices` | プッシュの端末の登録 |
 
 ### E7 視聴の計測
 
@@ -160,6 +182,9 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `takedown-requests` | 削除の申出の受付と通知、侵害の繰り返し。法務：L1 |
 | `reference-backscan` | 新しい参照の遡り（90 日と人気の動画） |
 | `fp-bench` | 歪めた参照の集まりと合否（quality.md の 2.2.1 節 D） |
+| `claim-revenue-split` | 照合の収益の 1 秒ごとの分け方と預かり（ADR-0047） |
+| `counter-notices-and-strikes` | 反論の通知と著作権の strike を出す時機（ADR-0049）。法務：L1・L2 |
+| `rights-abuse-monitoring` | 権利者と創作者の濫用の監視 |
 
 ### E9 コメントとモデレーション
 
@@ -170,6 +195,12 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `age-restriction` | 年齢の制限と確かめ、`playable()` の行 |
 | `made-for-kids-flag` | 子ども向けの印と、コメント・通知・個人化の停止。法務：L3 |
 | `paid-promotion-disclosure` | タイアップの申告の欄と視聴の画面の表示。法務：L4 |
+| `comment-posting-and-hold` | 投稿の判定と保留（ADR-0051）。法務：L6 |
+| `creator-comment-tools` | 創作者のコメントの道具 |
+| `moderation-actions` | 措置の記録と効かせ方（ADR-0052） |
+| `strikes-and-standing` | 警告・strike・アカウントの状態（ADR-0061）。法務：L1 |
+| `age-and-supervision` | 年齢の帯と見守りのアカウント。法務：L3 |
+| `quarantine-account-handling` | 既知の違法なメディアに一致したときのアカウントの扱い。法務：L3・L10 |
 
 ### E10 検索
 
@@ -179,6 +210,8 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `japanese-analysis` | kuromoji と N-gram、正規化（X の題材の形に寄せる） |
 | `search-ranking-and-filter` | 順位、`playable()` での絞り込み、候補の補完 |
 | `search-eval-set` | 日本語の検索の評価の集まり |
+| `search-poc` | PoC：索引の大きさ、字幕の区切り、応答の時間 |
+| `search-suggest` | 候補の補完（ADR-0042）。法務：L5 |
 
 ### E11 おすすめと視聴の履歴
 
@@ -190,6 +223,8 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `scoring-s1` | 手で決めた式、AppConfig の重み |
 | `non-personalized-feed` | 個人化しない並び（子ども向け、履歴の停止、匿名）。法務：L3 |
 | `recs-offline-eval-and-ab` | オフラインの評価と A/B、ガードレール |
+| `covisitation-batch` | 共起の毎日の作成（ADR-0038） |
+| `mixer` | 混ぜ合わせの規則（ADR-0039） |
 
 ### E12 ライブ
 
@@ -204,6 +239,11 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `live-matching` | 30 秒の窓の照合と差し替え |
 | `premieres` | 予約の公開を配信のように見せるプレミア公開 |
 | `live-latency-tests` | 時刻の焼き込みの見張り（quality.md の 2.2.1 節 E） |
+| `live-distribution-quota` | `live` のディストリビューションの上限の申請と分割の手順（ADR-0064） |
+| `live-deploy-without-interruption` | 配信を切らない `live-transcoder`・`live-origin`・`live-ingest` の入れ替え（ADR-0070） |
+| `live-latency-telemetry` | 心拍の `lat_ms` と `EXT-X-PROGRAM-DATE-TIME`（ADR-0067） |
+| `ll-hls-abr` | 低遅延のライブの ABR（ADR-0022） |
+| `stream-key-protection` | ストリームキーの漏えいの検出と失効（ADR-0062） |
 
 ### E13 ライブチャット
 
@@ -214,6 +254,7 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `chat-moderation` | 低速モード、モデレーター、ブロックの語、利用者のタイムアウト。法務：L6 |
 | `chat-replay` | 配信の時刻のずれでのリプレイ |
 | `chat-load-tests` | 20 万人の配信の負荷（quality.md の 2.2.1 節 H） |
+| `chat-sequencer` | 配信ごとの順番付け（ADR-0032） |
 
 ### E14 収益化
 
@@ -225,6 +266,9 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `members-only-drm` | メンバー限定の動画の DRM、ライセンスの事業者の口（ADR-0004） |
 | `revenue-ledger` | 台帳、収益の分配の計算、照合の収益の分け方、調整の行 |
 | `creator-payouts` | 月ごとの支払い、明細、税の情報（Stripe の題材の形を参考にする）。法務：L7 |
+| `drm-provider-poc` | PoC：`cbcs` の細部、鍵を要求ごとに渡す形、端末の試験 |
+| `drm-packaging-and-license-proxy` | DRM のパッケージと `license-proxy`（ADR-0021） |
+| `client-side-ads` | プレイヤーの広告の挿入（ADR-0024） |
 
 ### E15 本番の準備と GA の判定
 
@@ -237,6 +281,18 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e15` | 個別の手順の作成と確認 |
 | `ga-readiness` | GA の判定。法務：L1・L3・L5・L10 |
+| `event-capacity-plan` | 大きな催しの 2 週間前の確認（ADR-0069） |
+| `dr-hot-set` | 熱い集まりの選び方と大阪への写し（ADR-0066） |
+| `legal-request-workflow` | 開示の請求と照会の手順。法務：L10 |
+
+### S2 の前の PoC
+
+| Story | 内容 |
+| --- | --- |
+| `multi-cdn-poc` | 2 つ目の CDN のトークン・拒否の一覧・リアルタイムのログ、オリジンの形（ADR-0066） |
+| `osaka-upload-poc` | 大阪でアップロードを受けるか |
+| `dr-replication-poc` | S2 の量の元のファイルの写しの転送 |
+| `encoder-arch-poc` | Graviton の符号化の VMAF と決定性 |
 
 ## エージェントに任せないこと
 

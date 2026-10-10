@@ -120,7 +120,9 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **段のやり直し**：作業者を任意の位置で止め、出力が 1 回だけ行った場合と同じになる。Spot の中断を 1 時間に 10% の作業者に注入しても、出力が同じ。
 - **元のファイル**：元のファイルの消去が 3 つの経路の外で起きないことを、消去の経路の検査（S3 の削除の API を呼ぶコードの許可リスト）と、毎週の S3 Inventory とカタログの突き合わせで確かめる。
 - **出来事**：MSK のブローカーの停止、消費者の再起動で、確定の数が変わらない。
-- **DR の訓練**：大阪へ切り替え、元のファイルの写しから再生を再開できる（RTO 2 時間、NFR-009）。
+- **DR の訓練**：大阪へ切り替え、熱い集まりの再生が 2 時間以内に戻る（RTO 2 時間、NFR-009。熱い集まりで満たす解釈は PM・QA の判断待ち）。熱い集まりの外の動画の「処理中」と作り直しの時間、オリジングループの自動の切り替えを記録する（[infrastructure.md](architecture/infrastructure.md) の 7.3 節）。
+- **符号化の決定性**：黄金の動画 20 本を群れの全部のインスタンスの型で夜間に符号化し、出力のバイトが同じ（[ADR-0065](decisions/0065-media-fleets-msk-and-storage-tiers.md)、[delivery.md](architecture/delivery.md) の 2.2 節）。`enc_build` を上げるときは、全集まりで平均の VMAF ±0.5・平均のビットレート ±2% に入る（[ADR-0071](decisions/0071-encoder-pinning-reencode-and-manifest-format-versions.md)）。
+- **ライブのアーカイブ**：作り直さないアーカイブの 30 日の後の間引きで、残す段（720p・360p・音声）が再生でき、元の流れの消去が `original_deletions` に記録される（[ADR-0031](decisions/0031-dvr-storage-and-live-to-vod.md) の注記）。
 
 **G. 見える範囲の漏れの経路の表**
 
@@ -138,17 +140,49 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 創作者・権利者の管理の画面と API | RLS で別のチャンネル・権利者の行が出ない |
 | 分析と書き出し | 他のチャンネルの数が出ない |
 | エラーの応答 | 非公開の動画の有無を推測させない |
+| 運用者の審査の画面（`moderation-review`・`safety-review`） | `playable()` を通さない経路なので、役割・JIT の許可・監査の記録のない取得が 0 件。見た動画と理由が `audit_events` に残る（[security.md](architecture/security.md) の 8 節、[ADR-0063](decisions/0063-operator-access-audit-retention-and-legal-hold.md)） |
+| チャットのリプレイ、通知、DRM のライセンス | 措置・メンバー限定・年齢の制限の配信で、`playable()` と配信の停止に従う |
 
 **H. 負荷と急な人気**
 
 - **急な人気**：公開の直後に、1 つの動画へ同時に 10 万の再生を始める。エッジにないセグメントへの要求が、Origin Shield と要求の合流で S3 の GET を 1 セグメントあたり数回に抑え、開始の時間が NFR-003 に入る。
 - **ライブの大きな配信**：20 万人の配信で、チャットのピーク 1 秒 2,000 件、配信の時間 3 時間。チャットの遅れ p95 2 秒（NFR-013）。
 - **アップロードの急増**：S1 の 3 倍のアップロードを 1 時間。急ぎの組の段が NFR-002 に入り、後ろの組は遅れてよい。
-- **出来事**：S1 のピークの 2 倍の出来事で、仮の数の遅れ p95 60 秒。
+- **出来事**：S1 のピークの 2 倍の出来事で、仮の数の遅れ p95 60 秒。1 つの動画へ 2 万件/秒（20 万人の配信の心拍）で、熱い動画の桶に切り替わる。
+- **大きなライブの配信**：`live-origin` は 20 万人を Origin Shield の後ろの合流した要求の量で全規模の模型にし、CDN を通す試験は 2 万人（10%）を `live` の staging のディストリビューションで行う。CDN を通す VOD の試験も平常のピークの 10%（[capacity.md](architecture/capacity.md) の 9 節、[ADR-0069](decisions/0069-load-model-headroom-and-load-tests.md)）。
+- **余裕**：平常のピークで各部品の使用 60% 以下、AZ を 1 つ止めて催しのピークで 90% 以下。
 
 **I. 合成監視（本番）**
 
-- 見張りの動画（AZ・ISP の代表から）の再生、見張りのアップロード（小さな動画をアップロードから公開まで）、見張りのライブ（24 時間の配信の時刻の焼き込み）、見張りの措置（毎日、見張りの動画に措置をかけて配信の停止を測る）。
+- 見張りの動画（AZ・ISP の代表から）の再生、見張りのアップロード（小さな動画をアップロードから公開まで）、見張りのライブ（24 時間の配信の時刻の焼き込み）、見張りの措置（毎日、見張りの動画に措置をかけて配信の停止を測る）、見張りのチャット、見張りの視聴回数。
+- 見張りの再生は仮の数に入り、確定の数では規則 B08 で除く（[view-counting-and-analytics.md](architecture/view-counting-and-analytics.md) の 5.1 節）。SLO の母数からも除く。
+- 見張りの端末は、家庭の固定回線 3 拠点と携帯の回線 3 拠点に置く（[observability.md](architecture/observability.md) の 6 節）。
+
+### 2.2.2 性質と決定表の一覧
+
+領域の文書が提案した性質（`PROP-*`）と決定表（`DT-*`）。ID は各 Story の `spec.md` で正式に振り直すときに、この一覧と重ならないことを確かめる。
+
+| 領域 | 性質・決定表 | 2.2.1 節の重点 |
+| --- | --- | --- |
+| [upload-and-ingest.md](architecture/upload-and-ingest.md) | PROP-UPL-001〜005、DT-UPL-001・002 | F |
+| [transcoding-pipeline.md](architecture/transcoding-pipeline.md) | PROP-PIPE-001〜004、PROP-LADDER-001・002、PROP-AV1-001、DT-PIPE-001、DT-AV1-001 | A、F |
+| [packaging-and-drm.md](architecture/packaging-and-drm.md) | PROP-PKG-001〜004、PROP-DRM-001、DT-PKG-001、DT-DRM-001 | A、G |
+| [playback-and-abr.md](architecture/playback-and-abr.md) | PROP-ABR-001〜004、PROP-QOE-001、DT-QOE-001 | B |
+| [cdn-and-delivery.md](architecture/cdn-and-delivery.md) | PROP-CDN-001〜005 | G、H、I |
+| [live-streaming.md](architecture/live-streaming.md) | PROP-LIVE-001〜004、DT-LIVE-001 | E |
+| [live-chat.md](architecture/live-chat.md) | PROP-CHAT-001〜005、DT-CHAT-001 | H |
+| [view-counting-and-analytics.md](architecture/view-counting-and-analytics.md) | PROP-VIEW-001〜006、DT-VIEW-001・002 | C |
+| [recommendations.md](architecture/recommendations.md) | PROP-REC-001〜005、DT-REC-001 | G |
+| [search.md](architecture/search.md) | PROP-SRCH-001〜004、DT-SRCH-001 | G |
+| [copyright-matching.md](architecture/copyright-matching.md) | PROP-FP-001〜006、DT-FP-001 | D |
+| [copyright-claims-and-disputes.md](architecture/copyright-claims-and-disputes.md) | PROP-CLM-001〜006、DT-CLM-001〜003 | D |
+| [comments-and-moderation.md](architecture/comments-and-moderation.md) | PROP-CMT-001〜005、PROP-MOD-001、DT-CMT-001〜003 | G |
+| [channels-subscriptions-and-notifications.md](architecture/channels-subscriptions-and-notifications.md) | PROP-SUB-001〜005、DT-SUB-001 | G |
+| [monetization-and-payouts.md](architecture/monetization-and-payouts.md) | PROP-REV-001〜006、PROP-MEM-001、DT-REV-001、DT-ADS-001 | — （参照の実装との比べ） |
+| [accounts-and-safety.md](architecture/accounts-and-safety.md) | PROP-ACC-001〜005、DT-ACC-001〜003 | G |
+| [security.md](architecture/security.md) | PROP-SEC-001〜003、DT-SEC-001 | F、G |
+| [observability.md](architecture/observability.md) | PROP-OBS-001・002、DT-OBS-001 | I |
+| [delivery.md](architecture/delivery.md) | PROP-DLV-001〜003、DT-DLV-001 | A |
 
 ### 2.3 エージェントの確認ループ
 
@@ -232,9 +266,9 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 
 | Epic | 重点 | リリースの合否基準 |
 | --- | --- | --- |
-| E1 基盤 | RLS の検査、MSK と消費者の枠、EC2 のプール、自己監視、CI の黄金の動画の枠 | RLS の性質ベーステストが緑。見張りの経路が動く |
+| E1 基盤 | RLS の検査、MSK と消費者の枠、EC2 のプール、自己監視、CI の黄金の動画の枠、Terraform のポリシーの検査、信頼しないメディアの実行の形 | RLS の性質ベーステストが緑。見張りの経路が動く。ポリシーの検査（[infrastructure.md](architecture/infrastructure.md) の 8 節）と、復号する部品の構成の検査（ADR-0062）が緑 |
 | E2 アップロードと検査 | 完了の条件（F）、再開、ファジング（コンテナの解析）、段の冪等 | 障害の注入で完了の後の消失 0。ファジング 7 日で落ちない |
-| E3 変換 | 黄金の動画と VMAF（A）、継ぎ目、Spot の中断、AV1 への上げ | 全集まりで下限を満たす。`per-title-ladder-poc`・`av1-cost-poc`・`asr-engine-poc` の結果が記録済み |
+| E3 変換 | 黄金の動画と VMAF（A）、継ぎ目、Spot の中断、AV1 への上げ、型ごとの決定性 | 全集まりで下限を満たす。`enc_build` の差が許す範囲（VMAF ±0.5、ビットレート ±2%）。`per-title-ladder-poc`・`av1-cost-poc`・`asr-engine-poc` の結果が記録済み |
 | E4 パッケージと再生 | パッケージの適合（A）、ABR の模擬（B）、端末の試験、DRM | NFR-003・NFR-004 を模擬と見張りで満たす |
 | E5 配信 | 措置の停止（G）、急な人気（H）、署名 | 措置の停止 60 秒、急な人気の場面が緑 |
 | E6 アカウント・チャンネル・通知 | RLS（G）、通知の重複 | 漏れの経路の表の該当行が緑 |
@@ -246,7 +280,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | E12 ライブ | 遅延の試験（E）、切り替え、ライブの照合 | NFR-005 を満たす。DVR と VOD が一致 |
 | E13 ライブチャット | 扇形の配りの負荷（H）、モデレーション | NFR-013 を満たす |
 | E14 収益化 | 分配の参照の実装との比べ、台帳の性質、DRM | 差 0 円 |
-| E15 本番の準備 | 負荷試験（S1 のピークの 2 倍）、急な人気、DR の訓練、外部のペンテスト | runbooks の SLO を負荷試験で満たす。DR で RPO・RTO を満たす。ペンテストの High 以上が 0 |
+| E15 本番の準備 | 負荷試験（S1 のピークの 2 倍、催しのピーク）、急な人気、DR の訓練、外部のペンテスト | runbooks の SLO を負荷試験で満たす。AZ を 1 つ止めた状態で催しのピークの使用 90% 以下。DR で RPO・RTO を満たす（熱い集まり）。ペンテストの High 以上が 0 |
 
 ## 6. 責任分担
 

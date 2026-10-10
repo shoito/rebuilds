@@ -99,13 +99,13 @@ flowchart LR
 
 - **見張りの配信**（SLO）：`canary` の配信のソフトが映像に時刻の QR を焼き込み、音声に時刻の合図を入れる（[quality.md](../quality.md) の 2.2.1 節 E）。見張りの端末（6 節）が画面を読み、撮影の時刻と比べる。低遅延と通常のモードの 2 本を 24 時間流す。
 - **実ユーザーの推定**（警報と調べ）：プレイヤーは心拍に `lat_ms`（今の時刻 − 再生の位置の `EXT-X-PROGRAM-DATE-TIME`）を足す。端末の時計のずれを除くため、再生の API の応答の時刻で端末の時計を補正する。
-- **必要な前提**：ライブのプレイリストに `EXT-X-PROGRAM-DATE-TIME`（入力の時刻から）を入れること。[live-streaming.md](live-streaming.md) の 6.3 節の例にはないので、live-streaming の担当に足すことを提案する（14 節）。
+- **前提**：ライブのプレイリストに `EXT-X-PROGRAM-DATE-TIME`（入力の時刻から）を入れる。統合の工程で採り、[live-streaming.md](live-streaming.md) の 6.3 節に足した（[ADR-0030](../decisions/0030-ll-hls-parameters-and-live-origin.md) の注記）。
 - 撮影から取り込みまで（配信者の側）は実ユーザーの推定に入らない（プログラムの時刻は取り込みの時刻）。見張りの配信とは差がある。
 
 ### 2.4 視聴回数の遅れ
 
 - `canary` が見張りの動画（非公開ではなく限定公開、見張りのチャンネル）を 1 分ごとに再生し、公開の数の API を 5 秒ごとに読んで、増えるまでの時間を測る。
-- 見張りの再生は `view-rules` の「同じ組の 24 時間 4 回」に当たるので、見張りの端末の識別子を回す（`canary` の印は `view-rules` の正しさの判定から除く。数には入れて遅れを測り、確定の段で見張りの印で除く）。この扱いは view-counting の担当と合意する（14 節）。
+- 見張りの再生は `view-rules` の「同じ組の 24 時間 4 回」に当たるので、見張りの端末の識別子を回す（`canary` の印は `view-rules` の正しさの判定から除く。数には入れて遅れを測り、確定の段で見張りの印で除く）。統合の工程で採り、規則 B08 を足した（[view-counting-and-analytics.md](view-counting-and-analytics.md) の 5.1 節、[ADR-0035](../decisions/0035-view-rules-catalog-and-public-count-composition.md) の注記）。
 
 ### 2.5 措置の停止
 
@@ -293,9 +293,7 @@ ADR-0068。プレイヤーの出来事は [playback-and-abr.md](playback-and-abr
 | --- | --- |
 | 端末の計測の外部送信の通知・公表、送信を止める設定 | **法務の確認待ち：L6** |
 | `qoe_minute` の保持 | **法務の確認待ち：L5** |
-| ライブのプレイリストへの `EXT-X-PROGRAM-DATE-TIME` | live-streaming の担当に提案する（`ll-hls-and-dash-live`） |
-| 見張りの再生を数に入れて確定で除く扱い | view-counting の担当と合意する（`provisional-view-counts`） |
-| 再生できるまでの帯の選び方を、runbooks の SLI の定義の変更とみなすか | QA と Ops で合意する |
+| 再生できるまでの帯の選び方を、runbooks の SLI の定義の変更とみなすか | runbooks の 1 節の定義に書いた。QA の合意は残る（[architecture/README.md](README.md) の 6 節） |
 | 標準のログの届きの遅れ | E5 の `cdn-logs` で測る（**未検証**） |
 | CMCD を使うか | S2 の `multi-cdn-poc` |
 
