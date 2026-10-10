@@ -170,8 +170,8 @@ Wasmtime のバージョンごとの機械語と署名。90 日残す。
 | `duration_us` | `integer` | NULL | — | |
 | `input_hash` | `bytea` | NOT NULL | — | 入力の JSON の SHA-256 |
 | `input` | `jsonb` | NULL | — | 同意のある 24 時間だけ。保護のデータの項目を除く |
-| `output` | `jsonb` | NULL | — | 20 KB まで |
-| `log` | `text` | NULL | — | 1 KB まで |
+| `output` | `jsonb` | NULL | — | 20 KiB まで |
+| `log` | `text` | NULL | — | 1 KiB まで |
 | `sampled` | `boolean` | NOT NULL | — | 成功の抜き取りか |
 
 - キー：PK `(shop_id, function_id, run_at, run_id)`。索引：`(shop_id, status, run_at)` — 開発者の画面と事業者の失敗の数。

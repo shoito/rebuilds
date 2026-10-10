@@ -2,7 +2,7 @@
 
 アプリの関数（WebAssembly）の種類と入出力の契約、入力のクエリ、モジュールの約束（輸入・輸出）、`checkout` と `function-runner` の間の約束、上限、呼ぶ順序と予算、失敗のときの決まった結果、モジュールの公開・検査・事前の翻訳・署名・配り、関数のログと再現を決める。
 
-前提となる決定は、関数は WebAssembly のモジュールで、`checkout` の隣の Rust のプロセスの Wasmtime で、燃料 1,000 万・線形メモリー 10 MB・入力 128 KB・出力 20 KB などの上限で動かし、WASI を渡さず、失敗は種類ごとの「効果なし」にすること（[ADR-0008](../decisions/0008-extension-sandbox-wasm.md)）、Rust のホストは共通の基盤からの外れ（[ADR-0001](../decisions/0001-platform-and-stack.md)）、関数の割引は割引のエンジンの組み合わせの規則で合わせること（[discounts-engine.md](discounts-engine.md)）。要件は NFR-012（関数 1 回 p99 5ms、1 段の合計 p99 50ms、上限の超過でチェックアウトが落ちない）と NFR-001（チェックアウトの段 p99 500ms）。法務の確認待ちは L1（関数が最終確認画面に出す事項を変えないこと）と L3（関数の入力の買い手のデータ）。この文書で決めたことは次の ADR にある。
+前提となる決定は、関数は WebAssembly のモジュールで、`checkout` の隣の Rust のプロセスの Wasmtime で、燃料 1,000 万・線形メモリー 10 MiB・入力 128 KiB・出力 20 KiB などの上限で動かし、WASI を渡さず、失敗は種類ごとの「効果なし」にすること（[ADR-0008](../decisions/0008-extension-sandbox-wasm.md)）、Rust のホストは共通の基盤からの外れ（[ADR-0001](../decisions/0001-platform-and-stack.md)）、関数の割引は割引のエンジンの組み合わせの規則で合わせること（[discounts-engine.md](discounts-engine.md)）。要件は NFR-012（関数 1 回 p99 5ms、1 段の合計 p99 50ms、上限の超過でチェックアウトが落ちない）と NFR-001（チェックアウトの段 p99 500ms）。法務の確認待ちは L1（関数が最終確認画面に出す事項を変えないこと）と L3（関数の入力の買い手のデータ）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |
@@ -69,7 +69,7 @@ ADR-0058。
 | `FunctionConfiguration` | `metafield(ns, key)`（事業者の設定の値。下） |
 
 - 入力の作り方：`checkout` が、クエリを入力のスキーマで実行して JSON を作る（DB を読まない。チェックアウトの今のカートと、カートの読み出しの時に読んだ値から作る）。保護のデータの承認のない項目は `null`。
-- 入力の JSON は 128 KB まで（カートの行が 200 を超えたら比例して広げる。6 節）。超えたら関数を呼ばずに `INPUT_TOO_LARGE` の失敗にする。
+- 入力の JSON は 128 KiB まで（カートの行が 200 を超えたら比例して広げる。6 節）。超えたら関数を呼ばずに `INPUT_TOO_LARGE` の失敗にする。
 - **関数の設定**：事業者は、関数ごとに設定（アプリの管理画面で作る JSON、16 KB まで）を持ち、関数は入力の `FunctionConfiguration.metafield` で読む。例：「10 個以上で 15% 引き」の閾値と率。
 
 例（割引の関数の入力のクエリと入力）：
@@ -135,7 +135,7 @@ import "<brand>_io" "input_read"   : (ptr: i32, cap: i32) -> i32
 import "<brand>_io" "output_write" : (ptr: i32, len: i32) -> i32
         出力の続きを足す。合計が上限を超えたら -1 を返し、以後の書き込みも -1（実行の後で OUTPUT_TOO_LARGE）
 import "<brand>_io" "log"          : (ptr: i32, len: i32) -> ()
-        ログ（合計 1 KB まで。超えた分は捨て、切った印を残す）
+        ログ（合計 1 KiB まで。超えた分は捨て、切った印を残す）
 import "wasi_snapshot_preview1" "fd_read"  : fd 0 だけ。input_read と同じ中身
 import "wasi_snapshot_preview1" "fd_write" : fd 1 は output_write、fd 2 は log と同じ
 import "wasi_snapshot_preview1" "proc_exit": 0 は正常の終わり、他はトラップとして扱う
@@ -244,7 +244,7 @@ flowchart LR
 
 ## 10. 実行の記録と開発者の道具
 
-- 実行の記録（`function_runs`）：関数、ショップ、時刻、`status`、燃料、時間、入力のハッシュ、出力（20 KB まで）、ログ（1 KB）。7 日。開発者の画面と Admin API（`functionRuns`）で読む。
+- 実行の記録（`function_runs`）：関数、ショップ、時刻、`status`、燃料、時間、入力のハッシュ、出力（20 KiB まで）、ログ（1 KiB）。7 日。開発者の画面と Admin API（`functionRuns`）で読む。
 - 入力の本体は既定で残さない。事業者が「デバッグのため入力を残す」を有効にしたとき（24 時間で自動で切れる）だけ、保護のデータの項目を除いた入力を残す（法務の確認待ち L3）。
 - 記録は、成功を 1% の抜き取り、失敗は全部（ショップと関数ごとに 1 分 100 件まで）。
 - **再現**：開発者の道具（自前の CLI、`<brand>-fn`）は、本システムと同じ Wasmtime のバージョンと設定、同じ燃料の数え方で、ローカルで関数を動かす。残した入力（または開発者が作った入力）で、本番と同じ燃料と出力になる。

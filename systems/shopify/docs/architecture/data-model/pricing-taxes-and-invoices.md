@@ -81,7 +81,7 @@ erDiagram
         uuid shop_id PK
         uuid order_id PK
         text tax_category PK
-        integer rate_bp
+        integer rate_bp UK "rate_bp > 0"
         bigint taxable_gross_amount
         bigint tax_amount
     }

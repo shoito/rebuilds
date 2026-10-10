@@ -430,7 +430,9 @@ erDiagram
     }
     order_tax_lines {
         uuid shop_id PK
+        uuid order_id PK
         text tax_category PK
+        integer rate_bp UK "rate_bp > 0"
     }
     fulfillment_orders {
         uuid shop_id PK
@@ -570,6 +572,7 @@ erDiagram
     }
     order_tax_lines {
         text tax_category PK
+        integer rate_bp UK "rate_bp > 0"
         bigint tax_amount
     }
     inventory_movements {
@@ -624,7 +627,7 @@ erDiagram
 | **提供者への要求は冪等** | 冪等キー `<checkout_id>:<attempt>:<op>`・`<refund_id>:refund`・`<invoice_id>:charge:<attempt>`（列から決まる）。`unknown` の間は同じキーで照会だけ | [ADR-0006](../decisions/0006-payments-via-providers.md)、[ADR-0044](../decisions/0044-returns-state-and-restock.md) |
 | **割引の使用の回数の上限** | `discount_usage_slots` の CHECK `remaining >= 0`、`discount_customer_usage` の CHECK `reserved + used <= limit_qty`。決済済みで取り直せない分は `overage` と `over_limit_reasons`（上限の外の数として残す） | [ADR-0034](../decisions/0034-discount-usage-counters.md) |
 | **1 人あたりの上限** | `purchase_limit_counters` の CHECK `reserved + used <= limit_qty`、鍵は正規化した値の HMAC（元の値を持たない） | [ADR-0026](../decisions/0026-bot-defense-and-purchase-limits.md) |
-| **税は税率ごとに 1 回だけ丸める** | 行ごとの税額の列を持たない。`order_tax_lines`・`refund_tax_lines` の UK `(…, rate_bp) WHERE rate_bp > 0`。文書は `order_tax_lines` から作り、計算し直さない。`tax-ref` との日次の抜き取り | [ADR-0017](../decisions/0017-consumption-tax-calculation-and-rounding.md)、[ADR-0018](../decisions/0018-invoice-documents-and-receipts.md) |
+| **税は税率ごとに 1 回だけ丸める** | 行ごとの税額の列を持たない。`order_tax_lines`・`refund_tax_lines` は PK `(…, tax_category)`、UK `(…, rate_bp) WHERE rate_bp > 0`。文書は `order_tax_lines` から作り、計算し直さない。`tax-ref` との日次の抜き取り | [ADR-0017](../decisions/0017-consumption-tax-calculation-and-rounding.md)、[ADR-0018](../decisions/0018-invoice-documents-and-receipts.md) |
 | **文書は不変、番号は抜けない** | `tax_documents` の UPDATE を拒むトリガー、`tax_document_sequences` を同じトランザクションで 1 増やす、`(shop_id, number)` 一意 | [ADR-0018](../decisions/0018-invoice-documents-and-receipts.md) |
 | **返金は確定の額を超えない** | 返金の作成で `orders` を `FOR UPDATE`、和を確かめる。`orders.refunded_amount <= captured_amount` の CHECK。返す単位は `refund_lines` で 1 回 | [ADR-0043](../decisions/0043-refund-calculation-from-unit-allocations.md) |
 | **割引の按分は決定的** | 単位の配列（`unit_*_amounts`）を写しと注文に持ち、按分の順は額と ID だけで決まる。参照の実装 `discount-ref` との性質ベーステスト | [ADR-0033](../decisions/0033-discount-allocation-and-rounding.md) |

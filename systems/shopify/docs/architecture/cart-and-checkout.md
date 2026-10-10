@@ -124,7 +124,7 @@ sequenceDiagram
     C->>DB: payment_attempts（created）を INSERT
     C->>DB: state = payment_pending、checkout_events
     C->>DB: COMMIT
-    C->>P: createSession（冪等キー checkout_id:attempt:session）
+    C->>P: createSession（冪等キー #lt;checkout_id#gt;:#lt;attempt#gt;:session）
     P-->>C: リダイレクトの URL か入力部品の値
     C->>DB: payment_attempts に providerRef、session_open
     C-->>B: リダイレクト（または入力部品で確定）
