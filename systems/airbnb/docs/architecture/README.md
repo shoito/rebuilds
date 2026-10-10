@@ -452,31 +452,31 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
-| `listings-and-content.md` | リスティングの状態とバージョン、物件の種類・定員・設備・ハウスルール、写真の処理と知覚ハッシュ、多言語の内容と翻訳の印、公開の審査の呼び出し、`listingVisible()`、表示の規則（法務の L13） | 0010–0013 | QA | E3 |
-| `location-and-geo.md` | 住所の入力と確かめ、正確な位置の金庫、ずらした位置の決め方と割り出しの防止、地名の辞書（日本語と外国語の名前、かなとローマ字の揺れ）、地図の範囲と多角形、住所の検索と地図の提供者 | 0014–0016 | QA、セキュリティ | E4 |
-| `availability-and-calendars.md` | `stay_claims` と排他の制約、滞在の規則（最短・最長、曜日、締め切り、予約できる期間、準備の日）、泊ごとのカレンダーの設定、ブロック、物件のタイムゾーンと `packages/stay-time`、tz データベースの更新、1 リスティングの複数の同じ部屋（S2） | 0017–0020 | QA | E5 |
-| `calendar-sync.md` | iCal の取り込み（取得、差分、正規化、上限、egress）、書き出し（秘密のアドレス、`UID`）、食い違いの検出と知らせ、PMS の API との優先、ホストの申告の外部の泊 | 0021–0023 | QA、セキュリティ | E6 |
-| `search-and-ranking.md` | 索引の形（ずらした位置、空きの区間、料金の要約、多言語の欄）、ステージ 1 と 2、空室の写し、価格の絞り込み、日付を決めない検索、地図の点の集め方、順位の式 v1、検索の誤りの率の計測 | 0024–0028 | QA | E7 |
-| `pricing-and-fees.md` | 泊の料金の規則（基本、週末、季節、日付の上書き）、長期の割引、清掃料・追加のゲスト・ペットの料金、サービス料、`quoteStay` と見積もりの写し、総額の表示、割引の表示（法務の L13） | 0029–0031 | QA、財務 | E8 |
-| `taxes.md` | 税の表（消費税、宿泊税、入湯税）と自治体の区域、免除、端数、明細、預かりと納付の型（法務の L4） | 0032–0034 | QA、財務、法務 | E8、E12 |
-| `booking-and-holds.md` | `reserveStay`、状態と遷移の決定表、仮押さえとリクエストの期限、熱い日付の先着の印、予約の一回性、確認の画面（法務の L7）、予約のリクエストの断り（法務の L2・L11）、チェックインの案内 | 0035–0038 | QA、法務 | E9 |
-| `cancellations-and-changes.md` | キャンセルポリシーの表とバージョン、返金の決定表、ホストのキャンセルと罰、運用のキャンセル（事故、災害）、日程・人数の変更と差分の見積もり、変更のリクエスト | 0039–0041 | QA、財務、法務 | E10 |
-| `payments-and-fx.md` | 提供者のアダプターの契約、カードと財布型、オーソリと売上の確定、3-D セキュア、Webhook の inbox と照会、返金、チャージバック、為替の相場の写しと上乗せ（法務の L5・L6） | 0042–0045 | QA、セキュリティ、法務 | E11 |
-| `ledger-and-payouts.md` | 勘定科目、仕訳の型、預かりと決着、release の時刻、送金の束と実行、失敗の戻し、送金の保留、税の預かり、3 者の照合、手数料の請求書（法務の L4・L5） | 0046–0049 | QA、財務、法務 | E12 |
-| `deposits-and-claims.md` | 損害の請求の受け付けと期限、ゲストの応答、運用の判断、ゲストへの請求、補償の記録、保証金（MVP の後）（法務の L12） | 0050–0051 | QA、財務、法務 | E13 |
-| `messaging.md` | 問い合わせと予約のメッセージ、連絡先の絞り込みと段（確定の前と後）、翻訳、決まった文の返信、通報、通知の種類と配信（プッシュ、メール、SMS）、通信の秘密（法務の L9） | 0052–0054 | QA、法務 | E14 |
-| `reviews.md` | `review_pairs`、期限と同時の公開、項目ごとの点、ホストの返答、集計と表示、操作の検出、削除の基準（法務の L13） | 0055–0056 | QA、法務 | E15 |
-| `trust-and-safety.md` | 規則のエンジン、信号、審査の待ち行列、措置と異議、偽のリスティング、決済の不正、乗っ取り、パーティーの危険、安全の事故と 24 時間の窓口、差別の禁止（法務の L11）、開示の請求（法務の L14） | 0057–0061 | QA、セキュリティ、法務 | E16 |
-| `identity-verification.md` | eKYC の提供者の連携、確認の水準、確認を求める規則、旅券の読み取り、書類の保存と削除（法務の L3・L8） | 0062–0063 | セキュリティ、法務 | E17 |
-| `regulatory-compliance-japan.md` | 届出住宅・許可・特定認定の型、番号の確かめと表示、`regulated_nights` と年度、自治体の規則の表、宿泊者名簿の電子の名簿、定期報告の書き出し、行政の要請への対応（法務の L1・L2・L3・L10） | 0064–0067 | QA、法務 | E18 |
-| `host-tools-and-api.md` | 複数のリスティングの管理、一括の変更、共同ホストの役割、PMS の API（OAuth、範囲、速さの上限、冪等）、Webhook の署名と配信、API のバージョン | 0068–0070 | QA、セキュリティ | E19 |
-| `accounts.md` | ログイン（パスキー、一時コード、外部の ID）、セッション、端末、言語と通貨の設定、ホストのアカウントの作り方、退会とデータの削除（法務の L8）、アプリの形 | 0071–0072 | セキュリティ | E2 |
-| `security.md` | 脅威モデル、vault と鍵、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、越境の移転（法務の L8） | 0073–0075 | セキュリティ | E1、E20 |
+| [listings-and-content.md](listings-and-content.md) | リスティングの状態とバージョン、物件の種類・定員・設備・ハウスルール、写真の処理と知覚ハッシュ、多言語の内容と翻訳の印、公開の審査の呼び出し、`listingVisible()`、表示の規則（法務の L13） | [0010](../decisions/0010-listing-states-and-revisions.md)、[0011](../decisions/0011-photo-pipeline-and-hashes.md)、[0012](../decisions/0012-multilingual-content-and-machine-translation.md) | QA | E3 |
+| [location-and-geo.md](location-and-geo.md) | 住所の入力と確かめ、正確な位置の金庫、ずらした位置の決め方と割り出しの防止、地名の辞書（日本語と外国語の名前、かなとローマ字の揺れ）、地図の範囲と多角形、住所の検索と地図の提供者 | [0014](../decisions/0014-approximate-location-offset.md)、[0015](../decisions/0015-place-dictionary-and-name-normalization.md)、[0016](../decisions/0016-geocoding-adapter-and-confirmed-pin.md) | QA、セキュリティ | E4 |
+| [availability-and-calendars.md](availability-and-calendars.md) | `stay_claims` と排他の制約、滞在の規則（最短・最長、曜日、締め切り、予約できる期間、準備の日）、泊ごとのカレンダーの設定、ブロック、物件のタイムゾーンと `packages/stay-time`、tz データベースの更新、1 リスティングの複数の同じ部屋（S2） | [0017](../decisions/0017-stay-rules-decision-table.md)、[0018](../decisions/0018-calendar-settings-blocks-and-calendar-version.md)、[0019](../decisions/0019-tzdb-update-and-time-zone-recompute.md)、[0020](../decisions/0020-multi-unit-listings-per-unit-claims.md) | QA | E5 |
+| [calendar-sync.md](calendar-sync.md) | iCal の取り込み（取得、差分、正規化、上限、egress）、書き出し（秘密のアドレス、`UID`）、食い違いの検出と知らせ、PMS の API との優先、ホストの申告の外部の泊 | [0021](../decisions/0021-ical-import-pipeline-and-safety.md)、[0022](../decisions/0022-ical-conflict-clipping-and-reevaluation.md)、[0023](../decisions/0023-ical-export-secret-url-and-contents.md) | QA、セキュリティ | E6 |
+| [search-and-ranking.md](search-and-ranking.md) | 索引の形（ずらした位置、空きの区間、料金の要約、多言語の欄）、ステージ 1 と 2、空室の写し、価格の絞り込み、日付を決めない検索、地図の点の集め方、順位の式 v1、検索の誤りの率の計測 | [0024](../decisions/0024-listing-index-layout-and-stay-ranges.md)、[0025](../decisions/0025-availability-snapshot-layout.md)、[0026](../decisions/0026-ranking-formula-v1.md)、[0027](../decisions/0027-flexible-date-search.md) | QA | E7 |
+| [pricing-and-fees.md](pricing-and-fees.md) | 泊の料金の規則（基本、週末、季節、日付の上書き）、長期の割引、清掃料・追加のゲスト・ペットの料金、サービス料、`quoteStay` と見積もりの写し、総額の表示、割引の表示（法務の L13） | [0029](../decisions/0029-nightly-price-rules-and-discounts.md)、[0030](../decisions/0030-quote-stay-pipeline-and-rounding.md)、[0031](../decisions/0031-host-only-service-fee.md) | QA、財務 | E8 |
+| [taxes.md](taxes.md) | 税の表（消費税、宿泊税、入湯税）と自治体の区域、免除、端数、明細、預かりと納付の型（法務の L4） | [0032](../decisions/0032-tax-rule-tables-by-jurisdiction.md)、[0033](../decisions/0033-stay-tax-computation.md)、[0034](../decisions/0034-tax-collection-model.md) | QA、財務、法務 | E8、E12 |
+| [booking-and-holds.md](booking-and-holds.md) | `reserveStay`、状態と遷移の決定表、仮押さえとリクエストの期限、熱い日付の先着の印、予約の一回性、確認の画面（法務の L7）、予約のリクエストの断り（法務の L2・L11）、チェックインの案内 | [0035](../decisions/0035-booking-decision-table-and-deadlines.md)、[0036](../decisions/0036-hot-date-admission-and-hold-limits.md)、[0037](../decisions/0037-quote-binding-and-idempotency.md)、[0038](../decisions/0038-booking-requests-and-arrival-info-release.md) | QA、法務 | E9 |
+| [cancellations-and-changes.md](cancellations-and-changes.md) | キャンセルポリシーの表とバージョン、返金の決定表、ホストのキャンセルと罰、運用のキャンセル（事故、災害）、日程・人数の変更と差分の見積もり、変更のリクエスト | [0039](../decisions/0039-cancellation-policy-table-and-refund-decision-table.md)、[0040](../decisions/0040-host-and-ops-cancellations.md)、[0041](../decisions/0041-alterations-with-claim-group-and-delta-settlement.md) | QA、財務、法務 | E10 |
+| [payments-and-fx.md](payments-and-fx.md) | 提供者のアダプターの契約、カードと財布型、オーソリと売上の確定、3-D セキュア、Webhook の inbox と照会、返金、チャージバック、為替の相場の写しと上乗せ（法務の L5・L6） | [0042](../decisions/0042-payment-adapter-contract-and-capture-timing.md)、[0043](../decisions/0043-fx-rate-snapshots-markup-and-staleness.md)、[0044](../decisions/0044-refunds-to-original-method.md)、[0045](../decisions/0045-chargeback-handling-and-liability.md) | QA、セキュリティ、法務 | E11 |
+| [ledger-and-payouts.md](ledger-and-payouts.md) | 勘定科目、仕訳の型、預かりと決着、release の時刻、送金の束と実行、失敗の戻し、送金の保留、税の預かり、3 者の照合、手数料の請求書（法務の L4・L5） | [0046](../decisions/0046-chart-of-accounts-and-journal-types.md)、[0047](../decisions/0047-settlement-seq-and-escrow-settlement.md)、[0048](../decisions/0048-release-payout-batching-and-holds.md)、[0049](../decisions/0049-reconciliation-and-tax-collection-gate.md) | QA、財務、法務 | E12 |
+| [deposits-and-claims.md](deposits-and-claims.md) | 損害の請求の受け付けと期限、ゲストの応答、運用の判断、ゲストへの請求、補償の記録、保証金（MVP の後）（法務の L12） | [0050](../decisions/0050-damage-claim-lifecycle-and-guest-charge.md)、[0051](../decisions/0051-security-deposits-deferred-shape.md) | QA、財務、法務 | E13 |
+| [messaging.md](messaging.md) | 問い合わせと予約のメッセージ、連絡先の絞り込みと段（確定の前と後）、翻訳、決まった文の返信、通報、通知の種類と配信（プッシュ、メール、SMS）、通信の秘密（法務の L9） | [0052](../decisions/0052-message-threads-and-stages.md)、[0053](../decisions/0053-contact-info-filter-by-stage.md)、[0054](../decisions/0054-notification-kinds-lanes-and-quiet-hours.md) | QA、法務 | E14 |
+| [reviews.md](reviews.md) | `review_pairs`、期限と同時の公開、項目ごとの点、ホストの返答、集計と表示、操作の検出、削除の基準（法務の L13） | [0055](../decisions/0055-review-pairs-and-simultaneous-reveal.md)、[0056](../decisions/0056-review-aggregation-and-removal.md) | QA、法務 | E15 |
+| [trust-and-safety.md](trust-and-safety.md) | 規則のエンジン、信号、審査の待ち行列、措置と異議、偽のリスティング、決済の不正、乗っ取り、パーティーの危険、安全の事故と 24 時間の窓口、差別の禁止（法務の L11）、開示の請求（法務の L14） | [0057](../decisions/0057-ts-decision-points-and-outcomes.md)、[0058](../decisions/0058-party-risk-score-and-bounded-ml.md)、[0059](../decisions/0059-fake-listing-signals-and-new-host-holds.md)、[0060](../decisions/0060-safety-incidents-and-24x7-line.md)、[0061](../decisions/0061-non-discrimination-enforcement.md) | QA、セキュリティ、法務 | E16 |
+| [identity-verification.md](identity-verification.md) | eKYC の提供者の連携、確認の水準、確認を求める規則、旅券の読み取り、書類の保存と削除（法務の L3・L8） | [0062](../decisions/0062-verification-levels-gates-and-provider-adapter.md)、[0063](../decisions/0063-passport-capture-for-guest-registry.md) | セキュリティ、法務 | E17 |
+| [regulatory-compliance-japan.md](regulatory-compliance-japan.md) | 届出住宅・許可・特定認定の型、番号の確かめと表示、`regulated_nights` と年度、自治体の規則の表、宿泊者名簿の電子の名簿、定期報告の書き出し、行政の要請への対応（法務の L1・L2・L3・L10） | [0064](../decisions/0064-registration-types-and-number-verification.md)、[0065](../decisions/0065-regulated-nights-fiscal-year-and-external-overflow.md)、[0066](../decisions/0066-municipal-rule-sets.md)、[0067](../decisions/0067-guest-registry-in-vault.md) | QA、法務 | E18 |
+| [host-tools-and-api.md](host-tools-and-api.md) | 複数のリスティングの管理、一括の変更、共同ホストの役割、PMS の API（OAuth、範囲、速さの上限、冪等）、Webhook の署名と配信、API のバージョン | 0068–0070（使用：0068、0069、0070） | QA、セキュリティ | E19 |
+| [accounts.md](accounts.md) | ログイン（パスキー、一時コード、外部の ID）、セッション、端末、言語と通貨の設定、ホストのアカウントの作り方、退会とデータの削除（法務の L8）、アプリの形 | 0071–0072（使用：0071、0072） | セキュリティ | E2 |
+| [security.md](security.md) | 脅威モデル、vault と鍵、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、越境の移転（法務の L8） | 0073–0075（使用：0073、0074、0075） | セキュリティ | E1、E20 |
 | `data-model.md` | データモデルの索引（core・ledger・content・vault の表、S3 のパス、SNS・SQS の話題、OpenSearch の索引、Valkey の鍵、データレイクの形） | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `infrastructure.md` | AWS のアカウントとネットワーク、4 つの Aurora、OpenSearch、Valkey、egress（提供者、銀行、iCal の取得）、DR（大阪）、段階を上げる基準と分け方 | 0076–0078 | Ops | E1、E20 |
-| `observability.md` | ログ・メトリクス・トレース、SLI の計測、検索の誤りの率の抜き取り、合成監視、照合の指標、外部送信規律（法務の L9） | 0079–0080 | Ops | E1、E20 |
-| `capacity.md` | 負荷のモデル（検索、ステージ 2、予約、熱い日付、iCal の取り込み、繁忙期）、部品ごとの必要量、費用のモデル、負荷試験 | 0081 | Ops | E20 |
-| `delivery.md` | CI/CD、段階のデプロイ、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、料金・ポリシー・税・自治体の規則の表の出し方、アプリのリリースと最小のバージョン、ML のモデルの出し方 | 0082–0083 | QA、Ops | E1、E20 |
+| [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、4 つの Aurora、OpenSearch、Valkey、egress（提供者、銀行、iCal の取得）、DR（大阪）、段階を上げる基準と分け方 | 0076–0078（使用：0076、0077、0078） | Ops | E1、E20 |
+| [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、検索の誤りの率の抜き取り、合成監視、照合の指標、外部送信規律（法務の L9） | 0079–0080（使用：0079、0080） | Ops | E1、E20 |
+| [capacity.md](capacity.md) | 負荷のモデル（検索、ステージ 2、予約、熱い日付、iCal の取り込み、繁忙期）、部品ごとの必要量、費用のモデル、負荷試験 | 0081（使用：0081） | Ops | E20 |
+| [delivery.md](delivery.md) | CI/CD、段階のデプロイ、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、料金・ポリシー・税・自治体の規則の表の出し方、アプリのリリースと最小のバージョン、ML のモデルの出し方 | 0082–0083（使用：0082、0083） | QA、Ops | E1、E20 |
 
 - 次に採番する ADR は 0084。
 
