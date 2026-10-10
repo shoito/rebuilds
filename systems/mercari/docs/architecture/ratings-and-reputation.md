@@ -171,7 +171,7 @@ sequenceDiagram
 
 - 規則（例：`rating_link_device` か `rating_link_payment` か `rating_link_address` のどれかが真で、同じ組の評価が 3 件以上）が、`rating_manipulation` の審査の案件を作る（`review`）。規則は評価を外さない（ADR-0009 の自動の措置の範囲は出品の `hold` と完全な一致の `block` まで）。
 - 審査員が、外す評価の範囲（組、期間）と、アカウントへの措置（出品の上限、停止）を判定する。措置の種類 `rating_exclude` は、外す評価の ID の一覧を `params` に持つ（[trust-and-safety.md](trust-and-safety.md) の 9 節）。
-- 外しは `moderation_actions` に書き、同じトランザクションで評価の行に `excluded_by_action_id` を書き、outbox を出す。集計と段を直す。
+- 外しは `moderation_actions`（content）に書き、同じトランザクションで outbox を出す。core の評価の適用の消費者が、その事象を受けて core の 1 つのトランザクションで評価の行に `excluded_by_action_id` を書き、集計と段を直す（措置と評価は別のクラスタなので 1 つのトランザクションにできない。`moderation_action_id` で冪等。[data-model.md](data-model.md) の D-20）。
 - 価格の提案の標本からは、`rating_min_price_farm` の取引を規則の判定を待たずに除く（提案の計算の入力の選び方で、措置ではない。[categories-brands-and-pricing-suggestions.md](categories-brands-and-pricing-suggestions.md) の 6.1 節）。
 
 ## 7. 失敗と回復

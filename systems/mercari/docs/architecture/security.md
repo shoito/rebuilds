@@ -158,7 +158,7 @@ ADR-0071。詳しい保持の値は 7 節。
 | 区分 | 例 | 置き場所 | 暗号化 | ログ・トレースに出してよいか |
 | --- | --- | --- | --- | --- |
 | S 秘密 | KMS で包んだ鍵、提供者の API の鍵、APNs の鍵、HMAC の鍵 | Secrets Manager、包んだ形で DB | KMS | 出さない |
-| V 金庫 | 住所、氏名、電話番号、メールアドレス、生年月日、口座の番号、本人確認の結果と確認した属性 | core（`address_vault`・`accounts` の `*_enc`、本人確認の表）、ledger（`bank_accounts`） | 封筒の暗号化（5.3 節）＋保存時の暗号化 | 出さない（ID だけ） |
+| V 金庫 | 住所、氏名、電話番号、メールアドレス、生年月日、口座の番号、本人確認の結果と確認した属性 | core（`address_vault`・`accounts` の `*_ct`、本人確認の表）、ledger（`bank_accounts`） | 封筒の暗号化（5.3 節）＋保存時の暗号化 | 出さない（ID だけ） |
 | P 2 者 | 取引、取引のメッセージ、配送の状態、紛争 | core、content | 保存時の暗号化 | ID・状態・理由のコードだけ |
 | O 本人 | いいね、閲覧の履歴、検索の履歴、保存した検索、通知、セッション、端末 | content、core | 保存時の暗号化 | ID と数だけ。検索の語は出さない |
 | U 公開 | 出品、写真、商品のコメント、公開のプロフィール、評価の集計 | core、content、S3、OpenSearch | 保存時の暗号化 | ID だけ（本文を出さない） |
@@ -293,7 +293,7 @@ sequenceDiagram
 | 口座の番号 | V | 口座の削除・退会まで | 鍵の破棄 |
 | 取引のメッセージ | P | 取引の終わりから 2 年 | 月の区切りで落とす |
 | 取引・配送の状態・紛争 | P | 10 年（お金の記録と同じ） | 仮名にして残す |
-| 閲覧の履歴 | O | 180 日 | 月の区切りで落とす |
+| 閲覧の履歴 | O | 90 日・200 件（[ADR-0020](../decisions/0020-likes-history-and-rule-recommendations.md)。区分の既定 180 日より短い） | 日次の削除（主キーで上書きするので区切りにしない。[data-model.md](data-model.md) の D-22） |
 | 検索の履歴（本人に見せるもの） | O | 90 日 | 同上 |
 | 通知（お知らせの一覧） | O | 90 日 | 同上 |
 | セッション、端末の記録 | O | 失効から 1 年 | 行の削除 |
@@ -306,7 +306,7 @@ sequenceDiagram
 
 ### 7.2 消す処理
 
-- `retention-sweeper` のジョブが、区分ごとの規則を日次で当てる。大きな表（`notifications`、`notification_sends`、`view_history`、`transaction_messages`）は月の区切り（PostgreSQL の宣言の区切り）にし、区切りを落とす。
+- `retention-sweeper` のジョブが、区分ごとの規則を日次で当てる。大きな表（`notifications`、`notification_sends`、`transaction_messages`）は区切り（PostgreSQL の宣言の区切り。区切りの単位は [data-model.md](data-model.md) の 3.9 節）にし、区切りを落とす。
 - 消した件数と、期限を過ぎて残る件数を指標にする（[observability.md](observability.md) の 3 節）。期限の 7 日を過ぎた残りはチケット。
 - 法令の照会・紛争・措置の対象の行は「保全」の印を付け、印の間は消さない（印の付け外しは `legal.respond` の権限と監査）。
 
@@ -346,14 +346,15 @@ sequenceDiagram
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| core：`vault_keys` | `user_id`、`vault`（`address`・`identity_pii`）、`key_version`、`wrapped_key`、`kms_key_arn`、`created_at`、`destroyed_at`。本人の FORCE RLS（サービスの役割の許可リスト：`shipping`・`identity`） | `(user_id, vault, key_version)` | 5.3 |
+| core：`vault_keys` | `user_id`、`vault`（`address`・`identity_pii`・`kyc`）、`key_version`、`wrapped_key`、`kms_key_arn`、`created_at`、`destroyed_at`。本人の FORCE RLS（サービスの役割の許可リスト：`shipping`・`identity`） | `(user_id, vault, key_version)` | 5.3 |
 | ledger：`vault_keys` | 同上（`vault = bank`）。`payouts` だけ | 同上 | 5.3 |
 | core：`address_vault` に足す列 | `ciphertext`、`nonce`、`key_version`、`aad_version` | — | 5.3 |
 | core：`shipment_addresses`（[shipping-integrations.md](shipping-integrations.md) が持つ。ADR-0044） | 暗号の列は 5.3 節の形。保持は 7.1 節 | — | 5.3、7.1 |
-| 各クラスタ：`audit_events` | `id`、`stream`、`actor`（運用者・サービス）、`action`、`target`、`case_id`、`reason_code`、`reason_enc`、`grant_id`、`created_at` | `(stream, id)` | 6.4 |
+| 各クラスタ：`audit_events` | `id`、`stream`、`actor`（運用者・サービス）、`action`、`target`、`case_id`、`reason_code`、`reason_ct`、`grant_id`、`created_at` | `(stream, id)` | 6.4 |
 | core：`ops_grants` | JIT の権限：運用者、種類、案件、承認者、発行・期限・取り消し | `(operator_id, expires_at)` | 6.1 |
 | core：`ops_reveals` | 見せた記録：運用者、種類、対象、案件、時刻（数の上限の判定） | `(operator_id, created_at)` | 6.2 |
 | 各クラスタ：`legal_holds` | 保全の印：対象、理由、付けた人、期限 | `(target_type, target_id)` | 7.2 |
+| 各クラスタ：`data_keys`・`audit_chain_heads` | 利用者に結び付かない列の暗号の鍵（T&S の証拠、監査の理由の自由文）、監査の鎖の頭（[data-model.md](data-model.md) の D-10・D-14） | `(purpose, key_version)`、`stream` | 5、6.4 |
 | S3（log-archive） | `audit/<stream>/<yyyy>/<mm>/<dd>/` の鎖つきの束（Object Lock） | — | 6.4 |
 | Secrets Manager | HMAC の鍵（`phone`、`email`、`bank_account`）、レイクの鍵 | — | 5.4 |
 

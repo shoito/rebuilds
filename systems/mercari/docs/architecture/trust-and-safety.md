@@ -120,7 +120,7 @@ flowchart TD
 
 ### 5.2 禁止の語の辞書
 
-- `ts_terms`：`term`（正規化した後の文字）、`class`（禁止の品の種類のコード、偽ブランドの言い回し、外部の取引への誘導、侮辱）、`match`（`exact_block`・`signal`）、`state`（`shadow`・`active`）、`version`。
+- `ts_terms`：`term`（正規化した後の文字）、`term_class`（禁止の品の種類のコード、偽ブランドの言い回し、外部の取引への誘導、侮辱）、`match_mode`（`exact_block`・`signal`）、`state`（`shadow`・`active`）、`version`。
 - 正規化は [messaging-and-comments.md](messaging-and-comments.md) の 5.2 節の 1〜3（NFKC、ゼロ幅の除き、かなをカタカナに）と、空白の除きを同じ関数で行う。
 - 照合は Aho–Corasick（全部の語を 1 つの自動機械に）。S1 で 2 万語、題名と説明で 1ms 以下。
 - `exact_block` は、4 文字以上で、普通の文に出ない語に限る（例：法令で売れない薬物の名前の正式な表記）。登録は T&S の責任者の承認。`exact_block` の一致は完全な一致として `block` にしてよい（ADR-0009）。

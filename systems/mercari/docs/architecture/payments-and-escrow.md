@@ -364,7 +364,7 @@ sequenceDiagram
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `payment_attempts`（core、2 者の RLS は買い手だけ） | 取引、手段、提供者、額、状態、提供者の支払いの ID、理由のコード、照会の次の時刻、事象を出した時刻 | `id`、`(transaction_id)`、`(state, next_inquiry_at)`、一意 `(provider, provider_payment_id)` | 5、6 |
+| `payment_attempts`（core、2 者の RLS は買い手だけ） | 取引、手段、提供者、額、状態、提供者の支払いの ID、理由のコード、照会の次の時刻、事象を出した時刻 | `id`、一意 `(transaction_id)`（1 取引 1 試行。[data-model.md](data-model.md) の D-17）、`(state, next_inquiry_at)`、一意 `(provider, provider_payment_id)` | 5、6 |
 | `payment_inbox`（core） | 提供者、提供者の事象の ID、種類、受け取った時刻、処理の状態、生の本文の S3 の参照（カード番号を含まない形だけ） | 一意 `(provider, provider_event_id)`、`(status, received_at)` | 6 |
 | `payment_methods`（core、本人の RLS） | 提供者の顧客とカードの参照、表示用の下 4 桁・有効期限の月と年 | `(owner_id, id)` | 7 |
 | `refund_attempts`（core） | 取引、返金の番号、額、状態、提供者の返金の ID | 一意 `(transaction_id, refund_no)`、一意 `(provider, provider_refund_id)` | 9 |

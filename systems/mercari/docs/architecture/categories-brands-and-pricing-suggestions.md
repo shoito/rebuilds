@@ -113,7 +113,8 @@
 
 ### 5.1 形
 
-- `brands`：`brand_id`（整数）、正式な名前（日本語、英字）、`status`（`active`・`merged`）、`merged_into`、`counterfeit_risk`（`high`・`normal`。T&S が持つ）、`category_scope`（よく出る 1 階層目のカテゴリ）。
+- `brands`：`brand_id`（整数）、正式な名前（日本語、英字）、`status`（`active`・`merged`）、`merged_into`、`category_scope`（よく出る 1 階層目のカテゴリ）。
+- 偽ブランドの危険の段（`counterfeit_risk`：`high`・`normal`）は T&S の `brand_risk_profiles` が持つ（[trust-and-safety.md](trust-and-safety.md) の 11.1 節。[data-model.md](data-model.md) の D-12）。`brands` には置かない。
 - `brand_aliases`：`alias`（正規化した後の文字）、`brand_id`、`kind`（`ja`・`en`・`abbr`・`typo`）、`ambiguous`（別のブランド・普通の語と重なる）。
 - S1 の見込み：ブランド 2 万、別名 10 万。中身は自前で作る（カタログの担当、権利者の窓口からの申し出、出品の題名の頻出の語の候補）。本家・他のサービスの一覧を取り出して使わない。
 
@@ -228,9 +229,9 @@ flowchart LR
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora core `catalog_versions`（`catalog_version`、`state`（`draft`・`approved`・`published`）、`created_by`、`approved_by`、`published_at`、`s3_key`） | カタログの設定のバージョン | 4.5 |
-| Aurora core `categories`（`category_id`、`parent_id`、`depth`、`name_ja`、`status`、`successor_id`、`size_scheme`、`brand_mode`、`condition_scheme`、`fee_class`、`default_shipping_tiers`、`restriction`（JSON）、`min_seller_age`、`min_buyer_age`、`keywords`、`catalog_version`） | カテゴリ | 4 |
-| Aurora core `brands`、`brand_aliases`（5.1 節の列） | ブランドの辞書 | 5 |
-| Aurora core `category_term_stats`（`term`、`category_id`、`count`、`window_end`）。日次 | カテゴリの候補 | 4.4 |
+| Aurora core `categories`（`category_id`、`parent_id`、`depth`、`name_ja`、`status`、`successor_id`、`size_scheme`、`brand_mode`、`condition_scheme`、`fee_class`、`default_shipping_tiers`、`restriction`（JSON）、`min_seller_age`、`min_buyer_age`、`keywords`、`from_version`・`to_version`（その行が効くカタログのバージョンの範囲。[data-model.md](data-model.md) の D-7）） | カテゴリ | 4 |
+| Aurora core `brands`、`brand_aliases`（5.1 節の列と `from_version`・`to_version`） | ブランドの辞書 | 5 |
+| Aurora core `category_term_stats`（`term`、`category_id`、`term_count`、`window_end`）。日次 | カテゴリの候補 | 4.4 |
 | S3 `catalog/{catalog_version}.json`、`price-stats/{date}/{stats_version}.parquet` | 写し | 4.5、6.4 |
 | Valkey `price:{stats_version}:{date}:{level}:{cat}:{brand}:{cond}`、`price:current` | 価格の提案 | 6.4 |
 | outbox の話題 `catalog.published` | バージョンの公開 | 4.5 |

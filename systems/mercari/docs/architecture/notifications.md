@@ -323,9 +323,9 @@ sequenceDiagram
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| content：`notifications` | お知らせの一覧：`id`（UUIDv7）、`user_id`、`kind`、`target_type`、`target_id`、`args`（許可の一覧の欄だけ）、`count`、`read_at`、`created_at`。本人の FORCE RLS。90 日で消す | `(user_id, created_at DESC)`、未読の数の部分の索引 | 4.1 |
+| content：`notifications` | お知らせの一覧：`id`（UUIDv7）、`user_id`、`kind`、`target_type`、`target_id`、`args`（許可の一覧の欄だけ）、`item_count`、`read_at`、`created_at`。本人の FORCE RLS。90 日で消す | `(user_id, created_at DESC)`、未読の数の部分の索引 | 4.1 |
 | content：`notification_sends` | 送信の記録：（`kind`、`target_id`、`user_id`、`source_event_id`）の一意、経路、結果、提供者の応答のコード、`queued_at`・`decided_at`・`accepted_at`。30 日で消す | 一意の鍵、`(user_id, decided_at)` | 6.3、9 |
-| content：`notification_prefs` | （`user_id`、`group`、`channel`）→ 値、静かな時間、時間帯、案内の同意の日時。本人の FORCE RLS | 主キー | 7 |
+| content：`notification_prefs`、`notification_settings` | `notification_prefs`：（`user_id`、`pref_group`、`channel`）→ 値。`notification_settings`：静かな時間、時間帯、案内の同意の日時（行の形が違うので分けた。[data-model.md](data-model.md) の D-13・D-14）。どちらも本人の FORCE RLS | 主キー | 7 |
 | content：`fanout_jobs` | 値下げ・案内の fan-out：出品・企画、続きの位置、状態、開始・終わり。24 時間に 1 回の判定にも使う | `(listing_id, kind, started_at)` | 6.1 |
 | content：`email_suppressions` | 止めたアドレスの HMAC、理由（bounce・complaint）、日時 | 主キー | 8.3 |
 | Valkey | `ntf:devices:{user_id}`（端末とトークンの写し）、`ntf:cap:{user_id}:{yyyymmdd}`（数え）、`ntf:digest:{user_id}`（静かな時間・窓のまとめ） | — | 6.5、8.1 |

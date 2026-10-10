@@ -224,10 +224,10 @@ stateDiagram-v2
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora core `kyc_sessions`（`session_id`（UUIDv7）、`user_id`、`method`、`provider`、`provider_session_ref`、`state`、`result_code`、`created_at`、`submitted_at`、`decided_at`、`expires_at`）。FORCE RLS | セッション | 6 |
-| Aurora core `kyc_records`（`user_id`、`status`、`level`、`method`、`provider`、`provider_ref`、`verified_at`、`attributes_ct`、`attributes_key_id`、`age_band`、`revoked_by_action_id`、`updated_at`）。FORCE RLS。運用者は `kyc.view` の JIT | 確認の正本 | 6.2、7 |
+| Aurora core `kyc_records`（`user_id`、`status`、`level`、`method`、`provider`、`provider_ref`、`verified_at`、`attributes_ct`、`attributes_key_version`（`vault_keys` の `kyc` の鍵。[data-model.md](data-model.md) の D-10）、`age_band`、`revoked_by_action_id`、`updated_at`）。FORCE RLS。運用者は `kyc.view` の JIT | 確認の正本 | 6.2、7 |
 | Aurora core `kyc_fingerprints`（`fingerprint`、`user_id`、`state`、`created_at`）。サービスの役割だけ | 同じ人の検出 | 6.3 |
 | Aurora core `kyc_inbox`（`provider`、`event_id`、`received_at`、`processed_at`） | Webhook の inbox | 6.1 |
-| 設定 `kyc_gates`（バージョンつき）、AppConfig `kyc.*`、`legal.balance_requires_kyc_level`、`legal.payout_limit_yen.*`、`legal.payout_monthly_limit_yen.*`、`legal.balance_spend_limit_yen.*`、`legal.kyc_*` | 開く機能と法令の値 | 5、9 |
+| Aurora core `kyc_gates`（`gates_version`、`feature`、必要な水準か `legal.*` の名前。[data-model.md](data-model.md) の D-11）、AppConfig `kyc.*`、`legal.balance_requires_kyc_level`、`legal.payout_limit_yen.*`、`legal.payout_monthly_limit_yen.*`、`legal.balance_spend_limit_yen.*`、`legal.kyc_*` | 開く機能と法令の値 | 5、9 |
 | outbox の話題 `kyc.level_changed`、`kyc.gates_changed`、`kyc.on_hold` | 事象 | 5、6 |
 
 ## 13. テストと性質

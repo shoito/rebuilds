@@ -146,7 +146,7 @@ ADR-0073。大きさと台数は [capacity.md](capacity.md) の 4 節。
 | ElastiCache（Valkey） | クラスタモード、2 シャード × 主 1・写し 1、転送中と保存の暗号化。失ってよい（正本にしない） |
 | OpenSearch | 1 つのドメイン、3 AZ、データのノード 9、専用のマスター 3、gp3。細かいアクセス制御で、`search-indexer` は書き、`search-api`・`ml-inference` は読みだけ |
 | SQS・SNS | outbox の話題（クラスタごと）と、消費者ごとのキュー。各キューに DLQ。通知のレーンは [notifications.md](notifications.md) の 4.1 節 |
-| S3 | `photos-incoming`（元の写真。`kms-core`、変換の後 24 時間で消す。[listings-and-photos.md](listings-and-photos.md)）、`photos`（変換の後。SSE-S3、`static` の元）、`exports`（`kms-ops-exports`）、`opensearch-snapshots`、`ml-models`（data のアカウントから署名つきで入る） |
+| S3 | `photos-incoming`（元の写真。`kms-core`、変換の後 24 時間で消す。[listings-and-photos.md](listings-and-photos.md)）、`photos`（変換の後。SSE-S3、`static` の元）、`exports`（`kms-ops-exports`）、`opensearch-snapshots`、`ml-models`（data のアカウントから署名つきで入る）、`records`（inbox の本文、外部の明細、全銀のファイル、古い区切りの写し。接頭辞ごとの鍵）、`config`（カタログ・価格の統計・規則の写し）、`cases`・`ts-docs`（`kms-content`）。キーと保持は [data-model/stores.md](data-model/stores.md) の 3 節 |
 | ECS（Fargate、ARM64） | [capacity.md](capacity.md) の 4.2 節のサービスの一覧 |
 | ALB | 内部、`lb` のサブネット、VPC origin |
 | AppConfig | `release.*`・`ops.*`・`legal.*`（`legal` は別のアプリケーション。[delivery.md](delivery.md) の 3.3 節） |

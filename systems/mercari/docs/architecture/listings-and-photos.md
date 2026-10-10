@@ -365,11 +365,11 @@ flowchart TD
 
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
-| Aurora core `listings`（`listing_id`（UUIDv7）、`seller_id`、`status`、`resume_to`、`version`、`title`、`description`、`category_id`、`category_tree_version`、`condition`、`brand_id`、`size_code`、`shipping_method`、`shipping_payer`、`ship_days`、`ship_from_pref`、`price`、`like_count`、`photo_quality`、`relisted_from`、`published_at`、`sold_at`、`created_at`、`updated_at`）。索引 `(seller_id, status)`、`(status, published_at)` | 出品の正本 | 4 |
+| Aurora core `listings`（`listing_id`（UUIDv7）、`seller_id`、`status`、`resume_to`、`version`、`title`、`description`、`category_id`、`category_tree_version`、`condition`、`brand_id`、`size_code`、`shipping_method_code`、`shipping_payer`、`ship_days_code`、`ship_from_pref`、`price`、`like_count`、`photo_quality`、`relisted_from`、`published_at`、`sold_at`、`created_at`、`updated_at`）。索引 `(seller_id, status)`、`(status, published_at)` | 出品の正本 | 4 |
 | Aurora core `listing_events`（`listing_id`、`seq`、`from_status`、`to_status`、`event`、`actor_kind`（`seller`・`buyer`・`system`・`ts_rule`・`reviewer`）、`actor_id`、`reason_code`、`moderation_action_id`、`transaction_id`、`version`、`created_at`）。追記だけ | 遷移の記録 | 4.2 |
-| Aurora core `listing_drafts`（本人だけ。FORCE RLS） | 下書き | 4.5 |
-| Aurora core `listing_photos`（`photo_id`（UUIDv7）、`listing_id`、`position`、`state`（`uploading`・`processing`・`ready`・`failed`・`withdrawn`）、`fail_reason`、`width`、`height`、`phash`、`dhash`、`hash_degenerate`、`dark_score`、`blur_score`、`photo_version`、`created_at`） | 写真 | 5 |
-| Aurora core `seller_business_signals`（`seller_id`、`window`、`listings`、`sales`、`sales_yen`、`new_ratio`、`computed_at`） | 事業者の兆し | 7 |
+| Aurora core `listing_drafts`（本人だけ。FORCE RLS。`listings` の行は最初の送信で作る。[data-model.md](data-model.md) の D-4） | 下書き | 4.5 |
+| Aurora core `listing_photos`（`photo_id`（UUIDv7）、`listing_id`、`object_id`（S3 の物。再出品は元を指す）、`position`、`state`（`uploading`・`processing`・`ready`・`failed`・`withdrawn`）、`fail_reason`、`width`、`height`、`phash`、`dhash`、`hash_degenerate`、`dark_score`、`blur_score`、`photo_version`、`created_at`） | 写真 | 5 |
+| Aurora core `seller_business_signals`（`seller_id`、`window_days`、`listings`、`sales`、`sales_yen`、`new_ratio`、`computed_at`） | 事業者の兆し | 7 |
 | S3 `photos-incoming/{listing_id}/{photo_id}`（24 時間）、`photos/{photo_id}/{variant}.{ext}`、`photos/quarantine/…` | 写真の置き場 | 5 |
 | OpenSearch `photo_hashes` | 使い回しの索引 | 5.4 |
 | SQS `media-process`、outbox の話題 `listing.published`・`listing.updated`・`listing.price_changed`・`listing.price_dropped`・`listing.status_changed`・`photo.ready` | 事象 | 5、6 |

@@ -166,7 +166,7 @@ SET LOCAL lock_timeout = '200ms';
 SET LOCAL statement_timeout = '2s';
 UPDATE listings
    SET status = 'trading', version = version + 1, updated_at = now()
- WHERE id = $listing_id AND status = 'on_sale'
+ WHERE listing_id = $listing_id AND status = 'on_sale'
    AND version = $seen_version AND price = $seen_price
    AND seller_id <> $buyer_id
 RETURNING seller_id, price, shipping_method_code, shipping_payer, ship_days_code, version;
@@ -447,19 +447,19 @@ SELECT id FROM transactions
 | `deadline-runner` | 1 分ごと、100 件ずつ、ワーカー 4（13:00 の前後は 30） |
 | 照会の不明のときの支払いの期限の再試行 | 5 分ごと、1 時間でチケット |
 | キャンセルの申し出 | 1 取引 3 回まで（取り下げ・拒否の後の繰り返しを止める） |
-| 取引の事象の行の保持 | 取引の完了から 7 年（法務の確認待ち。会計と L7 の保存の期間に合わせる） |
+| 取引の事象の行の保持 | 取引の終わりから 10 年（ADR-0071 のお金と取引の記録。法務の確認待ち：L5・L7・L8） |
 
 ## 14. data-model への項目
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `transactions`（core、2 者の RLS） | 出品、買い手、売り手、購入の試行の ID、価格、手数料の表と送料の表のバージョン、配送の方法と負担、支払いの方法、状態、`resume_state`、`version`、期限の 6 列、`next_deadline_at`、`on_hold`、`paused_at`、`paused_seconds`、`ship_overdue`、`refund_amount`、`shipped_at`、`received_at` | `id`。部分一意 `(listing_id) WHERE state NOT IN ('cancelled','payment_expired')`、一意 `(buyer_id, purchase_attempt_id)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(seller_id, state)`、`(buyer_id, state)` | 5、6、7 |
+| `transactions`（core、2 者の RLS） | 出品、買い手、売り手、購入の試行の ID、価格、手数料の表と送料の表のバージョン、配送の方法と負担、支払いの方法、状態、`resume_state`、`version`、期限の 5 列、`next_deadline_at`、`on_hold`、`paused_at`、`paused_seconds`、`ship_overdue`、`refund_amount`、`shipped_at`、`received_at` | `id`。部分一意 `(listing_id) WHERE state NOT IN ('cancelled','payment_expired')`、一意 `(buyer_id, purchase_attempt_id)`、`(next_deadline_at) WHERE next_deadline_at IS NOT NULL`、`(seller_id, state)`、`(buyer_id, state)` | 5、6、7 |
 | `transaction_events`（core、2 者の RLS、追記だけ） | 事象、主体の種類と ID、理由のコード、前と後の状態、決定表の行、冪等キー、案件の ID、作成の時の出品の価格 | `(transaction_id, seq)`、一意 `(transaction_id, idempotency_key)` | 6.1 |
 | `cancel_requests`（core、2 者の RLS） | 申し出た人、理由のコード、状態（`open`・`accepted`・`rejected`・`withdrawn`・`expired`・`superseded_by_shipment`）、期限 | `(transaction_id, request_no)` | 8 |
 | `listings` の列（listings-and-photos の領域が持つ） | `status` に `trading`・`sold`・`paused`、`version`、`price` | — | 5、6.3 |
 | outbox の事象 | `transaction.*`（6.1 節の一覧） | — | 6.1 |
 | Valkey | `listing:{id}:snap`（状態、バージョン、価格。outbox で更新、60 秒以内）、`purchase:{listing_id}`（印、15 秒） | 失ってよい | 5.3 |
-| `reconciliation_runs`（core） | 照合の種類、時刻、外れの件数と ID | `(kind, run_at)` | 10 |
+| `reconciliation_runs`（core） | 照合の種類、時刻、外れの件数（対象は `reconciliation_findings`） | `(kind, started_at)` | 10 |
 
 ## 15. テスト
 

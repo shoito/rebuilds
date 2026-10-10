@@ -297,9 +297,9 @@ stateDiagram-v2
 
 | 置き場所 | 中身 | 鍵・索引 | 節 |
 | --- | --- | --- | --- |
-| core：`accounts` | `id`、`status`（`active`・`restricted`・`locked`・`suspended`・`phone_unbound`・`deleting`・`deleted`）、`phone_hmac`、`phone_enc`、`email_hmac`、`email_enc`、`email_verified_at`、`birth_date_enc`、`minor_consent_at`・`minor_consent_version`、`created_at`、`deleting_until`。本人の FORCE RLS | `phone_hmac` の部分一意（有効な状態）、`email_hmac` | 4、9、10 |
+| core：`accounts` | `id`、`status`（`active`・`restricted`・`locked`・`suspended`・`phone_unbound`・`deleting`・`deleted`）、`phone_hmac`、`phone_ct`、`email_hmac`、`email_ct`、`email_verified_at`、`birth_date_ct`、`minor_consent_at`・`minor_consent_version`、`created_at`、`deleting_until`。本人の FORCE RLS | `phone_hmac` の部分一意（有効な状態）、`email_hmac` | 4、9、10 |
 | core：`passkeys` | 資格情報の ID、公開鍵、署名の数、AAGUID、作成・最後の利用。本人の FORCE RLS | `(user_id)`、資格情報の ID の一意 | 5.1 |
-| core：`sessions` | `token_hash`、系列の ID、`device_id`、強さ（`strong`・`sms`・`recovery`）、ログインの時刻、最後の利用、取り消しの時刻と理由 | `token_hash` の一意、`(user_id)`、系列 | 5 |
+| core：`sessions`、`refresh_tokens` | 系列の ID、今のアクセスのトークンのハッシュ（`access_token_hash`）、`device_id`、強さ（`strong`・`sms`・`recovery`）、ログインの時刻、最後の利用、取り消しの時刻と理由。更新のトークンの履歴は `refresh_tokens`（再使用の検出。[data-model.md](data-model.md) の D-8） | `access_token_hash` の一意、`(user_id)`、`refresh_tokens.token_hash` | 5 |
 | core：`devices` | 6 節の欄 | `(user_id, last_seen_at)` | 6 |
 | core：`phone_verifications` | 番号の HMAC、コードのハッシュ、試行の数、期限、IP の HMAC、端末。24 時間で消す | `(phone_hmac, created_at)` | 4.2 |
 | core：`account_holds` | 理由（`new_device_sms`・`recovery`・`phone_changed`・`email_changed`・`bank_changed`）、始まり、終わり | `(user_id, ends_at)` | 7.2 |

@@ -215,7 +215,7 @@ sequenceDiagram
 ```
 
 - 受け付けの冪等キーは `<transaction_id>:ship:<attempt>`（[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md)）。サイズの変更・QR の期限切れで受け付けをやり直すときは、前の受け付けを `cancelShipment` で取り消してから `attempt` を 1 つ上げる。前の取り消しが失敗したら、やり直さず運用へ。
-- QR と受け付けの番号は、売り手だけが読める列（`shipments` の売り手の側の列。2 者の RLS に加えて主体の確かめ）に置く。買い手には運送会社と追跡の番号だけを出す。
+- QR と受け付けの番号は、差し出す人（往路は売り手）だけが読む表（`shipment_labels`。差し出す人の RLS）に置く。買い手には運送会社と追跡の番号だけを出す。
 - QR の有効の期間は運送会社の値（**未検証**）。期限の 24 時間前と期限の後に売り手に通知し、期限の後は手続きのやり直しを促す。
 - 取引が `cancel_requested` の間も QR は使える。取引が `cancelled` になったら、`label_issued` の受け付けを `cancelShipment` で取り消す。
 
@@ -326,7 +326,8 @@ sequenceDiagram
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
 | `shipping_rate_tables`・`shipping_rates`（core、設定） | バージョン、方法のコード、料金、資材の代金、大きさ・重さの上限、匿名の可否 | `(version, method_code)` | 4.2 |
-| `shipments`（core、2 者の RLS） | 取引、方向（`forward`・`return`）、方法のコード、試行の番号、状態、`max_rank`、運送会社、受け付けの番号、追跡の番号、QR の中身と期限（売り手だけ）、`implied_accept`、引き受けの時刻、次の照会の時刻、例外の種類 | `id`、一意 `(transaction_id, direction, attempt)`、`(carrier, tracking_no)`、`(next_poll_at)` | 5、6 |
+| `shipments`（core、2 者の RLS） | 取引、方向（`forward`・`return`）、方法のコード、試行の番号、状態、`max_rank`、運送会社、追跡の番号、`implied_accept`、引き受けの時刻、次の照会の時刻、例外の種類 | `id`、一意 `(transaction_id, direction, attempt)`、`(carrier, tracking_no)`、`(next_poll_at)` | 5、6 |
+| `shipment_labels`（core、差し出す人の RLS） | 受け付けの番号、QR の中身と期限。往路は売り手、返送は買い手だけが読む（行の RLS で列ごとに 2 者を分けられないので表に分けた。[data-model.md](data-model.md) の D-19） | `shipment_id`、一意 `reception_no` | 6.1 |
 | `shipment_events`（core、追記だけ） | 正規の事象、順位、運送会社の時刻、受け取った時刻、採否（進めた・低い・重複・例外）、出所（Webhook・照会） | `(shipment_id, seq)` | 5 |
 | `carrier_inbox`（core） | 運送会社、重複の鍵、受け取った時刻、処理の状態、住所の欄を落とした本文の S3 の参照 | 一意 `(carrier, dedup_key)` | 5.2 |
 | `address_vault`（core、本人の RLS。鍵の列は [security.md](security.md) の 5.3 節） | 封筒の暗号化の列（住所、氏名、電話番号）、`key_version`、既定の印 | `(owner_id, id)` | 7.1 |

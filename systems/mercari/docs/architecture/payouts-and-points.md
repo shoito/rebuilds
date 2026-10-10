@@ -294,12 +294,13 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | `bank_accounts`（ledger、本人の RLS） | 金融機関・支店のコード、預金種目、口座番号と名義（封筒の暗号化）、下 4 桁、`bank_account_hmac`、状態（`active`・`unusable`・`replaced`）、登録の時刻 | `(owner_id, id)`、部分一意 `(owner_id) WHERE status = 'active'` | 4 |
 | `bank_master`（ledger、設定） | 金融機関・支店のコードと名前 | `(bank_code, branch_code)` | 4.1 |
-| `bank_calendar`（ledger、設定） | 銀行の営業日 | `date` | 6.1 |
+| `bank_calendar`（ledger、設定） | 銀行の営業日 | `day` | 6.1 |
 | `payouts`（ledger、本人の RLS） | 利用者、口座、申請の額、振り込む額、手数料、状態、理由（`user`・`expiry_auto_payout`）、`payout_ref`、まとめ、不能の理由のコード | `id`、一意 `payout_ref`、部分一意 `(owner_id) WHERE status IN ('requested','batched','submitted','unknown','accepted')` | 5、6 |
 | `payout_batches`（ledger） | 払出口座、手段（API・ファイル）、`bank_request_ref`、件数、合計、状態、ファイルの S3 の参照と渡した記録 | `id`、一意 `bank_request_ref` | 6 |
 | `payout_blocks`（ledger） | 利用者、理由のコード、出した人（規則・運用者）、期限 | `(owner_id, id)` | 10 |
 | `points_lots`（ledger、本人の RLS） | 口座、付与の理由、キャンペーン・案件、付与の額、期限、元の仕訳 | `(owner_id, lot_id)`、`(expires_at)` | 8 |
 | `point_campaigns`（ledger） | 予算、付与の規則、期限、承認の記録 | `id` | 8.2 |
+| `point_campaign_grants`（ledger） | キャンペーン、利用者、額、ロット（冪等キー `(campaign_grant, <id>, grant)` の元。[data-model.md](data-model.md) の D-14） | `id`、一意 `(campaign_id, user_id)` | 8.2 |
 | `balance_reservations`（ledger） | 購入の試行、引き当てた口座と額（ロットごと）、状態 | `purchase_attempt_id` | 7.2 |
 | S3 | `payouts/zengin/<yyyy>/<mm>/<dd>/<batch_id>.txt`（ファイル、ハッシュ） | — | 6.3 |
 | outbox の事象 | `payout.requested`、`payout.settled`、`payout.failed`、`payout.returned`、`points.granted`、`points.expiring` | — | 5、6、8 |

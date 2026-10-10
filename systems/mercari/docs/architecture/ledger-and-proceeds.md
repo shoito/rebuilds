@@ -51,7 +51,7 @@
 ## 3. 本家の形（確かめたこと）
 
 - 売上金には 180 日の振込の申請の期限がある。「アプリでかんたん本人確認」を済ませると「残高」の表記になり、期限がなくなる。振込の申請の手数料は 200 円。期限を過ぎると登録した口座へ自動で振り込む（1 回 200 円、2 回まで）。口座がないか 200 円以下なら失効する（[ヘルプの記事 96](https://help.jp.mercari.com/guide/articles/96/)、2026-10-10 に確認）。
-- 販売の手数料（10%）、手数料の端数、売上金の管理の主体と法的な整理は、公式の資料で確かめられなかった（**未検証**）。
+- 販売の手数料 10% は公式のヘルプで確かめた（[ヘルプの記事 65](https://help.jp.mercari.com/guide/articles/65/)、2026-10-10）。手数料の端数、売上金の管理の主体と法的な整理は、公式の資料で確かめられなかった（**未検証**）。
 
 ## 4. 勘定科目（[ADR-0034](../decisions/0034-chart-of-accounts-journal-types-and-fee-rounding.md)）
 
@@ -162,7 +162,7 @@ seller_net    = price − sales_fee − shipping_fee               -- must be >=
 escrow_amount = price + payment_fee
 ```
 
-- 率は基点（1 bp = 0.01%）の整数。既定 1,000 bp（10%。本家の値は**未検証**）。表はカテゴリごとの行を持ち、バージョン（`fee_table_version`）で固定する。取引の作成の時のバージョンを取引の行に記録し、完了の時もそれを使う。
+- 率は基点（1 bp = 0.01%）の整数。既定 1,000 bp（10%。本家と同じ。[ヘルプの記事 65](https://help.jp.mercari.com/guide/articles/65/)）。表はカテゴリごとの行を持ち、バージョン（`fee_table_version`）で固定する。取引の作成の時のバージョンを取引の行に記録し、完了の時もそれを使う。
 - 端数は 1 円未満の切り捨て（売り手に有利）。例：価格 333 円 → 33.3 → 33 円。価格 9,999,999 円 → 999,999 円。
 - 売上金が負になる組み合わせは作らない。出品の時に `price − sales_fee − shipping_fee ≥ 0` を確かめる（例：価格 300 円で宅急便の 160 サイズ相当の送料は選べない）。発送の時のサイズの変更でも同じく確かめ、負になる変更は止める（[shipping-integrations.md](shipping-integrations.md) の 5.3 節）。
 - 着払い（匿名でない配送で、買い手が運送会社に直接払う）は送料 0 で、台帳に載らない。
@@ -371,7 +371,7 @@ escrow_amount = price + payment_fee
 
 | 表・置き場 | 中身 | 主キー・索引 | 節 |
 | --- | --- | --- | --- |
-| `accounts`（ledger、持ち主の RLS） | 種類、持ち主の種類と ID、副の鍵、閉じた印 | `id`、一意 `(kind, owner_type, owner_id, sub_key)` | 4.1 |
+| `ledger_accounts`（ledger、持ち主の RLS。core の `accounts` と分けるためこの名前。[data-model.md](data-model.md) の D-1） | 種類、持ち主の種類と ID、副の鍵、閉じた印 | `id`（`bigint`）、一意 `(kind, owner_type, owner_id, sub_key)` | 4.1 |
 | `account_balances`（ledger） | 正常な側の残高、更新の時刻、CHECK（種類ごとの制約） | `account_id` | 4.1 |
 | `journals`（ledger、追記だけ） | 型、冪等キー、表のバージョン、`legal_config_version`、承認者 | `id`、一意 `(source_type, source_id, event)` | 4.2 |
 | `journal_lines`（ledger、追記だけ、月ごとに分割） | 口座、額 | `(journal_id, line_no)`、`(account_id, journal_id)` | 4.2 |
@@ -379,9 +379,9 @@ escrow_amount = price + payment_fee
 | `proceeds_lots`（ledger、本人の RLS） | 利用者、額、残り、入った時刻、期限、元の仕訳、状態（`active`・`expiry_exhausted`） | `id`、`(owner_id, expires_at NULLS LAST, created_at)`、部分索引 `(expires_at) WHERE remaining > 0` | 6.1 |
 | `proceeds_lot_consumptions`（ledger） | 仕訳、ロット、額 | `(journal_id, lot_id)` | 6.1 |
 | `proceeds_expiry_state`（ledger、本人の RLS） | 期限の後の扱いの回数、最後の扱い、通知の済んだ日 | `owner_id` | 6.3 |
-| `fee_tables`・`fee_table_rows`（core、設定） | バージョン、カテゴリ、率の基点、支払いの手数料、振込の手数料、税率（L8 の後） | `(version, category_id)` | 5.1 |
-| `customer_funds_daily`（ledger） | 日付、口座の種類、合計 | `(date, kind)` | 8 |
-| `external_statement_lines`（ledger） | 出所（提供者・銀行・運送会社）、元のファイルの参照、相手の参照、額、日付 | `(source, file_id, line_no)`、`(source, external_ref)` | 9.1 |
+| `fee_tables`・`fee_table_rows`（core、設定） | バージョン、手数料の種類（カテゴリの `fee_class`）、率の基点、支払いの手数料、振込の手数料、税率（L8 の後） | `(version, fee_class)`（D-18） | 5.1 |
+| `customer_funds_daily`（ledger） | 日付（`as_of_date`）、口座の種類、合計 | `(as_of_date, kind)` | 8 |
+| `external_statement_files`・`external_statement_lines`（ledger） | ファイル（出所、S3 の参照、ハッシュ）と行（出所（提供者・銀行・運送会社）、相手の参照、額、日付） | ファイルは一意 `sha256`。行は `(file_id, line_no)`、`(source, external_ref)` | 9.1 |
 | `recon_breaks`（ledger） | 9.2 節の列 | `id`、`(status, detected_at)` | 9.2 |
 | `recon_runs`（ledger） | 段、規則、時刻、件数 | `(tier, rule, run_at)` | 9.1 |
 | S3 | `ledger/statements/<source>/<yyyy>/<mm>/<dd>/<file>`（元のファイル、ハッシュ） | — | 9.1 |
@@ -434,7 +434,7 @@ escrow_amount = price + payment_fee
 | --- | --- |
 | 売上金の期限・失効・残高・保全の値と、遡りの可否 | 法務の確認待ち（L1） |
 | 手数料の消費税と請求書の形、送料の取引の整理 | 法務の確認待ち（L8） |
-| 販売の手数料の率（10%）とカテゴリごとの差 | PM・財務。本家の値は**未検証** |
+| 販売の手数料のカテゴリごとの差 | PM・財務。既定の 10% は本家と同じ（確認済み） |
 | 提供者の手数料と精算のサイクル | E8 の `payment-provider-selection` |
 | 熱い口座の S1 の見込み（行のロック 2ms） | `ledger-core` の負荷試験 |
 | ledger の分け方（S3） | infrastructure の領域 |

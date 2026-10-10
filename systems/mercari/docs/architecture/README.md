@@ -1,6 +1,6 @@
 # Architecture: Mercari
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節、表と置き場所の索引は [data-model.md](data-model.md)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節、データモデルの正本は [data-model.md](data-model.md) と [data-model/](data-model/)）。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
 
 ## 1. 全体構成
 
@@ -450,7 +450,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 - **品質と運用**：
   - 各領域の文書の「テストと性質」の ID の一覧を [quality.md](../quality.md) の 2.2.2 節に置いた。漏れの経路の表（2.2.1 節 G）に見張りの出品と売れた品の検索の行を足した。
   - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[hot-listing-or-campaign-day.md](../runbooks/hot-listing-or-campaign-day.md)、[ledger-reconciliation-mismatch.md](../runbooks/ledger-reconciliation-mismatch.md)、[payout-failure.md](../runbooks/payout-failure.md)、[account-takeover.md](../runbooks/account-takeover.md)）と、計画のものに分けた（[runbooks/README.md](../runbooks/README.md) の 4 節）。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。ER 図を含む正本は、後のデータモデルの工程で書く。
+  - 表と置き場所の索引は [data-model.md](data-model.md)。ER 図を含む正本は、データモデルの工程で書いた（下の「決定（2026-10-10、データモデル）」）。
 - **数値の正本**：
   - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限は各 ADR と runbooks の 2 節。
   - 期限（支払い 3 日目の 23:59:59、カード 30 分、発送の期限、キャンセルの応答 48 時間、自動の完了 発送の 9 日後の 13:00、売り手の評価 72 時間）は [ADR-0025](../decisions/0025-transaction-decision-table-and-deadline-pause.md) と [transactions-and-state-machine.md](transactions-and-state-machine.md) の 7.1 節。
@@ -459,6 +459,13 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
   - 運用の承認の上限（返金 3 万円、補償 3,000 円、1 日 3 万円）は [ADR-0060](../decisions/0060-ops-money-interventions-and-proceeds-hold.md)。
   - 負荷と費用のモデル（S1 で月 約 8.1 万 USD、取引 1 件 約 4 円）は [capacity.md](capacity.md)、単位あたりの原価は [infrastructure.md](infrastructure.md) の 9 節。
 - 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
+
+### 決定（2026-10-10、データモデル）
+
+データモデルの工程で、索引だった [data-model.md](data-model.md) を、表の目録と ER 図を持つ正本（[data-model/](data-model/) の 15 のファイル）に書き直した。名前・列・置き場所の決め（D-1〜D-30）と、直した領域の文書の一覧は [data-model.md](data-model.md) の 7 節。ADR の決定は変えていない。アーキテクチャに関わる 2 件は推奨の案で次のとおり決めた。
+
+- **T&S の暗号文の鍵**：取引のメッセージ・コメントの保持の写し、通報の証拠、権利者の連絡先、法令の申出者は「T&S の鍵」で暗号化すると決まっていたが（[messaging-and-comments.md](messaging-and-comments.md) の 4.3 節、[trust-and-safety.md](trust-and-safety.md) の 17 節）、[ADR-0069](../decisions/0069-key-layout-and-vault-envelope-encryption.md) の鍵の一覧にない。**推奨：KMS の鍵 `kms-ts` を足し、`Decrypt` を `trust-safety` のタスクの役割と、法務の書き出しのジョブだけに与える**。データの鍵は content の `data_keys`（`purpose = 'ts'`）に包んで置く。案：content の保存時の鍵 `kms-content` を使う（採らない。DB を読める役割がそのまま本文を読めてしまう）。security の領域で ADR-0069 に注記するか後継の ADR を起票する。
+- **記録のバケット `records`**：決済・運送会社の Webhook の本文、外部の明細、全銀の形式のファイル、分割の表の古い区切りの写しを、S3 の `records` のバケットにまとめ、接頭辞ごとに KMS の鍵と書ける役割を分ける。ledger の物（明細、全銀のファイル）は Object Lock のガバナンスのモードで 10 年（[data-model/stores.md](data-model/stores.md) の 3 節）。案：接頭辞ごとに別のバケット（採らない。ライフサイクルと大阪への写しの設定が増えるだけで、鍵と役割の分けは政策でできる）。[infrastructure.md](infrastructure.md) の 4.2 節の S3 の一覧に足した。
 
 ### 残る未解決事項（2026-10-10）
 
@@ -477,7 +484,6 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 費用の実績（OpenSearch・大阪の S3・観測・ネットワークの単価は**未検証**） | E18 の `cost-baseline` |
 | 審査の体制（S1 で 1 日 210 時間前後の審査） | E14 の前に PM と Ops |
 | 本家の振る舞いで未確認のもの（手数料の端数、商品説明の上限、コンビニ払いの手数料、発送の期限の後の扱い、早期受取の条件、SLA） | 公式の資料で確かめられなかった。本システムの値を使う |
-| ER 図を含むデータモデルの正本 | 次のデータモデルの工程で Dev が [data-model.md](data-model.md) を正本に書き直す |
 
 ## 7. 領域の文書
 
@@ -502,7 +508,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [notifications.md](notifications.md) | プッシュ・メール・お知らせ、配信の設定、まとめ、値下げ・いいねの fan-out、速さの上限、端末のトークンの管理、文言（法務の L4） | 0063–0065（使用：0063、0064、0065） | QA、Ops | E17 |
 | [accounts-and-devices.md](accounts-and-devices.md) | 電話番号の確認、ログイン（パスキー、SMS）、セッション、端末、乗っ取りの兆しと再確認、ブロック、退会とデータの削除（法務の L5）、アプリの形 | 0066–0068（使用：0066、0067、0068） | セキュリティ | E2 |
 | [security.md](security.md) | 脅威モデル、暗号化と鍵（住所の金庫、口座）、運用者の JIT の権限と監査、個人のデータの扱い、漏えいの対応、不正の兆しの基盤 | 0069–0071（使用：0069、0070、0071） | セキュリティ | E1、E18 |
-| [data-model.md](data-model.md) | データモデルの索引（core・ledger・content の表、Valkey・OpenSearch・S3 の置き場所、SNS・SQS の話題、AppConfig）。ER 図は後のデータモデルの工程 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [data-model.md](data-model.md)・[data-model/](data-model/) | データモデルの正本（規約、core・ledger・content の 145 表の目録と ER 図、購入から振込までの道筋、横断の不変条件、Valkey・S3・SNS と SQS・OpenSearch・外部の形式・AppConfig と `legal.*`） | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、3 つの Aurora、OpenSearch、egress（提供者・銀行・運送会社）、DR（大阪）、段階を上げる基準と分け方 | 0072–0074（使用：0072、0073、0074） | Ops | E1、E18 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、合成監視、照合の指標、外部送信規律（法務の L11） | 0075–0076（使用：0075、0076） | Ops | E1、E18 |
 | [capacity.md](capacity.md) | 負荷のモデル（出品、検索、購入、人気の出品、通知の fan-out、大型の企画の日）、部品ごとの必要量、費用のモデル、負荷試験 | 0077（使用：0077） | Ops | E18 |

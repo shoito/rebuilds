@@ -335,7 +335,7 @@ pop24    = min(1, ln(1 + 24 時間のいいねの増え) / ln(101))
 | Aurora content `likes`（`user_id`、`listing_id`、`created_at`）。FORCE RLS | いいね | 7.1 |
 | Aurora content `view_history`（`user_id`、`listing_id`、`viewed_at`）、`user_discovery_settings`（`user_id`、`use_history`） | 閲覧の履歴 | 7.2 |
 | Aurora core `listings.like_count`（listings-and-photos の表の列） | いいねの数 | 7.1 |
-| Aurora core `reindex_jobs`（`job_id`、`target_index`、`range_from`、`range_to`、`state`、`count`） | 作り直し | 4.5 |
+| Aurora core `reindex_jobs`（`job_id`、`target_index`、`range_from`、`range_to`、`state`、`doc_count`） | 作り直し | 4.5 |
 | Valkey `vis:{listing_id}`（`status`、`mod`、`seller_state`、`version`）、`rec:{user_id}`（10 分）、`sq:{hash}`（10 秒） | 写しとキャッシュ | 4.4、5.4、7.3 |
 | SQS `search-index`、`search-index-priority`。outbox の話題 `like.added`・`like.removed`・`listing.viewed`（本人の履歴だけ） | 事象 | 4.4、7 |
 | OpenSearch の保存したスクリプト `ranking_v1` | 順位の式 | 5.5 |

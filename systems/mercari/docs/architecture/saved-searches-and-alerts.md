@@ -107,7 +107,7 @@
 
 ### 5.3 逆索引の置き場所
 
-- **正本**：Aurora content の `saved_searches`（本人だけ。FORCE RLS）と `saved_search_keys`（`key`、`ss_id`、`user_id`、`packed`、`updated_at`）。`saved_search_keys` は `saved-search-matcher` のサービスの役割だけが読む。
+- **正本**：Aurora content の `saved_searches`（本人だけ。FORCE RLS）と `saved_search_keys`（`match_key`、`ss_id`、`user_id`、`packed`、`keys_version`、`updated_at`）。`saved_search_keys` は `saved-search-matcher` のサービスの役割だけが読む。
 - **写し**：Valkey の `ss:k:{key}:{shard}`（hash。`ss_id` → 詰めた条件 `packed`）。`packed` は条件を MessagePack で詰めたもの（平均 100 バイト）。語は文字のまま持たず、索引の語の 64 ビットのハッシュで持つ（Valkey の中の文字を減らし、語の比べを数の比べにする）。
 - **分け方**：1 つの鍵の件数が 2,000 を超えたら、分ける数（`ss:ks:{key}`、1・2・4・…・64）を倍にし、`ss_id` のハッシュで振り直す。
 - **バージョン**：鍵ごとに `ss:kv:{key}`（整数）を持ち、変更のたびに 1 上げる。Worker はメモリーの LRU（1 GB）に鍵の中身をバージョンつきで持ち、バージョンが同じなら Valkey から読まない。
@@ -246,8 +246,8 @@ flowchart TD
 | 置き場所 | 中身 | 節 |
 | --- | --- | --- |
 | Aurora content `saved_searches`（`ss_id`（UUIDv7）、`user_id`、`name`、`q`、`q_terms_c`、`q_terms_b`、`category_id`、`brand_ids`、`price_min`、`price_max`、`conditions`、`shipping_payer`、`shipping_methods`、`push_enabled`、`push_enabled_until`、`cond_hash`、`analyzer_version`、`chosen_keys`、`active_from`、`created_at`、`updated_at`）。FORCE RLS。一意 `(user_id, cond_hash)` | 保存した検索の正本 | 4 |
-| Aurora content `saved_search_keys`（`key`、`ss_id`、`user_id`、`packed`、`keys_version`、`updated_at`）。索引 `(key)`、`(ss_id)`。サービスの役割だけ | 逆索引の正本 | 5.3 |
-| Aurora content `ss_key_rates`（`key`、`listings_per_day`、`window_end`） | 鍵の流量 | 5.2 |
+| Aurora content `saved_search_keys`（`match_key`、`ss_id`、`user_id`、`packed`、`keys_version`、`updated_at`）。主キー `(keys_version, match_key, ss_id)`、索引 `(keys_version, ss_id)`（`key` は SQL の予約語なので `match_key`。[data-model.md](data-model.md) の D-13）。サービスの役割だけ | 逆索引の正本 | 5.3 |
+| Aurora content `ss_key_rates`（`match_key`、`listings_per_day`、`window_end`） | 鍵の流量 | 5.2 |
 | Aurora content `alert_matches`（`user_id`、`listing_id`、`ss_id`、`reason`（`published`・`price_dropped`）、`matched_at`、`window_id`、`sent`、`suppressed_reason`）。一意 `(user_id, listing_id, reason)`。FORCE RLS（本人）とサービスの役割。7 日 | 一致 | 5.4、6.4 |
 | Aurora content `alert_windows`（`window_id`、`user_id`、`opens_at`、`closes_at`、`state`、`push_count_day`） | 窓 | 6.1 |
 | Valkey `ss:k:{key}:{shard}`、`ss:ks:{key}`、`ss:kv:{key}`、`ss:ready:{gen}` | 写し | 5.3 |
