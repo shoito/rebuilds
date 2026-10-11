@@ -5,6 +5,7 @@
 | 場所 | 内容 |
 | --- | --- |
 | （方針） | このリポジトリは設計の記録に限る。実装は題材ごとの開発リポジトリで行う（[ADR-0005](decisions/0005-design-record-repository.md)） |
+| [agents.md](agents.md) | AI エージェントの観点の、題材をまたいだまとめ：任せないこと、誤りを止める仕組み、確認ループと eval、技術の選定 |
 | [patterns.md](patterns.md) | 題材をまたぐパターンの索引：テーマごとに、どの題材のどの ADR から読むか。読む順の道筋 |
 | [process.md](process.md) | 開発プロセス：成果物、ロールと持ち主、段と承認、規模に応じた経路、要件の書き方、衝突の防止、品質、運用 |
 | [project-management.md](project-management.md) | GitHub の Issue・Projects・Actions での回し方：正本の分担、Issue の種類、ラベル、Projects の項目、自動化、エージェントの関わり方 |

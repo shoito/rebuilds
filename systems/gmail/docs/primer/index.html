@@ -58,6 +58,11 @@
         <li>ブロックリストに載った送信の IP は、プールから外し、原因を止めてから解除を申請し、ウォームアップの段から戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/ip-blocklisted.md">ip-blocklisted.md</a>）</li>
         <li>選別のモデルは影の判定の 7 日の後に 1% から段階的に広げ、<code>ops.filter_model_pinned</code> で前のバージョンに固定できます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>選別のモデルの本番での有効化、送信の上限と評判の閾値の変更、報告のサンプルを見ることは人が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>件名や本文をログに書くコードは、計装の関数が型の許可の一覧しか受けないので、コンパイルで落ちます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0067-content-free-telemetry-schema.md">ADR-0067</a>）</li>
+        <li>「S3 の PUT の前に 250 を返せ」のような誘いを eval に入れ、受け付けの確定と通信の秘密のタスクは 1 件の失敗でマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

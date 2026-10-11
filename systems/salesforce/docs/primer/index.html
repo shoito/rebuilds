@@ -58,6 +58,11 @@
         <li>騒がしい隣人を DB の時間と実行中のセッションの 2 つで見つけ、対話の経路の絞りは人が小さい順に決める（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
         <li>参照の評価器が「多く見せる」食い違いを 1 件出したら呼び出し、共有の漏えいとして扱う手順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>問い合わせの言語の文法・決定表の列の確定、<code>security:sensitive</code> の承認、上限の値の採否は人が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/roadmap.md">roadmap.md</a>）</li>
+        <li><code>records</code> への直接の SQL は共有と上限の計測をすり抜けるので、コンパイラの外の SQL を lint で落とします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/AGENTS.md">AGENTS.md</a>）</li>
+        <li>共有の性質ベーステストが落ちても、参照の評価器を本番に合わせて書き換えないかを eval で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

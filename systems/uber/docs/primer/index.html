@@ -57,6 +57,11 @@
         <li>緊急の通報を 30 秒以内に担当が受けることを SLO にし、受けていない通報が 1 件あれば呼び出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/runbooks/README.md">runbooks/README.md</a>）</li>
         <li>運賃の規則と legal のフラグの有効化を、デプロイと別の手順にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/runbooks/deploy-and-rollback.md">deploy-and-rollback.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>運賃の規則と <code>fare-replay</code> で許す差の承認、<code>legal_gate_records</code> の作成はエージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>遷移関数の外で <code>trips.state</code> を更新するコードを lint で、配車と Trips の条件の食い違いを DT-DISP-001 のベクターで止めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/quality.md">quality.md</a>）</li>
+        <li>Go を選んだ理由の 1 つは確認ループの短さで、Rust は修正の往復が増えるとして索引の退路に残しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0001-platform-and-stack.md">ADR-0001</a>）</li>
+      </ul></div>
     </div>
   </section>
 

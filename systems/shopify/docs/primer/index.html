@@ -58,6 +58,11 @@
         <li>フラッシュセールは、7 日前の事業者との面談から 3 日前の隔離のポッドへの移し替えまで、日付つきの手順で備えます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/flash-sale-operations.md">flash-sale-operations.md</a>）</li>
         <li><code>ops.checkout_enabled</code>・<code>ops.functions_enabled</code>・<code>ops.app_suspended</code> で、ショップやアプリの単位で被害を区切ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>チェックアウトの決定表・在庫の不変条件・税の端数などの契約の確定と、試験のベクトルの期待する値の変更は人が決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>アプリの条件だけでは書き忘れ 1 件で漏えいになるので、エージェントが書くコードの量を考えて FORCE RLS で DB に止めさせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0003-tenancy-and-rls.md">ADR-0003</a>）</li>
+        <li>「Webhook でも注文を作る関数を足せ」のような誘いを eval に入れ、在庫・注文・金額のタスクは 1 件の失敗でマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

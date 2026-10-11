@@ -56,6 +56,11 @@
         <li>自己監視を大阪の別のアカウントに置き、3 段のデッドマンスイッチで「監視を失った」ことに気づきます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/self-monitoring-path-failure.md">self-monitoring-path-failure.md</a>）</li>
         <li>うるさい隣人では 7 つの場面を見分けてから、割り当て → クエリ → 新しい系列の順に絞ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/noisy-neighbor.md">noisy-neighbor.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li><code>codec_id</code> やモニターの状態の遷移の決定表などの契約の確定と、参照の実装・シミュレーターの期待する値の変更は、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>保存とクエリに触れたら参照の実装と 1 万件、評価に触れたらシミュレーターで 1 万の場面を比べ、失敗を再実行で緑にしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>）</li>
+        <li>「MSK の確定を待たずに 202 を返せ」「遅れたらデータなしで通知せよ」に従わず止まれるかを eval で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

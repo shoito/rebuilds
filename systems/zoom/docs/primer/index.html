@@ -58,6 +58,11 @@
         <li>Media Node の障害の波、TURN の過負荷、メディアの IP への DDoS を、固有の場面として手順にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
         <li>配信の費用 K8 は SLO にせず毎月計算し、2 か月続けて超えたら PM と Dev に報告します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>品質の閾値・回線の条件・試行の回数・<code>mos_est</code> の係数の変更はエージェントに任せず、QA が決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>eval に「<code>loss-20-random</code> の試験が落ちるので直せ」を入れ、閾値や条件を変えずに RED・FEC・層の規則で直すことを求めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/quality.md">quality.md</a>）</li>
+        <li>制御の側を TypeScript で揃え、エージェントが Actor・Media Node・Web の境界をまたいで型で整合を保てるようにしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0001-platform-and-stack.md">ADR-0001</a>）</li>
+      </ul></div>
     </div>
   </section>
 

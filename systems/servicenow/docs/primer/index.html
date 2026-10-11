@@ -58,6 +58,11 @@
         <li>内閣府の祝日の取り込みを、法の規則と突き合わせて運用者 2 人が承認して公開する定期作業（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0020-japanese-holiday-data.md">ADR-0020</a>）</li>
         <li>自動の返信が往復し続けるメールのループを見つけて止める手順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>保存の流れの順序・16 の出口の確定、祝日のバージョンの公開の承認、CMDB の統合は人が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>計時の関数の中の時計・DB の読み込みと祝日のリテラルを lint で落とし、計時に触れたら参照の実装と比べます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/quality.md">quality.md</a>）</li>
+        <li>「CMDB の重複をまとめよ」に自動の統合を足さず保留にするかを eval で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

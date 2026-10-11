@@ -46,7 +46,7 @@ ADR-0005 が禁じたのは、題材の製品の実装を rebuilds に置くこ�
   - 図・リンク・ADR の一覧の壊れが、マージの前に止まる。
   - エージェントへの指示に、検査の手順を毎回書かなくてよくなる。
 - 引き受けるコスト：
-  - rebuilds に Node.js の依存（Mermaid、Puppeteer）が入る。Puppeteer は Chromium を取得する。
+  - rebuilds に Node.js の依存（Mermaid、Puppeteer）が入る。Puppeteer（puppeteer-core）は、手元と CI の Chrome を使う。
   - 検査の道具そのものの保守が要る。
 
 ## Confirmation

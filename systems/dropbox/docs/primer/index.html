@@ -55,6 +55,11 @@
         <li>一斉の削除・ランサムウェアでは、端末の切り離し → 時点の選択 → 1,000 操作ずつの巻き戻しの順に戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/runbooks/mass-change-response.md">mass-change-response.md</a>）</li>
         <li>同期・名前・分割・権限の規則はフラグにせず、新しい GC は参照の監査が 24 時間 0 のときだけ有効にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/runbooks/README.md">README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>衝突の決定表・<code>chunker_version</code>・<code>name_key</code> などの契約の確定と、GC の猶予の短縮やブロックの消去は、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/roadmap.md">roadmap.md</a>）</li>
+        <li><code>sync-core</code> に触れたら決定的な同期のシミュレーターで 1 万の場面を回し、落ちるシードは除外せず回帰テストに足します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a>）</li>
+        <li>「競合が多いので新しいほうで上書きせよ」に、時刻で勝ち負けを決めず止まって Dev に確認できるかを eval で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

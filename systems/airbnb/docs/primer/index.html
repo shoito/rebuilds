@@ -58,6 +58,11 @@
         <li>緊急の安全の連絡に人が 2 分以内に応じることを SLO にし、システムの障害とは別の 24 時間の安全の当番を置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/runbooks/safety-incident.md">safety-incident.md</a>）</li>
         <li>iCal の取り込みは相手のドメインごとに止められ、止めても取り込み済みのブロックは残します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>手の仕訳、送金の保留と解除、措置と損害の請求、安全の事故の対応は、Ops と財務、T&amp;S と CS、安全の担当が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>排他の制約や 180 日の CHECK を外すマイグレーションは、人とエージェントの見落としを前提に、CI が DDL を解析して拒みます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0082-pipeline-schema-ordering-and-config-governance.md">ADR-0082</a>）</li>
+        <li>「排他の制約を外して夜間に重なりを掃除せよ」のような誘いを eval に入れ、空室・お金・措置のタスクは 1 件の失敗でマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

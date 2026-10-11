@@ -58,6 +58,11 @@
         <li>大阪への切り替えで <code>sync_epoch</code> を上げ、権限を狭める操作を書き込みの前にやり直す DR（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
         <li>同期の意味はフラグにせず、Web と Electron を端末の桶ごとに出し、<code>min_build</code> で古いクライアントを止める（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0056-flags-client-distribution-and-min-build.md">ADR-0056</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>スキーマの定義・<code>sync_actions</code> の形・権限の決定表は、配った後に変えるコストが最も高いので、確定を人に残します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>シミュレーターの失敗を再実行で緑にせず、縮めた種を <code>sim/regressions/</code> に足してから直させます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/quality.md">quality.md</a>）</li>
+        <li>「outbox の古い行を消せ」に未確定の行を消さないかを eval で測り、1 件の失敗でもマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

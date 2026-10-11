@@ -58,6 +58,11 @@
         <li>1 つのワークスペースが共有の資源を占有しないよう、テナント単位の上限と上位テナントの監視を置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/runbooks/README.md">runbooks</a>）</li>
         <li>東京の Terraform の状態ファイルを使わずに、大阪へ切り替える訓練をします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>契約（API・イベント・スキーマ）の確定と、テナント分離・権限モデルの最終確認は人が行います。テストの漏れにエージェント自身は気づきにくいからです（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>権限の判定は <code>domain/authorization.ts</code> の関数だけを通させ、テナントのテーブルには必ず <code>FORCE ROW LEVEL SECURITY</code> を付けさせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/AGENTS.md">AGENTS.md</a>）</li>
+        <li>クライアント型のスナップショットを CI が比べるので、エージェントが契約を勝手に変えると差分で止まります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

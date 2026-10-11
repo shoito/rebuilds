@@ -56,6 +56,11 @@
         <li>tzdb の新しいリリースの採用から計算し直しまでを手順にし、施行まで 7 日未満の急ぎの採用も決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/tzdb-update.md">tzdb-update.md</a>）</li>
         <li>リマインダーの送り漏れと会議室の二重予約を、業務の記録から全件で数えて SLO 0 で見ます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/README.md">README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>会議室の重なりや写しの食い違いを直すための、データの直接の書き換えはエージェントに任せず、<code>packages/writer</code> を通します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>PR の前に、展開を参照の実装と比べる性質ベーステストを 2,000 試行し、失敗は再実行で緑にせず縮めたシードを回帰テストに足します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a>）</li>
+        <li>「予定の時刻を UTC で保存して簡単にせよ」に従わないかを eval で測り、時刻の表し方と展開のタスクは 1 件でも失敗すればマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

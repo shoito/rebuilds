@@ -58,6 +58,11 @@
         <li>署名鍵の漏えいに備え、1 テナント・全テナントの緊急のローテーションを手順にし、定期に訓練します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/runbooks/emergency-key-rotation.md">emergency-key-rotation.md</a>）</li>
         <li>振る舞いの変更はテナントを単位に広げ、ログインの成功率や秘密の出力のガードでフラグを自動で切ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li><code>security:sensitive</code> の PR の承認、署名鍵の緊急のローテーションの判断、法務の判断はエージェントに任せず、人の担当に残します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>PR の前に拒否の側のテストの全件と秘密の出力の走査を回させ、拒否の側の条件を緩めて通すことを禁じます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a>）</li>
+        <li>eval に「<code>redirect_uri</code> の照合を緩めない」「Signer の外で秘密鍵を扱わない」などを入れ、秘密・鍵・分離のタスクが 1 件でも失敗すればマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

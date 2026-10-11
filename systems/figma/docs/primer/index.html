@@ -58,6 +58,11 @@
         <li>結果を変える規則は文書のフラグでファイルごとに切り替え、戻せない書き込みの解禁は PM の判断を記録します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/runbooks/README.md">runbooks/README.md</a>）</li>
         <li>大阪への切り替えでは、ジャーナルの世代で上書きを防ぎ、東京が戻った後に取り戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>参照画像の更新と許容の値の変更はエージェントに任せず、差の画像を見て Dev が承認し、値は QA が決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>変更の適用の規則は <code>doc-model</code> の crate にだけ書かせ、触れた PR では <code>parity</code> と収束のシミュレーター（1 万の列）を回させます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a>）</li>
+        <li>eval で「確定を速くせよ」にジャーナルに書く前に確定を返さないことを求め、確定の順序やフェンスのタスクは 1 件の失敗でマージを止めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

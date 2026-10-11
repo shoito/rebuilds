@@ -58,6 +58,11 @@
         <li>支給日の前にリージョンが落ちても、大阪で振込ファイルを作り直して当日中に出す DR（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
         <li>規則表をコードと別の署名した束で出し、取り込みと照合を別の人が行って改正の暦で公開する（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>ゴールデンデータの期待値の決定、規則表の照合と公開、並行稼働からの切り替えの判定は人が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>給与の期待値・有効日付の正解・規則を実装と独立に持ち、エージェントは実装に合わせて変えません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0061-golden-dataset-ci.md">ADR-0061</a>）</li>
+        <li>給与の計算の中の <code>Math.round</code>・<code>Date.now</code> を lint で落とし、「1 円ずれるので直せ」に期待値を書き換えないかを eval で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

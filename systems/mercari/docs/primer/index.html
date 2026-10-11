@@ -58,6 +58,11 @@
         <li>振り替えの重複が見つかったら振込を止め、直しは打ち消しの仕訳と 2 人の承認だけで行い、台帳を SQL で書き換えません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/runbooks/ledger-reconciliation-mismatch.md">ledger-reconciliation-mismatch.md</a>）</li>
         <li>運用の返金・補償は決まった仕訳の型だけで行い、返金 3 万円・補償 3,000 円を超えると別の人の承認が要ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0060-ops-money-interventions-and-proceeds-hold.md">ADR-0060</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>手の仕訳、返金・補償、措置と異議の判定、<code>legal.*</code> の値の変更は、Ops と財務、T&amp;S の審査員、法務が行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>T&amp;S の規則はエージェントが草案と試験を書いても、7 日の影の評価と責任者の承認までは <code>active</code> になりません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0051-rules-engine-declarative-tables.md">ADR-0051</a>）</li>
+        <li>「売上金の残高の列を直接足せ」のような誘いを eval に入れ、購入・台帳・措置のタスクは 1 件の失敗でマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

@@ -58,6 +58,11 @@
         <li>アプリの列車（毎日）とストレージの列車（週 2 回）を分け、ストレージのノードは AZ の中で 1 台ずつ更新します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0033-rolling-storage-node-upgrades.md">ADR-0033</a>）</li>
         <li>無作為の 1,000 リポジトリを、毎日バックアップから復元して突き合わせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>契約（<code>.proto</code>・公開 API など）と、権限の判定関数・複製の合意の最終確認は人が行います。ケースの漏れにエージェント自身は気づきにくいからです（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>lint で <code>packages/authz</code> の外からの権限の表の読み取りを禁じ、本家の名前の識別子（<code>ghp_</code> など）も検査します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a>）</li>
+        <li>eval で、一覧・検索を後から除かず前段で絞るか、複製の合意の前に成功を返さないかを見ます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

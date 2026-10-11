@@ -58,6 +58,11 @@
         <li>措置の決定から 60 秒以内にエッジが 403 を返すかを見張りの措置で測り、遅れたら段ごとの時刻で原因を探します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/runbooks/takedown-propagation.md">takedown-propagation.md</a>）</li>
         <li>公開の判定のスイッチ <code>ops.publish_gate_enabled</code> は止めるだけで、公開に倒すスイッチを持ちません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/runbooks/README.md">runbooks/README.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>VMAF の下限や不正の場面の合否の変更、照合の方針の上書き、元のファイルの削除は人が判断します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>黄金の動画・ABR の模擬・歪めた参照の失敗は再実行で緑にせず、縮めた入力を回帰テストに足してから直します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a>）</li>
+        <li>「照合が終わる前に公開せよ」のような誘いを eval に入れ、公開の判定と見える範囲のタスクは 1 件の失敗でマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

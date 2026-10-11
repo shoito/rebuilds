@@ -82,6 +82,15 @@
     <div class="card"><div class="genre">SLO、題材に固有の runbook、外から来る変化への備え</div><h3>Ops</h3><ul class="role-list"><li><a href="systems/datadog/docs/primer/index.html#learn">Datadog</a>：監視のサービス自身を、別のアカウントの自己監視とデッドマンスイッチで見張る</li><li><a href="systems/zoom/docs/primer/index.html#learn">Zoom</a>：音声と映像の体感の品質を、回線の劣化の下の数値の SLO にする</li><li><a href="systems/gmail/docs/primer/index.html#learn">Gmail</a>：送信の評判、IP のブロックリスト、迷惑メールの波を運用の手順で扱う</li><li><a href="systems/google-calendar/docs/primer/index.html#learn">Google カレンダー</a>：tz データベースの改正という、外から来る時限の変更を運用で受ける</li></ul></div>
   </div>
 
+  <h2>AI エージェントから探す</h2>
+  <p class="hint" style="margin:-.4em 0 14px">このリポジトリの問いは「AI エージェントを主な作り手にするなら、どう設計するか」です。21 題材の答えを <a href="https://github.com/shoito/rebuilds/blob/main/docs/agents.md">AI エージェントから読む</a> にまとめ、各題材の資料の「この題材から学べること」にも「AI エージェント」のカードを置いています。</p>
+  <div class="grid roles">
+    <div class="card"><div class="genre">契約の確定、お金、法令、本番の操作に加えて、テストの正解（期待値・閾値）を変えることを任せない</div><h3>任せないこと</h3><ul class="role-list"><li><a href="systems/workday/docs/primer/index.html#learn">Workday</a>：給与の期待値は社労士・税理士が確かめたもので、エージェントは書き換えない</li><li><a href="systems/stripe/docs/primer/index.html#learn">Stripe</a>：お金を動かす変更の承認と、影の実行の結果の判断は人が行う</li></ul></div>
+    <div class="card"><div class="genre">もっともらしいが規則を 1 つ外したコードを、レビューの目でなく機械で落とす</div><h3>誤りを止める仕組み</h3><ul class="role-list"><li><a href="systems/airbnb/docs/primer/index.html#learn">Airbnb</a>：排他の制約を外すマイグレーションは、CI が DDL を解析して拒む</li><li><a href="systems/gmail/docs/primer/index.html#learn">Gmail</a>：メールの中身をログに渡すとコンパイルで落ちる型</li></ul></div>
+    <div class="card"><div class="genre">PR の前に回す検証と、もっともらしい誤った指示に止まれるかを測る eval</div><h3>確認ループと eval</h3><ul class="role-list"><li><a href="systems/dropbox/docs/primer/index.html#learn">Dropbox</a>：「新しいほうで上書きせよ」に止まれるか</li><li><a href="systems/linear/docs/primer/index.html#learn">Linear</a>：本物の同期のコードを毎晩 20 万の列でシミュレーターに通す</li></ul></div>
+    <div class="card"><div class="genre">確認ループが短く、エージェントが扱える形を選ぶ</div><h3>技術の選定</h3><ul class="role-list"><li><a href="systems/uber/docs/primer/index.html#learn">Uber</a>：Go はテストが速い。Rust は修正の往復が増えるので退路に残す</li><li><a href="systems/shopify/docs/primer/index.html#learn">Shopify</a>：エージェントのコード量では条件の書き忘れが出るので、分離を DB で強制する</li></ul></div>
+  </div>
+
   <h2>題材</h2>
   <p class="hint" style="margin:-.4em 0 14px">「設計の文書」は GitHub で、「資料」と「スライド」はこのサイトで読めます。資料とスライドは、右上のボタンか S キーで切り替えられます。</p>
   <div class="grid" id="grid">

@@ -56,6 +56,11 @@
         <li>投稿から監視用のフォロワーに届くまでを合成監視の組で測り、fan-out の SLO の正解にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/runbooks/README.md">README.md</a>）</li>
         <li>殺到の時に削る順（閲覧の取り込み → おすすめ → … → fan-out の量）と、削らないもの（投稿、<code>visible()</code>、措置、法令の期限）を決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/capacity.md">capacity.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>契約（出来事の形・<code>tid</code> の形・<code>visible()</code> の決定表・公開 API の形）の確定は、配った後に変えるコストが最も高いため、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>閾値の直書きや <code>visible()</code> を通らない応答は lint で、読み出しの経路の変更は漏れの経路の表の結合テストで、PR の前に落とします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/quality.md">quality.md</a>）</li>
+        <li>「ブロックの判定を fan-out の時に移せ」に止まれるかを eval で測り、見える範囲のタスクは 1 件でも失敗すればマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

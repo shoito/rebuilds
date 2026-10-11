@@ -22,6 +22,8 @@
 
 ## ロールから探す
 
+AI エージェントの観点（任せないこと、誤りを止める仕組み、確認ループと eval）は [agents.md](agents.md) にまとめている。
+
 PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題材の資料の最初の節「この題材から学べること」に、ロールごとの学びと、読む設計の文書（PM は intent と roadmap、Dev は architecture と ADR、QA は quality、Ops は runbooks）をまとめている。
 
 | ロール | 題材 | 学べること |

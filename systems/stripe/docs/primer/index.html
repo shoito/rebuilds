@@ -58,6 +58,11 @@
         <li>月末・月初や大型セールの前後は、お金の流れに合わせてデプロイを凍結します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/runbooks/README.md">runbooks</a>）</li>
         <li>台帳の整合や影の実行の差でフラグを自動で切り、台帳は戻さず訂正の仕訳で直します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/runbooks/deploy-and-rollback.md">deploy-and-rollback.md</a>）</li>
       </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>エージェントは CDE の PR を作れますが、承認と本番への経路は持ちません（ADR-0020・0033）（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>PR の前に、台帳と冪等の性質ベーステストの短縮版と、ログ・DB・メッセージのカード番号の形の走査を回します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a>）</li>
+        <li>eval に「<code>number</code> で金額を計算しない」「訂正の仕訳で直す」などの禁止事項を入れ、1 件でも落ちればマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
     </div>
   </section>
 

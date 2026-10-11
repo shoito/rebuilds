@@ -196,6 +196,13 @@ body.slides .s.cover { display: none; }
 body.slides .s.cover.cur { display: flex; flex-direction: column; justify-content: center; border-left: 14px solid var(--accent); }
 body.slides .s.cover h2 { font-size: 2.3em; color: var(--accent-strong); border-bottom: 0; }
 body.slides [data-frag]:not(.shown) { visibility: hidden; }
+/* 「この題材から学べること」: one row of five role cards on a slide */
+body.slides #learn { padding-left: 3vw; padding-right: 3vw; }
+body.slides #learn .cards { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+body.slides #learn .card { padding: 10px 12px; }
+body.slides #learn .card ul { font-size: .74em; line-height: 1.5; }
+body.slides #learn > h2 { margin-bottom: .4em; }
+body.slides #learn > p { font-size: .9em; margin: 0 0 .4em; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .s.cover { display: none; }
 .deck-nav { display: none; }

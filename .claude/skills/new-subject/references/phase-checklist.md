@@ -19,7 +19,7 @@
   - [ ] 7 節の表で、全領域に ADR の番号の範囲を割り当てる
 - [ ] `docs/decisions/`：核の決定の ADR（10 本前後）。一覧は `npm run adr-index`
 - [ ] `docs/quality.md`：利用者の画面があればアクセシビリティの行
-- [ ] `docs/roadmap.md`：Epic と Story、エージェントに任せないこと、延期の一覧。Epic の依存を書いたら DAG の図
+- [ ] `docs/roadmap.md`：Epic と Story、エージェントに任せないこと（理由と、誤りを止める仕組みも）、延期の一覧。Epic の依存を書いたら DAG の図
 - [ ] `docs/runbooks/`：`README.md`（SLI・SLO、アラートと手順の対応）と共通の 3 本（deploy-and-rollback、disaster-recovery、incident-response）。題材に固有の事故があれば、その手順も
 
 ## 工程 2：領域の文書
@@ -49,7 +49,7 @@
 ## 工程 5：前提知識の資料と索引
 
 - [ ] `docs/primer/index.html`：`docs/primer/AUTHORING.md` に従う（GA のタグ、favicon、`og:site_name`、節は 13〜22 個、確認の問いは 3〜6 個、用語集）
-- [ ] 表紙の直後に「この題材から学べること」の節（PM・Dev・QA・Ops ごとに 2〜3 項目、各項目に設計の文書へのリンク）
+- [ ] 表紙の直後に「この題材から学べること」の節（PM・Dev・QA・Ops・AI エージェントごとに 2〜3 項目、各項目に設計の文書へのリンク）
 - [ ] 資料の数値を設計の文書と照らし合わせる
 - [ ] ルートの `index.html` のカードと、`README.md` の題材の表に足す。並び順を揃える
 - [ ] `docs/patterns.md` のテーマの表か「題材に固有の論点」に足す。読む順の道筋と「ロールから探す」に入れるかを考える
