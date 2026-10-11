@@ -79,27 +79,29 @@
 
 ### 3.1 受け取りとトークン化
 
-CDE から本体を呼ばない（2 節）ので、`pm_` の作成は「ブラウザ → 本体 → CDE」の向きで行う。
+CDE から本体を呼ばない（2 節）ので、`pm_` の作成は「ブラウザ → 本体 → CDE」の向きで行う。次の図は、カードの入力から `pm_` を返すまでを手順の番号で示す。
 
-```
-ブラウザ（elements iframe）
-  └─▶ POST vault.<domain>/v1/card_inputs   （公開キー、PAN、有効期限、CVC）
-        vault-ingest
-          1. 形式の検証（桁数、Luhn）。BIN 表でブランド・funding・発行国を引く
-          2. cde-test なら、ブランドのテスト用の番号以外を拒否する（保存もログもしない）
-          3. PAN を暗号化（DEK で AES-256-GCM）。DEK は cde-pan の CMK で包む
-          4. 指紋を計算（cde-fp の HMAC 鍵。4 節）
-          5. Vault DB に INSERT：card_ref（ランダム）、暗号文、表示用の情報、指紋、公開キーの ID と、それから決めた account_id（vault_publishable_keys）。pm_ は未設定
-          6. CVC を cde-sad で暗号化し、ElastiCache に TTL 30 分で置く
-  ◀── { card_input: "ci_..." }              使い捨て。30 分で失効
-  └─▶ POST api.<domain>/v1/payment_methods  （公開キー、type=card、card_input）
-        api（本体）
-          7. 公開キーを検証し、account_id を決め、pm_ を採番する
-          8. PrivateLink で vault-core.bind_card_input(card_input, account_id, pm_, 公開キーの ID)
-             vault-core：card_input が未使用・期限内・同じ公開キー・同じ account_id のものかを確かめ、行に pm_ を書く
-             → 表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と加盟店向け・内部向けの指紋を返す
-          9. payment_methods に INSERT
-  ◀── { id: "pm_..." }                      iframe → 加盟店の JS → 加盟店のサーバー
+```mermaid
+sequenceDiagram
+    participant B as ブラウザ（elements iframe）
+    participant VI as vault-ingest（CDE）
+    participant DB as Vault DB（CDE）
+    participant EC as ElastiCache（CDE）
+    participant API as api（本体）
+    participant VC as vault-core（CDE）
+
+    B->>VI: POST vault.<domain>/v1/card_inputs<br/>公開キー、PAN、有効期限、CVC
+    Note over VI: 1. 形式の検証（桁数、Luhn）。BIN 表でブランド・funding・発行国を引く<br/>2. cde-test なら、ブランドのテスト用の番号以外を拒否する（保存もログもしない）<br/>3. PAN を暗号化（DEK で AES-256-GCM）。DEK は cde-pan の CMK で包む<br/>4. 指紋を計算（cde-fp の HMAC 鍵。4 節）
+    VI->>DB: 5. INSERT：card_ref（ランダム）、暗号文、表示用の情報、指紋、<br/>公開キーの ID と、それから決めた account_id（vault_publishable_keys）。pm_ は未設定
+    VI->>EC: 6. CVC を cde-sad で暗号化し、TTL 30 分で置く
+    VI-->>B: { card_input: "ci_..." }（使い捨て。30 分で失効）
+    B->>API: POST api.<domain>/v1/payment_methods<br/>公開キー、type=card、card_input
+    Note over API: 7. 公開キーを検証し、account_id を決め、pm_ を採番する
+    API->>VC: 8. PrivateLink で bind_card_input(card_input, account_id, pm_, 公開キーの ID)
+    VC->>DB: card_input が未使用・期限内・同じ公開キー・同じ account_id のものかを確かめ、行に pm_ を書く
+    VC-->>API: 表示用の情報（ブランド、BIN、下 4 桁、有効期限、funding、発行国）と<br/>加盟店向け・内部向けの指紋
+    Note over API: 9. payment_methods に INSERT
+    API-->>B: { id: "pm_..." }（iframe → 加盟店の JS → 加盟店のサーバー）
 ```
 
 - **`card_ref` は PAN から導かないランダムな値**（`vc_` ＋ 128 bit）で、CDE の外に出さない。`card_input`（`ci_` ＋ 128 bit）は、紐づけの 1 回だけ使える別の値で、紐づけの後は無効になる。

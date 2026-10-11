@@ -92,6 +92,26 @@ flowchart TB
 - **差分の畳み込み**：主体の行をロックし、差分を追記して、影響の始まりの日 `D` 以降の期間を作り直す（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 5.1 節）
 - **マイナンバーの収集**：本人が保管庫の画面で番号と本人確認の書類を出し、事務取扱担当者が確かめる。人事の側は `mn_ref` と状態だけを受け取る（[my-number-vault.md](my-number-vault.md) の 4.1 節）
 
+### 1.5 本家の形（確かめたこと）
+
+1.1 節の構成の考え方に加え、各領域の文書の 2 節で確かめた本家の振る舞いのうち、主な論点（有効日付、業務プロセス、権限、給与計算）に関わるものを集めた。いずれも 2026-09-28 に確認した。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 有効の時点と入力の時点 | 変更には、業務の上で有効になる時点と、システムに入力した時点がある。同じ有効日に複数の変更があれば、入力の時点で最後のものを取る | [Change Detection](https://doc.workday.com/workday-education/en-us/course-manuals/creating-integrations-using-global-payroll-connect/change-detection.html)。[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 2 節 |
+| 将来日付の発効 | 将来日付の変更は、指定したタイムゾーンの、その日の 0 時に効く | [Concept: Effective Dates](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/business-process-framework-concepts/dan1370796344630.html) |
+| 監査 | 前後の値、変更者、時刻を記録する | [Concept: Auditing](https://doc.workday.com/admin-guide/en-us/manage-workday/tenant-configuration/auditing/dan1370797846272.html) |
+| 業務プロセスの定義の変更 | 定義の変更は有効日を持つ。進行中の案件は定義の変更を拾わず、新しく起票した案件だけが新しい定義を使う | Concept: Effective Dates、[Business Process Framework](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/business-process-framework.html)（検索の要約と講座の資料）。[business-process-engine.md](business-process-engine.md) の 2 節 |
+| 委任 | 開始日の 0 時から終了日の終わりまで、委任した人のタイムゾーンで効く。委任された人は再委任できない。委任の前に起票された案件の扱いは資料の間で食い違う（未検証） | [Delegate My Tasks](https://doc.workday.com/admin-guide/en-us/manage-workday/business-processes/delegate-business-processes/business-process-task-delegation/dan1370796482940.html) |
+| 取消・訂正・キャンセル | 取消は完了した案件、キャンセルは進行中の案件に使い、元に戻せない。訂正は承認に回らない | [Correct, Cancel, and Rescind](https://it.tamus.edu/workdayservices/training/job_aid/correct-cancel-and-rescind/)（二次資料） |
+| ドメインの権限 | 画面・レポートの View・Modify と、連携の Get・Put で、セキュリティグループに権限を与える。絞られたグループは組織などで対象の一部だけに届き、権限は和になる | [Security](https://doc.workday.com/workday-education/en-us/course-manuals/financial-management-for-administrators/security.html)、[Security Group Configuration and Constraints](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-group-configuration-and-constraints.html)。[security-model.md](security-model.md) の 2 節 |
+| 権限の方針の有効化 | 方針の変更は有効化まで保留され、前の時刻のバージョンを有効化して戻せる。編集と有効化を別のグループに持たせられる。グループの所属の変更はすぐ効く | [Security Policy Configuration and Activation](https://doc.workday.com/workday-education/en-us/course-manuals/security-for-administrators/security-policy-configuration-and-activation.html) |
+| 人員の管理のモデル | 監督組織ごとに、ポジション管理かジョブ管理を選び、同じ階層で混ぜられる | [Staffing Models](https://doc.workday.com/workday-education/en-us/course-manuals/hcm-core-for-administrators/staffing-models.html)。[core-hr.md](core-hr.md) の 2 節 |
+| 給与計算 | 重い計算を別の計算のサービスで、メモリーの中のデータのスナップショットから行う。日本の給与計算を自社の機能で持つかは未検証 | [ホワイトペーパー](https://www.workday.com/content/dam/web/en-us/documents/whitepapers/whitepaper_workday_technology_platform_devt_process.pdf)。[payroll-engine.md](payroll-engine.md) の 2 節 |
+| 規模 | テナント数、従業員数、計算の時間は未検証 | 公開の資料で確かめられなかった（2 節） |
+
+**本家との意図した違い**：データは汎用のテーブルとメモリーの中のグラフではなく、型のある業務のテーブルを有効時間と記録時間の 2 軸で持つ（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）。同じ日の変更の順序は、入力の順ではなく事象の種類の順で決める（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 5.2 節）。人員の管理はポジションに一本化する（[ADR-0010](../decisions/0010-person-employment-job-assignment-model.md)）。委任の期間中は、未完了のタスクも代理人が操作できる（[ADR-0014](../decisions/0014-bp-routing-and-delegation.md)）。グループの所属とロールの変更も業務プロセスの承認を経る（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)）。日本の給与計算は、本家ではパートナーとの連携で扱う形と見られる（未検証）が、本システムは自前の純粋な計算で持つ（[ADR-0004](../decisions/0004-payroll-engine.md)）。
+
 ## 2. 規模の段階
 
 | 段階 | テナント（うち本番） | 従業員（合計） | 最大のテナント | 打刻のピーク | 給与計算の集中 | 構成 |
@@ -104,6 +124,26 @@ flowchart TB
 - 給与計算の負荷は、支給日の前に集中する。25 日支給の企業が多い前提（本システムの仮定。公開の統計を見つけられなかった。未検証。E12 の `load-test-suite` の前に、本番のテナントの支給日の分布で置き直す）で、S1 は 70 万人分を 5 日の中で計算・再計算する。
 - 給与計算 1 人あたりの項目は 50〜200 を想定し、1 万人の計算で 200 万回ほどの計算の要素になる。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 8 節（[ADR-0056](../decisions/0056-stages-cluster-sharding-and-cells.md)）。
+
+### 2.1 費用のモデル
+
+従業員 1 人の 1 か月の原価を、次の和で見る。部品の月額は [infrastructure.md](infrastructure.md) の 11 節の概算（S1、本番、±50%）を使う。
+
+```
+従業員 1 人の月の原価 = （人事の Aurora（writer・reader、支給日の前の追加の reader、大阪の写し、ストレージ）
+                       ＋ 保管庫の Aurora
+                       ＋ ECS Fargate（API、BP Worker、Worker、Payroll Compute、保管庫）
+                       ＋ ElastiCache
+                       ＋ 網と入口（CloudFront、ALB、WAF、NAT、Network Firewall）
+                       ＋ KMS（テナントの鍵）、Secrets Manager、Private CA
+                       ＋ 可観測性、セキュリティの監視、S3（明細、入力の文書）、バックアップ）
+                       ÷ 従業員
+```
+
+- S1 の本番の合計は約 31,000 USD/月で、従業員 100 万人で割ると 1 人の月で約 0.03 USD になる（本番の基盤だけ。staging などの約 6,000 USD は含めない）。
+- 最も大きいのは人事の Aurora（約 12,300 USD、本番の合計の約 4 割）である。内訳は [infrastructure.md](infrastructure.md) の 11 節にある。
+- 給与計算は支給日の前の 5 日に集中する（2 節）。その間の追加の reader と Payroll Compute の費用は、実行ごとのタグで見る（[infrastructure.md](infrastructure.md) の 11 節、[capacity.md](capacity.md) の 3 節）。
+- KMS のテナントの鍵は、S1 は 1 テナント 1 本で月 1,200 USD 程度。S3 では 1 テナント 1 本なら月 4 万 USD 程度になるので、S2 からはセルごとに 1 本とテナントの DEK にする（[ADR-0052](../decisions/0052-kms-key-hierarchy.md)）。
 
 ## 3. 非機能要件
 

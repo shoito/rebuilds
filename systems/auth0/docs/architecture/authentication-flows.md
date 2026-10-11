@@ -194,29 +194,38 @@ OIDC・OAuth のエンドポイント、グラント、クライアントの認�
 
 ### 5.4 シーケンス
 
-```
-RP(ブラウザ)          Auth（/authorize）             Universal Login        Signer   Aurora
-   │ GET /authorize ──▶│ 1. ホスト→tenant、client を設定のキャッシュから
-   │                   │ 2. redirect_uri を照合（失敗→エラーの画面）
-   │                   │ 3. パラメーターを検証（失敗→redirect_uri へ error＋state＋iss）
-   │                   │ 4. login_transactions に保存 ─────────────────────────────▶│
-   │                   │ 5. セッションを確かめる（sessions-and-sso.md）
-   │                   │    ├ 有効・prompt なし・max_age 内・acr を満たす → 8 へ
-   │                   │    ├ prompt=none で満たさない → error=login_required など
-   │◀── 302 /u/login?state=<tx> ───── 6. ログインの画面へ
-   │ ...ログイン・MFA・同意...        ──▶│ 7. セッションを作る・更新する
-   │                   │ 8. 認可コードを作り、ハッシュを保存 ─────────────────────▶│
-   │◀── 302 redirect_uri?code=..&state=..&iss=..（form_post なら自動送信の HTML）
-   │
-RP(サーバー)
-   │ POST /oauth/token（code, code_verifier, redirect_uri, クライアントの認証）
-   │                   │ 9. クライアントの認証（6 節）
-   │                   │10. コードを消費（UPDATE ... WHERE consumed_at IS NULL）──▶│
-   │                   │11. PKCE・redirect_uri・client_id を照合
-   │                   │12. クレームを組み立てる（8 節）
-   │                   │13. 署名を依頼 ─────────────────────────▶│
-   │                   │14. リフレッシュトークンの系列を作る（offline_access のとき）─▶│
-   │◀── 200 { access_token, id_token, refresh_token?, token_type, expires_in, scope }
+次の図は、認可コード＋PKCE の流れを、`/authorize` からトークンの応答まで示す。番号は下の説明と対応する。
+
+```mermaid
+sequenceDiagram
+  participant RP as "RP（ブラウザ）"
+  participant Auth as "Auth（/authorize）"
+  participant UL as "Universal Login"
+  participant Signer as "Signer"
+  participant DB as "Aurora"
+  participant RPS as "RP（サーバー）"
+  RP->>Auth: GET /authorize
+  Note over Auth: 1. ホスト→tenant、client を設定のキャッシュから<br/>2. redirect_uri を照合（失敗→エラーの画面）<br/>3. パラメーターを検証（失敗→redirect_uri へ error・state・iss）
+  Auth->>DB: 4. login_transactions に保存
+  Note over Auth: 5. セッションを確かめる（sessions-and-sso.md）
+  alt 有効・prompt なし・max_age 内・acr を満たす
+    Note over Auth: 8 へ
+  else prompt=none で満たさない
+    Auth-->>RP: error=login_required など
+  else それ以外
+    Auth-->>RP: 6. 302 /u/login?state=＜tx＞
+    RP->>UL: ログイン・MFA・同意
+    UL->>Auth: 7. セッションを作る・更新する
+  end
+  Auth->>DB: 8. 認可コードを作り、ハッシュを保存
+  Auth-->>RP: 302 redirect_uri?code・state・iss（form_post なら自動送信の HTML）
+  RPS->>Auth: POST /oauth/token（code、code_verifier、redirect_uri、クライアントの認証）
+  Note over Auth: 9. クライアントの認証（6 節）
+  Auth->>DB: 10. コードを消費（UPDATE ... WHERE consumed_at IS NULL）
+  Note over Auth: 11. PKCE・redirect_uri・client_id を照合<br/>12. クレームを組み立てる（8 節）
+  Auth->>Signer: 13. 署名を依頼
+  Auth->>DB: 14. リフレッシュトークンの系列を作る（offline_access のとき）
+  Auth-->>RPS: 200 access_token、id_token、refresh_token?、token_type、expires_in、scope
 ```
 
 - 4 の `login_transactions` は、検証を通った認可の要求と、ログインの画面の遷移の間の状態を持つ。表と `__Host-<brand>_tx` の Cookie による結び付け、有効 60 分は universal-login の領域の [ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md) が決める。この領域は、表に入れる認可の要求の欄（17 節）と、検証を決める。
@@ -329,16 +338,23 @@ sequenceDiagram
 
 [ADR-0009](../decisions/0009-device-authorization-grant.md)。
 
-```
-端末（TV など）             Auth                         利用者のスマートフォン
-  │ POST /oauth/device/code（client_id, scope, audience）
-  │◀─ { device_code, user_code: "BDFK-LMNP", verification_uri: https://<host>/activate,
-  │     verification_uri_complete: ...?user_code=BDFK-LMNP, expires_in: 900, interval: 5 }
-  │ 画面にコードと QR を出す                      ── /activate を開く、コードを入れる
-  │                                               ── ログイン（Universal Login）、確認の画面で「許可」
-  │ POST /oauth/token（grant_type=device_code, device_code, client_id）を interval ごとに
-  │◀─ 400 authorization_pending（まだ）／ slow_down（速すぎ）／ access_denied ／ expired_token
-  │◀─ 200 { access_token, id_token, refresh_token? }（1 回だけ）
+次の図は、入力の限られた端末が、利用者のスマートフォンでの承認を待ってトークンを受け取る流れを示す。
+
+```mermaid
+sequenceDiagram
+  participant Dev as "端末（TV など）"
+  participant Auth as "Auth"
+  participant Phone as "利用者のスマートフォン"
+  Dev->>Auth: POST /oauth/device/code（client_id、scope、audience）
+  Auth-->>Dev: device_code、user_code: BDFK-LMNP、verification_uri: https://＜host＞/activate、<br/>verification_uri_complete: ...?user_code=BDFK-LMNP、expires_in: 900、interval: 5
+  Note over Dev: 画面にコードと QR を出す
+  Phone->>Auth: /activate を開く、コードを入れる
+  Phone->>Auth: ログイン（Universal Login）、確認の画面で「許可」
+  loop interval ごと
+    Dev->>Auth: POST /oauth/token（grant_type=device_code、device_code、client_id）
+    Auth-->>Dev: 400 authorization_pending（まだ）、slow_down（速すぎ）、access_denied、expired_token
+  end
+  Auth-->>Dev: 200 access_token、id_token、refresh_token?（1 回だけ）
 ```
 
 | 項目 | 値 |

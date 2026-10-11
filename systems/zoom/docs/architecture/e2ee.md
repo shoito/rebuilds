@@ -58,25 +58,24 @@
 
 ## 4. 構成
 
-```
-参加者の端末
-┌───────────────────────────────────────────────────────────────┐
-│ main スレッド：UI、シグナリング（TypeScript）                  │
-│   │ MLS のメッセージ（暗号文・公開の情報）だけを中継            │
-│   ▼                                                           │
-│ e2ee ワーカー：core-e2ee（WASM）                               │
-│   OpenMLS（グループ、資格情報、鍵のスケジュール）             │
-│   SFrame（送り方ごとの暗号化・復号）                          │
-│   RTCRtpScriptTransform の変換（送る側・受ける側）            │
-└───────────────────────────────────────────────────────────────┘
-      │ WebSocket（MLS のメッセージ）          │ UDP（SRTP の中に SFrame）
-      ▼                                        ▼
-Signaling Gateway → Meeting Actor（DS）     Media Node
-                    ・エポックごとに最初のコミットだけ受ける   ・ペイロード（SFrame）は読まない
-                    ・GroupInfo を持つ（公開の情報）           ・RTP のヘッダーと拡張（mid、rid、
-                    ・外部の送り手として Remove を提案           DD、音量、transport-cc）で転送
-API（AS）
-  ・参加のたびに、端末の公開鍵に会議の間だけ有効な証明書を出す
+次の図は、端末の中で鍵を扱う場所と、サーバーの側の各部品が扱うものを示す。鍵を持つのは端末の `e2ee` ワーカーだけである。
+
+```mermaid
+flowchart TB
+    subgraph dev["参加者の端末"]
+        main["main スレッド<br/>UI、シグナリング（TypeScript）"]
+        worker["e2ee ワーカー：core-e2ee（WASM）<br/>OpenMLS（グループ、資格情報、鍵のスケジュール）<br/>SFrame（送り方ごとの暗号化・復号）<br/>RTCRtpScriptTransform の変換（送る側・受ける側）"]
+    end
+    sig["Signaling Gateway"]
+    ds["Meeting Actor（DS）<br/>エポックごとに最初のコミットだけ受ける<br/>GroupInfo を持つ（公開の情報）<br/>外部の送り手として Remove を提案"]
+    mn["Media Node<br/>ペイロード（SFrame）は読まない<br/>RTP のヘッダーと拡張（mid、rid、DD、音量、transport-cc）で転送"]
+    as["API（AS）<br/>参加のたびに、端末の公開鍵に<br/>会議の間だけ有効な証明書を出す"]
+
+    main -->|"MLS のメッセージ（暗号文・公開の情報）だけを中継"| worker
+    dev -->|"WebSocket（MLS のメッセージ）"| sig
+    sig --> ds
+    dev -->|"UDP（SRTP の中に SFrame）"| mn
+    dev -->|"参加の要求と公開鍵（5 節）"| as
 ```
 
 - MLS の秘密と SFrame の鍵は、`e2ee` のワーカー（ネイティブは共通のコア）の外に出さない。main スレッドは、暗号文と公開の情報だけを扱う。

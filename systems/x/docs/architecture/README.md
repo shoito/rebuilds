@@ -168,6 +168,25 @@ flowchart LR
 - fan-out の書き込みの量は、投稿 1 件あたりの「プッシュするアクティブなフォロワー」の平均で決まる。S1 で平均 100 と置くと、1 日 1 億件、瞬間のピークで 30 万件/秒をキューで受けて均す。プルに回す作者の閾値（S1 の既定 1 万フォロワー）で上限を抑える（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）。
 - 段階を上げる判断の基準は infrastructure の領域、負荷のモデルは capacity の領域で決める。
 
+### 2.1 費用のモデル
+
+DAU 1 人・1 か月の原価を、次の和で見る。S1 の本番の月額の概算（[infrastructure.md](infrastructure.md) の 13 節、約 120,000〜190,000 USD）を DAU 30 万で割ると、1 人・1 か月 約 0.4〜0.6 USD になる。単価は AWS の価格表で確かめていない（**未検証**）。E14 の `cost-baseline` で確定する。
+
+```
+DAU 1 人・1 か月の原価 = メディアの配信（CloudFront。1 日 100〜200 MB の画像と動画）
+                       ＋ 動画の変換（MediaConvert）
+                       ＋ 写しと計算（Valkey の 4 クラスタ、Fargate の fan-out・ランキング・読み出し）
+                       ＋ 正本（Aurora）
+                       ＋ 出来事のログ（Kinesis の 8 つの流れと拡張ファンアウト、Firehose、S3、Athena）
+                       ＋ 検索（OpenSearch）
+                       ＋ 外部（SMS、メール、外部の照合）
+                       ＋ API・資産の配信、WAF、可観測性、セキュリティのサービス
+```
+
+- メディアの配信が半分以上を占め、最大の不確かさでもある見込み。画像の形式（AVIF・WebP）と、端末に合わせた大きさで量を減らす（[media.md](media.md)）。
+- メディアの配信の次は、Fargate・Valkey・Aurora（それぞれ月 1 万 USD 前後）。fan-out でプッシュするフォロワーの数と、プルに回す作者の閾値が主な制御の手段になる（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）。
+- 動画の割合（MediaConvert）と SMS の数は幅が大きい。SMS は送信の上限で抑える。
+
 ## 3. 非機能要件
 
 | ID | 項目 | S1 の目標 | 備考 |

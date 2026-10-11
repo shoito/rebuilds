@@ -42,15 +42,34 @@
 
 ## 4. 通知のパイプライン
 
-```
-API ─tx─▶ outbox ─▶ Relay ─▶ SQS notify-events ─▶ 通知の計画（planner）
-                                                     │ 受け手を決める。大人数なら分割する
-                                                     ├──▶ SQS notify-fanout ─▶ planner（分割した受け手の続き）
-                                                     ├──▶ SQS notify-push ───▶ push の送信 ─▶ Web Push サービス
-                                                     └──▶ notification_pending_emails（DB）
-                                                                   │ 1 分ごと
-                                                                   ▼
-                                                              メールの送信 ─▶ SES
+次の図は、投稿の outbox から、通知の計画（planner）を経て Web Push とメールに分かれるまでを示す。
+
+```mermaid
+flowchart LR
+  API["API"]
+  OB[("outbox")]
+  Relay["Relay"]
+  QE["SQS notify-events"]
+  PL["通知の計画（planner）<br/>受け手を決める。大人数なら分割する"]
+  QF["SQS notify-fanout"]
+  QP["SQS notify-push"]
+  PS["push の送信"]
+  WP["Web Push サービス"]
+  PE[("notification_pending_emails（DB）")]
+  MS["メールの送信"]
+  SES["SES"]
+  API -- "tx" --> OB
+  OB --> Relay
+  Relay --> QE
+  QE --> PL
+  PL --> QF
+  QF -- "分割した受け手の続き" --> PL
+  PL --> QP
+  QP --> PS
+  PS --> WP
+  PL --> PE
+  PE -- "1 分ごと" --> MS
+  MS --> SES
 ```
 
 - Relay は `message.created`、`message.deleted`（未送信の通知の取り消し）、`channel.member_left` を `notify-events` へ送る。`message.edited` は送らない（編集で増えたメンションには通知しない。[messaging.md](messaging.md)）（[realtime.md](realtime.md) の 11 節）。

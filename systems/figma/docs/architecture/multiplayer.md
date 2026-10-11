@@ -92,17 +92,28 @@ Document Server
 
 ### 4.3 接続の確立
 
-```
-Client          Gateway                    Router          Document Server
-  │ Hello ───────▶│
-  │               │ 能力のチケットを検証（署名、期限、jti の使い回し、file_id）→ level（view / edit / owner）、acl_version
-  │               │ owner(file_id) ───────────▶│ なければ割り当て（ADR-0047）
-  │               │ open_session(file, user, level, resume) ──────────────▶│
-  │               │                                               │ resume が有効なら同じ session_id
-  │               │                                               │ でなければ session_open をジャーナルに書く（ADR-0007）
-  │◀──── Welcome ─│◀──────────────────────────────────────────────│
-  │ LoadPlan に従って読み込む（file-storage-and-history.md の 6 節）
-  │ Changes ─────▶ ...
+次の図は、クライアントが WebSocket でつないでから、読み込みを始めるまでを示す。
+
+```mermaid
+sequenceDiagram
+  participant C as "Client"
+  participant GW as "Gateway"
+  participant R as "Router"
+  participant DS as "Document Server"
+  C->>GW: Hello
+  Note over GW: 能力のチケットを検証（署名、期限、jti の使い回し、file_id）<br/>→ level（view・edit・owner）、acl_version
+  GW->>R: owner(file_id)
+  Note over R: なければ割り当て（ADR-0047）
+  GW->>DS: open_session(file, user, level, resume)
+  alt resume が有効
+    Note over DS: 同じ session_id
+  else それ以外
+    Note over DS: session_open をジャーナルに書く（ADR-0007）
+  end
+  DS-->>GW: Welcome
+  GW-->>C: Welcome
+  Note over C: LoadPlan に従って読み込む（file-storage-and-history.md の 6 節）
+  C->>GW: Changes ...
 ```
 
 - バージョンの照合は [ADR-0053](../decisions/0053-client-server-version-skew.md) による。Document Server は `protocol_version`（今のバージョンと 1 つ前のバージョンを話す）、`schema_hash`（今の表から追加だけでたどれる直近 30 日の一覧）、`engine_version`（`min_client_build` 以上）を確かめる。どれかが外れたときだけ `Kick(version_mismatch, retry_after_ms)`（0〜5 分に散らす）を返し、クライアントは強い再読み込みをする。`schema_hash` が違っても一覧の中なら、接続を続ける（[delivery.md](delivery.md) の 4 節）。

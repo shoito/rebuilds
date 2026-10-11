@@ -118,6 +118,25 @@ flowchart TB
 - 同期のログ（`sync_actions`）は S1 の平均で 1 日 800 万行ほどと見込む。保持は既定案で 30 日（[ADR-0013](../decisions/0013-sync-group-changes-retention-and-reset.md)）。法務の L5 と、やり直しの頻度の計測（E3）で確定する。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 9 節、負荷のモデルは [capacity.md](capacity.md) の 1 節にある。
 
+### 2.1 費用のモデル
+
+月間の利用者 1 人の 1 か月の原価を、次の和で見る。部品の月額は [infrastructure.md](infrastructure.md) の 11 節の概算（S1、本番、±50%）を使う。
+
+```
+利用者 1 人の月の原価 = （データ転送（CloudFront：WebSocket の差分、ブートストラップ、資産、添付）
+                       ＋ Aurora（writer・reader、sync_actions を含むストレージ、大阪への複製）
+                       ＋ ECS Fargate（Sync API、Sync Gateway、Writer、Relay、Worker、Public API）
+                       ＋ OpenSearch（検索の索引）
+                       ＋ ElastiCache（差分の配信、チケット、枠）
+                       ＋ 網と入口（ALB、NAT、Network Firewall）、可観測性、セキュリティの監視、S3、その他）
+                       ÷ 月間の利用者
+```
+
+- S1 の本番の合計は約 51,000 USD/月（permessage-deflate で約 36,000〜38,000 の見込み）。月間の利用者 10 万人で割ると、1 人の月で約 0.5 USD（圧縮で約 0.36〜0.38 USD）になる。staging などの約 7,000 USD は含めない。
+- 最も大きいのはデータ転送である。圧縮なしで月に約 230 TB、約 21,000 USD と見込み、本番の合計の 4 割を占める。差分の 1 件が行の全体を運ぶこと（[ADR-0007](../decisions/0007-sync-actions-and-range-proof-deltas.md)）と、同時の接続の数に比例する。主な制御の手段は permessage-deflate の圧縮の率で、E12 の `cost-baseline` で測る（[infrastructure.md](infrastructure.md) の 11 節）。
+- 次に大きいのは Aurora（約 10,000 USD）である。`sync_actions` の保持（既定案で 30 日。[ADR-0013](../decisions/0013-sync-group-changes-retention-and-reset.md)）がストレージを決める。
+- 単価は AWS Price List API で一部を確かめただけで、他は**未検証**である。E12 の `cost-baseline` で請求の実績に置き換える。
+
 ## 3. 非機能要件
 
 | ID | 項目 | S1 の目標 | 備考 |

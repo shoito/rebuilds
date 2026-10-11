@@ -2,28 +2,46 @@
 
 全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/slack/docs/primer/index.html#glossary)の用語集にある。
 
-| ファイル | 領域 |
-| --- | --- |
-| [data-model.md](data-model.md) | データモデルの正本：規約、ER 図、テーブルの定義（[data-model/](data-model/identity.md) に領域ごと）、Valkey・S3・検索・イベントの形、横断的な不変条件、テナントのコンテキスト |
-| [identity-and-access.md](identity-and-access.md) | 認証、セッション、SSO、招待、ロールと権限 |
-| [messaging.md](messaging.md) | 投稿・編集・削除・スレッド・リアクション・メンション、本文、リンクのプレビュー |
-| [realtime.md](realtime.md) | Gateway、購読、ファンアウト、在席・入力中、再接続と差分取得 |
-| [read-state-and-notifications.md](read-state-and-notifications.md) | 既読・未読、通知（Web Push、メール）、通知設定 |
-| [search.md](search.md) | 全文検索、インデックス、権限の適用 |
-| [files.md](files.md) | ファイルのアップロード、スキャン、サムネイル、配信 |
-| [client.md](client.md) | Web クライアント |
-| [mcp.md](mcp.md) | AI エージェント向けのリモート MCP サーバー |
-| [public-api.md](public-api.md) | バージョン付きの公開 API（MVP の後、E12） |
-| [apps.md](apps.md) | アプリのプラットフォーム：インストール、イベントの配信、インタラクティブ（MVP の後、E12） |
-| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
-| [infrastructure.md](infrastructure.md) | AWS の構成、環境、IaC、冗長化、バックアップと災害復旧、デプロイ、コスト |
-| [observability.md](observability.md) | ログ、メトリクス、トレース |
-| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーターの設定、キャパシティの運用 |
-| [delivery.md](delivery.md) | ブランチ、CI、デプロイ、リリース、フィーチャーフラグ |
-| [rate-limiting.md](rate-limiting.md) | レート制限、同時実行の制限、テナント単位の上限の一覧（プランによらない。ADR-0033） |
-| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） |
+領域ごとの文書の一覧は 7 節にある。
 
 ## 1. 全体構成
+
+### 1.1 コンテキスト
+
+次の図は、本システムを使う人と、本システムがやり取りする外部のシステムを示す（[intent.md](../intent.md) の Affected users and systems）。中の部品は 1.2 節にある。
+
+```mermaid
+flowchart LR
+  member["メンバー<br/>一般メンバー・管理者・ゲスト"]
+  pwa["Web クライアント（PWA）"]
+  agent["AI エージェント<br/>MCP クライアント（E9）"]
+  app["アプリ（ボット・連携）<br/>公開 API・イベントの配信（E12、MVP の後）"]
+  ops["運用者（Ops）"]
+  sys["本システム<br/>ワークスペース、チャンネル、メッセージ、<br/>既読と通知、検索、ファイル"]
+  idp["ID の提供者<br/>SAML・OIDC の SSO、Google・Microsoft"]
+  push["Web Push サービス"]
+  mail["メールの送信（SES）"]
+  site["外部の Web サイト<br/>リンクのプレビューの取得先"]
+  ga["Google Analytics 4<br/>利用状況の分析"]
+
+  member --> pwa
+  pwa -- "HTTPS・WebSocket" --> sys
+  agent -- "リモート MCP" --> sys
+  app <-- "公開 API・Webhook" --> sys
+  ops -- "期限つきの権限" --> sys
+  sys --> idp
+  sys --> push
+  sys --> mail
+  sys --> site
+  pwa -.-> ga
+```
+
+- SSO（SAML・OIDC）は Business+ 以上、Google・Microsoft でのログインは全プラン（[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md)、[identity-and-access.md](identity-and-access.md)）。
+- リンクのプレビューの取得は、VPC の外の権限を持たない取得器から行う（[ADR-0016](../decisions/0016-isolated-link-unfurling.md)）。
+- GA4 は、送る内容と読み込む条件を絞って、クライアントから送る（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)）。
+- 運用者のアクセスは [ADR-0035](../decisions/0035-operator-access.md)（proposed）。
+
+### 1.2 コンテナ
 
 次の図は、コンポーネントと、書き込みの経路・配信の経路を示す。
 
@@ -60,11 +78,44 @@ flowchart LR
 
 ポイントは **書き込み経路（API → DB）と配信経路（Relay → Gateway）を分ける** こと（[ADR-0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)）。配信が落ちてもデータは失われず、クライアントは再接続時の差分取得で追いつく。
 
-### 主要な流れ
+### 1.3 主要な流れ
 
 - **送信キューと楽観表示**：送信は IndexedDB の `outbox` に書いてから「送信中」で出し、SharedWorker がチャンネルごとの FIFO で 1 件ずつ送り、結果ごとに差し替え・再送・失敗にする（[client.md](client.md) の 3.6 節）
 - **チャンネルごとの同期の状態**：`stale`・`catching_up`・`live` を、WebSocket の接続・差分の取得・`seq` の欠損で移る（[client.md](client.md) の 3.5 節）
 - **再接続と差分取得**：欠損の検知や再接続のとき `after_seq` で差分を取り、reader の結果が届かなければ writer から読み直す（[realtime.md](realtime.md) の 6 節）
+
+### 1.4 本家の形（確かめたこと）
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| リアルタイムの規模 | 数千万の接続中のクライアントに、世界のどこへでも 500ms でメッセージを届ける。ピークでは 1 台のホストが約 1,600 万のチャンネルを受け持つ | [Real-time Messaging](https://slack.engineering/real-time-messaging/)（2023-04-11 の技術ブログ） |
+| リアルタイムの構成 | Channel Server が、一貫性ハッシュで割り当てたチャンネルの履歴をメモリに持つ（状態を持つ）。Gateway Server が利用者の情報と WebSocket の購読を持ち、近い地域で接続を受ける。壊れた Channel Server は 20 秒未満で入れ替わる | 同上 |
+| 本文の長さ | `text` は 4,000 文字以内を推奨。40,000 文字を超えるメッセージは切り詰める | [chat.postMessage](https://docs.slack.dev/reference/methods/chat.postMessage) |
+| 投稿のレート | アプリの投稿は、チャンネルごとに 1 秒 1 件まで。短いバーストは許し、ワークスペース全体の上限も持つ | [Rate limits](https://docs.slack.dev/apis/web-api/rate-limits/) |
+| Web API のレート制限 | 段階（Tier 1〜4：1 分に 1 回以上・20 回以上・50 回以上・100 回以上）と特別な段階。API のメソッド × ワークスペース × アプリの単位で数え、プランで変えない | 同上、[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) |
+| 未審査の配布型のアプリ | 履歴・スレッドの取得が 1 分に 1 回、1 回 15 件まで（2025 年 5 月から） | [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) の References（2026 年 9 月に確認） |
+| Events API | 3 秒以内に 2xx を返す。失敗は 3 回まで再送する（すぐ・1 分後・5 分後）。60 分の配送の 95% 超が失敗すると、購読を一時的に無効にする | [The Events API](https://docs.slack.dev/apis/events-api/) |
+| 無料のプラン | 直近 90 日のメッセージとファイルを閲覧・検索できる。アプリは 10 個まで。1 年より古いデータは順に消すことがある（2024-08-26 から） | [Usage limits for free workspaces](https://slack.com/intl/en-gb/help/articles/115002422943-Message-file-and-app-limits-on-the-free-version-of-Slack) |
+| プランの区分と機能 | Free・Pro・Business+・Enterprise。SAML の SSO と SCIM は Business+ から。監査ログ・リーガルホールドは Enterprise だけ。有料プランに人数の上限はない | [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) の References（2026 年 9 月に確認） |
+| ファイル | 1 ファイル 1 GB まで | [Add files to Slack](https://slack.com/help/articles/201330736-Add-files-to-Slack)（ページは取得できず、検索の抜粋で確認） |
+| 対応ブラウザ | モバイルアプリの下限は iOS 17。Web は Safari 26 以降。半年ごと（5 月・11 月）に見直す | [client.md](client.md) の 13 節（2026-09-26 に確認） |
+| 本家の DB・検索の索引・通知の経路の内部、通知の遅延と SLA の数値 | 公式の資料で確かめられなかった | **未検証** |
+
+表の 1〜5 行目と 7・8・10 行目は 2026-10-11 に確認した。この設計は振る舞いを参考にするが、本家の内部実装の再現は目的にしない（[intent.md](../intent.md) の Constraints、[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+
+**本家との意図した違い**：
+
+| 項目 | 本家 | 本システム | 理由・根拠 |
+| --- | --- | --- | --- |
+| リアルタイムの配信 | Channel Server がチャンネルの履歴をメモリに持つ | DB を唯一の正本にし、Relay・Valkey・Gateway はベストエフォートで状態を作らない。欠けた分はクライアントが `seq` で取り戻す | 配信が落ちてもデータを失わない（[ADR-0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)、[ADR-0003](../decisions/0003-redis-pubsub-for-fanout.md)、[realtime.md](realtime.md) の 1 節） |
+| 長すぎる本文 | 40,000 文字を超えると切り詰める | 40,000 文字を超えると 400 で拒否する | [messaging.md](messaging.md) の「上限」 |
+| 1 ファイルの大きさ | 1 GB まで | MVP は 100 MB まで。100 MB 超・最大 1 GB のマルチパートのアップロードは S2 で足す | [files.md](files.md) の 4・7 節 |
+| 公開 API の形 | メソッド名を URL にする RPC（`chat.postMessage` など） | リソース指向の REST。本家の SDK との互換は目的にしない | [public-api.md](public-api.md) の 3.1 節、[ADR-0030](../decisions/0030-versioned-public-api.md) |
+| パスワード | パスワードでのログインがある | 持たない。メールの OTP、パスキー、Google・Microsoft、SSO | [identity-and-access.md](identity-and-access.md) の 2.1 節 |
+| Enterprise での MCP のクライアント | 登録済みのアプリだけ。管理者が通常のアプリの承認で承認する | 任意のクライアントを受ける（CIMD）。Enterprise は許可リスト（初期は空）を既定にし、MCP の利用そのものも既定で無効 | [mcp.md](mcp.md) の決定、[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) |
+| リンクのプレビュー | メンバーと投稿者が切れる | 加えて、ワークスペースの設定で無効にできる | [security.md](security.md) の決定 |
+| データの保管地域 | Business+ から選べる | 単一リージョン（東京、DR は大阪）の間は提供しない | [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) |
+| Huddle、Slack Connect、Canvas・Lists、Enterprise Grid、モバイルネイティブアプリ | ある | 作らない（Workflow Builder と、公開 API・アプリは MVP の後） | [intent.md](../intent.md) の Non-goals |
 
 ## 2. 規模の段階
 
@@ -77,6 +128,27 @@ flowchart LR
 | S3 | 100 万 | 100,000 | セル構成：1 つのセルがスタック一式を持ち、ワークスペースをセルに割り当てる。大口のワークスペースには専用のセルを割り当てる。災害復旧用に大阪リージョンを使う |
 
 段階を上げる判断の基準は、[infrastructure.md](infrastructure.md) に書く。
+
+### 2.1 費用のモデル
+
+アクティブなメンバー 1 人・1 か月の原価を、次の和で見る。S1 の月額は [infrastructure.md](infrastructure.md) の 9 節の概算（東京のオンデマンド料金、±50%）を、DAU は [capacity.md](capacity.md) の 1 節の 10 万を使う。
+
+```
+メンバー 1 人・1 か月の原価 = 接続と API（Fargate：Gateway、API、Worker）
+                          ＋ 正本の DB（Aurora：writer・reader、I/O-Optimized、Global Database の複製）
+                          ＋ 配信のバス（ElastiCache の Valkey）
+                          ＋ 配信の経路（CloudFront、ALB、データ転送）
+                          ＋ 出口のネットワーク（NAT ゲートウェイ、Network Firewall）
+                          ＋ 可観測性（ログ、メトリクス、トレース）
+                          ＋ セキュリティの統制（WAF、GuardDuty、Security Hub ほか）
+                          ＋ 保存（S3、バックアップ、大阪の待機）
+                          ＋ 通知とキュー（SES、SQS、Secrets Manager、KMS ほか）
+```
+
+- S1 の本番は月 約 10,000 USD で、DAU 10 万で割ると、メンバー 1 人・1 か月 約 0.1 USD になる（staging・dev・shared の約 3,000 USD を含めない）。
+- いちばん大きいのは Aurora（約 2,500 USD、本番の約 25%）で、Fargate、CloudFront・ALB・データ転送、可観測性（各 約 1,500 USD）が続く（[infrastructure.md](infrastructure.md) の 9 節）。
+- S2 では検索に OpenSearch が加わる（[ADR-0004](../decisions/0004-postgres-fulltext-search-first.md)）。段階ごとの単価と台数は、capacity の領域で公開の価格から入れ、負荷試験で確かめる。
+- ワークスペースごとの原価は、[observability.md](observability.md) の上位テナントの指標から按分して推定する（[infrastructure.md](infrastructure.md) の 9 節）。
 
 ## 3. 非機能要件
 
@@ -186,3 +258,26 @@ flowchart LR
 法務の確認待ちの項目（全データのエクスポートでメンバーへ自動で通知しないこと）は決めていない（[intent.md](../intent.md) の Open questions）。
 
 決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
+
+## 7. 領域の文書
+
+| ファイル | 範囲 | ADR |
+| --- | --- | --- |
+| [data-model.md](data-model.md) | データモデルの正本：規約、ER 図、テーブルの定義（[data-model/](data-model/identity.md) に領域ごと）、Valkey・S3・検索・イベントの形、横断的な不変条件、テナントのコンテキスト | [0001](../decisions/0001-per-channel-sequence.md)、[0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)、[0009](../decisions/0009-pooled-tenancy-with-rls.md)、[0010](../decisions/0010-accounts-and-workspace-members.md) |
+| [identity-and-access.md](identity-and-access.md) | 認証、セッション、SSO、招待、ロールと権限 | [0005](../decisions/0005-single-authorization-check.md)、[0009](../decisions/0009-pooled-tenancy-with-rls.md)、[0010](../decisions/0010-accounts-and-workspace-members.md)、[0012](../decisions/0012-self-hosted-auth-with-better-auth.md) |
+| [messaging.md](messaging.md) | 投稿・編集・削除・スレッド・リアクション・メンション、本文、リンクのプレビュー | [0001](../decisions/0001-per-channel-sequence.md)、[0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)、[0005](../decisions/0005-single-authorization-check.md)、[0006](../decisions/0006-message-body-ast.md) |
+| [realtime.md](realtime.md) | Gateway、購読、ファンアウト、在席・入力中、再接続と差分取得 | [0001](../decisions/0001-per-channel-sequence.md)、[0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)、[0003](../decisions/0003-redis-pubsub-for-fanout.md)、[0008](../decisions/0008-hono-rpc-for-api-contract.md)、[0009](../decisions/0009-pooled-tenancy-with-rls.md)、[0011](../decisions/0011-aws-container-platform.md)、[0013](../decisions/0013-gateway-scaling-and-presence.md) |
+| [read-state-and-notifications.md](read-state-and-notifications.md) | 既読・未読、通知（Web Push、メール）、通知設定 | [0014](../decisions/0014-sqs-worker-queues-and-notification-delivery.md) |
+| [search.md](search.md) | 全文検索、インデックス、権限の適用 | [0004](../decisions/0004-postgres-fulltext-search-first.md)、[0005](../decisions/0005-single-authorization-check.md)、[0027](../decisions/0027-search-table-rls-exception.md) |
+| [files.md](files.md) | ファイルのアップロード、スキャン、サムネイル、配信 | [0009](../decisions/0009-pooled-tenancy-with-rls.md)、[0015](../decisions/0015-file-upload-scan-and-delivery.md) |
+| [client.md](client.md) | Web クライアント | [0024](../decisions/0024-client-data-layer-and-offline.md) |
+| [mcp.md](mcp.md) | AI エージェント向けのリモート MCP サーバー | [0028](../decisions/0028-remote-mcp-server.md) |
+| [public-api.md](public-api.md) | バージョン付きの公開 API（MVP の後、E12） | [0030](../decisions/0030-versioned-public-api.md)、[0031](../decisions/0031-app-platform.md) |
+| [apps.md](apps.md) | アプリのプラットフォーム：インストール、イベントの配信、インタラクティブ（MVP の後、E12） | [0030](../decisions/0030-versioned-public-api.md)、[0031](../decisions/0031-app-platform.md)、[0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) |
+| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル | [0016](../decisions/0016-isolated-link-unfurling.md)、[0017](../decisions/0017-encryption-and-key-management.md)、[0018](../decisions/0018-audit-log.md)、[0019](../decisions/0019-data-retention-and-deletion.md)、[0034](../decisions/0034-workspace-import-from-other-tools.md)、[0035](../decisions/0035-operator-access.md) |
+| [infrastructure.md](infrastructure.md) | AWS の構成、環境、IaC、冗長化、バックアップと災害復旧、デプロイ、コスト | [0011](../decisions/0011-aws-container-platform.md)、[0020](../decisions/0020-infrastructure-as-code-with-terraform.md)、[0022](../decisions/0022-zero-downtime-deploy-and-migrations.md)、[0023](../decisions/0023-cell-based-architecture.md) |
+| [observability.md](observability.md) | ログ、メトリクス、トレース | [0021](../decisions/0021-observability-stack.md) |
+| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーターの設定、キャパシティの運用 | — |
+| [delivery.md](delivery.md) | ブランチ、CI、デプロイ、リリース、フィーチャーフラグ | [0020](../decisions/0020-infrastructure-as-code-with-terraform.md)、[0022](../decisions/0022-zero-downtime-deploy-and-migrations.md)、[0026](../decisions/0026-feature-flags.md) |
+| [rate-limiting.md](rate-limiting.md) | レート制限、同時実行の制限、テナント単位の上限の一覧（プランによらない） | [0029](../decisions/0029-rate-limiting.md)、[0032](../decisions/0032-plans-and-entitlements.md)、[0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） | — |

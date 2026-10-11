@@ -14,24 +14,28 @@
 
 ## 2. 全体の流れ
 
-```
-API / Worker（Payments・Refund・Dispute・Payout・Checkout）
-  │ 1 トランザクション：状態の遷移 ＋ 仕訳 ＋ events に INSERT ＋ outbox に INSERT
-  ▼
-Relay ─▶ SQS webhook-fanout
-          ▼
-webhook-router（Worker、VPC 内）
-  │ そのアカウント・環境の enabled なエンドポイントのうち、enabled_events に合うものを引く
-  │ webhook_deliveries に INSERT ... ON CONFLICT DO NOTHING（キーは (endpoint_id, event_id)）
-  ▼
-SQS webhook-delivery ─▶ webhook-sender（Worker、VPC 内）
-  │ 1. エンドポイントが enabled か確かめる（外れたら abandoned）
-  │ 2. Event をエンドポイントの API のバージョンで描画する（6 節）
-  │ 3. 署名する（7 節）
-  │ 4. webhook-egress（Lambda、専用の egress VPC、権限なし）を同期で呼ぶ
-  │ 5. 結果を webhook_delivery_attempts に書く。失敗なら next_attempt_at を決める
-  ▼
-webhook-scheduler（advisory lock で 1 台）：next_attempt_at を過ぎた配信を 10 秒ごとに webhook-delivery へ戻す
+次の図は、状態の遷移と同じトランザクションで書いた Event が、加盟店のエンドポイントへ送られ、失敗したら再試行の予定に戻るまでを示す。
+
+```mermaid
+flowchart TB
+  W["API・Worker<br/>Payments・Refund・Dispute・Payout・Checkout"]
+  DB[("1 トランザクション：状態の遷移 ＋ 仕訳 ＋<br/>events に INSERT ＋ outbox に INSERT")]
+  Relay["Relay"]
+  QF["SQS webhook-fanout"]
+  Router["webhook-router（Worker、VPC 内）<br/>アカウント・環境の enabled なエンドポイントのうち、<br/>enabled_events に合うものを引く。<br/>webhook_deliveries に INSERT ... ON CONFLICT DO NOTHING<br/>（キーは (endpoint_id, event_id)）"]
+  QD["SQS webhook-delivery"]
+  Sender["webhook-sender（Worker、VPC 内）<br/>1. エンドポイントが enabled か確かめる（外れたら abandoned）<br/>2. Event をエンドポイントの API のバージョンで描画する（6 節）<br/>3. 署名する（7 節）<br/>5. 結果を webhook_delivery_attempts に書く。失敗なら next_attempt_at を決める"]
+  Egress["4. webhook-egress（Lambda、専用の egress VPC、権限なし）を同期で呼ぶ"]
+  Sched["webhook-scheduler（advisory lock で 1 台）<br/>next_attempt_at を過ぎた配信を 10 秒ごとに戻す"]
+  W --> DB
+  DB --> Relay
+  Relay --> QF
+  QF --> Router
+  Router --> QD
+  QD --> Sender
+  Sender --> Egress
+  Sender -. "next_attempt_at" .-> Sched
+  Sched --> QD
 ```
 
 - 最初の試行は、SQS からすぐに行う。再試行の予定は DB（`next_attempt_at`）に置く。SQS の遅延は最大 15 分で、数時間の間隔を表せないため（Slack の apps.md の 7.3 節と同じ）。

@@ -394,6 +394,30 @@ WHERE r.org_id = $org AND r.shard_no = $s AND r.object_id = $obj AND r.deleted_a
 5. 1 つのバージョンで、新しい `rule_id` を `active` にし、古い `rule_id` を `retired` にする。スナップショットの有効なルールの集合（`$rules`）が一度に変わる。
 6. `retired` の行を Worker が消す。
 
+次の図は、上の手順 1〜6 を、登場する者ごとに示す。手順は上の番号の一覧を正とする。
+
+```mermaid
+sequenceDiagram
+  participant A as 管理者
+  participant M as Metadata
+  participant W as Worker
+  participant DB as Aurora（record_shares・implicit_parent_grants）
+  participant SV as 保存（applySharingDelta）
+  A->>M: ルールを足す・変える
+  M->>DB: 1 バージョンを上げ、新しい rule_id を building で入れる（古い rule_id は active のまま）
+  loop ID の範囲（1 万件）ごと
+    W->>DB: 2 範囲を FOR SHARE で読み、新しいルールで評価して書く
+  end
+  SV->>DB: 3 範囲を済ませた後の保存は、building のルールも評価して書く
+  W->>W: 4 標本の照合（1,000 件）
+  alt 食い違いあり
+    Note over W: 切り替えずに止めて警告する
+  else 一致
+    Note over M,DB: 5 1 つのバージョンで、新しい rule_id を active、古い rule_id を retired にする
+    W->>DB: 6 retired の行を消す
+  end
+```
+
 - 要求は 1 つのバージョンに固定されるので、1 つの問い合わせの中で、古いルールと新しいルールが混ざらない。
 - ジョブは範囲ごとに冪等で、止まっても同じ範囲をやり直せる（ADR-0004）。
 - 同じオブジェクトで作成中のルールは、同時に 1 つまで。組織の中で同時に動く共有のジョブは 2 つまで（Worker の公平な順番。ADR-0005）。

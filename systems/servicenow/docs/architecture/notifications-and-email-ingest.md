@@ -118,16 +118,23 @@ Notifier：事象ごとに
 
 ### 5.1 受信の経路
 
-```
-顧客のメールサーバー（servicedesk@example.co.jp への転送）
-   → SES（mail-ingress のアカウント、東京。受信の規則：受け手 *@in.<brand>.<domain>、スパム・ウイルスの判定を有効）
-   → S3（mail-ingress の一時のバケット。SSE-KMS。1 日で消える。SES のクライアント側の暗号化は使わない）
-   → SNS（S3 の動作の通知）→ SQS → mail-router
-        mail-router：封筒の受け手 → テナント → セル（制御の面の台帳の写し。テナントのデータを読まない）
-                     セルの受信のバケット（SSE-KMS、テナントの接頭辞）へ写し、セルの SQS へ送り、一時のオブジェクトを消す
-                     解決できない受け手：捨てて記録する。送り主へバウンスしない（後方散乱を避ける）
-   → セルの SQS → Ingest
-専用のセル：専用の受信のサブドメイン（<cell>.in.<brand>.<domain>）を、専用のセルのアカウントの SES で直接受ける
+次の図は、共有のセルのテナントのメールが、受信から Ingest に届くまでの経路を示す。受信のドメインは `*@in.<brand>.<domain>`、専用のセルは、専用の受信のサブドメイン（`<cell>.in.<brand>.<domain>`）を、専用のセルのアカウントの SES で直接受ける。図の中の `brand.domain` は `<brand>.<domain>` を表す。
+
+```mermaid
+flowchart TD
+  MS["顧客のメールサーバー<br/>（servicedesk@example.co.jp への転送）"]
+  SES["SES（mail-ingress のアカウント、東京）<br/>受信の規則：受け手 *@in.brand.domain、スパム・ウイルスの判定を有効"]
+  TMP[("S3（mail-ingress の一時のバケット。SSE-KMS。1 日で消える。<br/>SES のクライアント側の暗号化は使わない）")]
+  NQ["SNS（S3 の動作の通知）→ SQS"]
+  MR{"mail-router：封筒の受け手 → テナント → セル<br/>（制御の面の台帳の写し。テナントのデータを読まない）"}
+  CB[("セルの受信のバケット（SSE-KMS、テナントの接頭辞）")]
+  DROP["捨てて記録する。送り主へバウンスしない（後方散乱を避ける）"]
+  CQ["セルの SQS"]
+  ING["Ingest"]
+  MS --> SES --> TMP --> NQ --> MR
+  MR -->|"解決できた：写し、一時のオブジェクトを消す"| CB
+  CB --> CQ --> ING
+  MR -->|"解決できない受け手"| DROP
 ```
 
 - 経路の正本は [infrastructure.md](infrastructure.md) の 2.3 節と [ADR-0055](../decisions/0055-accounts-cells-and-edge-router.md)。SES の受信の規則は受け手のアドレスで選ぶので、同じドメインの下のテナントを受信の規則の段でセルのバケットへ振り分けられない（テナントごとに規則が要る）。そのため、共有の入口に置いてから `mail-router` がセルへ振り分ける（統合で決めた。[ADR-0034](../decisions/0034-inbound-email-threading-and-sender-trust.md) の注記）。

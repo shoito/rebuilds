@@ -194,15 +194,25 @@ ADR-0025。
 
 ### 6.1 流れ
 
-```
-Browser                    API            Gateway / Router       Document Server           CloudFront + S3
-  │ GET /files/{id} ─────────▶│ 判定関数 → 役割、ticket（60 秒）
-  │◀───── ticket ─────────────│
-  │ WebSocket Hello ──────────────────────▶│ 判定、持ち主の問い合わせ ───▶│（なければ回復：4.4 節）
-  │◀──────────────────────────────── Welcome { LoadPlan } ──────────────│
-  │ 今のページのチャンク：端末のキャッシュ、なければ署名付き URL で取る ─────────────────────────▶│
-  │ 復号 → 当てる → LoadPlan.tail の変更を当てる → 描画（操作できる）
-  │ 他のページのチャンクを、裏で順に取る
+次の図は、ファイルを開いてから今のページを操作できるまでと、他のページを裏で読む流れを示す。
+
+```mermaid
+sequenceDiagram
+  participant B as "Browser"
+  participant API as "API"
+  participant GR as "Gateway / Router"
+  participant DS as "Document Server"
+  participant CF as "CloudFront + S3"
+  B->>API: GET /files/{id}
+  Note over API: 判定関数 → 役割、ticket（60 秒）
+  API-->>B: ticket
+  B->>GR: WebSocket Hello
+  Note over GR: 判定、持ち主の問い合わせ
+  GR->>DS: 中継（なければ回復：4.4 節）
+  DS-->>B: Welcome（LoadPlan）
+  B->>CF: 今のページのチャンク（端末のキャッシュになければ、署名付き URL で取る）
+  Note over B: 復号 → 当てる → LoadPlan.tail の変更を当てる → 描画（操作できる）
+  B->>CF: 他のページのチャンクを、裏で順に取る
 ```
 
 ```

@@ -63,17 +63,27 @@ AWS Organizations で、用途ごとにアカウントを分ける。Slack・Str
 
 [ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) による。
 
-```
-デプロイ・縮小・退役の通知
-   ▼
-router（ドレインの制御）
-   ├─ 古いタスクの ds_liveness.state = draining（新しいファイルを置かない）
-   ├─ 古いタスクのファイルを、大きい順に毎秒 20 ずつ、新しいタスクへ渡す
-   │     古い持ち主：受け付けを止める → ジャーナルを書き切る → file_leases.state = handoff
-   │     router：新しい持ち主を割り当てる（epoch + 1）
-   │     新しい持ち主：フェンス → チェックポイント＋ジャーナルから回復 → 受け付け
-   │     Gateway：Kick(owner_changed) → クライアントが resume で再接続
-   └─ ファイルが 0 になったタスクは、タスクの保護を外す → ECS が止める
+次の図は、デプロイ・縮小・退役の通知を受けて、古いタスクのファイルを新しいタスクへ渡し、古いタスクを止めるまでを示す。
+
+```mermaid
+sequenceDiagram
+  participant R as "router（ドレインの制御）"
+  participant Old as "古い持ち主"
+  participant New as "新しい持ち主"
+  participant GW as "Gateway"
+  participant C as "クライアント"
+  participant ECS as "ECS"
+  Note over R: デプロイ・縮小・退役の通知を受ける
+  R->>Old: ds_liveness.state = draining（新しいファイルを置かない）
+  loop 古いタスクのファイルを、大きい順に毎秒 20 ずつ
+    Note over Old: 受け付けを止める → ジャーナルを書き切る → file_leases.state = handoff
+    R->>New: 新しい持ち主を割り当てる（epoch + 1）
+    Note over New: フェンス → チェックポイント＋ジャーナルから回復 → 受け付け
+    GW->>C: Kick(owner_changed)
+    C->>GW: resume で再接続
+  end
+  Note over Old: ファイルが 0 になったら、タスクの保護を外す
+  ECS->>Old: 止める
 ```
 
 - Document Server は、ファイルを 1 つでも持つ間、ECS のタスクの保護を立てる（期限 60 分、10 分ごとに延ばす）。保護のあるタスクは、ローリングの更新でも止められない（[Task scale-in protection](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-scale-in-protection.html)、2026-09-27 に確認）。サービスの `maximumPercent` を 200% にし、新しいタスクが先に起動できるようにする。

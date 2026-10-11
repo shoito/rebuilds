@@ -11,17 +11,25 @@ Gateway、購読、ファンアウト、在席・入力中、再接続と差分�
 
 ## 2. 全体の流れ
 
-```
-API ── tx: messages + channel_events + outbox ──▶ Aurora (writer)
-                                                    │ poll（25ms）
-                                                    ▼
-                                                  Relay ──▶ SQS（通知・検索など。ADR-0014）
-                                                    │ PUBLISH / SPUBLISH
-                                                    ▼
-                                           Valkey  ws:{w}:ch:{c} / ws:{w}:m:{m} / ws:{w}:pr
-                                                    │ ノードごとに 1 回だけ購読
-                                                    ▼
-Browser ◀── WebSocket ── CloudFront ── ALB ── Gateway（ECS、タスクあたり最大 1 万接続）
+次の図は、書き込みのトランザクションから、Relay・Valkey・Gateway を経てブラウザに届くまでの配信の経路を示す。
+
+```mermaid
+flowchart TB
+  API["API"]
+  PG[("Aurora（writer）")]
+  Relay["Relay"]
+  SQS["SQS<br/>通知・検索など（ADR-0014）"]
+  VK["Valkey<br/>ws:{w}:ch:{c}、ws:{w}:m:{m}、ws:{w}:pr"]
+  GW["Gateway（ECS）<br/>タスクあたり最大 1 万接続"]
+  Edge["CloudFront・ALB"]
+  Browser["Browser"]
+  API -- "tx：messages ＋ channel_events ＋ outbox" --> PG
+  PG -- "poll（25ms）" --> Relay
+  Relay --> SQS
+  Relay -- "PUBLISH・SPUBLISH" --> VK
+  VK -- "ノードごとに 1 回だけ購読" --> GW
+  GW --> Edge
+  Edge -- "WebSocket" --> Browser
 ```
 
 ### NFR-002 の遅延の予算
@@ -40,20 +48,28 @@ Browser ◀── WebSocket ── CloudFront ── ALB ── Gateway（ECS、
 
 ### 3.1 接続の確立
 
-```
-Client                         API                     Gateway                 Valkey / Aurora(reader)
-  │ POST /workspaces/{w}/realtime/tickets               │                            │
-  │───────────────────────────▶│ セッションを検証        │                            │
-  │                            │ ticket を発行（TTL 30s） ───────────────────────────▶ SET
-  │◀──── { ticket, url } ──────│                         │                            │
-  │ WSS {url}                  │                         │                            │
-  │─────────────────────────────────────────────────────▶│                            │
-  │ hello { ticket, protocol, client_id, heads? }       │                            │
-  │─────────────────────────────────────────────────────▶│ GETDEL（1 回だけ使える）──▶│
-  │                                                      │ 1. 読めるチャンネルを解決 ─▶│（ADR-0005 の判定関数）
-  │                                                      │ 2. 購読する                │
-  │                                                      │ 3. 各チャンネルの last_seq ▶│
-  │◀──────────── ready { connection_id, heads, ... } ────│ 4. 2〜3 の間の受信を送る   │
+次の図は、チケットの発行から `ready` までの順序を示す。購読を先に始めてから `last_seq` を読む点が要である。
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as API
+    participant GW as Gateway
+    participant VK as Valkey
+    participant R as Aurora（reader）
+
+    C->>API: POST /workspaces/{w}/realtime/tickets
+    Note over API: セッションを検証する
+    API->>VK: ticket を SET（TTL 30s）
+    API-->>C: { ticket, url }
+    C->>GW: WSS {url}
+    C->>GW: hello { ticket, protocol, client_id, heads? }
+    GW->>VK: GETDEL（1 回だけ使える）
+    Note over GW: 1. 読めるチャンネルを解決する（ADR-0005 の判定関数）
+    GW->>VK: 2. 購読する
+    GW->>R: 3. 各チャンネルの last_seq を読む
+    GW-->>C: ready { connection_id, heads, ... }
+    Note over GW,C: 4. 2〜3 の間に受信したイベントを送る
 ```
 
 - **認証はチケットで行う。** ブラウザの WebSocket はヘッダーを付けられないので、API が短命の 1 回限りのチケット（32 バイトの乱数。Valkey には SHA-256 だけを置き、TTL 30 秒）を発行する。チケットには `workspace_id`、`member_id`、`session_id` を結び付ける。Gateway は `GETDEL` で消費するので、再利用できない。チケットは URL のクエリに載せず、最初のメッセージ（`hello`）で送る（アクセスログに残さないため。[identity-and-access.md](identity-and-access.md) の 7 節）。

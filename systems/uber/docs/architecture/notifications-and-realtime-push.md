@@ -28,20 +28,37 @@
 
 ### 3.1 構成
 
-```
-Trips ── outbox ──▶ 中継 ──▶ SNS trips-events ──▶ SQS rt-fanout ──▶ rt-router（TypeScript）
-                                                                     │ 1. 受け手のストリームに XADD（seq を振る）
-                                                                     │ 2. 接続の登録表を引く
-                                                                     ▼
-                                                          Valkey  PUBLISH gw:{node}
-                                                                     ▼
-アプリ ◀── gRPC 双方向ストリーム ── ALB（rt.<domain>、gRPC） ── rt-gateway（Go、ECS、タスクあたり最大 2 万接続）
-   │                                                                  │ Ack(seq)・OfferDelivered
-   └──────────────────────────────────────────────────────────────────┘──▶ Trips（受信の確認）
+次の図は、乗車の状態の変化と車の位置が、常時の接続かプッシュ通知でアプリに届くまでの経路を示す。
 
-Kinesis loc-<city> ──▶ trip-location-fanout（Go、rt-gateway と同じバイナリの別の役）──▶ Valkey PUBLISH gw:{node}（位置は一時のメッセージ）
+```mermaid
+flowchart TB
+    trips["Trips"]
+    relay["中継"]
+    sns["SNS trips-events"]
+    sqs["SQS rt-fanout"]
+    router["rt-router（TypeScript）<br/>1. 受け手のストリームに XADD（seq を振る）<br/>2. 接続の登録表を引く"]
+    valkey[("Valkey")]
+    gw["rt-gateway（Go、ECS、タスクあたり最大 2 万接続）"]
+    alb["ALB（rt.&lt;domain&gt;、gRPC）"]
+    app["アプリ"]
+    kin["Kinesis loc-&lt;city&gt;"]
+    fan["trip-location-fanout<br/>Go、rt-gateway と同じバイナリの別の役"]
+    push["push-sender（TypeScript）"]
+    apns["APNs・FCM"]
 
-rt-router ── 接続がない・確認がない ──▶ push-sender（TypeScript）──▶ APNs・FCM
+    trips -->|"outbox"| relay
+    relay --> sns
+    sns --> sqs
+    sqs --> router
+    router -->|"PUBLISH gw:{node}"| valkey
+    valkey --> gw
+    gw --- alb
+    alb <-->|"gRPC 双方向ストリーム"| app
+    gw -->|"Ack(seq)・OfferDelivered（受信の確認）"| trips
+    kin --> fan
+    fan -->|"PUBLISH gw:{node}（位置は一時のメッセージ）"| valkey
+    router -->|"接続がない・確認がない"| push
+    push --> apns
 ```
 
 - `rt-gateway` は、接続と、受け手ごとの未確認のメッセージの窓だけを持つ。DB に書かない。すべて再接続で作り直せる（Slack の題材の [realtime.md](../../../slack/docs/architecture/realtime.md) と同じ原則）。

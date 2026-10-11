@@ -85,17 +85,92 @@ flowchart TB
 3. Record Service が、1 つのトランザクションでインシデントを作る。割り当ての規則、SLA の開始の条件、監査の履歴、outbox を同じトランザクションで書く。SLA の計時の行には、カレンダーから計算した期限の時刻を入れ、タイマーの表に登録する。
 4. Engine が、期限の前の警告と違反のタイマーを発火させる。担当が状態を「保留」にすると、一時停止の条件で計時を止め、再開で期限を計算し直す。
 
+次の図は、上の 1〜4 を、登場する部品ごとに示す。手順は上の番号の一覧を正とする。
+
+```mermaid
+sequenceDiagram
+  participant MS as 社内のメールサーバー
+  participant MI as mail-ingress（SES、mail-router）
+  participant ING as Ingest
+  participant RS as Record Service
+  participant DB as Aurora
+  participant ENG as Engine
+  MS->>MI: 1 サービスデスクの宛先へのメールを、テナントの受信のアドレスへ転送
+  MI->>ING: 封筒の受け手からテナントとセルを決め、セルの S3 と SQS へ
+  ING->>ING: 2 原本を解析。参照の印か In-Reply-To で既存のチケットを探す。差出人を社員のメールアドレスで照合
+  ING->>RS: 3 インシデントを作る
+  RS->>DB: 1 つのトランザクション：インシデント、割り当て、SLA の計時の行（期限の時刻）、タイマー、監査の履歴、outbox
+  ENG->>DB: 4 期限の前の警告と違反のタイマーを発火
+  Note over RS,ENG: 「保留」で計時を止め、再開で期限を計算し直す
+```
+
 **変更の承認（CAB）**
 
 1. 変更の記録を「評価」に進めると、リスクの質問票と規則からリスクを決める。リスクと種類で、承認の方針（誰の、何段の承認か）が決まる。
 2. Engine が承認の依頼を作り、承認者へ通知する。承認者の回答は、承認のレコードのバージョンの番号で守った 1 回の遷移として反映する。
 3. すべての承認がそろうと、同じトランザクションで変更の状態を「予定済み」に進め、次のステップのタイマーを登録する。
 
+次の図は、上の 1〜3 を、登場する者ごとに示す。
+
+```mermaid
+sequenceDiagram
+  participant U as 変更の担当
+  participant RS as Record Service
+  participant ENG as Engine
+  participant AP as 承認者
+  U->>RS: 1 変更の記録を「評価」に進める
+  Note over RS,ENG: リスクの質問票と規則からリスクを決め、リスクと種類で承認の方針が決まる
+  ENG->>AP: 2 承認の依頼を作り、通知する
+  AP->>ENG: 回答（承認のレコードのバージョンの番号で守った 1 回の遷移）
+  ENG->>RS: 3 すべての承認がそろう：同じトランザクションで「予定済み」に進め、次のステップのタイマーを登録
+```
+
 **CMDB の取り込み**
 
 1. 取り込み元（API、CSV、外部の資産管理）が、CI と関係のまとまり（ペイロード）を送る。
 2. Ingest が、クラスごとの識別の規則で既存の CI を探す。識別の値を正規化した一意の索引の上で行うので、並行の取り込みでも重複を作らない。
 3. 一致した CI には、属性ごとの取り込み元の優先度と鮮度の規則で、書いてよい属性だけを書く。複数の CI に一致したら、重複の候補として止める（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）。
+
+次の図は、上の 1〜3 を示す。一致しないときの新しい CI の作成は [cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 5.4 節にある。
+
+```mermaid
+sequenceDiagram
+  participant SRC as 取り込み元（API、CSV、外部の資産管理）
+  participant ING as Ingest
+  participant DB as Aurora
+  SRC->>ING: 1 CI と関係のまとまり（ペイロード）
+  ING->>DB: 2 クラスごとの識別の規則で既存の CI を探す（正規化した一意の索引）
+  alt 1 つの CI に一致
+    ING->>DB: 3 優先度と鮮度の規則で、書いてよい属性だけを書く
+  else 複数の CI に一致
+    ING->>DB: 重複の候補として止める
+  else 一致なし
+    ING->>DB: 新しい CI を作る（5.4 節）
+  end
+```
+
+### 1.4 本家の形（確かめたこと）
+
+各領域の文書の 2 節で確かめたことのうち、主な論点（アクセスの判定、SLA の計時、ワークフロー、CMDB の識別と調整）に関わるものを集めた。いずれも 2026-09-28 に確認した。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| ACL の評価 | テーブルの規則、次にフィールドの規則。利用者は「テーブルに一致する最初の規則」と「フィールドに一致する最初の規則」の両方を満たす必要がある。1 つの規則の中は、ロール・データの条件・スクリプトなどのすべてを満たすと通る | [Access control list rules](https://www.servicenow.com/docs/bundle/zurich-platform-security/page/administer/contextual-security/concept/exploring-access-control-list.html)。[access-control.md](access-control.md) の 2 節 |
+| クラスの継承 | テーブルの規則は、テーブル名 → 親のテーブル名 → `*` の順に探す。フィールドの規則は `テーブル.フィールド` → `親.フィールド` → `*.フィールド` → `テーブル.*` → `親.*` → `*.*` の順 | [ACL rule types](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/contextual-security/concept/acl-rule-types.html) |
+| 規則がないとき | 一致する規則がなければ許す（既定の規則の集合が守る）。既定の拒否の設定を「deny」にすると拒否し、一度変えると戻せない | 上の 2 つと [Deny by default with empty ACLs](https://www.servicenow.com/docs/bundle/xanadu-platform-security/page/administer/security-center/reference/sc-security-manager-default-deny.html) |
+| テーブルの継承と物理の配置 | 子のクラスは親のフィールドを継承する。物理の配置は、階層ごとに 1 つの表、クラスごとの表、パーティションごとの表の 3 つ | [Table extension and classes](https://www.servicenow.com/docs/r/platform-administration/table-administration-and-data-management/table-extension-and-classes.html)。[data-dictionary-and-tables.md](data-dictionary-and-tables.md) の 2 節 |
+| SLA の条件 | 開始・一時停止・停止・リセット。スケジュール（営業時間）とタイムゾーンの取り方を定義ごとに選ぶ。開始の時刻をさかのぼれる | [Create an SLA definition](https://www.servicenow.com/docs/bundle/zurich-it-service-management/page/product/service-level-management/task/t_CreateAnSLADefinition.html)。[sla-and-calendars.md](sla-and-calendars.md) の 2 節 |
+| SLA の計時の更新 | 違反までの近さで分けた 6 つの定期のジョブで更新する（10 分以内は 1 分ごと、から、30 日より先は 5 日ごとまで）。一時停止の行は対象外 | [Scheduled jobs for SLA](https://www.servicenow.com/docs/r/it-service-management/service-level-management/c_ScheduledJobsForSLA.html) |
+| 承認 | 「誰か 1 人」「全員」「% の人」「n 人」などの規則と却下の規則。期限を過ぎたら自動で承認・却下・取り消しにできる | [Ask for Approval action](https://www.servicenow.com/docs/r/washingtondc/build-workflows/ask-approval-flow-designer.html)。[workflow-engine.md](workflow-engine.md) の 2 節 |
+| フローのバージョン | 新しいバージョンを公開しても、動いている実行は影響を受けない（バージョンの対応の細部は未検証） | [Flow execution details](https://www.servicenow.com/docs/r/build-workflows/workflow-studio/flow-execution-details.html)。[workflow-engine.md](workflow-engine.md) の 2 節 |
+| インシデントの状態 | 新規、対応中、保留、解決、完了、取り消し。解決のまま一定の期間がたつと完了になる | [Incident Management state model](https://www.servicenow.com/docs/r/it-service-management/incident-management/c_IncidentManagementStateModel.html)。[itsm-processes.md](itsm-processes.md) の 2 節 |
+| 変更の状態 | 通常：新規 → 評価 → 承認 → 予定済み → 実施 → 振り返り → 完了。標準は評価・承認を通らない。緊急は評価を通らない | [State progression for change models](https://www.servicenow.com/docs/r/it-service-management/change-management/normal-standard-emergency-states.html) |
+| CMDB の識別 | 識別の規則で CI を一意に見分ける。取り込み元の名前と固有のキーでの識別が速い道。依存の CI は先に親を識別する | [Identification and Reconciliation engine (IRE)](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/ire.html)。[cmdb-and-reconciliation.md](cmdb-and-reconciliation.md) の 2 節 |
+| CMDB の調整 | 権威のある取り込み元だけが属性を書ける。データの更新の規則で古い観測を下げ、動的な調整の規則で複数の値から選ぶ | [Reconciliation rules](https://www.servicenow.com/docs/r/servicenow-platform/configuration-management-database-cmdb/r_ReconciliationRulesPrinciples.html) |
+
+規模（テナント・CI・チケットの数）の本家の実数は、公開の資料で確かめられなかった（未検証。2 節）。
+
+**本家との意図した違い**：規則・フロー・受信の処理にスクリプトを持たず、条件は式の言語だけで書く（[ADR-0001](../decisions/0001-platform-and-stack.md)）。ACL は既定で拒否し、管理者の上書きを持たない（[access-control.md](access-control.md) の 2 節）。SLA は定期のジョブで更新せず、期限を計算してタイマーで発火させる（[ADR-0004](../decisions/0004-workflow-and-sla-engine.md)）。CMDB で複数の CI に一致したら、最も古い CI を選ばず、重複の候補として止める（[ADR-0005](../decisions/0005-cmdb-identification-and-reconciliation.md)）。本家の更新のセット・スコープのアプリは読み込まず、全テナントを同じバージョンで動かす（[intent.md](../intent.md) の Non-goals、[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
 
 ## 2. 規模の段階
 
@@ -109,6 +184,26 @@ flowchart TB
 - API のピークは、画面の操作、REST API、ポータルを合わせた要求の数。取り込み（メール・CMDB）は別に数える。
 - 動いている SLA の計時は、S1 でおよそ 200 万件、動いているフローの実行はおよそ 100 万件と見込む。タイマーの発火は、業務の開始の時刻（平日の 9 時）に集中する。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 9 節にある。
+
+### 2.1 費用のモデル
+
+担当者 1 人の 1 か月の原価を、次の和で見る。部品の月額は [infrastructure.md](infrastructure.md) の 10 節の概算（S1、本番、±50%）を使う。
+
+```
+担当者 1 人の月の原価 = （Aurora（セルごとの writer・reader、大阪の写し、制御の面）
+                       ＋ ECS Fargate（App、Admin、Engine、Notifier、Indexer、Ingest、Relay、制御の面、mail-router）
+                       ＋ OpenSearch（セルごとの検索の索引）
+                       ＋ ElastiCache（セルごと）
+                       ＋ SES（通知の送信、メールの受信）
+                       ＋ 網と入口（CloudFront、WAF、ALB、NAT、Network Firewall）
+                       ＋ S3（添付・原本）、可観測性、セキュリティの監視、鍵と秘密）
+                       ÷ 担当者
+```
+
+- S1 の本番の合計は約 50,000 USD/月で、担当者 3 万人で割ると 1 人の月で約 1.7 USD になる（本番の基盤だけ。staging などの約 8,000 USD は含めない）。
+- 最も大きいのは Aurora で、約半分を占める。セルの数に比例して増える（S1 は共有のセル 2 つ）。書き込みの量は、チケットの作成、SLA の計時、フローの実行、監査の履歴で決まる（[capacity.md](capacity.md) の 2.1 節）。
+- 専用のセルの最小の構成は月 約 8,000〜10,000 USD で、専用のセルの料金の下限の材料にする（PM）。
+- テナントごとの費用は、セルの費用をテナントの要求の重みとレコードの数で按分する（[infrastructure.md](infrastructure.md) の 10 節）。
 
 ## 3. 非機能要件
 

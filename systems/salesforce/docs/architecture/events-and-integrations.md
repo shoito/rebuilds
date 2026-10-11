@@ -86,21 +86,26 @@
 
 ### 3.2 生成
 
-```
-保存の手順 11（最上位で 1 回、変わった全てのレコード）
-  outbox に change_event（org, object, record_id, op, row_version, 変わった field_no と新しい値, tx_key, tx_seq）
-  │ 確定（手順 12）
-  ▼
-Relay（論理シャードごとに 1 つの書き手。advisory lock を持つ Worker のタスク）
-  1. その論理シャードの未送の outbox の行を id の順に 1,000 件読む
-  2. 組織ごとに replay_id を採番し、events の Aurora に INSERT（1 トランザクション）
-  3. 同じトランザクションで event_heads(org, max_replay_id) を進める
-  4. outbox の行を送った印にする（主の Aurora。2 の後に行う。二重に送った時は event_id で重複を捨てる）
-  5. 購読者への通知（Valkey の Pub/Sub）
-  ▼
-events（イベントの専用の Aurora のクラスタ、日ごとの分割）
-  ├─▶ SSE・取り出しの API（3.4 節）
-  └─▶ Webhook の送り手（5 節）
+次の図は、保存の手順 11 で outbox に書いた変更のイベントが、Relay を通って events のクラスタに入り、購読者に届くまでを示す。Relay は論理シャードごとに 1 つの書き手（advisory lock を持つ Worker のタスク）である。
+
+```mermaid
+sequenceDiagram
+  participant TX as 保存（主の Aurora）
+  participant R as Relay
+  participant EV as events の Aurora
+  participant V as Valkey
+  participant S as SSE・取り出しの API
+  participant WH as Webhook の送り手
+  TX->>TX: 手順 11：outbox に change_event（org, object, record_id, op, row_version, 変わった field_no と新しい値, tx_key, tx_seq）
+  TX->>TX: 手順 12：確定
+  R->>TX: 1 その論理シャードの未送の outbox の行を id の順に 1,000 件読む
+  R->>EV: 2 組織ごとに replay_id を採番し INSERT（1 トランザクション、日ごとの分割）
+  R->>EV: 3 同じトランザクションで event_heads(org, max_replay_id) を進める
+  R->>TX: 4 outbox の行を送った印にする（2 の後。二重に送った時は event_id で重複を捨てる）
+  R->>V: 5 購読者への通知（Pub/Sub）
+  V-->>S: 通知
+  S->>EV: 読む（3.4 節）
+  WH->>EV: 読む（5 節）
 ```
 
 - **`replay_id` は、組織の中で確定の順に単調に増える。** 論理シャードごとに書き手は 1 つで、組織は 1 つの論理シャードに属するため（[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)）。形は `commit_ms`（48 ビット）｜シャードの中の連番（16 ビット）の 16 進 16 文字。Auth0 の再構築のログの `log_id` と同じ考え方（[auth0 の ADR-0042](../../../auth0/docs/decisions/0042-log-event-model-and-type-codes.md)）。

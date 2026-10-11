@@ -97,21 +97,31 @@
 
 ### 3.3 全体の流れ（パスワード、MFA なし）
 
+次の図は、パスワードでログインし、MFA を求めない場合の画面の遷移と書き込みを示す。
+
+```mermaid
+sequenceDiagram
+  participant B as "ブラウザ"
+  participant Auth as "Auth（/u/*）"
+  participant DB as "DB（writer）"
+  B->>Auth: GET /authorize?...
+  Note over Auth: 検証（authentication-flows）
+  Auth->>DB: INSERT login_transactions
+  Auth-->>B: 302 /u/login?state=＜tx＞<br/>Set-Cookie: __Host-＜brand＞_tx
+  B->>Auth: GET /u/login?state=＜tx＞
+  Note over Auth: state と Cookie の照合
+  Auth-->>B: 200 識別子の画面（CSRF のトークン入り）
+  B->>Auth: POST /u/login（識別子）
+  Note over Auth: CSRF・Origin の検査
+  Auth-->>B: 303 /u/login/password
+  B->>Auth: POST /u/login/password
+  Note over Auth: 攻撃の防御の判定 → Argon2id
+  Auth->>DB: UPDATE step、INSERT session
+  Auth->>DB: コードの発行
+  Auth-->>B: 303 redirect_uri?code・state・iss（form_post なら自動送信の HTML）
 ```
-ブラウザ                     Auth（/u/*）                          DB（writer）        Signer
-  │ GET /authorize?...          │                                      │
-  │────────────────────────────▶│ 検証（authentication-flows）          │
-  │                             │ INSERT login_transactions ─────────▶│
-  │◀─ 302 /u/login?state=<tx> ──│ Set-Cookie: __Host-<brand>_tx         │
-  │ GET /u/login?state=<tx>     │ state と Cookie の照合                │
-  │◀─ 200 識別子の画面（CSRF のトークン入り）                           │
-  │ POST /u/login（識別子）      │ CSRF・Origin の検査                   │
-  │◀─ 303 /u/login/password     │                                      │
-  │ POST /u/login/password      │ 攻撃の防御の判定 → Argon2id           │
-  │                             │ UPDATE step, INSERT session ───────▶│
-  │                             │ コードの発行 ────────────────────────▶│
-  │◀─ 303 redirect_uri?code=&state=&iss=（form_post なら自動送信の HTML）│
-```
+
+署名はこの流れに含まれない。アプリがコードをトークンと交換するときに行う（[authentication-flows.md](authentication-flows.md) の 5.4 節）。
 
 ## 4. トランザクションの表
 

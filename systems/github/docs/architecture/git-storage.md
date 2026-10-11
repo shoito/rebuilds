@@ -121,21 +121,26 @@ fork は、元のネットワークの 3 つのノードに置く（新しい配
 
 push の objects は、ref の更新の前に、全ての複製の検疫（quarantine）の領域に届いている（[git-protocols.md](git-protocols.md) の 5 節）。
 
-```
-coordinator                     replica A / B / C（gitd）                  Aurora
-    │ 0. version を読む ──────────────────────────────────────────────▶ repository_checksums
-    │ 1. PREPARE(updates, base_checksum) ─▶ 検疫の objects を本体へ移す
-    │                                       git update-ref --stdin: start / update ... / prepare
-    │                                       （ref のロックを取り、旧値を確かめる）
-    │◀── vote(ok, before, after) ───────────
-    │ 2. 2 票以上が ok で before・after が一致したら
-    │    tx: ref_transactions に pending を書く ─────────────────────────▶ （同時に version を CAS で予約）
-    │ 3. COMMIT ─────────────────────────▶ commit（ロックを外して反映）、gitd/checksum を更新
-    │◀── ack ───────────────────────────────
-    │ 4. 2 つ以上の ack で
-    │    tx: checksum・version を更新、ref_transactions を committed、
-    │        投票しなかった・失敗した複製を out_of_sync、outbox に repository.refs_updated ─▶
-    │ 5. クライアントに成功を返す
+次の図は、coordinator が 3 つの複製と DB の間で回す 3 相の手順を示す。番号は下の説明の番号に対応する。
+
+```mermaid
+sequenceDiagram
+    participant Cl as git クライアント
+    participant C as coordinator
+    participant R as 複製 A・B・C（gitd）
+    participant DB as Aurora
+    C->>DB: 0. version を読む（repository_checksums）
+    C->>R: 1. PREPARE(updates, base_checksum)
+    Note over R: 検疫の objects を本体へ移す<br/>update-ref --stdin の start・update・prepare<br/>（ref のロックを取り、旧値を確かめる）
+    R-->>C: vote(ok, before, after)
+    Note over C: 2. 2 票以上が ok で before・after が一致したら
+    C->>DB: tx：ref_transactions に pending を書く（同時に version を CAS で予約）
+    C->>R: 3. COMMIT
+    Note over R: commit（ロックを外して反映）、gitd/checksum を更新
+    R-->>C: ack
+    Note over C: 4. 2 つ以上の ack で
+    C->>DB: tx：checksum・version を更新、ref_transactions を committed、<br/>投票しなかった・失敗した複製を out_of_sync、outbox に repository.refs_updated
+    C-->>Cl: 5. 成功を返す
 ```
 
 - 1 の `prepare` は、ref のロックを取り、全ての ref の旧値が期待どおりか確かめる。Git の `update-ref --stdin` の `start`・`prepare`・`commit`・`abort` を使う（[git-update-ref](https://git-scm.com/docs/git-update-ref)）。本家が Git に入れた、トランザクションとしての ref の更新と同じもの（Stretching Spokes）。

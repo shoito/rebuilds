@@ -334,16 +334,21 @@ evaluate(repo, ref, operation, actor, context) -> { allowed, violations[], bypas
 
 ### 6.2 マージの手順
 
-```
-API ──(1) can(actor, write, base_repo)
-    ──(2) evaluate(..., merge(method)) … DB の写しで事前判定
-    ──(3) pull_request_merges に「開始」を記録（expected_base_sha, head_sha, method）
-    ──(4) ストレージ RPC: MergePullRequest(base_ref, expected_base_sha, head_sha, method, message, signer)
-              ├ Git の現在の base・head を読み、expected と違えば失敗（競合）
-              ├ evaluate を現在の SHA で再評価（ADR-0011）
-              ├ コミットを作り、署名する
-              └ base の ref を比較交換で更新（複製の合意、ADR-0003・ADR-0006）→ outbox に ref の Event
-    ──(5) PR を merged にし、merge_commit_sha を記録
+次の図は、API がマージの要求を受けてから PR を `merged` にするまでを示す。番号は下の説明の番号に対応する。
+
+```mermaid
+sequenceDiagram
+    participant A as API
+    participant D as Aurora
+    participant S as ストレージ RPC
+    Note over A: (1) can(actor, write, base_repo)
+    Note over A,D: (2) evaluate(..., merge(method)) を DB の写しで事前判定
+    A->>D: (3) pull_request_merges に「開始」を記録<br/>（expected_base_sha, head_sha, method）
+    A->>S: (4) MergePullRequest(base_ref, expected_base_sha, head_sha, method, message, signer)
+    Note over S: Git の現在の base・head を読み、expected と違えば失敗（競合）<br/>evaluate を現在の SHA で再評価（ADR-0011）<br/>コミットを作り、署名する
+    S->>D: base の ref を比較交換で更新（複製の合意、ADR-0003・ADR-0006）、outbox に ref の Event
+    S-->>A: 結果
+    A->>D: (5) PR を merged にし、merge_commit_sha を記録
 ```
 
 - 正本は Git の ref の更新（4）。（5）の前に API が落ちても、ref の Event の処理（2 節の 4）が「base に head が含まれた」ことを検出し、（3）の記録と照合して `merged` にする。二重のマージは、（4）の比較交換で起こらない。

@@ -4,6 +4,36 @@
 
 ## 1. 全体構成
 
+### 1.1 コンテキスト
+
+次の図は、本システムを使う人と、本システムがつながる外部のシステムを示す（[intent.md](../intent.md) の Affected users and systems）。中の部品は 1.2 節にある。
+
+```mermaid
+flowchart LR
+    host["主催者<br/>予定の会議を作る、待合室で確かめる"]
+    part["参加者<br/>社内の人、社外の人（アカウントなしでブラウザから）"]
+    admin["組織の管理者<br/>ユーザー、既定の設定と強制、録画の保持"]
+    ops["社内の運用<br/>メディアサーバー、品質の監視、濫用の対応、サポート"]
+    sys["本システム<br/>会議、シグナリング、メディアの転送、録画と文字起こし"]
+    cal["カレンダー<br/>Google、Microsoft 365"]
+    idp["ID の連携<br/>SAML・OIDC の IdP"]
+    asr["音声認識のエンジン<br/>S1 は Amazon Transcribe"]
+    mail["メールの送信事業者"]
+    tel["電話の通信事業者<br/>後の段階"]
+
+    host --> sys
+    part --> sys
+    admin --> sys
+    ops --> sys
+    sys --> cal
+    sys --> idp
+    sys --> asr
+    sys --> mail
+    sys -.-> tel
+```
+
+### 1.2 コンテナ
+
 制御の経路（API、シグナリング、Meeting Actor）とメディアの経路（Media Node、TURN）、記録の置き場所を示す。
 
 ```mermaid
@@ -60,11 +90,38 @@ flowchart TB
 - **会議の状態の正本は、会議ごとに 1 か所。** 状態の変化は Meeting Actor が順番を決め、連番を付けて全員に配る（[ADR-0005](../decisions/0005-meeting-state-and-signaling.md)）。
 - **暗号化は既定、E2EE は選べる。** 通常の会議は DTLS-SRTP でホップごとに暗号化し、サーバーはメディアを扱える。E2EE の会議は SFrame と MLS で暗号化し、サーバーは鍵を持たない（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)）。
 
-### 主要な流れ
+### 1.3 主要な流れ
 
 - **会議への参加と接続の確立**：API で参加のトークンを得て、Gateway で検査し、Actor が待合室などを判定してから、Media Node に transport と producer を作る（[signaling-and-meetings.md](signaling-and-meetings.md) の 4.4 節）
 - **Media Node の障害と付け替え**：Actor が障害と判定し、予備の Node に `media_generation` を上げて付け替え、全員に `media.reattach` を送り、音声から先に戻す（[media-server-sfu.md](media-server-sfu.md) の 9.1 節）
 - **E2EE のグループの作成と参加**：最初の参加者がグループを作り、以後の参加者は Actor が保存した GroupInfo から外部コミットで入る（[e2ee.md](e2ee.md) の 6.4 節）
+
+### 1.4 本家の形（確かめたこと）
+
+領域の文書の 2 節で確かめたことの要約。確認日はすべて 2026-09-27。細部は各領域の文書にある。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 帯域の目安 | グループの通話の 720p で上り 2.6 Mbps・下り 1.8 Mbps、音声だけで 60〜80 kbps | [Zoom の帯域の要件](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060748)（2 節、[codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md) の 2 節） |
+| 会議の ID | すぐの会議・予定の会議・繰り返しの会議は 11 桁、個人の会議の ID（PMI）は 10 桁 | [Frequently asked questions about meeting and webinar IDs](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065196)（[signaling-and-meetings.md](signaling-and-meetings.md) の 2 節） |
+| 待合室とパスコード | 2020-09-27 から、どちらかを必ず有効にする。パスコードは最大 10 文字 | [May 2020: Passcode and security settings](https://support.zoom.us/hc/en-us/articles/360042647952-May-2020-Passcode-and-security-settings)、[Meetings API の定義](https://developers.zoom.us/api-hub/meetings/methods/endpoints.json)（[meeting-security.md](meeting-security.md) の 2 節） |
+| 主催者によるミュートの解除 | 既定は参加者に解除を求め、本人が応じる。前もって同意した参加者は、主催者がすぐに解除できる | [Muting or unmuting participants in a meeting](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0066716)（[signaling-and-meetings.md](signaling-and-meetings.md) の 2 節） |
+| E2EE の鍵 | リーダーの 1 人が 32 バイトの会議の鍵を作り、他の参加者の公開鍵で暗号化して配る。鍵の更新は約 2 秒待ってから使い、退出の時の更新は最大 10 秒遅れうる | [Zoom Cryptography Whitepaper](https://github.com/zoom/zoom-e2e-whitepaper) v4.7（[e2ee.md](e2ee.md) の 2 節） |
+| E2EE の会議の制限 | クラウド録画、ライブの文字起こし、会議の前後のチャットなどが使えない。参加者は 1,000 人まで | [End-to-end encryption for meetings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065408)（同上） |
+| 録画の同意と削除 | 録画が始まると同意の表示が出る。応じないまま残る人の扱いは書かれていない。削除した録画は、ふつう 30 日の間ごみ箱から戻せる | [Providing consent to be recorded](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0059819)、[Recovering a deleted local or cloud recording](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060380)（[recording-and-transcription.md](recording-and-transcription.md) の 2 節） |
+| ファイアウォールの規則 | 会議のクライアントは TCP 443・8801・8802、UDP 3478・3479・8801〜8810 を、公開された範囲へ開ける | [Zoom network firewall or proxy server settings](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0060548)（[network-traversal.md](network-traversal.md) の 2 節） |
+| Webhook の再送 | 5 分後・その 20 分後・その 60 分後の 3 回。応答は 3 秒以内 | [Webhooks](https://developers.zoom.us/docs/api/webhooks/)（[api-and-webhooks.md](api-and-webhooks.md) の 2 節） |
+| 設定の階層 | 組織・グループ・ユーザーの 3 段。上で鍵をかけると下で変えられない | [Managing Zoom Meetings passcodes](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0063160)（[accounts-and-admin.md](accounts-and-admin.md) の 2 節） |
+| 符号器・層の構成・帯域の推定、シグナリングの形式、録画の作り方 | **未検証**（公開の一次の資料に書かれていない） | [codecs-and-bandwidth-adaptation.md](codecs-and-bandwidth-adaptation.md)・[signaling-and-meetings.md](signaling-and-meetings.md)・[recording-and-transcription.md](recording-and-transcription.md) の 2 節 |
+
+本家との意図した違い：
+
+- E2EE の鍵の配布を標準の MLS に替え、鍵の更新の待ちと退出の遅れを持たない（[ADR-0004](../decisions/0004-encryption-and-e2ee.md)）。
+- 参加の鍵は URL のフラグメント（`#k=`）に置き、サーバーのアクセスログと `Referer` に残さない（[ADR-0006](../decisions/0006-meeting-id-and-join-url.md)）。
+- 主催者によるミュートの解除は、求めて本人が応じる形だけにする（[ADR-0009](../decisions/0009-host-controls-enforcement.md)）。
+- 録画の同意の表示に応じないまま残ることを同意とみなさず、本人が押すまでその人の音声と映像を送らせない（[ADR-0027](../decisions/0027-capture-consent-and-indicators.md)）。
+- Webhook は Standard Webhooks の形で、7 回・約 1.9 日まで再送する（[ADR-0044](../decisions/0044-signed-webhooks-standard-webhooks.md)）。
+- 本家のクライアント・SDK・API との互換、サーバーでの映像の合成による配信は目標にしない（intent の Non-goals）。
 
 ## 2. 規模の段階
 
@@ -82,6 +139,25 @@ flowchart TB
 パケットの数は、映像 1 本（1.5 Mbps、平均 1,200 バイト）で約 160 パケット/秒、音声 1 本（Opus、20ms ごと）で 50 パケット/秒になる。S1 のピークで、SFU の全体で約 1,200 万パケット/秒（送出 約 940 万、受信 約 300 万。平均 1,000 バイトで計算。容量の前提）の見込み（**未検証**。E7 の `load-l0-l2` で 1 台の pps を測って直す）。EC2 はインスタンスごとの PPS の上限を公表していないため、`pps_allowance_exceeded` の指標を見ながら負荷試験で 1 台の上限を決める（[ENA の性能の指標](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/monitoring-network-performance-ena.html)、2026-09-27 に確認）。初期見積もりでは、1 台の上限は帯域より先に consumer と CPU で決まる（[capacity.md](capacity.md) の 3 節）。
 
 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 11 節、台数と上限は [capacity.md](capacity.md) の 3〜5 節にある。
+
+### 2.1 費用のモデル
+
+参加者・分あたりのメディアの原価（K8）を、次の和で見る。定義と見積もりの正本は [capacity.md](capacity.md) の 6 節と [ADR-0053](../decisions/0053-capacity-model-cost-target-and-load-bots.md)、計算の中身は [infrastructure.md](infrastructure.md) の 12 節にある。
+
+```
+K8（参加者・分あたり） = （インターネットへの転送
+                        ＋ Media Node
+                        ＋ TURN
+                        ＋ TURN と Media Node の間の転送
+                        ＋ DDoS の防御）の月の費用 ÷ 月の参加者・分
+別に見るもの = 制御の側（API、Signaling Gateway、Meeting Actor、Aurora、Valkey）
+            ＋ 録画（Recorder・Composer、S3）
+            ＋ 字幕（音声認識のエンジン）
+```
+
+- 目標は S1 で 0.20 円以下、S2 で 0.07 円以下（1 USD = 150 円と仮定。[capacity.md](capacity.md) の 6 節）。
+- **転送の単価が K8 のほとんどを決める。** AWS の東京のインターネットへの転送は、1 参加者・分（11.25 MB）で約 0.14 円になる。AWS の表の料金で、下りの平均が 1.5 Mbps なら K8 は約 0.18 円、2.5 Mbps（容量の前提）なら約 0.28 円で、S1 の目標に届かない。国内のコロケーション（Edge）では約 0.05 円と見込む（同じ節）。
+- 下りの平均は**未検証**で、E2 のベータで測って置き換える。実測が 2.5 Mbps に近ければ、Edge の判断を早める（[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md)）。
 
 ## 3. 非機能要件
 

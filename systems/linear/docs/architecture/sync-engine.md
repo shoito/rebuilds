@@ -558,18 +558,28 @@ ADR-0009。接続のライフサイクル（心拍、デプロイの時の穏や
 
 ### 9.3 接続の確立
 
-```
-Client                    Sync API                Gateway                     Aurora (reader)
-  │ POST /sync/ticket ───▶│ セッションを確かめ、60 秒・1 回限りのチケット（Valkey に SHA-256 だけ）
-  │◀── { ticket, url } ───│
-  │ WSS 接続（URL にチケットを入れない）─────────────────▶│
-  │ hello ─────────────────────────────────────────────▶│ チケットを GETDEL で消費。Origin を確かめる
-  │                                                     │ can() から購読の groups を計算（ADR-0004）
-  │                                                     │ workspace_sync を読む（head, floor, epoch）
-  │                                                     │ 9.4 節の決定表で mode を決める
-  │◀────────────────────────────────────────── welcome ─│ live_from = head。以後の差分を流し始める
-  │ mode = catch_up：Sync API で (L, live_from] を取る（その間の deltas は持っておく）
-  │ outbox の queued / sent を outbox の順に submit
+次の図は、チケットの発行から差分の流れ始めと取り戻しまでの順序を示す。
+
+```mermaid
+sequenceDiagram
+  participant C as Client
+  participant API as Sync API
+  participant GW as Gateway
+  participant DB as Aurora（reader）
+  C->>API: POST /sync/ticket
+  API->>API: セッションを確かめ、60 秒・1 回限りのチケット（Valkey に SHA-256 だけ）
+  API-->>C: ticket, url
+  C->>GW: WSS 接続（URL にチケットを入れない）
+  C->>GW: hello
+  GW->>GW: チケットを GETDEL で消費。Origin を確かめる
+  GW->>GW: can() から購読の groups を計算（ADR-0004）
+  GW->>DB: workspace_sync を読む（head, floor, epoch）
+  GW->>GW: 9.4 節の決定表で mode を決める
+  GW-->>C: welcome（live_from = head）。以後の差分を流し始める
+  opt mode = catch_up
+    C->>API: (L, live_from] を取る（その間の deltas は持っておく）
+  end
+  C->>GW: outbox の queued・sent を outbox の順に submit
 ```
 
 - チケットを URL に入れないのは、プロキシとアクセスログに残るため。最初のメッセージで送る。

@@ -76,20 +76,19 @@ DELETE /api/v1/jobs/ingest/{id}             （終わったジョブと結果を
 
 ### 3.2 処理の流れ
 
-```
-upload_complete
-  │ 1. 見出しの検査：API の名前を、その時のバージョンで field_id に解決する（無い名前・書けない項目は、ジョブを failed）
-  │ 2. 分割：CSV を 1 万行の部分に分けて S3 に置く（upsert・match_update は鍵で振り分け。4.3 節）
-  │ 3. 部分を jobs の表の class bulk_ingest に入れる（組織の公平な順番。governor-limits の 8.4 節）
-  ▼
-Worker（部分ごと）
-  │ 4. 部分を 200 行ずつの塊にし、塊ごとに 1 つの非同期のトランザクション
-  │      - バージョンを固定（ADR-0003）。見出しの field_id を、そのバージョンで読める・書けるか確かめ直す
-  │      - DML の手順 0〜12（ADR-0008）。all_or_none = false：失敗した行を外して 2 回までやり直す
-  │ 5. 行ごとの結果を、部分の結果のファイル（S3）に追記する
-  │ 6. 塊の全体の失敗は 3.4 節
-  ▼
-全ての部分が終わる → job_complete（失敗の行があっても complete。行の失敗は結果で見る）
+次の図は、`upload_complete` の後に、ジョブを部分に分けて Worker で処理し、`job_complete` になるまでを示す。
+
+```mermaid
+flowchart TD
+  UC["upload_complete"] --> H{"1 見出しの検査：API の名前を、<br/>その時のバージョンで field_id に解決できる？"}
+  H -->|"無い名前・書けない項目"| F["failed"]
+  H -->|"できる"| SP["2 分割：CSV を 1 万行の部分に分けて S3 に置く<br/>（upsert・match_update は鍵で振り分け。4.3 節）"]
+  SP --> Q["3 部分を jobs の表の class bulk_ingest に入れる<br/>（組織の公平な順番。governor-limits の 8.4 節）"]
+  Q --> WK["Worker（部分ごと）<br/>4 200 行ずつの塊ごとに 1 つの非同期のトランザクション"]
+  WK --> TX["バージョンを固定し、field_id を読める・書けるか確かめ直す<br/>DML の手順 0〜12（ADR-0008）。all_or_none = false：<br/>失敗した行を外して 2 回までやり直す"]
+  TX --> RS["5 行ごとの結果を、部分の結果のファイル（S3）に追記する"]
+  TX -->|"塊の全体の失敗"| G["6 3.4 節"]
+  RS --> D["全ての部分が終わる → job_complete<br/>（失敗の行があっても complete。行の失敗は結果で見る）"]
 ```
 
 - **1 つのトランザクションは 200 行**（DML の 1 つの塊。ADR-0008）。非同期のトランザクションの上限（[governor-limits.md](governor-limits.md) の 4.1 節）の中で、フロー・入力規則・重複の規則・積み上げ集計が通常どおり動く。

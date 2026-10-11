@@ -27,22 +27,31 @@
 
 ## 3. 構成と流れ
 
+次の図は、ドライバーの位置が受信から各読み手に届くまでの流れを示す。
+
+```mermaid
+flowchart TB
+    app["ドライバーのアプリ"]
+    alb["ALB（loc.&lt;domain&gt;）"]
+    ingest["loc-ingest（Go、無状態、ECS Fargate）<br/>認証 → 流量の制限 → 時刻の補正 → 検証 → 付加（city_id、operator_id）"]
+    kin["Kinesis Data Streams<br/>S1：loc-tokyo、分割キー driver_id"]
+    geo["geo-index の主・待機<br/>geospatial-index.md"]
+    trail["trail-builder（Go）<br/>乗車ごとの軌跡、当てはめ、速度の標本（7・8 節）"]
+    fh["Amazon Data Firehose"]
+    s3[("S3 loc-raw/（Parquet）<br/>7 節")]
+    fan["trip-location-fanout（Go）<br/>乗客への車の位置の配信<br/>notifications-and-realtime-push の 6 節"]
+
+    app -->|"HTTPS（HTTP/2）POST /v1/driver/locations<br/>4 秒ごと、LocationBatch（protobuf）"| alb
+    alb --> ingest
+    ingest --> kin
+    kin -->|"拡張ファンアウト"| geo
+    kin --> trail
+    kin --> fh
+    fh --> s3
+    kin --> fan
 ```
-ドライバーのアプリ
-   │ HTTPS（HTTP/2）POST /v1/driver/locations  … 4 秒ごと、LocationBatch（protobuf）
-   ▼
-ALB（loc.<domain>）
-   ▼
-loc-ingest（Go、無状態、ECS Fargate）
-   │ 認証 → 流量の制限 → 時刻の補正 → 検証 → 付加（city_id、operator_id）
-   ▼
-Kinesis Data Streams（S1：loc-tokyo、分割キー driver_id）
-   ├─▶ geo-index の主・待機（拡張ファンアウト）                  … geospatial-index.md
-   ├─▶ trail-builder（Go）：乗車ごとの軌跡、当てはめ、速度の標本 … 7・8 節
-   ├─▶ Amazon Data Firehose → S3 loc-raw/（Parquet）            … 7 節
-   ├─▶ trip-location-fanout（Go）：乗客への車の位置の配信     … notifications-and-realtime-push の 6 節
-   └─▶ dispatch の判断の記録は、索引から読んだ値で書く（位置の流れは読まない）
-```
+
+dispatch の判断の記録は、索引から読んだ値で書く（位置の流れは読まない）。
 
 - 取り込みのサービスは状態を持たない。どのタスクに届いても同じ結果になる。重複と順序は、流れを読む側が `sample_seq` と時刻で扱う（5 節）。
 - 索引に直接 gRPC で渡す案は採らない。索引の再構築（直近 30 秒の読み直し）と、複数の読み手（待機、軌跡、保存）に、1 つの流れで応えるため（ADR-0009）。

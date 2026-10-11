@@ -75,6 +75,32 @@ flowchart TB
 - **セッションとリフレッシュトークンの系列**：同じセッションで出した `session` と `independent` の 2 つの系列の寿命を、時刻の順に示す（[sessions-and-sso.md](sessions-and-sso.md) の 7 節）
 - **署名鍵のライフサイクル**：署名鍵の状態を、操作の表に沿って示す（[keys-and-secrets.md](keys-and-secrets.md) の 5 節）
 
+### 1.4 本家の形（確かめたこと）
+
+領域の文書の 2 節で確かめたことの要約。確認日はすべて 2026-09-27。細部と食い違いは各領域の文書にある。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 認証の経路の SLA | Enterprise のプランで月間 99.99% | [Auth0 Pricing](https://auth0.com/pricing)（3 節の NFR-001） |
+| テナントとリージョン | テナントの名前は作成後に変えられない。リージョンは AU・CA・EU・JP・UK・US から作成時に選ぶ。環境ごとに別のテナントを勧める | [Create Tenants](https://auth0.com/docs/get-started/auth0-overview/create-tenants)（[tenants-and-applications.md](tenants-and-applications.md) の 2 節） |
+| 件数の上限 | Enterprise はアプリ・API・client grant が各 100,000。セルフサービスはアプリ 100、API 100、接続 100 | [Entity Limit Policy](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/entity-limit-policy)（同上） |
+| グラントと PKCE | `authorization_code`・`client_credentials`・`refresh_token` に加え、`password`・`implicit`・デバイスなどを持つ。PKCE は `S256` と `plain` | `samples.auth0.com` の discovery（[authentication-flows.md](authentication-flows.md) の 2 節） |
+| トークンの有効期間 | アクセストークンは既定 86,400 秒・最大 2,592,000 秒。ID トークンは既定 36,000 秒。認可コードは**未検証** | [Update Access Token Lifetime](https://auth0.com/docs/secure/tokens/access-tokens/update-access-token-lifetime)、[Update ID Token Lifetime](https://auth0.com/docs/secure/tokens/id-tokens/update-id-token-lifetime)（同上） |
+| リフレッシュトークン | `offline_access` で求める。1 ユーザー × 1 アプリで有効なものは 200 個まで、超えると最も古いものを失効させる | [Refresh Tokens](https://auth0.com/docs/secure/tokens/refresh-tokens)（同上） |
+| セッション | 既定は使われない期間 72 時間・最終の期限 168 時間。上限は Enterprise 以外で 3 日・30 日、Enterprise で 100 日・365 日 | [Session Lifetime Limits](https://auth0.com/docs/manage-users/sessions/session-lifetime-limits)（[sessions-and-sso.md](sessions-and-sso.md) の 2 節） |
+| Back-Channel Logout | Enterprise のプラン。非同期の待ち行列から送る。再試行の回数は資料にない | [OIDC Back-Channel Logout](https://auth0.com/docs/authenticate/login/logout/back-channel-logout)（同上） |
+| 署名鍵 | 「使用中」「前の鍵」「次の鍵」。ローテーションは手で行い、失効できるのは前の鍵だけ。ローテーションの API はバースト 5・1 日 5 | [Signing Keys](https://auth0.com/docs/get-started/tenant-settings/signing-keys)（[keys-and-secrets.md](keys-and-secrets.md) の 2 節） |
+| 攻撃の防御 | ブルートフォースは 1 つの IP から 1 つの識別子への失敗が既定 10 回で止める。不審な IP の抑制はログインで 1 IP 1 日 100 回 | [Brute-Force Protection](https://auth0.com/docs/secure/attack-protection/brute-force-protection)、[Suspicious IP Throttling](https://auth0.com/docs/secure/attack-protection/suspicious-ip-throttling)（[attack-protection.md](attack-protection.md) の 2 節） |
+| レート制限 | トークンバケット。Enterprise の本番で、認証 API はテナントで 1 秒 100、Management API はバースト 50・1 秒 16 | [Rate Limit Configurations（Enterprise）](https://auth0.com/docs/troubleshoot/customer-support/operational-policies/rate-limit-policy/rate-limit-configurations/enterprise-public)（[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 2 節） |
+| ログとログストリーム | 保持は Enterprise で 30 日。ストリームは少なくとも 1 回で、順序は保証しない。7 日続けて届かないと自動で止める | [Log Data Retention](https://auth0.com/docs/deploy-monitor/logs/log-data-retention)、[Log Streams](https://auth0.com/docs/customize/log-streams)（[logs-and-streams.md](logs-and-streams.md) の 2 節） |
+
+本家との意図した違い：
+
+- 暗黙フローとパスワードのグラント（ROPG）を持たない。PKCE は `S256` だけを受ける（RFC 9700。intent の Non-goals、[authentication-flows.md](authentication-flows.md) の 5.3 節・7.5 節）。
+- ログインの画面はホスト型の Universal Login に限り、埋め込み型の部品と独自のプッシュの認証アプリを持たない（intent の Non-goals）。
+- 公開のアプリのアクセストークンの既定を 3,600 秒、リフレッシュトークンの使われない期間の既定を 15 日と、本家より短くする（[authentication-flows.md](authentication-flows.md) の 8.1 節、[ADR-0008](../decisions/0008-token-lifetimes-and-claims.md)）。
+- リージョンは日本だけ。本家の SDK・Management API との完全な互換は目標にせず、標準のプロトコルで互換にする（intent の Constraints・Non-goals）。
+
 ## 2. 規模の段階
 
 | 段階 | テナント（うち本番） | エンドユーザー（合計） | 対話のログインのピーク | トークンの発行のピーク | 構成 |
@@ -87,6 +113,25 @@ flowchart TB
 - 対話のログインは、パスワードの照合（Argon2id）を伴うものを数える。S1 のピークで Argon2id の計算は 1 秒 500 回で、CPU の必要量は E12 の負荷試験で決める。
 - トークンの発行 1 件で、最大 2 回（ID トークンとアクセストークン）署名する。
 - 段階を上げる判断の基準は [infrastructure.md](infrastructure.md) の 9 節、台数は同じく 5 節、負荷のモデルは [capacity.md](capacity.md)。
+
+### 2.1 費用のモデル
+
+対話のログイン（2 節の定義のとおり Argon2id を伴うもの）1 件と、トークンの発行 1 件の原価を、次の和で見る。部品は 1.2 節のコンテナと、[capacity.md](capacity.md) の 1 節の負荷のモデルによる。
+
+```
+対話のログイン 1 件の原価 = エッジ（CloudFront・WAF の要求）
+                         ＋ Auth（Argon2id の計算。Fargate の vCPU の時間）
+                         ＋ Aurora 主（login_transactions、セッション、認可コードの書き込み）
+                         ＋ ログ（認証のイベント数件。Aurora ログ、ログストリーム）
+                         ＋ 外部（メールの送信事業者。確認・MFA のメールのとき）
+トークンの発行 1 件の原価 = Auth（クライアントの認証、クレームの組み立て）
+                         ＋ Signer（署名 1〜2 回。KMS で復号した鍵で署名）
+                         ＋ Aurora 主（リフレッシュのローテーションのときの書き込み。M2M は書かない）
+                         ＋ ログ（発行のイベント）
+```
+
+- S1 の本番の月額は約 31,000 USD（±50%）で、Aurora の主とログで約 12,000 USD、Fargate で約 4,700 USD と見積もった（[infrastructure.md](infrastructure.md) の 10 節）。単価は同じ節に AWS の東京の公開の価格で入れた。確かめていない単価は、そこに「未検証」と書いてある。
+- ログイン 1 件の原価で最も大きくなると見込むのは、Argon2id の計算である。パラメーターを上げる判断では、auth の費用が本番の合計の 3 割を超えない範囲にする（[capacity.md](capacity.md) の 2.1 節）。実際の比は E12 の負荷試験で確かめる。
 
 ## 3. 非機能要件
 

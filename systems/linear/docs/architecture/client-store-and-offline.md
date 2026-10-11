@@ -172,15 +172,24 @@ ADR-0014。ADR-0005 の方針（移行で outbox を消さない、1 つ前の�
 
 ### 6.2 手順
 
-```
- 新しいコードのタブが open(name, v_new)
-  ├─ 他のタブの古い接続に versionchange が届く
-  │    古いタブ：まとめ中の outbox を書き終えてから db.close()、
-  │               「新しいバージョンに更新しました。再読み込みしてください」を示し、操作を止める
-  ├─ onupgradeneeded（versionchange のトランザクション）：store と索引の追加・削除だけ
-  └─ 開いた後：Web Locks の `<brand>:migrate:<db>` を取り、行の移行を通常のトランザクションで
-       2,000 行ずつ。進みを `_meta.migration = {from, to, model, cursor}` に書く（strict）
-       落ちたら、次の起動で cursor から続ける
+次の図は、新しいコードのタブが DB を開いてから、行の移行を終えるまでの順序を示す。移行のロックの名前は `<brand>:migrate:<db>` である。
+
+```mermaid
+sequenceDiagram
+  participant N as 新しいコードのタブ
+  participant O as 他のタブ（古い接続）
+  participant IDB as IndexedDB
+  N->>IDB: open(name, v_new)
+  IDB-->>O: versionchange
+  O->>IDB: まとめ中の outbox を書き終えてから db.close()
+  O->>O: 「新しいバージョンに更新しました。再読み込みしてください」を示し、操作を止める
+  IDB-->>N: onupgradeneeded（versionchange のトランザクション）
+  N->>IDB: store と索引の追加・削除だけ
+  N->>N: 開いた後：Web Locks の移行のロックを取る
+  loop 2,000 行ずつ（通常のトランザクション）
+    N->>IDB: 行の移行と、進みの _meta.migration = {from, to, model, cursor}（strict）
+  end
+  Note over N,IDB: 落ちたら、次の起動で cursor から続ける
 ```
 
 - `onupgradeneeded` の中は同期の IndexedDB の操作しかできないので、行の移行を入れない。長い移行でブラウザの versionchange のトランザクションを長く持たないためでもある。

@@ -30,23 +30,29 @@
 
 ## 3. 構成
 
-```
-Browser
-  │ HTTPS  POST /v1/meetings, POST /v1/meetings/{id}/join
-  ▼
-API（Hono）──── Aurora（meetings, meeting_instances, participations, removals）
-  │ 参加のトークン（EdDSA、120 秒、1 回限り）
-  ▼
-Browser ── WSS（サブプロトコル <brand>.sig.v1）── Signaling Gateway（ECS、状態なし）
-                                                     │ 会議の ID で持ち主を引く（Valkey）
-                                                     │ Actor Host ごとに 1 本の多重化した内部の接続
-                                                     ▼
-                                               Actor Host（ECS、多数の会議の Actor）
-                                                 ├─ Meeting Actor（会議ごとに 1 つ）
-                                                 │    検証 → 判定 → seq → 適用 → 配信
-                                                 ├─ Valkey：リース、epoch、スナップショット
-                                                 ├─ Aurora：失ってはならない変更、outbox
-                                                 └─ Media Node の制御の API（mTLS、epoch 付き）
+次の図は、会議の作成と参加の要求（API）、シグナリングの接続（Gateway）、会議の状態の正本（Actor Host）のつながりを示す。
+
+```mermaid
+flowchart TB
+    browser["Browser"]
+    api["API（Hono）"]
+    aurora[("Aurora<br/>meetings、meeting_instances、participations、removals<br/>失ってはならない変更、outbox")]
+    gw["Signaling Gateway<br/>ECS、状態なし"]
+    subgraph host["Actor Host（ECS、多数の会議の Actor）"]
+        actor["Meeting Actor（会議ごとに 1 つ）<br/>検証 → 判定 → seq → 適用 → 配信"]
+    end
+    valkey[("Valkey<br/>リース、epoch、スナップショット")]
+    mnapi["Media Node の制御の API<br/>mTLS、epoch 付き"]
+
+    browser -->|"HTTPS POST /v1/meetings、POST /v1/meetings/{id}/join"| api
+    api --- aurora
+    api -->|"参加のトークン（EdDSA、120 秒、1 回限り）"| browser
+    browser -->|"WSS（サブプロトコル &lt;brand&gt;.sig.v1）"| gw
+    gw -->|"会議の ID で持ち主を引く"| valkey
+    gw -->|"Actor Host ごとに 1 本の多重化した内部の接続"| actor
+    actor --> valkey
+    actor --> aurora
+    actor --> mnapi
 ```
 
 - Gateway と Actor Host は別の ECS のサービスにする。Gateway は接続の数で、Actor Host は会議の数と操作の量で増やす。
@@ -425,17 +431,32 @@ ADR-0009。
 
 ### 10.2 回復の手順
 
-```
-t=0      Actor Host が落ちる（プロセスの終了、タスクの停止、分断）
-t≈0〜3s  Gateway は内部の接続の切断（または 3 秒の ping の失敗）で気づく。
-         会議の参加者に eph{name: "control.degraded"} を送る（画面に「一部の操作が遅れています」）
-t=6s     リースの TTL が切れる（最後の更新が t=0 の直前の場合の最悪は t≈6s）
-t≈6.1s   Gateway が次の Host に acquire を頼む。新しい Host は epoch+1 で取る
-t≈6.2s   スナップショットを Valkey から、失ってはならない変更を Aurora から読む
-         Media Node に inventory{meeting, epoch} を求める（今の transport・producer・consumer の一覧）
-t≈6.4s   全員に snap{epoch+1} を送り、state.report を求める
-t≈7.5s   state.report を 1 秒待って突き合わせる（下の表）。status を戻す
-t≈8s     主催者の操作が効く（目標：10 秒以内。NFR-004）
+次の図は、Actor Host が落ちてから主催者の操作が効くまでを、時刻の順に示す。
+
+```mermaid
+sequenceDiagram
+    participant Old as "Actor Host（落ちる）"
+    participant G as "Gateway"
+    participant C as "参加者"
+    participant V as "Valkey"
+    participant New as "次の Host"
+    participant DB as "Aurora"
+    participant MN as "Media Node"
+    Note over Old: t=0 Actor Host が落ちる（プロセスの終了、タスクの停止、分断）
+    Note over G: t≈0〜3s 内部の接続の切断（または 3 秒の ping の失敗）で気づく
+    G->>C: eph（control.degraded）。画面に「一部の操作が遅れています」
+    Note over V: t=6s リースの TTL が切れる（最後の更新が t=0 の直前の場合の最悪）
+    G->>New: t≈6.1s acquire を頼む
+    New->>V: epoch+1 で取る
+    New->>V: t≈6.2s スナップショットを読む
+    New->>DB: 失ってはならない変更を読む
+    New->>MN: inventory（meeting、epoch）を求める
+    MN-->>New: 今の transport・producer・consumer の一覧
+    New->>C: t≈6.4s 全員に snap（epoch+1）を送り、state.report を求める
+    C->>New: state.report
+    Note over New: t≈7.5s state.report を 1 秒待って突き合わせる（下の表）。status を戻す
+    Note over New: t≈8s 主催者の操作が効く（目標：10 秒以内。NFR-004）
+    Note over MN: この間も、最後の指示のまま転送を続ける
 ```
 
 - 流れているメディアは止まらない。Media Node は、最後の指示のまま転送を続ける（ADR-0005）。

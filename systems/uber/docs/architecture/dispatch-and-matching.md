@@ -32,16 +32,24 @@
 
 ## 3. 構成と 1 回のバッチ
 
-```
-Trips ──（trip.requested・offer の結果・取り消し）──▶ dispatch（区域のリースを持つタスク）
-                                                     │ 2 秒ごと
-                                                     ├─ 1. 未割り当ての依頼の集合（Trips の写し）
-                                                     ├─ 2. geo-index.FindNearby（依頼ごと、同じ写しの generation）
-                                                     ├─ 3. 候補の条件（5 節、バージョンつきのデータ）
-                                                     ├─ 4. ETA（many-to-one、依頼ごと。eta-and-routing の 4.1 節）
-                                                     ├─ 5. コストの行列と最小の割り当て（6 節）
-                                                     ├─ 6. Trips.ProposeOffer（組ごと、並列）
-                                                     └─ 7. 判断の記録（9 節）
+次の図は、dispatch が区域のバッチを 1 回締めるときの手順を示す。番号は下の各節に対応する。
+
+```mermaid
+sequenceDiagram
+  participant T as "Trips"
+  participant D as "dispatch（区域のリースを持つタスク）"
+  participant I as "geo-index"
+  participant E as "ETA"
+  T->>D: trip.requested・offer の結果・取り消し
+  loop 2 秒ごと
+    Note over D: 1. 未割り当ての依頼の集合（Trips の写し）
+    D->>I: 2. FindNearby（依頼ごと、同じ写しの generation）
+    Note over D: 3. 候補の条件（5 節、バージョンつきのデータ）
+    D->>E: 4. ETA（many-to-one、依頼ごと。eta-and-routing の 4.1 節）
+    Note over D: 5. コストの行列と最小の割り当て（6 節）
+    D->>T: 6. ProposeOffer（組ごと、並列）
+    Note over D: 7. 判断の記録（9 節）
+  end
 ```
 
 | 段 | 予算（p99） | 超えたとき |

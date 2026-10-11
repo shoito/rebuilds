@@ -82,6 +82,27 @@ flowchart TB
 - **DML の実行の順序**：検証、保存の前のフロー、書き込み、保存の後のフロー、積み上げ集計、項目の変更の履歴、共有の評価、変更のイベントを、1 つの DB のトランザクションで行い、どこで失敗しても全体を巻き戻す（[metadata-and-runtime.md](metadata-and-runtime.md) の 6.1 節）
 - **承認のプロセス**：申請のインスタンスは `pending` のまま段ごとに進み、最後の段の承認・却下・取り消しで終わる。承認者を決められなければ `error` になる（[automation-flows.md](automation-flows.md) の 8.2 節）
 
+### 1.4 本家の形（確かめたこと）
+
+各領域の文書の 2 節で確かめたことのうち、主な論点（メタデータで動く実行基盤、共有の表、上限）に関わるものを集めた。確認日は、各領域の文書の 2 節に書いた日（多くは 2026-09-28）である。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| データの表 | 全組織のレコードを MT_Data に入れる。項目の値は文字列の flex 列（Value0〜ValueN）。列の数は資料に書かれていない | [Platform Multitenant Architecture](https://architect.salesforce.com/docs/architect/fundamentals/guide/platform-multitenant-architecture.html)（以下「MT」）。[data-storage.md](data-storage.md) の 2 節 |
+| ピボットの表と分割 | 索引の要る項目は型付きのピボットの表（MT_Indexes など）へ写して引く。全てのデータ・メタデータ・索引を OrgID で物理的に分割する | MT。[data-storage.md](data-storage.md) の 2 節 |
+| メタデータとキャッシュ | オブジェクトの定義を MT_Objects、項目の定義を MT_Fields に持つ。よく使うメタデータを大きなメタデータのキャッシュに持つ | MT。[metadata-and-runtime.md](metadata-and-runtime.md) の 2 節 |
+| 保存の順序 | 検証、保存の前のフロー、トリガー、保存（未確定）、保存の後のフロー、積み上げ集計、共有の評価、確定、確定の後の処理の順。API の要求は 200 件ずつの塊でトリガーを動かす | [Apex Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_apex_developer_guide.pdf)（Winter '27 版）。[metadata-and-runtime.md](metadata-and-runtime.md) の 2 節 |
+| 共有の事前計算 | 読む時に全て計算すると 300ms に収まらないので、設定が変わった時に計算して保存する。付与は明示・グループの所属・継承・暗黙の 4 種で、最も強いものを使う | [Record-Level Access: Under the Hood](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_record_access_under_the_hood.pdf)（Winter '27 版、以下「RLA」）。[sharing-and-record-access.md](sharing-and-record-access.md) の 2 節 |
+| 大きな組織の例 | 取引先 1,000 万件、利用者 7,000、ロール 2,000、テリトリー 1,000 | RLA |
+| スキュー | 1 人が 1 万件を超えて所有しない。1 つの親に 1 万件を超える子を置かない | [Best Practices for Deployments with Large Data Volumes](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_large_data_volumes_bp.pdf)。[sharing-and-record-access.md](sharing-and-record-access.md) の 2 節 |
+| 1 トランザクションの上限 | 同期で問い合わせ 100、取得の行 50,000、DML 150、DML の行 10,000、CPU 10,000ms、ヒープ 10MB。超えると捕まえられない例外で巻き戻る | Apex Developer Guide（Winter '27 版）。[governor-limits.md](governor-limits.md) の 2 節 |
+| API の割り当て | Enterprise は 24 時間で 100,000＋ライセンスの数 × 1,000。組織の全体で数える。有料の組織は一定の量だけ超えて動く（量は資料に書かれていない） | [Developer Limits and Allocations Quick Reference](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_app_limits_cheatsheet.pdf)（2026-09-11 更新版）。[governor-limits.md](governor-limits.md) の 2 節 |
+| 一括の割り当て | 24 時間で 15,000 の batch、取り込み 1 億 5,000 万行。1 つのジョブの CSV は 150MB | 同上 |
+| 変更のイベント | イベントバスに最大 3 日。共有の設定を無視し、オブジェクトの全てのレコードのイベントを送る（FLS で読めない項目は入れない） | [Change Data Capture Developer Guide](https://resources.docs.salesforce.com/latest/latest/en-us/sfdc/pdf/salesforce_change_data_capture.pdf)（Winter '27 版）。[events-and-integrations.md](events-and-integrations.md) の 2 節 |
+| 項目の変更の履歴 | 1 オブジェクト 20 項目まで。保持は 18 か月、API では 24 か月まで読める。データの容量に数えない | [Field History Tracking Overview](https://help.salesforce.com/s/articleView?id=xcloud.tracking_field_history.htm&type=5)。[audit-and-field-history.md](audit-and-field-history.md) の 2 節 |
+
+**本家との意図した違い**：レコードは flex 列ではなく、共有の `records` の表の JSONB に項目の ID をキーにして入れ、型付きのピボットの表で引く（[ADR-0002](../decisions/0002-custom-object-storage.md)）。Apex・SOQL・本家のメタデータの XML・Visualforce は受け付けず、問い合わせの言語・数式の言語・メタデータの形式は独自のものにする（[ADR-0001](../decisions/0001-platform-and-stack.md)）。ダッシュボードは見る人の権限だけで集計し、指定した実行ユーザーを持たない（[ADR-0030](../decisions/0030-dashboards-viewer-intersection-and-subscriptions.md)）。上限の数え方（フローの要素の数を数える）と、割り当ての超過を 429 で返すことも本家と違う（[ADR-0041](../decisions/0041-limits-registry-and-counting-rules.md)、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md)）。違いの一覧の正本は [bulk-and-import.md](bulk-and-import.md) の 15.4 節にある（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。
+
 ## 2. 規模の段階
 
 | 段階 | 組織（うち本番） | 利用者（合計） | レコード（合計） | 最大の組織 | 対話の要求のピーク | 構成 |
@@ -94,6 +115,26 @@ flowchart TB
 - 1 件の対話の要求は、平均で問い合わせを 3〜5 回行う想定。
 - 共有の表の行は、非公開の OWD のオブジェクトで、レコードあたり平均 3 行を想定する（所有者は表に持たない。[ADR-0004](../decisions/0004-record-access-model.md)）。
 - 段階を上げる判断の基準は、[infrastructure.md](infrastructure.md) の 5 節（[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md)）。部品ごとの量と台数の根拠は [capacity.md](capacity.md)。
+
+### 2.1 費用のモデル
+
+利用者 1 人の 1 か月の原価を、次の和で見る。部品の月額は [infrastructure.md](infrastructure.md) の 9 節の概算（S1、本番、±50%）を使う。
+
+```
+利用者 1 人の月の原価 = （主の Aurora（writer・reader、保存、大阪の写し）
+                       ＋ events・history の Aurora（変更のイベント 3 日、項目の変更の履歴 18 か月）
+                       ＋ OpenSearch（全文検索の索引）
+                       ＋ ECS Fargate（Runtime、Metadata、Bulk、Worker、Relay、sender）
+                       ＋ ElastiCache（コンパイル済みのメタデータ、上限・割り当ての数）
+                       ＋ 網と入口（CloudFront、WAF、ALB、NAT、Network Firewall）
+                       ＋ SES、S3、可観測性、セキュリティの監視、鍵と秘密）
+                       ÷ 利用者
+```
+
+- S1 の本番の合計は約 44,500 USD/月で、利用者 5 万人で割ると 1 人の月で約 0.9 USD になる（本番の基盤だけ。staging などの約 8,000 USD は含めない）。
+- 最も大きいのは Aurora で、約半分を占める。主の writer の DB の時間は、1 要求の DB の時間（保存は自動化なしで 8ms、フローと積み上げ集計ありで 25ms の想定）と、ピボットの書き込みの増幅で決まる（[capacity.md](capacity.md) の 2.2 節・4 節）。
+- 項目の変更の履歴は保存の量の半分以上になるので、主から `history` のクラスタに分けた（[capacity.md](capacity.md) の 3 節、[infrastructure.md](infrastructure.md) の 9 節）。
+- 組織ごとの費用は、組織の DB の時間（[ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md)）と保存の量で按分する。1 要求の費用は想定の値で、E3・E5・E6 で測る。
 
 ## 3. 非機能要件
 

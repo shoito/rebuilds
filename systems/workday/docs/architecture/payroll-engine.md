@@ -270,6 +270,19 @@ payroll_result_lines (tenant_id, result_id, pay_date, seq, item_code, item_versi
 3. **差**：項目ごとに、新しい値 −（元の結果 ＋ P に対する前の差額の合計）。
 4. **当期の行**：差が 0 でない項目を、当期の結果に `retro_period = P` の行として足す。税・保険の扱いは項目の種類ごとの決定表（DT-PAY-003）で決める。
 
+次の図は、候補の 1 つの期間 P についての 1〜4 の流れを示す。手順は上の番号の一覧を正とする。
+
+```mermaid
+flowchart TD
+  A["1 再現の確認：P の元の入力の文書と元の規則表のバージョンを、<br/>いまのエンジンで計算する"] --> B{"元の結果と同じ？"}
+  B -->|"違う"| X["ENGINE_DRIFT で実行を止める"]
+  B -->|"同じ"| C["2 計算し直し：今回の known_at で P の入力を作り直し、<br/>P の期間に有効な最新の規則表のバージョンで計算する"]
+  C --> D["3 差：項目ごとに、新しい値 −（元の結果 ＋ P に対する前の差額の合計）"]
+  D --> E{"差が 0 でない？"}
+  E -->|"はい"| F["4 当期の結果に retro_period = P の行として足す<br/>（扱いは DT-PAY-003）"]
+  E -->|"いいえ"| G["行を足さない"]
+```
+
 DT-PAY-003（遡及の差の扱い。上から評価。法令の扱いは [payroll-jp-rules.md](payroll-jp-rules.md) の DT-JP-006 が決める）：
 
 | # | 差の項目 | 当期での扱い |
@@ -293,10 +306,17 @@ DT-PAY-003（遡及の差の扱い。上から評価。法令の扱いは [payro
 
 ## 9. 計算の分割（[ADR-0029](../decisions/0029-parallel-run-and-compute-partitioning.md)）
 
-```
-freeze ─▶ inputs (S3, per employee) ─▶ chunk manifest (employment_id order, 250 each)
-      ─▶ SQS (chunk ids) ─▶ Payroll Compute (ECS tasks × worker threads)
-      ─▶ payroll-results/{tenant}/{run}/{chunk}.jsonl + sha256 (S3) ─▶ Loader (Worker): 1 tx per chunk ─▶ payroll_results
+次の図は、入力の固定から、束ごとの計算と結果の取り込みまでの流れを示す。
+
+```mermaid
+flowchart LR
+  FR["freeze（入力の固定）"] --> IN[("inputs（S3、従業員ごと）")]
+  IN --> MF["chunk manifest<br/>（employment_id の順、250 人ずつ）"]
+  MF --> Q["SQS（束の ID）"]
+  Q --> PC["Payroll Compute<br/>（ECS のタスク × ワーカーのスレッド）"]
+  PC --> RS[("payroll-results/{tenant}/{run}/{chunk}.jsonl<br/>＋ sha256（S3）")]
+  RS --> LD["Loader（Worker）<br/>1 束を 1 トランザクション"]
+  LD --> PR[("payroll_results")]
 ```
 
 - 束は、雇用の ID の順に 250 人ずつ（既定。E12 の負荷試験で決める）。束の中身は `payroll_chunks (run_id, chunk_no, employment_ids, manifest_hash)` に記録し、再試行でも変えない。

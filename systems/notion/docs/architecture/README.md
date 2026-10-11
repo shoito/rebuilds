@@ -2,25 +2,39 @@
 
 全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/notion/docs/primer/index.html#glossary)の用語集にある。
 
-| ファイル | 領域 |
-| --- | --- |
-| [block-model.md](block-model.md) | ブロックのデータモデル、ページの木、同期ブロック、履歴 |
-| [editor.md](editor.md) | エディタ、リッチテキスト、ブロックの種類、クライアントの構成 |
-| [collaboration.md](collaboration.md) | 同時編集の方式、変更の配信、在席、オフラインと統合 |
-| [databases.md](databases.md) | データベース、プロパティ、ビュー、フィルタ、リレーション、ロールアップ、数式、問い合わせ |
-| [permissions-and-sharing.md](permissions-and-sharing.md) | ワークスペース、チームスペース、ページの権限と継承、ゲスト、公開、アカウント |
-| [search.md](search.md) | 全文検索、権限の適用 |
-| [comments-and-notifications.md](comments-and-notifications.md) | コメント、メンション、通知 |
-| [api-and-integrations.md](api-and-integrations.md) | 公開 API、Webhook、インポートとエクスポート |
-| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、データのライフサイクル |
-| [data-model.md](data-model.md) | データモデルの正（規約、ER 図、全テーブルの定義。領域ごとの定義は [data-model/](data-model/)） |
-| [infrastructure.md](infrastructure.md) | AWS の構成、シャード、冗長化、災害復旧 |
-| [observability.md](observability.md) | ログ、メトリクス、トレース、SLO |
-| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
-| [delivery.md](delivery.md) | CI/CD、リリース、フィーチャーフラグ |
-| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） |
+領域ごとの文書の一覧は 7 節にある。
 
 ## 1. 全体構成
+
+### 1.1 コンテキスト
+
+次の図は、本システムを使う人と、本システムがやり取りする外部のシステムを示す。中身の部品は 1.2 節にある。
+
+```mermaid
+flowchart LR
+  Member["ワークスペースのメンバー<br/>ブラウザ、デスクトップ"]
+  Guest["ゲスト<br/>ページ単位で招待"]
+  Viewer["公開ページの閲覧者"]
+  Integ["連携<br/>公開 API の利用者、Webhook の受け手"]
+  Agent["AI エージェント<br/>MCP、API とトークン"]
+  Sys["本システム<br/>ブロックとページ、同時編集、データベース、<br/>権限と共有、検索、コメントと通知、API"]
+  Mail["メール（SES）"]
+  Push["デスクトップ・Web Push"]
+  IdP["SAML の IdP<br/>SSO（MVP の後）"]
+  Member -- "HTTPS・WebSocket" --> Sys
+  Guest -- "HTTPS・WebSocket" --> Sys
+  Viewer -- "公開サイト（別のドメイン）" --> Sys
+  Integ -- "REST" --> Sys
+  Sys -- "Webhook" --> Integ
+  Agent -- "MCP・REST" --> Sys
+  Sys --> Mail
+  Sys --> Push
+  Sys -- "SSO" --> IdP
+```
+
+使う人は [intent.md](../intent.md) の「Affected users and systems」による。公開サイトは [ADR-0020](../decisions/0020-published-pages-isolation.md)、連携と MCP は [api-and-integrations.md](api-and-integrations.md)、メールと push は [comments-and-notifications.md](comments-and-notifications.md) の 5 節、SSO は [permissions-and-sharing.md](permissions-and-sharing.md) の 6 節にある。
+
+### 1.2 コンテナ
 
 次の図は、変更の受け付けから配信までの経路と、主なコンポーネントを示す。
 
@@ -59,11 +73,41 @@ flowchart TB
 - **ワークスペースで分け、ワークスペースで閉じる。** テナントの境界はワークスペースで、Slack と同じく RLS で分ける。シャードもワークスペースで決め、1 つの操作が 1 つのシャードで閉じるようにする（[ADR-0003](../decisions/0003-workspace-sharding.md)）。
 - **権限はページの木を継承する。** ブロックの権限は、祖先のページの設定から決まる。判定の関数を 1 つにし、検索・通知・API・リレーションのすべてが通る（[ADR-0004](../decisions/0004-inherited-page-permissions.md)）。
 
-### 主要な流れ
+### 1.3 主要な流れ
 
 - **構造とプロパティの衝突**：サーバーがトランザクションを `seq` の順に当てるとき、2 台の端末の操作がどう決着するかを、表の 3 つの行で示す（[collaboration.md](collaboration.md) の 6 節）
 - **長時間のオフラインの統合**：再接続の後に、持っているページの鮮度を確かめて追いつくことと、待ち行列を FIFO で送ることを示す（[collaboration.md](collaboration.md) の 11.4 節）
 - **再シャーディング**：論理シャードを別の物理クラスタへ移す手順のうち、1 回の切り替え（8〜16 シャード）を示す（[infrastructure.md](infrastructure.md) の 3.4 節）
+- **変更の流れと配信**：API がトランザクションを 1 つの DB のトランザクションで書き、Relay が outbox から配信のバスと SQS へ送る（[collaboration.md](collaboration.md) の 7 節）
+- **権限の変更の反映**：`acl_version` を上げ、`acl.changed` で Sync Gateway の購読と検索の索引を直す（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.3 節）
+
+### 1.4 本家の形（確かめたこと）
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 規模 | 利用者 1 億超（2024 年 8 月）。ブロックは 2021 年の 200 億から 2024 年に 2,000 億超、6〜12 か月で倍。書き込みの 90% は既存の行の更新 | [100 million of you](https://www.notion.com/blog/100-million-of-you)（2026-10-11）、[Building and scaling Notion's data lake](https://www.notion.com/blog/building-and-scaling-notions-data-lake)（[block-model.md](block-model.md) の 1 節、[capacity.md](capacity.md) の 1.2 節） |
+| シャード | Postgres をワークスペースの ID で 480 の論理シャード（スキーマ）に分け、1 つの物理 DB に 15 のスキーマを置いた。振り分けはアプリの層。後に物理を 32 から 96 に論理レプリケーションで分け、同期は 12 時間、利用者に見えたのは短い「保存中」の表示だけ | [Herding elephants](https://www.notion.com/blog/sharding-postgres-at-notion)、[The Great Re-shard](https://www.notion.com/blog/the-great-re-shard)（[ADR-0027](../decisions/0027-shard-router.md)、[infrastructure.md](infrastructure.md) の 3.4 節） |
+| ブロックと変更の単位 | ブロックは `id`・`type`・`properties`・`content`・`parent` を持つ。操作をまとめたトランザクションを `/saveTransactions` で送り、サーバーが検証して記録する | [The data model behind Notion's flexibility](https://www.notion.com/blog/data-model-behind-notion)（[block-model.md](block-model.md) の 1 節） |
+| 配信 | `MessageStore` への WebSocket でレコードを購読し、バージョンが変わったら `syncRecordValues` で取り直す | 同上（[collaboration.md](collaboration.md) の 2 節） |
+| テキストの統合 | 2025 年 7 月から、RGA に Peritext の書式の操作を足した CRDT。分割・結合に text slice を使う。以前は同じブロックへの同時の編集が LWW で失われた。テキスト以外のプロパティは片方だけが残る | [How Notion handles concurrent editing with CRDTs](https://www.notion.com/blog/how-notion-handles-concurrent-editing-with-crdts)、[オフラインで使う](https://www.notion.com/help/use-pages-offline)（[collaboration.md](collaboration.md) の 2 節） |
+| オフライン | デスクトップとモバイルのアプリだけ。明示したページ（有料プランでは最近のページとお気に入りも）。データベースは最初のビューの先頭 50 行、子ページは含めない | [How we made Notion available offline](https://www.notion.com/blog/how-we-made-notion-available-offline)（[collaboration.md](collaboration.md) の 2 節） |
+| 検索 | Elasticsearch に、ブロック単位で、文書ごとの権限を解決して入れる。外部バージョンで新しい書き込みを優先する | [Rebuilding Notion's lexical search reindexer](https://www.notion.com/blog/rebuilding-notions-lexical-search-reindexer)（[search.md](search.md) の 2 節） |
+| ロールと所有者 | ワークスペースの所有者、メンバーの管理者（Enterprise）、メンバー、ゲストの 4 つ。所有者はプライベートのページを含むデータにアクセスしうる | [Who's who in a workspace](https://www.notion.com/help/whos-who-in-a-workspace)、[Data your workspace owner can access](https://www.notion.com/help/data-accessible-by-your-workspace-owner)（2026-09-27。[permissions-and-sharing.md](permissions-and-sharing.md) の 2.2 節） |
+| ゴミ箱と履歴 | ゴミ箱は 30 日（Enterprise は変えられる）。ページの履歴は Free 7 日、Plus 30 日、Business 90 日、Enterprise は任意 | [Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)（[block-model.md](block-model.md) の 8・9 節） |
+| 公開 API | `Notion-Version` の日付でバージョンを選ぶ。連携ごとに平均 3 回/秒（Business・Enterprise は 10 回/秒）。リクエストは 500 KB・1,000 ブロックまで、リッチテキストは 2,000 文字、配列は 100 要素まで。検索はタイトルだけ | [Versioning](https://developers.notion.com/reference/versioning)、[Request limits](https://developers.notion.com/reference/request-limits)（2026-10-11）、[Search](https://developers.notion.com/reference/post-search)（[api-and-integrations.md](api-and-integrations.md) の 4・5 節） |
+| Webhook | 登録した URL に一度だけ `verification_token` を送って確かめ、以後の配送に `X-Notion-Signature`（HMAC-SHA256）を付ける | [Webhooks](https://developers.notion.com/reference/webhooks)、[Event types & delivery](https://developers.notion.com/reference/webhooks-events-delivery)（[api-and-integrations.md](api-and-integrations.md) の 6 節） |
+| エディタの実装、データベースの問い合わせの索引、在席・カーソルの実装 | 公式の資料で確かめられなかった | **未検証**（[editor.md](editor.md) の 3 節、[databases.md](databases.md) の 1 節、[collaboration.md](collaboration.md) の 2 節） |
+
+日付を付けた行はその日に確認した。日付のない行は、各領域の文書が設計の工程（2026-09-26〜27）で確かめたもの。この設計は振る舞いを参考にするが、本家のコードを使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+
+**本家との意図した違い**：
+
+- **所有者も、ページの権限を迂回しない。** 他のメンバーのプライベートのページは、所有者でも通常の画面では読めない（[permissions-and-sharing.md](permissions-and-sharing.md) の 2.2 節、[ADR-0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md)）。
+- **オフラインを Web（PWA）でも使える**（[ADR-0013](../decisions/0013-offline-availability-policy.md)）。テキストの CRDT は Fugue＋Peritext を自前で作る（[ADR-0010](../decisions/0010-text-crdt-with-server-ordered-structure.md)）。
+- **検索はページ単位で索引し、権限キーと読み直しの二重で権限を効かせる**（[ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md)）。
+- **公開 API の `POST` に `Idempotency-Key` を持つ。個人のアクセストークンは MVP で持たず、AI エージェントは MCP を使う**（[api-and-integrations.md](api-and-integrations.md) の 3.1・4.2 節）。
+- **ブロックをまたぐ部分的なテキストの選択を MVP で作らない**（[editor.md](editor.md) の 3 節）。
+- **ヘッダー・ドメインに本家の名前を使わない**（`<Brand>-Version`、`X-<Brand>-Signature`。[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 ## 2. 規模の段階
 
@@ -74,6 +118,23 @@ flowchart TB
 | S3 | 1 億 | 数千億 | 1,000 万 | 物理クラスタを増やし、データレイクを分析と AI の基盤にする。複数のリージョン |
 
 論理シャードの数（480）は、本家の値に合わせ、S1 から固定する（[Herding elephants](https://www.notion.com/blog/sharding-postgres-at-notion)）。物理の数だけを段階で増やす。
+
+### 2.1 費用のモデル
+
+利用者の月の原価を、次の和で見る。単価は [infrastructure.md](infrastructure.md) の 13 節の概算（Slack の単価をもとにした）による。
+
+```
+利用者の月あたりの原価 = Aurora（ブロック・操作のログ・権限の正本。書き込みと保存、Global Database の複製）
+                     ＋ OpenSearch（ページ単位の索引と検索）
+                     ＋ API・Sync Gateway・Relay・Worker（ECS Fargate）と配信のバス（ElastiCache）
+                     ＋ ファイル（S3・CloudFront）とデータ転送
+                     ＋ 通知（SES、Web Push）
+                     ＋ バックアップ、大阪の待機、可観測性、セキュリティのサービス
+```
+
+- S1 の本番の月額は約 17,200 USD（±50%）。大きいのは Aurora（6,000）と OpenSearch（4,500）で、OpenSearch の単価は E8 の `load-test-k6` で確かめる（[infrastructure.md](infrastructure.md) の 13 節）。
+- 目安として、10 万の利用者で割ると、1 利用者の月あたり約 0.17 USD になる。
+- Aurora の量は、トランザクションの数（1 件あたり平均 5 行の書き込み）と、30 日ぶんの操作のログで決まる。台数と単価は E8 の負荷試験で置き換える（[capacity.md](capacity.md) の 1 節）。
 
 ## 3. 非機能要件
 
@@ -173,3 +234,25 @@ flowchart TB
 | 本家の振る舞いで未検証のもの（購読の既定、ゴミ箱へ入れる水準、子で変えた後の親の変更など。2026-09-27 に公式の文書で確かめられなかったもの） | 各 Epic の Story で本家を観察して揃える |
 
 決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
+
+## 7. 領域の文書
+
+各文書の頭にある ADR を「ADR」の列に示す（他の題材の ADR は除く）。
+
+| ファイル | 範囲 | ADR |
+| --- | --- | --- |
+| [block-model.md](block-model.md) | ブロックのデータモデル、ページの木、同期ブロック、履歴 | 0002、0003、0004、0005、0006 |
+| [editor.md](editor.md) | エディタ、リッチテキスト、ブロックの種類、クライアントの構成 | 0002、0004、0005、0006、0007、0008、0009、0032 |
+| [collaboration.md](collaboration.md) | 同時編集の方式、変更の配信、在席、オフラインと統合 | 0002、0003、0004、0005、0010、0011、0012、0013、0032 |
+| [databases.md](databases.md) | データベース、プロパティ、ビュー、フィルタ、リレーション、ロールアップ、数式、問い合わせ | 0014、0015、0016、0017 |
+| [permissions-and-sharing.md](permissions-and-sharing.md) | ワークスペース、チームスペース、ページの権限と継承、ゲスト、公開、アカウント | 0003、0004、0018、0019、0020、0021、0022、0024、0033 |
+| [search.md](search.md) | 全文検索、権限の適用 | 0023 |
+| [comments-and-notifications.md](comments-and-notifications.md) | コメント、メンション、通知 | — |
+| [api-and-integrations.md](api-and-integrations.md) | 公開 API、Webhook、インポートとエクスポート、リモートの MCP サーバー | 0024、0025、0026 |
+| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、データのライフサイクル | 0001、0003、0004、0018、0019、0020、0021、0022、0023、0024、0025、0033 |
+| [data-model.md](data-model.md) | データモデルの正（規約、ER 図、全テーブルの定義。領域ごとの定義は [data-model/](data-model/)） | 0002、0003、0004、0005、0018、0019、0021、0027 |
+| [infrastructure.md](infrastructure.md) | AWS の構成、シャード、冗長化、災害復旧 | 0001、0003、0027、0028、0029、0030 |
+| [observability.md](observability.md) | ログ、メトリクス、トレース、SLO | 0001 |
+| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター | — |
+| [delivery.md](delivery.md) | CI/CD、リリース、フィーチャーフラグ | 0001、0031 |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） | — |

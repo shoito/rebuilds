@@ -332,15 +332,19 @@ level(actor, page):
 
 ### 5.3 移動と共有の反映
 
-```
-権限の変更（1 つのトランザクション）
-  ├─ page_acls / 親の変更 / メンバー・グループ・チームスペースの変更
-  ├─ acl_version += 1
-  ├─ 監査ログ（security.md の 6 節）
-  └─ outbox: acl.changed { workspace_id, acl_version, root_page_id }
-        ├─▶ Sync Gateway：祖先の鎖に root_page_id を含む購読を判定し直し、読めなくなった接続に page.revoked を送る（collaboration.md の 7.2 節）
-        ├─▶ 検索：search-acl のキューで access_keys を更新する（search.md の 5.3 節）
-        └─▶ 通知・Webhook：送る直前に判定し直すので、ここでは何もしない
+次の図は、権限の変更を 1 つのトランザクションで書き、`acl.changed` で各経路へ伝える流れを示す。
+
+```mermaid
+flowchart TB
+  TX["権限の変更（1 つのトランザクション）<br/>page_acls・親の変更・メンバー・グループ・チームスペースの変更<br/>acl_version += 1<br/>監査ログ（security.md の 6 節）"]
+  EV["outbox：acl.changed<br/>workspace_id, acl_version, root_page_id"]
+  GW["Sync Gateway<br/>祖先の鎖に root_page_id を含む購読を判定し直し、<br/>読めなくなった接続に page.revoked を送る<br/>（collaboration.md の 7.2 節）"]
+  SR["検索<br/>search-acl のキューで access_keys を更新する<br/>（search.md の 5.3 節）"]
+  NT["通知・Webhook<br/>送る直前に判定し直すので、ここでは何もしない"]
+  TX --> EV
+  EV --> GW
+  EV --> SR
+  EV --> NT
 ```
 
 - メンバー・グループ・チームスペースの変更のように、特定のページに結び付かない変更は、`root_page_id` を持たない `acl.changed` として流し、Gateway はそのワークスペースの全購読を判定し直す。

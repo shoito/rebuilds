@@ -152,6 +152,23 @@ flowchart TB
 - 1 つのカレンダーの書き込みは、`change_seq` を振る行のロックで直列になる。会議室と大きな共有のカレンダーで、1 カレンダー 1 秒 50 件を上限と見込み、E2 の PoC で確かめる（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）。
 - 段階を上げる基準は [ADR-0045](../decisions/0045-stage-up-criteria-tenant-sharding-and-cells.md)、負荷のモデルは [capacity.md](capacity.md) にある。
 
+### 2.1 費用のモデル
+
+月間の利用者 1 人・1 か月の原価を、次の和で見る。S1 の本番の月額の概算（[infrastructure.md](infrastructure.md) の 12 節、約 57,000 USD、±50%）を、月間の利用者 60 万で割ると、1 人・1 か月 約 0.1 USD になる。単価の一部は**未検証**で、E12 の `cost-baseline` で請求の実績に置き換える。
+
+```
+利用者 1 人・1 か月の原価 = Aurora（writer・reader、大阪、ストレージ、Global Database の複製。約 32,000 USD）
+                         ＋ Fargate（API、CalDAV、Realtime、Worker。業務の時間の下限を含む。約 5,400 USD）
+                         ＋ データ転送（CloudFront の API の応答・資産・tzdata、alb-dav の CalDAV。約 4,400 USD）
+                         ＋ 送信のメール（SES。招待・リマインダー・毎朝の一覧。約 3,200 USD）
+                         ＋ 入口とネットワーク（ALB、NAT、Network Firewall。約 4,500 USD）
+                         ＋ Valkey、S3、可観測性、セキュリティのサービス ほか
+```
+
+- 最も大きいのは Aurora で、本番の合計の半分を超える。writer の大きさは、参加者の写しの配送（平均 4 倍）と展開の索引の書き込みで決まる（[capacity.md](capacity.md) の 5.1 節）。E2 の PoC で、1 予定オブジェクトの書き込みの行の数が見込み（約 10 行）より少なければ、writer を下げる。
+- Fargate の費用の約 3 分の 1 は、業務の時間の下限の分になる見込み（[ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md)）。
+- 本番の外に、staging・dev・shared・edge・security・synthetics で約 8,000 USD を見込む。
+
 ## 3. 非機能要件
 
 | ID | 項目 | S1 の目標 | 備考 |

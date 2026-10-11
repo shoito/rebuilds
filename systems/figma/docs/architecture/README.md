@@ -77,6 +77,34 @@ flowchart TB
 - **同じ規則を 1 つのコードで。** 変更の適用・検証・レイアウト・描画は Rust の crate にまとめ、ブラウザ（WASM）とサーバー（ネイティブ）で同じコードを使う。一致は CI で確かめる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md)）。
 - **ファイルの中身とメタデータを分ける。** ファイルの中身（ノードの木）はマルチプレイヤーの経路で扱い、Aurora には置かない。Aurora はメタデータ（組織、権限、コメント、バージョンの一覧）の正本で、RLS で組織を分ける（[ADR-0005](../decisions/0005-tenancy-and-document-routing.md)）。本家も、ファイルの中の同時編集はマルチプレイヤー、ファイルをまたぐデータは LiveGraph と Postgres に分けている（同上の LiveGraph の記事）。
 
+### 1.3 本家の形（確かめたこと）
+
+領域の文書の 2 節で確かめたことの要約。確認日はすべて 2026-09-27。括弧の中の日付は記事の公開日。細部は各領域の文書にある。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 規模 | ジャーナルは 1 日 22 億件を超える変更を受け、95% を約 600ms 以内に保存する | [Making multiplayer more reliable](https://www.figma.com/blog/making-multiplayer-more-reliable/)（2022-10-20。[file-storage-and-history.md](file-storage-and-history.md) の 2 節） |
+| 権威と競合 | ファイルごとのサーバーのプロセスが権威。OT は使わず、CRDT の考え方を借りる。オブジェクトのプロパティごとに、サーバーに最後に届いた値が勝つ | [How Figma's multiplayer technology works](https://www.figma.com/blog/how-figmas-multiplayer-technology-works/)（2019-10-16。[multiplayer.md](multiplayer.md) の 2 節） |
+| 文書の形 | `Map<ObjectID, Map<Property, Value>>` の 2 段の対応。木は親の参照をプロパティで持つ。ID はクライアントごとの ID を含め、サーバーを待たずに作る | 同上（[document-model.md](document-model.md) の 2 節） |
+| 並び | 0 と 1 の間の分数を任意精度の文字列で持つ | [Realtime editing of ordered sequences](https://www.figma.com/blog/realtime-editing-of-ordered-sequences/)（2017-03-06。同上） |
+| 1 ファイルの人数 | 編集と閲覧の合計 500 人、編集 200 人、カーソルの表示 200 人まで | [How many people can be in a file at once?](https://help.figma.com/hc/en-us/articles/1500006775761-How-many-people-can-be-in-a-file-at-once)（[multiplayer.md](multiplayer.md) の 2 節） |
+| ジャーナルと二重の持ち主 | DynamoDB。変更にファイルごとの連番を振り、約 0.5 秒ごとにまとめて書く。書き込みは lock UUID が一致する条件付き。以前のチェックポイントは 30〜60 秒ごとのファイル全体 | [Making multiplayer more reliable](https://www.figma.com/blog/making-multiplayer-more-reliable/)（[file-storage-and-history.md](file-storage-and-history.md) の 2 節） |
+| バージョンの履歴 | 自動のバージョンは 30 分ごと。Starter と下書きは 30 日、有料のプランはすべて。復元しても履歴を消さない | [View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)（同上） |
+| 描画 | WebGL の上の自前のタイルの描画エンジン。C++ を WASM にして読み込みが 3 倍速くなった。WebGPU で始め、互換性のテストに失敗したら WebGL に戻る | [Building a professional design tool on the web](https://www.figma.com/blog/building-a-professional-design-tool-on-the-web/)（2015-12-07）、[Figma is powered by WebAssembly](https://www.figma.com/blog/webassembly-cut-figmas-load-time-by-3x/)（2017-06-08）、[Figma rendering: Powered by WebGPU](https://www.figma.com/blog/figma-rendering-powered-by-webgpu/)（[rendering-engine.md](rendering-engine.md) の 2 節） |
+| メモリ | タブあたり 2 GB を上限にする。ページとレイヤーを必要なときに読む | [Reduce memory usage in files](https://help.figma.com/hc/en-us/articles/360040528173-Reduce-memory-usage-in-files)（同上） |
+| 権限 | 組織 → ワークスペース → チーム → フォルダー → ファイル。水準は所有者・編集・閲覧。判定は allow / deny（deny が勝つ）のポリシーの DSL | [Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、[How we rolled out our own permissions DSL at Figma](https://www.figma.com/blog/how-we-rolled-out-our-own-permissions-dsl-at-figma/)（[permissions-and-sharing.md](permissions-and-sharing.md) の 2 節） |
+| ファイルの外のデータ | コメントや利用者は、Postgres の上の LiveGraph で配る | [LiveGraph](https://www.figma.com/blog/livegraph-real-time-data-fetching-at-figma/)（2021-10-14。[multiplayer.md](multiplayer.md) の 2 節） |
+| プラグイン | QuickJS を WASM にしたサンドボックスでメインスレッドに動く。UI とブラウザの API は iframe で使う | [An update on plugin security](https://www.figma.com/blog/an-update-on-plugin-security/)（2019-10-02。[plugins.md](plugins.md) の 2 節） |
+
+本家の送受信の形式、在席の送り方、ファイルの直列化の形式は公開されていない（**未検証**）。
+
+本家との意図した違い：
+
+- 変更は約 20ms ごとの group commit でジャーナルに書き、書いてから確定を返す（[ADR-0003](../decisions/0003-journal-and-checkpoints.md)）。チェックポイントは変わったページだけを書く（[ADR-0025](../decisions/0025-content-addressed-checkpoints-and-loading.md)）。
+- 描画とマルチプレイヤーのサーバーは Rust で書き、ブラウザ（WASM）とサーバーで同じ crate を使う（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+- タブのメモリの目標を 1.5 GB にする（4 節の NFR-004）。
+- 既存のデザインツールのファイル（本家の形式を含む）は読み込まない。スライド、Web サイトの公開、AI による生成は範囲の外（intent の「やらないこと」）。
+
 ## 2. 主要フロー
 
 ### 2.1 編集の確定
@@ -192,6 +220,24 @@ sequenceDiagram
 
 - 本家の規模の目安：ジャーナルは 1 日に 22 億件を超える変更を受ける（[Making multiplayer more reliable](https://www.figma.com/blog/making-multiplayer-more-reliable/)、2022-10-20、2026-09-27 に確認）。段階 S3 の値は、これより 1 桁大きく見積もって余裕を持たせた。
 - 数値の根拠と部品ごとの必要量は [capacity.md](capacity.md)、台数と段階を上げる目安は [infrastructure.md](infrastructure.md) の 8・9 節にある。どれも E12 の負荷試験の前の初期見積もり。
+
+### 3.1 費用のモデル
+
+月間の利用者 1 人と、確定する変更 100 万件の原価を、次の和で見る。部品は 1.2 節のコンテナによる。
+
+```
+利用者の月の原価 = Document Server（ファイルをメモリに持つ時間。Fargate）
+                 ＋ Gateway・Router・API・Realtime（Fargate）
+                 ＋ CloudFront・S3（チャンク、WASM、画像、フォントの配信と保存）
+                 ＋ Aurora・Valkey（メタデータ）
+                 ＋ Render Worker（書き出し・サムネイル）
+確定する変更 100 万件の原価 = DynamoDB のジャーナル（書き込み、大阪への複製、TTL の削除の複製）
+                            ＋ チェックポイントの S3 への書き込み
+```
+
+- S1 の本番の月額は約 48,000 USD（±50%）と見積もった（[infrastructure.md](infrastructure.md) の 11 節）。月間の利用者 10 万人で割ると、1 人あたり約 0.48 USD になる。
+- 大きく効くのは DynamoDB のジャーナル（約 13,500 USD。[capacity.md](capacity.md) の 4.3 節）と CloudFront（約 4,000 USD。同 6 節）で、Document Server の計算（約 7,700 USD）が続く。ジャーナルは同じ鍵のまとめの効き目、CloudFront は端末のキャッシュの当たりの率で決まる。
+- Fargate・DynamoDB・CloudFront の単価は AWS の東京の公開の価格で確かめた。他の単価は**未検証**で、E12 の負荷試験と試用の期間の実測で置き換える（[infrastructure.md](infrastructure.md) の 11 節）。
 
 ## 4. 非機能要件
 

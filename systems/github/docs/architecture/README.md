@@ -2,27 +2,38 @@
 
 全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/github/docs/primer/index.html#glossary)の用語集にある。
 
-| ファイル | 領域 |
-| --- | --- |
-| [git-storage.md](git-storage.md) | リポジトリの保存、3 つの複製、ルーティング、fork のネットワーク、保守（repack） |
-| [git-protocols.md](git-protocols.md) | HTTPS・SSH、プロトコル v2、push の受け付けと ref の更新、LFS、大きなリポジトリ |
-| [pull-requests.md](pull-requests.md) | 差分、マージの計算、レビュー、ブランチの保護（ruleset）、merge queue |
-| [web.md](web.md) | Web の画面、描画の方式、コードの閲覧、信頼できない内容（Markdown・SVG・ノートブック）の安全な描画、多言語化 |
-| [issues.md](issues.md) | Issue、ラベル、マイルストーン、参照（相互リンク） |
-| [notifications.md](notifications.md) | 通知の購読、配信、メール |
-| [search.md](search.md) | コード検索と、リポジトリ・Issue・Pull Request の検索 |
-| [identity-and-permissions.md](identity-and-permissions.md) | ユーザー、Organization、チーム、ロール、SSH の鍵、トークン、SSO |
-| [api-and-webhooks.md](api-and-webhooks.md) | REST・GraphQL、Webhook、OAuth のアプリと App（本家の GitHub App に相当）、レート制限 |
-| [actions.md](actions.md) | CI：ワークフロー、ジョブのスケジューリング、実行環境の隔離、シークレット、ログ、成果物、キャッシュ |
-| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル |
-| [data-model.md](data-model.md) | データモデルの正本：置き場所、テーブルの規則、ER 図、全テーブルの定義（[data-model/](data-model/identity.md) に領域ごと）、Git・Valkey・S3・索引・Event の形、横断の不変条件 |
-| [infrastructure.md](infrastructure.md) | AWS の構成、ストレージのノード、冗長化、災害復旧 |
-| [observability.md](observability.md) | ログ、メトリクス、トレース、SLO |
-| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
-| [delivery.md](delivery.md) | CI/CD、リリース、フィーチャーフラグ |
-| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） |
+領域ごとの文書の一覧は 7 節にある。
 
 ## 1. 全体構成
+
+### 1.1 コンテキスト
+
+次の図は、本システムを使う人と、本システムがやり取りする外部のシステムを示す。中身の部品は 1.2 節にある。
+
+```mermaid
+flowchart LR
+  Dev["開発者<br/>Git のクライアント、Web、CLI"]
+  Admin["Organization の管理者"]
+  Tools["外部の CI・ツール<br/>Webhook と API の利用者"]
+  Agent["AI エージェント<br/>API とトークン"]
+  Sys["本システム<br/>Git のホスティング、PR、Issue、通知、<br/>検索、API・Webhook、Actions"]
+  Mail["メール（SES）<br/>通知の送信と返信の受信"]
+  Cloud["外部のクラウド<br/>Actions の OIDC の ID トークンを検証"]
+  IdP["SAML の IdP<br/>SSO（E10）"]
+  Dev -- "HTTPS・SSH（Git）、HTTPS（Web・API）" --> Sys
+  Admin -- "Web・API" --> Sys
+  Tools -- "REST・GraphQL" --> Sys
+  Sys -- "Webhook" --> Tools
+  Agent -- "REST・GraphQL、Git" --> Sys
+  Sys --> Mail
+  Mail -- "返信" --> Sys
+  Sys -- "ID トークン" --> Cloud
+  Sys -- "SSO" --> IdP
+```
+
+使う人は [intent.md](../intent.md) の「Affected users and systems」による。メールは [notifications.md](notifications.md)、OIDC は [actions.md](actions.md) の 7 節、SSO は [identity-and-permissions.md](identity-and-permissions.md) の 8 節にある。
+
+### 1.2 コンテナ
 
 次の図は、Git の経路と Web・API の経路、非同期の処理のつながりを示す。
 
@@ -61,11 +72,41 @@ flowchart LR
 - **権限はリポジトリの単位で、1 つの判定関数で決める。** 公開リポジトリをまたいだ読み取りが本質なので、テナントの RLS ではなく、リポジトリへの権限の判定に集約する（[ADR-0002](../decisions/0002-repository-permission-model.md)）。
 - **信頼できない入力を実行・描画する部分を隔離する。** CI のジョブ、Markdown・SVG の描画、Webhook の外向きの送信は、それぞれ隔離された環境で行う。
 
-### 主要な流れ
+### 1.3 主要な流れ
 
 - **merge queue**：キューの各 PR について、base の最新と前の PR を合わせた一時的なブランチでチェックを走らせ、失敗した PR を外して後ろを作り直す（[pull-requests.md](pull-requests.md) の 8 節）
 - **複製の修復と再配置**：`network_replicas.state` が、修復・定期の照合・再配置・ref の更新の合意でどう移るかを示す（[git-storage.md](git-storage.md) の 6 節）
 - **Actions の実行とジョブ**：実行（workflow run）とジョブの状態の移り方を示す（[actions.md](actions.md) の 4 節）
+- **push の受け付けと ref の更新の合意**：パックを 3 つの複製の検疫へ流し、検査の後に 3 相の手順で ref を更新し、2 つ以上の複製と DB が確定してから成功を返す（[git-protocols.md](git-protocols.md) の 5.1 節、[git-storage.md](git-storage.md) の 5.2 節）
+- **PR のマージ**：DB の写しで事前に判定し、ストレージの RPC で現在の SHA で再評価してから、base の ref を比較交換で更新する（[pull-requests.md](pull-requests.md) の 6.2 節）
+
+### 1.4 本家の形（確かめたこと）
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 規模 | 開発者 1 億 8,000 万超、リポジトリ 6 億 3,000 万（2025 年の新規 1 億 2,100 万）。2025 年に公開リポジトリでマージされた PR 5 億 1,870 万、push されたコミット約 10 億 | [Octoverse 2025](https://github.blog/news-insights/octoverse/octoverse-a-new-developer-joins-github-every-second-as-ai-leads-typescript-to-1/)（2026-10-11） |
+| リポジトリの保存 | Spokes（旧 DGit）。3 つの複製を別のラックに置き、厳密な過半数で書き込みを確定する。3 相コミット、`(refname, value)` のハッシュの XOR のチェックサム、同期している最も近い複製から読む | [Introducing DGit](https://github.blog/engineering/architecture-optimization/introducing-dgit/)、[Building resilience in Spokes](https://github.blog/engineering/infrastructure/building-resilience-in-spokes/)、[Stretching Spokes](https://github.blog/engineering/infrastructure/stretching-spokes/)（[git-storage.md](git-storage.md) の冒頭） |
+| ファイルと push の上限 | 50 MiB で警告、100 MiB を超えるファイルを拒否、push は 2 GB、ブラウザからの追加は 25 MiB。推奨はリポジトリ（`.git`）10 GB 以下、ブランチ 5,000 以下 | [About large files on GitHub](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github)、[Repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits)（2026-10-11） |
+| 差分の上限 | PR 全体で 20,000 行か生の差分 1 MB、1 ファイルで 20,000 行か 500 KB、1 つの差分に 300 ファイル | [Repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits#diff-limits)（2026-10-11。[pull-requests.md](pull-requests.md) の 3.4 節） |
+| マージの計算 | libgit2 の独自の実装から `merge-ort` に移り、平均 71 ms から 7.74 ms に。rebase は `git replay` | [Scaling merge-ort across GitHub](https://github.blog/engineering/infrastructure/scaling-merge-ort-across-github/)（[pull-requests.md](pull-requests.md) の 3.1 節） |
+| ruleset | 1 つのブランチに複数が重なり、優先順位はなく、最も厳しい規則が効く。上限はリポジトリあたり 75、Organization あたり 75 | [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)（[pull-requests.md](pull-requests.md) の 5.2 節） |
+| fork のネットワーク | ネットワークのどのリポジトリに push したコミットも、上流を含む他のリポジトリから到達できうる | [About permissions and visibility of forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-permissions-and-visibility-of-forks)（2026-09-26。[git-storage.md](git-storage.md) の 7.2 節） |
+| REST のレート制限 | 認証なし 60 回/時（IP ごと）、ユーザー 5,000 回/時、App のインストール 5,000〜12,500 回/時（Enterprise Cloud は 15,000）、Actions のトークン 1,000 回/時・リポジトリ。同時 100 件、REST は 900 点/分 | [Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)（2026-10-11） |
+| App と Webhook | インストールのトークンは 1 時間、ユーザーのトークンは 8 時間、リフレッシュトークンは 6 か月。Webhook は事象の種類ごとに 20 まで、ペイロードは 25 MB まで、HMAC-SHA256 で署名 | [Generating an installation access token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)、[Refreshing user access tokens](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/refreshing-user-access-tokens)、[Troubleshooting webhooks](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/troubleshooting-webhooks)（2026-09-26。[api-and-webhooks.md](api-and-webhooks.md) の 7・9 節） |
+| Actions のランナー | ホストされた標準のランナーは、公開リポジトリで 4 CPU・16 GB・SSD 14 GB、非公開で 2 CPU・8 GB・SSD 14 GB。分はジョブごとに切り上げて数える | [GitHub-hosted runners reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)、[Actions runner pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing)（2026-09-26。[actions.md](actions.md) の 8・14 節） |
+| コード検索 | Rust の専用のエンジン Blackbird。公表の時点で 4,500 万リポジトリ・115 TB のコード。権限はクエリの後で絞る。索引はデフォルトブランチだけ、350 KiB を超えるファイルを除く | [The technology behind GitHub's new code search](https://github.blog/engineering/architecture-optimization/the-technology-behind-githubs-new-code-search/)、[About GitHub code search](https://docs.github.com/en/search-github/github-code-search/about-github-code-search)（[search.md](search.md) の 2・3.1 節） |
+| バックアップの方式、マージ可能かの計算の上限、ジョブのログの上限 | 公式の資料で確かめられなかった | **未検証**（[git-storage.md](git-storage.md) の 9 節、[pull-requests.md](pull-requests.md) の 3.3 節、[actions.md](actions.md) の 10 節） |
+
+日付を付けた行はその日に確認した。日付のない行は、各領域の文書が設計の工程で確かめたもの。この設計は振る舞いを参考にするが、本家のコード・本家が公開した部品を核に使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)、[ADR-0036](../decisions/0036-own-runner-agent-and-no-original-components.md)）。
+
+**本家との意図した違い**：
+
+- **非公開の fork のネットワークでは、到達できない SHA を返さない。** 本家は到達できうるとする。ストレージの層で到達可能性を検査する（[git-storage.md](git-storage.md) の 7.2 節、2026-09-28 の決定）。
+- **検索の権限は、シャードへの問い合わせの前に絞る**（[ADR-0015](../decisions/0015-search-permission-filtering.md)、[search.md](search.md) の 2 節）。
+- **App のユーザーのトークンの期限を外せない**。Webhook のペイロードは、Webhook ごとに REST のバージョンを固定する。`POST` に冪等性のキーを持つ（[api-and-webhooks.md](api-and-webhooks.md) の 3.3・7・9 節）。
+- **標準のランナーは、公開リポジトリも 2 vCPU・8 GiB にする**（容量の計画を単純にするため。[actions.md](actions.md) の 18 節）。
+- **squash では、PR の中のコミットの署名を問わない**（base に入る 1 つのコミットだけを署名する。[pull-requests.md](pull-requests.md) の 5.5 節）。
+- **ヘッダー・トークンの接頭辞・ドメイン・パスに本家の名前を使わない**（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 ## 2. 規模の段階
 
@@ -74,6 +115,26 @@ flowchart LR
 | S1（MVP） | 100 万 | 10 万 | 2,000 件/秒 | 1 リージョン（東京）・3 AZ。ストレージのノードは数十台 |
 | S2 | 1,000 万 | 100 万 | 20,000 件/秒 | ストレージのノードを数百台に。コード検索の索引を独立したクラスタに |
 | S3 | 1 億 | 1,000 万 | 200,000 件/秒 | 複数のリージョン。リポジトリをリージョンに割り当て、読み取りの複製を他のリージョンに置く |
+
+### 2.1 費用のモデル
+
+リポジトリの月と、Actions のジョブの分の原価を、次の和で見る。単価は [infrastructure.md](infrastructure.md) の 9 節の、AWS の東京のオンデマンドの価格（2026-09-26 に確認）による。
+
+```
+リポジトリの月あたりの原価 = Git ストレージ（i8g.4xlarge のローカル NVMe、3 つの複製）
+                         ＋ 外向きの転送（clone・fetch。CloudFront、NLB）
+                         ＋ バックアップ（大阪の S3 への差分のバンドル）、LFS（S3）
+                         ＋ メタデータ（Aurora）と検索の索引（Zoekt、OpenSearch）
+                         ＋ Web・API・Worker（ECS）、通知（SES）、Webhook の配信
+ジョブの分あたりの原価 = 実行環境（m7i.metal-48xl ÷ 1 ホストあたり約 40 の microVM）
+                     ＋ 待機のホスト（20%）と待機中の microVM
+                     ＋ ログ・成果物・キャッシュ（S3）
+                     ＋ Actions の中からの clone（PrivateLink）
+```
+
+- S1 の本番の月額は約 300,000 USD（±50%）。最も大きいのは Actions の実行環境（約 180,000、約 6 割）で、次が Git ストレージ（約 50,000）と外向きの転送（約 25,000）である（[infrastructure.md](infrastructure.md) の 9 節）。
+- 目安として、Git ストレージは 50,000 USD ÷ 100 万リポジトリで、1 リポジトリの月あたり約 0.05 USD。実行環境は 12.4992 USD/時 ÷ 約 40 VM で、VM 1 時間あたり約 0.31 USD（待機を除く）。1 ホストあたりの VM の数は E8 の `firecracker-host-poc` で測って直す（[capacity.md](capacity.md) の 2.9 節）。
+- 外向きの転送は、外部の CI からの大量の clone で大きく変わる。bundle-uri と CDN、リポジトリごと・IP ごとの clone の制限で抑える（[ADR-0008](../decisions/0008-pack-caching-and-bundle-cdn.md)）。
 
 ## 3. 非機能要件
 
@@ -186,3 +247,27 @@ flowchart LR
 | S3 の複数リージョン（ADR-0034 は proposed） | E11。S2 の間に staging で試す |
 
 決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
+
+## 7. 領域の文書
+
+各文書の頭の表・前提にある ADR を「ADR」の列に示す（他の題材の ADR は除く）。
+
+| ファイル | 範囲 | ADR |
+| --- | --- | --- |
+| [git-storage.md](git-storage.md) | リポジトリの保存、3 つの複製、ルーティング、fork のネットワーク、保守（repack） | 0001、0003、0004、0005、0006、0007 |
+| [git-protocols.md](git-protocols.md) | HTTPS・SSH、プロトコル v2、push の受け付けと ref の更新、LFS、大きなリポジトリ | 0002、0003、0004、0005、0006、0008、0009 |
+| [pull-requests.md](pull-requests.md) | 差分、マージの計算、レビュー、ブランチの保護（ruleset）、merge queue | 0002、0003、0005、0006、0010、0011、0012 |
+| [web.md](web.md) | Web の画面、描画の方式、コードの閲覧、信頼できない内容（Markdown・SVG・ノートブック）の安全な描画、多言語化 | 0001、0002、0010、0013、0035 |
+| [issues.md](issues.md) | Issue、ラベル、マイルストーン、参照（相互リンク） | 0017 |
+| [notifications.md](notifications.md) | 通知の購読、配信、メール | 0016 |
+| [search.md](search.md) | コード検索と、リポジトリ・Issue・Pull Request の検索 | 0002、0014、0015 |
+| [identity-and-permissions.md](identity-and-permissions.md) | ユーザー、Organization、チーム、ロール、SSH の鍵、トークン、SSO | 0002、0018、0019、0020 |
+| [api-and-webhooks.md](api-and-webhooks.md) | REST・GraphQL、Webhook、OAuth のアプリと App（本家の GitHub App に相当）、レート制限 | 0019、0020、0021、0022 |
+| [actions.md](actions.md) | CI：ワークフロー、ジョブのスケジューリング、実行環境の隔離、シークレット、ログ、成果物、キャッシュ | 0001、0002、0005、0023、0024、0025、0026、0027、0036 |
+| [security.md](security.md) | 脅威モデル、暗号化、監査ログ、濫用対策、データのライフサイクル | 0002、0003、0004、0005、0028、0029、0030、0037、0038 |
+| [data-model.md](data-model.md) | データモデルの正本：置き場所、テーブルの規則、ER 図、全テーブルの定義（[data-model/](data-model/identity.md) に領域ごと）、Git・Valkey・S3・索引・Event の形、横断の不変条件 | 0002、0005 |
+| [infrastructure.md](infrastructure.md) | AWS の構成、ストレージのノード、冗長化、災害復旧 | 0003、0004、0031、0032、0033、0034 |
+| [observability.md](observability.md) | ログ、メトリクス、トレース、SLO | — |
+| [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター | — |
+| [delivery.md](delivery.md) | CI/CD、リリース、フィーチャーフラグ | 0033 |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） | — |

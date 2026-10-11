@@ -125,6 +125,26 @@
   6. 確定する。確定の後に、Relay が Valkey の今のバージョンの値と Pub/Sub を更新する。
 - 時間のかかる処理（型の変換、索引の作り直し、共有の再計算、項目の値の消去）は、確定の後に Worker で行う（ADR-0003）。確定の間の書き込みの止まりを p99 1 秒以内にする（NFR-004）。
 
+次の図は、上の手順 1〜6 と、確定の後の処理を、登場する部品ごとに示す。手順は上の箇条書きを正とする。
+
+```mermaid
+sequenceDiagram
+  participant M as Metadata
+  participant DB as Aurora（主）
+  participant R as Relay
+  participant V as Valkey
+  participant W as Worker
+  M->>DB: 1 組織のメタデータの鍵の排他のロック（pg_advisory_xact_lock）
+  M->>M: 2 変更を検証する（名前の重複、上限、依存、数式の型）
+  M->>DB: 3 メタデータの表、md_changes の差分、md_versions の 1 行
+  M->>DB: 4 orgs.metadata_version を 1 つ上げる
+  M->>DB: 5 outbox に metadata.version_changed
+  M->>DB: 6 確定
+  DB-->>R: outbox
+  R->>V: 今のバージョンの値と Pub/Sub を更新
+  Note over W: 確定の後：型の変換、索引の作り直し、共有の再計算、項目の値の消去
+```
+
 ### 4.2 部品に分けたスナップショット
 
 ADR-0003 は「バージョンごとに 1 つのスナップショット」とし、大きな組織では差分のコンパイルが要るかもしれないとした。ここでは、次のように部品に分ける。

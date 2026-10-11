@@ -17,21 +17,28 @@
 
 ## 2. 全体の流れ
 
-```
-PaymentIntent の confirm（Payments）
-  │
-  ├─ 段 1：3DS の判断（request_3ds のルール、発行会社の要求、日本発行のカードの CIT）
-  │     └─ 必要なら 3DS（Connector Gateway 経由で 3DS Server へ）→ 結果を属性に入れる
-  │
-  ├─ 段 2：オーソリの前の判定（allow → block → review の順）
-  │     ├─ block  → 決済を失敗にする（コネクタへ送らない）。outcome.type = blocked
-  │     └─ それ以外 → オーソリへ
-  │
-  ├─ オーソリ（コネクタ）
-  │
-  └─ 段 3：オーソリの後の判定（発行会社の CVC・住所の照合の結果を使うルールだけ）
-        ├─ block  → オーソリを取り消す（void）。outcome.type = blocked
-        └─ review → オーソリ・キャプチャは通常どおり進め、レビューを開く
+次の図は、PaymentIntent の confirm の中で、3 つの段とオーソリが進む順序を示す。
+
+```mermaid
+flowchart TB
+  start["PaymentIntent の confirm（Payments）"]
+  s1{"段 1：3DS の判断<br/>request_3ds のルール、発行会社の要求、<br/>日本発行のカードの CIT"}
+  tds["3DS（Connector Gateway 経由で 3DS Server へ）<br/>結果を属性に入れる"]
+  s2{"段 2：オーソリの前の判定<br/>allow → block → review の順"}
+  blk2["決済を失敗にする（コネクタへ送らない）<br/>outcome.type = blocked"]
+  auth["オーソリ（コネクタ）"]
+  s3{"段 3：オーソリの後の判定<br/>発行会社の CVC・住所の照合の結果を使うルールだけ"}
+  blk3["オーソリを取り消す（void）<br/>outcome.type = blocked"]
+  rev["オーソリ・キャプチャは通常どおり進め、<br/>レビューを開く"]
+  start --> s1
+  s1 -- "必要" --> tds
+  tds --> s2
+  s1 -- "不要" --> s2
+  s2 -- "block" --> blk2
+  s2 -- "それ以外" --> auth
+  auth --> s3
+  s3 -- "block" --> blk3
+  s3 -- "review" --> rev
 ```
 
 - [payments.md](payments.md) の 4 節の手順との対応：段 1 は手順 3（不正検知）、段 2 は手順 6（3D セキュア）の後で手順 7（オーソリ）の前、段 3 は手順 8（結果の反映）の前。段 2 でブロックした試行はコネクタへ送らず、`decline_code = fraudulent`（顧客には `generic_decline`）で失敗にする。

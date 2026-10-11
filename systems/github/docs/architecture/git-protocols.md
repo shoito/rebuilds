@@ -66,16 +66,23 @@ clone（人気のリポジトリ）──▶ bundle-uri ──▶ CloudFront ─
 
 ### 5.1 流れ
 
-```
-client ─ push ─▶ frontend                         gitd × 3（検疫）                 policy / Aurora
-  │ 1. 認証・認可（write）
-  │ 2. コマンドの一覧（ref, old, new）を読む
-  │ 3. パックを 3 つの複製へ同時に流す ─────────▶ index-pack、fsck、接続性の検査
-  │    （大きさの上限を流しながら数える）          objects は検疫の領域に置く
-  │ 4. 検査（5.2）：1 つの複製の検疫を読む ───────────────────────────────────▶ ルールの評価
-  │ 5. ref の更新の合意（ADR-0006）────────────▶ prepare / commit ──────────────▶ checksum、outbox
-  │ 6. report-status を返す（ref ごとの ok / ng）
-  │    サイドバンドで案内（PR の作成の URL など）
+次の図は、push を受けてから結果を返すまでを示す。番号は下の説明の番号に対応する。
+
+```mermaid
+sequenceDiagram
+    participant Cl as client
+    participant F as frontend
+    participant G as gitd × 3（検疫）
+    participant P as policy・Aurora
+    Cl->>F: push
+    Note over F: 1. 認証・認可（write）<br/>2. コマンドの一覧（ref, old, new）を読む
+    F->>G: 3. パックを 3 つの複製へ同時に流す（大きさの上限を流しながら数える）
+    Note over G: index-pack、fsck、接続性の検査<br/>objects は検疫の領域に置く
+    F->>G: 4. 検査（5.2）：1 つの複製の検疫を読む
+    F->>P: 4. ルールの評価
+    F->>G: 5. ref の更新の合意（ADR-0006）：prepare・commit
+    F->>P: 5. checksum、outbox
+    F-->>Cl: 6. report-status（ref ごとの ok・ng）<br/>サイドバンドで案内（PR の作成の URL など）
 ```
 
 - 3 では、パックのバイトを 3 つの複製の `gitd` に同時に流す（本家の DGit も、書き込みを 3 つの複製に同期で流す）。各複製は Git の検疫の環境（[githooks](https://git-scm.com/docs/githooks)、`receive-pack` の quarantine）で objects を受け、`receive.fsckObjects` の相当の検査を行う。2 つ以上の複製で検査が通らなければ、拒否する。

@@ -4,6 +4,36 @@
 
 ## 1. 全体構成
 
+### 1.1 コンテキスト
+
+次の図は、本システムを使う人と、本システムがつながる外部のシステムを示す（[intent.md](../intent.md) の Affected users and systems）。中の部品は 1.2 節にある。
+
+```mermaid
+flowchart LR
+    rider["乗客<br/>依頼、乗車、支払い、評価"]
+    driver["ドライバー<br/>タクシーの乗務員、日本版ライドシェアのドライバー"]
+    operator["タクシー事業者・営業所<br/>車両とドライバーの登録、運行の管理、精算を受ける"]
+    ops["社内の運用<br/>サポート、安全の対応、事業者の審査、経理"]
+    sys["本システム<br/>配車、乗車、運賃、支払い、配信"]
+    psp["PSP（決済代行）"]
+    maps["地図・住所の提供者"]
+    meter["タクシーメーターの製造者<br/>または車載の機器"]
+    notify["通知（APNs・FCM）"]
+    sms["SMS・音声の通話の中継"]
+
+    rider --> sys
+    driver --> sys
+    operator --> sys
+    ops --> sys
+    sys --> psp
+    sys --> maps
+    sys --> meter
+    sys --> notify
+    sys --> sms
+```
+
+### 1.2 コンテナ
+
 乗客とドライバーのアプリから、配車・Trips・お金・配信までのコンテナを示す。
 
 ```mermaid
@@ -65,6 +95,34 @@ flowchart TB
 
 本家の構成との対応（出典の確認は 2026-09-27）：本家は 2014 年の構成で、配車を供給・需要・DISCO（配車の最適化）・地理の索引に分け、Ringpop（一貫ハッシュとゴシップ）でアプリケーションの層を分割していた（[How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)、2015）。その後、乗車などの状態を持つ Fulfillment の基盤を、可用性を優先した構成（last-write-wins）から、Spanner の強い一貫性のトランザクションと階層的なステートマシン（statechart）へ作り直した（[Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)、2021-07）。この設計は、後者の教訓（状態は強い一貫性で、1 つの遷移の仕組みで持つ）を S1 から採る。
 
+### 1.3 本家の形（確かめたこと）
+
+領域の文書の 2 節と、上の「本家の構成との対応」で確かめたことの要約。確認日はすべて 2026-09-27。括弧の中の日付は記事の公開日。細部は各領域の文書にある。
+
+| 項目 | 本家 | 出典 |
+| --- | --- | --- |
+| 位置の送信 | ドライバーは 4 秒ごとに位置を送る。受け取った位置はセルの ID で分けて供給のサービスに渡す | [How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)（2015。[location-ingestion.md](location-ingestion.md) の 2 節） |
+| 都市での GPS の誤差 | 建物に遮られる都市では 50 m 以上になる | [Rethinking GPS](https://www.uber.com/en-CA/blog/rethinking-gps/)（2018-04-19。同上） |
+| 配車のバッチ | 依頼の後の数秒待って、近くの依頼とドライバーをまとめ、全員の平均の待ちが短くなるように組む。バッチの長さ・コストの式・解き方は**未検証**（確かめた資料に書かれていない） | [Uber Marketplace: Matching](https://www.uber.com/us/en/marketplace/matching/)（[dispatch-and-matching.md](dispatch-and-matching.md) の 2 節） |
+| 配車の目的 | DISCO は余分な走行と待ちを減らし、全体の ETA を最も低くすることを目指した。将来の見込みを使った計画もした | [How Uber Scales Their Real-time Market Platform](http://highscalability.com/blog/2015/9/14/how-uber-scales-their-real-time-market-platform.html)（同上） |
+| 供給の索引と地理の単位 | 「Geo by Supply」は毎秒 100 万件の書き込みに耐えるよう作った。2015 年は S2 のセル（レベル 12）で分け、その後 H3 を作って公開した | 同上、[H3](https://www.uber.com/blog/h3/)（[geospatial-index.md](geospatial-index.md) の 2 節） |
+| 分割の仕組み | Ringpop（一貫ハッシュとゴシップ）でアプリケーションの層を分けた。後に、クラスタの大きさによる拡張の制約があったと書いている | 同上、[Uber's Fulfillment Platform](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)（同上） |
+| 乗車の状態 | last-write-wins の可用性優先の構成で分断のときに状態が壊れたため、Spanner の強い一貫性のトランザクションと階層的なステートマシンへ作り直した | [Uber's Fulfillment Platform: Ground-up Re-architecture](https://www.uber.com/us/en/blog/fulfillment-platform-rearchitecture/)（2021-07。[trips-lifecycle.md](trips-lifecycle.md) の 2 節） |
+| ETA | 経路のエンジンの ETA に、実績との差（残差）を DeepETA で予測して足す。経路のエンジンは毎秒数十万件の要求を 1 桁ミリ秒で返す | [DeepETA](https://www.uber.com/us/en/blog/deepeta-how-uber-predicts-arrival-times/)、[ETA Phone Home: How Uber Engineers an Efficient Route](https://www.uber.com/us/en/blog/engineering-routing-engine/)（[eta-and-routing.md](eta-and-routing.md) の 2 節） |
+| リアルタイムの配信 | RAMEN は優先度と数秒〜30 分の TTL を持ち、少なくとも 1 回届ける。SSE から gRPC の双方向ストリームに替え、受信の確認をすぐ返すようにした | [Uber's Real-Time Push Platform](https://www.uber.com/gb/en/blog/real-time-push-platform/)、[Uber's Next Gen Push Platform on gRPC](https://www.uber.com/us/en/blog/ubers-next-gen-push-platform-on-grpc/)（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の 2 節） |
+| ML の展開 | 400 の用途、ピークで毎秒 1,500 万の予測。影の実行で新しいモデルを確かめ、段階的に広げる | [Raising the Bar on ML Model Deployment Safety](https://www.uber.com/us/en/blog/raising-the-bar-on-ml-model-deployment-safety/)（[ml-platform.md](ml-platform.md) の 2 節） |
+| 取り消しの料金 | 日本のヘルプは、マッチングの前の取り消しは無料、後はキャンセル料がかかることがあると説明する | [Uber の配車をキャンセルする](https://help.uber.com/en/riders/article/uber-%E3%81%AE%E9%85%8D%E8%BB%8A%E3%82%92%E3%82%AD%E3%83%A3%E3%83%B3%E3%82%BB%E3%83%AB%E3%81%99%E3%82%8B?nodeId=56270015-1d1d-4c08-a460-3b94a090de23)（[trips-lifecycle.md](trips-lifecycle.md) の 2 節） |
+
+本家の位置の送信のプロトコルと、偽装の検出の方法も、確かめた資料には書かれていない（**未検証**。[location-ingestion.md](location-ingestion.md) の 2 節）。
+
+本家との意図した違い：
+
+- 地理の格子は自前の六角形の格子 `geogrid` にし、H3 は使わない（[ADR-0002](../decisions/0002-hex-grid-geospatial-model.md)、リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+- 索引の分割はゴシップを使わず、リースで持ち主を決める（[ADR-0011](../decisions/0011-geo-index-sharding-lease-and-rebuild.md)）。
+- 乗車の状態は S1 から強い一貫性の DB と 1 つの遷移関数で持つ（[ADR-0003](../decisions/0003-trip-state-and-single-assignment.md)、[ADR-0021](../decisions/0021-trip-transition-function-and-assignment-fencing.md)）。
+- 配車のバッチは 2 秒で、S1 は空車だけを対象にする（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)）。
+- 運送の主体はタクシー事業者で、事業者を通さない個人ドライバーのライドシェアは作らない（intent の Non-goals）。アプリ内のターンバイターンのナビは持たず、外部のナビのアプリに引き継ぐ（[ADR-0005](../decisions/0005-maps-and-routing.md)）。
+
 ## 2. 規模の段階
 
 規模の数値は設計の仮定で、提携先の車両の数から見直す（[intent.md](../intent.md) の Open questions）。
@@ -78,6 +136,22 @@ flowchart TB
 - 位置の受信は、オンラインの車両 × 4 秒に 1 回で見積もる。本家もドライバーが 4 秒ごとに位置を送ると説明している（上の High Scalability の記事）。
 - **「配車の依頼の受け付け」は、ピークに受け付ける依頼の数で、成立しない依頼（取り消し、`no_driver_found`、選び直し）を含む。** 1 万台で 1 乗車（迎車 7 分＋乗車 20 分）に約 27 分かかるので、成立する乗車は約 3〜6 件/秒である。容量・Trips・PSP の見積もりは、量ごとにどちらを使うかを分けている（[capacity.md](capacity.md) の 1.1 節）。この定義は 2026-09-28 に確定した（7 節）。
 - S2 の 12 地域は、日本版ライドシェアで国土交通省がアプリのデータから不足の車両数を出した大都市部の地域に合わせた（[関東運輸局の資料](https://wwwtb.mlit.go.jp/kanto/content/000334295.pdf)、2026-09-27 に確認）。
+
+### 2.1 費用のモデル
+
+成立した乗車 1 件の原価を、次の和で見る。部品は 1.2 節のコンテナによる。
+
+```
+乗車 1 件の原価 = 位置の取り込みと索引（Kinesis、Fargate。乗車に関わらず車両の数に比例）
+               ＋ 配車と ETA（Fargate の Valhalla。成立しない依頼の分を含む）
+               ＋ Trips・Pricing・Payments（Fargate、Aurora core・money）
+               ＋ リアルタイムの配信（常時の接続を持つ Fargate）
+               ＋ 外部（PSP の手数料、地図・住所・推計走行距離、SMS・通話）
+```
+
+- S1 の本番の月額は約 19,900 USD（±50%）と見積もった（[infrastructure.md](infrastructure.md) の 11 節）。外部の提供者の料金は含めていない。
+- 大きく効くのは、Fargate（Valhalla と常時の接続）と Aurora（2 クラスタ × 大阪）と見込む（同じ節）。位置の取り込みと常時の接続の費用は、乗車の数ではなくオンラインの車両の数で決まる。
+- 外部の提供者の単価と、量（転送、LCU、ログの量）は**未検証**で、提供者の選定と E12 の `cost-dashboard` の実測で置き換える。
 
 ## 3. 非機能要件
 
@@ -176,6 +250,45 @@ flowchart TB
 3. 配車が、区域の 2 秒のバッチの締めで、索引から候補を取り、ETA の行列を求め、候補の条件（E1〜E9）を当て、組を最適化する。
 4. 配車が、組ごとに Trips へ割り当てを提案する。Trips は、ドライバーの `(region_gen, assignment_epoch)` と供給・営業区域・運行枠を確かめ直し、1 つのトランザクションでオファーを作る（`offered`。落ちたら `NOT_ELIGIBLE` などで返す）。
 5. ドライバーのアプリにオファーが届き、表示の後に `OfferDelivered` を返す（5 秒で届かなければ取り下げ）。受諾は offer ID と epoch つきで送られ、Trips が確定する（`accepted`。サーバーの期限は 16.5 秒）。時間切れと辞退は、そのドライバーを除いて次のバッチに戻す。3 分か 10 回で `no_driver_found`。
+
+次の図は、1〜5 の流れを示す。
+
+```mermaid
+sequenceDiagram
+  participant R as "乗客のアプリ"
+  participant P as "Pricing"
+  participant API as "API"
+  participant T as "Trips"
+  participant D as "配車"
+  participant I as "地理空間の索引"
+  participant E as "ETA・経路"
+  participant Dr as "ドライバーのアプリ"
+  R->>P: 乗車地・降車地（乗客が確かめたピン）
+  P-->>R: 運賃の目安（事前確定運賃なら確定の額）
+  R->>API: 依頼
+  Note over API: 都市の受け入れの上限を確かめる（ADR-0041）
+  API->>T: 乗車を作る
+  opt アプリの決済
+    Note over T: payment_pending で与信を待つ
+  end
+  T->>D: requested にして配車のキューに入れる
+  Note over D: 区域の 2 秒のバッチの締め
+  D->>I: 候補を取る
+  D->>E: ETA の行列を求める
+  Note over D: 候補の条件（E1〜E9）を当て、組を最適化する
+  D->>T: 割り当てを提案（組ごと）
+  Note over T: (region_gen, assignment_epoch)、供給・営業区域・運行枠を確かめ直す
+  alt 落ちた
+    T-->>D: NOT_ELIGIBLE など
+  else 通った
+    Note over T: 1 つのトランザクションでオファーを作る（offered）
+    T->>Dr: オファー
+    Dr->>T: OfferDelivered（5 秒で届かなければ取り下げ）
+    Dr->>T: 受諾（offer ID と epoch つき）
+    Note over T: accepted に確定（サーバーの期限は 16.5 秒）
+  end
+  Note over D: 時間切れと辞退は、そのドライバーを除いて次のバッチに戻す。3 分か 10 回で no_driver_found
+```
 
 ### 6.2 乗車から精算まで
 

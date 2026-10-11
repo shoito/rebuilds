@@ -189,14 +189,26 @@ sequenceDiagram
 
 ## 7. 変更の流れと配信
 
-```
-Client ──(WebSocket or POST /transactions)──▶ API
-  API: page_seqs の行を page_id の順にロック → 権限（ADR-0004）→ 操作を当てる → 木の検証
-       → blocks / block_text_states / page_ops（page_id, seq）/ outbox を 1 トランザクションで書く
-                                   │ poll 25ms
-                                   ▼
-                                 Relay ──▶ Valkey  ws:{w}:pg:{page_id} ──▶ Sync Gateway ──▶ 購読中のクライアント
-                                   └────▶ SQS（検索の索引、通知、Webhook）
+次の図は、1 つのトランザクションを受けてから、同じページを購読しているクライアントと非同期の処理へ届くまでを示す。
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant DB as Aurora
+    participant R as Relay
+    participant V as Valkey
+    participant G as Sync Gateway
+    participant O as 購読中のクライアント
+    participant Q as SQS
+    C->>A: トランザクション（WebSocket か POST /transactions）
+    Note over A: page_seqs の行を page_id の順にロック<br/>権限（ADR-0004）→ 操作を当てる → 木の検証
+    A->>DB: blocks・block_text_states・page_ops（page_id, seq）・outbox を 1 トランザクションで書く
+    R->>DB: outbox を poll（25ms）
+    R->>V: ws:{w}:pg:{page_id}
+    V->>G: 配信
+    G->>O: 変更を送る
+    R->>Q: 検索の索引、通知、Webhook
 ```
 
 - ページの `seq` は、`page_seqs (workspace_id, page_id, last_seq)` の行で採番する。この行のロックが、ページごとの書き込みの直列化になる。ブロックの行（大きい JSON）と分け、更新の多い小さな行にする（[capacity.md](capacity.md) の 3.1 節）。
@@ -244,6 +256,19 @@ Client ──(WebSocket or POST /transactions)──▶ API
 3. 1,000 件を超える、または 30 日の保持より古いときは、ページのスナップショットを取り直す。
 4. どちらの場合も、未送信の待ち行列は捨てない。操作が ID で書かれているので、新しい状態にもそのまま当てられる。
 5. 取得の優先順位と同時数の制限は Slack と同じ（表示中のページを先に。同時 3 本）。
+
+次の図は、1〜4 の判定の流れを示す。
+
+```mermaid
+flowchart TD
+  RCV["操作を受け取る"] --> Q1{"seq が last + 1 か"}
+  Q1 -- "はい" --> APPLY["そのまま当てる"]
+  Q1 -- "いいえ（欠損）" --> Q2{"欠けが 1,000 件以下で、<br/>30 日の保持の中か"}
+  Q2 -- "はい" --> OPS["GET /pages/{id}/ops?after_seq=N<br/>で差分を取る"]
+  Q2 -- "いいえ" --> SNAP["ページのスナップショットを取り直す"]
+  OPS --> KEEP["未送信の待ち行列は捨てずに、<br/>新しい状態に当てる"]
+  SNAP --> KEEP
+```
 
 ## 9. 在席とカーソル
 

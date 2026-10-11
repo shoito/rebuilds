@@ -54,15 +54,16 @@
 
 ### 3.1 選び方
 
-```
- 起動
-  │ 登録（<brand>_registry）にこのアカウント×ワークスペースの DB があり、_meta が読め、
-  │ スキーマのバージョンが移行できる？
-  ├─ いいえ ─▶ サーバーのブートストラップ（kind=auto：全体か部分かはサーバーが決める。4.1 節）
-  └─ はい ──▶ 手元から（5 節）
-                │ WebSocket の握手（sync-engine.md の 9.4 節）
-                ├─ resume / catch_up ─▶ 通常
-                └─ reset ─────────────▶ やり直し（8.2 節）：手元のモデルを捨て、outbox を残して、サーバーのブートストラップ
+次の図は、起動のときに、手元から始めるか、サーバーのブートストラップをするかの判定を示す。登録は `<brand>_registry` である。
+
+```mermaid
+flowchart TD
+  S["起動"] --> Q{"登録にこのアカウント×ワークスペースの DB があり、<br/>_meta が読め、スキーマのバージョンが移行できる？"}
+  Q -->|"いいえ"| B["サーバーのブートストラップ<br/>（kind=auto：全体か部分かはサーバーが決める。4.1 節）"]
+  Q -->|"はい"| L["手元から（5 節）"]
+  L --> H{"WebSocket の握手<br/>（sync-engine.md の 9.4 節）"}
+  H -->|"resume・catch_up"| N["通常"]
+  H -->|"reset"| R["やり直し（8.2 節）：手元のモデルを捨て、<br/>outbox を残して、サーバーのブートストラップ"]
 ```
 
 ### 3.2 状態
@@ -267,14 +268,24 @@ CREATE TABLE sync_subscriptions (
 
 ### 7.3 参加
 
-```
- 差分：SyncSubscription insert（sync_id = M、group = team:X）
-  │ クライアント
-  ├─ _meta.groups に team:X を「読み込み中」で足す（IndexedDB のトランザクション）
-  ├─ GET /sync/bootstrap?kind=group&group=team:X&min_sync_id=M（4.2 節と同じ形。instant と partial の条件）
-  │     行は 4.4 節と 6.3 節の規則で書く（墓標と _u）
-  ├─ その間の team:X の差分は、普通に当てる（行の全体なので書ける）
-  └─ end：被覆の鍵を記録し、team:X を「そろった」にする
+次の図は、チームに参加したときに、そのグループのモデルを手元にそろえる順序を示す。
+
+```mermaid
+sequenceDiagram
+  participant GW as Gateway
+  participant C as クライアント
+  participant IDB as IndexedDB
+  participant API as Sync API
+  GW-->>C: 差分：SyncSubscription insert（sync_id = M、group = team:X）
+  C->>IDB: _meta.groups に team:X を「読み込み中」で足す（トランザクション）
+  C->>API: GET /sync/bootstrap?kind=group&group=team:X&min_sync_id=M
+  Note over C,API: 4.2 節と同じ形。instant と partial の条件
+  API-->>C: 行
+  C->>IDB: 行を 4.4 節と 6.3 節の規則で書く（墓標と _u）
+  GW-->>C: その間の team:X の差分
+  C->>IDB: 普通に当てる（行の全体なので書ける）
+  API-->>C: end
+  C->>IDB: 被覆の鍵を記録し、team:X を「そろった」にする
 ```
 
 - 写しは `M` 以後である必要がある（`min_sync_id=M`）。`M` より前の写しだと、参加の前に消えた行が生き返りうる。

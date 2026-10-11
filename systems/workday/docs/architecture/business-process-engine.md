@@ -269,6 +269,19 @@ stateDiagram-v2
 5. 案件を `completed` にし、`bp_events` と outbox（`bp.case_completed`）を書く。
 6. どれかが失敗したら、全体を戻す。
 
+次の図は、上の 1〜6 の判定の流れを示す。手順は上の番号の一覧を正とする。
+
+```mermaid
+flowchart TD
+  L["1 案件の行を FOR UPDATE でロック"] --> V{"2 based_on_version_ids の facet のバージョンが<br/>置き換えられ、案件の項目と重なる？"}
+  V -->|"重なる"| RS["完了しない。起票者に resubmit の action のステップ（STALE_BASIS）"]
+  V -->|"置き換えなし・重ならない"| S{"3 職務分掌を確かめ直す"}
+  S -->|"違反"| RB["6 全体を戻す"]
+  S -->|"通る"| T{"4 packages/temporal で差分を書く"}
+  T -->|"DT-TEMP-001〜004 の拒否"| AC["完了させず、起票者への action のステップ"]
+  T -->|"書けた"| C["5 completed にし、bp_events と outbox（bp.case_completed）を書く"]
+```
+
 - 1 つの案件の完了は 1 つのトランザクションにする。書く主体が多い案件（一括）は親子の案件に分ける（9 節）。
 - 完了のトランザクションにも `transaction_timeout = 5s` が掛かる（[ADR-0008](../decisions/0008-point-in-time-queries-and-activation-timers.md)）。
 

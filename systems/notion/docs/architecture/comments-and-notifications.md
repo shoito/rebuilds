@@ -83,13 +83,21 @@
 
 ## 5. 通知のパイプライン
 
-```
-API ─tx─▶ outbox ─▶ Relay ─▶ SQS notify-events ─▶ 通知の計画（planner）
-                                                   │ 受け手を決め、判定関数で読めるか確かめる
-                                                   ├──▶ inbox_items（DB）─▶ Sync Gateway（本人の購読）
-                                                   ├──▶ SQS notify-push ─▶ デスクトップ・Web Push
-                                                   └──▶ notification_pending_emails（DB）─▶ 1 分ごとにメール（SES）
-リマインダーのスケジューラー ─────────────────────────┘
+次の図は、変更とリマインダーから、受信箱・push・メールへ配るまでを示す。
+
+```mermaid
+flowchart LR
+  API["API"] -- "tx" --> OB["outbox"]
+  OB --> RL["Relay"]
+  RL --> SQ["SQS notify-events"]
+  SQ --> PL["通知の計画（planner）<br/>受け手を決め、判定関数で読めるか確かめる"]
+  RM["リマインダーのスケジューラー"] --> PL
+  PL --> IB["inbox_items（DB）"]
+  IB --> GW["Sync Gateway（本人の購読）"]
+  PL --> NP["SQS notify-push"]
+  NP --> WP["デスクトップ・Web Push"]
+  PL --> PE["notification_pending_emails（DB）"]
+  PE -- "1 分ごと" --> SES["メール（SES）"]
 ```
 
 ### 5.1 受け手の決め方
