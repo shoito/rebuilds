@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-[intent.md](../intent.md) は、ICS の購読（外部の URL を取り込む）と公開（秘密のアドレス）を MVP に含める。[architecture/README.md](../architecture/README.md) の 6 節は、取得を既定 6 時間ごと、`ETag`・`Last-Modified` で条件つき、1 回 10 MiB・予定 5 万件までと決めた。題材の `AGENTS.md` は、ICS の購読の取得を egress の専用の経路に通し、内部のアドレスへの要求（SSRF）を拒むと決めた。
+[intent.md](../intent.md) は、ICS の購読（外部の URL を取り込む）と公開（秘密のアドレス）を MVP に含める。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、取得を既定 6 時間ごと、`ETag`・`Last-Modified` で条件つき、1 回 10 MiB・予定 5 万件までと決めた。題材の `AGENTS.md` は、ICS の購読の取得を egress の専用の経路に通し、内部のアドレスへの要求（SSRF）を拒むと決めた。
 
 残っているのは次である。
 

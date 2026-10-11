@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- 他の掲載先の iCal は、外部との二重の予約を防ぐ唯一の入力であることが多い。取り込みは 15 分ごと、2 年先まで、1 リスティング 5 件まで（[architecture/README.md](../architecture/README.md) の 6 節）。取得から反映まで p95 1 分（NFR-003）。
+- 他の掲載先の iCal は、外部との二重の予約を防ぐ唯一の入力であることが多い。取り込みは 15 分ごと、2 年先まで、1 リスティング 5 件まで（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。取得から反映まで p95 1 分（NFR-003）。
 - 取り込みの予定は `stay_claims` の `ical_block` で、排他の制約に入る（[ADR-0002](0002-availability-representation-and-double-booking.md)）。同じ取り込みの重なる予定どうしも別の組になり、互いに当たる。
 - 相手の障害で、空の・途中で切れた iCal が 200 で返ることがある。そのまま書くと、外部で売れた夜が本システムで空いて見える。
 - 外部の入力は信用しない（大きさ、件数、期間、私的なアドレス）。信用しない宛先への送信は DB に触れない専用のタスクで行う（[ADR-0076](0076-accounts-network-and-egress-with-ssrf-controls.md)）。

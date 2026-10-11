@@ -9,7 +9,7 @@ date: 2026-10-09
 
 テールサンプリングは、トレースの全体を見てから残すかを決める。スパンは `trace_id` でパーティションを選ぶので、1 つのトレースのスパンは 1 つの `trace-assembler` に集まる（[ADR-0002](0002-intake-log-on-msk.md)）。
 
-- トレースの終わりは分からない。最後のスパンの後、どれだけ待つかを決める必要がある。既定の待ちは 30 秒（最大 5 分）と決めている（[architecture/README.md](../architecture/README.md) の 6 節）。
+- トレースの終わりは分からない。最後のスパンの後、どれだけ待つかを決める必要がある。既定の待ちは 30 秒（最大 5 分）と決めている（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。
 - 壁の時計で待つと、読み直しで同じ判断にならない（[ADR-0002](0002-intake-log-on-msk.md) の消費者の決まり）。
 - 待つ間のスパンはメモリーにある。長いトレース・急増で溢れる（[architecture/README.md](../architecture/README.md) の 6 節のリスク）。
 - 決めた後にもスパンは遅れて来る（バッチで送る SDK、Collector の再送）。

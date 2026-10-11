@@ -227,7 +227,7 @@ client ─ push ─▶ frontend                         gitd × 3（検疫）   
 
 - 数値は [Repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits) の本家の目安から始め、[capacity.md](capacity.md) のパラメーターにする。
 - clone の嵐（CI の大量の並列 clone、AI の学習のための収集）は、6.3 のキャッシュ、6.4 の bundle-uri、認証なしの制限で吸収する。
-- **公開リポジトリの大量の clone への帯域とコストの対策**（intent.md の未解決の問い）は、次の 2 つに決めた（2026-09-26、既定案。[README.md](README.md) の 6 節）。
+- **公開リポジトリの大量の clone への帯域とコストの対策**（intent.md の未解決の問い）は、次の 2 つに決めた（2026-09-26、既定案。[design-log.md](design-log.md)）。
   - 人気の公開リポジトリは bundle-uri と CDN で配る（6.4 節）。
   - リポジトリごと・IP ごとの clone のレート制限をかける（値は [capacity.md](capacity.md) の 4 節）。
   - 利用者ごとの帯域の課金は MVP に含めない。E9 の負荷試験と外向きの転送の費用の実績を見て、必要なら課金の Epic で扱う。

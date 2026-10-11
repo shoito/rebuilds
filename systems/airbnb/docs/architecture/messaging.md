@@ -6,7 +6,7 @@
 
 - メッセージ・通知は Aurora content に置き、`messaging` と `notifier` が書く（[ADR-0001](../decisions/0001-platform-and-stack.md)）
 - メッセージのスレッドは予約の 2 者の RLS（ゲスト本人か、リスティングのホストのアカウントの成員）（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)）
-- 予約の前は、電話番号・メールアドレス・URL・外部のサービスの ID・外部の支払いへの誘導を伏せる。確定の後は外部の支払いへの誘導だけを止める。範囲は `legal.message_scan_mode`（法務の L9）（[architecture/README.md](README.md) の 6 節）
+- 予約の前は、電話番号・メールアドレス・URL・外部のサービスの ID・外部の支払いへの誘導を伏せる。確定の後は外部の支払いへの誘導だけを止める。範囲は `legal.message_scan_mode`（法務の L9）（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 送る時の決定的な検査の形は Mercari の題材を参照する（[ADR-0047](../../../mercari/docs/decisions/0047-send-time-abuse-filter-and-scan-modes.md)）。通知の級とレーンも Mercari の題材を参照する（[ADR-0063](../../../mercari/docs/decisions/0063-notification-kinds-lanes-and-payload.md)、[ADR-0064](../../../mercari/docs/decisions/0064-fanout-batching-quiet-hours-and-caps.md)）
 
 この文書で決めたことは次の ADR にある。

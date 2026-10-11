@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- 書き出しは秘密のアドレスで、作り直すと古いアドレスは 404（[architecture/README.md](../architecture/README.md) の 6 節）。本システムの変化から作り直しまで p95 1 分（NFR-003）。
+- 書き出しは秘密のアドレスで、作り直すと古いアドレスは 404（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。本システムの変化から作り直しまで p95 1 分（NFR-003）。
 - 他の掲載先は書き出しを読むだけで、準備の日や締め切りの設定を知らない（[ヘルプの記事 99](https://www.airbnb.com/help/article/99) の「準備の日の設定の違いで効かない」、2026-10-10 に確認）。
 - 書き出しに個人のデータを出さない（[quality.md](../quality.md) の 2.2.1 節 H）。
 - `PRODID` と `UID` に本家の名前を使わない（[リポジトリ共通の ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。

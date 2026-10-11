@@ -7,7 +7,7 @@
 - 価格の提案は助言だけ。MVP は、同じカテゴリ（最も深い階層）・ブランド・状態の、直近 90 日に売れた出品の価格の四分位と件数。件数が 20 に満たなければ状態を外し、次に親のカテゴリへ広げる。値は `ml-inference` の統計の関数が、検索の索引の売れた品から日次で計算し、Valkey に置く。出品の価格・手数料・送料・売上金の計算に使わない（[ADR-0010](../decisions/0010-ml-boundary-for-pricing-and-recommendations.md)）
 - 同期の検査は、カテゴリごとの制限（法務の L10）を見る（[ADR-0009](../decisions/0009-trust-and-safety-pipeline-boundary.md)）
 - 索引はブランドを正規化した ID と表記の揺れの辞書の展開で持ち、カテゴリは木の全祖先の ID で持つ（[ADR-0008](../decisions/0008-search-engine-and-index.md)）
-- 販売の手数料の率は、カテゴリごとにバージョンの付いた表で持つ（[architecture/README.md](README.md) の 6 節の決定。表そのものは `ledger-and-proceeds.md`）
+- 販売の手数料の率は、カテゴリごとにバージョンの付いた表で持つ（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定。表そのものは `ledger-and-proceeds.md`）
 
 この文書で決めたことは次の ADR にある。
 

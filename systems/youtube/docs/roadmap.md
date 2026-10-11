@@ -120,6 +120,7 @@ E1〜E15 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `android-player` | Media3 と自前の ABR |
 | `ios-player` | AVPlayer と HLS、段の上限の制御 |
 | `qoe-telemetry` | 開始の時間・再バッファ・段の切り替えの出来事と集計。外部送信の公表は法務：L6 |
+| `player-accessibility` | プレイヤーのキー操作、読み上げ、字幕の表示の設定、動きの抑え（playback-and-abr の 3.1 節） |
 | `manifest-format-versions` | マニフェストの URL の `mf` と 2 つ前までの生成（ADR-0071） |
 | `player-rollout` | Web のプレイヤーの段の配布と、アプリの `min_supported`（ADR-0070） |
 
@@ -312,6 +313,7 @@ MVP の後に検討する。E16〜E22 に入れなかったもの。着手する
 
 - **レンタル・購入の動画**（法務の L7）。
 - **自動の吹き替え、自動のチャプター**（MVP の ASR の質を確かめてから）。
+- **音声解説のトラック**（受け付け・パッケージ・プレイヤーでの選択。MVP のプレイヤーは複数の音声のトラックを選べる形にしておく。playback-and-abr の 3.1 節）。
 - **Opus の音声と空間の音声**。
 - **VP9 のラダー**（`av1-cost-poc` で、AV1 を復号できず VP9 を復号できる端末が多いと分かったときだけ。[ADR-0003](decisions/0003-codecs-and-per-title-ladder.md)）。
 - **広告の販売と入札**（外部の広告サーバーに任せる）。

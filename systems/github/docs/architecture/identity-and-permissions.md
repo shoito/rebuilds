@@ -400,7 +400,7 @@ App と OAuth アプリのテーブルは [api-and-webhooks.md](api-and-webhooks
 
 ### 決定（2026-09-26、既定案）
 
-PM の方針（本家に寄せる、既定案）で次のとおり決めた。一覧は [README.md](README.md) の 6 節にもある。
+PM の方針（本家に寄せる、既定案）で次のとおり決めた。一覧は [design-log.md](design-log.md) にもある。
 
 - **名前の変更の後の転送**：本家に寄せる。旧い名前は、変更の直後から他のアカウントが取れる。旧い URL の転送は、旧い名前を他のアカウントが取るか、旧い名前の下に同じ名前のリポジトリが作られるまで続ける。人気のある公開のリポジトリの `OWNER/REPOSITORY` の組は、アカウントの削除と同じ条件で永久に予約する（repojacking の対策。[ADR-0030](../decisions/0030-data-retention-and-deletion.md)）。
 - **クラシックの PAT の期限の必須**：[ADR-0019](../decisions/0019-authentication-and-token-model.md) のとおり、本家との違い（最長 366 日）を受け入れる。

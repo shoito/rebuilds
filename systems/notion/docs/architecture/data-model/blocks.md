@@ -81,7 +81,7 @@ erDiagram
 | `type` | text | NO | | ブロックの種類（[block-model.md](../block-model.md) の 3 節）。`linked_database` を含む |
 | `properties` | jsonb | NO | `'{}'` | 中身。リッチテキスト（`title`）、`checked`、`source` など。行のページはプロパティ ID をキーに値を持つ（リレーション・ロールアップ・数式を除く）。`database` ブロックは `title`、`data_source_ids`、`view_ids` を持つ |
 | `format` | jsonb | NO | `'{}'` | 表示の設定（色、アイコン、幅、`toggleable`、ページの `locked` など）。検索の索引の対象外 |
-| `parent_type` | text | NO | | `teamspace` / `member` / `block` / `data_source`（2026-09-28 に `workspace` を `member` に改めた。[README.md](../README.md) の決定） |
+| `parent_type` | text | NO | | `teamspace` / `member` / `block` / `data_source`（2026-09-28 に `workspace` を `member` に改めた。[design-log.md](../design-log.md) の決定） |
 | `parent_id` | uuid | NO | | 親の ID。`teamspace` はチームスペース、`member` はプライベートの領域の持ち主、`block` は親のブロック、`data_source` はデータソース |
 | `page_id` | uuid | NO | | 自分を含む最も近い `page`。ページ自身なら自分の ID（T6） |
 | `content` | uuid[] | NO | `'{}'` | 子の ID の並び。行のページはどの `content` にも入らない（T1） |

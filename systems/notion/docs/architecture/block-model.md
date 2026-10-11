@@ -181,7 +181,7 @@
 
 ## 8. ページの履歴
 
-履歴は、操作のログ（ADR-0005）とスナップショットの 2 段で持つ。本家の履歴の保持期間は、Free が 7 日、Plus が 30 日、Business が 90 日、Enterprise は任意である（[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)）。
+履歴は、操作のログ（ADR-0005）とスナップショットの 2 段で持つ。本家の履歴の保持期間は、Free が 7 日、Plus が 30 日、Business が 90 日、Enterprise は任意である（[Duplicate, delete, and restore content](https://www.notion.com/help/duplicate-delete-and-restore-content)）。本システムは、この日数をプランの権利 `limit.history.days` として持つ（[ADR-0034](../decisions/0034-plans-and-entitlements.md)、proposed）。プランの区別を持つまで（MVP）は 30 日に固定する。
 
 | 段 | 単位 | 保持 | 用途 |
 | --- | --- | --- | --- |

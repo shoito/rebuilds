@@ -172,16 +172,20 @@ type MfaPolicy = {
 
 ### 4.2 ステートマシン（認証器）
 
-```
-  create ──▶ pending ──(確認のコード・署名が通る)──▶ active
-               │ 10 分                               │   ▲
-               ▼                                     │   │ 期限が過ぎる／管理者が解除
-            （消す）                        連続の失敗 ▼   │
-                                                  locked ──┘
-                                                     │ 失敗が 100 回（通算の連続）
-                                                     ▼
-                              active ──(本人・管理者が外す)──▶ （消す）
-                                                  disabled ──（管理者の再設定まで使えない）
+次の図は、認証器の状態を示す。回数と期間は 7 節の表にある。
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: create
+  pending --> active: 確認のコード・署名が通る
+  pending --> [*]: 10 分（消す）
+  active --> locked: 連続の失敗
+  locked --> active: 期限が過ぎる／管理者が解除
+  locked --> disabled: 失敗が 100 回（通算の連続）
+  active --> [*]: 本人・管理者が外す（消す）
+  note right of disabled
+    管理者の再設定まで使えない
+  end note
 ```
 
 - `pending` の認証器は、10 分以内に確かめないと消す。TOTP は最初のコードの照合、WebAuthn は登録の応答の検証で `active` にする。

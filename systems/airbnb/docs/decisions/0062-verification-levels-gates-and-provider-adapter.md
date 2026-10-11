@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- ホストは公開の前に本人確認が必須。ゲストは規則で求める（初めての予約、高額、危険の点）（[architecture/README.md](../architecture/README.md) の 6 節）。
+- ホストは公開の前に本人確認が必須。ゲストは規則で求める（初めての予約、高額、危険の点）（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 自前の eKYC は作らない（[intent.md](../intent.md) の Non-goals）。方式の法令の扱いは法務の確認待ち（L3・L6）で、結論で方式と水準の対応が変わりうる。
 - Mercari の題材は、水準と方式を分け、機能の条件を表にし、書類の画像を持たない形にした（[ADR-0056](../../../mercari/docs/decisions/0056-ekyc-provider-and-verification-levels.md)、[ADR-0057](../../../mercari/docs/decisions/0057-identity-data-minimization-and-retention.md)）。
 

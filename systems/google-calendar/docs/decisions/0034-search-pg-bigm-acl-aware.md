@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-[intent.md](../intent.md) は、予定のタイトル・場所・説明・参加者の検索（日本語を含む）を MVP に含める。NFR-012 は、変更から検索に出るまで p95 30 秒、応答 p99 1 秒、日本語の部分一致で取りこぼさないことを求める。[architecture/README.md](../architecture/README.md) の 6 節は、S1 は Aurora の `pg_bigm` で、`redact()` を通した検索の表を引き、新しい部品を足さないと決めた。[ADR-0004](0004-tenancy-and-rls.md) は、検索の表に `redact()` の結果ごとの文字列を入れると決めた。
+[intent.md](../intent.md) は、予定のタイトル・場所・説明・参加者の検索（日本語を含む）を MVP に含める。NFR-012 は、変更から検索に出るまで p95 30 秒、応答 p99 1 秒、日本語の部分一致で取りこぼさないことを求める。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、S1 は Aurora の `pg_bigm` で、`redact()` を通した検索の表を引き、新しい部品を足さないと決めた。[ADR-0004](0004-tenancy-and-rls.md) は、検索の表に `redact()` の結果ごとの文字列を入れると決めた。
 
 `pg_bigm` は Aurora PostgreSQL 18 で使え（[Extension versions for Aurora PostgreSQL](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)）、2-gram の GIN の索引で `LIKE` の部分一致を速くし、1〜2 文字の語も扱える（[pg_bigm 1.X Document](https://pgbigm.github.io/pg_bigm/pg_bigm_en.html)）。いずれも 2026-10-04 に確認。他の題材（Linear の ADR-0030）は、関連度の並べ替えと Writer のクラスタの負荷を理由に OpenSearch を選んだ。本家の検索の対象・並べ方・遅れは公式の資料にない（未検証）。
 

@@ -185,6 +185,25 @@ facet の中身は [core-hr.md](core-hr.md) の 3 節で決める。この領域
 9. outbox に `temporal.changed`（主体、facet、影響の範囲 `[D, ∞)`、`case_id`）を書く。影響の範囲が今日以前なら `temporal.retro_detected` も書く（6.4 節）。
 10. 発効の予定を書き直す（8 節）。
 
+次の図は、入社（等級 G1、営業部）と昇格（G2）の差分を持つ `worker_job` に、過去日付の異動（企画部へ）を足したときの、有効日の軸の上の期間の変わり方を示す（日付は説明のための例）。`D` をまたぐ前の期間は `D` で分かれ、`D` 以降の期間は作り直される。前の 2 つのバージョンには `superseded_at` を書き、後の 3 つを新しいバージョンとして追記する。
+
+```mermaid
+gantt
+  title 過去日付の異動を足したときの worker_job の期間（日付は例）
+  dateFormat YYYY-MM-DD
+  axisFormat %Y-%m
+  todayMarker off
+  section 前の現在のテーブル
+  G1・営業部 :done, b1, 2024-04-01, 2026-04-01
+  G2・営業部（以降、終わりなし） :done, b2, 2026-04-01, 2026-12-31
+  section 新しい差分
+  D ＝ 異動の effective_on :milestone, m1, 2025-10-01, 0d
+  section 後の現在のテーブル
+  G1・営業部（D で分けた） :a1, 2024-04-01, 2025-10-01
+  G1・企画部 :crit, a2, 2025-10-01, 2026-04-01
+  G2・企画部（以降、終わりなし） :crit, a3, 2026-04-01, 2026-12-31
+```
+
 ```ts
 // Pure fold. Used by the DB write path AND the reference model (ADR-0009).
 function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
@@ -272,6 +291,25 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 
 - 「またぐ」は、古い有効日と新しい有効日の間（両端を含む）に、同じ項目に触れる取消されていない別の差分があること。またぐと、その差分との前後が入れ替わり、意味が変わるため拒む。
 
+次の図は、昇格（等級 G1 → G2）の有効日を早める訂正（#2）の前後の期間を示す（日付は説明のための例）。影響の始まり `D` は、古い日と新しい日の早いほうになる。古い日と新しい日の間に、等級に触れる別の差分があれば、#3 で拒む。
+
+```mermaid
+gantt
+  title 昇格の有効日を 2026-04-01 から 2026-02-01 へ訂正したときの期間（日付は例）
+  dateFormat YYYY-MM-DD
+  axisFormat %Y-%m
+  todayMarker off
+  section 訂正の前
+  G1 :done, b1, 2025-04-01, 2026-04-01
+  G2（以降、終わりなし） :done, b2, 2026-04-01, 2026-09-30
+  section 訂正の差分
+  D ＝ 新しい有効日（早いほう） :milestone, m1, 2026-02-01, 0d
+  古い有効日 :milestone, m2, 2026-04-01, 0d
+  section 訂正の後
+  G1 :a1, 2025-04-01, 2026-02-01
+  G2（以降、終わりなし） :crit, a2, 2026-02-01, 2026-09-30
+```
+
 ### 6.3 取消と依存（DT-TEMP-004）
 
 取消は、後の差分がその差分を前提にしているとき拒む（[ADR-0002](../decisions/0002-effective-dated-data-model.md)）。前提にしているかは、次の表で判定する。表は上から評価する。候補の後の差分 `L` は、同じ主体・facet（coverage の子の facet を含む）の、取消されていない差分で、`L.effective_on ≥ R.effective_on` のもの。`R` は取り消す差分。
@@ -287,6 +325,25 @@ function fold<F>(spec: FacetSpec<F>, deltas: ChangeRow[]): Period<F>[] {
 
 - `based_on_version_ids` は、起票の画面・API が読んだバージョンの ID を、案件が完了のときに差分へ写したもの。起票の時と完了の時の間にバージョンが変わったら、完了の前に「見ていたバージョンが古い」として担当に確かめ直させる（[business-process-engine.md](business-process-engine.md) の 6.3 節）。
 - 拒んだときは、依存する後の案件の一覧を返す。担当は、後の案件から順に取り消す。一括の取消（依存の連鎖をまとめて取り消す）は MVP では持たない（13 節）。
+
+次の図は、取消を受ける場合の前後の期間を示す（日付は説明のための例）。`R` は昇格（等級 G2）、`L` は後の異動（企画部へ）で、`L` は `R` の作ったバージョンを見て起票されたが、触れる項目（組織）は `R`（等級）と重ならない（#4）。`R` を取り消すと、`D` ＝ `R` の有効日から作り直し、同じ状態の隣り合う期間をまとめる（5.1 節の 7）。`L` が等級にも触れていれば、#3 で拒む。
+
+```mermaid
+gantt
+  title 昇格 R を取り消したときの期間（L は組織だけに触れる。日付は例）
+  dateFormat YYYY-MM-DD
+  axisFormat %Y-%m
+  todayMarker off
+  section 取消の前
+  G1・営業部 :done, b1, 2025-04-01, 2026-04-01
+  G2・営業部（R） :done, b2, 2026-04-01, 2026-07-01
+  G2・企画部（L、以降） :done, b3, 2026-07-01, 2026-12-31
+  section 取消
+  D ＝ R の有効日 :milestone, m1, 2026-04-01, 0d
+  section 取消の後
+  G1・営業部（まとめた） :crit, a1, 2025-04-01, 2026-07-01
+  G1・企画部（L、以降） :crit, a2, 2026-07-01, 2026-12-31
+```
 
 ### 6.4 遡及の検知
 

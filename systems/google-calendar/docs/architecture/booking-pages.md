@@ -2,7 +2,7 @@
 
 予約ページの設定（長さ、受け付けの時間、間の時間、1 日の上限、受け付けの期間、質問）、空いている枠の計算、予約の作成と二重の予約の防止、予約者の確認、取り消しと変更、予約者へのメールとリマインダー、ボットの対策、予約者の個人情報の扱いの枠を決める。
 
-前提となる決定は、時刻の表し方（[ADR-0002](../decisions/0002-time-representation.md)）、繰り返しの保存と展開（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）、テナントと権限（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）、変更のログ（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）、写し（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）、iMIP のアドレス（[ADR-0015](../decisions/0015-imip-addressing-and-trust.md)）、空き時間の元とキャッシュ（[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)）、通知の経路（[ADR-0031](../decisions/0031-notification-channels-and-content.md)）。会議室の二重予約を防ぐ排他の制約の考え方（[architecture/README.md](README.md) の 6 節、[rooms-and-resources.md](rooms-and-resources.md)）を、予約にも使う。この文書で決めたことは次の ADR にある。
+前提となる決定は、時刻の表し方（[ADR-0002](../decisions/0002-time-representation.md)）、繰り返しの保存と展開（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)）、テナントと権限（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）、変更のログ（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）、写し（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）、iMIP のアドレス（[ADR-0015](../decisions/0015-imip-addressing-and-trust.md)）、空き時間の元とキャッシュ（[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)）、通知の経路（[ADR-0031](../decisions/0031-notification-channels-and-content.md)）。会議室の二重予約を防ぐ排他の制約の考え方（[design-log.md](design-log.md) の「2026-10-04：既定案」、[rooms-and-resources.md](rooms-and-resources.md)）を、予約にも使う。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |

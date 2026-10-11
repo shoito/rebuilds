@@ -39,7 +39,7 @@
 | 可用性 | CalDAV の読み書き 月間 99.9% | NFR-006 |
 | 漏れ | CalDAV の `calendar-data`・`calendar-query` の条件・ICS の公開に、見てはいけない中身を出さない | NFR-008 |
 | 相互運用 | iOS・macOS のカレンダー、Thunderbird、DAVx5 で受け入れ試験の場面の 100% | K9 |
-| ICS の購読 | 既定 6 時間ごとに取る。1 回 10 MiB・予定 5 万件まで。内部のアドレスへ要求しない | [architecture/README.md](README.md) の 6 節、[quality.md](../quality.md) の 2.2.1 節 I |
+| ICS の購読 | 既定 6 時間ごとに取る。1 回 10 MiB・予定 5 万件まで。内部のアドレスへ要求しない | [design-log.md](design-log.md) の「2026-10-04：既定案」、[quality.md](../quality.md) の 2.2.1 節 I |
 | CalDAV の量 | S1 で CalDAV の読み出し 2,000 件/秒（多くは CTag・`sync-collection` の確かめ） | [architecture/README.md](README.md) の 2 節 |
 
 ## 3. 本家の形と標準（確かめたこと）
@@ -528,7 +528,7 @@ stateDiagram-v2
 - **`sync-collection` の切り詰め**：1,000 件と 507（ADR-0023）。
 - **参加者の写しへの `PUT`**：自分の項目だけ受ける。`can_modify` でも CalDAV からは共有の項目を受けない（ADR-0024）。
 - **`SCHEDULE-AGENT=CLIENT`**：外部の参加者にだけ従う（ADR-0024）。
-- **ICS の購読の間隔**：6 時間、`REFRESH-INTERVAL` で 1〜24 時間（ADR-0025。[architecture/README.md](README.md) の 6 節の決定のとおり）。
+- **ICS の購読の間隔**：6 時間、`REFRESH-INTERVAL` で 1〜24 時間（ADR-0025。[design-log.md](design-log.md) の「2026-10-04：既定案」のとおり）。
 - **秘密のアドレスの見え方**：全体か空き時間だけ。ATTENDEE を出さない（ADR-0025）。
 - **ICS の取り込み**：`PUBLISH` として扱い、招待を送らない。
 

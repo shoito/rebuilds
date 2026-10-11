@@ -234,6 +234,7 @@ CREATE UNIQUE INDEX transactions_purchase_attempt
 
 - 確認の画面は、価格、送料の負担、配送の方法、支払いの方法と手数料、支払いの期限、キャンセルの条件、売り手の表示（事業者の印があればその表示の欄）を出す。出す事項と文言は **法務の確認待ち（L3。最終確認の画面の規定が C2C の購入に当たるか）** で、確定は `purchase-confirmation-screen` の spec で行う。
 - 本システムは、画面に出した `price`・`listing_version`・手数料の表のバージョンを購入の要求に持たせ、5.1 節で一致を確かめる。画面の内容と取引の内容が違う取引は作らない。
+- 画面のアクセシビリティ（読み上げの順、購入のボタンの名前、結果の知らせ）は [accounts-and-devices.md](accounts-and-devices.md) の 11.1 節。
 
 ## 6. 遷移の関数と決定表
 

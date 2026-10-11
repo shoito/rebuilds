@@ -7,6 +7,7 @@
 | [0051](../decisions/0051-encryption-and-key-layout.md) | KMS の鍵をデータの種類ごとに分ける（`aurora`、`pii`、`pii-logs`、`dm-content`、`media`、`lake`、`audit`、`secrets`）。電話番号・メールアドレス・生年月日・ログインの IP アドレスは、DB の保存の暗号化に加えて、アプリの層で封筒の暗号化をし、検索は鍵付きの HMAC の列で行う。鍵はマルチリージョンの鍵で大阪に複製する |
 | [0052](../decisions/0052-audit-and-operator-access.md) | 監査ログは、Aurora の追記だけの表に書き、同じ内容を Firehose で log-archive の S3（Object Lock）へ送る。本番の DB への人の常時のアクセスを置かず、読み出しは理由（案件の ID）を必須にした決まったロールと、2 人の承認の break-glass だけにする。DM の中身を人が読む手順は、法務の L3 が済むまで作らない |
 | [0053](../decisions/0053-data-lifecycle-and-retention.md) | データを種類ごとの保持の方針の表で管理し、法令に関わる期間は法務の L2・L8 の値を入れるまで「消さない」を既定にする。削除はアカウント・投稿ごとの削除の流れ（墓石 → 写し・索引・メディアの後始末 → 物理の削除）で行い、法的な保全（`legal_holds`）がかかった対象は止める。バックアップは 35 日で切れることを削除の約束に含める |
+| [0064](../decisions/0064-personal-data-export-scope-and-format.md)（proposed） | 本人のデータの書き出しは、表ごとの扱いを 1 か所の目録に持ち、機械で読める JSON と閲覧用の HTML の ZIP でセルフサービスで渡す。法務の確認待ちの種類は既定で入れない。書き出しで足りない法令の開示の求めは T&S の法令の窓口で受ける |
 
 前提は、テナントが 1 つで本人だけの表を FORCE RLS で守ること（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)）、確定した変更を outbox から流すこと（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）、ML が安全の判定を上書きしないこと（[ADR-0006](../decisions/0006-ranking-boundary.md)）。
 
@@ -265,6 +266,29 @@ flowchart TD
 - Aurora の自動バックアップと AWS Backup の保持は 35 日（[infrastructure.md](infrastructure.md) の 7 節）。削除したデータは、バックアップから 35 日で消える。これを、プライバシーの方針の「削除から完全に消えるまで」の説明に含める（文言は法務の確認）。
 - バックアップから戻すとき（論理の破損）、戻した範囲に、その後に削除・墓石にした行があれば、墓石を当て直す（削除の出来事を S3 の監査の写しから読み直す）。
 
+### 7.5 本人のデータの書き出しと開示の求め
+
+[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)（proposed）。入れ物（重い操作の確かめ、`data_export_requests`、`exports` のバケット）は [accounts-and-auth.md](accounts-and-auth.md) の 5.4 節と [data-model/users-and-accounts.md](data-model/users-and-accounts.md) の 4.5 節にある。ここでは中身と、法令の開示の求めとの分け方を決める。**書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）、**法令の解釈は法務の確認待ち（L12）**。
+
+- **目録**：本人に結び付く表・置き場所ごとに「入れる」「入れない（理由）」「法務の確認待ち（`release.export.<種類>` で止める）」を `packages/export` の 1 か所に書く。本人だけの表の一覧（9 節の最後）と目録の突き合わせを CI に置く。
+
+| 種類 | 扱い | 根拠 |
+| --- | --- | --- |
+| プロフィール、本人の投稿とメディアの原本、リポスト・いいね・ブックマーク、設定、認可したアプリ | 入れる（削除した投稿は入れない） | 本人が作ったもの |
+| フォロー・フォロワー・ブロック・ミュートの一覧 | 入れる。相手は ID とハンドルだけ | 相手のプロフィールの中身は相手のデータ |
+| 連絡先、生年月日 | 入れる（平文に戻す） | 本人のデータ。暗号化は保存のため（5.3 節） |
+| 本人のアカウントと投稿への措置・根拠・異議 | 入れる（利用者への通知と同じ範囲） | [ADR-0038](../decisions/0038-moderation-action-model.md) |
+| おすすめの理由の記録 | 入れる | [ADR-0020](../decisions/0020-ranking-evaluation-experiments-and-transparency.md) |
+| DM | 本人が送ったメッセージと参加者の ID は入れる。相手が書いたメッセージは**法務の確認待ち（L3・L12）**、既定は入れない | 通信の秘密に当たりうる |
+| ログインの記録、投稿の時の IP | **法務の確認待ち（L2・L12）**、既定は入れない | 開示に使うログ |
+| 推薦に使う特徴の値 | **法務の確認待ち（L4・L12）**、既定は入れない | 検出の回避に使われうる |
+| 通報した人の身元、T&S のメモ、検出の規則と危険の点、データレイクの仮名の記録 | 入れない | 他人のデータ、回避の防止（[ADR-0040](../decisions/0040-spam-and-bot-defense.md)） |
+
+- **形**：ZIP に `manifest.json`（形と目録のバージョン）、`data/<種類>.jsonl`（ID は文字列）、メディアの原本、オフラインで開ける `index.html`。2 GB ごとに分ける。形の変更は足すだけにする（[ADR-0063](../decisions/0063-contract-change-ordering.md)）。
+- **作り方**：Worker のジョブが本人の権限（`app.actor_id`）で読み、公開の表も `visible()` を通す（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)）。準備ができたらアプリの通知とメールで知らせ、ダウンロードは重い操作の確かめの後に 15 分の署名付きの URL で渡す。要求とダウンロードを監査ログ（6.1 節）に書く。間隔は `policy.export.min_interval_days`（既定 7）。
+- **状態ごとの可否**：`locked` では受け付けず、作りかけも取り消す（乗っ取った人の持ち出しを防ぐ）。`suspended` と `deactivated` の猶予の間は受け付ける。`suspended` の扱いは L12 で変えうる。
+- **法令の開示の求め**：書き出しで足りない求め（第三者提供の記録、開示の方法の指定、訂正・利用停止など）は、T&S の法令の案件（[ADR-0041](../decisions/0041-legal-requests-and-transparency.md)）の種類として受け、本人の求めとして期限を持つ。本人確認の方法・期限・手数料・対象の範囲は**法務の確認待ち（L12）**。
+
 ## 8. 乗っ取りへの対応
 
 ### 8.1 検出
@@ -342,6 +366,7 @@ sequenceDiagram
 | L4 | 外国にある第三者（SMS・プッシュ・ハッシュの照合の事業者）への提供、漏えい等の報告、推薦に使う行動の記録の仮名の扱い |
 | L7 | 捜査機関・裁判所への対応と、保全の手続き |
 | L8 | 7.1 節の「法務の確認待ち」の各行の期間 |
+| L12 | 7.5 節の書き出しと開示の求め：開示の請求の対象の範囲（DM の相手のメッセージ、ログインの記録、推薦の特徴）、本人確認・期限・手数料、凍結の間の扱い |
 
 ## 13. data-model への項目
 
@@ -362,7 +387,7 @@ sequenceDiagram
 | 種類 | 対象 |
 | --- | --- |
 | 表駆動 | DT-SEC-001（データの種類 × 保持の方針 × 保全の有無 → 消すか）。DT-SEC-002（T&S の案件の種類 × 読める範囲） |
-| 性質 | PROP-SEC-001：任意の削除・保全・解除・ジョブの実行の列で、保全のかかった対象の行は物理の削除をされない。PROP-SEC-002：任意の書き込みの列で、`audit_events` の行は消えず、変わらない |
+| 性質 | PROP-SEC-001：任意の削除・保全・解除・ジョブの実行の列で、保全のかかった対象の行は物理の削除をされない。PROP-SEC-002：任意の書き込みの列で、`audit_events` の行は消えず、変わらない。PROP-SEC-003：任意の利用者の組と書き込みの列で、利用者 A の書き出しに、A 以外の本人だけの表の行と、A から見えない公開の行が入らない（7.5 節） |
 | 結合 | 本人だけの表を別の利用者の `app.actor_id` で読むと 0 行。`ts_reader` の読み出しが案件の ID なしで失敗する。封筒の暗号化の往復と、HMAC での重複の判定 |
 | 走査 | ログ・トレースに、合成のテストデータの電話・メール・本文の印（カナリアの文字列）が出ない（E2E の後に走査） |
 | 訓練 | 乗っ取りの手順（staging の合成のアカウント）。疑いから `locked` まで 5 分 |
@@ -380,6 +405,7 @@ sequenceDiagram
 | E11 | `legal-holds` | 7.3 節。法務：L2・L7 |
 | E14 | `data-lifecycle` | 7 節の保持の方針と削除の流れ（roadmap の既存の Story）。法務：L8 |
 | E14 | `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後） |
+| E14 | `data-export` | 7.5 節の目録・書き出しのジョブ・渡し方（[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)、proposed）。MVP に入れるかは PM の判断。法務：L12 |
 | E14 | `external-pentest` | 10 節 |
 
 ## 16. 未解決の問い
@@ -400,6 +426,7 @@ sequenceDiagram
 | 7.1 節の「法務の確認待ち」の各期間（L2・L8） | 法務の確認。E14 の `data-lifecycle` の spec の承認の前 |
 | 漏えい等の報告の手順（L4） | 法務の確認。E14 の前 |
 | DM の中身の扱い（L3） | 法務の確認。それまで読む手順を作らない |
+| 書き出しを MVP に入れるか、7.5 節の法務の確認待ちの種類（L12） | PM の判断と法務の確認。E14 の `data-export` の spec の承認の前 |
 | 脆弱性の報奨の制度 | GA の後 |
 | アプリの証明（App Attest、Play Integrity）を拒否に使うか | E11 の計測の後。誤判定の率を見て決める |
 

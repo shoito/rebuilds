@@ -84,6 +84,33 @@ Peritext は段落をまたぐ構造を扱わない（論文の範囲外）。�
 - 結合は、後ろのブロックの slice を前のブロックの末尾へ移し、後ろのブロックを削除する。
 - 同じ位置での分割と入力が競合したら、入力は左のアンカーの文字を持つブロックに入る。
 
+次の図は、インスタンス A のテキストを分割し、その後に届いた操作が索引で今の持ち主へ届くまでと、結合の後を示す。文字の ID は `(r, 1)`〜`(r, n)` とし、`(r, k)` の後で分割する例である。
+
+```mermaid
+flowchart LR
+  subgraph before["分割の前"]
+    A0["ブロック A<br/>インスタンス A の (r, 1)〜(r, n)"]
+  end
+  subgraph after_split["text.split の後"]
+    A1["ブロック A<br/>(r, 1)〜(r, k)"]
+    B1["新しいブロック B<br/>(r, k+1)〜(r, n)"]
+  end
+  subgraph idx["text_slices"]
+    S1["インスタンス A、(r, 1)〜(r, k)<br/>→ ブロック A"]
+    S2["インスタンス A、(r, k+1)〜(r, n)<br/>→ ブロック B"]
+  end
+  subgraph after_join["text.join の後"]
+    A2["ブロック A<br/>(r, 1)〜(r, k)、(r, k+1)〜(r, n)"]
+    B2["ブロック B は削除"]
+  end
+  before -->|"後半の slice を B へ移す<br/>文字の ID は変えない"| after_split
+  after_split -->|"B の slice を A の末尾へ移す"| after_join
+  OP["分割の後に届いた text.insert<br/>インスタンス A、文字 (r, m) の後<br/>（m は k+1〜n のどれか）"] --> S2
+  S2 --> B1
+```
+
+結合の後は、索引の 2 つの範囲がどちらもブロック A を指す。操作はブロックではなくインスタンスと文字の ID を指すので、どの時点で届いても、索引を引いて今の持ち主のブロックへ当たる。
+
 ### 5.4 実装
 
 - TypeScript で自前の実装を `packages/text-crdt` に持ち、クライアントとサーバーで同じものを使う。理由は ADR-0010。
@@ -107,6 +134,58 @@ Peritext は段落をまたぐ構造を扱わない（論文の範囲外）。�
 
 - 「取り消す」は、トランザクション全体を拒否するのではなく、その操作だけを当てない。ADR-0005 の「まとめて拒否」は、検証の失敗（権限、不正な値、木の不変条件）に使う。
 - 捨てた値・取り消した操作は `sync_conflicts` に 30 日残し、該当する利用者に出す（11.5 節）。ページの履歴にも残る。
+
+表のうち 3 つの行を、2 台の端末の時系列で示す。端末 X の操作が先にサーバーに着き、端末 Y の操作が後に着く。
+
+同じプロパティへの同時の設定：
+
+```mermaid
+sequenceDiagram
+  participant X as 端末 X
+  participant S as サーバー（API）
+  participant Y as 端末 Y
+  X->>S: prop.set（ブロック P の欄 f = 値 a）
+  S->>S: seq の順で先に当てる。f = a
+  Y->>S: prop.set（ブロック P の欄 f = 値 b）
+  S->>S: 後に着いた方が勝つ。f = b<br/>負けた値 a を sync_conflicts に残す
+  S-->>X: 配信（f = b）
+  S-->>Y: 配信（f = b）
+  Note over X: 「上書きされた変更」を出す。値 a に戻せる
+```
+
+循環になる移動：
+
+```mermaid
+sequenceDiagram
+  participant X as 端末 X
+  participant S as サーバー（API）
+  participant Y as 端末 Y
+  X->>S: block.move（A を B の下へ）
+  S->>S: 当てる
+  Y->>S: block.move（B を A の下へ）
+  S->>S: 循環になるので、この操作だけ当てない<br/>トランザクション全体は拒否しない<br/>取り消した操作を sync_conflicts に残す
+  S-->>X: 配信（A は B の下）
+  S-->>Y: 配信（A は B の下）
+  Note over Y: 取り消しの通知
+```
+
+削除された親への移動（削除が先）：
+
+```mermaid
+sequenceDiagram
+  participant X as 端末 X
+  participant S as サーバー（API）
+  participant Y as 端末 Y
+  X->>S: block.delete（親 P）
+  S->>S: 当てる。P は alive = false
+  Y->>S: block.move（C を P の下へ）
+  S->>S: 移動を取り消す。C は元の場所に残す<br/>取り消した操作を sync_conflicts に残す
+  S-->>X: 配信
+  S-->>Y: 配信
+  Note over Y: 取り消しの通知
+```
+
+同じ場面で `block.move` ではなく `block.insert` なら、挿入は削除された親の下に入り、Y には復元のボタンを出す。
 
 ## 7. 変更の流れと配信
 
@@ -188,6 +267,30 @@ Client ──(WebSocket or POST /transactions)──▶ API
 - 拒否されたトランザクションから、本人が入力したテキストと作ったブロックだけを取り出し、端末の「送れなかった変更」に置く。他人の書いた周りの内容は含めない。
 - 本人は、コピーするか、自分のプライベートなページとして新しく保存できる。30 日で消える。
 
+次の図は、端末の待ち行列（`transaction_queue`）に入ったトランザクションが、確定するか、送れなかった変更（`failed_changes`）になるまでの状態を示す。
+
+```mermaid
+stateDiagram-v2
+  state "未送信（transaction_queue、FIFO）" as queued
+  state "送信中" as sending
+  state "適用（確定）" as applied
+  state "拒否" as rejected
+  state "送れなかった変更（failed_changes）" as failed
+
+  [*] --> queued: 打鍵を 100ms ごとにまとめて保存する
+  queued --> sending: 接続中、または再接続の後に FIFO で送る
+  sending --> applied: 成功（適用済みの tx_counter 以下も成功）
+  sending --> queued: 送信の途中で切れた（同じ device_id・tx_counter で再送する）
+  sending --> rejected: 403、検証の失敗（権限、不正な値、木の不変条件）
+  rejected --> failed: 本人の入力したテキストと作ったブロックだけを取り出す
+  queued --> failed: 編集できなくなった、page.revoked を受けた
+  queued --> [*]: ワークスペースから外された後のログアウト
+  applied --> [*]
+  failed --> [*]: コピーする、プライベートなページとして保存する、30 日で消える
+```
+
+- 構造とプロパティの衝突で取り消された操作（6 節）は「拒否」ではない。トランザクションは適用され、取り消した操作は `sync_conflicts` に残る。
+
 ## 11. オフライン
 
 方針は ADR-0013。
@@ -223,6 +326,36 @@ Client ──(WebSocket or POST /transactions)──▶ API
 - 再接続したら、待ち行列を FIFO で送る。1 回の送信は 500 操作まで。途中で失敗しても `tx_counter` で続きから再開できる。
 - テキストはすべて合わさる。構造とプロパティは ADR-0011 の規則で決まる。
 - セッションが切れていたら、ログインの後に送る。別のアカウントでログインしても、他のアカウントの待ち行列は送らない。
+
+次の図は、再接続の後に、持っているページの鮮度を確かめて追いつくこと（11.3 節、8 節）と、待ち行列を送ること（この節）を示す。この文書は、2 つの順序を決めていないので、並行として描く。
+
+```mermaid
+sequenceDiagram
+  participant C as 端末
+  participant S as サーバー（API）
+  Note over C: 再接続（セッションが切れていたらログインの後）
+  par 鮮度の確認と追いつき
+    C->>S: POST /sync/heads（page_id, seq）を 500 件ずつ
+    S-->>C: 変わったページ、削除されたページ、読めなくなったページ
+    Note over C: 読めなくなったページの写しを消す
+    loop 変わったページごと
+      alt 1,000 件以内で、30 日の保持の中
+        C->>S: 差分取得（ops?after_seq=N）
+        S-->>C: 操作の差分
+      else それ以外
+        C->>S: ページのスナップショットを取り直す
+        S-->>C: スナップショット
+      end
+    end
+  and 待ち行列の送信
+    loop 待ち行列が空になるまで
+      C->>S: transaction_queue を FIFO で送る（1 回 500 操作まで）
+      S-->>C: 成功、または拒否（拒否は 10.1 節へ）
+    end
+    Note over C,S: 途中で失敗したら tx_counter で続きから再開する
+  end
+  Note over C: 自分の sync_conflicts があれば、ページの上部に出す（11.5 節）
+```
 
 ### 11.5 衝突の見せ方
 

@@ -289,14 +289,14 @@ Aurora（RLS、論理シャード）
 
 ## 11. 決定と持ち越し
 
-2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
+2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[design-log.md](design-log.md) の「決定」）。
 
 - 個人のアクセストークンは MVP に入れない。AI エージェントは MCP（8 節）か内部の連携を使う（[roadmap.md](../roadmap.md) の「後回しにしたもの」）。
 - 公開の連携のリフレッシュトークンは 90 日で、使うたびに入れ替える（3.1 節）。本家も更新のたびに新しいリフレッシュトークンを返す（[Authorization](https://developers.notion.com/guides/get-started/authorization)、2026-09-27 に確認）。本家の有効期間は公開されていない（未検証）。90 日は本システムの値である。
 - ビューの API と `view.*` の Webhook は、E5 のビューの形が固まった後に、E7 の後半の Story として入れる。
 - Webhook の署名の秘密は、本家と同じく `verification_token` を使う。別に入れ替える仕組みは MVP に入れない。
 
-2026-09-28 に、推奨案で次のとおり決めた（[README.md](README.md) の「決定（2026-09-28、推奨案で確定）」）。
+2026-09-28 に、推奨案で次のとおり決めた（[design-log.md](design-log.md) の「2026-09-28：推奨案で確定」）。
 
 - 公開 API のトークンの `{id}` に `workspace_id` を埋め込み、シャードへの振り分けに使う（3.1 節）。`global` にトークンの索引を持たない。
 - データソースのスキーマは、API でも 50KB を推奨の上限として文書に書き、1.5MB を超える更新だけを拒む（[databases.md](databases.md) の 11 節）。

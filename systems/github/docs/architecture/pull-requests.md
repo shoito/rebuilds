@@ -45,13 +45,21 @@ PR は「head の ref の変更を、base の ref に取り込む提案」であ
 
 ### 1.3 状態の遷移
 
-```
-          ┌── ready_for_review ──┐
- draft ◀──┤                      ├──▶ open ──merge──▶ merged
-          └── converted_to_draft ┘     │  ▲
-                                   close  reopen
-                                       ▼  │
-                                      closed
+次の図は、PR の状態と、状態を変える操作を示す。
+
+```mermaid
+stateDiagram-v2
+    state "draft" as draft
+    state "open" as open
+    state "merged" as merged
+    state "closed" as closed
+
+    draft --> open : ready_for_review
+    open --> draft : converted_to_draft
+    open --> merged : merge<br/>base に head が含まれた
+    open --> closed : close
+    closed --> open : reopen（head の ref があり、base に未取り込み）
+    merged --> [*]
 ```
 
 - `merged` は終端。`closed` は `reopen` できる。ただし head の ref が消えていたり、base に既に取り込まれていたりすると `reopen` できない。
@@ -126,6 +134,23 @@ head または base の ref が動くと、ストレージが順序付きの Eve
   - 画面か API で見られた PR、自動マージが有効な PR、merge queue に入っている PR を優先する。
   - それ以外は、最後の計算から一定時間（例：5 分）経つまで積まない。見られたときに計算する。
 - `mergeable_state`（`clean`、`blocked`、`behind`、`dirty`、`unstable`、`draft`、`unknown`）は、マージ可能か（Git）と ruleset の評価（5 節）を合わせて、読み取りのときに組み立てる。保存しない。
+
+次の図は、`mergeable_state` を組み立てるときの材料と、どこから読むかを示す。値ごとの判定の順序は、この文書ではまだ決めていない。
+
+```mermaid
+flowchart LR
+    MS["pull_request_merge_states<br/>(base_sha, head_sha) の mergeable<br/>null・true・false"]
+    RS["ruleset の評価<br/>evaluate(..., merge(method))（5.3 節）"]
+    ST["strict：base の tip が<br/>head から到達できるか（5.4 節）"]
+    DR["PR の状態（draft）"]
+    BUILD["読み取りのときに組み立てる<br/>（保存しない）"]
+    OUT["mergeable_state<br/>clean・blocked・behind・dirty・<br/>unstable・draft・unknown"]
+    MS --> BUILD
+    RS --> BUILD
+    ST -->|"満たさなければ behind"| BUILD
+    DR --> BUILD
+    BUILD --> OUT
+```
 
 ### 3.4 差分の上限
 
@@ -348,6 +373,38 @@ API ──(1) can(actor, write, base_repo)
 - 一時的なブランチは `<brand>-readonly-queue/{base}/pr-{number}-{head_sha}` の形の名前にし、利用者は push できない。名前の形は本家（`gh-readonly-queue/`）に合わせ、接頭辞だけを ADR-0006 で置き換える。外部の CI の設定は、接頭辞の置き換えで流用できる。
 - CI には `merge_group`（`checks_requested`）の Event を送る。Actions のワークフローは `merge_group` を契機に持たないと、キューでチェックが走らない（[Events that trigger workflows](https://docs.github.com/en/actions/writing-workflows/choosing-when-your-workflow-runs/events-that-trigger-workflows)）。
 - 失敗した PR はキューから外し、それより後ろの一時的なブランチを、外した PR を除いて作り直して続ける。
+
+次の図は、PR A・B・C が順にキューに入り、B のチェックが失敗したときの流れを、時刻の順に示す例である。同時に作るグループの数を 3、1 回に取り込む PR の数を 1、「失敗していないものだけ取り込む」を真とする。
+
+```mermaid
+sequenceDiagram
+    participant W as キューの Worker
+    participant G as Git（一時的なブランチ・base）
+    participant CI as CI
+
+    Note over W: キュー：A → B → C
+    W->>G: グループ 1：base の最新＋A
+    W->>G: グループ 2：base の最新＋A＋B
+    W->>G: グループ 3：base の最新＋A＋B＋C
+    W->>CI: merge_group（checks_requested）を 3 つ
+    CI-->>W: グループ 2 が失敗
+    Note over W: B を外す（dequeued、理由：失敗）
+    W->>G: グループ 2・3 を捨てる（merge_group.destroyed）
+    W->>G: 作り直す：base の最新＋A＋C
+    W->>CI: merge_group（checks_requested）
+    CI-->>W: グループ 1 が成功
+    Note over W: push の規則を再評価
+    W->>G: base をグループ 1 の SHA へ早送り（比較交換）
+    Note over W: A が merged
+    CI-->>W: 作り直したグループ（A＋C）が成功
+    Note over W: push の規則を再評価
+    W->>G: base をそのグループの SHA へ早送り（比較交換）
+    Note over W: C が merged
+    opt base が他の経路で動いていた（バイパスの push など）
+        G-->>W: 比較交換が失敗
+        W->>G: キューの全グループを作り直す
+    end
+```
 
 ### 8.2 設定
 

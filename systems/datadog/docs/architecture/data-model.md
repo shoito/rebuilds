@@ -553,7 +553,7 @@ flowchart TB
 
 ## 7. この工程で決めたこと（2026-10-09）
 
-領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。[README.md](README.md) の 6 節にも要点を書いた。
+領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。[design-log.md](design-log.md) の「2026-10-09：データモデル」にも要点を書いた。
 
 | # | 決めたこと | 理由 |
 | --- | --- | --- |
@@ -615,7 +615,7 @@ flowchart TB
 | [metrics-query-engine.md](metrics-query-engine.md) | 7.1 節と 10 節の系列の数の見積もり（D-7） |
 | [usage-and-billing.md](usage-and-billing.md) | 14 節の `usage_offsets` の主キー（D-26） |
 | [slos-and-incidents.md](slos-and-incidents.md) | 5.4 節と 10 節の時の行の保持（D-28） |
-| [README.md](README.md) | 冒頭と 6・7 節の data-model の行。6 節に「決定（2026-10-09、データモデル）」 |
+| [README.md](README.md) | 冒頭と 6・7 節の data-model の行。「決定（2026-10-09、データモデル）」（今は [design-log.md](design-log.md) にある） |
 | [../README.md](../README.md) | 文書の一覧の data-model の行 |
 | ADR の注記 | [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)（D-27）、[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)（D-40）、[ADR-0032](../decisions/0032-index-routing-and-derived-metrics.md)（D-23）、[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)・[ADR-0048](../decisions/0048-dashboard-sharing-scope.md)（D-24）、[ADR-0026](../decisions/0026-query-cache-and-admission.md)（D-7）。決定は変えていない |
 
@@ -624,7 +624,7 @@ flowchart TB
 | 段階 | 変化 |
 | --- | --- |
 | S1 | Aurora 1 クラスタ（writer `db.r8g.4xlarge`＋reader 2、約 2 TB。最大は `monitor_transitions` と `log_segments`）。セル `apne1-c0`・`apne1-c1`。MSK 1 クラスタ |
-| S2 | 共有のセルを 4〜8 に増やし、`intake-router` が `intake_keys_index` → `tenant_cells` で振り分ける。カタログ（`metric_blocks`・`log_segments`・`trace_segments`・`monitor_transitions`）の Aurora の分け方は、S2 の前に別の ADR で決める（[README.md](README.md) の 6 節の持ち越し） |
+| S2 | 共有のセルを 4〜8 に増やし、`intake-router` が `intake_keys_index` → `tenant_cells` で振り分ける。カタログ（`metric_blocks`・`log_segments`・`trace_segments`・`monitor_transitions`）の Aurora の分け方は、S2 の前に別の ADR で決める（[README.md](README.md) の 6 節の残る未解決事項） |
 | S3 | セルを数十にし、海外のリージョンに組織を固定する。管理の面の登録簿（`users`・`tenant_cells`・`intake_keys_index`）だけを全体で持つ形を検討する |
 
 ## 9. 持ち越し

@@ -185,6 +185,42 @@ DT-PAGE-001：
 | 9 | `acknowledged`・`resolved`・`exhausted`・`cancelled` | どの事象も | 変わらない | 何もしない（2 回目の受け付けは 200 で「すでに受け付け済み（誰が）」を返す） |
 | 10 | - | タイマーの `target_version` と `page.version` が違う | 変わらない | タイマーを消すだけ |
 
+次の図は DT-PAGE-001 の要約（表が正。括弧の数字は表の #）。`notifying` の中で、`level` と `round` が進む。
+
+```mermaid
+stateDiagram-v2
+  [*] --> notifying: 呼び出しの開始（1、level 0・round 0）
+  notifying --> notifying: 受け手が 0 人で次の段へ（2）<br/>ack_timeout で level + 1（3）<br/>最後の段で round が repeat 未満なら level 0・round + 1（4）
+  notifying --> exhausted: 最後の段で round が repeat に等しい（5）
+  notifying --> acknowledged: 受け手の本人が受け付け（6）
+  notifying --> resolved: タスクが解決・完了・取り消し（7）
+  notifying --> cancelled: 担当者の取り消し（8）
+  acknowledged --> [*]
+  resolved --> [*]
+  exhausted --> [*]
+  cancelled --> [*]
+```
+
+段が 2 つ、`ack_timeout` が既定の 15 分、`repeat` が既定の 1 で、誰も受け付けないときの時間の流れを次に示す（段の数は説明のための例）。途中で受け付けがあれば、その時点で `acknowledged` になる（6）。
+
+```mermaid
+sequenceDiagram
+  participant E as 呼び出し（page）
+  participant A as 段 0 の受け手
+  participant B as 段 1 の受け手
+  participant C as catch_all
+  Note over E: 0 分 開始 level 0・round 0（1）
+  E->>A: 通知
+  Note over E: 15 分 ack_timeout、level 1・round 0（3）
+  E->>B: 通知
+  Note over E: 30 分 最後の段、round 0 は repeat 未満、level 0・round 1（4）
+  E->>A: 通知
+  Note over E: 45 分 ack_timeout、level 1・round 1（3）
+  E->>B: 通知
+  Note over E: 60 分 最後の段、round 1 は repeat に等しい、exhausted（5）
+  E->>C: 通知、タスクに作業メモ「当番の応答なし」
+```
+
 - タイマーは `timer` の表（[workflow-engine.md](workflow-engine.md) の 5.1 節）に、新しい種類 `page_escalation` で登録する。優先度は 0（SLA と同じ）にする。夜中の呼び出しの遅れは、SLA の違反の通知の遅れと同じく重いためである（統合で [workflow-engine.md](workflow-engine.md) の 5.1・8.2 節の表に足した）。
 - 受け手の解決は、段に入った時刻に行う（当番の引き継ぎをまたいで呼び出しが続くとき、新しい段は新しい当番を呼ぶ）。
 - `exhausted` の後も、タスクの担当者は手で呼び直せる（新しい呼び出し）。

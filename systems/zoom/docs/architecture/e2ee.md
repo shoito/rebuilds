@@ -142,6 +142,30 @@ API（AS）
 4. 全員がコミットを処理する。各自、新しい参加者の証明書の `participant_id` が、シグナリングの `participant.joined` と一致するかを確かめる（11 節）。
 5. 各送り手は、新しいエポックの鍵で送り始め、カメラ・共有の映像でキーフレームを 1 回作る（`generateKeyFrame`。RFC 9605 の 6.2 節）。
 
+作成と参加の流れを図にする。最初の参加者がグループを作り、以後の参加者は Actor が保存した GroupInfo から外部コミットで入る。
+
+```mermaid
+sequenceDiagram
+    participant F as 最初の参加者
+    participant A as Meeting Actor（DS）
+    participant N as 参加する人
+    participant M as 既存のメンバー
+    Note over F,A: 作成
+    A->>F: e2ee.create（外部の送り手の公開鍵）
+    F->>F: グループを作る
+    F->>A: e2ee.commit（コミットは空、エポック 0 の GroupInfo）
+    A->>A: GroupInfo を保存する
+    Note over A,M: 参加（外部コミット）。待合室・パスコードの判定の後、Admitted になった人
+    A->>N: e2ee.group_info（最新の GroupInfo）
+    N->>N: GroupInfo の署名と名簿の全員の証明書を検証し、join_by_external_commit でコミットを作る
+    N->>A: e2ee.commit
+    A->>A: 送り手の証明書の participant_id が接続の参加者と同じときだけ受ける
+    A->>M: e2ee.commit（seq 付き）
+    A->>N: e2ee.commit（seq 付き）
+    M->>M: コミットを処理し、participant_id を participant.joined と照らす
+    Note over N,M: 各送り手は新しいエポックの鍵で送り始め、キーフレームを 1 回作る
+```
+
 **退出・退出させる**
 
 1. Actor が退出を確定する（`self.leave`、`host.remove`、切断の猶予の終わり。[signaling-and-meetings.md](signaling-and-meetings.md) の 5.2 節）。同時に Media Node に、その人の transport を閉じさせる。
@@ -149,6 +173,29 @@ API（AS）
 3. 担当者がコミットを作り（更新の経路を含む）、`e2ee.commit` で送る。
 4. 400ms 以内に担当者のコミットが来なければ、Actor は次の担当者を指名する。
 5. 全員がコミットを処理し、新しい鍵で送る。
+
+退出の流れを図にする。Actor は Remove を提案するだけで、コミットは指名された担当者が作る。担当者が 400ms 以内に送らなければ、次の担当者を指名する。
+
+```mermaid
+sequenceDiagram
+    participant A as Meeting Actor（DS）
+    participant MN as Media Node
+    participant C1 as 担当者
+    participant C2 as 次の担当者
+    participant M as 既存のメンバー
+    A->>A: 退出を確定する（self.leave、host.remove、切断の猶予の終わり）
+    A->>MN: その人の transport を閉じさせる
+    A->>M: e2ee.proposal（Remove の提案、担当者の指名）
+    Note over A,M: 担当者は、在席で接続が ok の人のうち leaf の番号が最も小さい人
+    alt 400ms 以内に担当者のコミットが来る
+        C1->>A: e2ee.commit（更新の経路を含む）
+    else 400ms 以内に来ない
+        A->>M: 次の担当者を指名する
+        C2->>A: e2ee.commit（更新の経路を含む）
+    end
+    A->>M: e2ee.commit（seq 付き）
+    M->>M: コミットを処理し、新しい鍵で送る
+```
 
 **入り直し（状態を失った人）**
 
@@ -361,7 +408,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **SFrame の暗号の組**：`AES_128_GCM_SHA256_128`（ADR-0028）。
 - **KID**：E=4、S=10、context は送り方と層（ADR-0028）。

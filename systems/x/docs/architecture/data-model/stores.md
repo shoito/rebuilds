@@ -75,7 +75,7 @@ Functions：`tl_insert`・`tl_begin`・`tl_merge`・`tl_remove`・`tl_remove_aut
 | `uc:{user_id}` | ハッシュ | 同上 | `followers`・`following`・`posts`、`l0`〜`l7`・`s0`〜`s7`・`t` | 同上 | 同上 |
 | `pcd:{aggregator_id}` | Set | なし | 書き戻しの対象（変わった投稿・利用者の ID。`p:` か `u:` の前置き） | `counter-aggregator` | [engagement-and-counters.md](../engagement-and-counters.md) の 4.3 節 |
 
-- `vk-counters` は数と連番だけを持つ。シャードの読み終わりの位置は Aurora の `stream_checkpoints`（[README.md](../README.md) の 6 節の統合の決定）。
+- `vk-counters` は数と連番だけを持つ。シャードの読み終わりの位置は Aurora の `stream_checkpoints`（[design-log.md](../design-log.md) の「2026-10-04：統合」）。
 - `pc:` がない投稿の読み出しは `post_counters` から入れる（連番を含む）。
 
 ### 1.4 `vk-edge`

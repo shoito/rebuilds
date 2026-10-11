@@ -264,6 +264,8 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `route-deviation-alert` | 端末での逸脱の知らせ |
 | `driver-trip-journal` | journal と送り直し（trips の `driver-journal-and-replay` と一緒に） |
 | `driving-mode-ui` | 走行中の操作の制限 |
+| `app-accessibility` | 読み上げのラベル、到着の知らせ、「連絡はメッセージで」の設定、オファーの振動と点滅（rider-and-driver-apps.md の 3.3 節） |
+| `app-localization-and-phrases` | UI の言語、定型文のカタログと対訳、行き先を見せる画面（ADR-0044、proposed。対象の言語は PM の確認待ち） |
 
 ### E10 安全と信頼
 
@@ -314,7 +316,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 
 設計：[supply-and-operators.md](architecture/supply-and-operators.md) の 6 節、[pricing-and-fares.md](architecture/pricing-and-fares.md) の 2.5 節、[dispatch-and-matching.md](architecture/dispatch-and-matching.md) の 5 節、[infrastructure.md](architecture/infrastructure.md) の 7 節、[capacity.md](architecture/capacity.md) の 7 節、[security.md](architecture/security.md) の 7・11 節
 
-2 つの流れに分ける。どちらも S1 の本番の開始の前に終える条件だが、日本版ライドシェアは法務（L2・L5）の結論を待つので、GA の準備を止めずに並行して進める（[architecture/README.md](architecture/README.md) の 7 節。2026-09-28 に確定）。
+2 つの流れに分ける。どちらも S1 の本番の開始の前に終える条件だが、日本版ライドシェアは法務（L2・L5）の結論を待つので、GA の準備を止めずに並行して進める（[architecture/design-log.md](architecture/design-log.md) の「2026-09-28：推奨案で確定」）。
 
 **日本版ライドシェア**（すべて `release.rideshare.*` と legal のフラグの裏）
 

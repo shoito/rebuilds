@@ -250,7 +250,7 @@ API ─(tx)─▶ outbox ─▶ Relay ─▶ SQS search-index（本文）─▶ 
 
 ## 12. 決定と持ち越し
 
-2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
+2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[design-log.md](design-log.md) の「決定」）。
 
 - ワークスペースの中の「リンクを知っている人」の共有（`hide_from_search`）のページは、開いたことのないメンバーの検索に出さない（キーにしない）。本家と同じ（「Hide in search」。[Sharing & permissions](https://www.notion.com/help/sharing-and-permissions)、2026-09-27 に確認）。
 - 本文は 1 MB で切る。切ったページの数を指標にし、多ければ上限を見直す（E6）。

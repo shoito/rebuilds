@@ -317,6 +317,104 @@ ADR-0071。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | KeyValueStore | `sys:origins`（ポッド → 元の ID）、`sys:region` | 3.1、7.2 |
 | AppConfig | `ops.checkout_enabled`（全体・ポッド・ショップ） | 7.2 |
 
+## 13. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の元になる、すべてのコンテナと呼び出しの図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    buyer["買い手のブラウザ"]
+    dev["アプリのサーバー・ヘッドレスのフロントエンド"]
+    merchant["事業者・スタッフ（管理画面）"]
+
+    subgraph edge["エッジ（CloudFront）"]
+        waf["AWS WAF<br/>Bot Control、速さの上限"]
+        cff["CloudFront Functions<br/>ホスト → ショップ・ポッド、<br/>待合室の許可証、キャッシュの鍵"]
+        kvs[("KeyValueStore<br/>熱い集まり（4 MB まで）、世代の番号")]
+        cache[("エッジのキャッシュ")]
+    end
+
+    subgraph global["全体の面（ポッドの外）"]
+        dir["shop-directory<br/>ショップ → ポッド"]
+        er["edge-router<br/>熱い集まりにないホストの中継"]
+        idn["identity<br/>スタッフのアカウント、SSO"]
+        appreg["app-registry<br/>アプリ、OAuth、関数"]
+        bill["billing<br/>プランと請求"]
+        wr["waiting-room<br/>待ちの列、許可証"]
+        mover["shop-mover"]
+        wh["webhook-dispatcher<br/>本文を運ぶだけ（保存しない）"]
+        gdb[("Aurora（全体）")]
+        wrv[("Valkey（待合室）")]
+    end
+
+    subgraph pod["ポッド（N 個。同じ形）"]
+        sf["storefront-renderer<br/>テーマの言語"]
+        sfapi["storefront-api"]
+        co["checkout<br/>ステートマシン、価格・税・割引・送料"]
+        admin["admin-api<br/>GraphQL、費用の上限"]
+        fr["function-runner<br/>Wasmtime（Rust）"]
+        wk["workers<br/>引き当ての掃除、照合、注文、配送、<br/>Webhook の本文の作成"]
+        relay["relay（outbox）"]
+        purge["cache-invalidator"]
+        idx["search-indexer"]
+        notif["notifier"]
+        pdb[("Aurora PostgreSQL<br/>ショップのデータ、FORCE RLS")]
+        pv[("Valkey<br/>カート、費用のバケット")]
+        os[("OpenSearch<br/>商品の検索")]
+    end
+
+    s3[("S3<br/>メディア、テーマ、一括の操作の結果")]
+    psp["決済の提供者"]
+    carrier["運送会社"]
+    osaka[("大阪：Aurora Global Database、S3 の写し")]
+
+    buyer --> waf --> cff
+    cff --> kvs
+    cff --> cache
+    cff --> wr
+    cff -->|"熱い集まりにない"| er
+    er --> dir
+    er --> sf
+    cache --> sf
+    cache --> sfapi
+    cff --> co
+    dev --> admin
+    dev --> sfapi
+    merchant --> admin
+    sf --> pdb
+    sfapi --> pdb
+    co --> pdb
+    co --> pv
+    co --> fr
+    co --> psp
+    psp -->|"Webhook"| co
+    admin --> pdb
+    admin --> pv
+    wk --> pdb
+    wk --> carrier
+    pdb --> relay
+    relay --> wk
+    relay --> purge
+    relay --> idx
+    relay --> notif
+    wk -->|"本文（暗号化した SQS）"| wh
+    purge --> dir
+    dir --> kvs
+    idx --> os
+    sfapi --> os
+    wr --> wrv
+    dir --> gdb
+    mover --> pdb
+    idn --> gdb
+    appreg --> gdb
+    appreg -.->|"P5：定義の写し"| pdb
+    bill --> gdb
+    sf --> s3
+    pdb -.-> osaka
+    gdb -.-> osaka
+    s3 -.-> osaka
+```
+
 ## 出典
 
 いずれも 2026-10-10 に確認・取得。

@@ -51,10 +51,26 @@ pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cu
 
 ### 4.1 状態
 
-```
- draft ─freeze─▶ frozen ─compute─▶ computing ─▶ computed ─review─▶ in_review ─finalize(bp)─▶ finalized ─release(bp)─▶ released
-   │               │                               │                 │   ▲                      │
-   └──────────────┴───────────── cancel ──────────┴─────────────────┘   └ recompute_one          └ payroll_cancel(bp) ─▶ cancelled
+実行の段の遷移を次の図に示す。遷移の正は DT-PAY-001 と下の表で、図はその要約。`finalized` までは `cancel` で捨てられ、`finalized` の後は支払の前に限り `payroll_cancel` の業務プロセスで取り消す。
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> frozen: freeze
+  frozen --> computing: compute
+  computing --> computed
+  computed --> in_review: review
+  in_review --> in_review: recompute_one
+  in_review --> finalized: finalize（bp）
+  finalized --> released: release（bp）
+  finalized --> cancelled: payroll_cancel（bp）
+  draft --> cancelled: cancel
+  frozen --> cancelled: cancel
+  computing --> cancelled: cancel
+  computed --> cancelled: cancel
+  in_review --> cancelled: cancel
+  released --> [*]
+  cancelled --> [*]
 ```
 
 | 段 | すること | 業務プロセス | 取り消し |
@@ -76,6 +92,25 @@ pay_periods (tenant_id, id, pay_group_id, period_start, period_end, pay_date, cu
 
 - 実行の予定（支給日から逆算した、勤怠の締め・入力の固定・確定・振込ファイルの承認の期限）を `pay_periods` から作り、受信箱と勤怠の締めの期限に出す。
 - 振込の締め切り（銀行ごと）は [payments-and-accounting.md](payments-and-accounting.md) の 3.5 節。既定は支給日の 3 営業日前に `released`。
+
+次の図は、締日 20 日・支給日 25 日（3.1 節の例）、振込の締め切り 3 営業日（`lead_business_days` の既定）のときの、2026 年 12 月の予定の例。`released` の期限は支給日から営業日で数えて逆算し、勤怠の締めから確定までは、締日とその期限の間に置く。
+
+```mermaid
+gantt
+  title 支給日から逆算した期限（2026 年 12 月の例）
+  dateFormat YYYY-MM-DD
+  axisFormat %m-%d
+  tickInterval 1day
+  todayMarker off
+  section 勤怠
+  締日（20 日） :milestone, c1, 2026-12-20, 0d
+  section 給与の実行
+  勤怠の締め・入力の固定・計算・確定 :p1, 2026-12-21, 2026-12-22
+  振込ファイルの承認の期限（released） :milestone, r1, 2026-12-22, 0d
+  section 振込
+  銀行の締め切りまでの 3 営業日 :b1, 2026-12-22, 2026-12-25
+  支給日（25 日） :milestone, pd, 2026-12-25, 0d
+```
 
 ## 5. 入力のスナップショット（[ADR-0026](../decisions/0026-payroll-run-stages-and-input-snapshot.md)）
 

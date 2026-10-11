@@ -16,6 +16,7 @@
 <meta property="og:site_name" content="rebuilds">
 <meta name="description" content="Stripe の再構築の設計の文書を読む前に知っておくとよい、カード決済・複式簿記・照合・PCI DSS・日本の決済手段と法令の枠組み。">
 <meta name="primer-home" content="../../../../index.html">
+<link rel="icon" href="../../../../docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
 </head>
 <body>
@@ -376,7 +377,7 @@
       <tr><td>バージョンの名前（acacia・basil など）</td><td>別の木の名前（本家のバージョンと互換と誤解させない）</td></tr>
     </table>
     <p>範囲の違い：Connect・Billing・Radar の機械学習・Terminal などは範囲外です。<code>POST /v1/charges</code> は作らず、Charge は PaymentIntent の中の試行としてだけ存在します。本番の秘密キーは作成時の 1 回だけ表示します。</p>
-    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/README.md">architecture/README.md</a> の 6 節の「決定」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>。</small></p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/architecture/design-log.md">architecture/design-log.md</a> の「決定」、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>。</small></p>
   </section>
 
   <section class="s" id="glossary">

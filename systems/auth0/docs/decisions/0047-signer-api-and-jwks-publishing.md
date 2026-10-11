@@ -55,7 +55,7 @@ JWKS のキャッシュ：
 - b は、Signer の DB の権限が広がり、outbox との一貫性を Signer が持つことになる。
 - y は、変更のたびの無効化に頼り、無効化の失敗が長い食い違いになる。
 
-> 2026-09-28 の注記：外向きの `oidc_client_assertion` の `aud` は、IdP のトークンのエンドポイントではなく IdP の `issuer` にする（draft-ietf-oauth-rfc7523bis に合わせた推奨案。keys-and-secrets.md の 6.3 節と architecture/README.md の決定と同じ）。トークンのエンドポイントの URL を求める IdP があれば、E14 の着手時に接続ごとの互換の設定で扱う。
+> 2026-09-28 の注記：外向きの `oidc_client_assertion` の `aud` は、IdP のトークンのエンドポイントではなく IdP の `issuer` にする（draft-ietf-oauth-rfc7523bis に合わせた推奨案。keys-and-secrets.md の 6.3 節と architecture/design-log.md の決定と同じ）。トークンのエンドポイントの URL を求める IdP があれば、E14 の着手時に接続ごとの互換の設定で扱う。
 
 ## Consequences
 

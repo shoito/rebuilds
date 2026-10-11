@@ -68,6 +68,8 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0061](0061-access-decision-and-limit-gates-in-ci.md) | 決定表・性質・上限・漏えいの経路を CI の関門にし、上限の登録簿は設計の記録の governor-limits.md と機械的に比べる | accepted |
 | [0062](0062-security-sensitive-change-flow.md) | security:sensitive はパスで自動で付け、テックリードとセキュリティの担当の 2 人の承認、追加の CI、組織の単位の段階的なリリースを必須にする | accepted |
 | [0063](0063-org-staged-release-and-shadow-evaluation.md) | リリースは組織を単位に段階で広げ、アクセスの判定・問い合わせのコンパイルを変える時は、新旧を本番の標本で並べて比べる影の実行を経る | accepted |
+| [0064](0064-web-lead-form-public-intake.md) | Web からのリードのフォームは、専用のホストの公開の受け口で受けて待ち行列に入れ、フォームごとの実行の利用者の権限で非同期に作る。守りを層に重ね、落とした・隔離した送信にも同じ応答を返す | proposed |
+| [0065](0065-migration-path-from-original.md) | 本家からの移行は、移行の文書と、本家の ID を外部 ID に入れて決まった順で CSV を upsert する手順で支える。監査の項目は専用の権限のジョブだけが書ける。メタデータの変換の道具は後の Epic で、上げたファイルを読む形にする | proposed |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

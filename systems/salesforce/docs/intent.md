@@ -133,8 +133,21 @@ B2B の営業チームは、顧客（取引先・取引先責任者）、見込�
 | L9 | 捜査機関・裁判所などからのデータの開示の要求：本システムが直接受けた時の応じ方、組織への通知（通知できない時の扱い）、運用者の break-glass で読む時の手続き（2026-09-28 に security の領域から足した） | [security.md](architecture/security.md) の 6 節 | E12 の GA の判定（運用の手順と DPA） |
 | L10 | 個人データの漏えい等の報告：組織をまたぐ漏えい・見えないデータの漏えい・Sandbox のマスキングの事故が起きた時、個人情報保護委員会への報告（速報・確報）と本人への通知の主体（組織か本システムか）と期限（2026-09-28 に security の領域から足した） | [security.md](architecture/security.md) の 10 節、[runbooks/incident-response.md](runbooks/incident-response.md) | E12 の GA の判定（インシデントの手順） |
 | L11 | 第三者のコードとパッケージ（E13・E14）：組織が入れた配布者のパッケージが組織のデータを読み書きする時の、本システム・配布者・組織の責任の分け方、配布者の審査と公開の一覧の条件（2026-09-28 に extensibility の領域から足した） | [extensibility.md](architecture/extensibility.md) の 8 節 | E14 のパッケージの配布 |
+| L12 | Web からのリードのフォームで集める個人データ（2026-10-10 に sales-objects の領域から足した）：取得の時の利用目的の通知・公表を誰が行うか（組織か本システムか。フォームの雛形にプライバシーの方針の URL を必須にする設計で足りるか）、同意の確認の要否、ボット対策で送り手の IP を HMAC にして 30 日持つことの扱い、外部のボット判定の事業者を使う時の外国にある第三者への提供（L2・L4 と関わる） | [sales-objects.md](architecture/sales-objects.md) の 9 節、[ADR-0064](decisions/0064-web-lead-form-public-intake.md) | E5 の `web-lead-form` |
+| L13 | 本家からの移行の道具（2026-10-10 に bulk-and-import の領域から足した）：利用者が上げた本家のメタデータの書き出しを読んで変換する道具を提供すること、画面・文書で本家の製品と機能の名前を出すことが、本家の利用規約・著作権・不正競争防止法の観点で許されるか | [bulk-and-import.md](architecture/bulk-and-import.md) の 15 節、[ADR-0065](decisions/0065-migration-path-from-original.md) | 後の移行の Epic（メタデータの変換の道具） |
 
-- **L1〜L11 は全て確認待ちのまま**にする（2026-09-28 の統合の工程で、結論を出さずに L9〜L11 を足した）。
+- **L1〜L13 は全て確認待ちのまま**にする（2026-09-28 の統合の工程で、結論を出さずに L9〜L11 を足した。2026-10-10 に L12・L13 を足した）。
+
+### PM の判断待ち
+
+- **Web からのリードのフォームを MVP に入れるか**（[ADR-0064](decisions/0064-web-lead-form-public-intake.md)、proposed。[sales-objects.md](architecture/sales-objects.md) の 9 節）：L4 はこのフォームを前提にしているが、MVP の一覧にない。選択肢は次の 3 つ。
+  1. **MVP の E5 に入れる（`web-lead-form`）**（推奨）：B2B の営業で、Web の問い合わせからのリードは主な入口であり、組織が OAuth の資格を Web のページに置く事故を防げる。法務の L4・L12 の確認が済むまで spec は承認しない。
+  2. MVP の後の Epic にし、MVP では組織が自分のサーバーから REST API で作る形を案内する。
+  3. 持たず、MA（マーケティングの自動化）の道具との連携に任せる。
+- **本家からの移行の支援の範囲**（[ADR-0065](decisions/0065-migration-path-from-original.md)、proposed。[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節）：Non-goals は「移行の道具が要れば別の Epic」とだけ書く。選択肢は次の 3 つ。
+  1. **MVP は移行の文書（本家との違いの表）と、`legacy_id` での CSV の取り込みの手順（E9 の `migration-import`）にし、メタデータの変換の道具は MVP の後の Epic にする**（推奨）：データの取り込みの部品はそろっており、足すのは検査と権限と手順書だけで済む。
+  2. MVP に、上げたファイルを読むメタデータの変換の道具まで入れる：法務の L13 が先に要り、E10 の形式が固まる前に作ることになる。
+  3. 移行の文書だけを用意し、取り込みの手順は一般の CSV の取り込みに任せる。
 
 ### PM の確認済みの決定
 

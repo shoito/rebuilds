@@ -28,23 +28,44 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 
 ## 3. PaymentIntent の状態遷移
 
-```
-                ┌──────────────── 決済手段なしで作成 ────────────────┐
-                ▼                                                    │
-  requires_payment_method ──PM を付ける──▶ requires_confirmation      │
-         ▲   │                                   │                   │
-         │   └───────────── confirm ─────────────┤                   │
-         │                                       ▼                   │
-         │  失敗・拒否・3DS 失敗 ◀──────── (試行を作ってコネクタへ)      │
-         │  コンビニの期限切れ                    │                   │
-         │                  ┌────────────┬───────┼────────────┐      │
-         │                  ▼            ▼       ▼            ▼      │
-         └────────── requires_action  processing  requires_capture   │
-                     (3DS・支払い待ち) (結果待ち)   │ capture         │
-                            │            │         ▼                 │
-                            └────────────┴──▶ succeeded              │
-                                                                     │
-  succeeded と processing（カード）以外から ──cancel──▶ canceled ◀──────┘
+次の図は、3.1 節の遷移の表を要約したものである。食い違ったら表を正とする。「試行中」は状態ではなく、試行（Charge）をコネクタへ送っている間を表す。
+
+```mermaid
+stateDiagram-v2
+    state "requires_payment_method" as rpm
+    state "requires_confirmation" as rc
+    state "試行中（Charge を作ってコネクタへ）" as attempt
+    state "requires_action<br/>（3DS・支払い待ち）" as ra
+    state "processing<br/>（結果待ち）" as proc
+    state "requires_capture" as rcap
+    state "succeeded" as succ
+    state "canceled" as canc
+
+    [*] --> rpm : 作成（payment_method なし）
+    [*] --> rc : 作成（payment_method あり）
+    rpm --> rc : 更新で payment_method を付ける（3.3 節）
+    rpm --> attempt : confirm
+    rc --> attempt : confirm
+    rc --> rpm : confirm を不正検知が拒否
+    attempt --> ra : 3DS のチャレンジ<br/>支払い番号・振込先の発行
+    ra --> attempt : 3DS 成功
+    ra --> rpm : 3DS 失敗・放棄<br/>コンビニの期限切れ
+    ra --> succ : コンビニの入金の速報<br/>銀行振込の充当で残りが 0
+    attempt --> rcap : オーソリ承認（manual）
+    attempt --> succ : オーソリ承認（automatic・automatic_async）
+    attempt --> rpm : オーソリ拒否
+    attempt --> proc : コネクタの結果不明
+    proc --> rcap : 照会で承認と判明（manual）
+    proc --> succ : 照会で承認と判明（automatic 系）
+    proc --> rpm : 未処理と判明し、取り消しが確定
+    rcap --> succ : capture
+    rcap --> canc : オーソリの期限切れ
+    rpm --> canc : cancel
+    rc --> canc : cancel
+    ra --> canc : cancel（コンビニで支払い中でない）
+    rcap --> canc : cancel
+    succ --> [*]
+    canc --> [*]
 ```
 
 ### 3.1 遷移の表
@@ -109,6 +130,41 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 6. **3D セキュア**（カード）：6 節。チャレンジが要れば `requires_action` を返して終わる。認証の完了後にオーソリへ進む。
 7. **オーソリ**：Connector Gateway（CDE）へ、PaymentMethod のトークンと参照番号で要求する。
 8. **結果の反映**：結果に応じて 3.1 節の表で遷移し、仕訳を書き、outbox に Event を積む（[events-and-webhooks.md](events-and-webhooks.md)）。すべて 1 トランザクション。
+
+次の図は、カードの確定の流れを手順の番号で示す。3D セキュアのチャレンジの後の流れは 6.2 節の図にある。
+
+```mermaid
+sequenceDiagram
+    participant M as 加盟店・ブラウザー
+    participant API as API
+    participant F as Fraud
+    participant CDE as Connector Gateway（CDE）
+    participant C as コネクタ
+
+    M->>API: confirm（Idempotency-Key）
+    Note over API: 1. 冪等の確認、PaymentIntent を FOR UPDATE<br/>受け付けない状態なら 400
+    Note over API: 2. 金額・通貨・決済手段の検証
+    API->>F: 3. ルールの評価
+    F-->>API: 許可・拒否・3DS を要求
+    Note over API: 4. Charge を pending_send で INSERT し、コミット<br/>5. 振り分け（コネクタを決める）
+    opt 6. 3D セキュア（6 節）
+        API->>CDE: 認証の開始
+        CDE->>C: 認証の開始（3DS Server）
+        C-->>CDE: frictionless かチャレンジか
+        CDE-->>API: 結果
+        Note over API: チャレンジが要れば requires_action を返して終わる
+    end
+    API->>CDE: 7. オーソリ（トークン・参照番号）
+    CDE->>C: オーソリ
+    alt connector.authorize_timeout（既定 20 秒）以内に応答
+        C-->>CDE: 承認・拒否
+        CDE-->>API: 結果（カード番号を含めない）
+        Note over API: 8. 遷移・仕訳・outbox の Event を 1 トランザクションで書く
+        API-->>M: 結果の PaymentIntent
+    else 上限を超えた
+        API-->>M: processing（結果は Webhook で知らせる。7 節）
+    end
+```
 
 - API の応答は、手順 8 の結果の PaymentIntent。コネクタの応答を待つ上限は `connector.authorize_timeout`（既定 20 秒。[capacity.md](capacity.md) のパラメーター）。超えたら `processing` を返し、結果は Webhook で知らせる。
 - 非同期の決済手段（コンビニ・銀行振込）は、手順 6・7 の代わりに支払い番号・振込先を発行し、`requires_action` を返す（[payment-methods.md](payment-methods.md)）。
@@ -178,6 +234,39 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 5. 結果が認証成功（または `attempt_acknowledged` のように、ネットワークの規則上オーソリを続けてよい結果）ならオーソリへ進む。失敗なら `requires_payment_method` にする。
 6. Charge の `payment_method_details.card.three_d_secure` に、結果・認証の流れ（frictionless / challenge）・ECI・バージョンを記録する。Dispute の証拠に自動で使う（[disputes.md](disputes.md)）。
 
+次の図は、チャレンジが要る場合の流れである。認証の結果は、コネクタの通知とブラウザーの戻りの 2 つの経路で届き、先に届いた方で 1 回だけ反映する。
+
+```mermaid
+sequenceDiagram
+    participant B as ブラウザー（Elements・Checkout）
+    participant API as API
+    participant CDE as Connector Gateway（CDE）
+    participant C as コネクタ（3DS Server）
+
+    API->>CDE: 認証の開始
+    CDE->>C: 認証の開始（カード番号を使う）
+    C-->>CDE: チャレンジが要る
+    CDE-->>API: チャレンジが要る
+    API-->>B: requires_action（next_action）
+    Note over B: チャレンジを iframe で表示するか、<br/>カード発行会社の画面へ移す（redirect_to_url）
+    par 経路 1：コネクタの通知
+        C->>API: 認証の結果の通知（受信箱に記録し、ワーカーが反映。ADR-0014）
+    and 経路 2：ブラウザーの戻り
+        B->>API: 戻り（return_url か Elements）
+        API->>CDE: 認証の結果の照会
+        CDE->>C: 照会
+        C-->>CDE: 認証の結果
+        CDE-->>API: 認証の結果
+    end
+    Note over API: どちらが先でも、同じ試行に 1 回だけ反映する
+    alt 認証成功・attempt_acknowledged
+        Note over API: オーソリへ進む（4 節の手順 7）
+    else 失敗
+        Note over API: requires_payment_method
+    end
+    Note over API: Charge に three_d_secure の結果・流れ・ECI・バージョンを記録
+```
+
 - チャレンジの放棄：`requires_action` のまま一定時間（`three_ds.abandon_after`、既定 1 時間）たったら、試行を失敗にし `requires_payment_method` に戻す。PaymentIntent 自体は取り消さない。
 - 3DS の成功はライアビリティシフトを保証しない（本家も明言している）。画面・文書で「保証」と書かない。
 
@@ -201,6 +290,38 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | `reversed` | 取り消しを送り、アクワイアラが受理した |
 | `captured` / `partially_refunded` / `refunded` | キャプチャ後 |
 
+次の図は、7.3 節の判定の規則と 7.4 節の回復のジョブで、試行の内部状態がどう移るかを示す。
+
+```mermaid
+stateDiagram-v2
+    state "pending_send" as ps
+    state "sent" as sent
+    state "failed_before_send" as fbs
+    state "authorized" as auth
+    state "declined" as dec
+    state "unknown" as unk
+    state "reversed" as rev
+    state "captured" as cap
+    state "partially_refunded" as pref
+    state "refunded" as ref
+
+    [*] --> ps : 参照番号を割り当てて INSERT
+    ps --> fbs : サーキットブレーカーが開いている
+    ps --> sent : 送信を始めた
+    sent --> fbs : DNS・TCP・TLS の確立前に失敗
+    sent --> auth : 応答があり、承認
+    sent --> dec : 応答があり、拒否
+    sent --> unk : 送信後のタイムアウト・切断・5xx・解釈の失敗
+    unk --> auth : 照会で承認が見つかった
+    unk --> dec : 照会で拒否が見つかった
+    unk --> rev : 見つからず、取り消しが受理された
+    auth --> cap : キャプチャ
+    cap --> pref : 一部の返金
+    cap --> ref : 全額の返金
+    pref --> ref : 残りの返金
+```
+
+- `unknown` のあいだ、PaymentIntent は `processing` にある。照会も取り消しもできないときは `unknown` のまま待つ（7.4 節）。
 - 参照番号は Charge の ID から決まる値で、コネクタごとに一意。再送・照会・取り消しは、すべて同じ参照番号で行う（[ADR-0004](../decisions/0004-idempotency.md) のコネクタの層）。
 - `connector_requests` に、要求の種類・参照番号・送信の時刻・応答（生のコードを含む）を追記する。カード番号は含めない（CDE の中で組み立て、本体には結果だけを返す）。
 
@@ -220,6 +341,31 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 3. **見つからない**：コネクタの「処理済みなら必ず照会で見える」時間（能力の `inquiry_consistency_window`）を過ぎてから、同じ参照番号で取り消し（リバーサル）を送る。取り消しが受理されたら `reversed` にし、PaymentIntent を `requires_payment_method`（`decline_code = processing_error`）に戻す。
 4. **照会も取り消しもできない**（コネクタの障害）：`processing` のまま待つ。顧客にも加盟店にも失敗と言わない。24 時間を超えたら SEV2 とし、runbook の `unknown-outcome-backlog.md`（E3 で作る。[runbooks/README.md](../runbooks/README.md)）の手順で、コネクタの窓口に参照番号で確認する。
 5. **最後の網**：コネクタの精算ファイルとの照合（[payouts-and-reconciliation.md](payouts-and-reconciliation.md)）で、こちらに成功の記録がない売上が見つかったら、自動で取り消し・返金し、SEV2 とする。
+
+次の図は、結果不明になってから、照会を繰り返し、取り消し（リバーサル）か SEV2 に至るまでを時刻の順に示す。
+
+```mermaid
+sequenceDiagram
+    participant J as 回復のジョブ
+    participant C as コネクタ
+    participant O as 運用
+
+    Note over J: Charge が unknown、PaymentIntent が processing
+    loop 間隔 5 秒・30 秒・2 分・10 分・1 時間（unknown_outcome.inquiry_schedule）
+        J->>C: 照会（同じ参照番号）
+        C-->>J: 見つかった・見つからない
+    end
+    alt 見つかった
+        Note over J: 承認・拒否を反映する。承認なら capture_method に従って進む
+    else 見つからず、inquiry_consistency_window を過ぎた
+        J->>C: 取り消し（リバーサル。同じ参照番号）
+        C-->>J: 受理
+        Note over J: Charge を reversed、PaymentIntent を<br/>requires_payment_method（processing_error）にする
+    else 照会も取り消しもできない（コネクタの障害）
+        Note over J: processing のまま待つ
+        J->>O: 24 時間を超えたら SEV2（unknown-outcome-backlog.md）
+    end
+```
 
 - `processing` の PaymentIntent への confirm・cancel は 400 で拒否する。加盟店は Webhook（`payment_intent.succeeded` / `payment_intent.payment_failed`）を待つ。
 - ブラウザーの Checkout・Elements は、`processing` のあいだ「処理中」を表示し、ポーリングする。
@@ -298,6 +444,38 @@ PaymentIntent・SetupIntent の状態遷移、確定（confirm）、3D セキュ
 | `pending` | コネクタ・銀行が受理した | `succeeded` |
 | `pending` | コネクタ・銀行が拒否した | `failed`（`failure_reason`） |
 | `succeeded` | 銀行から組み戻し（口座の誤りなど） | `requires_action`（口座情報を再び依頼）か `failed` |
+
+次の図は、上の表と、下の「残高が足りないとき」の規則をまとめたものである。表を正とする。`awaiting_balance` は API では `pending` に見える内部の状態である。
+
+```mermaid
+stateDiagram-v2
+    state "pending" as pending {
+        state "awaiting_balance<br/>（仕訳も送信もしない）" as awaiting
+        state "仕訳を書き、コネクタへ送った" as sending
+        state chk <<choice>>
+        [*] --> chk : 利用可能な残高を確かめる
+        chk --> sending : 足りる
+        chk --> awaiting : カードで足りない
+        awaiting --> sending : 残高が増えた後に確かめ直し、足りた
+    }
+    state "requires_action" as ra
+    state "succeeded" as succ
+    state "failed" as failed
+    state "canceled" as canc
+
+    [*] --> pending : 作成（カード）
+    [*] --> ra : 作成（コンビニ・銀行振込、口座情報がない）
+    [*] --> failed : 作成（コンビニ・銀行振込、残高が足りない）
+    ra --> pending : 顧客が口座情報を入力
+    ra --> failed : 45 日たっても入力がない
+    ra --> canc : 加盟店が取り消した
+    sending --> succ : コネクタ・銀行が受理した
+    sending --> failed : コネクタ・銀行が拒否した
+    awaiting --> failed : refund.balance_hold_max（既定 30 日）を過ぎた
+    awaiting --> canc : 加盟店が取り消した
+    succ --> ra : 組み戻し（口座情報を再び依頼）
+    succ --> failed : 組み戻し
+```
 
 - コンビニの返金の 45 日は本家の値（[コンビニ決済](https://docs.stripe.com/payments/konbini/accept-a-payment?payment-ui=direct-api)）。
 - 失敗の理由は本家の値に寄せる：`declined`、`expired_or_canceled_card`、`insufficient_funds`、`lost_or_stolen_card`、`merchant_request`、`charge_for_pending_refund_disputed`、`unknown`。

@@ -28,17 +28,31 @@
 
 本家の 8 つ：`warning_needs_response`、`warning_under_review`、`warning_closed`、`needs_response`、`under_review`、`won`、`lost`、`prevented`。`warning_` の付くものが照会、付かないものがチャージバック。
 
-```
-照会の通知 ──▶ warning_needs_response ──証拠の提出──▶ warning_under_review
-                   │                                     │
-                   │ 全額返金・120 日で終了                │ 終了の通知・120 日
-                   ▼                                     ▼
-              warning_closed ◀───────────────────────────┘
-                   │（照会がチャージバックへ）
-                   ▼
-チャージバックの通知 ──▶ needs_response ──証拠の提出──▶ under_review ──▶ won / lost
-                         │ 受け入れ（accept）・期限切れ                 
-                         └────────────────────────────────▶ lost
+次の図は、下の表を要約したものである。食い違ったら表を正とする。照会がチャージバックに進むときは、照会を閉じ、新しい Dispute を作る。
+
+```mermaid
+stateDiagram-v2
+    state "warning_needs_response" as wnr
+    state "warning_under_review" as wur
+    state "warning_closed" as wc
+    state "needs_response" as nr
+    state "under_review" as ur
+    state "won" as won
+    state "lost" as lost
+    state "prevented" as prev
+
+    [*] --> wnr : 照会の通知
+    wnr --> wur : 証拠の提出
+    wnr --> wc : 加盟店が全額返金
+    wnr --> wc : 照会を閉じた・120 日・チャージバックの通知
+    wur --> wc : 照会を閉じた・120 日・チャージバックの通知
+    [*] --> nr : チャージバックの通知（照会からの移行を含む）
+    nr --> ur : 証拠の提出
+    nr --> lost : 受け入れ（close）・提出の期限切れ
+    ur --> won : 加盟店に有利な決定
+    ur --> lost : 顧客に有利な決定
+    lost --> won : late win
+    [*] --> prev : 正式なチャージバックに至らなかった（MVP では作らない）
 ```
 
 | 今の状態 | きっかけ | 次の状態 | お金 |

@@ -615,7 +615,7 @@ erDiagram
 
 ## 7. この工程で決めたこと（2026-10-09）
 
-領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。[architecture/README.md](README.md) の 6 節にも要点を書いた。
+領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。[design-log.md](design-log.md) の「2026-10-09：データモデル」にも要点を書いた。
 
 | # | 決めたこと | 理由 |
 | --- | --- | --- |
@@ -656,7 +656,7 @@ erDiagram
 | [versions-and-recovery.md](versions-and-recovery.md) | 13 節の `node_versions` の分割と `kind`（D-2・D-5）、`rewind_skips` の主キー（D-14） |
 | [desktop-client.md](desktop-client.md) | 15 節の `app_version` を `client_version` に（D-19） |
 | [delivery.md](delivery.md) | 6.3 節の影の列の埋めの持ち越しを決定に（D-4） |
-| [README.md](README.md) | 3 行目と 7 節の data-model の行。6 節に「決定（2026-10-09、データモデル）」 |
+| [README.md](README.md) | 3 行目と 7 節の data-model の行。「決定（2026-10-09、データモデル）」（今は [design-log.md](design-log.md) にある） |
 | [../README.md](../README.md) | 文書の一覧の data-model の行（「これから作る文書」から外した） |
 
 ## 8. 段階ごとの変化

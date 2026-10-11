@@ -67,14 +67,17 @@
 
 ### 3.2 状態
 
-`_meta.bootstrap` に持つ。
+`_meta.bootstrap` に持つ。次の図は、その状態の遷移を示す。`streaming` は `kind`・`groups`・`chunks`・`done[]`・`s_min` を、`resetting` は `reason` を持つ。`L` は手元の `last_sync_id` である。
 
-```
- none ──(開始)──▶ streaming{kind, groups, chunks, done[], s_min} ──(全チャンク)──▶ catching_up ──(L = head)──▶ ready
-                         │ 切れた・タブが閉じた                                          ▲
-                         ▼                                                               │
-                  streaming（残りのチャンクだけ取り直す。4.5 節）─────────────────────────┘
- ready ──(reset)──▶ resetting{reason} ──▶ streaming …
+```mermaid
+stateDiagram-v2
+  [*] --> none
+  none --> streaming: 開始
+  streaming --> streaming: 切れた・タブが閉じた（残りのチャンクだけ取り直す。4.5 節）
+  streaming --> catching_up: 全チャンク
+  catching_up --> ready: L = head
+  ready --> resetting: reset
+  resetting --> streaming
 ```
 
 - `streaming` の間に、`instant` のモデルのチャンクがそろえば、画面を出してよい（ADR-0003）。`partial` のモデルは「読み込み中」と示す。

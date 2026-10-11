@@ -58,7 +58,7 @@ ElastiCache Valkey（クラスタのモード）。S1 は「一般」と「チ�
 
 ## 2. CloudFront KeyValueStore `edge-kv`
 
-1 つの保存は 5 MB、関数に 1 つ。鍵は 512 バイト、値は 1 KB まで（[README.md](../README.md) の 6 節の確認）。
+1 つの保存は 5 MB、関数に 1 つ。鍵は 512 バイト、値は 1 KB まで（[design-log.md](../design-log.md) の「2026-10-10：統合」の確認）。
 
 | 鍵 | 値 | 寿命 | 書く | 決めた場所 |
 | --- | --- | --- | --- | --- |

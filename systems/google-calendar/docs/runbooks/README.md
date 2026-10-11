@@ -40,7 +40,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 1 カレンダーの書き込み | 1 秒 50 件（見込み。E2 の PoC で確かめる）。`origin` ごとの枠：`user` 30、`itip` 15、`maintenance` 5、`import` 5 | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)、[ADR-0047](../decisions/0047-time-shaped-capacity-and-calendar-write-admission.md) | `ops.calendar_write_budget.<origin>` |
 | 展開の索引の範囲 | 過去 31 日から未来 548 日 | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) | — |
 | 1 つの予定オブジェクト | 上書き 1,000、RDATE 1,000、EXDATE 5,000、範囲の中の回 5,000、知らないプロパティ 32 KiB | 同上、[ADR-0007](../decisions/0007-interop-standards-scope.md) | — |
-| 予定の項目 | タイトル 1,024 文字、説明 64 KiB、直接の参加者 1,000、グループの展開 10,000（入れ子 10 段）、リマインダー 5 件・0〜40,320 分 | [architecture/README.md](../architecture/README.md) の 6 節、[ADR-0016](../decisions/0016-group-invitation-expansion.md) | — |
+| 予定の項目 | タイトル 1,024 文字、説明 64 KiB、直接の参加者 1,000、グループの展開 10,000（入れ子 10 段）、リマインダー 5 件・0〜40,320 分 | [architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」、[ADR-0016](../decisions/0016-group-invitation-expansion.md) | — |
 | 外からの入力 | CalDAV の `PUT` 1 MiB、ICS の取り込み・購読 10 MiB・5 万件、iMIP のメール 10 MiB（`text/calendar` 1 MiB） | [ADR-0040](../decisions/0040-untrusted-calendar-input-gate.md) | — |
 | 変更のログの保持 | 30 日（法務の L5 の後に確定） | [ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)、[ADR-0042](../decisions/0042-audit-log-and-data-lifecycle.md) | — |
 | 配送の並行 | 受け手ごとに並行、200 人を超える招待は `itip-bulk`（1 テナントの同時のバッチ 20） | [ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)、[ADR-0016](../decisions/0016-group-invitation-expansion.md) | `ops.itip_delivery_concurrency` |

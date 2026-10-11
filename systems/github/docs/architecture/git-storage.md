@@ -170,6 +170,24 @@ coordinator                     replica A / B / C（gitd）                  Aur
 | 複製の中身の破損 | 定期の `git fsck`、読み取りの失敗 | 破損した複製を捨て、作り直す |
 | チェックサムの不一致（原因不明） | 定期の照合 | `out_of_sync` にして修復する。3 つとも DB と違えば、ページを出して人が調べる |
 
+次の図は、`network_replicas.state` が、修復（6.1 節）、定期の照合（6.2 節）、再配置（6.3 節）、ref の更新の合意（5 節）でどう移るかを示す。
+
+```mermaid
+stateDiagram-v2
+    state "creating" as creating
+    state "healthy" as healthy
+    state "out_of_sync" as oos
+    state "removing" as removing
+
+    [*] --> creating : 複製を作る<br/>（新しい配置・ノードの喪失・破損・再配置の 4 つ目）
+    creating --> healthy : 一括のコピーと git fetch で追いつき、<br/>チェックサムが DB と一致した
+    healthy --> oos : 投票しなかった・失敗した（5.2 節の 4）<br/>回収で after に達していた（5.3 節）<br/>定期の照合で不一致
+    oos --> healthy : 同期している複製から git fetch し、<br/>ref を合わせ、チェックサムが DB と一致した
+    healthy --> removing : 再配置で、新しい複製が healthy になった
+    removing --> [*] : ルーティングから外し、<br/>読み取りの静止の後に消す
+```
+
+- `out_of_sync` の複製は、ref の更新の投票に入れない（4.3 節）。3 つとも DB と違えば、ページを出して人が調べる。
 - 新しい複製の作成は、まず rsync に相当する一括のコピーでパックファイルを持ってきて、そのあと `git fetch` と ref の合わせで追いつく（本家も Git と rsync を組み合わせる）。コピーの間も元の複製は書き込みを受ける。
 - コピー元は、生き残った 2 つの複製のどちらでもよい。多数のノードから多数のノードへ並列にコピーするので、1 台を失ったときの修復は、ノードの台数に比例して速くなる（Introducing DGit）。
 - 修復の優先順位：`healthy` が 1 つしかないネットワーク → `healthy` が 2 つで 1 つが `out_of_sync` → 容量の平準化。

@@ -239,7 +239,7 @@ ADR-0013。`packages/tz` の `normalizeTzid(tzid, vtimezone?, hints)` が、次�
 
 ### 9.1 正本と照合
 
-- 正本は、本システムが持つ祝日の規則の表からの生成である（[architecture/README.md](README.md) の 6 節の決定）。
+- 正本は、本システムが持つ祝日の規則の表からの生成である（[design-log.md](design-log.md) の「2026-10-04：既定案」）。
 - 内閣府の CSV（[「国民の祝日」について](https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html)、2026-10-04 に確認。ページに CSV の利用の条件の記載は見当たらなかった）は、照合にだけ使う。CSV を取り込んで配信するかは、利用の条件の確認が要る（**法務の確認待ち：L7**）。L7 の結論まで、祝日のカレンダーの公開（E3 の `japanese-holidays-calendar` の公開）の spec を承認しない。
 
 ### 9.2 規則の表

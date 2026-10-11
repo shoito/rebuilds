@@ -1,0 +1,51 @@
+---
+status: proposed
+date: 2026-10-10
+---
+
+# ADR-0077: 他の EC の基盤からの移行の取り込み
+
+## Context
+
+- 新しく開くショップの多くは、本家や他の EC の基盤（カートのサービス、モールの店舗）からの乗り換えになる。乗り換えには、商品だけでなく、顧客、過去の注文、URL（検索の順位を保つためのリダイレクト）が要る。
+- MVP には、本システムの独自の形の商品の CSV の取り込みと書き出しがある（[catalog-and-pricing.md](../architecture/catalog-and-pricing.md) の 11 節）。本家の CSV の形との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。顧客と過去の注文を取り込む道はなく、移行を MVP に含めるかも Non-goals に書いていない。
+- 過去の注文をそのまま `orders` に入れると、「注文は `completeCheckout` だけが作り、`orders.checkout_id` は一意」（[ADR-0005](0005-checkout-state-machine-and-exactly-once-orders.md)）と、在庫の不変条件（[ADR-0004](0004-inventory-reservation-model.md)）、注文の Webhook と通知、レシートの発行（[ADR-0018](0018-invoice-documents-and-receipts.md)）を壊す。
+- 顧客のデータは「買い手の個人」の区分（[ADR-0068](0068-data-classes-retention-and-operator-access.md)）で、取り込みのファイルにも同じ扱いが要る。前の基盤のパスワードは持ち出せない（ハッシュの方式が違い、持ち出せても受け取らない）。
+- 移行を MVP に含めるか、どの基盤の形を受けるかは PM の判断で、[intent.md](../intent.md) の「Open questions」に置いた。この ADR は、含めるときの形を決める。
+
+## Options
+
+1. **移行の道を作らない**：事業者が本システムの商品の CSV の形に自分で変換する。顧客と過去の注文は持ち込めない。
+2. **本システムの取り込みの形と、元の基盤の型（データ）で受ける**（推奨）：商品・顧客・過去の注文・リダイレクトの 4 つを、本システムの独自の CSV の形で受ける。元の基盤の書き出しの列の対応は、運送会社の型（[ADR-0042](0042-carrier-integration-profiles.md)）と同じく「元の型（バージョンつき）」のデータで持ち、同じ取り込みの処理で変換する。過去の注文は `orders` に入れず、読み出し専用の別の表に置く。
+3. **元の基盤の API から直接引く**：事業者が元の基盤の認証の情報を渡し、本システムが API で読み出す。
+
+## Decision
+
+2 を推奨する（`proposed`。範囲は PM の判断待ち）。
+
+- **取り込みの種類**：`products`（既存の 11 節の形）、`customers`、`historical_orders`、`url_redirects` の 4 つ。どれも S3 に上げた CSV（既存と同じ上限と文字の符号化）を、ショップごとに同時に 1 つのジョブで処理する。順は、商品 → 顧客 → 過去の注文 → リダイレクトに固定する（過去の注文が顧客と商品を参照するため）。
+- **元の型**：`migration_source_profiles`（元の基盤、バージョン、列の対応、値の変換の式）。式は ADR-0042 の副作用のない式を使い回す。型は全体の Aurora に置くデータで、デプロイなしに足せる。元の基盤の書き出しの形は、どれも**未検証**で、型を作る Story で確かめる。
+- **試しの実行**：取り込みは、まず検証だけの実行（書き込みなし）で、行ごとの結果（成功・警告・エラー）と件数を結果の CSV に出す。事業者が結果を見て本番の実行を押す。
+- **冪等**：各行は元の ID（`(shop_id, source, external_id)` の一意）を持ち、同じ行の再取り込みは更新か何もしない。途中で止まっても、再取り込みで続ける（既存の 11 節と同じ）。
+- **顧客**：パスワードを取り込まない。顧客のアカウントは「招待の待ち」で作り、事業者が招待のメールを送るまで買い手に何も送らない。メールの HMAC の一意（`(shop_id, email_hmac)`）で重複をまとめ、衝突の行は結果に出す。取り込みのファイルと結果の CSV は「買い手の個人」の区分で、30 日で消す（`retention_policies` の行。期限は法務の L3・L11 で変える）。
+- **過去の注文**：`historical_orders`・`historical_order_lines`（ポッド、RLS）に置き、`orders` に入れない。在庫を動かさず、決済・Webhook の注文の話題・通知・レシートの発行・割引の使用の回数を起こさない。返品・返金の対象にしない（前の基盤で行う）。管理画面の顧客の画面と、Admin API の読み出し専用の型でだけ見せる。顧客の `orders_count`・`total_spent_amount` には足さず、別の列 `imported_orders_count`・`imported_total_spent_amount` に持つ。
+- **リダイレクト**：既存の `url_redirects`（[storefront-api-and-caching.md](../architecture/storefront-api-and-caching.md)）に書く。1 ショップの上限（10 万）を超える行は拒む。
+- **権限と監査**：新しい権限を作らず、既存の権限で絞る（商品は `products_write`、顧客と過去の注文は `customers_write` と `customers_pii_read` と `orders_write`、リダイレクトは `settings_write`）。実行ごとに監査ログに残す（[ADR-0064](0064-permissions-roles-and-audit-log.md)、[merchant-admin-and-staff.md](../architecture/merchant-admin-and-staff.md) の 5.1 節）。社内の運用者が事業者の代わりに取り込むことはしない（ADR-0068 の入口の外）。
+
+### 他の案を選ばなかった理由
+
+- **1**：乗り換えの手間が、ショップの開設の速さ（K10）を崩す。顧客と注文の履歴を持ち込めないことが乗り換えの妨げになる。
+- **3**：元の基盤の認証の情報を預かることになり、元の API の上限と変更に追従するアダプターが基盤ごとに要る。CSV の書き出しはどの基盤にもあり、型のデータの追加で閉じる。3 は 2 の後に、需要の多い基盤だけ足せる。
+
+## Consequences
+
+- 良くなること：移行の形の追加が、元の型のデータの追加で閉じる。過去の注文を別の表に置くので、ADR-0004・0005 の不変条件と、注文の Webhook・通知・税の記録に触れない。
+- 引き受けるコスト：顧客の画面と Admin API に、過去の注文の読み出しの道が 1 つ増える。顧客の購入の合計が 2 つの列に分かれ、報告で足し合わせる。顧客の個人のデータを含むファイルを預かる期間ができる。
+- 過去の注文の記録の保存の義務（前の基盤で出したレシート・インボイス）を誰が負うか、取り込んだ顧客に関する同意の記録の引き継ぎは、法務の確認待ち（[intent.md](../intent.md) の L11）。確認まで `customers`・`historical_orders` の取り込みの Story の spec を承認しない。
+
+## Confirmation
+
+- 結合テスト：過去の注文の取り込みの前後で、`orders`・在庫の表・outbox・`tax_documents` の行の数が変わらない。
+- 性質ベーステスト：同じ CSV を 2 回取り込んでも、顧客・過去の注文・リダイレクトの行が同じ（冪等）。
+- ファジング：既存の CSV の取り込みの枠に、顧客・過去の注文の形を足す。
+- 漏れ：取り込みの結果の CSV と S3 のパスが他のショップの値を返さない（[quality.md](../quality.md) の 2.2.1 節 G）。

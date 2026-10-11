@@ -11,7 +11,7 @@ date: 2026-10-10
 
 ## Context
 
-- 本システムが宿泊税・入湯税を特別徴収義務者として預かり納めるか、ホストが納めるかは法務の確認待ち（[intent.md](../intent.md) の L4）。既定は「ホストが納める。本システムは額を出して明細に書く」（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 本システムが宿泊税・入湯税を特別徴収義務者として預かり納めるか、ホストが納めるかは法務の確認待ち（[intent.md](../intent.md) の L4）。既定は「ホストが納める。本システムは額を出して明細に書く」（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 台帳は `tax_payable:<jurisdiction>:<tax>` の口座を持ち、L4 の後に使う。既定はホストへの支払いに含める（[ADR-0005](0005-payments-hold-capture-and-ledger.md)）。
 - 管轄ごとに、本システムが集める協定を結ぶ可能性がある。
 - 泊がないのに税を残すと、ゲストに説明がつかない。

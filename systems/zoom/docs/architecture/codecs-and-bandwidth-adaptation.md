@@ -370,7 +370,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **RED**：mediasoup に RED の転送と剥がしを足す（ADR-0017）。上流に取り込まれなければフォークで持つ。ブラウザは distance 1 で送るので、Media Node は受け手ごとに残すか剥がすかだけを決める（2026-09-27 に libwebrtc の実装で確かめて直した）。
 - **カメラの既定**：VP8 の simulcast 3 本。SVC は全員 Chromium の会議だけ（ADR-0018）。

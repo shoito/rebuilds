@@ -106,7 +106,7 @@ sequenceDiagram
 
 - パスキーを登録したアカウントは、SMS のコードだけでは新しい端末にログインできない（本家の 2026 年 5 月の変更に寄せる）。
 - パスキー：RP ID は `<brand>.<domain>`、見つけられる資格情報（discoverable）、`userVerification = required`。1 アカウント 10 まで。最後の 1 つを消すには、別のパスキーを足すか、回復を通す。
-- パスワードは持たない。外のアカウント（Apple・Google など）のログインは MVP に入れない（[architecture/README.md](README.md) の 6 節の決定。識別の元を電話番号に 1 本にし、乗っ取りの入口を減らす）。
+- パスワードは持たない。外のアカウント（Apple・Google など）のログインは MVP に入れない（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定。識別の元を電話番号に 1 本にし、乗っ取りの入口を減らす）。
 
 ### 5.2 アプリのセッション
 
@@ -263,6 +263,19 @@ stateDiagram-v2
 - すべての要求に `X-<Brand>-Client: <platform>/<version> (<build>)` を付ける。最小のバージョンの判定に使う（[delivery.md](delivery.md) の 6 節）。
 - アプリは API の応答をキャッシュしてよいが、住所・売上金・口座・本人確認の画面は端末の暗号化された領域にだけ置き、ログアウトで消す。
 
+### 11.1 アクセシビリティ
+
+アプリと Web の画面の作り方の基準をここに置く（出品・購入の流れの画面の文書がないため、アプリの形の節に置く）。Web は WCAG 2.2 の AA、iOS・Android は VoiceOver・TalkBack と OS の文字の拡大で主な流れ（出品、商品の画面、購入、取引、ログイン）を最後まで進められることを受け入れの基準にする（[quality.md](../quality.md) の 2.2 節のアクセシビリティの行）。
+
+- **部品**：React Native の部品に `accessibilityLabel`・`accessibilityRole`・`accessibilityState` を付ける（いいね・選択・無効の状態）。押す的は iOS 44pt・Android 48dp・Web 24px 以上。OS の文字の大きさ（Dynamic Type、フォントの倍率）で 200% まで、価格・送料の負担・状態の表示を切らない（切るなら折り返す）。色だけで状態（売り切れ、値下げ、期限の近さ）を示さない。
+- **出品**（[listings-and-photos.md](listings-and-photos.md)）：撮影は端末の写真から選ぶ道も持つ。写真の並べ替えはドラッグの他に「前へ・後へ」の操作を持つ（2.5.7）。カテゴリの木の選択は、段ごとに見出しと戻る操作を持つ。価格を入れたときに出す手数料（カテゴリの表。[ledger-and-proceeds.md](ledger-and-proceeds.md)）と受け取る額、価格の提案（[categories-brands-and-pricing-suggestions.md](categories-brands-and-pricing-suggestions.md)）は、入力が止まってから `polite` で読み上げる（打つたびに読み上げない）。
+- **商品の画面**：写真は「写真 2 / 10」の名前を持ち、スワイプの他にボタンで移れる。読み上げの順は、名前 → 価格と送料の負担 → 状態 → 説明 → 売り手 → 購入のボタン。
+- **購入**（[transactions-and-state-machine.md](transactions-and-state-machine.md) の 5.5 節）：確認の画面は、読み上げの順を見た目の順と同じにし、購入のボタンの名前で何が起こるかと金額が分かるようにする（文言は法務の L3 の後）。売り切れ・価格の変更（`price_changed`）・`listing_version` の不一致の結果は、画面の先頭の知らせとして読み上げ、フォーカスを移す。決済の提供者の入力部品の読み上げは提供者の側で、提供者の選定の比べる項目に入れる。
+- **期限**：支払いの期限、発送の期限、受取評価の期限（[transactions-and-state-machine.md](transactions-and-state-machine.md) の 7 節）は、残りの時間の数え下げだけにせず、日時の文で出す。
+- **取引の画面**：新しいメッセージは `polite` で知らせる。運送会社の QR の画面は、画面の明るさを上げ、QR の下に読み上げられる番号（運送会社が番号の入力を受けるとき）を出す。
+- **ログイン**：SMS の一時コードは OS の自動の入力（iOS の `oneTimeCode`、Web の `autocomplete="one-time-code"`）を使い、覚える・書き写す試験に頼らない（3.3.8）。パスキーを勧める。
+- **動き**：購入の完了・出品の完了の演出は、OS の「視差効果を減らす」・`prefers-reduced-motion` で止める。
+
 ## 12. 失敗と回復
 
 | 事象 | 影響 | 扱い |
@@ -337,6 +350,7 @@ stateDiagram-v2
 | E2 | `profiles-and-blocks` | 8 節 |
 | E2 | `account-deletion` | 9 節（ADR-0068）。保持の期間は法務：L5 |
 | E2 | `age-and-minor-consent` | 10 節（ADR-0068）。同意と上限は法務の確認待ち |
+| E2 | `app-accessibility-baseline` | 11.1 節。部品の名前・役割・状態、文字の拡大、押す的の大きさの共通の部品と検査。出品（E3）と購入（E7）の画面はこの部品で作る |
 | E10 | `payouts`（[payouts-and-points.md](payouts-and-points.md) と共同） | `payoutHoldUntil()` の読み出し |
 
 ## 17. 未解決の問い

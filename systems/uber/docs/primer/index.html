@@ -16,6 +16,7 @@
 <meta property="og:site_name" content="rebuilds">
 <meta name="description" content="Uber の再構築の設計の文書を読む前に知っておくとよい、配車の分野の概念・用語と、日本のタクシー・日本版ライドシェアの制度の枠組み。">
 <meta name="primer-home" content="../../../../index.html">
+<link rel="icon" href="../../../../docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
 </head>
 <body>
@@ -103,7 +104,10 @@
   on_trip --> completed : 降車（額が確定）
   awaiting_fare --> completed : 額の確定
   requested --> no_driver_found : 3 分・10 回
-  arrived --> no_show : 無断キャンセル</pre>
+  arrived --> no_show : 無断キャンセル
+  accepted --> requested : ドライバーの取り消し（迎車中）
+  state "cancelled_by_*" as cancelled
+  note right of cancelled : 乗客・ドライバー・運用の取り消しで、途中の状態から入る終端</pre>
     <ul>
       <li><code>awaiting_fare</code>：メーターの額が届かないとき。<strong>ドライバーはここで解放され</strong>、次のオファーを受けられます。</li>
       <li>乗客の取り消しは、受諾の前は無料、受諾から 120 秒の猶予を過ぎると<a class="t" href="#g-cancel-fee">キャンセル料</a>（ドライバーが約束より遅れていれば無料）。到着から 300 秒待ち、乗車地の 200 m 以内なら<a class="t" href="#g-noshow">無断キャンセル</a>にできます。</li>

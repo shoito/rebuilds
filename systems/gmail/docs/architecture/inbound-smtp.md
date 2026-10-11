@@ -159,7 +159,7 @@ EHLO の応答で次を出す。
 | `neutral` | 直近 30 日に 100 通以上 |
 | `unknown` | それ以外（初めて見る IP） |
 
-- 外部のリストに 1 つだけ載っても拒まない（[architecture/README.md](README.md) の 6 節の決定）。外部への照会は IP だけを送る（法務の L5・L10）。
+- 外部のリストに 1 つだけ載っても拒まない（[design-log.md](design-log.md) の「2026-10-10：既定案」）。外部への照会は IP だけを送る（法務の L5・L10）。
 - `blocked` は 554 5.7.1 で切る。応答の文に理由のコードと、解除を求める案内の URL（`https://postmaster.<brand>.<domain>/`）を入れる。
 
 ### 6.2 上限の値
@@ -263,7 +263,7 @@ flowchart LR
 - グループと別名は、RCPT の時点では「ある」ことだけを確かめ、展開は `inbound-pipeline` で行う。グループは宛先の上限の 100 で 1 つと数える。
 - 全受け（catch-all）を設定した組織のドメインは、ない宛先でも 250 にする。
 - 宛先のキャッシュ：手元の LRU（台ごとに 100 万件、寿命 60 秒）と Valkey（あるもの 5 分、ないもの 60 秒）。directory の変更（アドレスの作成・削除、停止、容量の超過・回復）は outbox の通知で Valkey の鍵を消す。消し損ねても、あるものの寿命の 5 分で正しくなる。
-- **容量の超過**の判定は、`mailstore` が容量の 100% を超えたときに directory の `accounts.quota_state` を `over` にし、それを読む（[architecture/README.md](README.md) の 6 節の決定）。
+- **容量の超過**の判定は、`mailstore` が容量の 100% を超えたときに directory の `accounts.quota_state` を `over` にし、それを読む（[design-log.md](design-log.md) の「2026-10-10：既定案」）。
 
 ### 8.2 宛先ごとの受信の速さ
 

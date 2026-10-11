@@ -11,7 +11,7 @@ date: 2026-10-10
 
 - S1 で受信の申し出は 1.5 億通/日で、その 6 割を SMTP の時点で拒むと見込む（[architecture/README.md](../architecture/README.md) の 2 節）。拒むのが遅れるほど、スプール・選別・保存の費用が増える。
 - [ADR-0002](0002-accept-then-filter.md) は、接続の評判による 554、IP・/24・ASN ごとの速さの上限、評判の分からない IP の急な量の 421 を決めたが、値と数え方は inbound-smtp の領域に任せた。
-- 外部のブロックリストは、それだけで拒まない（[architecture/README.md](../architecture/README.md) の 6 節の決定）。照会に送るのは IP だけ（法務の L5・L10）。
+- 外部のブロックリストは、それだけで拒まない（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。照会に送るのは IP だけ（法務の L5・L10）。
 - IPv6 では 1 つの送り元が大きな範囲を持つので、1 つのアドレスを鍵にすると上限が効かない。
 - `mx-edge` は東京に 9 台、NLB は送り元の IP で台を固定しない。台ごとの数えだけでは、上限が台数の倍だけ緩くなる。
 - Valkey は失ってよい部品（[ADR-0001](0001-platform-and-stack.md)）。Valkey の障害で受信を止めてはいけない（NFR-007）。

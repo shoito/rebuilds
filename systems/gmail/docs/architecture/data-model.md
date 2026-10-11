@@ -606,7 +606,7 @@ erDiagram
 
 ## 7. この工程で決めたこと（2026-10-10）
 
-領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。ADR に注記を足した 2 件（D-20 は [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)、D-21 は [ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)）と、置き場所の未解決事項だった D-1、量の見直しの D-22 は、[README.md](README.md) の 6 節の「決定（2026-10-10、データモデル）」に書いた。
+領域の文書と ADR の間で、名前・列・置き場所が決まっていなかったところを、推奨の案で決めた。ADR の決定は変えていない。ADR に注記を足した 2 件（D-20 は [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)、D-21 は [ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)）と、置き場所の未解決事項だった D-1、量の見直しの D-22 は、[design-log.md](design-log.md) の「2026-10-10：データモデル」に書いた。
 
 | # | 決めたこと | 理由 |
 | --- | --- | --- |
@@ -659,7 +659,7 @@ erDiagram
 | [security.md](security.md) | 5.2 節の図と 5.4 節にアドレスの鍵、13 節の `tenant_keys` と `audit_chain_heads` の行（D-13、D-21） |
 | ADR の注記 | [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)（`device_authorizations`。D-20）、[ADR-0060](../decisions/0060-key-hierarchy-and-crypto-erasure.md)（アドレスの鍵。D-21）。決定は変えていない |
 | [capacity.md](capacity.md) | 4 節に配送の記録の行とシャードの書き込みの行の数（8 → 9）。1.3 節・4 節のメタデータの量（16 TB → 約 78 TB）、8 節の Aurora の保存と合計、8.1 節の積み上げ、9 節の単位の原価（D-1、D-22） |
-| [README.md](README.md) | 冒頭と 7 節の data-model の行。2 節・2.1 節のメタデータの量と費用。6 節に「決定（2026-10-10、データモデル）」、費用の行の補い、残る未解決事項の行の置き換え |
+| [README.md](README.md) | 冒頭と 7 節の data-model の行。2 節・2.1 節のメタデータの量と費用。「決定（2026-10-10、データモデル）」（今は [design-log.md](design-log.md) にある）、費用の行の補い、残る未解決事項の行の置き換え |
 | [infrastructure.md](infrastructure.md) | 9 節のメールボックス 1 つ・月の原価（0.19・0.21 → 0.20・0.24 USD。D-22） |
 | 「data-model への項目」の節を持つ 14 本（inbound-smtp、sender-authentication、outbound-smtp-and-reputation、spam-and-abuse-filtering、attachment-and-url-scanning、message-parsing-and-storage、organizations-domains-and-routing、retention-and-ediscovery、accounts-and-security、api-and-integrations、security、infrastructure、observability、delivery） | 節の頭の「この表が列の正本」を「項目の記録。正本は data-model」に |
 | [../README.md](../README.md) | 文書の一覧の data-model の行と `data-model/` の行。「これから作る文書」の ER 図の行を消した |

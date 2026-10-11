@@ -292,7 +292,7 @@ flowchart TD
 
 ## 10. S/MIME（MVP の後）
 
-- MVP は扱わない。署名は普通の添付として見え、暗号化されたメッセージは中身を読めない（[architecture/README.md](README.md) の 6 節の決定）。
+- MVP は扱わない。署名は普通の添付として見え、暗号化されたメッセージは中身を読めない（[design-log.md](design-log.md) の「2026-10-10：既定案」）。
 - MVP の後（E19 の候補）の順序：(1) 受信の署名の検証と表示（信頼の根は組織が上げる CA の一覧と、公開の CA の一覧）、(2) 送信の署名（鍵は組織が上げる利用者の証明書と鍵。KMS で包む）、(3) 暗号化（受け手の証明書の取り込み）。Web での秘密の鍵の扱い（端末の中か、サーバーか）は別の ADR で決める。
 - MVP の作りで、後で困らないために決めておくこと：送信のフッターは S/MIME の形に足さない（8.4 節）。選別は暗号化された中身を読めないので、送り手の評判と認証だけで判定する（[spam-and-abuse-filtering.md](spam-and-abuse-filtering.md)）。
 
@@ -394,7 +394,7 @@ flowchart TD
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | SCIM 2.0 の自動の作成と停止 | E14 の後。要望の多さで PM が決める |
-| 組織の SMTP のリレー（複合機などの IP の許可の一覧） | MVP の後（[architecture/README.md](README.md) の 6 節の決定） |
+| 組織の SMTP のリレー（複合機などの IP の許可の一覧） | MVP の後（[design-log.md](design-log.md) の「2026-10-10：既定案」） |
 | グループの共有の受信箱（グループあてを共有の箱で読む） | 委任と同じく MVP の後（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) の `app.account_ids`） |
 | 組織の外へ出すメッセージの承認（誤送信の対策） | E18 以降（[intent.md](../intent.md) の延期の機能）。8 節の `outbound` の段に動作を足す |
 | ドメインの移しの 7 日の長さ | 本家の値が確かめられれば寄せる（**未検証**） |

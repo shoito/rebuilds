@@ -6,7 +6,7 @@
 
 - 税は `quoteStay` の段の 1 つで、`packages/tax` の関数が計算する。見積もりは税の表のバージョンを固定する（[pricing-and-fees.md](pricing-and-fees.md) の 6 節、[ADR-0030](../decisions/0030-quote-stay-pipeline-and-rounding.md)）
 - 税の表はバージョンの付いた設定にする。フラグにしない。コードに自治体の名前を書かない（[AGENTS.md](../../AGENTS.md)）
-- 本システムが税を預かり納めるかは法務の L4 の後。既定は「ホストが納める。本システムは額を出して明細に書く」（[architecture/README.md](README.md) の 6 節）。台帳の `tax_payable:<jurisdiction>:<tax>` は L4 の後に使う（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）
+- 本システムが税を預かり納めるかは法務の L4 の後。既定は「ホストが納める。本システムは額を出して明細に書く」（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）。台帳の `tax_payable:<jurisdiction>:<tax>` は L4 の後に使う（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）
 - 物件の自治体のコードと税の区域は、ピンの確定の時に正確な位置から求めて core に書く（[location-and-geo.md](location-and-geo.md) の 4.4 節）
 
 この文書で決めたことは次の ADR にある。

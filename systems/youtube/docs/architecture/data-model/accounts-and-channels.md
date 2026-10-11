@@ -326,7 +326,7 @@ erDiagram
 
 ### 2.9 `strikes`
 
-違反の記録（警告と strike）。持ち主はこの領域だけ（[README.md](../README.md) の 6 節の「strike と役割の持ち主」）。
+違反の記録（警告と strike）。持ち主はこの領域だけ（[design-log.md](../design-log.md) の「2026-10-10：統合」の「strike と役割の持ち主」）。
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |

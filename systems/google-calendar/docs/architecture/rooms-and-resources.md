@@ -2,7 +2,7 @@
 
 建物・階・定員・設備の属性、会議室と設備のカレンダー、自動の承諾と管理者の承認、二重予約を防ぐ排他の制約、繰り返しの予約の一部の辞退、tzdb の計算し直しでの「要確認」、会議室の検索と提案を決める。
 
-前提となる決定は、繰り返しの保存と展開（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)）、テナント（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）、変更のログ（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）、写し（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）、tzdb の更新（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）、空き時間（[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)）。会議室の二重予約を DB の制約で防ぐことは [architecture/README.md](README.md) の 6 節で決めており、この文書で ADR にする。
+前提となる決定は、繰り返しの保存と展開（[ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0010](../decisions/0010-occurrence-index-maintenance.md)）、テナント（[ADR-0004](../decisions/0004-tenancy-and-rls.md)）、変更のログ（[ADR-0005](../decisions/0005-change-log-and-sync-tokens.md)）、写し（[ADR-0006](../decisions/0006-organizer-and-attendee-copies.md)）、tzdb の更新（[ADR-0012](../decisions/0012-tzdb-update-recompute-and-propagation.md)）、空き時間（[ADR-0017](../decisions/0017-freebusy-source-and-cache.md)）。会議室の二重予約を DB の制約で防ぐことは [design-log.md](design-log.md) の「2026-10-04：既定案」で決めており、この文書で ADR にする。
 
 | ADR | 決定 |
 | --- | --- |

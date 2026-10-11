@@ -146,18 +146,29 @@ Node = { type, next?: <node_id>, ...type ごとの設定 }
 
 ### 5.2 実行のステートマシン
 
+実行の状態の遷移を次の図に示す。遷移の正は下の DT-FLOW-002 で、図はその要約（括弧の数字は表の #）。
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: 作成（保存のトランザクション）
+  pending --> running: 次のノードが待たない（1）・失敗で error_handler あり（4）
+  running --> running: 次のノードが待たない（1）・失敗で error_handler あり（4）
+  pending --> waiting: 次のノードが待つ（2）
+  running --> waiting: 次のノードが待つ（2）
+  waiting --> running: 待ちが解ける（6）・待ちの期限（7）
+  pending --> completed: 次がない・end（3）
+  running --> completed: 次がない・end（3）
+  pending --> failed: 失敗で error_handler なし（5）
+  running --> failed: 失敗で error_handler なし（5）
+  pending --> cancelled: 取り消し（8）
+  running --> cancelled: 取り消し（8）
+  waiting --> cancelled: 取り消し（8）
+  completed --> [*]
+  failed --> [*]
+  cancelled --> [*]
 ```
-          作成（保存のトランザクション）
-               │
-               ▼
-          pending ──ステップを動かす──▶ running ──待つノード──▶ waiting
-               ▲                        │  ▲                     │
-               │                        │  └──待ちが解ける──────┘
-               │                        │
-               │           end / 最後のノード ▶ completed
-               │           失敗（error_handler なし）▶ failed
-               └── 取り消し（管理者・トリガーのレコードの削除・親の実行の取り消し）▶ cancelled
-```
+
+取り消しのきっかけは、管理者の操作、トリガーのレコードの削除、親の実行の取り消し。
 
 - `running` は「今すぐのタイマーがある」状態で、ワーカーがそれを取ると次のノードを動かす。`waiting` は「承認・条件・時刻・子の実行・外への呼び出しの結果」を待つ状態。
 - **不変条件（INV-FLOW-001）**：終わっていない実行は、次のどれか 1 つをちょうど持つ。今すぐの `run_step` のタイマー、待ちに対応するタイマーか待ちの行（`flow_wait`、承認のまとまり、子の実行、呼び出しの結果）。どれも持たない実行は「止まった実行」である（5.6 節）。

@@ -6,7 +6,7 @@
 
 - 決済は外部の提供者に任せ、本システムはカード番号に触れない。アダプターの契約、冪等キー `<checkout_id>:<attempt>:<op>`（返金は `<refund_id>:refund`）、Webhook の inbox。照会の API と冪等を持たない提供者は選ばない（[ADR-0006](../decisions/0006-payments-via-providers.md)）
 - 注文の作成と、決済だけ済んだ状態の解消は `completeCheckout` と完了の決定表 DT-CHK-001（[ADR-0005](../decisions/0005-checkout-state-machine-and-exactly-once-orders.md)、[cart-and-checkout.md](cart-and-checkout.md) の 7 節）
-- 非同期の決済は番号の発行で支払い待ちの注文。売上の確定は既定で注文の作成と同時（[architecture/README.md](README.md) の 6 節）
+- 非同期の決済は番号の発行で支払い待ちの注文。売上の確定は既定で注文の作成と同時（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - カード処理そのもの（保管、アクワイアラ、3D セキュア、台帳）は Stripe の題材の論点で、ここでは設計し直さない（[Stripe の payments.md](../../../stripe/docs/architecture/payments.md)）
 - 決済の範囲の法令の当てはめは法務の確認待ち（L7）
 

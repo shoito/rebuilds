@@ -323,10 +323,16 @@ ADR-0026。
 
 ### 11.1 状態
 
-```
-active ──ゴミ箱へ──▶ trashed ──完全に削除──▶ purging ──ジョブの完了──▶ purged
-   ▲                    │
-   └────── 戻す ────────┘
+次の図は、ファイルの削除の状態を示す。操作の権限と中身は、図の後の表にある。
+
+```mermaid
+stateDiagram-v2
+  [*] --> active
+  active --> trashed: ゴミ箱へ
+  trashed --> active: 戻す
+  trashed --> purging: 完全に削除
+  purging --> purged: ジョブの完了
+  purged --> [*]
 ```
 
 | 操作 | 権限 | 中身 |

@@ -13,7 +13,7 @@ date: 2026-10-04
 - **外から来た生のデータ**：iMIP の受信の生のメール（S3）、ICS の取り込みの元のファイル。本文に第三者の個人データを含む。
 - **監査ログ**：改ざんされてはならない。
 - **本システムの秘密**：
-  - CalDAV のアプリ用のパスワード（[architecture/README.md](../architecture/README.md) の 6 節。OS の標準のカレンダーが Basic 認証で 15 分ごとに送る）
+  - CalDAV のアプリ用のパスワード（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」。OS の標準のカレンダーが Basic 認証で 15 分ごとに送る）
   - ICS の秘密のアドレスの鍵（URL を知る人はだれでも予定を読める）
   - Webhook の署名の秘密（`<Brand>-Signature`）、OAuth のクライアントの秘密
   - 同期のトークンの HMAC の鍵（[ADR-0005](0005-change-log-and-sync-tokens.md)）

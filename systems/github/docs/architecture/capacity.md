@@ -235,7 +235,7 @@ Slack と同じ（可視性タイムアウトは処理時間 p99 の 6 倍、ロ
 | 1 回の push | 2 GB | push を拒否する |
 | 1 ファイルの大きさ | 警告 50 MiB、拒否 100 MiB | push を拒否する |
 
-- 公開リポジトリの大量の clone への対策（intent.md の未解決の問い）は、bundle-uri と CDN、上の IP ごと・リポジトリごとの clone の制限に決めた（2026-09-26、既定案。[README.md](README.md) の 6 節）。値は E9 の負荷試験で直す。
+- 公開リポジトリの大量の clone への対策（intent.md の未解決の問い）は、bundle-uri と CDN、上の IP ごと・リポジトリごとの clone の制限に決めた（2026-09-26、既定案。[design-log.md](design-log.md)）。値は E9 の負荷試験で直す。
 
 ## 5. キャパシティの運用
 

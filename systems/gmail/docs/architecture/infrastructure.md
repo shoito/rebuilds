@@ -357,6 +357,90 @@ sequenceDiagram
 | データの所在の約束の範囲（APNs・FCM、外部の評判の照会） | **法務の確認待ち**（L5） |
 | S3 のセルの設計 | S2 の後に別の ADR |
 
+## 16. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の、すべてのコンテナと呼び出しを描いた図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    subgraph ext["外部"]
+        smtpin["外部の MTA（送り手）"]
+        smtpout["外部の MX（受け手）"]
+        clients["Web・アプリ・IMAP のクライアント"]
+        apns["APNs・FCM"]
+    end
+
+    subgraph edge["エッジ"]
+        nlb["NLB（25・465・587・993、BYOIP の固定の IP）"]
+        cf["CloudFront＋WAF（Web、JMAP、usercontent）"]
+    end
+
+    subgraph mta["メールの面（Rust）"]
+        mx["mx-edge<br/>SMTP の受け口、接続の評判、宛先の確認、<br/>DATA の終わりの同期の検査、スプール"]
+        pipe["inbound-pipeline<br/>MIME の解析、選別の判定、<br/>組織の規則・フィルター・転送、配送"]
+        score["spam-scorer<br/>規則、評判、分類器"]
+        scan["content-scanner<br/>添付と URL の検査（隔離）"]
+        gate["outbound-gate<br/>送信の上限、送信の選別、<br/>DKIM の署名、IP プールの選択"]
+        mout["mta-out<br/>宛先のドメインごとの待ち行列、<br/>速さの調整、再試行、DSN"]
+        imap["imap-server・submission"]
+    end
+
+    subgraph store["保存と検索（Rust）"]
+        ms["mailstore<br/>メールボックスの変更の唯一の書き手、<br/>modseq と change log、blob の読み書き"]
+        packer["blob-packer"]
+        idx["search-indexer・search-node"]
+    end
+
+    subgraph control["管理の面（TypeScript・Hono）"]
+        jmap["jmap-api"]
+        push["push-gateway・push-notifier"]
+        acct["accounts（サインイン、OAuth）"]
+        admin["admin-api（組織、ドメイン、保持、eDiscovery）"]
+        relay["relay（outbox）"]
+    end
+
+    spool[("S3 spool＋SQS<br/>配送の待ち行列（2 つの層）")]
+    blobs[("S3 blobs<br/>メッセージ、パック")]
+    mbx[("Aurora メールボックスのシャード<br/>メッセージ、ラベル、スレッド、change log")]
+    dir[("Aurora directory<br/>アカウント、組織、アドレス、規則")]
+    valkey[("Valkey<br/>評判の数え、宛先のキャッシュ、<br/>セッション")]
+    osaka[("大阪：副 MX、S3 の写し、<br/>Aurora Global Database")]
+
+    smtpin --> nlb --> mx
+    mx --> spool
+    spool --> pipe
+    pipe --> score
+    pipe --> scan
+    pipe --> ms
+    ms --> blobs
+    ms --> mbx
+    packer --> blobs
+    mbx --> relay
+    relay --> idx
+    relay --> push
+    push --> clients
+    push --> apns
+    clients --> cf --> jmap
+    clients --> nlb
+    nlb --> imap
+    jmap --> ms
+    jmap --> idx
+    imap --> ms
+    jmap --> gate
+    imap --> gate
+    gate --> score
+    gate --> mout
+    gate --> ms
+    mout --> smtpout
+    mx --> valkey
+    mx --> dir
+    pipe --> dir
+    acct --> dir
+    admin --> dir
+    blobs -.-> osaka
+    mbx -.-> osaka
+```
+
 ## 出典
 
 - AWS, [Bring your own IP addresses (BYOIP) to Amazon EC2](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-byoip.html)（2026-10-10 に確認）：IPv4 は /24 が最も細かい、IPv6 は公開するものは /48、1 つの範囲は同時に 1 つのリージョン、リージョンあたり 5 つ（申請で増やせる）、他のアカウントへの共有は IPAM と Organizations の連携が要る

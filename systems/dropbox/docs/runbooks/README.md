@@ -50,7 +50,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | GC の猶予、削除の後の戻せる期間 | 参照 0 から 7 日、S3 のバージョニングで 30 日 | 同上 | `ops.block_gc_enabled`（止めるだけ）、`ops.block_gc_rate` |
 | CRR の遅れ | 15 分（Replication Time Control） | 同上 | — |
 | 消しすぎの止め | 5 分の窓で 1,000 ファイルか木の 10% | [ADR-0006](../decisions/0006-sync-conflict-model.md)、[sync-engine.md](../architecture/sync-engine.md) の 10 節 | — |
-| バージョンの保持 | 30 日・180 日・365 日（プラン） | [architecture/README.md](../architecture/README.md) の 6 節 | — |
+| バージョンの保持 | 30 日・180 日・365 日（プラン） | [architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」 | — |
 | アップロードの並行 | 端末ごとに 8 本（16 本まで広げる） | [block-storage.md](../architecture/block-storage.md) の 4.2 節 | `ops.client_upload_concurrency`（AppConfig でクライアントへ配る） |
 | アップロードの受け入れ | 全体 2.5 GB/秒、テナントは個人 100 MB/秒・チーム 1 GB/秒 | [ADR-0051](../decisions/0051-load-shaping-uploads-signals-and-reconnects.md) | `ops.upload_admission_global_bps`、`ops.upload_admission_tenant_bps` |
 | アップロード・書き込みの停止 | — | [infrastructure.md](../architecture/infrastructure.md) の 6.3 節 | `ops.uploads_enabled`、`ops.writes_enabled`（止めるだけ。読み出しは続ける） |

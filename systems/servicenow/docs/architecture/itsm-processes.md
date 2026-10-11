@@ -125,6 +125,27 @@ if changes に state がある:
 | 8 | `closed`・`cancelled` | どれも | - | - | - | 422 `invalid_transition`（終わったインシデントは戻さない。新しく起票し `reopened_from` で結ぶ） |
 | 9 | 上のどれにも当たらない | | | | | 422 `invalid_transition` |
 
+次の図は DT-INC-001 の要約（表が正。括弧の数字は表の #）。表にない遷移と、`closed`・`cancelled` からの遷移は 422 で拒む。
+
+```mermaid
+stateDiagram-v2
+  [*] --> new
+  new --> in_progress: start（1）
+  new --> on_hold: hold（2）
+  in_progress --> on_hold: hold（2）
+  on_hold --> in_progress: resume（3）
+  new --> resolved: resolve（4）
+  in_progress --> resolved: resolve（4）
+  on_hold --> resolved: resolve（4）
+  resolved --> in_progress: reopen（5、reopen_window の中）
+  resolved --> closed: close（6、自動の完了を含む）
+  new --> cancelled: cancel（7）
+  in_progress --> cancelled: cancel（7）
+  on_hold --> cancelled: cancel（7）
+  closed --> [*]
+  cancelled --> [*]
+```
+
 - `on_hold` で `hold_reason = awaiting_requester` のとき、依頼者のコメント（ポータル・メールの返信）が付くと、組み込みのルールで `resume` を行う（主体は `system`、`cause` はコメントの `journal_entry`）。
 - 担当のグループが変わっても状態は変えない（本家の「割り当て済み」の状態は持たない。割り当ては `assignment_group_id` と `assigned_to_id` だけで表す）。
 
@@ -312,6 +333,68 @@ DT-CHG-001（遷移）：
 | 12 | 全種 | `scheduled` | `new`（通常・標準）・`authorize`（緊急） | `reschedule` | `planned_start` か `planned_end` か `ci_id` を変えるとき | 承認を取り直す（通常は `assess` から） |
 | 13 | 全種 | `review`・`closed`・`cancelled` | 取り消し・前の状態 | - | - | 422（振り返りと完了は取り消せない。本家と同じ） |
 | 14 | そのほか | | | | | 422 `invalid_transition` |
+
+次の 3 枚の図は、DT-CHG-001 を種類ごとに分けた要約（表が正。括弧の数字は表の #）。`review`・`closed`・`cancelled` からの遷移は 422 で拒む（#13）。
+
+通常の変更：
+
+```mermaid
+stateDiagram-v2
+  [*] --> new
+  new --> assess: request_assessment（1）
+  assess --> authorize: 技術の承認が approved（2）
+  authorize --> scheduled: 承認が approved、衝突が blocking でない（3）
+  assess --> new: 承認の却下（4）
+  authorize --> new: 承認の却下（4）
+  scheduled --> implement: implement（8）
+  implement --> review: complete_implementation（9）
+  review --> closed: close（10）
+  scheduled --> new: reschedule（12）
+  new --> cancelled: cancel（11）
+  assess --> cancelled: cancel（11）
+  authorize --> cancelled: cancel（11）
+  scheduled --> cancelled: cancel（11）
+  implement --> cancelled: cancel（11、backout_performed）
+  closed --> [*]
+  cancelled --> [*]
+```
+
+標準の変更（承認は雛形のバージョンの承認で済んだものとみなす。8.2 節）：
+
+```mermaid
+stateDiagram-v2
+  [*] --> new
+  new --> scheduled: schedule（5）
+  scheduled --> implement: implement（8）
+  implement --> review: complete_implementation（9）
+  review --> closed: close（10）
+  scheduled --> new: reschedule（12）
+  new --> cancelled: cancel（11）
+  scheduled --> cancelled: cancel（11）
+  implement --> cancelled: cancel（11、backout_performed）
+  closed --> [*]
+  cancelled --> [*]
+```
+
+緊急の変更：
+
+```mermaid
+stateDiagram-v2
+  [*] --> new
+  new --> authorize: request_emergency_authorization（6）
+  authorize --> scheduled: 承認が approved、禁止期間の衝突は許す（7）
+  authorize --> new: 承認の却下（4）
+  scheduled --> implement: implement（8、衝突の再計算の検査を除く）
+  implement --> review: complete_implementation（9）
+  review --> closed: close（10、事後の CAB の承認が approved）
+  scheduled --> authorize: reschedule（12）
+  new --> cancelled: cancel（11）
+  authorize --> cancelled: cancel（11）
+  scheduled --> cancelled: cancel（11）
+  implement --> cancelled: cancel（11、backout_performed）
+  closed --> [*]
+  cancelled --> [*]
+```
 
 - **どの種類も、承認のまとまりが `approved` にならないと `scheduled` を通れず、`scheduled` を通らないと `implement` に入れない。** 標準の変更の承認は、雛形のバージョンの承認（8.2 節）で済んだものとみなす。これで [intent.md](../intent.md) の「変更の記録は、承認のないまま実施に進まない」を、遷移の表の上で確かめられる（PROP-CHG-001）。
 - 承認済みの変更で、予定の時刻・CI を変えると、`reschedule` で承認を取り直す（12 行）。承認のときに見た予定と違う予定で実施させないためである。`scheduled` の中で、予定の時刻・CI を `reschedule` 以外で変える保存は 422 `approved_fields_locked` にする（承認の対象のフィールドの一覧を固定する）。

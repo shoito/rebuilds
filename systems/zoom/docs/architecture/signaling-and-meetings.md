@@ -106,18 +106,38 @@ POST /v1/meetings/84512093376/join
 
 ### 4.4 接続の確立
 
-```
-Client                Gateway                 Valkey             Actor Host（持ち主）       Media Node
-  │ WSS（<brand>.sig.v1）│                        │                        │                        │
-  │ hello{token,resume?}▶│ Origin・トークンの署名と期限を検査                │                        │
-  │                      │ GET mtg:{m}:lease ─────▶│                        │                        │
-  │                      │   なし → 選んだ Host に acquire を頼む（5.2 節）  │                        │
-  │                      │ join(participant, token) ───────────────────────▶│ jti、ban、ロック、待合室 │
-  │                      │                        │                        │ （9 節の決定表）         │
-  │◀──── welcome{participant_id, epoch, seq, snapshot, status} ────────────│                        │
-  │ status=waiting なら待合室の画面。admitted を待つ                          │                        │
-  │ media.capabilities ─▶│───────────────────────────────────────────────────▶│ routerRtpCapabilities ─▶│
-  │ media.transport.create{direction:send} ...（8.4 節）                                              │
+参加のトークンを得てから、メディアの交渉に入るまでの流れを図にする。メディアの交渉の `cmd` は Gateway を経て Actor に届き、Actor が判定して Media Node に中継する（8 節の表）。
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant API as API
+    participant G as Gateway
+    participant V as Valkey
+    participant A as Actor Host（持ち主）
+    participant MN as Media Node
+    C->>API: POST /v1/meetings/会議の ID/join
+    API-->>C: join_token（120 秒、1 回限り）、signaling_url、ice_servers
+    C->>G: WSS で hello（token, resume?）
+    G->>G: Origin・トークンの署名と期限を検査
+    G->>V: 会議のリース（lease）を GET
+    opt リースがない
+        G->>A: 選んだ Host に acquire を頼む
+    end
+    G->>A: join（participant, token）
+    A->>A: jti、ban、ロック、待合室（9 節の決定表）
+    A-->>C: welcome（participant_id, epoch, seq, snapshot, status）
+    opt status=waiting
+        Note over C: 待合室の画面。admitted を待つ
+    end
+    C->>A: media.capabilities
+    A->>MN: routerRtpCapabilities
+    C->>A: media.transport.create（direction: send）
+    A->>MN: WebRtcTransport を作る
+    C->>A: media.transport.connect（transport_id, dtlsParameters）
+    A->>MN: DTLS を始める
+    C->>A: media.produce（kind, source, rtpParameters）
+    A->>MN: producer を作る
 ```
 
 - 待合室にいる間は、会議の参加者の一覧もメディアも受け取らない。受け取るのは `waiting.*` の差分だけ（meeting-security.md）。
@@ -127,16 +147,19 @@ Client                Gateway                 Valkey             Actor Host（�
 
 ### 5.1 会議のステートマシン
 
-```
-             最初の join             主催者が入る・または「主催者の前に入れる」設定
- Scheduled ───────────▶ Open ─────────────────────────────────────────▶ Live
- （Aurora の行だけ）    （Actor あり。参加者は待合室か                     │
-                          「主催者を待っています」）                        │ end_for_all ／ 全員の退出の後 60 秒
-                                                                         ▼
-                                                                       Ending ──▶ Ended
-                                                                   （Media Node の router を閉じ、
-                                                                     Aurora に終了を書き、リースを返す）
- どの状態でも：Actor の持ち主が替わる → Recovering（5.4 節）→ 元の状態
+会議の状態と遷移を図にする。各状態での Actor・メディア・Aurora は、図の下の表にある。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Scheduled
+    Scheduled --> Open: 最初の join
+    Open --> Live: 主催者が入る・または「主催者の前に入れる」設定
+    Live --> Ending: end_for_all ／ 全員の退出の後 60 秒
+    Ending --> Ended: Media Node の router を閉じ、Aurora に終了を書き、リースを返す
+    Ended --> [*]
+    note right of Scheduled: Aurora の行だけ
+    note right of Open: Actor あり。参加者は待合室か「主催者を待っています」
+    note left of Live: どの状態でも、Actor の持ち主が替わると Recovering を経て元の状態に戻る
 ```
 
 | 状態 | Actor | メディア | Aurora |
@@ -152,12 +175,27 @@ Client                Gateway                 Valkey             Actor Host（�
 
 ### 5.2 参加者のステートマシン
 
-```
- Joining ──▶ Waiting ──admit──▶ Admitted ──media 接続──▶ InMeeting
-    │           │ deny                                     │ ├─ WS 切断 ──▶ Reconnecting ──60 秒──▶ Left(dropped)
-    │           ▼                                          │ │                 └─ resume ──▶ InMeeting
-    │         Denied                                       │ ├─ leave ──▶ Left
-    └─ 拒否（ban・ロック・定員・E2EE 非対応）─▶ Rejected       │ └─ remove ──▶ Removed（ban に入る）
+参加者の状態と遷移を図にする。
+
+```mermaid
+stateDiagram-v2
+    state "Left(dropped)" as LeftDropped
+    [*] --> Joining
+    Joining --> Waiting
+    Joining --> Rejected: 拒否（ban・ロック・定員・E2EE 非対応）
+    Waiting --> Admitted: admit
+    Waiting --> Denied: deny
+    Admitted --> InMeeting: media 接続
+    InMeeting --> Reconnecting: WS 切断
+    Reconnecting --> InMeeting: resume
+    Reconnecting --> LeftDropped: 60 秒
+    InMeeting --> Left: leave
+    InMeeting --> Removed: remove（ban に入る）
+    Rejected --> [*]
+    Denied --> [*]
+    LeftDropped --> [*]
+    Left --> [*]
+    Removed --> [*]
 ```
 
 - `Reconnecting` の間、その人は一覧に「再接続中」と出す。Media Node の transport は閉じない（メディアが続いていれば、WS だけが切れている）。
@@ -519,7 +557,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) に従う。
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **会議の番号**：11 桁、CSPRNG、2 年は再び使わない。
 - **参加の鍵**：128 ビット、URL のフラグメント。パスコードの入力だけを省く。

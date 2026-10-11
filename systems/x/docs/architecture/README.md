@@ -1,6 +1,6 @@
 # Architecture: X
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節、データモデルの正本（表の定義、ER 図、横断の不変条件）は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節、データモデルの正本（表の定義、ER 図、横断の不変条件）は [data-model.md](data-model.md) にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/x/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -23,39 +23,81 @@
 
 ### 1.2 コンテナ
 
-```
- ┌──────────── CloudFront＋WAF（Bot Control、静的な資産、メディアの配信 <brand>media.<domain>）────────────┐
- └──────┬───────────────────────┬──────────────────────┬────────────────────────┬─────────────────┘
-        ▼                       ▼                      ▼                        ▼
- ┌──────────────┐      ┌───────────────┐     ┌────────────────┐      ┌──────────────────┐
- │ App API（BFF）│      │ Public API     │     │ Realtime Gateway│      │ Ingest（閲覧の出来事）│
- │ 画面向けの読み │      │ OAuth・レート制限│     │ WebSocket：DM、  │      │ 束ねて受け、失って   │
- │ 書きの入口     │      │ ・計量           │     │ 通知の数         │      │ よい扱い             │
- └──┬───────────┘      └──────┬────────┘     └───────┬────────┘      └────────┬─────────┘
-    │ 同じ内部のサービスを呼ぶ    │                        │                          │
-    ▼                            ▼                        ▼                          ▼
- ┌────────────────── 内部のサービス（ECS Fargate、Service Connect）──────────────────────┐
- │ Post（書き込み・tid）  Graph（フォロー・ブロック・ミュート）  Engagement（いいね・リポスト）    │
- │ Timeline（フォロー中の読み出し・プルの合わせ）  Ranking（おすすめ：候補→特徴→スコア→絞り→混ぜ）  │
- │ Search  Notification  Media  DM  Accounts  T&S（通報・措置・申出・開示）                      │
- │ すべての読み出しが packages/visibility の visible(viewer, post) を通る                     │
- └──────┬───────────────────────────────┬──────────────────────────────────────────┘
-        ▼                               ▼
- Aurora PostgreSQL（正本：利用者、投稿、フォロー、       Valkey（写し：ホームのタイムライン、作者の最近の投稿、
- いいね・リポスト、通知、DM、措置、outbox）             カウンター、特徴、レート制限の桶、セッション）
-        │ outbox                                        ▲
-        ▼                                               │
-     Relay ──▶ Kinesis Data Streams（出来事のログ：posts・graph・engagement・moderation・accounts・dm・audit。views は Ingest から）
-                     │
-                     ├─▶ Fanout Worker ──（SQS で分割した配り先の束）──▶ Valkey のホームのタイムライン
-                     ├─▶ Counter Aggregator ──▶ Valkey のカウンター ──（定期の書き戻し）──▶ Aurora
-                     ├─▶ Search Indexer ──▶ OpenSearch（投稿・利用者）、Trends（窓ごとの数）
-                     ├─▶ Notification Worker ──▶ 通知の行、APNs・FCM・メール
-                     ├─▶ T&S Worker（スパムの規則・分類、ハッシュの照合）
-                     └─▶ Firehose ──▶ S3（データレイク：分析、ランキングの学習と評価）
+全体の図と、出来事のログの消費者の図に分ける。全体の図では、要求の入口から正本・写し・出来事のログまでを示す。
 
- S3：メディア（原本と変換の後）、データレイク、監査ログの保管      MediaConvert：動画の変換（HLS）
- Ranking・Public API・Ingest ──▶ Firehose（直接：配信の記録、API の計量、見える範囲の抜き取り、RUM）──▶ S3
+```mermaid
+flowchart TB
+    cf["CloudFront＋WAF<br/>Bot Control、静的な資産、<br/>メディアの配信 &lt;brand&gt;media.&lt;domain&gt;"]
+    app["App API（BFF）<br/>画面向けの読み書きの入口"]
+    pub["Public API<br/>OAuth・レート制限・計量"]
+    rt["Realtime Gateway<br/>WebSocket：DM、通知の数"]
+    ing["Ingest（閲覧の出来事）<br/>束ねて受け、失ってよい扱い"]
+    svc["内部のサービス（ECS Fargate、Service Connect）<br/>Post・Graph・Engagement・Timeline・Ranking・Search・<br/>Notification・Media・DM・Accounts・T&S<br/>すべての読み出しが visible(viewer, post) を通る"]
+    aurora[("Aurora PostgreSQL（正本）<br/>利用者、投稿、フォロー、いいね・リポスト、<br/>通知、DM、措置、outbox")]
+    valkey[("Valkey（写し）<br/>ホームのタイムライン、作者の最近の投稿、<br/>カウンター、特徴、レート制限の桶、セッション")]
+    relay["Relay"]
+    kds["Kinesis Data Streams<br/>出来事のログ"]
+    workers["消費者（下の図）<br/>Fanout・Counter Aggregator・Search Indexer・<br/>Notification・T&S の Worker"]
+    fh["Firehose"]
+    s3[("S3<br/>メディア（原本と変換の後）、<br/>データレイク、監査ログの保管")]
+    mc["MediaConvert<br/>動画の変換（HLS）"]
+
+    cf --> app
+    cf --> pub
+    cf --> rt
+    cf --> ing
+    app -->|"同じ内部のサービスを呼ぶ"| svc
+    pub --> svc
+    rt --> svc
+    svc --> aurora
+    svc --> valkey
+    svc -->|"Media"| mc
+    aurora -->|"outbox"| relay
+    relay --> kds
+    ing -->|"views"| kds
+    kds --> workers
+    workers --> valkey
+    kds --> fh
+    svc -.->|"Ranking：直接"| fh
+    pub -.->|"直接"| fh
+    ing -.->|"直接"| fh
+    fh --> s3
+```
+
+- Ranking・Public API・Ingest は、配信の記録、API の計量、見える範囲の抜き取り、RUM を Firehose へ直接書く（点線）。
+
+出来事のログ（`posts`・`graph`・`engagement`・`moderation`・`accounts`・`dm`・`audit`、`views` は Ingest から）を読む消費者は次のとおり。
+
+```mermaid
+flowchart LR
+    kds["Kinesis Data Streams"]
+    fw["Fanout Worker"]
+    ca["Counter Aggregator"]
+    si["Search Indexer"]
+    nw["Notification Worker"]
+    tsw["T&S Worker<br/>スパムの規則・分類、ハッシュの照合"]
+    fh["Firehose"]
+    vtl[("Valkey のホームのタイムライン")]
+    vct[("Valkey のカウンター")]
+    aurora[("Aurora")]
+    os[("OpenSearch（投稿・利用者）")]
+    tr["Trends（窓ごとの数）"]
+    nt["通知の行、APNs・FCM・メール"]
+    lake[("S3（データレイク）<br/>分析、ランキングの学習と評価")]
+
+    kds --> fw
+    kds --> ca
+    kds --> si
+    kds --> nw
+    kds --> tsw
+    kds --> fh
+    fw -->|"SQS で分割した配り先の束"| vtl
+    ca --> vct
+    vct -->|"定期の書き戻し"| aurora
+    si --> os
+    si --> tr
+    nw --> nt
+    fh --> lake
 ```
 
 | コンテナ | 責務 |
@@ -105,6 +147,13 @@
 | DM | エンドツーエンドの暗号化の「Chat」を持つ。秘密鍵は PIN で守り、Juicebox の方式で 3 つの保管先（うち 2 つは HSM）に分けて預ける。従来の DM は Chat と別に残り、暗号化されない | 鍵の方式は公式の文書（[How X Chat keeps your messages secure](https://docs.x.com/xchat/cryptography-primer)）で確かめた。従来の DM の扱いは第三者の報道（[TechCrunch, 2025-09-05](https://techcrunch.com/2025/09/05/x-is-now-offering-me-end-to-end-encrypted-chat-you-probably-shouldnt-trust-it-yet/)）で、本家の文書は**未検証** |
 
 いずれも 2026-10-04 に確認（統合の工程で公式の資料を取得し直した）。本家のエンジニアリングのブログ（blog.x.com）とヘルプセンター（help.x.com）は、確認の時点で取得が 403 になった。そこにしかない数値は「未検証」とした。この設計は、上の考え方を参考にするが、本家のコード・設定・モデルを使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+
+### 1.4 主要な流れ
+
+- **投稿の書き込み**：冪等の記録を引き、検証して `tid` を振り、投稿の行と outbox を同じトランザクションで書き、Relay が Kinesis の `posts` の流れへ送る（[posts-and-ids.md](posts-and-ids.md) の 5.1 節）
+- **fan-out**：振り分け役が `ar:` に先に書き、作者の方式でプルかプッシュに分け、プッシュは SQS のページの仕事で 1,000 人ずつフォロワーの `tl:` に入れる（[timeline-fanout.md](timeline-fanout.md) の 5.1 節）
+- **写しの作り直し**：利用者ごとのロックで 1 回にまとめ、フォロー先の `ar:` と Aurora から 800 件を合わせて `tl:` を作る（[timeline-fanout.md](timeline-fanout.md) の 7 節）
+- **いいねの書き込み**：`visible()` を確かめ、関係の行を足したときだけ outbox に `like.created` を書く（[engagement-and-counters.md](engagement-and-counters.md) の 3.2 節）
 
 ## 2. 規模の段階
 
@@ -239,74 +288,15 @@
 - **スパムとボット**：公開の登録と公開 API は、スパムとボットの入口になる。登録の時の電話番号の確認、レート制限、行動の規則、アカウントの危険の点、WAF の Bot Control を重ねる（[ADR-0040](../decisions/0040-spam-and-bot-defense.md)）。
 - **ID の衝突**：生成器の番号の貸し出しの誤りか、時計の戻りで同じ `tid` が出る。貸し出しの重なりを DB の制約で防ぎ、時計の戻りでは振らない（[ADR-0002](../decisions/0002-post-ids-and-ordering.md)）。投稿の表の主キーで重複を検出する。
 - **大きな会話**：人気の投稿への数十万件の返信で、会話の表示と通知が重くなる。会話の読み出しは返信の上位だけをランクして返す（[ADR-0017](../decisions/0017-profile-and-conversation-reads.md)）。通知はまとめ、殺到の受け手は Valkey で数える（[ADR-0029](../decisions/0029-notification-rows-and-grouping.md)）。
-- **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L11）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
+- **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L12）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
-### 決定（2026-10-04、既定案）
-
-PM の方針（本家に寄せ、判断が要るところは推奨の既定案で進める）により、最初の設計で次のとおり決めた。その後の領域の工程と統合の工程での変更は、下の「統合」の節にある。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。どれも E1〜E14 の PoC・試験で覆りうる。
-
-- **テナント**：1 つ。RLS は本人だけの表に限る（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)）。
-- **ID**：投稿・利用者・DM のメッセージは 64 ビットの `tid`。共通の UUIDv7 から外れる（[ADR-0002](../decisions/0002-post-ids-and-ordering.md)）。
-- **fan-out**：プッシュとプルの組み合わせ。閾値の既定は 1 万フォロワー。写しは 800 件、アクティブ（30 日以内に読んだ）なフォロワーだけに配る（[ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)）。
-- **出来事のログ**：Kinesis Data Streams（オンデマンド）。仕事の待ち行列は SQS（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）。
-- **ランキング**：S1 は規則と軽いスコア。学習済みのモデルは S2（[ADR-0006](../decisions/0006-ranking-boundary.md)）。
-- **アプリ**：React Native（Expo）で iOS・Android を MVP に含める。日本の利用者の大半がスマートフォンで使うため（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
-- **文字数**：本家と同じ重み付きの 280。数え方は公開の仕様から自前で実装し、`twitter-text` を使わない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
-- **DM の暗号化**：MVP はサーバーの側の保存の暗号化（KMS）だけ。エンドツーエンドの暗号化は MVP の後（法務の L3 とあわせて決める）。
-- **レート制限のヘッダー**：本家の `x-rate-limit-*` の形でなく、IETF の `RateLimit`・`RateLimit-Policy` の形にする（領域の工程で確定した。[ADR-0047](../decisions/0047-rate-limit-token-buckets.md)）。
-
-### 決定（2026-10-04、統合）
-
-領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。
-
-- **出来事のログの流れ**：8 つにした（`posts`・`graph`・`engagement`・`moderation`・`accounts`・`views`・`dm`・`audit`）。`engagement` の鍵は `"{post_id}:{user_id mod 8}"`（[ADR-0023](../decisions/0023-counter-aggregation-and-reconciliation.md)）、`views` の鍵は閲覧者のセッションのハッシュ（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md)）。`dm` は ID だけを運び、データレイクへ写さない（[ADR-0035](../decisions/0035-dm-conversation-model-and-storage.md)）。ADR-0005 の表を直し、注記を残した。
-- **Firehose へ直接書く記録**：ランキングの配信の記録（`ranking-served`）、API の計量（`api-usage`）、見える範囲の抜き取り（`visibility-audit`）、RUM（`rum`）は、確定した変更でないので Kinesis Data Streams を通さない（ADR-0005 の注記）。名前は `ranking-served` に揃えた（observability の `ranking-reasons` を直した）。
-- **outbox の保持**：送った行を 1 時間残し、DR で大阪の Relay が直近 15 分を送り直す（[ADR-0056](../decisions/0056-disaster-recovery-osaka.md)）。ADR-0005 の「送れたら消す」を直した。
-- **カウンターの位置**：ADR-0005 の「結果とシャードの位置を同じ `MULTI`」は Valkey のクラスタでは書けないので取り消した。数の写しは投稿ごとのハッシュに部分ごとの最後の連番を持って冪等に足し（ADR-0023）、シャードの位置は全消費者とも Aurora の `stream_checkpoints` に持つ（[ADR-0055](../decisions/0055-kinesis-consumers-and-valkey-clusters.md) の注記）。`vk-counters` は数と連番だけを持つ。
-- **「Valkey の桁ごとの数」**：7 節の engagement-and-counters の行と intent の旧い書き方。閲覧の数を確率で概算する方式（桁ごとに確率で足す数え方。HyperLogLog と並ぶ案）を指していたが、数の小さい投稿で誤差が 2% に収まらないので採らなかった（[ADR-0024](../decisions/0024-view-counts-ingest-and-approximation.md) の案 c）。今の形は「投稿ごとのハッシュ `pc:{post_id}` に、数の欄と、`engagement` の鍵の部分（`sub` = 利用者の ID の下 3 ビット、8 つ）ごとの最後の連番を持つ」（ADR-0023）。閲覧の数も同じハッシュの `view` の欄で、HyperLogLog は使わない（ADR-0024）。intent の同じ書き方も直した。
-- **ミュートの向き**：ミュートは逆向きの表を持たない（[ADR-0012](../decisions/0012-viewer-sets-cache.md)）。2 つの向きはブロック（`blocks`・`blocked_by`）だけ。ADR-0007 を直した。
-- **`ar:` の範囲**：全作者に持つ（直近 7 日・200 件。[ADR-0015](../decisions/0015-fanout-pipeline-and-burst-control.md)）。ADR-0003 を直した。作者の方式は別の `authors` の表を作らず `users.fanout_mode` に置く。
-- **DR の `ar:`**：大阪では東京の Kinesis を読み直せないので、入口を開く前に、合わせに要る作者の `ar:` を Aurora から作る（ADR-0016 の注記、[infrastructure.md](infrastructure.md) の 7.5 節）。
-- **`visible()` の面**：`ViewerContext.surface` を足した。面で変わるのはミュートの当て方と `interstitial` の扱いだけで、ブロック・鍵・削除・措置は面に関わらず同じ（ADR-0004 の注記、AGENTS.md）。
-- **本人だけの表**：領域の文書が足した表（`ranking_feedback`、`dm_message_hidden`、`dm_requests`、`dm_settings`、`user_settings`、通知の表、`oauth_grants`、`data_export_requests` ほか）を ADR-0004 の一覧に足した。正本の一覧は [data-model.md](data-model.md) の 3 節。予約の投稿は MVP に含めない。
-- **列の持ち主**：他の領域が求めた列を、持ち主の文書の表に足した。`users.account_mod`・`graph_version`・`fanout_mode`・`pinned_post_id`・`flags` と、新しい `user_settings`（`region`・`personalized_ranking`・`home_default_tab` ほか）は [accounts-and-auth.md](accounts-and-auth.md) の 12 節。`posts.region_code`・`has_media` と `drafts` は [posts-and-ids.md](posts-and-ids.md) の 12 節。DM の設定は `user_settings` の列にせず `dm_settings` に分けた。
-- **フラグと設定の名前空間**：フラグは `release.*`・`ops.*`・`experiment.*`、決めた値は `policy.*`・`retention.*`・`legal.*`・`ts.*`（[delivery.md](delivery.md) の 3 節、AGENTS.md）。ランキングの A/B は `experiment.ranking.*` に揃えた（AGENTS.md の `release.ranking.*` を直した）。法務の確認待ちの振る舞いの門は `release.*` にし、`legal.l3.*` を `release.dm_report_evidence`・`release.dm_media_matching` に、`release.ranking.reasons` を `release.ranking_reasons` に、`policy.phone.max_accounts` を `ts.registration.max_accounts_per_phone` に改めた。`ops.timeline.rebuild_window` は `ops.timeline.rebuild_rate` に揃えた。
-- **鍵**：通報の証拠の写しとメディアの隔離の置き場に、KMS の鍵 `ts-evidence` を足した（[ADR-0051](../decisions/0051-encryption-and-key-layout.md) の注記）。
-- **Valkey の置き場所**：`pl:` は `vk-timeline` に置く（`vk-cache` から外した）。読み出しの命令の数（[capacity.md](capacity.md) の 3 節）を直した。閲覧者の集合は 1 回の Function で読む。
-- **閲覧の流れの量**：1 レコード（25 件の束）を 2 KB に揃えた（engagement-and-counters の値）。S1 のピーク 1.6 MB/秒・瞬間 4.8 MB/秒で、`views` も温めた量を 20 MB/秒にする。S3 は約 170 MB/秒で東京の上限の 8 割を超えるので、S2 の間に上限の引き上げを申請する（[capacity.md](capacity.md) の 5.3 節）。Ingest の口は `/i/views` に揃えた。
-- **おすすめの負荷**：候補は S1 で 800 件、特徴の付加は軽いランクの後の 200 件だけ（[ranking-and-recommendation.md](ranking-and-recommendation.md)）。capacity の見積もりを合わせた。
-- **検索とミュート**：ミュートした作者は投稿の検索から除くが、`from:` で指定したときは出す（[search-and-trends.md](search-and-trends.md) の 6.3 節、[follow-graph.md](follow-graph.md) の 4.5 節）。
-- **アプリの段階の配布**：iOS は App Store の 7 日の段階的リリース（1% → 2% → 5% → 10% → 20% → 50% → 100%）、Android は 1% → 10% → 50% → 100%（[runbooks/README.md](../runbooks/README.md) の 3 節を直した。[ADR-0062](../decisions/0062-mobile-release-and-min-version.md)）。
-- **品質と運用**：各領域の文書の「quality.md・runbooks への項目」を反映した。漏れの経路の表に、おすすめの続きのページ（`rk:`）、クライアントの手元の写し、運用者・T&S のコンソール、アカウントの状態の変更の直後、閲覧者の集合の更新の失敗、作った後のブロック（通知）を足した。DR の訓練の合格基準を足した。runbooks の手順を、作ったもの（3 つ）と計画のものに分けて一覧にした。
-- **法務の確認待ちの追加**：通知の要約のメールと特定電子メール法を L11 として足した。
-- **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。利用者の行動の上限は [api-and-rate-limits.md](api-and-rate-limits.md) の 5.3 節。保持の期間は [security.md](security.md) の 7.1 節。負荷のモデルは [capacity.md](capacity.md) の 1 節。表と置き場所は [data-model.md](data-model.md)。
-- **検証の工程での直し（2026-10-04）**：公式の資料を取得し直して、次を確かめ・直した。おすすめの今の構成（SimClusters、作者の減衰の下限、新しい作者の押し上げ。1.3 節）、Chat の鍵の預け方（Juicebox。公式の文書で確かめ、未検証を外した）、情報流通プラットフォーム対処法の指定（2025-04-30 の 5 社の後、5 月に 4 社を追加）、申出から 7 日の期限（第三者の解説で確認、省令の条文は未検証）、CloudFront KeyValueStore の上限と、CloudFront Functions で国の見出しを読めること（[media.md](media.md)）、App Store の段階的リリースの割合、Kinesis の上限、IETF の `RateLimit` の草案（draft-11、まだ RFC でない）、公開 API の課金と上限、メディアの上限。help.x.com と blog.x.com は再び 403 で、そこにしかない値は未検証のまま残した。
-- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
-
-### 決定（2026-10-04、データモデル）
-
-データモデルの完全版（[data-model.md](data-model.md) と [data-model/](data-model/)）を作る工程で、領域の文書と ADR の間の名前と列の食い違いを次のとおり解いた。ADR の決定は変えていない。
-
-- **正本の移動**：列・鍵・索引の正本を [data-model.md](data-model.md) と [data-model/](data-model/) に移した。領域の文書の「data-model への項目」は要点で、食い違ったらデータモデルに合わせて直す。
-- **措置の要約の形**：`posts.mod_flags` をビット（`LABEL`・`REDUCE`・`REMOVED`・`AGE_GATED`・`GEO_WITHHELD`・`UNDER_REVIEW`・`NO_ENGAGE`・`MEDIA_REMOVED`）と地域の列 `posts.mod_geo` にし、`users.account_mod` もビットと `account_mod_detail` にした（[data-model.md](data-model.md) の 3.5 節）。[posts-and-ids.md](posts-and-ids.md) の `restricted`・`age_gated`・`geo_withheld` と [trust-and-safety.md](trust-and-safety.md) の `label`・`reduce`・`removed`・`geo` の食い違いを、この名前に揃えた。
-- **作者の状態のバージョン**：`as:` のバージョンとして `users.state_version` を足した（[posts-and-ids.md](posts-and-ids.md) の 6 節が求めていたが、`users` の表になかった）。
-- **本人だけの表の列**：`owner_id` に揃えた（`user_contacts`・`user_birthdates`・`dm_message_hidden`・`oauth_grants` の `user_id` を直した）。`user_contacts` に変更の保留の `slot`（`current`・`pending`）と HMAC の鍵のバージョンを足した。
-- **`auth` スキーマ**：`auth.user.email`・`phone_number` に平文でなく HMAC の値を入れ、`auth.session` に IP を残さない（[security.md](security.md) の 5.3 節の「平文の列を持たない」を Better Auth の表にも当てる）。Better Auth のバージョンで動くかは E2 の `auth-signup-login` で確かめる。
-- **通知のまとめ**：日ごとに分けた `notifications` には、領域の文書の部分の一意の索引 `(owner_id, group_key) WHERE is_open` を張れない（分ける鍵を含まないため）。開いている行を `notification_open_groups` の主キーで 1 つにし、まとめない種類の冪等は分ける鍵 `bucket_on`（元の投稿の `tid` の日）を含めた一意にした。
-- **出来事の名前**：鍵の切り替えは `accounts` の流れの `accounts.protected_changed` に揃えた（[follow-graph.md](follow-graph.md) の `graph` の流れの `account.protected_changed` を直した）。投稿の措置は `moderation.action_applied` と `post.state_changed` を同じトランザクションで書く。
-- **Relay の区画**：`relay_partitions` は表にせず、Valkey の `relay:lease:{n}`（なければ勧告的ロック）にした（[infrastructure.md](infrastructure.md) の 14 節を直した）。
-- **足した表**：`notification_open_groups`、`processed_events`（DB に書く消費者の重複の記録）、`post_shard_map`・`engagement_shard_map`（S2。`graph_shard_map` と同じ形）。`legal_holds` の `from`・`to` は SQL の予約語を避けて `period_from`・`period_to` にした。
-- **DB のロールと S2 のクラスタ**：サービスごとの DB のロールと列の単位の書き込みの権限（[data-model.md](data-model.md) の 3.3 節）、S2 のクラスタへの表の割り当て（S1 の `main` を `core` として残す。3.12 節）を決めた。
-- **S2 で同じトランザクションを保てない書き込み（推奨。S2 の着手の時に ADR で確定する）**：
-  - フォローと `users.graph_version`：バージョンを関係のクラスタの表（`graph_versions(user_id, version)`、`user_id` の分割）に移す。
-  - 措置と要約：`moderation_actions`・`moderation_action_events` を対象と同じクラスタ・分割に置き（投稿・メディアは `posts`、アカウントは `accounts`）、案件・通報・法令の表は `core` に残す。ADR-0038 の「同じトランザクション」を保つ。
-  - 投稿と `media` の `attached`：付け先の正本を `post_media`・`dm_messages.media_id` にし、`media.state` の `attached` は出来事から冪等に書く。付ける前の確かめ（`ready` で同じ作者）は書き込みの時に読む。
+### 残る未解決事項
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 法務の確認待ち（L1〜L11） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
+| 法務の確認待ち（L1〜L12） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
 | fan-out の閾値、アクティブの定義、写しの形と件数、新着の窓、Worker と Valkey の 1 シャードの速さ | E5 の前の `fanout-poc` |
 | 閲覧の数の取り込みの費用と誤差 | E6 の前の `view-count-poc` |
 | 日本語の検索の索引の大きさ、Sudachi との比較 | E9 の前の `search-poc` |
@@ -316,9 +306,10 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | 「見えなくなった」の知らせ（`hidden`）を誰に送るか | E5（[clients.md](clients.md) の 4.4 節） |
 | MediaConvert で 1 分の動画 p95 60 秒を守れるか、CloudFront の無効化の時間 | E7 の `video-transcode`・`media-delivery-and-takedown` |
 | ElastiCache の Valkey のバージョンとノードの記憶、Global Datastore、KMS の要求のクォータ、サーバーの時計のずれ | E1 の着手の時 |
-| S2 で同じトランザクションを保てない書き込み（[data-model.md](data-model.md) の 7 節。推奨は上の「データモデル」の決定） | S2 の着手の時に ADR を書く |
+| S2 で同じトランザクションを保てない書き込み（[data-model.md](data-model.md) の 7 節。推奨は [design-log.md](design-log.md) の「2026-10-04：データモデル」） | S2 の着手の時に ADR を書く |
 | 本家の振る舞いで未確認のもの（ヘルプセンターの値、6,800 万人、2012 年の講演の数値） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
 
 ## 7. 領域の文書
 
@@ -339,14 +330,15 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [accounts-and-auth.md](accounts-and-auth.md) | 登録、ログイン、強いログイン、セッションと取り消し、連絡先の変更の保留、ログインの記録、ハンドルとプロフィール、アカウントの状態と削除、年齢の枠組み、認可の画面。`users`・`user_settings` の表の持ち主 | 0043–0044（範囲 0043–0045） | セキュリティ | E2 |
 | [api-and-rate-limits.md](api-and-rate-limits.md) | 公開 API の形とバージョン、ページングとエラー、開発者とアプリ、OAuth 2.0（PKCE）とトークンの形（`<brand>_`）、レート制限（トークンバケット、画面と API の共通の桶、`RateLimit` のヘッダー）、計量とプラン、後の Webhook | 0046–0048（範囲 0046–0048） | QA、Ops | E2、E13 |
 | [clients.md](clients.md) | 共通のパッケージ、Web（React、PWA）とアプリ（React Native）、データの層と手元の保存、オフライン、タイムラインの描画、投稿の作成と日本語の入力、閲覧の出来事の送り方、プッシュの受け方と深いリンク、公開の URL の HTML、アクセシビリティ | 0049–0050（範囲 0049–0050） | QA | E2〜E13 |
-| [security.md](security.md) | 信頼境界と脅威モデル、端末に残るデータ、暗号化と鍵、監査と運用者のアクセス、データのライフサイクルと保全、乗っ取りへの対応、ログに出さないもの、脆弱性の管理、インシデント | 0051–0053（範囲 0051–0053） | セキュリティ | E1、E11、E14 |
+| [security.md](security.md) | 信頼境界と脅威モデル、端末に残るデータ、暗号化と鍵、監査と運用者のアクセス、データのライフサイクルと保全、乗っ取りへの対応、ログに出さないもの、脆弱性の管理、インシデント | 0051–0053、0064（範囲 0051–0053、0064） | セキュリティ | E1、E11、E14 |
 | [data-model.md](data-model.md)・[data-model/](data-model/) | データモデルの正本：規約（ID、RLS、DB のロール、`visible()` に渡す列、暗号化、分割と保持、S2 のクラスタ）、全体と領域ごとの ER 図、95 表の定義、DB の外の置き場所の形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（既定案、統合、データモデル） | なし | — | — |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、ホスト名と CloudFront、サービスと配置、Valkey の 4 クラスタ、Kinesis の 8 つの流れと消費者、バックアップと DR（`tid` の範囲、outbox の送り直し、`ar:` の先の作成）、段階を上げる基準、S2・S3、Terraform、コスト | 0054–0056（範囲 0054–0057） | Ops | E1、E14 |
 | [observability.md](observability.md) | 中身を出さない計装、トレース、RUM、届く速さの計測（合成監視、区間、読み出しの抜き取り）、SLI の計測、出来事・写し・カウンターの指標、見える範囲の抜き取りの監査、ランキングのガードレールの指標、ダッシュボード | 0058–0059（範囲 0058–0059） | Ops | E1、E5、E10、E14 |
 | [capacity.md](capacity.md) | 負荷のモデル（投稿、読み出し、fan-out、エンゲージメント、閲覧、瞬間のピーク）、部品ごとの必要量、データの量、クォータ、余裕と削る順、負荷試験 L1〜L10 | 0060（範囲 0060） | Ops | E14 |
 | [delivery.md](delivery.md) | CI の関門、フラグと設定の名前空間、サーバーのデプロイの順、アプリのリリースの列車とストアの段階の配布、OTA の更新、最低のバージョン、スキーマと契約の変更の順序、ランキングの変更の出し方 | 0061–0063（範囲 0061–0063） | QA、Ops | E1、E2、E14 |
 
-- 次に採番する ADR は 0064。統合の後に足す ADR は、関わる領域の行に番号を書き足す。
+- 次に採番する ADR は 0065。統合の後に足す ADR は、関わる領域の行に番号を書き足す。0064（本人のデータの書き出し、proposed）は security の範囲が尽きていたため、次の番号を security の行に足した。
 
 ## 8. Epic
 

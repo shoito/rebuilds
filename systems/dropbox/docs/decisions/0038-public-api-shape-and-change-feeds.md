@@ -13,7 +13,7 @@ date: 2026-10-09
 
 - 呼び出しの形（資源ごとの REST か、呼び出しの形か）。
 - 「上書き」の指定の意味。[ADR-0006](0006-sync-conflict-model.md) は条件なしの上書きの API を禁じ、公開 API の上書きを、サーバーが今の `rev` を条件にする形に直すとした。
-- 合図の経路。[architecture/README.md](../architecture/README.md) の 6 節は、端末へは WebSocket、使えなければ 60 秒の確かめと long-poll とした。
+- 合図の経路。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」は、端末へは WebSocket、使えなければ 60 秒の確かめと long-poll とした。
 - 中身の送受信。[ADR-0001](0001-platform-and-stack.md) は、ブロックの中身をサーバーの ECS に通さないとした。
 - 本家の `content_hash` と互換の値を出すか（[ADR-0002](0002-chunking-and-block-addressing.md) がこの領域に預けた）。
 

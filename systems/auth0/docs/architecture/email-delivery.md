@@ -90,13 +90,18 @@ SES の送信の結果 ─ 設定セット ─▶ EventBridge ─▶ Worker（�
 
 ### 5.2 テナントの独自の送信ドメイン（E11）
 
-状態：
+次の図は、送信ドメインの状態を示す。
 
-```
- registered ──(SES の識別子の作成)──▶ pending_dns ──(DKIM SUCCESS)──▶ verified
-     ▲                                     │ 72 時間で未確認                │ DKIM が失敗に変わる
-     │                                     ▼                                ▼
-     └─────────── 再試行 ────────────── failed ◀──────────────────── degraded（共有のドメインで送る）
+```mermaid
+stateDiagram-v2
+  state "degraded（共有のドメインで送る）" as degraded
+  [*] --> registered
+  registered --> pending_dns: SES の識別子の作成
+  pending_dns --> verified: DKIM SUCCESS
+  pending_dns --> failed: 72 時間で未確認
+  verified --> degraded: DKIM が失敗に変わる
+  degraded --> failed
+  failed --> registered: 再試行
 ```
 
 - テナントに示すレコード：Easy DKIM の CNAME 3 つ（東京）と 3 つ（大阪）、MAIL FROM の MX と TXT（`send.<テナントのドメイン>` などのサブドメイン）、DMARC の推奨（最初は `p=none` で集計を見て、`quarantine`・`reject` へ）。

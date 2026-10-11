@@ -310,22 +310,34 @@ approval_process（object、バージョン、order、active）
 
 **インスタンス（`approval_instances`）**
 
-```
-            submit
-   (none) ─────────▶ pending ──┬── 最後の段で承認 ─────────▶ approved
-                        │      ├── 却下（reject_request）───▶ rejected
-                        │      ├── 取り消し ─────────────────▶ recalled
-                        │      └── 承認者を決められない ────▶ error ── 管理者が直して再開 ─▶ pending
-                        └── 段の承認 → 次の段（飛ばす段は飛ばす）
+インスタンスの状態と遷移を図にする。段の応答の結果は、下の DT-APR-001 を正とする。
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: submit
+    pending --> pending: 段の承認 → 次の段（飛ばす段は飛ばす）<br/>却下（back_to_previous）→ 前の段
+    pending --> approved: 最後の段で承認
+    pending --> rejected: 却下（reject_request）
+    pending --> recalled: 取り消し
+    pending --> error: 承認者を決められない
+    error --> pending: 管理者が直して再開
+    approved --> [*]
+    rejected --> [*]
+    recalled --> [*]
 ```
 
 **作業の項目（`approval_work_items`。段 × 承認者）**
 
-```
- pending ──承認──▶ approved
-    │   ──却下──▶ rejected
-    │   ──付け替え（管理者・キューの引き取り）──▶ reassigned（新しい作業の項目を作る）
-    └── 段が終わった（first_response で他の人が応答、却下など）──▶ cancelled
+作業の項目の状態と遷移を図にする。
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> approved: 承認
+    pending --> rejected: 却下
+    pending --> reassigned: 付け替え（管理者・キューの引き取り）
+    pending --> cancelled: 段が終わった（first_response で他の人が応答、却下など）
+    note right of reassigned: 新しい作業の項目を作る
 ```
 
 **DT-APR-001：段の応答の結果**（上から評価）

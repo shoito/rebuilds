@@ -230,17 +230,29 @@ view = DocView { base: confirmed, overlay }   // 描画・レイアウト・ヒ�
 
 ### 7.2 状態の遷移
 
-```
-          Hello              Welcome            読み込み完了
- Idle ─────────▶ Connecting ─────────▶ Loading ─────────────▶ Live ◀──────────┐
-                    ▲  │ 失敗                                   │ │ 切断        │ Welcome（resume）
-                    │  ▼                                         │ ▼             │
-                    │ Backoff ◀──────────────────────────────── Disconnected ──┘
-                    └───┘  最初は 0〜5s の一様な乱数、以後 1s, 2s, 4s … 30s（±20% の乱数）
- Live ── RoleChanged(view) ──▶ ReadOnly ── RoleChanged(edit) ──▶ Live
- どこからでも ── Kick(forbidden / file_deleted) ──▶ Closed
- どこからでも ── Kick(version_mismatch) ──▶ Reload（ページを読み込み直す）
- Connecting ── Kick(ticket_required) ──▶ API のチケットを取り、0〜1s の乱数の後に Connecting
+次の図は、クライアントの接続の状態を示す。`Kick(forbidden / file_deleted)` と `Kick(version_mismatch)` は、どの状態からも移る。
+
+```mermaid
+stateDiagram-v2
+  state "Reload（ページを読み込み直す）" as Reload
+  state "どの状態でも" as Session
+  [*] --> Session
+  state Session {
+    [*] --> Idle
+    Idle --> Connecting: Hello
+    Connecting --> Loading: Welcome
+    Loading --> Live: 読み込み完了
+    Connecting --> Backoff: 失敗
+    Backoff --> Connecting: 待ち（最初は 0〜5s の一様な乱数、以後 1s, 2s, 4s … 30s、±20% の乱数）
+    Live --> Disconnected: 切断
+    Disconnected --> Backoff
+    Disconnected --> Live: Welcome（resume）
+    Live --> ReadOnly: RoleChanged(view)
+    ReadOnly --> Live: RoleChanged(edit)
+    Connecting --> Connecting: Kick(ticket_required)（API のチケットを取り、0〜1s の乱数の後）
+  }
+  Session --> Closed: Kick(forbidden / file_deleted)
+  Session --> Reload: Kick(version_mismatch)
 ```
 
 - `Disconnected` の間も、編集はできる（4.6 節の上限まで）。画面に「オフライン」と未確定の件数を出す。

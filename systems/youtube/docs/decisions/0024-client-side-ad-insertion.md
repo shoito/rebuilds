@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、MVP の広告を外部の広告サーバー（VAST 4・VMAP）にし、本システムは広告の枠（再生の前・途中・後）、表示の計測、無効なトラフィックの除外を持つとした。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、MVP の広告を外部の広告サーバー（VAST 4・VMAP）にし、本システムは広告の枠（再生の前・途中・後）、表示の計測、無効なトラフィックの除外を持つとした。
 - 挿入の方式には、プレイヤーが広告を別に再生する形（CSAI）と、サーバーが本編のマニフェストに広告のセグメントを差し込む形（SSAI）がある。
 - SSAI は、マニフェストが視聴者ごとになり、CDN で共有できなくなる（[ADR-0020](0020-manifest-generation-and-capability-classes.md)）。広告の素材を本編のラダーと同じ形に変換する仕組みも要る。
 - 子ども向けの動画など、広告を出さない動画がある（`playable()` の `allow_with: no_ads`、[ADR-0009](0009-single-tenant-and-playable.md)）。

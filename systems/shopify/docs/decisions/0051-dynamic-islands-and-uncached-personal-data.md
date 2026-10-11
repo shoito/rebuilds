@@ -30,7 +30,7 @@ date: 2026-10-10
 ### 他の案を選ばなかった理由
 
 - **2（ログインのページをキャッシュしない）**：ログインした買い手が増えると元の負荷が増え、TTFB の目標を外す。キャッシュする・しないの判定の誤りで漏れる経路が残る。
-- **3（ESI）**：CloudFront は ESI を持たず、エッジでの組み立てに Lambda@Edge が要る。東京の元で描く決定（[architecture/README.md](../architecture/README.md) の 6 節）と合わない。
+- **3（ESI）**：CloudFront は ESI を持たず、エッジでの組み立てに Lambda@Edge が要る。東京の元で描く決定（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）と合わない。
 
 ## Consequences
 

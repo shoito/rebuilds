@@ -42,7 +42,7 @@
 | `pg_bigm` の仕組み | 2-gram の GIN の索引（`gin_bigm_ops`）で `LIKE` の部分一致を速くする。`likequery()` は検索語の前後に `%` を付け、`%` などを逃がして `LIKE` の形にする。1〜2 文字の語の検索も速いとしている。索引を付ける列は約 102 MB まで | [pg_bigm 1.X Document](https://pgbigm.github.io/pg_bigm/pg_bigm_en.html)（2026-10-04 に確認） |
 
 - 本家の検索の対象の項目、日本語の部分一致の振る舞い、索引の遅れ、検索の範囲（過去・未来）は、公式の資料で確かめられなかった（**未検証**）。本システムの値は 4〜8 節。
-- 他の題材（Linear の [ADR-0030](../../../linear/docs/decisions/0030-search-engine-opensearch.md)）は、`pg_bigm` を代案として残し、OpenSearch を選んだ。本題材は、検索が主な論点でなく、権限の判定がカレンダーの単位で粗い（4.3 節）ので、S1 は新しい部品を足さない（[architecture/README.md](README.md) の 6 節の決定）。
+- 他の題材（Linear の [ADR-0030](../../../linear/docs/decisions/0030-search-engine-opensearch.md)）は、`pg_bigm` を代案として残し、OpenSearch を選んだ。本題材は、検索が主な論点でなく、権限の判定がカレンダーの単位で粗い（4.3 節）ので、S1 は新しい部品を足さない（[design-log.md](design-log.md) の「2026-10-04：既定案」）。
 
 ## 4. 検索の表
 
@@ -256,7 +256,7 @@ sequenceDiagram
 
 2026-10-04 の既定案。E11 の PoC で覆りうる。
 
-- **S1 の基盤**：Aurora の `pg_bigm`（ADR-0034。[architecture/README.md](README.md) の 6 節の決定のとおり）。
+- **S1 の基盤**：Aurora の `pg_bigm`（ADR-0034。[design-log.md](design-log.md) の「2026-10-04：既定案」のとおり）。
 - **権限**：カレンダーの集合と `is_private` を条件にし、`redact()` で確かめ直す（ADR-0034）。
 - **更新**：outbox からの非同期（ADR-0034）。
 - **並べ方**：次の回の近さ。関連度で並べない。

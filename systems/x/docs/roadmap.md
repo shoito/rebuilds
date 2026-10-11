@@ -9,7 +9,7 @@
   - E9 の前：日本語の検索（`search-poc`。kuromoji と N-gram、索引の大きさ、p99）。
 - **規則は 1 つのコードに。** 見える範囲は `packages/visibility`、文字数は `packages/text`、ID は `packages/tid`、ランキングの段は `packages/ranking` にだけ書く。
 - **契約を先に固定する。** 出来事の形（流れと鍵）、`tid` の形、`visible()` の決定表、公開 API の形は、人間がレビューして確定する。エージェントは勝手に変えない。
-- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L11）。下の表で「法務：L*」と書いた Story が当たる。
+- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L12）。下の表で「法務：L*」と書いた Story が当たる。
 - **1 変更 1 PR を目安に、差分を小さくする。** アプリは段階的に配布し、ランキングの変更は A/B で広げる。
 
 ## Epic
@@ -265,6 +265,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `dr-failover-workflow` | 7.3 節のワークフロー、outbox の送り直し、`ar:` の先の作成（[infrastructure.md](architecture/infrastructure.md)） |
 | `cost-baseline` | 13 節の確定（[infrastructure.md](architecture/infrastructure.md)） |
 | `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後）（[security.md](architecture/security.md)） |
+| `data-export` | 本人のデータの書き出しの目録・ジョブ・渡し方（[security.md](architecture/security.md) の 7.5 節、[ADR-0064](decisions/0064-personal-data-export-scope-and-format.md)、proposed）。MVP に入れるかは PM の判断（[intent.md](intent.md) の「PM が決めるもの」）。法務：L12 |
 
 ### E15〜E20（MVP の後）
 
@@ -286,7 +287,7 @@ Story は、着手するときに `intent.md` から起票する。
 - **ランキングの変更を 100% に広げる判断**：PM が A/B の結果で決める。
 - **T&S の個別の措置の判断と、法令の申出への回答**：人が判断する。エージェントは整理と草案まで。
 - **DR の切り替えの判断**：IC と Ops の責任者。
-- **法務の判断**（L1〜L11）。
+- **法務の判断**（L1〜L12）。
 
 ## 延期の一覧
 

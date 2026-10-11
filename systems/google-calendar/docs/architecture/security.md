@@ -97,7 +97,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 ### 3.3 CalDAV の資格情報の窃取
 
-CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用のパスワードの Basic 認証（[architecture/README.md](README.md) の 6 節）。アプリ用のパスワードの発行の形は accounts-and-orgs の領域で決め、この領域はセキュリティの要件を置く。
+CalDAV の認証は、OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用のパスワードの Basic 認証（[design-log.md](design-log.md) の「2026-10-04：既定案」）。アプリ用のパスワードの発行の形は accounts-and-orgs の領域で決め、この領域はセキュリティの要件を置く。
 
 | # | 種類 | 脅威 | 対策 |
 | --- | --- | --- | --- |

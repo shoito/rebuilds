@@ -7,7 +7,7 @@
 - フィルターの条件は検索と同じ IR（`search-lang`）を使う（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0036](../decisions/0036-search-language-and-ir.md)）
 - 利用者のフィルターの「迷惑メールにしない」「迷惑メールにする」は、選別の判定の上書きの決定表 DT-FLT-001 の 5・6 行で当たる（[spam-and-abuse-filtering.md](spam-and-abuse-filtering.md) の 5.5 節、[ADR-0022](../decisions/0022-verdict-score-composition-and-overrides.md)）
 - 転送は SRS で封筒を書き換え（[ADR-0020](../decisions/0020-bounces-dsn-srs-and-feedback-loops.md)）、ARC で封印し（[ADR-0017](../decisions/0017-arc-sealing-trusted-sealers-and-dmarc-reports.md)）、`forward` の IP プールから送る（[ADR-0018](../decisions/0018-outbound-ip-pools-and-warmup.md)）
-- 元に戻す送信は 5・10・20・30 秒、予約の送信は 100 通・1 年先まで、不在の返信は同じ差出人へ 4 日に 1 回（[architecture/README.md](README.md) の 6 節の決定）
+- 元に戻す送信は 5・10・20・30 秒、予約の送信は 100 通・1 年先まで、不在の返信は同じ差出人へ 4 日に 1 回（[design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 送信の依頼は `release_at` を過ぎたら `outbound-gate` が取る（[outbound-smtp-and-reputation.md](outbound-smtp-and-reputation.md)）
 
 この文書で決めたことは次の ADR にある。

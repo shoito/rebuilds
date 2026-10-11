@@ -25,14 +25,27 @@
 
 ## 3. 状態
 
-```
-pending_upload ──complete──▶ scanning ──NO_THREATS_FOUND──▶ processing ──▶ ready
-      │                         │
-      │ 24h 未完了               ├─THREATS_FOUND──────────▶ blocked
-      ▼                         ├─UNSUPPORTED / ACCESS_DENIED─▶ unscannable
-   (GC で削除)                   └─FAILED / 15 分以内に結果なし─▶ 再スキャン ─▶ failed
+次の図は、ファイルの状態の移り方を示す。スキャンの結果ごとの扱いの正は 5.2 節の表である。どの状態からでも `deleted` に移れるが、図では省く。
 
-どの状態からでも ──▶ deleted
+```mermaid
+stateDiagram-v2
+    state "pending_upload" as pu
+    state "scanning" as scanning
+    state "processing" as processing
+    state "ready" as ready
+    state "blocked" as blocked
+    state "unscannable" as unscannable
+    state "failed" as failed
+
+    [*] --> pu : 作成
+    pu --> scanning : complete
+    pu --> [*] : 24h 未完了（GC で削除）
+    scanning --> processing : NO_THREATS_FOUND
+    scanning --> blocked : THREATS_FOUND
+    scanning --> unscannable : UNSUPPORTED・ACCESS_DENIED
+    scanning --> scanning : FAILED・15 分以内に結果なし<br/>（1 回だけ再スキャン）
+    scanning --> failed : 再スキャンも失敗
+    processing --> ready
 ```
 
 `files` に足す列：`status`、`name`、`declared_mime`、`detected_mime`、`width`、`height`、`scan_result`、`scanned_at`、`deleted_at`（[data-model/files-and-search.md](data-model/files-and-search.md) に反映済み。キーは ID から決まるので列に持たない）。

@@ -142,6 +142,7 @@ flowchart LR
 | 言語 | OS の言語（日本語・英語） | 同上 |
 
 - 設定の変更は UI からホストのコマンドで行う。UI は DB を直接書かない。
+- UI は Web と同じ React の部品を使うので、アクセシビリティ（WCAG 2.2 AA、キー操作、読み上げ）と文言の持ち方（ICU MessageFormat）は [web-client.md](web-client.md) の 4・5 節に従う。トレイ・メニューバーの状態のアイコンには、状態の名前を読み上げのラベルとして持たせる。
 
 ## 6. 資源の上限
 
@@ -242,7 +243,7 @@ sequenceDiagram
 
 ## 10. LAN 同期の将来の置き場所（E14）
 
-- MVP では持たない（[architecture/README.md](README.md) の 6 節）。
+- MVP では持たない（[design-log.md](design-log.md) の「2026-10-09：既定案」）。
 - `sync-core` のブロックの取り出しは、`BlockSource` の境目（手元のブロックの索引 → CDN）を通す。E14 で、同じネットワークの端末を `BlockSource` として足す。中身だけを送り、名前・木・権限は送らない（本家も同じ。[LAN sync overview](https://help.dropbox.com/sync/lan-sync-overview)）。
 - 受けたブロックは、ハッシュで確かめてから使う。端末どうしの認証・鍵の配布・チームのネットワークの方針は E14 で決める。
 

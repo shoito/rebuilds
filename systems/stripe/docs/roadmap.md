@@ -217,6 +217,8 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `data-retention-jobs` | 消去のジョブと四半期の消し残しの確認（ADR-0024。期間は L6） |
 | `audit-archive-verification` | 監査のアーカイブ（Object Lock）と連鎖・署名の検証（L6 の後に本番のバケットを作る） |
 | `cde-jit-access` | CDE の JIT の仕組み（AWS TEAM などの PoC）と記録の突き合わせ（ADR-0020） |
+| `operator-console-roles` | 本体の期限つきの権限（`cde-jit-access` と同じ仕組み）と、運用者の画面の役割・伏せ字・理由の入力・閲覧の記録（ADR-0035、proposed） |
+| `card-data-migration`（候補） | cde-live の SFTP でのカード番号の取り込みと書き出し（ADR-0034、proposed）。提供の可否は PM の判断待ち、法令は L9 |
 | `pci-evidence-and-qsa` | QSA の選定と事前相談、ASV・ペンテスト・分割の検証の計画、証跡の収集 |
 | `secret-scanning-partner` | シークレットスキャンのパートナーへの `<brand>_` のキーの形の登録 |
 | `security-baseline` | GuardDuty・Security Hub・Config、egress の許可リスト、SAST・DAST |

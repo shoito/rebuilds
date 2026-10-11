@@ -299,5 +299,5 @@ MVP の後に検討する。E13〜E18 に入れなかったもの。着手する
 - **時刻の提案（`COUNTER`）**、`RANGE=THISANDFUTURE` の受け付け（[ADR-0003](decisions/0003-recurrence-storage-and-expansion.md)、[ADR-0007](decisions/0007-interop-standards-scope.md)）。
 - **CalDAV の代理（proxy）の拡張、`free-busy-query`**（ADR-0007）。
 - **`writerWithoutPrivateAccess` のロール**、勤務の時間の複数の範囲、テナントをまたぐ主催者の変更、組織から個人へ戻す移り、組織のドメインでの iMIP の送信、他の組織へ配る公開の OAuth のアプリ、サービスアカウント（各領域の文書の持ち越し）。
-- **Web の画面のオフラインの書き込み**（[architecture/README.md](architecture/README.md) の 6 節）。
+- **Web の画面のオフラインの書き込み**（[architecture/design-log.md](architecture/design-log.md) の「2026-10-04：既定案」）。
 - **S2 の構成**（テナントのシャード、検索の専用の基盤）と **S3 のセル構成**（infrastructure の領域）。

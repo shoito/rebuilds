@@ -123,6 +123,38 @@ flowchart TD
 | 走査し直し | — | 作り直す | 変えない |
 | カーソルの取り直し | 作り直す | — | 変えない |
 
+表を図にすると、次のようになる。Remote と Local はそれぞれの観測で進み、Synced は操作の結果を確かめた後と、計画が「そろっている」と判断した後だけ進む。計画は、Synced を基準に Remote・Local との差を見る（6.1 節）。
+
+```mermaid
+flowchart LR
+    e1["list/continue の差分を受けた"]
+    e7["カーソルの取り直し"]
+    e3["commit が成功した"]
+    e5["計画が「そろっている」と判断した<br/>（決定表の 1・5・10）"]
+    e4["サーバーの中身を手元に置いた"]
+    e2["監視・走査で手元の変化を観測した"]
+    e6["走査し直し"]
+    R[("Remote")]
+    S[("Synced<br/>最後に一致を確かめた状態")]
+    L[("Local")]
+    P["計画<br/>Synced との差で Rc・Lc を分類"]
+
+    e1 -->|"当てる"| R
+    e7 -->|"作り直す"| R
+    e3 -->|"応答の状態を当てる"| R
+    e3 -->|"送った中身と置き場所で当てる"| S
+    e5 -->|"当てる"| S
+    e4 -->|"当てる"| S
+    e4 -->|"置いた後の観測を当てる"| L
+    e2 -->|"当てる"| L
+    e6 -->|"作り直す"| L
+    R -.->|"Rc"| P
+    S -.->|"基準"| P
+    L -.->|"Lc"| P
+```
+
+- 走査し直しとカーソルの取り直しは、Synced を変えない。
+
 - Synced を進めるのは、操作の結果を確かめた後だけにする。計画の時点では進めない。
 - 仮の ID のノードは、作成の commit が成功したら、返った `node_id` に 3 つの木で付け替える（同じ DB のトランザクション）。
 
@@ -261,7 +293,7 @@ sequenceDiagram
 
 - 利用者がフォルダー F を外すと、Synced の F に `excluded` を付ける。F の子孫は Local と比べない。Remote の F の子孫は受け続けるが、計画は飛ばす。
 - 手元の F の子孫は、Local と Synced が同じもの（変更なし）だけを消す。手元で変えたものがあれば、先に上げてから消す。サーバーへの削除は出さない。
-- 外したフォルダーは手元の木に出さない（オンラインのみのプレースホルダーとしても出さない。[architecture/README.md](README.md) の 6 節）。
+- 外したフォルダーは手元の木に出さない（オンラインのみのプレースホルダーとしても出さない。[design-log.md](design-log.md) の「2026-10-09：既定案」）。
 - 外した F と同じ親・同じ `name_key` の名前を手元で作ったら、手元のものを `<名前> (選択型の同期の競合)` に移して新しいフォルダーとして上げる。F を黙って戻さない。
 - F を戻すと、`excluded` を外し、F の子孫を Synced に「手元にない」として入れて、取り出しの計画を立てる。
 
@@ -342,6 +374,26 @@ A が `図面.dwg` を `図面_最終.dwg` に名前を変える。B が同時�
 - A は差分で r2（中身）を受け、Synced と比べて `Lc = place`（自分の名前の変更は既に確定して Synced に入っている）・`Rc = content` → 中身を取り出す。B は `node_ver` の変化を受け、手元のファイルの名前を変える。
 - 最終：両方の端末で `図面_最終.dwg` が r2 の中身を持つ。競合のコピーは作らない。
 
+B の中身の変更が先に確定し、A がまだ名前の変更を送っていない順では、A の計画が決定表の 6 に当たる。
+
+```mermaid
+sequenceDiagram
+    participant A as 端末 A
+    participant S as サーバー
+    participant B as 端末 B
+    Note over A: 図面.dwg を 図面_最終.dwg に名前を変える
+    B->>S: update 図面.dwg（条件は base_rev だけ）
+    S-->>B: 成功（r2）
+    S-->>A: 合図 → list/continue で 図面.dwg の r2（中身）
+    Note over A: Lc = place、Rc = content → 決定表の 6
+    A->>S: move 図面.dwg → 図面_最終.dwg（条件は base_node_ver だけ）
+    S-->>A: 成功
+    A->>A: r2 の中身を取り出す
+    S-->>B: 合図 → list/continue で node_ver の変化
+    Note over B: 手元のファイルの名前を 図面_最終.dwg に変える
+    Note over A,B: 両方の端末で 図面_最終.dwg が r2 の中身を持つ。競合のコピーは作らない
+```
+
 ### 11.3 オフラインの編集の後の競合のコピー（決定表の 2）
 
 1. 端末 A（名前「A-PC」）がオフラインで `見積.xlsx`（r1）を c_A に変える。Local は c_A、Synced は r1。
@@ -354,9 +406,43 @@ A が `図面.dwg` を `図面_最終.dwg` に名前を変える。B が同時�
 5. 最終：両方の端末に `見積.xlsx`（c_B）と競合のコピー（c_A）がある。どちらの中身も失わない。
 - A がオンラインに戻ってすぐ差分を読む前に `update`（`base_rev` r1）を送っていたら、409 になり、差分を読んでから同じ計画になる。
 
+```mermaid
+sequenceDiagram
+    participant A as 端末 A（A-PC）
+    participant S as サーバー
+    participant B as 端末 B
+    Note over A: オフライン。見積.xlsx（r1）を c_A に変える<br/>Local は c_A、Synced は r1
+    B->>S: update 見積.xlsx（中身 c_B）
+    S-->>B: 成功（r2）
+    Note over A: オンラインに戻る
+    A->>S: list/continue
+    S-->>A: 見積.xlsx（r2）
+    Note over A: Lc = content(c_A)、Rc = content(c_B)、ハッシュが違う → 決定表の 2
+    A->>A: 1. 見積.xlsx を 見積 (A-PC の競合コピー 2026-10-09).xlsx へ移す（O6、意図の記録を通す）
+    A->>S: 2. 競合のコピーを create（その名前がまだない条件、c_A のブロック）
+    S-->>A: 成功
+    A->>A: 3. r2 を staging に組み立て、見積.xlsx として置く
+    S-->>B: 合図 → list/continue で競合のコピー
+    Note over A,B: 両方の端末に 見積.xlsx（c_B）と競合のコピー（c_A）がある
+```
+
 ### 11.4 名前の入れ替え（O3）
 
 A が `a.txt` と `b.txt` の名前を入れ替える（`a.txt`→`tmp`→…）。Local は最終の形だけを見る。計画は 2 つの `move` が互いの名前を空けることに依る輪を見つけ、1 つの commit にまとめて送る。サーバーは 2 段で当てる。他の端末では、仮の名前を経て入れ替える。
+
+```mermaid
+sequenceDiagram
+    participant A as 端末 A
+    participant S as サーバー
+    participant O as 他の端末
+    Note over A: a.txt と b.txt の名前を入れ替える<br/>Local は最終の形だけを見る
+    Note over A: 2 つの move が互いの名前を空けることに依る輪を見つける（O3）
+    A->>S: 1 つの commit：move a.txt → b.txt、move b.txt → a.txt
+    S->>S: 2 段で当てる（name_key を仮の値にしてから最後の値に）
+    S-->>A: 成功
+    S-->>O: 合図 → list/continue で 2 つの move
+    O->>O: 仮の名前を経て入れ替える（O3）
+```
 
 ## 12. 状態
 

@@ -123,6 +123,7 @@
 | L7 | 顧客との契約：委託の契約（DPA）の雛形、サブプロセッサーの一覧と変更の通知、SLA の文言（取り込み・クエリ・アラートのどれを約束するか、返金の率）、利用規約（割り当ての超過、上限での拒否、データの失いの責任の限定）、日本の業界の基準（金融機関の FISC 安全対策基準、政府の ISMAP）への対応をうたうか | security、usage-and-billing の各領域 | E12 の利用量の表示の文言、E13 の GA の判定 |
 | L8 | 通知の経路：アラートを電話・SMS で送る機能（MVP の後）を持つときの電気通信事業法上の扱い、国外の通知の事業者の利用。メールの通知の特定電子メール法上の扱い（業務の通知として扱えるか） | notifications-and-integrations の領域 | E8 のメールの通知、電話・SMS の Story（MVP の後） |
 | L9 | 画面とクエリの言語を本家に寄せる範囲：不正競争防止法（商品等表示、商品の形態の模倣）と著作権の観点で、画面の配置、ウィジェットの見た目、クエリの文法をどこまで似せてよいか | dashboards、metrics-query-engine の各領域 | E4 のクエリの文法の確定、E9 の画面の Story |
+| L10 | 移行の取り込み：他の監視の道具（本家を含む）が書き出した設定の形式を読む変換器を持つこと、画面・文書で他社の製品の名前を出すこと（商標の表示）が、他社の利用規約・著作権・不正競争防止法の観点で許されるか。利用者が上げたファイルに含まれる他社の雛形の扱い | dashboards の領域（11 節）、[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md) | 移行の取り込みの Story（本家の形式の変換） |
 
 ### 選定・計測で決めるもの（法務以外）
 
@@ -133,6 +134,18 @@
 - テールサンプリングの待ちの窓（既定 30 秒）と、組み立てのメモリー：E6 の前の `tail-sampling-memory-poc`。
 - 本家の利用量の数え方のうち、ホストの数え方（月の時間の上位 1% を除いた最大）とトレースの保持の規則（15 日と 30 日）は、領域の工程で公式の資料で確かめた（[usage-and-billing.md](architecture/usage-and-billing.md) の 3 節、[traces-and-sampling.md](architecture/traces-and-sampling.md) の 3 節）。ログの索引の保持の期間の選択肢と、本家のサービスの SLA は確かめられなかった（**未検証**）。
 - ログの取り込みの原価と値段：公開の価格での原価は 1 GB 0.100 USD で、最初の仮の予算 0.03 USD の約 3 倍。統合の工程で予算を仮に 0.10 USD に上げた。値段と単位は PM が E13 の `cost-baseline` の前に決める（[architecture/README.md](architecture/README.md) の 6 節）。
+
+### PM が決めるもの
+
+- **組織のデータの書き出しの範囲**（[ADR-0067](decisions/0067-org-data-export.md)、proposed。[security.md](architecture/security.md) の 5.6 節）：Non-goals は「データの書き出しは API で行う」とだけ書き、組織の全体の書き出しは MVP の一覧にない。選択肢は次の 3 つ。
+  1. **MVP に設定の束とテレメトリーの一括の書き出しの両方を入れる（E13 の `org-data-export`）**（推奨）：解約の猶予（`suspended`）の間に利用者がデータを持ち出せることを、GA の時点で約束できる。設定の束は公開 API の形を使い回すので安い。
+  2. MVP は設定の束だけにし、テレメトリーは既存のログのエクスポート（1 回 10 万行）とクエリの API で取ってもらう。一括の書き出しは E18（利用者の S3 へのアーカイブ）と一緒に足す。
+  3. MVP には入れず、公開 API と Terraform だけにする。
+  - あわせて、テレメトリーの書き出しの費用（S3 の読み出し、egress、アーカイブの取り出し）を利用量に数えるかを決める。
+- **他の監視の道具からの移行を MVP に入れるか**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)、proposed。[dashboards.md](architecture/dashboards.md) の 11 節）：今は MVP にも Non-goals にもない。選択肢は次の 3 つ。
+  1. **MVP は 2 重の送信の手順書と、公開 API・Terraform での作り直しの案内だけにし、変換器は PromQL（E17）の後に Grafana と Prometheus から足す**（推奨）：Grafana と Prometheus の規則の多くは PromQL で書かれ、E17 の前に変換しても「できない」が大半になる。
+  2. MVP に変換器を入れ、PromQL を使わない変換元（本家の書き出した JSON など）から始める：法務の L10 が先に要る。
+  3. 変換器を作らず、手順書と案内だけを続ける。
 
 ## 出典
 

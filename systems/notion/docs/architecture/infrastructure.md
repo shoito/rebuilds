@@ -78,6 +78,32 @@ Slack の [infrastructure.md](../../../slack/docs/architecture/infrastructure.md
 4. 8〜16 シャードずつ切り替える：`frozen`（書き込みを最大 10 秒待たせる）→ 移動元のフェンス → 追いつきの確認 → 逆向きの複製 → `shard_map` の更新。
 5. 7 日間は逆向きの複製で戻せるようにしておき、その後に移動元を消す。
 
+次の図は、手順 4 の 1 回の切り替え（8〜16 シャード）を、ADR-0028 の「切り替え」に沿って示す。
+
+```mermaid
+sequenceDiagram
+  participant W as 再シャーディングのワークフロー
+  participant M as shard_map
+  participant R as API のタスク（ルーター）
+  participant Src as 移動元のクラスタ
+  participant Dst as 移動先のクラスタ
+  W->>M: 状態を frozen にする
+  Note over R: その論理シャードへの書き込みを最大 10 秒待たせる<br/>クライアントは「保存中」
+  W->>Src: app ロールの書き込み権限を外す（フェンス）
+  Note over Src: 実行中のトランザクションの終わりを待つ（lock_timeout の範囲）
+  W->>Dst: 移動元の現在の WAL の位置まで追いついたか確かめる
+  W->>Dst: シーケンスを進める
+  W->>Dst: 逆向き（移動先 → 移動元）の複製を作る（copy_data = false）
+  W->>M: 移動先・active に更新し、version を上げる
+  W->>R: 再読み込みを通知する
+  R->>M: shard_map を読み直す
+  W->>R: 各タスクのバージョンがそろったか確かめる
+  alt frozen から shard_map の更新までが 10 秒を超えた
+    W->>Src: フェンスを外す
+    W->>M: active に戻す（frozen の前へ）
+  end
+```
+
 - `rds.logical_replication` は writer の再起動で有効になるので、S1 の最初から有効にしておく（[AWS のドキュメント](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Replication.Logical.Configure.html)）。
 - 本家は、32 → 96 の再シャーディングを論理レプリケーションで行い、同期は索引を後回しにして 12 時間、切り替えで利用者に見えたのは短い「保存中」の表示だけだった（[The Great Re-shard](https://www.notion.com/blog/the-great-re-shard)）。
 

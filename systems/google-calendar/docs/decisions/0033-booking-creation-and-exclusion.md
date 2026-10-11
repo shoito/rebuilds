@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-予約ページは匿名の人から並行に予約を受ける。同じ枠に 2 人が同時に予約しうる。[architecture/README.md](../architecture/README.md) の 6 節は、会議室の二重予約を `btree_gist` の排他の制約で防ぐと決め、題材の `AGENTS.md` は、アプリの事前の確かめだけに頼らないと決めた。[quality.md](../quality.md) の 5 節は、E10 の合否基準を「並行の予約で二重の予約 0」とした。
+予約ページは匿名の人から並行に予約を受ける。同じ枠に 2 人が同時に予約しうる。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、会議室の二重予約を `btree_gist` の排他の制約で防ぐと決め、題材の `AGENTS.md` は、アプリの事前の確かめだけに頼らないと決めた。[quality.md](../quality.md) の 5 節は、E10 の合否基準を「並行の予約で二重の予約 0」とした。
 
 決めることは次である。
 

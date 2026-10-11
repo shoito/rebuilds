@@ -99,13 +99,26 @@ push・PR・Issue・schedule・dispatch
 
 ### 4.1 実行（workflow run）
 
-```
-requested ──▶ queued ──▶ in_progress ──▶ completed
-    │            │  ▲
-    │            ▼  │
-    │         pending（concurrency の待ち）
-    ▼
- action_required（fork の PR の承認待ち） ──承認──▶ queued
+次の図は、実行の状態の移り方を示す。
+
+```mermaid
+stateDiagram-v2
+    state "requested" as requested
+    state "action_required<br/>（fork の PR の承認待ち）" as ar
+    state "queued" as queued
+    state "pending<br/>（concurrency の待ち）" as pending
+    state "in_progress" as ip
+    state "completed" as completed
+
+    [*] --> requested
+    requested --> queued
+    requested --> ar
+    ar --> queued : 承認
+    queued --> pending
+    pending --> queued
+    queued --> ip
+    ip --> completed
+    completed --> [*]
 ```
 
 - 結論（`conclusion`）は `success`・`failure`・`cancelled`・`skipped`・`timed_out`・`action_required`・`startup_failure`・`neutral`。本家の [Checks API](https://docs.github.com/en/rest/checks/runs) の値にそろえる。
@@ -114,13 +127,30 @@ requested ──▶ queued ──▶ in_progress ──▶ completed
 
 ### 4.2 ジョブ
 
-```
-created ──▶ waiting（環境の保護） ──▶ queued ──▶ assigned ──▶ in_progress ──▶ completed
-   │            │ 否認・期限切れ                  │ 受け取り期限切れ │ 心拍の途絶
-   │            ▼                                  ▼                ▼
-   │         completed(failure)               queued へ戻す     completed(failure, runner_lost)
-   ▼
- skipped（needs の失敗・if が偽）
+次の図は、下の表と、表にない終わり方（否認・期限切れ、`skipped`）をまとめたものである。条件と担当は表を正とする。
+
+```mermaid
+stateDiagram-v2
+    state "created" as created
+    state "waiting<br/>（環境の保護）" as waiting
+    state "queued" as queued
+    state "assigned" as assigned
+    state "in_progress" as ip
+    state "completed" as completed
+    state "completed（failure）" as failed
+    state "skipped" as skipped
+
+    [*] --> created
+    created --> waiting : environment に保護の規則がある
+    created --> queued : needs が完了、if が真、<br/>concurrency に空きがある
+    waiting --> queued : 環境の規則を満たした
+    waiting --> failed : 否認・期限切れ
+    created --> skipped : needs の失敗・if が偽
+    queued --> assigned : ランナーの long poll に渡した
+    assigned --> ip : ランナーが受け取りを確認した（60 秒以内）
+    assigned --> queued : 確認がない（受け取りの期限切れ）
+    ip --> completed : ランナーが結果を報告した
+    ip --> failed : 心拍が 5 分途絶えた（runner_lost）<br/>実行時間の上限を超えた
 ```
 
 | 遷移 | 条件 | 担当 |

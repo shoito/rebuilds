@@ -4,7 +4,7 @@
 
 前提となる決定は次のとおり。
 
-- 本人確認は外部の eKYC の提供者を使う（マイナンバーカードの IC を優先、書類と顔の照合を予備）。本システムは結果と確認の水準を持ち、書類の画像を長く持たない。期間は法務の L2・L5 の後（[architecture/README.md](README.md) の 6 節の決定、[intent.md](../intent.md) の Non-goals）
+- 本人確認は外部の eKYC の提供者を使う（マイナンバーカードの IC を優先、書類と顔の照合を予備）。本システムは結果と確認の水準を持ち、書類の画像を長く持たない。期間は法務の L2・L5 の後（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定、[intent.md](../intent.md) の Non-goals）
 - 売上金を期限のない残高へ移す条件（`legal.balance_requires_kyc_level`）など、売上金の法的な扱いは `legal.*` の設定で持ち、法務の L1 の結論まで本番の値を有効にしない（[ADR-0004](../decisions/0004-proceeds-model-under-payment-services-act.md)）
 - 匿名でない配送に変えるには売り手の本人確認を求める（本家に寄せる。[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md)）
 - 本人確認のデータは本人だけのデータで、FORCE RLS と、運用者の別の種類の権限で守る（[ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md)）

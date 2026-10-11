@@ -478,6 +478,111 @@ ADR-0066。[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md) は S2 か�
 | S3 のオブジェクトのタグ | `published_at`（層の移し）、`dr=hot` | — | 6.2、7.2 |
 | AppConfig | `ops.upload_enabled`（リージョンごと）、`ops.live_ingest_enabled` | — | 7.3 |
 
+## 15. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の元になる、すべてのコンテナと呼び出しの図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    subgraph clients["利用者"]
+        creator["創作者<br/>Studio・アプリ・配信のソフト"]
+        viewer["視聴者のプレイヤー<br/>Web・Android・iOS"]
+        owner["権利者"]
+    end
+
+    subgraph edge["エッジ"]
+        cdn["CloudFront と Origin Shield<br/>S2 から複数の CDN"]
+        nlb["NLB（RTMPS・SRT）"]
+    end
+
+    subgraph control["管理の面（TypeScript・Hono、Fargate）"]
+        api["api・web-bff<br/>動画、チャンネル、登録、コメント、<br/>権利者、収益、playable()"]
+        upl["upload-service<br/>再開できるアップロードのセッション"]
+        relay["relay（outbox）"]
+        lic["license-proxy<br/>DRM のライセンス"]
+        blk["delivery-blocker<br/>措置の配信の停止"]
+        ads["ad-decision<br/>VMAP、VAST の代理の要求"]
+    end
+
+    subgraph media["メディアの面（Rust、EC2）"]
+        orch["pipeline-orchestrator<br/>段のステートマシン、作業の配り"]
+        enc["encode-worker（CPU の Spot）<br/>区切りごとの符号化、VMAF"]
+        pkg["packager・manifest-service<br/>CMAF、HLS・DASH、鍵"]
+        origin["origin-cache<br/>NVMe の中間のキャッシュ"]
+        live["live-ingest・live-transcoder（GPU）<br/>ライブのラダー、DVR、アーカイブ"]
+        lorigin["live-origin<br/>LL-HLS の部分と要求の保留"]
+        fp["fingerprinter・match-engine<br/>音声と映像の指紋、索引、照合"]
+        asr["asr-worker（GPU）<br/>自動の字幕"]
+    end
+
+    subgraph events["視聴の出来事（Rust）"]
+        coll["event-collector"]
+        msk[("MSK<br/>watch-events")]
+        val["view-validator<br/>仮の数（view-rules）"]
+        ver["view-verifier（バッチ）<br/>確定の数、総再生時間（view-rules）"]
+        kin[("Kinesis<br/>CDN のリアルタイムのログだけ")]
+    end
+
+    subgraph ml["おすすめと検索"]
+        rec["recommender<br/>段のパイプライン、ONNX Runtime"]
+        search[("OpenSearch<br/>日本語の検索")]
+    end
+
+    chat["live-chat-gateway<br/>WebSocket、配信ごとの扇形の配り"]
+    seq["chat-sequencer<br/>配信ごとの順番付け"]
+    s3[("S3（東京）<br/>元のファイル、レンディション、<br/>指紋、出来事の Parquet")]
+    aurora[("Aurora PostgreSQL<br/>管理の正本、パイプラインの状態、<br/>照合の方針、台帳、outbox")]
+    valkey[("Valkey<br/>仮の視聴回数、チャット、<br/>セッション、キャッシュ")]
+    osaka[("大阪：S3 の写し、<br/>Aurora Global Database")]
+
+    creator --> upl
+    creator --> nlb
+    owner --> api
+    viewer --> cdn
+    viewer --> api
+    viewer --> coll
+    viewer --> chat
+    upl --> s3
+    upl --> orch
+    orch --> enc
+    orch --> fp
+    orch --> asr
+    orch --> pkg
+    enc --> s3
+    pkg --> s3
+    fp --> aurora
+    nlb --> live
+    live --> s3
+    live --> fp
+    live --> lorigin
+    cdn --> origin
+    origin --> lorigin
+    cdn -.-> kin
+    viewer --> lic
+    viewer --> ads
+    relay --> blk
+    blk --> cdn
+    origin --> pkg
+    origin --> s3
+    coll --> msk
+    msk --> val
+    val --> valkey
+    msk --> s3
+    s3 --> ver
+    ver --> aurora
+    api --> aurora
+    api --> rec
+    api --> search
+    aurora --> relay
+    relay --> search
+    chat --> msk
+    msk --> seq
+    seq --> valkey
+    valkey --> chat
+    s3 -.-> osaka
+    aurora -.-> osaka
+```
+
 ## 出典
 
 いずれも 2026-10-10 に確認。

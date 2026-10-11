@@ -16,6 +16,7 @@
 <meta property="og:site_name" content="rebuilds">
 <meta name="description" content="Datadog の再構築の設計の文書を読む前に知っておくとよい、可観測性・時系列のデータモデルとカーディナリティ・圧縮・TSDB・遅れたデータと水位・パーセンタイルとスケッチ・ログの検索・トレースとサンプリング・モニターと SLO・Kafka・マルチテナントの前提知識。">
 <meta name="primer-home" content="../../../../index.html">
+<link rel="icon" href="../../../../docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
 </head>
 <body>
@@ -376,7 +377,7 @@ burn = 14.4 → 1 時間で 30 日のバジェットの 2% を使う（14.4 × 1
       </div>
       <p class="why">冪等のプロデューサーは送り直しの重なりを防ぎ、トランザクションは Kafka のトピックへの出力とオフセットをまとめます。設計でトランザクションを使うのは、出力が MSK のトピックの <code>log-processor</code> だけです（ADR-0030）。他は出力とオフセットを一緒に確定し、出どころのオフセットで重複を除きます。</p>
     </div>
-    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0002-intake-log-on-msk.md">ADR-0002</a>（トピックと注記の「1 回だけ」の方針）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/README.md">architecture/README.md</a> の 6 節「決定（統合）」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0060-msk-express-and-ec2-fleets.md">ADR-0060</a>（MSK Express）。冪等の考え方は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0002-intake-log-on-msk.md">ADR-0002</a>（トピックと注記の「1 回だけ」の方針）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/design-log.md">architecture/design-log.md</a> の「2026-10-09：統合」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0060-msk-express-and-ec2-fleets.md">ADR-0060</a>（MSK Express）。冪等の考え方は<a href="../../../../docs/primer/index.html#idempotency">共通の資料</a>。</div>
   </section>
 
   <section class="s" id="tenancy">
@@ -423,7 +424,7 @@ burn = 14.4 → 1 時間で 30 日のバジェットの 2% を使う（14.4 × 1
       <div data-tab="電気通信事業法"><p>テレメトリーを受けて保存し、組織の中で共有させることが届出の要る電気通信事業に当たるか。ログに他人の通信の中身が含まれるとき、マスク・索引のために機械で読むことが<strong>通信の秘密</strong>に触れるか（L3）。2023-06-16 施行の<strong>外部送信規律</strong>は、本システムの画面の計測（L3）と、MVP の後の RUM のブラウザの SDK（L4）に関わります。電話・SMS の通知（L8）も。<strong>法務の確認待ち</strong>。</p></div>
       <div data-tab="監査・契約ほか"><p>監査ログの保持と、開示の請求・捜査機関の照会への対応（L6）。委託の契約（DPA）、SLA の文言、FISC 安全対策基準・ISMAP への対応をうたうか（L7）。画面とクエリの言語を本家に寄せる範囲（不正競争防止法・著作権、L9）。どれも<strong>法務の確認待ち</strong>です。</p></div>
     </div>
-    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L9 と承認を止める spec）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/security.md">security.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/logs-pipeline.md">logs-pipeline.md</a> の 8.5 節（マスクの既定）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0036-personal-data-deletion-tombstones.md">ADR-0036</a>（墓標による削除）。</div>
+    <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a> の「法務の確認待ち」（L1〜L10 と承認を止める spec）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/security.md">security.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/architecture/logs-pipeline.md">logs-pipeline.md</a> の 8.5 節（マスクの既定）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0036-personal-data-deletion-tombstones.md">ADR-0036</a>（墓標による削除）。</div>
   </section>
 
   <section class="s" id="datamodel">

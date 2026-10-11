@@ -7,7 +7,7 @@
 - 決まった時刻の評価、シャードとリース、水位を待つ、待ちの上限 5 分で「不完全」、不完全ではデータなしと回復に遷移しない、遷移と通知の依頼を 1 つのトランザクションで、入力の写し、5 分ごとのスナップショット、10 分までの抜けを追う（[ADR-0008](../decisions/0008-monitor-evaluation-model.md)）
 - モニターのクエリは IR を通し、ダッシュボードと同じエンジンで実行する。「不完全」の印（[ADR-0007](../decisions/0007-query-language.md)）
 - 評価は別のクエリの読み手の組で、組織ごとの評価の量の上限（[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)）
-- フラッピングは 30 分に 6 回を超える遷移、通知を 1 回にまとめる（[architecture/README.md](README.md) の 6 節の決定）
+- フラッピングは 30 分に 6 回を超える遷移、通知を 1 回にまとめる（[design-log.md](design-log.md) の「2026-10-09：既定案」）
 - 通知の送り方は [notifications-and-integrations.md](notifications-and-integrations.md)。SLO のバーンレートのモニターは [slos-and-incidents.md](slos-and-incidents.md)
 
 この文書で決めたことは次の ADR にある。

@@ -4,6 +4,7 @@
 
 - 一括の取り込みは、CSV を S3 に置き、1 万行の部分に分けて Worker の公平な順番に入れる。部分は 200 行ずつの非同期のトランザクションで処理し、行ごとに成功か失敗かを返す（部分の成功）。トランザクションの全体の失敗（ロックの待ち、バージョンの変更）は同じ 200 行で最大 10 回やり直し、上限の超過は 200 行を半分ずつに分けて原因の行を見つける。結果は 7 日（[ADR-0036](../decisions/0036-bulk-jobs-chunking-and-partial-success.md)）。
 - インポートのウィザードは、同じ一括のジョブの上に作る画面にする。文字コード（UTF-8 と Shift_JIS）の判定、項目の対応、200 行の下見（巻き戻すトランザクション）を持つ。外部 ID での upsert と、照合の規則での「既存を更新」は、同じ鍵の行を同じ部分に集めて順に処理し、ファイルの中の重複も既存のレコードも 1 件にまとめる。見えないレコードとの一致は無いものとして扱う（[ADR-0037](../decisions/0037-import-wizard-upsert-and-duplicate-matching.md)）。
+- 本家からの移行は、移行の文書（本家との違いの表）と、本家の ID を `legacy_id` の外部 ID に入れて決まった順で upsert する手順で支える。メタデータの変換の道具は後の Epic にする（[ADR-0065](../decisions/0065-migration-path-from-original.md)、proposed）。15 節。
 
 本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。本家の Bulk API との互換は持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
@@ -17,6 +18,7 @@
 | 外部 ID での upsert、親の外部 ID での参照 | 一意と外部 ID の保存（[data-storage.md](data-storage.md) の 3.2 節） |
 | 取り込みの時の重複の照合と既存の更新 | 割り当ての値の正本（[governor-limits.md](governor-limits.md)） |
 | 完全な削除のジョブ | ごみ箱と消去（[data-storage.md](data-storage.md) の 5 節） |
+| 本家からの移行の手順と、本家との違いの表（15 節） | メタデータの形式とデプロイ（[sandboxes-and-deploy.md](sandboxes-and-deploy.md)） |
 
 ## 2. 本家の仕組み（確かめたこと）
 
@@ -298,6 +300,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | --- | --- |
 | [0036](../decisions/0036-bulk-jobs-chunking-and-partial-success.md) | 一括の取り込みは CSV を S3 に置き、1 万行の部分に分けて公平な順番に入れ、200 行ずつの非同期のトランザクションで行ごとに成功・失敗を返す。失敗は原因ごとにやり直し、上限の超過は半分ずつに分ける。結果は 7 日 |
 | [0037](../decisions/0037-import-wizard-upsert-and-duplicate-matching.md) | ウィザードは同じジョブの上の画面にし、文字コードの判定と 200 行の下見を持つ。upsert と照合の既存の更新は同じ鍵の行を同じ部分に集めて順に処理し、見えない一致は無いものとして扱う |
+| [0065](../decisions/0065-migration-path-from-original.md)（proposed） | 本家からの移行は、移行の文書と、本家の ID を外部 ID に入れて決まった順で CSV を upsert する手順で支える。監査の項目は専用の権限のジョブだけが書ける。メタデータの変換の道具は後の Epic で、上げたファイルを読む形にする |
 
 他の領域への依頼：
 
@@ -373,3 +376,78 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | `bulk_job_columns` | `org_id`、`job_id`、`col_no`、`header`、`field_id`、`parent_external_field_id` | 見出しの解決 |
 | `import_mappings` | `org_id`、`id`、`object_id`、`name`、`columns`（JSONB）、`owner_id` | 対応の型 |
 | S3 `bulk/<org>/<job>/...` | 元の CSV（24 時間）、部分、結果（7 日） | 組織のデータキーで暗号化 |
+
+## 15. 本家からの移行（ADR-0065）
+
+[ADR-0065](../decisions/0065-migration-path-from-original.md)（proposed）。これまで各領域が「移行の文書に書く」とした本家との違いと、本家のデータを取り込む手順を、この節に集める。**移行の道具（メタデータの変換）の Epic を作るか、いつ作るかは PM の判断**（[intent.md](../intent.md) の「PM の判断待ち」）。MVP では、データは 3〜5 節の部品で取り込み、メタデータは管理者が作り直す。本家のメタデータ・XML・`package.xml`・Apex は受け付けない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+
+### 15.1 オブジェクトと項目の対応
+
+| 本家 | 本システム | 注意 |
+| --- | --- | --- |
+| 取引先、取引先責任者、リード、商談、ToDo、行動、メールのメッセージ | `account`、`contact`、`lead`、`opportunity`、`task`、`event`、`email_message`（[sales-objects.md](sales-objects.md) の 3 節） | カナ・法人番号の項目は本システムだけにある。空で入れてよい |
+| 商談の取引先責任者の役割 | `opportunity_contact_role` | `is_primary` は商談ごとに 1 件 |
+| 利用者 | 利用者（[orgs-users-and-auth.md](orgs-users-and-auth.md)） | 先に作り、`legacy_id` を入れる。パスワードは移さない（SSO か招待で入る） |
+| カスタムオブジェクト | カスタムオブジェクト（メタデータで作り直す） | 主従の親から順に作る |
+| テキスト・数値・パーセント・日付・日時・チェックボックス・選択リスト・複数選択リスト・メール・電話・URL・参照・主従 | 同じ名前の型（[metadata-and-runtime.md](metadata-and-runtime.md) の 3.3 節） | 選択リストの値は先に作る。ウィザードは値のラベルか API の値で合わせる（5.2 節） |
+| 通貨 | `currency`（JPY） | 複数の通貨は E19。JPY 以外の値は移す前に換算する |
+| 数式 | `formula` | 言語が違うので書き直す。FLS の扱いが本家より厳しい（15.4 節） |
+| 積み上げ集計 | `rollup_summary` | 取り込みの後に計算し直す。値を列で入れない |
+| 自動採番 | `autonumber` | 本家の番号を残すなら、`text` の項目に入れる。新しい番号は本システムが振る |
+| 本家の項目の型の全ての一覧と、ここにない型（地理位置情報、時刻、暗号化したテキストなど） | — | 対応しない型は `text` に入れるか作り直す。型の一覧は本家の公開の資料で確かめる（未検証。E9 の着手の時） |
+
+### 15.2 取り込みの手順
+
+1. メタデータを作る（オブジェクト、項目、選択リストの値、レコードタイプ）。移す各オブジェクトに `legacy_id`（`text`、18、`external_id`・`unique`）を足す。
+2. 本家の組織からデータを CSV で書き出す（本家の書き出しの機能。手順は本家の資料に従う）。
+3. 次の順に、upsert の一括のジョブ（3・4 節）かウィザード（5 節）で取り込む。参照の列は親の `legacy_id`（4.2 節）で結ぶ。
+
+| 順 | 対象 | 参照の結び方 |
+| --- | --- | --- |
+| 1 | 利用者 | — |
+| 2 | 取引先 | 所有者は `owner.legacy_id`。親の取引先は、全件を入れた後の 2 回目の更新で結ぶ |
+| 3 | 取引先責任者、リード | `account.legacy_id`、所有者 |
+| 4 | 商談、商談の取引先責任者の役割 | `account.legacy_id`、`contact.legacy_id` |
+| 5 | ToDo・行動、メールのメッセージ | 多態の参照は `who`・`what` の型と `legacy_id` の組 |
+| 6 | カスタムオブジェクト | 主従の親から順に |
+
+- `legacy_id` は 18 文字の形だけを受ける。本家の 15 文字の ID は大文字と小文字を区別するので、15 文字の値は `INVALID_LEGACY_ID` で断る（18 文字の形の性質は未検証。E9 の着手の時に確かめる）。
+- 作成日・更新日・作成者・更新者は、`set_audit_fields_on_import` のシステムの権限（既定はどの権限セットにもない）を持つ人のジョブだけが列で指定できる。使ったジョブは監査に残る（[audit-and-field-history.md](audit-and-field-history.md)）。
+- 取り込みでもフロー・入力規則・重複の規則が動く（5.4 節）。移行の間だけフローを止めたい時は、`$Origin` が `bulk` のときに抜ける条件をフローに書く。
+- 各段は upsert なので、途中で止まっても同じ CSV でやり直せる。
+
+### 15.3 持ってこないもの
+
+- 項目の変更の履歴、設定の変更の履歴、ログインの履歴：新しい組織の監査の鎖（[ADR-0046](../decisions/0046-setup-audit-trail-and-login-history.md)）に、確かめられない記録を混ぜない。要る組織は、本家から書き出したファイルを組織の側で保管する。
+- 本家のメタデータ・Apex・Visualforce・本家の形のレポートとダッシュボードの定義：作り直す。Apex の処理は、宣言的な設定か Webhook で外のシステムに任せる（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+- ファイルと添付：MVP では対象にしない（容量の割り当てと形の設計が要る。後の移行の Epic で扱う）。
+
+### 15.4 本家との違い（移行の文書の正本）
+
+本家との違いを決めた領域は、この表に 1 行足す。
+
+| 機能 | 本家 | 本システム | 代わりの案 | 根拠 |
+| --- | --- | --- | --- | --- |
+| 利用者のコード | Apex | MVP は持たない。後に TypeScript を WASM の砂場で（E13） | 宣言的な設定、Webhook | [ADR-0001](../decisions/0001-platform-and-stack.md) |
+| ダッシュボードの実行の利用者 | 指定した実行ユーザーで全員が同じ数字を見られる | 見る人の権限だけで集計する | 部下の視点は共通部分で集計 | [ADR-0030](../decisions/0030-dashboards-viewer-intersection-and-subscriptions.md)、[reports-and-dashboards.md](reports-and-dashboards.md) の 7 節 |
+| 組織が定義するイベントの既定 | すぐに発行 | 確定の後に発行（`after_commit`） | 型ごとに「すぐに発行」を選ぶ | [ADR-0034](../decisions/0034-event-subscription-access-and-org-events.md)、[events-and-integrations.md](events-and-integrations.md) の 4.2 節 |
+| フローの要素の数 | 上限を持たない | 足並みの 1 歩で数え、上限を持つ | フローを分ける | [governor-limits.md](governor-limits.md) の 4.2 節、[ADR-0025](../decisions/0025-flow-definition-and-bulk-engine.md) の注記 |
+| 数式の値の FLS | 参照先の FLS に関わらず値を見せると言われる（未検証） | 参照する項目を全て読める人にだけ返す | 参照先の FLS を見直す | [ADR-0009](../decisions/0009-formula-language-and-evaluator.md)、[metadata-and-runtime.md](metadata-and-runtime.md) の 7.7 節 |
+| 活動を見られる人 | 公開の資料に細部がない（未検証） | 主の親 1 つと、割り当てられた本人の強い方 | — | [ADR-0021](../decisions/0021-lead-conversion-and-activity-parents.md)、[sales-objects.md](sales-objects.md) の 4 節 |
+| 暗黙の親の共有 | 所有者の条件の共有ルールで子を見る人に親を見せるかは未検証 | 子の所有者と、子の行の付与の相手にだけ与える | 取引先にも共有ルールを足す | [sharing-and-record-access.md](sharing-and-record-access.md) の暗黙の親の節と未解決の問いの決定 |
+| 新しいカスタムオブジェクトの OWD の既定 | 公開・参照・更新 | 非公開 | 作成の後に OWD を選ぶ | [sharing-and-record-access.md](sharing-and-record-access.md) の OWD の節 |
+| ごみ箱から戻せる人 | 消した人（読める時）か、すべてのデータの編集 | 消した人、束の元の所有者、オブジェクトの「すべて変更」 | — | [data-storage.md](data-storage.md) の 5 節 |
+| 外部 ID の一意 | 一意でない外部 ID がありうる（複数の一致で 300） | 外部 ID は必ず一意 | 一意にしてから取り込む | 4.1 節、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md) |
+| メタデータの形式とデプロイ | XML、`package.xml`、変更セット | 独自の形式だけ | 作り直す。変換の道具は後の Epic | [ADR-0039](../decisions/0039-metadata-package-format.md)、[sandboxes-and-deploy.md](sandboxes-and-deploy.md) |
+| Web からのリードのフォーム | 本家の HTML のフォーム | 専用のホストの受け口と埋め込みのスクリプト | フォームの HTML の送り先と項目の名前を書き換える | [ADR-0064](../decisions/0064-web-lead-form-public-intake.md)（proposed）、[sales-objects.md](sales-objects.md) の 9 節 |
+| システムの権限の一覧 | 全ての一覧は未検証 | 25 の権限（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 7 節） | — | E4 の着手の時に確かめて行を足す |
+
+### 15.5 Story の候補と依頼
+
+| Epic | Story の候補 |
+| --- | --- |
+| E9 | 移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、15.2 節の手順書と生成した本家の形の CSV での結合テスト |
+| 後の移行の Epic（PM の判断） | 本家のメタデータの書き出しの変換の道具（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。法務：L13 |
+
+- orgs-users-and-auth の領域：システムの権限に `set_audit_fields_on_import` を足す（どの権限セットにも既定で入れない）。
+- 各領域：本家との違いを決めたら、15.4 節に行を足す。

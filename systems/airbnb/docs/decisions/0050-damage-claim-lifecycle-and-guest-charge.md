@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- MVP は保証金を持たず、チェックアウトの後 14 日の損害の請求で扱う（[architecture/README.md](../architecture/README.md) の 6 節）。
+- MVP は保証金を持たず、チェックアウトの後 14 日の損害の請求で扱う（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 本家は、チェックアウトから 14 日以内の請求、ゲストの 24 時間の応答、応じなければ担当の審査、とする（[ヘルプの記事 279](https://www.airbnb.com/help/article/279)、2026-10-10 に確認）。ゲストへの請求の方法は**未検証**。
 - 損害の保険そのものは本システムの外（intent の Non-goals）。補償の仕組みと請求の代わりの取り立ては法務の L12。
 - 判断は人が行う（[ADR-0009](0009-trust-and-safety-and-ml-boundary.md)、[roadmap.md](../roadmap.md) の「エージェントに任せないこと」）。

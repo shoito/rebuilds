@@ -220,18 +220,23 @@ ADR-0013。
 - Actor は、「心拍の疑い」か「同じ Node の参加者の 2 人以上（2 人以下の会議では全員）の `media.stall`」で、その Node を障害とみなす。1 人だけの `media.stall` は、その人の回線の問題として扱い、その人にだけ ICE restart を指示する（[network-traversal.md](network-traversal.md) の 6 節）。
 - Assignment Service は、障害とみなした Node を `dead` にし、他の会議の Actor にも知らせる（同じ Node の会議の Actor が一斉に付け替えを始める）。
 
-付け替え（`media_generation` を 1 つ上げる）：
+付け替え（`media_generation` を 1 つ上げる）の時刻の流れを図にする。区間ごとの予算（p95）は、図の下の表にある。
 
-```
-t=0      Node X が落ちる
-t≈1.5s   障害と判定（心拍の欠落か、クライアントの報告）
-t≈1.6s   Actor：予備の Node Y で router.ensure（epoch 付き）。media_generation = g+1
-         全員に evt: media.reattach{generation: g+1, reason: node_failed}
-t≈1.7s   クライアント：古い transport を閉じる。Device はそのまま（router の mediaCodecs が同じ）
-         send の transport を作る → connect（ICE・DTLS）→ 音声の produce
-         recv の transport を作る → connect → 音声の consume・resume
-t≈2.8s   音声が戻る（ICE と DTLS で 400〜600ms、produce と consume で 300ms、ジッタバッファ 200ms）
-t≈3.5s   映像の produce と consume（話者と共有を先に）
+```mermaid
+sequenceDiagram
+    participant X as Node X
+    participant A as Meeting Actor
+    participant Y as 予備の Node Y
+    participant C as クライアント
+    Note over X: t=0 Node X が落ちる
+    Note over A: t≈1.5s 障害と判定（心拍の欠落か、クライアントの報告）
+    A->>Y: t≈1.6s router.ensure（epoch 付き）。media_generation = g+1
+    A->>C: 全員に media.reattach（generation: g+1, reason: node_failed）
+    Note over C: t≈1.7s 古い transport を閉じる。Device はそのまま（router の mediaCodecs が同じ）
+    C->>Y: send の transport を作る → connect（ICE・DTLS）→ 音声の produce
+    C->>Y: recv の transport を作る → connect → 音声の consume・resume
+    Note over C,Y: t≈2.8s 音声が戻る（ICE と DTLS で 400〜600ms、produce と consume で 300ms、ジッタバッファ 200ms）
+    C->>Y: t≈3.5s 映像の produce と consume（話者と共有を先に）
 ```
 
 | 区間 | 予算（p95） |
@@ -347,7 +352,7 @@ t≈3.5s   映像の produce と consume（話者と共有を先に）
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **worker の数**：vCPU−2。コアに固定する。
 - **ポート**：worker ごとに UDP・TCP の 20000＋番号。

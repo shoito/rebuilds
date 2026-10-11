@@ -8,6 +8,7 @@
 | --- | --- |
 | [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作るステートマシンのテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低のバージョンで行い、乗車の最中と緊急の入口は塞がない |
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の位置の許可で動かす。iOS は `allowsBackgroundLocationUpdates` と `CLBackgroundActivitySession`、Android は出庫の操作で始める `location` 型のフォアグラウンドサービスで、出庫の間だけ位置を取る。「常に」の許可と Android の `ACCESS_BACKGROUND_LOCATION` は求めない。取り方は状態ごとの表で決め、止まったら 60 秒でサーバーがプッシュ通知で知らせる |
+| [0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)（proposed） | 乗客のアプリは OS の言語に従い、言語を切り替えられる形にする（MVP の言語は PM の確認待ち。既定の案は日本語と英語）。乗客とドライバーのやり取りは、人が訳した定型文の対訳（ID と型の決まった引数で送り、受け手のアプリが自分の言語で出す）で行い、自由な文は訳さない。外の翻訳の提供者に本文を送らない。乗客の言語はオファーに出さず、受諾の後に出す |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには、選んだルートの主要経由地点を経由地として渡す（Google マップは Maps URLs の `waypoints`、Apple マップは統合の Maps URL の `waypoint`）。経由地を守らない引き継ぎ先は事前確定運賃の乗車で出さない。アプリの中でルートからの逸脱を知らせる |
 
 ## 1. 目的と範囲
@@ -91,6 +92,42 @@
 
 - **運転中の操作を減らす。** 走行中（速度 10 km/h 以上）は、受諾・辞退・到着・ナビを開く・緊急以外のボタンを隠す。オファーの受諾は 1 回のタップで済ませる。メッセージは定型文だけにする。道路交通法の運転中の携帯電話の使用との関係は、事業者の車載の器具（ホルダー）と運用に依る（法務と事業者の確認待ち。E9 の `driving-mode-ui` の spec の承認の前に確かめる）。
 - 文字の大きさは OS の設定に従い、最小でも 17 pt 相当にする。オファーの画面は、色だけでなく形と文字で受諾・辞退を分ける。
+
+### 3.3 アクセシビリティ
+
+乗客とドライバーのアプリを、iOS・Android の読み上げ（VoiceOver・TalkBack）と文字の拡大で使えるようにする。基準は WCAG 2.2 AA を、ネイティブのアプリに当てはめたもの（[quality.md](../quality.md) の 2.2 節）。
+
+**乗客のアプリ**
+
+- **地図に頼らない**：乗車地は、ピンの操作のほかに、乗降の地点の提案と住所の文で選べる（[ADR-0034](../decisions/0034-geocoding-provider-and-pickup-points.md)）。現在地から選んだときは、住所の文と「約 N m の誤差」を読み上げる。
+- **車を見つける**：迎車中の画面は、車両の番号・色・車種・ドライバーの名を 1 つのまとまりとして読み上げる。到着（`arrived`）は音・振動と画面の知らせで出し、読み上げを使う乗客には、到着の知らせを読み上げの通知（`UIAccessibility.post`・`announceForAccessibility`）でも出す。
+- **緊急の入口**：盾の印に「緊急」の読み上げのラベルを付け、どの画面でも読み上げの順の最初の群に置く（読み上げのときは選んでダブルタップの 1 回の操作）。
+- **車いす**：車いすでの乗車は、商品の選択で UD（車いす対応）を選ぶ（配車の条件 E2・E3。[dispatch-and-matching.md](dispatch-and-matching.md)）。
+- **動き**：OS の「視差効果を減らす」の設定では、地図の車のアニメーションを止め、位置の更新ごとに置き直す。
+
+**ドライバーのアプリ**
+
+- **連絡の方法の設定**：ドライバーは「連絡はメッセージで」を設定できる。設定したドライバーの乗車では、乗客のアプリの「電話」が「このドライバーへの連絡はメッセージでお願いします」とメッセージの画面を出す（[safety-and-trust.md](safety-and-trust.md) の 6 節）。理由（聴覚の障害など）を本システムは尋ねず、持たず、乗客に見せない（心身の機能の障害は要配慮個人情報に当たりうるため、理由を持たない形にする）。
+- **オファーの知らせ**：音のほかに、振動と画面の点滅（OS の「LED フラッシュで通知」とは別に、アプリの画面の全体の色の切り替え）で知らせる。音を聞けないドライバーも 15 秒の中で気づけるようにする（ADR-0015）。
+- **乗客からのメッセージ**：走行中は、定型文の受信を大きな文字と振動で出し、止まってから読む形にする（3.2 節の走行中の制限は変えない）。
+- 文字の大きさと色の決まりは 3.2 節の最後のとおり（OS の設定に従い最小 17 pt 相当、色だけで分けない）。
+
+### 3.4 言語（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)、proposed）
+
+訪日の旅行者を MVP の対象にするか、どの言語を持つかは PM の確認待ち（[intent.md](../intent.md) の Open questions）。下はどの結論にも合う形。
+
+| 項目 | 決まり |
+| --- | --- |
+| UI の言語 | 乗客のアプリは OS の言語に従う。既定の案は日本語と英語（PM の確認待ち）。ドライバーのアプリは日本語 |
+| 文言の持ち方 | iOS は String Catalog、Android はリソース。件数と語順の違う文を連結で作らない。見積もりの文言（L8）は言語ごとに法務が確かめる |
+| 乗客の言語の印 | 依頼で `rider_locale`（BCP 47）を送る。ドライバーには受諾の後の迎車の画面にだけ出す。オファーには出さない |
+| メッセージ | 定型文は `{template_id, args, catalog_version}` で送り、受け手のアプリが自分の言語で組み立てる。自由な文は訳さず、原文と「翻訳されていません」の印を出す。本文を外の翻訳の提供者に送らない |
+| 行き先を見せる画面 | 乗客のアプリに、行き先の名前と住所を日本語で大きく出す画面（「ドライバーに見せる」）を持つ |
+| 住所の検索 | 乗客の言語で検索し、結果に日本語の表示名も持たせる。ドライバーには常に日本語の名前と住所を出す（[maps-and-geodata.md](maps-and-geodata.md) の 7 節） |
+| 時刻と金額 | 時刻は日本時間で出し、乗客の端末の時刻帯が違うときは時刻帯を書き添える。金額は円で、桁の区切りは UI の言語に従う |
+
+- 定型文の例（ドライバーから）：「乗車地に着きました（{color} の {plate}）」「{n} 分で着きます」「トランクを開けます」「シートベルトをお締めください」。乗客から：「{n} 分で行きます」「荷物が多いです」「入口の前にいます」。全体で約 60 文。
+- 古いアプリが知らない `template_id` を受けたときは、「メッセージがあります。アプリを更新してください」を出す。
 
 ## 4. 背景での位置の送信と電池（[ADR-0007](../decisions/0007-driver-background-location-and-battery.md)）
 
@@ -334,6 +371,8 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 
 - エージェントが UI の試験（XCUITest・Espresso）を、画面の流れ（3 節）の各行で書く。スクリーンショットの比較は、日本語の文言の折り返しと大きな文字の設定でも行う。
 - 緊急の入口が、ログインの後のすべての画面で 1 回のタップで開くことを、画面の一覧から生成した試験で確かめる。
+- アクセシビリティ：画面の一覧の各画面で、操作できる要素に読み上げのラベルがあることを、XCUITest の `performAccessibilityAudit` と Espresso の `AccessibilityChecks` で確かめる。VoiceOver・TalkBack で、依頼から評価まで、出庫からオファーの受諾・降車までを手で通す（列車の前、E9 のリリースの前）。
+- 言語：英語の設定で、依頼から評価までの画面に未訳の文言がないこと（ADR-0044 の Confirmation）。
 
 ## 12. Story の候補
 
@@ -354,6 +393,8 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | E9 | `driver-trip-journal` | 7.1 節の journal と送り直し（trips の `driver-journal-and-replay` と一緒に） |
 | E9 | `rider-offline-mode` | 7.2 節 |
 | E9 | `driving-mode-ui` | 走行中の操作の制限 |
+| E9 | `app-accessibility` | 3.3 節の読み上げのラベル、到着の知らせ、連絡の方法の設定、オファーの振動と点滅 |
+| E9 | `app-localization-and-phrases` | 3.4 節の UI の言語、`phrase_catalog` と定型文のベクター、行き先を見せる画面（ADR-0044。safety の `in-trip-messaging` と一緒に） |
 | E10 | `emergency-dial-on-device` | どの画面にも緊急の入口（safety の Story と同じ 1 つ） |
 | E3 | `driver-session-integrity` | App Attest・Play Integrity の判定を出庫で送る（security の Story と同じ 1 つ） |
 
@@ -385,6 +426,7 @@ journal の中身と、サーバーでの受け取りは [trips-lifecycle.md](tr
 | Live Activities・Android の進行中の通知で、乗客に迎車の状況を出すか | S1 の後。APNs の `liveactivity` の型の条件を確かめてから |
 | アプリの外部送信の SDK の一覧と公表（L4） | 法務の確認待ち |
 | 給電なしの電池の目標（10%／時）の妥当性 | E9 の計測で見直す |
+| 訪日の旅行者を MVP の対象にするか、日本語と英語の外の言語、自由な文の機械翻訳 | PM が決める（[intent.md](../intent.md) の Open questions）。機械翻訳は L4 の結論の後に別の ADR（ADR-0044） |
 
 ## 14. quality.md・runbooks・data-model への項目
 

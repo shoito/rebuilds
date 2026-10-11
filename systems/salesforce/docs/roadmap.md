@@ -173,6 +173,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `email-sending` | 1 通ずつのメールの送信、`email_opt_out`、SES と送信のドメインの確認、bounce と苦情（法務：L4） |
 | `email-bcc-logging` | メールの記録（BCC の受信、差出人の検査、照合、未処理のメール）（法務：L1・L4） |
 | `accessibility-baseline` | キーボードの操作、レイアウトのビルダーの代わりの操作、axe の関門 |
+| `web-lead-form` | Web からのリードのフォーム：`web_lead_form` のメタデータ、専用のホストの `form-intake`、守りの層、隔離した送信、フォームの利用者、`alloc.web_form_submissions`、`DT-WLF-001`・`LEAK-031`（[sales-objects.md](architecture/sales-objects.md) の 9 節、[ADR-0064](decisions/0064-web-lead-form-public-intake.md)、proposed）。MVP に入れるかは PM の判断（法務：L4・L12） |
 
 ### E6 宣言的な自動化
 
@@ -244,6 +245,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `import-match-update` | 照合の規則での既存の更新（`DT-IMP-001`）と、取り込みでの重複の判定 |
 | `bulk-allocations-and-setup` | 一括の割り当て（24 時間の行、ジョブ、結果の大きさ）と、Setup の「一括のジョブ」の画面 |
 | `bulk-low-priority-lanes` | 一括の分の索引・変更のイベントを低い優先の経路に入れる、足並みの実行の性能（200 件の塊） |
+| `migration-import` | 本家からの移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、移行の手順書と本家との違いの表（[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節、[ADR-0065](decisions/0065-migration-path-from-original.md)、proposed） |
 
 ### E10 Sandbox とメタデータのデプロイ
 
@@ -340,13 +342,36 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | E18 テリトリーとチーム | テリトリーの階層・割り当ての規則を、共有の理由（新しい `row_cause`）として足す。商談チーム・取引先チームの役割ごとの水準 | E4（決定表と参照の評価器の拡張） |
 | E19 複数の通貨と言語 | 通貨の型の換算（日付の換算の表）、多言語のラベル | E3、E7 |
 
+上の表の「前提」の Epic の依存を図にする（法務と、`opportunity_history` などの Epic でない前提は省いた）。矢印は「前提 → 後に来る Epic」の向き。
+
+```mermaid
+flowchart LR
+    E3["E3 メタデータの実行基盤"]
+    E4["E4 アクセス制御"]
+    E6["E6 宣言的な自動化"]
+    E7["E7 レポートとダッシュボード"]
+    E15["E15 CPQ"]
+    E16["E16 売上予測"]
+    E17["E17 AI"]
+    E18["E18 テリトリーとチーム"]
+    E19["E19 複数の通貨と言語"]
+    E6 --> E15
+    E7 --> E15
+    E4 --> E16
+    E7 --> E16
+    E4 --> E17
+    E4 --> E18
+    E3 --> E19
+    E7 --> E19
+```
+
 ## エージェントに任せないこと
 
 - **契約（問い合わせの言語の文法、REST API の形とエラー、変更のイベントの形、Webhook の署名、メタデータのパッケージの形式、決定表の列）の確定**：公開した後に変えるコストが最も高い。
 - **`security:sensitive` の承認**：Dev のテックリードとセキュリティの担当の 2 人が行う（[ADR-0062](decisions/0062-security-sensitive-change-flow.md)）。
 - **上限と割り当ての値の決定**：E12 の負荷試験の数字は出せるが、値の採否はプロダクトと Ops の判断。
 - **参照の評価器の `over` の食い違いの時の、安全の設定をかける判断と組織への告知**：セキュリティの担当と Ops（[runbooks/incident-response.md](runbooks/incident-response.md)）。
-- **法務の判断**（L1〜L11）。
+- **法務の判断**（L1〜L13）。
 - **エディションの分け方と価格**：E2 の着手前に PM が決める。
 
 ## 後回しにしたもの
@@ -365,6 +390,6 @@ MVP の後に検討する。着手するときに `intent.md` から起票する
 - **代理のログイン、独自のドメイン**（[orgs-users-and-auth.md](architecture/orgs-users-and-auth.md) の 14 節）。
 - **gRPC の購読、変更のイベントの 3 日を超える保持、共有で絞る変更のイベントの購読**（[events-and-integrations.md](architecture/events-and-integrations.md) の 13 節）。
 - **Excel（xlsx）の取り込み、`insert` のジョブの冪等キー**（[bulk-and-import.md](architecture/bulk-and-import.md) の 13 節）。
-- **本家のメタデータからの変換の道具**（intent の Non-goals。移行の Epic として扱う）。
+- **本家のメタデータからの変換の道具**（intent の Non-goals。移行の Epic として扱う。形は [ADR-0065](decisions/0065-migration-path-from-original.md)（proposed）、Epic を作るかは PM の判断。法務：L13）。
 - **Experience Cloud（ポータル）、Service Cloud、モバイルのネイティブアプリ、外部オブジェクト**（intent）。
 - **S2 の構成**（主のクラスタの分割、Sandbox と試用の別のクラスタ、射影、専用の検索の索引）と **S3 のセル構成**（[infrastructure.md](architecture/infrastructure.md) の 5 節）。

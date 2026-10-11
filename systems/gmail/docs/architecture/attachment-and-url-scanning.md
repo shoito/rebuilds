@@ -46,7 +46,7 @@
 | 隔離 | 検査のプロセスはネットワークに届かない。検査の部品の侵害が、他のメールと鍵に届かない | [AGENTS.md](../../AGENTS.md) |
 | 止まらない | 検査の部品の障害で受信を止めない。終わらない検査は後からやり直す | [ADR-0002](../decisions/0002-accept-then-filter.md) |
 | 開くときの確かめ | `url-check` の応答 p99 100ms。サーバーは利用者が開いた URL を知らない | NFR-013、[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) |
-| 画像の代理 | 送り手に利用者の IP・端末を渡さない。中身を本システムの他のアカウントに漏らさない | [architecture/README.md](README.md) の 6 節、NFR-010 |
+| 画像の代理 | 送り手に利用者の IP・端末を渡さない。中身を本システムの他のアカウントに漏らさない | [design-log.md](design-log.md) の「2026-10-10：既定案」、NFR-010 |
 
 ## 3. 本家の形（確かめたこと）
 

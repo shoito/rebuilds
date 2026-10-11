@@ -7,6 +7,7 @@
 | [0056](../decisions/0056-encryption-keys-and-secrets.md) | 転送中は TLS 1.2 以上（取り込みとクエリの内部の経路を含む）。保存時は、データの種類ごと・リージョンごとのカスタマー管理の KMS の鍵（テレメトリー、アーカイブ、MSK、Aurora、監査、秘密、キャッシュ）。S3 はバケットキー。インスタンスの NVMe はハードウェアの暗号化に任せ、ヘッドのチェックポイントは S3 の鍵で守る。組織ごとの鍵（BYOK）は MVP で持たない。アプリの秘密（Webhook の署名、通知の連携の資格、マスクの HMAC の鍵）は、鍵の ID つきで 2 つを並べて回す |
 | [0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) | 保持の期間は `retention_policies` の 1 つの表で持ち、`compactor` がカタログを先に「削除中」にしてから消す。解約は 30 日の猶予の後に `tenant_id` の接頭辞ごと消し、S3 の古いバージョン（7 日）と大阪の写しを含めて消えたことを確かめて記録する。個人のデータの削除の請求は墓標と書き直し（[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)）で、期限は法務の L5 の後。法的な保全は組織の単位で削除を止める |
 | [0058](../decisions/0058-untrusted-senders-egress-and-operator-access.md) | 取り込みの送り手（エージェント、OTLP）は信頼しない。取り込みのキーは書き込みだけで読めず、漏れたときの被害を「データの注入と量の消費」に限る。外への送信（通知、Webhook、オンコールの連携）は egress のサブネットの専用の送信の部品だけから出し、SSRF を拒む。社内の運用者は、利用者のテレメトリーを日常の権限で読めず、読むときは組織の許可（サポートの許可）と JIT と監査の 3 つを要る |
+| [0067](../decisions/0067-org-data-export.md)（proposed） | 組織の設定とテレメトリーの書き出しを 1 つの非同期の作業で持つ。設定は公開 API と同じ JSON の束、テレメトリーは信号・期間・条件を選んで Parquet と JSON Lines で書き、同じクエリの経路とデータのアクセスの制限を通す。権限は管理者だけ、結果は 7 日で消す |
 
 前提：組織とセルと鍵の先頭の `tenant_id`（[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)）、データのアクセスの制限（[ADR-0051](../decisions/0051-roles-permissions-and-data-access-restrictions.md)）、キーの形式と失効（[ADR-0015](../decisions/0015-key-format-validation-and-revocation.md)）、PII のマスク（[ADR-0031](../decisions/0031-pii-scrubbing-before-routing.md)）、保持の層（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）。アカウントとネットワークは [infrastructure.md](infrastructure.md)、利用者に見せる監査ログは [tenancy-and-rbac.md](tenancy-and-rbac.md) の 8 節にある。
 
@@ -232,6 +233,23 @@ stateDiagram-v2
 - 組織の単位で `legal_hold` を付けると、その組織の保持の削除・解約の消去・削除の請求の物理の消去（墓標は付ける）を止める。付け外しは法務と Ops の 2 人で、本システムの監査に残す。
 - 保全の範囲（組織か、期間か、データの種類か）と手順は**法務の確認待ち：L6**。
 
+### 5.6 組織のデータの書き出し
+
+[ADR-0067](../decisions/0067-org-data-export.md)（proposed）。組織の管理者が、設定とテレメトリーを本システムの外へ持ち出す手段。**テレメトリーの一括の書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）。
+
+| 種類 | 中身 | 形 |
+| --- | --- | --- |
+| 設定の束 | ダッシュボード（今のバージョン）、モニター、ダウンタイム、SLO、ログのパイプライン・索引・ログから作るメトリクス、テールサンプリングの規則、クエリに残すタグ、チーム・役割・データセット、通知の宛先の名前 | 公開 API と同じ JSON（同じ Zod のスキーマ）の ZIP と `manifest.json`。公開 API にそのまま戻せる |
+| メトリクス | 選んだ指標・条件・期間・解像度（生・1 分・1 時間のうち保持の層に残るもの） | Parquet（時刻、指標、タグの組、合計・個数・最小・最大・最後、分布は指数のヒストグラムの区間） |
+| ログ・スパン | 選んだ索引・条件・期間（アーカイブを含む） | 検索の API と同じ属性の形の JSON Lines（gzip） |
+
+- **入れないもの**：取り込みのキー・アプリケーションキー、Webhook と連携の秘密（[ADR-0056](../decisions/0056-encryption-keys-and-secrets.md) の `integration_secrets`）、SSO の証明書、本システムの監査（7 節）。
+- **同じ経路を通す**：テレメトリーは IR にコンパイルし、要求した人の役割のデータのアクセスの制限を AND で足して読む（[ADR-0007](../decisions/0007-query-language.md)）。マスクの後の値だけが出る。削除の請求の墓標の行は出ない（[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)）。書き出しのための別の読み出しの経路を作らない。
+- **作業**：組織の同時 1 本。費用の見積もりで受け付け、評価とダッシュボードと別の低い優先度の待ち行列で流す（[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)）。結果は S3 の `<cell>/<tenant_id>/exports/` に置き、7 日の署名付きの URL で渡して 7 日で消す（保持の区分 `exports-7d` を `retention_policies` に足す）。利用者の S3 へ直接書くのは E18。
+- **権限と記録**：`org.data_export.write`（管理者の役割だけ。[tenancy-and-rbac.md](tenancy-and-rbac.md) の 5.1 節）。要求・完成・ダウンロードを組織の監査ログに書く（[tenancy-and-rbac.md](tenancy-and-rbac.md) の 8.1 節）。
+- **解約との関係**（5.3 節）：`suspended` の猶予の間は作れる。`purging` に入ると作れず、作りかけを取り消し、`exports/` も接頭辞ごと消える。猶予の長さと「書き出しの期間」の約束の文言は**法務の確認待ち：L5・L7**。
+- 既存のログの検索のエクスポート（1 回 10 万行。[log-storage-and-search.md](log-storage-and-search.md) の 11 節）は、画面の検索の結果を少し持ち出す手段として残す。
+
 ## 6. ログの PII の扱い（L1 の枠）
 
 - マスクの実行の場所と方式は [ADR-0031](../decisions/0031-pii-scrubbing-before-routing.md)（パイプラインの後、振り分け・ログから作るメトリクス・ライブテールの前、すべての文字列の値）。この節は、法務の結論に合わせて変えられるようにする枠である。
@@ -299,6 +317,7 @@ ADR-0058。
 | 結合 | 取り込みのキーで読み出しの API を呼ぶと 401。シークレットスキャンの通報で、取り込みのキーは 24 時間の後、アプリケーションキーはすぐに失効する | `REQ-SEC-*` |
 | 性質ベース | 任意の組織の列で、読み手がブロックの頭の `tenant_id` と要求の `tenant_id` の違いを必ず拒む | `PROP-SEC-001` |
 | 解約 | 縮めた規模で、組織の解約から `purged` までに、東京・大阪のすべての接頭辞と Aurora の行が 0 になる | `PROP-SEC-002` |
+| 書き出し | 任意の組織・役割の制限・削除の請求の列で、書き出しの中身が、同じ人の同じ条件の検索・クエリの結果と一致し、制限の外・墓標・他の組織の行が入らない。設定の束を空の組織に戻すと同じ定義になり、秘密が入らない（5.6 節） | `PROP-SEC-003` |
 | SSRF | 私的・リンクローカル・メタデータのアドレス、DNS の再結合、リダイレクトで内部へ向ける Webhook を拒む（試験のベクトル） | `REQ-SEC-*` |
 
 ## 12. Story の候補
@@ -313,6 +332,7 @@ ADR-0058。
 | E8 | `egress-ssrf-guard` | 3.5 節（notifications-and-integrations と共同） |
 | E11 | `support-access-grants` | 8 節のサポートの許可の画面と監査 |
 | E13 | `tenant-purge` | 5.3 節。猶予と期限は法務：L5・L7 |
+| E13 | `org-data-export` | 5.6 節の設定の束とテレメトリーの書き出し（[ADR-0067](../decisions/0067-org-data-export.md)、proposed）。テレメトリーを MVP に入れるかは PM の判断。猶予の約束は法務：L5・L7 |
 | E13 | `legal-hold` | 5.5 節。範囲は法務：L6 |
 | E13 | `pentest-external` | 9 節 |
 
@@ -340,6 +360,7 @@ ADR-0058。
 | 漏れたキーで生じた超過の扱い、消去の約束の文言 | **法務の確認待ち：L7** |
 | 大阪の写しの明示の削除（タグの複製の規則では削除マーカーは写らないと確かめた。[ADR-0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) の注記） | E1 の `s3-buckets-baseline` で実の S3 で確かめる |
 | BYOK | MVP の後 |
+| テレメトリーの一括の書き出しを MVP に入れるか、書き出しの費用を利用量に数えるか（5.6 節） | PM の判断（[intent.md](../intent.md) の「PM が決めるもの」）。E13 の `org-data-export` の spec の承認の前 |
 
 ## 14. quality.md・runbooks・data-model への項目
 

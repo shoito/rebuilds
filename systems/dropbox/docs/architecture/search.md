@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - 検索は Amazon OpenSearch Service。索引は写しで、Aurora と S3 から作り直せる。権限の判定は持たせず、返す前に `can()` で確かめ直す。名前は n-gram、本文は形態素と n-gram（[ADR-0001](../decisions/0001-platform-and-stack.md)）
-- 名前はすべてのプラン、本文はチームのプラン（テキスト、PDF の文字の層、Office の文書）。OCR は E15（[architecture/README.md](README.md) の 6 節）
+- 名前はすべてのプラン、本文はチームのプラン（テキスト、PDF の文字の層、Office の文書）。OCR は E15（[design-log.md](design-log.md) の「2026-10-09：既定案」）
 - 社内の処理は outbox から SNS・SQS で受け、ジャーナルと食い違わない（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）
 - パスの写しは持たない。検索の索引だけが写しを持てる（[ADR-0008](../decisions/0008-node-identity-and-names.md)）
 - 本文の抽出は、プレビューと同じ隔離の変換で行う（[previews-and-thumbnails.md](previews-and-thumbnails.md)）

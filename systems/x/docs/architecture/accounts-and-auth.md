@@ -182,6 +182,8 @@ DT-AUTH-001：ログインの手段の識別子が、どのアカウントにな
 
 連絡先の変更は、6.3 節の保留を通す。
 
+データの書き出しの中身・形・状態ごとの可否は [security.md](security.md) の 7.5 節（[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)、proposed）。
+
 ## 6. セッション
 
 ADR-0043。

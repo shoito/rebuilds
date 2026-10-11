@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-[architecture/README.md](../architecture/README.md) の 6 節は、ショップ（大きなショップは商品・コレクションの単位）の世代の番号をキャッシュの鍵に入れて KeyValueStore で配り、CloudFront の無効化の API を主にしないと決めた。決めることは次である。
+[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、ショップ（大きなショップは商品・コレクションの単位）の世代の番号をキャッシュの鍵に入れて KeyValueStore で配り、CloudFront の無効化の API を主にしないと決めた。決めることは次である。
 
 - 鍵の材料と正規化。鍵からショップが抜けると、他のショップのページが出る（NFR-008）。
 - 何が世代を上げるか。上げすぎると当たりの割合（90% の見込み）が落ちる。

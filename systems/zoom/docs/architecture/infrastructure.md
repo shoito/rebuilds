@@ -390,7 +390,7 @@ Media Node と TURN だけを国内の Edge（東京と大阪のコロケーシ�
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **アカウント**：`media-prod` を分ける（ADR-0048）。
 - **インスタンス**：c8gn.16xlarge、予備に c7gn.16xlarge、大阪は c6gn.16xlarge（ADR-0049）。

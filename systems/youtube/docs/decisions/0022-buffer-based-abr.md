@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、Web と Android を自前の ABR にし、開始は回線の推定、安定してからはバッファの量で決める（バッファに基づく形を主にする）とした。iOS は AVPlayer に任せる。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、Web と Android を自前の ABR にし、開始は回線の推定、安定してからはバッファの量で決める（バッファに基づく形を主にする）とした。iOS は AVPlayer に任せる。
 - 回線の推定だけの ABR は、推定の揺れ（携帯の回線、混んだ Wi-Fi）で段が上下し、推定が外れると止まる。バッファだけの ABR は、開始の直後にバッファが薄いので、最下段から長く上がれない。
 - 日本の視聴は、電車のトンネルと駅で帯域が急に落ちる場面が多い（[quality.md](../quality.md) の 2.2.1 節 B の回線の記録）。
 - ライブの低遅延のモードは、バッファが 1〜3 秒しかない（[ADR-0006](0006-live-ingest-and-latency.md)）。

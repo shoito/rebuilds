@@ -75,12 +75,17 @@
 
 ### 5.1 支払いの状態
 
-```
- authorizing ─成功─▶ authorized ─確定─▶ captured ─返金（一部）─▶ partially_refunded ─全額─▶ refunded
-     │                   │  └─与信の取り消し─▶ canceled
-     │ 失敗              └─確定の後に不足───▶ captured（追加の請求の行が別に進む）
-     ▼
-   failed
+支払い（`trip_payments.status`）の状態と遷移を図にする。確定の額と追加の請求の決め方は 5.2 節の DT-PAY-002 にある。
+
+```mermaid
+stateDiagram-v2
+    [*] --> authorizing
+    authorizing --> authorized: 成功
+    authorizing --> failed: 失敗
+    authorized --> captured: 確定（不足の分は、追加の請求の行が別に進む）
+    authorized --> canceled: 与信の取り消し
+    captured --> partially_refunded: 返金（一部）
+    partially_refunded --> refunded: 全額
 ```
 
 ```sql

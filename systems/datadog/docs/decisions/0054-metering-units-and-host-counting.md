@@ -9,7 +9,7 @@ date: 2026-10-09
 
 - 利用量は、取り込んだ時点で間引く前の量を数え、参照の数え方との差を 0.1% 以内にする（NFR-012、K9）。課金の数字をサンプリングした値から推定しない。
 - 本家は、ホストとカスタムメトリクスを時間ごとに数え、ホストは月の時間のうち上位 1% を除いた中の最大で請求する。ホストは監視する OS のインスタンスで、各コンテナにエージェントを入れるとコンテナごとに数える（[Billing](https://docs.datadoghq.com/account_management/billing/)、2026-10-09 に確認）。カスタムメトリクスは指標の名前とタグの値の組で、時間ごとの数の月の平均。分布は 5、パーセンタイルでさらに 5（[Custom Metrics Billing](https://docs.datadoghq.com/account_management/billing/custom_metrics/)、同日に確認）。ログは索引に入れた件数で請求する（[Log Management Billing](https://docs.datadoghq.com/account_management/billing/log_management/)、同日に確認）。取り込みのバイトの数え方は確かめられなかった（**未検証**）。
-- 本システムの分布は OpenTelemetry の指数のヒストグラム 1 つで、どのパーセンタイルも同じデータから出る（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 本システムの分布は OpenTelemetry の指数のヒストグラム 1 つで、どのパーセンタイルも同じデータから出る（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。
 - 原価の大きな部分は、インジェスターのメモリー（有効な系列に比例）と MSK（バイトに比例）である（同 2.1 節）。
 
 ## Options

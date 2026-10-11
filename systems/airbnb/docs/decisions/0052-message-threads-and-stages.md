@@ -10,7 +10,7 @@ date: 2026-10-10
 ## Context
 
 - ゲストは予約の前にホストへ問い合わせ、そのまま予約のリクエスト・確定へ進む。会話の流れは 1 つで見たい。
-- 連絡先の扱いは、予約の前と確定の後で違う（[architecture/README.md](../architecture/README.md) の 6 節）。予約はリクエスト・断り・キャンセルで行き来する。
+- 連絡先の扱いは、予約の前と確定の後で違う（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。予約はリクエスト・断り・キャンセルで行き来する。
 - 同じゲストが同じリスティングに何度も泊まる。
 - メッセージは予約の 2 者の RLS（[ADR-0007](0007-tenancy-host-accounts-and-rls.md)）。
 

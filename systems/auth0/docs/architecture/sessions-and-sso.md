@@ -79,15 +79,17 @@
 
 ### 3.3 状態
 
-```
-            ログイン成功
-   (なし) ─────────────▶ active ──┬─ 使われない期間を過ぎた ─▶ expired
-                          │  ▲    └─ 最終の期限を過ぎた ────▶ expired
-      MFA・再認証の成功    │  │
-      （秘密を作り直す）───┘  │
-                          │
-                          └─ ログアウト・取り消し・ユーザーのブロック／削除・
-                             別の利用者でのログイン・再利用の検知 ─▶ ended
+次の図は、セッションの状態を示す。
+
+```mermaid
+stateDiagram-v2
+  [*] --> active: ログイン成功
+  active --> active: MFA・再認証の成功（秘密を作り直す）
+  active --> expired: 使われない期間を過ぎた
+  active --> expired: 最終の期限を過ぎた
+  active --> ended: ログアウト・取り消し・ユーザーのブロック／削除・別の利用者でのログイン・再利用の検知
+  expired --> [*]
+  ended --> [*]
 ```
 
 - `expired` と `ended` は終わりの状態で、`active` に戻らない。
@@ -278,6 +280,27 @@ Auth（ログアウト）          outbox → Relay → SQS          Worker     
 | --- | --- | --- |
 | `session` | セッションが終わる（ログアウト、取り消し、期限）と、系列も使えなくなる。系列の利用はセッションの「使われた」に数える（3.4 節） | SPA、機密の Web アプリ |
 | `independent` | セッションが終わっても、系列は使える。止まるのは、失効・再利用の検知・系列の期限・ユーザーのブロック／削除・「すべての端末からログアウト」のとき | Native、デバイスのフロー |
+
+次の図は、同じセッションで出した 2 つの系列の寿命を、時刻の順に示す。期限はどれも既定の値（セッションの最終の期限 7 日は 3.4 節、系列の最終の期限 30 日は [authentication-flows.md](authentication-flows.md) の 8.1 節）である。
+
+```mermaid
+sequenceDiagram
+  participant S as セッション
+  participant FS as 系列（binding = session）
+  participant FI as 系列（binding = independent）
+  Note over S,FI: 0 日：ログイン。セッションと、2 つの系列ができる
+  Note over FS: 最終の期限は 7 日（セッションの最終の期限を超えない）
+  Note over FI: 最終の期限は 30 日
+  FS->>S: 系列の利用を「使われた」に数える（最終の期限は延びない）
+  alt 期限の前に、ログアウト・取り消し
+    S->>FS: 同じトランザクションで revoked_at を書く。使えなくなる
+    Note over FI: 使える。Back-Channel Logout も送らない
+  else 7 日：セッションの最終の期限
+    Note over S,FS: セッションも系列も使えなくなる
+    Note over FI: 使える
+  end
+  Note over FI: 30 日：系列の最終の期限。それより前でも、失効・再利用の検知・ユーザーのブロック／削除・「すべての端末からログアウト」で止まる
+```
 
 - アプリの設定で、既定を変えられる。
 - `session` の系列の最終の期限は、セッションの最終の期限を超えない（系列を作るときに短い方にする）。

@@ -80,12 +80,23 @@ payout_settings (account_id, currency,
 
 ### 4.2 流れ
 
-```
-payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 API──▶ 受付
-                                      │
-                                      ├─ 結果照会：成功 → payouts(in_transit → paid)
-                                      ├─ 結果照会：不能 → payouts(failed)、残高に戻す
-                                      └─ 数日後の組戻し・資金返却 → payouts(paid → failed)
+次の図は、入金（`payouts`）の状態の移り方を示す。失敗と返却の正は 4.3 節の表である。
+
+```mermaid
+stateDiagram-v2
+    state "pending" as pending
+    state "in_transit" as transit
+    state "paid" as paid
+    state "failed" as failed
+    state "canceled" as canceled
+
+    [*] --> pending : 入金の作成（3 節）
+    pending --> canceled : 締めの前の取り消し
+    pending --> transit : 締めて payout_batches で依頼し、銀行が受付
+    pending --> failed : 依頼の時点で拒否
+    transit --> paid : 結果照会で完了
+    transit --> failed : 結果照会で不能（残高に戻す）
+    paid --> failed : 数日後の組戻し・資金返却
 ```
 
 1. **締め**：1 日に数回（例：9:00、13:00）、`pending` の入金を銀行ごと・払出口座ごとにまとめ、`payout_batches` を作る。まとめる件数は銀行の上限に合わせる。
@@ -120,7 +131,29 @@ payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 AP
 | 着金の照合 | 精算のバッチの純額（精算ファイルの合計） | 銀行の入出金明細の入金 | 金額・日付・振込依頼人名（決済代行ごとの規則） |
 | 入金の照合 | `payouts` と `payout_batches` | 銀行の結果照会と入出金明細の出金 | `bank_request_ref`、金額、日付 |
 
-これらをつないで、**台帳・決済代行の精算・銀行の明細の 3 つが一致すること（3 者照合）** を確かめる。
+これらをつないで、**台帳・決済代行の精算・銀行の明細の 3 つが一致すること（3 者照合）** を確かめる。次の図は、3 つの照合がどの記録とどの記録を、どの鍵で突き合わせるかを示す。
+
+```mermaid
+flowchart LR
+    subgraph L["台帳"]
+        LR["connector_receivable の行<br/>（決済・返金・Dispute）"]
+        LP["payouts・payout_batches<br/>（入金の仕訳）"]
+    end
+    subgraph S["決済代行"]
+        SL["精算ファイルの明細"]
+        SN["精算のバッチの純額"]
+    end
+    subgraph B["銀行"]
+        BI["入出金明細の入金"]
+        BR["結果照会"]
+        BO["入出金明細の出金"]
+    end
+    LR <-->|"精算の照合<br/>コネクタの参照番号"| SL
+    SL -->|"明細の合計"| SN
+    SN <-->|"着金の照合<br/>金額・日付・振込依頼人名"| BI
+    LP <-->|"入金の照合<br/>bank_request_ref・金額・日付"| BR
+    LP <-->|"入金の照合"| BO
+```
 
 - 決済 1 件について：台帳の未収金の行 ＝ 精算ファイルの明細（総額・手数料）。
 - 精算のバッチについて：明細の合計 ＝ 精算ファイルの純額 ＝ 銀行の着金額。
@@ -154,6 +187,23 @@ payouts(pending) ──締め──▶ payout_batches(submitted) ──銀行 AP
 ### 5.4 ブレイクと仮勘定
 
 - 説明のつかない差（ブレイク）は `recon_breaks (id, kind, source, external_id, amount, currency, detected_at, age_business_days, status, owner, resolution, resolution_entry_id)` に記録する。`status` は `open` → `investigating` → `resolved` / `written_off`。
+次の図は、ブレイクの `status` の移り方を示す。
+
+```mermaid
+stateDiagram-v2
+    state "open" as open
+    state "investigating" as inv
+    state "resolved" as resolved
+    state "written_off" as wo
+
+    [*] --> open : 説明のつかない差を検知
+    open --> inv : 調査を始める
+    inv --> resolved : 仮勘定から正しい口座へ振り替える<br/>（加盟店の残高を動かすなら 2 人の承認）
+    inv --> wo : loss_write_off へ償却（2 人の承認）
+    resolved --> [*]
+    wo --> [*]
+```
+
 - **お金が実際に動いているのに相手が分からないとき**（例：銀行に入金があるのに、どの精算のバッチにも当たらない）は、その時点で仮勘定に計上する：`bank_cash` +X / `suspense:bank_unidentified` −X。預金の口座の残高を、銀行の残高と常に一致させるためである。
 - 解消するときは、仮勘定から正しい口座へ振り替える仕訳を書く。**加盟店の残高を動かす解消**（決済代行だけが知っていた Dispute を加盟店に計上するなど）は、担当者と承認者の 2 人の承認を要し、`adjustment` の BT を作る。
 - 償却（`loss_write_off`）も 2 人の承認を要する。

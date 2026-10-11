@@ -11,7 +11,7 @@ date: 2026-10-10
 
 - アカウントの乗っ取りは、本人の連絡先へのフィッシングと、共有の送信の評判の崩れにつながる（[intent.md](../intent.md) の Problem）。パスワードの使い回しとフィッシングが主な入口である。
 - 本家はパスキーを出し、パスキーは 2 段階の確認の 2 つ目の段を兼ねる（[Sign in with a passkey](https://support.google.com/accounts/answer/13548313)、2026-10-10 に確認）。個人の IMAP はユーザー名とパスワードのアプリを使えない（[Add Gmail to another email client](https://support.google.com/mail/answer/7126229)、同）。
-- アプリのパスワードは作らないと決めた（[architecture/README.md](../architecture/README.md) の 6 節の決定）。既存の IMAP のアプリがどう認証するかを決める必要がある。
+- アプリのパスワードは作らないと決めた（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。既存の IMAP のアプリがどう認証するかを決める必要がある。
 - SMS での確かめは法務の L3。
 - IMAP の接続は長く続く（20 万の同時の接続）。トークンを失効しても、接続が残れば読み続けられる。
 

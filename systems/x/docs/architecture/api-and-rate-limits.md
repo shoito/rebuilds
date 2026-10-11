@@ -41,7 +41,7 @@
 | 課金 | 使った量に応じた課金、月 300 万件の投稿の読み出しの上限 | [intent.md](../intent.md) の出典 |
 | バージョン | パスに `/2/` を持つ | 同上（Pagination の例の URL） |
 
-- 本家の `x-rate-limit-*` の形は採らない。IETF の `RateLimit` の形を使う（[architecture/README.md](README.md) の 6 節の決定、5.4 節）。本家の SDK とそのまま互換にすることは目標にしない（[intent.md](../intent.md) の Non-goals）。
+- 本家の `x-rate-limit-*` の形は採らない。IETF の `RateLimit` の形を使う（[design-log.md](design-log.md) の「2026-10-04：既定案」、5.4 節）。本家の SDK とそのまま互換にすることは目標にしない（[intent.md](../intent.md) の Non-goals）。
 
 ## 3. API の形
 
@@ -149,6 +149,27 @@ ADR-0046。
 
 - OAuth 1.0a は持たない。
 
+認可のコードの流れと、リフレッシュトークンの入れ替えを図にする。
+
+```mermaid
+sequenceDiagram
+  participant U as 利用者
+  participant C as アプリ（クライアント）
+  participant W as 認可の画面（/i/oauth/authorize）
+  participant T as トークンの口（/v1/oauth/token）
+  C->>W: response_type=code、state、code_challenge（S256。plain は拒む）
+  W->>U: 範囲を示して確かめる
+  U->>W: 認可する
+  W-->>C: 認可のコード（60 秒・1 回限り）
+  C->>T: authorization_code ＋ code_verifier（public のクライアントは秘密なし）
+  T-->>C: アクセストークン（2 時間）、リフレッシュトークン（offline.access のとき）
+  C->>T: refresh_token
+  T-->>C: 新しいアクセストークンと新しいリフレッシュトークン
+  alt 古いリフレッシュトークンの再使用を見た
+    T->>T: 一式を取り消す
+  end
+```
+
 ### 4.4 範囲
 
 `posts.read`、`posts.write`、`users.read`、`timeline.read`、`follows.read`、`follows.write`、`likes.read`、`likes.write`、`reposts.write`、`bookmarks.read`、`bookmarks.write`、`blocks.read`、`blocks.write`、`mutes.read`、`mutes.write`、`dm.read`、`dm.write`、`media.write`、`offline.access`（リフレッシュトークンを出す）。
@@ -182,6 +203,22 @@ ADR-0047。
 - 時刻は呼び出し側の時刻（`now`）ではなく、Valkey の `TIME` を使う（タスクの時計のずれで桶が増えない）。
 - 桶の鍵は、満杯に戻るまでの時間で期限を付ける（`PEXPIRE`）。
 - 1 日の上限は「容量 = 1 日の上限、補充 = 上限 / 86,400 秒」の桶と、短い窓の桶（30 分）の 2 つで表す。短い窓の桶が連投の束を止め、1 日の桶が総量を止める。
+
+1 つの要求の判定の流れを図にする。
+
+```mermaid
+flowchart TD
+  R["要求"] --> K["当たる桶を集める<br/>利用者の行動・利用者×アプリ・アプリ・IP・全体"]
+  K --> G["主体ごとに分ける<br/>同じ主体の桶はハッシュタグで同じスロットに置く"]
+  G --> T1["rl_take（1 つ目の主体）<br/>Valkey の TIME で補充し、全部の桶に余りがあれば引く"]
+  T1 -->|"どれかが空"| X["429 と Retry-After<br/>（どの桶も引かない）"]
+  T1 -->|"全部引けた"| M{"主体の違う桶が残っているか"}
+  M -->|"ない"| OK["通す<br/>RateLimit-Policy・RateLimit のヘッダー"]
+  M -->|"ある"| T2["rl_take（2 つ目の主体）"]
+  T2 -->|"全部引けた"| OK
+  T2 -->|"どれかが空"| B["先に引いた側を戻す<br/>（戻しの失敗は許す）"]
+  B --> X
+```
 
 ### 5.3 値（S1 の既定）
 

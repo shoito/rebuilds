@@ -58,6 +58,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `auth-and-sessions` | ログイン、セッション、WebSocket のチケット（Slack の ADR-0012 を先例に。[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 1 節） |
 | `accounts-and-members` | `accounts` と `members`、メンバーの解決のミドルウェア（[ADR-0021](decisions/0021-accounts-members-guests-and-teamspaces.md)） |
 | `workspace-roles-and-admin` | ロール、招待、無効化、最後の所有者の保護（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節） |
+| `plans-and-entitlements` | `plans` と `workspace_entitlements`、`packages/entitlements`、管理ツールからの変更と監査（[ADR-0034](decisions/0034-plans-and-entitlements.md)、proposed）。`guests-and-limits` の前に行う |
 | `guests-and-limits` | ゲスト、ゲストの上限と `guest_limit`（同じ文書の 2.3 節） |
 | `teamspaces` | 4 種類のチームスペース、最上位の暗黙の ACL、サイドバーの並び（同じ文書の 3 節） |
 | `groups` | グループとメンバー（同じ文書の 2.4 節） |
@@ -208,7 +209,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `membership-admin-role` | メンバーの管理者 |
 | `workspace-security-policies` | 公開・ゲスト・エクスポート・連携の禁止、ゲストの追加の申請（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 4.6・10 節） |
 | `enterprise-trash-retention` | ゴミ箱の保持期間の変更（[ADR-0022](decisions/0022-trash-history-and-deletion-retention.md)） |
-| `plan-history-retention` | プランごとの履歴の日数（7・30・90 日・無期限） |
+| `plan-history-retention` | プランごとの履歴の日数（7・30・90 日・無期限。`limit.history.days`、[ADR-0034](decisions/0034-plans-and-entitlements.md)） |
 | `deprovisioned-content-transfer` | 無効化したメンバーのプライベートのページを、所有者が中身を読まずに別のメンバーへ移す。30 日以内、監査ログに残す（[ADR-0033](decisions/0033-transfer-private-pages-of-deactivated-members.md)） |
 | `restricted-member-role` | 制限付きメンバーのロール `restricted_member`（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節、[ADR-0021](decisions/0021-accounts-members-guests-and-teamspaces.md) の注記） |
 | `admin-content-search` | 管理者の内容の検索。監査ログに残す別の経路で、ページの権限の判定は変えない（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節） |

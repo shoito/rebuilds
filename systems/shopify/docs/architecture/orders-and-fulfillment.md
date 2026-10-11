@@ -8,7 +8,7 @@
 - 引き当てた拠点で確定する。配送は `committed` と `on_hand` を減らす（[ADR-0004](../decisions/0004-inventory-reservation-model.md)、[inventory-and-reservations.md](inventory-and-reservations.md) の 4.3 節）
 - 単位ごとの支払いの額は価格の写しから注文の行に写す（[discounts-engine.md](discounts-engine.md) の 7 節）
 - 売上の確定の時点は [payments-integration.md](payments-integration.md) の 8 節
-- MVP は 3 社（ヤマト運輸、佐川急便、日本郵便）の送り状の CSV と、選定した 1 社の API（[architecture/README.md](README.md) の 6 節）
+- MVP は 3 社（ヤマト運輸、佐川急便、日本郵便）の送り状の CSV と、選定した 1 社の API（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 
 この文書で決めたことは次の ADR にある。
 

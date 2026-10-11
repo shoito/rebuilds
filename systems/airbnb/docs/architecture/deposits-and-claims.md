@@ -4,7 +4,7 @@
 
 前提となる決定は次のとおり。
 
-- MVP は保証金の預かりを持たない。損害はチェックアウトの後の請求で扱う（[README.md](README.md) の 6 節、intent の「MVP の後」）
+- MVP は保証金の預かりを持たない。損害はチェックアウトの後の請求で扱う（[design-log.md](design-log.md) の「2026-10-10：既定案」、intent の「MVP の後」）
 - 損害の保険そのものは本システムの外。本システムは請求の手続きと支払いの記録を持つ（intent の Non-goals）
 - お金は台帳の仕訳で動く（[ledger-and-payouts.md](ledger-and-payouts.md) の型 26・28・29）
 - ゲストへの請求は保存した支払いの方法での加盟店からの請求（[payments-and-fx.md](payments-and-fx.md) の 4.1 節の `chargeMerchantInitiated`）

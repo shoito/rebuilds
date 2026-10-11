@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-- フラッピングは 30 分に 6 回を超える遷移で、通知を 1 回にまとめると決めている（[ADR-0008](0008-monitor-evaluation-model.md)、[architecture/README.md](../architecture/README.md) の 6 節）。始まりと終わりの決め方が要る。
+- フラッピングは 30 分に 6 回を超える遷移で、通知を 1 回にまとめると決めている（[ADR-0008](0008-monitor-evaluation-model.md)、[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。始まりと終わりの決め方が要る。
 - 本家の再通知は、間隔・対象の状態・回数の上限を持つ（[Notifications](https://docs.datadoghq.com/monitors/notify/)、2026-10-09 に確認）。本家のフラッピングの判定の規則は確かめなかった（**未検証**）。
 - フラッピングで状態の遷移そのものを止めると、ダッシュボード・SLO（モニターの SLO は遷移の記録から計算する）・複合モニターが今の状態を誤る。
 

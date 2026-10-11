@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、権利者は 30 日で応え、応えなければ一致を外すと決めた（30 日は本システムの値、本家の値は未検証としていた）。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、権利者は 30 日で応え、応えなければ一致を外すと決めた（30 日は本システムの値、本家の値は未検証としていた）。
 - 本家は、異議への応答 30 日、再審査への応答 7 日、ブロックの申し立ての直接の再審査（7 日）を公開している（[Dispute a Content ID claim](https://support.google.com/youtube/answer/2797454)、2026-10-10 に確認）。README の 30 日は本家と同じだと確かめられた。
 - 期限を過ぎた申し立てが放っておかれると、創作者の収益と公開が不当に止まる。
 

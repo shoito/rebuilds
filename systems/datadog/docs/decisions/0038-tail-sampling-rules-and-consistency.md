@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-- 規則の既定は、エラーをすべて、サービス・リソースごとに遅い上位 1%、まれな組を 1 秒 5 件、残りはテナントの予算の中の確率、と決めている（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 規則の既定は、エラーをすべて、サービス・リソースごとに遅い上位 1%、まれな組を 1 秒 5 件、残りはテナントの予算の中の確率、と決めている（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。
 - 1 つのトレースが断片に分かれる（遅れたスパン、打ち切り）。断片ごとに違う確率の結果になると、残すトレースが欠ける。
 - 利用者は SDK でヘッドサンプリングをする。OpenTelemetry は `tracestate` の `ot=th` で棄却のしきい値を運び、重み（adjusted count）を求める仕組みを定めている（[TraceState: Probability Sampling](https://opentelemetry.io/docs/specs/otel/trace/tracestate-probability-sampling/)、2026-10-09 に確認。状態は Development）。
 - 本家は保持のフィルターと多様性のサンプリングで残すものを決める（[Trace Retention](https://docs.datadoghq.com/tracing/trace_pipeline/trace_retention/)、2026-10-09 に確認）。サーバーのテールサンプリングは確かめなかった（**未検証**）。

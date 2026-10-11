@@ -8,7 +8,7 @@
 - 評価と署名は自前の `crates/mailauth` に置く。暗号と DNS の解決は汎用の部品、DNSSEC の検証は Route 53 Resolver（[ADR-0001](../decisions/0001-platform-and-stack.md)）
 - 受け取ったバイトは不変の blob に置き、本システムが足すヘッダー（`Authentication-Results`、`ARC-*`）は受け手ごとの前置きに持つ（[ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md)）
 - 認証の結果は C1、認証済みのドメインは評判の鍵になる（[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md)）
-- 一括の配信停止のボタンは、DKIM がそのヘッダーを含んで通るときだけ出し、本システムの egress から POST する（[architecture/README.md](README.md) の 6 節、法務の L2 の (d)）
+- 一括の配信停止のボタンは、DKIM がそのヘッダーを含んで通るときだけ出し、本システムの egress から POST する（[design-log.md](design-log.md) の「2026-10-10：既定案」、法務の L2 の (d)）
 
 この文書で決めたことは次の ADR にある。
 
@@ -176,6 +176,35 @@ sequenceDiagram
 - 本システムのドメイン（`<brand>.<domain>`）は `p=reject` を出す。本システムの送信の基盤を通らずに本システムのドメインを騙るメールは、9 行で拒む。これは [ADR-0002](../decisions/0002-accept-then-filter.md) の表の 13 の「確信の高い規則」と同じ結果になる。
 - 宛先の方針の組（`smtp_policy_class`）が違う宛先は、トランザクションが分かれている（[inbound-smtp.md](inbound-smtp.md) の 8.4 節）。
 - 利用者の連絡先・フィルターの「迷惑メールにしない」は、6 行（迷惑メールの箱）を上書きできるが、9 行（拒否）は SMTP の時点なので上書きできない。
+
+**例：メーリングリストで DMARC が壊れ、ARC で救われる**：`p=reject` のドメインのメールが、件名の印を足すメーリングリストを通って届く場合を、1 通の流れで示す。リストが件名を変えると作者のドメインの DKIM が壊れ、SPF も作者のドメインに揃わなくなる（[ADR-0017](../decisions/0017-arc-sealing-trusted-sealers-and-dmarc-reports.md) の Context）。救えるかは、リストの封印が信頼の一覧にあるかで決まる。
+
+```mermaid
+sequenceDiagram
+    participant S as 送り手（作者のドメイン、p=reject）
+    participant L as メーリングリスト
+    participant M as mx-edge（SMTP の会話）
+    participant A as mailauth
+
+    S->>L: 送る（From と DKIM の d= は作者のドメイン）
+    L->>L: 受け取った時点の検査：作者のドメインに揃う dmarc=pass
+    L->>L: 件名の印を足す（作者のドメインの DKIM が壊れる）
+    L->>L: ARC の組を付ける（ARC-Authentication-Results に dmarc=pass）
+    L->>M: 展開して送る
+    M->>A: DATA の終わり
+    A->>A: SPF と DKIM：作者のドメインに揃う pass なし → DMARC fail、方針 reject
+    A->>A: ARC の検査（5.3 節）：連鎖 cv=pass、封印者と ARC-Authentication-Results を結果の束へ
+    alt 封印者が信頼の一覧にあり、揃う dmarc=pass を記録している
+        A-->>M: DT-AUTH-001 の行 7：受け付ける、救いの印、点を足す
+        M-->>L: 250（スプールに確定した後）
+    else 封印者が一覧にない、または連鎖が pass でない
+        A-->>M: 行 9（宛先の方針の組が default）
+        M-->>L: 550 5.7.26
+    end
+```
+
+- 宛先の方針の組が `quarantine_on_reject` なら、救いのない場合も行 8 で受け付けて組織の隔離に入れる。
+- 攻撃者が自分で ARC の組を付けても、封印者が信頼の一覧になければ救わない（ADR-0017 の「他の案を選ばなかった理由」の 2）。
 
 ### 5.5 Authentication-Results（RFC 8601）
 

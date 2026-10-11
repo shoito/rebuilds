@@ -9,6 +9,7 @@
 | [0014](../decisions/0014-product-variant-option-model.md) | 商品はオプション（3 つまで、順序つき）とオプションの値（1 つに 100 まで）を持ち、バリエーションはオプションの値の組で一意にする。1 商品のバリエーションは 1,000 まで。バリエーションと在庫の品目は 1 対 1。価格・比較の価格・SKU・重さはバリエーションが持つ |
 | [0015](../decisions/0015-markets-currencies-and-rounding.md) | 価格の正本はショップの基本の通貨（JPY）の税込みの整数。マーケットごとに「固定の価格」か「換算と丸めの規則」で表示と支払いの通貨の価格を出す。換算は日次の為替の写し（ID つき）で行い、丸めは最小単位の整数の上で決めた規則（`none`・`whole`・`ends_99`・`ends_00_jpy10`）で 1 回だけ行う。チェックアウトは為替の写しの ID を価格の写しに固定する |
 | [0016](../decisions/0016-collection-membership-and-catalog-events.md) | 条件のコレクションの所属は、保存した所属の表（`collection_products`）にする。商品の変更では、その商品だけを全条件で評価して同期で直し、条件の変更では、非同期のジョブで全商品を評価し直す。カタログの変更は、商品ごとに単調に増える `catalog_version` を持つ outbox の事象にし、キャッシュ・検索・Webhook が同じ事象を使う |
+| [0077](../decisions/0077-migration-import-from-other-platforms.md) | （proposed。範囲は PM の判断待ち）他の EC の基盤からの移行は、商品・顧客・過去の注文・リダイレクトを本システムの CSV の形と「元の型（バージョンつき）」のデータで受ける。過去の注文は `orders` に入れず、読み出し専用の別の表に置く |
 
 ## 1. 範囲
 
@@ -278,6 +279,24 @@ output: amount_minor（整数）, fx_rate_id
 - 取り込みは、ショップごとに同時に 1 つ。DB の書き込みの速さは、ショップの Admin API のバケットとは別の、ジョブの公平なキュー（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）で絞る。
 - 列の形は本システムの独自の形。本家の CSV の形との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
 
+### 11.1 他の EC の基盤からの移行（[ADR-0077](../decisions/0077-migration-import-from-other-platforms.md)、proposed）
+
+移行を MVP に含めるか、どの元の基盤を受けるかは PM の判断待ち（[intent.md](../intent.md) の「Open questions」）。ここは含めるときの形を書く。顧客と過去の注文はこの文書の範囲の外だが、取り込みの処理を 11 節と共有するので、ここにまとめる。
+
+| 種類 | 書く先 | 起こさないこと |
+| --- | --- | --- |
+| `products` | 11 節と同じ（商品ごとのミューテーションの関数） | なし（通常の商品の作成と同じ事象を出す） |
+| `customers` | `customers`・`customer_addresses`（状態は「招待の待ち」） | パスワードの取り込み、買い手へのメール |
+| `historical_orders` | `historical_orders`・`historical_order_lines`（読み出し専用） | `orders` の行、在庫の移動、決済、注文の Webhook、通知、レシート、割引の使用の回数 |
+| `url_redirects` | `url_redirects`（[storefront-api-and-caching.md](storefront-api-and-caching.md)） | 上限（1 ショップ 10 万）を超える行 |
+
+- **流れ**：CSV を S3（`shops/<shop_id>/imports/`）に上げる → 元の型（`migration_source_profiles`）で本システムの形へ変換 → 検証だけの実行で結果の CSV と件数を出す → 事業者が本番の実行を押す → 商品・顧客・過去の注文・リダイレクトの順に書く。
+- **冪等**：各行の元の ID を `(shop_id, source, external_id)` の一意で持つ（`import_external_ids`）。再取り込みは同じ行を更新か何もしない。
+- **元の型**：列の対応と値の変換の式。式は運送会社の型（[ADR-0042](../decisions/0042-carrier-integration-profiles.md)）の式を使い回す。各基盤の書き出しの形は**未検証**で、型を作る Story で確かめる。
+- **個人のデータ**：顧客と過去の注文の CSV と結果の CSV は「買い手の個人」の区分（[ADR-0068](../decisions/0068-data-classes-retention-and-operator-access.md)）。30 日で消す（`retention_policies`）。ログには行の番号と理由のコードだけを書く。
+- **権限**：種類ごとに既存の権限（[merchant-admin-and-staff.md](merchant-admin-and-staff.md) の 5.1 節）で絞り、実行ごとに監査ログに残す。
+- 過去の注文の記録の保存の義務と、取り込んだ顧客の同意の記録の引き継ぎは**法務の確認待ち：L11**。確認まで `customer-and-order-migration` の spec を承認しない。
+
 ## 12. カタログの変更の事象
 
 ADR-0016。
@@ -351,6 +370,8 @@ ADR-0016。
 | E3 | `compare-at-price` | 9.1 節。表示の既定は法務：L2 |
 | E3 | `product-csv-import-export` | 11 節 |
 | E3 | `product-categories-and-restrictions` | 10 節。範囲は法務：L10 |
+| E3 | `migration-source-profiles`（PM の判断待ち） | 11.1 節。元の型、検証だけの実行、商品とリダイレクトの取り込み（ADR-0077） |
+| E3 | `customer-and-order-migration`（PM の判断待ち） | 11.1 節。顧客と過去の注文の取り込み（ADR-0077）。法務：L3・L11 |
 
 ## 18. 未解決の問い
 

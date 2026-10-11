@@ -237,7 +237,7 @@ Better Auth の表をそのまま使う（Slack と同じ）。列の細部は E
 
 ## account_workspaces
 
-- 目的：アカウントが属するワークスペースの目録。ワークスペースの切り替えの一覧と、ログイン後の振り分けに使う。**正本はシャードの `members`** で、これは写しである（2026-09-28 の決定。[README.md](../README.md) の決定）。
+- 目的：アカウントが属するワークスペースの目録。ワークスペースの切り替えの一覧と、ログイン後の振り分けに使う。**正本はシャードの `members`** で、これは写しである（2026-09-28 の決定。[design-log.md](../design-log.md) の決定）。
 - 更新：`members` を変えたトランザクションが outbox に `member.changed` を積み、Worker がこの行を upsert する。数秒遅れうる。要求の認可には使わない（認可は必ずシャードの `members` で行う）。
 - 保持・削除：外れたら `removed_at` を入れ、30 日後に消す。
 - 規模（S1）：15 万行
@@ -257,6 +257,7 @@ Better Auth の表をそのまま使う（Slack と同じ）。列の細部は E
 ## plans
 
 - 目的：プランと権利（上限・機能）。Slack の ADR-0032 を先例にする（[permissions-and-sharing.md](../permissions-and-sharing.md) の 2.3 節）。課金の表は MVP の範囲外で、ここでは定義しない。
+- 権利の名前（`limit.*`・`feature.*`）、初期値、ワークスペースごとの上書きの表 `workspace_entitlements`、プランを下げたときの扱いは [ADR-0034](../../decisions/0034-plans-and-entitlements.md)（proposed）にある。accepted になったら、この表の名前と上書きの表の定義を合わせる。
 - 規模（S1）：4 行
 
 | 列 | 型 | NULL | 既定 | 説明 |

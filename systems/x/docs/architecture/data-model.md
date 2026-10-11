@@ -458,7 +458,7 @@ erDiagram
 | --- | --- |
 | 行数・容量の見積もり、パーティションの粒度（とくに `notifications` の 1 日 3,000 万行、`dm_messages` の年 1.6 TB） | E14 の負荷試験、E8・E12 の Story |
 | 法定の保存期間（`purged` の時期、DM、連絡先、ログインの記録、投稿の時の IP、措置・通報、監査） | 法務の確認（[intent.md](../intent.md) の L2・L8） |
-| S2 で同じトランザクションを保てない書き込み：(1) フォローと `users.graph_version`（関係と利用者が別のクラスタ）、(2) 措置と `posts.mod_flags`・`users.account_mod`（T&S と対象が別のクラスタ）、(3) 投稿と `media` の `attached` への遷移（投稿とメディアが別の分割） | S2 の着手の時に ADR を書く。推奨は [README.md](README.md) の 6 節 |
+| S2 で同じトランザクションを保てない書き込み：(1) フォローと `users.graph_version`（関係と利用者が別のクラスタ）、(2) 措置と `posts.mod_flags`・`users.account_mod`（T&S と対象が別のクラスタ）、(3) 投稿と `media` の `attached` への遷移（投稿とメディアが別の分割） | S2 の着手の時に ADR を書く。推奨は [design-log.md](design-log.md) の「2026-10-04：データモデル」 |
 | `auth.user` に連絡先の HMAC を入れる扱いが Better Auth のバージョンで動くか | E2 の `auth-signup-login` |
 | `seen:` の Bloom の型を ElastiCache の Valkey で使えるか | E1 の着手の時 |
 | `media_hash_blocklist` の近さの照合の索引（10 万件を超えたら） | E11 の `media-hash-matching` |

@@ -136,12 +136,21 @@ operator_users (id, operator_id, email, role,          -- 5.1 節
 
 ### 3.2 ドライバーの状態
 
-```
- draft ──書類の提出──▶ pending_review ──確認の完了──▶ active ◀──再開──┐
-   ▲                        │ 差し戻し                  │              │
-   └────────────────────────┘                          ├─停止─▶ suspended
-                                                       ├─書類の期限切れ─▶ expired ─書類の更新と確認─▶ active
-                                                       └─登録の解除─▶ offboarded（終端）
+ドライバーの状態と遷移を図にする。
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft
+    draft --> pending_review: 書類の提出
+    pending_review --> draft: 差し戻し
+    pending_review --> active: 確認の完了
+    active --> suspended: 停止
+    suspended --> active: 再開
+    active --> expired: 書類の期限切れ
+    expired --> active: 書類の更新と確認
+    active --> offboarded: 登録の解除
+    offboarded --> [*]
+    note right of offboarded: 終端
 ```
 
 - 停止（`suspended`）は、事業者の操作か、この基盤の安全の担当の操作で入る。理由のコードと監査ログを必須にする。安全の担当の停止は、事業者が解除できない。

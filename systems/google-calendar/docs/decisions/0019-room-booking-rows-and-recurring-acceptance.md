@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-自動で承諾する会議室の二重予約を 0 件にする（NFR-005、K5）。[architecture/README.md](../architecture/README.md) の 6 節は、会議室の予約の行に、会議室と時刻の区間の `btree_gist` の排他の制約を付け、制約に当たった回を辞退にすると決め、この領域で ADR にするとした。[ADR-0003](0003-recurrence-storage-and-expansion.md) は、会議室の予約を展開の索引の範囲（未来 548 日）の中に限ると決めた。[ADR-0006](0006-organizer-and-attendee-copies.md) は、予約の行を主催者の書き込みのトランザクションで書き、会議室の写しは後から内部の iTIP で書くと決めた。
+自動で承諾する会議室の二重予約を 0 件にする（NFR-005、K5）。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、会議室の予約の行に、会議室と時刻の区間の `btree_gist` の排他の制約を付け、制約に当たった回を辞退にすると決め、この領域で ADR にするとした。[ADR-0003](0003-recurrence-storage-and-expansion.md) は、会議室の予約を展開の索引の範囲（未来 548 日）の中に限ると決めた。[ADR-0006](0006-organizer-and-attendee-copies.md) は、予約の行を主催者の書き込みのトランザクションで書き、会議室の写しは後から内部の iTIP で書くと決めた。
 
 決めることが残っている。
 

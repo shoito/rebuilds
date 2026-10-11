@@ -71,6 +71,26 @@ JPY、手数料 3.6% の例（本家の日本の料金は国内カード 3.6%、
 | 入金の失敗 | `payouts_in_transit` +P（出金後の返却なら `bank_cash:payout` +P）/ `merchant_available` −P | `payout_failure`、amount +P |
 | 決済代行からの精算の着金 | `bank_cash:settlement` +N / `processing_cost` +C / `connector_receivable` −(N+C) | 作らない |
 
+次の図は、上の表のうち、10,000 円のカードの決済 1 件が確定してから、加盟店への入金と決済代行からの精算の着金までに書く仕訳を、時刻の順に並べたものである。加盟店の売上は、保留中・利用可能・入金中・出金の順に移る。精算の着金がいつになるかは決済代行のサイクルで決まり（5.1 節）、利用可能への移動や入金の前にも後にもなりうる。
+
+```mermaid
+sequenceDiagram
+    participant CR as connector_receivable
+    participant MP as merchant_pending
+    participant MA as merchant_available
+    participant PT as payouts_in_transit
+    participant BP as bank_cash:payout
+    participant BS as bank_cash:settlement
+
+    Note over CR,MP: 確定の日：決済の確定<br/>connector_receivable +10,000 / merchant_pending −9,640 / fee_revenue −360<br/>BT：charge、net 9,640、status pending
+    MP->>MA: available_on（確定の日＋4 営業日、初回は 7 暦日）の JST 0:00<br/>merchant_pending +9,640 / merchant_available −9,640（日次の一括）
+    MA->>PT: 入金の作成（自動入金なら支払日の JST 6:00）<br/>merchant_available +P / payouts_in_transit −P、BT：payout
+    PT->>BP: 入金の出金の確認（銀行の明細）<br/>payouts_in_transit +P / bank_cash:payout −P
+    Note over CR,BS: 決済代行の精算のサイクルで：精算の着金<br/>bank_cash:settlement +N / processing_cost +C / connector_receivable −10,000（N＋C ＝ 10,000）
+```
+
+この決済だけを入金するなら、P は 9,640 である。
+
 - 返金で決済手数料を返さない（fee 0）のは、本家に揃えたもの（[支払いの返金とキャンセル](https://docs.stripe.com/refunds)、[payments.md](payments.md)）。
 - 返金は `merchant_available` から引く（本家も利用可能な残高を使い、保留中の金額は使わない。[支払いの返金とキャンセル](https://docs.stripe.com/refunds)）。足りないときの扱いは [payments.md](payments.md) の 10.2 節。Dispute も `merchant_available` から引き、マイナスを許す（4.5 節）。
 - Dispute の金額・手数料の詳細は [disputes.md](disputes.md)、決済の状態遷移は [payments.md](payments.md) にある。

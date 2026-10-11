@@ -37,7 +37,7 @@ iCalendar の解析は、壊れやすい入力の典型である。行の折り�
 
 | 項目 | CalDAV の `PUT` | ICS の取り込み | ICS の購読 | iMIP の受信 |
 | --- | --- | --- | --- | --- |
-| 本文の大きさ | 1 MiB（`CALDAV:max-resource-size`。`PROPFIND`・`REPORT` の XML の本文は 2 MiB） | 10 MiB | 10 MiB（[architecture/README.md](../architecture/README.md) の 6 節） | メール 10 MiB、`text/calendar` 1 MiB（[invitations-and-itip.md](../architecture/invitations-and-itip.md) の 11.3 節） |
+| 本文の大きさ | 1 MiB（`CALDAV:max-resource-size`。`PROPFIND`・`REPORT` の XML の本文は 2 MiB） | 10 MiB | 10 MiB（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」） | メール 10 MiB、`text/calendar` 1 MiB（[invitations-and-itip.md](../architecture/invitations-and-itip.md) の 11.3 節） |
 | VEVENT の数 | 1,001（マスター＋上書き 1,000） | 50,000 | 50,000 | 1,000 |
 | 折り返しを戻した 1 行 | 128 KiB | 同じ | 同じ | 同じ |
 | 1 つの構成要素のプロパティ | 500 | 同じ | 同じ | 同じ |

@@ -237,6 +237,24 @@ bp_timers   (tenant_id, id, case_id, step_id, kind, fire_at, fired_at, state)   
 | 13 | `completed` | `correct` | 訂正の権限。8 節の DT-BP-003 | `completed` | 訂正の案件（子）を作る。元の案件の状態は変えない |
 | 14 | `cancelled`・`denied`・`rescinded` | 何でも | - | 変えない | 終端 |
 
+次の図は上の表の要約（表が正）。括弧の数字は表の #。`in_progress` のまま進む操作（#2・#3・#6〜#8）は 1 本の自己遷移にまとめた。差し戻し（#3）は案件の状態を変えず、ステップを開き直す。
+
+```mermaid
+stateDiagram-v2
+  [*] --> in_progress: initiate（1）
+  in_progress --> in_progress: approve・complete_action・send_back<br/>reassign・timer_fired・service_result（2・3・6〜8）
+  in_progress --> denied: deny（4）
+  in_progress --> cancelled: cancel（5）
+  in_progress --> completed: 完了のステップ（9）
+  in_progress --> partially_applied: 子の一部が失敗（10、親）
+  partially_applied --> in_progress: retry_children（11）
+  completed --> completed: correct（13、訂正の子の案件）
+  completed --> rescinded: rescind（12）
+  denied --> [*]
+  cancelled --> [*]
+  rescinded --> [*]
+```
+
 - 操作は冪等にする。画面・API は `command_id` を付け、`bp_commands` で 2 回目に同じ結果を返す。
 - 同じ案件への同時の操作は `lock_version` の楽観ロックで 1 つにする。負けた側は `CONFLICT` を返し、画面は読み直す。
 

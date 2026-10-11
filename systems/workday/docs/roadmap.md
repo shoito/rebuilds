@@ -36,7 +36,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各領域の文書の「Story の候補」と「Epic との対応」から集めた。同じ中身の Story が 2 つの文書にあるものは 1 つにした（[architecture/README.md](architecture/README.md) の 6 節の「決定」）。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各領域の文書の「Story の候補」と「Epic との対応」から集めた。同じ中身の Story が 2 つの文書にあるものは 1 つにした（[architecture/design-log.md](architecture/design-log.md) の「2026-09-28：既定案」）。
 
 ### E1 基盤
 

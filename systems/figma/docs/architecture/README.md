@@ -1,6 +1,6 @@
 # Architecture: Figma
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧と ADR の番号の範囲は 8 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md)、データモデルの正本（表・列・キー・ER 図・プロパティの番号）は [data-model.md](data-model.md) と [data-model/](data-model/identity.md) の下にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧と ADR の番号の範囲は 8 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md)、データモデルの正本（表・列・キー・ER 図・プロパティの番号）は [data-model.md](data-model.md) と [data-model/](data-model/identity.md) の下にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/figma/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -20,23 +20,41 @@
 
 ### 1.2 コンテナ
 
-```
-ブラウザ
- ├─ UI の殻（TypeScript・React）：ツールバー、パネル、ファイルの一覧、コメント
- └─ エンジン（Rust → WASM）：ドキュメントのモデル、レイアウト、描画（WebGPU / WebGL2）
-      │ HTTPS（API）          │ WebSocket（変更・在席）            │ HTTPS（チャンク・画像・フォント。署名付き URL）
-      ▼                       ▼                                    ▼
- API（Hono）── Aurora     Multiplayer Gateway（接続・チケット・配信）   CloudFront（files・assets の <brand>usercontent）
-   │   │  （メタデータ、RLS）   │                                          ▲
-   │   └─ Realtime（メタデータの購読）                                     │
-   │        ◀── 無効化の outbox ─┘    ▼                                    │
-   │                    Document Server（Rust。ファイルごとに 1 つの持ち主）│
-   │                       │ 変更の追記（フェンス付き）  │ 定期的に         │
-   │                       ▼                              ▼                  │
-   │                    Journal（DynamoDB）          S3（チェックポイント・画像）
-   │
-   └──▶ SQS ──▶ Worker（通知、掃除、検索の索引）、Render Worker（書き出し・サムネイル＝Rust の描画をネイティブで）
- Router（ファイル → Document Server の割り当て。正本は DynamoDB の割り当てとタスクの生存、Valkey にキャッシュ）
+ブラウザからの 3 つの経路（API、WebSocket、CDN）と、その先のコンテナと置き場所を示す。
+
+```mermaid
+flowchart TB
+    subgraph browser["ブラウザ"]
+        shell["UI の殻（TypeScript・React）<br/>ツールバー、パネル、ファイルの一覧、コメント"]
+        engine["エンジン（Rust → WASM）<br/>ドキュメントのモデル、レイアウト、<br/>描画（WebGPU / WebGL2）"]
+    end
+    api["API（Hono）"]
+    aurora[("Aurora<br/>メタデータ、RLS")]
+    realtime["Realtime<br/>メタデータの購読"]
+    gw["Multiplayer Gateway<br/>接続・チケット・配信"]
+    router["Router<br/>ファイル → Document Server の割り当て<br/>正本は DynamoDB の割り当てとタスクの生存、<br/>Valkey にキャッシュ"]
+    ds["Document Server<br/>Rust。ファイルごとに 1 つの持ち主"]
+    journal[("Journal（DynamoDB）")]
+    s3[("S3<br/>チェックポイント・画像")]
+    cf["CloudFront<br/>files・assets の &lt;brand&gt;usercontent"]
+    sqs["SQS"]
+    worker["Worker<br/>通知、掃除、検索の索引"]
+    render["Render Worker<br/>書き出し・サムネイル<br/>Rust の描画をネイティブで"]
+
+    browser -->|"HTTPS（API）"| api
+    browser -->|"WebSocket（変更・在席）"| gw
+    browser -->|"HTTPS（チャンク・画像・フォント。署名付き URL）"| cf
+    api --- aurora
+    api --- realtime
+    aurora -->|"無効化の outbox"| realtime
+    gw -->|"割り当てを問い合わせる"| router
+    gw --> ds
+    ds -->|"変更の追記（フェンス付き）"| journal
+    ds -->|"定期的に"| s3
+    s3 --> cf
+    api --> sqs
+    sqs --> worker
+    sqs --> render
 ```
 
 | コンテナ | 責務 |
@@ -70,6 +88,28 @@
 5. 書けたら、送り手に確定（`Ack`）を返し、他のクライアントに配る（Gateway ごとに 1 回）。
 6. 他のクライアントは、未確定の自分の変更と同じプロパティへのサーバーの変更を、確定するまで画面に出さない（ちらつきを防ぐ。本家と同じ）。
 
+次の図は、1〜6 の流れを、送り手のクライアント A と、同じファイルを開いている他のクライアント B について示す。
+
+```mermaid
+sequenceDiagram
+  participant A as クライアント A（送り手）
+  participant GW as Gateway
+  participant DS as Document Server
+  participant J as ジャーナル
+  participant B as クライアント B
+  A->>A: 変更を自分のモデルに当て、すぐに描画する（未確定）
+  A->>GW: 変更（WebSocket。続く操作は 20Hz にまとめる）
+  GW->>DS: 中継
+  DS->>DS: 権限と木の不変条件を確かめ、seq を振ってメモリのモデルに当てる
+  Note over DS: 約 20ms ごとに、たまった変更をまとめる（group commit）
+  DS->>J: 書き込み。フェンスの epoch が自分のものであることと、その seq の項目がまだないことを、1 つのトランザクションで確かめる
+  J-->>DS: 書けた
+  DS->>GW: Ack と、確定した変更（Gateway ごとに 1 回）
+  GW-->>A: Ack
+  GW-->>B: 確定した変更
+  Note over B: 未確定の自分の変更と同じプロパティへの変更は、確定するまで画面に出さない
+```
+
 ### 2.2 ファイルを開く
 
 1. クライアントは API から能力のチケット（60 秒・1 回だけ）を受け取り、WebSocket の最初のメッセージで送る。Gateway はチケットを確かめ、Router にファイルの持ち主を問い合わせる。持ち主がなければ、Router が Document Server を割り当てる。
@@ -78,12 +118,69 @@
 4. クライアントは、チャンクを端末のキャッシュ（IndexedDB）か CloudFront から読む。今のページを先に読み、tail を当てて操作できるようにし、他のページは裏で読む（本家も、ページとレイヤーを必要なときに読む。[Reduce memory usage in files](https://help.figma.com/hc/en-us/articles/360040528173-Reduce-memory-usage-in-files)、2026-09-27 に確認）。以後は変更を WebSocket で受ける。
 5. 数百人が同時に開いても、チャンクは CloudFront から配られ、Document Server の送信は tail だけになる。
 
+次の図は、1〜4 の流れを示す。
+
+```mermaid
+sequenceDiagram
+  participant C as クライアント
+  participant API as API
+  participant GW as Gateway
+  participant R as Router
+  participant DS as Document Server
+  participant J as ジャーナル
+  participant S3 as S3
+  participant CF as 端末のキャッシュ・CloudFront
+  C->>API: 能力のチケットを受け取る（60 秒・1 回だけ）
+  C->>GW: WebSocket の最初のメッセージでチケットを送る
+  GW->>GW: チケットを確かめる
+  GW->>R: ファイルの持ち主を問い合わせる
+  opt 持ち主がない
+    R->>DS: Document Server を割り当てる
+  end
+  opt 持ち主がまだ読み込んでいない
+    DS->>J: フェンスを上げる
+    DS->>S3: 最新のチェックポイントを読む
+    DS->>J: それより後の変更を読んで当てる
+  end
+  DS-->>C: LoadPlan（マニフェストの内容とチャンクごとの署名付き URL）と tail（Gateway 経由）
+  C->>CF: チャンクを読む（今のページを先に）
+  C->>C: tail を当てて操作できるようにする。他のページは裏で読む
+```
+
 ### 2.3 Document Server の障害
 
 1. 持ち主のタスクの生存の記録（10 秒の期限）が切れると、猶予 2 秒の後に、Router は別の Document Server に `epoch` を 1 つ上げて割り当てる（[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md)）。誰も開かないファイルは、回復のジョブが 5 分以内に拾う。
 2. 新しい持ち主は、フェンスを上げ、2.2 の 2 と同じ手順で、最後に確定した `seq` まで戻す。古い持ち主が生きていても、フェンスで書き込みが止まる。
 3. クライアントは再接続し（最初は 0〜5 秒の乱数の待ち）、確定していない自分の変更を送り直す。重複は `(session_id, client_seq)` で除く。持ち主が変わったので、API のチケットを取り直す。持ち主が変わらない再接続（Gateway の喪失・入れ替え）は、Gateway が出した 60 秒の再開のトークンで入り、API を通らない（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節）。
 4. デプロイでは、Document Server はファイルを渡してから止まる（ドレイン。[ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md)）。ファイルごとの中断は 1〜2 秒の見込み。
+
+次の図は、1〜3 の流れを、持ち主が変わる場合について示す。
+
+```mermaid
+sequenceDiagram
+  participant Old as 古い持ち主
+  participant R as Router
+  participant New as 新しい持ち主
+  participant J as ジャーナル
+  participant S3 as S3
+  participant C as クライアント
+  participant API as API
+  participant GW as Gateway
+  Note over Old,R: 生存の記録（10 秒の期限）が切れる
+  R->>R: 猶予 2 秒
+  R->>New: epoch を 1 つ上げて割り当てる
+  New->>J: フェンスを上げる
+  New->>S3: 最新のチェックポイントを読む
+  New->>J: それより後の変更を当て、最後に確定した seq まで戻す
+  Old-xJ: 書き込み（生きていても、フェンスで止まる）
+  C->>API: チケットを取り直す（持ち主が変わったため）
+  C->>GW: 再接続（最初は 0〜5 秒の乱数の待ち）
+  GW->>New: 中継
+  C->>New: 確定していない自分の変更を送り直す
+  New->>New: 重複は (session_id, client_seq) で除く
+```
+
+持ち主が変わらない再接続（Gateway の喪失・入れ替え）では、API を通らず、Gateway が出した 60 秒の再開のトークンで入る。誰も開かないファイルは、回復のジョブが 5 分以内に拾う。
 
 ## 3. 規模の段階
 
@@ -210,33 +307,7 @@
 - **大阪への切り替え**：グローバルテーブルは非同期で項目ごとに最後の書き込みが勝つ。切り替えのたびに世代を上げてキーを分け、失った範囲をバージョンとして取り戻す（[ADR-0048](../decisions/0048-osaka-dr-with-journal-generations.md)）。RTO の内訳と、障害中に東京のレプリカを外せるかは DR の訓練で確かめる。
 - **法務**：フォント、権利侵害の申し立て、公開のリンク、削除の期間、漏洩の報告、本家への寄せ方は、法務の確認待ち（[intent.md](../intent.md) の L1〜L6）。結論が出るまで、該当する Story の spec を承認しない。
 
-### 決定（2026-09-27、既定案）
-
-PM の方針（本家に寄せる、既定案で進める）により、統合の工程で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」（L1〜L6）に残した。
-
-- **ADR と intent の状態**：基盤の ADR（0001〜0005）と intent.md を、他の題材と同じく `accepted` にした。先に次を直した。
-  - ADR-0002：ノードの ID の名前を ADR-0007 の `(session_id, local_id)` に揃え、鍵の振り直しの長さを ADR-0010（48 バイトで振り直し、上限 64 バイト）に揃えた。
-  - ADR-0003：ジャーナルの書き込みの条件にフェンスの `epoch` を足し（ADR-0024）、TTL を「書いた時点から 30 日＋回復のジョブ」（ADR-0024・0047）にし、世代のキー（ADR-0048）を足した。
-  - ADR-0004：wgpu#6166 は #6371 で解決、Vello GPU は WebGL2 に対応したが panic と wgpu の外の経路のため採らない、rustybuzz はアーカイブされ HarfRust を使う、サーバーの描画は Fargate に GPU がないので CPU（lavapipe）だけ、起動は WebGPU で始め WebGL2 に戻る（ADR-0014 と本家の記事）。
-  - ADR-0005：ファイルごとのリースの延長を、ADR-0047 のタスクの生存＋ファイルの割り当てに置き換え、書き込みの条件にフェンスを足した。
-  - 本題材の AGENTS.md のジャーナルの規則にフェンスを足した。
-- **読み込みの経路**：チャンクは CloudFront から読み、Document Server は計画と tail だけを送る（ADR-0025。2.2 節を直した）。
-- **`derived_layout`**：画面はいつも手元の計算。保存された値を書くのは入力を変えた本人と修復の担当。サーバーは型と範囲だけを検証する。`derived` のプロパティは Undo の項目に入れない（ADR-0019、ADR-0012 の注記。document-model.md の 4.4・9.2 節、multiplayer.md の 10 節を直した）。Render Worker は保存されないインスタンスの中身だけを計算する（export-and-assets.md の 5.2 節を直した）。
-- **メモリ**：10 万ノードの `Doc` は 200 MiB（document-model.md の 10 節を正とし、rendering-engine.md の 11 節の単位を揃えた）。
-- **CDN の署名**：署名はキャッシュの鍵に含めない。署名付き URL は取得を許すもので、キャッシュのオブジェクトは中身のハッシュで名付け、パスに組織（`images/{org_id}/…`）かファイル（`files/{file_id}/…`）を含むので、組織をまたいで共有されない（permissions-and-sharing.md の 11 節を直した）。
-- **S3 の削除**：削除とライフサイクルは大阪へ複製されないので、完全な削除・掃除・画像の mark-and-sweep を東京と大阪の両方で行う（ADR-0045。file-storage-and-history.md の 11.2 節、export-and-assets.md の 6.5 節を直した）。
-- **バージョンの照合**：`schema_hash` の不一致で再読み込みにする規則を、ADR-0053 の 3 つのバージョンの照合に置き換えた（document-model.md の 8.4 節、multiplayer.md の 4.3 節）。
-- **キーの世代**：ジャーナルの `{file_id}#g{n}` とマニフェストの `checkpoints/g{n}/` を file-storage-and-history.md の 4.1・5 節に足した。取り戻したバージョンは `salvage/g{n}/` に置く（[data-model.md](data-model.md) の 9.2 節）。
-- **領域の間の提案**：`thumbnail_node`、`cjk_fallback_font`、レイアウトのプロパティ、`component_prop_values` などのコンポーネントのプロパティ、表の列 `public_api`・`api_name`・`api_since`・`public_plugin`、`ChangeSet` の `origin`、マニフェストの `features`、`Hello.protocol_version`、再接続の最初の 0〜5 秒の乱数の待ち、`file_versions.kind = dr_salvaged`、ファイルの `maintenance` の状態を取り込んだ（data-model.md の 9.2 節、[data-model/document.md](data-model/document.md)）。
-- **呼び名**：本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名している。本システムは「プロジェクト」のまま進め、表とコードも `project` にする。画面の呼び名は下の「決定（2026-09-27、推奨案で確定）」で決めた（permissions-and-sharing.md の 15 節）。
-- **Epic**：E1〜E12 が MVP、E13 ライブラリ、E14 プラグイン、E15 公開 API と Webhook。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。領域の文書の仮の Epic の番号を roadmap.md に揃えた（rendering-engine.md と editor-and-tools.md の E8・E9 の入れ替わり、「後」「後-P」「後-A」の置き換え）。組織の SAML SSO は ADR-0043 のとおり E12 に作るが、MVP の範囲の外で GA の判定に含めない。
-- **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。上限（ファイル・ノード）は document-model.md の 11 節、送受信の上限は multiplayer.md の 4.6 節、メモリの予算は rendering-engine.md の 11 節、容量のパラメーターは capacity.md の 10 節、保持の期間は security.md の 7 節。
-- 領域ごとの決定は、各文書の「決定（2026-09-27、既定案）」の節にある。
-- **仕上げの工程（2026-09-27）**：公式の資料で「未検証」を確かめ直し、統合の後に残った食い違いを直した。
-  - 再接続の殺到：持ち主が変わらない再接続は、Gateway が出す 60 秒・1 回だけの再開のトークン（`session_id`・`file_id`・割り当ての `epoch` に束ねる）で入り、API のチケットを通らない（[permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節、ADR-0030 の注記）。
-  - `files.team_id` の書き換え：ファイル・プロジェクトの移動と同じトランザクションで書き、`acl_version` を上げる（permissions-and-sharing.md の 9.3 節）。
-  - 回復のジョブの割り当ての名前を `recover_then_release` に揃えた（ADR-0047、[infrastructure.md](infrastructure.md) の 5.1 節、[observability.md](observability.md)）。`ds-large` の閾値は ADR-0051 の見積もり 1.5 GiB を正とした（圧縮の前のチェックポイントでおよそ 500 MB）。ADR-0024・0026・0046 の「リース」を、タスクの生存とファイルの割り当てに直した。ADR-0034 に、Render Worker がインスタンスの中のレイアウトを計算することを書いた。
-  - 資料で確かめて設計を変えたもの：ブレンドモードを 18 種に（本家の `LINEAR_BURN`・`LINEAR_DODGE`。[rendering-engine.md](rendering-engine.md) の 8.3 節）、`strokes_included_in_layout` の既定を true に（[layout.md](layout.md) の 2 節）、Render Worker の子のプロセスの通信の遮断を seccomp だけに（Fargate は `CAP_SYS_ADMIN` を与えない。[export-and-assets.md](export-and-assets.md) の 5.3 節）、CloudFront の WebSocket の経路で Gateway も 20 秒ごとに送る（[infrastructure.md](infrastructure.md) の 4 節）、Fargate の退役は保護を待たない前提に、署名の要る CDN の経路は `GET`・`HEAD` だけに（export-and-assets.md の 6.4 節）、DynamoDB の費用に TTL の削除の大阪への複製を足した（[capacity.md](capacity.md) の 4.3 節）。
+### 残る未解決事項
 
 持ち越し（計測・PoC で決めるもの）：
 
@@ -255,53 +326,13 @@ PM の方針（本家に寄せる、既定案で進める）により、統合�
 | 費用の単価 | E12 の前に、AWS の料金の計算ツールで置き換える |
 | 参照画像のテストの許容の値 | E2 で端末ごとの差を測って決め直す（[rendering-engine.md](rendering-engine.md) の 16.1 節） |
 
-### 決定（2026-09-27、推奨案で確定）
-
-PM の方針（「判断が要るところは推奨案でよい」）により、ロールの決定・確認を待っていた項目を、推奨案で確定した。各文書と ADR の「待ち」の書き方を消し、決定として書き直した。ADR を覆した直しには、日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。法務の項目と、法務の結論に依る項目は決めていない（下の「残したもの」）。
-
-| 決定 | 理由 | 文書 |
-| --- | --- | --- |
-| チームの可視性・参加・一般アクセスは、チームの中身に引き継がない。open のチームへの参加で見えるのはチームだけ。一般アクセスはプロジェクトとファイルにだけ置く | 本家は audience access を中身に引き継がない。本家に寄せる方針に合わせる | [permissions-and-sharing.md](permissions-and-sharing.md) の 3.3・4.3・13・15 節、[ADR-0029](../decisions/0029-hierarchy-roles-seats-and-link-access.md)、[search.md](search.md) の 3.3 節、[ADR-0032](../decisions/0032-name-search-in-aurora.md)、[quality.md](../quality.md) |
-| ブレンドモードは 18 種 | 本家の一覧（`LINEAR_BURN`・`LINEAR_DODGE` を含む）に合わせる | [rendering-engine.md](rendering-engine.md) の 8.3 節 |
-| `strokes_included_in_layout` の既定は true | 本家が内側の線を既定でレイアウトに含める | [layout.md](layout.md) の 2 節 |
-| Gateway の再開のトークンの設計を承認 | 再接続の殺到で API のチケットの発行が律速になるのを避ける | [permissions-and-sharing.md](permissions-and-sharing.md) の 5.5 節、[ADR-0030](../decisions/0030-single-policy-engine-and-signed-capabilities.md) |
-| 匿名の閲覧者にコメントを見せない | 「リンクを知っている全員」のファイルで、社内のやり取りを外に出さない | [comments-and-notifications.md](comments-and-notifications.md) の 10 節 |
-| アプリで読んだコメントは、メールのまとめから除く | メールの数を減らす | 同上 |
-| 無料のプランのバージョンの履歴は 30 日。過ぎたバージョンは消す | 本家の Starter と同じ | [intent.md](../intent.md)、[file-storage-and-history.md](file-storage-and-history.md) の 8.4 節、[ADR-0026](../decisions/0026-version-history-restore-and-deletion.md) |
-| 画面の呼び名は、S1 は「プロジェクト」のまま。利用者の調査で混乱が見えたら見直す | 表とコードの名前と揃い、改名の費用がかからない | [permissions-and-sharing.md](permissions-and-sharing.md) の 15 節、[intent.md](../intent.md) |
-| NFR-004 を CPU の側 1.5 GB と GPU の側 720 MB に分ける | GPU のメモリがタブのメモリに数えられるかは、ブラウザと OS で違う | 4 節、[quality.md](../quality.md) の 2.2 節、[rendering-engine.md](rendering-engine.md) の 11 節、[observability.md](observability.md) |
-| 書き込みの予算の段に入ったファイルは NFR-001 の対象の外にし、反映の p99 1 秒を別に見る | 予算の段は、わざと反映を遅らせて編集を続ける仕組みだから | 4 節、[ADR-0052](../decisions/0052-journal-throughput-and-hot-file-budget.md)、[capacity.md](capacity.md) |
-| 参照の端末は 3 台（標準 2・下限 1） | Windows と Mac の標準の端末と、WebGL2 だけの下限で NFR を判定する | [quality.md](../quality.md) の 2.4 節 |
-| E7 を出す合格は、作り直しの影の検証の連続 10 万回の一致 | 本家の段階的な出し方に倣い、確定の損失を出す前に見つける | [quality.md](../quality.md) の 2.2.1 節 |
-| インスタンスの中で、大きさの方式（hug・fill・fixed）を上書きできる | 拒否すると、オートレイアウトのインスタンスの使い勝手が大きく落ちる | [components-and-libraries.md](components-and-libraries.md) の 3.4・11 節、[layout.md](layout.md) の 16 節 |
-| 絶対配置の子の制約は、利用者が親の大きさを変えたときだけ当てる。端末のフォントのノードの食い違いは、次にそのテキストを編集した人が直す | 今の振る舞いのままで、収束の規則を増やさない | [layout.md](layout.md) の 16 節 |
-| 在席の `selection` は、MVP は `NodeId` だけ。導出したノードはインスタンスの `NodeId` で送る | 送受信の形式を変えない | [editor-and-tools.md](editor-and-tools.md) の 19 節 |
-| セッションはアイドル 14 日・最長 30 日。匿名のセッションは 24 時間で、匿名の人数は 1 ファイルの参加の上限（500 人）の中で数える | 別の上限を足さず、既存の上限で抑える | [security.md](security.md) の 4・13 節 |
-| プランを上げる前の監査ログは、組織の管理者に見せない | 本家と同じ | [security.md](security.md) の 13 節、[ADR-0045](../decisions/0045-audit-log-and-data-lifecycle.md) |
-| 1 組織の画像の合計に、MVP では上限を置かない。合計を計測する | 1 枚の上限とファイルの大きさの上限で足りる。容量は料金の設計（MVP の後）で決める | [export-and-assets.md](export-and-assets.md) の 6.1・15 節 |
-| 有料のプラグインは扱わない | 決済の仕組みが要り、範囲の外 | [plugins.md](plugins.md) の 15 節 |
-| MCP のサーバーは出さない | intent は AI の生成を範囲の外にする。出すなら別の ADR | [api-and-webhooks.md](api-and-webhooks.md) の 13 節 |
-| GPU 付きの VM の CI は、AWS の GPU のインスタンスをジョブごとに立てる自前の runner | GPU の種類を固定でき、計測の揺れを抑えやすい | [delivery.md](delivery.md) の 10 節、[ADR-0054](../decisions/0054-wasm-native-parity-and-bundle-budgets.md) |
-| 端末のキャッシュは暗号化せず、組織の方針で止められるようにする。組織ごとの KMS の鍵は MVP で持たない | security.md と ADR-0044 の決定に揃え、file-storage-and-history.md の持ち越しから外した | [file-storage-and-history.md](file-storage-and-history.md) の 16 節、[ADR-0044](../decisions/0044-encryption-keys-and-client-cache.md) |
-
 残したもの：
 
 - 法務の確認待ち（[intent.md](../intent.md) の L1〜L6）と、その結論に依る項目：フォントの配布と埋め込み（L1）、権利侵害の申し立て（L2）、公開のリンクの扱い（L3）、削除とバックアップの期間・監査のアーカイブの 7 年（L4）、漏洩の報告（L5）、本家の UI・ショートカットへの寄せ方（L6）、クライアントの計測の利用規約への書き方。
 - 計測・PoC で決めるもの（上の「持ち越し」の表と、各文書の「持ち越し」）。参照画像の許容の値は、E2 で決め直す。
 - 利用者の声や将来の条件で見直すもの（未確定の変更の IndexedDB への保存、Undo の履歴のタブをまたぐ保存、500 人を超えるファイル、ShadowRealm など）。どれも今の決定があり、見直しの条件だけを書いている。
 
-### 決定（2026-09-28、データモデルの設計）
-
-データモデルを [data-model.md](data-model.md) と [data-model/](data-model/identity.md) の下に、ER 図つきの正本としてまとめた。ADR は変えていない。PM の方針（推奨案でよい）で、次を決めた。一覧と理由は data-model.md の 9.1 節（D-1〜D-23）。
-
-- 形（表・列・キー・プロパティの番号）は data-model を正とし、振る舞いは領域の文書を正とする。
-- トークンとグラント（`api_tokens`・`oauth_grants`）は `global` に置く。アカウントに属し、組織が決まる前に引くため（[api-and-webhooks.md](api-and-webhooks.md) の 14 節を直した）。
-- `files.file_key` は組織をまたいで一意にし、`resolve_file_key` の関数で組織の文脈を決める。
-- `file_leases` に `org_id` を持たせ、Document Server と回復のジョブが Aurora の文脈を得る（[infrastructure.md](infrastructure.md) の 5.1・5.2 節を直した）。
-- ファイルの所有者は `files.owner_account_id` だけで表す（[permissions-and-sharing.md](permissions-and-sharing.md) の 4.3 節の計算を直した）。
-- プロパティの番号の重なり（12・41）を分け、43〜46 を振った。69 `library_source` を予約した（[document-model.md](document-model.md) の 4.2 節を直した）。`NodeType` の値を振った。
-- `outbox`・`global_outbox` と Relay、制御の出来事の Valkey のチャンネル（`ctl:*`）を置いた。
-- 確認済みのドメインを `org_domains` にした（[security.md](security.md) の 14 節を直した）。
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
 
 ## 8. 領域の文書
 
@@ -328,6 +359,7 @@ PM の方針（「判断が要るところは推奨案でよい」）により�
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター、負荷試験 L1〜L10 | 0051〜0052 | Ops | E3、E12 |
 | [delivery.md](delivery.md) | CI/CD、WASM とネイティブの一致、バージョンの照合、段階的なリリース、プロパティの表の変更 | 0053〜0055 | QA、Ops | E1〜E3 |
 | [data-model.md](data-model.md) | データモデルの正本。規約、ER 図、表の索引、横断の不変条件。領域ごとの定義は [data-model/](data-model/identity.md) の下 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（既定案、推奨案で確定、データモデルの設計） | なし | — | — |
 
 ## 9. Epic
 

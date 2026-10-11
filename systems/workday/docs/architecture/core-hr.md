@@ -166,14 +166,19 @@ CREATE INDEX ON org_closure USING gist (tenant_id, descendant_id, valid);
 
 ### 5.2 雇用の状態
 
-```
-               hire（入社日 > 今日なら「入社予定」として見える）
-    (なし) ─────────────────────────▶ active ◀──── leave_return ──── on_leave
-                                        │  └──── leave_start ────────▶  │
-                                        │                               │
-                                        └──── terminate ───▶ (なし) ◀───┘ terminate
-                                                               │
-                                                  rehire（新しい雇用）
+雇用の状態の遷移を次の図に示す。受け入れの正は下の DT-HR-001 で、図はその要約（括弧の数字は表の #）。異動・昇格など（#4）は `active`・`on_leave` のまま受けるので、図から省いた。
+
+```mermaid
+stateDiagram-v2
+  state "雇用なし" as none
+  [*] --> none
+  none --> active: hire（1）<br/>入社日が今日より後なら「入社予定」として見える
+  none --> active: rehire（3、新しい雇用）
+  active --> on_leave: leave_start（6）
+  on_leave --> on_leave: leave_start（7、種類の切り替え）
+  on_leave --> active: leave_return（8）
+  active --> none: terminate（10）
+  on_leave --> none: terminate（10）
 ```
 
 事象の受け入れ（DT-HR-001）。「有効日の状態」は、事象の有効日の前日の、現在の知識での状態。

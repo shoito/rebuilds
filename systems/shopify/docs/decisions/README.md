@@ -81,6 +81,7 @@ Shopify の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0074](0074-pod-size-tiers-and-pre-scaling.md) | ポッドの大きさを段（`p-min`・`p-std`・`x-min`・`x-std`・`x-large`、S3 の `d-xl`）で持ち、Terraform の変数で切り替える。共有のポッドは 2 AZ でピークを受けられる最小の数と CPU の自動の拡大で動かす。隔離のポッドは、セールの登録から段を決め、4 日前（ショップを移す前）に Aurora を上げ、開始の 60 分前に ECS の最小の数を予定の拡大で上げる。急増は自動の拡大を待たず、ショップの同時実行の上限と待合室で受ける | accepted |
 | [0075](0075-pod-wave-rollout-and-cross-pod-migrations.md) | デプロイは staging → 見張りのポッド `p00` → 共有のポッド 1 つ → 残りを 25% ずつの波で出し、各波 30 分の自動のロールバックの条件を見る。スキーマの変更は広げる段と縮める段に分け、`pod-migrator` が波の順で全ポッドに当てる。縮める段は全ポッドの全サービスが新しい形だけを使ってから 7 日の後にだけ行う。移し替えは元と先のスキーマのバージョンが同じときだけ動く | accepted |
 | [0076](0076-api-runtime-version-lifecycles.md) | Admin API・Storefront API・Webhook の本文・関数の API は同じ四半期の日付のバージョン（`YYYY-MM`）を持ち、12 か月支え、支えを外したバージョンの要求は支えている最も古いバージョンで答える（繰り上げ）。`loom_version` は消さずに足し、`loom_ir_version` を上げるときは公開中のテーマを背景で翻訳し直してから新しいレンダラーを出す。Wasmtime を上げるときは全モジュールを翻訳し直し、記録した入力で出力と燃料を比べてから出す | accepted |
+| [0077](0077-migration-import-from-other-platforms.md) | 他の EC の基盤からの移行の取り込み | proposed |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

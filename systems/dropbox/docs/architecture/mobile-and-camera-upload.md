@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - モバイルは Swift・Kotlin の UI と、UniFFI で呼ぶ `sync-core`。木の全体の同期はしない（[ADR-0001](../decisions/0001-platform-and-stack.md)）
-- 写真のライブラリの新しい項目を、OS の写真の ID と内容のハッシュで重ねずに上げる。元の形式のまま上げ、変換はプレビューだけ（[architecture/README.md](README.md) の 6 節）
+- 写真のライブラリの新しい項目を、OS の写真の ID と内容のハッシュで重ねずに上げる。元の形式のまま上げ、変換はプレビューだけ（[design-log.md](design-log.md) の「2026-10-09：既定案」）
 - 分割、アップロードの許可とセッション、再開（[ADR-0002](../decisions/0002-chunking-and-block-addressing.md)、[block-storage.md](block-storage.md)）
 - 書き込みは条件つき（[ADR-0006](../decisions/0006-sync-conflict-model.md)）。カーソルと `list/continue`（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md)）
 - 法務の確認待ち：L4（モバイルの通知の配信のサービスへの提供、外国にある第三者）

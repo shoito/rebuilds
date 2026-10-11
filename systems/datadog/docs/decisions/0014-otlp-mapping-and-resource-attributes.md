@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-本システムは自前の言語ごとの SDK を持たず、OpenTelemetry の SDK と Collector から OTLP で受ける（[architecture/README.md](../architecture/README.md) の 6 節）。
+本システムは自前の言語ごとの SDK を持たず、OpenTelemetry の SDK と Collector から OTLP で受ける（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。
 
 - OTLP の仕様は、一部の成功（`partial_success`）、送り直してよい状態の値、`Retry-After`・`RetryInfo` を決めている（[OTLP Specification](https://opentelemetry.io/docs/specs/otlp/)、2026-10-09 に確認）。合わせないと、Collector が送り直すべきでないものを送り直し、送り直すべきものを捨てる。
 - 本システムの API の成功は 202 で、OTLP の仕様の成功は 200 である。

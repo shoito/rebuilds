@@ -17,5 +17,5 @@
 | 文書 | 内容 | 持ち主 |
 | --- | --- | --- |
 | `runbooks/` の個別の手順 | [runbooks/README.md](runbooks/README.md) の 6 節の計画の runbook（作成済みは 4 つ） | Ops |
-| データモデルの完全版 | ER 図、列の型と索引の正本、横断の不変条件（[architecture/README.md](architecture/README.md) の 6 節の持ち越し） | Dev |
+| データモデルの完全版 | ER 図、列の型と索引の正本、横断の不変条件（[architecture/README.md](architecture/README.md) の 6 節の残る未解決事項） | Dev |
 | `primer/index.html` | 前提知識の資料（iCalendar、RRULE、tzdb、iTIP、CalDAV）（[リポジトリ共通の ADR-0008](../../../docs/decisions/0008-primers-on-github-pages.md)） | Dev |

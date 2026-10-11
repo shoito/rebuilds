@@ -1,6 +1,6 @@
 # Architecture: Auth0
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。品質は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/auth0/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -22,29 +22,33 @@
 
 ### 1.2 コンテナ
 
-```
-            ┌───────────────── CloudFront＋WAF（IP のレート制限、明らかな攻撃の遮断）─────────────────┐
-            │  discovery・JWKS（S3 に書き出したもの。大阪の S3 を予備のオリジンに）、静的な資産           │
-            └──────┬──────────────────────────────┬───────────────────────────────┬───────────────┘
-                   │ 認証の経路                     │                               │ 管理の経路
-                   ▼                                ▼                               ▼
-           ┌──────────────┐               ┌────────────────┐              ┌─────────────────┐
-           │ Auth（認可    │──相互 TLS───▶│ Signer          │              │ Management API   │◀── Dashboard（SPA）
-           │ サーバー）    │  クレーム     │ 秘密鍵はここだけ │              └────────┬────────┘
-           │ Universal     │◀─── JWT ─────│ （KMS で復号）   │                       │
-           │ Login の画面  │               └────────────────┘                       │
-           └──┬───────┬───┘                                                         │
-              │       │ セッションのキャッシュ・攻撃の防御の数・レート制限            │
-              │       ▼                                                               │
-              │   Valkey                                                              │
-              ▼                                                                       ▼
-        Aurora PostgreSQL（テナントの設定、ユーザー、資格情報、セッション、リフレッシュトークン、RLS）
-              │ outbox
-              ▼
-          Relay ─▶ SQS ─▶ Worker（ログの書き込みとログストリーム、メール、Back-Channel Logout の送信、
-                          │       JWKS の書き出し、漏えいしたパスワードのデータの取り込み）
-                          ▼
-                  Aurora PostgreSQL（ログの専用のクラスタ。認証のイベント、31 日）
+次の図は、認証の経路と管理の経路、非同期の処理のつながりを示す。
+
+```mermaid
+flowchart TB
+  Edge["CloudFront＋WAF（IP のレート制限、明らかな攻撃の遮断）<br/>discovery・JWKS（S3 に書き出したもの。大阪の S3 を予備のオリジンに）、静的な資産"]
+  Auth["Auth（認可サーバー）<br/>Universal Login の画面"]
+  Signer["Signer<br/>秘密鍵はここだけ（KMS で復号）"]
+  Mgmt["Management API"]
+  Dash["Dashboard（SPA）"]
+  Valkey[("Valkey")]
+  Aurora[("Aurora PostgreSQL<br/>（テナントの設定、ユーザー、資格情報、セッション、リフレッシュトークン、RLS）")]
+  Relay["Relay"]
+  SQS["SQS"]
+  Worker["Worker<br/>（ログの書き込みとログストリーム、メール、Back-Channel Logout の送信、<br/>JWKS の書き出し、漏えいしたパスワードのデータの取り込み）"]
+  LogDB[("Aurora PostgreSQL<br/>（ログの専用のクラスタ。認証のイベント、31 日）")]
+  Edge -- "認証の経路" --> Auth
+  Edge -- "管理の経路" --> Mgmt
+  Dash --> Mgmt
+  Auth -- "相互 TLS（クレーム）" --> Signer
+  Signer -- "JWT" --> Auth
+  Auth -- "セッションのキャッシュ・攻撃の防御の数・レート制限" --> Valkey
+  Auth --> Aurora
+  Mgmt --> Aurora
+  Aurora -- "outbox" --> Relay
+  Relay --> SQS
+  SQS --> Worker
+  Worker --> LogDB
 ```
 
 | コンテナ | 責務 |
@@ -64,6 +68,12 @@
 - **テナントで分け、テナントで閉じる。** データも鍵もドメインもテナントに属する（[ADR-0002](../decisions/0002-tenancy-and-isolation.md)）。
 - **秘密は平文で持たず、出さない。** 署名の秘密鍵は Signer の外に出ない。資格情報はハッシュか暗号化で持つ（[ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)、[ADR-0004](../decisions/0004-credential-storage.md)）。
 - **認証の経路は止めない。** 管理の経路と分け、依存先ごとの縮退を決めておく（[ADR-0005](../decisions/0005-authentication-path-availability.md)）。
+
+### 1.3 主要な流れ
+
+- **リフレッシュトークンのローテーションと再利用の検知**：正規の利用者と、リフレッシュトークンを盗んだ攻撃者の時系列で、使用済みのトークンの再利用が系列のすべてを失効させることを示す（[authentication-flows.md](authentication-flows.md) の 7.2 節）
+- **セッションとリフレッシュトークンの系列**：同じセッションで出した `session` と `independent` の 2 つの系列の寿命を、時刻の順に示す（[sessions-and-sso.md](sessions-and-sso.md) の 7 節）
+- **署名鍵のライフサイクル**：署名鍵の状態を、操作の表に沿って示す（[keys-and-secrets.md](keys-and-secrets.md) の 5 節）
 
 ## 2. 規模の段階
 
@@ -209,63 +219,7 @@
 - **リージョンの障害で失う書き込み**：失効した鍵・変えたパスワードが大阪で有効に戻りうる。失った範囲のやり直し（[ADR-0060](../decisions/0060-disaster-recovery-and-stages.md)）と四半期の訓練で抑える。
 - **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L8 と、Pwned Passwords・契約の論点）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
-### 決定（2026-09-27、既定案）
-
-PM の方針（本家 Auth0 に寄せる、既定案で進める）により、統合の工程で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に集めた。計測・PoC・選定で決めるものは、下の「持ち越し」に置いた。
-
-- **ADR の状態**：基盤の ADR（0001〜0005）を、他の題材と同じく `accepted` にした（2026-09-27）。先に、ADR-0005 の NFR の番号（リージョンの障害は NFR-006）と縮退の表（漏えいしたパスワードの照合、Actions の実行の基盤、LDAP のコネクタ、エンタープライズの IdP）を直し、ADR-0004 を ADR-0025 に揃えた。intent.md も `accepted` にした。
-- **本家の名前・接頭辞を使わない**（リポジトリ共通の ADR-0006）。ヘッダー・Cookie・ドメイン・接頭辞・クレームの名前空間は `<Brand>`・`<brand>`。本家から移るテナントの `auth0|...` の `user_id` は、テナントの顧客のデータとして受け取り、そのまま `sub` にする（本システムが作る識別子ではない。[users-and-profiles.md](users-and-profiles.md) の 3.1 節）。ログの種類のコード（`s`、`fp` など）と `/mfa/challenge`・`org_` のような一般の名前は、本家の名前を含まないので使う。
-- **適合試験の対象**：OP の Basic・Config・Form Post・RP-Initiated Logout・Back-Channel Logout。Form Post を加え（intent の K2 の「未定」を埋めた）、Dynamic は持たない。GA の判定は `main` の夜間で 7 日続けて通ること（[quality.md](../quality.md)）。
-- **漏えいしたパスワード**：法務の確認までは公式の range API を使い、自前のホストは確認の後（ADR-0025 を正とし、ADR-0004・connections.md・attack-protection.md を揃えた）。
-- **Signer の範囲**：テナントのトークン（ID・アクセス・ログアウト）に加え、**型を分けた外部 IdP のアサーション**（`apple_client_secret`、`oidc_client_assertion`、`saml_authn_request`）に署名する。接続ごとの鍵（`external_idp_keys`）を使い、宛先と有効期間は Signer が登録の値から決める（ADR-0047、[keys-and-secrets.md](keys-and-secrets.md) の 6.3 節、security.md）。Signer の DB のロールは 4 つの表（ADR-0059 を揃えた）。
-- **HSTS**：本システムのドメインは `includeSubDomains` 付き。カスタムドメインには HSTS を付けるが `includeSubDomains`・`preload` は付けない（custom-domains.md を正とし、security.md の SEC-024 を直した）。
-- **AWS のアカウント**：Actions のための `actions` のアカウントを足した（ADR-0057、infrastructure.md）。作るのは E13 の着手時。
-- **MFA の API**（`/mfa/challenge` など、埋め込み・ネイティブ向け）：MVP では持たず、MVP の後に扱う形を [mfa-and-passkeys.md](mfa-and-passkeys.md) の 8.1 節に書いた。
-- **データベース接続の `authentication_methods`**（`password`・`passkey`）：connections.md の 4.1.1 節に足した（パスキーだけのユーザーを作るための設定）。
-- **組織ごとのカスタムドメイン**：持たない（organizations.md、ADR-0051 を正とし、custom-domains.md の E14 の Story を外した）。
-- **ログインのトランザクションの用語**：`login_transactions` の行を「トランザクション」、その参照の乱数を「handle」と呼び、画面の URL の `state` で運ぶ。アプリの OAuth の `state` とは別物（authentication-flows.md の 5.4 節、universal-login.md の 4 節）。
-- **データモデル**：クライアントの資格情報は `client_credentials` の 1 つの表、`refresh_token_families` は 1 つの定義にまとめ、ユーザーを指す列は `user_pk` に揃え、テナントの外の表を理由とともに列挙した（[data-model.md](data-model.md) の 3・9 節）。
-- **ログの種類のコード**：本家に同じ意味のコードがあればそれを使い（`limit_wc`、`limit_mu`、`pwd_leak` など）、ないものは `ap_*` などの独自のコードにする（ADR-0042。attack-protection.md の 8 節を揃えた）。Back-Channel Logout の失敗は `oidc_backchannel_logout_failed`。
-- **Epic**：E13 は Actions、E14 は Organizations とエンタープライズ接続。インポート・エクスポート、SCIM、PAR・DPoP・トークン交換・mTLS、SMS、MFA の API は「後回し」（[roadmap.md](../roadmap.md)）。
-- **数値の正本**：レート制限は [management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 6 節。トークンの有効期間は [ADR-0008](../decisions/0008-token-lifetimes-and-claims.md)。セッションは使われない期間 3 日・最終の期限 7 日（[ADR-0027](../decisions/0027-server-side-sessions.md)）。JWKS のキャッシュは RP 300 秒・CloudFront 60 秒・オリジンの障害中 24 時間（[ADR-0047](../decisions/0047-signer-api-and-jwks-publishing.md)）。設定の反映は最大 15 秒（ADR-0032）。保持の期間は [security.md](security.md) の 9 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。
-- **検証の工程の後の既定案**（2026-09-27）：
-  - 認証のイベントのログの `user_name` には、本家と同じくメールアドレスを載せる。保持は `log_retention_days`、ストリームでは伏せ字を選べる（[logs-and-streams.md](logs-and-streams.md) の 3.1 節、[users-and-profiles.md](users-and-profiles.md)）。
-  - 429 は方針の制限だけに使い、理由を `<Brand>-RateLimit-Reason`（`tenant`・`endpoint`・`user`・`concurrency`・`attack_protection`）で示す。過負荷・依存先の都合は 503 にする（[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 7.2 節、ADR-0062・ADR-0005 の注記）。
-  - Cookie はすべて `__Host-` の接頭辞にする（`__Host-<brand>_did`・`__Host-<brand>_mfa_rd` を含む。一覧は [sessions-and-sso.md](sessions-and-sso.md) の 3.1 節）。
-  - `consent_records` は `user_pk` で参照する（ADR-0013、[data-model.md](data-model.md) の 2 節）。
-  - 署名鍵のローテーションの API の制限は、本家と同じバースト 5・1 日 5 にする（ADR-0046 の注記）。
-- **訓練の頻度**：1 テナントの緊急のローテーションは四半期（ADR-0046 と keys-and-secrets.md に揃え、runbook を直した）。DR の計画外のフェイルオーバーは四半期、本番の switchover は年 1 回（ADR-0060）。
-- 領域ごとの決定は、各文書の「決定」の節にある：[authentication-flows.md](authentication-flows.md) の 14 節、[universal-login.md](universal-login.md) の 17 節、[connections.md](connections.md) の 13 節、[users-and-profiles.md](users-and-profiles.md) の 16 節、[mfa-and-passkeys.md](mfa-and-passkeys.md) の 15 節、[attack-protection.md](attack-protection.md) の 17 節、[sessions-and-sso.md](sessions-and-sso.md) の 13 節、[tenants-and-applications.md](tenants-and-applications.md) の 13 節、[management-api-and-rate-limiting.md](management-api-and-rate-limiting.md) の 14 節、[dashboard.md](dashboard.md) の 12 節、[custom-domains.md](custom-domains.md) の 12 節、[email-delivery.md](email-delivery.md) の 16 節、[logs-and-streams.md](logs-and-streams.md) の 12 節、[keys-and-secrets.md](keys-and-secrets.md) の 13 節、[extensibility.md](extensibility.md) の 13 節、[organizations.md](organizations.md) の 13 節。
-
-### 決定（2026-09-27、推奨案で確定）
-
-PM の方針（判断が要るところは推奨案で進める）により、法務以外の確認待ち・持ち越しを、次のとおり決めた。法務の確認待ちと、法務の結論に依るもの、計測・PoC が要るものは、下の「持ち越し」に残した。
-
-- **`private_key_jwt` の `aud`**：`issuer` だけを受ける。`draft-ietf-oauth-rfc7523bis` に合わせる。移るクライアントのために、アプリごとの互換のフラグ `legacy_token_endpoint_aud`（既定は無効、GA から 12 か月で廃止）を置く（[authentication-flows.md](authentication-flows.md) の 6.1・14 節、[ADR-0007](../decisions/0007-client-authentication-methods.md) の注記、[tenants-and-applications.md](tenants-and-applications.md) の `clients`）。
-- **外向きの `oidc_client_assertion` の `aud`**：同じ規則で、IdP の `issuer` にする。主要な IdP が受けるかは E14 で確かめる（[keys-and-secrets.md](keys-and-secrets.md) の 6.3・13 節）。
-- **429 と 503 の分け方**：ADR-0005 の注記（429 は方針の制限、503 は過負荷・依存先の都合）を承認した。SLI を状態コードだけで分けられる（[ADR-0005](../decisions/0005-authentication-path-availability.md)、[ADR-0062](../decisions/0062-sli-and-synthetic-monitoring.md)）。
-- **OpenID Foundation の会員**：E12 の前に会員になる。認証の費用は会員 700 USD・非会員 3,500 USD で、プロファイルが 5 つある（[intent.md](../intent.md)、[ADR-0064](../decisions/0064-conformance-suite-in-ci.md)、[roadmap.md](../roadmap.md) の E12）。
-- **適合試験の Form Post**：対象に含める。PM の決定として確定した（[authentication-flows.md](authentication-flows.md) の 13.3・14 節、intent の K2）。
-- **統合で足した値**：列挙の時間の差の p90 10%（QA。[quality.md](../quality.md) の 2.2.1 節、[ADR-0015](../decisions/0015-database-connection-password-and-enumeration.md)）、`refresh_token_families.rotation` の列（Dev。[data-model/login-and-sessions.md](data-model/login-and-sessions.md) の 2 節）、Story の名前（PM。[roadmap.md](../roadmap.md)）、runbook の名前（Ops。[runbooks/](../runbooks/README.md)）を、そのまま受け入れた。
-- **漏えいしたパスワードの予備の案**：公式の range API を使う間の ADR-0005 の縮退の表の行を、Dev のテックリードの確認として確定した（[attack-protection.md](attack-protection.md) の 17 節）。
-- **イントロスペクション**：持たない。JWT を JWKS で確かめる形で足りる（[authentication-flows.md](authentication-flows.md) の 14 節）。
-- **`resource`（RFC 8707）**：MVP では受けない。トークン交換で受けるときは `audience` と同じ意味に扱う（同上）。
-- **同意の画面の一部の許可**：持たない。まとめて許すか断るかにし、形を単純に保つ（同上）。
-- **JWKS の `x5c`**：載せない。OIDC の検証に要らない（[keys-and-secrets.md](keys-and-secrets.md) の 13 節）。
-- **耐量子の署名**：S1 では持たない。標準化を待つ（同上）。
-- **セッション**：アプリごとの有効期間の上書きは持たない。`federated` のログアウトは E14 で扱う。パスワードの変更・再設定で他のセッションを既定で終える。端末の記憶は別の Cookie。Back-Channel Logout の出口は `worker-egress`（[sessions-and-sso.md](sessions-and-sso.md) の 13 節、[connections.md](connections.md) の 13 節）。
-- **K3 の測り方**：データベース接続だけで測る。開発者キーを持たないため（[connections.md](connections.md) の 13 節）。
-- **よく使われるパスワードの一覧**：本家と同じ SecLists の 1 万件（同上）。
-- **ライブラリ**：WebAuthn は `@simplewebauthn/server`、SAML は第一候補を `@node-saml/node-saml` にする。どちらも着手時に基準を確かめ、満たさないときだけ見直す（4 節、[mfa-and-passkeys.md](mfa-and-passkeys.md) の 15 節、[connections.md](connections.md) の 13 節）。
-- **MFA**：BE=1 を拒む設定は AAL3 と一緒に S2 以降。アカウントの画面は MVP の後。IdP の `amr`・`acr` は既定で引き継がない（[mfa-and-passkeys.md](mfa-and-passkeys.md) の 15 節）。
-- **Public Suffix List**：`jp.<brand>.<domain>` を登録し、テナントのホスト名を互いに別の site にする。防御は登録に頼らない（[universal-login.md](universal-login.md) の 17 節、[custom-domains.md](custom-domains.md) の 12 節）。
-- **ブランディング**：テナントの任意の HTML は MVP で入れない。サインアップの追加の項目は MVP の後に 3 つの型で足し、`user_metadata` に保存する（[universal-login.md](universal-login.md) の 17 節）。
-- **カスタムドメイン**：アプリごとにドメインを縛らない。配信のテナントの上限は、先に引き上げを申請する。DNS の確認は Google Public DNS と Cloudflare の DoH の 2 つで行う（[custom-domains.md](custom-domains.md) の 12 節）。
-- **メール**：SES の上限は S2 の前に引き上げを申請する。予備の SES のアカウントは、合成監視のメールで毎日暖める（[email-delivery.md](email-delivery.md) の 16 節）。
-- **ユーザー**：仮名の `sub` は持たない。本人のメタデータの更新は MVP の後。SCIM の最初のバージョンは `Users` だけ（[users-and-profiles.md](users-and-profiles.md) の 16 節）。
-- **テナント**：アカウントを請求・契約の単位にする。ワイルドカードのコールバックの移行は、URL の個別の登録で支える（[tenants-and-applications.md](tenants-and-applications.md) の 13 節）。
-- **Actions**：同期のトリガーの時限は既定 10 秒、テナントの上書きで 20 秒まで（[extensibility.md](extensibility.md) の 13 節、[ADR-0048](../decisions/0048-extensibility-triggers-and-failure-policy.md)）。
-- **EventBridge の SaaS パートナーの登録**：E10 の着手前に申請する（[logs-and-streams.md](logs-and-streams.md) の 12 節）。
+### 残る未解決事項
 
 持ち越し（法務、計測・PoC で決めるもの）：
 
@@ -281,15 +235,9 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 | 列挙の時間の差の 5% の妥当性、画面の LCP の目標、証明書の発行の時間、共有の送信の 1 日の上限、検索を専用の基盤へ移すか、攻撃の防御の閾値と PoW の難しさ、M2M の発行のログを失う件数 | 計測 | 各領域の文書の「持ち越し」（E3・E8・E11・E12、S2 の前） |
 | 本家の振る舞いで未確認のもの（不審な IP の抑制のサインアップの補う速度の既定、認可コードの有効期間、ログインのトランザクションの有効期間、ブロックしたユーザーのリフレッシュトークン、リフレッシュでの組織のメンバーシップの確認など。セッションの既定値・リフレッシュトークンの猶予・ログのコードの意味は 2026-09-27 に確かめた） | 確かめるだけ（決定は済み） | 各領域の文書の「持ち越し」に書いた Epic で、本家の資料か試用のテナントで確かめる |
 
-### 決定（2026-09-28、データモデル）
-
-ユーザーの依頼（各題材のデータモデルを十分に設計し、ER 図を付ける）により、[data-model.md](data-model.md) を索引から形の正本に変え、`data-model/` に領域ごとの定義（92 テーブル、ER 図 14 個）を置いた。ADR の決定は変えていない。判断が要ったところは推奨案で決めた（詳細は [data-model.md](data-model.md) の 9.2 節）。
-
-- **分割の鍵**：時間で切る表は UUIDv7 の `id` の範囲で切る。旧い `audit_events` の `RANGE (occurred_at)` は主キーと合わず作れなかったので直した。分割した表のハッシュの引き当ては普通の索引にし、1 回限りは条件付きの更新で守る。
-- **テナントの外の表**：`signing_key_state_versions` を足した（Signer が全テナントのバージョンを読むため。値はバージョンと時刻だけ）。
-- **列の名前と型**：管理者を指す列は `member_user_id`（管理用のテナントの `sub`）、`credential_tickets` はリンクの `secret_hash` とコードの `code_hash` に分けた、`clients` の主キーは `(tenant_id, client_id)`。
-- **Valkey とリース**：Valkey のキーは `<用途>:{t:<tenant_id>}:...` で IP を HMAC にする。ログストリームのリースは DB の行で持つ。
 - **持ち越し**：`refresh_tokens` の行の数（再利用の検知のため使用済みの行を残すと S1 で十数億行になりうる）を E12 で測り、多ければ ADR-0003 の改訂を Dev のテックリードに諮る（[data-model.md](data-model.md) の 9.4 節）。
+
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
 
 ## 7. 領域の文書
 
@@ -315,6 +263,7 @@ PM の方針（判断が要るところは推奨案で進める）により、�
 | [organizations.md](organizations.md)（MVP の後） | B2B の組織、招待、組織ごとの接続とブランド、トークンの組織のクレーム | 0051–0052 | QA | E14 |
 | [security.md](security.md) | 脅威モデル、RFC 9700 のチェックリスト、暗号化、監査ログ、データのライフサイクル、脆弱性の対応、法務の論点の整理 | 0053–0056 | セキュリティ | E1、E12 |
 | [data-model.md](data-model.md)（と `data-model/`） | データモデルの正本（規約、テナントの外の表、ER 図、テーブルの定義、DB の外のストアの形、横断的な不変条件） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） | なし | — | — |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、エッジ、冗長化、DR、段階を上げる基準、S3 のセル構成 | 0057–0060 | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI の計測、秘密を出さない計装 | 0061–0062 | Ops | E1、E10 |
 | [capacity.md](capacity.md) | 負荷のモデル、Argon2id と署名の CPU、部品ごとの必要量、パラメーター | 0063 | Ops | E12 |

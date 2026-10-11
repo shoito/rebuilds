@@ -249,21 +249,25 @@ field = "user_id" | "email" | "email_verified" | "username" | "name"
 
 ### 7.1 ステートマシン
 
-```
-             create
-               │
-               ▼
-  ┌──────── active ◀──────────────┐
-  │            │ block             │ unblock
-  │            ▼                   │
-  │         blocked ───────────────┘
-  │            │
-  │ delete     │ delete
-  ▼            ▼
- deleted（墓石：プロフィールを消し、deleted_at を付ける。資格情報・ID・セッションは同じトランザクションで物理削除）
-   │ 30 日
-   ▼
- （行なし）＋ user_tombstones（user_id の HMAC。消さない）
+次の図は、ユーザーの `status` と、削除の後の扱いを示す。
+
+```mermaid
+stateDiagram-v2
+  state "deleted（墓石）" as deleted
+  state "行なし＋user_tombstones" as gone
+  [*] --> active: create
+  active --> blocked: block
+  blocked --> active: unblock
+  active --> deleted: delete
+  blocked --> deleted: delete
+  deleted --> gone: 30 日
+  note right of deleted
+    プロフィールを消し、deleted_at を付ける。
+    資格情報・ID・セッションは同じトランザクションで物理削除
+  end note
+  note right of gone
+    user_tombstones は user_id の HMAC。消さない
+  end note
 ```
 
 - `status` は `active`・`blocked`・`deleted` の 3 つ。`deleted` の行（墓石）は、外からは「存在しない」（404）に見える。墓石と 30 日の期限は、security の領域の [ADR-0055](../decisions/0055-data-retention-and-deletion.md) の決定に従う。

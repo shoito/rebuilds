@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、ライブチャットを WebSocket の Gateway と Valkey での扇形の配りにし、大きな配信は 1 秒ごとにまとめて送り、低速モードと上位のチャットを持つとした。NFR-013 は 20 万人の配信で送信から画面まで p95 2 秒。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、ライブチャットを WebSocket の Gateway と Valkey での扇形の配りにし、大きな配信は 1 秒ごとにまとめて送り、低速モードと上位のチャットを持つとした。NFR-013 は 20 万人の配信で送信から画面まで p95 2 秒。
 - 人気の配信では、送信が 1 秒に数千件になる（[quality.md](../quality.md) の 2.2.1 節 H の場面で 2,000 件）。視聴者はそれを読めない。1 件ずつ全視聴者に送ると、送りの量が「視聴者 × 送信」で増える（100 万人 × 2,000 件/秒）。
 - Slack の題材は、DB を正本にし、配りをベストエフォートにして、欠けはクライアントが DB から差分を取る（[Slack の realtime.md](../../../slack/docs/architecture/realtime.md)）。チャットはメッセージの量が桁違いで、全部を取り戻す必要はない。
 - 順序（削除がメッセージの後に届くこと）は守りたい。

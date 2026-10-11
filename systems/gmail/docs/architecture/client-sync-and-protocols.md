@@ -296,6 +296,35 @@ stateDiagram-v2
 - INBOX を `MODSEQ 1002` と既知の UID `501` で QRESYNC するアプリは、`VANISHED (EARLIER) 501:502` と、UID 503 の `FETCH` を受ける（502 はアプリが知らないが、含めても害がない）。
 - 同じメッセージが INBOX と All Mail と `仕事` に見えるので、All Mail も同期するアプリは同じメッセージを 2 回以上取る（[ADR-0004](../decisions/0004-labels-as-primary-mailbox-model.md) の Consequences）。`EMAILID` が同じなので、OBJECTID を使うアプリは重ねて保存しない。
 
+表の `modseq` 1007（Web でゴミ箱へ）を例に、1 つのラベルの変更が change log を通って、JMAP の差分と IMAP の 2 つの箱に届く流れを図にすると次のとおり。どちらのプロトコルも、同じ `modseq` の change log を読むだけで、状態を書かない。
+
+```mermaid
+sequenceDiagram
+    participant W as Web（JMAP）
+    participant MS as mailstore
+    participant DB as Aurora（change log、imap_vanished、outbox）
+    participant PG as push-gateway
+    participant JC as JMAP のクライアント
+    participant IS as imap-server
+    participant IA as IMAP のアプリ（INBOX）
+    participant IB as IMAP のアプリ（All Mail）
+
+    W->>MS: ゴミ箱へ（DT-MBX の行 9）
+    MS->>DB: 1 つのトランザクション：modseq 1007、change log（label_added、label_removed、hidden）、imap_vanished（INBOX 502、All Mail 9001）、Trash に UID 88、outbox に account.changed
+    DB-->>PG: relay で account.changed（modseq 1007）
+    PG-->>JC: StateChange（Email と Mailbox の状態の文字列。200ms まとめる）
+    JC->>MS: Email/changes（modseq 1006 から）
+    MS-->>JC: updated、newState は modseq 1007
+    JC->>MS: Email/queryChanges（inMailbox が inbox）
+    MS-->>JC: removed（受信箱から出た ID）
+    PG-->>IS: account.changed
+    IS->>MS: 選んでいる箱の change log を modseq から読む
+    IS-->>IA: VANISHED 502
+    IS-->>IB: VANISHED 9001
+```
+
+- 図の `W` と `JC` の要求は `jmap-api` が受け、`mailstore` の gRPC を呼ぶ（`jmap-api` は図では省いた）。
+
 ### 7.5 コマンドとラベルの操作
 
 | コマンド | 箱 | 当てる操作（DT-MBX の行） |
@@ -334,7 +363,7 @@ stateDiagram-v2
 
 ## 8. SMTP の submission
 
-- 465（暗黙の TLS）と 587（STARTTLS を求める）。`AUTH OAUTHBEARER`・`XOAUTH2` だけ（[architecture/README.md](README.md) の 6 節の決定：アプリのパスワードを作らない）。
+- 465（暗黙の TLS）と 587（STARTTLS を求める）。`AUTH OAUTHBEARER`・`XOAUTH2` だけ（[design-log.md](design-log.md) の「2026-10-10：既定案」：アプリのパスワードを作らない）。
 - `MAIL FROM` は、アカウントのアドレスと、確かめた送信の別名だけを許す（accounts-and-security.md）。
 - DATA の終わりで、`mailstore` に送信の依頼（`release_at` は今、元に戻す送信の窓なし）として確定してから 250 を返す。上限の扱いは [outbound-smtp-and-reputation.md](outbound-smtp-and-reputation.md) の 4.2 節。
 - 送信のメッセージは `SENT` を付けてスレッドに入る（7.6 節の重複の抑え）。`Bcc` のヘッダーは送る前に外し、送信済みのメッセージに残す。
@@ -447,7 +476,7 @@ stateDiagram-v2
 | --- | --- |
 | `VANISHED (EARLIER)` に知らない UID を含めることへの主なアプリの振る舞い | `imap-interop` |
 | IMAP の読み出しの量の上限の値 | api-and-integrations.md で 1 時間 2.5 GB・1 日 20 GB に決めた（[ADR-0059](../decisions/0059-api-rate-limits-and-third-party-push.md)）。E17 の負荷試験の後に見直す |
-| POP3 | MVP の後（[architecture/README.md](README.md) の 6 節） |
+| POP3 | MVP の後（[design-log.md](design-log.md) の「2026-10-10：既定案」） |
 | 本家の IMAP の `EXPUNGE` の既定の振る舞い | 公式の資料が出れば 3 節を直す（**未検証**） |
 
 ## 出典

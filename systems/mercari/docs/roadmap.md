@@ -85,6 +85,7 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `account-deletion` | 退会、データの削除と保持。法務：L5 |
 | `age-and-minor-consent` | 生年月日、保護者の同意の記録、`ageOf()`（ADR-0068）。法務：L12 |
 | `app-release-train` | アプリの列車、最小のバージョン（ADR-0079） |
+| `app-accessibility-baseline` | アプリと Web の共通の部品の名前・役割・状態、文字の拡大、押す的の大きさ、検査（accounts-and-devices の 11.1 節） |
 
 ### E3 出品と写真
 

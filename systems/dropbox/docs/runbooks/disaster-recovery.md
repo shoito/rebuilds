@@ -72,4 +72,4 @@ staging で四半期ごと、本番の switchover を年 1 回（E13 の `dr-fai
 ## 事後
 
 - 失った commit の数、`pending` と `lost` の数、読み直しの時間を記録し、`changes/` に起票する。
-- DR の後の取り直しを失った commit を見た端末だけに絞る改良（[architecture/README.md](../architecture/README.md) の 6 節の持ち越し）の判断の材料にする。
+- DR の後の取り直しを失った commit を見た端末だけに絞る改良（[architecture/README.md](../architecture/README.md) の 6 節の残る未解決事項）の判断の材料にする。

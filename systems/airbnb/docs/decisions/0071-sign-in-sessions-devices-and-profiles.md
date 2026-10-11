@@ -9,7 +9,7 @@ date: 2026-10-10
 
 - ゲストの多くは海外から来る。日本の携帯の番号を持たない。ホストは日本に住み、送金の口座を持つ（[intent.md](../intent.md)）。
 - 乗っ取りの価値は、ホストの送金と、ゲストの保存したカードと予約の住所にある（[security.md](../architecture/security.md) の T1）。一時コードの詐取が主な入口になる。
-- 最初の設計で「パスキーを勧め、メールの一時コードと外部の ID の提供者。パスワードは持たない」と決めた（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 最初の設計で「パスキーを勧め、メールの一時コードと外部の ID の提供者。パスワードは持たない」と決めた（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 本家はパスキーを持ち、操作の確かめにも使う（[ヘルプの記事 4094](https://www.airbnb.com/help/article/4094)、2026-10-10 に確認）。パスワードと Apple でのサインインも持つ（記事の存在だけを確かめた。細部は**未検証**）。
 - Mercari の題材は、電話番号を必須の識別にし、パスキーと SMS で入れる形を決めた（[Mercari の ADR-0066](../../../mercari/docs/decisions/0066-sign-in-sessions-and-devices.md)）。海外のゲストには電話番号を必須の入口にできない。
 - 予約の前にホストへゲストの属性が見えると、断りの差別の恐れがある（[ADR-0009](0009-trust-and-safety-and-ml-boundary.md)、法務の L11）。

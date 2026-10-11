@@ -11,7 +11,7 @@ date: 2026-10-04
 - スパムとボットへの備えとして、投稿・フォロー・DM の 1 日の上限が要る（NFR-011）。本家の文書は、投稿 1 日 2,400 件、DM 500 件、フォロー 400 件としている（[intent.md](../intent.md) の出典。検索結果の抜粋）。
 - 本家の API は `x-rate-limit-limit`・`x-rate-limit-remaining`・`x-rate-limit-reset` を返す（[Rate limits](https://docs.x.com/x-api/fundamentals/rate-limits)、2026-10-04 に確認）。
 - IETF の draft-ietf-httpapi-ratelimit-headers は draft-11（2026-05-23）で、`RateLimit-Policy`（`q`、`w`）と `RateLimit`（`r`、`t`）を定める。まだ RFC ではない（[datatracker](https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/)、2026-10-04 に確認）。
-- [architecture/README.md](../architecture/README.md) の 6 節で、IETF の形を第一の候補にした。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」で、IETF の形を第一の候補にした。
 
 ## Options
 

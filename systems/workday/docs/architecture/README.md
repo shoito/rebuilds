@@ -1,6 +1,6 @@
 # Architecture: Workday
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。データモデルの正本は [data-model.md](data-model.md)、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。データモデルの正本は [data-model.md](data-model.md)、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/workday/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -36,35 +36,35 @@
 
 ### 1.3 コンテナ
 
-```
-        ┌──────────── CloudFront＋WAF（SPA の静的な資産は S3、レート制限）───┐
-        └──────┬───────────────────────────────────────────────────────┘
-               ▼
-        ┌──────────────┐     ┌──────────────────────┐
-        │ API（Hono）   │────▶│ 権限の判定（ライブラリ）│  すべての読み書きが通る
-        │ Better Auth   │     └──────────────────────┘
-        └──┬────────┬──┘
-           │        │ 業務プロセスのコマンド
-           │        ▼
-           │   ┌────────────────┐   タイマー・ステップの実行
-           │   │ BP Worker       │◀──────────────── SQS
-           │   └───────┬────────┘
-           ▼           ▼
-   Aurora PostgreSQL（正本：有効日付のテーブルと履歴、業務プロセスの案件とイベント、勤怠、休暇、
-                      給与の結果と仕訳、規則表、監査ログ。RLS）
-           │ outbox                         ▲ 入力のスナップショット・結果の書き込み
-           ▼                                │
-       Relay ─▶ SQS ─▶ Worker（通知、帳票・明細の PDF、全銀ファイル、仕訳の出力、一括の取り込み・出力、レポートの出力）
-                         Payroll Compute（ECS のタスク。給与計算を従業員の束ごとに並列に実行）
+次の図は、コンテナと、その間の主な呼び出しとデータの流れを示す。
 
-   ┌──────── 別の AWS アカウント ─────────┐
-   │ Vault（マイナンバーの保管庫）          │◀── 参照の ID だけで呼ぶ（API は相互 TLS）
-   │ 専用の Aurora、専用の KMS の鍵         │
-   │ 法定の書類の生成は、この中で行う       │
-   └───────────────────────────────────┘
-
-   S3：明細・帳票の PDF、取り込みのファイル、監査ログの保管（Object Lock）
-   Valkey：セッション、キャッシュ、レート制限（失われてもよい）
+```mermaid
+flowchart TB
+  CF["CloudFront＋WAF（SPA の静的な資産は S3、レート制限）"]
+  API["API（Hono）<br/>Better Auth"]
+  AUTHZ["権限の判定（ライブラリ）<br/>すべての読み書きが通る"]
+  BPW["BP Worker"]
+  DB[("Aurora PostgreSQL（正本：有効日付のテーブルと履歴、業務プロセスの案件とイベント、勤怠、休暇、給与の結果と仕訳、規則表、監査ログ。RLS）")]
+  RELAY["Relay"]
+  SQS["SQS"]
+  WK["Worker（通知、帳票・明細の PDF、全銀ファイル、仕訳の出力、一括の取り込み・出力、レポートの出力）"]
+  PC["Payroll Compute（ECS のタスク。給与計算を従業員の束ごとに並列に実行）"]
+  subgraph VACC["別の AWS アカウント"]
+    VAULT["Vault（マイナンバーの保管庫）<br/>専用の Aurora、専用の KMS の鍵<br/>法定の書類の生成は、この中で行う"]
+  end
+  S3[("S3：明細・帳票の PDF、取り込みのファイル、監査ログの保管（Object Lock）")]
+  VK[("Valkey：セッション、キャッシュ、レート制限（失われてもよい）")]
+  CF --> API
+  API --> AUTHZ
+  API -->|"業務プロセスのコマンド"| BPW
+  SQS -->|"タイマー・ステップの実行"| BPW
+  API --> DB
+  BPW --> DB
+  DB -->|"outbox"| RELAY
+  RELAY --> SQS
+  SQS --> WK
+  PC -->|"入力のスナップショット・結果の書き込み"| DB
+  API -->|"参照の ID だけで呼ぶ（API は相互 TLS）"| VAULT
 ```
 
 | コンテナ | 責務 |
@@ -84,6 +84,13 @@
 - **給与は純粋な計算にする。** 入力と規則表のバージョンから決まり、再計算で同じ結果になる。お金は整数の円で扱う（[ADR-0004](../decisions/0004-payroll-engine.md)）。
 - **権限は 1 つの仕組みで判定する。** 画面・API・レポート・連携・一括の出力で同じ判定を通す（[ADR-0005](../decisions/0005-security-and-my-number.md)）。
 - **マイナンバーは隔離する。** 別のアカウント・DB・鍵に置き、人事の側には参照の ID だけを持つ（[ADR-0005](../decisions/0005-security-and-my-number.md)）。
+
+### 1.4 主要な流れ
+
+- **給与計算の実行**：`draft` から入力の固定、計算、確認を経て、業務プロセスで確定・公開する。`finalized` までは `cancel` で捨てられる（[payroll-engine.md](payroll-engine.md) の 4.1 節）
+- **業務プロセスの案件**：起票で `in_progress` になり、承認・差し戻しなどで進み、完了・却下・キャンセル・取消で終わる（[business-process-engine.md](business-process-engine.md) の 6.2 節）
+- **差分の畳み込み**：主体の行をロックし、差分を追記して、影響の始まりの日 `D` 以降の期間を作り直す（[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 5.1 節）
+- **マイナンバーの収集**：本人が保管庫の画面で番号と本人確認の書類を出し、事務取扱担当者が確かめる。人事の側は `mn_ref` と状態だけを受け取る（[my-number-vault.md](my-number-vault.md) の 4.1 節）
 
 ## 2. 規模の段階
 
@@ -222,28 +229,7 @@
 - **現行のシステムからの移行**：履歴（過去の所属・給与・年休の残日数・社会保険の等級）が欠けると、有効日付と遡及の前提が崩れる。移行の差分と期首の値の台帳、sandbox での試し、`go_live_on` より前に遡及を出さない規則で扱う（[ADR-0043](../decisions/0043-migration-history-and-parallel-run-inputs.md)）。
 - **法令の解釈**：確認待ちの事項が 58 ある（[intent.md](../intent.md) の L1〜L58）。結論が出るまで、そこに挙げた Story の spec を承認しない。
 
-### 決定（2026-09-28、既定案）
-
-PM の方針（「判断が要るところは推奨の既定案でよい」）により、統合の工程で次のとおり決めた。法務・社労士・税理士の判断が要るものは決めず、[intent.md](../intent.md) の「法務・社労士・税理士の確認待ち」に残した。ADR を直したものには、日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
-
-- **ADR と intent の状態**：基盤の ADR（0001〜0005）と intent.md は、他の題材と同じく `accepted`（確かめた）。先に次を直した。
-  - ADR-0001：`Dec` の桁を、[ADR-0027](../decisions/0027-pay-item-graph-and-formula-language.md) の小数 10 桁に揃えた（注記）。
-  - ADR-0005：個人情報保護委員会のガイドラインを、令和 7 年 6 月の一部改正のバージョンに直した（注記）。職務分掌の例の表の正本が [security-model.md](security-model.md) の 5.1 節であることと、ドメインの名前の対応を書いた（注記）。
-  - ADR-0041：`aggregate` の操作を足すと決めたことを書いた（注記）。
-- **intent.md**：年次有給休暇管理簿の保存を「施行規則 24 条の 7 で 5 年、附則 71 条で当分の間 3 年」に直した（L5）。厚生労働省の年 5 日の解説の URL を新しいもの（001140963.pdf）に直した。各領域が提案した確認待ち（L-HR・L-TA・L-ABS・L-PAY・L-JP・L-PMT・L-INT・L-MN・L-AUD・L-SEC）を、L12〜L58 の 1 つの通し番号に振り直して載せた（L-PMT-2 は L4 と同じなので L4 にまとめた）。各領域の文書と ADR の参照も新しい番号に直した。どれも確認待ちのまま。「選定・計測で決めるもの」のうち、領域の文書で決めたもの（源泉の方式、雇用保険の料率の区切り、健康保険組合の料率の持ち方）に「決定」を付けた。厚生年金の上限の引き上げの出典（厚生労働省）を参考に足した。
-- **技術スタック**：画面にサーバーでの描画（SSR）は要らない。明細は保存した文書を画面で描き、PDF は確定のときに決定的に作る（4 節、[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)、[ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)）。
-- **休職の持ち主**：休職・復職は core-hr の `employment_status` と `leave_start`・`leave_return` が持ち、休暇の領域は読むだけ（[ADR-0025](../decisions/0025-special-leave-and-leave-of-absence-boundary.md)）。7 節の表と [core-hr.md](core-hr.md) の持ち越しを直した。
-- **データモデル**（[data-model.md](data-model.md) の 6 節）：休職の種類を `leave_of_absence_types` に改名（DM-1）。`pay_items` のシステムの行は同じ表で、RLS の部分の例外として 3 節の表に載せた（DM-2）。Better Auth の表はテナントの外に置き、理由と補う統制を書いた（DM-3）。住民税の通知・並行稼働の表の保存の期間を決めた（DM-4）。退職者の閲覧は、機微でないドメインは保存の期間（既定 5 年）の間、機微なドメインは退職から 3 年まで組織の範囲で見られる（DM-5）。口座の HMAC を `worker_payment_election` に足した（DM-6）。
-- **データモデルを正本にした**（[data-model.md](data-model.md) と [data-model/](data-model/temporal.md)。6 節の DM-8〜DM-17）：facet の 3 つの表の列の名前を `subject_id`・`case_id` に揃えた（DM-8。ADR-0002 に注記）。人の中の複数の主体・職務・等級の主体の表を置いた（DM-9）。`mn_ref`・`mn_status` を facet から有効日付でない `mn_links` に移し（DM-10）、保管庫の状態は人事の側が引き取る形にした（DM-17）。時間を持つ表を 5 つの形に分け、`overtime_agreements` は期間つきの行にした（DM-11）。人事の側の HMAC の鍵を `tenant_keys` に置いた（DM-12）。全文検索の製品を置かない（DM-13）。定義のなかった表を最小の形で足した（DM-14）。給与の結果のパーティションの鍵を `pay_date` にした（DM-15）。採用・福利厚生の加入などは表を作らない（DM-16）。
-- **業務プロセスの種類**：各領域が足した種類（`time_correction`、`time_period_reopen`、`overtime_agreement_change`、`annual_leave_designation`、`special_leave_grant`、`leave_balance_adjustment`、`leave_policy_change`、`pay_item_change`、`si_grade_change`、`bonus_entry` など）と、`payroll.retro_override` の権限を、[business-process-engine.md](business-process-engine.md) の 3.1 節に集めた。
-- **権限**（[security-model.md](security-model.md)）：規則表の運用者の権限 `rules.import`・`rules.verify`・`rules.publish` と、取り込みと照合を分ける職務分掌の規則 S8 を足した。集計だけの操作 `aggregate` を足し、必ず少人数の抑止を通す。`security.admin` のドメインを一覧に足した。
-- **支給日の前の口座の変更**：[security.md](security.md) の THR-020 の提案を採り、給与の確認の検査に「支給日の 10 営業日前より後の振込先の変更」の警告を足した（[payroll-engine.md](payroll-engine.md) の DT-PAY-004 の #10）。
-- **runbook の名前**：`clock-offline-backlog` は `clock-ingest-backlog` に、`bulk-import-partial-failure` は `bp-partial-bulk` にまとめた。`payday-dr-bank-file` は作らず、[runbooks/disaster-recovery.md](../runbooks/disaster-recovery.md) の「E. 支給日の DR」を使う（[runbooks/README.md](../runbooks/README.md) の 4 節）。
-- **Story の名前**：`terminal-import` は `clock-terminal-integration` に、`inbox-ui` は `ui-inbox` に、`worker-register-report`・`attendance-register-report` は `statutory-registers` に、`authz-pentest` は `pentest-and-fixes` に、打刻・給与・業務プロセスの負荷試験は `load-test-suite` にまとめた（[roadmap.md](../roadmap.md)）。
-- **Epic**：E1〜E12 が MVP。E13 年末調整と法定調書、E14 電子申請、E15 退職所得と退職金、E16 タレント管理。それ以外の MVP の後の機能は [roadmap.md](../roadmap.md) の延期の一覧。E13 の ADR は 0064〜0066 を使う（7 節）。
-- **数値の正本**：SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節（[observability.md](observability.md) は計測の側）。容量のパラメーターは [capacity.md](capacity.md) の 5 節、台数と費用は [infrastructure.md](infrastructure.md) の 5・11 節、保存の期間は [audit-and-retention.md](audit-and-retention.md) の 5.2 節、上限は各領域の文書（例：[object-model-and-effective-dating.md](object-model-and-effective-dating.md) の 3.1 節、[core-hr.md](core-hr.md) の 3.4 節）。
-- **KMS のテナントの鍵の単位**：S1 は 1 テナント 1 本。S2 からはセルごとに 1 本の鍵で、暗号の文脈に `tenant_id` を入れ、テナントの DEK を包んで分ける。解約の暗号の消去はテナントの DEK の破棄で行う。専用の鍵は有料の選択肢として残す。S3 の鍵の費用は月 4 万 USD 程度から数十 USD（と選択肢の分）に下がる（[ADR-0052](../decisions/0052-kms-key-hierarchy.md) の 2026-09-28 の注記、[security.md](security.md) の 5.3 節）。
-- **文書の間の参照**：領域の文書を書いた時点でまだなかった文書を、コードの書式（[payroll-engine.md](payroll-engine.md) など）で書いていたところを、リンクに直した。
+### 残る未解決事項
 
 持ち越し（計測・PoC・選定で決めるもの）：
 
@@ -258,6 +244,8 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 | 分析用の基盤のアカウント | S2 の前 |
 | 費用の単価 | E12 の前に、AWS の料金の計算ツールで置き換える |
 | 本家の振る舞いで未確認のもの（委任と進行中のタスク、代理のログインの条件。リリースの周期は 2026-09-28 に 1 節で確かめた） | 各領域の文書で、本家の資料で確かめる。設計は本家に依らない |
+
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
 
 ## 7. 領域の文書
 
@@ -285,6 +273,7 @@ PM の方針（「判断が要るところは推奨の既定案でよい」）�
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、予定のスケール、同時の上限、クォータ、負荷試験の計画 | 0060 | Ops | E1、E6、E8、E12 |
 | [delivery.md](delivery.md) | CI、`security:sensitive`、ゴールデンデータセットの CI、デプロイ、規則表のリリースと改正の暦、フラグ、支給日の前の凍結 | 0061〜0063 | QA、Ops | E1、E8、E12 |
 | [data-model.md](data-model.md)、[data-model/](data-model/temporal.md) | データモデルの正本：規約（ID、テナントと RLS、有効日付、暗号）、置き場所、全体と領域ごとの ER 図、テーブルの定義、DB 以外の置き場所の形、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとに決めたことの経緯（今の結論は本書・各領域の文書・ADR にある） | なし | なし | なし |
 
 - 領域の範囲はすべて使い切った。**MVP の後の Epic の ADR は 0064 から順に振る。** E13（年末調整と法定調書）は 0064〜0066 を予約する。E14 以降は、着手のときにこの表に行を足してから採番する。
 

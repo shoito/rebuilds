@@ -4,7 +4,7 @@
 
 前提となる決定は次のとおり。
 
-- アプリのパスワードを作らない。IMAP と submission は OAuth（`OAUTHBEARER`・`XOAUTH2`）だけ（[architecture/README.md](README.md) の 6 節の決定）
+- アプリのパスワードを作らない。IMAP と submission は OAuth（`OAUTHBEARER`・`XOAUTH2`）だけ（[design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 送信の乗っ取りの点と帯（0.9 以上で全保留と再認証、0.7〜0.9 で外への送信の保留）、保留は 7 日で取り消す（[ADR-0021](../decisions/0021-sending-limits-and-compromised-account-detection.md)）
 - `sessions`・`oauth_tokens_index`（トークンのハッシュ → アカウント）は RLS の外の表（[ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md)）
 - 転送の先は確かめてから有効にする（[ADR-0048](../decisions/0048-verified-forwarding.md)）
@@ -115,7 +115,7 @@
 - 認証は `AUTHENTICATE OAUTHBEARER`（RFC 7628）と `XOAUTH2` だけ。`LOGIN`・`AUTHENTICATE PLAIN` は出さない（`LOGINDISABLED`）。
 - 既存の IMAP のアプリは、本システムに OAuth の公開のクライアントとして登録して使う（[api-and-integrations.md](api-and-integrations.md) の 5 節）。主なアプリ（OS の標準のメールのアプリ、主な第三者のメールのアプリ）は、本システムが前もって登録し、アプリの作り手に案内する。
 - OAuth のフローを組み込めない機器・コマンドの道具には、端末の認可のフロー（RFC 8628）を出す：機器が短い番号を出し、利用者が別の端末のブラウザーで本システムにサインインして番号を入れる。番号は 8 文字・15 分。許すスコープは `mail.full` に限らず、機器が求めたもの。
-- それでも使えないアプリ（OAuth にも端末の認可のフローにも対応しないもの）は、MVP では使えない。代わりに JMAP の本システムのアプリか Web を案内する。複合機などの送信は、組織の SMTP のリレー（IP の許可の一覧）を MVP の後に作る（[architecture/README.md](README.md) の 6 節の決定）。
+- それでも使えないアプリ（OAuth にも端末の認可のフローにも対応しないもの）は、MVP では使えない。代わりに JMAP の本システムのアプリか Web を案内する。複合機などの送信は、組織の SMTP のリレー（IP の許可の一覧）を MVP の後に作る（[design-log.md](design-log.md) の「2026-10-10：既定案」）。
 - IMAP の接続は、トークンの失効で切る：`push-gateway` が失効の出来事を `imap-server` に流し、その `session_family` の接続に `* BYE` を送って閉じる（60 秒以内）。アクセスのトークンの期限（1 時間）が接続の途中で切れても、接続は切らない（RFC 7628 は再認証を求めない）。失効だけで切る。
 
 ### 5.6 フロー
@@ -349,7 +349,7 @@ stateDiagram-v2
 | SMS・電話での確かめと回復 | **法務の確認待ち**（L3） |
 | サインインの記録の保持の期間 | **法務の確認待ち**（L1・L6） |
 | アカウントの消去の期限・休眠のアカウント | **法務の確認待ち**（L6） |
-| 組織の SMTP のリレー（OAuth を使えない機器の送信） | MVP の後（[architecture/README.md](README.md) の 6 節の決定） |
+| 組織の SMTP のリレー（OAuth を使えない機器の送信） | MVP の後（[design-log.md](design-log.md) の「2026-10-10：既定案」） |
 | 高い保護の利用者向けの設定（セキュリティキーだけ、第三者のアプリの禁止） | E13 の後。要望で PM が決める |
 
 ## 出典

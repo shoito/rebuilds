@@ -295,10 +295,16 @@ EXISTS (SELECT 1 FROM org_closure c
 
 ## 8. 権限の方針の保留と有効化（[ADR-0018](../decisions/0018-security-policy-versions-and-activation.md)）
 
-```
- draft ──(security_policy_activation の案件を起票)──▶ pending_activation ──(承認・完了)──▶ active
-   ▲                                                         │                             │
-   └────────────────────── 却下・キャンセル ◀────────────────┘                  次のバージョンの有効化で superseded
+方針のバージョンの状態を次の図に示す。
+
+```mermaid
+stateDiagram-v2
+  [*] --> draft
+  draft --> pending_activation: security_policy_activation の案件を起票
+  pending_activation --> active: 承認・完了
+  pending_activation --> draft: 却下・キャンセル
+  active --> superseded: 次のバージョンの有効化
+  superseded --> [*]
 ```
 
 - テナントに下書きのバージョンは 1 つだけ。`security.config` の権限の人が編集する（楽観ロック）。

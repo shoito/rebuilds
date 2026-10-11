@@ -344,7 +344,7 @@ ADR-0061。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | NLB の TLS のリスナーを通した gRPC の端から端まで（ALPN の方針は確かめた） | E1 の `edge-and-intake-endpoints`（**未検証**） |
 | S3 の複製の規則のタグでの絞りと保存クラス（設定として持てることは確かめた。削除マーカーは写らないので明示に消す） | E1 の `s3-buckets-baseline` で実の S3 で確かめる |
 | 大阪で EC2 の群れを起こせる容量（予約の要否） | E1 の `osaka-warm-standby`（**未検証**） |
-| ログの取り込みの原価（予算の約 3 倍） | 統合の工程で、予算を 1 GB 0.10 USD に仮に上げた（PM の判断待ち。[architecture/README.md](README.md) の 6 節の「決定（2026-10-09、統合）」） |
+| ログの取り込みの原価（予算の約 3 倍） | 統合の工程で、予算を 1 GB 0.10 USD に仮に上げた（PM の判断待ち。[design-log.md](design-log.md) の「2026-10-09：統合」） |
 | S2 のカタログの Aurora の分け方 | S2 の前に別の ADR |
 
 ## 13. quality.md・runbooks・data-model への項目
@@ -369,6 +369,92 @@ ADR-0061。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | `dr_events` | 切り替えの記録、失った範囲（組織ごとの時刻の範囲） | 6.3 |
 | S3 のオブジェクトのタグ | `class`、`tier`（`l0`・`l1`） | 5.1、6.2 |
 | AppConfig | `ops.intake_enabled`（セルごと） | 6.3 |
+
+## 14. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の、すべてのコンテナと呼び出しを描いた図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    subgraph src["利用者の環境"]
+        agent["&lt;brand&gt;-agent（Rust）<br/>ホスト・コンテナの指標、ログの追跡、<br/>StatsD・OTLP の受け口、ディスクの待ち行列"]
+        otel["OpenTelemetry の SDK・Collector"]
+    end
+
+    subgraph edge["エッジ"]
+        nlb["NLB・CloudFront＋WAF"]
+    end
+
+    subgraph intake["取り込み（Rust、Fargate）"]
+        gw["intake-gateway<br/>キーの確認、形式の変換、正規化、<br/>受け付けの窓、割り当て、背圧"]
+    end
+
+    subgraph bus["取り込みのログ（Amazon MSK）"]
+        tm[("metrics")]
+        tl[("logs-raw → logs")]
+        ts[("spans")]
+        tu[("usage")]
+        td[("derived-partials")]
+    end
+
+    subgraph dataplane["データの面（Rust、EC2 の NVMe のインスタンスの ECS）"]
+        ing["metrics-ingester<br/>ヘッド（2 時間）、系列の索引、<br/>ブロックの書き出し、ロールアップ"]
+        lp["log-processor<br/>解析、付け替え、PII のマスク、<br/>索引の振り分け、ログからのメトリクス"]
+        li["log-indexer<br/>列指向のセグメント、ブルームフィルター"]
+        ta["trace-assembler<br/>組み立て、テールサンプリング、<br/>RED メトリクス、サービスマップの辺"]
+        comp["compactor<br/>ブロック・セグメントの合わせ、<br/>ロールアップの層、保持"]
+        q["query-engine<br/>計画、扇形の展開、部分の集計、合わせ"]
+        ev["monitor-evaluator（slo-calculator）<br/>評価のシャード、ステートマシン、水位"]
+        dm["derived-metrics-aggregator<br/>ログ・スパンから作る指標を<br/>1 系列 1 書き手で集め直す"]
+    end
+
+    subgraph control["管理の面（TypeScript・Hono、Fargate）"]
+        api["api・web-bff<br/>組織、権限、モニター、<br/>ダッシュボード、SLO、インシデント"]
+        relay["relay（outbox）"]
+        notif["notifier（egress）"]
+        meter["usage-aggregator"]
+    end
+
+    s3[("S3（東京）<br/>ブロック、セグメント、トレース、<br/>アーカイブ、評価の記録")]
+    aurora[("Aurora PostgreSQL<br/>管理の正本、カタログ、<br/>状態の遷移、outbox、RLS")]
+    valkey[("Valkey<br/>結果のキャッシュ、キーの<br/>キャッシュ、割り当ての調整")]
+    osaka[("大阪：S3 の写し、<br/>Aurora Global Database")]
+
+    agent --> nlb
+    otel --> nlb
+    nlb --> gw
+    gw --> tm
+    gw --> tl
+    gw --> ts
+    gw --> tu
+    tm --> ing
+    tl --> lp
+    lp --> tl
+    tl --> li
+    ts --> ta
+    ta --> td
+    lp --> td
+    td --> dm
+    dm --> tm
+    ing --> s3
+    li --> s3
+    ta --> s3
+    comp --> s3
+    li --> aurora
+    q --> ing
+    q --> s3
+    q --> valkey
+    ev --> q
+    ev --> aurora
+    api --> q
+    api --> aurora
+    aurora --> relay
+    relay --> notif
+    tu --> meter
+    meter --> aurora
+    s3 -.-> osaka
+    aurora -.-> osaka
+```
 
 ## 出典
 

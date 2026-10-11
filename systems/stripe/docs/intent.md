@@ -80,6 +80,7 @@
 | L6 | 帳簿等の保存期間：取引の記録（7 年）、台帳（10 年）、本人確認の記録（7 年）、監査のアーカイブ（7 年）の期間。Object Lock は後から短くできない | [ADR-0023](decisions/0023-audit-log.md)、[ADR-0024](decisions/0024-data-retention-and-deletion.md)、[security.md](architecture/security.md) の 13 節 | E10 の監査のアーカイブと保持のジョブ（本番の Object Lock のバケットを作る前）。E4 の台帳の古いパーティションの書き出し |
 | L7 | 拒否・解約の後の残高の留保：留保の期間（既定案 120 日）と、制裁・反社のリストとの一致で拒否したときに入金してよいか | [merchant-onboarding.md](architecture/merchant-onboarding.md) の 8 節 | E2 の拒否と契約の終了の Story、E4 の入金の停止と解除 |
 | L8 | 消費税の扱い：決済手数料・Dispute の手数料にかかる消費税と、`fee_details` の `tax`、請求書の要件 | [ledger.md](architecture/ledger.md) の 2.2 節 | E4 の手数料（`fee-schedules`）の Story |
+| L9 | カード番号の移行：前の事業者から取り込む・次の事業者へ書き出すときに、カード会員の同意が要るか、個人情報保護法の上で誰の委託・提供にあたるか、割賦販売法のセキュリティガイドラインの上で受け手の準拠をどこまで確かめるか | [ADR-0034](decisions/0034-card-data-migration.md)、[card-vault.md](architecture/card-vault.md) の 13 節 | `card-data-migration` の Story（提供すると決めた場合） |
 
 ### 接続先の選定（法務以外）
 
@@ -93,3 +94,9 @@
 | eKYC・反社・制裁の照合の提供者 | E2 | 犯収法の本人確認の方式に対応すること（適用は L3）、API での結果の受け取り、国内でのデータの保管 | eKYC 2 社と照合 1 社。例：TRUSTDOCK、Liquid |
 | 外部の不正検知サービス | E9 | PAN を渡さずに使えること、同期の API の p99 が 300ms 以内、ルールの属性に使える点数と理由を返すこと（個人情報の渡し方は L4・L5） | 国内 1 社と海外 2 社。例：かっこ（O-PLUX）、Sift、SEON |
 | QSA | E10 の着手時 | PCI SSC の QSA の一覧にある会社、サービスプロバイダー レベル 1 と AWS の上のマルチテナント（附属書 A1）の審査の経験、日本語での対応、設計・構築の支援を請けていないこと（独立性） | 2〜3 社から見積もりを取る。事前相談で PrivateLink・指紋・附属書 A1 の見解を聞く |
+
+### PM の判断待ち
+
+| 問い | 選択肢（推奨に印） | 関係する設計 |
+| --- | --- | --- |
+| 他の決済事業者とのカード番号の移行を提供するか、いつか | 提供しない（Non-goal にする）／**取り込みと書き出しの両方を、MVP の後（E10 の後）に運用者が仲介する手続きとして提供する（推奨）**／書き出しだけを提供する | [ADR-0034](decisions/0034-card-data-migration.md)（proposed）。法令は L9 |

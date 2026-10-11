@@ -150,7 +150,7 @@ model("WorkspaceSettings", {          // 1 ワークスペース 1 行
 - `workspaces` の表も、他のワークスペースの表と同じく `workspace_id`（= `id`）と FORCE RLS を持つ。ワークスペースのコンテキストを決める前に slug から ID を引く処理（画面の最初の URL の解決）は、`SECURITY DEFINER` の関数 `resolve_workspace_slug(slug)` だけで行い、`(id, status, region)` だけを返す（[data-model.md](data-model.md) の 5 節）。アカウントから入れるワークスペースの一覧は `auth.workspace_directory`（[accounts-and-auth.md](accounts-and-auth.md) の 4.1 節）。
 - 行はワークスペースを作る時に Writer が作る。`status` と `region` は Writer のシステムのトランザクション（削除のジョブ、移動のジョブ）だけが書く。
 - `members_can_invite` の既定は偽（招待は管理者だけ）。本家の有料のプランの既定と同じで、管理者が設定で全員に広げられる（[Invite members](https://linear.app/docs/invite-members)、[Members and roles](https://linear.app/docs/members-roles)、2026-09-28 に確認）。B2B の利用で、知らない人が勝手に招かれない安全な既定にするため。
-  > 2026-09-28 の注記：当初の既定は真（本家の無料のプランの振る舞い）だった。PM の判断で偽に替えた（[README.md](README.md) の 6 節の決定）。
+  > 2026-09-28 の注記：当初の既定は真（本家の無料のプランの振る舞い）だった。PM の判断で偽に替えた（[design-log.md](design-log.md) の 2026-09-28 の決定）。
 - `slug` の長さ（48 文字まで）は本システムの既定である。URL に入れて読める長さに抑えるため。本家の上限は公式の資料で確かめられなかった（**未検証**）。
 - 書ける人は DT-PERM-002 の行 1・行 17 と DT-PERM-003。
 

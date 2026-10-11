@@ -9,7 +9,7 @@ date: 2026-10-10
 
 - 映像は区切りごとに並べて符号化する（[ADR-0002](0002-upload-and-pipeline-orchestration.md)）。AAC は符号化の始めに前置きのサンプル（プライミング）を入れるので、音声を区切りごとに符号化すると、境に無音や重なりができる。
 - 動画ごとに音量が大きく違う。視聴者が動画を移るたびに音量を直すのは体験が悪い。音量を上げる正規化は、ピークで歪む。
-- [architecture/README.md](../architecture/README.md) の 6 節は、日本語と英語の自動の字幕（VOD だけ）を作り、エンジンは Adapter の裏で `asr-engine-poc` の後に決めるとした。`asr-worker` は GPU のプールにある（[ADR-0001](0001-platform-and-stack.md)）。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、日本語と英語の自動の字幕（VOD だけ）を作り、エンジンは Adapter の裏で `asr-engine-poc` の後に決めるとした。`asr-worker` は GPU のプールにある（[ADR-0001](0001-platform-and-stack.md)）。
 - Zoom の題材は Amazon Transcribe を Adapter の後ろに置いた（[Zoom の ADR-0026](../../../zoom/docs/decisions/0026-asr-engine-amazon-transcribe-with-adapter.md)）。Zoom は流れの中の ASR で、この題材は量の多いバッチである。
 - アップロードされた音声を学習に使う範囲は法務の確認待ち（[intent.md](../intent.md) の L8）。
 

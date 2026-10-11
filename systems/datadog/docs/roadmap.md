@@ -10,7 +10,7 @@
   - E6 の前：テールサンプリングの待ちとメモリー（`tail-sampling-memory-poc`）。
 - **規則は 1 つのコードに。** コーデックとブロックは `crates/tsdb`、クエリの言語と IR は `crates/query-lang`、評価は `crates/monitor-eval`、セグメントは `crates/segstore`、データのアクセスの制限の付加は IR のコンパイラにだけ書く。
 - **契約を先に固定する。** 取り込みの形式（内部の Protobuf、OTLP の対応）、系列の鍵の作り方、`codec_id`、ブロックとセグメントの形式、クエリの言語と IR の既定の意味、モニターの状態の遷移の決定表、キーの形式とヘッダー、Webhook の署名は、人間がレビューして確定する。エージェントは勝手に変えない。
-- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L9）。下の表で「法務：L*」と書いた Story が当たる。
+- **法務の確認待ちの Story は、spec を承認しない。** 設計と、法務に依らない Story は進めてよい（[intent.md](intent.md) の「法務の確認待ち」L1〜L10）。下の表で「法務：L*」と書いた Story が当たる。
 - **うるさい隣人を早く試す。** 負荷の生成器を E2 で作り、縮めた規模のうるさい隣人の場面を、E2 から夜間に流し続ける。
 
 ## Epic
@@ -168,6 +168,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | --- | --- |
 | `dashboard-model` | ダッシュボードとウィジェットの定義、バージョン |
 | `widgets-timeseries-and-more` | 時系列・数値・上位・表・ヒートマップ・ログの一覧。画面の寄せ方は法務：L9 |
+| `ui-accessibility` | 画面の全体の WCAG 2.2 AA、グラフの要約と「表で見る」、キー操作、axe の関門（[dashboards.md](architecture/dashboards.md) の 10 節） |
 | `template-variables` | テンプレートの変数 |
 | `query-batching-and-live` | クエリの束ね、同じクエリのまとめ、ライブの更新 |
 | `dashboard-sharing` | 組織の中の共有のリンク |
@@ -216,6 +217,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `pentest-external` | 外部のペンテスト（取り込み、API、画面、データのアクセスの制限） |
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e13` | 個別の手順の作成と確認 |
+| `org-data-export` | 組織の設定の束とテレメトリーの書き出し（[security.md](architecture/security.md) の 5.6 節、[ADR-0067](decisions/0067-org-data-export.md)、proposed）。テレメトリーを MVP に入れるかは PM の判断。猶予の約束は法務：L5・L7 |
 | `ga-readiness` | GA の判定。法務：L1・L2・L5・L6・L7 |
 
 ## エージェントに任せないこと
@@ -226,7 +228,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 - **セルの割り当ての変更、組織のセルの移し替え**：Ops が判断する。
 - **大阪への切り替えの判断**：IC と Ops の責任者。
 - **開示の請求・捜査機関からの照会への応答、利用者のデータの削除の請求の実行**：法務と Ops。
-- **法務の判断**（L1〜L9）。
+- **法務の判断**（L1〜L10）。
 - **負荷試験・PoC の結果の解釈**：数字は出せるが、上限・構成・コーデックの採否は Dev と PM の判断。
 
 ## 延期の一覧
@@ -239,3 +241,4 @@ MVP の後に検討する。E14〜E19 に入れなかったもの。着手する
 - **組織ごとの暗号化の鍵（BYOK）**（[ADR-0009](decisions/0009-retention-tiers-on-s3.md)）。
 - **S2 のセルの分け方と、大きな組織の専用のセル**（infrastructure の領域）。
 - **プロファイリング、セキュリティの監視、データベースの監視**（intent.md）。
+- **他の監視の道具からの移行の取り込み**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)、proposed。PromQL の E17 の後。MVP に入れるかは PM の判断。本家の形式は法務：L10）。

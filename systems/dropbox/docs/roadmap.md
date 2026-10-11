@@ -171,6 +171,8 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `web-share-ui` | 共有フォルダーと共有リンクの画面 |
 | `web-restore-ui` | バージョン履歴、削除したファイル、巻き戻しの画面 |
 | `web-ime` | 名前の変更・検索の入力の IME |
+| `web-a11y-baseline` | キー操作・読み上げ・ドラッグの代わり、axe の PR の検査（web-client.md の 4 節） |
+| `web-i18n` | UI の言語（日本語・英語）と ICU MessageFormat、日時と大きさの表示（web-client.md の 5 節） |
 
 ### E8 バージョンと復元
 
@@ -280,7 +282,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 MVP の後に検討する。E14〜E19 に入れなかったもの。着手するときに `intent.md` から起票する。
 
 - **電子署名、文書の共同編集、ファイルの依頼（他人からの受け取り）**（intent.md）。
-- **編集の共有リンク、フォルダーの共有リンクの中への書き込み**（[architecture/README.md](architecture/README.md) の 6 節）。
+- **編集の共有リンク、フォルダーの共有リンクの中への書き込み**（[architecture/design-log.md](architecture/design-log.md) の「2026-10-09：既定案」）。
 - **小さなブロックのパック**（[ADR-0020](decisions/0020-small-block-packing-for-s2.md)。S2 の前の `small-block-pack-poc` で測って決める）。
 - **S2 の構成**（名前空間の持ち主のテナントでのシャード、検索の分け方）と **S3 のセル構成**（infrastructure の領域）。
 - **リーガルホールドと eDiscovery**（法務の L6 の結論で前に出しうる）。

@@ -69,7 +69,8 @@ Git のリポジトリのホスティングと、その上の共同作業を作�
 ## 未解決の問い
 
 - 公開リポジトリの大量の clone（CI や AI の学習の収集）への帯域とコストの対策を、どこまで行うか。
+- **PM の判断待ち**：他のホスティングからの取り込みを提供するか、どの範囲か。選択肢は、`git push --mirror` の案内だけにする（Non-goal にする）／Git の URL からの取り込みだけ／それに加えて、決めた 1 つの形式の移行のアーカイブから Issue・PR を MVP の後に取り込む（推奨）（[ADR-0037](decisions/0037-import-from-other-hosts.md)、proposed）。移行元の他人の発言と個人情報を預かることの扱いは**法務の確認待ち**。決まるまで取り込みの Story の spec を承認しない。
 
 ### 決定（2026-09-26、既定案）
 
-- 人気の公開リポジトリは bundle-uri と CDN で配り、リポジトリごと・IP ごとの clone のレート制限をかける。利用者ごとの帯域の課金は MVP に含めない（[architecture/README.md](architecture/README.md) の 6 節）。
+- 人気の公開リポジトリは bundle-uri と CDN で配り、リポジトリごと・IP ごとの clone のレート制限をかける。利用者ごとの帯域の課金は MVP に含めない（[architecture/design-log.md](architecture/design-log.md)）。

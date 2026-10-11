@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - 取り込んだ予定は `stay_claims` の `ical_block` の行で、同じ排他の制約に入る（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)。行の形は [availability-and-calendars.md](availability-and-calendars.md) の 4 節）
-- 取り込みは 15 分ごと、2 年先まで、1 リスティング 5 件まで。書き出しは秘密のアドレスで、作り直すと古いアドレスは 404（[architecture/README.md](README.md) の 6 節の決定）
+- 取り込みは 15 分ごと、2 年先まで、1 リスティング 5 件まで。書き出しは秘密のアドレスで、作り直すと古いアドレスは 404（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定）
 - 外部と本システムで同じ夜が売れていても、本システムの予約を自動で取り消さない（[architecture/README.md](README.md) の 1.3 節 E）
 - 外部のカレンダーは信用しない入力として扱う（[AGENTS.md](../../AGENTS.md)）
 - 取り込む向きと公開する向きの ICS の形は、Google Calendar の題材の [ADR-0025](../../../google-calendar/docs/decisions/0025-ics-subscriptions-both-directions.md) を参照し、宿泊の泊に合わせて自前で書く

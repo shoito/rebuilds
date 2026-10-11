@@ -435,6 +435,125 @@ ADR-0078。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | 本人確認の提供者・SMS の 1 回の料金と、予約あたりの原価の目標 | E2・E17 の選定（**未検証**） |
 | データの所在の法令上の約束、提供者の所在 | **法務の確認待ち：L8** |
 
+## 14. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の元になる、すべてのコンテナと呼び出しの図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    app["アプリ・Web<br/>ゲストとホスト"]
+    pms["PMS・チャネルマネージャー"]
+    ops["運用の画面<br/>CS・安全・財務"]
+
+    subgraph edge["エッジ"]
+        cf["CloudFront・AWS WAF<br/>Bot Control、速さの上限"]
+    end
+
+    subgraph api["API の層（Fargate）"]
+        gw["app-api<br/>認証、BFF"]
+        papi["partner-api<br/>OAuth、PMS の API"]
+        opsapi["ops-api<br/>JIT の権限、監査"]
+    end
+
+    subgraph domain["ドメインのサービス（Fargate）"]
+        idn["identity<br/>アカウント、ホストのアカウント、eKYC"]
+        lst["listings<br/>リスティング、写真、翻訳、位置"]
+        avl["availability<br/>stay_claims、滞在の規則、カレンダー"]
+        srch["search-api<br/>候補、空室の確かめ、順位"]
+        prc["pricing<br/>quoteStay、税、為替"]
+        bkg["booking<br/>reserveStay、ステートマシン、期限"]
+        pay["payments<br/>提供者のアダプター、inbox"]
+        led["ledger<br/>複式簿記、決着"]
+        pout["payouts<br/>送金、保留"]
+        msg["messaging<br/>メッセージ、絞り込み"]
+        rev["reviews<br/>同時の公開"]
+        ts["trust-safety<br/>規則、審査、措置、安全の案件"]
+        reg["compliance-jp<br/>届出住宅、180 日、名簿"]
+        ntf["notifier<br/>プッシュ、メール、SMS"]
+    end
+
+    subgraph async["非同期（SNS・SQS・Worker）"]
+        relay["relay（outbox）"]
+        media["media-processor"]
+        idx["search-indexer<br/>空きの区間"]
+        acache["availability-cache-writer"]
+        ical["ical-sync<br/>取り込みと書き出し"]
+        dl["deadline-runner<br/>期限の処理"]
+        rec["reconcilers"]
+    end
+
+    subgraph ml["ML（Python）"]
+        inf["ml-inference<br/>不正、パーティーの危険、料金の提案"]
+        lake[("データレイク")]
+    end
+
+    core[("Aurora core<br/>アカウント、リスティング、stay_claims、<br/>予約、届出住宅")]
+    ledger[("Aurora ledger<br/>仕訳、送金")]
+    content[("Aurora content<br/>メッセージ、レビュー、T&S、通知")]
+    vault[("Aurora vault<br/>住所、名簿、旅券、口座")]
+    vk[("Valkey<br/>空室の写し、見積もり、セッション")]
+    os[("OpenSearch<br/>リスティング、空きの区間、地名")]
+    s3[("S3<br/>写真、書き出し")]
+    ext["決済・為替・銀行・eKYC・<br/>翻訳・地図・他の掲載先"]
+    osaka[("大阪：Aurora Global Database、S3 の写し")]
+
+    app --> cf --> gw
+    pms --> cf --> papi
+    ops --> cf --> opsapi
+    gw --> srch
+    gw --> bkg
+    gw --> lst
+    gw --> msg
+    papi --> avl
+    papi --> bkg
+    papi --> lst
+    opsapi --> ts
+    opsapi --> bkg
+    srch --> os
+    srch --> vk
+    srch --> prc
+    bkg --> avl
+    bkg --> prc
+    bkg --> reg
+    bkg --> pay
+    avl --> core
+    reg --> core
+    reg --> vault
+    lst --> core
+    lst --> s3
+    pay --> ext
+    led --> ledger
+    pout --> led
+    pout --> ext
+    idn --> ext
+    msg --> content
+    rev --> content
+    ts --> content
+    ts --> inf
+    core --> relay
+    content --> relay
+    ledger --> relay
+    relay --> idx
+    relay --> acache
+    relay --> led
+    relay --> ntf
+    relay --> ts
+    relay --> media
+    relay --> lake
+    idx --> os
+    acache --> vk
+    ical --> avl
+    ical --> ext
+    dl --> bkg
+    dl --> rev
+    rec --> core
+    rec --> ledger
+    core -.-> osaka
+    ledger -.-> osaka
+    content -.-> osaka
+    vault -.-> osaka
+```
+
 ## 出典
 
 いずれも 2026-10-10 に確認（[Mercari の infrastructure.md](../../../mercari/docs/architecture/infrastructure.md) の出典と同じ公開の文書）。

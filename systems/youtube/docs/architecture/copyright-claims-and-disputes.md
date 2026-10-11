@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - 照合の結果が出るまで公開しない。一致ごとに参照の方針を当てる。所有の衝突の区間は追跡だけ（[ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md)、[copyright-matching.md](copyright-matching.md)）
-- 方針の重なりはブロック ＞ 収益化 ＞ 追跡。収益化の一致が複数あれば区間の長さで分ける。権利者は 30 日で異議に応え、応えなければ一致を外す（[architecture/README.md](README.md) の 6 節の決定）
+- 方針の重なりはブロック ＞ 収益化 ＞ 追跡。収益化の一致が複数あれば区間の長さで分ける。権利者は 30 日で異議に応え、応えなければ一致を外す（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定）
 - 見える範囲は `playable()`。創作者には権利者の表から写した通知の表で見せる（[ADR-0009](../decisions/0009-single-tenant-and-playable.md)）
 - 措置は記録してから効かせ、60 秒以内に配信を止める（[ADR-0005](../decisions/0005-cdn-and-origin-strategy.md)、[cdn-and-delivery.md](cdn-and-delivery.md) の 10 節）
 - 法令の判断は書かない。枠組みと問いだけ（AGENTS.md）

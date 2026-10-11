@@ -12,7 +12,7 @@
 | `refund_tax_lines` | ポッド `public` | `admin-api`（返金の作成） |
 | `tax_documents`、`tax_document_sequences` | ポッド `public` | `workers`（文書の作成のジョブ） |
 
-- 外貨のマーケットの有効化は `release.markets-foreign-currency` の裏（[README.md](../README.md) の 6 節の仮の決定）。表と計算は MVP で作る。
+- 外貨のマーケットの有効化は `release.markets-foreign-currency` の裏（[design-log.md](../design-log.md) の「2026-10-10：統合」の仮の決定）。表と計算は MVP で作る。
 - 法令の扱い（送料の区分、返金の方式、文書の記載、保存の期間）は法務の確認待ち（L4）。表は値を変えれば結論に合わせられる形にする。
 
 ## 1. ER 図

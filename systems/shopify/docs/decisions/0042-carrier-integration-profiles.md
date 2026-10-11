@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- MVP は 3 社（ヤマト運輸、佐川急便、日本郵便）の送り状の CSV と、選んだ 1 社の API を持つ（[architecture/README.md](../architecture/README.md) の 6 節）。
+- MVP は 3 社（ヤマト運輸、佐川急便、日本郵便）の送り状の CSV と、選んだ 1 社の API を持つ（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 各社の送り状の発行の道具の CSV の列・文字の符号化・時間帯の値は、公式の資料でまだ確かめていない（**未検証**）。各社が形を変えることがある。
 - 運送会社の API は、契約と認証が事業者ごとに要る。
 

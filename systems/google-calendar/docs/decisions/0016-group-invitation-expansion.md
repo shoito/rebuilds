@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-組織の会議では、部署やプロジェクトのグループを招待することが多い（[intent.md](../intent.md)）。[ADR-0006](0006-organizer-and-attendee-copies.md) は、グループの項目を主催者の写しに残し、メンバーごとに写しを作り、グループの変化を未来の予定にだけ反映すると決めた。展開の上限は MVP で 10,000 人とした（[architecture/README.md](../architecture/README.md) の 6 節）。
+組織の会議では、部署やプロジェクトのグループを招待することが多い（[intent.md](../intent.md)）。[ADR-0006](0006-organizer-and-attendee-copies.md) は、グループの項目を主催者の写しに残し、メンバーごとに写しを作り、グループの変化を未来の予定にだけ反映すると決めた。展開の上限は MVP で 10,000 人とした（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」）。
 
 本家では、グループの招待で参加者は最大 100,000 人で、グループの変化は未来の予定に反映され、200 人を超える予定では 24 時間以内に反映される（[Invite groups to calendar events](https://support.google.com/calendar/answer/172013)、2026-10-04 に確認）。
 

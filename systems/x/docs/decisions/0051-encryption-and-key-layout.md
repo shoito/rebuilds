@@ -10,7 +10,7 @@ date: 2026-10-04
 - 本システムは、電話番号・メールアドレス（登録と OTP）、生年月日（年齢。法務の L5）、ログインと投稿の時の IP アドレス（発信者情報の開示。法務の L2）を持つ。どれも漏れたときの影響が大きい。
 - DB の保存の暗号化（KMS）は、DB のスナップショットや、DB に届く権限を持つ者からは守らない。
 - 運用者・T&S の読み出しは理由を必須にして監査する（[ADR-0004](0004-single-tenant-and-visibility.md)、[ADR-0052](0052-audit-and-operator-access.md)）。
-- DM の中身の保存の暗号化は MVP で KMS による（[architecture/README.md](../architecture/README.md) の 6 節の決定）。形は direct-messages の領域で決める。
+- DM の中身の保存の暗号化は MVP で KMS による（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」）。形は direct-messages の領域で決める。
 
 ## Options
 

@@ -341,7 +341,7 @@ Slack の client.md の 8 節（CSP、Trusted Types、Cookie のセッション�
 
 ## 17. 決定と持ち越し
 
-2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
+2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[design-log.md](design-log.md) の「決定」）。
 
 - ブロックの間にまたがる部分的なテキストの選択は、MVP に入れない（3.1 節。[roadmap.md](../roadmap.md) の「後回しにしたもの」）。
 - デスクトップのローカルの保存は、S1 は Web と同じ WASM の SQLite（OPFS）にする。本家と同じネイティブの SQLite は S2 の候補にし、計測で決める（11 節、[ADR-0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md)）。

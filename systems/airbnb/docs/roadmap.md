@@ -129,6 +129,7 @@ E1〜E20 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `flexible-dates` | 日付を決めない検索 |
 | `ranking-formula-v1` | 順位の式とバージョン |
 | `search-correctness-sampling` | 混入の抜き取りと、`search-ref`（quality.md の 2.2.1 節 E） |
+| `search-accessible-list-and-map` | 地図の代わりの一覧、読み上げとキー操作（search-and-ranking.md の 5.5.1 節） |
 
 ### E8 料金・手数料・税
 

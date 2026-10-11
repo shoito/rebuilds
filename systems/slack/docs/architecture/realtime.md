@@ -213,6 +213,36 @@ Gateway ノード
 - `ready` の heads で、自分が持つ `seq` と `last_seq` が同じチャンネルは取りに行かない。
 - 差分取得の API は reader から読む。クライアントが「`seq` M までは存在する」と知っている場合（WebSocket で M を受け取った）は、`min_seq=M` を付ける。reader の結果が M に届かなければ、API は writer から読み直す（reader の遅れで欠損が続くのを防ぐ）。
 
+次の図は、再接続と欠損の検知から差分を取り、reader の遅れで writer に読み直すまでを示す。
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant GW as Gateway
+    participant API as API
+    participant R as Aurora（reader）
+    participant W as Aurora（writer）
+
+    C->>GW: 再接続（hello）
+    GW-->>C: ready（heads）
+    Note over C: heads の last_seq と自分の seq が同じチャンネルは取りに行かない<br/>表示中 → メンション・DM → その他は heads だけ。同時に 3 本まで
+    GW->>C: イベント（seq M）
+    Note over C: M が last＋1 でない → 欠損
+    C->>API: GET .../events?after_seq=N&min_seq=M
+    API->>R: 差分を読む
+    R-->>API: 結果
+    alt reader の結果が M に届かない
+        API->>W: 読み直す
+        W-->>API: 結果
+    end
+    API-->>C: 差分
+    alt 差分が多すぎる（例：1,000 件超）
+        C->>API: 最新ページを取り直す
+    else それ以外
+        Note over C: seq 順に適用する
+    end
+```
+
 ## 7. 背圧と遅い受信者
 
 | しきい値（接続ごと） | 動作 |

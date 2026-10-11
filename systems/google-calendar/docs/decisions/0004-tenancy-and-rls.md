@@ -70,7 +70,7 @@ date: 2026-10-04
 - 全テナントを順に回す保守のジョブ（範囲の端の維持、照合、削除の期限など）は、許可リストに入れない。`tenants` からテナントの ID を読み、テナントごとに `SET LOCAL` して処理する。
 - 運用者の JIT のアクセスと break-glass は、プラットフォームの監査に残す別の経路で、アプリの DB のロールを使わない（security の領域）。
 
-> 2026-10-04 の注記：データモデルの工程で、許可リストにないテナントをまたぐ処理が 4 つ見つかった（[architecture/README.md](../architecture/README.md) の 6 節）。推奨の案で決め、この ADR を直した。(1) Relay の `outbox` の読み出しを X10 にした。`outbox` は iTIP の本文（予定の中身）を持つので RLS の外の表にせず、`relay` のロールにだけ `outbox` の `SELECT`・`DELETE` を全テナントで許すポリシーを付ける。(2) X6 の入口に OAuth のトークン（API・CalDAV の Bearer）と予約の管理のリンク（`/m/<token>`）を足し、解決の表 `oauth_token_directory`・`booking_manage_directory` を足した。(3) ICS の購読の取得の予定を探す表 `ics_fetch_schedule` を足し、X11 にした（X5 と同じ形。ID と時刻だけ）。(4) テナントをまたぐ共有のカレンダーの既定のリマインダーの購読者は X4 の経路で書き、X4 が無効の間は計画しない（経路は足さない）。あわせて、S2 のディレクトリのクラスタの表（`tenant_directory`、`account_directory`）を一覧に載せた。
+> 2026-10-04 の注記：データモデルの工程で、許可リストにないテナントをまたぐ処理が 4 つ見つかった（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：データモデルの工程で見つけたテナントをまたぐ経路」）。推奨の案で決め、この ADR を直した。(1) Relay の `outbox` の読み出しを X10 にした。`outbox` は iTIP の本文（予定の中身）を持つので RLS の外の表にせず、`relay` のロールにだけ `outbox` の `SELECT`・`DELETE` を全テナントで許すポリシーを付ける。(2) X6 の入口に OAuth のトークン（API・CalDAV の Bearer）と予約の管理のリンク（`/m/<token>`）を足し、解決の表 `oauth_token_directory`・`booking_manage_directory` を足した。(3) ICS の購読の取得の予定を探す表 `ics_fetch_schedule` を足し、X11 にした（X5 と同じ形。ID と時刻だけ）。(4) テナントをまたぐ共有のカレンダーの既定のリマインダーの購読者は X4 の経路で書き、X4 が無効の間は計画しない（経路は足さない）。あわせて、S2 のディレクトリのクラスタの表（`tenant_directory`、`account_directory`）を一覧に載せた。
 
 ### RLS の外の表の許可リスト
 

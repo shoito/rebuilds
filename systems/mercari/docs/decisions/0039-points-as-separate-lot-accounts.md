@@ -8,7 +8,7 @@ date: 2026-10-10
 ## Context
 
 - [ADR-0003](0003-escrow-and-double-entry-ledger.md) は、ポイントを利用者ごと・発行のロットごとの口座にした。[ADR-0004](0004-proceeds-model-under-payment-services-act.md) は、売上金からの交換・期限・払い戻しの可否を `legal.*` に置いた。
-- 最初の設計で、MVP のポイントは本システムが付けるもの（キャンペーン、補償）だけとし、売上金からポイントへの交換は法務の L1 の後とした（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 最初の設計で、MVP のポイントは本システムが付けるもの（キャンペーン、補償）だけとし、売上金からポイントへの交換は法務の L1 の後とした（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - ポイントが前払式支払手段に当たるか、期限・保全・表示の義務は法務の確認待ち（L1）。キャンペーンの上限は景品表示法の確認待ち（L4）。
 - 取り消しでポイントを戻すとき、元のロットがすぐ期限になると、買い手の責めでない取り消しでポイントを失う。
 - 本家のポイントの名前と規則は確かめられなかった（**未検証**）。名前は本家のものを使わない（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。

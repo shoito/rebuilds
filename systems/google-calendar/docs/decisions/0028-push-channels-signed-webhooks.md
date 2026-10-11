@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-[ADR-0005](0005-change-log-and-sync-tokens.md) は、Webhook を変更のログの後に `push-sender` が送り、経路ごとに 1 秒 1 回にまとめ、中身を入れず、受け手が差分の同期で取ると決めた。[architecture/README.md](../architecture/README.md) の 6 節は、期限を既定 7 日・最大 30 日、自動の更新なし、ヘッダーを `<Brand>-Channel-Id`・`<Brand>-Resource-State`・`<Brand>-Message-Number` と署名の `<Brand>-Signature` にすると決めた。
+[ADR-0005](0005-change-log-and-sync-tokens.md) は、Webhook を変更のログの後に `push-sender` が送り、経路ごとに 1 秒 1 回にまとめ、中身を入れず、受け手が差分の同期で取ると決めた。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、期限を既定 7 日・最大 30 日、自動の更新なし、ヘッダーを `<Brand>-Channel-Id`・`<Brand>-Resource-State`・`<Brand>-Message-Number` と署名の `<Brand>-Signature` にすると決めた。
 
 決めることは次である。
 

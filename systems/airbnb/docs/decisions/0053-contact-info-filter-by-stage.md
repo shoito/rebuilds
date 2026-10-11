@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- 予約の前の連絡先の交換は、本システムの外での予約と支払い（手数料の回避、前払いの詐欺）につながる。確定の後は、到着の連絡に電話番号が要る（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 予約の前の連絡先の交換は、本システムの外での予約と支払い（手数料の回避、前払いの詐欺）につながる。確定の後は、到着の連絡に電話番号が要る（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 海外のゲストとホストは、英語・中国語・韓国語で数字を書く。
 - 問い合わせは、連絡先の部分だけが問題で、残りの質問は届けたい。
 - メッセージを機械で調べる範囲は法務の確認待ち（L9）。Mercari の題材は、送る時の決定的な検査と 3 つの値の `legal.message_scan_mode` にした（[ADR-0047](../../../mercari/docs/decisions/0047-send-time-abuse-filter-and-scan-modes.md)）。

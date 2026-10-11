@@ -7,7 +7,7 @@
 - 見える範囲は `playable()`。再生の API はマニフェストの短い期限の署名つきの URL、広告の枠、DRM のライセンスの URL を返す（[ADR-0009](../decisions/0009-single-tenant-and-playable.md)）
 - CMAF のセグメント 4 秒、マニフェストは能力の組ごと（[ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md)、[ADR-0020](../decisions/0020-manifest-generation-and-capability-classes.md)）
 - 視聴の出来事（`play_start`、心拍、`seek`、`quality_change`、`rebuffer`、`ad_*`、`end`）と再生のトークン（10 時間）は [ADR-0007](../decisions/0007-two-phase-view-counting.md)
-- Web と Android は自前の ABR、iOS は AVPlayer（[architecture/README.md](README.md) の 6 節）
+- Web と Android は自前の ABR、iOS は AVPlayer（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - ライブの低遅延は LL-HLS、部分 0.5 秒（[ADR-0006](../decisions/0006-live-ingest-and-latency.md)）
 
 この文書で決めたことは次の ADR にある。
@@ -58,6 +58,17 @@
 
 - `abr-core` は、時計とネットワークを外から渡す純粋な判断の部分にする。Web（TypeScript）を正本にし、Android（Kotlin）は同じ試験のベクトルを通す。`abr-sim` は同じコードを仮想の時計で動かす（[quality.md](../quality.md) の 2.2.1 節 B）。
 - 本家のプレイヤーのコードと形式は使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+
+### 3.1 アクセシビリティ
+
+Web のプレイヤーと視聴のページは WCAG 2.2 の AA を受け入れの基準にし、Android・iOS のプレイヤーは OS の読み上げ（TalkBack・VoiceOver）で全操作ができることを基準にする（[quality.md](../quality.md) の 2.2 節のアクセシビリティの行）。テレビは Web の形なので、Web と同じ基準に、リモコンの方向キーでの操作を足す。
+
+- **キー操作**：再生・停止、シーク（5 秒・10 秒）、音量、ミュート、字幕の切り替え、画質、速さ、全画面を、キーだけで操作できる。1 文字のショートカット（`k`・`m`・`c`・`f` など）は、プレイヤーにフォーカスがあるときだけ効き、設定で切れる（2.1.4）。全画面でもフォーカスを閉じ込めず、`Esc` で戻る。フォーカスの印は映像の上でも見える（暗い縁取りを付ける）。
+- **読み上げ**：操作の部品は名前と状態を持つ（字幕のボタンは押した状態、シークの部品は「3 分 12 秒、全体 10 分」の形の値の文）。再生の状態の変化、広告の始まりとスキップできるまでの秒（[ADR-0024](../decisions/0024-client-side-ad-insertion.md)）は `polite` で知らせ、秒ごとに読み上げない。Android・iOS は、自前の操作の部品に OS の読み上げの属性を付ける（AVPlayer の標準の操作を使わない画面でも同じ）。
+- **字幕の表示**：字幕のトラック（[transcoding-pipeline.md](transcoding-pipeline.md) の 8 節）を言語と種類（手動・自動）で選べ、自動の字幕は名前に「自動生成」と出す。文字の大きさ・色・背景・不透明度を変えられ、Android・iOS は OS の字幕の設定（Android の字幕の設定、iOS のメディアアクセシビリティ）を既定に使う。Web は視聴者の設定に持つ。広告の字幕は、VAST に字幕があるときだけ出す。
+- **字幕の質の線**：手動の字幕は時刻と文字が変換の前後で一致すること（[quality.md](../quality.md) の 2.2.1 節 A）。自動の字幕を既定で表示する（視聴者が選ばなくても出す）かどうかの文字の誤りの率の線は、`asr-engine-poc` の評価の集まりの結果で QA と PM が決める。線に届かない言語・動画では、自動の字幕を選べるが既定で出さない。ライブの字幕（自動は E18）は MVP では持たず、ライブのアクセシビリティは MVP の欠けとして残る。
+- **動き**：「次の動画」の自動の再生と、サムネイルに乗せたときの試しの再生は、`prefers-reduced-motion` と OS の「視差効果を減らす」の設定で既定を切にし、視聴者の設定で変えられる。
+- **音声解説**：パッケージは 1 動画に音声 4 本まで持てる（[packaging-and-drm.md](packaging-and-drm.md) の上限）。音声解説のトラック（DASH の `Role` の `description`、HLS の `CHARACTERISTICS` の `public.accessibility.describes-video`）の受け付けと選択は MVP の後の候補にする（[roadmap.md](../roadmap.md) の延期の一覧。範囲は PM が決める）。MVP では、プレイヤーが複数の音声のトラックを選べる形にしておく。
 
 ## 4. 再生の API とトークン（ADR-0023）
 
@@ -307,6 +318,7 @@ ADR-0007 の出来事に次を足す。どれも再生のトークンを付け�
 | E4 | `abr-algorithm` | 5 節（ADR-0022、PROP-ABR-001〜004） |
 | E4 | `abr-sim` | 5.4 節と回線の記録 |
 | E4 | `web-player`、`android-player`、`ios-player` | 3 節（画面の配置は**法務の確認待ち：L9**） |
+| E4 | `player-accessibility` | 3.1 節（キー操作、読み上げ、字幕の表示の設定、動きの抑え） |
 | E4 | `qoe-telemetry` | 7 節（PROP-QOE-001、DT-QOE-001。外部送信の公表は**法務の確認待ち：L6**） |
 | E14 | `client-side-ads` | 8 節（ADR-0024） |
 | E12 | `ll-hls-abr` | 5.5 節（`ll-hls-poc` の結果を受けて） |
@@ -330,6 +342,7 @@ ADR-0007 の出来事に次を足す。どれも再生のトークンを付け�
 | プレイヤーの外部送信の通知・公表の文言 | **法務の確認待ち：L6** |
 | プレイヤーの画面の配置 | **法務の確認待ち：L9** |
 | 途中の広告の最短の動画の長さ（8 分） | monetization-and-payouts の領域 |
+| 自動の字幕を既定で表示する文字の誤りの率の線（3.1 節） | `asr-engine-poc` の結果で QA と PM |
 
 ## 出典
 

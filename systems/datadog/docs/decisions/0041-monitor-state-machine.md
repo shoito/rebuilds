@@ -10,7 +10,7 @@ date: 2026-10-09
 [ADR-0008](0008-monitor-evaluation-model.md) は、グループごとのステートマシンで遷移を決め、決定表は monitors-and-alerting の領域で書くとした。
 
 - 閾値の周りで値がゆれると、OK と ALERT を行き来する。本家は回復の閾値を持つ（[Monitor Configuration](https://docs.datadoghq.com/monitors/configuration/)、2026-10-09 に確認）。
-- 一時の揺れで鳴らさないため、「N 回続けて」の条件が要る（[architecture/README.md](../architecture/README.md) の 6 節の決定、既定 1）。
+- 一時の揺れで鳴らさないため、「N 回続けて」の条件が要る（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」、既定 1）。
 - データなし・不完全・新しいグループ・グループの消え方・定義の変更が、閾値の判断と組み合わさる。組み合わせのどれかを抜くと、エラーにならずに誤った・鳴らないアラートになる（[quality.md](../quality.md) のリスク 2）。
 - 再生とシミュレーターで確かめるには、遷移が 1 つの関数の出力である必要がある。
 

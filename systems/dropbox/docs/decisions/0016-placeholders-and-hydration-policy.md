@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-[architecture/README.md](../architecture/README.md) の 6 節は、オンラインのみのファイルを OS の仕組み（macOS の File Provider、Windows の Cloud Files API）に従って作り、カーネルの拡張は作らないと決め、詳細を file-system-integration の領域の ADR に残した。
+[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」は、オンラインのみのファイルを OS の仕組み（macOS の File Provider、Windows の Cloud Files API）に従って作り、カーネルの拡張は作らないと決め、詳細を file-system-integration の領域の ADR に残した。
 
 - Windows の Cloud Files API は、プレースホルダー・完全なファイル（OS が中身を捨てうる）・固定した完全なファイル（オフラインで使える保証）の 3 つの状態を持つ。取り出しの方針は、アプリとエンジンの方針の大きいほうになる。中核のフィルターは NTFS だけ（[Build a Cloud Sync Engine](https://learn.microsoft.com/en-us/windows/win32/cfapi/build-a-cloud-file-sync-engine)、2026-10-09 に確認）。
 - 本家は File Provider を使うバージョンに macOS 12.5 以降を求める（[Dropbox on File Provider](https://help.dropbox.com/installs/dropbox-for-macos-support)、同日に確認）。File Provider の API の詳細は、Apple の文書の本文を取得できず**未検証**。

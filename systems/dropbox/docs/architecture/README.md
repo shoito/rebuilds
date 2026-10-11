@@ -1,6 +1,6 @@
 # Architecture: Dropbox
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。データモデルの正本（規約、ER 図、表の目録、DB の外の置き場所、横断の不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。データモデルの正本（規約、ER 図、表の目録、DB の外の置き場所、横断の不変条件）は [data-model.md](data-model.md) と [data-model/](data-model/)。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/dropbox/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -23,46 +23,43 @@
 
 ### 1.2 コンテナ
 
-```
- ┌ デスクトップのクライアント ───────────────────────────┐ ┌ モバイルのアプリ ─────────┐ ┌ Web の SPA ───────┐
- │ UI（TypeScript・Tauri）                               │ │ UI（Swift・Kotlin）        │ │ React             │
- │ sync-core（Rust）：監視、ローカルの状態の DB（SQLite）、│ │ sync-core（Rust）：分割、  │ │ 分割（sync-core の │
- │  3 つの木と計画、分割、送受信、ローカルのブロックの索引 │ │  送受信、カメラの取り込み  │ │  WASM）            │
- │ OS の殻：File Provider（Swift）・Cloud Files（Rust）    │ └──────────┬──────────────┘ └────────┬─────────┘
- └──────┬───────────────────────┬──────────────────────┘            │                            │
-        │ REST（commit、list）   │ ブロックの PUT・GET（署名つき URL）  │                            │
-        ▼                        ▼                                   ▼                            ▼
- ┌──── CloudFront＋WAF（www・api・notify・share、content＝<brand>usercontent。ブロックとプレビューの配信）────┐
- └──┬─────────────┬──────────────┬──────────────┬───────────────────────────────┬────────────────┘
-    ▼             ▼              ▼              ▼                               ▼（OAC）
- ┌───────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐                ┌────────────────────────┐
- │ API    │  │ Notify    │  │ Link      │  │ Auth      │                │ S3（東京）               │
- │ 木・   │  │ WebSocket │  │ 共有リンク │  │ ログイン・ │                │ blocks：ブロック（内容の │
- │ commit・│  │ の合図    │  │ の解決    │  │ SSO・SCIM・│  ブロックの PUT │  番地、テナントごと）    │
- │ 共有・ │  └────▲─────┘  └────┬─────┘  │ OAuth     │ ───────────────▶│ blocklists：大きな       │
- │ 管理   │       │             │        └──────────┘  （署名つき URL）  │  ファイルのブロックの一覧│
- └──┬────┘       │             │                                      │ previews：プレビューの   │
-    │ packages/committer（条件の確認・name_key・ns_seq・ジャーナル・   │  キャッシュ              │
-    │  ブロックの参照・outbox を 1 つの DB のトランザクションで）       │ audit：監査ログの写し    │
-    ▼             │             ▼                                      └──────────┬─────────────┘
-  Aurora PostgreSQL（ノード、リビジョン、ns_journal、ブロックの索引、       │ CRR
-   名前空間と共有、共有リンク、アカウントとチーム、outbox、RLS）           ▼
-    │ outbox      │                                              S3（大阪）：blocks の写し
-    ▼             │
-  Relay ──▶ Valkey（名前空間の合図の pub/sub、レート制限、共有リンクのキャッシュ）
-    │
-    ▼
-  SNS・SQS ──▶ Worker
-               ├ block-verifier：S3 のチェックサムを確かめてブロックの索引に入れる
-               ├ block-gc：参照が 0 のブロックを猶予の後に消す。block-scrubber：抜き取りの照合
-               ├ preview-renderer・text-extractor（隔離したタスク。ネットワークなし）
-               ├ indexer：OpenSearch へ名前と本文を入れる
-               ├ restore-runner：復元と巻き戻しの大きな操作をバッチで流す
-               ├ export-builder：フォルダーの ZIP と 1 つの URL のダウンロードを S3 の中で組み立てる（ADR-0054）
-               ├ mass-change-detector：一斉の変更（削除・名前の変更・暗号化らしい変更）を検知する
-               ├ webhook-sender（egress）、mailer、mobile-push
-               └ quota・auditor・lifecycle・slo-aggregator ほか
- OpenSearch（名前と本文の索引。ACL の判定はしない。返す前に can() で確かめ直す）
+```mermaid
+flowchart TB
+    subgraph clients["クライアント"]
+        desktop["デスクトップのクライアント<br/>UI（TypeScript・Tauri）、sync-core（Rust）、<br/>File Provider・Cloud Files"]
+        mobile["モバイルのアプリ<br/>UI（Swift・Kotlin）、sync-core（Rust）"]
+        web["Web（React）<br/>分割は sync-core の WASM"]
+    end
+
+    cf["CloudFront＋WAF<br/>www・api・notify・share、content"]
+    api["API<br/>木・commit・共有・管理<br/>（packages/committer）"]
+    notify["Notify<br/>WebSocket の合図"]
+    link["Link<br/>共有リンクの解決"]
+    auth["Auth<br/>ログイン・SSO・SCIM・OAuth"]
+    aurora[("Aurora PostgreSQL<br/>ノード、リビジョン、ns_journal、<br/>ブロックの索引、共有、outbox、RLS")]
+    s3[("S3（東京）<br/>blocks、previews、audit")]
+    osaka[("S3（大阪）<br/>blocks の写し")]
+    relay["Relay"]
+    valkey[("Valkey<br/>合図の pub/sub、レート制限、<br/>共有リンクのキャッシュ")]
+    worker["SNS・SQS → Worker<br/>block-verifier、block-gc・block-scrubber、<br/>preview-renderer・text-extractor、indexer、<br/>restore-runner、export-builder、mass-change-detector、<br/>webhook-sender・mailer・mobile-push ほか"]
+    search[("OpenSearch<br/>名前と本文の索引")]
+
+    clients -->|"REST、WebSocket、ブロックの GET"| cf
+    clients -->|"ブロックの PUT（署名つき URL）"| s3
+    cf --> api
+    cf --> notify
+    cf --> link
+    cf --> auth
+    cf -->|"ブロックとプレビューの配信（OAC）"| s3
+    api -->|"1 つの DB のトランザクション"| aurora
+    link --> aurora
+    aurora -->|"outbox"| relay
+    relay --> valkey
+    valkey --> notify
+    relay --> worker
+    worker --> s3
+    worker --> search
+    s3 -.->|"CRR"| osaka
 ```
 
 | コンテナ | 責務 |
@@ -151,7 +148,7 @@
 | 重複排除 | 範囲は未検証 | テナントの中だけ。読める名前空間の参照にあるときだけ「送らなくてよい」と答える | 他人のファイルの有無を漏らさない（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)） |
 | 保存の層 | 自社の Magic Pocket（消失訂正符号） | S3 | 耐久性は S3 に任せ、本システムは論理の耐久性を持つ（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)） |
 | データの所在 | 主に米国、条件つきで日本 | すべて日本（東京、DR は大阪） | 日本を最初の市場にする。CDN のエッジの扱いは法務の L5 |
-| LAN 同期 | あり | MVP では持たない | 6 節の決定 |
+| LAN 同期 | あり | MVP では持たない | [design-log.md](design-log.md) の「2026-10-09：既定案」 |
 | 競合のコピーの名前 | 編集した人の名前と日付 | 端末の名前と日付 | 同じ人の 2 台の衝突が多く、人の名前では見分けられない（[ADR-0006](../decisions/0006-sync-conflict-model.md)） |
 | Webhook の署名のヘッダー | 本家の名前を含む | `<Brand>-Signature`（HMAC-SHA256） | リポジトリ共通の ADR-0006 |
 | Webhook の署名の鍵 | アプリの秘密 | Webhook 専用の秘密（`<brand>_whsec_`、入れ替えられる）。時刻も署名に含める | アプリの秘密を受け口のサーバーに置かせない。再送の攻撃を防ぐ（[ADR-0040](../decisions/0040-signed-webhooks-delivery.md)） |
@@ -271,104 +268,9 @@
 - **OS の仕組みの変化**：File Provider と Cloud Files API の振る舞いは OS の更新で変わる。OS ごとの試験の機械を CI に持ち、ベータの OS で先に回す（delivery の領域）。
 - **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L10）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
-### 決定（2026-10-09、既定案）
+### 残る未解決事項
 
-PM の方針（本家に寄せ、判断が要るところは推奨の既定案で進める）により、最初の設計で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。どれも E1〜E13 の PoC・試験で覆りうる。その後の領域の工程と統合の工程での変更は、下の「統合」の節にある。
-
-- **分割**：内容で区切る（ギアのハッシュの分割、最小 1 MiB・平均 4 MiB・最大 16 MiB）。固定の 4 MiB より実装は増えるが、途中への挿入・削除のある大きなファイル（動画の編集の素材、仮想のディスク、データベースのファイル）で送る量が減る（[ADR-0002](../decisions/0002-chunking-and-block-addressing.md)）。
-- **重複排除**：テナントの中だけ。テナントをまたぐと、保存の量は減るが、他人のファイルの有無が漏れる（[ADR-0003](../decisions/0003-dedupe-scope-and-privacy.md)）。
-- **ファイルの上限**：2 TiB（本家と同じ）。
-- **LAN 同期**：MVP では持たない。端末どうしの認証と鍵、チームのネットワークの方針、File Provider との両立を設計する必要があり、まずサーバーとの同期の正しさを確かめる。E14 で扱う（本家は macOS の File Provider 版で使えないとしている。[LAN sync overview](https://help.dropbox.com/sync/lan-sync-overview)、2026-10-09 に確認）。
-- **検索の範囲**：MVP は名前（すべてのプラン）と本文（チームのプラン：テキスト、PDF の文字の層、Office の文書）。画像と走査した PDF の日本語の OCR は E15 へ延ばす。精度と費用を測ってから決める（search の領域で ADR にする）。
-- **オンラインのみのファイル**：macOS は File Provider（replicated の拡張）、Windows は Cloud Files API に従う。カーネルの拡張は作らない。既定は「新しい端末ではオンラインのみ」で、利用者が「オフラインで使う」を選ぶ（file-system-integration の領域で ADR にする）。
-- **選択型の同期**：フォルダーの単位で手元に置かないことを選べる。オンラインのみのファイルと両立し、手元に置かないフォルダーは木にも出さない（sync-engine の領域）。
-- **競合のコピーの名前**：`<名前> (<端末の名前> の競合コピー <YYYY-MM-DD>).<拡張子>`。英語の設定では `<name> (conflicted copy from <device> <YYYY-MM-DD>).<ext>`。本家は利用者の名前を入れるが、本システムは端末の名前を入れる（同じ人の 2 台の衝突が多いため）。文言は法務の L10 の後に確定する（[ADR-0006](../decisions/0006-sync-conflict-model.md)）。
-- **共有リンク**：閲覧だけ（編集のリンクは持たない）。パスワード・期限・ダウンロードの禁止は有料のプラン（本家の可否のプランは [Link expiration and passwords](https://help.dropbox.com/share/link-expiration) で確かめた。2026-10-09）。チームの方針で「チームの中だけ」「パスワードを必須」を強制できる（shared-links の領域）。
-- **バージョンの保持の期間**：本家と同じ区分の既定（無料・個人の有料 30 日、チームの標準 180 日、チームの上位 365 日）。約束の文言は法務の L6・L8 の後（versions-and-recovery の領域）。
-- **カメラのアップロード**：写真のライブラリの新しい項目を、OS の写真の ID と内容のハッシュで重ねずに上げる。元の形式（HEIC など）のまま上げ、変換はプレビューだけで行う（mobile-and-camera-upload の領域）。
-- **端末への合図**：WebSocket で「名前空間の番号が進んだ」だけを送る。WebSocket が使えない環境では 60 秒ごとの確かめと long-poll に落とす（api-and-webhooks の領域）。
-- **暗号化**：S3 は SSE-KMS とバケットキー。顧客の鍵（BYOK）とエンドツーエンドの暗号化は MVP の後（E16）。
-- **本家の名前**：識別子は `<Brand>`・`<brand>`（リポジトリ共通の ADR-0006）。
-
-### 決定（2026-10-09、統合）
-
-領域の文書の間の食い違いを、統合の工程で次のとおり解いた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に残した。最初の設計の ADR は直接直し、決定を覆したところに日付付きの注記を残した（[process.md](../../../../docs/process.md) の 9 節）。
-
-- **削除の条件**：ファイルの削除は `base_rev` と `base_node_ver`、フォルダーの削除は `base_node_ver` と `base_seq`（その後に子孫が変われば 409 `subtree_changed`）。[ADR-0006](../decisions/0006-sync-conflict-model.md) を [ADR-0021](../decisions/0021-committer-operations-and-conditions.md) に揃えた。
-- **ジャーナル**（[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) の注記）：
-  - `op` に利用者に返さない `purge` を足した。
-  - 列に `node_ver`・`deleted_reason`・`moved_to_ns`・`moved_to_seq`・`moved_from_ns`・`subtree_listing`・`batch_id`・`job_id` を足した。
-  - `epoch` は全体の 1 つの値（`platform_state`）で、DR の切り替えと運用者の DB の時点への戻しでだけ上げる。利用者の復元と巻き戻しでは上げない。
-  - 保持は、カーソルの最後の利用から 90 日と、日の分割の 92 日。`floor_seq` は特別な場合（テナントの削除、名前空間の作り直し、手での修復）だけに上げる。
-- **macOS の手元の変化**：File Provider の拡張の呼び出しだけを使い、FSEvents は使わない（[ADR-0015](../decisions/0015-local-change-observation-and-move-detection.md)）。1.3 節 A、[intent.md](../intent.md)、[roadmap.md](../roadmap.md)（`fs-watcher-macos` を `fs-observer-macos` に）を直した。
-- **commit が受けるブロック**：索引で `live` なだけでは受けず、`have`・`copy`・`granted` のどれかに限る。ハッシュを知るだけで他人の中身を得る穴を塞ぐ（[ADR-0018](../decisions/0018-upload-sessions-and-block-grants.md)。[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) の注記）。
-- **プレビューの隔離**：サムネイルの p95 2 秒と隔離の意図を両方満たす 1 つの形にした（[ADR-0032](../decisions/0032-sandboxed-preview-pipeline.md)・[ADR-0047](../decisions/0047-accounts-network-ingress-and-service-placement.md) の注記、[security.md](security.md) の 3.4 節、[infrastructure.md](infrastructure.md) の 2.1 節）。
-  - タスクの SQS の権限は、自分のジョブの待ち行列の受信・削除・見えない時間の変更と、結果の待ち行列 `sandbox-results` への送信だけ。S3・DB・KMS の権限は持たない。
-  - タスクは 50 ジョブか 10 分で入れ替える。新しいタスクが受け始めてから古いタスクを止め、20% の余裕の台数を持つ。
-  - 出力の検査と作り直しは sandbox の中の監督が行う。オーケストレーターは大きさ・種類・SHA-256 だけを確かめる。
-- **ハッシュの照合を逃れる申告**：違法なコンテンツのハッシュの照合は、クライアントの申告の `content_sha256` を使わない。`content-scanner` が sandbox の中で検証済みのブロックをつないで計算した `verified_sha256` を使う。申告と違えば `integrity_mismatch` にし、範囲に入る経路では検査の前に配らない（[ADR-0046](../decisions/0046-content-scanning-framework.md) の注記）。範囲（L1・L2）は法務の確認待ちのまま。
-- **マウントのノード**：`nodes.kind`（`file`・`folder`・`mount`）と `mount_ns_id` を、[metadata-and-journal.md](metadata-and-journal.md) のデータモデルに足した（[ADR-0024](../decisions/0024-shared-folder-mounts-and-grants.md)）。
-- **`incoming` のキー**：`u/<upload_id>/<n>` のまま、`upload_id` を 128 ビットの乱数にして接頭辞の偏りを避ける（[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md)、[capacity.md](capacity.md) の 4.1 節、[block-storage.md](block-storage.md) の 4.2 節）。
-- **サーバーで組み立てるダウンロード**：フォルダーの ZIP（E7 の `web-download`、共有リンク）と 1 つの URL のダウンロードは、Worker の `export-builder` が S3 から S3 の `exports` へ組み立て、`content.<brand>usercontent.<domain>/x/...` の署名つき URL で返す。10,000 ファイル・20 GiB まで。要求を受けるサービスは中身を通さない（[ADR-0054](../decisions/0054-server-assembled-downloads.md)。[ADR-0001](../decisions/0001-platform-and-stack.md)・[ADR-0038](../decisions/0038-public-api-shape-and-change-feeds.md) の注記）。
-- **DR の後の取り直し**：「失った commit を見た端末だけ」に絞る改良は採らず、テックリードの判断に残した。失った commit を自分で確定した端末は、カーソルの位置が切り替えの番号以下でも Synced を失った `rev` へ進めており、取り直しをしないと手元の中身を古い中身で置き換えうるため（[capacity.md](capacity.md) の 3.3 節）。それまでは全端末の取り直しを 2 時間の窓に散らす（[ADR-0051](../decisions/0051-load-shaping-uploads-signals-and-reconnects.md)）。
-- **本家との意図した違い**：1.4 節に、共有リンクの `members`、Webhook 専用の秘密、Webhook の 24 時間の再試行、すべてのアプリの PKCE、サポートの外の OS での読み出しだけ、巻き戻しのプラン、管理者のアクセスの形（法務の L7 の確認待ち）を足した。
-- **署名つき URL の期限**：PUT の 15 分がモバイルの背景の送信に足りるかは持ち越し（`mobile-background-upload-poc`。[ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) の 1 の手順）。
-- **費用と規模**：S1 の前提（アカウント 50 万、物理 13 PB、配信 3.9 PB/月）は README・capacity・infrastructure・ADR で同じ。本番の月の費用は約 79 万 USD で、保存と配信が 89%。保存の約 32 USD/TB は 2.1 節の仮の予算（30〜45 USD）の中にある（2.1 節に書き足した）。CRR の RTC の SLA は転送の既定の割り当て 1 Gbps を超える間は当たらないので、引き上げを E1 で申請する（[capacity.md](capacity.md) の 4.1 節）。
-- **名前の揃え**：
-  - 共有リンクのトークンの接頭辞を `<brand>_sl_` にした（他の `<brand>_at_`・`<brand>_rt_`・`<brand>_whsec_`・`<brand>_inv_`・`<brand>_scim_` と同じ形）。
-  - 照合の結果の表を `integrity_audit_runs` にした（block-storage の `blocks_audit_runs` を直した）。ログでブロックを指す `block_id` を `blocks` の列に足した。
-  - プランの保持の期間の表を `tenant_retention_settings` にした（versions-and-recovery の `retention_policies` が、security のデータの種類ごとの `retention_policies` と名前がぶつかっていた）。
-  - `epoch` は `namespaces` の列にせず、`platform_state` に持つ。
-- **数値の揃え**：
-  - 消しすぎの止めは「5 分の窓で 1,000 ファイルか木の 10%」（[ADR-0006](../decisions/0006-sync-conflict-model.md)・[security.md](security.md)・[runbooks/README.md](../runbooks/README.md) を [sync-engine.md](sync-engine.md) の 10 節に揃えた）。
-  - NFR-010 の取り直しの理由は「期限切れ・`floor_seq` より古い・`epoch`」で、載せた名前空間の変更では取り直しにしない。
-  - 名前空間をまたぐバッチは 2,000 ノードずつ（capacity を直した）。
-  - DR の中身の確かめの量は 40 万〜160 万個・数十秒〜2 分（infrastructure を直した）。
-  - commit は冪等のキーを持たない（infrastructure の 6.2 節の「冪等」を直した）。
-- **検証の工程での直し（2026-10-09）**：公式の資料を取得し直して、次を確かめ・直した。
-  - 本家のファイルの上限は 2,199,019,061,248 バイト（2 TiB より 4 MiB 少ない）。
-  - LAN 同期は暗号化した HTTPS の直接の接続で中身だけを送り、File Provider 版の macOS では使えない。
-  - Webhook は 10 分に 35 回を超える失敗かつ失敗の率 4.5% 超で止まる。
-  - 共有リンクのパスワード・期限・ダウンロードの禁止の可否のプラン（7 つ）を確かめた（「一部だけ確かめた」を外した）。
-  - Rewind は Basic で使えず、チームは既定で管理者だけ。
-  - S3 の RTC は 99.9% を 15 分以内に写し、1 Gbps の割り当てを超える間は SLA の外。
-  - Intelligent-Tiering は 128 KB 未満を監視せず、常に高頻度の層に置く。
-  - CopyObject は 2025-10-29 から `If-None-Match` を受ける（block-storage の未検証を外した）。
-  - CloudFront の OAC は SSE-KMS のオブジェクトを読める（鍵の方針で配信に復号を許す）。
-  - Aurora PostgreSQL 17.5 以降のクラスタの上限は 256 TiB、表は 32 TiB。
-  - Cloud Files API は Windows 10 1709 から、`cldflt.sys` は NTFS だけ、取り出しの方針は「アプリと提供者の大きいほう」。
-  - 情報流通プラットフォーム対処法は 2025-04-01 の施行、電気通信事業法の外部送信規律は 2023-06-16 の施行（法務の論点の前提として [intent.md](../intent.md) の出典に足した。結論は出さない）。
-  - 事前署名の URL でチェックサムの指定を強制できるかは、AWS の公式の資料で確かめられなかった（**未検証**のまま `presigned-upload-poc`）。
-  - 本家のフォルダーの ZIP の上限（20 GB か 250 GB、10,000 ファイル）は公式の頁を取得できず**未検証**。
-- **品質と運用**：
-  - 各領域の文書の「quality.md・runbooks・data-model への項目」を反映した。
-  - [quality.md](../quality.md) に Epic ごとの決定表と性質の一覧（2.2.2 節）、漏れの経路の表の行、DR の訓練の合格基準、互換と端末の群れの試験を足した。
-  - runbooks の手順を、作ったもの（[incident-response.md](../runbooks/incident-response.md)、[deploy-and-rollback.md](../runbooks/deploy-and-rollback.md)、[disaster-recovery.md](../runbooks/disaster-recovery.md)、[mass-change-response.md](../runbooks/mass-change-response.md)）と計画のものに分けて一覧にした。
-  - 表と置き場所の索引は [data-model.md](data-model.md)。
-- **数値の正本**：
-  - SLO とアラートは [runbooks/README.md](../runbooks/README.md) の 1・4 節。
-  - 上限は各 ADR と runbooks の 2 節。
-  - 保持の期間は [security.md](security.md) の 8.1 節と `retention_policies`。
-  - 負荷と費用のモデルは [capacity.md](capacity.md)、単価は [infrastructure.md](infrastructure.md) の 10 節。
-  - 表と置き場所は [data-model.md](data-model.md)。
-- 領域ごとの決定は、各文書の「未解決の問い」の「決定」の節にある。
-
-### 決定（2026-10-09、データモデル）
-
-データモデルの完全版を [data-model.md](data-model.md) と [data-model/](data-model/) に作り、形（表・列・キー・索引・分割・保持）の正本をそこへ移した。領域の文書の「data-model への項目」は提案の記録として残す。名前・列・置き場所の決まっていなかったところは、推奨の案で決めた（[data-model.md](data-model.md) の 7 節の D-1〜D-27）。ADR の決定は変えていない。主なものは次のとおり。
-
-- **スキーマ**：`public`（名前空間の表、テナントの表、RLS の外の登録簿）、`auth`（Better Auth と端末）、`maint`（保守、SLI、照合、テナントの消去の進み）の 3 つ（D-1・D-13）。
-- **ノードの種類**：正本は `nodes.kind`。`is_folder` は生成の列にし、ジャーナルと置き場所のバージョンにも `kind`・`mount_ns_id` を持つ。`ns_mounts` は `nodes` のビュー（D-2・D-3。前の索引で持ち越していた 2 つを解いた）。
-- **`name_key_next` の埋め**：ジャーナルに載せない。`committer_maint` のロールがこの列だけを書く。ぶつかる名前の解き方は普通の commit で載せる（D-4。[delivery.md](delivery.md) の 6.3 節の持ち越しを解いた）。
-- **`node_versions` の分割**：月ではなく `ns_id` のハッシュで 64（今のバージョンが期限で消えないため。D-5）。
-- **足した表**：`outbox`（D-10）、`export_jobs`（`files/export/status` のため。D-11）、`block_packs`（S2 の詰め直しの判定。D-12）。Better Auth の表の名前を `external_identities`・`verifications`・`passkeys` に決めた。
-- **ジャーナルの列**：`on_behalf_of` を足した（管理者のアクセス。D-9）。
-- **テナントをまたぐ読み出しの関数**：ログインの入口のドメインの解決 `auth_resolve_domain()`（ADR-0004 の「メールアドレスからアカウントの解決」に含める）、共有の招待の受け入れの `ns_invite_resolve()`（X5 に含める）、受け手のテナントへの通知の行の作成（X3 に含める）を決めた（D-20〜D-22）。ADR-0004 の一覧に 2026-10-09 の注記として足した（経路は増やしていない）。
-- **S2 のディレクトリのクラスタ**：ADR-0049 の一覧に加えて、`oauth_*`・`webhook_deliveries`・`abuse_reports`・`plan_features`・`retention_policies`・`tenants` を置く（D-23）。
-- **名前の揃え**：グループは入れ子にしない（namespaces-and-sharing を直した。D-17）。共有フォルダーの招待のトークンも `<brand>_inv_`（D-18）。端末の列は `client_version`（desktop-client を直した。D-19）。テナント・名前空間の表の主キーの先頭に `tenant_id`（`locked_subtrees`・`rewind_skips` を直した。D-14）。
-- 直した領域の文書の一覧は [data-model.md](data-model.md) の 7 節にある。
-
-持ち越し（法務、計測・PoC・選定・確認で決めるもの）：
+法務、計測・PoC・選定・確認で決めるもの。
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
@@ -390,6 +292,8 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | データモデルの持ち越し（`node_versions` の量、`delivery_samples` の抜き取りの率、抽出したテキストの 90 日の後、`abuse_reports` の連絡先） | [data-model.md](data-model.md) の 9 節。Dev・Ops・法務（L2・L3） |
 | 本家の振る舞いで未確認のもの（重複排除の範囲、共有フォルダーの容量の数え方と入れ子、SLA、API のアップロードのセッションの上限、フォルダーの ZIP の上限、内部のジャーナル） | 公式の資料で確かめられなかった。未検証のまま、本システムの値を使う |
 
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
+
 ## 7. 領域の文書
 
 領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。0012 は使っていない（欠番）。統合の工程の ADR は 0054。
@@ -397,6 +301,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
 | [sync-engine.md](sync-engine.md) | 3 つの木の形、計画（変化の求め方、操作の順序、依存）、衝突の決定表、意図の記録とクラッシュからの再開、選択型の同期、帯域と並行の制御、時計に頼らない判断 | [0009](../decisions/0009-planner-dirty-set-and-ordering.md)、[0010](../decisions/0010-local-state-db-and-intent-log.md)、[0011](../decisions/0011-selective-sync-and-access-loss.md) | QA（同期の性質） | E4 |
+| [web-client.md](web-client.md) | Web の画面と使う領域の決定の対応、アクセシビリティ、UI の言語と IME、名前・日時・大きさの表示 | なし（各領域の ADR を参照する） | QA | E7 |
 | [desktop-client.md](desktop-client.md) | `sync-core` の組み込み、UI、状態の表示、設定、自動の更新と配布の経路、プロキシ、端末の登録と切り離し、資源の使い方の上限、LAN 同期の将来の置き場所 | [0013](../decisions/0013-desktop-process-model-and-resource-budget.md)、[0014](../decisions/0014-desktop-unlink-and-wipe-execution.md) | QA、Ops | E5 |
 | [file-system-integration.md](file-system-integration.md) | 手元の変化の観測（Windows の ReadDirectoryChangesW、macOS の File Provider の呼び出し、イベントの溢れ）、移動の検出（inode・File ID）、macOS の File Provider と Windows の Cloud Files API、プレースホルダーと取り出し・追い出し、名前の対応（NFC・NFD、表せない名前）、無視するファイル、拡張属性とパーミッション、シンボリックリンク | [0015](../decisions/0015-local-change-observation-and-move-detection.md)、[0016](../decisions/0016-placeholders-and-hydration-policy.md)、[0017](../decisions/0017-local-names-and-unsyncable-items.md) | QA | E5 |
 | [block-storage.md](block-storage.md) | アップロードの流れと再開、署名つき URL、ブロックの検証、ローカルのブロックの索引、ダウンロードの組み立て、大きなファイルの一覧、GC と猶予、照合（スクラブ）、小さなブロックのパック | [0018](../decisions/0018-upload-sessions-and-block-grants.md)、[0019](../decisions/0019-block-refcount-and-gc-protocol.md)、[0020](../decisions/0020-small-block-packing-for-s2.md) | QA、Ops | E2 |
@@ -411,6 +316,7 @@ PM の方針（本家に寄せ、判断が要るところは推奨の既定案�
 | [accounts-and-teams.md](accounts-and-teams.md) | 個人のアカウント、プランと容量、チーム、SSO・SCIM、管理の役割、端末の管理、チームの外への共有の方針の管理、監査ログの画面、管理者のアクセス（法務の L7） | [0041](../decisions/0041-accounts-auth-and-device-credentials.md)、[0042](../decisions/0042-teams-sso-scim-and-plans.md)、[0043](../decisions/0043-admin-roles-device-wipe-and-member-access.md) | セキュリティ | E12 |
 | [security.md](security.md) | 脅威モデル、利用者の中身のドメイン、暗号化と鍵、マルウェアと悪用の対策、違法なコンテンツの通報と開示の請求の手順（法務の L1〜L3）、監査ログ、データのライフサイクル（削除、解約） | [0044](../decisions/0044-encryption-keys-and-secrets.md)、[0045](../decisions/0045-audit-log-and-data-lifecycle.md)、[0046](../decisions/0046-content-scanning-framework.md) | セキュリティ | E1、E12、E13 |
 | [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本：規約（ID、テナントと RLS、名前と `name_key`、ハッシュ、番号、分割、保持、暗号化、クラスタ）、ER 図、表の目録（列・キー・索引・CHECK・RLS・保持・量）、DB の外の置き場所、端末の SQLite、横断の不変条件 | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとの「決定」の記録（経緯） | なし | — | — |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、エッジ（CloudFront の配信とエッジの所在）、egress の経路、DR（大阪、中身の送り直しの依頼、`epoch`）、段階を上げる基準、S2 のシャード、S3 のセル | [0047](../decisions/0047-accounts-network-ingress-and-service-placement.md)、[0048](../decisions/0048-disaster-recovery-and-content-pending.md)、[0049](../decisions/0049-stage-up-criteria-sharding-and-cells.md) | Ops | E1、E13 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、クライアントの匿名の計測、伝播と同期の健全さの計測、ブロックの参照の監査、SLI | [0050](../decisions/0050-sli-from-ledgers-synthetics-and-client-telemetry.md) | Ops | E1、E13 |
 | [capacity.md](capacity.md) | 負荷のモデル（commit、合図、ブロックの送受信、プレビュー、索引）、費用のモデル（TB あたり）、部品ごとの必要量、負荷試験 | [0051](../decisions/0051-load-shaping-uploads-signals-and-reconnects.md) | Ops | E13 |

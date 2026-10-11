@@ -4,7 +4,7 @@
 
 前提となる決定は次のとおり。
 
-- 振込は提携銀行の API で行い、予備に全銀の形式のファイルを持つ。振込の手数料は 1 回 200 円（本家に寄せた既定値）（[architecture/README.md](README.md) の 6 節）
+- 振込は提携銀行の API で行い、予備に全銀の形式のファイルを持つ。振込の手数料は 1 回 200 円（本家に寄せた既定値）（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 売上金・残高・ポイントは別の口座の種類で、法的な値は `legal.*`（[ADR-0004](../decisions/0004-proceeds-model-under-payment-services-act.md)）
 - 仕訳の型、売上金のロット、照合は [ledger-and-proceeds.md](ledger-and-proceeds.md)（[ADR-0034](../decisions/0034-chart-of-accounts-journal-types-and-fee-rounding.md)、[ADR-0035](../decisions/0035-proceeds-lots-expiry-and-kyc-conversion.md)、[ADR-0036](../decisions/0036-three-tier-reconciliation-and-suspense.md)）
 - 購入は `purchaseListing` だけが取引を作る（[ADR-0002](../decisions/0002-transaction-state-machine-and-single-purchase.md)、[transactions-and-state-machine.md](transactions-and-state-machine.md)）

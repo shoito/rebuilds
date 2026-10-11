@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-[ADR-0004](0004-tenancy-and-rls.md) は、組織を 1 つのテナント、個人のアカウントを 1 人 1 つのテナントにし、アカウントとメールアドレスの解決をテナントの外に置くと決めた。[ADR-0001](0001-platform-and-stack.md) は、認証のライブラリを汎用の部品としてこの領域で選ぶとした。[architecture/README.md](../architecture/README.md) の 6 節は、CalDAV の認証を OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用のパスワード（利用者が作り、範囲と期限を持ち、組織の管理者が禁止できる）の Basic 認証にし、ログインのパスワードを CalDAV に使わないと決めた。OS の標準のカレンダーが、OAuth 2.0 の任意のサーバーに対応しないためである。
+[ADR-0004](0004-tenancy-and-rls.md) は、組織を 1 つのテナント、個人のアカウントを 1 人 1 つのテナントにし、アカウントとメールアドレスの解決をテナントの外に置くと決めた。[ADR-0001](0001-platform-and-stack.md) は、認証のライブラリを汎用の部品としてこの領域で選ぶとした。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、CalDAV の認証を OAuth 2.0 の Bearer と、CalDAV 専用のアプリ用のパスワード（利用者が作り、範囲と期限を持ち、組織の管理者が禁止できる）の Basic 認証にし、ログインのパスワードを CalDAV に使わないと決めた。OS の標準のカレンダーが、OAuth 2.0 の任意のサーバーに対応しないためである。
 
 他の題材は、Better Auth を `packages/auth` で包んで使う（Linear の ADR-0034、Slack の identity-and-access.md）。部品の告知が多いので、使う部品だけを依存に入れるとした（Linear の accounts-and-auth.md の 2.2 節、2026-09-28 に確認）。
 

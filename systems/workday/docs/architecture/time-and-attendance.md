@@ -323,10 +323,16 @@ overtime_alerts (tenant_id, id, employment_id, agreement_id, metric text, level 
 
 ### 7.2 状態
 
-```
- open ──(締日の翌日)──▶ employee_review ──(本人の確認)──▶ manager_review ──(timesheet_approval)──▶ hr_locked ──(給与の入力の固定)──▶ handed_off
-   ▲                                                                                                │
-   └──────────────────────────── reopen（time_period_reopen。承認つき）◀──────────────────────────────┘
+締めの期間の状態を次の図に示す。
+
+```mermaid
+stateDiagram-v2
+  [*] --> open
+  open --> employee_review: 締日の翌日
+  employee_review --> manager_review: 本人の確認
+  manager_review --> hr_locked: timesheet_approval
+  hr_locked --> handed_off: 給与の入力の固定
+  hr_locked --> open: reopen（time_period_reopen。承認つき）
 ```
 
 | 状態 | できること |

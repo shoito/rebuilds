@@ -210,6 +210,7 @@ E1〜E17 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `one-click-unsubscribe` | 配信停止のボタンの条件と POST（10.1 節）。法務：L2（[sender-authentication.md](architecture/sender-authentication.md)） |
 | `web-offline-and-optimistic` | IndexedDB、待ち行列、載せ直し（5 節）（[web-client.md](architecture/web-client.md)） |
 | `click-time-link-check` | iframe の押下の受け渡しと、先頭のハッシュの確かめ（7.5 節。`url-check` は [attachment-and-url-scanning.md](architecture/attachment-and-url-scanning.md)）（[web-client.md](architecture/web-client.md)） |
+| `web-accessibility` | 一覧のキー操作、フォーカスの扱い、知らせ、表示の基準（WCAG 2.2 AA。11.1 節）（[web-client.md](architecture/web-client.md)） |
 
 ### E10 検索
 

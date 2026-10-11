@@ -9,7 +9,7 @@
 - 条件なしの上書きの API を持たない。公開 API の「上書き」は、サーバーが今の `rev` を条件にする形に直す（[ADR-0006](../decisions/0006-sync-conflict-model.md)）
 - 本家の `content_hash` と互換の値は出さない。足すかはこの領域で決める（[ADR-0002](../decisions/0002-chunking-and-block-addressing.md)）
 - アップロードのセッションと `chunker_version` 0（[ADR-0018](../decisions/0018-upload-sessions-and-block-grants.md)）
-- 端末への合図は WebSocket、使えないときは 60 秒ごとの確かめと long-poll（[architecture/README.md](README.md) の 6 節）
+- 端末への合図は WebSocket、使えないときは 60 秒ごとの確かめと long-poll（[design-log.md](design-log.md) の「2026-10-09：既定案」）
 - 名前は `<Brand>`・`<brand>`（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）
 
 この文書で決めたことは次の ADR にある。

@@ -7,7 +7,7 @@
 - 正確な住所と位置は vault、ずらした位置（`approx_point`）は core に置く。検索の索引には `approx_point` だけを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）
 - 正確な位置・住所は `exactLocationVisible(viewer, listing)` が、ホストのアカウントの成員と、`confirmed`・`in_stay` の予約のゲスト（チェックアウトの後 7 日まで）に限って許す（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)）
 - 地理の検索は OpenSearch の `geo_point` と `geo_shape`。Uber の題材の六角形の格子は使わない（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)）
-- 正確な住所はチェックインの 48 時間前ではなく、予約の確定の時にゲストへ出す（[architecture/README.md](README.md) の 6 節の決定）
+- 正確な住所はチェックインの 48 時間前ではなく、予約の確定の時にゲストへ出す（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定）
 - 物件のタイムゾーンは位置から決め、ホストは変えられない（[ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)）
 
 この文書で決めたことは次の ADR にある。
@@ -33,7 +33,7 @@
 | 項目 | 事実 | この設計 |
 | --- | --- | --- |
 | 本家の位置の秘匿 | 正確な位置を出す設定を切ると、地図はおおよその範囲を出す。番地と部屋の番号は確定した予約のゲストにだけ出す（[ヘルプの記事 2141](https://www.airbnb.com/help/article/2141)）。ずらし方は**未検証** | 決まった点にずらす（ADR-0014） |
-| 本家の正確な住所を出す時期 | 確定の時か、チェックインの 48 時間前かは資料の間で食い違う（**未検証**。[intent.md](../intent.md) の出典） | 確定の時（[architecture/README.md](README.md) の 6 節） |
+| 本家の正確な住所を出す時期 | 確定の時か、チェックインの 48 時間前かは資料の間で食い違う（**未検証**。[intent.md](../intent.md) の出典） | 確定の時（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」） |
 | Uber の題材の住所の検索 | 提供者の利用条件（保存の期間、他の地図との併用）は提供者ごとに違う。提供者の座標でなく、利用者が確かめたピンを残す形にした（Uber の題材の [maps-and-geodata.md](../../../uber/docs/architecture/maps-and-geodata.md) の 7 節、[ADR-0034](../../../uber/docs/decisions/0034-geocoding-provider-and-pickup-points.md)） | 同じ形にする（ADR-0016） |
 | 地名の辞書の出どころ | 行政の区域の多角形、駅、地方公共団体の名前の読みは国の公開のデータにある見込み。多言語の名前の出どころとライセンスは確かめていない（**未検証**） | E4 の前の `place-dictionary-poc` で確かめる |
 

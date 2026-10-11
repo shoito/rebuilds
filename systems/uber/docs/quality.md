@@ -67,6 +67,8 @@ QA は Design 段の承認者として、各変更の `spec.md` を次の観点�
 | ログの検査 | 結合試験のログ・トレースの全体に緯度経度の形の値が 0 件 | 自前 | PR、本番は日次 |
 | 障害の注入 | 配車のタスクの二重、索引の主と待機の停止、Aurora のフェイルオーバー、PSP の結果不明、Valkey のフェイルオーバー、SNS・SQS の遅延、大阪への切り替え | テスト用の中継、AWS FIS | PR（中継の短縮版）、夜間、staging（四半期） |
 | UI・E2E | 画面の流れ、緊急の入口（全画面）、オファー、通信の切断、強制の更新 | XCUITest・Espresso、端末のクラウド | PR（主要）、列車ごと（全件） |
+| アクセシビリティ | 乗客・ドライバーのアプリ（依頼から評価まで、出庫からオファーの受諾・降車まで、緊急の入口）は WCAG 2.2 AA をネイティブに当てはめた基準、読み上げ、文字の拡大、音のないオファーの知らせ。事業者の管理画面（Web）は WCAG 2.2 AA | XCUITest の `performAccessibilityAudit`、Espresso の `AccessibilityChecks`、`@axe-core/playwright`（管理画面）、VoiceOver・TalkBack の手動 | PR（自動の検査）、E9 のリリースの前と列車ごと（手動の主な流れ） |
+| 言語 | 英語の設定での未訳の文言、定型文のカタログのベクター（全 ID × 全言語） | XCUITest・Espresso、定型文のベクター | PR |
 | 端末の試験 | 背景の位置と電池、OS の終了、ナビの経由地の順守 | 基準の端末（各 OS 2 機種）、端末のクラウド | E9、列車ごと、ナビのアプリの更新のたび |
 | 負荷 | L1〜L11（[capacity.md](architecture/capacity.md) の 7.2 節） | `loc-loadgen`、`rider-loadgen`、`driver-bot`、AWS FIS | リリース前、E12、半年ごと |
 | セキュリティ | SAST、依存（`govulncheck`・`npm audit`）、DAST、IaC、IAM（`location`・`biometric` の鍵の利用者） | 各種 | PR、週次 |

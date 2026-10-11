@@ -51,7 +51,7 @@
 - DB の ID は `uuid` 型の **UUIDv7**。PostgreSQL 18 の組み込みの `uuidv7()` で作る。文字列の ID を列に持たない（[api.md](api.md) の 3.3 節）。
 - API の ID は `<接頭辞>_<UUID の base62、22 文字>`。接頭辞はテーブルから決まる。接頭辞が違う ID は、DB を引かずに 404 を返す。
 - **`created_at` は ID の時刻と同じ値にする。** 挿入のトリガー `set_created_at_from_id()` が `uuid_extract_timestamp(id)` を入れる。ID だけから日ごと・月ごとのパーティションを絞れる。例外は `ledger_postings`（仕訳と同じ `created_at`。[data-model/ledger.md](data-model/ledger.md)）と `settlement_lines`（ファイルの取り込みの時刻。[data-model/payouts-and-reconciliation.md](data-model/payouts-and-reconciliation.md)）。
-- オブジェクトの接頭辞は本家に合わせる（秘密ではないため。[README.md](README.md) の 6 節の決定）。キー・秘密の接頭辞だけを `<brand>_` 付きにする（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
+- オブジェクトの接頭辞は本家に合わせる（秘密ではないため。[design-log.md](design-log.md) の決定）。キー・秘密の接頭辞だけを `<brand>_` 付きにする（リポジトリ共通の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）。
 
 | 接頭辞 | 種類 | テーブル | 接頭辞 | 種類 | テーブル |
 | --- | --- | --- | --- | --- | --- |

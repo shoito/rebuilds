@@ -66,33 +66,24 @@ CREATE UNIQUE INDEX custom_domains_active_hostname
 
 ### 3.2 ステートマシン
 
-```
-             POST /api/v2/custom-domains
-                        │
-                        ▼
-              ┌──────────────────────┐  TXT を確認（Worker、5 分ごと、72 時間まで）
-              │ pending_verification │───────────────────────────┐
-              └─────────┬────────────┘                            │ 72 時間で未確認
-                        │ TXT が一致（複数の DNS の問い合わせ先で）  ▼
-                        ▼                                   ┌──────────┐
-              ┌──────────────────────┐                      │ failed   │ ← 再確認の要求で pending へ
-              │ verified             │                      └──────────┘
-              └─────────┬────────────┘
-                        │ 配信のテナントの作成、証明書の要求（CNAME が向いた後）
-                        ▼
-              ┌──────────────────────┐  証明書の失敗（CAA など） ──▶ failed
-              │ provisioning         │
-              └─────────┬────────────┘
-                        │ 証明書の発行、/.well-known の確認、全タスクへの反映
-                        ▼
-              ┌──────────────────────┐  TXT が 30 日見えない、CNAME が別へ、テナントの停止
-              │ ready                │─────────────────────────────▶ suspended ──(回復)──▶ ready
-              └─────────┬────────────┘
-                        │ DELETE（テナント）／テナントの削除
-                        ▼
-              ┌──────────────────────┐
-              │ deleting             │ → tenant_hostnames から削除 → 配信のテナントを削除 → deleted_at
-              └──────────────────────┘
+次の図は、カスタムドメインの状態を示す。遷移の条件と副作用は、図の後の表にある。
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending_verification: POST /api/v2/custom-domains
+  pending_verification --> verified: TXT が一致（複数の DNS の問い合わせ先で）
+  pending_verification --> failed: 72 時間で未確認
+  failed --> pending_verification: 再確認の要求
+  verified --> provisioning: 配信のテナントの作成、証明書の要求（CNAME が向いた後）
+  provisioning --> failed: 証明書の失敗（CAA など）
+  provisioning --> ready: 証明書の発行、/.well-known の確認、全タスクへの反映
+  ready --> suspended: TXT が 30 日見えない、CNAME が別へ、テナントの停止
+  suspended --> ready: 回復
+  ready --> deleting: DELETE（テナント）／テナントの削除
+  deleting --> [*]: tenant_hostnames から削除、配信のテナントを削除、deleted_at
+  note right of pending_verification
+    Worker が TXT を 5 分ごとに確認する（72 時間まで）
+  end note
 ```
 
 | 遷移 | 誰が | 条件 | 副作用 |

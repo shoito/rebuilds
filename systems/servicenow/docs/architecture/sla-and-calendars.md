@@ -219,17 +219,24 @@ DT-CAL-001：
 
 ### 6.3 ステートマシン
 
+計時の行の段階（`stage`）の遷移を次の図に示す。遷移の正は 6.4 節の DT-SLA-001 で、図はその要約（括弧の数字は表の #）。
+
+```mermaid
+stateDiagram-v2
+  [*] --> in_progress: 開始の条件が真（3）
+  [*] --> paused: 開始の条件と一時停止の条件が真（3）
+  in_progress --> paused: 一時停止の条件（7）
+  paused --> in_progress: 再開（8）
+  in_progress --> completed: 停止の条件（4）
+  paused --> completed: 停止の条件（4）
+  in_progress --> cancelled: リセット（5）・取り消し（6）
+  paused --> cancelled: リセット（5）・取り消し（6）
+  completed --> [*]
+  cancelled --> [*]
+  note right of cancelled: リセットなら、同じ保存で新しい行を開始できる
 ```
-     （開始の条件が真）
-  ─────────────────────▶ in_progress ──一時停止の条件──▶ paused
-                            │   ▲                        │
-                            │   └────再開────────────────┘
-                            │ 停止の条件（in_progress・paused のどちらからも）
-                            ▼
-                         completed
-     in_progress・paused ──取り消し・リセット──▶ cancelled（リセットなら、同じ保存で新しい行を開始できる）
-  breached は段階ではなく印。in_progress で期限を過ぎたときに立つ。completed・cancelled でも残る
-```
+
+- `breached` は段階ではなく印。`in_progress` で期限を過ぎたときに立つ。`completed`・`cancelled` でも残る。
 
 ### 6.4 保存の時の評価（DT-SLA-001）
 
@@ -280,6 +287,26 @@ planned_end = addBusinessTime(start_at, duration + paused_bus, cc)
           paused_wall     += now − pause_since
           planned_end = addBusinessTime(start_at, duration + paused_business, cc)
           警告・違反のタイマーを登録し直す（すでに過ぎた割合の警告は送らない。違反の時刻を過ぎていれば今すぐ違反のタイマー）
+```
+
+次の図は、営業時間が平日 9:00〜18:00、`duration` が 4 時間の計時の行で、月曜（2026-10-05）16:00 に開始し、17:00 から火曜 10:00 まで一時停止したときの例（日付は説明のための例）。一時停止の間の業務時間（月曜 17:00〜18:00 と火曜 9:00〜10:00 の 2 時間）を `paused_business` に足し、`planned_end` を `start_at` から計算し直すので、期限は火曜 11:00 から 13:00 に動く。業務時間の外の夜の間は、一時停止していなくても数えない。
+
+```mermaid
+gantt
+  title 一時停止と再開での期限の計算し直し（平日 9 時〜18 時、duration 4 時間の例）
+  dateFormat YYYY-MM-DD HH:mm
+  axisFormat %H:%M
+  todayMarker off
+  section 業務時間
+  月曜 9 時〜18 時 :done, w1, 2026-10-05 09:00, 2026-10-05 18:00
+  火曜 9 時〜18 時 :done, w2, 2026-10-06 09:00, 2026-10-06 18:00
+  section 計時の行
+  in_progress（1 時間を数える） :active, c1, 2026-10-05 16:00, 2026-10-05 17:00
+  paused（業務時間 2 時間） :crit, c2, 2026-10-05 17:00, 2026-10-06 10:00
+  in_progress（残り 3 時間） :active, c3, 2026-10-06 10:00, 2026-10-06 13:00
+  section planned_end
+  一時停止の前の期限 :milestone, e1, 2026-10-06 11:00, 0m
+  再開の後の期限 :milestone, e2, 2026-10-06 13:00, 0m
 ```
 
 - **経過の業務時間** ＝ `businessTimeBetween(start_at, t, cc) − paused_business −（paused なら businessTimeBetween(pause_since, t, cc)）`。

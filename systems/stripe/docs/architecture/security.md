@@ -10,6 +10,7 @@
 | [ADR-0020](../decisions/0020-cde-access-model.md) | CDE へのアクセスは JIT だけ |
 | [ADR-0023](../decisions/0023-audit-log.md) | 監査ログ（Slack の ADR-0018 を引き継ぎ、CDE の系統を加える） |
 | [ADR-0024](../decisions/0024-data-retention-and-deletion.md) | データの保持と削除（法定の保存と、個人情報・カード情報の最小化） |
+| [ADR-0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧（proposed） |
 
 ## 1. 目標と前提
 
@@ -117,7 +118,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | T | XSS、CSRF、クリックジャッキング | Slack の security.md の 5 節と同じ（CSP、`SameSite`、`Origin` の検査、`frame-ancestors 'none'`） |
 | T | Checkout のページに偽のカード欄を重ねる | Checkout のページのスクリプトも 6.4.3 と 11.6.1 の対象にする（[card-vault.md](card-vault.md) の 2 節） |
 | I | 加盟店の顧客の個人情報の大量の持ち出し | エクスポートを監査ログに残す。一覧の API の上限 |
-| R | 運用者（サポート）による加盟店のデータの閲覧 | 閲覧の理由の入力と監査ログ。加盟店のセキュリティの履歴に表示する |
+| R | 運用者（サポート）による加盟店のデータの閲覧 | 業務の役割ごとの閲覧の範囲、閲覧の理由の入力と監査ログ。加盟店のセキュリティの履歴に表示する（4.1 節、[ADR-0035](../decisions/0035-operator-access-outside-cde.md)） |
 
 ### 3.6 CI/CD と AI エージェント
 
@@ -136,7 +137,7 @@ Slack の security.md の 3.10・3.11・7.3 節と同じ。加えて次のとお
 | テナント分離 | FORCE RLS、DB ロールの分離 | 性質ベーステスト（ADR-0002） |
 | お金の正しさ | 台帳の制約、冪等 | ADR-0003・0004 の Confirmation |
 | 認証 | API キーのハッシュ、制限付きキー、ダッシュボードの MFA | [auth-and-keys.md](auth-and-keys.md) |
-| 運用者のアクセス | SSO＋MFA、本体は最小権限と break-glass、CDE は JIT | 四半期のアクセスレビュー、ADR-0020 の Confirmation |
+| 運用者のアクセス | SSO＋MFA、本体も CDE も DB・シェルは期限つきの権限（JIT）、運用者の画面は役割で絞る、なりすましの機能を作らない（4.1 節） | 四半期のアクセスレビュー、ADR-0020・0035 の Confirmation |
 | 暗号化 | TLS、KMS の CMK、CDE の鍵の階層 | 5 節、ADR-0019 |
 | 監査 | 監査ログ、CloudTrail、CDE の復号の記録 | ADR-0023 |
 | 秘密情報 | Secrets Manager とローテーション | 7 節 |
@@ -145,6 +146,21 @@ Slack の security.md の 3.10・3.11・7.3 節と同じ。加えて次のとお
 | 加盟店の審査 | KYC・KYB、制裁・反社の照合、継続的な監視 | [merchant-onboarding.md](merchant-onboarding.md) |
 | 検知 | GuardDuty、Security Hub（PCI DSS の標準のチェック）、AWS Config、アプリのセキュリティイベント | [observability.md](observability.md) |
 | 第三者 | アクワイアラ、3DS Server、eKYC・照合・不正検知の提供者の管理（要件 12.8） | 年 1 回の見直し、AOC・SOC 報告書の取得 |
+
+### 4.1 運用者のアクセス
+
+CDE は [ADR-0020](../decisions/0020-cde-access-model.md)、CDE の外は [ADR-0035](../decisions/0035-operator-access-outside-cde.md)（proposed）。Auth0 の [ADR-0056](../../../auth0/docs/decisions/0056-operator-access.md) の形に寄せたが、加盟店のデータの閲覧に加盟店の許可は求めない。審査・不正・Dispute・照合を運用者が自ら行うため。
+
+| 区分 | 中身 | 承認 |
+| --- | --- | --- |
+| 常設 | ダッシュボード、メトリクス、トレース、許可リストのログ。運用者の画面での役割ごとの閲覧（サポート／リスク・審査／経理） | — |
+| 期限つき（最長 4 時間） | 本体の DB の読み取り（RLS の対象。加盟店を指定する） | Ops の責任者（依頼者と別） |
+| 期限つき（最長 4 時間） | 本体の DB の書き込み、ECS Exec | Ops の責任者と Dev のテックリードの 2 人 |
+| 期限つき（最長 4 時間） | CDE（SSM Session Manager だけ） | ADR-0020 |
+
+- 運用者の画面では、顧客の個人情報を既定で伏せ、開くたびに理由（問い合わせ・審査の ID）を求める。閲覧はすべて加盟店の `audit_events` に残り、セキュリティの履歴に出る（6 節）。
+- **なりすましの機能を作らない。** 運用者が加盟店のメンバーとしてログインする機能、API キーを作る・表示する機能はない。運用者の画面からお金を動かす操作は、運用者の名前で 2 人の承認を経て行う。
+- **AI エージェントは、本体にも CDE にも経路を持たない**（9 節）。
 
 ## 5. 暗号化と鍵の管理
 
@@ -281,7 +297,7 @@ Slack の security.md の 11 節の期限（Critical：緩和 24 時間・修正
 | E2 | API キーのハッシュ保存と制限付きキー、ダッシュボードの MFA、加盟店のセキュリティの履歴 |
 | E5 | Webhook の配信の隔離と署名 |
 | E6 | 決済ページのスクリプトの管理（6.4.3）と改ざんの検知（11.6.1）、CSP・SRI |
-| E10 | ASV・ペンテスト・分割の検証の実施、監査ログのアーカイブと検証、インシデント対応の訓練、QSA の審査の準備、保持のジョブ |
+| E10 | ASV・ペンテスト・分割の検証の実施、監査ログのアーカイブと検証、インシデント対応の訓練、QSA の審査の準備、保持のジョブ、本体の期限つきの権限と運用者の画面の役割（ADR-0035） |
 
 ## 16. 持ち越し
 

@@ -14,7 +14,7 @@ date: 2026-10-10
 - NFR-002 は、窓の後から外部の MX への最初の試行まで p95 5 秒を求める。
 - RFC 5321 の 4.5.4.1 節は、再試行の間隔を少なくとも 30 分、諦めるまで 4〜5 日を推奨する。一時の失敗の多く（相手の短い絞り、グレーリスト）は、数分で直る。
 - SQS の可視の時間切れは最大 12 時間、保持は最大 14 日。
-- MTA-STS を守ると決めた（[architecture/README.md](../architecture/README.md) の 6 節）。
+- MTA-STS を守ると決めた（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 
 ## Options
 

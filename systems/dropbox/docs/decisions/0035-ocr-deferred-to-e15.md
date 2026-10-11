@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-[intent.md](../intent.md) は、画像と走査した PDF の日本語の OCR での検索を MVP の後の Epic（E15）にし、精度と計算の費用を測ってから決めるとした。[architecture/README.md](../architecture/README.md) の 6 節は、これを search の領域で ADR にするとした。
+[intent.md](../intent.md) は、画像と走査した PDF の日本語の OCR での検索を MVP の後の Epic（E15）にし、精度と計算の費用を測ってから決めるとした。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」は、これを search の領域で ADR にするとした。
 
 日本語の OCR は、縦書き、手書き、表、低い解像度の走査で精度が大きく変わる。チームの利用者（設計・建設）の図面や、走査した請求書は量が多く、全部を OCR すると費用が本文の抽出の何倍にもなりうる。中身を機械で読む処理であり、法務の L1 の論点でもある。
 

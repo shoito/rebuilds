@@ -6,7 +6,7 @@
 
 - リスティングの価格はホストの通貨（MVP は円）の最小単位の整数。換算は見積もりの時の相場の写しで合計だけを 1 回、`packages/fx` で行う（[ADR-0008](../decisions/0008-multi-currency-and-fx.md)）
 - 予約の要求は `quote_id` を持ち、見積もりの写しと金額が一致しなければ 409。見積もりの有効期限は 15 分（[ADR-0004](../decisions/0004-booking-state-machine-and-holds.md)）
-- サービス料はホストだけの型、既定 15%。ゲストに見せる額は総額（[architecture/README.md](README.md) の 6 節）
+- サービス料はホストだけの型、既定 15%。ゲストに見せる額は総額（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 料金の提案はホストが有効にし、最低と最高を決めたときだけ、その範囲でカレンダーの料金を書く（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）
 - 料金の規則の表はバージョンの付いた設定にする。フラグにしない（[AGENTS.md](../../AGENTS.md)）
 
@@ -169,7 +169,7 @@ flowchart TD
 - サービス料 = `round_half_up(accommodation_subtotal × rate_bps / 10,000)`。既定 `rate_bps = 1500`（15%）。消費税を含む額で、うち消費税 = `floor(service_fee × 10 / 110)`（本システムが課税の事業者として出す。適格請求書と端数の扱いは法務の L4、[taxes.md](taxes.md) の 7 節）。
 - 税（宿泊税・入湯税）にはサービス料を掛けない。
 - 率は `service_fee_schedules`（`version`、`rate_bps`、`effective_from`、`applies_to`（ホストのアカウントの区分。MVP は全部 1 つ））で持つ。見積もりは作成の時に有効なバージョンを写しに固定し、予約の後に率を変えても既存の予約は変わらない。
-- 本家の多くのホストの 15.5% と違う 15% は、本システムの既定値（[architecture/README.md](README.md) の 6 節）。値は設定で、変更は財務と PM の承認。
+- 本家の多くのホストの 15.5% と違う 15% は、本システムの既定値（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）。値は設定で、変更は財務と PM の承認。
 
 ## 8. 総額の表示
 

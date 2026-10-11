@@ -40,7 +40,7 @@
 | 停止の速さ | 利用者の停止から、全部のセッション・アプリ用のパスワード・OAuth のトークンが効かなくなるまで 60 秒以内 | 本システムの基準 |
 | ログイン | ログインの手続きの p95 1 秒（IdP の往復を除く） | NFR-001 に準じる |
 | 可用性 | ログインと CalDAV の認証 月間 99.9% | NFR-006 |
-| CalDAV | OS の標準のカレンダーが、ログインのパスワードなしで使える | [architecture/README.md](README.md) の 6 節の決定 |
+| CalDAV | OS の標準のカレンダーが、ログインのパスワードなしで使える | [design-log.md](design-log.md) の「2026-10-04：既定案」 |
 | 管理者の閲覧 | 法務の L8 の結論まで、従業員の予定の中身を管理者が見る機能を出さない | [intent.md](../intent.md) の L8 |
 
 ## 3. 本家の形（確かめたこと）
@@ -56,7 +56,7 @@
 | CalDAV の認証 | OAuth 2.0 だけで、Basic 認証は受けない | [CalDAV API developer's guide](https://developers.google.com/workspace/calendar/caldav/v2/guide) |
 
 - 本家のドメインの確認の方式、SSO の設定の細部、SCIM の対応、管理の役割の一覧と委任の細部は、カレンダーの資料の範囲では確かめていない（**未検証**）。
-- 本家の CalDAV は Basic 認証を受けないが、本システムは OS の標準のカレンダーのために、CalDAV だけのアプリ用のパスワードを持つ（[architecture/README.md](README.md) の 6 節の決定）。本家と違う。
+- 本家の CalDAV は Basic 認証を受けないが、本システムは OS の標準のカレンダーのために、CalDAV だけのアプリ用のパスワードを持つ（[design-log.md](design-log.md) の「2026-10-04：既定案」）。本家と違う。
 
 ## 4. モデル
 
@@ -392,7 +392,7 @@ sequenceDiagram
 
 - **認証の部品**：Better Auth（ADR-0035。他の題材と同じ）。
 - **アカウントとテナント**：1 対 1（ADR-0035）。
-- **パスワード**：持たない。CalDAV はアプリ用のパスワード（ADR-0035。[architecture/README.md](README.md) の 6 節の決定のとおり）。
+- **パスワード**：持たない。CalDAV はアプリ用のパスワード（ADR-0035。[design-log.md](design-log.md) の「2026-10-04：既定案」のとおり）。
 - **ドメインの確認**：DNS の TXT、毎日確かめる（ADR-0036）。
 - **SSO**：SP 起点だけ、ドメインに 1 つの IdP、必須にしても特権の管理者はパスキー（ADR-0036）。
 - **個人から組織へ**：本人の同意で移す（ADR-0036）。

@@ -25,23 +25,51 @@
 
 ### 3.1 乗車の状態
 
-```
- (作成) ─▶ payment_pending ──与信の成功──▶ requested ◀────────────────────┐
-              │ 与信の失敗・時間切れ          │ 提案（配車）                     │ 辞退・時間切れ・
-              ▼                              ▼                               │ ドライバーの取り消し（再配車）
-         payment_failed                   offered ────────────────────────────┤
-                                             │ 受諾                           │
-                                             ▼                               │
-                                          accepted ─出発─▶ arriving ─到着─▶ arrived
-                                                                              │ 乗車の開始
-                                                                              ▼
-                                            awaiting_fare ◀──降車（額が未定）── on_trip ─┐ 区間の分割
-                                                 │ 額の確定                         │ ◀──┘
-                                                 ▼                                 │ 降車（額が確定）
-                                             completed ◀────────────────────────────┘
+乗車の状態と遷移を、受諾までと、受諾の後の 2 枚の図にする。図は 3.3 節の遷移の表（DT-TRIP-001）の要約で、条件と副作用は表を正とする。
 
- 終端：completed、cancelled_by_rider、cancelled_by_driver、cancelled_by_system、no_driver_found、no_show、payment_failed
+作成から受諾まで：
+
+```mermaid
+stateDiagram-v2
+    [*] --> payment_pending: create（決済が app）
+    [*] --> requested: create（決済が in_vehicle）
+    payment_pending --> requested: 与信の成功
+    payment_pending --> payment_failed: 与信の失敗・時間切れ
+    requested --> offered: propose（配車）
+    offered --> requested: 辞退・時間切れ・受信の確認なし
+    offered --> accepted: accept
+    requested --> no_driver_found: dispatch_deadline
+    offered --> no_driver_found: 10 回目のオファーの辞退・時間切れ、dispatch_deadline
 ```
+
+受諾の後。ドライバーの取り消し（`driver_cancel`）は、理由と期限で行き先が分かれる。理由が安全・迷惑行為でなく、`dispatch_deadline` の前なら、終端にならず `requested` に戻って再配車される（行 21〜23）。
+
+```mermaid
+stateDiagram-v2
+    state dc <<choice>>
+    [*] --> accepted: offered から accept
+    accepted --> arriving: depart
+    accepted --> arrived: arrive
+    arriving --> arrived: arrive
+    accepted --> on_trip: start_trip
+    arriving --> on_trip: start_trip
+    arrived --> on_trip: start_trip
+    arrived --> no_show: mark_no_show
+    accepted --> dc: driver_cancel
+    arriving --> dc: driver_cancel
+    arrived --> dc: driver_cancel
+    dc --> cancelled_by_driver: 理由が安全・迷惑行為
+    dc --> requested: それ以外で dispatch_deadline の前（再配車）
+    dc --> no_driver_found: それ以外で dispatch_deadline の後
+    on_trip --> on_trip: 区間の分割
+    on_trip --> completed: 降車（額が確定）
+    on_trip --> awaiting_fare: 降車（額が未定か保留）
+    awaiting_fare --> completed: 額の確定
+```
+
+図にない遷移：`payment_pending`〜`arrived` からの乗客の取り消し（`rider_cancel`）は `cancelled_by_rider`、終端以外からの `system_cancel` は `cancelled_by_system` になる（行 20・26）。
+
+終端は `completed`、`cancelled_by_rider`、`cancelled_by_driver`、`cancelled_by_system`、`no_driver_found`、`no_show`、`payment_failed`。
 
 - [ADR-0003](../decisions/0003-trip-state-and-single-assignment.md) の状態に、`payment_pending`・`awaiting_fare`・`cancelled_by_system`・`payment_failed` を加えた。
   - `payment_pending`：アプリの決済では、与信が通るまで配車しない（[payments-and-payouts.md](payments-and-payouts.md) の 4 節）。車内で払う乗車はこの状態を飛ばす。
@@ -183,7 +211,7 @@ CREATE UNIQUE INDEX one_active_assignment_per_trip ON driver_assignments (trip_i
    - `service_kind = rideshare` なら、乗客が日本版ライドシェアを承諾し、運賃が事前確定で、決済が `app` で、降車地が決まっていて、オファーの時刻と迎車の到着の見込みがともに事業者の運行枠の中にある（[supply-and-operators.md](supply-and-operators.md) の 6 節、[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節の E1・E5）。
 5. 割り当てを `offered` で作り、epoch を 1 増やし、`active_assignment_id` を入れ、乗車を `offered` にし、タイマーを入れ、outbox に書く。
 
-- 配車の側も同じ条件で候補を絞る（[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節）。**Trips は提案の時に、供給・営業区域・運行枠の条件を確かめ直す**（2026-09-27 の決定。[architecture/README.md](README.md) の 7 節）。ここでの検査は、索引の写しの古さに対する最後の確かめである。条件の判定は、配車（Go）と Trips（TypeScript）で同じバージョンのデータを読み、共通の決定表のテストのベクター（dispatch の 12.2 節の DT-DISP-001。`vectors/eligibility/`）を両方の CI で通して、2 つの実装の食い違いを防ぐ。条件の正本は配車の関数とし（[ADR-0014](../decisions/0014-dispatch-eligibility-and-street-hails.md)）、Trips の確かめ直しは防御である。
+- 配車の側も同じ条件で候補を絞る（[dispatch-and-matching.md](dispatch-and-matching.md) の 5 節）。**Trips は提案の時に、供給・営業区域・運行枠の条件を確かめ直す**（2026-09-27 の決定。[design-log.md](design-log.md) の「2026-09-27：既定案」）。ここでの検査は、索引の写しの古さに対する最後の確かめである。条件の判定は、配車（Go）と Trips（TypeScript）で同じバージョンのデータを読み、共通の決定表のテストのベクター（dispatch の 12.2 節の DT-DISP-001。`vectors/eligibility/`）を両方の CI で通して、2 つの実装の食い違いを防ぐ。条件の正本は配車の関数とし（[ADR-0014](../decisions/0014-dispatch-eligibility-and-street-hails.md)）、Trips の確かめ直しは防御である。
 - 検査に落ちた提案は、`ProposeOfferResponse.rejected`（`EPOCH_MISMATCH`、`TRIP_STATE_CHANGED`、`DRIVER_NOT_AVAILABLE`、`NOT_ELIGIBLE`、`CONSTRAINT_VIOLATION`）で配車に返す。供給・営業区域・運行枠の条件に落ちたときが `NOT_ELIGIBLE` である。配車はそのドライバーを次のバッチから除くか、索引の更新を待つ。
 
 ### 4.4 ロックの順序

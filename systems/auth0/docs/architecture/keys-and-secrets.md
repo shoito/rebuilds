@@ -92,13 +92,22 @@ KMS（顧客管理の対称鍵。マルチリージョン。primary は東京、
 
 ### 5.1 状態
 
-```
-             生成（Signer）          ローテーション              ローテーション（2 つ前）／失効
-  (なし) ──────────────▶ next ─────────────▶ current ──────────────▶ previous ─────────────▶ revoked
-                          │                    │                          ▲
-                          │                    └── 緊急のローテーション ────┼──────────────────▶ revoked
-                          │                                               │
-                          └── ready（JWKS に載せてから 15 分）── ローテーションの条件 ┘
+次の図は、署名鍵の状態を、5.2 節の操作の表に沿って示す。正は表である。
+
+```mermaid
+stateDiagram-v2
+  [*] --> next: 生成（Signer）
+  next --> current: ローテーション（next が ready）／緊急のローテーション（ready を問わない）
+  current --> previous: ローテーション
+  current --> revoked: 緊急のローテーション
+  previous --> revoked: 失効
+  next --> [*]: アルゴリズムの変更（古い next を消す）
+  note right of next
+    ready は JWKS に載せてから 15 分
+  end note
+  note right of revoked
+    緊急のローテーション（全部）では、すべての鍵が revoked になる
+  end note
 ```
 
 | 状態 | JWKS | 署名に使う | 数 |

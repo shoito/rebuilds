@@ -164,14 +164,19 @@ VectorNetwork {
 
 ### 7.2 ペンのステートマシン
 
-```
-Idle ──クリック──▶ Drawing（点を置く。前の点から辺を引く）
-Drawing ──ドラッグ──▶ 接線を対称に設定（Alt で対称を切る）
-Drawing ──最初の点をクリック──▶ 輪を閉じ、領域を作る ──▶ Idle（選択のまま）
-Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
-パスの編集 ──辺をクリック──▶ 辺を t で分割し、点を足す（de Casteljau）
-パスの編集 ──Cmd＋辺をドラッグ──▶ 曲げ：ドラッグした点を通るように、辺の 2 つの接線を同じ比で変える
-パスの編集 ──点を削除──▶ 次数 2 の点なら、両側の辺を 1 本につなぐ（外側の接線を残す）
+次の図は、ペンの状態と、パスの編集での操作を示す。パスの編集の 3 つの操作は、状態を変えない。
+
+```mermaid
+stateDiagram-v2
+  state "パスの編集" as Editing
+  [*] --> Idle
+  Idle --> Drawing: クリック（点を置く。前の点から辺を引く）
+  Drawing --> Drawing: ドラッグ（接線を対称に設定。Alt で対称を切る）
+  Drawing --> Idle: 最初の点をクリック（輪を閉じ、領域を作る。選択のまま）
+  Drawing --> Idle: Enter / Esc（開いたまま終える）
+  Editing --> Editing: 辺をクリック（辺を t で分割し、点を足す。de Casteljau）
+  Editing --> Editing: Cmd＋辺をドラッグ（曲げ。ドラッグした点を通るように、辺の 2 つの接線を同じ比で変える）
+  Editing --> Editing: 点を削除（次数 2 の点なら、両側の辺を 1 本につなぐ。外側の接線を残す）
 ```
 
 - Shift：45° 刻みに制限。
@@ -294,6 +299,20 @@ Drawing ──Enter / Esc──▶ 開いたまま終える ──▶ Idle
 - 他の人のカーソルは色だけで区別しない（名前の札を付ける）。`prefers-reduced-motion` で、ズームとパンのアニメーションを止める。
 - 選択の枠とガイドの色は、白と黒の背景のどちらでも 3:1 以上のコントラストにする。
 
+### 12.1 UI の言語と国際化
+
+Zoom の題材（[clients.md](../../../zoom/docs/architecture/clients.md) の 6 節）と Linear の題材（[client-app.md](../../../linear/docs/architecture/client-app.md) の 12 節）と同じ形にし、違うところだけを書く。
+
+- **言語**：殻の文言は ICU MessageFormat と FormatJS で持ち、日本語と英語（ja・en）を持てる形にする。日本語を先に作る（[intent.md](../intent.md)）。英語を利用者に出す時期は PM が決める（[intent.md](../intent.md) の Open questions）。言語はアカウントの設定で選び、未設定ならブラウザの言語（ja でなければ en）。
+- **文言の作り方**：件数・語順の違う文を連結で作らない（「3 個のレイヤーを選択」と "3 layers selected"）。12 節の読み上げの文（「矩形 1 を選択。幅 120、高さ 40」）も同じカタログから作る。ショートカットの一覧のダイアログ（10.2 節）の操作の名前も同じ。
+- **既定のレイヤー名は文書の中身**：新しく作ったノードの既定の名前（「矩形 1」・"Rectangle 1"）は、作った人の UI の言語で付け、文書に書く。後から他の言語の人が開いても訳し直さない（同じファイルの名前が人ごとに違って見えると、コメントとコンポーネントの参照で取り違える）。
+- **キー配列**：ショートカットの照らし方（JIS 配列と US 配列）は 10.1 節。IME の組み立て中にショートカットを動かさない規則も 10.1 節と 9 節。
+- **数と単位**：プロパティのパネルの数の入力は、UI の言語に関わらず小数点を `.` にし、桁の区切りを使わない（貼り付けた値を確実に読むため）。単位の表示（`px`、`%`、`°`）は訳さない。
+- **日時**：コメントの時刻とバージョンの履歴の時刻は、閲覧者の時刻帯で、UI の言語の形（`Intl.DateTimeFormat`）で出す（[comments-and-notifications.md](comments-and-notifications.md)、[file-storage-and-history.md](file-storage-and-history.md)）。メールの通知は、受け手のアカウントの言語で作る。
+- **文の折り返し**：殻の日本語の文は `line-break: strict`。キャンバスの上のテキストの行の組み立て（禁則）は描画の層の仕事で、殻の言語と関係しない（[layout.md](layout.md)、[ADR-0015](../decisions/0015-text-shaping-and-glyph-rendering.md)）。
+- **プラグインの UI**：プラグインの文言はプラグインの作者が持つ。利用者の UI の言語をプラグインの API で渡すかは、プラグインの API の設計（E14。[plugins.md](plugins.md)）で決める。
+- **試験**：英語の設定で、主な画面に未訳の文言がないこと（カタログの全キーが ja・en の両方にあることを CI で確かめる）。長い英語の文言でツールバーとパネルが崩れないことを、Playwright のスクリーンショットで確かめる。
+
 ## 13. クリップボードと取り込み
 
 - コピー：選んだノードを document-model の形式で直列化し、次の 3 つをクリップボードに書く。
@@ -384,6 +403,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 | E4 | `properties-panel` | 選択のプロパティ、`Mixed` の表示、`SetProps` |
 | E4 | `clipboard` | 13 節のコピーと貼り付け、ドラッグ＆ドロップ、SVG と画像の取り込みの操作 |
 | E4 | `canvas-a11y` | 12 節のキャンバスのキー操作と読み上げ、axe の検査 |
+| E1 | `ui-i18n-baseline` | 12.1 節の文言のカタログ（ICU MessageFormat・FormatJS、ja・en）、言語の選び方、カタログの CI の検査 |
 | E5 | `auto-layout-drag-reorder` | オートレイアウトの子のドラッグでの並べ替えと、差し込みの線（layout と一緒に） |
 | E5 | `resize-with-constraints` | フレームの大きさの変更で制約を当てる（layout の `constraints-on-resize` と一緒に） |
 | E6 | `edit-derived-nodes` | 導出したノードの選択と、上書きの書き込みへの変換（components と一緒に） |
@@ -420,6 +440,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 | iCurve の平坦化の品質 | E4 の前に参照の形で比べる |
 | 実機の IME の自動のテストの作り方 | E4 の前に確かめる |
 | 本家との細部の一致（マーキー、ダブルクリックの入り方） | E4 で比べる。L6 の結論に従う |
+| 英語の UI を利用者に出す時期 | PM が決める（[intent.md](../intent.md) の Open questions）。仕組みは E1 の `ui-i18n-baseline` で ja・en を持つ |
 
 ## 20. quality.md・runbooks・data-model への項目
 
@@ -429,6 +450,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 - PROP-EDIT-001〜006 を E4 のリリースの基準にする。
 - 性能の予算（11 節）を E4 のリリースの基準にする。入力から描画までの p95 を RUM で見る。
 - a11y：殻は WCAG 2.2 AA（axe と手動）。キャンバスは 12 節の範囲（キー操作と読み上げ）を手動で確かめる。
+- 言語：文言のカタログの全キーが ja・en の両方にあることを PR で確かめる（12.1 節）。
 - 本番での検証：入力から描画までの時間の p95、React の再描画が 3 ms を超えたフレームの割合、エンジンの panic の件数、IME のイベントの順序の食い違いの件数を、ブラウザ・OS の別に日次で見る。
 
 ### runbooks

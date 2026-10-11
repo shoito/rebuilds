@@ -325,7 +325,7 @@ Epic の番号は [architecture/README.md](README.md) の 7 節の割り当て�
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - **対応ブラウザ**：主要な 4 つの最新 2 メジャーと Firefox の ESR（ADR-0021）。
 - **仮想背景**：MediaPipe の Selfie Segmenter、WebGPU、なければ WebGL2（ADR-0022）。

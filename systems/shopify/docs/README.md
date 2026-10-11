@@ -11,7 +11,7 @@
 | [roadmap.md](roadmap.md) | Epic と Story、延期の一覧 | PM |
 | [runbooks/](runbooks/README.md) | SLI と SLO、上限とフラグ、リリース、アラートと手順（核の 6 本と計画）、フラッシュセールの運用 | Ops |
 
-2026-10-10 に統合と検証の工程を終えた（[architecture/README.md](architecture/README.md) の 6 節の「決定（2026-10-10、統合）」）。
+2026-10-10 に統合と検証の工程を終えた（[architecture/design-log.md](architecture/design-log.md) の「2026-10-10：統合」）。
 
 これから作る文書（まだない）：
 

@@ -91,7 +91,8 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 
 出典は [Pricing](https://www.notion.com/pricing)（2026-09-26 に確認）。上限を超えたワークスペースでは、ワークスペースのメールドメインに属する人だけを、ゲストではなくメンバーとして追加できる（[Manage members, admins & guests](https://www.notion.com/help/add-members-admins-guests-and-groups)）。Enterprise は、メンバーがゲストの追加を申請し、所有者が承認する運用を選べる（同じ文書）。
 
-- 上限の値はプランの権利（entitlements）として持ち、Slack の ADR-0032 を先例に決める。この文書は「上限を超えたら 409 `guest_limit`」だけを定める。
+- 上限の値はプランの権利（entitlements）の `limit.guests.max` として持つ（[ADR-0034](../decisions/0034-plans-and-entitlements.md)、proposed。Slack の ADR-0032 と同じ形）。この文書は「上限を超えたら 409 `guest_limit`」だけを定める。
+- プランを下げて上限を超えたときは、既存のゲストを残し、新しい追加だけを 409 `guest_limit` にする（ADR-0034）。
 
 ### 2.4 グループ
 
@@ -376,7 +377,7 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 - `page_general_access` も ACL の一部で、ACL を持たない子孫に継承する。
 - ページの URL はページの ID（UUIDv7）を含む。リンクの共有は URL を知っていることを前提にするので、UUIDv7 のランダムな部分（74 ビット）と、公開の配信のレート制限で推測を防ぐ。
 - **ログインしていない閲覧者には、アプリのオリジンで内容を見せない。** `public` のページへのログインしていない要求は、公開サイトのオリジン（8 節）へ送る。アプリのオリジンで、誰でも作れる内容を匿名に見せない（フィッシングの対策。本家と体験が違いうる。未検証）。
-- `public` の水準は、S1 では `can_view` だけにする（決定。[README.md](README.md) の「決定」）。本家は、リンクの閲覧者に編集・コメント・閲覧のいずれかを許せる。コメントと編集にはログインが要る（[Share your Notion pages](https://www.notion.com/help/share-your-work)、2026-09-27 に確認）。S1 で `can_view` だけにするのは本家との差異である。
+- `public` の水準は、S1 では `can_view` だけにする（決定。[design-log.md](design-log.md) の「決定」）。本家は、リンクの閲覧者に編集・コメント・閲覧のいずれかを許せる。コメントと編集にはログインが要る（[Share your Notion pages](https://www.notion.com/help/share-your-work)、2026-09-27 に確認）。S1 で `can_view` だけにするのは本家との差異である。
 - 本家は、有料のプランでリンクに期限（Link expires）を付けられる（[リリースノート 2022-10-12](https://www.notion.com/releases/2022-10-12)、2026-09-27 に確認）。
 
 ## 8. Web への公開（公開サイト）
@@ -452,7 +453,7 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 
 ## 11. 決定と持ち越し
 
-2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[README.md](README.md) の「決定」）。
+2026-09-26 に、本家に寄せる既定案で次のとおり決めた（[design-log.md](design-log.md) の「決定」）。
 
 | 問い | 決定 |
 | --- | --- |
@@ -463,7 +464,7 @@ intent.md の Non-goals（Enterprise の管理）に従い、MVP では作らな
 | `public` の水準 | S1 は `can_view` だけ |
 | 閲覧だけの人にコメントを見せるか | 見せる（4.2 節。本家と同じ）。公開サイトではコメントを描画しない（8 節） |
 
-2026-09-28 に、推奨案で次のとおり決めた（[README.md](README.md) の「決定（2026-09-28、推奨案で確定）」）。
+2026-09-28 に、推奨案で次のとおり決めた（[design-log.md](design-log.md) の「2026-09-28：推奨案で確定」）。
 
 | 問い | 決定 |
 | --- | --- |

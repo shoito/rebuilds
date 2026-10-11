@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-[architecture/README.md](../architecture/README.md) の 6 節は、バージョンの保持の期間を本家と同じ区分の既定（無料・個人の有料 30 日、チームの標準 180 日、チームの上位 365 日）にした。本家の区分は公式の資料で確かめた（[Version history overview](https://help.dropbox.com/delete-restore/version-history-overview)、2026-10-09 に確認）。数え始めは確かめられなかった（**未検証**）。
+[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」は、バージョンの保持の期間を本家と同じ区分の既定（無料・個人の有料 30 日、チームの標準 180 日、チームの上位 365 日）にした。本家の区分は公式の資料で確かめた（[Version history overview](https://help.dropbox.com/delete-restore/version-history-overview)、2026-10-09 に確認）。数え始めは確かめられなかった（**未検証**）。
 
 - 巻き戻しは、保持の期間の中の時点の木が要る（NFR-009）。ジャーナルは 90 日で落とす（[ADR-0023](0023-tree-listing-snapshot-and-journal-retention.md)）ので、365 日の時点の木を作れない。
 - ブロックの参照は、リビジョンの保持の期限で減る（[ADR-0003](0003-dedupe-scope-and-privacy.md)、[ADR-0007](0007-block-storage-layout-on-s3.md)）。

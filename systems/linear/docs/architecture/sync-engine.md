@@ -70,26 +70,35 @@
 
 ## 3. 構成と流れ
 
-```
- クライアント（書き手のタブ）
-   UI ─ 操作 ─▶ Tx を作る ─▶ オブジェクトプール（pending に積み、画面に当てる）─▶ 描画
-                     │ 同じイベントループの回の Tx をまとめて
-                     ▼
-                IndexedDB `_outbox` にコミット（strict）─▶ submit（WebSocket）
-                                                               │
- Sync Gateway ◀────────────────────────────────────────────────┘
-   │ submit を Writer へ（内部の HTTP/2。workspace_id を付ける）
-   ▼
- Writer：ワークスペースの行をロック → Tx ごとに検証・適用・sync_actions → tx_results → sync_outbox → COMMIT
-   │ ack（Tx ごとの結果）を Gateway へ返す ──────────────▶ クライアントへ ack
-   ▼
- Aurora：sync_outbox ──▶ Relay（ワークスペースの順に読む）──▶ Valkey（ワークスペースごとのチャンネル）
-                                                                    │ 絞る前の差分（連続した範囲）
-                                                                    ▼
- Sync Gateway：ワークスペースの列の連続を確かめる → 接続ごとに同期グループで絞る → deltas {from, to}
-                                                                    │
-                                                                    ▼
- クライアント：範囲の連続を確かめる → IndexedDB に保存（モデル・_meta・確定した outbox の削除）→ メモリーに当て、pending を当て直す
+次の図は、書き手のクライアントの 1 つの操作が、ack と差分として戻るまでを示す。ack と差分は別の経路を通る。
+
+```mermaid
+sequenceDiagram
+  participant C as クライアント（書き手のタブ）
+  participant IDB as IndexedDB
+  participant GW as Sync Gateway
+  participant W as Writer
+  participant DB as Aurora
+  participant R as Relay
+  participant V as Valkey
+  C->>C: 操作から Tx を作る。オブジェクトプールの pending に積み、画面に当てる
+  C->>IDB: 同じイベントループの回の Tx をまとめて _outbox にコミット（strict）
+  C->>GW: submit（WebSocket）
+  GW->>W: submit（内部の HTTP/2。workspace_id を付ける）
+  W->>DB: ワークスペースの行をロック → Tx ごとに検証・適用・sync_actions<br/>→ tx_results → sync_outbox → COMMIT
+  par ack の経路
+    W-->>GW: ack（Tx ごとの結果）
+    GW-->>C: ack
+  and 差分の経路
+    R->>DB: sync_outbox を読む（ワークスペースの順）
+    R->>V: ワークスペースごとのチャンネルへ出す
+    V->>GW: 絞る前の差分（連続した範囲）
+    GW->>GW: ワークスペースの列の連続を確かめる<br/>接続ごとに同期グループで絞る
+    GW-->>C: deltas（from, to）
+  end
+  C->>C: 範囲の連続を確かめる
+  C->>IDB: 保存（モデル・_meta・確定した outbox の削除）
+  C->>C: メモリーに当て、pending を当て直す
 ```
 
 - ack と差分は別の経路で届く。順序は揺れる。クライアントは両方をそろえて使う（6 節）。
@@ -154,12 +163,22 @@
 
 ### 4.4 トランザクションの状態
 
-```
- created ──(outbox のコミット)──▶ queued ──(submit を送る)──▶ sent
-    │                                  ▲                        │
-    │ 1 秒コミットできない               │ 切断・retry_later        │ ack ok (s)          ack reject
-    ▼                                  │                        ▼                         ▼
- unsaved（画面に「保存していない」）       └──────────────────── acked(s) ──(L ≥ s)──▶ done   rejected ──▶ _rejected へ
+次の図は、クライアントの 1 つのトランザクションの状態を示す。`s` は ack で知った確定の `sync_id`、`L` は手元の `_meta.last_sync_id` である。outbox の行の状態の表は [client-store-and-offline.md](client-store-and-offline.md) の 5.2 節にある。
+
+```mermaid
+stateDiagram-v2
+  state "unsaved（画面に「保存していない」）" as unsaved
+  state "acked(s)" as acked
+  state "_rejected へ" as rejected_store
+  [*] --> created
+  created --> queued: outbox のコミット
+  created --> unsaved: 1 秒コミットできない
+  queued --> sent: submit を送る
+  sent --> queued: 切断・retry・retry_later
+  sent --> acked: ack ok (s)
+  sent --> rejected: ack reject
+  rejected --> rejected_store
+  acked --> done: L ≥ s
 ```
 
 - `done` は、`s` までの差分を IndexedDB に保存したとき。同じ IndexedDB のトランザクションで outbox の行を消す（ADR-0005）。
@@ -374,6 +393,28 @@ conns[ws]     : 接続ごとの { groups: Set, sent_to: sync_id, queue }
    - `SyncSubscription` の変更が接続の利用者のものなら、**その sync_id の直後から**接続の `groups` を変える。絞る前の列を順に処理するので、どの接続でも、参加・脱退の位置が `sync_id` で決まる。
 4. 接続へ `deltas {from: sent_to, to: 範囲の終わり, actions: [...]}` を送り、`sent_to` を進める。載せる変更が 0 件でも、1 秒に 1 回まで空のパケットで範囲を知らせる。
 5. 範囲の終わりは、必ずトランザクションの境（`tx_end`）にする。クライアントが半分だけのトランザクションを当てる状態を作らない。
+
+次の図は、手順 1〜4 の例である。Gateway の `head` と接続の `sent_to` が 10 のとき、`(10, 12]` が届き、続いて `(12, 14]` を飛ばして `(14, 15]` が届く。12 と 15 はトランザクションの境とする。
+
+```mermaid
+sequenceDiagram
+  participant V as Valkey
+  participant G as Sync Gateway
+  participant DB as Aurora の reader
+  participant C as 接続
+  Note over G: head = 10、sent_to = 10
+  V->>G: from 10, to 12 の範囲
+  G->>G: from == head なので当てる。head = 12
+  G->>C: deltas（from 10, to 12）。接続の groups と交わる変更だけ
+  V->>G: from 14, to 15 の範囲
+  G->>G: from > head なので欠け。buffer に置く
+  G->>DB: (12, 14] を読む
+  DB-->>G: (12, 14] の変更
+  G->>G: 欠けなく並んだ。head = 15
+  G->>C: deltas（from 12, to 15）。接続の groups と交わる変更だけ
+  V->>G: from 11, to 12 の範囲（重複）
+  G->>G: to ≤ head なので捨てる
+```
 
 - **範囲の証明の意味**：`deltas {from: a, to: b}` は、「`(a, b]` のうち、この接続が見てよい変更は、これで全部」を表す。Gateway は、絞る前の列が `(a, b]` で欠けなく並んだときだけ、これを名乗る。
 - 絞り込みは、権限の関数（ADR-0004）から導いた接続の `groups` だけで決める。Gateway は、行の中身を見て権限を判断しない。

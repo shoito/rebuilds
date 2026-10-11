@@ -7,7 +7,7 @@
 - 本人の表は FORCE RLS と `SET LOCAL app.actor_id`。ホストの表はホストのアカウントと共同ホストの役割。送金の口座の変更、共同ホストの追加、届出住宅の登録は `owner` だけで、送金の口座の変更から 72 時間は送金を保留する（[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md)）
 - 預かりは予約ごとに 1 回だけ決着し、ホストへの支払いはチェックインの予定の時刻 + 24 時間に振り替える（[ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)）
 - ML と規則の点は信号で、アカウントの停止は人の審査を通す（[ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md)）
-- ログインはパスキーを勧め、メールの一時コードと外部の ID の提供者。パスワードは持たない（[architecture/README.md](README.md) の 6 節の決定）
+- ログインはパスキーを勧め、メールの一時コードと外部の ID の提供者。パスワードは持たない（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」の決定）
 
 この文書で決めたことは次の ADR にある。
 

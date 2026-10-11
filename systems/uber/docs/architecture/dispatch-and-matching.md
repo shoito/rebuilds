@@ -171,12 +171,38 @@ message ProposeOfferResponse {
 
 ### 8.1 流れ
 
-```
-dispatch ──ProposeOffer──▶ Trips（offered、offer_id、期限 = 作成 + 16.5 秒、trip_timers）
-Trips ──outbox──▶ リアルタイムの配信 ──▶ ドライバーのアプリ（OfferCreated）
-ドライバーのアプリ ──OfferDelivered(offer_id)──▶ Trips（受信の確認。受信までの時間を記録）
-ドライバーのアプリ ──AcceptOffer(offer_id, assignment_epoch) / DeclineOffer(offer_id, reason)──▶ Trips
-Trips ──（accepted / 次のバッチへ）──▶ dispatch、両方のアプリ
+オファーの流れを図にする。分岐は下の表の主な行（受信の確認の 5 秒、受諾、辞退、期限の 16.5 秒）をまとめたもので、振る舞いは表を正とする。
+
+```mermaid
+sequenceDiagram
+    participant D as dispatch
+    participant T as Trips
+    participant R as リアルタイムの配信
+    participant DA as ドライバーのアプリ
+    participant RA as 乗客のアプリ
+    D->>T: ProposeOffer
+    Note over T: offered、offer_id、期限 = 作成 + 16.5 秒（trip_timers）
+    T->>R: outbox
+    R->>DA: OfferCreated
+    alt 5 秒たっても OfferDelivered がない
+        Note over T: 取り下げ（undelivered）。罰則にしない
+        T->>D: 依頼を次のバッチへ
+    else 受け取った
+        DA->>T: OfferDelivered(offer_id)
+        Note over T: 受信の確認。受信までの時間を記録
+        alt 受諾（期限の中、epoch が一致）
+            DA->>T: AcceptOffer(offer_id, assignment_epoch)
+            T->>D: accepted
+            T->>DA: accepted
+            T->>RA: accepted
+        else 辞退
+            DA->>T: DeclineOffer(offer_id, reason)
+            T->>D: 依頼を次のバッチへ（ドライバーを除外に入れる）
+        else 期限（16.5 秒）
+            Note over T: 時間切れ。ドライバーに罰則
+            T->>D: 依頼を次のバッチへ
+        end
+    end
 ```
 
 | 事象 | Trips の振る舞い |

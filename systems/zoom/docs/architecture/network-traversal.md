@@ -318,7 +318,7 @@ Playwright で実際のブラウザ（Chrome・Edge・Firefox・Safari）を動�
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。公開する規則は Ops が確かめてから出す。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。公開する規則は Ops が確かめてから出す。
 
 - **STUN**：単独の STUN のサーバーを置かない。第三者の STUN を使わない。
 - **Media Node の候補**：公開の IPv4・IPv6、UDP と ICE-TCP、同じポート。プライベート IP を出さない。

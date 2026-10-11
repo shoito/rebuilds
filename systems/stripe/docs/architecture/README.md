@@ -1,6 +1,6 @@
 # Architecture: Stripe
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/stripe/docs/primer/index.html#glossary)の用語集にある。
 
 | ファイル | 領域 |
 | --- | --- |
@@ -24,25 +24,44 @@
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーター |
 | [delivery.md](delivery.md) | CI/CD、リリース、フィーチャーフラグ |
 | [rate-limiting.md](rate-limiting.md) | レート制限と同時実行の制限 |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） |
 
 ## 1. 全体構成
 
-```
-加盟店のサーバー ──HTTPS──▶ API（api.<domain>）─────────────┐
-加盟店の顧客のブラウザ ──▶ Checkout・Elements ──▶ Vault API ─┐ │
-                                                             │ │
-┌──────────────────────── CDE（別の AWS アカウント）───────┐ │ │
-│  Vault：カード番号の受け取り・トークン化・保管・復号       │◀┘ │
-│  Connector Gateway：アクワイアラへ送る要求の組み立て       │    │
-└──────────────────────────────────────────────────────────┘    │
-     ▲ PrivateLink（pm_ だけ）  │ SQS connector-results        │
-┌──────────── 本体（CDE の外）────────────────────────────────┐ │
-│  API ──▶ Payments（状態遷移）──▶ Ledger（複式簿記）          │◀┘
-│    │        │                      │                          │
-│    │        └──▶ Fraud（ルール）    └──▶ Payouts・照合         │
-│    └──▶ outbox ──▶ Events ──▶ Webhook の配信（外向き送信）    │
-│  Dashboard・Checkout のバックエンド                            │
-└──────────────────────────────────────────────────────────────┘
+次の図は、CDE と本体の境界と、主なコンポーネントのつながりを示す。
+
+```mermaid
+flowchart TB
+  Merchant["加盟店のサーバー"]
+  Browser["加盟店の顧客のブラウザ"]
+  Checkout["Checkout・Elements"]
+  subgraph CDE["CDE（別の AWS アカウント）"]
+    Vault["Vault：カード番号の受け取り・トークン化・保管・復号"]
+    CGW["Connector Gateway：アクワイアラへ送る要求の組み立て"]
+  end
+  subgraph Main["本体（CDE の外）"]
+    API["API"]
+    Payments["Payments（状態遷移）"]
+    Ledger["Ledger（複式簿記）"]
+    Fraud["Fraud（ルール）"]
+    Payouts["Payouts・照合"]
+    Outbox["outbox"]
+    Events["Events"]
+    Webhook["Webhook の配信（外向き送信）"]
+    Backend["Dashboard・Checkout のバックエンド"]
+  end
+  Merchant -- "HTTPS" --> API
+  Browser --> Checkout
+  Checkout -- "Vault API" --> Vault
+  API --> Payments
+  Payments --> Ledger
+  Payments --> Fraud
+  Ledger --> Payouts
+  API --> Outbox
+  Outbox --> Events
+  Events --> Webhook
+  Main -- "PrivateLink（pm_ だけ）" --> CDE
+  CDE -- "SQS connector-results" --> Main
 ```
 
 | コンポーネント | 責務 |
@@ -61,6 +80,12 @@
 - **カード番号は CDE の外に出さない。** 本体はトークンだけを扱い、PCI DSS の対象を CDE に閉じ込める（[ADR-0005](../decisions/0005-pci-scope-segmentation.md)）。
 - **お金の正本は台帳。** 残高・入金額・手数料は、台帳の仕訳から求める。状態のテーブルの数値を正としない（[ADR-0003](../decisions/0003-double-entry-ledger.md)）。
 - **すべての書き込みは冪等。** 加盟店の再送、内部の再試行、コネクタの再送のどれでも、お金は 1 回しか動かない（[ADR-0004](../decisions/0004-idempotency.md)）。
+
+### 主要な流れ
+
+- **決済の確定（confirm）**：試行を記録してから振り分け・3D セキュア・オーソリへ進み、結果の反映・仕訳・Event を 1 トランザクションで書く（[payments.md](payments.md) の 4 節）
+- **結果不明の回復**：オーソリの結果が分からない試行を `unknown` にし、照会を繰り返して、見つからなければ取り消しを送り、どちらもできなければ `processing` のまま待つ（[payments.md](payments.md) の 7 節）
+- **決済から入金までの仕訳**：1 件のカードの決済が確定してから、加盟店への入金と決済代行からの精算の着金までに書く仕訳を、時刻の順に示す（[ledger.md](ledger.md) の 2.3 節）
 
 ## 2. 規模の段階
 
@@ -136,6 +161,8 @@
 | [0031](../decisions/0031-active-active-cells.md) | S3 で加盟店をセルに固定し、東京・大阪の active-active にする |
 | [0032](../decisions/0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから加盟店単位のカナリアで広げる |
 | [0033](../decisions/0033-cde-pipeline-and-change-control.md) | CDE のコードは `cde/` に置き、ビルド・デプロイの経路と承認を本体から分ける |
+| [0034](../decisions/0034-card-data-migration.md) | 他の事業者とのカード番号の移行は、cde-live の SFTP でのファイルの受け渡しで行う（proposed。提供の可否は PM、法令は L9） |
+| [0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外も DB・シェルは JIT。運用者の画面は役割で絞り、閲覧を加盟店に見せる。なりすましの機能を作らない（proposed） |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
@@ -149,20 +176,7 @@
 - **接続先への依存**：最初のカードのコネクタ、コンビニ収納代行、提携銀行が未定。30 日のオーソリ、3DS Server、照会の整合性の時間、精算のサイクル、振込の API の仕様は、選定の後に確かめる。
 - **法令**：資金決済法の上の位置づけなど、法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
-### 決定（2026-09-26、既定案）
-
-PM の方針（本家 Stripe に寄せる、既定案）により、次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に集めた。計測・PoC・接続先の選定で決めるものは、下の「持ち越し」に置いた。
-
-- **本家の名前・接頭辞を使わない**（リポジトリ共通の ADR-0006）。見出しは `<Brand>-Version`・`<Brand>-Should-Retry`・`<Brand>-Rate-Limited-Reason`・`<Brand>-Signature`。API キーは `<brand>_{pk|sk|rk}_{live|test}_`、Webhook の署名の秘密は `<brand>_whsec_`。ドメインは `api.<domain>`・`js.<domain>` など。オブジェクトの ID の接頭辞（`pi_`、`cus_`、`du_` など）は秘密ではないので本家に合わせる。ADR-0002・0006・0008・0025 の表記を改めた。
-- **Dispute の ID は `du_`**、手数料は 1 件 1,500 円（本家の日本と同じ。[Stripe 料金](https://stripe.com/jp/pricing)）。
-- **残高が足りないときの返金は本家に合わせる。** 利用可能な残高から引き、足りなければカードの返金は残高が足りるまで保留（最長 30 日、過ぎたら `insufficient_funds` で失敗）、他の決済手段の返金は失敗にする（[支払いの返金とキャンセル](https://docs.stripe.com/refunds)）。Dispute の引き落としはマイナスを許す。[payments.md](payments.md) の 10.2 節、[ledger.md](ledger.md)、ADR-0016 を揃えた。コンビニ・銀行振込の返金のために `refunds_payable` の口座を足した。
-- **CDE の構成は ADR-0029 を正とする。** アカウントは cde-live・cde-test（ほかに cde-nonprod、cde-shared）。本体 → CDE は PrivateLink、CDE → 本体は SQS（`connector-results`）だけ。PaymentMethod の作成は「ブラウザ → vault-ingest（使い捨ての `card_input`）→ 本体の API → vault-core の紐づけ」の向きにし、CDE から本体を呼ばない。境界を越える識別子は `pm_` だけ（紐づけの 1 回だけ `card_input`）。[card-vault.md](card-vault.md)、[security.md](security.md)、[infrastructure.md](infrastructure.md)、[checkout.md](checkout.md)、ADR-0027 を揃えた。
-- **Webhook の送信元の IP** は、専用の egress VPC の Elastic IP 付き NAT から出し、東京 3 個・大阪 3 個を最初から公開する（ADR-0025）。
-- **数値の正本**：レート制限は [rate-limiting.md](rate-limiting.md) の 4 節（エッジの IP は api 5 分に 30,000、Vault・Checkout 5 分に 1,000）。Webhook の送信のタイムアウト（接続 5 秒・全体 15 秒）と送信先ごとの同時実行（10）は [events-and-webhooks.md](events-and-webhooks.md)。`lock_timeout` は 2 秒。冪等キーのパーティションは 48 時間で `DROP`。保持期間は [security.md](security.md) の 13 節。SLO は [runbooks/README.md](../runbooks/README.md) の 1 節。
-- **監査の記録**：`security_events` は `audit_events` の一部として扱い、DB に 1 年、アーカイブに 7 年（ADR-0023）。
-- **API のバージョン**：上げたバージョンを戻せる期間は 72 時間（本システムの決定）。`.preview` のバージョンは持たない（[api.md](api.md) の 15 節）。
-- **その他の既定案**：要求のログは本文を持たずメタデータを 30 日。ダッシュボードのセッションはアイドル 12 時間・絶対 7 日。独自のロールは持たない。レビュー中の決済の入金は止めない。Checkout に CAPTCHA 相当の部品を作らず WAF の Challenge とルールで守る。`fingerprint` は加盟店ごと。銀行振込の PaymentIntent は自動で失効させない。ダッシュボードのホームは日次の集計の表から出す。`Retry-After` を 429 に付ける。
-- 領域ごとの決定は、各文書の「決定と持ち越し」の節にある：[api.md](api.md)、[auth-and-keys.md](auth-and-keys.md)、[payments.md](payments.md)、[payment-methods.md](payment-methods.md)、[events-and-webhooks.md](events-and-webhooks.md)、[checkout.md](checkout.md)、[dashboard.md](dashboard.md)、[fraud.md](fraud.md)、[rate-limiting.md](rate-limiting.md)、[card-vault.md](card-vault.md)、[security.md](security.md)。
+### 残る未解決事項
 
 持ち越し（計測・PoC・接続先の選定で決めるもの）：
 
@@ -178,31 +192,4 @@ PM の方針（本家 Stripe に寄せる、既定案）により、次のとお
 | 検索 API の索引、読み取りの割当を止めるか | E11 の PoC と計測 |
 | 本家の振る舞いで未確認のもの（手数料の丸め、`cancellation_reason`、アクセスポリシーの `code`、Webhook の自動の無効化の条件など） | 各文書の「持ち越し」に書いた Epic の Story で、本家のサンドボックスを観察して揃える |
 
-### 決定（2026-09-28、推奨案で確定）
-
-PM の方針（判断が要るところは推奨案でよい）により、法務以外の残りを次のとおり決めた。法務の確認待ち（L1〜L8）と、それに依るものは決めていない。接続先の選定、PoC、計測の項目は、上の「持ち越し」に残した。
-
-- **3D セキュアの範囲は ADR-0012 のまま**（日本で発行されたカードの CIT では常に要求）。ガイドライン 6.1 版の都度の認証の原則に沿い、MVP はリスクの判断を持たないため。本家との違いは記録に残した（[ADR-0012](../decisions/0012-3ds-via-connector.md) の 2026-09-28 の注記、[fraud.md](fraud.md) の 5 節）。
-- **決済の経路のレート制限は、全体の枠だけのまま**。正当な決済を断らないことを優先するため（[ADR-0009](../decisions/0009-rate-limiting.md)、[rate-limiting.md](rate-limiting.md) の 4.2 節）。
-- **Aurora DSQL を S3 の候補から外し、ADR-0031 を accepted にした**。トリガーと RLS がなく、台帳の制約とテナントの分離が DB で守れないため（[ADR-0031](../decisions/0031-active-active-cells.md)、[infrastructure.md](infrastructure.md) の 10 節）。
-- **境界を越える値の例外は `card_input` の 1 つだけとし、承認した**。カード会員データを含まず、使い捨てで 30 分で失効するため（[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) の注記、[card-vault.md](card-vault.md) の 2 節）。
-- **DEK のキャッシュは AWS Encryption SDK の caching CMM で行う**。5 分のキャッシュをそのまま表せ、CDE に DynamoDB を足さずに済むため（[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) の 2026-09-28 の注記）。
-- **結果不明を起こすテスト用のカード番号は、`4000000000` で始まり本家の表にない番号から選ぶ**。本家の番号との衝突を CI で防げるため（[payment-methods.md](payment-methods.md) の 4・8 節）。
-- **会計への出力は、MVP では仕訳の CSV を経理が取り込む形にする**。会計システムを選ぶ前に始められるため（[payouts-and-reconciliation.md](payouts-and-reconciliation.md) の 7 節）。勘定科目の名前は法務・経理の確認待ちのまま。
-- **ダッシュボードのセッションの長さは、本システムの値（アイドル 12 時間・絶対 7 日）で確定した**。本家の値が公開されていないため（[auth-and-keys.md](auth-and-keys.md) の 3.3 節）。
-- **接続先の選定の条件と、比べる候補の絞り方を決めた**。コネクタ、収納代行、提携銀行、eKYC、不正検知、QSA を、各 Epic の Story で同じ物差しで選ぶため。どの会社にするかは選ばない（[intent.md](../intent.md) の「接続先の選定（法務以外）」）。QSA の最初の審査は、本番の加盟店を受け入れる前に受ける（[security.md](security.md) の 16 節）。
-- **本家の実装を核に使っていないことを確かめた**（リポジトリ共通の [ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。本家の `stripe-node` は、Webhook の署名の互換を確かめるテストの道具としてだけ使い、製品のコードには入れない（[ADR-0025](../decisions/0025-webhook-signing-and-isolated-delivery.md) の 2026-09-28 の注記）。
-
-### 決定（2026-09-28、データモデル）
-
-データモデルを [data-model.md](data-model.md) と [data-model/](data-model/) にまとめ、列・制約・索引の正本にした（領域の文書は振る舞いの正本）。その際、文書の間の食い違いと抜けを、推奨案で次のとおり決めた。
-
-- **パーティションをまたぐ一意**：PostgreSQL はパーティションの鍵を含まない一意を張れない。`idempotency_keys`・`connector_inbox`・`bank_statement_lines` は、`pg_advisory_xact_lock` で直列にし、直近のパーティションを確かめてから挿入する。`events` は日付の列 `created_on` をパーティションの鍵にし、同じ日の中で `(account_id, idempotency_source, created_on)` を一意にする（主な守りは遷移関数の冪等）。`webhook_deliveries` は `event_created_on` を鍵に含めて一意にする。[api.md](api.md)・[events-and-webhooks.md](events-and-webhooks.md) を揃えた。
-- **`livemode` の列を持たない**（Vault DB を含む）。[payment-methods.md](payment-methods.md)・[card-vault.md](card-vault.md) を揃えた。
-- **DEK の表（`vault_deks`）を持たない。** DEK は AWS Encryption SDK のメッセージに包んだ形で入る（ADR-0019 の注記）。漏洩の疑いの対象は `edk_hash`・`cmk_key_id` で探す。
-- **内部向けの指紋を本体に置く。** 紐づけの応答で返し、`payment_methods.fingerprint_internal` に持つ。プラットフォームの不正検知だけが使い、加盟店に出さない（[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md) の 2026-09-28 の注記）。QSA の確認の対象に含める。
-- **公開可能キーの写しを CDE に置く**（`vault_publishable_keys`、本体 → CDE の `sync_publishable_key`）。vault-ingest が加盟店向けの指紋を計算するのに加盟店が要るため。あわせて、保存の状態を CDE に伝える `set_card_attached` を足した（保持の期限の計算に要る）。どちらも本体 → CDE の向きで、境界を越える識別子は変えない。[card-vault.md](card-vault.md) を揃えた。
-- **`security_events` は `audit_events` の `category = 'security'` の行**（ビュー）にする。[auth-and-keys.md](auth-and-keys.md)・[dashboard.md](dashboard.md) を揃えた。
-- **プラットフォームの行はテナントテーブルに入れない。** 不正検知のルール・リストは `platform_fraud_rules`・`platform_fraud_list_items`、入金・照合の加盟店をまたぐ表は RLS の例外にする。RLS の例外の一覧の正本は [data-model.md](data-model.md) の 3.3 節。[fraud.md](fraud.md)・[payouts-and-reconciliation.md](payouts-and-reconciliation.md)・[security.md](security.md) を揃えた。
-- **テナントをまたぐ探索**は、`SECURITY DEFINER` の解決の関数と、読み取りだけの `sweeper` ロールで行う（[data-model.md](data-model.md) の 3.2・3.3 節）。
-- **足りなかった表を最小で定義した**：`connector_routes`、`refund_bank_details`、`vault_publishable_keys`、`vault_bin_ranges`、`vault_test_cards`、`platform_fraud_list_items`。口座番号の列の暗号化に KMS の `bank-accounts` を足した（[security.md](security.md) の 5 節）。
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。

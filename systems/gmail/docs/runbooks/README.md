@@ -33,7 +33,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 
 ## 2. 上限と容量のパラメーター
 
-値の正本は、各 ADR と領域の文書にある（一覧は [architecture/README.md](../architecture/README.md) の 6 節の「数値の正本」）。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
+値の正本は、各 ADR と領域の文書にある（一覧は [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：統合」の「数値の正本」）。Ops が運用で変えてよいのは、下の「運用で変えるもの」だけで、変えたら記録を残す。
 
 | 対象 | 値 | 正本 | 運用で変えるもの |
 | --- | --- | --- | --- |
@@ -51,7 +51,7 @@ Ops が持つ運用の文書。品質の判定基準は [quality.md](../quality.
 | 不在の返信 | 同じ送り手へ 96 時間に 1 回 | 同上 | — |
 | IMAP の量 | 読み出し 1 時間 2.5 GB・1 日 20 GB、書き込み 1 時間 1 GB | [ADR-0059](../decisions/0059-api-rate-limits-and-third-party-push.md) | — |
 | 容量 | 個人 15 GB | NFR-011 | — |
-| ゴミ箱・迷惑メールの箱の期限 | 30 日 | [architecture/README.md](../architecture/README.md) の 6 節 | — |
+| ゴミ箱・迷惑メールの箱の期限 | 30 日 | [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」 | — |
 | change log の保持 | 30 日 | [ADR-0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) | — |
 | IMAP の同時の接続 | アカウントあたり 15 | NFR-014 | — |
 | blob の GC の猶予 | 参照 0 から 7 日 | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) | — |

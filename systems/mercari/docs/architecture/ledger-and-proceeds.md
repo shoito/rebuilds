@@ -199,6 +199,25 @@ escrow_amount = price + payment_fee
 - 本システムの手元に残るのは 392 円（手数料 500 円 − 提供者の手数料 108 円）。全口座の和は 0。
 - 行 2 で売上金は 2,490 円になり、売り手の残高と明細に出る（NFR-006）。
 
+この例のお金の動きを、預かりから売上金のロット、振込までつないで図にすると次のとおり。実線の数字は上の表の #。点線は 6.1 節のロットの他の出で、この例では起きない。
+
+```mermaid
+flowchart LR
+    BUY["提供者（カードの支払い）<br/>psp_receivable"] -->|"1 hold_psp 3,000"| ESC["escrow:T1<br/>取引の預かり"]
+    ESC -->|"2 release 2,490"| LOT["seller_proceeds:S<br/>売上金のロット 2,490"]
+    ESC -->|"2 release 300"| FS["fee_revenue:sales"]
+    ESC -->|"2 release 210"| SH["shipping_payable:A"]
+    SH -->|"4 carrier_payment 210"| CAR["bank_operating から<br/>運送会社 A へ"]
+    LOT -->|"5 payout_request 2,290"| PIT["payout_in_transit:S"]
+    LOT -->|"5 payout_request 200"| FP["fee_revenue:payout"]
+    PIT -->|"6 payout_settled 2,290"| BANK["bank_operating から<br/>売り手の銀行口座へ"]
+    LOT -.->|"型 6 reserve"| RES["balance_reserved<br/>購入の引き当て"]
+    LOT -.->|"型 19 proceeds_to_balance<br/>legal.balance_enabled"| UB["user_balance<br/>期限のない残高"]
+    LOT -.->|"型 20 proceeds_forfeit<br/>legal.proceeds_forfeit_enabled"| FF["proceeds_forfeiture"]
+```
+
+- 点線の「型」の数字は 4.3 節の仕訳の型の #。19・20 は `legal.*` が有効のときだけ書く（本番の既定は無効。6.2 節）。提供者の精算（表の 3）は、本システムの銀行口座の側の動きなので図に入れていない。
+
 ### 5.3 release の直後の回収
 
 - 売り手に `chargeback_receivable` の残りがあれば、release と同じ ledger のトランザクションで `receivable_offset`（型 12）を書き、売上金から先に回収する。release の仕訳そのものは変えない（型を固定するため）。

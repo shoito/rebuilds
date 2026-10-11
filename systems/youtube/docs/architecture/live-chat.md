@@ -4,7 +4,7 @@
 
 前提となる決定は次のとおり。
 
-- ライブチャットは WebSocket の Gateway と Valkey での扇形の配り。大きな配信は 1 秒ごとにまとめて送り、送信の速さの上限（低速モード）と「上位のチャット」の絞り込みを持つ。チャットのリプレイは配信の時刻のずれで VOD に合わせる（[architecture/README.md](README.md) の 6 節）
+- ライブチャットは WebSocket の Gateway と Valkey での扇形の配り。大きな配信は 1 秒ごとにまとめて送り、送信の速さの上限（低速モード）と「上位のチャット」の絞り込みを持つ。チャットのリプレイは配信の時刻のずれで VOD に合わせる（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - Slack の題材の Gateway の形（ノードごとの購読の集約、遅い受信者の切断、再接続の殺到への備え）を参考にする（[Slack の realtime.md](../../../slack/docs/architecture/realtime.md)）
 - 視聴の出来事と同じく、量の多い流れは MSK に載せる（[ADR-0001](../decisions/0001-platform-and-stack.md)）
 - 措置は `playable()` と配信の停止（[ADR-0009](../decisions/0009-single-tenant-and-playable.md)、[ADR-0027](../decisions/0027-takedown-deny-list-within-60s.md)）

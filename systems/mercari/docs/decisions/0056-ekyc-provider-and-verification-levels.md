@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- 本人確認は外部の eKYC の提供者を使う（マイナンバーカードの IC を優先、書類と顔の照合を予備）。本システムは結果と水準を持つ（[architecture/README.md](../architecture/README.md) の 6 節）。
+- 本人確認は外部の eKYC の提供者を使う（マイナンバーカードの IC を優先、書類と顔の照合を予備）。本システムは結果と水準を持つ（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - 確認は、匿名でない配送（[ADR-0006](0006-shipping-orchestration-via-carriers.md)）、売上金の残高（`legal.balance_requires_kyc_level`。[ADR-0004](0004-proceeds-model-under-payment-services-act.md)）、振込の上限、制限つきのカテゴリを開く。値の多くは法務の確認待ち（L1・L2）。
 - 取引時確認の方式としてどの方式が足りるかは法務の確認待ち（L2）。提供者の選定も未定（E15）。
 - 提供者の結果は Webhook で届き、重複・欠け・順序の入れ替えがある。

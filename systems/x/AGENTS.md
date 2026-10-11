@@ -55,4 +55,4 @@ X（旧 Twitter）の再構築の設計。リポジトリ共通のルールは�
 - 領域の文書で ADR を起票するときは、[architecture/README.md](docs/architecture/README.md) の 7 節で領域に割り当てた番号の範囲の中で採番する。
 - 本家の振る舞い・数値を書くときは、出典と確認日を付ける。確かめられないものは「未検証」と書く。本家の公開のアルゴリズムの説明は、公式の資料（ブログ、公開のリポジトリの README）と、第三者の解説を分けて書く。
 - 法令の解釈は結論を出さず、[intent.md](docs/intent.md) の「法務の確認待ち」に載せる。
-- フラグと設定の名前空間を次に限る（[architecture/README.md](docs/architecture/README.md) の 6 節の統合の決定）。振る舞いを切り替えるフラグは `release.*`（未完成・法務の確認待ちの振る舞いを隠す）・`ops.*`（運用の止め・絞り・閾値）・`experiment.*`（A/B。ランキングは `experiment.ranking.*`）。決めた値の設定は `policy.*`（製品の規則）・`retention.*`（保持）・`legal.*`（法令の期限と基準の値）・`ts.*`（T&S の閾値）。
+- フラグと設定の名前空間を次に限る（[architecture/design-log.md](docs/architecture/design-log.md) の「2026-10-04：統合」）。振る舞いを切り替えるフラグは `release.*`（未完成・法務の確認待ちの振る舞いを隠す）・`ops.*`（運用の止め・絞り・閾値）・`experiment.*`（A/B。ランキングは `experiment.ranking.*`）。決めた値の設定は `policy.*`（製品の規則）・`retention.*`（保持）・`legal.*`（法令の期限と基準の値）・`ts.*`（T&S の閾値）。

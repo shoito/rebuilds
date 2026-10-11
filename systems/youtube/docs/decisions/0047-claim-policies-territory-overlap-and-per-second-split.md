@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [ADR-0008](0008-fingerprinting-and-match-engine.md) は、一致ごとに参照の方針（地域ごとのブロック・収益化・追跡）を当て、複数の一致を決定表で 1 つにする（ブロックが最も強い）と決めた。[architecture/README.md](../architecture/README.md) の 6 節は、収益化の一致が複数あれば区間の長さで分けると決めた。
+- [ADR-0008](0008-fingerprinting-and-match-engine.md) は、一致ごとに参照の方針（地域ごとのブロック・収益化・追跡）を当て、複数の一致を決定表で 1 つにする（ブロックが最も強い）と決めた。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、収益化の一致が複数あれば区間の長さで分けると決めた。
 - 本家の方針は国・地域ごとに変えられる（[How Content ID works](https://support.google.com/youtube/answer/2797370)、2026-10-10 に確認）。重なりの分け方と異議の間の収益の扱いは公式の資料で確かめられなかった（**未検証**）。
 - 録音の権利者と楽曲の権利者が、同じ区間に重なって申し立てることがある。
 - 異議の結末が出るまで、どちらの収益か決まらない。

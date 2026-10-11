@@ -33,7 +33,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 
 ## Story
 
-各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各領域の文書の「Story の候補」「Epic との対応」から集め、統合で Epic の食い違いを揃えた（[architecture/README.md](architecture/README.md) の「決定（2026-09-28、既定案）」）。各 Epic の品質の重点と合否基準は [quality.md](quality.md) の 5 節にある。
+各 Story は、着手するときに `changes/YYMMDD-<slug>/` として起票する。ここは計画で、進み具合は各変更の `spec.md` の frontmatter で見る。順序は Epic の中での目安で、依存があるものを先に置いた。各領域の文書の「Story の候補」「Epic との対応」から集め、統合で Epic の食い違いを揃えた（[architecture/design-log.md](architecture/design-log.md) の「2026-09-28：既定案」）。各 Epic の品質の重点と合否基準は [quality.md](quality.md) の 5 節にある。
 
 ### E1 基盤
 

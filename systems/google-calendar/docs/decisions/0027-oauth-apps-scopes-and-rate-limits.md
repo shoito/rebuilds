@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-[intent.md](../intent.md) は、公開 API を OAuth 2.0 で守ると決めた。[architecture/README.md](../architecture/README.md) の 6 節は、CalDAV の認証に OAuth 2.0 の Bearer とアプリ用のパスワードを使うと決めた。公開 API は社内のツール、予約・勤怠のシステムから使われ、CalDAV のクライアントも Bearer を使う。
+[intent.md](../intent.md) は、公開 API を OAuth 2.0 で守ると決めた。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、CalDAV の認証に OAuth 2.0 の Bearer とアプリ用のパスワードを使うと決めた。公開 API は社内のツール、予約・勤怠のシステムから使われ、CalDAV のクライアントも Bearer を使う。
 
 決めることは次である。
 

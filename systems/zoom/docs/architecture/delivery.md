@@ -253,7 +253,7 @@ Terraform：plan（ポリシーの検査）→ staging に apply → prod に ap
 
 ### 決定
 
-2026-09-27 に推奨案で確定した（[README.md](README.md) の 6 節の「決定（2026-09-27、推奨案で確定）」）。
+2026-09-27 に推奨案で確定した（[design-log.md](design-log.md) の「2026-09-27：推奨案で確定」）。
 
 - ラボは `media-lab` の EC2 の名前空間と netem。5 回の中央値（ADR-0054）。
 - Media Node はカナリアと日ごとの波（ADR-0055）。

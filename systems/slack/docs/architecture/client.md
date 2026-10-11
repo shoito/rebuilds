@@ -167,6 +167,28 @@ SharedWorker が使えないとき（古い Chrome for Android、Android の Web
 | `stale` | 再接続した | 開いているチャンネルは差分取得。開いていないチャンネルは `last_seq` だけを更新し、次に開いたときに差分取得 | `catching_up` / `stale` |
 | いずれか | チャンネルから外された（イベントまたは 404） | メモリと IndexedDB からチャンネルを消し、「見つかりません」を出す | — |
 
+次の図は、上の遷移の表を要約したものである。動作の詳細は表を正とする。
+
+```mermaid
+stateDiagram-v2
+    state "stale" as stale
+    state "catching_up" as cu
+    state "live" as live
+
+    [*] --> stale
+    stale --> cu : 接続済みでチャンネルを開いた<br/>再接続した（開いているチャンネル）
+    stale --> stale : 再接続した（開いていないチャンネル）
+    cu --> live : 差分を最後まで取得した<br/>差分が 1,000 件を超え、最新ページを取り直した
+    cu --> cu : 取得に失敗した（指数バックオフで再試行）
+    live --> cu : seq が applied_seq＋1 より大きいイベント
+    live --> live : seq が applied_seq 以下のイベント（捨てる）
+    live --> stale : WebSocket が切れた
+    cu --> stale : WebSocket が切れた
+    stale --> [*] : チャンネルから外された
+    cu --> [*] : チャンネルから外された
+    live --> [*] : チャンネルから外された
+```
+
 - 再接続のときに全チャンネルを一斉に差分取得しない。差分取得は開いているチャンネル（全タブの合計）に限り、ほかは未読の印に必要な `last_seq` だけを受け取る。これで再接続の集中（thundering herd）を抑える。
 - 差分の件数の上限 1,000 は [realtime.md](realtime.md) の値に合わせる。上限の判定方法（件数か、API が返す印か）は realtime.md に従う。
 
@@ -185,6 +207,28 @@ SharedWorker が使えないとき（古い Chrome for Android、Android の Web
    | 401 | 再認証を求める。キューは残す |
 
 4. 自分の投稿のイベントが POST の応答より先に届くことがある。`client_msg_id` が `pending` にあれば、イベントの側で差し替える。
+   次の図は、自分の投稿のイベントが POST の応答より先に届く場合を示す。
+
+   ```mermaid
+   sequenceDiagram
+       participant C as クライアント（Tab・SharedWorker）
+       participant DB as IndexedDB（outbox）
+       participant API as API
+       participant GW as Gateway
+
+       C->>DB: client_msg_id を作って書く
+       Note over C: 書き終えてから「送信中」で表示
+       C->>API: POST（client_msg_id）
+       API-->>GW: 投稿のイベント（outbox・Relay を経る。seq、client_msg_id）
+       GW->>C: 投稿のイベント
+       Note over C: client_msg_id が pending にあるので、<br/>イベントの側で seq 付きのメッセージに差し替える
+       API-->>C: 201
+       C->>DB: outbox から消す
+       opt ネットワークエラー・5xx・429 だった場合
+           Note over C: attempts を増やし、同じ client_msg_id で再送する<br/>（REQ-MSG-002 により重複しない）
+       end
+   ```
+
 5. 表示順：確定したメッセージは `seq` 順。`pending` は常に確定したメッセージの後ろに、作った順で並べる。
 6. 再読み込みやブラウザの再起動のあと、作成から 10 分を超えた未送信は、自動では送らず「未送信」として残し、ユーザーの操作で再送する。時間が経ってから意図せず投稿されるのを避けるため。
 

@@ -41,6 +41,8 @@ GitHub の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0034](0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く | proposed |
 | [0035](0035-web-rendering-ssr-streaming.md) | Web は React をサーバーでストリーム描画し、画面の単位でハイドレーションする | accepted |
 | [0036](0036-own-runner-agent-and-no-original-components.md) | Actions のランナーのエージェントを自前で作り、本家の公開の部品を核に使わない | accepted |
+| [0037](0037-import-from-other-hosts.md) | 他のホスティングからのリポジトリと Issue の取り込み | proposed |
+| [0038](0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 | proposed |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

@@ -11,7 +11,7 @@ date: 2026-10-10
 
 - 受け取った HTML は、外の誰でも書ける。スクリプト、フォーム、CSS による画面の偽装、追跡の画像、悪意のあるリンクを含む。
 - 本システムの画面（`app.<brand>.<domain>`）のクッキー・保存・DOM に、メールの HTML が届いてはならない。利用者の中身は `<brand>usercontent.<domain>` からだけ返す（`AGENTS.md`）。
-- 本文の URL を書き換えない（DKIM と転送のため）。外部の画像は代理で取得する（[architecture/README.md](../architecture/README.md) の 6 節の決定）。外部の画像の代理の取得は [ADR-0028](0028-external-image-proxy.md)、開くときの URL の確かめは [ADR-0027](0027-url-reputation-and-click-time-checks.md)。
+- 本文の URL を書き換えない（DKIM と転送のため）。外部の画像は代理で取得する（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。外部の画像の代理の取得は [ADR-0028](0028-external-image-proxy.md)、開くときの URL の確かめは [ADR-0027](0027-url-reputation-and-click-time-checks.md)。
 - 浄化の誤り（解析の違いを突くもの）は、1 段の守りでは防ぎきれない。
 
 ## Options

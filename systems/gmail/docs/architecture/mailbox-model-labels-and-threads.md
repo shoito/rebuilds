@@ -52,7 +52,7 @@
 | 会話 | 件名が変わると分かれる。100 通を超えると分かれる。自動の通知は 1 週間の中でまとめることがある（[Group emails into conversations](https://support.google.com/mail/answer/5900)） | 同じ（[ADR-0005](../decisions/0005-threading-algorithm.md)） |
 | スヌーズ | 一時的に受信箱から外し、決めた時刻に受信箱の先頭へ戻す。`in:snoozed` で探せる（[Snooze emails until later](https://support.google.com/mail/answer/7622010)） | 同じ。新しい返信で起こすかは公式の資料で確かめられなかった（**未検証**）。本システムは起こす（5.3 節） |
 | ミュート | 本家の詳しい条件（どのとき受信箱へ戻すか）は確かめられなかった（**未検証**） | 利用者だけに宛てたメッセージで戻す（5.3 節） |
-| ゴミ箱と迷惑メールの箱の日数 | **未検証** | 30 日（[architecture/README.md](README.md) の 6 節の決定） |
+| ゴミ箱と迷惑メールの箱の日数 | **未検証** | 30 日（[design-log.md](design-log.md) の「2026-10-10：既定案」） |
 | 利用者のラベルの数の上限 | **未検証** | 5,000（[ADR-0004](../decisions/0004-labels-as-primary-mailbox-model.md)） |
 
 ## 4. ラベル

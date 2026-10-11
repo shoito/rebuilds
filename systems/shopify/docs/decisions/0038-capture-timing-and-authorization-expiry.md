@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、既定は注文の作成と同時の自動の確定、事業者は「発送の時に確定」を選べると決めた。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、既定は注文の作成と同時の自動の確定、事業者は「発送の時に確定」を選べると決めた。
 - 本家は、チェックアウトでの自動、注文の全体の配送で自動、手動の 3 つを持つ。オーソリの期限は提供者による（本家の決済で 7 日）。期限の 1 日前に知らせる設定がある（[Payment authorization and capture](https://help.shopify.com/en/manual/payments/payment-authorization)、2026-10-10 に確認）。
 - Stripe の題材は、一部の確定を 1 回だけ許す（[Stripe の payments.md](../../../stripe/docs/architecture/payments.md) の 5.3 節）。他の提供者も同じ制約を持ちうる（未検証）。
 - 確定を注文の作成のトランザクションの中で呼ぶと、外部の呼び出しがロックを持ったまま待つ。

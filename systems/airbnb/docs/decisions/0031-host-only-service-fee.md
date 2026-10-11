@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- [architecture/README.md](../architecture/README.md) の 6 節は、MVP のサービス料をホストだけの型、既定 15% とし、ゲストに見せる額は総額とした。本家の多くのホストは 15.5%（[ヘルプの記事 1857](https://www.airbnb.com/help/article/1857)、2026-10-10 に確認）。
+- [architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」は、MVP のサービス料をホストだけの型、既定 15% とし、ゲストに見せる額は総額とした。本家の多くのホストは 15.5%（[ヘルプの記事 1857](https://www.airbnb.com/help/article/1857)、2026-10-10 に確認）。
 - 宿泊税・入湯税にサービス料を掛けると、税の額に本システムの収益が乗り、明細の説明がつかない。
 - 率を変えたときに、既存の予約のホストの受け取りが変わってはいけない。
 

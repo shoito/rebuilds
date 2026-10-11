@@ -7,7 +7,7 @@ date: 2026-10-10
 
 ## Context
 
-- [ADR-0003](0003-escrow-and-double-entry-ledger.md) は MVP の口座の種類（14）と取引の仕訳（5）を決め、手数料の端数を「1 円未満は切り捨て」とした（[architecture/README.md](../architecture/README.md) の 6 節）。
+- [ADR-0003](0003-escrow-and-double-entry-ledger.md) は MVP の口座の種類（14）と取引の仕訳（5）を決め、手数料の端数を「1 円未満は切り捨て」とした（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。
 - payments-and-escrow・payouts-and-points・disputes-and-customer-support の各領域で、口座と型が要る場面が増えた：チャージバックの引き落とし、期限の後の入金、売上金の保留、提供者の手数料、ポイントと売上金の失効、振込の失敗と組戻し、提供者の精算、運送会社への支払い、仮勘定の解消。
 - 型の追加が領域ごとにばらばらだと、照合と監査が型の一覧を持てない。型は `release.*` のフラグで切り替えない規則がある（AGENTS.md）。
 - 手数料の率を小数で持つと、端数の誤りが出る。最低価格 300 円の出品に高い送料を選ぶと、売上金が負になる。

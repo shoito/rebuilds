@@ -45,7 +45,7 @@
 
 | 機能 | 理由 |
 | --- | --- |
-| LAN 同期 | 本家にはある（[LAN sync](https://help.dropbox.com/sync/lan-sync-overview)）。同じネットワークの端末の間で中身を直接送るには、端末どうしの認証・鍵の配布・ネットワークの方針の設計が要る。MVP はサーバーとの同期の正しさを先に確かめる（[architecture/](architecture/README.md) の 6 節） |
+| LAN 同期 | 本家にはある（[LAN sync](https://help.dropbox.com/sync/lan-sync-overview)）。同じネットワークの端末の間で中身を直接送るには、端末どうしの認証・鍵の配布・ネットワークの方針の設計が要る。MVP はサーバーとの同期の正しさを先に確かめる（[architecture/design-log.md](architecture/design-log.md) の「2026-10-09：既定案」） |
 | 画像と走査した PDF の OCR（日本語）での検索 | 日本語の OCR の精度と計算の費用を測ってから決める。MVP は名前と本文だけ |
 | Linux のクライアント、ヘッドレスの CLI | MVP は macOS・Windows・iOS・Android |
 | 顧客の鍵（BYOK）、エンドツーエンドの暗号化のフォルダー | 重複排除、プレビュー、検索と両立しない。別の設計が要る |

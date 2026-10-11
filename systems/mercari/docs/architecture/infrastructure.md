@@ -331,6 +331,119 @@ ADR-0074。月次のキャパシティのレビュー（[capacity.md](capacity.m
 | S3 | `opensearch-snapshots`、`ml-models`、`photos-incoming`、`photos`（後の 2 つは [listings-and-photos.md](listings-and-photos.md) が持つ） | 4.2、5 |
 | Valkey | `price:*`（`ml-inference` だけが書ける） | 5 |
 
+## 13. 全体のコンテナ図
+
+[README.md](README.md) の 1.2 節の概要の図の元になる、すべてのコンテナと呼び出しの図。コンテナごとの責務は README.md の 1.2 節の表にある。
+
+```mermaid
+flowchart TB
+    app["アプリ・Web<br/>売り手と買い手"]
+    ops["運用の画面<br/>CS・審査・財務"]
+
+    subgraph edge["エッジ"]
+        cf["CloudFront・AWS WAF<br/>Bot Control、速さの上限"]
+    end
+
+    subgraph api["API の層（Fargate）"]
+        gw["app-api<br/>認証、BFF"]
+        opsapi["ops-api<br/>JIT の権限、監査"]
+    end
+
+    subgraph domain["ドメインのサービス（Fargate）"]
+        idn["identity<br/>アカウント、セッション、端末、eKYC"]
+        lst["listings<br/>出品、写真、質の検査"]
+        srch["search-api<br/>検索、集計、おすすめ"]
+        txn["transactions<br/>購入、ステートマシン、期限"]
+        pay["payments<br/>提供者のアダプター、inbox"]
+        led["ledger<br/>複式簿記、残高"]
+        pout["payouts<br/>振込、ポイント"]
+        ship["shipping<br/>運送会社のアダプター、住所の金庫"]
+        msg["messaging<br/>コメント、取引のメッセージ"]
+        ts["trust-safety<br/>規則のエンジン、審査の待ち行列、措置"]
+        ntf["notifier<br/>プッシュ、メール、お知らせ"]
+    end
+
+    subgraph async["非同期（SNS・SQS・Worker）"]
+        relay["relay（outbox）"]
+        media["media-processor<br/>写真の変換"]
+        idx["search-indexer"]
+        ssm["saved-search-matcher"]
+        dl["deadline-runner<br/>期限の処理"]
+        rec["reconcilers<br/>出品と取引、取引と台帳、台帳と提供者・銀行"]
+    end
+
+    subgraph ml["ML（Python）"]
+        inf["ml-inference<br/>文字・画像の分類器、価格の統計"]
+        lake[("データレイク<br/>S3・Athena、学習")]
+    end
+
+    core[("Aurora core<br/>アカウント、出品、取引、配送")]
+    ledger[("Aurora ledger<br/>仕訳、口座、振込")]
+    content[("Aurora content<br/>コメント、メッセージ、いいね、<br/>保存した検索、通知、T&S")]
+    vk[("Valkey<br/>セッション、先着の印、速さの上限")]
+    os[("OpenSearch<br/>出品の索引（売れた品を含む）")]
+    s3[("S3<br/>写真、書類（eKYC の結果）")]
+    psp["決済の提供者"]
+    bank["提携銀行"]
+    carrier["運送会社"]
+    kyc["eKYC の提供者"]
+    push["APNs・FCM・SMS・メール"]
+    osaka[("大阪：Aurora Global Database、S3 の写し")]
+
+    app --> cf --> gw
+    ops --> cf --> opsapi
+    gw --> idn
+    gw --> lst
+    gw --> srch
+    gw --> txn
+    gw --> msg
+    gw --> pout
+    opsapi --> ts
+    opsapi --> txn
+    opsapi --> led
+    lst --> core
+    lst --> s3
+    txn --> core
+    txn --> vk
+    txn --> pay
+    txn --> led
+    pay --> psp
+    psp -->|"Webhook"| pay
+    led --> ledger
+    pout --> led
+    pout --> bank
+    ship --> core
+    ship --> carrier
+    carrier -->|"Webhook"| ship
+    idn --> core
+    idn --> kyc
+    msg --> content
+    ts --> content
+    ts --> inf
+    srch --> os
+    core --> relay
+    content --> relay
+    ledger --> relay
+    relay --> media
+    relay --> idx
+    relay --> ssm
+    relay --> ntf
+    relay --> ts
+    relay --> ship
+    media --> s3
+    idx --> os
+    ssm --> content
+    ntf --> push
+    dl --> txn
+    rec --> core
+    rec --> ledger
+    relay --> lake
+    core -.-> osaka
+    ledger -.-> osaka
+    content -.-> osaka
+    s3 -.-> osaka
+```
+
 ## 出典
 
 いずれも 2026-10-10 に確認。

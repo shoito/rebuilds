@@ -2,7 +2,7 @@
 
 Storefront API（GraphQL、トークン、費用と上限、ボットの絞り込み）、エッジのキャッシュの鍵、世代の番号とキャッシュの無効化、在庫と価格とカートの動的な部品、SEO（サイトマップ、構造化データ、正規の URL、リダイレクト、`robots.txt`）を決める。
 
-前提となる決定は、エッジ（CloudFront Functions と KeyValueStore）でホスト名からショップ・ポッドを引くこと（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）、ストアフロントの元への要求のショップごとのトークンバケットと `stale-if-error`（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）、GraphQL の構文解析は graphql-js で費用の計算は自前（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)）、東京の元で描いてエッジでキャッシュし、世代の番号で無効にすること（[architecture/README.md](README.md) の 6 節）、テンプレートの読み出しの形（[ADR-0047](../decisions/0047-loom-data-access-and-prefetch.md)）。要件は NFR-003（キャッシュに当たれば TTFB p95 80ms、外れれば p95 500ms、Storefront API p95 150ms）、NFR-008（分離）、NFR-011（変更の表示まで p95 10 秒・p99 60 秒）。この文書で決めたことは次の ADR にある。
+前提となる決定は、エッジ（CloudFront Functions と KeyValueStore）でホスト名からショップ・ポッドを引くこと（[ADR-0002](../decisions/0002-pods-and-shop-placement.md)）、ストアフロントの元への要求のショップごとのトークンバケットと `stale-if-error`（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）、GraphQL の構文解析は graphql-js で費用の計算は自前（[ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md)）、東京の元で描いてエッジでキャッシュし、世代の番号で無効にすること（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）、テンプレートの読み出しの形（[ADR-0047](../decisions/0047-loom-data-access-and-prefetch.md)）。要件は NFR-003（キャッシュに当たれば TTFB p95 80ms、外れれば p95 500ms、Storefront API p95 150ms）、NFR-008（分離）、NFR-011（変更の表示まで p95 10 秒・p99 60 秒）。この文書で決めたことは次の ADR にある。
 
 | ADR | 決定 |
 | --- | --- |

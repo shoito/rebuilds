@@ -179,6 +179,7 @@ MVP は E1〜E9。
 | `checks-and-statuses` | check run・check suite・commit status |
 | `token-leak-revocation` | 自社のトークンの走査と自動の失効、失効の API（security.md の 10 節） |
 | `public-sdk-and-cli` | 公式の TypeScript の SDK と CLI（ADR-0006 で本家の SDK をそのまま使わないため） |
+| `repository-import`（候補、MVP の後） | Git の URL からの取り込みと、移行のアーカイブからの Issue・PR の取り込み（ADR-0037、proposed）。範囲と Epic は PM の判断待ち |
 
 ### E8 Actions
 
@@ -231,6 +232,7 @@ MVP は E1〜E9。
 | `legal-takedown-and-disclosure` | DMCA・発信者情報開示・制裁の手順 |
 | `legal-review-before-launch` | DMCA の通知の公開、利用規約（リージョンの障害での push の喪失）の法務の確認 |
 | `external-pentest` | 一般公開の前のペンテスト |
+| `operator-jit-access` | 運用者の期限つきの権限、持ち主の同意による非公開のリポジトリの参照、運用者の画面の記録（ADR-0038、proposed） |
 | `runbooks-completion` | [runbooks/README.md](runbooks/README.md) の 4 節の手順をそろえる |
 
 ### E10 S2 への拡張

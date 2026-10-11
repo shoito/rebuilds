@@ -1,6 +1,6 @@
 # Architecture: Slack
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリの各ファイルにある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/slack/docs/primer/index.html#glossary)の用語集にある。
 
 | ファイル | 領域 |
 | --- | --- |
@@ -21,30 +21,32 @@
 | [capacity.md](capacity.md) | 負荷のモデル、部品ごとの必要量、パラメーターの設定、キャパシティの運用 |
 | [delivery.md](delivery.md) | ブランチ、CI、デプロイ、リリース、フィーチャーフラグ |
 | [rate-limiting.md](rate-limiting.md) | レート制限、同時実行の制限、テナント単位の上限の一覧（プランによらない。ADR-0033） |
+| [design-log.md](design-log.md) | 設計の工程ごとの決定の記録（経緯） |
 
 ## 1. 全体構成
 
-```
-                ┌──────────────┐
-  Browser ──────┤  CDN / LB    │
-   │  ▲         └──────┬───────┘
-   │  │ WebSocket      │ HTTPS
-   │  │                ▼
-   │  │         ┌──────────────┐   write (tx: message + outbox)   ┌────────────┐
-   │  │         │  API server  │ ───────────────────────────────▶ │ PostgreSQL │
-   │  │         └──────────────┘                                   └─────┬──────┘
-   │  │                                                                  │ outbox
-   │  │         ┌──────────────┐   subscribe ws:..:ch ┌───────────┐     ▼
-   │  └─────────┤   Gateway    │ ◀─────────────────── │  Valkey   │ ◀── Relay
-   │            │ (WS 常時接続)│                       │  Pub/Sub  │     │
-   │            └──────────────┘                       └───────────┘     │
-   │                                                                     ▼
-   │ upload (presigned URL)                             ┌──────────────────────┐
-   └──────────────────────────▶ Object Storage (S3)     │ Workers              │
-                                                        │  - search indexer    │
-                                                        │  - notification      │
-                                                        │  - thumbnail         │
-                                                        └──────────────────────┘
+次の図は、コンポーネントと、書き込みの経路・配信の経路を示す。
+
+```mermaid
+flowchart LR
+  Browser["Browser"]
+  CDN["CDN / LB"]
+  API["API server"]
+  PG[("PostgreSQL")]
+  Relay["Relay"]
+  Valkey["Valkey Pub/Sub"]
+  GW["Gateway<br/>（WS 常時接続）"]
+  Workers["Workers<br/>search indexer・notification・thumbnail"]
+  S3[("Object Storage（S3）")]
+  Browser --> CDN
+  CDN -- "HTTPS" --> API
+  API -- "write（tx: message + outbox）" --> PG
+  PG -- "outbox" --> Relay
+  Relay --> Valkey
+  Valkey -- "subscribe ws:..:ch" --> GW
+  GW -- "WebSocket" --> Browser
+  Relay --> Workers
+  Browser -- "upload（presigned URL）" --> S3
 ```
 
 | コンポーネント | 責務 |
@@ -57,6 +59,12 @@
 | Valkey | リアルタイム配信用のバス（Pub/Sub）。**失われてもよい**（クライアントが差分取得で回復する） |
 
 ポイントは **書き込み経路（API → DB）と配信経路（Relay → Gateway）を分ける** こと（[ADR-0002](../decisions/0002-db-as-source-of-truth-with-outbox.md)）。配信が落ちてもデータは失われず、クライアントは再接続時の差分取得で追いつく。
+
+### 主要な流れ
+
+- **送信キューと楽観表示**：送信は IndexedDB の `outbox` に書いてから「送信中」で出し、SharedWorker がチャンネルごとの FIFO で 1 件ずつ送り、結果ごとに差し替え・再送・失敗にする（[client.md](client.md) の 3.6 節）
+- **チャンネルごとの同期の状態**：`stale`・`catching_up`・`live` を、WebSocket の接続・差分の取得・`seq` の欠損で移る（[client.md](client.md) の 3.5 節）
+- **再接続と差分取得**：欠損の検知や再接続のとき `after_seq` で差分を取り、reader の結果が届かなければ writer から読み直す（[realtime.md](realtime.md) の 6 節）
 
 ## 2. 規模の段階
 
@@ -143,6 +151,8 @@
 | [0031](../decisions/0031-app-platform.md) | アプリのプラットフォーム（インストール、ボット、イベントの配信、インタラクティブ） |
 | [0032](../decisions/0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ |
 | [0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める |
+| [0034](../decisions/0034-workspace-import-from-other-tools.md) | 他のツールからの取り込みは、新しいチャンネルに通常の投稿の経路を通さずに行う（proposed。範囲は PM の判断待ち） |
+| [0035](../decisions/0035-operator-access.md) | 運用者は常設で本文を読めず、DB は期限つきの権限、中身の参照は owner の許可で行う（proposed） |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
@@ -163,20 +173,7 @@
 - **外部との互換性**：公開 API とアプリ（E12）は、提供を始めると互換性を長く保つ義務が生じる。バージョンの方針（ADR-0030）と OpenAPI の破壊的変更の検査で守る。
 - **レート制限の基盤**：判定のたびに Valkey へ 1 往復する。Valkey の障害中は、一般の制限が緩くなる（ADR-0029）。
 
-### 決定（2026-09-26、既定案）
-
-PM の方針（本家 Slack に寄せる、既定案）により、次のとおり決めた。上のリスクのうち、計測で確かめるものは決定の対象にせず、下の「持ち越し」に置いた。
-
-- **対応ブラウザの下限は Safari 17**（macOS・iOS / iPadOS）。本家のモバイルアプリの下限（iOS 17）に合わせ、半年ごとに見直す（[client.md](client.md) の 13 節）。
-- **通知の遅延を NFR にする（NFR-010）。** DM と @メンバーの Web Push を、投稿から p95 5 秒以内に送信する。本家は数値を公開していないが、「取りこぼさない」（[intent.md](../intent.md)）の価値を測るために、PM の案のまま NFR にした。runbooks の SLI と quality.md の E5 の合否基準に加えた。
-- **@channel / @here / @everyone の制限は、本家に合わせる。** 提案の「1,000 人以上のチャンネルで制限」ではなく、本家の規則にした。
-  - 参加者が 6 人以上のチャンネルでは送信前に確認を求める。owner・admin は確認を無効にできる。
-  - owner・admin は使えるロールを絞れる。
-  - 参加者が 10,000 人以上のチャンネルでは、@channel / @here を owner・admin だけが使える。
-  - スレッドの返信の中では通知しない。
-  - 出典：[Notify a channel or workspace](https://slack.com/help/articles/202009646-Notify-a-channel-or-workspace)、[Manage who can notify a channel or workspace](https://slack.com/help/articles/115004855143-Manage-who-can-notify-a-channel-or-workspace)（2026-09-26 に確認）。詳細は [messaging.md](messaging.md) の「誰が使えるか」。E3 の `mentions-and-broadcast` の spec で決定表にする。
-- **監査ログの保持**は [ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) で決めた（DB に 1 年、アーカイブに 2 年）。解決済み。
-- 領域ごとの問いの決定は、各文書の「決定（2026-09-26、既定案）」にある：[client.md](client.md)、[security.md](security.md)、[identity-and-access.md](identity-and-access.md)、[search.md](search.md)、[mcp.md](mcp.md)、[public-api.md](public-api.md)、[apps.md](apps.md)。
+### 残る未解決事項
 
 持ち越し（計測・PoC・後の段階で決めるもの）：
 
@@ -186,23 +183,6 @@ PM の方針（本家 Slack に寄せる、既定案）により、次のとお�
 | 大阪の headless の二次クラスタの切り替え手順 | 対応状況は確認済み（ADR-0011）。E1 の `terraform-foundation` の後、staging で手順を試す |
 | iOS の PWA のバックグラウンドでの接続の寿命 | E4 の着手前に、実機の PoC で測る（[client.md](client.md) の 3.4 節） |
 
-### 決定（2026-09-28、推奨案で確定）
-
-残っていた問いを、推奨案で次のとおり決めた。
-
-- **Better Auth の `secondaryStorage` は使わない。** セッションの正本を DB の 1 か所に保ち、取り消しを単純にするため（[identity-and-access.md](identity-and-access.md) の 3.2 節）。
-- **S3 で Global が止まったときは、キャッシュの切れたセッションを最長 4 時間まで延長して受け入れる。** 拒否すると Global が単一障害点に戻るため（[ADR-0023](../decisions/0023-cell-based-architecture.md)、[infrastructure.md](infrastructure.md) の 10.2 節）。上の「持ち越し」から外した。
-- **オンコールの呼び出しの道具は PagerDuty にする。** SNS からそのまま受けられ、当番の表とエスカレーションを自前で作らずに済むため（[runbooks/incident-response.md](../runbooks/incident-response.md)、[ADR-0021](../decisions/0021-observability-stack.md) の注記）。
-- **ファイルのバケットの暗号化は SSE-KMS とバケットキーにする。** ADR-0017 で決まっていたのに、files.md が「security.md で決める」のままだったので直した（[files.md](files.md)、[ADR-0017](../decisions/0017-encryption-and-key-management.md)）。
-
-- **データモデルを 1 か所にまとめた。** [data-model.md](data-model.md) を正本にし、領域ごとの表の定義を [data-model/](data-model/identity.md) に分けた。領域の文書で名前や列が食い違っていたところは、data-model に合わせて直した。あわせて、次の細部を推奨案で決めた。
-  - **時間で切る表は、UUIDv7 の ID の範囲で分割する。** PostgreSQL は分割した表の一意制約に分割キーを求める。`created_at` で切ると、冪等性に使う一意制約（`notification_log` など）が効かなくなるため（[data-model.md](data-model.md) の 2.8 節）。
-  - **テナントをまたぐ `SECURITY DEFINER` 関数は、専用のロール `tenant_resolver` が持つ。** `BYPASSRLS` を与えず、関数が読む表だけにそのロール向けのポリシーを置く。期限の来た行を探す定期の Worker も、`scheduler_due_items` で `workspace_id` と主キーだけを得てから、RLS の下で読み直す（同 2.3 節）。
-  - **`workspaces` にも RLS を掛ける**（`id` がコンテキストと一致する行だけ）。別のワークスペースの名前も漏らさないため（NFR-009）。
-  - **メッセージに付かないファイル（アイコン、カスタム絵文字、アプリの画像）は `files.purpose` で区別し、ワークスペースのメンバー全員が読める**（[data-model/files-and-search.md](data-model/files-and-search.md)）。
-  - **`members.kind` に `sample`（開発用のワークスペースのダミー）を加えた**（[ADR-0031](../decisions/0031-app-platform.md) の注記）。
-  - **専用の表を持たないワークスペースの設定は `workspace_settings` の 1 行にまとめ、上書き（entitlement）は `workspace_entitlement_overrides` に 1 件ずつ理由と期限つきで置く**（[data-model/identity.md](data-model/identity.md)、[data-model/governance.md](data-model/governance.md)）。
-  - **削除の台帳は、DB ではなく S3 の別のバケットに置く。** 復元で DB と一緒に巻き戻らないようにするため。**`response_url` の状態は Valkey に置く**（`trigger_id` と同じ扱い。失ったらアプリにやり直してもらう）（[data-model/stores.md](data-model/stores.md)）。
-  - **KMS に `apps` キーを加えた**（[ADR-0017](../decisions/0017-encryption-and-key-management.md) の注記）。
-
 法務の確認待ちの項目（全データのエクスポートでメンバーへ自動で通知しないこと）は決めていない（[intent.md](../intent.md) の Open questions）。
+
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。

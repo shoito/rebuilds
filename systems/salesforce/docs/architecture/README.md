@@ -1,6 +1,6 @@
 # Architecture: Salesforce
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用の手順は [runbooks/](../runbooks/README.md) にある。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く。ファイルの一覧、持ち主、ADR の番号の範囲は 7 節にある。品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用の手順は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](https://shoito.github.io/rebuilds/systems/salesforce/docs/primer/index.html#glossary)の用語集にある。
 
 ## 1. 全体構成
 
@@ -21,30 +21,40 @@
 
 ### 1.2 コンテナ
 
-```
-            ┌──────── CloudFront＋WAF（静的な資産、IP のレート制限）────────┐
-            └──────┬───────────────────────┬──────────────────────┬──────┘
-                   │ 対話の経路（画面・API）  │ 一括の経路              │ 管理の経路
-                   ▼                        ▼                        ▼
-           ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────────┐
-           │ Runtime（API）     │   │ Bulk（ジョブの受付）│   │ Metadata（Setup・デプロイ）│
-           │ 問い合わせ・DML の  │   └────────┬─────────┘   └──────────┬───────────┘
-           │ コンパイルと実行     │            │ ジョブ                   │ メタデータのバージョン
-           │ 権限・共有・上限    │            ▼                          │
-           └──┬──────────┬────┘      SQS ─▶ Worker（一括の処理、共有の再計算、
-              │          │                    スケジュールのフロー、レポートの非同期の実行、
-              │          │ コンパイル済みの      検索の索引、Webhook・メールの送信の依頼、
-              │          ▼ メタデータ・上限の数   Sandbox の複製、項目の型の変換）
-              │      Valkey                         │ 署名済みの要求（SQS）
-              ▼                                     ▼
-        Aurora PostgreSQL（主。メタデータ、         prod-egress のアカウントの sender
-        records＋ピボット、共有の表、監査、           ─▶ Webhook・外向きの呼び出しの宛先
-        outbox。RLS）
-              │ outbox                           │ reader
-              ▼                                  ▼
-          Relay ─┬▶ events の Aurora（変更のイベント、3 日）─▶ 購読者
-                 └▶ history の Aurora（項目の変更の履歴、18 か月）
-                                             Reports（集計）   OpenSearch（全文検索）
+次の図は、コンテナと、その間の主な呼び出しとデータの流れを示す。
+
+```mermaid
+flowchart TB
+  CF["CloudFront＋WAF（静的な資産、IP のレート制限）"]
+  RT["Runtime（API）<br/>問い合わせ・DML のコンパイルと実行<br/>権限・共有・上限"]
+  BULK["Bulk（ジョブの受付）"]
+  META["Metadata（Setup・デプロイ）"]
+  WK["Worker（一括の処理、共有の再計算、スケジュールのフロー、レポートの非同期の実行、検索の索引、Webhook・メールの送信の依頼、Sandbox の複製、項目の型の変換）"]
+  VK[("Valkey")]
+  DB[("Aurora PostgreSQL（主。メタデータ、records＋ピボット、共有の表、監査、outbox。RLS）")]
+  SND["prod-egress のアカウントの sender"]
+  EXT["Webhook・外向きの呼び出しの宛先"]
+  RELAY["Relay"]
+  EV[("events の Aurora（変更のイベント、3 日）")]
+  HI[("history の Aurora（項目の変更の履歴、18 か月）")]
+  SUB["購読者"]
+  REP["Reports（集計）"]
+  OS[("OpenSearch（全文検索）")]
+  CF -->|"対話の経路（画面・API）"| RT
+  CF -->|"一括の経路"| BULK
+  CF -->|"管理の経路"| META
+  BULK -->|"ジョブ（SQS）"| WK
+  META -->|"メタデータのバージョン"| DB
+  RT -->|"コンパイル済みのメタデータ・上限の数"| VK
+  RT --> DB
+  WK -->|"署名済みの要求（SQS）"| SND
+  SND --> EXT
+  DB -->|"outbox"| RELAY
+  RELAY --> EV
+  RELAY --> HI
+  EV --> SUB
+  DB -->|"reader"| REP
+  WK -->|"検索の索引"| OS
 ```
 
 | コンテナ | 責務 |
@@ -66,6 +76,11 @@
 - **アクセスの判定は 1 か所で、事前計算した表で速く行う。** どの経路も同じ判定を通る（[ADR-0004](../decisions/0004-record-access-model.md)）。
 - **組織で分け、組織で閉じ、組織ごとに上限を置く。** データもメタデータも組織に属し、1 つのトランザクションと 1 つの組織の使う資源に上限がある（[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md)）。
 - **本家の実装と言語に頼らない。** 設計の考え方は参考にし、実装と言語は自分で作る（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+
+### 1.3 主要な流れ
+
+- **DML の実行の順序**：検証、保存の前のフロー、書き込み、保存の後のフロー、積み上げ集計、項目の変更の履歴、共有の評価、変更のイベントを、1 つの DB のトランザクションで行い、どこで失敗しても全体を巻き戻す（[metadata-and-runtime.md](metadata-and-runtime.md) の 6.1 節）
+- **承認のプロセス**：申請のインスタンスは `pending` のまま段ごとに進み、最後の段の承認・却下・取り消しで終わる。承認者を決められなければ `error` になる（[automation-flows.md](automation-flows.md) の 8.2 節）
 
 ## 2. 規模の段階
 
@@ -200,65 +215,21 @@
 - **JSONB の本体での集計の遅さ**：レポートの集計で JSONB から値を取り出して型を変える費用がかかる。S1 は reader で受け、見る人をまたぐ事前の集計を持たない（[ADR-0029](../decisions/0029-report-execution-on-reader-per-viewer.md)）。S2 で分析用の写し（共有の条件を持ち込む形）を PoC で決める。
 - **問い合わせの計画の悪化**：ピボットの表を使う計画は、組織ごとのデータの分布で良し悪しが変わる。組織ごとの統計と本家に寄せた閾値、途中の計画の変更、対話の経路での `NON_SELECTIVE_QUERY` で抑える（[ADR-0019](../decisions/0019-selectivity-statistics-and-planning.md)）。統計の標本の偏りは E3 で測る。
 - **騒がしい隣人**：上限の内側でも、多数の組織が同時に重い処理をすると共有の DB が詰まる。組織ごとの DB の時間と DB の側の実行中のセッションの 2 つで見つけ、Worker の重みを自動で下げ、対話の経路の絞りは人が決める（[ADR-0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md)、[ADR-0059](../decisions/0059-noisy-neighbor-detection-two-sources.md)）。
-- **保存の量**：項目の変更の履歴は 18 か月で約 3.5TB になり、主のクラスタの残りの全てより大きい。S1 から `history` のクラスタに分けた（下の決定）。S2 で主のクラスタは約 22TB になり、論理シャードの単位で分ける（[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md)）。
+- **保存の量**：項目の変更の履歴は 18 か月で約 3.5TB になり、主のクラスタの残りの全てより大きい。S1 から `history` のクラスタに分けた（[design-log.md](design-log.md) の 2026-09-28 の決定）。S2 で主のクラスタは約 22TB になり、論理シャードの単位で分ける（[ADR-0055](../decisions/0055-shard-placement-and-stage-criteria.md)）。
 - **メタデータのキャッシュの規模**：S3 で 50 万の組織のコンパイル済みのメタデータを、すべてプロセスに載せられない。内容で番地を決めた部品と 3 層のキャッシュで持つ（[ADR-0007](../decisions/0007-segmented-metadata-snapshots.md)）。
 - **Sandbox への個人データの流出**：複製の経路の中で伏せ、伏せる前の値を Sandbox の DB に書かない（[ADR-0038](../decisions/0038-sandbox-types-and-masked-copy.md)）。カスタム項目の分類の漏れは検出して警告する。法務の L3 の結論まで、伏せを外す設定を持たない。
 - **外への持ち出し・SSRF**：乗っ取られた管理者・連携のトークンによる Webhook・一括の問い合わせ・エクスポートでの持ち出しと、宛先の検査の漏れ。宛先の変更の監査と管理者全員への知らせ、別のアカウントの送信の網と宛先の検査で抑える（[ADR-0035](../decisions/0035-webhooks-outbound-calls-and-ssrf-guard.md)、[ADR-0054](../decisions/0054-accounts-network-and-service-separation.md)）。
 - **利用者のコードの隔離（E13）**：砂場の脱出と、組織をまたぐ状態の残り。WASM の境界、WASI なし、呼び出しごとの新しい実体、資格情報のない別のコンテナ（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）と、E13 の外部のペンテストで確かめる。
-- **本家との差**：数式の FLS、活動の見え方、指定した実行ユーザーのダッシュボードを持たないこと、フローの要素の数え方、組織が定義するイベントの既定の発行の時点などが本家と違う。移行の文書に書く（各領域の文書の「決定」）。
-- **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L11）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
+- **本家との差**：数式の FLS、活動の見え方、指定した実行ユーザーのダッシュボードを持たないこと、フローの要素の数え方、組織が定義するイベントの既定の発行の時点などが本家と違う。移行の文書に書く（各領域の文書の「決定」）。移行の文書の正本は [bulk-and-import.md](bulk-and-import.md) の 15.4 節の表に集めた（[ADR-0065](../decisions/0065-migration-path-from-original.md)、proposed）。
+- **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L13）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
-### 決定（2026-09-28、既定案）
-
-利用者の指示（判断が要るところは推奨の既定案で進める）により、統合の工程で次のとおり決めた。法務の判断が要るものは決めず、[intent.md](../intent.md) の「法務の確認待ち」に集めた。計測・PoC・選定で決めるものは、下の「持ち越し」に置いた。
-
-- **ADR の状態**：0001〜0063 は全て `accepted`（2026-09-28）。題材の最初の設計の間に直したものは、日付付きの注記を残した。
-  - ADR-0003 の DML の順とスナップショットの形は、ADR-0008 と ADR-0007 で置き換えた。
-  - ADR-0004 の 2 つの閉包の表と、オブジェクトごとの影の世代は、ADR-0014・ADR-0015・ADR-0016 で置き換えた。
-  - ADR-0005 のハッシュでのシャードの決め方は ADR-0010・ADR-0055 で細かくし、上限の表に ADR-0041 の外向きの呼び出し・メール（と E13 の `tx.code_*`）を足した。
-  - ADR-0002 の JSONB のキーは `field_no`（ADR-0006）。システムの列に `parent_id` を足した。
-  - ADR-0018 の「集計した行を取得の行に数える」の例外（積み上げ集計、レポート、一括の問い合わせ）は ADR-0041。
-  - ADR-0026・ADR-0049 の手順は 3a・3b・7a・7b（ADR-0008 の注記）。題名も 3a・7b・13（ADR-0026）と 3b・7a・13（ADR-0049）に直した。ADR-0021 の活動の割り当ての行は DT-SHR-001 の行 3 に足した。
-  - ADR-0010 の分割の数は、分割する表が 13 に増えて約 3,300 になった。
-- **`field_id` の一意の範囲**：「全組織で一意」（ADR-0006）と、Sandbox が元の組織の ID を共有すること（ADR-0038）の食い違いを、**組織の系統（本番の組織と、その Sandbox）の中で一意**に揃えた（ADR-0006 の注記、[metadata-and-runtime.md](metadata-and-runtime.md) の 3.2 節）。
-- **DML の手順**：3・7 を 3a（保存の前のフロー）・3b（before トリガー）・7a（after トリガー）・7b（保存の後のフロー）に分け、手順 9（項目の変更の履歴）を手順 10・11 と同じく最上位で 1 回にした（ADR-0008 の注記、[metadata-and-runtime.md](metadata-and-runtime.md) の 6 節）。
-- **項目の変更の履歴の置き場所**：18 か月で約 3.5TB になり主のクラスタを圧迫するので、**S1 から `events` と同じ形の別のクラスタ `history` に置く**。手順 9 は同じトランザクションの outbox に書き、Relay が写す。`opportunity_history` は主に残す（ADR-0047・ADR-0060 の注記、[audit-and-field-history.md](audit-and-field-history.md) の 5.2 節、[capacity.md](capacity.md) の 3 節、[infrastructure.md](infrastructure.md) の 4.3 節）。
-- **OpenSearch の台数**：3 台（`r7g.xlarge`）ではメモリーとディスクが足りないので、`r7g.2xlarge.search` × 6（3 AZ に 2 つ）で見積もった（[capacity.md](capacity.md) の 7.1 節）。本番の費用の概算は約 40,000 から約 44,000 USD/月に直し、単価を確かめた後に約 44,500 USD/月にした（[infrastructure.md](infrastructure.md) の 9 節）。
-- **NFR-005・K6**：OWD の変更は述語の切り替え（再計算なし）。目標をレコードの条件の共有ルールの再計算（15 分）と閉包の世代（5 分）に当て直した（3 節の注記）。
-- **ダッシュボード**：見る人の権限だけで集計し、本家の「指定した実行ユーザー」は持たない（ADR-0030）。PM の確認済みの決定として intent に記録した。
-- **送信の網**：ADR-0035 の「送信の VPC」を、本番と別の prod-egress のアカウントの VPC と SQS の受け渡しに読み替えた（ADR-0035 の注記、ADR-0054）。
-- **システムの権限は 25**（ADR-0045）。正本は [orgs-users-and-auth.md](orgs-users-and-auth.md) の 7.1 節で、共有の領域の 3.2 節を合わせた。
-- **活動の共有**：DT-SHR-001 に「活動の割り当て（本人と上司は `full`）」の行 3 を足した。旧い行 3 以降は 1 つ繰り下げた（[sharing-and-record-access.md](sharing-and-record-access.md) の 6.1 節）。
-- **変更のイベントの購読**：オブジェクトの `view_all`（DT-EVT-001）を要し、共有で絞らない。共有の領域の 6.4 節を合わせた。
-- **フローの種類**：`event_triggered` を足し、フローの式で保存の出どころ `$Origin` を読めるようにした（[automation-flows.md](automation-flows.md) の 3.4 節）。
-- **組織の状態**：`orgs.migrating`（組織の移動の書き込みの止め、503 `ORG_MIGRATING`）と Sandbox の列を足した（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 3.1 節）。
-- **上限**：一括の問い合わせは `bulk.query` の予算（[query-language-and-api.md](query-language-and-api.md) の 4.5 節）。利用者のコードの `tx.code_*` と、名前空間ごとの内訳を登録簿に足した（[governor-limits.md](governor-limits.md) の 4 節）。
-- **メタデータの部品**：`report_types` を足し、部品の鍵に形のバージョンを含めた（ADR-0007 の注記）。
-- **`records.parent_id`**：主従の 1 本目の親に加え、活動の主の親を指す（[data-storage.md](data-storage.md) の 3.1 節）。
-- **data-model**：`shard_no` で分割する表は 13。統合の工程では索引だけに保つとしたが、次の工程（下）で正本に改めた。
-- **データモデルの完成（2026-09-28、既定案）**：[data-model.md](data-model.md) と [data-model/](data-model/) を、列・制約・索引・ER 図の正本にした（領域の文書は振る舞いの正本）。表は 171（`main` の RLS 147、`events` 3、`history` 1、RLS の外 20）、ER 図は 19。アーキテクチャの決定は変えず、次を決めた（詳しくは data-model.md の 8 節）。
-  - SQL の予約語の列の名前を改めた（`is_unique`、`can_*`、`sort_order`、`trigger_order`、`from_at`・`to_at`）。`permission_sets`・`profiles` の主キーを `ps_id`・`profile_id` にした。
-  - レコードの ID に接頭辞を持たず、`records` に `(org_id, id)` の索引を足した。
-  - `change_events`・`org_events` を `event_id` の範囲で分割し、主キーを `(org_id, event_id)` にした（ADR-0033 の `event_id` の一意を分割の表で守るため）。`field_history` の主キーに `source_id` を足した。
-  - 期限で動く仕事は `jobs.available_at` で予約し、組織をまたいで表を走査する役割を作らない。Worker の class に `maintenance` を足した。
-  - 外部キーはメタデータと設定の表の間だけに張る。
-  - 足りない表を最小で定めた：`sso_mfa_policies`、`profile_record_types`、`org_sharing_state`、`org_usage_hours`、`autonumber_counters`、`stats_parent_counts`。
-- **数値の正本**：上限と割り当ては [governor-limits.md](governor-limits.md)。保持と消去は [security.md](security.md) の 7 節。SLO とアラートは [runbooks/README.md](../runbooks/README.md)。漏えいの経路は [security.md](security.md) の 4 節。量と台数は [capacity.md](capacity.md)。
-- **検証の工程（2026-09-28）**：「未検証」の本家の振る舞いと AWS・部品の事実を、本家の PDF・ヘルプの本文、AWS の資料と Price List API、Wasmtime・QuickJS-ng・Better Auth の資料で確かめ、出典と確認日を付けた。確かめられないもの（試用の組織か PoC が要るもの）は「未検証」のまま、確かめる Story を添えた。設計を変えた・注記したものは次のとおり。
-  - SLO の窓を 28 日から他の題材と同じ 30 日の移動の窓に直し、エラーバジェットを約 43 分、速い燃え方を 1 時間 14.4 倍にした（[runbooks/README.md](../runbooks/README.md) の 1 節、[ADR-0058](../decisions/0058-slis-and-per-org-resource-metrics.md) の注記）。
-  - LEAK-012（検索の応答の時間から見えない一致を推し量れる）の既定の対策：1 ページごとに固定の候補の束（3,000）を取り、束の全てを後で確かめ、下限の時間（600ms）まで待って返す。`more_may_exist` を見えない候補で変えない。残るリスク（下限を超えた要求、繰り返しの平均の比べ）は [search.md](search.md) の 6.4 節（[ADR-0032](../decisions/0032-search-permission-post-filter.md) の注記）。
-  - 本家の Apex は API のバージョン 67.0 から既定で利用者の権限で動く。本システムの既定と同じ向きになった（ADR-0049 の注記。決定は変えない）。
-  - 本家はフローの要素の数の上限（2,000）をなくしていた。本システムは CPU 時間の近似が粗いので残し、差として移行の文書に書く（[ADR-0025](../decisions/0025-flow-definition-and-bulk-engine.md) の注記）。
-  - **SSO の MFA と特権を持つ利用者のパスキー**（利用者の指示による推奨の既定案。本家の 2026 年の方針に揃えた）：SSO でも IdP の `amr`（OIDC）・`AuthnContextClassRef`（SAML）を接続ごとの受け入れの一覧と比べ、確かめは既定で有効、組織の管理者は理由を記録した時だけ無効にでき監査に残る。主張がない・一覧にない時は SSO の後に本システムの 2 つ目の要素を求める。特権を持つ利用者（`modify_all_data`・`manage_users`・`customize_application` のどれか）はパスキーだけで TOTP を許さず、`sso_bypass` の非常用の管理者は 1 人あたりハードウェアのキーを 2 つ持つ（[ADR-0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) の注記、[orgs-users-and-auth.md](orgs-users-and-auth.md) の 6.3・6.4・14 節）。
-  - Aurora・OpenSearch の仮に置いていた単価を Price List API で確かめ、保存を東京と大阪の 2 つ分で数え直して、本番の費用を約 44,500 USD/月にした（[infrastructure.md](infrastructure.md) の 9 節）。
-  - 項目の変更の履歴で `long_text` を選べる型に戻し、「変わった」だけを記録する形に揃えた（ADR-0047 と [audit-and-field-history.md](audit-and-field-history.md) の食い違いを直した）。
-- 各領域の「他の領域への依頼」は、この工程で持ち主の文書へ反映した（一覧は [data-model.md](data-model.md) の付録 A と、各文書の「2026-09-28」の書き込み）。領域ごとの決定は、各文書の「決定」の節にある。
+### 残る未解決事項
 
 持ち越し（法務、計測・PoC・選定で決めるもの）：
 
 | 項目 | 理由 | いつ・どう決めるか |
 | --- | --- | --- |
-| 法務の確認待ち（L1〜L11） | 法務 | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた spec を承認しない |
+| 法務の確認待ち（L1〜L13） | 法務 | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた spec を承認しない |
 | 1 トランザクションの上限の値、組織ごとの割り当ての値、エディションの分け方と価格 | 計測・PM | E2 の着手前に PM がエディションを決め、E3 で初期値を置き、E12 の負荷試験で値を決める（[governor-limits.md](governor-limits.md)） |
 | ピボットの索引を全項目に張るか、trigram の索引 | PoC | E3 の PoC（[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)） |
 | 所有者の条件のルールの結合の速さ、`G_me` の読みの p99 | PoC | E4 の PoC（[sharing-and-record-access.md](sharing-and-record-access.md) の 15 節） |
@@ -271,6 +242,8 @@
 | S3 の最大の組織（50 億件）の置き方と共有の再計算 | 設計 | S3 の前に別の ADR（ADR-0005 の持ち越し） |
 | 本家の振る舞いで未確認のもの（フローの再帰の回数、承認者のアクセスとロックを越える自動化、活動の見え方、レポートの集計が見えない行を数えないか、数式・積み上げ集計の FLS、レイアウトの必須が API に効くか、リストビューの上限、Partial Copy の件数） | 確かめるだけ | 2026-09-28 に公開の資料で確かめられるものは確かめた（項目の数、Sandbox の種類と容量、承認の数、入力規則の数など）。残りは各文書の「未検証」に添えた Story で、試用の組織で確かめる |
 
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
+
 ## 7. 領域の文書
 
 領域の担当は、下の表の番号の範囲の中で ADR を採番する（範囲の外に出るときは、この表を先に更新する）。持ち主は、どれも Dev が書き、下の「レビュー」の列のロールが確認する。
@@ -281,13 +254,13 @@
 | [data-storage.md](data-storage.md) | records の表、ピボットの索引・一意・関係の表、長いテキストの別の表、outbox、論理シャードへの割り当て、ごみ箱と削除の確定、整合の検査、大口の組織の射影の表（S2 以降） | 0010–0012 | QA、Ops | E3、E12 |
 | [sharing-and-record-access.md](sharing-and-record-access.md) | プロファイルと権限セット、オブジェクトの権限、FLS、システムの権限、OWD、ロール階層、公開グループとキュー、共有ルール、手動の共有、チーム、親に連動する共有、暗黙の共有、再計算、スキューの扱い、参照の評価器 | 0013–0017 | QA、セキュリティ | E4 |
 | [query-language-and-api.md](query-language-and-api.md) | 独自の問い合わせの言語（構文、関係のたどり方、集計）、選択性の見積もりと計画、REST API（レコード、問い合わせ、記述、複合の要求）、バージョン、エラー、`<Brand>-Limit-Info` のヘッダー | 0018–0020 | QA | E3、E5 |
-| [sales-objects.md](sales-objects.md) | 取引先、取引先責任者、リードと変換、商談とフェーズ、活動（ToDo・行動）、重複の規則、メールの記録 | 0021–0022 | QA | E5 |
+| [sales-objects.md](sales-objects.md) | 取引先、取引先責任者、リードと変換、商談とフェーズ、活動（ToDo・行動）、重複の規則、メールの記録 | 0021–0022、0064 | QA | E5 |
 | [ui-layouts-and-list-views.md](ui-layouts-and-list-views.md) | ページレイアウト、関連リスト、レコードタイプごとの画面、リストビューのビルダーと共有、Setup の画面、アクセシビリティ | 0023–0024 | QA | E5 |
 | [automation-flows.md](automation-flows.md) | フローのエンジン（保存の前・後、スケジュール、画面、イベント）、入力規則、積み上げ集計、承認のプロセス、再帰と上限、非同期の続き | 0025–0028 | QA | E6 |
 | [reports-and-dashboards.md](reports-and-dashboards.md) | レポートの型、集計の実行（reader、非同期）、見る人の権限での集計、ダッシュボードの見え方、グラフ、定期の配信 | 0029–0030 | QA、セキュリティ | E7 |
 | [search.md](search.md) | 全文検索（索引の遅れ、日本語の解析）、名前での代わりの検索、検索の結果の権限の絞り込み | 0031–0032 | QA | E5 |
 | [events-and-integrations.md](events-and-integrations.md) | 変更のイベント（順序、再生、購読の権限）、組織が定義するイベント、Webhook（署名 `<Brand>-Signature`、再送）、外向きの呼び出し、メールの送信 | 0033–0035 | QA、Ops | E8 |
-| [bulk-and-import.md](bulk-and-import.md) | 一括の API（ジョブ、分割、部分の成功）、インポートのウィザード、外部 ID での upsert、重複の照合、自動化を伴う取り込みの上限 | 0036–0037 | QA、Ops | E9 |
+| [bulk-and-import.md](bulk-and-import.md) | 一括の API（ジョブ、分割、部分の成功）、インポートのウィザード、外部 ID での upsert、重複の照合、自動化を伴う取り込みの上限 | 0036–0037、0065 | QA、Ops | E9 |
 | [sandboxes-and-deploy.md](sandboxes-and-deploy.md) | Sandbox の種類と作成・再作成、データの複製とマスキング、メタデータの形式（独自）、デプロイ（検証だけ、全部か無しか、破壊的な変更）、差分と戻し | 0038–0040 | QA、セキュリティ | E10 |
 | [governor-limits.md](governor-limits.md) | 全ての上限の一覧と値（正本）、計測の方法、組織ごとの割り当て（API、一括、イベント、ストレージ）、長い要求の同時実行、公平な順番、上限の情報の返し方 | 0041–0042 | QA、Ops | E3、E12 |
 | [orgs-users-and-auth.md](orgs-users-and-auth.md) | 組織の作成と削除、エディションとライセンス、利用者、ログイン（SSO、MFA）、セッション、API の認証、組織のドメイン、システムの権限の一覧と渡す規則 | 0043–0045 | セキュリティ | E2 |
@@ -295,10 +268,13 @@
 | [extensibility.md](extensibility.md)（MVP の後） | 利用者のコード（TypeScript、QuickJS-ng と Wasmtime の砂場）、トリガー、上限と計測、パッケージと名前空間 | 0048–0050 | セキュリティ、Ops | E13、E14 |
 | [security.md](security.md) | 信頼境界、脅威モデル、漏えいの経路の登録簿、暗号化と鍵、運用者のアクセス、データのライフサイクル、脆弱性の対応、法務の論点の整理 | 0051–0053 | セキュリティ | E1、E12 |
 | [data-model.md](data-model.md)、[data-model/](data-model/) | データモデルの正本（規約、列・制約・索引、ER 図、DB 以外の置き場所、横断の不変条件） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| [design-log.md](design-log.md) | 設計の工程ごとに決めたことの経緯（今の結論は本書・各領域の文書・ADR にある） | なし | なし | なし |
 | [infrastructure.md](infrastructure.md) | AWS のアカウントとネットワーク、サービスの分け方、論理シャードと物理のクラスタ、`events`・`history` のクラスタ、セル、組織の移動、DR、段階を上げる基準、コスト | 0054–0057 | Ops | E1、E12 |
 | [observability.md](observability.md) | ログ・メトリクス・トレース、SLI、組織ごとの資源の使用量、騒がしい隣人の検知、アラート | 0058–0059 | Ops | E1、E12 |
 | [capacity.md](capacity.md) | 負荷のモデル、表の大きさ、書き込みの増幅、再計算の時間、部品ごとの必要量（OpenSearch の台数を含む） | 0060 | Ops | E12 |
 | [delivery.md](delivery.md) | CI/CD、アクセス制御の決定表と性質の CI、上限の試験と登録簿の一致、リリースとフラグ、影の実行、`security:sensitive` の変更の流れ | 0061–0063 | QA、Ops | E1、E12 |
+
+- 次に採番する ADR は 0066。0064（Web からのリードのフォーム、proposed）と 0065（本家からの移行の経路、proposed）は、sales-objects と bulk-and-import の範囲が尽きていたため、次の番号をそれぞれの行に足した。
 
 ## 8. Epic
 

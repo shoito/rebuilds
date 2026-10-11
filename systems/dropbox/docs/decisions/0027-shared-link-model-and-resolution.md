@@ -7,7 +7,7 @@ date: 2026-10-09
 
 ## Context
 
-[ADR-0004](0004-tenancy-namespaces-and-rls.md) は、共有リンクの主体を「リンクを持つ人」とし、`view` だけを与え、パスワード・期限・方針を `can()` の入力にすると決めた。`link_tokens` は RLS の外の表で、解決は X2 の経路で行う。[architecture/README.md](../architecture/README.md) の 6 節は、リンクを閲覧だけにし、パスワード・期限・ダウンロードの禁止を有料のプランにし、チームの方針で絞れると決めた。
+[ADR-0004](0004-tenancy-namespaces-and-rls.md) は、共有リンクの主体を「リンクを持つ人」とし、`view` だけを与え、パスワード・期限・方針を `can()` の入力にすると決めた。`link_tokens` は RLS の外の表で、解決は X2 の経路で行う。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」は、リンクを閲覧だけにし、パスワード・期限・ダウンロードの禁止を有料のプランにし、チームの方針で絞れると決めた。
 
 本家は、パスワード・期限・ダウンロードの設定を有料の区分（Professional、Essentials、Standard、Advanced、Business、Business Plus、Enterprise）で提供し、見せる相手に「リンクを知っている全員」と「チームのメンバー」を持つ（[Link expiration and passwords](https://help.dropbox.com/share/link-expiration)、2026-10-09 に確認）。トークンの形は公開されていない（**未検証**）。
 

@@ -9,7 +9,7 @@ date: 2026-10-09
 
 手元にないことが、削除ではない場合がある。
 
-- **選択型の同期**：利用者が、あるフォルダーを手元に置かないと選んだ（[architecture/README.md](../architecture/README.md) の 6 節）。
+- **選択型の同期**：利用者が、あるフォルダーを手元に置かないと選んだ（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。
 - **名前空間を外された**：共有フォルダーから外された。サーバーは `ns_access` を消してから `unmount` を書く（[ADR-0005](0005-namespace-journal-and-cursors.md)）。手元の扱いは sync-engine の領域に残した。
 - **役割が閲覧に下がった**：手元の変更を上げられない（[ADR-0006](0006-sync-conflict-model.md) の決定表の 12）。
 

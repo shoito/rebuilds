@@ -12,7 +12,7 @@ date: 2026-10-09
 - イベントは溢れる。Windows の ReadDirectoryChangesW は、溜めが溢れると中身を捨て、0 バイトを返す。記録できなかったときは `ERROR_NOTIFY_ENUM_DIR` で失敗し、列挙して求めるよう求める（[ReadDirectoryChangesW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-readdirectorychangesw)、2026-10-09 に確認）。
 - 移動は「消えた」と「現れた」に分かれて届くことがある。取り違えると、大きなフォルダーを送り直し、バージョン履歴と共有リンクが切れる（[architecture/README.md](../architecture/README.md) の 6 節）。
 - 多くのアプリは、一時のファイルに書いて元の名前へ置き換える。File ID が変わる。
-- macOS は File Provider（replicated の拡張）を使うと決めた（[architecture/README.md](../architecture/README.md) の 6 節）。File Provider の領域では、OS が変化を拡張に知らせる。呼び出しの詳細は Apple の文書の本文で確かめられなかった（**未検証**）。
+- macOS は File Provider（replicated の拡張）を使うと決めた（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-09：既定案」）。File Provider の領域では、OS が変化を拡張に知らせる。呼び出しの詳細は Apple の文書の本文で確かめられなかった（**未検証**）。
 
 ## Options
 

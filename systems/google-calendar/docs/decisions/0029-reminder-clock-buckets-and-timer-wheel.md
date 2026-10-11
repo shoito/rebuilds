@@ -7,7 +7,7 @@ date: 2026-10-04
 
 ## Context
 
-NFR-003 は、通知の時刻から送信の開始まで p99 30 秒、重複 0.01% 未満、送り漏れ 0 件を求める。S1 のピークは毎時 0 分・30 分の直前の 3,000 件/秒（[architecture/README.md](../architecture/README.md) の 2 節）。[architecture/README.md](../architecture/README.md) の 6 節は、Aurora の分の桶の表とシャードごとのメモリーのタイマーホイールの組み合わせを既定案にし、EventBridge Scheduler の 1 回ごとのスケジュールを、予定の変更のたびに作り直す量が多いので第一の候補にしないと決めた。[quality.md](../quality.md) の 2.2.1 節 F は、遅れすぎたもの（既定 15 分）を送らずに数えると決めた。
+NFR-003 は、通知の時刻から送信の開始まで p99 30 秒、重複 0.01% 未満、送り漏れ 0 件を求める。S1 のピークは毎時 0 分・30 分の直前の 3,000 件/秒（[architecture/README.md](../architecture/README.md) の 2 節）。[architecture/design-log.md](../architecture/design-log.md) の「2026-10-04：既定案」は、Aurora の分の桶の表とシャードごとのメモリーのタイマーホイールの組み合わせを既定案にし、EventBridge Scheduler の 1 回ごとのスケジュールを、予定の変更のたびに作り直す量が多いので第一の候補にしないと決めた。[quality.md](../quality.md) の 2.2.1 節 F は、遅れすぎたもの（既定 15 分）を送らずに数えると決めた。
 
 決めることは次である。
 

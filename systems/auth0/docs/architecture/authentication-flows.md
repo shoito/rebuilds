@@ -290,6 +290,28 @@ RP(サーバー)
 | 8 | `scope` が元の許可を超える | `invalid_scope` |
 | 9 | ユーザーがブロック・削除された | `invalid_grant`。系列を失効させる |
 
+次の図は、表の 1〜3 を、正規の利用者と、リフレッシュトークン RT1 を盗んだ攻撃者の時系列で示す。正は表である。
+
+```mermaid
+sequenceDiagram
+  participant U as 正規の利用者
+  participant Auth as Auth（/oauth/token）
+  participant X as 攻撃者
+  Note over U,X: 攻撃者が RT1 を盗む
+  U->>Auth: RT1 で更新
+  Auth-->>U: RT2 とアクセストークン・ID トークン（表の 1。RT1 は使用済み）
+  X->>Auth: RT1 で更新
+  alt 猶予の外か、最新の 2 つ以上前（表の 3）
+    Auth->>Auth: 系列のすべてを失効させる。ログに ferrt
+    Auth-->>X: invalid_grant
+    Note over U: RT2 も同じ系列なので、もう使えない
+  else 猶予（既定 0 秒）の内で、系列の最新の 1 つ前（表の 2）
+    Auth-->>X: 1 と同じ扱いで、新しいトークン
+  end
+```
+
+攻撃者が先に RT1 を使ったときは、正規の利用者が後から RT1 を送った時点で、同じ判定になる。猶予を 0 秒より長くすると、表の 2 の枝で攻撃者にもトークンが出る。
+
 - 公開のクライアントは、ローテーションを必須にする（RFC 9700 の 4.14.2 節）。機密のクライアントは、ローテーションなしも選べる（本家と同じく、アプリの設定）。
 - 1 ユーザー × 1 アプリの有効な系列は 200 個まで（本家と同じ）。超えたら最も古い系列を失効させる。
 - 系列の数え方と、2 の猶予の上限（0〜60 秒）は [ADR-0003](../decisions/0003-token-formats-and-signing-keys.md) にある。

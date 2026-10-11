@@ -9,7 +9,7 @@ date: 2026-10-10
 
 ## Context
 
-- 元に戻す送信（5・10・20・30 秒）、予約の送信（100 通、1 年）、スヌーズの起こし、不在の返信の期間の終わりは、決めた時刻に `mailstore` の操作を起こす必要がある（[architecture/README.md](../architecture/README.md) の 6 節の決定）。予約の送信の 100 通は本家に合わせる（[Schedule emails to be sent later](https://support.google.com/mail/answer/9214606)、2026-10-10 に確認）。
+- 元に戻す送信（5・10・20・30 秒）、予約の送信（100 通、1 年）、スヌーズの起こし、不在の返信の期間の終わりは、決めた時刻に `mailstore` の操作を起こす必要がある（[architecture/design-log.md](../architecture/design-log.md) の「2026-10-10：既定案」）。予約の送信の 100 通は本家に合わせる（[Schedule emails to be sent later](https://support.google.com/mail/answer/9214606)、2026-10-10 に確認）。
 - NFR-002 は、窓の後から外部の MX への最初の試行まで p95 5 秒を求める。窓の解放の遅れはこの予算を食う。
 - 取り消し（`undoStatus: canceled`）と解放は同時に起きうる。両方が成功すると、送ったのに下書きに戻る、または取り消したのに送られる。
 - 不在の返信は、本家に合わせて同じ差出人へ 4 日に 1 回（[Send automatic replies](https://support.google.com/mail/answer/25922)、2026-10-10 に確認）。RFC 3834 は、自動のメール・メーリングリストに返さないこと、`Auto-Submitted: auto-replied` を付けることを決める。

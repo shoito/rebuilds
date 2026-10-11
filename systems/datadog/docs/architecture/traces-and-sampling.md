@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - `spans` のトピックは、組織の組の中で `trace_id` のハッシュでパーティションを選ぶ。保持 24 時間。消費者は読み直しで同じ結果を作る（[ADR-0002](../decisions/0002-intake-log-on-msk.md)）
-- 自前のトレーサーの SDK を持たず、OpenTelemetry の SDK と Collector を使う。`traceparent` を正とし、`tracestate` の本システムの鍵は `<brand>`（[architecture/README.md](README.md) の 6 節の決定）
+- 自前のトレーサーの SDK を持たず、OpenTelemetry の SDK と Collector を使う。`traceparent` を正とし、`tracestate` の本システムの鍵は `<brand>`（[design-log.md](design-log.md) の「2026-10-09：既定案」）
 - 完成の待ち 30 秒（最大 5 分）。規則の既定は、エラーのトレースをすべて、サービス・リソースごとに遅い上位 1%、まれな組を 1 秒 5 件、残りはテナントの予算の中の確率（同上）
 - スパンのセグメントはログと同じ列指向の形式（[ADR-0005](../decisions/0005-log-storage-columnar-with-bloom.md)、[ADR-0033](../decisions/0033-log-segment-format-and-tokenizer.md)）。保持 15 日（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）
 - 系列の上限と溢れ（[ADR-0006](../decisions/0006-cardinality-policy.md)）。RED メトリクスも従う

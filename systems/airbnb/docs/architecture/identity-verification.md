@@ -5,7 +5,7 @@
 前提となる決定は次のとおり。
 
 - 自前の eKYC（書類の真贋、顔の照合のモデル）は作らない。提供者を使い、本システムは結果と水準を持つ（[intent.md](../intent.md) の Non-goals）
-- ホストは公開の前に本人確認が必須。ゲストは、日本の物件の名簿のため、チェックインの前に名簿の項目と旅券（日本に住所のない外国人）を入れる。eKYC の確認は規則で求める（初めての予約、高額、危険の点）（[architecture/README.md](README.md) の 6 節）
+- ホストは公開の前に本人確認が必須。ゲストは、日本の物件の名簿のため、チェックインの前に名簿の項目と旅券（日本に住所のない外国人）を入れる。eKYC の確認は規則で求める（初めての予約、高額、危険の点）（[architecture/design-log.md](design-log.md) の「2026-10-10：既定案」）
 - 本人確認の結果は vault に置き、`identity` が書く（[ADR-0001](../decisions/0001-platform-and-stack.md)）。宿泊者名簿と旅券の画像は `compliance-jp` が vault と S3 の `registry` に置く（regulatory-compliance-japan の領域の [ADR-0067](../decisions/0067-guest-registry-in-vault.md)、security の領域の [ADR-0073](../decisions/0073-key-layout-and-vault-envelope-encryption.md)）
 - 確認の水準と方式の分け方は Mercari の題材を参照する（[ADR-0056](../../../mercari/docs/decisions/0056-ekyc-provider-and-verification-levels.md)、[ADR-0057](../../../mercari/docs/decisions/0057-identity-data-minimization-and-retention.md)）
 
