@@ -48,6 +48,8 @@
 ```
 .
 ├── AGENTS.md                  # エージェント向けの共通ルール（CLAUDE.md は symlink）
+├── .claude/                   # Skill（new-subject・adr・design-review）とフックの設定
+├── scripts/                   # 文書の検査（npm run check）と ADR の一覧の生成（ADR-0009）
 ├── index.html                 # GitHub Pages の入口
 ├── .github/                   # CODEOWNERS、PR テンプレート
 ├── docs/

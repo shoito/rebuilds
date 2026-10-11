@@ -44,4 +44,4 @@ Slack の再構築に関する決定。リポジトリ共通の決定は [docs/d
 
 後の ADR で一部を改めた ADR：[0018](0018-audit-log.md)、[0026](0026-feature-flags.md)、[0028](0028-remote-mcp-server.md)、[0029](0029-rate-limiting.md)、[0031](0031-app-platform.md)、[0032](0032-plans-and-entitlements.md)。改めた内容は、各 ADR の注記にある。
 
-この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。生成と差分の検査は、rebuilds の CI（これから用意する）で行う。開発リポジトリの `ci-pipeline` の対象ではない（手で編集する一覧は衝突しやすいため。[process.md](../../../../docs/process.md) の「衝突の防止」）。
+この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。生成は `npm run adr-index`、差分の検査は `npm run check` と rebuilds の CI（`docs-check`）で行う。開発リポジトリの `ci-pipeline` の対象ではない（手で編集する一覧は衝突しやすいため。[process.md](../../../../docs/process.md) の「衝突の防止」）。

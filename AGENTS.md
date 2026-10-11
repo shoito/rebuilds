@@ -2,7 +2,7 @@
 
 既存のソフトウェア・SaaS を AI エージェント主体で再構築するなら、どう設計し、どう作るかを記録するリポジトリ。題材ごとに `systems/<name>/` を持ち、設計の文書だけを置く。実装のコード、`specs/`、`changes/`、CI は、題材ごとの開発リポジトリに置く（[ADR-0005](docs/decisions/0005-design-record-repository.md)）。
 
-- このリポジトリに実装のコードを置かない。
+- このリポジトリに実装のコードを置かない。例外は、文書を検査・生成する道具（`scripts/`）とその CI だけ（[ADR-0009](docs/decisions/0009-document-checks-and-ci.md)）。
 - 題材の核（主な論点を担う部分）に、本家の実装を使わない（[ADR-0007](docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 - 下の「守ること」のうち、`specs/`・`changes/`・テスト・ブランチに関する規則は、開発リポジトリで適用する。
 
@@ -30,6 +30,12 @@
 - アーキテクチャに影響する選択をしたら ADR を起票する。既存の ADR に反する実装はしない。
 - 同じ間違いを 2 回したら、該当する `AGENTS.md` に規則として追記する。
 - 公開する HTML（`index.html`、`docs/primer/`、`systems/*/docs/primer/`）を新しく作ったら、既存の HTML と同じ Google アナリティクスのタグ（`G-LRH3HT8NDH`）を `<head>` の直後に入れる。
+
+## 検査と Skill
+
+- 文書を変えたら、作業の終わりに `npm run check` を通す（初回は `npm ci`）。Mermaid の構文、相対リンク、ADR の番号・見出し・一覧、公開する HTML のタグ、表記を確かめる。ADR の一覧は `npm run adr-index` で生成し、手で編集しない。
+- `.claude/settings.json` のフックが、編集したファイルと、作業の終わりに変わったファイルへ同じ検査をかける。
+- 繰り返す作業は `.claude/skills/` の Skill に従う：新しい題材（`new-subject`）、ADR の起票（`adr`）、題材を横断した見直し（`design-review`）。
 
 ## 言語
 

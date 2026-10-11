@@ -63,7 +63,7 @@ X の再構築に関する決定。リポジトリ共通の決定は [docs/decis
 | [0061](0061-ci-gates.md) | PR の必須の関門に、漏れの経路の表、`visible()` の決定表、fan-out の性質、出来事の再生、本人だけの表の RLS、ランキングのオフラインの評価、本家の実装の検査、契約の互換を入れ、変更のパスで足す。外すラベルを持たない | accepted |
 | [0062](0062-mobile-release-and-min-version.md) | アプリは週 1 回の列車でストアに出し、iOS は 7 日の段階的リリース、Android は段階的公開で広げる。JS だけの修正は自前の Expo Updates の形のサーバーから署名した束で配る。最低のバージョンは `426` で強制し、支えるバージョンは 12 週 | accepted |
 | [0063](0063-contract-change-ordering.md) | 契約の変更は、広げる → 読む側を新旧に対応 → 書く側を移す → 縮める、の順にする。DB の縮めは別のリリース、出来事は共通の頭とバージョンを持ち、公開 API は同じバージョンの中で足すだけ、画面の API は 12 週前のアプリが読める形を保つ | accepted |
-| [0064](0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しは、表ごとの扱いを 1 か所の目録に持ち、機械で読める JSON と閲覧用の HTML の ZIP でセルフサービスで渡す。法務の確認待ちの種類は既定で入れない。書き出しで足りない法令の開示の求めは T&S の法令の窓口で受ける | proposed |
+| [0064](0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | proposed |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

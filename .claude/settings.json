@@ -1,0 +1,29 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hook.mjs\" post",
+            "timeout": 60,
+            "statusMessage": "Checking the edited document"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hook.mjs\" stop",
+            "timeout": 120,
+            "statusMessage": "Checking changed documents"
+          }
+        ]
+      }
+    ]
+  }
+}

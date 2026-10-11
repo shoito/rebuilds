@@ -1,0 +1,24 @@
+# Document checks (ADR-0009): Mermaid syntax, links, ADRs and their index, published HTML, wording.
+name: docs-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # GitHub's Ubuntu runners ship Google Chrome; scripts/mermaid.mjs finds it.
+      - run: npm run check

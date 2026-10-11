@@ -13,6 +13,7 @@
 | [0006](0006-brand-neutral-identifiers.md) | 本家に寄せても、名前・接頭辞・ドメインは本家のものを使わない | accepted |
 | [0007](0007-no-reuse-of-original-implementation.md) | 題材の核に、本家の実装を使わない | accepted |
 | [0008](0008-primers-on-github-pages.md) | 題材ごとの前提知識の資料を、HTML で書き GitHub Pages で公開する | accepted |
+| [0009](0009-document-checks-and-ci.md) | 文書の検査の道具と CI を rebuilds に置く | proposed |
 <!-- adr-index:end -->
 
-この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。生成と差分の検査は、rebuilds の CI（これから用意する）で行う。開発リポジトリの `ci-pipeline` の対象ではない（手で編集する一覧は衝突しやすいため。[process.md](../process.md) の「衝突の防止」）。
+この一覧は、各 ADR の frontmatter と見出しから生成したもの。当面は ADR を追加・更新したら生成し直す。生成は `npm run adr-index`、差分の検査は `npm run check` と rebuilds の CI（`docs-check`）で行う。開発リポジトリの `ci-pipeline` の対象ではない（手で編集する一覧は衝突しやすいため。[process.md](../process.md) の「衝突の防止」）。

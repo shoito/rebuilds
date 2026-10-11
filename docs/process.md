@@ -398,6 +398,8 @@ QA が品質の指標を新しく必要とするときは、`runbooks/README.md`
 
 設計の文書の図は、[templates/README.md](templates/README.md) の「図の決まり」に従う。
 
+文書の規則のうち機械で確かめられるもの（図の構文、リンク、ADR の番号・見出し・一覧、公開する HTML のタグ、表記）は、`npm run check` で確かめる。ローカルと CI（`.github/workflows/docs-check.yml`）が同じ検査を動かす（[ADR-0009](decisions/0009-document-checks-and-ci.md)）。
+
 ## 13. 参考
 
 - Anthropic, [The AI-Native SDLC playbook](https://claude.com/blog/the-ai-native-sdlc-playbook)（2026-08-21）
