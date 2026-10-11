@@ -121,6 +121,11 @@
     return api;
   });
 
+  // Declared before tabs: selecting the first tab renders Mermaid
+  const mermaidBlocks = $$('pre.mermaid');
+  mermaidBlocks.forEach((b) => { b.dataset.src = b.textContent; });
+  let mermaidLib = null;
+
   // Tabs: <div class="tabs"><div data-tab="Label">...</div>...</div>
   $$('.tabs').forEach((box, n) => {
     const panels = $$(':scope > [data-tab]', box);
@@ -158,9 +163,6 @@
   });
 
   // Mermaid, rendered lazily so hidden slides do not break layout
-  const mermaidBlocks = $$('pre.mermaid');
-  mermaidBlocks.forEach((b) => { b.dataset.src = b.textContent; });
-  let mermaidLib = null;
 
   async function renderMermaid() {
     const todo = mermaidBlocks.filter((b) => !b.dataset.processed && b.offsetParent !== null);

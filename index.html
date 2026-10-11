@@ -15,6 +15,7 @@
 <title>rebuilds</title>
 <meta property="og:site_name" content="rebuilds">
 <meta name="description" content="既存の SaaS を AI エージェント主体で再構築する設計の記録。題材ごとの前提知識の資料。">
+<link rel="icon" href="docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="docs/primer/assets/primer.css">
 <style>
   body { border-top: 3px solid var(--accent); }
@@ -35,6 +36,9 @@
   .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 36px; padding: 14px 16px; background: var(--accent-soft); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); }
   .start p { margin: 0; flex: 1; min-width: 220px; }
   .start .btn { background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; }
+  .paths { margin: 0 0 36px; }
+  .paths .chain { font-weight: 700; margin: .3em 0; }
+  .paths .desc { color: var(--muted); font-size: .88em; margin: 0; }
   h2 { font-size: 1.15em; margin: 0 0 .8em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); color: var(--accent-strong); }
 </style>
 </head>
@@ -54,45 +58,232 @@
     <a class="btn" href="docs/primer/index.html">共通の前提知識を読む</a>
   </div>
 
+  <h2>読む順の道筋</h2>
+  <p class="hint" style="margin:-.4em 0 14px">目的に合わせて、題材を左から順に読むと、前の題材の知識が次の題材の前提になります。テーマごとの詳しい索引は <a href="https://github.com/shoito/rebuilds/blob/main/docs/patterns.md">パターンの索引</a> にあります。</p>
+  <div class="grid paths">
+    <div class="card"><div class="genre">はじめの一歩</div><p class="chain"><a href="systems/slack/docs/primer/index.html">Slack</a> → <a href="systems/stripe/docs/primer/index.html">Stripe</a> → <a href="systems/github/docs/primer/index.html">GitHub</a></p><p class="desc">outbox と配信、冪等と台帳、権限。どの題材にも出る土台</p></div>
+    <div class="card"><div class="genre">お金</div><p class="chain"><a href="systems/stripe/docs/primer/index.html">Stripe</a> → <a href="systems/mercari/docs/primer/index.html">メルカリ</a> → <a href="systems/airbnb/docs/primer/index.html">Airbnb</a> → <a href="systems/shopify/docs/primer/index.html">Shopify</a></p><p class="desc">複式簿記の台帳、預かりと決着、売り越しの防止</p></div>
+    <div class="card"><div class="genre">共同編集と同期</div><p class="chain"><a href="systems/figma/docs/primer/index.html">Figma</a> → <a href="systems/notion/docs/primer/index.html">Notion</a> → <a href="systems/linear/docs/primer/index.html">Linear</a> → <a href="systems/dropbox/docs/primer/index.html">Dropbox</a> → <a href="systems/google-calendar/docs/primer/index.html">Google カレンダー</a></p><p class="desc">権威サーバー、CRDT、ローカルファースト、ファイルの衝突</p></div>
+    <div class="card"><div class="genre">大量のイベント</div><p class="chain"><a href="systems/x/docs/primer/index.html">X</a> → <a href="systems/datadog/docs/primer/index.html">Datadog</a> → <a href="systems/youtube/docs/primer/index.html">YouTube</a></p><p class="desc">ファンアウト、数の集計、時系列の保存、配信</p></div>
+    <div class="card"><div class="genre">業務のプラットフォーム</div><p class="chain"><a href="systems/salesforce/docs/primer/index.html">Salesforce</a> → <a href="systems/servicenow/docs/primer/index.html">ServiceNow</a> → <a href="systems/workday/docs/primer/index.html">Workday</a></p><p class="desc">メタデータ駆動、ワークフローと SLA、有効日付</p></div>
+    <div class="card"><div class="genre">リアルタイムと位置</div><p class="chain"><a href="systems/slack/docs/primer/index.html">Slack</a> → <a href="systems/zoom/docs/primer/index.html">Zoom</a> → <a href="systems/uber/docs/primer/index.html">Uber</a></p><p class="desc">常時の接続、メディアの中継、位置の索引</p></div>
+    <div class="card"><div class="genre">信頼と安全</div><p class="chain"><a href="systems/auth0/docs/primer/index.html">Auth0</a> → <a href="systems/gmail/docs/primer/index.html">Gmail</a> → <a href="systems/x/docs/primer/index.html">X</a> → <a href="systems/mercari/docs/primer/index.html">メルカリ</a></p><p class="desc">認証と攻撃の防御、迷惑メール、モデレーション、不正</p></div>
+  </div>
+
   <h2>題材</h2>
   <p class="hint" style="margin:-.4em 0 14px">「設計の文書」は GitHub で、「資料」と「スライド」はこのサイトで読めます。資料とスライドは、右上のボタンか S キーで切り替えられます。</p>
-  <div class="grid" id="grid"></div>
-</div>
-<script>
-  const subjects = [
-    ['slack', 'Slack', 'チャット', 'リアルタイム配信、メッセージの順序、既読、検索'],
-    ['stripe', 'Stripe', '決済', '冪等性、複式簿記の台帳、Webhook、カード情報の隔離'],
-    ['github', 'GitHub', 'Git ホスティング', 'Git の保存と複製、PR とレビュー、CI、コード検索'],
-    ['notion', 'Notion', 'ドキュメント / DB', 'ブロックのモデル、CRDT の共同編集、権限、シャーディング'],
-    ['auth0', 'Auth0', '認証基盤', 'OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離'],
-    ['figma', 'Figma', 'デザインツール', '権威サーバーでの共同編集、WebGL / WASM の描画、巨大な文書'],
-    ['zoom', 'Zoom', 'ビデオ会議', 'WebRTC、SFU、帯域の推定、低遅延、録画'],
-    ['uber', 'Uber', '配車', 'マッチング、地理空間の索引、動的な料金、リアルタイムの位置'],
-    ['linear', 'Linear', 'イシュー管理', 'ローカルファーストの同期、オフライン、即時の操作'],
-    ['salesforce', 'Salesforce', 'CRM プラットフォーム', 'メタデータ駆動のマルチテナント、共有のモデル、宣言的な自動化'],
-    ['servicenow', 'ServiceNow', 'IT サービス管理', '継承するテーブル、ワークフローと SLA、CMDB'],
-    ['workday', 'Workday', '人事・給与', '有効日付のデータ、業務プロセス、日本の給与計算、マイナンバー'],
-    ['x', 'X', 'SNS', 'タイムラインのファンアウト、フォローのグラフ、おすすめの順位付け、検索とトレンド、モデレーション'],
-    ['google-calendar', 'Google カレンダー', '予定管理', '繰り返しの予定とタイムゾーン、招待（iTIP / iMIP）、空き時間と会議室、CalDAV と差分同期、リマインダー'],
-    ['dropbox', 'Dropbox', 'ファイル同期', '同期エンジンと衝突の解決、内容で区切るブロックと重複の排除、名前空間と共有、バージョンと復元、オンデマンドのファイル'],
-    ['datadog', 'Datadog', '監視・オブザーバビリティ', '大量の取り込み、自前の時系列 DB、ログの保存と検索、テールサンプリング、モニターの評価'],
-    ['shopify', 'Shopify', 'EC 基盤', 'フラッシュセールの在庫と売り越しの防止、チェックアウトと注文の一意、ポッドのシャーディング、テーマの言語、拡張の砂場'],
-    ['gmail', 'Gmail', 'メール', '受信と送信の MTA と送信の評判、SPF・DKIM・DMARC、迷惑メールの選別と通信の秘密、ラベルとスレッド、JMAP と IMAP の同期'],
-    ['youtube', 'YouTube', '動画配信', '変換とラダー、ABR と CDN、低遅延のライブ、視聴回数の確定、著作物の照合'],
-    ['mercari', 'メルカリ', 'C2C マーケットプレイス', '一品の購入の一回性、預かりと売上金の台帳、匿名の配送、保存した検索、偽ブランドの検知'],
-    ['airbnb', 'Airbnb', '宿泊のマーケットプレイス', '日付の範囲の空室の検索、二重予約の防止、民泊の 180 日の上限、多通貨の決済とホストへの送金、双方向のレビュー'],
-  ];
-  document.getElementById('grid').innerHTML = subjects.map(([id, name, genre, topics]) => `
+  <div class="grid" id="grid">
     <div class="card">
-      <div class="genre">${genre}</div>
-      <h3><a href="systems/${id}/docs/primer/index.html">${name}</a></h3>
-      <p>${topics}</p>
+      <div class="genre">チャット</div>
+      <h3><a href="systems/slack/docs/primer/index.html">Slack</a></h3>
+      <p>リアルタイム配信、メッセージの順序、既読、検索</p>
       <div class="links">
-        <a href="systems/${id}/docs/primer/index.html">資料</a>
-        <a href="systems/${id}/docs/primer/index.html?view=slides">スライド</a>
-        <a href="https://github.com/shoito/rebuilds/tree/main/systems/${id}/docs">設計の文書</a>
+        <a href="systems/slack/docs/primer/index.html">資料</a>
+        <a href="systems/slack/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/slack/docs">設計の文書</a>
       </div>
-    </div>`).join('');
-</script>
+    </div>
+    <div class="card">
+      <div class="genre">決済</div>
+      <h3><a href="systems/stripe/docs/primer/index.html">Stripe</a></h3>
+      <p>冪等性、複式簿記の台帳、Webhook、カード情報の隔離</p>
+      <div class="links">
+        <a href="systems/stripe/docs/primer/index.html">資料</a>
+        <a href="systems/stripe/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/stripe/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">Git ホスティング</div>
+      <h3><a href="systems/github/docs/primer/index.html">GitHub</a></h3>
+      <p>Git の保存と複製、PR とレビュー、CI、コード検索</p>
+      <div class="links">
+        <a href="systems/github/docs/primer/index.html">資料</a>
+        <a href="systems/github/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/github/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">ドキュメント / DB</div>
+      <h3><a href="systems/notion/docs/primer/index.html">Notion</a></h3>
+      <p>ブロックのモデル、CRDT の共同編集、権限、シャーディング</p>
+      <div class="links">
+        <a href="systems/notion/docs/primer/index.html">資料</a>
+        <a href="systems/notion/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/notion/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">認証基盤</div>
+      <h3><a href="systems/auth0/docs/primer/index.html">Auth0</a></h3>
+      <p>OAuth / OIDC、MFA とパスキー、攻撃の防御、テナントの隔離</p>
+      <div class="links">
+        <a href="systems/auth0/docs/primer/index.html">資料</a>
+        <a href="systems/auth0/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/auth0/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">デザインツール</div>
+      <h3><a href="systems/figma/docs/primer/index.html">Figma</a></h3>
+      <p>権威サーバーでの共同編集、WebGL / WASM の描画、巨大な文書</p>
+      <div class="links">
+        <a href="systems/figma/docs/primer/index.html">資料</a>
+        <a href="systems/figma/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/figma/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">ビデオ会議</div>
+      <h3><a href="systems/zoom/docs/primer/index.html">Zoom</a></h3>
+      <p>WebRTC、SFU、帯域の推定、低遅延、録画</p>
+      <div class="links">
+        <a href="systems/zoom/docs/primer/index.html">資料</a>
+        <a href="systems/zoom/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/zoom/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">配車</div>
+      <h3><a href="systems/uber/docs/primer/index.html">Uber</a></h3>
+      <p>マッチング、地理空間の索引、動的な料金、リアルタイムの位置</p>
+      <div class="links">
+        <a href="systems/uber/docs/primer/index.html">資料</a>
+        <a href="systems/uber/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/uber/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">イシュー管理</div>
+      <h3><a href="systems/linear/docs/primer/index.html">Linear</a></h3>
+      <p>ローカルファーストの同期、オフライン、即時の操作</p>
+      <div class="links">
+        <a href="systems/linear/docs/primer/index.html">資料</a>
+        <a href="systems/linear/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/linear/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">CRM プラットフォーム</div>
+      <h3><a href="systems/salesforce/docs/primer/index.html">Salesforce</a></h3>
+      <p>メタデータ駆動のマルチテナント、共有のモデル、宣言的な自動化</p>
+      <div class="links">
+        <a href="systems/salesforce/docs/primer/index.html">資料</a>
+        <a href="systems/salesforce/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/salesforce/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">IT サービス管理</div>
+      <h3><a href="systems/servicenow/docs/primer/index.html">ServiceNow</a></h3>
+      <p>継承するテーブル、ワークフローと SLA、CMDB</p>
+      <div class="links">
+        <a href="systems/servicenow/docs/primer/index.html">資料</a>
+        <a href="systems/servicenow/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/servicenow/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">人事・給与</div>
+      <h3><a href="systems/workday/docs/primer/index.html">Workday</a></h3>
+      <p>有効日付のデータ、業務プロセス、日本の給与計算、マイナンバー</p>
+      <div class="links">
+        <a href="systems/workday/docs/primer/index.html">資料</a>
+        <a href="systems/workday/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/workday/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">SNS</div>
+      <h3><a href="systems/x/docs/primer/index.html">X</a></h3>
+      <p>タイムラインのファンアウト、フォローのグラフ、おすすめの順位付け、検索とトレンド、モデレーション</p>
+      <div class="links">
+        <a href="systems/x/docs/primer/index.html">資料</a>
+        <a href="systems/x/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/x/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">予定管理</div>
+      <h3><a href="systems/google-calendar/docs/primer/index.html">Google カレンダー</a></h3>
+      <p>繰り返しの予定とタイムゾーン、招待（iTIP / iMIP）、空き時間と会議室、CalDAV と差分同期、リマインダー</p>
+      <div class="links">
+        <a href="systems/google-calendar/docs/primer/index.html">資料</a>
+        <a href="systems/google-calendar/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/google-calendar/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">ファイル同期</div>
+      <h3><a href="systems/dropbox/docs/primer/index.html">Dropbox</a></h3>
+      <p>同期エンジンと衝突の解決、内容で区切るブロックと重複の排除、名前空間と共有、バージョンと復元、オンデマンドのファイル</p>
+      <div class="links">
+        <a href="systems/dropbox/docs/primer/index.html">資料</a>
+        <a href="systems/dropbox/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/dropbox/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">監視・オブザーバビリティ</div>
+      <h3><a href="systems/datadog/docs/primer/index.html">Datadog</a></h3>
+      <p>大量の取り込み、自前の時系列 DB、ログの保存と検索、テールサンプリング、モニターの評価</p>
+      <div class="links">
+        <a href="systems/datadog/docs/primer/index.html">資料</a>
+        <a href="systems/datadog/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/datadog/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">EC 基盤</div>
+      <h3><a href="systems/shopify/docs/primer/index.html">Shopify</a></h3>
+      <p>フラッシュセールの在庫と売り越しの防止、チェックアウトと注文の一意、ポッドのシャーディング、テーマの言語、拡張の砂場</p>
+      <div class="links">
+        <a href="systems/shopify/docs/primer/index.html">資料</a>
+        <a href="systems/shopify/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/shopify/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">動画配信</div>
+      <h3><a href="systems/youtube/docs/primer/index.html">YouTube</a></h3>
+      <p>変換とラダー、ABR と CDN、低遅延のライブ、視聴回数の確定、著作物の照合</p>
+      <div class="links">
+        <a href="systems/youtube/docs/primer/index.html">資料</a>
+        <a href="systems/youtube/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/youtube/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">メール</div>
+      <h3><a href="systems/gmail/docs/primer/index.html">Gmail</a></h3>
+      <p>受信と送信の MTA と送信の評判、SPF・DKIM・DMARC、迷惑メールの選別と通信の秘密、ラベルとスレッド、JMAP と IMAP の同期</p>
+      <div class="links">
+        <a href="systems/gmail/docs/primer/index.html">資料</a>
+        <a href="systems/gmail/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/gmail/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">C2C マーケットプレイス</div>
+      <h3><a href="systems/mercari/docs/primer/index.html">メルカリ</a></h3>
+      <p>一品の購入の一回性、預かりと売上金の台帳、匿名の配送、保存した検索、偽ブランドの検知</p>
+      <div class="links">
+        <a href="systems/mercari/docs/primer/index.html">資料</a>
+        <a href="systems/mercari/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/mercari/docs">設計の文書</a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="genre">宿泊のマーケットプレイス</div>
+      <h3><a href="systems/airbnb/docs/primer/index.html">Airbnb</a></h3>
+      <p>日付の範囲の空室の検索、二重予約の防止、民泊の 180 日の上限、多通貨の決済とホストへの送金、双方向のレビュー</p>
+      <div class="links">
+        <a href="systems/airbnb/docs/primer/index.html">資料</a>
+        <a href="systems/airbnb/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/airbnb/docs">設計の文書</a>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

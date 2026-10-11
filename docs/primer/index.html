@@ -16,6 +16,7 @@
 <meta property="og:site_name" content="rebuilds">
 <meta name="description" content="rebuilds の設計の文書を読む前に知っておくとよい、題材に共通する前提知識。">
 <meta name="primer-home" content="../../index.html">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="assets/primer.css">
 </head>
 <body>
@@ -204,6 +205,86 @@ CREATE POLICY tenant_isolation ON items
     <p>DB では、キーに一意の制約を張り、同じキーの 2 回目は保存した応答を返します。キューの受け手も、イベントの ID で重複を捨てます。</p>
   </section>
 
+  <section class="s" id="states">
+    <h2>ステートマシンと決定表</h2>
+    <p>決済・取引・予約・チケットのように「状態」を持つものは、<a class="t" href="#g-state-machine">ステートマシン</a>として明示します。多くの題材が同じ形を取っています。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> pending
+  pending --> confirmed: 支払いが通った
+  pending --> expired: 期限が来た
+  confirmed --> cancelled: 取り消した
+  confirmed --> completed: 期限が来た
+  expired --> [*]
+  cancelled --> [*]
+  completed --> [*]</pre>
+    <ul>
+      <li>遷移は <code>DT-*</code> の決定表で決める。図は表の要約で、食い違ったら表が正。</li>
+      <li>状態を変えるのは<strong>遷移の関数 1 つだけ</strong>。行のロックか、<code>WHERE status = '期待した状態'</code> の条件つきの更新で、同時の遷移を 1 つにする。</li>
+      <li>期限（「3 日後に自動で完了」など）は期限の列に持ち、定期の処理が拾って同じ関数で進める。</li>
+    </ul>
+    <div class="callout key"><span class="label">どの題材で読むか</span><a href="https://github.com/shoito/rebuilds/blob/main/docs/patterns.md#ステートマシン">パターンの索引</a>。手本は Stripe の PaymentIntent と Mercari の取引。</div>
+  </section>
+
+  <section class="s" id="ledger">
+    <h2>台帳：残高を書き換えない</h2>
+    <p>お金（題材によっては在庫や有給の日数）は、残高の列を書き換えずに、<a class="t" href="#g-ledger">複式簿記</a>の仕訳を追記して持ちます。残高は仕訳の和です。</p>
+    <table>
+      <tr><th>仕訳（3,000 円の購入）</th><th>借方</th><th>貸方</th></tr>
+      <tr><td>買い手が払った</td><td>決済の提供者への債権 3,000</td><td>預かり金 3,000</td></tr>
+      <tr><td>取引が完了した</td><td>預かり金 3,000</td><td>売り手の売上金 2,700・手数料の収益 300</td></tr>
+    </table>
+    <ul>
+      <li>1 つの仕訳の借方と貸方の和は必ず一致する（DB の制約か、書き込みの関数で拒む）。</li>
+      <li>間違いは消さずに、逆の仕訳で打ち消す。いつ何が起きたかが全部残る。</li>
+      <li>外の記録（決済の提供者、銀行）と毎日照らし合わせ、食い違いを見つける。</li>
+    </ul>
+    <p class="hint">数字は説明のための例です。各題材の勘定科目は、その題材の ADR にあります。</p>
+  </section>
+
+  <section class="s" id="fanout">
+    <h2>ファンアウト：1 つの出来事を多くの人へ</h2>
+    <p>投稿・メッセージ・通知を、フォロワーやチャンネルの全員に届けることを<a class="t" href="#g-fanout">ファンアウト</a>と呼びます。</p>
+    <div class="compare">
+      <div><h3>書く時に配る（push）</h3><p>投稿の時に、受け手ごとの箱へ写す。読むのは速いが、受け手が 1,000 万人いると書くのが重い。</p></div>
+      <div><h3>読む時に集める（pull）</h3><p>読む時に、相手の投稿を集める。書くのは軽いが、読むたびに重い。</p></div>
+    </div>
+    <p>多くの題材は、ふつうの人は push、受け手の多い人は pull と混ぜます。配信の経路は outbox の後ろに置き、失われても正本から作り直せるようにします。</p>
+  </section>
+
+  <section class="s" id="ratelimit">
+    <h2>速さの上限と公平さ</h2>
+    <p>1 つのテナント・利用者・API のキーが、全体の能力を使い切らないように、<a class="t" href="#g-token-bucket">トークンバケット</a>で速さを抑えます。</p>
+    <ul>
+      <li>上限は、キー・テナント・IP など、守りたい単位ごとに数える。Valkey で数え、超えたら <code>429</code> と <code>Retry-After</code> を返す。</li>
+      <li>数えるのが止まったとき（Valkey の障害）に通すか止めるかを、題材ごとに決めている。</li>
+      <li>重い処理は、上限とは別に、テナントごとの待ち行列で公平に回す（騒がしい隣人の対策）。</li>
+    </ul>
+  </section>
+
+  <section class="s" id="search">
+    <h2>検索の索引は遅れる写し</h2>
+    <p>検索は OpenSearch などの索引で行いますが、索引は正本（Aurora）の<strong>遅れて食い違う写し</strong>です。</p>
+    <ol>
+      <li>正本に書いた変更を outbox から索引へ流す。数秒遅れる。</li>
+      <li>索引で候補を絞る。</li>
+      <li>見せる前に、権限と今の状態を正本で確かめ直す。消えた・見えなくなったものは落とす。</li>
+    </ol>
+    <div class="callout warn"><span class="label">検索で漏らさない</span>権限を索引だけで判定すると、権限を外した直後に見えてしまいます。多くの題材が「索引で絞り、正本で確かめる」の 2 段にしています。</div>
+  </section>
+
+  <section class="s" id="vault">
+    <h2>鍵・金庫・監査ログ</h2>
+    <p>マイナンバー・カード番号・住所のような秘密のデータは、ふつうの表と分けて<strong>金庫</strong>（専用の DB とロール）に置き、<a class="t" href="#g-envelope">封筒の暗号化</a>で守ります。</p>
+    <div class="stepper">
+      <ol>
+        <li>データごとにデータの鍵を作って暗号化する。</li>
+        <li>データの鍵を、KMS が持つ鍵で暗号化して、データの隣に保存する。</li>
+        <li>読む時は、目的と理由を付けて KMS に復号を頼む。KMS の権限で読める範囲を絞る。</li>
+        <li>運用者が読んだことは、書き換えられない監査ログ（前の行のハッシュを含めて鎖にする）に残す。</li>
+      </ol>
+    </div>
+  </section>
+
   <section class="s" id="flags">
     <h2>デプロイとリリースを分ける</h2>
     <p>トランクベース開発で、<code>main</code> に毎日小さく入れます（ADR-0002）。未完成の機能は<strong>フィーチャーフラグの裏</strong>に置き、コードはデプロイしても、利用者には見せません。</p>
@@ -272,6 +353,11 @@ CREATE POLICY tenant_isolation ON items
       <dt id="g-idempotent">冪等</dt><dd>同じ操作を何回行っても、1 回行ったのと同じ結果になる性質。</dd>
       <dt id="g-valkey">Valkey</dt><dd>Redis から分かれたオープンソースのインメモリのデータストア。キャッシュ・Pub/Sub・レート制限に使う。</dd>
       <dt id="g-cell">セル</dt><dd>サービスのスタック一式の複製。テナントをセルに割り当て、障害の影響を 1 つのセルに閉じ込める。</dd>
+      <dt id="g-state-machine">ステートマシン</dt><dd>取りうる状態と、状態の間の遷移を決めたモデル。決められた遷移しか起きない。</dd>
+      <dt id="g-ledger">複式簿記</dt><dd>1 つの取引を、借方と貸方の 2 つの面で同じ額だけ記録する方法。和が一致しない記録は書けない。</dd>
+      <dt id="g-fanout">ファンアウト</dt><dd>1 つの出来事を、多くの受け手に配ること。</dd>
+      <dt id="g-token-bucket">トークンバケット</dt><dd>一定の速さで溜まるトークンを、要求ごとに 1 つ使う方式。溜まった分だけ一時の集中を許す。</dd>
+      <dt id="g-envelope">封筒の暗号化</dt><dd>データをデータの鍵で暗号化し、データの鍵を KMS の鍵で暗号化して一緒に置く方式。envelope encryption。</dd>
       <dt>AZ</dt><dd>Availability Zone。同じリージョンの中で、電源やネットワークが独立したデータセンターの群。</dd>
       <dt>Aurora Global Database</dt><dd>別のリージョンに読み取り用の複製を持つ Aurora の構成。災害のときに昇格させる。</dd>
     </dl>
@@ -283,6 +369,7 @@ CREATE POLICY tenant_isolation ON items
     <p><a class="btn" href="../../index.html">題材の一覧へ</a></p>
     <div class="reading">
       <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/docs/patterns.md">docs/patterns.md</a> <span>— テーマごとに、どの題材から読むか（読む順の道筋）</span></li>
         <li><a href="https://github.com/shoito/rebuilds/blob/main/docs/process.md">docs/process.md</a> <span>— 開発の流れと成果物の正式な定義</span></li>
         <li><a href="https://github.com/shoito/rebuilds/tree/main/docs/decisions">docs/decisions/</a> <span>— リポジトリ共通の ADR</span></li>
       </ol>

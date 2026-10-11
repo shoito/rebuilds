@@ -327,6 +327,7 @@ ID は一度振ったら再利用しない。削除した要件の ID は欠番�
   - 複数の選択肢を比べて選んだもの
   - エージェントが別の選択をしがちなもの
 - 形式は `docs/templates/adr.md`（MADR を簡略化したもの）に従う。
+- 見出しは決定の名前（60 字まで）にする。決定の中身は Decision に書く。見出しは ADR の一覧の表にそのまま出るため、長い見出しは一覧を読めなくする。
 - `proposed` の間は、同じ ADR を書き換えて最新化してよい。
 - `accepted` になった ADR は書き換えない。方針を変えるときは新しい ADR を書き、古いほうの状態を `superseded by ADR-NNNN` にする。
   - 例外：題材の最初の設計の間（統合と検証の工程が終わり、開発リポジトリで実装が始まる前）は、その設計の作業で書いた ADR を直接直してよい。まだ誰もその ADR の上に作っていないためである。決定を覆す直しには、日付付きの注記（`> YYYY-MM-DD の注記：…`）を残す。
@@ -384,7 +385,9 @@ QA が品質の指標を新しく必要とするときは、`runbooks/README.md`
 | 成果物 | テンプレート |
 | --- | --- |
 | `intent.md` | [templates/intent.md](templates/intent.md) |
-| `architecture/README.md` | [templates/architecture.md](templates/architecture.md)。領域ごとのファイルは、題材に合わせて自由に分ける |
+| `architecture/README.md` | [templates/architecture.md](templates/architecture.md) |
+| `architecture/<area>.md` | [templates/architecture-area.md](templates/architecture-area.md)。領域の分け方は題材に合わせて決める |
+| `architecture/design-log.md` | [templates/design-log.md](templates/design-log.md) |
 | `quality.md`（題材） | [templates/quality.md](templates/quality.md) |
 | `quality.md`（変更） | [templates/change-quality.md](templates/change-quality.md) |
 | `roadmap.md` | [templates/roadmap.md](templates/roadmap.md) |
@@ -392,6 +395,8 @@ QA が品質の指標を新しく必要とするときは、`runbooks/README.md`
 | `plan.md` | [templates/plan.md](templates/plan.md) |
 | ADR | [templates/adr.md](templates/adr.md) |
 | runbook | [templates/runbook.md](templates/runbook.md) |
+
+設計の文書の図は、[templates/README.md](templates/README.md) の「図の決まり」に従う。
 
 ## 13. 参考
 

@@ -13,6 +13,7 @@
 - 入口：<https://shoito.github.io/rebuilds/>
 - 共通の前提知識：[docs/primer/index.html](docs/primer/index.html)
 - 書き方：[docs/primer/AUTHORING.md](docs/primer/AUTHORING.md)
+- テーマ別の索引と読む順の道筋：[docs/patterns.md](docs/patterns.md)（台帳、ステートマシン、ファンアウト、同期など、どの題材から読むか）
 
 ## 題材
 
@@ -51,6 +52,7 @@
 ├── .github/                   # CODEOWNERS、PR テンプレート
 ├── docs/
 │   ├── process.md             # 開発プロセス（方法論）の定義
+│   ├── patterns.md            # 題材をまたぐパターンの索引と読む順
 │   ├── project-management.md  # GitHub での回し方
 │   ├── templates/             # 各成果物のテンプレート
 │   ├── primer/                # 共通の前提知識の資料と、資料の CSS・JS
