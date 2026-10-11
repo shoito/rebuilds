@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>日付の範囲・物件の現地の時刻・法令の 180 日の上限が絡む在庫を、外部のカレンダーとも合わせながら売る。「同じ夜を二度売らない」を DB の制約で守る設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>保証金の預かりは、オーソリの期限（数日）と予約から滞在までの長さが合わないので MVP から外し、損害の請求で始めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/intent.md">intent.md</a>）</li>
+        <li>外部のカレンダーとの食い違いは防ぎきれない前提で、「取り込みから 5 分以内に検出してホストに知らせる」を成功の基準にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/intent.md">intent.md</a>）</li>
+        <li>180 日の数え方と自治体の規則の表の形は人がレビューして確定する契約にし、条例の読み取りはエージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>予約・仮押さえ・ブロック・外部の予定をすべて <code>stay_claims</code> の行にし、<code>EXCLUDE USING gist</code> の排他の制約で重なりを DB が拒みます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0002-availability-representation-and-double-booking.md">ADR-0002</a>）</li>
+        <li>届出住宅の泊の日を予約と同じトランザクションで <code>regulated_nights</code> に挿入し、年度の上限を CHECK 制約で守ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0006-regulatory-night-cap-enforcement.md">ADR-0006</a>）</li>
+        <li>地図と検索には、秘密の鍵から HMAC で決めたずらした位置だけを出し、正確な住所は確定した予約のゲストにだけ出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0014-approximate-location-offset.md">ADR-0014</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>締め切りの 17:59:59 と 18:00:00、夏時間の切り替え、年度をまたぐ 3 月 31 日の 2 泊を、仮想の時計と tz の試験ベクトルで確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/quality.md">quality.md</a>）</li>
+        <li>180 日の上限を、2 室の同じ夜を 1 日と数える参照の実装と比べ、上限の後の予約が 409 になり既存の予約を取り消さないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/quality.md">quality.md</a>）</li>
+        <li>「返金 + ホストの取り分 + 本システムの収益 = 払った額」を、ポリシーの文をそのまま書いた参照の実装と比べます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>二重の予約と 180 日の上限の照合の不一致は 1 件で呼び出し、そのリスティングや届出住宅の予約を止めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/runbooks/double-booking-or-cap-violation.md">double-booking-or-cap-violation.md</a>）</li>
+        <li>緊急の安全の連絡に人が 2 分以内に応じることを SLO にし、システムの障害とは別の 24 時間の安全の当番を置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/runbooks/safety-incident.md">safety-incident.md</a>）</li>
+        <li>iCal の取り込みは相手のドメインごとに止められ、止めても取り込み済みのブロックは残します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>宿泊のマーケットプレイスは何をするサービスか</h2>
     <p>Airbnb は、個人や事業者が住まいや部屋を貸し、旅行者が地図と日付で泊まる所を探して予約する場です。本家のホストは 550 万人を超え、有効な<a class="t" href="#g-listing">リスティング</a>は 900 万件を超えます。2026 年の第 2 四半期の予約の泊と席は 1 億 4,830 万でした。この設計は、日本を最初の市場にして、海外のゲストも受けます。</p>

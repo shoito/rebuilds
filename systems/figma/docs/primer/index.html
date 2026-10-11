@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>同じファイルを開いた全員の画面を、中央のサーバーの順序と決定的な計算で 1 つに収束させる手本です。CRDT を使う Notion と比べて読めます。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「速い・一緒に作れる・失わない」を、60fps、0.25 秒で伝わる、確定した編集の損失 0 件の基準に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a>）</li>
+        <li>マルチプレイヤーの方式（OT・CRDT・中央の順序）や IME の受け方を問いとして立て、結論と ADR を残しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/intent.md">intent.md</a>）</li>
+        <li>walking skeleton を「2 つのブラウザで同じ矩形を動かす」までと決め、PoC の結果を spec の承認の前に記録させます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>ファイルごとに持ち主の Document Server を 1 つ置き、<code>seq</code> の順で全員の結果を 1 つに決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0002-central-authoritative-multiplayer.md">ADR-0002</a>）</li>
+        <li>持ち主が二重になっても編集を失わないよう、ジャーナルの書き込みを <code>epoch</code> の条件でフェンスします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0024-journal-items-and-fencing.md">ADR-0024</a>）</li>
+        <li>WASM とネイティブで同じ結果を出すため、レイアウトの計算を決定的にし、一致の CI で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0054-wasm-native-parity-and-bundle-budgets.md">ADR-0054</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>任意の遅延・切断・持ち主の交代の列で全員が収束することを、収束のシミュレーターで確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a>）</li>
+        <li>ジャーナルから作り直した状態がチェックポイントとバイト単位で一致することを、本番の影で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a>）</li>
+        <li>読めない人に名前・サムネイル・中身が漏れる経路を表にし、4 つの主体で結合テストします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>編集の SLO を「開く」「確定」「伝わる」「持ち主の回復」に分け、二重に数えないように定義しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>結果を変える規則は文書のフラグでファイルごとに切り替え、戻せない書き込みの解禁は PM の判断を記録します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>大阪への切り替えでは、ジャーナルの世代で上書きを防ぎ、東京が戻った後に取り戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Figma は何をするサービスか</h2>
     <p>Figma は、ブラウザで動く画面のデザインのツールです。デザインの<strong>ファイルを 1 つだけ置き、全員が同じものを同時に見て編集する</strong>ことで、「どれが最新か分からない」「受け渡しで食い違う」をなくしました。</p>

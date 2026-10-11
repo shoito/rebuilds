@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>Stripe は、壊れたときに「エラーにならずにお金が違う」ことがいちばん危ない題材で、お金の不変条件・カード番号の隔離・法務の確認待ちの扱いの手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>法務の問い L1〜L9 ごとに「承認を止める spec」を決め、設計は先に進めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/intent.md">intent.md</a>）</li>
+        <li>コンビニ払い・銀行振込は MVP に入れ、Connect・Billing は後回しにしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/intent.md">intent.md</a>）</li>
+        <li>お金を動かす変更（区分 A）の承認と、影の実行の結果の判断は、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>借方と貸方の一致を、追記のみの複式簿記と DB の遅延制約で強制します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0003-double-entry-ledger.md">ADR-0003</a>）</li>
+        <li>送れたか分からない「結果不明」は、照会と取り消しで確定させてから次の手を打ちます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0011-connector-abstraction-and-unknown-outcome.md">ADR-0011</a>）</li>
+        <li>カード番号を平文で一度も CDE の外に出さないよう、領域を分けます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0005-pci-scope-segmentation.md">ADR-0005</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li><code>fee + net = amount</code> や「全口座の合計が 0」を、お金の不変条件として spec に書かせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a>）</li>
+        <li>コネクタのタイムアウト・切断・5xx・照会の遅延の全組み合わせで、二重のオーソリが起きないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a>）</li>
+        <li>お金を動かす変更は影の実行にかけ、その合格基準を QA が持ちます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>結果不明の残り（15 分・24 時間）や照合の不一致（T+2 営業日で 0 件）を SLO にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>月末・月初や大型セールの前後は、お金の流れに合わせてデプロイを凍結します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>台帳の整合や影の実行の差でフラグを自動で切り、台帳は戻さず訂正の仕訳で直します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/runbooks/deploy-and-rollback.md">deploy-and-rollback.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="what">
     <h2>Stripe は何をするサービスか</h2>
     <p>Stripe は、事業者（<a class="t" href="#g-merchant">加盟店</a>）が<strong>数行のコードでオンラインの代金を受け取れる</strong>ようにする決済の API です。カード会社や銀行との接続、カード情報の保護、返金やチャージバック、売上の入金までを肩代わりします。</p>

@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>GitHub は、push したコードを失わないことと、非公開の中身をどの経路からも漏らさないことを Git の層から作り直す題材で、ストレージの複製と経路ごとの漏洩テストの手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>漏洩テスト・障害注入・Git の互換のマトリクスを、機能より先に作ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>AI エージェントを利用者に数え、Copilot は外しても、エージェントが使いやすい API とトークンは MVP に入れています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/intent.md">intent.md</a>）</li>
+        <li>公開リポジトリの大量の clone は、課金ではなく bundle-uri・CDN とレート制限で受けると決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/intent.md">intent.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>ref の更新を、3 つの複製の 3 相の手順と DB のチェックサムの CAS で決め、push を失いません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0006-ref-update-consensus.md">ADR-0006</a>）</li>
+        <li>テナントの RLS を使わず、権限をリポジトリ単位の判定関数に集約しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0002-repository-permission-model.md">ADR-0002</a>）</li>
+        <li>他人のコードを動かす CI は、1 ジョブ 1 microVM の使い捨てで隔離します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0023-firecracker-microvm-runners.md">ADR-0023</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>Git・Web・API・検索・通知・Webhook・Actions の経路ごとに、ID を振った漏洩テストを持ちます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a>）</li>
+        <li>fork のネットワークで広告していない <code>want</code> が漏れるかを、PoC で確かめてからテストに固定します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a>）</li>
+        <li>Git のバージョン・libgit2・JGit・go-git、LFS、partial clone の互換をマトリクスで確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>「合意した複製が 2 未満で成功を返した push」を 0 件とし、1 件で SEV1 にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>アプリの列車（毎日）とストレージの列車（週 2 回）を分け、ストレージのノードは AZ の中で 1 台ずつ更新します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0033-rolling-storage-node-upgrades.md">ADR-0033</a>）</li>
+        <li>無作為の 1,000 リポジトリを、毎日バックアップから復元して突き合わせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <!-- 1 -->
   <section class="s" id="what">
     <h2>GitHub は何をするサービスか</h2>

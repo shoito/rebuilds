@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>外から届く信用できない入力を、受け付けたら失わず、迷惑メールを見抜き、中身を人が読まずに運用する。「受け付けた後の責任」と通信の秘密を両立させる設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>迷惑メールの捕捉 99.9% 以上と、正規のメールの誤判定 0.05% 以下を、対になる成功の基準にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/intent.md">intent.md</a>）</li>
+        <li>機密モードを「受け手の画面の写しを防げず、誤った安心を与える」として MVP から外しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/intent.md">intent.md</a>）</li>
+        <li>送信の IP の評判は育つまで時間がかかるので、E7 を待たずに E1 で IP を取り、見張りのメールの少ない量から温め始めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>SMTP の時点では安く確かなものだけを拒み、中身の選別はスプールに確定して 250 を返した後に行います。受け付けた後に送り返しません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0002-accept-then-filter.md">ADR-0002</a>）</li>
+        <li>ラベルを正にし、フォルダーは別のモデルを作らず「ラベルを 1 つだけ持つ」見せ方にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0004-labels-as-primary-mailbox-model.md">ADR-0004</a>）</li>
+        <li>本文の blob を共有するのは同じ配送の受け手の間だけにし、中身のハッシュでメッセージをまたいで重複を除きません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0003-message-storage-layout-and-dedupe.md">ADR-0003</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>どの順序でメールが届いてもスレッドの分け方が同じで、一度合わせたスレッドを分けないことを、性質ベーステストで確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a>）</li>
+        <li>JMAP と IMAP のクライアントの模型を複数動かし、UID が再利用されず、全員の状態がサーバーに収束することを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a>）</li>
+        <li>選別のモデルは、どの種類の誤判定の率も前のバージョンより悪くしないことを合否にし、影の判定を経てから出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>見張りのメールの送った番号と届いた番号の差 0 を SLI にし、1 件の欠けで呼び出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>ブロックリストに載った送信の IP は、プールから外し、原因を止めてから解除を申請し、ウォームアップの段から戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/ip-blocklisted.md">ip-blocklisted.md</a>）</li>
+        <li>選別のモデルは影の判定の 7 日の後に 1% から段階的に広げ、<code>ops.filter_model_pinned</code> で前のバージョンに固定できます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>メールのサービスは何をするか</h2>
     <p>Gmail は、メールを受け取って保存し、探しやすく見せ、利用者の代わりに外へ送るサービスです。個人の無料のアカウントと、組織向けの Google Workspace があります。メールは、他社のサーバーと標準のプロトコルでつながる、開いた網の上で動きます。相手を選べないことが、迷惑メールとなりすましの根にあります。</p>

@@ -33,6 +33,31 @@
     <p class="lead">届ける・選ぶ・数える・守るの前提知識</p>
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>1 件の投稿を数千万人のホームへ数秒で届けながら、ブロック・鍵アカウント・削除の投稿をどの経路でも見せない、「写しと見える範囲」の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>届ける・選ぶ・数える・守るの 4 つの難しさを K1〜K8 に落とし、おすすめの価値は「フォロー中より 20% 高い」を A/B で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a>）</li>
+        <li>法令の 12 の問い（L1〜L12）を、承認を止める spec と結びつけ、設計は先に進めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/intent.md">intent.md</a>）</li>
+        <li>ランキングを 100% に広げる判断は PM が A/B で決め、fan-out の閾値や T&S の措置はエージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>フォロワーの少ない作者はプッシュ、多い作者はプルで、セレブリティの問題を解きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0003-timeline-fanout-hybrid.md">ADR-0003</a>）</li>
+        <li>見える範囲を 1 つの関数 <code>visible()</code> に集め、写し・検索・通知・API のどこでも読み出しの時に判定します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0004-single-tenant-and-visibility.md">ADR-0004</a>）</li>
+        <li>削除は行を消さずに <code>state_version</code> を進め、写しの寿命 45 秒で 60 秒以内に全経路から消します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0009-post-state-tombstones-and-state-cache.md">ADR-0009</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>16 の経路を並べた「漏れの経路の表」の各行に、ブロックされた人など 5 つの主体の結合テストを付けます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/quality.md">quality.md</a>）</li>
+        <li>出来事を流し直し、写し（タイムライン・カウンター・索引）が正本から作ったものと一致するかを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/quality.md">quality.md</a>）</li>
+        <li>本番の応答の 0.1% を 5 秒後に正本で判定し直し、説明のつかない漏れ 0 を測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0059-guardrail-and-audit-metrics.md">ADR-0059</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>投稿から監視用のフォロワーに届くまでを合成監視の組で測り、fan-out の SLO の正解にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/runbooks/README.md">README.md</a>）</li>
+        <li>殺到の時に削る順（閲覧の取り込み → おすすめ → … → fan-out の量）と、削らないもの（投稿、<code>visible()</code>、措置、法令の期限）を決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/architecture/capacity.md">capacity.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
 
   <section class="s" id="product">
     <h2>X は何をするサービスか</h2>

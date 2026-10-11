@@ -33,6 +33,30 @@
     <p class="lead">ファイルシステム・同期・内容の番地・ジャーナル・S3・復元の前提知識</p>
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>2 台での同時の編集、「が.txt」の NFC と NFD、ランサムウェアの一斉の暗号化が起きても「ファイルを黙って失わない」ことを、端末とサーバーにまたがって守る手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「失わない・すぐそろう・共有の範囲が分かる・戻せる」を、夜間 1,000 万の場面で中身を失う場合 0 件などの K1〜K9 に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/intent.md">intent.md</a>）</li>
+        <li>巻き戻しを本家と違って無料のプランにも出し、ランサムウェアからの回復を全員に届けます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/architecture/README.md">README.md</a>）</li>
+        <li>LAN 同期・OCR・顧客の鍵を MVP の後に回した理由を、要る設計と、重複排除・検索と両立しないことで説明しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/intent.md">intent.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>Remote・Local・Synced の 3 つの木で計画し、サーバーは条件つきの書き込みだけを受け、衝突は中身が残るほうを選びます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0006-sync-conflict-model.md">ADR-0006</a>）</li>
+        <li>名前は NFC で持ち、同じフォルダーの中の一意を <code>name_key</code>（NFC＋大文字小文字の畳み込み）で決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0008-node-identity-and-names.md">ADR-0008</a>）</li>
+        <li>重複排除をテナントの中に限り、「送らなくてよい」の答えから読めないファイルの有無が漏れないようにします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0003-dedupe-scope-and-privacy.md">ADR-0003</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>I/O を差し替えた決定的な同期のシミュレーターで、収束・中身を失わない・黙って上書きしないを夜間 1,000 万の場面で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a>）</li>
+        <li>読めない名前空間の中身だけが違う「2 つの世界」を作り、重複排除の答えや応答の時間に差が出ないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>一斉の削除・ランサムウェアでは、端末の切り離し → 時点の選択 → 1,000 操作ずつの巻き戻しの順に戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/runbooks/mass-change-response.md">mass-change-response.md</a>）</li>
+        <li>同期・名前・分割・権限の規則はフラグにせず、新しい GC は参照の監査が 24 時間 0 のときだけ有効にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/runbooks/README.md">README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
 
   <section class="s" id="product">
     <h2>Dropbox は何をするサービスか</h2>

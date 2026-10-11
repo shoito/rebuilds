@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>数十万のショップが 1 つの基盤に載り、限定品の発売の数分に買い手が殺到し、他人のコードがチェックアウトで動く中で、「売り越さない」「注文はちょうど 1 回」「税は 1 円も違わない」を守る設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>6 つの価値を「売り越し 0 件」「重複の注文 0 件」「税額の差 0 円」のような測れる成功の基準 K1〜K10 に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/intent.md">intent.md</a>）</li>
+        <li>ギフトカード・定期購入・越境は法務の確認を理由に後へ回し、外貨のマーケットは仕組みだけ作ってフラグの裏に置いています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/intent.md">intent.md</a>）</li>
+        <li>walking skeleton で「1 つのショップで 1 つの商品が買える」まで貫き、在庫の CHECK 制約やキャッシュの鍵のショップは後から足せないので最初から本物で作ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>在庫の正本を Aurora の行にして <code>available &gt;= 0</code> の CHECK 制約で売り越しを DB に止めさせ、熱い品目は在庫を複数の枠の行に分けます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0004-inventory-reservation-model.md">ADR-0004</a>）</li>
+        <li>リダイレクトの戻り・Webhook・照合のどの経路も同じ <code>completeCheckout</code> を通し、<code>orders.checkout_id</code> の一意の制約で注文を 1 つに限ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0005-checkout-state-machine-and-exactly-once-orders.md">ADR-0005</a>）</li>
+        <li>アプリの関数は燃料とメモリーの上限つきの WebAssembly の砂場で動かし、失敗しても「効果なし」にしてチェックアウトを止めません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0008-extension-sandbox-wasm.md">ADR-0008</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>売り越しの性質を、模型ではなく本物の PostgreSQL に並行度 200 で流し、1 つのロックで直列に処理する参照の実装と比べます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/quality.md">quality.md</a>）</li>
+        <li>決済の Webhook の重複・遅れ・順序の入れ替えを模型で起こし、1 つのチェックアウトの注文が 0 か 1 かを夜間に 100 万の場面で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/quality.md">quality.md</a>）</li>
+        <li>国税庁の Q&amp;A の計算の例を試験のベクトルにし、税率ごとに 1 回だけ丸める参照の実装と 1 円単位で比べます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>売り越し・重複の注文・金額の不一致を「0 件」の SLI として持ち、1 件で呼び出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>フラッシュセールは、7 日前の事業者との面談から 3 日前の隔離のポッドへの移し替えまで、日付つきの手順で備えます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/flash-sale-operations.md">flash-sale-operations.md</a>）</li>
+        <li><code>ops.checkout_enabled</code>・<code>ops.functions_enabled</code>・<code>ops.app_suspended</code> で、ショップやアプリの単位で被害を区切ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="what">
     <h2>EC の基盤は何をするサービスか</h2>
     <p>Shopify は、事業者が自分のネットショップを開き、商品を並べ、売り、配送と返品までを 1 か所で回せる基盤です。モールと違い、ショップの見た目と顧客は事業者のものです。1 つの基盤の上に、数十万の独立したショップ（テナント）が載ります。</p>

@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>「いつから有効か」と「いつそう記録したか」の 2 つの時間で人事の履歴を持ち、そこから給与を 1 円も違えずに計算して支給日に振り込む、正解を実装と独立に持つ設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>ゴールデンデータセットで誤り 0 件と、現行のシステムとの 3 か月の並行稼働で差異がすべて説明済みを、切り替えの条件にする基準（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/intent.md">intent.md</a>）</li>
+        <li>年末調整・法定調書・電子申請を MVP から外し、最初の年は現行のシステムで行う範囲の切り方（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/intent.md">intent.md</a>）</li>
+        <li>法令の値をコードでなく規則表で届け、源泉徴収税額表・社会保険・雇用保険の改正の暦で動かす計画（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>facet ごとの 3 つのテーブルを宣言から生成し、同じ日の変更の順序を事象の種類で決める有効日付の実装（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0006-temporal-table-triplet-and-fold.md">ADR-0006</a>）</li>
+        <li>給与の実行をステートマシンにし、入力を RFC 8785 の正規の形と SHA-256 で固定して、同じ入力なら同じ結果にする（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0026-payroll-run-stages-and-input-snapshot.md">ADR-0026</a>）</li>
+        <li>マイナンバーの平文を保管庫の外に返さず、目的ごとに判定してアクセスを番号なしのハッシュの連鎖で残す（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0046-purpose-bound-vault-api-and-access-log.md">ADR-0046</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>給与の期待値を社労士・税理士が確かめたゴールデンデータセットで持ち、実装に合わせて変えさせない CI（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0061-golden-dataset-ci.md">ADR-0061</a>）</li>
+        <li>有効日付の実装を、純粋な参照のモデルとのモデルベーステスト PROP-TEMP-001〜009 で確かめる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0009-temporal-reference-model-testing.md">ADR-0009</a>）</li>
+        <li>36 協定の上限や年休の付与を、境界の行を含む決定表 DT-TIME-*・DT-ABS-* の全マスで確かめる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>支給日の前の 5 営業日だけ給与の経路に 99.95% の SLO を置き、デプロイを凍結する運用（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>支給日の前にリージョンが落ちても、大阪で振込ファイルを作り直して当日中に出す DR（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
+        <li>規則表をコードと別の署名した束で出し、取り込みと照合を別の人が行って改正の暦で公開する（<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Workday は何をするサービスか</h2>
     <p>Workday は、企業の人事（<a class="t" href="#g-hcm">HCM</a>）と給与を 1 つのシステムで扱う SaaS です。組織と従業員の記録を持ち、異動や昇給を承認を経て反映し、そこから給与を計算します。</p>

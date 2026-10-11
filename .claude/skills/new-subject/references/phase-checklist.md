@@ -48,7 +48,8 @@
 
 ## 工程 5：前提知識の資料と索引
 
-- [ ] `docs/primer/index.html`：`docs/primer/AUTHORING.md` に従う（GA のタグ、favicon、`og:site_name`、節は 12〜20 個、確認の問いは 3〜6 個、用語集）
+- [ ] `docs/primer/index.html`：`docs/primer/AUTHORING.md` に従う（GA のタグ、favicon、`og:site_name`、節は 13〜22 個、確認の問いは 3〜6 個、用語集）
+- [ ] 表紙の直後に「この題材から学べること」の節（PM・Dev・QA・Ops ごとに 2〜3 項目、各項目に設計の文書へのリンク）
 - [ ] 資料の数値を設計の文書と照らし合わせる
 - [ ] ルートの `index.html` のカードと、`README.md` の題材の表に足す。並び順を揃える
-- [ ] `docs/patterns.md` のテーマの表か「題材に固有の論点」に足す。読む順の道筋に入れるかを考える
+- [ ] `docs/patterns.md` のテーマの表か「題材に固有の論点」に足す。読む順の道筋と「ロールから探す」に入れるかを考える

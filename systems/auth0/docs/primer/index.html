@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>エラーにならずに「他人としてログインできる」誤りが残る認証基盤で、通してはいけない要求を標準とテストで先に決める手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「すぐ組み込める・安全・止まらない」を、月間 99.99%、15 分で最初のログイン、誤ブロック 0.1% 以下などの K1〜K8 に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a>）</li>
+        <li>法令の論点 L1〜L8 ごとに「承認を止める spec」を決め、法務に依らない Story は先に進められます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/intent.md">intent.md</a>）</li>
+        <li>discovery の値やトークンのクレームなどの契約の確定と、攻撃の模擬試験の結果の解釈は、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>署名の秘密鍵は Signer の外に出さず、Signer は外への経路のないサブネットに置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0059-signer-isolation.md">ADR-0059</a>）</li>
+        <li>依存先が落ちてもログインを続けるため、認証の経路を管理の経路から分け、依存ごとの縮退の表を持ちます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0005-authentication-path-availability.md">ADR-0005</a>）</li>
+        <li>攻撃の判定を Argon2id の前の 1 段にまとめ、攻撃の波でハッシュの CPU を使い切らないようにします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0024-attack-protection-counters-and-enforcement.md">ADR-0024</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>RFC 9700 から SEC-001〜024 の拒否の側のテストを作り、どの行もテストから参照されることを CI で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a>）</li>
+        <li>アカウントの有無を明かさないことを、応答の同一と処理時間の差（中央値 5% 以内）で測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a>）</li>
+        <li>クレデンシャルスタッフィングの模擬の試験で、攻撃の 99% を止め、正規の誤ブロックを 0.1% 以下にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>99.99% のエラーバジェットは月に約 4.3 分なので、合成監視と症状のアラートを重ねます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>署名鍵の漏えいに備え、1 テナント・全テナントの緊急のローテーションを手順にし、定期に訓練します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/runbooks/emergency-key-rotation.md">emergency-key-rotation.md</a>）</li>
+        <li>振る舞いの変更はテナントを単位に広げ、ログインの成功率や秘密の出力のガードでフラグを自動で切ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Auth0 は何をするサービスか</h2>
     <p>Auth0 は、アプリの利用者（顧客）のログインを肩代わりする認証基盤です。この分野を <a class="t" href="#g-ciam">CIAM</a> と呼びます。アプリはログインの画面もパスワードも持たず、本システムへリダイレクトして、戻ってきた結果をトークンとして受け取ります。</p>

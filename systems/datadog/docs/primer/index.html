@@ -33,6 +33,31 @@
     <p class="lead">時系列・カーディナリティ・TSDB・水位・スケッチ・ログの検索・トレース・モニターと SLO・Kafka の前提知識</p>
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>障害の日にデータが急増しても、隣の組織に巻き込まれず、本システムの遅れで誤ったアラートを鳴らさない、「信用できる監視」の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>失わない・すぐ見える・アラートを信用できる・量と費用を制御できる・隣に巻き込まれない、の 5 つの価値を K1〜K9 にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a>）</li>
+        <li>異常検知のモニターは、閾値のモニターの評価の決定性を確かめるまで MVP の後に回します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/intent.md">intent.md</a>）</li>
+        <li>系列の上限・割り当て・保持の期間の変更と、組織のセルの移し替えは、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>モニターは流れの中で評価せず、取り込みの水位を待ってクエリで評価し、入力の写しを残して再生できるようにします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0008-monitor-evaluation-model.md">ADR-0008</a>）</li>
+        <li>系列の上限を超えたデータを捨てずに溢れの系列に数え、ほかの系列を守ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0006-cardinality-policy.md">ADR-0006</a>）</li>
+        <li>組織をセルに置き、取り込み・保存・クエリ・評価の各段に割り当てと公平なキューを入れます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0003-tenancy-cells-and-isolation.md">ADR-0003</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>コーデックとロールアップを参照の実装と比べ、合計・個数・最小・最大の不一致 0、パーセンタイルの誤差 1.1% 以内を確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>）</li>
+        <li>仮想の時計と模型の水位でモニターを夜間 100 万の場面で動かし、本システムの遅れでデータなしが出ないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>）</li>
+        <li>1 つの組織が割り当ての 10 倍を送る間も、他の組織の SLI が SLO の中にあることを負荷試験で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>自己監視を大阪の別のアカウントに置き、3 段のデッドマンスイッチで「監視を失った」ことに気づきます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/self-monitoring-path-failure.md">self-monitoring-path-failure.md</a>）</li>
+        <li>うるさい隣人では 7 つの場面を見分けてから、割り当て → クエリ → 新しい系列の順に絞ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/runbooks/noisy-neighbor.md">noisy-neighbor.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
 
   <section class="s" id="product">
     <h2>Datadog は何をするサービスか</h2>

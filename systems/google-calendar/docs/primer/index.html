@@ -33,6 +33,31 @@
     <p class="lead">iCalendar・繰り返し・タイムゾーン・招待・同期の前提知識</p>
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>「毎週火曜、ただし 3 回目だけ水曜」に夏時間や tzdb の改正が重なっても、同じ回をどの経路でも同じ瞬間に出す、「時刻と繰り返しの正しさ」の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>繰り返し・時刻・招待・空き・同期の 5 つの壊れ方を、K1〜K9 と「守るべき振る舞い」に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/intent.md">intent.md</a>）</li>
+        <li>秒・分・時ごとの繰り返しと旧暦などの暦を Non-goals にし、展開の量を読める範囲に絞ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/intent.md">intent.md</a>）</li>
+        <li>tzdb のバージョンの採用や、参照との食い違いの許可は、エージェントでなく人が判断します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>壁時計の時刻＋TZID を正にし、UTC の瞬間は <code>tzdata_version</code> つきの派生の値にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0002-time-representation.md">ADR-0002</a>）</li>
+        <li>主催者の写しを正にし、参加者ごとの写しへ内部の iTIP のメッセージで配って追いつかせます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0006-organizer-and-attendee-copies.md">ADR-0006</a>）</li>
+        <li>会議室の二重予約を、<code>btree_gist</code> の排他の制約で DB に拒ませます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0019-room-booking-rows-and-recurring-acceptance.md">ADR-0019</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>繰り返しの展開を参照の実装と性質ベーステストで比べ、夜間に 20 万試行します。食い違いの許可は QA が承認します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a>）</li>
+        <li>旧と新の tzdb の組で、壁時計の時刻が変わらず UTC の瞬間・会議室・リマインダーだけが直ることを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a>）</li>
+        <li>空き時間だけの共有や <code>private</code> の予定の中身が出ないことを、経路と主体ごとの漏れの経路の表で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>tzdb の新しいリリースの採用から計算し直しまでを手順にし、施行まで 7 日未満の急ぎの採用も決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/tzdb-update.md">tzdb-update.md</a>）</li>
+        <li>リマインダーの送り漏れと会議室の二重予約を、業務の記録から全件で数えて SLO 0 で見ます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/runbooks/README.md">README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
 
   <section class="s" id="product">
     <h2>Google Calendar は何をするサービスか</h2>

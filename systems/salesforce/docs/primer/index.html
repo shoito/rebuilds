@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>会社ごとに違うオブジェクト・項目・権限・自動化を 1 つの共有の基盤でメタデータとして動かしながら、「見せてはならないレコードを見せない」「1 つの組織に共有の DB を占めさせない」を守る手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「業務に合わせて変えられる・見せてよい人にだけ見せる・安全に変える・公平で止まらない」の 4 つの価値を K1〜K8 に落とす形（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a>）</li>
+        <li>Apex・SOQL との互換と利用者のコードを MVP から外し、宣言的な設定だけに絞った判断と理由（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a>）</li>
+        <li>ダッシュボードの「指定した実行ユーザー」を持たず、見る人の権限だけで集計すると本家と違えた決定（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/intent.md">intent.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>メタデータを不変のスナップショットにコンパイルし、1 つの要求を 1 つのバージョンに固定して AST から SQL を作る実行基盤（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0003-metadata-driven-runtime.md">ADR-0003</a>）</li>
+        <li>共有を事前計算し、OWD の変更は述語の切り替え、ルールの再計算は影の世代で切り替えて新旧を混ぜない（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0004-record-access-model.md">ADR-0004</a>）</li>
+        <li>ガバナ制限を実行基盤のデータ層で強制し、上限を超えたトランザクションを全体で巻き戻す（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/architecture/governor-limits.md">governor-limits.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>共有の判定を、決定表・参照の評価器との性質ベーステスト・<code>LEAK-*</code> の否定側のテスト・本番の標本の照合の 4 段で確かめる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/quality.md">quality.md</a>）</li>
+        <li>上限ごとに「ちょうどで通り、1 つ超えたら巻き戻る」試験を書き、登録簿と設計の一致を CI で見る（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0061-access-decision-and-limit-gates-in-ci.md">ADR-0061</a>）</li>
+        <li>フローを 200 件の足並みで実行した結果が、1 件ずつ実行した結果と同じになる性質（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>アクセスの判定を変えるリリースは、新旧を本番の標本で比べる影の実行を経て、組織の段ごとに広げる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0063-org-staged-release-and-shadow-evaluation.md">ADR-0063</a>）</li>
+        <li>騒がしい隣人を DB の時間と実行中のセッションの 2 つで見つけ、対話の経路の絞りは人が小さい順に決める（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
+        <li>参照の評価器が「多く見せる」食い違いを 1 件出したら呼び出し、共有の漏えいとして扱う手順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Salesforce は何をするサービスか</h2>
     <p>Salesforce は、B2B の営業チームが顧客・見込み客・商談・活動を記録し、チームで共有して、売上の見込みを管理する <a class="t" href="#g-crm">CRM</a> です。同時に、会社ごとに項目・画面・自動化を変えられる「業務アプリの基盤」でもあります。</p>

@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>知らない個人どうしの売り買いを仲立ちし、代金を預かってから渡す。「一品は一回だけ売る」ことと、預かったお金を 1 回だけ動かす台帳の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>売上金の期限・本人確認・使い道を <code>legal.*</code> の設定に置き、資金決済法でどう整理されても切り替えられる形にして、結論まで本番で有効にしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0004-proceeds-model-under-payment-services-act.md">ADR-0004</a>）</li>
+        <li>価格の提示と取り置き（オファー）や事業者の出品は、取り置きの設計と特定商取引法・インボイスの確認を理由に MVP の後へ回しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/intent.md">intent.md</a>）</li>
+        <li>walking skeleton は、預かりの仕訳と匿名の配送を含めて「1 つの出品が売れて売上金になる」まで貫きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>出品の行の条件つきの更新と取引の挿入を同じトランザクションで書き、「進行中の取引は出品ごとに 1 つ」の部分一意の索引で二人に売りません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0002-transaction-state-machine-and-single-purchase.md">ADR-0002</a>）</li>
+        <li>お金の正本を追記だけの複式簿記の台帳にし、売上金への振り替えと返金を一意の冪等キーで取引ごとに 1 回に限ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0003-escrow-and-double-entry-ledger.md">ADR-0003</a>）</li>
+        <li>住所は購入の時に配送ごとの写しにし、復号は <code>openAddress(purpose, subject)</code> の 1 つの関数だけが目的のコードつきで行います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0044-address-vault-snapshots-and-access.md">ADR-0044</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>仕訳の和 0、振り替えと返金は合わせて 1 回、無効の <code>legal.*</code> の仕訳を書かない、を素直に足し引きする参照の実装と比べます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/quality.md">quality.md</a>）</li>
+        <li>仮想の時計で、コンビニ払いの期限の 23:59:59 の前後 1 秒や、紛争で期限が止まって延びる場面を確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/quality.md">quality.md</a>）</li>
+        <li>運送会社の事象の重複・順序の入れ替え・欠けを起こし、取引の状態が前にだけ進み、配達済みだけで受取評価にならないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>提供者・銀行・台帳の 3 者の照合で、3 営業日を過ぎた説明のつかない差を 0 円にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>振り替えの重複が見つかったら振込を止め、直しは打ち消しの仕訳と 2 人の承認だけで行い、台帳を SQL で書き換えません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/runbooks/ledger-reconciliation-mismatch.md">ledger-reconciliation-mismatch.md</a>）</li>
+        <li>運用の返金・補償は決まった仕訳の型だけで行い、返金 3 万円・補償 3,000 円を超えると別の人の承認が要ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0060-ops-money-interventions-and-proceeds-hold.md">ADR-0060</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>フリマアプリは何をするサービスか</h2>
     <p>Mercari は、個人が家の使わない品をスマートフォンで出し、知らない個人に売る <a class="t" href="#g-c2c">C2C</a> のフリマです。本家の日本のマーケットプレイスの月間の利用者は 2,419 万人（2026 年 6 月期の第 4 四半期）です。運営は代金を預かり、取引が終わると、販売の手数料（10%）を引いて売り手に渡します。</p>

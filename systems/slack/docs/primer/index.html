@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>Slack は、ほかの題材が先例にし、ただ 1 つ <code>changes/</code> に spec・plan・quality の実例まで持つ、開発プロセスとチャットの土台（順序・取りこぼし・テナント分離）の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>価値を「速い会話・取りこぼさない・積み上がる知識」の 3 つに絞り、Huddle や Slack Connect を外した理由が書いてあります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/intent.md">intent.md</a>）</li>
+        <li>未読数は近似と決め、正しさは不一致率 0.1% 未満で担保すると割り切っています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/intent.md">intent.md</a>）</li>
+        <li>E1 の walking skeleton が、起票済みの変更（spec・plan・quality）として読めます（<a href="https://github.com/shoito/rebuilds/tree/main/systems/slack/docs/changes/260926-post-and-list-messages">changes/</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>チャンネル内連番 <code>seq</code> 1 つで、順序・欠損の検知・既読位置・差分取得を整数で表します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0001-per-channel-sequence.md">ADR-0001</a>）</li>
+        <li>DB を唯一の正本にし、リアルタイム配信はベストエフォートと割り切ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0002-db-as-source-of-truth-with-outbox.md">ADR-0002</a>）</li>
+        <li>検索のテーブルだけ RLS を外し、関数を経由してしか読めない例外にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0027-search-table-rls-exception.md">ADR-0027</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>権限外の内容が API・配信・検索・通知・ファイルのどれからも見えないことを、経路ごとに試します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/quality.md">quality.md</a>）</li>
+        <li>Valkey や Gateway を止めても、全クライアントが DB と同じ状態に収束することを障害注入で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/quality.md">quality.md</a>）</li>
+        <li>AGENTS.md・Skills の変更を、実タスクの eval で回帰から守ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>クライアントの欠損検知率と未読数の不一致率を SLI にし、QA と同じ数字で品質を判定します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>1 つのワークスペースが共有の資源を占有しないよう、テナント単位の上限と上位テナントの監視を置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>東京の Terraform の状態ファイルを使わずに、大阪へ切り替える訓練をします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Slack は何をするサービスか</h2>
     <p>Slack は、会社やチームの中の会話を<strong>話題ごとの部屋（チャンネル）</strong>に分けて行うチャットです。メールと違い、宛先を選んで送るのではなく、部屋に書き込み、部屋にいる人が読みます。</p>

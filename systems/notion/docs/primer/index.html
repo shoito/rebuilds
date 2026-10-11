@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>Notion は、同時・オフラインの編集を必ず収束させながら、継承する権限で見えないページを守る題材で、CRDT の使い分けと、最初から論理シャードを持つ設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「操作の変換か CRDT か」という問いを、オフラインの長い編集を基準に決めて閉じています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/intent.md">intent.md</a>）</li>
+        <li>エディタの計測や OPFS の確認を、PoC として Epic の前に置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>衝突の規則が利用者の意図に合うかは、テストが通っても人が判断します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>テキストはブロックごとの CRDT、構造とプロパティはサーバーの順序で決めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0010-text-crdt-with-server-ordered-structure.md">ADR-0010</a>）</li>
+        <li>物理 1 台のうちから 480 の論理シャードに分け、後の分割に備えます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0003-workspace-sharding.md">ADR-0003</a>）</li>
+        <li>ロールアップは読める行だけで集計し、集計の値から中身を漏らしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0017-rollups-over-readable-rows-only.md">ADR-0017</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>経路 × 隠れる理由の「漏洩の行列」で、読めないページのタイトルや存在まで漏れないことを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/quality.md">quality.md</a>）</li>
+        <li>数万の操作・数時間分のオフラインの列で、全レプリカが収束する性質を夜間に回します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/quality.md">quality.md</a>）</li>
+        <li>データベースの問い合わせは、評価器をオラクルにした性質ベーステストで確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>マイグレーションは群れ G0 → G3 の順に 480 シャードへ当て、全部に当たるまで、それに頼るアプリを出しません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0031-migration-rollout-by-shard-groups.md">ADR-0031</a>）</li>
+        <li>再シャーディングは、影の読み取りで確かめながら、止めずに物理クラスタを分けます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0028-zero-downtime-resharding.md">ADR-0028</a>）</li>
+        <li>衝突の記録（<code>sync_conflicts</code>）の件数を過去 4 週と比べ、2 倍を超えたら QA に共有します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/runbooks/README.md">runbooks</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Notion は何をするサービスか</h2>
     <p>チームの文書・wiki・表・タスク・議事録を、1 つの道具の中で作り、つなげるサービスです。文書の中に表を置き、表の行を開くとまた文書になる、という入れ子が特徴です。</p>

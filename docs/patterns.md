@@ -20,6 +20,29 @@
 | リアルタイムと位置 | Slack → Zoom → Uber | 常時の接続、メディアの中継、位置の索引とマッチング |
 | 信頼と安全 | Auth0 → Gmail → X → Mercari | 認証と攻撃の防御、送信者の認証と迷惑メール、モデレーション、不正 |
 
+## ロールから探す
+
+PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題材の資料の最初の節「この題材から学べること」に、ロールごとの学びと、読む設計の文書（PM は intent と roadmap、Dev は architecture と ADR、QA は quality、Ops は runbooks）をまとめている。
+
+| ロール | 題材 | 学べること |
+| --- | --- | --- |
+| PM | [Slack](https://shoito.github.io/rebuilds/systems/slack/docs/primer/index.html#learn) | spec・plan・quality が揃った変更の実例。価値を 3 つに絞り、未読数を近似と割り切る |
+| PM | [メルカリ](https://shoito.github.io/rebuilds/systems/mercari/docs/primer/index.html#learn) | 法令の結論を待つ値を設定に切り出し、結論まで本番で有効にしない |
+| PM | [Uber](https://shoito.github.io/rebuilds/systems/uber/docs/primer/index.html#learn) | 制度の線引き（運送の主体）から範囲を決め、法令の論点をフラグと記録で本番の関門にする |
+| PM | [Workday](https://shoito.github.io/rebuilds/systems/workday/docs/primer/index.html#learn) | 誤り 0 件のゴールデンデータと 3 か月の並行稼働を、切り替えの判定にする |
+| Dev | [Airbnb](https://shoito.github.io/rebuilds/systems/airbnb/docs/primer/index.html#learn) | 日付の範囲の排他の制約で、同じ夜を二度売らないことを DB が拒む |
+| Dev | [Shopify](https://shoito.github.io/rebuilds/systems/shopify/docs/primer/index.html#learn) | 熱い在庫の行を分け、注文をちょうど 1 回にし、他人のコードを砂場で動かす |
+| Dev | [GitHub](https://shoito.github.io/rebuilds/systems/github/docs/primer/index.html#learn) | 3 つの複製の合意で、成功を返した push を失わない |
+| Dev | [Notion](https://shoito.github.io/rebuilds/systems/notion/docs/primer/index.html#learn) | テキストは CRDT、構造はサーバーの順序と使い分け、最初から論理シャードを持つ |
+| QA | [Linear](https://shoito.github.io/rebuilds/systems/linear/docs/primer/index.html#learn) | 本物の同期のコードを決定的なシミュレーターで毎晩 20 万の列に通す |
+| QA | [Stripe](https://shoito.github.io/rebuilds/systems/stripe/docs/primer/index.html#learn) | お金の不変条件を性質にし、コネクタの障害注入と照合で確かめ続ける |
+| QA | [Workday](https://shoito.github.io/rebuilds/systems/workday/docs/primer/index.html#learn) | 給与の期待値を、実装と独立したゴールデンデータセットで持つ |
+| QA | [Auth0](https://shoito.github.io/rebuilds/systems/auth0/docs/primer/index.html#learn) | RFC から拒否の側のテストを作り、通してはいけない要求を先に決める |
+| Ops | [Datadog](https://shoito.github.io/rebuilds/systems/datadog/docs/primer/index.html#learn) | 監視のサービス自身を、別のアカウントの自己監視とデッドマンスイッチで見張る |
+| Ops | [Zoom](https://shoito.github.io/rebuilds/systems/zoom/docs/primer/index.html#learn) | 音声と映像の体感の品質を、回線の劣化の下の数値の SLO にする |
+| Ops | [Gmail](https://shoito.github.io/rebuilds/systems/gmail/docs/primer/index.html#learn) | 送信の評判、IP のブロックリスト、迷惑メールの波を運用の手順で扱う |
+| Ops | [Google カレンダー](https://shoito.github.io/rebuilds/systems/google-calendar/docs/primer/index.html#learn) | tz データベースの改正という、外から来る時限の変更を運用で受ける |
+
 ## テーマ別
 
 ### 台帳（複式簿記）
@@ -197,3 +220,4 @@ ML は信号、決定は規則と人。措置には根拠と異議の道を残�
 
 - 題材を足したら、その題材の主な論点を、上のテーマの表か「題材に固有の論点」に足す。
 - 「最初に読む」は、そのテーマを題材の主な論点として扱い、資料に節を持つ題材にする。
+- 「ロールから探す」は、各題材の資料の「この題材から学べること」のうち、ほかの題材より特に手本になるものを選ぶ。1 ロール 4 題材までにする。

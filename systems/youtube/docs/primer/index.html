@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>預かった巨大なファイルを失わず、著作権の照合が終わるまで公開せず、視聴回数とお金は検証した数だけで出す。大量のメディアの処理と、権利と数の信用を両立させる設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>配信 1 GB・保存 1 時間・変換 1 時間の原価を E1 から毎週測り、予算と比べながら進めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>「照合のしくみが止まっても、時間で公開に倒さない」のように、創作者の待ちより権利を優先する振る舞いを先に決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a>）</li>
+        <li>短い縦の動画・2 秒未満のライブ・投げ銭を、作り方の違いや資金決済法の確認を理由に MVP の後へ回しています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/intent.md">intent.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>公開の範囲・年齢・地域・照合の方針・措置を <code>playable(viewer, video, region)</code> の 1 か所で決め、再生・検索・おすすめ・埋め込みのすべてが通ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0009-single-tenant-and-playable.md">ADR-0009</a>）</li>
+        <li>視聴回数を、流れの中の仮の数とバッチで確かめる確定の数の 2 段で出し、収益は確定の数だけから作ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0007-two-phase-view-counting.md">ADR-0007</a>）</li>
+        <li>パイプラインの段の出力のキーを入力のハッシュと設定のバージョンから決め、途中で落ちた段を最初からやり直せるようにします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0002-upload-and-pipeline-orchestration.md">ADR-0002</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>200 本の黄金の動画で、ラダーの段ごとの VMAF の下限と、区切りの継ぎ目の画質の落ち込みを確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a>）</li>
+        <li>視聴の工場のような不正に加え、学校の授業のような「除いてはいけない偏った視聴」も場面に入れて、視聴回数の判定を試します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a>）</li>
+        <li>実在の作品を使わず、生成した音楽を切り出し・雑音・ピッチの変化で歪めた参照で、照合の再現率と誤った一致の率を測ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>再生の開始・再バッファ・キャッシュの外れを、実ユーザーのプレイヤーの計測から SLO にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>措置の決定から 60 秒以内にエッジが 403 を返すかを見張りの措置で測り、遅れたら段ごとの時刻で原因を探します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/runbooks/takedown-propagation.md">takedown-propagation.md</a>）</li>
+        <li>公開の判定のスイッチ <code>ops.publish_gate_enabled</code> は止めるだけで、公開に倒すスイッチを持ちません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="what">
     <h2>動画の基盤は何をするサービスか</h2>
     <p>YouTube は、誰でも動画を上げ、誰でも見られる <a class="t" href="#g-ugc">UGC</a> の動画の基盤です。登場人物は大きく 3 者で、それぞれ欲しいものが違います。</p>

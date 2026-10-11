@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>サーバーを待たずに手元で書き、後でサーバーの順序にそろえるローカルファーストの同期を、「収束する・ちょうど 1 回効く・見てよいものだけが端末に届く」の性質で確かめる手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>価値を「待たない（p99 50ms）・全員が同じものを見る（1 秒）・失わない（7 日のオフライン）」の数字に落とし、K1〜K8 で測る形（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/intent.md">intent.md</a>）</li>
+        <li>本家の文書がオフラインを「失敗への備え」とするのに対し、上書きの記録と 7 日のオフラインという強い保証をあえて目標にした判断（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/intent.md">intent.md</a>）</li>
+        <li>シミュレーター・遅延の CI・同期グループを、後から足せないものとして E1〜E3 の walking skeleton に入れる Epic の順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>ワークスペースごとにサーバーが全順序の <code>sync_id</code> を決め、クライアントは楽観的に当てて差分の上に載せ直す同期の型（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0002-sync-model.md">ADR-0002</a>）</li>
+        <li>非公開のチームのデータを端末の IndexedDB にも届けないため、読む権限を同期グループと 1 つの <code>can()</code> にまとめた設計（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0032-single-policy-module-and-group-mapping.md">ADR-0032</a>）</li>
+        <li>outbox だけを <code>strict</code> で書き、移行でも消さずに変更を失わない手元の保存（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0014-indexeddb-layout-durability-and-migrations.md">ADR-0014</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>本物の同期のコードを決定的なシミュレーターで PR ごとに 2,000、夜間に 20 万の列で回し、失敗したシードを回帰に残す方法（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0010-deterministic-sync-simulator.md">ADR-0010</a>）</li>
+        <li>収束・ちょうど 1 回・見てよい集合を、どんな出来事の列でも成り立つ性質 <code>PROP-*</code> として spec に先に書かせる関門（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/quality.md">quality.md</a>）</li>
+        <li>p99 50ms を固定の機械の CI で落とし、IME の組み立て中のキーを決定表 DT-APP-001 で確かめる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0055-ci-gates-latency-convergence-ime.md">ADR-0055</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>収束の監査の <code>unexplained</code>、outbox の喪失、非公開のチームの漏れを「1 件で呼び出し」にする SLO（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>大阪への切り替えで <code>sync_epoch</code> を上げ、権限を狭める操作を書き込みの前にやり直す DR（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/runbooks/disaster-recovery.md">disaster-recovery.md</a>）</li>
+        <li>同期の意味はフラグにせず、Web と Electron を端末の桶ごとに出し、<code>min_build</code> で古いクライアントを止める（<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0056-flags-client-distribution-and-min-build.md">ADR-0056</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Linear は何をするサービスか</h2>
     <p>Linear は、ソフトウェアのチームのための課題管理のツールです。開発者・PM・デザイナーが、やること（<a class="t" href="#g-issue">イシュー</a>）を登録し、状態を進め、期間（<a class="t" href="#g-cycle">サイクル</a>）や<a class="t" href="#g-project">プロジェクト</a>にまとめて計画します。本家の料金のページには「40,000 社以上」が使うとあります。</p>

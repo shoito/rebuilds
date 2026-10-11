@@ -34,6 +34,32 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>「1 台の車を 2 つの乗車に割り当てない」をデータベースで保証しつつ、道路運送法と運賃の認可という制度を設計に組み込む手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>白タクを設計せず、運送の主体をタクシー事業者に置く、という制度の線引きから範囲を決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a>）</li>
+        <li>法務の確認待ち L1〜L9 ごとに承認を止める spec を決め、該当の経路は法務の結論の記録の範囲でだけ本番で有効にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a>）</li>
+        <li>配車の計算を広げる判断は、再生・シミュレーション・影の実行の結果を見て PM が行い、エージェントに任せません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>乗車の状態と割り当てを変えるのは Trips の遷移関数だけにし、<code>assignment_epoch</code> と部分一意索引で割り当てを 1 つに限ります（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0021-trip-transition-function-and-assignment-fencing.md">ADR-0021</a>）</li>
+        <li>変動運賃は 10 円単位に丸めた後に認可の幅へ切り詰め、幅の外は計算を失敗させます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0020-dynamic-fares-within-authorized-bands.md">ADR-0020</a>）</li>
+        <li>legal のフラグは法務の記録の範囲の外では本番で有効にできず、緊急の入口にはフラグを置きません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md">ADR-0043</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>二重の割り当て・二重の請求・位置の漏洩を、並行・遅延・リージョンの切り替えの下で成り立つ性質で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/quality.md">quality.md</a>）</li>
+        <li>運賃のコードは直近 30 日の <code>fare-replay</code> で差 0、配車の計算は直近 7 日の再生と市場のシミュレーションを経て出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>SLO を都市ごとに持ち、二重の割り当てや台帳の釣り合いの失敗は SLO にせず、1 件で呼び出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>緊急の通報を 30 秒以内に担当が受けることを SLO にし、受けていない通報が 1 件あれば呼び出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>運賃の規則と legal のフラグの有効化を、デプロイと別の手順にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/runbooks/deploy-and-rollback.md">deploy-and-rollback.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Uber は何をするサービスか</h2>
     <p>Uber は、車に乗りたい人（乗客）と、近くを走っている車（ドライバー）を、その場で結びつける<strong>配車のマーケットプレイス</strong>です。乗客から見た 1 回の使われ方は、次のとおりです。</p>

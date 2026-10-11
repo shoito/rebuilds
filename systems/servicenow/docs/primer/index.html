@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>SLA の期限・承認・CI の識別・ACL の出口のように「0 件でなければならない」約束を、純粋な関数と 1 つのトランザクションで守る、記録の基盤の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「すぐに使える・コードなしで合わせられる・数え間違えない」の 3 つの価値を、SLA の期限が参照の実装と 1 秒も違わない、のような基準に落とす形（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a>）</li>
+        <li>内閣府の祝日の CSV の利用の条件や「ITIL」の商標まで、法務の確認待ちとして spec の承認を止める扱い（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/intent.md">intent.md</a>）</li>
+        <li>ACL の漏れ・承認なしの実施・重複の CI の「0 件の約束」を、先にテストにしてから機能を広げる Epic の順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>業務カレンダーを不変のバージョンにし、SLA の計時を半開区間の上の純粋な関数 2 つで行う設計（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0019-business-calendar-and-pure-time-functions.md">ADR-0019</a>）</li>
+        <li>読めないフィールドを NULL として扱い、フォームから集計・検索・通知まで 16 の出口で同じ ACL を効かせる（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/access-control.md">access-control.md</a>）</li>
+        <li>並行に届く取り込みでも CI を 1 つにする、項目ごとの 1 トランザクションの識別と候補の保留（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0037-ci-ingest-entry-point-and-ambiguity-hold.md">ADR-0037</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>カレンダー・祝日・夏時間・夜勤の組み合わせで、SLA の期限を参照の実装と比べる性質 PROP-SLA-001〜010（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/quality.md">quality.md</a>）</li>
+        <li>承認の二重の反映・遷移の欠落・タイマーの喪失を、障害注入で探す「1 回だけ」の試験（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/quality.md">quality.md</a>）</li>
+        <li>平日 9 時にタイマーが集中する山を再現する <code>timer-burst-load-test</code>（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/architecture/capacity.md">capacity.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>「期限を過ぎた未発火の違反 0 件」を 9 時の山でも守る SLO と、タイマーの遅れの手順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>内閣府の祝日の取り込みを、法の規則と突き合わせて運用者 2 人が承認して公開する定期作業（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0020-japanese-holiday-data.md">ADR-0020</a>）</li>
+        <li>自動の返信が往復し続けるメールのループを見つけて止める手順（<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>ServiceNow は何をするサービスか</h2>
     <p>ServiceNow は、企業の IT 部門が受ける<strong>障害の報告と依頼</strong>を 1 つの記録にまとめ、誰が・いつまでに・何をするかを管理する SaaS です。この分野を <a class="t" href="#g-itsm">ITSM</a>（IT サービス管理）と呼びます。</p>

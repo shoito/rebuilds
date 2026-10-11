@@ -34,6 +34,33 @@
     <p class="hint">→ キーで進む · Esc で資料表示</p>
   </section>
 
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>音声の途切れが 5xx にならず、悪い回線でしか見えない題材で、品質を回線の劣化の下の数値で決めて守る手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>「すぐ集まれる・遅れない・安全」を、遅れ p95 300ms、損失 20% で MOS 3.0、待合室もパスコードもない会議 0 件に落としています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/intent.md">intent.md</a>）</li>
+        <li>参加者・分あたりの配信の費用を成功の基準に入れ、届かない分を受け入れて Edge の構築を始める閾値を決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/intent.md">intent.md</a>）</li>
+        <li>社外へベータを出すのは、待合室・パスコード・参加の流量の制限と法務の確認がそろってから、と順序を決めています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/roadmap.md">roadmap.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>会議の状態は 1 つの Actor が持ち、リースと <code>epoch</code> で古い持ち主の操作を拒みます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0007-meeting-actor-lease-and-epoch.md">ADR-0007</a>）</li>
+        <li>Media Node が落ちたら予備の Node へ付け替え、音声を映像より先に戻します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0013-media-node-failover-and-reattach.md">ADR-0013</a>）</li>
+        <li>E2EE は主催者が会議ごとに選び、その会議では録画・字幕・電話を動かさない、と両立しない機能の線を引いています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0004-encryption-and-e2ee.md">ADR-0004</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>メディアに触れる PR は、netem のラボで損失と揺らぎの行列を通し、遅れと MOS の数値を PR に載せます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/quality.md">quality.md</a>）</li>
+        <li>「待合室もパスコードもない会議 0 件」を、会議を作る・設定を変えるすべての経路の性質にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/quality.md">quality.md</a>）</li>
+        <li>E2EE の約束を、SFrame・MLS の試験のベクトルと、録画・字幕が動かないことの拒否の試験で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>可用性に加えて「良い音声の分」「フリーズのない分」「付け替えの時間」を SLO にし、利用者の回線の悪さと分けて扱います（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+        <li>Media Node の障害の波、TURN の過負荷、メディアの IP への DDoS を、固有の場面として手順にしています（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/runbooks/incident-response.md">incident-response.md</a>）</li>
+        <li>配信の費用 K8 は SLO にせず毎月計算し、2 か月続けて超えたら PM と Dev に報告します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/runbooks/README.md">runbooks/README.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
   <section class="s" id="product">
     <h2>Zoom は何をするサービスか</h2>
     <p>Zoom Meetings は、離れた人どうしが音声・映像・画面共有で話すビデオ会議です。URL を開くと会議に入れ、主催者が参加者を管理します。社外の人も、アカウントなしでブラウザから入ります。</p>

@@ -71,6 +71,9 @@ for (const f of html) {
   if (!text.includes("gtag('config', 'G-LRH3HT8NDH')")) problems.push(`${f}:1: missing Google Analytics tag G-LRH3HT8NDH`);
   if (!/<link rel="icon" href="[^"]*favicon\.svg"/.test(text)) problems.push(`${f}:1: missing favicon link`);
   if (!text.includes('<meta property="og:site_name" content="rebuilds">')) problems.push(`${f}:1: missing og:site_name`);
+  if (/^systems\/[^/]+\/docs\/primer\/index\.html$/.test(f) && !text.includes('<section class="s" id="learn">')) {
+    problems.push(`${f}:1: missing the「この題材から学べること」section (id="learn", docs/primer/AUTHORING.md)`);
+  }
 }
 
 // 5. Wording rules that can be checked mechanically (AGENTS.md「言語」).
