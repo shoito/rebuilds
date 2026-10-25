@@ -11,7 +11,7 @@
 | [ADR-0028](../decisions/0028-encryption-and-key-management.md) | 暗号化と鍵管理 |
 | [ADR-0029](../decisions/0029-audit-log.md) | 監査ログ |
 | [ADR-0030](../decisions/0030-data-retention-and-deletion.md) | データの保持と削除、リポジトリの復元 |
-| [ADR-0037](../decisions/0037-import-from-other-hosts.md) | 他のホスティングからの取り込み（proposed） |
+| [ADR-0037](../decisions/0037-import-from-other-hosts.md) | 他のホスティングからの取り込み |
 | [ADR-0038](../decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照（proposed） |
 
 本家の数字と方針は、2026-09-26 に docs.github.com と GitHub のブログで確かめた。確かめられなかったものは「未検証」と書く。

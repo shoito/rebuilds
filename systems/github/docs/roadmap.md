@@ -179,7 +179,7 @@ MVP は E1〜E9。
 | `checks-and-statuses` | check run・check suite・commit status |
 | `token-leak-revocation` | 自社のトークンの走査と自動の失効、失効の API（security.md の 10 節） |
 | `public-sdk-and-cli` | 公式の TypeScript の SDK と CLI（ADR-0006 で本家の SDK をそのまま使わないため） |
-| `repository-import`（候補、MVP の後） | Git の URL からの取り込みと、移行のアーカイブからの Issue・PR の取り込み（ADR-0037、proposed）。範囲と Epic は PM の判断待ち |
+| `repository-import`（候補、MVP の後） | Git の URL からの取り込みと、移行のアーカイブからの Issue・PR の取り込み（ADR-0037）。範囲は 2026-10-25 に決定（MVP の後）。Epic は MVP の後の計画で決める |
 
 ### E8 Actions
 

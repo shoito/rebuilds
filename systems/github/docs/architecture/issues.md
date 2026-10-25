@@ -126,7 +126,7 @@ Issue、ラベル、マイルストーン、担当者、sub-issue と Issue の�
 
 ### 9.1 他のホスティングからの取り込み
 
-方針は [ADR-0037](../decisions/0037-import-from-other-hosts.md)（proposed）。提供するか、どの範囲かは PM の判断待ち（[intent.md](../intent.md) の未解決の問い）。推奨案は、MVP の後に、Git の URL からの取り込みと、決めた 1 つの形式の移行のアーカイブからの Issue・PR の取り込みを提供すること。
+方針は [ADR-0037](../decisions/0037-import-from-other-hosts.md)。2026-10-25 に PM が範囲を決めた。MVP の後に、Git の URL からの取り込みと、決めた 1 つの形式の移行のアーカイブからの Issue・PR の取り込みを提供する。
 
 - **空のリポジトリにだけ取り込む。** 元の番号のまま書き、終わったら `next_issue_number` を最大の番号の次に進める。欠番は欠番のまま残す（1 節の「再利用しない」を守る）。
 - **通知・Webhook・Actions を起こさない。** 取り込みの Worker は outbox に Event を積まず、取り込みの間はリポジトリの Actions を無効にする。検索の索引は終わってからまとめて作る。

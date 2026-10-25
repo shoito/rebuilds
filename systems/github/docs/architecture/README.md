@@ -204,7 +204,7 @@ flowchart LR
 | [0034](../decisions/0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く（proposed） |
 | [0035](../decisions/0035-web-rendering-ssr-streaming.md) | Web は React をサーバーでストリーム描画し、画面の単位でハイドレーションする |
 | [0036](../decisions/0036-own-runner-agent-and-no-original-components.md) | Actions のランナーのエージェントを自前で作り、本家の公開の部品を核に使わない |
-| [0037](../decisions/0037-import-from-other-hosts.md) | 他のホスティングからの取り込みは、空のリポジトリに元の番号のまま、通知・Webhook・Actions を起こさずに行う（proposed。範囲は PM の判断待ち） |
+| [0037](../decisions/0037-import-from-other-hosts.md) | 他のホスティングからの取り込みは、空のリポジトリに元の番号のまま、通知・Webhook・Actions を起こさずに行う。MVP の後に提供する |
 | [0038](../decisions/0038-operator-access.md) | 運用者は常設で非公開の中身を読めず、DB・ストレージのノードは期限つきの権限、中身の参照は持ち主の同意で行う（proposed） |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前を使わない識別子、本家の実装を核に使わないこと）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。特に [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)：振る舞いは本家に寄せるが、ヘッダー・トークンの接頭辞・ドメイン・環境変数・パスの本家の名前は使わず、`<Brand>`・`<brand>`・`<BRAND>` の置き換え用の名前で書く（例：`X-<Brand>-Api-Version`、`X-<Brand>-Signature-256`、`<brand>p_...`、`<brand>usercontent.<domain>`、`<BRAND>_TOKEN`、`.<brand>/workflows/`）。

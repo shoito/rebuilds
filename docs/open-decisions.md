@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| github | [ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 他のホスティングからのリポジトリと Issue の取り込み | 2026-10-10 |
 | github | [ADR-0038](../systems/github/docs/decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 | 2026-10-10 |
 | notion | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの権利（entitlements）として持つ | 2026-10-10 |
 | salesforce | [ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | 2026-10-10 |
@@ -75,7 +74,7 @@
 | --- | --- | --- | --- | --- | --- |
 | PM-001 | Slack | 他のチャットツールからの取り込み（移行）を提供するか、どの範囲か | 本家のエクスポートのパブリックチャンネルを MVP の後に取り込む | [intent.md](../systems/slack/docs/intent.md)、[ADR-0034](../systems/slack/docs/decisions/0034-workspace-import-from-other-tools.md) | 待ち |
 | PM-002 | Stripe | 他の決済事業者とのカード番号の移行を提供するか | 取り込みと書き出しの両方を、MVP の後に運用者の仲介で | [intent.md](../systems/stripe/docs/intent.md)、[ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 待ち |
-| PM-003 | GitHub | 他のホスティングからのリポジトリと Issue の取り込みを提供するか | Git に加えて、決めた 1 つの形式のアーカイブから Issue と PR を MVP の後に | [intent.md](../systems/github/docs/intent.md)、[ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 待ち |
+| PM-003 | GitHub | 他のホスティングからのリポジトリと Issue の取り込みを提供するか | Git に加えて、決めた 1 つの形式のアーカイブから Issue と PR を MVP の後に | [intent.md](../systems/github/docs/intent.md)、[ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 解決（2026-10-25：Git と Issue・PR を MVP の後に） |
 | PM-004 | Salesforce | Web からのリードのフォームを MVP に入れるか | E5 に入れる | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | 待ち |
 | PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 待ち |
 | PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 解決（2026-10-25：両方を MVP に。費用は GA では数えない） |
