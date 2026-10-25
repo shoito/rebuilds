@@ -124,12 +124,12 @@ stateDiagram-v2
 
 1. **冪等と排他**：`Idempotency-Key` を確かめる（[ADR-0004](../decisions/0004-idempotency.md)）。PaymentIntent の行を `SELECT ... FOR UPDATE` で取り、状態が confirm を受け付けるかを表で確かめる。受け付けなければ 400（`payment_intent_unexpected_state`）。
 2. **検証**：金額と通貨（10 節）、決済手段の種類が `payment_method_types` に含まれるか、PaymentMethod が同じ加盟店・同じ Customer のものか。
-3. **不正検知**：[fraud.md](fraud.md) のルールで、許可・拒否・3DS を要求のいずれかを決める。
+3. **不正検知（段 1）**：[fraud.md](fraud.md) の段 1 で、3DS を要求するかを決める。拒否の判定は、3DS の結果を使えるように手順 6 の後（段 2）と、手順 8 の前（段 3）で行う（fraud.md の 2 節）。
 4. **試行を作る**：Charge を `pending_send` で INSERT し、コネクタの参照番号を割り当てる。ここでコミットする（送信の前に記録を残す。7 節）。
 5. **振り分け**：どのコネクタに送るかを決める（8 節）。
-6. **3D セキュア**（カード）：6 節。チャレンジが要れば `requires_action` を返して終わる。認証の完了後にオーソリへ進む。
+6. **3D セキュア**（カード）：6 節。チャレンジが要れば `requires_action` を返して終わる。認証の完了後、不正検知の段 2（拒否の判定。3DS の結果も使う）を行い、`block` なら Charge を失敗にしてコネクタへ送らずに返す（`outcome.type = blocked`）。それ以外はオーソリへ進む。
 7. **オーソリ**：Connector Gateway（CDE）へ、PaymentMethod のトークンと参照番号で要求する。
-8. **結果の反映**：結果に応じて 3.1 節の表で遷移し、仕訳を書き、outbox に Event を積む（[events-and-webhooks.md](events-and-webhooks.md)）。すべて 1 トランザクション。
+8. **結果の反映**：承認なら、まず不正検知の段 3（発行会社の CVC・住所の照合の結果を使うルール）を行い、`block` ならオーソリを取り消す（void）。結果に応じて 3.1 節の表で遷移し、仕訳を書き、outbox に Event を積む（[events-and-webhooks.md](events-and-webhooks.md)）。すべて 1 トランザクション。
 
 次の図は、カードの確定の流れを手順の番号で示す。3D セキュアのチャレンジの後の流れは 6.2 節の図にある。
 
@@ -144,8 +144,8 @@ sequenceDiagram
     M->>API: confirm（Idempotency-Key）
     Note over API: 1. 冪等の確認、PaymentIntent を FOR UPDATE<br/>受け付けない状態なら 400
     Note over API: 2. 金額・通貨・決済手段の検証
-    API->>F: 3. ルールの評価
-    F-->>API: 許可・拒否・3DS を要求
+    API->>F: 3. 段 1 のルールの評価
+    F-->>API: 3DS の要否
     Note over API: 4. Charge を pending_send で INSERT し、コミット<br/>5. 振り分け（コネクタを決める）
     opt 6. 3D セキュア（6 節）
         API->>CDE: 認証の開始
@@ -154,12 +154,15 @@ sequenceDiagram
         CDE-->>API: 結果
         Note over API: チャレンジが要れば requires_action を返して終わる
     end
+    API->>F: 段 2：拒否の判定（3DS の結果も使う）
+    F-->>API: allow・block・review
+    Note over API: block なら Charge を失敗にし、コネクタへ送らずに返す
     API->>CDE: 7. オーソリ（トークン・参照番号）
     CDE->>C: オーソリ
     alt connector.authorize_timeout（既定 20 秒）以内に応答
         C-->>CDE: 承認・拒否
         CDE-->>API: 結果（カード番号を含めない）
-        Note over API: 8. 遷移・仕訳・outbox の Event を 1 トランザクションで書く
+        Note over API: 8. 段 3 の判定（block ならオーソリを取り消す）<br/>遷移・仕訳・outbox の Event を 1 トランザクションで書く
         API-->>M: 結果の PaymentIntent
     else 上限を超えた
         API-->>M: processing（結果は Webhook で知らせる。7 節）
