@@ -25,7 +25,7 @@ description: rebuilds で ADR（設計の決定の記録）を起票・更新す
 
 ## 判断をエージェントが決めないもの
 
-次のどれかに当たるときは、ADR に選択肢と推奨を書いたうえで、その題材の `intent.md` の Open questions に「PM の判断待ち」として 1 項目足す。
+次のどれかに当たるときは、ADR に選択肢と推奨を書いたうえで、その題材の `intent.md` の Open questions に「PM の判断待ち」として 1 項目足し、`docs/open-decisions.md` の 3 節にも行を足す。
 
 - MVP の範囲に入れるか（本家からの移行、データの書き出し、新しい言語など）
 - 法令の解釈。枠組みだけを書き、結論を書かない。「法務の確認待ち」とし、intent の L 番号の末尾に足す。
@@ -39,7 +39,8 @@ description: rebuilds で ADR（設計の決定の記録）を起票・更新す
 
 ```bash
 npm run adr-index
+npm run open-decisions
 npm run check
 ```
 
-一覧（`decisions/README.md`）は手で編集しない。`npm run adr-index` が各 ADR の frontmatter と見出しから生成する。題材の `architecture/README.md` の 5 節（主な決定）に載せるかは、その表の前書きに従う（「どれも accepted」とある表には proposed を載せない）。
+一覧（`decisions/README.md`）と、`docs/open-decisions.md` の承認待ちの表は手で編集しない。`accepted` にしたら `npm run open-decisions` で表から消え、`docs/open-decisions.md` の 5 節に、合わせて直す箇所が残っていないかを見る。`npm run adr-index` が各 ADR の frontmatter と見出しから生成する。題材の `architecture/README.md` の 5 節（主な決定）に載せるかは、その表の前書きに従う（「どれも accepted」とある表には proposed を載せない）。

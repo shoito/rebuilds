@@ -13,6 +13,7 @@
 - 入口：<https://shoito.github.io/rebuilds/>
 - 共通の前提知識：[docs/primer/index.html](docs/primer/index.html)
 - 書き方：[docs/primer/AUTHORING.md](docs/primer/AUTHORING.md)
+- 人の判断を待っているもの（承認待ちの ADR、PM・法務の判断待ち、文書の食い違い）：[docs/open-decisions.md](docs/open-decisions.md)
 - AI エージェントを主な作り手にする設計の、題材をまたいだまとめ：[docs/agents.md](docs/agents.md)（任せないこと、誤りを止める仕組み、確認ループと eval、技術の選定）
 - テーマ別の索引と読む順の道筋：[docs/patterns.md](docs/patterns.md)（台帳、ステートマシン、ファンアウト、同期など、どの題材から読むか）
 
@@ -57,6 +58,7 @@
 │   ├── process.md             # 開発プロセス（方法論）の定義
 │   ├── patterns.md            # 題材をまたぐパターンの索引と読む順
 │   ├── agents.md              # AI エージェントの観点の、題材をまたいだまとめ
+│   ├── open-decisions.md      # 保留中の判断と食い違いの一覧
 │   ├── project-management.md  # GitHub での回し方
 │   ├── templates/             # 各成果物のテンプレート
 │   ├── primer/                # 共通の前提知識の資料と、資料の CSS・JS

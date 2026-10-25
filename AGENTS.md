@@ -35,6 +35,7 @@
 
 - 文書を変えたら、作業の終わりに `npm run check` を通す（初回は `npm ci`）。Mermaid の構文、相対リンク、ADR の番号・見出し・一覧、公開する HTML のタグ、表記を確かめる。ADR の一覧は `npm run adr-index` で生成し、手で編集しない。
 - `.claude/settings.json` のフックが、編集したファイルと、作業の終わりに変わったファイルへ同じ検査をかける。
+- 文書の食い違い（本文と表、文書と文書）を見つけたら、直さずに [docs/open-decisions.md](docs/open-decisions.md) の 4 節に行を足す。範囲の判断を PM に委ねたら 3 節に足す。会話や報告にだけ書いて終わりにしない。
 - 繰り返す作業は `.claude/skills/` の Skill に従う：新しい題材（`new-subject`）、ADR の起票（`adr`）、題材を横断した見直し（`design-review`）。
 
 ## 言語

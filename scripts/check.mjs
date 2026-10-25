@@ -6,6 +6,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { adrIndexProblems } from './adr-index.mjs';
+import { openDecisionsProblems } from './open-decisions.mjs';
 import { ADR_FILE, adrTitle, frontmatter, lineOf, listFiles, read, root } from './lib.mjs';
 
 const args = process.argv.slice(2);
@@ -63,6 +64,11 @@ for (const f of all.filter((x) => ADR_FILE.test(x))) {
 // 3. ADR indexes are generated from the ADRs.
 if (!only || md.some((f) => ADR_FILE.test(f) || f.endsWith('decisions/README.md'))) {
   problems.push(...adrIndexProblems());
+}
+
+// 3b. The generated tables in docs/open-decisions.md follow the ADRs and intents.
+if (!only || md.some((f) => ADR_FILE.test(f) || f === 'docs/open-decisions.md' || f.endsWith('/intent.md'))) {
+  problems.push(...openDecisionsProblems());
 }
 
 // 4. Published HTML: GA tag, favicon, site name (AGENTS.md, docs/primer/AUTHORING.md).

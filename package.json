@@ -9,7 +9,8 @@
   "scripts": {
     "check": "node scripts/check.mjs",
     "check:fast": "node scripts/check.mjs --no-mermaid",
-    "adr-index": "node scripts/adr-index.mjs"
+    "adr-index": "node scripts/adr-index.mjs",
+    "open-decisions": "node scripts/open-decisions.mjs"
   },
   "devDependencies": {
     "mermaid": "11.17.2",

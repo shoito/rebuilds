@@ -28,6 +28,8 @@ Rules:
 Report back (Japanese, concise): files changed and what was added (file:section); discrepancies found but not fixed (file:line); anything skipped and why.
 ```
 
+サブエージェントは `docs/open-decisions.md` を編集しない（並行して同じファイルを書くと衝突する）。報告された食い違いと PM の判断待ちは、まとめ役が確かめてから 4 節と 3 節に行を足す。
+
 ## 作業ごとに足す指示
 
 ### 領域の文書を書く（工程 2）
