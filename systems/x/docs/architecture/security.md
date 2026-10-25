@@ -268,7 +268,7 @@ flowchart TD
 
 ### 7.5 本人のデータの書き出しと開示の求め
 
-[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)。入れ物（重い操作の確かめ、`data_export_requests`、`exports` のバケット）は [accounts-and-auth.md](accounts-and-auth.md) の 5.4 節と [data-model/users-and-accounts.md](data-model/users-and-accounts.md) の 4.5 節にある。ここでは中身と、法令の開示の求めとの分け方を決める。**書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）、**法令の解釈は法務の確認待ち（L12）**。
+[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)。入れ物（重い操作の確かめ、`data_export_requests`、`exports` のバケット）は [accounts-and-auth.md](accounts-and-auth.md) の 5.4 節と [data-model/users-and-accounts.md](data-model/users-and-accounts.md) の 4.5 節にある。ここでは中身と、法令の開示の求めとの分け方を決める。書き出しは MVP（E14）に入れる（2026-10-25 の PM の判断）。**法令の解釈は法務の確認待ち（L12）**。
 
 - **目録**：本人に結び付く表・置き場所ごとに「入れる」「入れない（理由）」「法務の確認待ち（`release.export.<種類>` で止める）」を `packages/export` の 1 か所に書く。本人だけの表の一覧（9 節の最後）と目録の突き合わせを CI に置く。
 
