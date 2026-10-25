@@ -68,7 +68,7 @@ Web のプレイヤーと視聴のページは WCAG 2.2 の AA を受け入れ�
 - **字幕の表示**：字幕のトラック（[transcoding-pipeline.md](transcoding-pipeline.md) の 8 節）を言語と種類（手動・自動）で選べ、自動の字幕は名前に「自動生成」と出す。文字の大きさ・色・背景・不透明度を変えられ、Android・iOS は OS の字幕の設定（Android の字幕の設定、iOS のメディアアクセシビリティ）を既定に使う。Web は視聴者の設定に持つ。広告の字幕は、VAST に字幕があるときだけ出す。
 - **字幕の質の線**：手動の字幕は時刻と文字が変換の前後で一致すること（[quality.md](../quality.md) の 2.2.1 節 A）。自動の字幕を既定で表示する（視聴者が選ばなくても出す）かどうかの文字の誤りの率の線は、`asr-engine-poc` の評価の集まりの結果で QA と PM が決める。線に届かない言語・動画では、自動の字幕を選べるが既定で出さない。ライブの字幕（自動は E18）は MVP では持たず、ライブのアクセシビリティは MVP の欠けとして残る。
 - **動き**：「次の動画」の自動の再生と、サムネイルに乗せたときの試しの再生は、`prefers-reduced-motion` と OS の「視差効果を減らす」の設定で既定を切にし、視聴者の設定で変えられる。
-- **音声解説**：パッケージは 1 動画に音声 4 本まで持てる（[packaging-and-drm.md](packaging-and-drm.md) の上限）。音声解説のトラック（DASH の `Role` の `description`、HLS の `CHARACTERISTICS` の `public.accessibility.describes-video`）の受け付けと選択は MVP の後の候補にする（[roadmap.md](../roadmap.md) の延期の一覧。範囲は PM が決める）。MVP では、プレイヤーが複数の音声のトラックを選べる形にしておく。
+- **音声解説**：パッケージは 1 動画に音声 4 本まで持てる（[packaging-and-drm.md](packaging-and-drm.md) の上限）。音声解説のトラック（DASH の `Role` の `description`、HLS の `CHARACTERISTICS` の `public.accessibility.describes-video`）の受け付けと選択は MVP の後の候補にする（[roadmap.md](../roadmap.md) の延期の一覧。2026-10-25 に PM が決めた）。MVP では、プレイヤーが複数の音声のトラックを選べる形にしておく。
 
 ## 4. 再生の API とトークン（ADR-0023）
 

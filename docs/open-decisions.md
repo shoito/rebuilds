@@ -73,7 +73,7 @@
 | PM-010 | Uber | 訪日の旅行者を MVP の対象にするか（アプリの言語） | 日本語と英語と、人が訳した定型文 | [intent.md](../systems/uber/docs/intent.md)、[ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | 解決（2026-10-25：日本語と英語と定型文） |
 | PM-011 | Figma | 英語の UI を利用者に出す時期 | MVP は日本語だけ、英語は後から（仕組みは最初から両方） | [intent.md](../systems/figma/docs/intent.md)、[editor-and-tools.md](../systems/figma/docs/architecture/editor-and-tools.md) | 解決（2026-10-25：MVP から日本語と英語。推奨と違う判断） |
 | PM-013 | Notion | 1 ファイルの大きさの上限（`limit.file.bytes`）の値 | 価格の設計の中で決める。本家の値は未確認 | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | 待ち |
-| PM-012 | YouTube | 音声解説を入れる時期 | MVP の後の候補 | [roadmap.md](../systems/youtube/docs/roadmap.md) | 待ち |
+| PM-012 | YouTube | 音声解説を入れる時期 | MVP の後の候補 | [roadmap.md](../systems/youtube/docs/roadmap.md) | 解決（2026-10-25：MVP の後の候補のまま） |
 
 ## 4. 文書の食い違い
 
