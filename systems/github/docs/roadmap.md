@@ -232,7 +232,7 @@ MVP は E1〜E9。
 | `legal-takedown-and-disclosure` | DMCA・発信者情報開示・制裁の手順 |
 | `legal-review-before-launch` | DMCA の通知の公開、利用規約（リージョンの障害での push の喪失）の法務の確認 |
 | `external-pentest` | 一般公開の前のペンテスト |
-| `operator-jit-access` | 運用者の期限つきの権限、持ち主の同意による非公開のリポジトリの参照、運用者の画面の記録（ADR-0038、proposed） |
+| `operator-jit-access` | 運用者の期限つきの権限、持ち主の同意による非公開のリポジトリの参照、運用者の画面の記録（ADR-0038） |
 | `runbooks-completion` | [runbooks/README.md](runbooks/README.md) の 4 節の手順をそろえる |
 
 ### E10 S2 への拡張

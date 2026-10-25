@@ -78,7 +78,7 @@ RLS は使わない。持ち主（ユーザー・Organization）は「テナン�
 | R | リポジトリのデータ。`repo_id` を持つ | `can(actor, <権限>, repo)`。一覧は `accessPredicate(actor)` を `WHERE` に入れて前段で絞る |
 | A | 権限の材料（コラボレーター、チーム、所属など） | `packages/authz` の中からだけ読む。他のパッケージからの読み取りを lint で禁止する |
 | O | Organization・持ち主の設定 | 持ち主（Organization の owner、個人は本人）の判定を通す |
-| U | 利用者の個人のデータ | 本人だけ。運用者は break-glass |
+| U | 利用者の個人のデータ | 本人だけ。運用者は期限つきの権限（JIT）で、承認と記録を残して読む（[ADR-0038](../decisions/0038-operator-access.md)） |
 | S | システムの内部（ルーティング、キュー、キャッシュの状態） | サービスのロールだけ。利用者の要求は、判定を通った上位の資源を経てだけ届く |
 | P | 運用者（監査、削除、措置） | 運用者のロール。操作は `platform_audit_events` に残す |
 

@@ -12,7 +12,7 @@
 | [ADR-0029](../decisions/0029-audit-log.md) | 監査ログ |
 | [ADR-0030](../decisions/0030-data-retention-and-deletion.md) | データの保持と削除、リポジトリの復元 |
 | [ADR-0037](../decisions/0037-import-from-other-hosts.md) | 他のホスティングからの取り込み |
-| [ADR-0038](../decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照（proposed） |
+| [ADR-0038](../decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 |
 
 本家の数字と方針は、2026-09-26 に docs.github.com と GitHub のブログで確かめた。確かめられなかったものは「未検証」と書く。
 
@@ -180,7 +180,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 ### 4.1 運用者のアクセス
 
-方針は [ADR-0038](../decisions/0038-operator-access.md)（proposed）。Auth0 の [ADR-0056](../../../auth0/docs/decisions/0056-operator-access.md) と同じ形にした。
+方針は [ADR-0038](../decisions/0038-operator-access.md)。Auth0 の [ADR-0056](../../../auth0/docs/decisions/0056-operator-access.md) と同じ形にした。
 
 | 区分 | 中身 | 承認 |
 | --- | --- | --- |

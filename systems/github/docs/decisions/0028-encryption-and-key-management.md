@@ -92,6 +92,8 @@ GitHub の保存するデータは、性質の違う 3 つの層に分かれる�
   - Secrets service と KMS が、Actions の起動の経路に入る。可用性を Actions と同じ水準で持つ。
   - ストレージのノードに入れる運用者は、平文の Git の中身を読める。break-glass と監査で守る。
 
+    > 2026-10-25 の注記：ストレージのノードへのシェルは、[ADR-0038](0038-operator-access.md) の期限つきの権限（Ops の責任者と Dev のテックリードの 2 人の承認、SSM Session Manager の入出力の記録）で得る。ここでの break-glass はその手順を指す。
+
 ## Confirmation
 
 - IaC の検査：CMK 以外で暗号化された（または暗号化されていない）S3・Aurora・EBS・SQS・ログ・検索のクラスタがあれば失敗させる。

@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| github | [ADR-0038](../systems/github/docs/decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 | 2026-10-10 |
 | notion | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの権利（entitlements）として持つ | 2026-10-10 |
 | salesforce | [ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | 2026-10-10 |
 | salesforce | [ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 本家からの移行の経路 | 2026-10-10 |
@@ -119,7 +118,7 @@
 | --- | --- | --- | --- |
 | FOL-001 | Slack ADR-0035（運用者のアクセス） | ADR-0009 のロールの表に `ops_read` を足す。infrastructure.md 1 節の「本番への書き込み権限は Ops のグループだけに与え」を JIT の形に | 待ち |
 | FOL-002 | Stripe ADR-0035（CDE の外の運用者のアクセス） | JIT の仕組みの選定（ADR-0020 の注記、E10 の PoC）と揃える | 待ち |
-| FOL-003 | GitHub ADR-0038（運用者のアクセス） | data-model.md 2.3 節（「運用者は break-glass」）、ADR-0028・0031 の書き方を JIT の形に | 待ち |
+| FOL-003 | GitHub ADR-0038（運用者のアクセス） | data-model.md 2.3 節（「運用者は break-glass」）、ADR-0028・0031 の書き方を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
 | FOL-004 | Notion ADR-0034（プランと権利） | data-model/global.md の権利の名前（`guest_limit` など）、api-and-integrations.md 5 節の 600 回の対象の書き方 | 待ち |
 | FOL-005 | Salesforce ADR-0064（Web からのリードのフォーム） | orgs-users-and-auth.md（ログインできないフォームの利用者、`set_audit_fields_on_import`）、governor-limits.md（`alloc.web_form_submissions`）、automation-flows.md（`$Origin` の `web_form`）、infrastructure.md（`forms.` のホスト） | 待ち |
 | FOL-006 | Datadog ADR-0068（他の道具からの移行） | monitors-and-alerting.md に、取り込んだモニターと移行の待ちのダウンタイムを書く（変換器を作る E17 の後で足りる） | 待ち（ADR は 2026-10-25 に承認） |
