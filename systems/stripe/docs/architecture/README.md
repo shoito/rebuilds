@@ -224,7 +224,7 @@ flowchart TB
 | [0032](../decisions/0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから加盟店単位のカナリアで広げる |
 | [0033](../decisions/0033-cde-pipeline-and-change-control.md) | CDE のコードは `cde/` に置き、ビルド・デプロイの経路と承認を本体から分ける |
 | [0034](../decisions/0034-card-data-migration.md) | 他の事業者とのカード番号の移行は、cde-live の SFTP でのファイルの受け渡しで行う。E10 の後に提供する（法令は L9） |
-| [0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外も DB・シェルは JIT。運用者の画面は役割で絞り、閲覧を加盟店に見せる。なりすましの機能を作らない（proposed） |
+| [0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外も DB・シェルは JIT。加盟店のデータの閲覧は加盟店の許可を前提にし、審査・不正・Dispute・照合は案件の ID で例外にする。閲覧はすべて加盟店に見せる。なりすましの機能を作らない |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞を使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
