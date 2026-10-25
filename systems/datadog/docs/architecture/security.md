@@ -332,7 +332,7 @@ ADR-0058。
 | E8 | `egress-ssrf-guard` | 3.5 節（notifications-and-integrations と共同） |
 | E11 | `support-access-grants` | 8 節のサポートの許可の画面と監査 |
 | E13 | `tenant-purge` | 5.3 節。猶予と期限は法務：L5・L7 |
-| E13 | `org-data-export` | 5.6 節の設定の束とテレメトリーの書き出し（[ADR-0067](../decisions/0067-org-data-export.md)、proposed）。テレメトリーを MVP に入れるかは PM の判断。猶予の約束は法務：L5・L7 |
+| E13 | `org-data-export` | 5.6 節の設定の束とテレメトリーの書き出し（[ADR-0067](../decisions/0067-org-data-export.md)）。設定とテレメトリーの両方を MVP に入れる（2026-10-25 の PM の判断）。猶予の約束は法務：L5・L7 |
 | E13 | `legal-hold` | 5.5 節。範囲は法務：L6 |
 | E13 | `pentest-external` | 9 節 |
 

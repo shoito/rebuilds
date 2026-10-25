@@ -81,7 +81,7 @@ ADR-0051。
 | トレース | `apm.data.read`、`apm.retention.write`（テールサンプリングの規則） |
 | モニター | `monitors.read`、`monitors.write`、`monitors.downtime.write` |
 | ダッシュボード・SLO・インシデント | `dashboards.read`、`dashboards.write`、`dashboards.share`、`slos.read`、`slos.write`、`incidents.read`、`incidents.write` |
-| 組織 | `org.users.write`、`org.teams.write`、`org.roles.write`、`org.sso.write`、`org.data_access.write`、`org.intake_keys.write`、`org.app_keys.write_own`、`org.app_keys.write_all`、`org.service_accounts.write`、`org.children.write`、`org.data_export.write`（組織のデータの書き出し。[security.md](security.md) の 5.6 節、ADR-0067 は proposed） |
+| 組織 | `org.users.write`、`org.teams.write`、`org.roles.write`、`org.sso.write`、`org.data_access.write`、`org.intake_keys.write`、`org.app_keys.write_own`、`org.app_keys.write_all`、`org.service_accounts.write`、`org.children.write`、`org.data_export.write`（組織のデータの書き出し。[security.md](security.md) の 5.6 節、[ADR-0067](../decisions/0067-org-data-export.md)） |
 | 監査・利用量 | `audit.read`、`usage.read`、`usage.billing.read` |
 
 ### 5.2 管理の役割
