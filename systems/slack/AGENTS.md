@@ -32,4 +32,4 @@ Slack の再構築。リポジトリ共通のルールはルートの [AGENTS.md
 
 ## このリポジトリ（rebuilds）での規則
 
-- ADR を追加・更新したら、`docs/decisions/README.md` の一覧を生成し直す。生成と差分の検査は、rebuilds の CI（これから用意する）で行う。
+- ADR を追加・更新したら、`docs/decisions/README.md` の一覧を生成し直す。生成は `npm run adr-index`、差分の検査は `npm run check` と rebuilds の CI（`docs-check`）で行う。
