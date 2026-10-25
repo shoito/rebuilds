@@ -297,7 +297,7 @@ MVP（E3）は独自の CSV の形での 4 種類の取り込みと、検証だ�
 - **元の型**：列の対応と値の変換の式。式は運送会社の型（[ADR-0042](../decisions/0042-carrier-integration-profiles.md)）の式を使い回す。各基盤の書き出しの形は**未検証**で、型を作る Story で確かめる。
 - **個人のデータ**：顧客と過去の注文の CSV と結果の CSV は「買い手の個人」の区分（[ADR-0068](../decisions/0068-data-classes-retention-and-operator-access.md)）。30 日で消す（`retention_policies`）。ログには行の番号と理由のコードだけを書く。
 - **権限**：種類ごとに既存の権限（[merchant-admin-and-staff.md](merchant-admin-and-staff.md) の 5.1 節）で絞り、実行ごとに監査ログに残す。
-- 過去の注文の記録の保存の義務と、取り込んだ顧客の同意の記録の引き継ぎは**法務の確認待ち：L11**。確認まで `customer-and-order-migration` の spec を承認しない。
+- 過去の注文の記録の保存の義務と、取り込んだ顧客の同意の記録の引き継ぎは**法務の確認待ち：L11**。確認まで、`migration-import` のうち顧客と過去の注文の部分の spec を承認しない。
 
 ## 12. カタログの変更の事象
 
