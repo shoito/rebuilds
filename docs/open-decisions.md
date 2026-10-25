@@ -82,7 +82,7 @@
 | ID | 題材 | 場所 | 食い違い | 確認先 | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | DOC-001 | Stripe | [payments.md](../systems/stripe/docs/architecture/payments.md) 4 節、[fraud.md](../systems/stripe/docs/architecture/fraud.md) 2 節 | 不正検知で拒否する時点が違う。payments.md は手順 3 で「許可・拒否・3DS を要求」を返し、fraud.md は段 2（block）を 3DS の後・オーソリの前に評価する | Dev | 解決（2026-10-25：fraud.md に揃え、payments.md の手順と図を 3 段にした） |
-| DOC-002 | Stripe | [payments.md](../systems/stripe/docs/architecture/payments.md) 3.1 節・3.3 節 | 3.3 節の `requires_payment_method → requires_confirmation`（決済の手段を付ける）が、3.1 節の遷移の表にない | Dev | 待ち |
+| DOC-002 | Stripe | [payments.md](../systems/stripe/docs/architecture/payments.md) 3.1 節・3.3 節 | 3.3 節の `requires_payment_method → requires_confirmation`（決済の手段を付ける）が、3.1 節の遷移の表にない | Dev | 解決（2026-10-25：3.3 節の 2 つの遷移を表と図に足し、不正検知の拒否の行を 3 段に合わせた） |
 | DOC-003 | Stripe | [payments.md](../systems/stripe/docs/architecture/payments.md) 7.2〜7.3 節、10.2 節 | `failed_before_send` に入る元と、`captured → partially_refunded → refunded` の条件が書かれていない。コンビニ・銀行振込の返金で、口座情報がないことと残高不足のどちらを先に判定するかが書かれていない | Dev、QA | 待ち |
 | DOC-004 | GitHub | [pull-requests.md](../systems/github/docs/architecture/pull-requests.md) 3.3 節 | `mergeable_state` の 7 つの値のうち、判定が書いてあるのは `behind` だけ。ほかの値の判定と順序がない。決定表にすることを勧める | Dev、QA | 待ち |
 | DOC-005 | GitHub | [actions.md](../systems/github/docs/architecture/actions.md) 4.2 節 | ジョブの遷移の表に `waiting → completed(failure)`（否認・期限切れ）と `created → skipped`（needs の失敗・if が偽）がない。図には残した | Dev | 待ち |

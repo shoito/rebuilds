@@ -46,14 +46,14 @@ stateDiagram-v2
     rpm --> rc : 更新で payment_method を付ける（3.3 節）
     rpm --> attempt : confirm
     rc --> attempt : confirm
-    rc --> rpm : confirm を不正検知が拒否
+    ra --> rc : 更新で金額か決済手段を変える（3.3 節）
     attempt --> ra : 3DS のチャレンジ<br/>支払い番号・振込先の発行
     ra --> attempt : 3DS 成功
     ra --> rpm : 3DS 失敗・放棄<br/>コンビニの期限切れ
     ra --> succ : コンビニの入金の速報<br/>銀行振込の充当で残りが 0
     attempt --> rcap : オーソリ承認（manual）
     attempt --> succ : オーソリ承認（automatic・automatic_async）
-    attempt --> rpm : オーソリ拒否
+    attempt --> rpm : オーソリ拒否<br/>不正検知の段 2・段 3 が拒否
     attempt --> proc : コネクタの結果不明
     proc --> rcap : 照会で承認と判明（manual）
     proc --> succ : 照会で承認と判明（automatic 系）
@@ -76,8 +76,10 @@ stateDiagram-v2
 | --- | --- | --- | --- | --- |
 | （なし） | 作成 | `payment_method` なし | `requires_payment_method` | なし |
 | （なし） | 作成 | `payment_method` あり、`confirm` なし | `requires_confirmation` | なし |
-| （なし）・`requires_payment_method`・`requires_confirmation` | confirm | 決済手段と金額の検証に通り、不正検知が拒否しない | 試行（Charge）を作り、4 節の流れへ | なし |
-| 同上 | confirm | 不正検知のルールが拒否 | `requires_payment_method`（`last_payment_error.decline_code = fraudulent` だが、顧客には `generic_decline` を見せる） | なし |
+| `requires_payment_method` | 更新 | `payment_method` を付ける（3.3 節） | `requires_confirmation` | なし |
+| `requires_action` | 更新 | 金額か決済手段を変える（3.3 節）。進行中の試行（3DS・支払い番号）を無効にする | 決済手段があれば `requires_confirmation`、なければ `requires_payment_method` | なし |
+| （なし）・`requires_payment_method`・`requires_confirmation` | confirm | 決済手段と金額の検証に通る | 試行（Charge）を作り、4 節の流れへ | なし |
+| 試行中 | 不正検知の段 2（3DS の後・オーソリの前）か段 3（オーソリの後）が拒否 | 段 3 はオーソリを取り消す（void） | `requires_payment_method`（`last_payment_error.decline_code = fraudulent` だが、顧客には `generic_decline` を見せる） | なし |
 | 試行中 | 3DS が必要（チャレンジ） | カード | `requires_action`（`next_action.type = use_<brand>_sdk` か `redirect_to_url`） | なし |
 | 試行中 | コンビニ・銀行振込の確定 | 支払い番号・振込先の発行に成功 | `requires_action`（`konbini_display_details` / `display_bank_transfer_instructions`） | なし |
 | `requires_action`（3DS） | 3DS 成功・frictionless | | オーソリへ進む（試行中） | なし |
