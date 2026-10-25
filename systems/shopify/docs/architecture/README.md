@@ -298,7 +298,6 @@ flowchart TB
 | --- | --- |
 | 法務の確認待ち（L1〜L11） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
 | 外貨の通貨を MVP の GA の範囲に含めるか（仮の決定は [design-log.md](design-log.md) の「2026-10-10：統合」） | PM |
-| 他の EC の基盤からの移行（商品・顧客・過去の注文・リダイレクト）を MVP に含めるか、どの元の基盤を受けるか（形は [ADR-0077](../decisions/0077-migration-import-from-other-platforms.md)、proposed） | PM。顧客と過去の注文は法務の確認待ち（L11） |
 | 返金の税の方式（`independent`・`recompute`）、返還インボイスの記載 | 法務の確認待ち（L4） |
 | 在庫の枠の数（32）、1 行の更新の上限、共有のアドバイザリーロックの費用 | E5 の前の `inventory-hot-row-poc`、E2 の前の `shop-move-poc` |
 | ショップの移し替えの停止の時間、コピーの速さ、Aurora の交代でのスロットの扱い（**未検証**） | E2 の前の `shop-move-poc` |
@@ -319,7 +318,7 @@ flowchart TB
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
 | [shops-and-pods.md](shops-and-pods.md) | ショップの開設とプラン、ドメインと TLS、ポッドの構成、ショップの置き場所の選び方、ディレクトリと KeyValueStore、ショップの移し替え、ポッドの中のうるさい隣人の上限 | [0010](../decisions/0010-shop-routing-hot-set-and-custom-domains.md)、[0011](../decisions/0011-shop-placement-and-rebalancing.md)、[0012](../decisions/0012-shop-mover-logical-decoding-and-cutover.md)、[0013](../decisions/0013-shop-lifecycle-and-data-deletion.md) | Ops、QA | E1、E2 |
-| [catalog-and-pricing.md](catalog-and-pricing.md) | 商品、バリエーション、オプション、コレクション（手動と条件）、メディアと画像の変換、メタフィールド、販売の公開、マーケットと通貨、価格の表と換算の丸め、比較の価格（法務の L2）、商品の区分（法務の L10） | [0014](../decisions/0014-product-variant-option-model.md)、[0015](../decisions/0015-markets-currencies-and-rounding.md)、[0016](../decisions/0016-collection-membership-and-catalog-events.md)、[0077](../decisions/0077-migration-import-from-other-platforms.md)（proposed。0076 の後の空きの番号で、範囲の外） | QA | E3 |
+| [catalog-and-pricing.md](catalog-and-pricing.md) | 商品、バリエーション、オプション、コレクション（手動と条件）、メディアと画像の変換、メタフィールド、販売の公開、マーケットと通貨、価格の表と換算の丸め、比較の価格（法務の L2）、商品の区分（法務の L10） | [0014](../decisions/0014-product-variant-option-model.md)、[0015](../decisions/0015-markets-currencies-and-rounding.md)、[0016](../decisions/0016-collection-membership-and-catalog-events.md)、[0077](../decisions/0077-migration-import-from-other-platforms.md)（0076 の後の空きの番号で、範囲の外） | QA | E3 |
 | [taxes-and-invoices.md](taxes-and-invoices.md) | 消費税の区分（10%・8%・非課税）、総額表示、税率ごとの端数処理、割引・送料の税の按分、適格簡易請求書（レシート）、登録番号、返還インボイス（法務の L4） | [0017](../decisions/0017-consumption-tax-calculation-and-rounding.md)、[0018](../decisions/0018-invoice-documents-and-receipts.md)、[0019](../decisions/0019-invoice-registration-number-verification.md) | QA、法務 | E4、E10 |
 | [inventory-and-reservations.md](inventory-and-reservations.md) | 拠点、在庫の状態、引き当て・確定・戻し、期限と掃除、枠の行と移し替え、拠点の選び方、調整と移動の履歴、照合 | [0020](../decisions/0020-inventory-slot-counters-and-reservation-sweep.md)、[0021](../decisions/0021-inventory-slot-probing-and-rebalance.md)、[0022](../decisions/0022-location-selection-and-lock-order.md)、[0023](../decisions/0023-inventory-movements-ledger-and-reconciliation.md) | QA、Ops | E5 |
 | [flash-sales-and-queueing.md](flash-sales-and-queueing.md) | セールの予定、待合室（並び、受け入れの速さ、許可証）、ボット対策（WAF、チャレンジ、1 人あたりの上限、重複の検出）、隔離のポッドへの前もっての移し替え | [0024](../decisions/0024-waiting-room-ordering-and-admission-rate.md)、[0025](../decisions/0025-queue-pass-tokens.md)、[0026](../decisions/0026-bot-defense-and-purchase-limits.md)、[0027](../decisions/0027-flash-sale-preparation-and-surge-auto-queue.md) | QA、Ops、セキュリティ | E13 |

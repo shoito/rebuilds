@@ -134,7 +134,7 @@
 | L8 | 取引デジタルプラットフォーム消費者保護法などのプラットフォームの規制：本システム（ショップの作成の基盤）が取引デジタルプラットフォームに当たるか。当たるなら、販売業者の情報の開示の請求、出品の停止の要請への対応の手順 | merchant-admin-and-staff、security の各領域 | E2 のショップの開設の審査、E18 の GA の判定 |
 | L9 | 本家に寄せる範囲：不正競争防止法（商品等表示、形態の模倣）と著作権の観点で、テーマの言語の文法、管理画面とチェックアウトの見た目、Admin API の型の名前をどこまで似せてよいか | storefront-themes、app-platform-and-apis、merchant-admin-and-staff の各領域 | E11 のテーマの言語の文法の確定、E14 の Admin API のスキーマの確定 |
 | L10 | 扱う商品の制限：酒類・医薬品・化粧品・食品・中古品（古物）など、許可・届出の要る商品を売るショップへの本システムの確認の範囲、利用の規約の禁止の品目 | catalog-and-pricing、merchant-admin-and-staff の各領域 | E2 のショップの審査、E3 の商品の区分 |
-| L11 | 他の EC の基盤からの移行（[ADR-0077](decisions/0077-migration-import-from-other-platforms.md)、proposed）：前の基盤で出したレシート・インボイスと注文の記録の保存の義務を、取り込んだ後に誰が負うか（本システムは取り込んだ過去の注文にレシートを出し直さない、という形でよいか）。事業者が前の基盤から移す買い手の個人のデータについて、本システムの扱い（L3 の委託の整理の中でよいか）と、取り込みのファイルの保持の期限。広告のメールの同意の記録（特定電子メール法）を前の基盤から引き継げるか、引き継ぐなら何を記録として持つか | catalog-and-pricing（11.1 節）、merchant-admin-and-staff、security の各領域 | E3 の `customer-and-order-migration` |
+| L11 | 他の EC の基盤からの移行（[ADR-0077](decisions/0077-migration-import-from-other-platforms.md)）：前の基盤で出したレシート・インボイスと注文の記録の保存の義務を、取り込んだ後に誰が負うか（本システムは取り込んだ過去の注文にレシートを出し直さない、という形でよいか）。事業者が前の基盤から移す買い手の個人のデータについて、本システムの扱い（L3 の委託の整理の中でよいか）と、取り込みのファイルの保持の期限。広告のメールの同意の記録（特定電子メール法）を前の基盤から引き継げるか、引き継ぐなら何を記録として持つか | catalog-and-pricing（11.1 節）、merchant-admin-and-staff、security の各領域 | E3 の `customer-and-order-migration` |
 
 ### 選定・計測で決めるもの（法務以外）
 
@@ -144,7 +144,7 @@
 - 関数の実体化と実行の時間、燃料の上限の値：E15 の前の `wasm-function-poc`（[ADR-0008](decisions/0008-extension-sandbox-wasm.md)）。
 - エッジのキャッシュの世代の番号と熱い集まりを CloudFront KeyValueStore で配るときの、伝わるまでの時間：E12 の前の `edge-cache-generation-poc`（[ADR-0010](decisions/0010-shop-routing-hot-set-and-custom-domains.md)、[ADR-0050](decisions/0050-edge-cache-keys-and-generations.md)）。
 - 決済の提供者、運送会社の API、ボット対策のチャレンジの提供者の選定：各 Epic の選定の Story。候補の名前は例で、能力は未確認である。
-- **PM の判断待ち**：他の EC の基盤（本家を含む）からの移行（商品・顧客・過去の注文・URL のリダイレクト）を MVP に含めるか、MVP の後の Epic にするか、作らないか。含めるなら、最初に受ける元の基盤をどれにするか。形の案は [ADR-0077](decisions/0077-migration-import-from-other-platforms.md)（proposed。推奨は、本システムの CSV の形と元の基盤の型のデータで受け、過去の注文を別の表に置く案）。いまの MVP は、本システムの独自の形の商品の CSV だけを持つ。
+- **他の EC の基盤からの移行（2026-10-25 に決定）**：MVP（E3 の `migration-import`）は、本システムの独自の CSV の形で商品・顧客・過去の注文・URL のリダイレクトを取り込む。元の基盤ごとの変換（元の型）は MVP の後の Epic にし、最初に受ける基盤はそのときに決める（[ADR-0077](decisions/0077-migration-import-from-other-platforms.md)）。顧客と過去の注文は、法務の L3・L11 の確認が済むまで spec を承認しない。
 - 本家の振る舞いのうち、チェックアウトで在庫を引き当てる時点、関数の失敗のときのチェックアウトの振る舞い、待合室の並びの規則、Webhook の再送の間隔は、公式の資料で確かめられなかった（**未検証**）。本システムの値を使う。
 
 ## 出典

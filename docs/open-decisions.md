@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| shopify | [ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 他の EC の基盤からの移行の取り込み | 2026-10-10 |
 | slack | [ADR-0034](../systems/slack/docs/decisions/0034-workspace-import-from-other-tools.md) | 他のチャットツールからの取り込み（移行）の範囲と方式 | 2026-10-10 |
 | slack | [ADR-0035](../systems/slack/docs/decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | 2026-10-10 |
 | stripe | [ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | 2026-10-10 |
@@ -76,7 +75,7 @@
 | PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 解決（2026-10-25：両方を MVP に。費用は GA では数えない） |
 | PM-007 | Datadog | 他の監視の道具からの移行を MVP に入れるか | MVP は手順書だけ、変換器は E17 の後 | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 解決（2026-10-25：MVP は手順書だけ、変換器は E17 の後） |
 | PM-008 | X | 本人のデータの書き出しを MVP に入れるか | E14 に入れる | [intent.md](../systems/x/docs/intent.md)、[ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 待ち |
-| PM-009 | Shopify | 他の EC の基盤からの移行を MVP に入れるか、最初にどの基盤を受けるか | 自前の CSV の形と元の型のデータで受ける | [intent.md](../systems/shopify/docs/intent.md)、[ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 待ち |
+| PM-009 | Shopify | 他の EC の基盤からの移行を MVP に入れるか、最初にどの基盤を受けるか | 自前の CSV の形と元の型のデータで受ける | [intent.md](../systems/shopify/docs/intent.md)、[ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 解決（2026-10-25：独自の CSV の 4 種類を MVP に、元の型は後） |
 | PM-010 | Uber | 訪日の旅行者を MVP の対象にするか（アプリの言語） | 日本語と英語と、人が訳した定型文 | [intent.md](../systems/uber/docs/intent.md)、[ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | 待ち |
 | PM-011 | Figma | 英語の UI を利用者に出す時期 | MVP は日本語だけ、英語は後から（仕組みは最初から両方） | [intent.md](../systems/figma/docs/intent.md)、[editor-and-tools.md](../systems/figma/docs/architecture/editor-and-tools.md) | 待ち |
 | PM-013 | Notion | 1 ファイルの大きさの上限（`limit.file.bytes`）の値 | 価格の設計の中で決める。本家の値は未確認 | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | 待ち |

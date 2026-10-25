@@ -9,7 +9,7 @@
 | [0014](../decisions/0014-product-variant-option-model.md) | 商品はオプション（3 つまで、順序つき）とオプションの値（1 つに 100 まで）を持ち、バリエーションはオプションの値の組で一意にする。1 商品のバリエーションは 1,000 まで。バリエーションと在庫の品目は 1 対 1。価格・比較の価格・SKU・重さはバリエーションが持つ |
 | [0015](../decisions/0015-markets-currencies-and-rounding.md) | 価格の正本はショップの基本の通貨（JPY）の税込みの整数。マーケットごとに「固定の価格」か「換算と丸めの規則」で表示と支払いの通貨の価格を出す。換算は日次の為替の写し（ID つき）で行い、丸めは最小単位の整数の上で決めた規則（`none`・`whole`・`ends_99`・`ends_00_jpy10`）で 1 回だけ行う。チェックアウトは為替の写しの ID を価格の写しに固定する |
 | [0016](../decisions/0016-collection-membership-and-catalog-events.md) | 条件のコレクションの所属は、保存した所属の表（`collection_products`）にする。商品の変更では、その商品だけを全条件で評価して同期で直し、条件の変更では、非同期のジョブで全商品を評価し直す。カタログの変更は、商品ごとに単調に増える `catalog_version` を持つ outbox の事象にし、キャッシュ・検索・Webhook が同じ事象を使う |
-| [0077](../decisions/0077-migration-import-from-other-platforms.md) | （proposed。範囲は PM の判断待ち）他の EC の基盤からの移行は、商品・顧客・過去の注文・リダイレクトを本システムの CSV の形と「元の型（バージョンつき）」のデータで受ける。過去の注文は `orders` に入れず、読み出し専用の別の表に置く |
+| [0077](../decisions/0077-migration-import-from-other-platforms.md) | 他の EC の基盤からの移行は、商品・顧客・過去の注文・リダイレクトを本システムの CSV の形と「元の型（バージョンつき）」のデータで受ける。過去の注文は `orders` に入れず、読み出し専用の別の表に置く |
 
 ## 1. 範囲
 
@@ -279,7 +279,9 @@ output: amount_minor（整数）, fx_rate_id
 - 取り込みは、ショップごとに同時に 1 つ。DB の書き込みの速さは、ショップの Admin API のバケットとは別の、ジョブの公平なキュー（[ADR-0003](../decisions/0003-tenancy-and-rls.md)）で絞る。
 - 列の形は本システムの独自の形。本家の CSV の形との互換は目標にしない（[intent.md](../intent.md) の Non-goals）。
 
-### 11.1 他の EC の基盤からの移行（[ADR-0077](../decisions/0077-migration-import-from-other-platforms.md)、proposed）
+### 11.1 他の EC の基盤からの移行（[ADR-0077](../decisions/0077-migration-import-from-other-platforms.md)）
+
+MVP（E3）は独自の CSV の形での 4 種類の取り込みと、検証だけの実行。元の型は MVP の後（2026-10-25 の PM の判断）。
 
 移行を MVP に含めるか、どの元の基盤を受けるかは PM の判断待ち（[intent.md](../intent.md) の「Open questions」）。ここは含めるときの形を書く。顧客と過去の注文はこの文書の範囲の外だが、取り込みの処理を 11 節と共有するので、ここにまとめる。
 
@@ -370,8 +372,8 @@ ADR-0016。
 | E3 | `compare-at-price` | 9.1 節。表示の既定は法務：L2 |
 | E3 | `product-csv-import-export` | 11 節 |
 | E3 | `product-categories-and-restrictions` | 10 節。範囲は法務：L10 |
-| E3 | `migration-source-profiles`（PM の判断待ち） | 11.1 節。元の型、検証だけの実行、商品とリダイレクトの取り込み（ADR-0077） |
-| E3 | `customer-and-order-migration`（PM の判断待ち） | 11.1 節。顧客と過去の注文の取り込み（ADR-0077）。法務：L3・L11 |
+| E3 | `migration-import` | 11.1 節。独自の CSV の形で商品・リダイレクト・顧客・過去の注文を取り込む。検証だけの実行（ADR-0077）。顧客と過去の注文は法務：L3・L11 |
+| MVP の後 | `migration-source-profiles` | 11.1 節。元の型（ADR-0077） |
 
 ## 18. 未解決の問い
 

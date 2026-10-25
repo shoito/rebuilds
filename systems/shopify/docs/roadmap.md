@@ -99,8 +99,8 @@ E1〜E18 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `compare-at-price` | 比較の価格。表示の条件は法務：L2 |
 | `product-csv-import-export` | CSV の取り込みと書き出し（一括の操作） |
 | `product-categories-and-restrictions` | 商品の区分、扱いに許可の要る品目の印。範囲は法務：L10 |
-| `migration-source-profiles` | 他の EC の基盤からの移行の元の型、検証だけの実行、商品とリダイレクトの取り込み（ADR-0077、proposed）。MVP に含めるかは PM の判断待ち |
-| `customer-and-order-migration` | 顧客（パスワードなし、招待の待ち）と過去の注文（読み出し専用の別の表）の取り込み（ADR-0077、proposed）。MVP に含めるかは PM の判断待ち。法務：L3・L11 |
+| `migration-import` | 他の EC の基盤からの移行：本システムの独自の CSV の形で、商品・リダイレクト・顧客（パスワードなし、招待の待ち）・過去の注文（読み出し専用の別の表）を取り込む。検証だけの実行と、行ごとの冪等（ADR-0077）。顧客と過去の注文は法務：L3・L11 |
+| `migration-source-profiles`（MVP の後） | 元の型（基盤ごとの列の対応と変換の式）。最初に受ける基盤は、この Story を始めるときに PM が決める（ADR-0077、2026-10-25 の PM の判断） |
 
 ### E4 税とインボイス
 
