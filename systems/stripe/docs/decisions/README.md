@@ -38,7 +38,7 @@ Stripe の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0031](0031-active-active-cells.md) | S3 で、加盟店をセルに固定し、セルごとに主のリージョンを東京か大阪に置いて active-active にする | accepted |
 | [0032](0032-release-safety-for-money-moving-code.md) | お金を動かすコードは、影の実行で比べてから、加盟店単位のカナリアで広げる | accepted |
 | [0033](0033-cde-pipeline-and-change-control.md) | CDE のコードは同じリポジトリの `cde/` に置き、ビルドとデプロイの経路と承認を本体から分ける | accepted |
-| [0034](0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | proposed |
+| [0034](0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | accepted |
 | [0035](0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | proposed |
 <!-- adr-index:end -->
 

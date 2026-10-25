@@ -9,7 +9,7 @@
 | [ADR-0020](../decisions/0020-cde-access-model.md) | CDE へのアクセスは、人は期限つきの承認（JIT）だけ。エージェントは持たない |
 | [ADR-0023](../decisions/0023-audit-log.md) | 監査ログ。CDE の復号の記録は別の系統で残す |
 | [ADR-0024](../decisions/0024-data-retention-and-deletion.md) | カード番号の保持と消去 |
-| [ADR-0034](../decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（proposed） |
+| [ADR-0034](../decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行 |
 
 ## 1. 目標と前提
 
@@ -291,7 +291,7 @@ S2 以降で扱う。ネットワークトークンは、ブランドのトー�
 
 ## 13. カード番号の移行（取り込みと書き出し）
 
-方針は [ADR-0034](../decisions/0034-card-data-migration.md)（proposed）。提供するか、いつかは PM の判断待ち、法令の扱いは法務の確認待ち（[intent.md](../intent.md) の L9）。推奨案は、MVP の後（E10 の後）に、取り込みと書き出しの両方を運用者が仲介する手続きとして始めること。
+方針は [ADR-0034](../decisions/0034-card-data-migration.md)。2026-10-25 に PM が範囲を決めた。MVP の後（E10 の後）に、取り込みと書き出しの両方を運用者が仲介する手続きとして始める。法令の扱いは法務の確認待ち（[intent.md](../intent.md) の L9）。
 
 ```
 取り込み：前の事業者 ──SFTP（PGP）──▶ cde-live の SFTP

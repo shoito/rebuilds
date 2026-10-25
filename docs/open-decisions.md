@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| stripe | [ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | 2026-10-10 |
 | stripe | [ADR-0035](../systems/stripe/docs/decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | 2026-10-10 |
 | uber | [ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | 2026-10-10 |
 | x | [ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | 2026-10-10 |
