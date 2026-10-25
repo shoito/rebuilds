@@ -173,7 +173,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `email-sending` | 1 通ずつのメールの送信、`email_opt_out`、SES と送信のドメインの確認、bounce と苦情（法務：L4） |
 | `email-bcc-logging` | メールの記録（BCC の受信、差出人の検査、照合、未処理のメール）（法務：L1・L4） |
 | `accessibility-baseline` | キーボードの操作、レイアウトのビルダーの代わりの操作、axe の関門 |
-| `web-lead-form` | Web からのリードのフォーム：`web_lead_form` のメタデータ、専用のホストの `form-intake`、守りの層、隔離した送信、フォームの利用者、`alloc.web_form_submissions`、`DT-WLF-001`・`LEAK-031`（[sales-objects.md](architecture/sales-objects.md) の 9 節、[ADR-0064](decisions/0064-web-lead-form-public-intake.md)、proposed）。MVP に入れるかは PM の判断（法務：L4・L12） |
+| `web-lead-form` | Web からのリードのフォーム：`web_lead_form` のメタデータ、専用のホストの `form-intake`、守りの層、隔離した送信、フォームの利用者、`alloc.web_form_submissions`、`DT-WLF-001`・`LEAK-031`（[sales-objects.md](architecture/sales-objects.md) の 9 節、[ADR-0064](decisions/0064-web-lead-form-public-intake.md)）。MVP の E5 に入れる（2026-10-25 の PM の判断。法務：L4・L12） |
 
 ### E6 宣言的な自動化
 

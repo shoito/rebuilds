@@ -315,7 +315,7 @@ flowchart TB
 | [capacity.md](capacity.md) | 負荷のモデル、表の大きさ、書き込みの増幅、再計算の時間、部品ごとの必要量（OpenSearch の台数を含む） | 0060 | Ops | E12 |
 | [delivery.md](delivery.md) | CI/CD、アクセス制御の決定表と性質の CI、上限の試験と登録簿の一致、リリースとフラグ、影の実行、`security:sensitive` の変更の流れ | 0061–0063 | QA、Ops | E1、E12 |
 
-- 次に採番する ADR は 0066。0064（Web からのリードのフォーム、proposed）と 0065（本家からの移行の経路、proposed）は、sales-objects と bulk-and-import の範囲が尽きていたため、次の番号をそれぞれの行に足した。
+- 次に採番する ADR は 0066。0064（Web からのリードのフォーム）と 0065（本家からの移行の経路、proposed）は、sales-objects と bulk-and-import の範囲が尽きていたため、次の番号をそれぞれの行に足した。
 
 ## 8. Epic
 

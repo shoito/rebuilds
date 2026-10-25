@@ -60,7 +60,7 @@
 
 | 境界 | 越えるもの | 主な統制 |
 | --- | --- | --- |
-| B1 エッジ | 全ての外部の要求 | TLS 1.2 以上、HSTS、WAF、オリジンは CloudFront からだけ受ける（[infrastructure.md](infrastructure.md) の 2.1 節）。認証のない書き込みは Web のフォームの専用のホスト（`forms.<brand>.<domain>`）だけで、待ち行列を経てフォームの利用者の権限でデータ層を通す（[sales-objects.md](sales-objects.md) の 9 節、ADR-0064 は proposed） |
+| B1 エッジ | 全ての外部の要求 | TLS 1.2 以上、HSTS、WAF、オリジンは CloudFront からだけ受ける（[infrastructure.md](infrastructure.md) の 2.1 節）。認証のない書き込みは Web のフォームの専用のホスト（`forms.<brand>.<domain>`）だけで、待ち行列を経てフォームの利用者の権限でデータ層を通す（[sales-objects.md](sales-objects.md) の 9 節、ADR-0064） |
 | B2 組織 | サービスから DB | DB を読む前にホスト名・トークンから組織を決める。`SET LOCAL app.org_id`・`app.shard_no`、`FORCE ROW LEVEL SECURITY`（ADR-0005、[ADR-0010](../decisions/0010-record-tables-partitioning-and-pivots.md)） |
 | B3 データ層 | 利用者の要求からレコード | 問い合わせと DML の AST をコンパイラで束縛・権限・共有の条件の付加（[ADR-0003](../decisions/0003-metadata-driven-runtime.md)）。`records` とピボットへの直接の SQL を lint で禁止 |
 | B4 組織をまたぐ処理 | RLS を外す処理 | 専用のサービス `cross-org-worker` と DB のロール `admin_cross_org` だけ（ADR-0054） |
@@ -173,7 +173,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 | LEAK-028 | アプリのログ・トレース | in_org（個人データ） | 値・リテラル・検索の語を入れない型 | ログの型の lint | 出力の走査 | observability |
 | LEAK-029 | 運用者の道具 | in_org | 組織の許可と JIT | 許可なしで読めない | 監査 | security |
 | LEAK-030 | 利用者のコードのホストの API（E13） | cross_org・in_org | データ層、呼び出しごとの新しい実体 | `user` で読めないものが出ない | — | extensibility |
-| LEAK-031 | Web からのリードのフォームの応答（認証なし。ADR-0064 は proposed） | existence | 受け付け・捨てる・隔離・重複の `block` で同じ応答。専用のホストで組織のクッキーを届かせない | 既存と同じメールの送信と新しい送信の応答が区別できない | 隔離の件数の急増の警告 | sales |
+| LEAK-031 | Web からのリードのフォームの応答（認証なし。ADR-0064） | existence | 受け付け・捨てる・隔離・重複の `block` で同じ応答。専用のホストで組織のクッキーを届かせない | 既存と同じメールの送信と新しい送信の応答が区別できない | 隔離の件数の急増の警告 | sales |
 
 - 新しい経路を足す変更は、この表に行を足す。`security:sensitive` の PR のテンプレートで問う（ADR-0062）。
 - CI は、全ての行のテストの ID が、テストのコードから参照されていることを確かめる（[ADR-0061](../decisions/0061-access-decision-and-limit-gates-in-ci.md)）。

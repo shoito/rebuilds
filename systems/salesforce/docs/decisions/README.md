@@ -68,7 +68,7 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0061](0061-access-decision-and-limit-gates-in-ci.md) | 決定表・性質・上限・漏えいの経路を CI の関門にし、上限の登録簿は設計の記録の governor-limits.md と機械的に比べる | accepted |
 | [0062](0062-security-sensitive-change-flow.md) | security:sensitive はパスで自動で付け、テックリードとセキュリティの担当の 2 人の承認、追加の CI、組織の単位の段階的なリリースを必須にする | accepted |
 | [0063](0063-org-staged-release-and-shadow-evaluation.md) | リリースは組織を単位に段階で広げ、アクセスの判定・問い合わせのコンパイルを変える時は、新旧を本番の標本で並べて比べる影の実行を経る | accepted |
-| [0064](0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | proposed |
+| [0064](0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | accepted |
 | [0065](0065-migration-path-from-original.md) | 本家からの移行の経路 | proposed |
 <!-- adr-index:end -->
 
