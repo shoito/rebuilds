@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| stripe | [ADR-0035](../systems/stripe/docs/decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | 2026-10-10 |
 | uber | [ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | 2026-10-10 |
 | x | [ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | 2026-10-10 |
 
@@ -111,7 +110,7 @@
 | ID | ADR | 直す箇所 | 状態 |
 | --- | --- | --- | --- |
 | FOL-001 | Slack ADR-0035（運用者のアクセス） | ADR-0009 のロールの表に `ops_read` を足す。infrastructure.md 1 節の「本番への書き込み権限は Ops のグループだけに与え」を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
-| FOL-002 | Stripe ADR-0035（CDE の外の運用者のアクセス） | JIT の仕組みの選定（ADR-0020 の注記、E10 の PoC）と揃える | 待ち |
+| FOL-002 | Stripe ADR-0035（CDE の外の運用者のアクセス。2026-10-25 に承認） | JIT の仕組みの選定（ADR-0020 の注記、E10 の PoC）と揃える | 待ち（E10 の PoC の後） |
 | FOL-003 | GitHub ADR-0038（運用者のアクセス） | data-model.md 2.3 節（「運用者は break-glass」）、ADR-0028・0031 の書き方を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
 | FOL-004 | Notion ADR-0034（プランと権利） | data-model/global.md の権利の名前（`guest_limit` など）、api-and-integrations.md 5 節の 600 回の対象の書き方 | 解決（2026-10-25、ADR の承認と同時に直した。`workspace_entitlements` の表も定義した） |
 | FOL-005 | Salesforce ADR-0064（Web からのリードのフォーム）と ADR-0065（本家からの移行）。どちらも 2026-10-25 に承認 | orgs-users-and-auth.md（ログインできないフォームの利用者、`set_audit_fields_on_import`）、governor-limits.md（`alloc.web_form_submissions`）、automation-flows.md（`$Origin` の `web_form`）、infrastructure.md（`forms.` のホスト） | 待ち |

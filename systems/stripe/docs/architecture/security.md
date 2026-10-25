@@ -10,7 +10,7 @@
 | [ADR-0020](../decisions/0020-cde-access-model.md) | CDE へのアクセスは JIT だけ |
 | [ADR-0023](../decisions/0023-audit-log.md) | 監査ログ（Slack の ADR-0018 を引き継ぎ、CDE の系統を加える） |
 | [ADR-0024](../decisions/0024-data-retention-and-deletion.md) | データの保持と削除（法定の保存と、個人情報・カード情報の最小化） |
-| [ADR-0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧（proposed） |
+| [ADR-0035](../decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 |
 
 ## 1. 目標と前提
 
