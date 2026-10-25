@@ -438,7 +438,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | ごみ箱から戻せる人 | 消した人（読める時）か、すべてのデータの編集 | 消した人、束の元の所有者、オブジェクトの「すべて変更」 | — | [data-storage.md](data-storage.md) の 5 節 |
 | 外部 ID の一意 | 一意でない外部 ID がありうる（複数の一致で 300） | 外部 ID は必ず一意 | 一意にしてから取り込む | 4.1 節、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md) |
 | メタデータの形式とデプロイ | XML、`package.xml`、変更セット | 独自の形式だけ | 作り直す。変換の道具は後の Epic | [ADR-0039](../decisions/0039-metadata-package-format.md)、[sandboxes-and-deploy.md](sandboxes-and-deploy.md) |
-| Web からのリードのフォーム | 本家の HTML のフォーム | 専用のホストの受け口と埋め込みのスクリプト | フォームの HTML の送り先と項目の名前を書き換える | [ADR-0064](../decisions/0064-web-lead-form-public-intake.md)（proposed）、[sales-objects.md](sales-objects.md) の 9 節 |
+| Web からのリードのフォーム | 本家の HTML のフォーム | 専用のホストの受け口と埋め込みのスクリプト | フォームの HTML の送り先と項目の名前を書き換える | [ADR-0064](../decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](sales-objects.md) の 9 節 |
 | システムの権限の一覧 | 全ての一覧は未検証 | 25 の権限（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 7 節） | — | E4 の着手の時に確かめて行を足す |
 
 ### 15.5 Story の候補と依頼
