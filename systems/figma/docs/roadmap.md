@@ -47,7 +47,7 @@ E1〜E12 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `aws-accounts-and-network` | アカウント、SCP、VPC、エンドポイント、NAT（Slack・Stripe の Terraform のモジュールを流用。[infrastructure.md](architecture/infrastructure.md) の 1・2 節） |
 | `terraform-layout` | ルートモジュールの分け方、状態ファイル（東京と大阪）、`prevent_destroy`（10 節） |
 | `ecs-rust-services-baseline` | Rust のサービスの ECS のテンプレート（ARM64、ログ、OTel、ヘルスチェック） |
-| `ui-i18n-baseline` | 殻の文言のカタログ（ICU MessageFormat・FormatJS、ja・en）、言語の選び方、カタログの CI の検査（[editor-and-tools.md](architecture/editor-and-tools.md) の 12.1 節） |
+| `ui-i18n-baseline` | 殻の文言のカタログ（ICU MessageFormat・FormatJS、ja・en）、言語の選び方、カタログの CI の検査、英語の訳と英語での画面の幅の確かめ。MVP から日本語と英語の両方を出す（2026-10-25 の PM の判断。[editor-and-tools.md](architecture/editor-and-tools.md) の 12.1 節） |
 | `kms-keys-and-policies` | データの種類ごとの KMS の鍵、鍵のポリシー、大阪のレプリカ（[ADR-0044](decisions/0044-encryption-keys-and-client-cache.md)） |
 | `aurora-orgs-and-rls` | 組織・チーム・プロジェクト・ファイルの表と FORCE RLS、`SET LOCAL app.org_id`、最小の判定関数（所有者だけ）（[permissions-and-sharing.md](architecture/permissions-and-sharing.md)、[data-model/organization.md](architecture/data-model/organization.md)） |
 | `dynamodb-journal-table` | `journal`・`file_leases`・`ds_liveness` の表、TTL、PITR、グローバルテーブル（大阪）、IAM（[file-storage-and-history.md](architecture/file-storage-and-history.md)） |

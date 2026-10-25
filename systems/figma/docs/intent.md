@@ -111,7 +111,7 @@ MVP のリリースの判断に使う。計測の方法は [quality.md](quality.
 - キャンバスの上のテキストで、IME の入力をどう受けるか → 全ブラウザで隠した `textarea` に決めた（[ADR-0017](decisions/0017-text-input-via-hidden-textarea.md)）。見えなくし方とイベントの順序は E4 の前の PoC で確かめる。
 - 「プロジェクト」の呼び名：本家は 2026-08-03 から「フォルダー」へ改名している（中身と権限は変わらない。[Guide to sharing and permissions](https://help.figma.com/hc/en-us/articles/1500007609322-Guide-to-sharing-and-permissions)、2026-09-27 に確認）。→ S1 は「プロジェクト」のままにし、表とコードの名前も `project` にすると決めた。利用者の調査で混乱が見えたら見直す（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 15 節）。
 - 無料のプランのバージョンの履歴 → 本家の Starter と同じく 30 日に決めた（[View a file's version history](https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history)、2026-09-27 に確認）。30 日を過ぎたバージョンは消す（[ADR-0026](decisions/0026-version-history-restore-and-deletion.md)）。ファイル数などの他の範囲は、料金の設計（MVP の後）で決める。
-- 英語の UI を利用者に出す時期（PM が決める）。UI は日本語を先に作り、文言の仕組みは最初から日本語と英語を持てる形にする（[editor-and-tools.md](architecture/editor-and-tools.md) の 12.1 節）。選択肢は (a) MVP から日本語と英語を出す、(b) MVP は日本語だけを出し、英語は日本の市場での利用を見てから出す（推奨。intent の「日本の市場を先に狙う」に合い、訳と画面の確かめの費用を後に回せる）。どちらでも仕組みは同じ。
+- 英語の UI を利用者に出す時期（**2026-10-25 に決定：(a) MVP から日本語と英語を出す**）。文言の仕組みは最初から日本語と英語を持ち（[editor-and-tools.md](architecture/editor-and-tools.md) の 12.1 節）、英語の訳と、英語での画面の幅の確かめを MVP に含める。検討した選択肢は (a) と、(b) MVP は日本語だけを出し、英語は日本の市場での利用を見てから出す。
 
 ## 法務の確認待ち
 

@@ -303,7 +303,7 @@ stateDiagram-v2
 
 Zoom の題材（[clients.md](../../../zoom/docs/architecture/clients.md) の 6 節）と Linear の題材（[client-app.md](../../../linear/docs/architecture/client-app.md) の 12 節）と同じ形にし、違うところだけを書く。
 
-- **言語**：殻の文言は ICU MessageFormat と FormatJS で持ち、日本語と英語（ja・en）を持てる形にする。日本語を先に作る（[intent.md](../intent.md)）。英語を利用者に出す時期は PM が決める（[intent.md](../intent.md) の Open questions）。言語はアカウントの設定で選び、未設定ならブラウザの言語（ja でなければ en）。
+- **言語**：殻の文言は ICU MessageFormat と FormatJS で持ち、日本語と英語（ja・en）を持てる形にする。MVP から日本語と英語の両方を利用者に出す（2026-10-25 の PM の判断。[intent.md](../intent.md) の Open questions）。言語はアカウントの設定で選び、未設定ならブラウザの言語（ja でなければ en）。
 - **文言の作り方**：件数・語順の違う文を連結で作らない（「3 個のレイヤーを選択」と "3 layers selected"）。12 節の読み上げの文（「矩形 1 を選択。幅 120、高さ 40」）も同じカタログから作る。ショートカットの一覧のダイアログ（10.2 節）の操作の名前も同じ。
 - **既定のレイヤー名は文書の中身**：新しく作ったノードの既定の名前（「矩形 1」・"Rectangle 1"）は、作った人の UI の言語で付け、文書に書く。後から他の言語の人が開いても訳し直さない（同じファイルの名前が人ごとに違って見えると、コメントとコンポーネントの参照で取り違える）。
 - **キー配列**：ショートカットの照らし方（JIS 配列と US 配列）は 10.1 節。IME の組み立て中にショートカットを動かさない規則も 10.1 節と 9 節。
@@ -403,7 +403,7 @@ Epic の番号と名前は [roadmap.md](../roadmap.md) のとおり。
 | E4 | `properties-panel` | 選択のプロパティ、`Mixed` の表示、`SetProps` |
 | E4 | `clipboard` | 13 節のコピーと貼り付け、ドラッグ＆ドロップ、SVG と画像の取り込みの操作 |
 | E4 | `canvas-a11y` | 12 節のキャンバスのキー操作と読み上げ、axe の検査 |
-| E1 | `ui-i18n-baseline` | 12.1 節の文言のカタログ（ICU MessageFormat・FormatJS、ja・en）、言語の選び方、カタログの CI の検査 |
+| E1 | `ui-i18n-baseline` | 12.1 節の文言のカタログ（ICU MessageFormat・FormatJS、ja・en）、言語の選び方、カタログの CI の検査。英語の訳と、英語での画面の幅の確かめ（MVP から両方を出す） |
 | E5 | `auto-layout-drag-reorder` | オートレイアウトの子のドラッグでの並べ替えと、差し込みの線（layout と一緒に） |
 | E5 | `resize-with-constraints` | フレームの大きさの変更で制約を当てる（layout の `constraints-on-resize` と一緒に） |
 | E6 | `edit-derived-nodes` | 導出したノードの選択と、上書きの書き込みへの変換（components と一緒に） |
@@ -440,7 +440,7 @@ E7・E8・E10・E11 には、この領域の Story はない（E8 のコメン�
 | iCurve の平坦化の品質 | E4 の前に参照の形で比べる |
 | 実機の IME の自動のテストの作り方 | E4 の前に確かめる |
 | 本家との細部の一致（マーキー、ダブルクリックの入り方） | E4 で比べる。L6 の結論に従う |
-| 英語の UI を利用者に出す時期 | PM が決める（[intent.md](../intent.md) の Open questions）。仕組みは E1 の `ui-i18n-baseline` で ja・en を持つ |
+| 英語の UI を利用者に出す時期 | 決定：MVP から日本語と英語（2026-10-25）。仕組みは E1 の `ui-i18n-baseline` で ja・en を持つ |
 
 ## 20. quality.md・runbooks・data-model への項目
 
