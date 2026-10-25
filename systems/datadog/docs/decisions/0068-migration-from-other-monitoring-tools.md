@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-10
 ---
 
@@ -22,7 +22,9 @@ date: 2026-10-10
 
 ## Decision
 
-2 を提案する。詳細は [dashboards.md](../architecture/dashboards.md) の 11 節。
+2 を採用する。詳細は [dashboards.md](../architecture/dashboards.md) の 11 節。
+
+> 2026-10-25 の注記：PM が範囲を決めた。MVP は 2 重の送信の手順書と、公開 API・Terraform での作り直しの案内だけにする。変換器は PromQL の IR へのコンパイル（E17）の後に、Grafana と Prometheus から足す。
 
 - **入力はファイルだけ**：利用者が上げた JSON・YAML（1 回 20 MiB まで）を読む。他社のサービスの API キーを預かって取りに行く形にしない（他社の秘密を持たない。[ADR-0058](0058-untrusted-senders-egress-and-operator-access.md) の egress を増やさない）。
 - **変換器は口の後ろに置く**：`crates/import` に変換元ごとの変換器（`Importer`）を置き、出力は公開 API と同じ定義の JSON（[dashboards.md](../architecture/dashboards.md) の 4.1 節）にする。クエリは変換元の言語から IR へ変換し、IR に表せない関数・パネルの種類・テンプレートは変換せず、項目ごとの理由のコードで報告する。黙って近い意味に置き換えない（集計の意味が変わるため。[ADR-0024](0024-query-ir-default-semantics.md)）。

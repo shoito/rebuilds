@@ -241,4 +241,4 @@ MVP の後に検討する。E14〜E19 に入れなかったもの。着手する
 - **組織ごとの暗号化の鍵（BYOK）**（[ADR-0009](decisions/0009-retention-tiers-on-s3.md)）。
 - **S2 のセルの分け方と、大きな組織の専用のセル**（infrastructure の領域）。
 - **プロファイリング、セキュリティの監視、データベースの監視**（intent.md）。
-- **他の監視の道具からの移行の取り込み**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)、proposed。PromQL の E17 の後。MVP に入れるかは PM の判断。本家の形式は法務：L10）。
+- **他の監視の道具からの移行の取り込み**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)。変換器は PromQL の E17 の後。MVP は 2 重の送信の手順書と作り直しの案内だけ（2026-10-25 の PM の判断）。本家の形式は法務：L10）。

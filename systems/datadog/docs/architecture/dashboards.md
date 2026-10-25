@@ -16,7 +16,7 @@
 | --- | --- |
 | [0047](../decisions/0047-dashboard-query-batching-and-caching.md) | ダッシュボードの読み込みは、見えている順に並べたウィジェットのクエリを 1 つの束の要求にし、`web-bff` で IR にコンパイルして重ねを除き、ダッシュボードごとの費用の予算の中で優先度の順に実行する。窓は区間に揃え、水位より前の閉じた部分をキャッシュし、開いた部分だけを計算し直す。ライブの更新は差分のポーリングで、同じ開いた部分は 15 秒の間 1 回の実行を共有する |
 | [0048](../decisions/0048-dashboard-sharing-scope.md) | 共有は組織の中のリンクだけにし、見る人の権限（データのアクセスの制限）で描く。リンクの状態（時間の範囲、変数の値）はサーバーに置き、URL に値を入れない。公開（認証なし）の共有と、外部への埋め込みは MVP に入れず、法務の L1・L2・L7・L9 の後に別の ADR で決める |
-| [0068](../decisions/0068-migration-from-other-monitoring-tools.md)（proposed） | 他の監視の道具からの移行は、利用者が上げた書き出しのファイルを変換器でダッシュボードとモニターの定義に変換し、モニターは通知を止めた下書きで作る。変換できない部分は理由のコードで報告する |
+| [0068](../decisions/0068-migration-from-other-monitoring-tools.md) | 他の監視の道具からの移行は、利用者が上げた書き出しのファイルを変換器でダッシュボードとモニターの定義に変換し、モニターは通知を止めた下書きで作る。変換できない部分は理由のコードで報告する |
 
 ## 1. 範囲
 
@@ -206,7 +206,7 @@ sequenceDiagram
 
 ## 11. 他の監視の道具からの移行
 
-[ADR-0068](../decisions/0068-migration-from-other-monitoring-tools.md)（proposed）。**移行の道具を MVP に入れるか、どの変換元から始めるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）。本家の書き出した形式の変換は**法務の確認待ち：L10**。
+[ADR-0068](../decisions/0068-migration-from-other-monitoring-tools.md)。MVP は 2 重の送信の手順書と作り直しの案内だけで、変換器は E17 の後に Grafana と Prometheus から足す（2026-10-25 の PM の判断）。本家の書き出した形式の変換は**法務の確認待ち：L10**。
 
 ```mermaid
 flowchart LR
@@ -272,7 +272,7 @@ flowchart LR
 | E9 | `query-batching-and-live` | 6・7 節（ADR-0047。PROP-DSH-001〜003） |
 | E9 | `dashboard-sharing` | 8 節（ADR-0048。漏れの経路） |
 | E9 | `ui-accessibility` | 10 節の基準、グラフの要約と「表で見る」、キー操作、axe の関門 |
-| E17 の後（PM の判断） | `import-grafana-prometheus` | 11 節（[ADR-0068](../decisions/0068-migration-from-other-monitoring-tools.md)、proposed）。変換器の口、Grafana と Prometheus の変換、移行の待ち、`import_runs`、2 重の送信の手順書。本家の形式は法務：L10 |
+| E17 の後 | `import-grafana-prometheus` | 11 節（[ADR-0068](../decisions/0068-migration-from-other-monitoring-tools.md)）。変換器の口、Grafana と Prometheus の変換、移行の待ち、`import_runs`、2 重の送信の手順書。本家の形式は法務：L10 |
 
 ## 16. 未解決の問い
 

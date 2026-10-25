@@ -142,7 +142,7 @@
   2. MVP は設定の束だけにし、テレメトリーは既存のログのエクスポート（1 回 10 万行）とクエリの API で取ってもらう。一括の書き出しは E18（利用者の S3 へのアーカイブ）と一緒に足す。
   3. MVP には入れず、公開 API と Terraform だけにする。
   - あわせて、テレメトリーの書き出しの費用（S3 の読み出し、egress、アーカイブの取り出し）を利用量に数えるかを決める。
-- **他の監視の道具からの移行を MVP に入れるか**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)、proposed。[dashboards.md](architecture/dashboards.md) の 11 節）：今は MVP にも Non-goals にもない。選択肢は次の 3 つ。
+- **他の監視の道具からの移行を MVP に入れるか**（[ADR-0068](decisions/0068-migration-from-other-monitoring-tools.md)。[dashboards.md](architecture/dashboards.md) の 11 節）：**2026-10-25 に決定。1 を採る。** 検討した選択肢は次の 3 つ。
   1. **MVP は 2 重の送信の手順書と、公開 API・Terraform での作り直しの案内だけにし、変換器は PromQL（E17）の後に Grafana と Prometheus から足す**（推奨）：Grafana と Prometheus の規則の多くは PromQL で書かれ、E17 の前に変換しても「できない」が大半になる。
   2. MVP に変換器を入れ、PromQL を使わない変換元（本家の書き出した JSON など）から始める：法務の L10 が先に要る。
   3. 変換器を作らず、手順書と案内だけを続ける。
