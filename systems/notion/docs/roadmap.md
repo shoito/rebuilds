@@ -58,7 +58,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `auth-and-sessions` | ログイン、セッション、WebSocket のチケット（Slack の ADR-0012 を先例に。[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 1 節） |
 | `accounts-and-members` | `accounts` と `members`、メンバーの解決のミドルウェア（[ADR-0021](decisions/0021-accounts-members-guests-and-teamspaces.md)） |
 | `workspace-roles-and-admin` | ロール、招待、無効化、最後の所有者の保護（[permissions-and-sharing.md](architecture/permissions-and-sharing.md) の 2.2 節） |
-| `plans-and-entitlements` | `plans` と `workspace_entitlements`、`packages/entitlements`、管理ツールからの変更と監査（[ADR-0034](decisions/0034-plans-and-entitlements.md)、proposed）。`guests-and-limits` の前に行う |
+| `plans-and-entitlements` | `plans` と `workspace_entitlements`、`packages/entitlements`、管理ツールからの変更と監査（[ADR-0034](decisions/0034-plans-and-entitlements.md)）。`guests-and-limits` の前に行う |
 | `guests-and-limits` | ゲスト、ゲストの上限と `guest_limit`（同じ文書の 2.3 節） |
 | `teamspaces` | 4 種類のチームスペース、最上位の暗黙の ACL、サイドバーの並び（同じ文書の 3 節） |
 | `groups` | グループとメンバー（同じ文書の 2.4 節） |

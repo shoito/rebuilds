@@ -135,7 +135,7 @@ Aurora（RLS、論理シャード）
 
 | 単位 | 上限 |
 | --- | --- |
-| 連携（トークン）ごと | 1 分に 180 回（平均で毎秒 3 回）。Business・Enterprise の相当は 1 分に 600 回 |
+| 連携（トークン）ごと | 権利の `limit.api.per_min`（[ADR-0034](../decisions/0034-plans-and-entitlements.md)）。初期値は Free・Plus が 1 分に 180 回（平均で毎秒 3 回）、Business・Enterprise が 1 分に 600 回 |
 | ワークスペースごと | 全連携の合計に上限を持つ（値は負荷試験で決める） |
 | エンドポイントごと | 重い操作（問い合わせ、検索、Markdown の更新）に別の上限 |
 

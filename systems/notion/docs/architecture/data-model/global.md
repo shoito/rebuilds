@@ -18,6 +18,7 @@ erDiagram
   accounts ||--o{ account_workspaces : "所属の目録"
   workspaces ||--o{ account_workspaces : "所属の目録"
   plans ||--o{ workspaces : "プラン"
+  workspaces ||--o{ workspace_entitlements : "権利の上書き"
   shard_map ||--o{ workspaces : "logical_shard で所在"
   shard_groups ||--o{ shard_map : "マイグレーションの群れ"
   migration_ledger ||--o{ shard_groups : "適用の状況"
@@ -93,6 +94,13 @@ erDiagram
   plans {
     text id PK "free plus business enterprise"
     jsonb entitlements "上限と機能"
+    int version
+  }
+  workspace_entitlements {
+    uuid workspace_id FK "workspaces"
+    text key "limit.* feature.*"
+    jsonb value
+    timestamptz expires_at
   }
   auth_identities {
     uuid id PK "UUIDv7"
@@ -257,17 +265,38 @@ Better Auth の表をそのまま使う（Slack と同じ）。列の細部は E
 ## plans
 
 - 目的：プランと権利（上限・機能）。Slack の ADR-0032 を先例にする（[permissions-and-sharing.md](../permissions-and-sharing.md) の 2.3 節）。課金の表は MVP の範囲外で、ここでは定義しない。
-- 権利の名前（`limit.*`・`feature.*`）、初期値、ワークスペースごとの上書きの表 `workspace_entitlements`、プランを下げたときの扱いは [ADR-0034](../../decisions/0034-plans-and-entitlements.md)（proposed）にある。accepted になったら、この表の名前と上書きの表の定義を合わせる。
+- 正：[ADR-0034](../../decisions/0034-plans-and-entitlements.md)。権利の名前は `limit.<対象>` と `feature.<機能>` で、`packages/entitlements` に型付きで定義する。初期値とプランを下げたときの扱いは ADR にある。
 - 規模（S1）：4 行
 
 | 列 | 型 | NULL | 既定 | 説明 |
 | --- | --- | --- | --- | --- |
 | `id` | text | NO | | `free` / `plus` / `business` / `enterprise` |
-| `entitlements` | jsonb | NO | `'{}'` | `guest_limit`、`history_days`、`api_rate_per_min` など |
+| `entitlements` | jsonb | NO | `'{}'` | 各上限と機能の既定値。`limit.guests.max`、`limit.history.days`、`limit.api.per_min`、`feature.*` など。`packages/entitlements` の型で検証する |
+| `version` | integer | NO | `1` | 定義を変えるたびに増やす |
 | `updated_at` | timestamptz | NO | `now()` | |
 
 - PK `(id)`。
-- API は `plans` をプロセスの中にキャッシュする。ゲストの上限などの検査は、シャードのトランザクションの中で数えた値と、キャッシュの上限を比べる。
+- API は、プランの既定値と上書き（`workspace_entitlements`）を合わせた値を 60 秒キャッシュする。ゲストの上限などの検査は、シャードのトランザクションの中で数えた値と、キャッシュの上限を比べる。
+
+## workspace_entitlements
+
+- 目的：ワークスペースごとの権利の上書き。上限の緩和と、個別の機能の有効化に使う。上書き 1 件ごとに理由と期限を持つ（Slack の `workspace_entitlement_overrides` と同じ形）。
+- 正：[ADR-0034](../../decisions/0034-plans-and-entitlements.md)
+- 規模（S1）：数百行
+
+| 列 | 型 | NULL | 既定 | 説明 |
+| --- | --- | --- | --- | --- |
+| `workspace_id` | uuid | NO | | |
+| `key` | text | NO | | `limit.*` / `feature.*` の名前。`packages/entitlements` に定義のあるものだけ |
+| `value` | jsonb | NO | | |
+| `reason` | text | NO | | |
+| `expires_at` | timestamptz | YES | | 期限切れは日次で検出して Ops に知らせる |
+| `created_by_operator_id` | text | NO | | 運用者（社内の SSO の ID）。将来は課金の仕組み |
+| `created_at` | timestamptz | NO | `now()` | |
+
+- PK `(workspace_id, key)`。FK `workspace_id` → `workspaces(id)`。
+- 索引 `(expires_at) WHERE expires_at IS NOT NULL`：日次の検出。
+- 変更は `platform_audit_events` と、そのワークスペースの `audit_events` に残す（[security.md](../security.md) の 6 節）。
 
 ## shard_map
 

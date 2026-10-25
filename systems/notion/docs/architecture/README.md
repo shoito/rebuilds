@@ -201,7 +201,7 @@ flowchart TB
 | [0031](../decisions/0031-migration-rollout-by-shard-groups.md) | スキーマの変更は、論理シャードの群れの順に expand / contract で当てる |
 | [0032](../decisions/0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 のデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補にする（ADR-0013 の一部を置き換える） |
 | [0033](../decisions/0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） |
-| [0034](../decisions/0034-plans-and-entitlements.md) | プランごとの上限と機能を、`global` の権利とワークスペースごとの上書きで持つ。Slack の ADR-0032 と同じ形（proposed） |
+| [0034](../decisions/0034-plans-and-entitlements.md) | プランごとの上限と機能を、`global` の権利とワークスペースごとの上書きで持つ。Slack の ADR-0032 と同じ形 |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル、本家の名前・接頭辞・ドメインを使わない規則の [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md)）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 

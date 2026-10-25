@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-10
 ---
 
@@ -29,14 +29,14 @@ Slack の題材は、同じ問いを [ADR-0032](../../../slack/docs/decisions/00
 
 ## Decision
 
-1 を採用する（proposed。PM と Dev の承認待ち）。
+1 を採用する（2026-10-25 に承認）。`limit.file.bytes` の値は、PM が価格の設計の中で決める（[open-decisions.md](../../../../docs/open-decisions.md) の PM-013）。
 
 | 表（`global` スキーマ） | 中身 |
 | --- | --- |
 | `plans` | 既存の表。コード（`free` / `plus` / `business` / `enterprise`）と、各上限と機能の既定値（JSON）。`version` を足す |
 | `workspace_entitlements`（新規） | ワークスペースごとの上書きの値。上書きには理由・期限・変えた運用者を持たせる |
 
-- **値の名前**は、Slack と同じく `limit.<対象>` と `feature.<機能>` の 2 種類にし、`packages/entitlements` に型付きで定義する。global.md の `guest_limit`・`history_days`・`api_rate_per_min` は、この ADR が accepted になったら、それぞれ `limit.guests.max`・`limit.history.days`・`limit.api.per_min` に改める。
+- **値の名前**は、Slack と同じく `limit.<対象>` と `feature.<機能>` の 2 種類にし、`packages/entitlements` に型付きで定義する。global.md の `guest_limit`・`history_days`・`api_rate_per_min` は、それぞれ `limit.guests.max`・`limit.history.days`・`limit.api.per_min` に改める。
 - **初期値は本家に寄せる**（2026-09-26・27 に確かめた値。各文書の出典のとおり）。
 
   | 名前 | Free | Plus | Business | Enterprise |

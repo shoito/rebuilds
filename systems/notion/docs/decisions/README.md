@@ -38,7 +38,7 @@ Notion の再構築に関する決定。リポジトリ共通の決定は [docs/
 | [0031](0031-migration-rollout-by-shard-groups.md) | スキーマの変更は、論理シャードの群れの順に expand / contract で当てる | accepted |
 | [0032](0032-desktop-uses-wasm-sqlite-in-s1.md) | S1 のデスクトップも Web と同じ WASM の SQLite（OPFS）を使い、ネイティブの SQLite は S2 の候補にする | accepted |
 | [0033](0033-transfer-private-pages-of-deactivated-members.md) | 無効化したメンバーのプライベートのページを、所有者が監査付きで別のメンバーへ移せるようにする（E10） | accepted |
-| [0034](0034-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの権利（entitlements）として持つ | proposed |
+| [0034](0034-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの権利（entitlements）として持つ | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

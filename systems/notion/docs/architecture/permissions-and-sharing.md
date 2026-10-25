@@ -91,7 +91,7 @@ Slack の [ADR-0010](../../../slack/docs/decisions/0010-accounts-and-workspace-m
 
 出典は [Pricing](https://www.notion.com/pricing)（2026-09-26 に確認）。上限を超えたワークスペースでは、ワークスペースのメールドメインに属する人だけを、ゲストではなくメンバーとして追加できる（[Manage members, admins & guests](https://www.notion.com/help/add-members-admins-guests-and-groups)）。Enterprise は、メンバーがゲストの追加を申請し、所有者が承認する運用を選べる（同じ文書）。
 
-- 上限の値はプランの権利（entitlements）の `limit.guests.max` として持つ（[ADR-0034](../decisions/0034-plans-and-entitlements.md)、proposed。Slack の ADR-0032 と同じ形）。この文書は「上限を超えたら 409 `guest_limit`」だけを定める。
+- 上限の値はプランの権利（entitlements）の `limit.guests.max` として持つ（[ADR-0034](../decisions/0034-plans-and-entitlements.md)。Slack の ADR-0032 と同じ形）。この文書は「上限を超えたら 409 `guest_limit`」だけを定める。
 - プランを下げて上限を超えたときは、既存のゲストを残し、新しい追加だけを 409 `guest_limit` にする（ADR-0034）。
 
 ### 2.4 グループ
