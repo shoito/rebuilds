@@ -30,7 +30,6 @@
 | stripe | [ADR-0035](../systems/stripe/docs/decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | 2026-10-10 |
 | uber | [ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | 2026-10-10 |
 | x | [ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | 2026-10-10 |
-| リポジトリ共通 | [ADR-0001](decisions/0001-adopt-ai-native-lifecycle.md) | AI-Native SDLC を骨格に、正本 spec と変更差分を分けて管理する | 2026-09-26 |
 | リポジトリ共通 | [ADR-0009](decisions/0009-document-checks-and-ci.md) | 文書の検査の道具と CI を rebuilds に置く | 2026-10-11 |
 <!-- proposed-adrs:end -->
 
