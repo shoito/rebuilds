@@ -174,17 +174,17 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（API・サービス・Web） | Slack と同じ。型で API の契約と金額の型を守る（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 金額 | 通貨ごとの最小単位の整数（`bigint`）と、ISO 4217 の通貨コード | 浮動小数点を使わない。JPY は小数なし |
-| API | Hono＋Zod。公開 API は `@hono/zod-openapi` で OpenAPI を出す | |
-| DB | Aurora PostgreSQL 18。台帳は追記のみのテーブルと制約で守る | |
-| 非同期 | transactional outbox → SQS | Slack と同じ |
-| CDE | 別の AWS アカウント（cde-live・cde-test）。暗号鍵は KMS（CDE 専用の鍵）。必要に応じて AWS Payment Cryptography | [ADR-0005](../decisions/0005-pci-scope-segmentation.md)、[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md)、[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) |
-| 実行基盤 | AWS（ECS Fargate、Aurora、SQS、S3、CloudFront） | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| IaC | Terraform | Slack と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | Slack と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（API・サービス・Web） | Slack と同じ。型で API の契約と金額の型を守る（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 金額 | 通貨ごとの最小単位の整数（`bigint`）と、ISO 4217 の通貨コード | 浮動小数点を使わない。JPY は小数なし | — |
+| API | Hono＋Zod。公開 API は `@hono/zod-openapi` で OpenAPI を出す | | — |
+| DB | Aurora PostgreSQL 18。台帳は追記のみのテーブルと制約で守る | | — |
+| 非同期 | transactional outbox → SQS | Slack と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| CDE | 別の AWS アカウント（cde-live・cde-test）。暗号鍵は KMS（CDE 専用の鍵）。必要に応じて AWS Payment Cryptography | [ADR-0005](../decisions/0005-pci-scope-segmentation.md)、[ADR-0019](../decisions/0019-vault-encryption-and-key-hierarchy.md)、[ADR-0029](../decisions/0029-multi-account-and-cde-layout.md) | — |
+| 実行基盤 | AWS（ECS Fargate、Aurora、SQS、S3、CloudFront） | [ADR-0001](../decisions/0001-platform-and-stack.md) | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | Slack と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | Slack と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 5. 主な決定
 

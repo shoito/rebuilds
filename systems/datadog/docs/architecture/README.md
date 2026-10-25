@@ -224,26 +224,26 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 管理の面の言語 | TypeScript（Hono＋Zod） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| データの面の言語 | Rust（取り込み、インジェスター、ログの処理と保存、組み立て、クエリ、評価）。非同期は Tokio、シャードごとの単一スレッド | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| エージェント | Rust の 1 つのバイナリ（Linux・Windows、コンテナのイメージ、Kubernetes の DaemonSet） | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| 取り込みのログ | Amazon MSK（Kafka のプロトコル）。3 AZ、複製 3、`min.insync.replicas=2` | [ADR-0002](../decisions/0002-intake-log-on-msk.md)。共通の基盤（SQS・SNS）からの外れ |
-| 取り込みの形式 | OTLP（gRPC・HTTP、Protobuf）、StatsD（タグの拡張）、本システムの JSON の API。内部は Protobuf | intake-and-agent、otlp-and-api-keys の領域 |
-| 時系列の保存 | 自前の TSDB（ヘッドとブロック、`codec_id` 1 は Gorilla の形、ロールアップ）。S3 とインスタンスの NVMe のキャッシュ | [ADR-0004](../decisions/0004-tsdb-storage-engine.md) |
-| ログ・トレースの保存 | 自前の列指向のセグメント（zstd、辞書、ブルームフィルター）を S3 に。カタログは Aurora | [ADR-0005](../decisions/0005-log-storage-columnar-with-bloom.md) |
-| 分布 | 指数のヒストグラム（OpenTelemetry の形、最大 512 の区間、既定のスケール 5） | distributions-and-sketches の領域 |
-| 管理の DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7、outbox | [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) |
-| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 |
-| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ |
-| 実行基盤 | 管理の面と状態を持たない部品は ECS Fargate。状態を持つデータの面（インジェスター、インデクサー、組み立て、クエリの読み手）は ECS の EC2 のキャパシティープロバイダー（NVMe を持つインスタンス） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| オブジェクトストレージ | S3（SSE-KMS とバケットキー、保持の層、大阪への CRR） | [ADR-0009](../decisions/0009-retention-tiers-on-s3.md) |
-| IaC | Terraform | 他の題材と同じ |
-| 自己監視 | OpenTelemetry（ADOT）→ 別の AWS アカウント（大阪）の AMP・CloudWatch・Grafana（OSS を Fargate で。Amazon Managed Grafana は大阪にない）。呼び出しは AMP・CloudWatch のアラームとオンコールのサービスの直接の連携 | [runbooks/](../runbooks/README.md) の 5 節、[observability.md](observability.md)、[ADR-0062](../decisions/0062-independent-self-monitoring-path.md) |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| Web の画面 | React（TypeScript）、グラフは Canvas の自前の描画 | dashboards の領域 |
-| テスト | Rust の `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、自前の参照の実装と再生の枠、自前の負荷の生成器、Testcontainers（PostgreSQL 18、Valkey、Kafka）、LocalStack、Playwright | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 管理の面の言語 | TypeScript（Hono＋Zod） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| データの面の言語 | Rust（取り込み、インジェスター、ログの処理と保存、組み立て、クエリ、評価）。非同期は Tokio、シャードごとの単一スレッド | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | Rust を持つ分、エージェントの eval に Rust のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| エージェント | Rust の 1 つのバイナリ（Linux・Windows、コンテナのイメージ、Kubernetes の DaemonSet） | [ADR-0001](../decisions/0001-platform-and-stack.md) | Rust を持つ分、エージェントの eval に Rust のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 取り込みのログ | Amazon MSK（Kafka のプロトコル）。3 AZ、複製 3、`min.insync.replicas=2` | [ADR-0002](../decisions/0002-intake-log-on-msk.md)。共通の基盤（SQS・SNS）からの外れ | — |
+| 取り込みの形式 | OTLP（gRPC・HTTP、Protobuf）、StatsD（タグの拡張）、本システムの JSON の API。内部は Protobuf | intake-and-agent、otlp-and-api-keys の領域 | — |
+| 時系列の保存 | 自前の TSDB（ヘッドとブロック、`codec_id` 1 は Gorilla の形、ロールアップ）。S3 とインスタンスの NVMe のキャッシュ | [ADR-0004](../decisions/0004-tsdb-storage-engine.md) | — |
+| ログ・トレースの保存 | 自前の列指向のセグメント（zstd、辞書、ブルームフィルター）を S3 に。カタログは Aurora | [ADR-0005](../decisions/0005-log-storage-columnar-with-bloom.md) | — |
+| 分布 | 指数のヒストグラム（OpenTelemetry の形、最大 512 の区間、既定のスケール 5） | distributions-and-sketches の領域 | — |
+| 管理の DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7、outbox | [ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md) | — |
+| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | 管理の面と状態を持たない部品は ECS Fargate。状態を持つデータの面（インジェスター、インデクサー、組み立て、クエリの読み手）は ECS の EC2 のキャパシティープロバイダー（NVMe を持つインスタンス） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | — |
+| オブジェクトストレージ | S3（SSE-KMS とバケットキー、保持の層、大阪への CRR） | [ADR-0009](../decisions/0009-retention-tiers-on-s3.md) | — |
+| IaC | Terraform | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 自己監視 | OpenTelemetry（ADOT）→ 別の AWS アカウント（大阪）の AMP・CloudWatch・Grafana（OSS を Fargate で。Amazon Managed Grafana は大阪にない）。呼び出しは AMP・CloudWatch のアラームとオンコールのサービスの直接の連携 | [runbooks/](../runbooks/README.md) の 5 節、[observability.md](observability.md)、[ADR-0062](../decisions/0062-independent-self-monitoring-path.md) | — |
+| フラグ | AWS AppConfig | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| Web の画面 | React（TypeScript）、グラフは Canvas の自前の描画 | dashboards の領域 | — |
+| テスト | Rust の `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、自前の参照の実装と再生の枠、自前の負荷の生成器、Testcontainers（PostgreSQL 18、Valkey、Kafka）、LocalStack、Playwright | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

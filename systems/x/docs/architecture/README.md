@@ -207,26 +207,26 @@ DAU 1 人・1 か月の原価 = メディアの配信（CloudFront。1 日 100�
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サービス、Web、アプリ）。学習と評価だけ Python（オフライン） | 他の題材と同じ。学習の道具は Python が厚い。推論は ONNX の形で TypeScript のサービスに載せる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-ranking-boundary.md)） |
-| HTTP・検証 | Hono＋Zod | 他の題材と同じ |
-| ID | 投稿・利用者・DM のメッセージは 64 ビットの `tid`（`packages/tid`）。その他は UUIDv7 | 共通の UUIDv7 から外れる。理由は [ADR-0002](../decisions/0002-post-ids-and-ordering.md) |
-| DB | Aurora PostgreSQL 18。テナントの RLS はなく、本人だけが読む表（DM、ブックマーク、下書き、通知、設定など。一覧は [data-model.md](data-model.md) の 3.2 節）に FORCE RLS と `SET LOCAL app.actor_id` | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) |
-| 写し | ElastiCache（Valkey）の 4 クラスタ：`vk-timeline`（ホームの写し、作者の最近の投稿）、`vk-cache`（投稿の状態、閲覧者の集合、特徴）、`vk-counters`（数）、`vk-edge`（セッション、レート制限） | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)、[ADR-0055](../decisions/0055-kinesis-consumers-and-valkey-clusters.md) |
-| 出来事のログ | transactional outbox → Relay → Kinesis Data Streams。仕事の待ち行列は SQS | 共通の SQS・SNS に加えて Kinesis を使う。理由は [ADR-0005](../decisions/0005-event-log-and-outbox.md) |
-| 検索 | Amazon OpenSearch Service。一致の判定は 1〜2 文字の N-gram、関連度は kuromoji | [ADR-0025](../decisions/0025-search-engine-and-japanese-analysis.md)。Sudachi は `search-poc` で比べる |
-| ランキング | 自前のパイプライン（`packages/ranking`）。S1 は規則と軽いスコア、S2 から学習済みのモデル（ONNX Runtime。学習は SageMaker と Step Functions）、S3 で埋め込みの取り出し | [ADR-0006](../decisions/0006-ranking-boundary.md)、[ADR-0019](../decisions/0019-ranking-features-and-training-platform.md) |
-| メディア | S3、CloudFront（KeyValueStore の拒否の一覧で配信を止める）、画像の変換は自前の Worker（`sharp`）、動画は AWS Elemental MediaConvert（HLS） | [ADR-0032](../decisions/0032-media-upload-and-processing.md)、[ADR-0033](../decisions/0033-media-delivery-and-takedown.md) |
-| リアルタイム | WebSocket（Realtime Gateway）、Valkey の pub/sub | Slack の題材の考え方を先例にする |
-| クライアント | Web は React（SPA、PWA）。iOS・Android は React Native（Expo） | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| データレイク | Kinesis Data Firehose → S3（Apache Iceberg の表）、Athena | 分析、学習、評価、法令の報告の集計 |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana | 他の題材と同じ |
-| フラグと設定 | AWS AppConfig。フラグは `release.*`・`ops.*`・`experiment.*`、決めた値は `policy.*`・`retention.*`・`legal.*`・`ts.*`（[delivery.md](delivery.md) の 3 節） | 他の題材と同じ。ランキングの A/B は `experiment.ranking.*` |
-| 認証 | Better Auth（`packages/auth` で包む。電話番号・メールの OTP、パスキー、Google・Apple。パスワードは持たない） | Linear の題材と同じ考え方（[ADR-0043](../decisions/0043-auth-methods-and-sessions.md)） |
-| テスト | Vitest、fast-check、Testcontainers、Playwright、Maestro（アプリの E2E）、k6 | [quality.md](../quality.md) の 2.2 節 |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サービス、Web、アプリ）。学習と評価だけ Python（オフライン） | 他の題材と同じ。学習の道具は Python が厚い。推論は ONNX の形で TypeScript のサービスに載せる（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-ranking-boundary.md)） | — |
+| HTTP・検証 | Hono＋Zod | 他の題材と同じ | — |
+| ID | 投稿・利用者・DM のメッセージは 64 ビットの `tid`（`packages/tid`）。その他は UUIDv7 | 共通の UUIDv7 から外れる。理由は [ADR-0002](../decisions/0002-post-ids-and-ordering.md) | — |
+| DB | Aurora PostgreSQL 18。テナントの RLS はなく、本人だけが読む表（DM、ブックマーク、下書き、通知、設定など。一覧は [data-model.md](data-model.md) の 3.2 節）に FORCE RLS と `SET LOCAL app.actor_id` | [ADR-0004](../decisions/0004-single-tenant-and-visibility.md) | — |
+| 写し | ElastiCache（Valkey）の 4 クラスタ：`vk-timeline`（ホームの写し、作者の最近の投稿）、`vk-cache`（投稿の状態、閲覧者の集合、特徴）、`vk-counters`（数）、`vk-edge`（セッション、レート制限） | [ADR-0003](../decisions/0003-timeline-fanout-hybrid.md)、[ADR-0055](../decisions/0055-kinesis-consumers-and-valkey-clusters.md) | — |
+| 出来事のログ | transactional outbox → Relay → Kinesis Data Streams。仕事の待ち行列は SQS | 共通の SQS・SNS に加えて Kinesis を使う。理由は [ADR-0005](../decisions/0005-event-log-and-outbox.md) | — |
+| 検索 | Amazon OpenSearch Service。一致の判定は 1〜2 文字の N-gram、関連度は kuromoji | [ADR-0025](../decisions/0025-search-engine-and-japanese-analysis.md)。Sudachi は `search-poc` で比べる | — |
+| ランキング | 自前のパイプライン（`packages/ranking`）。S1 は規則と軽いスコア、S2 から学習済みのモデル（ONNX Runtime。学習は SageMaker と Step Functions）、S3 で埋め込みの取り出し | [ADR-0006](../decisions/0006-ranking-boundary.md)、[ADR-0019](../decisions/0019-ranking-features-and-training-platform.md) | — |
+| メディア | S3、CloudFront（KeyValueStore の拒否の一覧で配信を止める）、画像の変換は自前の Worker（`sharp`）、動画は AWS Elemental MediaConvert（HLS） | [ADR-0032](../decisions/0032-media-upload-and-processing.md)、[ADR-0033](../decisions/0033-media-delivery-and-takedown.md) | — |
+| リアルタイム | WebSocket（Realtime Gateway）、Valkey の pub/sub | Slack の題材の考え方を先例にする | — |
+| クライアント | Web は React（SPA、PWA）。iOS・Android は React Native（Expo） | [ADR-0001](../decisions/0001-platform-and-stack.md) | — |
+| データレイク | Kinesis Data Firehose → S3（Apache Iceberg の表）、Athena | 分析、学習、評価、法令の報告の集計 | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | — |
+| IaC | Terraform | 他の題材と同じ | — |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana | 他の題材と同じ | — |
+| フラグと設定 | AWS AppConfig。フラグは `release.*`・`ops.*`・`experiment.*`、決めた値は `policy.*`・`retention.*`・`legal.*`・`ts.*`（[delivery.md](delivery.md) の 3 節） | 他の題材と同じ。ランキングの A/B は `experiment.ranking.*` | — |
+| 認証 | Better Auth（`packages/auth` で包む。電話番号・メールの OTP、パスキー、Google・Apple。パスワードは持たない） | Linear の題材と同じ考え方（[ADR-0043](../decisions/0043-auth-methods-and-sessions.md)） | — |
+| テスト | Vitest、fast-check、Testcontainers、Playwright、Maestro（アプリの E2E）、k6 | [quality.md](../quality.md) の 2.2 節 | — |
 
 ## 5. 主な決定
 

@@ -439,7 +439,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | 外部 ID の一意 | 一意でない外部 ID がありうる（複数の一致で 300） | 外部 ID は必ず一意 | 一意にしてから取り込む | 4.1 節、[ADR-0020](../decisions/0020-rest-api-shape-and-versioning.md) |
 | メタデータの形式とデプロイ | XML、`package.xml`、変更セット | 独自の形式だけ | 作り直す。変換の道具は後の Epic | [ADR-0039](../decisions/0039-metadata-package-format.md)、[sandboxes-and-deploy.md](sandboxes-and-deploy.md) |
 | Web からのリードのフォーム | 本家の HTML のフォーム | 専用のホストの受け口と埋め込みのスクリプト | フォームの HTML の送り先と項目の名前を書き換える | [ADR-0064](../decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](sales-objects.md) の 9 節 |
-| システムの権限の一覧 | 全ての一覧は未検証 | 25 の権限（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 7 節） | — | E4 の着手の時に確かめて行を足す |
+| システムの権限の一覧 | 全ての一覧は未検証 | 26 の権限（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 7 節） | — | E4 の着手の時に確かめて行を足す |
 
 ### 15.5 Story の候補と依頼
 
@@ -448,5 +448,5 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | E9 | 移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、15.2 節の手順書と生成した本家の形の CSV での結合テスト |
 | MVP の後の移行の Epic | 本家のメタデータの書き出しの変換の道具（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。法務：L13 |
 
-- orgs-users-and-auth の領域：システムの権限に `set_audit_fields_on_import` を足す（どの権限セットにも既定で入れない）。
+- orgs-users-and-auth の領域：システムの権限に `set_audit_fields_on_import` を足す（どの権限セットにも既定で入れない）（2026-10-25 に反映済み）。
 - 各領域：本家との違いを決めたら、15.4 節に行を足す。

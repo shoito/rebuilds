@@ -16,6 +16,8 @@ date: 2026-10-04
 - 書き込みの側でキャッシュを消す方式は、消し忘れで古い空き時間を返す。
 - Valkey は失われてもよい部品である（[architecture/README.md](../architecture/README.md) の 1.2 節）。
 
+> 2026-10-25 の注記：上の「architecture/README.md の 6 節」は、最初の設計の README の 6 節を指す。この持ち越しの項目は今の README にも [design-log.md](../architecture/design-log.md) にも残っていない。経緯は design-log.md の「2026-10-04：既定案」。冷たいキャッシュの速さの確かめは、`freebusy-poc` として design-log.md の「2026-10-04：データモデルの工程で見つけたテナントをまたぐ経路」の持ち越しに残る。
+
 ## Options
 
 元のデータ：

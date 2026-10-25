@@ -154,15 +154,15 @@ flowchart LR
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| Web・API・Worker | TypeScript（Hono、React）。Web は SSR をストリームで返し、画面の単位でハイドレーションする | Slack・Stripe と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)）。描画の方式は [ADR-0035](../decisions/0035-web-rendering-ssr-streaming.md) |
-| Git ストレージ・フロントエンド | Go と Git の本体（`git` のコマンド、必要に応じて libgit2 に相当するライブラリ） | Git の操作と長時間の I/O に向く。本家の Spokes・GitLab の Gitaly と同じ考え方 |
-| コード検索 | Zoekt（Go）をリポジトリの単位のシャードで独立したクラスタに。Issue・PR・リポジトリの検索は Amazon OpenSearch Service | [ADR-0014](../decisions/0014-code-search-engine.md) |
-| DB | Aurora PostgreSQL 18 | |
-| 非同期 | outbox → SQS | |
-| 実行基盤 | AWS（ECS、EC2 のストレージのノード（ローカル NVMe）、Actions の実行環境は EC2 の metal の上の Firecracker の microVM） | [ADR-0031](../decisions/0031-storage-nodes-on-instance-store.md)、[ADR-0023](../decisions/0023-firecracker-microvm-runners.md) |
-| IaC・可観測性 | Terraform、OpenTelemetry | Slack と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| Web・API・Worker | TypeScript（Hono、React）。Web は SSR をストリームで返し、画面の単位でハイドレーションする | Slack・Stripe と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)）。描画の方式は [ADR-0035](../decisions/0035-web-rendering-ssr-streaming.md) | — |
+| Git ストレージ・フロントエンド | Go と Git の本体（`git` のコマンド、必要に応じて libgit2 に相当するライブラリ） | Git の操作と長時間の I/O に向く。本家の Spokes・GitLab の Gitaly と同じ考え方 | — |
+| コード検索 | Zoekt（Go）をリポジトリの単位のシャードで独立したクラスタに。Issue・PR・リポジトリの検索は Amazon OpenSearch Service | [ADR-0014](../decisions/0014-code-search-engine.md) | — |
+| DB | Aurora PostgreSQL 18 | | — |
+| 非同期 | outbox → SQS | | — |
+| 実行基盤 | AWS（ECS、EC2 のストレージのノード（ローカル NVMe）、Actions の実行環境は EC2 の metal の上の Firecracker の microVM） | [ADR-0031](../decisions/0031-storage-nodes-on-instance-store.md)、[ADR-0023](../decisions/0023-firecracker-microvm-runners.md) | — |
+| IaC・可観測性 | Terraform、OpenTelemetry | Slack と同じ | — |
 
 ## 5. 主な決定
 

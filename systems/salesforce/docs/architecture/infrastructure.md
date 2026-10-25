@@ -64,7 +64,9 @@ prod: worker（webhook-sender、署名を付ける）─SQS─▶ prod-egress: s
 | `login.<brand>.<domain>` | 組織を知らない時のログインの入口 |
 | `static.<brand>.<domain>` | SPA の静的な資産（S3） |
 | `api.<brand>.<domain>` | OAuth のトークンのエンドポイント（トークンから組織を決める） |
+| `forms.<brand>.<domain>` | Web からのリードのフォームの受け口（`/f/<form_key>`）。CloudFront と WAF の後ろに `form-intake` を置く（[ADR-0064](../decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](sales-objects.md) の 9 節） |
 
+- `forms.<brand>.<domain>` は組織のホストと分け、組織の利用者のセッションのクッキーが届かないようにする。`form_key` は 128 ビットの乱数で、組織の ID を出さない。WAF で IP ごとのレート制限をかける（同じ IP から同じフォームへ 1 分 10 回の案。超えたら 429）。
 - `*.my.<brand>.<domain>` はワイルドカードの証明書 1 枚。独自のドメインは MVP の後（[orgs-users-and-auth.md](orgs-users-and-auth.md) の 1 節）。
 
 ## 3. ECS サービス
@@ -81,6 +83,7 @@ prod: worker（webhook-sender、署名を付ける）─SQS─▶ prod-egress: s
 | relay | outbox → `events`・SQS（論理シャードごとの書き手） | `app_worker` | outbox の最古の行の経過時間 | 3 |
 | indexer | 検索の索引の書き込み | `app_worker`（読むだけ） | SQS の最古のメッセージ | 3 |
 | sender（prod-egress） | Webhook・外向きの呼び出しの送信 | なし | SQS の最古のメッセージ、同時送信数 | 2 |
+| form-intake | Web からのリードのフォームの受け口（E5）。本文の大きさ（32KB）・形・許可の一覧・token を検査して SQS に入れ、常に同じ 202 か 303 を返す。DB に書かない（ADR-0064） | なし | 未定（E5 の着手の時に決める） | 未定（E5 の着手の時に決める） |
 
 - `runtime` と `worker` のタスクには、E13 から `code-runner`（Rust＋Wasmtime）のコンテナを足す。資格情報の環境変数を渡さず、読み取り専用のファイルシステム、root でない利用者にする。`runtime` とはタスクの中の共有のボリュームの UNIX ドメインソケットでつなぐ（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）。
 - DB の接続：各タスクは writer と reader の接続のプールを持つ。RDS Proxy は使わない。PostgreSQL では `SET`・`set_config` とセッションの単位のアドバイザリロックが接続を固定（pinning）し、多重化が効かなくなるため（トランザクションの単位のアドバイザリロックは固定しない。[Avoiding pinning an RDS Proxy](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html)、2026-09-28 に確認）。接続の数の上限は [capacity.md](capacity.md) の 5 節。

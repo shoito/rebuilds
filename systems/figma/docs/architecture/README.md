@@ -256,22 +256,22 @@ sequenceDiagram
 
 ## 5. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| エンジン | Rust → WASM（`wasm32-unknown-unknown`）。ドキュメントのモデル・レイアウト・描画 | [ADR-0001](../decisions/0001-platform-and-stack.md)。本家は C++ と Emscripten |
-| GPU | 1 つのビルドに WebGPU と WebGL2。WebGPU で始め、失敗したら WebGL2 へ。自前の GPU の抽象の下に wgpu | [ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)、[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md) |
-| テキスト | HarfRust・Skrifa・ICU4X | [ADR-0015](../decisions/0015-text-shaping-and-glyph-rendering.md) |
-| UI の殻 | TypeScript、React | 他の題材と同じ |
-| マルチプレイヤー | Rust（tokio）の Document Server。Gateway・Router も Rust | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0002](../decisions/0002-central-authoritative-multiplayer.md) |
-| API・Worker | TypeScript、Hono＋Zod | 他の題材と同じ |
-| メタデータ | Aurora PostgreSQL 18。共有スキーマと `FORCE ROW LEVEL SECURITY` | [ADR-0005](../decisions/0005-tenancy-and-document-routing.md) |
-| ジャーナル・割り当て | DynamoDB（条件付きの書き込み、`TransactWriteItems`、グローバルテーブル） | [ADR-0003](../decisions/0003-journal-and-checkpoints.md)、[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md) |
-| キャッシュ・配信 | ElastiCache（Valkey。pub/sub はクラスタモードを使わない） | 他の題材と同じ。[infrastructure.md](infrastructure.md) の 6 節 |
-| ファイル・配布 | S3、CloudFront | [ADR-0025](../decisions/0025-content-addressed-checkpoints-and-loading.md) |
-| サーバーの描画 | ネイティブの同じ crate、wgpu の Vulkan を Mesa の lavapipe（CPU）で | [ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)、[ADR-0034](../decisions/0034-export-rendering-split.md) |
-| 非同期 | transactional outbox → SQS | 他の題材と同じ |
-| 実行基盤 | AWS 東京（3 AZ）、大阪を DR。ECS Fargate（Rust のサービスは ARM64、Render Worker は x86-64） | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) |
-| IaC・可観測性 | Terraform、OpenTelemetry | 他の題材と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| エンジン | Rust → WASM（`wasm32-unknown-unknown`）。ドキュメントのモデル・レイアウト・描画 | [ADR-0001](../decisions/0001-platform-and-stack.md)。本家は C++ と Emscripten | ビルドの仕組みは、CMake と Emscripten の設定より Cargo のほうがエージェントにとって扱いやすい（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| GPU | 1 つのビルドに WebGPU と WebGL2。WebGPU で始め、失敗したら WebGL2 へ。自前の GPU の抽象の下に wgpu | [ADR-0004](../decisions/0004-gpu-rendering-in-wasm.md)、[ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md) | — |
+| テキスト | HarfRust・Skrifa・ICU4X | [ADR-0015](../decisions/0015-text-shaping-and-glyph-rendering.md) | — |
+| UI の殻 | TypeScript、React | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| マルチプレイヤー | Rust（tokio）の Document Server。Gateway・Router も Rust | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0002](../decisions/0002-central-authoritative-multiplayer.md) | — |
+| API・Worker | TypeScript、Hono＋Zod | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| メタデータ | Aurora PostgreSQL 18。共有スキーマと `FORCE ROW LEVEL SECURITY` | [ADR-0005](../decisions/0005-tenancy-and-document-routing.md) | — |
+| ジャーナル・割り当て | DynamoDB（条件付きの書き込み、`TransactWriteItems`、グローバルテーブル） | [ADR-0003](../decisions/0003-journal-and-checkpoints.md)、[ADR-0024](../decisions/0024-journal-items-and-fencing.md)、[ADR-0047](../decisions/0047-router-task-liveness-and-file-assignment.md) | — |
+| キャッシュ・配信 | ElastiCache（Valkey。pub/sub はクラスタモードを使わない） | 他の題材と同じ。[infrastructure.md](infrastructure.md) の 6 節 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| ファイル・配布 | S3、CloudFront | [ADR-0025](../decisions/0025-content-addressed-checkpoints-and-loading.md) | — |
+| サーバーの描画 | ネイティブの同じ crate、wgpu の Vulkan を Mesa の lavapipe（CPU）で | [ADR-0014](../decisions/0014-gpu-backend-selection-and-fallback.md)、[ADR-0034](../decisions/0034-export-rendering-split.md) | — |
+| 非同期 | transactional outbox → SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | AWS 東京（3 AZ）、大阪を DR。ECS Fargate（Rust のサービスは ARM64、Render Worker は x86-64） | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0046](../decisions/0046-multiplayer-compute-on-fargate-with-drain.md) | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC・可観測性 | Terraform、OpenTelemetry | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 6. 主な決定
 

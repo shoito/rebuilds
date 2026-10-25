@@ -211,28 +211,28 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| サーバーの言語 | TypeScript | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| HTTP・検証 | Hono＋Zod | 他の題材と同じ |
-| クライアントの核 | Rust の `sync-core`（監視の抽象、ローカルの状態の DB、3 つの木と計画、分割、送受信）。デスクトップ・モバイル・Web（WASM）で同じコード | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの追加 |
-| デスクトップの UI | TypeScript（React）を Tauri の WebView で。macOS の File Provider の拡張は Swift の薄い殻で `sync-core` を呼ぶ。Windows の Cloud Files API は Rust から呼ぶ | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| モバイル | Swift（iOS）・Kotlin（Android）の UI、`sync-core` を UniFFI で呼ぶ | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| ローカルの状態の DB | SQLite（WAL） | 第三者の汎用の部品 |
-| 分割とハッシュ | 自前の内容で区切る分割（ギアのハッシュ）、SHA-256 | [ADR-0002](../decisions/0002-chunking-and-block-addressing.md) |
-| 公開 API | REST と JSON。形は本家の API の振る舞いに寄せ、名前は独自にする | api-and-webhooks の領域 |
-| DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7。`pg_partman`（ジャーナルの分割） | [ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md)、[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) |
-| 中身の保存 | S3（SSE-KMS とバケットキー、SHA-256 のチェックサム、バージョニング、Intelligent-Tiering、大阪への CRR） | [ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) |
-| 配信 | CloudFront（OAC で S3 から、署名つき URL）。利用者の中身は `<brand>usercontent.<domain>` | security の領域 |
-| 検索 | Amazon OpenSearch Service（名前は日本語の n-gram、本文は形態素と n-gram） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの追加 |
-| プレビューの変換 | 第三者の汎用の部品（画像の変換、PDF の描画、Office の文書の変換、動画の最初の画面）を、ネットワークのない隔離した Fargate のタスクで | previews-and-thumbnails の領域 |
-| キャッシュ・合図 | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 |
-| 非同期 | transactional outbox → SNS・SQS | 他の題材と同じ |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana。クライアントは匿名の計測だけ（法務の L1） | 他の題材と同じ |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| テスト | Vitest、fast-check（サーバーの性質）、Rust の proptest と自前の決定的な同期のシミュレーター、ファイルシステムの端の場合の試験（実の macOS・Windows の CI の機械）、Testcontainers、Playwright | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| サーバーの言語 | TypeScript | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| HTTP・検証 | Hono＋Zod | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| クライアントの核 | Rust の `sync-core`（監視の抽象、ローカルの状態の DB、3 つの木と計画、分割、送受信）。デスクトップ・モバイル・Web（WASM）で同じコード | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの追加 | Rust・Swift・Kotlin・TypeScript の 4 つの言語を持つ分、エージェントの eval に各言語のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| デスクトップの UI | TypeScript（React）を Tauri の WebView で。macOS の File Provider の拡張は Swift の薄い殻で `sync-core` を呼ぶ。Windows の Cloud Files API は Rust から呼ぶ | [ADR-0001](../decisions/0001-platform-and-stack.md) | Rust・Swift・Kotlin・TypeScript の 4 つの言語を持つ分、エージェントの eval に各言語のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| モバイル | Swift（iOS）・Kotlin（Android）の UI、`sync-core` を UniFFI で呼ぶ | [ADR-0001](../decisions/0001-platform-and-stack.md) | Rust・Swift・Kotlin・TypeScript の 4 つの言語を持つ分、エージェントの eval に各言語のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| ローカルの状態の DB | SQLite（WAL） | 第三者の汎用の部品 | — |
+| 分割とハッシュ | 自前の内容で区切る分割（ギアのハッシュ）、SHA-256 | [ADR-0002](../decisions/0002-chunking-and-block-addressing.md) | — |
+| 公開 API | REST と JSON。形は本家の API の振る舞いに寄せ、名前は独自にする | api-and-webhooks の領域 | — |
+| DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7。`pg_partman`（ジャーナルの分割） | [ADR-0004](../decisions/0004-tenancy-namespaces-and-rls.md)、[ADR-0005](../decisions/0005-namespace-journal-and-cursors.md) | — |
+| 中身の保存 | S3（SSE-KMS とバケットキー、SHA-256 のチェックサム、バージョニング、Intelligent-Tiering、大阪への CRR） | [ADR-0007](../decisions/0007-block-storage-layout-on-s3.md) | — |
+| 配信 | CloudFront（OAC で S3 から、署名つき URL）。利用者の中身は `<brand>usercontent.<domain>` | security の領域 | — |
+| 検索 | Amazon OpenSearch Service（名前は日本語の n-gram、本文は形態素と n-gram） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの追加 | — |
+| プレビューの変換 | 第三者の汎用の部品（画像の変換、PDF の描画、Office の文書の変換、動画の最初の画面）を、ネットワークのない隔離した Fargate のタスクで | previews-and-thumbnails の領域 | — |
+| キャッシュ・合図 | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期 | transactional outbox → SNS・SQS | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana。クライアントは匿名の計測だけ（法務の L1） | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | サーバーは他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest、fast-check（サーバーの性質）、Rust の proptest と自前の決定的な同期のシミュレーター、ファイルシステムの端の場合の試験（実の macOS・Windows の CI の機械）、Testcontainers、Playwright | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

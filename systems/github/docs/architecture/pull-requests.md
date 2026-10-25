@@ -135,21 +135,52 @@ head または base の ref が動くと、ストレージが順序付きの Eve
   - それ以外は、最後の計算から一定時間（例：5 分）経つまで積まない。見られたときに計算する。
 - `mergeable_state`（`clean`、`blocked`、`behind`、`dirty`、`unstable`、`draft`、`unknown`）は、マージ可能か（Git）と ruleset の評価（5 節）を合わせて、読み取りのときに組み立てる。保存しない。
 
-次の図は、`mergeable_state` を組み立てるときの材料と、どこから読むかを示す。値ごとの判定の順序は、この文書ではまだ決めていない。
+`mergeable_state` は、次の決定表 DT-PR-001 で決める（2026-10-25 に決めた）。上から評価し、最初に一致した行の値を返す。本家の値ごとの優先順位は公開されていない（**未検証**）。本システムの順序とする。
+
+| # | 条件 | `mergeable_state` | 材料 |
+| --- | --- | --- | --- |
+| 1 | PR が下書き | `draft` | PR の状態（10 節） |
+| 2 | `(base_sha, head_sha)` のマージ可能かがまだ計算されていない（`mergeable = null`） | `unknown` | `pull_request_merge_states` |
+| 3 | 衝突がある（`mergeable = false`。計算できないときを含む） | `dirty` | `pull_request_merge_states` |
+| 4 | ruleset の要件を満たさない：必須のレビュー、または必須のチェック（5.4 節）が満たされていない | `blocked` | `evaluate(..., merge(method))`（5.3 節） |
+| 5 | strict で、base の tip が head から到達できない（base が進んだ） | `behind` | 5.4 節 |
+| 6 | 必須でないチェックだけが失敗か未完了 | `unstable` | `head_sha` のチェック（5.4 節） |
+| 7 | 上のどれでもない | `clean` | — |
+
+- `blocked` の判定では、strict の「base が最新でない」は数えない。それは 5 の `behind` で返す。
+- 下書きを 1 に置くのは、下書きの間はマージ可能かの計算の結果にかかわらずマージできないため（10 節）。
+
+次の図は、DT-PR-001 の評価の順序を示す。表を正とする。
 
 ```mermaid
-flowchart LR
-    MS["pull_request_merge_states<br/>(base_sha, head_sha) の mergeable<br/>null・true・false"]
-    RS["ruleset の評価<br/>evaluate(..., merge(method))（5.3 節）"]
-    ST["strict：base の tip が<br/>head から到達できるか（5.4 節）"]
-    DR["PR の状態（draft）"]
-    BUILD["読み取りのときに組み立てる<br/>（保存しない）"]
-    OUT["mergeable_state<br/>clean・blocked・behind・dirty・<br/>unstable・draft・unknown"]
-    MS --> BUILD
-    RS --> BUILD
-    ST -->|"満たさなければ behind"| BUILD
-    DR --> BUILD
-    BUILD --> OUT
+flowchart TD
+    S["読み取りのときに組み立てる<br/>（保存しない）"]
+    Q1{"下書きか"}
+    Q2{"mergeable が null か"}
+    Q3{"mergeable が false か"}
+    Q4{"必須のレビュー・<br/>必須のチェックを満たさないか<br/>（5.3 節）"}
+    Q5{"strict で base が<br/>進んでいるか（5.4 節）"}
+    Q6{"必須でないチェックが<br/>失敗か未完了か"}
+    DRAFT["draft"]
+    UNK["unknown"]
+    DIRTY["dirty"]
+    BLK["blocked"]
+    BEH["behind"]
+    UNS["unstable"]
+    CLN["clean"]
+    S --> Q1
+    Q1 -->|"はい"| DRAFT
+    Q1 -->|"いいえ"| Q2
+    Q2 -->|"はい"| UNK
+    Q2 -->|"いいえ"| Q3
+    Q3 -->|"はい"| DIRTY
+    Q3 -->|"いいえ"| Q4
+    Q4 -->|"はい"| BLK
+    Q4 -->|"いいえ"| Q5
+    Q5 -->|"はい"| BEH
+    Q5 -->|"いいえ"| Q6
+    Q6 -->|"はい"| UNS
+    Q6 -->|"いいえ"| CLN
 ```
 
 ### 3.4 差分の上限

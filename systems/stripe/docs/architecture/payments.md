@@ -290,10 +290,10 @@ sequenceDiagram
 | `pending_send` | 参照番号を割り当て、DB に記録した。まだ送っていない |
 | `sent` | 送信を始めた（応答待ち） |
 | `authorized` / `declined` | 結果が確定した |
-| `failed_before_send` | 送信していないことが確実（接続の確立前の失敗、サーキットブレーカーが開いている） |
+| `failed_before_send` | 送信していないことが確実。`pending_send` からはサーキットブレーカーが開いているとき、`sent` からは DNS・TCP・TLS の接続の確立前に失敗したときに入る |
 | `unknown` | 送った可能性があり、結果が分からない |
 | `reversed` | 取り消しを送り、アクワイアラが受理した |
-| `captured` / `partially_refunded` / `refunded` | キャプチャ後 |
+| `captured` / `partially_refunded` / `refunded` | キャプチャ後。返金の合計（`failed`・`canceled` を除く。10.1 節）がキャプチャ額より少なければ `partially_refunded`、等しければ `refunded` |
 
 次の図は、7.3 節の判定の規則と 7.4 節の回復のジョブで、試行の内部状態がどう移るかを示す。
 
@@ -321,11 +321,16 @@ stateDiagram-v2
     unk --> dec : 照会で拒否が見つかった
     unk --> rev : 見つからず、取り消しが受理された
     auth --> cap : キャプチャ
-    cap --> pref : 一部の返金
-    cap --> ref : 全額の返金
-    pref --> ref : 残りの返金
+    cap --> pref : 返金の合計がキャプチャ額より少ない
+    cap --> ref : 返金の合計がキャプチャ額と等しい
+    pref --> pref : 返金の合計がまだキャプチャ額より少ない
+    pref --> ref : 返金の合計がキャプチャ額と等しくなった
+    ref --> pref : 返金が失敗・取り消しで終わり、合計が減った
+    pref --> cap : 同上で、合計が 0 になった
 ```
 
+- `failed_before_send` に入る元は 2 つある。`pending_send` でサーキットブレーカーが開いている（送信を始めない）ときと、`sent` で DNS・TCP・TLS の接続の確立前に失敗した（要求のバイトがコネクタに届いていない）とき。接続の確立後の失敗は `unknown` にする（7.3 節）。
+- 返金の合計は、返金を作るたびと、返金が `failed`・`canceled` で終わるたびに、10.1 節の検査と同じ数え方（`failed`・`canceled` を除く）で数え直す。返金が失敗・取り消しで終わって合計が減ったら、状態を戻す（`refunded` → `partially_refunded`、合計が 0 なら `captured`）（2026-10-25 に決めた）。キャプチャ額より少なければ `partially_refunded`、等しければ `refunded` にする。合計はキャプチャ額を超えない（10.1 節）。
 - `unknown` のあいだ、PaymentIntent は `processing` にある。照会も取り消しもできないときは `unknown` のまま待つ（7.4 節）。
 - 参照番号は Charge の ID から決まる値で、コネクタごとに一意。再送・照会・取り消しは、すべて同じ参照番号で行う（[ADR-0004](../decisions/0004-idempotency.md) のコネクタの層）。
 - `connector_requests` に、要求の種類・参照番号・送信の時刻・応答（生のコードを含む）を追記する。カード番号は含めない（CDE の中で組み立て、本体には結果だけを返す）。
@@ -334,7 +339,8 @@ stateDiagram-v2
 
 | 起きたこと | 判定 | 次の手 |
 | --- | --- | --- |
-| DNS・TCP・TLS の確立前に失敗、サーキットブレーカーが開いている | `failed_before_send` | 別のコネクタへ振り分けてよい（8 節） |
+| サーキットブレーカーが開いている（`pending_send` から。送信を始めない） | `failed_before_send` | 別のコネクタへ振り分けてよい（8 節） |
+| DNS・TCP・TLS の接続の確立前に失敗（`sent` から） | `failed_before_send` | 別のコネクタへ振り分けてよい（8 節） |
 | 応答があり、承認 | `authorized` | 3.1 節の遷移 |
 | 応答があり、拒否（カード発行会社・アクワイアラの明確な拒否） | `declined` | `requires_payment_method` |
 | 送信後のタイムアウト、切断、5xx、応答の解釈に失敗 | `unknown` | PaymentIntent を `processing` にし、回復のジョブに渡す |
@@ -442,13 +448,18 @@ sequenceDiagram
 | 今の状態 | きっかけ | 次の状態 |
 | --- | --- | --- |
 | （なし） | 作成（カード） | `pending` |
-| （なし） | 作成（コンビニ・銀行振込で、顧客の口座情報がない） | `requires_action`（顧客に口座情報の入力を依頼） |
-| `requires_action` | 顧客が口座情報を入力 | `pending` |
+| （なし） | 作成（コンビニ・銀行振込で、利用可能な残高が足りない） | `failed`（`insufficient_funds`）。口座情報の有無は見ない |
+| （なし） | 作成（コンビニ・銀行振込で、残高が足り、顧客の口座情報がない） | `requires_action`（顧客に口座情報の入力を依頼） |
+| （なし） | 作成（コンビニ・銀行振込で、残高が足り、顧客の口座情報がある） | `pending` |
+| `requires_action` | 顧客が口座情報を入力 | `pending`（送る前に残高を確かめ直す） |
+| `pending`（送る前） | 確かめ直した残高が足りない（コンビニ・銀行振込） | `failed`（`insufficient_funds`） |
 | `requires_action` | 45 日たっても入力がない | `failed` |
 | `requires_action` | 加盟店が取り消した | `canceled` |
 | `pending` | コネクタ・銀行が受理した | `succeeded` |
 | `pending` | コネクタ・銀行が拒否した | `failed`（`failure_reason`） |
 | `succeeded` | 銀行から組み戻し（口座の誤りなど） | `requires_action`（口座情報を再び依頼）か `failed` |
+
+コンビニ・銀行振込の返金は、作成の時点で先に残高を確かめ、足りるときだけ口座情報を確かめる（2026-10-25 に決めた）。残高が足りずに失敗する返金のために、顧客へ口座情報の入力を頼まないためである。口座情報の入力を待つあいだに残高が減ることがあるので、入力の後に `pending` で送る前にもう一度確かめる。
 
 次の図は、上の表と、下の「残高が足りないとき」の規則をまとめたものである。表を正とする。`awaiting_balance` は API では `pending` に見える内部の状態である。
 
@@ -463,15 +474,19 @@ stateDiagram-v2
         chk --> awaiting : カードで足りない
         awaiting --> sending : 残高が増えた後に確かめ直し、足りた
     }
+    state create <<choice>>
     state "requires_action" as ra
     state "succeeded" as succ
     state "failed" as failed
     state "canceled" as canc
 
     [*] --> pending : 作成（カード）
-    [*] --> ra : 作成（コンビニ・銀行振込、口座情報がない）
-    [*] --> failed : 作成（コンビニ・銀行振込、残高が足りない）
+    [*] --> create : 作成（コンビニ・銀行振込）<br/>先に残高を確かめる
+    create --> failed : 残高が足りない
+    create --> ra : 残高が足り、口座情報がない
+    create --> pending : 残高が足り、口座情報がある
     ra --> pending : 顧客が口座情報を入力
+    chk --> failed : コンビニ・銀行振込で足りない
     ra --> failed : 45 日たっても入力がない
     ra --> canc : 加盟店が取り消した
     sending --> succ : コネクタ・銀行が受理した
@@ -487,7 +502,7 @@ stateDiagram-v2
 - **残高が足りないときは本家に合わせる。** 本家は、返金を利用可能な残高（保留中を含まない）から引き、足りなければ「カードの返金は残高が足りるまで保留し、他の決済手段の返金は失敗にする」（[支払いの返金とキャンセル](https://docs.stripe.com/refunds)、2026-09-26 に確認）。
   - 作成の時点で、`merchant_available` の全スロットを `FOR UPDATE` で読んで確かめる（[ADR-0016](../decisions/0016-hot-accounts-and-ledger-sharding.md)）。足りれば、9 節の仕訳を書いてからコネクタへ送る。
   - カードで足りなければ、Refund を `pending` のまま保留する（内部の状態 `awaiting_balance`）。仕訳もコネクタへの送信もしない。利用可能への移動（[ledger.md](ledger.md) の 5.2 節）など残高が増えた後に、古い順に確かめ直す。保留が `refund.balance_hold_max`（既定 30 日。本家は日数を公開していないので本システムの値）を過ぎたら `failed`（`insufficient_funds`）にする。保留中は加盟店が取り消せる（`canceled`）。
-  - コンビニ・銀行振込で足りなければ、すぐに `failed`（`insufficient_funds`）にする。
+  - コンビニ・銀行振込で足りなければ、すぐに `failed`（`insufficient_funds`）にする。作成の時点では口座情報より先に確かめ、`requires_action` からの入力の後は送る前に確かめ直す（上の表）。
   - Dispute の引き落としは残高を確かめず、マイナスを許す（[disputes.md](disputes.md) の 5.1 節）。マイナスの回収は [ledger.md](ledger.md) の 4.5 節。
 
 ### 10.3 非同期

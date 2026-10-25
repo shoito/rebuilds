@@ -182,14 +182,17 @@ stateDiagram-v2
   active --> locked: 連続の失敗
   locked --> active: 期限が過ぎる／管理者が解除
   locked --> disabled: 失敗が 100 回（通算の連続）
+  disabled --> active: 管理者が disabled を解除
+  disabled --> [*]: 管理者が外す（MFA の再設定。消す）
   active --> [*]: 本人・管理者が外す（消す）
   note right of disabled
-    管理者の再設定まで使えない
+    管理者の操作でだけ抜ける
   end note
 ```
 
 - `pending` の認証器は、10 分以内に確かめないと消す。TOTP は最初のコードの照合、WebAuthn は登録の応答の検証で `active` にする。
 - `locked`・`disabled` は 7 節。
+- `disabled` から抜けるのは、8 節の管理者の操作だけ。`disabled` の解除なら `active` に戻し、`failure_count` を 0 にする（2026-10-25 に決めた。0 に戻さないと、次の 1 回の失敗で再び `disabled` になる）。認証器を外す（MFA の再設定）なら行を消し、本人は次のログインで登録し直す。
 
 ### 4.3 登録のチケット
 
@@ -354,7 +357,7 @@ stateDiagram-v2
 | 対象 | 数え方 | 上限 | 超えたとき |
 | --- | --- | --- | --- |
 | TOTP・リカバリーコード・WebAuthn（2 つ目の要素） | 認証器ごとの連続の失敗 | 10 回 | 認証器を `locked` にし、15 分後に自動で戻す。戻すたびに次の期間を倍にする（最大 24 時間） |
-| 同じ認証器の通算の連続の失敗 | 成功で 0 に戻る | 100 回 | `disabled`。管理者の再設定まで使えない（NIST SP 800-63B-4 の 100 回以下） |
+| 同じ認証器の通算の連続の失敗 | 成功で 0 に戻る | 100 回 | `disabled`。管理者が解除するか認証器を外す（MFA の再設定）まで使えない（4.2 節。NIST SP 800-63B-4 の 100 回以下） |
 | メールの OTP | チャレンジごと | 5 回 | そのチャレンジを使えなくする。再送の上限は 5.3 |
 | MFA の画面全体 | ユーザー × IP | ブルートフォースの防御の値（[attack-protection.md](attack-protection.md)） | ユーザー × IP のブロック |
 

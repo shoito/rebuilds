@@ -176,24 +176,24 @@ K8（参加者・分あたり） = （インターネットへの転送
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 制御の側の言語 | TypeScript（API、Signaling Gateway、Meeting Actor、Media Node の制御、Web） | 他の題材と同じ。シグナリングのメッセージの型を、サーバーと Web クライアントで共有できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| API | Hono＋Zod | 他の題材と同じ |
-| SFU | mediasoup v3（C++ の worker を、Node.js の API から制御する）。RED と、E2EE の VP8・VP9 の Dependency Descriptor の判断を足したフォークを持つ | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)、[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md) |
-| TURN | coturn（UDP・TCP 3478、TLS 443） | [ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md) |
-| Web クライアント | React＋ブラウザの WebRTC＋mediasoup-client | [ADR-0003](../decisions/0003-client-platform.md)、[ADR-0021](../decisions/0021-web-client-browser-support.md) |
-| E2EE | SFrame（RFC 9605）と MLS（RFC 9420）。MLS は OpenMLS（Rust）を WebAssembly にして使う | [ADR-0004](../decisions/0004-encryption-and-e2ee.md)、[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)〜[ADR-0030](../decisions/0030-security-code-and-e2ee-feature-limits.md) |
-| アプリ（MVP の後） | デスクトップは Electron、モバイルはネイティブ。共通のコアは Rust（シグナリングのステートマシンと E2EE の鍵管理） | [ADR-0023](../decisions/0023-desktop-electron-mobile-native.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md) |
-| 音声認識 | Amazon Transcribe streaming（ja-JP、東京）を ASR Adapter の裏で | [ADR-0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) |
-| 認証 | Better Auth を自前でホスト（Slack の題材と同じ） | [ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md) |
-| DB | Aurora PostgreSQL 18。組織に属する表は FORCE RLS | 他の題材と同じ（[ADR-0058](../decisions/0058-tenant-tables-with-force-rls.md)） |
-| 会議の状態の補助 | Valkey（Meeting Actor のリース、状態のスナップショット、チャット、流量の制限） | [ADR-0005](../decisions/0005-meeting-state-and-signaling.md)、[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md) |
-| 実行基盤（制御） | AWS（ECS Fargate、Aurora、ElastiCache、SQS、S3、CloudFront）。東京、災害復旧は大阪 | 他の題材と同じ |
-| 実行基盤（メディア） | EC2 の `media-prod` のアカウント（東京は c8gn.16xlarge、大阪は c6gn.16xlarge）。パブリック IP（BYOIP）を直接持つ。閾値を超えたら Edge（コロケーション・ベアメタル） | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0048](../decisions/0048-accounts-network-and-media-regions.md)〜[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs。メディアの品質の数値（`getStats`、RTCP）は `qos.report` → Firehose → S3・Athena | [observability.md](observability.md)、[ADR-0051](../decisions/0051-qos-telemetry-pipeline.md)、[ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md) |
-| ネットワークの劣化の試験 | `media-lab` の EC2 の上の名前空間と `tc netem`。Playwright で実際のブラウザを動かす。Safari は macOS の dummynet | [ADR-0054](../decisions/0054-network-impairment-lab.md)、[quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 制御の側の言語 | TypeScript（API、Signaling Gateway、Meeting Actor、Media Node の制御、Web） | 他の題材と同じ。シグナリングのメッセージの型を、サーバーと Web クライアントで共有できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる。制御を TypeScript で統一し、エージェントが境界をまたいで型で整合を保てる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| API | Hono＋Zod | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| SFU | mediasoup v3（C++ の worker を、Node.js の API から制御する）。RED と、E2EE の VP8・VP9 の Dependency Descriptor の判断を足したフォークを持つ | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0017](../decisions/0017-opus-dtx-fec-red.md)、[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md) | — |
+| TURN | coturn（UDP・TCP 3478、TLS 443） | [ADR-0015](../decisions/0015-turn-coturn-and-ephemeral-credentials.md) | — |
+| Web クライアント | React＋ブラウザの WebRTC＋mediasoup-client | [ADR-0003](../decisions/0003-client-platform.md)、[ADR-0021](../decisions/0021-web-client-browser-support.md) | — |
+| E2EE | SFrame（RFC 9605）と MLS（RFC 9420）。MLS は OpenMLS（Rust）を WebAssembly にして使う | [ADR-0004](../decisions/0004-encryption-and-e2ee.md)、[ADR-0028](../decisions/0028-sframe-encoded-transform-and-dependency-descriptor.md)〜[ADR-0030](../decisions/0030-security-code-and-e2ee-feature-limits.md) | — |
+| アプリ（MVP の後） | デスクトップは Electron、モバイルはネイティブ。共通のコアは Rust（シグナリングのステートマシンと E2EE の鍵管理） | [ADR-0023](../decisions/0023-desktop-electron-mobile-native.md)、[ADR-0024](../decisions/0024-shared-rust-core-and-test-vectors.md) | — |
+| 音声認識 | Amazon Transcribe streaming（ja-JP、東京）を ASR Adapter の裏で | [ADR-0026](../decisions/0026-asr-engine-amazon-transcribe-with-adapter.md) | — |
+| 認証 | Better Auth を自前でホスト（Slack の題材と同じ） | [ADR-0038](../decisions/0038-organizations-users-roles-and-sso.md) | — |
+| DB | Aurora PostgreSQL 18。組織に属する表は FORCE RLS | 他の題材と同じ（[ADR-0058](../decisions/0058-tenant-tables-with-force-rls.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 会議の状態の補助 | Valkey（Meeting Actor のリース、状態のスナップショット、チャット、流量の制限） | [ADR-0005](../decisions/0005-meeting-state-and-signaling.md)、[ADR-0007](../decisions/0007-meeting-actor-lease-and-epoch.md) | — |
+| 実行基盤（制御） | AWS（ECS Fargate、Aurora、ElastiCache、SQS、S3、CloudFront）。東京、災害復旧は大阪 | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤（メディア） | EC2 の `media-prod` のアカウント（東京は c8gn.16xlarge、大阪は c6gn.16xlarge）。パブリック IP（BYOIP）を直接持つ。閾値を超えたら Edge（コロケーション・ベアメタル） | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0048](../decisions/0048-accounts-network-and-media-regions.md)〜[ADR-0050](../decisions/0050-disaster-recovery-and-edge-migration.md) | — |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs。メディアの品質の数値（`getStats`、RTCP）は `qos.report` → Firehose → S3・Athena | [observability.md](observability.md)、[ADR-0051](../decisions/0051-qos-telemetry-pipeline.md)、[ADR-0052](../decisions/0052-media-slis-and-mos-estimation.md) | — |
+| ネットワークの劣化の試験 | `media-lab` の EC2 の上の名前空間と `tc netem`。Playwright で実際のブラウザを動かす。Safari は macOS の dummynet | [ADR-0054](../decisions/0054-network-impairment-lab.md)、[quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

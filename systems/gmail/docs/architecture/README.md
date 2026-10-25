@@ -233,29 +233,29 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 管理の面の言語 | TypeScript（Hono＋Zod）：`jmap-api`、`push-*`、`accounts`、`admin-api`、`relay` | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| メールの面と保存の言語 | Rust（Tokio）：`mx-edge`、`inbound-pipeline`、`spam-scorer`、`content-scanner`、`outbound-gate`、`mta-out`、`imap-server`、`mailstore`、`blob-packer`、`search-*` | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| SMTP・MIME | SMTP のステートマシン・待ち行列・配送は自前。コマンドの構文の層と MIME の解析は汎用のライブラリ（候補は PoC で選ぶ）を、自前の上限の層で包む | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| 認証 | SPF・DKIM・DMARC・ARC の評価と署名は自前。暗号（RSA、Ed25519）と DNS の解決は汎用のライブラリ。DNSSEC を検証する再帰の解決は Route 53 Resolver | sender-authentication の領域 |
-| 選別 | 規則のエンジンと評判は自前。分類器の推論は ONNX Runtime（汎用の実行系）。学習は Python（オフライン、隔離したアカウント）。マルウェアの署名の検出は汎用のエンジン（ClamAV の類）と YARA の形の規則 | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) |
-| 配送の待ち行列 | S3 のスプール＋SQS（標準。受信は層で 2 つ）。送信は SQS の遅延と送り直し | 他の題材と同じ部品（[ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)） |
-| メッセージの保存 | S3 の blob（zstd のフレーム、blob ごとのデータの鍵）と、パックのオブジェクト | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) |
-| メタデータ | Aurora PostgreSQL 18。directory は 1 つ、メールボックスはアカウントで分けたシャード。FORCE RLS と `SET LOCAL`、UUIDv7、outbox | [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) |
-| 検索 | 自前の索引（アカウントごとのセグメント、2-gram と語、doc values、状態のビットマップ）。S3 と NVMe のキャッシュ | [ADR-0009](../decisions/0009-search-index-design.md) |
-| 同期 | JMAP（Core・Mail・WebSocket・EventSource）、IMAP4rev2（CONDSTORE・QRESYNC・IDLE・OBJECTID・MOVE・SPECIAL-USE）、SMTP の submission（465・587）。認証は OAuth（`OAUTHBEARER`） | [ADR-0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) |
-| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 |
-| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ |
-| 実行基盤 | 状態を持たない部品は ECS Fargate。固定の IP の要る `mx-edge`・`mta-out` と、NVMe の要る `search-node` は ECS の EC2 のキャパシティープロバイダー | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| IP | 自社の IP の範囲を BYOIP で持ち込み、受信の MX と送信のプールに使う。IPv4 と IPv6、正引きと逆引きを揃える | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| オブジェクトストレージ | S3（SSE-KMS とバケットキー、大阪への CRR と RTC） | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) |
-| IaC | Terraform | 他の題材と同じ |
-| 観測 | OpenTelemetry → CloudWatch・AMP・Managed Grafana。外からの見張り（見張りのメールの送受） | observability の領域 |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| Web | React（TypeScript）、JMAP のクライアントのライブラリは自前 | web-client の領域 |
-| モバイル | iOS（Swift）・Android（Kotlin）。オフラインの DB と JMAP の同期の層を各 OS で持つ | mobile-and-push の領域 |
-| テスト | `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、自前の SMTP の相手の模型（`smtp-peer-sim`）、認証の試験のベクトル、選別の評価の枠、同期の収束の模型、Testcontainers（PostgreSQL 18、Valkey）、LocalStack（S3・SQS）、Playwright | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 管理の面の言語 | TypeScript（Hono＋Zod）：`jmap-api`、`push-*`、`accounts`、`admin-api`、`relay` | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| メールの面と保存の言語 | Rust（Tokio）：`mx-edge`、`inbound-pipeline`、`spam-scorer`、`content-scanner`、`outbound-gate`、`mta-out`、`imap-server`、`mailstore`、`blob-packer`、`search-*` | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | Rust を持つ分、エージェントの eval に Rust のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| SMTP・MIME | SMTP のステートマシン・待ち行列・配送は自前。コマンドの構文の層と MIME の解析は汎用のライブラリ（候補は PoC で選ぶ）を、自前の上限の層で包む | [ADR-0001](../decisions/0001-platform-and-stack.md) | — |
+| 認証 | SPF・DKIM・DMARC・ARC の評価と署名は自前。暗号（RSA、Ed25519）と DNS の解決は汎用のライブラリ。DNSSEC を検証する再帰の解決は Route 53 Resolver | sender-authentication の領域 | — |
+| 選別 | 規則のエンジンと評判は自前。分類器の推論は ONNX Runtime（汎用の実行系）。学習は Python（オフライン、隔離したアカウント）。マルウェアの署名の検出は汎用のエンジン（ClamAV の類）と YARA の形の規則 | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0008](../decisions/0008-spam-pipeline-boundary-and-secrecy.md) | — |
+| 配送の待ち行列 | S3 のスプール＋SQS（標準。受信は層で 2 つ）。送信は SQS の遅延と送り直し | 他の題材と同じ部品（[ADR-0002](../decisions/0002-accept-then-filter.md)、[ADR-0011](../decisions/0011-spool-commit-and-sweeper.md)） | — |
+| メッセージの保存 | S3 の blob（zstd のフレーム、blob ごとのデータの鍵）と、パックのオブジェクト | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) | — |
+| メタデータ | Aurora PostgreSQL 18。directory は 1 つ、メールボックスはアカウントで分けたシャード。FORCE RLS と `SET LOCAL`、UUIDv7、outbox | [ADR-0007](../decisions/0007-tenancy-accounts-orgs-and-rls.md) | — |
+| 検索 | 自前の索引（アカウントごとのセグメント、2-gram と語、doc values、状態のビットマップ）。S3 と NVMe のキャッシュ | [ADR-0009](../decisions/0009-search-index-design.md) | — |
+| 同期 | JMAP（Core・Mail・WebSocket・EventSource）、IMAP4rev2（CONDSTORE・QRESYNC・IDLE・OBJECTID・MOVE・SPECIAL-USE）、SMTP の submission（465・587）。認証は OAuth（`OAUTHBEARER`） | [ADR-0006](../decisions/0006-sync-protocol-jmap-imap-and-modseq.md) | — |
+| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | 状態を持たない部品は ECS Fargate。固定の IP の要る `mx-edge`・`mta-out` と、NVMe の要る `search-node` は ECS の EC2 のキャパシティープロバイダー | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | — |
+| IP | 自社の IP の範囲を BYOIP で持ち込み、受信の MX と送信のプールに使う。IPv4 と IPv6、正引きと逆引きを揃える | [ADR-0001](../decisions/0001-platform-and-stack.md) | — |
+| オブジェクトストレージ | S3（SSE-KMS とバケットキー、大阪への CRR と RTC） | [ADR-0003](../decisions/0003-message-storage-layout-and-dedupe.md) | — |
+| IaC | Terraform | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 観測 | OpenTelemetry → CloudWatch・AMP・Managed Grafana。外からの見張り（見張りのメールの送受） | observability の領域 | — |
+| フラグ | AWS AppConfig | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| Web | React（TypeScript）、JMAP のクライアントのライブラリは自前 | web-client の領域 | — |
+| モバイル | iOS（Swift）・Android（Kotlin）。オフラインの DB と JMAP の同期の層を各 OS で持つ | mobile-and-push の領域 | — |
+| テスト | `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、自前の SMTP の相手の模型（`smtp-peer-sim`）、認証の試験のベクトル、選別の評価の枠、同期の収束の模型、Testcontainers（PostgreSQL 18、Valkey）、LocalStack（S3・SQS）、Playwright | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

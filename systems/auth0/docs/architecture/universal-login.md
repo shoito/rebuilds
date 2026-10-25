@@ -59,38 +59,52 @@
 
 ### 3.2 トランザクションのステートマシン
 
-```
-             /authorize の検証が通る
-                    │
-                    ▼
-             ┌─────────────┐   識別子    ┌──────────────┐
-             │ identifier  │────────────▶│ password     │─┐
-             └─────┬───────┘             └──────────────┘ │ 照合の成功
-       ソーシャル・ │  サインアップ                        │
-       パスキー     ▼                                      ▼
-             ┌─────────────┐  コード   ┌──────────────┐   ┌──────────────────┐
-             │ signup      │──────────▶│ signup_verify│──▶│ first_factor_done │
-             └─────────────┘           └──────────────┘   └────────┬─────────┘
-                                                                     │
-               ┌─────────────────────┬───────────────────────┬──────┴───────────┐
-               ▼                     ▼                       ▼                  ▼
-       ┌──────────────┐     ┌────────────────┐      ┌──────────────┐    （どれも不要）
-       │ mfa_required │────▶│ link_proposed  │─────▶│ consent_req. │──────┐
-       └──────────────┘     └────────────────┘      └──────────────┘      │
-                                                                           ▼
-                                                                  ┌────────────────┐
-                                                                  │ completed      │ コードを発行して
-                                                                  └────────────────┘ redirect_uri へ
-  どの状態からも：60 分の経過 → expired、利用者の取り消し → aborted（access_denied で戻す）
-```
+ログインのトランザクションは、最初の要素（パスワード、ソーシャル、パスキー、サインアップ）を済ませて `first_factor_done` に入る。その後の手順は、リンクの提案 → MFA → 同意 → 完了の決まった順に進み、要らない手順は飛ばす（2026-10-25 に決めた）。リンクの提案を MFA より前に置くのは、リンクするときに既存のユーザーとして認証し、その MFA の方針を適用するため（[users-and-profiles.md](users-and-profiles.md) の 5.2 節、[connections.md](connections.md) の 5.1 節）。
 
-| 遷移 | 条件 | 記録 |
-| --- | --- | --- |
-| → `first_factor_done` | パスワードの照合、ソーシャルの `VerifiedIdentity`、パスキーの検証のどれか | `amr` の候補、接続、`user_id` |
-| → `mfa_required` | テナント・アプリの MFA の方針、`acr_values`、step-up（[mfa-and-passkeys.md](mfa-and-passkeys.md)） | — |
-| → `link_proposed` | リンクの提案の表（[users-and-profiles.md](users-and-profiles.md) の 5.3 節） | — |
-| → `consent_required` | 第三者のアプリで `grants` にないスコープ、`prompt=consent`、規約の新しいバージョンの再同意 | — |
-| → `completed` | すべて済んだ | セッションを作る（[sessions-and-sso.md](sessions-and-sso.md)）。トランザクションを使用済みにする |
+| # | 前の状態 | 次の状態 | 条件 | 記録 |
+| --- | --- | --- | --- | --- |
+| 1 | （なし） | `identifier` | `/authorize` の検証が通る | 行を作る |
+| 2 | `identifier` | `password` | 識別子の送信 | — |
+| 3 | `identifier` | `signup` | サインアップへの導線 | — |
+| 4 | `signup` | `signup_verify` | 識別子と同意の送信。確認のコードを送る | — |
+| 5 | `password` | `first_factor_done` | パスワードの照合の成功 | `amr` の候補、接続、`user_id` |
+| 6 | `signup_verify` | `first_factor_done` | コードの確認とパスワードを決める（3.1 節の `/u/signup/verify`・`/u/signup/password`） | `amr` の候補、接続、`user_id` |
+| 7 | `identifier` | `first_factor_done` | ソーシャルの `VerifiedIdentity`、パスキーの検証のどちらか | `amr` の候補、接続、`user_id` |
+| 8 | `first_factor_done` | `link_proposed` | リンクの提案の表（[users-and-profiles.md](users-and-profiles.md) の 5.3 節）で提案する | — |
+| 9 | `first_factor_done`、`link_proposed` | `mfa_required` | テナント・アプリの MFA の方針、`acr_values`、step-up（[mfa-and-passkeys.md](mfa-and-passkeys.md)）。`link_proposed` からは、提案に答えた後（つなぐなら既存のユーザーとしての認証の後） | — |
+| 10 | `first_factor_done`、`link_proposed`、`mfa_required` | `consent_required` | 第三者のアプリで `grants` にないスコープ、`prompt=consent`、規約の新しいバージョンの再同意。`mfa_required` からは MFA の成功の後 | — |
+| 11 | `first_factor_done`、`link_proposed`、`mfa_required`、`consent_required` | `completed` | 残りの手順がすべて済んだか、要らない | セッションを作る（[sessions-and-sso.md](sessions-and-sso.md)）。トランザクションを使用済みにする |
+| 12 | `completed` 以外のどれか | `expired` | 60 分の経過 | — |
+| 13 | `completed` 以外のどれか | `aborted` | 利用者の取り消し（`access_denied` で戻す） | — |
+
+- 行 8〜11 は、前の状態の手順が済んだ時点で、上の行から順に条件を確かめ、最初に当てはまる状態へ進む。当てはまらない手順は飛ばす（2026-10-25 に決めた）。
+
+次の図は上の表の要約で、表を正とする。期限切れと取り消し（行 12・13）は、`completed` 以外のどの状態からも起きるので、図では矢印を省き、注記にした。
+
+```mermaid
+stateDiagram-v2
+  [*] --> identifier: /authorize の検証が通る
+  identifier --> password: 識別子
+  identifier --> signup: サインアップ
+  signup --> signup_verify: コードを送る
+  password --> first_factor_done: 照合の成功
+  signup_verify --> first_factor_done: コードの確認とパスワード
+  identifier --> first_factor_done: ソーシャル・パスキー
+  first_factor_done --> link_proposed: リンクを提案する
+  first_factor_done --> mfa_required: MFA が要る
+  first_factor_done --> consent_required: 同意が要る
+  first_factor_done --> completed: どれも要らない
+  link_proposed --> mfa_required: MFA が要る
+  link_proposed --> consent_required: 同意が要る
+  link_proposed --> completed: どれも要らない
+  mfa_required --> consent_required: 同意が要る
+  mfa_required --> completed: 同意が要らない
+  consent_required --> completed: 同意の後
+  completed --> [*]: コードを発行して redirect_uri へ
+  note right of first_factor_done
+    completed 以外のどの状態からも<br/>60 分の経過で expired、取り消しで aborted
+  end note
+```
 
 - 状態は `login_transactions.step` に持ち、画面の `POST` は、その状態で許された操作だけを受ける。許されない操作（例：`password` の状態で `mfa` の送信）は 409 にして、今の状態の画面へ送る。
 - 同じトランザクションの `POST` は、行のバージョン（楽観ロック）で直列にする。2 つのタブからの同時の送信で、状態が飛ばない。

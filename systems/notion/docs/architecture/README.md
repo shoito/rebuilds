@@ -153,16 +153,16 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（クライアント・API・Worker） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| クライアント | React、ブロックの層は自前、テキストの編集はブロックごとの ProseMirror。ローカルの保存は SQLite（WASM、`opfs-sahpool`） | [ADR-0007](../decisions/0007-block-editor-with-per-block-prosemirror.md)、[ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md) |
-| デスクトップ | Electron で Web のクライアントを包む | [ADR-0009](../decisions/0009-electron-desktop-shell.md) |
-| 共同編集 | テキストはブロックごとの CRDT（Fugue＋Peritext、自前の実装）。構造とプロパティはサーバーの順序 | [ADR-0010](../decisions/0010-text-crdt-with-server-ordered-structure.md) |
-| 検索 | Amazon OpenSearch Service（S1 から） | [ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md) |
-| DB | Aurora PostgreSQL 18。論理シャード 480（PostgreSQL のスキーマ）とアプリの中のルーター | [ADR-0027](../decisions/0027-shard-router.md) |
-| 配信 | WebSocket の Gateway と、配信のバス（Slack の設計に倣う） | |
-| 実行基盤・IaC・可観測性 | AWS、Terraform、OpenTelemetry | 他の題材と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（クライアント・API・Worker） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | — |
+| クライアント | React、ブロックの層は自前、テキストの編集はブロックごとの ProseMirror。ローカルの保存は SQLite（WASM、`opfs-sahpool`） | [ADR-0007](../decisions/0007-block-editor-with-per-block-prosemirror.md)、[ADR-0008](../decisions/0008-sqlite-wasm-opfs-local-store.md) | — |
+| デスクトップ | Electron で Web のクライアントを包む | [ADR-0009](../decisions/0009-electron-desktop-shell.md) | — |
+| 共同編集 | テキストはブロックごとの CRDT（Fugue＋Peritext、自前の実装）。構造とプロパティはサーバーの順序 | [ADR-0010](../decisions/0010-text-crdt-with-server-ordered-structure.md) | — |
+| 検索 | Amazon OpenSearch Service（S1 から） | [ADR-0023](../decisions/0023-search-engine-and-permission-filtering.md) | — |
+| DB | Aurora PostgreSQL 18。論理シャード 480（PostgreSQL のスキーマ）とアプリの中のルーター | [ADR-0027](../decisions/0027-shard-router.md) | — |
+| 配信 | WebSocket の Gateway と、配信のバス（Slack の設計に倣う） | | — |
+| 実行基盤・IaC・可観測性 | AWS、Terraform、OpenTelemetry | 他の題材と同じ | — |
 
 ## 5. 主な決定
 

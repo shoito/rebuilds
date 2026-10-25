@@ -200,7 +200,7 @@ RETURNING id, reservation_id;
 | 20:00:00.125 | `checkStayRules` 通過。`hold` の行 `nights [12/31, 1/3)`、`block_span [12/31, 1/4)` を挿入 | 待つ |
 | 20:00:00.131 | 予約（`pending_payment`）と outbox を書き、`COMMIT` | ロックを得る |
 | 20:00:00.133 | 支払いへ | `ical_block` `[12/30, 1/2)` の挿入が `block_span [12/31, 1/4)` と重なる → 0 行 |
-| 20:00:00.135 | — | 6.3 節で切り取る：重ならない `[12/30, 12/31)` だけを `ical_block` で挿入。`[12/31, 1/2)` を `calendar_conflicts` に記録。`COMMIT` |
+| 20:00:00.135 | — | [calendar-sync.md](calendar-sync.md) の 6.3 節で切り取る：重ならない `[12/30, 12/31)` だけを `ical_block` で挿入。`[12/31, 1/2)` を `calendar_conflicts` に記録。`COMMIT` |
 | 20:00:01 | — | outbox → ホストへの知らせ（NFR-003 の 5 分以内）、運用の待ち行列 |
 
 表の流れを図にすると次のとおり。2 つのトランザクションはリスティングの行のロックで直列になり、後からロックを得た `ical-sync` の挿入が、先に入った `hold` の行と重なって 0 行になる。

@@ -441,11 +441,11 @@ flowchart LR
 
 他の領域への依頼（この文書では決めず、各領域の文書の更新を待つ）：
 
-- orgs-users-and-auth の領域：ログインできず、ライセンスを消費しない「フォームの利用者」の種類を足す。権限セットの付与を `security:sensitive` の変更にする。
-- governor-limits の領域：`alloc.web_form_submissions` を割り当ての表に足す（初期値の案：Pro 1,000、Enterprise 5,000、Unlimited 10,000、Developer・試用 100、Sandbox 100）。
-- automation-flows の領域：`$Origin` に `web_form` を足す。
+- orgs-users-and-auth の領域：ログインできず、ライセンスを消費しない「フォームの利用者」の種類を足す。権限セットの付与を `security:sensitive` の変更にする（2026-10-25 に反映済み）。
+- governor-limits の領域：`alloc.web_form_submissions` を割り当ての表に足す（初期値の案：Pro 1,000、Enterprise 5,000、Unlimited 10,000、Developer・試用 100、Sandbox 100）（2026-10-25 に反映済み）。
+- automation-flows の領域：`$Origin` に `web_form` を足す（2026-10-25 に反映済み）。
 - security の領域：信頼境界に公開の受け口を足し、漏えいの経路の登録簿に `LEAK-031` を足す（2026-10-10 に反映済み）。
-- infrastructure の領域：`forms.<brand>.<domain>` の CloudFront・WAF の規則と、`form-intake` のサービス。
+- infrastructure の領域：`forms.<brand>.<domain>` の CloudFront・WAF の規則と、`form-intake` のサービス（2026-10-25 に反映済み。`form-intake` の台数は E5 の着手の時に決める）。
 
 ## 10. 障害のとき
 

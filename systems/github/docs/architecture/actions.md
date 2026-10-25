@@ -127,7 +127,7 @@ stateDiagram-v2
 
 ### 4.2 ジョブ
 
-次の図は、下の表と、表にない終わり方（否認・期限切れ、`skipped`）をまとめたものである。条件と担当は表を正とする。
+次の図は、下の表をまとめたものである。条件と担当は表を正とする。
 
 ```mermaid
 stateDiagram-v2
@@ -157,6 +157,8 @@ stateDiagram-v2
 | --- | --- | --- |
 | created → waiting | `environment` があり、保護の規則がある | Scheduler |
 | created/waiting → queued | `needs` がすべて完了し、`if` が真、環境の規則を満たした、concurrency に空きがある | Scheduler |
+| created → skipped | `needs` のジョブが失敗した、または `if` が偽 | Scheduler |
+| waiting → completed(failure) | 環境の承認が否認された、または期限が切れた（5.3 節） | Scheduler |
 | queued → assigned | ランナーの long poll に渡した | Broker |
 | assigned → in_progress | ランナーが受け取りを確認した（60 秒以内） | Broker。確認がなければ queued に戻す |
 | in_progress → completed | ランナーが結果を報告した | Broker |

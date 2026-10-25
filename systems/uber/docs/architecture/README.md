@@ -170,23 +170,23 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語（一般） | TypeScript（API、Trips、Pricing、Payments、供給、管理画面、配信の振り分け） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 言語（熱い経路） | Go の 6 つのサービス：`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`（付随の役：`trail-builder`、`dispatch-shadow`） | メモリ上の状態と高い並行度を、単純な書き方で扱える（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md)、[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)） |
-| サービス間の契約 | Protocol Buffers と gRPC（Go と TypeScript の間、アプリとの常時の接続） | 型を 1 か所から生成する |
-| API | Hono＋Zod | 他の題材と同じ |
-| モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、ステートマシンはテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） |
-| 地理 | 自前の六角形の格子 `geogrid`（`metro`・`district`・`block`・`street`・`spot`。判断の記録は `spot`） | [ADR-0002](../decisions/0002-hex-grid-geospatial-model.md) |
-| DB | Aurora PostgreSQL 18 の `core`（乗車・供給・運賃・地図（PostGIS）・安全）と `money`（支払い・台帳） | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md) |
-| キャッシュ・一時の状態 | Valkey（ElastiCache）`rt` と `cache`。正本は置かない | ADR-0038 |
-| 非同期 | transactional outbox → SNS → SQS。位置の流れは Kinesis Data Streams | [ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)、[ADR-0009](../decisions/0009-location-upload-and-validation.md) |
-| 経路 | 自前で動かす Valhalla（OpenStreetMap）＋商用の地図・住所の提供者 | [ADR-0005](../decisions/0005-maps-and-routing.md) |
-| 実行基盤 | AWS 東京（ECS Fargate の ARM64）、災害復旧は大阪のウォームスタンバイ | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)、[ADR-0039](../decisions/0039-city-cells-and-osaka-warm-standby.md) |
-| 鍵 | KMS の 6 種類（`location`・`pii`・`biometric`・`money`・`audit`・`app`） | [ADR-0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md) |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ（[ADR-0040](../decisions/0040-per-city-slis-and-slos.md)） |
-| フラグ | AWS AppConfig。release・ops・legal の 3 種類。割り当ての単位は都市・事業者・交通圏・利用者 | [ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語（一般） | TypeScript（API、Trips、Pricing、Payments、供給、管理画面、配信の振り分け） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | — |
+| 言語（熱い経路） | Go の 6 つのサービス：`loc-ingest`、`geo-index`、`dispatch`、`eta-service`、`rt-gateway`、`trip-location-fanout`（付随の役：`trail-builder`、`dispatch-shadow`） | メモリ上の状態と高い並行度を、単純な書き方で扱える（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0030](../decisions/0030-realtime-grpc-bidirectional-stream-gateway.md)、[ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)） | Go はコンパイルとテストが速く、エージェントの確認ループが短い。学習データも多い。Rust は所有権の制約で修正の往復が増える（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| サービス間の契約 | Protocol Buffers と gRPC（Go と TypeScript の間、アプリとの常時の接続） | 型を 1 か所から生成する | — |
+| API | Hono＋Zod | 他の題材と同じ | — |
+| モバイル | ネイティブ（Swift・Kotlin）。モデルとプロトコルは Protocol Buffers から生成し、ステートマシンはテストのベクターで揃える | 背景での位置の送信と電池の管理が要る（[ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md)） | — |
+| 地理 | 自前の六角形の格子 `geogrid`（`metro`・`district`・`block`・`street`・`spot`。判断の記録は `spot`） | [ADR-0002](../decisions/0002-hex-grid-geospatial-model.md) | — |
+| DB | Aurora PostgreSQL 18 の `core`（乗車・供給・運賃・地図（PostGIS）・安全）と `money`（支払い・台帳） | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md) | — |
+| キャッシュ・一時の状態 | Valkey（ElastiCache）`rt` と `cache`。正本は置かない | ADR-0038 | — |
+| 非同期 | transactional outbox → SNS → SQS。位置の流れは Kinesis Data Streams | [ADR-0022](../decisions/0022-trip-outbox-and-offline-continuation.md)、[ADR-0009](../decisions/0009-location-upload-and-validation.md) | — |
+| 経路 | 自前で動かす Valhalla（OpenStreetMap）＋商用の地図・住所の提供者 | [ADR-0005](../decisions/0005-maps-and-routing.md) | — |
+| 実行基盤 | AWS 東京（ECS Fargate の ARM64）、災害復旧は大阪のウォームスタンバイ | [ADR-0038](../decisions/0038-compute-on-fargate-and-data-stores.md)、[ADR-0039](../decisions/0039-city-cells-and-osaka-warm-standby.md) | — |
+| 鍵 | KMS の 6 種類（`location`・`pii`・`biometric`・`money`・`audit`・`app`） | [ADR-0036](../decisions/0036-location-privacy-keys-retention-and-audited-access.md) | — |
+| IaC | Terraform | 他の題材と同じ | — |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ（[ADR-0040](../decisions/0040-per-city-slis-and-slos.md)） | — |
+| フラグ | AWS AppConfig。release・ops・legal の 3 種類。割り当ての単位は都市・事業者・交通圏・利用者 | [ADR-0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md) | — |
 
 ## 5. 主な決定
 

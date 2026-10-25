@@ -173,7 +173,7 @@ sequenceDiagram
 | 対象 | 規則 |
 | --- | --- |
 | 要素 | 許すもの：文字の構造（`p`、`div`、`span`、`br`、`h1`〜`h6`、`ul`、`ol`、`li`、`blockquote`、`pre`、`code`、`b`、`i`、`u`、`s`、`strong`、`em`、`small`、`sub`、`sup`、`hr`、`font`、`center`）、表（`table` の一族）、`a`、`img`。それ以外（`script`、`style` の外の CSS の読み込み、`iframe`、`object`、`embed`、`form`、`input`、`button`、`svg`、`math`、`video`、`audio`、`meta`、`base`、`link`）は消す（中の文字は残す。`script`・`style` の中は捨てる） |
-| 属性 | 見た目の属性（`align`、`width`、`height`、`bgcolor`、`color`、`border`、`cellpadding` など）、`a` の `href`、`img` の `src`・`alt`、`style`。`on*`、`id`・`name`（画面の DOM と混ざらないよう `m-` を前に付ける）、`class`（同じ）。他は消す |
+| 属性 | 見た目の属性（`align`、`width`、`height`、`bgcolor`、`color`、`border`、`cellpadding` など）、`a` の `href`、`img` の `src`・`alt`、`style`。支援技術のための属性（2026-10-25 に決めた。11.1 節）：`lang`・`dir`、`th` の `scope`・`abbr`、`td`・`th` の `headers`、表の一族の `role`（値が `presentation`・`none` のときだけ。他の値は画面の部品を装えるので属性ごと消す）。`on*`、`id`・`name`（画面の DOM と混ざらないよう `m-` を前に付ける）、`class`（同じ）。他は消す |
 | URL | `href` は `http`・`https`・`mailto` だけ。`img` の `src` は `http`・`https`・`cid` だけ。`data:` は 64 KiB までの画像だけ。`javascript:` などは消す |
 | CSS | `<style>` の中と `style` の属性を構文解析し、選択子を `.m-body` の下に閉じ込め、許す性質（色、字、余白、枠、表、幅と高さの上限つき）だけを残す。`position: fixed`、`url()`（画像の代理に書き換えるものを除く）、`@import`、`expression`、`behavior` を消す |
 | 大きさ | 浄化の入力 2 MiB（[message-parsing-and-storage.md](message-parsing-and-storage.md) の 5.1 節の文字の上限の中）、DOM の深さ 256、要素 5 万。超えたら text の表示に落とす |
@@ -243,7 +243,7 @@ sequenceDiagram
 - **時間の制限**：元に戻す送信の窓（5〜30 秒）は時間の制限に当たる（2.2.1）。通知の「元に戻す」にはキーの操作で届く（ショートカットと、通知へのフォーカスの移し）。時間が足りない利用者は設定で 30 秒を選べることを、設定の画面の説明に書く。
 - **ドラッグの代わり**：ラベル・フォルダーへのドラッグでの移動には、同じことができるメニューとキーの操作を必ず持つ（2.5.7）。
 - **表示**：200% の拡大と 320px の幅で横に流れない。ダークモードと OS の強制の色（`forced-colors`）で、未読・選択・フォーカスの印が残る。`prefers-reduced-motion` で動き（行の滑り、通知の出入り）を止める。押す的は 24px 以上（2.5.8）。
-- **メールの本文**：送り手の表の組みが読み上げで表として読まれるのを避けられるよう、浄化の許可の一覧（7.2 節）に、`lang`・`dir`、表の `role="presentation"`・`role="none"`、`th` の `scope`、`td` の `headers`、`abbr` を足すことを提案する（`aria-label` などの名前を上書きする属性は、読み上げの利用者への見せかけに使えるので足さない）。足すかどうかは 17 節の持ち越し。本文を文字だけで出す切り替え（text のパート、なければ浄化した HTML から文字を取り出したもの）を持つ。
+- **メールの本文**：送り手の表の組みが読み上げで表として読まれるのを避けられるよう、浄化の許可の一覧（7.2 節）に、`lang`・`dir`、表の `role="presentation"`・`role="none"`、`th` の `scope`、`td` の `headers`、`abbr` を足す（2026-10-25 に決めた。[ADR-0044](../decisions/0044-safe-html-rendering.md) の注記）。`role` はこの 2 つの値だけを許す。メールの組みの表でよく使われ、他の値はボタンやダイアログなど画面の部品を装えるためである。`aria-label` などの名前を上書きする属性は、読み上げの利用者への見せかけに使えるので足さない。本文を文字だけで出す切り替え（text のパート、なければ浄化した HTML から文字を取り出したもの）を持つ。
 - **差出人の確かめの印と迷惑メールの警告**（7.6 節）：本文の前に見出しつきの領域として置き、読み上げで本文より先に届くようにする。
 
 ## 12. 失敗と回復
@@ -322,6 +322,7 @@ sequenceDiagram
 - **HTML**：サーバーで浄化し、usercontent の sandbox の iframe（ADR-0044）。
 - **リンク**：本文も描画した `href` も変えず、押下を親の画面で確かめる（ADR-0044、ADR-0027）。
 - **元に戻す送信の既定**：5 秒（[design-log.md](design-log.md) の「2026-10-10：既定案」）。
+- **浄化の許可の一覧のアクセシビリティの属性**：`lang`・`dir`・`scope`・`headers`・`abbr` を足し、`role` は `presentation`・`none` だけを許す（2026-10-25 に決めた。7.2・11.1 節、ADR-0044 の注記）。規則のバージョンを上げる前に、PROP-WEB-002〜003 と XSS の試験のベクトルを通す。
 
 ### 持ち越し
 
@@ -332,7 +333,6 @@ sequenceDiagram
 | 配信停止のボタン | 法務の確認待ち（L2） |
 | 画面の計測の通知・公表 | 法務の確認待ち（L8） |
 | ブラウザーの保存の暗号化（端末の鍵での） | セキュリティ（security.md）。MVP は端末の保護に任せる |
-| 浄化の許可の一覧に、アクセシビリティの属性（`lang`・`dir`・表の `role`・`scope`・`headers`・`abbr`）を足すか（11.1 節） | Dev のテックリードとセキュリティ。[ADR-0044](../decisions/0044-safe-html-rendering.md) の規則の変更になるので、足すなら PROP-WEB-002〜003 と XSS の試験のベクトルを通してから |
 
 ## 出典
 

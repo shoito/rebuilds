@@ -251,13 +251,13 @@ stateDiagram-v2
   state Session {
     [*] --> Idle
     Idle --> Connecting: Hello
-    Connecting --> Loading: Welcome
+    Connecting --> Loading: Welcome（新しい接続か読み込み直し）
+    Connecting --> Live: Welcome（resumed、続きを送れる）
     Loading --> Live: 読み込み完了
     Connecting --> Backoff: 失敗
     Backoff --> Connecting: 待ち（最初は 0〜5s の一様な乱数、以後 1s, 2s, 4s … 30s、±20% の乱数）
     Live --> Disconnected: 切断
-    Disconnected --> Backoff
-    Disconnected --> Live: Welcome（resume）
+    Disconnected --> Backoff: 最初の再接続の待ち
     Live --> ReadOnly: RoleChanged(view)
     ReadOnly --> Live: RoleChanged(edit)
     Connecting --> Connecting: Kick(ticket_required)（API のチケットを取り、0〜1s の乱数の後）
@@ -266,6 +266,7 @@ stateDiagram-v2
   Session --> Reload: Kick(version_mismatch)
 ```
 
+- 再接続も、必ず `Backoff` の待ちを経て `Connecting` を通る。`Welcome.resumed` が真で、`last_seq` より後の `Committed` を送れるなら `Live` に戻る。新しい接続か、`LoadPlan` で読み込み直しを指示されたら（9 節）、`Loading` を通る。
 - `Disconnected` の間も、編集はできる（4.6 節の上限まで）。画面に「オフライン」と未確定の件数を出す。
 - 予期しない切断（`Kick` なし）の後の最初の再接続は、0〜5 秒の一様な乱数だけ待つ。Gateway のタスクの喪失で 1 万の接続が一度に戻るのを散らすため（[capacity.md](capacity.md) の 2.2 節）。`Kick` に `retry_after_ms` があれば、それに従う。
 - 未確定があるままタブを閉じようとしたら、ブラウザの確認を出す（`beforeunload`）。未確定の変更を端末に保存することは、MVP でしない（16 節）。

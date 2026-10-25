@@ -588,7 +588,7 @@ erDiagram
 | `md_fields.searchable`、`md_fields.track_history` | 真偽（それぞれ 1 オブジェクト 20 まで） | search（[ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md)）、audit-and-field-history（[ADR-0047](../decisions/0047-field-history-tracking-and-retention.md)） |
 | `md_fields.state` の `building`、`md_fields.type` の `polymorphic_lookup` | 積み上げ集計の作成中、活動の `who`・`what` | automation-flows（[ADR-0027](../decisions/0027-roll-up-summaries-incremental-with-reconciliation.md)）、sales-objects |
 | `md_objects.allow_activities`、`md_picklist_values.attrs` | 活動の `what` になれるか、フェーズなどの属性 | sales-objects |
-| `permission_sets.license`、`permission_set_system_perms.perm` の 25 の値 | ライセンス、システムの権限 | orgs-users-and-auth（[ADR-0043](../decisions/0043-orgs-editions-licenses-and-users.md)、[ADR-0045](../decisions/0045-system-permissions-and-delegation.md)） |
+| `permission_sets.license`、`permission_set_system_perms.perm` の 26 の値 | ライセンス、システムの権限 | orgs-users-and-auth（[ADR-0043](../decisions/0043-orgs-editions-licenses-and-users.md)、[ADR-0045](../decisions/0045-system-permissions-and-delegation.md)） |
 | `orgs` の Sandbox の列、`orgs.migrating` | `parent_org_id` など、組織の移動の書き込みの止め | sandboxes-and-deploy、infrastructure（[ADR-0056](../decisions/0056-org-migration-by-row-filtered-logical-replication.md)） |
 | `outbox.kind` | 8 種類（[data-model/records-and-storage.md](data-model/records-and-storage.md)） | events-and-integrations、audit-and-field-history |
 | `field_history` の置き場所 | `history` のクラスタ（S1 から） | capacity（[ADR-0060](../decisions/0060-load-model-and-sizing-review.md)） |

@@ -150,25 +150,25 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サービス・Web） | 他の題材と同じ。型でプロトコルのパラメーターとクレームを守る（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| HTTP・検証 | Hono＋Zod。Management API は `@hono/zod-openapi` で OpenAPI を出す | 他の題材と同じ |
-| Universal Login | サーバーで HTML を組み立てる（Hono の JSX）。JavaScript は最小 | 速さと厳しい CSP（[ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md)） |
-| JOSE | `jose` | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| WebAuthn | `@simplewebauthn/server` | 保守されている。E7 の着手時に基準を確かめ、満たさないときだけ見直す（[ADR-0022](../decisions/0022-webauthn-and-passkeys.md)） |
-| パスワード | Argon2id のネイティブのバインディング、bcrypt の照合 | [ADR-0004](../decisions/0004-credential-storage.md) |
-| DB | Aurora PostgreSQL 18（主とログの 2 つのクラスタ）、RLS、ID は UUIDv7 | [ADR-0002](../decisions/0002-tenancy-and-isolation.md)、[ADR-0043](../decisions/0043-log-storage-and-search.md) |
-| キャッシュ・数 | ElastiCache（Valkey） | 失われてもよい（[ADR-0005](../decisions/0005-authentication-path-availability.md)） |
-| 非同期 | transactional outbox → SQS | 他の題材と同じ |
-| 鍵 | KMS（署名鍵の専用の鍵、資格情報の鍵、pepper の鍵、保存の鍵。マルチリージョン）、Signer | [ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)、[ADR-0045](../decisions/0045-kms-key-hierarchy.md) |
-| エッジ | CloudFront、AWS WAF、ACM | discovery・JWKS の配布、カスタムドメイン |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ。秘密を出さない計装は [ADR-0061](../decisions/0061-secret-free-telemetry.md) |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| 適合試験 | OpenID Foundation の conformance suite（CI の中で動かす）、node-oidc-provider との差分テスト | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| テスト | Vitest、fast-check、Testcontainers、Playwright（仮想の WebAuthn の認証器） | 他の題材と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サービス・Web） | 他の題材と同じ。型でプロトコルのパラメーターとクレームを守る（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| HTTP・検証 | Hono＋Zod。Management API は `@hono/zod-openapi` で OpenAPI を出す | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| Universal Login | サーバーで HTML を組み立てる（Hono の JSX）。JavaScript は最小 | 速さと厳しい CSP（[ADR-0011](../decisions/0011-universal-login-rendering-and-transaction.md)） | — |
+| JOSE | `jose` | [ADR-0001](../decisions/0001-platform-and-stack.md) | — |
+| WebAuthn | `@simplewebauthn/server` | 保守されている。E7 の着手時に基準を確かめ、満たさないときだけ見直す（[ADR-0022](../decisions/0022-webauthn-and-passkeys.md)） | — |
+| パスワード | Argon2id のネイティブのバインディング、bcrypt の照合 | [ADR-0004](../decisions/0004-credential-storage.md) | — |
+| DB | Aurora PostgreSQL 18（主とログの 2 つのクラスタ）、RLS、ID は UUIDv7 | [ADR-0002](../decisions/0002-tenancy-and-isolation.md)、[ADR-0043](../decisions/0043-log-storage-and-search.md) | — |
+| キャッシュ・数 | ElastiCache（Valkey） | 失われてもよい（[ADR-0005](../decisions/0005-authentication-path-availability.md)） | — |
+| 非同期 | transactional outbox → SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 鍵 | KMS（署名鍵の専用の鍵、資格情報の鍵、pepper の鍵、保存の鍵。マルチリージョン）、Signer | [ADR-0003](../decisions/0003-token-formats-and-signing-keys.md)、[ADR-0045](../decisions/0045-kms-key-hierarchy.md) | — |
+| エッジ | CloudFront、AWS WAF、ACM | discovery・JWKS の配布、カスタムドメイン | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ。秘密を出さない計装は [ADR-0061](../decisions/0061-secret-free-telemetry.md) | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 適合試験 | OpenID Foundation の conformance suite（CI の中で動かす）、node-oidc-provider との差分テスト | [ADR-0001](../decisions/0001-platform-and-stack.md) | — |
+| テスト | Vitest、fast-check、Testcontainers、Playwright（仮想の WebAuthn の認証器） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 5. 主な決定
 

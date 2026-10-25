@@ -239,24 +239,24 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口ごとに別のサービス（`storefront-renderer`、`storefront-api`、`checkout`、`admin-api`、`workers`）として出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 関数の砂場のホスト | Rust と Wasmtime（燃料、メモリーの上限、Cranelift の事前の翻訳） | [ADR-0008](../decisions/0008-extension-sandbox-wasm.md)。共通の基盤からの外れ |
-| テーマの言語 | 自前の字句解析・構文解析・中間表現・インタープリター（TypeScript）。`eval` を使わない | [ADR-0007](../decisions/0007-theme-language-design.md) |
-| GraphQL | graphql-js（GraphQL の参照の実装）で構文解析と検証。費用の計算と実行の計画は自前 | [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md) |
-| DB | Aurora PostgreSQL 18。ポッドごとのクラスタと全体のクラスタ。FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0003](../decisions/0003-tenancy-and-rls.md) |
-| キャッシュ | ElastiCache Valkey（ポッドごと、待合室は全体） | 他の題材と同じ。失ってよい部品 |
-| 非同期 | outbox → SNS・SQS（ポッドごとのキュー） | 他の題材と同じ |
-| エッジ | CloudFront、CloudFront Functions、KeyValueStore、AWS WAF（Bot Control、CAPTCHA・Challenge） | storefront-api-and-caching、flash-sales-and-queueing の各領域 |
-| 検索 | Amazon OpenSearch Service（日本語の形態素の解析と n-gram）。順位付けとおすすめの規則は自前 | search-and-recommendations の領域で ADR にする。汎用の部品（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 実行基盤 | ECS Fargate（ポッドごとのサービス）。`function-runner` は `checkout` のタスクの隣のコンテナ | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| オブジェクトストレージ | S3（メディア、テーマ、一括の結果）。画像の変換は自前の変換のサービス（sharp）と CloudFront | catalog-and-pricing の領域 |
-| IaC | Terraform。ポッドは 1 つのモジュールから作る | infrastructure の領域 |
-| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana。ショップ・ポッドのラベル | observability の領域 |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| 管理画面 | React（TypeScript）。自社の Admin API だけを使う | merchant-admin-and-staff の領域 |
-| テスト | Vitest・fast-check、Rust の `cargo test`・proptest・cargo-fuzz、自前の参照の実装（在庫、税、割引）、Testcontainers（PostgreSQL 18、Valkey）、LocalStack、k6 と自前の負荷の生成器、Playwright | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口ごとに別のサービス（`storefront-renderer`、`storefront-api`、`checkout`、`admin-api`、`workers`）として出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる。ドメインごとのマイクロサービスは、小さなチームとエージェントには重い（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 関数の砂場のホスト | Rust と Wasmtime（燃料、メモリーの上限、Cranelift の事前の翻訳） | [ADR-0008](../decisions/0008-extension-sandbox-wasm.md)。共通の基盤からの外れ | Rust を持つ分、エージェントの eval に Rust のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テーマの言語 | 自前の字句解析・構文解析・中間表現・インタープリター（TypeScript）。`eval` を使わない | [ADR-0007](../decisions/0007-theme-language-design.md) | — |
+| GraphQL | graphql-js（GraphQL の参照の実装）で構文解析と検証。費用の計算と実行の計画は自前 | [ADR-0009](../decisions/0009-admin-api-graphql-and-cost-limits.md) | — |
+| DB | Aurora PostgreSQL 18。ポッドごとのクラスタと全体のクラスタ。FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0002](../decisions/0002-pods-and-shop-placement.md)、[ADR-0003](../decisions/0003-tenancy-and-rls.md) | 規則をアプリの条件でなく DB で止める。エージェントが書くコードの量では、条件の書き忘れが出る（[ADR-0003](../decisions/0003-tenancy-and-rls.md)） |
+| キャッシュ | ElastiCache Valkey（ポッドごと、待合室は全体） | 他の題材と同じ。失ってよい部品 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期 | outbox → SNS・SQS（ポッドごとのキュー） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| エッジ | CloudFront、CloudFront Functions、KeyValueStore、AWS WAF（Bot Control、CAPTCHA・Challenge） | storefront-api-and-caching、flash-sales-and-queueing の各領域 | — |
+| 検索 | Amazon OpenSearch Service（日本語の形態素の解析と n-gram）。順位付けとおすすめの規則は自前 | search-and-recommendations の領域で ADR にする。汎用の部品（[ADR-0001](../decisions/0001-platform-and-stack.md)） | — |
+| 実行基盤 | ECS Fargate（ポッドごとのサービス）。`function-runner` は `checkout` のタスクの隣のコンテナ | [ADR-0001](../decisions/0001-platform-and-stack.md) | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| オブジェクトストレージ | S3（メディア、テーマ、一括の結果）。画像の変換は自前の変換のサービス（sharp）と CloudFront | catalog-and-pricing の領域 | — |
+| IaC | Terraform。ポッドは 1 つのモジュールから作る | infrastructure の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana。ショップ・ポッドのラベル | observability の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 管理画面 | React（TypeScript）。自社の Admin API だけを使う | merchant-admin-and-staff の領域 | — |
+| テスト | Vitest・fast-check、Rust の `cargo test`・proptest・cargo-fuzz、自前の参照の実装（在庫、税、割引）、Testcontainers（PostgreSQL 18、Valkey）、LocalStack、k6 と自前の負荷の生成器、Playwright | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

@@ -254,12 +254,15 @@
 | `alloc.cdc_objects` | 変更のイベントの対象のオブジェクト | — | 5 | 20 | 50 | 5 | 本番と同じ |
 | `alloc.report_sync_runs`・`alloc.report_async_runs` | レポートの API の実行 | 1 時間 | 500・1,200 | 500・1,200 | 500・1,200 | 100・200 | 同じ |
 | `alloc.dashboard_refresh`・`alloc.dashboard_results` | ダッシュボード | 1 時間 | 200・5,000 | 200・5,000 | 200・5,000 | 50・1,000 | 同じ |
+| `alloc.web_form_submissions` | Web からのリードのフォームの受け付け（組織の全てのフォームの合計） | 24 時間 | 1,000 | 5,000 | 10,000 | 100 | 100 |
 | `alloc.emails_single` | 1 通ずつのメール | 24 時間 | 1,000 | 5,000 | 5,000 | 15 | 0（外へ送らない） |
 | `alloc.data_storage` | データの容量 | — | 10GB＋ライセンス × 20MB | 同じ | 同じ | 200MB | 種類ごと（[sandboxes-and-deploy.md](sandboxes-and-deploy.md) の 3 節） |
 | `alloc.file_storage` | ファイルの容量 | — | 10GB＋ライセンス × 2GB | 同じ | 同じ | 20MB | 種類ごと |
 
 - API の要求の数に入れるもの：REST（`/api/versions` と `/api/v1/limits` を除く）、一括のジョブの作成・状態・結果の取り出しの要求、検索の API、イベントの発行・読みの API。画面（本システムの SPA）の要求は数えない（本家も一部の自社のアプリを数えない。Limits）。画面の要求は、長い要求の同時実行と上限で守る。
 - データの容量は、1 レコードを 2KB と数える（本家の数え方に寄せる。本家も多くのレコードを約 2KB と数える。[Salesforce Data Storage: Estimated Record Size by Object Type](https://help.salesforce.com/s/articleView?id=000383664&type=1)、2026-09-28 に確認）。ごみ箱の行は数えない（本家もごみ箱のレコードをストレージに数えない。ADR-0011）。容量を超えたら、作成を 400 `STORAGE_LIMIT_EXCEEDED` で断り、更新と削除は通す。
+
+- `alloc.web_form_submissions`（[ADR-0064](../decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](sales-objects.md) の 9.3 節）：フォームごとの `daily_limit` は、この割り当ての内側で決める。超えた送信は 429 で断らず、リードを作らずに隔離する（送り手への応答は受け付けと同じ）。割り当てのちょうどまで受け付け、1 つ超えたら隔離する。
 
 ### 8.2 数え方と超過（ADR-0042）
 

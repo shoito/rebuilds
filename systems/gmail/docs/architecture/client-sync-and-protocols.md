@@ -131,7 +131,7 @@ changes(
 3. 1 つの `modseq` の行は分けない。まとめた ID の数が `maxChanges`（既定 500、上限 5,000）を超える手前の `modseq` で止め、`newState` をその `modseq` にし、`hasMoreChanges = true`。
 4. 分け方：その範囲で作られ消えたもの → 返さない。作られた → `created`。消えた → `destroyed`。それ以外 → `updated`。
 
-**例**：`sinceState = "1.1000"`、`maxChanges = 2`。
+**例**：`sinceState = "1.rs"`（`modseq` は 10 進で 1000。表の `modseq` は 10 進で書く）、`maxChanges = 2`。
 
 | modseq | 行 |
 | --- | --- |
@@ -141,7 +141,7 @@ changes(
 | 1004 | e3 destroyed |
 | 1005 | e1 updated（ラベル） |
 
-1001・1002 で ID は 2（e1、e2）。1003 を足すと 3 になるので止める。応答は `created: [e1]`、`updated: [e2]`、`newState: "1.1002"`、`hasMoreChanges: true`。次の呼び出しで 1003〜1005 を読み、e3 は作られて消えたので返さず、`updated: [e1]`、`newState: "1.1005"`。
+1001・1002 で ID は 2（e1、e2）。1003 を足すと 3 になるので止める。応答は `created: [e1]`、`updated: [e2]`、`newState: "1.ru"`（1002）、`hasMoreChanges: true`。次の呼び出しで 1003〜1005 を読み、e3 は作られて消えたので返さず、`updated: [e1]`、`newState: "1.rx"`（1005）。
 
 ### 5.3 `Email/query`
 

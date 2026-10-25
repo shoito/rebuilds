@@ -243,7 +243,7 @@ erDiagram
 | `permission_set_system_perms` | `org_id`、`ps_id`、`perm`（`text`） | PK `(org_id, ps_id, perm)` |
 
 - 列の名前は 2026-09-28 に `read` などから `can_*` に改めた（SQL の予約語を避ける）。
-- CHECK（依存）：`NOT can_create OR can_read`、`NOT can_edit OR can_read`、`NOT can_delete OR can_edit`、`NOT can_view_all OR can_read`、`NOT can_modify_all OR (can_delete AND can_view_all)`、`NOT can_edit OR can_read`（項目）。`perm IN (...)`（25 の権限。正本は [orgs-users-and-auth.md](../orgs-users-and-auth.md) の 7.1 節）。システムの権限の依存と、必須の項目の `can_edit` は保存の時にデータ層で検査する。
+- CHECK（依存）：`NOT can_create OR can_read`、`NOT can_edit OR can_read`、`NOT can_delete OR can_edit`、`NOT can_view_all OR can_read`、`NOT can_modify_all OR (can_delete AND can_view_all)`、`NOT can_edit OR can_read`（項目）。`perm IN (...)`（26 の権限。正本は [orgs-users-and-auth.md](../orgs-users-and-auth.md) の 7.1 節）。システムの権限の依存と、必須の項目の `can_edit` は保存の時にデータ層で検査する。
 - 行のない組み合わせは全て偽。種類 `meta`。
 
 ### 2.3 `permission_set_groups`・`permission_set_group_members`

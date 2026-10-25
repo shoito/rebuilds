@@ -154,26 +154,26 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サーバー・クライアント・共有のモデルの定義） | 他の題材と同じ。モデルの定義と競合の規則を、クライアントとサーバーで同じコードにする（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| モデルの定義 | 自前のスキーマの定義（`packages/schema` の TypeScript の宣言）から、DB の望む形、共有のパッケージ、クライアントの構成、GraphQL の型、検証を生成する | [ADR-0019](../decisions/0019-schema-definition-and-codegen.md) |
-| HTTP・検証 | Hono＋Zod | 他の題材と同じ |
-| 公開 API | GraphQL（`graphql-js` を Hono の上で。型は生成、入口と mutation は手で書く） | 本家の公開 API の形に寄せる（[ADR-0041](../decisions/0041-public-graphql-generated-schema-and-writer-mutations.md)） |
-| リアルタイム | WebSocket（Sync Gateway。JSON のテキストフレーム、差分の流れに permessage-deflate）、Valkey の pub/sub | Slack の [realtime.md](../../../slack/docs/architecture/realtime.md) の Gateway の考え方を先例にする（[ADR-0009](../decisions/0009-sync-gateway-protocol.md)） |
-| クライアント | React、反応型のオブジェクトプール（MobX を第一の候補。E2 の PoC で決める）、IndexedDB（`idb` のラッパー）、TanStack Router・Query、`@tanstack/virtual-core` | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0005](../decisions/0005-client-persistence-and-offline.md)、[ADR-0018](../decisions/0018-render-path-and-latency-budget.md) |
-| デスクトップ | Electron | Web と同じコードを使う。Notion・Zoom の題材と同じ |
-| 本文の同時編集 | ProseMirror と Yjs・y-prosemirror（`packages/doc` に閉じる）。コメントの本文は ProseMirror の JSON を LWW | [ADR-0021](../decisions/0021-description-crdt-yjs-in-sync-log.md)、[ADR-0022](../decisions/0022-comments-anchors-mentions-attachments.md) |
-| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7 | [ADR-0004](../decisions/0004-tenancy-and-permissions.md) |
-| 非同期 | transactional outbox → SQS | 他の題材と同じ |
-| 検索 | S1 から Amazon OpenSearch Service（一致は 1〜2 文字の N-gram、関連度は kuromoji）。権限は同期グループで絞る。Aurora の `pg_bigm` は使えることを確かめたうえで代案 | [ADR-0030](../decisions/0030-search-engine-opensearch.md)、[ADR-0031](../decisions/0031-search-permission-by-sync-groups.md) |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana。クライアントの RUM は自前の収集の口 | [ADR-0052](../decisions/0052-rum-and-propagation-measurement.md) |
-| 認証 | Better Auth（`packages/auth` で包む。メールの OTP、Google、パスキー） | [ADR-0034](../decisions/0034-accounts-with-better-auth.md) |
-| DR の記録 | DynamoDB のグローバルテーブル（権限を狭める操作の追記だけの記録） | [ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md) |
-| フラグ | AWS AppConfig（サーバー）。クライアントのフラグはサーバーが評価して握手で配る | [ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md) |
-| テスト | Vitest、fast-check（収束の性質）、決定的な同期のシミュレーター（自前）、Testcontainers、Playwright（複数のクライアント、オフラインの模擬） | [ADR-0002](../decisions/0002-sync-model.md) の Confirmation |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サーバー・クライアント・共有のモデルの定義） | 他の題材と同じ。モデルの定義と競合の規則を、クライアントとサーバーで同じコードにする（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| モデルの定義 | 自前のスキーマの定義（`packages/schema` の TypeScript の宣言）から、DB の望む形、共有のパッケージ、クライアントの構成、GraphQL の型、検証を生成する | [ADR-0019](../decisions/0019-schema-definition-and-codegen.md) | — |
+| HTTP・検証 | Hono＋Zod | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 公開 API | GraphQL（`graphql-js` を Hono の上で。型は生成、入口と mutation は手で書く） | 本家の公開 API の形に寄せる（[ADR-0041](../decisions/0041-public-graphql-generated-schema-and-writer-mutations.md)） | — |
+| リアルタイム | WebSocket（Sync Gateway。JSON のテキストフレーム、差分の流れに permessage-deflate）、Valkey の pub/sub | Slack の [realtime.md](../../../slack/docs/architecture/realtime.md) の Gateway の考え方を先例にする（[ADR-0009](../decisions/0009-sync-gateway-protocol.md)） | — |
+| クライアント | React、反応型のオブジェクトプール（MobX を第一の候補。E2 の PoC で決める）、IndexedDB（`idb` のラッパー）、TanStack Router・Query、`@tanstack/virtual-core` | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0005](../decisions/0005-client-persistence-and-offline.md)、[ADR-0018](../decisions/0018-render-path-and-latency-budget.md) | — |
+| デスクトップ | Electron | Web と同じコードを使う。Notion・Zoom の題材と同じ | — |
+| 本文の同時編集 | ProseMirror と Yjs・y-prosemirror（`packages/doc` に閉じる）。コメントの本文は ProseMirror の JSON を LWW | [ADR-0021](../decisions/0021-description-crdt-yjs-in-sync-log.md)、[ADR-0022](../decisions/0022-comments-anchors-mentions-attachments.md) | — |
+| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7 | [ADR-0004](../decisions/0004-tenancy-and-permissions.md) | — |
+| 非同期 | transactional outbox → SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 検索 | S1 から Amazon OpenSearch Service（一致は 1〜2 文字の N-gram、関連度は kuromoji）。権限は同期グループで絞る。Aurora の `pg_bigm` は使えることを確かめたうえで代案 | [ADR-0030](../decisions/0030-search-engine-opensearch.md)、[ADR-0031](../decisions/0031-search-permission-by-sync-groups.md) | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana。クライアントの RUM は自前の収集の口 | [ADR-0052](../decisions/0052-rum-and-propagation-measurement.md) | — |
+| 認証 | Better Auth（`packages/auth` で包む。メールの OTP、Google、パスキー） | [ADR-0034](../decisions/0034-accounts-with-better-auth.md) | — |
+| DR の記録 | DynamoDB のグローバルテーブル（権限を狭める操作の追記だけの記録） | [ADR-0058](../decisions/0058-dr-permission-narrowing-journal.md) | — |
+| フラグ | AWS AppConfig（サーバー）。クライアントのフラグはサーバーが評価して握手で配る | [ADR-0056](../decisions/0056-flags-client-distribution-and-min-build.md) | — |
+| テスト | Vitest、fast-check（収束の性質）、決定的な同期のシミュレーター（自前）、Testcontainers、Playwright（複数のクライアント、オフラインの模擬） | [ADR-0002](../decisions/0002-sync-model.md) の Confirmation | — |
 
 ## 5. 主な決定
 

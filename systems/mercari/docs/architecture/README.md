@@ -260,24 +260,24 @@ MAU あたりの原価 = 検索（OpenSearch のデータノード、索引の�
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口・Worker ごとのサービスとして出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 言語（ML） | Python（学習と `ml-inference`）。PyTorch などの汎用の枠組み。モデルは自前で学習する | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| DB | Aurora PostgreSQL 18。core・ledger・content の 3 クラスタ。FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md)、[ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md) |
-| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 |
-| 非同期 | outbox → SNS・SQS | 他の題材と同じ |
-| 検索 | Amazon OpenSearch Service（Sudachi の解析器、ICU の正規化、2-gram の欄）。順位付けは自前の式 | [ADR-0008](../decisions/0008-search-engine-and-index.md) |
-| エッジ | CloudFront、AWS WAF（Bot Control） | 他の題材と同じ |
-| 実行基盤 | ECS Fargate。`ml-inference` の画像の分類器は、S2 から GPU の EC2（ECS on EC2）を検討する | [ADR-0001](../decisions/0001-platform-and-stack.md)、capacity の領域 |
-| オブジェクトストレージ | S3（写真、書き出し）。写真の変換は sharp | listings-and-photos の領域 |
-| データレイク | S3、Glue のカタログ、Athena。個人のデータを除く・仮名にした事象 | [ADR-0010](../decisions/0010-ml-boundary-for-pricing-and-recommendations.md) |
-| 外部 | 決済の提供者、提携銀行の API（予備に全銀の形式のファイル）、運送会社の API、eKYC の提供者、SMS、APNs・FCM、Amazon SES | [ADR-0005](../decisions/0005-payments-via-providers-and-capture-at-purchase.md)、[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md) |
-| アプリ | iOS・Android は React Native（TypeScript）、Web は React | 他の題材（X、Uber）と同じ形（[ADR-0066](../decisions/0066-sign-in-sessions-and-devices.md)） |
-| IaC | Terraform | infrastructure の領域 |
-| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana | observability の領域 |
-| フラグ | AWS AppConfig（`release.*`、`ops.*`、`legal.*`） | 他の題材と同じ |
-| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（取引のステートマシン、台帳）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者と運送会社の模型、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口・Worker ごとのサービスとして出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる。ドメインごとのマイクロサービスは、小さなチームとエージェントには重い（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 言語（ML） | Python（学習と `ml-inference`）。PyTorch などの汎用の枠組み。モデルは自前で学習する | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | Python を持つ分、エージェントの eval に Python のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| DB | Aurora PostgreSQL 18。core・ledger・content の 3 クラスタ。FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0003](../decisions/0003-escrow-and-double-entry-ledger.md)、[ADR-0007](../decisions/0007-single-tenant-and-party-visibility.md) | — |
+| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期 | outbox → SNS・SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 検索 | Amazon OpenSearch Service（Sudachi の解析器、ICU の正規化、2-gram の欄）。順位付けは自前の式 | [ADR-0008](../decisions/0008-search-engine-and-index.md) | — |
+| エッジ | CloudFront、AWS WAF（Bot Control） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | ECS Fargate。`ml-inference` の画像の分類器は、S2 から GPU の EC2（ECS on EC2）を検討する | [ADR-0001](../decisions/0001-platform-and-stack.md)、capacity の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| オブジェクトストレージ | S3（写真、書き出し）。写真の変換は sharp | listings-and-photos の領域 | — |
+| データレイク | S3、Glue のカタログ、Athena。個人のデータを除く・仮名にした事象 | [ADR-0010](../decisions/0010-ml-boundary-for-pricing-and-recommendations.md) | — |
+| 外部 | 決済の提供者、提携銀行の API（予備に全銀の形式のファイル）、運送会社の API、eKYC の提供者、SMS、APNs・FCM、Amazon SES | [ADR-0005](../decisions/0005-payments-via-providers-and-capture-at-purchase.md)、[ADR-0006](../decisions/0006-shipping-orchestration-via-carriers.md) | — |
+| アプリ | iOS・Android は React Native（TypeScript）、Web は React | 他の題材（X、Uber）と同じ形（[ADR-0066](../decisions/0066-sign-in-sessions-and-devices.md)） | ネイティブの 2 つのコードベースは、小さなチームとエージェントに重い（[ADR-0066](../decisions/0066-sign-in-sessions-and-devices.md)） |
+| IaC | Terraform | infrastructure の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana | observability の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig（`release.*`、`ops.*`、`legal.*`） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（取引のステートマシン、台帳）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者と運送会社の模型、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

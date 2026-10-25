@@ -307,7 +307,7 @@ ADR-0044。**最低の年齢、確かめの方法、未成年への制限の中�
 | `user_contacts` | `(owner_id, kind, slot, value_ct, contact_hmac, hmac_kid, verified_at, pending_until)`。`slot` は `current`・`pending`（保留の間の新しい連絡先） | 本人だけの表（RLS） |
 | `user_birthdates` | `(owner_id, birthdate_ct)` | 本人だけの表（RLS）。Accounts だけが読む |
 | `user_settings` | `owner_id PK`、`region`（地方。[search-and-trends.md](search-and-trends.md) の 9.2 節）、`personalized_ranking`・`home_default_tab`（[ranking-and-recommendation.md](ranking-and-recommendation.md) の 12.2 節）、`sensitive_media`（センシティブなメディアを出すか）、`locale`、`updated_at` | 本人だけの表（RLS）。通知の設定は `notification_settings`、DM の設定は `dm_settings` に分ける |
-| `data_export_requests` | `(id, owner_id, state, requested_at, ready_at, s3_key, expires_at)` | 本人だけの表（RLS）。データの書き出し（5.4 節） |
+| `data_export_requests` | `(id, owner_id, state, requested_at, catalog_version, ready_at, s3_key, expires_at)` | 本人だけの表（RLS）。データの書き出し（5.4 節） |
 | `handle_holds` | `(handle_lower, user_id, reason, until)` | 公開の表（書くのは Accounts だけ） |
 | `login_events` | 6.4 節 | 本人だけの表（RLS）。保持は法務の L2・L8 |
 | `account_state_history` | 状態の遷移の記録（理由、主体、措置の ID） | 運用の表 |

@@ -118,7 +118,7 @@
 | `event_triggered` | 組織が定義するイベント（[events-and-integrations.md](events-and-integrations.md) の 4.2 節）。2026-09-28 に events-and-integrations の領域の依頼で足した | Worker が購読者のカーソル（`event_subscriber_cursors`）で 200 件ずつ読み、1 つの非同期のトランザクションで足並みの実行にする | `system` |
 
 - `event_triggered` のフローは、`$Record` の代わりに `$Event`（イベントの項目）を持つ。確定の後に起動するので、イベントを発行したトランザクションとは別のトランザクションになる。二重の配信は、購読者のカーソルを実行と同じトランザクションで進めて防ぐ。フローの購読は `alloc.events_delivered` に数えない（本家と同じ。[events-and-integrations.md](events-and-integrations.md) の 4.3 節）。
-- **`$Origin`**（2026-09-28。bulk-and-import の領域の依頼）：フローの式で、今の保存の出どころを読める。値は `ui`（本システムの画面）、`api`（REST）、`bulk`（一括のジョブ）、`wizard`（インポートのウィザード）、`flow`（フローの DML）、`approval`（承認の動作）、`system`（型の変換・整合の検査など）。入れ子の保存では、最上位の出どころを継ぐ。変更のイベントの `origin`（[events-and-integrations.md](events-and-integrations.md) の 3.1 節）と項目の変更の履歴の `via` と同じ値を使う。
+- **`$Origin`**（2026-09-28。bulk-and-import の領域の依頼）：フローの式で、今の保存の出どころを読める。値は `ui`（本システムの画面）、`api`（REST）、`bulk`（一括のジョブ）、`wizard`（インポートのウィザード）、`flow`（フローの DML）、`approval`（承認の動作）、`web_form`（Web からのリードのフォーム。Worker がフォームの利用者の権限で作る保存。[sales-objects.md](sales-objects.md) の 9.1 節、ADR-0064）、`system`（型の変換・整合の検査など）。入れ子の保存では、最上位の出どころを継ぐ。変更のイベントの `origin`（[events-and-integrations.md](events-and-integrations.md) の 3.1 節）と項目の変更の履歴の `via` と同じ値を使う。
 - 一括の取り込みでフローを止めたい組織は、`$Origin = 'bulk' || $Origin = 'wizard'` を条件に書く。取り込みだけ自動化を止める設定は持たない（[bulk-and-import.md](bulk-and-import.md) の 5.4 節）。
 
 ## 4. 実行の解釈器（ADR-0025）

@@ -397,6 +397,7 @@ Google・Apple の結び付け。Better Auth の `account` の表で、パスワ
 | `id` | `uuid` | NOT NULL | `uuidv7()` | |
 | `state` | `text` | NOT NULL | `'requested'` | `requested`・`building`・`ready`・`expired`・`failed` |
 | `requested_at` | `timestamptz` | NOT NULL | `now()` | |
+| `catalog_version` | `text` | NOT NULL | — | 書き出しの目録のバージョン。`manifest.json` に書く（[ADR-0064](../../decisions/0064-personal-data-export-scope-and-format.md)）。要求の行を作るときの目録のバージョンを入れる（2026-10-25 に決めた） |
 | `ready_at` | `timestamptz` | NULL | — | |
 | `s3_key` | `text` | NULL | — | 書き出しの束（[stores.md](stores.md) の 4 節） |
 | `expires_at` | `timestamptz` | NULL | — | 渡してから 7 日 |

@@ -155,23 +155,23 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サービス・Web） | 他の題材と同じ。メタデータ・AST・決定表を型で扱う（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| HTTP・検証 | Hono＋Zod。API の OpenAPI は組織のメタデータから動的に生成する | 他の題材と同じ。組織ごとにオブジェクトが違うため、固定の型では足りない |
-| Web の画面 | React の SPA。ページレイアウトとリストビューはメタデータから描く | ui-layouts-and-list-views の領域で詳しく決める |
-| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。records と型付きのピボットの索引 | [ADR-0002](../decisions/0002-custom-object-storage.md)、[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) |
-| キャッシュ・数 | ElastiCache（Valkey） | コンパイル済みのメタデータ、上限の数（[ADR-0003](../decisions/0003-metadata-driven-runtime.md)） |
-| 全文検索 | Amazon OpenSearch Service。kuromoji と CJK の 2-gram（E5 の PoC で Sudachi と比べる） | [ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md) |
-| 非同期 | transactional outbox → Relay（論理シャードごとの唯一の書き手）→ `events`・`history` の Aurora、SQS。Worker の順番は Aurora の `jobs` の表と組織の仮想時刻 | [ADR-0033](../decisions/0033-change-event-log-and-replay.md)、[ADR-0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md) |
-| 問い合わせ・数式の言語 | 独自。パーサー、型検査、SQL へのコンパイル、参照の評価器を TypeScript で持つ | [ADR-0003](../decisions/0003-metadata-driven-runtime.md) |
-| 利用者のコード（MVP の後、E13） | TypeScript で書き、QuickJS-ng を WASM にしたものを Wasmtime の燃料とメモリーの上限の下で、Runtime の隣の別のコンテナで動かす | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md) |
-| 認証 | 自前でホストする Better Auth（パスワード＋MFA、パスキー、組織ごとの SAML・OIDC の SSO）。API は OAuth 2.0 | [ADR-0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs。組織ごとの資源の使用量を計測する | 他の題材と同じ |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| テスト | Vitest、fast-check（共有の性質、問い合わせのコンパイラと参照の評価器の一致）、Testcontainers、Playwright、k6 | 他の題材と同じ |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サービス・Web） | 他の題材と同じ。メタデータ・AST・決定表を型で扱う（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| HTTP・検証 | Hono＋Zod。API の OpenAPI は組織のメタデータから動的に生成する | 他の題材と同じ。組織ごとにオブジェクトが違うため、固定の型では足りない | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| Web の画面 | React の SPA。ページレイアウトとリストビューはメタデータから描く | ui-layouts-and-list-views の領域で詳しく決める | — |
+| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。records と型付きのピボットの索引 | [ADR-0002](../decisions/0002-custom-object-storage.md)、[ADR-0005](../decisions/0005-tenancy-and-governor-limits.md) | — |
+| キャッシュ・数 | ElastiCache（Valkey） | コンパイル済みのメタデータ、上限の数（[ADR-0003](../decisions/0003-metadata-driven-runtime.md)） | — |
+| 全文検索 | Amazon OpenSearch Service。kuromoji と CJK の 2-gram（E5 の PoC で Sudachi と比べる） | [ADR-0031](../decisions/0031-search-index-and-japanese-analysis.md) | — |
+| 非同期 | transactional outbox → Relay（論理シャードごとの唯一の書き手）→ `events`・`history` の Aurora、SQS。Worker の順番は Aurora の `jobs` の表と組織の仮想時刻 | [ADR-0033](../decisions/0033-change-event-log-and-replay.md)、[ADR-0042](../decisions/0042-org-allocations-fair-queuing-and-limit-info.md) | — |
+| 問い合わせ・数式の言語 | 独自。パーサー、型検査、SQL へのコンパイル、参照の評価器を TypeScript で持つ | [ADR-0003](../decisions/0003-metadata-driven-runtime.md) | — |
+| 利用者のコード（MVP の後、E13） | TypeScript で書き、QuickJS-ng を WASM にしたものを Wasmtime の燃料とメモリーの上限の下で、Runtime の隣の別のコンテナで動かす | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md) | 書き手は TypeScript の型を使える。エージェントにも人にも学習の資料が多い（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 認証 | 自前でホストする Better Auth（パスワード＋MFA、パスキー、組織ごとの SAML・OIDC の SSO）。API は OAuth 2.0 | [ADR-0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs。組織ごとの資源の使用量を計測する | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest、fast-check（共有の性質、問い合わせのコンパイラと参照の評価器の一致）、Testcontainers、Playwright、k6 | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 5. 主な決定
 

@@ -286,28 +286,28 @@ CloudFront の公開の価格（月 27 PB で約 0.064 USD/GB）は予算 0.02 U
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 管理の面の言語 | TypeScript（Hono＋Zod） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| メディアの面・計測の言語 | Rust（パイプラインの指揮、符号化の作業者の殻、パッケージ、オリジン、ライブ、指紋と照合、視聴の検証）。非同期は Tokio | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| 符号化の部品 | FFmpeg のライブラリ（libavformat・libavcodec・libavfilter、LGPL の組み立て）、x264、SVT-AV1、NVENC（ライブ）、libvmaf | [ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)。第三者の汎用の部品 |
-| パッケージ | 自前の CMAF の書き手とマニフェストの生成（Rust）。CENC `cbcs` | [ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) |
-| DRM のライセンス | 外部の複数の DRM のライセンスの事業者（Widevine・FairPlay・PlayReady）。鍵は自前の KMS で管理 | [ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) |
-| CDN | CloudFront ＋ Origin Shield（東京）。VOD・ライブ・画面と API の 3 つのディストリビューション。オリジンは VPC オリジンの NLB。2 つ目の CDN は月 100 PB かピーク 1 Tbps の前 | [ADR-0005](../decisions/0005-cdn-and-origin-strategy.md)、[ADR-0064](../decisions/0064-accounts-network-and-edge-distributions.md)、[ADR-0066](../decisions/0066-osaka-dr-stage-up-and-multi-cdn-timing.md) |
-| ライブ | RTMPS・SRT の自前の受け口（Rust）、GPU の EC2（`g6.2xlarge`、L4、NVENC。下限はキャパシティの予約）、自前の `live-origin` | [ADR-0006](../decisions/0006-live-ingest-and-latency.md)、[ADR-0065](../decisions/0065-media-fleets-msk-and-storage-tiers.md) |
-| 視聴の出来事 | Amazon MSK（Kafka のプロトコル）→ S3 の Parquet（Iceberg の表）。検証のバッチは Rust と Apache DataFusion | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0007](../decisions/0007-two-phase-view-counting.md)。共通の基盤（SQS・SNS）からの外れ |
-| 指紋の索引 | 自前のメモリーの転置の索引（Rust）、S3 の写し | [ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md) |
-| 検索 | Amazon OpenSearch Service（kuromoji と N-gram）。X の題材の形（[ADR-0025](../../../x/docs/decisions/0025-search-engine-and-japanese-analysis.md)）に寄せる | [ADR-0041](../decisions/0041-search-index-layout-and-caption-chunks.md) |
-| おすすめ | 段のパイプライン（TypeScript の殻と Rust の取り出し）、ONNX Runtime、学習は SageMaker（S2 から） | [ADR-0010](../decisions/0010-recommendation-boundary.md) |
-| ASR | `AsrEngine` の口の裏のエンジン。既定の案は GPU で自前でホストする公開の重みのモデル、Amazon Transcribe を 2 つ目の実装に | [ADR-0017](../decisions/0017-audio-loudness-and-asr-adapter.md) |
-| 管理の DB | Aurora PostgreSQL 18、本人だけの表に FORCE RLS と `SET LOCAL`、ID は UUIDv7、outbox | [ADR-0009](../decisions/0009-single-tenant-and-playable.md) |
-| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 |
-| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ |
-| 実行基盤 | 管理の面は ECS Fargate。メディアの面は ECS の EC2 のキャパシティープロバイダー（CPU の Spot、GPU、NVMe） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| オブジェクトストレージ | S3（SSE-KMS とバケットキー、層の移し、大阪への CRR） | [ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md) |
-| クライアント | Web は React と MSE の自前のプレイヤー。Android は Media3（ExoPlayer）に自前の ABR。iOS は AVPlayer（HLS の ABR は OS）。テレビは Web の形 | [ADR-0022](../decisions/0022-buffer-based-abr.md) |
-| IaC・計測・フラグ | Terraform、OpenTelemetry（ADOT）、AWS AppConfig。自己監視は大阪の `selfmon` のアカウント。CDN のリアルタイムのログだけ Kinesis | 他の題材と同じ。[ADR-0067](../decisions/0067-sli-sources-and-computation.md)、[ADR-0068](../decisions/0068-qoe-privacy-limits-cdn-logs-and-selfmon.md) |
-| テスト | `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、黄金の動画の集まりと VMAF、ABR の模擬（ネットワークの記録）、不正の場面の生成器、歪めた参照の集まり、Testcontainers（PostgreSQL 18、Valkey、Kafka）、LocalStack、Playwright | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 管理の面の言語 | TypeScript（Hono＋Zod） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| メディアの面・計測の言語 | Rust（パイプラインの指揮、符号化の作業者の殻、パッケージ、オリジン、ライブ、指紋と照合、視聴の検証）。非同期は Tokio | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | Rust を持つ分、エージェントの eval に Rust のタスクを入れる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 符号化の部品 | FFmpeg のライブラリ（libavformat・libavcodec・libavfilter、LGPL の組み立て）、x264、SVT-AV1、NVENC（ライブ）、libvmaf | [ADR-0003](../decisions/0003-codecs-and-per-title-ladder.md)。第三者の汎用の部品 | — |
+| パッケージ | 自前の CMAF の書き手とマニフェストの生成（Rust）。CENC `cbcs` | [ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) | — |
+| DRM のライセンス | 外部の複数の DRM のライセンスの事業者（Widevine・FairPlay・PlayReady）。鍵は自前の KMS で管理 | [ADR-0004](../decisions/0004-cmaf-packaging-and-drm-scope.md) | — |
+| CDN | CloudFront ＋ Origin Shield（東京）。VOD・ライブ・画面と API の 3 つのディストリビューション。オリジンは VPC オリジンの NLB。2 つ目の CDN は月 100 PB かピーク 1 Tbps の前 | [ADR-0005](../decisions/0005-cdn-and-origin-strategy.md)、[ADR-0064](../decisions/0064-accounts-network-and-edge-distributions.md)、[ADR-0066](../decisions/0066-osaka-dr-stage-up-and-multi-cdn-timing.md) | — |
+| ライブ | RTMPS・SRT の自前の受け口（Rust）、GPU の EC2（`g6.2xlarge`、L4、NVENC。下限はキャパシティの予約）、自前の `live-origin` | [ADR-0006](../decisions/0006-live-ingest-and-latency.md)、[ADR-0065](../decisions/0065-media-fleets-msk-and-storage-tiers.md) | — |
+| 視聴の出来事 | Amazon MSK（Kafka のプロトコル）→ S3 の Parquet（Iceberg の表）。検証のバッチは Rust と Apache DataFusion | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0007](../decisions/0007-two-phase-view-counting.md)。共通の基盤（SQS・SNS）からの外れ | — |
+| 指紋の索引 | 自前のメモリーの転置の索引（Rust）、S3 の写し | [ADR-0008](../decisions/0008-fingerprinting-and-match-engine.md) | — |
+| 検索 | Amazon OpenSearch Service（kuromoji と N-gram）。X の題材の形（[ADR-0025](../../../x/docs/decisions/0025-search-engine-and-japanese-analysis.md)）に寄せる | [ADR-0041](../decisions/0041-search-index-layout-and-caption-chunks.md) | — |
+| おすすめ | 段のパイプライン（TypeScript の殻と Rust の取り出し）、ONNX Runtime、学習は SageMaker（S2 から） | [ADR-0010](../decisions/0010-recommendation-boundary.md) | — |
+| ASR | `AsrEngine` の口の裏のエンジン。既定の案は GPU で自前でホストする公開の重みのモデル、Amazon Transcribe を 2 つ目の実装に | [ADR-0017](../decisions/0017-audio-loudness-and-asr-adapter.md) | — |
+| 管理の DB | Aurora PostgreSQL 18、本人だけの表に FORCE RLS と `SET LOCAL`、ID は UUIDv7、outbox | [ADR-0009](../decisions/0009-single-tenant-and-playable.md) | — |
+| キャッシュ | ElastiCache Valkey | 他の題材と同じ。失ってよい部品 | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期（管理の面） | transactional outbox → SNS・SQS | 他の題材と同じ | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | 管理の面は ECS Fargate。メディアの面は ECS の EC2 のキャパシティープロバイダー（CPU の Spot、GPU、NVMe） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | — |
+| オブジェクトストレージ | S3（SSE-KMS とバケットキー、層の移し、大阪への CRR） | [ADR-0002](../decisions/0002-upload-and-pipeline-orchestration.md) | — |
+| クライアント | Web は React と MSE の自前のプレイヤー。Android は Media3（ExoPlayer）に自前の ABR。iOS は AVPlayer（HLS の ABR は OS）。テレビは Web の形 | [ADR-0022](../decisions/0022-buffer-based-abr.md) | — |
+| IaC・計測・フラグ | Terraform、OpenTelemetry（ADOT）、AWS AppConfig。自己監視は大阪の `selfmon` のアカウント。CDN のリアルタイムのログだけ Kinesis | 他の題材と同じ。[ADR-0067](../decisions/0067-sli-sources-and-computation.md)、[ADR-0068](../decisions/0068-qoe-privacy-limits-cdn-logs-and-selfmon.md) | 管理の面は他の題材と同じ道具で、エージェントと人が検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | `cargo test`・proptest・cargo-fuzz、Vitest・fast-check、黄金の動画の集まりと VMAF、ABR の模擬（ネットワークの記録）、不正の場面の生成器、歪めた参照の集まり、Testcontainers（PostgreSQL 18、Valkey、Kafka）、LocalStack、Playwright | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

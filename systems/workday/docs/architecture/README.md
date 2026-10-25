@@ -162,24 +162,24 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サービス、Web、給与計算のエンジン） | 他の題材と同じ。給与計算も同じ言語にする（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| お金と数 | `packages/money`：円は `bigint`、率と途中の値は `bigint` の固定小数点。名前付きの丸め | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0004](../decisions/0004-payroll-engine.md) |
-| HTTP・検証 | Hono＋Zod。`@hono/zod-openapi` で OpenAPI を出す | 他の題材と同じ |
-| Web | React の SPA（Vite）。1 つのレスポンシブなアプリで、サーバーでの描画（SSR）は使わない。打刻の画面だけ Service Worker と IndexedDB でオフラインに耐える | [ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)。明細は保存した文書を画面で描き、PDF は確定のときに決定的に作るので SSR は要らない（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)） |
-| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。有効日付は範囲型と、PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS`、`PERIOD` の外部キー） | [ADR-0002](../decisions/0002-effective-dated-data-model.md) |
-| 業務プロセス | 自前のステートマシン（Aurora の案件とイベントのテーブル、SQS でステップを実行） | [ADR-0003](../decisions/0003-business-process-engine.md) |
-| 給与計算 | 自前のエンジン（純粋関数）。ECS のタスクで並列に実行 | [ADR-0004](../decisions/0004-payroll-engine.md) |
-| キャッシュ | ElastiCache（Valkey） | 失われてもよい |
-| 非同期 | transactional outbox → SQS | 他の題材と同じ |
-| 鍵 | KMS（テナントのデータの鍵、口座などの項目の暗号化、Vault の専用の鍵） | [ADR-0005](../decisions/0005-security-and-my-number.md) |
-| 帳票 | PDF は汎用のライブラリで座標を指定して描く（HTML の変換は使わない）。ライブラリは E10 の PoC で選ぶ | 明細、賃金台帳（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)） |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ。個人情報を出さない計装 |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| テスト | Vitest、fast-check、Testcontainers、Playwright。ゴールデンデータセットの比較の道具（自前） | [ADR-0004](../decisions/0004-payroll-engine.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サービス、Web、給与計算のエンジン） | 他の題材と同じ。給与計算も同じ言語にする（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる。性質ベーステストとゴールデンデータセットの道具を 1 つの言語で揃え、エージェントが扱いやすい（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| お金と数 | `packages/money`：円は `bigint`、率と途中の値は `bigint` の固定小数点。名前付きの丸め | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0004](../decisions/0004-payroll-engine.md) | — |
+| HTTP・検証 | Hono＋Zod。`@hono/zod-openapi` で OpenAPI を出す | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| Web | React の SPA（Vite）。1 つのレスポンシブなアプリで、サーバーでの描画（SSR）は使わない。打刻の画面だけ Service Worker と IndexedDB でオフラインに耐える | [ADR-0038](../decisions/0038-single-responsive-spa-and-offline-clock.md)。明細は保存した文書を画面で描き、PDF は確定のときに決定的に作るので SSR は要らない（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)） | — |
+| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。有効日付は範囲型と、PostgreSQL 18 の時間の制約（`WITHOUT OVERLAPS`、`PERIOD` の外部キー） | [ADR-0002](../decisions/0002-effective-dated-data-model.md) | — |
+| 業務プロセス | 自前のステートマシン（Aurora の案件とイベントのテーブル、SQS でステップを実行） | [ADR-0003](../decisions/0003-business-process-engine.md) | — |
+| 給与計算 | 自前のエンジン（純粋関数）。ECS のタスクで並列に実行 | [ADR-0004](../decisions/0004-payroll-engine.md) | — |
+| キャッシュ | ElastiCache（Valkey） | 失われてもよい | — |
+| 非同期 | transactional outbox → SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 鍵 | KMS（テナントのデータの鍵、口座などの項目の暗号化、Vault の専用の鍵） | [ADR-0005](../decisions/0005-security-and-my-number.md) | — |
+| 帳票 | PDF は汎用のライブラリで座標を指定して描く（HTML の変換は使わない）。ライブラリは E10 の PoC で選ぶ | 明細、賃金台帳（[ADR-0036](../decisions/0036-payslips-wage-ledger-and-e-delivery-consent.md)） | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ。個人情報を出さない計装 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest、fast-check、Testcontainers、Playwright。ゴールデンデータセットの比較の道具（自前） | [ADR-0004](../decisions/0004-payroll-engine.md) | 性質ベーステスト（fast-check）とゴールデンデータセットの道具を 1 つの言語で揃え、エージェントが扱いやすい（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 5. 主な決定
 

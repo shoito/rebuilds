@@ -178,10 +178,11 @@ stateDiagram-v2
   sent --> acked: ack ok (s)
   sent --> rejected: ack reject
   rejected --> rejected_store
-  acked --> done: L ≥ s
+  acked --> done: L ≥ s（同じトランザクションで行を done にする）
+  done --> [*]: 15 分後に行を消す
 ```
 
-- `done` は、`s` までの差分を IndexedDB に保存したとき。同じ IndexedDB のトランザクションで outbox の行を消す（ADR-0005）。
+- `done` は、`s` までの差分を IndexedDB に保存したとき。同じ IndexedDB のトランザクションで outbox の行を `done` にし、15 分後に消す（[ADR-0014](../decisions/0014-indexeddb-layout-durability-and-migrations.md)。ADR-0005 の「確定したら消す」を 15 分遅らせる）。残す理由は [client-store-and-offline.md](client-store-and-offline.md) の 5.2 節。
 - `acked(s)` のまま `pending` から外さない。`s` までの差分が届く前に外すと、画面が一瞬古い値に戻る（ADR-0002）。
 - 送信の順は outbox の順（`seq`）。前のトランザクションの結果を待たずに続きを送ってよい（4.3 節の 4 個まで）。Writer は同じ接続の `submit` を順に処理する（5.2 節）ので、作成の後の更新が先に当たることはない。
 
@@ -432,7 +433,7 @@ sequenceDiagram
 
 - 取り戻しの応答も、同じ範囲の形（`{from, to}` と変更の列）で返る。同じ判定で当てる。
 - 持っておくパケットは 16 MiB まで。超えたら持ったものを捨て、`(L, 今の head]` をまとめて取り戻す。
-- 1 つのパケットの保存は、1 つの IndexedDB のトランザクションで、モデルの行・`_meta.last_sync_id`・確定した outbox の行の削除をまとめて書く（ADR-0005、[client-store-and-offline.md](client-store-and-offline.md) の 4 節）。
+- 1 つのパケットの保存は、1 つの IndexedDB のトランザクションで、モデルの行・`_meta.last_sync_id`・確定した outbox の行を `done` にする書き込みをまとめて書く（ADR-0005、ADR-0014、[client-store-and-offline.md](client-store-and-offline.md) の 4 節）。
 
 ### 7.6 伝播の遅延の予算（NFR-002：確定から他のクライアントの適用まで p99 1 秒）
 

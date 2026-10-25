@@ -222,23 +222,23 @@ sequenceDiagram
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サービス・Web） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| HTTP・検証 | Hono＋Zod。REST API は `@hono/zod-openapi` で OpenAPI を出す。テナントのテーブルの検証は、データ辞書から Zod のスキーマを組み立てる | 他の題材と同じ。メタデータから型を作る |
-| 画面 | React の SPA（作業の画面・ポータル・設定）。フォームとリストはサーバーがコンパイルした画面のモデルを描く | [ADR-0040](../decisions/0040-metadata-driven-forms-and-lists.md)、[ADR-0041](../decisions/0041-employee-portal-themes-widgets-and-push.md) |
-| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。セルごとに 1 つのクラスタ（S1） | [ADR-0002](../decisions/0002-tenancy-and-isolation.md)、[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md) |
-| ワークフロー・タイマー | Aurora の上の自前のエンジン（実行の状態とタイマーの表、`FOR UPDATE SKIP LOCKED`） | [ADR-0004](../decisions/0004-workflow-and-sla-engine.md) |
-| キャッシュ | ElastiCache（Valkey） | 失われてもよい |
-| 検索 | Amazon OpenSearch Service（日本語の解析器は Sudachi ＋ 2 文字の n-gram） | [ADR-0043](../decisions/0043-japanese-analyzer-and-index-layout.md)。E9 の評価で確かめる |
-| 非同期 | transactional outbox → SQS | 他の題材と同じ |
-| メール | Amazon SES（東京で受信と送信。大阪も受信に対応） | 東京・大阪とも受信のエンドポイントがある（[Amazon SES endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)、2026-09-28 に確認） |
-| ファイル | S3（添付ファイル、メールの原本）、CloudFront の署名付き URL | |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ |
-| フラグ | AWS AppConfig | 他の題材と同じ。テナント・セルの単位で振る舞いの変更を出す |
-| テスト | Vitest、fast-check、Testcontainers、Playwright | 他の題材と同じ。SLA・CMDB の性質ベーステストと、ワークフローの障害注入 |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サービス・Web） | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| HTTP・検証 | Hono＋Zod。REST API は `@hono/zod-openapi` で OpenAPI を出す。テナントのテーブルの検証は、データ辞書から Zod のスキーマを組み立てる | 他の題材と同じ。メタデータから型を作る | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 画面 | React の SPA（作業の画面・ポータル・設定）。フォームとリストはサーバーがコンパイルした画面のモデルを描く | [ADR-0040](../decisions/0040-metadata-driven-forms-and-lists.md)、[ADR-0041](../decisions/0041-employee-portal-themes-widgets-and-push.md) | — |
+| DB | Aurora PostgreSQL 18、RLS、ID は UUIDv7。セルごとに 1 つのクラスタ（S1） | [ADR-0002](../decisions/0002-tenancy-and-isolation.md)、[ADR-0003](../decisions/0003-table-hierarchy-and-extensible-schema.md) | — |
+| ワークフロー・タイマー | Aurora の上の自前のエンジン（実行の状態とタイマーの表、`FOR UPDATE SKIP LOCKED`） | [ADR-0004](../decisions/0004-workflow-and-sla-engine.md) | — |
+| キャッシュ | ElastiCache（Valkey） | 失われてもよい | — |
+| 検索 | Amazon OpenSearch Service（日本語の解析器は Sudachi ＋ 2 文字の n-gram） | [ADR-0043](../decisions/0043-japanese-analyzer-and-index-layout.md)。E9 の評価で確かめる | — |
+| 非同期 | transactional outbox → SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| メール | Amazon SES（東京で受信と送信。大阪も受信に対応） | 東京・大阪とも受信のエンドポイントがある（[Amazon SES endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)、2026-09-28 に確認） | — |
+| ファイル | S3（添付ファイル、メールの原本）、CloudFront の署名付き URL | | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ。テナント・セルの単位で振る舞いの変更を出す | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest、fast-check、Testcontainers、Playwright | 他の題材と同じ。SLA・CMDB の性質ベーステストと、ワークフローの障害注入 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
 
 ## 5. 主な決定
 

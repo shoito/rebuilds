@@ -188,26 +188,26 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語 | TypeScript（サーバー・Web クライアント・共有のパッケージ） | 他の題材と同じ。展開とタイムゾーンの計算を、サーバーとクライアントで同じコードにする（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| HTTP・検証 | Hono＋Zod | 他の題材と同じ |
-| 公開 API | REST と JSON。形は本家の API の振る舞いに寄せ、名前は独自にする | [ADR-0026](../decisions/0026-public-rest-api-shape.md) |
-| CalDAV | Hono の上に WebDAV のメソッド（`PROPFIND`・`REPORT`・`PUT`・`DELETE` など）を自前で書く。XML は第三者の汎用のパーサー | [ADR-0007](../decisions/0007-interop-standards-scope.md) |
-| iCalendar | 自前のパーサーと書き出し（`packages/ical`）。行の折り返し、エスケープ、VTIMEZONE を含む | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0007](../decisions/0007-interop-standards-scope.md) |
-| 繰り返しの展開 | 自前（`packages/recurrence`）。参照の実装（libical を第一の候補）はテストにだけ使う | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) |
-| タイムゾーン | 自前の変換（`packages/tz`）と、バージョンを固定した tzdb のデータ（`packages/tzdata`。IANA の tzdb を zic で遷移の表にしたもの）。サーバーとクライアントで同じバージョン | [ADR-0002](../decisions/0002-time-representation.md) |
-| Web クライアント | React、TanStack Router・Query、IndexedDB（最近の範囲のキャッシュ） | [ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) |
-| DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7。拡張は `btree_gist`（会議室の排他の制約）、`pg_bigm`（日本語の検索）、`pg_partman`（展開の索引と変更のログの分割） | [ADR-0004](../decisions/0004-tenancy-and-rls.md)。拡張が Aurora PostgreSQL 18 で使えることは確かめた（[Extension versions](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-10-04） |
-| キャッシュ・合図 | ElastiCache Valkey（pub/sub、空き時間のキャッシュ、レート制限、1 カレンダーの書き込みの枠） | 他の題材と同じ。失ってよい部品 |
-| 非同期 | transactional outbox → SNS・SQS | 他の題材と同じ |
-| メール | Amazon SES（送信と受信。受信は東京を主、大阪を副の MX にする。どちらも受信を使える。[SES endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)、2026-10-04 に確認） | [ADR-0015](../decisions/0015-imip-addressing-and-trust.md)、[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md) |
-| Web Push | 標準の Web Push（VAPID）。配信はブラウザの事業者のサービス | [ADR-0031](../decisions/0031-notification-channels-and-content.md)。法務の L1・L4 |
-| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ |
-| IaC | Terraform | 他の題材と同じ |
-| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana | 他の題材と同じ |
-| フラグ | AWS AppConfig | 他の題材と同じ |
-| テスト | Vitest、fast-check（展開・タイムゾーン・同期の性質）、参照の実装との差分テスト、Testcontainers、Playwright、CalDAV のクライアントの相互運用の試験 | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語 | TypeScript（サーバー・Web クライアント・共有のパッケージ） | 他の題材と同じ。展開とタイムゾーンの計算を、サーバーとクライアントで同じコードにする（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| HTTP・検証 | Hono＋Zod | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 公開 API | REST と JSON。形は本家の API の振る舞いに寄せ、名前は独自にする | [ADR-0026](../decisions/0026-public-rest-api-shape.md) | — |
+| CalDAV | Hono の上に WebDAV のメソッド（`PROPFIND`・`REPORT`・`PUT`・`DELETE` など）を自前で書く。XML は第三者の汎用のパーサー | [ADR-0007](../decisions/0007-interop-standards-scope.md) | 実装と試験の範囲を決め、エージェントが RFC の全部や独自の拡張に流れないようにする（[ADR-0007](../decisions/0007-interop-standards-scope.md)） |
+| iCalendar | 自前のパーサーと書き出し（`packages/ical`）。行の折り返し、エスケープ、VTIMEZONE を含む | [ADR-0001](../decisions/0001-platform-and-stack.md)、[ADR-0007](../decisions/0007-interop-standards-scope.md) | 実装と試験の範囲を決め、エージェントが RFC の全部や独自の拡張に流れないようにする（[ADR-0007](../decisions/0007-interop-standards-scope.md)） |
+| 繰り返しの展開 | 自前（`packages/recurrence`）。参照の実装（libical を第一の候補）はテストにだけ使う | [ADR-0003](../decisions/0003-recurrence-storage-and-expansion.md) | — |
+| タイムゾーン | 自前の変換（`packages/tz`）と、バージョンを固定した tzdb のデータ（`packages/tzdata`。IANA の tzdb を zic で遷移の表にしたもの）。サーバーとクライアントで同じバージョン | [ADR-0002](../decisions/0002-time-representation.md) | — |
+| Web クライアント | React、TanStack Router・Query、IndexedDB（最近の範囲のキャッシュ） | [ADR-0038](../decisions/0038-web-calendar-rendering-and-local-expansion.md) | — |
+| DB | Aurora PostgreSQL 18、FORCE RLS と `SET LOCAL`、ID は UUIDv7。拡張は `btree_gist`（会議室の排他の制約）、`pg_bigm`（日本語の検索）、`pg_partman`（展開の索引と変更のログの分割） | [ADR-0004](../decisions/0004-tenancy-and-rls.md)。拡張が Aurora PostgreSQL 18 で使えることは確かめた（[Extension versions](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraPostgreSQLReleaseNotes/AuroraPostgreSQL.Extensions.html)、2026-10-04） | — |
+| キャッシュ・合図 | ElastiCache Valkey（pub/sub、空き時間のキャッシュ、レート制限、1 カレンダーの書き込みの枠） | 他の題材と同じ。失ってよい部品 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期 | transactional outbox → SNS・SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| メール | Amazon SES（送信と受信。受信は東京を主、大阪を副の MX にする。どちらも受信を使える。[SES endpoints and quotas](https://docs.aws.amazon.com/general/latest/gr/ses.html)、2026-10-04 に確認） | [ADR-0015](../decisions/0015-imip-addressing-and-trust.md)、[ADR-0043](../decisions/0043-accounts-network-ingress-and-service-placement.md) | — |
+| Web Push | 標準の Web Push（VAPID）。配信はブラウザの事業者のサービス | [ADR-0031](../decisions/0031-notification-channels-and-content.md)。法務の L1・L4 | — |
+| 実行基盤 | AWS（東京、DR は大阪）、ECS Fargate | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| IaC | Terraform | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ AMP、X-Ray、CloudWatch Logs、Managed Grafana | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest、fast-check（展開・タイムゾーン・同期の性質）、参照の実装との差分テスト、Testcontainers、Playwright、CalDAV のクライアントの相互運用の試験 | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 

@@ -286,7 +286,7 @@ CREATE INDEX trip_timers_due ON trip_timers (due_at) WHERE status = 'pending';
 | 種類 | 期限（既定） | 設定 | 時間切れの遷移 |
 | --- | --- | --- | --- |
 | `authorization` | 作成から 30 秒 | `payment_pending` | `payment_failed` |
-| `dispatch_deadline` | 与信の成功から 3 分（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)） | `requested` | `no_driver_found` |
+| `dispatch_deadline` | 与信の成功から 3 分。車内払い（与信なし）は作成から 3 分（[ADR-0004](../decisions/0004-batched-dispatch-and-offers.md)） | `requested` | `no_driver_found` |
 | `offer_delivery` | オファーから 5 秒 | `offered` | 受信の確認がなければ `requested`（`undelivered`） |
 | `offer_expiry` | オファーから 16.5 秒（アプリの表示は 15 秒、配信と送信の遅れの猶予 1.5 秒。[dispatch-and-matching.md](dispatch-and-matching.md) の 8.2 節） | `offered` | `requested`（割り当ての解放） |
 | `no_show_eligible` | 到着から 300 秒（事業者の規則） | `arrived` | 状態は変えない。ドライバーのアプリの「無断キャンセル」を押せるようにする事象を配る |

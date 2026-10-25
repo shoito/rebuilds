@@ -330,7 +330,7 @@ DT-CHG-001（遷移）：
 | 9 | 全種 | `implement` | `review` | `complete_implementation` | `resolution_code`、`resolution_notes` | `actual_end = now` |
 | 10 | 全種 | `review` | `closed` | `close` | 緊急なら事後の CAB の承認のまとまりが `approved`。`resolution_code = unsuccessful` なら関連のインシデントか `review_notes` | |
 | 11 | 全種 | `new`・`assess`・`authorize`・`scheduled`・`implement` | `cancelled` | `cancel` | `cancel_reason`。`implement` からの取り消しは `backout_performed` を必須 | 開いている承認を `cancelled` |
-| 12 | 全種 | `scheduled` | `new`（通常・標準）・`authorize`（緊急） | `reschedule` | `planned_start` か `planned_end` か `ci_id` を変えるとき | 承認を取り直す（通常は `assess` から） |
+| 12 | 全種 | `scheduled` | `assess`（通常）・`new`（標準）・`authorize`（緊急） | `reschedule` | `planned_start` か `planned_end` か `ci_id` を変えるとき | 承認を取り直す。通常は #1 と同じ効果（リスクの評価し直し、`recompute_conflicts`、`request_approval(assess)`）、緊急は `request_approval(emergency)`。標準は `schedule`（#5）からやり直す |
 | 13 | 全種 | `review`・`closed`・`cancelled` | 取り消し・前の状態 | - | - | 422（振り返りと完了は取り消せない。本家と同じ） |
 | 14 | そのほか | | | | | 422 `invalid_transition` |
 
@@ -349,7 +349,7 @@ stateDiagram-v2
   scheduled --> implement: implement（8）
   implement --> review: complete_implementation（9）
   review --> closed: close（10）
-  scheduled --> new: reschedule（12）
+  scheduled --> assess: reschedule（12）
   new --> cancelled: cancel（11）
   assess --> cancelled: cancel（11）
   authorize --> cancelled: cancel（11）

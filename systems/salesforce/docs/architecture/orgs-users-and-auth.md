@@ -132,6 +132,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 - `username` はメールの形で、**全ての組織で一意**にする（共通のログインの画面で、名前から組織を決めるため。6.2 節）。`email` は組織をまたいで同じでもよい（同じ人が複数の組織の利用者になれる）。
 - `manager_id` は承認の `manager_of_submitter`（[automation-flows.md](automation-flows.md) の 8.5 節）と、ロール階層とは別の上司の関係に使う。
 - 利用者の作成・変更は `manage_users`。7.2 節の渡す規則に従う。
+- **フォームの利用者**（[ADR-0064](../decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](sales-objects.md) の 9 節）：Web からのリードのフォームの実行の利用者にする種類。フォームごとに 1 人を結ぶ（`web_lead_form.run_as`）。ログインできず（画面・OAuth のどちらも。DT-AUTH-001 の行 1）、ライセンスを消費しない（`license` は空。`LICENSE_LIMIT_EXCEEDED` の数に入れない）。権限セットで、対象のオブジェクトの `create` と、フォームが受ける項目の FLS だけを渡す。フォームの利用者への権限セットの付与は `security:sensitive` の変更にし、Setup で警告する（権限が広すぎると、フォームが組織への書き込みの穴になる）。
 - **サポートのアクセスの許可**：組織の管理者（`manage_users`）は、Setup で本システムの運用者に、期限（1〜7 日）とオブジェクトの範囲を決めてレコードの読みを許せる（`support_access_grants`。security の領域の依頼、[security.md](security.md) の 6 節、[ADR-0053](../decisions/0053-operator-access-and-data-lifecycle.md)）。許可・取り消し・運用者の操作は、組織の監査に残る。
 
 ## 6. ログインと認証（ADR-0044）
@@ -158,7 +159,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 
 | # | 組織の設定 | 利用者 | 手段 | 結果 |
 | --- | --- | --- | --- | --- |
-| 1 | - | `frozen`・`deactivated` | - | 拒否（失敗の理由を画面で区別しない） |
+| 1 | - | `frozen`・`deactivated`、フォームの利用者（5.2 節） | - | 拒否（失敗の理由を画面で区別しない） |
 | 2 | - | `integration` のライセンス | 画面のログイン | 拒否 |
 | 3 | SSO を必須 | `sso_bypass` なし | パスワード | 拒否（SSO へ案内） |
 | 4 | - | 特権あり | パスワード | パスワードの後にパスキーを求める。未登録なら登録するまで他の画面に進めない。TOTP と回復の番号は受け付けない |
@@ -218,7 +219,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 
 ### 7.1 一覧
 
-[sharing-and-record-access.md](sharing-and-record-access.md) の 3.2 節の 10 の権限に、他の領域から依頼のあった 6 つと、この文書と他の領域で要る 9 つを足した **25**。オブジェクトの権限（`read`〜`modify_all`）と項目の権限（`read`・`edit`）は、共有の領域の 3.2 節のまま。
+[sharing-and-record-access.md](sharing-and-record-access.md) の 3.2 節の 10 の権限に、他の領域から依頼のあった 6 つと、この文書と他の領域で要る 9 つを足した 25 に、移行の 1 つ（[ADR-0065](../decisions/0065-migration-path-from-original.md)）を足した **26**。オブジェクトの権限（`read`〜`modify_all`）と項目の権限（`read`・`edit`）は、共有の領域の 3.2 節のまま。
 
 | # | 権限 | 分類 | できること | 使う領域 | 追加 |
 | --- | --- | --- | --- | --- | --- |
@@ -247,6 +248,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 | 23 | `deploy_metadata` | 管理 | メタデータのデプロイ・戻し、パッケージの受け取り | sandboxes-and-deploy | 追加 |
 | 24 | `view_audit_trail` | 監査 | 設定の変更の履歴、ログインの履歴を読む・書き出す | audit-and-field-history | 追加 |
 | 25 | `erase_history_values` | 監査 | 項目の変更の履歴の値を消す（本人の請求） | audit-and-field-history の 5.5 節 | 追加 |
+| 26 | `set_audit_fields_on_import` | データ | 一括のジョブで、作成日・更新日・作成者・更新者（`created_at`・`created_by` など）を列で指定する。使ったジョブは監査に残る | bulk-and-import の 15.2 節 | 追加（依頼。ADR-0065） |
 
 **依存**（保存の時に検査する。共有の領域の 3.2 節の依存に足す）
 
@@ -264,7 +266,8 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 | `erase_history_values` | `view_audit_trail`、`modify_all_data` |
 
 - 本家の似た権限の名前（「リードの変換」など）は、各領域の文書で確かめた振る舞いから寄せた。本家の全体の一覧は確かめていない（2 節。未検証。E4 の `system-permissions-and-delegation` で確かめる）。本システムの権限は、名前も粒度も本家に合わせない（`api_enabled` のように、意味で名前を付ける）。
-- `system_admin` のプロファイルの基本の権限セットは、25 の全てを持つ。
+- `system_admin` のプロファイルの基本の権限セットは、`set_audit_fields_on_import` を除く 25 を持つ。`set_audit_fields_on_import` は既定でどの権限セットにも入れない（記録を偽る手段にもなるため。移行の期間だけ付け、外したことを監査で確かめるよう案内する。[ADR-0065](../decisions/0065-migration-path-from-original.md)）。
+- `set_audit_fields_on_import` は、組織の中では誰も渡せない（DT-AUTH-002 の部分集合の規則のまま）。組織の管理者（`manage_users`）が Setup から依頼し、本システムの運用者が、移行のジョブを実行する利用者 1 人に、期限つき（最長 14 日）で付ける。付けるには運用者 2 人の承認が要り、付与・期限切れ・外したことを組織の監査ログに残す（[ADR-0053](../decisions/0053-operator-access-and-data-lifecycle.md) の運用者のアクセスと同じ記録）。期限が来たら自動で外す（2026-10-25 に決めた）。
 
 ### 7.2 権限を渡す規則
 
@@ -349,10 +352,12 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 | [0043](../decisions/0043-orgs-editions-licenses-and-users.md) | 組織は種類と状態を持ち、削除は 30 日の猶予の後に消す。エディションはトランザクションの上限を変えず、割り当て・機能・Sandbox の数を変える。ライセンスが権限の上限になる。利用者は消さずに無効にし、匿名化できる |
 | [0044](../decisions/0044-authentication-better-auth-sso-and-mfa.md) | ログインは自前でホストする Better Auth。組織ごとの SAML・OIDC の SSO。Auth0 の題材を IdP にしない。SSO を含めて MFA を確かめ（SSO は IdP の主張、なければ 2 つ目の要素）、特権を持つ利用者はパスキーだけ。API は OAuth、画面の API はセッションの Cookie だけ |
 | [0045](../decisions/0045-system-permissions-and-delegation.md) | システムの権限を 25 にし、依存を決める。権限を渡す人は自分の権限の部分集合しか渡せず、自分より強い利用者を操作できない。最後の管理者を無くせない |
+| [0064](../decisions/0064-web-lead-form-public-intake.md) | （sales-objects の領域の ADR）Web からのリードのフォームは、フォームごとに結んだ「フォームの利用者」（ログインできず、ライセンスを消費しない）の権限で書く |
+| [0065](../decisions/0065-migration-path-from-original.md) | （bulk-and-import の領域の ADR）監査の項目は、`set_audit_fields_on_import`（既定でどの権限セットにもない）を持つ人の一括のジョブだけが書ける |
 
 他の領域への依頼：
 
-- sharing-and-record-access の領域：3.2 節のシステムの権限を、7.1 節の 25 と依存の表に合わせる。`permission_sets.license` を足す。
+- sharing-and-record-access の領域：3.2 節のシステムの権限を、7.1 節の 26 と依存の表に合わせる。`permission_sets.license` を足す。
 - query-language-and-api の領域：`/api/v1` の認証（OAuth のトークン）と、画面の API をセッションの Cookie だけにする規則を 5 節に書く。
 
 ## 13. Story の候補
@@ -372,7 +377,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 | E2 | OAuth のクライアントとトークン（認可コード＋PKCE、クライアントクレデンシャル） |
 | E2 | 組織のドメインと名前の変更の転送 |
 | E2 | 組織の削除（猶予、書き出し、消去） |
-| E4 | システムの権限の 25 と依存、DT-AUTH-002（部分集合の規則、最後の管理者） |
+| E4 | システムの権限の 26 と依存、DT-AUTH-002（部分集合の規則、最後の管理者） |
 | E11 | 管理の操作・認証の設定の変更の監査と、管理者への知らせ |
 | E12 | 外部のペンテスト（認証、権限の昇格） |
 
@@ -385,6 +390,7 @@ users(org_id, user_id, auth_subject_id, username, email, email_verified_at,
 - 組織の削除の猶予（30 日）と、監査のログの外部の保管の扱い（法務の L5・L7）。
 - 代理のログイン（管理者が利用者として入る。本家の似た機能）を MVP に入れるか。
 - レポートの作成・実行をシステムの権限で分けるか（本家には似た権限があると読める。未検証。E4 の `system-permissions-and-delegation` で確かめる）。
+- ~~`set_audit_fields_on_import` を誰が最初に渡せるか。~~ 2026-10-25 に決めた：組織の管理者の依頼で、本システムの運用者が期限つきで付ける（7.1 節）。
 - SSO のログインでも MFA を確かめるか（IdP の MFA の主張、SAML の `AuthnContextClassRef`・OIDC の `amr` を要るとするか）。管理者（`manage_users` などを持つ利用者）にパスキーを必須にするか。本家は 2026 年から両方を強制する（2 節）。 → 決定を見よ。
 
 ### 決定

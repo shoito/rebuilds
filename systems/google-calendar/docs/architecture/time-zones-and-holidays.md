@@ -352,7 +352,7 @@ tzdb のバージョンの差分の試験（[quality.md](../quality.md) の 2.2.
 
 2026-10-04 の既定案。E3 の試験で覆りうる。
 
-- **tzdb の更新で外部の参加者へ更新を送るか**：送る。施行の後に回がある予定だけ、同じ `SEQUENCE` で（ADR-0012。[architecture/README.md](README.md) の 6 節の持ち越しを閉じる）。
+- **tzdb の更新で外部の参加者へ更新を送るか**：送る。施行の後に回がある予定だけ、同じ `SEQUENCE` で（ADR-0012。最初の設計の README の 6 節で持ち越していた問いを閉じる。その一覧は [design-log.md](design-log.md) に移していない。経緯は design-log.md の「2026-10-04：既定案」）。
 - **会議室の重なり**：後から確定したほうを「要確認」（ADR-0012、[rooms-and-resources.md](rooms-and-resources.md) の ADR-0020）。
 - **知っている TZID の VTIMEZONE**：使わない（ADR-0013）。
 - **知らない TZID**：遷移の照合で寄せる（ADR-0013）。

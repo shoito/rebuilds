@@ -282,26 +282,26 @@ flowchart TB
 
 ## 4. 技術スタック
 
-| 層 | 選定 | 理由 |
-| --- | --- | --- |
-| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口・Worker ごとのサービスとして出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
-| 言語（ML） | Python（学習と `ml-inference`） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ |
-| DB | Aurora PostgreSQL 18。core・ledger・content・vault の 4 クラスタ。`btree_gist` の排他の制約、FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)、[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md) |
-| キャッシュ | ElastiCache Valkey（空室の写し、見積もりの写し、セッション） | 他の題材と同じ。失ってよい部品 |
-| 非同期 | outbox → SNS・SQS | 他の題材と同じ |
-| 検索 | Amazon OpenSearch Service（`geo_point`、`date_range`、Sudachi と ICU、言語ごとの解析器）。順位付けは自前の式 | [ADR-0003](../decisions/0003-search-for-date-range-availability.md) |
-| 地理 | PostGIS（境界の多角形、地名の範囲）、OpenSearch の `geo_point`。地図のタイルと住所の検索は提供者 | location-and-geo の領域。Uber の題材の格子は日本だけの平面なので使わない（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)） |
-| 時刻 | IANA の tz データベース（バージョンを固定して配る）、`packages/stay-time` | Google Calendar の題材の [ADR-0002](../../../google-calendar/docs/decisions/0002-time-representation.md) |
-| エッジ | CloudFront、AWS WAF（Bot Control） | 他の題材と同じ |
-| 実行基盤 | ECS Fargate | [ADR-0001](../decisions/0001-platform-and-stack.md) |
-| オブジェクトストレージ | S3（写真、書き出し、旅券の画像）。写真の変換は sharp | listings-and-content の領域 |
-| データレイク | S3、Glue のカタログ、Athena。個人のデータを除く・仮名にした事象 | [ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md) |
-| 外部 | 決済の提供者、為替の相場の提供者、提携銀行の API（予備に全銀の形式のファイル）、国際送金の提供者（MVP の後）、eKYC の提供者、翻訳の提供者、地図の提供者、SMS、APNs・FCM、Amazon SES | [ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)、[ADR-0008](../decisions/0008-multi-currency-and-fx.md) |
-| アプリ | iOS・Android は React Native（TypeScript）、Web は React | 他の題材（Mercari、Uber）と同じ形。accounts の領域で ADR にする |
-| IaC | Terraform | infrastructure の領域 |
-| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana | observability の領域 |
-| フラグ | AWS AppConfig（`release.*`、`ops.*`、`legal.*`） | 他の題材と同じ |
-| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（空室、料金、台帳、キャンセルの精算）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者の模型、iCal の模型、仮想の時計、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) |
+| 層 | 選定 | 理由 | エージェントにとっての理由 |
+| --- | --- | --- | --- |
+| 言語（サービス） | TypeScript（Hono＋Zod）。ドメインごとのパッケージを持つ 1 つのコードベースを、入口・Worker ごとのサービスとして出す | 他の題材と同じ（[ADR-0001](../decisions/0001-platform-and-stack.md)） | 題材をまたいで、エージェントと人が同じ道具で検証できる。ドメインごとのマイクロサービスは、小さなチームとエージェントには重い（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 言語（ML） | Python（学習と `ml-inference`） | [ADR-0001](../decisions/0001-platform-and-stack.md)。共通の基盤からの外れ | — |
+| DB | Aurora PostgreSQL 18。core・ledger・content・vault の 4 クラスタ。`btree_gist` の排他の制約、FORCE RLS と `SET LOCAL`、ID は UUIDv7、transactional outbox | [ADR-0002](../decisions/0002-availability-representation-and-double-booking.md)、[ADR-0007](../decisions/0007-tenancy-host-accounts-and-rls.md) | — |
+| キャッシュ | ElastiCache Valkey（空室の写し、見積もりの写し、セッション） | 他の題材と同じ。失ってよい部品 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 非同期 | outbox → SNS・SQS | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 検索 | Amazon OpenSearch Service（`geo_point`、`date_range`、Sudachi と ICU、言語ごとの解析器）。順位付けは自前の式 | [ADR-0003](../decisions/0003-search-for-date-range-availability.md) | — |
+| 地理 | PostGIS（境界の多角形、地名の範囲）、OpenSearch の `geo_point`。地図のタイルと住所の検索は提供者 | location-and-geo の領域。Uber の題材の格子は日本だけの平面なので使わない（[ADR-0003](../decisions/0003-search-for-date-range-availability.md)） | — |
+| 時刻 | IANA の tz データベース（バージョンを固定して配る）、`packages/stay-time` | Google Calendar の題材の [ADR-0002](../../../google-calendar/docs/decisions/0002-time-representation.md) | — |
+| エッジ | CloudFront、AWS WAF（Bot Control） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 実行基盤 | ECS Fargate | [ADR-0001](../decisions/0001-platform-and-stack.md) | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| オブジェクトストレージ | S3（写真、書き出し、旅券の画像）。写真の変換は sharp | listings-and-content の領域 | — |
+| データレイク | S3、Glue のカタログ、Athena。個人のデータを除く・仮名にした事象 | [ADR-0009](../decisions/0009-trust-and-safety-and-ml-boundary.md) | — |
+| 外部 | 決済の提供者、為替の相場の提供者、提携銀行の API（予備に全銀の形式のファイル）、国際送金の提供者（MVP の後）、eKYC の提供者、翻訳の提供者、地図の提供者、SMS、APNs・FCM、Amazon SES | [ADR-0005](../decisions/0005-payments-hold-capture-and-ledger.md)、[ADR-0008](../decisions/0008-multi-currency-and-fx.md) | — |
+| アプリ | iOS・Android は React Native（TypeScript）、Web は React | 他の題材（Mercari、Uber）と同じ形。accounts の領域で ADR にする | — |
+| IaC | Terraform | infrastructure の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| 可観測性 | OpenTelemetry（ADOT）→ CloudWatch・AMP・Managed Grafana | observability の領域 | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| フラグ | AWS AppConfig（`release.*`、`ops.*`、`legal.*`） | 他の題材と同じ | 題材をまたいで、エージェントと人が同じ道具で検証できる（[ADR-0001](../decisions/0001-platform-and-stack.md)） |
+| テスト | Vitest・fast-check、pytest・Hypothesis、自前の参照の実装（空室、料金、台帳、キャンセルの精算）、Testcontainers（PostgreSQL 18、Valkey、OpenSearch）、LocalStack、提供者の模型、iCal の模型、仮想の時計、k6 と自前の負荷の生成器、Playwright・Maestro | [quality.md](../quality.md) | — |
 
 ## 5. 主な決定
 
