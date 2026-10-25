@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-10
 ---
 
@@ -22,7 +22,9 @@ date: 2026-10-10
 
 ## Decision
 
-1 を提案する。詳細は [bulk-and-import.md](../architecture/bulk-and-import.md) の 15 節。
+1 を採用する。詳細は [bulk-and-import.md](../architecture/bulk-and-import.md) の 15 節。
+
+> 2026-10-25 の注記：PM が範囲を決めた。MVP（E9 の `migration-import`）は移行の文書と、`legacy_id` での CSV の取り込みの手順にする。メタデータの変換の道具は MVP の後の Epic にする（法務の L13 の後）。
 
 - **移行の文書**：本家との違い（各領域で「移行の文書に書く」と決めたもの）を 1 か所に集め、本家の機能 → 本システムの対応・代わりの案・違いの理由の表にする。正本は bulk-and-import.md の 15.4 節に置き、各領域の文書はそこへの行を足す。
 - **本家の ID を外部 ID にする**：移す各オブジェクトに、`legacy_id`（`text`、18、`external_id`・`unique`）を足す。本家の 15 文字の ID は大文字と小文字を区別し、18 文字の形は区別しなくても一意になるとされる（未検証。E9 の着手の時に公開の資料で確かめる）ので、18 文字の形だけを受け、15 文字の値は `INVALID_LEGACY_ID` で断る。参照の列は、親の外部 ID（`account.legacy_id` の形。[bulk-and-import.md](../architecture/bulk-and-import.md) の 4.2 節）で結ぶ。

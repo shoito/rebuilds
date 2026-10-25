@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| salesforce | [ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 本家からの移行の経路 | 2026-10-10 |
 | shopify | [ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 他の EC の基盤からの移行の取り込み | 2026-10-10 |
 | slack | [ADR-0034](../systems/slack/docs/decisions/0034-workspace-import-from-other-tools.md) | 他のチャットツールからの取り込み（移行）の範囲と方式 | 2026-10-10 |
 | slack | [ADR-0035](../systems/slack/docs/decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | 2026-10-10 |
@@ -73,7 +72,7 @@
 | PM-002 | Stripe | 他の決済事業者とのカード番号の移行を提供するか | 取り込みと書き出しの両方を、MVP の後に運用者の仲介で | [intent.md](../systems/stripe/docs/intent.md)、[ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 待ち |
 | PM-003 | GitHub | 他のホスティングからのリポジトリと Issue の取り込みを提供するか | Git に加えて、決めた 1 つの形式のアーカイブから Issue と PR を MVP の後に | [intent.md](../systems/github/docs/intent.md)、[ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 解決（2026-10-25：Git と Issue・PR を MVP の後に） |
 | PM-004 | Salesforce | Web からのリードのフォームを MVP に入れるか | E5 に入れる | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | 解決（2026-10-25：E5 に入れる） |
-| PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 待ち |
+| PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 解決（2026-10-25：文書と CSV の手順、変換の道具は MVP の後） |
 | PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 解決（2026-10-25：両方を MVP に。費用は GA では数えない） |
 | PM-007 | Datadog | 他の監視の道具からの移行を MVP に入れるか | MVP は手順書だけ、変換器は E17 の後 | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 解決（2026-10-25：MVP は手順書だけ、変換器は E17 の後） |
 | PM-008 | X | 本人のデータの書き出しを MVP に入れるか | E14 に入れる | [intent.md](../systems/x/docs/intent.md)、[ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 待ち |
@@ -119,7 +118,7 @@
 | FOL-002 | Stripe ADR-0035（CDE の外の運用者のアクセス） | JIT の仕組みの選定（ADR-0020 の注記、E10 の PoC）と揃える | 待ち |
 | FOL-003 | GitHub ADR-0038（運用者のアクセス） | data-model.md 2.3 節（「運用者は break-glass」）、ADR-0028・0031 の書き方を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
 | FOL-004 | Notion ADR-0034（プランと権利） | data-model/global.md の権利の名前（`guest_limit` など）、api-and-integrations.md 5 節の 600 回の対象の書き方 | 解決（2026-10-25、ADR の承認と同時に直した。`workspace_entitlements` の表も定義した） |
-| FOL-005 | Salesforce ADR-0064（Web からのリードのフォーム。2026-10-25 に承認） | orgs-users-and-auth.md（ログインできないフォームの利用者、`set_audit_fields_on_import`）、governor-limits.md（`alloc.web_form_submissions`）、automation-flows.md（`$Origin` の `web_form`）、infrastructure.md（`forms.` のホスト） | 待ち |
+| FOL-005 | Salesforce ADR-0064（Web からのリードのフォーム）と ADR-0065（本家からの移行）。どちらも 2026-10-25 に承認 | orgs-users-and-auth.md（ログインできないフォームの利用者、`set_audit_fields_on_import`）、governor-limits.md（`alloc.web_form_submissions`）、automation-flows.md（`$Origin` の `web_form`）、infrastructure.md（`forms.` のホスト） | 待ち |
 | FOL-006 | Datadog ADR-0068（他の道具からの移行） | monitors-and-alerting.md に、取り込んだモニターと移行の待ちのダウンタイムを書く（変換器を作る E17 の後で足りる） | 待ち（ADR は 2026-10-25 に承認） |
 | FOL-007 | X ADR-0064（本人のデータの書き出し） | data-model/users-and-accounts.md の `data_export_requests` に目録のバージョンの列を足す | 待ち |
 | FOL-008 | Gmail ADR-0044（安全な HTML の描画） | 浄化の許可の一覧に `lang`・`dir`・表の `role`・`scope`・`headers`・`abbr` を足す提案（web-client.md 17 節の持ち越し）。Dev とセキュリティの判断 | 待ち |

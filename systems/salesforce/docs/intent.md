@@ -140,13 +140,11 @@ B2B の営業チームは、顧客（取引先・取引先責任者）、見込�
 
 ### PM の判断待ち
 
-- **本家からの移行の支援の範囲**（[ADR-0065](decisions/0065-migration-path-from-original.md)、proposed。[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節）：Non-goals は「移行の道具が要れば別の Epic」とだけ書く。選択肢は次の 3 つ。
-  1. **MVP は移行の文書（本家との違いの表）と、`legacy_id` での CSV の取り込みの手順（E9 の `migration-import`）にし、メタデータの変換の道具は MVP の後の Epic にする**（推奨）：データの取り込みの部品はそろっており、足すのは検査と権限と手順書だけで済む。
-  2. MVP に、上げたファイルを読むメタデータの変換の道具まで入れる：法務の L13 が先に要り、E10 の形式が固まる前に作ることになる。
-  3. 移行の文書だけを用意し、取り込みの手順は一般の CSV の取り込みに任せる。
+なし（2026-10-25 にすべて決めた。下の「PM の確認済みの決定」にある）。
 
 ### PM の確認済みの決定
 
+- **本家からの移行の支援は、移行の文書と `legacy_id` での CSV の取り込みの手順にする**（2026-10-25 に決定。E9 の `migration-import`。[ADR-0065](decisions/0065-migration-path-from-original.md)、[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節）。メタデータの変換の道具は MVP の後の Epic にし、法務の L13 の後に作る。
 - **Web からのリードのフォームを MVP の E5 に入れる**（2026-10-25 に決定。[ADR-0064](decisions/0064-web-lead-form-public-intake.md)、[sales-objects.md](architecture/sales-objects.md) の 9 節）。B2B の営業で、Web の問い合わせからのリードは主な入口であり、組織が OAuth の資格を Web のページに置く事故を防げる。法務の L4・L12 の確認が済むまで spec は承認しない。
 - **ダッシュボードは見る人の権限だけで集計する。** 本家の「指定した実行ユーザー」（全員が特定の人の権限で見る形）は持たない。上司が部下の視点で見る時も、部下と見る人の権限の共通部分で集計する（[ADR-0030](decisions/0030-dashboards-viewer-intersection-and-subscriptions.md)）。「見られないレコードはレポートの集計に現れない」の約束を優先し、本家から移る組織の、全員が同じ数字を見る経営のダッシュボードは作れなくなることを受け入れる。全員に同じ数字を見せたい需要には、MVP の後に、集計の値を別のオブジェクトに保存するスケジュールのフローで応える案を検討する（値の共有は通常の共有で決まる）。PM が 2026-09-28 に確認した。
 

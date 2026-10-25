@@ -245,7 +245,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `import-match-update` | 照合の規則での既存の更新（`DT-IMP-001`）と、取り込みでの重複の判定 |
 | `bulk-allocations-and-setup` | 一括の割り当て（24 時間の行、ジョブ、結果の大きさ）と、Setup の「一括のジョブ」の画面 |
 | `bulk-low-priority-lanes` | 一括の分の索引・変更のイベントを低い優先の経路に入れる、足並みの実行の性能（200 件の塊） |
-| `migration-import` | 本家からの移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、移行の手順書と本家との違いの表（[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節、[ADR-0065](decisions/0065-migration-path-from-original.md)、proposed） |
+| `migration-import` | 本家からの移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、移行の手順書と本家との違いの表（[bulk-and-import.md](architecture/bulk-and-import.md) の 15 節、[ADR-0065](decisions/0065-migration-path-from-original.md)） |
 
 ### E10 Sandbox とメタデータのデプロイ
 
@@ -390,6 +390,6 @@ MVP の後に検討する。着手するときに `intent.md` から起票する
 - **代理のログイン、独自のドメイン**（[orgs-users-and-auth.md](architecture/orgs-users-and-auth.md) の 14 節）。
 - **gRPC の購読、変更のイベントの 3 日を超える保持、共有で絞る変更のイベントの購読**（[events-and-integrations.md](architecture/events-and-integrations.md) の 13 節）。
 - **Excel（xlsx）の取り込み、`insert` のジョブの冪等キー**（[bulk-and-import.md](architecture/bulk-and-import.md) の 13 節）。
-- **本家のメタデータからの変換の道具**（intent の Non-goals。移行の Epic として扱う。形は [ADR-0065](decisions/0065-migration-path-from-original.md)（proposed）、Epic を作るかは PM の判断。法務：L13）。
+- **本家のメタデータからの変換の道具**（intent の Non-goals。移行の Epic として扱う。形は [ADR-0065](decisions/0065-migration-path-from-original.md)、MVP の後の Epic にする（2026-10-25 の PM の判断）。法務：L13）。
 - **Experience Cloud（ポータル）、Service Cloud、モバイルのネイティブアプリ、外部オブジェクト**（intent）。
 - **S2 の構成**（主のクラスタの分割、Sandbox と試用の別のクラスタ、射影、専用の検索の索引）と **S3 のセル構成**（[infrastructure.md](architecture/infrastructure.md) の 5 節）。

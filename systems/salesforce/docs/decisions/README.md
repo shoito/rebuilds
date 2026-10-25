@@ -69,7 +69,7 @@ Salesforce の再構築に関する決定。リポジトリ共通の決定は [d
 | [0062](0062-security-sensitive-change-flow.md) | security:sensitive はパスで自動で付け、テックリードとセキュリティの担当の 2 人の承認、追加の CI、組織の単位の段階的なリリースを必須にする | accepted |
 | [0063](0063-org-staged-release-and-shadow-evaluation.md) | リリースは組織を単位に段階で広げ、アクセスの判定・問い合わせのコンパイルを変える時は、新旧を本番の標本で並べて比べる影の実行を経る | accepted |
 | [0064](0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | accepted |
-| [0065](0065-migration-path-from-original.md) | 本家からの移行の経路 | proposed |
+| [0065](0065-migration-path-from-original.md) | 本家からの移行の経路 | accepted |
 <!-- adr-index:end -->
 
 この一覧は、各 ADR の frontmatter と見出しから生成したもの。ADR を追加・更新したら生成し直す。

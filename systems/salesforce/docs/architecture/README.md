@@ -261,7 +261,7 @@ flowchart TB
 - **Sandbox への個人データの流出**：複製の経路の中で伏せ、伏せる前の値を Sandbox の DB に書かない（[ADR-0038](../decisions/0038-sandbox-types-and-masked-copy.md)）。カスタム項目の分類の漏れは検出して警告する。法務の L3 の結論まで、伏せを外す設定を持たない。
 - **外への持ち出し・SSRF**：乗っ取られた管理者・連携のトークンによる Webhook・一括の問い合わせ・エクスポートでの持ち出しと、宛先の検査の漏れ。宛先の変更の監査と管理者全員への知らせ、別のアカウントの送信の網と宛先の検査で抑える（[ADR-0035](../decisions/0035-webhooks-outbound-calls-and-ssrf-guard.md)、[ADR-0054](../decisions/0054-accounts-network-and-service-separation.md)）。
 - **利用者のコードの隔離（E13）**：砂場の脱出と、組織をまたぐ状態の残り。WASM の境界、WASI なし、呼び出しごとの新しい実体、資格情報のない別のコンテナ（[ADR-0048](../decisions/0048-user-code-engine-quickjs-ng-on-wasmtime-fuel.md)）と、E13 の外部のペンテストで確かめる。
-- **本家との差**：数式の FLS、活動の見え方、指定した実行ユーザーのダッシュボードを持たないこと、フローの要素の数え方、組織が定義するイベントの既定の発行の時点などが本家と違う。移行の文書に書く（各領域の文書の「決定」）。移行の文書の正本は [bulk-and-import.md](bulk-and-import.md) の 15.4 節の表に集めた（[ADR-0065](../decisions/0065-migration-path-from-original.md)、proposed）。
+- **本家との差**：数式の FLS、活動の見え方、指定した実行ユーザーのダッシュボードを持たないこと、フローの要素の数え方、組織が定義するイベントの既定の発行の時点などが本家と違う。移行の文書に書く（各領域の文書の「決定」）。移行の文書の正本は [bulk-and-import.md](bulk-and-import.md) の 15.4 節の表に集めた（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。
 - **法令**：法務の確認待ちの事項がある（[intent.md](../intent.md) の「法務の確認待ち」の L1〜L13）。結論が出るまで、そこに挙げた Epic の spec を承認しない。
 
 ### 残る未解決事項
@@ -315,7 +315,7 @@ flowchart TB
 | [capacity.md](capacity.md) | 負荷のモデル、表の大きさ、書き込みの増幅、再計算の時間、部品ごとの必要量（OpenSearch の台数を含む） | 0060 | Ops | E12 |
 | [delivery.md](delivery.md) | CI/CD、アクセス制御の決定表と性質の CI、上限の試験と登録簿の一致、リリースとフラグ、影の実行、`security:sensitive` の変更の流れ | 0061–0063 | QA、Ops | E1、E12 |
 
-- 次に採番する ADR は 0066。0064（Web からのリードのフォーム）と 0065（本家からの移行の経路、proposed）は、sales-objects と bulk-and-import の範囲が尽きていたため、次の番号をそれぞれの行に足した。
+- 次に採番する ADR は 0066。0064（Web からのリードのフォーム）と 0065（本家からの移行の経路）は、sales-objects と bulk-and-import の範囲が尽きていたため、次の番号をそれぞれの行に足した。
 
 ## 8. Epic
 

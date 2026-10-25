@@ -4,7 +4,7 @@
 
 - 一括の取り込みは、CSV を S3 に置き、1 万行の部分に分けて Worker の公平な順番に入れる。部分は 200 行ずつの非同期のトランザクションで処理し、行ごとに成功か失敗かを返す（部分の成功）。トランザクションの全体の失敗（ロックの待ち、バージョンの変更）は同じ 200 行で最大 10 回やり直し、上限の超過は 200 行を半分ずつに分けて原因の行を見つける。結果は 7 日（[ADR-0036](../decisions/0036-bulk-jobs-chunking-and-partial-success.md)）。
 - インポートのウィザードは、同じ一括のジョブの上に作る画面にする。文字コード（UTF-8 と Shift_JIS）の判定、項目の対応、200 行の下見（巻き戻すトランザクション）を持つ。外部 ID での upsert と、照合の規則での「既存を更新」は、同じ鍵の行を同じ部分に集めて順に処理し、ファイルの中の重複も既存のレコードも 1 件にまとめる。見えないレコードとの一致は無いものとして扱う（[ADR-0037](../decisions/0037-import-wizard-upsert-and-duplicate-matching.md)）。
-- 本家からの移行は、移行の文書（本家との違いの表）と、本家の ID を `legacy_id` の外部 ID に入れて決まった順で upsert する手順で支える。メタデータの変換の道具は後の Epic にする（[ADR-0065](../decisions/0065-migration-path-from-original.md)、proposed）。15 節。
+- 本家からの移行は、移行の文書（本家との違いの表）と、本家の ID を `legacy_id` の外部 ID に入れて決まった順で upsert する手順で支える。メタデータの変換の道具は後の Epic にする（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。15 節。
 
 本家の振る舞いは、2026-09-28 に次の資料で確かめた。確かめられなかったものは「未検証」と書く。本家の Bulk API との互換は持たない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
@@ -299,7 +299,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | --- | --- |
 | [0036](../decisions/0036-bulk-jobs-chunking-and-partial-success.md) | 一括の取り込みは CSV を S3 に置き、1 万行の部分に分けて公平な順番に入れ、200 行ずつの非同期のトランザクションで行ごとに成功・失敗を返す。失敗は原因ごとにやり直し、上限の超過は半分ずつに分ける。結果は 7 日 |
 | [0037](../decisions/0037-import-wizard-upsert-and-duplicate-matching.md) | ウィザードは同じジョブの上の画面にし、文字コードの判定と 200 行の下見を持つ。upsert と照合の既存の更新は同じ鍵の行を同じ部分に集めて順に処理し、見えない一致は無いものとして扱う |
-| [0065](../decisions/0065-migration-path-from-original.md)（proposed） | 本家からの移行は、移行の文書と、本家の ID を外部 ID に入れて決まった順で CSV を upsert する手順で支える。監査の項目は専用の権限のジョブだけが書ける。メタデータの変換の道具は後の Epic で、上げたファイルを読む形にする |
+| [0065](../decisions/0065-migration-path-from-original.md) | 本家からの移行は、移行の文書と、本家の ID を外部 ID に入れて決まった順で CSV を upsert する手順で支える。監査の項目は専用の権限のジョブだけが書ける。メタデータの変換の道具は後の Epic で、上げたファイルを読む形にする |
 
 他の領域への依頼：
 
@@ -378,7 +378,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 
 ## 15. 本家からの移行（ADR-0065）
 
-[ADR-0065](../decisions/0065-migration-path-from-original.md)（proposed）。これまで各領域が「移行の文書に書く」とした本家との違いと、本家のデータを取り込む手順を、この節に集める。**移行の道具（メタデータの変換）の Epic を作るか、いつ作るかは PM の判断**（[intent.md](../intent.md) の「PM の判断待ち」）。MVP では、データは 3〜5 節の部品で取り込み、メタデータは管理者が作り直す。本家のメタデータ・XML・`package.xml`・Apex は受け付けない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
+[ADR-0065](../decisions/0065-migration-path-from-original.md)。これまで各領域が「移行の文書に書く」とした本家との違いと、本家のデータを取り込む手順を、この節に集める。移行の道具（メタデータの変換）は MVP の後の Epic にする（2026-10-25 の PM の判断）（[intent.md](../intent.md) の「PM の判断待ち」）。MVP では、データは 3〜5 節の部品で取り込み、メタデータは管理者が作り直す。本家のメタデータ・XML・`package.xml`・Apex は受け付けない（[ADR-0001](../decisions/0001-platform-and-stack.md)）。
 
 ### 15.1 オブジェクトと項目の対応
 
@@ -446,7 +446,7 @@ GET  /api/v1/jobs/query/{id}/results?locator=<l>&max_records=50000   （CSV。�
 | Epic | Story の候補 |
 | --- | --- |
 | E9 | 移行の取り込み：`legacy_id` の検査、`set_audit_fields_on_import`、本家の書き出しの見出しの対応の型、15.2 節の手順書と生成した本家の形の CSV での結合テスト |
-| 後の移行の Epic（PM の判断） | 本家のメタデータの書き出しの変換の道具（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。法務：L13 |
+| MVP の後の移行の Epic | 本家のメタデータの書き出しの変換の道具（[ADR-0065](../decisions/0065-migration-path-from-original.md)）。法務：L13 |
 
 - orgs-users-and-auth の領域：システムの権限に `set_audit_fields_on_import` を足す（どの権限セットにも既定で入れない）。
 - 各領域：本家との違いを決めたら、15.4 節に行を足す。
