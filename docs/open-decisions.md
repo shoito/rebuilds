@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| slack | [ADR-0035](../systems/slack/docs/decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | 2026-10-10 |
 | stripe | [ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | 2026-10-10 |
 | stripe | [ADR-0035](../systems/stripe/docs/decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | 2026-10-10 |
 | uber | [ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | 2026-10-10 |
@@ -112,7 +111,7 @@
 
 | ID | ADR | 直す箇所 | 状態 |
 | --- | --- | --- | --- |
-| FOL-001 | Slack ADR-0035（運用者のアクセス） | ADR-0009 のロールの表に `ops_read` を足す。infrastructure.md 1 節の「本番への書き込み権限は Ops のグループだけに与え」を JIT の形に | 待ち |
+| FOL-001 | Slack ADR-0035（運用者のアクセス） | ADR-0009 のロールの表に `ops_read` を足す。infrastructure.md 1 節の「本番への書き込み権限は Ops のグループだけに与え」を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
 | FOL-002 | Stripe ADR-0035（CDE の外の運用者のアクセス） | JIT の仕組みの選定（ADR-0020 の注記、E10 の PoC）と揃える | 待ち |
 | FOL-003 | GitHub ADR-0038（運用者のアクセス） | data-model.md 2.3 節（「運用者は break-glass」）、ADR-0028・0031 の書き方を JIT の形に | 解決（2026-10-25、ADR の承認と同時に直した） |
 | FOL-004 | Notion ADR-0034（プランと権利） | data-model/global.md の権利の名前（`guest_limit` など）、api-and-integrations.md 5 節の 600 回の対象の書き方 | 解決（2026-10-25、ADR の承認と同時に直した。`workspace_entitlements` の表も定義した） |

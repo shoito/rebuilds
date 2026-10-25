@@ -45,6 +45,7 @@ ADR-0005（権限判定の集約）を拡張する。判定の起点に、テナ
   | `migrator` | マイグレーション | テーブルの所有者 |
   | `app` | API・Gateway・Worker | RLS の対象。`BYPASSRLS` を持たない |
   | `relay` | Relay | `outbox` の読み取りと削除だけを持つ |
+  | `ops_read` | 運用者（期限つきの権限で得る） | RLS の対象。`BYPASSRLS` を持たない。読み取りだけ（2026-10-25 に [ADR-0035](0035-operator-access.md) で追加） |
 
 - **テナントのコンテキストは、トランザクションの中で設定する。**
   - API はリクエストごとに、トランザクションの先頭で `SET LOCAL app.workspace_id` と `SET LOCAL app.member_id` を設定する。

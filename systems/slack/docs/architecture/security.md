@@ -15,7 +15,7 @@
 | [ADR-0018](../decisions/0018-audit-log.md) | 監査ログ |
 | [ADR-0019](../decisions/0019-data-retention-and-deletion.md) | データの保持と削除 |
 | [ADR-0034](../decisions/0034-workspace-import-from-other-tools.md) | 他のツールからの取り込み |
-| [ADR-0035](../decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可（proposed） |
+| [ADR-0035](../decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 |
 
 ## 1. 目標と前提
 
@@ -212,7 +212,7 @@ S＝なりすまし、T＝改ざん、R＝否認、I＝情報漏洩、D＝サー
 
 ### 4.1 運用者のアクセス
 
-方針は [ADR-0035](../decisions/0035-operator-access.md)（proposed）。Auth0 の [ADR-0056](../../../auth0/docs/decisions/0056-operator-access.md) と同じ形にした。
+方針は [ADR-0035](../decisions/0035-operator-access.md)。Auth0 の [ADR-0056](../../../auth0/docs/decisions/0056-operator-access.md) と同じ形にした。
 
 | 区分 | 中身 | 承認 |
 | --- | --- | --- |

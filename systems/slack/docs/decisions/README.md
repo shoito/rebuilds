@@ -39,7 +39,7 @@ Slack の再構築に関する決定。リポジトリ共通の決定は [docs/d
 | [0032](0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ | accepted |
 | [0033](0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める | accepted |
 | [0034](0034-workspace-import-from-other-tools.md) | 他のチャットツールからの取り込み（移行）の範囲と方式 | accepted |
-| [0035](0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | proposed |
+| [0035](0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | accepted |
 <!-- adr-index:end -->
 
 後の ADR で一部を改めた ADR：[0018](0018-audit-log.md)、[0026](0026-feature-flags.md)、[0028](0028-remote-mcp-server.md)、[0029](0029-rate-limiting.md)、[0031](0031-app-platform.md)、[0032](0032-plans-and-entitlements.md)。改めた内容は、各 ADR の注記にある。

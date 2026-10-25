@@ -18,7 +18,7 @@ AWS Organizations で、用途ごとにアカウントを分ける。本番の�
 | staging | Workloads/NonProd | 本番と同じ構成を小さくしたもの。負荷試験、カオス試験、リリース前の確認 |
 | prod | Workloads/Prod | 本番。東京と大阪（災害復旧）の両方をこのアカウントに置く |
 
-- **人のアクセスは IAM Identity Center に集める。** IAM ユーザーは作らない。本番への書き込み権限は Ops のグループだけに与え、緊急時のロール（break-glass）は使うたびに通知する。
+- **人のアクセスは IAM Identity Center に集める。** IAM ユーザーは作らない。本番の DB・シェル・KMS への権限は、常設では誰にも与えず、Ops のグループの人が期限つきの権限（JIT）で承認を得て使う（[ADR-0035](../decisions/0035-operator-access.md)）。緊急時のロール（break-glass）は使うたびに通知する。
 - **SCP で次を禁止する。**
   - 東京・大阪以外のリージョンの利用（CloudFront・WAF・ACM のために us-east-1 のグローバルなサービスだけは許可する）
   - CloudTrail・GuardDuty・AWS Config の停止

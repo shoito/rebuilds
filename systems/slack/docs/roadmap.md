@@ -142,7 +142,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | --- | --- |
 | `security-headers-csp` | CSP と各種ヘッダー |
 | `waf-baseline` | WAF の基本設定 |
-| `operator-jit-access` | 運用者の期限つきの権限（IAM Identity Center、`ops_read` の DB ロール、承認と期限切れの検出。ADR-0035、proposed） |
+| `operator-jit-access` | 運用者の期限つきの権限（IAM Identity Center、`ops_read` の DB ロール、承認と期限切れの検出。ADR-0035） |
 | `security-baseline-guardduty` | GuardDuty・Security Hub・AWS Config の有効化と委任（`terraform-foundation` で後回しにしたもの） |
 | `egress-firewall` | AWS Network Firewall と Route 53 Resolver DNS Firewall による外向き通信の許可リスト |
 | `supply-chain-ci` | SBOM、来歴、Actions の SHA の固定 |
@@ -175,7 +175,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `workspace-export` | ワークスペースのエクスポート。全データ（プライベート・DM を含む）は Business+ 以上で、申請と運用者の承認を経て有効にする（[security.md](architecture/security.md) の 15 節） |
 | `workspace-deletion` | ワークスペースの削除と消去 |
 | `workspace-import` | 本家 Slack のエクスポートの ZIP のパブリックチャンネルの取り込み（ADR-0034）。MVP の後（E8）に提供する（2026-10-25 の PM の判断）。法務の確認まで spec は承認しない |
-| `support-access-grant` | owner によるサポートの参照の許可、期限、監査ログへの記録、サポートの管理ツールでの制限（ADR-0035、proposed） |
+| `support-access-grant` | owner によるサポートの参照の許可、期限、監査ログへの記録、サポートの管理ツールでの制限（ADR-0035） |
 | `invite-links` | 招待リンク（S2） |
 | `scim-users` | SCIM（S2） |
 

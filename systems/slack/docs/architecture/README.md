@@ -39,7 +39,7 @@ flowchart LR
 - SSO（SAML・OIDC）は Business+ 以上、Google・Microsoft でのログインは全プラン（[ADR-0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md)、[identity-and-access.md](identity-and-access.md)）。
 - リンクのプレビューの取得は、VPC の外の権限を持たない取得器から行う（[ADR-0016](../decisions/0016-isolated-link-unfurling.md)）。
 - GA4 は、送る内容と読み込む条件を絞って、クライアントから送る（[ADR-0025](../decisions/0025-product-analytics-with-ga4.md)）。
-- 運用者のアクセスは [ADR-0035](../decisions/0035-operator-access.md)（proposed）。
+- 運用者のアクセスは [ADR-0035](../decisions/0035-operator-access.md)。
 
 ### 1.2 コンテナ
 
@@ -224,7 +224,7 @@ flowchart LR
 | [0032](../decisions/0032-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの entitlement として持つ |
 | [0033](../decisions/0033-slack-aligned-platform-and-plan-decisions.md) | プラン、アプリの配布と審査、ボットの投稿の枠、配送の記録を、本家 Slack に寄せて決める |
 | [0034](../decisions/0034-workspace-import-from-other-tools.md) | 他のツールからの取り込みは、新しいチャンネルに通常の投稿の経路を通さずに行う。MVP の後（E8）に提供する |
-| [0035](../decisions/0035-operator-access.md) | 運用者は常設で本文を読めず、DB は期限つきの権限、中身の参照は owner の許可で行う（proposed） |
+| [0035](../decisions/0035-operator-access.md) | 運用者は常設で本文を読めず、DB は期限つきの権限、中身の参照は owner の許可で行う |
 
 リポジトリ共通の決定（開発プロセス、ブランチモデル）は、ルートの [docs/decisions/](../../../../docs/decisions/) にある。
 
