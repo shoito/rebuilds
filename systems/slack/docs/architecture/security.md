@@ -14,7 +14,7 @@
 | [ADR-0017](../decisions/0017-encryption-and-key-management.md) | 暗号化と鍵管理 |
 | [ADR-0018](../decisions/0018-audit-log.md) | 監査ログ |
 | [ADR-0019](../decisions/0019-data-retention-and-deletion.md) | データの保持と削除 |
-| [ADR-0034](../decisions/0034-workspace-import-from-other-tools.md) | 他のツールからの取り込み（proposed） |
+| [ADR-0034](../decisions/0034-workspace-import-from-other-tools.md) | 他のツールからの取り込み |
 | [ADR-0035](../decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可（proposed） |
 
 ## 1. 目標と前提
@@ -425,7 +425,7 @@ ADR-0010 により、ボット・AI エージェントは `account_id` が NULL 
 
 ### 14.1 他のツールからの取り込み（移行）
 
-方針は [ADR-0034](../decisions/0034-workspace-import-from-other-tools.md)（proposed）。提供するか、どの範囲かは PM の判断待ち（[intent.md](../intent.md) の Open questions）。推奨案は、MVP の後（E8）に、本家 Slack のエクスポートの ZIP のパブリックチャンネルだけを取り込むこと。
+方針は [ADR-0034](../decisions/0034-workspace-import-from-other-tools.md)。2026-10-25 に PM が範囲を決めた。MVP の後（E8）に、本家 Slack のエクスポートの ZIP のパブリックチャンネルだけを取り込む。
 
 - **新しいチャンネルにだけ取り込む。** 元の時刻の順に `seq` を 1 から採番し、終わってから公開する（ADR-0001 を崩さない）。
 - **通常の投稿の経路を通さない。** outbox に積まず、配信・メンション・通知・リンクのプレビューを出さない。検索のインデックスは後からバックフィルする。

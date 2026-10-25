@@ -174,7 +174,7 @@ PM が持つ。変更の一覧はここに書かず、各変更の `spec.md` の
 | `legal-hold` | リーガルホールド |
 | `workspace-export` | ワークスペースのエクスポート。全データ（プライベート・DM を含む）は Business+ 以上で、申請と運用者の承認を経て有効にする（[security.md](architecture/security.md) の 15 節） |
 | `workspace-deletion` | ワークスペースの削除と消去 |
-| `workspace-import`（候補） | 本家 Slack のエクスポートの ZIP からの取り込み（ADR-0034、proposed）。範囲は PM の判断待ち（[intent.md](intent.md) の Open questions） |
+| `workspace-import` | 本家 Slack のエクスポートの ZIP のパブリックチャンネルの取り込み（ADR-0034）。MVP の後（E8）に提供する（2026-10-25 の PM の判断）。法務の確認まで spec は承認しない |
 | `support-access-grant` | owner によるサポートの参照の許可、期限、監査ログへの記録、サポートの管理ツールでの制限（ADR-0035、proposed） |
 | `invite-links` | 招待リンク（S2） |
 | `scim-users` | SCIM（S2） |
