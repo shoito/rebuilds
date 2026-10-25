@@ -114,7 +114,7 @@
 
 ### 3.4 言語（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)）
 
-訪日の旅行者を MVP の対象にし、MVP の言語は日本語と英語にする（2026-10-25 の PM の判断。[intent.md](../intent.md) の Open questions）。下はどの結論にも合う形。
+訪日の旅行者を MVP の対象にし、MVP の言語は日本語と英語にする（2026-10-25 の PM の判断。[intent.md](../intent.md) の Open questions）。仕組みは、言語を後から足せる形にする。
 
 | 項目 | 決まり |
 | --- | --- |
