@@ -65,7 +65,7 @@
 | ID | 題材 | 判断すること | 推奨 | 置き場所 | 状態 |
 | --- | --- | --- | --- | --- | --- |
 | PM-001 | Slack | 他のチャットツールからの取り込み（移行）を提供するか、どの範囲か | 本家のエクスポートのパブリックチャンネルを MVP の後に取り込む | [intent.md](../systems/slack/docs/intent.md)、[ADR-0034](../systems/slack/docs/decisions/0034-workspace-import-from-other-tools.md) | 解決（2026-10-25：パブリックを MVP の後の E8 に） |
-| PM-002 | Stripe | 他の決済事業者とのカード番号の移行を提供するか | 取り込みと書き出しの両方を、MVP の後に運用者の仲介で | [intent.md](../systems/stripe/docs/intent.md)、[ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 待ち |
+| PM-002 | Stripe | 他の決済事業者とのカード番号の移行を提供するか | 取り込みと書き出しの両方を、MVP の後に運用者の仲介で | [intent.md](../systems/stripe/docs/intent.md)、[ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 解決（2026-10-25：両方を E10 の後に） |
 | PM-003 | GitHub | 他のホスティングからのリポジトリと Issue の取り込みを提供するか | Git に加えて、決めた 1 つの形式のアーカイブから Issue と PR を MVP の後に | [intent.md](../systems/github/docs/intent.md)、[ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 解決（2026-10-25：Git と Issue・PR を MVP の後に） |
 | PM-004 | Salesforce | Web からのリードのフォームを MVP に入れるか | E5 に入れる | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | 解決（2026-10-25：E5 に入れる） |
 | PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 解決（2026-10-25：文書と CSV の手順、変換の道具は MVP の後） |
