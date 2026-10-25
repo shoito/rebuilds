@@ -7,7 +7,7 @@
 | [0056](../decisions/0056-encryption-keys-and-secrets.md) | 転送中は TLS 1.2 以上（取り込みとクエリの内部の経路を含む）。保存時は、データの種類ごと・リージョンごとのカスタマー管理の KMS の鍵（テレメトリー、アーカイブ、MSK、Aurora、監査、秘密、キャッシュ）。S3 はバケットキー。インスタンスの NVMe はハードウェアの暗号化に任せ、ヘッドのチェックポイントは S3 の鍵で守る。組織ごとの鍵（BYOK）は MVP で持たない。アプリの秘密（Webhook の署名、通知の連携の資格、マスクの HMAC の鍵）は、鍵の ID つきで 2 つを並べて回す |
 | [0057](../decisions/0057-data-lifecycle-and-deletion-framework.md) | 保持の期間は `retention_policies` の 1 つの表で持ち、`compactor` がカタログを先に「削除中」にしてから消す。解約は 30 日の猶予の後に `tenant_id` の接頭辞ごと消し、S3 の古いバージョン（7 日）と大阪の写しを含めて消えたことを確かめて記録する。個人のデータの削除の請求は墓標と書き直し（[ADR-0036](../decisions/0036-personal-data-deletion-tombstones.md)）で、期限は法務の L5 の後。法的な保全は組織の単位で削除を止める |
 | [0058](../decisions/0058-untrusted-senders-egress-and-operator-access.md) | 取り込みの送り手（エージェント、OTLP）は信頼しない。取り込みのキーは書き込みだけで読めず、漏れたときの被害を「データの注入と量の消費」に限る。外への送信（通知、Webhook、オンコールの連携）は egress のサブネットの専用の送信の部品だけから出し、SSRF を拒む。社内の運用者は、利用者のテレメトリーを日常の権限で読めず、読むときは組織の許可（サポートの許可）と JIT と監査の 3 つを要る |
-| [0067](../decisions/0067-org-data-export.md)（proposed） | 組織の設定とテレメトリーの書き出しを 1 つの非同期の作業で持つ。設定は公開 API と同じ JSON の束、テレメトリーは信号・期間・条件を選んで Parquet と JSON Lines で書き、同じクエリの経路とデータのアクセスの制限を通す。権限は管理者だけ、結果は 7 日で消す |
+| [0067](../decisions/0067-org-data-export.md) | 組織の設定とテレメトリーの書き出しを 1 つの非同期の作業で持つ。設定は公開 API と同じ JSON の束、テレメトリーは信号・期間・条件を選んで Parquet と JSON Lines で書き、同じクエリの経路とデータのアクセスの制限を通す。権限は管理者だけ、結果は 7 日で消す |
 
 前提：組織とセルと鍵の先頭の `tenant_id`（[ADR-0003](../decisions/0003-tenancy-cells-and-isolation.md)）、データのアクセスの制限（[ADR-0051](../decisions/0051-roles-permissions-and-data-access-restrictions.md)）、キーの形式と失効（[ADR-0015](../decisions/0015-key-format-validation-and-revocation.md)）、PII のマスク（[ADR-0031](../decisions/0031-pii-scrubbing-before-routing.md)）、保持の層（[ADR-0009](../decisions/0009-retention-tiers-on-s3.md)）。アカウントとネットワークは [infrastructure.md](infrastructure.md)、利用者に見せる監査ログは [tenancy-and-rbac.md](tenancy-and-rbac.md) の 8 節にある。
 
@@ -235,7 +235,7 @@ stateDiagram-v2
 
 ### 5.6 組織のデータの書き出し
 
-[ADR-0067](../decisions/0067-org-data-export.md)（proposed）。組織の管理者が、設定とテレメトリーを本システムの外へ持ち出す手段。**テレメトリーの一括の書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）。
+[ADR-0067](../decisions/0067-org-data-export.md)。組織の管理者が、設定とテレメトリーを本システムの外へ持ち出す手段。設定とテレメトリーの両方を MVP に入れる（2026-10-25 の PM の判断）。
 
 | 種類 | 中身 | 形 |
 | --- | --- | --- |

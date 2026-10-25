@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| datadog | [ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 組織のデータの書き出し（設定とテレメトリー） | 2026-10-10 |
 | datadog | [ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 他の監視の道具からの移行の取り込み | 2026-10-10 |
 | github | [ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 他のホスティングからのリポジトリと Issue の取り込み | 2026-10-10 |
 | github | [ADR-0038](../systems/github/docs/decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 | 2026-10-10 |
@@ -80,7 +79,7 @@
 | PM-003 | GitHub | 他のホスティングからのリポジトリと Issue の取り込みを提供するか | Git に加えて、決めた 1 つの形式のアーカイブから Issue と PR を MVP の後に | [intent.md](../systems/github/docs/intent.md)、[ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 待ち |
 | PM-004 | Salesforce | Web からのリードのフォームを MVP に入れるか | E5 に入れる | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | 待ち |
 | PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 待ち |
-| PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 待ち |
+| PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 解決（2026-10-25：両方を MVP に。費用は GA では数えない） |
 | PM-007 | Datadog | 他の監視の道具からの移行を MVP に入れるか | MVP は手順書だけ、変換器は E17 の後 | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 待ち |
 | PM-008 | X | 本人のデータの書き出しを MVP に入れるか | E14 に入れる | [intent.md](../systems/x/docs/intent.md)、[ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 待ち |
 | PM-009 | Shopify | 他の EC の基盤からの移行を MVP に入れるか、最初にどの基盤を受けるか | 自前の CSV の形と元の型のデータで受ける | [intent.md](../systems/shopify/docs/intent.md)、[ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 待ち |

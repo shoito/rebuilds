@@ -68,7 +68,7 @@ Datadog の再構築に関する決定。リポジトリ共通の決定は [docs
 | [0064](0064-capacity-headroom-and-load-test-gates.md) | 部品ごとにピークの使用率の上限を 60% にし、AZ を 1 つ失っても 90% に収める。MSK の書き込みはピークの 2 倍以上にする。急増は割り当てとエージェントの待ち行列で受ける。負荷試験とうるさい隣人の試験を、夜間・段階を上げる前・E13 の 3 つの関門にし、他の組織の SLI が SLO の中であることを合否にする | accepted |
 | [0065](0065-stateful-rollout-with-replica-handoff.md) | 状態を持つ部品は、予備のインスタンスに新しいタスクを先に起こし、チェックポイントと MSK から追いつかせ、もう一方の写しとの影の比べが通ってから古いタスクを止める。貸し出しは止める前に明け渡す。インジェスターは 1 つの AZ の写しを入れ替え終えて写しの一致を確かめてから次の AZ に進み、書き出しの窓には貸し出しの持ち主を止めない | accepted |
 | [0066](0066-format-versioning-and-compatibility-windows.md) | 形式（`codec_id`、ブロック、セグメント、`tokenizer_version`、MSK のメッセージ、チェックポイント、クエリの IR、評価の記録）はどれも番号を持ち、読む側を先に全セルへ出してから書く側を出す。古い番号の読み出しは消さない。保存した定義は文と `ir_version` を持ち、IR を上げるときは評価の記録の再生で新旧を比べる。エージェントは 6 か月前までのバージョンを受ける | accepted |
-| [0067](0067-org-data-export.md) | 組織のデータの書き出し（設定とテレメトリー） | proposed |
+| [0067](0067-org-data-export.md) | 組織のデータの書き出し（設定とテレメトリー） | accepted |
 | [0068](0068-migration-from-other-monitoring-tools.md) | 他の監視の道具からの移行の取り込み | proposed |
 <!-- adr-index:end -->
 

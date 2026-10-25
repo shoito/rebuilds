@@ -217,7 +217,7 @@ E1〜E13 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `pentest-external` | 外部のペンテスト（取り込み、API、画面、データのアクセスの制限） |
 | `slo-dashboards-alerts` | SLO とアラート（[runbooks/README.md](runbooks/README.md)） |
 | `runbooks-e13` | 個別の手順の作成と確認 |
-| `org-data-export` | 組織の設定の束とテレメトリーの書き出し（[security.md](architecture/security.md) の 5.6 節、[ADR-0067](decisions/0067-org-data-export.md)、proposed）。テレメトリーを MVP に入れるかは PM の判断。猶予の約束は法務：L5・L7 |
+| `org-data-export` | 組織の設定の束とテレメトリーの書き出し（[security.md](architecture/security.md) の 5.6 節、[ADR-0067](decisions/0067-org-data-export.md)）。設定とテレメトリーの両方を MVP に入れる（2026-10-25 の PM の判断）。猶予の約束は法務：L5・L7 |
 | `ga-readiness` | GA の判定。法務：L1・L2・L5・L6・L7 |
 
 ## エージェントに任せないこと
