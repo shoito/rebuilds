@@ -131,7 +131,7 @@
 
 - 乗車の中で、定型文（「今向かっています」「〇〇の前にいます」「少し遅れます」など）と短い自由な文（200 文字まで）を送れる。配信は常時の接続とプッシュ（[notifications-and-realtime-push.md](notifications-and-realtime-push.md) の `ChatMessage`）。
 - 走行中のドライバーは定型文だけ（[rider-and-driver-apps.md](rider-and-driver-apps.md) の 3.2 節）。
-- 定型文は ID と型の決まった引数で送り、受け手のアプリが自分の言語で出す。自由な文は訳さず、本文を外の翻訳の提供者に送らない（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)、proposed。[rider-and-driver-apps.md](rider-and-driver-apps.md) の 3.4 節）。
+- 定型文は ID と型の決まった引数で送り、受け手のアプリが自分の言語で出す。自由な文は訳さず、本文を外の翻訳の提供者に送らない（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)。[rider-and-driver-apps.md](rider-and-driver-apps.md) の 3.4 節）。
 - 「連絡はメッセージで」を設定したドライバーの乗車では、乗客の「電話」をメッセージの画面に替える（同 3.3 節）。
 - 電話番号・URL の形の文字列は、送る前に伏せ字にする（相手と乗車の外でつながる経路を作らない）。
 - 保持は乗車の終わりから 30 日（安全の調べのため）。期間は法務の確認待ち（L4・L7）。

@@ -48,5 +48,5 @@ Uber の再構築に関する決定。リポジトリ共通の決定は [docs/de
 | [0041](0041-load-model-admission-control-and-prescaling.md) | 負荷は平常のピークに雨・大晦日・大雪の倍率を掛けて見積もる。熱い経路は平常のピークの 2 倍を常に持ち、依頼は都市ごとの受け入れの上限で絞り、予定の催しと雨の予報で前もって広げる | accepted |
 | [0042](0042-replay-and-shadow-gates-for-dispatch-and-pricing.md) | 配車と運賃の変更は、再生・シミュレーション・影の実行の関門を通し、都市とセルの単位の波で出す | accepted |
 | [0043](0043-flag-taxonomy-legal-gates-and-safety-defaults.md) | フラグは release・ops・legal の 3 つに分け、法務の確認待ちの経路は法務の記録がないと本番で有効にできない。安全の機能はフラグで「出さない」に倒せない | accepted |
-| [0044](0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | proposed |
+| [0044](0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | accepted |
 <!-- adr-index:end -->

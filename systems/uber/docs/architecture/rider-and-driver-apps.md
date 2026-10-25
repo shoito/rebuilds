@@ -8,7 +8,7 @@
 | --- | --- |
 | [0006](../decisions/0006-native-apps-contracts-vectors-and-release-train.md) | 2 つのアプリを Swift と Kotlin で書き、共有するのは buf で生成する Protocol Buffers の型と、Trips の遷移の表から作るステートマシンのテストのベクター（JSON）だけにする。アプリの乗車の状態は、純粋な reducer（状態 ＋ 入力 → 状態 ＋ 副作用）で持つ。対応する OS は iOS 17 以上・Android 10（API 29）以上。リリースは週 1 回の列車で、強制の更新はサーバーが返す最低のバージョンで行い、乗車の最中と緊急の入口は塞がない |
 | [0007](../decisions/0007-driver-background-location-and-battery.md) | ドライバーのアプリは「使用中のみ」の位置の許可で動かす。iOS は `allowsBackgroundLocationUpdates` と `CLBackgroundActivitySession`、Android は出庫の操作で始める `location` 型のフォアグラウンドサービスで、出庫の間だけ位置を取る。「常に」の許可と Android の `ACCESS_BACKGROUND_LOCATION` は求めない。取り方は状態ごとの表で決め、止まったら 60 秒でサーバーがプッシュ通知で知らせる |
-| [0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)（proposed） | 乗客のアプリは OS の言語に従い、言語を切り替えられる形にする（MVP の言語は PM の確認待ち。既定の案は日本語と英語）。乗客とドライバーのやり取りは、人が訳した定型文の対訳（ID と型の決まった引数で送り、受け手のアプリが自分の言語で出す）で行い、自由な文は訳さない。外の翻訳の提供者に本文を送らない。乗客の言語はオファーに出さず、受諾の後に出す |
+| [0044](../decisions/0044-app-languages-and-rider-driver-phrases.md) | 乗客のアプリは OS の言語に従い、言語を切り替えられる形にする（MVP の言語は日本語と英語）。乗客とドライバーのやり取りは、人が訳した定型文の対訳（ID と型の決まった引数で送り、受け手のアプリが自分の言語で出す）で行い、自由な文は訳さない。外の翻訳の提供者に本文を送らない。乗客の言語はオファーに出さず、受諾の後に出す |
 | [0008](../decisions/0008-navigation-handoff-with-waypoints.md) | 外部のナビには、選んだルートの主要経由地点を経由地として渡す（Google マップは Maps URLs の `waypoints`、Apple マップは統合の Maps URL の `waypoint`）。経由地を守らない引き継ぎ先は事前確定運賃の乗車で出さない。アプリの中でルートからの逸脱を知らせる |
 
 ## 1. 目的と範囲
@@ -112,7 +112,7 @@
 - **乗客からのメッセージ**：走行中は、定型文の受信を大きな文字と振動で出し、止まってから読む形にする（3.2 節の走行中の制限は変えない）。
 - 文字の大きさと色の決まりは 3.2 節の最後のとおり（OS の設定に従い最小 17 pt 相当、色だけで分けない）。
 
-### 3.4 言語（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)、proposed）
+### 3.4 言語（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)）
 
 訪日の旅行者を MVP の対象にするか、どの言語を持つかは PM の確認待ち（[intent.md](../intent.md) の Open questions）。下はどの結論にも合う形。
 

@@ -265,7 +265,7 @@ E1〜E12 が MVP（S1）。E13〜E15 は S2 の Epic。領域の文書の「Stor
 | `driver-trip-journal` | journal と送り直し（trips の `driver-journal-and-replay` と一緒に） |
 | `driving-mode-ui` | 走行中の操作の制限 |
 | `app-accessibility` | 読み上げのラベル、到着の知らせ、「連絡はメッセージで」の設定、オファーの振動と点滅（rider-and-driver-apps.md の 3.3 節） |
-| `app-localization-and-phrases` | UI の言語、定型文のカタログと対訳、行き先を見せる画面（ADR-0044、proposed。対象の言語は PM の確認待ち） |
+| `app-localization-and-phrases` | UI の言語、定型文のカタログと対訳、行き先を見せる画面（ADR-0044。MVP の言語は日本語と英語） |
 
 ### E10 安全と信頼
 

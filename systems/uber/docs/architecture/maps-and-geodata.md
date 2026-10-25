@@ -106,7 +106,7 @@ Geofabrik ──週 1──▶ osm-import ──▶ S3 osm/japan/<date>/ ──�
 - 入力の文字列（自宅の住所などを含む）は、ログ・メトリクスに書かない。数えるのは件数と遅れだけ。
 - 流量の制限：乗客 1 人あたり、自動補完は 1 秒に 5 回・1 日に 500 回。
 - 乗客のアプリの近くの結果を優先するための位置は、`district` のセルの中心に丸めて提供者に送る。
-- 乗客の UI の言語を提供者に渡し、`PlaceCandidate` に日本語の表示名も持たせる。ドライバーには日本語の名前を出す。英語・ローマ字の入力の的中の率を、7.2 節の PoC の参考の基準として測る（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)、proposed）。
+- 乗客の UI の言語を提供者に渡し、`PlaceCandidate` に日本語の表示名も持たせる。ドライバーには日本語の名前を出す。英語・ローマ字の入力の的中の率を、7.2 節の PoC の参考の基準として測る（[ADR-0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)）。
 
 ### 7.2 提供者の PoC
 

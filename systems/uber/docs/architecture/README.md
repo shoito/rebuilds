@@ -237,7 +237,7 @@ flowchart TB
 | [0041](../decisions/0041-load-model-admission-control-and-prescaling.md) | 負荷は平常のピーク × 場面の倍率。熱い経路は 2 倍を常に持ち、依頼は受け入れの上限で絞り、予定で前もって広げる |
 | [0042](../decisions/0042-replay-and-shadow-gates-for-dispatch-and-pricing.md) | 配車と運賃の変更は、再生・シミュレーション・影の実行・`fare-replay` の関門を通し、都市の波で出す |
 | [0043](../decisions/0043-flag-taxonomy-legal-gates-and-safety-defaults.md) | フラグは release・ops・legal。legal は `legal_gate_records` がないと本番で有効にできない。緊急の入口はフラグで止めない |
-| [0044](../decisions/0044-app-languages-and-rider-driver-phrases.md)（proposed） | 乗客のアプリの言語を切り替えられる形にする（MVP の言語は PM の確認待ち。既定の案は日本語と英語）。乗客とドライバーのやり取りは定型文の対訳で行い、自由な文を外の提供者で訳さない |
+| [0044](../decisions/0044-app-languages-and-rider-driver-phrases.md) | 乗客のアプリの言語を切り替えられる形にする（MVP の言語は日本語と英語）。乗客とドライバーのやり取りは定型文の対訳で行い、自由な文を外の提供者で訳さない |
 
 領域ごとの ADR は、8 節の番号の範囲で起票する。範囲を使い切ったら 0044 以降から振る。リポジトリ共通の決定（本家の名前・接頭辞・ドメインを使わない [ADR-0006](../../../../docs/decisions/0006-brand-neutral-identifiers.md) など）は、ルートの [docs/decisions/](../../../../docs/decisions/README.md) にある。
 
