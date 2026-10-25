@@ -7,7 +7,7 @@
 | [0051](../decisions/0051-encryption-and-key-layout.md) | KMS の鍵をデータの種類ごとに分ける（`aurora`、`pii`、`pii-logs`、`dm-content`、`media`、`lake`、`audit`、`secrets`）。電話番号・メールアドレス・生年月日・ログインの IP アドレスは、DB の保存の暗号化に加えて、アプリの層で封筒の暗号化をし、検索は鍵付きの HMAC の列で行う。鍵はマルチリージョンの鍵で大阪に複製する |
 | [0052](../decisions/0052-audit-and-operator-access.md) | 監査ログは、Aurora の追記だけの表に書き、同じ内容を Firehose で log-archive の S3（Object Lock）へ送る。本番の DB への人の常時のアクセスを置かず、読み出しは理由（案件の ID）を必須にした決まったロールと、2 人の承認の break-glass だけにする。DM の中身を人が読む手順は、法務の L3 が済むまで作らない |
 | [0053](../decisions/0053-data-lifecycle-and-retention.md) | データを種類ごとの保持の方針の表で管理し、法令に関わる期間は法務の L2・L8 の値を入れるまで「消さない」を既定にする。削除はアカウント・投稿ごとの削除の流れ（墓石 → 写し・索引・メディアの後始末 → 物理の削除）で行い、法的な保全（`legal_holds`）がかかった対象は止める。バックアップは 35 日で切れることを削除の約束に含める |
-| [0064](../decisions/0064-personal-data-export-scope-and-format.md)（proposed） | 本人のデータの書き出しは、表ごとの扱いを 1 か所の目録に持ち、機械で読める JSON と閲覧用の HTML の ZIP でセルフサービスで渡す。法務の確認待ちの種類は既定で入れない。書き出しで足りない法令の開示の求めは T&S の法令の窓口で受ける |
+| [0064](../decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しは、表ごとの扱いを 1 か所の目録に持ち、機械で読める JSON と閲覧用の HTML の ZIP でセルフサービスで渡す。法務の確認待ちの種類は既定で入れない。書き出しで足りない法令の開示の求めは T&S の法令の窓口で受ける |
 
 前提は、テナントが 1 つで本人だけの表を FORCE RLS で守ること（[ADR-0004](../decisions/0004-single-tenant-and-visibility.md)）、確定した変更を outbox から流すこと（[ADR-0005](../decisions/0005-event-log-and-outbox.md)）、ML が安全の判定を上書きしないこと（[ADR-0006](../decisions/0006-ranking-boundary.md)）。
 
@@ -268,7 +268,7 @@ flowchart TD
 
 ### 7.5 本人のデータの書き出しと開示の求め
 
-[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)（proposed）。入れ物（重い操作の確かめ、`data_export_requests`、`exports` のバケット）は [accounts-and-auth.md](accounts-and-auth.md) の 5.4 節と [data-model/users-and-accounts.md](data-model/users-and-accounts.md) の 4.5 節にある。ここでは中身と、法令の開示の求めとの分け方を決める。**書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）、**法令の解釈は法務の確認待ち（L12）**。
+[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)。入れ物（重い操作の確かめ、`data_export_requests`、`exports` のバケット）は [accounts-and-auth.md](accounts-and-auth.md) の 5.4 節と [data-model/users-and-accounts.md](data-model/users-and-accounts.md) の 4.5 節にある。ここでは中身と、法令の開示の求めとの分け方を決める。**書き出しを MVP に入れるかは PM の判断**（[intent.md](../intent.md) の「PM が決めるもの」）、**法令の解釈は法務の確認待ち（L12）**。
 
 - **目録**：本人に結び付く表・置き場所ごとに「入れる」「入れない（理由）」「法務の確認待ち（`release.export.<種類>` で止める）」を `packages/export` の 1 か所に書く。本人だけの表の一覧（9 節の最後）と目録の突き合わせを CI に置く。
 
@@ -405,7 +405,7 @@ sequenceDiagram
 | E11 | `legal-holds` | 7.3 節。法務：L2・L7 |
 | E14 | `data-lifecycle` | 7 節の保持の方針と削除の流れ（roadmap の既存の Story）。法務：L8 |
 | E14 | `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後） |
-| E14 | `data-export` | 7.5 節の目録・書き出しのジョブ・渡し方（[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)、proposed）。MVP に入れるかは PM の判断。法務：L12 |
+| E14 | `data-export` | 7.5 節の目録・書き出しのジョブ・渡し方（[ADR-0064](../decisions/0064-personal-data-export-scope-and-format.md)）。MVP（E14）に入れる（2026-10-25 の PM の判断）。法務：L12 |
 | E14 | `external-pentest` | 10 節 |
 
 ## 16. 未解決の問い
@@ -426,7 +426,7 @@ sequenceDiagram
 | 7.1 節の「法務の確認待ち」の各期間（L2・L8） | 法務の確認。E14 の `data-lifecycle` の spec の承認の前 |
 | 漏えい等の報告の手順（L4） | 法務の確認。E14 の前 |
 | DM の中身の扱い（L3） | 法務の確認。それまで読む手順を作らない |
-| 書き出しを MVP に入れるか、7.5 節の法務の確認待ちの種類（L12） | PM の判断と法務の確認。E14 の `data-export` の spec の承認の前 |
+| 7.5 節の法務の確認待ちの種類（L12）。書き出しを MVP に入れることは 2026-10-25 に PM が決めた | 法務の確認。E14 の `data-export` の spec の承認の前 |
 | 脆弱性の報奨の制度 | GA の後 |
 | アプリの証明（App Attest、Play Integrity）を拒否に使うか | E11 の計測の後。誤判定の率を見て決める |
 

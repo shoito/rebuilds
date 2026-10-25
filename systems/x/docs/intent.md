@@ -136,7 +136,7 @@
 
 ### PM が決めるもの
 
-- **本人のデータの書き出しを MVP に入れるか**：入れ物（[accounts-and-auth.md](architecture/accounts-and-auth.md) の 5.4 節）と中身の形（[ADR-0064](decisions/0064-personal-data-export-scope-and-format.md)、proposed）はあるが、MVP の機能の一覧に書き出しがない。選択肢は次の 3 つ。
+- **本人のデータの書き出しを MVP に入れるか**（**2026-10-25 に決定。1 を採る**）：入れ物（[accounts-and-auth.md](architecture/accounts-and-auth.md) の 5.4 節）と中身の形（[ADR-0064](decisions/0064-personal-data-export-scope-and-format.md)）はあるが、MVP の機能の一覧に書き出しがない。選択肢は次の 3 つ。
   1. **MVP に入れる（E14 の `data-export`。GA の前）**（推奨）：法令の開示の求め（L12）の多くをセルフサービスで受けられ、T&S の窓口の負荷が下がる。アカウントの削除の前に取り出す手段にもなる。
   2. MVP では法令の開示の求めだけを T&S の窓口で手作業で受け、書き出しは MVP の後の Epic にする。
   3. MVP には投稿とメディアだけの書き出しを入れ、残りの種類を後で足す。

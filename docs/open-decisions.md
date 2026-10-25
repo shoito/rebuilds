@@ -15,7 +15,6 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
-| x | [ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | 2026-10-10 |
 
 **判断する時点を待つもの**（frontmatter の `decide_after`）
 
@@ -69,7 +68,7 @@
 | PM-005 | Salesforce | 本家からの移行の支援の範囲 | MVP は手順と移行の文書だけ | [intent.md](../systems/salesforce/docs/intent.md)、[ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 解決（2026-10-25：文書と CSV の手順、変換の道具は MVP の後） |
 | PM-006 | Datadog | 組織のデータの書き出しの範囲 | 設定とテレメトリーの両方を MVP に | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 解決（2026-10-25：両方を MVP に。費用は GA では数えない） |
 | PM-007 | Datadog | 他の監視の道具からの移行を MVP に入れるか | MVP は手順書だけ、変換器は E17 の後 | [intent.md](../systems/datadog/docs/intent.md)、[ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 解決（2026-10-25：MVP は手順書だけ、変換器は E17 の後） |
-| PM-008 | X | 本人のデータの書き出しを MVP に入れるか | E14 に入れる | [intent.md](../systems/x/docs/intent.md)、[ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 待ち |
+| PM-008 | X | 本人のデータの書き出しを MVP に入れるか | E14 に入れる | [intent.md](../systems/x/docs/intent.md)、[ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 解決（2026-10-25：E14 に入れる） |
 | PM-009 | Shopify | 他の EC の基盤からの移行を MVP に入れるか、最初にどの基盤を受けるか | 自前の CSV の形と元の型のデータで受ける | [intent.md](../systems/shopify/docs/intent.md)、[ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 解決（2026-10-25：独自の CSV の 4 種類を MVP に、元の型は後） |
 | PM-010 | Uber | 訪日の旅行者を MVP の対象にするか（アプリの言語） | 日本語と英語と、人が訳した定型文 | [intent.md](../systems/uber/docs/intent.md)、[ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | 解決（2026-10-25：日本語と英語と定型文） |
 | PM-011 | Figma | 英語の UI を利用者に出す時期 | MVP は日本語だけ、英語は後から（仕組みは最初から両方） | [intent.md](../systems/figma/docs/intent.md)、[editor-and-tools.md](../systems/figma/docs/architecture/editor-and-tools.md) | 待ち |
@@ -114,7 +113,7 @@
 | FOL-004 | Notion ADR-0034（プランと権利） | data-model/global.md の権利の名前（`guest_limit` など）、api-and-integrations.md 5 節の 600 回の対象の書き方 | 解決（2026-10-25、ADR の承認と同時に直した。`workspace_entitlements` の表も定義した） |
 | FOL-005 | Salesforce ADR-0064（Web からのリードのフォーム）と ADR-0065（本家からの移行）。どちらも 2026-10-25 に承認 | orgs-users-and-auth.md（ログインできないフォームの利用者、`set_audit_fields_on_import`）、governor-limits.md（`alloc.web_form_submissions`）、automation-flows.md（`$Origin` の `web_form`）、infrastructure.md（`forms.` のホスト） | 待ち |
 | FOL-006 | Datadog ADR-0068（他の道具からの移行） | monitors-and-alerting.md に、取り込んだモニターと移行の待ちのダウンタイムを書く（変換器を作る E17 の後で足りる） | 待ち（ADR は 2026-10-25 に承認） |
-| FOL-007 | X ADR-0064（本人のデータの書き出し） | data-model/users-and-accounts.md の `data_export_requests` に目録のバージョンの列を足す | 待ち |
+| FOL-007 | X ADR-0064（本人のデータの書き出し。2026-10-25 に承認） | data-model/users-and-accounts.md の `data_export_requests` に目録のバージョンの列を足す | 待ち |
 | FOL-008 | Gmail ADR-0044（安全な HTML の描画） | 浄化の許可の一覧に `lang`・`dir`・表の `role`・`scope`・`headers`・`abbr` を足す提案（web-client.md 17 節の持ち越し）。Dev とセキュリティの判断 | 待ち |
 | FOL-009 | 全題材 | primer の「読む順」に、今回足した文書（design-log.md、Dropbox の web-client.md など）が載っていない | 待ち |
 | FOL-010 | 全題材 | architecture/README.md の 4 節（技術スタック）の多くに「エージェントにとっての理由」の列がない（[agents.md](agents.md) の 4 節） | 待ち |

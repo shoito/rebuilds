@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 date: 2026-10-10
 ---
 
@@ -21,7 +21,9 @@ date: 2026-10-10
 
 ## Decision
 
-1 を提案する。詳細は [security.md](../architecture/security.md) の 7.5 節。
+1 を採用する。詳細は [security.md](../architecture/security.md) の 7.5 節。
+
+> 2026-10-25 の注記：PM が範囲を決めた。MVP（E14 の `data-export`、GA の前）に入れる。法務の確認待ちの種類（L12）は、結論まで `release.export.*` のフラグで止める。
 
 - **書き出しの目録**：`packages/export` に、本人に結び付く表・置き場所ごとに「入れる（列の一覧）」「入れない（理由）」「法務の確認待ち（`release.export.<種類>` のフラグで止める）」のどれかを書く。本人だけの表の一覧（[data-model.md](../architecture/data-model.md) の規約）にある表が、目録に 1 つ残らず載っていることを CI で確かめる。新しい表は、目録に載せるまで CI を通らない。
 - **入れる**：プロフィール、本人の投稿とメディアの原本（削除したものは入れない）、リポスト・いいね・ブックマーク、フォロー・フォロワー・ブロック・ミュートの一覧（相手は ID とハンドルだけ）、設定、連絡先（平文に戻す）、本人のアカウントと投稿への措置とその根拠と異議（利用者への通知と同じ範囲。[ADR-0038](0038-moderation-action-model.md)）、おすすめの理由の記録（[ADR-0020](0020-ranking-evaluation-experiments-and-transparency.md)）、認可したアプリの一覧。

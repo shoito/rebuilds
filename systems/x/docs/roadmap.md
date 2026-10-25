@@ -265,7 +265,7 @@ E1〜E14 が MVP（S1）。領域の文書の「Story の候補」は、この�
 | `dr-failover-workflow` | 7.3 節のワークフロー、outbox の送り直し、`ar:` の先の作成（[infrastructure.md](architecture/infrastructure.md)） |
 | `cost-baseline` | 13 節の確定（[infrastructure.md](architecture/infrastructure.md)） |
 | `account-takeover-response` | 8 節（accounts-and-auth の `contact-change-hold` の後）（[security.md](architecture/security.md)） |
-| `data-export` | 本人のデータの書き出しの目録・ジョブ・渡し方（[security.md](architecture/security.md) の 7.5 節、[ADR-0064](decisions/0064-personal-data-export-scope-and-format.md)、proposed）。MVP に入れるかは PM の判断（[intent.md](intent.md) の「PM が決めるもの」）。法務：L12 |
+| `data-export` | 本人のデータの書き出しの目録・ジョブ・渡し方（[security.md](architecture/security.md) の 7.5 節、[ADR-0064](decisions/0064-personal-data-export-scope-and-format.md)）。MVP（E14）に入れる（2026-10-25 の PM の判断）。法務：L12 |
 
 ### E15〜E20（MVP の後）
 
