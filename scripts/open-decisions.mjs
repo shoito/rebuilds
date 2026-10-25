@@ -19,17 +19,30 @@ function replaceBlock(text, name, body) {
 const scopeOf = (f) => (f.startsWith('systems/') ? f.split('/')[1] : 'リポジトリ共通');
 
 function proposedAdrs(files) {
-  const rows = files
+  const all = files
     .filter((f) => ADR_FILE.test(f))
     .map((f) => ({ f, text: read(f) }))
-    .filter(({ text }) => frontmatter(text).status === 'proposed')
-    .map(({ f, text }) => {
+    .map(({ f, text }) => ({ f, text, fm: frontmatter(text) }))
+    .filter(({ fm }) => fm.status === 'proposed')
+    .map(({ f, text, fm }) => {
       const t = adrTitle(text);
-      const date = frontmatter(text).date ?? '';
-      return `| ${scopeOf(f)} | [ADR-${t?.number ?? '????'}](${path.relative('docs', f)}) | ${t?.title ?? ''} | ${date} |`;
+      const link = `[ADR-${t?.number ?? '????'}](${path.relative('docs', f)})`;
+      return { now: !fm.decide_after, row: [scopeOf(f), link, t?.title ?? '', fm.decide_after ?? fm.date ?? ''] };
     })
-    .sort();
-  return ['| 題材 | ADR | 決定 | 起票日 |', '| --- | --- | --- | --- |', ...rows].join('\n');
+    .sort((a, b) => a.row.join('|').localeCompare(b.row.join('|')));
+  const table = (head, rows) =>
+    [`| ${head.join(' | ')} |`, `| ${head.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.join(' | ')} |`)].join('\n');
+  const now = all.filter((x) => x.now).map((x) => x.row);
+  const later = all.filter((x) => !x.now).map((x) => x.row);
+  return [
+    '**今判断が要るもの**',
+    '',
+    table(['題材', 'ADR', '決定', '起票日'], now),
+    '',
+    '**判断する時点を待つもの**（frontmatter の `decide_after`）',
+    '',
+    table(['題材', 'ADR', '決定', '判断する時点'], later),
+  ].join('\n');
 }
 
 // Legal items are the rows "| L<n> | …" in each subject's intent.md.

@@ -8,28 +8,35 @@
 
 ## 1. 承認を待つ ADR（自動）
 
-`status: proposed` の ADR。持ち主（Dev、範囲に関わるものは PM も）が読み、`accepted` にするか、直すか、退ける。
+`status: proposed` の ADR。持ち主（Dev、範囲に関わるものは PM も）が読み、`accepted` にするか、直すか、退ける。検証や規模の段階を待ってから承認するものは、`decide_after` を書いて「判断する時点を待つもの」に分ける。
 
 <!-- proposed-adrs:start -->
+**今判断が要るもの**
+
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
 | datadog | [ADR-0067](../systems/datadog/docs/decisions/0067-org-data-export.md) | 組織のデータの書き出し（設定とテレメトリー） | 2026-10-10 |
 | datadog | [ADR-0068](../systems/datadog/docs/decisions/0068-migration-from-other-monitoring-tools.md) | 他の監視の道具からの移行の取り込み | 2026-10-10 |
-| github | [ADR-0034](../systems/github/docs/decisions/0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く | 2026-09-26 |
 | github | [ADR-0037](../systems/github/docs/decisions/0037-import-from-other-hosts.md) | 他のホスティングからのリポジトリと Issue の取り込み | 2026-10-10 |
 | github | [ADR-0038](../systems/github/docs/decisions/0038-operator-access.md) | 運用者の本番へのアクセスと、非公開のリポジトリの参照 | 2026-10-10 |
-| notion | [ADR-0030](../systems/notion/docs/decisions/0030-cdc-data-lake.md) | S2 で、変更データの取り込み（CDC）によるデータレイクを S3 に作る | 2026-09-26 |
 | notion | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | プランごとの上限と機能を、ワークスペースの権利（entitlements）として持つ | 2026-10-10 |
 | salesforce | [ADR-0064](../systems/salesforce/docs/decisions/0064-web-lead-form-public-intake.md) | Web からのリードのフォームの公開の受け口 | 2026-10-10 |
 | salesforce | [ADR-0065](../systems/salesforce/docs/decisions/0065-migration-path-from-original.md) | 本家からの移行の経路 | 2026-10-10 |
 | shopify | [ADR-0077](../systems/shopify/docs/decisions/0077-migration-import-from-other-platforms.md) | 他の EC の基盤からの移行の取り込み | 2026-10-10 |
-| slack | [ADR-0023](../systems/slack/docs/decisions/0023-cell-based-architecture.md) | S3 でセル構成に移る | 2026-09-26 |
 | slack | [ADR-0034](../systems/slack/docs/decisions/0034-workspace-import-from-other-tools.md) | 他のチャットツールからの取り込み（移行）の範囲と方式 | 2026-10-10 |
 | slack | [ADR-0035](../systems/slack/docs/decisions/0035-operator-access.md) | 運用者の本番へのアクセスと、ワークスペースの参照の許可 | 2026-10-10 |
 | stripe | [ADR-0034](../systems/stripe/docs/decisions/0034-card-data-migration.md) | 他の決済事業者とのカード番号の移行（取り込みと書き出し） | 2026-10-10 |
 | stripe | [ADR-0035](../systems/stripe/docs/decisions/0035-operator-access-outside-cde.md) | CDE の外での運用者のアクセスと、加盟店のデータの閲覧 | 2026-10-10 |
 | uber | [ADR-0044](../systems/uber/docs/decisions/0044-app-languages-and-rider-driver-phrases.md) | アプリの言語と、乗客とドライバーの言葉の壁の越え方 | 2026-10-10 |
 | x | [ADR-0064](../systems/x/docs/decisions/0064-personal-data-export-scope-and-format.md) | 本人のデータの書き出しの範囲と形 | 2026-10-10 |
+
+**判断する時点を待つもの**（frontmatter の `decide_after`）
+
+| 題材 | ADR | 決定 | 判断する時点 |
+| --- | --- | --- | --- |
+| github | [ADR-0034](../systems/github/docs/decisions/0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く | E11 の staging での検証（S3 の前） |
+| notion | [ADR-0030](../systems/notion/docs/decisions/0030-cdc-data-lake.md) | S2 で、変更データの取り込み（CDC）によるデータレイクを S3 に作る | S2 への移行を始めるとき |
+| slack | [ADR-0023](../systems/slack/docs/decisions/0023-cell-based-architecture.md) | S3 でセル構成に移る | S3 への移行を始めるとき |
 <!-- proposed-adrs:end -->
 
 ## 2. 法務の確認待ち（自動）

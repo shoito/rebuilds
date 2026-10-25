@@ -1,5 +1,6 @@
 ---
 status: proposed
+decide_after: E11 の staging での検証（S3 の前）
 date: 2026-09-26
 ---
 

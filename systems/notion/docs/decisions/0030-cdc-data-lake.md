@@ -1,5 +1,6 @@
 ---
 status: proposed
+decide_after: S2 への移行を始めるとき
 date: 2026-09-26
 ---
 

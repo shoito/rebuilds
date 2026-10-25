@@ -1,5 +1,6 @@
 ---
 status: proposed | accepted | superseded by ADR-NNNN
+# decide_after: <判断する時点。proposed のまま、検証や規模の段階を待つときだけ書く（例：S2 への移行を始めるとき）>
 date: YYYY-MM-DD
 ---
 
