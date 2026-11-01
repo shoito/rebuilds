@@ -295,7 +295,7 @@ RDATE;TZID=Asia/Tokyo:20270630T100000</code></pre>
   <section class="s" id="rooms">
     <h2>会議室：二重予約を DB で防ぐ</h2>
     <p>会議室や設備は、予定の「参加者」として招きます。会議室は自動で出欠を返します。設定は「重ならなければ自動で承諾」か「管理者の承認」です。自動で承諾する会議室の二重予約は 0 件が目標です。</p>
-    <p>アプリで「重なりを探してから入れる」だけでは、同時の 2 つの要求が両方とも「空いている」と判断しえます。そこで PostgreSQL の<a class="t" href="#g-exclusion">排他の制約</a>で、DB 自身に重なりを拒ませます。</p>
+    <p>アプリで「重なりを探してから入れる」だけでは、同時の 2 つの要求が両方とも「空いている」と判断しえます。そこで予約する前に会議室の行をロックし、同じ会議室への判断を 1 つずつ順番にします。最後の守りとして、PostgreSQL の<a class="t" href="#g-exclusion">排他の制約</a>で、DB 自身にも重なりを拒ませます。</p>
     <pre class="mermaid">sequenceDiagram
   participant A as 予約 A
   participant B as 予約 B

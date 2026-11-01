@@ -320,7 +320,7 @@
   I -. "セクションの上限を超えた" .-> E["そのセクションを空にする"]</pre>
     <div class="compare">
       <div class="bad"><p><strong>任意のコードが動く言語</strong></p><p>無限ループでサーバーを止める。DB や他のショップのデータを読む。<code>&lt;script&gt;</code> を埋め込む<a class="t" href="#g-xss">XSS</a>。</p></div>
-      <div class="good"><p><strong>この設計の言語</strong></p><p>副作用なし。読めるのは許した <a class="t" href="#g-drop">drop</a> だけ。歩数（1 ページ 100 万）・出力（2 MB）・ループ（1,000 要素）に上限。超えたらそのセクションを空にする。</p></div>
+      <div class="good"><p><strong>この設計の言語</strong></p><p>副作用なし。読めるのは許した <a class="t" href="#g-drop">drop</a> だけ。歩数（1 ページ 100 万）・出力（2 MB）・ループ（1,000 要素）に上限。歩数を超えたらそのセクションを空にし、出力を超えたらエラーのページ（500）にし、ループは 1,000 要素で切る。</p></div>
     </div>
     <p>出力は、置いた場所の文脈で<a class="t" href="#g-escape">エスケープ</a>します。本文なら <code>&lt;</code> を文字の参照に、URL の属性なら <code>javascript:</code> を拒み、<code>&lt;script&gt;</code> の中は <code>json</code> フィルターだけを許します。</p>
     <div class="quiz" data-answer="3">
