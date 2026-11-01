@@ -16,6 +16,8 @@
 - 1 つの HTML ファイルに書く。CSS と JS は共通のもの（`docs/primer/assets/`）を相対パスで読む。
 - `<head>` の直後に、既存のページと同じ Google アナリティクスのタグ（`G-LRH3HT8NDH`）を入れる（ルートの AGENTS.md）。
 - サイト名は `rebuilds`。`<title>` は「〈題材〉の前提知識 | rebuilds」の形にし、`<meta property="og:site_name" content="rebuilds">` を入れる。`description` にはサイト名を入れない。
+- 共有の表示のため、`og:title`（`<title>` と同じ）・`og:description`（`description` と同じ）・`og:url`（公開の URL）・`og:image`（共通の `docs/primer/assets/og.png`）と `twitter:card` を入れる（`npm run check` が確かめる）。
+- ページを足したら `npm run sitemap` で `sitemap.xml` を作り直す（`npm run check` が古さを確かめる）。
 - favicon は共通の `docs/primer/assets/favicon.svg` を相対パスで読む。
 - 外部から読むのは、このタグと、共通の JS が読む Mermaid（jsdelivr）だけにする。画像は使わず、図は Mermaid かインラインの SVG にする。
 - 本文は日本語で書く。短い文で、です・ます調にする。識別子とコードはそのまま。
@@ -37,6 +39,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slack の前提知識 | rebuilds</title>
 <meta property="og:site_name" content="rebuilds">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Slack の前提知識 | rebuilds">
+<meta property="og:description" content="…">
+<meta property="og:url" content="https://shoito.github.io/rebuilds/systems/slack/docs/primer/">
+<meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="…">
 <meta name="primer-home" content="../../../../index.html">
 <link rel="icon" href="../../../../docs/primer/assets/favicon.svg" type="image/svg+xml">

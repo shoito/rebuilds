@@ -14,6 +14,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rebuilds</title>
 <meta property="og:site_name" content="rebuilds">
+<meta property="og:type" content="website">
+<meta property="og:title" content="rebuilds">
+<meta property="og:description" content="既存の SaaS を AI エージェント主体で再構築する設計の記録。題材ごとの前提知識の資料。">
+<meta property="og:url" content="https://shoito.github.io/rebuilds/">
+<meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="既存の SaaS を AI エージェント主体で再構築する設計の記録。題材ごとの前提知識の資料。">
 <link rel="icon" href="docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="docs/primer/assets/primer.css">
@@ -306,5 +312,17 @@
     </div>
   </div>
 </div>
+<script>
+  // Mark subjects whose primer was read to the end in this browser (stored by primer.js).
+  (() => {
+    let done = [];
+    try { done = JSON.parse(localStorage.getItem('rebuilds-read') || '[]'); } catch { return; }
+    if (!done.length) return;
+    for (const a of document.querySelectorAll('.grid h3 a')) {
+      const id = (a.getAttribute('href').match(/^systems\/([^/]+)\//) || [])[1];
+      if (done.includes(id)) a.insertAdjacentHTML('afterend', '<span class="read-mark" title="このブラウザで最後まで読んだ資料">読了</span>');
+    }
+  })();
+</script>
 </body>
 </html>

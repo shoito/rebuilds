@@ -273,6 +273,54 @@
     touchX = null;
   });
 
+  // Reading paths: the same chains as the "読む順の道筋" cards on the top page
+  const SUBJECTS = {
+    slack: 'Slack', stripe: 'Stripe', github: 'GitHub', notion: 'Notion', auth0: 'Auth0', figma: 'Figma',
+    zoom: 'Zoom', uber: 'Uber', linear: 'Linear', salesforce: 'Salesforce', servicenow: 'ServiceNow',
+    workday: 'Workday', x: 'X', 'google-calendar': 'Google カレンダー', dropbox: 'Dropbox', datadog: 'Datadog',
+    shopify: 'Shopify', youtube: 'YouTube', gmail: 'Gmail', mercari: 'メルカリ', airbnb: 'Airbnb',
+  };
+  const PATHS = [
+    ['はじめの一歩', ['slack', 'stripe', 'github']],
+    ['お金', ['stripe', 'mercari', 'airbnb', 'shopify']],
+    ['共同編集と同期', ['figma', 'notion', 'linear', 'dropbox', 'google-calendar']],
+    ['大量のイベント', ['x', 'datadog', 'youtube']],
+    ['業務のプラットフォーム', ['salesforce', 'servicenow', 'workday']],
+    ['リアルタイムと位置', ['slack', 'zoom', 'uber']],
+    ['信頼と安全', ['auth0', 'gmail', 'x', 'mercari']],
+  ];
+  const subject = (location.pathname.match(/\/systems\/([^/]+)\/docs\/primer\//) || [])[1];
+  const base = homeHref ? homeHref.replace(/index\.html$/, '') : null;
+  const primerHref = (id) => `${base}systems/${id}/docs/primer/index.html`;
+  const last = content[content.length - 1];
+  if (subject && SUBJECTS[subject] && base && last) {
+    const rows = PATHS.filter(([, ids]) => ids.includes(subject)).map(([name, ids]) => {
+      const i = ids.indexOf(subject);
+      const chain = ids.map((id) => (id === subject
+        ? `<strong>${SUBJECTS[id]}</strong>`
+        : `<a href="${primerHref(id)}">${SUBJECTS[id]}</a>`)).join(' → ');
+      const nextId = ids[i + 1];
+      const nextLink = nextId
+        ? `<a class="btn" href="${primerHref(nextId)}">次は ${SUBJECTS[nextId]} →</a>`
+        : '<span class="hint">この道筋の最後の題材です</span>';
+      return `<div class="card"><h3>${name}</h3><p class="chain">${chain}</p><p>${nextLink}</p></div>`;
+    });
+    if (rows.length) {
+      last.insertAdjacentHTML('beforeend', `<nav class="next-read" aria-label="次に読む題材"><h3>次に読む題材</h3><p class="hint">この題材を含む読む順の道筋です（<a href="${base}index.html">題材の一覧</a>）。</p><div class="cards">${rows.join('')}</div></nav>`);
+    }
+  }
+
+  // Read marks: remember finished primers in this browser so the top page can show them
+  const READ_KEY = 'rebuilds-read';
+  const markRead = () => {
+    if (!subject) return;
+    try {
+      const done = new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]'));
+      if (!done.has(subject)) { done.add(subject); localStorage.setItem(READ_KEY, JSON.stringify([...done])); }
+    } catch { /* storage may be unavailable */ }
+  };
+  if (last) new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) markRead(); }).observe(last);
+
   // Initial view comes from the URL so shared links open the same way
   const initial = new URLSearchParams(location.search).get('view') === 'slides' ? 'slides' : 'doc';
   const hashId = location.hash.slice(1);

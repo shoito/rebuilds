@@ -203,6 +203,9 @@ body.slides #learn .card { padding: 10px 12px; }
 body.slides #learn .card ul { font-size: .74em; line-height: 1.5; }
 body.slides #learn > h2 { margin-bottom: .4em; }
 body.slides #learn > p { font-size: .9em; margin: 0 0 .4em; }
+/* Narrow screens cannot fit five columns: fall back to two, then one */
+@media (max-width: 1000px) { body.slides #learn .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { body.slides #learn .cards { grid-template-columns: minmax(0, 1fr); } body.slides #learn .card ul { font-size: .82em; } }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .s.cover { display: none; }
 .deck-nav { display: none; }
@@ -224,3 +227,13 @@ body.slides .doc-only { display: none; }
   .layout { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* 「次に読む題材」 at the end of each subject primer */
+.next-read { margin-top: 2em; padding-top: 1em; border-top: 1px solid var(--border); }
+.next-read > h3 { margin-top: 0; }
+.next-read .chain { font-size: .9em; margin: .2em 0 .6em; }
+.next-read .card p:last-child { margin: 0; }
+.next-read .btn { text-decoration: none; }
+
+/* Read mark on the top page (set by primer.js in this browser) */
+.read-mark { display: inline-block; margin-left: .4em; padding: 0 .45em; font-size: .7em; font-weight: 700; color: var(--ok); border: 1px solid var(--ok); border-radius: 999px; vertical-align: .2em; }

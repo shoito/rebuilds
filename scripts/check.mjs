@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { adrIndexProblems } from './adr-index.mjs';
 import { openDecisionsProblems } from './open-decisions.mjs';
+import { sitemapProblems } from './sitemap.mjs';
 import { ADR_FILE, adrTitle, frontmatter, lineOf, listFiles, read, root } from './lib.mjs';
 
 const args = process.argv.slice(2);
@@ -77,6 +78,7 @@ for (const f of html) {
   if (!text.includes("gtag('config', 'G-LRH3HT8NDH')")) problems.push(`${f}:1: missing Google Analytics tag G-LRH3HT8NDH`);
   if (!/<link rel="icon" href="[^"]*favicon\.svg"/.test(text)) problems.push(`${f}:1: missing favicon link`);
   if (!text.includes('<meta property="og:site_name" content="rebuilds">')) problems.push(`${f}:1: missing og:site_name`);
+  if (f !== '404.html' && (!text.includes('<meta property="og:title"') || !text.includes('<meta property="og:image"'))) problems.push(`${f}:1: missing og:title or og:image (docs/primer/AUTHORING.md)`);
   if (/^systems\/[^/]+\/docs\/primer\/index\.html$/.test(f)) {
     const learn = text.match(/<section class="s" id="learn">([\s\S]*?)<\/section>/);
     if (!learn) problems.push(`${f}:1: missing the「この題材から学べること」section (id="learn", docs/primer/AUTHORING.md)`);
@@ -85,6 +87,9 @@ for (const f of html) {
     }
   }
 }
+
+// 4b. sitemap.xml lists every published page (scripts/sitemap.mjs).
+if (!only || html.length) problems.push(...sitemapProblems());
 
 // 5. Wording rules that can be checked mechanically (AGENTS.md「言語」).
 for (const f of [...md, ...html]) {
