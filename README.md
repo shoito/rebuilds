@@ -2,6 +2,8 @@
 
 既存のソフトウェア・システム・SaaS を、**AI（コーディングエージェント）を主な作り手として再構築するなら、どう設計し、どう作るか** を記録するリポジトリ。
 
+> 非公式の思考実験です。各サービスの名前は題材を示すためにだけ使っており、各サービスの運営会社とは関係ありません。公開されている情報をもとに「作り直すなら」を考えたもので、本家の実際の作りとは異なります。
+
 実際の開発は、題材ごとの開発リポジトリで行う（[ADR-0005](docs/decisions/0005-design-record-repository.md)）。
 
 開発プロセスは Anthropic の [AI-Native SDLC Playbook](https://claude.com/blog/the-ai-native-sdlc-playbook) の intent → spec → plan を骨格にしている。そこへ Kiro の EARS 記法と要件 ID、OpenSpec の正本／差分の分離、MADR 形式の ADR を組み合わせた。詳細は [docs/process.md](docs/process.md)、採用の理由は [ADR-0001](docs/decisions/0001-adopt-ai-native-lifecycle.md) にある。
