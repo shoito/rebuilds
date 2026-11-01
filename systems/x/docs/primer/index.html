@@ -73,6 +73,14 @@
   <section class="s" id="product">
     <h2>X は何をするサービスか</h2>
     <p>X（旧 Twitter）は、誰でも短い文を投稿し、誰でもそれを読める公開型の SNS です。宛先を選んで送るのではなく、自分の投稿を公開し、<strong>自分をフォローしている人</strong>のホームに届きます。ニュースの速報、災害の情報、テレビの実況が、同じ流れの上で起きます。</p>
+    <pre class="mermaid">flowchart LR
+  W["投稿する人"] -- "投稿・リポスト" --> S["SNS のサービス"]
+  R["読む人<br>利用者の大半"] -- "ホーム・検索・通知" --> S
+  S -- "フォロワーのホームへ届ける" --> R
+  D["開発者のアプリ・ボット"] -- "公開 API" --> S
+  M["モデレーター"] -- "措置・削除" --> S
+  C["申出をする人・裁判所"] -- "申出・命令" --> S
+  S -- "プッシュ通知" --> P["APNs・FCM"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>おすすめ（For you）</h3><p>フォローしていない人の投稿も含めて、1 人ひとりに合わせて並べ替えたホーム。<a class="t" href="#g-ranking">ランキング</a>で作ります。</p></div>
       <div class="card" data-frag><h3>フォロー中（Following）</h3><p>フォローしている人の投稿だけを、新しい順に並べたホーム。順は時刻だけで決まります。</p></div>
@@ -115,6 +123,13 @@
   <section class="s" id="visibility">
     <h2>見える範囲は「読む時に」決める</h2>
     <p>この題材は、Slack のようなテナントの壁を持ちません。全員が 1 つの空間にいて、投稿は原則として公開です。そのかわり、<strong>誰に見せてはいけないか</strong>が、投稿と閲覧者の組ごとに変わります。</p>
+    <pre class="mermaid">flowchart LR
+  T["タイムライン"] --> V{"visible<br>閲覧者と投稿"}
+  Q["検索"] --> V
+  N["通知・API・メディア"] --> V
+  St[("最新の状態<br>ブロック・鍵・削除・措置")] --> V
+  V -- "見せてよい" --> O["表示する"]
+  V -- "見せない" --> X["外す"]</pre>
     <ul>
       <li>ブロックの関係、鍵アカウント、削除、法的な措置、規約の措置、年齢の制限、地域の制限。</li>
       <li>これらは、投稿の後にも変わります（あとからブロックする、措置が入る）。</li>
@@ -173,8 +188,35 @@
   <section class="s" id="tid">
     <h2>時刻の順に並ぶ 64 ビットの ID</h2>
     <p>共通の資料の <a href="../../../../docs/primer/index.html#ids">UUIDv7</a> と同じく「ID の大小が時刻の順」になる ID ですが、この題材は <strong>64 ビット</strong>の <a class="t" href="#g-tid"><code>tid</code></a> を使います。本家が 2010 年に公開した方式（<a class="t" href="#g-snowflake">Snowflake</a>）と同じ考え方で、コードは自前で書きます。</p>
-    <pre><code> 0 | ミリ秒 41 ビット（起点 2026-01-01） | 生成器 10 ビット | 連番 12 ビット
-符号  └── 約 69 年もつ ──────────────┘   └ 0〜1023 ─┘   └ 1 ms に 4096 ─┘</code></pre>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 150" role="img" aria-label="64 ビットの tid の配分。上から符号 1 ビット、ミリ秒 41 ビット、生成器 10 ビット、連番 12 ビット">
+        <g style="stroke:var(--border);stroke-width:1">
+          <rect x="0" y="30" width="40" height="44" style="fill:var(--surface-2)"/>
+          <rect x="40" y="30" width="350" height="44" style="fill:var(--accent-soft)"/>
+          <rect x="390" y="30" width="110" height="44" style="fill:var(--ok-soft)"/>
+          <rect x="500" y="30" width="140" height="44" style="fill:var(--warn-soft)"/>
+        </g>
+        <g style="font-size:13px;fill:var(--text)" text-anchor="middle">
+          <text x="20" y="57">0</text>
+          <text x="215" y="57">ミリ秒 41 ビット</text>
+          <text x="445" y="57">生成器 10</text>
+          <text x="570" y="57">連番 12</text>
+        </g>
+        <g style="font-size:12px;fill:var(--muted)" text-anchor="middle">
+          <text x="20" y="20">符号</text>
+          <text x="215" y="20">上位のビット：大小で並べると時刻の順</text>
+          <text x="20" y="96">正の数</text>
+          <text x="215" y="96">起点 2026-01-01 から約 69 年</text>
+          <text x="445" y="96">東京 0〜511</text>
+          <text x="445" y="114">大阪 512〜1023</text>
+          <text x="570" y="96">1 ms に 4096 まで</text>
+        </g>
+        <g style="font-size:12px;fill:var(--muted)">
+          <text x="0" y="142">上位</text>
+          <text x="640" y="142" text-anchor="end">下位</text>
+        </g>
+      </svg>
+    </figure>
     <ul>
       <li data-frag><strong>なぜ 64 ビットか</strong>：ホームの写しは 1 項目に ID を 3 つ持ちます。UUIDv7（128 ビット）だと写しの記憶が倍になります。</li>
       <li data-frag><strong>調整なしで振れる</strong>：生成器の番号さえ重ならなければ、DB の連番を通さずに各サーバーで振れます。番号は DB で貸し出し、東京は 0〜511、大阪は 512〜1023 です。</li>
@@ -304,6 +346,16 @@
   <section class="s" id="media">
     <h2>メディアの配信：HLS と CDN</h2>
     <p>動画を 1 本の大きなファイルで配ると、回線の遅い人は再生が止まります。そこで動画は <a class="t" href="#g-hls">HLS</a> で配ります。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant P as 再生する端末
+  participant C as CDN の端
+  P->>C: 一覧 master.m3u8 を取る
+  C-->>P: 240p から 1080p の 5 段
+  P->>C: 回線が速い。高い段の区切り 1
+  C-->>P: 6 秒の区切り
+  P->>C: 回線が遅くなった。低い段の区切り 2
+  C-->>P: 6 秒の区切り
+  Note over P: 区切りごとに段を切り替える</pre>
     <div class="cards">
       <div class="card" data-frag><h3>短く切る</h3><p>動画を 6 秒ずつの区切り（セグメント）に分ける。</p></div>
       <div class="card" data-frag><h3>画質を何段も作る</h3><p>240p〜1080p の 5 段を作り、一覧（<code>master.m3u8</code>）に並べる。</p></div>

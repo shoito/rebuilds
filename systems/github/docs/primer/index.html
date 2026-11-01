@@ -76,6 +76,14 @@
   <section class="s" id="what">
     <h2>GitHub は何をするサービスか</h2>
     <p>Git のリポジトリを預かり、その上でレビュー・課題の管理・CI を回す場です。使うのは、開発者・Organization の管理者・外部のツール、そして API で操作する AI エージェントです。</p>
+    <pre class="mermaid">flowchart LR
+  D["開発者"] -- "clone・push" --> S["本システム<br>(リポジトリ)"]
+  D -- "PR・レビュー・Issue" --> S
+  Adm["Organization の<br>管理者"] -- "権限・ruleset" --> S
+  AI["AI エージェント"] -- "API・トークン" --> S
+  S -- "ジョブ" --> CI["CI のランナー"]
+  CI -- "チェックの結果" --> S
+  S -- "Webhook" --> T["外部のツール"]</pre>
     <div class="stepper">
       <ol>
         <li>リポジトリを <code>git clone</code> で手元に取る。</li>
@@ -176,6 +184,11 @@
   <section class="s" id="fork">
     <h2>fork とネットワーク</h2>
     <p><strong>fork</strong> は、他人のリポジトリを自分のアカウントの下に写したものです。権限のない人も、fork に push してから元のリポジトリへ PR を出せます。これが OSS への貢献の普通の形です。</p>
+    <pre class="mermaid">flowchart LR
+  O["元のリポジトリ<br>(ref だけ)"] -- "alternates" --> N["ネットワークの<br>共有のオブジェクト"]
+  F1["fork A<br>(ref だけ)"] -- "alternates" --> N
+  F2["fork B<br>(ref だけ)"] -- "alternates" --> N
+  F1 -. "PR を出す" .-> O</pre>
     <p>元のリポジトリと全ての fork を、1 つの<a class="t" href="#g-network">ネットワーク</a>にまとめます。オブジェクトはネットワークで 1 か所に集め、各リポジトリは <a class="t" href="#g-alternates">alternates</a> でそこを参照します。fork の作成は ref を写すだけで、コピーはありません。</p>
     <div class="callout warn"><span class="label">共有の副作用</span>ある fork に push したコミットは、同じネットワークの他のリポジトリから SHA を指定すると見ええます。Git のプロトコル v2 の <code>fetch</code> は、広告していない <code>want</code> も弾かないためです。公開のネットワークでは本家と同じく仕様として受け入れ、非公開のネットワークでは到達できるかを検査します（本家との違い）。</div>
     <div class="quiz" data-answer="3">
@@ -234,6 +247,14 @@
   <section class="s" id="review-rules">
     <h2>レビューとブランチの保護（ruleset）</h2>
     <p>既定のブランチは、だれでも書き換えてよいものではありません。「承認が 2 件」「CI が成功」などの条件を、<a class="t" href="#g-ruleset">ruleset</a> で表します。</p>
+    <pre class="mermaid">flowchart LR
+  P["git push"] --> E["1 つの評価関数<br>(ruleset)"]
+  M["PR のマージ"] --> E
+  R["レビューの結論"] --> E
+  C["CODEOWNERS<br>(base 側)"] --> E
+  K["ステータスチェック<br>(SHA ごと)"] --> E
+  E --> OK["許可"]
+  E -- "材料が読めない" --> NG["拒否"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>レビュー</h3><p>結論は承認・変更の依頼・コメント。数に入るのは、書き込み権限を持つ人の、レビュアーごとの最新の結論だけ。新しい push で古い承認を取り消せる。</p></div>
       <div class="card" data-frag><h3>CODEOWNERS</h3><p>パスごとのオーナーを書いたファイル。<strong>base 側</strong>のファイルを使い、後に書いた一致が優先する。<a class="t" href="#g-codeowners">詳しく</a></p></div>
@@ -348,6 +369,15 @@
   <section class="s" id="untrusted">
     <h2>信頼できない内容を安全に見せる</h2>
     <p>README、Issue の本文、SVG、ノートブックは、だれでも書けます。アプリと同じオリジンで描くと、利用者の書いたスクリプトが閲覧者のセッションで動きます（XSS）。</p>
+    <pre class="mermaid">flowchart LR
+  U["利用者の内容"] --> MD["Markdown"]
+  U --> IMG["画像・SVG"]
+  U --> NB["ノートブック・<br>Mermaid"]
+  U --> RAW["生のファイル"]
+  MD -- "HTML にして無害化" --> A["アプリのドメイン"]
+  IMG -- "img で読む" --> UC["別のドメイン<br>(usercontent)"]
+  NB -- "sandbox の iframe" --> UC
+  RAW -- "text/plain・nosniff" --> UC</pre>
     <div class="compare">
       <div class="bad"><h3>危ない</h3><p>生のファイルをアプリのサブドメインから HTML として返す。サブドメインは同じサイトなので、Cookie が送られ、上書きもされうる。</p></div>
       <div class="good"><h3>安全</h3><p>利用者の内容は<strong>別の登録可能ドメイン</strong>（<code>&lt;brand&gt;usercontent.&lt;domain&gt;</code>）から、<code>text/plain</code>・<code>nosniff</code>・CSP の <code>sandbox</code> 付きで返す。</p></div>
@@ -382,6 +412,7 @@
   <section class="s" id="data-model">
     <h2>データモデルの読み方</h2>
     <p>中身の正本は Git、メタデータの正本は Aurora です。DB にある ref や SHA は<strong>写し</strong>で、マージの判定には使いません。</p>
+    <p>まず <code>repositories</code> と、fork をまとめる <code>repository_networks</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   owners ||--o{ repositories : "owns"
   repository_networks ||--|{ repositories : "groups"

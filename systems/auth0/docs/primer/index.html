@@ -75,6 +75,14 @@
   <section class="s" id="product">
     <h2>Auth0 は何をするサービスか</h2>
     <p>Auth0 は、アプリの利用者（顧客）のログインを肩代わりする認証基盤です。この分野を <a class="t" href="#g-ciam">CIAM</a> と呼びます。アプリはログインの画面もパスワードも持たず、本システムへリダイレクトして、戻ってきた結果をトークンとして受け取ります。</p>
+    <pre class="mermaid">flowchart LR
+  Dev["テナントの開発者"] -- "アプリと API を登録" --> S["本システム<br>(認証基盤)"]
+  Adm["テナントの管理者"] -- "設定・ユーザー・ログ" --> S
+  U["エンドユーザー"] -- "ホスト型の画面で<br>ログイン" --> S
+  A["テナントのアプリ"] -- "リダイレクト" --> S
+  S -- "トークン" --> A
+  S -- "ソーシャルログイン" --> G["外部の IdP<br>(Google など)"]
+  A -- "アクセストークン" --> API["テナントの API"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>テナントの開発者</h3><p>テナントを作り、アプリと API を登録し、標準の OIDC のライブラリでつなぐ。主な利用者。</p></div>
       <div class="card" data-frag><h3>テナントの管理者</h3><p>ダッシュボードと Management API で、設定・ユーザー・ログを扱う。</p></div>
@@ -232,6 +240,21 @@
   <section class="s" id="ulogin">
     <h2>Universal Login とログインのトランザクション</h2>
     <p><a class="t" href="#g-ul">Universal Login</a> は、本システムのドメインで出すホスト型のログインの画面です。アプリの画面にログインの部品を埋め込む方式は持ちません。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> identifier: /authorize の検証が通る
+  identifier --> password: 識別子
+  identifier --> signup: サインアップ
+  password --> first_factor_done: 照合の成功
+  signup --> first_factor_done: 確認とパスワード
+  identifier --> first_factor_done: ソーシャル・パスキー
+  first_factor_done --> link_proposed: リンクの提案
+  link_proposed --> mfa_required: MFA
+  mfa_required --> consent_required: 同意
+  consent_required --> completed
+  completed --> [*]: コードを redirect_uri へ
+  note right of first_factor_done
+    要らない手順は飛ばす<br>60 分で expired
+  end note</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>埋め込み型</h3><p>パスワードがアプリのページを通る。偽の画面と見分けにくい。アプリごとに CSP や MFA の画面を作り直す。</p></div>
       <div class="good" data-frag><h3>ホスト型</h3><p>パスワードは本システムにしか渡らない。パスキーの RP ID が 1 つにそろう。厳しい CSP をかけられる。</p></div>
@@ -252,6 +275,13 @@
   <section class="s" id="connections">
     <h2>接続・ユーザー・ID のリンク</h2>
     <p><a class="t" href="#g-connection">接続</a>は「資格情報を確かめて、外部の ID を返す部品」です。MVP はデータベース接続（メールアドレスとパスワード）と、ソーシャル接続（Google・Apple・LINE・GitHub）を持ちます。1 人のユーザーは、接続ごとの <a class="t" href="#g-identity">ID</a> を複数持てます。</p>
+    <pre class="mermaid">flowchart LR
+  C1["データベース接続<br>(メールとパスワード)"] --> I1["ID 1"]
+  C2["Google の接続"] --> I2["ID 2"]
+  C3["LINE の接続"] --> I3["ID 3"]
+  I1 --> U["1 人のユーザー<br>user_id = sub"]
+  I2 -- "リンク" --> U
+  I3 -. "リンクしなければ<br>別のユーザー" .-> U2["別のユーザー"]</pre>
     <ul>
       <li data-frag><strong><code>user_id</code> は接続から独立。</strong><code>usr_</code> ＋乱数で、そのままトークンの <code>sub</code> になります。接続の種類を含めず、削除しても再利用しません（OIDC Core が <code>sub</code> の再割り当てを禁じるため）。</li>
       <li data-frag><strong>メールアドレスの「確認済み」は IdP ごとに違う。</strong>Google・Apple は ID トークンの <code>email_verified</code> を使い、LINE はそのクレームがないので確認済みにしません。</li>
@@ -272,6 +302,13 @@
   <section class="s" id="passwords">
     <h2>パスワードを守る：保存・ポリシー・列挙</h2>
     <p>パスワードの扱いは、米国の <a class="t" href="#g-nist">NIST SP 800-63B-4</a> が事実上の基準です。昔の常識と逆になっている点があります。</p>
+    <pre class="mermaid">flowchart LR
+  A["パスワードの送信"] --> B["攻撃の防御の判定<br>(ハッシュの前)"]
+  B --> C{"識別子で<br>ユーザーを引く"}
+  C -- "ある" --> D["Argon2id ＋ pepper<br>で照合"]
+  C -- "ない" --> E["ダミーのハッシュで<br>同じ計算"]
+  D --> F["同じ文言・同じ時間で<br>結果を返す"]
+  E --> F</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>昔の常識</h3><p>SHA-256 で保存（速すぎて総当たりされる）。記号を必須にする。定期的に変えさせる。</p></div>
       <div class="good" data-frag><h3>この設計</h3><p><a class="t" href="#g-argon2id">Argon2id</a> ＋ <a class="t" href="#g-pepper">pepper</a> で保存。組み合わせの規則は持たず、長さ（既定 15 文字）と、よく使われる・漏えいしたパスワードの一覧で拒否する。</p></div>
@@ -382,6 +419,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 92 表（MVP 73）ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>tenant_id</code> を持ちます。</p>
+    <p>まず <code>users</code> と <code>user_identities</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   tenants ||--o{ clients : "has"
   tenants ||--o{ connections : "has"

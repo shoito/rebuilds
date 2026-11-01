@@ -75,6 +75,14 @@
   <section class="s" id="what">
     <h2>EC の基盤は何をするサービスか</h2>
     <p>Shopify は、事業者が自分のネットショップを開き、商品を並べ、売り、配送と返品までを 1 か所で回せる基盤です。モールと違い、ショップの見た目と顧客は事業者のものです。1 つの基盤の上に、数十万の独立したショップ（テナント）が載ります。</p>
+    <pre class="mermaid">flowchart LR
+  M["事業者・スタッフ"] -- "管理画面で<br>商品・在庫・注文" --> SYS["このシステム<br>(多くのショップの基盤)"]
+  B["買い手"] -- "ストアフロントで<br>見て買う" --> SYS
+  D["アプリの開発者"] -- "Admin API・関数" --> SYS
+  SYS -. "Webhook" .-> D
+  O["社内の運用"] -- "セールの準備・<br>ショップの移し替え" --> SYS
+  SYS -- "決済" --> P["決済の提供者"]
+  SYS -- "配送" --> C["運送会社"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>事業者とスタッフ</h3><p>管理画面で商品・在庫・注文・配送を扱います。持ち主がスタッフに権限を与えます。</p></div>
       <div class="card" data-frag><h3>買い手</h3><p>スマートフォンでストアフロントを見て、会員にならずに買う人が多いです。</p></div>
@@ -303,6 +311,13 @@
   <section class="s" id="themes">
     <h2>テーマの言語は安全でなければならない</h2>
     <p>ストアフロントの見た目は<a class="t" href="#g-theme">テーマ</a>が決めます。テーマは事業者やテーマの開発者が書くテンプレート（<code>{{ product.title }}</code>・<code>{% for %}</code> の形）で、基盤のサーバーの上で描かれます。他人のコードを自分のサーバーで動かすので、言語そのものに安全を組み込みます。設計の言語の名前は Loom です。</p>
+    <pre class="mermaid">flowchart LR
+  T["テンプレート<br>(事業者・開発者が書く)"] --> C["翻訳と検査<br>(文脈・型・上限)"]
+  C --> IR["命令の列 (IR)"]
+  IR --> I["インタープリター<br>(歩数を数える)"]
+  DR["許した drop<br>(商品・価格など)"] --> I
+  I -- "文脈でエスケープ" --> H["ページの HTML"]
+  I -. "セクションの上限を超えた" .-> E["そのセクションを空にする"]</pre>
     <div class="compare">
       <div class="bad"><p><strong>任意のコードが動く言語</strong></p><p>無限ループでサーバーを止める。DB や他のショップのデータを読む。<code>&lt;script&gt;</code> を埋め込む<a class="t" href="#g-xss">XSS</a>。</p></div>
       <div class="good"><p><strong>この設計の言語</strong></p><p>副作用なし。読めるのは許した <a class="t" href="#g-drop">drop</a> だけ。歩数（1 ページ 100 万）・出力（2 MB）・ループ（1,000 要素）に上限。超えたらそのセクションを空にする。</p></div>
@@ -360,6 +375,12 @@
   <section class="s" id="wasm">
     <h2>WebAssembly の砂場：燃料とメモリー</h2>
     <p>アプリは、割引・送料・決済の手段の並べ替えなどのロジックを<a class="t" href="#g-function">関数</a>として、チェックアウトの中で動かせます。関数は <a class="t" href="#g-wasm">WebAssembly</a> のモジュールで、基盤の中の Wasmtime が動かします。</p>
+    <pre class="mermaid">flowchart LR
+  CO["チェックアウト"] -- "入力 JSON" --> FR["関数の実行役 (Wasmtime)<br>時計・乱数・通信は渡さない"]
+  FR --> RUN["燃料 1,000 万・<br>メモリー 10 MiB で run"]
+  RUN -- "ok" --> OUT["出力を検証して使う"]
+  RUN -- "燃料切れ・メモリー超え・<br>トラップなど" --> NO["その関数は効果なし<br>(試し直さない)"]
+  NO -. "必須のカートの検証だけ" .-> STOP["送信を止める"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-fuel">燃料</a> 1,000 万</h3><p>命令を実行するたびに減る数。尽きたら止まる。同じ入力なら必ず同じ所で止まるので、開発者が再現できる。</p></div>
       <div class="card" data-frag><h3>メモリー 10 MiB</h3><p>線形メモリーの上限。スタック 512 KiB、入力 128 KiB、出力 20 KiB。</p></div>
@@ -393,7 +414,7 @@
 
   <section class="s" id="data-model">
     <h2>データモデルの読み方</h2>
-    <p>ポッドの全表は主キーの先頭に <code>shop_id</code> を持ちます（図では省きます）。全体の面（ポッドの外）には、ショップ → ポッドのディレクトリなど、ショップのデータでない表だけを置きます。</p>
+    <p>ポッドの全表は主キーの先頭に <code>shop_id</code> を持ちます（図では省きます）。全体の面（ポッドの外）には、ショップ → ポッドのディレクトリなど、ショップのデータでない表だけを置きます。まず checkouts と orders の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   products ||--|{ product_variants : "has"
   product_variants ||--o| inventory_items : "tracks"

@@ -75,6 +75,14 @@
   <section class="s" id="what">
     <h2>動画の基盤は何をするサービスか</h2>
     <p>YouTube は、誰でも動画を上げ、誰でも見られる <a class="t" href="#g-ugc">UGC</a> の動画の基盤です。登場人物は大きく 3 者で、それぞれ欲しいものが違います。</p>
+    <pre class="mermaid">flowchart LR
+  C["創作者"] -- "アップロード・ライブ" --> S["動画の基盤"]
+  R["権利者"] -- "参照のファイル・方針" --> S
+  S -- "変換した動画" --> CDN["CDN"]
+  CDN -- "再生" --> V["視聴者"]
+  V -- "視聴・コメント・チャット" --> S
+  S -- "申し立て・収益の分配" --> C
+  S -- "収益の分配" --> R</pre>
     <div class="cards">
       <div class="card" data-frag><h3>視聴者</h3><p>テレビ・スマートフォン・パソコンで、どの回線でも止まらずに見たい。ログインしない人も多い。</p></div>
       <div class="card" data-frag><h3>創作者</h3><p>数 GB〜数十 GB の動画を確実に上げ、すぐ公開し、数と収益を信用したい。ライブで視聴者と話したい。</p></div>
@@ -395,6 +403,19 @@ h720-c24/index.m3u8</code></pre>
   <section class="s" id="claims">
     <h2>申し立て・異議・方針</h2>
     <p>権利者は<a class="t" href="#g-reference">参照のファイル</a>を登録し、一致したときの方針を地域ごとに決めます。一致から生まれる記録を<a class="t" href="#g-claim">申し立て</a>（claim）と呼びます。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> active: 一致して方針を適用
+  active --> disputed: 創作者の異議
+  disputed --> released: 権利者が外す
+  disputed --> expired: 30 日の応答なし
+  disputed --> reinstated: 権利者が復活させる
+  reinstated --> appealed: 再審査の申立て
+  reinstated --> upheld: 申立てなし
+  appealed --> released: 権利者が外す
+  appealed --> expired: 7 日の応答なし
+  note right of disputed
+    審査の間の収益は預かり<br>削除の申出の道は省略
+  end note</pre>
     <div class="cards">
       <div class="card" data-frag><h3>ブロック</h3><p>その地域で再生させない。複数の一致があれば最も強い。</p></div>
       <div class="card" data-frag><h3>収益化</h3><p>広告を出し、収益を権利者へ分ける（次の節）。</p></div>
@@ -464,6 +485,7 @@ h720-c24/index.m3u8</code></pre>
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>Aurora の 141 表を、領域ごとの 14 のファイルに分けています。テナントは 1 つで、持ち主（本人・チャンネル・権利者）ごとに RLS をかけます。見える範囲は表ではなく <a class="t" href="#g-playable">playable()</a> の 1 つの関数で決めます。主な表のつながりは次のとおりです。</p>
+    <p>まず <code>channels</code> と <code>videos</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   channels ||--o{ videos : "publishes"
   videos ||--o{ renditions : "per gen"

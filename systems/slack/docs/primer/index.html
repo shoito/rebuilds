@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>Slack は何をするサービスか</h2>
     <p>Slack は、会社やチームの中の会話を<strong>話題ごとの部屋（チャンネル）</strong>に分けて行うチャットです。メールと違い、宛先を選んで送るのではなく、部屋に書き込み、部屋にいる人が読みます。</p>
+    <pre class="mermaid">flowchart LR
+  M["メンバー"] -- "投稿・検索・既読" --> S["このシステム<br>(チャット)"]
+  G["ゲスト"] -- "招かれたチャンネルだけ" --> S
+  A["管理者"] -- "招待・SSO の設定" --> S
+  B["ボット・<br>AI エージェント"] -- "MCP・API" --> S
+  I["IdP<br>(SSO・SCIM)"] -- "ログイン・メンバーの同期" --> S
+  S -- "通知" --> N["メール・<br>Web Push"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>速い会話</h3><p>送ったメッセージが、相手の画面に 1 秒以内に、正しい順で出る。</p></div>
       <div class="card" data-frag><h3>取りこぼさない</h3><p>未読・メンション・スレッドで、どこで何が起きたかを後から追える。</p></div>
@@ -115,6 +122,13 @@
   <section class="s" id="messages">
     <h2>メッセージ・スレッド・リアクション</h2>
     <p>Slack のメッセージには、メールや掲示板にない決まりがいくつかあります。</p>
+    <pre class="mermaid">flowchart LR
+  C["チャンネル"] --> P["親のメッセージ"]
+  P --> R1["返信"]
+  P --> R2["返信<br>チャンネルにも送信"]
+  R2 -. "一覧にも出る" .-> C
+  R1 -. "返信への返信はない" .-x X["返信の返信"]
+  P --> E["リアクション<br>絵文字ごとに 1 人 1 回"]</pre>
     <ul>
       <li data-frag><strong><a class="t" href="#g-thread">スレッド</a>は 1 段だけ。</strong>返信への返信はありません。「チャンネルにも送信」を選ぶと、返信がチャンネルの一覧にも出ます。</li>
       <li data-frag><strong>編集は投稿者だけ。</strong>管理者も他人の本文は直せません（削除はできます）。前の本文は残しません。</li>
@@ -151,6 +165,19 @@
   <section class="s" id="ordering">
     <h2>なぜ「順序」が難しいのか</h2>
     <p>チャンネルの全員が<strong>同じ順</strong>でメッセージを見る必要があります。時刻で並べればよさそうですが、うまくいきません。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant A as 投稿者 A
+  participant B as 投稿者 B
+  participant D as DB のチャンネルの行
+  participant C as 受信者
+  A->>D: 投稿（行をロック）
+  D-->>A: seq 41
+  B->>D: 投稿（A の後を待つ）
+  D-->>B: seq 42
+  D->>C: seq 41 が届く
+  D->>C: seq 43 が届く
+  Note over C: 42 が抜けていると分かる
+  C->>D: 41 より後の差分を取る</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>時刻（<code>created_at</code>）や ID で並べる</h3><p>サーバーごとに時計がずれる。同じミリ秒の投稿は順が決まらない。そして「間が抜けている」ことを判定できない。</p></div>
       <div class="good" data-frag><h3>チャンネル内の連番 <a class="t" href="#g-seq"><code>seq</code></a></h3><p>チャンネルの行の <code>last_seq</code> を、投稿と同じトランザクションで 1 増やして採番する。1, 2, 3… と欠番なく並ぶ。</p></div>
@@ -219,6 +246,12 @@
   <section class="s" id="presence">
     <h2>在席と入力中：消えてよい情報</h2>
     <p>チャットには、保存しない種類の情報があります。</p>
+    <pre class="mermaid">flowchart LR
+  T["入力している人の端末"] -- "入力中<br>3 秒に 1 回まで" --> G["Gateway"]
+  G -- "seq なしで流す" --> V["Valkey"]
+  V --> O["見ている人の端末<br>5 秒で消す"]
+  G -- "在席を登録<br>90 秒で失効" --> V
+  G -. "書かない" .-x D[("DB")]</pre>
     <div class="cards">
       <div class="card"><h3><a class="t" href="#g-presence">在席</a></h3><p>名前の横の緑の点。<code>active</code>・<code>away</code>・<code>offline</code> の 3 状態。Valkey に TTL 付きで置き、端末が消えれば 90 秒以内に自然に消える。DB には保存しない。</p></div>
       <div class="card"><h3>入力中（typing）</h3><p>「○○さんが入力中…」。3 秒に 1 回まで送り、5 秒で消える。DB も <code>seq</code> も通らず、取りこぼしても取り戻さない。</p></div>
@@ -284,6 +317,14 @@
     <p>チャットの権限は、ワークスペースのロールと、チャンネルの種別と、そのチャンネルに入っているかの組み合わせで決まります。この判定を<strong>1 つの関数</strong>にまとめ、API・WebSocket の購読・検索・通知のすべてが同じ関数を使います（ADR-0005）。経路ごとに判定を書くと、どこか 1 つが漏れるからです。</p>
     <pre><code>0 主体の解決 → 1 テナント → 2 メンバー → SET LOCAL
 → 3 ワークスペースの操作 → 4 チャンネル → 5 操作・スコープ</code></pre>
+    <pre class="mermaid">flowchart TD
+  Q["チャンネルを読みたい"] --> J{"参加している?"}
+  J -- "はい" --> OK["読める"]
+  J -- "いいえ" --> K{"パブリック?"}
+  K -- "いいえ<br>プライベート・DM" --> NF["404<br>存在を見せない"]
+  K -- "はい" --> G{"ゲスト?"}
+  G -- "はい" --> NF
+  G -- "いいえ" --> OK</pre>
     <p>読めないプライベートチャンネルには、403 ではなく <strong>404</strong> を返します。403 は「そこに何かある」と教えてしまうからです。</p>
     <div class="quiz" data-answer="3">
       <p class="q">admin が、自分の入っていないプライベートチャンネルの履歴を API で取ろうとしました。結果は？</p>
@@ -328,6 +369,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 83 表ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>workspace_id</code> を持ちます。</p>
+    <p>まず <code>channels</code> と <code>messages</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   accounts ||--o{ members : "has membership"
   workspaces ||--|{ members : "has"

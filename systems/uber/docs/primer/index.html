@@ -84,6 +84,14 @@
       </ol>
     </div>
     <p>関わるのは乗客・ドライバー・<a class="t" href="#g-operator">タクシー事業者</a>の 3 者です。再構築の intent は「すぐに確実に来る」「制度に合った納得できる運賃」「安全で位置を守る」の 3 つを価値に掲げます。規模の感覚は、S1 で東京のオンラインの車両 1 万台、位置の受信 2,500 件/秒、配車の依頼の受け付け 30 件/秒（成立は約 3〜6 件/秒）です。</p>
+    <pre class="mermaid">flowchart LR
+  R["乗客"] -- "依頼・評価" --> P["この基盤<br>(配車)"]
+  P -- "オファー" --> D["ドライバー"]
+  D -- "4 秒ごとの位置<br>受諾・辞退" --> P
+  P -- "車の位置・ETA" --> R
+  O["タクシー事業者"] -- "ドライバー・車両<br>運賃の規則" --> P
+  P -- "与信・売上の確定" --> K["PSP<br>(カード決済)"]
+  P -- "手数料を引いて精算" --> O</pre>
     <div class="callout"><span class="label">設計の文書で効くところ</span><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/intent.md">intent.md</a> の「Proposed outcome」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/architecture/README.md">architecture/README.md</a> の 2 節（規模の段階）。</div>
   </section>
 
@@ -104,6 +112,15 @@
     <h2>どこで・いつ走れるか：営業区域と運行枠</h2>
     <p>タクシー事業者は、許可された<a class="t" href="#g-area">営業区域</a>の中で営業します。道路運送法第 20 条により、<strong>発地と着地のどちらもが営業区域の外</strong>の運送はできません。運賃は<a class="t" href="#g-fare-block">運賃ブロック</a>ごと、需給の管理は<a class="t" href="#g-kotsuken">交通圏</a>ごとに決まります（東京なら「特別区・武三交通圏」）。</p>
     <p>日本版ライドシェアには、さらに次の条件が重なります。</p>
+    <pre class="mermaid">flowchart LR
+  A["出庫したい"] --> B{"日本版<br>ライドシェアか"}
+  B -- "いいえ (タクシー)" --> C["出庫できる"]
+  B -- "はい" --> W{"運行枠の時間帯で<br>台数に空きがあるか"}
+  W -- "はい" --> C
+  W -- "いいえ" --> X["出庫を断る"]
+  C --> E{"乗車地か降車地が<br>営業区域の中か"}
+  E -- "はい" --> F["その依頼の<br>候補になる"]
+  E -- "いいえ" --> G["候補にしない"]</pre>
     <ul>
       <li data-frag>国土交通省が、配車アプリのデータなどから、タクシーが足りない<strong>曜日・時間帯と台数</strong>（<a class="t" href="#g-shortage">不足車両数</a>）を指定する。この設計はこれを<a class="t" href="#g-window">運行枠</a>として持ち、出庫の時点で台数を数える。</li>
       <li data-frag>雨天・酷暑・イベントで、枠と台数が広がる決まりがある。</li>
@@ -156,6 +173,13 @@
   <section class="s" id="location">
     <h2>位置の流れ：4 秒ごとの GPS</h2>
     <p>オンラインのドライバーのアプリは、<strong>約 4 秒ごと</strong>に位置を送ります。1 万台なら 2,500 件/秒です。スマートフォンの位置は <a class="t" href="#g-gnss">GNSS</a>（GPS など）で測りますが、都市ではビルの反射で数十〜数百 m ずれ、トンネルでは途切れます。</p>
+    <pre class="mermaid">flowchart LR
+  A["ドライバーの<br>アプリ"] -- "4 秒ごとに送る" --> I["取り込み<br>(点ごとに検証)"]
+  I --> S["位置の流れ"]
+  S --> G["地理の索引<br>(配車の候補)"]
+  S --> T["乗車の軌跡<br>(道路に当てはめる)"]
+  S --> F["乗客の画面へ<br>車の位置"]
+  S --> R["生の記録<br>(保存)"]</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>1 点ずつそのまま信じる</h3><p>1 点の跳びで車の位置が数百 m 動き、遠い車にオファーが届く。古い点が後から届くと、位置が過去に戻る。</p></div>
       <div class="good" data-frag><h3>検証してから使う</h3><p>範囲・時刻・精度・順序・跳びを点ごとに判定する。跳んだ点は保留し、次の点が整合したときだけ動かす。15 秒より古い位置のドライバーは候補から外す。</p></div>
@@ -191,6 +215,14 @@
   <section class="s" id="dispatch">
     <h2>配車：近い順ではなく、まとめて組む</h2>
     <p>依頼が来るたびに「いちばん近い空車」を割り当てると、その場では良くても、全体では待ちが延びることがあります。</p>
+    <pre class="mermaid">flowchart LR
+  Q["依頼を<br>区域ごとに 2 秒ためる"] --> C["索引から<br>近くの候補"]
+  C --> E["条件 E1〜E9 で<br>合わない組を外す"]
+  E --> T["迎車の ETA で<br>コストの表"]
+  T --> S["合計が最小の<br>組を解く"]
+  S -- "300 ms を超えたら" --> G["貪欲法"]
+  S --> O["オファーを送る"]
+  G --> O</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>1 件ずつ、いちばん近い車</h3><p>依頼 A に車 1（2 分）を取った直後に依頼 B が来ると、B には遠い車 2（12 分）しか残らない。合計 14 分。</p></div>
       <div class="good" data-frag><h3>2 秒ためて、まとめて組む</h3><p>A に車 2（4 分）、B に車 1（3 分）と組めば、合計 7 分。依頼と車の組を<a class="t" href="#g-assignment">割り当て問題</a>として解く。</p></div>
@@ -254,6 +286,12 @@
   <section class="s" id="fares">
     <h2>タクシーの運賃の基本</h2>
     <p>タクシーの運賃は、国土交通大臣の<strong>認可</strong>事項です。運賃ブロックごとに幅が決まり、事業者はその中で運賃を選びます。基本は<a class="t" href="#g-distance-fare">距離制運賃</a>です。</p>
+    <pre class="mermaid">flowchart LR
+  M1["車載のメーター"] -- "額" --> P["この基盤<br>(額を受け取る)"]
+  M2["認定の<br>ソフトメーター"] -- "額" --> P
+  M3["ドライバーの入力"] -- "額" --> P
+  T["乗車の軌跡"] --> S["影の計算<br>(請求しない)"]
+  S -. "照合" .-> M3</pre>
     <ul>
       <li data-frag><strong>初乗運賃と加算</strong>：特別区・武三地区の普通車の A 運賃は、2026-04-20 の改定から、初乗 1.0 km 500 円、以後 232 m ごとに 100 円。</li>
       <li data-frag><strong><a class="t" href="#g-time-distance">時間距離併用制</a></strong>：時速 10 km 以下で走った時間を距離に換算して加算する（A 運賃で 1 分 25 秒ごとに 100 円）。</li>
@@ -312,6 +350,12 @@
   <section class="s" id="privacy-safety">
     <h2>位置のプライバシーと安全の機能</h2>
     <p>位置の履歴は、住まいや行動を明かす情報です。この設計の規則は 1 つです：<strong>正確な位置は、乗車の相手にだけ、その乗車の間だけ見せる</strong>（NFR-009）。</p>
+    <pre class="mermaid">flowchart LR
+  L["ドライバーの<br>正確な位置"] -- "乗車の間だけ" --> R["その乗車の乗客"]
+  L -- "約 200 m に丸め<br>ID なし" --> M["依頼の前の地図"]
+  L -- "緯度経度を書かない" --> G["ログ"]
+  L -- "理由の入力と監査ログ" --> H["人の調査"]
+  L -- "例外" --> S["乗車の共有・<br>事業者の稼働の地図"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>依頼の前の地図の車</h3><p>約 200 m のセルの中心に丸め、ID を出さない。10 秒キャッシュして、同じ車を追えないようにする。</p></div>
       <div class="card" data-frag><h3>ログと調査</h3><p>ログに緯度経度を書かない。人が軌跡を見るときは、理由の入力と監査ログを必須にする。</p></div>

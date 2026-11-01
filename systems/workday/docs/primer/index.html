@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>Workday は何をするサービスか</h2>
     <p>Workday は、企業の人事（<a class="t" href="#g-hcm">HCM</a>）と給与を 1 つのシステムで扱う SaaS です。組織と従業員の記録を持ち、異動や昇給を承認を経て反映し、そこから給与を計算します。</p>
+    <pre class="mermaid">flowchart LR
+  HR["人事・給与の担当者"] -->|"組織と従業員の記録<br>給与の計算と確定"| WD["Workday"]
+  MGR["マネージャー"] -->|"異動・昇給を起票<br>受信箱で承認"| WD
+  EMP["従業員"] -->|"打刻・休暇の申請<br>給与明細を見る"| WD
+  CLK["打刻機"] -->|"打刻"| WD
+  WD -->|"全銀協の形式の<br>振込ファイル"| BANK["銀行<br>送信は企業が行う"]
+  WD -->|"仕訳"| ACC["会計システム"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>人事・給与の担当者</h3><p>組織と従業員の記録、承認の流れの定義、給与の計算・確定・振込を扱う。主な利用者。</p></div>
       <div class="card" data-frag><h3>マネージャー</h3><p>部下の勤怠・休暇を見て、異動・昇給を起票し、承認の受信箱で承認する。</p></div>
@@ -245,6 +252,15 @@
   <section class="s" id="time">
     <h2>労働時間と 36 協定</h2>
     <p>日本の労働基準法は、<a class="t" href="#g-statutory-hours">法定労働時間</a>（1 日 8 時間・1 週 40 時間）を超えて働かせるには、労使の協定（<a class="t" href="#g-36">36 協定</a>）を結んで届け出ることを求めます。協定があっても、時間外には上限があります。</p>
+    <pre class="mermaid">flowchart LR
+  W["働いた時間"] --> A["所定まで<br>通常の労働"]
+  W --> B["所定を超え<br>法定まで<br>法定内残業"]
+  W --> C["1 日 8 時間・<br>週 40 時間を超えた分<br>時間外の労働"]
+  C --> M["月と年で合計し<br>上限と比べる"]
+  M -->|"上限の 80% 以上"| N1["本人と上長に警告"]
+  M -->|"見込みか実績が超える"| N2["本人・上長・<br>人事に警告"]
+  M --> CL["月次の締め<br>本人 → 上長 → 人事"]
+  CL --> PAY["給与へ渡す"]</pre>
     <ul>
       <li data-frag><strong>所定と法定は違う。</strong>会社の定める時間（所定）を超えても法定以内なら「法定内残業」。法定を超えた分だけが 36 協定と割増の対象です。</li>
       <li data-frag><strong>原則の上限</strong>：月 45 時間・年 360 時間。</li>
@@ -344,6 +360,14 @@
   <section class="s" id="determinism">
     <h2>給与を誤らない仕組み</h2>
     <p>給与の誤りは、1 円でもエラーにならずに従業員の信頼と届出の誤りにつながります。そこで、給与の計算を<strong>入力から決まる純粋な関数</strong>にします。</p>
+    <pre class="mermaid">flowchart LR
+  IN["入力のスナップショット<br>known_at で固定・ハッシュ"] --> ENG["エンジンのイメージ<br>DB を読まない"]
+  RT["規則表のバージョン<br>税額表・料率・等級表"] --> ENG
+  CF["計算の設定の<br>バージョン"] --> ENG
+  ENG --> RES["結果 (整数の円)<br>4 つの印と一緒に保存"]
+  RES -->|"夜間に 1% を<br>計算し直す"| CHK{"1 円も違わない?"}
+  CHK -->|"違う"| SEV["SEV1 で調べる"]
+  RES -->|"後から分かった変更"| RETRO["次の給与の<br>遡及の差額の行"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-snapshot">入力のスナップショット</a></h3><p>計算に使う事実を <code>known_at</code> で固定し、正規の JSON にしてハッシュを取る。計算は DB を読まない。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-rule-table">規則表</a>のバージョン</h3><p>税額表・料率・等級表を、公的な資料から取り込み、2 人で照合して公開する。</p></div>
@@ -383,6 +407,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 160 表と 22 の facet がありますが、核は次の数個です。facet は図では「現在の表」の名前で描かれ、実際には差分・バージョン・現在の 3 つの表を持ちます。</p>
+    <p>まず <code>workers</code>・<code>employments</code>・<code>worker_job</code> の 3 つの表から見てください。人・雇用・その時点の職の割り当てです。</p>
     <pre class="mermaid">erDiagram
   workers ||--o{ employments : "employed as"
   employments ||--o{ job_assignments : "has"

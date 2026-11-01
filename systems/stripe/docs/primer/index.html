@@ -75,6 +75,14 @@
   <section class="s" id="what">
     <h2>Stripe は何をするサービスか</h2>
     <p>Stripe は、事業者（<a class="t" href="#g-merchant">加盟店</a>）が<strong>数行のコードでオンラインの代金を受け取れる</strong>ようにする決済の API です。カード会社や銀行との接続、カード情報の保護、返金やチャージバック、売上の入金までを肩代わりします。</p>
+    <pre class="mermaid">flowchart LR
+  D["加盟店の開発者"] -- "API で支払いを作る" --> S["このシステム<br>(決済の基盤)"]
+  S -. "Webhook で結果" .-> D
+  O["加盟店の運用担当"] -- "ダッシュボードで<br>売上・返金を見る" --> S
+  C["加盟店の顧客"] -- "カード入力・<br>3D セキュア" --> S
+  S -- "オーソリ・キャプチャ" --> A["決済代行・<br>アクワイアラ"]
+  S -- "支払いの番号" --> K["コンビニ収納代行"]
+  S -- "入金の振込" --> B["提携銀行"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>加盟店の開発者</h3><p>API キーで PaymentIntent を作り、Webhook で結果を受け取ります。</p></div>
       <div class="card" data-frag><h3>加盟店の運用担当</h3><p>ダッシュボードで売上・返金・Dispute・入金を見ます。</p></div>
@@ -157,6 +165,16 @@
   <section class="s" id="three-ds">
     <h2>3D セキュアと不正検知</h2>
     <p><a class="t" href="#g-3ds">3D セキュア</a>（EMV 3-D セキュア、3DS2）は、イシュアが顧客本人かを確かめる仕組みです。リスクが低ければ顧客の操作なしで通り（<a class="t" href="#g-frictionless">frictionless</a>）、高ければパスワードなどを求めます（チャレンジ）。</p>
+    <pre class="mermaid">flowchart TB
+  S["confirm"] --> Q1{"3DS が要る?<br>(日本発行のカードの CIT など)"}
+  Q1 -- "要る" --> T["3D セキュア<br>(コネクタの 3DS Server)"]
+  Q1 -- "要らない" --> Q2
+  T --> Q2{"オーソリの前の判定<br>allow → block → review"}
+  Q2 -- "block" --> F["失敗にする<br>(コネクタへ送らない)"]
+  Q2 -- "block 以外" --> AU["オーソリ"]
+  AU --> Q3{"オーソリの後の判定"}
+  Q3 -- "block" --> V["オーソリを取り消す"]
+  Q3 -- "block 以外" --> R["そのまま進む<br>(review ならレビューも開く)"]</pre>
     <ul>
       <li data-frag>日本の「クレジットカード・セキュリティガイドライン」（現行 6.1 版）は、EC 加盟店に EMV 3-D セキュアの導入と、原則として決済の都度の認証を求めています。</li>
       <li data-frag>設計は、日本で発行されたカードの <a class="t" href="#g-cit">CIT</a> で常に 3DS を要求します。事前に認証した <a class="t" href="#g-mit">MIT</a> は免除です。</li>
@@ -237,6 +255,13 @@
   <section class="s" id="balance">
     <h2>保留中・利用可能・リザーブ</h2>
     <p>本家の加盟店の残高（Balance）は、<code>pending</code>（まだ使えない）と <code>available</code>（入金・返金に使える）に分かれます。残高を動かす 1 件ごとの記録が <a class="t" href="#g-bt">BalanceTransaction</a> で、設計では仕訳の射影です。</p>
+    <pre class="mermaid">flowchart LR
+  CH["決済の確定"] -- "手数料を引いた額" --> P["保留中<br>pending"]
+  P -- "available_on の日に<br>日次でまとめて" --> A["利用可能<br>available<br>(マイナスもありうる)"]
+  A -- "留め置く" --> R["リザーブ"]
+  R -. "解放" .-> A
+  A -- "入金を作る" --> PO["入金<br>(加盟店の銀行口座へ)"]
+  A -- "返金・Dispute で引く" --> X["顧客へ戻る額"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>available_on</h3><p>売上が利用可能になる日。確定日＋売上処理のタイミング（日本の既定は初回 7 暦日、以後 4 営業日）。確定時に固定します。</p></div>
       <div class="card" data-frag><h3>リザーブ</h3><p>リスクに応じて残高の一部を留め置く。固定（指定日に解放）とローリング（決済から N 日後に解放）があります。</p></div>
@@ -249,6 +274,21 @@
   <section class="s" id="refunds-disputes">
     <h2>返金とチャージバック</h2>
     <p>どちらもお金が顧客に戻りますが、<strong>誰が始め、誰が決めるか</strong>が違います。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as 顧客
+  participant I as イシュア
+  participant A as アクワイアラ
+  participant S as このシステム
+  participant M as 加盟店
+  C->>I: 異議を申し立てる
+  I->>A: チャージバック
+  A->>S: 通知
+  S->>S: 額と手数料を残高から引く<br>(needs_response)
+  S->>M: Webhook で知らせる
+  M->>S: 証拠を 1 回だけ出す
+  S->>A: 証拠を届ける (under_review)
+  I-->>A: 勝ち負けを決める
+  A-->>S: 結果の通知 (won または lost)</pre>
     <div class="compare">
       <div><h3>返金（Refund）</h3><p>加盟店が自分の判断で行う。利用可能な残高から引く。足りなければカードは最長 30 日保留し、他の手段は失敗にする。決済手数料は戻らない。</p></div>
       <div><h3><a class="t" href="#g-chargeback">チャージバック</a>（Dispute）</h3><p>顧客がイシュアに異議を申し立てて始まる。通知の時点で額と手数料（1 件 1,500 円）を引き、加盟店は証拠を<strong>1 回だけ</strong>提出できる。勝てば額は戻るが、手数料は戻らない。</p></div>
@@ -323,6 +363,18 @@
   <section class="s" id="webhooks">
     <h2>Event と Webhook</h2>
     <p>決済の結果は、非同期に決まることが多い（3DS・結果不明・コンビニの入金）ため、加盟店は Webhook で知ります。Event は状態の変化と同じトランザクションで outbox に書きます（<a href="../../../../docs/primer/index.html#outbox">共通の資料</a>）。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant S as このシステム
+  participant Q as 配信の仕組み
+  participant M as 加盟店のエンドポイント
+  S->>S: 状態の変化と Event を<br>同じトランザクションで書く
+  S->>Q: Event を渡す (outbox から)
+  Q->>M: 署名つきで POST (egress の固定 IP から)
+  M->>M: 生の本文で署名を検証<br>Event の id で重複を捨てる
+  M-->>Q: 2xx 以外 (失敗)
+  Q->>Q: 3 日間、間隔を広げて再試行を待つ
+  Q->>M: 署名を作り直して再送
+  M-->>Q: 2xx (成功)</pre>
     <ul>
       <li data-frag><strong>少なくとも 1 回・順序なし</strong>：加盟店は Event の <code>id</code> で重複を捨てる。</li>
       <li data-frag><strong>失敗は 3 日間、指数的に再試行</strong>：2xx 以外はすべて失敗。</li>

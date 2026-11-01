@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>ServiceNow は何をするサービスか</h2>
     <p>ServiceNow は、企業の IT 部門が受ける<strong>障害の報告と依頼</strong>を 1 つの記録にまとめ、誰が・いつまでに・何をするかを管理する SaaS です。この分野を <a class="t" href="#g-itsm">ITSM</a>（IT サービス管理）と呼びます。</p>
+    <pre class="mermaid">flowchart LR
+  EMP["社員 (依頼者)"] -->|"ポータル・メールで<br>障害と依頼を出す"| SN["ServiceNow"]
+  DESK["サービスデスク"] -->|"分類・割り当て・解決"| SN
+  OPS["運用・開発のチーム"] -->|"原因を調べ<br>変更を計画する"| SN
+  APR["承認する人"] -->|"変更や要求を承認"| SN
+  ADM["管理者"] -->|"フィールド・承認・<br>SLA を設定"| SN
+  AUD["監査の担当"] -->|"証跡を確かめる"| SN</pre>
     <div class="cards">
       <div class="card" data-frag><h3>サービスデスク</h3><p>電話・メール・ポータルで受けた障害と依頼を、分類し、担当のグループに割り当て、解決する。</p></div>
       <div class="card" data-frag><h3>運用・開発のチーム</h3><p>繰り返す障害の原因を調べ、本番の変更を計画し、承認を得て実施する。</p></div>
@@ -87,6 +94,22 @@
   <section class="s" id="platform">
     <h2>アプリの下にある「記録の基盤」</h2>
     <p>ServiceNow の特徴は、ITSM のアプリが<strong>汎用の記録の基盤</strong>の上に載っていることです。インシデントも変更も、基盤から見れば「テーブルの 1 行」にすぎません。</p>
+    <pre class="mermaid">flowchart TB
+  ADM["管理者"] -->|"画面で設定する<br>コードは書かない"| META["メタデータ<br>テーブル・フィールド・承認・SLA"]
+  subgraph APP["ITSM のアプリ"]
+    INC["インシデント"]
+    CHG["変更"]
+    REQ["要求"]
+  end
+  subgraph BASE["記録の基盤"]
+    RS["Record Service<br>書き込みの唯一の入口"]
+    TBL["テーブルの行"]
+    SUP["ACL・監査の履歴・通知"]
+  end
+  APP --> RS
+  META --> RS
+  RS --> TBL
+  RS --> SUP</pre>
     <div class="compare">
       <div data-frag><h3>記録の基盤</h3><p><a class="t" href="#g-dictionary">データ辞書</a>（テーブルとフィールドの定義）、フォームとリスト、<a class="t" href="#g-acl">ACL</a>、ワークフロー、通知、レポート、REST API、監査の履歴。</p></div>
       <div data-frag><h3>ITSM のアプリ</h3><p>インシデント・問題・変更・要求・ナレッジ・CMDB・SLA。基盤の上の「テーブルの定義 ＋ 状態の流れ ＋ 既定の設定」の束。</p></div>
@@ -155,6 +178,14 @@
       <div class="card" data-frag><h3>問題と RCA</h3><p>問題は「評価 → 根本原因の分析 → 修正中 → 解決」と進む。<a class="t" href="#g-rca">根本原因の分析</a>の結果、恒久の対策は変更として実施します。</p></div>
     </div>
     <p><a class="t" href="#g-workaround">回避策</a>が分かったら、原因が不明でも既知のエラーにでき、その記事をナレッジに公開してサービスデスクが使います。</p>
+    <pre class="mermaid">flowchart LR
+  I["インシデント"] -->|"規則や担当者が提案"| C["メジャーの候補"]
+  C -->|"人が昇格を決める"| MJ["メジャーインシデント<br>親になる"]
+  O["同じ障害の<br>ほかのインシデント"] -->|"子として結ぶ"| MJ
+  MJ -->|"原因を追う"| PR["問題<br>根本原因の分析"]
+  PR -->|"回避策が分かった"| KE["既知のエラーの印"]
+  KE -->|"記事の草案"| KB["ナレッジ"]
+  PR -->|"恒久の対策"| CH["変更"]</pre>
     <div class="quiz" data-answer="3">
       <p class="q">根本原因を調査中ですが、回避策は分かりました。再構築の設計で、この問題はどう表しますか？</p>
       <div class="opts">
@@ -329,6 +360,16 @@
   <section class="s" id="acl">
     <h2>ロールと ACL：テーブル・行・フィールド</h2>
     <p>ITSM では、同じインシデントでも見せてよい範囲が人で違います。依頼者には作業メモを見せない、人事の案件は人事のグループだけ、などです。ACL はこれを<strong>テーブル × 操作（作成・読み取り・書き込み・削除）</strong>の規則で書きます。</p>
+    <pre class="mermaid">flowchart TD
+  S["incident の行を読む"] --> D{"incident と親の task の<br>拒否の規則を<br>すべて満たす?"}
+  D -->|"いいえ"| N["拒否"]
+  D -->|"はい"| A{"許可の規則を持つ<br>最も近い段がある?"}
+  A -->|"ない"| N
+  A -->|"ある"| B{"その段の規則の<br>どれかを満たす?"}
+  B -->|"いいえ"| N
+  B -->|"はい"| Y["行は読める"]
+  Y --> F["フィールドごとに<br>同じ形で判定する"]
+  F --> X["読めない値は<br>NULL として扱う"]</pre>
     <div class="compare">
       <div data-frag><h3>行の規則</h3><p>そのレコードを読めるか。例：「依頼者は自分が依頼したものだけ」。</p></div>
       <div data-frag><h3>フィールドの規則</h3><p>その項目を読めるか。行が読めても、作業メモや原価は読めないことがある。</p></div>
@@ -373,6 +414,15 @@
   <section class="s" id="intake">
     <h2>受け付け：メール・割り当て・当番</h2>
     <p>日本の企業では、今も多くの依頼がメールで来ます。サービスデスクの宛先に届いたメールから起票し、返信を同じチケットに追記します。</p>
+    <pre class="mermaid">flowchart TD
+  M["サービスデスク宛ての<br>メール"] --> L{"不在の返信や<br>自分のループ?"}
+  L -->|"はい"| R["追記しない<br>応答も返さない"]
+  L -->|"いいえ"| T{"既存のチケットへの返信?<br>ヘッダー → 印 → 件名の番号"}
+  T -->|"はい"| A["そのチケットに追記"]
+  T -->|"いいえ"| N["新しいチケットを起票"]
+  N --> G["割り当ての規則で<br>担当のグループを決める"]
+  G --> P["グループの中で<br>担当者を選ぶ"]
+  G -.->|"時間外の P1 など"| O["当番を呼ぶ<br>応答がなければ次の段"]</pre>
     <ul>
       <li><strong>スレッドの紐付け</strong>：<code>In-Reply-To</code>・<code>References</code> のヘッダー → 送ったメールに入れた推測できない<a class="t" href="#g-watermark">参照の印</a> → 件名の番号（関係者だけ）の順で探す。</li>
       <li><strong>ループの防止</strong>：不在の返信や監視のアラートに自動の返信を返すと、メールが往復し続ける。<code>Auto-Submitted</code> などのヘッダー（RFC 3834）で見分け、応答しない。</li>

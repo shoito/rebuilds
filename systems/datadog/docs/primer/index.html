@@ -73,6 +73,13 @@
   <section class="s" id="product">
     <h2>Datadog は何をするサービスか</h2>
     <p>自社のシステムの状態を外から読み取れるようにする、<a class="t" href="#g-observability">可観測性</a>の SaaS です。利用者のホスト・コンテナ・アプリが送る<a class="t" href="#g-telemetry">テレメトリー</a>を 1 か所に集め、調べ、異常を知らせます。主な利用者は、日本の中堅・大企業の運用の担当者（SRE）と開発者です。</p>
+    <pre class="mermaid">flowchart LR
+  SRC["利用者のホスト・<br>コンテナ・アプリ"] -->|"メトリクス・ログ・<br>トレースを送る"| DD["Datadog"]
+  DD -->|"モニターが<br>条件を満たす"| NT["通知の先<br>メール・チャット・オンコール"]
+  NT -->|"呼び出す"| SRE["運用の担当 (SRE)"]
+  SRE -->|"ダッシュボード・トレース・<br>ログで調べる"| DD
+  DEV["開発者"] -->|"自分のサービスを調べる"| DD
+  ADM["組織の管理者"] -->|"利用者・キー・<br>利用量を管理"| DD</pre>
     <div class="cards">
       <div class="card" data-frag><h3>メトリクス</h3><p>数の時系列。CPU の使用率、要求の数、所要時間。安く長く持てる。「何かおかしい」に気づく道具。</p></div>
       <div class="card" data-frag><h3>ログ</h3><p>出来事の 1 行ずつの記録。量が多く高い。「何が起きたか」を本文で確かめる道具。</p></div>
@@ -269,6 +276,13 @@ system.cpu.user{host:web-2, env:prod, cpu:0}   12:00:00 → 40.1   ← 別の系
   <section class="s" id="logs">
     <h2>ログのパイプライン：解析・マスク・索引とアーカイブ</h2>
     <p>ログは文字列で届きます。検索や集計に使うには、まず属性に分けます。本家と同じく、組織が並べた<a class="t" href="#g-pipeline">パイプライン</a>の処理器で、1 件ずつ処理します。</p>
+    <pre class="mermaid">flowchart LR
+  A["届いたログ<br>文字列"] --> P["パイプライン<br>属性に分ける"]
+  P --> M["PII のマスク"]
+  M --> R{"索引に入れるか<br>除外・1 日の上限"}
+  R -->|"入れる"| IX["索引<br>すぐ検索できる"]
+  M -->|"全件"| AR["アーカイブ<br>1 年持つ"]
+  M -->|"全件"| LM["ログから作る<br>メトリクス"]</pre>
     <pre><code>203.0.113.7 - alice@example.com [09/Oct/2026:12:00:00 +0900] "GET /api/orders?id=42 HTTP/1.1" 504 …
    ↓ grok_parser
 network.client.ip=203.0.113.7  usr.id=alice@example.com  http.method=GET  http.status_code=504 …
@@ -466,6 +480,7 @@ burn = 14.4 → 1 時間で 30 日のバジェットの 2% を使う（14.4 × 1
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>データは置き場所が 2 つに分かれます。<strong>テレメトリーの中身</strong>は S3 の不変のファイル（ブロック・セグメント）に、<strong>管理の正本とカタログ</strong>は Aurora に置きます。Aurora の表は「どのファイルがあり、どこまで読んだか」を持ち、中身そのものは持ちません。</p>
+    <p>まず <code>metric_blocks</code> と <code>log_segments</code> の 2 つの表から見てください。どちらも S3 のファイルの目録です。</p>
     <pre class="mermaid">erDiagram
   tenants ||--o{ metric_metadata : "names"
   tenants ||--o{ metric_blocks : "stores"

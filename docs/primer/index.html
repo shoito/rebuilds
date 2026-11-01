@@ -120,6 +120,18 @@
   <section class="s" id="stages">
     <h2>規模の段階：S1・S2・S3</h2>
     <p>最初から最大の構成にはしません。題材ごとに、構成を変える地点を段階として決めています。</p>
+    <pre class="mermaid">flowchart LR
+  S1["S1（MVP）<br>東京の 1 リージョン・3 AZ<br>DB は writer 1 台と reader"]
+  S2["S2<br>reader とキャッシュを増やす<br>検索を専用の部品へ分ける"]
+  S3["S3<br>セルの構成<br>スタック一式を複製する"]
+  DR[("大阪<br>災害復旧の控え")]
+  T1["テナント A・B"] --> C1["セル 1"]
+  T2["テナント C"] --> C2["セル 2"]
+  S1 -- "利用が増えた" --> S2
+  S2 -- "1 つの構成では足りない" --> S3
+  S1 -. "控えを置く" .-> DR
+  S3 --- C1
+  S3 --- C2</pre>
     <div class="compare">
       <div data-frag><h3>S1（MVP）</h3><p>東京の 1 リージョン・3 AZ。DB は writer 1 台と reader。大阪に災害復旧の控えを置く。</p></div>
       <div data-frag><h3>S2</h3><p>reader やキャッシュを増やし、検索などを専用の部品へ分ける。</p></div>
@@ -167,6 +179,41 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="ids">
     <h2>ID：UUIDv7</h2>
     <p>主キーは多くの題材で <a class="t" href="#g-uuidv7">UUIDv7</a> です（GitHub のように <code>bigint</code> の連番を使う題材もあります。各題材の data-model の規約を見てください）。先頭 48 ビットが作った時刻（ミリ秒）なので、<strong>ほぼ作った順に並びます</strong>。</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 220" role="img" aria-label="UUIDv7 の 128 ビットの内訳。先頭 48 ビットが作った時刻、次の 4 ビットがバージョンの 7、残り 76 ビットはほぼランダム。時刻が先頭にあるので、続けて作った ID は作った順に並び、索引の末尾に足される">
+        <g style="font-size:13px;fill:var(--text)" text-anchor="middle">
+          <text x="132" y="22">作った時刻（ミリ秒）48 ビット</text>
+          <text x="442" y="22">残り 76 ビット：ほぼランダム</text>
+          <text x="254" y="100">バージョン（4 ビット）は 7</text>
+        </g>
+        <rect x="20" y="32" width="225" height="32" style="fill:var(--accent-soft);stroke:var(--accent);stroke-width:1"/>
+        <rect x="245" y="32" width="19" height="32" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1"/>
+        <rect x="264" y="32" width="356" height="32" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1"/>
+        <g style="font-size:13px;fill:var(--text);font-family:var(--mono)" text-anchor="middle">
+          <text x="132" y="53">0192 3e4f 8a1b</text>
+          <text x="254" y="53">7</text>
+          <text x="442" y="53">c3d 9e2f 1a2b 3c4d 5e6f</text>
+        </g>
+        <line x1="254" y1="64" x2="254" y2="86" style="stroke:var(--warn);stroke-width:1"/>
+        <g style="font-size:13px;fill:var(--muted)">
+          <text x="20" y="136">続けて 3 つ作ると</text>
+          <text x="250" y="160">最初</text>
+          <text x="250" y="184">1 ミリ秒後</text>
+          <text x="250" y="208">2 ミリ秒後</text>
+        </g>
+        <g style="font-size:13px;fill:var(--text);font-family:var(--mono)">
+          <text x="20" y="160">0192 3e4f 8a1<tspan style="fill:var(--accent);font-weight:bold">b</tspan> 7…</text>
+          <text x="20" y="184">0192 3e4f 8a1<tspan style="fill:var(--accent);font-weight:bold">c</tspan> 7…</text>
+          <text x="20" y="208">0192 3e4f 8a1<tspan style="fill:var(--accent);font-weight:bold">d</tspan> 7…</text>
+        </g>
+        <line x1="380" y1="152" x2="380" y2="200" style="stroke:var(--accent);stroke-width:2"/>
+        <polygon points="374,198 386,198 380,210" style="fill:var(--accent)"/>
+        <g style="font-size:13px;fill:var(--text)">
+          <text x="396" y="168">先頭の時刻で並ぶので、</text>
+          <text x="396" y="188">B-tree の索引の末尾に足される</text>
+        </g>
+      </svg>
+    </figure>
     <pre><code>0192 3e4f-8a1b-7c3d-9e2f-1a2b3c4d5e6f
 └── 時刻(48bit) ─┘ └ バージョン=7 ┘ └── ランダム ──┘</code></pre>
     <ul>
@@ -204,6 +251,18 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="idempotency">
     <h2>冪等：同じ要求を 2 回送っても 1 回分</h2>
     <p>ネットワークが切れると、クライアントは「届いたか分からない」まま再送します。<a class="t" href="#g-idempotent">冪等</a>にしておけば、再送しても二重にはなりません。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as クライアント
+  participant A as API
+  participant D as DB
+  C->>A: 決済して（Idempotency-Key は K1）
+  A->>D: K1 を一意の制約つきで保存し、処理する
+  A--xC: 応答が途中で失われる
+  Note over C: 届いたか分からないので再送する
+  C->>A: 同じ K1 で、もう一度送る
+  A->>D: K1 を探す
+  D-->>A: もうある。保存した応答を返す
+  A-->>C: 1 回目と同じ結果（請求は 1 回だけ）</pre>
     <div class="compare">
       <div class="bad"><h3>冪等でない</h3><p>決済の API を再送 → 2 回請求される。</p></div>
       <div class="good"><h3>冪等</h3><p><code>Idempotency-Key</code> を付けて再送 → 1 回目の結果をそのまま返す。</p></div>
@@ -250,6 +309,14 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="fanout">
     <h2>ファンアウト：1 つの出来事を多くの人へ</h2>
     <p>投稿・メッセージ・通知を、フォロワーやチャンネルの全員に届けることを<a class="t" href="#g-fanout">ファンアウト</a>と呼びます。</p>
+    <pre class="mermaid">flowchart LR
+  P["投稿する"] --> O[("正本と outbox")]
+  O --> D{"受け手が<br>多い人か"}
+  D -- "ふつうの人" --> PUSH["書く時に配る<br>受け手ごとの箱へ写す"]
+  D -- "受け手が多い人" --> KEEP["配らずに<br>投稿者の側に置く"]
+  PUSH --> BOX[("受け手ごとの箱")]
+  BOX --> R["読む人の一覧"]
+  KEEP -- "読む時に集める" --> R</pre>
     <div class="compare">
       <div><h3>書く時に配る（push）</h3><p>投稿の時に、受け手ごとの箱へ写す。読むのは速いが、受け手が 1,000 万人いると書くのが重い。</p></div>
       <div><h3>読む時に集める（pull）</h3><p>読む時に、相手の投稿を集める。書くのは軽いが、読むたびに重い。</p></div>
@@ -260,6 +327,14 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="ratelimit">
     <h2>速さの上限と公平さ</h2>
     <p>1 つのテナント・利用者・API のキーが、全体の能力を使い切らないように、<a class="t" href="#g-token-bucket">トークンバケット</a>で速さを抑えます。</p>
+    <pre class="mermaid">flowchart LR
+  REQ["要求"] --> KEY["数える単位を決める<br>キー・テナント・IP"]
+  KEY --> B{"Valkey のバケットに<br>トークンが残っているか"}
+  FILL["一定の速さで<br>トークンを足す"] -.-> B
+  B -- "残っている：1 つ使う" --> OK["処理する"]
+  B -- "空" --> NG["429 と Retry-After<br>を返す"]
+  OK -- "重い処理" --> Q["テナントごとの<br>待ち行列で公平に回す"]
+  B -. "Valkey が落ちた" .-> F["通すか止めるかは<br>題材ごとに決める"]</pre>
     <ul>
       <li>上限は、キー・テナント・IP など、守りたい単位ごとに数える。Valkey で数え、超えたら <code>429</code> と <code>Retry-After</code> を返す。</li>
       <li>数えるのが止まったとき（Valkey の障害）に通すか止めるかを、題材ごとに決めている。</li>
@@ -270,6 +345,21 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="search">
     <h2>検索の索引は遅れる写し</h2>
     <p>検索は OpenSearch などの索引で行いますが、索引は正本（Aurora）の<strong>遅れて食い違う写し</strong>です。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant M as 管理者
+  participant U as 利用者
+  participant A as API
+  participant D as Aurora（正本）
+  participant I as 検索の索引
+  M->>D: 文書の権限を外す（行と outbox を同じ tx で）
+  Note over I: まだ古いまま（数秒遅れる）
+  U->>A: 検索する
+  A->>I: 候補を絞る
+  I-->>A: 権限を外した文書も候補に入る
+  A->>D: 権限と今の状態を確かめ直す
+  D-->>A: その文書は見えない
+  A-->>U: 見てよいものだけを返す
+  D->>I: 後から outbox で索引に届く</pre>
     <ol>
       <li>正本に書いた変更を outbox から索引へ流す。数秒遅れる。</li>
       <li>索引で候補を絞る。</li>
@@ -308,6 +398,7 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="er">
     <h2>ER 図の読み方</h2>
     <p>data-model の ER 図は Mermaid の <code>erDiagram</code> です。線の両端の記号が、相手が何件あるか（多重度）を表します。</p>
+    <p>まず、workspaces から channels、channels から messages へ伸びる 2 本の線の端の記号を見てください。</p>
     <pre class="mermaid">erDiagram
   workspaces ||--o{ channels : "has"
   channels ||--o{ messages : "contains"
@@ -339,6 +430,33 @@ CREATE POLICY tenant_isolation ON items
   <section class="s" id="slo">
     <h2>SLO と復旧の目標</h2>
     <p>非機能の目標は数字で書きます。よく出る略語です。</p>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 190" role="img" aria-label="時間の線の上に、データが残っている最後の時点、障害、復旧の 3 つの点がある。最後の時点から障害までが RPO で、失うデータの幅。障害から復旧までが RTO で、止まっている時間">
+        <rect x="150" y="34" width="180" height="30" style="fill:var(--ng-soft);stroke:var(--ng);stroke-width:1"/>
+        <rect x="330" y="34" width="200" height="30" style="fill:var(--warn-soft);stroke:var(--warn);stroke-width:1"/>
+        <g style="font-size:13px;fill:var(--text)" text-anchor="middle">
+          <text x="240" y="54">RPO：失うデータの幅</text>
+          <text x="430" y="54">RTO：止まっている時間</text>
+          <text x="80" y="54" style="fill:var(--muted)">ふつうに動く</text>
+          <text x="580" y="54" style="fill:var(--muted)">再開</text>
+        </g>
+        <line x1="20" y1="90" x2="610" y2="90" style="stroke:var(--muted);stroke-width:1.5"/>
+        <polygon points="610,84 622,90 610,96" style="fill:var(--muted)"/>
+        <g style="stroke:var(--text);stroke-width:1.5">
+          <line x1="150" y1="64" x2="150" y2="98"/>
+          <line x1="330" y1="64" x2="330" y2="98"/>
+          <line x1="530" y1="64" x2="530" y2="98"/>
+        </g>
+        <g style="font-size:13px;fill:var(--text)" text-anchor="middle">
+          <text x="150" y="118">ここまでの</text>
+          <text x="150" y="136">データは残る</text>
+          <text x="330" y="118" style="fill:var(--ng);font-weight:bold">障害</text>
+          <text x="530" y="118">復旧</text>
+          <text x="612" y="118" style="fill:var(--muted)">時間</text>
+        </g>
+        <text x="20" y="176" style="font-size:13px;fill:var(--muted)">RPO 0 は赤い幅がないこと。成功を返したものは 1 つも失わない。</text>
+      </svg>
+    </figure>
     <dl class="glossary">
       <dt id="g-p99">p99</dt><dd>遅い順に並べて上位 1% を除いた値。「p99 200ms」は、99% の要求が 200ms 以内に終わること。</dd>
       <dt id="g-slo">SLO</dt><dd>目標とする信頼性（例：月間 99.9% 成功）。破りそうになったら機能の開発より安定を優先する。</dd>

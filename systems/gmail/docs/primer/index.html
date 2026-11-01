@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>メールのサービスは何をするか</h2>
     <p>Gmail は、メールを受け取って保存し、探しやすく見せ、利用者の代わりに外へ送るサービスです。個人の無料のアカウントと、組織向けの Google Workspace があります。メールは、他社のサーバーと標準のプロトコルでつながる、開いた網の上で動きます。相手を選べないことが、迷惑メールとなりすましの根にあります。</p>
+    <pre class="mermaid">flowchart LR
+  U["個人の利用者"] -- "読む・探す・送る" --> S["メールのサービス"]
+  A["組織の管理者"] -- "ドメイン・別名・規則・SSO" --> S
+  L["法務・監査の担当"] -- "保留・横断の検索・書き出し" --> S
+  X["外部の送信者と MTA"] -- "SMTP で届ける" --> S
+  S -- "受け付け・選別・保存" --> M[("メールボックス")]
+  S -- "利用者の代わりに送る" --> O["他社のメールのサーバー"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>個人の利用者</h3><p>スマートフォンが主です。通販・行政・金融のメールを受け、フィッシングに狙われます。</p></div>
       <div class="card" data-frag><h3>組織の利用者と管理者</h3><p>自社のドメイン、別名とグループ、配送の規則、SSO、監査ログを使います。</p></div>
@@ -112,6 +119,13 @@
   <section class="s" id="envelope">
     <h2>封筒とヘッダー、受け付けと不達</h2>
     <p>メールには送り手が 2 つあります。SMTP の <code>MAIL FROM</code>（封筒）と、本文の頭の <code>From:</code> ヘッダーです。利用者の画面に出るのは <code>From:</code> で、不達の通知が返るのは <code>MAIL FROM</code> です。2 つは違ってよく、メールの配信の事業者を使うと普通に違います。</p>
+    <pre class="mermaid">flowchart LR
+  T["送り手の MTA が DATA を送る"] --> R{"受け手の応答"}
+  R -- "250" --> K["受け手が責任を引き継ぐ<br>届けるか不達を知らせる"]
+  K --> J["選別で受信箱か<br>迷惑メールの箱"]
+  R -- "4xx" --> Q["待ち行列に戻し<br>間隔を広げて送り直す"]
+  Q -- "5 日で諦める" --> D
+  R -- "5xx" --> D["DSN を MAIL FROM へ返す<br>DSN 自身は空の MAIL FROM"]</pre>
     <div class="compare">
       <div><h3>封筒（RFC 5321）</h3><p><code>MAIL FROM:&lt;bounce-8812@esp.example&gt;</code><br>不達の返し先。受け手は <code>Return-Path:</code> として残す。<a class="t" href="#g-spf">SPF</a> が確かめるのはこちら。</p></div>
       <div><h3>ヘッダー（RFC 5322）</h3><p><code>From: お店 &lt;news@shop.example&gt;</code><br>画面に出る差出人。送り手が自由に書ける。<a class="t" href="#g-dmarc">DMARC</a> が守るのはこちら。</p></div>
@@ -155,6 +169,16 @@
   <section class="s" id="dmarc">
     <h2>送信者の認証 2：DMARC の揃いと方針</h2>
     <p>SPF も DKIM も、画面に出る <code>From:</code> を見ていません。<a class="t" href="#g-dmarc">DMARC</a> は、SPF か DKIM で確かめたドメインが From のドメインと<a class="t" href="#g-alignment">揃う</a>ことを求め、揃わないときの扱いを From のドメインの持ち主が <code>_dmarc.&lt;domain&gt;</code> の TXT で宣言します。</p>
+    <pre class="mermaid">flowchart LR
+  A{"SPF か DKIM が pass で<br>From と揃う"} -- "はい" --> P["DMARC pass<br>加点"]
+  A -- "いいえ" --> B{"From のドメインの方針 p"}
+  B -- "none" --> N["受け付けて<br>失敗を点にする"]
+  B -- "quarantine" --> C{"ARC で救える"}
+  B -- "reject" --> E{"ARC で救える"}
+  C -- "はい" --> H["受け付けて<br>救いの印"]
+  E -- "はい" --> H
+  C -- "いいえ" --> Q["迷惑メールの箱"]
+  E -- "いいえ" --> X["既定は SMTP の時点で<br>550 5.7.26"]</pre>
     <ul>
       <li data-frag><strong>揃い</strong>：SPF が <code>pass</code> で <code>MAIL FROM</code> のドメインが From と揃うか、DKIM が <code>pass</code> で <code>d=</code> が From と揃うか。どちらか 1 つで DMARC は <code>pass</code>。既定（<code>r</code>）は同じ<a class="t" href="#g-org-domain">組織のドメイン</a>なら揃い、<code>s</code> は名前の完全な一致。</li>
       <li data-frag><strong>方針</strong>：<code>p=none</code>（見るだけ）、<code>quarantine</code>（迷惑メールへ）、<code>reject</code>（拒む）。設計は <code>quarantine</code> の失敗を迷惑メールの箱へ、<code>reject</code> の失敗を、ARC で救えなければ SMTP の時点で <code>550 5.7.26</code> にします（決定表 DT-AUTH-001）。</li>
@@ -192,6 +216,14 @@
   <section class="s" id="reputation">
     <h2>送信の評判：IP・ブロックリスト・苦情・一括の配信停止</h2>
     <p>受け手の事業者は、送り元の IP とドメインの過去の振る舞い（苦情、不達、迷惑メールの報告）から評判を付け、受け付けの速さと箱を決めます。評判の悪い IP からは、正規のメールも届かなくなります。だから本システムは、送信の IP と評判を自分で持ち、守ります。</p>
+    <pre class="mermaid">flowchart LR
+  U["利用者の送信"] --> G["関門<br>乗っ取りの確認・送信の上限・内容の選別"]
+  G --> P["DKIM の署名と<br>IP プールの選択"]
+  P --> O["送信の MTA"]
+  O --> R["相手の MX"]
+  R -- "苦情の報告 FBL" --> C["苦情と不達の率<br>アカウント・組織・プール・IP"]
+  B["ブロックリスト"] -- "5 分ごとに照会" --> C
+  C -- "上限を下げる・IP を外す" --> G</pre>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-warmup">ウォームアップ</a></h3><p>新しい IP は実績がなく疑われます。設計は 1 日目 500 通から 14 日目 5 万通まで段で上げ、苦情 0.1% 未満・不達 2% 未満・絞りの応答 5% 未満を満たした日だけ進めます。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-blocklist">ブロックリスト</a></h3><p>迷惑メールを出した IP を載せる公開の一覧（DNSBL）。多くの受け手が参照します。設計は送信のすべての IP を 5 分ごとに照会します。</p></div>
@@ -205,6 +237,14 @@
   <section class="s" id="filtering">
     <h2>迷惑メールの選別：層と対数オッズ</h2>
     <p>選別は 1 つの判定器ではなく、層の重ねです。規則（ヘッダーの形、認証の結果）、評判（IP・ドメイン・URL・添付のハッシュ）、内容の分類器、添付と URL の検査が、それぞれ証拠を出します。設計は各層の証拠を<a class="t" href="#g-log-odds">対数オッズ</a>の寄与 <code>w</code> にし、足して確率に戻します。</p>
+    <pre class="mermaid">flowchart LR
+  R["規則<br>ヘッダーの形・認証の結果"] --> S["寄与 w を足す<br>S = b + Σ w"]
+  E["評判<br>IP・ドメイン・URL・ハッシュ"] --> S
+  C["内容の分類器"] --> S
+  A["添付と URL の検査"] --> S
+  S --> P{"確率 p と閾値"}
+  P -- "超える" --> J["迷惑メールの箱<br>警告の帯"]
+  P -- "超えない" --> I["受信箱"]</pre>
     <pre><code>S = b + Σ w        （b は事前。迷惑メール −3.0、フィッシング −5.0）
 p = 1 / (1 + e^(−S))</code></pre>
     <p data-frag>独立した証拠は、オッズの掛け算、つまり対数オッズの足し算で合わさります。設計の例 1（宅配の不在を装うメール）は、フィッシングの頭で <code>−5.0 + 0.4 + 1.2 + 3.8 + 2.0 + 2.8 = 5.2</code>、<code>p ≈ 0.994</code> で、閾値 0.80 を超えて迷惑メールの箱へ入り、警告の帯が付きます。</p>
@@ -289,6 +329,13 @@ JVBERi0xLjcK...
   <section class="s" id="storage">
     <h2>保存：blob とメタデータ、同じ配送の中だけの共有</h2>
     <p>受け取ったバイトは、そのまま返せる必要があります。DKIM の検証、IMAP の <code>BODY[]</code>、EML の書き出し、eDiscovery が同じバイトを求めるからです。設計は、生のメッセージを変わらない <a class="t" href="#g-blob">blob</a>（S3）に置き、頻繁に変わる状態（ラベル・既読・スレッド）をメタデータ（Aurora）に置きます。</p>
+    <pre class="mermaid">flowchart LR
+  T1["配送 1<br>1 つの SMTP のトランザクション"] --> B1[("blob 1")]
+  B1 --> A["A さんの行"]
+  B1 --> B["B さんの行"]
+  B1 --> C["C さんの行"]
+  T2["配送 2<br>中身は配送 1 と同じ"] --> B2[("blob 2<br>共有しない")]
+  B2 --> D["D さんの行"]</pre>
     <div class="compare">
       <div><h3>blob（S3）</h3><p>受け取ったヘッダーと本文。zstd で 256 KiB ごとに圧縮し、blob ごとの鍵で暗号化。1 日を過ぎた小さな blob は 64 MiB のパックに詰め直す。</p></div>
       <div><h3>メタデータ（Aurora）</h3><p>受け手ごとの行。前置きのヘッダー（<code>Received</code>・<code>Authentication-Results</code>）、パートの木、件名、ラベル、旗、スレッド、<code>modseq</code>。</p></div>
@@ -375,6 +422,13 @@ JVBERi0xLjcK...
   <section class="s" id="retention">
     <h2>保持・保留・eDiscovery</h2>
     <p>組織は、法令や社内の規程のために、メールを決めた期間残し、期間の後に消す必要があります。訴訟や監査が始まると、関係する人のメールを消さずに守り（<a class="t" href="#g-hold">保留</a>、リーガルホールド）、横断して探して書き出します（<a class="t" href="#g-ediscovery">eDiscovery</a>）。</p>
+    <pre class="mermaid">flowchart LR
+  D["行を消す<br>完全な削除・期限・purge"] --> H{"保留に当たる"}
+  H -- "はい" --> P["preserved_messages に移し<br>blob に保留の参照"]
+  H -- "いいえ" --> R{"規則の期間の中"}
+  R -- "はい" --> P
+  R -- "いいえ" --> X["消す"]
+  X --> G["参照が 0 で 7 日の後<br>blob を消す"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>保持の規則</h3><p>範囲（組織・OU・アカウント）× ラベルの条件 × 受け付けからの日数。期間の後に消すか残すかを選ぶ。複数の規則は最も長いものが勝つ。</p></div>
       <div class="card" data-frag><h3>保留</h3><p>案件（matter）の範囲で置く。規則より常に強い。利用者が完全に削除しても、保留が外れるまで消えない。利用者には見せない。</p></div>
@@ -387,6 +441,7 @@ JVBERi0xLjcK...
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>Aurora は 3 種類あります。directory（テナント・アカウント・アドレス・規則。リージョンで 1 つ）、メールボックスのシャード（受け手ごとのメッセージの行・ラベル・スレッド・change log。アカウントで分ける）、blob の目録のシャード（blob の場所と鍵と参照）です。DB をまたぐ線は論理の参照で、外部キーを張りません。</p>
+    <p>まず messages と labels、その間をつなぐ message_labels の 3 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   accounts_state ||--o{ changes : "change log"
   threads ||--|{ messages : "groups"

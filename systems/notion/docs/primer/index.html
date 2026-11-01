@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>Notion は何をするサービスか</h2>
     <p>チームの文書・wiki・表・タスク・議事録を、1 つの道具の中で作り、つなげるサービスです。文書の中に表を置き、表の行を開くとまた文書になる、という入れ子が特徴です。</p>
+    <pre class="mermaid">flowchart LR
+  M["メンバー"] -- "書く・まとめる・共有する" --> S["このシステム<br>(文書とデータベース)"]
+  G["ゲスト"] -- "共有されたページだけ" --> S
+  P["公開ページの閲覧者"] -- "Web で読む" --> S
+  A["AI エージェント"] -- "API とトークン" --> S
+  I["連携<br>(公開 API の利用者)"] -- "API" --> S
+  S -- "Webhook" --> W["Webhook の受け手"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>書く</h3><p>見出し・リスト・ToDo・トグル・コードなどを、<code>/</code> で呼ぶメニュー（スラッシュコマンド）や Markdown の入力で並べます。</p></div>
       <div class="card" data-frag><h3>まとめる</h3><p>データベースに行を足し、表・ボード・カレンダーなどの「ビュー」で見ます。タスク管理や CRM の代わりにも使われます。</p></div>
@@ -133,6 +140,14 @@
   <section class="s" id="databases">
     <h2>データベース：行はページ、見え方はビュー</h2>
     <p>Notion のデータベースは、表計算というより「型付きのプロパティを持つページの集まり」です。</p>
+    <pre class="mermaid">flowchart LR
+  P["ページ"] --> D["データベース"]
+  D --> S["データソース<br>(スキーマ)"]
+  S --> R["行 = ページ"]
+  R --> B["行の本文のブロック"]
+  D --> V["ビュー<br>(表・ボードなど)"]
+  V -- "1 つを指す" --> S
+  L["リンクドビュー<br>(別のページ)"] -- "元を指す" --> S</pre>
     <div class="cards">
       <div class="card" data-frag><h3>データベース</h3><p>タイトル・アイコン・置き場所を持つ入れ物。ページの中に置きます。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-datasource">データソース</a></h3><p>スキーマ（プロパティの名前と型）と行を持つ。2025 年に本家でデータベースから分かれました。</p></div>
@@ -178,6 +193,9 @@
   <section class="s" id="text-crdt">
     <h2>テキストの CRDT の中身</h2>
     <p>設計は、列の CRDT に <a class="t" href="#g-fugue">Fugue</a>、書式に <a class="t" href="#g-peritext">Peritext</a> を使います。押さえる点は 4 つです。</p>
+    <pre class="mermaid">flowchart LR
+  C1["あ<br>ID A-1"] --> C2["い<br>ID A-2"] --> C3["う<br>ID B-1<br>消した墓標"] --> C4["え<br>ID A-3"]
+  OP["遅れて届いた操作<br>B-1 の右に お を入れる"] -. "目印が残っている" .-> C3</pre>
     <ul>
       <li data-frag><strong>文字の ID</strong>：<code>(replica_id, counter)</code>。位置を添字でなく ID で指すので、他人の挿入でずれません。カーソルの位置も ID で送ります。</li>
       <li data-frag><strong>墓標</strong>：消した文字は中身だけ消し、ID は<a class="t" href="#g-tombstone">墓標</a>として残します。何か月も前のバージョンを基にした操作でも、アンカーの文字が見つかるようにするためです。</li>
@@ -242,6 +260,10 @@
   <section class="s" id="offline">
     <h2>オフラインとブラウザの中の DB</h2>
     <p>開いたことのあるページは、ネットがなくても読めて書けます。ブラウザの中で SQLite を動かし、端末に写しと未送信の待ち行列を持ちます。</p>
+    <pre class="mermaid">flowchart LR
+  T2["他のタブ"] -- "SharedWorker が<br>読み書きを回す" --> T1["ロックを取ったタブ<br>(Web Locks)"]
+  T1 --> W["専用ワーカー<br>(SQLite の WASM)"]
+  W -- "1 つだけが開く" --> F[("OPFS の<br>SQLite のファイル<br>写しと未送信の待ち行列")]</pre>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-wasm">WASM</a> の SQLite</h3><p>C で書かれた SQLite を WebAssembly にしてブラウザで動かします。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-opfs">OPFS</a></h3><p>ブラウザがサイトごとに持つ、高速なファイルの置き場。SQLite のファイルをここに置きます。</p></div>

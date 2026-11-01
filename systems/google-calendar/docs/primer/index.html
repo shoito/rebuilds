@@ -73,6 +73,14 @@
   <section class="s" id="product">
     <h2>Google Calendar は何をするサービスか</h2>
     <p>個人と組織が、会議・面談・休暇・会議室の予定を管理し、他の人と調整するためのカレンダーです。主な使い手は、日本の中堅・大企業の社員です。社内の会議に人と会議室を招き、空きを探し、出欠を集めます。</p>
+    <pre class="mermaid">flowchart LR
+  P["個人"] -- "予定を書く・共有する" --> C["カレンダーのサービス"]
+  E["組織の社員"] -- "招待・空きを探す・会議室" --> C
+  A["組織の管理者"] -- "共有の方針・SSO" --> C
+  D["OS のカレンダー・スマートフォン"] -- "差分で同期" --> C
+  C -- "メールで招待" --> G["取引先"]
+  N["アカウントのない人"] -- "予約ページで予約" --> C
+  C -- "リマインダー" --> E</pre>
     <div class="cards">
       <div class="card" data-frag><h3>個人</h3><p>自分の予定、家族との共有、祝日。OS の標準のカレンダーやスマートフォンからも見る。</p></div>
       <div class="card" data-frag><h3>組織</h3><p>部署やグループへの招待、会議室の予約、空き時間の共有。管理者が共有の方針と SSO を決める。</p></div>
@@ -85,6 +93,14 @@
   <section class="s" id="icalendar">
     <h2>iCalendar の基本：VEVENT・UID・DTSTART</h2>
     <p>カレンダーの世界の共通語は <a class="t" href="#g-icalendar">iCalendar</a>（RFC 5545）です。テキストの形式で、メールの招待・CalDAV・ICS のファイルのどれもこの形で予定を運びます。</p>
+    <pre class="mermaid">flowchart LR
+  CAL["VCALENDAR<br>ファイル全体"] --> TZ["VTIMEZONE<br>時刻の規則"]
+  CAL --> EV["VEVENT<br>予定 1 つ"]
+  EV --> U["UID<br>世界で一意の名前"]
+  EV --> S["DTSTART<br>開始"]
+  EV --> L["DTEND か DURATION<br>長さ"]
+  EV --> R["RRULE<br>繰り返し"]
+  EV --> Q["SEQUENCE<br>変更の回数"]</pre>
     <pre><code>BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//&lt;Brand&gt;//Calendar//JA
@@ -280,6 +296,18 @@ RDATE;TZID=Asia/Tokyo:20270630T100000</code></pre>
     <h2>会議室：二重予約を DB で防ぐ</h2>
     <p>会議室や設備は、予定の「参加者」として招きます。会議室は自動で出欠を返します。設定は「重ならなければ自動で承諾」か「管理者の承認」です。自動で承諾する会議室の二重予約は 0 件が目標です。</p>
     <p>アプリで「重なりを探してから入れる」だけでは、同時の 2 つの要求が両方とも「空いている」と判断しえます。そこで PostgreSQL の<a class="t" href="#g-exclusion">排他の制約</a>で、DB 自身に重なりを拒ませます。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant A as 予約 A
+  participant B as 予約 B
+  participant DB as DB
+  A->>DB: 会議室の行をロック
+  B->>DB: 会議室の行をロック
+  Note over B,DB: A が終わるまで待つ
+  A->>DB: 10時から11時の行を入れる
+  DB-->>A: 入った。承諾
+  B->>DB: 10時半から11時半の行を入れる
+  DB-->>B: 重なるので入らない
+  Note over B: この回は辞退</pre>
     <pre><code>-- resource_bookings：範囲の中の回ごとに 1 行
 during tstzrange  -- [start_utc, end_utc)
 EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
@@ -339,6 +367,17 @@ EXCLUDE USING gist (tenant_id WITH =, room_id WITH =, during WITH &amp;&amp;)
   <section class="s" id="sync">
     <h2>差分の同期：トークン・410・Webhook・ICS</h2>
     <p>端末は、毎回全件を取り直さず、前回からの差分だけを取ります。そのための目印が<a class="t" href="#g-synctoken">同期のトークン</a>です。設計では、カレンダーごとに単調に増える番号 <code>change_seq</code> と変更のログを持ち、Web・公開 API・CalDAV・Webhook の共通の背骨にします。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant C as 端末
+  participant S as サーバー
+  C->>S: 最初は全件を取る
+  S-->>C: 予定の一覧とトークン N
+  S->>C: Webhook で「変わった」だけ知らせる
+  C->>S: トークン N で差分を求める
+  S-->>C: N より後の変更と削除、新しいトークン M
+  C->>S: 古いトークンで差分を求める
+  S-->>C: 410 で全件を取り直してと返す
+  C->>S: 全件を取り直す</pre>
     <div class="cards">
       <div class="card" data-frag><h3>トークン</h3><p>「このカレンダーの seq N まで見た」。次の要求で N より後の変更（削除を含む）だけを返す。</p></div>
       <div class="card" data-frag><h3>410 Gone</h3><p>トークンが使えない（30 日の期限切れ、共有の変化、DR の切り替え）。黙って欠けた差分を返さず、全件の取り直しを求める。CalDAV では 403 と <code>valid-sync-token</code>。</p></div>

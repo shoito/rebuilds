@@ -14,7 +14,7 @@ Subjects to review: {subjects}
 Already known from the quantitative scan (do not re-report): {scan の結果のうち、このグループに関係する要点}
 
 For EACH subject, skim intent.md, architecture/README.md, the area docs that carry the main 論点 (root README.md table), quality.md, roadmap.md and the primer. Report from the perspective of a web developer unfamiliar with the domain:
-1. 図解の不足: concrete places where a diagram would materially help (file + section + diagram type), prioritized. Especially multi-actor flows, state machines given only as prose/tables/ASCII, failure and recovery paths, anything on a time axis.
+1. 図解の不足: concrete places where a diagram would materially help (file + section + diagram type), prioritized. Especially multi-actor flows, state machines given only as prose/tables/ASCII, failure and recovery paths, anything on a time axis. Read as a junior engineer too: a primer section explained only in prose, and a service intro with no big-picture diagram, count as gaps.
 2. 理解の障害: undefined jargon, missing "why", leaps, over-dense sections, missing cross-links, primer vs docs inconsistencies (spot-check numbers).
 3. 漏れている観点: perspectives a real rebuild must address that are missing or very thin (privacy and data subject rights, data export, migration from the original/import, accessibility, i18n, abuse, compliance, retention, operator access, multi-region, specific failure modes, subject-specific runbooks). Grep to confirm before claiming something is missing.
 4. 良い点 (1–2 lines) worth spreading to other subjects.

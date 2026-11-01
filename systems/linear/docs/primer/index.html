@@ -75,6 +75,14 @@
   <section class="s" id="product">
     <h2>Linear は何をするサービスか</h2>
     <p>Linear は、ソフトウェアのチームのための課題管理のツールです。開発者・PM・デザイナーが、やること（<a class="t" href="#g-issue">イシュー</a>）を登録し、状態を進め、期間（<a class="t" href="#g-cycle">サイクル</a>）や<a class="t" href="#g-project">プロジェクト</a>にまとめて計画します。本家の料金のページには「40,000 社以上」が使うとあります。</p>
+    <pre class="mermaid">flowchart LR
+  T["チームの人<br>(開発者・PM・デザイナー)"] -- "イシューを作る・進める" --> S["このシステム<br>(課題管理)"]
+  A["管理者"] -- "チーム・メンバー・連携の設定" --> S
+  G["GitHub・GitLab"] -- "PR の出来事" --> S
+  I["インポートの元<br>(Jira など)"] -- "移行" --> S
+  S -- "通知・イシューの作成" --- SL["Slack"]
+  S -- "Webhook・公開 API" --> E["外部のシステム"]
+  S -- "通知のメール" --> M["メールの送信"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>待たない</h3><p>状態・優先度・担当の変更は、入力から描画まで p99 50ms 以内。サーバーの応答を待たない（NFR-001）。</p></div>
       <div class="card" data-frag><h3>全員が同じものを見る</h3><p>他の人の変更は 1 秒以内に届き、切断や同時の編集の後も全員が同じ状態に収束する（NFR-002・005）。</p></div>
@@ -122,6 +130,11 @@
   <section class="s" id="cycles">
     <h2>サイクル：チームの短い期間</h2>
     <p><a class="t" href="#g-cycle">サイクル</a>はスクラムのスプリントにあたる、チームごとの 1〜8 週の期間です。決めた曜日から自動で繰り返し、先のサイクルを最大 15 個まで用意します。サイクルの間に任意の<a class="t" href="#g-cooldown">クールダウン</a>を置けます。クールダウンにはイシューを割り当てられません。</p>
+    <pre class="mermaid">flowchart LR
+  C1["サイクル 1<br>(1〜8 週)"] --> CD["クールダウン<br>(任意)"]
+  CD --> C2["サイクル 2"]
+  U["未完了<br>(unstarted・started)"] -- "繰り越し" --> C2
+  TB["Triage・Backlog"] -- "元のサイクルに残る" --> C1</pre>
     <ul>
       <li data-frag><strong>境界はチームのタイムゾーンで決まる。</strong>同じワークスペースでも、東京のチームとロンドンのチームでは、サイクルの始まりの時刻が違います。</li>
       <li data-frag><strong><a class="t" href="#g-rollover">繰り越し</a></strong>：サイクルが終わると、未完了のイシューは次のサイクルへ自動で移ります。</li>
@@ -156,6 +169,11 @@
   <section class="s" id="localfirst">
     <h2>ローカルファーストとは</h2>
     <p>この題材の核です。<a class="t" href="#g-localfirst">ローカルファースト</a>では、ワークスペースのデータを端末の DB に持ち、画面はそれを読みます。</p>
+    <pre class="mermaid">flowchart LR
+  U["操作"] --> L["手元のモデル<br>(すぐ描く)"]
+  L -- "後で送る" --> S["サーバー<br>(1 本の順序で確定)"]
+  S -- "差分" --> L
+  S -- "差分" --> O["他の人の手元"]</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>よくある Web アプリ</h3><p>操作 → API に送る → 応答を待つ → 描く。数百ミリ秒かかり、回線が切れると何もできない。他の人の変更は再読み込みまで見えない。</p></div>
       <div class="good" data-frag><h3>ローカルファースト</h3><p>操作 → 手元のモデルに<a class="t" href="#g-optimistic">楽観的に</a>当てて描く → 後で送る。サーバーが順序を決めて確定し、他の人の変更は<a class="t" href="#g-delta">差分</a>で届く。</p></div>
@@ -176,6 +194,10 @@
   <section class="s" id="syncid">
     <h2>sync_id：ワークスペースの 1 本の順序</h2>
     <p>サーバーは、ワークスペースの中の<strong>すべての変更</strong>に、1 つずつ増える番号 <a class="t" href="#g-syncid"><code>sync_id</code></a> を欠けなく振ります。クライアントの手元のバージョンは「どの <code>sync_id</code> まで当てたか」の 1 つの数（<code>L</code>）で表せます。</p>
+    <pre class="mermaid">flowchart LR
+  A1["101<br>公開のチーム"] --> A2["102<br>非公開のチーム"] --> A3["103<br>公開のチーム"]
+  A3 -- "見てよいものだけに絞る" --> P["届く差分<br>from 100 to 103<br>中身は 101 と 103"]
+  P --> L["手元の L が 103 になる"]</pre>
     <ul>
       <li data-frag><strong>なぜ DB のシーケンスを使わないか。</strong>シーケンスは、番号の順とコミットの順がずれます。ワークスペースの行をロックして数を増やすと、番号の順とコミットの順が一致し、「x より後」を読んで取りこぼすことがなくなります。代わりに、1 ワークスペースの書き込みは直列になります（S1 で 1 秒 300 変更の見込み）。</li>
       <li data-frag><strong>絞ると番号が飛ぶ。</strong>非公開のチームの変更は、見てよくない人に送りません。すると受け手から見た番号は飛び飛びになり、番号の連続では欠けを判定できません。</li>
@@ -269,6 +291,13 @@
   <section class="s" id="browser">
     <h2>ブラウザの保存とオフライン</h2>
     <p>手元の DB はブラウザの <a class="t" href="#g-indexeddb">IndexedDB</a> です。アカウント × ワークスペースごとに 1 つの DB を持ちます。ブラウザの保存には、サーバーの DB にない癖があります。</p>
+    <pre class="mermaid">flowchart LR
+  B["他のタブ"] -- "outbox に書く<br>(strict)" --> DB[("IndexedDB")]
+  B -- "BroadcastChannel<br>で知らせる" --> A["書き手のタブ<br>(Web Locks で 1 つ)"]
+  A -- "outbox を読む" --> DB
+  A -- "WebSocket で送る" --> S["サーバー"]
+  S -- "差分" --> A
+  A -- "差分を保存<br>(relaxed)" --> DB</pre>
     <ul>
       <li data-frag><strong>書けたかの強さを選べる。</strong>IndexedDB のトランザクションの <a class="t" href="#g-durability"><code>durability</code></a> は、<code>strict</code>（ディスクに書けてから完了）と <code>relaxed</code>（OS に渡したら完了）を選べます。Chrome 121 から既定が <code>relaxed</code> です。この設計は outbox だけを <code>strict</code> にし、差分は <code>relaxed</code> にします（失っても取り戻せるため）。</li>
       <li data-frag><strong>ブラウザに消されうる。</strong>空きが少ないと、永続でないオリジンのデータは丸ごと消されます。Safari は追跡の防止で、7 日操作のないサイトのデータを消します。永続の保存（<code>persist()</code>）を求め、デスクトップのアプリ（Electron）を勧めます。</li>
@@ -290,6 +319,13 @@
   <section class="s" id="views">
     <h2>フィルターとビュー：手元とサーバーで同じ答え</h2>
     <p>Linear の一覧は、条件を AND・OR で組み合わせたフィルター、グループ化、並べ方で作ります。保存した<a class="t" href="#g-view">ビュー</a>は個人・チーム・ワークスペースの範囲を持ちます。ビューのリンクを共有しても、見る権限は与えません。</p>
+    <pre class="mermaid">flowchart TD
+  F["フィルター<br>(型の付いた JSON の木)"] --> C["手元の評価"]
+  F --> Q["サーバーの SQL"]
+  F --> K{"被覆の鍵で選ぶ"}
+  K -- "手元だけ" --> C
+  K -- "サーバー" --> Q
+  K -- "手元とサーバー" --> M["両方で補い合う"]</pre>
     <p data-frag>この題材では、同じフィルターを<strong>クライアントの手元</strong>でも<strong>サーバーの SQL</strong> でも評価します。手元にないイシュー（古い完了）を含む条件は、サーバーに問い合わせて補うからです。両者がずれると、同じビューで結果が変わります。そこで、フィルターを型の付いた JSON の木で持ち、1 つの定義から両方の評価を生成します。手元だけで答えられるかは、<a class="t" href="#g-coverage">被覆の鍵</a>から「手元だけ」「手元とサーバー」「サーバー」を選びます。</p>
     <div class="quiz" data-answer="1">
       <p class="q">フィルター「担当が Alice でない」に、担当のいないイシューは入りますか？</p>
@@ -306,6 +342,13 @@
   <section class="s" id="integrations">
     <h2>連携：Git のホスティング・Slack・Webhook</h2>
     <p>ソフトウェアのチームの課題管理は、コードの変更とつながって初めて楽になります。GitHub・GitLab の連携では、<a class="t" href="#g-pr">PR</a>（GitLab では MR）とイシューを、次の手がかりで結びます。</p>
+    <pre class="mermaid">flowchart LR
+  G["GitHub・GitLab"] -- "PR の Webhook<br>(署名を確かめる)" --> S["このシステム"]
+  S -- "識別子で結ぶ" --> I["イシュー ENG-123"]
+  I -- "PR が開く" --> ST["started"]
+  ST -- "マージ" --> CO["completed"]
+  SL["Slack"] -- "メッセージから作る" --> S
+  S -- "署名付き Webhook" --> E["外部のシステム"]</pre>
     <ul>
       <li data-frag>ブランチ名に識別子を入れる（<code>eng-123-fix-login</code>）。タイトルに識別子を書く。</li>
       <li data-frag>本文に<a class="t" href="#g-magicword">閉じる語</a>と識別子を書く（<code>Fixes ENG-123</code>）。<code>ref</code>・<code>part of</code> などは閉じない結び付け、<code>skip</code>・<code>ignore</code> は結ばない。</li>
@@ -318,6 +361,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 86 表（うち同期するモデル 45）ありますが、核は次の数個です。テナントの中の表は、主キーの先頭に <code>workspace_id</code> を持ちます（ER 図の記号は<a href="../../../../docs/primer/index.html#er">共通の資料</a>）。</p>
+    <p>まず <code>teams</code> と <code>issues</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   workspaces ||--o{ teams : "has"
   workspaces ||--|| workspace_sync : "counter"

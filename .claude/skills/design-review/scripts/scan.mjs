@@ -81,3 +81,20 @@ console.log(table(
 ));
 console.log('\n## 観点の言及（言及のあるファイルの数。0 は漏れの候補で、grep で中身を確かめる）\n');
 console.log(table(['題材', ...Object.keys(CONCERNS)], rows.map((r) => [r.name, ...Object.values(r.concerns)])));
+
+// Primers: sections with no visual aid are hard for junior readers.
+const SKIP_SECTION = /読む前に|学べること|用語集|読む順/;
+const VISUAL = /class="mermaid"|<svg|class="stepper|<table/;
+const primers = ['docs/primer/index.html', ...rows.map((r) => `systems/${r.name}/docs/primer/index.html`)]
+  .filter((f) => existsSync(path.join(root, f)))
+  .map((f) => {
+    const html = readFileSync(path.join(root, f), 'utf8');
+    const sections = html.split(/<section\b/).slice(1).map((s) => ({
+      title: ((s.match(/<h2[^>]*>([\s\S]*?)<\/h2>/) || [])[1] || '').replace(/<[^>]+>/g, '').trim(),
+      visual: VISUAL.test(s),
+    })).filter((s) => !SKIP_SECTION.test(s.title));
+    const bare = sections.filter((s) => !s.visual).map((s) => s.title);
+    return [f.split('/')[1] === 'primer' ? '共通' : f.split('/')[1], sections.length, (html.match(/class="mermaid"/g) || []).length, bare.length, bare.join(' / ') || '—'];
+  });
+console.log('\n## 前提知識の資料（図・表・ステップのない節。多いほどジュニアが読みにくい）\n');
+console.log(table(['資料', '節', '図', '図・表なし', '図・表のない節'], primers));

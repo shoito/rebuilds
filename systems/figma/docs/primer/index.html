@@ -75,6 +75,14 @@
   <section class="s" id="product">
     <h2>Figma は何をするサービスか</h2>
     <p>Figma は、ブラウザで動く画面のデザインのツールです。デザインの<strong>ファイルを 1 つだけ置き、全員が同じものを同時に見て編集する</strong>ことで、「どれが最新か分からない」「受け渡しで食い違う」をなくしました。</p>
+    <pre class="mermaid">flowchart LR
+  D["デザイナー"] -- "編集する" --> S["このシステム<br>(デザインのファイル)"]
+  E["開発者"] -- "寸法・色を見る<br>書き出す" --> S
+  P["PM・レビュアー"] -- "見る・コメントする" --> S
+  A["チームの管理者"] -- "権限・シートの設定" --> S
+  X["リンクで見る外部の人"] -- "見る" --> S
+  F["フォントの提供元"] -- "フォント" --> S
+  S -- "通知" --> M["メールの送信"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>手元のアプリのように速い</h3><p>大きなファイルでも、パン・ズーム・変形が 60fps。自分の入力は 1 フレームで画面に出る。</p></div>
       <div class="card" data-frag><h3>一緒に作れる</h3><p>他の人の編集とカーソルが 0.25 秒以内に見え、競合しても全員の画面が同じ結果になる。</p></div>
@@ -108,6 +116,10 @@
   <section class="s" id="vector">
     <h2>ベクター・パス・ブール演算</h2>
     <p><a class="t" href="#g-vector">ベクター</a>は、点と曲線で形を表す方式です。画素で持たないので、拡大しても劣化しません。曲線は<a class="t" href="#g-bezier">3 次ベジェ</a>（端の点 2 つと、向きを決める接線 2 本）で表します。</p>
+    <pre class="mermaid">flowchart LR
+  B["BOOLEAN_OPERATION<br>(差)"] --> C1["円<br>子として残る"]
+  B --> C2["四角<br>子として残る"]
+  B -. "毎回計算する" .-> R["画面に出す形<br>保存しない"]</pre>
     <div class="compare">
       <div class="bad" data-frag><h3>ふつうのパス（SVG の path）</h3><p>点を一筆書きでつないだ列。1 つの点から出る線は 2 本まで。</p></div>
       <div class="good" data-frag><h3><a class="t" href="#g-vnet">ベクターネットワーク</a></h3><p>点と辺のグラフ。1 つの点から 3 本以上の辺が出てよい。閉じた輪が「領域」になり、領域ごとに塗れる。</p></div>
@@ -147,6 +159,12 @@
   <section class="s" id="components">
     <h2>コンポーネント・インスタンス・バリアント</h2>
     <p>ボタンのような部品を何十か所でも使えるのが、デザインシステムの要です。</p>
+    <pre class="mermaid">flowchart LR
+  SET["COMPONENT_SET<br>ボタン"] --> C1["バリアント<br>Size=Large, State=Hover"]
+  SET --> C2["バリアント<br>Size=Small, State=Default"]
+  C1 -- "原本" --> I["INSTANCE"]
+  O["上書き<br>(テキスト・塗りなど)"] --> I
+  I -- "各自のエンジンが導出" --> V["画面に出る中身<br>保存しない"]</pre>
     <ul>
       <li data-frag><strong><a class="t" href="#g-component">コンポーネント</a>は原本</strong>、<a class="t" href="#g-instance">インスタンス</a>はその写しです。原本を直すと、全インスタンスに反映します。</li>
       <li data-frag><strong>インスタンスで変えた部分が<a class="t" href="#g-override">上書き</a></strong>です。テキスト・塗り・線・エフェクト・表示・名前は上書きできます。並び・位置・子の追加のような構造は変えられず、<a class="t" href="#g-detach">デタッチ</a>が要ります。</li>
@@ -204,6 +222,9 @@
   <section class="s" id="ordering">
     <h2>並びの鍵と、木の循環</h2>
     <p>同じ親の子の並び（重なりの順）を 0, 1, 2… の番号で持つと、間に挿入するたびに後ろの全員の番号を書き換え、同時の挿入で衝突します。そこで<a class="t" href="#g-fracindex">分数インデックス</a>を使います。</p>
+    <pre class="mermaid">flowchart LR
+  K1["鍵 a0<br>背景"] --> K2["鍵 a0V<br>新しく入れた子"] --> K3["鍵 a1<br>ボタン"]
+  N["間に入れる"] -. "a0 と a1 の間の鍵を作る" .-> K2</pre>
     <ul>
       <li data-frag>並びは文字列の鍵の辞書順で決める。間に入れるときは、前後の鍵の「間」の鍵を新しく作る（例：<code>a0</code> と <code>a1</code> の間に <code>a0V</code>）。他の子は書き換えない。</li>
       <li data-frag>同じ隙間に同時に入れて鍵が重なったら、サーバーが後の方を書き換える。鍵が 48 バイトを超えたら、サーバーがその親の子をまとめて振り直す。</li>
@@ -269,6 +290,12 @@
   <section class="s" id="rendering">
     <h2>ブラウザの中の描画エンジン</h2>
     <p>数万のノードを 60fps で動かし、どのブラウザでも同じ見た目にするため、DOM や SVG ではなく <code>&lt;canvas&gt;</code> に GPU で自前で描きます。エンジンは Rust で書いて <a class="t" href="#g-wasm">WASM</a> にし、同じコードをサーバーでネイティブに動かして書き出しにも使います。</p>
+    <pre class="mermaid">flowchart LR
+  M["変更を当てる<br>(変わったノード)"] --> L["レイアウト<br>影響する所だけ"]
+  L --> SG["シーングラフ<br>世界座標と境界の箱"]
+  SG --> T["無効なタイルを描く<br>(256 px の区画)"]
+  T --> C["タイルを並べ<br>カーソルなどを重ねる"]
+  C --> G["GPU<br>WebGPU か WebGL2"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3><a class="t" href="#g-webgl2">WebGL2</a> と <a class="t" href="#g-webgpu">WebGPU</a></h3><p>WebGL2 は広く使える必須の土台。WebGPU は新しい API で、使えるときに使い、失敗したら WebGL2 へ戻る。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-scenegraph">シーングラフ</a></h3><p>ドキュメントの木とは別の描画用の木。世界座標と境界の箱を持ち、見えない部分木を飛ばす。</p></div>
@@ -282,6 +309,13 @@
   <section class="s" id="text">
     <h2>テキスト・フォント・日本語の入力</h2>
     <p>キャンバスに自前で文字を描くので、ブラウザが普段やっている仕事を自分でします。</p>
+    <pre class="mermaid">flowchart LR
+  K["キーボード"] --> IME["IME"]
+  IME --> TA["見えない textarea"]
+  TA -- "変換中" --> U["下線付きで描く<br>ファイルに書かない"]
+  TA -- "確定" --> D["ファイルのテキストに<br>1 つの変更として当てる"]
+  D --> SH["整形とフォールバック<br>(グリフの列)"]
+  SH --> R["キャンバスに描く"]</pre>
     <ul>
       <li data-frag><strong><a class="t" href="#g-shaping">整形</a></strong>：文字の列を、フォントの<a class="t" href="#g-glyph">グリフ</a>とその位置の列に変える。合字や字詰めもここで決まる。</li>
       <li data-frag><strong><a class="t" href="#g-fallback">フォールバック</a></strong>：欧文のフォントに和文を打つと、グリフがない。代わりのフォントを、端末ごとの既定に頼らずファイルの設定（既定は Noto Sans JP）で決め、全員の見た目を揃える。</li>
@@ -308,6 +342,14 @@
   <section class="s" id="permissions">
     <h2>組織・チーム・プロジェクトと権限</h2>
     <p>資源は <strong>組織 → チーム → プロジェクト → ファイル</strong> の階層です（ほかに、プロジェクトに属さない個人の下書き）。本家は 2026-08-03 から「プロジェクト」を「フォルダー」に改名していますが、この設計は「プロジェクト」のままです。</p>
+    <pre class="mermaid">flowchart TD
+  O["組織"] --> T["チーム"]
+  T --> P["プロジェクト"]
+  P --> F["ファイル"]
+  O --> DR["個人の下書き<br>(所有者ごと・プロジェクトなし)"]
+  DR --> F2["ファイル"]
+  F --> E{"編集できる?"}
+  E -- "edit の水準と<br>Full のシートの両方" --> OK["編集できる"]</pre>
     <ul>
       <li data-frag><strong>水準は全順序</strong>：<code>none &lt; view_prototype &lt; view &lt; edit &lt; owner</code>。上位で与えた役割は下位に届き、下位で下げられない。</li>
       <li data-frag><strong><a class="t" href="#g-generalaccess">一般アクセス</a></strong>：「招待した人だけ」「組織の中」「リンクを知っている全員」。プロジェクトとファイルに置く。</li>
@@ -346,6 +388,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>Aurora の表は 62、DynamoDB の表は 3 あります。核は次の数個です。ファイルの中身は表ではなく、DynamoDB のジャーナルと S3 のチェックポイントにあります。</p>
+    <p>まず <code>orgs</code> と <code>files</code> の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   orgs ||--|{ org_members : "has"
   orgs ||--o{ teams : "has"

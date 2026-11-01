@@ -75,6 +75,15 @@
   <section class="s" id="product">
     <h2>宿泊のマーケットプレイスは何をするサービスか</h2>
     <p>Airbnb は、個人や事業者が住まいや部屋を貸し、旅行者が地図と日付で泊まる所を探して予約する場です。本家のホストは 550 万人を超え、有効な<a class="t" href="#g-listing">リスティング</a>は 900 万件を超えます。2026 年の第 2 四半期の予約の泊と席は 1 億 4,830 万でした。この設計は、日本を最初の市場にして、海外のゲストも受けます。</p>
+    <pre class="mermaid">flowchart LR
+  G["ゲスト"] -- "地図と日付で探す・<br>予約・支払い" --> SYS["このシステム"]
+  H["ホスト"] -- "リスティング・<br>カレンダー・料金" --> SYS
+  P["共同ホスト・PMS"] -- "ホストに代わって管理" --> SYS
+  O["運用・CS・安全"] -- "審査・介入・補償" --> SYS
+  SYS <-- "iCal で空室を同期" --> X["他の掲載先"]
+  SYS -- "決済・為替" --> PAY["決済の提供者"]
+  SYS -- "チェックインの<br>24 時間後に送金" --> BK["提携銀行"]
+  BK -. "振込" .-> H</pre>
     <div class="cards">
       <div class="card" data-frag><h3>ゲスト</h3><p>家族や友人の数人で 2〜5 泊が中心です。海外の人は英語・中国語・韓国語で日本の地名を探し、自分の通貨で払いたいです。</p></div>
       <div class="card" data-frag><h3>ホスト</h3><p>自宅の一部や空き家を貸す個人と、複数の物件を持つ事業者です。多くは他の掲載先にも同じ物件を出します。</p></div>
@@ -91,9 +100,38 @@
   <section class="s" id="nights">
     <h2>泊と日付の範囲：[check_in, check_out)</h2>
     <p>宿泊は「夜」で数えます。2026-12-30 にチェックインし、2027-01-02 にチェックアウトする滞在は、12/30・12/31・1/1 の <strong>3 泊</strong>です。設計は、これを<strong>チェックインの日を含み、チェックアウトの日を含まない</strong>半開区間 <code>[2026-12-30, 2027-01-02)</code> で書きます。PostgreSQL の <a class="t" href="#g-daterange">daterange</a> も、既定で同じ形です。</p>
-    <pre><code>泊   12/30  12/31  1/1  │ 1/2
-     ■      ■      ■    │ □  ← チェックアウトの日は泊でない
-次の滞在は 1/2 にチェックインできる（[1/2, …)）</code></pre>
+    <figure class="diagram">
+      <svg viewBox="0 0 640 176" role="img" aria-label="予約 A は 12/30 から 1/2 の前日までの 3 泊、予約 B は 1/2 から 2 泊。チェックアウトの日 1/2 に次のゲストがチェックインでき、重ならない">
+        <g style="font-size:13px;fill:var(--text)">
+          <text x="8" y="30">夜</text>
+          <text x="8" y="70">予約 A</text>
+          <text x="8" y="118">予約 B</text>
+        </g>
+        <g style="font-size:13px;fill:var(--muted)" text-anchor="middle">
+          <text x="168" y="30">12/30</text>
+          <text x="264" y="30">12/31</text>
+          <text x="360" y="30">1/1</text>
+          <text x="456" y="30">1/2</text>
+          <text x="552" y="30">1/3</text>
+        </g>
+        <g style="stroke:var(--accent);stroke-width:1;fill:var(--accent-soft)">
+          <rect x="120" y="48" width="96" height="32"/>
+          <rect x="216" y="48" width="96" height="32"/>
+          <rect x="312" y="48" width="96" height="32"/>
+        </g>
+        <g style="stroke:var(--ok);stroke-width:1;fill:var(--ok-soft)">
+          <rect x="408" y="96" width="96" height="32"/>
+          <rect x="504" y="96" width="96" height="32"/>
+        </g>
+        <g style="font-size:13px;fill:var(--text)" text-anchor="middle">
+          <text x="264" y="69">[12/30, 1/2) の 3 泊</text>
+          <text x="504" y="117">[1/2, 1/4) の 2 泊</text>
+        </g>
+        <line x1="408" y1="40" x2="408" y2="140" style="stroke:var(--ng);stroke-width:1.5;stroke-dasharray:4 3"/>
+        <text x="408" y="162" text-anchor="middle" style="font-size:13px;fill:var(--ng)">1/2：A のチェックアウト ＝ B のチェックイン（重ならない）</text>
+      </svg>
+      <figcaption>1 マスが 1 泊。チェックアウトの日は泊に数えません。</figcaption>
+    </figure>
     <ul>
       <li><strong>日付は物件の現地の日付</strong>です。時刻もタイムゾーンも持ちません。東京の 12/30 の夜は、どの国のゲストから見ても 12/30 の夜です。</li>
       <li><strong>瞬間は別に計算します。</strong>チェックインの時刻（例 15:00）、予約の締め切り、キャンセルの境、送金の時刻は、<a class="t" href="#g-property-tz">物件のタイムゾーン</a>で現地の時刻から UTC の瞬間に直します。計算は <code>packages/stay-time</code> の 1 か所です。</li>
@@ -409,7 +447,7 @@
 
   <section class="s" id="data-model">
     <h2>データモデルの読み方</h2>
-    <p>Aurora は 4 つのクラスタに分かれます。core（アカウント・リスティング・<code>stay_claims</code>・見積もり・予約・届出住宅）、ledger（口座・仕訳・決着・送金）、content（メッセージ・レビュー・T&amp;S）、vault（正確な位置・名簿・旅券・送金の口座）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。</p>
+    <p>Aurora は 4 つのクラスタに分かれます。core（アカウント・リスティング・<code>stay_claims</code>・見積もり・予約・届出住宅）、ledger（口座・仕訳・決着・送金）、content（メッセージ・レビュー・T&amp;S）、vault（正確な位置・名簿・旅券・送金の口座）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。まず listings と stay_claims、reservations の 3 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   listings ||--o{ stay_claims : "nights claimed"
   listings ||--o{ quotes : "priced"

@@ -75,6 +75,14 @@
   <section class="s" id="product">
     <h2>フリマアプリは何をするサービスか</h2>
     <p>Mercari は、個人が家の使わない品をスマートフォンで出し、知らない個人に売る <a class="t" href="#g-c2c">C2C</a> のフリマです。本家の日本のマーケットプレイスの月間の利用者は 2,419 万人（2026 年 6 月期の第 4 四半期）です。運営は代金を預かり、取引が終わると、販売の手数料（10%）を引いて売り手に渡します。</p>
+    <pre class="mermaid">flowchart LR
+  SE["売り手"] -- "出品する・発送する" --> SYS["このシステム<br>(代金を預かる)"]
+  BU["買い手"] -- "探す・買う・受取評価" --> SYS
+  SYS -- "支払い" --> PAY["決済の提供者"]
+  SYS -- "匿名の配送の手配" --> CA["運送会社"]
+  CA -. "配送の事象" .-> SYS
+  SYS -- "売上金の振込" --> BK["提携銀行"]
+  OP["運用者・CS"] -- "審査・介入" --> SYS</pre>
     <div class="cards">
       <div class="card" data-frag><h3>売り手</h3><p>写真を撮り、題名・状態・価格を決めて<a class="t" href="#g-listing">出品</a>します。初めて売る人が多く、相場がわかりません。</p></div>
       <div class="card" data-frag><h3>買い手</h3><p>中古の品を安く探します。相場を調べる人、欲しい品の新着を待つ人がいます。</p></div>
@@ -309,6 +317,14 @@
     <h2>メッセージの悪用と通信の秘密</h2>
     <p>取引のメッセージやコメントで、「直接振り込んでくれれば安くします」と<a class="t" href="#g-off-platform">外部の取引に誘う</a>人がいます。預かりの外で払うと、品が届かなくても運営は返金できません。連絡先や住所の交換も、匿名の配送を壊します。</p>
     <p>そこで送る時に、決定的な検査をメモリーの中で行います。検出の前に、すり抜けの書き方を正規化します。</p>
+    <pre class="mermaid">flowchart LR
+  SEND["送る文"] --> N["正規化<br>(全角・かな・読みを直す)"]
+  N --> D{"決まった規則で検出"}
+  D -- "block" --> R["送らない<br>理由のコードだけ記録"]
+  D -- "warn" --> W["送る前に本人へ確認"]
+  D -- "allow" --> OK["保存して届ける"]
+  W -- "本人が送る" --> OK
+  OK -. "公開のコメントだけ" .-> CL["文の分類器<br>(信号だけ出す)"]</pre>
     <div class="compare">
       <div class="bad"><h3>送られた文</h3><p>「ぜろきゅうぜろ‐１２３４‐５６７８ に連絡を」「abc アットマーク example ドット com」</p></div>
       <div class="good"><h3>正規化の後</h3><p>「09012345678」「abc@example.com」→ 電話・メールとして <code>block</code>。記録は理由のコードだけで、一致した文字は残しません。</p></div>
@@ -320,6 +336,16 @@
   <section class="s" id="ratings">
     <h2>評価と信用：完了まで伏せる</h2>
     <p>取引ごとに、買い手と売り手が互いを評価します（この設計は <code>good</code>・<code>normal</code>・<code>bad</code> の 3 段。本家は 2 段）。買い手の評価は受取評価と同時に付けます。どちらの評価も<a class="t" href="#g-sealed">伏せて</a>書き、完了の遷移と同じトランザクションで同時に公開します。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant B as 買い手
+  participant T as 取引
+  participant S as 売り手
+  B->>T: 受取評価と評価
+  T->>T: 評価を伏せて書く (received)
+  T->>S: 評価してください (期限 3 日)
+  S->>T: 評価 (買い手の評価は見えない)
+  T->>T: 完了 (completed) と同じ<br>トランザクションで両方を公開
+  Note over T: 売り手が期限までに評価しなければ<br>完了し、買い手の評価だけを公開</pre>
     <div class="quiz" data-answer="2">
       <p class="q">買い手が付けた評価を、すぐ売り手に見せてよいですか？</p>
       <div class="opts">
@@ -365,7 +391,7 @@
 
   <section class="s" id="data-model">
     <h2>データモデルの読み方</h2>
-    <p>Aurora は 3 つのクラスタに分かれます。core（アカウント・出品・取引・配送・評価）、ledger（口座・仕訳・ロット・振込）、content（保存した検索・メッセージ・T&amp;S・紛争）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。</p>
+    <p>Aurora は 3 つのクラスタに分かれます。core（アカウント・出品・取引・配送・評価）、ledger（口座・仕訳・ロット・振込）、content（保存した検索・メッセージ・T&amp;S・紛争）です。クラスタをまたぐ参照には外部キーを張らず、照合で守ります。下は主な表だけの図です。まず listings と transactions の 2 つの表から見てください。</p>
     <pre class="mermaid">erDiagram
   accounts ||--o{ listings : "sells"
   listings ||--o{ transactions : "at most 1 active"

@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>Salesforce は何をするサービスか</h2>
     <p>Salesforce は、B2B の営業チームが顧客・見込み客・商談・活動を記録し、チームで共有して、売上の見込みを管理する <a class="t" href="#g-crm">CRM</a> です。同時に、会社ごとに項目・画面・自動化を変えられる「業務アプリの基盤」でもあります。</p>
+    <pre class="mermaid">flowchart LR
+  REP["営業の担当者"] -->|"商談と活動を記録"| SF["Salesforce<br>組織 = テナント"]
+  MGR["管理職"] -->|"パイプラインと<br>レポートを見る"| SF
+  ADM["組織の管理者"] -->|"項目・画面・<br>自動化を設定"| SB["Sandbox"]
+  SB -->|"試してからデプロイ"| SF
+  DEV["連携の開発者"] -->|"API と一括の API"| SF
+  SF -->|"変更のイベント・<br>Webhook"| EXT["基幹・MA などの<br>外のシステム"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>業務に合わせて変えられる</h3><p>管理者が画面の操作で、オブジェクト・項目・画面・自動化を足す。コードは書かない。</p></div>
       <div class="card" data-frag><h3>見せてよい人にだけ見せる</h3><p>上司は部下の商談を見られるが、他の支店の商談は見えない、を設定で決める。</p></div>
@@ -151,6 +158,13 @@
   <section class="s" id="metadata">
     <h2>メタデータ駆動：オブジェクトも項目も「データ」</h2>
     <p>Salesforce の一番の特徴は、会社ごとの違いをコードや DB の構造ではなく<a class="t" href="#g-metadata">メタデータ</a>として持つことです。管理者が<a class="t" href="#g-customobj">カスタムオブジェクト</a>「契約」や、取引先の項目「地域」を足すと、メタデータの表に行が増えるだけです。</p>
+    <pre class="mermaid">flowchart LR
+  A["管理者が項目<br>地域を足す"] --> B["メタデータの表に<br>行が増える"]
+  B --> C["組織のバージョンが<br>1 つ上がる"]
+  C --> D["変わった部品だけ<br>コンパイルし直す"]
+  D --> E["キャッシュに置く"]
+  E --> F["問い合わせと保存が<br>SQL を作る"]
+  N["DB の表の形は<br>変えない"] -.- B</pre>
     <ul>
       <li data-frag><strong>名前の決まり</strong>：標準は接頭辞なしの小文字のスネーク（<code>account</code>、<code>close_date</code>）、カスタムは <code>x_</code> の接頭辞（<code>x_region</code>）。本家の <code>__c</code> は使いません。</li>
       <li data-frag><strong>項目の型</strong>：テキスト、数値、通貨、日付、<a class="t" href="#g-picklist">選択リスト</a>、<a class="t" href="#g-lookup">参照</a>、<a class="t" href="#g-md">主従</a>、<a class="t" href="#g-formula">数式</a>、<a class="t" href="#g-rollup">積み上げ集計</a>など。</li>
@@ -272,6 +286,13 @@
   <section class="s" id="recalc">
     <h2>事前計算・閉包・再計算・スキュー</h2>
     <p>読むたびに共有を全て計算すると、ページの表示の目安 300ms に収まりません。本家も、設定が変わった時に計算して保存しています。この設計は、何を行に持ち、何を問い合わせの時に結ぶかを分けています。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> building: 管理者がルールを足す
+  building --> building: Worker が 1 万件ずつ共有の行を作る
+  building --> active: 標本の照合が合えば、バージョンを上げて切り替え
+  active --> retired: 新しいルールに置き換わる
+  retired --> [*]: Worker が古い行を消す
+  note right of building: 作っている間は古いルールで判定する</pre>
     <div class="cards">
       <div class="card" data-frag><h3>行に持つ（事前計算）</h3><p>レコードの条件の共有ルール・手動・チームは <code>record_shares</code> に、暗黙の親は子ごとの行に持つ。条件のルールの追加は、全レコードを評価し直す<a class="t" href="#g-recalc">再計算</a>になる。</p></div>
       <div class="card" data-frag><h3>問い合わせの時に結ぶ</h3><p>所有者・ロール階層・所有者の条件のルール・OWD は、<code>owner_id</code> と<a class="t" href="#g-closure">閉包</a>の表を結んで判定する。OWD の変更はバージョンの切り替えだけで、行を書き直さない。</p></div>
@@ -296,6 +317,13 @@
   <section class="s" id="reports">
     <h2>画面・レポート・検索：見えない行を数えない</h2>
     <p>営業の担当者は、<a class="t" href="#g-layout">ページレイアウト</a>の画面でレコードを開き、<a class="t" href="#g-listview">リストビュー</a>で一覧を見て、レポートとダッシュボードで集計を見ます。どれも<strong>見る人の権限</strong>で毎回コンパイルします。</p>
+    <pre class="mermaid">flowchart LR
+  U["見る人"] --> C["見る人の権限で<br>毎回コンパイル"]
+  C --> Q["SQL に共有と<br>FLS の条件を付ける"]
+  Q --> R["見える行だけを<br>表示・集計する"]
+  U --> S["検索の索引で<br>候補を探す"]
+  S --> V["データ層で共有を<br>確かめ直す"]
+  V --> R2["見える行だけ返す<br>件数の合計は返さない"]</pre>
     <ul>
       <li data-frag><strong>レイアウトは狭めるだけ。</strong>FLS で読めない項目は、レイアウトにあっても出ない。レイアウトの必須は画面の保存だけに効く。</li>
       <li data-frag><strong>レポート</strong>：表形式・サマリー・マトリックス。件数・合計・平均のどれにも、見えない行を入れない。</li>
@@ -317,6 +345,13 @@
   <section class="s" id="integrations">
     <h2>API・一括・変更のイベント・Webhook</h2>
     <p>CRM は、基幹システム・名刺管理・MA（マーケティングの自動化）とつながって使われます。連携の道具は 4 つです。</p>
+    <pre class="mermaid">flowchart LR
+  EXT["基幹・名刺管理・MA"] -->|"REST API"| SF["Salesforce"]
+  EXT -->|"一括の API<br>200 行ずつ"| SF
+  SF -->|"確定の順に書く"| EV["変更のイベントのログ<br>3 日持つ"]
+  EV -->|"replay_id から<br>取り直せる"| SUB["購読者"]
+  EV --> WH["Webhook の送信<br>本番と別の送信の網"]
+  WH -->|"署名付き"| OUT["外のサーバー"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>REST API と問い合わせの言語</h3><p>レコードの CRUD と、SQL に寄せた独自の問い合わせの言語。親へは <code>account.name</code> のようにドットでたどる。</p></div>
       <div class="card" data-frag><h3><a class="t" href="#g-bulk">一括の API</a></h3><p>大量の登録・更新・削除・問い合わせのジョブ。200 行ずつ処理し、行ごとに成否を返す（部分の成功）。<a class="t" href="#g-upsert">upsert</a> は<a class="t" href="#g-extid">外部 ID</a> で既存を探す。</p></div>
@@ -361,6 +396,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 171 表ありますが、核は次の数個です。組織の表は、主キーと全ての索引の先頭に <code>org_id</code> を持ち、レコードの系の表は末尾に <code>shard_no</code> を持ちます。</p>
+    <p>まず <code>orgs</code>・<code>md_objects</code>・<code>records</code> の 3 つの表から見てください。全てのレコードが <code>records</code> の 1 つの表に入ります。</p>
     <pre class="mermaid">erDiagram
   orgs ||--o{ users : "has"
   orgs ||--o{ md_objects : "defines"

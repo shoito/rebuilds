@@ -75,6 +75,13 @@
   <section class="s" id="product">
     <h2>Zoom は何をするサービスか</h2>
     <p>Zoom Meetings は、離れた人どうしが音声・映像・画面共有で話すビデオ会議です。URL を開くと会議に入れ、主催者が参加者を管理します。社外の人も、アカウントなしでブラウザから入ります。</p>
+    <pre class="mermaid">flowchart LR
+  H["主催者"] -- "会議を作る・参加者を管理" --> Z["ビデオ会議のサービス"]
+  P["社内の参加者"] -- "URL を開いて入る" --> Z
+  G["社外の人<br>アカウントなし"] -- "ブラウザから入る" --> Z
+  A["組織の管理者"] -- "ユーザー・既定の設定・録画の保持" --> Z
+  Z -- "ほかの人の音声・映像・画面共有を届ける" --> P
+  Z -- "録画・字幕" --> R[("録画と文字起こし")]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>すぐに集まれる</h3><p>URL を開くだけで、ブラウザから 3 秒程度で音声がつながる。</p></div>
       <div class="card" data-frag><h3>遅れず、途切れない</h3><p>話してから届くまで p95 300ms 以内。損失 20% の回線でも音声で会話を続けられる。</p></div>
@@ -100,6 +107,11 @@
   <section class="s" id="latency">
     <h2>遅れ・揺らぎ・損失：会話の物差し</h2>
     <p>人は音声の遅れに敏感です。ITU-T G.114 は、片道 150ms 以下なら会話がほぼ自然、400ms を超えると許容できないとしています。そこで設計は、音声の口から耳まで（mouth-to-ear）p95 200ms、映像の撮影から表示まで（<a class="t" href="#g-g2g">glass-to-glass</a>）p95 300ms を目標にします。</p>
+    <pre class="mermaid">flowchart LR
+  S["送り手<br>音声を小さく分けて送る"] -- "UDP の RTP" --> N["網<br>遅れ・揺らぎ・損失"]
+  N --> J["ジッタバッファ<br>溜めて間隔を均す"]
+  J --> O["再生<br>欠けても今の音声"]
+  N -. "TCP なら" .-> T["失った分の再送を待つ<br>後続も止まる"]</pre>
     <div class="cards">
       <div class="card" data-frag><h3>遅れ（RTT）</h3><p>往復の時間。距離と経路で決まる。サーバーを日本に置く理由。</p></div>
       <div class="card" data-frag><h3>揺らぎ（ジッタ）</h3><p>パケットの到着の間隔のばらつき。受け手は<a class="t" href="#g-jitterbuffer">ジッタバッファ</a>で溜めて均すが、溜めた分だけ遅れる。</p></div>
@@ -219,6 +231,15 @@
   <section class="s" id="video">
     <h2>映像：符号器・キーフレーム・層</h2>
     <p>映像の符号器は VP8・H.264（どのブラウザも必須）、VP9、AV1 です。映像は差分で圧縮するので、途中から見るには「それだけで描ける」<a class="t" href="#g-keyframe">キーフレーム</a>が要ります。受け手が欲しいときは RTCP の <a class="t" href="#g-pli">PLI</a> で求めます。</p>
+    <pre class="mermaid">flowchart LR
+  S["送り手"] --> L["180p"]
+  S --> M["360p"]
+  S --> H["720p"]
+  L --> F["SFU<br>受け手ごとに 1 本を選ぶ"]
+  M --> F
+  H --> F
+  F -- "720p" --> A["回線の良い受け手"]
+  F -- "180p" --> B["回線の細い受け手"]</pre>
     <div class="compare">
       <div data-frag><h3><a class="t" href="#g-simulcast">simulcast</a>（既定）</h3><p>送り手が同じ映像を 3 本（180p・360p・720p）別々に符号化して送る。SFU は受け手ごとに 1 本を選ぶ。本を替えるときはキーフレームが要る。VP8 で使う。</p></div>
       <div data-frag><h3><a class="t" href="#g-svc">SVC</a></h3><p>1 本の流れの中に層を重ねる。<code>L3T3_KEY</code> は空間の層 3・時間の層 3。SFU は層を剥がすだけ。上りが少なく済む。全員が Chromium の会議だけ VP9 で使う。</p></div>
@@ -287,6 +308,14 @@
   <section class="s" id="safety">
     <h2>会議の荒らしと、待合室・パスコード</h2>
     <p>2020 年、会議の URL や番号が漏れて知らない人が入り込み、会議を荒らす事件が相次ぎました（「Zoombombing」）。本家は 2020-09-27 から、<a class="t" href="#g-waitingroom">待合室</a>かパスコードのどちらかを必ず有効にしています。設計も同じ規則を DB の CHECK で守ります。</p>
+    <pre class="mermaid">flowchart LR
+  J["URL か番号で入る"] --> K{"URL に参加の鍵がある"}
+  K -- "いいえ" --> P["パスコードを入れる<br>誤りの回数を制限"]
+  K -- "はい" --> W{"身元で待合室を省ける<br>同じ組織・招待など"}
+  P --> W
+  W -- "いいえ" --> R["待合室で待つ"]
+  R -- "主催者が入れる" --> M["会議"]
+  W -- "はい" --> M</pre>
     <ul>
       <li data-frag><strong>会議の番号は秘密ではない。</strong>画面に出し、電話でも読み上げます。11 桁の乱数でも、有効な番号が多ければ推測で当たります（S3 の見込みで 1 回あたり約 1/9,000）。だから番号だけでは入れない形にします。</li>
       <li data-frag><strong><a class="t" href="#g-joinkey">参加の鍵</a></strong>（128 ビット）は URL の <code>#k=</code> に置きます。フラグメントはサーバーへ送られないので、アクセスログや <code>Referer</code> に残りません。</li>
@@ -308,6 +337,16 @@
   <section class="s" id="e2ee">
     <h2>暗号化：ホップごとと E2EE</h2>
     <p>「暗号化している」には 2 つの意味があります。SFU を通す会議では、この違いが機能の可否を決めます。</p>
+    <pre class="mermaid">flowchart LR
+  subgraph HOP["ホップごと（既定）"]
+    A1["端末"] -- "SRTP" --> N1["Media Node<br>中身を平文で扱える<br>録画・字幕ができる"]
+    N1 -- "SRTP" --> B1["端末"]
+  end
+  subgraph E2E["E2EE"]
+    A2["端末"] -- "SFrame と SRTP" --> N2["Media Node<br>中身は読めない<br>ヘッダーで層を選ぶ"]
+    N2 -- "SFrame と SRTP" --> B2["端末"]
+    A2 -. "MLS で鍵を共有" .- B2
+  end</pre>
     <div class="compare">
       <div data-frag><h3>ホップごと（既定）</h3><p>DTLS-SRTP。端末と Media Node の間を暗号化する。Media Node は中身を平文で扱えるので、録画・字幕ができる。</p></div>
       <div data-frag><h3><a class="t" href="#g-e2ee">E2EE</a>（選べる）</h3><p>端末が符号化の後のフレームを <a class="t" href="#g-sframe">SFrame</a> で暗号化し、さらに SRTP で包む。鍵は <a class="t" href="#g-mls">MLS</a> で参加者だけが共有し、サーバーは持たない。</p></div>
@@ -363,6 +402,7 @@
   <section class="s" id="datamodel">
     <h2>データモデルの読み方</h2>
     <p>全部で 68 表ありますが、核は次の数個です。組織に属する表は主キーの先頭に <code>org_id</code> を持ち、FORCE RLS で分けます（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。</p>
+    <p>まず meetings と meeting_instances の 2 つの表から見てください。会議と、実際に集まった 1 回の開催です。</p>
     <pre class="mermaid">erDiagram
   organizations ||--o{ users : "has"
   users ||--o{ meetings : "hosts"
