@@ -101,6 +101,7 @@
 | DOC-018 | Google Calendar | [time-zones-and-holidays.md](../systems/google-calendar/docs/architecture/time-zones-and-holidays.md)、[free-busy-and-scheduling.md](../systems/google-calendar/docs/architecture/free-busy-and-scheduling.md)、ADR-0017 | 「README の 6 節の持ち越しを閉じる」「持ち越していた」と書くが、指す項目が README にも design-log にもない | Dev | 解決（2026-10-25：持ち越しは design-log に移されていなかったので、経緯の説明と ADR-0017 の注記で示した） |
 | DOC-019 | Workday | [payroll-engine.md](../systems/workday/docs/architecture/payroll-engine.md) 4.2 節 | 既定値（締日 20 日、支給日 25 日、3 営業日前）を 2026 年 12 月に当てると、締日から確定の期限までが実質 1 営業日になる。勤怠の締めと入力の固定の期限は値がない | PM、Ops | 解決（2026-10-25、推奨で決めた：期限を会社ごとの設定にし、営業日が 2 日より少ない月に警告。既定値は置かない） |
 | DOC-020 | Salesforce | [orgs-users-and-auth.md](../systems/salesforce/docs/architecture/orgs-users-and-auth.md) 7.1 節 | 移行用の権限 `set_audit_fields_on_import` は既定でどの権限セットにもなく、自分の持たない権限は渡せない規則のため、誰も付けられなかった（FOL-005 の反映で見つかった） | Dev | 解決（2026-10-25、推奨で決めた：管理者の依頼で運用者が期限つき・2 人の承認で付ける） |
+| DOC-021 | 共通、Datadog、X、Workday | [共通の前提知識](primer/index.html) の 2 つの用語集、[Datadog](../systems/datadog/docs/primer/index.html)・[X](../systems/x/docs/primer/index.html)・[Workday](../systems/workday/docs/primer/index.html) の資料の用語集 | [AUTHORING.md](primer/AUTHORING.md) は「各 `dt` に `id="g-…"`」とするが、13 語（p99、SLO、RPO、RTO、AZ、Aurora Global Database、OTLP、StatsD、IR、発信者情報の開示、墓石、社労士・税理士、全銀協の規定形式）に `id` がない。用語の索引（`docs/glossary/`）は `id` のある語だけを集めるので、これらは載らない | Dev | 解決（2026-11-01、13 語に `id="g-…"` を付け、用語の索引に載せた） |
 
 ## 5. ADR が承認されたら直す文書
 

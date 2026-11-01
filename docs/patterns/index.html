@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>題材をまたぐパターンの索引 | rebuilds</title>
+<meta property="og:site_name" content="rebuilds">
+<meta property="og:type" content="website">
+<meta property="og:title" content="題材をまたぐパターンの索引 | rebuilds">
+<meta property="og:description" content="同じ設計の問題が、どの題材のどの文書に出てくるかをテーマごとにまとめた索引。">
+<meta property="og:url" content="https://shoito.github.io/rebuilds/docs/patterns/">
+<meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="同じ設計の問題が、どの題材のどの文書に出てくるかをテーマごとにまとめた索引。">
+<link rel="icon" href="../../docs/primer/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../docs/primer/assets/primer.css">
+<style>
+  main.page { margin: 0 auto; padding: 24px 16px 64px; max-width: 980px; }
+  .page .hero { margin-bottom: 24px; }
+  .page .source { color: var(--muted); font-size: .85em; margin: .6em 0 0; }
+  .page h2 { font-size: 1.3em; margin: 1.8em 0 .7em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); color: var(--accent-strong); }
+  /* Keep cells readable on phones; the table scrolls sideways instead (primer.css). */
+  .page table th, .page table td { min-width: 9em; overflow-wrap: break-word; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="../../index.html">← <span>題材の一覧</span></a>
+  <div class="title">題材をまたぐパターンの索引</div>
+</header>
+<main class="page">
+<header class="hero">
+  <h1>題材をまたぐパターンの索引</h1>
+  <p class="source">このページは <a href="https://github.com/shoito/rebuilds/blob/main/docs/patterns.md">docs/patterns.md</a> から生成しています。</p>
+</header>
+<p>同じ設計の問題が、いくつもの題材に形を変えて出てくる。この文書は、テーマごとに「どの題材のどの文書から読むとよいか」をまとめた索引である。設計そのものは各題材の文書と ADR にあり、ここでは説明し直さない。</p>
+<ul>
+<li>「最初に読む」は、そのテーマが題材の主な論点になっていて、いちばん詳しく書いてある題材。</li>
+<li>「資料」は前提知識の資料（GitHub Pages）の節、「ADR」は設計の決定。</li>
+<li>どの題材にも共通する土台（RLS、UUIDv7、outbox、冪等、フラグ）は、先に <a href="../primer/index.html">共通の前提知識</a> を読む。</li>
+</ul>
+<h2>読む順の道筋</h2>
+<p>目的に合わせて、題材を次の順に読むと、前の題材の知識が次の題材の前提になる。</p>
+<table>
+<thead>
+<tr>
+<th>道筋</th>
+<th>順</th>
+<th>身につくこと</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>はじめの一歩</td>
+<td>Slack → Stripe → GitHub</td>
+<td>outbox と配信、冪等と台帳、権限とイベントの配信。どの題材にも出る土台</td>
+</tr>
+<tr>
+<td>お金</td>
+<td>Stripe → Mercari → Airbnb → Shopify</td>
+<td>複式簿記の台帳、預かりと決着、結果の分からない決済、売り越しの防止</td>
+</tr>
+<tr>
+<td>共同編集と同期</td>
+<td>Figma → Notion → Linear → Dropbox → Google Calendar</td>
+<td>権威サーバー、CRDT、ローカルファースト、ファイルの衝突、差分同期のトークン</td>
+</tr>
+<tr>
+<td>大量のイベント</td>
+<td>X → Datadog → YouTube</td>
+<td>ファンアウト、数の集計、時系列の保存、取り込みの割り当て、配信</td>
+</tr>
+<tr>
+<td>業務のプラットフォーム</td>
+<td>Salesforce → ServiceNow → Workday</td>
+<td>メタデータ駆動、ワークフローと SLA、有効日付、給与の計算</td>
+</tr>
+<tr>
+<td>リアルタイムと位置</td>
+<td>Slack → Zoom → Uber</td>
+<td>常時の接続、メディアの中継、位置の索引とマッチング</td>
+</tr>
+<tr>
+<td>信頼と安全</td>
+<td>Auth0 → Gmail → X → Mercari</td>
+<td>認証と攻撃の防御、送信者の認証と迷惑メール、モデレーション、不正</td>
+</tr>
+</tbody></table>
+<h2>ロールから探す</h2>
+<p>AI エージェントの観点（任せないこと、誤りを止める仕組み、確認ループと eval）は <a href="../agents/index.html">agents.md</a> にまとめている。</p>
+<p>PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題材の資料の最初の節「この題材から学べること」に、ロールごとの学びと、読む設計の文書（PM は intent と roadmap、Dev は architecture と ADR、QA は quality、Ops は runbooks）をまとめている。</p>
+<table>
+<thead>
+<tr>
+<th>ロール</th>
+<th>題材</th>
+<th>学べること</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>PM</td>
+<td><a href="../../systems/slack/docs/primer/index.html#learn">Slack</a></td>
+<td>spec・plan・quality が揃った変更の実例。価値を 3 つに絞り、未読数を近似と割り切る</td>
+</tr>
+<tr>
+<td>PM</td>
+<td><a href="../../systems/mercari/docs/primer/index.html#learn">メルカリ</a></td>
+<td>法令の結論を待つ値を設定に切り出し、結論まで本番で有効にしない</td>
+</tr>
+<tr>
+<td>PM</td>
+<td><a href="../../systems/uber/docs/primer/index.html#learn">Uber</a></td>
+<td>制度の線引き（運送の主体）から範囲を決め、法令の論点をフラグと記録で本番の関門にする</td>
+</tr>
+<tr>
+<td>PM</td>
+<td><a href="../../systems/workday/docs/primer/index.html#learn">Workday</a></td>
+<td>誤り 0 件のゴールデンデータと 3 か月の並行稼働を、切り替えの判定にする</td>
+</tr>
+<tr>
+<td>Dev</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html#learn">Airbnb</a></td>
+<td>日付の範囲の排他の制約で、同じ夜を二度売らないことを DB が拒む</td>
+</tr>
+<tr>
+<td>Dev</td>
+<td><a href="../../systems/shopify/docs/primer/index.html#learn">Shopify</a></td>
+<td>熱い在庫の行を分け、注文をちょうど 1 回にし、他人のコードを砂場で動かす</td>
+</tr>
+<tr>
+<td>Dev</td>
+<td><a href="../../systems/github/docs/primer/index.html#learn">GitHub</a></td>
+<td>3 つの複製の合意で、成功を返した push を失わない</td>
+</tr>
+<tr>
+<td>Dev</td>
+<td><a href="../../systems/notion/docs/primer/index.html#learn">Notion</a></td>
+<td>テキストは CRDT、構造はサーバーの順序と使い分け、最初から論理シャードを持つ</td>
+</tr>
+<tr>
+<td>QA</td>
+<td><a href="../../systems/linear/docs/primer/index.html#learn">Linear</a></td>
+<td>本物の同期のコードを決定的なシミュレーターで毎晩 20 万の列に通す</td>
+</tr>
+<tr>
+<td>QA</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#learn">Stripe</a></td>
+<td>お金の不変条件を性質にし、コネクタの障害注入と照合で確かめ続ける</td>
+</tr>
+<tr>
+<td>QA</td>
+<td><a href="../../systems/workday/docs/primer/index.html#learn">Workday</a></td>
+<td>給与の期待値を、実装と独立したゴールデンデータセットで持つ</td>
+</tr>
+<tr>
+<td>QA</td>
+<td><a href="../../systems/auth0/docs/primer/index.html#learn">Auth0</a></td>
+<td>RFC から拒否の側のテストを作り、通してはいけない要求を先に決める</td>
+</tr>
+<tr>
+<td>Ops</td>
+<td><a href="../../systems/datadog/docs/primer/index.html#learn">Datadog</a></td>
+<td>監視のサービス自身を、別のアカウントの自己監視とデッドマンスイッチで見張る</td>
+</tr>
+<tr>
+<td>Ops</td>
+<td><a href="../../systems/zoom/docs/primer/index.html#learn">Zoom</a></td>
+<td>音声と映像の体感の品質を、回線の劣化の下の数値の SLO にする</td>
+</tr>
+<tr>
+<td>Ops</td>
+<td><a href="../../systems/gmail/docs/primer/index.html#learn">Gmail</a></td>
+<td>送信の評判、IP のブロックリスト、迷惑メールの波を運用の手順で扱う</td>
+</tr>
+<tr>
+<td>Ops</td>
+<td><a href="../../systems/google-calendar/docs/primer/index.html#learn">Google カレンダー</a></td>
+<td>tz データベースの改正という、外から来る時限の変更を運用で受ける</td>
+</tr>
+</tbody></table>
+<h2>テーマ別</h2>
+<h3>台帳（複式簿記）</h3>
+<p>お金や在庫を「残高の列の書き換え」ではなく「追記だけの仕訳の和」で持つ。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Stripe</strong>（最初に読む）</td>
+<td>勘定科目、熱い口座の分割</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#ledger">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0003-double-entry-ledger.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0016-hot-accounts-and-ledger-sharding.md">ADR-0016</a></td>
+</tr>
+<tr>
+<td>Mercari</td>
+<td>預かりと売上金、ポイントのロット</td>
+<td><a href="../../systems/mercari/docs/primer/index.html#escrow">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0003-escrow-and-double-entry-ledger.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0039-points-as-separate-lot-accounts.md">ADR-0039</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>予約ごとの預かりの決着、為替</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html#money">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0005-payments-hold-capture-and-ledger.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0046-chart-of-accounts-and-journal-types.md">ADR-0046</a></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td>在庫の移動の台帳</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0023-inventory-movements-ledger-and-reconciliation.md">ADR-0023</a></td>
+</tr>
+<tr>
+<td>Uber・YouTube</td>
+<td>精算と照合、収益の分配と丸め</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0025-ledger-settlement-and-reconciliation.md">Uber ADR-0025</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0057-revenue-ledger-share-calculation-and-rounding.md">YouTube ADR-0057</a></td>
+</tr>
+<tr>
+<td>Workday</td>
+<td>有給の付与の台帳、給与の仕訳の書き出し</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0024-annual-leave-grant-ledger.md">ADR-0024</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0037-payroll-journal-export.md">ADR-0037</a></td>
+</tr>
+</tbody></table>
+<h3>ステートマシン</h3>
+<p>状態と遷移を決定表で決め、遷移の関数を 1 か所に置き、期限で自動に進める。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Stripe</strong>（最初に読む）</td>
+<td>結果が分からない状態、3DS の待ち</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#payment-intent">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0010-payment-intent-state-machine.md">ADR-0010</a></td>
+</tr>
+<tr>
+<td>Mercari</td>
+<td>取引の期限、自動の完了</td>
+<td><a href="../../systems/mercari/docs/primer/index.html#states">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0002-transaction-state-machine-and-single-purchase.md">ADR-0002</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>予約、仮押さえ、リクエストの期限</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0004-booking-state-machine-and-holds.md">ADR-0004</a></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td>チェックアウトと注文の一意</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0005-checkout-state-machine-and-exactly-once-orders.md">ADR-0005</a></td>
+</tr>
+<tr>
+<td>ServiceNow</td>
+<td>インシデント・変更・問題の過程</td>
+<td><a href="../../systems/servicenow/docs/primer/index.html#change">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0022-process-state-machines.md">ADR-0022</a></td>
+</tr>
+<tr>
+<td>Uber</td>
+<td>乗車の状態</td>
+<td><a href="../../systems/uber/docs/primer/index.html#states">資料</a></td>
+</tr>
+<tr>
+<td>Datadog・YouTube・X</td>
+<td>モニターの状態、異議の期限、フォローの状態</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0041-monitor-state-machine.md">Datadog ADR-0041</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md">YouTube ADR-0048</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0011-graph-edge-state-machine-and-locking.md">X ADR-0011</a></td>
+</tr>
+</tbody></table>
+<h3>一回性と熱い行（売り越し・二重予約の防止）</h3>
+<p>同じものを二度売らないことを、DB の制約で保証し、集中する行の待ちを減らす。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Shopify</strong>（最初に読む）</td>
+<td>フラッシュセールの在庫、行の分割</td>
+<td><a href="../../systems/shopify/docs/primer/index.html#hot-rows">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0004-inventory-reservation-model.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0020-inventory-slot-counters-and-reservation-sweep.md">ADR-0020</a></td>
+</tr>
+<tr>
+<td>Mercari</td>
+<td>一品の購入、集中する出品</td>
+<td><a href="../../systems/mercari/docs/primer/index.html#single-purchase">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0026-hot-listing-purchase-admission.md">ADR-0026</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>日付の範囲の排他の制約</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html#exclusion">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0002-availability-representation-and-double-booking.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0036-hot-date-admission-and-hold-limits.md">ADR-0036</a></td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>熱い口座</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0016-hot-accounts-and-ledger-sharding.md">ADR-0016</a></td>
+</tr>
+</tbody></table>
+<h3>ファンアウト</h3>
+<p>1 つの出来事を、多くの受け手に配る。書く時に配るか、読む時に集めるか。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>X</strong>（最初に読む）</td>
+<td>書く時と読む時の混ぜ方、有名人</td>
+<td><a href="../../systems/x/docs/primer/index.html#fanout">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0003-timeline-fanout-hybrid.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0015-fanout-pipeline-and-burst-control.md">ADR-0015</a></td>
+</tr>
+<tr>
+<td>Slack</td>
+<td>チャンネルへの常時の接続での配信</td>
+<td><a href="../../systems/slack/docs/primer/index.html#realtime">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0003-redis-pubsub-for-fanout.md">ADR-0003</a></td>
+</tr>
+<tr>
+<td>YouTube</td>
+<td>ライブのチャット、登録の通知の間隔</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0032-chat-sequencer-and-batched-fanout.md">ADR-0032</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0054-notification-fanout-pacing-and-coalescing.md">ADR-0054</a></td>
+</tr>
+<tr>
+<td>GitHub・Figma・Mercari</td>
+<td>通知、在席、保存した検索の通知</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0016-notification-fanout.md">GitHub ADR-0016</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0011-presence-and-fan-out.md">Figma ADR-0011</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0064-fanout-batching-quiet-hours-and-caps.md">Mercari ADR-0064</a></td>
+</tr>
+</tbody></table>
+<h3>共同編集と同期</h3>
+<p>複数の端末が同じデータを変え、食い違いを解く。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>方式</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Figma</strong>（最初に読む）</td>
+<td>中央の権威サーバー、プロパティごとの後勝ち</td>
+<td><a href="../../systems/figma/docs/primer/index.html#collab">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0002-central-authoritative-multiplayer.md">ADR-0002</a></td>
+</tr>
+<tr>
+<td>Notion</td>
+<td>テキストの CRDT とサーバーが決める構造</td>
+<td><a href="../../systems/notion/docs/primer/index.html#text-crdt">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0010-text-crdt-with-server-ordered-structure.md">ADR-0010</a></td>
+</tr>
+<tr>
+<td>Linear</td>
+<td>ローカルファースト、同期 ID と差分</td>
+<td><a href="../../systems/linear/docs/primer/index.html#localfirst">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0002-sync-model.md">ADR-0002</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/decisions/0007-sync-actions-and-range-proof-deltas.md">ADR-0007</a></td>
+</tr>
+<tr>
+<td>Dropbox</td>
+<td>3 つの木とファイルの衝突</td>
+<td><a href="../../systems/dropbox/docs/primer/index.html#sync">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0006-sync-conflict-model.md">ADR-0006</a></td>
+</tr>
+<tr>
+<td>Google Calendar・Gmail</td>
+<td>変更の記録と同期のトークン、JMAP と IMAP</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0005-change-log-and-sync-tokens.md">Google Calendar ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0006-sync-protocol-jmap-imap-and-modseq.md">Gmail ADR-0006</a></td>
+</tr>
+</tbody></table>
+<h3>時間</h3>
+<p>有効日付、繰り返し、タイムゾーン、夏時間、tz データベースの更新。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Workday</strong>（有効日付）</td>
+<td>過去と未来の訂正、取消</td>
+<td><a href="../../systems/workday/docs/primer/index.html#effective">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0002-effective-dated-data-model.md">ADR-0002</a></td>
+</tr>
+<tr>
+<td><strong>Google Calendar</strong>（繰り返しとタイムゾーン）</td>
+<td>繰り返しの展開、例外、夏時間</td>
+<td><a href="../../systems/google-calendar/docs/primer/index.html#recurrence">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0003-recurrence-storage-and-expansion.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/decisions/0008-recurrence-expansion-semantics.md">ADR-0008</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>物件の現地の日付、tz の更新</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0019-tzdb-update-and-time-zone-recompute.md">ADR-0019</a></td>
+</tr>
+<tr>
+<td>ServiceNow</td>
+<td>業務時間での SLA の計時</td>
+<td><a href="../../systems/servicenow/docs/primer/index.html#sla">資料</a></td>
+</tr>
+</tbody></table>
+<h3>シャーディングとセル</h3>
+<p>テナントや文書を DB・スタックに割り当て、動かす。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Notion</strong>（最初に読む）</td>
+<td>ワークスペースのシャード、止めない再シャーディング</td>
+<td><a href="../../systems/notion/docs/primer/index.html#sharding">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0003-workspace-sharding.md">ADR-0003</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0028-zero-downtime-resharding.md">ADR-0028</a></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td>ポッドとショップの移動</td>
+<td><a href="../../systems/shopify/docs/primer/index.html#pods">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0002-pods-and-shop-placement.md">ADR-0002</a></td>
+</tr>
+<tr>
+<td>Slack・Stripe・ServiceNow・Datadog</td>
+<td>セルの構成、テナントの移動</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0023-cell-based-architecture.md">Slack ADR-0023</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0031-active-active-cells.md">Stripe ADR-0031</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/decisions/0056-dedicated-cells-and-tenant-moves.md">ServiceNow ADR-0056</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0003-tenancy-cells-and-isolation.md">Datadog ADR-0003</a></td>
+</tr>
+<tr>
+<td>Uber</td>
+<td>都市のセル、地理の索引の分割</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0039-city-cells-and-osaka-warm-standby.md">ADR-0039</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0011-geo-index-sharding-lease-and-rebuild.md">ADR-0011</a></td>
+</tr>
+</tbody></table>
+<h3>速さの上限と公平さ</h3>
+<p>1 つのテナント・利用者が、他の人の分を使い切らないようにする。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Salesforce</strong>（最初に読む）</td>
+<td>ガバナ制限：1 つのトランザクションの上限</td>
+<td><a href="../../systems/salesforce/docs/primer/index.html#limits">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0005-tenancy-and-governor-limits.md">ADR-0005</a></td>
+</tr>
+<tr>
+<td>Slack・Stripe・X</td>
+<td>API の上限、トークンバケット</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/decisions/0029-rate-limiting.md">Slack ADR-0029</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0009-rate-limiting.md">Stripe ADR-0009</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0047-rate-limit-token-buckets.md">X ADR-0047</a></td>
+</tr>
+<tr>
+<td>Auth0</td>
+<td>攻撃の防御の数え方</td>
+<td><a href="../../systems/auth0/docs/primer/index.html#attack">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0024-attack-protection-counters-and-enforcement.md">ADR-0024</a></td>
+</tr>
+<tr>
+<td>Datadog</td>
+<td>取り込みの割り当て、騒がしい隣人</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0012-intake-quota-coordination.md">ADR-0012</a></td>
+</tr>
+</tbody></table>
+<h3>数を数える</h3>
+<p>視聴回数・いいね・参照の数を、速く、ほぼ正しく、後で確定させる。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>YouTube</strong>（最初に読む）</td>
+<td>視聴回数の 2 段の確定</td>
+<td><a href="../../systems/youtube/docs/primer/index.html#views">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0007-two-phase-view-counting.md">ADR-0007</a></td>
+</tr>
+<tr>
+<td>X</td>
+<td>数の集計と照合、表示回数の近似</td>
+<td><a href="../../systems/x/docs/primer/index.html#counters">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0023-counter-aggregation-and-reconciliation.md">ADR-0023</a></td>
+</tr>
+<tr>
+<td>Dropbox</td>
+<td>ブロックの参照の数と GC</td>
+<td><a href="../../systems/dropbox/docs/primer/index.html#gc">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0019-block-refcount-and-gc-protocol.md">ADR-0019</a></td>
+</tr>
+<tr>
+<td>Datadog</td>
+<td>課金のためのホストの数え方</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0054-metering-units-and-host-counting.md">ADR-0054</a></td>
+</tr>
+</tbody></table>
+<h3>検索と権限</h3>
+<p>索引は遅れて食い違う写し。見えてはいけないものを結果に出さない。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>GitHub</strong>（最初に読む）</td>
+<td>コード検索と権限の絞り込み</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0014-code-search-engine.md">ADR-0014</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0015-search-permission-filtering.md">ADR-0015</a></td>
+</tr>
+<tr>
+<td>Dropbox・Notion・Salesforce</td>
+<td>共有の権限での絞り込み</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0034-search-index-and-permission-filter.md">Dropbox ADR-0034</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/decisions/0023-search-engine-and-permission-filtering.md">Notion ADR-0023</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0032-search-permission-post-filter.md">Salesforce ADR-0032</a></td>
+</tr>
+<tr>
+<td>Mercari・X</td>
+<td>日本語の解析</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0018-search-index-layout-and-japanese-analysis.md">Mercari ADR-0018</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0025-search-engine-and-japanese-analysis.md">X ADR-0025</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>日付の範囲の空室で絞る 2 段の検索</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html#search">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0003-search-for-date-range-availability.md">ADR-0003</a></td>
+</tr>
+</tbody></table>
+<h3>鍵、金庫、監査ログ</h3>
+<p>秘密のデータを封筒の暗号化で閉じ、運用者が読むときは理由と記録を残す。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Workday</strong>（最初に読む）</td>
+<td>マイナンバーの金庫、目的で縛る API、ハッシュの鎖の監査ログ</td>
+<td><a href="../../systems/workday/docs/primer/index.html#mynumber">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0046-purpose-bound-vault-api-and-access-log.md">ADR-0046</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0048-audit-log-hash-chain-and-anchoring.md">ADR-0048</a></td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>カード情報の金庫と鍵の階層</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#pci">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0019-vault-encryption-and-key-hierarchy.md">ADR-0019</a></td>
+</tr>
+<tr>
+<td>Auth0</td>
+<td>署名の鍵の階層と入れ替え</td>
+<td><a href="../../systems/auth0/docs/primer/index.html#keys">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0045-kms-key-hierarchy.md">ADR-0045</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/decisions/0046-signing-key-lifecycle.md">ADR-0046</a></td>
+</tr>
+<tr>
+<td>Mercari・Airbnb</td>
+<td>住所の金庫、運用者の開示と監査</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0070-operator-access-vault-reveal-and-audit.md">Mercari ADR-0070</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0074-operator-access-reveal-and-audit-chain.md">Airbnb ADR-0074</a></td>
+</tr>
+<tr>
+<td>Zoom</td>
+<td>エンドツーエンドの暗号化</td>
+<td><a href="../../systems/zoom/docs/primer/index.html#e2ee">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0004-encryption-and-e2ee.md">ADR-0004</a></td>
+</tr>
+</tbody></table>
+<h3>Webhook の署名と配信</h3>
+<p>外へ送るイベントを、署名し、再送し、相手の遅さや悪意から本体を守る。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Stripe</strong>（最初に読む）</td>
+<td>署名、隔離した配信</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#webhooks">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0025-webhook-signing-and-isolated-delivery.md">ADR-0025</a></td>
+</tr>
+<tr>
+<td>GitHub・Zoom・Shopify</td>
+<td>署名、Standard Webhooks、中身の預かり</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0022-webhook-signing-and-delivery.md">GitHub ADR-0022</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0044-signed-webhooks-standard-webhooks.md">Zoom ADR-0044</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0061-webhook-delivery-and-signing.md">Shopify ADR-0061</a></td>
+</tr>
+<tr>
+<td>Salesforce</td>
+<td>外への呼び出しと SSRF の防御</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/decisions/0035-webhooks-outbound-calls-and-ssrf-guard.md">ADR-0035</a></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td>受ける側：決済の通知の inbox と照会</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0036-payment-webhook-inbox-and-inquiry-schedule.md">ADR-0036</a></td>
+</tr>
+</tbody></table>
+<h3>乱用・不正・モデレーション</h3>
+<p>ML は信号、決定は規則と人。措置には根拠と異議の道を残す。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>何が難しいか</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Gmail</strong>（最初に読む）</td>
+<td>迷惑メールの選別と通信の秘密</td>
+<td><a href="../../systems/gmail/docs/primer/index.html#filtering">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0008-spam-pipeline-boundary-and-secrecy.md">ADR-0008</a></td>
+</tr>
+<tr>
+<td>X・YouTube</td>
+<td>措置のモデル、スパムとボット、年齢と子ども</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0038-moderation-action-model.md">X ADR-0038</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0040-spam-and-bot-defense.md">X ADR-0040</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0052-moderation-actions-age-kids-and-promotion.md">YouTube ADR-0052</a></td>
+</tr>
+<tr>
+<td>Mercari・Airbnb</td>
+<td>T&amp;S の段と ML の境界</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0009-trust-and-safety-pipeline-boundary.md">Mercari ADR-0009</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/decisions/0009-trust-and-safety-and-ml-boundary.md">Airbnb ADR-0009</a></td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td>不正の規則のエンジン</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/decisions/0021-fraud-rules-engine.md">ADR-0021</a></td>
+</tr>
+<tr>
+<td>Dropbox・GitHub</td>
+<td>共有のリンクの乱用、信用しない内容の隔離</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/decisions/0028-shared-link-abuse-controls.md">Dropbox ADR-0028</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/decisions/0013-untrusted-content-domain-isolation.md">GitHub ADR-0013</a></td>
+</tr>
+</tbody></table>
+<h2>題材に固有の論点</h2>
+<p>次の論点は、ほかの題材に同じ形では出てこない。その題材の資料から読む。</p>
+<table>
+<thead>
+<tr>
+<th>論点</th>
+<th>題材</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Git のオブジェクトの保存と複製、merge queue</td>
+<td><a href="../../systems/github/docs/primer/index.html">GitHub</a></td>
+</tr>
+<tr>
+<td>メディアの中継（SFU）と帯域の推定</td>
+<td><a href="../../systems/zoom/docs/primer/index.html">Zoom</a></td>
+</tr>
+<tr>
+<td>地理の格子とマッチング</td>
+<td><a href="../../systems/uber/docs/primer/index.html">Uber</a></td>
+</tr>
+<tr>
+<td>時系列 DB とスケッチ、テールサンプリング</td>
+<td><a href="../../systems/datadog/docs/primer/index.html">Datadog</a></td>
+</tr>
+<tr>
+<td>変換のラダー、ABR、ライブ、著作物の照合</td>
+<td><a href="../../systems/youtube/docs/primer/index.html">YouTube</a></td>
+</tr>
+<tr>
+<td>SMTP、SPF・DKIM・DMARC、送信の評判</td>
+<td><a href="../../systems/gmail/docs/primer/index.html">Gmail</a></td>
+</tr>
+<tr>
+<td>メタデータ駆動の実行、共有の再計算</td>
+<td><a href="../../systems/salesforce/docs/primer/index.html">Salesforce</a></td>
+</tr>
+<tr>
+<td>CMDB の識別と照合</td>
+<td><a href="../../systems/servicenow/docs/primer/index.html">ServiceNow</a></td>
+</tr>
+<tr>
+<td>日本の給与計算、源泉徴収、社会保険</td>
+<td><a href="../../systems/workday/docs/primer/index.html">Workday</a></td>
+</tr>
+<tr>
+<td>民泊の 180 日の上限、宿泊者名簿</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html">Airbnb</a></td>
+</tr>
+<tr>
+<td>匿名の配送</td>
+<td><a href="../../systems/mercari/docs/primer/index.html">Mercari</a></td>
+</tr>
+<tr>
+<td>テーマの言語、WASM の拡張の砂場</td>
+<td><a href="../../systems/shopify/docs/primer/index.html">Shopify</a></td>
+</tr>
+<tr>
+<td>描画のエンジン（WebGL / WASM）</td>
+<td><a href="../../systems/figma/docs/primer/index.html">Figma</a></td>
+</tr>
+</tbody></table>
+<h2>この索引を直すとき</h2>
+<ul>
+<li>題材を足したら、その題材の主な論点を、上のテーマの表か「題材に固有の論点」に足す。</li>
+<li>「最初に読む」は、そのテーマを題材の主な論点として扱い、資料に節を持つ題材にする。</li>
+<li>「ロールから探す」は、各題材の資料の「この題材から学べること」のうち、ほかの題材より特に手本になるものを選ぶ。1 ロール 4 題材までにする。</li>
+</ul>
+</main>
+</body>
+</html>

@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://shoito.github.io/rebuilds/</loc></url>
+  <url><loc>https://shoito.github.io/rebuilds/docs/agents/</loc></url>
+  <url><loc>https://shoito.github.io/rebuilds/docs/glossary/</loc></url>
+  <url><loc>https://shoito.github.io/rebuilds/docs/patterns/</loc></url>
   <url><loc>https://shoito.github.io/rebuilds/docs/primer/</loc></url>
   <url><loc>https://shoito.github.io/rebuilds/systems/airbnb/docs/primer/</loc></url>
   <url><loc>https://shoito.github.io/rebuilds/systems/auth0/docs/primer/</loc></url>

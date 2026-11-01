@@ -18,6 +18,7 @@
 - サイト名は `rebuilds`。`<title>` は「〈題材〉の前提知識 | rebuilds」の形にし、`<meta property="og:site_name" content="rebuilds">` を入れる。`description` にはサイト名を入れない。
 - 共有の表示のため、`og:title`（`<title>` と同じ）・`og:description`（`description` と同じ）・`og:url`（公開の URL）・`og:image`（共通の `docs/primer/assets/og.png`）と `twitter:card` を入れる（`npm run check` が確かめる）。
 - ページを足したら `npm run sitemap` で `sitemap.xml` を作り直す（`npm run check` が古さを確かめる）。
+- 用語集（`dl.glossary`）を変えたら `npm run pages` で用語の索引（`docs/glossary/`）を作り直す。`docs/patterns.md`・`docs/agents.md` を変えたときも同じ（`npm run check` が古さを確かめる）。
 - favicon は共通の `docs/primer/assets/favicon.svg` を相対パスで読む。
 - 外部から読むのは、このタグと、共通の JS が読む Mermaid（jsdelivr）だけにする。画像は使わず、図は Mermaid かインラインの SVG にする。
 - 本文は日本語で書く。短い文で、です・ます調にする。識別子とコードはそのまま。

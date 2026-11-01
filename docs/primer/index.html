@@ -340,10 +340,10 @@ CREATE POLICY tenant_isolation ON items
     <h2>SLO と復旧の目標</h2>
     <p>非機能の目標は数字で書きます。よく出る略語です。</p>
     <dl class="glossary">
-      <dt>p99</dt><dd>遅い順に並べて上位 1% を除いた値。「p99 200ms」は、99% の要求が 200ms 以内に終わること。</dd>
-      <dt>SLO</dt><dd>目標とする信頼性（例：月間 99.9% 成功）。破りそうになったら機能の開発より安定を優先する。</dd>
-      <dt>RPO</dt><dd>障害で失ってよいデータの時間幅。RPO 0 は「成功を返したものは失わない」。</dd>
-      <dt>RTO</dt><dd>障害から復旧するまでの時間の目標。</dd>
+      <dt id="g-p99">p99</dt><dd>遅い順に並べて上位 1% を除いた値。「p99 200ms」は、99% の要求が 200ms 以内に終わること。</dd>
+      <dt id="g-slo">SLO</dt><dd>目標とする信頼性（例：月間 99.9% 成功）。破りそうになったら機能の開発より安定を優先する。</dd>
+      <dt id="g-rpo">RPO</dt><dd>障害で失ってよいデータの時間幅。RPO 0 は「成功を返したものは失わない」。</dd>
+      <dt id="g-rto">RTO</dt><dd>障害から復旧するまでの時間の目標。</dd>
     </dl>
   </section>
 
@@ -364,8 +364,8 @@ CREATE POLICY tenant_isolation ON items
       <dt id="g-fanout">ファンアウト</dt><dd>1 つの出来事を、多くの受け手に配ること。</dd>
       <dt id="g-token-bucket">トークンバケット</dt><dd>一定の速さで溜まるトークンを、要求ごとに 1 つ使う方式。溜まった分だけ一時の集中を許す。</dd>
       <dt id="g-envelope">封筒の暗号化</dt><dd>データをデータの鍵で暗号化し、データの鍵を KMS の鍵で暗号化して一緒に置く方式。envelope encryption。</dd>
-      <dt>AZ</dt><dd>Availability Zone。同じリージョンの中で、電源やネットワークが独立したデータセンターの群。</dd>
-      <dt>Aurora Global Database</dt><dd>別のリージョンに読み取り用の複製を持つ Aurora の構成。災害のときに昇格させる。</dd>
+      <dt id="g-az">AZ</dt><dd>Availability Zone。同じリージョンの中で、電源やネットワークが独立したデータセンターの群。</dd>
+      <dt id="g-aurora-global-database">Aurora Global Database</dt><dd>別のリージョンに読み取り用の複製を持つ Aurora の構成。災害のときに昇格させる。</dd>
     </dl>
   </section>
 

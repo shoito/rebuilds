@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI エージェントから読む | rebuilds</title>
+<meta property="og:site_name" content="rebuilds">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AI エージェントから読む | rebuilds">
+<meta property="og:description" content="21 の題材が、AI エージェントを主な作り手にする問いにどう答えたかをまとめた索引。">
+<meta property="og:url" content="https://shoito.github.io/rebuilds/docs/agents/">
+<meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="21 の題材が、AI エージェントを主な作り手にする問いにどう答えたかをまとめた索引。">
+<link rel="icon" href="../../docs/primer/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../docs/primer/assets/primer.css">
+<style>
+  main.page { margin: 0 auto; padding: 24px 16px 64px; max-width: 980px; }
+  .page .hero { margin-bottom: 24px; }
+  .page .source { color: var(--muted); font-size: .85em; margin: .6em 0 0; }
+  .page h2 { font-size: 1.3em; margin: 1.8em 0 .7em; padding-bottom: .35em; border-bottom: 2px solid var(--accent); color: var(--accent-strong); }
+  /* Keep cells readable on phones; the table scrolls sideways instead (primer.css). */
+  .page table th, .page table td { min-width: 9em; overflow-wrap: break-word; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="home" href="../../index.html">← <span>題材の一覧</span></a>
+  <div class="title">AI エージェントから読む</div>
+</header>
+<main class="page">
+<header class="hero">
+  <h1>AI エージェントから読む</h1>
+  <p class="source">このページは <a href="https://github.com/shoito/rebuilds/blob/main/docs/agents.md">docs/agents.md</a> から生成しています。</p>
+</header>
+<p>このリポジトリの問いは「AI のコーディングエージェントを主な作り手にするなら、どう設計し、どう作るか」である。この文書は、21 の題材がその問いにどう答えたかを、題材をまたいでまとめた索引である。設計そのものは各題材の文書にあり、ここでは説明し直さない。</p>
+<p>エージェントの役割は <a href="https://github.com/shoito/rebuilds/blob/main/docs/process.md">process.md</a> の 2 節で決めている。草案を書き、実装し、確認ループを回し、調べる。<strong>承認はしない</strong>。各題材は、その上で次の 4 つを決めている。</p>
+<ol>
+<li>エージェントに任せないこと（各題材の <code>roadmap.md</code> の「エージェントに任せないこと」）</li>
+<li>エージェントのもっともらしい誤りを、黙って通さずに落とす仕組み（<code>AGENTS.md</code> の固有の規則、<code>quality.md</code>）</li>
+<li>エージェントが PR の前に回す確認ループと、エージェント自体の品質を測る eval（<code>quality.md</code> の 2.3 節と 3 節）</li>
+<li>エージェントを理由にした技術の選定（ADR-0001 など）</li>
+</ol>
+<p>題材ごとの要点は、各題材の資料の「この題材から学べること」の「AI エージェント」のカードにある（下の 5 節）。</p>
+<h2>1. 任せないことの型</h2>
+<p>21 題材の「エージェントに任せないこと」は、次の型に分かれる。理由はどれも「間違えたときに気づきにくいか、後から直すコストが高いか、人の責任で決めるべきか」のどれかである。</p>
+<table>
+<thead>
+<tr>
+<th>型</th>
+<th>任せない理由</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>契約の確定（API、イベント、スキーマ、決定表の形）</td>
+<td>公開した後や、ログ・端末に書いた後に変えるコストが最も高い</td>
+<td>Slack、GitHub、Notion、X、Linear、Dropbox、Datadog、Figma、Salesforce、ServiceNow、Auth0</td>
+</tr>
+<tr>
+<td><strong>テストの正解（期待値・閾値・参照）を変えること</strong></td>
+<td>エージェントが自分のテストを通すために正解を緩めると、誤りが消えて見える</td>
+<td>Workday（ゴールデンデータの期待値）、Figma（参照画像の許容）、Zoom（品質の閾値）、YouTube（VMAF の下限）、Google Calendar（参照との食い違いの許可）、Datadog・Dropbox（参照とシミュレーターの期待値）</td>
+</tr>
+<tr>
+<td>お金を動かすこと</td>
+<td>誤りがエラーにならずに金額の違いとして残る</td>
+<td>Stripe（区分 A の変更の承認）、メルカリ・Airbnb（手の仕訳、返金と補償）、Shopify（在庫の手動の修正、注文の作成と取り消し）、Uber（運賃の規則）、Workday（並行稼働の差の説明）</td>
+</tr>
+<tr>
+<td>法令と措置</td>
+<td>解釈と責任は人が持つ</td>
+<td>メルカリ・Airbnb（<code>legal.*</code> の値、条例の読み取り）、Uber（法令の関門の記録）、X・YouTube（措置と照合の方針）、Gmail（eDiscovery、開示の請求）</td>
+</tr>
+<tr>
+<td>本番の操作とデータの削除</td>
+<td>取り返しがつかない</td>
+<td>大阪への切り替え（多くの題材）、Dropbox（GC の猶予と保持の短縮）、YouTube（元のファイルの削除）、Google Calendar（データの直接の書き換え）、Notion（再シャーディングの切り替え）</td>
+</tr>
+<tr>
+<td>秘密と鍵</td>
+<td>漏れたら戻せない</td>
+<td>Auth0（署名鍵の緊急のローテーション）、Stripe（CDE と本番への経路）、Gmail（報告のサンプルの中身を見ること）、Workday（保管庫の緊急の操作）</td>
+</tr>
+<tr>
+<td>結果の解釈</td>
+<td>負荷試験や PoC の数字から何を決めるかは判断である</td>
+<td>ほぼすべての題材</td>
+</tr>
+</tbody></table>
+<p>なかでも「テストの正解を変えない」は、エージェントを主な作り手にする設計に特有の規則である。人が書いたテストを人が直す前提では、ここまで明示する必要がなかった。</p>
+<h2>2. 誤りを黙って通さない仕組み</h2>
+<p>エージェントの誤りは、多くが「もっともらしいが規則を 1 つ外したコード」である。各題材は、その誤りがレビューの目でなく機械で落ちるようにしている。</p>
+<table>
+<thead>
+<tr>
+<th>仕組み</th>
+<th>何を落とすか</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DB の制約</td>
+<td>アプリの確かめを忘れた書き込み</td>
+<td>Airbnb（日付の範囲の排他の制約、180 日の CHECK。制約を外すマイグレーションは CI が DDL を解析して拒む）、メルカリ（部分一意の索引、借方と貸方の一致）、Shopify（FORCE RLS。エージェントのコード量では条件の書き忘れが必ず出る、と ADR に書いている）、Uber（<code>assignment_epoch</code> と部分一意の索引）</td>
+</tr>
+<tr>
+<td>1 つの関数</td>
+<td>別の経路から規則を回り道する実装</td>
+<td>Slack（<code>authorization.ts</code>）、X（<code>visible()</code>）、Notion（<code>can()</code>）、YouTube（<code>playable()</code>）、Uber（Trips の遷移関数）、Airbnb（<code>reserveStay</code>）、Salesforce（データ層のコンパイラ）、Workday（<code>packages/temporal</code>）、Figma（<code>doc-model</code>）</td>
+</tr>
+<tr>
+<td>lint と CI の検査</td>
+<td>規則を外す書き方そのもの</td>
+<td>GitHub（<code>packages/authz</code> の外からの権限の読み取り、本家の名前の識別子）、Workday（給与の中の <code>Math.round</code>・<code>Date.now</code>・料率の直書き）、Uber（金額の <code>number</code>・<code>float64</code>）、Stripe（カード番号の形の走査）、ServiceNow（計時の関数の中の時計と祝日のリテラル）</td>
+</tr>
+<tr>
+<td>生成した型</td>
+<td>境界をまたいだ不整合、禁止されたデータの持ち出し</td>
+<td>Gmail（ログに渡せる属性を型の許可の一覧に限り、メールの中身を渡すとコンパイルで落ちる。<a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/decisions/0067-content-free-telemetry-schema.md">ADR-0067</a>）、Stripe（金額は <code>packages/money</code> の型だけ）、Figma（エンジンと UI の境界の型を Rust から生成）、Linear（<code>packages/schema</code> から生成）</td>
+</tr>
+<tr>
+<td>実装と独立した正解</td>
+<td>実装に合わせてずれた期待値</td>
+<td>Workday（社労士・税理士が確かめたゴールデンデータセット。<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0061-golden-dataset-ci.md">ADR-0061</a>）、Salesforce（共有の参照の評価器）、Google Calendar（繰り返しの展開を参照の実装と比べる）、Datadog（<code>tsdb-ref</code>）、Shopify（在庫・税・割引の参照）</td>
+</tr>
+<tr>
+<td>シミュレーター</td>
+<td>順序・遅延・障害の組み合わせでだけ起きる誤り</td>
+<td>Linear（毎晩 20 万の列）、Dropbox（毎晩 1,000 万の場面）、Figma（収束）、Datadog（<code>monitor-sim</code>）、Zoom（回線の劣化のラボ）、Uber（直近の再生）</td>
+</tr>
+<tr>
+<td>決定表を spec から直接読む</td>
+<td>決定表の書き写しの漏れ</td>
+<td>Notion、Salesforce、ServiceNow</td>
+</tr>
+<tr>
+<td>人の承認の段</td>
+<td>エージェントが書いた規則がそのまま効くこと</td>
+<td>メルカリ（T&amp;S の規則は、7 日の影の評価と責任者の承認を経るまで有効にならない。<a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0051-rules-engine-declarative-tables.md">ADR-0051</a>）</td>
+</tr>
+</tbody></table>
+<h2>3. 確認ループと eval</h2>
+<p><strong>確認ループ</strong>（エージェントが PR の前に回すもの）は、どの題材も同じ骨格を持つ。型検査と lint → 変更した箇所のテスト → 触れた領域に応じた重い検証（漏えいの経路の表、参照との比較、シミュレーター）→ 要件 ID の追跡。共通の規則が 2 つある。</p>
+<ul>
+<li>失敗したテストを再実行で緑にしない。縮めた入力を回帰テストに足してから直す（Linear、Google Calendar、Shopify、YouTube など）。</li>
+<li>エージェントは本番に経路を持たない（Auth0 の ADR-0056 の形を、多くの題材が引き継いでいる）。</li>
+</ul>
+<p><strong>eval</strong>（エージェント自体の品質）も同じ形である。開発リポジトリの実際のタスクを 20〜50 件集め、成功率が基準から 10 ポイント下がったらマージしない。お金・分離・秘密など題材の核に触れるタスクは、1 件の失敗でもマージしない。</p>
+<p>題材ごとの違いは、eval のタスクに入れる「誘い」に出る。もっともらしいが誤った指示を与え、エージェントが止まれるかを測る。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>eval の誘いの例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dropbox</td>
+<td>「衝突したら新しいほうで上書きせよ」「名前の比較は <code>toLowerCase()</code> で十分」</td>
+</tr>
+<tr>
+<td>Google Calendar</td>
+<td>「予定の時刻を UTC で保存せよ」「参照と食い違うテストを直せ」</td>
+</tr>
+<tr>
+<td>Datadog</td>
+<td>「上限を超えた点は捨てよ」「1 分の平均の平均で作れ」</td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td>「排他の制約を外して、夜間に重なりを掃除せよ」</td>
+</tr>
+<tr>
+<td>Workday</td>
+<td>「1 円ずれる」ので期待値を書き換えたくなる場面</td>
+</tr>
+<tr>
+<td>メルカリ</td>
+<td>「売上金の残高の列を直接足せ」</td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td>「Webhook でも注文を作る関数を足せ」</td>
+</tr>
+<tr>
+<td>Notion</td>
+<td>本文に埋め込んだ指示で、MCP の書き込みのツールが呼ばれないか</td>
+</tr>
+</tbody></table>
+<h2>4. エージェントを理由にした技術の選定</h2>
+<table>
+<thead>
+<tr>
+<th>理由</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>エージェントと人が同じ道具で検証できるよう、基盤を題材の間で揃える</td>
+<td>多くの題材の ADR-0001</td>
+</tr>
+<tr>
+<td>マイクロサービスは、小さなチームとエージェントには重い</td>
+<td>Shopify・メルカリ・Airbnb の ADR-0001</td>
+</tr>
+<tr>
+<td>確認ループが短い言語を選ぶ（Go はコンパイルとテストが速い。Rust は所有権の制約で修正の往復が増えるので退路に残す）</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/decisions/0001-platform-and-stack.md">Uber の ADR-0001</a></td>
+</tr>
+<tr>
+<td>ビルドの設定をエージェントが扱える形にする（CMake と Emscripten より Cargo）</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/decisions/0001-platform-and-stack.md">Figma の ADR-0001</a></td>
+</tr>
+<tr>
+<td>型を境界をまたいで共有し、エージェントが整合を保てるようにする</td>
+<td>Slack、Zoom</td>
+</tr>
+<tr>
+<td>ネイティブのアプリを 2 つのコードベースで持たない</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/decisions/0066-sign-in-sessions-and-devices.md">メルカリの ADR-0066</a></td>
+</tr>
+<tr>
+<td>規則をアプリの条件でなく DB で強制する（エージェントのコード量では書き忘れが出る）</td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/decisions/0003-tenancy-and-rls.md">Shopify の ADR-0003</a></td>
+</tr>
+<tr>
+<td>性質ベーステストとゴールデンデータの道具を 1 つの言語で揃える</td>
+<td>Workday</td>
+</tr>
+<tr>
+<td>複数の言語を持つなら、eval に言語ごとのタスクを入れる</td>
+<td>Dropbox、Shopify、YouTube、Gmail、メルカリ</td>
+</tr>
+</tbody></table>
+<p><strong>残る課題</strong>：これらの理由は、多くが ADR の本文にだけ書かれている。<code>architecture/README.md</code> の 4 節（技術スタック）に「エージェントにとっての理由」の列があるのは一部の題材だけである。<a href="https://github.com/shoito/rebuilds/blob/main/docs/templates/architecture.md">テンプレート</a>は、今はこの列を求めている。</p>
+<h2>5. 題材ごとの入口</h2>
+<p>各題材の資料の「この題材から学べること」の「AI エージェント」のカードと、元の文書。</p>
+<table>
+<thead>
+<tr>
+<th>題材</th>
+<th>資料</th>
+<th>任せないこと</th>
+<th>確認ループと eval</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Slack</td>
+<td><a href="../../systems/slack/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/slack/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Stripe</td>
+<td><a href="../../systems/stripe/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/stripe/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>GitHub</td>
+<td><a href="../../systems/github/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/github/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Notion</td>
+<td><a href="../../systems/notion/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/notion/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Auth0</td>
+<td><a href="../../systems/auth0/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/auth0/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Figma</td>
+<td><a href="../../systems/figma/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/figma/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Zoom</td>
+<td><a href="../../systems/zoom/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Uber</td>
+<td><a href="../../systems/uber/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/uber/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Linear</td>
+<td><a href="../../systems/linear/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/linear/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Salesforce</td>
+<td><a href="../../systems/salesforce/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/salesforce/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>ServiceNow</td>
+<td><a href="../../systems/servicenow/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/servicenow/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Workday</td>
+<td><a href="../../systems/workday/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>X</td>
+<td><a href="../../systems/x/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Google Calendar</td>
+<td><a href="../../systems/google-calendar/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/google-calendar/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Dropbox</td>
+<td><a href="../../systems/dropbox/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/dropbox/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Datadog</td>
+<td><a href="../../systems/datadog/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Shopify</td>
+<td><a href="../../systems/shopify/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/shopify/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>YouTube</td>
+<td><a href="../../systems/youtube/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Gmail</td>
+<td><a href="../../systems/gmail/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/gmail/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>メルカリ</td>
+<td><a href="../../systems/mercari/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/mercari/docs/quality.md">quality.md</a></td>
+</tr>
+<tr>
+<td>Airbnb</td>
+<td><a href="../../systems/airbnb/docs/primer/index.html#learn">資料</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/roadmap.md">roadmap.md</a></td>
+<td><a href="https://github.com/shoito/rebuilds/blob/main/systems/airbnb/docs/quality.md">quality.md</a></td>
+</tr>
+</tbody></table>
+<h2>この文書を直すとき</h2>
+<ul>
+<li>題材を足したら、5 節に行を足し、1〜4 節の表に、その題材が手本になる行があれば足す。</li>
+<li>中身は各題材の <code>roadmap.md</code>・<code>quality.md</code>・<code>AGENTS.md</code>・ADR から読み取れることに限る。</li>
+</ul>
+</main>
+</body>
+</html>

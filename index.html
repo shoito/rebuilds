@@ -42,6 +42,7 @@
   .start { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 0 0 36px; padding: 14px 16px; background: var(--accent-soft); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: var(--radius); }
   .start p { margin: 0; flex: 1; min-width: 220px; }
   .start .btn { background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; }
+  .start .btn.alt { background: var(--surface); color: var(--accent); border-color: var(--border); }
   .paths, .roles { margin: 0 0 36px; }
   .role-list { margin: .3em 0 0; padding-left: 1.1em; font-size: .88em; color: var(--muted); }
   .role-list li + li { margin-top: .35em; }
@@ -65,10 +66,11 @@
   <div class="start">
     <p><strong>はじめに</strong>：どの題材にも出てくる進め方と技術（ADR、RLS、outbox、冪等、規模の段階など）。</p>
     <a class="btn" href="docs/primer/index.html">共通の前提知識を読む</a>
+    <a class="btn alt" href="docs/glossary/index.html">用語の索引</a>
   </div>
 
   <h2>読む順の道筋</h2>
-  <p class="hint" style="margin:-.4em 0 14px">目的に合わせて、題材を左から順に読むと、前の題材の知識が次の題材の前提になります。テーマごとの詳しい索引は <a href="https://github.com/shoito/rebuilds/blob/main/docs/patterns.md">パターンの索引</a> にあります。</p>
+  <p class="hint" style="margin:-.4em 0 14px">目的に合わせて、題材を左から順に読むと、前の題材の知識が次の題材の前提になります。テーマごとの詳しい索引は <a href="docs/patterns/index.html">パターンの索引</a> にあります。</p>
   <div class="grid paths">
     <div class="card"><div class="genre">はじめの一歩</div><p class="chain"><a href="systems/slack/docs/primer/index.html">Slack</a> → <a href="systems/stripe/docs/primer/index.html">Stripe</a> → <a href="systems/github/docs/primer/index.html">GitHub</a></p><p class="desc">outbox と配信、冪等と台帳、権限。どの題材にも出る土台</p></div>
     <div class="card"><div class="genre">お金</div><p class="chain"><a href="systems/stripe/docs/primer/index.html">Stripe</a> → <a href="systems/mercari/docs/primer/index.html">メルカリ</a> → <a href="systems/airbnb/docs/primer/index.html">Airbnb</a> → <a href="systems/shopify/docs/primer/index.html">Shopify</a></p><p class="desc">複式簿記の台帳、預かりと決着、売り越しの防止</p></div>
@@ -89,7 +91,7 @@
   </div>
 
   <h2>AI エージェントから探す</h2>
-  <p class="hint" style="margin:-.4em 0 14px">このリポジトリの問いは「AI エージェントを主な作り手にするなら、どう設計するか」です。21 題材の答えを <a href="https://github.com/shoito/rebuilds/blob/main/docs/agents.md">AI エージェントから読む</a> にまとめ、各題材の資料の「この題材から学べること」にも「AI エージェント」のカードを置いています。</p>
+  <p class="hint" style="margin:-.4em 0 14px">このリポジトリの問いは「AI エージェントを主な作り手にするなら、どう設計するか」です。21 題材の答えを <a href="docs/agents/index.html">AI エージェントから読む</a> にまとめ、各題材の資料の「この題材から学べること」にも「AI エージェント」のカードを置いています。</p>
   <div class="grid roles">
     <div class="card"><div class="genre">契約の確定、お金、法令、本番の操作に加えて、テストの正解（期待値・閾値）を変えることを任せない</div><h3>任せないこと</h3><ul class="role-list"><li><a href="systems/workday/docs/primer/index.html#learn">Workday</a>：給与の期待値は社労士・税理士が確かめたもので、エージェントは書き換えない</li><li><a href="systems/stripe/docs/primer/index.html#learn">Stripe</a>：お金を動かす変更の承認と、影の実行の結果の判断は人が行う</li></ul></div>
     <div class="card"><div class="genre">もっともらしいが規則を 1 つ外したコードを、レビューの目でなく機械で落とす</div><h3>誤りを止める仕組み</h3><ul class="role-list"><li><a href="systems/airbnb/docs/primer/index.html#learn">Airbnb</a>：排他の制約を外すマイグレーションは、CI が DDL を解析して拒む</li><li><a href="systems/gmail/docs/primer/index.html#learn">Gmail</a>：メールの中身をログに渡すとコンパイルで落ちる型</li></ul></div>

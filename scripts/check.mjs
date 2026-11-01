@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { adrIndexProblems } from './adr-index.mjs';
 import { openDecisionsProblems } from './open-decisions.mjs';
+import { pagesProblems } from './pages.mjs';
 import { sitemapProblems } from './sitemap.mjs';
 import { ADR_FILE, adrTitle, frontmatter, lineOf, listFiles, read, root } from './lib.mjs';
 
@@ -90,6 +91,9 @@ for (const f of html) {
 
 // 4b. sitemap.xml lists every published page (scripts/sitemap.mjs).
 if (!only || html.length) problems.push(...sitemapProblems());
+
+// 4c. Generated pages follow their sources (scripts/pages.mjs).
+if (!only || md.length || html.length) problems.push(...pagesProblems());
 
 // 5. Wording rules that can be checked mechanically (AGENTS.md「言語」).
 for (const f of [...md, ...html]) {
