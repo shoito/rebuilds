@@ -15,11 +15,22 @@
 
 | 題材 | ADR | 決定 | 起票日 |
 | --- | --- | --- | --- |
+| coinbase | [ADR-0001](../systems/coinbase/docs/decisions/0001-platform-and-stack.md) | 共通の基盤を引き継ぎ、マッチングだけを Rust で EC2 に置く | 2026-11-15 |
+| coinbase | [ADR-0002](../systems/coinbase/docs/decisions/0002-sequencer-and-event-journal.md) | 板ごとの sequencer が順序を決め、MSK の記録を板の正本にする | 2026-11-15 |
+| coinbase | [ADR-0003](../systems/coinbase/docs/decisions/0003-matching-rules-and-self-trade-prevention.md) | 価格・時間の優先と自己約定の防止を engine-core にだけ書く | 2026-11-15 |
+| coinbase | [ADR-0004](../systems/coinbase/docs/decisions/0004-order-entry-holds-and-idempotency.md) | 注文は sequencer の前に台帳で拘束し、client_order_id で冪等にする | 2026-11-15 |
+| coinbase | [ADR-0005](../systems/coinbase/docs/decisions/0005-ledger-balances-and-trade-settlement.md) | 台帳を引き継ぎ、資産ごとの釣り合いと拘束と約定の記帳を足す | 2026-11-15 |
+| coinbase | [ADR-0006](../systems/coinbase/docs/decisions/0006-wallet-tiers-and-cold-ratio.md) | ウォレットを 3 段にし、ネットワークにつながる額の上限を legal.* で持つ | 2026-11-15 |
+| coinbase | [ADR-0008](../systems/coinbase/docs/decisions/0008-withdrawal-pipeline-and-approvals.md) | 出金をステートマシンにし、許可した宛先と額による承認だけで署名する | 2026-11-15 |
+| coinbase | [ADR-0009](../systems/coinbase/docs/decisions/0009-deposits-confirmations-and-own-nodes.md) | 入金は自前のノード 2 台で確かめ、閾値の後に記帳する | 2026-11-15 |
+| coinbase | [ADR-0010](../systems/coinbase/docs/decisions/0010-brokerage-quotes-and-inventory.md) | 販売所は板を通らない期限つきの提示にし、MVP ではヘッジしない | 2026-11-15 |
+| coinbase | [ADR-0011](../systems/coinbase/docs/decisions/0011-external-providers-boundary.md) | 外部の提供者をアダプターの後ろに置き、障害の間は止める側に倒す | 2026-11-15 |
 
 **判断する時点を待つもの**（frontmatter の `decide_after`）
 
 | 題材 | ADR | 決定 | 判断する時点 |
 | --- | --- | --- | --- |
+| coinbase | [ADR-0007](../systems/coinbase/docs/decisions/0007-signing-service-and-key-custody.md) | 署名の方針を自前で持ち、鍵を別のアカウントの署名の境界に閉じる | E6 の前の custody-signing-poc の結果が出たとき（鍵の保管の方式と提供者の選定） |
 | github | [ADR-0034](../systems/github/docs/decisions/0034-multi-region-repository-placement.md) | S3 では、リポジトリにホームのリージョンを割り当て、他のリージョンに非同期の読み取りの複製を置く | E11 の staging での検証（S3 の前） |
 | notion | [ADR-0030](../systems/notion/docs/decisions/0030-cdc-data-lake.md) | S2 で、変更データの取り込み（CDC）によるデータレイクを S3 に作る | S2 への移行を始めるとき |
 | slack | [ADR-0023](../systems/slack/docs/decisions/0023-cell-based-architecture.md) | S3 でセル構成に移る | S3 への移行を始めるとき |
@@ -34,6 +45,7 @@
 | --- | --- | --- |
 | airbnb | 14 | [intent.md](../systems/airbnb/docs/intent.md) |
 | auth0 | 8 | [intent.md](../systems/auth0/docs/intent.md) |
+| coinbase | 14 | [intent.md](../systems/coinbase/docs/intent.md) |
 | datadog | 10 | [intent.md](../systems/datadog/docs/intent.md) |
 | dropbox | 10 | [intent.md](../systems/dropbox/docs/intent.md) |
 | figma | 6 | [intent.md](../systems/figma/docs/intent.md) |
@@ -74,6 +86,10 @@
 | PM-011 | Figma | 英語の UI を利用者に出す時期 | MVP は日本語だけ、英語は後から（仕組みは最初から両方） | [intent.md](../systems/figma/docs/intent.md)、[editor-and-tools.md](../systems/figma/docs/architecture/editor-and-tools.md) | 解決（2026-10-25：MVP から日本語と英語。推奨と違う判断） |
 | PM-013 | Notion | 1 ファイルの大きさの上限（`limit.file.bytes`）の値 | 価格の設計の中で決める。本家の値は未確認 | [ADR-0034](../systems/notion/docs/decisions/0034-plans-and-entitlements.md) | 待ち |
 | PM-012 | YouTube | 音声解説を入れる時期 | MVP の後の候補 | [roadmap.md](../systems/youtube/docs/roadmap.md) | 解決（2026-10-25：MVP の後の候補のまま） |
+| PM-014 | Coinbase | 法人の口座とマーケットメイカーを MVP に入れるか | 入れる。板の流動性が取引所の価値を決める | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-015 | Coinbase | API キーに出金の権限を持たせるか | MVP では持たせない。出金は画面とパスキーだけ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-016 | Coinbase | 販売所の在庫をヘッジするか | MVP はヘッジしない。在庫の上限とスプレッドで持つ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-017 | Coinbase | 出金の宛先の許可の一覧を必須にするか | 必須にし、登録の後に 24 時間待つ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
 
 ## 4. 文書の食い違い
 
