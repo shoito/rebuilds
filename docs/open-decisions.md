@@ -191,6 +191,10 @@
 | DOC-023 | Google Calendar | [資料](../systems/google-calendar/docs/primer/index.html) の「会議室：二重予約を DB で防ぐ」の本文と、[rooms-and-resources.md](../systems/google-calendar/docs/architecture/rooms-and-resources.md) 5 節・ADR-0019 | 本文は「排他の制約で DB 自身に重なりを拒ませる」とだけ書く。設計では、会議室の行をロックして判断を順番にするのが主で、排他の制約は最後の守り。誤りではなく説明の不足。図はロックを含めて描いた | Dev | 解決（2026-11-01：資料の本文に、会議室の行のロックが主で排他の制約が最後の守りであることを書いた） |
 | DOC-024 | Coinbase | [ADR-0035](../systems/coinbase/docs/decisions/0035-signing-policy-bundle-and-decision-table.md) と [delivery.md](../systems/coinbase/docs/architecture/delivery.md) 4.9 節 | ADR-0035 は署名の方針の切り替えで 2 つの束を最大 1 時間有効にしてよいとし、delivery.md と runbooks の README は手続き中の依頼を待って猶予を置かない。統合で delivery.md に揃える注記を ADR に足した | Dev | 待ち（Dev の確認） |
 | DOC-025 | Coinbase | [deploy-and-rollback.md](../systems/coinbase/docs/runbooks/deploy-and-rollback.md) と ADR-0035 | 署名の方針を前のバージョンに戻すとき、緩める向きなら 24 時間の待ちがかかる（ADR-0035 の規則どおり）。障害の時のロールバックを例外にするか | セキュリティ | 待ち |
+| DOC-026 | Coinbase | [data-model.md](../systems/coinbase/docs/architecture/data-model.md) 10 節 G1、ADR-0032・ADR-0037 | 販売所の精算で、本システムのウォレットから利用者用のホットへ移す向き（to_user）を ADR-0032 と segregation-and-reconciliation.md は定めるが、ADR-0037 の経路と custody-and-keys.md の DT-POL にこの行がなく、方針で拒まれる | Dev、セキュリティ | 待ち |
+| DOC-027 | Coinbase | [data-model.md](../systems/coinbase/docs/architecture/data-model.md) 10 節 G2 | `trading_suspended`（order-entry-and-risk.md）は売りも止めるが、kyc-and-accounts.md の DT-KYC-001 の restricted の行は売りを通す | Dev、法務（L7） | 待ち |
+| DOC-028 | Coinbase | [data-model.md](../systems/coinbase/docs/architecture/data-model.md) 10 節 G9 | `journals.idempotency_key` の全期間での一意（ledger-and-balances.md）と、月の分割（capacity.md）が両立しない。データモデルは分割しない `idempotency_keys` 表を足した（Dev の承認待ち） | Dev | 待ち |
+| DOC-029 | Coinbase | [data-model.md](../systems/coinbase/docs/architecture/data-model.md) 10 節 G7・G10 | 日本円の出金の戻り（`fiat_withdrawal_return`）と完了後の組戻しの仕訳の型が型の表にない。ETH の集め直しの記帳先が `crypto_deposit` の借記先と合わない | Dev、財務 | 待ち |
 
 ## 5. ADR が承認されたら直す文書
 

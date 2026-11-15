@@ -57,3 +57,19 @@
 - 口座の制限の理由のコードの名前（`takeover_suspected` と `takeover_lock`、取引の `frozen` と `sanctions_match`・`legal_order`）を 1 つの一覧にそろえる（データモデルの工程）。
 - 署名の方針の宛先の種類 `house_hot`・`house_warm`・`house_cold`（利用者用のウォレットの段）と `house_wallet`（本システムの財産）の名前の取り違えやすさ（ADR-0035 の注記。データモデルの工程）。
 - 入金のアドレスの残高を台帳で `wallet:hot:ETH` の中に持つか、別の口座にするか（[deposits.md](deposits.md) の 14 節。ledger-and-balances の領域）。
+
+## 2026-11-15：データモデル
+
+工程 4 で、領域の文書（21 本）の data-model の項目と ADR から、[data-model.md](data-model.md) と [data-model/](data-model/) の 14 のファイル（Aurora の 125 表、署名の境界の記録 6、`watch` の DynamoDB 2）を書いた。統合の工程の結論（D1・D2・D9・D14 など）をそのまま形にし、統合で残した名前を次のとおり揃えた。どれも Dev（テックリード）の承認を待つ。領域の文書と ADR の本文は持ち主が直す（data-model.md の 10 節の G1〜G14）。
+
+- **口座の制限の理由**（統合の残り。N1）：[accounts-and-kyc.md](data-model/accounts-and-kyc.md) の `restriction_reasons` を 1 つの一覧にした。`takeover_suspected` は `takeover_lock` に揃え、ADR-0019 の `frozen` は `kind = frozen` の `sanctions_match`・`legal_order`・`deceased` に分けた。`kyc_incomplete` と `closing` は制限の行にせず、寿命の状態で表す。`trading_suspended` は残し、DT-KYC-001 の `restricted` の行との違い（売りも止め、板の注文を取り消す）を理由の表の列で持つ。
+- **署名の方針の宛先の種類**（統合の残り。N2）：データモデルでは `tier_hot`・`tier_warm`・`tier_cold` と `house_wallet`。`wallets` の持ち主の列は台帳と同じ `property_class`（`user`・`house`）。
+- **名前**：`account_id` は利用者の口座、台帳の口座は `ledger_account_id`（N3）。板は `btc_jpy`（N4）。自己約定の組は `self_trade_group_id`（N8）。AML の案件の事象は `compliance_case_events`（N9）。
+- **手数料の表は 1 つ**（N5）：`withdrawal_fee_tables` を `fee_schedules`（core、`crypto_withdrawal`）にまとめ、最小の出金の額を `min_amount` にした。
+- **仕訳の型**（N6）：`deposit_reversal_hold` は `hold`（`source_type = reorg`）。`fiat_withdrawal_return` を型の一覧に入れた。
+- **残高の行を 2 つに分けた**（N7）：利用者の `balances` と、照合と在庫のための `ledger_balances`。`fee_revenue:*` は約定ごとに更新しない（capacity の行の数を変えない）。
+- **冪等キーの表**：`journals` の月の分割と全期間の一意を両立させるため、分割しない `idempotency_keys` を ledger に置いた（ADR-0001 の ledger の「冪等キー」）。同じ理由で `orders` は S1 では分割しない。
+- **出金の制限は 1 つの表**（N10）：`withdrawal_restrictions` の `scope`、`deposit_maturity` は `scope = account`（D1 のまま）。口座の制限・出金の待ちとは別の表。
+- **見つけた食い違い**：精算の `to_user`（本システムのウォレット → 利用者用のホット。ADR-0032）を ADR-0037 と DT-POL が許さない（G1）。データモデルはこの経路を持たず、custody-and-keys と segregation-and-reconciliation の持ち主に委ねた。
+
+残したもの：署名の境界の記録の器、`kyc-vault` の人ごとの鍵の表、日本円の出金の `returned` の仕訳の型、販売所の提示の量、`orders` の分け方、入金のアドレスの残高の台帳での置き方（[data-model.md](data-model.md) の 9 節）。

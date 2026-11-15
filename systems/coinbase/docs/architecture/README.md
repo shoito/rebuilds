@@ -1,6 +1,6 @@
 # Architecture: Coinbase
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。設計の工程ごとの決定の記録は [design-log.md](design-log.md) にある。データモデルの正本は `data-model.md`（工程 4 で作る）、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は前提知識の資料の用語集に置く（工程 5 で作る）。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。設計の工程ごとの決定の記録は [design-log.md](design-log.md) にある。データモデルの正本は [data-model.md](data-model.md)、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は[前提知識の資料](../primer/index.html)の用語集に置く。
 
 ## 1. 全体構成
 
@@ -456,7 +456,7 @@ sequenceDiagram
 | `capacity.md` | 負荷のモデル（相場の急変、マーケットメイカーの入力、入出金の山）、部品ごとの必要量、費用のモデルと単価、負荷試験 | 0070 | Ops | E16 |
 | `infrastructure.md` | AWS のアカウントとネットワーク、マッチングの EC2 の配置、MSK、3 つの Aurora、ノード、署名の境界のアカウント、egress（銀行・提供者・ノードの P2P）、DR（大阪）と板の再開、段階を上げる基準 | 0071–0073 | Ops、セキュリティ | E1、E16 |
 | `delivery.md` | CI/CD、段階のデプロイ（エンジンは板の停止の時間に入れ替える）、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、署名の方針と規則の表の出し方、アプリのリリース | 0074–0075 | QA、Ops | E1、E16 |
-| `data-model.md`・`data-model/` | データモデルの正本（工程 4） | なし（各領域の ADR を参照する） | QA | 全 Epic |
+| `data-model.md`・`data-model/` | データモデルの正本 | なし（各領域の ADR を参照する） | QA | 全 Epic |
 | [`design-log.md`](design-log.md) | 設計の工程ごとの「決定」の記録（工程 3 から） | なし | なし | なし |
 
 - 範囲の空きは 5 節に書いた。次に採番する ADR は、各領域の範囲の空いた番号か、範囲を広げた後の番号である。
