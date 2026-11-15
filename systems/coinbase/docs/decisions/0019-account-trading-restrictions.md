@@ -29,6 +29,8 @@ date: 2026-11-15
 - 解除は、付けた者の側の手順で承認する（`frozen` と `trading_suspended` は作成者と別の人の承認）。全部の行が解けたら `AccountUnblock` を送る。
 - 制限の種類と理由は、法令の結論で増える（法務の L6・L7・L14）。種類の追加は表への行の追加にし、コードの分岐を増やさない。
 
+> 2026-11-15 の注記（統合）：`account_restrictions` は kyc-and-accounts の領域が持つ 1 つの表にする（[ADR-0052](0052-account-lifecycle-levels-and-restrictions.md)）。列は ADR-0052 の形（`kind` は `restricted`・`frozen`、理由は `reason_code`）で、この ADR の制限の名前（`kyc_incomplete`・`trading_suspended`・`takeover_suspected`・`closing`）は `reason_code` の値として同じ表に足す（`frozen` は `kind = frozen` の行）。理由のコードごとに、新しい注文・取り消し・板の注文・出金・販売所をどう扱うかは、理由の表（`restriction_reasons`）の行で持ち、各領域が自分の理由の行を足す。`order-gateway` は理由の表で「新しい注文を止めるか」を引く。
+
 ### 他の案を選ばなかった理由
 
 - **2**：理由が重なると片方の解除で両方が解ける。`order-gateway` の確かめと sequencer の間の競りを閉じられない。

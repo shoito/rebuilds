@@ -26,6 +26,8 @@ date: 2026-11-15
 
 - 拘束の行は `source_type` ごとに、作る部品と戻す部品を決める（[ledger-and-balances.md](../architecture/ledger-and-balances.md) の 6.1 節）。NFR-004 の照合は `order`・`withdrawal`・`fiat_withdrawal` の拘束を、それぞれの必要額と比べる。`reorg`・`legal` は案件の記録と比べる。
 - 出金に使える額 ＝ `available` − 解けていない制限の和（0 未満なら 0）。出金と日本円の出金の拘束の条件つきの更新に、この式を入れる。制限は台帳の口座にしない。資産の持ち主が変わらないためである。
+
+> 2026-11-15 の注記（統合）：入金の成熟の前（BTC の 6 承認の前）の制限は、[ADR-0039](0039-deposit-state-machine-and-withdrawal-lock.md) に合わせて、口座の全部の出金（暗号資産と日本円）を止める。`withdrawal_restrictions` に範囲の列（`scope` ＝ `account`・`asset`、`asset` は `scope = account` のとき空）を足し、理由 `deposit_maturity` の行は `scope = account` で 1 行書く。`scope = account` の解けていない行がある口座の出金は、額の式によらず `held` の前で待つ。額の式は `scope = asset` の行（将来の理由）にだけ使う。下の「引き受けるコスト」の 2 つ目の経路（売った日本円、日本円で買った ETH での持ち出し）は、これで閉じる。
 - `legal` の拘束は、運用の画面からコンプライアンスの担当が作り、作成者と別の人の承認を要する。解除も 2 人の承認にする。返し方（暗号資産か日本円か、換算の時点）は法務の L14 の結論で決め、それまでは運用の手順で扱う。
 - 長く使われない口座の残高は、MVP では動かさない（法務の L14）。
 

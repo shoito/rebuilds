@@ -1,7 +1,7 @@
 # Intent: Coinbase を AI エージェント主体で再構築する
 
 - Author: shoito
-- Status: draft（2026-11-15 に土台の設計を書いた。領域の文書、統合と検証の工程はこれから。PM の受理を待つ）
+- Status: draft（2026-11-15 に土台の設計と領域の文書を書き、統合の工程で領域から出た問い（L15〜L19、P5〜P14）を足した。PM の受理を待つ）
 - Date: 2026-11-15
 
 ## Problem
@@ -58,7 +58,7 @@
 
 ### 守るべき振る舞い
 
-- 利用者の各資産の使える残高（`available`）は、どの時点でも 0 以上。拘束（`hold`）の和は、未約定の注文の残りの必要額、手続き中の出金、受け入れた販売所の提示の和と一致する。
+- 利用者の各資産の使える残高（`available`）は、どの時点でも 0 以上。拘束（`hold`）の和は、拘束の種類（`source_type`）ごとに元の記録と一致する。未約定の注文の残りの必要額（`order`）、手続き中の暗号資産と日本円の出金（`withdrawal`・`fiat_withdrawal`）、巻き戻りと法令による拘束（`reorg`・`legal`。案件の記録と比べる）である（[ADR-0029](decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）。販売所の提示の受け入れは 1 つのトランザクションで記帳し、拘束を残さない（[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md)）。
 - 板の状態を変える入力は、sequencer が付けた通し番号の順にだけエンジンに入る。番号に抜けも重なりもない。
 - エンジンは、同じスナップショットと同じ入力の列から、同じ出力の列を出す。本番のエンジンと、別の AZ の写しのエンジンの出力の要約（ハッシュ）は、入力の番号ごとに一致する。
 - 板の注文は、価格の良い順、同じ価格なら受け付けの順に約定する。約定の価格は、板にあった注文の価格である。同じ利用者の売りと買いは約定しない。
@@ -66,7 +66,7 @@
 - 台帳の各仕訳は、資産ごとに借方と貸方の和が等しい。利用者の口座の残高の和は、利用者用のウォレットの残高（チェーンの上）と、照合の時点で一致する。違いは仮勘定に置き、説明がつくまで消さない。
 - 利用者の暗号資産のうち、ネットワークにつながる環境で管理する額は、`legal.hot_ratio_max` の割合を超えない。超えたら、自動でコールドへ移す依頼を出す。
 - 1 つの出金から、チェーンの上で確定する取引は 0 か 1。出金の宛先は、登録して待ち時間を過ぎた宛先の許可の一覧の中にある。スクリーニングを通らない出金には署名しない。
-- 入金は、承認の数（BTC）・確定（ETH）の閾値を満たすまで、使える残高に入れない。記帳の後にチェーンが巻き戻ったら、その額を拘束し、仮勘定に置く。
+- 入金は、承認の数（BTC）・確定（ETH）の閾値を満たすまで、使える残高に入れない。記帳の後も、出金に使える閾値（BTC の 6 承認）までは、その口座の暗号資産と日本円のすべての出金を止める（[ADR-0039](decisions/0039-deposit-state-machine-and-withdrawal-lock.md)）。記帳の後にチェーンが巻き戻ったら、その額を拘束し、仮勘定に置く。
 - 一人の人も、一つのサービスも、方針の上限を超えて資産を動かせない。
 
 ### 成功の基準
@@ -124,29 +124,44 @@
 
 | # | 問い | 関係する設計 | 承認を止める spec |
 | --- | --- | --- | --- |
-| L1 | 業の区分と移行：2026 年 7 月 15 日に成立した改正法で、暗号資産交換業は金融商品取引法の暗号資産取引業へ移る（暗号資産の規定は公布の日から 1 年以内に施行）。本システムの開業の時期に、どちらの法令の登録を取り、施行の前後で何を変えるか。改正法で入る規律（自己資本規制比率、金融商品取引責任準備金、情報の公表、取り扱えない暗号資産の基準、日々の売買高の公表）の当てはめ。暗号資産の貸借が規制の対象になることの扱い | regulatory-compliance-japan、ledger-and-balances、market-data の各領域、[ADR-0005](decisions/0005-ledger-balances-and-trade-settlement.md) | E15 の全 Story、E16 の GA の判定 |
-| L2 | 利用者の暗号資産の管理：「常時インターネットに接続していない」環境で管理する割合（内閣府令の第 27 条。翻訳の資料では、例外は円換算の額の 5% まで）の計算の方法（時点、円換算の価格、ウォームのウォレットをどちらに数えるか、MPC の鍵の断片をどう数えるか）。超えたときの扱い。履行保証暗号資産の額の計算と管理。改正法の後の「顧客の暗号資産の分別管理」の規律 | custody-and-keys、segregation-and-reconciliation の各領域、[ADR-0006](decisions/0006-wallet-tiers-and-cold-ratio.md) | E6 のウォレットの段の Story、E13 の分別管理の報告、E16 の GA の判定 |
+| L1 | 業の区分と移行：2026 年 7 月 15 日に成立した改正法で、暗号資産交換業は金融商品取引法の暗号資産取引業へ移る（暗号資産の規定は公布の日から 1 年以内に施行）。本システムの開業の時期に、どちらの法令の登録を取り、施行の前後で何を変えるか。改正法で入る規律（自己資本規制比率、金融商品取引責任準備金、情報の公表、取り扱えない暗号資産の基準、日々の売買高の公表）の当てはめ。暗号資産の貸借が規制の対象になることの扱い。日々の売買高の公表の中身（販売所を含めるか、単位、時刻、場所。`legal.daily_volume_definition`、[ADR-0023](decisions/0023-daily-volume-publication.md)） | regulatory-compliance-japan、ledger-and-balances、market-data の各領域、[ADR-0005](decisions/0005-ledger-balances-and-trade-settlement.md) | E15 の全 Story、E16 の GA の判定 |
+| L2 | 利用者の暗号資産の管理：「常時インターネットに接続していない」環境で管理する割合（内閣府令の第 27 条。翻訳の資料では、例外は円換算の額の 5% まで）の計算の方法（時点、円換算の価格、ウォームのウォレットをどちらに数えるか、MPC の鍵の断片をどう数えるか）。超えたときの扱い。履行保証暗号資産の額の計算と管理。改正法の後の「顧客の暗号資産の分別管理」の規律。コールドの鍵の 3-of-5 の断片の数え方と置き場所（[ADR-0034](decisions/0034-cold-key-quorum-and-locations.md)）、履行保証暗号資産を置くウォレットの段 | custody-and-keys、segregation-and-reconciliation の各領域、[ADR-0006](decisions/0006-wallet-tiers-and-cold-ratio.md) | E6 のウォレットの段の Story、E13 の分別管理の報告、E16 の GA の判定 |
 | L3 | 利用者の金銭の分別管理：利用者の日本円の信託の方式（金銭信託の契約の形）、信託すべき額の計算と頻度（毎営業日か）、信託までの間の扱い、入金の途中・出金の途中のお金の数え方。改正法の後の「顧客の金銭の分別管理・信託」の規律 | fiat-and-banking、segregation-and-reconciliation の各領域、[ADR-0005](decisions/0005-ledger-balances-and-trade-settlement.md) | E3 の信託の Story、E13 の照合と報告 |
-| L4 | 犯罪収益移転防止法：取引時確認の方式（非対面の「ホ」方式は 2027 年 4 月 1 日から使えなくなると解説されている。IC チップの読み取りと公的個人認証）、確認の記録と取引の記録の保存の期間、再確認の契機、高リスクの取引の確認、疑わしい取引の届出の基準と手順、法人の実質的支配者 | kyc-and-accounts、aml-and-travel-rule の各領域、[ADR-0011](decisions/0011-external-providers-boundary.md) | E2 の全 Story、E12 の届出の案件の Story |
-| L5 | トラベルルール：通知の義務の対象（国内・国外の相手の交換業者、相手が分からないとき、利用者が自分で管理するウォレット）、通知の項目、通知の手段（提供者のプロトコル）と相手が対応しないときに送ってよいか、受け取りの側の確認と、情報の欠けた入金の扱い | aml-and-travel-rule、withdrawals、deposits の各領域、[ADR-0008](decisions/0008-withdrawal-pipeline-and-approvals.md) | E7 の出金の Story、E5 の入金の Story、E12 のトラベルルールの Story |
-| L6 | 制裁と AML：外為法の資産凍結の対象との照合の範囲と頻度、チェーン分析の点で入出金を止める基準、止めた資産の扱い（凍結、返却の可否）、当局への報告 | aml-and-travel-rule の領域、[ADR-0011](decisions/0011-external-providers-boundary.md) | E12 のスクリーニングの Story |
-| L7 | 不公正取引：改正法で新しく入るインサイダー取引の規制（重要事実、本システムの役職員と関係者の取引の制限、情報の管理）、相場操縦・見せ玉・仮装売買の監視の義務と、見つけたときの扱い。本システムの自己の売買（販売所の在庫の調整、取引所への注文）と利益相反の管理 | market-surveillance、brokerage-quotes の各領域、[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md) | E14 の全 Story、E11 の在庫の調整の Story |
-| L8 | 販売所：本システムが相手になる取引の価格の示し方（スプレッドの表示、取引所の価格との関係）、説明の義務、広告の規制、提示の期限の間の価格の変動の扱い | brokerage-quotes の領域、[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md) | E11 の全 Story |
-| L9 | 自主規制団体の規則：日本暗号資産等取引業協会の規則（利用者財産の管理等に関する規則、システムのリスクの管理、取扱いの暗号資産の審査）の当てはめ。2024 年の流出の後の規則の改正（2025 年に意見の公募。改正の中身は未検証）の内容 | custody-and-keys、security、regulatory-compliance-japan の各領域 | E6・E15 の Story、銘柄の追加の Epic（MVP の後） |
-| L10 | 税：年間の取引の報告書の様式と交付、支払調書・税務署への報告（暗号資産の取引の報告の新しい制度を含む）、利用者の取得の価額の扱い。2028 年 1 月の施行と報じられた分離課税に向けた記録の形 | ledger-and-balances、regulatory-compliance-japan の各領域 | E4 の明細と報告書の Story、E15 の報告の Story |
-| L11 | 個人情報保護法：本人確認の書類と顔の画像の利用の目的と保存の期間、外国にある提供者への提供（eKYC、チェーン分析、トラベルルール）、漏えい等の報告の手順、退会の後の保持の期限 | kyc-and-accounts、security の各領域 | E2 の書類の保存、E12 の提供者の連携、E16 の GA の判定 |
-| L12 | 利用者への説明と表示：契約の前の書面、手数料とリスクの説明、出金の宛先の誤りの責任、未成年の口座 | kyc-and-accounts、withdrawals、brokerage-quotes の各領域 | E2 の口座の開設、E7 の宛先の登録、E11 の販売所の画面 |
-| L13 | システムのリスクと外部への委託：金融庁の事務ガイドライン（第三分冊）のシステムのリスクの管理と外部への委託（クラウド、HSM・MPC の提供者、eKYC・チェーン分析の提供者）の当てはめ。2024 年 9 月と 12 月の、流出のリスクとウォレットの管理の自主点検の要請への対応 | custody-and-keys、security、infrastructure の各領域、[ADR-0007](decisions/0007-signing-service-and-key-custody.md) | E6 の提供者の選定、E16 の GA の判定 |
+| L4 | 犯罪収益移転防止法：取引時確認の方式（非対面の「ホ」方式は 2027 年 4 月 1 日から使えなくなると解説されている。IC チップの読み取りと公的個人認証）、確認の記録と取引の記録の保存の期間、再確認の契機、高リスクの取引の確認、疑わしい取引の届出の基準と手順、法人の実質的支配者。確認の記録に書類の番号を残すか（`legal.kyc_record_fields`）。ログ（13 か月）・監査ログ・エンジンのビルド（7 年）の保存の期間で、記録の保存の要件を満たすか | kyc-and-accounts、aml-and-travel-rule の各領域、[ADR-0011](decisions/0011-external-providers-boundary.md) | E2 の全 Story、E12 の届出の案件の Story |
+| L5 | トラベルルール：通知の義務の対象（国内・国外の相手の交換業者、相手が分からないとき、利用者が自分で管理するウォレット）、通知の項目、通知の手段（提供者のプロトコル）と相手が対応しないときに送ってよいか、受け取りの側の確認と、情報の欠けた入金の扱い（既定の案：通知のない入金は 24 時間待って保留、自分で管理するウォレットからの入金は答えがなければ 7 日で保留）。自分で管理するウォレットの所有の確かめ（`legal.travel_rule_self_hosted_proof`）、通知の対象の額の閾値（`legal.travel_rule_threshold_jpy`。既定は 0、全件）。自分で管理するウォレットへの出金と、通知を受けられない相手への出金を送ってよいか | aml-and-travel-rule、withdrawals、deposits の各領域、[ADR-0008](decisions/0008-withdrawal-pipeline-and-approvals.md) | E7 の出金の Story、E5 の入金の Story、E12 のトラベルルールの Story |
+| L6 | 制裁と AML：外為法の資産凍結の対象との照合の範囲と頻度、チェーン分析の点で入出金を止める基準、止めた資産の扱い（凍結、返却の可否）、当局への報告。凍結した入金（`frozen`）と、出金の `compliance_review` で止めた資産の保管と返却 | aml-and-travel-rule の領域、[ADR-0011](decisions/0011-external-providers-boundary.md) | E12 のスクリーニングの Story |
+| L7 | 不公正取引：改正法で新しく入るインサイダー取引の規制（重要事実、本システムの役職員と関係者の取引の制限、情報の管理）、相場操縦・見せ玉・仮装売買の監視の義務と、見つけたときの扱い。本システムの自己の売買（販売所の在庫の調整、取引所への注文）と利益相反の管理。販売所の在庫を補う暗号資産を、どこから、どう得るか（[ADR-0025](decisions/0025-brokerage-inventory-target-and-replenishment.md)）。取引の停止（`frozen`）の間に本人の名義の口座への日本円の出金を許すか。役職員の取引を禁止にするか、申請と期間で縛るか、家族を含めるか（`legal.staff_trading_policy`）。本番の見張りの口座（`canary`）の注文と約定の扱い（推奨：本番は注文と取り消しだけにし、約定させない） | market-surveillance、brokerage-quotes の各領域、[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md) | E14 の全 Story、E11 の在庫の調整の Story |
+| L8 | 販売所：本システムが相手になる取引の価格の示し方（スプレッドの表示、取引所の価格との関係）、説明の義務、広告の規制、提示の期限の間の価格の変動の扱い。示し方の設定（`legal.brokerage_display`、[ADR-0026](decisions/0026-brokerage-price-display.md)） | brokerage-quotes の領域、[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md) | E11 の全 Story |
+| L9 | 自主規制団体の規則：日本暗号資産等取引業協会の規則（利用者財産の管理等に関する規則、システムのリスクの管理、取扱いの暗号資産の審査）の当てはめ。2024 年の流出の後の規則の改正（2025 年に意見の公募。改正の中身は未検証）の内容。協会が集める注文と取引のデータの様式と頻度 | custody-and-keys、security、regulatory-compliance-japan の各領域 | E6・E15 の Story、銘柄の追加の Epic（MVP の後） |
+| L10 | 税：年間の取引の報告書の様式と交付、支払調書・税務署への報告（暗号資産の取引の報告の新しい制度を含む）、利用者の取得の価額の扱い。2028 年 1 月の施行と報じられた分離課税に向けた記録の形。税の報告のために個人番号を集めるか（本システムの公的個人認証では個人番号を受け取らない。集めるなら Workday の題材の[マイナンバーの保管庫](../../workday/docs/architecture/my-number-vault.md)の設計を使う） | ledger-and-balances、regulatory-compliance-japan の各領域 | E4 の明細と報告書の Story、E15 の報告の Story |
+| L11 | 個人情報保護法：本人確認の書類と顔の画像の利用の目的と保存の期間、外国にある提供者への提供（eKYC、チェーン分析、トラベルルール）、漏えい等の報告の手順、退会の後の保持の期限。漏えい等の報告の手順の型の ADR は、結論の後に起票する（番号 0067 を空けている） | kyc-and-accounts、security の各領域 | E2 の書類の保存、E12 の提供者の連携、E16 の GA の判定 |
+| L12 | 利用者への説明と表示：契約の前の書面、手数料とリスクの説明、出金の宛先の誤りの責任、未成年の口座。急ぎのエンジンの修正で、保守の時間の告知を短くしてよいか | kyc-and-accounts、withdrawals、brokerage-quotes の各領域 | E2 の口座の開設、E7 の宛先の登録、E11 の販売所の画面 |
+| L13 | システムのリスクと外部への委託：金融庁の事務ガイドライン（第三分冊）のシステムのリスクの管理と外部への委託（クラウド、HSM・MPC の提供者、eKYC・チェーン分析の提供者）の当てはめ。2024 年 9 月と 12 月の、流出のリスクとウォレットの管理の自主点検の要請への対応。コールドの鍵の 3 か所目の保管の場所と、保管の委託（金庫の業者）。CS の委託（海外の委託先を使うか）。外部の監視の提供者（`watch` の外部のノード、呼び出し）。`custody` の変更の記録の形 | custody-and-keys、security、infrastructure の各領域、[ADR-0007](decisions/0007-signing-service-and-key-custody.md) | E6 の提供者の選定、E16 の GA の判定 |
 | L14 | 相続・差押え・休眠：利用者の死亡、差押え、長く使われない口座の残高の扱い。暗号資産での返還か日本円での返還か | ledger-and-balances、kyc-and-accounts の各領域 | E4・E2 の該当の Story（MVP は運用の手順で扱う） |
+| L15 | 調べと凍結の間の利用者への説明：AML の調べ、制裁の照合、凍結の間に、利用者へ何を、どの文言で伝えてよいか（理由を伝えないことの扱いを含む）。既定の案は、理由を出さない一般の文言 | aml-and-travel-rule、kyc-and-accounts の各領域、[ADR-0058](decisions/0058-transaction-monitoring-and-str-cases.md) | E12 の届出の案件の Story、E2 の通知の文言 |
+| L16 | 販売所の受け渡しの精算の待ちで、利用者の財産の一部を本システムの側で一時に持つこと：許す時間と額（既定の案は 1 時間か 1,000 万円）、超えたときの扱い、日次の報告での示し方。L2・L3 に近い | segregation-and-reconciliation、brokerage-quotes の各領域、[ADR-0032](decisions/0032-house-share-settlement.md) | E13 の精算の Story、E13 の分別管理の報告 |
+| L17 | 第三者からの振込と名義の表記の違い：本人の名義と認める表記の違いの範囲、本人でない名義からの振込の扱い（組戻し）。L4 に近い | fiat-and-banking の領域、[ADR-0049](decisions/0049-virtual-accounts-and-name-matching.md) | E3 の入金の Story |
+| L18 | 適合性の確認と取引の上限：年齢・経験・資産・所得・目的から段を決め、段に応じた取引の上限（新しい買いの累計、保有の上限。`legal.suitability_limits`）が求められるか、その段と値。L12 に近い | kyc-and-accounts、order-entry-and-risk、brokerage-quotes の各領域、[ADR-0052](decisions/0052-account-lifecycle-levels-and-restrictions.md) | E2 の適合性の Story、E8・E11 の上限の Story |
+| L19 | リージョンの障害で失った入力の扱い：大阪へ切り替えたとき、東京で約定して大阪に届かなかった入力の約定を打ち消しの仕訳で戻すときの、利用者への扱いと説明（推奨は再生の終わりを正にする案）。結論までは 1 件ずつ IC・財務・コンプライアンスで合意する | infrastructure、ledger-and-balances の各領域、[ADR-0073](decisions/0073-osaka-dr-and-market-restart.md) | E16 の DR の訓練と GA の判定 |
 
 ### PM の判断待ち（範囲）
 
 | # | 問い | 選択肢と推奨 |
 | --- | --- | --- |
 | P1 | 法人の口座とマーケットメイカーを MVP に入れるか | 推奨：入れる。板の流動性が取引所の価値を決める。法人の取引時確認（実質的支配者。法務の L4）と、API の速さの上限の段が増える。入れないなら、取引所は販売所より遅れて出す |
-| P2 | API キーに出金の権限を持たせるか | 推奨：MVP では持たせない。漏れた API キーで資産が出る経路を作らない。出金は画面とパスキーだけにする |
-| P3 | 販売所の在庫をヘッジするか | 推奨：MVP はヘッジしない。在庫の上限とスプレッドの広げで持つ（[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md)）。本システムの取引所でのヘッジは法務の L7 の後に検討する |
+| P2 | API キーに出金の権限を持たせるか | 推奨：MVP では持たせない。漏れた API キーで資産が出る経路を作らない。出金は画面とパスキーだけにする。持たせるなら [ADR-0045](decisions/0045-allowlist-registration-recorded-in-boundary.md) を見直す |
+| P3 | 販売所の在庫をヘッジするか | 推奨：MVP はヘッジしない。在庫の上限とスプレッドの広げで持つ（[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md)）。本システムの取引所でのヘッジは法務の L7 の後に検討する。在庫を補う手段（[ADR-0025](decisions/0025-brokerage-inventory-target-and-replenishment.md)）も法務の L7 とあわせて決める |
 | P4 | 出金の宛先の許可の一覧を必須にするか、登録の後の待ち時間 | 推奨：必須。待ち時間は 24 時間（[ADR-0008](decisions/0008-withdrawal-pipeline-and-approvals.md)）。利用者の手間が増える代わりに、乗っ取りの後の即時の出金を止める |
+| P5 | 最小の額に満たない入金を、後の入金と合わせて記帳するか | 推奨：MVP は記帳しない。入金の画面で最小の額を事前に知らせる（[ADR-0039](decisions/0039-deposit-state-machine-and-withdrawal-lock.md)）。合わせて記帳するなら、合算の規則と照合の項が要る |
+| P6 | ERC-20 のトークンの誤送（ETH のアドレスへのトークンの入金）の返却を扱うか | 推奨：MVP は扱わない。返却は MVP の後に、本人確認と手数料の規則とともに設計する |
+| P7 | 入出金の `compliance_review` の確認の待ちの目標と、営業時間の外の当番 | 推奨：目標は営業時間の 4 時間。営業時間の外は、優先の確認だけに当番を置く（[aml-and-travel-rule.md](architecture/aml-and-travel-rule.md)） |
+| P8 | メイカーへの払い戻し（負の手数料）と、30 日の取引高による手数料の段を持つか。既定のメイカーの率 | 推奨：MVP は持たない（段は 1 つ）。P1 の結論の後に決める。既定のメイカーの率は 500 ppm で、PM が確かめる（[ADR-0027](decisions/0027-fee-schedules-and-rounding.md)） |
+| P9 | 退会の時に、最小の出金の額に届かない暗号資産の端数をどう扱うか | 推奨は未定。既定の案は、残高と拘束が 0 のときだけ退会を受け、画面で販売所での売却と出金を案内する（[kyc-and-accounts.md](architecture/kyc-and-accounts.md)）。売れない端数の扱いは、法務の L12・L14 とあわせて決める |
+| P10 | 保護者の同意で未成年の口座を受けるか | 推奨：MVP では受けない。`legal.minimum_age` より若い申込みは受けない（法務の L12） |
+| P11 | API の接続が切れたときに注文を取り消す仕組み（cancel on disconnect）を MVP に入れるか | 推奨：P1 でマーケットメイカーを入れるなら入れる。入れないなら、一括の取り消し（`CancelAll`）だけにする（[order-entry-and-risk.md](architecture/order-entry-and-risk.md)） |
+| P12 | 注文ごとの板の配信（本家の `full`・`level3` に当たるもの）を出すか | 推奨：MVP は出さない。マーケットメイカー（P1）の求めと、見せ玉の監視の後に決める（[market-data.md](architecture/market-data.md)） |
+| P13 | 本番で入出金の見張り（`canary`）を回すか | 推奨：回す。本システムの `canary` の口座と見張りのウォレット（本システムの財産）の間で、1 日 1 回、最小の額（BTC 0.0001、ETH 0.001）を出金し、入金として受ける。本物の手数料を払い、署名の方針の決定表に見張りのウォレットの行が要る（セキュリティと財務。[observability.md](architecture/observability.md) の 4.5 節） |
+| P14 | 領域の文書で置いた本システムの既定の値を、いつ誰と合意するか：口座の自動の出金の 24 時間の累計 300 万円、ウォームの目標 2%、出金の手数料の表、CS の 1 日 80 口座、自動の停止（tripwire）の閾値、注文の最大の数量（BTC 100、ETH 1,000）、API の段（個人 15 件/秒・瞬間 30、マーケットメイカー 200 件/秒）、販売所の在庫の目標（BTC 5 億円、ETH 2 億円）、基本の幅（BTC 100 bp、ETH 150 bp）、在庫の損失の止め（24 時間で 3,000 万円） | 推奨：開発と検証の既定として使い、各 Epic の spec の前に財務・Ops・セキュリティと値を確かめ、E16 の GA の判定の前に合意する |
 
 ### 選定・計測で決めるもの（法務以外）
 

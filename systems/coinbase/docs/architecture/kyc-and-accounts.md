@@ -74,6 +74,7 @@
 
 - 制限は行で持ち、複数が同時に立つ。解除は行ごとに、立てた者の種類の承認で行う（たとえば `compliance` が立てた行は、コンプライアンスの担当の 2 人目の承認で外す）。
 - 口座の実際の制限は、立っている行のうち重いほう（`frozen` ＞ `restricted`）。
+- `account_restrictions` はこの領域が持つ 1 つの表で、order-entry-and-risk（[ADR-0019](../decisions/0019-account-trading-restrictions.md)）、market-surveillance、aml-and-travel-rule も同じ表に行を立てる。理由のコードごとの扱い（新しい注文、取り消し、板の注文、出金、販売所）は理由の表（`restriction_reasons`）の行で決め、各領域が自分の理由の行を足す（2026-11-15 の統合。ADR-0019 の注記）。
 
 ### 4.2 水準と方式
 
@@ -139,7 +140,7 @@ stateDiagram-v2
 - `frozen` に入るとき、`identity` は未約定の注文の取り消しを `order-gateway` に依頼する（[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md) の取り消しの入力）。取り消しで戻る拘束は `available` に戻るが、出金も注文もできない。
 - `frozen` の間に届いた日本円の着金は、記帳してから拘束の口座に移す（返却は組戻しの手順。fiat-and-banking の領域）。暗号資産の入金の記帳を止める理由は、制裁の対象の疑いの間に残高に入れないためである（法務の L6）。
 - `restricted` の理由のコードの例：`reverify_due`（再確認の期限切れ）、`suitability_limit`（適合性の上限。4.6 節）、`surveillance_hold`（market-surveillance の措置）、`compliance_hold`。
-- `frozen` の理由のコードの例：`takeover_lock`（本人の「これは私ではない」）、`sanctions_match`、`legal_order`（差押え・凍結の要請。法務の L6・L14）、`deceased`（法務の L14）。
+- `frozen` の理由のコードの例：`takeover_lock`（本人の「これは私ではない」）、`sanctions_match`、`legal_order`（差押え・凍結の要請。法務の L6・L14）、`deceased`（法務の L14）、`surveillance_suspension`（market-surveillance の取引の停止。[market-surveillance.md](market-surveillance.md) の 5.2 節）。
 
 ### 4.5 制限の反映の速さ
 
@@ -152,7 +153,7 @@ stateDiagram-v2
 ### 4.6 申告と適合性
 
 - 口座の開設の申告で、職業、取引の目的、投資の経験、金融資産の区分、年収の区分を受ける。値は `kyc-vault` に置き、core には区分から決めた段（`suitability_tier`）だけを置く。
-- 段に応じた取引の上限（新しい買いの累計、保有の上限）を `legal.suitability_limits` で持つ。協会と業界の団体は、年齢・経験・資産・所得・目的からリスクの閾値を置き、超えた取引を制限する運用を計画していると示した（[第 6 回暗号資産制度に関する WG の説明資料](https://www.fsa.go.jp/singi/singi_kinyu/angoshisanseido_wg/gijishidai/20251126/02.pdf)、2025-11-26）。本システムに何が求められるかは法務の確認待ち（L12。新しい問い L-new-kyc-1 の候補）。
+- 段に応じた取引の上限（新しい買いの累計、保有の上限）を `legal.suitability_limits` で持つ。協会と業界の団体は、年齢・経験・資産・所得・目的からリスクの閾値を置き、超えた取引を制限する運用を計画していると示した（[第 6 回暗号資産制度に関する WG の説明資料](https://www.fsa.go.jp/singi/singi_kinyu/angoshisanseido_wg/gijishidai/20251126/02.pdf)、2025-11-26）。本システムに何が求められるかは法務の確認待ち（L12。新しい問い L18 の候補）。
 - 本番の値が決まるまで、段を記録するだけにし、上限で止めない（`restricted` の `suitability_limit` を書かない）。
 
 ### 4.7 再確認
@@ -241,7 +242,7 @@ stateDiagram-v2
 ## 7. 退会と保持（ADR-0054）
 
 - 退会の条件：未約定の注文 0、拘束 0、手続き中の入出金 0、全資産の残高 0、制限の行のうち `frozen` 0、開いたコンプライアンスと監視の案件 0。
-- 残高が残っていれば、画面は「販売所で売る」「日本円を出金する」「暗号資産を出金する」を案内する。最小の出金の額に届かない暗号資産の端数の扱いは PM の判断待ち（P-new-kyc-1 の候補）と法務の L12・L14。
+- 残高が残っていれば、画面は「販売所で売る」「日本円を出金する」「暗号資産を出金する」を案内する。最小の出金の額に届かない暗号資産の端数の扱いは PM の判断待ち（P9 の候補）と法務の L12・L14。
 - 受け付けたら `closing` にし、ログインと全 API キーを止める。台帳と取引の記録は消さない（追記だけ）。
 - 保持の期限：本人確認の記録と取引の記録を、取引の終了（退会）から `legal.kyc_record_retention_days`・`legal.transaction_record_retention_days` の日数持つ。開発と検証の既定はどちらも 2,555 日（7 年。本システムの仮の値）。本番の値は法務の L4・L11。法令の照会や差押えの間は保持の延長（legal hold）をかける（[Workday の ADR-0049](../../../workday/docs/decisions/0049-retention-rules-table-and-legal-hold.md)）。
 - 期限の後、`kyc-vault` の人ごとの鍵を破棄し、`closed` にする。台帳と core には口座の ID と `person_key` だけが残る（`person_key` も鍵の破棄の後は照合に使えなくなる）。
@@ -250,7 +251,7 @@ stateDiagram-v2
 ### 7.1 未成年（法務の L12）
 
 - 確かめた生年月日から `ageOf()` の 1 つの関数で年齢を出す（形は Mercari の題材の [ADR-0068](../../../mercari/docs/decisions/0068-account-deletion-and-minors.md)）。
-- `legal.minimum_age` より若い申込みは `rejected` にする。開発と検証の既定は 18。保護者の同意で未成年を受けるかは PM の判断待ち（P-new-kyc-2 の候補。推奨：MVP では受けない）と法務の L12。
+- `legal.minimum_age` より若い申込みは `rejected` にする。開発と検証の既定は 18。保護者の同意で未成年を受けるかは PM の判断待ち（P10 の候補。推奨：MVP では受けない）と法務の L12。
 
 ## 8. 例：口座の開設から出金の待ちまで
 
@@ -340,9 +341,9 @@ stateDiagram-v2
 
 - 方式ごとの扱いと、本番で使える方式（法務の L4）。`document_face` の終わりの日の扱い。
 - 確認の記録に書類の番号を残すか、保持の期間（法務の L4・L11）。
-- 適合性の確認と取引の上限が求められるか、その段と値（法務の L12。L-new-kyc-1 の候補）。
-- 未成年を受けるか（PM の判断待ち P-new-kyc-2 の候補、法務の L12）。
-- 退会の時の端数の扱い（PM の判断待ち P-new-kyc-1 の候補、法務の L12・L14）。
+- 適合性の確認と取引の上限が求められるか、その段と値（法務の L12。L18 の候補）。
+- 未成年を受けるか（PM の判断待ち P10 の候補、法務の L12）。
+- 退会の時の端数の扱い（PM の判断待ち P9 の候補、法務の L12・L14）。
 - 税の報告で個人番号を集めるか（法務の L10）。集めるなら Workday の保管庫を使う ADR を起票する。
 
 ## 15. quality.md・runbooks・data-model への項目

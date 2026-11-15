@@ -117,11 +117,11 @@ stateDiagram-v2
 | `detected` | 2 台（組）が同じ高さで同じブロックの ID と同じ入金（取引の ID、出力の番号、額、アドレス）を返した | `confirming` | なし |
 | `detected`・`confirming` | 入金のブロックが合意の鎖にない | `reorged` | なし |
 | `reorged` | 同じ取引の ID と出力の番号が新しい鎖のブロックに入った | `detected` | なし |
-| `confirming` | 閾値に届き、スクリーニングとトラベルルールの判定が「通す」、額が最小の額以上 | `credited` | `deposit_credit` |
+| `confirming` | 閾値に届き、スクリーニングとトラベルルールの判定が「通す」、額が最小の額以上 | `credited` | `crypto_deposit` |
 | `confirming` | 閾値に届き、判定が「保留」 | `review_hold` | なし |
 | `confirming` | 閾値に届き、判定がまだない（提供者の障害、トラベルルールの情報の待ち） | `confirming` のまま | なし |
 | `confirming` | 閾値に届き、額が最小の額に満たない | `below_minimum` | なし |
-| `review_hold` | コンプライアンスの担当が通した | `credited` | `deposit_credit` |
+| `review_hold` | コンプライアンスの担当が通した | `credited` | `crypto_deposit` |
 | `review_hold` | コンプライアンスの担当が凍結した | `frozen` | なし（扱いは法務の L6） |
 | `credited` | BTC は 6 承認に届いた。ETH は記帳と同時 | `withdrawable` | なし（出金の止めを外す） |
 | `credited`・`withdrawable` | 入金のブロックが合意の鎖から外れた | `reversed_suspense` | `deposit_reversal_hold`（[ADR-0009](../decisions/0009-deposits-confirmations-and-own-nodes.md)） |
@@ -145,7 +145,7 @@ stateDiagram-v2
 
 ADR-0009 は、BTC を 3 承認で記帳し、6 承認まで「その額を出金に使えない」とした。入金した BTC を売って日本円にし、日本円で出金すると、同じ止めをすり抜ける。そこで、止めの対象を口座の全部の出金にする（[ADR-0039](../decisions/0039-deposit-state-machine-and-withdrawal-lock.md)）。
 
-- `credited` で `withdrawable` でない入金が 1 件でもある口座は、暗号資産の出金と日本円の出金の依頼を受け付けるが、`held` の前で待たせる。止めは台帳の出金の制限の行（`withdrawal_restrictions`、理由 `deposit_maturity`。[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）で持ち、範囲を「口座の全部の出金」にする（ADR-0029 の額の制限は入金の資産だけを止めるので、範囲の印を足す依頼を ledger-and-balances の領域に出す。14 節）。注文と販売所には使える。
+- `credited` で `withdrawable` でない入金が 1 件でもある口座は、暗号資産の出金と日本円の出金の依頼を受け付けるが、`held` の前で待たせる。止めは台帳の出金の制限の行（`withdrawal_restrictions`、理由 `deposit_maturity`。[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）で持ち、範囲を「口座の全部の出金」にする（ADR-0029 の額の制限に範囲の列 `scope` を足した。ADR-0029 の 2026-11-15 の注記）。注文と販売所には使える。
 - 待ちは BTC の 3 承認から 6 承認まで、通常およそ 30 分（BTC のブロックは平均およそ 10 分）。画面には「入金の確かめが済むと出金できます（あと約 N 分）」と出す。
 - 日本円の出金の側の読み込みは fiat-and-banking の領域、暗号資産の出金の側は withdrawals の領域に置く（10 節）。
 
@@ -245,7 +245,7 @@ gantt
 
 1. 10:00:15 に、ノード A が高さ h のブロックを返し、`deposit-watcher` が A の入金のアドレスへの出力（取引の ID `t1`、出力の番号 1、25,000,000 satoshi）を見つける（`detected`）。10:00:40 にノード B も同じブロックの ID を返し、`confirming` にする。
 2. `compliance` がチェーン分析の点（送り手は国内の交換業者のアドレス）と制裁の照合を返し、相手の交換業者からトラベルルールの通知（送り手の氏名、受取人 A）が届く。10:06 に判定は「通す」。
-3. 10:21 に高さ h+2 のブロック（3 承認）を 2 台が返す。10:22 に `deposit_credit`（`wallet:hot:BTC` ＋25,000,000、`user_available:BTC`（A）＋25,000,000。冪等キー `(deposit, btc, t1, 1)`）を書き、`credited` にする（閾値から記帳まで約 1 分。NFR-009 の 5 分の中）。
+3. 10:21 に高さ h+2 のブロック（3 承認）を 2 台が返す。10:22 に `crypto_deposit`（`wallet:hot:BTC` ＋25,000,000、`user_available:BTC`（A）＋25,000,000。冪等キー `(deposit, btc, t1, 1)`）を書き、`credited` にする（閾値から記帳まで約 1 分。NFR-009 の 5 分の中）。
 4. A は 10:23 に、取引所で 0.25 BTC を売り、日本円にする。10:30 に日本円の出金を依頼するが、口座の全部の出金の制限（`deposit_maturity`）があるので `held` の前で待つ。
 5. 10:52 に 6 承認に届き、`withdrawable` にする。止めを外し、日本円の出金が進む。
 
@@ -294,7 +294,7 @@ gantt
 
 - **DT-DEP**：5 節の遷移の決定表の全行を表駆動のテストで確かめる。
 - **PROP-DEP-001**：閾値の前の記帳 0（`chain-sim` の任意のブロックの列、巻き戻り、遅れ）。
-- **PROP-DEP-002**：1 つの入金（`chain`、`txid`、出力の番号）の `deposit_credit` は 0 か 1。巻き戻りと入り直しの後も同じ。
+- **PROP-DEP-002**：1 つの入金（`chain`、`txid`、出力の番号）の `crypto_deposit` は 0 か 1。巻き戻りと入り直しの後も同じ。
 - **PROP-DEP-003**：2 台が食い違う間の `credited` への遷移 0。
 - **PROP-DEP-004**：`withdrawable` でない入金がある口座の出金（暗号資産・日本円）の `held` 0。
 - **PROP-DEP-005**：スクリーニングの判定が「通す」でない入金の記帳 0。提供者の障害の注入の間の記帳 0。
@@ -308,10 +308,10 @@ gantt
 | --- | --- | --- |
 | トラベルルールの情報のない・欠けた入金の扱い（待つ時間、利用者への問い、保留） | 法務の確認待ち（L5） | 24 時間待ち、その後 `review_hold` |
 | 凍結した入金の扱い（保管、返却の可否） | 法務の確認待ち（L6） | 結論まで `frozen` で記帳しない |
-| 最小の額に満たない入金を、後の入金と合わせて記帳するか | PM の判断待ち（P-new-deposits-1） | MVP は記帳しない。画面で事前に知らせる |
-| ERC-20 のトークンの誤送の返却を扱うか | PM の判断待ち（P-new-deposits-2） | MVP は扱わない。返却は MVP の後に、本人確認と手数料の規則とともに |
+| 最小の額に満たない入金を、後の入金と合わせて記帳するか | PM の判断待ち（P5） | MVP は記帳しない。画面で事前に知らせる |
+| ERC-20 のトークンの誤送の返却を扱うか | PM の判断待ち（P6） | MVP は扱わない。返却は MVP の後に、本人確認と手数料の規則とともに |
 | ETH の入金のアドレスの方式 | `eth-deposit-sweep-poc` | 利用者ごとの通常のアドレス（ADR-0009 の既定） |
-| 6 承認の前の出金の制限の範囲（ADR-0029 は入金の資産の額だけ、ADR-0039 は口座の全部の出金） | ledger-and-balances の領域と合わせる | `withdrawal_restrictions` に範囲（`asset`・`account`）の列を足し、`deposit_maturity` は `account` にする |
+| 6 承認の前の出金の制限の範囲（ADR-0029 は入金の資産の額だけ、ADR-0039 は口座の全部の出金） | 2026-11-15 の統合で決めた（[design-log.md](design-log.md)） | `withdrawal_restrictions` に範囲（`scope` ＝ `account`・`asset`）の列を足し、`deposit_maturity` は `account` にした（ADR-0029・ADR-0050 の注記、[ledger-and-balances.md](ledger-and-balances.md) の 6.2 節） |
 | 台帳の口座で入金のアドレスの残高を `wallet:hot:ETH` の中に持つか、別の口座（例：`wallet:hot_deposit:ETH`）にするか | ledger-and-balances の領域 | 別の口座。照合で集め直しの前の残高を分けて見られる |
 
 ## 15. Story の候補

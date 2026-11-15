@@ -48,7 +48,7 @@
 | 手数料をどの資産で取るか、端数の規則 | 公式の資料で確かめられなかった | **未検証** |
 | 年間の報告書、日本の税の書類 | 本家は日本の事業を止めた。日本の様式は確かめていない | **未検証** |
 
-本家との意図した違い（[README.md](README.md) の 1.4 節に足す候補）：
+本家との意図した違い（2026-11-15 の統合で [README.md](README.md) の 1.4 節に足した）：
 
 | 項目 | 本家 | 本システム | 理由 |
 | --- | --- | --- | --- |
@@ -123,15 +123,16 @@ stateDiagram-v2
 | `reorg` | `deposit-watcher` | 調べの結論で使う（`suspense` へ）か戻す | 財務とコンプライアンスの結論 | [ADR-0009](../decisions/0009-deposits-confirmations-and-own-nodes.md) |
 | `legal` | 運用の画面（コンプライアンスの 2 人の承認） | 法的な手続きの結論で使うか戻す | 解除の 2 人の承認 | [ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)（法務の L14） |
 
-- 販売所の受け入れは、残高の条件つきの更新と在庫との振り替えを 1 つのトランザクションで書く（ADR-0010）。拘束の行を作らない。したがって、NFR-004 の「受け入れた提示の必要額」は、トランザクションの外からは常に 0 に見える（18 節の未解決の問い）。
+- 販売所の受け入れは、残高の条件つきの更新と在庫との振り替えを 1 つのトランザクションで書く（ADR-0010）。拘束の行を作らない。したがって、NFR-004 の照合には販売所の項を入れない（2026-11-15 の統合で、NFR-004 と intent からこの項を外した）。
 - 拘束の額は `user_available` の条件つきの更新（`available >= $a`）で書く（ADR-0004）。`reorg` だけは、足りなければ足りない分を `suspense:reorg` に置く（ADR-0009）。
 
 ### 6.2 出金の制限
 
-BTC は 3 承認で記帳するが、6 承認までは出金に使えない（ADR-0009）。これは拘束ではなく、出金だけを止める制限である。注文と販売所には使える。
+BTC は 3 承認で記帳するが、6 承認までは、その口座の全部の出金（暗号資産と日本円）を止める（ADR-0009、[ADR-0039](../decisions/0039-deposit-state-machine-and-withdrawal-lock.md)、ADR-0029 の 2026-11-15 の注記）。これは拘束ではなく、出金だけを止める制限である。注文と販売所には使える。入金した BTC を売った日本円や、その日本円で買った ETH での持ち出しも、これで止まる。
 
-- 制限の行（`withdrawal_restrictions`：口座、資産、額、理由 `deposit_maturity`、元の入金の ID、解ける条件）を記帳と同じトランザクションで書く。6 承認で `deposit-watcher` が解く。
-- 出金に使える額 ＝ `available` − 解けていない制限の和（0 未満なら 0）。出金の拘束の条件つきの更新に、この式を入れる（`available - restricted >= $a`）。
+- 制限の行（`withdrawal_restrictions`：口座、範囲 `scope`、資産、額、理由 `deposit_maturity`、元の入金の ID、解ける条件）を記帳と同じトランザクションで書く。`deposit_maturity` は `scope = account`（`asset` は空）にする。6 承認で `deposit-watcher` が解く。
+- `scope = account` の解けていない行がある口座は、暗号資産と日本円の出金を `held` の前で待たせる（額の式を使わない）。
+- `scope = asset` の行（将来の理由のため）は、出金に使える額 ＝ `available` − 解けていない制限の和（0 未満なら 0）で引く。出金の拘束の条件つきの更新に、この式を入れる（`available - restricted >= $a`）。
 - 制限は台帳の口座にしない。資産の持ち主は変わらず、照合の等式にも入らない（[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）。
 
 ## 7. 約定の記帳
@@ -174,9 +175,9 @@ sequenceDiagram
 | 既定の率（本システムの値。PM が確かめる） | テイカー 1,000 ppm（0.10%。[README.md](README.md) の 2.1 節）、メイカー 500 ppm（0.05%） |
 | 取る資産 | 受け取る資産から引く。買い手は暗号資産、売り手は日本円（ADR-0005） |
 | 実際の手数料 | `floor(受け取る額 × 率 ÷ 1,000,000)`。利用者に有利な側に切る |
-| 拘束の上限 | `ceil(…)`（ADR-0004）。上限 ≥ 実際の手数料が常に成り立つ |
+| 拘束 | 手数料の上限を含めない。手数料は受け取る資産から引くので、拘束した資産から払わない（ADR-0004 の 2026-11-15 の注記） |
 | 最低の手数料 | 持たない。小さな約定の手数料は 0 になりうる |
-| 負の手数料（メイカーへの払い戻し） | MVP で持たない（P1 の結論の後に検討。PM の判断待ちの候補） |
+| 負の手数料（メイカーへの払い戻し） | MVP で持たない（P1 の結論の後に検討。PM の判断待ち P8） |
 | 段 | MVP は 1 つ。30 日の取引高の段は P1 の結論の後 |
 
 - 端数の切り捨てで本システムが失う額は、約定 1 件で 1 単位（1 円、1 satoshi、1 wei）未満である。1 日 30 万件でも 30 万円未満で、収益の誤差として受ける。
@@ -219,7 +220,7 @@ sequenceDiagram
 
 買い手 B が 0.1 BTC を指値 1,000 万円で買い、板にあった売り手 S の指値 999 万円の売り 0.1 BTC と約定する。B はテイカー（1,000 ppm）、S はメイカー（500 ppm）。
 
-1. **拘束**（ADR-0004）：B の `user_available:JPY` から `user_hold:JPY` へ、`floor(10,000,000 × 0.1)` ＝ 1,000,000 円と、手数料の上限 `ceil(1,000,000 × 1,000 ÷ 1,000,000)` ＝ 1,000 円の、計 1,001,000 円。S は既に 0.1 BTC（10,000,000 satoshi）を拘束している。
+1. **拘束**（ADR-0004）：B の `user_available:JPY` から `user_hold:JPY` へ、`floor(10,000,000 × 0.1)` ＝ 1,000,000 円（手数料は受け取る BTC から引くので、上限を足さない）。S は既に 0.1 BTC（10,000,000 satoshi）を拘束している。
 2. **約定**：価格は板の注文の価格の 999 万円（ADR-0003）。代金 n ＝ `floor(9,990,000 × 0.1)` ＝ 999,000 円。
 3. **手数料**：B は受け取る BTC から `floor(10,000,000 × 1,000 ÷ 1,000,000)` ＝ 10,000 satoshi。S は受け取る日本円から `floor(999,000 × 500 ÷ 1,000,000)` ＝ `floor(499.5)` ＝ 499 円。
 4. **`trade` の仕訳**（冪等キー `trade:BTC-JPY:<trade_seq>`）：
@@ -229,7 +230,7 @@ sequenceDiagram
 | JPY | B の `user_hold:JPY` 999,000 | S の `user_available:JPY` 998,501、`fee_revenue:JPY` 499 | 0 |
 | BTC | S の `user_hold:BTC` 10,000,000 | B の `user_available:BTC` 9,990,000、`fee_revenue:BTC` 10,000 | 0 |
 
-5. **拘束の戻し**：B の注文が `done` になり、残りの 1,001,000 − 999,000 ＝ 2,000 円を `hold_release` で戻す。S の拘束の残りは 0。
+5. **拘束の戻し**：B の注文が `done` になり、残りの 1,000,000 − 999,000 ＝ 1,000 円を `hold_release` で戻す。S の拘束の残りは 0。
 6. **結果**：B は 999,000 円を払い、0.0999 BTC を得た。S は 0.1 BTC を渡し、998,501 円を得た。本システムは 499 円と 10,000 satoshi を得た。手数料の 0.5 円の端数は S に残った。
 
 ## 13. 障害のときの振る舞い
@@ -261,8 +262,8 @@ sequenceDiagram
 
 - **PROP-LED-001**：任意の注文・約定・取り消し・入出金・販売所・巻き戻りの列（重複、遅れ、順序の入れ替え）で、仕訳は資産ごとに釣り合い、全口座の和は 0、`available >= 0`、`user_hold` ＝ 拘束の行の残りの和（[quality.md](../quality.md) の 2.2.1 節 B）。
 - **PROP-LED-002**：約定ごとの記帳は 1 回。`ledger-poster` の任意の停止と再開で変わらない。
-- **PROP-LED-003**：任意の約定で、実際の手数料 ≤ 拘束の手数料の上限。`done` の注文の拘束の残りは 0。
-- **PROP-LED-004**：出金に使える額は、6 承認の前の入金を含まない。注文の拘束には含む。
+- **PROP-LED-003**：任意の約定で、0 ≤ 手数料 ≤ 受け取る額（買い手は受け取る暗号資産、売り手は受け取る日本円）。`done` の注文の拘束の残りは 0。
+- **PROP-LED-004**：6 承認の前の入金がある口座の出金（暗号資産と日本円）の `held` 0。注文の拘束には、その入金を使える。
 - **DT-LED-001**：仕訳の型と口座の組の決定表（5 節）。全行を表駆動で流し、表にない組を拒む。
 - **DT-LED-002**：手数料の端数の決定表（率、受け取る額、期待する手数料）。期待する値は QA が持つ。
 - **参照の実装**：`ledger-ref` の残高と一致する。
@@ -285,16 +286,16 @@ sequenceDiagram
 
 - 取得の価額の計算の方法と報告書の様式（法務の L10）。
 - 差押え・相続の返し方と換算の時点（法務の L14）。
-- メイカーへの払い戻し（負の手数料）と取引高の段（P1 の後。PM の判断待ちの候補）。
+- メイカーへの払い戻し（負の手数料）と取引高の段（P1 の後。PM の判断待ち P8）。
 - 既定のメイカーの率 500 ppm（PM が確かめる）。
-- 食い違い（Dev に確認）：[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md) の拘束の表は、指値の買いと成行の買いに日本円の手数料の上限を含めるが、[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md) の既定では買い手の手数料は受け取る暗号資産から引く。この文書は ADR-0005 に従い、日本円の上限は安全側の余分として `done` で戻す。
-- 食い違い（Dev に確認）：NFR-004 と intent の「受け入れた販売所の提示の必要額」は、ADR-0010 の 1 つのトランザクションの受け入れでは拘束として残らない。照合の式ではこの項を 0 として扱う。
+- 2026-11-15 の統合で決めた（Dev の承認待ち）：[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md) の拘束の表の日本円の手数料の上限は、[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md) の既定（買い手の手数料は受け取る暗号資産から引く）と合わないので外した（ADR-0004 の注記、[design-log.md](design-log.md)）。
+- 2026-11-15 の統合で決めた：NFR-004 と intent の「受け入れた販売所の提示の必要額」は、ADR-0010 の 1 つのトランザクションの受け入れでは拘束として残らないので、その項を外し、`source_type` ごとの拘束の和で書いた（[README.md](README.md) の NFR-004、ADR-0029）。
 
 ## 19. quality.md・runbooks・data-model への項目
 
 **quality.md**
 
-- 2.2.1 節 B の性質に PROP-LED-003（手数料 ≤ 上限）と PROP-LED-004（出金の制限）を足す。
+- 2.2.1 節 B の性質に PROP-LED-003（0 ≤ 手数料 ≤ 受け取る額）と PROP-LED-004（出金の制限）を足す。
 - DT-LED-001・DT-LED-002 を 3 節の ID の表に足す。手数料の端数の期待する値は QA の正解のファイル。
 
 **runbooks**
@@ -312,7 +313,7 @@ sequenceDiagram
 | `journal_type_rules` | `journal_type`、`side`、`account_kind`、`version` |
 | `balances` | `account_id`、`asset`、`available`、`hold`、`version`、`updated_at` |
 | `holds` | `hold_id`、`account_id`、`asset`、`source_type`、`source_id`、`amount`、`remaining`、`status`、`created_at`、`closed_at` |
-| `withdrawal_restrictions` | `restriction_id`、`account_id`、`asset`、`amount`、`reason`、`deposit_id`、`released_at` |
+| `withdrawal_restrictions` | `restriction_id`、`account_id`、`scope`（`account`・`asset`）、`asset`（`scope = account` は空）、`amount`、`reason`、`deposit_id`、`released_at` |
 | `fee_schedules` | `schedule_id`、`version`、`kind`、`pair_or_asset`、`tier`、`maker_ppm`、`taker_ppm`、`fixed_amount`、`effective_from`、`approved_by` |
 | `balance_snapshots` | `account_id`、`asset`、`as_of_date`、`balance` |
 | `statement_lines` | `account_id`、`journal_id`、`journal_type`、`asset`、`delta`、`fee`、`price`、`counterparty_kind`、`created_at` |

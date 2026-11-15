@@ -27,13 +27,13 @@
 
 | 出どころ | 要件 |
 | --- | --- |
-| NFR-008 | 二重の出金 0。許可の一覧の外の宛先への出金 0。ホットで払える出金の依頼から放送まで p95 30 分（承認の待ちを除く）。上限を超える出金は 24 時間以内（営業日） |
+| NFR-008 | 二重の出金 0。許可の一覧の外の宛先への出金 0。ホットで払える出金の依頼から放送まで p95 30 分（承認とコンプライアンスの待ちを除く）。上限を超える出金は 24 時間以内（営業日） |
 | NFR-015 | スクリーニングとトラベルルールの判定のない署名 0 |
-| NFR-004 | 拘束の和 ＝ 未約定の注文の必要額 ＋ 手続き中の出金 ＋ 受け入れた提示（[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md)） |
+| NFR-004 | 拘束の和を `source_type` ごとに必要額と比べる（`withdrawal` は手続き中の出金の額。[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md)、[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)） |
 | NFR-010 | 入出金の受け付けの可用性 月間 99.9% |
 | K5・K10 | 出金の正しさと速さ |
 | intent の守るべき振る舞い | 1 つの出金から確定する取引は 0 か 1。宛先は待ち時間を過ぎた許可の一覧の中。スクリーニングを通らない出金に署名しない |
-| ADR-0009 | BTC の入金は 6 承認まで出金に使えない（出金の拘束の対象から外す） |
+| ADR-0009・ADR-0039 | 6 承認の前の BTC の入金がある口座は、全部の出金（暗号資産と日本円）を `held` の前で待たせる（`withdrawal_restrictions`、`scope = account`、理由 `deposit_maturity`） |
 
 ## 3. 本家の形（確かめたこと）
 
@@ -45,7 +45,7 @@
 | 個人向けの許可の一覧 | 個人向けは、利用者が選んで有効にする（opt-in）許可の一覧で、新しい宛先に 48 時間の保留があると、検索の結果の要約が伝える。ヘルプの頁は取得できなかった | **未検証** |
 | 出金の手数料、詰まった取引の扱い、まとめ方 | 見つからなかった | **未検証** |
 
-**本家との意図した違い**（[README.md](README.md) の 1.4 節に足す候補）：
+**本家との意図した違い**（2026-11-15 の統合で [README.md](README.md) の 1.4 節に足した）：
 
 | 項目 | 本家 | 本システム | 理由 |
 | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ stateDiagram-v2
 | # | 今の状態 | 条件 | 次の状態 | 副作用 |
 | --- | --- | --- | --- | --- |
 | W01 | `requested` | 拘束（額 ＋ 手数料）の条件つきの更新が成功 | `held` | 拘束の仕訳（冪等キー `(withdrawal, <id>, hold)`） |
-| W02 | `requested` | 使える残高の不足（BTC は 6 承認の前の入金を除いて数える） | `rejected`（`insufficient_funds`） | なし |
+| W02 | `requested` | 使える残高の不足 | `rejected`（`insufficient_funds`） | なし |
 | W03 | `held` | — | `screening` | スクリーニングとトラベルルールの依頼（[ADR-0011](../decisions/0011-external-providers-boundary.md)） |
 | W04 | `screening` | 制裁の一致なし、点が閾値以下、トラベルルールの通知が済んだか対象外 | `policy` | 判定の記録 |
 | W05 | `screening` | 一致、閾値の超え、通知を送れない相手 | `compliance_review` | 案件を作る。拘束は残す |
@@ -119,6 +119,7 @@ stateDiagram-v2
 | W26 | `confirming` | BTC 6 承認、ETH の確定 | `completed` | 出金の記帳（拘束、ウォレット、手数料の収益、チェーンの手数料。仕訳の型は ledger-and-balances の領域） |
 
 - 表にない遷移は `transitionWithdrawal()` が拒む。`signing` から後は `rejected` に行かない（ADR-0008）。
+- 口座に `scope = account` の解けていない出金の制限（理由 `deposit_maturity`）がある間は、W01 を行わず `requested` に留める。止めが解けたら W01・W02 を判定する（[ADR-0039](../decisions/0039-deposit-state-machine-and-withdrawal-lock.md)。2026-11-15 の統合）。
 - `ops.withdrawals_enabled.<asset>` を切っている間は、W09・W13 の遷移を止める（状態は変えない）。`signing` より後の出金の追跡と置き換えは続ける。
 - W19 で境界が拒むのは、オンラインの判定と境界の判定が食い違ったときで、方針の外の署名の SLI に数える。
 
@@ -150,7 +151,7 @@ gantt
     確認（BTC 6 承認）           :b4, after b3, 60m
 ```
 
-- 待ち時間（既定 24 時間）は PM の判断待ち P4。認証の情報の変更の後 72 時間は出金を受けない（ADR-0008。境界は ADR-0045 でパスキーの追加の 72 時間を数える。パスワードとメール・電話の変更の 72 時間は identity の事象を境界が記録して数える）。
+- 待ち時間（既定 24 時間）は PM の判断待ち P4。認証の情報の変更の後 72 時間は出金を受けない（ADR-0008。境界は ADR-0045 でパスキーの追加の 72 時間を数える。TOTP の再設定、メール・電話番号の変更、回復の 72 時間は identity の事象を境界が記録して数える。契機は [ADR-0053](../decisions/0053-sign-in-step-up-cooldown-and-api-keys.md)。パスワードは持たない）。
 
 ## 6. 例：0.5 BTC の出金
 

@@ -4,7 +4,7 @@
 - 対応するアラート: 暗号資産の説明のつかない減り（page、SEV1 の候補）、約定の記帳の重複（page、SEV1 の候補）、約定の記帳の 1 分を超える欠け（チケット、多ければ page）、台帳とウォレットの説明のつかない増え（チケット）、台帳と銀行・信託の翌営業日を過ぎた差（チケット、財務）、照合のジョブの最後の成功からの時間が間隔の 2 倍を超えた（page）
 - 最終確認日: 2026-11-15
 
-照合の等式は [ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)。照合と仮勘定の一般の形は [Stripe の ADR-0017](../../../stripe/docs/decisions/0017-three-way-reconciliation-with-suspense.md)。照合の詳細は segregation-and-reconciliation の領域（工程 2 で書く）。
+照合の等式は [ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)。照合と仮勘定の一般の形は [Stripe の ADR-0017](../../../stripe/docs/decisions/0017-three-way-reconciliation-with-suspense.md)。照合の詳細は [segregation-and-reconciliation.md](../architecture/segregation-and-reconciliation.md)（5 節の時点の照合と途中の項目、10 節の仮勘定）と [ADR-0031](../decisions/0031-point-in-time-reconciliation-with-in-flight.md)。日次の締めの検査の破れは [ledger-daily-close-failure.md](ledger-daily-close-failure.md)、本システムの持ち分の精算の詰まりは [house-settlement-stuck.md](house-settlement-stuck.md)。
 
 ## 症状
 
@@ -26,16 +26,18 @@
 ## 確認
 
 1. 外れの種類（R1〜R5）、資産、額、時刻。対象は口座の ID、仕訳の ID、取引の ID、額だけで見る。
-2. R1 なら：同じ時間帯の出金・移し替えの取引と、署名の境界の記録。記録にない減りは、ただちに [hot-wallet-compromise.md](hot-wallet-compromise.md) へ。記録にある減りなら、台帳の記帳の欠け（出金の `completed` の記帳、チェーンの手数料の `network_fee_expense`）を探す。
-3. R2 なら：記帳を止めている入金（閾値の前、スクリーニングの待ち、ERC-20 のトークン）、手数料の移しの予定。
-4. R3 なら：`ledger-poster` の停止・遅れ（MSK の消費の遅れ）、直近のデプロイ、冪等キーの制約の有無。
-5. R4・R5 なら：銀行の着金の通知と照会、出金の結果の不明、信託の依頼の状態、銀行の営業日。
+2. **R1・R2 は、まず h を 1 ブロック前後にずらして取り直す。** 途中の項目（記帳を待つ入金、`completed` の前の出金、段の間の移し替え、集め直し）の状態の遅れで出た差は、これで消える。2 回続けて同じ差なら、説明のつかない差として次へ進む（ADR-0031）。
+3. R1 なら：同じ時間帯の出金・移し替えの取引と、署名の境界の記録。記録にない減りは、ただちに [hot-wallet-compromise.md](hot-wallet-compromise.md) へ。記録にある減りなら、台帳の記帳の欠け（出金の `completed` の記帳、チェーンの手数料の `network_fee_expense`）を探す。
+4. R2 なら：記帳を止めている入金（閾値の前、スクリーニングの待ち、ERC-20 のトークン）、手数料の移しの予定。
+5. R3 なら：`ledger-poster` の停止・遅れ（MSK の消費の遅れ）、直近のデプロイ、冪等キーの制約の有無。手数料の表のバージョンが見つからずに、その板の記帳を止めていないか（`ledger-poster` の誤り）。
+6. R4・R5 なら：銀行の着金の通知と照会、出金の結果の不明、信託の依頼の状態、銀行の営業日。
 
 ## 対処
 
 1. **R1（記録にない減り）**：[hot-wallet-compromise.md](hot-wallet-compromise.md) に従う。
 2. **R3 の重複**：その資産の出金を止める（`ops.withdrawals_enabled.<asset>`、`ops.fiat_withdrawals_enabled`）。影響した口座を特定し、打ち消しの仕訳で直す（財務の 2 人の承認）。直近のデプロイが疑わしければ戻す（[deploy-and-rollback.md](deploy-and-rollback.md)）。
 3. **R3 の欠け**：`ledger-poster` を戻し、出力の記録を最後に記帳した `trade_seq` から読み直す（冪等キーで 2 度書かれない）。手で約定の仕訳を書かない。
+   - 手数料の表のバージョンが見つからないときは、`ledger-poster` がその板の記帳を止めている（後の約定を先に書かない）。表の束を戻して記帳を再開させる。手で率を入れない（[ledger-and-balances.md](../architecture/ledger-and-balances.md) の 13 節、[ADR-0027](../decisions/0027-fee-schedules-and-rounding.md)）。
 4. **R2**：説明がつけば（記帳の待ちの入金、移しの予定）、待つ。説明がつかなければ、仮勘定に置き、財務が調べる。
 5. **R4**：銀行の照会で結果を確かめる。説明のつかない差は `suspense:bank` に置き、期限（翌営業日）で財務が確かめる。
 6. **R5**：不足の額の信託を、その営業日の中に依頼する（財務）。不足の理由（入金の急増、計算の誤り）を記録する。計算の方法は法務の L3 の結論に従う。

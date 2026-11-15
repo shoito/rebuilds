@@ -48,7 +48,7 @@
 | ローソク足の粒度、日の境界 | 確かめられなかった | **未検証** |
 | WebSocket の接続と送信の上限 | 上の頁には書かれていない | **未検証** |
 
-本家との意図した違い（README の 1.4 節に足す提案）：板の全部の差分の経路（`book`）を認証なしで、まとめずに配る。本家は全部の更新の `level2` に認証を求め、認証なしは 50ms のまとめ（`level2_batch`）である。日本の利用者の多くは画面で板を見るので、認証なしで NFR-002 の速さを出す（[ADR-0021](../decisions/0021-market-data-feed-and-book-seq.md)）。
+本家との意図した違い（2026-11-15 の統合で README の 1.4 節に足した）：板の全部の差分の経路（`book`）を認証なしで、まとめずに配る。本家は全部の更新の `level2` に認証を求め、認証なしは 50ms のまとめ（`level2_batch`）である。日本の利用者の多くは画面で板を見るので、認証なしで NFR-002 の速さを出す（[ADR-0021](../decisions/0021-market-data-feed-and-book-seq.md)）。
 
 ## 4. 設計
 
@@ -219,7 +219,7 @@ roadmap の E10 の `market-data-publisher`・`ws-gateway`・`daily-volume-publi
 | 問い | いつ・どう決めるか |
 | --- | --- |
 | 日々の売買高の公表の中身（販売所を含めるか、単位、時刻、場所） | 法務の確認待ち（L1）。`legal.daily_volume_definition` |
-| 注文ごとの配信（本家の `full`・`level3` に当たるもの）を出すか | PM の判断待ち（新しい問い）。推奨：MVP は出さない。マーケットメイカー（P1）の求めと、見せ玉の監視（market-surveillance）の後に決める |
+| 注文ごとの配信（本家の `full`・`level3` に当たるもの）を出すか | PM の判断待ち（P12）。推奨：MVP は出さない。マーケットメイカー（P1）の求めと、見せ玉の監視（market-surveillance）の後に決める |
 | 1 タスク 5,000 の接続で NFR-002 を満たすか | capacity の領域の負荷試験 |
 | 本家のローソク足の粒度と日の境界 | 公式の資料で確かめられなかった（**未検証**）。本システムの値を使う |
 
@@ -233,7 +233,7 @@ roadmap の E10 の `market-data-publisher`・`ws-gateway`・`daily-volume-publi
 
 ### runbooks
 
-- `market-data-lag.md`（新規）：配信の p99 が 500ms を 5 分超えたとき（区間ごとの遅れ、遅い接続の率、`ws-gateway` の CPU、MSK の遅れ）と、タスクの追加。
+- [`market-data-degraded.md`](../runbooks/market-data-degraded.md)（2026-11-15 の統合で、ledger-and-balances の領域が出した同じ手順と 1 本にした）：配信の p99 が 500ms を 5 分超えたとき（区間ごとの遅れ、遅い接続の率、`ws-gateway` の CPU、MSK の遅れ）と、タスクの追加。
 - `daily-volume-mismatch.md`（新規）：日々の売買高の照合が合わないとき（記帳の欠けと出力の欠けの調べ、公表の保留と知らせ、訂正の出し方）。
 
 ### data-model

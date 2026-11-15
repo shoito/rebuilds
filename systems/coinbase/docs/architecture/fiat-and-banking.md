@@ -115,7 +115,7 @@ stateDiagram-v2
 
 - 遷移は 1 つの関数だけが書き、遷移ごとに `fiat_withdrawal_events` に行を足す。`submitted` 以降は `rejected` に進めない。
 - `unknown` では依頼し直さない。結果の照会で依頼の番号の状態を確かめ、照会しても分からなければ Ops の確認に回す（Stripe の [ADR-0018](../../../stripe/docs/decisions/0018-payout-execution-via-banking-partner.md) の形）。
-- 出金に使える日本円 ＝ `available:JPY` − 同じ口座の解けていない出金の制限（6 承認の前の BTC の入金）の円換算の額（0 未満なら 0）。円換算の価格は、その時点の参照の価格（[ADR-0006](../decisions/0006-wallet-tiers-and-cold-ratio.md)）とする（[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md) の残した経路を閉じる）。
+- 同じ口座に、解けていない出金の制限（`withdrawal_restrictions`、`scope = account`、理由 `deposit_maturity`。6 承認の前の BTC の入金）があれば、日本円の出金を `held` の前で待たせる（[ADR-0039](../decisions/0039-deposit-state-machine-and-withdrawal-lock.md)。[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md) の残した経路を閉じる）。円換算の額を引く式は使わない（ADR-0050 の 2026-11-15 の注記）。参照の価格に依らない。
 - 出金の手数料は表の固定の額（[ADR-0027](../decisions/0027-fee-schedules-and-rounding.md)）。`ops.fiat_withdrawals_enabled` を切ると、`submitted` の前の出金を止める（[runbooks/README.md](../runbooks/README.md) の 2 節）。
 
 ### 6.3 締めと束ね
@@ -184,7 +184,7 @@ stateDiagram-v2
 
 - **PROP-FIAT-001**：`bank-sim` の任意の通知の重複・遅れ・取りこぼしと照会の列で、着金ごとの記帳は 0 か 1。名義が一致しない着金の記帳 0（`review` の承認を除く）。
 - **PROP-FIAT-002**：任意の時間切れ・誤り・照会の列で、1 つの出金の依頼の番号から完了する振込は 0 か 1。`unknown` からの依頼のし直し 0。
-- **PROP-FIAT-003**：6 承認の前の BTC の入金がある口座で、その円換算を超える日本円の出金の拘束 0。
+- **PROP-FIAT-003**：6 承認の前の BTC の入金がある口座の、日本円の出金の `held` 0。
 - **DT-FIAT-001**：名義の正規化の決定表（全角・半角、小書き、空白、長音、法人格の略語）。期待する値は QA の正解のファイル。
 - **DT-FIAT-002**：出金の遷移の決定表（6.2 節）。
 
@@ -201,7 +201,7 @@ stateDiagram-v2
 
 ## 15. 未解決の問い
 
-- 第三者からの振込と、本人と認める表記の違いの範囲（法務の L4。新しい項目の候補）。
+- 第三者からの振込と、本人と認める表記の違いの範囲（法務の確認待ち L17。L4 と関わる）。
 - 信託の接続の方式と締め（法務の L3、信託銀行の選定）。
 - 1 件と 1 日の出金の上限を `legal.*` に置くか（法務の L4・L12）。
 - 提携銀行の能力（口座番号の払い出し、名義の照会、組戻しの API、締めの時刻、件数の上限）：**未検証**。銀行の選定の Story で確かめる。

@@ -128,9 +128,9 @@ intent の守るべき振る舞いのうち、次の 3 つをこの領域が持�
 | 8 | 口座の注文の数、板の注文の数 | `too_many_open_orders`・`book_full` |
 
 - 5〜8 は `order-gateway` も確かめるが、エンジンが正本である（銘柄の設定と帯は、`order-gateway` が読む写しより新しいことがある）。エンジンが拒んだ注文の拘束は、`ledger-poster` が `OrderRejected` で戻す。
-- **成行の金額の指定**：残りの金額で買える数量を、数量の刻みで切り捨てて約定させる。残りの金額が 1 刻みの代金に届かなくなったら、`OrderDone(market_remainder)` にする。手数料を金額に含めるかは `order-gateway` が `NewOrder` の金額に入れる前に決める（エンジンは手数料を知らない。[order-entry-and-risk.md](order-entry-and-risk.md) の 4.3 節）。
+- **成行の金額の指定**：残りの金額で買える数量を、数量の刻みで切り捨てて約定させる。残りの金額が 1 刻みの代金に届かなくなったら、`OrderDone(market_remainder)` にする。指定の金額の全部が `NewOrder` の金額になる（買い手の手数料は受け取る暗号資産から引くので、金額に含めない。エンジンは手数料を知らない。[order-entry-and-risk.md](order-entry-and-risk.md) の 4.3 節）。
 - **成行の止まり方**：参照の価格の上下 5% の端を越える段とは突き合わせない。端に達したか板が尽きたら、残りを `OrderDone(market_remainder)` にする。
-- **成行の数量の指定の買い**：代金の合計が `NewOrder` の代金の上限（`order-gateway` が拘束した額から手数料の上限を除いた額）を超える約定はしない。超える手前で残りを `OrderDone(market_remainder)` にする（[order-entry-and-risk.md](order-entry-and-risk.md) の 4.3 節）。
+- **成行の数量の指定の買い**：代金の合計が `NewOrder` の代金の上限（`order-gateway` が拘束した額）を超える約定はしない。超える手前で残りを `OrderDone(market_remainder)` にする（[order-entry-and-risk.md](order-entry-and-risk.md) の 4.3 節）。
 - **自己約定の防止**：`stp_group_id` が同じ注文どうしで働く。既定は `cancel_newest`（ADR-0003）。`decrement` は本家の `dc` と同じく、同じ数量なら両方を取り消す。
 - 約定の代金は `floor(価格 × 数量 ÷ 基準の資産の 1 単位)`（ADR-0003）。
 
@@ -246,7 +246,7 @@ sequenceDiagram
 
 **1. C の指値の買い**（`seq` 103、`gtc`、15,000,010 円、0.12 BTC、テイカーの率 1,000 ppm。[ADR-0027](../decisions/0027-fee-schedules-and-rounding.md)）
 
-- `order-gateway` は `floor(15,000,010 × 0.12) = 1,800,001` 円に手数料の上限 `ceil(1,800,001 × 1,000 ÷ 1,000,000) = 1,801` 円を足した 1,801,802 円を拘束してから送る（[order-entry-and-risk.md](order-entry-and-risk.md)）。
+- `order-gateway` は `floor(15,000,010 × 0.12) = 1,800,001` 円を拘束してから送る（手数料は受け取る BTC から引くので、上限を足さない。[order-entry-and-risk.md](order-entry-and-risk.md) の 4.3 節）。
 - エンジンの出力：
 
 | 出力 | 中身 |
@@ -258,7 +258,7 @@ sequenceDiagram
 | `BookDelta`（`book_seq` 9,001） | 売り 15,000,000 → 0、売り 15,000,010 → 0.03 |
 | `InputDigest` | `seq` 103、`output_hash[103]` |
 
-- 約定の価格は板の注文の価格で、C は指値より 10 円安く 0.05 BTC を買えた。C の代金は 1,800,000 円で、拘束の残り 1,802 円は `done` で戻る（ADR-0005 の既定では、買い手の手数料は受け取る BTC から引く：5,000 satoshi と 7,000 satoshi）。
+- 約定の価格は板の注文の価格で、C は指値より 10 円安く 0.05 BTC を買えた。C の代金は 1,800,000 円で、拘束の残り 1 円は `done` で戻る（ADR-0005 の既定では、買い手の手数料は受け取る BTC から引く：5,000 satoshi と 7,000 satoshi）。
 
 **2. D の成行の売りと自己約定**
 

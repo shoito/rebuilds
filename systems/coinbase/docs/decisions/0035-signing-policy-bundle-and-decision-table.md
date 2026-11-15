@@ -32,6 +32,8 @@ date: 2026-11-15
 | 依頼の種類 | `user_withdrawal`、`replacement`、`internal_transfer`、`deposit_sweep`、`house_transfer` |
 | 送り元の段 | `hot`、`warm`、`cold`、`deposit_address` |
 | 宛先の種類 | `user_allowlisted`（待ち時間を過ぎた宛先）、`house_cold`、`house_warm`、`house_hot`、`house_wallet`、`other` |
+
+> 2026-11-15 の注記（統合）：`house_hot`・`house_warm`・`house_cold` は、本システムが管理する**利用者用の**ウォレットの段（台帳の `wallet:<tier>:<asset>`）のアドレスで、`house_wallet` は**本システムの財産の**ウォレット（台帳の `house_wallet:<asset>`。[ADR-0005](0005-ledger-balances-and-trade-settlement.md)）である。同じ `house_` の接頭辞で意味が違い、取り違えやすい。名前（たとえば `tier_hot`・`tier_warm`・`tier_cold`）はデータモデルの工程でそろえる。意味は変えない。
 | 円換算の額の幅 | 依頼 1 件の額 |
 | 累計 | 口座の 24 時間の累計、送り元の段の 24 時間の自動の署名の累計 |
 | 状態の条件 | ネットワークにつながる額の割合が `legal.hot_ratio_max` を超えているか（[ADR-0006](0006-wallet-tiers-and-cold-ratio.md)） |
@@ -47,6 +49,8 @@ date: 2026-11-15
 - 束を有効にするには、セキュリティの 1 人と財務の 1 人が、承認者の鍵（[ADR-0036](0036-approver-keys-and-approval-payload.md)）で束の ID に署名する。作成者（変更を書いた人）はどちらにもなれない。
 - 境界の `policy-verifier` は、2 つの署名を確かめた束だけを読み込む。`wallet-orchestrator` は同じ束を読み、依頼に束の ID を入れる。境界は、自分の有効な束の ID と依頼の束の ID が違えば拒む。
 - 切り替えは「新しい束を境界に入れる → `wallet-orchestrator` を新しい束に切り替える → 古い束を取り下げる」の順にし、切り替えの間は 2 つの束を有効にしてよい（最大 1 時間）。値を緩める変更（額の段を上げる、累計を広げる）は、入れてから 24 時間後に有効にする。厳しくする変更はすぐに有効にする。
+
+> 2026-11-15 の注記（統合）：「切り替えの間は 2 つの束を有効にしてよい（最大 1 時間）」をやめ、[delivery.md](../architecture/delivery.md) の 4.9 節に合わせる。切り替えは、`ops.hot_auto_signing_enabled` を止め、古い束で判定した手続き中の依頼が片付くのを待ってから新しい束を境界に入れ、`wallet-orchestrator` を切り替え、見張りのウォレットへの試験の出金で判定の一致を確かめ、2 人の承認で自動の署名を開ける。境界が有効にする束は常に 1 つで、猶予の時間を持たない（[runbooks/signing-policy-rollout.md](../runbooks/signing-policy-rollout.md)）。値を緩める変更の 24 時間の待ちは変えない。Dev の確認待ち。
 - 方針の変更は平日 10〜15 時、コールドの儀式の当日を除く（[runbooks/README.md](../runbooks/README.md) の 3.1 節）。
 
 ### 他の案を選ばなかった理由

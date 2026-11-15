@@ -111,18 +111,18 @@ sequenceDiagram
 
 ### 4.3 拘束の額
 
-拘束の額は ADR-0004 の表のとおりで、手数料の上限は [ADR-0027](../decisions/0027-fee-schedules-and-rounding.md) の `ceil(額 × 率 ÷ 1,000,000)`（率は ppm）にする。
+拘束の額は ADR-0004 の表から手数料の上限を除いたものにする（ADR-0004 の 2026-11-15 の注記）。手数料は、買い手は受け取る暗号資産から、売り手は受け取る日本円から引く（[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)、[ADR-0027](../decisions/0027-fee-schedules-and-rounding.md)）ので、拘束した資産から手数料を払うことはない。
 
 | 注文 | 拘束する資産 | 拘束の額 |
 | --- | --- | --- |
-| 指値の買い | JPY | `floor(指値 × 数量)` ＋ `ceil(floor(指値 × 数量) × テイカーの率 ÷ 1,000,000)` |
+| 指値の買い | JPY | `floor(指値 × 数量)` |
 | 指値の売り | 基準の資産 | 数量 |
 | 成行の買い（金額の指定） | JPY | 指定の金額 |
-| 成行の買い（数量の指定） | JPY | `floor(成行の帯の上の端 × 数量)` ＋ 手数料の上限 |
+| 成行の買い（数量の指定） | JPY | `floor(成行の帯の上の端 × 数量)` |
 | 成行の売り | 基準の資産 | 数量 |
 
 - 成行の帯の上の端は、`order-gateway` が読む参照の価格の写しの 1.05 倍（切り上げ）。エンジンの参照の価格が写しより高く、拘束が足りなくなる場合に備え、`NewOrder` に拘束した額を載せ、エンジンは成行の数量の指定の買いを、拘束の額を超える代金に達したところで止める（`market_remainder`）。
-- 手数料の通貨：ADR-0005 の既定では買い手の手数料は受け取る暗号資産から引くので、日本円の手数料の上限は使われずに `done` で戻る（[ledger-and-balances.md](ledger-and-balances.md) の 8 節と同じ扱い）。成行の金額の指定は、指定の金額の全部をエンジンの金額（代金の上限）にする。
+- 手数料の通貨：ADR-0005 の既定では買い手の手数料は受け取る暗号資産から引くので、日本円の拘束に手数料の上限を足さない（2026-11-15 の統合。[design-log.md](design-log.md)）。成行の金額の指定は、指定の金額の全部をエンジンの金額（代金の上限）にする。
 - 拘束の冪等キーは `order:<order_id>:hold`（ADR-0004）。
 
 ### 4.4 冪等と注文の行
@@ -180,6 +180,8 @@ stateDiagram-v2
 
 [ADR-0019](../decisions/0019-account-trading-restrictions.md) で決める。口座の状態の持ち主は kyc-and-accounts・aml-and-travel-rule・market-surveillance で、この領域は「注文と取り消しを通すか」だけを持つ。
 
+2026-11-15 の統合で、`account_restrictions` を kyc-and-accounts の領域の 1 つの表にした（[ADR-0052](../decisions/0052-account-lifecycle-levels-and-restrictions.md)、ADR-0019 の注記）。下の表の「制限」は、その表の `reason_code` の値（`frozen` は `kind = frozen`）で、この領域が理由の表（`restriction_reasons`）に足す取引の理由の行である。他の領域の理由（たとえば market-surveillance の `surveillance_hold`・`surveillance_suspension`）も、同じ理由の表の行で注文の扱いを決める。理由のコードの名前（たとえばこの表の `takeover_suspected` と kyc-and-accounts の `takeover_lock`、この表の `frozen` と kyc-and-accounts の `sanctions_match`・`legal_order`）は、データモデルの工程で 1 つの一覧にそろえる。
+
 | 制限 | 付ける者 | 新しい注文 | 取り消し | 板の注文 |
 | --- | --- | --- | --- | --- |
 | `kyc_incomplete` | identity | 拒む | 通す | なし（確認の前は注文できない） |
@@ -222,10 +224,10 @@ stateDiagram-v2
 
 口座 F（`api_standard`）が ETH/JPY で成行の買い 2 ETH を出す。`order-gateway` の参照の価格の写しは 500,000 円（例の値）。
 
-1. 拘束：成行の帯の上の端は `ceil(500,000 × 1.05) = 525,000` 円。`floor(525,000 × 2) = 1,050,000` 円 ＋ 手数料の上限 `ceil(1,050,000 × 1,000 ÷ 1,000,000) = 1,050` 円で、1,051,050 円を拘束する。F の `available:JPY` は 1,200,000 円なので通り、148,950 円が残る。
+1. 拘束：成行の帯の上の端は `ceil(500,000 × 1.05) = 525,000` 円。`floor(525,000 × 2) = 1,050,000` 円を拘束する（手数料は受け取る ETH から引くので足さない）。F の `available:JPY` は 1,200,000 円なので通り、150,000 円が残る。
 2. F の端末の通信が切れ、同じ `client_order_id` で 0.4 秒後に再送が届く。core の一意の制約で 4.2 節の 4 に当たり、最初の `order_id` と `received` を返す。拘束は 1 回だけ。
 3. エンジンで、売りの段 500,100 円の 1.2 ETH と 500,300 円の 0.8 ETH に約定する。代金は 600,120 円と 400,240 円で、計 1,000,360 円。
-4. `done(filled)` で、拘束の残り 1,051,050 − 1,000,360 ＝ 50,690 円を戻す。手数料は ADR-0005 の既定で受け取る ETH から引く（`floor(2 ETH × 1,000 ÷ 1,000,000)` ＝ 0.002 ETH）。
+4. `done(filled)` で、拘束の残り 1,050,000 − 1,000,360 ＝ 49,640 円を戻す。手数料は ADR-0005 の既定で受け取る ETH から引く（`floor(2 ETH × 1,000 ÷ 1,000,000)` ＝ 0.002 ETH）。
 5. 同じ秒に F が 31 件目の取り消しを送ると、取り消しの瞬間の 60 件の中なので通る。新しい注文の 31 件目は、瞬間の 30 件を超えて `order-rate` の 429 になる。
 
 ## 5. 障害のときの振る舞い
@@ -302,7 +304,7 @@ roadmap の E8 の 3 つに、`order-cancel`・`account-trading-restrictions`・
 
 | 問い | いつ・どう決めるか |
 | --- | --- |
-| API の切断の時に注文を取り消す仕組み（cancel on disconnect）を MVP に入れるか | PM の判断待ち（新しい問い）。推奨：P1 でマーケットメイカーを入れるなら入れる。入れないなら `CancelAll` だけ |
+| API の切断の時に注文を取り消す仕組み（cancel on disconnect）を MVP に入れるか | PM の判断待ち（P11）。推奨：P1 でマーケットメイカーを入れるなら入れる。入れないなら `CancelAll` だけ |
 | マーケットメイカーの段の値（200 件/秒）が流動性に足りるか | P1 の結論の後に、候補の事業者と確かめる |
 | 4.1 節の遅れの予算が実際に収まるか | `engine-latency-poc`。収まらなければ ADR-0017 の 2 を見直す |
 | 本家の注文の API の項目と、板の注文の数の上限 | 公式の資料で確かめられなかった（**未検証**） |
@@ -317,7 +319,7 @@ roadmap の E8 の 3 つに、`order-cancel`・`account-trading-restrictions`・
 
 ### runbooks
 
-- `order-intake-degraded.md`（新規）：受け付けの p99 が 100ms を 5 分超えたとき（区間ごとの遅れの確かめ、core と ledger と MSK のどこか、`market_busy` の率）。
+- [`order-entry-degraded.md`](../runbooks/order-entry-degraded.md)（2026-11-15 の統合で、ledger-and-balances の領域が出した同じ手順と 1 本にした）：受け付けの p99 が 100ms を 5 分超えたとき（区間ごとの遅れの確かめ、core と ledger と MSK のどこか、`market_busy` の率）。
 - `rate-limit-override.md`（新規）：マーケットメイカーの段の一時の引き上げの申請と承認（Ops と PM の 2 人）、期限つきの上書き。
 
 ### data-model
@@ -326,6 +328,7 @@ roadmap の E8 の 3 つに、`order-cancel`・`account-trading-restrictions`・
 | --- | --- |
 | core `orders` | `order_id`、`account_id`、`client_order_id`（`account_id` と一意）、`pair`、向き、種類、期限、価格、数量・金額、`hold_id`、`fee_schedule_version`、`taker_fee_ppm`・`maker_fee_ppm`、`status`、`reject_reason`、`seq`、`filled_quantity`、`cancel_requested_at`、`created_at` |
 | core `fills` | `pair`、`trade_seq`、`order_id`、`account_id`、役割（メイカー・テイカー）、価格、数量、代金、手数料の率 |
-| core `account_restrictions` | `account_id`、`kind`、`reason_code`、`set_by`、`set_at`、`cleared_by`、`cleared_at`、承認の ID |
+| core `account_restrictions` | kyc-and-accounts の領域の表を使う（列は [kyc-and-accounts.md](kyc-and-accounts.md) の data-model。ADR-0052）。この領域は書かず、読むだけ |
+| core `restriction_reasons` | `reason_code`、`kind`、新しい注文・取り消し・板の注文・出金・販売所の扱い、持ち主の領域、解除の承認。この領域は取引の理由の行を足す（2026-11-15 の統合の候補） |
 | core `rate_limit_tiers` | `account_id`、`tier`、上書きの値、期限、承認の ID |
 | Valkey `rl:{acct}:<limit>` | GCRA の値 |

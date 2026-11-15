@@ -173,7 +173,7 @@
 | E16 | `load-test-mm-and-reconnect` | LT-3・LT-4（**新しい候補**） |
 | E16 | `load-test-funding-peak` | LT-5（**新しい候補**） |
 | E16 | `cost-baseline` | 8 節の単価と和の確かめ |
-| E8 | `order-load-generator` | 負荷の生成器と場面 |
+| E9 | `order-load-generator` | 負荷の生成器と場面（[roadmap.md](../roadmap.md) に合わせて E9 に置いた。2026-11-15 の統合） |
 
 ## 13. 未解決の問い
 

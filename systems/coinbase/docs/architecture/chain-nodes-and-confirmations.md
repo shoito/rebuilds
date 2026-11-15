@@ -6,7 +6,7 @@ Bitcoin と Ethereum の自前のノードと、チェーンの「今の姿」�
 
 - 合意の規則を自前で書かない。BTC は Bitcoin Core を 2 台、ETH は実行のクライアントと合意のクライアントの組を 2 組、別の AZ に置き、大阪に待機の 1 台（組）を置く。クライアントの種類は `node-ops-poc` で決める（[ADR-0009](../decisions/0009-deposits-confirmations-and-own-nodes.md)）
 - 外部のノードの提供者を 1 つ、見張りにだけ使う。自前の頭が外部より 3 ブロック（BTC）・2 エポック（ETH）以上遅れたら入金の記帳を止める。外部の結果で記帳しない（同上）
-- ノードの RPC は `deposit-watcher`・`wallet-orchestrator` と、署名の境界の放送の部品だけに開く。P2P はノードの専用のサブネットから出す（同上。infrastructure の領域）
+- ノードの RPC は `deposit-watcher`・`wallet-orchestrator` だけに開く。署名の境界はノードへの経路を持たない（ADR-0009 の 2026-11-15 の注記、[ADR-0071](../decisions/0071-aws-accounts-network-and-egress.md)）。P2P はノードの専用のサブネットから出す（infrastructure の領域）
 - 放送は 2 台以上のノードに流す。結果が分からない放送では取引を作り直さない（[ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md)）
 - 手数料の見積もりは自前のノードから作る（同上）
 
@@ -15,7 +15,7 @@ Bitcoin と Ethereum の自前のノードと、チェーンの「今の姿」�
 | ADR | 決定 |
 | --- | --- |
 | [0046](../decisions/0046-two-node-agreement-and-external-watch.md) | チェーンの今の姿は、2 台（組）が同じブロックの ID を返す最も高い高さ（合意の頭）と、両方の確定の低いほうで決める。承認の数は合意の頭から数える。外部の見張りとは頭の差と、合意の頭の近くのブロックの ID を比べ、食い違えば記帳を止める |
-| [0047](../decisions/0047-fee-estimation-and-broadcast-paths.md) | 手数料の見積もりは `fee-estimator` が 30 秒ごとに 2 台から取り、高いほうを使う。放送は `wallet-orchestrator` が全部の使えるノードへ同じ取引を流し、見えなければ同じ取引を流し直す。署名の境界の放送の部品は、本体のアカウントを信じられないときだけ使う |
+| [0047](../decisions/0047-fee-estimation-and-broadcast-paths.md) | 手数料の見積もりは `fee-estimator` が 30 秒ごとに 2 台から取り、高いほうを使う。放送は `wallet-orchestrator` が全部の使えるノードへ同じ取引を流し、見えなければ同じ取引を流し直す。侵害の時にコールドへ逃がす取引も含め、署名の境界は放送しない（2026-11-15 の注記） |
 | [0048](../decisions/0048-node-client-diversity-and-upgrades.md) | ETH の 2 組は、実行と合意のクライアントをそれぞれ違う種類にする（PoC で確かめる仮説）。BTC は 2 台とも Bitcoin Core。更新は 1 台ずつ、見習いの期間を経て比べに戻す。ノードは自前のスナップショットから作る |
 
 ## 1. 範囲
@@ -39,7 +39,7 @@ Bitcoin と Ethereum の自前のノードと、チェーンの「今の姿」�
 | --- | --- | --- |
 | 1 台で決めない | 1 台（組）のノードの結果だけでの記帳・承認の数の判定 0 | ADR-0009 |
 | 外部で決めない | 外部の提供者の結果での記帳 0 | ADR-0009 |
-| ノードの遅れ | 自前の頭と外部の見張りの差：BTC 2 ブロック、ETH 1 エポック以内（SLO） | [runbooks/README.md](../runbooks/README.md) の 1 節 |
+| ノードの遅れ | 自前の頭と外部の見張りの差：BTC 2 ブロック、ETH 1 エポック以内（SLO、目標）。BTC 3 ブロック・ETH 2 エポック以上で入金の記帳を止める（ADR-0009 の止めの閾値。5 節の表） | [runbooks/README.md](../runbooks/README.md) の 1 節 |
 | 記帳の速さ | 閾値から記帳まで p95 5 分。合意の頭の計算はブロックの到着から p95 30 秒 | NFR-009 |
 | 放送 | 二重の出金 0。署名済みの取引の作り直し 0（流し直しは同じ取引だけ） | NFR-008、ADR-0008 |
 | 可用性 | 1 つの AZ のノードが止まっても、入金の検出と放送は続く。記帳は 2 台の比べが戻るまで止まる | NFR-010、NFR-011 |
@@ -153,7 +153,7 @@ sequenceDiagram
 - 流し直し：BTC は 10 分、ETH は 2 分、どのノードの mempool にも見えず、ブロックにも入らなければ、同じ取引を流し直す。手数料の引き上げ（置き換え）は withdrawals の領域の判断で、`replacing` を通す（[ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md)）。
 - ノードが取引を拒んだ理由（手数料が低すぎる、入力が使用済み、nonce が古い）は、理由のコードにして `broadcasts` に残す。「入力が使用済み」「nonce が古い」は、前の取引が確定した可能性があるので、作り直しの判断の前に 4.1 節の規則でチェーンを確かめる（ADR-0008 の作り直しの規則）。
 - BTC の出金の取引は、置き換えを許す印（RBF の nSequence）を付けて作る（custody-and-keys の領域の取引の組み立てで守る）。
-- 署名の境界の放送の部品は、本体のアカウントを信じられないとき（[runbooks/hot-wallet-compromise.md](../runbooks/hot-wallet-compromise.md) でコールドへ逃がす取引など）だけ使う。普段の出金は `wallet-orchestrator` が流す。
+- 放送は、普段の出金も、[runbooks/hot-wallet-compromise.md](../runbooks/hot-wallet-compromise.md) でコールドへ逃がす取引も、`wallet-orchestrator` が流す。署名の境界はノードへの経路を持たず、署名した取引を普段の出力の経路で渡すだけである（ADR-0047 の 2026-11-15 の注記、ADR-0071）。
 
 ## 8. 更新と合意の規則の変更（[ADR-0048](../decisions/0048-node-client-diversity-and-upgrades.md)）
 

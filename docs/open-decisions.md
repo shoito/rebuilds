@@ -104,7 +104,7 @@
 | --- | --- | --- |
 | airbnb | 14 | [intent.md](../systems/airbnb/docs/intent.md) |
 | auth0 | 8 | [intent.md](../systems/auth0/docs/intent.md) |
-| coinbase | 14 | [intent.md](../systems/coinbase/docs/intent.md) |
+| coinbase | 19 | [intent.md](../systems/coinbase/docs/intent.md) |
 | datadog | 10 | [intent.md](../systems/datadog/docs/intent.md) |
 | dropbox | 10 | [intent.md](../systems/dropbox/docs/intent.md) |
 | figma | 6 | [intent.md](../systems/figma/docs/intent.md) |
@@ -149,6 +149,16 @@
 | PM-015 | Coinbase | API キーに出金の権限を持たせるか | MVP では持たせない。出金は画面とパスキーだけ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
 | PM-016 | Coinbase | 販売所の在庫をヘッジするか | MVP はヘッジしない。在庫の上限とスプレッドで持つ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
 | PM-017 | Coinbase | 出金の宛先の許可の一覧を必須にするか | 必須にし、登録の後に 24 時間待つ | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-018 | Coinbase | 最小の額に満たない入金を、後の入金と合わせて記帳するか（P5） | しない。画面で最小の額を前もって知らせる | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-019 | Coinbase | ERC-20 のトークンの誤送を返却するか（P6） | MVP では扱わない | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-020 | Coinbase | `compliance_review` の判断までの目標と、営業時間の外の当番（P7） | 営業時間の中で 4 時間。時間外は優先の確認にだけ当番を置く | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-021 | Coinbase | メイカーへの払い戻しと、30 日の取引高による手数料の段を持つか（P8） | MVP は段 1 つで持たない（PM-014 の後に決める）。メイカーの率の既定は 500 ppm | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-022 | Coinbase | 退会のとき、最小の出金の額に届かない端数をどう扱うか（P9） | 推奨なし。既定の案は「残高が 0 のときだけ退会を受ける」 | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-023 | Coinbase | 未成年を受けるか（P10） | MVP では受けない | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-024 | Coinbase | API の切断で注文を取り消す仕組みを MVP に入れるか（P11） | PM-014 でマーケットメイカーを入れるなら入れる | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-025 | Coinbase | 注文ごとの公開の配信（level3 に当たるもの）を出すか（P12） | MVP では出さない | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-026 | Coinbase | 本番で入出金の見張り（canary）を回すか（P13） | 回す。mainnet で見張りのウォレットとの間に最小の額を動かす | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
+| PM-027 | Coinbase | 領域の文書で置いた本システムの既定の値（累計 300 万円/24h、ウォーム 2%、CS 80 口座/日、注文の最大の数量、API の段、在庫の目標、スプレッド、損失の止め、自動の停止の閾値）をいつ誰と合意するか（P14） | 開発の既定として使い、GA の前に財務・Ops・セキュリティと合意する | [intent.md](../systems/coinbase/docs/intent.md) | 待ち |
 
 ## 4. 文書の食い違い
 
@@ -179,6 +189,8 @@
 | DOC-021 | 共通、Datadog、X、Workday | [共通の前提知識](primer/index.html) の 2 つの用語集、[Datadog](../systems/datadog/docs/primer/index.html)・[X](../systems/x/docs/primer/index.html)・[Workday](../systems/workday/docs/primer/index.html) の資料の用語集 | [AUTHORING.md](primer/AUTHORING.md) は「各 `dt` に `id="g-…"`」とするが、13 語（p99、SLO、RPO、RTO、AZ、Aurora Global Database、OTLP、StatsD、IR、発信者情報の開示、墓石、社労士・税理士、全銀協の規定形式）に `id` がない。用語の索引（`docs/glossary/`）は `id` のある語だけを集めるので、これらは載らない | Dev | 解決（2026-11-01、13 語に `id="g-…"` を付け、用語の索引に載せた） |
 | DOC-022 | Shopify | [資料](../systems/shopify/docs/primer/index.html) の「テーマの言語は安全でなければならない」の比べの表と、[storefront-themes.md](../systems/shopify/docs/architecture/storefront-themes.md) 11 節の表 | 資料は歩数・出力（2 MB）・ループ（1,000 要素）をまとめて「超えたらそのセクションを空にする」と書く。設計では、空にするのは歩数・入れ子・データの読み出しで、出力の超過は 500（エッジは古いページを返せる）、ループは 1,000 で切る。図は設計に合わせた | Dev | 解決（2026-11-01：資料の本文を設計に合わせ、上限ごとの扱いを書き分けた） |
 | DOC-023 | Google Calendar | [資料](../systems/google-calendar/docs/primer/index.html) の「会議室：二重予約を DB で防ぐ」の本文と、[rooms-and-resources.md](../systems/google-calendar/docs/architecture/rooms-and-resources.md) 5 節・ADR-0019 | 本文は「排他の制約で DB 自身に重なりを拒ませる」とだけ書く。設計では、会議室の行をロックして判断を順番にするのが主で、排他の制約は最後の守り。誤りではなく説明の不足。図はロックを含めて描いた | Dev | 解決（2026-11-01：資料の本文に、会議室の行のロックが主で排他の制約が最後の守りであることを書いた） |
+| DOC-024 | Coinbase | [ADR-0035](../systems/coinbase/docs/decisions/0035-signing-policy-bundle-and-decision-table.md) と [delivery.md](../systems/coinbase/docs/architecture/delivery.md) 4.9 節 | ADR-0035 は署名の方針の切り替えで 2 つの束を最大 1 時間有効にしてよいとし、delivery.md と runbooks の README は手続き中の依頼を待って猶予を置かない。統合で delivery.md に揃える注記を ADR に足した | Dev | 待ち（Dev の確認） |
+| DOC-025 | Coinbase | [deploy-and-rollback.md](../systems/coinbase/docs/runbooks/deploy-and-rollback.md) と ADR-0035 | 署名の方針を前のバージョンに戻すとき、緩める向きなら 24 時間の待ちがかかる（ADR-0035 の規則どおり）。障害の時のロールバックを例外にするか | セキュリティ | 待ち |
 
 ## 5. ADR が承認されたら直す文書
 

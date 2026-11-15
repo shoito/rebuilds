@@ -97,7 +97,7 @@ gantt
 
 ### 4.2 一覧（2026-11-15 の時点）
 
-この領域で決めるのはカタログの形と手順で、各値の使い方は持ち主の領域が書く。他の領域の文書が足した鍵は、工程 3 で合わせる。
+この領域で決めるのはカタログの形と手順で、各値の使い方は持ち主の領域が書く。他の領域の文書が足した鍵は、工程 3 の統合（2026-11-15）で下の表に合わせた（`legal.daily_volume_publication` は ADR-0023 の名前 `legal.daily_volume_definition` にそろえた）。
 
 | key | l_ref | owner_area | dev_default | when_unset（本番） | ga_required |
 | --- | --- | --- | --- | --- | --- |
@@ -112,7 +112,13 @@ gantt
 | `legal.surveillance_record_retention_days` | L7・L9 | market-surveillance | 1,826 | 期限の後も消さない | ○ |
 | `legal.staff_trading_policy` | L7 | market-surveillance | 30 日の保有の期間と事前の承認 | 開発の既定と同じ制限を本番でも効かせる（緩める側に倒さない） | ○ |
 | トラベルルール・制裁・出金の上限の鍵 | L5・L6 | aml-and-travel-rule、withdrawals | 各領域 | 各領域（[ADR-0011](../decisions/0011-external-providers-boundary.md) の止める既定） | ○ |
-| `legal.daily_volume_publication` | L1 | market-data | 無効 | 公表しない | `regime` による |
+| `legal.daily_volume_definition` | L1 | market-data | 無効 | 公表しない（[ADR-0023](../decisions/0023-daily-volume-publication.md)） | `regime` による |
+| `legal.kyc_record_fields` | L4 | kyc-and-accounts | 書類の種類だけを残す | 書類の種類だけを残す（番号を残すかは L4 の結論で決める） | ○ |
+| `legal.kyc_reverify_on_method_sunset` | L4 | kyc-and-accounts | 求めない | 水準を下げず、再確認を求めない | - |
+| `legal.travel_rule_threshold_jpy` | L5 | aml-and-travel-rule | 0 | 0 円（全件を通知の対象にする。[ADR-0057](../decisions/0057-travel-rule-notification-and-receipt.md)） | ○ |
+| `legal.travel_rule_self_hosted_proof` | L5 | aml-and-travel-rule | 求めない | 求めない（記録だけ。ADR-0057） | - |
+| `legal.brokerage_display` | L8・L12 | brokerage-quotes | 開発の文言 | 本番の販売所の画面を出さない（[ADR-0026](../decisions/0026-brokerage-price-display.md)） | ○ |
+| `legal.cost_basis_method` | L10 | ledger-and-balances | `none` | `none`（数量と円の受け払いだけを出す。[ADR-0028](../decisions/0028-statements-and-annual-report-source.md)） | ○ |
 
 - `when_unset` は「止める」か「緩めない」側にする。保持の日数は、未設定なら消さない（消したデータは戻らない）。
 - `legal.staff_trading_policy` のように、未設定でも制限を効かせるべき鍵は、`when_unset` に開発の既定を使うと書く。

@@ -1,6 +1,6 @@
 # Architecture: Coinbase
 
-全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節。工程 2 で書く）。データモデルの正本は `data-model.md`（工程 4 で作る）、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は前提知識の資料の用語集に置く（工程 5 で作る）。
+全体像と横断的な方針。領域ごとの設計は、同じディレクトリに領域ごとのファイルとして置く（一覧は 7 節）。設計の工程ごとの決定の記録は [design-log.md](design-log.md) にある。データモデルの正本は `data-model.md`（工程 4 で作る）、品質の戦略は [quality.md](../quality.md)、Epic と Story は [roadmap.md](../roadmap.md)、SLO と運用は [runbooks/](../runbooks/README.md) にある。用語は前提知識の資料の用語集に置く（工程 5 で作る）。
 
 ## 1. 全体構成
 
@@ -66,7 +66,7 @@ flowchart TB
     workers --> vk
     me --> s3
     domain --> signer
-    signer --> nodes
+    domain --> nodes
     workers --> nodes
     domain --> ext
     ext -->|"Webhook"| domain
@@ -135,7 +135,7 @@ sequenceDiagram
 
     U->>OG: 指値の買い 0.1 BTC、1,000 万円、client_order_id
     OG->>OG: 刻み・最小の数量・価格の帯・口座の状態を検査する
-    OG->>L: 拘束 100 万円＋手数料の上限。available が足りるときだけ更新する
+    OG->>L: 拘束 100 万円。available が足りるときだけ更新する
     L-->>OG: 拘束を書いた（order_id、冪等キー）
     OG->>S: 注文の入力（order_id、拘束の ID）
     S->>K: seq を付けて書く（acks=all）
@@ -152,7 +152,7 @@ sequenceDiagram
 ```
 
 1. `order-gateway` は、`(account_id, client_order_id)` の一意の制約で重複を止める。同じ値の再送には最初の結果を返す（[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md)）。
-2. 買いの指値は「数量 × 指値 ＋ テイカーの手数料の上限」を、売りは数量を拘束する。成行の買いは、金額の指定か、数量 × 価格の帯の上限で拘束する。拘束は ledger の Aurora の 1 つのトランザクションで、仕訳（`available` から `hold` へ）と注文の行を書く。
+2. 買いの指値は「数量 × 指値」を、売りは数量を拘束する。手数料は受け取る資産から引く（買い手は暗号資産、売り手は日本円）ので、拘束に足さない（[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)、ADR-0004 の 2026-11-15 の注記）。成行の買いは、金額の指定ならその全部を、数量の指定なら数量 × 価格の帯の上限を拘束する。注文の行の正本は core の `orders` で、`order-gateway` が先に `pending_submit` で書く（[ADR-0017](../decisions/0017-order-row-states-across-clusters.md)）。拘束は ledger の Aurora の 1 つのトランザクションで、拘束の行と仕訳（`available` から `hold` へ）を冪等キー `order:<order_id>:hold` で書く。
 3. sequencer は板ごとに 1 つだけ動き（epoch で囲う）、入力に `seq` と時刻を付けて MSK の区画に書く。書けてから受け付けを返す。拘束を書いた後に sequencer へ届かなかった注文は、`reconcilers` が同じ `order_id` で送り直すか、取り消して拘束を戻す（[ADR-0002](../decisions/0002-sequencer-and-event-journal.md)）。
 4. エンジンは、入力の番号の順に、価格の良い順・同じ価格なら `seq` の順に突き合わせる。約定の価格は板にあった注文の価格で、テイカーの指値との差は買い手の拘束に戻る。同じ利用者の注文がぶつかったら、自己約定の防止の指定で取り消す（[ADR-0003](../decisions/0003-matching-rules-and-self-trade-prevention.md)）。
 5. `ledger-poster` は約定ごとに 1 つの仕訳を書く。買い手の `hold:JPY` から売り手の `available:JPY`（手数料を引く）、売り手の `hold:BTC` から買い手の `available:BTC`（手数料を引く）、手数料の収益。冪等キーは `(pair, trade_seq)` で、再実行しても 2 度書かない（[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)）。
@@ -198,7 +198,7 @@ sequenceDiagram
 2. スクリーニングを通らない出金（制裁の一致、チェーン分析の点が閾値を超える、トラベルルールの通知を送れない相手）は、`compliance_review` に止め、コンプライアンスの担当が判断する。止めた間も拘束は戻さない（法務の L5・L6）。
 3. 方針は `wallet-orchestrator` と署名の境界の両方で判定する。境界の中の判定は、承認者の署名、方針のバージョン、出金の ID の一回性（同じ出金の ID に 2 度署名しない）を確かめる（[ADR-0007](../decisions/0007-signing-service-and-key-custody.md)）。
 4. 結果が分からない放送は作り直さない。BTC は同じ入力の取引だけ（手数料の引き上げ）、ETH は同じ nonce の取引だけを、新しく作ってよい（[ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md)）。
-5. 出金の依頼から放送まで、ホットで払えるものは p95 30 分（承認の待ちを除く。NFR-008）。ホットの残高が足りない大きな出金は、ウォームからの補充か、コールドの儀式の後になる（最長 24 時間を目安にする）。
+5. 出金の依頼から放送まで、ホットで払えるものは p95 30 分（承認とコンプライアンスの待ちを除く。NFR-008）。ホットの残高が足りない大きな出金は、ウォームからの補充か、コールドの儀式の後になる（最長 24 時間を目安にする）。
 
 **C. 暗号資産の入金（承認の数と巻き戻り）**
 
@@ -259,13 +259,18 @@ sequenceDiagram
 | 自己約定の防止 | 同じ利用者の注文は約定しない。テイカーの指定が優先し、`dc`（既定）・`co`・`cn`・`cb` を選べる | 同上 |
 | 注文の状態 | `received`（エンジンに届いた）→ `open`（残りが板にある）→ `done`（約定し終えたか、取り消された） | 同上 |
 | 配信の通し番号 | 銘柄ごとに増える整数。抜けは取りこぼし、小さい番号は順序の入れ替わり。板の同期には `level2` の経路を勧める | [Exchange WebSocket Feed](https://docs.cdp.coinbase.com/exchange/websocket-feed/overview) |
+| 板の配信の経路 | `level2` は認証が要り、全部の更新を届ける。認証の要らない `level2_batch` は 50ms ごとにまとめて送る | [Channels](https://docs.cdp.coinbase.com/exchange/websocket-feed/channels) |
+| 取引所の置き場所と配備 | 米国の現物の取引所は AWS の US-EAST-1。注文の口・エンジン・配信の AZ の ID に use1-az4 を挙げる。配備は月・水・木の 14 時（米国東部）。どれも予告なく変わるとする | [Exchange Systems & Operations](https://docs.cdp.coinbase.com/exchange/introduction/systems-operations) |
+| マッチングエンジンの 2026 年 5 月の停止 | 1 つの配置グループの Raft のクラスタが、1 つの AZ の障害で定足数を失い、数時間止まった（報道でだけ確かめた） | [InfoQ](https://infoq.com/news/2026/06/coinbase-aws-failure-postmortem)（本家のブログは**未検証**。[infrastructure.md](infrastructure.md) の 3 節） |
+| 宛先の帳簿の待ち | 国際の取引所（INTX）の帳簿の行は `PENDING` の 24 時間の後に `ACTIVE` になる。個人向けの許可の一覧（選んで有効にする、新しい宛先の 48 時間の保留）はヘルプの頁を取得できなかった | [INTX Get Address Book](https://docs.cdp.coinbase.com/api-reference/international-exchange-api/rest-api/address-book/get-address-book)。個人向けは**未検証**（[withdrawals.md](withdrawals.md) の 3 節） |
+| 手数料の段 | メイカーとテイカーの率は 30 日の取引高で段に分かれる。手数料を取る資産と端数の規則は**未検証** | [Get fees](https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/fees/get-fee)（[ledger-and-balances.md](ledger-and-balances.md) の 3 節） |
 | 日本の事業 | 2023 年 1 月に止めると発表した（報道でだけ確かめた） | [Bloomberg](https://www.bloomberg.com/news/articles/2023-01-18/coinbase-stops-japan-operations-after-slump-in-digital-assets)、[CNBC](https://www.cnbc.com/2023/01/18/crypto-exchange-coinbase-says-it-will-halt-japan-operations-.html) |
 | サポートの委託先からの漏えい | 2025 年 5 月、米国の外のサポートの委託先の担当者が買収され、利用者のデータを持ち出した。鍵とウォレットには触れられなかった | [Help Net Security](https://www.helpnetsecurity.com/2025/05/15/coinbase-suffers-data-breach-gets-extorted/)（届出の本文は**未検証**） |
 | マッチングエンジンの実装、言語、配置、遅れの値 | 公式の資料で確かめられなかった | **未検証** |
 | コールドの割合、鍵の保管の方式、出金の承認の段、入金の承認の数 | 公式の資料で確かめられなかった | **未検証** |
 | 預かり資産の額、取引高 | 二次の資料でだけ見つけた | **未検証** |
 
-いずれも 2026-11-15 に確認。この設計は振る舞いを参考にするが、本家のコード・データ・ライブラリは使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
+いずれも 2026-11-15 に確認。統合の工程（2026-11-15）で、板と約定の優先・約定の価格・自己約定の防止・注文の状態（Matching Engine）、配信の通し番号（WebSocket Feed）、`level2` と `level2_batch`（Channels）、置き場所と配備（Systems & Operations）、INTX の帳簿の 24 時間を、公式の資料で読み直して確かめた。報道だけの項目と**未検証**の項目は、そのままにした。この設計は振る舞いを参考にするが、本家のコード・データ・ライブラリは使わない（[リポジトリ共通の ADR-0007](../../../../docs/decisions/0007-no-reuse-of-original-implementation.md)）。
 
 **本家との意図した違い**：
 
@@ -277,6 +282,13 @@ sequenceDiagram
 | ヘッダーと API キーの名前 | 本家の名前を含む | `<Brand>-Signature`、`<brand>_live_` | リポジトリ共通の ADR-0006 |
 | サポートの担当の参照 | 委託先の担当者が利用者のデータを広く引けた（報道） | CS の画面は問い合わせに要る項目だけを出し、本人確認の書類と口座の番号は金庫の画面で、期限つきの権限と理由でだけ見る | 本家の 2025 年の事故（security の領域） |
 | データの所在 | 国ごとに**未検証** | すべて日本（東京、DR は大阪） | 日本の交換業者にする |
+| 取引所の置き場所 | US-EAST-1 | 東京、DR は大阪 | 日本の交換業者にする（[infrastructure.md](infrastructure.md) の 3 節） |
+| エンジンの冗長 | 1 つの配置グループの Raft のクラスタ（報道） | 板ごとに単一の書き手のエンジンと、別の AZ の写しのエンジン。板ごとに本番の AZ を互い違いにする | 1 つの物理の障害で板を止めない（[ADR-0072](../decisions/0072-matching-placement-across-azs.md)） |
+| 板の全部の差分の配信 | 認証が要る（`level2`）。認証なしは 50ms のまとめ（`level2_batch`） | 認証なしで、まとめずに配る（`book`） | 日本の利用者の多くは画面で板を見る。認証なしで NFR-002 の速さを出す（[ADR-0021](../decisions/0021-market-data-feed-and-book-seq.md)） |
+| 個人の宛先の許可の一覧 | 選んで有効にする（**未検証**） | 必須（PM の判断待ち P4） | 乗っ取りの後の即時の出金を止める（[ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md)） |
+| 新しい宛先の待ち時間 | 個人 48 時間（**未検証**）、INTX 24 時間 | 24 時間（P4） | ADR-0008 の既定 |
+| 手数料の段 | 30 日の取引高の段 | MVP は段を 1 つにする。段は P1（マーケットメイカー）の結論の後（P8） | 個人だけの MVP では段の効果が小さい（[ADR-0027](../decisions/0027-fee-schedules-and-rounding.md)） |
+| 手数料を取る資産 | **未検証** | 受け取る資産から引く（買い手は暗号資産、売り手は日本円）。拘束に手数料を足さない | 拘束の額と受け取りの額を、それぞれ 1 つの資産で閉じる（[ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md)、ADR-0004 の 2026-11-15 の注記） |
 
 ## 2. 規模の段階
 
@@ -312,7 +324,7 @@ sequenceDiagram
 ```
 
 - 最も大きいのは、固定の原価（ノード、HSM・MPC、コールドの儀式、監査）と、出金あたりの提供者の料金、CS とコンプライアンスの人の時間と見込む。約定あたりの原価は、入力の数（マーケットメイカーの注文と取り消し）に比例し、速さの上限の段とメイカーの手数料が主な制御の手段になる。
-- S1 の本番の AWS の費用は、月 約 8 万 USD（±50%。本システムの見積もりで、単価は**未検証**）と置く。提供者の料金（HSM・MPC、eKYC、チェーン分析、トラベルルール）は選定の後に capacity の領域で入れる。目標は、約定あたりの基盤の原価（提供者を除く）を、テイカーの手数料の既定（約定の額の 0.1%。本システムの値）の 1 割以下に置くことである。
+- S1 の本番の AWS の費用は、月 約 8 万 USD（±50%。本システムの見積もりで、単価は**未検証**）と置く。[capacity.md](capacity.md) の 8 節の内訳の和は約 5.5 万 USD で、この幅の下の側にある。差は未検証の項目（ノード、署名の境界、外への転送、Aurora ledger の型）の幅で、E16 の `cost-baseline` で確かめるまで幅を狭めない。提供者の料金（HSM・MPC、eKYC、チェーン分析、トラベルルール）は選定の後に capacity の領域で入れる。目標は、約定あたりの基盤の原価（提供者を除く）を、テイカーの手数料の既定（約定の額の 0.1%。本システムの値）の 1 割以下に置くことである。
 
 ## 3. 非機能要件
 
@@ -321,11 +333,11 @@ sequenceDiagram
 | NFR-001 | 注文の受け付けの速さ | `trading-api` が注文を受けてから、入力の記録に書けた受け付けを返すまで p99 20ms・p50 5ms（東京の中、拘束の記帳を含む）。取り消しも同じ | [ADR-0002](../decisions/0002-sequencer-and-event-journal.md)、[ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md)。`engine-latency-poc` で確かめる |
 | NFR-002 | 板の配信の速さ | 入力の記録への書き込みから、配信の接続への送り出しまで p99 50ms。エンジンの 1 入力の処理 p99 100µs | market-data の領域 |
 | NFR-003 | エンジンの決定性 | 同じスナップショットと入力の列から、出力の要約が一致しない件数 0。本番と写しのエンジンの要約の食い違い 0。日次の全部の再生で食い違い 0 | [ADR-0002](../decisions/0002-sequencer-and-event-journal.md)、[ADR-0003](../decisions/0003-matching-rules-and-self-trade-prevention.md) |
-| NFR-004 | 残高の二重の使用なし | 使える残高が負になった件数 0。拘束の和と、未約定の注文・手続き中の出金・受け入れた提示の必要額の和の違い 0（5 分ごとの照合）。DB のフェイルオーバー、MSK の障害のときも 0 | [ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md) |
+| NFR-004 | 残高の二重の使用なし | 使える残高が負になった件数 0。拘束の和と必要額の和の違い 0（5 分ごとの照合）。拘束は `source_type` ごとに比べる：`order` は未約定の注文の必要額、`withdrawal`・`fiat_withdrawal` は手続き中の出金の額、`reorg`・`legal` は案件の記録（[ADR-0029](../decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）。販売所の受け入れは 1 つのトランザクションで記帳し、拘束を残さない（[ADR-0010](../decisions/0010-brokerage-quotes-and-inventory.md)）。DB のフェイルオーバー、MSK の障害のときも 0 | [ADR-0004](../decisions/0004-order-entry-holds-and-idempotency.md) |
 | NFR-005 | 台帳の正しさと約定の反映 | 釣り合わない仕訳 0。約定から台帳の記帳まで p99 1 秒。約定の記帳の重複 0、欠け（出力の記録にあって台帳にない約定）が 1 分を超える件数 0 | [ADR-0005](../decisions/0005-ledger-balances-and-trade-settlement.md) |
 | NFR-006 | 照合 | 台帳と利用者用のウォレット（チェーン）の照合を、ホットとウォームは 1 時間ごと、コールドは毎日。台帳と銀行・信託の照合を毎営業日。説明のつかない差を翌営業日に 0 にする（仮勘定に置き、期限で人が確かめる） | segregation-and-reconciliation の領域 |
 | NFR-007 | ネットワークにつながる額 | ホットとウォームの利用者の暗号資産の割合が `legal.hot_ratio_max` を超える時間 0（10 分ごとに計る）。ホットの自動の署名で使える額は、既定で利用者の暗号資産の 1% まで | [ADR-0006](../decisions/0006-wallet-tiers-and-cold-ratio.md)。法務の L2 |
-| NFR-008 | 出金 | 二重の出金 0。許可の一覧の外の宛先への出金 0。ホットで払える出金の依頼から放送まで p95 30 分（承認の待ちを除く）。上限を超える出金は 24 時間以内（営業日） | [ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md) |
+| NFR-008 | 出金 | 二重の出金 0。許可の一覧の外の宛先への出金 0。ホットで払える出金の依頼から放送まで p95 30 分（承認とコンプライアンスの待ちを除く）。上限を超える出金は 24 時間以内（営業日） | [ADR-0008](../decisions/0008-withdrawal-pipeline-and-approvals.md) |
 | NFR-009 | 入金 | 閾値（BTC 3 承認、ETH の確定）に届いてから記帳まで p95 5 分。巻き戻りで消えた入金が使われた件数 0 | [ADR-0009](../decisions/0009-deposits-confirmations-and-own-nodes.md) |
 | NFR-010 | 可用性 | 取引所（注文と取り消し）と販売所 月間 99.95%、板の配信 月間 99.95%、入出金の受け付け 月間 99.9%、運用の画面 月間 99.5%。予定した板の停止（銘柄の設定の変更）は数えない | 本家の SLA は確かめなかった（**未検証**） |
 | NFR-011 | 耐久性と復旧 | 受け付けを返した注文・取り消しの消失 0（AZ の障害を含む）。AZ の障害で、板の再開まで RTO 5 分（写しのエンジンへの切り替え）。リージョンの障害で、板は止めてから大阪で再開する RTO 4 時間、台帳の RPO 1 分（Aurora Global Database）、入力の記録の RPO は写しの遅れ（目標 1 秒）で、失った入力は利用者に取り消しとして知らせる | infrastructure の領域、[ADR-0002](../decisions/0002-sequencer-and-event-journal.md) |
@@ -358,7 +370,7 @@ sequenceDiagram
 
 ## 5. 主な決定
 
-どれも `proposed`（2026-11-15。人の承認を待つ）。0001〜0011 は最初の設計の起票で、下の表に置く。領域ごとの ADR は、7 節の番号の範囲で起票する。
+どれも `proposed`（2026-11-15。人の承認を待つ）。0001〜0011 は最初の設計の起票で、下の表に置く。領域ごとの ADR（0012〜0075）は 7 節の番号の範囲で起票し、一覧は [decisions/README.md](../decisions/README.md) にある。空けた番号は 0016、0030、0038（履行保証暗号資産の額の計算。法務の L2 の後）、0051、0067（漏えい等の報告の手順。法務の L11 の後）。統合の工程（2026-11-15）で、既存の ADR に日付つきの注記を足した（[design-log.md](design-log.md)）。
 
 | ADR | 決定 |
 | --- | --- |
@@ -406,8 +418,8 @@ sequenceDiagram
 
 | 項目 | いつ・どう決めるか |
 | --- | --- |
-| 法務の確認待ち（L1〜L14） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
-| PM の判断待ち（P1〜P4：法人の口座、API キーの出金の権限、販売所のヘッジ、宛先の待ち時間） | [intent.md](../intent.md) の「PM の判断待ち」。E2・E7・E11 の spec の前 |
+| 法務の確認待ち（L1〜L19） | [intent.md](../intent.md) の「法務の確認待ち」。結論まで、そこに挙げた Story の spec を承認しない |
+| PM の判断待ち（P1〜P14。P1〜P4：法人の口座、API キーの出金の権限、販売所のヘッジ、宛先の待ち時間。P5 以降は領域の文書から足した問いと、本システムの既定の値の合意（P14）） | [intent.md](../intent.md) の「PM の判断待ち」。関わる Epic の spec の前 |
 | MSK の `acks=all` の p99 と、エンジンの処理の速さ、写しのエンジンの遅れ | E9 の前の `engine-latency-poc`。NFR-001 を満たさなければ、入力の記録の方式を見直す ADR を書く |
 | 鍵の保管と署名の方式（HSM・MPC・チェーンの上の複数署名）と提供者 | E6 の前の `custody-signing-poc`（[ADR-0007](../decisions/0007-signing-service-and-key-custody.md)） |
 | ETH の入金のアドレスの方式と集め直しの費用 | E5 の前の `eth-deposit-sweep-poc` |
@@ -416,7 +428,7 @@ sequenceDiagram
 | 費用の実績（単価は**未検証**） | E16 の `cost-baseline` |
 | 本家の振る舞いで未確認のもの（エンジンの実装、コールドの割合、承認の数、出金の承認の段） | 公式の資料で確かめられなかった。本システムの値を使う |
 
-決めた経緯（工程ごとの「決定」の記録）は、工程 3 から `design-log.md` に書く。
+決めた経緯（工程ごとの「決定」の記録）は [design-log.md](design-log.md) にある。
 
 ## 7. 領域の文書
 
@@ -425,29 +437,29 @@ sequenceDiagram
 | ファイル | 範囲 | ADR | レビュー | 関わる Epic |
 | --- | --- | --- | --- | --- |
 | `matching-engine.md` | `engine-core` の板の型、注文の種類と期限、約定の規則、自己約定の防止、価格の帯、板の状態（取引中・取り消しだけ・停止）、銘柄の設定、スナップショットの形、再生の道具、写しのエンジンと切り替え | 0012–0016 | QA | E9 |
-| `order-entry-and-risk.md` | 注文の検査、拘束の額の計算（指値・成行・手数料の上限）、冪等、sequencer への送りと送り直し、速さの上限の段（個人・API・マーケットメイカー）、口座の状態による止め、注文の照会 | 0017–0020 | QA | E8 |
+| `order-entry-and-risk.md` | 注文の検査、拘束の額の計算（指値・成行）、冪等、sequencer への送りと送り直し、速さの上限の段（個人・API・マーケットメイカー）、口座の状態による止め、注文の照会 | 0017–0020 | QA | E8 |
 | `market-data.md` | 板の差分と全体、約定、ローソク足、配信の通し番号と取りこぼしの回復、`ws-gateway` の接続と上限、日々の売買高の公表（法務の L1） | 0021–0023 | QA、Ops | E10 |
 | `brokerage-quotes.md` | 販売所の価格の作り方（板の写し、参照の価格、スプレッド）、提示の期限、受け入れの記帳、在庫の上限、在庫の調整（法務の L7・L8）、表示 | 0024–0026 | QA、法務 | E11 |
-| `ledger-and-balances.md` | 勘定科目（資産ごと、利用者・本システム・ウォレット・仮勘定）、仕訳の型、拘束、約定の記帳、手数料の表と端数、明細と年間の報告書（法務の L10）、相続・差押え（法務の L14） | 0027–0030 | QA、財務、法務 | E4 |
+| `ledger-and-balances.md` | 勘定科目（資産ごと、利用者・本システム・ウォレット・仮勘定）、仕訳の型、拘束、約定の記帳、手数料の表と端数、明細と利用者への年間の報告書（法務の L10）、相続・差押え（法務の L14） | 0027–0030 | QA、財務、法務 | E4 |
 | `segregation-and-reconciliation.md` | 台帳とチェーン（ウォレットの段ごと）、台帳と銀行・信託、拘束と注文の照合、仮勘定、日本円の信託の額の計算（法務の L3）、分別管理の日次の報告（法務の L2） | 0031–0033 | QA、財務、法務 | E13 |
 | `custody-and-keys.md` | ウォレットの段と上限、鍵の作成と儀式、鍵の材料の分け方と場所、署名の境界、方針の言語と決定表、承認者の鍵、移し替え（`rebalancer`）、履行保証暗号資産（法務の L2）、提供者の選定（法務の L13） | 0034–0038 | セキュリティ、財務、法務 | E6 |
 | `deposits.md` | 入金のアドレスの払い出し（BTC の導出、ETH の方式）、入金の状態、閾値、巻き戻りの扱い、集め直し、入金のスクリーニングとトラベルルールの情報（法務の L5） | 0039–0041 | QA、セキュリティ | E5 |
-| `withdrawals.md` | 出金のステートマシン、宛先の許可の一覧と待ち時間、出金の手数料の表と手数料の見積もり、方針と承認の段、取引の作り直しの規則、詰まった取引、利用者への説明（法務の L12） | 0042–0045 | QA、セキュリティ、法務 | E7 |
-| `chain-nodes-and-confirmations.md` | ノードの構成と台数、クライアントの選定、同期と更新、2 台の比べ、外部の見張り、頭と確定の追跡、手数料の見積もり、放送 | 0046–0048 | Ops、セキュリティ | E5 |
+| `withdrawals.md` | 出金のステートマシン、宛先の許可の一覧と待ち時間、利用者の出金の手数料の表と、見積もりを使った手数料の引き上げの判断、方針と承認の段、取引の作り直しの規則、詰まった取引、利用者への説明（法務の L12） | 0042–0045 | QA、セキュリティ、法務 | E7 |
+| `chain-nodes-and-confirmations.md` | ノードの構成と台数、クライアントの選定、同期と更新、2 台の比べ、外部の見張り、頭と確定の追跡、ノードからの手数料の見積もり（`fee-estimator`）、放送 | 0046–0048 | Ops、セキュリティ | E5 |
 | `fiat-and-banking.md` | 提携銀行のアダプター、利用者ごとの振込先の口座番号、名義の照合、組戻し、出金の依頼と結果、信託銀行との連携（法務の L3）、銀行の営業日 | 0049–0051 | QA、財務、法務 | E3 |
 | `kyc-and-accounts.md` | 口座の開設、eKYC の方式と状態（法務の L4）、再確認、法人の口座（PM の判断待ち P1）、ログインと端末、API キー、`kyc-vault`、退会と保持（法務の L11）、未成年（法務の L12） | 0052–0054 | セキュリティ、法務 | E2 |
 | `aml-and-travel-rule.md` | 制裁の照合、チェーン分析のスクリーニングと閾値、取引の監視の規則、疑わしい取引の届出の案件（法務の L4・L6）、トラベルルールの通知と受け取り（法務の L5）、提供者の障害の時の既定 | 0055–0058 | QA、コンプライアンス、法務 | E12 |
 | `market-surveillance.md` | 板の入力と約定の記録からの兆しの検出（見せ玉、仮装売買、相場操縦、価格の急変）、案件と調べ、役職員の取引の制限、インサイダー取引の規制への備え（法務の L7） | 0059–0061 | コンプライアンス、法務 | E14 |
-| `regulatory-compliance-japan.md` | 法令の枠組みと移行（法務の L1）、当局と自主規制団体への報告、`legal.*` の値の一覧と変更の手順、税の書類（法務の L10）、システムのリスクと外部への委託（法務の L13）、自主規制の規則（法務の L9） | 0062–0064 | 法務、コンプライアンス | E15 |
+| `regulatory-compliance-japan.md` | 法令の枠組みと移行（法務の L1）、当局と自主規制団体への報告、`legal.*` の値の一覧と変更の手順、税務署への提出の書類（法務の L10。利用者への年間の報告書は ledger-and-balances）、システムのリスクと外部への委託（法務の L13）、自主規制の規則（法務の L9） | 0062–0064 | 法務、コンプライアンス | E15 |
 | `security.md` | 脅威モデル（ウォレット、承認者、内部の者、利用者の乗っ取り、宛先の書き換え）、アカウントの分け方、運用者の期限つきの権限と監査、CS の画面の参照の範囲、個人のデータの扱い、漏えいの対応 | 0065–0067 | セキュリティ | E1、E16 |
 | `observability.md` | ログ・メトリクス・トレース、SLI の計測（受け付け、配信、記帳、照合、ウォレットの割合）、正しさの見張り（要約の比べ、照合）、外からの見張り、秘密を含まない計測の型 | 0068–0069 | Ops | E1、E16 |
 | `capacity.md` | 負荷のモデル（相場の急変、マーケットメイカーの入力、入出金の山）、部品ごとの必要量、費用のモデルと単価、負荷試験 | 0070 | Ops | E16 |
 | `infrastructure.md` | AWS のアカウントとネットワーク、マッチングの EC2 の配置、MSK、3 つの Aurora、ノード、署名の境界のアカウント、egress（銀行・提供者・ノードの P2P）、DR（大阪）と板の再開、段階を上げる基準 | 0071–0073 | Ops、セキュリティ | E1、E16 |
 | `delivery.md` | CI/CD、段階のデプロイ（エンジンは板の停止の時間に入れ替える）、スキーマの変更、フラグ（`release.*`・`ops.*`・`legal.*`）、署名の方針と規則の表の出し方、アプリのリリース | 0074–0075 | QA、Ops | E1、E16 |
 | `data-model.md`・`data-model/` | データモデルの正本（工程 4） | なし（各領域の ADR を参照する） | QA | 全 Epic |
-| `design-log.md` | 設計の工程ごとの「決定」の記録（工程 3 から） | なし | なし | なし |
+| [`design-log.md`](design-log.md) | 設計の工程ごとの「決定」の記録（工程 3 から） | なし | なし | なし |
 
-- 範囲の空きは、領域の工程の後で 5 節に書く。次に採番する ADR は、各領域の範囲の最初の番号である。
+- 範囲の空きは 5 節に書いた。次に採番する ADR は、各領域の範囲の空いた番号か、範囲を広げた後の番号である。
 - 範囲を決めたときに、既存の `decisions/` に 0012 以降の番号がないことを確かめた（2026-11-15）。
 
 ## 8. Epic

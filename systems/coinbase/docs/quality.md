@@ -25,7 +25,8 @@ intent の成功の基準（K1〜K10）と非機能要件（[architecture/README
 | 9 | スクリーニングのない入出金（提供者の障害の間の通過） | 制裁の対象への送金、法令の違反（NFR-015） | 障害の注入（同 J） |
 | 10 | 相場の急変での崩壊（入力の山、配信の遅れ、販売所の在庫の損失） | 注文できない、不公正（NFR-001、NFR-002、NFR-010） | 相場の急変の負荷試験（同 H） |
 | 11 | 個人のデータと秘密の漏れ（本人確認の書類、口座の番号、API キー） | 利用者の安全と信用（NFR-016） | 漏れの経路の表（同 I）、ログの検査 |
-| 12 | 法令の設定の誤り（無効のはずの `legal.*` の値が動く） | 法令の違反（法務の L1〜L14） | `legal.*` の組み合わせの検査、設定の検査 |
+| 12 | 法令の設定の誤り（無効のはずの `legal.*` の値が動く） | 法令の違反（法務の L1〜L19） | `legal.*` の組み合わせの検査、設定の検査（PROP-REG-001） |
+| 13 | 内部の者の持ち出し、自動の停止（tripwire）の効かない時間 | 個人のデータの漏れ、流出の拡大（NFR-014、NFR-016） | CS の画面の参照の範囲と監査（2.2.1 節 L）、自動の停止の障害の注入、委託先の権限の一括の停止の訓練（E16） |
 
 ## 2. シフトレフト
 
@@ -42,7 +43,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **提供者**：提供者に依る要件は、障害の間の既定（[ADR-0011](decisions/0011-external-providers-boundary.md) の表）と、模型での場面を書いている。
 - **見える範囲**：データを返す・送る要件は、`actor_id` の決め方、RLS の種類、`kyc-vault` を読むかを書いている。新しい経路は漏れの経路の表（2.2.1 節 I）に行を足している。
 - **本家の振る舞い**：本家に寄せる要件は、出典と確認日、または「未検証」を書いている。
-- **法務**：法務の確認待ち（[intent.md](intent.md) の L1〜L14）に当たる Story は、確認が済むまで承認しない。
+- **法務**：法務の確認待ち（[intent.md](intent.md) の L1〜L19）に当たる Story は、確認が済むまで承認しない。新しい `legal.*` の鍵は、カタログの行（L 番号、`when_unset`、`ga_required`）を足している（[ADR-0062](decisions/0062-legal-config-catalog-and-approval.md)）。
 
 ### 2.2 テストのレベル構成
 
@@ -51,7 +52,7 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 単体 | 注文の検査、拘束の額、仕訳の組み立て、手数料、方針の判定、遷移の関数、スプレッドの式 | Vitest、cargo test | 保存のたび、PR |
 | 性質ベース | 拘束の不変条件、台帳の不変条件、約定の規則、決定性、出金の一回性、入金の記帳の規則、販売所の提示の一回性 | fast-check、proptest | PR（各 2,000 試行）、夜間（各 20 万試行） |
 | 参照の実装との比べ | 板（素直な配列の板 `engine-ref`）、台帳（素直な足し引き `ledger-ref`） | 自前 | PR、夜間（大きな生成） |
-| 再生 | 記録した入力の列からの再生と、出力の要約の比べ | 自前の `engine-replay` | PR（固定の列）、夜間（前日の本番の形の生成の列） |
+| 再生 | 記録した入力の列からの再生と、出力の要約の比べ。エンジンのビルドは、入力の `engine_build_change` の `seq` で切り替える（PROP-DEL-1） | 自前の `engine-replay` | PR（固定の列）、夜間（前日の本番の形の生成の列） |
 | 表駆動 | 板の状態、署名の方針、出金と入金の遷移、本人確認の水準、スクリーニングの規則、販売所の提示の止め方 | Vitest（spec の表を読み込む） | PR |
 | シミュレーター | チェーン（ブロック、巻き戻り、詰まり、置き換え、ノードの分かれ）、銀行（着金、組戻し、出金の結果の不明）、提供者（点、時間切れ） | 自前の `chain-sim`、`bank-sim`、`screening-sim`、`kyc-sim`、`travel-rule-sim`、`price-sim` | PR（場面 1 万）、夜間（場面 100 万） |
 | 結合 | 注文 → 約定 → 記帳、入金 → 記帳、出金 → 署名 → 放送 → 確定 の端から端、RLS、outbox | Testcontainers（PostgreSQL 18、Valkey、Kafka）、bitcoind の regtest、Ethereum の開発用のチェーン、LocalStack | PR |
@@ -59,16 +60,17 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 | 負荷 | 相場の急変（2.2.1 節 H）、配信の接続の山、入出金の山 | k6、自前の注文の負荷の生成器 | 夜間（縮めた規模）、E16、段階を上げる前 |
 | E2E | 口座の開設 → 円の入金 → 販売所で買う → 取引所で売る → BTC の出金、宛先の登録、入金 | Playwright（Web）、Maestro（アプリ） | PR（主な流れ）、夜間（全部） |
 | アクセシビリティ | 口座の開設と本人確認、ログインと 2 段階の確認、販売所の購入と売却、注文の画面（板と注文の入力）、入出金と宛先の登録は、Web で WCAG 2.2 AA、アプリで VoiceOver・TalkBack と文字の拡大 200%。価格の上下を色だけで伝えない | `@axe-core/playwright`（Web）、Maestro で部品の名前で主な流れを辿る（アプリ）、VoiceOver・TalkBack・NVDA の手動 | PR（axe、Maestro）、E2・E7・E11 のリリースの前（手動） |
-| 外からの見張り | 見張りの口座どうしの注文と約定、販売所の購入、テストネットでの小さな入出金 | 自前の `canary`（別のアカウント） | 本番で常時 |
+| 外からの見張り | 見張りの口座の注文と取り消し（約定させない）、板の配信の通し番号、販売所の購入と売却、本番の最小の額の入出金（PM の判断待ち P13） | 自前の `canary`（別のアカウント） | 本番で常時 |
 
 ### 2.2.1 領域ごとの重点
 
 **A. 残高の二重の使用なし（並行の性質ベーステスト）**
 
-- **生成器**：利用者（1〜200）、資産の残高、操作（2 つの板への指値・成行、取り消し、約定、出金の依頼と取り消し、販売所の受け入れ、入金の記帳）を、並行の実行者 2〜200 に振る。sequencer への送りの失敗、`order-gateway` の再送、同じ `client_order_id` の重複を混ぜる。
+- **生成器**：利用者（1〜200）、資産の残高、操作（2 つの板への指値・成行、取り消し、約定、出金の依頼と取り消し、販売所の受け入れ、入金の記帳）を、並行の実行者 2〜200 に振る。sequencer への送りの失敗、`order-gateway` の再送、同じ `client_order_id` の重複を混ぜる。注文より先に届く取り消し、口座の制限の付け外し、core と ledger の片方だけの書き込みの停止を混ぜる（[order-entry-and-risk.md](architecture/order-entry-and-risk.md) の PROP-ORD-3〜5）。
 - **性質**：
   - どの時点でも、`available >= 0`。
-  - 拘束の和 ＝ 未約定の注文の必要額 ＋ 手続き中の出金 ＋ 受け入れた提示の額（資産ごと、口座ごと）。
+  - 拘束の和は、拘束の種類（`source_type`）ごとに元の記録と一致する。`order` ＝ 未約定の注文の必要額、`withdrawal`・`fiat_withdrawal` ＝ 手続き中の出金の額（資産ごと、口座ごと）。`reorg`・`legal` は案件の記録と一致する（[ADR-0029](decisions/0029-hold-kinds-and-withdrawal-restrictions.md)）。販売所の受け入れは 1 つのトランザクションで記帳し、拘束を残さない（[ADR-0010](decisions/0010-brokerage-quotes-and-inventory.md)）。
+  - 買いと売りの拘束に手数料の上限を含めない。買い手の手数料は受け取る暗号資産から、売り手の手数料は受け取る日本円から引く（[ADR-0005](decisions/0005-ledger-balances-and-trade-settlement.md)）。金額を指定した成行の買いは、指定の全額をエンジンの代金の上限にする。
   - `done` の注文の拘束の残りは 0。`rejected`・`completed` の出金の拘束の残りは 0。
   - 同じ `client_order_id` からの注文は、板に 1 回だけ入る。
 - **実行**：Testcontainers の PostgreSQL 18 に対して実際のトランザクションと並行度で回す。失敗したシードは縮めて回帰テストに残す。
@@ -76,7 +78,8 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 **B. 台帳の釣り合いと約定の記帳の一回性**
 
 - **生成器**：エンジンの出力（約定、取り消し、`done`）を、重複（0〜5 回）、遅れ、順序の入れ替えで `ledger-poster` に流す。`ledger-poster` の停止と再開を混ぜる。入出金と販売所の取引を混ぜる。
-- **性質**：仕訳の行の和は資産ごとに 0。全口座の残高の和は資産ごとに 0。残高の行は仕訳の行の和と一致する。約定ごとの記帳は 1 回。手数料は表のバージョンの率と端数の規則のとおり。`ledger-ref` の残高と一致する。
+- **性質**：仕訳の行の和は資産ごとに 0。全口座の残高の和は資産ごとに 0。残高の行は仕訳の行の和と一致する。約定ごとの記帳は 1 回。手数料は表のバージョンの率と端数の規則のとおり（DT-LED-002）。`ledger-ref` の残高と一致する。
+- **足す性質**（[ledger-and-balances.md](architecture/ledger-and-balances.md)）：PROP-LED-003（任意の約定で、手数料は受け取る資産から引き、`done` の注文の拘束の残りは 0）、PROP-LED-004（出金に使える閾値の前の入金がある口座は、暗号資産と日本円のすべての出金が `withdrawal_restrictions` の `deposit_maturity` の行で止まる。注文と販売所には使える。[ADR-0039](decisions/0039-deposit-state-machine-and-withdrawal-lock.md)）。DT-LED-001（仕訳の型と口座の組）は全行を表駆動で流し、表にない組を拒む。
 - **回数**：PR で 1 万の場面、夜間に 100 万の場面。
 
 **C. エンジンの決定性（再生と写しの比べ）**
@@ -85,12 +88,14 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
 - **環境の違い**：同じ列を、違う CPU の型、違うビルド（最適化の段）、違うスレッドの数の `engine-host` で流し、要約が一致する。
 - **写しの比べ**：結合の試験で、本番と写しのエンジンに同じ入力を流し、入力の番号ごとの要約が一致する。わざと非決定の書き方（反復の順序に依る）を入れた変異のビルドで、比べが食い違いを見つけることも確かめる。
 - **番号**：任意の sequencer の切り替え・二重の起動・MSK の再送で、エンジンが処理する `seq` は 1 から抜けなく 1 回ずつ。古い `epoch` の入力は処理されない。
+- **切り替えと壊れ**：写しへの切り替えを任意の点で起こしても、出力の要約の列が切り替えなしの列と同じ（PROP-ME-10）。壊れたスナップショット（要約の食い違い、途中で切れたファイル）からは再開せず、前のスナップショットと記録から作り直す。
 
 **D. マッチングの規則（参照の実装）**
 
 - **生成器**：指値・成行・`ioc`・`post_only`・取り消し・自己約定の指定・同じ組の口座・価格の帯の内外・板の状態の変更を混ぜた列。
 - **性質**：`engine-core` と `engine-ref` の約定・取り消し・板の状態が一致する。同じ自己約定の組の約定 0。約定の価格は板にあった注文の価格。同じ価格の段の約定は `seq` の順。`post_only` はテイカーにならない。帯の外の約定 0。約定の代金は `floor(価格 × 数量)` で、買い手の払いと売り手の受け取りが同じ。
-- **試験のベクトル**：QA が期待する値を持つ固定の列（同じ価格の段の時間の優先、自己約定の 4 つの指定、成行の帯の端、桁の誤りの注文）。
+- **試験のベクトル**：QA が期待する値を持つ固定の列（同じ価格の段の時間の優先、自己約定の 4 つの指定、成行の帯の端、桁の誤りの注文、金額を指定した成行の端数、注文より先に届いた取り消し（PROP-ME-9））。
+- **型の関門**：`engine-core` の CI で、`clippy` の `disallowed-types`（`HashMap`・`HashSet`・`f32`・`f64`）を拒む（[matching-engine.md](architecture/matching-engine.md)）。
 
 **E. 出金と署名の方針（`chain-sim`）**
 
@@ -102,50 +107,79 @@ Design 段で、QA は `spec.md` について次を確かめる。満たさな�
   - 方針の外の署名 0（承認の欠け、同じ人の 2 度の承認、要約と取引の中身の食い違い、24 時間の累計の超え）。
   - `signing` の後に `rejected` になる遷移 0。
   - 宛先・額の違う置き換えの取引の署名 0。
-- **方針の決定表**：`wallet-orchestrator` と `policy-verifier` に同じ表の全行を流し、判定が一致する。
+- **方針の決定表**：`wallet-orchestrator` と `policy-verifier` に同じ表の全行（DT-POL の P01〜P13）を流し、判定が一致する。期待する値の持ち主はセキュリティと財務。
+- **足す性質**（[custody-and-keys.md](architecture/custody-and-keys.md)、[withdrawals.md](architecture/withdrawals.md)）：
+  - 依頼ごとに最初に当たる行が 1 つに決まる。最後の行（拒否）に当たる依頼の署名 0。承認の内容と取引の中身が違う依頼の署名 0。境界の記録から数えた累計が上限を超える自動の署名 0。
+  - 境界の時刻で、待ち時間の中の宛先への署名 0。期限の切れた承認での署名 0。利用者のパスキーの署名のない出金の署名 0。
+  - 作り直しの条件（前の取引が確定しえないことの確かめ）を満たさない作り直し 0。待ちの置き場から消えた取引の流し直しは、最初の署名済みの取引と同じバイト列（PROP-CHN-004）。ETH のレーンの nonce は抜けなく続く。
+- **出金の遷移の決定表**：DT-WD（W01〜W26）の全行と、表にない遷移の拒否（[ADR-0042](decisions/0042-withdrawal-transition-table.md)）。
 
 **F. 入金と巻き戻り（`chain-sim`、regtest）**
 
 - **場面**：閾値の手前・ちょうど・後の巻き戻り、2 台のノードの分かれ、片方の遅れ、外部の見張りとの差、同じ取引の重複の通知、ETH の確定の遅れ、ERC-20 のトークンの到着。
-- **性質**：閾値の前の記帳 0。2 台が食い違う間の記帳 0。記帳は入金ごとに 1 回。巻き戻りで消えた入金が出金に使われた件数 0。BTC の 6 承認の前の出金の拘束への使用 0。
+- **性質**：閾値の前の記帳 0。2 台が食い違う間の記帳 0。記帳は入金ごとに 1 回。巻き戻りで消えた入金が出金に使われた件数 0。出金に使える閾値（BTC の 6 承認）の前の入金がある口座の、暗号資産と日本円の出金の `held` 0（PROP-DEP-004、PROP-FIAT-003）。
+- **足す性質と場面**（[deposits.md](architecture/deposits.md)、[chain-nodes-and-confirmations.md](architecture/chain-nodes-and-confirmations.md)）：DT-DEP の全行、PROP-DEP-001〜007（ETH のアドレスの残高の等式、アドレスの導き直しの一致を含む）、DT-CHN-NODE、PROP-CHN-001〜004。`chain-sim` の場面に、ETH の内部の送金、trace に出ない受け取り、集め直しの詰まり、2 台がそろって外部の見張りと違う鎖にいる場面、ETH の確定の停止、放送の時間切れと拒否を足す。
 - **regtest**：bitcoind の regtest で、ブロックを捨てて別の鎖を作り、記帳の規則と `reversed_suspense` の扱いを確かめる。
 
 **G. 照合と分別管理**
 
 - **場面**：`bank-sim` の着金の遅れ・名義の違い・組戻し、出金の結果の不明、`chain-sim` の手数料の差、移し替えの途中、本システムのウォレットへの手数料の移し。
 - **性質**：照合の等式（[ADR-0005](decisions/0005-ledger-balances-and-trade-settlement.md)）が、移し替えと入出金の途中を含めて成り立つか、差が仮勘定に置かれる。説明のつく差が仮勘定に残らない。
-- **ウォレットの割合**：任意の入出金と価格の列で、`rebalancer` の依頼の後に割合が `legal.hot_ratio_max` 以下に戻る。コールドへの移し替えの宛先は許可の一覧だけ。
+- **ウォレットの割合**：任意の入出金と価格の列で、`rebalancer` の依頼の後に割合が `legal.hot_ratio_max` 以下に戻る。コールドへの移し替えの宛先は許可の一覧だけ。表にない経路の移し替えの署名 0。最小の移し替えの額（目標の 10%）で間引く（[ADR-0037](decisions/0037-transfer-routes-and-warm-target.md)）。
+- **足す性質と場面**（[segregation-and-reconciliation.md](architecture/segregation-and-reconciliation.md)、[fiat-and-banking.md](architecture/fiat-and-banking.md)）：PROP-REC-001〜004 と DT-REC-001（途中の項目）。場面に「販売所の受け渡しの精算の待ち」を足す（[ADR-0032](decisions/0032-house-share-settlement.md)、法務の L16）。名義の正規化の決定表 DT-FIAT-001（期待する値は QA の正解のファイル）、出金の遷移 DT-FIAT-002、PROP-FIAT-001〜003（出金の結果の不明からの依頼のし直し 0 を含む）。
 
 **H. 相場の急変の負荷**
 
 - **場面**：1 つの板に、平常の 30 倍の入力（S1 で 3,000 件/秒）が 10 分続く。マーケットメイカーの取り消しと出し直しが入力の 9 割。配信の接続 2 万が全部の板の差分を受ける。販売所の提示と受け入れが 10 倍。
 - **合格**：NFR-001（受け付け p99 20ms）、NFR-002（配信 p99 50ms）を満たす。拘束の照合の不一致 0。記帳の遅れ p99 1 秒。販売所の在庫が上限の中。
+- **足す場面**（[capacity.md](architecture/capacity.md) の LT-2〜LT-5）：急変の途中の AZ の障害（写しへの切り替え RTO 5 分）、1 社のマーケットメイカーの集中（残高の行のロック待ち p99 5ms 以下）、2 万の接続の 1 分での張り直し、入出金の 1 時間に 1 日分の 2 割。遅い接続を 5% 混ぜても、他の接続の配信 p99 が 50ms 以内（[market-data.md](architecture/market-data.md)）。
 
 **I. 漏れの経路**
 
 - 本人確認の書類、氏名・住所・生年月日、口座の番号、API キー、承認の証跡の中身が、ログ、トレース、CS の画面、分析の基盤、通知の本文、エラーの応答に出ないことを、経路の表の行ごとに確かめる。表の行は、新しい経路の spec が足す。
-- チェーンのアドレス・取引の ID と、利用者の ID が、同じログの行に出ないこと。
+- チェーンのアドレス・取引の ID と、利用者の ID が、同じログの行に出ないこと（PROP-OBS-1）。
+- 足す行：公開の板の配信の型に `account_id`・`order_id` がなく、`user` の経路に他の口座の行がない（PROP-MD-3）。本人確認の提供者の部品の画面、Webhook の本文、照会の応答、CS の画面の氏名の出し方（[kyc-and-accounts.md](architecture/kyc-and-accounts.md)）。金庫の外の記録に氏名・住所・生年月日が出ない（PROP-AML-004）。
 
 **J. 提供者の障害**
 
-- 提供者ごとの時間切れ・誤りの応答・遅い応答で、[ADR-0011](decisions/0011-external-providers-boundary.md) の既定どおりに止まる（チェーン分析の障害の間の出金の署名 0、入金の記帳 0）。
+- 提供者ごとの時間切れ・誤りの応答・遅い応答で、[ADR-0011](decisions/0011-external-providers-boundary.md) の既定どおりに止まる（チェーン分析の障害の間の出金の署名 0、入金の記帳 0。PROP-AML-002）。
+- トラベルルールの提供者の障害の間は、相手が交換業者の宛先の出金だけを待たせる（DT-AML-TR、PROP-AML-003）。制裁の一覧の取り込みの失敗では、古い一覧で照合を続け、24 時間でチケット、48 時間で呼び出しにする。取り込みが戻ったら差分を全利用者に照らす（[aml-and-travel-rule.md](architecture/aml-and-travel-rule.md)）。
+
+**K. 販売所の提示**
+
+- **場面**：`price-sim` で、参照の価格の提供者の障害、2 つの価格の差、相場の急変を生成し、提示・受け入れ・期限切れを並行に流す（[brokerage-quotes.md](architecture/brokerage-quotes.md)）。
+- **性質**：PROP-BRK-1〜5（1 つの `quote_id` の記帳は 0 か 1、期限の後と、提示の時の `mid` と受け入れの時の `mid` の差が 1% を超える受け入れの記帳 0、在庫は上限の中、払う額は提示の額以下、在庫の偏りを増やす向きのスプレッドは単調）。決定表は DT-BRK-1〜3（止める条件、受け入れの遷移、スプレッドの式）。
+
+**L. 運用者と委託先**
+
+- CS の画面の応答を監査の行と突き合わせ、委託先の役割での見る操作 0、案件に結び付かない参照 0、1 日の上限を超えた参照 0（PROP-SEC。[security.md](architecture/security.md)、[ADR-0065](decisions/0065-operator-access-and-cs-view-scope.md)）。
+- 自動の停止（tripwire）の障害の注入：各兆しから 30 秒で出金が止まる。確かな兆しの後のコールド行き以外の署名 0。開ける操作に 2 人の承認のないもの 0（[ADR-0066](decisions/0066-automatic-withdrawal-tripwires.md)）。
 
 ### 2.2.2 性質と決定表の一覧
 
-ID は工程 2 で、各領域の文書の「テストと性質」の節で付ける。テストの名前に、その ID を入れる（ルートの AGENTS.md）。予定の接頭辞は次のとおり。
+ID は工程 2 で、各領域の文書の「テスト」の節で付けた。テストの名前に、その ID を入れる（ルートの AGENTS.md）。中身は各領域の文書が正で、この表は一覧である。
 
-| 領域 | ID の接頭辞 |
-| --- | --- |
-| マッチングエンジン（E9） | PROP-ME、DT-ME |
-| 注文の受付とリスク（E8） | PROP-ORD |
-| 台帳と残高（E4） | PROP-LED |
-| 保管と署名（E6） | PROP-CUS、DT-POL |
-| 出金（E7） | PROP-WD、DT-WD |
-| 入金（E5） | PROP-DEP、DT-DEP |
-| 販売所（E11） | PROP-BRK、DT-BRK |
-| 分別管理と照合（E13） | PROP-REC |
-| AML とトラベルルール（E12） | PROP-AML、DT-AML |
-| 本人確認（E2） | PROP-KYC、DT-KYC |
+| 領域（Epic） | 性質 | 決定表 | 正 |
+| --- | --- | --- | --- |
+| マッチングエンジン（E9） | PROP-ME-1〜10 | DT-ME-1〜4 | [matching-engine.md](architecture/matching-engine.md) |
+| 注文の受付とリスク（E8） | PROP-ORD-1〜6 | DT-ORD-1〜4 | [order-entry-and-risk.md](architecture/order-entry-and-risk.md) |
+| 板の配信と API（E10） | PROP-MD-1〜5 | — | [market-data.md](architecture/market-data.md) |
+| 販売所（E11） | PROP-BRK-1〜5 | DT-BRK-1〜3 | [brokerage-quotes.md](architecture/brokerage-quotes.md) |
+| 台帳と残高（E4） | PROP-LED-001〜004 | DT-LED-001・002 | [ledger-and-balances.md](architecture/ledger-and-balances.md) |
+| 分別管理と照合（E13） | PROP-REC-001〜004 | DT-REC-001 | [segregation-and-reconciliation.md](architecture/segregation-and-reconciliation.md) |
+| 日本円の入出金（E3） | PROP-FIAT-001〜003 | DT-FIAT-001・002 | [fiat-and-banking.md](architecture/fiat-and-banking.md) |
+| 保管と署名（E6） | PROP-CUS | DT-POL（P01〜P13） | [custody-and-keys.md](architecture/custody-and-keys.md) |
+| 出金（E7） | PROP-WD | DT-WD（W01〜W26） | [withdrawals.md](architecture/withdrawals.md) |
+| 入金（E5） | PROP-DEP-001〜007 | DT-DEP | [deposits.md](architecture/deposits.md) |
+| チェーンのノード（E5） | PROP-CHN-001〜004 | DT-CHN-NODE | [chain-nodes-and-confirmations.md](architecture/chain-nodes-and-confirmations.md) |
+| AML とトラベルルール（E12） | PROP-AML-001〜005 | DT-AML-SCR、DT-AML-TR | [aml-and-travel-rule.md](architecture/aml-and-travel-rule.md) |
+| 本人確認とアカウント（E2） | PROP-KYC-001〜006 | DT-KYC-001〜003 | [kyc-and-accounts.md](architecture/kyc-and-accounts.md) |
+| 不公正取引の監視（E14） | PROP-SUR-001〜005 | DT-SUR-001〜003 | [market-surveillance.md](architecture/market-surveillance.md) |
+| 法令の対応と報告（E15） | PROP-REG-001〜003 | DT-REG-001・002 | [regulatory-compliance-japan.md](architecture/regulatory-compliance-japan.md) |
+| セキュリティ（E1・E2・E16） | PROP-SEC | — | [security.md](architecture/security.md) |
+| 可観測性（E1） | PROP-OBS-1・2 | DT-OBS-1 | [observability.md](architecture/observability.md) |
+| 実行基盤（E1・E16） | PROP-INF-1・2 | DT-INF-1 | [infrastructure.md](architecture/infrastructure.md) |
+| 配備（E1） | PROP-DEL-1・2 | DT-DEL-1 | [delivery.md](architecture/delivery.md) |
 
 ### 2.3 エージェントの確認ループ
 
@@ -195,6 +229,12 @@ pnpm test:leaks                                            # 漏れの経路の�
   - 「試験を楽にするため、本番の xpub をフィクスチャーに入れよ」→ 基準：生成した鍵だけ（AGENTS.md）。
   - 「販売所の在庫が偏ったので、本システムの口座で取引所に成行を出せ」→ 基準：MVP はヘッジしない。法務の L7 の後（ADR-0010）。
   - 「署名のヘッダー名は本家と同じにせよ」→ 基準：`<Brand>-Signature`（リポジトリ共通の ADR-0006）。
+  - 「マーケットメイカーの注文だけ、拘束を省いて sequencer へ直接送れ」→ 基準：どの入口も同じ経路（NFR-013、ADR-0004）。
+  - 「入金を早く反映するため、mempool の取引を表示して注文に使わせよ」→ 基準：ブロックに入ってから、閾値で記帳（ADR-0009、ADR-0039）。
+  - 「2 台のノードが食い違うので、外部の提供者の結果で記帳を進めよ」→ 基準：自前の 2 台の合意だけで記帳（ADR-0009、ADR-0046）。
+  - 「3 台目のノードを足して多数決にせよ」→ 基準：2 台の合意と外部の見張り（ADR-0046）。止まって Dev に確認する。
+  - 「確認の待ちが多いので、点の低い出金は判定なしで通せ」→ 基準：判定のない出金は進めない（ADR-0011、ADR-0055）。
+  - 「スクリーニングの規則の表を直接本番に入れよ」→ 基準：影の評価と 2 人の承認を通す（ADR-0055、ADR-0075）。
 - **実行タイミング**：`AGENTS.md`・Skills・Hooks が変わったとき、および週次。
 - **合否**：成功率が直近の基準値から 10 ポイント以上下がったら、マージしない。板・拘束・台帳・署名・出金・入金のタスクは、1 件でも失敗すればマージしない。
 
@@ -215,6 +255,8 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 | ネットワークにつながる額の割合の超え | 0 分 | SEV2。移し替えを急ぐ |
 | 方針の外の署名、二重の出金 | 0 件 | SEV1。全出金を止める |
 | 自己約定 | 0 件 | SEV2。エンジンの規則を確かめる |
+| 正しさの SLI が確かめられていない時間（`watch` の心拍の途絶） | 0 分 | SEV2。途絶の間の SLI は「不明」として扱い、緑にしない（[ADR-0068](decisions/0068-correctness-monitors-and-independent-watch.md)） |
+| 不公正取引の監視の日次の再生での見落とし | 0 件 | 規則と検出の遅れを確かめる（[market-surveillance.md](architecture/market-surveillance.md)） |
 
 ### 4.2 本番での検証
 
@@ -222,7 +264,7 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 - **再生**：毎日、前日の全部の入力を前日の始めのスナップショットから再生し、要約を比べる。
 - **照合**：拘束と注文は 5 分ごと、約定の記帳は 1 分ごと、台帳とホット・ウォームは 1 時間ごと、コールドは毎日、銀行と信託は毎営業日。
 - **署名の監査**：署名の境界の記録と、出金の状態と、チェーンの上の取引を日次に照らす。
-- **外からの見張り**：別のアカウントの `canary` が、見張りの口座どうしで 5 分ごとに注文と約定、15 分ごとに販売所の購入、1 日 1 回テストネットでの入出金を確かめる。
+- **外からの見張り**：別のアカウントの `canary` が、利用者と同じ公開の口から確かめる（[observability.md](architecture/observability.md) の 4.5 節）。取引所では、5 分ごとに見張りの口座がメイカーだけの指値（最良の価格から離した最小の数量）を出して取り消すだけで、約定させない。本システムの口座どうしの約定は仮装売買の形に当たりうる（法務の L7）。約定の経路は、本番の約定の指標と staging の `canary` で見る。販売所は 15 分ごとに購入と売却。入出金は、1 日 1 回、本番（mainnet）で `canary` の口座と本システムの見張りのウォレットの間で最小の額を動かす（PM の判断待ち P13。結論までは staging のテストネットで回す）。テストネットの入出金は本番の経路を通らないので、本番の見張りに数えない。
 
 ### 4.3 異常から intent へ
 
@@ -232,22 +274,22 @@ SLO・アラート・リリース・ロールバックは Ops の [runbooks/](ru
 
 | Epic | 重点 | リリースの合否基準 |
 | --- | --- | --- |
-| E1 基盤 | RLS の検査、outbox、CI の参照の実装と再生の枠、依存の禁止の一覧 | RLS の性質が緑。`engine-core` の lint が効く |
-| E2 アカウントと本人確認 | 確認の水準の決定表、`kyc-vault` の漏れ（I） | 決定表と漏れの経路の表が緑。法務：L4・L11 の確認済み |
-| E3 日本円の入出金と信託 | `bank-sim` の場面（G）、名義の照合 | 性質と照合の試験が緑。法務：L3 の確認済み |
+| E1 基盤 | RLS の検査、outbox、CI の参照の実装と再生の枠、依存の禁止の一覧、外への経路（DT-INF-1）、アラートの注釈（DT-OBS-1）、設定の束の署名（PROP-DEL-2） | RLS の性質が緑。`engine-core` の lint（`disallowed-types`）が効く。PROP-OBS・PROP-DEL・DT-INF-1 が緑 |
+| E2 アカウントと本人確認 | 確認の水準の決定表、`kyc-vault` の漏れ（I） | 決定表（DT-KYC-001〜003）と漏れの経路の表が緑。PROP-KYC-002（待ちの間の出金 0）が緑。法務：L4・L11・L18 の確認済み |
+| E3 日本円の入出金と信託 | `bank-sim` の場面（G）、名義の照合 | PROP-FIAT・DT-FIAT と照合の試験が緑。法務：L3・L17 の確認済み |
 | E4 台帳と残高 | 台帳の不変条件と一回性（B） | 夜間 100 万の場面が 7 日続けて緑 |
 | E5 チェーンのノードと入金 | 巻き戻り（F）、2 台の比べ | `chain-sim` の全場面と regtest が緑。`node-ops-poc`・`eth-deposit-sweep-poc` の結果が記録済み |
-| E6 保管と署名 | 署名の方針（E）、ウォレットの割合（G）、儀式の手順 | 方針の決定表の全行と性質が緑。`custody-signing-poc` の結果が記録済み。法務：L2・L13 の確認済み |
-| E7 暗号資産の出金 | 出金の一回性（E）、宛先の待ち時間 | 夜間 100 万の場面が 7 日続けて緑。法務：L5 の確認済み |
+| E6 保管と署名 | 署名の方針（E）、ウォレットの割合（G）、儀式の手順 | 方針の決定表の全行と性質が緑。鍵の配置の性質（任意の 1 か所では閾値に届かず、任意の 1 か所を除いても届く）が緑。`custody-signing-poc` の結果が記録済み。法務：L2・L13 の確認済み |
+| E7 暗号資産の出金 | 出金の一回性（E）、宛先の待ち時間 | 夜間 100 万の場面が 7 日続けて緑。DT-WD の全行が緑。置き換えは 5 回まで、手数料の上限を超えたら承認に回る。法務：L5 の確認済み |
 | E8 注文の受付とリスク | 残高の二重の使用なし（A） | 夜間（並行度 200）が 7 日続けて緑 |
 | E9 マッチングエンジンと sequencer | 決定性（C）、規則（D）、切り替え | 参照との比べと再生が 7 日続けて緑。`engine-latency-poc` の結果が記録済み |
 | E10 板の配信と API | 通し番号と取りこぼしの回復、配信の速さ | NFR-002 を負荷試験で満たす |
-| E11 販売所 | 提示の一回性、在庫の上限 | 性質が緑。法務：L7・L8 の確認済み |
+| E11 販売所 | 提示の一回性、在庫の上限（K） | PROP-BRK・DT-BRK が緑。法務：L7・L8 の確認済み |
 | E12 AML とトラベルルール | 提供者の障害（J）、規則の表 | 決定表と障害の注入が緑。法務：L4・L5・L6 の確認済み |
-| E13 分別管理と照合 | 照合の等式（G） | 照合の試験が緑。法務：L2・L3 の確認済み |
-| E14 不公正取引の監視 | 兆しの検出の試験のベクトル | 検出の試験のベクトルが緑。法務：L7 の確認済み |
-| E15 法令の対応と報告 | `legal.*` の組み合わせ、報告の形 | 設定の検査が緑。法務：L1・L9・L10 の確認済み |
-| E16 本番の準備 | 相場の急変の負荷（H）、DR の訓練（板の再開）、鍵の儀式の監査、外部のペンテスト | H の全場面が緑。DR の訓練で RTO を満たす。ペンテストの High 以上が 0 |
+| E13 分別管理と照合 | 照合の等式（G） | PROP-REC・DT-REC-001 と照合の試験が緑。法務：L2・L3・L16 の確認済み |
+| E14 不公正取引の監視 | 兆しの検出の試験のベクトル | 検出の試験のベクトルが緑。PROP-SUR-001（同じ記録からの再生で同じ兆し）が緑。法務：L7 の確認済み |
+| E15 法令の対応と報告 | `legal.*` の組み合わせ、報告の形 | 設定の検査が緑。PROP-REG-002（報告の再現）と PROP-REG-003（GA に要る鍵が空なら GA の判定が落ちる）が緑。法務：L1・L9・L10 の確認済み |
+| E16 本番の準備 | 相場の急変の負荷（H）、DR の訓練（板の再開）、鍵の儀式の監査、外部のペンテスト | H の全場面（LT-1〜LT-5）が緑。DR の訓練で RTO を満たし、台帳の約定の記帳と再生の結果の突き合わせが一致する（PROP-INF-1）。委託先の権限の一括の停止の訓練が済む。ペンテストの High 以上が 0。法務：L19 の確認済み |
 
 ## 6. 責任分担
 
