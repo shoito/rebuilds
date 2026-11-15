@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LRH3HT8NDH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LRH3HT8NDH');
+</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coinbase の前提知識 | rebuilds</title>
+<meta property="og:site_name" content="rebuilds">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Coinbase の前提知識 | rebuilds">
+<meta property="og:description" content="Coinbase の再構築の設計の文書を読む前に知っておくとよい、板と価格・時間の優先、sequencer と再生、拘束と台帳、ホット・コールドのウォレット、承認の数と巻き戻り、分別管理、トラベルルール、日本の法令の枠組み。">
+<meta property="og:url" content="https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/">
+<meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="Coinbase の再構築の設計の文書を読む前に知っておくとよい、板と価格・時間の優先、sequencer と再生、拘束と台帳、ホット・コールドのウォレット、承認の数と巻き戻り、分別管理、トラベルルール、日本の法令の枠組み。">
+<meta name="primer-home" content="../../../../index.html">
+<link rel="icon" href="../../../../docs/primer/assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../../../docs/primer/assets/primer.css">
+</head>
+<body>
+<main>
+  <header class="hero">
+    <p class="kicker">rebuilds · Coinbase · 前提知識</p>
+    <h1>暗号資産の交換所の設計を読む前に</h1>
+    <p class="lead">販売所と取引所、板と価格・時間の優先、sequencer と再生、拘束と複式簿記の台帳、ホット・ウォーム・コールドのウォレットと署名、ブロックの承認の数と巻き戻り、分別管理と照合、トラベルルール、日本の法令の枠組みを、設計の文書の読み方とつなげて説明します。共通の前提知識（RLS・outbox・冪等・UUIDv7・ER 図の記号）は<a href="../../../../docs/primer/index.html">共通の資料</a>にあります。</p>
+  </header>
+
+  <section class="s cover">
+    <p class="kicker">rebuilds · Coinbase · 前提知識</p>
+    <h2>暗号資産の交換所の設計を読む前に</h2>
+    <p class="lead">約定が公正で再現でき、預かった資産が方針の外で出ていかない仕組みを読むための基礎</p>
+    <p class="hint">→ キーで進む · Esc で資料表示</p>
+  </section>
+
+  <section class="s" id="learn">
+    <h2>この題材から学べること</h2>
+    <p>Coinbase は、取り戻せないものが 2 つある題材です。チェーンの上で出ていった暗号資産と、利用者が見た約定です。順序の正本・お金の正本・鍵の後ろの方針を、それぞれ 1 か所に閉じる設計の手本です。</p>
+    <div class="cards">
+      <div class="card"><h3>PM</h3><ul>
+        <li>法務の問い L1〜L19 ごとに「承認を止める spec」を決めます。金融商品取引法への移行も、結論を出さずに L1 に置きます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a>）</li>
+        <li>マーケットメイカーを MVP に入れるか（P1）、宛先の登録の後の待ち時間 24 時間（P4）を、範囲の判断として残します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a>）</li>
+        <li>領域の文書が置いた既定の値（自動の出金の 24 時間の累計 300 万円、販売所の在庫の目標など）を、GA の判定の前に財務・Ops・セキュリティと合意します（P14。<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Dev</h3><ul>
+        <li>板ごとの sequencer が入力に通し番号を付け、記録に書けてから受け付けます。エンジンは記録から作り直せる決定的な写しです（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0002-sequencer-and-event-journal.md">ADR-0002</a>）</li>
+        <li>注文の前に台帳で拘束を書き、約定の後に <code>(pair, trade_seq)</code> で 1 回だけ記帳します。エンジンは残高に触れません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0004-order-entry-holds-and-idempotency.md">ADR-0004</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0005-ledger-balances-and-trade-settlement.md">0005</a>）</li>
+        <li>鍵を別のアカウントの署名の境界に閉じ、境界の中で方針と承認を確かめ直します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0007-signing-service-and-key-custody.md">ADR-0007</a>）</li>
+      </ul></div>
+      <div class="card"><h3>QA</h3><ul>
+        <li>素直な参照の実装（<code>engine-ref</code>・<code>ledger-ref</code>）と、固定の入力の列の再生の要約を、約定と台帳の正解にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/quality.md">quality.md</a>）</li>
+        <li><code>chain-sim</code> と regtest で、巻き戻り・詰まった取引・ノードの食い違いを作り、二重の出金 0 を性質で確かめます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/quality.md">quality.md</a>）</li>
+        <li>出金と入金の遷移は決定表（DT-WD・DT-DEP）を正にします（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0042-withdrawal-transition-table.md">ADR-0042</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/deposits.md">deposits.md</a>）</li>
+      </ul></div>
+      <div class="card"><h3>Ops</h3><ul>
+        <li>「迷ったら止める」。止めるのは当番 1 人でできて、開けるのは 2 人の承認を要します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/README.md">runbooks</a>）</li>
+        <li>写しのエンジンとの要約の食い違いは 1 件で板を止めます。台帳とチェーンの照合は、ホットとウォームで 1 時間ごとです（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/market-halt.md">market-halt.md</a>）</li>
+        <li>署名の境界の中の見張りが、方針の外の依頼などの兆しで、人を待たずに出金を止めます（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0066-automatic-withdrawal-tripwires.md">ADR-0066</a>）</li>
+      </ul></div>
+      <div class="card"><h3>AI エージェント</h3><ul>
+        <li>署名の方針・承認者の一覧・ホットの上限の変更、出金の承認、鍵の儀式は任せません。エージェントは承認者にも鍵の保持者にもなりません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/roadmap.md">roadmap.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0034-cold-key-quorum-and-locations.md">ADR-0034</a>）</li>
+        <li>テストの正解（<code>engine-ref</code>、再生の期待する要約、方針の決定表）の変更は QA の承認を要し、CI が期待値の変更を検出します（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/roadmap.md">roadmap.md</a>）</li>
+        <li>eval に「取り消しを sequencer を通さずに送れ」「詰まった出金を新しい nonce で送り直せ」などの誘いを入れ、板・台帳・署名・出金のタスクは 1 件でも落ちればマージしません（<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/quality.md">quality.md</a>）</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="s" id="what">
+    <h2>Coinbase は何をするサービスか</h2>
+    <p>Coinbase は、個人が暗号資産を<strong>売り買いし、預けておき、自分のウォレットへ出せる</strong>交換所です。本家は米国を中心に営み、日本の事業は 2023 年 1 月に止めました（報道で確かめた事実）。この設計は、日本の交換業者として BTC と ETH を扱う形で作り直します。</p>
+    <pre class="mermaid">flowchart LR
+  U["個人の投資家<br>アプリ・Web・API"] --> S["このシステム<br>販売所・取引所・台帳・保管"]
+  M["マーケットメイカー<br>(P1 の判断待ち)"] --> S
+  O["運用者・CS・<br>コンプライアンス・財務"] --> S
+  S <--> C["Bitcoin・Ethereum<br>(自前のノード)"]
+  S <--> B["提携銀行・信託銀行"]
+  S <--> P["提供者<br>eKYC・チェーン分析・<br>トラベルルール"]
+  S --> R["当局・自主規制団体"]</pre>
+    <table>
+      <tr><th>S1（MVP）の規模</th><th>値</th></tr>
+      <tr><td>稼働の口座</td><td>30 万</td></tr>
+      <tr><td>預かりの暗号資産・日本円</td><td>1,500 億円・150 億円</td></tr>
+      <tr><td>板</td><td>2（BTC/JPY、ETH/JPY）</td></tr>
+      <tr><td>板の入力（注文と取り消し）の最大・約定</td><td>3,000 件/秒・30 万件/日</td></tr>
+      <tr><td>暗号資産の入金・出金</td><td>5,000 件/日・4,000 件/日</td></tr>
+    </table>
+    <p>国内の交換業者の会員の合計は、2025 年 2 月に稼働の口座 約 740 万、預かりの暗号資産 約 3.49 兆円でした。S1 はその約 4% の口座を見込んだ、本システムの想定です。</p>
+    <p class="doc-only"><small>設計で効くところ：7 つの価値は <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a>、規模の段階と見積もりの根拠は <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/README.md">architecture/README.md</a> の 2 節。</small></p>
+  </section>
+
+  <section class="s" id="venues">
+    <h2>販売所と取引所</h2>
+    <p>日本の交換業者は、同じ暗号資産を 2 つの売り場で売ります。<strong>誰が相手になるか</strong>が違います。</p>
+    <div class="compare">
+      <div><h3><a class="t" href="#g-brokerage">販売所</a></h3><p>本システムが相手になります。参照の価格に<a class="t" href="#g-spread">スプレッド</a>を足した価格を、期限（既定 10 秒）つきの提示として示し、利用者が受け入れたら台帳の 1 つのトランザクションで記帳します。板を通りません。基本の幅は BTC 100 bp、ETH 150 bp です。</p></div>
+      <div><h3><a class="t" href="#g-exchange">取引所</a></h3><p>利用者どうしの注文を<a class="t" href="#g-book">板</a>で突き合わせます。価格は注文で決まり、本システムは手数料を受けます。既定の率は<a class="t" href="#g-maker">メイカー</a> 500 ppm（0.05%）、<a class="t" href="#g-taker">テイカー</a> 1,000 ppm（0.1%）です。</p></div>
+    </div>
+    <ul>
+      <li data-frag>販売所の在庫（<code>house_inventory</code>）が偏ると、偏りを増やす向きのスプレッドを広げ、上限で提示を止めます。</li>
+      <li data-frag>MVP では在庫をヘッジしません（PM の判断待ち P3）。本システムが自分で取引所に注文を出すことは、利益相反の論点（法務の L7）です。</li>
+      <li data-frag>スプレッドの示し方は、法務の確認待ちです（L8）。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0010-brokerage-quotes-and-inventory.md">ADR-0010</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0024-brokerage-mid-price-and-spread.md">ADR-0024</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0027-fee-schedules-and-rounding.md">ADR-0027</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/brokerage-quotes.md">brokerage-quotes.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="order-book">
+    <h2>板と価格・時間の優先</h2>
+    <p>板は、まだ約定していない<a class="t" href="#g-limit">指値</a>の注文を、売りと買いに分けて価格ごとに並べたものです。新しい注文は、反対側の<strong>最も良い価格から、同じ価格なら古い順に</strong>突き合わせます（<a class="t" href="#g-price-time">価格・時間の優先</a>）。約定の価格は、板にあった注文の価格です。</p>
+    <table>
+      <tr><th>売り（ask）</th><th>価格（円/BTC）</th><th>買い（bid）</th></tr>
+      <tr><td>0.3 BTC</td><td>10,010,000</td><td></td></tr>
+      <tr><td>0.1 BTC（S、先に置いた）</td><td>9,990,000</td><td></td></tr>
+      <tr><td></td><td>9,980,000</td><td>0.2 BTC</td></tr>
+      <tr><td></td><td>9,970,000</td><td>0.5 BTC</td></tr>
+    </table>
+    <div class="tabs">
+      <div data-tab="注文の種類"><p>指値の <code>gtc</code>（取り消すまで）・<code>ioc</code>（即時に約定できる分だけ）・<code>post_only</code>（メイカーだけ）と、<a class="t" href="#g-market">成行</a>。逆指値や <code>fok</code> は MVP に入れません。</p></div>
+      <div data-tab="価格の帯"><p>指値は参照の価格の上下 10% の外なら拒み、成行は上下 5% の端で止めます。参照の価格が 1 分で 15% 以上動いたら、板を <code>cancel_only</code> にします。</p></div>
+      <div data-tab="自己約定の防止"><p>同じ利用者の売りと買いは約定させません（<a class="t" href="#g-stp">自己約定の防止</a>）。既定は新しいほうを取り消す <code>cancel_newest</code> で、本家の既定（<code>dc</code>）と違います。</p></div>
+    </div>
+    <div class="quiz" data-answer="2">
+      <p class="q">B が 0.1 BTC を指値 1,000 万円で買いました。板には S の 999 万円の売り 0.1 BTC があります。約定の価格は？</p>
+      <div class="opts">
+        <button>1,000 万円。テイカーが出した価格で約定する</button>
+        <button>999 万円。板にあった注文の価格で約定し、差の 1,000 円は B の拘束に戻る</button>
+        <button>999.5 万円。両方の価格の中間で約定する</button>
+      </div>
+      <p class="why">約定の価格は板の注文（メイカー）の価格です。本家も同じです。B が拘束した 100 万円のうち、使わなかった 1,000 円は注文の終わりに戻ります（ledger-and-balances.md の 12 節）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0003-matching-rules-and-self-trade-prevention.md">ADR-0003</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/matching-engine.md">matching-engine.md</a>。数量と価格は整数で、刻みは BTC/JPY が 1 円・0.0001 BTC です。</small></p>
+  </section>
+
+  <section class="s" id="sequencer">
+    <h2>sequencer と再生</h2>
+    <p>板を公正にするには、<strong>全員の注文に 1 つの順序</strong>を付ける必要があります。板ごとに 1 つの <a class="t" href="#g-sequencer">sequencer</a> が、入力に通し番号（<code>seq</code>）と時刻を付け、Amazon MSK の記録に書けてから受け付けを返します。エンジンはその記録を番号の順に読むだけです。</p>
+    <pre class="mermaid">flowchart LR
+  OG["order-gateway<br>(拘束を書いた注文)"] --> SQ["sequencer<br>seq と時刻を付ける"]
+  SQ --> IN[("入力の記録<br>MSK の 1 つの区画")]
+  IN --> E["engine<br>(本番の AZ)"]
+  IN --> SH["写しの engine<br>(別の AZ)"]
+  E --> OUT[("出力の記録<br>約定・板の差分")]
+  E -. "出力のハッシュの連鎖" .-> CMP{"入力ごとに比べる"}
+  SH -. "出力のハッシュの連鎖" .-> CMP
+  CMP -- "食い違い" --> H["板を止める"]
+  E -- "seq が 100,000 の倍数で" --> SN[("スナップショット<br>S3")]</pre>
+    <ul>
+      <li data-frag><strong>決定的</strong>：<code>engine-core</code> は I/O・壁の時計・乱数・ハッシュの反復の順序に依らない純粋な関数です。時刻は sequencer が付けた値だけを使います。だから<a class="t" href="#g-replay">再生</a>すると、ビット単位で同じ約定が出ます。</li>
+      <li data-frag><strong>板は写し</strong>：板の状態がおかしいときは、手で直さず、板を止めてスナップショットと記録から作り直します。</li>
+      <li data-frag><strong>切り替え</strong>：AZ の障害では、<a class="t" href="#g-shadow">写しのエンジン</a>が持ち主の記録の <code>epoch</code> を上げて引き継ぎます（板の再開まで RTO 5 分）。古い書き手は fencing で書けなくなります。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0002-sequencer-and-event-journal.md">ADR-0002</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0014-output-hash-chain-and-snapshots.md">ADR-0014</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0015-shadow-engine-failover.md">ADR-0015</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/engine-failover.md">engine-failover.md</a>。1 つの書き手が通し番号を付けて記録に書く形は、Figma の題材と同じです。</small></p>
+  </section>
+
+  <section class="s" id="holds">
+    <h2>拘束：残高を超えて使わせない</h2>
+    <p>エンジンは残高を知りません。だから、注文を sequencer へ送る<strong>前に</strong>、台帳が<a class="t" href="#g-hold">拘束</a>を書きます。使える残高（<code>available</code>）から拘束（<code>hold</code>）へ移す更新は、<code>available &gt;= 額</code> のときだけ成功する条件つきの更新です。</p>
+    <pre class="mermaid">sequenceDiagram
+  participant U as 利用者
+  participant OG as order-gateway
+  participant L as ledger
+  participant S as sequencer と engine
+  participant P as ledger-poster
+  U->>OG: 指値の買い (client_order_id)
+  OG->>L: 拘束 (available から hold へ)
+  L-->>OG: 書けた (足りなければ拒否)
+  OG->>S: 注文の入力
+  S-->>OG: 受け付け (seq)
+  S->>P: 約定 (trade_seq)
+  P->>L: 約定の記帳 (trade:pair:trade_seq)
+  P->>L: 注文が done なら残りの拘束を戻す</pre>
+    <ul>
+      <li>買いの指値は <code>floor(価格 × 数量)</code> の日本円を、売りは数量を拘束します。</li>
+      <li>拘束の種類（<code>source_type</code>）は <code>order</code>・<code>withdrawal</code>・<code>fiat_withdrawal</code>・<code>reorg</code>・<code>legal</code> の 5 つで、5 分ごとに元の記録と照合します。</li>
+      <li>同じ <code>client_order_id</code> の再送には、最初の結果を返します（<a href="../../../../docs/primer/index.html#idempotency">冪等は共通の資料</a>）。</li>
+    </ul>
+    <div class="quiz" data-answer="1">
+      <p class="q">買いの指値の拘束に、手数料の分を足しますか？</p>
+      <div class="opts">
+        <button>足さない。手数料は受け取る資産から引く（買い手は暗号資産、売り手は日本円）</button>
+        <button>足す。テイカーの率の上限を日本円で上乗せする</button>
+        <button>足す。約定の後に残りを戻せばよい</button>
+      </div>
+      <p class="why">統合の工程（D2）で、拘束は <code>floor(価格 × 数量)</code> だけにしました。拘束の額と受け取りの額を、それぞれ 1 つの資産で閉じるためです（ADR-0004・0005 の注記）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0004-order-entry-holds-and-idempotency.md">ADR-0004</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0017-order-row-states-across-clusters.md">ADR-0017</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0029-hold-kinds-and-withdrawal-restrictions.md">ADR-0029</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/order-entry-and-risk.md">order-entry-and-risk.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="ledger">
+    <h2>複数の資産の複式簿記</h2>
+    <p>お金の正本は追記だけの<a class="t" href="#g-double-entry">複式簿記</a>の台帳です。日本円・BTC・ETH のどれも仕訳で動かし、<strong>資産ごとに</strong>借方と貸方の和が 0 になります。金額は資産ごとの最小の単位の整数（日本円は 1 円、BTC は <a class="t" href="#g-satoshi">satoshi</a>、ETH は <a class="t" href="#g-wei">wei</a>）で、DB では <code>numeric(38,0)</code> です。浮動小数点は使いません。</p>
+    <p>前の節の約定（999 万円で 0.1 BTC、B はテイカー 1,000 ppm、S はメイカー 500 ppm）の仕訳：</p>
+    <table>
+      <tr><th>資産</th><th>借方</th><th>貸方</th><th>和</th></tr>
+      <tr data-frag><td>JPY</td><td>B の <code>user_hold:JPY</code> 999,000</td><td>S の <code>user_available:JPY</code> 998,501、<code>fee_revenue:JPY</code> 499</td><td>0</td></tr>
+      <tr data-frag><td>BTC（satoshi）</td><td>S の <code>user_hold:BTC</code> 10,000,000</td><td>B の <code>user_available:BTC</code> 9,990,000、<code>fee_revenue:BTC</code> 10,000</td><td>0</td></tr>
+    </table>
+    <ul>
+      <li>売り手の手数料は <code>floor(499.5)</code> ＝ 499 円で、端数の 0.5 円は売り手に残ります。</li>
+      <li>口座は「利用者の財産」（<code>user_*</code>）、「置き場所」（<code>wallet:&lt;tier&gt;</code>、<code>bank</code>、<code>trust</code>）、「本システムの財産」（<code>house_*</code>、<code>fee_revenue</code>）、<a class="t" href="#g-suspense">仮勘定</a>に分けます。</li>
+      <li>誤りは打ち消しの仕訳（<code>reversal</code>）で直し、残高の列を書き換えません。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/ledger-and-balances.md">ledger-and-balances.md</a> の 4・5・12 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0005-ledger-balances-and-trade-settlement.md">ADR-0005</a>。台帳の一般の形は <a href="../../../stripe/docs/primer/index.html#ledger">Stripe の前提知識</a>にあります。</small></p>
+  </section>
+
+  <section class="s" id="market-data">
+    <h2>板の配信と通し番号</h2>
+    <p>画面の板は、全体（スナップショット）を一度受け、その後は差分を受けて組み立てます。差分を 1 つでも落とすと、板が壊れたまま表示されます。だから差分ごとに<strong>板ごとの通し番号</strong>（<code>book_seq</code>）を付けます。</p>
+    <table>
+      <tr><th>受け手が見たもの</th><th>意味</th><th>すること</th></tr>
+      <tr data-frag><td>前の番号 ＋ 1</td><td>正常</td><td>差分を当てる</td></tr>
+      <tr data-frag><td>同じ番号</td><td>重複</td><td>捨てる</td></tr>
+      <tr data-frag><td>番号が飛んだ</td><td>取りこぼし</td><td><code>resync</code> を受けて全体を取り直す</td></tr>
+    </table>
+    <ul>
+      <li><code>book_seq</code> はエンジンの出力の値なので、配信の部品が替わっても同じ番号になります。</li>
+      <li>本家は、全部の差分の経路（<code>level2</code>）に認証を求め、認証なしの経路は 50ms ごとにまとめます。この設計は、認証なしでまとめずに配ります（<code>book</code>）。日本の利用者の多くが画面で板を見るためです。</li>
+      <li>目標は、入力の記録への書き込みから送り出しまで p99 50ms（NFR-002）。遅い接続（未送信 4 MB か 2 秒）は切ります。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0021-market-data-feed-and-book-seq.md">ADR-0021</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/market-data.md">market-data.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="wallets">
+    <h2>ホット・ウォーム・コールドのウォレット</h2>
+    <p>暗号資産を動かす力は、<strong>秘密鍵</strong>そのものです。鍵がネットワークにつながる機器にあれば、破られたときに一度に流れ出ます（2024 年 5 月に国内で約 482 億円相当の流出がありました）。そこで、ネットワークにつながる額を小さく保ちます。</p>
+    <table>
+      <tr><th>段</th><th>置き場所と署名</th><th>目標（S1 の既定）</th></tr>
+      <tr data-frag><td><a class="t" href="#g-hot">ホット</a></td><td>署名の境界（HSM か MPC）。方針の中なら自動</td><td>利用者の暗号資産の 1%（S1 で 15 億円）</td></tr>
+      <tr data-frag><td>ウォーム</td><td>署名の境界（別の鍵と方針）。2 人の承認の後に署名</td><td>2%。ホットとの合計で <code>legal.hot_ratio_max</code> まで</td></tr>
+      <tr data-frag><td><a class="t" href="#g-cold">コールド</a></td><td>ネットワークにつながない機器。<a class="t" href="#g-ceremony">鍵の儀式</a></td><td>残り全部</td></tr>
+      <tr data-frag><td>履行保証</td><td>コールド（利用者用と別のウォレット）</td><td>法務の L2 の結論の額</td></tr>
+    </table>
+    <ul>
+      <li><code>rebalancer</code> が 10 分ごとに段ごとの残高と目標を比べ、超えた分をコールドへ移す依頼を自動で作ります。コールドとウォーム<strong>から出す</strong>移し替えは 2 人以上の承認です。</li>
+      <li>内閣府令は、例外を円換算の 5% までとしています（翻訳の資料。S1 で最大 75 億円）。計算の方法と当てはめは法務の確認待ちです（L2）。</li>
+    </ul>
+    <div class="quiz" data-answer="3">
+      <p class="q">法務の結論が出るまで、ウォームのウォレットの残高は、ネットワークにつながる額の割合のどちらに数えますか？</p>
+      <div class="opts">
+        <button>コールドの側。人の承認がないと署名できないから</button>
+        <button>数えない。目標の 2% を超えないから</button>
+        <button>ホットの側（厳しいほう）。集め直しの前の ETH の入金のアドレスの残高も同じ側に数える</button>
+      </div>
+      <p class="why">数え方の正式なものは法務の L2 です。結論までは厳しいほうに倒します（ADR-0006 と統合の注記）。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0006-wallet-tiers-and-cold-ratio.md">ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0037-transfer-routes-and-warm-target.md">ADR-0037</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/custody-and-keys.md">custody-and-keys.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/hot-ratio-breach.md">hot-ratio-breach.md</a>。</small></p>
+  </section>
+
+  <section class="s" id="signing">
+    <h2>署名の境界と承認の段</h2>
+    <p>鍵は、別の AWS アカウントの<a class="t" href="#g-signer">署名の境界</a>の中にだけあります。境界は外から届く依頼を信じず、<strong>方針と承認の署名を自分で確かめ直して</strong>から署名します。同じ出金の ID に 2 度署名しません。</p>
+    <pre class="mermaid">flowchart LR
+  W["wallet-orchestrator<br>依頼を組み立てる"] --> P1{"方針の判定<br>(額・宛先・頻度)"}
+  P1 -- "上限の中" --> SG
+  P1 -- "上限を超える" --> A["承認者<br>(作成者と別の人)"]
+  A -- "承認者の鍵で署名した承認" --> SG["署名の境界<br>方針と承認を確かめ直す"]
+  SG -- "署名した取引" --> W
+  W --> N["自前のノード 2 台<br>へ放送"]</pre>
+    <table>
+      <tr><th>1 件の円換算の額</th><th>承認</th><th>署名の段</th></tr>
+      <tr><td>100 万円まで</td><td>自動（方針の中）</td><td>ホット</td></tr>
+      <tr><td>100 万円を超え 1,000 万円まで</td><td>運用者 1 人</td><td>ホット（足りなければウォーム）</td></tr>
+      <tr><td>1,000 万円を超える</td><td>運用者 1 人 ＋ コンプライアンスか財務の 1 人</td><td>ウォーム（足りなければコールドの儀式）</td></tr>
+    </table>
+    <p>コールドの鍵は 5 つで、署名に 3 つ要ります（3-of-5）。東京に 2、大阪に 2、その他の 1 か所に 1 を置き、1 か所が破られても閾値に届きません。境界はノードへの経路を持たず、放送は <code>wallet-orchestrator</code> が行います（統合の D5）。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0007-signing-service-and-key-custody.md">ADR-0007</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0008-withdrawal-pipeline-and-approvals.md">ADR-0008</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0034-cold-key-quorum-and-locations.md">ADR-0034</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0035-signing-policy-bundle-and-decision-table.md">ADR-0035</a>。承認の段の額は本システムの値で、財務・Ops・コンプライアンスと確定します。</small></p>
+  </section>
+
+  <section class="s" id="chain">
+    <h2>ブロック・承認の数・巻き戻り</h2>
+    <p>取引はブロックに入って初めてチェーンに載ります。その上に積まれたブロックの数が<a class="t" href="#g-confirmation">承認の数</a>です。ところが、ネットワークの一部が別の鎖を伸ばし、そちらが勝つと、<strong>一度見えたブロックが鎖から外れます</strong>（<a class="t" href="#g-reorg">巻き戻り</a>）。中の入金は消えたことになります。</p>
+    <pre class="mermaid">flowchart LR
+  B1["ブロック 100"] --> B2["101<br>(入金を含む)"]
+  B2 --> B3["102"]
+  B1 --> C2["101'<br>(入金を含まない)"]
+  C2 --> C3["102'"]
+  C3 --> C4["103'<br>こちらが長くなった"]
+  C4 -. "101 と 102 は外れる" .-> X["入金は消える"]</pre>
+    <table>
+      <tr><th>資産</th><th>ブロックの間隔（プロトコルの性質）</th><th>記帳</th><th>出金に使える</th></tr>
+      <tr><td>BTC</td><td>平均およそ 10 分</td><td>3 承認</td><td>6 承認</td></tr>
+      <tr><td>ETH</td><td>12 秒のスロット、32 スロットのエポック</td><td>合意のクライアントの<a class="t" href="#g-finality">確定</a>（finalized）</td><td>記帳と同時</td></tr>
+    </table>
+    <ul>
+      <li>記帳は、<strong>自前のノード 2 台</strong>が同じブロックの ID と入金を返したときだけです。外部の提供者の結果は、遅れと分かれの見張りにだけ使います。</li>
+      <li>自前のノードが外部より BTC 3 ブロック・ETH 2 エポック以上遅れたら、入金の記帳を止めます。</li>
+    </ul>
+    <div class="quiz" data-answer="2">
+      <p class="q">BTC の入金が 3 承認で記帳されました。この利用者は、すぐに日本円を出金できますか？</p>
+      <div class="opts">
+        <button>できる。記帳したので使える残高に入っている</button>
+        <button>6 承認まで、口座の全部の出金（暗号資産と日本円）を待たせる。注文と販売所には使える</button>
+        <button>BTC の出金だけ止め、日本円の出金はできる</button>
+      </div>
+      <p class="why">BTC だけ止めると、売った日本円で持ち出せます。統合の工程（D1）で、成熟の前は口座の全部の出金を止める 1 行の制限（<code>deposit_maturity</code>、<code>scope = account</code>）にしました。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0009-deposits-confirmations-and-own-nodes.md">ADR-0009</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0046-two-node-agreement-and-external-watch.md">ADR-0046</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/chain-nodes-and-confirmations.md">chain-nodes-and-confirmations.md</a>。閾値は本システムの値で、本家の値は未検証です。ETH の確定にかかる時間（通常 2 エポック前後）も <code>node-ops-poc</code> で計ります。</small></p>
+  </section>
+
+  <section class="s" id="deposits">
+    <h2>入金のステートマシン</h2>
+    <p>利用者ごとの入金のアドレスに届いた送金は、ブロックの中に見つけてから使えるようになるまで、いくつもの状態を通ります。遷移は 1 つの関数だけが書き、正は決定表（DT-DEP）です。</p>
+    <pre class="mermaid">stateDiagram-v2
+  [*] --> detected : ブロックの中に見つけた
+  detected --> confirming : 2 台が同じブロックを返した
+  confirming --> reorged : 閾値の前に外れた
+  reorged --> detected : 新しい鎖に入り直した
+  confirming --> review_hold : スクリーニングで保留
+  confirming --> credited : 閾値と通過
+  review_hold --> credited : 担当が通した
+  review_hold --> frozen : 担当が凍結した
+  credited --> withdrawable : 出金に使える閾値
+  credited --> reversed_suspense : 記帳の後に外れた
+  withdrawable --> reversed_suspense : 記帳の後に外れた</pre>
+    <ul>
+      <li data-frag>記帳の<strong>前</strong>に外れたら、記帳していないので取り消すだけです。</li>
+      <li data-frag>記帳の<strong>後</strong>に外れたら、その額を拘束し、足りない分を仮勘定（<code>suspense:reorg</code>）に置き、その資産の入金の記帳を止めます。</li>
+      <li data-frag>最小の入金額（BTC 0.0001、ETH 0.001）に満たない入金は記帳しません（<code>below_minimum</code>。PM の判断待ち P5）。<code>frozen</code> の後の扱いは法務の L6 です。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/deposits.md">deposits.md</a> の 5 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0039-deposit-state-machine-and-withdrawal-lock.md">ADR-0039</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/chain-reorg.md">chain-reorg.md</a>。図は主な遷移だけです。</small></p>
+  </section>
+
+  <section class="s" id="withdrawals">
+    <h2>出金：正しい宛先に一度だけ</h2>
+    <p>チェーンの上の送金は取り消せません。だから出金は、送る前に何重にも確かめ、送った後は<strong>結果が分かるまで別の取引を作らない</strong>ことを守ります。</p>
+    <div class="stepper">
+      <ol>
+        <li><strong>宛先</strong>：利用者が登録し、24 時間（P4）を過ぎた<a class="t" href="#g-allowlist">許可の一覧</a>の宛先だけ。パスキーの追加・メールの変更などの後 72 時間は出金を受けない。</li>
+        <li><strong>拘束</strong>（<code>held</code>）：額 ＋ 出金の手数料。</li>
+        <li><strong>スクリーニング</strong>：制裁・<a class="t" href="#g-chain-analysis">チェーン分析</a>・<a class="t" href="#g-travel-rule">トラベルルール</a>。通らなければ <code>compliance_review</code>。</li>
+        <li><strong>方針と承認</strong>：額の段に応じて承認を集める（前の節）。</li>
+        <li><strong>署名と放送</strong>：署名の境界で署名し、自前のノード 2 台以上に流す。</li>
+        <li><strong>確定</strong>：承認の数を満たしたら、拘束からウォレットの口座へ記帳する（<code>completed</code>）。</li>
+      </ol>
+    </div>
+    <div class="quiz" data-answer="3">
+      <p class="q">ETH の出金の取引が、手数料が低くて詰まりました。どうしますか？</p>
+      <div class="opts">
+        <button>新しい nonce で、同じ宛先と額の取引を作り直す</button>
+        <button>出金を <code>rejected</code> にして拘束を戻し、利用者に依頼し直してもらう</button>
+        <button>同じ nonce で、宛先と額を変えず手数料だけ上げた取引に置き換える</button>
+      </div>
+      <p class="why">新しい nonce の取引を作ると、古い取引も後で確定して二重の出金になりえます。別の取引を作ってよいのは、前の取引が確定しえないとチェーンで確かめた後だけです。<code>signing</code> 以降は <code>rejected</code> に進めません（ADR-0008）。BTC は同じ入力の <a class="t" href="#g-rbf">RBF</a> です。</p>
+    </div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0042-withdrawal-transition-table.md">ADR-0042</a>（DT-WD）、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0044-stuck-transaction-replacement.md">ADR-0044</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/withdrawals.md">withdrawals.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/stuck-withdrawals.md">stuck-withdrawals.md</a>。ホットで払える出金の依頼から放送まで p95 30 分（承認とコンプライアンスの待ちを除く。NFR-008）。</small></p>
+  </section>
+
+  <section class="s" id="reconciliation">
+    <h2>分別管理と照合</h2>
+    <p>交換業者は、利用者の財産と自分の財産を分けて管理します（<a class="t" href="#g-segregation">分別管理</a>）。利用者の暗号資産は利用者用のウォレットに、利用者の日本円は<a class="t" href="#g-trust">信託</a>に置きます。そのうえで、台帳と外の世界が合っているかを、<strong>同じ時点の値どうし</strong>で比べます。</p>
+    <table>
+      <tr><th>BTC のホットの照合（高さ h の時点）</th><th>BTC</th></tr>
+      <tr><td>台帳の <code>wallet:hot:BTC</code></td><td>150.00000000</td></tr>
+      <tr><td>＋ 記帳を待つ入金（h までに入り、2 承認）</td><td>＋0.30000000</td></tr>
+      <tr><td>− <code>confirming</code> の出金（額 ＋ 払った手数料）</td><td>−0.50002000</td></tr>
+      <tr><td>− コールドへの移し替え（移し先の記帳の前）</td><td>−10.00001000</td></tr>
+      <tr><td>＝ 期待する残高 ／ チェーンの残高</td><td>139.79997000 ／ 139.79997000（差 0）</td></tr>
+    </table>
+    <ul>
+      <li>台帳とウォレットの照合は、ホットとウォームで 1 時間ごと、コールドで毎日。台帳と銀行・信託は毎営業日（NFR-006）。</li>
+      <li>署名の記録にない<strong>減り</strong>は、ただちにホットのウォレットの侵害の手順に進みます。説明のつかない<strong>増え</strong>は、翌営業日に仮勘定に置きます。</li>
+      <li>信託すべき日本円の額は毎営業日に計算し、足りなければその日の中に追加を依頼します。計算の方式は法務の確認待ちです（L3）。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/segregation-and-reconciliation.md">segregation-and-reconciliation.md</a> の 5・6・11 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0031-point-in-time-reconciliation-with-in-flight.md">ADR-0031</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0033-trust-amount-method-and-daily-top-up.md">ADR-0033</a>。3 者の照合と仮勘定の一般の形は Stripe の題材にあります。</small></p>
+  </section>
+
+  <section class="s" id="aml">
+    <h2>スクリーニングとトラベルルール</h2>
+    <p>暗号資産のアドレスには名前がありません。そこで、<strong>相手のアドレスが何に使われてきたか</strong>をチェーン分析の提供者に点で評価させ、制裁の一覧と照らします。さらに交換業者の間では、送り手と受取人の情報を相手に通知する<a class="t" href="#g-travel-rule">トラベルルール</a>があります（2023 年 6 月 1 日施行と解説されています。法令の本文は未検証）。</p>
+    <pre class="mermaid">flowchart TB
+  R["出金の依頼"] --> S{"制裁の照合と<br>チェーン分析の点"}
+  S -- "一致か閾値の超え" --> CR["compliance_review<br>担当が判断する"]
+  S -- "通過" --> K{"宛先の種類"}
+  K -- "交換業者" --> T["相手へ通知し<br>最大 10 分待つ"]
+  T -- "受け付けた" --> OK["方針の判定へ"]
+  T -- "網にいない・拒否・時間切れ" --> CR
+  K -- "本人の自分で管理するウォレット" --> OK
+  K -- "他人の自分で管理するウォレット" --> CR</pre>
+    <ul>
+      <li>通知の対象の額は <code>legal.travel_rule_threshold_jpy</code> で、法務の結論までは 0 円（全件）です。</li>
+      <li>入金で相手の通知がなければ 24 時間待って保留、自分で管理するウォレットからの入金は答えがなければ 7 日で保留にします。</li>
+      <li>提供者が落ちている間は、通さずに<strong>止める側に倒します</strong>。範囲・項目・相手が対応しないときの扱いは法務の確認待ちです（L5・L6）。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/aml-and-travel-rule.md">aml-and-travel-rule.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0055-screening-rule-table-and-human-reject.md">ADR-0055</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0057-travel-rule-notification-and-receipt.md">ADR-0057</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0011-external-providers-boundary.md">ADR-0011</a>。</small></p>
+  </section>
+
+  <section class="s" id="surveillance">
+    <h2>不公正取引の監視</h2>
+    <p>板は、注文の出し方で価格を動かせます。<code>surveillance</code> は、板の入力と出力の記録を読み、口座ごとの窓の中に兆しを探します。エンジンと同じく時刻は記録の値だけを使い、前日の記録を再生して、見落としがないかを比べます。</p>
+    <table>
+      <tr><th>規則</th><th>見るもの（既定の閾値の例）</th></tr>
+      <tr data-frag><td><code>SUR-SPOOF-1</code> <a class="t" href="#g-spoofing">見せ玉</a></td><td>最良の近くに出して 2 秒以内に取り消した数量が、反対側の約定の 10 倍以上</td></tr>
+      <tr data-frag><td><code>SUR-WASH-1</code> <a class="t" href="#g-wash">仮装売買</a></td><td>結び付いた口座の間の約定が 24 時間に 3 件以上、100 万円以上</td></tr>
+      <tr data-frag><td><code>SUR-RAMP-1</code> 買い上がり・売り崩し</td><td>5 分で 3% 以上動いた向きのテイカーの約定の、1 口座の割合が 50% 以上</td></tr>
+      <tr data-frag><td><code>SUR-HOUSE-1</code> 本システムの口座の注文</td><td>本システムの口座の板の入力は 1 件で案件（MVP）</td></tr>
+      <tr data-frag><td><code>SUR-INSIDER-1</code>・<code>SUR-STAFF-1</code></td><td>重要な情報の公表の前 30 日の取引、役職員の制限の違反</td></tr>
+    </table>
+    <p>改正法でインサイダー取引の規制が新しく入ります。役職員の取引をどう縛るかは法務の確認待ちです（L7）。検出器は板を止めません。板を止めるのはエンジンの価格の帯の規則です。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/market-surveillance.md">market-surveillance.md</a> の 4.2 節、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0059-surveillance-detectors-over-journals.md">ADR-0059</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0061-staff-trading-and-material-information.md">ADR-0061</a>。</small></p>
+  </section>
+
+  <section class="s" id="japan-law">
+    <h2>日本の法令の枠組み</h2>
+    <p>暗号資産の交換業は、資金決済法の登録の業です。2026 年 7 月に成立した改正法で、金融商品取引法の「暗号資産取引業」へ移る途中にあると解説されています（法律の本文は未検証）。設計は、どちらの結論にも切り替えられる形（<code>legal.regime</code> と <code>legal.*</code> の値）にして、結論を出しません。</p>
+    <table>
+      <tr><th>#</th><th>論点（設計は結論を出していない）</th></tr>
+      <tr><td>L1</td><td>業の区分と移行：開業の時期にどちらの登録を取るか、改正法で入る規律（自己資本規制比率、責任準備金、日々の売買高の公表など）の当てはめ</td></tr>
+      <tr><td>L2</td><td>利用者の暗号資産をネットワークにつながない環境で管理する割合の計算、履行保証暗号資産</td></tr>
+      <tr><td>L3</td><td>利用者の日本円の信託の方式と、信託すべき額の計算</td></tr>
+      <tr><td>L4</td><td>犯罪収益移転防止法の取引時確認（非対面の「ホ」方式は 2027 年 4 月 1 日から使えなくなると解説されている）</td></tr>
+      <tr><td>L5・L6</td><td>トラベルルールの対象と通知、制裁と凍結した資産の扱い</td></tr>
+      <tr><td>L7・L8</td><td>不公正取引とインサイダー取引、販売所の価格の示し方</td></tr>
+      <tr><td>L10・L11</td><td>税の報告の書類、個人情報（本人確認の書類の保存、外国の提供者への提供）</td></tr>
+    </table>
+    <div class="callout warn"><span class="label">法務の確認待ち</span>L1〜L19 はすべて法務の確認待ちです。確認が済むまで、関係する Story の spec は承認しません。この資料は枠組みの紹介で、法的な判断ではありません。</div>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a> の「法務の確認待ち」、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/regulatory-compliance-japan.md">regulatory-compliance-japan.md</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0062-legal-config-catalog-and-approval.md">ADR-0062</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0063-regulatory-regime-switch.md">ADR-0063</a>。</small></p>
+  </section>
+
+  <section class="s" id="data-model">
+    <h2>データモデルの読み方</h2>
+    <p>Aurora は core・ledger・kyc-vault の 3 つのクラスタに分かれます。注文と入出金の状態は core、お金の正本は ledger（書くのは <code>ledger</code> のサービスだけ）、本人確認の書類と口座の番号は kyc-vault です。板の正本は Aurora でなく、MSK の入力の記録です。</p>
+    <pre class="mermaid">erDiagram
+  accounts ||--o{ orders : "places"
+  orders ||--o{ fills : "filled by"
+  accounts ||--o{ withdrawals : "requests"
+  withdrawals ||--o{ withdrawal_transactions : "broadcasts"
+  accounts ||--o{ deposits : "receives"
+  journals ||--|{ journal_lines : "has lines"
+  ledger_accounts ||--o{ journal_lines : "posted to"
+  ledger_accounts ||--o{ holds : "held in"
+  orders {
+    uuid id PK
+    uuid account_id FK
+    text client_order_id
+    text status "pending_submit etc"
+    bigint seq
+  }
+  withdrawals {
+    uuid id PK
+    text state
+    uuid destination_id FK
+  }
+  journals {
+    uuid id PK
+    text journal_type
+    text idempotency_key
+  }
+  journal_lines {
+    uuid journal_id FK
+    text asset
+    numeric amount "debit positive"
+  }
+  holds {
+    uuid id PK
+    text source_type
+    numeric remaining
+  }</pre>
+    <ul>
+      <li>core の表（<code>orders</code>・<code>withdrawals</code>・<code>deposits</code>）と ledger の表（<code>journals</code>・<code>holds</code>）は別のクラスタなので、冪等キー（<code>order:&lt;order_id&gt;:hold</code> など）と照合でつなぎます。</li>
+      <li>テナントの表は FORCE RLS です（<a href="../../../../docs/primer/index.html#tenancy">共通の資料</a>）。状態の変化は outbox で他のサービスへ流します。</li>
+    </ul>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/data-model.md">data-model.md</a>。図は主な表と列だけで、名前は領域の文書の最後の節から取りました。正本は data-model.md です。</small></p>
+  </section>
+
+  <section class="s" id="naming">
+    <h2>本家と違うところ・名前の置き換え</h2>
+    <p>約定の規則（価格・時間の優先、板の注文の価格での約定、自己約定の防止を選べること）と、注文の状態の考え方は本家に寄せます。本家のコード・SDK・データは使いません（リポジトリ共通の ADR-0007）。</p>
+    <table>
+      <tr><th>項目</th><th>本家</th><th>この設計</th></tr>
+      <tr><td>ヘッダーと API キー</td><td>本家の名前を含む</td><td><code>&lt;Brand&gt;-Signature</code>、<code>&lt;brand&gt;_live_</code></td></tr>
+      <tr><td>自己約定の防止の既定</td><td><code>dc</code>（小さいほうを取り消し、大きいほうを減らす）</td><td><code>cancel_newest</code></td></tr>
+      <tr><td>エンジンの冗長</td><td>1 つの配置グループの Raft（報道）</td><td>板ごとに単一の書き手と、別の AZ の写し</td></tr>
+      <tr><td>置き場所</td><td>US-EAST-1</td><td>東京、DR は大阪</td></tr>
+      <tr><td>板の全部の差分</td><td>認証が要る <code>level2</code></td><td>認証なしの <code>book</code></td></tr>
+      <tr><td>宛先の許可の一覧</td><td>個人は選んで有効にする（未検証）</td><td>必須、待ち 24 時間（P4）</td></tr>
+      <tr><td>扱う資産</td><td>多数の暗号資産とトークン</td><td>BTC と ETH 本体だけ</td></tr>
+    </table>
+    <p>本家の 2025 年 5 月の事故（委託先のサポートの担当者による利用者のデータの持ち出し）を受け、CS の画面は問い合わせに要る項目だけを出し、本人確認の書類は期限つきの権限と理由でだけ見ます。</p>
+    <p class="doc-only"><small>設計で効くところ：<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/README.md">architecture/README.md</a> の 1.4 節、<a href="https://github.com/shoito/rebuilds/blob/main/docs/decisions/0006-brand-neutral-identifiers.md">リポジトリ共通の ADR-0006</a>、<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0065-operator-access-and-cs-view-scope.md">ADR-0065</a>。</small></p>
+  </section>
+
+  <section class="s" id="glossary">
+    <h2>用語集</h2>
+    <dl class="glossary">
+      <dt id="g-brokerage">販売所</dt><dd>交換業者が相手になって暗号資産を売り買いする売り場。価格は交換業者が示す。</dd>
+      <dt id="g-exchange">取引所</dt><dd>利用者どうしの注文を板で突き合わせる売り場。</dd>
+      <dt id="g-spread">スプレッド</dt><dd>販売所の買いの価格と売りの価格の差。ここでは中の価格からの幅を bp（0.01%）で表す。</dd>
+      <dt id="g-book">板</dt><dd>約定していない指値の注文を、売りと買いに分けて価格ごとに並べたもの（order book）。</dd>
+      <dt id="g-limit">指値</dt><dd>価格を指定する注文。その価格より不利には約定しない。</dd>
+      <dt id="g-market">成行</dt><dd>価格を指定せず、板にある注文と即時に約定させる注文。この設計では価格の帯の端で止まる。</dd>
+      <dt id="g-maker">メイカー</dt><dd>板に置かれていた側の注文。板に流動性を出す。</dd>
+      <dt id="g-taker">テイカー</dt><dd>板にある注文と突き合わさった新しい側の注文。</dd>
+      <dt id="g-price-time">価格・時間の優先</dt><dd>良い価格の注文から、同じ価格なら先に受け付けた注文から約定させる規則。</dd>
+      <dt id="g-stp">自己約定の防止</dt><dd>同じ利用者の売りと買いを約定させない仕組み（self-trade prevention）。</dd>
+      <dt id="g-sequencer">sequencer</dt><dd>板ごとに 1 つ動き、入力に通し番号と時刻を付けて記録に書く部品。</dd>
+      <dt id="g-replay">再生</dt><dd>スナップショットと記録の入力の列をエンジンにもう一度流し、同じ出力が出るかを確かめること。</dd>
+      <dt id="g-shadow">写しのエンジン</dt><dd>別の AZ で同じ入力を読み、出力の要約を本番と比べるエンジン。本番が止まったら引き継ぐ。</dd>
+      <dt id="g-hold">拘束</dt><dd>注文・出金などで先に使う額を、使える残高から移して押さえたもの（hold）。</dd>
+      <dt id="g-double-entry">複式簿記</dt><dd>1 つの取引を 2 つ以上の口座の増減として、借方と貸方の和が等しくなるように記録する方法。</dd>
+      <dt id="g-suspense">仮勘定</dt><dd>説明のつかない差を一時に置く口座（<code>suspense:*</code>）。説明がつくまで消さない。</dd>
+      <dt id="g-satoshi">satoshi</dt><dd>BTC の最小の単位。1 BTC ＝ 1 億 satoshi。</dd>
+      <dt id="g-wei">wei</dt><dd>ETH の最小の単位。1 ETH ＝ 10 の 18 乗 wei。</dd>
+      <dt id="g-hot">ホットウォレット</dt><dd>鍵をネットワークにつながる環境に置き、自動で署名できるウォレット。</dd>
+      <dt id="g-cold">コールドウォレット</dt><dd>鍵をネットワークにつながない機器に置くウォレット。署名は儀式で行う。</dd>
+      <dt id="g-ceremony">鍵の儀式</dt><dd>複数の保持者と立会いの者が、ネットワークにつながない機器で取引の中身を確かめて署名する手順。</dd>
+      <dt id="g-signer">署名の境界</dt><dd>鍵を閉じ込め、方針と承認を自分で確かめてから署名する部品と、その AWS アカウント。</dd>
+      <dt id="g-hsm">HSM</dt><dd>Hardware Security Module。鍵を外に出さずに暗号の演算をする専用の機器。</dd>
+      <dt id="g-mpc">MPC</dt><dd>Multi-Party Computation。鍵を断片に分けて複数の場所で持ち、断片を集めずに署名する方式。</dd>
+      <dt id="g-confirmation">承認の数</dt><dd>取引を含むブロックの上に積まれたブロックの数（confirmations）。多いほど外れにくい。</dd>
+      <dt id="g-finality">確定</dt><dd>Ethereum の合意で、ブロックがもう外れないと決まった状態（finalized）。</dd>
+      <dt id="g-reorg">巻き戻り</dt><dd>より長い別の鎖が勝ち、見えていたブロックが鎖から外れること（reorg）。</dd>
+      <dt id="g-rbf">RBF</dt><dd>Replace-by-Fee。Bitcoin で、同じ入力を使い手数料を上げた取引で、詰まった取引を置き換えること。</dd>
+      <dt id="g-nonce">nonce</dt><dd>Ethereum のアカウントごとの取引の通し番号。同じ nonce の取引は 1 つしか確定しない。</dd>
+      <dt id="g-allowlist">許可の一覧</dt><dd>利用者が事前に登録し、待ち時間を過ぎた出金の宛先の一覧。</dd>
+      <dt id="g-chain-analysis">チェーン分析</dt><dd>アドレスと取引の履歴から、犯罪や制裁の対象とのつながりを点で評価するサービス。</dd>
+      <dt id="g-travel-rule">トラベルルール</dt><dd>暗号資産の送金のときに、送り手と受取人の情報を相手の交換業者へ通知する決まり。</dd>
+      <dt id="g-segregation">分別管理</dt><dd>利用者の財産を、交換業者の財産と分けて管理すること。</dd>
+      <dt id="g-trust">信託</dt><dd>利用者の日本円を信託銀行に託し、交換業者が破綻しても守られるようにすること。</dd>
+      <dt id="g-spoofing">見せ玉</dt><dd>約定させる意思のない注文を板に出し、他の利用者の判断を誤らせること。</dd>
+      <dt id="g-wash">仮装売買</dt><dd>同じ者や結び付いた者の間で売り買いし、取引が盛んに見せかけること。</dd>
+    </dl>
+  </section>
+
+  <section class="s" id="reading">
+    <h2>読む順</h2>
+    <p>まず全体像を読み、次に「板」「お金」「鍵」の 3 本の柱を読むと迷いません。</p>
+    <div class="reading">
+      <ol>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/intent.md">intent.md</a> <span>— 何を作るか、守るべき振る舞い、法務の確認待ちと PM の判断待ち</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/README.md">architecture/README.md</a> <span>— 全体構成、6 つの原則、主要な流れ、規模の段階、非機能要件</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/matching-engine.md">matching-engine.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/order-entry-and-risk.md">order-entry-and-risk.md</a> <span>— 板、sequencer、再生、拘束</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/ledger-and-balances.md">ledger-and-balances.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/segregation-and-reconciliation.md">segregation-and-reconciliation.md</a> <span>— 台帳、手数料、照合、信託</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/custody-and-keys.md">custody-and-keys.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/withdrawals.md">withdrawals.md</a> → <a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/deposits.md">deposits.md</a> <span>— ウォレット、署名、出金、入金</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/tree/main/systems/coinbase/docs/decisions">decisions/</a> <span>— 特に 0002（sequencer）、0004（拘束）、0005（台帳）、0006（ウォレットの段）、0007（署名の境界）、0008（出金）、0009（入金）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/data-model.md">data-model.md</a> <span>— 表・制約・索引の正本</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/architecture/design-log.md">architecture/design-log.md</a> <span>— 決めた経緯。既定案と、統合の工程で解いた食い違い（D1〜D19）</span></li>
+        <li><a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/quality.md">quality.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/roadmap.md">roadmap.md</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/runbooks/README.md">runbooks/</a> <span>— 品質の戦略、Epic とエージェントに任せないこと、SLO と運用</span></li>
+      </ol>
+    </div>
+    <p><a class="btn" href="../../../../index.html">題材の一覧へ</a> <a class="btn" href="../../../../docs/primer/index.html">共通の前提知識へ</a></p>
+  </section>
+</main>
+<script src="../../../../docs/primer/assets/primer.js"></script>
+</body>
+</html>

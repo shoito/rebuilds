@@ -59,6 +59,7 @@ PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題
 | Shopify | 在庫の移動の台帳 | [ADR-0023](../systems/shopify/docs/decisions/0023-inventory-movements-ledger-and-reconciliation.md) |
 | Uber・YouTube | 精算と照合、収益の分配と丸め | [Uber ADR-0025](../systems/uber/docs/decisions/0025-ledger-settlement-and-reconciliation.md)・[YouTube ADR-0057](../systems/youtube/docs/decisions/0057-revenue-ledger-share-calculation-and-rounding.md) |
 | Workday | 有給の付与の台帳、給与の仕訳の書き出し | [ADR-0024](../systems/workday/docs/decisions/0024-annual-leave-grant-ledger.md)・[ADR-0037](../systems/workday/docs/decisions/0037-payroll-journal-export.md) |
+| Coinbase | 注文の拘束、確定前の入金の出金の止め、台帳とチェーンの同じ高さでの照合 | [資料](https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/index.html#holds)・[ADR-0005](../systems/coinbase/docs/decisions/0005-ledger-balances-and-trade-settlement.md)・[ADR-0029](../systems/coinbase/docs/decisions/0029-hold-kinds-and-withdrawal-restrictions.md)・[ADR-0031](../systems/coinbase/docs/decisions/0031-point-in-time-reconciliation-with-in-flight.md) |
 
 ### ステートマシン
 
@@ -73,6 +74,7 @@ PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題
 | ServiceNow | インシデント・変更・問題の過程 | [資料](https://shoito.github.io/rebuilds/systems/servicenow/docs/primer/index.html#change)・[ADR-0022](../systems/servicenow/docs/decisions/0022-process-state-machines.md) |
 | Uber | 乗車の状態 | [資料](https://shoito.github.io/rebuilds/systems/uber/docs/primer/index.html#states) |
 | Datadog・YouTube・X | モニターの状態、異議の期限、フォローの状態 | [Datadog ADR-0041](../systems/datadog/docs/decisions/0041-monitor-state-machine.md)・[YouTube ADR-0048](../systems/youtube/docs/decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md)・[X ADR-0011](../systems/x/docs/decisions/0011-graph-edge-state-machine-and-locking.md) |
+| Coinbase | 出金と入金の状態（承認・署名・確定・巻き戻り） | [資料](https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/index.html#withdrawals)・[ADR-0042](../systems/coinbase/docs/decisions/0042-withdrawal-transition-table.md)・[ADR-0039](../systems/coinbase/docs/decisions/0039-deposit-state-machine-and-withdrawal-lock.md) |
 
 ### 一回性と熱い行（売り越し・二重予約の防止）
 
@@ -174,6 +176,7 @@ PM・Dev・QA・Ops のそれぞれが、特に手本にできる題材。各題
 | Auth0 | 署名の鍵の階層と入れ替え | [資料](https://shoito.github.io/rebuilds/systems/auth0/docs/primer/index.html#keys)・[ADR-0045](../systems/auth0/docs/decisions/0045-kms-key-hierarchy.md)・[ADR-0046](../systems/auth0/docs/decisions/0046-signing-key-lifecycle.md) |
 | Mercari・Airbnb | 住所の金庫、運用者の開示と監査 | [Mercari ADR-0070](../systems/mercari/docs/decisions/0070-operator-access-vault-reveal-and-audit.md)・[Airbnb ADR-0074](../systems/airbnb/docs/decisions/0074-operator-access-reveal-and-audit-chain.md) |
 | Zoom | エンドツーエンドの暗号化 | [資料](https://shoito.github.io/rebuilds/systems/zoom/docs/primer/index.html#e2ee)・[ADR-0004](../systems/zoom/docs/decisions/0004-encryption-and-e2ee.md) |
+| Coinbase | コールドの鍵の分け方、署名の方針の決定表、承認者の鍵 | [資料](https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/index.html#signing)・[ADR-0034](../systems/coinbase/docs/decisions/0034-cold-key-quorum-and-locations.md)・[ADR-0035](../systems/coinbase/docs/decisions/0035-signing-policy-bundle-and-decision-table.md)・[ADR-0036](../systems/coinbase/docs/decisions/0036-approver-keys-and-approval-payload.md) |
 
 ### Webhook の署名と配信
 
@@ -217,6 +220,7 @@ ML は信号、決定は規則と人。措置には根拠と異議の道を残�
 | 匿名の配送 | [Mercari](https://shoito.github.io/rebuilds/systems/mercari/docs/primer/index.html) |
 | テーマの言語、WASM の拡張の砂場 | [Shopify](https://shoito.github.io/rebuilds/systems/shopify/docs/primer/index.html) |
 | 描画のエンジン（WebGL / WASM） | [Figma](https://shoito.github.io/rebuilds/systems/figma/docs/primer/index.html) |
+| 板とマッチングエンジン（sequencer と再生）、ホット・コールドのウォレットと署名の方針、チェーンの確定とリオーグ | [Coinbase](https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/index.html) |
 
 ## この索引を直すとき
 

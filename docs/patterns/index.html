@@ -227,6 +227,11 @@
 <td>有給の付与の台帳、給与の仕訳の書き出し</td>
 <td><a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0024-annual-leave-grant-ledger.md">ADR-0024</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/workday/docs/decisions/0037-payroll-journal-export.md">ADR-0037</a></td>
 </tr>
+<tr>
+<td>Coinbase</td>
+<td>注文の拘束、確定前の入金の出金の止め、台帳とチェーンの同じ高さでの照合</td>
+<td><a href="../../systems/coinbase/docs/primer/index.html#holds">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0005-ledger-balances-and-trade-settlement.md">ADR-0005</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0029-hold-kinds-and-withdrawal-restrictions.md">ADR-0029</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0031-point-in-time-reconciliation-with-in-flight.md">ADR-0031</a></td>
+</tr>
 </tbody></table>
 <h3>ステートマシン</h3>
 <p>状態と遷移を決定表で決め、遷移の関数を 1 か所に置き、期限で自動に進める。</p>
@@ -272,6 +277,11 @@
 <td>Datadog・YouTube・X</td>
 <td>モニターの状態、異議の期限、フォローの状態</td>
 <td><a href="https://github.com/shoito/rebuilds/blob/main/systems/datadog/docs/decisions/0041-monitor-state-machine.md">Datadog ADR-0041</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/youtube/docs/decisions/0048-claim-dispute-appeal-state-machine-and-deadlines.md">YouTube ADR-0048</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/x/docs/decisions/0011-graph-edge-state-machine-and-locking.md">X ADR-0011</a></td>
+</tr>
+<tr>
+<td>Coinbase</td>
+<td>出金と入金の状態（承認・署名・確定・巻き戻り）</td>
+<td><a href="../../systems/coinbase/docs/primer/index.html#withdrawals">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0042-withdrawal-transition-table.md">ADR-0042</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0039-deposit-state-machine-and-withdrawal-lock.md">ADR-0039</a></td>
 </tr>
 </tbody></table>
 <h3>一回性と熱い行（売り越し・二重予約の防止）</h3>
@@ -562,6 +572,11 @@
 <td>エンドツーエンドの暗号化</td>
 <td><a href="../../systems/zoom/docs/primer/index.html#e2ee">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/zoom/docs/decisions/0004-encryption-and-e2ee.md">ADR-0004</a></td>
 </tr>
+<tr>
+<td>Coinbase</td>
+<td>コールドの鍵の分け方、署名の方針の決定表、承認者の鍵</td>
+<td><a href="../../systems/coinbase/docs/primer/index.html#signing">資料</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0034-cold-key-quorum-and-locations.md">ADR-0034</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0035-signing-policy-bundle-and-decision-table.md">ADR-0035</a>・<a href="https://github.com/shoito/rebuilds/blob/main/systems/coinbase/docs/decisions/0036-approver-keys-and-approval-payload.md">ADR-0036</a></td>
+</tr>
 </tbody></table>
 <h3>Webhook の署名と配信</h3>
 <p>外へ送るイベントを、署名し、再送し、相手の遅さや悪意から本体を守る。</p>
@@ -690,6 +705,10 @@
 <tr>
 <td>描画のエンジン（WebGL / WASM）</td>
 <td><a href="../../systems/figma/docs/primer/index.html">Figma</a></td>
+</tr>
+<tr>
+<td>板とマッチングエンジン（sequencer と再生）、ホット・コールドのウォレットと署名の方針、チェーンの確定とリオーグ</td>
+<td><a href="../../systems/coinbase/docs/primer/index.html">Coinbase</a></td>
 </tr>
 </tbody></table>
 <h2>この索引を直すとき</h2>

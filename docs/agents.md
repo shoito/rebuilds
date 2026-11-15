@@ -1,6 +1,6 @@
 # AI エージェントから読む
 
-このリポジトリの問いは「AI のコーディングエージェントを主な作り手にするなら、どう設計し、どう作るか」である。この文書は、21 の題材がその問いにどう答えたかを、題材をまたいでまとめた索引である。設計そのものは各題材の文書にあり、ここでは説明し直さない。
+このリポジトリの問いは「AI のコーディングエージェントを主な作り手にするなら、どう設計し、どう作るか」である。この文書は、22 の題材がその問いにどう答えたかを、題材をまたいでまとめた索引である。設計そのものは各題材の文書にあり、ここでは説明し直さない。
 
 エージェントの役割は [process.md](process.md) の 2 節で決めている。草案を書き、実装し、確認ループを回し、調べる。**承認はしない**。各題材は、その上で次の 4 つを決めている。
 
@@ -13,7 +13,7 @@
 
 ## 1. 任せないことの型
 
-21 題材の「エージェントに任せないこと」は、次の型に分かれる。理由はどれも「間違えたときに気づきにくいか、後から直すコストが高いか、人の責任で決めるべきか」のどれかである。
+22 題材の「エージェントに任せないこと」は、次の型に分かれる。理由はどれも「間違えたときに気づきにくいか、後から直すコストが高いか、人の責任で決めるべきか」のどれかである。
 
 | 型 | 任せない理由 | 例 |
 | --- | --- | --- |
@@ -107,6 +107,7 @@
 | Gmail | [資料](https://shoito.github.io/rebuilds/systems/gmail/docs/primer/index.html#learn) | [roadmap.md](../systems/gmail/docs/roadmap.md) | [quality.md](../systems/gmail/docs/quality.md) |
 | メルカリ | [資料](https://shoito.github.io/rebuilds/systems/mercari/docs/primer/index.html#learn) | [roadmap.md](../systems/mercari/docs/roadmap.md) | [quality.md](../systems/mercari/docs/quality.md) |
 | Airbnb | [資料](https://shoito.github.io/rebuilds/systems/airbnb/docs/primer/index.html#learn) | [roadmap.md](../systems/airbnb/docs/roadmap.md) | [quality.md](../systems/airbnb/docs/quality.md) |
+| Coinbase | [資料](https://shoito.github.io/rebuilds/systems/coinbase/docs/primer/index.html#learn) | [roadmap.md](../systems/coinbase/docs/roadmap.md) | [quality.md](../systems/coinbase/docs/quality.md) |
 
 ## この文書を直すとき
 

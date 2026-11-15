@@ -16,11 +16,11 @@
 <meta property="og:site_name" content="rebuilds">
 <meta property="og:type" content="website">
 <meta property="og:title" content="rebuilds">
-<meta property="og:description" content="有名な SaaS を、AI エージェントが作り直すならどう設計するか。21 のサービスを題材にした設計の記録と、図解つきの前提知識の資料。">
+<meta property="og:description" content="有名な SaaS を、AI エージェントが作り直すならどう設計するか。22 のサービスを題材にした設計の記録と、図解つきの前提知識の資料。">
 <meta property="og:url" content="https://shoito.github.io/rebuilds/">
 <meta property="og:image" content="https://shoito.github.io/rebuilds/docs/primer/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="有名な SaaS を、AI エージェントが作り直すならどう設計するか。21 のサービスを題材にした設計の記録と、図解つきの前提知識の資料。">
+<meta name="description" content="有名な SaaS を、AI エージェントが作り直すならどう設計するか。22 のサービスを題材にした設計の記録と、図解つきの前提知識の資料。">
 <link rel="icon" href="docs/primer/assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="docs/primer/assets/primer.css">
 <style>
@@ -72,7 +72,7 @@
   <header class="masthead">
   <h1>rebuilds</h1>
   <p class="tagline">有名な SaaS を、AI エージェントが作り直すなら、どう設計するか。</p>
-  <p class="lead">Slack・Stripe・GitHub など 21 のサービスを題材に、要件、設計の判断、データモデル、テスト、運用までを書いた設計の記録です。題材ごとに、設計を読む前に要る知識を図解でまとめた資料があり、1 本 20〜30 分で読めます。Web の開発の経験があれば、その分野を知らなくても読めるように書いています。</p>
+  <p class="lead">Slack・Stripe・GitHub など 22 のサービスを題材に、要件、設計の判断、データモデル、テスト、運用までを書いた設計の記録です。題材ごとに、設計を読む前に要る知識を図解でまとめた資料があり、1 本 20〜30 分で読めます。Web の開発の経験があれば、その分野を知らなくても読めるように書いています。</p>
   <div class="actions">
     <a class="btn primary" href="systems/slack/docs/primer/index.html">はじめての方：Slack の資料から読む</a>
     <a class="btn" href="#subjects">題材の一覧</a>
@@ -302,6 +302,16 @@
         <a href="https://github.com/shoito/rebuilds/tree/main/systems/airbnb/docs">設計の文書</a>
       </div>
     </div>
+    <div class="card">
+      <div class="genre">暗号資産の取引所</div>
+      <h3><a href="systems/coinbase/docs/primer/index.html">Coinbase</a></h3>
+      <p>板とマッチングエンジン、ホット・コールドのウォレットと鍵、台帳と分別管理、チェーンの確定とリオーグ、日本の法令</p>
+      <div class="links">
+        <a href="systems/coinbase/docs/primer/index.html">資料</a>
+        <a href="systems/coinbase/docs/primer/index.html?view=slides">スライド</a>
+        <a href="https://github.com/shoito/rebuilds/tree/main/systems/coinbase/docs">設計の文書</a>
+      </div>
+    </div>
   </div>
   </section>
 
@@ -330,7 +340,7 @@
 
   <details class="more">
   <summary><h2>AI エージェントから探す</h2></summary>
-  <p class="hint" style="margin:-.4em 0 14px">このリポジトリの問いは「AI エージェントを主な作り手にするなら、どう設計するか」です。21 題材の答えを <a href="docs/agents/index.html">AI エージェントから読む</a> にまとめ、各題材の資料の「この題材から学べること」にも「AI エージェント」のカードを置いています。</p>
+  <p class="hint" style="margin:-.4em 0 14px">このリポジトリの問いは「AI エージェントを主な作り手にするなら、どう設計するか」です。22 題材の答えを <a href="docs/agents/index.html">AI エージェントから読む</a> にまとめ、各題材の資料の「この題材から学べること」にも「AI エージェント」のカードを置いています。</p>
   <div class="grid roles">
     <div class="card"><div class="genre">契約の確定、お金、法令、本番の操作に加えて、テストの正解（期待値・閾値）を変えることを任せない</div><h3>任せないこと</h3><ul class="role-list"><li><a href="systems/workday/docs/primer/index.html#learn">Workday</a>：給与の期待値は社労士・税理士が確かめたもので、エージェントは書き換えない</li><li><a href="systems/stripe/docs/primer/index.html#learn">Stripe</a>：お金を動かす変更の承認と、影の実行の結果の判断は人が行う</li></ul></div>
     <div class="card"><div class="genre">もっともらしいが規則を 1 つ外したコードを、レビューの目でなく機械で落とす</div><h3>誤りを止める仕組み</h3><ul class="role-list"><li><a href="systems/airbnb/docs/primer/index.html#learn">Airbnb</a>：排他の制約を外すマイグレーションは、CI が DDL を解析して拒む</li><li><a href="systems/gmail/docs/primer/index.html#learn">Gmail</a>：メールの中身をログに渡すとコンパイルで落ちる型</li></ul></div>

@@ -19,7 +19,7 @@ const MD_PAGES = [
   {
     src: 'docs/agents.md',
     out: 'docs/agents/index.html',
-    description: '21 の題材が、AI エージェントを主な作り手にする問いにどう答えたかをまとめた索引。',
+    description: '22 の題材が、AI エージェントを主な作り手にする問いにどう答えたかをまとめた索引。',
   },
 ];
 const GLOSSARY_OUT = 'docs/glossary/index.html';
